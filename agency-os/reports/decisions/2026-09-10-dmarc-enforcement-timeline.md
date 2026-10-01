@@ -8,12 +8,20 @@
 
 **現在不升級。** 維持 `p=none` 至 **2026-09-28**（= p=none 起算 2026-08-29 滿 30 天），之後照下表機械分階段推進，不是一次跳到 reject：
 
-| 日期（含以後） | 條件 | 動作 |
-|---|---|---|
-| 2026-09-28 | rua 報表顯示三個已知寄件來源（Cloudflare Email Routing／Amazon SES／Resend）皆對齊，零未解釋失敗 | `p=quarantine; pct=25` |
-| +14 天 | 同上，pct=25 期間零未解釋失敗 | `pct=100` |
-| +14 天 | 同上，pct=100 期間零未解釋失敗 | `p=reject` |
-| 任一階段 | 出現未解釋的失敗（非測試信、非已知第三方） | **凍結在當前階段**，先查明原因，不得跳過原因逕自往下推進 |
+| 日期（含以後） | 條件 | 動作 | 狀態 |
+|---|---|---|---|
+| 2026-09-28 | rua 報表顯示三個已知寄件來源（Cloudflare Email Routing／Amazon SES／Resend）皆對齊，零未解釋失敗 | `p=quarantine; pct=25` | ✅ **2026-10-01 已執行**（見下方「執行紀錄」；9/28 排程提醒有準時觸發推播，實際報表查核延到 10/1 才做） |
+| 2026-10-15 | 同上，pct=25 期間零未解釋失敗 | `pct=100` | 待執行，尚未建排程提醒 |
+| +14 天（≈2026-10-29） | 同上，pct=100 期間零未解釋失敗 | `p=reject` | 待執行 |
+| 任一階段 | 出現未解釋的失敗（非測試信、非已知第三方） | **凍結在當前階段**，先查明原因，不得跳過原因逕自往下推進 | — |
+
+## 執行紀錄
+
+**2026-10-01｜階段 1 執行（p=none → p=quarantine;pct=25）**
+
+操作者手動下載 10 份 Google DMARC rua 報表（2026-09-08～2026-09-29），逐份解壓解析：DKIM 100% pass、SPF 100% pass、disposition 全 none，零失敗；來源 IP 全落在 AWS SES 固定區段，簽章組合穩定（Resend DKIM on root + SES DKIM + SPF via `send.aware-wave.com`）。樣本涵蓋 9/10 SPF 修補前後，確認無回歸。符合過關條件，執行升級：Cloudflare API PATCH `_dmarc.aware-wave.com`（record id `f28b0da709e0379d4921e99fc39b8c36`）→ `v=DMARC1; p=quarantine; pct=25; rua=mailto:peijingartstudio@gmail.com; fo=1`，CF API 直接 GET 覆查確認生效。完整證據鏈見 `agency-os/WORKLOG.md` 2026-10-01「DMARC 升第一階段」條目。
+
+**殘留**：只驗證了 Google 一家收信方；2026-10-15 複查時應同時確認是否有 Microsoft/Yahoo 等其他主要收信方的報表，不要只看 google.com 寄件者。9/28 一次性排程提醒已耗用，10/15 這一步需另開新 routine（或操作者手動記得）。
 
 ## 為什麼不是今天做
 

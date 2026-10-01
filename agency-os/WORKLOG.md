@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-01（續2）aware-wave.com DMARC 升第一階段：p=none → p=quarantine;pct=25（決策條件達成，執行）
+
+**觸發**：操作者「我沒看到你動」追問 2026-09-28 排程提醒後續——查 `RemoteTrigger list_runs`/`get_run_log` 證實排程準時觸發、已推播通知（`agency-os/TASKS.md:321` 同日已有紀錄），但沒人實際看過 rua 報表。本次互動 session 的 Gmail 連結器當場測試失效（`search_threads` 回 "connection invalidated"），改走操作者手動下載報表附件、逐一丟進對話的路徑。
+
+**報表分析**：操作者提供 10 份 Google DMARC 聚合報表 zip（`google.com!aware-wave.com!<epoch-begin>!<epoch-end>.zip`），橫跨 2026-09-08～2026-09-29（google.com 在低流量網域上只在有信當天才寄報表，非每日必有）。寫 `parse_reports.py` 逐份解壓+解析，結果：
+
+- 10 份報表、10 筆 `<record>`，**DKIM 100% pass、SPF 100% pass、disposition 全為 none，零失敗**
+- 來源 IP 全落在 AWS SES 固定區段 `54.240.9.x`/`54.240.10.x`，無來路不明 IP
+- 簽章組合穩定一致：DKIM `selector=resend, domain=aware-wave.com`（Resend 根網域簽章）+ DKIM `selector=224i4yxa5dv7c2xz3womw6peuasteono, domain=amazonses.com`（SES 中轉簽章）；SPF 對齊走 `domain=send.aware-wave.com`
+- 樣本涵蓋 9/10 SPF 修補（見 9/10 WORKLOG「aware-wave.com SPF/CAA 補齊」條目）前（9/8、9/9）與後（9/14 起）——兩側皆 pass，確認該次 SPF 修補未造成任何回歸，且 Resend 實際寄信路徑本來就經由 SES 中轉、SPF 對齊走 `send.aware-wave.com` 子網域，不依賴根網域那筆新增的 `include:_spf.resend.com`（根網域那筆是防禦 Resend 若改用根網域當 envelope sender 的另一條路徑，非本次驗證到的實際路徑）
+- 決策文件列的「Cloudflare Email Routing」未出現在任何報表——此為預期，它是收信轉發服務非寄信來源，DMARC 聚合報表本就不會替它產生紀錄，不是遺漏
+
+**結論**：符合 `reports/decisions/2026-09-10-dmarc-enforcement-timeline.md` 訂的第一階段過關條件（三週以上、零未解釋失敗），執行升級。
+
+**執行**：Cloudflare API `PATCH` `_dmarc.aware-wave.com` TXT 記錄（record id `f28b0da709e0379d4921e99fc39b8c36`）從 `v=DMARC1; p=none; rua=mailto:peijingartstudio@gmail.com; fo=1` 改為 `v=DMARC1; p=quarantine; pct=25; rua=mailto:peijingartstudio@gmail.com; fo=1`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=PowerShell 呼叫 CF API `PATCH /zones/f21b1919632fee2221647908a94fdcac/dns_records/f28b0da709e0379d4921e99fc39b8c36` | exit=0 | `success=True`，回應 `content` 確認為新值
+- REALTEST_EVIDENCE: tool=Bash | cmd=CF API 直接 `GET` 同一 record id 覆查（繞過任何快取）| exit=0 | `content=v=DMARC1; p=quarantine; pct=25; rua=mailto:peijingartstudio@gmail.com; fo=1`，與 PATCH 回應一致
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=`dns.google/resolve?name=_dmarc.aware-wave.com&type=TXT` | 結果=仍回舊值（TTL 291s 遞減中的快取），屬正常傳播延遲非失敗——CF API 直接讀取已是權威來源且已確認新值生效
+- REVIEW_WAIVED: NA -- 單筆 DNS TXT 記錄 PATCH，沿用上次（9/10）同一支流程與同一組憑證，無新邏輯/新程式碼；風險由本次 10 份報表零失敗的實證資料承擔，不是臆測
+- BUGHUNT_DONE: scope=agency-os | grep=`_dmarc.aware-wave.com\|p=none.*aware-wave\|dmarc-enforcement-timeline` | hits=`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`（本次同步更新執行紀錄）+ `TASKS.md:321`（本次同步更新）+ 9/10 WORKLOG 條目（歷史記錄，不回改）；無其他檔案引用舊 `p=none` 字面值
+- WORKLOG_DONE: 本條目
+
+[剩餘風險] ① 下一階段（`pct=100`）訂在 **2026-10-15**（= 今天 +14 天），需要重複本次同款報表檢查，目前沒有排程提醒（9/28 那個 routine 是一次性，已耗用）——待辦：比照 9/10 作法另開一個 2026-10-15 的一次性 routine，本條目先記錄，下一步再建；② 本次只驗證 Google 一家收信方的報表，若 Microsoft/Yahoo 等其他主要收信方從未回報，無法排除它們那邊的失敗情形——10/15 複查時應同時確認 Gmail 搜尋範圍沒有限制在單一寄件者。
+[rollback] Cloudflare API `PATCH` 同一 record id 回 `p=none; rua=mailto:peijingartstudio@gmail.com; fo=1`；DNS-only 變更，無 schema/DB/deploy 影響，可秒級回滾。
 ## 2026-10-01（續1）
 - Dirty tree cleared + pushed (4a8f16808 prune deletions + drop stray 81MB zip; 300fe838a generated stamps/LATEST/memory; .gitignore junk; d48515eaa 68 record files). Root cause: prune-reports.ps1 / doc-sync / collectors wrote tracked files nobody committed.
 - claude-oracle.ps1 failed exit 1 twice 2026-09-28 and again 2026-09-30/10-01. Root causes: (1) capture of whole dirty worktree (470KB) → no valid JSON; (2) opus prefixes prose before the JSON, script only stripped code fences. Fix: `-DiffRef/-Path` passthrough to capture AND review call (else a scoped review is labelled whole-repo = fail-open, write-oracle-artifact.ps1:331/342), writer splits comma-joined `-Path` (-File never builds arrays), answer JSON must END the answer and first parsing `{` slice wins (parse still decides validity → fails closed). scripts/claude-oracle.ps1, scripts/write-oracle-artifact.ps1.
