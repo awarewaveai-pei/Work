@@ -875,6 +875,8 @@
   - 後果：`.claude/commands/ao-close.md` 要求存檔涵蓋「上次 AO-RESUME → 本次 AO-CLOSE」，但依錨點算出的視窗是 6/12→今天，與實際工作區間對不上，**逼得每次收工都要手選「真實區間」繞過**（2026-08-24-2014.md 就是這樣寫的，敘述誠實但錨點沒修）。CONVERSATION_MEMORY 2026-07-02 已記過同一現象，**未修**。
   - **根因待查**：`ao-resume.ps1` 只在「寫出真實 AO-RESUME 存檔」時推進 stamp，而 hook 自動觸發那輪印的是 `AO-RESUME stamp NOT advanced (auto-refresh / non-interactive)`代理事後補寫存檔時沒有回頭推進錨點。
   - **完成定義**：確認推進條件、補上代理寫完 archive 後推進 stamp 的路徑（或改由 `verify-aoresume-archive.ps1` 帶動），並讓 AO-CLOSE 視窗不再需要人工手選。（2026-08-25 Codex round-5 覆審抓到，經讀三個錨點檔實測確認）
+  - 同類（2026-10-01）：`ao-close-prev/last` 也只在成功收工時推進，git-log-injector 已改為窗 >3d 退 `-10` 並封頂（WORKLOG 2026-10-01 續5）。
+- [ ] **【2026-10-01 開出】git-log-injector 描述過期：仍寫「上一完整 session（全部）commits」** — 實際行為見 WORKLOG 2026-10-01 續5（窗 >3d 退 `-10`、20 行封頂）。待改：`agency-os/AGENTS.md:23`、`agency-os/docs/operations/AGENTS_APPENDIX.md:122,155,581,699`、`agency-os/docs/operations/TOOL_TRIGGER_MAP.md:377`、`mcp/claude-userlevel/hooks/README.md:61`、`README.zh-TW.md:61`。當日皆被他 session 認領／未 commit，等其 commit 後改；另 live hooks 的 settings.json 與 template 漂移（`model` 等 key）待操作者決定是否 `sync-claude-userlevel.ps1 -Mode merge`。
 
 - [x] **【2026-08-24 開出｜已關閉 2026-09-30｜舊 Cursor 規劃】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN** — 原 7 對 WARN 全部指向已退場的 `.cursor/` / `Cursor  Rules for AI` 資產；現行 workflow 已收斂至 `CLAUDE.md` + `agency-os/AGENTS.md`。已在 `scripts/check-change-impact-matrix-drift.ps1` 加入明確 retired-path 排除，保留歷史 matrix rows，並在 report `Skipped` 區記錄每筆排除，避免月度巡檢追蹤已不用的 IDE 鏡像。
   - **證據**：`docs/operations/cursor-enterprise-rules-index.md:3-4` 明確標示 Cursor 退場；`reports/governance/impact-matrix-drift-LATEST.md:12-18` 的原 WARN 全為退場資產；不刪歷史文件、不修改現行 Claude/Codex SSOT。

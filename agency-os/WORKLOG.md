@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-01（續5）git-log-injector 首次 Edit 注入 1389 行：AO-CLOSE 錨點窗＝兩次成功收工，不是一個 session
+- [症狀] 本 session 首次 Write 被 BLOCK，注入 `ao-close-prev→last`＝`2026-08-24T12:14Z→2026-09-29T17:42Z` 共 1389 行 commit（~160KB）。
+- [根因] 寫入端沒停擺：兩檔 mtime 同為 `2026-09-30 01:42:23.5576`，prev 確實在 09-29 那次收工被推進一次。真因是設計假設錯：`scripts/ao-close.ps1:1507-1512`（舊註解）宣稱 `[prev→last]`＝「上一個完整 work session」且「prev<last 恆成立、不需日期守衛」；實際 stamp 只在 ao-close.ps1 跑到結尾才寫（之前 25 個 `exit` 路徑都不寫），08-24→09-29 之間零次成功收工（`agency-os/reports/ao-close/` 只有 `2026-08-24-2014.md`、`2026-09-30-0142.md`；09-04 commit `aff7fa1c4` 明寫 "minimal close-out without ao-close.ps1"）。消費端 `git-log-injector.js:30-37`（舊）只驗 ISO 格式，窗多寬都照印、無上限。另 `scripts/import-cross-machine-memory.ps1:635-690` 只匯入 last 不動 prev（Codex F1），同類。
+- [改] `mcp/claude-userlevel/hooks/rules/git-log-injector.js`：`windowProblem()` — prev<last、last 不在未來（5 分鐘容差）、跨度 ≤3d、last 距今 ≤3d，否則 `-10` 並在標題寫原因；所有路徑輸出經既有 `shared.capStderr`（20 行）＋`… +N more — full list: <cmd>`；標題改「between the last two AO-CLOSEs」不再宣稱是 session。`scripts/ao-close.ps1` 只改註解：stamp 是真實事實（兩次成功收工時間），寫入邏輯不動 —— 在寫入端夾 prev 會捏造一個不存在的 session 起點，且同一條 3d 規則會有兩份。
+- [決策] 不改寫入端邏輯、不讓 import 同步 prev（第二份同步拷貝）；有效性只由消費端一處判定。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh（含新增 5 測：寬窗→-10＋原因、舊窗→-10、35 commit 有效窗→20 行＋"+15 more"、小窗全列、windowProblem 邊界含本次實際錨點值→"span 36d > 3d"）| exit=0 | ms=52522（328/328）
+- MUTATION: scratch 複本經 `CLAUDE_HOOKS_RUNNER_HOME` 跑（不碰共享檔）：`problem = null` → 寬窗、舊窗 2 測紅；`capStderr` → `[logLines,0]` → cap 測紅；原碼全綠。
+- REVIEW_DONE: critic=Deep | verdict=warn→fixed | findings=0c/1m/0n（Codex `codex-oracle.ps1 -Mode review -Path` 3 檔，ms=510132，artifact `agency-os/reports/oracle/2026-10-01-partialreview-c741871c.md`；F1 cross-machine import 只動 last → 3d 內窗仍被稱為「last session」＝成立，grep `import-cross-machine-memory.ps1:635-690` 無 prev，修法＝標題照實改名＋測試改斷言）
+- ORACLE_WAIVED: Codex 審後唯一改動＝依 F1 改標題字串與註解（無邏輯變更），全套 328/328 重跑綠；adversarial-review 無法限定路徑（工作樹含他 session 進行中改動），改用 `codex-oracle.ps1 -Path`（同 Codex 額度）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,runbooks,lobster-factory,.claude/{commands,agents,skills} | grep=ao-close-prev|git-log-injector | hits=90（.claude 0；過期主張「上一完整 session（全部）commits」在 `agency-os/AGENTS.md:23`、`agency-os/docs/operations/AGENTS_APPENDIX.md:122,155,581,699`、`agency-os/docs/operations/TOOL_TRIGGER_MAP.md:377`、`mcp/claude-userlevel/hooks/README.md:61`、`README.zh-TW.md:61` —— 全在他 session 認領／未 commit 中（file-claim-guard BLOCK TOOL_TRIGGER_MAP），開 TASKS 待該 session commit 後補；其餘為歷史 WORKLOG／archive，不回改）
+- [部署] live `~/.claude/hooks` 是複本：`sync-claude-userlevel.ps1 -Mode dry-run` 顯示 hooks 僅 3 檔待更新，但 `-Mode merge` 會連帶寫入 settings.json 既有漂移（template 有 `model` 等 key，不屬本任務）→ 只把 repo 的 `rules/git-log-injector.js` 原樣複製進 `~/.claude/hooks/rules/`（live `lib/shared.js` 與 repo 逐位元相同，舊檔備份於 session scratchpad）；settings 漂移留給操作者。
+- 回滾：`git revert <本 commit>` 後重新複製該檔到 `~/.claude/hooks/rules/`。
 ## 2026-10-01（續4）模型路由提醒機制＋AGENTS.md／CLAUDE.md 第四次瘦身
 
 - 根因：計畫已寫模型分工（`RESEARCH_LINES_MASTER_PLAN.md` §12.1 規則 9），但沒有任何機制在該換模型時通知操作者；session 不能改自己的模型，只能操作者在選單切 → 規則形同不存在。操作者原話：「所有的計畫都是 claude 做的，我根本不知道什麼時候可以用哪個模型」。

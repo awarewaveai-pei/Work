@@ -166,6 +166,72 @@ test('parity: git-log-injector blocks first Write/Edit in repo cwd, re-issue pas
   assert.equal(second.status, 0);
 });
 
+// 2026-10-01: ao-close-prev/last = 08-24 -> 09-29 (the last two successful
+// ao-close.ps1 runs) injected 1389 log lines. Pins: a wide or stale close
+// window falls back to -10, and every listing is capped by shared.capStderr.
+function gliRepo({ commitsAgoMin = [], prev, last }) {
+  const repo = makeGitRepo({ branch: 'main' });
+  for (const ago of commitsAgoMin) {
+    const date = new Date(Date.now() - ago * 60000).toISOString();
+    spawnSync('git', ['commit', '-q', '--allow-empty', '-m', `c-${ago}m`], {
+      cwd: repo, env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+    });
+  }
+  const st = path.join(repo, 'agency-os', '.agency-state');
+  fs.mkdirSync(st, { recursive: true });
+  fs.writeFileSync(path.join(st, 'ao-close-prev.txt'), prev + '\n');
+  fs.writeFileSync(path.join(st, 'ao-close-last.txt'), last + '\n');
+  return repo;
+}
+const isoAgo = (min) => new Date(Date.now() - min * 60000).toISOString();
+function gliFirstEdit(repo) {
+  const r = run('PreToolUse', { session_id: freshSid('gli'), tool_name: 'Edit', tool_input: { file_path: path.join(repo, 'seed.txt') } }, { cwd: repo });
+  assert.equal(r.status, 2);
+  return { stderr: r.stderr, logLines: r.stderr.split('\n').filter((l) => /^\[Hook\] {3}[0-9a-f]{7,} /.test(l)) };
+}
+
+test('git-log-injector: a close window spanning weeks is not a session -> last 10, reason shown', () => {
+  const ago = Array.from({ length: 40 }, (_, i) => 60 * 24 * 20 - i * 60); // 40 commits inside the window
+  const repo = gliRepo({ commitsAgoMin: ago, prev: isoAgo(60 * 24 * 36), last: isoAgo(60 * 2) });
+  const { stderr, logLines } = gliFirstEdit(repo);
+  assert.match(stderr, /last 10 commits; close window unusable: span 36d > 3d/);
+  assert.equal(logLines.length, 10);
+  assert.doesNotMatch(stderr, /more — full list/);
+});
+
+test('git-log-injector: a short window whose last close is days old is stale -> last 10', () => {
+  const repo = gliRepo({ commitsAgoMin: [60 * 24 * 9], prev: isoAgo(60 * 24 * 10), last: isoAgo(60 * 24 * 8) });
+  const { stderr } = gliFirstEdit(repo);
+  assert.match(stderr, /close window unusable: last close 8d old > 3d/);
+});
+
+test('git-log-injector: a valid window is listed and capped at STDERR_MAX_LINES with a "+N more" tail', async () => {
+  const { STDERR_MAX_LINES } = (await import('../../mcp/claude-userlevel/hooks/lib/shared.js')).default;
+  const n = STDERR_MAX_LINES + 15;
+  const repo = gliRepo({ commitsAgoMin: Array.from({ length: n }, (_, i) => 300 - i), prev: isoAgo(400), last: isoAgo(100) });
+  const { stderr, logLines } = gliFirstEdit(repo);
+  assert.match(stderr, /GIT LOG \(between the last two AO-CLOSEs /);
+  assert.equal(logLines.length, STDERR_MAX_LINES);
+  assert.match(stderr, new RegExp(`… \\+15 more — full list: git log --oneline --since="`));
+});
+
+test('git-log-injector: a small valid window is listed whole, no tail', () => {
+  const repo = gliRepo({ commitsAgoMin: [300, 200], prev: isoAgo(400), last: isoAgo(100) });
+  const { stderr, logLines } = gliFirstEdit(repo);
+  assert.equal(logLines.length, 2);
+  assert.doesNotMatch(stderr, /more — full list/);
+});
+
+test('git-log-injector windowProblem: ordering, future and non-ISO anchors are rejected', async () => {
+  const { windowProblem } = (await import('../../mcp/claude-userlevel/hooks/rules/git-log-injector.js')).default;
+  const now = Date.parse('2026-10-01T12:00:00Z');
+  assert.equal(windowProblem('2026-10-01T08:00:00Z', '2026-10-01T10:00:00Z', now), null);
+  assert.equal(windowProblem('2026-10-01T10:00:00Z', '2026-10-01T08:00:00Z', now), 'prev >= last');
+  assert.equal(windowProblem('2026-10-01T10:00:00Z', '2026-10-01T13:00:00Z', now), 'last close in the future');
+  assert.equal(windowProblem('yesterday', '2026-10-01T10:00:00Z', now), 'anchor not ISO-8601');
+  assert.equal(windowProblem('2026-08-24T12:14:06.0339803Z', '2026-09-29T17:42:23.5566363Z', now), 'span 36d > 3d');
+});
+
 test('parity: auto-repair path blocks once per category (non-repo cwd isolates the rule)', () => {
   const sid = freshSid('parg');
   const tmp = makeTmpHome();
