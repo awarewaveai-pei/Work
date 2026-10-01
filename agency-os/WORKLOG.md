@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-01（續15）Cognitive OS 部署 b51095cbf（字級 U22 ＋ 73b9ac8f8 之後累積的 6 個後端提交）
+- [操作者] 「部署」；告知部署會一併帶上 73b9ac8f8..b51095cbf 的報告 API／Markdown 匯出（53dc77535）、route.method（2d6ddbbda）、WorkflowInterpretation（2dd6c6aab）、引用完整性（b024d6474）、報告核准修正（ee1729223，「核准限角色」仍待操作者決定，TASKS）與新表 `project_reports` 後，選「全部一起上（照標準流程）」。
+- [試跑] `scripts/dev/cos_predeploy_trial.sh b51095cbf`：3 庫 SQLite backup API 備份 integrity ok；副本上新程式開庫：既有表列數全不變、新增 `project_reports`、8 專案 18 來源讀回、6 次分析狀態一致、/health 200、/catalog 284 工具 → TRIAL PASS。
+- [部署] `/opt/cognitive-os` ff 73b9ac8f8→b51095cbf；`deploy.sh`：測試關卡 349 個受影響模組＋golden＋eval PASS（13:15→約 14:25 UTC，主機負載 8–10，單核序列跑），api／web 重建 healthy，本機 /health、/login 與公開 /api/health smoke PASS；`.green-sha`=b51095cbf。
+- [線上] `live_check.sh` 14 頁全對、無 cookie 307、無 session 401；公開 CSS 含 `--fs-body:16px`、`--muted:#6f6757`、`--measure:80em`、`max-width:1360px`；`cos_live_counts.sh` 3 庫 integrity ok、列數同部署前（project_reports 為空表）；`prod_interpret_check.py` 冰山真實分析 81 s、5 gates PASS（前兩次嘗試被 DETAIL_INTEGRITY／citation_integrity 擋回重試，屬既有閘的正常行為）。備份資料夾依流程刪除。
+- [操作者問] 「只改 CSS 要跑全套？」：不用。測試挑選以上次部署的 SHA 為基準；這次 349 個是因為後端 `main.py` +225 行（幾乎所有測試都載入它）。只有這次的 CSS 提交時，在主機乾淨 checkout 上 `affected_tests.py --base b51095cbf~1` = 30 個模組（讀 mock 檔或 check-mocks 的測試）。
+- [發現] 主機 `/opt/cognitive-os` 的 `git remote` URL 內嵌 GitHub token（明文）；未動，交操作者決定是否輪換並改用 credential helper。
+- REALTEST_EVIDENCE: tool=SSH | cmd=cos_predeploy_trial.sh b51095cbf ＋ deploy.sh ＋ live_check.sh ＋ cos_live_counts.sh ＋ prod_interpret_check.py | exit=0 | ms=4500000
+- REVIEW_WAIVED: NA -- 部署本身無程式改動；程式審查見同日 字級 U22 條（Codex 7 輪）
+- BUGHUNT_WAIVED: NA -- 部署操作，無程式改動
 ## 2026-10-01（續14）Cognitive OS 字級與行寬（U22）：六個字級 token、段落最寬 80 字、灰字過 AA，檢查器守住
 - TRIGGER: 操作者討論 cognitive.aware-wave.com 設計優化，採用外部建議（正文 16、H3 18/600、H2 20、H1 28、次要 14、要讀的字不低於 14、固定級距），裁定「桌機段落 80 字、版面盡量寬（720px 太小）、手機 25 字」，「直接執行」。
 - ROOT_CAUSE: `design-system.css` 顏色早已 token 化並由 `check-mocks.py` 守，字級沒有：12 種散寫字面值（11–22px，12–14px 佔 59 處），標題與內文拉不開；「怎麼讀」12.5px、副標 13px 是要讀的字卻低於 14；內容欄 1000px 下段落一行約 57–73 字無上限；`--muted #7a7261` 在 bg／soft／tag 上 4.0–4.3:1（< WCAG AA 4.5）。檢查器沒有任何字級規則，再加一個 12.75px 也是綠的。
