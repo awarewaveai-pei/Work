@@ -41,6 +41,17 @@ methods:
     dimensions.status: 這一面向目前
     dimensions.gap_note: 還缺什麼資訊（選填）
 
+  art_therapy.personal_swot:
+    subject: {label: 我在想的事, hint: 例：要不要回學校、要不要換工作、我和家人的關係。}
+    factors: {label: 四個格子, hint: 優勢、劣勢是關於你自己；機會、威脅是你身邊的人事物。四種都至少要有一項。}
+    factors.category: 屬於哪一格
+    factors.statement: 這一項是什麼
+    factors.moment: {label: 一個真的發生過的時刻, hint: 什麼時候、發生了什麼，讓你知道這一項是真的。}
+    action: {label: 我要怎麼用, hint: 挑一個優勢去接住一個機會。}
+    action.strength_id: {label: 用哪一個優勢, hint: 填優勢那一格的編號，例：S1。}
+    action.opportunity_id: {label: 接住哪一個機會, hint: 填機會那一格的編號，例：O1。}
+    action.first_step: {label: 今天就能開始的第一步}
+
   art_therapy.life_timeline:
     subject: {label: 這條時間線的主題, hint: 例：我和創作的路、我的職涯、我和家人的關係。}
     now: {label: 今天（切開過去與未來的日期）, hint: 比這天早的是過去、同一天是現在、比這天晚的是未來，系統自動判斷。}

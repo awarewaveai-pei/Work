@@ -117,4 +117,4 @@
 | 根本原因分析 | 新增工作流：問題陳述（須標 validated）→ 魚骨圖 → 五個為什麼 ＋ 帕累托；後兩步吃魚骨本身的假設集 | `recipes/validated/root-cause-analysis-v1.recipe.yaml`；首頁掛在「這件事為什麼一直發生」 |
 | 風險矩陣 | `delivery.risk_register` 結果頁 ② 改畫 5×5 機率×衝擊格子圖，格子由紀錄數字直接算，不經 AI | COS `apps/cognitive-web/components/result/RiskMatrix.tsx` |
 | 時間線／反向時間軸 | 新建治療用方法，取代原對應的 `foresight.backcasting`（只能從未來倒推、沒有過去） | `art_therapy.life_timeline`（contract＋schema＋module＋slice＋test） |
-| 個人 SWOT | **未做，待操作者決定**：`strategy.swot` 每個因素必填地理範圍／時間／來源並要附證據庫（Atlas L1332，防空泛 SWOT），案主填自己會卡；只改說明會誤導 | 選項：新建 `art_therapy.personal_swot`，或維持現狀 |
+| 個人 SWOT | 操作者選新建案主版（2026-10-02）：四格各至少一項、每項寫一個真實時刻（取代 `strategy.swot` 每項必填的地理範圍／時間／來源（Atlas L1332）與知識庫輸入）、最後用一個優勢接一個機會並寫第一步 | `art_therapy.personal_swot`（contract＋schema＋module＋slice＋test） |

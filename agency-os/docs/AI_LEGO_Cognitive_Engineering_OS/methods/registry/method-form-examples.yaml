@@ -348,6 +348,31 @@ examples:
         source: EXTRINSIC
         weight: 3
     scenario: 分析「決定要不要離開現在的工作、去創業」這個行動背後的動機。
+  art_therapy.personal_swot:
+    input:
+      subject: 要不要回學校念藝術治療
+      factors:
+      - id: S1
+        category: STRENGTH
+        statement: 能讓人放心說話
+        moment: 上個月同事哭著來找我，聊完說輕鬆多了
+      - id: W1
+        category: WEAKNESS
+        statement: 寫長篇文字很慢
+        moment: 去年寫計畫書拖了三週
+      - id: O1
+        category: OPPORTUNITY
+        statement: 公司有在職進修補助
+        moment: 人資上週寄了申請公告
+      - id: T1
+        category: THREAT
+        statement: 家人擔心收入變少
+        moment: 中秋聚餐時爸爸問了兩次薪水
+      action:
+        strength_id: S1
+        opportunity_id: O1
+        first_step: 這週五前問人資補助的申請條件
+    scenario: 案主在想要不要回學校念藝術治療，先看清自己手上有什麼、外面有什麼。
   art_therapy.role_playing:
     input:
       reflections:

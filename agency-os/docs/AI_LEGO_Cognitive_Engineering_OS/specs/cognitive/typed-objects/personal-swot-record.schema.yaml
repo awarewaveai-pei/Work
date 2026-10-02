@@ -1,0 +1,62 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/personal-swot-record.schema.yaml"
+title: Personal SWOT Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `PersonalSwotRecord` -- output of `art_therapy.personal_swot` (個人 SWOT). The client's own strengths, weaknesses,
+  opportunities and threats, each grounded by one concrete moment, plus one action that uses a strength to take an
+  opportunity. Runtime invariants beyond this schema live in ai_lego/modules/art_therapy/personal_swot.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.personal_swot.contract.yaml"
+
+decided_by: "Operator directive 2026-10-02; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, subject, factors, action, provenance]
+properties:
+  id: { type: string, pattern: "^PSWOT-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.personal_swot" }
+  subject: { type: string, minLength: 1, description: "The decision or situation the client is looking at themself for." }
+  factors:
+    type: array
+    minItems: 4
+    maxItems: 40
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, category, statement, moment]
+      properties:
+        id: { type: string, minLength: 1 }
+        category: { type: string, enum: [STRENGTH, WEAKNESS, OPPORTUNITY, THREAT] }
+        statement: { type: string, minLength: 1 }
+        moment: { type: string, minLength: 1, description: "One concrete time this showed up -- the client's grounding in place of strategy.swot's evidence set." }
+  action:
+    type: object
+    additionalProperties: false
+    required: [strength_id, opportunity_id, first_step]
+    properties:
+      strength_id: { type: string, minLength: 1, description: "Must name a STRENGTH factor (runtime invariant)." }
+      opportunity_id: { type: string, minLength: 1, description: "Must name an OPPORTUNITY factor (runtime invariant)." }
+      first_step: { type: string, minLength: 1 }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Deciding whether to go back to school"
+    value:
+      id: "PSWOT-2026-10-02-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.personal_swot"
+      subject: "要不要回學校念藝術治療"
+      factors:
+        - { id: "S1", category: STRENGTH, statement: "能讓人放心說話", moment: "上個月同事哭著來找我，聊完說輕鬆多了" }
+        - { id: "W1", category: WEAKNESS, statement: "寫長篇文字很慢", moment: "去年寫計畫書拖了三週" }
+        - { id: "O1", category: OPPORTUNITY, statement: "公司有在職進修補助", moment: "人資上週寄了申請公告" }
+        - { id: "T1", category: THREAT, statement: "家人擔心收入變少", moment: "中秋聚餐時爸爸問了兩次薪水" }
+      action: { strength_id: "S1", opportunity_id: "O1", first_step: "這週五前問人資補助的申請條件" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }
