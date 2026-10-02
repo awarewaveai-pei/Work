@@ -134,10 +134,12 @@ main{display:grid;gap:32px;min-width:0}
 .case{padding:10px 18px;border-radius:12px;background:var(--accent);color:var(--card);font-size:var(--fs-body);line-height:1.7}
 .case b{font-size:var(--fs-small);font-weight:700;opacity:.8;margin-right:10px}
 .case small{display:block;font-size:var(--fs-small);opacity:.85}
-/* 一頁看懂：左邊整個流程一直在畫面上，右邊放選到的那一項。整頁不用捲。 */
+/* 一頁看懂：右邊整個流程一直在畫面上，左邊放選到的那一項。整頁不用捲。 */
 body[data-view="one"] .app{padding-block:16px 8px}
 #v-one{gap:14px;container-type:inline-size}
-.one{display:grid;grid-template-columns:minmax(0,372px) minmax(0,1fr);gap:20px;align-items:start}
+.one{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,372px);gap:20px;align-items:start}
+.one>.route{grid-column:2;grid-row:1}
+.one>#one-panels{grid-column:1;grid-row:1}
 .route{position:sticky;top:12px;display:grid;grid-template-columns:minmax(0,1fr) 124px;gap:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
 #one-steps{list-style:none;margin:0;padding:0;display:grid;position:relative}
 #one-steps::before{content:"";position:absolute;left:14px;top:14px;bottom:14px;border-left:2px solid var(--line)}
@@ -183,7 +185,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
 .dp-nav .next{background:var(--accent);color:var(--card)}
 .dp-left{font-size:var(--fs-small);color:var(--muted);border-top:1px dashed var(--line);padding-top:6px}
 @container (max-width:939px){
-  .one{grid-template-columns:minmax(0,318px) minmax(0,1fr);gap:14px}
+  .one{grid-template-columns:minmax(0,1fr) minmax(0,318px);gap:14px}
   .route{grid-template-columns:minmax(0,1fr) 104px;gap:8px;padding:10px}
   .rs{font-size:14px;gap:6px}
   .rs .bk{font-size:11px;padding:1px 6px}
@@ -196,15 +198,11 @@ body[data-view="one"] .app{padding-block:16px 8px}
 }
 @container (max-width:699px){
   .one{grid-template-columns:minmax(0,1fr)}
+  .one>.route,.one>#one-panels{grid-column:auto;grid-row:auto}
   .route{position:static}
   .dp{padding:12px 14px}
   .dp-h .dp-nav{margin-left:0;width:100%}
 }
-/* 其他頁：一次只展開一段 */
-.acc>h3{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px}
-.acc>h3::after{content:"＋";color:var(--muted);font-weight:400;flex:none}
-.acc.open>h3::after{content:"－"}
-.acc:not(.open)>:not(h3){display:none!important}
 .walk{display:grid;gap:0;max-width:760px}
 .act-w{font-size:var(--fs-small);font-weight:700;border-radius:999px;padding:5px 0;text-align:center}
 .act-w[data-a="you"]{background:var(--accent);color:var(--card)}
@@ -243,7 +241,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
 .two{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start;max-width:820px}
 @media (max-width:859px){.two{grid-template-columns:minmax(0,1fr)}}
 .phase{display:grid;gap:12px}
-.phase+.phase{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.phase+.phase{margin-top:24px;padding-top:24px;border-top:1px solid var(--line)}
 .phase h3{font-size:var(--fs-small);color:var(--accent);letter-spacing:.04em}
 .phase h3 small{font-weight:400;color:var(--muted);margin-left:8px;letter-spacing:0}
 .ev{display:grid;grid-template-columns:4.5em 14px minmax(0,1fr);gap:12px;align-items:start}
@@ -544,14 +542,14 @@ body[data-view="one"] .app{padding-block:16px 8px}
     <section class="view" id="v-record" hidden>
       <div class="stack"><h2>一個案子的紀錄長什麼樣</h2>
         <p class="sub">每個案子都有完整紀錄。這次的方法沒解決，就換方法再做；行動之後有短期觀察和長期觀察。最低標準是今天的冰山模型專案頁。下面的範例：第一輪走套件的 6 塊，回顧之後再加，走到最後 13 塊都用到。</p></div>
-      <div class="card stack">
-        <h3>範例：一個案子的紀錄，從開案到長期觀察</h3>
-        <p class="cap">分六段。一次看一段，點段名展開。</p>
-        <div id="timeline"></div>
+      <div class="two">
+        <div class="card" id="timeline"></div>
+        <div class="stack">
+          <div class="have"><h3>今天的專案頁已經有</h3><ul id="have"></ul></div>
+          <div class="lack"><h3>照最低標準，今天還缺</h3><ul id="lack"></ul></div>
+          <p class="cap">2026-10-02 登入正式站看過：冰山模型工具頁、「冰山模型 2026-09-29 09:13」專案頁、它的結果頁。</p>
+        </div>
       </div>
-      <div class="have"><h3>今天的專案頁已經有</h3><ul id="have"></ul></div>
-      <div class="lack"><h3>照最低標準，今天還缺</h3><ul id="lack"></ul>
-        <p class="cap">2026-10-02 登入正式站看過：冰山模型工具頁、「冰山模型 2026-09-29 09:13」專案頁、它的結果頁。</p></div>
     </section>
 
     <section class="view" id="v-contracts" hidden>
@@ -628,7 +626,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
     <section class="view" id="v-progress" hidden>
       <div class="stack"><h2>進度與順序</h2>
         <p class="sub">三欄各自獨立：現況是今天有沒有這塊的能力；合約是有沒有寫清楚；建置是有沒有照合約蓋。</p></div>
-      <div class="card stack"><h3>13 塊和全程生效的五樣：現況、合約、建置各到哪裡</h3><div class="mx" id="matrix"></div></div>
+      <div class="card"><div class="mx" id="matrix"></div></div>
       <div class="card stack">
         <h3>建置順序</h3>
         <div class="order" id="order"></div>
@@ -2074,7 +2072,7 @@ $("cover").innerHTML = [
 })();
 
 /* 一頁看懂：從 JOURNEY 畫，跟「走一趟」同一份資料。
-   左邊是整個流程，一直在畫面上：14 步，和從頭到尾都在的六樣。右邊只放選到的那一項。整頁不用捲。 */
+   右邊是整個流程，一直在畫面上：14 步、從頭到尾都在的六樣、出狀況時。左邊只放選到的那一項。整頁不用捲。 */
 (function(){
   const card = (c, label) => `<button class="bk" data-g="${GROUP[c]||0}" data-open="${c}" style="border:0;cursor:pointer">${label||c}</button>`;
   const ps = a => a.map(x=>`<p>${x}</p>`).join("");
@@ -2160,21 +2158,6 @@ ${nav(N+1+k)}</div>
   $("case-any").textContent = "任何時候都可以：" + CASE_ANYTIME.join("、") + "。";
   $("arch-open").innerHTML = ARCH_OPEN.map(x=>`<li><span class="m">？</span><span>${x}</span></li>`).join("");
 })();
-
-/* 一次只展開一段：一個容器裡，有標題（h3）的每一塊是一段。內容和順序都沒變，只是不一次全攤開。 */
-function oneAtATime(box){
-  const secs = [...box.children].filter(el => [...el.children].some(c => c.tagName === "H3"));
-  if (secs.length < 2) return;
-  secs.forEach((el,k) => {
-    el.classList.add("acc"); if (k === 0) el.classList.add("open");
-    const h = [...el.children].find(c => c.tagName === "H3");
-    h.setAttribute("role","button"); h.tabIndex = 0;
-    const toggle = () => { const was = el.classList.contains("open"); secs.forEach(x => x.classList.remove("open")); if (!was) el.classList.add("open"); };
-    h.addEventListener("click", toggle);
-    h.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
-  });
-}
-document.querySelectorAll(".view:not(#v-one), .view>.two, #timeline").forEach(oneAtATime);
 
 /* 切換畫面；網址 #map #flow #record #contracts #tools #progress #decided 可直接連到那一頁 */
 const VIEWS = ["one","north","map","arch","flow","record","contracts","tools","progress","decided"];

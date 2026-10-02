@@ -48,17 +48,14 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
   const views = await page.evaluate(() => VIEWS);
 
   for (const v of views) {
-    // Real state first: what the operator sees on opening the view, and how tall it is.
-    const tall = await page.evaluate((name) => { window.show(name, true); scrollTo(0, 0); return document.documentElement.scrollHeight; }, v);
+    // Real state first: what the operator sees on opening the view. (The one-page view has its own rule below:
+    // all of it fits one laptop screen. The other views stay fully open -- she never asked to fold them.)
+    await page.evaluate((name) => { window.show(name, true); scrollTo(0, 0); }, v);
     await page.screenshot({ path: path.join(out, `${label}-${v}.png`), fullPage: true });
-    // A view must not be a long scroll: every other view opens with at most one section expanded.
-    // The one-page view is held to more, below: all of it fits one laptop screen.
-    if (label === 'wide' && v !== 'one') rule(label, `${v}.too_long`, tall > 3200 ? tall + 'px' : '');
     const m = await page.evaluate((name) => {
       const el = document.getElementById('v-' + name);
       // Then open everything so the text checks and the dump cover the whole view.
       el.querySelectorAll('[data-panel]').forEach((d) => { d.hidden = false; });
-      el.querySelectorAll('.acc').forEach((d) => d.classList.add('open'));
       el.querySelectorAll('details').forEach((d) => { d.open = true; });
       const text = el.innerText;
       const latin = (c) => new RegExp('(^|[^A-Z])' + c + '([^A-Z]|$)').test(text);

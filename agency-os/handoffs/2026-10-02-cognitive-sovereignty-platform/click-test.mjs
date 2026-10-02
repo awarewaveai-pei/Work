@@ -1,4 +1,4 @@
-// Real interaction test of the one-page view (whole route on the left, the picked item beside it) and the one-section-at-a-time pages.
+// Real interaction test of the one-page view (whole route on the right, the picked item beside it); the other views just render.
 // Run check-supervisor.mjs first (it writes supervisor-wrapped.html into its --out folder), then:
 //   node click-test.mjs [<that out folder>] [<repo root>]     defaults: <os temp>/supervisor-check, three levels up
 // Screenshots (st-*.png) go to the same folder. Exit 1 when a step fails.
@@ -49,19 +49,10 @@ checks.push(['the five and the arrow keys', a1 === 'always:1' && a2 === 'always:
 const tallest = Math.max(...await p.evaluate(() => [...document.querySelectorAll('#one-route [data-k]')].map((x) => { x.click(); return document.documentElement.scrollHeight; })));
 out.push(`tallest page over all items=${tallest} screen=660`);
 checks.push(['no item makes the page scroll at 1280x660', tallest <= 660]);
-// other views: default heights, and the accordion closes the previous section
+// other views: they open fully (nothing folded); just make sure each one renders
 const views = await p.evaluate(() => VIEWS);
-for (const v of views) {
-  const h = await p.evaluate((name) => { window.show(name, true); return document.documentElement.scrollHeight; }, v);
-  const open = await p.evaluate((name) => [...document.querySelectorAll(`#v-${name} > .acc`)].map((e) => e.classList.contains('open') ? 1 : 0).join(''), v);
-  out.push(`${v}: default height=${h} sections(open=1)=${open}`);
-}
-await p.evaluate(() => window.show('arch', true));
-await p.click('#v-arch > .acc:nth-of-type(3) > h3');
-const arch = await p.evaluate(() => [...document.querySelectorAll('#v-arch > .acc')].map((e) => e.classList.contains('open') ? 1 : 0).join(''));
-out.push('arch after clicking 2nd section: ' + arch);
-checks.push(['accordion opens one section at a time', arch.split('1').length === 2]);
-await p.screenshot({ path: path.join(dir, 'st-arch.png') });
+for (const v of views) out.push(`${v}: height=${await p.evaluate((name) => { window.show(name, true); return document.documentElement.scrollHeight; }, v)}`);
+checks.push(['nothing folded on the other views', await p.evaluate(() => document.querySelectorAll('.acc').length === 0)]);
 out.push('page errors=' + errs.length + ' ' + errs.join(' | '));
 checks.push(['no page errors', errs.length === 0]);
 console.log(out.join('\n'));
