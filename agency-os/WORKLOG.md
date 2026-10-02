@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-02（續5）Cognitive OS 個人 SWOT 案主版 `art_therapy.personal_swot`；PR #28 已合併
+- [操作者] 「合併」→ PR #28 合併（`dcc17c7`）；「個人 SWOT 要新建一個案主專用版」。
+- [新方法] contract＋`personal-swot-record.schema.yaml`＋`modules/art_therapy/personal_swot.py`＋slice＋test＋4 份登記檔；首頁工具數 285→286。不變量：四格各 ≥1；每項必填一個真實 `moment`；`action` 的 strength_id 必須是 STRENGTH、opportunity_id 必須是 OPPORTUNITY，並有 first_step。gate 由原始紀錄重算。
+- [更正] 續4 與先前對話稱 `strategy.swot`「每項要附證據庫」不正確：實際是每項必填 geography/time/source（Atlas L1332）＋整體輸入 KnowledgeSet（`strategy.swot.contract.yaml:46`）；只有標 EVIDENCE 的因素要附 evidence refs（`swot.py:132`）。新檔文字已照實寫。
+- [突變] 拔四格完整檢查／拔 strength_id 類別檢查 → 指名測試變紅，還原綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/affected_tests.py --run`（93 模組）＋`pytest tests/unit/test_personal_swot.py`＋`run_golden_tests.py`＋`check-mocks.py` | exit=0 | ms=1502000
+- [結果] affected 3300 tests OK；新測試 7 passed／27 subtests；golden 4273 PASSED；check-mocks 全綠；CLI slice PASS。
+- REVIEW_DONE: critic=Quick | verdict=warn→fixed | findings=0c/0m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evidence set|證據庫|personal_swot` | hits=0 stale（新檔已改；續4 為已出貨歷史，於本條更正）
+- ORACLE_WAIVED: container 無 codex／pwsh → 獨立 critic（Quick）＋2 個突變證據
+- rollback：revert 本 commit；純新增方法，未改其他方法行為。
 ### （續5）CI `perplexity-search-only` 紅：紀錄檔引文被當成呼叫點
 
 - 症狀：main 自 2026-10-02 起每次 push／PR 的 `perplexity-search-only` 皆紅（最近 10 次 run 全 failure；PR #29 雲端 session 留言指出同一點）。訊息 `agency-os/reports/agent-dispatch/dispatch-20260918.jsonl: names api.perplexity.ai outside the guarded exits`。

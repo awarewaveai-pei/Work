@@ -6472,6 +6472,13 @@ tier_1:
     mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md), Timeline / Reverse Timeline row; GROUNDED ORIGINAL DESIGN, operator directive 2026-10-02 (treatment version; foresight.backcasting and representation.timeline_view only partly covered it)"
     source: "methods/contracts/art_therapy.life_timeline.contract.yaml + specs/cognitive/typed-objects/life-timeline-record.schema.yaml + ai_lego/modules/art_therapy/life_timeline.py + ai_lego/apps/cli/run_life_timeline_slice.py"
     note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-10-02)."
+  twohundredeightyfourth_concrete_entry:
+    method_id: "art_therapy.personal_swot"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md), Personal SWOT row; GROUNDED ORIGINAL DESIGN, operator directive 2026-10-02 (client version; strategy.swot needs geography/time/source per factor + a KnowledgeSet input)"
+    source: "methods/contracts/art_therapy.personal_swot.contract.yaml + specs/cognitive/typed-objects/personal-swot-record.schema.yaml + ai_lego/modules/art_therapy/personal_swot.py + ai_lego/apps/cli/run_personal_swot_slice.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-10-02)."
 
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only

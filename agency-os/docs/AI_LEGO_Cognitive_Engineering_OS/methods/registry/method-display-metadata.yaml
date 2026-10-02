@@ -171,6 +171,15 @@ entries:
     why_en: "At least one thing pulling you forward and one holding you back. A list with only one polarity shows no tension, and without tension there is no matrix. The quadrant counts and the net pull are computed from the entries you wrote, so the same content always yields the same reading."
     why_zh: "至少要各有一項「推動」和一項「阻礙」：只有單邊的清單看不出張力，也就不成矩陣。四個象限的統計和淨推力都是當場從你填的項目算出來的，同一份內容永遠算出同一個結果。"
     url: "https://selfdeterminationtheory.org/theory/"
+  art_therapy.personal_swot:
+    name_en: "Personal SWOT"
+    abbr: "SWOT"
+    name_zh: "個人 SWOT"
+    blurb_en: "Looks at yourself through four boxes: your strengths, weaknesses, the opportunities and threats around you. Each one is tied to a real moment, and you pick one strength to use on one opportunity. Non-diagnostic."
+    blurb_zh: "從四個格子看自己：我的優勢、劣勢，身邊的機會、威脅。每一項都要寫一個真的發生過的時刻，最後挑一個優勢去接住一個機會。非診斷工具。"
+    why_en: "All four boxes must be filled, because looking only at strengths or only at worries hides half the picture. Each item names a real moment it showed up, so it stays a fact about you rather than a label. The exercise ends with one strength used on one opportunity and a first step, so seeing yourself turns into a move you can make."
+    why_zh: "四個格子都要填，只看優點或只看擔心，都會漏掉一半。每一項都要寫一個真的發生過的時刻，它才是關於你的事實，不是貼在自己身上的標籤。最後一定要挑一個優勢去接一個機會、寫出第一步，看清自己才會變成能做的一步。"
+    url: "https://en.wikipedia.org/wiki/SWOT_analysis"
   art_therapy.role_playing:
     name_en: "Role Playing"
     abbr: ""

@@ -222,6 +222,7 @@
 | `specs/cognitive/typed-objects/pasta-threat-model-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, assets, trust_boundaries, entry_points, stages, provenance] properties[9] |
 | `specs/cognitive/typed-objects/pdca-cycle-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, process_under_improvement, cycles, provenance] properties[6] |
 | `specs/cognitive/typed-objects/persona-profile.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, persona_name, goals, behaviors, context, research_basis, provenance] properties[9] |
+| `specs/cognitive/typed-objects/personal-swot-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, factors, action, provenance] properties[7] |
 | `specs/cognitive/typed-objects/pestel-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, factors] properties[4] |
 | `specs/cognitive/typed-objects/pilot-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, scope, success_criteria, stop_criteria, rollback_criteria, monitoring_metrics, provenance] properties[10] |
 | `specs/cognitive/typed-objects/porter-five-forces-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, forces, overall_attractiveness, provenance] properties[6] |

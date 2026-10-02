@@ -1,0 +1,57 @@
+$id: "ai-lego://methods/contracts/art_therapy.personal_swot.contract.yaml"
+title: "Personal SWOT Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.personal_swot (個人 SWOT). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md), Personal SWOT row, use "引導案主評估自我或
+  情境的優勢、劣勢、機會與威脅，以支持決策與自我理解". Operator chose a client version over strategy.swot (2026-10-02):
+  strategy.swot requires geography/time/source on every factor (Atlas L1332) and a KnowledgeSet input, which a client describing
+  themself cannot supply. Here each factor is grounded by one concrete moment it showed up instead. Not an EC §32 method.
+  Core invariant: all four quadrants present; the action pairs a real STRENGTH id with a real OPPORTUNITY id and names a
+  first step. Non-diagnostic: the client's own words only.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Personal SWOT row (operator-supplied use)"
+  - "specs/cognitive/typed-objects/personal-swot-record.schema.yaml"
+
+decided_by: "Operator directive 2026-10-02 (build a client-only personal SWOT); no ADR governs the content."
+
+id: art_therapy.personal_swot
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [MAP, EVALUATE]
+# INFERRED, not cited.
+
+purpose:
+  - map_ones_own_strengths_weaknesses_opportunities_threats_and_pair_one_strength_with_one_opportunity
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - PersonalSwotRecord
+
+preconditions:
+  - ">= 1 factor in each of STRENGTH / WEAKNESS / OPPORTUNITY / THREAT; each names a concrete moment; action pairs a STRENGTH with an OPPORTUNITY and a first step"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - framing.smart
+  - art_therapy.value_clarification
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-PSWOT-1: should the record allow a second action that uses a strength to guard against a threat (the TOWS ST pairing)?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'personal_swot'/'personal swot'/'個人 SWOT'/'PSWOT-' before writing -- zero prior implementation. Overlap disclosed: strategy.swot covers the same quadrants for strategy with evidence-labelled factors. Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_personal_swot.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."
