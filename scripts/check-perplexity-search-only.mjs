@@ -32,6 +32,8 @@ const LLM_PLUGIN_PROSE_ALLOWED = new Set(["scripts/ensure-agent-bootstrap-prompt
 const SKIP_EXT = /\.(png|jpe?g|gif|webp|ico|pdf|zip|lock|woff2?|ttf|mp4|mp3|wav)$/i;
 // Markdown is documentation, except where agents read it as instructions.
 const AGENT_MD = /^(\.claude|\.agents|\.codex)\/|(^|\/)SKILL\.md$/;
+// Append-only agent records quote reviews verbatim: data, never a call site. Scripts under these roots are still scanned.
+const RECORD_DATA = /^agency-os\/(reports|handoffs|memory)\/.+\.(jsonl|json|txt|log|csv)$/i;
 
 const HOST = /api\.perplexity\.ai/gi;
 const SDK_OR_GATEWAY = /@ai-sdk\/perplexity|@perplexity-ai\/|\bperplexityai\b|ChatPerplexity|createPerplexity|["']perplexity\/|PERPLEXITY_BASE_URL|server-perplexity|perplexity-ask|mcp\/perplexity|perplexity-mcp/i;
@@ -40,6 +42,7 @@ const KEY_READER = /(process\.env|\benv|environ|getenv|\$env:|GetEnvironmentVari
 export function skipped(file) {
   if (file === SELF || SKIP_EXT.test(file)) return true;
   if (/\.mdx?$/i.test(file) && !AGENT_MD.test(file)) return true;
+  if (RECORD_DATA.test(file)) return true;
   return false;
 }
 
@@ -115,6 +118,10 @@ function selfTest() {
     ["docs/notes.md", "https://api.perplexity.ai/chat/completions", 0],
     [CLI, 'Uri ("https://api.perplexity.ai" + $Path); GetEnvironmentVariable("PERPLEXITY_API_KEY", "User")', 0],
     ["scripts/ensure-agent-bootstrap-prompts.ps1", "the llm-perplexity plugin is intentionally not installed", 0],
+    ["agency-os/reports/agent-dispatch/d.jsonl", '{"result_snippet":"a literal `api.perplexity.ai` in a file"}', 0],
+    ["agency-os/reports/agent-dispatch/d.ps1", "Invoke-RestMethod https://api.perplexity.ai/chat/completions", 1],
+    ["agency-os/memory/x.mjs", "fetch('https://api.perplexity.ai/v1/agent')", 1],
+    ["agency-os/config/x.json", '{"url":"https://api.perplexity.ai/chat/completions"}', 1],
   ];
   let bad = 0;
   for (const [f, t, want] of cases) {

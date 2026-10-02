@@ -10,6 +10,7 @@ entries:
   art-therapy-creative-reflection-v1: {audience: user, goal: facilitate, name_zh: 創作反思, blurb_zh: 帶領者需要一個可追溯的創作提示：抽一個隨機刺激，再用心智圖把聯想攤開。}
   art-therapy-project-ideation-v1: {audience: user, goal: facilitate, name_zh: 專案發想, blurb_zh: 早期專案設計：先把目標講清楚，再發散，再整理。}
   art-therapy-unstick-v1: {audience: user, goal: facilitate, name_zh: 卡關解套, blurb_zh: 參與者答不出反思提問時，用非語言的路走一遍：隱喻、對話、重新框定、價值澄清。}
+  root-cause-analysis-v1: {audience: user, goal: why_repeat, name_zh: 根本原因分析, blurb_zh: 一再發生的問題，一次走完：問題講清楚 → 魚骨圖列出可能原因 → 五個為什麼挖到底 → 帕累托看哪幾個原因最大。}
   life-decision-v1: {audience: user, goal: decide, name_zh: 做一個決定, blurb_zh: 幾個選項選一個：先把問題講清楚，再看自己與外面，最後用你定的權重打分。}
   business-foundation-v1: {audience: user, goal: strategy, name_zh: 商業基礎盤點, blurb_zh: 早期企劃：把事實與策略假設分開標記，四站走完。}
   business-planning-strategy-v1: {audience: user, goal: strategy, name_zh: 商業策略框架, blurb_zh: 從問題陳述到商業模式圖的策略前段。}

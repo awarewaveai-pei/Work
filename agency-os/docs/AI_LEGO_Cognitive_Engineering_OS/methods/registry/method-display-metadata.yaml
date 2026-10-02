@@ -135,6 +135,15 @@ entries:
     why_en: "A segment tagged with a distortion (anything but NONE) MUST carry a revision that genuinely differs from the sentence (normalized) -- tagging a sentence as distorted without rewriting it leaves the client with only the label and no way out. A NONE segment must carry no revision at all, so the record can't quietly smuggle in an unrequested 'fix' for a sentence that wasn't actually flagged. The 7 pattern codes are David Burns' own classic cognitive-distortion taxonomy, not an invented list."
     why_zh: "一個被標記了扭曲類型（除了 NONE 以外任何一種）的句子，必須帶有一個（正規化後）真的跟原句不一樣的 revision——只貼標籤說這句話扭曲了、卻沒有改寫，只是把案主留在標籤裡，沒有給出路。一個 NONE 的句子絕對不能帶 revision——這樣才不會悄悄塞進一個沒人要求的「修正」，改動一句根本沒被標記有問題的話。這 7 種扭曲類型代碼是 David Burns 自己提出的經典認知扭曲分類，不是自創清單。"
     url: "https://en.wikipedia.org/wiki/Cognitive_distortion"
+  art_therapy.life_timeline:
+    name_en: "Life Timeline (Forward / Reverse)"
+    abbr: ""
+    name_zh: "生命時間線（正向／反向）"
+    blurb_en: "Places past, present and future life events on one dated line and walks it either from the oldest event forward or from the wished-for future back to today. Non-diagnostic."
+    blurb_zh: "把過去、現在、未來的生命事件放在同一條時間線上，可以從最早的事往後走，也可以從想要的未來倒著走回今天，建立過去－現在－未來的脈絡。非診斷工具。"
+    why_en: "One dated 'now' splits the line, and the system works out past / present / future from the dates rather than taking your label for it, so the line cannot quietly drift. It must reach both the past and the future, and every future event has to name one step you can start today -- a wished-for future with no first step stays a wish."
+    why_zh: "用一個「今天」的日期把線切開，過去／現在／未來由日期自動判斷，不靠你自己標，線就不會偷偷走樣。這條線一定要同時碰到過去和未來，而且每一件未來的事都要寫一個今天就能開始的小步——沒有第一步的未來，只會停在願望。"
+    url: "https://positivepsychology.com/narrative-therapy/"
   art_therapy.life_wheel:
     name_en: "Life Wheel"
     abbr: ""

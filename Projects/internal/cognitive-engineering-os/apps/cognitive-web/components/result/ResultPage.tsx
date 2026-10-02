@@ -12,7 +12,7 @@ import { formatTime } from "../../lib/time";
 import { RunHeader } from "../RunHeader";
 import { LeverageChart, LoopChart, TrendChart, type Loop, type TrendSeries } from "./Charts";
 import { HowTo } from "./HowTo";
-import { ICEBERG_LAYERS, MethodVisual, type Unit } from "./MethodVisual";
+import { ICEBERG_LAYERS, MethodVisual, recordPictureCaption, type Unit } from "./MethodVisual";
 
 // The result, card by card as docs/mockups/iceberg-result-mock.html (① conclusion … ⑨ citations, then the approve
 // card), filled only from what the interpretation returns (schema method-interpretation 1.2.0). A section the
@@ -391,8 +391,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       </div>
     </Card>
 
-    <Card id="2" title={iceberg ? "② 冰山圖：你的問題在四層各是什麼" : `② ${name}圖：${PICTURE[result.visual.kind] ?? "你的資料放在圖上的哪裡"}`} read={focusLayer ? "從上往下；★ 是建議先出手的層。" : "圖上每一個位置都對應你填的一段。"} act={layers.length ? `看你填的${NUMERAL[layers.length] ?? ""}段話有沒有放錯層。` : "看你填的內容有沒有放錯位置。"}>
-      <MethodVisual kind={result.visual.kind} bindings={result.visual.bindings} methodId={result.method_id} name={name} units={units} />
+    <Card id="2" title={iceberg ? "② 冰山圖：你的問題在四層各是什麼" : `② ${name}圖：${recordPictureCaption(result.method_id, record) ?? PICTURE[result.visual.kind] ?? "你的資料放在圖上的哪裡"}`} read={focusLayer ? "從上往下；★ 是建議先出手的層。" : "圖上每一個位置都對應你填的一段。"} act={layers.length ? `看你填的${NUMERAL[layers.length] ?? ""}段話有沒有放錯層。` : "看你填的內容有沒有放錯位置。"}>
+      <MethodVisual kind={result.visual.kind} bindings={result.visual.bindings} methodId={result.method_id} name={name} units={units} record={record} />
       {thickness.length > 0 && <div className="thick"><b>資料厚度</b>（你填了多少）：{thickness.map(([unit, value]) => `${layerNo(unit)} ${dots(value.own_statements ?? 0)}${thicknessOf(unit)?.note ? `（${thicknessOf(unit)!.note}）` : thinnest && thinnest[0] === unit && thickness.length > 1 ? `（最薄：只有 ${value.own_statements ?? 0} 句）` : ""}`).join("　")}。薄的層，結論的信心就低。</div>}
       {removedNote("units", "層的解讀")}
     </Card>

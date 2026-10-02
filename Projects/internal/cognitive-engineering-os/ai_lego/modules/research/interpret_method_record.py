@@ -15,7 +15,7 @@ import yaml
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.support import canonical_json
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform.ai_gateway.draft import extract_json_object
+from ai_lego.platform.ai_gateway.structured import ask_object, offers_schema, parse_object, tool_schema
 from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS, ProviderCallError
 from ai_lego.modules.research.gates import evaluate_citation_integrity
 
@@ -560,22 +560,9 @@ def conform_to_schema(interpretation: Mapping[str, Any], schema: Mapping[str, An
 
 
 def answer_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
-    """The contract as the answer's JSON Schema for the tool call (P-48): standard keywords only, the server's keys out.
+    """The contract as the answer's JSON Schema for the tool call (P-48; ``structured.tool_schema``), the server's keys out.
     Guidance for the model; conform_to_schema and the gates stay the authority."""
-    keep = {"type", "properties", "required", "items", "enum", "minLength", "maxLength", "minItems", "maxItems", "additionalProperties", "const"}
-    def clean(node: Any) -> Any:
-        if not isinstance(node, Mapping): return node
-        if "$ref" in node: return {"type": "object"}
-        out: dict[str, Any] = {}
-        for key, value in node.items():
-            if key not in keep: continue
-            if key == "properties": out[key] = {name: clean(child) for name, child in value.items()}
-            elif key == "items": out[key] = clean(value)
-            else: out[key] = copy.deepcopy(value)
-        return out
-    result = clean(schema)
-    for key in SERVER_KEYS: result.get("properties", {}).pop(key, None)
-    result["required"] = [key for key in result.get("required", []) if key not in SERVER_KEYS]
+    result = tool_schema(schema, drop=SERVER_KEYS)
     result.setdefault("properties", {})["visual"] = {"type": "object", "required": ["kind", "bindings"], "properties": {"kind": {"type": "string"}, "bindings": {"type": "object"}}}
     return result
 
@@ -918,12 +905,9 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
     kind = visual_kind(spec_root, method_id, contract)
     manifest = build_prompt_manifest(record, sources)
     contract_schema = load_interpretation_schema(spec_root)
-    via_tool = callable(getattr(provider, "complete_json", None))
-    system, user = build_interpretation_prompt(method_id, contract, display, record, manifest, kind, language=language, catalog_lines=catalog_lines, record_schema_text=record_schema_text, feedback=feedback, previous=previous, via_tool=via_tool, excluded_method_ids=excluded_method_ids)
+    system, user = build_interpretation_prompt(method_id, contract, display, record, manifest, kind, language=language, catalog_lines=catalog_lines, record_schema_text=record_schema_text, feedback=feedback, previous=previous, via_tool=offers_schema(provider), excluded_method_ids=excluded_method_ids)
     def complete(system: str, user: str) -> Any:   # API-parsed JSON with bounded thinking when the provider offers it; a fake's text otherwise
-        if via_tool:
-            return provider.complete_json(system, user, max_tokens=INTERPRET_MAX_TOKENS, effort=INTERPRET_EFFORT, input_schema=answer_schema(contract_schema))
-        return provider.complete(system, user, max_tokens=INTERPRET_MAX_TOKENS)
+        return ask_object(provider, system, user, max_tokens=INTERPRET_MAX_TOKENS, schema=answer_schema(contract_schema), effort=INTERPRET_EFFORT)
     total_input = total_output = 0
     previous_error = ""
     gates: list[dict[str, Any]] = []
@@ -984,7 +968,7 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
         total_output += completion.output_tokens
         attempts.append({"output_tokens": completion.output_tokens, "refused": None, "stop_reason": getattr(completion, "stop_reason", "")})
         try:
-            interpretation = extract_json_object(completion.text)
+            interpretation = parse_object(completion)
             supplied_visual = interpretation.get("visual") if isinstance(interpretation.get("visual"), Mapping) else {}
             interpretation.update({"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record), "visual": {**supplied_visual, "kind": kind}, "data_thickness": data_thickness_from_manifest(manifest), "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None}, "model": completion.model, "usage": {"input_tokens": completion.input_tokens, "output_tokens": completion.output_tokens}})
             for key in DETAIL_KEYS:   # "trend": null means omitted, not a malformed section

@@ -36,7 +36,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
-from ai_lego.errors import InvariantViolation
+from ai_lego.errors import InvariantViolation, SchemaValidationError
 from ai_lego.modules.research.gates import evaluate_citation_integrity, synthesis_reference_errors
 from ai_lego.modules.research.source_manifest import (
     build_source_manifest,
@@ -45,11 +45,26 @@ from ai_lego.modules.research.source_manifest import (
     render_source_block,
     resolve_citation_numbers,
 )
-from ai_lego.platform.ai_gateway.draft import extract_json_object
 from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS
+from ai_lego.platform.ai_gateway.structured import ask_object, map_property, parse_object, schema_lookup, tool_schema
 from ai_lego.platform.evolution.registry import load_champion
 
 EVOLUTION_KIND = "synthesis-prompts"
+# What the server writes into the stored object (run_synthesis's synthesis.update and subject copy), so never the model.
+SERVER_KEYS = ("synthesis_id", "project_id", "kind", "language", "manifest_ref", "provenance", "model", "usage", "uncited_sections", "subject")
+
+
+def answer_schema(schema_contracts: SchemaContracts, schema_id: str) -> dict[str, Any]:
+    """The kind's typed object as the model writes it: server keys out, every ``citations`` a list of manifest numbers
+    (P-K2: ``resolve_citation_numbers`` turns them into ids), literature ``studies[].source_id`` left to the server."""
+    contents, lookup = schema_lookup(schema_contracts, schema_id)
+    shape = tool_schema(contents, lookup=lookup, drop=SERVER_KEYS)
+    shape = map_property(shape, "citations", lambda prop: {**prop, "items": {"type": "integer", "minimum": 1}})
+    studies = shape.get("properties", {}).get("studies", {}).get("items")
+    if isinstance(studies, dict):
+        studies.get("properties", {}).pop("source_id", None)
+        studies["required"] = [key for key in studies.get("required", []) if key != "source_id"]
+    return shape
 
 
 def _flatten_sources(sources: list[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, str]]:
@@ -219,7 +234,7 @@ def run_synthesis(
         map_outputs: list[str] = []
         for batch in call_batches:
             user = fenced_prompt(batch, prefix=[])
-            try:
+            try:   # a map answer is reduce's free-text input, never an object of its own: the one plain call here
                 completion = provider.complete(system, user, max_tokens=MAX_OUTPUT_TOKENS)
             except InvariantViolation as error:
                 return {"artifact": None, "error": str(error), "model": provider.model, "input_tokens": total_input, "output_tokens": total_output}
@@ -235,17 +250,19 @@ def run_synthesis(
     else:
         base_user = fenced_prompt(call_batches[0], prefix=[])
 
+    shape = answer_schema(schema_contracts, schema_id)
     previous_error = ""
+    violations: list[str] = []
     for _attempt in range(2):
         user = base_user if not previous_error else base_user + "\n\nPrevious response was refused. Correct exactly this failure: " + previous_error
         try:
-            completion = provider.complete(system, user, max_tokens=MAX_OUTPUT_TOKENS)
+            completion = ask_object(provider, system, user, max_tokens=MAX_OUTPUT_TOKENS, schema=shape)
         except InvariantViolation as error:
-            return {"artifact": None, "error": str(error), "model": provider.model, "input_tokens": total_input, "output_tokens": total_output}
+            return {"artifact": None, "error": str(error), "model": provider.model, "input_tokens": total_input, "output_tokens": total_output, "violations": violations}
         total_input += completion.input_tokens
         total_output += completion.output_tokens
         try:
-            synthesis = resolve_citation_numbers(extract_json_object(completion.text), entries)
+            synthesis = resolve_citation_numbers(parse_object(completion), entries)
             synthesis.update({
                 "synthesis_id": synthesis_id,
                 "project_id": project_id,
@@ -274,7 +291,10 @@ def run_synthesis(
                 "model": completion.model,
                 "input_tokens": total_input,
                 "output_tokens": total_output,
+                "violations": [],
             }
         except (InvariantViolation, KeyError, TypeError) as error:
             previous_error = str(error)
-    return {"artifact": None, "error": f"SYNTHESIS_REJECTED_AFTER_REPAIR: {previous_error}", "model": provider.model, "input_tokens": total_input, "output_tokens": total_output}
+            # Where the last answer broke the schema, without its values: the one part of the reason the API may store.
+            violations = list(error.violations) if isinstance(error, SchemaValidationError) else []
+    return {"artifact": None, "error": f"SYNTHESIS_REJECTED_AFTER_REPAIR: {previous_error}", "model": provider.model, "input_tokens": total_input, "output_tokens": total_output, "violations": violations}

@@ -35,13 +35,32 @@ class SchemaContracts:
         self.registry = Registry().with_resources(resources)
         self.schema_count = len(resources)
 
-    def errors(self, reference: str, instance: Any) -> list[str]:
+    def _found(self, reference: str, instance: Any) -> list[Any]:
         validator = Draft202012Validator({"$ref": reference}, registry=self.registry)
-        found = sorted(validator.iter_errors(instance), key=lambda error: list(error.absolute_path))
-        return [f"{list(error.absolute_path)}: {error.message}" for error in found]
+        return sorted(validator.iter_errors(instance), key=lambda error: list(error.absolute_path))
+
+    def errors(self, reference: str, instance: Any) -> list[str]:
+        return [f"{list(error.absolute_path)}: {error.message}" for error in self._found(reference, instance)]
+
+    def violations(self, reference: str, instance: Any) -> list[str]:
+        """Where the instance breaks the schema, never its values: ``"sections[0].claims[2].citations minItems"``. A message
+        can quote a value (a fetched page, a person's name); a path and a keyword cannot, so this is what a failure stores."""
+        return [_violation(error) for error in self._found(reference, instance)]
 
     def validate(self, reference: str, instance: Any, label: str) -> None:
-        problems = self.errors(reference, instance)
-        if problems:
-            detail = "; ".join(problems[:4])
-            raise SchemaValidationError(f"SCHEMA_VALIDATION_FAILED: {label} against {reference}: {detail}")
+        found = self._found(reference, instance)
+        if found:
+            detail = "; ".join(f"{list(error.absolute_path)}: {error.message}" for error in found[:4])
+            raise SchemaValidationError(f"SCHEMA_VALIDATION_FAILED: {label} against {reference}: {detail}",
+                                        tuple(_violation(error) for error in found[:MAX_VIOLATIONS]))
+
+
+MAX_VIOLATIONS = 20
+_MAX_PATH_PART = 64
+
+
+def _violation(error: Any) -> str:
+    path = ""
+    for part in error.absolute_path:
+        path += f"[{part}]" if isinstance(part, int) else ("." if path else "") + str(part)[:_MAX_PATH_PART]
+    return f"{path or '$'} {error.validator}"

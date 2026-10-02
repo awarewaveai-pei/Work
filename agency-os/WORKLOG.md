@@ -1,4 +1,46 @@
 # Worklog
+### （續5）CI `perplexity-search-only` 紅：紀錄檔引文被當成呼叫點
+
+- 症狀：main 自 2026-10-02 起每次 push／PR 的 `perplexity-search-only` 皆紅（最近 10 次 run 全 failure；PR #29 雲端 session 留言指出同一點）。訊息 `agency-os/reports/agent-dispatch/dispatch-20260918.jsonl: names api.perplexity.ai outside the guarded exits`。
+- 根因：`d48515eaa`（2026-09-30 chore: commit accumulated record files）把 dispatch 紀錄進版控；第 31 行是 critic 報告引文，字面含主機名。`scripts/check-perplexity-search-only.mjs` `skipped()` 只豁免 `.md`（文件），未把「append-only 紀錄資料」視為同一類非呼叫點。
+- 不變量：閘擋的是**可能發出呼叫的檔案**。`agency-os/{reports,handoffs,memory}/` 下的 `.jsonl/.json/.txt/.log/.csv` 是紀錄資料，不執行、不被當設定載入；同根目錄下的腳本仍是潛在呼叫點，必須照掃。修法 = 新增 `RECORD_DATA` 跳過規則（關掉整類），不改寫歷史紀錄、不加單檔豁免。
+- 改動：`scripts/check-perplexity-search-only.mjs` +`RECORD_DATA` 常數與 `skipped()` 一行；self-test +4 例（紀錄 jsonl 引文放行；紀錄目錄 `.ps1`／`.mjs` 照擋；非紀錄根 `agency-os/config/*.json` 照擋）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/check-perplexity-search-only.mjs --self-test && node scripts/check-perplexity-search-only.mjs && node --test tests/hooks/settings-deny-parity.test.mjs` | exit=0 | ms=1500 | result=self-test 17 例 + UTF-16 + invariants ok；7368 tracked 檔 0 違規；deny parity 3/3
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 書面對抗自審：跳過範圍以根目錄 × 非可執行副檔名雙重收斂；突變 1 拔掉 `RECORD_DATA` 跳過 → 紀錄 jsonl 案例紅；突變 2 放寬為不限根且含 `.ps1/.mjs` → `requirements.txt`／CLI／紀錄 `.ps1` 三例紅；皆已還原轉綠
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,.github | grep=`check-perplexity-search-only|Markdown is documentation` | hits=9（workflow 3、WORKLOG 歷史 4、tool-expert.md 1、腳本自身 1；無一描述跳過規則，無需同步）；紀錄根下含主機名／SDK／key 字樣的非 md 檔僅 `dispatch-20260918.jsonl` 1 個
+- ORACLE_WAIVED: 7 行 CI 閘豁免規則，以突變證據＋對抗自審取代外部 oracle
+- 避免再發生：新增紀錄類目錄或副檔名時改 `RECORD_DATA`，並在 self-test 補「紀錄放行／腳本照擋」成對案例。
+- rollback：`git revert <本 commit>`（閘回到會擋紀錄檔的狀態，main 會重新變紅）。
+## 2026-10-02（續4）Cognitive OS 補藝術治療清單 3 個部分對應項：生命時間線新方法、風險矩陣格子圖、根本原因分析工作流；個人 SWOT 待操作者決定
+- [操作者] 對照 54 項藝術治療工具清單問「少哪些」→ 53 個 method_id 全在（本機 `/methods` 實測），4 項只部分對應 → 指示「做」前三項。
+- [新方法] `art_therapy.life_timeline`：contract＋`life-timeline-record.schema.yaml`＋`modules/art_therapy/life_timeline.py`＋slice＋test＋4 份登記檔。不變量：`phase` 由 `when` 對 `now` 算出、不收輸入；≥1 過去＋≥1 未來；順序依 `direction`（forward 非遞減／backward 非遞增）；只有未來事件帶 `first_step`。gate 由原始紀錄重算（`life_timeline.py:_line_problem stored=True`）。
+- [格子圖] `delivery.risk_register` 結果頁 ② 改畫 5×5 機率×衝擊圖（`apps/cognitive-web/components/result/RiskMatrix.tsx`），由紀錄數字直接算格，不經 AI；格子分區＝等級相乘 ≥15 紅／≥6 黃；圖下依曝險排序列表；畫不上的風險明說數量。更正：前端 `quadrant`／`matrix` 原本都不是真圖（`MethodVisual.tsx` 舊版只有冰山與分層是 SVG），先前「沿用 stakeholders matrix 圖」說法錯誤。
+- [工作流] `recipes/validated/root-cause-analysis-v1.recipe.yaml`：problem_statement(status 綁 source) → fishbone → five_whys ＋ pareto，後兩步吃 `outputs.fishbone`；首頁掛 `why_repeat`。Atlas 依據 L4472「想找根因」、L1258。
+- [未做] 個人 SWOT：`strategy.swot` factor 必填 geography/time/source＋證據庫（schema `swot-analysis.schema.yaml:152`，Atlas L1332），只改說明會誤導 → 寫進 `ART_THERAPY_METHOD_ATLAS_GAP_LIST.md` 新節，待操作者選「新建 art_therapy.personal_swot」或維持。
+- [critic] 1m/4n：M1 `life_timeline.py` 非 list `events` 拋 TypeError→API 500，已修＋2 個 refusal 測試；L1 `risksOf` 未驗 description/exposure 型別→已修；L2 ② 標題與圖可能不一致→改共用 `recordPictureCaption`；L3 recipe 兩條 mandatory_elements 宣稱程式強制但未強制→改寫成「程式擋／操作者責任」分開；L4 Atlas L1332 引用→實查 `grep -n` 為 L1332，不成立。
+- [突變] 拔 order 檢查／拔 phase 比對／刪 recipe status 綁定／紅區門檻 15→16 → 各自指名測試變紅，還原後綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/affected_tests.py --run`（93 模組）＋`pytest tests/unit/test_life_timeline.py tests/unit/test_root_cause_analysis_recipe.py`＋`npx tsc --noEmit && npx vitest run`＋`tests/run_golden_tests.py`＋`check-mocks.py` | exit=0 | ms=1592000
+- [結果] affected 3365 tests OK；新測試 12 passed／26 subtests；web 15 檔 111 tests；golden 4268 PASSED（補 recipe 釘選清單 `tests/run_golden_tests.py:272`＋重生 SPEC_QUICKREF／MOTHER_DOC_SECTION_INDEX）；check-mocks 5 頁全綠；風險矩陣 Chromium 截圖 1140／390 寬皆無橫向捲動。
+- [自測] `check-mocks-selftest.py`：HEAD 基準漏 2＋page 段 2（既有：「路線」錨點 SETUP、page fact SETUP、結果頁 fixture 過期 TASKS）；本分支多漏 1 = 「hero stale tool count」突變以字面 `284 個思考工具、12 條工作流` 當錨點，加工具即失效 → 改正規式錨點、工具數換成 9999（`check-mocks-selftest.py:122`），單案重跑 CAUGHT。
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/1m/4n
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`284 個(思考)?工具|12 條工作流|life_timeline|root-cause-analysis-v1|RiskMatrix` | hits=2 stale（Phase 0 歷史報告、已關閉 TASKS 條目，舊檔不回改）
+- ORACLE_WAIVED: container 無 codex／pwsh，oracle 無法執行 → 獨立 critic（Standard）＋4 個突變證據（拔 guard→指名測試紅→還原綠）
+- rollback：revert 本 commit；新方法／recipe 為純新增檔，前端只在 `delivery.risk_register` 且紀錄有可用風險時才換圖，其他方法路徑不變。
+## 2026-10-02（續3）Cognitive OS：要回 JSON 物件的 AI 呼叫一律帶格式規格（structured.py）；schema 失敗記違規路徑不記值（方案 B，未部署）
+- [操作者] 選 B（關整類，不只修彙整）。
+- 根因：模型答案必須符合 typed object 的 5 處，只有 interpret 走 `complete_json`＋schema（9/27 修過一次，只修那一處）；synthesis／route_method／workflow_interpretation／draft 仍讓模型自由打字再 `extract_json_object` 挖 JSON，模型看不到 schema → 續2 dossier_brief 1/2 整次 FAILED。且 SynthesisFailed 只存錯誤碼（K8），違規欄位一併丟失。
+- 不變量：① 答案須為 JSON 物件者一律 `ask_object(provider, …, schema=)`（provider 有 complete_json 即帶 schema；無則 fake 走文字）＋`parse_object`；② schema 失敗帶 `violations`＝路徑＋keyword，永不含值。
+- [改] 新 `ai_lego/platform/ai_gateway/structured.py`（ask_object／offers_schema／parse_object／extract_json_object 遷入／tool_schema 內聯 $ref／schema_lookup／keep_properties／map_property）；synthesis `answer_schema`（去 server keys、citations→整數、studies.source_id 留給伺服器）；route_method／workflow_interpretation `answer_schema`（只留模型寫的鍵）；draft `draft_tool_schema`（builder 參數＋record schema 屬性；`schema_yaml_full` 不截斷）；interpret 改走共用（answer_schema 輸出前後逐鍵比對 0 差異）；`SchemaContracts.violations`＋`SchemaValidationError.violations`；SynthesisFailed／GET synthesis 帶 `violations`。
+- [測] 新 `tests/unit/test_structured_answers.py` 11 項（AST 架構規則：`.complete(` 只准 5 處白名單含理由、`.complete_json(` 只在 gateway＋meter、`extract_json_object` 只在 structured＋draft 轉出）；`test_api_synthesis` EVENT_KEYS 加 violations（事件契約新增欄位，依 12.1-13）＋新案（heading 寫人名 → violations 只有路徑、事件不含人名）。
+- MUTATION（拋棄式 worktree `D:\tmp\wt-structured`）5/5：reduce 改回 `provider.complete` → 2 案紅；丟 violations → 2 案紅；violation 帶值 → 2 案紅；route 自挖 JSON → 架構案紅；citations 不轉整數 → schema 案紅；還原皆綠。
+- [真 API] 正式站容器內 metered `complete_json` 對 9 個新 schema（3 synthesis、route、workflow、interpret、3 draft）各一次：全 ACCEPTED 且皆回 tool-call JSON；12286/1574 tokens，ai_usage purpose `schema-probe`。
+- [範圍外，白名單註明] `ai_coding.py`／`coding_eval.py` 走 model-profile gateway（本機／離線 provider，無 tool call），不在本次。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run（365 模組）＋重跑 test_api_synthesis test_structured_answers | exit=0 | ms=2808547
+- 受影響測試：Ran 14705，1 紅＝本批 API 新案的舊預期（跑測開始後才補 heading enum）；修後兩模組 Ran 29 OK。golden 4261 PASS。註：本次改到 schema_contracts／errors（幾乎全模組 import）→ 受影響≈全套。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path 11 檔，packet 48.4KB 內嵌 diff），artifact `agency-os/reports/oracle/2026-10-02-partialreview-93b854a8.md`；首次 900s 逾時無輸出，1800s 重跑完成
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=extract_json_object|schema_yaml|\.complete\(|SynthesisFailed | hits=96
+- rollback：revert 本 commit（未部署；部署另等操作者 go-ahead）。
 ## 2026-10-02（續2）研究線 P2 DOD-2 PASS：新建真來源專案重新蒐集 → dossier_brief 引註全在 manifest 內；首跑一次 schema 失敗為模型輸出不穩
 - [操作者] 選 A「重新蒐集」（DOD-2）；B 門檻未回覆，thresholds 維持 null。
 - [身分] 續59 模式：容器內 `issue_session_for_identity`（操作者唯一真人 identity）、`expires_at` 改 30 分、token 只在主機 `/home/ubuntu/.p2-session`（600）；完成後 `revoke_session`（session_left=0）＋刪 5 個暫存檔。

@@ -1,0 +1,56 @@
+$id: "ai-lego://methods/contracts/art_therapy.life_timeline.contract.yaml"
+title: "Life Timeline Method Contract"
+status: ACTIVE
+
+description: >
+  art_therapy.life_timeline (生命時間線／反向時間軸). GROUNDED ORIGINAL DESIGN: not in the Method Atlas mother document; source is the
+  operator's 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md), Timeline / Reverse Timeline row,
+  therapeutic use "建立過去－現在－未來的因果脈絡". Not an EC §32 method. Core invariant: one dated "now" anchor splits the
+  events into past/present/future (phase is COMPUTED from the dates, never asserted); >= 1 past and >= 1 future event;
+  the listed order matches the chosen direction (forward = oldest first, backward = from the wished-for future back to
+  today); every future event names a first step that can start now. Non-diagnostic: the client's own words only.
+
+source_of_truth_for:
+  - "ART_THERAPY_METHOD_ATLAS_GAP_LIST.md -- Timeline / Reverse Timeline row (operator-supplied therapeutic use)"
+  - "specs/cognitive/typed-objects/life-timeline-record.schema.yaml"
+
+decided_by: "Operator directive 2026-10-02 (build the treatment version of the timeline); no ADR governs the content."
+
+id: art_therapy.life_timeline
+version: "1.0.0"
+family: art_therapy
+
+cognitive_primitives: [MAP, REFLECT]
+# INFERRED, not cited.
+
+purpose:
+  - place_past_present_and_future_life_events_on_one_dated_line_and_walk_it_forward_or_backward
+
+inputs:
+  required: []
+  # Entry-point method: the client's own material is supplied directly.
+
+outputs:
+  - LifeTimelineRecord
+
+preconditions:
+  - "now is an ISO date; >= 1 event before now and >= 1 after now; listed order follows direction; future events carry first_step"
+
+quality:
+  provenance_required: true
+
+forbidden_transition: []
+
+recommended_next:
+  - art_therapy.turning_point_analysis
+  - art_therapy.value_clarification
+
+rollback:
+  side_effect_free: true
+
+open_questions:
+  - "OQ-LIFETL-1: should a past event be allowed to link to a turning_point_analysis event id it was expanded from?（owner: operator）"
+
+verification:
+  method: "Grepped the spec root and ai_lego for 'life_timeline'/'life timeline'/'生命時間線'/'LIFETL-' before writing -- zero prior implementation. Overlap disclosed: representation.timeline_view only orders event refs (no content); foresight.backcasting only walks future->today (no past). Validated against specs/cognitive/method.schema.yaml via tests/run_golden_tests.py; typed-object schema exercised by tests/unit/test_life_timeline.py."
+  note: "No mother document was modified. Field shape and the invariant floor are this contract's own compilation decisions."
