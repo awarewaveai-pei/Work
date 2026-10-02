@@ -10,7 +10,7 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evidence set|證據庫|personal_swot` | hits=0 stale（新檔已改；續4 為已出貨歷史，於本條更正）
 - ORACLE_WAIVED: container 無 codex／pwsh → 獨立 critic（Quick）＋2 個突變證據
 - rollback：revert 本 commit；純新增方法，未改其他方法行為。
-### （續5）CI `perplexity-search-only` 紅：紀錄檔引文被當成呼叫點
+## 2026-10-02（續6）CI `perplexity-search-only` 紅：紀錄檔引文被當成呼叫點
 
 - 症狀：main 自 2026-10-02 起每次 push／PR 的 `perplexity-search-only` 皆紅（最近 10 次 run 全 failure；PR #29 雲端 session 留言指出同一點）。訊息 `agency-os/reports/agent-dispatch/dispatch-20260918.jsonl: names api.perplexity.ai outside the guarded exits`。
 - 根因：`d48515eaa`（2026-09-30 chore: commit accumulated record files）把 dispatch 紀錄進版控；第 31 行是 critic 報告引文，字面含主機名。`scripts/check-perplexity-search-only.mjs` `skipped()` 只豁免 `.md`（文件），未把「append-only 紀錄資料」視為同一類非呼叫點。
