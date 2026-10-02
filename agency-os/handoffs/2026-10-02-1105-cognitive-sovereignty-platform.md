@@ -34,7 +34,7 @@ source_session_summary: "操作者以藍圖 v0.6/v0.7 重新定義產品：Cogni
 1. 本機開 Claude Code 於 `$WORK_ROOT`，`git fetch origin claude/festive-sagan-getiwm && git merge --ff-only origin/claude/festive-sagan-getiwm`（或合併 PR）。
 2. 用瀏覽器登入正式站，親自走 iceberg 工具頁與上述專案頁，記下紀錄功能實況（歷程、任務卡、短期／長期計畫、現在重跑並比較、⑧ 只推沒做過的工具），對照監工台「三、一個案子的紀錄長什麼樣」與「共用紀錄」合約，不符就改合約文字。
 3. 監工台更新方式：Artifact tool `action: read` `url: https://claude.ai/artifact/E8VKViRmycqsXySHdnhUSJ` 一次，再以 `$WORK_ROOT/agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/platform-supervisor.html` 為檔案、同一 `url` 發布（網址不變）。資料全在該檔 `<script>` 的 `BLOCKS`／`CROSS` 陣列。
-4. 接著一塊一塊跟操作者談合約（九欄：解決什麼問題／使用者做什麼／系統做什麼／AI 能做什麼／AI 不准做什麼／讀什麼／寫什麼／產出給誰／現在有沒有），每談完一塊更新監工台。建議順序：GATHER（已有，最快寫完）→ MAP → THINK → DECIDE → ACT → LEARN。
+4. 接著一塊一塊跟操作者談合約（十二欄，見 §7），每談完一塊更新監工台。建議順序：GATHER（已有，最快寫完）→ MAP → THINK → DECIDE → ACT → LEARN。
 5. 13 份合約齊了再動 RLMP（§1 L4 升格、§3.3 閘作用域、§9 定案、§5 分期）與 ADR；之前不要改任何 plan／code。
 
 ## 6. 相關資源
@@ -55,3 +55,19 @@ source_session_summary: "操作者以藍圖 v0.6/v0.7 重新定義產品：Cogni
 - **未定**：第一圈是否「個人複雜決策」；外化媒介先文字卡＋關係圖；其餘 12 份合約。
 - **Commits**：本 session 無程式變更；本接手包是唯一提交。
 - **Known landmines**：操作者要討論不要文件；要圖不要表；一次只談一件；回覆短；不要再提「省工／最小改動」當理由；不要擅自跑大規模 agent 扇出。
+
+## 7. 本機 session 接手後的變更（2026-10-02，監工台 v7 → v11）
+
+§1–§6 是雲端 session 寫的原文；與本節衝突處以本節為準。
+
+- **已看正式站**：iceberg 工具頁、專案 `b1964684…`、其結果頁。實況與缺口寫在監工台「案子的紀錄」與 `CROSS` 的「共用紀錄」。更正：任務卡沒有「下次檢視日」；「你的判斷」是三選一＋原話。
+- **監工台重做**：操作者否決 v6/v7（「擠在一起、單一色彩、陽春」）。§3「單欄、單字體、無色塊」的判讀是錯的，勿沿用。現版用站上 `apps/cognitive-web/app/design-system.css` 的 token，七個畫面（地圖／走一趟／案子的紀錄／13 份合約／現有工具去哪／進度與順序／談定與未定），狀態色＋分組色。
+- **對齊藍圖 v0.6**（操作者下載的 `認知主權平台整合藍圖.md` 與本資料夾 `BLUEPRINT_v0.6.md` 逐位元相同）：
+  - 合約由九欄改為**十二欄**：解決什麼問題／使用者做什麼／系統做什麼／AI 能做什麼／AI 不准做什麼、何時交還控制／讀什麼、絕不讀什麼／寫什麼／產出給誰／來源與不確定性／人怎麼控制／資料與版本／現在有沒有。後三欄＝藍圖 3.3 原本漏掉的。
+  - 新增第五個全程生效項「規範與脈絡」（藍圖 5.1a）；GOVERN 改為全程伴隨並含安全（藍圖 3.1、10）；地圖加五個套件（3.5）；建置第 1 步併入外殼（組裝器、協作合約、完整性核心）；「未定」補齊藍圖 13 的六項。
+  - 核准不列入案子紀錄的最低標準（藍圖 4.3）。
+- **操作者新裁定**：
+  1. **13 塊定案**（「13 塊比較好」）。套件裡 DECIDE 後接 ACT；首輪上限由 5 改 6（本 session 的推論，操作者未逐字確認上限數字）。
+  2. **藍圖寫明的要求一律明文寫進合約卡**（「你會忘記所以應該明文寫出來」）。已寫進監工台原始碼的 `BP` 物件，逐塊帶藍圖節號；合約頁底有「藍圖每一節寫在哪」對照表。之後談合約＝談 `BP` 以外還沒定的欄位，不重談 `BP`。
+- **現有工具歸屬**（操作者問「近 300 工具和 16 條工作流屬於哪一部份」）：不是積木，是積木裡的做法。285 方法依 `methods/registry/method-goal-groups.yaml` 12 類計數：MAP 116、THINK 22、THINK＋VERIFY 20、ACT＋LEARN 33、SENSE 15、DECIDE 14、COMPUTE 11、規範與脈絡 10、不給一般使用者 43（非 §6 寫的約 64）、未分類 1。`recipes/validated` 17 條。歸屬是依類名判斷，未逐方法看。
+- **提交方式**：本機工作樹有別的 session 未提交的 `WORKLOG.md`，本 session 一律用暫存 index 在 `origin/main` 上直接建 commit 再 push，本機 `main` 未前進。
