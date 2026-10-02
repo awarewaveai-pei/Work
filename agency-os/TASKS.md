@@ -117,7 +117,7 @@
   - `✅ 裁決` · `2026-09-23` · `收尾 session（操作者「都你決定」）`
   - 裁決：無一能證明已以別的形式落地 → 不 drop；hook 修好後（續113）不再新增；inventory `reports/status/stash-inventory-2026-09-23.md` 唯讀。要清時逐個 `git stash show -p stash@{N}` 證明已落地才 drop。WORKLOG 2026-09-23 續123。
 
-- [ ] **【研究線｜P1 全部完成（WC-15 ⑤ 2026-10-02 驗過）；P2 WC-01–09 程式與部署前置完成；DOD-2 需新建真來源專案】三條線（合作風險／決策利弊／EdD）做成 Cognitive OS 上的 Project 工作流** — 現況與下一步只看計畫正本 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` §0／§12.8／§12.9；P1 紀錄 WORKLOG 續37／41／52／54／55／59；P2 09b 剩：DOD-2（指定專案 9/29 被網頁刪掉，需操作者同意新建真專案重新蒐集，付費）＋操作者門檻裁定；「舊專案刪不掉」後端已排除、待操作者描述畫面（WORKLOG 2026-10-02 續1）。
+- [ ] **【研究線｜P1 全部完成（WC-15 ⑤ 2026-10-02 驗過）；P2 DOD 8/8 完成（2026-10-02）；剩操作者定門檻】三條線（合作風險／決策利弊／EdD）做成 Cognitive OS 上的 Project 工作流** — 現況與下一步只看計畫正本 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` §0／§12.8／§12.9；P1 紀錄 WORKLOG 續37／41／52／54／55／59；P2 09b 剩：操作者門檻裁定（DOD-2 已用新專案 `857b6f41…`「勿刪」通過，WORKLOG 2026-10-02 續2）；「舊專案刪不掉」後端已排除、待操作者描述畫面（WORKLOG 2026-10-02 續1）。
 - [ ] **【Cognitive OS P4｜待操作者決定】報告核准角色與來源搜尋規模** — ① `POST /projects/{id}/reports/{rid}/approval` 任何有效 session 都能核准，是否限角色；② `GET /sources/search` 無分頁／全文索引／限流（現為上限 100 筆＋每請求讀 200 份 artifact，超出標 `truncated`／`incomplete`），租戶或資料量變大時再做；③ 報告 `run_results` 要等 project-level run binding 才開放。WORKLOG 2026-10-01（續7）。
 - [ ] **【基礎設施｜小】主機 nginx 有 repo 沒有的 `hci.aware-wave.com` server 區塊（漂移）** — `/root/lobster-phase1/nginx/default.conf` 含 hci 區塊，repo `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 沒有；任何人以 repo 檔覆蓋主機檔會讓 hci 站下線。修：把該區塊收進 repo（先比對主機現值）。2026-09-26 PI-b 分流時發現，詳 WORKLOG 2026-09-26（續34）。
 - [ ] **【Cognitive OS web】結果頁已照示意稿（已上線）；剩各頁渲染閘與示意稿裡還沒做的動作** — 已上正式站：外框／首頁／工具／工作流／專案（WORKLOG 續36）、填寫頁（續38）、兩堂課＋課程連結（續39），`79bf7cc5`（續40）。結果頁＝卡片①–⑨＋核准卡、解讀契約 1.1.0 與 detail_integrity 閘（續61），已上正式站 `1fbb021f`（續62）。我的專案：專案名點得進專案頁、每次分析一列且打得開、每次「執行分析」開自己的專案、建立／最後更新到分鐘（2026-09-27 續1），已上正式站 `b6936ecc`（續3）。剩：① `check-mocks.py --page` 只有 result，首頁／工具目錄／工具頁／工作流頁沒有渲染 HTML 閘；② 工作流逐站頁（P3）；③ 結果頁對示意稿 310 筆已全修（2026-09-28 續11＋續15），已隨 `73b9ac8f8` 上線（2026-09-29 續8；登入後畫面待正式站測試身分），見 `Projects/internal/cognitive-engineering-os/docs/RESULT_PAGE_GAP_REPORT.md`；④ 上線 High-STOP（報告 §9），先定每租戶每日 token 額度（一次分析約 1.8–4.3 萬）。
@@ -699,6 +699,9 @@
 - [x] **【2026-09-12 開出｜低優先】`sg-deploy.sh` next-admin 兩個 smoke 探針硬編 host port，同款漂移風險已知但未動** → ✅ 2026-09-26 續49（雲端 T25）：`docker port lobster-next-admin 3000/tcp`，fallback 3002。
   - `🟡 未開始` · `2026-09-12 開出` · `不卡誰，目前 prod .env 未設 override 故未觸發`
   - **一句話**：修 node-api 健康探針打錯 nginx 層那次（見 WORKLOG 2026-09-12），critic 覆審抓到 `sg-deploy.sh:311-312` 的 `next-admin /login`／`/api/ops/summary` 兩個探針一樣硬編 `127.0.0.1:3002`，而 `docker-compose.yml:437` 該埠其實是 `${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000`——跟當時 node-api 那個已修掉的 bug 同一種脆弱（host port 可被 env var 覆寫，硬編值只是「今天 prod .env 剛好沒設」才沒事）。node-api 已改成 `docker port lobster-node-api 3001/tcp` runtime 解析；next-admin 這兩行維持原樣未動，因為不是本次事故的觸發點，屬於刻意劃定的範圍外項目，非遺漏。修法方向：套同一個 `docker port lobster-next-admin 3000/tcp` 解析。細節見 WORKLOG 2026-09-12。
+- [ ] **【2026-10-02 開出｜Cognitive OS｜低優先】synthesis 失敗只存錯誤碼，事後看不到哪個欄位不合 schema**
+  - `🟡 未開始` · `2026-10-02 開出` · `不卡誰`
+  - **一句話**：真來源 `dossier_brief` 1/2 次整次 FAILED（`SCHEMA_VALIDATION_FAILED`，修復重試也失敗）；`main.py:2045` `_error_code` 只存碼（刻意不存模型／來源文字），違規 JSON path 也一起丟了 → 只能付費重放才診斷。方向：另存 path＋validator keyword（不含值）。WORKLOG 2026-10-02 續2。
 - [ ] **【2026-10-01 開出｜Cognitive OS｜低優先】渲染後的字級／行寬檢查（U22）還不是任何閘：`render-mocks.cjs` exit 4 只在手動跑時擋**
   - `🟡 未開始` · `2026-10-01 開出` · `不卡誰`
   - **一句話**：靜態 `check-mocks.py` 看不到層疊（更具體的覆蓋、繼承到 12px），渲染檢查看得到，但 `build-artifact.py:37` 與 `deploy/web_test.sh:22` 只跑靜態檢查；接上需在建置環境裝 Playwright（Codex 第 6 輪 `agency-os/reports/oracle/2026-10-01-partialreview-3e4ea501.md` F1）。正式站網頁本身（`apps/cognitive-web`）也未做渲染量測。細節 WORKLOG 2026-10-01 字級 U22 那筆。

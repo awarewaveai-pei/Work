@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-02（續2）研究線 P2 DOD-2 PASS：新建真來源專案重新蒐集 → dossier_brief 引註全在 manifest 內；首跑一次 schema 失敗為模型輸出不穩
+- [操作者] 選 A「重新蒐集」（DOD-2）；B 門檻未回覆，thresholds 維持 null。
+- [身分] 續59 模式：容器內 `issue_session_for_identity`（操作者唯一真人 identity）、`expires_at` 改 30 分、token 只在主機 `/home/ubuntu/.p2-session`（600）；完成後 `revoke_session`（session_left=0）＋刪 5 個暫存檔。
+- [專案] `857b6f41-73ef-4b93-a00d-c093d414348e`「Soulful Expression 合作風險（P2 驗收，勿刪）」Confidential，操作者租戶。
+- [蒐集] run `7336fd3a…`：entity `SOULFUL EXPRESSION`（company，anchors soulfulexpression.org）＋官網首頁，fetches 30 → completed 47s，fetched 16 refused 11 written 1（stopped_by budget）；只 1 筆太薄 → run `9cb1daef…`：官網 10 頁（page-sitemap.xml 取 about-me／partners／core-values-and-vision／strategic-vision-architecture-projects／wusheng-healing-module／healing-modules／book-a-session／creators-license…／privacy-policy／insights/art-therapy-explained），fetches 10 → completed 25s，fetched 9 written 8。active Sources = 9。
+- [首跑失敗] `SYN-314F7E5F…` FAILED `SYNTHESIS_REJECTED_AFTER_REPAIR: SCHEMA_VALIDATION_FAILED`（2 次呼叫皆 schema 不合）。存檔只留錯誤碼（`main.py:2045` `_error_code`，設計上不存模型／來源文字）→ 看不到違規欄位。改法：容器內同來源、同 runner、metered provider 重放並只印違規 JSON path（`SYN-DIAG-20261002`，不寫 synthesis 紀錄）→ 第一次即 PASS、0 違規 → 判定為模型輸出不穩，非固定 bug。
+- P2_DOD_2: PASS | cmd=POST /api/projects/857b6f41…/synthesis {kind:dossier_brief, subject SOULFUL EXPRESSION/company/anchors} → `SYN-7E5EE357…` | out=DONE 50s；claims_total 20、citations 31（distinct 9）全 ⊆ manifest 9 entries、out_of_manifest 0、zero_citation 0；gate citation_integrity PASS；uncited_sections ["財務與募資"]（如實標缺口）；ai_usage 列 `synthesis:dossier_brief` 15070/3526 settled run_id 對上
+- [用量] 今日 4 次呼叫（失敗 2＋診斷 1＋正式 1）合計 in 60621／out 16519 tokens，皆有 ai_usage 列。
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl 正式站 /api/projects、/collections ×2、/synthesis ×2＋容器內診斷重放 | exit=0 | ms=300000
+- REVIEW_WAIVED: NA -- 無程式碼變更；正式站資料操作＋計畫回填
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=DOD-2 | hits=8
+- [殘留風險] dossier_brief 在真來源上可能整次 FAILED（本次 1/2），且失敗只存錯誤碼、無法事後知道哪個欄位 → TASKS 一行（低優先）。
+- rollback：專案可由網頁刪除（操作者決定去留；名稱已標「勿刪」）。
 ## 2026-10-02（續1）Cognitive OS 正式站：舊專案全部抹除只留最新一個（P1 WC-15 ⑤ PASS）；P2 DOD-2 阻塞根因 = 指定專案已被刪；PI-b 05 操作者驗收
 - [操作者] PI-b 05 結果頁已親眼看過 → PI-b 5/5。
 - [操作者 go-ahead「刪」] 正式站 `projects.sqlite3` 8 個專案，保留最新 `b1964684`（冰山模型 2026-09-29 09:13），其餘 7 個抹除：操作者租戶 3（冰山 09-26 `7136d4ce`、WC-P1-15 erasure probe `264ba6a4`、冰山 09-27 `c04300c0`）＋測試租戶 4（Deploy Verify `870e779c`、Knowledge Import `8e323c1c`／`3e7b8539`、PI-b 驗收 `13bdf5bb`）。
