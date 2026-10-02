@@ -137,6 +137,22 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     }
     for (const c of codes) if (!WIRING.some((w) => w[0] === c)) arch.push('wiring?' + c);
     for (const k of Object.keys(DRAWER_LIMIT)) { const [c, id] = k.split(':'); if (!canRead(c).includes(id)) arch.push('limit on a drawer not read ' + k); }
+    // One journey, two pages: same steps in the same order. A section that promises the five always-on items shows exactly those five.
+    const journey = [];
+    const oneSteps = [...document.querySelectorAll('#one-steps [data-step]')].map((e) => e.dataset.step);
+    const flowSteps = [...document.querySelectorAll('#steps [data-step]')].map((e) => e.dataset.step);
+    const want = JOURNEY.map((s) => s.t);
+    if (oneSteps.join('|') !== want.join('|')) journey.push('one-page shows ' + oneSteps.length + ' of ' + want.length + ' steps');
+    if (flowSteps.join('|') !== want.join('|')) journey.push('walk-through shows ' + flowSteps.length + ' of ' + want.length + ' steps');
+    const covered = new Set([...JOURNEY.map((s) => s.who), 'GOVERN', ...Object.keys(JOURNEY_ALWAYS)]);
+    for (const c of codes) if (!covered.has(c)) journey.push('not in the journey: ' + c);
+    if (JOURNEY.filter((s) => s.round === 'first').length !== 6) journey.push('first round is not 6 blocks');
+    const five = CROSS.map((x) => x.code).join('|');
+    for (const id of ['steps-always5', 'one-always5']) {
+      const got = [...document.querySelectorAll('#' + id + ' [data-five]')].map((e) => e.dataset.five);
+      if (got.join('|') !== five) journey.push(id + ' shows ' + got.length + ' of 5');
+    }
+    document.querySelectorAll('[data-cross5]').forEach((e, n) => { const k = e.querySelectorAll('.node').length; if (k !== 5) journey.push('five-card row #' + n + ' has ' + k); });
     // Build order places all 18.
     window.show('progress', true);
     const chips = [...document.querySelectorAll('#order .bks .bk')].map((e) => e.textContent.trim());
@@ -147,7 +163,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // One word per meaning: words retired when two contracts used them for different things.
     for (const s of ['同源合併', '同源群組', '來源地圖', '管道佔比', '來源身分卡']) if (whole.includes(s)) typed.push('retired word ' + s);
     if (!whole.includes(FACET_NAMES.length + ' 個面向')) typed.push('facet count');
-    return { arch, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
+    return { journey, arch, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
   });
   rule(label, 'empty_fields', r.empty);
   rule(label, 'no_hand_back', r.noHandBack);
@@ -155,6 +171,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
   rule(label, 'handoff_unread', r.handoff);
   rule(label, 'package_step_unread', r.pkgs);
   rule(label, 'north_star_missing_from_contract', r.north);
+  rule(label, 'journey', r.journey);
   rule(label, 'architecture', r.arch);
   rule(label, 'not_in_build_order', r.notBuilt);
   rule(label, 'stale_typed_numbers', r.typed);
