@@ -18,7 +18,12 @@ class SpecRootNotFound(InvariantViolation):
 
 
 class SchemaValidationError(InvariantViolation):
-    """An emitted record failed validation against a canonical spec schema."""
+    """An emitted record failed validation against a canonical spec schema. ``violations`` = where, without values
+    (``SchemaContracts.violations``): the one part of the failure that is safe to store."""
+
+    def __init__(self, message: str, violations: tuple[str, ...] = ()):
+        super().__init__(message)
+        self.violations = tuple(violations)
 
 
 class AdapterUnavailable(InvariantViolation):

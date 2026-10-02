@@ -1,5 +1,5 @@
 # Worklog
-## 2026-10-02（續3）Cognitive OS 補藝術治療清單 3 個部分對應項：生命時間線新方法、風險矩陣格子圖、根本原因分析工作流；個人 SWOT 待操作者決定
+## 2026-10-02（續4）Cognitive OS 補藝術治療清單 3 個部分對應項：生命時間線新方法、風險矩陣格子圖、根本原因分析工作流；個人 SWOT 待操作者決定
 - [操作者] 對照 54 項藝術治療工具清單問「少哪些」→ 53 個 method_id 全在（本機 `/methods` 實測），4 項只部分對應 → 指示「做」前三項。
 - [新方法] `art_therapy.life_timeline`：contract＋`life-timeline-record.schema.yaml`＋`modules/art_therapy/life_timeline.py`＋slice＋test＋4 份登記檔。不變量：`phase` 由 `when` 對 `now` 算出、不收輸入；≥1 過去＋≥1 未來；順序依 `direction`（forward 非遞減／backward 非遞增）；只有未來事件帶 `first_step`。gate 由原始紀錄重算（`life_timeline.py:_line_problem stored=True`）。
 - [格子圖] `delivery.risk_register` 結果頁 ② 改畫 5×5 機率×衝擊圖（`apps/cognitive-web/components/result/RiskMatrix.tsx`），由紀錄數字直接算格，不經 AI；格子分區＝等級相乘 ≥15 紅／≥6 黃；圖下依曝險排序列表；畫不上的風險明說數量。更正：前端 `quadrant`／`matrix` 原本都不是真圖（`MethodVisual.tsx` 舊版只有冰山與分層是 SVG），先前「沿用 stakeholders matrix 圖」說法錯誤。
@@ -14,6 +14,21 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`284 個(思考)?工具|12 條工作流|life_timeline|root-cause-analysis-v1|RiskMatrix` | hits=2 stale（Phase 0 歷史報告、已關閉 TASKS 條目，舊檔不回改）
 - ORACLE_WAIVED: container 無 codex／pwsh，oracle 無法執行 → 獨立 critic（Standard）＋4 個突變證據（拔 guard→指名測試紅→還原綠）
 - rollback：revert 本 commit；新方法／recipe 為純新增檔，前端只在 `delivery.risk_register` 且紀錄有可用風險時才換圖，其他方法路徑不變。
+## 2026-10-02（續3）Cognitive OS：要回 JSON 物件的 AI 呼叫一律帶格式規格（structured.py）；schema 失敗記違規路徑不記值（方案 B，未部署）
+- [操作者] 選 B（關整類，不只修彙整）。
+- 根因：模型答案必須符合 typed object 的 5 處，只有 interpret 走 `complete_json`＋schema（9/27 修過一次，只修那一處）；synthesis／route_method／workflow_interpretation／draft 仍讓模型自由打字再 `extract_json_object` 挖 JSON，模型看不到 schema → 續2 dossier_brief 1/2 整次 FAILED。且 SynthesisFailed 只存錯誤碼（K8），違規欄位一併丟失。
+- 不變量：① 答案須為 JSON 物件者一律 `ask_object(provider, …, schema=)`（provider 有 complete_json 即帶 schema；無則 fake 走文字）＋`parse_object`；② schema 失敗帶 `violations`＝路徑＋keyword，永不含值。
+- [改] 新 `ai_lego/platform/ai_gateway/structured.py`（ask_object／offers_schema／parse_object／extract_json_object 遷入／tool_schema 內聯 $ref／schema_lookup／keep_properties／map_property）；synthesis `answer_schema`（去 server keys、citations→整數、studies.source_id 留給伺服器）；route_method／workflow_interpretation `answer_schema`（只留模型寫的鍵）；draft `draft_tool_schema`（builder 參數＋record schema 屬性；`schema_yaml_full` 不截斷）；interpret 改走共用（answer_schema 輸出前後逐鍵比對 0 差異）；`SchemaContracts.violations`＋`SchemaValidationError.violations`；SynthesisFailed／GET synthesis 帶 `violations`。
+- [測] 新 `tests/unit/test_structured_answers.py` 11 項（AST 架構規則：`.complete(` 只准 5 處白名單含理由、`.complete_json(` 只在 gateway＋meter、`extract_json_object` 只在 structured＋draft 轉出）；`test_api_synthesis` EVENT_KEYS 加 violations（事件契約新增欄位，依 12.1-13）＋新案（heading 寫人名 → violations 只有路徑、事件不含人名）。
+- MUTATION（拋棄式 worktree `D:\tmp\wt-structured`）5/5：reduce 改回 `provider.complete` → 2 案紅；丟 violations → 2 案紅；violation 帶值 → 2 案紅；route 自挖 JSON → 架構案紅；citations 不轉整數 → schema 案紅；還原皆綠。
+- [真 API] 正式站容器內 metered `complete_json` 對 9 個新 schema（3 synthesis、route、workflow、interpret、3 draft）各一次：全 ACCEPTED 且皆回 tool-call JSON；12286/1574 tokens，ai_usage purpose `schema-probe`。
+- [範圍外，白名單註明] `ai_coding.py`／`coding_eval.py` 走 model-profile gateway（本機／離線 provider，無 tool call），不在本次。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run（365 模組）＋重跑 test_api_synthesis test_structured_answers | exit=0 | ms=2808547
+- 受影響測試：Ran 14705，1 紅＝本批 API 新案的舊預期（跑測開始後才補 heading enum）；修後兩模組 Ran 29 OK。golden 4261 PASS。註：本次改到 schema_contracts／errors（幾乎全模組 import）→ 受影響≈全套。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path 11 檔，packet 48.4KB 內嵌 diff），artifact `agency-os/reports/oracle/2026-10-02-partialreview-93b854a8.md`；首次 900s 逾時無輸出，1800s 重跑完成
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=extract_json_object|schema_yaml|\.complete\(|SynthesisFailed | hits=96
+- rollback：revert 本 commit（未部署；部署另等操作者 go-ahead）。
 ## 2026-10-02（續2）研究線 P2 DOD-2 PASS：新建真來源專案重新蒐集 → dossier_brief 引註全在 manifest 內；首跑一次 schema 失敗為模型輸出不穩
 - [操作者] 選 A「重新蒐集」（DOD-2）；B 門檻未回覆，thresholds 維持 null。
 - [身分] 續59 模式：容器內 `issue_session_for_identity`（操作者唯一真人 identity）、`expires_at` 改 30 分、token 只在主機 `/home/ubuntu/.p2-session`（600）；完成後 `revoke_session`（session_left=0）＋刪 5 個暫存檔。

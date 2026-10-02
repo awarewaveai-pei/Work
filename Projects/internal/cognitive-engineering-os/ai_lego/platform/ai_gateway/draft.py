@@ -15,7 +15,6 @@ from __future__ import annotations
 import datetime
 import inspect
 import json
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -28,6 +27,7 @@ from ai_lego.core.domain.provenance import AUTHORSHIP_STATES, EPISTEMIC_TYPES, m
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_gateway.provider import AiProvider
+from ai_lego.platform.ai_gateway.structured import ask_object, extract_json_object, parse_object, tool_schema  # noqa: F401 -- extract_json_object: re-exported for existing importers
 from ai_lego.platform.workflow.human_required import load_human_required
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
 
@@ -78,8 +78,30 @@ def _schema_text(spec_root: Path, method_id: str, contract: dict[str, Any], cont
     schema_path = spec_root / TYPED_OBJECTS / name if name else None
     if schema_path is None or not schema_path.is_file():
         return None
-    text = schema_path.read_text(encoding="utf-8")
+    return schema_path.read_text(encoding="utf-8")
+
+
+def _prompt_schema_text(text: str | None) -> str | None:
+    if text is None:
+        return None
     return text if len(text) <= MAX_SCHEMA_CHARS else text[:MAX_SCHEMA_CHARS] + "\n# ...(truncated)"
+
+
+def draft_tool_schema(spec: dict[str, Any], exclude_params: tuple[str, ...] = ()) -> dict[str, Any]:
+    """The draft's shape for the tool call: exactly the builder parameters asked for, each with its property in the
+    output-record schema when it has one (the builder's kwargs become that record's top-level properties)."""
+    try:
+        record = yaml.safe_load(spec.get("schema_yaml_full") or "") or {}
+    except yaml.YAMLError:
+        record = {}
+    properties = record.get("properties") if isinstance(record, dict) and isinstance(record.get("properties"), dict) else {}
+    params = [p for p in spec["parameters"] if p["name"] not in exclude_params]
+    return tool_schema({
+        "type": "object",
+        "properties": {p["name"]: properties.get(p["name"], {}) for p in params},
+        "required": [p["name"] for p in params if p["required"]],
+        "additionalProperties": False,
+    })
 
 
 def method_input_spec(spec_root: Path, catalog: MethodCatalog, method_id: str) -> dict[str, Any]:
@@ -96,6 +118,7 @@ def method_input_spec(spec_root: Path, catalog: MethodCatalog, method_id: str) -
             continue
         parameters.append({"name": name, "required": parameter.default is inspect.Parameter.empty})
     description = str(contract.get("description") or "")
+    schema_text = _schema_text(spec_root, method_id, contract, contract_text) if contract_text else None
     return {
         "method_id": method_id,
         "title": contract.get("title"),
@@ -105,7 +128,8 @@ def method_input_spec(spec_root: Path, catalog: MethodCatalog, method_id: str) -
         "forbidden": contract.get("forbidden_transition"),
         "parameters": parameters,
         "record_id_prefix": record_id_prefix(method_id, required=False),
-        "schema_yaml": _schema_text(spec_root, method_id, contract, contract_text) if contract_text else None,
+        "schema_yaml": _prompt_schema_text(schema_text),
+        "schema_yaml_full": schema_text,
     }
 
 
@@ -149,22 +173,6 @@ def build_prompt(spec: dict[str, Any], brief: str, *, exclude_params: tuple[str,
         lines.append("YOUR PREVIOUS DRAFT WAS REFUSED. Previous draft:\n" + json.dumps(previous, ensure_ascii=False))
         lines.append("REFUSAL (fix exactly this, keep everything else): " + error)
     return "\n\n".join(lines)
-
-
-def extract_json_object(text: str) -> dict[str, Any]:
-    """First balanced top-level JSON object in ``text``; fences and surrounding prose are tolerated."""
-    stripped = re.sub(r"^```(?:json)?\s*|\s*```$", "", text.strip(), flags=re.IGNORECASE | re.MULTILINE)
-    start = stripped.find("{")
-    if start < 0:
-        raise InvariantViolation("AI_DRAFT_NOT_JSON: no object in model output")
-    decoder = json.JSONDecoder()
-    try:
-        parsed, _ = decoder.raw_decode(stripped[start:])
-    except json.JSONDecodeError as error:
-        raise InvariantViolation(f"AI_DRAFT_NOT_JSON: {error.msg} at char {error.pos}") from None
-    if not isinstance(parsed, dict):
-        raise InvariantViolation("AI_DRAFT_NOT_JSON: top-level value is not an object")
-    return parsed
 
 
 def _validate(method_id: str, kwargs: dict[str, Any], catalog: MethodCatalog) -> dict[str, Any]:
@@ -247,7 +255,7 @@ def draft_method_kwargs(
     result = DraftResult(method_id=method_id, kwargs={}, validation={"ok": False, "stage": "none", "error": None, "gate_results": []}, attempts=0, model=provider.model)
     for attempt in range(1, max(1, max_attempts) + 1):
         try:
-            completion = provider.complete(_SYSTEM, build_prompt(spec, brief, exclude_params=exclude_params, previous=previous, error=error), max_tokens=DRAFT_MAX_TOKENS)
+            completion = ask_object(provider, _SYSTEM, build_prompt(spec, brief, exclude_params=exclude_params, previous=previous, error=error), max_tokens=DRAFT_MAX_TOKENS, schema=draft_tool_schema(spec, exclude_params))
         except InvariantViolation as provider_error:
             raise AiDraftProviderError(str(provider_error), input_tokens=result.input_tokens, output_tokens=result.output_tokens) from provider_error
         result.attempts = attempt
@@ -255,7 +263,7 @@ def draft_method_kwargs(
         result.input_tokens += completion.input_tokens
         result.output_tokens += completion.output_tokens
         try:
-            kwargs = extract_json_object(completion.text)
+            kwargs = parse_object(completion)
         except InvariantViolation as parse_error:
             previous, error = {"raw": completion.text[:2000]}, str(parse_error)
             result.validation = {"ok": False, "stage": "parse", "error": error, "gate_results": []}

@@ -8,12 +8,22 @@ from pathlib import Path
 from typing import Any
 
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform.ai_gateway.draft import extract_json_object
+from ai_lego.platform.ai_gateway.structured import ask_object, keep_properties, parse_object, schema_lookup, tool_schema
 from ai_lego.platform.evolution.registry import load_champion
 
 _TERMS = re.compile(r"[一-鿿]+|[a-z0-9]{2,}")
 _MAX_CANDIDATES = 3
 _SCHEMA_REF = "ai-lego://specs/cognitive/typed-objects/method-route.schema.yaml"
+# The model proposes candidates and an order; everything else in a MethodRoute is the server's.
+_ANSWER_KEYS = ("candidates", "suggested_workflow")
+_CANDIDATE_KEYS = ("kind", "id", "why", "citations", "yields", "est_cost")
+
+
+def answer_schema(schema_contracts: Any) -> dict[str, Any]:
+    contents, lookup = schema_lookup(schema_contracts, _SCHEMA_REF)
+    shape = keep_properties(tool_schema(contents, lookup=lookup), _ANSWER_KEYS)
+    shape["properties"]["candidates"]["items"] = keep_properties(shape["properties"]["candidates"]["items"], _CANDIDATE_KEYS)
+    return shape
 
 
 def _terms_of(text: str) -> list[str]:
@@ -81,8 +91,8 @@ def route(text: str, *, catalog: Any, provider: Any, spec_root: Path, schema_con
         result = {"text": text, "candidates": free, "suggested_workflow": [item["id"] for item in free], "needs_ai": True, "gates": _free_gates(free)}
         schema_contracts.validate(_SCHEMA_REF, result, "method route")
         return result
-    completion = provider.complete("You route users to existing catalog methods. Return one JSON object with candidates and suggested_workflow.", _ai_prompt(catalog, text), max_tokens=1800)
-    raw = extract_json_object(completion.text)
+    completion = ask_object(provider, "You route users to existing catalog methods. Return one JSON object with candidates and suggested_workflow.", _ai_prompt(catalog, text), max_tokens=1800, schema=lambda: answer_schema(schema_contracts))
+    raw = parse_object(completion)
     allowed = _catalog_ids(catalog)
     candidates = []
     repaired_ids = []

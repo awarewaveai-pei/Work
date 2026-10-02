@@ -2037,7 +2037,8 @@ def list_reruns(
 
 # -- Synthesis (RESEARCH_LINES_MASTER_PLAN §12.8 WC-P2-06; runner P-h, subject P-j): the interpret shape, one runner for
 # three kinds. Events carry ids, counts and error codes only (K8): a runner message can quote model text about the
-# subject, so SynthesisFailed keeps its leading codes, never the message.
+# subject, so SynthesisFailed keeps its leading codes, never the message -- plus the schema violations as paths and
+# keywords (SchemaContracts.violations; the synthesis schemas close every object, so a path is schema names and indexes).
 
 _ERROR_CODES = re.compile(r"([A-Z][A-Z0-9_]{2,})(?=:|$)(?:: ([A-Z][A-Z0-9_]{2,})(?=:|$))?")
 
@@ -2151,6 +2152,8 @@ def _run_synthesis(
         repo.append_event(tenant_id, aggregate_id, "SynthesisFailed", {
             "synthesis_id": synthesis_id, "kind": kind, "error": error or "SYNTHESIS_FAILED",
             "input_tokens": metered.input_tokens, "output_tokens": metered.output_tokens,
+            # Where the answer broke the schema, never its values (the error keeps only codes for the same reason).
+            "violations": list((outcome or {}).get("violations") or []),
         })
     finally:
         lock.release()
@@ -2246,7 +2249,7 @@ def get_synthesis(
             return {**base, "status": "PENDING"}
         return get_synthesis(project_id, synthesis_id, session, repo, artifact_store)  # it finished between the reads
     if latest["event_type"] == "SynthesisFailed":
-        return {**base, "status": "FAILED", "error": latest["payload"]["error"], "finished_at": latest["occurred_at"]}
+        return {**base, "status": "FAILED", "error": latest["payload"]["error"], "violations": latest["payload"].get("violations", []), "finished_at": latest["occurred_at"]}
     stored = repo.get_synthesis(tenant_id, project_id, synthesis_id)
     if stored is None:
         raise HTTPException(status_code=500, detail="SYNTHESIS_ARTIFACT_MISSING")
