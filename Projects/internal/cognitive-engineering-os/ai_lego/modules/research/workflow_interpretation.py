@@ -8,9 +8,19 @@ from collections.abc import Mapping
 from typing import Any
 
 from ai_lego.modules.research.gates import evaluate_citation_integrity
-from ai_lego.platform.ai_gateway.draft import extract_json_object
+from ai_lego.platform.ai_gateway.structured import ask_object, keep_properties, parse_object, schema_lookup, tool_schema
 
 SCHEMA_REF = "ai-lego://specs/cognitive/typed-objects/workflow-interpretation.schema.yaml"
+# _assemble builds the stored object; the model writes only these, and per station only its index and one line.
+_ANSWER_KEYS = ("stations", "summary", "final_recommendation", "revision_conditions")
+_STATION_KEYS = ("station_index", "one_liner")
+
+
+def answer_schema(schema_contracts: Any) -> dict[str, Any]:
+    contents, lookup = schema_lookup(schema_contracts, SCHEMA_REF)
+    shape = keep_properties(tool_schema(contents, lookup=lookup), _ANSWER_KEYS)
+    shape["properties"]["stations"]["items"] = keep_properties(shape["properties"]["stations"]["items"], _STATION_KEYS)
+    return shape
 _CONFIDENCE_ORDER = {"high": 0, "mid": 1, "low": 2}
 _FORBIDDEN = {"conclusion", "verdict", "correct_answer"}
 
@@ -111,14 +121,14 @@ def run_workflow_interpretation(*, workflow_id: str, run_or_chain_id: str, stati
     last: dict[str, Any] | None = None
     for _attempt in range(2):
         try:
-            completion = provider.complete("Summarize the workflow. Never write judgment or a preset conclusion. Return JSON only.", prompt + ("\nFIX: " + previous_error if previous_error else ""), max_tokens=6000)
+            completion = ask_object(provider, "Summarize the workflow. Never write judgment or a preset conclusion. Return JSON only.", prompt + ("\nFIX: " + previous_error if previous_error else ""), max_tokens=6000, schema=lambda: answer_schema(schema_contracts))
         except Exception as error:
             if last is None:
                 raise
             return {"interpretation": last, "gate_results": list(last["gates"].values()), "error": str(error), "model": last.get("model", provider.model), "input_tokens": usage["input_tokens"], "output_tokens": usage["output_tokens"]}
         usage["input_tokens"] += completion.input_tokens
         usage["output_tokens"] += completion.output_tokens
-        answer = extract_json_object(completion.text)
+        answer = parse_object(completion)
         last = _assemble(workflow_id=workflow_id, run_or_chain_id=run_or_chain_id, interpretation_id=interpretation_id, stations=original, answer=answer, model=completion.model, usage_total=usage, schema_contracts=schema_contracts)
         failed = [name for name, gate in last["gates"].items() if gate["status"] != "PASS"]
         if not failed:

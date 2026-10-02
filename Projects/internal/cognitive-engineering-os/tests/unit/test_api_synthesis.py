@@ -26,7 +26,7 @@ import run as eval_run  # noqa: E402  (P-c artifact contract, same import as tes
 SUBJECT_NAME = "Mira Okonkwo-Hale"
 DOSSIER = {"kind": "dossier_brief", "subject": {"name": SUBJECT_NAME, "kind": "person", "anchors": ["Lisbon"]}}
 NOTE = {"title": "Interview notes", "media_type": "text/plain", "data_classification": "Confidential", "content": f"{SUBJECT_NAME} runs a studio in Lisbon."}
-EVENT_KEYS = {"synthesis_id", "kind", "source_count", "artifact_reference", "error", "input_tokens", "output_tokens"}
+EVENT_KEYS = {"synthesis_id", "kind", "source_count", "artifact_reference", "error", "input_tokens", "output_tokens", "violations"}
 
 
 def _dossier_answer() -> str:
@@ -121,6 +121,20 @@ class SynthesisApiTests(ProjectSourceApiTestCase):
         self.assertEqual(self._usage(), [("synthesis:dossier_brief", 11, 23)] * 2)   # one row per paid call
         payload = self._events()[-1]["payload"]
         self.assertEqual((payload["input_tokens"], payload["output_tokens"]), (22, 46))
+        self._assert_events_hold_no_text()
+
+    def test_a_schema_failure_keeps_where_it_broke_but_no_value(self):
+        broken = json.loads(_dossier_answer())
+        broken["summary"]["citations"] = []                       # minItems 1
+        broken["sections"][0]["claims"][0]["text"] = 7            # a number where text goes
+        broken["sections"][0]["heading"] = SUBJECT_NAME           # a value that must never reach the event
+        self.provider.answers = [json.dumps(broken, ensure_ascii=False)] * 2
+        response, launch = self._post()
+        api_main._run_synthesis(**launch.call_args.kwargs)
+        failed = self._get(response.json()["synthesis_id"]).json()
+        self.assertEqual(failed["error"], "SYNTHESIS_REJECTED_AFTER_REPAIR: SCHEMA_VALIDATION_FAILED")
+        self.assertEqual(failed["violations"], ["sections[0].claims[0].text type", "sections[0].heading enum", "summary.citations minItems"])
+        self.assertEqual(self._events()[-1]["payload"]["violations"], failed["violations"])
         self._assert_events_hold_no_text()
 
     def test_a_usage_write_failure_finishes_failed_not_done(self):
