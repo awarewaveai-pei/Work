@@ -241,11 +241,17 @@ main{display:grid;gap:32px;min-width:0}
         <div class="ring" id="ring"></div>
       </div>
       <div class="card stack">
+        <h3>一次任務只組 2 到 5 塊：藍圖的五個套件</h3>
+        <p class="cap">上面那一圈是全部積木的位置，不是每次都要走完。先選目的，系統推薦一組，你可以重排、跳過、停止。</p>
+        <div class="rows" id="packs"></div>
+        <p class="cap">藍圖把「行動」放在 DECIDE 裡。我們把 ACT 獨立之後，套件要不要加 ACT 還沒定：加了，個人複雜決策變 6 塊，超過藍圖「首輪最多 5 塊」。</p>
+      </div>
+      <div class="card stack">
         <h3>不在圈上，需要的時候接進來</h3>
         <div class="row4" id="below"></div>
       </div>
       <div class="card stack">
-        <h3>全程生效的規則</h3>
+        <h3>全程生效，任何積木都不能覆寫</h3>
         <div class="row4" id="rules"></div>
       </div>
       <div class="legend" id="legend"></div>
@@ -253,7 +259,7 @@ main{display:grid;gap:32px;min-width:0}
 
     <section class="view" id="v-flow" hidden>
       <div class="stack"><h2>走一趟：一個人從頭到尾做什麼</h2>
-        <p class="sub">左邊是你做的事，下面的標籤是負責的積木。虛線圈是「需要時」才做，可以跳過。任何一步都可以停；只有「判斷」那一格永遠是你填。</p></div>
+        <p class="sub">這是最長的走法，多數任務只走其中 2 到 5 塊。下面的標籤是負責的積木，虛線圈是「需要時」才做。任何一步都可以停、可以要 AI 直接給建議；只有「判斷」那一格永遠是你填。每一步都是你先寫，AI 才回。</p></div>
       <div class="card"><ol class="steps" id="steps"></ol></div>
       <p class="note">觀察和回顧改了判斷，就回到第 8 步出新版本。這次的方法沒解決，就換一個方法從第 5 步再走，兩次都留著。</p>
     </section>
@@ -273,19 +279,19 @@ main{display:grid;gap:32px;min-width:0}
 
     <section class="view" id="v-contracts" hidden>
       <div class="stack"><h2>13 份合約</h2>
-        <p class="sub">每塊積木一份合約，同一個形狀，九個欄位。點一張卡展開。</p></div>
+        <p class="sub">每塊積木一份合約，同一個形狀，十二個欄位。藍圖 3.3 要求的六項（輸入、輸出、AI 權限、來源與不確定性、人的控制、資料與版本）都在裡面。點一張卡展開。</p></div>
       <div class="card stack">
         <h3>一份合約長這樣</h3>
         <div class="shape">
-          <div class="io"><span>讀什麼</span></div>
+          <div class="io"><span>讀什麼、絕不讀什麼</span></div>
           <div class="arr">→</div>
-          <div class="mid"><span>解決什麼問題</span><span>使用者做什麼</span><span>系統做什麼</span><span>AI 能做什麼</span><span>AI 不准做什麼</span><span>現在有沒有</span></div>
+          <div class="mid"><span>解決什麼問題</span><span>使用者做什麼</span><span>系統做什麼</span><span>AI 能做什麼</span><span>AI 不准做什麼、何時交還控制</span><span>來源與不確定性</span><span>人怎麼控制：改、跳過、覆寫、刪除、換一塊</span><span>資料與版本：存多久、誰看得到</span><span>現在有沒有</span></div>
           <div class="arr">→</div>
           <div class="io"><span>寫什麼</span><span>產出給誰</span></div>
         </div>
       </div>
       <div class="cgrid" id="blocks"></div>
-      <h3>全程生效的四樣（不算積木）</h3>
+      <h3>全程生效的五樣（不算積木）</h3>
       <div class="cgrid" id="cross"></div>
     </section>
 
@@ -367,15 +373,16 @@ const BLOCKS = [
  {n:12, code:"COLLAB", name:"共同程序", role:"多人時加入", status:"無", contract:"未寫", build:"未開始",
   problem:"多人怎麼共同決定又保留異議：分歧地圖、授權與撤回、少數意見保存、閉合與重開條件。",
   now:"沒有。"},
- {n:13, code:"GOVERN", name:"治理與研究", role:"監督整個平台", status:"部分", contract:"未寫", build:"未開始",
-  problem:"平台自己被檢查：prompt 和模型版本可追、研究同意、匯出刪除、申訴、在地化。",
-  now:"一點點。prompt 版本、重放、演化迴圈的雛形有。同意、匯出、申訴沒有。"},
+ {n:13, code:"GOVERN", name:"安全、資料與治理", role:"全程伴隨", status:"部分", contract:"未寫", build:"未開始",
+  problem:"保護使用者，也讓平台自己被檢查：同意、隱私、資料匯出與完整刪除、危機與高風險轉介、來源標記、申訴、prompt 和模型版本可追、在地化。高風險任務（健康、法律、金錢、急性心理危機、公共擴散）自動加護欄。不是治療服務。",
+  now:"一點點。prompt 版本、重放、演化迴圈的雛形有；專案可抹除、可匯出 PDF。同意、申訴、危機轉介、高風險護欄沒有。"},
 ];
 const CROSS = [
- {code:"完整性核心", name:"判斷權、可修正、非操控", status:"部分", contract:"未寫", build:"未開始", problem:"套在全部 13 份合約上的共同規則：結論只能人寫、AI 不能預填、可重開、不評分人。", now:"判斷主權的七道閘存在，但只套在藝術反思那 14 個方法上。"},
+ {code:"完整性核心", name:"判斷權、可修正、非操控", status:"部分", contract:"未寫", build:"未開始", problem:"藍圖第 9 節的 11 條，套在全部 13 份合約上，任何積木都不能覆寫：人保有最終判斷權；不預設結論但要呈現規範脈絡；所有影響可檢查；事實、法律、價值、文化宗教四種主張不混；追求可修正而不是懷疑一切；服從或抵抗都可以是結果；判斷權不等於免責；共同秩序另外設計；平台本身可被質疑；AI 權限看得見、可縮小、可撤回；信任可校準。不評分人。", now:"判斷主權的七道閘存在，但只套在藝術反思那 14 個方法上。"},
+ {code:"規範與脈絡", name:"政治、文化、宗教、法律、倫理、道德", status:"無", contract:"未寫", build:"未開始", problem:"藍圖 5.1a 的橫切鏡頭，不是最後才補的一層。每個判斷都要看：誰有權決定、誰負什麼義務；這個規範從哪來、誰受益；這句話是可查證的事實、要確認的法律條件，還是要人權衡的價值；我是真心認同、暫時遵守，還是沒檢查過。法律主張要標法域、時效、來源；文化與宗教要先問當事人自己的理解。", now:"沒有。資料上「事實／法律／價值」沒有分開的欄位，沒有任何一頁問這些。"},
  {code:"組裝器", name:"依目的挑 2 到 5 塊", status:"部分", contract:"未寫", build:"未開始", problem:"先選目的，推薦積木組合並說理由。人可重排、跳過、停止。", now:"工具已按問題分類（例：「這件事為什麼一直發生？」31 個），方法頁有「做完常接」，結果頁 ⑧ 推下一步。能推薦方法，不能組積木，沒有套件。"},
  {code:"共用紀錄", name:"案子的紀錄＋個人歷程", status:"部分", contract:"未寫", build:"未開始",
-  problem:"一個案子的家。13 塊積木宣告要讀寫的欄位加起來就是它。最低標準：完整歷程（每一步一筆）；同一案子可做很多次分析，這次的方法沒解決就換別的方法，每次都留著、可以比較；案子自己的來源；任務卡和每筆紀錄（實際狀況、想法、調整方針、卡住了、實際數字，數字自動成趨勢）；短期觀察（按週）與長期觀察（按月、季、年）；重跑並比較；只推還沒做過的工具；核准、退回（舊版保留）、匯出、抹除（留一筆已抹除）。跨案子的個人歷程也在這裡。",
+  problem:"一個案子的家。13 塊積木宣告要讀寫的欄位加起來就是它。最低標準：完整歷程（每一步一筆）；同一案子可做很多次分析，這次的方法沒解決就換別的方法，每次都留著、可以比較；案子自己的來源；任務卡和每筆紀錄（實際狀況、想法、調整方針、卡住了、實際數字，數字自動成趨勢）；短期觀察（按週）與長期觀察（按月、季、年）；重跑並比較；只推還沒做過的工具；匯出、抹除（留一筆已抹除）。藍圖 4.4 另外要求的欄位：目的、風險與協作合約；情緒、關係與權力訊號；規範脈絡；假設、替代解釋、判準、不確定性；暫定判斷、行動、預測、結果與版本；每張卡標「我的／AI 提出／共同發展」。核准不是個人流程的必經步驟（藍圖 4.3），多人或高風險才有「授權、退回、重開」。跨案子的個人歷程也在這裡。",
   now:"今天的專案頁（2026-10-02 親自看過冰山模型那個專案）已有：歷程、分析表（一次一列，有工具、狀態、你的判斷、核准欄）、來源、任務卡與紀錄、數字趨勢、到期重跑並比較、⑧ 只推沒做過的工具、核准／退回／匯出 PDF／抹除。缺的是：專案頁上只有「再用同一個工具」的按鈕，換方法要從結果頁 ⑧ 進；觀察沒有按週、按月季年的節奏；狀態每點一次記一筆，那個專案 30 筆歷程有 21 筆是一分鐘內來回點；沒有判斷版本、外化素材，也沒有跨案子記憶。"},
  {code:"協作合約", name:"AI 這次能做什麼", status:"無", contract:"未寫", build:"未開始", problem:"每件任務開始前設定：AI 的角色、能用的資料、不准碰的部分、什麼時候交還控制。系統層強制，不只是提示詞。", now:"沒有。AI 每次都是全權。"},
 ];
@@ -417,9 +424,17 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
   $("ring").innerHTML = ring +
     `<button class="hub" data-open="共用紀錄" style="--c:2/4;--r:2;--o:0"><b>共用紀錄</b><span>這個案子的所有紀錄。每一塊積木都讀它、寫它。</span><span>${st(hub.status)}</span></button>` +
     `<div class="loop" style="--c:1;--r:2;--o:10" data-dir="u">回顧完，回到外化<br>再走一圈</div>`;
-  $("below").innerHTML = BLOCKS.filter(b=>!pos[b.code]).map(b=>node(b)).join("");
+  $("below").innerHTML = BLOCKS.filter(b=>!pos[b.code] && b.code!=="GOVERN").map(b=>node(b)).join("");
   $("rules").innerHTML = CROSS.filter(x=>x.code!=="共用紀錄").map(x=>`<button class="node" data-s="${x.status}" data-open="${x.code}">
-      <span class="top">${x.code}${st(x.status)}</span><span class="rl">${x.name}</span></button>`).join("");
+      <span class="top">${x.code}${st(x.status)}</span><span class="rl">${x.name}</span></button>`).join("") + node(byCode("GOVERN"));
+  const PK = [
+    ["個人複雜決策","關係、職涯、合作與個人選擇",["SENSE","MAP","THINK","DECIDE","LEARN"]],
+    ["可疑訊息判斷","詐騙、健康、投資、公共資訊與日常轉傳",["VERIFY","THINK","DECIDE","LEARN"]],
+    ["創意與策略衝刺","研究、創作、產品與策略問題。SENSE 或 MAP 擇一開始",["SENSE","MAP","THINK","DECIDE"]],
+    ["課堂反思","學生的思考練習與 AI 素養",["SENSE","THINK","LEARN"]],
+    ["團隊審議","團隊、社群與組織的共同問題",["MAP","VERIFY","COLLAB","DECIDE","LEARN"]],
+  ];
+  $("packs").innerHTML = PK.map(([k,d,bs])=>`<div class="r"><span class="k">${k}</span><span><span>${bs.map(bk).join(" → ")}</span><span class="d" style="display:block">${d}</span></span></div>`).join("");
   $("legend").innerHTML = `<span>框的顏色＝今天有沒有：</span>${["有","部分","無"].map(st).join("")}
     <span>號碼的顏色＝建置順序：</span>
     <span><i class="nb" data-g="1"></i>第一圈</span><span><i class="nb" data-g="2"></i>現有引擎</span>
@@ -456,7 +471,7 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
     ["第一輪","方法 A",[
       ["10／03","冰山模型","事件 → 模式 → 結構 → 心智模型，每層有引註","MAP"],
       ["10／03","判斷　第 1 版","我的結論、依據、信心、什麼會改變它","DECIDE"],
-      ["10／04","行動＋任務卡","先談一次條件；負責人、期限、停止條件","ACT"]]],
+      ["10／04","行動＋任務卡","先談一次條件；我的預測、負責人、期限、停止條件","ACT"]]],
     ["短期觀察","行動後第一個月，按週",[
       ["10／11","第 1 週","實際狀況、數字、想法、調整","ACT"],
       ["10／18","第 2 週","同上，數字自動連成趨勢","ACT"],
@@ -489,11 +504,15 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
     "歷程有雜訊：狀態每點一下記一筆，那個專案 30 筆裡 21 筆是一分鐘內來回點",
     "判斷沒有版本：沒有第 1 版、第 2 版",
     "沒有外化素材",
+    "沒有預測：行動前沒寫下預期，回顧時沒東西可對",
+    "沒有規範脈絡：事實、法律、價值沒有分開的欄位",
+    "沒有標「我的／AI 提出／共同發展」",
+    "流程列是「建立→蒐集→彙整→分析→報表→核准」，正是藍圖 4 說平台不該是的樣子；個人流程不該以核准收尾",
     "沒有跨案子的記憶"]);
 })();
 
 /* 合約卡 */
-const FIELDS = [["解決什麼問題","problem"],["使用者做什麼","user"],["系統做什麼","system"],["AI 能做什麼","ai"],["AI 不准做什麼","aino"],["讀什麼","reads"],["寫什麼","writes"],["產出給誰","out"],["現在有沒有","now"]];
+const FIELDS = [["解決什麼問題","problem"],["使用者做什麼","user"],["系統做什麼","system"],["AI 能做什麼","ai"],["AI 不准做什麼","aino"],["讀什麼、絕不讀什麼","reads"],["寫什麼","writes"],["產出給誰","out"],["來源與不確定性","uncert"],["人怎麼控制","control"],["資料與版本","data"],["現在有沒有","now"]];
 function card(b){
   const g = GROUP[b.code]||0;
   const val = v => Array.isArray(v) ? `<ul>${v.map(x=>`<li>${x}</li>`).join("")}</ul>` : v;
@@ -517,8 +536,8 @@ $("cross").innerHTML = CROSS.map(card).join("");
   $("matrix").innerHTML = `<div class="r h"><span></span><span>現況</span><span>合約</span><span>建置</span></div>` +
     BLOCKS.map((b,i)=>row(b,i===BLOCKS.length-1)).join("") + CROSS.map(b=>row(b)).join("");
   const O = [
-    [0,"第 0 步","寫 13 份合約","每塊說清楚九個欄位。共用紀錄從這 13 份推出來。","進行中，1 份草稿",[]],
-    [1,"第 1 步","第一圈：個人複雜決策","一塊一塊做到能拿真事進去用。串連靠合約的讀寫宣告。","未開始，第一圈待確認",["SENSE","MAP","THINK","DECIDE","ACT","LEARN"]],
+    [0,"第 0 步","寫 13 份合約","每塊說清楚十二個欄位。共用紀錄從這 13 份推出來。","進行中，1 份草稿",[]],
+    [1,"第 1 步","第一圈：個人複雜決策","外殼（組裝器與目的卡、協作合約、完整性核心）和六塊一起做，藍圖把它們都列在最優先。一塊一塊做到能拿真事進去用。","未開始，第一圈待確認",["組裝器","協作合約","完整性核心","SENSE","MAP","THINK","DECIDE","ACT","LEARN"]],
     [2,"第 2 步","接現有引擎當積木","東西已經有，缺的是積木外殼。","未開始",["GATHER","VERIFY","COMPUTE"]],
     [3,"第 3 步","表達與教學","把判斷變成給別人看的東西；用一個方法前先練。","未開始",["EXPRESS","TEACH"]],
     [4,"第 4 步","共同與治理","多人共同程序；平台自己被檢查。","未開始",["COLLAB","GOVERN"]],
@@ -542,8 +561,13 @@ $("cross").innerHTML = CROSS.map(card).join("");
     "不做「先放 13 個有畫面沒合約的空頁」。",
     "ACT（行動與觀察）獨立成一塊。短期觀察按週、長期觀察按月季年，都在這塊。"];
   const open = [
-    "第一圈是不是「個人複雜決策」。",
-    "外化媒介：先文字卡＋關係圖，畫圖與照片之後加。",
+    "第一個場景：個人複雜決策、師生反思、團隊協作，三選一當主線（藍圖 13.1）。",
+    "外化媒介：先文字卡＋關係圖，畫圖與照片之後加（藍圖 13.2）。",
+    "AI 邊界：可以挑戰到多強、能不能引用外部資料、什麼情況要轉給人（藍圖 13.3）。",
+    "資料承諾：反思資料是不是預設只有自己看得到；研究怎麼取得同意（藍圖 13.4）。",
+    "第一次試用只驗證一件事：外化加基本積木，有沒有讓人更看得見自己怎麼判斷（藍圖 13.5）。",
+    "首批是哪三種套件；哪些積木暫不開放自由組合（藍圖 13.6）。",
+    "ACT 獨立之後，套件要不要加 ACT（加了會超過首輪 5 塊）。",
     "其餘 12 份合約的內容。"];
   $("done").innerHTML = done.map(x=>`<li><span class="m">✓</span><span>${x}</span></li>`).join("");
   $("open").innerHTML = open.map(x=>`<li><span class="m">？</span><span>${x}</span></li>`).join("");
