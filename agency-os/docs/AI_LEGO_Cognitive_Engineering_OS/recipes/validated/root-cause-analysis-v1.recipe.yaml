@@ -1,0 +1,92 @@
+$id: "ai-lego://recipes/validated/root-cause-analysis-v1.recipe.yaml"
+title: "Root Cause Analysis (Problem Statement -> Fishbone -> 5 Whys -> Pareto)"
+status: ACTIVE
+description: >
+  The operator's 54-item list names "Root Cause Analysis" as one tool; the Atlas has no single RCA method, only the
+  concrete techniques (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md, partial-match row). This Recipe is that one tool: the
+  Atlas §28 quick-pick row "想找根因 -> Fishbone -> Pareto + 5 Whys" (L4472) as one chain. A reviewed problem
+  statement feeds the fishbone; the fishbone's CauseHypothesisSet feeds both the 5 Whys drill-down and the Pareto
+  ranking, so every cause the later steps touch is one the fishbone actually listed (each builder refuses an id that
+  is not in the set).
+id: root-cause-analysis-v1
+version: "1.0.0"
+name: "Root Cause Analysis"
+references:
+  cognitive_method_atlas:
+    file: "AI_LEGO_Cognitive_Method_Atlas_Global_Architecture_v1.md"
+    required: true
+suited_for:
+  - "A problem that keeps coming back and needs its causes found, not just this instance handled"
+  - "Workshop or team settings that want one guided path instead of picking among nine root-cause techniques"
+not_for:
+  - "Incidents in progress (start with root_cause.change_analysis, Atlas §28 L4473)"
+  - "Promoting a cause to fact: the fishbone output stays a hypothesis set (Atlas §11.4 L1258)"
+mandatory_elements:
+  - "The problem statement's status is validated before the fishbone runs -- code-enforced (fishbone refuses any other status); that a person, not an AI draft, set it is the operator's obligation, not checked by code"
+  - "The 5 Whys target and every Pareto row name a hypothesis the fishbone produced -- code-enforced (five_whys / pareto refuse unknown ids)"
+  - "The Pareto metric values are counts the person supplies from real data -- operator obligation; the ranking and cumulative share are computed, the counts are taken as given"
+forbidden_actions:
+  - "Declaring a root cause without evidence on the why chain (five_whys refuses a chain with no evidence at all)"
+  - "Using a silent 80/20 cut: the vital-few threshold is set by the person running it"
+steps:
+  - label: "problem_statement"
+    type: method
+    method_id: framing.problem_statement
+    input: source.problem
+    bindings:
+      problem_id: source.problem.problem_id
+      current_state: source.problem.current_state
+      expected_state: source.problem.expected_state
+      gap: source.problem.gap
+      status: source.problem.status
+      provenance: source.problem.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "fishbone"
+    type: method
+    method_id: root_cause.fishbone
+    input: [source.fishbone, outputs.problem_statement]
+    bindings:
+      chs_id: source.fishbone.chs_id
+      problem_statement: outputs.problem_statement
+      hypotheses: source.fishbone.hypotheses
+    necessity: REQUIRED_BY_RISK
+  - label: "five_whys"
+    type: method
+    method_id: root_cause.five_whys
+    input: [source.five_whys, outputs.fishbone]
+    bindings:
+      validation_id: source.five_whys.validation_id
+      cause_hypothesis_set: outputs.fishbone
+      target_hypothesis_id: source.five_whys.target_hypothesis_id
+      why_chain: source.five_whys.why_chain
+      stop_conditions_met: source.five_whys.stop_conditions_met
+      provenance: source.five_whys.provenance
+    necessity: REQUIRED_BY_RISK
+  - label: "pareto"
+    type: method
+    method_id: root_cause.pareto
+    input: [source.pareto, outputs.fishbone]
+    bindings:
+      analysis_id: source.pareto.analysis_id
+      cause_hypothesis_set: outputs.fishbone
+      metric_name: source.pareto.metric_name
+      dataset: source.pareto.dataset
+      provenance: source.pareto.provenance
+      vital_few_threshold_percent: source.pareto.vital_few_threshold_percent
+    necessity: REQUIRED_BY_RISK
+outputs:
+  - "ProblemStatement"
+  - "CauseHypothesisSet"
+  - "FiveWhysValidation"
+  - "ParetoAnalysis"
+open_questions:
+  - id: "OQ-RCA-1"
+    question: "Should a barrier_analysis / CAPA step close the chain (Atlas L1109 Incident recipe), or stay a separate Recipe?"
+    owner: "operator"
+    blocks: "nothing in v1"
+verification:
+  required: true
+  checks:
+    - "All four method ids resolve to ACTIVE contracts and dispatchable builders/gates"
+    - "five_whys and pareto receive the fishbone's own CauseHypothesisSet (outputs.fishbone), never a re-supplied copy"
+    - "Each record passes its provenance and integrity gates"

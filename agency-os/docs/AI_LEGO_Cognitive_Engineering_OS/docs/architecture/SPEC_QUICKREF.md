@@ -184,6 +184,7 @@
 | `specs/cognitive/typed-objects/lean-canvas-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, blocks, validation_status, provenance] properties[6] |
 | `specs/cognitive/typed-objects/leverage-point-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, intervention_points, provenance] properties[5] |
 | `specs/cognitive/typed-objects/life-system-mapping-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, focal_person, subsystems, provenance] properties[6] |
+| `specs/cognitive/typed-objects/life-timeline-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, now, present_self, direction, events, provenance] properties[9] |
 | `specs/cognitive/typed-objects/life-wheel-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, dimensions, provenance] properties[6] |
 | `specs/cognitive/typed-objects/linddun-privacy-threat-model-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, assets, trust_boundaries, entry_points, data_flow_elements, threats, elements_with_no_recorded_threats, provenance] properties[11] |
 | `specs/cognitive/typed-objects/literature-matrix.schema.yaml` | DRAFT | 1.0.0 | `(root)`: type=object required=[synthesis_id, project_id, kind, language, summary, sections, gaps, conflicts, uncited_sections, manifest_ref, provenance, model, usage, studies] properties[14] |

@@ -41,6 +41,19 @@ methods:
     dimensions.status: 這一面向目前
     dimensions.gap_note: 還缺什麼資訊（選填）
 
+  art_therapy.life_timeline:
+    subject: {label: 這條時間線的主題, hint: 例：我和創作的路、我的職涯、我和家人的關係。}
+    now: {label: 今天（切開過去與未來的日期）, hint: 比這天早的是過去、同一天是現在、比這天晚的是未來，系統自動判斷。}
+    present_self: {label: 現在的我, hint: 用自己的話寫：今天站在哪裡、感覺如何。}
+    direction: {label: 走的方向, hint: 正向＝從最早的事往後排；反向＝從想要的未來開始，倒著排回今天、再到過去。事件要照這個方向排。}
+    "direction=": {forward: 正向：從過去走到未來, backward: 反向：從想要的未來倒著走回來}
+    events: {label: 時間線上的事件, hint: 至少一件過去的事、一件未來的事。}
+    events.when: {label: 日期, hint: 未來的事寫你希望發生的大約日期。}
+    events.event: 發生了什麼／希望發生什麼
+    events.feeling: 當時（或想像中）的感受
+    events.meaning: 這件事對我的意義
+    events.first_step: {label: 今天就能開始的第一步, hint: 只有未來的事要寫；過去和今天的事留空。}
+
   challenge.fmea:
     _computed: [failure_modes.rpn, failure_modes.action_priority]
 

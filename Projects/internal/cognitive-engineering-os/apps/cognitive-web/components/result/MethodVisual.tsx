@@ -1,5 +1,6 @@
 import React from "react";
 import { lineHeight, useLines, Wrap } from "./svgtext";
+import { RiskMatrix, riskCount, risksOf } from "./RiskMatrix";
 
 type Bindings = Record<string, unknown>;
 // One unit of a layered picture: its name, what you filled in (and its short form, when the analysis wrote one), its [n],
@@ -84,7 +85,16 @@ function Layers({ units, name }: { units: Unit[]; name: string }) {
   </svg>;
 }
 
-export function MethodVisual({ kind, bindings, methodId, name = "", units = [] }: { kind: string; bindings: Bindings; methodId?: string; name?: string; units?: Unit[] }) {
+// A tool whose picture is drawn from the record itself, whatever the reading binds (the record is the one source).
+const RECORD_PICTURES: Record<string, string> = { "delivery.risk_register": "每個風險落在機率×衝擊的哪一格" };
+/** Card ②'s caption for a record-drawn picture, or undefined when that picture is not drawn (same test as the body). */
+export function recordPictureCaption(methodId: string, record?: Record<string, unknown>): string | undefined {
+  return methodId === "delivery.risk_register" && risksOf(record).length ? RECORD_PICTURES[methodId] : undefined;
+}
+
+export function MethodVisual({ kind, bindings, methodId, name = "", units = [], record }: { kind: string; bindings: Bindings; methodId?: string; name?: string; units?: Unit[]; record?: Record<string, unknown> }) {
+  const risks = methodId === "delivery.risk_register" ? risksOf(record) : [];
+  if (risks.length) return <div data-visual="risk-matrix" data-method={methodId}><RiskMatrix risks={risks} total={riskCount(record)} /></div>;
   if (kind === "layered") return <div data-visual="layered" data-method={methodId}>{methodId === "systems.iceberg_model" ? <Iceberg units={units} /> : <Layers units={units} name={name} />}</div>;
   if (kind === "quadrant") {
     return <dl className="visual-quadrant" data-visual="quadrant">

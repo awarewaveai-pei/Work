@@ -1,0 +1,67 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "ai-lego://specs/cognitive/typed-objects/life-timeline-record.schema.yaml"
+title: Life Timeline Record
+version: "1.0.0"
+status: ACTIVE
+
+description: >
+  `LifeTimelineRecord` -- output of `art_therapy.life_timeline` (生命時間線／反向時間軸). Past, present and future events on one
+  dated line around a "now" anchor, listed forward (oldest first) or backward (from the wished-for future back to
+  today). Runtime invariants beyond this schema live in ai_lego/modules/art_therapy/life_timeline.py.
+
+source_of_truth_for:
+  - "methods/contracts/art_therapy.life_timeline.contract.yaml"
+
+decided_by: "Operator directive 2026-10-02; no ADR."
+
+type: object
+additionalProperties: false
+required: [id, version, subject, now, present_self, direction, events, provenance]
+properties:
+  id: { type: string, pattern: "^LIFETL-" }
+  version: { type: string }
+  generated_by_method: { type: string, default: "art_therapy.life_timeline" }
+  subject: { type: string, minLength: 1 }
+  now: { type: string, format: date, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", description: "The dated anchor that splits the line into past / present / future." }
+  present_self: { type: string, minLength: 1, description: "Where the client stands today, in their own words." }
+  direction:
+    type: string
+    enum: [forward, backward]
+    description: "forward = walk from the oldest event to the furthest future; backward = start at the wished-for future and walk back to today."
+  events:
+    type: array
+    minItems: 2
+    maxItems: 40
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, when, phase, event, feeling, meaning]
+      properties:
+        id: { type: string, minLength: 1 }
+        when: { type: string, format: date, pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        phase:
+          type: string
+          enum: [past, present, future]
+          description: "COMPUTED -- derived from `when` against `now` (before = past, same day = present, after = future); never caller-supplied."
+        event: { type: string, minLength: 1 }
+        feeling: { type: string, minLength: 1 }
+        meaning: { type: string, minLength: 1 }
+        first_step: { type: string, minLength: 1, description: "Future events only: one small step that can start now." }
+  provenance:
+    $ref: "ai-lego://specs/governance/epistemic-label.schema.yaml#/provenance_record"
+
+examples:
+  - description: "Backward walk: from a wished-for future back to today, then the past it grew from"
+    value:
+      id: "LIFETL-2026-10-02-001"
+      version: "1.0.0"
+      generated_by_method: "art_therapy.life_timeline"
+      subject: "我和創作的路"
+      now: "2026-10-02"
+      present_self: "白天上班，晚上偶爾畫，覺得自己離畫畫越來越遠"
+      direction: backward
+      events:
+        - { id: "F1", when: "2028-06-01", phase: future, event: "辦一場小小的個展", feeling: "期待", meaning: "讓作品被看見", first_step: "這週挑出三張想展的舊作" }
+        - { id: "F2", when: "2027-01-01", phase: future, event: "每週固定畫兩個晚上", feeling: "踏實", meaning: "創作回到生活裡", first_step: "週三晚上先空出一小時" }
+        - { id: "P1", when: "2019-09-01", phase: past, event: "畢業後把畫具收進箱子", feeling: "失落", meaning: "以為要先顧好生活才能畫" }
+      provenance: { epistemic_type: HUMAN_OPINION, authorship_state: HUMAN_ORIGINAL, locked: null }

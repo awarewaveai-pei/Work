@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-02（續4）Cognitive OS 補藝術治療清單 3 個部分對應項：生命時間線新方法、風險矩陣格子圖、根本原因分析工作流；個人 SWOT 待操作者決定
+- [操作者] 對照 54 項藝術治療工具清單問「少哪些」→ 53 個 method_id 全在（本機 `/methods` 實測），4 項只部分對應 → 指示「做」前三項。
+- [新方法] `art_therapy.life_timeline`：contract＋`life-timeline-record.schema.yaml`＋`modules/art_therapy/life_timeline.py`＋slice＋test＋4 份登記檔。不變量：`phase` 由 `when` 對 `now` 算出、不收輸入；≥1 過去＋≥1 未來；順序依 `direction`（forward 非遞減／backward 非遞增）；只有未來事件帶 `first_step`。gate 由原始紀錄重算（`life_timeline.py:_line_problem stored=True`）。
+- [格子圖] `delivery.risk_register` 結果頁 ② 改畫 5×5 機率×衝擊圖（`apps/cognitive-web/components/result/RiskMatrix.tsx`），由紀錄數字直接算格，不經 AI；格子分區＝等級相乘 ≥15 紅／≥6 黃；圖下依曝險排序列表；畫不上的風險明說數量。更正：前端 `quadrant`／`matrix` 原本都不是真圖（`MethodVisual.tsx` 舊版只有冰山與分層是 SVG），先前「沿用 stakeholders matrix 圖」說法錯誤。
+- [工作流] `recipes/validated/root-cause-analysis-v1.recipe.yaml`：problem_statement(status 綁 source) → fishbone → five_whys ＋ pareto，後兩步吃 `outputs.fishbone`；首頁掛 `why_repeat`。Atlas 依據 L4472「想找根因」、L1258。
+- [未做] 個人 SWOT：`strategy.swot` factor 必填 geography/time/source＋證據庫（schema `swot-analysis.schema.yaml:152`，Atlas L1332），只改說明會誤導 → 寫進 `ART_THERAPY_METHOD_ATLAS_GAP_LIST.md` 新節，待操作者選「新建 art_therapy.personal_swot」或維持。
+- [critic] 1m/4n：M1 `life_timeline.py` 非 list `events` 拋 TypeError→API 500，已修＋2 個 refusal 測試；L1 `risksOf` 未驗 description/exposure 型別→已修；L2 ② 標題與圖可能不一致→改共用 `recordPictureCaption`；L3 recipe 兩條 mandatory_elements 宣稱程式強制但未強制→改寫成「程式擋／操作者責任」分開；L4 Atlas L1332 引用→實查 `grep -n` 為 L1332，不成立。
+- [突變] 拔 order 檢查／拔 phase 比對／刪 recipe status 綁定／紅區門檻 15→16 → 各自指名測試變紅，還原後綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/affected_tests.py --run`（93 模組）＋`pytest tests/unit/test_life_timeline.py tests/unit/test_root_cause_analysis_recipe.py`＋`npx tsc --noEmit && npx vitest run`＋`tests/run_golden_tests.py`＋`check-mocks.py` | exit=0 | ms=1592000
+- [結果] affected 3365 tests OK；新測試 12 passed／26 subtests；web 15 檔 111 tests；golden 4268 PASSED（補 recipe 釘選清單 `tests/run_golden_tests.py:272`＋重生 SPEC_QUICKREF／MOTHER_DOC_SECTION_INDEX）；check-mocks 5 頁全綠；風險矩陣 Chromium 截圖 1140／390 寬皆無橫向捲動。
+- [自測] `check-mocks-selftest.py`：HEAD 基準漏 2＋page 段 2（既有：「路線」錨點 SETUP、page fact SETUP、結果頁 fixture 過期 TASKS）；本分支多漏 1 = 「hero stale tool count」突變以字面 `284 個思考工具、12 條工作流` 當錨點，加工具即失效 → 改正規式錨點、工具數換成 9999（`check-mocks-selftest.py:122`），單案重跑 CAUGHT。
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/1m/4n
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`284 個(思考)?工具|12 條工作流|life_timeline|root-cause-analysis-v1|RiskMatrix` | hits=2 stale（Phase 0 歷史報告、已關閉 TASKS 條目，舊檔不回改）
+- ORACLE_WAIVED: container 無 codex／pwsh，oracle 無法執行 → 獨立 critic（Standard）＋4 個突變證據（拔 guard→指名測試紅→還原綠）
+- rollback：revert 本 commit；新方法／recipe 為純新增檔，前端只在 `delivery.risk_register` 且紀錄有可用風險時才換圖，其他方法路徑不變。
 ## 2026-10-02（續3）Cognitive OS：要回 JSON 物件的 AI 呼叫一律帶格式規格（structured.py）；schema 失敗記違規路徑不記值（方案 B，未部署）
 - [操作者] 選 B（關整類，不只修彙整）。
 - 根因：模型答案必須符合 typed object 的 5 處，只有 interpret 走 `complete_json`＋schema（9/27 修過一次，只修那一處）；synthesis／route_method／workflow_interpretation／draft 仍讓模型自由打字再 `extract_json_object` 挖 JSON，模型看不到 schema → 續2 dossier_brief 1/2 整次 FAILED。且 SynthesisFailed 只存錯誤碼（K8），違規欄位一併丟失。
