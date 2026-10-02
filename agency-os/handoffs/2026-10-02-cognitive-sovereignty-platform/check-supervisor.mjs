@@ -48,9 +48,17 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
   const views = await page.evaluate(() => VIEWS);
 
   for (const v of views) {
+    // Real state first: what the operator sees on opening the view, and how tall it is.
+    const tall = await page.evaluate((name) => { window.show(name, true); scrollTo(0, 0); return document.documentElement.scrollHeight; }, v);
+    await page.screenshot({ path: path.join(out, `${label}-${v}.png`), fullPage: true });
+    // A view must not be a long scroll: the one-page view shows one panel (about a screen and a half at most),
+    // every other view opens with at most one section expanded.
+    if (label === 'wide') rule(label, `${v}.too_long`, tall > (v === 'one' ? 1500 : 3200) ? tall + 'px' : '');
     const m = await page.evaluate((name) => {
-      window.show(name, true);
       const el = document.getElementById('v-' + name);
+      // Then open everything so the text checks and the dump cover the whole view.
+      el.querySelectorAll('[data-panel]').forEach((d) => { d.hidden = false; });
+      el.querySelectorAll('.acc').forEach((d) => d.classList.add('open'));
       el.querySelectorAll('details').forEach((d) => { d.open = true; });
       const text = el.innerText;
       const latin = (c) => new RegExp('(^|[^A-Z])' + c + '([^A-Z]|$)').test(text);
@@ -79,7 +87,6 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
         alwaysOn: CROSS.map((x) => x.code).filter((c) => !text.includes(c)),
       };
     }, v);
-    await page.screenshot({ path: path.join(out, `${label}-${v}.png`), fullPage: true });
     if (label === 'wide') writeFileSync(path.join(out, `text-${v}.txt`), m.text);
     rule(label, `${v}.overflow`, m.overflow ? 'yes' : '');
     rule(label, `${v}.cramped_text`, m.cramped);
@@ -153,6 +160,11 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       if (got.join('|') !== five) journey.push(id + ' shows ' + got.length + ' of 5');
     }
     document.querySelectorAll('[data-cross5]').forEach((e, n) => { const k = e.querySelectorAll('.node').length; if (k !== 5) journey.push('five-card row #' + n + ' has ' + k); });
+    // The tools page may hold nothing a contract card lacks: each row appears in the card of the block it belongs to.
+    const toolsMissing = [];
+    const ownerOf = (w) => TOOL_OWNER[w] || w;
+    for (const r of [...TOOL_ROWS, ...FLOW_ROWS]) for (const w of r[0]) { const c = ownerOf(w); if (codes.includes(c) && !card(c).includes(r[2])) toolsMissing.push(c + ':' + r[2].slice(0, 12)); }
+    for (const r of EXISTING_OTHER) for (const c of r[3]) if (!card(c).includes(r[2])) toolsMissing.push(c + ':' + r[0]);
     // Build order places all 18.
     window.show('progress', true);
     const chips = [...document.querySelectorAll('#order .bks .bk')].map((e) => e.textContent.trim());
@@ -163,7 +175,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // One word per meaning: words retired when two contracts used them for different things.
     for (const s of ['同源合併', '同源群組', '來源地圖', '管道佔比', '來源身分卡']) if (whole.includes(s)) typed.push('retired word ' + s);
     if (!whole.includes(FACET_NAMES.length + ' 個面向')) typed.push('facet count');
-    return { journey, arch, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
+    return { toolsMissing, journey, arch, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
   });
   rule(label, 'empty_fields', r.empty);
   rule(label, 'no_hand_back', r.noHandBack);
@@ -171,6 +183,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
   rule(label, 'handoff_unread', r.handoff);
   rule(label, 'package_step_unread', r.pkgs);
   rule(label, 'north_star_missing_from_contract', r.north);
+  rule(label, 'tools_page_missing_from_contract', r.toolsMissing);
   rule(label, 'journey', r.journey);
   rule(label, 'architecture', r.arch);
   rule(label, 'not_in_build_order', r.notBuilt);
