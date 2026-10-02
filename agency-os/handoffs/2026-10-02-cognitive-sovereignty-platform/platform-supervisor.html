@@ -1,182 +1,327 @@
 <title>認知主權平台監工台</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap">
 <style>
-/* 版面：單欄、固定寬度、同一種字。先看圖，再看清單。每一列同一個形狀。 */
+/* 版面：左邊導覽切換六個畫面，一次只看一件事；右邊內容。
+   沿用 cognitive.aware-wave.com 的設計系統（底色、卡片、綠色主色、字級），另加四個積木分組色。
+   顏色的意思：號碼色＝建置順序的哪一組；狀態色＝今天有沒有（綠 有／橘 部分／灰虛線 無）。 */
 :root{
-  --bg:#f7f7f5; --fg:#222426; --muted:#6b6f75; --line:#d9dadc; --stroke:#8b8f95; --accent:#355f8d; --accent-bg:#edf2f8; --open-bg:#fbfbfa; --box:#ffffff; --fill:#8b8f95;
+  --bg:#f6f2e9; --card:#fffdf8; --ink:#232019; --muted:#6f6757; --line:#e3dbc8; --soft:#f3efe4;
+  --accent:#0e5b50; --accent-hover:#093f38; --tag:#e2eeea;
+  --ok:#1f6b47; --ok-bg:#e2eeea; --warn:#a3611c; --warn-bg:#fbf0dc;
+  --g1:#2a5d9f; --g1-bg:#e4ecf7; --g2:#6247a8; --g2-bg:#ece7f7; --g3:#a23a62; --g3-bg:#f7e4ec; --g4:#2d6f78; --g4-bg:#e0eef0;
+  --fs-h1:28px; --fs-h2:20px; --fs-h3:18px; --fs-body:16px; --fs-small:14px; --fs-tag:12px;
 }
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#1b1d20; --fg:#e4e4e1; --muted:#9ea3aa; --line:#3a3d42; --stroke:#7d838b; --accent:#9dbfe0; --accent-bg:#26323f; --open-bg:#202327; --box:#23262b; --fill:#9ea3aa; color-scheme:dark } }
-:root[data-theme="dark"]{
-  --bg:#1b1d20; --fg:#e4e4e1; --muted:#9ea3aa; --line:#3a3d42; --stroke:#7d838b; --accent:#9dbfe0; --accent-bg:#26323f; --open-bg:#202327; --box:#23262b; --fill:#9ea3aa; color-scheme:dark }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ color-scheme:dark;
+  --bg:#1c2b27; --card:#243530; --ink:#f3efe4; --muted:#a9beb6; --line:#3a4b45; --soft:#2a3b36;
+  --accent:#8fc7b0; --accent-hover:#b5dcc9; --tag:#22403a;
+  --ok:#5fcf8f; --ok-bg:#14301f; --warn:#f0a44a; --warn-bg:#3a2a10;
+  --g1:#a9c8f0; --g1-bg:#22344f; --g2:#c9bbf2; --g2-bg:#332c54; --g3:#f2adc8; --g3-bg:#48263b; --g4:#a3d6dd; --g4-bg:#1f3d43 } }
+:root[data-theme="dark"]{ color-scheme:dark;
+  --bg:#1c2b27; --card:#243530; --ink:#f3efe4; --muted:#a9beb6; --line:#3a4b45; --soft:#2a3b36;
+  --accent:#8fc7b0; --accent-hover:#b5dcc9; --tag:#22403a;
+  --ok:#5fcf8f; --ok-bg:#14301f; --warn:#f0a44a; --warn-bg:#3a2a10;
+  --g1:#a9c8f0; --g1-bg:#22344f; --g2:#c9bbf2; --g2-bg:#332c54; --g3:#f2adc8; --g3-bg:#48263b; --g4:#a3d6dd; --g4-bg:#1f3d43 }
 
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--fg);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;font-size:16px;line-height:1.8;margin:0}
-.wrap{max-width:768px;margin:0 auto;padding-block:32px 80px;padding-inline:16px}
-h1{font-size:1.5rem;font-weight:700;line-height:1.4;margin:0}
-h2{font-size:1.15rem;font-weight:700;line-height:1.4;margin:40px 0 12px;padding-top:40px;border-top:1px solid var(--line)}
-h2.first{border-top:0;margin-top:32px;padding-top:0}
-p{margin:0}
-a{color:var(--accent)}
-.sub{color:var(--muted);margin-top:8px}
-.toc{margin:20px 0 0;padding:0;list-style:none}
-.toc li{padding:2px 0}
-.toc li a{text-decoration:none}
-
-/* 圖 */
-figure{margin:16px 0 0}
-figure svg{width:100%;height:auto;display:block}
-svg text{font-family:inherit;fill:var(--fg)}
-svg .mute{fill:var(--muted)}
-svg .bx{fill:var(--box);stroke:var(--stroke);stroke-width:1.25}
-svg .ctr{fill:var(--accent-bg);stroke:none}
-svg .frame{fill:none;stroke:var(--stroke);stroke-width:1.25}
-svg .ar{fill:none;stroke:var(--stroke);stroke-width:1.5}
-svg .ln{stroke:var(--line);stroke-width:1}
-svg .b{font-weight:700}
-svg .sq{fill:none;stroke:var(--stroke);stroke-width:1.25}
-svg .sqf{fill:var(--fill);stroke:none}
-figcaption{color:var(--muted);font-size:.9rem;margin-top:8px}
-
-/* 總覽：純文字，每行一個事實 */
-.facts{margin:16px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
-.facts li{display:grid;grid-template-columns:8.5em 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
-.facts .k{color:var(--muted)}
+body{margin:0;background:var(--bg);color:var(--ink);font:var(--fs-body)/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,p{margin:0}
+h1{font-size:var(--fs-h1);line-height:1.3;text-wrap:balance}
+h2{font-size:var(--fs-h2);line-height:1.4}
+h3{font-size:var(--fs-h3);line-height:1.4}
+.sub{color:var(--muted);font-size:var(--fs-small);max-width:46em}
 .num{font-variant-numeric:tabular-nums}
 
-/* 積木清單：每一列同一個形狀 */
-.blocks{margin:12px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
-details{border-bottom:1px solid var(--line)}
-details[open]{background:var(--open-bg)}
-summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:2.2em 7.5em 1fr 5.5em 6.5em;gap:8px;align-items:baseline;padding:10px 4px;min-height:48px}
-summary::-webkit-details-marker{display:none}
-summary:hover{background:var(--accent-bg)}
-summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.no{color:var(--muted);font-variant-numeric:tabular-nums}
-.code{font-weight:700}
-.name{min-width:0}
-.st,.ct{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
-.st b{font-weight:400;display:inline-block;width:1.2em}
-.body{padding:4px 4px 20px}
-.body dl{margin:0;display:grid;grid-template-columns:8.5em 1fr;gap:10px 12px}
-.body dt{color:var(--muted)}
-.body dd{margin:0;min-width:0}
-.body ul{margin:0;padding-left:1.2em}
-.body li{margin:0}
-.todo{color:var(--muted)}
-.ex{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
-.ex .k{color:var(--muted);display:block;margin-bottom:6px}
-.ex ul{margin:0;padding:0;list-style:none}
-.ex li{display:grid;grid-template-columns:6em 1fr;gap:12px;padding:3px 0}
-.ex li span:first-child{color:var(--muted)}
-
-/* 步驟、去向：同一種列 */
-.rows{margin:12px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
-.rows li{display:grid;grid-template-columns:7.5em 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
-.rows li .k{color:var(--muted)}
-.rows li .w{font-weight:700}
-.rows li .d{color:var(--muted);margin-top:2px;display:block}
-.plain{margin:0;padding-left:1.2em}
-.plain li{margin:6px 0}
-@media (max-width:560px){
-  summary{grid-template-columns:2.2em 1fr;row-gap:2px}
-  .name{grid-column:2}
-  .st,.ct{grid-column:2}
-  .facts li,.rows li,.body dl,.ex li{grid-template-columns:1fr}
+/* 骨架 */
+.app{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;max-width:1320px;margin:0 auto;padding-inline:24px;padding-block:32px 96px}
+.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px);align-self:start;display:flex;flex-direction:column;gap:4px}
+.brand{padding:0 12px 16px;line-height:1.4;font-weight:700}
+.brand small{display:block;font-weight:400;font-size:var(--fs-tag);color:var(--muted)}
+.navi{border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:8px;font-weight:600;cursor:pointer}
+.navi:hover{background:var(--soft)}
+.navi[aria-current="page"]{background:var(--tag);color:var(--accent)}
+main{display:grid;gap:32px;min-width:0}
+.head{display:grid;gap:8px}
+.view{display:grid;gap:24px;min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;min-width:0}
+.stack{display:grid;gap:16px}
+.cap{color:var(--muted);font-size:var(--fs-small)}
+@media (max-width:959px){
+  .app{grid-template-columns:minmax(0,1fr);gap:20px;padding-inline:16px;padding-block:20px 72px}
+  .side{position:static;flex-direction:row;flex-wrap:wrap;gap:8px}
+  .brand{flex-basis:100%;padding:0 0 4px}
+  .navi{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 14px;font-size:var(--fs-small)}
+  .card{padding:16px}
 }
-@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* 現在在哪 */
+.now{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:24px}
+.now .k{font-size:var(--fs-tag);color:var(--muted);letter-spacing:.04em}
+.now .v{font-size:var(--fs-h3);font-weight:700;line-height:1.4}
+.now .d{font-size:var(--fs-small);color:var(--muted)}
+.bar{height:8px;border-radius:999px;background:var(--soft);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:999px}
+.counts{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+
+/* 小零件：狀態、合約、積木代號、號碼 */
+.st,.ct{display:inline-block;white-space:nowrap;font-size:var(--fs-tag);font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.st[data-s="有"]{background:var(--ok);border-color:var(--ok);color:var(--card)}
+.st[data-s="部分"]{background:var(--warn-bg);border-color:var(--warn);color:var(--warn)}
+.st[data-s="無"]{border-style:dashed}
+.ct[data-s="草稿"],.ct[data-s="進行中"]{border-color:var(--accent);color:var(--accent)}
+.ct[data-s="已確認"],.ct[data-s="完成"]{background:var(--accent);border-color:var(--accent);color:var(--card)}
+.ct[data-s="未寫"],.ct[data-s="未開始"]{border-style:dashed}
+.bk{display:inline-block;font-size:var(--fs-tag);font-weight:700;padding:2px 10px;border-radius:999px;white-space:nowrap;background:var(--soft);color:var(--ink)}
+.bk[data-g="1"]{background:var(--g1-bg);color:var(--g1)}
+.bk[data-g="2"]{background:var(--g2-bg);color:var(--g2)}
+.bk[data-g="3"]{background:var(--g3-bg);color:var(--g3)}
+.bk[data-g="4"]{background:var(--g4-bg);color:var(--g4)}
+.nb{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;font-size:var(--fs-tag);font-weight:700;background:var(--muted);color:var(--card);font-variant-numeric:tabular-nums;flex:none}
+.nb[data-g="1"]{background:var(--g1)} .nb[data-g="2"]{background:var(--g2)} .nb[data-g="3"]{background:var(--g3)} .nb[data-g="4"]{background:var(--g4)}
+.nb.opt{background:transparent;border:1.5px dashed var(--muted);color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:var(--fs-small);color:var(--muted);align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend .nb{width:14px;height:14px}
+
+/* 地圖：一圈九塊，中間共用紀錄 */
+.ring{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:36px}
+.ring>*{grid-column:var(--c);grid-row:var(--r);position:relative}
+.node{display:grid;gap:4px;align-content:start;text-align:left;padding:14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);cursor:pointer;min-width:0}
+.node:hover{border-color:var(--accent)}
+.node[data-s="有"]{background:var(--ok-bg);border-color:var(--ok)}
+.node[data-s="部分"]{background:var(--warn-bg);border-color:var(--warn)}
+.node[data-s="無"]{border-style:dashed;border-color:var(--muted)}
+.node .top{display:flex;align-items:center;gap:8px;font-size:var(--fs-tag);font-weight:700;letter-spacing:.04em}
+.node .top .st{margin-left:auto}
+.node .nm{font-size:var(--fs-h3);font-weight:700;line-height:1.4}
+.node .rl{font-size:var(--fs-small);color:var(--muted)}
+.hub{display:grid;place-content:center;gap:4px;text-align:center;padding:16px;border-radius:12px;border:0;background:var(--tag);color:var(--accent);cursor:pointer}
+.hub b{font-size:var(--fs-h3)}
+.hub span{font-size:var(--fs-small)}
+.loop{display:grid;place-content:center;text-align:center;font-size:var(--fs-small);color:var(--muted)}
+.ring>[data-dir]::after{position:absolute;color:var(--muted);font-size:20px;line-height:36px;text-align:center}
+.ring>[data-dir="r"]::after{content:"→";left:100%;top:50%;width:36px;margin-top:-18px}
+.ring>[data-dir="l"]::after{content:"←";right:100%;top:50%;width:36px;margin-top:-18px}
+.ring>[data-dir="d"]::after{content:"↓";top:100%;left:0;right:0;height:36px}
+.ring>[data-dir="u"]::after{content:"↑";bottom:100%;left:0;right:0;height:36px}
+.row4{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px}
+@media (max-width:759px){
+  .ring{grid-template-columns:minmax(0,1fr);gap:32px}
+  .ring>*{grid-column:1;grid-row:auto;order:var(--o)}
+  .ring>[data-dir]::after{content:"↓";top:100%;bottom:auto;left:0;right:0;width:auto;height:32px;line-height:32px;margin-top:0}
+  .ring>.loop::after{content:none}
+}
+
+/* 走一趟 */
+.steps{display:grid;gap:0;list-style:none;margin:0;padding:0}
+.steps li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:16px;padding-bottom:24px;position:relative}
+.steps li::before{content:"";position:absolute;left:13px;top:28px;bottom:0;border-left:2px solid var(--line)}
+.steps li:last-child{padding-bottom:0}
+.steps li:last-child::before{content:none}
+.steps .t{font-weight:700}
+.steps .d{color:var(--muted);font-size:var(--fs-small)}
+.steps .who{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center}
+.opt-tag{font-size:var(--fs-tag);color:var(--muted);border:1px dashed var(--muted);border-radius:999px;padding:1px 8px}
+.note{background:var(--tag);color:var(--accent);border-radius:12px;padding:14px 16px;font-size:var(--fs-small);font-weight:600}
+
+/* 案子的紀錄 */
+.two{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:859px){.two{grid-template-columns:minmax(0,1fr)}}
+.phase{display:grid;gap:12px}
+.phase+.phase{margin-top:24px;padding-top:24px;border-top:1px solid var(--line)}
+.phase h3{font-size:var(--fs-small);color:var(--accent);letter-spacing:.04em}
+.phase h3 small{font-weight:400;color:var(--muted);margin-left:8px;letter-spacing:0}
+.ev{display:grid;grid-template-columns:4.5em 14px minmax(0,1fr);gap:12px;align-items:start}
+.ev .dt{font-size:var(--fs-tag);color:var(--muted);text-align:right;padding-top:3px;font-variant-numeric:tabular-nums}
+.ev .dot{width:12px;height:12px;border-radius:50%;margin-top:7px;background:var(--muted)}
+.ev .dot[data-g="1"]{background:var(--g1)} .ev .dot[data-g="2"]{background:var(--g2)} .ev .dot[data-g="3"]{background:var(--g3)} .ev .dot[data-g="4"]{background:var(--g4)}
+.ev .t{font-weight:700}
+.ev .t .bk{margin-left:8px;vertical-align:2px}
+.ev .d{color:var(--muted);font-size:var(--fs-small)}
+.have,.lack{border-radius:12px;padding:16px 20px;border:1.5px solid var(--ok);background:var(--ok-bg)}
+.lack{border-color:var(--warn);background:var(--warn-bg)}
+.have h3,.lack h3{font-size:var(--fs-body);margin-bottom:8px}
+.have h3{color:var(--ok)} .lack h3{color:var(--warn)}
+.have ul,.lack ul{margin:0;padding-left:1.2em;display:grid;gap:6px;font-size:var(--fs-small)}
+
+/* 合約 */
+.shape{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,2.2fr) auto minmax(0,1fr);gap:12px;align-items:center;font-size:var(--fs-small)}
+.shape .io{display:grid;gap:8px}
+.shape .io span,.shape .mid span{padding:6px 12px;border-radius:8px;background:var(--soft);font-weight:600;text-align:center}
+.shape .mid{display:grid;gap:6px;padding:14px;border:1.5px solid var(--accent);border-radius:12px}
+.shape .mid span:first-child{background:var(--tag);color:var(--accent)}
+.shape .arr{color:var(--muted);font-size:20px}
+@media (max-width:659px){.shape{grid-template-columns:minmax(0,1fr)}.shape .arr{text-align:center;transform:rotate(90deg)}}
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.cc{background:var(--card);border:1px solid var(--line);border-radius:12px;min-width:0}
+.cc[open]{grid-column:1/-1;border-color:var(--accent)}
+.cc summary{list-style:none;cursor:pointer;display:grid;gap:8px;padding:16px 20px;border-radius:12px}
+.cc summary::-webkit-details-marker{display:none}
+.cc summary:hover{background:var(--soft)}
+.cc .top{display:flex;align-items:center;gap:8px;font-size:var(--fs-tag);font-weight:700;letter-spacing:.04em}
+.cc .nm{font-size:var(--fs-h3);font-weight:700;line-height:1.4}
+.cc .nm small{font-size:var(--fs-small);font-weight:400;color:var(--muted);margin-left:8px}
+.cc .pills{display:flex;flex-wrap:wrap;gap:6px}
+.cc .body{padding:4px 20px 24px;display:grid;gap:20px}
+.cc dl{margin:0;display:grid;grid-template-columns:8em minmax(0,1fr);gap:14px 20px}
+.cc dt{color:var(--muted);font-size:var(--fs-small);padding-top:2px}
+.cc dd{margin:0;max-width:46em}
+.cc dd ul{margin:0;padding-left:1.2em;display:grid;gap:4px}
+.cc dd.no{color:var(--warn)}
+.cc .rest{font-size:var(--fs-small);color:var(--muted);border-top:1px dashed var(--line);padding-top:14px}
+@media (max-width:659px){.cc dl{grid-template-columns:minmax(0,1fr);gap:2px 0}.cc dd{margin-bottom:10px}}
+.ex{display:grid;gap:10px}
+.ex .k{font-size:var(--fs-small);color:var(--muted)}
+.ex .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.ex .cards div{background:var(--g1-bg);border-radius:8px;padding:10px 12px;font-size:var(--fs-small)}
+.ex .cards b{display:block;font-size:var(--fs-tag);color:var(--g1);letter-spacing:.04em}
+
+/* 進度 */
+.mx{display:grid;gap:0}
+.mx .r{display:grid;grid-template-columns:minmax(0,1fr) 5.5em 5.5em 5.5em;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.mx .r.h{font-size:var(--fs-tag);color:var(--muted);padding-top:0}
+.mx .r.sep{border-bottom:2px solid var(--line)}
+.mx .lb{display:flex;align-items:center;gap:10px;min-width:0;font-weight:600}
+.mx .lb small{font-weight:400;color:var(--muted);font-size:var(--fs-small)}
+@media (max-width:559px){.mx .r{grid-template-columns:minmax(0,1fr) auto auto auto;gap:4px}.mx .lb small{display:none}.mx .st,.mx .ct{padding:2px 6px}}
+.order{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+.order .s{border-radius:12px;padding:16px;background:var(--soft);display:grid;gap:8px;align-content:start}
+.order .s[data-g="1"]{background:var(--g1-bg)} .order .s[data-g="2"]{background:var(--g2-bg)} .order .s[data-g="3"]{background:var(--g3-bg)} .order .s[data-g="4"]{background:var(--g4-bg)}
+.order .k{font-size:var(--fs-tag);font-weight:700;letter-spacing:.04em;color:var(--muted)}
+.order .s[data-g="1"] .k{color:var(--g1)} .order .s[data-g="2"] .k{color:var(--g2)} .order .s[data-g="3"] .k{color:var(--g3)} .order .s[data-g="4"] .k{color:var(--g4)}
+.order .w{font-weight:700}
+.order .d{font-size:var(--fs-small);color:var(--muted)}
+.order .bks{display:flex;flex-wrap:wrap;gap:4px}
+.tl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+@media (max-width:659px){.tl{grid-template-columns:minmax(0,1fr)}}
+.tl h3{font-size:var(--fs-small);color:var(--muted);margin-bottom:12px}
+.tl ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.tl li{display:grid;grid-template-columns:14px 6.5em minmax(0,1fr);gap:10px;align-items:center}
+.tl .dot{width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.tl .dot.o{background:transparent;border:2px solid var(--muted)}
+.tl .dt{font-size:var(--fs-small);color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* 談定 */
+.dec{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.dec li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:12px}
+.dec .m{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:var(--fs-tag);font-weight:700;background:var(--ok);color:var(--card);margin-top:2px}
+.dec.open .m{background:transparent;border:1.5px dashed var(--warn);color:var(--warn)}
+.rows{display:grid;gap:0}
+.rows .r{display:grid;grid-template-columns:8em minmax(0,1fr);gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}
+.rows .r:last-child{border-bottom:0}
+.rows .k{color:var(--muted);font-size:var(--fs-small);padding-top:2px}
+.rows .w{font-weight:700}
+.rows .d{color:var(--muted);font-size:var(--fs-small)}
+@media (max-width:559px){.rows .r{grid-template-columns:minmax(0,1fr);gap:2px}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 
-<div class="wrap">
-  <h1>認知主權平台　監工台</h1>
-  <p class="sub">13 塊積木是骨架。先看四張圖，再看每塊的合約。更新：2026-10-02。</p>
-  <ul class="toc">
-    <li><a href="#s1">一、全地圖</a></li>
-    <li><a href="#s2">二、流程圖：一個人走一趟</a></li>
-    <li><a href="#s2b">三、一個案子的紀錄長什麼樣</a></li>
-    <li><a href="#s3">四、進度圖</a></li>
-    <li><a href="#s4">五、時間軸</a></li>
-    <li><a href="#s5">六、13 塊積木的合約</a></li>
-    <li><a href="#s6">七、全程生效的四樣</a></li>
-    <li><a href="#s7">八、建置順序</a></li>
-    <li><a href="#s8">九、現有工具去哪裡</a></li>
-    <li><a href="#s9">十、談定與未定</a></li>
-  </ul>
+<div class="app">
+  <nav class="side" aria-label="監工台畫面">
+    <div class="brand">認知主權平台<small>監工台　更新 2026-10-02</small></div>
+    <button class="navi" data-v="map" aria-current="page">地圖</button>
+    <button class="navi" data-v="flow">走一趟</button>
+    <button class="navi" data-v="record">案子的紀錄</button>
+    <button class="navi" data-v="contracts">13 份合約</button>
+    <button class="navi" data-v="progress">進度與順序</button>
+    <button class="navi" data-v="decided">談定與未定</button>
+  </nav>
 
-  <h2 id="s1" class="first">一、全地圖</h2>
-  <figure id="fig1"></figure>
-  <figcaption>上面一圈是一個人走一趟的順序，LEARN 走完回到 SENSE。中間是共用紀錄，每塊積木都讀它、寫它。下面四塊不在圈上，各自在對的時機接進來。外框是全程生效的規則。右上角：● 有　◐ 部分　○ 無。</figcaption>
+  <main>
+    <header class="head">
+      <h1>認知主權平台　監工台</h1>
+      <p class="sub">13 塊積木是骨架。這一頁只給我們兩個討論用，放在 claude.ai，不在 cognitive.aware-wave.com 裡。</p>
+    </header>
+    <section class="card now" id="now" aria-label="現在在哪"></section>
 
-  <h2 id="s2">二、流程圖：一個人走一趟</h2>
-  <figure id="fig4"></figure>
-  <figcaption>左邊是使用者做的事，右邊是負責的積木。標「需要時」的步驟可以跳過。任何一步都可以停、可以要直接答案；只有「判斷」那一格永遠是人填。</figcaption>
+    <section class="view" id="v-map">
+      <div class="stack"><h2>地圖：13 塊積木怎麼接</h2>
+        <p class="sub">一個人走一圈，從外化走到回顧，再回到外化。中間是這個案子的紀錄，每一塊都讀它、寫它。點任何一塊看它的合約。</p></div>
+      <div class="card stack">
+        <div class="ring" id="ring"></div>
+      </div>
+      <div class="card stack">
+        <h3>不在圈上，需要的時候接進來</h3>
+        <div class="row4" id="below"></div>
+      </div>
+      <div class="card stack">
+        <h3>全程生效的規則</h3>
+        <div class="row4" id="rules"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </section>
 
-  <h2 id="s2b">三、一個案子的紀錄長什麼樣</h2>
-  <p class="sub">一個案子從建立到長期觀察，每一步都是歷程裡的一筆。一個方法沒解決，換一個方法再做，兩次都留著、可以比較。最低標準＝今天專案頁已經有的：歷程、任務卡、短期與長期計畫、只推還沒做過的工具、現在重跑並比較。</p>
-  <figure id="fig7"></figure>
-  <figcaption>左邊的點是時間順序。「短期觀察」是行動後的第一個月，按週記實際狀況與數字；「長期觀察」按月、季、年。觀察結果回頭對判斷，沒解決就換方法、判斷出新版本。</figcaption>
+    <section class="view" id="v-flow" hidden>
+      <div class="stack"><h2>走一趟：一個人從頭到尾做什麼</h2>
+        <p class="sub">左邊是你做的事，下面的標籤是負責的積木。虛線圈是「需要時」才做，可以跳過。任何一步都可以停；只有「判斷」那一格永遠是你填。</p></div>
+      <div class="card"><ol class="steps" id="steps"></ol></div>
+      <p class="note">觀察和回顧改了判斷，就回到第 8 步出新版本。這次的方法沒解決，就換一個方法從第 5 步再走，兩次都留著。</p>
+    </section>
 
-  <h2 id="s3">四、進度圖</h2>
-  <figure id="fig5"></figure>
-  <figcaption>三欄各自獨立：現況是今天有沒有這塊的能力；合約是有沒有寫清楚它該長什麼樣；建置是有沒有照合約蓋。■ 全　◧ 半　□ 無。</figcaption>
-  <ul class="facts" id="facts"></ul>
+    <section class="view" id="v-record" hidden>
+      <div class="stack"><h2>一個案子的紀錄長什麼樣</h2>
+        <p class="sub">每個案子都有完整紀錄。這次的方法沒解決，就換方法再做；行動之後有短期觀察和長期觀察。最低標準是今天的冰山模型專案頁。</p></div>
+      <div class="two">
+        <div class="card" id="timeline"></div>
+        <div class="stack">
+          <div class="have"><h3>今天的專案頁已經有</h3><ul id="have"></ul></div>
+          <div class="lack"><h3>照最低標準，今天還缺</h3><ul id="lack"></ul></div>
+          <p class="cap">2026-10-02 登入正式站看過：冰山模型工具頁、「冰山模型 2026-09-29 09:13」專案頁、它的結果頁。</p>
+        </div>
+      </div>
+    </section>
 
-  <h2 id="s4">五、時間軸</h2>
-  <figure id="fig6"></figure>
-  <figcaption>左半是已經發生的，有日期。右半是接下來的五步，還沒有日期，先排順序；定了日期就填上。</figcaption>
+    <section class="view" id="v-contracts" hidden>
+      <div class="stack"><h2>13 份合約</h2>
+        <p class="sub">每塊積木一份合約，同一個形狀，九個欄位。點一張卡展開。</p></div>
+      <div class="card stack">
+        <h3>一份合約長這樣</h3>
+        <div class="shape">
+          <div class="io"><span>讀什麼</span></div>
+          <div class="arr">→</div>
+          <div class="mid"><span>解決什麼問題</span><span>使用者做什麼</span><span>系統做什麼</span><span>AI 能做什麼</span><span>AI 不准做什麼</span><span>現在有沒有</span></div>
+          <div class="arr">→</div>
+          <div class="io"><span>寫什麼</span><span>產出給誰</span></div>
+        </div>
+      </div>
+      <div class="cgrid" id="blocks"></div>
+      <h3>全程生效的四樣（不算積木）</h3>
+      <div class="cgrid" id="cross"></div>
+    </section>
 
-  <h2 id="s5">六、13 塊積木的合約</h2>
-  <p class="sub">每塊積木的合約都是同一個形狀，九個欄位：</p>
-  <figure id="fig2"></figure>
-  <p class="sub" style="margin-top:20px">點一列展開那一塊的合約。</p>
-  <ul class="blocks" id="blocks"></ul>
+    <section class="view" id="v-progress" hidden>
+      <div class="stack"><h2>進度與順序</h2>
+        <p class="sub">三欄各自獨立：現況是今天有沒有這塊的能力；合約是有沒有寫清楚；建置是有沒有照合約蓋。</p></div>
+      <div class="card"><div class="mx" id="matrix"></div></div>
+      <div class="card stack">
+        <h3>建置順序</h3>
+        <div class="order" id="order"></div>
+        <p class="cap">網站的變化：cognitive.aware-wave.com 首頁變成「我的任務」和組裝器；今天的方法目錄、工作流、結果頁退到積木裡面，不再是入口。</p>
+      </div>
+      <div class="card stack">
+        <h3>時間</h3>
+        <div class="tl" id="tl"></div>
+      </div>
+    </section>
 
-  <h2 id="s6">七、全程生效的四樣（不算積木）</h2>
-  <ul class="blocks" id="cross"></ul>
-
-  <h2 id="s7">八、建置順序</h2>
-  <figure id="fig3"></figure>
-  <ul class="rows">
-    <li><span class="k">第 0 步</span><span><span class="w">寫 13 份合約</span><span class="d">每塊說清楚九個欄位。共用紀錄從這 13 份推出來。狀態：進行中，1 份草稿。</span></span></li>
-    <li><span class="k">第 1 步</span><span><span class="w">第一圈：個人複雜決策</span><span class="d">SENSE → MAP → THINK → DECIDE → ACT → LEARN。一塊一塊做到能拿真事進去用。串連靠合約的讀寫宣告，不另外做。狀態：未開始，第一圈待確認。</span></span></li>
-    <li><span class="k">第 2 步</span><span><span class="w">接現有引擎當積木</span><span class="d">GATHER、VERIFY、COMPUTE 的東西已經有，缺的是積木外殼。狀態：未開始。</span></span></li>
-    <li><span class="k">第 3 步</span><span><span class="w">EXPRESS、TEACH</span><span class="d">把判斷變成給別人看的東西；用一個方法前先練。狀態：未開始。</span></span></li>
-    <li><span class="k">第 4 步</span><span><span class="w">COLLAB、GOVERN</span><span class="d">多人共同程序；平台自己被檢查。狀態：未開始。</span></span></li>
-  </ul>
-  <p class="sub">網站的變化：cognitive.aware-wave.com 首頁變成「我的任務」和組裝器；今天的方法目錄、工作流、結果頁退到積木裡面，不再是入口。</p>
-
-  <h2 id="s8">九、現有工具去哪裡</h2>
-  <ul class="rows">
-    <li><span class="k">蒐集器</span><span><span class="w">GATHER 的引擎</span><span class="d">抓來源、品質閘、相關性閘。平台在背後呼叫它，使用者不用自己去另一個網站。</span></span></li>
-    <li><span class="k">方法與工作流</span><span><span class="w">MAP、THINK、DECIDE、COMPUTE 裡的做法</span><span class="d">285 個方法、16 條工作流。方法是積木裡可以挑的做法，不是積木。約 64 個軟體工程方法不給一般使用者看。</span></span></li>
-    <li><span class="k">彙整與引註閘</span><span><span class="w">VERIFY 的一半</span><span class="d">每句主張必須對得上送進去的來源，否則整份不過。</span></span></li>
-    <li><span class="k">結果頁與課程頁</span><span><span class="w">積木內部的畫面</span><span class="d">結果頁歸 MAP／COMPUTE，課程頁歸 TEACH。</span></span></li>
-    <li><span class="k">知識庫</span><span><span class="w">不在平台內</span><span class="d">客戶客服語料，給客服 AI 用。</span></span></li>
-    <li><span class="k">HCI</span><span><span class="w">不在平台內</span><span class="d">評估「別人」可不可信的獨立產品。平台評估的是「自己的判斷過程」。只留人工連結。</span></span></li>
-    <li><span class="k">portal</span><span><span class="w">身分層，未開</span><span class="d">第二個使用者出現才接。</span></span></li>
-  </ul>
-
-  <h2 id="s9">十、談定與未定</h2>
-  <p class="sub">談定的</p>
-  <ol class="plain">
-    <li>每個案子都有完整紀錄，最低標準＝今天的專案頁（歷程、任務卡、短期與長期計畫、換方法再做、重跑比較）。這不是小工具，是全功能平台。</li>
-    <li>平台是新東西。現有 Cognitive OS 退到後面當引擎，不再是產品本身。</li>
-    <li>13 塊積木：藍圖的 8 塊，VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。</li>
-    <li>個人歷程（跨任務的記憶）不算積木，是共用紀錄的一部分。</li>
-    <li>骨架＝13 份合約。任務容器、協作合約、完整性核心都從合約推出來。</li>
-    <li>不做「先放 13 個有畫面沒合約的空頁」。</li>
-    <li>ACT（行動與觀察）獨立成一塊。短期觀察按週、長期觀察按月季年，都在這塊。</li>
-  </ol>
-  <p class="sub" style="margin-top:20px">未定的</p>
-  <ol class="plain">
-    <li>第一圈是不是「個人複雜決策」。</li>
-    <li>外化媒介：先文字卡＋關係圖，畫圖與照片之後加。</li>
-    <li>其餘 12 份合約的內容。</li>
-  </ol>
+    <section class="view" id="v-decided" hidden>
+      <div class="stack"><h2>談定與未定</h2></div>
+      <div class="two">
+        <div class="card stack"><h3>談定的</h3><ol class="dec" id="done"></ol></div>
+        <div class="card stack"><h3>還沒定的</h3><ol class="dec open" id="open"></ol></div>
+      </div>
+      <div class="card stack">
+        <h3>現有工具去哪裡</h3>
+        <div class="rows" id="tools"></div>
+      </div>
+    </section>
+  </main>
 </div>
 
 <script>
 const G = {"有":"●","部分":"◐","無":"○"};
+/* 分組＝建置順序：1 第一圈六塊　2 現有引擎三塊　3 表達與教學　4 共同與治理 */
+const GROUP = {SENSE:1,MAP:1,THINK:1,DECIDE:1,ACT:1,LEARN:1,GATHER:2,VERIFY:2,COMPUTE:2,EXPRESS:3,TEACH:3,COLLAB:4,GOVERN:4};
 const BLOCKS = [
  {n:1, code:"SENSE", name:"外化", role:"先攤出來", status:"無", contract:"草稿", build:"未開始",
   problem:"我實際看見、感覺、在意什麼？把腦子裡混在一起、還沒說清楚的東西先放到外面，讓自己看見。不分析、不下結論。",
@@ -234,182 +379,200 @@ const CROSS = [
   now:"今天的專案頁（2026-10-02 親自看過冰山模型那個專案）已有：歷程、分析表（一次一列，有工具、狀態、你的判斷、核准欄）、來源、任務卡與紀錄、數字趨勢、到期重跑並比較、⑧ 只推沒做過的工具、核准／退回／匯出 PDF／抹除。缺的是：專案頁上只有「再用同一個工具」的按鈕，換方法要從結果頁 ⑧ 進；觀察沒有按週、按月季年的節奏；狀態每點一次記一筆，那個專案 30 筆歷程有 21 筆是一分鐘內來回點；沒有判斷版本、外化素材，也沒有跨案子記憶。"},
  {code:"協作合約", name:"AI 這次能做什麼", status:"無", contract:"未寫", build:"未開始", problem:"每件任務開始前設定：AI 的角色、能用的資料、不准碰的部分、什麼時候交還控制。系統層強制，不只是提示詞。", now:"沒有。AI 每次都是全權。"},
 ];
-const MARK = (id)=>`<defs><marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--stroke)"/></marker></defs>`;
+const NEXT_TALK = "GATHER";   /* 下一塊要談的合約 */
 
-/* 圖一：全地圖。四欄三列的圈，中間共用紀錄，下面四塊，外框全程生效。 */
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+const st = s => `<span class="st" data-s="${s}">${G[s]} ${s}</span>`;
+const ct = (label,s) => `<span class="ct" data-s="${s}">${label}${s}</span>`;
+const bk = code => `<span class="bk" data-g="${GROUP[code]||0}">${code}</span>`;
+const byCode = code => BLOCKS.find(b=>b.code===code);
+
+/* 現在在哪 */
 (function(){
-  const C=[50,230,410,590], R=[50,150,250], RB=360, W=150, H=70;
-  const pos={SENSE:[C[0],R[0]],GATHER:[C[1],R[0]],MAP:[C[2],R[0]],THINK:[C[3],R[0]],VERIFY:[C[3],R[1]],
-             COMPUTE:[C[3],R[2]],DECIDE:[C[2],R[2]],ACT:[C[1],R[2]],LEARN:[C[0],R[2]],
-             EXPRESS:[C[0],RB],TEACH:[C[1],RB],COLLAB:[C[2],RB],GOVERN:[C[3],RB]};
-  const box=b=>{const [x,y]=pos[b.code];return `<rect class="bx" x="${x}" y="${y}" width="${W}" height="${H}"/>
-    <text x="${x+10}" y="${y+22}" font-size="12" class="b">${String(b.n).padStart(2,"0")}　${b.code}</text>
-    <text x="${x+W-10}" y="${y+22}" font-size="12" text-anchor="end" class="mute">${G[b.status]} ${b.status}</text>
-    <text x="${x+10}" y="${y+43}" font-size="14">${b.name}</text>
-    <text x="${x+10}" y="${y+61}" font-size="11" class="mute">${b.role}</text>`;};
-  const ar=(d)=>`<path class="ar" d="${d}" marker-end="url(#ah1)"/>`;
-  const y0=R[0]+35, y2=R[2]+35, xr=C[3]+75;
-  const arrows=[`M200 ${y0} H230`,`M380 ${y0} H410`,`M560 ${y0} H590`,
-    `M${xr} ${R[0]+H} V${R[1]}`,`M${xr} ${R[1]+H} V${R[2]}`,
-    `M590 ${y2} H560`,`M410 ${y2} H380`,`M230 ${y2} H200`,`M50 ${y2} H25 V${y0} H50`].map(ar).join("");
-  document.getElementById("fig1").innerHTML=`<svg viewBox="0 0 768 470" role="img" aria-label="13 塊積木全地圖">${MARK("ah1")}
-    <rect class="frame" x="8" y="8" width="752" height="452"/>
-    <text x="20" y="32" font-size="12" class="mute">全程生效：完整性核心　組裝器　協作合約</text>
-    <rect class="ctr" x="${C[0]}" y="${R[1]}" width="${C[2]+W-C[0]}" height="${H}"/>
-    <text x="${(C[0]+C[2]+W)/2}" y="${R[1]+30}" font-size="14" text-anchor="middle" class="b">共用紀錄</text>
-    <text x="${(C[0]+C[2]+W)/2}" y="${R[1]+52}" font-size="12" text-anchor="middle" class="mute">這件事的所有紀錄，每一塊積木都讀它、寫它</text>
-    ${BLOCKS.map(box).join("")}${arrows}
-    <line class="ln" x1="50" y1="${RB-20}" x2="740" y2="${RB-20}"/></svg>`;
+  const c = s => BLOCKS.filter(b=>b.status===s).length;
+  const drafts = BLOCKS.filter(b=>b.contract!=="未寫").length;
+  const nx = byCode(NEXT_TALK);
+  $("now").innerHTML = `
+    <div><div class="k">現在在哪一步</div><div class="v">第 0 步　寫 13 份合約</div>
+      <div class="bar" role="img" aria-label="13 份合約有 ${drafts} 份草稿"><i style="width:${drafts/13*100}%"></i></div>
+      <div class="d num">${drafts} ／ 13 份有草稿</div></div>
+    <div><div class="k">下一塊要談</div><div class="v">${pad(nx.n)}　${nx.code}　${nx.name}</div>
+      <div class="d">引擎已經有，最快寫完</div></div>
+    <div><div class="k">13 塊積木今天的現況</div>
+      <div class="counts">${["有","部分","無"].map(s=>`<span class="st num" data-s="${s}">${G[s]} ${s} ${c(s)}</span>`).join("")}</div>
+      <div class="d">建置：0 塊完成</div></div>`;
 })();
 
-/* 圖四：流程圖，一個人走一趟。直式，左邊使用者做的事，右邊負責的積木。 */
+/* 地圖 */
 (function(){
-  const steps=[
-    ["建立任務","說清楚要釐清什麼、風險、誰會受影響","組裝器"],
-    ["設定權限","AI 這次能做什麼、不准碰什麼","協作合約"],
-    ["外化","把事件、感受、關係攤成卡片","SENSE"],
-    ["蒐集（需要時）","外面的資料抓回來","GATHER"],
-    ["拆解","事實、解釋、利益、結構、矛盾、介入分開","MAP"],
-    ["共思考","人先想，AI 再發散、反證","THINK"],
-    ["查證、計算（需要時）","主張對來源；該算的真的算","VERIFY　COMPUTE"],
-    ["判斷","我的結論、依據、什麼會改變它。只能人填","DECIDE"],
-    ["行動與觀察","最小、可逆的一步；短期按週、長期按月季年記錄","ACT"],
-    ["回顧","到期回來對結果，更新判斷；沒解決就換方法","LEARN"],
+  const pos = {SENSE:["1","1","r"],GATHER:["2","1","r"],MAP:["3","1","r"],THINK:["4","1","d"],VERIFY:["4","2","d"],
+               COMPUTE:["4","3","l"],DECIDE:["3","3","l"],ACT:["2","3","l"],LEARN:["1","3","u"]};
+  const node = (b,extra="") => `<button class="node" data-s="${b.status}" data-open="${b.code}" ${extra}>
+      <span class="top"><span class="nb" data-g="${GROUP[b.code]}">${pad(b.n)}</span>${b.code}${st(b.status)}</span>
+      <span class="nm">${b.name}</span><span class="rl">${b.role}</span></button>`;
+  const ring = BLOCKS.filter(b=>pos[b.code]).map(b=>{const [c,r,d]=pos[b.code];
+    return node(b,`style="--c:${c};--r:${r};--o:${b.n}" data-dir="${d}"`);}).join("");
+  const hub = CROSS.find(x=>x.code==="共用紀錄");
+  $("ring").innerHTML = ring +
+    `<button class="hub" data-open="共用紀錄" style="--c:2/4;--r:2;--o:0"><b>共用紀錄</b><span>這個案子的所有紀錄。每一塊積木都讀它、寫它。</span><span>${st(hub.status)}</span></button>` +
+    `<div class="loop" style="--c:1;--r:2;--o:10" data-dir="u">回顧完，回到外化<br>再走一圈</div>`;
+  $("below").innerHTML = BLOCKS.filter(b=>!pos[b.code]).map(b=>node(b)).join("");
+  $("rules").innerHTML = CROSS.filter(x=>x.code!=="共用紀錄").map(x=>`<button class="node" data-s="${x.status}" data-open="${x.code}">
+      <span class="top">${x.code}${st(x.status)}</span><span class="rl">${x.name}</span></button>`).join("");
+  $("legend").innerHTML = `<span>框的顏色＝今天有沒有：</span>${["有","部分","無"].map(st).join("")}
+    <span>號碼的顏色＝建置順序：</span>
+    <span><i class="nb" data-g="1"></i>第一圈</span><span><i class="nb" data-g="2"></i>現有引擎</span>
+    <span><i class="nb" data-g="3"></i>表達與教學</span><span><i class="nb" data-g="4"></i>共同與治理</span>`;
+})();
+
+/* 走一趟 */
+(function(){
+  const S = [
+    ["建立任務","說清楚要釐清什麼、風險、誰會受影響",["組裝器"]],
+    ["設定權限","AI 這次能做什麼、不准碰什麼",["協作合約"]],
+    ["外化","把事件、感受、關係攤成卡片",["SENSE"]],
+    ["蒐集","外面的資料抓回來",["GATHER"],true],
+    ["拆解","事實、解釋、利益、結構、矛盾、介入分開",["MAP"]],
+    ["共思考","人先想，AI 再發散、反證",["THINK"]],
+    ["查證、計算","主張對來源；該算的真的算",["VERIFY","COMPUTE"],true],
+    ["判斷","我的結論、依據、什麼會改變它。只能人填",["DECIDE"]],
+    ["行動與觀察","最小、可逆的一步；短期按週、長期按月季年記錄",["ACT"]],
+    ["回顧","到期回來對結果，更新判斷；沒解決就換方法",["LEARN"]],
   ];
-  const X=120,W=300,H=56,gap=24,top=20;
-  let s=`<svg viewBox="0 0 768 ${top+steps.length*(H+gap)}" role="img" aria-label="一個人走一趟的流程">${MARK("ah4")}`;
-  steps.forEach(([a,b,c],i)=>{const y=top+i*(H+gap);
-    s+=`<rect class="bx" x="${X}" y="${y}" width="${W}" height="${H}"/>
-        <text x="${X-12}" y="${y+34}" font-size="12" text-anchor="end" class="mute">${i+1}</text>
-        <text x="${X+12}" y="${y+23}" font-size="13" class="b">${a}</text>
-        <text x="${X+12}" y="${y+43}" font-size="11" class="mute">${b}</text>
-        <text x="${X+W+16}" y="${y+34}" font-size="12">${c}</text>`;
-    if(i<steps.length-1) s+=`<path class="ar" d="M${X+W/2} ${y+H} V${y+H+gap}" marker-end="url(#ah4)"/>`;});
-  const yLast=top+(steps.length-1)*(H+gap)+H/2, yJudge=top+7*(H+gap)+H/2;
-  s+=`<path class="ar" d="M${X} ${yLast} H${X-60} V${yJudge} H${X}" marker-end="url(#ah4)"/>
-      <text x="${X-66}" y="${(yLast+yJudge)/2}" font-size="11" text-anchor="end" class="mute">判斷改了就回到這裡</text></svg>`;
-  document.getElementById("fig4").innerHTML=s;
+  $("steps").innerHTML = S.map(([t,d,who,opt],i)=>`<li>
+    <span class="nb ${opt?"opt":""}" data-g="${GROUP[who[0]]||0}">${i+1}</span>
+    <div><div class="t">${t}</div><div class="d">${d}</div>
+      <div class="who">${who.map(bk).join("")}${opt?`<span class="opt-tag">需要時</span>`:""}</div></div></li>`).join("");
 })();
 
-/* 圖七：一個案子的紀錄。直式歷程，左邊一條線，一步一筆。 */
+/* 案子的紀錄：範例歷程，分五段 */
 (function(){
-  const E=[
-    ["10／02","建立案子","「這段合作要不要繼續」。目的、風險、誰會受影響","組裝器"],
-    ["10／02","設定權限","AI 可以發散、反方；不准替我下結論","協作合約"],
-    ["10／02","外化","8 張卡：事件 3、身體 1、恐懼 1、關係 1、期待 1、故事 1","SENSE"],
-    ["10／03","方法 A：冰山模型","事件 → 模式 → 結構 → 心智模型，每層有引註","MAP"],
-    ["10／03","判斷 第 1 版","我的結論、依據、信心、什麼會改變它","DECIDE"],
-    ["10／04","行動 ＋ 任務卡","先談一次條件；負責人、期限、停止條件","ACT"],
-    ["10／11","短期觀察 第 1 週","實際狀況、數字、想法、調整","ACT"],
-    ["10／18","短期觀察 第 2 週","〃","ACT"],
-    ["11／01","回顧","對照第 1 版判斷：沒解決，卡在人不在結構","LEARN"],
-    ["11／02","方法 B：利害關係人地圖","換一個方法。冰山那次仍在，可以比較","MAP"],
-    ["11／02","判斷 第 2 版","修訂理由寫在卡上，第 1 版不刪","DECIDE"],
-    ["11／03","行動 第 2 版","新的一步；舊任務卡標結束","ACT"],
-    ["12／01","長期觀察 第 1 個月","按月；之後第 1 季、第 2 季、第 1 年","ACT"],
-    ["（到期）","回顧","預測對上結果；更新判斷和對 AI 的信任範圍","LEARN"],
+  const P = [
+    ["開案","",[
+      ["10／02","建立案子","「這段合作要不要繼續」。目的、風險、誰會受影響","組裝器"],
+      ["10／02","設定權限","AI 可以發散、反方；不准替我下結論","協作合約"],
+      ["10／02","外化","8 張卡：事件 3、身體 1、恐懼 1、關係 1、期待 1、故事 1","SENSE"]]],
+    ["第一輪","方法 A",[
+      ["10／03","冰山模型","事件 → 模式 → 結構 → 心智模型，每層有引註","MAP"],
+      ["10／03","判斷　第 1 版","我的結論、依據、信心、什麼會改變它","DECIDE"],
+      ["10／04","行動＋任務卡","先談一次條件；負責人、期限、停止條件","ACT"]]],
+    ["短期觀察","行動後第一個月，按週",[
+      ["10／11","第 1 週","實際狀況、數字、想法、調整","ACT"],
+      ["10／18","第 2 週","同上，數字自動連成趨勢","ACT"],
+      ["11／01","回顧","對照第 1 版判斷：沒解決，卡在人不在結構","LEARN"]]],
+    ["第二輪","這次的方法沒解決，換方法 B",[
+      ["11／02","利害關係人地圖","換一個方法。冰山那次仍在，可以並排比較","MAP"],
+      ["11／02","判斷　第 2 版","修訂理由寫在卡上，第 1 版不刪","DECIDE"],
+      ["11／03","行動　第 2 版","新的一步；舊任務卡標結束","ACT"]]],
+    ["長期觀察","按月、季、年",[
+      ["12／01","第 1 個月","之後第 1 季、第 2 季、第 1 年","ACT"],
+      ["到期","回顧","預測對上結果；更新判斷和對 AI 的信任範圍","LEARN"]]],
   ];
-  const RH=36, top=16, X=130;
-  let s=`<svg viewBox="0 0 768 ${top+E.length*RH+8}" role="img" aria-label="一個案子的紀錄">`;
-  s+=`<line class="ln" x1="${X}" y1="${top}" x2="${X}" y2="${top+(E.length-1)*RH+8}" stroke-width="1.5"/>`;
-  E.forEach(([d,t,n,b],i)=>{const y=top+i*RH+8;
-    s+=`<circle cx="${X}" cy="${y}" r="4" fill="var(--fill)"/>
-        <text x="${X-14}" y="${y+4}" font-size="11" text-anchor="end" class="mute">${d}</text>
-        <text x="${X+16}" y="${y+4}" font-size="13" class="b">${t}</text>
-        <text x="${X+16}" y="${y+20}" font-size="11" class="mute">${n}</text>
-        <text x="748" y="${y+4}" font-size="11" text-anchor="end" class="mute">${b}</text>`;});
-  document.getElementById("fig7").innerHTML=s+"</svg>";
+  $("timeline").innerHTML = P.map(([h,sm,ev])=>`<div class="phase"><h3>${h}${sm?`<small>${sm}</small>`:""}</h3>
+    ${ev.map(([d,t,n,b])=>`<div class="ev"><span class="dt">${d}</span><span class="dot" data-g="${GROUP[b]||0}"></span>
+      <div><div class="t">${t}${bk(b)}</div><div class="d">${n}</div></div></div>`).join("")}</div>`).join("");
+  const li = a => a.map(x=>`<li>${x}</li>`).join("");
+  $("have").innerHTML = li([
+    "歷程：每一步一筆",
+    "分析表：一次分析一列，有工具、狀態、你的判斷、核准",
+    "案子自己的來源",
+    "任務卡：狀態、負責人、期限、怎麼證明有效、目標",
+    "每筆紀錄：實際狀況、想法、調整方針、卡住了、實際數字",
+    "同一個數字記到兩筆以上，自動畫趨勢",
+    "到期重跑並比較（同一個專案裡並排）",
+    "結果頁 ⑧ 只推這個專案還沒做過的工具",
+    "核准、退回（舊版保留）、匯出 PDF、抹除（留一筆已抹除）"]);
+  $("lack").innerHTML = li([
+    "換方法：專案頁上只有「再用同一個工具」，換方法要進結果頁 ⑧",
+    "短期、長期觀察：沒有按週、按月季年的節奏和提醒，只有期限和一次到期重跑",
+    "歷程有雜訊：狀態每點一下記一筆，那個專案 30 筆裡 21 筆是一分鐘內來回點",
+    "判斷沒有版本：沒有第 1 版、第 2 版",
+    "沒有外化素材",
+    "沒有跨案子的記憶"]);
 })();
 
-/* 圖五：進度圖。每列一塊，三欄：現況、合約、建置。■ 全　◧ 半　□ 無 */
-(function(){
-  const lvl={有:2,部分:1,無:0,已確認:2,草稿:1,未寫:0,完成:2,進行中:1,未開始:0};
-  const sq=(x,y,v)=>{let s=`<rect class="sq" x="${x}" y="${y}" width="14" height="14"/>`;
-    if(v===2) s+=`<rect class="sqf" x="${x+1}" y="${y+1}" width="12" height="12"/>`;
-    if(v===1) s+=`<rect class="sqf" x="${x+1}" y="${y+1}" width="6" height="12"/>`; return s;};
-  const rows=[...BLOCKS.map(b=>({label:`${String(b.n).padStart(2,"0")}　${b.code}　${b.name}`,...b})),
-              ...CROSS.map(b=>({label:`　　${b.code}`,...b}))];
-  const RH=28, top=46, cols=[420,540,660];
-  let s=`<svg viewBox="0 0 768 ${top+rows.length*RH+10}" role="img" aria-label="進度圖">`;
-  s+=`<text x="420" y="24" font-size="12" class="mute">現況</text><text x="540" y="24" font-size="12" class="mute">合約</text><text x="660" y="24" font-size="12" class="mute">建置</text>`;
-  s+=`<line class="ln" x1="20" y1="34" x2="748" y2="34"/>`;
-  rows.forEach((r,i)=>{const y=top+i*RH;
-    s+=`<text x="20" y="${y+11}" font-size="13">${r.label}</text>`;
-    s+=sq(cols[0],y,lvl[r.status])+`<text x="${cols[0]+22}" y="${y+11}" font-size="12" class="mute">${r.status}</text>`;
-    s+=sq(cols[1],y,lvl[r.contract])+`<text x="${cols[1]+22}" y="${y+11}" font-size="12" class="mute">${r.contract}</text>`;
-    s+=sq(cols[2],y,lvl[r.build])+`<text x="${cols[2]+22}" y="${y+11}" font-size="12" class="mute">${r.build}</text>`;
-    s+=`<line class="ln" x1="20" y1="${y+RH-6}" x2="748" y2="${y+RH-6}"/>`;
-    if(i===BLOCKS.length-1) s+=`<line class="ln" x1="20" y1="${y+RH-5}" x2="748" y2="${y+RH-5}"/>`;});
-  document.getElementById("fig5").innerHTML=s+"</svg>";
-})();
+/* 合約卡 */
+const FIELDS = [["解決什麼問題","problem"],["使用者做什麼","user"],["系統做什麼","system"],["AI 能做什麼","ai"],["AI 不准做什麼","aino"],["讀什麼","reads"],["寫什麼","writes"],["產出給誰","out"],["現在有沒有","now"]];
+function card(b){
+  const g = GROUP[b.code]||0;
+  const val = v => Array.isArray(v) ? `<ul>${v.map(x=>`<li>${x}</li>`).join("")}</ul>` : v;
+  const has = FIELDS.filter(([,f])=>b[f]!==undefined), rest = FIELDS.filter(([,f])=>b[f]===undefined);
+  const dl = has.map(([k,f])=>`<dt>${k}</dt><dd class="${f==="aino"?"no":""}">${val(b[f])}</dd>`).join("");
+  const ex = b.example ? `<div class="ex"><span class="k">範例：「這段合作要不要繼續」攤出來的卡</span><div class="cards">${b.example.map(([k,v])=>`<div><b>${k}</b>${v}</div>`).join("")}</div></div>` : "";
+  return `<details class="cc" id="b-${b.code}"><summary>
+      <span class="top">${b.n?`<span class="nb" data-g="${g}">${pad(b.n)}</span>`:""}${b.code}</span>
+      <span class="nm">${b.name}${b.role?`<small>${b.role}</small>`:""}</span>
+      <span class="pills">${st(b.status)}${ct("合約　",b.contract)}</span>
+    </summary><div class="body"><dl>${dl}</dl>${ex}
+      ${rest.length?`<div class="rest">還沒談的 ${rest.length} 欄：${rest.map(([k])=>k).join("、")}</div>`:""}</div></details>`;
+}
+$("blocks").innerHTML = BLOCKS.map(card).join("");
+$("cross").innerHTML = CROSS.map(card).join("");
 
-/* 圖六：時間軸。左半已發生有日期，右半未來五步沒日期。 */
+/* 進度 */
 (function(){
+  const row = (b,sep) => `<div class="r ${sep?"sep":""}"><span class="lb">${b.n?`<span class="nb" data-g="${GROUP[b.code]}">${pad(b.n)}</span>`:""}<span>${b.code}　<small>${b.name}</small></span></span>
+    ${st(b.status)}${ct("",b.contract)}${ct("",b.build)}</div>`;
+  $("matrix").innerHTML = `<div class="r h"><span></span><span>現況</span><span>合約</span><span>建置</span></div>` +
+    BLOCKS.map((b,i)=>row(b,i===BLOCKS.length-1)).join("") + CROSS.map(b=>row(b)).join("");
+  const O = [
+    [0,"第 0 步","寫 13 份合約","每塊說清楚九個欄位。共用紀錄從這 13 份推出來。","進行中，1 份草稿",[]],
+    [1,"第 1 步","第一圈：個人複雜決策","一塊一塊做到能拿真事進去用。串連靠合約的讀寫宣告。","未開始，第一圈待確認",["SENSE","MAP","THINK","DECIDE","ACT","LEARN"]],
+    [2,"第 2 步","接現有引擎當積木","東西已經有，缺的是積木外殼。","未開始",["GATHER","VERIFY","COMPUTE"]],
+    [3,"第 3 步","表達與教學","把判斷變成給別人看的東西；用一個方法前先練。","未開始",["EXPRESS","TEACH"]],
+    [4,"第 4 步","共同與治理","多人共同程序；平台自己被檢查。","未開始",["COLLAB","GOVERN"]],
+  ];
+  $("order").innerHTML = O.map(([g,k,w,d,s,bs])=>`<div class="s" data-g="${g}"><span class="k">${k}</span><span class="w">${w}</span>
+    <span class="d">${d}</span><span class="bks">${bs.map(bk).join("")}</span><span class="d">狀態：${s}</span></div>`).join("");
   const past=[["2026-08-28","母文件收斂"],["2026-09-03","引擎跑通"],["2026-09-12","網站上線"],["2026-09-23","三線不順裁決"],["2026-10-02","13 塊骨架"]];
   const next=[["第 0 步","寫合約"],["第 1 步","第一圈"],["第 2 步","接引擎"],["第 3 步","表達、教學"],["第 4 步","共同、治理"]];
-  const Y=50, px=[40,120,200,280,360], nx=[430,505,580,655,730];
-  let s=`<svg viewBox="0 0 768 120" role="img" aria-label="時間軸">${MARK("ah6")}
-    <path class="ar" d="M20 ${Y} H752" marker-end="url(#ah6)"/>
-    <text x="40" y="22" font-size="12" class="mute">已發生（有日期）</text>
-    <text x="430" y="22" font-size="12" class="mute">接下來（還沒有日期）</text>`;
-  past.forEach(([d,t],i)=>{s+=`<circle cx="${px[i]}" cy="${Y}" r="5" fill="var(--fill)"/>
-    <text x="${px[i]}" y="${Y+26}" font-size="11" text-anchor="middle" class="mute">${d}</text>
-    <text x="${px[i]}" y="${Y+44}" font-size="12" text-anchor="middle">${t}</text>`;});
-  s+=`<line x1="395" y1="${Y-18}" x2="395" y2="${Y+18}" stroke="var(--stroke)" stroke-width="1.5"/><text x="395" y="${Y-24}" font-size="11" text-anchor="middle" class="mute">今天</text>`;
-  next.forEach(([d,t],i)=>{s+=`<circle cx="${nx[i]}" cy="${Y}" r="5" fill="var(--box)" stroke="var(--stroke)" stroke-width="1.5"/>
-    <text x="${nx[i]}" y="${Y+26}" font-size="11" text-anchor="middle" class="mute">${d}</text>
-    <text x="${nx[i]}" y="${Y+44}" font-size="12" text-anchor="middle">${t}</text>`;});
-  document.getElementById("fig6").innerHTML=s+"</svg>";
+  $("tl").innerHTML = `<div><h3>已經發生</h3><ul>${past.map(([d,t])=>`<li><span class="dot"></span><span class="dt">${d}</span><span>${t}</span></li>`).join("")}</ul></div>
+    <div><h3>接下來（還沒有日期，先排順序）</h3><ul>${next.map(([d,t])=>`<li><span class="dot o"></span><span class="dt">${d}</span><span>${t}</span></li>`).join("")}</ul></div>`;
 })();
 
-/* 圖二：一份合約長什麼樣 */
-document.getElementById("fig2").innerHTML=`<svg viewBox="0 0 768 210" role="img" aria-label="一份積木合約的九個欄位">${MARK("ah2")}
-  <text x="40" y="104" font-size="13" class="b">讀什麼</text>
-  <path class="ar" d="M100 100 H170" marker-end="url(#ah2)"/>
-  <rect class="bx" x="170" y="20" width="420" height="170"/>
-  <text x="190" y="48" font-size="14" class="b">解決什麼問題</text>
-  <text x="190" y="80" font-size="13">使用者做什麼</text>
-  <text x="190" y="104" font-size="13">系統做什麼</text>
-  <text x="190" y="128" font-size="13">AI 能做什麼</text>
-  <text x="190" y="152" font-size="13">AI 不准做什麼</text>
-  <text x="190" y="178" font-size="12" class="mute">現在有沒有：● 有　◐ 部分　○ 無</text>
-  <path class="ar" d="M590 80 H660" marker-end="url(#ah2)"/><text x="672" y="85" font-size="13" class="b">寫什麼</text>
-  <path class="ar" d="M590 120 H660" marker-end="url(#ah2)"/><text x="672" y="125" font-size="13" class="b">產出給誰</text>
-</svg>`;
-
-/* 圖三：建置順序 */
+/* 談定與未定 */
 (function(){
-  const steps=[["第 0 步","寫 13 份合約"],["第 1 步","第一圈六塊"],["第 2 步","接現有引擎"],["第 3 步","EXPRESS、TEACH"],["第 4 步","COLLAB、GOVERN"]];
-  const W=130,H=70,gap=27;
-  let s=`<svg viewBox="0 0 768 90" role="img" aria-label="建置順序五步">${MARK("ah3")}`;
-  steps.forEach(([a,b],i)=>{const x=10+i*(W+gap);
-    s+=`<rect class="bx" x="${x}" y="10" width="${W}" height="${H}"/><text x="${x+10}" y="36" font-size="13" class="b">${a}</text><text x="${x+10}" y="60" font-size="13">${b}</text>`;
-    if(i<steps.length-1) s+=`<path class="ar" d="M${x+W} 45 H${x+W+gap}" marker-end="url(#ah3)"/>`;});
-  document.getElementById("fig3").innerHTML=s+"</svg>";
+  const done = [
+    "每個案子都有完整紀錄，最低標準＝今天的專案頁：歷程、任務卡、短期與長期觀察、換方法再做、重跑比較。這是全功能平台，不是小工具。",
+    "平台是新東西。現有 Cognitive OS 退到後面當引擎，不再是產品本身。",
+    "13 塊積木：藍圖的 8 塊，VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。",
+    "個人歷程（跨案子的記憶）不算積木，是共用紀錄的一部分。",
+    "骨架＝13 份合約。任務容器、協作合約、完整性核心都從合約推出來。",
+    "不做「先放 13 個有畫面沒合約的空頁」。",
+    "ACT（行動與觀察）獨立成一塊。短期觀察按週、長期觀察按月季年，都在這塊。"];
+  const open = [
+    "第一圈是不是「個人複雜決策」。",
+    "外化媒介：先文字卡＋關係圖，畫圖與照片之後加。",
+    "其餘 12 份合約的內容。"];
+  $("done").innerHTML = done.map(x=>`<li><span class="m">✓</span><span>${x}</span></li>`).join("");
+  $("open").innerHTML = open.map(x=>`<li><span class="m">？</span><span>${x}</span></li>`).join("");
+  const T = [
+    ["蒐集器","GATHER 的引擎","抓來源、品質閘、相關性閘。平台在背後呼叫它，使用者不用自己去另一個網站。",["GATHER"]],
+    ["方法與工作流","積木裡可以挑的做法","285 個方法、16 條工作流。方法不是積木。約 64 個軟體工程方法不給一般使用者看。",["MAP","THINK","DECIDE","COMPUTE"]],
+    ["彙整與引註閘","VERIFY 的一半","每句主張必須對得上送進去的來源，否則整份不過。",["VERIFY"]],
+    ["結果頁與課程頁","積木內部的畫面","結果頁歸 MAP／COMPUTE，課程頁歸 TEACH。",["MAP","COMPUTE","TEACH"]],
+    ["知識庫","不在平台內","客戶客服語料，給客服 AI 用。",[]],
+    ["HCI","不在平台內","評估「別人」可不可信的獨立產品。平台評估的是「自己的判斷過程」。只留人工連結。",[]],
+    ["portal","身分層，未開","第二個使用者出現才接。",[]],
+  ];
+  $("tools").innerHTML = T.map(([k,w,d,bs])=>`<div class="r"><span class="k">${k}</span><span><span class="w">${w}　</span>${bs.map(bk).join(" ")}<span class="d" style="display:block">${d}</span></span></div>`).join("");
 })();
 
-/* 清單 */
-const FIELDS = [["解決什麼問題","problem"],["使用者做什麼","user"],["系統做什麼","system"],["AI 能做什麼","ai"],["AI 不准做什麼","aino"],["讀什麼","reads"],["寫什麼","writes"],["產出給誰","out"],["現在有沒有","now"]];
-const ul = a => `<ul>${a.map(x=>`<li>${x}</li>`).join("")}</ul>`;
-const cell = v => v===undefined ? `<span class="todo">待討論</span>` : (Array.isArray(v) ? ul(v) : v);
-function row(b){
-  const no = b.n ? String(b.n).padStart(2,"0") : "";
-  const dl = FIELDS.map(([k,f])=>`<dt>${k}</dt><dd>${cell(b[f])}</dd>`).join("");
-  const ex = b.example ? `<div class="ex"><span class="k">範例：「這段合作要不要繼續」丟出來的卡</span><ul>${b.example.map(([k,v])=>`<li><span>${k}</span><span>${v}</span></li>`).join("")}</ul></div>` : "";
-  return `<li><details id="b-${b.code}"><summary>
-      <span class="no">${no}</span><span class="code">${b.code}</span><span class="name">${b.name}</span>
-      <span class="st"><b>${G[b.status]}</b>${b.status}</span><span class="ct">合約　${b.contract}</span>
-    </summary><div class="body"><dl>${dl}</dl>${ex}</div></details></li>`;
+/* 切換畫面；網址 #map #flow #record #contracts #progress #decided 可直接連到那一頁 */
+const VIEWS = ["map","flow","record","contracts","progress","decided"];
+function show(v, keepScroll){
+  if(!VIEWS.includes(v)) v = "map";
+  VIEWS.forEach(x => { $("v-"+x).hidden = x!==v; });
+  document.querySelectorAll(".navi").forEach(b => b.dataset.v===v ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
+  try{ history.replaceState(null,"","#"+v); }catch(e){}
+  if(!keepScroll) window.scrollTo(0,0);
 }
-const c = s => BLOCKS.filter(b=>b.status===s).length;
-const drafts = BLOCKS.filter(b=>b.contract!=="未寫").length;
-document.getElementById("facts").innerHTML = [
-  ["積木","13 塊"],
-  ["現況",`<span class="num">● 有 ${c("有")}　◐ 部分 ${c("部分")}　○ 無 ${c("無")}</span>`],
-  ["合約",`<span class="num">草稿 ${drafts} 份　未寫 ${13-drafts} 份</span>`],
-  ["建置",`<span class="num">完成 0 塊　未開始 13 塊</span>`],
-  ["現在在哪一步","第 0 步，寫合約"],
-].map(([k,v])=>`<li><span class="k">${k}</span><span>${v}</span></li>`).join("");
-document.getElementById("blocks").innerHTML = BLOCKS.map(row).join("");
-document.getElementById("cross").innerHTML = CROSS.map(row).join("");
+document.querySelectorAll(".navi").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-open]"); if(!t) return;
+  show("contracts", true);
+  const d = $("b-"+t.dataset.open); if(d){ d.open = true; d.scrollIntoView({block:"start"}); }
+});
+show((location.hash||"").slice(1), true);
 </script>
