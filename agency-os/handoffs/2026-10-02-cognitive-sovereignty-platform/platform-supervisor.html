@@ -49,7 +49,8 @@ main{display:grid;gap:32px;min-width:0}
 @media (max-width:959px){
   .app{grid-template-columns:minmax(0,1fr);gap:20px;padding-inline:16px;padding-block:20px 72px}
   .side{position:static;flex-direction:row;flex-wrap:wrap;gap:8px}
-  .brand{flex-basis:100%;padding:0 0 4px}
+  .brand{display:none}
+  h1{font-size:24px}
   .navi{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 14px;font-size:var(--fs-small)}
   .card{padding:16px}
 }
@@ -201,6 +202,17 @@ main{display:grid;gap:32px;min-width:0}
 .tl .dot.o{background:transparent;border:2px solid var(--muted)}
 .tl .dt{font-size:var(--fs-small);color:var(--muted);font-variant-numeric:tabular-nums}
 
+/* 現有工具去哪 */
+.bars{display:grid;gap:16px}
+.bars .b{display:grid;grid-template-columns:11em minmax(0,1fr);gap:16px;align-items:start}
+.bars .who{display:flex;flex-wrap:wrap;gap:4px;padding-top:1px}
+.bars .track{display:flex;align-items:center;gap:10px}
+.bars .fill{height:14px;border-radius:999px;background:var(--muted);flex:none;max-width:calc(100% - 3em)}
+.bars .fill[data-g="1"]{background:var(--g1)} .bars .fill[data-g="2"]{background:var(--g2)} .bars .fill[data-g="3"]{background:var(--g3)} .bars .fill[data-g="4"]{background:var(--g4)}
+.bars .n{font-weight:700}
+.bars .d{font-size:var(--fs-small);color:var(--muted);margin-top:2px}
+@media (max-width:659px){.bars .b{grid-template-columns:minmax(0,1fr);gap:6px}}
+
 /* 談定 */
 .dec{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .dec li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:12px}
@@ -223,6 +235,7 @@ main{display:grid;gap:32px;min-width:0}
     <button class="navi" data-v="flow">走一趟</button>
     <button class="navi" data-v="record">案子的紀錄</button>
     <button class="navi" data-v="contracts">13 份合約</button>
+    <button class="navi" data-v="tools">現有工具去哪</button>
     <button class="navi" data-v="progress">進度與順序</button>
     <button class="navi" data-v="decided">談定與未定</button>
   </nav>
@@ -295,6 +308,32 @@ main{display:grid;gap:32px;min-width:0}
       <div class="cgrid" id="cross"></div>
     </section>
 
+    <section class="view" id="v-tools" hidden>
+      <div class="stack"><h2>現有的 285 個工具和工作流去哪裡</h2>
+        <p class="sub">它們不是積木。積木是「人在判斷的哪一段」；工具是那一段裡可以挑的做法。工作流是把幾個工具排成一串。它們全部留著，變成積木裡面的選單，受那塊積木的合約管。</p></div>
+      <div class="card stack">
+        <h3>285 個工具，照今天網站上的 12 個問題分類，落在哪一塊</h3>
+        <div class="bars" id="toolbars"></div>
+        <p class="cap">數字是 2026-10-02 從方法登記檔數出來的，12 類加起來 284，另有 1 個還沒分類。長條長度照數量畫。</p>
+      </div>
+      <div class="card stack">
+        <h3>工作流，落在哪一塊</h3>
+        <div class="bars" id="flowbars"></div>
+        <p class="cap">工作流和套件不一樣：工作流是一串工具，全部由 AI 跑完；套件是一串積木，中間有人自己寫的步驟。登記檔裡是 17 條，含 3 條內部用。</p>
+      </div>
+      <div class="card stack">
+        <h3>這代表什麼</h3>
+        <div class="two">
+          <div class="have"><h3>已經很厚的</h3><ul><li>拆解（MAP）有 116 個做法</li><li>發散、反證、計算、選擇、排計畫都有做法</li><li>每個工具都有一堂 5 分鐘的課</li></ul></div>
+          <div class="lack"><h3>工具再多也補不了的</h3><ul><li>SENSE、THINK、DECIDE、LEARN 是「人先寫」的地方，今天沒有這個位置</li><li>工具現在是 AI 先產、人後看；進了積木要照合約改成人先寫、AI 才回</li><li>GATHER、EXPRESS、TEACH、COLLAB、GOVERN 靠的不是這 285 個工具</li></ul></div>
+        </div>
+      </div>
+      <div class="card stack">
+        <h3>其他現有的東西</h3>
+        <div class="rows" id="tools"></div>
+      </div>
+    </section>
+
     <section class="view" id="v-progress" hidden>
       <div class="stack"><h2>進度與順序</h2>
         <p class="sub">三欄各自獨立：現況是今天有沒有這塊的能力；合約是有沒有寫清楚；建置是有沒有照合約蓋。</p></div>
@@ -315,10 +354,6 @@ main{display:grid;gap:32px;min-width:0}
       <div class="two">
         <div class="card stack"><h3>談定的</h3><ol class="dec" id="done"></ol></div>
         <div class="card stack"><h3>還沒定的</h3><ol class="dec open" id="open"></ol></div>
-      </div>
-      <div class="card stack">
-        <h3>現有工具去哪裡</h3>
-        <div class="rows" id="tools"></div>
       </div>
     </section>
   </main>
@@ -573,7 +608,6 @@ $("cross").innerHTML = CROSS.map(card).join("");
   $("open").innerHTML = open.map(x=>`<li><span class="m">？</span><span>${x}</span></li>`).join("");
   const T = [
     ["蒐集器","GATHER 的引擎","抓來源、品質閘、相關性閘。平台在背後呼叫它，使用者不用自己去另一個網站。",["GATHER"]],
-    ["方法與工作流","積木裡可以挑的做法","285 個方法、16 條工作流。方法不是積木。約 64 個軟體工程方法不給一般使用者看。",["MAP","THINK","DECIDE","COMPUTE"]],
     ["彙整與引註閘","VERIFY 的一半","每句主張必須對得上送進去的來源，否則整份不過。",["VERIFY"]],
     ["結果頁與課程頁","積木內部的畫面","結果頁歸 MAP／COMPUTE，課程頁歸 TEACH。",["MAP","COMPUTE","TEACH"]],
     ["知識庫","不在平台內","客戶客服語料，給客服 AI 用。",[]],
@@ -583,8 +617,34 @@ $("cross").innerHTML = CROSS.map(card).join("");
   $("tools").innerHTML = T.map(([k,w,d,bs])=>`<div class="r"><span class="k">${k}</span><span><span class="w">${w}　</span>${bs.map(bk).join(" ")}<span class="d" style="display:block">${d}</span></span></div>`).join("");
 })();
 
-/* 切換畫面；網址 #map #flow #record #contracts #progress #decided 可直接連到那一頁 */
-const VIEWS = ["map","flow","record","contracts","progress","decided"];
+/* 現有工具去哪：長條照數量畫，最長的一條＝116 */
+(function(){
+  const bars = (rows, max) => rows.map(([who,n,d])=>`<div class="b"><span class="who">${who.map(bk).join("")}</span>
+    <div><div class="track"><span class="fill" data-g="${GROUP[who[0]]||0}" style="width:${Math.max(n/max*100,1.5)}%"></span><span class="n num">${n}</span></div>
+    <div class="d">${d}</div></div></div>`).join("");
+  $("toolbars").innerHTML = bars([
+    [["SENSE"],15,"帶一個團體、帶反思（藝術反思 15）"],
+    [["MAP"],116,"這件事為什麼一直發生 31　問題到底是什麼 24　看清楚自己和外面的局 40　使用者、參與者到底怎麼想 21"],
+    [["THINK"],22,"需要更多點子 22"],
+    [["THINK","VERIFY"],20,"我的說法站不站得住 20：反方挑戰歸 THINK，證據檢查歸 VERIFY"],
+    [["COMPUTE"],11,"做不做得起來、划不划算 11"],
+    [["DECIDE"],14,"幾個選項，選哪一個 14：工具只給候選和比較，結論仍是人寫"],
+    [["ACT","LEARN"],33,"計畫怎麼排、風險怎麼盯、做完學到什麼 33"],
+    [["規範與脈絡"],10,"哪些法規管得到 10"],
+    [["不給一般使用者"],43,"系統、資料與資安的工程決策 43：留給內部和工程客戶，不出現在一般人的選單"],
+  ],116);
+  $("flowbars").innerHTML = bars([
+    [["SENSE"],3,"藝術反思 3 條：創作反思、專案發想、卡住時"],
+    [["MAP"],1,"根因分析 1 條"],
+    [["MAP","COMPUTE","DECIDE"],6,"商業計畫與可行性 6 條"],
+    [["GATHER","VERIFY"],3,"研究 3 條：文獻搜尋、研究證據、質性研究"],
+    [["套件雛形"],1,"人生決策 1 條：最接近藍圖的「個人複雜決策」套件，但中間沒有人自己寫的步驟"],
+    [["不給一般使用者"],3,"內部用 3 條：資料庫搬遷、方法汰換、新舊版本比較"],
+  ],6);
+})();
+
+/* 切換畫面；網址 #map #flow #record #contracts #tools #progress #decided 可直接連到那一頁 */
+const VIEWS = ["map","flow","record","contracts","tools","progress","decided"];
 function show(v, keepScroll){
   if(!VIEWS.includes(v)) v = "map";
   VIEWS.forEach(x => { $("v-"+x).hidden = x!==v; });
