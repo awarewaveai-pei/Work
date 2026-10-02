@@ -10,6 +10,18 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`evidence set|證據庫|personal_swot` | hits=0 stale（新檔已改；續4 為已出貨歷史，於本條更正）
 - ORACLE_WAIVED: container 無 codex／pwsh → 獨立 critic（Quick）＋2 個突變證據
 - rollback：revert 本 commit；純新增方法，未改其他方法行為。
+### （續5）CI `perplexity-search-only` 紅：紀錄檔引文被當成呼叫點
+
+- 症狀：main 自 2026-10-02 起每次 push／PR 的 `perplexity-search-only` 皆紅（最近 10 次 run 全 failure；PR #29 雲端 session 留言指出同一點）。訊息 `agency-os/reports/agent-dispatch/dispatch-20260918.jsonl: names api.perplexity.ai outside the guarded exits`。
+- 根因：`d48515eaa`（2026-09-30 chore: commit accumulated record files）把 dispatch 紀錄進版控；第 31 行是 critic 報告引文，字面含主機名。`scripts/check-perplexity-search-only.mjs` `skipped()` 只豁免 `.md`（文件），未把「append-only 紀錄資料」視為同一類非呼叫點。
+- 不變量：閘擋的是**可能發出呼叫的檔案**。`agency-os/{reports,handoffs,memory}/` 下的 `.jsonl/.json/.txt/.log/.csv` 是紀錄資料，不執行、不被當設定載入；同根目錄下的腳本仍是潛在呼叫點，必須照掃。修法 = 新增 `RECORD_DATA` 跳過規則（關掉整類），不改寫歷史紀錄、不加單檔豁免。
+- 改動：`scripts/check-perplexity-search-only.mjs` +`RECORD_DATA` 常數與 `skipped()` 一行；self-test +4 例（紀錄 jsonl 引文放行；紀錄目錄 `.ps1`／`.mjs` 照擋；非紀錄根 `agency-os/config/*.json` 照擋）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/check-perplexity-search-only.mjs --self-test && node scripts/check-perplexity-search-only.mjs && node --test tests/hooks/settings-deny-parity.test.mjs` | exit=0 | ms=1500 | result=self-test 17 例 + UTF-16 + invariants ok；7368 tracked 檔 0 違規；deny parity 3/3
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 書面對抗自審：跳過範圍以根目錄 × 非可執行副檔名雙重收斂；突變 1 拔掉 `RECORD_DATA` 跳過 → 紀錄 jsonl 案例紅；突變 2 放寬為不限根且含 `.ps1/.mjs` → `requirements.txt`／CLI／紀錄 `.ps1` 三例紅；皆已還原轉綠
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,.github | grep=`check-perplexity-search-only|Markdown is documentation` | hits=9（workflow 3、WORKLOG 歷史 4、tool-expert.md 1、腳本自身 1；無一描述跳過規則，無需同步）；紀錄根下含主機名／SDK／key 字樣的非 md 檔僅 `dispatch-20260918.jsonl` 1 個
+- ORACLE_WAIVED: 7 行 CI 閘豁免規則，以突變證據＋對抗自審取代外部 oracle
+- 避免再發生：新增紀錄類目錄或副檔名時改 `RECORD_DATA`，並在 self-test 補「紀錄放行／腳本照擋」成對案例。
+- rollback：`git revert <本 commit>`（閘回到會擋紀錄檔的狀態，main 會重新變紅）。
 ## 2026-10-02（續4）Cognitive OS 補藝術治療清單 3 個部分對應項：生命時間線新方法、風險矩陣格子圖、根本原因分析工作流；個人 SWOT 待操作者決定
 - [操作者] 對照 54 項藝術治療工具清單問「少哪些」→ 53 個 method_id 全在（本機 `/methods` 實測），4 項只部分對應 → 指示「做」前三項。
 - [新方法] `art_therapy.life_timeline`：contract＋`life-timeline-record.schema.yaml`＋`modules/art_therapy/life_timeline.py`＋slice＋test＋4 份登記檔。不變量：`phase` 由 `when` 對 `now` 算出、不收輸入；≥1 過去＋≥1 未來；順序依 `direction`（forward 非遞減／backward 非遞增）；只有未來事件帶 `first_step`。gate 由原始紀錄重算（`life_timeline.py:_line_problem stored=True`）。
