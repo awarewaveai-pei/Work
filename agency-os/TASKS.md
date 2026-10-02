@@ -699,6 +699,9 @@
 - [x] **【2026-09-12 開出｜低優先】`sg-deploy.sh` next-admin 兩個 smoke 探針硬編 host port，同款漂移風險已知但未動** → ✅ 2026-09-26 續49（雲端 T25）：`docker port lobster-next-admin 3000/tcp`，fallback 3002。
   - `🟡 未開始` · `2026-09-12 開出` · `不卡誰，目前 prod .env 未設 override 故未觸發`
   - **一句話**：修 node-api 健康探針打錯 nginx 層那次（見 WORKLOG 2026-09-12），critic 覆審抓到 `sg-deploy.sh:311-312` 的 `next-admin /login`／`/api/ops/summary` 兩個探針一樣硬編 `127.0.0.1:3002`，而 `docker-compose.yml:437` 該埠其實是 `${NEXT_ADMIN_HOST_PORT:-127.0.0.1:3002}:3000`——跟當時 node-api 那個已修掉的 bug 同一種脆弱（host port 可被 env var 覆寫，硬編值只是「今天 prod .env 剛好沒設」才沒事）。node-api 已改成 `docker port lobster-node-api 3001/tcp` runtime 解析；next-admin 這兩行維持原樣未動，因為不是本次事故的觸發點，屬於刻意劃定的範圍外項目，非遺漏。修法方向：套同一個 `docker port lobster-next-admin 3000/tcp` 解析。細節見 WORKLOG 2026-09-12。
+- [ ] **【2026-10-02 開出｜Cognitive OS｜收工時】待部署：`118958b5f`（structured answers）＋之後同批改動，一次 `deploy.sh`（High-STOP，收工時列清單再確認）**
+  - `🟡 待部署` · `2026-10-02 開出` · `操作者要求收工時一起部署`
+  - **一句話**：正式站仍是 `b51095cbf`；部署＝`/opt/cognitive-os` pull＋`deploy/deploy.sh`（受影響測試自 `.green-sha`，本批觸及 schema_contracts／errors ≈ 365 模組約 47 分）；部署後在「勿刪」專案 `857b6f41…` 實測一次 dossier_brief。WORKLOG 2026-10-02 續3。
 - [x] **【2026-10-02 開出｜Cognitive OS｜低優先】synthesis 失敗只存錯誤碼，事後看不到哪個欄位不合 schema** → ✅ 2026-10-02 續3：整類關閉（要回 JSON 物件的 AI 呼叫一律帶 schema；SynthesisFailed 帶違規路徑不帶值），未部署
   - `✅ 已完成` · `2026-10-02 開出` · `不卡誰`
   - **一句話**：真來源 `dossier_brief` 1/2 次整次 FAILED（`SCHEMA_VALIDATION_FAILED`，修復重試也失敗）；`main.py:2045` `_error_code` 只存碼（刻意不存模型／來源文字），違規 JSON path 也一起丟了 → 只能付費重放才診斷。方向：另存 path＋validator keyword（不含值）。WORKLOG 2026-10-02 續2。
