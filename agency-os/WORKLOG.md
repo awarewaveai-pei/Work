@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-02（續1）Cognitive OS 正式站：舊專案全部抹除只留最新一個（P1 WC-15 ⑤ PASS）；P2 DOD-2 阻塞根因 = 指定專案已被刪；PI-b 05 操作者驗收
+- [操作者] PI-b 05 結果頁已親眼看過 → PI-b 5/5。
+- [操作者 go-ahead「刪」] 正式站 `projects.sqlite3` 8 個專案，保留最新 `b1964684`（冰山模型 2026-09-29 09:13），其餘 7 個抹除：操作者租戶 3（冰山 09-26 `7136d4ce`、WC-P1-15 erasure probe `264ba6a4`、冰山 09-27 `c04300c0`）＋測試租戶 4（Deploy Verify `870e779c`、Knowledge Import `8e323c1c`／`3e7b8539`、PI-b 驗收 `13bdf5bb`）。
+- 做法：容器內直接呼叫 endpoint 函式 `main.erase_project`（`Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py:2569`；= 網頁「刪除專案」同一路徑，只少 HTTP 認證），逐一驗：DB 6 表殘留列、source CAS blob 檔、artifact 可讀性、非 tombstone events、ProjectErased tombstone。
+- 結果：7/7 ERASED；rows_left=0、blobs 0/18 存在、artifacts 0/5 可讀、events_left=0、tombstone 各 1；剩餘專案 = `b1964684`。前置備份 `/root/cos-preerase-20261002T060027Z.tgz`（122 檔）驗證完成後已刪（操作者要求永久刪除）。
+- 「舊的刪不掉」：後端抹除對舊專案全部成功 → 不是後端；nginx access log 只有 2026-09-29 兩筆 `DELETE /api/projects/…` 且皆 200，舊專案從未送出 DELETE → 前端端未重現，待操作者描述畫面（TASKS）。
+- P2 DOD-2 根因：指定專案 `1c749cbf-7f53-43e1-a152-3d27b0d7c123`（P1 L1 Soulful Expression，11 來源）由網頁於 2026-09-29 02:32:20 UTC 刪除（nginx `DELETE /api/projects/1c749cbf… 200`，referer 專案頁）。正式站現無真來源專案；解鎖 = 新建真專案重新蒐集後跑 `dossier_brief`（有付費用量，待操作者同意）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec cognitive-os-api python - < cos_erase.py（main.erase_project ×7 + 五項查證）; curl https://cognitive.aware-wave.com/api/health | exit=0 | ms=6000
+- REVIEW_WAIVED: NA -- 無程式碼變更；正式站資料操作＋計畫文件回填
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=1c749cbf | hits=6
+- 避免再發生：DOD 指定的 prod 資源被操作者 UI 刪掉 → 卡片指定 prod 專案時同時寫「勿刪」標示於專案名或 TASKS（下次產卡套用）。
+- rollback：無（不可逆，操作者明示；備份依要求已刪）。
+- 順修 `scripts/worklog-insert-entry.py:31`：換行判斷原為「檔內有任何 CRLF 就用 CRLF」，WORKLOG 有別的 session 未提交的 CRLF 行時找不到 `# Worklog\n` 標頭 → ValueError；改看標頭行本身的換行。實測：修後插入成功（續1）。
 ## 2026-10-01（續16）ks-aw-01 `/opt/cognitive-os`：git 遠端網址裡的 GitHub token 改為唯讀部署金鑰
 - ROOT_CAUSE: 2026-09-12 13:31 UTC 首次部署 COS（WORKLOG 2026-09-12 續12；session 2f650e6f，Sonnet 5）以 `git clone --filter=blob:none --sparse --no-checkout "https://<token>@github.com/awarewaveai-pei/Work.git"` 建 `/opt/cognitive-os`，git 把含 token 的 URL 明文存進 `.git/config`（664，ubuntu）。token＝筆電 `GITHUB_PERSONAL_ACCESS_TOKEN`／`COPILOT_MCP_BEARER_TOKEN`（`ghp_6uoP…`，sha256 前 12 碼比對相同）。repo 內無任何腳本這樣做，屬臨時指令；WORKLOG 當時未記。
 - FIX: 主機產生 ED25519 金鑰 `~/.ssh/cognitive-os-deploy`（SHA256:eFgNq+RHSXgpbXg45dnHaPSbCwNa0MI4RztsQbWLyEE）；`gh api POST repos/awarewaveai-pei/Work/keys read_only=true` → id 165068099；github.com ED25519 指紋與官方一致後寫入 known_hosts；repo `core.sshCommand` 指定金鑰；remote 改 `git@github.com:awarewaveai-pei/Work.git`。`scripts/dev/README.md` 部署段加一行（金鑰位置＋禁止 token 進 URL）。資料記入操作者本機筆記 `AWARE_WAVE_CREDENTIALS.md`（操作者指定）。

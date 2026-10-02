@@ -28,7 +28,8 @@ def main():
     if "續NNN" not in entry:
         print("entry has no 續NNN placeholder"); return 2
     b = open(a.worklog, "rb").read()
-    nl = b"\r\n" if b"\r\n" in b else b"\n"
+    # The header line decides: another session's uncommitted hunk can leave stray CRLF lines in an LF file.
+    nl = b"\r\n" if b.split(b"\n", 1)[0].endswith(b"\r") else b"\n"
     text = b.decode("utf-8")
     used = [int(m) for m in re.findall(r"^## " + re.escape(a.date) + r"（續(\d+)）", text, re.M)]
     n = (max(used) + 1) if used else 1
