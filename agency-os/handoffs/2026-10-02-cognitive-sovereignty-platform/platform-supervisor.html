@@ -131,64 +131,91 @@ main{display:grid;gap:32px;min-width:0}
 .states .s span{font-size:var(--fs-small);color:var(--muted)}
 .states .s .bks{display:flex;flex-wrap:wrap;gap:4px}
 @media (max-width:640px){.layer,.dw{grid-template-columns:minmax(0,1fr)}.gate{margin:0 8px}}
-.pin{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0 14px;display:grid;gap:10px;max-width:760px;border-bottom:1px solid var(--line)}
-.case{padding:12px 18px;border-radius:12px;background:var(--accent);color:var(--card);font-size:var(--fs-body);line-height:1.7}
+.case{padding:10px 18px;border-radius:12px;background:var(--accent);color:var(--card);font-size:var(--fs-body);line-height:1.7}
 .case b{font-size:var(--fs-small);font-weight:700;opacity:.8;margin-right:10px}
-.tabs{display:flex;flex-wrap:wrap;gap:8px}
-.tab{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:7px 16px;font:inherit;font-size:var(--fs-small);font-weight:700;cursor:pointer}
-.tab[aria-current="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
-.trail{display:flex;flex-wrap:wrap;gap:6px}
-.tr{border:1.5px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 11px;font:inherit;font-size:var(--fs-small);cursor:pointer}
-.tr.opt{border-style:dashed}
-.tr[aria-current="true"]{background:var(--accent);color:var(--card);border-color:var(--accent);font-weight:700}
-#one-panels{max-width:760px}
-.stp-prev{margin:-8px 0 26px;padding:12px 18px;border-radius:12px;background:var(--soft);line-height:1.7}
-.stp-prev small{display:block;font-size:var(--fs-small);color:var(--muted)}
-.pager{display:flex;justify-content:space-between;gap:12px;max-width:760px}
-.pager button{border:1.5px solid var(--accent);background:var(--card);color:var(--accent);border-radius:12px;padding:12px 18px;font:inherit;font-weight:700;cursor:pointer;max-width:48%;text-align:left}
-.pager button.next{background:var(--accent);color:var(--card);margin-left:auto;text-align:right}
-.pager small{display:block;font-weight:400;font-size:var(--fs-tag);opacity:.85}
+.case small{display:block;font-size:var(--fs-small);opacity:.85}
+/* 一頁看懂：左邊整個流程一直在畫面上，右邊放選到的那一項。整頁不用捲。 */
+body[data-view="one"] .app{padding-block:16px 8px}
+#v-one{gap:14px;container-type:inline-size}
+.one{display:grid;grid-template-columns:minmax(0,372px) minmax(0,1fr);gap:20px;align-items:start}
+.route{position:sticky;top:12px;display:grid;grid-template-columns:minmax(0,1fr) 124px;gap:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+#one-steps{list-style:none;margin:0;padding:0;display:grid;position:relative}
+#one-steps::before{content:"";position:absolute;left:14px;top:14px;bottom:14px;border-left:2px solid var(--line)}
+.rs{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;width:100%;border:0;background:transparent;text-align:left;padding:1px 6px 1px 1px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1.5}
+.rs .n{position:relative;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--card);font-size:var(--fs-tag);font-weight:700}
+.rs.opt .n{background:var(--card);border:1.5px dashed var(--muted);color:var(--muted)}
+.rs:hover{background:var(--soft)}
+.rs[aria-current="true"]{background:var(--tag)}
+.rs[aria-current="true"] .t{font-weight:700;color:var(--accent)}
+.rs.near .n{outline:3px solid var(--warn);outline-offset:1px}
+.band{display:grid;align-content:start;gap:6px;border-left:3px solid var(--accent);padding-left:10px}
+.band-h{font-size:var(--fs-small);font-weight:700;color:var(--accent);line-height:1.4}
+.band-s{font-size:var(--fs-tag);color:var(--muted);line-height:1.5;margin-top:8px}
+#one-always5{display:grid;gap:6px}
+.bs{border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:4px 8px;text-align:left;font-size:var(--fs-small);font-weight:600;line-height:1.5;cursor:pointer}
+.bs:hover{border-color:var(--accent)}
+.bs[aria-current="true"]{background:var(--tag);border-color:var(--accent);color:var(--accent)}
+.rt-foot{grid-column:1/-1;border-top:1px solid var(--line);padding-top:8px;display:grid;gap:6px;font-size:var(--fs-small);color:var(--muted);line-height:1.5}
+.rt-foot .fls{display:flex;flex-wrap:wrap;gap:5px}
+.fb{border:1.5px solid var(--warn);background:var(--card);color:var(--warn);border-radius:8px;padding:1px 7px;font-size:13px;font-weight:600;line-height:1.6;cursor:pointer}
+.fb[aria-current="true"]{background:var(--warn-bg)}
+.dp{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:12px 20px 14px;display:grid;gap:7px}
+.dp.opt{border-style:dashed}
+.dp-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.dp-h .n{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--card);font-weight:700;flex:none}
+.dp.opt .dp-h .n{background:transparent;color:var(--muted);border:1.5px dashed var(--muted)}
+.dp-h .n.all{background:var(--ink)}
+.dp-h .n.warn{background:var(--warn)}
+.dp-h .dp-nav{margin-left:auto}
+.dp-h>b{font-size:20px;line-height:1.3;margin-right:4px}
+.dp-prev{font-size:var(--fs-small);color:var(--muted);line-height:1.6}
+.dp-when{padding:6px 12px;border-radius:10px;border:1px dashed var(--muted);font-size:var(--fs-small);line-height:1.6}
+.dp-r{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:start}
+.dp-r p,.dp-b p,.dp-fail p{margin:0;line-height:1.6}
+.dp-r p+p{margin-top:2px}
+.dp-b p+p{margin-top:6px}
+.dp-out{padding:6px 14px;border-radius:10px;background:var(--tag);color:var(--accent);font-weight:700;line-height:1.6}
+.dp-out small{font-weight:400;font-size:var(--fs-tag);margin-right:10px}
+.dp-fail{padding:6px 14px;border-radius:10px;background:var(--warn-bg);font-size:var(--fs-small)}
+.dp-fail b{color:var(--warn)}
+.dp-nav{display:flex;gap:8px}
+.dp-nav button{border:1.5px solid var(--accent);background:var(--card);color:var(--accent);border-radius:10px;padding:5px 12px;font-size:var(--fs-small);font-weight:700;cursor:pointer}
+.dp-nav .next{background:var(--accent);color:var(--card)}
+.dp-left{font-size:var(--fs-small);color:var(--muted);border-top:1px dashed var(--line);padding-top:6px}
+@container (max-width:939px){
+  .one{grid-template-columns:minmax(0,318px) minmax(0,1fr);gap:14px}
+  .route{grid-template-columns:minmax(0,1fr) 104px;gap:8px;padding:10px}
+  .rs{font-size:14px;gap:6px}
+  .rs .bk{font-size:11px;padding:1px 6px}
+  .rs .n{width:24px;height:24px}
+  #one-steps::before{left:13px}
+  .bs{font-size:13px;padding:3px 6px}
+  .fb{font-size:12px;padding:0 6px}
+  .dp{padding:12px 14px}
+  .dp-r{grid-template-columns:44px minmax(0,1fr);gap:8px}
+}
+@container (max-width:699px){
+  .one{grid-template-columns:minmax(0,1fr)}
+  .route{position:static}
+  .dp{padding:12px 14px}
+  .dp-h .dp-nav{margin-left:0;width:100%}
+}
 /* 其他頁：一次只展開一段 */
 .acc>h3{cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .acc>h3::after{content:"＋";color:var(--muted);font-weight:400;flex:none}
 .acc.open>h3::after{content:"－"}
 .acc:not(.open)>:not(h3){display:none!important}
 .walk{display:grid;gap:0;max-width:760px}
-.stp{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:32px}
-.stp.opt{border-style:dashed}
-.stp-h{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center;margin-bottom:28px}
-.stp-n{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--accent);color:var(--card);font-size:20px;font-weight:700}
-.stp.opt .stp-n{background:transparent;color:var(--muted);border:1.5px dashed var(--muted)}
-.stp-t{font-size:22px;font-weight:700;line-height:1.3}
-.stp-m{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px}
-.act{display:grid;grid-template-columns:72px minmax(0,1fr);gap:20px;align-items:start}
-.act+.act{margin-top:28px}
 .act-w{font-size:var(--fs-small);font-weight:700;border-radius:999px;padding:5px 0;text-align:center}
 .act-w[data-a="you"]{background:var(--accent);color:var(--card)}
 .act-w[data-a="sys"]{background:var(--soft);color:var(--ink);border:1px solid var(--line)}
 .act-w[data-a="ai"]{background:var(--g2-bg);color:var(--g2)}
-.act p{margin:0;font-size:var(--fs-body);line-height:1.8}
-.act p+p{margin-top:10px}
-.stp-w{margin:-8px 0 28px;padding:14px 18px;border-radius:12px;border:1px dashed var(--muted);line-height:1.8}
-.a5{padding:24px 0 0;margin-top:24px;border-top:1px solid var(--line)}
-.a5-b{margin-top:12px}
-.a5-b p,.stp>.a5-b p{margin:0;line-height:1.8}
-.a5-b p+p{margin-top:8px}
-.stp-o{margin-top:32px;padding:16px 20px;border-radius:12px;background:var(--tag);color:var(--accent);font-weight:700}
-.stp-o small{display:block;font-weight:400;font-size:var(--fs-small);margin-bottom:2px}
 .down{text-align:center;color:var(--muted);font-size:22px;line-height:1;padding:14px 0}
 .walk .note{font-size:var(--fs-body);line-height:1.8;padding:20px 24px}
 .any{display:grid;gap:0;max-width:760px}
 .any>div{display:grid;gap:8px;padding:20px 0;border-top:1px solid var(--line)}
 .any>div:first-child{border-top:0;padding-top:0}
 .any p{margin:0;line-height:1.8}
-.fails{display:grid;gap:16px;max-width:760px}
-.fl{border:1.5px solid var(--line);border-radius:16px;padding:28px}
-.fl h4{margin:0 0 20px;font-size:var(--fs-h3)}
-.three{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:760px}
-.three>div{border:1.5px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:10px;align-content:start}
-.three .bks{display:flex;flex-wrap:wrap;gap:6px}
-@media (max-width:640px){.stp,.fl{padding:20px}.act{grid-template-columns:minmax(0,1fr);gap:8px}.act-w{width:72px}}
 .row5{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
 .nb.all{background:var(--ink);color:var(--card)}
 .hubtag{display:flex;align-items:center;justify-content:center;gap:8px;font-size:var(--fs-tag);font-weight:700;letter-spacing:.04em}
@@ -363,15 +390,15 @@ main{display:grid;gap:32px;min-width:0}
     <section class="card now" id="now" aria-label="現在在哪"></section>
 
     <section class="view" id="v-one">
-      <div class="stack"><h2>一頁看懂：一個例子從頭走到尾</h2>
-        <p class="sub">一次只看一格。上面那一排一直都在：亮起來的是你現在看的那一格。</p></div>
-      <div class="pin" id="one-pin">
-        <div class="case" id="one-case"></div>
-        <div class="tabs" id="one-tabs"></div>
-        <div class="trail" id="one-trail"></div>
+      <div class="case" id="one-case"></div>
+      <div class="one">
+        <div class="route" id="one-route" aria-label="整個流程">
+          <ol id="one-steps"></ol>
+          <div class="band" id="one-band"></div>
+          <div class="rt-foot" id="one-foot"></div>
+        </div>
+        <div id="one-panels" aria-live="polite"></div>
       </div>
-      <div id="one-panels"></div>
-      <div class="pager" id="one-pager"></div>
     </section>
 
     <section class="view" id="v-north" hidden>
@@ -913,13 +940,14 @@ const JOURNEY_ALWAYS = {
   "共用紀錄":["每一步寫下的東西，都記在這個案子裡。","每一筆標作者和是哪一塊寫的。"],
   "協作合約":["第 2 步用它設定。","之後每次 AI 要做事，系統先查它。","你隨時可以縮小或收回 AI 的權限。"],
 };
+/* 出狀況時：名稱、例子、系統怎麼做、你怎麼做、在哪一步（空的＝任何時候）。 */
 const ONE_FAIL = [
-  ["找到的來源太少","系統只找到一個獨立出處。","系統停下來。畫面顯示「只有一個出處」。","你決定：再找、照用但標存疑，或不用這筆。"],
-  ["來源互相矛盾","公會的公告說可以改，顧問公司的文章說不行。","系統把兩邊並排。AI 不選邊。","你標哪個採用、哪個存疑，並寫理由。"],
-  ["來源可能是灌出來的","兩小時內四十多個帳號貼同一段話。","系統在查證那一步標「疑似協同」並寫理由。這個標記不代表它是假的。","你在查證那一步標採信、存疑或不採信。"],
-  ["你情緒很強","你剛跟合夥人吵完，想馬上拆夥。","系統在你下判斷前問你情緒多強。你選「強」，系統建議把不能反悔的決定延後。","你決定延不延。"],
-  ["做了沒有用","談過一次，他下個月又改條件。","回顧時系統把預測和結果並排。","你選「換方法再做一輪」。舊的那一輪留著，可以比。"],
-  ["你不想繼續","做到一半不想做了。","系統不催。寫過的都留著。","你隨時可以停、可以回來、可以整個刪掉。"],
+  ["找到的來源太少","系統只找到一個獨立出處。","系統停下來。畫面顯示「只有一個出處」。","你決定：再找、照用但標存疑，或不用這筆。","蒐集"],
+  ["來源互相矛盾","公會的公告說可以改，顧問公司的文章說不行。","系統把兩邊並排。AI 不選邊。","你標哪個採用、哪個存疑，並寫理由。","蒐集"],
+  ["來源可能是灌出來的","兩小時內四十多個帳號貼同一段話。","系統在查證那一步標「疑似協同」並寫理由。這個標記不代表它是假的。","你在查證那一步標採信、存疑或不採信。","查證"],
+  ["你情緒很強","你剛跟合夥人吵完，想馬上拆夥。","系統在你下判斷前問你情緒多強。你選「強」，系統建議把不能反悔的決定延後。","你決定延不延。","判斷"],
+  ["做了沒有用","談過一次，他下個月又改條件。","回顧時系統把預測和結果並排。","你選「換方法再做一輪」。舊的那一輪留著，可以比。","回顧"],
+  ["你不想繼續","做到一半不想做了。","系統不催。寫過的都留著。","你隨時可以停、可以回來、可以整個刪掉。",""],
 ];
 
 /* 套件：地圖頁畫它，進度頁用它算「這一步做完能開哪些套件」。 */
@@ -2045,75 +2073,69 @@ $("cover").innerHTML = [
   rows("trains", BLOCKS.map(b=>[pad(b.n),[b.code],TRAINS[b.code]]));
 })();
 
-/* 一頁看懂：從 JOURNEY 畫，跟「走一趟」同一份資料。一次只顯示一格；上面那一排一直都在。 */
+/* 一頁看懂：從 JOURNEY 畫，跟「走一趟」同一份資料。
+   左邊是整個流程，一直在畫面上：14 步，和從頭到尾都在的六樣。右邊只放選到的那一項。整頁不用捲。 */
 (function(){
-  const link = c => `<button class="bk" data-g="${GROUP[c]||0}" data-open="${c}" style="border:0;cursor:pointer">${c}</button>`;
+  const card = (c, label) => `<button class="bk" data-g="${GROUP[c]||0}" data-open="${c}" style="border:0;cursor:pointer">${label||c}</button>`;
   const ps = a => a.map(x=>`<p>${x}</p>`).join("");
   const split = s => s.split(/(?<=。)/).filter(Boolean);
   const stOf = c => (BLOCKS.find(b=>b.code===c) || CROSS.find(b=>b.code===c)).status;
-  const act = (who, label, ls) => `<div class="act"><div class="act-w" data-a="${who}">${label}</div><div>${ps(ls)}</div></div>`;
+  const row = (who, label, ls) => `<div class="dp-r"><span class="act-w" data-a="${who}">${label}</span><div>${ps(ls)}</div></div>`;
   const tagOf = s => s.round==="add" ? "需要時才加" : s.round==="first" ? "第一輪就走" : "每個案子都有";
   const G13 = BLOCKS.find(b=>b.code==="GOVERN");
-  const all = [...BLOCKS, ...CROSS];
-  const names = s => all.filter(b=>b.status===s).map(b=>bk(b.code)).join("");
+  const N = JOURNEY.length;
+  const ITEMS = [...JOURNEY.map((s,i)=>`${i+1} ${s.t}`), "GOVERN", ...CROSS.map(x=>x.code), ...ONE_FAIL.map(f=>f[0])];
+  const F0 = N + 1 + CROSS.length;   // 出狀況的第一項
+  const stepOf = t => JOURNEY.findIndex(s=>s.t===t);
+  const nav = k => `<div class="dp-nav">${k>0?`<button type="button" class="prev" data-k="${k-1}">← ${ITEMS[k-1]}</button>`:""}${k<ITEMS.length-1?`<button type="button" class="next" data-k="${k+1}">${ITEMS[k+1]} →</button>`:""}</div>`;
+  const pkg = PK.find(p=>p[2].join()===JOURNEY.filter(s=>s.round==="first").map(s=>s.who).join());
+
   $("one-case").innerHTML = `<b>例子</b>${ONE_CASE.replace(/^例子：/,"")}`;
+  $("one-steps").innerHTML = JOURNEY.map((s,i)=>`<li data-step="${s.t}"><button type="button" class="rs ${s.round==="add"?"opt":""}" data-k="${i}">
+    <span class="n">${i+1}</span><span class="t">${s.t}</span><span class="bk" data-g="${GROUP[s.who]||0}">${s.who}</span></button></li>`).join("");
+  $("one-band").innerHTML = `<div class="band-h">從頭到尾都在</div>
+    <button type="button" class="bs" data-k="${N}">GOVERN</button>
+    <div class="band-s">全程生效的五樣<br>（不算積木）</div>
+    <div id="one-always5">${CROSS.map((x,k)=>`<button type="button" class="bs" data-k="${N+1+k}" data-five="${x.code}">${x.code}</button>`).join("")}</div>`;
+  $("one-foot").innerHTML = `<div class="band-h">出狀況時</div>
+    <div class="fls">${ONE_FAIL.map((f,n)=>`<button type="button" class="fb" data-k="${F0+n}">${f[0]}</button>`).join("")}</div>
+    <p>實線圈：第一輪就走。虛線圈：需要時才加。</p>`;
 
-  /* 四組。每一組裡一次只顯示一格。 */
-  const GROUPS = [
-    {id:"steps", label:`一步一步走（${JOURNEY.length} 步）`, chips:JOURNEY.map((s,i)=>[`${i+1}　${s.t}`, s.round==="add"])},
-    {id:"always", label:"從頭到尾都在的", chips:[["GOVERN",false], ...CROSS.map(x=>[x.code,false])]},
-    {id:"fail", label:"出狀況時怎麼走", chips:ONE_FAIL.map(f=>[f[0],false])},
-    {id:"now", label:"現在有、還沒有", chips:[["現況",false]]},
-  ];
   $("one-panels").innerHTML =
-    `<div id="one-steps">${JOURNEY.map((s,i)=>`<div class="stp ${s.round==="add"?"opt":""}" data-step="${s.t}" data-panel="steps:${i}" hidden>
-      <div class="stp-h"><div class="stp-n">${i+1}</div>
-        <div><div class="stp-t">${s.t}</div><div class="stp-m">${link(s.who)}${st(stOf(s.who))}<span class="opt-tag" ${s.round==="add"?"":`style="border-style:solid"`}>${tagOf(s)}</span></div></div></div>
-      ${i?`<div class="stp-prev"><small>上一步（${JOURNEY[i-1].t}）交出的</small>${JOURNEY[i-1].out}</div>`:""}
-      ${s.round==="add"?`<div class="stp-w"><b>什麼時候加：</b>${s.when}${s.how}。</div>`:""}
-      ${act("you","你",s.you)}${act("sys","系統",s.sys)}${act("ai","AI",s.ai)}
-      <div class="stp-o"><small>這一步交出</small>${s.out}</div></div>`).join("")}</div>
-    <div class="stp" data-panel="always:0" hidden><div class="stp-h"><div class="stp-n">★</div>
-      <div><div class="stp-t">${G13.name}</div><div class="stp-m">${link("GOVERN")}${st(G13.status)}<span class="opt-tag" style="border-style:solid">一塊積木，從頭到尾都在</span></div></div></div>
-      <div class="a5-b">${ps(JOURNEY_GOVERN)}</div></div>
-    <div id="one-always5">${CROSS.map((x,k)=>`<div class="stp" data-five="${x.code}" data-panel="always:${k+1}" hidden>
-      <div class="stp-h"><div class="stp-n">全</div>
-        <div><div class="stp-t">${x.code}</div><div class="stp-m">${link(x.code)}${st(x.status)}<span class="opt-tag" style="border-style:solid">全程生效的五樣之一，不算積木</span></div></div></div>
-      <div class="a5-b">${ps(JOURNEY_ALWAYS[x.code])}</div></div>`).join("")}</div>
-    <div class="fails" id="one-fail">${ONE_FAIL.map(([k,eg,sys,you],n)=>`<div class="fl" data-panel="fail:${n}" hidden><h4>${k}</h4>
-      ${act("sys","例子",[eg])}${act("sys","系統",split(sys))}${act("you","你",split(you))}</div>`).join("")}</div>
-    <div class="three" id="one-now" data-panel="now:0" hidden>
-      <div><b>今天有一部分</b><span class="cap">這些功能今天的網站有一部分。但現在是 AI 先寫、你後看。要改成你先寫、AI 才回。</span><div class="bks">${names("有")}${names("部分")}</div></div>
-      <div><b>今天沒有</b><span class="cap">要新做。</span><div class="bks">${names("無")}</div></div>
-      <div><b>還沒決定</b><span class="cap">等你定的事，列在「談定與未定」和「架構」兩頁的最下面。最先要定的一件：第一個場景是不是就用上面這個「個人複雜決策」。</span></div></div>`;
+    JOURNEY.map((s,i)=>`<div class="dp ${s.round==="add"?"opt":""}" data-panel="steps:${i}" hidden>
+      <div class="dp-h"><span class="n">${i+1}</span><b>${s.t}</b>${card(s.who)}${st(stOf(s.who))}<span class="opt-tag">${tagOf(s)}</span>${nav(i)}</div>
+      <p class="dp-prev">${i ? `上一步（${JOURNEY[i-1].t}）交出：${JOURNEY[i-1].out}` : "這是第一步。"}</p>
+      ${s.round==="add" ? `<p class="dp-when"><b>什麼時候加：</b>${s.when}${s.how}。</p>` : ""}
+      ${row("you","你",s.you)}${row("sys","系統",s.sys)}${row("ai","AI",s.ai)}
+      <p class="dp-out"><small>這一步交出</small>${s.out}</p>
+      ${i===0 && pkg ? `<p class="dp-left">還等你決定：第一個場景是不是就用這一組「${pkg[0]}」。</p>` : ""}</div>`).join("") +
+    `<div class="dp" data-panel="always:0" hidden>
+      <div class="dp-h"><span class="n all">★</span><b>${G13.name}</b>${card("GOVERN")}${st(G13.status)}<span class="opt-tag">一塊積木，從頭到尾都在</span>
+      ${nav(N)}</div><div class="dp-b">${ps(JOURNEY_GOVERN)}</div></div>` +
+    CROSS.map((x,k)=>`<div class="dp" data-panel="always:${k+1}" hidden>
+      <div class="dp-h"><span class="n all">全</span><b>${x.code}</b>${card(x.code,"合約卡")}${st(x.status)}<span class="opt-tag">全程生效的五樣之一，不算積木</span>
+${nav(N+1+k)}</div>
+      <div class="dp-b">${ps(JOURNEY_ALWAYS[x.code])}</div></div>`).join("") +
+    ONE_FAIL.map(([k,eg,sys,you,at],n)=>`<div class="dp" data-panel="fail:${n}" hidden>
+      <div class="dp-h"><span class="n warn">!</span><b>${k}</b><span class="opt-tag">${at ? `在第 ${stepOf(at)+1} 步：${at}` : "任何一步都可能"}</span>${nav(F0+n)}</div>
+      ${row("sys","例子",[eg])}${row("sys","系統",split(sys))}${row("you","你",split(you))}</div>`).join("");
 
-  let cur = [0,0];
-  const flat = GROUPS.flatMap((g,gi)=>g.chips.map((c,i)=>[gi,i]));
-  function go(gi, i, keep){
-    cur = [gi,i];
-    const g = GROUPS[gi];
-    document.querySelectorAll("#one-panels [data-panel]").forEach(el => { el.hidden = el.dataset.panel !== `${g.id}:${i}`; });
-    $("one-tabs").innerHTML = GROUPS.map((x,k)=>`<button class="tab" data-tab="${k}" aria-current="${k===gi}">${x.label}</button>`).join("");
-    $("one-trail").innerHTML = g.chips.length>1 ? g.chips.map(([label,opt],k)=>`<button class="tr ${opt?"opt":""}" data-chip="${k}" aria-current="${k===i}">${label}</button>`).join("") : "";
-    const at = flat.findIndex(([a,b])=>a===gi&&b===i), prev = flat[at-1], next = flat[at+1];
-    const lab = ([a,b]) => (a===gi ? "" : GROUPS[a].label + "：") + GROUPS[a].chips[b][0];
-    $("one-pager").innerHTML = (prev?`<button class="prev" data-go="${prev.join(",")}"><small>← 上一格</small>${lab(prev)}</button>`:"") +
-      (next?`<button class="next" data-go="${next.join(",")}"><small>下一格 →</small>${lab(next)}</button>`:"");
-    if(!keep){ const y = $("one-panels").getBoundingClientRect().top + scrollY - $("one-pin").offsetHeight - 12; if (scrollY > y) scrollTo(0, y); }
+  let cur = 0;
+  const ids = [...JOURNEY.map((s,i)=>`steps:${i}`), ...[0,1,2,3,4,5].map(k=>`always:${k}`), ...ONE_FAIL.map((f,n)=>`fail:${n}`)];
+  function go(k){
+    cur = k;
+    document.querySelectorAll("#one-panels [data-panel]").forEach(el => { el.hidden = el.dataset.panel !== ids[k]; });
+    document.querySelectorAll("#one-route [data-k]").forEach(b => b.setAttribute("aria-current", String(+b.dataset.k === k)));
+    const near = k >= F0 && ONE_FAIL[k-F0][4] ? stepOf(ONE_FAIL[k-F0][4]) : -1;   // 出狀況那一項：在流程上標出它發生在哪一步
+    document.querySelectorAll("#one-steps .rs").forEach((b,i) => b.classList.toggle("near", i === near));
   }
-  $("v-one").addEventListener("click", e => {
-    const tab = e.target.closest("[data-tab]"), chip = e.target.closest("[data-chip]"), pg = e.target.closest("[data-go]");
-    if (tab) go(+tab.dataset.tab, 0);
-    else if (chip) go(cur[0], +chip.dataset.chip);
-    else if (pg) { const [a,b] = pg.dataset.go.split(",").map(Number); go(a,b); }
-  });
+  $("v-one").addEventListener("click", e => { const b = e.target.closest("[data-k]"); if (b) go(+b.dataset.k); });
   document.addEventListener("keydown", e => {
     if ($("v-one").hidden || e.target.closest("input,textarea,select")) return;
-    const at = flat.findIndex(([a,b])=>a===cur[0]&&b===cur[1]);
-    if (e.key==="ArrowRight" && flat[at+1]) go(...flat[at+1]);
-    if (e.key==="ArrowLeft" && flat[at-1]) go(...flat[at-1]);
+    if ((e.key==="ArrowDown"||e.key==="ArrowRight") && cur < ITEMS.length-1) { e.preventDefault(); go(cur+1); }
+    if ((e.key==="ArrowUp"||e.key==="ArrowLeft") && cur > 0) { e.preventDefault(); go(cur-1); }
   });
-  go(0,0,true);
+  go(0);
 })();
 
 /* 架構 */
@@ -2160,6 +2182,8 @@ function show(v, keepScroll){
   if(!VIEWS.includes(v)) v = "one";
   VIEWS.forEach(x => { $("v-"+x).hidden = x!==v; });
   $("now").hidden = v==="one";   /* 第一頁只放例子，不放進度條 */
+  document.querySelector(".head").hidden = v==="one";   /* 第一頁要整頁放得進一個畫面；左邊導覽還是寫著頁名 */
+  document.body.dataset.view = v;
   document.querySelectorAll(".navi").forEach(b => b.dataset.v===v ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
   try{ history.replaceState(null,"","#"+v); }catch(e){}
   if(!keepScroll) window.scrollTo(0,0);

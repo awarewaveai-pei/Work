@@ -51,9 +51,9 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // Real state first: what the operator sees on opening the view, and how tall it is.
     const tall = await page.evaluate((name) => { window.show(name, true); scrollTo(0, 0); return document.documentElement.scrollHeight; }, v);
     await page.screenshot({ path: path.join(out, `${label}-${v}.png`), fullPage: true });
-    // A view must not be a long scroll: the one-page view shows one panel (about a screen and a half at most),
-    // every other view opens with at most one section expanded.
-    if (label === 'wide') rule(label, `${v}.too_long`, tall > (v === 'one' ? 1500 : 3200) ? tall + 'px' : '');
+    // A view must not be a long scroll: every other view opens with at most one section expanded.
+    // The one-page view is held to more, below: all of it fits one laptop screen.
+    if (label === 'wide' && v !== 'one') rule(label, `${v}.too_long`, tall > 3200 ? tall + 'px' : '');
     const m = await page.evaluate((name) => {
       const el = document.getElementById('v-' + name);
       // Then open everything so the text checks and the dump cover the whole view.
@@ -193,6 +193,30 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
   rule(label, 'art_count_vs_repo', r.art === repo.art ? '' : `page ${r.art} repo ${repo.art}`);
   rule(label, 'workflow_count_vs_repo', r.whole.includes('登記檔裡是 ' + repo.flows + ' 條') ? '' : `repo ${repo.flows}`);
   rule(label, 'page_errors', errors);
+  await ctx.close();
+}
+// The one-page view is one picture (operator 2026-10-03: pieces shown one after another read as unrelated pieces,
+// and whatever scrolls away is forgotten). On a laptop screen, whichever item is picked, the page does not scroll:
+// the whole route and the picked item are both in view. On a narrower screen at least the whole route stays in view.
+for (const [w, h, all] of [[1536, 660, true], [1280, 660, true], [1100, 660, false]]) {
+  const ctx = await browser.newContext({ viewport: { width: w, height: h } });
+  const page = await ctx.newPage();
+  await page.goto(pathToFileURL(wrappedPath).href);
+  const bad = await page.evaluate((all) => {
+    show('one', true); scrollTo(0, 0);
+    const out = [];
+    const items = [...document.querySelectorAll('#one-route [data-k]')];
+    if (items.length !== JOURNEY.length + 1 + CROSS.length + ONE_FAIL.length) out.push('route has ' + items.length + ' items');
+    for (const b of items) {
+      b.click();
+      const shown = [...document.querySelectorAll('#one-panels [data-panel]')].filter((e) => !e.hidden);
+      if (shown.length !== 1) out.push(b.dataset.k + ': ' + shown.length + ' panels');
+      if (document.getElementById('one-route').getBoundingClientRect().bottom > innerHeight) out.push('route cut off');
+      if (all && document.documentElement.scrollHeight > innerHeight) out.push(b.textContent.trim().slice(0, 10) + ':' + document.documentElement.scrollHeight);
+    }
+    return [...new Set(out)];
+  }, all);
+  rule(`${w}x${h}`, 'one.needs_scroll', bad);
   await ctx.close();
 }
 await browser.close();
