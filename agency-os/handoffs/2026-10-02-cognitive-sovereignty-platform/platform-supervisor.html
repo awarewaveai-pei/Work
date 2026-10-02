@@ -101,6 +101,7 @@ main{display:grid;gap:32px;min-width:0}
 .hub b{font-size:var(--fs-h3)}
 .hub span{font-size:var(--fs-small)}
 .loop{display:grid;place-content:center;text-align:center;font-size:var(--fs-small);color:var(--muted)}
+.join{font-size:var(--fs-small);font-weight:600;color:var(--accent);border-top:1px solid var(--line);padding-top:16px}
 .ring>[data-dir]::after{position:absolute;color:var(--muted);font-size:20px;line-height:36px;text-align:center}
 .ring>[data-dir="r"]::after{content:"→";left:100%;top:50%;width:36px;margin-top:-18px}
 .ring>[data-dir="l"]::after{content:"←";right:100%;top:50%;width:36px;margin-top:-18px}
@@ -191,7 +192,7 @@ main{display:grid;gap:32px;min-width:0}
 .mx .lb{display:flex;align-items:center;gap:10px;min-width:0;font-weight:600}
 .mx .lb small{font-weight:400;color:var(--muted);font-size:var(--fs-small)}
 @media (max-width:559px){.mx .r{grid-template-columns:minmax(0,1fr) auto auto auto;gap:4px}.mx .lb small{display:none}.mx .st,.mx .ct{padding:2px 6px}}
-.order{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+.order{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
 .order .s{border-radius:12px;padding:16px;background:var(--soft);display:grid;gap:8px;align-content:start}
 .order .s[data-g="1"]{background:var(--g1-bg)} .order .s[data-g="2"]{background:var(--g2-bg)} .order .s[data-g="3"]{background:var(--g3-bg)} .order .s[data-g="4"]{background:var(--g4-bg)}
 .order .k{font-size:var(--fs-tag);font-weight:700;letter-spacing:.04em;color:var(--muted)}
@@ -256,37 +257,33 @@ main{display:grid;gap:32px;min-width:0}
 
     <section class="view" id="v-map">
       <div class="stack"><h2>地圖：13 塊積木怎麼接</h2>
-        <p class="sub">一個人走一圈，從外化走到回顧，再回到外化。中間是這個案子的紀錄，每一塊都讀它、寫它。點任何一塊看它的合約。</p></div>
+        <p class="sub">13 塊都是平台的一部分，一塊都不少。01 到 09 是一個人走的一圈，從外化走到回顧，再回到外化。10 到 13 接在整圈上。中間是這個案子的紀錄，13 塊都讀它、寫它。點任何一塊看它的合約。</p></div>
       <div class="card stack">
         <div class="ring" id="ring"></div>
+        <div class="legend" id="legend"></div>
       </div>
       <div class="card stack">
-        <h3>一次任務只組幾塊：藍圖的五個套件</h3>
-        <p class="cap">上面那一圈是全部積木的位置，不是每次都要走完。先選目的，系統推薦一組，你可以重排、跳過、停止。</p>
-        <div class="rows" id="packs"></div>
-        <p class="cap">藍圖把「行動」放在 DECIDE 裡。13 塊定案後，套件裡 DECIDE 後面接 ACT，最長的套件是 6 塊；藍圖的「首輪最多 5 塊」因此改成最多 6 塊。</p>
-      </div>
-      <div class="card stack">
-        <h3>不在圈上，需要的時候接進來</h3>
-        <div class="row4" id="below"></div>
-      </div>
-      <div class="card stack">
-        <h3>全程生效，任何積木都不能覆寫</h3>
+        <h3>套在 13 塊上面的四樣，任何積木都不能覆寫</h3>
         <div class="row4" id="rules"></div>
       </div>
-      <div class="legend" id="legend"></div>
+      <div class="card stack">
+        <h3>藍圖的五個套件</h3>
+        <p class="cap">套件是藍圖第 3.5 節寫的預設組合：先選目的，系統推薦一組積木當起點，人可以重排、跳過、停止。</p>
+        <div class="rows" id="packs"></div>
+        <p class="cap">藍圖原文的套件沒有 ACT（它把行動放在 DECIDE 裡），這裡照 13 塊補上。藍圖另有一條「首輪最多 5 塊」，13 塊定案後這條怎麼處理還沒定，列在「談定與未定」。</p>
+      </div>
     </section>
 
     <section class="view" id="v-flow" hidden>
-      <div class="stack"><h2>走一趟：一個人從頭到尾做什麼</h2>
-        <p class="sub">這是最長的走法，多數任務只走其中 2 到 5 塊。下面的標籤是負責的積木，虛線圈是「需要時」才做。任何一步都可以停、可以要 AI 直接給建議；只有「判斷」那一格永遠是你填。每一步都是你先寫，AI 才回。</p></div>
+      <div class="stack"><h2>走一趟：一個案子從頭到尾，13 塊各在哪一步</h2>
+        <p class="sub">下面的標籤是負責的積木。任何一步都可以停、可以跳過、可以要 AI 直接給建議；只有「判斷」那一格永遠是你填。每一步都是你先寫，AI 才回。</p></div>
       <div class="card"><ol class="steps" id="steps"></ol></div>
-      <p class="note">觀察和回顧改了判斷，就回到第 8 步出新版本。這次的方法沒解決，就換一個方法從第 5 步再走，兩次都留著。</p>
+      <p class="note">觀察和回顧改了判斷，就回到第 11 步出新版本。這次的方法沒解決，就換一個方法從第 6 步再走，兩次都留著。</p>
     </section>
 
     <section class="view" id="v-record" hidden>
       <div class="stack"><h2>一個案子的紀錄長什麼樣</h2>
-        <p class="sub">每個案子都有完整紀錄。這次的方法沒解決，就換方法再做；行動之後有短期觀察和長期觀察。最低標準是今天的冰山模型專案頁。</p></div>
+        <p class="sub">每個案子都有完整紀錄。這次的方法沒解決，就換方法再做；行動之後有短期觀察和長期觀察。最低標準是今天的冰山模型專案頁。下面的範例裡 13 塊都出現。</p></div>
       <div class="two">
         <div class="card" id="timeline"></div>
         <div class="stack">
@@ -324,9 +321,9 @@ main{display:grid;gap:32px;min-width:0}
       <div class="stack"><h2>現有的 285 個工具和工作流去哪裡</h2>
         <p class="sub">它們不是積木。積木是「人在判斷的哪一段」；工具是那一段裡可以挑的做法。工作流是把幾個工具排成一串。它們全部留著，變成積木裡面的選單，受那塊積木的合約管。</p></div>
       <div class="card stack">
-        <h3>285 個工具，照今天網站上的 12 個問題分類，落在哪一塊</h3>
+        <h3>285 個工具，落在 13 塊的哪一塊</h3>
         <div class="bars" id="toolbars"></div>
-        <p class="cap">數字是 2026-10-02 從方法登記檔數出來的，12 類加起來 284，另有 1 個還沒分類。長條長度照數量畫。</p>
+        <p class="cap">13 塊每一塊一列，照 01 到 13 的順序；最後兩列是不屬於任何一塊的。數字是 2026-10-02 從方法登記檔數出來的，照網站上的 12 個問題分類和工具家族歸塊，沒有逐個工具看過。加起來 284，另有 1 個還沒分類。長條長度照數量畫。</p>
       </div>
       <div class="card stack">
         <h3>工作流，落在哪一塊</h3>
@@ -421,13 +418,13 @@ const BLOCKS = [
  {n:9, code:"LEARN", name:"回顧校準", role:"回頭對結果", status:"無", contract:"未寫", build:"未開始",
   problem:"預測跟結果差在哪？我當初怎麼想、信心多少、AI 給了什麼、我為何採納或拒絕、後來發生什麼。",
   now:"沒有。沒有校準紀錄、沒有信任校準、沒有「不同問題出現同樣慣性」的提示。"},
- {n:10, code:"EXPRESS", name:"產出與表達", role:"從判斷輸出給別人", status:"部分", contract:"未寫", build:"未開始",
+ {n:10, code:"EXPRESS", name:"產出與表達", role:"任何一步都能輸出給別人", status:"部分", contract:"未寫", build:"未開始",
   problem:"把我的判斷變成給別人看的東西：論文章節、提案、一封信、一次談話的稿。每句話追得回紀錄。",
   now:"雛形。有報表匯出；但報表讀的是來源和 AI 分析，不是人的判斷卡。"},
- {n:11, code:"TEACH", name:"課程與演練", role:"用之前先練", status:"部分", contract:"未寫", build:"未開始",
+ {n:11, code:"TEACH", name:"課程與演練", role:"每一塊用之前先練", status:"部分", contract:"未寫", build:"未開始",
   problem:"用一個方法或一個套件之前先練：五分鐘課、低風險案例、角色輪替、帶領者的腳本。",
   now:"一半。每個方法一堂課、工作流課有。情境演練、帶領稿沒有。"},
- {n:12, code:"COLLAB", name:"共同程序", role:"多人時加入", status:"無", contract:"未寫", build:"未開始",
+ {n:12, code:"COLLAB", name:"共同程序", role:"有別人一起決定時", status:"無", contract:"未寫", build:"未開始",
   problem:"多人怎麼共同決定又保留異議：分歧地圖、授權與撤回、少數意見保存、閉合與重開條件。",
   now:"沒有。"},
  {n:13, code:"GOVERN", name:"安全、資料與治理", role:"全程伴隨", status:"部分", contract:"未寫", build:"未開始",
@@ -437,7 +434,7 @@ const BLOCKS = [
 const CROSS = [
  {code:"完整性核心", name:"判斷權、可修正、非操控", status:"部分", contract:"未寫", build:"未開始", problem:"藍圖第 9 節的 11 條，套在全部 13 份合約上，任何積木都不能覆寫：人保有最終判斷權；不預設結論但要呈現規範脈絡；所有影響可檢查；事實、法律、價值、文化宗教四種主張不混；追求可修正而不是懷疑一切；服從或抵抗都可以是結果；判斷權不等於免責；共同秩序另外設計；平台本身可被質疑；AI 權限看得見、可縮小、可撤回；信任可校準。不評分人。", now:"判斷主權的七道閘存在，但只套在藝術反思那 14 個方法上。"},
  {code:"規範與脈絡", name:"政治、文化、宗教、法律、倫理、道德", status:"無", contract:"未寫", build:"未開始", problem:"藍圖 5.1a 的橫切鏡頭，不是最後才補的一層。每個判斷都要看：誰有權決定、誰負什麼義務；這個規範從哪來、誰受益；這句話是可查證的事實、要確認的法律條件，還是要人權衡的價值；我是真心認同、暫時遵守，還是沒檢查過。法律主張要標法域、時效、來源；文化與宗教要先問當事人自己的理解。", now:"沒有。資料上「事實／法律／價值」沒有分開的欄位，沒有任何一頁問這些。"},
- {code:"組裝器", name:"依目的挑 2 到 5 塊", status:"部分", contract:"未寫", build:"未開始", problem:"先選目的，推薦積木組合並說理由。人可重排、跳過、停止。", now:"工具已按問題分類（例：「這件事為什麼一直發生？」31 個），方法頁有「做完常接」，結果頁 ⑧ 推下一步。能推薦方法，不能組積木，沒有套件。"},
+ {code:"組裝器", name:"依目的把積木組起來", status:"部分", contract:"未寫", build:"未開始", problem:"先選目的，推薦積木組合並說理由。人可重排、跳過、停止。", now:"工具已按問題分類（例：「這件事為什麼一直發生？」31 個），方法頁有「做完常接」，結果頁 ⑧ 推下一步。能推薦方法，不能組積木，沒有套件。"},
  {code:"共用紀錄", name:"案子的紀錄＋個人歷程", status:"部分", contract:"未寫", build:"未開始",
   problem:"一個案子的家。13 塊積木宣告要讀寫的欄位加起來就是它。最低標準：完整歷程（每一步一筆）；同一案子可做很多次分析，這次的方法沒解決就換別的方法，每次都留著、可以比較；案子自己的來源；任務卡和每筆紀錄（實際狀況、想法、調整方針、卡住了、實際數字，數字自動成趨勢）；短期觀察（按週）與長期觀察（按月、季、年）；重跑並比較；只推還沒做過的工具；匯出、抹除（留一筆已抹除）。藍圖 4.4 另外要求的欄位：目的、風險與協作合約；情緒、關係與權力訊號；規範脈絡；假設、替代解釋、判準、不確定性；暫定判斷、行動、預測、結果與版本；每張卡標「我的／AI 提出／共同發展」。核准不是個人流程的必經步驟（藍圖 4.3），多人或高風險才有「授權、退回、重開」。跨案子的個人歷程也在這裡。",
   now:"今天的專案頁（2026-10-02 親自看過冰山模型那個專案）已有：歷程、分析表（一次一列，有工具、狀態、你的判斷、核准欄）、來源、任務卡與紀錄、數字趨勢、到期重跑並比較、⑧ 只推沒做過的工具、核准／退回／匯出 PDF／抹除。缺的是：專案頁上只有「再用同一個工具」的按鈕，換方法要從結果頁 ⑧ 進；觀察沒有按週、按月季年的節奏；狀態每點一次記一筆，那個專案 30 筆歷程有 21 筆是一分鐘內來回點；沒有判斷版本、外化素材，也沒有跨案子記憶。"},
@@ -662,7 +659,7 @@ const BP = {
  "組裝器": [
   ["組裝規則六條。（3.4）",[
     "一個任務先有目的卡，六種目的：自我理解、複雜決策、訊息判斷、創意發散、學習反思、團隊審議；選了才推薦積木組合",
-    "預設少而精：藍圖寫首輪最多 5 塊；ACT 獨立後我們改成最多 6 塊",
+    "預設少而精：藍圖原文寫首輪最多 5 塊；13 塊定案後這條怎麼處理還沒定",
     "人看得見順序：顯示「現在為何用這一塊、下一塊會做什麼」，可重排、跳過、停止",
     "所有關鍵結論回到人的暫定立場，AI 輸出不能直接寫成使用者的判斷",
     "每次組合留可回放紀錄：用了哪些積木、資料從哪來、何時改變想法、為何改變",
@@ -743,10 +740,11 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
   const hub = CROSS.find(x=>x.code==="共用紀錄");
   $("ring").innerHTML = ring +
     `<button class="hub" data-open="共用紀錄" style="--c:2/4;--r:2;--o:0"><b>共用紀錄</b><span>這個案子的所有紀錄。每一塊積木都讀它、寫它。</span><span>${st(hub.status)}</span></button>` +
-    `<div class="loop" style="--c:1;--r:2;--o:10" data-dir="u">回顧完，回到外化<br>再走一圈</div>`;
-  $("below").innerHTML = BLOCKS.filter(b=>!pos[b.code] && b.code!=="GOVERN").map(b=>node(b)).join("");
+    `<div class="loop" style="--c:1;--r:2;--o:10" data-dir="u">回顧完，回到外化<br>再走一圈</div>` +
+    `<div class="join" style="--c:1/5;--r:4;--o:11">另外四塊接在整圈上：任何一步都用得到</div>` +
+    BLOCKS.filter(b=>!pos[b.code]).map((b,i)=>node(b,`style="--c:${i+1};--r:5;--o:${b.n+10}"`)).join("");
   $("rules").innerHTML = CROSS.filter(x=>x.code!=="共用紀錄").map(x=>`<button class="node" data-s="${x.status}" data-open="${x.code}">
-      <span class="top">${x.code}${st(x.status)}</span><span class="rl">${x.name}</span></button>`).join("") + node(byCode("GOVERN"));
+      <span class="top">${x.code}${st(x.status)}</span><span class="rl">${x.name}</span></button>`).join("");
   const PK = [
     ["個人複雜決策","關係、職涯、合作與個人選擇",["SENSE","MAP","THINK","DECIDE","ACT","LEARN"]],
     ["可疑訊息判斷","詐騙、健康、投資、公共資訊與日常轉傳",["VERIFY","THINK","DECIDE","ACT","LEARN"]],
@@ -767,16 +765,21 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
     ["建立任務","說清楚要釐清什麼、風險、誰會受影響",["組裝器"]],
     ["設定權限","AI 這次能做什麼、不准碰什麼",["協作合約"]],
     ["外化","把事件、感受、關係攤成卡片",["SENSE"]],
-    ["蒐集","外面的資料抓回來",["GATHER"],true],
-    ["拆解","事實、解釋、利益、結構、矛盾、介入分開",["MAP"]],
+    ["蒐集","外面的資料抓回來，記清楚從哪來",["GATHER"]],
+    ["先練","要用的方法先上 5 分鐘的課、用低風險案例練一次",["TEACH"]],
+    ["拆解","事實、解釋、利益、結構、矛盾、介入分開；規範與脈絡一起看",["MAP"]],
     ["共思考","人先想，AI 再發散、反證",["THINK"]],
-    ["查證、計算","主張對來源；該算的真的算",["VERIFY","COMPUTE"],true],
+    ["查證","每個主張對來源：支持、反證、未知、可能怎麼操弄我",["VERIFY"]],
+    ["計算","該算的真的算：統計、損益、情境模擬",["COMPUTE"]],
+    ["共同程序","有別人一起決定時：分歧地圖、保留異議、授權與重開條件",["COLLAB"]],
     ["判斷","我的結論、依據、什麼會改變它。只能人填",["DECIDE"]],
     ["行動與觀察","最小、可逆的一步；短期按週、長期按月季年記錄",["ACT"]],
-    ["回顧","到期回來對結果，更新判斷；沒解決就換方法",["LEARN"]],
+    ["輸出","把判斷變成給別人看的東西，每句追得回紀錄",["EXPRESS"]],
+    ["回顧","到期回來對結果，更新判斷和對 AI 的信任；沒解決就換方法",["LEARN"]],
+    ["全程","同意、隱私、匯出與刪除、危機轉介、高風險護欄、版本可追",["GOVERN"]],
   ];
   $("steps").innerHTML = S.map(([t,d,who,opt],i)=>`<li>
-    <span class="nb ${opt?"opt":""}" data-g="${GROUP[who[0]]||0}">${i+1}</span>
+    <span class="nb ${opt?"opt":""}" data-g="${GROUP[who[0]]||0}">${t==="全程"?"★":i+1}</span>
     <div><div class="t">${t}</div><div class="d">${d}</div>
       <div class="who">${who.map(bk).join("")}${opt?`<span class="opt-tag">需要時</span>`:""}</div></div></li>`).join("");
 })();
@@ -789,20 +792,29 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
       ["10／02","設定權限","AI 可以發散、反方；不准替我下結論","協作合約"],
       ["10／02","外化","8 張卡：事件 3、身體 1、恐懼 1、關係 1、期待 1、故事 1","SENSE"]]],
     ["第一輪","方法 A",[
+      ["10／02","蒐集","合約原文、三次改條件的訊息、同業行情；每筆記來源","GATHER"],
+      ["10／03","先上 5 分鐘的課","冰山模型怎麼用，用別人的案例練一次","TEACH"],
       ["10／03","冰山模型","事件 → 模式 → 結構 → 心智模型，每層有引註","MAP"],
+      ["10／03","共思考","我先寫三個解釋，AI 當反方挑最弱的一個","THINK"],
+      ["10／03","查證","「同業都這樣」這句話對來源：支持 1、反證 2、未知 1","VERIFY"],
+      ["10／03","計算","拆夥後六個月的收入，三種情境","COMPUTE"],
       ["10／03","判斷　第 1 版","我的結論、依據、信心、什麼會改變它","DECIDE"],
-      ["10／04","行動＋任務卡","先談一次條件；我的預測、負責人、期限、停止條件","ACT"]]],
+      ["10／04","行動＋任務卡","先談一次條件；我的預測、負責人、期限、停止條件","ACT"],
+      ["10／04","輸出","寫給合夥人的一封信，每句追得回紀錄","EXPRESS"]]],
     ["短期觀察","行動後第一個月，按週",[
       ["10／11","第 1 週","實際狀況、數字、想法、調整","ACT"],
       ["10／18","第 2 週","同上，數字自動連成趨勢","ACT"],
       ["11／01","回顧","對照第 1 版判斷：沒解決，卡在人不在結構","LEARN"]]],
     ["第二輪","這次的方法沒解決，換方法 B",[
       ["11／02","利害關係人地圖","換一個方法。冰山那次仍在，可以並排比較","MAP"],
+      ["11／02","共同程序","請第三位合夥人一起談：分歧地圖、保留異議、寫下重開條件","COLLAB"],
       ["11／02","判斷　第 2 版","修訂理由寫在卡上，第 1 版不刪","DECIDE"],
       ["11／03","行動　第 2 版","新的一步；舊任務卡標結束","ACT"]]],
     ["長期觀察","按月、季、年",[
       ["12／01","第 1 個月","之後第 1 季、第 2 季、第 1 年","ACT"],
       ["到期","回顧","預測對上結果；更新判斷和對 AI 的信任範圍","LEARN"]]],
+    ["全程","從開案到結束都在",[
+      ["全程","安全、資料與治理","隨時可匯出、可刪除；每筆產出標版本；高風險時加護欄","GOVERN"]]],
   ];
   $("timeline").innerHTML = P.map(([h,sm,ev])=>`<div class="phase"><h3>${h}${sm?`<small>${sm}</small>`:""}</h3>
     ${ev.map(([d,t,n,b])=>`<div class="ev"><span class="dt">${d}</span><span class="dot" data-g="${GROUP[b]||0}"></span>
@@ -930,7 +942,7 @@ $("cover").innerHTML = [
   const done = [
     "每個案子都有完整紀錄，最低標準＝今天的專案頁：歷程、任務卡、短期與長期觀察、換方法再做、重跑比較。這是全功能平台，不是小工具。",
     "平台是新東西。現有 Cognitive OS 退到後面當引擎，不再是產品本身。",
-    "13 塊積木定案（2026-10-02 再確認「13 塊比較好」）：藍圖的 8 塊，VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。套件裡 DECIDE 後面接 ACT，首輪上限從 5 塊改成 6 塊。",
+    "13 塊積木定案（2026-10-02 再確認「13 塊比較好」）：藍圖的 8 塊，VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。13 塊都要，沒有哪一塊是次要的：SENSE、GATHER、MAP、THINK、VERIFY、COMPUTE、DECIDE、ACT、LEARN、EXPRESS、TEACH、COLLAB、GOVERN。",
     "藍圖寫明的要求一律明文寫進對應積木的合約卡，不留到「之後談到再說」。",
     "個人歷程（跨案子的記憶）不算積木，是共用紀錄的一部分。",
     "骨架＝13 份合約。任務容器、協作合約、完整性核心都從合約推出來。",
@@ -943,6 +955,7 @@ $("cover").innerHTML = [
     "資料承諾：反思資料是不是預設只有自己看得到；研究怎麼取得同意（藍圖 13.4）。",
     "第一次試用只驗證一件事：外化加基本積木，有沒有讓人更看得見自己怎麼判斷（藍圖 13.5）。",
     "首批是哪三種套件；哪些積木暫不開放自由組合（藍圖 13.6）。",
+    "藍圖 3.4 的「一次任務只組 2 到 5 塊、首輪最多 5 塊」還算不算數：一個案子是 13 塊都走，還是照套件先挑幾塊。",
     "其餘 12 份合約的內容。"];
   $("done").innerHTML = done.map(x=>`<li><span class="m">✓</span><span>${x}</span></li>`).join("");
   $("open").innerHTML = open.map(x=>`<li><span class="m">？</span><span>${x}</span></li>`).join("");
@@ -960,16 +973,22 @@ $("cover").innerHTML = [
 /* 現有工具去哪：長條照數量畫，最長的一條＝116 */
 (function(){
   const bars = (rows, max) => rows.map(([who,n,d])=>`<div class="b"><span class="who">${who.map(bk).join("")}</span>
-    <div><div class="track"><span class="fill" data-g="${GROUP[who[0]]||0}" style="width:${Math.max(n/max*100,1.5)}%"></span><span class="n num">${n}</span></div>
+    <div><div class="track">${n?`<span class="fill" data-g="${GROUP[who[0]]||0}" style="width:${Math.max(n/max*100,1.5)}%"></span>`:""}<span class="n num">${n}</span></div>
     <div class="d">${d}</div></div></div>`).join("");
   $("toolbars").innerHTML = bars([
     [["SENSE"],15,"帶一個團體、帶反思（藝術反思 15）"],
+    [["GATHER"],0,"不靠這 285 個工具。靠的是蒐集器：抓網頁、搜尋、學術資料，已經有"],
     [["MAP"],116,"這件事為什麼一直發生 31　問題到底是什麼 24　看清楚自己和外面的局 40　使用者、參與者到底怎麼想 21"],
-    [["THINK"],22,"需要更多點子 22"],
-    [["THINK","VERIFY"],20,"我的說法站不站得住 20：反方挑戰歸 THINK，證據檢查歸 VERIFY"],
+    [["THINK"],32,"需要更多點子 22　我的說法站不站得住裡的反方挑戰 10"],
+    [["VERIFY"],10,"我的說法站不站得住裡的證據檢查 10。另外靠彙整與引註閘，已經有"],
     [["COMPUTE"],11,"做不做得起來、划不划算 11"],
     [["DECIDE"],14,"幾個選項，選哪一個 14：工具只給候選和比較，結論仍是人寫"],
-    [["ACT","LEARN"],33,"計畫怎麼排、風險怎麼盯、做完學到什麼 33"],
+    [["ACT"],22,"計畫怎麼排、風險怎麼盯 11　小步試驗 11"],
+    [["LEARN"],11,"做完學到什麼 11"],
+    [["EXPRESS"],0,"不靠這 285 個工具。今天只有結果頁匯出 PDF"],
+    [["TEACH"],0,"不靠這 285 個工具。靠的是每個工具各一堂 5 分鐘的課，已經有"],
+    [["COLLAB"],0,"不靠這 285 個工具。今天什麼都沒有"],
+    [["GOVERN"],0,"不靠這 285 個工具。今天有 prompt 版本、重放、抹除、匯出"],
     [["規範與脈絡"],10,"哪些法規管得到 10"],
     [["不給一般使用者"],43,"系統、資料與資安的工程決策 43：留給內部和工程客戶，不出現在一般人的選單"],
   ],116);

@@ -67,7 +67,8 @@ source_session_summary: "操作者以藍圖 v0.6/v0.7 重新定義產品：Cogni
   - 新增第五個全程生效項「規範與脈絡」（藍圖 5.1a）；GOVERN 改為全程伴隨並含安全（藍圖 3.1、10）；地圖加五個套件（3.5）；建置第 1 步併入外殼（組裝器、協作合約、完整性核心）；「未定」補齊藍圖 13 的六項。
   - 核准不列入案子紀錄的最低標準（藍圖 4.3）。
 - **操作者新裁定**：
-  1. **13 塊定案**（「13 塊比較好」）。套件裡 DECIDE 後接 ACT；首輪上限由 5 改 6（本 session 的推論，操作者未逐字確認上限數字）。
+  1. **13 塊定案**（「13 塊比較好」「13 區塊都要」）。每一頁都要 13 塊齊全、同等地位：地圖 13 塊在同一張圖（01–09 一圈、10–13 接在整圈上），走一趟 13 塊各一步，案子紀錄範例 13 塊都出現，工具歸屬 13 塊各一列。不可再寫「不在圈上／需要時才接」這類把某幾塊降級的字。套件裡 DECIDE 後接 ACT。藍圖 3.4「一次 2–5 塊、首輪最多 5 塊」在 13 塊定案後是否仍算數＝**未定**，已列「還沒定的」，要問操作者，勿自行改數字（本 session 曾擅自寫成 6，已撤回）。
   2. **藍圖寫明的要求一律明文寫進合約卡**（「你會忘記所以應該明文寫出來」）。已寫進監工台原始碼的 `BP` 物件，逐塊帶藍圖節號；合約頁底有「藍圖每一節寫在哪」對照表。之後談合約＝談 `BP` 以外還沒定的欄位，不重談 `BP`。
-- **現有工具歸屬**（操作者問「近 300 工具和 16 條工作流屬於哪一部份」）：不是積木，是積木裡的做法。285 方法依 `methods/registry/method-goal-groups.yaml` 12 類計數：MAP 116、THINK 22、THINK＋VERIFY 20、ACT＋LEARN 33、SENSE 15、DECIDE 14、COMPUTE 11、規範與脈絡 10、不給一般使用者 43（非 §6 寫的約 64）、未分類 1。`recipes/validated` 17 條。歸屬是依類名判斷，未逐方法看。
+- **現有工具歸屬**（操作者問「近 300 工具和 16 條工作流屬於哪一部份」）：不是積木，是積木裡的做法。285 方法依 `methods/registry/method-goal-groups.yaml` 12 類＋家族計數：SENSE 15、GATHER 0、MAP 116、THINK 32（divergent＋association 22、challenge 10）、VERIFY 10（epistemic 9、evidence 1）、COMPUTE 11、DECIDE 14、ACT 22（delivery 11、experiment 11）、LEARN 11、EXPRESS／TEACH／COLLAB／GOVERN 各 0、規範與脈絡 10、不給一般使用者 43（非 §6 寫的約 64）、未分類 1。`recipes/validated` 17 條。歸屬是依類名與家族名判斷，未逐方法看。
+- **檢查方式**：內建瀏覽器窗格只有約 300px 寬，看不到寬版。改用 Playwright（`lobster-factory/infra/hetzner-phase1-core/tests` 的 `@playwright/test`）把七頁各截寬 1280、窄 400 兩張全頁圖再逐張看。每次改監工台都要七頁全看，不能只看改到的那頁。
 - **提交方式**：本機工作樹有別的 session 未提交的 `WORKLOG.md`，本 session 一律用暫存 index 在 `origin/main` 上直接建 commit 再 push，本機 `main` 未前進。
