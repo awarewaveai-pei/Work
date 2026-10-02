@@ -174,6 +174,24 @@ SENSE、GATHER、MAP、THINK、VERIFY、COMPUTE、DECIDE、ACT、LEARN、EXPRESS
 - **「判斷主權七道閘只套在藝術反思 14 個方法」是錯的**（出自雲端那一場的交接紀錄第 19 行，本場之前照抄）。查程式：七閘是計畫（`Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md:101`、`:323`「在 P5 之後」）；計畫指的 `ai_lego/modules/reflection/sovereignty_gates.py` 不存在；程式裡只有一道 `no_preset_conclusion`（`ai_lego/modules/research/interpret_method_record.py:890-897`，在 `:1007` 套到每一次方法解讀；`workflow_interpretation.py:68` 套到工作流解讀），不限藝術反思。其餘六個閘名在 `ai_lego/` 裡查無實作。完整性核心卡的「現在有沒有」已改。
 - **還沒讀原文的**（照舊標在卡上）：Meta 停止第三方查核的公告、C2PA 規格、NewsGuard 九條標準、SIFT、劍橋預先揭露手法的論文、台灣民主實驗室報告、黑熊學院教材、Farrell 的書本身。
 
+## A17　初步架構（2026-10-03）｜擬稿；「今天」的部分是查程式的結果
+
+操作者：「你現在連初步的架構都做不好」。之前只有 18 份文字合約，沒有：紀錄的實際形狀、每塊接現有系統哪裡、三個關卡在哪一層、案子的狀態。上一版系統設計被退的原因是 600 行工程規格（`REJECTED_DRAFT_system_design_v1.md`），這次畫成監工台的一頁「架構」，白話，資料在 `LAYERS`／`ARCH_GATES`／`DRAWERS`／`DRAWER_READS`／`DRAWER_NEVER`／`DRAWER_TODAY`／`WIRING`／`CASE_STATES`／`ARCH_OPEN`。
+
+- **五層**：畫面／外殼（組裝器、協作合約、完整性核心、規範與脈絡）／13 塊積木／案子的紀錄／引擎（現有，不重做）。
+- **三個關卡**：人先寫才看得到 AI；寫進紀錄前檢查（結論只收人寫、每筆標誰寫的）；每次呼叫 AI 前查協作合約。
+- **紀錄＝18 個抽屜**，每個抽屜一個主人；讀、不准讀照合約。存放範圍五種：案子／個人／群組／練習／平台。歷程不是抽屜，是每次寫入自動記的一筆。
+- **案子的狀態**：開案 → 這一輪進行中 → 行動後觀察中 → 回顧 → 維持判斷／出新版判斷／換方法再一輪；任何時候可暫停、匯出、抹除、收回 AI 權限。
+- **今天的系統（查程式，路徑相對 `Projects/internal/cognitive-engineering-os/`；由 subagent 盤點，下列各條我再 grep 驗過）**：
+  - 儲存是 SQLite 檔加內容定址的 blob，schema 寫在程式裡：`ai_lego/data/repositories/project_source_repository.py:31-138`；`events` 表 `:77-89` 沒有作者欄。
+  - 判斷＝事件 `InterpretationJudged`（`ai_lego/apps/api/main.py:1734`），讀的時候取最新一筆（`:1666`）；核准／退回 `:1789`；重跑 `:2024`。任務卡、筆記、歷程都是事件，沒有自己的表。
+  - 模型自己寫的 judgment 在存檔前被拿掉：`ai_lego/modules/research/interpret_method_record.py:976`。
+  - 網站的 AI 呼叫都包在 `_MeteredProvider`（`main.py:2061`、`:2082`）和 `_require_ai`（`:1238`）；`check_entitlement` 不看 capability（`ai_lego/platform/entitlement/check.py:23-31`）。另有命令列用的第二條路（subagent 報告 `ai_lego/platform/ai_execution/gateway.py:93`，這一條我沒有自己打開看）。
+  - 課只有兩堂：`apps/cognitive-web/lib/lessons.generated.ts` 兩個 key（`systems.iceberg_model`、`life-decision-v1`）；沒有課的工具是 404（`apps/cognitive-web/app/(shell)/learn/[id]/page.tsx` 註解）。**監工台原本寫「每個工具都有一堂 5 分鐘的課」是錯的，已改三處。**
+  - 預測追蹤、信心校準、決策日誌有模組和命令列入口（`ai_lego/apps/cli/run_{prediction_tracking,confidence_calibration,decision_journal}_slice.py`），沒接到專案。LEARN 的「現在有沒有」已改。
+- **架構上未定（列在頁面）**：新抽屜沿用事件還是開表（我傾向沿用事件並補作者）；作者欄要先補；AI 兩條路都要擋；其餘課怎麼產生；群組紀錄存哪；單檔資料庫夠不夠。
+- **檢查**：`check-supervisor.mjs` 新增 `architecture` 規則（抽屜一個主人、交接對得上抽屜、讀與不准讀不衝突、18 樣都有接線、每個抽屜有「今天」）。
+
 ## A9　還沒建的（不是設計缺口）
 
 六層地圖已在 MAP 合約（藍圖 5.1），今天的網站只有個別方法、沒有這塊積木；排在建置第 1 步。

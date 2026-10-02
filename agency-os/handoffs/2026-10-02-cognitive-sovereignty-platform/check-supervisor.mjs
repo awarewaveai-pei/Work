@@ -101,6 +101,22 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     for (const [k, d, bs] of MEASURE) for (const c of bs) if (!card(c).includes(d)) north.push('measure:' + k + ':' + c);
     for (const [c, at, df] of CW_BLOCKS) { const t = card(c); if (!t.includes(at) || !t.includes(df)) north.push('cw:' + c); }
     for (const [k, v] of [...CW.defs, ...CW.goals, ...CW.levels]) if (!card('規範與脈絡').includes(v)) north.push('cwdef:' + k);
+    // Architecture: one owner per drawer; a stated handoff means the receiver reads a drawer the giver owns;
+    // nobody both reads and never-reads a drawer; every drawer and every one of the 18 has a 'today' / wiring line.
+    const arch = [];
+    const ids = DRAWERS.map((d) => d.id);
+    if (new Set(ids).size !== ids.length) arch.push('duplicate drawer id');
+    for (const d of DRAWERS) { if (!codes.includes(d.owner)) arch.push('owner?' + d.id); if (!DRAWER_TODAY[d.id]) arch.push('today?' + d.id); }
+    const owns = (c) => DRAWERS.filter((d) => d.owner === c).map((d) => d.id);
+    const canRead = (c) => (DRAWER_READS[c] || []);
+    for (const c of codes) if (!(c in DRAWER_READS)) arch.push('reads?' + c);
+    for (const c of Object.keys(DRAWER_READS)) for (const id of DRAWER_READS[c]) if (id !== '*' && !ids.includes(id)) arch.push('unknown drawer ' + c + ':' + id);
+    for (const c of Object.keys(DRAWER_NEVER)) for (const id of DRAWER_NEVER[c]) if (canRead(c).includes(id) || (canRead(c).includes('*'))) arch.push('reads and never-reads ' + c + ':' + id);
+    for (const a of all) for (const c of names(flat(a.out))) {
+      if (c === a.code || !owns(a.code).length) continue;
+      if (!canRead(c).includes('*') && !owns(a.code).some((id) => canRead(c).includes(id))) arch.push('handoff without drawer ' + a.code + '->' + c);
+    }
+    for (const c of codes) if (!WIRING.some((w) => w[0] === c)) arch.push('wiring?' + c);
     // Build order places all 18.
     window.show('progress', true);
     const chips = [...document.querySelectorAll('#order .bks .bk')].map((e) => e.textContent.trim());
@@ -109,7 +125,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     const whole = VIEWS.map((v) => { window.show(v, true); return document.getElementById('v-' + v).innerText; }).join('\n');
     const typed = ['285', '18 份', '四樣', '寫好九條'].filter((s) => whole.includes(s));
     if (!whole.includes(FACET_NAMES.length + ' 個面向')) typed.push('facet count');
-    return { empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
+    return { arch, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
   });
   rule(label, 'empty_fields', r.empty);
   rule(label, 'no_hand_back', r.noHandBack);
@@ -117,6 +133,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
   rule(label, 'handoff_unread', r.handoff);
   rule(label, 'package_step_unread', r.pkgs);
   rule(label, 'north_star_missing_from_contract', r.north);
+  rule(label, 'architecture', r.arch);
   rule(label, 'not_in_build_order', r.notBuilt);
   rule(label, 'stale_typed_numbers', r.typed);
   rule(label, 'contract_count_not_18', r.contracts === 18 ? '' : r.contracts);

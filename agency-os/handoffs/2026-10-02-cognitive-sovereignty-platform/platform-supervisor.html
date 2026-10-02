@@ -107,6 +107,30 @@ main{display:grid;gap:32px;min-width:0}
 .ring>[data-dir="l"]::after{content:"←";right:100%;top:50%;width:36px;margin-top:-18px}
 .ring>[data-dir="d"]::after{content:"↓";top:100%;left:0;right:0;height:36px}
 .ring>[data-dir="u"]::after{content:"↑";bottom:100%;left:0;right:0;height:36px}
+.layers{display:grid;gap:0}
+.layer{display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr);gap:16px;padding:16px;border:1.5px solid var(--line);border-radius:12px;background:var(--card)}
+.layer .nm{font-weight:700;font-size:var(--fs-h3);line-height:1.4}
+.layer .nm small{display:block;font-weight:400;font-size:var(--fs-small);color:var(--muted)}
+.layer .bd{display:grid;gap:8px;min-width:0}
+.layer .bd .bks{display:flex;flex-wrap:wrap;gap:4px}
+.layer .now{font-size:var(--fs-small);color:var(--muted)}
+.gate{display:grid;gap:4px;margin:0 24px;padding:10px 14px;border-left:3px solid var(--warn);background:var(--warn-bg);font-size:var(--fs-small)}
+.gate b{font-size:var(--fs-body)}
+.dw{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:16px;padding:14px 0;border-top:1px solid var(--line)}
+.dw:first-child{border-top:0}
+.dw .nm{font-weight:700}
+.dw .nm small{display:block;font-weight:400;font-size:var(--fs-tag);color:var(--muted);margin-top:2px}
+.dw .bd{display:grid;gap:6px;min-width:0}
+.dw .has{font-size:var(--fs-small);color:var(--muted)}
+.dw .ln{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:var(--fs-small)}
+.dw .ln .lb{width:4.5em;color:var(--muted);flex:none}
+.bk.no{background:transparent;border:1px dashed var(--muted);color:var(--muted);text-decoration:line-through}
+.states{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.states .s{border:1.5px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:6px;align-content:start}
+.states .s b{font-size:var(--fs-h3)}
+.states .s span{font-size:var(--fs-small);color:var(--muted)}
+.states .s .bks{display:flex;flex-wrap:wrap;gap:4px}
+@media (max-width:640px){.layer,.dw{grid-template-columns:minmax(0,1fr)}.gate{margin:0 8px}}
 .row5{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
 .nb.all{background:var(--ink);color:var(--card)}
 .hubtag{display:flex;align-items:center;justify-content:center;gap:8px;font-size:var(--fs-tag);font-weight:700;letter-spacing:.04em}
@@ -255,6 +279,7 @@ main{display:grid;gap:32px;min-width:0}
     <div class="brand">認知主權平台<small>監工台　更新 2026-10-03</small></div>
     <button class="navi" data-v="north">北極星</button>
     <button class="navi" data-v="map" aria-current="page">地圖</button>
+    <button class="navi" data-v="arch">架構</button>
     <button class="navi" data-v="flow">走一趟</button>
     <button class="navi" data-v="record">案子的紀錄</button>
     <button class="navi" data-v="contracts">合約（13＋5）</button>
@@ -350,6 +375,42 @@ main{display:grid;gap:32px;min-width:0}
       </div>
     </section>
 
+    <section class="view" id="v-arch" hidden>
+      <div class="stack"><h2>架構：分幾層、紀錄怎麼存、接到現有系統的哪裡</h2>
+        <p class="sub">地圖那一頁說「有哪 13 塊」。這一頁說「蓋起來長什麼樣」：分幾層、三個關卡擋在哪、案子的紀錄有哪些抽屜、每一塊接到現有系統的哪裡、一個案子的狀態怎麼變。整頁是我擬的草稿，等你看；「今天」的部分是 2026-10-03 查程式寫的。</p></div>
+      <div class="card stack">
+        <h3>一、五層，和中間的三個關卡</h3>
+        <p class="cap">上面是人看到的，下面是現有的引擎。新平台要蓋的是上面四層；最下面一層已經有，不重做。三個關卡是整個平台跟「一般 AI 問答」不一樣的地方，要做在系統裡，不能只靠提示詞。</p>
+        <div class="layers" id="layers"></div>
+      </div>
+      <div class="card stack">
+        <h3>二、案子的紀錄有哪些抽屜：誰寫、誰讀、誰不准讀</h3>
+        <p class="cap">「共用紀錄」就是這些抽屜加起來。每個抽屜只有一個主人能寫，別的積木只能讀。任何一塊寫進任何抽屜，系統都自動記一筆歷程：誰寫的（我、AI、共同）、什麼時候、哪一版。下面「讀」那一行沒有再列的：你自己和 LEARN（回顧）讀這個案子的全部；TEACH 不准讀真實案子的任何抽屜，除非你同意拿來練。</p>
+        <div id="drawers"></div>
+      </div>
+      <div class="card stack">
+        <h3>三、每一塊接到現有系統的哪裡</h3>
+        <p class="cap">左邊是今天已經有、可以直接接的；右邊是要新做的。</p>
+        <div class="rows" id="wiring"></div>
+      </div>
+      <div class="card stack">
+        <h3>四、一個案子的狀態怎麼變</h3>
+        <div class="states" id="states"></div>
+        <p class="cap">回顧之後三條路：</p>
+        <div class="rows" id="case-next"></div>
+        <p class="cap" id="case-any"></p>
+      </div>
+      <div class="card stack">
+        <h3>架構上還沒定的</h3>
+        <ol class="dec open" id="arch-open"></ol>
+      </div>
+      <div class="card stack">
+        <h3>全程生效的五樣（不算積木）</h3>
+        <p class="cap">五樣在架構裡的位置：組裝器、協作合約、完整性核心、規範與脈絡在「外殼」那一層；共用紀錄就是上面那些抽屜。</p>
+        <div class="row5" data-cross5></div>
+      </div>
+    </section>
+
     <section class="view" id="v-flow" hidden>
       <div class="stack"><h2>走一趟：一個案子從頭到尾，13 塊和全程生效的五樣各在哪一步</h2>
         <p class="sub">任何一步都可以停、可以跳過、可以要 AI 直接給建議；只有「判斷」那一格永遠是你填。每一步都是你先寫，AI 才回。</p></div>
@@ -401,11 +462,12 @@ main{display:grid;gap:32px;min-width:0}
           <li><span class="nb">4</span><span>交接對得上：甲寫「交給乙」，乙的「讀什麼」就要有甲</span></li>
           <li><span class="nb">5</span><span>每個套件裡前後兩塊接得上</span></li>
           <li><span class="nb">6</span><span>北極星頁有的，對應的合約卡裡一定有</span></li>
-          <li><span class="nb">7</span><span>八頁每一頁都看得到 13 塊和全程生效的五樣</span></li>
+          <li><span class="nb">7</span><span>每一頁都看得到 13 塊和全程生效的五樣</span></li>
           <li><span class="nb">8</span><span>13 塊和五樣都排進建置順序</span></li>
           <li><span class="nb">9</span><span>數字由資料算，不手寫；工具總數要等於程式庫裡的檔案數</span></li>
+          <li><span class="nb">10</span><span>紀錄的每個抽屜只有一個主人能寫；合約寫「交給乙」，乙就要讀得到甲的抽屜</span></li>
         </ol>
-        <p class="cap">腳本查不到、要我自己守的：引用前先讀原文；你的判斷不寫成平台立場；我擬的和你裁定的分開標；不用沒解釋的內部用語。腳本全過之後，還要把八頁的文字讀一遍。</p>
+        <p class="cap">腳本查不到、要我自己守的：引用前先讀原文；你的判斷不寫成平台立場；我擬的和你裁定的分開標；不用沒解釋的內部用語。腳本全過之後，還要把每一頁的文字讀一遍。</p>
       </div>
       <div class="cgrid" id="blocks"></div>
       <h3>全程生效的五樣（不算積木）</h3>
@@ -433,8 +495,8 @@ main{display:grid;gap:32px;min-width:0}
       <div class="card stack">
         <h3>這代表什麼</h3>
         <div class="two">
-          <div class="have"><h3>已經很厚的</h3><ul><li>拆解（MAP）有 116 個做法</li><li>發散、反證、計算、選擇、排計畫都有做法</li><li>每個工具都有一堂 5 分鐘的課</li></ul></div>
-          <div class="lack"><h3>工具再多也補不了的</h3><ul><li>SENSE、THINK、DECIDE、LEARN 是「人先寫」的地方，今天沒有這個位置</li><li>工具現在是 AI 先產、人後看；進了積木要照合約改成人先寫、AI 才回</li><li>GATHER、EXPRESS、TEACH、COLLAB、GOVERN 靠的不是這些工具</li></ul></div>
+          <div class="have"><h3>已經很厚的</h3><ul><li>拆解（MAP）有 116 個做法</li><li>發散、反證、計算、選擇、排計畫都有做法</li></ul></div>
+          <div class="lack"><h3>工具再多也補不了的</h3><ul><li>SENSE、THINK、DECIDE、LEARN 是「人先寫」的地方，今天沒有這個位置</li><li>工具現在是 AI 先產、人後看；進了積木要照合約改成人先寫、AI 才回</li><li>GATHER、EXPRESS、TEACH、COLLAB、GOVERN 靠的不是這些工具</li><li>「開始前 5 分鐘」的課程頁只有兩堂（冰山模型、人生決策）；其餘工具只有說明和範例，還沒有課程頁</li></ul></div>
         </div>
       </div>
       <div class="card stack">
@@ -506,7 +568,7 @@ const TOOL_ROWS = [
   [["ACT"],22,"計畫怎麼排、風險怎麼盯 11　小步試驗 11"],
   [["LEARN"],11,"做完學到什麼 11"],
   [["EXPRESS"],0,"不靠這些工具。今天只有結果頁匯出 PDF"],
-  [["TEACH"],0,"不靠這些工具。靠的是每個工具各一堂 5 分鐘的課，已經有"],
+  [["TEACH"],0,"不靠這些工具。靠的是課程頁；今天只有兩堂（冰山模型、人生決策），其餘工具只有說明和範例"],
   [["COLLAB"],0,"不靠這些工具。今天什麼都沒有"],
   [["GOVERN"],0,"不靠這些工具。今天有 AI 指令的版本紀錄、重跑、抹除、匯出"],
   [["規範與脈絡"],10,"哪些法規管得到 10"],
@@ -514,6 +576,133 @@ const TOOL_ROWS = [
 ];
 const TOOL_TOTAL = TOOL_ROWS.reduce((s,r)=>s+r[1],0);
 const TOOL_OF = code => TOOL_ROWS.find(r=>r[0][0]===code)[1];
+
+/* ───────── 架構：案子的紀錄分成哪些抽屜。每個抽屜只有一個主人（owner）能寫；別的積木只能讀。
+   where = 存在哪裡：案子（跟著這個案子）／個人（跨案子）／群組（多人共有）／練習（跟真實案子分開）／平台（不屬於任何案子）。
+   check-supervisor.mjs 會查：每個抽屜一個主人；A 寫「交給 B」⇒ B 讀得到 A 的抽屜；讀和不准讀不能同時出現。 */
+const DRAWERS = [
+  {id:"open",   name:"開案資料",   has:"目的、風險、誰會受影響、發生在哪裡、這次用了哪幾塊", owner:"組裝器", where:"案子"},
+  {id:"perm",   name:"AI 權限",    has:"AI 這次能做什麼、不准碰什麼、什麼時候要停；每次修改都留一版", owner:"協作合約", where:"案子", note:"不是哪一塊去讀；每次呼叫 AI 之前由系統查（第三個關卡）"},
+  {id:"sense",  name:"外化素材",   has:"卡片、關係圖、時間線、情緒訊號", owner:"SENSE", where:"案子"},
+  {id:"source", name:"來源",       has:"來源卡（誰辦的、何時出現、從哪找到）、同一出處的分組、頁面快照", owner:"GATHER", where:"案子"},
+  {id:"context",name:"脈絡註記",   has:"每個脈絡面向的註記、適用哪裡的法律", owner:"規範與脈絡", where:"案子"},
+  {id:"map",    name:"地圖",       has:"六層地圖、假設、資訊缺口、核心矛盾；每拆一次存一版", owner:"MAP", where:"案子"},
+  {id:"think",  name:"思考卡",     has:"思考卡、反例、候選的判準；我自己的版本和跟 AI 一起的版本分開", owner:"THINK", where:"案子"},
+  {id:"claims", name:"主張帳本",   has:"每個主張有幾個出處支持、反對、查不到；用了什麼手法；我對每個主張的判定", owner:"VERIFY", where:"案子"},
+  {id:"calc",   name:"計算",       has:"輸入的數字、公式、結果、情境；可以重算", owner:"COMPUTE", where:"案子"},
+  {id:"judge",  name:"判斷卡",     has:"我的結論、依據、信心、什麼會改變它；第 1 版、第 2 版都留", owner:"DECIDE", where:"案子"},
+  {id:"act",    name:"行動與觀察", has:"任務卡、我的預測、每週和每月季年的觀察紀錄", owner:"ACT", where:"案子"},
+  {id:"review", name:"回顧",       has:"預測對上結果、當時漏看什麼、對 AI 的信任要不要調整", owner:"LEARN", where:"案子"},
+  {id:"habit",  name:"個人歷程",   has:"跨案子的：我常出現的慣性、哪些事交給 AI 可靠", owner:"LEARN", where:"個人"},
+  {id:"draft",  name:"輸出稿",     has:"給別人看的稿子；每一句對回紀錄裡的哪一筆", owner:"EXPRESS", where:"案子"},
+  {id:"group",  name:"共同紀錄",   has:"分歧地圖、各人的同意和異議、授權、結束與重開的條件", owner:"COLLAB", where:"群組"},
+  {id:"drill",  name:"練習紀錄",   has:"上過哪些課、練習案例做到哪；可以選擇不留", owner:"TEACH", where:"練習"},
+  {id:"rules",  name:"規則檢查",   has:"每一塊上線前對照 11 條的檢查結果；規則的每一版", owner:"完整性核心", where:"平台"},
+  {id:"govern", name:"平台紀錄",   has:"同意紀錄、模型和規則的版本、稽核紀錄、申訴", owner:"GOVERN", where:"平台"},
+];
+/* 歷程不是抽屜：任何一塊寫進任何抽屜，系統都自動記一筆（誰寫的：我／AI／共同、什麼時候、哪一版）。由共用紀錄負責。 */
+
+/* 哪一塊讀哪些抽屜（自己的不用列）。"*" = 這個案子的全部。 */
+const DRAWER_READS = {
+  SENSE:[], GATHER:["open","map"], MAP:["open","sense","source","context","review"], THINK:["map","sense","claims"],
+  VERIFY:["source","map"], COMPUTE:["source"], DECIDE:["map","think","claims","calc","context","group","review"],
+  ACT:["judge","calc","claims","group"], LEARN:["*"], EXPRESS:["judge","map","claims","calc"], TEACH:[],
+  COLLAB:["map","claims","draft"], GOVERN:[],
+  "完整性核心":[], "規範與脈絡":["open","map"], "組裝器":["review"], "共用紀錄":["*"], "協作合約":["open"],
+};
+/* 合約寫明絕不讀的。 */
+const DRAWER_NEVER = {
+  SENSE:["judge","review"], GATHER:["sense","judge"], MAP:["judge"], VERIFY:["judge"], COMPUTE:["sense","habit"],
+  GOVERN:["sense","review"], TEACH:["*"],
+};
+/* 有條件的讀，照合約原文：THINK 可以讀外化素材，但不准拿裡面的脆弱內容來說服人；EXPRESS 只讀使用者選的那幾部分；
+   COLLAB 只讀每個人同意分享的部分；TEACH 要使用者同意才能拿真實案子來練。 */
+
+/* 一個案子的狀態。 */
+const CASE_STATES = [
+  ["開案","寫目的、風險、誰會受影響、發生在哪；設定 AI 權限",["組裝器","協作合約"]],
+  ["這一輪進行中","照套件走；每一步人先寫、AI 才回",["SENSE","MAP","THINK","DECIDE"]],
+  ["行動後觀察中","短期按週、長期按月季年；到期系統提醒",["ACT"]],
+  ["回顧","預測對上結果，決定下一步",["LEARN"]],
+];
+const CASE_NEXT = [
+  ["維持判斷","案子結束，紀錄留著；之後有新資訊可以重開"],
+  ["出新版判斷","回到判斷，寫第 2 版和修訂理由，再行動、再觀察"],
+  ["換方法再一輪","回到拆解，換一個方法，並加上回顧時挑的積木；舊的那一輪留著可以比"],
+];
+const CASE_ANYTIME = ["暫停（系統不催）","匯出","抹除整個案子（留一筆「已抹除」）","縮小或收回 AI 的權限"];
+
+
+/* ───────── 架構：今天的系統實際長什麼樣。2026-10-03 查程式寫的（路徑在增補 A17）。 */
+const LAYERS = [
+  ["第 1 層","畫面","人看到、動手的地方：我的任務、每一塊的畫面、案子的紀錄頁",[],
+   "有工具目錄、填表頁、結果頁、專案頁、比較頁、兩堂課的頁面。沒有「我的任務」首頁，沒有 13 塊各自的畫面。"],
+  ["第 2 層","外殼","開案、AI 權限、全程生效的規則",["組裝器","協作合約","完整性核心","規範與脈絡"],
+   "完整性核心只做了一道閘（不預設結論）。其餘三樣沒有。"],
+  ["第 3 層","13 塊積木","人在判斷的每一段；GOVERN 貫穿每一層",["SENSE","GATHER","MAP","THINK","VERIFY","COMPUTE","DECIDE","ACT","LEARN","EXPRESS","TEACH","COLLAB","GOVERN"],
+   "8 塊有一部分，5 塊沒有。有的那些是「AI 先產、人後看」，方向跟合約相反。"],
+  ["第 4 層","案子的紀錄","所有抽屜，加上每一步一筆的歷程",["共用紀錄"],
+   "專案、來源、分析結果有自己的表。判斷、任務卡、觀察紀錄沒有自己的表，是一筆一筆往後加的事件。事件沒有記是誰寫的。"],
+  ["第 5 層","引擎","現有的 Cognitive OS。已經有，不重做",[],
+   TOOL_TOTAL + " 個工具、17 條工作流、蒐集器、彙整與引註檢查、AI 呼叫的計量和額度、帳號和登入。"],
+];
+/* 三個關卡，畫在層和層之間。index = 在第幾層下面（0 起算）；沒有關卡的地方放 null。 */
+const ARCH_GATES = [
+  ["人先寫，才看得到 AI 的回應","使用者沒寫自己的版本之前，AI 的完整回應不展開。","只有填表那一步是人先寫。結果出來之後，「你的判斷」可填可不填，不填也能核准。"],
+  null,
+  ["寫進紀錄之前檢查","結論的格子只收人寫的；每一筆都標是誰寫的（我、AI、共同）。","有一半。AI 的解讀存檔前，模型自己寫的「判斷」會被拿掉。但判斷、任務卡、筆記存進去時，沒有記是誰寫的。"],
+  ["每次呼叫 AI 之前，查這次准不准","照協作合約：這個案子 AI 能做什麼、不准碰什麼。","還沒有。網站上所有 AI 呼叫都經過同一個點（今天用來算用量和額度），檢查可以加在這裡；但它現在不看「准不准做這件事」。另外還有第二條呼叫 AI 的路（命令列用的），不經過這個點。"],
+];
+const DRAWER_TODAY = {
+  open:"有一部分。專案有名稱、目的、資料分級；沒有風險、受影響者、所在地、用了哪幾塊。",
+  perm:"沒有。",
+  sense:"沒有。",
+  source:"有。每份來源存內容指紋、網址、抓取時間、類別、相關性；沒有「誰辦的」、沒有同出處分組。",
+  context:"沒有。",
+  map:"有一部分。每次分析的結果有存，可以重跑、並排比較；不是六層的形狀。",
+  think:"沒有。",
+  claims:"有一部分。有「每句主張對得上來源」的檢查；沒有帳本。",
+  calc:"有一部分。計算類工具的結果有存；沒有接到判斷。",
+  judge:"有一點。結果頁的「你的判斷」（同意、部分同意、不同意，加一段話）。每次修改都留在事件裡，但畫面只顯示最新一次。",
+  act:"有一部分。任務卡和每筆紀錄有存；沒有預測、沒有按週按月的節奏。",
+  review:"沒接上。引擎裡有預測追蹤、信心校準、決策日誌三個模組，但只能在命令列跑，沒接到案子。",
+  habit:"沒有。",
+  draft:"有一部分。報表可以產出、核准、匯出；讀的不是人的判斷卡。",
+  group:"沒有。",
+  drill:"沒有。課程頁只有兩堂，沒有練習紀錄。",
+  rules:"沒有。只有一道閘在跑。",
+  govern:"有一部分。帳號、登入、AI 用量、抹除時留一筆「已抹除」；沒有同意紀錄、沒有申訴。",
+};
+/* 每一塊：今天能直接接的 → 要新做的。 */
+const WIRING = [
+  ["SENSE","沒有可接的。最接近的是填表頁的「AI 幫我起草」，方向相反。","卡片畫面、關係圖、時間線；外化素材這個抽屜。"],
+  ["GATHER","蒐集器（在另一個系統裡，抓完送進來）、來源的資料表。","來源身分、同出處分組、多管道；來源地圖的畫面。"],
+  ["MAP",TOOL_OF("MAP") + " 個拆解工具、填表頁、結果頁、重跑和比較。","六層地圖的畫面和資料形狀；人每一層先寫一句；事實、法律、價值分欄。"],
+  ["THINK","22 個發散工具、10 個反方工具，都是 AI 先產。","回合規則（人先寫）、七種角色、思考卡、反方按鈕。"],
+  ["VERIFY","引註檢查（每句對得上來源）、" + TOOL_OF("VERIFY") + " 個證據檢查工具。","主張帳本、手法比對、三個勾、查核資料庫的接口。"],
+  ["COMPUTE",TOOL_OF("COMPUTE") + " 個計算工具。","每個輸入帶來源；結果接到判斷卡。"],
+  ["DECIDE","結果頁的「你的判斷」、" + TOOL_OF("DECIDE") + " 個選擇工具。","判斷卡 11 格、看得到的版本、結論只收人寫。"],
+  ["ACT","任務卡、每筆紀錄、數字趨勢、到期重跑。","預測、按週按月的節奏和提醒、觀察接回判斷。"],
+  ["LEARN","引擎裡的預測追蹤、信心校準、決策日誌（只能在命令列跑）；" + TOOL_OF("LEARN") + " 個回顧工具。","接到案子上；校準紀錄；跨案子的個人歷程。"],
+  ["EXPRESS","報表產出、核准、匯出 PDF。","從判斷卡組稿；每一句對回紀錄。"],
+  ["TEACH","兩堂課程頁（冰山模型、人生決策）；每個工具頁的說明和可填入的範例。","其餘工具和套件的課程頁、練習案例、情境演練。"],
+  ["COLLAB","沒有。帳號已經分「單位、工作區」兩層，可以當多人的地基。","全部。"],
+  ["GOVERN","帳號登入、AI 用量和額度、抹除、匯出、AI 指令的版本紀錄。","同意、申訴、危機轉介、高風險護欄。"],
+  ["組裝器","工具照 12 個問題分類、結果頁會推下一步。","目的卡、套件、每個案子的 13 格。"],
+  ["協作合約","網站上所有 AI 呼叫都經過同一個點。","權限設定的畫面；在那個點加上權限檢查。"],
+  ["完整性核心","一道閘：不預設結論。","其餘規則；每一塊上線前的檢查。"],
+  ["規範與脈絡",TOOL_OF("規範與脈絡") + " 個法規類工具。","脈絡面向清單；每個判斷都問一次的機制。"],
+  ["共用紀錄","專案、來源、分析結果的表；一條只增不改的事件紀錄；抹除。","上面每一個抽屜；每筆事件記是誰寫的。"],
+];
+const ARCH_OPEN = [
+  "紀錄怎麼存。今天判斷、任務卡、觀察都只是一筆一筆往後加的事件，沒有自己的表。新抽屜要沿用這個做法，還是各開一張表。我傾向沿用事件，再補上「誰寫的」：歷程、版本、抹除今天都靠它，不用重做。",
+  "「誰寫的」今天沒有記。判斷、任務卡、筆記存進去時沒有作者。「我的／AI 提出／共同」要靠這個，得最先補。",
+  "呼叫 AI 有兩條路：網站一條、命令列一條。權限檢查要兩條都擋，還是把命令列那條收掉。",
+  "課程頁只有兩堂。其餘工具的課怎麼來：一堂一堂寫，還是從工具頁已有的說明和範例自動組出來。",
+  "群組的紀錄存哪裡。藍圖第 10 節要求跟個人的分開存；帳號今天有「單位、工作區」兩層可以用。",
+  "資料存在主機上的單一檔案裡。多人同時用、資料要放在不同國家時夠不夠，要不要換。",
+];
+
 /* 套件：地圖頁畫它，進度頁用它算「這一步做完能開哪些套件」。 */
 const PK = [
     ["個人複雜決策","關係、職涯、合作與個人選擇",["SENSE","MAP","THINK","DECIDE","ACT","LEARN"]],
@@ -615,19 +804,19 @@ const BLOCKS = [
   now:"方法庫裡有（蒙地卡羅、NPV、統計、因果圖）。沒有作為一塊積木接進判斷。"},
  {n:7, code:"DECIDE", name:"判斷", role:"我的結論", status:"無", contract:"未寫", build:"未開始",
   problem:"我自己的暫定結論、依據、信心、判準、不確定性、什麼會改變結論。只能人填，AI 只能給候選。",
-  now:"幾乎沒有。結果頁有「你的判斷」：同意／部分同意／不同意＋你的原話，不填也能核准；專案頁的分析表有「你的判斷」一欄。沒有判斷卡（依據、信心、判準、什麼會改變它），也沒有第 1 版、第 2 版。結果頁的方案和下一步是 AI 產的、人按核准。"},
+  now:"幾乎沒有。結果頁有「你的判斷」：同意／部分同意／不同意＋你的原話，不填也能核准；專案頁的分析表有「你的判斷」一欄。沒有判斷卡（依據、信心、判準、什麼會改變它）。每次修改判斷其實都留在事件裡，但畫面只顯示最新一次，看不到第 1 版、第 2 版。結果頁的方案和下一步是 AI 產的、人按核准。"},
  {n:8, code:"ACT", name:"行動與觀察", role:"做一步，持續看", status:"部分", contract:"未寫", build:"未開始",
   problem:"最小、可逆、可負責的下一步，然後持續觀察：短期觀察（行動後第一個月，按週記實際狀況、數字、想法、調整）、長期觀察（按月、季、年）。觀察到的東西回頭對判斷。",
   now:"一半。結果頁 ⑦ 起草 12 週行動計畫，長期可選一月、一季、一年；存成任務卡。任務卡有狀態、負責人、期限、怎麼證明有效、目標；每寫一筆紀錄可記實際狀況、想法、調整方針、卡住了、實際數字。同一個數字記到兩筆以上，專案頁自動畫趨勢。到期重跑一次並比較。缺的是：按週、按月季年的觀察節奏和提醒（今天只有期限和一次到期重跑，沒有下次檢視日）；觀察沒有接回「人的判斷」。"},
  {n:9, code:"LEARN", name:"回顧校準", role:"回頭對結果", status:"無", contract:"未寫", build:"未開始",
   problem:"預測跟結果差在哪？我當初怎麼想、信心多少、AI 給了什麼、我為何採納或拒絕、後來發生什麼。",
-  now:"沒有。沒有校準紀錄、沒有信任校準、沒有「不同問題出現同樣慣性」的提示。"},
+  now:"案子上沒有。引擎裡有預測追蹤、信心校準、決策日誌三個模組，但只能在命令列跑，沒接到案子。沒有信任校準、沒有「不同問題出現同樣慣性」的提示。"},
  {n:10, code:"EXPRESS", name:"產出與表達", role:"任何一步都能輸出給別人", status:"部分", contract:"未寫", build:"未開始",
   problem:"把我的判斷變成給別人看的東西：論文章節、提案、一封信、一次談話的稿。每句話追得回紀錄。",
   now:"雛形。有報表匯出；但報表讀的是來源和 AI 分析，不是人的判斷卡。"},
  {n:11, code:"TEACH", name:"課程與演練", role:"每一塊用之前先練", status:"部分", contract:"未寫", build:"未開始",
   problem:"用一個方法或一個套件之前先練：五分鐘課、低風險案例、角色輪替、帶領者的腳本。",
-  now:"一半。每個方法一堂課、工作流課有。情境演練、帶領稿沒有。"},
+  now:"一小部分。每個工具自己的頁面都有說明和一個可以直接填入的範例。但「開始前 5 分鐘」那種一頁一頁教的課程頁，程式裡只有兩堂：冰山模型（工具）、人生決策（工作流）；其餘工具沒有課程頁。情境演練、帶領稿沒有。2026-10-03 查程式核對（沒有登入正式站逐個點）；之前這裡寫「每個方法一堂課」不對。"},
  {n:12, code:"COLLAB", name:"共同程序", role:"有別人一起決定時", status:"無", contract:"未寫", build:"未開始",
   problem:"多人怎麼共同決定又保留異議：分歧地圖、授權與撤回、少數意見保存、閉合與重開條件。",
   now:"沒有。"},
@@ -1639,8 +1828,30 @@ $("cover").innerHTML = [
   rows("trains", BLOCKS.map(b=>[pad(b.n),[b.code],TRAINS[b.code]]));
 })();
 
+/* 架構 */
+(function(){
+  const chips = a => a.map(bk).join("");
+  $("layers").innerHTML = LAYERS.map(([k,nm,what,who,now],i)=>
+    (i && ARCH_GATES[i-1] ? `<div class="gate"><b>關卡：${ARCH_GATES[i-1][0]}</b><span>${ARCH_GATES[i-1][1]}<br>今天：${ARCH_GATES[i-1][2]}</span></div>` : "") +
+    `<div class="layer"><div class="nm">${k}　${nm}<small>${what}</small></div>
+      <div class="bd"><div class="bks">${chips(who)}</div><div class="now">今天：${now}</div></div></div>`).join("");
+  const readers = id => Object.keys(DRAWER_READS).filter(c=>DRAWER_READS[c].includes(id));
+  const nevers = id => Object.keys(DRAWER_NEVER).filter(c=>DRAWER_NEVER[c].includes(id));
+  $("drawers").innerHTML = DRAWERS.map(d=>`<div class="dw"><div class="nm">${d.name}<small>存在：${d.where}</small></div>
+    <div class="bd"><div class="has">${d.has}</div>
+      <div class="ln"><span class="lb">寫</span>${bk(d.owner)}</div>
+      <div class="ln"><span class="lb">讀</span>${readers(d.id).length ? chips(readers(d.id)) : `<span class="has">${d.note||"沒有別的積木讀"}</span>`}</div>
+      ${nevers(d.id).length?`<div class="ln"><span class="lb">不准讀</span>${nevers(d.id).map(c=>`<span class="bk no">${c}</span>`).join("")}</div>`:""}
+      <div class="has">今天：${DRAWER_TODAY[d.id]}</div></div></div>`).join("");
+  $("wiring").innerHTML = WIRING.map(([code,have,todo])=>`<div class="r"><span class="k">${bk(code)}</span><span><span>接現有的：${have}</span><span class="d" style="display:block">要新做：${todo}</span></span></div>`).join("");
+  $("states").innerHTML = CASE_STATES.map(([k,d,who])=>`<div class="s"><b>${k}</b><span>${d}</span><div class="bks">${chips(who)}</div></div>`).join("");
+  $("case-next").innerHTML = CASE_NEXT.map(([k,d])=>`<div class="r"><span class="k">${k}</span><span>${d}</span></div>`).join("");
+  $("case-any").textContent = "任何時候都可以：" + CASE_ANYTIME.join("、") + "。";
+  $("arch-open").innerHTML = ARCH_OPEN.map(x=>`<li><span class="m">？</span><span>${x}</span></li>`).join("");
+})();
+
 /* 切換畫面；網址 #map #flow #record #contracts #tools #progress #decided 可直接連到那一頁 */
-const VIEWS = ["north","map","flow","record","contracts","tools","progress","decided"];
+const VIEWS = ["north","map","arch","flow","record","contracts","tools","progress","decided"];
 function show(v, keepScroll){
   if(!VIEWS.includes(v)) v = "map";
   VIEWS.forEach(x => { $("v-"+x).hidden = x!==v; });
