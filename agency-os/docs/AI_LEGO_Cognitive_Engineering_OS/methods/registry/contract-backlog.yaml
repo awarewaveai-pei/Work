@@ -6465,6 +6465,14 @@ tier_1:
     source: "methods/contracts/strategy.lean_canvas.contract.yaml + specs/cognitive/typed-objects/lean-canvas-record.schema.yaml + ai_lego/modules/strategy/lean_canvas.py + ai_lego/apps/cli/run_lean_canvas_slice.py"
     note: "2026-09-25 (T12): completed the 2 files this method was missing (typed-object schema, CLI slice -- contract/module/tests already existed since 2026-09-18). 54 tests pass (52 existing + 2 new: builder output validates against the real schema, CLI slice runs end-to-end). This module has no separate runtime automatic-authority guard (unlike decision.eisenhower_matrix's assert_no_automatic_authority_claim), so the contract's forbidden_transition (LeanCanvas -> AutomaticProductionDeployment) is demonstrated at the schema layer only (additionalProperties:false) -- disclosed in the CLI slice's own docstring and this file's compilation_decisions, not overclaimed as two-layer. CLI slice run confirmed exit 0, schema-layer guard verified."
 
+  twohundredeightythird_concrete_entry:
+    method_id: "art_therapy.life_timeline"
+    contract_status: complete
+    tier: 1
+    mandated_by: "Operator 54-item art-therapy tool list (ART_THERAPY_METHOD_ATLAS_GAP_LIST.md), Timeline / Reverse Timeline row; GROUNDED ORIGINAL DESIGN, operator directive 2026-10-02 (treatment version; foresight.backcasting and representation.timeline_view only partly covered it)"
+    source: "methods/contracts/art_therapy.life_timeline.contract.yaml + specs/cognitive/typed-objects/life-timeline-record.schema.yaml + ai_lego/modules/art_therapy/life_timeline.py + ai_lego/apps/cli/run_life_timeline_slice.py"
+    note: "Registered after contract, typed-object schema, implementation, tests, and CLI slice were verified (2026-10-02)."
+
 # =============================================================================
 # Tier 2 -- remaining pending methods, policy + one worked example only
 # =============================================================================

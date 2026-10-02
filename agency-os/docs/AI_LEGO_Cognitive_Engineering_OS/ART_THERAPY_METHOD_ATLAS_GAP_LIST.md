@@ -107,3 +107,14 @@
 | `learning.appreciative_inquiry` | 欣賞式探詢 | DONE 2026-09-17 |
 | `delivery.gantt_chart` | 甘特圖 | DONE 2026-09-17 |
 
+
+## 部分對應項處理（2026-10-02）
+
+2026-10-02 重驗：本機 API `/methods` 列出上方 53 個 method_id 全在且有中英文顯示資料。原清單的 2 項「部分有」加上 2 項當時算「已有」但實際只部分對應的，處理如下：
+
+| 項目 | 處理 | 落點 |
+|---|---|---|
+| 根本原因分析 | 新增工作流：問題陳述（須標 validated）→ 魚骨圖 → 五個為什麼 ＋ 帕累托；後兩步吃魚骨本身的假設集 | `recipes/validated/root-cause-analysis-v1.recipe.yaml`；首頁掛在「這件事為什麼一直發生」 |
+| 風險矩陣 | `delivery.risk_register` 結果頁 ② 改畫 5×5 機率×衝擊格子圖，格子由紀錄數字直接算，不經 AI | COS `apps/cognitive-web/components/result/RiskMatrix.tsx` |
+| 時間線／反向時間軸 | 新建治療用方法，取代原對應的 `foresight.backcasting`（只能從未來倒推、沒有過去） | `art_therapy.life_timeline`（contract＋schema＋module＋slice＋test） |
+| 個人 SWOT | **未做，待操作者決定**：`strategy.swot` 每個因素必填地理範圍／時間／來源並要附證據庫（Atlas L1332，防空泛 SWOT），案主填自己會卡；只改說明會誤導 | 選項：新建 `art_therapy.personal_swot`，或維持現狀 |

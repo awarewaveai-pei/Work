@@ -261,6 +261,31 @@ examples:
         pattern: NONE
         sentence: 今天下午三點要交這份報告
     scenario: 把「我每次報告都會搞砸，大家一定都覺得我很沒用」逐句拆解檢視。
+  art_therapy.life_timeline:
+    input:
+      subject: 我和創作的路
+      now: '2026-10-02'
+      present_self: 白天上班，晚上偶爾畫，覺得自己離畫畫越來越遠
+      direction: backward
+      events:
+      - id: F1
+        when: '2028-06-01'
+        event: 辦一場小小的個展
+        feeling: 期待
+        meaning: 讓作品被看見
+        first_step: 這週挑出三張想展的舊作
+      - id: F2
+        when: '2027-01-01'
+        event: 每週固定畫兩個晚上
+        feeling: 踏實
+        meaning: 創作回到生活裡
+        first_step: 週三晚上先空出一小時
+      - id: P1
+        when: '2019-09-01'
+        event: 畢業後把畫具收進箱子
+        feeling: 失落
+        meaning: 以為要先顧好生活才能畫
+    scenario: 案主想重新開始創作：從想要的未來倒著走回今天，再看當初是怎麼停下來的。
   art_therapy.life_wheel:
     input:
       dimensions:

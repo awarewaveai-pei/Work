@@ -269,6 +269,7 @@ def run_recipe_instance_conformance():
         "life-decision-v1",
         "method-deprecation-retirement",
         "research-qualitative-v1",
+        "root-cause-analysis-v1",
     }
     check(set(recipe_basenames) == expected_recipe_ids, f"recipe inventory mismatch: expected {sorted(expected_recipe_ids)}, found {sorted(recipe_basenames)}")
     # 2026-08-30 critic finding: a bare count check does not pin WHICH file is
