@@ -391,6 +391,22 @@ main{display:grid;gap:32px;min-width:0}
           <div class="io"><span>寫什麼</span><span>產出給誰</span></div>
         </div>
       </div>
+      <div class="card stack">
+        <h3>固定模板：每一份合約都要過的檢查</h3>
+        <p class="cap">模板寫在同資料夾的 CONTRACT_TEMPLATE.md，檢查寫成腳本 check-supervisor.mjs。每次改這一頁都要跑，有一條不過就不能發佈。</p>
+        <ol class="dec">
+          <li><span class="nb">1</span><span>十二欄每一欄都有寫，13 塊和全程生效的五樣都一樣</span></li>
+          <li><span class="nb">2</span><span>「AI 不准做什麼」一定寫明什麼時候停下來交還給人</span></li>
+          <li><span class="nb">3</span><span>13 塊的「讀什麼」一定寫明絕不讀什麼</span></li>
+          <li><span class="nb">4</span><span>交接對得上：甲寫「交給乙」，乙的「讀什麼」就要有甲</span></li>
+          <li><span class="nb">5</span><span>每個套件裡前後兩塊接得上</span></li>
+          <li><span class="nb">6</span><span>北極星頁有的，對應的合約卡裡一定有</span></li>
+          <li><span class="nb">7</span><span>八頁每一頁都看得到 13 塊和全程生效的五樣</span></li>
+          <li><span class="nb">8</span><span>13 塊和五樣都排進建置順序</span></li>
+          <li><span class="nb">9</span><span>數字由資料算，不手寫；工具總數要等於程式庫裡的檔案數</span></li>
+        </ol>
+        <p class="cap">腳本查不到、要我自己守的：引用前先讀原文；你的判斷不寫成平台立場；我擬的和你裁定的分開標；不用沒解釋的內部用語。腳本全過之後，還要把八頁的文字讀一遍。</p>
+      </div>
       <div class="cgrid" id="blocks"></div>
       <h3>全程生效的五樣（不算積木）</h3>
       <div class="cgrid" id="cross"></div>
