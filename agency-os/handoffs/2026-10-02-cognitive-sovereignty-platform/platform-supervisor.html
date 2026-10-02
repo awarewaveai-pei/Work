@@ -108,15 +108,16 @@ main{display:grid;gap:32px;min-width:0}
 .ring>[data-dir="d"]::after{content:"↓";top:100%;left:0;right:0;height:36px}
 .ring>[data-dir="u"]::after{content:"↑";bottom:100%;left:0;right:0;height:36px}
 .layers{display:grid;gap:0}
-.layer{display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr);gap:16px;padding:16px;border:1.5px solid var(--line);border-radius:12px;background:var(--card)}
+.layers{max-width:820px}
+.layer{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;padding:24px;border:1.5px solid var(--line);border-radius:12px;background:var(--card)}
 .layer .nm{font-weight:700;font-size:var(--fs-h3);line-height:1.4}
 .layer .nm small{display:block;font-weight:400;font-size:var(--fs-small);color:var(--muted)}
 .layer .bd{display:grid;gap:8px;min-width:0}
 .layer .bd .bks{display:flex;flex-wrap:wrap;gap:4px}
 .layer .now{font-size:var(--fs-small);color:var(--muted)}
-.gate{display:grid;gap:4px;margin:0 24px;padding:10px 14px;border-left:3px solid var(--warn);background:var(--warn-bg);font-size:var(--fs-small)}
+.gate{display:grid;gap:6px;margin:0 24px;line-height:1.8;padding:10px 14px;border-left:3px solid var(--warn);background:var(--warn-bg);font-size:var(--fs-small)}
 .gate b{font-size:var(--fs-body)}
-.dw{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:16px;padding:14px 0;border-top:1px solid var(--line)}
+.dw{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:22px 0;max-width:820px;border-top:1px solid var(--line)}
 .dw:first-child{border-top:0}
 .dw .nm{font-weight:700}
 .dw .nm small{display:block;font-weight:400;font-size:var(--fs-tag);color:var(--muted);margin-top:2px}
@@ -160,11 +161,11 @@ main{display:grid;gap:32px;min-width:0}
 .fails{display:grid;gap:16px;max-width:760px}
 .fl{border:1.5px solid var(--line);border-radius:16px;padding:28px}
 .fl h4{margin:0 0 20px;font-size:var(--fs-h3)}
-.three{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.three{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;max-width:760px}
 .three>div{border:1.5px solid var(--line);border-radius:12px;padding:20px;display:grid;gap:10px;align-content:start}
 .three .bks{display:flex;flex-wrap:wrap;gap:6px}
 @media (max-width:640px){.stp,.fl{padding:20px}.act{grid-template-columns:minmax(0,1fr);gap:8px}.act-w{width:72px}}
-.row5{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
+.row5{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;max-width:760px}
 .nb.all{background:var(--ink);color:var(--card)}
 .hubtag{display:flex;align-items:center;justify-content:center;gap:8px;font-size:var(--fs-tag);font-weight:700;letter-spacing:.04em}
 @media (max-width:759px){
@@ -214,7 +215,7 @@ main{display:grid;gap:32px;min-width:0}
 .shape .mid span:first-child{background:var(--tag);color:var(--accent)}
 .shape .arr{color:var(--muted);font-size:20px}
 @media (max-width:659px){.shape{grid-template-columns:minmax(0,1fr)}.shape .arr{text-align:center;transform:rotate(90deg)}}
-.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+.cgrid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;max-width:900px}
 .cc{background:var(--card);border:1px solid var(--line);border-radius:12px;min-width:0}
 .cc[open]{grid-column:1/-1;border-color:var(--accent)}
 .cc summary{list-style:none;cursor:pointer;display:grid;gap:8px;padding:16px 20px;border-radius:12px}
@@ -224,11 +225,12 @@ main{display:grid;gap:32px;min-width:0}
 .cc .nm{font-size:var(--fs-h3);font-weight:700;line-height:1.4}
 .cc .nm small{font-size:var(--fs-small);font-weight:400;color:var(--muted);margin-left:8px}
 .cc .pills{display:flex;flex-wrap:wrap;gap:6px}
-.cc .body{padding:4px 20px 24px;display:grid;gap:20px}
-.cc dl{margin:0;display:grid;grid-template-columns:8em minmax(0,1fr);gap:14px 20px}
-.cc dt{color:var(--muted);font-size:var(--fs-small);padding-top:2px}
-.cc dd{margin:0;max-width:46em}
-.cc dd ul{margin:0;padding-left:1.2em;display:grid;gap:4px}
+.cc .body{padding:12px 28px 32px;display:grid;gap:28px;max-width:860px}
+.cc dl{margin:0;display:grid;grid-template-columns:minmax(0,1fr);gap:8px 0}
+.cc dt{color:var(--ink);font-weight:700;font-size:var(--fs-body);margin-top:20px}
+.cc dt:first-child{margin-top:0}
+.cc dd{margin:0;max-width:46em;line-height:1.8}
+.cc dd ul{margin:0;padding-left:1.2em;display:grid;gap:10px}
 .cc dd.no{color:var(--warn)}
 .bp{background:var(--tag);border-radius:12px;padding:16px 20px}
 .bp h4{margin:0 0 10px;font-size:var(--fs-body);color:var(--accent)}
@@ -241,10 +243,14 @@ main{display:grid;gap:32px;min-width:0}
 .cc .rest{font-size:var(--fs-small);color:var(--muted);border-top:1px dashed var(--line);padding-top:14px}
 @media (max-width:659px){.cc dl{grid-template-columns:minmax(0,1fr);gap:2px 0}.cc dd{margin-bottom:10px}}
 .ex{display:grid;gap:10px}
-.ex .k{font-size:var(--fs-small);color:var(--muted)}
-.ex .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
-.ex .cards div{background:var(--g1-bg);border-radius:8px;padding:10px 12px;font-size:var(--fs-small)}
-.ex .cards b{display:block;font-size:var(--fs-tag);color:var(--g1);letter-spacing:.04em}
+.ex .k{font-size:var(--fs-body);font-weight:700;color:var(--ink)}
+.ex{max-width:760px}
+.ex .cards{display:grid;grid-template-columns:minmax(0,1fr);gap:0;border-left:3px solid var(--g1);margin-left:6px}
+.ex .cards div{padding:10px 0 18px 22px;font-size:var(--fs-body);line-height:1.8}
+.ex .cards div:last-child{padding-bottom:4px}
+.ex .cards p{margin:0}
+.ex .cards p+p{margin-top:6px}
+.ex .cards b{display:block;font-size:var(--fs-small);color:var(--g1);margin-bottom:2px}
 
 /* 進度 */
 .mx{display:grid;gap:0}
@@ -262,7 +268,7 @@ main{display:grid;gap:32px;min-width:0}
 .order .w{font-weight:700}
 .order .d{font-size:var(--fs-small);color:var(--muted)}
 .order .bks{display:flex;flex-wrap:wrap;gap:4px}
-.tl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.tl{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;max-width:760px}
 @media (max-width:659px){.tl{grid-template-columns:minmax(0,1fr)}}
 .tl h3{font-size:var(--fs-small);color:var(--muted);margin-bottom:12px}
 .tl ul{list-style:none;margin:0;padding:0;display:grid;gap:10px}
@@ -298,9 +304,10 @@ main{display:grid;gap:32px;min-width:0}
 .dec .nb{margin-top:1px;width:24px;height:24px}
 .dec.open .m{background:transparent;border:1.5px dashed var(--warn);color:var(--warn)}
 .rows{display:grid;gap:0}
-.rows .r{display:grid;grid-template-columns:8em minmax(0,1fr);gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}
+.rows{max-width:820px}
+.rows .r{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;padding:18px 0;border-bottom:1px solid var(--line)}
 .rows .r:last-child{border-bottom:0}
-.rows .k{color:var(--muted);font-size:var(--fs-small);padding-top:2px}
+.rows .k{color:var(--ink);font-weight:700}
 .rows .w{font-weight:700}
 .rows .d{color:var(--muted);font-size:var(--fs-small)}
 @media (max-width:559px){.rows .r{grid-template-columns:minmax(0,1fr);gap:2px}}
@@ -1793,12 +1800,14 @@ document.querySelectorAll("[data-cross5]").forEach(el => { el.innerHTML = CROSS.
 
 /* 合約卡 */
 const FIELDS = [["解決什麼問題","problem"],["使用者做什麼","user"],["系統做什麼","system"],["AI 能做什麼","ai"],["AI 不准做什麼","aino"],["讀什麼、絕不讀什麼","reads"],["寫什麼","writes"],["產出給誰","out"],["來源與不確定性","uncert"],["人怎麼控制","control"],["資料與版本","data"],["現在有沒有","now"]];
+/* 一句一行：照句號切開。 */
+const lines = s => String(s).split(/(?<=[。？])/).filter(x=>x.trim()).map(x=>`<p>${x}</p>`).join("");
 function card(b){
   const g = GROUP[b.code]||0;
   const val = v => Array.isArray(v) ? `<ul>${v.map(x=>`<li>${x}</li>`).join("")}</ul>` : v;
   const has = FIELDS.filter(([,f])=>b[f]!==undefined), rest = FIELDS.filter(([,f])=>b[f]===undefined);
   const dl = has.map(([k,f])=>`<dt>${k}</dt><dd class="${f==="aino"?"no":""}">${val(b[f])}</dd>`).join("");
-  const ex = b.example ? `<div class="ex"><span class="k">${b.exampleTitle || "範例：「這段合作要不要繼續」攤出來的卡"}</span><div class="cards">${b.example.map(([k,v])=>`<div><b>${k}</b>${v}</div>`).join("")}</div></div>` : "";
+  const ex = b.example ? `<div class="ex"><span class="k">${b.exampleTitle || "範例：「這段合作要不要繼續」攤出來的卡"}</span><div class="cards">${b.example.map(([k,v])=>`<div><b>${k}</b>${lines(v)}</div>`).join("")}</div></div>` : "";
   const bp = BP[b.code] || [];
   const bpi = x => Array.isArray(x) ? `<li>${x[0]}<ul>${x[1].map(s=>`<li>${s}</li>`).join("")}</ul></li>` : `<li>${x}</li>`;
   const bph = bp.length ? `<div class="bp"><h4>藍圖已經寫明的要求<small>${bp.length} 條。照做，不用再談；寫「還沒定」的那幾條等你定</small></h4><ul>${bp.map(bpi).join("")}</ul></div>` : "";
@@ -1810,7 +1819,7 @@ function card(b){
       <span class="top">${b.n?`<span class="nb" data-g="${g}">${pad(b.n)}</span>`:ALLTAG}${b.code}</span>
       <span class="nm">${b.name}${b.role?`<small>${b.role}</small>`:""}</span>
       <span class="pills">${st(b.status)}${ct("合約　",b.contract)}<span class="ct" data-s="草稿">藍圖要求 ${bp.length} 條</span>${ad.length?`<span class="ct" data-s="草稿">我們加的 ${ad.length} 條</span>`:""}${nr.length?`<span class="ct" data-s="草稿">北極星 ${nr.length} 條</span>`:""}</span>
-    </summary><div class="body">${b.words?`<div class="ex"><span class="k">這張卡用到的詞</span><div class="cards">${b.words.map(([k,v])=>`<div><b>${k}</b>${v}</div>`).join("")}</div></div>`:""}<dl>${dl}</dl>${ex}${bph}${adh}${nrh}
+    </summary><div class="body">${b.words?`<div class="ex"><span class="k">這張卡用到的詞</span><div class="cards">${b.words.map(([k,v])=>`<div><b>${k}</b>${lines(v)}</div>`).join("")}</div></div>`:""}<dl>${dl}</dl>${ex}${bph}${adh}${nrh}
       ${rest.length?`<div class="rest">還沒談的 ${rest.length} 欄：${rest.map(([k])=>k).join("、")}</div>`:""}</div></details>`;
 }
 $("blocks").innerHTML = BLOCKS.map(card).join("");
@@ -1959,7 +1968,8 @@ $("cover").innerHTML = [
 
 /* 北極星：每一張表都從上面的共用資料畫。 */
 (function(){
-  $("chain").innerHTML = CHAIN.map((t,i)=>`${i?`<span class="ar">→</span>`:""}<div class="lk">${t}${i===CHAIN.length-1?`<small>不是因為有人帶領或有完美制度，是構成世界的人改變了</small>`:""}</div>`).join("");
+  $("chain").innerHTML = CHAIN.map((t,i)=>`${i?`<span class="ar">→</span>`:""}<div class="lk">${t}</div>`).join("");
+  $("chain").insertAdjacentHTML("afterend", `<p class="cap">最後一環的意思：不是因為有人帶領或有完美制度，是構成世界的人改變了。</p>`);
   const kv = (id, data) => { $(id).innerHTML = data.map(([k,d])=>`<div class="r"><span class="k">${k}</span><span>${d}</span></div>`).join(""); };
   const rows = (id, data) => { $(id).innerHTML = data.map(([k,bs,d])=>`<div class="r"><span class="k">${k}</span><span><span>${bs.map(bk).join(" ")}</span><span class="d" style="display:block">${d}</span></span></div>`).join(""); };
   rows("measure", MEASURE.map(([k,d,bs])=>[k,bs,d]));

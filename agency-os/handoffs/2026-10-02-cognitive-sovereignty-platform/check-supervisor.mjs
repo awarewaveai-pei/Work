@@ -54,8 +54,26 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       el.querySelectorAll('details').forEach((d) => { d.open = true; });
       const text = el.innerText;
       const latin = (c) => new RegExp('(^|[^A-Z])' + c + '([^A-Z]|$)').test(text);
+      // Reading text must not sit in a narrow column: a sentence that wraps to 3+ lines inside a block under
+      // 300px wide at desktop width is "cramped". Pictures (the ring map, the bar charts) are exempt.
+      const cramped = [];
+      if (innerWidth >= 1000) for (const e of el.querySelectorAll('*')) {
+        if (e.closest('.ring') || e.closest('nav') || e.closest('.bars')) continue;
+        const nodes = [...e.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim().length >= 12);
+        if (!nodes.length) continue;
+        let blk = e;
+        while (blk && getComputedStyle(blk).display.startsWith('inline')) blk = blk.parentElement;
+        if (!blk || blk.getBoundingClientRect().width >= 300 || blk.getBoundingClientRect().width === 0) continue;
+        const range = document.createRange();
+        for (const n of nodes) {
+          range.selectNodeContents(n);
+          const tops = new Set([...range.getClientRects()].map((r) => Math.round(r.top)));
+          if (tops.size >= 3) cramped.push((e.closest('[class]')?.className || e.tagName).split(' ')[0] + ':' + n.textContent.trim().slice(0, 8));
+        }
+      }
       return {
         text,
+        cramped: [...new Set(cramped.map((c) => c.split(':')[0]))].map((k) => k + '×' + cramped.filter((c) => c.startsWith(k + ':')).length),
         overflow: document.documentElement.scrollWidth > innerWidth,
         blocks: BLOCKS.map((b) => b.code).filter((c) => !latin(c)),
         alwaysOn: CROSS.map((x) => x.code).filter((c) => !text.includes(c)),
@@ -64,6 +82,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     await page.screenshot({ path: path.join(out, `${label}-${v}.png`), fullPage: true });
     if (label === 'wide') writeFileSync(path.join(out, `text-${v}.txt`), m.text);
     rule(label, `${v}.overflow`, m.overflow ? 'yes' : '');
+    rule(label, `${v}.cramped_text`, m.cramped);
     rule(label, `${v}.blocks_missing`, m.blocks);
     rule(label, `${v}.always_on_missing`, m.alwaysOn);
   }
