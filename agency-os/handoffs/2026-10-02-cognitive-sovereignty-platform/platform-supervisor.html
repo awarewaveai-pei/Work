@@ -241,6 +241,9 @@ body[data-view="one"] .app{padding-block:16px 8px}
 .steps li>.nb.all{align-self:start}
 .opt-tag{font-size:var(--fs-tag);color:var(--muted);border:1px dashed var(--muted);border-radius:999px;padding:1px 8px}
 .note{background:var(--tag);color:var(--accent);border-radius:12px;padding:14px 16px;font-size:var(--fs-small);font-weight:600}
+.b .tnames{display:grid;grid-template-columns:minmax(0,1fr);gap:6px;margin-top:8px;font-size:var(--fs-small);line-height:1.7}
+.b .tnames p{margin:0}
+.b .tnames b{margin-right:8px}
 
 /* 案子的紀錄 */
 .two{display:grid;grid-template-columns:minmax(0,1fr);gap:24px;align-items:start;max-width:820px}
@@ -604,17 +607,17 @@ body[data-view="one"] .app{padding-block:16px 8px}
     </section>
 
     <section class="view" id="v-tools" hidden>
-      <div class="stack"><h2>現有的 <span class="tt"></span> 個工具和工作流去哪裡</h2>
+      <div class="stack"><h2>現有的 <span class="tt"></span> 個工具和 <span class="ft"></span> 條工作流去哪裡</h2>
         <p class="sub">它們不是積木。積木是「人在判斷的哪一段」；工具是那一段裡可以挑的做法。工作流是把幾個工具排成一串。它們全部留著，變成積木裡面的選單，受那塊積木的合約管。這一頁的每一列，在它歸屬的那張合約卡裡都有（卡上「現有的東西裡歸這一塊的」那一區）。</p></div>
       <div class="card stack">
         <h3><span class="tt"></span> 個工具，落在 13 塊的哪一塊</h3>
         <div class="bars" id="toolbars"></div>
-        <p class="cap">13 塊每一塊一列，照 01 到 13 的順序。倒數第二列「規範與脈絡」是全程生效的五樣之一；最後一列不給一般使用者。數字是 2026-10-02 晚上從程式庫的方法合約檔數出來的：287 份，扣掉 1 份不是工具（監管者視角），共 <span class="tt"></span> 個。比早上數的多 1 個：當天另一場工作又加了 1 個藝術反思方法。照網站上的 12 個問題分類和工具家族歸塊，沒有逐個工具看過。正式站部署的版本可能比程式庫少。長條長度照數量畫。</p>
+        <p class="cap">13 塊每一塊一列，照 01 到 13 的順序。倒數第二列「規範與脈絡」是全程生效的五樣之一；最後一列不給一般使用者。每一列底下是那幾個工具的名字。數字和名字都由 gen-tools-data.mjs 從程式庫產生（方法合約檔，扣掉 1 份不是工具的監管者視角），檢查腳本確認跟程式庫一致。每個工具照它在程式庫的類別歸塊，一個類別只歸一塊。網站上是 <span class="gc"></span> 個問題分類；其中「我的說法站不站得住」拆給 THINK 和 VERIFY，「計畫怎麼排、風險怎麼盯、做完學到什麼」拆成三組給 ACT 和 LEARN，所以這裡比網站多 <span class="gx"></span> 組。正式站部署的版本可能比程式庫少。長條長度照數量畫。</p>
       </div>
       <div class="card stack">
         <h3>工作流，落在哪一塊</h3>
         <div class="bars" id="flowbars"></div>
-        <p class="cap">工作流和套件不一樣：工作流是一串工具，全部由 AI 跑完；套件是一串積木，中間有人自己寫的步驟。登記檔裡是 <span class="ft"></span> 條，含 3 條內部用。</p>
+        <p class="cap">工作流和套件不一樣：工作流是一串工具，全部由 AI 跑完；套件是一串積木，中間有人自己寫的步驟。登記檔裡是 <span class="ft"></span> 條，含 <span class="fi"></span> 條內部用（工作流登記檔標 internal 的）。每一列寫出每一條的名字。</p>
       </div>
       <div class="card stack">
         <h3>這代表什麼</h3>
@@ -681,6 +684,319 @@ const GROUP = {SENSE:1,MAP:1,THINK:1,DECIDE:1,ACT:1,LEARN:1,GATHER:2,VERIFY:2,CO
 
 /* 現有工具落在哪一塊。總數由這張表加出來，頁面上不另外寫死數字。
    2026-10-02 晚上數程式庫的方法合約檔：287 份，扣掉 1 份不是工具（stakeholder.regulator，監管者視角）。 */
+/* ── 這一段由 gen-tools-data.mjs 從程式庫產生，不要手改 ── */
+/* 每一個工具：程式庫裡的代號、類別（family）、中文名。 */
+const TOOLS = [
+ ["architecture.adr","architecture","架構決策紀錄"],
+ ["architecture.atam","architecture","架構取捨分析法"],
+ ["architecture.ddd","architecture","領域驅動設計"],
+ ["architecture.dependency_mapping","architecture","相依關係地圖"],
+ ["architecture.event_storming","architecture","事件風暴"],
+ ["architecture.fitness_functions","architecture","架構適應度函數"],
+ ["architecture.quality_attribute_scenario","architecture","品質屬性情境"],
+ ["architecture.strangler_fig","architecture","絞殺者模式"],
+ ["architecture.system_context_model","architecture","C4 模型"],
+ ["architecture.trade_off_matrix","architecture","架構取捨矩陣"],
+ ["art_therapy.conflict_mapping","art_therapy","衝突地圖"],
+ ["art_therapy.full_stop_method","art_therapy","句點分析法"],
+ ["art_therapy.life_timeline","art_therapy","生命時間線（正向／反向）"],
+ ["art_therapy.life_wheel","art_therapy","生命之輪"],
+ ["art_therapy.metaphor_dialogue","art_therapy","隱喻對話"],
+ ["art_therapy.motivation_matrix","art_therapy","動機矩陣"],
+ ["art_therapy.personal_swot","art_therapy","個人 SWOT"],
+ ["art_therapy.role_playing","art_therapy","角色扮演"],
+ ["art_therapy.story_completion","art_therapy","故事延續"],
+ ["art_therapy.storytelling","art_therapy","故事敘說"],
+ ["art_therapy.synonym_substitution","art_therapy","同義詞替換"],
+ ["art_therapy.turning_point_analysis","art_therapy","轉折點分析"],
+ ["art_therapy.value_clarification","art_therapy","價值澄清"],
+ ["art_therapy.visual_metaphor","art_therapy","視覺隱喻創作"],
+ ["art_therapy.workshop_certificate_drawing","art_therapy","工作坊證章畫"],
+ ["art_therapy.wusheng_five_phase","art_therapy","五階段療程系統（五行五階段）"],
+ ["association.affinity_diagram","association","親和圖／KJ 法"],
+ ["association.analogy_mapping","association","類比映射"],
+ ["association.attribute_listing","association","屬性列舉法"],
+ ["association.concept_map","association","概念圖"],
+ ["association.mind_map","association","心智圖"],
+ ["association.morphological_analysis","association","型態分析法"],
+ ["causal.counterfactual_reasoning","causal","反事實推理"],
+ ["causal.dag","causal","因果圖"],
+ ["causal.difference_in_differences","causal","差異中的差異法"],
+ ["causal.instrumental_variables","causal","工具變數法"],
+ ["causal.logic_model","causal","邏輯模型"],
+ ["causal.process_tracing","causal","過程追蹤法"],
+ ["causal.rct","causal","隨機對照試驗"],
+ ["causal.regression_discontinuity","causal","斷點迴歸設計"],
+ ["causal.synthetic_control","causal","合成控制法"],
+ ["causal.theory_of_change","causal","改變理論"],
+ ["challenge.blue_team","challenge","藍隊防禦"],
+ ["challenge.counterexample_search","challenge","反例搜尋"],
+ ["challenge.devils_advocate","challenge","魔鬼代言人"],
+ ["challenge.disconfirming_evidence","challenge","反證搜尋"],
+ ["challenge.fmea","challenge","失效模式與影響分析"],
+ ["challenge.hazop","challenge","危害與可操作性分析"],
+ ["challenge.independent_judge","challenge","獨立裁決"],
+ ["challenge.pre_mortem","challenge","事前驗屍"],
+ ["challenge.red_team","challenge","紅隊攻擊"],
+ ["challenge.stress_testing","challenge","壓力測試（情境）"],
+ ["computation.monte_carlo","computation","蒙地卡羅模擬"],
+ ["database_data.backup_restore_drill","database_data","備份還原演練"],
+ ["database_data.data_contract","database_data","資料契約"],
+ ["database_data.data_lineage","database_data","資料血緣"],
+ ["database_data.data_quality_dimensions","database_data","資料品質維度"],
+ ["database_data.erd","database_data","實體關係圖"],
+ ["database_data.expand_contract_migration","database_data","擴張-收縮式遷移"],
+ ["database_data.normalization","database_data","正規化"],
+ ["database_data.reconciliation","database_data","資料對帳"],
+ ["database_data.retention_deletion_model","database_data","保留與刪除模型"],
+ ["database_data.schema_compatibility_analysis","database_data","Schema 相容性分析"],
+ ["decision.ahp","decision","層級分析法"],
+ ["decision.decision_tree","decision","決策樹"],
+ ["decision.eisenhower_matrix","decision","艾森豪矩陣"],
+ ["decision.expected_value","decision","期望值"],
+ ["decision.ice","decision","ICE 評分法"],
+ ["decision.impact_effort","decision","影響力-努力矩陣"],
+ ["decision.kano","decision","卡諾模型"],
+ ["decision.mcda","decision","多準則決策分析"],
+ ["decision.moscow","decision","MoSCoW 優先分級"],
+ ["decision.pareto_frontier","decision","柏拉圖前緣"],
+ ["decision.rice","decision","RICE 優先排序法"],
+ ["decision.topsis","decision","逼近理想解排序法"],
+ ["decision.weighted_decision_matrix","decision","加權決策矩陣"],
+ ["decision.wsjf","decision","加權最短工作優先法"],
+ ["decomposition.fast","decomposition","功能分析系統技術"],
+ ["decomposition.functional_decomposition","decomposition","功能分解"],
+ ["decomposition.hierarchical_task_analysis","decomposition","階層式任務分析"],
+ ["decomposition.issue_tree","decomposition","議題樹"],
+ ["decomposition.logic_tree","decomposition","邏輯樹"],
+ ["decomposition.mece","decomposition","MECE 檢查"],
+ ["decomposition.objective_tree","decomposition","目標樹"],
+ ["decomposition.problem_tree","decomposition","問題樹"],
+ ["decomposition.wbs","decomposition","工作分解結構"],
+ ["delivery.change_risk_matrix","delivery","變更風險矩陣"],
+ ["delivery.critical_path_method","delivery","要徑法"],
+ ["delivery.decision_log","delivery","決策日誌"],
+ ["delivery.definition_of_done","delivery","完成的定義"],
+ ["delivery.dependency_graph","delivery","任務相依圖"],
+ ["delivery.gantt_chart","delivery","甘特圖"],
+ ["delivery.outcome_roadmap","delivery","成果導向路線圖"],
+ ["delivery.raci","delivery","交付 RACI 矩陣"],
+ ["delivery.raid_log","delivery","RAID 日誌"],
+ ["delivery.risk_register","delivery","風險登記表"],
+ ["delivery.stage_gate","delivery","階段關卡法"],
+ ["devops_sre.blue_green_deployment","devops_sre","藍綠部署"],
+ ["devops_sre.canary_deployment","devops_sre","金絲雀部署"],
+ ["devops_sre.capacity_model","devops_sre","容量模型"],
+ ["devops_sre.chaos_engineering","devops_sre","混沌工程"],
+ ["devops_sre.error_budget","devops_sre","錯誤預算"],
+ ["devops_sre.game_day","devops_sre","演習日"],
+ ["devops_sre.load_test","devops_sre","負載測試"],
+ ["devops_sre.release_readiness_review","devops_sre","發布就緒審查"],
+ ["devops_sre.rto_rpo","devops_sre","復原時間目標／復原點目標"],
+ ["devops_sre.runbook_execution","devops_sre","作業手冊執行"],
+ ["devops_sre.sli_slo","devops_sre","服務等級指標／目標／協議"],
+ ["devops_sre.soak_test","devops_sre","浸泡測試"],
+ ["devops_sre.stress_test","devops_sre","壓力測試（工程）"],
+ ["divergent.brainwriting","divergent","腦力書寫法"],
+ ["divergent.classic_brainstorming","divergent","經典腦力激盪"],
+ ["divergent.crazy_eights","divergent","瘋狂 8 法"],
+ ["divergent.creative_constraints","divergent","創意限制"],
+ ["divergent.design_thinking","divergent","設計思考"],
+ ["divergent.forced_connections","divergent","強制關聯法"],
+ ["divergent.lateral_thinking","divergent","水平思考"],
+ ["divergent.lotus_blossom","divergent","蓮花座法"],
+ ["divergent.random_stimulus","divergent","隨機刺激法"],
+ ["divergent.reverse_brainstorming","divergent","反向腦力激盪法"],
+ ["divergent.scamper","divergent","SCAMPER 檢核表法"],
+ ["divergent.six_thinking_hats","divergent","六頂思考帽"],
+ ["divergent.six_three_five","divergent","6-3-5 腦力書寫法"],
+ ["divergent.starbursting","divergent","星爆法"],
+ ["divergent.synectics","divergent","類比創意法"],
+ ["divergent.triz","divergent","創新理論工具"],
+ ["epistemic.argument_mapping","epistemic","論證地圖"],
+ ["epistemic.assumption_mapping","epistemic","假設地圖"],
+ ["epistemic.assumption_registry","epistemic","假設登記表"],
+ ["epistemic.bayesian_updating","epistemic","貝氏更新"],
+ ["epistemic.confidence_calibration","epistemic","信心校準"],
+ ["epistemic.contradiction_detection","epistemic","矛盾偵測"],
+ ["epistemic.evidence_hierarchy","epistemic","證據強度階層"],
+ ["epistemic.evidence_matrix","epistemic","證據矩陣"],
+ ["epistemic.ladder_of_inference","epistemic","推論階梯"],
+ ["epistemic.toulmin_model","epistemic","圖爾敏論證模型"],
+ ["evidence.triangulation","evidence","證據三角驗證"],
+ ["experiment.ab_test","experiment","A/B 測試"],
+ ["experiment.benchmark","experiment","標竿比較"],
+ ["experiment.concierge_test","experiment","門房測試"],
+ ["experiment.fake_door","experiment","假門測試"],
+ ["experiment.mvp","experiment","最小可行產品"],
+ ["experiment.pilot","experiment","試點計畫"],
+ ["experiment.proof_of_concept","experiment","概念驗證"],
+ ["experiment.prototype","experiment","原型測試"],
+ ["experiment.smoke_test","experiment","煙霧測試（市場）"],
+ ["experiment.technical_spike","experiment","技術試探"],
+ ["experiment.wizard_of_oz","experiment","綠野仙蹤測試"],
+ ["feasibility.break_even","feasibility","損益兩平分析"],
+ ["feasibility.cost_benefit_analysis","feasibility","成本效益分析"],
+ ["feasibility.cost_effectiveness","feasibility","成本效果分析"],
+ ["feasibility.irr","feasibility","內部報酬率"],
+ ["feasibility.npv","feasibility","淨現值分析"],
+ ["feasibility.real_options","feasibility","實質選擇權"],
+ ["feasibility.tco","feasibility","總持有成本"],
+ ["feasibility.telos","feasibility","TELOS 可行性檢核"],
+ ["feasibility.unit_economics","feasibility","單位經濟效益"],
+ ["finance.financial_assumptions","finance","財務假設"],
+ ["foresight.adjacent_discipline_search","foresight","鄰近學科搜尋"],
+ ["foresight.backcasting","foresight","回溯規劃"],
+ ["foresight.black_swan_exercise","foresight","黑天鵝演練"],
+ ["foresight.cross_country_comparison","foresight","跨國比較"],
+ ["foresight.cross_impact_analysis","foresight","交叉影響分析"],
+ ["foresight.cross_industry_transfer","foresight","跨產業移植"],
+ ["foresight.delphi","foresight","德爾菲法"],
+ ["foresight.futures_wheel","foresight","未來輪"],
+ ["foresight.historical_analogy","foresight","歷史類比"],
+ ["foresight.horizon_scanning","foresight","地平線掃描"],
+ ["foresight.outlier_analysis","foresight","異常個案分析"],
+ ["foresight.scenario_planning","foresight","情境規劃"],
+ ["foresight.weak_signal_detection","foresight","微弱訊號偵測"],
+ ["foresight.wild_cards","foresight","外卡情境"],
+ ["framing.boundary_critique","framing","邊界批判"],
+ ["framing.five_w_one_h","framing","5W1H 問題輪廓"],
+ ["framing.frame_storming","framing","框架風暴"],
+ ["framing.future_compass","framing","未來羅盤"],
+ ["framing.goal_statement","framing","目標陳述"],
+ ["framing.grow_model","framing","GROW 模型"],
+ ["framing.how_might_we","framing","我們可以如何…"],
+ ["framing.non_goals","framing","非目標清單"],
+ ["framing.north_star_metric","framing","北極星指標"],
+ ["framing.okr","framing","OKR 目標關鍵成果"],
+ ["framing.problem_statement","framing","問題陳述"],
+ ["framing.reframing","framing","框架轉換"],
+ ["framing.smart","framing","SMART 目標"],
+ ["framing.success_criteria","framing","成功標準"],
+ ["framing.value_sorting","framing","價值觀排序"],
+ ["insight.contextual_inquiry","insight","情境訪查"],
+ ["insight.empathy_map","insight","同理心地圖"],
+ ["insight.focus_group","insight","焦點團體"],
+ ["insight.interview","insight","深度訪談"],
+ ["insight.journey_map","insight","顧客旅程地圖"],
+ ["insight.jtbd","insight","待完成任務理論"],
+ ["insight.persona","insight","使用者原型"],
+ ["insight.service_blueprint","insight","服務藍圖"],
+ ["insight.survey","insight","問卷調查"],
+ ["jurisdiction.applicable_law_graph","jurisdiction","適用法規圖譜"],
+ ["jurisdiction.compliance_gap_analysis","jurisdiction","合規缺口分析"],
+ ["jurisdiction.conflict_of_law_review","jurisdiction","法律衝突審查"],
+ ["jurisdiction.cultural_context_review","jurisdiction","文化脈絡審查"],
+ ["jurisdiction.data_residency_assessment","jurisdiction","資料落地評估"],
+ ["jurisdiction.localization_review","jurisdiction","在地化審查"],
+ ["jurisdiction.market_admission_control","jurisdiction","市場准入控管"],
+ ["jurisdiction.obligation_to_control_mapping","jurisdiction","義務對應控制措施"],
+ ["jurisdiction.regulatory_horizon_scan","jurisdiction","法規前瞻掃描"],
+ ["jurisdiction.resolver","jurisdiction","管轄權解析器"],
+ ["learning.after_action_review","learning","行動後檢討"],
+ ["learning.appreciative_inquiry","learning","欣賞式探詢"],
+ ["learning.build_measure_learn","learning","建構-衡量-學習"],
+ ["learning.decision_journal","learning","決策日誌"],
+ ["learning.dmaic","learning","定義-測量-分析-改善-控制"],
+ ["learning.kill_criteria","learning","終止條件"],
+ ["learning.ooda","learning","OODA 循環"],
+ ["learning.pdca","learning","PDCA 循環"],
+ ["learning.post_mortem","learning","事後檢討"],
+ ["learning.prediction_tracking","learning","預測追蹤"],
+ ["learning.reversal_criteria","learning","決策逆轉條件"],
+ ["representation.audio_conversational_view","representation","語音／對話檢視"],
+ ["representation.causal_view","representation","因果檢視"],
+ ["representation.concept_graph_view","representation","概念圖檢視"],
+ ["representation.expert_lego_mode","representation","專家自由組裝模式"],
+ ["representation.guided_mode","representation","引導模式"],
+ ["representation.mind_map_view","representation","心智圖檢視"],
+ ["representation.switching","representation","表徵切換"],
+ ["representation.table_matrix_view","representation","表格／矩陣檢視"],
+ ["representation.text_outline_view","representation","文字／大綱檢視"],
+ ["representation.timeline_view","representation","時間軸檢視"],
+ ["research.qualitative_coding","research","質性編碼（開放／軸心／選擇性）"],
+ ["research.reporting_guideline_checklist","research","報告規範查核清單"],
+ ["root_cause.barrier_analysis","root_cause","屏障分析"],
+ ["root_cause.bow_tie","root_cause","蝴蝶結分析"],
+ ["root_cause.change_analysis","root_cause","變更分析"],
+ ["root_cause.event_tree","root_cause","事件樹分析"],
+ ["root_cause.fault_tree","root_cause","故障樹分析"],
+ ["root_cause.fishbone","root_cause","魚骨圖（石川圖）"],
+ ["root_cause.five_whys","root_cause","五個為什麼"],
+ ["root_cause.kepner_tregoe","root_cause","凱普納-崔果問題分析"],
+ ["root_cause.pareto","root_cause","柏拉圖分析（80/20 法則）"],
+ ["security.abuse_case","security","濫用案例"],
+ ["security.attack_tree","security","攻擊樹"],
+ ["security.dpia_pia","security","資料保護／隱私影響評估"],
+ ["security.linddun","security","LINDDUN 隱私威脅模型"],
+ ["security.pasta","security","PASTA 攻擊模擬與威脅分析流程"],
+ ["security.secrets_threat_review","security","機密資訊威脅檢視"],
+ ["security.security_control_mapping","security","安全控制對照表"],
+ ["security.stride","security","STRIDE 威脅模型"],
+ ["security.supply_chain_threat_model","security","供應鏈威脅模型"],
+ ["security.zero_trust_review","security","零信任架構檢視"],
+ ["stakeholders.batna","stakeholders","最佳替代方案（BATNA）"],
+ ["stakeholders.coalition_mapping","stakeholders","聯盟關係圖"],
+ ["stakeholders.game_theory","stakeholders","賽局理論"],
+ ["stakeholders.incentive_mapping","stakeholders","誘因圖"],
+ ["stakeholders.interest_based_negotiation","stakeholders","利益導向談判"],
+ ["stakeholders.power_interest","stakeholders","權力-利益矩陣"],
+ ["stakeholders.raci","stakeholders","RACI 責任矩陣"],
+ ["stakeholders.salience_model","stakeholders","顯著性模型"],
+ ["stakeholders.stakeholder_map","stakeholders","利害關係人圖"],
+ ["stakeholders.zopa","stakeholders","可能同意區間（ZOPA）"],
+ ["strategy.ansoff","strategy","Ansoff 矩陣"],
+ ["strategy.bcg_matrix","strategy","BCG 成長占有率矩陣"],
+ ["strategy.blue_ocean","strategy","藍海策略"],
+ ["strategy.business_model_canvas","strategy","商業模式圖"],
+ ["strategy.lean_canvas","strategy","精實畫布"],
+ ["strategy.market_analysis","strategy","市場分析"],
+ ["strategy.pestel","strategy","PESTEL 分析"],
+ ["strategy.porter_five_forces","strategy","五力分析"],
+ ["strategy.steepv","strategy","STEEPV 分析"],
+ ["strategy.stp","strategy","STP 市場區隔定位"],
+ ["strategy.swot","strategy","SWOT 分析"],
+ ["strategy.three_c","strategy","3C 分析"],
+ ["strategy.tows","strategy","TOWS 矩陣"],
+ ["strategy.value_chain","strategy","價值鏈分析"],
+ ["strategy.value_proposition_canvas","strategy","價值主張圖"],
+ ["strategy.vrio","strategy","VRIO 資源分析"],
+ ["systems.agent_based_modeling","systems","主體模型模擬"],
+ ["systems.behavior_over_time","systems","隨時間變化行為圖"],
+ ["systems.causal_loop_diagram","systems","因果回饋圖"],
+ ["systems.flowchart","systems","流程圖"],
+ ["systems.force_field_analysis","systems","場域分析（推力與阻力分析）"],
+ ["systems.iceberg_model","systems","冰山模型"],
+ ["systems.leverage_point_analysis","systems","槓桿點分析"],
+ ["systems.life_system_mapping","systems","生活系統圖"],
+ ["systems.rich_picture","systems","豐富圖像"],
+ ["systems.sipoc","systems","SIPOC（供應者-輸入-流程-輸出-顧客）"],
+ ["systems.stock_and_flow","systems","存量與流量圖"],
+ ["systems.systems_archetypes","systems","系統原型"],
+];
+/* 每一條工作流：程式庫裡的檔名、中文名、給誰用（user＝一般使用者，internal＝內部）。 */
+const FLOWS = [
+ ["art-therapy-creative-reflection-v1","創作反思","user"],
+ ["art-therapy-project-ideation-v1","專案發想","user"],
+ ["art-therapy-unstick-v1","卡關解套","user"],
+ ["business-feasibility-review-v1","可行性審視","user"],
+ ["business-foundation-v1","商業基礎盤點","user"],
+ ["business-plan-full-v1","完整企劃鏈","user"],
+ ["business-planning-feasibility-v1","企劃可行性","user"],
+ ["business-planning-review-v1","企劃總檢","user"],
+ ["business-planning-strategy-v1","商業策略框架","user"],
+ ["champion-challenger","冠軍／挑戰者切換","internal"],
+ ["db-migration-expand-contract","資料庫遷移（擴張／收縮）","internal"],
+ ["edd-literature-search-v1","EdD 文獻離線夾具","internal"],
+ ["edd-research-evidence-v1","EdD 證據鏈","user"],
+ ["life-decision-v1","做一個決定","user"],
+ ["method-deprecation-retirement","工具／物件退役","internal"],
+ ["research-qualitative-v1","質性研究","user"],
+ ["root-cause-analysis-v1","根本原因分析","user"],
+];
+/* 網站上的問題分類有幾個。 */
+const GOAL_COUNT = 12;
+/* ── 產生的資料到這裡 ── */
 /* 每一列：歸哪一塊、幾個、說明、[問題分類, 程式庫裡的類別]。工具檔的 family 決定它歸哪一塊（methods/registry/method-goal-groups.yaml）；數量由檢查腳本照程式庫重算。 */
 const TOOL_ROWS = [
   [["SENSE"],16,"帶一個團體、帶反思（藝術反思 16）",[["藝術反思",["art_therapy"]]]],
@@ -701,16 +1017,19 @@ const TOOL_ROWS = [
 ];
 const TOOL_TOTAL = TOOL_ROWS.reduce((s,r)=>s+r[1],0);
 const TOOL_OF = code => TOOL_ROWS.find(r=>r[0][0]===code)[1];
+const toolsOf = fams => TOOLS.filter(t=>fams.includes(t[1]));   // 某幾個類別的全部工具（代號、類別、中文名）
 /* 現有工作流落在哪一塊。總數由這張表加出來。 */
-/* 每一列：歸哪幾塊、幾條、說明、程式庫裡的檔名（recipes/validated，去掉 .recipe.yaml）。 */
-const FLOW_ROWS = [
-  [["SENSE"],3,"藝術反思 3 條：創作反思、專案發想、卡住時",["art-therapy-creative-reflection-v1","art-therapy-project-ideation-v1","art-therapy-unstick-v1"]],
-  [["MAP"],1,"根因分析 1 條",["root-cause-analysis-v1"]],
-  [["MAP","COMPUTE","DECIDE"],6,"商業計畫與可行性 6 條",["business-feasibility-review-v1","business-foundation-v1","business-plan-full-v1","business-planning-feasibility-v1","business-planning-review-v1","business-planning-strategy-v1"]],
-  [["GATHER","VERIFY"],3,"研究 3 條：文獻搜尋、研究證據、質性研究",["edd-literature-search-v1","edd-research-evidence-v1","research-qualitative-v1"]],
-  [["套件雛形"],1,"人生決策 1 條：最接近藍圖的「個人複雜決策」套件，但中間沒有人自己寫的步驟",["life-decision-v1"]],
-  [["不給一般使用者"],3,"內部用 3 條：資料庫搬遷、方法汰換、新舊版本比較",["db-migration-expand-contract","method-deprecation-retirement","champion-challenger"]],
+/* 每一列：歸哪幾塊、這一組叫什麼、程式庫裡的檔名、補充。條數和每一條的中文名從 FLOWS 算，不手寫。 */
+const FLOW_DEF = [
+  [["SENSE"],"藝術反思",["art-therapy-creative-reflection-v1","art-therapy-project-ideation-v1","art-therapy-unstick-v1"]],
+  [["MAP"],"根因分析",["root-cause-analysis-v1"]],
+  [["MAP","COMPUTE","DECIDE"],"商業計畫與可行性",["business-feasibility-review-v1","business-foundation-v1","business-plan-full-v1","business-planning-feasibility-v1","business-planning-review-v1","business-planning-strategy-v1"]],
+  [["GATHER","VERIFY"],"研究",["edd-research-evidence-v1","research-qualitative-v1"]],
+  [["套件雛形"],"人生決策",["life-decision-v1"],"最接近藍圖的「個人複雜決策」套件，但中間沒有人自己寫的步驟"],
+  [["不給一般使用者"],"內部用",["edd-literature-search-v1","champion-challenger","db-migration-expand-contract","method-deprecation-retirement"]],
 ];
+const FLOW_NAME = id => (FLOWS.find(f=>f[0]===id) || [id,id])[1];
+const FLOW_ROWS = FLOW_DEF.map(([who,label,ids,note]) => [who, ids.length, `${label} ${ids.length} 條：${ids.map(FLOW_NAME).join("、")}` + (note ? `。${note}` : ""), ids]);
 const FLOW_TOTAL = FLOW_ROWS.reduce((s,r)=>s+r[1],0);
 /* 其他現有的東西：名稱、它是什麼、說明、歸哪一塊。 */
 const EXISTING_OTHER = [
@@ -796,7 +1115,7 @@ const LAYERS = [
   ["第 2 層","外殼","開案、AI 權限、全程生效的規則",["組裝器","協作合約","完整性核心","規範與脈絡"],
    "完整性核心只做了一道檢查（不預設結論）。組裝器只有雛形：工具照問題分類、結果頁會推下一步，但不能組積木。協作合約、規範與脈絡沒有。"],
   ["第 3 層","13 塊積木","人在判斷的每一段；GOVERN 貫穿每一層",["SENSE","GATHER","MAP","THINK","VERIFY","COMPUTE","DECIDE","ACT","LEARN","EXPRESS","TEACH","COLLAB","GOVERN"],
-   "{部分} 塊有一部分，{無} 塊沒有。有的那些是 AI 先寫、人後看，方向跟合約相反。"],
+   "有一部分的 {部分}；沒有的 {無}。有的那些是 AI 先寫、人後看，方向跟合約相反。"],
   ["第 4 層","案子的紀錄","所有抽屜，加上每一步一筆的歷程",["共用紀錄"],
    "專案、來源、分析結果有自己的表。判斷、任務卡、觀察紀錄沒有自己的表，是一筆一筆往後加的事件。事件沒有記是誰寫的。"],
   ["第 5 層","引擎","現有的 Cognitive OS。已經有，不重做",[],
@@ -834,7 +1153,7 @@ const WIRING = [
   ["SENSE","沒有可接的。最接近的是填表頁的「AI 幫我起草」，方向相反。","卡片畫面、關係圖、時間線；外化素材這個抽屜。"],
   ["GATHER","蒐集器（在另一個系統裡，抓完送進來）、來源的資料表。","來源身分、同出處分組、多管道；來源總覽的畫面。"],
   ["MAP",TOOL_OF("MAP") + " 個拆解工具、填表頁、結果頁、重跑和比較。","六層地圖的畫面和資料形狀；人每一層先寫一句；事實、法律、價值分欄。"],
-  ["THINK","22 個發散工具、10 個反方工具，都是 AI 先產。","回合規則（人先寫）、七種角色、思考卡、反方按鈕。"],
+  ["THINK",toolsOf(["divergent","association"]).length + " 個發散工具、" + toolsOf(["challenge"]).length + " 個反方工具，都是 AI 先產。","回合規則（人先寫）、七種角色、思考卡、反方按鈕。"],
   ["VERIFY","引註檢查（每句對得上來源）、" + TOOL_OF("VERIFY") + " 個證據檢查工具。","主張帳本、手法比對、三件事分開、查核資料庫的接口。"],
   ["COMPUTE",TOOL_OF("COMPUTE") + " 個計算工具。","每個輸入帶來源；結果接到判斷卡。"],
   ["DECIDE","結果頁的「你的判斷」、" + TOOL_OF("DECIDE") + " 個選擇工具。","判斷卡 11 格、看得到的版本、結論只收人寫。"],
@@ -844,7 +1163,7 @@ const WIRING = [
   ["TEACH","兩堂課程頁（冰山模型、人生決策）；每個工具頁的說明和可填入的範例。","其餘工具和套件的課程頁、練習案例、情境演練。"],
   ["COLLAB","沒有。帳號已經分「單位、工作區」兩層，可以當多人的地基。","全部。"],
   ["GOVERN","帳號登入、AI 用量和額度、抹除、匯出、AI 指令的版本紀錄。","同意、申訴、危機轉介、高風險護欄。"],
-  ["組裝器","工具照 12 個問題分類、結果頁會推下一步。","目的卡、套件、每個案子的 13 格。"],
+  ["組裝器","工具照網站上的 " + GOAL_COUNT + " 個問題分類（每一類的名單在「現有工具去哪」頁）、結果頁會推下一步。","目的卡、套件、每個案子的 13 格。"],
   ["協作合約","網站上所有 AI 呼叫都經過同一個點。","權限設定的畫面；在那個點加上權限檢查。"],
   ["完整性核心","一道閘：不預設結論。","其餘規則；每一塊上線前的檢查。"],
   ["規範與脈絡",TOOL_OF("規範與脈絡") + " 個法規類工具。","脈絡面向清單；每個判斷都問一次的機制。"],
@@ -1088,7 +1407,7 @@ const BLOCKS = [
 const CROSS = [
  {code:"完整性核心", name:"判斷權、可修正、非操控", status:"部分", contract:"未寫", build:"未開始", problem:"藍圖第 9 節的 11 條，套在全部 13 份合約上，任何積木都不能覆寫：人保有最終判斷權；不預設結論但要呈現規範脈絡；所有影響可檢查；事實、法律、價值、文化宗教四種主張不混；追求可修正而不是懷疑一切；服從或抵抗都可以是結果；判斷權不等於免責；共同秩序另外設計；平台本身可被質疑；AI 權限看得見、可縮小、可撤回；信任可校準。不評分人。", now:"只有一小部分。判斷主權七道閘是計畫（研究線總計畫 D20，排在之後做），程式裡今天只做了一道「不預設結論」：AI 的解讀一律標成 AI 的推論，「你的判斷」那一格留給人填，模型自己寫進去的會被拿掉。這一道套在每個工具和工作流的結果解讀上。其餘六道（最終判斷由參與者下、影響清單、證據條件、排定回顧、停止訊號、不給信念打分）還沒做。2026-10-03 查程式核對；之前這裡寫「七道都有、只套在藝術反思 14 個方法上」是錯的。"},
  {code:"規範與脈絡", short:"這件事所在的世界", name:"這件事所在的世界：從地理、戰爭、政治、經濟、教育到宗教、道德", status:"無", contract:"未寫", build:"未開始", problem:"脈絡面向現在 " + FACET_NAMES.length + " 個：" + FACET_NAMES.join("、") + "。它們有兩種作用：一是界定什麼算正常、正確、允許；二是它們本身可能就是造成這個問題的原因之一。兩種都要看。平台會跨國使用，所以不預設任何一個國家、文化或法域。藍圖 5.1a 的橫切鏡頭，不是最後才補的一層。每個判斷都要看：誰有權決定、誰負什麼義務；這個規範從哪來、誰受益；這句話是可查證的事實、要確認的法律條件，還是要人權衡的價值；我是真心認同、暫時遵守，還是沒檢查過。法律主張要標法域、時效、來源；文化與宗教要先問當事人自己的理解。", now:"沒有。資料上「事實／法律／價值」沒有分開的欄位，沒有任何一頁問這些。"},
- {code:"組裝器", name:"依目的把積木組起來", status:"部分", contract:"未寫", build:"未開始", problem:"先選目的，推薦積木組合並說理由。人可重排、跳過、停止。", now:"工具已按問題分類（例：「這件事為什麼一直發生？」31 個），方法頁有「做完常接」，結果頁 ⑧ 推下一步。能推薦方法，不能組積木，沒有套件。"},
+ {code:"組裝器", name:"依目的把積木組起來", status:"部分", contract:"未寫", build:"未開始", problem:"先選目的，推薦積木組合並說理由。人可重排、跳過、停止。", now:"工具已按問題分類（例：「這件事為什麼一直發生？」" + toolsOf(["systems","root_cause","causal"]).length + " 個，名單在 MAP 的合約卡），方法頁有「做完常接」，結果頁 ⑧ 推下一步。能推薦方法，不能組積木，沒有套件。"},
  {code:"共用紀錄", name:"案子的紀錄＋個人歷程", status:"部分", contract:"未寫", build:"未開始",
   problem:"一個案子的家。13 塊積木宣告要讀寫的欄位加起來就是它。最低標準：完整歷程（每一步一筆）；同一案子可做很多次分析，這次的方法沒解決就換別的方法，每次都留著、可以比較；案子自己的來源；任務卡和每筆紀錄（實際狀況、想法、調整方針、卡住了、實際數字，數字自動成趨勢）；短期觀察（按週）與長期觀察（按月、季、年）；重跑並比較；只推還沒做過的工具；匯出、抹除（留一筆已抹除）。藍圖 4.4 另外要求的欄位：目的、風險與協作合約；情緒、關係與權力訊號；規範脈絡；假設、替代解釋、判準、不確定性；暫定判斷、行動、預測、結果與版本；每張卡標「我的／AI 提出／共同發展」。核准不是個人流程的必經步驟（藍圖 4.3），多人或高風險才有「授權、退回、重開」。跨案子的個人歷程也在這裡。",
   now:["今天的專案頁已經有（2026-10-02 登入正式站親自看過冰山模型那個專案）：" + RECORD_HAVE.join("；") + "。","照最低標準，今天還缺：" + RECORD_LACK.join("；") + "。"]},
@@ -1717,7 +2036,7 @@ const CAPS = [
  ["看見長期後果",["THINK","COMPUTE","ACT"],"第二序後果（後果帶來的後果）；情境模擬；按月季年的長期觀察"],
 ];
 const MEASURE = [
- ["認知能力、自主判斷","個人層。藍圖第 11 節的十項過程指標，加 6.10 的成長九項",["LEARN","GOVERN"]],
+ ["認知能力、自主判斷","個人層。藍圖第 11 節的十項過程指標（十項列在 GOVERN 合約卡的「藍圖要求」），加 6.10 的成長九項（九項列在 LEARN 合約卡的「藍圖要求」）",["LEARN","GOVERN"]],
  ["少被煽動、操控","轉傳前有沒有查證；能不能指出一則訊息用了哪種操弄手法",["VERIFY"]],
  ["更好的公共決策","團體層，只量過程：異議有沒有保留、重開條件有沒有寫、決定後有沒有回顧、能不能正確轉述對方立場、主張帶來源的比例。不量大家是否一致",["COLLAB"]],
  ["更好的世界","量不到，平台不宣稱。只在課堂、團隊、組織的試點比較用前用後，並保留沒變、失敗、退出的結果",["GOVERN"]],
@@ -1805,7 +2124,7 @@ function toolReqs(code){
   const out = [];
   TOOL_ROWS.filter(r=>mine(r[0])).forEach(r=>{
     out.push(r[1] ? `現有工具 ${r[1]} 個：${r[2]}` : r[2]);
-    if (r[1]) out.push(`這些工具在程式庫裡的類別：${r[3].flatMap(g=>g[1]).join("、")}。蓋這一塊的人照類別就找得到每一個。`);
+    if (r[1]) r[3].forEach(([label,fams])=>out.push(`「${label}」的 ${toolsOf(fams).length} 個：${toolsOf(fams).map(x=>x[2]).join("、")}`));
   });
   FLOW_ROWS.filter(r=>mine(r[0])).forEach(r=>out.push(`現有工作流：${r[2]}` + (r[0].length>1 ? `（跟 ${r[0].filter(c=>c!==code).join("、")} 共用）` : "") + `。程式庫裡的檔名：${r[3].join("、")}`));
   EXISTING_OTHER.filter(r=>r[3].includes(code)).forEach(r=>out.push(`${r[0]}（${r[1]}）：${r[2]}`));
@@ -1825,6 +2144,9 @@ const bk = code => `<span class="bk" data-g="${GROUP[code]||0}">${code}</span>`;
 const byCode = code => BLOCKS.find(b=>b.code===code);
 $("facet-line").textContent = FACET_NAMES.join("、") + "，一共 " + FACET_NAMES.length + " 個面向，是判斷的材料，也可能就是問題的成因：規範與脈絡。藍圖原文有六個（政治、文化、宗教、法律、倫理、道德）；其餘的和「成因」是 2026-10-02 加的";
 document.querySelectorAll(".ft").forEach(el => { el.textContent = FLOW_TOTAL; });
+document.querySelectorAll(".fi").forEach(el => { el.textContent = FLOWS.filter(f=>f[2]==="internal").length; });
+document.querySelectorAll(".gc").forEach(el => { el.textContent = GOAL_COUNT; });
+document.querySelectorAll(".gx").forEach(el => { el.textContent = TOOL_ROWS.flatMap(r=>r[3]||[]).length - GOAL_COUNT; });
 document.querySelectorAll(".tt").forEach(el => { el.textContent = TOOL_TOTAL; });
 /* 全程生效的五樣：每一頁都用同一個畫法、同一個名字。 */
 const ALLTAG = `<span class="nb all" title="全程生效，不算積木">全</span>`;
@@ -2051,7 +2373,7 @@ $("cover").innerHTML = [
   const done = [
     "每個案子都有完整紀錄，最低標準＝今天的專案頁：歷程、任務卡、短期與長期觀察、換方法再做、重跑比較。這是全功能平台，不是小工具。",
     "平台是新東西。現有 Cognitive OS 退到後面當引擎，不再是產品本身。",
-    "13 塊積木定案（2026-10-02 再確認「13 塊比較好」）：藍圖的 8 塊，VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。13 塊都要，沒有哪一塊是次要的：SENSE、GATHER、MAP、THINK、VERIFY、COMPUTE、DECIDE、ACT、LEARN、EXPRESS、TEACH、COLLAB、GOVERN。",
+    "13 塊積木定案（2026-10-02 再確認「13 塊比較好」）：藍圖的 8 塊（SENSE、MAP、THINK、VERIFY、DECIDE、LEARN、COLLAB、GOVERN），VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。13 塊都要，沒有哪一塊是次要的：SENSE、GATHER、MAP、THINK、VERIFY、COMPUTE、DECIDE、ACT、LEARN、EXPRESS、TEACH、COLLAB、GOVERN。",
     "藍圖寫明的要求一律明文寫進對應積木的合約卡，不留到「之後談到再說」。",
     "一個案子怎麼走 13 塊：並存（2026-10-02 你同意）。平台上 13 塊都在，每個案子的頁面都有 13 格；第一輪照套件走最多 6 塊；其他積木在對的時機由系統提出，你同意才加；TEACH 和 GOVERN 不算在 6 塊裡；每次回顧系統列出還沒用過的積木；案子本身沒有上限。圖在「走一趟」那一頁。",
     "北極星寫進設計：「提升人類的認知品質，讓更多人能以清明、自主的判斷，共同塑造更好的未來」；尺度是文明的決策品質；因果鏈是待驗證的命題。",
@@ -2086,10 +2408,12 @@ $("cover").innerHTML = [
 
 /* 現有工具去哪：長條照數量畫 */
 (function(){
-  const bars = (rows, max) => rows.map(([who,n,d])=>`<div class="b"><span class="who">${who.map(bk).join("")}</span>
+  const bars = (rows, max, names) => rows.map(([who,n,d,x])=>`<div class="b"><span class="who">${who.map(bk).join("")}</span>
     <div><div class="track">${n?`<span class="fill" data-g="${GROUP[who[0]]||0}" style="width:${Math.max(n/max*100,1.5)}%"></span>`:""}<span class="n num">${n}</span></div>
-    <div class="d">${d}</div></div></div>`).join("");
-  $("toolbars").innerHTML = bars(TOOL_ROWS, Math.max(...TOOL_ROWS.map(r=>r[1])));
+    <div class="d">${d}</div>${names ? names(x) : ""}</div></div>`).join("");
+  /* 每一列底下列出是哪幾個工具（從 TOOLS，跟合約卡同一份） */
+  const toolNames = groups => groups && groups.length ? `<div class="tnames">${groups.map(([label,fams])=>`<p><b>${label}　${toolsOf(fams).length} 個：</b>${toolsOf(fams).map(x=>x[2]).join("、")}</p>`).join("")}</div>` : "";
+  $("toolbars").innerHTML = bars(TOOL_ROWS, Math.max(...TOOL_ROWS.map(r=>r[1])), toolNames);
   $("flowbars").innerHTML = bars(FLOW_ROWS, Math.max(...FLOW_ROWS.map(r=>r[1])));
 })();
 
@@ -2179,7 +2503,7 @@ ${nav(N+1+k)}</div>
   $("layers").innerHTML = LAYERS.map(([k,nm,what,who,now],i)=>
     (i && ARCH_GATES[i-1] ? `<div class="gate"><b>關卡：${ARCH_GATES[i-1][0]}</b><span>${ARCH_GATES[i-1][1]}<br>今天：${ARCH_GATES[i-1][2]}</span></div>` : "") +
     `<div class="layer"><div class="nm">${k}　${nm}<small>${what}</small></div>
-      <div class="bd"><div class="bks">${who.length<=5 ? who.map(c=>bk(c)+st((BLOCKS.find(b=>b.code===c)||CROSS.find(b=>b.code===c)).status)).join("") : chips(who)}</div><div class="now">今天：${now.replace("{部分}",BLOCKS.filter(b=>b.status==="部分").length).replace("{無}",BLOCKS.filter(b=>b.status==="無").length)}</div></div></div>`).join("");
+      <div class="bd"><div class="bks">${who.length<=5 ? who.map(c=>bk(c)+st((BLOCKS.find(b=>b.code===c)||CROSS.find(b=>b.code===c)).status)).join("") : chips(who)}</div><div class="now">今天：${now.replace("{部分}",(a=>`${a.length} 塊：${a.join("、")}`)(BLOCKS.filter(b=>b.status==="部分").map(b=>b.code))).replace("{無}",(a=>`${a.length} 塊：${a.join("、")}`)(BLOCKS.filter(b=>b.status==="無").map(b=>b.code)))}</div></div></div>`).join("");
   const readers = id => Object.keys(DRAWER_READS).filter(c=>DRAWER_READS[c].includes(id));
   const nevers = id => Object.keys(DRAWER_NEVER).filter(c=>DRAWER_NEVER[c].includes(id));
   /* 一個抽屜一塊：名稱、裝什麼，然後固定四行。只能讀一部分的，自己一行，旁邊寫它只讀什麼。 */
@@ -2198,7 +2522,8 @@ ${nav(N+1+k)}</div>
   };
   if (DRAWERS.some(d=>!WHERE.some(w=>w[0]===d.where))) throw new Error("drawer with unknown place");
   $("drawers").innerHTML = WHERE.map(([w,label])=>{ const ds = DRAWERS.filter(d=>d.where===w); return ds.length ? `<div class="dw-g"><h4>${label}（${ds.length} 個）</h4>${ds.map(drawer).join("")}</div>` : ""; }).join("");
-  $("wiring").innerHTML = WIRING.map(([code,have,todo])=>`<div class="r"><span class="k">${bk(code)}</span><span><span>接現有的：${have}</span><span class="d" style="display:block">要新做：${todo}</span></span></div>`).join("");
+  const named = code => TOOL_ROWS.some(r=>r[1] && r[0].map(w=>TOOL_OWNER[w]||w).includes(code));
+  $("wiring").innerHTML = WIRING.map(([code,have,todo])=>`<div class="r"><span class="k">${bk(code)}</span><span><span>接現有的：${have}${named(code) && code!=="組裝器" ? `工具一個一個的名字在 ${code} 的合約卡。` : ""}</span><span class="d" style="display:block">要新做：${todo}</span></span></div>`).join("");
   $("states").innerHTML = CASE_STATES.map(([k,d,who])=>`<div class="s"><b>${k}</b><span>${d}</span><div class="bks">${chips(who)}</div></div>`).join("");
   $("case-next").innerHTML = CASE_NEXT.map(([k,d])=>`<div class="r"><span class="k">${k}</span><span>${d}</span></div>`).join("");
   $("case-any").textContent = "任何時候都可以：" + CASE_ANYTIME.join("、") + "。";

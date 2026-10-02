@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
+import { buildBlock, pageBlock } from './gen-tools-data.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const arg = (name, fallback) => { const i = process.argv.indexOf('--' + name); return i > 0 ? path.resolve(process.argv[i + 1]) : fallback; };
@@ -69,7 +70,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       // 300px wide at desktop width is "cramped". Pictures (the ring map, the bar charts) are exempt.
       const cramped = [];
       if (innerWidth >= 1000) for (const e of el.querySelectorAll('*')) {
-        if (e.closest('.ring') || e.closest('nav') || e.closest('.bars')) continue;
+        if (e.closest('.ring') || e.closest('nav') || e.closest('.bars .track, .bars .who')) continue;   // only the chart itself; text under a bar is reading text
         const nodes = [...e.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim().length >= 12);
         if (!nodes.length) continue;
         let blk = e;
@@ -82,7 +83,19 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
           if (tops.size >= 3) cramped.push((e.closest('[class]')?.className || e.tagName).split(' ')[0] + ':' + n.textContent.trim().slice(0, 8));
         }
       }
+      // ...nor side by side: two blocks in one row that each hold a sentence of 40+ characters.
+      const side = [];
+      const longText = (k) => [k, ...k.querySelectorAll('*')].some((x) => [...x.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length >= 40));
+      if (innerWidth >= 1000) for (const e of el.querySelectorAll('*')) {
+        if (e.closest('.ring, nav')) continue;
+        const kids = [...e.children].filter((k) => k.getBoundingClientRect().height > 0 && longText(k));
+        for (let i = 0; i < kids.length; i++) for (let j = i + 1; j < kids.length; j++) {
+          const a = kids[i].getBoundingClientRect(), b = kids[j].getBoundingClientRect();
+          if (Math.abs(a.top - b.top) < 4 && Math.abs(a.left - b.left) > 40) side.push((e.className || e.tagName).split(' ')[0]);
+        }
+      }
       return {
+        side: [...new Set(side)],
         text,
         cramped: [...new Set(cramped.map((c) => c.split(':')[0]))].map((k) => k + '×' + cramped.filter((c) => c.startsWith(k + ':')).length),
         overflow: document.documentElement.scrollWidth > innerWidth,
@@ -93,6 +106,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     if (label === 'wide') writeFileSync(path.join(out, `text-${v}.txt`), m.text);
     rule(label, `${v}.overflow`, m.overflow ? 'yes' : '');
     rule(label, `${v}.cramped_text`, m.cramped);
+    rule(label, `${v}.long_text_side_by_side`, m.side);
     rule(label, `${v}.blocks_missing`, m.blocks);
     rule(label, `${v}.always_on_missing`, m.alwaysOn);
   }
@@ -157,6 +171,9 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     for (const r of FLOW_ROWS) if ((r[3] || []).length !== r[1]) toolRows.push('workflow row ' + r[0].join() + ' says ' + r[1] + ', lists ' + (r[3] || []).length);
     for (const id of repo.recipes) if (seen.filter((x) => x === id).length !== 1) toolRows.push('workflow file listed ' + seen.filter((x) => x === id).length + ' times: ' + id);
     for (const id of seen) if (!repo.recipes.includes(id)) toolRows.push('workflow file not in repo: ' + id);
+    const internal = FLOWS.filter((f) => f[2] === 'internal').map((f) => f[0]).sort().join();
+    const inRow = (FLOW_ROWS.find((r) => r[0][0] === '不給一般使用者') || [, , , []])[3].slice().sort().join();
+    if (internal !== inRow) toolRows.push('internal workflows: registry ' + internal + ' / row ' + inRow);
     // Architecture: one owner per drawer; a stated handoff means the receiver reads a drawer the giver owns;
     // nobody both reads and never-reads a drawer; every drawer and every one of the 18 has a 'today' / wiring line.
     const arch = [];
@@ -251,6 +268,8 @@ for (const [w, h, all] of [[1536, 660, true], [1280, 660, true], [1100, 660, fal
   await ctx.close();
 }
 await browser.close();
+// Every tool and workflow is named on the page from a block generated out of the repo; it must be current.
+rule('repo', 'tools_block_out_of_date', pageBlock(readFileSync(pageFile, 'utf8')) === buildBlock(root) ? '' : 'run gen-tools-data.mjs --write');
 
 console.log(report.filter((l) => !l.endsWith('=[]')).join('\n') || 'all rules empty');
 console.log(`output: ${out}`);
