@@ -240,6 +240,18 @@ SENSE、GATHER、MAP、THINK、VERIFY、COMPUTE、DECIDE、ACT、LEARN、EXPRESS
 **流程改動**：`CONTRACT_TEMPLATE.md` 第 4 節加一步「改了合約內容 → 一個獨立審查者逐句找矛盾」；第 3 節加三條人要守的規則（一個詞一個意思、一件事一塊負責、選用的積木不能被當成必經）。`check-supervisor.mjs` 加停用詞和 `DRAWER_LIMIT` 檢查。
 **其餘卡的「現在有沒有」已對程式**（SENSE `apps/cognitive-web/components/RunPage.tsx:29`、`LazyFill.tsx:13`、`ai_lego/apps/api/main.py:1296`；EXPRESS `main.py:2289-2358`；COMPUTE 合約檔 `computation.monte_carlo`、`feasibility.npv`、`causal.dag`；組裝器 `app/(shell)/methods/[id]/page.tsx:29`；命令列的第二條 AI 路 `ai_lego/platform/ai_execution/gateway.py:93`，只被 `apps/cli/run_coding_eval.py:37`、`run_research_slice.py:192` 用）：與卡上一致。
 
+## A19　跟 GPT 討論之後：主文件改成「一頁看懂」，合約卡退為附錄（2026-10-03）｜擬稿
+
+操作者：「你寫的是狗屎，我看不懂你在說什麼」「你先跟去 gpt 討論」。用 `scripts/codex-oracle.ps1 -Mode inspect`（Codex，走 ChatGPT 訂閱）送出 GATHER 卡全文、我寫給她的矛盾說明、她的原話。回覆存檔：`agency-os/reports/oracle/2026-10-03-inspect-26e50291.md`。Codex 讀不到 handoffs 資料夾，只依貼上的文字回答。
+
+- **GPT 的判斷**：「13 塊 × 12 格」是規則矩陣，不是架構；適合當驗收和責任邊界的附錄，不適合當產品負責人的主文件。她要的初步架構是一頁圖：流程＋每一步的輸入、輸出、負責者＋一個完整例子＋三條失敗路徑＋「現在有／還沒有／還沒決定」。它畫的流程只含四塊（它只看到 GATHER），這一點不採用；形式採用。
+- **照做的**：監工台新增第一頁「一頁看懂」（`ONE_CASE`／`ONE_STEPS`／`ONE_ANYTIME`／`ONE_FAIL`），預設開在這一頁。同一個例子（「這段合作要不要繼續」）從開案走到回顧，每一步四欄：你做什麼／系統做什麼／AI 做什麼／交出什麼；六條出狀況時怎麼走；現在有／沒有／還沒定。
+- **寫作五條**（寫進 `CONTRACT_TEMPLATE.md` 第 3 節）：一句一件事；先寫主詞；不造名詞；每條規則配場景；要求、現況、未決分開。
+- **GATHER 卡照五條重寫**，加一個範例區。GPT 另指出、已補的四個洞：怎樣算同一個出處沒有標準（→ 規則寫明有版本，拿不準標「可能同出處」由人定）；「不打可信度」卻說滿足藍圖 5.2（→ 明寫只做到來源加人的判斷，跟藍圖字面不同，列為未定）；貼一段沒出處的文字會被當外部來源（→ 標「我自己說的」）；最早出現時間有時查不到（→ 寫查不到並註明看不到的範圍）。
+- **GATHER「現在有沒有」更正**：檢查沒過的網頁不是「丟掉」，是不進案子、只在蒐集報告留網址和原因（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/collect/orchestrator.ts:451-452`）；在案子畫面看不到、拿不回來。
+- **第四輪審查（針對重寫的 GATHER 和「一頁看懂」）**：上一輪 12 處確認解掉 11 處（剩 EXPRESS 少一句危機交還，已補）；新寫的兩處被抓到 13 處對不上和 8 句難懂，全部處理。其中 3 處 C：GATHER 寫「你不按系統不會找」但 VERIFY 會在背後找；範例數字算錯（7 個網頁扣 5 個同一篇不可能是 3 個出處，改成 9 個）；「一頁看懂」寫規範與脈絡會問發生地，合約寫不重問。審查者指出的原因：新寫的摘要沒有回頭對照它所摘要的合約卡。重寫時掉的三條規則（核對碼、中立新聞網站、與當事方的關係）已補回。GATHER 卡新增「這張卡用到的詞」一區（`words`）。四輪數量：30 → 29 → 12 → 13（後 13 處全在新寫的內容）。第五輪還沒跑。
+- **其餘 17 張合約卡還沒照五條重寫**。
+
 ## A9　還沒建的（不是設計缺口）
 
 六層地圖已在 MAP 合約（藍圖 5.1），今天的網站只有個別方法、沒有這塊積木；排在建置第 1 步。
