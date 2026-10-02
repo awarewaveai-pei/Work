@@ -107,6 +107,24 @@ main{display:grid;gap:32px;min-width:0}
 .ring>[data-dir="l"]::after{content:"←";right:100%;top:50%;width:36px;margin-top:-18px}
 .ring>[data-dir="d"]::after{content:"↓";top:100%;left:0;right:0;height:36px}
 .ring>[data-dir="u"]::after{content:"↑";bottom:100%;left:0;right:0;height:36px}
+/* 架構「一、五層」：一張圖，今天做到哪另外列 */
+.lyr{display:grid;gap:0;max-width:880px}
+.lyr .ly{display:grid;grid-template-columns:40px minmax(0,1fr);gap:14px;align-items:start;padding:14px 16px;border:1.5px solid var(--line);border-radius:12px;background:var(--card)}
+.lyr .ly .n{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--card);font-weight:700}
+.lyr .ly.old{border-style:dashed}
+.lyr .ly.old .n{background:var(--muted)}
+.lyr .ly b{display:block;font-size:var(--fs-h3);line-height:1.4}
+.lyr .ly .what{display:block;color:var(--muted);font-size:var(--fs-small);line-height:1.6}
+.lyr .ly .bks{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.lyr .gap{height:10px}
+.lyr .gt{display:grid;grid-template-columns:40px minmax(0,1fr);gap:14px;align-items:center;padding:8px 16px}
+.lyr .gt .ar{text-align:center;color:var(--warn);font-size:18px}
+.lyr .gt>span:last-child{background:var(--warn-bg);border:1px solid var(--warn);border-radius:10px;padding:6px 12px;font-size:var(--fs-small);line-height:1.7}
+.lyr .gt b{display:block;color:var(--warn);font-size:var(--fs-body)}
+.lyr-h{margin:20px 0 0;padding-bottom:8px;font-size:var(--fs-small);color:var(--accent);border-bottom:2px solid var(--accent);max-width:880px}
+.lyr-today{list-style:none;margin:0;padding:0;max-width:880px}
+.lyr-today li{padding:10px 0;border-bottom:1px solid var(--line);font-size:var(--fs-small);line-height:1.7}
+.lyr-today b{display:block;font-size:var(--fs-body)}
 .layers{display:grid;gap:0}
 .layer{display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr);gap:16px;padding:16px;border:1.5px solid var(--line);border-radius:12px;background:var(--card)}
 .layer .nm{font-weight:700;font-size:var(--fs-h3);line-height:1.4}
@@ -492,8 +510,15 @@ body[data-view="one"] .app{padding-block:16px 8px}
         <p class="sub">地圖那一頁說「有哪 13 塊」。這一頁說「蓋起來長什麼樣」：分幾層、三個關卡擋在哪、案子的紀錄有哪些抽屜、每一塊接到現有系統的哪裡、一個案子的狀態怎麼變。整頁是我擬的草稿，等你看；「今天」的部分是 2026-10-03 查程式寫的。</p></div>
       <div class="card stack">
         <h3>一、五層，和中間的三個關卡</h3>
-        <p class="cap">上面是人看到的，下面是現有的引擎。新平台要蓋的是上面四層；最下面一層已經有，不重做。三個關卡是整個平台跟「一般 AI 問答」不一樣的地方，要做在系統裡，不能只靠提示詞。全程生效的五樣分在兩層：組裝器、協作合約、完整性核心、規範與脈絡在第 2 層；共用紀錄在第 4 層。</p>
-        <div class="layers" id="layers"></div>
+        <div class="dw-intro">
+          <p>平台分成五層。最上面是你看到的畫面，最下面是現有的引擎。</p>
+          <p>新平台要蓋上面四層。最下面一層已經有，不重做。</p>
+          <p>層和層之間有三個關卡。關卡做在系統裡，不靠給 AI 的指令。這是平台跟一般 AI 問答不一樣的地方。</p>
+          <p>全程生效的五樣：組裝器、協作合約、完整性核心、規範與脈絡在第 2 層；共用紀錄在第 4 層。</p>
+        </div>
+        <div class="lyr" id="layers"></div>
+        <h4 class="lyr-h">今天做到哪</h4>
+        <ul class="lyr-today" id="layers-today"></ul>
       </div>
       <div class="card stack">
         <h3>二、案子的紀錄有哪些抽屜：誰寫、誰讀、誰不准讀</h3>
@@ -1123,7 +1148,7 @@ const LAYERS = [
 ];
 /* 三個關卡，畫在層和層之間。index = 在第幾層下面（0 起算）；沒有關卡的地方放 null。 */
 const ARCH_GATES = [
-  ["人先寫，才看得到 AI 的回應","使用者沒寫自己的版本之前，AI 的完整回應不展開。","只有填表那一步是人先寫。結果出來之後，「你的判斷」可填可不填，不填也能核准。"],
+  ["人先寫，才看得到 AI 的回應","你沒寫自己的版本之前，AI 的完整回應不展開。","只有填表那一步是人先寫。結果出來之後，「你的判斷」可填可不填，不填也能核准。"],
   null,
   ["寫進紀錄之前檢查","結論的格子只收人寫的；每一筆都標作者（我、AI、共同、系統）和是哪一塊寫的。","有一半。AI 的解讀存檔前，模型自己寫的「判斷」會被拿掉。但判斷、任務卡、筆記存進去時，沒有記是誰寫的。"],
   ["每次呼叫 AI 之前，查這次准不准","照協作合約：這個案子 AI 能做什麼、不准碰什麼。","還沒有。網站上所有 AI 呼叫都經過同一個點（今天用來算用量和額度），檢查可以加在這裡；但它現在不看「准不准做這件事」。另外還有第二條呼叫 AI 的路（命令列用的），不經過這個點。"],
@@ -2500,10 +2525,21 @@ ${nav(N+1+k)}</div>
 /* 架構 */
 (function(){
   const chips = a => a.map(bk).join("");
-  $("layers").innerHTML = LAYERS.map(([k,nm,what,who,now],i)=>
-    (i && ARCH_GATES[i-1] ? `<div class="gate"><b>關卡：${ARCH_GATES[i-1][0]}</b><span>${ARCH_GATES[i-1][1]}<br>今天：${ARCH_GATES[i-1][2]}</span></div>` : "") +
-    `<div class="layer"><div class="nm">${k}　${nm}<small>${what}</small></div>
-      <div class="bd"><div class="bks">${who.length<=5 ? who.map(c=>bk(c)+st((BLOCKS.find(b=>b.code===c)||CROSS.find(b=>b.code===c)).status)).join("") : chips(who)}</div><div class="now">今天：${now.replace("{部分}",(a=>`${a.length} 塊：${a.join("、")}`)(BLOCKS.filter(b=>b.status==="部分").map(b=>b.code))).replace("{無}",(a=>`${a.length} 塊：${a.join("、")}`)(BLOCKS.filter(b=>b.status==="無").map(b=>b.code)))}</div></div></div>`).join("");
+  /* 一張圖：五層由上往下，三個關卡畫在它隔開的兩層中間。「今天」不放在圖裡，放在圖下面一個清單，順序一樣。 */
+  const GN = ["一","二","三"];
+  const gateAt = [];   // [層的 index, 關卡] ：關卡畫在這一層的上面
+  ARCH_GATES.forEach((g,k) => { if (g) gateAt.push([k+1, g]); });
+  const gateNo = i => gateAt.findIndex(([at])=>at===i);
+  const today = s => s.replace("{部分}",(a=>`${a.length} 塊：${a.join("、")}`)(BLOCKS.filter(b=>b.status==="部分").map(b=>b.code))).replace("{無}",(a=>`${a.length} 塊：${a.join("、")}`)(BLOCKS.filter(b=>b.status==="無").map(b=>b.code)));
+  $("layers").innerHTML = LAYERS.map(([k,nm,what,who],i)=>{
+    const g = gateNo(i) >= 0 ? gateAt[gateNo(i)][1] : null;
+    return (g ? `<div class="gt"><span class="ar">⬇</span><span><b>關卡${GN[gateNo(i)]}：${g[0]}</b>${g[1]}</span></div>` : (i ? `<div class="gap"></div>` : "")) +
+      `<div class="ly ${i===LAYERS.length-1?"old":""}"><span class="n">${i+1}</span><div><b>${nm}</b><span class="what">${what}</span>${who.length?`<div class="bks">${chips(who)}</div>`:""}</div></div>`;
+  }).join("");
+  $("layers-today").innerHTML = LAYERS.map(([k,nm,,,now],i)=>{
+    const g = gateNo(i) >= 0 ? gateAt[gateNo(i)][1] : null;
+    return (g ? `<li><b>關卡${GN[gateNo(i)]}</b>${g[2]}</li>` : "") + `<li><b>第 ${i+1} 層 ${nm}</b>${today(now)}</li>`;
+  }).join("");
   const readers = id => Object.keys(DRAWER_READS).filter(c=>DRAWER_READS[c].includes(id));
   const nevers = id => Object.keys(DRAWER_NEVER).filter(c=>DRAWER_NEVER[c].includes(id));
   /* 一個抽屜一塊：名稱、裝什麼，然後固定四行。只能讀一部分的，自己一行，旁邊寫它只讀什麼。 */
