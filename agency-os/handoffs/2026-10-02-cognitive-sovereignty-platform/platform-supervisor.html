@@ -1,0 +1,415 @@
+<title>認知主權平台監工台</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap">
+<style>
+/* 版面：單欄、固定寬度、同一種字。先看圖，再看清單。每一列同一個形狀。 */
+:root{
+  --bg:#f7f7f5; --fg:#222426; --muted:#6b6f75; --line:#d9dadc; --stroke:#8b8f95; --accent:#355f8d; --accent-bg:#edf2f8; --open-bg:#fbfbfa; --box:#ffffff; --fill:#8b8f95;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#1b1d20; --fg:#e4e4e1; --muted:#9ea3aa; --line:#3a3d42; --stroke:#7d838b; --accent:#9dbfe0; --accent-bg:#26323f; --open-bg:#202327; --box:#23262b; --fill:#9ea3aa; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#1b1d20; --fg:#e4e4e1; --muted:#9ea3aa; --line:#3a3d42; --stroke:#7d838b; --accent:#9dbfe0; --accent-bg:#26323f; --open-bg:#202327; --box:#23262b; --fill:#9ea3aa; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;font-size:16px;line-height:1.8;margin:0}
+.wrap{max-width:768px;margin:0 auto;padding-block:32px 80px;padding-inline:16px}
+h1{font-size:1.5rem;font-weight:700;line-height:1.4;margin:0}
+h2{font-size:1.15rem;font-weight:700;line-height:1.4;margin:40px 0 12px;padding-top:40px;border-top:1px solid var(--line)}
+h2.first{border-top:0;margin-top:32px;padding-top:0}
+p{margin:0}
+a{color:var(--accent)}
+.sub{color:var(--muted);margin-top:8px}
+.toc{margin:20px 0 0;padding:0;list-style:none}
+.toc li{padding:2px 0}
+.toc li a{text-decoration:none}
+
+/* 圖 */
+figure{margin:16px 0 0}
+figure svg{width:100%;height:auto;display:block}
+svg text{font-family:inherit;fill:var(--fg)}
+svg .mute{fill:var(--muted)}
+svg .bx{fill:var(--box);stroke:var(--stroke);stroke-width:1.25}
+svg .ctr{fill:var(--accent-bg);stroke:none}
+svg .frame{fill:none;stroke:var(--stroke);stroke-width:1.25}
+svg .ar{fill:none;stroke:var(--stroke);stroke-width:1.5}
+svg .ln{stroke:var(--line);stroke-width:1}
+svg .b{font-weight:700}
+svg .sq{fill:none;stroke:var(--stroke);stroke-width:1.25}
+svg .sqf{fill:var(--fill);stroke:none}
+figcaption{color:var(--muted);font-size:.9rem;margin-top:8px}
+
+/* 總覽：純文字，每行一個事實 */
+.facts{margin:16px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.facts li{display:grid;grid-template-columns:8.5em 1fr;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}
+.facts .k{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* 積木清單：每一列同一個形狀 */
+.blocks{margin:12px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
+details{border-bottom:1px solid var(--line)}
+details[open]{background:var(--open-bg)}
+summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:2.2em 7.5em 1fr 5.5em 6.5em;gap:8px;align-items:baseline;padding:10px 4px;min-height:48px}
+summary::-webkit-details-marker{display:none}
+summary:hover{background:var(--accent-bg)}
+summary:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.no{color:var(--muted);font-variant-numeric:tabular-nums}
+.code{font-weight:700}
+.name{min-width:0}
+.st,.ct{color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.st b{font-weight:400;display:inline-block;width:1.2em}
+.body{padding:4px 4px 20px}
+.body dl{margin:0;display:grid;grid-template-columns:8.5em 1fr;gap:10px 12px}
+.body dt{color:var(--muted)}
+.body dd{margin:0;min-width:0}
+.body ul{margin:0;padding-left:1.2em}
+.body li{margin:0}
+.todo{color:var(--muted)}
+.ex{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.ex .k{color:var(--muted);display:block;margin-bottom:6px}
+.ex ul{margin:0;padding:0;list-style:none}
+.ex li{display:grid;grid-template-columns:6em 1fr;gap:12px;padding:3px 0}
+.ex li span:first-child{color:var(--muted)}
+
+/* 步驟、去向：同一種列 */
+.rows{margin:12px 0 0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.rows li{display:grid;grid-template-columns:7.5em 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.rows li .k{color:var(--muted)}
+.rows li .w{font-weight:700}
+.rows li .d{color:var(--muted);margin-top:2px;display:block}
+.plain{margin:0;padding-left:1.2em}
+.plain li{margin:6px 0}
+@media (max-width:560px){
+  summary{grid-template-columns:2.2em 1fr;row-gap:2px}
+  .name{grid-column:2}
+  .st,.ct{grid-column:2}
+  .facts li,.rows li,.body dl,.ex li{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <h1>認知主權平台　監工台</h1>
+  <p class="sub">13 塊積木是骨架。先看四張圖，再看每塊的合約。更新：2026-10-02。</p>
+  <ul class="toc">
+    <li><a href="#s1">一、全地圖</a></li>
+    <li><a href="#s2">二、流程圖：一個人走一趟</a></li>
+    <li><a href="#s2b">三、一個案子的紀錄長什麼樣</a></li>
+    <li><a href="#s3">四、進度圖</a></li>
+    <li><a href="#s4">五、時間軸</a></li>
+    <li><a href="#s5">六、13 塊積木的合約</a></li>
+    <li><a href="#s6">七、全程生效的四樣</a></li>
+    <li><a href="#s7">八、建置順序</a></li>
+    <li><a href="#s8">九、現有工具去哪裡</a></li>
+    <li><a href="#s9">十、談定與未定</a></li>
+  </ul>
+
+  <h2 id="s1" class="first">一、全地圖</h2>
+  <figure id="fig1"></figure>
+  <figcaption>上面一圈是一個人走一趟的順序，LEARN 走完回到 SENSE。中間是共用紀錄，每塊積木都讀它、寫它。下面四塊不在圈上，各自在對的時機接進來。外框是全程生效的規則。右上角：● 有　◐ 部分　○ 無。</figcaption>
+
+  <h2 id="s2">二、流程圖：一個人走一趟</h2>
+  <figure id="fig4"></figure>
+  <figcaption>左邊是使用者做的事，右邊是負責的積木。標「需要時」的步驟可以跳過。任何一步都可以停、可以要直接答案；只有「判斷」那一格永遠是人填。</figcaption>
+
+  <h2 id="s2b">三、一個案子的紀錄長什麼樣</h2>
+  <p class="sub">一個案子從建立到長期觀察，每一步都是歷程裡的一筆。一個方法沒解決，換一個方法再做，兩次都留著、可以比較。最低標準＝今天專案頁已經有的：歷程、任務卡、短期與長期計畫、只推還沒做過的工具、現在重跑並比較。</p>
+  <figure id="fig7"></figure>
+  <figcaption>左邊的點是時間順序。「短期觀察」是行動後的第一個月，按週記實際狀況與數字；「長期觀察」按月、季、年。觀察結果回頭對判斷，沒解決就換方法、判斷出新版本。</figcaption>
+
+  <h2 id="s3">四、進度圖</h2>
+  <figure id="fig5"></figure>
+  <figcaption>三欄各自獨立：現況是今天有沒有這塊的能力；合約是有沒有寫清楚它該長什麼樣；建置是有沒有照合約蓋。■ 全　◧ 半　□ 無。</figcaption>
+  <ul class="facts" id="facts"></ul>
+
+  <h2 id="s4">五、時間軸</h2>
+  <figure id="fig6"></figure>
+  <figcaption>左半是已經發生的，有日期。右半是接下來的五步，還沒有日期，先排順序；定了日期就填上。</figcaption>
+
+  <h2 id="s5">六、13 塊積木的合約</h2>
+  <p class="sub">每塊積木的合約都是同一個形狀，九個欄位：</p>
+  <figure id="fig2"></figure>
+  <p class="sub" style="margin-top:20px">點一列展開那一塊的合約。</p>
+  <ul class="blocks" id="blocks"></ul>
+
+  <h2 id="s6">七、全程生效的四樣（不算積木）</h2>
+  <ul class="blocks" id="cross"></ul>
+
+  <h2 id="s7">八、建置順序</h2>
+  <figure id="fig3"></figure>
+  <ul class="rows">
+    <li><span class="k">第 0 步</span><span><span class="w">寫 13 份合約</span><span class="d">每塊說清楚九個欄位。共用紀錄從這 13 份推出來。狀態：進行中，1 份草稿。</span></span></li>
+    <li><span class="k">第 1 步</span><span><span class="w">第一圈：個人複雜決策</span><span class="d">SENSE → MAP → THINK → DECIDE → ACT → LEARN。一塊一塊做到能拿真事進去用。串連靠合約的讀寫宣告，不另外做。狀態：未開始，第一圈待確認。</span></span></li>
+    <li><span class="k">第 2 步</span><span><span class="w">接現有引擎當積木</span><span class="d">GATHER、VERIFY、COMPUTE 的東西已經有，缺的是積木外殼。狀態：未開始。</span></span></li>
+    <li><span class="k">第 3 步</span><span><span class="w">EXPRESS、TEACH</span><span class="d">把判斷變成給別人看的東西；用一個方法前先練。狀態：未開始。</span></span></li>
+    <li><span class="k">第 4 步</span><span><span class="w">COLLAB、GOVERN</span><span class="d">多人共同程序；平台自己被檢查。狀態：未開始。</span></span></li>
+  </ul>
+  <p class="sub">網站的變化：cognitive.aware-wave.com 首頁變成「我的任務」和組裝器；今天的方法目錄、工作流、結果頁退到積木裡面，不再是入口。</p>
+
+  <h2 id="s8">九、現有工具去哪裡</h2>
+  <ul class="rows">
+    <li><span class="k">蒐集器</span><span><span class="w">GATHER 的引擎</span><span class="d">抓來源、品質閘、相關性閘。平台在背後呼叫它，使用者不用自己去另一個網站。</span></span></li>
+    <li><span class="k">方法與工作流</span><span><span class="w">MAP、THINK、DECIDE、COMPUTE 裡的做法</span><span class="d">285 個方法、16 條工作流。方法是積木裡可以挑的做法，不是積木。約 64 個軟體工程方法不給一般使用者看。</span></span></li>
+    <li><span class="k">彙整與引註閘</span><span><span class="w">VERIFY 的一半</span><span class="d">每句主張必須對得上送進去的來源，否則整份不過。</span></span></li>
+    <li><span class="k">結果頁與課程頁</span><span><span class="w">積木內部的畫面</span><span class="d">結果頁歸 MAP／COMPUTE，課程頁歸 TEACH。</span></span></li>
+    <li><span class="k">知識庫</span><span><span class="w">不在平台內</span><span class="d">客戶客服語料，給客服 AI 用。</span></span></li>
+    <li><span class="k">HCI</span><span><span class="w">不在平台內</span><span class="d">評估「別人」可不可信的獨立產品。平台評估的是「自己的判斷過程」。只留人工連結。</span></span></li>
+    <li><span class="k">portal</span><span><span class="w">身分層，未開</span><span class="d">第二個使用者出現才接。</span></span></li>
+  </ul>
+
+  <h2 id="s9">十、談定與未定</h2>
+  <p class="sub">談定的</p>
+  <ol class="plain">
+    <li>每個案子都有完整紀錄，最低標準＝今天的專案頁（歷程、任務卡、短期與長期計畫、換方法再做、重跑比較）。這不是小工具，是全功能平台。</li>
+    <li>平台是新東西。現有 Cognitive OS 退到後面當引擎，不再是產品本身。</li>
+    <li>13 塊積木：藍圖的 8 塊，VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。</li>
+    <li>個人歷程（跨任務的記憶）不算積木，是共用紀錄的一部分。</li>
+    <li>骨架＝13 份合約。任務容器、協作合約、完整性核心都從合約推出來。</li>
+    <li>不做「先放 13 個有畫面沒合約的空頁」。</li>
+    <li>ACT（行動與觀察）獨立成一塊。短期觀察按週、長期觀察按月季年，都在這塊。</li>
+  </ol>
+  <p class="sub" style="margin-top:20px">未定的</p>
+  <ol class="plain">
+    <li>第一圈是不是「個人複雜決策」。</li>
+    <li>外化媒介：先文字卡＋關係圖，畫圖與照片之後加。</li>
+    <li>其餘 12 份合約的內容。</li>
+  </ol>
+</div>
+
+<script>
+const G = {"有":"●","部分":"◐","無":"○"};
+const BLOCKS = [
+ {n:1, code:"SENSE", name:"外化", role:"先攤出來", status:"無", contract:"草稿", build:"未開始",
+  problem:"我實際看見、感覺、在意什麼？把腦子裡混在一起、還沒說清楚的東西先放到外面，讓自己看見。不分析、不下結論。",
+  user:["一件一張卡：事件、感受、身體反應、恐懼、期待、人物關係與權力、直覺、我現在跟自己講的故事、別人的聲音。","用打字或講話。之後可以畫、可以放照片（藝術外化＝同一塊換媒介）。"],
+  system:["把卡片擺在一個畫面上，讓人拖、分組、連線（關係圖）、排時間（時間線）。","每張卡標它是哪一類。"],
+  ai:["鏡子：把你放的東西整理回給你看，指出空白。例：「事實裡沒有一件是關於錢的，是沒發生還是沒放？」","提問：一次只問一題。"],
+  aino:["解釋你的動機、診斷、評價、替你下結論。詮釋權留給人。"],
+  reads:["使用者的輸入。不讀判斷卡和回顧紀錄，避免外化被結論汙染。"],
+  writes:["素材卡、關係圖、時間線、情緒訊號。"],
+  out:"一疊卡＋關係圖／時間線＋情緒訊號，交給 MAP。",
+  now:"沒有。現在的入口是「貼一段話 → AI 起草表單」，中間跳過了「自己先看見」。",
+  example:[["事件","上週他第三次改合約條件"],["身體","開會前我胃會緊"],["恐懼","怕拆夥後案子接不到"],["關係","他跟我前老闆很熟"],["期待","我希望能自己決定方向"],["別人的聲音","我媽說做生意就是要忍"],["直覺","他沒把我當夥伴"],["故事","我被利用了"]]},
+ {n:2, code:"GATHER", name:"蒐集來源", role:"把資料抓回來", status:"有", contract:"未寫", build:"未開始",
+  problem:"關於這件事，外面有哪些資料？把來源抓回來、記清楚從哪來。",
+  now:"有。蒐集器抓網頁、搜尋、學術資料；每份來源記網址、內容雜湊、抓取時間、誰抓。同一網址內容沒變就不重複，變了就新增一版。"},
+ {n:3, code:"MAP", name:"拆解", role:"分開看", status:"部分", contract:"未寫", build:"未開始",
+  problem:"把事實、解釋、利益、結構、核心矛盾、介入分開；法律、價值、文化也分開看。",
+  now:"做法庫有（285 個方法的執行與閘門，例如冰山、魚骨、SWOT）。六層地圖、規範檢查這塊積木本身沒有。資料上「事實／法律／價值」沒有分開的欄位。"},
+ {n:4, code:"THINK", name:"共思考", role:"發散、反證", status:"無", contract:"未寫", build:"未開始",
+  problem:"人先想，AI 再給支架：發散、反證、提問，但不替人決定。",
+  now:"沒有。沒有「人先寫、AI 才回」的回合規則；沒有七種 AI 角色；沒有思考卡；沒有反方按鈕。"},
+ {n:5, code:"VERIFY", name:"查證主張", role:"對來源", status:"部分", contract:"未寫", build:"未開始",
+  problem:"這則訊息可以驗證什麼？每個主張有哪些來源、支持、反證、未知？它可能怎麼操弄我？不宣判真假。",
+  now:"一半。彙整和「每句引註必須對得上來源」的閘有。主張帳本、操弄模式辨識、法律主張的法域與時效沒有。"},
+ {n:6, code:"COMPUTE", name:"計算與模擬", role:"真的算", status:"部分", contract:"未寫", build:"未開始",
+  problem:"真的算：統計、損益平衡、淨現值、情境模擬。結果標成「計算結果」或「模擬結果」。",
+  now:"方法庫裡有（蒙地卡羅、NPV、統計、因果圖）。沒有作為一塊積木接進判斷。"},
+ {n:7, code:"DECIDE", name:"判斷", role:"我的結論", status:"無", contract:"未寫", build:"未開始",
+  problem:"我自己的暫定結論、依據、信心、判準、不確定性、什麼會改變結論。只能人填，AI 只能給候選。",
+  now:"沒有判斷卡。只有一個「同意／不同意」的事件。結果頁的方案和下一步是 AI 產的、人按核准。"},
+ {n:8, code:"ACT", name:"行動與觀察", role:"做一步，持續看", status:"部分", contract:"未寫", build:"未開始",
+  problem:"最小、可逆、可負責的下一步，然後持續觀察：短期觀察（行動後第一個月，按週記實際狀況、數字、想法、調整）、長期觀察（按月、季、年）。觀察到的東西回頭對判斷。",
+  now:"一半。今天的專案頁已有任務卡（狀態、每次紀錄、實際數字、調整方針、下次檢視日）、短期與長期計畫、到期重跑並比較。缺的是把觀察接回「人的判斷」那一格，以及觀察本身的提醒與回報流程。已定：獨立成一塊。"},
+ {n:9, code:"LEARN", name:"回顧校準", role:"回頭對結果", status:"無", contract:"未寫", build:"未開始",
+  problem:"預測跟結果差在哪？我當初怎麼想、信心多少、AI 給了什麼、我為何採納或拒絕、後來發生什麼。",
+  now:"沒有。沒有校準紀錄、沒有信任校準、沒有「不同問題出現同樣慣性」的提示。"},
+ {n:10, code:"EXPRESS", name:"產出與表達", role:"從判斷輸出給別人", status:"部分", contract:"未寫", build:"未開始",
+  problem:"把我的判斷變成給別人看的東西：論文章節、提案、一封信、一次談話的稿。每句話追得回紀錄。",
+  now:"雛形。有報表匯出；但報表讀的是來源和 AI 分析，不是人的判斷卡。"},
+ {n:11, code:"TEACH", name:"課程與演練", role:"用之前先練", status:"部分", contract:"未寫", build:"未開始",
+  problem:"用一個方法或一個套件之前先練：五分鐘課、低風險案例、角色輪替、帶領者的腳本。",
+  now:"一半。每個方法一堂課、工作流課有。情境演練、帶領稿沒有。"},
+ {n:12, code:"COLLAB", name:"共同程序", role:"多人時加入", status:"無", contract:"未寫", build:"未開始",
+  problem:"多人怎麼共同決定又保留異議：分歧地圖、授權與撤回、少數意見保存、閉合與重開條件。",
+  now:"沒有。"},
+ {n:13, code:"GOVERN", name:"治理與研究", role:"監督整個平台", status:"部分", contract:"未寫", build:"未開始",
+  problem:"平台自己被檢查：prompt 和模型版本可追、研究同意、匯出刪除、申訴、在地化。",
+  now:"一點點。prompt 版本、重放、演化迴圈的雛形有。同意、匯出、申訴沒有。"},
+];
+const CROSS = [
+ {code:"完整性核心", name:"判斷權、可修正、非操控", status:"部分", contract:"未寫", build:"未開始", problem:"套在全部 13 份合約上的共同規則：結論只能人寫、AI 不能預填、可重開、不評分人。", now:"判斷主權的七道閘存在，但只套在藝術反思那 14 個方法上。"},
+ {code:"組裝器", name:"依目的挑 2 到 5 塊", status:"部分", contract:"未寫", build:"未開始", problem:"先選目的，推薦積木組合並說理由。人可重排、跳過、停止。", now:"問題路由能推薦方法，不能組積木，沒有套件。"},
+ {code:"共用紀錄", name:"案子的紀錄＋個人歷程", status:"部分", contract:"未寫", build:"未開始",
+  problem:"一個案子的家。13 塊積木宣告要讀寫的欄位加起來就是它。最低標準：完整歷程（每一步一筆）、同一案子可做很多次分析（不同方法）、任務卡（狀態、每次紀錄、實際數字、調整方針、下次檢視日）、短期與長期觀察、重跑並比較、只推還沒做過的工具。跨案子的個人歷程也在這裡。",
+  now:"今天的專案頁已有：歷程（事件＋實際數字趨勢）、每次分析一列、任務卡、短期與長期計畫、現在重跑並比較、⑧ 只推沒做過的工具。缺的是人的判斷版本、外化素材、觀察紀錄這些欄位，以及跨案子記憶。"},
+ {code:"協作合約", name:"AI 這次能做什麼", status:"無", contract:"未寫", build:"未開始", problem:"每件任務開始前設定：AI 的角色、能用的資料、不准碰的部分、什麼時候交還控制。系統層強制，不只是提示詞。", now:"沒有。AI 每次都是全權。"},
+];
+const MARK = (id)=>`<defs><marker id="${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="var(--stroke)"/></marker></defs>`;
+
+/* 圖一：全地圖。四欄三列的圈，中間共用紀錄，下面四塊，外框全程生效。 */
+(function(){
+  const C=[50,230,410,590], R=[50,150,250], RB=360, W=150, H=70;
+  const pos={SENSE:[C[0],R[0]],GATHER:[C[1],R[0]],MAP:[C[2],R[0]],THINK:[C[3],R[0]],VERIFY:[C[3],R[1]],
+             COMPUTE:[C[3],R[2]],DECIDE:[C[2],R[2]],ACT:[C[1],R[2]],LEARN:[C[0],R[2]],
+             EXPRESS:[C[0],RB],TEACH:[C[1],RB],COLLAB:[C[2],RB],GOVERN:[C[3],RB]};
+  const box=b=>{const [x,y]=pos[b.code];return `<rect class="bx" x="${x}" y="${y}" width="${W}" height="${H}"/>
+    <text x="${x+10}" y="${y+22}" font-size="12" class="b">${String(b.n).padStart(2,"0")}　${b.code}</text>
+    <text x="${x+W-10}" y="${y+22}" font-size="12" text-anchor="end" class="mute">${G[b.status]} ${b.status}</text>
+    <text x="${x+10}" y="${y+43}" font-size="14">${b.name}</text>
+    <text x="${x+10}" y="${y+61}" font-size="11" class="mute">${b.role}</text>`;};
+  const ar=(d)=>`<path class="ar" d="${d}" marker-end="url(#ah1)"/>`;
+  const y0=R[0]+35, y2=R[2]+35, xr=C[3]+75;
+  const arrows=[`M200 ${y0} H230`,`M380 ${y0} H410`,`M560 ${y0} H590`,
+    `M${xr} ${R[0]+H} V${R[1]}`,`M${xr} ${R[1]+H} V${R[2]}`,
+    `M590 ${y2} H560`,`M410 ${y2} H380`,`M230 ${y2} H200`,`M50 ${y2} H25 V${y0} H50`].map(ar).join("");
+  document.getElementById("fig1").innerHTML=`<svg viewBox="0 0 768 470" role="img" aria-label="13 塊積木全地圖">${MARK("ah1")}
+    <rect class="frame" x="8" y="8" width="752" height="452"/>
+    <text x="20" y="32" font-size="12" class="mute">全程生效：完整性核心　組裝器　協作合約</text>
+    <rect class="ctr" x="${C[0]}" y="${R[1]}" width="${C[2]+W-C[0]}" height="${H}"/>
+    <text x="${(C[0]+C[2]+W)/2}" y="${R[1]+30}" font-size="14" text-anchor="middle" class="b">共用紀錄</text>
+    <text x="${(C[0]+C[2]+W)/2}" y="${R[1]+52}" font-size="12" text-anchor="middle" class="mute">這件事的所有紀錄，每一塊積木都讀它、寫它</text>
+    ${BLOCKS.map(box).join("")}${arrows}
+    <line class="ln" x1="50" y1="${RB-20}" x2="740" y2="${RB-20}"/></svg>`;
+})();
+
+/* 圖四：流程圖，一個人走一趟。直式，左邊使用者做的事，右邊負責的積木。 */
+(function(){
+  const steps=[
+    ["建立任務","說清楚要釐清什麼、風險、誰會受影響","組裝器"],
+    ["設定權限","AI 這次能做什麼、不准碰什麼","協作合約"],
+    ["外化","把事件、感受、關係攤成卡片","SENSE"],
+    ["蒐集（需要時）","外面的資料抓回來","GATHER"],
+    ["拆解","事實、解釋、利益、結構、矛盾、介入分開","MAP"],
+    ["共思考","人先想，AI 再發散、反證","THINK"],
+    ["查證、計算（需要時）","主張對來源；該算的真的算","VERIFY　COMPUTE"],
+    ["判斷","我的結論、依據、什麼會改變它。只能人填","DECIDE"],
+    ["行動與觀察","最小、可逆的一步；短期按週、長期按月季年記錄","ACT"],
+    ["回顧","到期回來對結果，更新判斷；沒解決就換方法","LEARN"],
+  ];
+  const X=120,W=300,H=56,gap=24,top=20;
+  let s=`<svg viewBox="0 0 768 ${top+steps.length*(H+gap)}" role="img" aria-label="一個人走一趟的流程">${MARK("ah4")}`;
+  steps.forEach(([a,b,c],i)=>{const y=top+i*(H+gap);
+    s+=`<rect class="bx" x="${X}" y="${y}" width="${W}" height="${H}"/>
+        <text x="${X-12}" y="${y+34}" font-size="12" text-anchor="end" class="mute">${i+1}</text>
+        <text x="${X+12}" y="${y+23}" font-size="13" class="b">${a}</text>
+        <text x="${X+12}" y="${y+43}" font-size="11" class="mute">${b}</text>
+        <text x="${X+W+16}" y="${y+34}" font-size="12">${c}</text>`;
+    if(i<steps.length-1) s+=`<path class="ar" d="M${X+W/2} ${y+H} V${y+H+gap}" marker-end="url(#ah4)"/>`;});
+  const yLast=top+(steps.length-1)*(H+gap)+H/2, yJudge=top+7*(H+gap)+H/2;
+  s+=`<path class="ar" d="M${X} ${yLast} H${X-60} V${yJudge} H${X}" marker-end="url(#ah4)"/>
+      <text x="${X-66}" y="${(yLast+yJudge)/2}" font-size="11" text-anchor="end" class="mute">判斷改了就回到這裡</text></svg>`;
+  document.getElementById("fig4").innerHTML=s;
+})();
+
+/* 圖七：一個案子的紀錄。直式歷程，左邊一條線，一步一筆。 */
+(function(){
+  const E=[
+    ["10／02","建立案子","「這段合作要不要繼續」。目的、風險、誰會受影響","組裝器"],
+    ["10／02","設定權限","AI 可以發散、反方；不准替我下結論","協作合約"],
+    ["10／02","外化","8 張卡：事件 3、身體 1、恐懼 1、關係 1、期待 1、故事 1","SENSE"],
+    ["10／03","方法 A：冰山模型","事件 → 模式 → 結構 → 心智模型，每層有引註","MAP"],
+    ["10／03","判斷 第 1 版","我的結論、依據、信心、什麼會改變它","DECIDE"],
+    ["10／04","行動 ＋ 任務卡","先談一次條件；負責人、期限、停止條件","ACT"],
+    ["10／11","短期觀察 第 1 週","實際狀況、數字、想法、調整","ACT"],
+    ["10／18","短期觀察 第 2 週","〃","ACT"],
+    ["11／01","回顧","對照第 1 版判斷：沒解決，卡在人不在結構","LEARN"],
+    ["11／02","方法 B：利害關係人地圖","換一個方法。冰山那次仍在，可以比較","MAP"],
+    ["11／02","判斷 第 2 版","修訂理由寫在卡上，第 1 版不刪","DECIDE"],
+    ["11／03","行動 第 2 版","新的一步；舊任務卡標結束","ACT"],
+    ["12／01","長期觀察 第 1 個月","按月；之後第 1 季、第 2 季、第 1 年","ACT"],
+    ["（到期）","回顧","預測對上結果；更新判斷和對 AI 的信任範圍","LEARN"],
+  ];
+  const RH=36, top=16, X=130;
+  let s=`<svg viewBox="0 0 768 ${top+E.length*RH+8}" role="img" aria-label="一個案子的紀錄">`;
+  s+=`<line class="ln" x1="${X}" y1="${top}" x2="${X}" y2="${top+(E.length-1)*RH+8}" stroke-width="1.5"/>`;
+  E.forEach(([d,t,n,b],i)=>{const y=top+i*RH+8;
+    s+=`<circle cx="${X}" cy="${y}" r="4" fill="var(--fill)"/>
+        <text x="${X-14}" y="${y+4}" font-size="11" text-anchor="end" class="mute">${d}</text>
+        <text x="${X+16}" y="${y+4}" font-size="13" class="b">${t}</text>
+        <text x="${X+16}" y="${y+20}" font-size="11" class="mute">${n}</text>
+        <text x="748" y="${y+4}" font-size="11" text-anchor="end" class="mute">${b}</text>`;});
+  document.getElementById("fig7").innerHTML=s+"</svg>";
+})();
+
+/* 圖五：進度圖。每列一塊，三欄：現況、合約、建置。■ 全　◧ 半　□ 無 */
+(function(){
+  const lvl={有:2,部分:1,無:0,已確認:2,草稿:1,未寫:0,完成:2,進行中:1,未開始:0};
+  const sq=(x,y,v)=>{let s=`<rect class="sq" x="${x}" y="${y}" width="14" height="14"/>`;
+    if(v===2) s+=`<rect class="sqf" x="${x+1}" y="${y+1}" width="12" height="12"/>`;
+    if(v===1) s+=`<rect class="sqf" x="${x+1}" y="${y+1}" width="6" height="12"/>`; return s;};
+  const rows=[...BLOCKS.map(b=>({label:`${String(b.n).padStart(2,"0")}　${b.code}　${b.name}`,...b})),
+              ...CROSS.map(b=>({label:`　　${b.code}`,...b}))];
+  const RH=28, top=46, cols=[420,540,660];
+  let s=`<svg viewBox="0 0 768 ${top+rows.length*RH+10}" role="img" aria-label="進度圖">`;
+  s+=`<text x="420" y="24" font-size="12" class="mute">現況</text><text x="540" y="24" font-size="12" class="mute">合約</text><text x="660" y="24" font-size="12" class="mute">建置</text>`;
+  s+=`<line class="ln" x1="20" y1="34" x2="748" y2="34"/>`;
+  rows.forEach((r,i)=>{const y=top+i*RH;
+    s+=`<text x="20" y="${y+11}" font-size="13">${r.label}</text>`;
+    s+=sq(cols[0],y,lvl[r.status])+`<text x="${cols[0]+22}" y="${y+11}" font-size="12" class="mute">${r.status}</text>`;
+    s+=sq(cols[1],y,lvl[r.contract])+`<text x="${cols[1]+22}" y="${y+11}" font-size="12" class="mute">${r.contract}</text>`;
+    s+=sq(cols[2],y,lvl[r.build])+`<text x="${cols[2]+22}" y="${y+11}" font-size="12" class="mute">${r.build}</text>`;
+    s+=`<line class="ln" x1="20" y1="${y+RH-6}" x2="748" y2="${y+RH-6}"/>`;
+    if(i===BLOCKS.length-1) s+=`<line class="ln" x1="20" y1="${y+RH-5}" x2="748" y2="${y+RH-5}"/>`;});
+  document.getElementById("fig5").innerHTML=s+"</svg>";
+})();
+
+/* 圖六：時間軸。左半已發生有日期，右半未來五步沒日期。 */
+(function(){
+  const past=[["2026-08-28","母文件收斂"],["2026-09-03","引擎跑通"],["2026-09-12","網站上線"],["2026-09-23","三線不順裁決"],["2026-10-02","13 塊骨架"]];
+  const next=[["第 0 步","寫合約"],["第 1 步","第一圈"],["第 2 步","接引擎"],["第 3 步","表達、教學"],["第 4 步","共同、治理"]];
+  const Y=50, px=[40,120,200,280,360], nx=[430,505,580,655,730];
+  let s=`<svg viewBox="0 0 768 120" role="img" aria-label="時間軸">${MARK("ah6")}
+    <path class="ar" d="M20 ${Y} H752" marker-end="url(#ah6)"/>
+    <text x="40" y="22" font-size="12" class="mute">已發生（有日期）</text>
+    <text x="430" y="22" font-size="12" class="mute">接下來（還沒有日期）</text>`;
+  past.forEach(([d,t],i)=>{s+=`<circle cx="${px[i]}" cy="${Y}" r="5" fill="var(--fill)"/>
+    <text x="${px[i]}" y="${Y+26}" font-size="11" text-anchor="middle" class="mute">${d}</text>
+    <text x="${px[i]}" y="${Y+44}" font-size="12" text-anchor="middle">${t}</text>`;});
+  s+=`<line x1="395" y1="${Y-18}" x2="395" y2="${Y+18}" stroke="var(--stroke)" stroke-width="1.5"/><text x="395" y="${Y-24}" font-size="11" text-anchor="middle" class="mute">今天</text>`;
+  next.forEach(([d,t],i)=>{s+=`<circle cx="${nx[i]}" cy="${Y}" r="5" fill="var(--box)" stroke="var(--stroke)" stroke-width="1.5"/>
+    <text x="${nx[i]}" y="${Y+26}" font-size="11" text-anchor="middle" class="mute">${d}</text>
+    <text x="${nx[i]}" y="${Y+44}" font-size="12" text-anchor="middle">${t}</text>`;});
+  document.getElementById("fig6").innerHTML=s+"</svg>";
+})();
+
+/* 圖二：一份合約長什麼樣 */
+document.getElementById("fig2").innerHTML=`<svg viewBox="0 0 768 210" role="img" aria-label="一份積木合約的九個欄位">${MARK("ah2")}
+  <text x="40" y="104" font-size="13" class="b">讀什麼</text>
+  <path class="ar" d="M100 100 H170" marker-end="url(#ah2)"/>
+  <rect class="bx" x="170" y="20" width="420" height="170"/>
+  <text x="190" y="48" font-size="14" class="b">解決什麼問題</text>
+  <text x="190" y="80" font-size="13">使用者做什麼</text>
+  <text x="190" y="104" font-size="13">系統做什麼</text>
+  <text x="190" y="128" font-size="13">AI 能做什麼</text>
+  <text x="190" y="152" font-size="13">AI 不准做什麼</text>
+  <text x="190" y="178" font-size="12" class="mute">現在有沒有：● 有　◐ 部分　○ 無</text>
+  <path class="ar" d="M590 80 H660" marker-end="url(#ah2)"/><text x="672" y="85" font-size="13" class="b">寫什麼</text>
+  <path class="ar" d="M590 120 H660" marker-end="url(#ah2)"/><text x="672" y="125" font-size="13" class="b">產出給誰</text>
+</svg>`;
+
+/* 圖三：建置順序 */
+(function(){
+  const steps=[["第 0 步","寫 13 份合約"],["第 1 步","第一圈六塊"],["第 2 步","接現有引擎"],["第 3 步","EXPRESS、TEACH"],["第 4 步","COLLAB、GOVERN"]];
+  const W=130,H=70,gap=27;
+  let s=`<svg viewBox="0 0 768 90" role="img" aria-label="建置順序五步">${MARK("ah3")}`;
+  steps.forEach(([a,b],i)=>{const x=10+i*(W+gap);
+    s+=`<rect class="bx" x="${x}" y="10" width="${W}" height="${H}"/><text x="${x+10}" y="36" font-size="13" class="b">${a}</text><text x="${x+10}" y="60" font-size="13">${b}</text>`;
+    if(i<steps.length-1) s+=`<path class="ar" d="M${x+W} 45 H${x+W+gap}" marker-end="url(#ah3)"/>`;});
+  document.getElementById("fig3").innerHTML=s+"</svg>";
+})();
+
+/* 清單 */
+const FIELDS = [["解決什麼問題","problem"],["使用者做什麼","user"],["系統做什麼","system"],["AI 能做什麼","ai"],["AI 不准做什麼","aino"],["讀什麼","reads"],["寫什麼","writes"],["產出給誰","out"],["現在有沒有","now"]];
+const ul = a => `<ul>${a.map(x=>`<li>${x}</li>`).join("")}</ul>`;
+const cell = v => v===undefined ? `<span class="todo">待討論</span>` : (Array.isArray(v) ? ul(v) : v);
+function row(b){
+  const no = b.n ? String(b.n).padStart(2,"0") : "";
+  const dl = FIELDS.map(([k,f])=>`<dt>${k}</dt><dd>${cell(b[f])}</dd>`).join("");
+  const ex = b.example ? `<div class="ex"><span class="k">範例：「這段合作要不要繼續」丟出來的卡</span><ul>${b.example.map(([k,v])=>`<li><span>${k}</span><span>${v}</span></li>`).join("")}</ul></div>` : "";
+  return `<li><details id="b-${b.code}"><summary>
+      <span class="no">${no}</span><span class="code">${b.code}</span><span class="name">${b.name}</span>
+      <span class="st"><b>${G[b.status]}</b>${b.status}</span><span class="ct">合約　${b.contract}</span>
+    </summary><div class="body"><dl>${dl}</dl>${ex}</div></details></li>`;
+}
+const c = s => BLOCKS.filter(b=>b.status===s).length;
+const drafts = BLOCKS.filter(b=>b.contract!=="未寫").length;
+document.getElementById("facts").innerHTML = [
+  ["積木","13 塊"],
+  ["現況",`<span class="num">● 有 ${c("有")}　◐ 部分 ${c("部分")}　○ 無 ${c("無")}</span>`],
+  ["合約",`<span class="num">草稿 ${drafts} 份　未寫 ${13-drafts} 份</span>`],
+  ["建置",`<span class="num">完成 0 塊　未開始 13 塊</span>`],
+  ["現在在哪一步","第 0 步，寫合約"],
+].map(([k,v])=>`<li><span class="k">${k}</span><span>${v}</span></li>`).join("");
+document.getElementById("blocks").innerHTML = BLOCKS.map(row).join("");
+document.getElementById("cross").innerHTML = CROSS.map(row).join("");
+</script>
