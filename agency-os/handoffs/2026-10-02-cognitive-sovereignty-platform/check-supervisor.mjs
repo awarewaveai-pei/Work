@@ -117,6 +117,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       if (!canRead(c).includes('*') && !owns(a.code).some((id) => canRead(c).includes(id))) arch.push('handoff without drawer ' + a.code + '->' + c);
     }
     for (const c of codes) if (!WIRING.some((w) => w[0] === c)) arch.push('wiring?' + c);
+    for (const k of Object.keys(DRAWER_LIMIT)) { const [c, id] = k.split(':'); if (!canRead(c).includes(id)) arch.push('limit on a drawer not read ' + k); }
     // Build order places all 18.
     window.show('progress', true);
     const chips = [...document.querySelectorAll('#order .bks .bk')].map((e) => e.textContent.trim());
@@ -124,6 +125,8 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // No counts typed by hand that the data already knows.
     const whole = VIEWS.map((v) => { window.show(v, true); return document.getElementById('v-' + v).innerText; }).join('\n');
     const typed = ['285', '18 份', '四樣', '寫好九條'].filter((s) => whole.includes(s));
+    // One word per meaning: words retired when two contracts used them for different things.
+    for (const s of ['同源合併', '同源群組', '來源地圖', '管道佔比', '來源身分卡']) if (whole.includes(s)) typed.push('retired word ' + s);
     if (!whole.includes(FACET_NAMES.length + ' 個面向')) typed.push('facet count');
     return { arch, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
   });
