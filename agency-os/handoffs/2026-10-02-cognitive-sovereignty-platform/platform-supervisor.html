@@ -107,7 +107,9 @@ main{display:grid;gap:32px;min-width:0}
 .ring>[data-dir="l"]::after{content:"←";right:100%;top:50%;width:36px;margin-top:-18px}
 .ring>[data-dir="d"]::after{content:"↓";top:100%;left:0;right:0;height:36px}
 .ring>[data-dir="u"]::after{content:"↑";bottom:100%;left:0;right:0;height:36px}
-.row4{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px}
+.row5{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
+.nb.all{background:var(--ink);color:var(--card)}
+.hubtag{display:flex;align-items:center;justify-content:center;gap:8px;font-size:var(--fs-tag);font-weight:700;letter-spacing:.04em}
 @media (max-width:759px){
   .ring{grid-template-columns:minmax(0,1fr);gap:32px}
   .ring>*{grid-column:1;grid-row:auto;order:var(--o)}
@@ -255,7 +257,7 @@ main{display:grid;gap:32px;min-width:0}
     <button class="navi" data-v="map" aria-current="page">地圖</button>
     <button class="navi" data-v="flow">走一趟</button>
     <button class="navi" data-v="record">案子的紀錄</button>
-    <button class="navi" data-v="contracts">13 份合約</button>
+    <button class="navi" data-v="contracts">合約（13＋5）</button>
     <button class="navi" data-v="tools">現有工具去哪</button>
     <button class="navi" data-v="progress">進度與順序</button>
     <button class="navi" data-v="decided">談定與未定</button>
@@ -322,18 +324,24 @@ main{display:grid;gap:32px;min-width:0}
           <li>六層地圖：設計上本來就有（MAP 的合約），是還沒蓋；排進建置第 1 步</li></ul>
           <p class="cap">這幾條的內容是我擬的，你可以改。合約卡上標「藍圖沒寫、我們加的」。</p></div>
       </div>
+      <div class="card stack">
+        <h3>全程生效的五樣（不算積木）</h3>
+        <p class="cap">北極星的要求落在 13 塊積木和這五樣的合約裡。點了看每一份。</p>
+        <div class="row5" data-cross5></div>
+      </div>
     </section>
 
     <section class="view" id="v-map">
-      <div class="stack"><h2>地圖：13 塊積木怎麼接</h2>
-        <p class="sub">13 塊都是平台的一部分，一塊都不少。01 到 09 是一個人走的一圈，從外化走到回顧，再回到外化。10 到 13 接在整圈上。中間是這個案子的紀錄，13 塊都讀它、寫它。點任何一塊看它的合約。</p></div>
+      <div class="stack"><h2>地圖：13 塊積木怎麼接，加上全程生效的五樣</h2>
+        <p class="sub">平台是 13 塊積木，加上全程生效的五樣（不算積木）。13 塊一塊都不少。01 到 09 是一個人走的一圈，從外化走到回顧，再回到外化。10 到 13 接在整圈上。中間是這個案子的紀錄，13 塊都讀它、寫它。點任何一塊看它的合約。</p></div>
       <div class="card stack">
         <div class="ring" id="ring"></div>
         <div class="legend" id="legend"></div>
       </div>
       <div class="card stack">
-        <h3>套在 13 塊上面的四樣，任何積木都不能覆寫</h3>
-        <div class="row4" id="rules"></div>
+        <h3>全程生效的五樣（不算積木）</h3>
+        <p class="cap">13 塊每一塊都要遵守或用到這五樣，任何積木都不能覆寫。五樣各有一份合約，點了看。「共用紀錄」就是上面圈中間那一格。</p>
+        <div class="row5" data-cross5></div>
       </div>
       <div class="card stack">
         <h3>六個套件：藍圖的五個，加一個公共議題判斷</h3>
@@ -344,7 +352,7 @@ main{display:grid;gap:32px;min-width:0}
     </section>
 
     <section class="view" id="v-flow" hidden>
-      <div class="stack"><h2>走一趟：一個案子從頭到尾，13 塊各在哪一步</h2>
+      <div class="stack"><h2>走一趟：一個案子從頭到尾，13 塊和全程生效的五樣各在哪一步</h2>
         <p class="sub">任何一步都可以停、可以跳過、可以要 AI 直接給建議；只有「判斷」那一格永遠是你填。每一步都是你先寫，AI 才回。</p></div>
       <div class="card stack">
         <h3>一輪走幾塊、一個案子走幾塊（談定：並存）</h3>
@@ -352,7 +360,7 @@ main{display:grid;gap:32px;min-width:0}
         <div class="rows" id="rounds"></div>
       </div>
       <div class="card stack">
-        <h3>走到最完整的樣子：13 塊各在哪一步</h3>
+        <h3>走到最完整的樣子：13 塊和全程生效的五樣各在哪一步</h3>
         <ol class="steps" id="steps"></ol>
       </div>
       <p class="note">觀察和回顧改了判斷，就回到第 11 步出新版本。這次的方法沒解決，就換一個方法從第 6 步再走，兩次都留著。</p>
@@ -372,7 +380,7 @@ main{display:grid;gap:32px;min-width:0}
     </section>
 
     <section class="view" id="v-contracts" hidden>
-      <div class="stack"><h2>13 份合約</h2>
+      <div class="stack"><h2>合約：13 塊積木各一份，全程生效的五樣各一份</h2>
         <p class="sub">每塊積木一份合約，同一個形狀，十二個欄位。藍圖 3.3 要求的六項（輸入、輸出、AI 權限、來源與不確定性、人的控制、資料與版本）都在裡面。點一張卡展開。</p></div>
       <div class="card stack">
         <h3>一份合約長這樣</h3>
@@ -418,6 +426,11 @@ main{display:grid;gap:32px;min-width:0}
         <h3>其他現有的東西</h3>
         <div class="rows" id="tools"></div>
       </div>
+      <div class="card stack">
+        <h3>全程生效的五樣（不算積木）</h3>
+        <p class="cap">這五樣不在 285 個工具裡，是管工具怎麼被用的：組裝器照目的推薦積木組合；協作合約設定 AI 這次能做什麼；完整性核心規定結論只能人寫；規範與脈絡要人看這件事所在的世界；工具跑出來的東西都寫進共用紀錄。</p>
+        <div class="row5" data-cross5></div>
+      </div>
     </section>
 
     <section class="view" id="v-progress" hidden>
@@ -450,6 +463,11 @@ main{display:grid;gap:32px;min-width:0}
       <div class="two">
         <div class="card stack"><h3>談定的</h3><ol class="dec" id="done"></ol></div>
         <div class="card stack"><h3>還沒定的</h3><ol class="dec open" id="open"></ol></div>
+      </div>
+      <div class="card stack">
+        <h3>全程生效的五樣（不算積木）</h3>
+        <p class="cap">談定：這五樣不算積木。五樣各有一份合約草稿，你還沒看過。</p>
+        <div class="row5" data-cross5></div>
       </div>
     </section>
   </main>
@@ -1243,6 +1261,11 @@ const st = s => `<span class="st" data-s="${s}">${G[s]} ${s}</span>`;
 const ct = (label,s) => `<span class="ct" data-s="${s}">${label}${s}</span>`;
 const bk = code => `<span class="bk" data-g="${GROUP[code]||0}">${code}</span>`;
 const byCode = code => BLOCKS.find(b=>b.code===code);
+/* 全程生效的五樣：每一頁都用同一個畫法、同一個名字。 */
+const ALLTAG = `<span class="nb all" title="全程生效，不算積木">全</span>`;
+const crossNode = x => `<button class="node" data-s="${x.status}" data-open="${x.code}">
+    <span class="top">${ALLTAG}${st(x.status)}</span><span class="nm">${x.code}</span><span class="rl">${x.name}</span></button>`;
+document.querySelectorAll("[data-cross5]").forEach(el => { el.innerHTML = CROSS.map(crossNode).join(""); });
 
 /* 現在在哪 */
 (function(){
@@ -1252,7 +1275,7 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
   $("now").innerHTML = `
     <div><div class="k">現在在哪一步</div><div class="v">第 0 步　寫 13 份合約</div>
       <div class="bar" role="img" aria-label="13 份合約有 ${drafts} 份草稿"><i style="width:${drafts/13*100}%"></i></div>
-      <div class="d num">${drafts} ／ 13 份有草稿</div></div>
+      <div class="d num">積木 ${drafts} ／ 13 份有草稿；全程生效的五樣 ${CROSS.filter(b=>b.contract!=="未寫").length} ／ ${CROSS.length} 份有草稿</div></div>
     <div><div class="k">下一塊要談</div><div class="v">${pad(nx.n)}　${nx.code}　${nx.name}</div>
       <div class="d">13 份草稿都寫了，等你一塊一塊看</div></div>
     <div><div class="k">13 塊積木今天的現況</div>
@@ -1271,12 +1294,10 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
     return node(b,`style="--c:${c};--r:${r};--o:${b.n}" data-dir="${d}"`);}).join("");
   const hub = CROSS.find(x=>x.code==="共用紀錄");
   $("ring").innerHTML = ring +
-    `<button class="hub" data-open="共用紀錄" style="--c:2/4;--r:2;--o:0"><b>共用紀錄</b><span>這個案子的所有紀錄。每一塊積木都讀它、寫它。</span><span>${st(hub.status)}</span></button>` +
+    `<button class="hub" data-open="共用紀錄" style="--c:2/4;--r:2;--o:0"><div class="hubtag">${ALLTAG}全程生效，不算積木</div><b>共用紀錄</b><span>這個案子的所有紀錄。每一塊積木都讀它、寫它。</span><span>${st(hub.status)}</span></button>` +
     `<div class="loop" style="--c:1;--r:2;--o:10" data-dir="u">回顧完，回到外化<br>再走一圈</div>` +
     `<div class="join" style="--c:1/5;--r:4;--o:11">另外四塊接在整圈上：任何一步都用得到</div>` +
     BLOCKS.filter(b=>!pos[b.code]).map((b,i)=>node(b,`style="--c:${i+1};--r:5;--o:${b.n+10}"`)).join("");
-  $("rules").innerHTML = CROSS.filter(x=>x.code!=="共用紀錄").map(x=>`<button class="node" data-s="${x.status}" data-open="${x.code}">
-      <span class="top">${x.code}${st(x.status)}</span><span class="rl">${x.name}</span></button>`).join("");
   const PK = [
     ["個人複雜決策","關係、職涯、合作與個人選擇",["SENSE","MAP","THINK","DECIDE","ACT","LEARN"]],
     ["可疑訊息判斷","詐騙、健康、投資、公共資訊與日常轉傳；也包括有組織、大量散布的假訊息",["VERIFY","THINK","DECIDE","ACT","LEARN"]],
@@ -1310,6 +1331,9 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
     ["輸出","把判斷變成給別人看的東西，每句追得回紀錄",["EXPRESS"]],
     ["回顧","到期回來對結果，更新判斷和對 AI 的信任；沒解決就換方法",["LEARN"]],
     ["全程","同意、隱私、匯出與刪除、危機轉介、高風險護欄、版本可追",["GOVERN"]],
+    ["全程","每一步寫下的東西都進同一份案子紀錄，13 塊都讀它、寫它",["共用紀錄"]],
+    ["全程","結論只能人寫；AI 的權限看得見、可縮小、可撤回；不評分人。任何一步都不能覆寫",["完整性核心"]],
+    ["全程","這件事所在的世界：" + FACET_NAMES.length + " 個脈絡面向。不是最後才補的一層，每一步的判斷都要看",["規範與脈絡"]],
   ];
   $("rounds").innerHTML = [
     ["第一輪","照套件走，最多 6 塊",["SENSE","MAP","THINK","DECIDE","ACT","LEARN"],"先走完一圈。只走一半就停，等於沒有回顧，學不到東西"],
@@ -1357,7 +1381,10 @@ const byCode = code => BLOCKS.find(b=>b.code===code);
       ["12／01","第 1 個月","之後第 1 季、第 2 季、第 1 年","ACT"],
       ["到期","回顧","預測對上結果；更新判斷和對 AI 的信任範圍","LEARN"]]],
     ["全程","從開案到結束都在",[
-      ["全程","安全、資料與治理","隨時可匯出、可刪除；每筆產出標版本；高風險時加護欄","GOVERN"]]],
+      ["全程","安全、資料與治理","隨時可匯出、可刪除；每筆產出標版本；高風險時加護欄","GOVERN"],
+      ["全程","共用紀錄","這一整條歷程就是它：每一步一筆，兩輪都留著","共用紀錄"],
+      ["全程","完整性核心","兩版判斷都是我自己寫的；AI 提的卡都標「AI 提出」","完整性核心"],
+      ["全程","規範與脈絡","拆解時看了合約適用哪裡的法律、「同業都這樣」這個慣例從哪來；事實、法律條件、價值分開標","規範與脈絡"]]],
   ];
   $("timeline").innerHTML = P.map(([h,sm,ev])=>`<div class="phase"><h3>${h}${sm?`<small>${sm}</small>`:""}</h3>
     ${ev.map(([d,t,n,b])=>`<div class="ev"><span class="dt">${d}</span><span class="dot" data-g="${GROUP[b]||0}"></span>
@@ -1402,7 +1429,7 @@ function card(b){
   const nr = northReqs(b.code);
   const nrh = nr.length ? `<div class="bp north"><h4>北極星對這一塊的要求<small>${nr.length} 條。和北極星頁是同一份資料</small></h4><ul>${nr.map(x=>`<li>${x}</li>`).join("")}</ul></div>` : "";
   return `<details class="cc" id="b-${b.code}"><summary>
-      <span class="top">${b.n?`<span class="nb" data-g="${g}">${pad(b.n)}</span>`:""}${b.code}</span>
+      <span class="top">${b.n?`<span class="nb" data-g="${g}">${pad(b.n)}</span>`:ALLTAG}${b.code}</span>
       <span class="nm">${b.name}${b.role?`<small>${b.role}</small>`:""}</span>
       <span class="pills">${st(b.status)}${ct("合約　",b.contract)}<span class="ct" data-s="草稿">藍圖要求 ${bp.length} 條</span>${ad.length?`<span class="ct" data-s="草稿">我們加的 ${ad.length} 條</span>`:""}${nr.length?`<span class="ct" data-s="草稿">北極星 ${nr.length} 條</span>`:""}</span>
     </summary><div class="body"><dl>${dl}</dl>${ex}${bph}${adh}${nrh}
@@ -1441,12 +1468,12 @@ $("cover").innerHTML = [
 
 /* 進度 */
 (function(){
-  const row = (b,sep) => `<div class="r ${sep?"sep":""}"><span class="lb">${b.n?`<span class="nb" data-g="${GROUP[b.code]}">${pad(b.n)}</span>`:""}<span>${b.code}　<small>${b.name}</small></span></span>
+  const row = (b,sep) => `<div class="r ${sep?"sep":""}"><span class="lb">${b.n?`<span class="nb" data-g="${GROUP[b.code]}">${pad(b.n)}</span>`:ALLTAG}<span>${b.code}　<small>${b.name}</small></span></span>
     ${st(b.status)}${ct("",b.contract)}${ct("",b.build)}</div>`;
   $("matrix").innerHTML = `<div class="r h"><span></span><span>現況</span><span>合約</span><span>建置</span></div>` +
     BLOCKS.map((b,i)=>row(b,i===BLOCKS.length-1)).join("") + CROSS.map(b=>row(b)).join("");
   const O = [
-    [0,"第 0 步","寫 13 份合約","每塊說清楚十二個欄位。共用紀錄從這 13 份推出來。","13 份草稿寫完，等你逐塊看",[]],
+    [0,"第 0 步","寫 13 份合約","每塊說清楚十二個欄位。共用紀錄從這 13 份推出來。全程生效的五樣也各寫一份。","13 份積木合約、5 份全程生效項合約的草稿寫完，等你逐塊看",[]],
     [1,"第 1 步","第一圈：個人複雜決策","外殼（組裝器與目的卡、協作合約、完整性核心）、六塊、基本安全一起做。MAP 這一步要做出六層地圖。一塊一塊做到能拿真事進去用。","未開始，第一圈待確認",["組裝器","協作合約","完整性核心","SENSE","MAP","THINK","DECIDE","ACT","LEARN","GOVERN"]],
     [2,"第 2 步","接現有引擎當積木","東西已經有，缺的是積木外殼。做完就能開「可疑訊息判斷」和「公共議題判斷」兩個套件。","未開始",["GATHER","VERIFY","COMPUTE"]],
     [4,"第 3 步","公共決策","多人共同程序提前到這裡：它是北極星因果鏈的第四環。研究與治理（同意、申訴、衡量）也在這一步。","未開始",["COLLAB","GOVERN"]],
@@ -1513,7 +1540,7 @@ $("cover").innerHTML = [
     "首批是哪三種套件；哪些積木暫不開放自由組合（藍圖 13.6）。",
     "藍圖正文什麼時候改版：增補檔已經寫好九條，等你併進下一版。",
     "我擬的內容你還沒逐條看過：情緒調節的五個做法、公共議題判斷套件的順序、每一環的量法、各積木的觸發時機。",
-    "18 份合約草稿你都還沒逐塊看過。",
+    "13 份積木合約、5 份全程生效項合約的草稿，你都還沒逐塊看過。",
     "要不要申請 Google 查核搜尋的金鑰（免費，要你的 Google 帳號）。"];
   $("done").innerHTML = done.map(x=>`<li><span class="m">✓</span><span>${x}</span></li>`).join("");
   $("open").innerHTML = open.map(x=>`<li><span class="m">？</span><span>${x}</span></li>`).join("");
