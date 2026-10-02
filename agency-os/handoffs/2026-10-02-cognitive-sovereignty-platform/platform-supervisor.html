@@ -220,6 +220,15 @@ main{display:grid;gap:32px;min-width:0}
 .bars .d{font-size:var(--fs-small);color:var(--muted);margin-top:2px}
 @media (max-width:659px){.bars .b{grid-template-columns:minmax(0,1fr);gap:6px}}
 
+/* 北極星 */
+.star{font-size:22px;font-weight:700;line-height:1.5;max-width:28em;text-wrap:balance}
+.star2{font-size:var(--fs-h3);color:var(--accent);font-weight:600;max-width:30em}
+.chain{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+.chain .lk{flex:1 1 140px;border:1.5px solid var(--accent);border-radius:12px;padding:12px 14px;font-weight:600;background:var(--card);min-width:0}
+.chain .lk small{display:block;font-weight:400;color:var(--muted);font-size:var(--fs-small);margin-top:4px}
+.chain .ar{align-self:center;color:var(--muted);font-size:20px}
+@media (max-width:759px){.chain{flex-direction:column}.chain .lk{flex:none}.chain .ar{transform:rotate(90deg)}}
+
 /* 談定 */
 .dec{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 .dec li{display:grid;grid-template-columns:24px minmax(0,1fr);gap:12px}
@@ -239,6 +248,7 @@ main{display:grid;gap:32px;min-width:0}
 <div class="app">
   <nav class="side" aria-label="監工台畫面">
     <div class="brand">認知主權平台<small>監工台　更新 2026-10-02</small></div>
+    <button class="navi" data-v="north">北極星</button>
     <button class="navi" data-v="map" aria-current="page">地圖</button>
     <button class="navi" data-v="flow">走一趟</button>
     <button class="navi" data-v="record">案子的紀錄</button>
@@ -254,6 +264,52 @@ main{display:grid;gap:32px;min-width:0}
       <p class="sub">13 塊積木是骨架。這一頁只給我們兩個討論用，放在 claude.ai，不在 cognitive.aware-wave.com 裡。</p>
     </header>
     <section class="card now" id="now" aria-label="現在在哪"></section>
+
+    <section class="view" id="v-north" hidden>
+      <div class="stack"><h2>北極星：為什麼做這個平台</h2>
+        <p class="sub">來源是你 2026-10-02 貼的整理。這一頁把它寫下來，並對照 13 塊積木各自負責哪一部分。</p></div>
+      <div class="card stack">
+        <p class="star">提升人類的認知品質，讓更多人能以清明、自主的判斷，共同塑造更好的未來。</p>
+        <p class="star2">我們相信，人類文明的方向，取決於每一個人的判斷品質。</p>
+        <p class="cap">平台不是要改變世界，也不決定世界應該變成什麼樣。它做的是提升人做出更好判斷的能力。尺度不是批判思考、不是教育、不是 AI 平台，是人類文明的決策品質。</p>
+      </div>
+      <div class="card stack">
+        <h3>因果鏈</h3>
+        <div class="chain" id="chain"></div>
+        <p class="cap">這是要驗證的命題，不是保證：「如果更多人具備更好的判斷能力，公共決策是否真的會改善？」仇恨、假訊息、極端化、詐騙、群體對立各有不同成因，不能全部歸成同一個原因；但其中很多會受資訊判斷、情緒調節、媒體素養和公共討論品質影響。</p>
+      </div>
+      <div class="card stack">
+        <h3>三個尺度，各由哪幾塊負責</h3>
+        <div class="rows" id="scales"></div>
+        <p class="cap">這裡的「政治」不是黨派，是人們共同決定公共事務怎麼運作的過程：教育制度、AI 規範、醫療資源、環境、言論自由、稅收。平台要提升的是人參與公共決策的能力，不是做政治教育。</p>
+      </div>
+      <div class="card stack">
+        <h3>成熟公民的五件事，哪一塊在練</h3>
+        <p class="cap">成熟公民不是永遠正確、永遠理性、永遠同意彼此。</p>
+        <div class="rows" id="citizen"></div>
+      </div>
+      <div class="card stack">
+        <h3>要培養的能力，哪一塊在練</h3>
+        <div class="rows" id="caps"></div>
+      </div>
+      <div class="card stack">
+        <h3>反過來看：13 塊各自在練什麼</h3>
+        <div class="rows" id="trains"></div>
+      </div>
+      <div class="two">
+        <div class="have"><h3>藍圖和合約卡已經有的</h3><ul>
+          <li>六層：事實、解釋、利益、結構、核心矛盾、介入。寫在 MAP 的合約卡，逐層一個問題和輸出</li>
+          <li>不預設結論、不決定世界該怎樣：完整性核心的非目標六條</li>
+          <li>政治、文化、宗教、法律、倫理、道德是判斷的材料：規範與脈絡</li>
+          <li>上面六種能力和七件事，都找得到負責的積木</li></ul></div>
+        <div class="lack"><h3>還沒涵蓋的</h3><ul>
+          <li>情緒調節：SENSE 只做到「覺察」情緒和身體訊號，沒有「調節」的做法</li>
+          <li>公共事務的判斷：只有「團隊審議」一個套件，COLLAB 排在建置最後一步</li>
+          <li>因果鏈的上半段沒有衡量方法：現在的指標只量個人的判斷過程，量不到公共決策有沒有變好</li>
+          <li>藍圖 v0.6 第 1 節的使命寫的是「保有判斷」，沒有寫到認知品質和文明這個尺度</li>
+          <li>六層地圖這塊積木今天網站上還沒有，只有個別方法</li></ul></div>
+      </div>
+    </section>
 
     <section class="view" id="v-map">
       <div class="stack"><h2>地圖：13 塊積木怎麼接</h2>
@@ -278,7 +334,7 @@ main{display:grid;gap:32px;min-width:0}
       <div class="stack"><h2>走一趟：一個案子從頭到尾，13 塊各在哪一步</h2>
         <p class="sub">任何一步都可以停、可以跳過、可以要 AI 直接給建議；只有「判斷」那一格永遠是你填。每一步都是你先寫，AI 才回。</p></div>
       <div class="card stack">
-        <h3>一輪走幾塊、一個案子走幾塊（建議做法：並存，等你確認）</h3>
+        <h3>一輪走幾塊、一個案子走幾塊（談定：並存）</h3>
         <p class="cap">13 塊都在平台上，每個案子的頁面都有 13 格。第一輪只走套件的 6 塊，先把「判斷 → 行動 → 回顧」這一圈走完。其他積木在對的時機由系統提出，你同意才加。案子沒有上限。</p>
         <div class="rows" id="rounds"></div>
       </div>
@@ -907,7 +963,7 @@ $("cover").innerHTML = [
   ["11　衡量方式","GOVERN（十項過程指標、不應採用的指標）"],
   ["12　分期發展","進度與順序（藍圖的五個階段寫在建置順序下面）"],
   ["13　待定決策","談定與未定"],
-  ["14　願景","對外表述，沒有寫進卡片"],
+  ["14　願景","北極星那一頁"],
 ].map(([k,w])=>`<div class="r"><span class="k">${k}</span><span>${w}</span></div>`).join("");
 
 /* 進度 */
@@ -962,6 +1018,7 @@ $("cover").innerHTML = [
     "平台是新東西。現有 Cognitive OS 退到後面當引擎，不再是產品本身。",
     "13 塊積木定案（2026-10-02 再確認「13 塊比較好」）：藍圖的 8 塊，VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。13 塊都要，沒有哪一塊是次要的：SENSE、GATHER、MAP、THINK、VERIFY、COMPUTE、DECIDE、ACT、LEARN、EXPRESS、TEACH、COLLAB、GOVERN。",
     "藍圖寫明的要求一律明文寫進對應積木的合約卡，不留到「之後談到再說」。",
+    "一個案子怎麼走 13 塊：並存（2026-10-02 你同意）。平台上 13 塊都在，每個案子的頁面都有 13 格；第一輪照套件走最多 6 塊；其他積木在對的時機由系統提出，你同意才加；TEACH 和 GOVERN 不算在 6 塊裡；每次回顧系統列出還沒用過的積木；案子本身沒有上限。圖在「走一趟」那一頁。",
     "第一輪最多 6 塊（藍圖寫 5 塊）。多出來的一塊是 ACT：它本來在 DECIDE 裡，拆出來之後事情沒變多，只是算成兩塊。套件裡 DECIDE 後面接 ACT。",
     "個人歷程（跨案子的記憶）不算積木，是共用紀錄的一部分。",
     "骨架＝13 份合約。任務容器、協作合約、完整性核心都從合約推出來。",
@@ -974,7 +1031,10 @@ $("cover").innerHTML = [
     "資料承諾：反思資料是不是預設只有自己看得到；研究怎麼取得同意（藍圖 13.4）。",
     "第一次試用只驗證一件事：外化加基本積木，有沒有讓人更看得見自己怎麼判斷（藍圖 13.5）。",
     "首批是哪三種套件；哪些積木暫不開放自由組合（藍圖 13.6）。",
-    "一個案子怎麼走 13 塊。我的建議是並存，等你說好：平台上 13 塊都在，每個案子的頁面都有 13 格；第一輪照套件走最多 6 塊；之後每次回顧，系統列出還沒用過的積木，你挑了才加；案子本身沒有上限，走久了 13 塊都會用到。圖在「走一趟」那一頁。",
+    "北極星的正式句子用哪一句：「提升人類的認知品質…」還是「人類文明的方向，取決於每一個人的判斷品質」；藍圖第 1 節要不要照這個尺度改版。",
+    "情緒調節要不要做：現在只有覺察。",
+    "公共事務的判斷要不要有自己的套件，COLLAB 要不要提前。",
+    "因果鏈上半段怎麼衡量：個人判斷變好之後，公共決策有沒有變好。",
     "其餘 12 份合約的內容。"];
   $("done").innerHTML = done.map(x=>`<li><span class="m">✓</span><span>${x}</span></li>`).join("");
   $("open").innerHTML = open.map(x=>`<li><span class="m">？</span><span>${x}</span></li>`).join("");
@@ -1021,8 +1081,55 @@ $("cover").innerHTML = [
   ],6);
 })();
 
+/* 北極星 */
+(function(){
+  const chain = [["提升人的認知能力",""],["更多人有自主判斷能力",""],["更少人被煽動、操控、極端化",""],["更好的公共決策",""],["更好的世界","不是因為有人帶領或有完美制度，是構成世界的人改變了"]];
+  $("chain").innerHTML = chain.map(([t,s],i)=>`${i?`<span class="ar">→</span>`:""}<div class="lk">${t}${s?`<small>${s}</small>`:""}</div>`).join("");
+  const rows = (id, data) => { $(id).innerHTML = data.map(([k,bs,d])=>`<div class="r"><span class="k">${k}</span><span><span>${bs.map(bk).join(" ")}</span><span class="d" style="display:block">${d}</span></span></div>`).join(""); };
+  rows("scales", [
+    ["每一個人的判斷",["SENSE","GATHER","MAP","THINK","VERIFY","COMPUTE","DECIDE","ACT","LEARN","EXPRESS","TEACH"],"藍圖的「個體判斷」。先做這一層"],
+    ["公共決策",["COLLAB"],"藍圖的「共同程序」：不同判斷怎麼形成正當的共同決定，保留異議、可以重開"],
+    ["文明的方向",["GOVERN"],"藍圖的「制度與社群」：制度怎麼維持秩序而不壓縮個人判斷；平台自己也要可被質疑"],
+  ]);
+  rows("citizen", [
+    ["知道自己的決定會影響他人",["DECIDE","ACT"],"判斷卡要寫決策者與受影響者"],
+    ["願意承擔選擇的後果",["ACT","LEARN"],"判斷權不等於免責；行動後回來對結果"],
+    ["能分辨證據與情緒",["SENSE","MAP","VERIFY"],"先看見情緒，再把事實和解釋分開，再對來源"],
+    ["新證據出現時願意修正",["DECIDE","LEARN"],"判斷卡先寫「什麼會改變結論」；判斷有第 1 版、第 2 版"],
+    ["尊重別人思考後得出不同結論",["MAP","THINK","COLLAB"],"解釋層和利益層、視角切換、保留少數意見"],
+  ]);
+  rows("caps", [
+    ["後設認知 Metacognition",["THINK","LEARN"],"每次共思考最後回看自己怎麼想；回顧時比對慣性"],
+    ["知識上的謙遜 Epistemic Humility",["THINK","DECIDE"],"「我不知道」算一種產出；判斷卡要寫不確定性和改變條件"],
+    ["資訊素養 Information Literacy",["GATHER","VERIFY"],"資料從哪來；主張、來源、支持、反證、未知"],
+    ["情緒調節 Emotional Regulation",["SENSE"],"只做到覺察：情緒、身體、急迫感怎麼改變判斷速度。調節的做法還沒有"],
+    ["偏誤覺察 Bias Awareness",["SENSE","THINK","LEARN"],"慾望和身份訊號、反方挑戰、不同問題出現同樣慣性時提示"],
+    ["反思判斷 Reflective Judgment",["DECIDE","LEARN"],"暫定結論、依據、信心、修訂理由"],
+    ["獨立思考",["THINK"],"先想再看；獨立版本和 AI 協作版本分開留"],
+    ["辨別真偽、願意查證",["VERIFY"],"平台不宣判真假，是幫人自己對來源"],
+    ["不容易被操控",["VERIFY","GOVERN"],"辨認操弄手法；平台自己不得操控，AI 權限可撤回"],
+    ["理解他人立場",["MAP","THINK","COLLAB"],"每個角色真正要什麼、怕什麼；分歧地圖"],
+    ["看見長期後果",["THINK","COMPUTE","ACT"],"第二序後果；情境模擬；按月季年的長期觀察"],
+  ]);
+  rows("trains", [
+    ["01",["SENSE"],"看見情緒、身份、慾望、關係怎麼進入判斷"],
+    ["02",["GATHER"],"知道資料從哪來"],
+    ["03",["MAP"],"分清事實和解釋；看見別人要什麼、結構怎麼配置"],
+    ["04",["THINK"],"獨立思考、反證自己、看見第二序後果"],
+    ["05",["VERIFY"],"願意查證、辨認操弄"],
+    ["06",["COMPUTE"],"分清「算出來的」和「感覺的」"],
+    ["07",["DECIDE"],"自己下結論，並寫下什麼會改變它"],
+    ["08",["ACT"],"承擔選擇，持續看後果"],
+    ["09",["LEARN"],"回看自己怎麼想，願意修正"],
+    ["10",["EXPRESS"],"能向別人說明自己的立場和理由"],
+    ["11",["TEACH"],"把這些動作練到沒有 AI 也會做"],
+    ["12",["COLLAB"],"在不同意見裡共同決定，保留異議"],
+    ["13",["GOVERN"],"不被平台自己操控；平台可被質疑"],
+  ]);
+})();
+
 /* 切換畫面；網址 #map #flow #record #contracts #tools #progress #decided 可直接連到那一頁 */
-const VIEWS = ["map","flow","record","contracts","tools","progress","decided"];
+const VIEWS = ["north","map","flow","record","contracts","tools","progress","decided"];
 function show(v, keepScroll){
   if(!VIEWS.includes(v)) v = "map";
   VIEWS.forEach(x => { $("v-"+x).hidden = x!==v; });
