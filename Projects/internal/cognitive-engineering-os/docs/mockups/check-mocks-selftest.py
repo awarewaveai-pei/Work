@@ -119,7 +119,7 @@ CASES = [
     ("demo project cards lose their finished state (U9)", "U9|示範專案", "home-mock.html", "strall", 'class="mcard done"', 'class="mcard"'),
     ("the all-tools card loses its id, so the search is no longer inside it (U1)", "U1|inside the #directory card", "home-mock.html", "str", '<div class="card" id="directory">', '<div class="card" id="all-tools">'),
     ("the project table becomes a div (U8)", "U8|project table", "home-mock.html", "re", r"<table>(.*?)</table>", r"<div>\1</div>"),
-    ("hero states a stale tool count (numbers pinned to the registries)", "catalog|hero sentence", "home-mock.html", "str", '284 個思考工具、12 條工作流', '285 個思考工具、12 條工作流'),
+    ("hero states a stale tool count (numbers pinned to the registries)", "catalog|hero sentence", "home-mock.html", "re", r"\d+ 個思考工具、(\d+) 條工作流", r"9999 個思考工具、\1 條工作流"),   # count-independent: a literal anchor went dead the day a tool was added
     ("the invented word 路線 comes back on the home page (FORBID)", "continuity|superseded text", "home-mock.html", "str", '要開新的，按上面「開新專案」', '要開新的，挑一條路線'),
     ("six-step strip loses its .journey class (the workflow cards' own strips must not satisfy the rule)", "U2|six-step", "home-mock.html", "str", '<div class="journey">\n      <span>建立</span>', '<div class="steps">\n      <span>建立</span>'),
     ("the worked example of three suggestions removed from the 說你卡在哪 card (U16)", "U16|worked example", "home-mock.html", "re", r'\s*<div class="mcards">\s*<div class="mcard now">\s*<div><b>1 <a href="#t-systems\.iceberg_model">冰山模型</a></b>.*?\n      </div>\n(?=      <div class="btns mt10">)', ""),

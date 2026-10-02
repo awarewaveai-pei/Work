@@ -9,7 +9,7 @@
 - [突變] 拔 order 檢查／拔 phase 比對／刪 recipe status 綁定／紅區門檻 15→16 → 各自指名測試變紅，還原後綠。
 - REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/affected_tests.py --run`（93 模組）＋`pytest tests/unit/test_life_timeline.py tests/unit/test_root_cause_analysis_recipe.py`＋`npx tsc --noEmit && npx vitest run`＋`tests/run_golden_tests.py`＋`check-mocks.py` | exit=0 | ms=1592000
 - [結果] affected 3365 tests OK；新測試 12 passed／26 subtests；web 15 檔 111 tests；golden 4268 PASSED（補 recipe 釘選清單 `tests/run_golden_tests.py:272`＋重生 SPEC_QUICKREF／MOTHER_DOC_SECTION_INDEX）；check-mocks 5 頁全綠；風險矩陣 Chromium 截圖 1140／390 寬皆無橫向捲動。
-- [未綠] `check-mocks-selftest.py` 211 突變漏 3（本分支）；其中 page 段 2 個為既有 TASKS「結果頁快照 fixture 過期」；HEAD 基準比對在 PR 回報。
+- [自測] `check-mocks-selftest.py`：HEAD 基準漏 2＋page 段 2（既有：「路線」錨點 SETUP、page fact SETUP、結果頁 fixture 過期 TASKS）；本分支多漏 1 = 「hero stale tool count」突變以字面 `284 個思考工具、12 條工作流` 當錨點，加工具即失效 → 改正規式錨點、工具數換成 9999（`check-mocks-selftest.py:122`），單案重跑 CAUGHT。
 - REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/1m/4n
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=`284 個(思考)?工具|12 條工作流|life_timeline|root-cause-analysis-v1|RiskMatrix` | hits=2 stale（Phase 0 歷史報告、已關閉 TASKS 條目，舊檔不回改）
 - ORACLE_WAIVED: container 無 codex／pwsh，oracle 無法執行 → 獨立 critic（Standard）＋4 個突變證據（拔 guard→指名測試紅→還原綠）
