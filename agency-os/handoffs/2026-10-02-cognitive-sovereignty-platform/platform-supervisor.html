@@ -116,21 +116,26 @@ main{display:grid;gap:32px;min-width:0}
 .layer .now{font-size:var(--fs-small);color:var(--muted)}
 .gate{display:grid;gap:6px;margin:0 24px;line-height:1.8;padding:10px 14px;border-left:3px solid var(--warn);background:var(--warn-bg);font-size:var(--fs-small)}
 .gate b{font-size:var(--fs-body)}
-.dw{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:16px;padding:14px 0;border-top:1px solid var(--line)}
-.dw:first-child{border-top:0}
-.dw .nm{font-weight:700}
-.dw .nm small{display:block;font-weight:400;font-size:var(--fs-tag);color:var(--muted);margin-top:2px}
-.dw .bd{display:grid;gap:6px;min-width:0}
-.dw .has{font-size:var(--fs-small);color:var(--muted)}
-.dw .ln{display:flex;flex-wrap:wrap;gap:4px;align-items:center;font-size:var(--fs-small)}
-.dw .ln .lb{width:4.5em;color:var(--muted);flex:none}
-.bk.no{background:transparent;border:1px dashed var(--muted);color:var(--muted);text-decoration:line-through}
+/* 架構「二、抽屜」：一個抽屜一塊，四行固定標籤 */
+.dw-intro{display:grid;gap:4px;max-width:860px}
+.dw-intro p{margin:0;line-height:1.7}
+.dw-g{max-width:860px}
+.dw-g>h4{margin:22px 0 0;padding-bottom:8px;font-size:var(--fs-small);color:var(--accent);border-bottom:2px solid var(--accent)}
+.dw{display:grid;gap:10px;padding:16px 0;border-bottom:1px solid var(--line)}
+.dw-h b{display:block;font-size:var(--fs-h3);line-height:1.4}
+.dw-h span{display:block;color:var(--muted);font-size:var(--fs-small);line-height:1.6;margin-top:2px}
+.dw-l{display:grid;grid-template-columns:5.5em minmax(0,1fr);gap:8px 12px;margin:0;align-items:baseline}
+.dw-l dt{font-weight:700;font-size:var(--fs-small)}
+.dw-l dd{margin:0;display:grid;gap:6px;font-size:var(--fs-small);line-height:1.6;min-width:0}
+.dw-l .chips{display:flex;flex-wrap:wrap;gap:6px}
+.dw-l .lim{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}
+.bk.no{background:transparent;border:1px solid var(--line);color:var(--muted)}
 .states{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;max-width:820px}
 .states .s{border:1.5px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:6px;align-content:start}
 .states .s b{font-size:var(--fs-h3)}
 .states .s span{font-size:var(--fs-small);color:var(--muted)}
 .states .s .bks{display:flex;flex-wrap:wrap;gap:4px}
-@media (max-width:640px){.layer,.dw{grid-template-columns:minmax(0,1fr)}.gate{margin:0 8px}}
+@media (max-width:640px){.layer{grid-template-columns:minmax(0,1fr)}.gate{margin:0 8px}.dw-l{grid-template-columns:minmax(0,1fr);gap:2px}.dw-l dd{margin-bottom:8px}}
 .case{padding:10px 18px;border-radius:12px;background:var(--accent);color:var(--card);font-size:var(--fs-body);line-height:1.7}
 .case b{font-size:var(--fs-small);font-weight:700;opacity:.8;margin-right:10px}
 .case small{display:block;font-size:var(--fs-small);opacity:.85}
@@ -401,34 +406,34 @@ body[data-view="one"] .app{padding-block:16px 8px}
 
     <section class="view" id="v-north" hidden>
       <div class="stack"><h2>北極星：為什麼做這個平台</h2>
-        <p class="sub">來源是你 2026-10-02 貼的整理。這一頁的每一張表，都和合約卡用同一份資料：這裡有的，對應的合約卡裡一定有（卡上「北極星對這一塊的要求」那一區）。設計每一塊時看合約卡就夠。</p></div>
+        <p class="sub" data-nav>來源是你 2026-10-02 貼的整理。這一頁的每一張表，都和合約卡用同一份資料：這裡有的，對應的合約卡裡一定有（卡上「北極星對這一塊的要求」那一區）。設計每一塊時看合約卡就夠。</p></div>
       <div class="card stack">
-        <p class="star">提升人類的認知品質，讓更多人能以清明、自主的判斷，共同塑造更好的未來。</p>
-        <p class="star2">我們相信，人類文明的方向，取決於每一個人的判斷品質。</p>
-        <p class="cap">平台不是要改變世界，也不決定世界應該變成什麼樣。它做的是提升人做出更好判斷的能力。尺度不是批判思考、不是教育、不是 AI 平台，是人類文明的決策品質。</p>
+        <p class="star" id="n-star"></p>
+        <p class="star2" id="n-belief"></p>
+        <p class="cap" id="n-scope"></p>
       </div>
       <div class="card stack">
         <h3>因果鏈</h3>
         <div class="chain" id="chain"></div>
         <h3>每一環怎麼量</h3>
         <div class="rows" id="measure"></div>
-        <p class="cap">這是要驗證的命題，不是保證：「如果更多人具備更好的判斷能力，公共決策是否真的會改善？」仇恨、假訊息、極端化、詐騙、群體對立各有不同成因，不能全部歸成同一個原因；但其中很多會受資訊判斷、情緒調節、媒體素養和公共討論品質影響。</p>
+        <p class="cap" id="n-prop"></p>
       </div>
       <div class="card stack">
         <h3>平台要讓人擋得住的東西：認知作戰與資訊戰</h3>
-        <p class="cap">因果鏈第三環寫「更少人被煽動、操控」。操控不只是零星的假訊息，也包括有組織、跨國、長期的行動。下面兩個定義是你 2026-10-02 給的。</p>
+        <p class="cap"><span data-nav>因果鏈第三環寫「更少人被煽動、操控」。</span><span id="n-cwscope"></span><span data-nav>下面兩個定義是你 2026-10-02 給的。</span></p>
         <div class="rows" id="cw-defs"></div>
-        <p class="note">這一頁只說「要擋的是什麼」。真正怎麼做，寫在合約卡：GATHER（來源身分、同出處分組、多管道）、VERIFY（主張帳本、手法比對、三件事分開）、GOVERN（平台自己不被利用）。對方的目標和它打的弱點寫在「規範與脈絡」那張卡。13 塊各自怎麼被打到、怎麼防，在每一張合約卡的「北極星對這一塊的要求」裡。</p>
-        <p class="cap">出處：台灣國家安全局 2026 年 1 月公布的《2025年中共對臺認知作戰操作手法分析》（原文 7 頁，2026-10-03 讀完）；北約轉型司令部的認知作戰概念（我讀的是一篇分析這份概念的學術論文，概念文件原文我沒找到公開的全文）。同樣的做法適用於任何國家的操作。</p>
+        <p class="note" data-nav>這一頁只說「要擋的是什麼」。真正怎麼做，寫在合約卡：GATHER（來源身分、同出處分組、多管道）、VERIFY（主張帳本、手法比對、三件事分開）、GOVERN（平台自己不被利用）。對方的目標和它打的弱點寫在「規範與脈絡」那張卡。13 塊各自怎麼被打到、怎麼防，在每一張合約卡的「北極星對這一塊的要求」裡。</p>
+        <p class="cap" id="n-cwsrc"></p>
       </div>
       <div class="card stack">
         <h3>三個尺度，各由哪幾塊負責</h3>
         <div class="rows" id="scales"></div>
-        <p class="cap">這裡的「政治」不是黨派，是人們共同決定公共事務怎麼運作的過程：教育制度、AI 規範、醫療資源、環境、言論自由、稅收。平台要提升的是人參與公共決策的能力，不是做政治教育。</p>
+        <p class="cap" id="n-politics"></p>
       </div>
       <div class="card stack">
         <h3>成熟公民的五件事，哪一塊在練</h3>
-        <p class="cap">成熟公民不是永遠正確、永遠理性、永遠同意彼此。</p>
+        <p class="cap" id="n-citizen"></p>
         <div class="rows" id="citizen"></div>
       </div>
       <div class="card stack">
@@ -439,7 +444,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
         <h3>反過來看：13 塊各自在練什麼</h3>
         <div class="rows" id="trains"></div>
       </div>
-      <div class="two">
+      <div class="two" data-nav>
         <div class="have"><h3>藍圖和合約卡已經有的</h3><ul>
           <li>六層：事實、解釋、利益、結構、核心矛盾、介入。寫在 MAP 的合約卡，逐層一個問題和輸出。設計上有，還沒蓋；排進建置第 1 步</li>
           <li>不預設結論、不決定世界該怎樣：完整性核心的非目標六條</li>
@@ -454,7 +459,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
       </div>
       <div class="card stack">
         <h3>全程生效的五樣（不算積木）</h3>
-        <p class="cap">北極星的要求落在 13 塊積木和這五樣的合約裡。點了看每一份。</p>
+        <p class="cap" data-nav>北極星的要求落在 13 塊積木和這五樣的合約裡。點了看每一份。</p>
         <div class="row5" data-cross5></div>
       </div>
     </section>
@@ -489,7 +494,13 @@ body[data-view="one"] .app{padding-block:16px 8px}
       </div>
       <div class="card stack">
         <h3>二、案子的紀錄有哪些抽屜：誰寫、誰讀、誰不准讀</h3>
-        <p class="cap">「共用紀錄」就是這些抽屜加起來。每個抽屜只有一個主人能寫，別的積木只能讀。任何一塊寫進任何抽屜，系統都自動記一筆歷程：作者（我、AI、共同、系統）、哪一塊寫的、什麼時候、哪一版。下面「讀」那一行沒有再列的：你自己和 LEARN（回顧）讀這個案子的全部；TEACH 不准讀真實案子的任何抽屜，除非你同意拿來練。</p>
+        <div class="dw-intro">
+          <p>一個案子的紀錄分成好幾個抽屜。「共用紀錄」就是這些抽屜加起來。</p>
+          <p>每個抽屜只有一塊能寫。別的積木只能讀。</p>
+          <p>每寫一次，系統自動記一筆：誰寫的（你、AI、共同或系統）、哪一塊寫的、什麼時候、第幾版。</p>
+          <p>你自己和 LEARN 讀這個案子的全部抽屜，下面不再一一列出。</p>
+          <p>TEACH 不讀真實案子的任何抽屜，除非你同意拿來練習。</p>
+        </div>
         <div id="drawers"></div>
       </div>
       <div class="card stack">
@@ -670,33 +681,35 @@ const GROUP = {SENSE:1,MAP:1,THINK:1,DECIDE:1,ACT:1,LEARN:1,GATHER:2,VERIFY:2,CO
 
 /* 現有工具落在哪一塊。總數由這張表加出來，頁面上不另外寫死數字。
    2026-10-02 晚上數程式庫的方法合約檔：287 份，扣掉 1 份不是工具（stakeholder.regulator，監管者視角）。 */
+/* 每一列：歸哪一塊、幾個、說明、[問題分類, 程式庫裡的類別]。工具檔的 family 決定它歸哪一塊（methods/registry/method-goal-groups.yaml）；數量由檢查腳本照程式庫重算。 */
 const TOOL_ROWS = [
-  [["SENSE"],16,"帶一個團體、帶反思（藝術反思 16）"],
+  [["SENSE"],16,"帶一個團體、帶反思（藝術反思 16）",[["藝術反思",["art_therapy"]]]],
   [["GATHER"],0,"不靠這些工具。靠的是蒐集器：抓網頁、搜尋、學術資料，已經有"],
-  [["MAP"],116,"這件事為什麼一直發生 31　問題到底是什麼 24　看清楚自己和外面的局 40　使用者、參與者到底怎麼想 21"],
-  [["THINK"],32,"需要更多點子 22　我的說法站不站得住裡的反方挑戰 10"],
-  [["VERIFY"],11,"我的說法站不站得住裡的證據檢查 11。另外靠彙整與引註閘，已經有"],
-  [["COMPUTE"],11,"做不做得起來、划不划算 11"],
-  [["DECIDE"],14,"幾個選項，選哪一個 14：工具只給候選和比較，結論仍是人寫"],
-  [["ACT"],22,"計畫怎麼排、風險怎麼盯 11　小步試驗 11"],
-  [["LEARN"],11,"做完學到什麼 11"],
+  [["MAP"],116,"這件事為什麼一直發生 31　問題到底是什麼 24　看清楚自己和外面的局 40　使用者、參與者到底怎麼想 21",[["這件事為什麼一直發生",["systems","root_cause","causal"]],["問題到底是什麼",["framing","decomposition"]],["看清楚自己和外面的局",["strategy","foresight","stakeholders"]],["使用者、參與者到底怎麼想",["insight","research","representation"]]]],
+  [["THINK"],32,"需要更多點子 22　我的說法站不站得住裡的反方挑戰 10",[["需要更多點子",["divergent","association"]],["我的說法站不站得住裡的反方挑戰",["challenge"]]]],
+  [["VERIFY"],11,"我的說法站不站得住裡的證據檢查 11。另外靠彙整與引註閘，已經有",[["我的說法站不站得住裡的證據檢查",["epistemic","evidence"]]]],
+  [["COMPUTE"],11,"做不做得起來、划不划算 11",[["做不做得起來、划不划算",["feasibility","finance","computation"]]]],
+  [["DECIDE"],14,"幾個選項，選哪一個 14：工具只給候選和比較，結論仍是人寫",[["幾個選項，選哪一個",["decision"]]]],
+  [["ACT"],22,"計畫怎麼排、風險怎麼盯 11　小步試驗 11",[["計畫怎麼排、風險怎麼盯",["delivery"]],["小步試驗",["experiment"]]]],
+  [["LEARN"],11,"做完學到什麼 11",[["做完學到什麼",["learning"]]]],
   [["EXPRESS"],0,"不靠這些工具。今天只有結果頁匯出 PDF"],
   [["TEACH"],0,"不靠這些工具。靠的是課程頁；今天只有兩堂（冰山模型、人生決策），其餘工具只有說明和範例"],
   [["COLLAB"],0,"不靠這些工具。今天什麼都沒有"],
   [["GOVERN"],0,"不靠這些工具。今天有 AI 指令的版本紀錄、重跑、抹除、匯出"],
-  [["規範與脈絡"],10,"哪些法規管得到 10"],
-  [["不給一般使用者"],43,"系統、資料與資安的工程決策 43：留給內部和工程客戶，不出現在一般人的選單"],
+  [["規範與脈絡"],10,"哪些法規管得到 10",[["哪些法規管得到",["jurisdiction"]]]],
+  [["不給一般使用者"],43,"系統、資料與資安的工程決策 43：留給內部和工程客戶，不出現在一般人的選單",[["系統、資料與資安的工程決策",["architecture","devops_sre","database_data","security"]]]],
 ];
 const TOOL_TOTAL = TOOL_ROWS.reduce((s,r)=>s+r[1],0);
 const TOOL_OF = code => TOOL_ROWS.find(r=>r[0][0]===code)[1];
 /* 現有工作流落在哪一塊。總數由這張表加出來。 */
+/* 每一列：歸哪幾塊、幾條、說明、程式庫裡的檔名（recipes/validated，去掉 .recipe.yaml）。 */
 const FLOW_ROWS = [
-  [["SENSE"],3,"藝術反思 3 條：創作反思、專案發想、卡住時"],
-  [["MAP"],1,"根因分析 1 條"],
-  [["MAP","COMPUTE","DECIDE"],6,"商業計畫與可行性 6 條"],
-  [["GATHER","VERIFY"],3,"研究 3 條：文獻搜尋、研究證據、質性研究"],
-  [["套件雛形"],1,"人生決策 1 條：最接近藍圖的「個人複雜決策」套件，但中間沒有人自己寫的步驟"],
-  [["不給一般使用者"],3,"內部用 3 條：資料庫搬遷、方法汰換、新舊版本比較"],
+  [["SENSE"],3,"藝術反思 3 條：創作反思、專案發想、卡住時",["art-therapy-creative-reflection-v1","art-therapy-project-ideation-v1","art-therapy-unstick-v1"]],
+  [["MAP"],1,"根因分析 1 條",["root-cause-analysis-v1"]],
+  [["MAP","COMPUTE","DECIDE"],6,"商業計畫與可行性 6 條",["business-feasibility-review-v1","business-foundation-v1","business-plan-full-v1","business-planning-feasibility-v1","business-planning-review-v1","business-planning-strategy-v1"]],
+  [["GATHER","VERIFY"],3,"研究 3 條：文獻搜尋、研究證據、質性研究",["edd-literature-search-v1","edd-research-evidence-v1","research-qualitative-v1"]],
+  [["套件雛形"],1,"人生決策 1 條：最接近藍圖的「個人複雜決策」套件，但中間沒有人自己寫的步驟",["life-decision-v1"]],
+  [["不給一般使用者"],3,"內部用 3 條：資料庫搬遷、方法汰換、新舊版本比較",["db-migration-expand-contract","method-deprecation-retirement","champion-challenger"]],
 ];
 const FLOW_TOTAL = FLOW_ROWS.reduce((s,r)=>s+r[1],0);
 /* 其他現有的東西：名稱、它是什麼、說明、歸哪一塊。 */
@@ -1747,6 +1760,18 @@ const CW_BLOCKS = [
  ["COLLAB","假帳號混進共同決定、帶風向","參與者身分要確認；「多數意見」要防被灌"],
  ["GOVERN","模型和資料來源被汙染；平台被利用","模型與來源列清單、可換、可查；模型的記憶不算來源"],
 ];
+/* 北極星頁上不在表格裡的句子。一樣只在這裡寫一次，北極星頁和合約卡都從這裡畫。 */
+const NORTH = {
+ star:"提升人類的認知品質，讓更多人能以清明、自主的判斷，共同塑造更好的未來。",
+ belief:"我們相信，人類文明的方向，取決於每一個人的判斷品質。",
+ scope:"平台不是要改變世界，也不決定世界應該變成什麼樣。它做的是提升人做出更好判斷的能力。尺度不是批判思考、不是教育、不是 AI 平台，是人類文明的決策品質。",
+ chainEnd:"最後一環的意思：不是因為有人帶領或有完美制度，是構成世界的人改變了。",
+ proposition:"這是要驗證的命題，不是保證：「如果更多人具備更好的判斷能力，公共決策是否真的會改善？」仇恨、假訊息、極端化、詐騙、群體對立各有不同成因，不能全部歸成同一個原因；但其中很多會受資訊判斷、情緒調節、媒體素養和公共討論品質影響。",
+ cwScope:"操控不只是零星的假訊息，也包括有組織、跨國、長期的行動。",
+ anyState:"同樣的做法適用於任何國家的操作。",
+ politics:"這裡的「政治」不是黨派，是人們共同決定公共事務怎麼運作的過程：教育制度、AI 規範、醫療資源、環境、言論自由、稅收。平台要提升的是人參與公共決策的能力，不是做政治教育。",
+ citizen:"成熟公民不是永遠正確、永遠理性、永遠同意彼此。",
+};
 /* 每一塊（或全程生效項）從上面這些資料算出「北極星對它的要求」。 */
 function northReqs(code){
   const out = [];
@@ -1754,15 +1779,21 @@ function northReqs(code){
   SCALES.filter(r=>r[1].includes(code)).forEach(r=>out.push(`尺度「${r[0]}」：${r[2]}`));
   CAPS.filter(r=>r[1].includes(code)).forEach(r=>out.push(`要培養的能力「${r[0]}」：${r[2]}`));
   CITIZEN.filter(r=>r[1].includes(code)).forEach(r=>out.push(`成熟公民「${r[0]}」：${r[2]}`));
+  if (CITIZEN.some(r=>r[1].includes(code))) out.push(`成熟公民的意思：${NORTH.citizen}`);
   MEASURE.filter(r=>r[2].includes(code)).forEach(r=>out.push(`因果鏈「${r[0]}」這一環怎麼量：${r[1]}`));
   CW_DEFENCE.filter(r=>r[1].includes(code)).forEach(r=>out.push(`擋認知作戰「${r[0]}」：${r[2]}`));
   CW_BLOCKS.filter(r=>r[0]===code).forEach(r=>out.push(`認知作戰會這樣打到這一塊：${r[1]}。防法：${r[2]}`));
-  if (code==="完整性核心") out.push(`因果鏈（待驗證的命題，不是保證）：${CHAIN.join(" → ")}`);
+  if (code==="完整性核心"){
+    out.push(NORTH.belief, NORTH.scope);   // 北極星那一句已經在這張卡的「我們加的」（增補 A1）；檢查腳本確認兩處一字不差
+    out.push(`因果鏈（待驗證的命題，不是保證）：${CHAIN.join(" → ")}`, NORTH.chainEnd, NORTH.proposition);
+  }
+  if (code==="規範與脈絡" || code==="COLLAB") out.push(NORTH.politics);
   if (code==="規範與脈絡"){
+    out.push(`認知作戰與資訊戰：${NORTH.cwScope}`);
     CW.defs.forEach(([k,v])=>out.push(`定義「${k}」：${v}`));
     CW.goals.forEach(([k,v])=>out.push(`對方想達到什麼（${k}）：${v}`));
     CW.levels.forEach(([k,v])=>out.push(`它打的弱點（${k}）：${v}`));
-    out.push(CW.src);
+    out.push(CW.src + NORTH.anyState);
   }
   return out;
 }
@@ -1772,8 +1803,11 @@ const TOOL_OWNER = {"不給一般使用者":"組裝器", "套件雛形":"組裝�
 function toolReqs(code){
   const mine = who => who.map(w => TOOL_OWNER[w] || w).includes(code);
   const out = [];
-  TOOL_ROWS.filter(r=>mine(r[0])).forEach(r=>out.push(r[1] ? `現有工具 ${r[1]} 個：${r[2]}` : r[2]));
-  FLOW_ROWS.filter(r=>mine(r[0])).forEach(r=>out.push(`現有工作流：${r[2]}` + (r[0].length>1 ? `（跟 ${r[0].filter(c=>c!==code).join("、")} 共用）` : "")));
+  TOOL_ROWS.filter(r=>mine(r[0])).forEach(r=>{
+    out.push(r[1] ? `現有工具 ${r[1]} 個：${r[2]}` : r[2]);
+    if (r[1]) out.push(`這些工具在程式庫裡的類別：${r[3].flatMap(g=>g[1]).join("、")}。蓋這一塊的人照類別就找得到每一個。`);
+  });
+  FLOW_ROWS.filter(r=>mine(r[0])).forEach(r=>out.push(`現有工作流：${r[2]}` + (r[0].length>1 ? `（跟 ${r[0].filter(c=>c!==code).join("、")} 共用）` : "") + `。程式庫裡的檔名：${r[3].join("、")}`));
   EXISTING_OTHER.filter(r=>r[3].includes(code)).forEach(r=>out.push(`${r[0]}（${r[1]}）：${r[2]}`));
   if (TOOL_ROWS.some(r=>mine(r[0]) && r[1]) && code !== "組裝器"){
     out.push("這些工具是這一塊裡可以挑的做法，不是另外的積木。它們全部留著。");
@@ -2062,7 +2096,10 @@ $("cover").innerHTML = [
 /* 北極星：每一張表都從上面的共用資料畫。 */
 (function(){
   $("chain").innerHTML = CHAIN.map((t,i)=>`${i?`<span class="ar">→</span>`:""}<div class="lk">${t}</div>`).join("");
-  $("chain").insertAdjacentHTML("afterend", `<p class="cap">最後一環的意思：不是因為有人帶領或有完美制度，是構成世界的人改變了。</p>`);
+  $("chain").insertAdjacentHTML("afterend", `<p class="cap">${NORTH.chainEnd}</p>`);
+  [["n-star","star"],["n-belief","belief"],["n-scope","scope"],["n-prop","proposition"],["n-politics","politics"],["n-citizen","citizen"],["n-cwscope","cwScope"]]
+    .forEach(([id,k]) => { $(id).textContent = NORTH[k]; });
+  $("n-cwsrc").textContent = CW.src + NORTH.anyState;
   const kv = (id, data) => { $(id).innerHTML = data.map(([k,d])=>`<div class="r"><span class="k">${k}</span><span>${d}</span></div>`).join(""); };
   const rows = (id, data) => { $(id).innerHTML = data.map(([k,bs,d])=>`<div class="r"><span class="k">${k}</span><span><span>${bs.map(bk).join(" ")}</span><span class="d" style="display:block">${d}</span></span></div>`).join(""); };
   rows("measure", MEASURE.map(([k,d,bs])=>[k,bs,d]));
@@ -2145,13 +2182,22 @@ ${nav(N+1+k)}</div>
       <div class="bd"><div class="bks">${who.length<=5 ? who.map(c=>bk(c)+st((BLOCKS.find(b=>b.code===c)||CROSS.find(b=>b.code===c)).status)).join("") : chips(who)}</div><div class="now">今天：${now.replace("{部分}",BLOCKS.filter(b=>b.status==="部分").length).replace("{無}",BLOCKS.filter(b=>b.status==="無").length)}</div></div></div>`).join("");
   const readers = id => Object.keys(DRAWER_READS).filter(c=>DRAWER_READS[c].includes(id));
   const nevers = id => Object.keys(DRAWER_NEVER).filter(c=>DRAWER_NEVER[c].includes(id));
-  $("drawers").innerHTML = DRAWERS.map(d=>`<div class="dw"><div class="nm">${d.name}<small>存在：${d.where}</small></div>
-    <div class="bd"><div class="has">${d.has}</div>
-      <div class="ln"><span class="lb">寫</span>${bk(d.owner)}</div>
-      <div class="ln"><span class="lb">讀</span>${readers(d.id).length ? chips(readers(d.id)) : `<span class="has">${d.note||"沒有別的積木讀"}</span>`}</div>
-      ${readers(d.id).filter(c=>DRAWER_LIMIT[c+":"+d.id]).map(c=>`<div class="has">　${c}：${DRAWER_LIMIT[c+":"+d.id]}</div>`).join("")}
-      ${nevers(d.id).length?`<div class="ln"><span class="lb">不准讀</span>${nevers(d.id).map(c=>`<span class="bk no">${c}</span>`).join("")}</div>`:""}
-      <div class="has">今天：${DRAWER_TODAY[d.id]}</div></div></div>`).join("");
+  /* 一個抽屜一塊：名稱、裝什麼，然後固定四行。只能讀一部分的，自己一行，旁邊寫它只讀什麼。 */
+  const WHERE = [["案子","放在這個案子裡"],["個人","放在你個人那裡（跨案子）"],["群組","放在群組裡（多人一起決定時）"],["練習","放在練習區（跟真實案子分開）"],["平台","放在平台（不屬於哪一個案子）"]];
+  const drawer = d => {
+    const rs = readers(d.id), lim = c => DRAWER_LIMIT[c+":"+d.id];
+    const free = rs.filter(c=>!lim(c)), part = rs.filter(c=>lim(c)), nv = nevers(d.id);
+    const reads = rs.length
+      ? (free.length ? `<div class="chips">${free.map(bk).join("")}</div>` : "") + part.map(c=>`<div class="lim">${bk(c)}<span>${lim(c)}</span></div>`).join("")
+      : (d.note || "沒有別的積木讀");
+    return `<div class="dw"><div class="dw-h"><b>${d.name}</b><span>${d.has}</span></div>
+      <dl class="dw-l"><dt>誰寫</dt><dd><div class="chips">${bk(d.owner)}</div></dd>
+        <dt>誰讀</dt><dd>${reads}</dd>
+        <dt>誰不准讀</dt><dd>${nv.length ? `<div class="chips">${nv.map(c=>`<span class="bk no">${c}</span>`).join("")}</div>` : "沒有"}</dd>
+        <dt>今天</dt><dd>${DRAWER_TODAY[d.id]}</dd></dl></div>`;
+  };
+  if (DRAWERS.some(d=>!WHERE.some(w=>w[0]===d.where))) throw new Error("drawer with unknown place");
+  $("drawers").innerHTML = WHERE.map(([w,label])=>{ const ds = DRAWERS.filter(d=>d.where===w); return ds.length ? `<div class="dw-g"><h4>${label}（${ds.length} 個）</h4>${ds.map(drawer).join("")}</div>` : ""; }).join("");
   $("wiring").innerHTML = WIRING.map(([code,have,todo])=>`<div class="r"><span class="k">${bk(code)}</span><span><span>接現有的：${have}</span><span class="d" style="display:block">要新做：${todo}</span></span></div>`).join("");
   $("states").innerHTML = CASE_STATES.map(([k,d,who])=>`<div class="s"><b>${k}</b><span>${d}</span><div class="bks">${chips(who)}</div></div>`).join("");
   $("case-next").innerHTML = CASE_NEXT.map(([k,d])=>`<div class="r"><span class="k">${k}</span><span>${d}</span></div>`).join("");

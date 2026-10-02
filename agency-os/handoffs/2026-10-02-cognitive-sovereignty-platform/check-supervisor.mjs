@@ -28,6 +28,12 @@ const repo = {
   tools: contractFiles.filter((f) => !f.startsWith('stakeholder.')).length,   // stakeholder.regulator is a lens, not a tool
   art: contractFiles.filter((f) => f.startsWith('art_therapy.')).length,
   flows: readdirSync(path.join(methods, 'recipes/validated')).length,
+  // family of every tool file (the family decides which block a tool belongs to), and every workflow file id
+  families: Object.fromEntries(Object.entries(contractFiles.filter((f) => !f.startsWith('stakeholder.')).reduce((m, f) => {
+    const fam = (readFileSync(path.join(methods, 'methods/contracts', f), 'utf8').match(/^family:\s*(\S+)/m) || [])[1] || '?';
+    m[fam] = (m[fam] || 0) + 1; return m;
+  }, {}))),
+  recipes: readdirSync(path.join(methods, 'recipes/validated')).map((f) => f.replace(/\.recipe\.yaml$/, '')),
 };
 
 const failures = [];
@@ -91,7 +97,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     rule(label, `${v}.always_on_missing`, m.alwaysOn);
   }
 
-  const r = await page.evaluate(() => {
+  const r = await page.evaluate((repo) => {
     const all = [...BLOCKS, ...CROSS];
     const codes = all.map((b) => b.code);
     const flat = (v) => (Array.isArray(v) ? v.join(' ') : String(v || ''));
@@ -124,6 +130,33 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     for (const [k, d, bs] of MEASURE) for (const c of bs) if (!card(c).includes(d)) north.push('measure:' + k + ':' + c);
     for (const [c, at, df] of CW_BLOCKS) { const t = card(c); if (!t.includes(at) || !t.includes(df)) north.push('cw:' + c); }
     for (const [k, v] of [...CW.defs, ...CW.goals, ...CW.levels]) if (!card('規範與脈絡').includes(v)) north.push('cwdef:' + k);
+    // ...and every sentence on the north-star page is in some card (headings and data-nav navigation aside).
+    const sq = (s) => s.replace(/\s+/g, '');
+    const cardsText = sq(all.map((b) => card(b.code)).join('|'));
+    const walker = document.createTreeWalker(document.getElementById('v-north'), NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (n.parentElement.closest('[data-nav], h2, h3, .bk, [data-cross5]')) continue;
+      for (const s of n.textContent.split(/(?<=[。；])/)) { const k = sq(s); if (k.length >= 8 && !cardsText.includes(k)) north.push('sentence:' + k.slice(0, 20)); }
+    }
+    // Tools: each row's count, recounted from the repo by family; every family in exactly one row.
+    const toolRows = [];
+    const famRow = {};
+    for (const r of TOOL_ROWS) {
+      const groups = r[3] || [];
+      for (const [label, fams] of groups) {
+        const n = fams.reduce((s, f) => s + (repo.families[f] || 0), 0);
+        if (groups.length > 1 && !r[2].includes(label + ' ' + n)) toolRows.push(label + ' should be ' + n);
+        for (const f of fams) { if (famRow[f]) toolRows.push('family in two rows: ' + f); famRow[f] = r[0].join(); }
+      }
+      const n = groups.flatMap((g) => g[1]).reduce((s, f) => s + (repo.families[f] || 0), 0);
+      if (n !== r[1]) toolRows.push(r[0].join() + ' says ' + r[1] + ', repo ' + n);
+    }
+    for (const f of Object.keys(repo.families)) if (!famRow[f]) toolRows.push('family in no row: ' + f);
+    // Workflows: every file in exactly one row; each row's count equals its files.
+    const seen = FLOW_ROWS.flatMap((r) => r[3] || []);
+    for (const r of FLOW_ROWS) if ((r[3] || []).length !== r[1]) toolRows.push('workflow row ' + r[0].join() + ' says ' + r[1] + ', lists ' + (r[3] || []).length);
+    for (const id of repo.recipes) if (seen.filter((x) => x === id).length !== 1) toolRows.push('workflow file listed ' + seen.filter((x) => x === id).length + ' times: ' + id);
+    for (const id of seen) if (!repo.recipes.includes(id)) toolRows.push('workflow file not in repo: ' + id);
     // Architecture: one owner per drawer; a stated handoff means the receiver reads a drawer the giver owns;
     // nobody both reads and never-reads a drawer; every drawer and every one of the 18 has a 'today' / wiring line.
     const arch = [];
@@ -172,9 +205,10 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // One word per meaning: words retired when two contracts used them for different things.
     for (const s of ['同源合併', '同源群組', '來源地圖', '管道佔比', '來源身分卡']) if (whole.includes(s)) typed.push('retired word ' + s);
     if (!whole.includes(FACET_NAMES.length + ' 個面向')) typed.push('facet count');
-    return { toolsMissing, journey, arch, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
-  });
+    return { toolRows, toolsMissing, journey, arch, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
+  }, repo);
   rule(label, 'empty_fields', r.empty);
+  rule(label, 'tool_rows_vs_repo', r.toolRows);
   rule(label, 'no_hand_back', r.noHandBack);
   rule(label, 'no_never_read', r.noNever);
   rule(label, 'handoff_unread', r.handoff);
