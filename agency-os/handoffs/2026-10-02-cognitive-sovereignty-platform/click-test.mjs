@@ -29,7 +29,7 @@ for (let i = 1; i < n; i++) {
   seen.push(await visible() + '/' + (await current()).split('|').length);
 }
 out.push(`after ${n - 1} x next: ${seen.at(-1)}`);
-checks.push(['next walks every item, one panel and one mark each time', seen.length === 25 && seen.at(-1) === 'fail:5/1' && seen.every((s) => !s.includes('|') && s.endsWith('/1'))]);
+checks.push(['next walks every item, one panel and one mark each time', seen.length === n - 1 && seen.at(-1) === 'fail:5/1' && seen.every((s) => !s.includes('|') && s.endsWith('/1'))]);
 await p.click('#one-steps [data-k="3"]');
 const s4 = await visible();
 out.push('click step 4: ' + s4);
@@ -45,7 +45,8 @@ const a1 = await visible();
 await p.keyboard.press('ArrowDown'); const a2 = await visible();
 await p.keyboard.press('ArrowUp'); await p.keyboard.press('ArrowUp'); const a0 = await visible();
 out.push(`first of the five: ${a1}; arrow down: ${a2}; arrow up x2: ${a0}`);
-checks.push(['the five and the arrow keys', a1 === 'always:1' && a2 === 'always:2' && a0 === 'always:0']);
+const na = await p.evaluate(() => ALWAYS_BLOCKS.length);   // the blocks always there come before the five
+checks.push(['the five and the arrow keys', a1 === 'always:' + na && a2 === 'always:' + (na + 1) && a0 === 'always:' + (na - 1)]);
 const tallest = Math.max(...await p.evaluate(() => [...document.querySelectorAll('#one-route [data-k]')].map((x) => { x.click(); return document.documentElement.scrollHeight; })));
 out.push(`tallest page over all items=${tallest} screen=660`);
 checks.push(['no item makes the page scroll at 1280x660', tallest <= 660]);

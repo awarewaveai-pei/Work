@@ -140,7 +140,12 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     const card = (c) => { const d = document.getElementById('b-' + c); d.open = true; return d.innerText; };
     const north = [];
     for (const c of Object.keys(TRAINS)) if (!card(c).includes(TRAINS[c])) north.push('trains:' + c);
-    for (const [k, bs, d] of [...SCALES, ...CITIZEN, ...CAPS, ...CW_DEFENCE]) for (const c of bs) if (!card(c).includes(d)) north.push(k + ':' + c);
+    for (const [k, bs, d] of [...SCALES, ...CITIZEN, ...CAPS, ...CW_DEFENCE, ...WAR_BEFORE]) for (const c of bs) if (!card(c).includes(d)) north.push(k + ':' + c);
+    // Her framework (v0.1): every requirement is in the card of each block it names, and every step of her eight-step loop has a block.
+    for (const [d, bs] of FRAME_REQ) for (const c of bs) if (!card(c).includes(d)) north.push('frame:' + c + ':' + d.slice(0, 10));
+    for (const [s, ps] of LOOP) { if (!ps.length) north.push('loop step without a block: ' + s); for (const [c] of ps) if (!card(c).includes('「' + s + '」')) north.push('loop:' + s + ':' + c); }
+    // Her five interface questions are in both cards that ask them, word for word from one list (2026-10-03).
+    for (const q of INTERFACE_Q) for (const c of ['COLLAB', '規範與脈絡']) if (!card(c).includes(q)) north.push('interface question not in ' + c + ': ' + q.slice(0, 8));
     for (const [k, d, bs] of MEASURE) for (const c of bs) if (!card(c).includes(d)) north.push('measure:' + k + ':' + c);
     for (const [c, at, df] of CW_BLOCKS) { const t = card(c); if (!t.includes(at) || !t.includes(df)) north.push('cw:' + c); }
     for (const [k, v] of [...CW.defs, ...CW.goals, ...CW.levels]) if (!card('規範與脈絡').includes(v)) north.push('cwdef:' + k);
@@ -175,7 +180,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     const inRow = (FLOW_ROWS.find((r) => r[0][0] === '不給一般使用者') || [, , , []])[3].slice().sort().join();
     if (internal !== inRow) toolRows.push('internal workflows: registry ' + internal + ' / row ' + inRow);
     // Architecture: one owner per drawer; a stated handoff means the receiver reads a drawer the giver owns;
-    // nobody both reads and never-reads a drawer; every drawer and every one of the 18 has a 'today' / wiring line.
+    // nobody both reads and never-reads a drawer; every drawer and every block and each of the five has a 'today' / wiring line.
     const arch = [];
     const ids = DRAWERS.map((d) => d.id);
     if (new Set(ids).size !== ids.length) arch.push('duplicate drawer id');
@@ -191,6 +196,29 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     }
     for (const c of codes) if (!WIRING.some((w) => w[0] === c)) arch.push('wiring?' + c);
     for (const k of Object.keys(DRAWER_LIMIT)) { const [c, id] = k.split(':'); if (!canRead(c).includes(id)) arch.push('limit on a drawer not read ' + k); }
+    // Data collected for one purpose goes only to that purpose (critic round 5c): every reader of a drawer that holds where
+    // someone is says which items it reads, and the places a card says it reads are the places the architecture page gives it.
+    // Your provisional stance on a norm (規範與脈絡's fourth check) is held to the same rule (round 5e: MAP could read it).
+    const PLACE = [['發生地', /發生地|發生在哪裡/], ['你在哪裡', /你在哪裡|你所在地|你自己在哪裡/], ['當事人各在哪裡', /當事人各在哪裡/], ['參與者在哪裡', /參與者在哪裡/], ['暫定立場', /暫定立場/]];
+    const places = (s) => PLACE.filter(([, re]) => re.test(s)).map(([k]) => k).join('、');
+    const placeDrawers = DRAWERS.filter((d) => places(d.has));
+    const purpose = [];
+    for (const d of placeDrawers) for (const c of Object.keys(DRAWER_READS)) if (DRAWER_READS[c].includes(d.id) && !DRAWER_LIMIT[c + ':' + d.id]) purpose.push(c + ' reads all of ' + d.name);
+    for (const b of all) {
+      const archSays = placeDrawers.filter((d) => canRead(b.code).includes(d.id)).map((d) => DRAWER_LIMIT[b.code + ':' + d.id] || d.has).join(' ');
+      const cardSays = [].concat(b.reads).filter((s) => !/^絕不讀/.test(s)).join(' ');
+      if (places(archSays) !== places(cardSays)) purpose.push(b.code + ': card [' + places(cardSays) + '] / architecture [' + places(archSays) + ']');
+    }
+    // The one-page says the same places as the architecture page (round 5d: 規範與脈絡's summary left out 你在哪裡).
+    const archPlaces = (c) => places(placeDrawers.filter((d) => canRead(c).includes(d.id)).map((d) => DRAWER_LIMIT[c + ':' + d.id] || d.has).join(' '));
+    const onePage = [...Object.entries(JOURNEY_ALWAYS), ...JOURNEY.map((s) => [s.who, [...s.you, ...s.sys, ...s.ai]])];
+    for (const [c, ls] of onePage) {
+      const said = places(ls.filter((s) => s.includes('讀')).join(' '));
+      if (said && said !== archPlaces(c)) purpose.push('one-page ' + c + ': [' + said + '] / architecture [' + archPlaces(c) + ']');
+    }
+    // Each of the seven judgment-sovereignty checks has one owner, and the owner's card carries the sentence (round 5c).
+    const seven = SEVEN.length === 7 ? [] : ['not seven: ' + SEVEN.length];
+    for (const [k, parts] of SEVEN) for (const [owner, quote] of parts) for (const c of [].concat(owner)) if (!card(c).includes(quote)) seven.push(k + ':' + c);
     // One journey, two pages: same steps in the same order. A section that promises the five always-on items shows exactly those five.
     const journey = [];
     const oneSteps = [...document.querySelectorAll('#one-steps [data-step]')].map((e) => e.dataset.step);
@@ -198,7 +226,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     const want = JOURNEY.map((s) => s.t);
     if (oneSteps.join('|') !== want.join('|')) journey.push('one-page shows ' + oneSteps.length + ' of ' + want.length + ' steps');
     if (flowSteps.join('|') !== want.join('|')) journey.push('walk-through shows ' + flowSteps.length + ' of ' + want.length + ' steps');
-    const covered = new Set([...JOURNEY.map((s) => s.who), 'GOVERN', ...Object.keys(JOURNEY_ALWAYS)]);
+    const covered = new Set([...JOURNEY.map((s) => s.who), ...ALWAYS_BLOCKS, ...Object.keys(JOURNEY_ALWAYS)]);
     for (const c of codes) if (!covered.has(c)) journey.push('not in the journey: ' + c);
     if (JOURNEY.filter((s) => s.round === 'first').length !== 6) journey.push('first round is not 6 blocks');
     const five = CROSS.map((x) => x.code).join('|');
@@ -212,7 +240,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     const ownerOf = (w) => TOOL_OWNER[w] || w;
     for (const r of [...TOOL_ROWS, ...FLOW_ROWS]) for (const w of r[0]) { const c = ownerOf(w); if (codes.includes(c) && !card(c).includes(r[2])) toolsMissing.push(c + ':' + r[2].slice(0, 12)); }
     for (const r of EXISTING_OTHER) for (const c of r[3]) if (!card(c).includes(r[2])) toolsMissing.push(c + ':' + r[0]);
-    // Build order places all 18.
+    // Build order places every block and each of the five.
     window.show('progress', true);
     const chips = [...document.querySelectorAll('#order .bks .bk')].map((e) => e.textContent.trim());
     const notBuilt = codes.filter((c) => !chips.includes(c));
@@ -221,8 +249,27 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     const typed = ['285', '18 份', '四樣', '寫好九條'].filter((s) => whole.includes(s));
     // One word per meaning: words retired when two contracts used them for different things.
     for (const s of ['同源合併', '同源群組', '來源地圖', '管道佔比', '來源身分卡']) if (whole.includes(s)) typed.push('retired word ' + s);
+    // One word, one meaning (critic round 5): 關卡 = the three architecture gates; 任務 = one action (任務卡), the whole is a 案子;
+    // COLLAB's record is 群組紀錄 (共用紀錄 is the case record); 所在地 is split into 發生地 and 你在哪裡; a thin result counts 出處.
+    for (const s of ['七道關卡', '建立任務', '每件任務', '我的任務', '共同紀錄', '案子的所在地', '找到的來源太少']) if (whole.includes(s)) typed.push('ambiguous word ' + s);
     if (!whole.includes(FACET_NAMES.length + ' 個面向')) typed.push('facet count');
-    return { toolRows, toolsMissing, journey, arch, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, whole };
+    // The block count is written once (NB). Any "N 塊積木 / N 份積木合約 / N 格" on any page equals it; a position (第 N 塊),
+    // the judgment card's 11 boxes and dated history are not counts of blocks (2026-10-03: 55 hand-typed 13s when block 14 came).
+    if (NB !== BLOCKS.length) typed.push('NB ' + NB + ' but BLOCKS ' + BLOCKS.length);
+    for (const m of whole.matchAll(/(第 )?(\d+) (塊積木|份積木合約|格(?!是))/g)) {
+      const before = whole.slice(Math.max(0, m.index - 12), m.index);
+      if (!m[1] && +m[2] !== NB && !/判斷卡|2026-/.test(before)) typed.push('block count typed by hand: ' + before.slice(-6) + m[0]);
+    }
+    // The blueprint's 任務 means the whole case in most boxes and one AI task in LEARN's: every box that uses it says which (round 5c).
+    const taskBoxes = Object.keys(BP).filter((c) => BP[c].some((x) => /任務(?!卡)/.test(Array.isArray(x) ? x[0] + x[1].join('') : x)));
+    for (const c of taskBoxes) if (!TASK_NOTE[c]) typed.push('任務 without a note: ' + c);
+    for (const c of Object.keys(TASK_NOTE)) if (!taskBoxes.includes(c)) typed.push('任務 note on a box without 任務: ' + c);
+    // Our own text (the twelve fields and 我們加的) says 案子; a bare 任務 is the blueprint's word only (round 5d).
+    for (const b of all) {
+      const own = [...FIELDS.map(([, f]) => [].concat(b[f] || []).join(' ')), ...(ADD[b.code] || []).map((x) => (Array.isArray(x) ? x[0] + x[1].join('') : x))].join(' ');
+      if (/任務(?!卡)/.test(own)) typed.push('bare 任務 in ' + b.code);
+    }
+    return { toolRows, toolsMissing, journey, arch, purpose, seven, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, nb: NB, whole };
   }, repo);
   rule(label, 'empty_fields', r.empty);
   rule(label, 'tool_rows_vs_repo', r.toolRows);
@@ -234,9 +281,11 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
   rule(label, 'tools_page_missing_from_contract', r.toolsMissing);
   rule(label, 'journey', r.journey);
   rule(label, 'architecture', r.arch);
+  rule(label, 'data_for_one_purpose', r.purpose);
+  rule(label, 'sovereignty_check_owner', r.seven);
   rule(label, 'not_in_build_order', r.notBuilt);
   rule(label, 'stale_typed_numbers', r.typed);
-  rule(label, 'contract_count_not_18', r.contracts === 18 ? '' : r.contracts);
+  rule(label, 'contract_count', r.contracts === r.nb + 5 ? '' : `${r.contracts} contracts for ${r.nb} blocks and the five`);
   rule(label, 'tool_total_vs_repo', r.total === repo.tools ? '' : `page ${r.total} repo ${repo.tools}`);
   rule(label, 'art_count_vs_repo', r.art === repo.art ? '' : `page ${r.art} repo ${repo.art}`);
   rule(label, 'workflow_count_vs_repo', r.whole.includes('登記檔裡是 ' + repo.flows + ' 條') ? '' : `repo ${repo.flows}`);
@@ -254,7 +303,7 @@ for (const [w, h, all] of [[1536, 660, true], [1280, 660, true], [1100, 660, fal
     show('one', true); scrollTo(0, 0);
     const out = [];
     const items = [...document.querySelectorAll('#one-route [data-k]')];
-    if (items.length !== JOURNEY.length + 1 + CROSS.length + ONE_FAIL.length) out.push('route has ' + items.length + ' items');
+    if (items.length !== JOURNEY.length + ALWAYS_BLOCKS.length + CROSS.length + ONE_FAIL.length) out.push('route has ' + items.length + ' items');
     for (const b of items) {
       b.click();
       const shown = [...document.querySelectorAll('#one-panels [data-panel]')].filter((e) => !e.hidden);

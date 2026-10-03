@@ -179,25 +179,27 @@ body[data-view="one"] .app{padding-block:16px 8px}
 #one-always5{display:grid;gap:6px}
 .bs{border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:4px 8px;text-align:left;font-size:var(--fs-small);font-weight:600;line-height:1.5;cursor:pointer}
 .bs:hover{border-color:var(--accent)}
+.bs small{display:block;font-weight:400;color:var(--muted);font-size:var(--fs-tag);line-height:1.3}
 .bs[aria-current="true"]{background:var(--tag);border-color:var(--accent);color:var(--accent)}
 .rt-foot{grid-column:1/-1;border-top:1px solid var(--line);padding-top:8px;display:grid;gap:6px;font-size:var(--fs-small);color:var(--muted);line-height:1.5}
 .rt-foot .fls{display:flex;flex-wrap:wrap;gap:5px}
 .fb{border:1.5px solid var(--warn);background:var(--card);color:var(--warn);border-radius:8px;padding:1px 7px;font-size:13px;font-weight:600;line-height:1.6;cursor:pointer}
 .fb[aria-current="true"]{background:var(--warn-bg)}
-.dp{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:12px 20px 14px;display:grid;gap:7px}
+.dp{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:12px 20px 12px;display:grid;gap:6px}
 .dp.opt{border-style:dashed}
 .dp-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.dp-h .n{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--accent);color:var(--card);font-weight:700;flex:none}
+.dp-h .n{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:var(--accent);color:var(--card);font-weight:700;flex:none}
 .dp.opt .dp-h .n{background:transparent;color:var(--muted);border:1.5px dashed var(--muted)}
 .dp-h .n.all{background:var(--ink)}
 .dp-h .n.warn{background:var(--warn)}
 .dp-h .dp-nav{margin-left:auto}
 .dp-h>b{font-size:20px;line-height:1.3;margin-right:4px}
 .dp-prev{font-size:var(--fs-small);color:var(--muted);line-height:1.6}
-.dp-when{padding:6px 12px;border-radius:10px;border:1px dashed var(--muted);font-size:var(--fs-small);line-height:1.6}
+.cc .who-reads{margin:6px 0 0;color:var(--muted);font-size:var(--fs-small);line-height:1.7}
+.dp-when{padding:4px 12px;border-radius:10px;border:1px dashed var(--muted);font-size:var(--fs-small);line-height:1.6}
 .dp-r{display:grid;grid-template-columns:52px minmax(0,1fr);gap:12px;align-items:start}
 .dp-r p,.dp-b p,.dp-fail p{margin:0;line-height:1.6}
-.dp-r p+p{margin-top:2px}
+.dp-r p+p{margin-top:1px}
 .dp-b p+p{margin-top:6px}
 .dp-out{padding:6px 14px;border-radius:10px;background:var(--tag);color:var(--accent);font-weight:700;line-height:1.6}
 .dp-out small{font-weight:400;font-size:var(--fs-tag);margin-right:10px}
@@ -318,6 +320,8 @@ body[data-view="one"] .app{padding-block:16px 8px}
 .bp.tool h4{color:var(--g2)}
 .bp.north{background:var(--g1-bg)}
 .bp.north h4{color:var(--g1)}
+.bp.frame{background:var(--g3-bg)}
+.bp.frame h4{color:var(--g3)}
 .cc .rest{font-size:var(--fs-small);color:var(--muted);border-top:1px dashed var(--line);padding-top:14px}
 @media (max-width:659px){.cc dl{grid-template-columns:minmax(0,1fr);gap:2px 0}.cc dd{margin-bottom:10px}}
 .ex{display:grid;gap:10px}
@@ -400,7 +404,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
     <button class="navi" data-v="arch">架構</button>
     <button class="navi" data-v="flow">走一趟</button>
     <button class="navi" data-v="record">案子的紀錄</button>
-    <button class="navi" data-v="contracts">合約（13＋5）</button>
+    <button class="navi" data-v="contracts">合約（<span class="n-blocks"></span>＋5）</button>
     <button class="navi" data-v="tools">現有工具去哪</button>
     <button class="navi" data-v="progress">進度與順序</button>
     <button class="navi" data-v="decided">談定與未定</button>
@@ -409,7 +413,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
   <main>
     <header class="head">
       <h1>認知主權平台　監工台</h1>
-      <p class="sub">13 塊積木是骨架。這一頁只給我們兩個討論用，放在 claude.ai，不在 cognitive.aware-wave.com 裡。</p>
+      <p class="sub"><span class="n-blocks"></span> 塊積木是骨架。這一頁只給我們兩個討論用，放在 claude.ai，不在 cognitive.aware-wave.com 裡。</p>
     </header>
     <section class="card now" id="now" aria-label="現在在哪"></section>
 
@@ -434,6 +438,14 @@ body[data-view="one"] .app{padding-block:16px 8px}
         <p class="cap" id="n-scope"></p>
       </div>
       <div class="card stack">
+        <h3>內部的核心信念</h3>
+        <p class="star2" id="n-war"></p>
+        <p class="cap" id="n-war-out"></p>
+        <h3>要盯的六個「之前」，哪一塊在擋</h3>
+        <div class="rows" id="war-before"></div>
+        <p class="cap" id="n-war-limit"></p>
+      </div>
+      <div class="card stack">
         <h3>因果鏈</h3>
         <div class="chain" id="chain"></div>
         <h3>每一環怎麼量</h3>
@@ -444,7 +456,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
         <h3>平台要讓人擋得住的東西：認知作戰與資訊戰</h3>
         <p class="cap"><span data-nav>因果鏈第三環寫「更少人被煽動、操控」。</span><span id="n-cwscope"></span><span data-nav>下面兩個定義是你 2026-10-02 給的。</span></p>
         <div class="rows" id="cw-defs"></div>
-        <p class="note" data-nav>這一頁只說「要擋的是什麼」。真正怎麼做，寫在合約卡：GATHER（來源身分、同出處分組、多管道）、VERIFY（主張帳本、手法比對、三件事分開）、GOVERN（平台自己不被利用）。對方的目標和它打的弱點寫在「規範與脈絡」那張卡。13 塊各自怎麼被打到、怎麼防，在每一張合約卡的「北極星對這一塊的要求」裡。</p>
+        <p class="note" data-nav>這一頁只說「要擋的是什麼」。真正怎麼做，寫在合約卡：GATHER（來源身分、同出處分組、多管道）、VERIFY（主張帳本、手法比對、三件事分開）、GOVERN（平台自己不被利用）。對方的目標和它打的弱點寫在「規範與脈絡」那張卡。<span class="n-blocks"></span> 塊各自怎麼被打到、怎麼防，在每一張合約卡的「北極星對這一塊的要求」裡。</p>
         <p class="cap" id="n-cwsrc"></p>
       </div>
       <div class="card stack">
@@ -462,7 +474,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
         <div class="rows" id="caps"></div>
       </div>
       <div class="card stack">
-        <h3>反過來看：13 塊各自在練什麼</h3>
+        <h3>反過來看：<span class="n-blocks"></span> 塊各自在練什麼</h3>
         <div class="rows" id="trains"></div>
       </div>
       <div class="two" data-nav>
@@ -480,34 +492,39 @@ body[data-view="one"] .app{padding-block:16px 8px}
       </div>
       <div class="card stack">
         <h3>全程生效的五樣（不算積木）</h3>
-        <p class="cap" data-nav>北極星的要求落在 13 塊積木和這五樣的合約裡。點了看每一份。</p>
+        <p class="cap" data-nav>北極星的要求落在 <span class="n-blocks"></span> 塊積木和這五樣的合約裡。點了看每一份。</p>
         <div class="row5" data-cross5></div>
       </div>
     </section>
 
     <section class="view" id="v-map" hidden>
-      <div class="stack"><h2>地圖：13 塊積木怎麼接，加上全程生效的五樣</h2>
-        <p class="sub">平台是 13 塊積木，加上全程生效的五樣（不算積木）。13 塊一塊都不少。01 到 09 是一個人走的一圈，從外化走到回顧。回顧完再走一圈：出新版判斷就回到判斷，換方法就回到拆解。第一輪走哪幾塊看套件：「個人複雜決策」走藍色號碼那 6 塊；紫色號碼的 3 塊（蒐集、查證、計算）在別的套件會先用到（例如「可疑訊息判斷」從查證開始），其餘情況需要時才加。10 到 13 接在整圈上。中間是這個案子的紀錄，13 塊都讀它、寫它。點任何一塊看它的合約。</p></div>
+      <div class="stack"><h2>地圖：<span class="n-blocks"></span> 塊積木怎麼接，加上全程生效的五樣</h2>
+        <p class="sub">平台是 <span class="n-blocks"></span> 塊積木，加上全程生效的五樣（不算積木）。<span class="n-blocks"></span> 塊一塊都不少。01 到 09 是一個人走的一圈，從外化走到回顧。回顧完再走一圈：出新版判斷就回到判斷，換方法就回到拆解。第一輪走哪幾塊看套件：「個人複雜決策」走藍色號碼那 6 塊；紫色號碼的 3 塊（蒐集、查證、計算）在別的套件會先用到（例如「可疑訊息判斷」從查證開始），其餘情況需要時才加。10 到 <span class="n-blocks"></span> 接在整圈上。中間是這個案子的紀錄，除了 TEACH 和 FACILITATE，每一塊都讀它、寫它。點任何一塊看它的合約。</p></div>
       <div class="card stack">
         <div class="ring" id="ring"></div>
         <div class="legend" id="legend"></div>
       </div>
       <div class="card stack">
         <h3>全程生效的五樣（不算積木）</h3>
-        <p class="cap">13 塊每一塊都要遵守或用到這五樣，任何積木都不能覆寫。五樣各有一份合約，點了看。「共用紀錄」就是上面圈中間那一格。</p>
+        <p class="cap"><span class="n-blocks"></span> 塊每一塊都要遵守或用到這五樣，任何積木都不能覆寫。五樣各有一份合約，點了看。「共用紀錄」就是上面圈中間那一格。</p>
         <div class="row5" data-cross5></div>
       </div>
       <div class="card stack">
-        <h3>六個套件：藍圖的五個，加一個公共議題判斷</h3>
+        <h3>你的八步循環：每一步由哪幾塊做</h3>
+        <p class="cap">觀察 → 外化 → 反思 → 提問 → 比較 → 重構 → 判斷 → 再檢視。每一種情況都用得到，所以不另外做一塊：八步分在這幾塊裡，每張合約卡寫明它做哪幾步。出自你的《判斷主權教育架構 v0.1》第 5 節。</p>
+        <div class="rows" id="loop"></div>
+      </div>
+      <div class="card stack">
+        <h3><span class="n-pk"></span> 個套件：藍圖的五個，加我們的「自我理解」和「公共議題判斷」</h3>
         <p class="cap">套件是藍圖第 3.5 節寫的預設組合：先選目的，系統推薦一組積木當起點，人可以重排、跳過、停止。</p>
         <div class="rows" id="packs"></div>
-        <p class="cap">藍圖原文的套件沒有 ACT（它把行動放在 DECIDE 裡），這裡照 13 塊補上，所以第一輪最多是 6 塊。套件只管第一輪；之後怎麼加到 13 塊，看「走一趟」那一頁。</p>
+        <p class="cap">藍圖原文的套件沒有 ACT（它把行動放在 DECIDE 裡），這裡把 ACT 補上，所以第一輪最多是 6 塊。套件只管第一輪；之後怎麼加別的積木，看「走一趟」那一頁。</p>
       </div>
     </section>
 
     <section class="view" id="v-arch" hidden>
       <div class="stack"><h2>架構：分幾層、紀錄怎麼存、接到現有系統的哪裡</h2>
-        <p class="sub">地圖那一頁說「有哪 13 塊」。這一頁說「蓋起來長什麼樣」：分幾層、三個關卡擋在哪、案子的紀錄有哪些抽屜、每一塊接到現有系統的哪裡、一個案子的狀態怎麼變。整頁是我擬的草稿，等你看；「今天」的部分是 2026-10-03 查程式寫的。</p></div>
+        <p class="sub">地圖那一頁說「有哪 <span class="n-blocks"></span> 塊」。這一頁說「蓋起來長什麼樣」：分幾層、三個關卡擋在哪、案子的紀錄有哪些抽屜、每一塊接到現有系統的哪裡、一個案子的狀態怎麼變。整頁是我擬的草稿，等你看；「今天」的部分是 2026-10-03 查程式寫的。</p></div>
       <div class="card stack">
         <h3>一、五層，和中間的三個關卡</h3>
         <div class="dw-intro">
@@ -555,11 +572,11 @@ body[data-view="one"] .app{padding-block:16px 8px}
     </section>
 
     <section class="view" id="v-flow" hidden>
-      <div class="stack"><h2>走一趟：一個案子從頭到尾，13 塊和全程生效的五樣各在哪一步</h2>
+      <div class="stack"><h2>走一趟：一個案子從頭到尾，<span class="n-blocks"></span> 塊和全程生效的五樣各在哪一步</h2>
         <p class="sub">任何一步都可以停、可以跳過、可以要 AI 直接給建議；只有「判斷」那一格永遠是你填。每一步都是你先寫，AI 才回。</p></div>
       <div class="card stack">
         <h3>一輪走幾塊、一個案子走幾塊（談定：並存）</h3>
-        <p class="cap">13 塊都在平台上，每個案子的頁面都有 13 格。第一輪只走套件的 6 塊，先把「判斷 → 行動 → 回顧」這一圈走完。其他積木在對的時機由系統提出，你同意才加。案子沒有上限。</p>
+        <p class="cap"><span class="n-blocks"></span> 塊都在平台上，每個案子的頁面都有 <span class="n-blocks"></span> 格。第一輪只走套件裡的積木，最多 6 塊；有 ACT 的套件，先把「判斷 → 行動 → 回顧」這一圈走完。其他積木在對的時機由系統提出，你同意才加。案子沒有上限。</p>
         <div class="rows" id="rounds"></div>
       </div>
       <div class="card stack">
@@ -580,19 +597,20 @@ body[data-view="one"] .app{padding-block:16px 8px}
 
     <section class="view" id="v-record" hidden>
       <div class="stack"><h2>一個案子的紀錄長什麼樣</h2>
-        <p class="sub">每個案子都有完整紀錄。這次的方法沒解決，就換方法再做；行動之後有短期觀察和長期觀察。最低標準是今天的冰山模型專案頁。下面的範例：第一輪走套件的 6 塊，回顧之後再加，走到最後 13 塊都用到。</p></div>
+        <p class="sub">每個案子都有完整紀錄。這次的方法沒解決，就換方法再做；行動之後有短期觀察和長期觀察。最低標準是今天的冰山模型專案頁。下面的範例：第一輪走套件的 6 塊，回顧之後再加，走到最後，除了要有人帶才用的「帶領」，每一塊都用到。</p></div>
       <div class="two">
         <div class="card" id="timeline"></div>
         <div class="stack">
           <div class="have"><h3>今天的專案頁已經有</h3><ul id="have"></ul></div>
           <div class="lack"><h3>照最低標準，今天還缺</h3><ul id="lack"></ul></div>
+          <p class="cap">有人帶的時候，帶領者寫的帶領紀錄存在帶領者那裡，不放進這個案子的紀錄（FACILITATE）。</p>
           <p class="cap">2026-10-02 登入正式站看過：冰山模型工具頁、「冰山模型 2026-09-29 09:13」專案頁、它的結果頁。</p>
         </div>
       </div>
     </section>
 
     <section class="view" id="v-contracts" hidden>
-      <div class="stack"><h2>合約：13 塊積木各一份，全程生效的五樣各一份</h2>
+      <div class="stack"><h2>合約：<span class="n-blocks"></span> 塊積木各一份，全程生效的五樣各一份</h2>
         <p class="sub">每塊積木一份合約，同一個形狀，十二個欄位。藍圖 3.3 要求的六項（輸入、輸出、AI 權限、來源與不確定性、人的控制、資料與版本）都在裡面。點一張卡展開。</p></div>
       <div class="card stack">
         <h3>一份合約長這樣</h3>
@@ -608,14 +626,14 @@ body[data-view="one"] .app{padding-block:16px 8px}
         <h3>固定模板：每一份合約都要過的檢查</h3>
         <p class="cap">模板寫在同資料夾的 CONTRACT_TEMPLATE.md，檢查寫成腳本 check-supervisor.mjs。每次改這一頁都要跑，有一條不過就不能發佈。</p>
         <ol class="dec">
-          <li><span class="nb">1</span><span>十二欄每一欄都有寫，13 塊和全程生效的五樣都一樣</span></li>
+          <li><span class="nb">1</span><span>十二欄每一欄都有寫，<span class="n-blocks"></span> 塊和全程生效的五樣都一樣</span></li>
           <li><span class="nb">2</span><span>「AI 不准做什麼」一定寫明什麼時候停下來交還給人</span></li>
-          <li><span class="nb">3</span><span>13 塊的「讀什麼」一定寫明絕不讀什麼</span></li>
+          <li><span class="nb">3</span><span><span class="n-blocks"></span> 塊的「讀什麼」一定寫明絕不讀什麼</span></li>
           <li><span class="nb">4</span><span>交接對得上：甲寫「交給乙」，乙的「讀什麼」就要有甲</span></li>
           <li><span class="nb">5</span><span>每個套件裡前後兩塊接得上</span></li>
           <li><span class="nb">6</span><span>北極星頁有的，對應的合約卡裡一定有</span></li>
-          <li><span class="nb">7</span><span>每一頁都看得到 13 塊和全程生效的五樣</span></li>
-          <li><span class="nb">8</span><span>13 塊和五樣都排進建置順序</span></li>
+          <li><span class="nb">7</span><span>每一頁都看得到 <span class="n-blocks"></span> 塊和全程生效的五樣</span></li>
+          <li><span class="nb">8</span><span><span class="n-blocks"></span> 塊和五樣都排進建置順序</span></li>
           <li><span class="nb">9</span><span>數字由資料算，不手寫；工具總數要等於程式庫裡的檔案數</span></li>
           <li><span class="nb">10</span><span>紀錄的每個抽屜只有一個主人能寫；合約寫「交給乙」，乙就要讀得到甲的抽屜</span></li>
         </ol>
@@ -629,15 +647,20 @@ body[data-view="one"] .app{padding-block:16px 8px}
         <p class="cap">藍圖 v0.6 共 15 節。每一節的要求都要在上面某一張卡裡找得到；找不到就是漏了。</p>
         <div class="rows" id="cover"></div>
       </div>
+      <div class="card stack">
+        <h3>你的《判斷主權教育架構 v0.1》每一節寫在哪</h3>
+        <p class="cap">原文存在同一個資料夾。命盤、大限、對話三段是你個人的筆記，沒有放進平台。沒寫進平台的，照實寫「沒有」。</p>
+        <div class="rows" id="cover01"></div>
+      </div>
     </section>
 
     <section class="view" id="v-tools" hidden>
       <div class="stack"><h2>現有的 <span class="tt"></span> 個工具和 <span class="ft"></span> 條工作流去哪裡</h2>
         <p class="sub">它們不是積木。積木是「人在判斷的哪一段」；工具是那一段裡可以挑的做法。工作流是把幾個工具排成一串。它們全部留著，變成積木裡面的選單，受那塊積木的合約管。這一頁的每一列，在它歸屬的那張合約卡裡都有（卡上「現有的東西裡歸這一塊的」那一區）。</p></div>
       <div class="card stack">
-        <h3><span class="tt"></span> 個工具，落在 13 塊的哪一塊</h3>
+        <h3><span class="tt"></span> 個工具，落在 <span class="n-blocks"></span> 塊的哪一塊</h3>
         <div class="bars" id="toolbars"></div>
-        <p class="cap">13 塊每一塊一列，照 01 到 13 的順序。倒數第二列「規範與脈絡」是全程生效的五樣之一；最後一列不給一般使用者。每一列底下是那幾個工具的名字。數字和名字都由 gen-tools-data.mjs 從程式庫產生（方法合約檔，扣掉 1 份不是工具的監管者視角），檢查腳本確認跟程式庫一致。每個工具照它在程式庫的類別歸塊，一個類別只歸一塊。網站上是 <span class="gc"></span> 個問題分類；其中「我的說法站不站得住」拆給 THINK 和 VERIFY，「計畫怎麼排、風險怎麼盯、做完學到什麼」拆成三組給 ACT 和 LEARN，所以這裡比網站多 <span class="gx"></span> 組。正式站部署的版本可能比程式庫少。長條長度照數量畫。</p>
+        <p class="cap"><span class="n-blocks"></span> 塊每一塊一列，照 01 到 <span class="n-blocks"></span> 的順序。倒數第二列「規範與脈絡」是全程生效的五樣之一；最後一列不給一般使用者。每一列底下是那幾個工具的名字。數字和名字都由 gen-tools-data.mjs 從程式庫產生（方法合約檔，扣掉 1 份不是工具的監管者視角），檢查腳本確認跟程式庫一致。每個工具照它在程式庫的類別歸塊，一個類別只歸一塊。網站上是 <span class="gc"></span> 個問題分類；其中「我的說法站不站得住」拆給 THINK 和 VERIFY，「計畫怎麼排、風險怎麼盯、做完學到什麼」拆成三組給 ACT 和 LEARN，所以這裡比網站多 <span class="gx"></span> 組。正式站部署的版本可能比程式庫少。長條長度照數量畫。</p>
       </div>
       <div class="card stack">
         <h3>工作流，落在哪一塊</h3>
@@ -648,7 +671,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
         <h3>這代表什麼</h3>
         <div class="two">
           <div class="have"><h3>已經很厚的</h3><ul><li>拆解（MAP）有 116 個做法</li><li>發散、反證、計算、選擇、排計畫都有做法</li></ul></div>
-          <div class="lack"><h3>工具再多也補不了的</h3><ul><li>SENSE、THINK、DECIDE、LEARN 是「人先寫」的地方，今天沒有這個位置</li><li>工具現在是 AI 先產、人後看；進了積木要照合約改成人先寫、AI 才回</li><li>GATHER、EXPRESS、TEACH、COLLAB、GOVERN 靠的不是這些工具</li><li>「開始前 5 分鐘」的課程頁只有兩堂（冰山模型、人生決策）；其餘工具只有說明和範例，還沒有課程頁</li></ul></div>
+          <div class="lack"><h3>工具再多也補不了的</h3><ul><li>SENSE、THINK、DECIDE、LEARN 是「人先寫」的地方，今天沒有這個位置</li><li>工具現在是 AI 先產、人後看；進了積木要照合約改成人先寫、AI 才回</li><li id="no-tools"></li><li>「開始前 5 分鐘」的課程頁只有兩堂（冰山模型、人生決策）；其餘工具只有說明和範例，還沒有課程頁</li></ul></div>
         </div>
       </div>
       <div class="card stack">
@@ -669,7 +692,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
       <div class="card stack">
         <h3>建置順序</h3>
         <div class="order" id="order"></div>
-        <p class="cap">網站的變化：cognitive.aware-wave.com 首頁變成「我的任務」和組裝器；今天的方法目錄、工作流、結果頁退到積木裡面，不再是入口。</p>
+        <p class="cap">網站的變化：cognitive.aware-wave.com 首頁變成「我的案子」和組裝器；今天的方法目錄、工作流、結果頁退到積木裡面，不再是入口。</p>
         <p class="cap">藍圖第 12 節的五個階段：一、核心積木＋首版（完整性核心、積木合約、三種套件、低風險原型）；二、證據與遷移（加入 VERIFY，比較藝術外化、純文字反思、一般 AI 問答）；三、交付與機構試行（高等教育、教師發展、負責任 AI 使用）；四、共同程序與在地化；五、治理與去中心化。我們的第 0 到 2 步落在它的第一、二階段。</p>
       </div>
       <div class="card stack">
@@ -704,8 +727,11 @@ body[data-view="one"] .app{padding-block:16px 8px}
 
 <script>
 const G = {"有":"●","部分":"◐","無":"○"};
-/* 分組＝建置順序：1 第一圈六塊　2 現有引擎三塊　3 表達與教學　4 共同與治理 */
-const GROUP = {SENSE:1,MAP:1,THINK:1,DECIDE:1,ACT:1,LEARN:1,GATHER:2,VERIFY:2,COMPUTE:2,EXPRESS:3,TEACH:3,COLLAB:4,GOVERN:4};
+/* 積木有幾塊，只寫在這裡（BLOCKS 之前的資料也要用）；檢查腳本確認它等於 BLOCKS 的數量。頁面上的數字都從它來。 */
+const NB = 14;
+document.querySelectorAll(".n-blocks").forEach(e => { e.textContent = NB; });
+/* 分組＝建置順序：1 第一圈六塊　2 現有引擎三塊　3 表達、教學與帶領　4 共同與治理 */
+const GROUP = {SENSE:1,MAP:1,THINK:1,DECIDE:1,ACT:1,LEARN:1,GATHER:2,VERIFY:2,COMPUTE:2,EXPRESS:3,TEACH:3,FACILITATE:3,COLLAB:4,GOVERN:4};
 
 /* 現有工具落在哪一塊。總數由這張表加出來，頁面上不另外寫死數字。
    2026-10-02 晚上數程式庫的方法合約檔：287 份，扣掉 1 份不是工具（stakeholder.regulator，監管者視角）。 */
@@ -1024,7 +1050,7 @@ const GOAL_COUNT = 12;
 /* ── 產生的資料到這裡 ── */
 /* 每一列：歸哪一塊、幾個、說明、[問題分類, 程式庫裡的類別]。工具檔的 family 決定它歸哪一塊（methods/registry/method-goal-groups.yaml）；數量由檢查腳本照程式庫重算。 */
 const TOOL_ROWS = [
-  [["SENSE"],16,"帶一個團體、帶反思（藝術反思 16）",[["藝術反思",["art_therapy"]]]],
+  [["SENSE"],16,"帶一個團體、帶反思（藝術反思 16）。工具本身是外化，歸 SENSE；工具裡帶活動的提示用語，給 FACILITATE 當帶領稿的底稿",[["藝術反思",["art_therapy"]]]],
   [["GATHER"],0,"不靠這些工具。靠的是蒐集器：抓網頁、搜尋、學術資料，已經有"],
   [["MAP"],116,"這件事為什麼一直發生 31　問題到底是什麼 24　看清楚自己和外面的局 40　使用者、參與者到底怎麼想 21",[["這件事為什麼一直發生",["systems","root_cause","causal"]],["問題到底是什麼",["framing","decomposition"]],["看清楚自己和外面的局",["strategy","foresight","stakeholders"]],["使用者、參與者到底怎麼想",["insight","research","representation"]]]],
   [["THINK"],32,"需要更多點子 22　我的說法站不站得住裡的反方挑戰 10",[["需要更多點子",["divergent","association"]],["我的說法站不站得住裡的反方挑戰",["challenge"]]]],
@@ -1037,10 +1063,12 @@ const TOOL_ROWS = [
   [["TEACH"],0,"不靠這些工具。靠的是課程頁；今天只有兩堂（冰山模型、人生決策），其餘工具只有說明和範例"],
   [["COLLAB"],0,"不靠這些工具。今天什麼都沒有"],
   [["GOVERN"],0,"不靠這些工具。今天有 AI 指令的版本紀錄、重跑、抹除、匯出"],
+  [["FACILITATE"],0,"不靠這些工具。帶領稿的底稿在藝術反思的工具資料裡：每個工具的「帶活動者提示用語」和「停止活動訊號」"],
   [["規範與脈絡"],10,"哪些法規管得到 10",[["哪些法規管得到",["jurisdiction"]]]],
   [["不給一般使用者"],43,"系統、資料與資安的工程決策 43：留給內部和工程客戶，不出現在一般人的選單",[["系統、資料與資安的工程決策",["architecture","devops_sre","database_data","security"]]]],
 ];
 const TOOL_TOTAL = TOOL_ROWS.reduce((s,r)=>s+r[1],0);
+document.getElementById("no-tools").textContent = TOOL_ROWS.filter(r=>r[1]===0).map(r=>r[0][0]).join("、") + " 靠的不是這些工具";
 const TOOL_OF = code => TOOL_ROWS.find(r=>r[0][0]===code)[1];
 const toolsOf = fams => TOOLS.filter(t=>fams.includes(t[1]));   // 某幾個類別的全部工具（代號、類別、中文名）
 /* 現有工作流落在哪一塊。總數由這張表加出來。 */
@@ -1070,58 +1098,83 @@ const EXISTING_OTHER = [
    where = 存在哪裡：案子（跟著這個案子）／個人（跨案子）／群組（多人共有）／練習（跟真實案子分開）／平台（不屬於任何案子）。
    check-supervisor.mjs 會查：每個抽屜一個主人；A 寫「交給 B」⇒ B 讀得到 A 的抽屜；讀和不准讀不能同時出現。 */
 const DRAWERS = [
-  {id:"open",   name:"開案資料",   has:"目的、風險、誰會受影響、發生在哪裡、這次用了哪幾塊", owner:"組裝器", where:"案子"},
+  {id:"open",   name:"開案資料",   sys:"每次呼叫 AI 時，系統只把發生地和你在哪裡交給 AI，讓 AI 先看適不適用（你在協作合約裡可以不給）", has:"目的、風險、誰會受影響、暫定完成條件、發生在哪裡、你在哪裡、當事人各在哪裡、有沒有人帶和哪一位帶領者、這次用了哪幾塊", owner:"組裝器", where:"案子"},
   {id:"perm",   name:"AI 權限",    has:"AI 這次能做什麼、不准碰什麼、什麼時候要停；每次修改都留一版", owner:"協作合約", where:"案子", note:"不是哪一塊去讀；每次呼叫 AI 之前由系統查（第三個關卡）"},
   {id:"sense",  name:"外化素材",   has:"卡片、關係圖、時間線、情緒訊號（含你自己標的強度）", owner:"SENSE", where:"案子"},
-  {id:"source", name:"來源",       has:"來源卡（誰辦的、何時出現、從哪找到）、同一出處的分組、頁面快照、你對每個來源的標記", owner:"GATHER", where:"案子"},
-  {id:"context",name:"脈絡註記",   has:"每個脈絡面向的註記、適用哪裡的法律", owner:"規範與脈絡", where:"案子"},
-  {id:"map",    name:"地圖",       has:"六層地圖、假設、資訊缺口、核心矛盾；每拆一次存一版", owner:"MAP", where:"案子"},
+  {id:"source", name:"來源",       has:"來源卡（誰辦的、何時出現、從哪找到）、同一出處的分組、頁面快照、你對每個出處的標記、回顧時你標錯的出處", owner:"GATHER", where:"案子"},
+  {id:"context",name:"脈絡註記",   has:"每個脈絡面向的註記、適用哪裡的法律、四個檢查的回答（權利和義務、規範從哪來、你的暫定立場）、公共議題時介面問題的回答", owner:"規範與脈絡", where:"案子"},
+  {id:"map",    name:"地圖",       has:"六層地圖、用的拆法、假設、資訊缺口、核心矛盾、要查的主張、「解不了的局」的回答；每拆一次存一版", owner:"MAP", where:"案子"},
   {id:"think",  name:"思考卡",     has:"思考卡、反例、候選的判準；我自己的版本和跟 AI 一起的版本分開", owner:"THINK", where:"案子"},
-  {id:"claims", name:"主張帳本",   has:"每個主張有幾個出處支持、反對、查不到；用了什麼手法；我對每個主張的判定", owner:"VERIFY", where:"案子"},
+  {id:"claims", name:"主張帳本",   has:"每個主張有幾個出處支持、反對、查不到、無法檢查；用了什麼手法；這則訊息怎麼傳開；訊息原文當時的樣子；我的第一反應和信心；我對每個主張的判定；還該查什麼", owner:"VERIFY", where:"案子"},
   {id:"calc",   name:"計算",       has:"輸入的數字、公式、結果、情境；可以重算", owner:"COMPUTE", where:"案子"},
-  {id:"judge",  name:"判斷卡",     has:"我的結論、依據、信心、什麼會改變它；第 1 版、第 2 版都留", owner:"DECIDE", where:"案子"},
-  {id:"act",    name:"行動與觀察", has:"任務卡、我的預測、每週和每月季年的觀察紀錄", owner:"ACT", where:"案子"},
-  {id:"review", name:"回顧",       has:"預測對上結果、當時漏看什麼、對 AI 的信任要不要調整", owner:"LEARN", where:"案子"},
-  {id:"habit",  name:"個人歷程",   has:"跨案子的：我常出現的慣性、哪些事交給 AI 可靠", owner:"LEARN", where:"個人"},
+  {id:"judge",  name:"判斷卡",     has:"我的結論、依據、信心、什麼會改變它；下判斷前選的情緒強度；「什麼時候停止分析」的回答；第 1 版、第 2 版都留", owner:"DECIDE", where:"案子"},
+  {id:"act",    name:"行動與觀察", has:"任務卡（期限、風險、停止和升級條件、誰負責）、我的預測、每週和每月季年的觀察紀錄", owner:"ACT", where:"案子"},
+  {id:"review", name:"回顧",       has:"回來重看的日子（沒有 ACT 的時候）、預測對上結果、當時漏看什麼、對 AI 的信任要不要調整、回顧時挑的新方法和還缺什麼、下一輪要加哪幾塊、你標錯的出處", owner:"LEARN", where:"案子"},
+  {id:"habit",  name:"個人歷程",   has:"跨案子的：我常出現的慣性、哪些事交給 AI 可靠、哪些思考動作我已經不用 AI 也做得到、每天校準和每週衝刺的提醒", owner:"LEARN", where:"個人"},
   {id:"draft",  name:"輸出稿",     has:"給別人看的稿子；每一句對回紀錄裡的哪一筆", owner:"EXPRESS", where:"案子"},
-  {id:"group",  name:"共同紀錄",   has:"分歧地圖、各人的同意和異議、授權、結束與重開的條件", owner:"COLLAB", where:"群組"},
+  {id:"guard",  name:"護欄",       sys:"每次呼叫 AI 時，系統讀它：照這個案子的護欄提醒 AI", has:"這個案子加了哪些護欄、是哪一類高風險、是哪一塊認出來的", owner:"GOVERN", where:"案子"},
+  {id:"facil",  name:"帶領紀錄",   has:"上完帶領者的課的紀錄、帶了哪個工具或套件、照帶領稿做了哪些、哪裡沒照稿和為什麼、交出去的危機（只記哪一類、交給誰、什麼時候）、參與者的異議、督導的回饋；不寫參與者的名字和內容", owner:"FACILITATE", where:"帶領"},
+  {id:"group",  name:"群組紀錄",   has:"各人的立場、分歧地圖、同意和異議、授權、共同的判斷和要做的行動、介面問題的回答、結束與重開的條件、每個參與者在哪裡", owner:"COLLAB", where:"群組"},
   {id:"drill",  name:"練習紀錄",   has:"上過哪些課、練習案例做到哪；可以選擇不留", owner:"TEACH", where:"練習"},
   {id:"rules",  name:"規則檢查",   has:"每一塊上線前對照 11 條的檢查結果；規則的每一版", owner:"完整性核心", where:"平台"},
-  {id:"govern", name:"平台紀錄",   has:"同意紀錄；模型、提示、來源名單、分類規則、手法清單的版本；稽核紀錄；申訴", owner:"GOVERN", where:"平台"},
+  {id:"govern", name:"平台紀錄",   sys:"每次呼叫 AI 之前，系統讀模型和 AI 指令的現行版本", has:"同意紀錄；模型、AI 指令、來源名單、分類規則、分組規則、操弄手法清單、查核資料庫名單的版本；稽核紀錄；申訴；被抹除的案子留的一筆「已抹除」", owner:"GOVERN", where:"平台"},
 ];
 /* 歷程不是抽屜：任何一塊寫進任何抽屜，系統都自動記一筆（誰寫的：我／AI／共同、什麼時候、哪一版）。由共用紀錄負責。 */
 
 /* 哪一塊讀哪些抽屜（自己的不用列）。"*" = 這個案子的全部。 */
 const DRAWER_READS = {
-  SENSE:[], GATHER:["open","map"], MAP:["open","sense","source","context","review"], THINK:["map","sense","claims"],
-  VERIFY:["source","map"], COMPUTE:["source"], DECIDE:["open","map","think","claims","calc","context","group","review","act","sense"],
-  ACT:["open","judge","calc","claims","group"], LEARN:["*"], EXPRESS:["judge","map","claims","calc","source","think","act","sense"], TEACH:[],
-  COLLAB:["map","claims","draft"], GOVERN:[],
+  SENSE:[], GATHER:["open","map","claims","review","govern"], MAP:["open","sense","source","context","review"], THINK:["map","sense","claims"],
+  VERIFY:["source","map","open","govern"], COMPUTE:["source"], DECIDE:["open","map","think","claims","calc","context","group","review","act","sense","guard"],
+  ACT:["open","judge","calc","claims","group","guard"], LEARN:["*"], EXPRESS:["judge","map","claims","calc","source","think","act","sense","review"], TEACH:[],
+  COLLAB:["map","claims","draft","act","open"], GOVERN:["open","group","facil"], FACILITATE:["open","sense","map","think"],
   "完整性核心":[], "規範與脈絡":["open","map"], "組裝器":["review"], "共用紀錄":["*"], "協作合約":["open"],
 };
 /* 合約寫明絕不讀的。 */
 const DRAWER_NEVER = {
   SENSE:["judge","review"], GATHER:["sense","judge"], MAP:["judge"], VERIFY:["judge"], COMPUTE:["sense","habit"],
-  GOVERN:["sense","review"], TEACH:["*"],
+  GOVERN:["sense","review"], TEACH:["*"], ACT:["habit"], FACILITATE:["habit"],
 };
 /* 只讀抽屜裡的一部分。key = 積木:抽屜。 */
 const DRAWER_LIMIT = {
   "GATHER:map":"只讀資訊缺口",
+  "GATHER:claims":"只讀要查的主張（VERIFY 在背後找來源時）",
+  "GATHER:review":"只讀你標錯的出處",
+  "GATHER:govern":"只讀來源名單、分類規則、分組規則的現行版本",
+  "VERIFY:govern":"只讀操弄手法清單和查核資料庫名單的現行版本",
+  "MAP:review":"只讀回顧時挑的新方法、還缺什麼",
+  "組裝器:review":"只讀下一輪要加哪幾塊",
+  "COLLAB:act":"只讀群組決定之後的觀察",
+  "EXPRESS:review":"只讀你選的",
   "VERIFY:map":"只讀要查的主張",
   "DECIDE:sense":"只讀情緒強度，不讀卡片內容",
   "EXPRESS:judge":"只讀你選的", "EXPRESS:map":"只讀你選的", "EXPRESS:claims":"只讀你選的；另外只讀每個主張的查證狀態", "EXPRESS:calc":"只讀你選的",
   "EXPRESS:source":"只讀你選的；另外只讀出處數", "EXPRESS:think":"只讀你選的", "EXPRESS:act":"只讀你選的", "EXPRESS:sense":"只讀你選的",
-  "DECIDE:open":"讀決策者與受影響者；你補的寫回去由組裝器存", "ACT:open":"讀誰會受影響；你補的寫回去由組裝器存",
+  "DECIDE:open":"只讀誰會受影響、有沒有人帶；你補的寫回去由組裝器存", "ACT:open":"讀誰會受影響；你補的寫回去由組裝器存",
   "COLLAB:map":"只讀本人同意分享的", "COLLAB:claims":"只讀本人同意分享的", "COLLAB:draft":"只讀本人同意分享的",
-  "THINK:sense":"可以讀，但不准拿脆弱的內容來說服人",
+  "THINK:sense":"只在沒有地圖時讀；不准拿脆弱的內容來說服人",
+  "GOVERN:open":"只讀你在哪裡：給當地的求助資源、照當地的規定處理資料",
+  "VERIFY:open":"只讀你在哪裡：換成當地的查核組織",
+  "COLLAB:open":"只讀受影響的人",
+  "GOVERN:group":"只讀每個參與者在哪裡：給當地的求助資源",
+  "GOVERN:facil":"只讀帶領者和那幾位參與者都同意給研究的偏離紀錄",
+  "FACILITATE:open":"只讀有沒有人帶、哪一位帶領者",
+  "FACILITATE:sense":"只讀參與者同意給帶領者看的部分", "FACILITATE:map":"只讀參與者同意給帶領者看的部分", "FACILITATE:think":"只讀參與者同意給帶領者看的部分",
+  "GATHER:open":"只讀發生地",
+  "MAP:context":"只讀面向註記和適用哪裡的法律",
+  "DECIDE:context":"讀全部：面向註記、適用哪裡的法律、四個檢查的回答（包括你的暫定立場）",
+  "MAP:open":"只讀發生地、受影響的人",
+  "規範與脈絡:open":"只讀發生地、你在哪裡、當事人各在哪裡",
+  "協作合約:open":"只讀目的、風險、受影響的人",
+  "DECIDE:group":"只讀共同的判斷和異議",
+  "ACT:group":"只讀要做的行動和授權",
 };
 /* 有條件的讀，照合約原文：THINK 可以讀外化素材，但不准拿裡面的脆弱內容來說服人；EXPRESS 只讀使用者選的那幾部分；
    COLLAB 只讀每個人同意分享的部分；TEACH 要使用者同意才能拿真實案子來練。 */
 
 /* 一個案子的狀態。 */
 const CASE_STATES = [
-  ["開案","寫目的、風險、誰會受影響、發生在哪；設定 AI 權限",["組裝器","協作合約"]],
-  ["這一輪進行中","照套件走；每一步人先寫、AI 才回",["SENSE","MAP","THINK","DECIDE"]],
+  ["開案","寫目的、風險、誰會受影響、暫定完成條件、發生地、你在哪裡、當事人各在哪裡；設定 AI 權限",["組裝器","協作合約"]],
+  ["這一輪進行中","照套件走；每一步人先寫、AI 才回；套件沒有 ACT 時，直接到回顧",["SENSE","MAP","THINK","DECIDE"]],
   ["行動後觀察中","短期按週、長期按月季年；到期系統提醒",["ACT"]],
   ["回顧","預測對上結果，決定下一步",["LEARN"]],
 ];
@@ -1135,11 +1188,11 @@ const CASE_ANYTIME = ["暫停（系統不催）","匯出","抹除整個案子（
 
 /* ───────── 架構：今天的系統實際長什麼樣。2026-10-03 查程式寫的（路徑在增補 A17）。 */
 const LAYERS = [
-  ["第 1 層","畫面","人看到、動手的地方：我的任務、每一塊的畫面、案子的紀錄頁",[],
-   "有工具目錄、填表頁、結果頁、專案頁、比較頁、兩堂課的頁面。沒有「我的任務」首頁，沒有 13 塊各自的畫面。"],
+  ["第 1 層","畫面","人看到、動手的地方：我的案子、每一塊的畫面、案子的紀錄頁",[],
+   "有工具目錄、填表頁、結果頁、專案頁、比較頁、兩堂課的頁面。沒有「我的案子」首頁，沒有 " + NB + " 塊各自的畫面。"],
   ["第 2 層","外殼","開案、AI 權限、全程生效的規則",["組裝器","協作合約","完整性核心","規範與脈絡"],
-   "完整性核心只做了一道檢查（不預設結論）。組裝器只有雛形：工具照問題分類、結果頁會推下一步，但不能組積木。協作合約、規範與脈絡沒有。"],
-  ["第 3 層","13 塊積木","人在判斷的每一段；GOVERN 貫穿每一層",["SENSE","GATHER","MAP","THINK","VERIFY","COMPUTE","DECIDE","ACT","LEARN","EXPRESS","TEACH","COLLAB","GOVERN"],
+   "完整性核心還沒有做出來：今天那一道「不預設結論」是寫進紀錄時擋，算關卡二。組裝器只有雛形：工具照問題分類、結果頁會推下一步，但不能組積木。協作合約、規範與脈絡沒有。"],
+  ["第 3 層",NB + " 塊積木","人在判斷的每一段；GOVERN 貫穿每一層",["SENSE","GATHER","MAP","THINK","VERIFY","COMPUTE","DECIDE","ACT","LEARN","EXPRESS","TEACH","COLLAB","GOVERN","FACILITATE"],
    "有一部分的 {部分}；沒有的 {無}。有的那些是 AI 先寫、人後看，方向跟合約相反。"],
   ["第 4 層","案子的紀錄","所有抽屜，加上每一步一筆的歷程",["共用紀錄"],
    "專案、來源、分析結果有自己的表。判斷、任務卡、觀察紀錄沒有自己的表，是一筆一筆往後加的事件。事件沒有記是誰寫的。"],
@@ -1150,11 +1203,11 @@ const LAYERS = [
 const ARCH_GATES = [
   ["人先寫，才看得到 AI 的回應","你沒寫自己的版本之前，AI 的完整回應不展開。","只有填表那一步是人先寫。結果出來之後，「你的判斷」可填可不填，不填也能核准。"],
   null,
-  ["寫進紀錄之前檢查","結論的格子只收人寫的；每一筆都標作者（我、AI、共同、系統）和是哪一塊寫的。","有一半。AI 的解讀存檔前，模型自己寫的「判斷」會被拿掉。但判斷、任務卡、筆記存進去時，沒有記是誰寫的。"],
-  ["每次呼叫 AI 之前，查這次准不准","照協作合約：這個案子 AI 能做什麼、不准碰什麼。","還沒有。網站上所有 AI 呼叫都經過同一個點（今天用來算用量和額度），檢查可以加在這裡；但它現在不看「准不准做這件事」。另外還有第二條呼叫 AI 的路（命令列用的），不經過這個點。"],
+  ["寫進紀錄之前檢查","結論的格子只收人寫的；不收給信念打分數的欄位；每一筆都標作者（我、AI、共同、系統）和是哪一塊寫的。","有一半。AI 的解讀存檔前，模型自己寫的「判斷」會被拿掉。但判斷、任務卡、筆記存進去時，沒有記是誰寫的。"],
+  ["每次呼叫 AI 之前，查這次准不准","照協作合約：這個案子 AI 能做什麼、不准碰什麼。案子以外的呼叫（TEACH 的練習、FACILITATE 的演練和帶領紀錄），照那一塊合約卡寫死的權限查。","還沒有。網站上所有 AI 呼叫都經過同一個點（今天用來算用量和額度），檢查可以加在這裡；但它現在不看「准不准做這件事」。另外還有第二條呼叫 AI 的路（命令列用的），不經過這個點。"],
 ];
 const DRAWER_TODAY = {
-  open:"有一部分。專案有名稱、目的、資料分級；沒有風險、受影響者、所在地、用了哪幾塊。",
+  open:"有一部分。專案有名稱、目的、資料分級；沒有風險、受影響者、發生地和你在哪裡、用了哪幾塊。",
   perm:"沒有。",
   sense:"沒有。",
   source:"有。每份來源存內容指紋、網址、抓取時間、類別、相關性；沒有「誰辦的」、沒有同出處分組。",
@@ -1169,34 +1222,37 @@ const DRAWER_TODAY = {
   habit:"沒有。",
   draft:"有一部分。報表可以產出、核准、匯出；讀的不是人的判斷卡。",
   group:"沒有。",
+  facil:"沒有。",
   drill:"沒有。課程頁只有兩堂，沒有練習紀錄。",
-  rules:"沒有。只有一道閘在跑。",
+  rules:"沒有。今天那一道「不預設結論」是寫進紀錄時擋，算關卡二，歸共用紀錄。",
+  guard:"沒有。",
   govern:"有一部分。帳號、登入、AI 用量、抹除時留一筆「已抹除」；沒有同意紀錄、沒有申訴。",
 };
 /* 每一塊：今天能直接接的 → 要新做的。 */
 const WIRING = [
-  ["SENSE","沒有可接的。最接近的是填表頁的「AI 幫我起草」，方向相反。","卡片畫面、關係圖、時間線；外化素材這個抽屜。"],
+  ["SENSE","沒有可接的。最接近的是填表頁的「AI 幫我起草」，方向相反。","卡片畫面、關係圖、時間線；外化素材這個抽屜；給帶領者看哪幾張的選擇；沒寫停止訊號的工具先不開放。"],
   ["GATHER","蒐集器（在另一個系統裡，抓完送進來）、來源的資料表。","來源身分、同出處分組、多管道；來源總覽的畫面。"],
   ["MAP",TOOL_OF("MAP") + " 個拆解工具、填表頁、結果頁、重跑和比較。","六層地圖的畫面和資料形狀；人每一層先寫一句；事實、法律、價值分欄。"],
   ["THINK",toolsOf(["divergent","association"]).length + " 個發散工具、" + toolsOf(["challenge"]).length + " 個反方工具，都是 AI 先產。","回合規則（人先寫）、七種角色、思考卡、反方按鈕。"],
   ["VERIFY","引註檢查（每句對得上來源）、" + TOOL_OF("VERIFY") + " 個證據檢查工具。","主張帳本、手法比對、三件事分開、查核資料庫的接口。"],
   ["COMPUTE",TOOL_OF("COMPUTE") + " 個計算工具。","每個輸入帶來源；結果接到判斷卡。"],
-  ["DECIDE","結果頁的「你的判斷」、" + TOOL_OF("DECIDE") + " 個選擇工具。","判斷卡 11 格、看得到的版本、結論只收人寫。"],
+  ["DECIDE","結果頁的「你的判斷」、" + TOOL_OF("DECIDE") + " 個選擇工具。","判斷卡 11 格、看得到的版本。結論只收人寫，由共用紀錄在寫進去時擋。"],
   ["ACT","任務卡、每筆紀錄、數字趨勢、到期重跑。","預測、按週按月的節奏和提醒、觀察接回判斷。"],
-  ["LEARN","引擎裡的預測追蹤、信心校準、決策日誌（只能在命令列跑）；" + TOOL_OF("LEARN") + " 個回顧工具。","接到案子上；校準紀錄；跨案子的個人歷程。"],
+  ["LEARN","引擎裡的預測追蹤、信心校準、決策日誌（只能在命令列跑）；" + TOOL_OF("LEARN") + " 個回顧工具。","接到案子上；校準紀錄；跨案子的個人歷程；自己做到的思考動作；每天校準和每週衝刺的提醒；沒有 ACT 時回來重看的提醒。"],
   ["EXPRESS","報表產出、核准、匯出 PDF。","從判斷卡組稿；每一句對回紀錄。"],
   ["TEACH","兩堂課程頁（冰山模型、人生決策）；每個工具頁的說明和可填入的範例。","其餘工具和套件的課程頁、練習案例、情境演練。"],
   ["COLLAB","沒有。帳號已經分「單位、工作區」兩層，可以當多人的地基。","全部。"],
-  ["GOVERN","帳號登入、AI 用量和額度、抹除、匯出、AI 指令的版本紀錄。","同意、申訴、危機轉介、高風險護欄。"],
-  ["組裝器","工具照網站上的 " + GOAL_COUNT + " 個問題分類（每一類的名單在「現有工具去哪」頁）、結果頁會推下一步。","目的卡、套件、每個案子的 13 格。"],
-  ["協作合約","網站上所有 AI 呼叫都經過同一個點。","權限設定的畫面；在那個點加上權限檢查。"],
-  ["完整性核心","一道閘：不預設結論。","其餘規則；每一塊上線前的檢查。"],
+  ["FACILITATE","藝術反思工具資料裡每個工具的「帶活動者提示用語」和「停止活動訊號」（在 Airtable，還沒同步進程式）；TEACH 的課程頁格式。","帶領稿、帶領者的課和演練、上完課的紀錄、帶的時候的提醒、只給看參與者同意的部分、帶領紀錄和參與者的異議欄、督導回饋、升級標準、偏離紀錄交給 GOVERN 的路。"],
+  ["GOVERN","帳號登入、AI 用量和額度、抹除、匯出、AI 指令的版本紀錄。","同意、申訴、危機轉介、高風險護欄和「護欄」抽屜。"],
+  ["組裝器","工具照網站上的 " + GOAL_COUNT + " 個問題分類（每一類的名單在「現有工具去哪」頁）、結果頁會推下一步。","目的卡、套件、每個案子的 " + NB + " 格。"],
+  ["協作合約","網站上所有 AI 呼叫都經過同一個點。","權限設定的畫面；在那個點加上權限檢查，也在那裡把發生地、你在哪裡、這個案子的護欄交給 AI。"],
+  ["完整性核心","沒有。今天那一道「不預設結論」是在寫進紀錄時擋，算共用紀錄的（見下面共用紀錄那一列）。","每一塊上線前，對照 11 條的檢查。"],
   ["規範與脈絡",TOOL_OF("規範與脈絡") + " 個法規類工具。","脈絡面向清單；每個判斷都問一次的機制。"],
-  ["共用紀錄","專案、來源、分析結果的表；一條只增不改的事件紀錄；抹除。","上面每一個抽屜；每筆事件記是誰寫的。"],
+  ["共用紀錄","專案、來源、分析結果的表；一條只增不改的事件紀錄；今天那一道「不預設結論」（模型寫進「你的判斷」的會被拿掉）。","上面每一個抽屜；每筆事件記是誰寫的；結論只收人寫。"],
 ];
 const ARCH_OPEN = [
   "紀錄怎麼存。今天判斷、任務卡、觀察都只是一筆一筆往後加的事件，沒有自己的表。新抽屜要沿用這個做法，還是各開一張表。我傾向沿用事件，再補上「誰寫的」：歷程、版本、抹除今天都靠它，不用重做。",
-  "「誰寫的」今天沒有記。判斷、任務卡、筆記存進去時沒有作者。「我的／AI 提出／共同」要靠這個，得最先補。",
+  "「誰寫的」今天沒有記。判斷、任務卡、筆記存進去時沒有作者。作者標記（我、AI、共同、系統）要靠這個，得最先補。",
   "呼叫 AI 有兩條路：網站一條、命令列一條。權限檢查要兩條都擋，還是把命令列那條收掉。",
   "課程頁只有兩堂。其餘工具的課怎麼來：一堂一堂寫，還是從工具頁已有的說明和範例自動組出來。",
   "群組的紀錄存哪裡。藍圖第 10 節要求跟個人的分開存；帳號今天有「單位、工作區」兩層可以用。",
@@ -1209,11 +1265,11 @@ const ARCH_OPEN = [
    寫法規則（CONTRACT_TEMPLATE.md 第 3 節）：一句一件事、先寫主詞、不造名詞、配場景。每一句都要在那一塊的合約卡裡找得到依據。 */
 const ONE_CASE = "例子：我跟合夥人合作兩年。上週他第三次改合約條件，還說「同業都這樣改」。我想弄清楚：這段合作要不要繼續。";
 const JOURNEY = [
-  {t:"建立任務", who:"組裝器", round:"always", short:"說清楚要釐清什麼、風險、誰會受影響、發生在哪裡",
-   you:["你選目的：「複雜決策」。","你寫下要釐清什麼：「這段合作要不要繼續」。","你寫風險，和誰會受影響：我、合夥人、兩個員工。","你寫事情發生在哪裡、當事人各在哪裡。"],
-   sys:["系統推薦一組積木：「個人複雜決策」，第一輪 6 塊。","系統說明為什麼推薦這一組。","你可以重排、跳過、停止。","系統顯示這個案子的 13 格。哪幾格做過，看得到。"],
+  {t:"建立案子", who:"組裝器", round:"always", short:"說清楚要釐清什麼、風險、誰會受影響、發生在哪裡",
+   you:["你選目的：「複雜決策」。","你寫下要釐清什麼：「這段合作要不要繼續」。","你寫風險，和誰會受影響：我、合夥人、兩個員工。","你寫做到什麼就算告一段落：「談完一次，知道要不要續約」。","你寫事情發生在哪裡、你自己在哪裡、其他當事人各在哪裡。"],
+   sys:["系統推薦一組積木：「個人複雜決策」，第一輪 6 塊。","系統說明為什麼推薦這一組。","你可以重排、跳過、停止。","系統顯示這個案子的 " + NB + " 格。哪幾格做過，看得到。"],
    ai:["AI 解釋為什麼推薦這個組合。","AI 不准強迫你走完。","AI 不准沒問就加積木。"],
-   out:"開案資料：目的、風險、受影響的人、所在地、這次用哪幾塊"},
+   out:"開案資料：目的、風險、受影響的人、暫定完成條件、發生地、你在哪裡、當事人各在哪裡、這次用哪幾塊"},
   {t:"設定權限", who:"協作合約", round:"always", short:"AI 這次能做什麼、不准碰什麼",
    you:["你填五格。","第一格：我現在要釐清、探索、比較，還是決定。","第二格：哪些事一定由我承擔。","第三格：AI 可以做什麼。例：「可以當反方。不准替我下結論。」","第四格：哪些來源和限制要納入。","第五格：什麼情況 AI 要停下來交還給我。","中途你隨時可以改。"],
    sys:["每次 AI 要做事之前，系統先查這份設定。","超出設定的動作，系統擋下來。","畫面上一直看得到現在的權限。","你每改一次，系統都記下來。"],
@@ -1225,37 +1281,37 @@ const JOURNEY = [
    ai:["AI 把你寫的整理回給你看。","AI 指出哪裡是空的。例：「沒有一張卡講到錢，是沒發生還是沒寫？」","AI 不解釋你的動機。"],
    out:"一疊卡片、關係圖或時間線、情緒訊號"},
   {t:"蒐集", who:"GATHER", round:"add", short:"外面的資料抓回來，記清楚從哪來",
-   whenT:"資料不夠時", when:"拆解或回顧時發現缺資料。加了以後，它排在拆解前面，因為拆解要用找回來的資料。", how:"系統提出，你同意才加",
-   you:["你寫下要查什麼：「同業都這樣改合約，是真的嗎？」","你按「去找」。","你也可以自己貼：合約原文、他三次改條件的訊息。","你把每個來源標成採用、存疑、不用，並寫理由。"],
+   whenT:"資料不夠時", when:"拆解時發現缺資料，或回顧時你挑了蒐集。加了以後，它排在拆解前面，因為拆解要用找回來的資料。", how:"系統提出，你同意才加",
+   you:["你寫下要查什麼：「同業都這樣改合約，是真的嗎？」","你按「去找」。","你也可以自己貼：合約原文、他三次改條件的訊息。","你對每個出處標採用、存疑、不用，並寫理由。"],
    sys:["系統至少用兩家搜尋引擎、兩種語言找。","系統查每個來源是誰辦的。","系統把抄同一篇的網頁排成一組，算一個出處。","系統顯示來源總覽：幾個獨立出處、各是誰辦的。"],
    ai:["你有准 AI 找外部資料時，AI 才摘要每個來源說了什麼。","AI 一律寫成「這個來源說……」。","AI 不說哪個是真的。","AI 不替來源打分數。"],
    out:"來源總覽。每一筆都標「有人這樣說」"},
   {t:"先練", who:"TEACH", round:"add", short:"要用的方法先上 5 分鐘的課、用低風險案例練一次",
-   whenT:"第一次用某個方法時", when:"你第一次用某個拆法或方法。", how:"系統提出，可以跳過。不算在 6 塊裡",
+   whenT:"這個案子第一次用某個方法時", when:"這個案子第一次用某個拆法或方法。", how:"系統提出，可以跳過。不算在 6 塊裡",
    you:["你第一次用「冰山模型」拆解。","你先上 5 分鐘的課。","你用別人的案例練一次。","你可以跳過。"],
    sys:["系統給這個方法的課，和一個低風險的練習案例。","系統把練習和你真實的案子分開存。"],
    ai:["AI 當練習的對手。","AI 針對你思考的動作給回饋。","AI 不打分數。"],
    out:"練習紀錄。你可以選擇不留"},
   {t:"拆解", who:"MAP", round:"first", short:"事實、解釋、利益、結構、矛盾、介入分開；所有脈絡面向一起看，包括它們是不是成因",
-   you:["你選一個拆法。例：冰山模型。","你把卡片和找回來的來源分到六層：事實、解釋、利益、結構、核心矛盾、介入。","每一層你先寫一句。","你對有關的脈絡各寫一句。例：這份合約適用哪裡的法律。"],
-   sys:["系統顯示六層的畫面。","系統在每一條事實旁邊顯示有幾個獨立出處。","沒有外部資料的事實，系統標成「我自己說的」。","拆解時發現缺資料，系統提議加「蒐集」。你同意才加。"],
+   you:["你選一個拆法。例：冰山模型。","你把卡片和找回來的來源分到六層：事實、解釋、利益、結構、核心矛盾、介入。","每一層你先寫一句。","有關的脈絡面向，你各回答兩題：它怎麼界定這裡的「正常」？它是不是原因之一？例：「同業都這樣改」這個慣例，界定了什麼算正常；它也可能就是你一再被改條件的原因。"],
+   sys:["系統顯示六層的畫面。","系統在每一條事實旁邊顯示有幾個獨立出處。","沒有外部出處的事實，系統標「我自己說的，還沒有外部出處」。","拆解時發現缺資料，系統提議加「蒐集」。你同意才加。"],
    ai:["AI 建議每張卡放哪一層。你確認才算。","AI 指出哪一層是空的、哪一層資料最少。","AI 不替你決定核心矛盾是什麼。"],
    out:"六層地圖、假設、還缺什麼資料"},
   {t:"共思考", who:"THINK", round:"first", short:"人先想，AI 再發散、反證",
    you:["你先寫自己的三個解釋。","你選 AI 這一輪當什麼角色。例：反方。","你自己至少再加兩張思考卡。","你自己選三張帶到下一步。"],
-   sys:["你沒寫之前，系統不顯示 AI 的回應。","系統把你自己的版本、跟 AI 一起的版本分開存。"],
+   sys:["你沒寫之前，系統不展開 AI 的完整回應。","系統把你自己的版本、跟 AI 一起的版本分開存。"],
    ai:["AI 當反方，針對你最有把握的那個解釋提出最強的反例。","AI 不替你排序。","AI 不替你選。"],
    out:"思考卡、反例、候選的判準"},
   {t:"查證", who:"VERIFY", round:"add", short:"每個主張對來源：支持、反證、未知、可能怎麼操弄我",
-   whenT:"出現別人的說法時", when:"卡片裡有「聽說」「他說」「網路上寫」這類別人的說法。", how:"系統提出，你同意才加",
+   whenT:"出現別人的說法時", when:"卡片裡有「聽說」「他說」「網路上寫」這類別人的說法，或拆解時有要查的主張。", how:"系統提出，你同意才加",
    you:["你把「同業都這樣改合約」這句話貼進來。","你先寫第一反應和信心：「半信半疑，五成」。","你看完之後，對這句話標採信、存疑或不採信，並寫理由。"],
-   sys:["系統把這句話拆開：哪些是可以查的事實，哪些是解釋。","系統列出主張帳本。例：1 個出處支持、2 個反對。","系統檢查這句話是怎麼傳開的。","系統把三件事分開顯示：找得到出處、出處彼此獨立、出處站不站得住。"],
-   ai:["AI 指出這句話用了哪種手法，並附上原文的哪一段。","AI 不宣判真假。","AI 不替你決定信不信。"],
+   sys:["系統把主張分成四種句子，只有可以查的事實才查。","系統列出主張帳本。例：1 個出處支持、1 個反對；1 個你標了「不用」，不算。","系統檢查這句話是怎麼傳開的。","系統把三件事分開顯示：找得到出處、出處彼此獨立、出處站不站得住。"],
+   ai:["AI 先提出這句話可以拆成哪幾個主張。你確認了才算。","AI 指出這句話用了哪種手法，並附上原文的哪一段。","AI 不宣判真假。","AI 不替你決定信不信。"],
    out:"主張帳本、你對這句話的判定"},
   {t:"計算", who:"COMPUTE", round:"add", short:"該算的真的算：統計、損益、情境模擬",
    whenT:"出現數字或錢時", when:"選項要比成本、收入、機率。", how:"系統提出，你同意才加",
    you:["你說要算什麼：「拆夥後六個月的收入」。","你挑要用的數字，並確認每個數字從哪裡來。","你設三種情境：樂觀、一般、悲觀。"],
-   sys:["系統真的把數字算出來，不是讓 AI 用講的。","系統列出公式和每一個輸入。","你自己給的數字，系統標成「我自己說的」。","系統指出哪一個數字一變，結果就翻。"],
+   sys:["系統真的把數字算出來，不是讓 AI 用講的。","系統列出公式和每一個輸入。","你自己給的數字，系統標「我自己說的，還沒有外部出處」。","系統指出哪一個數字一變，結果就翻。"],
    ai:["AI 建議適合的算法。","AI 用白話解釋結果。","AI 不編數字。","AI 不把模擬說成預測。"],
    out:"計算結果：輸入、公式、三種情境的結果"},
   {t:"共同程序", who:"COLLAB", round:"add", short:"有別人一起決定時：分歧地圖、保留異議、授權與重開條件",
@@ -1263,41 +1319,44 @@ const JOURNEY = [
    you:["你發起共同程序，邀請第三位合夥人。","每個人先各自寫自己的立場。寫完才看別人的。","你們對每個方案標同意或異議，並寫理由。","你們一起訂：什麼情況結束討論、什麼情況重新開。"],
    sys:["系統畫出分歧地圖：大家在哪裡不一樣。","系統把異議和理由存下來，不會被多數蓋掉。","各自寫完之前，系統不顯示多數意見。"],
    ai:["AI 整理分歧。","AI 轉述每一方的立場，由本人確認說得對不對。","AI 不代表任何一方。","AI 不宣布「大家已經有共識」。"],
-   out:"共同紀錄：分歧地圖、異議、授權、重開條件"},
+   out:"群組紀錄：分歧地圖、異議、授權、重開條件"},
   {t:"判斷", who:"DECIDE", round:"first", short:"我的結論、依據、什麼會改變它。只能人填",
    you:["你自己寫：結論、依據、信心多少、什麼事會讓你改變想法。","你寫一句下一步：「先跟他談一次條件」。","你也可以寫「現在先不決定」。"],
-   sys:["系統檢查每一格有沒有填。","結論那一格只收你寫的。","系統先問你現在情緒和急迫感多強。你選「強」，系統建議把不能反悔的決定延後。","選項要比成本、收入時，系統提議加「計算」。有人也有決定權時，系統提議加「共同程序」。你同意才加。"],
-   ai:["AI 指出哪一格空著、哪裡前後矛盾。","AI 可以提出候選的判準，也可以用問題幫你把話說清楚。","AI 不寫結論。"],
+   sys:["系統檢查每一格有沒有填。","結論那一格只收你寫的。共用紀錄在寫進去時擋。","系統先問你現在情緒和急迫感多強。你選「強」，系統建議把不能反悔的決定延後。","選項要比成本、收入時，系統提議加「計算」。有人也有決定權時，系統提議加「共同程序」。你同意才加。"],
+   ai:["AI 指出哪一格空著、哪裡矛盾、哪裡寫不清楚、哪一步不能反悔。","AI 不寫結論。"],
    out:"判斷卡第 1 版"},
   {t:"行動與觀察", who:"ACT", round:"first", short:"最小、可逆的一步；短期按週、長期按月季年記錄",
    you:["你把判斷卡上那一句下一步寫成任務卡：什麼時候談、談什麼。","你先寫預測：「我猜他會讓步一半」。","之後你每週回來記實際狀況。一個月後改成按月、季、年。"],
-   sys:["系統到時間提醒你。","同一個數字記到兩次，系統畫成趨勢。","到期時，系統把新的觀察和當初的判斷卡、預測並排。"],
+   sys:["系統到時間提醒你。","同一個數字記到兩次，系統畫成趨勢。","到期時，系統提醒你做回顧。"],
    ai:["AI 幫你把那一步拆得更小。","AI 提醒哪一步不能反悔。","AI 不替你承諾。"],
    out:"任務卡、預測、觀察紀錄"},
   {t:"輸出", who:"EXPRESS", round:"add", short:"把判斷變成給別人看的東西，每句追得回紀錄",
    whenT:"要拿給別人看時", when:"你要把判斷拿給別人看。任何一步之後都可以。", how:"你隨時可以叫出來",
    you:["你選要給誰看、用什麼形式。例：一封給合夥人的信。","你先寫幾句自己要說的重點。","你選要帶哪些判斷和依據。","你自己改寫，自己按送出。"],
-   sys:["你寫完重點之後，系統才從你選的紀錄組成草稿。","每一句都連得回紀錄裡的哪一筆。","還沒查證、只有一個出處的句子，系統標出來。"],
-   ai:["AI 起草，並依讀者調整說法。","AI 不加紀錄裡沒有的主張。","AI 不替你送出。"],
+   sys:["你寫完重點之後，系統才把你選的紀錄排成大綱。","每一句都連得回紀錄裡的哪一筆。","還沒查證、只有一個出處的句子，系統標出來。"],
+   ai:["AI 照大綱起草，並依讀者調整說法。","AI 不加紀錄裡沒有的主張。","AI 不替你送出。"],
    out:"信的稿子、每一句對回紀錄的對照"},
   {t:"回顧", who:"LEARN", round:"first", short:"到期回來對結果，更新判斷和對 AI 的信任；沒解決就換方法",
    you:["你回來對照：當初預測什麼，後來發生什麼。","你寫當時漏看了什麼。","你決定下一步：維持判斷、出新版判斷，或換方法再做一輪。"],
-   sys:["系統把當初的判斷卡、預測、後來的結果並排。","系統列出這個案子還沒用過的積木。"],
+   sys:["系統把當初的判斷卡、預測、後來的結果並排，也擺出開案時寫的暫定完成條件。","系統列出這一輪你沒靠 AI、自己做到的思考動作，和這個案子還沒用過的積木。"],
    ai:["AI 指出這次你想得好的兩處、下次可以練的一處。","AI 不打分數。","AI 不替你決定要不要修正。"],
    out:"回顧紀錄"},
 ];
 /* 從頭到尾都在的：一塊積木（GOVERN）加上全程生效的五樣。五樣的順序跟 CROSS 一樣。 */
-const JOURNEY_GOVERN = ["它是第 13 塊積木，從頭到尾都在。","你隨時可以匯出、刪除自己的資料。","出現危機訊號時，系統給所在地的求助資源。","健康、法律、金錢這類高風險的事，系統自動多一層提醒。"];
+/* 一頁看懂右邊「從頭到尾都在」的積木：GOVERN 一直在；FACILITATE 在有人帶的時候一直在。 */
+const ALWAYS_BLOCKS = ["GOVERN","FACILITATE"];
+const JOURNEY_FACILITATE = ["它的積木編號是 14。有人帶的時候才用：課堂、工作坊、團體。","帶領者照帶領稿帶。參與者寫的東西，帶領者只看得到參與者同意給他看的。","帶領者不替參與者下結論，也不要求說出脆弱的事；停止訊號一出現就停。","每帶完一次，帶領者寫帶領紀錄；督導看了寫回饋。"];
+const JOURNEY_GOVERN = ["它的積木編號是 13，從頭到尾都在。","你隨時可以匯出、刪除自己的資料。","出現危機訊號時，系統照你在哪裡給當地的求助資源。","健康、法律、金錢、人身安全、急性心理危機、要公開散布的事，系統自動加護欄：要求來源、建議找專業的人、先等一下或請人覆核；有別人也有決定權時，「判斷」那一步提議加「共同程序」，標明是護欄，你可以不加。"];
 const JOURNEY_ALWAYS = {
-  "完整性核心":["每一步都受它管。","例：結論只能你自己寫，AI 不能預先填好。","例：平台不給人打分數。"],
-  "規範與脈絡":["拆解和判斷時打開。","它讀你開案時寫的發生地。","它問：適用哪裡的法律、這個「慣例」是誰定的、這個環境是不是問題的原因之一。"],
+  "完整性核心":["每一步都受它管。","例：結論只能你自己寫，AI 不能預先填好。","例：AI 的權限看得見，你隨時可以縮小或收回。"],
+  "規範與脈絡":["拆解和判斷時打開。","它讀你開案時寫的發生地、你在哪裡、當事人各在哪裡。","每個有關的面向，它問兩題：它怎麼界定這裡的「正常」？它是不是這件事的原因之一？例：「同業都這樣改」這個慣例，界定了什麼算正常；它也可能就是你一再被改條件的原因。","每一條起作用的規範，你也走四個檢查：誰有權決定、從哪來誰受益、是事實還是價值、你是真心認同還是暫時遵守。"],
   "組裝器":["第 1 步用它開案。","之後每次要加一塊積木，都由它把提議顯示給你。你同意才加。"],
   "共用紀錄":["每一步寫下的東西，都記在這個案子裡。","每一筆標作者和是哪一塊寫的。"],
   "協作合約":["第 2 步用它設定。","之後每次 AI 要做事，系統先查它。","你隨時可以縮小或收回 AI 的權限。"],
 };
 /* 出狀況時：名稱、例子、系統怎麼做、你怎麼做、在哪一步（空的＝任何時候）。 */
 const ONE_FAIL = [
-  ["找到的來源太少","系統只找到一個獨立出處。","系統停下來。畫面顯示「只有一個出處」。","你決定：再找、照用但標存疑，或不用這筆。","蒐集"],
+  ["找到的出處太少","系統只找到一個獨立出處。","系統停下來。畫面顯示「只有一個出處」。","你決定：再找、照用但標存疑，或不用這筆。","蒐集"],
   ["來源互相矛盾","公會的公告說可以改，顧問公司的文章說不行。","系統把兩邊並排。AI 不選邊。","你標哪個採用、哪個存疑，並寫理由。","蒐集"],
   ["來源可能是灌出來的","兩小時內四十多個帳號貼同一段話。","系統在查證那一步標「疑似協同」並寫理由。這個標記不代表它是假的。","你在查證那一步標採信、存疑或不採信。","查證"],
   ["你情緒很強","你剛跟合夥人吵完，想馬上拆夥。","系統在你下判斷前問你情緒多強。你選「強」，系統建議把不能反悔的決定延後。","你決定延不延。","判斷"],
@@ -1312,8 +1371,10 @@ const PK = [
     ["創意與策略衝刺","研究、創作、產品與策略問題。SENSE 或 MAP 擇一開始",["SENSE","MAP","THINK","DECIDE","ACT"]],
     ["課堂反思","學生的思考練習與 AI 素養",["SENSE","THINK","LEARN"]],
     ["團隊審議","團隊、社群與組織的共同問題",["MAP","VERIFY","COLLAB","DECIDE","ACT","LEARN"]],
-    ["公共議題判斷（我們加的）","一項政策、一個公共爭議，我怎麼形成自己的立場。拆解時必開「規範與脈絡」；行動是參與的一步",["MAP","VERIFY","THINK","DECIDE","ACT","LEARN"]],
+    ["自我理解（我們加的，等你定）","你的八步循環：觀察、外化在 SENSE；反思、提問、比較、重構在 THINK；判斷在 DECIDE；再檢視在 LEARN。藝術外化之後加入",["SENSE","THINK","DECIDE","LEARN"]],
+    ["公共議題判斷（我們加的）","一項政策、一個公共爭議，我怎麼形成自己的立場。拆解時必開「規範與脈絡」，它會問你的介面問題；行動是參與的一步",["MAP","VERIFY","THINK","DECIDE","ACT","LEARN"]],
 ];
+document.querySelectorAll(".n-pk").forEach(e => { e.textContent = PK.length; });
 /* 今天的專案頁有什麼、缺什麼：案子的紀錄那一頁和「共用紀錄」合約卡用同一份。 */
 const RECORD_HAVE = [
     "歷程：每一步一筆",
@@ -1333,7 +1394,7 @@ const RECORD_LACK = [
     "沒有外化素材",
     "沒有預測：行動前沒寫下預期，回顧時沒東西可對",
     "沒有規範脈絡：事實、法律、價值沒有分開的欄位",
-    "沒有標「我的／AI 提出／共同發展」",
+    "沒有標作者（我、AI、共同、系統）",
     "流程列是「建立→蒐集→彙整→分析→報表→核准」，正是藍圖 4 說平台不該是的樣子；個人流程不該以核准收尾",
     "沒有跨案子的記憶"];
 /* 脈絡面向：只在這裡列一次。加一個面向＝在這裡加一列。[名稱, 看什麼, 是不是建議中] */
@@ -1357,93 +1418,60 @@ const FACETS = [
 const FACET_NAMES = FACETS.filter(f=>!f[2]).map(f=>f[0]);
 const BLOCKS = [
  {n:1, code:"SENSE", name:"外化", role:"先攤出來", status:"無", contract:"草稿", build:"未開始",
-  problem:"我實際看見、感覺、在意什麼？把腦子裡混在一起、還沒說清楚的東西先放到外面，讓自己看見。不分析、不下結論。",
-  user:["一件一張卡：事件、感受、身體反應、恐懼、期待、人物關係與權力、直覺、我現在跟自己講的故事、別人的聲音。","替現在最強的情緒自己標一個強度：弱、中、強。","用打字或講話。之後可以畫、可以放照片（藝術外化＝同一塊換媒介）。先做哪一種還沒定（藍圖 13.2）。"],
-  system:["把卡片擺在一個畫面上，讓人拖、分組、連線（關係圖）、排時間（時間線）。","每張卡標它是哪一類。","卡片裡出現「聽說」「他說」「網路上寫」這類外來的說法時，提出加 VERIFY；你同意才加。"],
-  ai:["鏡子：把你放的東西整理回給你看，指出空白。例：「事實裡沒有一件是關於錢的，是沒發生還是沒放？」","提問：一次只問一題。"],
-  aino:["解釋你的動機、診斷、評價、替你下結論。詮釋權留給人。","交還控制：出現自傷、暴力、急性危機的訊號時，停下來給所在地的求助資源；使用者說不想再談，立刻停。"],
-  reads:["使用者的輸入。不讀判斷卡和回顧紀錄，避免外化被結論汙染。"],
-  writes:["素材卡、關係圖、時間線、情緒訊號（含你自己標的強度）。"],
-  out:"一疊卡＋關係圖／時間線＋情緒訊號，交給 MAP；套件裡沒有 MAP 時（課堂反思）直接交給 THINK。",
-  now:"沒有。現在的入口是「貼一段話 → AI 起草表單」，中間跳過了「自己先看見」。",
   example:[["事件","上週他第三次改合約條件"],["身體","開會前我胃會緊"],["恐懼","怕拆夥後案子接不到"],["關係","他跟我前老闆很熟"],["期待","我希望能自己決定方向"],["別人的聲音","我媽說做生意就是要忍"],["直覺","他沒把我當夥伴"],["故事","我被利用了"]]},
  {n:2, code:"GATHER", name:"蒐集來源", role:"把資料找回來，看清楚是誰說的",
   words:[["來源","一個網頁或一份文件。"],["出處","最早的源頭。五個網頁抄同一篇文章，算五個來源、一個出處。"],["管道","怎麼找到的：哪一家搜尋引擎、哪種語言，或你自己貼的。"],["蒐集器","在背後抓資料的程式。你在 VERIFY 查一則訊息時，系統也用它。"]], status:"部分", contract:"草稿", build:"未開始",
   exampleTitle:"範例：合夥人說「同業都這樣改合約」，我想查是不是真的",
   example:[["我寫","同業都這樣改合約，是真的嗎？然後按「去找」"],["系統找到","9 個網頁。其中 5 個貼的是同一篇文章，算 1 個出處。另外 2 個各算 1 個出處。所以是 3 個獨立出處。還有 2 個抓不到內文"],["來源總覽","出處一：某產業公會的公告，2019 年就有。出處二：一家顧問公司的文章，查得到是誰辦的。出處三：一個網站，網域上個月才註冊，查不到誰辦的"],["放一旁","2 個網頁抓不到內文，放在一旁，沒算進去"],["我標記","出處一：採用。出處二：存疑，因為它在賣顧問服務。出處三：不用，因為查不到誰辦的"],["交出去","三筆都標「有人這樣說」，連同我的標記交給查證。我標「不用」的那一筆照樣交出去，但不算進支持或反對的數量"]],
-  problem:"GATHER 幫你把外面的資料找回來。它讓你看得出每一筆是誰說的。它也讓你看得出幾個網頁是不是抄自同一個源頭。它不替你判斷真假。這一步是你自己看來源、決定採不採用。",
-  user:["你寫下要查什麼。","在這一步，你按「去找」，系統才開始找。","你在 VERIFY 貼一則訊息去查的時候，系統會在背後找來源。那時畫面會寫明系統正在找。","你可以自己貼網址、檔案、截圖。","你貼的網址和檔案，系統標成「我貼的」，一樣查它是誰辦的。","你貼的是一段沒有出處的文字，系統標成「我自己說的」，不算外部來源。","你看來源總覽：找到幾個獨立出處、各是誰辦的、各自最早什麼時候出現。","你把每個來源標成採用、存疑、不用，並寫一句理由。","你點一個來源，可以按「找跟它說法相反的」或「找它引用的原始文件」。","事情發生在哪裡，沿用開案時寫的。要改，回開案資料改。"],
-  system:["系統至少用兩家搜尋引擎找。","系統至少用兩種語言找：事情發生地的語言，加上另一方或國際通用的語言。","系統替每一筆記下：從哪個管道、用哪句查詢找到的。","系統查每個來源是誰辦的。它只寫查得到的事：網域什麼時候註冊、網站自己寫的經營者是誰。","系統查這個網站列在哪一份名單上（官方、媒體、學術、查核組織、內容農場），並寫明那份名單是誰維護的、哪一版。","網站的名字像國際媒體或中立的新聞網站時，系統查這家媒體是不是真的存在。","查不到的，系統寫「查不到」。","系統把這三種網頁排成一組，算一個出處：抄同一篇的、用同一張圖的、幾個網站只互相引用而沒有別的依據的。","平台把「怎樣算同一組」的規則寫出來給你看，並標明是第幾版。","改寫過的文章系統拿不準時，標「可能同出處」，由你決定算不算。","分組不是刪除。組裡每一頁都還看得到，你可以拆開。","系統記每個來源最早什麼時候出現。查不到就寫查不到。被刪掉的文章、私人群組裡的訊息系統看不到，畫面會註明。","一句話怎麼傳開、是不是很多帳號一起貼，這一步不看。那是 VERIFY 在看。","系統先找最原始的：法規原文、官方公告、原始的影片和照片。","抓不到內文的網頁、講的不是這件事的網頁，系統不丟掉。它把它們放進「放一旁」清單並寫理由。你可以拿回來。","放一旁的網頁不算進出處的數量。畫面會寫有幾頁在一旁。","系統替每個網頁存一份當時的樣子，附上時間和一串核對碼。","網頁之後被改過，核對碼會不一樣，系統就看得出來。網頁被刪了，存的那一份還在。","畫面顯示來源分佈：多少來自同一家搜尋引擎、同一種語言、同一個國家。"],
+  problem:"GATHER 幫你把外面的資料找回來。它讓你看得出每一筆是誰說的。它也讓你看得出幾個網頁是不是抄自同一個源頭。它不替你判斷真假。這一步是你自己看來源，再對每個出處決定採不採用。",
+  user:["你寫下要查什麼。","在這一步，你按「去找」，系統才開始找。","你在 VERIFY 貼一則訊息去查的時候，系統會在背後找來源。那時畫面會寫明系統正在找。","你可以自己貼網址、檔案、截圖。","你貼的網址和檔案，系統標成「我貼的」，一樣查它是誰辦的。","你貼的是一段沒有出處的文字，系統標成「我自己說的，還沒有外部出處」，不算外部來源。","你看來源總覽：找到幾個獨立出處、各是誰辦的、各自最早什麼時候出現。","你對每個出處標採用、存疑、不用，並寫一句理由。同一組裡的網頁一起標；要分開標，先把組拆開。","你點一個來源，可以按「找跟它說法相反的」或「找它引用的原始文件」。","事情發生在哪裡，沿用開案時寫的。要改，回開案資料改。"],
+  system:["系統至少用兩家搜尋引擎找。","系統至少用兩種語言找：事情發生地的語言，加上另一方或國際通用的語言。","系統替每一筆記下：從哪個管道、用哪句查詢找到的。","系統查每個來源是誰辦的。它只寫查得到的事：網域什麼時候註冊、網站自己寫的經營者是誰。","系統查這個網站列在哪一份名單上（官方、媒體、學術、查核組織、內容農場），並寫明那份名單是誰維護的、哪一版。","網站的名字像國際媒體或中立的新聞網站時，系統查這家媒體是不是真的存在。","查不到的，系統寫「查不到」。","回顧時你標錯的出處，GATHER 存在那個出處的來源卡上；這個案子裡同一個出處再出現時，畫面顯示你的標記。","系統把這三種網頁排成一組，算一個出處：抄同一篇的、用同一張圖的、幾個網站只互相引用而沒有別的依據的。","平台把「怎樣算同一組」的規則寫出來給你看，並標明是第幾版。","改寫過的文章系統拿不準時，標「可能同出處」，由你決定算不算。","分組不是刪除。組裡每一頁都還看得到，你可以拆開。","系統記每個來源最早什麼時候出現。查不到就寫查不到。被刪掉的文章、私人群組裡的訊息系統看不到，畫面會註明。","一句話怎麼傳開、是不是很多帳號一起貼，這一步不看。那是 VERIFY 在看。","系統先找最原始的：法規原文、官方公告、原始的影片和照片。","抓不到內文的網頁、講的不是這件事的網頁，系統不丟掉。它把它們放進「放一旁」清單並寫理由。你可以拿回來。","放一旁的網頁不算進出處的數量。畫面會寫有幾頁在一旁。","系統替每個網頁存一份當時的樣子，附上時間和一串核對碼。","網頁之後被改過，核對碼會不一樣，系統就看得出來。網頁被刪了，存的那一份還在。","畫面顯示來源分佈：多少來自同一家搜尋引擎、同一種語言、同一個國家。"],
   ai:["你在協作合約裡准了「AI 可以找外部資料」，AI 才做下面四件事。","你沒准的時候，AI 只能問你問題、整理你貼的東西、指出還缺什麼。（藍圖 6.3）","AI 幫你想查詢要怎麼下，並翻成別的語言再查一次。","AI 摘要每個來源說了什麼。它一律寫成「這個來源說……」。","AI 指出哪兩個來源互相矛盾。","AI 提醒可能還缺哪一方的說法。要不要再找由你決定。AI 不能自己把內容補上。"],
-  aino:["AI 不准把來源說的話寫成事實。","AI 不准拿自己記得的事補進來。沒有來源，它就說沒有。","AI 不准刪掉來源。","AI 不准決定哪個來源不採用。","AI 不准替來源打可信度的分數。","交還控制：獨立出處不到兩個時，系統停下來。畫面顯示「只有一個出處」，由你決定要不要繼續。","交還控制：事情發生地的語言一筆都找不到時，系統停下來問你。","交還控制：來源互相矛盾時，系統把兩邊並排，由你決定。AI 不選邊。"],
-  reads:["這一步讀：你要查的問題、事情發生在哪裡、你貼的來源、MAP 交回來的「還缺什麼資料」。","絕不讀：你的情緒卡、你的判斷卡。在這一步，系統不知道你站哪一邊，所以不會照你想聽的去挑來源。"],
-  writes:["來源卡。每張記：誰辦的、何時開始存在、國家、語言、是原始的還是轉貼的、最早何時出現、它自己宣稱的立場、查得到的隸屬、查得到它跟當事方的關係（查不到的寫查不到）、從哪個管道找到。","分組、來源分佈、每個網頁當時的樣子、「放一旁」清單和理由。","你對每個來源的標記（採用、存疑、不用）和理由。","有些地方的網路有審查。系統記下在那裡哪些搜尋引擎或網站連不上。這樣你知道「查不到」可能是被擋住，不是沒發生。"],
-  out:"來源總覽交給 MAP、VERIFY、COMPUTE。交出去的每一筆都標「有人這樣說」。你標成「不用」的來源照樣交出去，但不算進支持或反對的數量。要不要把它當成事實放進 MAP 拆解的地圖，由你決定。",
+  aino:["AI 不准把來源說的話寫成事實。","AI 不准拿自己記得的事補進來。沒有來源，它就說沒有。","AI 不准刪掉來源。","AI 不准決定哪個出處不採用。","AI 不准替來源打可信度的分數。","交還控制：獨立出處不到兩個時，系統停下來。畫面顯示找到幾個出處，由你決定要不要繼續。","交還控制：事情發生地的語言一筆都找不到時，系統停下來問你。","交還控制：來源互相矛盾時，系統把兩邊並排，由你決定。AI 不選邊。"],
+  reads:["這一步讀：你要查的問題、事情發生在哪裡、你貼的來源、MAP 交回來的「還缺什麼資料」。","VERIFY 在背後找來源時，這一步讀 VERIFY 交過來要查的主張。","這一步也讀：LEARN 交回來的「你標錯的出處」、GOVERN 管的來源名單、分類規則、分組規則的現行版本。","絕不讀：你的情緒卡、你的判斷卡。在這一步，系統不知道你站哪一邊，所以不會照你想聽的去挑來源。"],
+  writes:["來源卡。每張記：誰辦的、何時開始存在、國家、語言、是原始的還是轉貼的、最早何時出現、它自己宣稱的立場、查得到的隸屬、查得到它跟當事方的關係（查不到的寫查不到）、從哪個管道找到。","分組、來源分佈、每個網頁當時的樣子、「放一旁」清單和理由。","你對每個出處的標記（採用、存疑、不用）和理由；回顧時你標錯的出處。","有些地方的網路有審查。系統記下在那裡哪些搜尋引擎或網站連不上。連不上的管道標「無法檢查（這裡連不上 X）」，不標「查不到」。"],
+  out:"來源總覽交給 MAP、VERIFY、COMPUTE。交出去的每一筆都標「有人這樣說」。你標成「不用」的出處照樣交出去，但不算進支持或反對的數量。要不要把它當成事實放進 MAP 拆解的地圖，由你決定。",
   uncert:["每一格都寫三種之一，不留空白。「查到」：找到了。「查不到」：找過，沒有。「無法檢查」：系統沒有辦法查這一項，例如私人群組裡的訊息。","系統不替來源打可信度。它只給三件查得到的事：誰辦的、有幾個獨立出處、是不是原始的。","可信不可信由你判斷，寫在你的採用標記和理由裡。","畫面顯示這次用的名單和分組規則是哪一版。","列在哪份名單上、被分在哪一組，都不代表它是假的。"],
-  control:["你可以加來源。","你可以把來源標成不用。來源只會被標成不用，不會消失。要徹底刪除，走整個案子的抹除。","你可以把系統分的組拆開。","你可以改系統的分類，改的時候寫理由。","你可以關掉某個搜尋管道，也可以要求重抓。","搜尋引擎少於兩家、或語言少於兩種時，畫面標「管道不足」，系統停下來讓你決定。","你可以不蒐集，只用自己寫的內容。這些內容標「我自己說的，還沒有外部出處」。"],
+  control:["你可以加來源。","你可以把出處標成不用。標成不用的出處不會消失。要徹底刪除，請 GOVERN 抹除整個案子。","你可以把系統分的組拆開。","你可以改系統的分類，改的時候寫理由。","你可以關掉某個搜尋管道，也可以要求重抓。","搜尋引擎少於兩家、或語言少於兩種時，畫面標「管道不足」，系統停下來讓你決定。","你可以不蒐集，只用自己寫的內容。這些內容標「我自己說的，還沒有外部出處」。"],
   data:["來源卡和網頁當時的樣子跟著案子。案子抹除時一起刪。","每張來源卡記下這次用的名單和規則是哪一版。","名單和規則改版時，由 GOVERN（治理那一塊）記錄是誰改的、改了什麼。","各地的名單由當地的人參與維護。平台不單方面定。"],
   now:["今天有蒐集器，但擋不住灌水。","它會抓網頁、搜尋結果、學術資料。","它替每份來源記網址、抓取時間、誰抓的，並存一份當時的內容。","它只做三道檢查：抓到的是不是內文、講的是不是這件事、是哪一類網站。","它不查網站是誰辦的。它不查十個網站是不是同一篇。","沒列在名單上的網站，它一律放行。","檢查沒過的網頁不會進到案子裡，只在蒐集報告裡留網址和原因。在案子的畫面上你看不到，也拿不回來。這跟上面「放一旁、可以拿回來」的要求不一樣，要改。","它一次只用一家搜尋引擎。","好的一點：它抓回來的東西一律標成「有人這樣說」，從不標成事實。"]},
  {n:3, code:"MAP", name:"拆解", role:"分開看", status:"部分", contract:"未寫", build:"未開始",
-  problem:"把事實、解釋、利益、結構、核心矛盾、介入分開；法律、價值、文化也分開看。",
   now:"做法庫有：" + TOOL_TOTAL + " 個工具裡 " + TOOL_OF("MAP") + " 個是拆解用的（例如冰山、魚骨、SWOT），都能跑、都有檢查。" + "六層地圖、規範檢查這塊積木本身沒有。資料上「事實／法律／價值」沒有分開的欄位。"},
- {n:4, code:"THINK", name:"共思考", role:"發散、反證", status:"無", contract:"未寫", build:"未開始",
-  problem:"人先想，AI 再給支架：發散、反證、提問，但不替人決定。",
-  now:"沒有。沒有「人先寫、AI 才回」的回合規則；沒有七種 AI 角色；沒有思考卡；沒有反方按鈕。"},
+ {n:4, code:"THINK", name:"共思考", role:"發散、反證", status:"無", contract:"未寫", build:"未開始"},
  {n:5, code:"VERIFY", name:"查證主張", role:"對來源", status:"部分", contract:"草稿", build:"未開始",
-  problem:"一則訊息或一個說法，可以驗證什麼？每個主張有幾個獨立出處支持、幾個反對、哪些查不到？它是怎麼傳開的？它想讓我做什麼？平台不宣判真假，是讓人自己看得清楚再決定。",
-  user:["貼上訊息、截圖或連結。","先停一下，寫下自己的第一反應和信心有多少，再看系統查到什麼。","順序照查核員的做法：先查是誰說的，再找別的地方怎麼報，最後追回最原始的出處。","看主張帳本，對每個主張標採信、存疑、不採信，寫一句理由。","決定要不要轉傳、要不要照它說的做。"],
-  system:["查別人是不是已經查過這一則。查核組織的結論跟別的來源一樣，由蒐集器照 GATHER 合約的規則寫進「來源」抽屜（一樣做身分查核、同出處分組），再列進主張帳本；標明是誰判的、依據什麼，不當成平台的結論。你寫完第一反應才顯示。已確認可以用的兩個來源（2026-10-02 實際連上測過）：全球查核結果的公開資料檔，10 萬多筆、1,297 個查核組織、每天更新、可免費使用（要標出處），台灣事實查核中心和 MyGoPen 都在裡面；台灣的 Cofacts，有公開的查詢介面，資料可用（要標出處、同樣方式分享）。Google 的查核搜尋介面也能用，但要先申請金鑰。各地換成當地的查核組織。","拆主張：把一則訊息拆成四類——可以查的事實、對事實的解釋、價值判斷、叫你去做的事。","每個事實主張在背後用蒐集器找來源。來源由蒐集器照 GATHER 合約的規則寫進「來源」抽屜，寫的人算 GATHER，不是這一塊；這不算加了 GATHER 這一塊。來源多到要你自己篩時，才問你要不要加。回來做成主張帳本：幾個獨立出處支持、幾個反對、查不到的寫查不到。","傳播檢查：最早從哪裡出來、怎麼擴散、是不是很多帳號同時貼同一句。短時間暴增就標「疑似協同」並附理由；這個標記不等於判定是假的。查得到才寫，查不到寫「無法檢查」。","手法比對：對照一份有版本的操弄手法清單，每一個命中都附上原文的哪一段。清單至少有：斷章取義、冒充來源、舊圖新用、移花接木、半真半假、假的二選一、情緒勒索、用量造勢、冒充在地人。","圖片和影片：反向搜尋最早的出處；檔案帶有內容來源憑證（相機或軟體簽過名的製作紀錄）就讀出來顯示，沒有憑證不代表是假的。是不是 AI 生成，只有工具給得出依據時才寫，否則寫「無法判定」。","三件事分開顯示：找得到出處（系統打勾）、出處彼此獨立（系統打勾）、出處站不站得住（系統不打勾，只列查得到的事：誰辦的、列在哪一份名單、是不是一手；由你判斷）。三件都不是「這是真的」。","抽出「它要你做什麼」：轉傳、捐款、不投票、敵視某一群人、不信任身邊的人。","查過的結果存進案子。同一個案子裡同一個說法再出現，提醒「你查過」。跨案子要不要提醒，等個人歷程怎麼做定了再說。"],
-  ai:["拆主張、整理帳本。","指出用了哪種手法，並附證據。","提出還該查什麼。"],
-  aino:["不准宣判真假。","沒有證據不准說是誰發的。","不准拿自己記得的事當來源。","不准因為來源是哪一國就下結論。","不准替人決定轉不轉、信不信。","交還控制：關鍵主張沒有獨立出處時；涉及法律、醫療、金錢時要提醒找專業的人。"],
-  reads:["使用者貼的訊息、GATHER 的來源卡；從拆解接過來時，讀 MAP 地圖裡要查的主張。","絕不讀：使用者的政治立場。不依立場調整結果。"],
-  writes:["主張帳本、手法命中和證據、傳播紀錄。","使用者對每個主張的判定和理由。"],
-  out:"交給 THINK（拿查過的主張去想）、DECIDE（判斷卡的已知事實）、ACT（轉不轉、做不做）、LEARN（之後回頭對）；多人時交給 COLLAB（各方案的證據）。",
-  uncert:["每個主張的狀態只有四種：有獨立出處支持、有獨立出處反對、兩邊都有、查不到。","手法命中不等於是假的；真的事也會被拿來操弄。","AI 對一個主張說得多肯定，不能超過最弱的一環：只有一個獨立出處時，只能說「只有一個出處這樣說」。AI 不替主張打分數。"],
-  control:["人可以改拆法、補主張、覆寫任何一格，留理由。","可以只要結果、跳過練習；也可以隨時停。"],
-  data:["訊息原文存快照。","記下這次用的手法清單、模型、來源名單是哪一版。版本本身由 GOVERN 管。","案子抹除時一起刪。"],
-  now:"一半。彙整和「每句引註必須對得上來源」的閘有；這道閘只證明「這句話在來源裡找得到」，不證明來源是真的。來源如果是灌水來的，結果一樣會打勾。主張帳本、操弄模式辨識、來源獨立性、法律主張的法域與時效沒有。",
   exampleTitle:"範例：群組裡瘋傳「下週起每人每天只能提領一萬元現金，快去領」",
-  example:[["我先寫","有點慌，想轉給家人。信心六成"],["拆主張","事實 2 個：政府有這個規定；下週生效。號召 1 個：快去領、快轉傳"],["主張帳本","「有這個規定」：官方公告查不到；3 個網站有寫，合併後是同 1 個出處，網域上個月才註冊"],["傳播","兩小時內 40 多個帳號貼同一段文字，多數是這個月建立的"],["手法","用量造勢；冒充來源（寫「銀行內部通知」但沒有文件）；情緒勒索（「不轉就來不及」）"],["三件事","找得到出處 ✓　彼此獨立 ✗　站不站得住：網域上個月才註冊、查不到誰辦的（我判斷：站不住）"],["它要我做","去領錢、轉傳。照做的人多了，真的會出事"],["我的判定","不採信，不轉傳。理由：沒有官方出處，來源只有一個而且很新"]]},
- {n:6, code:"COMPUTE", name:"計算與模擬", role:"真的算", status:"部分", contract:"未寫", build:"未開始",
-  problem:"真的算：統計、損益平衡、淨現值、情境模擬。結果標成「計算結果」或「模擬結果」。",
-  now:"方法庫裡有（蒙地卡羅、NPV、統計、因果圖）。沒有作為一塊積木接進判斷。"},
- {n:7, code:"DECIDE", name:"判斷", role:"我的結論", status:"無", contract:"未寫", build:"未開始",
-  problem:"我自己的暫定結論、依據、信心、判準、不確定性、什麼會改變結論。只能人填，AI 只能給候選。",
-  now:"幾乎沒有。結果頁有「你的判斷」：同意／部分同意／不同意＋你的原話，不填也能核准；專案頁的分析表有「你的判斷」一欄。沒有判斷卡（依據、信心、判準、什麼會改變它）。每次修改判斷其實都留在事件裡，但畫面只顯示最新一次，看不到第 1 版、第 2 版。結果頁的方案和下一步是 AI 產的、人按核准。"},
- {n:8, code:"ACT", name:"行動與觀察", role:"做一步，持續看", status:"部分", contract:"未寫", build:"未開始",
-  problem:"最小、可逆、可負責的下一步，然後持續觀察：短期觀察（行動後第一個月，按週記實際狀況、數字、想法、調整）、長期觀察（按月、季、年）。觀察到的東西回頭對判斷。",
-  now:"一半。結果頁 ⑦ 起草 12 週行動計畫，長期可選一月、一季、一年；存成任務卡。任務卡有狀態、負責人、期限、怎麼證明有效、目標；每寫一筆紀錄可記實際狀況、想法、調整方針、卡住了、實際數字。同一個數字記到兩筆以上，專案頁自動畫趨勢。到期重跑一次並比較。缺的是：按週、按月季年的觀察節奏和提醒（今天只有期限和一次到期重跑，沒有下次檢視日）；觀察沒有接回「人的判斷」。"},
- {n:9, code:"LEARN", name:"回顧校準", role:"回頭對結果", status:"無", contract:"未寫", build:"未開始",
-  problem:"預測跟結果差在哪？我當初怎麼想、信心多少、AI 給了什麼、我為何採納或拒絕、後來發生什麼。",
-  now:"案子上沒有。引擎裡有預測追蹤、信心校準、決策日誌三個模組，但只能在命令列跑，沒接到案子。沒有信任校準、沒有「不同問題出現同樣慣性」的提示。"},
- {n:10, code:"EXPRESS", name:"產出與表達", role:"任何一步都能輸出給別人", status:"部分", contract:"未寫", build:"未開始",
-  problem:"把我的判斷變成給別人看的東西：論文章節、提案、一封信、一次談話的稿。每句話追得回紀錄。",
-  now:"雛形。有報表匯出；但報表讀的是來源和 AI 分析，不是人的判斷卡。"},
- {n:11, code:"TEACH", name:"課程與演練", role:"每一塊用之前先練", status:"部分", contract:"未寫", build:"未開始",
-  problem:"用一個方法或一個套件之前先練：五分鐘課、低風險案例、角色輪替、帶領者的腳本。",
-  now:"一小部分。每個工具自己的頁面都有說明和一個可以直接填入的範例。但「開始前 5 分鐘」那種一頁一頁教的課程頁，程式裡只有兩堂：冰山模型（工具）、人生決策（工作流）；其餘工具沒有課程頁。情境演練、帶領稿沒有。2026-10-03 查程式核對（沒有登入正式站逐個點）；之前這裡寫「每個方法一堂課」不對。"},
- {n:12, code:"COLLAB", name:"共同程序", role:"有別人一起決定時", status:"無", contract:"未寫", build:"未開始",
-  problem:"多人怎麼共同決定又保留異議：分歧地圖、授權與撤回、少數意見保存、閉合與重開條件。",
-  now:"沒有。"},
- {n:13, code:"GOVERN", name:"安全、資料與治理", role:"全程伴隨", status:"部分", contract:"未寫", build:"未開始",
-  problem:"保護使用者，也讓平台自己被檢查：同意、隱私、資料匯出與完整刪除、危機與高風險轉介、來源標記、申訴、AI 指令和模型的版本可追、在地化。高風險任務（健康、法律、金錢、急性心理危機、公共擴散）自動加護欄。不是治療服務。",
-  now:"一點點。AI 指令的版本紀錄、拿同一份輸入重跑一次、照結果改進指令，這三樣有雛形；專案可抹除、可匯出 PDF。同意、申訴、危機轉介、高風險護欄沒有。"},
+  example:[["我先寫","有點慌，想轉給家人。信心六成"],["拆主張","可以查的事實 2 個：政府有這個規定（法律：要寫法域、時效、來源）；下週生效。叫你去做的事 1 個：快去領、快轉傳"],["主張帳本","「有這個規定」：官方公告查不到；3 個網站有寫，合併後是同 1 個出處，網域上個月才註冊"],["傳播","兩小時內 40 多個帳號貼同一段文字，多數是這個月建立的"],["手法","用量造勢；冒充來源（寫「銀行內部通知」但沒有文件）；情緒勒索（「不轉就來不及」）"],["三件事","找得到出處 ✓　彼此獨立 ✗　站不站得住：網域上個月才註冊、查不到誰辦的（我判斷：站不住）"],["它要我做","去領錢、轉傳。照做的人多了，真的會出事"],["我的判定","不採信。理由：沒有官方出處，出處只有一個而且很新。轉不轉傳，在判斷和行動那兩步決定"]]},
+ {n:6, code:"COMPUTE", name:"計算與模擬", role:"真的算", status:"部分", contract:"未寫", build:"未開始"},
+ {n:7, code:"DECIDE", name:"判斷", role:"我的結論", status:"無", contract:"未寫", build:"未開始"},
+ {n:8, code:"ACT", name:"行動與觀察", role:"做一步，持續看", status:"部分", contract:"未寫", build:"未開始"},
+ {n:9, code:"LEARN", name:"回顧校準", role:"回頭對結果", status:"無", contract:"未寫", build:"未開始"},
+ {n:10, code:"EXPRESS", name:"產出與表達", role:"任何一步都能輸出給別人", status:"部分", contract:"未寫", build:"未開始"},
+ {n:11, code:"TEACH", name:"課程與演練", role:"每一塊用之前先練", status:"部分", contract:"未寫", build:"未開始"},
+ {n:12, code:"COLLAB", name:"共同程序", role:"有別人一起決定時", status:"無", contract:"未寫", build:"未開始"},
+ {n:13, code:"GOVERN", name:"安全、資料與治理", role:"全程伴隨", status:"部分", contract:"未寫", build:"未開始"},
+ {n:14, code:"FACILITATE", name:"帶領", role:"有人帶的時候", status:"無", contract:"未寫", build:"未開始"},
 ];
 const CROSS = [
- {code:"完整性核心", name:"判斷權、可修正、非操控", status:"部分", contract:"未寫", build:"未開始", problem:"藍圖第 9 節的 11 條，套在全部 13 份合約上，任何積木都不能覆寫：人保有最終判斷權；不預設結論但要呈現規範脈絡；所有影響可檢查；事實、法律、價值、文化宗教四種主張不混；追求可修正而不是懷疑一切；服從或抵抗都可以是結果；判斷權不等於免責；共同秩序另外設計；平台本身可被質疑；AI 權限看得見、可縮小、可撤回；信任可校準。不評分人。", now:"只有一小部分。判斷主權七道閘是計畫（研究線總計畫 D20，排在之後做），程式裡今天只做了一道「不預設結論」：AI 的解讀一律標成 AI 的推論，「你的判斷」那一格留給人填，模型自己寫進去的會被拿掉。這一道套在每個工具和工作流的結果解讀上。其餘六道（最終判斷由參與者下、影響清單、證據條件、排定回顧、停止訊號、不給信念打分）還沒做。2026-10-03 查程式核對；之前這裡寫「七道都有、只套在藝術反思 14 個方法上」是錯的。"},
- {code:"規範與脈絡", short:"這件事所在的世界", name:"這件事所在的世界：從地理、戰爭、政治、經濟、教育到宗教、道德", status:"無", contract:"未寫", build:"未開始", problem:"脈絡面向現在 " + FACET_NAMES.length + " 個：" + FACET_NAMES.join("、") + "。它們有兩種作用：一是界定什麼算正常、正確、允許；二是它們本身可能就是造成這個問題的原因之一。兩種都要看。平台會跨國使用，所以不預設任何一個國家、文化或法域。藍圖 5.1a 的橫切鏡頭，不是最後才補的一層。每個判斷都要看：誰有權決定、誰負什麼義務；這個規範從哪來、誰受益；這句話是可查證的事實、要確認的法律條件，還是要人權衡的價值；我是真心認同、暫時遵守，還是沒檢查過。法律主張要標法域、時效、來源；文化與宗教要先問當事人自己的理解。", now:"沒有。資料上「事實／法律／價值」沒有分開的欄位，沒有任何一頁問這些。"},
- {code:"組裝器", name:"依目的把積木組起來", status:"部分", contract:"未寫", build:"未開始", problem:"先選目的，推薦積木組合並說理由。人可重排、跳過、停止。", now:"工具已按問題分類（例：「這件事為什麼一直發生？」" + toolsOf(["systems","root_cause","causal"]).length + " 個，名單在 MAP 的合約卡），方法頁有「做完常接」，結果頁 ⑧ 推下一步。能推薦方法，不能組積木，沒有套件。"},
+ {code:"完整性核心", name:"判斷權、可修正、非操控", status:"無", contract:"未寫", build:"未開始"},
+ {code:"規範與脈絡", short:"這件事所在的世界", name:"這件事所在的世界：從地理、戰爭、政治、經濟、教育到宗教、道德", status:"無", contract:"未寫", build:"未開始"},
+ {code:"組裝器", name:"依目的把積木組起來", status:"部分", contract:"未寫", build:"未開始"},
  {code:"共用紀錄", name:"案子的紀錄＋個人歷程", status:"部分", contract:"未寫", build:"未開始",
-  problem:"一個案子的家。13 塊積木宣告要讀寫的欄位加起來就是它。最低標準：完整歷程（每一步一筆）；同一案子可做很多次分析，這次的方法沒解決就換別的方法，每次都留著、可以比較；案子自己的來源；任務卡和每筆紀錄（實際狀況、想法、調整方針、卡住了、實際數字，數字自動成趨勢）；短期觀察（按週）與長期觀察（按月、季、年）；重跑並比較；只推還沒做過的工具；匯出、抹除（留一筆已抹除）。藍圖 4.4 另外要求的欄位：目的、風險與協作合約；情緒、關係與權力訊號；規範脈絡；假設、替代解釋、判準、不確定性；暫定判斷、行動、預測、結果與版本；每張卡標「我的／AI 提出／共同發展」。核准不是個人流程的必經步驟（藍圖 4.3），多人或高風險才有「授權、退回、重開」。跨案子的個人歷程也在這裡。",
   now:["今天的專案頁已經有（2026-10-02 登入正式站親自看過冰山模型那個專案）：" + RECORD_HAVE.join("；") + "。","照最低標準，今天還缺：" + RECORD_LACK.join("；") + "。"]},
- {code:"協作合約", name:"AI 這次能做什麼", status:"無", contract:"未寫", build:"未開始", problem:"每件任務開始前設定：AI 的角色、能用的資料、不准碰的部分、什麼時候交還控制。系統層強制，不只是提示詞。", now:"沒有。AI 每次都是全權。"},
+ {code:"協作合約", name:"AI 這次能做什麼", status:"無", contract:"未寫", build:"未開始"},
 ];
 /* 藍圖 v0.6 已經寫明的要求，逐塊明文寫在這裡。字串＝一條；[標題,[子項]]＝一條帶清單。 */
 const BP = {
+ FACILITATE:[
+  "藍圖沒有這一塊。藍圖把帶領者的事寫在第 9、10、11、12 節；2026-10-03 你說「那做一塊」，拆成獨立一塊（增補 A26）。",
+  "帶領者訓練、督導與升級標準。（10 心理與教育邊界）",
+  "所有影響都可以檢查：家庭、文化、宗教、法律、機構、帶領者、研究者、演算法與平台本身。（9 第 3 條）",
+  "不應採用的指標：是否同意平台或帶領者的結論。（11）平台那一半在 GOVERN。",
+  "研究要主動保留沒改變、失敗、退出、負面結果與帶領者偏離。（11）這一塊記帶領者偏離原則的地方；研究資料由 GOVERN 交出。",
+  "第二階段要測試不同帶領者、不同情境與失敗模式。（12）"],
  SENSE: [
   "外化是把腦中混在一起的材料先放到外面讓自己看見。不是立即分析，也不是請 AI 解釋動機或下結論。（4.2）",
-  "材料：事件、聽到的資訊、情緒、身體反應、恐懼、期待、人物關係、權力訊號、直覺、目前的故事、規範脈絡。（4.1 步驟 3、4.2）",
-  "形式：文字卡、語音、關係圖、時間線、圖像、便條。（4.2）首版用哪一種還沒定。（13.2）",
+  "材料：事件、聽到的資訊、情緒、身體反應、恐懼、期待、人物關係、權力訊號、直覺、目前的故事、規範脈絡。（4.1 步驟 3、4.2）聽到的資訊放在「別人的聲音」那一類；規範脈絡在拆解那一步由「規範與脈絡」記，不是這裡的卡片類別。跟藍圖不同，還沒定。",
+  "形式：文字卡、語音、關係圖、時間線、圖像、便條。（4.2）首版先用文字卡、語音、關係圖、時間線；圖像這類藝術外化之後加入，已談定（13.2，2026-10-03）。",
   ["自我覺察七個訊號，每個一題最小提問。AI 只標記可以探索的點，不能說它知道你「真正的動機」。（6.7）",[
     "情緒：我現在最強的情緒是什麼？它推我靠近或遠離什麼？",
     "身體：我在緊繃、急迫、麻木或過度興奮嗎？這怎麼改變我判斷的速度？",
@@ -1501,13 +1529,13 @@ const BP = {
   ["介面必須保留人的思考空間。（6.9）",[
     "先想再看（Think First）：使用者先寫自己的版本，才能展開 AI 的完整回應",
     "模式切換：我想被鏡像、幫我發散、挑戰我、幫我查證、幫我收斂、只問我問題",
-    "來源標記：每張思考卡標「我的／AI 提出／共同發展」",
+    "作者標記：每張思考卡標作者（藍圖寫「我的／AI 提出／共同發展」，這裡統一寫成我、AI、共同）",
     "理由與信心軌跡：保留原始假設、權重、信心、AI 介入、改寫理由",
     "認知地圖：問題、假設、證據、情緒訊號、選項、判準放在同一畫面",
     "反方按鈕：一鍵要最強反例",
     "降級與交還控制：資料不足、脈絡不明、風險升高或超出適用範圍時，從建議降為提問、整理或轉介",
     "暫停與直答權：隨時可以跳過訓練要直接建議，系統不把這視為失敗",
-    "回顧與遷移提示：不同問題出現相同慣性時提示"]],
+    "回顧與遷移提示：不同問題出現相同慣性時提示（由 LEARN 做：只有它讀得到跨案子的個人歷程）"]],
   ["七張指令卡，一鍵啟動，不只是提示詞。（6.11）",[
     "先幫我看見我在想什麼","和我一起發散，但不要替我決定","請當最強的反方","幫我把直覺變成可檢查的判斷","幫我看這個選擇跟我有什麼關係","幫我拆開事實、法律與價值","現在要求我自己下結論"]],
   "雙軌能力：獨立形成的版本和 AI 協作後的版本分開保留，兩條都要看得見。（6.15）",
@@ -1515,7 +1543,7 @@ const BP = {
  VERIFY: [
   "不是真假裁判機，不替任何人貼標籤。（3.2）",
   "把主張、來源、時間、支持／反證、脈絡、操弄手法拆開，讓使用者自己形成可追溯的判斷。（3.2）",
-  "輸出：主張帳本、來源卡、脈絡缺口、操弄模式、下一步。（3.2）",
+  "輸出：主張帳本、來源卡、脈絡缺口、操弄模式、下一步。（3.2）來源卡由 GATHER 寫（拆成兩塊已談定）；脈絡缺口和下一步寫成「還該查什麼」。",
   "需要時才做，不是每次必經。（4.1 步驟 6）",
   "法律主張沒標法域、時效、來源，不能當成確定結論。（5.1a、6.12）",
   "優先級排在第一批之後；不把首版變成大型事實查核服務。（7）"],
@@ -1527,14 +1555,14 @@ const BP = {
  DECIDE: [
   ["判斷卡 11 個必要欄位。（5.2）",[
     "問題目前怎麼被定義，為什麼這樣定義",
-    "已知事實、來源與可信度",
+    "已知事實、來源與可信度（這裡系統不給可信度，只給出處數；跟藍圖字面不同，還沒定，見 GATHER 那張卡）",
     "假設與它的依據",
     "涉及的規範脈絡：適用法域、權利與義務、政治／文化／宗教／倫理價值、由誰承擔後果",
     "至少一個替代假設或反例",
     "判斷用的判準與權衡",
     "仍存在的不確定性",
     "什麼證據或事件會改變結論",
-    "下一個行動、預期效果、風險與停止條件",
+    "下一個行動、預期效果、風險與停止條件（拆出 ACT 之後，判斷卡只寫下一步；預期效果、風險、停止條件寫在 ACT 的任務卡上；已談定）",
     "決策者與受影響者",
     "修訂歷程與修訂理由"]],
   ["停止分析的條件：防止無限分析，每個工作流程都要回答。（5.3；跟 ACT 任務卡上「行動的停止條件」是兩件事）",[
@@ -1544,7 +1572,7 @@ const BP = {
     "何時應退出、暫停或升級處理？"]],
   "人自己說明暫定結論、依據、信心、價值權衡與改變條件。AI 只檢查是否清楚、可逆、可被回看，並標示超出適用範圍之處。（4.1 步驟 7、7 旅程 8）",
   "指令卡「現在要求我自己下結論」：AI 停止提供新答案，只用問題幫人形成自己的暫定決定。（6.11）",
-  "輸出：選項、權衡、可逆試驗與停止條件。（3.2）",
+  "輸出：選項、權衡、可逆試驗與停止條件。（3.2）可逆試驗和停止條件寫在 ACT 的任務卡上，已談定。",
   "追求可修正，不追求一次到位的正確。（4.4）"],
  ACT: [
   "藍圖把行動放在 DECIDE 裡（4.1 步驟 8）；獨立成一塊是我們談定的。",
@@ -1580,10 +1608,10 @@ const BP = {
   "輸出：預測／結果比較、更新條件、遷移提示。（3.2）"],
  EXPRESS: [
   "藍圖沒有這一塊。它寫的是：報表不是必經步驟，是任何階段都可以產生的輸出。（4.3）",
-  "輸出種類：個人摘要、證據報告、決策理由、團隊提案、學習紀錄、研究資料。（4.3）",
-  "最後形成一份個人可攜、可檢查、可刪除的判斷紀錄。（7 旅程 10）"],
+  "輸出種類：個人摘要、證據報告、決策理由、團隊提案、學習紀錄、研究資料。（4.3）研究資料由 GOVERN 在你同意後交出，不在這一塊；跟藍圖不同，還沒定。",
+  "最後形成一份個人可攜、可檢查、可刪除的判斷紀錄。（7 旅程 10）匯出和刪除由 GOVERN 做，這一塊做給別人看的稿子；跟藍圖不同，還沒定。"],
  TEACH: [
-  "藍圖沒有這一塊，內容在 6.14 和 6.8。",
+  "藍圖沒有這一塊，內容在 6.14。6.8 的三種練習用的是真的案子，由 LEARN 負責。",
   ["練習與共同學習四種。（6.14）",[
     "情境演練：用低風險案例練習資料不足、意見衝突、時間壓力、AI 出錯時怎麼重新定義問題和交還控制",
     "角色輪替：同一個問題分別當提出者、反方、證據稽核者、決策者、回顧者",
@@ -1604,15 +1632,15 @@ const BP = {
     "使用者擁有並可匯出、刪除自己的資料",
     "研究資料採明確、可撤回的知情同意",
     "個人反思資料不得用於廣告、操控式推薦或評分",
-    "個人原始素材、匿名研究資料、群組決策資料分開治理",
+    "個人原始素材、匿名研究資料、群組決策資料分開治理（研究資料這裡只拿掉帳號和三個地點，不保證認不出是誰；跟「匿名」不同，還沒定）",
     "對 AI 訓練、人工審閱、資料保留提供清楚選項"]],
   ["心理與教育邊界五條。（10）",[
     "清楚的非治療定位與安全提醒",
     "隨時暫停、跳過、刪除、不分享的權利",
     "自傷、暴力、急性危機的安全轉介流程",
-    "帶領者訓練、督導與升級標準",
+    "帶領者訓練、督導與升級標準（由 FACILITATE 負責；危機的求助資源仍由 GOVERN 給）",
     "不以脆弱揭露作為課程或組織績效要求"]],
-  "高風險任務（健康、法律、金錢、急性心理危機、公共擴散）自動加護欄：來源要求、專業轉介、等待／覆核、群組程序。（3.4 第 6 條）",
+  "高風險任務（健康、法律、金錢、急性心理危機、公共擴散）自動加護欄：來源要求、專業轉介、等待／覆核、群組程序。（3.4 第 6 條）群組程序這裡改成 DECIDE 提議加 COLLAB、你同意才加，因為 COLLAB 是選用的積木；跟「自動加」不同，還沒定。",
   ["成效衡量：評估判斷過程，不評分信念內容。可觀察的過程指標十項。（11）",[
     "能否區分事實、解釋、法律條件與價值選擇",
     "能否說出自身假設與影響來源",
@@ -1624,10 +1652,10 @@ const BP = {
     "能否依任務目的選擇、調整或停用積木",
     "能否同時保留獨立版本與 AI 協作版本",
     "能否在群體中保留異議並理解程序"]],
-  "不應採用的指標：是否同意平台結論、是否改變立場、是否更服從或更反抗、單一「自主分數」排名、立場是否符合平台偏好、AI 使用次數或對話長度或產出速度、是否盲目接受推薦、使用的積木數量或流程長度、把 AI 協作表現誤作純個人能力、群體一致性本身。（11）",
-  "研究要主動保留未改變、失敗、退出、負面結果與帶領者偏移。（11）",
+  "不應採用的指標：是否同意平台或帶領者的結論（帶領者那一半由 FACILITATE 守）、是否改變立場、是否更服從或更反抗、單一「自主分數」排名、立場是否符合平台偏好、AI 使用次數或對話長度或產出速度、是否盲目接受推薦、使用的積木數量或流程長度、把 AI 協作表現誤作純個人能力、群體一致性本身。（11）",
+  "研究要主動保留未改變、失敗、退出、負面結果與帶領者偏離。（11）",
   "平台本身可爭辯：模型、提示、資料治理、評估方式都要可被質疑、研究、修改或部分推翻。（9 第 9 條）",
-  "每塊積木的產出要帶來源與積木版本。（3.3）"],
+  "每塊積木的產出要記下出自哪一塊、哪一版。（3.3）由共用紀錄記，見那張卡。"],
  "完整性核心": [
   ["判斷主權六個能力構面。（2）",[
     "影響辨識：哪些人、群體、情緒、身份、媒體或演算法正在影響我？",
@@ -1656,13 +1684,13 @@ const BP = {
   "法律義務不能被平台當成純粹的個人偏好。（1）"],
  "組裝器": [
   ["組裝規則六條。（3.4）",[
-    "一個任務先有目的卡，六種目的：自我理解、複雜決策、訊息判斷、創意發散、學習反思、團隊審議；選了才推薦積木組合",
+    "一個任務先有目的卡，六種目的：自我理解、複雜決策、訊息判斷、創意發散、學習反思、團隊審議；選了才推薦積木組合。我們加了第七種「公共議題判斷」，已談定，見「我們加的」",
     "預設少而精：第一輪最多 6 塊（藍圖原文 5 塊；ACT 從 DECIDE 拆出後改 6）。目的是避免把反思、查證、決策、群體協作全部塞進同一回合",
     "人看得見順序：顯示「現在為何用這一塊、下一塊會做什麼」，可重排、跳過、停止",
     "所有關鍵結論回到人的暫定立場，AI 輸出不能直接寫成使用者的判斷",
     "每次組合留可回放紀錄：用了哪些積木、資料從哪來、何時改變想法、為何改變",
-    "高風險任務自動加護欄"]],
-  "首版先做任務目的卡和三種預設套件，驗證「可組合、可理解」，不急著做自由拖拉介面。（7）",
+    "高風險任務自動加護欄：組裝器從開案時寫的風險認出來，護欄由 GOVERN 加。"]],
+  "首版先做任務目的卡和三種預設套件（我們加了「自我理解」之後，第 1 步能開的變成四種；跟藍圖不同，等你定，藍圖 13.6），驗證「可組合、可理解」，不急著做自由拖拉介面。（7）",
   "任務建立時要標：目的、風險、受影響者、相關法律／程序、暫定完成條件。（4.1 步驟 1）",
   "積木可以替換、單獨啟用；使用者不被單一公司、模型、流程或價值觀綁定。（3、3.5）"],
  "共用紀錄": [
@@ -1675,7 +1703,7 @@ const BP = {
     "暫定判斷、行動、預測、結果與版本"]],
   "積木只讀寫明確欄位，不能暗中改寫使用者立場。（3.1）",
   "報表不是必經步驟；核准不是個人流程的必經步驟。（4.3）",
-  "資料要寫明保存期限、共用範圍、產出來源與積木版本。（3.3）"],
+  "資料要寫明保存期限、共用範圍、出自哪一塊、哪一版。（3.3）"],
  "協作合約": [
   ["每個重要回合先建立，五個欄位。（6.3）",[
     "任務與決策範圍：我現在要釐清、探索、比較，還是做決定？",
@@ -1735,7 +1763,7 @@ const ADD = {
   "來源裡要找到過現場的人的看法。坐在桌前做的評估和現場的人說的不一樣時，兩個都留著。（增補 A10，同上）",
   "不會當地語言、不懂當地文化時，要明說這是缺口。（增補 A10，同上）"],
  COMPUTE: [
-  "算出來的數字，可信度不會高過輸入的資料。民調、統計、報表可能是造出來的；每個輸入都要帶來源；你自己給的數字標「我自己說的」。（增補 A12）"],
+  "算出來的數字，可信度不會高過輸入的資料。民調、統計、報表可能是造出來的；每個輸入都要帶來源；你自己給的數字標「我自己說的，還沒有外部出處」。（增補 A12）"],
  EXPRESS: [
   "使用者的輸出會變成別人看到的資訊。發表或轉傳之前，把還沒查證、只有單一出處的句子標出來，不要讓使用者不知不覺成了放大的一環。（增補 A12）"],
  TEACH: [
@@ -1749,7 +1777,7 @@ const ADD = {
   "判斷有版本：第 1 版、第 2 版，修訂理由寫在卡上，舊版不刪。（增補 A5）",
   "辨認出贏不了的局之後，選項要包含退出、止損、換目標，不只有「更努力」。（增補 A10；接藍圖 5.3 停止條件）",
   ["下決定前的四個檢查題，來自 Farrell 的講稿。（增補 A10）",[
-    "資源是照任務需要給的，還是照別的上限給的？（財政部設 10 億英鎊上限；首批 3,300 人、6 架運輸直升機）",
+    "資源是照這件事需要給的，還是照別的上限給的？（財政部設 10 億英鎊上限；首批 3,300 人、6 架運輸直升機）",
     "有沒有人警告過，卻沒人聽？（走過當地的人說去那裡是瘋了；美國大使館警告會是血腥的一年；國防大臣說希望一槍不發，頭六個月打了近 50 萬發）",
     "是不是被合作的對象拉著走？（省長施壓，英軍分兵去守北邊縣城，成了吸引攻擊的磁鐵）",
     "宣布期限會不會改變所有人的行為？（宣布 2014 年撤軍之後：自己忙著撤、顧問沒人聽、對手只要等）"]]],
@@ -1789,7 +1817,7 @@ const ADD = {
     "它要我對誰生氣？要我做什麼：轉傳、不投票、放棄、不信任身邊的人？",
     "很多人這樣說，不等於是真的；留言區、熱門、搜尋排名都可以用量灌出來"]],
   "某一則訊息是哪個國家、哪個組織發的，要有證據才寫；沒有證據就寫「來源不明、手法像有組織的」。（增補 A11）",
-  "有審查的地方，查不到不等於沒發生。「這裡查不到哪些管道」記在 GATHER 的來源總覽上。（增補 A10）"],
+  "有審查的地方，查不到不等於沒發生。「這裡連不上哪些管道」記在 GATHER 的來源總覽上，標「無法檢查」。（增補 A10）"],
  COLLAB: [
   "任何「大家怎麼看」的顯示都不用票數決定，要看平常意見不同的人是不是都同意；並排除少數大量投票的人再算一次。這是 X 社群註解公開的做法，可以照著用。（增補 A14；我讀了它的官方技術文件）",
   "分化社會是認知作戰的目標。共同程序要保住的是「不同意，但還信任彼此、還能一起決定」；保留異議、可以重開，就是在做這件事。（增補 A11）",
@@ -1798,6 +1826,7 @@ const ADD = {
     "異議有沒有被保留","重開條件有沒有寫","決定後有沒有回顧","參與者能不能正確轉述對方的立場","主張帶來源的比例","事實、法律、價值有沒有分開談"]],
   "不量：大家是否一致、是否同意某個結論。"],
  GOVERN: [
+  "高風險另外加上「人身安全」（藍圖 3.4 第 6 條的清單沒有它）。",
   "分兩段建：基本安全（匯出、刪除、非治療聲明、危機轉介、高風險護欄）併入第 1 步；研究與治理（同意、申訴、在地化、衡量）在第 3 步。（增補 A7）",
   "AI 模型自己「記得」的事不算來源。有爭議的事實，AI 只能根據蒐集到、有身分卡的來源說話；沒有來源就說沒有。模型本身也是被網路內容餵出來的，同樣會被灌水影響。（增補 A12）",
   "來源分類的名單和規則要有版本、看得到、可以被質疑；平台自己的判定也可能錯或被利用。（增補 A12）",
@@ -1809,12 +1838,12 @@ const ADD = {
   ["在戰爭、內戰、高壓政權底下使用，紀錄本身可能危及使用者的人身安全。（增補 A10）",[
     "可以選擇不留紀錄，或只留在自己的裝置上",
     "一鍵快速刪除整個案子",
-    "不要求實名",
-    "資料放在哪個國家，要考慮會不會被使用者所在國調閱"]],
+    "平台本來就不要求實名，這裡不用另外開",
+    "資料放在哪個國家，要考慮你所在國家的政府會不會調閱"]],
   ["跨國使用。（增補 A10）",[
     "介面、課程、範例都要能換語言和在地案例，不是翻譯一份台灣版",
-    "資料保護、未成年人、同意的規定各地不同，照使用者所在地的規定走；不確定時用較嚴的",
-    "危機轉介的資源照所在地給，不能只列一國的專線",
+    "資料保護、未成年人、同意的規定各地不同，照你所在地的規定走；不確定時用較嚴的",
+    "危機轉介的資源照你所在地給，不能只列一國的專線",
     "在地化由當地的人參與改寫，平台不單方面定義（藍圖第 12 節第四階段原有）"]],
   "衡量加上群體層，見 COLLAB。文明層量不到，平台不宣稱；只在課堂、團隊、組織的試點比較用前用後，並保留沒變、失敗、退出的結果。（增補 A8）"],
  "完整性核心": [
@@ -1835,196 +1864,322 @@ const ADD = {
     "我在乎什麼、願意付什麼代價，屬於價值，由人自己權衡",
     "AI 不得把某個政治立場包裝成唯一中立的答案"]],
   ["跨國使用：不預設任何國家。（增補 A10）",[
-    "每個案子開案時標「這件事發生在哪裡、當事人各在哪裡」；跨國的事可以標不只一地",
-    "法律主張照所在地標法域；同一件事在兩地答案不同時，兩個都列，不替人選",
+    "每個案子開案時標「這件事發生在哪裡、你在哪裡、當事人各在哪裡」；跨國的事可以標不只一地",
+    "法律主張照發生地、你在哪裡、當事人各在哪裡標法域；同一件事在兩地答案不同時，兩個都列，不替人選",
     "文化與宗教不拿某一國當預設值；先問當事人自己的理解（藍圖 5.1a 原有）",
-    "AI 舉例、類比、建議的行動，要先看所在地適不適用；不知道就說不知道"]],
+    "AI 舉例、類比、建議的行動，要先看你所在地和發生地適不適用；不知道就說不知道。每次呼叫 AI 時，系統把發生地和你在哪裡交給 AI；你在協作合約裡可以不給"]],
   "「政治」＝人們共同決定公共事務如何運作的過程，不是黨派。（增補 A1）",
-  "「公共議題判斷」套件拆解時必開這個鏡頭。（增補 A7）"],
+  "拆解時一定打開這個鏡頭；「公共議題判斷」套件特別需要。跟這件事無關的面向，你可以標「無關」。（增補 A7）"],
  "組裝器": [
-  "第一輪最多 6 塊；13 塊都在每個案子的頁面上（13 格）；其他積木在對的時機由系統提出，人同意才加；TEACH 和 GOVERN 不算在 6 塊裡；案子沒有上限。（增補 A4）",
-  "第六個套件「公共議題判斷」：MAP → VERIFY → THINK → DECIDE → ACT → LEARN。（增補 A7）",
-  "開案時除了目的、風險、受影響者，還要標所在地。適用哪裡的法律由「規範與脈絡」記。（增補 A10）",
+  "第一輪最多 6 塊；" + NB + " 塊都在每個案子的頁面上（" + NB + " 格）；其他積木在對的時機由系統提出，人同意才加；TEACH 和 GOVERN 不算在 6 塊裡（你裁定的）；FACILITATE 也不算（2026-10-03 我們加的，等你定）；案子沒有上限。（增補 A4；第 14 塊見增補 A26）",
+  "第七種目的和第六個套件「公共議題判斷」：MAP → VERIFY → THINK → DECIDE → ACT → LEARN。藍圖寫的是六種目的、五個套件。（增補 A7）",
+  "第七個套件「自我理解」：SENSE → THINK → DECIDE → LEARN，照你的八步循環：觀察、外化在 SENSE；反思、提問、比較、重構在 THINK；判斷在 DECIDE；再檢視在 LEARN。MAP 不在裡面，因為 MAP 讀不到 THINK 寫的東西。2026-10-03 我擬的，等你定。",
+  "開案時除了目的、風險、受影響者，還要標發生地、你在哪裡、當事人各在哪裡。適用哪裡的法律由「規範與脈絡」記。（增補 A10）",
   "開案時問一句（選填）：有沒有到過現場的人可以問？（增補 A10，來自 Farrell 的講稿）"],
  "共用紀錄": [
   "每個案子的最低標準：完整歷程、換方法再做且每次都留著、任務卡與每筆紀錄、短期與長期觀察、重跑並比較、只推還沒做過的工具。（增補 A5）",
   "記情緒強度，供回顧對照。（增補 A6）",
-  "記所在地、適用法域、所有脈絡面向各自的註記。（增補 A10）"],
+  "記發生地、你在哪裡、適用法域、所有脈絡面向各自的註記。（增補 A10）"],
 };
-/* 十二欄合約草稿。GATHER、VERIFY 直接寫在 BLOCKS 裡；其餘寫在這裡，載入時併進去。
-   每一欄寫「誰做什麼」，不寫口號。內容是 2026-10-02 的擬稿，操作者還沒逐塊看過。 */
+/* 看得到你寫的內容的積木，都要做兩件事（GOVERN 卡上的規則）：出現危機訊號時停下來，叫 GOVERN 給當地的求助資源；
+   碰到高風險時，叫 GOVERN 加護欄。這幾句由這一份名單加到每張卡（合約併進來之後），不在各卡手寫（手寫時漏掉過 VERIFY）。 */
+const SEES_CONTENT = ["SENSE","GATHER","MAP","THINK","VERIFY","COMPUTE","DECIDE","ACT","LEARN","EXPRESS","TEACH","FACILITATE","COLLAB","組裝器","規範與脈絡"];
+/* 判斷主權的七項檢查（研究線總計畫 D20）。每一項一個負責的積木，和那張卡上的原句；完整性核心的卡、架構頁的「要新做」照這份算，
+   檢查腳本查原句真的在那張卡上。負責的是一份名單時，名單裡每一張卡都要有那一句。 */
+/* 你的八步循環（《判斷主權教育架構 v0.1》第 5 節第一層）。每一步由哪幾塊做，只寫卡上已經有的做法。
+   組裝器照它檢查每個套件有沒有走完八步；每張卡「你的判斷主權框架」那一框從這裡算。 */
+const LOOP = [
+  ["觀察",[["SENSE","你先寫下實際看見、感覺、在意什麼"],["VERIFY","查一則訊息之前，你先寫第一反應和信心"]]],
+  ["外化",[["SENSE","一件事寫一張卡，放到外面；藝術外化之後加入"],["VERIFY","把第一反應寫下來，才看系統查到什麼"]]],
+  ["反思",[["SENSE","AI 當鏡子，把你放的東西整理回給你看"],["THINK","AI 當鏡子，整理你說的事實、情緒、推論和沒說出的假設"]]],
+  ["提問",[["SENSE","AI 一次只問一題"],["THINK","AI 一次只問最能改變問題定義的一題"]]],
+  ["比較",[["MAP","兩次拆解並排比"],["THINK","8 到 15 個不同的方向、最強的反例"],["COLLAB","分歧地圖：大家在哪裡不一樣"]]],
+  ["重構",[["MAP","換一個拆法再拆一次"],["THINK","換角度、重設限制"]]],
+  ["判斷",[["DECIDE","你自己寫結論、依據、信心、什麼會改變它"]]],
+  ["再檢視",[["LEARN","回頭對，決定維持判斷、出新版，或換方法再做一輪"]]],
+];
+/* 一個套件少了八步裡的哪幾步。 */
+const loopGaps = bs => LOOP.filter(([,ps])=>!ps.some(([c])=>bs.includes(c))).map(([s])=>s);
+/* 你的《判斷主權教育架構 v0.1》寫明、要落到某一塊的事。出自你的文件，原文讀過（同資料夾）。 */
+const FRAME_REQ = [
+  ["一個人的判斷怎麼形成，要變得看得見。這是方法的目的，不是治療、說服或改變信念。（第 5 節第一層）",["SENSE","THINK"]],
+  ["藝術式外化可能在語言、合理化和既有說法接管之前，先讓反應、關係、情緒變得看得見，讓解釋慢下來。這是要驗證的假設。（第 7 節）首版先用文字，藝術外化之後加入。",["SENSE"]],
+  ["什麼證據會讓我重新考慮？答「沒有任何證據」時，要研究的不只是這個信念，而是判斷是不是已經不能修正。（第 3.3 節）",["DECIDE"]],
+  ["改變結論不等於反思成功。判斷經過檢查、保留以後重新檢查的可能，才重要。（第 3.4 節）",["DECIDE","LEARN"]],
+  ["所有影響都要能被檢查：家庭、文化、制度、帶領者、研究者、框架本身、系統本身。（第 8 節第 3 條）",["DECIDE","FACILITATE"]],
+  ["自主可以包含自願授權。授權要看得懂、查得到、有邊界，必要時能重新評估。（第 6 節）",["COLLAB"]],
+  ["共同程序這一層還是之後的研究和設計領域，不假裝已經完成。（第 5 節第二層）",["COLLAB"]],
+  ["評估判斷的過程，不給信念打分數，不產生「自主排名」。（第 9 節 C）",["GOVERN","LEARN"]],
+  ["研究要主動保留失敗、沒改變、負面、退出、互相矛盾的資料，和帶領者偏離。（第 10 節第 2 階段）",["GOVERN","FACILITATE"]],
+  ["方法離開原開發者，還能不能守住核心原則；帶領者最常在哪裡偏離；訓練要清楚，但不能把帶領變成照稿念。（第 9 節 B）",["FACILITATE"]],
+  ["交付階段要看：帶領者能不能接手、訓練、忠實度、調整、常見錯誤、參與者安全、文化轉譯。原開發者不在場，它還成立嗎？（第 10 節第 3 階段）",["FACILITATE"]],
+  ["長期：教師可以獨立教學；不同文化可以發展不同方法；機構不需要向原開發者請示。（第 11 節第 VI 期）",["FACILITATE","規範與脈絡"]],
+  ["八條不可妥協的原則，全部在這張卡的 11 條裡：最終判斷權在參與者、不預設結論、所有影響都能檢查、要的是可修正而不是普遍懷疑、服從和反抗都可以是結果、判斷和後果分開、共同秩序另外設計、框架本身可以被質疑。（第 8 節）",["完整性核心"]],
+  ["本專案不是什麼：不教人相信某個正確立場；不把改變立場當成熟、維持立場當失敗；不把服從當不成熟、反抗當自主；不用單一分數判定誰比較自主。（第 4 節）",["完整性核心"]],
+];
+function frameReqs(code){
+  const out = [];
+  const steps = LOOP.filter(([,ps])=>ps.some(([c])=>c===code));
+  if (steps.length) out.push("你的八步循環裡，這一塊做：" + steps.map(([s,ps])=>`「${s}」${ps.find(([c])=>c===code)[1]}`).join("；") + "。（第 5 節第一層）");
+  FRAME_REQ.filter(r=>r[1].includes(code)).forEach(r=>out.push(r[0]));
+  return out;
+}
+/* 你的五個介面問題（《判斷主權教育架構 v0.1》第一部分 C_Interface Questions，原文照錄）。COLLAB 和規範與脈絡從這裡帶進卡片。 */
+const INTERFACE_Q = ["個體判斷權與制度決策權在哪裡相遇？","制度何時有正當理由限制個體選擇？","誰來判斷「共同利益」？","如果制度必須保有權威，如何避免權威變成認知上的接管？","如果個體必須保有自主，如何避免自主變成拒絕一切共同責任？"];
+const qList = INTERFACE_Q.map((q,i)=>"①②③④⑤⑥⑦⑧⑨"[i] + q);
+const SEVEN = [
+  ["最終判斷由參與者下",[["DECIDE","這一塊的結論永遠由你寫"]]],
+  ["不預設結論",[["共用紀錄","結論的格子只收你自己寫的"]]],
+  ["影響清單",[["DECIDE","AI、這次用的拆法、這個平台本身，一定在清單上"]]],
+  ["證據條件",[["DECIDE","「什麼會改變結論」那一格一定要填"]]],
+  ["排定回顧",[["ACT","到期時，系統提醒你回來做回顧"],["LEARN","你選一天再回來重看","套件沒有 ACT 時"]]],
+  ["停止訊號",[[SEES_CONTENT,"出現自傷、暴力、急性危機的訊號時，AI 停下來"],["SENSE","AI 看到那個工具自己列的停止訊號","藝術反思工具自己列的停止訊號"],["FACILITATE","停止訊號一出現就停","有人帶的時候"]]],
+  ["不給信念打分",[["共用紀錄","給你的信念或結論打分數的欄位，一律不收"]]],
+];
+const sevenOwner = o => Array.isArray(o) ? "看得到你內容的每一塊，名單在 GOVERN 那張卡" : o;
+/* 十二欄合約草稿。GATHER 直接寫在 BLOCKS 裡；其餘 17 份的十二欄只寫在這裡，載入時併進去（BLOCKS／CROSS 只留代號、名稱、狀態，和 MAP、共用紀錄算出來的「現在有沒有」）。
+   2026-10-03 照 CONTRACT_TEMPLATE.md 第 3 節的五條改成白話。操作者還沒逐塊看過。 */
 const CONTRACTS = {
  SENSE: {
-  uncert:["卡片是使用者當下的感受和記憶，不是查證過的事實；每張卡標它是哪一類。","AI 整理回來的版本要人確認才算數。"],
-  control:["任何一張卡可以改、刪、不分享。","可以跳過外化直接往下走。","隨時可以停；系統不催。"],
-  data:["外化內容預設只有自己看得到。（藍圖 13.4 還沒定；這裡先照最嚴的寫）","不用於研究、廣告、說服；要用於研究必須另外明確同意，可撤回。","案子抹除時一起刪。"]},
+  problem:"SENSE 幫你回答：我實際看見、感覺、在意什麼？你把腦子裡混在一起、還沒說清楚的東西，先放到外面。這樣你自己看得見。這一步不分析，也不下結論。",
+  user:["你一件事寫一張卡。","你替每張卡選一類：事件、感受、身體反應、恐懼、期待、人物關係與權力、直覺、你現在跟自己講的故事、別人的聲音。","你自己替現在最強的情緒標強度：弱、中、強。","你用打字或講話寫卡。","畫圖、放照片這些藝術外化，之後加入（2026-10-03 你定的，藍圖 13.2）。到時候還是 SENSE，只是換一種做法。",],
+  system:["系統把卡片擺在一個畫面上。","系統讓你拖卡片、分組。","系統讓你把卡片連成關係圖，或照時間排成時間線。","系統在每張卡上顯示它是哪一類。","藝術反思的工具裡，沒寫停止訊號的，先不給你用（研究線總計畫 R21）。帶領者補上停止訊號、寫進帶領稿之後才開放；這一句是我們加的。","卡片裡出現「聽說」「他說」「網路上寫」這類別人的說法時，SENSE 提議加 VERIFY。","你同意才加。"],
+  ai:["AI 當鏡子：把你放的東西整理回給你看。","AI 指出哪裡是空的。例：「事實裡沒有一件是關於錢的，是沒發生還是沒放？」","AI 可以問你問題。AI 一次只問一題。"],
+  aino:["AI 不准解釋你的動機。","AI 不准診斷，也不准評價。","AI 不准替你下結論。這些卡代表什麼，由你自己解讀。","交還控制：你說不想再談，AI 立刻停。","交還控制：用藝術反思的工具時，AI 看到那個工具自己列的停止訊號，這一輪就停，歷程裡記一筆停在哪裡。你自己也可以隨時停。"],
+  reads:["這一步讀：你輸入的內容。","絕不讀：你的判斷卡、回顧紀錄。這樣你攤出來的東西，不會被已經寫下的結論帶偏。"],
+  writes:["卡片、關係圖、時間線。","情緒訊號，包括你自己標的強度。"],
+  out:"一疊卡、關係圖或時間線、情緒訊號，交給 MAP。這次走的套件裡沒有 MAP 時，直接交給 THINK。例：「課堂反思」這個套件沒有 MAP。",
+  uncert:["卡片寫的是你當下的感受和記憶。它們不是查證過的事實。","每張卡都看得到它是哪一類。","AI 整理回來的版本，你確認了才算數。"],
+  control:["你可以改、刪任何一張卡。你也可以不分享。","你可以跳過 SENSE，直接往下走。","你隨時可以停。系統不催你。"],
+  data:["你攤出來的內容，預設只有你自己看得到。","有人帶你做的時候，你選哪幾張給帶領者看，記在 GOVERN 的同意紀錄。帶領者的督導看帶領紀錄，看不到你的內容。","藍圖 13.4 還沒定這件事。這裡先照最嚴的寫。","這些內容不用於研究、廣告、說服。","要拿去做研究，必須你另外明確同意。你同意了也可以撤回。","案子抹除時，這些內容一起刪。"],
+  now:["今天沒有這一塊。","今天的入口是：你貼一段話，AI 起草表單。","這樣中間跳過了「你自己先看見」。"]},
  MAP: {
-  user:["選一個拆法（例如冰山模型），或讓系統推薦。拆法是工具；不管用哪個拆法，結果都放進同一張六層地圖。","把外化的卡片和蒐集到的來源放進六層；每一層自己先寫一句。","對有關的脈絡面向各寫一句註記。這是「規範與脈絡」的鏡頭，在這一步打開；註記存在它那裡。","指出自己認為的核心矛盾，並回答「解不了的局」檢查題。","一個拆法沒看清楚，換一個再拆一次。"],
-  system:["六層地圖的畫面，每層顯示它要回答的問題。","事實層的每一條顯示有幾個獨立出處；沒做蒐集時標「我自己說的，還沒有外部出處」。","把事實、法律、價值、文化宗教四種主張分成不同的欄。","利益層和受影響者分群體列。","每次拆解存一版，兩次可以並排比較。","拆解時發現缺資料，提出加 GATHER；第一次用某個拆法，提出先上那個方法的課（TEACH）。你同意才加，可以跳過。"],
-  ai:["建議每張卡放哪一層，人確認才算。","指出哪一層是空的、哪一層資料最薄。","對同一件事提出別的解釋。","從方法庫挑適合的拆法，說明理由。"],
-  aino:["不准替人決定核心矛盾是什麼。","不准把解釋寫進事實層。","不准憑常識說法律怎麼規定。","不准定義當事人的文化或宗教是什麼意思。","交還控制：事實層的獨立出處不夠時；碰到文化、宗教時先問當事人自己的理解。出現自傷、暴力、急性危機的訊號時，停下來，叫 GOVERN 給所在地的求助資源。"],
-  reads:["SENSE 的卡片、GATHER 的來源卡、案子的所在地、規範與脈絡的面向註記；換方法再拆時讀 LEARN 的回顧。","絕不讀：使用者的立場。不依立場調整事實層。"],
-  writes:["六層地圖、假設清單、資訊缺口、核心矛盾的假設。脈絡面向的註記由「規範與脈絡」寫，這裡只引用。"],
-  out:"交給 THINK 去發散和反證；缺口交回 GATHER；要查的主張交給 VERIFY；地圖交給 DECIDE。",
-  uncert:["每條事實帶獨立出處數。","每個假設標是誰提的：我、AI、共同。","資料薄的層要標出來。"],
-  control:["可以改層、刪、跳過某一層、換方法。","可以不採用 AI 的建議。"],
-  data:["每一版拆解都留著，不覆蓋。","用的方法和模型記版本。"]},
+  problem:"MAP 幫你把一件事拆開來看。你把事實、解釋、利益、結構、核心矛盾、介入，分成六層。你也把法律、價值、文化分開看。",
+  user:["你選一個拆法，例如冰山模型。你也可以讓系統推薦。","一個拆法就是一個工具。不管用哪一個，結果都放進同一張六層地圖。","你把攤出來的卡片和找回來的來源，分到六層裡。","每一層你自己先寫一句。","有關的脈絡面向，你各回答兩題（題目在規範與脈絡那張卡）。例：「同業都這樣改」這個慣例，界定了什麼算正常；它也可能就是你一再被改條件的原因。","「規範與脈絡」在這一步打開。你寫的註記存在它那裡。","你寫下你認為的核心矛盾。","你回答「解不了的局」的檢查題。這些題目問：這個局在現有條件下，解得了嗎？","一個拆法沒看清楚，你就換一個拆法，再拆一次。"],
+  system:["系統顯示六層地圖的畫面。","每一層上面寫著它要回答的問題。例：事實層問「到底發生了什麼？」","事實層的每一條，系統顯示它有幾個獨立出處。","事實層的一條沒有外部出處時，系統標「我自己說的，還沒有外部出處」。","你確認哪幾條是主張、各是哪一種之後，系統把主張分欄：事實、法律、價值、文化宗教。","利益層和受影響的人，系統按群體分開列。例：同一件事，對不同世代的人可能是不同的事。","你每拆一次，系統存一版。兩次拆解可以並排比較。","拆解時發現缺資料，MAP 提議加 GATHER。","這個案子第一次用某個拆法時，MAP 提議先上那個方法的課（TEACH）。上過的課，你可以跳過。","有要查的主張時，MAP 提議加 VERIFY。","系統只推這個案子還沒用過的拆法。","你同意才加。你也可以跳過。"],
+  ai:["AI 建議每張卡放哪一層。你確認了才算。","AI 指出哪一層是空的、哪一層資料最少。","AI 對同一件事提出別的解釋。","AI 從現有的工具裡挑適合的拆法，並說明理由。","AI 提議地圖上哪幾條是主張、各是哪一種。你確認了才算。例：「同業都這樣改」是事實的說法；「他能不能自己改合約」是法律問題；「我該不該忍」是價值。"],
+  aino:["AI 不准替你決定核心矛盾是什麼。","AI 不准把解釋寫進事實層。例：「他第三次改條件」是事實，「他沒把我當夥伴」是解釋。","AI 不准憑常識說法律怎麼規定。","AI 不准替當事人定義他的文化或宗教是什麼意思。","交還控制：事實層某一條的獨立出處不到兩個時，AI 停下來。畫面顯示有幾個出處，由你決定。","交還控制：碰到文化、宗教時，AI 先問當事人自己怎麼理解。"],
+  reads:["這一步讀：SENSE 的卡片、GATHER 的來源卡、規範與脈絡的面向註記和適用哪裡的法律；開案資料裡的發生地、受影響的人。","你換方法再拆時，這一步也讀 LEARN 的回顧：只讀回顧時挑的新方法、還缺什麼。","絕不讀：你的立場。這一步不會照你站哪一邊，去改事實層。"],
+  writes:["六層地圖、用的拆法、假設清單、還缺什麼資料、對核心矛盾的假設、要查的主張（交給 VERIFY）、你對「解不了的局」檢查題的回答。","脈絡面向的註記由「規範與脈絡」寫。這裡只引用。"],
+  out:"地圖交給 THINK，去發散和反證。還缺什麼資料，交回 GATHER。要查的主張，交給 VERIFY。地圖也交給 DECIDE。",
+  uncert:["每條事實都帶著它有幾個獨立出處。","每個假設都標是誰提的：我、AI，或共同。","資料少的那一層，系統要標出來。"],
+  control:["你可以改、刪、跳過某一層。","你可以換方法。","你可以不採用 AI 的建議。"],
+  data:["每一版拆解都留著。新的一版不蓋掉舊的。","系統記下這次用的方法和模型是哪一版。","有人帶你做的時候，你選哪一版地圖給帶領者看，記在 GOVERN 的同意紀錄。"]},
  THINK: {
-  user:["先寫自己的版本：一個觀察、一個假設或一個方向，才看 AI 的回應。","選這一輪要 AI 當什麼角色。","自己至少加兩張思考卡。","每張卡標有共鳴、反感或不理解，寫原因。","自己選三張進下一步。","最後寫一句：這次我是怎麼想的。"],
-  system:["先想再看：使用者沒寫之前，AI 的完整回應不展開。","模式切換：鏡像、發散、挑戰、查證、收斂、只問問題。","思考卡五欄：主張、機制、可能好處、風險、要驗證的假設。","每張卡標是誰提的：我的、AI 提出、共同發展。","反方按鈕：一鍵要最強的反例。","自己的獨立版本和 AI 協作後的版本分開存。","25 分鐘循環的計時，可以關掉。"],
-  ai:["七種角色：鏡子、發散夥伴、蘇格拉底引導者、反方教練、證據稽核者、決策教練、後設學習教練。","發散時給 8 到 15 個真正不同的方向，並標是哪一種發散法（替代假設、反向思考、視角切換、限制重設、類比遷移、後果的後果）。","挑戰時針對使用者最好的論點。"],
-  aino:["使用者沒寫之前，不准給完整答案；除非使用者選了「直接給建議」。","不准替人排序、替人選卡。","不准下結論。","自己說的話和有來源的話要分開標，不准混在一起。","交還控制：資料不足、超出適用範圍時，從建議降成提問；使用者一直照單全收時，提醒他先寫自己的。出現自傷、暴力、急性危機的訊號時，停下來，叫 GOVERN 給所在地的求助資源。"],
-  reads:["MAP 的地圖、使用者這一輪寫的內容；沒有地圖時讀 SENSE 的卡片；有查證時讀 VERIFY 的主張帳本。","絕不讀來做說服：外化卡片裡的脆弱內容。"],
-  writes:["思考卡、反例、候選的判準、獨立版本與協作版本、這一輪的回顧。"],
-  out:"交給 DECIDE。",
-  uncert:["AI 的每張卡標「有來源」或「它自己說的」。","AI 的建議要附前提、適用條件、可能怎麼失敗。"],
-  control:["換角色、跳過回合、要直接的建議、隨時停。跳過不算失敗。"],
-  data:["兩個版本都留。","模型和提示記版本。"]},
+  problem:"THINK 讓你先自己想，AI 再幫忙。AI 幫你想出更多不同的方向，也幫你找反例。AI 也可以問你問題。AI 不替你決定。",
+  user:["你先寫自己的版本：至少一個觀察、假設或方向。例：三個解釋。","你寫完，才看得到 AI 的回應。例：你先寫「他可能想逼我退出」，才看 AI 怎麼說。","你選這一輪 AI 當什麼角色。例：反方。","你自己至少加兩張思考卡。","你在每張卡上標：有共鳴、反感，或不理解。你寫下原因。","你自己選三張卡，帶到下一步。","最後你寫一句：這次我是怎麼想的。"],
+  system:["先想再看：你沒寫之前，系統不展開 AI 的完整回應。","系統讓你切換模式：鏡像、發散、挑戰、查證、收斂、只問問題。","每張思考卡有五格：主張、機制、可能好處、風險、要驗證的假設。","每張卡都標作者：我、AI 或共同。","畫面上有反方按鈕。你按一下，AI 就給最強的反例。","系統把你自己的版本、跟 AI 一起想的版本，分開存。","系統替 25 分鐘一輪的思考計時。你可以關掉計時。"],
+  ai:["AI 可以當七種角色：鏡子、發散夥伴、蘇格拉底引導者、反方教練、證據稽核者、決策教練、後設學習教練。","發散時，AI 給 8 到 15 個真正不同的方向。","AI 標出每個方向用的是哪一種發散法：替代假設、反向思考、視角切換、限制重設、類比遷移、後果的後果。","挑戰時，AI 針對你最好的論點。例：AI 針對你最有把握的那個解釋，提出最強的反例。"],
+  aino:["你沒寫之前，AI 不准給完整答案。例外：你選了「直接給建議」。","AI 不排序，除非你在協作合約裡准了；准了也只是參考。三張由你自己選。","AI 不准下結論。","AI 不准拿你攤出來的脆弱內容來說服你。","AI 自己說的話和有來源的話，要分開標。AI 不准把兩種混在一起。","交還控制：資料不足或超出適用範圍時，AI 不再給建議，改成問你問題。","交還控制：你一直照單全收時，AI 提醒你先寫自己的。"],
+  reads:["這一步讀：MAP 的地圖、你這一輪寫的內容。","沒有地圖時，這一步讀 SENSE 的卡片。","有查證時，這一步也讀 VERIFY 的主張帳本。","絕不讀：別人的案子。"],
+  writes:["思考卡、反例、候選的判準。","你自己的版本，和跟 AI 一起想的版本。","這一輪「回看自己怎麼想」的紀錄。"],
+  out:"這一輪寫下的東西，交給 DECIDE。",
+  uncert:["AI 的每張卡都標「有來源」或「它自己說的」。","AI 給建議時，要附上前提和適用條件。例：「先跟他談一次條件」的前提是他還願意談。","AI 也要寫出這個建議可能怎麼失敗。"],
+  control:["你可以換 AI 的角色，也可以跳過回合。","你可以直接要建議。","你隨時可以停。跳過不算失敗。"],
+  data:["你自己的版本和跟 AI 一起想的版本，兩個都留著。","系統記下這次用的模型和給 AI 的指令是哪一版。","有人帶你做的時候，你選哪幾張思考卡給帶領者看，記在 GOVERN 的同意紀錄。"],
+  now:["今天沒有這一塊。","今天沒有「你先寫、AI 才回」的回合規則。","今天沒有七種 AI 角色。","今天沒有思考卡，也沒有反方按鈕。"]},
+ VERIFY: {
+  problem:"VERIFY 幫你查一則訊息或一個說法。你看得到其中哪些可以查證。你看得到每個主張有幾個獨立出處支持、幾個反對、哪些查不到。你看得到它是怎麼傳開的，想讓你做什麼。平台不宣判真假。你看清楚了，再自己決定。",
+  user:["你貼上訊息、截圖或連結。","你先停一下，寫下第一反應和信心有多少。例：「有點慌，信心六成」。","寫完，你才看系統查到什麼。","你照查核員的順序：先查是誰說的，再找別的地方怎麼報。","最後，你追回最原始的出處。","你看主張帳本。你對每個主張標採信、存疑或不採信，並寫一句理由。","要不要轉傳、照不照它說的做，在判斷（DECIDE）和行動（ACT）那兩步決定。"],
+  system:["系統查別人是不是已經查過這一則。","查核組織的結論，系統當成一個來源，跟別的來源一樣處理。","蒐集器照 GATHER 合約的規則，把它寫進「來源」抽屜。","它一樣查是誰辦的，一樣把同一個出處的排成一組。","系統再把它列進主張帳本，標明是誰判的、依據什麼。","系統不把它當成平台的結論。","你寫完第一反應，系統才顯示這些結論。","已確認可以用的查核資料庫有兩個，2026-10-02 實際連上測過。","第一個是全球查核結果的公開資料檔：10 萬多筆、1,297 個查核組織、每天更新。","這個資料檔可以免費使用，要標出處。台灣事實查核中心和 MyGoPen 都在裡面。","第二個是台灣的 Cofacts：有公開的查詢介面，資料可以用。","用 Cofacts 的資料要標出處，並用同樣方式分享。","Google 的查核搜尋介面也能用，但要先申請金鑰。","你在別的地方時，系統換成當地的查核組織。","系統把拆好的主張分成「訊息裡的四種句子」：可以查的事實、對事實的解釋、價值判斷、叫你去做的事。","講法律的句子另外標「法律」，要寫法域、時效、來源。","例：「下週起每天只能領一萬元」是可以查的事實，「快去領」是叫你去做的事。","每個事實主張，系統在背後用蒐集器找來源。","蒐集器照 GATHER 合約的規則，把來源寫進「來源」抽屜。","寫的人算 GATHER，不算 VERIFY。","這樣不算加了 GATHER 這一塊：案子的 " + NB + " 格裡，GATHER 那一格不會亮。帳本上找到的出處，照樣算外部出處。","來源多到要你自己篩時，系統才問你要不要加 GATHER。","系統把結果排成一張表，叫主張帳本。","帳本上寫每個主張有幾個獨立出處支持、幾個反對。查不到的寫「查不到」。","系統查這則訊息最早從哪裡出來、怎麼傳開。","系統查是不是很多帳號同時貼同一句。","短時間內暴增，系統就標「疑似協同」，意思是像有人安排好一起貼。","系統附上理由。例：兩小時內 40 多個帳號貼同一段文字。","這個標記不等於判定它是假的。","查得到才寫。查過但找不到，系統寫「查不到」。","沒辦法查，系統寫「無法檢查」。例：訊息只在私人群組裡傳。","系統拿訊息對照一份操弄手法的清單。這份清單有版本。","每找到一個手法，系統附上原文的哪一段。例：「不轉就來不及」是情緒勒索。","清單至少有：斷章取義、冒充來源、舊圖新用、移花接木、半真半假、假的二選一、情緒勒索、用量造勢、冒充在地人。","圖片和影片，系統拿去搜尋，找它最早出現在哪裡。","檔案裡有內容來源憑證時，系統讀出來顯示。這種憑證是相機或軟體簽過名的製作紀錄。","沒有憑證，不代表是假的。","是不是 AI 生成的，只有工具給得出依據時，系統才寫。給不出，系統寫「無法判定」。","系統把三件事分開顯示：找不找得到出處、出處是不是彼此獨立、出處站不站得住。","前兩件，系統打勾。","第三件，系統不打勾。","系統只列查得到的事：誰辦的、列在哪一份名單、是不是第一手。由你判斷。","這三件，沒有一件等於「這是真的」。","系統找出它要你做什麼：轉傳、捐款、不投票、敵視某一群人、不信任身邊的人。","系統把查過的結果存進案子。","同一個案子裡，同一個說法再出現時，系統提醒「你查過」。","還沒定：跨案子要不要提醒。這要等「個人歷程」（你跨案子的紀錄）怎麼做定了再說。"],
+  ai:["AI 先提出一則訊息怎麼拆成主張。你確認了才算。","AI 用白話摘要主張帳本。帳本本身由系統排。","AI 指出這則訊息用了哪種手法，並附上證據。","AI 提出還該查什麼。"],
+  aino:["AI 不准宣判真假。","AI 沒有證據時，不准說是誰發的。","AI 不准拿自己記得的事當來源。","AI 不准因為來源是哪一國，就下結論。","AI 不准替你決定轉不轉、信不信。","交還控制：一個主張的獨立出處不到兩個時，AI 停下來。畫面顯示有幾個出處，由你決定。"],
+  reads:["這一步讀：你貼的訊息、GATHER 的來源卡。","從 MAP 接過來時，這一步讀 MAP 地圖裡要查的主張。","這一步也讀：你在哪裡（只讀這一項，用來換成當地的查核組織）、GOVERN 管的操弄手法清單和查核資料庫名單的現行版本。","絕不讀：你的政治立場。這一步不照你的立場改結果。"],
+  writes:["主張帳本、找到的手法和證據、這則訊息怎麼傳開的紀錄、訊息原文當時的樣子、你的第一反應和信心。","你對每個主張的判定和理由。","還該查什麼。"],
+  out:"要查的主張交給 GATHER，在背後找來源。查證結果交給 THINK，讓你拿查過的主張去想。它也交給 DECIDE，當判斷卡上的已知事實。它也交給 ACT，讓你決定轉不轉、做不做。它也交給 LEARN，讓你之後回頭對。多人一起決定時，它也交給 COLLAB，當各方案的證據。",
+  uncert:["可以查的事實，狀態只有五種：有獨立出處支持、有獨立出處反對、兩邊都有、查不到、無法檢查。","價值判斷和叫你去做的事不查，標「不是查得了的句子」。","對事實的解釋不查真假。系統請你至少寫一個別的解釋。","找到操弄手法，不等於訊息是假的。真的事也會被拿來操弄。","AI 對一個主張說得多肯定，不能超過最弱的那一環。","例：只有一個獨立出處時，AI 只能說「只有一個出處這樣說」。","AI 不替主張打分數。"],
+  control:["你可以改拆法、補主張、覆寫任何一格。","你改的時候，要留下理由。","你可以只看結果，跳過練習。","你也可以隨時停。"],
+  data:["系統替訊息原文存一份當時的樣子。","系統記下這次用的手法清單、查核資料庫名單、模型是哪一版。","這些版本本身由 GOVERN 管。","案子抹除時，這些一起刪。"],
+  now:["今天有一半。","今天有「彙整」這一步。","今天有一道檢查：每句引註都要對得上來源。","這道檢查只證明「這句話在來源裡找得到」。它不證明來源是真的。","來源如果是灌水來的，結果一樣會打勾。","今天沒有主張帳本。","今天不會辨認操弄的模式。","今天不查來源是不是彼此獨立。","今天法律主張沒有標法域和時效。"]},
  COMPUTE: {
-  user:["說要算什麼。","挑輸入的數字，確認每個數字的來源。","設情境：樂觀、一般、悲觀。","看結果和它依賴的假設；改假設再算一次。"],
-  system:["真的執行計算，不是讓 AI 用講的。","畫面上列出公式和每一個輸入。","每個輸入帶來源；你自己給的數字標「我自己說的」。","結果標成「計算結果」或「模擬結果」。","指出哪一個輸入一變，結果就翻。","每次計算都存，可以重跑。"],
-  ai:["建議適合的算法。","用白話解釋結果。","指出最影響結果的假設。"],
-  aino:["不准自己編數字。","不准把模擬說成預測。","不准藏假設。","交還控制：輸入只有單一出處或查不到來源時；涉及錢、法律、醫療時提醒找專業的人。"],
-  reads:["GATHER 的來源卡、使用者給的數字。","絕不讀：與這次計算無關的個人資料。"],
-  writes:["計算紀錄：輸入、公式、結果、情境、版本。"],
-  out:"交給 DECIDE（比較選項）、ACT（寫預測）。",
-  uncert:["給範圍，不只給一個數字。","結果的可信度不高過輸入的來源。"],
-  control:["改輸入、換算法、不採用結果。"],
-  data:["計算可以重跑對照。","算法記版本。"]},
+  problem:"COMPUTE 替你真的把數字算出來。它可以算統計、損益平衡、淨現值，也可以做情境模擬。系統把結果標成「計算結果」或「模擬結果」。",
+  user:["你說要算什麼。例：拆夥後六個月的收入。","你挑要用的數字。","你確認每個數字從哪裡來。","你設情境：樂觀、一般、悲觀。","你看結果，也看結果靠的是哪些假設。","你可以改假設，再算一次。"],
+  system:["系統真的執行計算，不是讓 AI 用講的。","畫面上列出公式和每一個輸入。","每個輸入都帶著來源。","你自己給的數字，系統標「我自己說的，還沒有外部出處」。","系統把結果標成「計算結果」或「模擬結果」。","系統指出：哪一個輸入一變，結果就翻過來。","系統把每次計算都存起來。你可以重跑。"],
+  ai:["AI 建議適合的算法。","AI 用白話解釋結果。","AI 指出哪一個假設最影響結果。"],
+  aino:["AI 不准自己編數字。","AI 不准把模擬說成預測。例：悲觀情境算出會虧，不等於你一定會虧。","AI 不准把假設藏起來。","交還控制：某個外部數字的獨立出處不到兩個時，AI 停下來。畫面顯示有幾個出處，由你決定。你自己給的數字不算。"],
+  reads:["這一步讀：GATHER 的來源卡、你給的數字。","絕不讀：跟這次計算無關的個人資料。"],
+  writes:["每次計算的紀錄：輸入、公式、結果、情境、版本。"],
+  out:"計算結果交給 DECIDE，用來比較選項。它也交給 ACT，用來寫預測。",
+  uncert:["系統給一個範圍，不只給一個數字。","結果的可信度，不會高過輸入的來源。"],
+  control:["你可以改輸入、換算法。","你可以不採用結果。"],
+  data:["每次計算都可以重跑，跟之前的對照。","系統記下算法是哪一版。"],
+  now:["今天方法庫裡有這些：蒙地卡羅、NPV、統計、因果圖。","它們沒有做成一塊積木，接進判斷。"]},
  DECIDE: {
-  user:["自己填判斷卡的 11 格：問題怎麼定義、已知事實、假設、規範脈絡、替代假設或反例、判準與權衡、不確定性、什麼會改變結論、下一步、決策者與受影響者、修訂理由。","寫信心有多少。","回答「什麼時候停止分析」的四題。","判斷卡的「下一步」那一格只寫一句要做什麼，交給 ACT。任務卡在 ACT 那一塊建；預測、期限、行動的停止條件都寫在那張卡上。","「決策者與受影響者」那一格先帶入開案時寫的；有新增就補，補的寫回開案資料。","之後有新資訊，出新的一版，寫修訂理由。","也可以決定「現在先不決定」。"],
-  system:["判斷卡的表單。","檢查每一格有沒有填、寫得清不清楚、行動可不可逆、之後能不能回頭對。","已知事實的每一條顯示有幾個獨立出處；沒做蒐集時標「我自己說的，還沒有外部出處」。","下判斷前問你一句：現在情緒和急迫感多強（弱、中、強）？你選「強」，就建議把不可逆的決定延後。做過外化的話，一併顯示當時你標的強度。","判斷有版本，舊版不刪。","辨認出解不了的局時，選項裡列出退出、止損、換目標。","選項要比成本、收入、機率時，提出加 COMPUTE；受影響的人裡有人有決定權時，提出加 COLLAB。你同意才加。"],
-  ai:["提出候選的判準。","指出哪一格還空著、哪裡前後矛盾。","用問題幫人把話說清楚。"],
-  aino:["不准預填結論。","不准替人選。","使用者按「現在我要自己下結論」之後，不准再給新答案。","交還控制：這一塊的結論永遠由人寫；涉及健康、法律、金錢、人身安全時提醒找專業的人。出現自傷、暴力、急性危機的訊號時，停下來，叫 GOVERN 給所在地的求助資源。"],
-  reads:["開案資料（決策者與受影響者）；MAP、THINK、VERIFY、COMPUTE 交過來的東西；規範與脈絡的面向註記；多人時 COLLAB 的共同紀錄；這個案子之前的判斷版本；ACT 的觀察紀錄；SENSE 的情緒強度（只讀強度，不讀卡片內容）；回顧後要修訂時讀 LEARN 的校準紀錄。","絕不讀：別人的案子。"],
-  writes:["判斷卡，每一版都存。"],
-  out:"交給 ACT（下一步）、EXPRESS（說給別人聽）、LEARN（之後回頭對）。",
-  uncert:["信心和不確定性是必填的格子。","只靠單一出處撐起來的事實要看得出來。"],
-  control:["任何一格可以改；可以重開；可以不下判斷。"],
-  data:["每一版都留，可匯出、可刪除。"]},
+  problem:"DECIDE 讓你寫下自己的暫定結論。你也寫下依據、信心、判準、不確定性，和什麼會改變結論。這些只有你能填。AI 只檢查你寫得清不清楚、做了能不能反悔、之後能不能回頭對。",
+  user:["你自己填判斷卡的 11 格。「決策者與受影響者」那一格，系統先帶入你開案時寫的受影響的人。誰有決定權，你在這一格寫。","11 格是：問題怎麼定義、已知事實、假設、規範脈絡、替代假設或反例、判準與權衡、不確定性、什麼會改變結論、下一步、決策者與受影響者、修訂理由。","你寫信心有多少。","你回答「什麼時候停止分析」的四題。例：再查下去，值得讓行動延後嗎？","「下一步」那一格，你只寫一句要做什麼。例：「先跟他談一次條件」。","這一句交給 ACT。任務卡在 ACT 那一塊建。","預測、期限、風險、行動的停止條件，都寫在那張任務卡上。","有新增的人，你就補上。你補的寫回開案資料。","之後有新資訊，你出新的一版，並寫修訂理由。","你也可以決定「現在先不決定」。"],
+  system:["系統給你判斷卡的表單。","系統檢查每一格有沒有填。","寫判斷時，「什麼會改變結論」那一格一定要填。你寫「沒有」也可以：系統標「這一版不打算改」，不算你做錯。","你下結論前，系統列出這次可能影響你的：地圖上「別人的聲音」那幾張卡、已知事實靠的出處、AI 寫的或跟 AI 一起寫的思考卡、這次用的拆法。","AI、這次用的拆法、這個平台本身，一定在清單上。有人帶的時候，帶領者也一定在清單上。","系統也問你：家庭、文化、宗教、法律、你所在的制度（例如學校、公司）、演算法（例如你常看的推薦）、帶領者、做研究的人，有沒有在影響這個判斷。你可以補。","已知事實的每一條，系統顯示有幾個獨立出處。","已知事實的一條沒有外部出處時，系統標「我自己說的，還沒有外部出處」。","你下判斷前，系統問一句：現在情緒和急迫感多強？弱、中、強。","你選「強」，系統就建議把不能反悔的決定延後。例：你剛跟合夥人吵完，想馬上拆夥。","這個案子有護欄時，不能反悔的決定，系統請你先等一下或請人覆核。","做過 SENSE 的話，系統一併顯示你當時標的強度。","判斷有版本：第 1 版、第 2 版。舊版不刪。","你在 MAP 把這個局標成解不了時，系統在選項裡列出：退出、止損、換目標。","選項要比成本、收入、機率時，DECIDE 提議加 COMPUTE。","受影響的人裡有人也有決定權時，DECIDE 提議加 COLLAB。例：第三位合夥人。","這個案子有護欄時，這個提議會標明是護欄。","你同意才加。"],
+  ai:["AI 檢查你寫的結論：清不清楚、做了能不能反悔、之後能不能回頭對。","不能反悔的地方，AI 標出來，你確認。系統照你確認的標記，決定要不要請你先等一下。","AI 標出超出適用範圍的地方。","要 AI 幫忙想判準，回 THINK 請決策教練。THINK 寫的候選判準，這一步讀得到。","AI 指出哪一格還空著、哪裡前後矛盾。","AI 用問題幫你把話說清楚。"],
+  aino:["AI 不准預先填好結論。","AI 不准替你選。","你按「現在我要自己下結論」之後，AI 不准再給新答案。","交還控制：這一塊的結論永遠由你寫。"],
+  reads:["這一步讀：開案資料裡誰會受影響、有沒有人帶。","這一步也讀：MAP、THINK、VERIFY、COMPUTE 交過來的東西。沒有查證或計算時，「已知事實」和「判準與權衡」那兩格旁邊，標「這次沒做查證」或「這次沒做計算」。","這一步也讀：規範與脈絡的面向註記、適用哪裡的法律、四個檢查的回答（包括你的暫定立場）。","多人時，這一步讀 COLLAB 群組紀錄裡的共同判斷和異議。","這一步也讀：GOVERN 寫的護欄，看這個案子加了哪些護欄。","這一步也讀：這個案子之前的每一版判斷、ACT 的觀察紀錄。","這一步也讀 SENSE 的情緒強度。只讀強度，不讀外化素材裡的卡片。你放進地圖的卡片，會跟著地圖讀到。","回顧後要修訂時，這一步讀 LEARN 的校準紀錄。","絕不讀：別人的案子。"],
+  writes:["判斷卡。每一版都存。","下判斷前你選的情緒強度、「什麼時候停止分析」四題的回答，跟著那一版判斷卡存。"],
+  out:"下一步交給 ACT。套件裡沒有 ACT 時，下一步和信心交給 LEARN。判斷卡也交給 EXPRESS，讓你說給別人聽。判斷卡也交給 LEARN，讓你之後回頭對。",
+  uncert:["信心和不確定性，是一定要填的格子。","只靠一個出處撐起來的事實，卡上要看得出來。","例：你把「同業都這樣改」寫成事實，但它只有 1 個出處支持，卡上看得出來。"],
+  control:["你可以改任何一格。","你可以重開。","你可以不下判斷。"],
+  data:["每一版判斷都留著。","匯出和刪除由 GOVERN 做。"],
+  now:["今天幾乎沒有。","今天結果頁有「你的判斷」：同意、部分同意、不同意，加上你的原話。","這一格不填，也能核准。","今天專案頁的分析表，有「你的判斷」一欄。","今天沒有判斷卡（依據、信心、判準、什麼會改變它）。","每次修改判斷，其實都留在事件紀錄裡。","但畫面只顯示最新一次。你看不到第 1 版、第 2 版。","今天結果頁的方案和下一步是 AI 產的，你按核准。"]},
  ACT: {
-  user:["把判斷卡交過來的那一句下一步寫成任務卡：最小、可逆、自己負得起責任的。","先寫預測：我預期會怎樣。","定期限、行動的停止條件、升級條件、誰負責。誰會受影響沿用開案資料；這一步多出來的人，補回開案資料。","之後按週、按月回來記：實際狀況、數字、想法、要調整什麼、卡在哪。"],
-  system:["任務卡。","觀察的節奏：行動後第一個月按週提醒，之後按月、季、年。","每筆紀錄的欄位：實際狀況、想法、調整方針、卡住了、實際數字。同一個數字記到兩筆就畫趨勢。","狀態在短時間內來回改，歷程畫面只顯示最後一次；每一次照樣記著，展開看得到。","到期時把新的觀察和當初的判斷卡、預測並排比較。","把觀察結果接回判斷卡，問要不要出新版。"],
-  ai:["幫你把判斷卡交過來的那一句拆成更小、可逆的做法，由你挑。","提醒哪一步不可逆。","整理觀察紀錄的趨勢。"],
-  aino:["不准替人承諾。","不准替人定目標數字。","不准代替人去做那件事。","交還控制：行動不可逆、會影響別人、或有高風險時。"],
-  reads:["開案資料（誰會受影響）；DECIDE 的判斷卡、COMPUTE 的結果、VERIFY 的主張帳本；多人時 COLLAB 的共同決定。","絕不讀：別人的案子；跟這一步無關的個人資料。"],
+  problem:"ACT 幫你走下一步，然後持續看結果。這一步要最小、能反悔、你負得起責任。行動後第一個月是短期觀察：你每週記實際狀況、數字、想法、調整。之後是長期觀察：你按月、按季、按年記。你看到的東西，到回顧（LEARN）時拿來對照你的判斷。",
+  user:["你把判斷卡上那一句下一步，寫成一張任務卡。例：「這週先跟他談一次條件」。","這一步要最小、能反悔、你自己負得起責任。","你先寫預測：我預期會怎樣。例：「我猜他會讓步一半」。","你定期限、風險、行動的停止條件、升級條件、誰負責。","例：停止條件是「他再改一次就不談了」；升級條件是「談不攏就找律師」。","誰會受影響，沿用開案資料。這一步多出來的人，你補回開案資料。","之後你按週、按月回來記：實際狀況、數字、想法、要調整什麼、卡在哪。"],
+  system:["系統給你任務卡。","這個案子有護欄時，不能反悔的行動，系統請你先等一下或請人覆核。","行動後第一個月，系統每週提醒你記一次。之後按月、按季、按年提醒。","每筆紀錄有五格：實際狀況、想法、調整方針、卡住了、實際數字。","同一個數字記到兩筆，系統就畫成趨勢。","你在短時間內來回改狀態時，歷程畫面只顯示最後一次。","每一次系統照樣記著。你展開就看得到。","到期時，系統提醒你回來做回顧（LEARN）。比較和「要不要出新的一版」在回顧那一步。"],
+  ai:["AI 幫你把判斷卡上那一句，拆成更小、能反悔的做法。由你挑。","AI 提醒你哪一步不能反悔。","AI 整理觀察紀錄的趨勢。"],
+  aino:["AI 不准替你承諾。","AI 不准替你定目標數字。","AI 不准代替你去做那件事。例：AI 不能替你去跟合夥人談。","交還控制：行動不能反悔、會影響別人，或有高風險時，AI 停下來，由你決定。"],
+  reads:["這一步讀：開案資料裡誰會受影響。","這一步也讀：DECIDE 的判斷卡、COMPUTE 的結果、VERIFY 的主張帳本。沒有計算或查證時，預測只靠你寫的。","多人時，這一步讀 COLLAB 群組紀錄裡要做的行動和授權。","這一步也讀：GOVERN 寫的護欄，看這個案子加了哪些護欄。","絕不讀：別人的案子、跟這一步無關的個人資料。"],
   writes:["任務卡、預測、每一筆觀察紀錄。"],
-  out:"交給 LEARN。",
-  uncert:["預測要寫成之後對得出來的樣子。","觀察紀錄是使用者自己報的，系統不查證。"],
-  control:["改期限、停掉、標結束、換做法。"],
-  data:["任務卡和紀錄跟著案子。"]},
+  out:"這一步記下的東西，交給 LEARN。DECIDE 出新的一版時，也讀這些觀察。多人一起決定時，觀察也交給 COLLAB，帶進下一輪。",
+  uncert:["預測要寫成之後對得出來的樣子。例：「他會讓步一半」對得出來；「應該會好一點」對不出來。","觀察紀錄是你自己報的。系統不查證。"],
+  control:["你可以改期限、停掉、標結束。","你可以換做法。"],
+  data:["任務卡和紀錄跟著案子存。"],
+  now:["今天有一半。","今天結果頁 ⑦ 會起草 12 週的行動計畫。長期可以選一月、一季、一年。","計畫存成任務卡。","任務卡有狀態、負責人、期限、怎麼證明有效、目標。","每寫一筆紀錄，可以記實際狀況、想法、調整方針、卡住了、實際數字。","同一個數字記到兩筆以上，專案頁自動畫趨勢。","到期時會重跑一次，並比較。","今天缺按週、按月季年的觀察節奏和提醒。","今天只有期限和一次到期重跑，沒有下次檢視日。","今天觀察沒有接回「人的判斷」。"]},
  LEARN: {
-  user:["到期回來，寫實際發生了什麼。","對照當初的預測和信心。","寫當時漏看了什麼。","決定：維持判斷、出新版、還是換方法再做一輪。","調整之後哪些事還交給 AI、哪些不交。","從還沒用過的積木裡挑下一輪要加的。"],
-  system:["並排顯示：當初的判斷卡、預測、AI 當時提了什麼、我採納還是拒絕、後來的結果。","每個重要判斷存一條校準紀錄。","列出這個案子還沒用過的積木。","不同案子出現同樣的慣性時提醒。","顯示當時的情緒強度和後來的結果。","讓你標出當時哪個來源錯了。這個案子裡同一個來源再出現時，顯示你的這個標記；系統不自動降它的權。"],
-  ai:["指出這次思考的兩個強項、一個下次可以練的地方。","整理前後的比較。"],
-  aino:["不准給人打分數、排名。","不准改寫當初的紀錄讓它看起來一直是對的。","不准替人決定要不要修正。","交還控制：要不要修正判斷、之後還信不信 AI，都由人決定；AI 只把前後擺出來對照。出現自傷、暴力、急性危機的訊號時，停下來，叫 GOVERN 給所在地的求助資源。"],
-  reads:["這個案子的全部紀錄，和使用者自己跨案子的歷程。","絕不讀：別人的案子。"],
-  writes:["校準紀錄、更新後的判斷條件、下次要保留或改變的思考習慣。"],
-  out:"判斷要修訂就回 DECIDE；要換方法就回 MAP；下一輪要加的積木交給組裝器。",
-  uncert:["一次結果好壞不代表判斷好壞；紀錄要分開寫「過程」和「運氣」。"],
-  control:["可以延後回顧、可以不改判斷。"],
-  data:["校準紀錄是使用者的，可匯出、可刪除。","不拿來跟別人比。"]},
+  problem:"LEARN 幫你回頭對：預測跟結果差在哪？你看當初怎麼想、信心多少。你看 AI 當時給了什麼，你為什麼採納或拒絕。你看後來發生了什麼。例：你猜他會讓步一半，結果他下個月又改條件。",
+  user:["到期時你回來，寫實際發生了什麼。","套件裡沒有 ACT 時，你對照當初的判斷和信心；沒有判斷卡時（例如課堂反思），對照思考卡。","你對照當初的預測和信心。","你寫當時漏看了什麼。","你決定下一步：維持判斷、出新版判斷，還是換方法再做一輪。","你調整之後哪些事還交給 AI，哪些不交。要改，回協作合約改。例：你已經會自己找反例，下一輪就讓 AI 等你寫完再挑戰。","你從還沒用過的積木裡，挑下一輪要加的。例：蒐集、查證、計算。"],
+  system:["系統把這些並排：當初的判斷卡、預測、AI 當時提了什麼、你採納還是拒絕、後來的結果。","每個重要判斷，系統存一條校準紀錄。","每次回顧，系統列出這一輪你沒靠 AI、自己做到的思考動作。思考動作就是下面藍圖 6.10 成長九項裡的那幾項。例：你自己先寫出三個替代解釋。","系統把這些存進你的個人歷程，對照以前的案子，讓你看見哪些動作越來越不用 AI。只給你看，不打分數、不排名。","你可以設定兩件固定做的事，系統照時間提醒你：每天 10 分鐘認知校準、每週 2 到 3 次 30 分鐘思考衝刺。藍圖 6.8 叫它們「練習」。","這兩件都是真的小案子，不是 TEACH 用練習案例的練習。每天的校準用「自我理解」開（這個套件還沒定；沒定之前用「學習反思」目的開）；每週的衝刺挑一個真的案子，照 THINK 的 25 分鐘循環走一輪。","系統列出這個案子還沒用過的積木。","系統擺出開案時寫的暫定完成條件，你看這件事做到了沒有。","這次的套件沒有 ACT 時（例如課堂反思、自我理解），回顧接在前一塊後面做。你選一天再回來重看，系統照那一天提醒你。","不同案子出現同樣的慣性時，系統提醒你。例：你在不同的案子裡，都在情緒很強時下決定。","系統顯示你下判斷前選的情緒強度，和後來的結果。","你可以標出當時哪個出處錯了。這個標記交回 GATHER，存在那個出處的來源卡上。","這個案子裡同一個出處再出現時，GATHER 顯示你的標記。","系統不會自動降低這個出處的分量。"],
+  ai:["AI 指出這次你想得好的兩處，和下次可以練的一處。","AI 整理前後的比較。"],
+  aino:["AI 不准給你打分數或排名。","AI 不准改寫當初的紀錄，讓它看起來一直是對的。","AI 不准替你決定要不要修正。","交還控制：要不要修正判斷，由你決定。","交還控制：之後還信不信 AI，也由你決定。AI 只把前後擺出來對照。"],
+  reads:["這一步讀：這個案子的全部紀錄。","這一步也讀：你自己跨案子的歷程。","絕不讀：別人的案子。"],
+  writes:["校準紀錄。","個人歷程：你自己做到的思考動作、每天校準和每週衝刺的提醒。","回顧時挑的新方法、還缺什麼、下一輪要加哪幾塊。","你標錯的出處（交回 GATHER 存）。","更新後的判斷條件交回 DECIDE，存在判斷卡的新一版。","下次要保留或改變的思考習慣。"],
+  out:"你標錯的出處，交回 GATHER 存在來源卡上。判斷要修訂時，交回 DECIDE。要換方法時，交回 MAP。下一輪要加的積木，交給組裝器。",
+  uncert:["一次結果的好壞，不代表判斷的好壞。","紀錄要分開寫「過程」和「運氣」。例：他讓步了，可能是你談得好，也可能只是運氣。"],
+  control:["你可以延後回顧。","你可以不改判斷。"],
+  data:["校準紀錄是你的。匯出和刪除由 GOVERN 做。","平台不拿它跟別人比。"],
+  now:["今天案子上沒有這一塊。","引擎裡有三個模組：預測追蹤、信心校準、決策日誌。","它們只能在命令列跑，沒接到案子。","今天沒有信任校準。","今天沒有「不同問題出現同樣慣性」的提示。"]},
  EXPRESS: {
-  user:["選要給誰看、用什麼形式：摘要、提案、一封信、談話稿、論文段落。","先寫幾句自己要說的重點。","選要帶哪些判斷和依據。","自己改寫。","自己按送出。"],
-  system:["你寫完重點、選好要帶的內容之後，才從你選的紀錄組成草稿。","每一句都連得回紀錄裡的哪一筆。","把還沒查證、只有單一出處的句子標出來。","匯出成需要的格式。"],
-  ai:["起草；依讀者調整說法。"],
-  aino:["不准加進紀錄裡沒有的主張。","不准替人送出。","AI 寫的句子不准當成使用者自己的立場，要標示。","交還控制：要送給別人或公開之前，一定由人看過、自己按送出；稿子裡有還沒查證的句子時，先停下來問。出現自傷、暴力、急性危機的訊號時，停下來，叫 GOVERN 給所在地的求助資源。"],
-  reads:["你選的那幾部分，可以是任何一個抽屜裡的東西：地圖、主張帳本、計算、DECIDE 的判斷卡。還沒有判斷卡也能輸出；你選了外化卡片，也可以帶。要標「還沒查證」時，只讀每個主張的查證狀態和出處數，不讀你沒選的內容。","絕不讀：使用者沒選的外化卡片。"],
-  writes:["輸出的稿子、每句對應紀錄的對照表、版本。"],
-  out:"給外面的讀者；多人時交給 COLLAB 當提案。",
-  uncert:["稿子裡保留信心和不確定的地方，不因為要說服人而拿掉。"],
-  control:["改、刪、不送。"],
-  data:["稿子的版本跟著案子。"]},
+  problem:"EXPRESS 幫你把判斷變成給別人看的東西。它可以是論文章節、提案、一封信、一次談話的稿。例：寫給合夥人的一封信。稿子裡每一句話，都追得回紀錄。",
+  user:["你選要給誰看、用什麼形式。","形式有：摘要、證據報告、決策理由、提案、學習紀錄、一封信、談話稿、論文段落。","你先寫幾句自己要說的重點。","你選要帶哪些判斷和依據。","你自己改寫。","你自己按送出。"],
+  system:["你寫完重點、選好要帶的內容之後，系統才把你選的紀錄排成大綱。","大綱只用你選的紀錄。","草稿的每一句，都連得回紀錄裡的哪一筆。","還沒查證、只有一個出處的句子，系統標出來。","系統匯出成你需要的格式。"],
+  ai:["AI 照大綱起草。","AI 依讀者調整說法。"],
+  aino:["AI 不准加進紀錄裡沒有的主張。","AI 不准替你送出。","AI 寫的句子，不准當成你自己的立場。AI 寫的句子要標出來。","交還控制：送給別人或公開之前，一定由你看過，你自己按送出。","交還控制：稿子裡有還沒查證的句子時，AI 先停下來問你。"],
+  reads:["這一步讀：你選的那幾部分。","你選的可以是這些抽屜裡的東西：" + DRAWER_READS.EXPRESS.map(id=>DRAWERS.find(d=>d.id===id)).map(d=>d.name+"（"+d.owner+"）").join("、") + "。","還沒有判斷卡，也能輸出。你選了攤出來的卡片，也可以帶。","要標「還沒查證」時，這一步只讀每個主張的查證狀態和出處數。它不讀你沒選的內容。","絕不讀：你攤出來、但沒選的卡片。"],
+  writes:["輸出的稿子、每一句對回紀錄的對照表、稿子的版本。"],
+  out:"稿子交給外面的讀者。多人一起決定時，稿子交給 COLLAB 當提案。",
+  uncert:["稿子裡保留你的信心和不確定的地方。","這些地方不因為要說服人就拿掉。"],
+  control:["你可以改、刪稿子。","你可以不送。"],
+  data:["稿子的每一版都跟著案子存。"],
+  now:["今天只有雛形。","今天有報表匯出。","但報表讀的是來源和 AI 分析，不是人的判斷卡。"]},
  TEACH: {
-  user:["用一個方法或套件之前，上一堂 5 分鐘的課。","用練習案例做一次。","輪流當提出者、反方、證據稽核者、決策者、回顧者。","帶領別人時，拿帶領稿。"],
-  system:["每個方法、每個套件一堂課。","低風險的練習案例，來源先查過。","情境演練：資料不足、意見衝突、時間很趕、AI 出錯時怎麼辦。","帶領稿。","課和練習都可以跳過。"],
-  ai:["當練習的對手。","針對思考的動作給回饋。"],
-  aino:["不准給人打分數、排名。","不准要求人揭露脆弱的事。","交還控制：練習中出現真實的危機時，停下來轉介。"],
-  reads:["課程內容和練習案例。","絕不讀：使用者真實的案子，除非使用者同意拿來練。"],
-  writes:["練習紀錄，可以選擇不留。"],
-  out:"回到要用的那一塊。",
-  uncert:["上過課不等於會；能力看的是之後真的做出來的動作。"],
-  control:["跳過、重來、換案例。"],
-  data:["練習和真實案子分開存。","案例在各地要換成當地的例子。"]},
+  problem:"TEACH 讓你在用一個方法或一個套件之前，先練一次。它有五分鐘的課、低風險的練習案例、輪流當不同的角色。帶領別人的事在 FACILITATE。例：你第一次用冰山模型，先上 5 分鐘的課。",
+  user:["你用一個方法或套件之前，先上一堂 5 分鐘的課。","你用練習案例做一次。例：用別人的案例練一次。","你輪流當提出者、反方、證據稽核者、決策者、回顧者。","練完一個案例，你也練一次行動後回顧：原本預測、實際結果、漏看的脈絡、下次要調整的協作條件。真實案子的回顧在 LEARN。"],
+  system:["系統替每個方法、每個套件準備一堂課。","系統給低風險的練習案例。案例的來源先查過。","系統給情境演練：資料不足、意見衝突、時間很趕、AI 出錯時，你怎麼辦。","課和練習，你都可以跳過。"],
+  ai:["AI 當練習的對手。","AI 針對你思考的動作給回饋。例：「你還沒寫反例，就下了結論。」"],
+  aino:["AI 不准給你打分數或排名。","AI 不准要求你說出脆弱的事。"],
+  reads:["這一步讀：課程內容和練習案例。","絕不讀：你真實的案子，除非你同意拿來練。"],
+  writes:["練習紀錄。你可以選擇不留。"],
+  out:"不交給別塊。練習紀錄只有你看。練完，你回到要用的那一塊。",
+  uncert:["上過課，不等於會了。","會不會，看的是你之後真的做出來的動作。"],
+  control:["你可以跳過、重來、換案例。"],
+  data:["系統把練習和真實的案子分開存。","在各地，練習案例要換成當地的例子。"],
+  now:["今天只有一小部分。","每個工具自己的頁面，都有說明和一個可以直接填入的範例。","「開始前 5 分鐘」那種一頁一頁教的課程頁，程式裡只有兩堂。","兩堂是：冰山模型（工具）、人生決策（工作流）。","其餘工具沒有課程頁。","今天沒有情境演練。","這是 2026-10-03 查程式核對的，沒有登入正式站逐個點。","之前這裡寫「每個方法一堂課」，不對。"]},
+ FACILITATE: {
+  problem:"FACILITATE 管有人帶領的時候。例：老師帶一班學生做反思、工作坊帶一群人用冰山模型。這張卡裡的「你」是帶領者。帶領者也是一種影響，跟家庭、文化、制度、平台本身一樣，要能被檢查。所以這一塊讓帶領者先受訓，帶的時候守住原則，碰到危機知道交給誰，帶完留下紀錄給督導看。方法離開原開發者，別人也要帶得起來。",
+  user:["帶之前，你上帶領者的課，用練習案例演練。","帶的時候，你照帶領稿走。每個工具、每個套件各有一份。","參與者寫的東西，你只看得到他同意給你看的部分。","每帶完一次，你寫帶領紀錄：照稿做了哪些、哪裡沒照稿、為什麼。","你定期找督導談。督導是受過訓、帶過的人。督導看你的帶領紀錄，寫回饋。","停止訊號一出現就停：帶領稿上寫的、工具自己列的、參與者說不想再做的，都算。","出現自傷、暴力、急性危機的訊號時，你停下來，照升級標準交出去。"],
+  system:["系統給帶領稿、帶領者的課、演練用的練習案例。","上完帶領者的課，系統記一筆。沒上完，不能帶。","參與者對帶法的異議，系統記進帶領紀錄的一欄。參與者自己寫，帶領者不能改，督導一定看。","帶領稿寫明：這一步怎麼帶、不能做什麼、停止訊號是什麼。","帶的時候，畫面一直列出四件不能做的事：替參與者下結論；要求參與者說出脆弱的事；停止訊號出現了還繼續；把服從或反抗當成錯。","參與者同意給你看的部分，系統跟沒同意的分開。沒同意的，你看不到。","升級標準寫明：碰到危機或超出範圍，交給誰、怎麼交。求助資源由 GOVERN 照那位參與者在哪裡給。","藝術反思的工具裡，沒寫停止訊號的，不給參與者用（研究線總計畫 R21）。你補上停止訊號、寫進帶領稿之後才開放；這一句是我們加的。","帶領紀錄和督導的回饋，存在你這裡，跟參與者的案子分開。","做研究時，你和那幾位參與者都同意了，帶領紀錄裡偏離原則的部分才交給 GOVERN，跟研究資料放在一起。"],
+  ai:["AI 扮演練習的參與者，讓你演練。","你寫帶領紀錄時，AI 對照帶領稿，指出可能偏離原則的地方。例：你替參與者下了結論。"],
+  aino:["AI 不准給帶領者打分數或排名。","AI 不准代替你帶領參與者。","AI 不准讀參與者沒同意給你看的內容。","交還控制：要不要改帶法，由你和督導決定。AI 只指出來。"],
+  reads:["這一步讀：帶領稿、帶領者的課和練習案例、你自己的帶領紀錄。","這一步也讀：參與者開案時寫的有沒有人帶、哪一位帶領者，看哪些案子是你帶的。","帶的時候，也讀參與者同意給你看的部分：他攤出來的卡片、地圖、思考卡。","絕不讀：參與者沒同意給你看的內容、參與者的個人歷程。"],
+  writes:["帶領紀錄：帶了哪個工具或套件、照稿做了哪些、哪裡沒照稿和為什麼、交出去的危機。","帶領紀錄不寫參與者的名字和他寫的內容；交出去的危機只記哪一類、交給誰、什麼時候。","上完帶領者的課的紀錄。","參與者對帶法的異議：參與者自己寫，你不能改。","督導的回饋。"],
+  out:"帶領紀錄和督導的回饋，交給你本人和你的督導。做研究時，你和那幾位參與者都同意了，偏離原則的部分才交給 GOVERN。",
+  uncert:["帶領稿是起點，不是唯一正確的帶法。","沒照稿不一定是錯。寫下理由，你和督導一起看。","同一個方法換一個帶領者，效果可能不一樣。這要研究，不能假設。"],
+  control:["參與者隨時可以停、不分享，也可以對你的帶法提出異議。異議記在帶領紀錄裡，督導一定看。","你可以改帶法，寫下理由。"],
+  data:["帶領紀錄跟著你，跟參與者的案子分開存。","帶領稿有版本。各地由當地的帶領者參與改寫，平台不單方面定。","研究要你和參與者都同意。藍圖 13.4 還沒定研究怎麼取得同意。"],
+  now:["今天沒有這一塊，也沒有帶領稿。","藝術反思的工具資料在 Airtable，每個工具都有「帶活動者提示用語」和「停止活動訊號」兩欄，可以當帶領稿的底稿；研究線總計畫列為還沒同步進程式。","研究線總計畫把「停止訊號欄有好幾筆是空的」列為風險 R21；帶領者偏離原則的紀錄排在參與者模式那一步，還沒做。"]},
  COLLAB: {
-  user:["發起共同程序，邀請有關的人。","每個人先各自寫自己的立場，寫完才看別人的。","對每個方案標同意或異議，寫理由。","一起訂：什麼情況下結束討論、什麼情況下重新開。","決定授權給誰、範圍多大；可以收回。"],
-  system:["分歧地圖：大家在哪裡不一樣。","各方案的證據、風險、價值權衡並排。","異議和理由存下來，不會被多數蓋掉。","記錄結束討論的理由、重開條件、檢討日期、負責的人。","確認每個參與者是受邀的那個帳號、沒有一人多個帳號；不要求實名。各自寫完之前不顯示多數意見，防止帶風向。","決定的後果之後寫回來，進下一輪。"],
-  ai:["整理分歧。","轉述每一方的立場，由本人確認說得對不對。","指出還沒被聽到的人。"],
-  aino:["不准代表任何一方。","不准宣布大家已經有共識。","不准藏少數意見。","不准給參與者排名。","交還控制：有人提出異議、要求重開，或說自己的立場被轉述錯了，AI 停下來交回給當事人。"],
-  reads:["每個參與者同意分享的部分：各自的地圖（MAP）、查證結果（VERIFY）、提案（EXPRESS）。","絕不讀：參與者沒分享的個人案子。"],
-  writes:["共同紀錄：分歧地圖、授權、異議、結束與重開的紀錄。"],
-  out:"共同的判斷交給 DECIDE，行動交給 ACT。",
-  uncert:["一致不代表對；異議的數量和內容都要看得到。"],
-  control:["任何人可以撤回授權、提出重開。"],
-  data:["個人的原始素材和群組的決策紀錄分開存。","誰看得到什麼，要寫明。"]},
+  problem:"COLLAB 幫幾個人一起做決定，又保留不同的意見。例：第三位合夥人也要一起決定。它用這些做法：畫出大家在哪裡不一樣、授權和收回授權、保存少數意見、訂好什麼時候結束和什麼時候重開。",
+  user:["你發起共同程序，邀請有關的人。例：第三位合夥人。","每個參與者加入時，寫自己在哪裡。","每個人先各自寫自己的立場。寫完，才看得到別人的。","你們對每個方案標同意或異議，並寫理由。","你們一起訂：什麼情況結束討論、什麼情況重新開。","做共同決定之前，你們一起回答這 " + INTERFACE_Q.length + " 個問題（你的《判斷主權教育架構 v0.1》的介面問題）：",...qList,"你們決定授權給誰、範圍多大。","授權可以收回。每個人收回的是自己那一份。例：三個人授權給甲，乙收回後，甲只代表兩個人；範圍要重新談。"],
+  system:["系統畫出分歧地圖：大家在哪裡不一樣。","系統把各方案的證據、風險、價值權衡並排。","系統把異議和理由存下來。異議不會被多數蓋掉。","系統記下結束討論的理由、重開條件、檢討日期、負責的人。","系統確認每個參與者是受邀的那個帳號。","一個人用多個帳號，由 GOVERN 的帳號檢查擋。平台不要求實名。","各自寫完之前，系統不顯示多數意見。這樣防止有人帶風向。","系統之後把決定的後果寫回來，帶進下一輪。"],
+  ai:["AI 整理大家的分歧。","AI 轉述每一方的立場。每一方本人確認說得對不對。","AI 指出還沒被聽到的人。例：兩個員工還沒說話。"],
+  aino:["AI 不准代表任何一方。","AI 不准宣布大家已經有共識。","AI 不准藏起少數意見。","AI 不准給參與者排名。","交還控制：有人提出異議或要求重開時，AI 停下來，交回給當事人。","交還控制：有人說自己的立場被轉述錯了，AI 停下來，交回給他本人。"],
+  reads:["這一步讀：每個參與者同意分享的地圖（MAP）、查證結果（VERIFY）、提案（EXPRESS）。","這一步也讀：ACT 的觀察紀錄（只讀群組決定之後的觀察）、開案資料裡受影響的人（只讀這一項）。","沒有查證或提案時，只看地圖和各人寫的立場。","絕不讀：參與者沒分享的個人案子。"],
+  writes:["群組紀錄：各人的立場、分歧地圖、同意和異議、授權、共同的判斷和要做的行動、介面問題的回答、結束和重開的紀錄、每個參與者在哪裡。"],
+  out:"共同的判斷交給 DECIDE。要做的行動交給 ACT。",
+  uncert:["大家一致，不代表就是對的。","異議有幾個、說了什麼，都要看得到。"],
+  control:["任何參與者都可以撤回授權。","任何參與者都可以提出重開。"],
+  data:["系統把個人的原始素材，和群組的決策紀錄分開存。","誰看得到什麼，系統要寫明。","每個參與者在哪裡，只有他本人和 GOVERN 讀得到；別的參與者看不到。"],
+  now:["今天沒有這一塊。"]},
  GOVERN: {
-  user:["看和改自己的資料設定。","匯出、完整刪除自己的資料。","同意或撤回研究用途。","對平台的做法提申訴。","查這個案子用了哪個模型、哪一版規則。"],
-  system:["同意的管理。","匯出和完整刪除。","維護各地的求助資源清單和轉介流程。危機訊號由看得到內容的那一塊自己偵測（例如 SENSE），偵測到就叫這一塊給出所在地的資源；這一塊自己不讀外化和反思的內容。","健康、法律、金錢、公共擴散這類高風險任務自動加護欄。","模型、提示、來源名單、分類規則、操弄手法清單的版本都由這一塊管，看得到；別的積木只記下自己用的是哪一版。","防假帳號大量註冊和灌入。","戰爭或高壓環境的選項：不留紀錄（這個模式下歷程只留在你自己的裝置上，或案子結束就刪；回顧會用不了，系統先講清楚）、一鍵刪除、不要求實名。"],
-  ai:["解釋設定是什麼意思。"],
-  aino:["不准拿使用者的資料做說服、廣告、評分。","不准在危機時自己處理，要轉介。","模型自己記得的事不算來源。","交還控制：偵測到危機時交給人和所在地的求助資源；申訴由人處理，AI 不自己裁決。"],
-  reads:["設定、同意紀錄、版本紀錄。","絕不讀來做別的用途：外化和反思的內容。"],
-  writes:["同意紀錄、版本紀錄、稽核紀錄、申訴紀錄。"],
-  out:"給使用者本人；研究資料只在明確同意之後、匿名後給研究用。",
-  uncert:["平台自己的分類和名單可能錯，要標版本、可以被質疑。"],
-  control:["所有同意都可以撤回。","可以關掉任何非必要的資料蒐集。"],
-  data:["資料最少化。","保存期限、存放地點寫明。","各地的規定不同，照使用者所在地，不確定時用較嚴的。"]},
+  problem:"GOVERN 保護你，也讓平台自己被檢查。它管：同意、隱私、資料匯出和完整刪除、危機和高風險的轉介、申訴。它也管：AI 指令和模型的版本查得到、在地化。高風險的案子，系統自動加護欄，也就是多一層保護。高風險是指：健康、法律、金錢、人身安全、急性心理危機、要公開散布的事。這不是治療服務。",
+  user:["你可以看、可以改自己的資料設定。","你可以匯出自己的資料。你也可以完整刪除。","你可以同意把資料用在研究上，也可以撤回。","你可以對平台的做法提申訴。","你可以查這個案子用了哪個模型、哪一版規則。"],
+  system:["GOVERN 管理你的同意。","GOVERN 負責匯出和完整刪除。","GOVERN 維護各地的求助資源清單和轉介流程。","有人帶你的時候，你在每一張卡片、每一版地圖、每一張思考卡上，選要不要給帶領者看。GOVERN 記在同意紀錄；系統照它決定帶領者看得到什麼。","做研究時，GOVERN 把 FACILITATE 交來的帶領者偏離紀錄，和研究資料放在一起。研究資料要留下沒改變、失敗、退出的案子，不只挑成功的。","危機訊號和高風險，由看得到你內容的積木自己認出來：" + SEES_CONTENT.join("、") + "。","那一塊認出危機，就叫 GOVERN 照你在哪裡（多人時、或有人帶的時候，照那位參與者在哪裡）給當地的求助資源；認出高風險，就叫 GOVERN 加護欄。","GOVERN 不看你攤出來的內容和反思的內容。","匯出和刪除時，GOVERN 只搬動、刪掉資料，不看裡面寫了什麼。","高風險的案子，系統自動加護欄。高風險是指：健康、法律、金錢、人身安全、急性心理危機、要公開散布的事。","組裝器從你開案時寫的風險認出來；看得到內容的積木在過程中認出來。它們叫 GOVERN 加護欄。","GOVERN 把這個案子加了哪些護欄、是哪一類高風險、是哪一塊認出來的，寫進「護欄」抽屜。GOVERN 只收到是哪一類，不看內容。","護欄有四種，下面各寫由誰做。","要求來源：每次呼叫 AI 時，系統讀護欄；AI 說到事實時一定要附來源（哪一個網頁或哪一份文件），沒有來源就說沒有。","建議找專業的人：每次呼叫 AI 時，系統讀護欄；AI 提醒你這件事可以找專業的人，並說明哪些事要由專業的人負責、哪些由你自己負責。GOVERN 照你在哪裡，告訴你當地可以找誰。","先等一下或請人覆核：DECIDE 和 ACT 讀護欄；碰到不能反悔的決定或行動，請你先等一下或請人覆核。","群組程序：有別人也有決定權時，DECIDE 提議加 COLLAB，並標明是護欄。你可以不加。","模型、給 AI 的指令、來源名單、分類規則、分組規則、操弄手法清單、查核資料庫名單，版本都由 GOVERN 管。","這些版本你都看得到。","別的積木只記下自己用的是哪一版。","系統防假帳號大量註冊，也防它們大量灌進來。","在戰爭或高壓的環境，你可以選擇不留紀錄。","不留紀錄時，歷程只留在你自己的裝置上，或案子結束就刪。","這樣回顧會用不了。系統會先跟你講清楚。","這種環境的選項還有：一鍵刪除。平台本來就不要求實名。"],
+  ai:["AI 解釋設定是什麼意思。"],
+  aino:["AI 不准拿你的資料做說服、廣告、評分。","AI 在危機時不准自己處理。AI 要轉介。","AI 模型自己記得的事，不算來源。","交還控制：積木認出危機時，AI 停下來，交還給你；GOVERN 給當地的求助資源。","交還控制：申訴由人處理。AI 不自己裁決。"],
+  reads:["這一塊讀：設定、同意紀錄、版本紀錄。","這一塊也讀：你在哪裡（開案時寫的）。只讀這一項，用來給當地的求助資源、照當地的規定處理資料。","多人時，也讀群組紀錄裡每個參與者在哪裡。只讀這一項。","做研究時，也讀 FACILITATE 的帶領紀錄裡，帶領者和那幾位參與者都同意給研究的偏離紀錄。只讀這一部分。","絕不讀：你攤出來的內容和反思的內容。匯出和刪除只搬動資料，不看內容。"],
+  writes:["同意紀錄、版本紀錄、稽核紀錄、申訴紀錄。","這個案子的護欄：加了哪些、是哪一類高風險、是哪一塊認出來的。","案子被抹除後留的一筆「已抹除」。"],
+  out:"這些紀錄交給你本人。這個案子的護欄交給 DECIDE、ACT 讀；每次呼叫 AI 時，系統也讀。來源名單、分類規則、分組規則、操弄手法清單、查核資料庫名單的現行版本，交給 GATHER、VERIFY 讀。每次呼叫 AI 時，系統讀模型和 AI 指令的版本。研究資料要等你明確同意，才給研究用。GOVERN 拿掉帳號和三個地點（發生地、你在哪裡、當事人各在哪裡），不改內文；內文裡的人名要你自己先刪改。這樣只是拿掉帳號，不保證認不出是誰。",
+  uncert:["平台自己的分類和名單也可能錯。","它們要標版本。你可以質疑它們。"],
+  control:["你的每一個同意，都可以撤回。","研究這類選用的用途，你都可以關掉。","你看得到這個案子加了哪些護欄、是哪一類高風險。"],
+  data:["系統只收最少、必要的資料。","資料存多久、存在哪裡，系統都寫明。","各地的規定不同。系統照你所在地的規定走。","不確定時，系統用比較嚴的。"],
+  now:["今天只有一點點。","今天有三樣雛形：AI 指令的版本紀錄、拿同一份輸入重跑一次、照結果改進指令。","今天專案可以抹除，也可以匯出 PDF。","今天沒有同意、申訴、危機轉介、高風險護欄。"]},
  "完整性核心": {
-  user:["任何時候都能看到：這個結論是誰寫的、AI 現在有什麼權限、資料從哪來。"],
-  system:["每一塊積木上線前，對照 11 條逐條檢查，包括「結論的格子只收人寫」有沒有做到。實際在寫入時擋的是共用紀錄。","任何一個勾都要說清楚它證明了什麼。"],
-  ai:["照規則做事。"],
-  aino:["不准預填結論。","不准把某個立場包裝成唯一中立的答案。","不准因為使用者不同意就懲罰或貼標籤。","交還控制：使用者的要求和某一條規則衝突時，說出是哪一條，由使用者決定要不要提異議。"],
-  reads:["每一塊的合約。"],
-  writes:["檢查的結果。"],
-  out:"給每一塊積木當上線的門檻。",
-  uncert:["規則本身也可以被質疑和修改，要有版本。"],
-  control:["使用者可以對任何一條提出異議。"],
-  data:["規則的每一版都留著。"]},
+  problem:"完整性核心是藍圖第 9 節的 11 條規則。它們套在全部 " + NB + " 份積木合約上。任何積木都不能蓋過它們。這 11 條是：①最後的判斷權在你。②平台不預設結論，但要把規範和脈絡擺出來。③所有的影響都可以檢查，包括平台自己。④不同種類的主張不混在一起：事實要查證；法律要標法域、時效和來源；倫理和道德要說明原則、權衡和後果；文化和宗教要承認有不同的理解。⑤平台追求的是能重新檢查，不是懷疑一切。⑥服從或抵抗，都可以是結果。⑦有判斷權，不等於不用負責。⑧大家共同的秩序另外設計。⑨平台本身可以被質疑：模型、AI 指令、資料管理、評估方式，都可以被質疑、研究、修改。⑩AI 的權限看得見、可以縮小、可以收回。⑪信任要能校準：每個重要的產出，都要說明適用的範圍、依據、限制，和什麼時候交還給你判斷。另外，平台不給人打分數（藍圖第 1 節、6.10、第 11 節）。這一條不在這 11 條裡，一樣要守。",
+  user:["你隨時看得到：這個結論是誰寫的、AI 現在有什麼權限、資料從哪裡來。"],
+  system:["每一塊積木上線前，完整性核心對照 11 條，一條一條檢查。「不給人打分數」也一起查。","其中一條要檢查：結論的格子是不是只收人寫的。","真正存進紀錄的那一刻，負責擋的是共用紀錄。例：AI 想把結論寫進判斷卡，共用紀錄會擋下來。","任何一個勾，都要說清楚它證明了什麼。例：「找得到出處」的勾，不證明出處是真的。","判斷主權的七項檢查（研究線總計畫 D20）落實上面幾條規則，例如 ① 和 ②。","執行時由下面這幾塊做。上線前，完整性核心查它們真的寫在那一塊的合約上。",...SEVEN.map(([k,parts]) => `${k}：` + parts.map(([o,q,w]) => `${w ? w + "，" : ""}${sevenOwner(o)}（${q}）`).join("；"))],
+  ai:["AI 照規則做事。"],
+  aino:["AI 不准預先填好結論。","AI 不准把某個立場，包裝成唯一中立的答案。","你不同意時，AI 不准懲罰你，也不准給你貼標籤。","交還控制：你的要求和某一條規則衝突時，AI 說出是哪一條。","要不要提異議，由你決定。"],
+  reads:["它讀：每一塊的合約。"],
+  writes:["每次檢查的結果。"],
+  out:"檢查結果交給上線流程，不交給積木。沒過，那一塊就不能上線。",
+  uncert:["規則本身也可以被質疑、被修改。","規則要有版本。"],
+  control:["你可以對任何一條提出異議。"],
+  data:["規則的每一版都留著。"],
+  now:["今天還沒有這一樣：沒有上線前的檢查。","判斷主權的七項檢查排在之後做。各由哪一塊負責，寫在上面「系統做什麼」。","程式裡今天只做了其中一項：「不預設結論」。AI 的解讀一律標成 AI 的推論；模型自己寫進「你的判斷」的，會被拿掉。","它在寫進紀錄時擋，所以在架構頁算關卡二，歸共用紀錄。它套在每個工具和工作流的結果解讀上。","其餘 " + (SEVEN.length - 1) + " 項還沒做：" + SEVEN.filter(s=>s[0]!=="不預設結論").map(s=>s[0]).join("、") + "。","這是 2026-10-03 查程式核對的。之前這裡寫「七道都有、只套在藝術反思 14 個方法上」，不對。"]},
  "規範與脈絡": {
-  user:["發生在哪裡，開案時組裝器問過，這裡不重問。","對跟這件事有關的脈絡面向各寫一句。","每個面向回答兩題：它怎麼界定這裡的正常；它是不是原因之一。"],
-  system:["列出脈絡面向的清單，讓人勾跟這件事有關的。","讀開案時寫的所在地，記適用哪裡的法律。","同一件事在兩地答案不同時，兩個都列。"],
-  ai:["提醒可能有關但沒被勾到的面向。","把事實、法律、價值分開。"],
-  aino:["不准拿某一國當預設。","不准定義當事人的文化或宗教。","不准憑常識說法律。","不准替任何政黨、政權、交戰方說話。","交還控制：碰到法律、文化、宗教怎麼解釋，交回給當事人和專業的人。"],
-  reads:["案子的所在地、MAP 的地圖。"],
-  writes:["各面向的註記、適用的法律。所在地是組裝器開案時寫的，這裡只讀。"],
-  out:"給 MAP 的每一層、DECIDE 判斷卡的規範脈絡那一格。",
-  uncert:["法律主張要有法域、時效、來源，否則標「未確認」。"],
-  control:["可以加面向、刪面向、說某個面向跟這件事無關。"],
-  data:["面向清單有版本；各地可以加自己的面向。"]},
+  problem:"規範與脈絡看這件事所在的世界。脈絡面向現在 " + FACET_NAMES.length + " 個：" + FACET_NAMES.join("、") + "。" + "每個面向有兩種作用。第一，它界定這裡什麼算正常、正確、允許。第二，它本身可能就是造成這個問題的原因之一。兩種都要看。例：「同業都這樣改」這個慣例，界定了什麼算正常；它也可能就是你一再被改條件的原因。平台會跨國使用。所以平台不預設任何一個國家、文化或法域（適用哪裡的法律）。它是藍圖 5.1a 說的橫切鏡頭：它貫穿 MAP 的每一層，不是最後才補的一層。每個判斷，你都要看：誰有權決定、誰負什麼義務。你也要看：這個規範從哪來、誰受益。你也要看：這句話是可查證的事實、要確認的法律條件，還是要人權衡的價值。你也要看：你是真心認同、暫時遵守，還是沒檢查過。法律主張要標法域、時效、來源。碰到文化和宗教，要先問當事人自己怎麼理解。",
+  user:["事情發生在哪裡，組裝器開案時問過。這裡不再問一次。","這件事裡起作用的每一條規範，你走四個檢查。例：「同業都這樣改」。","誰有權決定、誰負什麼義務。","這條規範從哪來、誰定的、誰受益。","它是事實、法律條件，還是價值。這一項由 MAP 分欄做，這裡不重做。","你是真心認同、暫時遵守、仍有保留，還是沒看見別的可能。你寫下暫定的立場、理由，和什麼情況要重新檢查。","走「公共議題判斷」套件時，你也回答這 " + INTERFACE_Q.length + " 個問題（你的《判斷主權教育架構 v0.1》的介面問題）：",...qList,"跟這件事有關的每個面向，你回答兩題：它怎麼界定這裡的「正常」？它是不是這件事的原因之一？例：「同業都這樣改」這個慣例，界定了什麼算正常；它也可能就是你一再被改條件的原因。"],
+  system:["系統列出脈絡面向的清單。","你勾出跟這件事有關的面向。","系統讀開案時寫的發生地、你在哪裡、當事人各在哪裡。","系統記下適用哪裡的法律。","同一件事在兩個地方答案不同時，系統兩個都列。"],
+  ai:["AI 提醒你：哪些面向可能有關，但還沒被勾。"],
+  aino:["AI 不准拿某一國當預設。","AI 不准替當事人定義他的文化或宗教。","AI 不准憑常識說法律。","AI 不准替任何政黨、政權、交戰的一方說話。","交還控制：法律、文化、宗教要怎麼解釋時，AI 交回給當事人和專業的人。"],
+  reads:["它讀：開案時寫的發生地、你在哪裡、當事人各在哪裡；MAP 的地圖。"],
+  writes:["各面向的註記、適用哪裡的法律。","四個檢查的回答：權利和義務、規範從哪來和誰受益、你的暫定立場、理由和重新檢查的條件。","公共議題時，介面問題的回答。","發生地、你在哪裡、當事人各在哪裡，是組裝器開案時寫的。這裡只讀。"],
+  out:"註記交給 MAP 的每一層。註記也交給 DECIDE，放進判斷卡的「規範脈絡」那一格。",
+  uncert:["法律主張要有法域、時效、來源。","缺了的，系統標「未確認」。"],
+  control:["你可以加面向、刪面向。","你可以說某個面向跟這件事無關。"],
+  data:["面向清單有版本。","各地可以加自己的面向。"],
+  now:["今天沒有這一樣。","今天的資料，沒有把事實、法律、價值分開存。","今天沒有任何一頁問這些。"]},
  "組裝器": {
-  user:["選目的：自我理解、複雜決策、訊息判斷、創意發散、學習反思、團隊審議、公共議題判斷。「自我理解」目前沒有對應的套件，還沒定。","寫要釐清什麼、風險、誰會受影響、發生在哪裡、當事人各在哪裡（跨國的事可以標不只一地）。","看系統推薦的組合和理由；可以重排、跳過、停止。"],
-  system:["依目的推薦一個套件，第一輪最多 6 塊。選「自我理解」時目前沒有套件可推。","畫面上顯示：現在在哪一塊、為什麼、下一塊做什麼。","每個案子有 13 格，看得到哪幾格做過。","該加別塊的時機由各塊自己發現（例如 SENSE 的卡片裡出現「聽說」，由 SENSE 提出加 VERIFY）；組裝器只把提議顯示給你，你同意才加。","每次的組合可以回放。"],
-  ai:["解釋為什麼推薦這個組合。"],
-  aino:["不准強迫走完流程。","不准沒問就加積木。","交還控制：使用者要重排、跳過、停止時，照做，不追問。"],
-  reads:["使用者寫的目的和問題；LEARN 交過來的「下一輪要加哪幾塊」；各塊提出的「建議加哪一塊」；DECIDE、ACT 交回的受影響者補充。不讀各塊的其他內容。"],
-  writes:["案子的目的、風險、受影響者、所在地、這次用了哪些積木。"],
-  out:"交給協作合約，然後進第一塊。",
-  uncert:["推薦只是起點，可能不適合。"],
-  control:["重排、跳過、停止、換套件。"],
-  data:["組合紀錄跟著案子。"]},
+  problem:"組裝器依你的目的，把積木組起來。你先選目的。組裝器推薦一組積木，並說明理由。例：你選「複雜決策」，組裝器推薦「個人複雜決策」這一組。你可以重排、跳過、停止。",
+  user:["你選目的：自我理解、複雜決策、訊息判斷、創意發散、學習反思、團隊審議、公共議題判斷。","「自我理解」用你的八步循環：觀察→外化→反思→提問→比較→重構→判斷→再檢視。這是我擬的套件，等你定。","你寫要釐清什麼、風險、誰會受影響。例：受影響的是我、合夥人、兩個員工。","有人帶你做的時候，你邀請那位帶領者；系統確認是受邀的那個帳號。","你寫暫定的完成條件：做到什麼，這件事就算告一段落。例：談完一次，知道要不要續約。","你寫事情發生在哪裡（發生地）、你自己在哪裡、其他當事人各在哪裡。跨國的事，可以標不只一個地方。","你看系統推薦的組合和理由。","你可以重排、跳過、停止。"],
+  system:["組裝器依你的目的，推薦一個套件。套件就是一組排好順序的積木。","第一輪最多 6 塊。","你選「自我理解」時，組裝器推「自我理解」這一組：SENSE → THINK → DECIDE → LEARN。","畫面上顯示：現在在哪一塊、為什麼在這一塊、下一塊做什麼。","每個案子有 " + NB + " 格，一塊積木一格。你看得到哪幾格做過。","什麼時候該加別塊，由各塊自己發現。","例：SENSE 的卡片裡出現「聽說」，由 SENSE 提議加 VERIFY。","組裝器只把提議顯示給你。你同意才加。","你開案時寫的風險屬於 GOVERN 列的高風險時，組裝器叫 GOVERN 加護欄。","組裝器照你的八步循環檢查每個套件：觀察、外化、反思、提問、比較、重構、判斷、再檢視，每一步都要有一塊在做。","現在少了步驟的套件：" + (PK.filter(p=>loopGaps(p[2]).length).map(p=>`「${p[0]}」少了${loopGaps(p[2]).join("、")}`).join("；") || "沒有") + "。要不要補，等你定；地圖頁的套件旁邊也標出來。","每次的組合，你都可以回放來看。"],
+  ai:["AI 解釋為什麼推薦這個組合。"],
+  aino:["AI 不准強迫你走完流程。","AI 不准沒問你就加積木。","交還控制：你要重排、跳過、停止時，AI 照做，不追問。"],
+  reads:["它讀：你寫的目的和問題。","它也讀：LEARN 交過來的「下一輪要加哪幾塊」。","它也讀：SENSE、MAP、VERIFY、DECIDE 提出的「建議加哪一塊」。提議不是資料交接：提議的那一塊叫組裝器顯示給你。","它也讀：DECIDE、ACT 交回來的受影響者補充。","它不讀各塊的其他內容。"],
+  writes:["案子的目的、風險、受影響的人、暫定完成條件、發生地、你在哪裡、當事人各在哪裡、有沒有人帶和哪一位帶領者、這次用了哪些積木。"],
+  out:"開案資料交給協作合約。然後你進第一塊積木。誰還讀開案資料的哪一部分，照下面架構頁的名單。",
+  uncert:["推薦的組合只是起點。它可能不適合你。"],
+  control:["你可以重排、跳過、停止。","你可以換套件。"],
+  data:["每次用了哪些積木的紀錄，跟著案子存。"],
+  now:["今天工具已經按問題分類。例：「這件事為什麼一直發生？」這一類有 " + toolsOf(["systems","root_cause","causal"]).length + " 個，名單在 MAP 的合約卡。","今天方法頁有「做完常接」。","今天結果頁 ⑧ 會推下一步。","今天能推薦方法，但不能組積木。","今天沒有套件。"]},
  "共用紀錄": {
-  user:["隨時看這個案子從頭到尾的歷程。","看每一次分析、每一版判斷、每一筆觀察。","匯出、抹除。"],
-  system:["存目的、風險、協作合約。","存事件、主張、來源、證據。","存情緒、關係、權力的訊號。","存所在地和各脈絡面向的註記。","存假設、替代解釋、判準、不確定性。","存判斷的每一版、行動、預測、結果。","每一筆標兩件事：作者（我、AI、共同、系統）和是哪一塊寫的。「系統」是既不是你也不是 AI 的寫入，例如蒐集器抓回來的來源、系統打的勾。","寫入前檢查：結論的格子只收你自己寫的內容（架構頁的第二個關卡）。"],
-  ai:["只能透過積木讀寫明確的欄位。"],
-  aino:["不准暗中改使用者寫的內容。","不准把 AI 寫的標成使用者寫的。","交還控制：使用者要改、刪、匯出、抹除時，照做。"],
-  reads:["各積木宣告要讀的欄位。"],
-  writes:["各積木宣告要寫的欄位。"],
-  out:"給每一塊積木，和使用者本人。",
-  uncert:["每一筆帶時間、作者、是哪一塊寫的、版本。"],
-  control:["改、刪、匯出、抹除整個案子（留一筆已抹除）。"],
-  data:["預設只有自己看得到。（藍圖 13.4 還沒定；這裡先照最嚴的寫）","跨案子的個人歷程也在這裡，同樣可刪。"]},
+  problem:"共用紀錄是一個案子的家。積木說要讀、要寫的東西，加起來就是它；TEACH 的練習紀錄和 FACILITATE 的帶領紀錄另外存。它至少要做到這些。每一步都記一筆，歷程是完整的。同一個案子可以做很多次分析。這次的方法沒解決，就換別的方法。每一次都留著，可以比較。案子有自己的來源。它存任務卡和每筆紀錄：實際狀況、想法、調整方針、卡住了、實際數字。數字的趨勢和觀察的節奏由 ACT 做，拆法的推薦由 MAP 做；結果都存在這裡。你可以重跑，並比較結果。匯出和抹除由 GOVERN 做；抹除後，平台紀錄留一筆「已抹除」。藍圖 4.4 另外要求存這些：目的、風險、協作合約；情緒、關係、權力的訊號；規範脈絡；假設、替代解釋、判準、不確定性；暫定判斷、行動、預測、結果、版本。每一筆都標作者：我、AI、共同或系統。核准不是個人流程一定要走的步驟（藍圖 4.3）。多人或高風險時，才有授權、退回、重開。跨案子的個人歷程也存在這裡。",
+  user:["你隨時看得到這個案子從頭到尾的歷程。","你看得到每一次分析、每一版判斷、每一筆觀察。","匯出和抹除，在 GOVERN 那裡做。"],
+  system:["共用紀錄存：目的、風險、協作合約。","共用紀錄存：事件、主張、來源、證據。","共用紀錄存：情緒、關係、權力的訊號。","共用紀錄存：發生地、你在哪裡、當事人各在哪裡、各脈絡面向的註記。","共用紀錄存：假設、替代解釋、判準、不確定性。","共用紀錄存：判斷的每一版、行動、預測、結果。","每一筆都標兩件事：作者是誰、是哪一塊寫的。","作者是：我、AI、共同，或系統。","「系統」是指既不是你、也不是 AI 寫的。例：蒐集器抓回來的來源、系統打的勾。","東西寫進來之前，共用紀錄先檢查：結論的格子只收你自己寫的。","給你的信念或結論打分數的欄位，一律不收。","這是架構頁上的第二個關卡。例：AI 想把結論寫進判斷卡，會被擋下來。"],
+  ai:["AI 只能透過積木讀寫。","AI 只能讀寫說好的那幾格。"],
+  aino:["AI 不准偷偷改你寫的內容。","AI 不准把自己寫的，標成你寫的。","交還控制：你要改、刪時，系統照做。匯出和抹除由 GOVERN 做。"],
+  reads:["它讀：每一塊積木說好要讀的東西。"],
+  writes:["每一塊積木說好要寫的東西。"],
+  out:"紀錄交給每一塊積木，也交給你本人。",
+  uncert:["每一筆都帶著：時間、作者、是哪一塊寫的、版本。"],
+  control:["你可以改、刪、匯出。","抹除整個案子由 GOVERN 做。平台紀錄留一筆「已抹除」。"],
+  data:["紀錄預設只有你自己看得到。","藍圖 13.4 還沒定這件事。這裡先照最嚴的寫。","跨案子的個人歷程也存在這裡。它一樣可以刪。","你在 GOVERN 選了「不留紀錄」時，歷程只留在你自己的裝置上，或案子結束就刪。這時回顧會用不了。"]},
  "協作合約": {
-  user:["每個案子開始前填五格：我要釐清、探索、比較還是決定；哪些事一定由我承擔；AI 可以做什麼；哪些來源和限制要納入；什麼情況 AI 要停下來交還給我。","中途隨時可以改。"],
-  system:["在系統這一層擋住 AI 超出權限的動作，不只是提示詞。","畫面上一直看得到現在的權限。","每次改權限都記下來。"],
-  ai:["在被授權的範圍內做事。沒授權時只提問、整理、標缺口。"],
-  aino:["超出權限的要求要拒絕並說明。","不准因為說得流暢就多做。","交還控制：你設定的交還條件一到，AI 停下來交還。"],
-  reads:["使用者填的五格；組裝器交過來的目的、風險、受影響者。"],
-  writes:["合約的每一版。"],
-  out:"給每一塊積木當 AI 的權限設定。",
-  uncert:["AI 給建議時要附前提、適用條件、可能怎麼失敗。"],
-  control:["縮小權限、收回權限、換模式。"],
-  data:["合約的版本跟著案子。"]},
+  problem:"每個案子開始前，你在協作合約裡設定 AI 這次能做什麼。你設定 AI 的角色、能用的資料、不准碰的部分、什麼時候交還控制。例：「可以當反方，不准替我下結論。」系統會真的擋下 AI 超出設定的動作。這不只是在給 AI 的指令裡交代一句。",
+  user:["開案時你填五格。之後每進一塊新的積木，系統請你看一次要不要改。例：進共思考之前，問你這一輪 AI 能不能當反方。","前三格：你要釐清、探索、比較，還是決定；哪些事一定由你承擔；AI 可以做什麼。","後兩格：哪些來源和限制要納入；什麼情況 AI 要停下來，交還給你。","你中途隨時可以改。","你也可以不讓 AI 知道發生地和你在哪裡。這時碰到要看地點的事，AI 就說不知道。"],
+  system:["AI 超出權限的動作，系統會擋下來。這不只是在給 AI 的指令裡交代。","案子以外的 AI 呼叫（練習、演練、寫帶領紀錄）沒有協作合約，系統照那一塊合約卡寫死的權限查。","例：你沒准 AI 找外部資料，AI 就找不了。","畫面上一直看得到 AI 現在的權限。","你每改一次權限，系統都記下來。"],
+  ai:["AI 只在你准的範圍內做事。","你沒准的時候，AI 只提問、整理、指出還缺什麼。"],
+  aino:["AI 碰到超出權限的要求，要拒絕，並說明原因。","AI 不准因為自己說得流暢，就多做。","交還控制：你設定的交還條件一到，AI 就停下來，交還給你。"],
+  reads:["它讀：你填的五格。","它也讀：組裝器交過來的目的、風險、受影響的人。"],
+  writes:["這份合約的每一版。"],
+  out:"不交給積木。每次呼叫 AI 之前，系統先查這份合約（架構頁的第三個關卡）。",
+  uncert:["AI 給建議時，要附上前提和適用條件。","AI 也要寫出這個建議可能怎麼失敗。"],
+  control:["你可以縮小或收回 AI 的權限。","你可以換模式。"],
+  data:["合約的每一版都跟著案子存。"],
+  now:["今天沒有這一樣。","今天 AI 每次都是全權。"]},
 };
 [...BLOCKS, ...CROSS].forEach(b => { const c = CONTRACTS[b.code]; if (c) { Object.assign(b, c); b.contract = "草稿"; } });
+/* 看得到你內容的積木（SEES_CONTENT，定義在 CONTRACTS 前面）：危機和高風險那幾句由名單加到每張卡，不在各卡手寫。 */
+[...BLOCKS, ...CROSS].filter(b=>SEES_CONTENT.includes(b.code)).forEach(b => {
+  const whose = ["COLLAB","FACILITATE"].includes(b.code) ? "那位參與者在哪裡" : "你在哪裡";
+  b.aino = [...b.aino, "交還控制：出現自傷、暴力、急性危機的訊號時，AI 停下來。", `這時 ${b.code} 叫 GOVERN，照${whose}給當地的求助資源。`]
+    .concat(b.code==="組裝器" ? [] : [`交還控制：碰到 GOVERN 列的高風險時，${b.code} 叫 GOVERN 加護欄。`]);
+});
 
 /* 北極星頁和合約卡共用的資料。只在這裡寫一次；北極星頁的表和合約卡的「北極星對這一塊的要求」都從這裡畫。
    規則：北極星頁不得有任何一列不在合約卡裡。要加內容，加在這裡，兩邊同時出現。 */
@@ -2033,12 +2188,12 @@ const TRAINS = {
  SENSE:"看見情緒、身份、慾望、關係怎麼進入判斷", GATHER:"知道資料從哪來、是誰說的", MAP:"分清事實和解釋；看見別人要什麼、結構怎麼配置",
  THINK:"獨立思考、反證自己、看見第二序後果", VERIFY:"願意查證、辨認操弄", COMPUTE:"分清「算出來的」和「感覺的」",
  DECIDE:"自己下結論，並寫下什麼會改變它", ACT:"承擔選擇，持續看後果", LEARN:"回看自己怎麼想，願意修正",
- EXPRESS:"能向別人說明自己的立場和理由", TEACH:"把這些動作練到沒有 AI 也會做", COLLAB:"在不同意見裡共同決定，保留異議", GOVERN:"不被平台自己操控；平台可被質疑",
+ EXPRESS:"能向別人說明自己的立場和理由", TEACH:"把這些動作練到沒有 AI 也會做", COLLAB:"在不同意見裡共同決定，保留異議", FACILITATE:"帶別人想，但不替人想；自己的帶法也能被檢查", GOVERN:"不被平台自己操控；平台可被質疑",
 };
 const SCALES = [
  ["每一個人的判斷",["SENSE","GATHER","MAP","THINK","VERIFY","COMPUTE","DECIDE","ACT","LEARN","EXPRESS","TEACH"],"藍圖的「個體判斷」。先做這一層"],
  ["公共決策",["COLLAB"],"藍圖的「共同程序」：不同判斷怎麼形成正當的共同決定，保留異議、可以重開"],
- ["文明的方向",["GOVERN"],"藍圖的「制度與社群」：制度怎麼維持秩序而不壓縮個人判斷；平台自己也要可被質疑"],
+ ["文明的方向",["GOVERN","FACILITATE"],"藍圖的「制度與社群」：制度怎麼維持秩序而不壓縮個人判斷；平台自己也要可被質疑"],
 ];
 const CITIZEN = [
  ["知道自己的決定會影響他人",["DECIDE","ACT"],"判斷和行動都要寫明決策者與受影響者"],
@@ -2098,24 +2253,37 @@ const CW_BLOCKS = [
  ["COMPUTE","假的統計和民調算出看起來很準的數字","每個輸入帶來源；自己給的數字標出來"],
  ["DECIDE","靠單一出處下了判斷","判斷卡上看得出哪些事實只有一個出處"],
  ["ACT","被引導去做對方要的事：轉傳、不投票、放棄","行動前問「這正好是誰希望我做的」"],
- ["LEARN","事後才發現當時信了假的","回顧時由人標出「當時哪個來源錯了」，同一個來源再出現時提醒"],
+ ["LEARN","事後才發現當時信了假的","回顧時由人標出「當時哪個出處錯了」，同一個出處再出現時提醒"],
  ["EXPRESS","使用者成了放大器","發表前標出沒查證的句子"],
  ["TEACH","練習案例本身被汙染","案例來源先查過"],
  ["COLLAB","假帳號混進共同決定、帶風向","參與者身分要確認；「多數意見」要防被灌"],
  ["GOVERN","模型和資料來源被汙染；平台被利用","模型與來源列清單、可換、可查；模型的記憶不算來源"],
+ ["FACILITATE","帶領者被利用，在課堂或團體裡把某個立場帶成「大家的結論」","帶領稿寫明不替人下結論、服從或反抗都不算錯；帶領紀錄由督導看"],
 ];
 /* 北極星頁上不在表格裡的句子。一樣只在這裡寫一次，北極星頁和合約卡都從這裡畫。 */
 const NORTH = {
  star:"提升人類的認知品質，讓更多人能以清明、自主的判斷，共同塑造更好的未來。",
  belief:"我們相信，人類文明的方向，取決於每一個人的判斷品質。",
  scope:"平台不是要改變世界，也不決定世界應該變成什麼樣。它做的是提升人做出更好判斷的能力。尺度不是批判思考、不是教育、不是 AI 平台，是人類文明的決策品質。",
- chainEnd:"最後一環的意思：不是因為有人帶領或有完美制度，是構成世界的人改變了。",
+ chainEnd:"最後一環的意思：不是因為有領袖或有完美制度，是構成世界的人改變了。",
  proposition:"這是要驗證的命題，不是保證：「如果更多人具備更好的判斷能力，公共決策是否真的會改善？」仇恨、假訊息、極端化、詐騙、群體對立各有不同成因，不能全部歸成同一個原因；但其中很多會受資訊判斷、情緒調節、媒體素養和公共討論品質影響。",
  cwScope:"操控不只是零星的假訊息，也包括有組織、跨國、長期的行動。",
  anyState:"同樣的做法適用於任何國家的操作。",
  politics:"這裡的「政治」不是黨派，是人們共同決定公共事務怎麼運作的過程：教育制度、AI 規範、醫療資源、環境、言論自由、稅收。平台要提升的是人參與公共決策的能力，不是做政治教育。",
  citizen:"成熟公民不是永遠正確、永遠理性、永遠同意彼此。",
+ war:"STOP THE WAR BEFORE IT HAPPENS：在戰爭發生之前止住它。在衝突跨過不可逆的門檻以前，讓人仍然有能力檢查、修正、重新取得自己的判斷。",
+ warOut:"對外的說法：在衝突變得不可逆之前，加強人的判斷主權、制度的自我修正，和正當的共同決策（Strengthening judgment sovereignty, institutional revisability, and legitimate collective decision-making before conflict becomes irreversible.）。",
+ warLimit:"這是內部的方向，不是成效指標，也不對外宣稱平台能避免戰爭。平台不把和平設為正確答案：一個人想清楚之後，仍然可能認為某些情況需要用武力。平台做的不是教和平，是讓戰爭比較難被製造。（你的《判斷主權教育架構 v0.1》第 13 節和第三部分）",
 };
+/* 你列的六個「之前」，各由哪幾塊在擋。只寫已經在卡上的做法。 */
+const WAR_BEFORE = [
+ ["去人化變成正常之前",["VERIFY","COLLAB"],"訊息要你敵視某一群人時，VERIFY 標出來；共同決定時，每一方的立場由本人確認轉述得對不對"],
+ ["異議被當成背叛之前",["COLLAB"],"異議和理由都存下來，不會被多數蓋掉；任何參與者都可以提出重開"],
+ ["權威變成不能質疑之前",["規範與脈絡","FACILITATE","GOVERN"],"問誰有權決定、規範從哪來、誰受益；帶領者和平台本身都能被檢查"],
+ ["確定變成不能修正之前",["DECIDE","LEARN"],"判斷一定要寫「什麼會改變結論」，寫「沒有」會被標出來；回顧時回頭對"],
+ ["制度失去自我修正能力之前",["GOVERN","COLLAB"],"平台自己可以被質疑、被申訴，研究保留失敗和沒改變的結果；共同決定寫明重開的條件"],
+ ["人不再問自己為什麼相信之前",["SENSE","DECIDE"],"先看見情緒、身份、關係怎麼進入判斷；判斷卡寫依據和什麼會改變它"],
+];
 /* 每一塊（或全程生效項）從上面這些資料算出「北極星對它的要求」。 */
 function northReqs(code){
   const out = [];
@@ -2127,9 +2295,11 @@ function northReqs(code){
   MEASURE.filter(r=>r[2].includes(code)).forEach(r=>out.push(`因果鏈「${r[0]}」這一環怎麼量：${r[1]}`));
   CW_DEFENCE.filter(r=>r[1].includes(code)).forEach(r=>out.push(`擋認知作戰「${r[0]}」：${r[2]}`));
   CW_BLOCKS.filter(r=>r[0]===code).forEach(r=>out.push(`認知作戰會這樣打到這一塊：${r[1]}。防法：${r[2]}`));
+  WAR_BEFORE.filter(r=>r[1].includes(code)).forEach(r=>out.push(`在戰爭發生之前「${r[0]}」：${r[2]}`));
   if (code==="完整性核心"){
     out.push(NORTH.belief, NORTH.scope);   // 北極星那一句已經在這張卡的「我們加的」（增補 A1）；檢查腳本確認兩處一字不差
     out.push(`因果鏈（待驗證的命題，不是保證）：${CHAIN.join(" → ")}`, NORTH.chainEnd, NORTH.proposition);
+    out.push(`內部的核心信念：${NORTH.war}`, NORTH.warOut, NORTH.warLimit);
   }
   if (code==="規範與脈絡" || code==="COLLAB") out.push(NORTH.politics);
   if (code==="規範與脈絡"){
@@ -2185,12 +2355,12 @@ document.querySelectorAll("[data-cross5]").forEach(el => { el.innerHTML = CROSS.
   const drafts = BLOCKS.filter(b=>b.contract!=="未寫").length;
   const nx = byCode(NEXT_TALK);
   $("now").innerHTML = `
-    <div><div class="k">現在在哪一步</div><div class="v">第 0 步　寫 13 份合約</div>
-      <div class="bar" role="img" aria-label="13 份合約有 ${drafts} 份草稿"><i style="width:${drafts/13*100}%"></i></div>
-      <div class="d num">積木 ${drafts} ／ 13 份有草稿；全程生效的五樣 ${CROSS.filter(b=>b.contract!=="未寫").length} ／ ${CROSS.length} 份有草稿</div></div>
+    <div><div class="k">現在在哪一步</div><div class="v">第 0 步　寫 ${NB} 份合約</div>
+      <div class="bar" role="img" aria-label="${NB} 份合約有 ${drafts} 份草稿"><i style="width:${drafts/NB*100}%"></i></div>
+      <div class="d num">積木 ${drafts} ／ ${NB} 份有草稿；全程生效的五樣 ${CROSS.filter(b=>b.contract!=="未寫").length} ／ ${CROSS.length} 份有草稿</div></div>
     <div><div class="k">下一塊要談</div><div class="v">${pad(nx.n)}　${nx.code}　${nx.name}</div>
-      <div class="d">13 份草稿都寫了，等你一塊一塊看</div></div>
-    <div><div class="k">13 塊積木今天的現況</div>
+      <div class="d">${NB} 份草稿都寫了，等你一塊一塊看</div></div>
+    <div><div class="k">${NB} 塊積木今天的現況</div>
       <div class="counts">${["有","部分","無"].map(s=>`<span class="st num" data-s="${s}">${G[s]} ${s} ${c(s)}</span>`).join("")}</div>
       <div class="d">全程生效的五樣：${["有","部分","無"].map(s=>s+" "+CROSS.filter(b=>b.status===s).length).join("、")}</div>
       <div class="d">建置：0 塊完成</div></div>`;
@@ -2207,15 +2377,16 @@ document.querySelectorAll("[data-cross5]").forEach(el => { el.innerHTML = CROSS.
     return node(b,`style="--c:${c};--r:${r};--o:${b.n}" data-dir="${d}"`);}).join("");
   const hub = CROSS.find(x=>x.code==="共用紀錄");
   $("ring").innerHTML = ring +
-    `<button class="hub" data-open="共用紀錄" style="--c:2/4;--r:2;--o:0"><div class="hubtag">${ALLTAG}全程生效，不算積木</div><b>共用紀錄</b><span>這個案子的所有紀錄。每一塊積木都讀它、寫它。</span><span>${st(hub.status)}</span></button>` +
+    `<button class="hub" data-open="共用紀錄" style="--c:2/4;--r:2;--o:0"><div class="hubtag">${ALLTAG}全程生效，不算積木</div><b>共用紀錄</b><span>這個案子的所有紀錄。除了 TEACH 和 FACILITATE，每一塊積木都讀它、寫它。</span><span>${st(hub.status)}</span></button>` +
     `<div class="loop" style="--c:1;--r:2;--o:10" data-dir="u">回顧完再走一圈<br>從哪裡開始，看回顧的結果</div>` +
-    `<div class="join" style="--c:1/5;--r:4;--o:11">另外四塊接在整圈上：任何一步都用得到</div>` +
-    BLOCKS.filter(b=>!pos[b.code]).map((b,i)=>node(b,`style="--c:${i+1};--r:5;--o:${b.n+10}"`)).join("");
-  $("packs").innerHTML = PK.map(([k,d,bs])=>`<div class="r"><span class="k">${k}</span><span><span>${bs.map(bk).join(" → ")}</span><span class="d" style="display:block">${d}</span></span></div>`).join("");
+    `<div class="join" style="--c:1/5;--r:4;--o:11">另外 ${BLOCKS.filter(b=>!pos[b.code]).length} 塊接在整圈上：任何一步都用得到</div>` +
+    BLOCKS.filter(b=>!pos[b.code]).map((b,i)=>node(b,`style="--c:${i%4+1};--r:${5+Math.floor(i/4)};--o:${b.n+10}"`)).join("");
+  $("loop").innerHTML = LOOP.map(([s,ps])=>`<div class="r"><span class="k">${s}</span><span><span>${ps.map(([c])=>bk(c)).join(" ")}</span><span class="d" style="display:block">${ps.map(([c,h])=>`${c}：${h}`).join("；")}</span></span></div>`).join("");
+  $("packs").innerHTML = PK.map(([k,d,bs])=>`<div class="r"><span class="k">${k}</span><span><span>${bs.map(bk).join(" → ")}</span><span class="d" style="display:block">${d}</span><span class="d" style="display:block">${loopGaps(bs).length ? `八步裡少了：${loopGaps(bs).join("、")}（藍圖的套件，要不要補等你定）` : "八步都走到"}</span></span></div>`).join("");
   $("legend").innerHTML = `<span>框的顏色＝今天有沒有：</span>${["有","部分","無"].map(st).join("")}
     <span>號碼的顏色＝哪一組：</span>
     <span><i class="nb" data-g="1"></i>第一圈</span><span><i class="nb" data-g="2"></i>現有引擎</span>
-    <span><i class="nb" data-g="3"></i>表達與教學</span><span><i class="nb" data-g="4"></i>共同與治理</span>`;
+    <span><i class="nb" data-g="3"></i>表達、教學與帶領</span><span><i class="nb" data-g="4"></i>共同與治理</span>`;
 })();
 
 /* 走一趟：從 JOURNEY 畫，跟「一頁看懂」同一份資料。 */
@@ -2226,15 +2397,16 @@ document.querySelectorAll("[data-cross5]").forEach(el => { el.innerHTML = CROSS.
     ["第一輪（以「個人複雜決策」為例）",`照套件走，最多 ${first.length} 塊`,first.map(s=>s.who),"先走完一圈。只走一半就停，等於沒有回顧，學不到東西"],
     ...JOURNEY.filter(s=>s.round==="add").map(s=>[s.whenT, s.how, [s.who], s.when]),
     ["全程","一直都在，不用你叫",["GOVERN"],"不算在 6 塊裡"],
+    ["有人帶的時候","帶領者陪著走完",["FACILITATE"],"課堂、工作坊、團體。不算在 6 塊裡（我們加的，等你定）"],
   ].map(([k,w,bs,d])=>`<div class="r"><span class="k">${k}</span><span><span>${bs.map(bk).join(" → ")}</span>　<span class="w">${w}</span><span class="d" style="display:block">${d}</span></span></div>`).join("");
-  $("steps-h").textContent = `走到最完整的樣子：${JOURNEY.length} 步`;
+  $("steps-h").textContent = `走到最完整的樣子：${JOURNEY.length} 步（其中 ${JOURNEY.filter(s=>BLOCKS.some(b=>b.code===s.who)).length} 步是積木，另外是組裝器、協作合約；${ALWAYS_BLOCKS.join("、")} 不是其中一步）`;
   $("steps").innerHTML = JOURNEY.map((s,i)=>`<li data-step="${s.t}">
     <span class="nb ${s.round==="add"?"opt":""}" data-g="${GROUP[s.who]||0}">${i+1}</span>
     <div><div class="t">${s.t}</div><div class="d">${s.short}</div>
       <div class="who">${bk(s.who)}${s.round==="add"?`<span class="opt-tag">需要時才加</span>`:""}</div></div></li>`).join("");
   const G13 = BLOCKS.find(b=>b.code==="GOVERN");
   $("steps-govern").innerHTML = `<li><span class="nb" data-g="${GROUP.GOVERN}">${pad(G13.n)}</span>
-    <div><div class="t">${G13.name}</div><div class="d">它是第 ${G13.n} 塊積木，不是全程生效的五樣之一。同意、隱私、匯出與刪除、危機轉介、高風險護欄、版本可追。</div>
+    <div><div class="t">${G13.name}</div><div class="d">它的積木編號是 ${G13.n}，不是全程生效的五樣之一。同意、隱私、匯出與刪除、危機轉介、高風險護欄、版本可追。</div>
       <div class="who">${bk("GOVERN")}</div></div></li>`;
   $("steps-always5").innerHTML = CROSS.map(x=>`<li data-five="${x.code}">${ALLTAG}
     <div><div class="t">${x.code}</div><div class="d">${JOURNEY_ALWAYS[x.code].join("")}</div></div></li>`).join("");
@@ -2262,7 +2434,7 @@ document.querySelectorAll("[data-cross5]").forEach(el => { el.innerHTML = CROSS.
       ["11／02","蒐集","合約原文、三次改條件的訊息、同業行情；每筆記來源","GATHER"],
       ["11／02","先上 5 分鐘的課","利害關係人地圖怎麼用，用別人的案例練一次","TEACH"],
       ["11／02","拆解：換用利害關係人地圖","換一個方法。冰山那次仍在，可以並排比較","MAP"],
-      ["11／02","查證","「同業都這樣」這句話對來源：1 個出處支持、2 個反對","VERIFY"],
+      ["11／02","查證","「同業都這樣」這句話對出處：1 個支持、1 個反對；1 個我標了「不用」，不算","VERIFY"],
       ["11／02","計算","拆夥後六個月的收入，三種情境","COMPUTE"],
       ["11／03","共同程序","提到第三位合夥人要一起決定，系統提出這一塊：分歧地圖、保留異議、重開條件","COLLAB"],
       ["11／03","判斷　第 2 版","修訂理由寫在卡上，第 1 版不刪","DECIDE"],
@@ -2286,6 +2458,18 @@ document.querySelectorAll("[data-cross5]").forEach(el => { el.innerHTML = CROSS.
 })();
 
 /* 合約卡 */
+/* 藍圖框裡的「任務」各指什麼。多數框指整個案子；LEARN 的框指交給 AI 做的一件事。照框寫，不用字串比對自動加。 */
+const TASK_CASE = "藍圖寫的「任務」，就是這裡的「案子」。";
+const TASK_NOTE = {GOVERN:TASK_CASE, "組裝器":TASK_CASE, "共用紀錄":TASK_CASE, "協作合約":TASK_CASE, LEARN:"這裡寫的「任務」，是交給 AI 做的一件事，不是案子。"};
+/* 產出給誰的完整名單：照架構頁的抽屜算，跟架構頁同一份資料，不靠各卡手寫。 */
+function whoReads(code){
+  const mine = DRAWERS.filter(d=>d.owner===code);
+  if (!mine.length) return "";
+  const lim = (c,id) => DRAWER_LIMIT[c+":"+id];
+  const parts = mine.map(d => { const rs = Object.keys(DRAWER_READS).filter(c=>c!==code && DRAWER_READS[c].includes(d.id));
+    return `「${d.name}」：` + (rs.length ? rs.map(c=>lim(c,d.id) ? `${c}（${lim(c,d.id)}）` : c).join("、") : (d.note || "沒有別的積木讀")) + (d.sys ? `；${d.sys}` : ""); });
+  return `<p class="who-reads">照架構頁，讀這一塊寫的東西的：${parts.join("；")}。` + (mine.some(d=>d.where==="案子") ? "LEARN 和共用紀錄讀這個案子的全部。" : "") + `</p>`;
+}
 const FIELDS = [["解決什麼問題","problem"],["使用者做什麼","user"],["系統做什麼","system"],["AI 能做什麼","ai"],["AI 不准做什麼","aino"],["讀什麼、絕不讀什麼","reads"],["寫什麼","writes"],["產出給誰","out"],["來源與不確定性","uncert"],["人怎麼控制","control"],["資料與版本","data"],["現在有沒有","now"]];
 /* 一句一行：照句號切開。 */
 const lines = s => String(s).split(/(?<=[。？])/).filter(x=>x.trim()).map(x=>`<p>${x}</p>`).join("");
@@ -2293,26 +2477,49 @@ function card(b){
   const g = GROUP[b.code]||0;
   const val = v => Array.isArray(v) ? `<ul>${v.map(x=>`<li>${x}</li>`).join("")}</ul>` : v;
   const has = FIELDS.filter(([,f])=>b[f]!==undefined), rest = FIELDS.filter(([,f])=>b[f]===undefined);
-  const dl = has.map(([k,f])=>`<dt>${k}</dt><dd class="${f==="aino"?"no":""}">${val(b[f])}</dd>`).join("");
+  const dl = has.map(([k,f])=>`<dt>${k}</dt><dd class="${f==="aino"?"no":""}">${val(b[f])}${f==="out" ? whoReads(b.code) : ""}</dd>`).join("");
   const ex = b.example ? `<div class="ex"><span class="k">${b.exampleTitle || "範例：「這段合作要不要繼續」攤出來的卡"}</span><div class="cards">${b.example.map(([k,v])=>`<div><b>${k}</b>${lines(v)}</div>`).join("")}</div></div>` : "";
   const bp = BP[b.code] || [];
   const bpi = x => Array.isArray(x) ? `<li>${x[0]}<ul>${x[1].map(s=>`<li>${s}</li>`).join("")}</ul></li>` : `<li>${x}</li>`;
-  const bph = bp.length ? `<div class="bp"><h4>藍圖已經寫明的要求<small>${bp.length} 條。照做，不用再談；寫「還沒定」的那幾條等你定</small></h4><ul>${bp.map(bpi).join("")}</ul></div>` : "";
+  const taskWord = TASK_NOTE[b.code] || "";
+  const bph = bp.length ? `<div class="bp"><h4>藍圖已經寫明的要求<small>${bp.length} 條。照做，不用再談；寫「還沒定」的那幾條等你定。${taskWord}</small></h4><ul>${bp.map(bpi).join("")}</ul></div>` : "";
   const ad = ADD[b.code] || [];
   const adh = ad.length ? `<div class="bp add"><h4>藍圖沒寫、我們加的<small>${ad.length} 條。內容是擬稿，你可以改</small></h4><ul>${ad.map(bpi).join("")}</ul></div>` : "";
   const tr = toolReqs(b.code);
   const trh = tr.length ? `<div class="bp tool"><h4>現有的東西裡歸這一塊的<small>${tr.length} 條。和「現有工具去哪」那一頁是同一份資料</small></h4><ul>${tr.map(x=>`<li>${x}</li>`).join("")}</ul></div>` : "";
+  const fr = frameReqs(b.code);
+  const frh = fr.length ? `<div class="bp frame"><h4>你的判斷主權框架對這一塊的要求<small>${fr.length} 條。出自你的《判斷主權教育架構 v0.1》，原文讀過，在同資料夾</small></h4><ul>${fr.map(x=>`<li>${x}</li>`).join("")}</ul></div>` : "";
   const nr = northReqs(b.code);
   const nrh = nr.length ? `<div class="bp north"><h4>北極星對這一塊的要求<small>${nr.length} 條。和北極星頁是同一份資料</small></h4><ul>${nr.map(x=>`<li>${x}</li>`).join("")}</ul></div>` : "";
   return `<details class="cc" id="b-${b.code}"><summary>
       <span class="top">${b.n?`<span class="nb" data-g="${g}">${pad(b.n)}</span>`:ALLTAG}${b.code}</span>
       <span class="nm">${b.name}${b.role?`<small>${b.role}</small>`:""}</span>
-      <span class="pills">${st(b.status)}${ct("合約　",b.contract)}<span class="ct" data-s="草稿">藍圖要求 ${bp.length} 條</span>${ad.length?`<span class="ct" data-s="草稿">我們加的 ${ad.length} 條</span>`:""}${nr.length?`<span class="ct" data-s="草稿">北極星 ${nr.length} 條</span>`:""}${tr.length?`<span class="ct" data-s="草稿">現有的 ${tr.length} 條</span>`:""}</span>
-    </summary><div class="body">${b.words?`<div class="ex"><span class="k">這張卡用到的詞</span><div class="cards">${b.words.map(([k,v])=>`<div><b>${k}</b>${lines(v)}</div>`).join("")}</div></div>`:""}<dl>${dl}</dl>${ex}${trh}${bph}${adh}${nrh}
+      <span class="pills">${st(b.status)}${ct("合約　",b.contract)}<span class="ct" data-s="草稿">藍圖要求 ${bp.length} 條</span>${ad.length?`<span class="ct" data-s="草稿">我們加的 ${ad.length} 條</span>`:""}${fr.length?`<span class="ct" data-s="草稿">你的框架 ${fr.length} 條</span>`:""}${nr.length?`<span class="ct" data-s="草稿">北極星 ${nr.length} 條</span>`:""}${tr.length?`<span class="ct" data-s="草稿">現有的 ${tr.length} 條</span>`:""}</span>
+    </summary><div class="body">${b.words?`<div class="ex"><span class="k">這張卡用到的詞</span><div class="cards">${b.words.map(([k,v])=>`<div><b>${k}</b>${lines(v)}</div>`).join("")}</div></div>`:""}<dl>${dl}</dl>${ex}${trh}${bph}${adh}${frh}${nrh}
       ${rest.length?`<div class="rest">還沒談的 ${rest.length} 欄：${rest.map(([k])=>k).join("、")}</div>`:""}</div></details>`;
 }
 $("blocks").innerHTML = BLOCKS.map(card).join("");
 $("cross").innerHTML = CROSS.map(card).join("");
+$("cover01").innerHTML = [
+  ["第一部分：八步循環","每一張卡的「你的判斷主權框架」那一框；組裝器檢查每個套件；地圖頁「你的八步循環」；「自我理解」套件"],
+  ["第一部分：五個介面問題","COLLAB；規範與脈絡（「公共議題判斷」套件）"],
+  ["1　核心摘要","北極星頁的說法比較廣（提升人的認知品質）。「讓判斷主權成為受教育本身的一部分」這個目標，沒有寫進平台"],
+  ["2　底層問題：影響不等於接管","完整性核心的藍圖框（第 2 節：對抗的是看不見、查不了、改不了的敘事接管）"],
+  ["3　判斷主權的五個能力","完整性核心（六個構面）；DECIDE（影響清單、證據條件）；LEARN（可修正）"],
+  ["4　本專案不是什麼","完整性核心"],
+  ["5　三個層級","第一層：八步循環分在 SENSE、THINK、MAP、DECIDE、LEARN；第二層：COLLAB，標明是之後的研究；第三層制度層：平台沒有做"],
+  ["6　總體問題","COLLAB（授權可收回、保留異議、可以重開）"],
+  ["7　藝術外化的機制","SENSE（首版先用文字，藝術外化之後加入）"],
+  ["8　八條不可妥協的原則","完整性核心（11 條）；DECIDE 和 FACILITATE（所有影響都能檢查）"],
+  ["9　研究問題","GOVERN（只評估過程、研究資料）；FACILITATE（帶領者偏離、接手）。A 機制、D 文化、E 制度這三組問題，沒有寫進平台"],
+  ["10　發展策略","GOVERN（第 2 階段：保留失敗的資料）；FACILITATE（第 3 階段：交付）。其餘階段沒有寫進平台"],
+  ["11　長期發展路徑","FACILITATE（第 VI 期：不需要原開發者）。其餘各期沒有寫進平台"],
+  ["12　AI 與未來的資訊環境","北極星頁（認知作戰與資訊戰）；協作合約（AI 的權限看得見、可以收回）"],
+  ["13　長期社會意義","北極星頁（內部的核心信念、六個「之前」）"],
+  ["14　長期願景","規範與脈絡、FACILITATE（不同文化發展不同方法）"],
+  ["15　最終企圖","沒有寫進平台（同第 1 節）"],
+  ["第三部分：在戰爭發生之前","北極星頁"],
+].map(([k,w])=>`<div class="r"><span class="k">${k}</span><span>${w}</span></div>`).join("");
 $("cover").innerHTML = [
   ["0　整合說明","不是要求，沒有寫進卡片"],
   ["1　使命與定位","完整性核心（非目標六條）、規範與脈絡"],
@@ -2335,8 +2542,8 @@ $("cover").innerHTML = [
   ["7　首版範圍","進度與順序（首版要驗證的十件事、功能優先級表）；組裝器"],
   ["8　共同程序","COLLAB"],
   ["9　完整性規格","完整性核心（11 條）"],
-  ["10　資料、倫理、安全","GOVERN"],
-  ["11　衡量方式","GOVERN（十項過程指標、不應採用的指標）"],
+  ["10　資料、倫理、安全","GOVERN；FACILITATE（帶領者訓練、督導與升級標準）"],
+  ["11　衡量方式","GOVERN（十項過程指標、不應採用的指標）；FACILITATE（帶領者偏離的紀錄）"],
   ["12　分期發展","進度與順序（藍圖的五個階段寫在建置順序下面）"],
   ["13　待定決策","談定與未定"],
   ["14　願景","北極星那一頁；增補 A1"],
@@ -2349,18 +2556,18 @@ $("cover").innerHTML = [
   $("matrix").innerHTML = `<div class="r h"><span></span><span>現況</span><span>合約</span><span>建置</span></div>` +
     BLOCKS.map((b,i)=>row(b,i===BLOCKS.length-1)).join("") + CROSS.map(b=>row(b)).join("");
   const O = [
-    [0,"第 0 步","寫 13 份合約","每塊說清楚十二個欄位。共用紀錄從這 13 份推出來。全程生效的五樣也各寫一份。","13 份積木合約、5 份全程生效項合約的草稿寫完，等你逐塊看",[]],
+    [0,"第 0 步","寫 " + NB + " 份合約","每塊說清楚十二個欄位。共用紀錄從這 " + NB + " 份推出來。全程生效的五樣也各寫一份。",NB + " 份積木合約、5 份全程生效項合約的草稿寫完，等你逐塊看",[]],
     [1,"第 1 步","第一圈：個人複雜決策","外殼（組裝器與目的卡、協作合約、完整性核心、共用紀錄）、六塊、基本安全一起做。MAP 這一步要做出六層地圖，連同「規範與脈絡」這個鏡頭。一塊一塊做到能拿真事進去用。","未開始。這一步假設第一個場景是「個人複雜決策」，你還沒定（藍圖 13.1）",["組裝器","協作合約","完整性核心","共用紀錄","規範與脈絡","SENSE","MAP","THINK","DECIDE","ACT","LEARN","GOVERN"]],
     [2,"第 2 步","接現有引擎當積木","東西已經有，缺的是積木外殼。","未開始",["GATHER","VERIFY","COMPUTE"]],
     [4,"第 3 步","公共決策","多人共同程序提前到這裡：它是北極星因果鏈的第四環。研究與治理（同意、申訴、衡量）也在這一步。","未開始",["COLLAB","GOVERN"]],
-    [3,"第 4 步","表達與教學","把判斷變成給別人看的東西；情境演練、角色輪替。","未開始",["EXPRESS","TEACH"]],
+    [3,"第 4 步","表達、教學與帶領","把判斷變成給別人看的東西；情境演練、角色輪替；帶領者的訓練和督導。","未開始",["EXPRESS","TEACH","FACILITATE"]],
   ];
   const built = new Set(), opened = new Set();
   $("order").innerHTML = O.map(([g,k,w,d,s,bs],i)=>{
     bs.forEach(b=>built.add(b));
     const fresh = PK.filter(p=>!opened.has(p[0]) && p[2].every(b=>built.has(b)));
     fresh.forEach(p=>opened.add(p[0]));
-    const pk = i===0 ? "" : `<span class="d">這一步做完，能開的套件：${fresh.length ? fresh.map(p=>"「"+p[0]+"」").join("、") : "沒有新的"}</span>`;
+    const pk = i===0 ? "" : `<span class="d">這一步做完，能開的套件：${fresh.length ? fresh.map(p=>"「"+p[0]+"」").join("、") : "沒有新的"}${fresh.length > 3 ? `。一共 ${fresh.length} 種，跟藍圖第 7 節「三種預設套件」不同，等你定（藍圖 13.6）` : ""}</span>`;
     return `<div class="s" data-g="${g}"><span class="k">${k}</span><span class="w">${w}</span>
     <span class="d">${d}</span><span class="bks">${bs.map(bk).join("")}</span>${pk}<span class="d">狀態：${s}</span></div>`;}).join("");
   $("mvp").innerHTML = [
@@ -2377,9 +2584,9 @@ $("cover").innerHTML = [
   ].map((x,i)=>`<li><span class="nb">${i+1}</span><span>${x}</span></li>`).join("");
   $("prio").innerHTML = [
     ["最優先","積木組裝器、任務目的卡、三種預設套件","先驗證模組可組合、可理解，不急著做自由拖拉介面",["組裝器"]],
-    ["最優先","文字／圖像式外化、先想再看、六層地圖、判斷卡、回顧提醒","直接支援核心機制",["SENSE","THINK","MAP","DECIDE","LEARN"]],
+    ["最優先","文字／圖像式外化、先想再看、六層地圖、判斷卡、回顧提醒。圖像那一半之後加入（13.2 已談定）：藍圖第二階段要比較藝術外化和純文字反思，那時加回來","直接支援核心機制",["SENSE","THINK","MAP","DECIDE","LEARN"]],
     ["最優先","協作合約、AI 權限設定、交還控制、理由與信心軌跡","把人機協作從聊天改成可控、可追責的工作流程",["協作合約"]],
-    ["最優先","AI 七種共思考模式、發散卡、反方回合、人機來源標記","讓 AI 對話變成可重複的認知訓練",["THINK"]],
+    ["最優先","AI 七種共思考模式、發散卡、反方回合、人機作者標記","讓 AI 對話變成可重複的認知訓練",["THINK"]],
     ["最優先","假設揭露、替代假設、證據條件、不確定性提示","避免平台退化成答案機器",["DECIDE","THINK"]],
     ["第二批","主張拆解、來源卡、脈絡缺口、操弄模式","把資訊判斷納入，但不變成大型事實查核服務",["VERIFY"]],
     ["第二批","可視化關係圖、來源與證據庫、版本比較","提高可見性與可檢查性",["SENSE","GATHER"]],
@@ -2387,8 +2594,8 @@ $("cover").innerHTML = [
     ["第三批","小組審議、少數意見保存、授權與重開規則","共同程序層要獨立驗證",["COLLAB"]],
     ["第四批","機構治理儀表板、跨文化在地化工具","原則與證據成熟後再擴張",["GOVERN"]],
   ].map(([k,w,d,bs])=>`<div class="r"><span class="k">${k}</span><span><span class="w">${w}　</span>${bs.map(bk).join(" ")}<span class="d" style="display:block">${d}</span></span></div>`).join("");
-  const past=[["2026-08-28","母文件收斂"],["2026-09-03","引擎跑通"],["2026-09-12","網站上線"],["2026-09-23","三線不順裁決"],["2026-10-02","13 塊骨架"]];
-  const next=[["第 0 步","寫合約"],["第 1 步","第一圈＋基本安全"],["第 2 步","接引擎"],["第 3 步","公共決策"],["第 4 步","表達、教學"]];
+  const past=[["2026-08-28","母文件收斂"],["2026-09-03","引擎跑通"],["2026-09-12","網站上線"],["2026-09-23","三線不順裁決"],["2026-10-02","13 塊骨架"],["2026-10-03","加第 14 塊「帶領」"]];
+  const next=[["第 0 步","寫合約"],["第 1 步","第一圈＋基本安全"],["第 2 步","接引擎"],["第 3 步","公共決策"],["第 4 步","表達、教學與帶領"]];
   $("tl").innerHTML = `<div><h3>已經發生</h3><ul>${past.map(([d,t])=>`<li><span class="dot"></span><span class="dt">${d}</span><span>${t}</span></li>`).join("")}</ul></div>
     <div><h3>接下來（還沒有日期，先排順序）</h3><ul>${next.map(([d,t])=>`<li><span class="dot o"></span><span class="dt">${d}</span><span>${t}</span></li>`).join("")}</ul></div>`;
 })();
@@ -2398,33 +2605,35 @@ $("cover").innerHTML = [
   const done = [
     "每個案子都有完整紀錄，最低標準＝今天的專案頁：歷程、任務卡、短期與長期觀察、換方法再做、重跑比較。這是全功能平台，不是小工具。",
     "平台是新東西。現有 Cognitive OS 退到後面當引擎，不再是產品本身。",
-    "13 塊積木定案（2026-10-02 再確認「13 塊比較好」）：藍圖的 8 塊（SENSE、MAP、THINK、VERIFY、DECIDE、LEARN、COLLAB、GOVERN），VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。13 塊都要，沒有哪一塊是次要的：SENSE、GATHER、MAP、THINK、VERIFY、COMPUTE、DECIDE、ACT、LEARN、EXPRESS、TEACH、COLLAB、GOVERN。",
+    "積木的數目：2026-10-02 定 13 塊（你再確認「13 塊比較好」）：藍圖的 8 塊（SENSE、MAP、THINK、VERIFY、DECIDE、LEARN、COLLAB、GOVERN），VERIFY 拆成 GATHER＋VERIFY，再加 COMPUTE、EXPRESS、TEACH、ACT。2026-10-03 你說帶領者「那做一塊」，加第 14 塊 FACILITATE（帶領）。現在 " + NB + " 塊都要，沒有哪一塊是次要的：" + BLOCKS.map(b=>b.code).join("、") + "。",
     "藍圖寫明的要求一律明文寫進對應積木的合約卡，不留到「之後談到再說」。",
-    "一個案子怎麼走 13 塊：並存（2026-10-02 你同意）。平台上 13 塊都在，每個案子的頁面都有 13 格；第一輪照套件走最多 6 塊；其他積木在對的時機由系統提出，你同意才加；TEACH 和 GOVERN 不算在 6 塊裡；每次回顧系統列出還沒用過的積木；案子本身沒有上限。圖在「走一趟」那一頁。",
+    "一個案子怎麼走這些積木：並存（2026-10-02 你同意）。平台上 " + NB + " 塊都在，每個案子的頁面都有 " + NB + " 格；第一輪照套件走最多 6 塊；其他積木在對的時機由系統提出，你同意才加；TEACH 和 GOVERN 不算在 6 塊裡（你裁定的）；FACILITATE 也不算（2026-10-03 我們加的，等你定）；每次回顧系統列出還沒用過的積木；案子本身沒有上限。圖在「走一趟」那一頁。",
     "北極星寫進設計：「提升人類的認知品質，讓更多人能以清明、自主的判斷，共同塑造更好的未來」；尺度是文明的決策品質；因果鏈是待驗證的命題。",
     "原本沒涵蓋的四件事都加進設計：情緒調節進 SENSE；加「公共議題判斷」套件、COLLAB 提前到建置第 3 步；因果鏈每一環寫了量法；使命的尺度寫成藍圖增補。",
     "脈絡面向現在 " + FACET_NAMES.length + " 個：" + FACET_NAMES.join("、") + "。每個面向都要問「它是不是造成這件事的原因之一」。平台會跨國使用，不預設任何國家、文化或法域；對政黨、政權、交戰各方的說法一律當成主張處理。",
     "認知作戰與資訊戰寫進設計：北極星頁寫明這是平台要讓人擋得住的東西；列為脈絡面向；VERIFY 加辨認有組織假訊息的檢查題；GOVERN 加「平台自己會成為目標」的防護。",
     "「有引註」不等於「是真的」。蒐集是入口，防灌水的檢查要做在 GATHER：來源身分查核、同出處算一個、不只一條管道。找得到出處、彼此獨立、站得住，三件事分開標。",
     "北極星頁不得有合約卡沒有的內容。兩邊用同一份資料畫；要加東西只加在那份資料裡，合約卡和北極星頁同時出現。設計每一塊只看合約卡。",
-    "13 塊積木和 5 個全程生效項的合約，十二欄都寫成草稿。還沒蓋；等你逐塊看過再定。",
+    NB + " 塊積木和 5 個全程生效項的合約，十二欄都寫成草稿。還沒蓋；等你逐塊看過再定。",
     "第一輪最多 6 塊（藍圖寫 5 塊）。多出來的一塊是 ACT：它本來在 DECIDE 裡，拆出來之後事情沒變多，只是算成兩塊。套件裡 DECIDE 後面接 ACT。",
     "個人歷程（跨案子的記憶）不算積木，是共用紀錄的一部分。",
-    "骨架＝13 份合約。任務容器、協作合約、完整性核心都從合約推出來。（藍圖說的「任務容器」就是共用紀錄。全程生效的五樣現在也各寫成一份合約草稿。）",
-    "不做「先放 13 個有畫面沒合約的空頁」。",
-    "ACT（行動與觀察）獨立成一塊。短期觀察按週、長期觀察按月季年，都在這塊。"];
+    "骨架＝" + NB + " 份合約。任務容器、協作合約、完整性核心都從合約推出來。（藍圖說的「任務容器」就是共用紀錄。全程生效的五樣現在也各寫成一份合約草稿。）",
+    "不做「先放一堆有畫面、沒合約的空頁」。",
+    "ACT（行動與觀察）獨立成一塊。短期觀察按週、長期觀察按月季年，都在這塊。",
+    "外化媒介：首版先用文字卡、語音、關係圖、時間線；藝術外化之後加入（2026-10-03 你定的，藍圖 13.2）。",
+    "北極星頁加「在戰爭發生之前止住它」，當內部的核心信念；對外用研究語言；寫明平台不把和平設為正確答案（2026-10-03 你說要）。",
+    "你的五個介面問題放進 COLLAB，和「公共議題判斷」套件裡的規範與脈絡，當每次都問的問題（2026-10-03 你說要）。"];
   const open = [
     "第一個場景：個人複雜決策、師生反思、團隊協作，三選一當主線（藍圖 13.1）。",
-    "外化媒介：先文字卡＋關係圖，畫圖與照片之後加（藍圖 13.2）。",
     "AI 邊界：可以挑戰到多強、能不能引用外部資料、什麼情況要轉給人（藍圖 13.3）。",
     "資料承諾：反思資料是不是預設只有自己看得到；研究怎麼取得同意（藍圖 13.4）。",
     "第一次試用只驗證一件事：外化加基本積木，有沒有讓人更看得見自己怎麼判斷（藍圖 13.5）。",
     "首批是哪三種套件；哪些積木暫不開放自由組合（藍圖 13.6）。",
     "藍圖 5.2 要每筆事實有「來源與可信度」。現在的設計是系統不給可信度，只列查得到的事，可信不可信由你標。這樣算不算做到，等你定。",
-    "藍圖 3.4 有六種目的，3.5 只有五個套件：「自我理解」這個目的沒有對應的套件。要補一個，還是併到「個人複雜決策」。",
-    "藍圖正文什麼時候改版：增補檔已經寫到 A14，等你併進下一版。",
+    "督導由誰指派、怎麼確認一個人可以當督導：還沒定。","「自我理解」套件：我擬的是你的八步循環，SENSE → THINK → DECIDE → LEARN。觀察、外化在 SENSE；反思、提問、比較、重構在 THINK；判斷在 DECIDE；再檢視在 LEARN。已經放進地圖頁，標成我們加的，等你點頭。",
+    "藍圖正文什麼時候改版：增補檔的條目等你併進下一版。",
     "我擬的內容你還沒逐條看過：情緒調節的五個做法、公共議題判斷套件的順序、每一環的量法、各積木的觸發時機。",
-    "13 份積木合約、5 份全程生效項合約的草稿，你都還沒逐塊看過。",
+    NB + " 份積木合約、5 份全程生效項合約的草稿，你都還沒逐塊看過。",
     "要不要申請 Google 查核搜尋的金鑰（免費，要你的 Google 帳號）。"];
   $("done").innerHTML = done.map(x=>`<li><span class="m">✓</span><span>${x}</span></li>`).join("");
   $("open").innerHTML = open.map(x=>`<li><span class="m">？</span><span>${x}</span></li>`).join("");
@@ -2455,6 +2664,8 @@ $("cover").innerHTML = [
   kv("cw-defs", CW.defs);
   rows("scales", SCALES); rows("citizen", CITIZEN); rows("caps", CAPS);
   rows("trains", BLOCKS.map(b=>[pad(b.n),[b.code],TRAINS[b.code]]));
+  rows("war-before", WAR_BEFORE);
+  $("n-war").textContent = NORTH.war; $("n-war-out").textContent = NORTH.warOut; $("n-war-limit").textContent = NORTH.warLimit;
 })();
 
 /* 一頁看懂：從 JOURNEY 畫，跟「走一趟」同一份資料。
@@ -2468,8 +2679,21 @@ $("cover").innerHTML = [
   const tagOf = s => s.round==="add" ? "需要時才加" : s.round==="first" ? "第一輪就走" : "每個案子都有";
   const G13 = BLOCKS.find(b=>b.code==="GOVERN");
   const N = JOURNEY.length;
-  const ITEMS = [...JOURNEY.map((s,i)=>`${i+1} ${s.t}`), "GOVERN", ...CROSS.map(x=>x.code), ...ONE_FAIL.map(f=>f[0])];
-  const F0 = N + 1 + CROSS.length;   // 出狀況的第一項
+  /* 這一步用到前面哪幾步寫的東西：照架構頁的抽屜算（上一步交出的，這一步不一定讀）。 */
+  const usesBefore = i => {
+    if (!i) return "這是第一步。";
+    const who = JOURNEY[i].who, reads = DRAWER_READS[who] || [];
+    if (reads.includes("*")) return "這一步讀這個案子前面全部的紀錄。";
+    const step = d => JOURNEY.findIndex(s=>s.who===d.owner);
+    const items = reads.map(id=>DRAWERS.find(d=>d.id===id)).filter(d=>d && d.where!=="平台" && step(d) < i)
+      .map(d => [`${d.name}（${step(d) < 0 ? "全程" : "第 " + (step(d)+1) + " 步"}）`, DRAWER_LIMIT[who+":"+d.id] || ""]);
+    const groups = [];   // 只讀的範圍相同的，寫在一起
+    items.forEach(([n,l]) => { const g = groups.find(x=>x[1]===l); if (g) g[0].push(n); else groups.push([[n],l]); });
+    return groups.length ? "這一步用到前面的：" + groups.map(([ns,l]) => ns.join("、") + (l ? (ns.length>1 ? "，都" : "，") + l : "")).join("。") + "。" : "這一步不讀前面寫的東西。";
+  };
+  const ITEMS = [...JOURNEY.map((s,i)=>`${i+1} ${s.t}`), ...ALWAYS_BLOCKS, ...CROSS.map(x=>x.code), ...ONE_FAIL.map(f=>f[0])];
+  const NA = ALWAYS_BLOCKS.length;
+  const F0 = N + NA + CROSS.length;   // 出狀況的第一項
   const stepOf = t => JOURNEY.findIndex(s=>s.t===t);
   const nav = k => `<div class="dp-nav">${k>0?`<button type="button" class="prev" data-k="${k-1}">← ${ITEMS[k-1]}</button>`:""}${k<ITEMS.length-1?`<button type="button" class="next" data-k="${k+1}">${ITEMS[k+1]} →</button>`:""}</div>`;
   const pkg = PK.find(p=>p[2].join()===JOURNEY.filter(s=>s.round==="first").map(s=>s.who).join());
@@ -2478,9 +2702,9 @@ $("cover").innerHTML = [
   $("one-steps").innerHTML = JOURNEY.map((s,i)=>`<li data-step="${s.t}"><button type="button" class="rs ${s.round==="add"?"opt":""}" data-k="${i}">
     <span class="n">${i+1}</span><span class="t">${s.t}</span><span class="bk" data-g="${GROUP[s.who]||0}">${s.who}</span></button></li>`).join("");
   $("one-band").innerHTML = `<div class="band-h">從頭到尾都在</div>
-    <button type="button" class="bs" data-k="${N}">GOVERN</button>
+    ${ALWAYS_BLOCKS.map((c,k)=>`<button type="button" class="bs" data-k="${N+k}">${c}${c==="FACILITATE"?"<small>有人帶的時候</small>":""}</button>`).join("")}
     <div class="band-s">全程生效的五樣<br>（不算積木）</div>
-    <div id="one-always5">${CROSS.map((x,k)=>`<button type="button" class="bs" data-k="${N+1+k}" data-five="${x.code}">${x.code}</button>`).join("")}</div>`;
+    <div id="one-always5">${CROSS.map((x,k)=>`<button type="button" class="bs" data-k="${N+NA+k}" data-five="${x.code}">${x.code}</button>`).join("")}</div>`;
   $("one-foot").innerHTML = `<div class="band-h">出狀況時</div>
     <div class="fls">${ONE_FAIL.map((f,n)=>`<button type="button" class="fb" data-k="${F0+n}">${f[0]}</button>`).join("")}</div>
     <p>實線圈：第一輪就走。虛線圈：需要時才加。</p>`;
@@ -2488,7 +2712,7 @@ $("cover").innerHTML = [
   $("one-panels").innerHTML =
     JOURNEY.map((s,i)=>`<div class="dp ${s.round==="add"?"opt":""}" data-panel="steps:${i}" hidden>
       <div class="dp-h"><span class="n">${i+1}</span><b>${s.t}</b>${card(s.who)}${st(stOf(s.who))}<span class="opt-tag">${tagOf(s)}</span>${nav(i)}</div>
-      <p class="dp-prev">${i ? `上一步（${JOURNEY[i-1].t}）交出：${JOURNEY[i-1].out}` : "這是第一步。"}</p>
+      <p class="dp-prev">${usesBefore(i)}</p>
       ${s.round==="add" ? `<p class="dp-when"><b>什麼時候加：</b>${s.when}${s.how}。</p>` : ""}
       ${row("you","你",s.you)}${row("sys","系統",s.sys)}${row("ai","AI",s.ai)}
       <p class="dp-out"><small>這一步交出</small>${s.out}</p>
@@ -2496,16 +2720,19 @@ $("cover").innerHTML = [
     `<div class="dp" data-panel="always:0" hidden>
       <div class="dp-h"><span class="n all">★</span><b>${G13.name}</b>${card("GOVERN")}${st(G13.status)}<span class="opt-tag">一塊積木，從頭到尾都在</span>
       ${nav(N)}</div><div class="dp-b">${ps(JOURNEY_GOVERN)}</div></div>` +
-    CROSS.map((x,k)=>`<div class="dp" data-panel="always:${k+1}" hidden>
+    `<div class="dp" data-panel="always:1" hidden>
+      <div class="dp-h"><span class="n all">★</span><b>${byCode("FACILITATE").name}</b>${card("FACILITATE")}${st(stOf("FACILITATE"))}<span class="opt-tag">有人帶的時候，從頭到尾都在</span>
+      ${nav(N+1)}</div><div class="dp-b">${ps(JOURNEY_FACILITATE)}</div></div>` +
+    CROSS.map((x,k)=>`<div class="dp" data-panel="always:${k+NA}" hidden>
       <div class="dp-h"><span class="n all">全</span><b>${x.code}</b>${card(x.code,"合約卡")}${st(x.status)}<span class="opt-tag">全程生效的五樣之一，不算積木</span>
-${nav(N+1+k)}</div>
+${nav(N+NA+k)}</div>
       <div class="dp-b">${ps(JOURNEY_ALWAYS[x.code])}</div></div>`).join("") +
     ONE_FAIL.map(([k,eg,sys,you,at],n)=>`<div class="dp" data-panel="fail:${n}" hidden>
       <div class="dp-h"><span class="n warn">!</span><b>${k}</b><span class="opt-tag">${at ? `在第 ${stepOf(at)+1} 步：${at}` : "任何一步都可能"}</span>${nav(F0+n)}</div>
       ${row("sys","例子",[eg])}${row("sys","系統",split(sys))}${row("you","你",split(you))}</div>`).join("");
 
   let cur = 0;
-  const ids = [...JOURNEY.map((s,i)=>`steps:${i}`), ...[0,1,2,3,4,5].map(k=>`always:${k}`), ...ONE_FAIL.map((f,n)=>`fail:${n}`)];
+  const ids = [...JOURNEY.map((s,i)=>`steps:${i}`), ...[...ALWAYS_BLOCKS, ...CROSS].map((x,k)=>`always:${k}`), ...ONE_FAIL.map((f,n)=>`fail:${n}`)];
   function go(k){
     cur = k;
     document.querySelectorAll("#one-panels [data-panel]").forEach(el => { el.hidden = el.dataset.panel !== ids[k]; });
@@ -2543,23 +2770,25 @@ ${nav(N+1+k)}</div>
   const readers = id => Object.keys(DRAWER_READS).filter(c=>DRAWER_READS[c].includes(id));
   const nevers = id => Object.keys(DRAWER_NEVER).filter(c=>DRAWER_NEVER[c].includes(id));
   /* 一個抽屜一塊：名稱、裝什麼，然後固定四行。只能讀一部分的，自己一行，旁邊寫它只讀什麼。 */
-  const WHERE = [["案子","放在這個案子裡"],["個人","放在你個人那裡（跨案子）"],["群組","放在群組裡（多人一起決定時）"],["練習","放在練習區（跟真實案子分開）"],["平台","放在平台（不屬於哪一個案子）"]];
+  const WHERE = [["案子","放在這個案子裡"],["個人","放在你個人那裡（跨案子）"],["群組","放在群組裡（多人一起決定時）"],["練習","放在練習區（跟真實案子分開）"],["帶領","放在帶領者那裡（跟參與者的案子分開）"],["平台","放在平台（不屬於哪一個案子）"]];
   const drawer = d => {
     const rs = readers(d.id), lim = c => DRAWER_LIMIT[c+":"+d.id];
     const free = rs.filter(c=>!lim(c)), part = rs.filter(c=>lim(c)), nv = nevers(d.id);
     const reads = rs.length
       ? (free.length ? `<div class="chips">${free.map(bk).join("")}</div>` : "") + part.map(c=>`<div class="lim">${bk(c)}<span>${lim(c)}</span></div>`).join("")
       : (d.note || "沒有別的積木讀");
+    const sysRead = d.sys ? `<div>系統：${d.sys}</div>` : "";
     return `<div class="dw"><div class="dw-h"><b>${d.name}</b><span>${d.has}</span></div>
       <dl class="dw-l"><dt>誰寫</dt><dd><div class="chips">${bk(d.owner)}</div></dd>
-        <dt>誰讀</dt><dd>${reads}</dd>
+        <dt>誰讀</dt><dd>${reads}${sysRead}</dd>
         <dt>誰不准讀</dt><dd>${nv.length ? `<div class="chips">${nv.map(c=>`<span class="bk no">${c}</span>`).join("")}</div>` : "沒有"}</dd>
         <dt>今天</dt><dd>${DRAWER_TODAY[d.id]}</dd></dl></div>`;
   };
   if (DRAWERS.some(d=>!WHERE.some(w=>w[0]===d.where))) throw new Error("drawer with unknown place");
   $("drawers").innerHTML = WHERE.map(([w,label])=>{ const ds = DRAWERS.filter(d=>d.where===w); return ds.length ? `<div class="dw-g"><h4>${label}（${ds.length} 個）</h4>${ds.map(drawer).join("")}</div>` : ""; }).join("");
   const named = code => TOOL_ROWS.some(r=>r[1] && r[0].map(w=>TOOL_OWNER[w]||w).includes(code));
-  $("wiring").innerHTML = WIRING.map(([code,have,todo])=>`<div class="r"><span class="k">${bk(code)}</span><span><span>接現有的：${have}${named(code) && code!=="組裝器" ? `工具一個一個的名字在 ${code} 的合約卡。` : ""}</span><span class="d" style="display:block">要新做：${todo}</span></span></div>`).join("");
+  const sevenTodo = c => { const ks = SEVEN.filter(([,parts])=>parts.some(([o])=>o===c || (Array.isArray(o) && o.includes(c)))).map(s=>s[0]); return ks.length ? `判斷主權的檢查：${ks.join("、")}。` : ""; };
+  $("wiring").innerHTML = WIRING.map(([code,have,todo])=>`<div class="r"><span class="k">${bk(code)}</span><span><span>接現有的：${have}${named(code) && code!=="組裝器" ? `工具一個一個的名字在 ${code} 的合約卡。` : ""}</span><span class="d" style="display:block">要新做：${todo}${sevenTodo(code)}</span></span></div>`).join("");
   $("states").innerHTML = CASE_STATES.map(([k,d,who])=>`<div class="s"><b>${k}</b><span>${d}</span><div class="bks">${chips(who)}</div></div>`).join("");
   $("case-next").innerHTML = CASE_NEXT.map(([k,d])=>`<div class="r"><span class="k">${k}</span><span>${d}</span></div>`).join("");
   $("case-any").textContent = "任何時候都可以：" + CASE_ANYTIME.join("、") + "。";
