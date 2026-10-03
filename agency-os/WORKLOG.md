@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-03（續5）認知主權平台監工台 v50–v51：EXPRESS 不算第一輪 6 塊；合約卡照 12 欄整合，出處不顯示
+- [操作者]
+  - EXPRESS 在第一輪叫出來時算不算：「不算」。
+  - 「所有的合約裡面的內容應該不要分藍圖、我們加的、框架、北極星、現有的…照邏輯、演繹整合起來，這樣之後要開始進行建置會比較順利」→ 我建議要 →「要」。
+  - 每句後面的出處標籤：「不用」。
+- [根因] 一張卡分五個出處框。建置的人照欄位做事，同一條要求卻落在兩處，要自己拼。
+- [修]
+  - `BP`／`ADD` 拿掉。176 條逐條放進 12 欄（scratchpad `merge_spec.mjs`、`migrate.mjs`，用 acorn 範圍搬，運算式不變）。
+  - 北極星、框架、工具照規則放進欄位。
+  - 出處留在資料裡，`plain()` 在卡上拿掉。
+  - 相鄰同義約 40 對併成一句。
+  - 細節：增補檔 A29、`CONTRACT_TEMPLATE.md` 第 1 節和規則 12、14、15。
+- [審查] 第 16 次審查：2 C／9 M／12 m；驗證一輪後新的 1 M／5 m，都修了。
+  - C1：COLLAB 的「共同問題定義」，在併的時候掉了。
+  - C2：規範與脈絡第一個檢查的「正當性」，在併的時候掉了。
+  - M：12 個詞在併的時候掉了。
+  - M：三條檢查變鬆了：看不到標籤、任務、落點表。
+  - M：還沒定的有兩條重複列。
+  - M：衡量的放錯欄。
+- [避免再發生] 模板寫明：併之前逐字對；看不到出處標籤，用兩種查法查；卡上不寫「任務」。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/check-supervisor.mjs --root D:/Work --out check-out-r16c | exit=0 | ms=24000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=2c/10m/17m
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=TASK_NOTE|BP\[|ADD\[ | hits=2
+- BUGHUNT_SCOPE_NARROW: 只動 handoff 資料夾的監工台、檢查腳本、模板、增補檔和接手包的一行指標。2 筆命中是增補檔 A29 和模板規則 12 講「以前用 TASK_NOTE」的歷史敘述，沒有程式引用。
+- ORACLE_WAIVED: 監工台是討論用的頁面（handoff 資料夾，不是產品程式）。審查由獨立的 critic agent 做兩輪（第 16 次加驗證），7 個突變副本全紅。
+- 驗證：click-test 7/7；artifact v51（https://claude.ai/artifact/E8VKViRmycqsXySHdnhUSJ）；commits `4d1aac6ca`（v50）、`3fdae9d1a`（v51）。
+- rollback：`git revert 3fdae9d1a 4d1aac6ca`；artifact 退回 v49（版本歷史）。
 ## 2026-10-03（續4）認知主權平台監工台 v37–v49：十頁逐頁對一致（一份順序、一份資料、一張還沒定清單）；「帶領」不算第一輪 6 塊
 - [操作者] 「去100%確認是否10個頁面完全正確, 有沒有遺漏…不該落東落西, 或是A面改, B面或其他頁面忘記改」；「帶領」算不算 6 塊：「不知道, 你說呢? 給我專業建議」→ 我建議不算 →「好」。
 - [v37–v46，補記] 細節在 `agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/BLUEPRINT_ADDENDUM_2026-10-02.md` A22–A27；commits `628c989af`（第 14 塊 FACILITATE、白話合約卡、八步循環）、`f5a3016d5`（照關聯排、v0.1 表從資料算）。
