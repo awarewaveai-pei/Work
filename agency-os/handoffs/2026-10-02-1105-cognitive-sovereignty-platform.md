@@ -78,3 +78,4 @@ source_session_summary: "操作者以藍圖 v0.6/v0.7 重新定義產品：Cogni
 - **檢查方式**：內建瀏覽器窗格只有約 300px 寬，看不到寬版。改用 Playwright（`lobster-factory/infra/hetzner-phase1-core/tests` 的 `@playwright/test`）把七頁各截寬 1280、窄 400 兩張全頁圖再逐張看。每次改監工台都要七頁全看，不能只看改到的那頁。
 - **共用工作目錄事故（20:38）**：另一個 session 執行 `git stash`（`before-pull-2026-10-02`），本機工作樹的監工台與本接手包被還原成舊版。內容已全在 `origin/main`，無遺失。此後本 session 改在 scratchpad 編輯 `git show origin/main:<path>` 取出的副本，再以暫存 index 提交；監工台以 `url` 參數從 scratchpad 路徑發布。下一個 session：先 `git pull --ff-only` 再動這些檔。
 - **提交方式**：本機工作樹有別的 session 未提交的 `WORKLOG.md`，本 session 一律用暫存 index 在 `origin/main` 上直接建 commit 再 push，本機 `main` 未前進。
+- **v43–v47（2026-10-03）**：14 塊（加第 14 塊 FACILITATE 帶領）；積木和全程生效的五樣照關聯排（TEACH 10、EXPRESS 11、FACILITATE 12、COLLAB 13、GOVERN 14，排法是擬稿）；她的八步循環分在積木裡；十頁逐頁對一致，每一類加一條檢查。細節只寫在同資料夾 `BLUEPRINT_ADDENDUM_2026-10-02.md` 的 A26–A28 和 `CONTRACT_TEMPLATE.md`，這裡不重述；上面寫 13 塊的地方是當時的紀錄。

@@ -1,6 +1,6 @@
 // Gate for platform-supervisor.html. Exit 1 when any rule of CONTRACT_TEMPLATE.md is broken.
 // Usage (from repo root):  node agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/check-supervisor.mjs [--page <html>] [--root <repo root>] [--out <dir>]
-// Writes full-page PNGs (8 views x 2 widths) and text-<view>.txt dumps to --out (default: OS temp dir). Read the dumps; green here is not a read-through.
+// Writes full-page PNGs (every view x 2 widths) and text-<view>.txt dumps to --out (default: OS temp dir). Read the dumps; green here is not a read-through.
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -73,14 +73,14 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
         if (e.closest('.ring') || e.closest('nav') || e.closest('.bars .track, .bars .who')) continue;   // only the chart itself; text under a bar is reading text
         const nodes = [...e.childNodes].filter((n) => n.nodeType === 3 && n.textContent.trim().length >= 12);
         if (!nodes.length) continue;
-        let blk = e;
-        while (blk && getComputedStyle(blk).display.startsWith('inline')) blk = blk.parentElement;
-        if (!blk || blk.getBoundingClientRect().width >= 300 || blk.getBoundingClientRect().width === 0) continue;
+        // Measure the width the text itself gets, not its box: text put into a narrow grid track sits in a wide box
+        // (round 11: the decided page's sub-lists went into the 24px mark column and the page grew to 18,000px).
         const range = document.createRange();
         for (const n of nodes) {
           range.selectNodeContents(n);
-          const tops = new Set([...range.getClientRects()].map((r) => Math.round(r.top)));
-          if (tops.size >= 3) cramped.push((e.closest('[class]')?.className || e.tagName).split(' ')[0] + ':' + n.textContent.trim().slice(0, 8));
+          const rects = [...range.getClientRects()].filter((r) => r.width > 0);
+          const tops = new Set(rects.map((r) => Math.round(r.top)));
+          if (tops.size >= 3 && Math.max(0, ...rects.map((r) => r.width)) < 300) cramped.push((e.closest('[class]')?.className || e.tagName).split(' ')[0] + ':' + n.textContent.trim().slice(0, 8));
         }
       }
       // ...nor side by side: two blocks in one row that each hold a sentence of 40+ characters.
@@ -94,7 +94,31 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
           if (Math.abs(a.top - b.top) < 4 && Math.abs(a.left - b.left) > 40) side.push((e.className || e.tagName).split(' ')[0]);
         }
       }
+      // One order (2026-10-03: by relation, written once in BLOCKS/CROSS). Chips side by side and 「、」 lists of codes follow it on
+      // every page; chips joined by → are a sequence (a package, the first round) and keep their own order (round 8: N8m4).
+      const ORDERL = [...BLOCKS.map((b) => b.code), ...CROSS.map((x) => x.code)];
+      const order = [];
+      for (const parent of new Set([...el.querySelectorAll('.bk')].map((b) => b.parentElement))) {
+        const kids = [...parent.children].filter((k) => k.classList.contains('bk') && ORDERL.includes(k.textContent.trim()));
+        if (kids.length < 2 || parent.textContent.includes('→')) continue;
+        const ix = kids.map((k) => ORDERL.indexOf(k.textContent.trim()));
+        if (ix.some((x, i) => i && x < ix[i - 1])) order.push(kids.map((k) => k.textContent.trim()).join('/'));
+      }
+      // A list split over several boxes is still one list: the renderer marks its box [data-set] (round 9: the arch reader
+      // lists and the record page's 全程 rows were sorted box by box, not as one list).
+      for (const box of el.querySelectorAll('[data-set]')) {
+        const cs = [...box.querySelectorAll('.bk')].map((k) => k.textContent.trim()).filter((c) => ORDERL.includes(c));
+        const ix = cs.map((c) => ORDERL.indexOf(c));
+        if (ix.some((x, i) => i && x < ix[i - 1])) order.push('[set] ' + cs.join('/'));
+      }
+      const tok = ORDERL.slice().sort((a, b) => b.length - a.length).join('|');
+      const sep = '、| ?和 ?| ?或 ?|／';
+      for (const mm of text.matchAll(new RegExp('(?<![A-Za-z])(?:' + tok + ')(?:(?:' + sep + ')(?:' + tok + '))+(?![A-Za-z])', 'g'))) {
+        const ix = mm[0].split(new RegExp(sep)).map((c) => ORDERL.indexOf(c));
+        if (ix.some((x, i) => i && x < ix[i - 1])) order.push(mm[0]);
+      }
       return {
+        order: [...new Set(order)],
         side: [...new Set(side)],
         text,
         cramped: [...new Set(cramped.map((c) => c.split(':')[0]))].map((k) => k + '×' + cramped.filter((c) => c.startsWith(k + ':')).length),
@@ -109,6 +133,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     rule(label, `${v}.long_text_side_by_side`, m.side);
     rule(label, `${v}.blocks_missing`, m.blocks);
     rule(label, `${v}.always_on_missing`, m.alwaysOn);
+    rule(label, `${v}.out_of_block_order`, m.order);
   }
 
   const r = await page.evaluate((repo) => {
@@ -151,6 +176,12 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // Her five interface questions are in both cards that ask them, word for word from one list (2026-10-03).
     for (const q of INTERFACE_Q) for (const c of ['COLLAB', '規範與脈絡']) if (!card(c).includes(q)) north.push('interface question not in ' + c + ': ' + q.slice(0, 8));
     for (const [k, d, bs] of MEASURE) for (const c of bs) if (!card(c).includes(d)) north.push('measure:' + k + ':' + c);
+    // The north page says 「N 塊各自…」: every block has a row in TRAINS and in CW_BLOCKS.
+    for (const b of BLOCKS) { if (!TRAINS[b.code]) north.push('trains: no row for ' + b.code); if (!CW_BLOCKS.some((x) => x[0] === b.code)) north.push('cw: no row for ' + b.code); }
+    // The blueprint table is computed from the section number after each blueprint line (round 8: written by hand, 9 rows missed
+    // cards). Every number has a row, and every section has a home (a card or a page).
+    for (const c of Object.keys(BP)) for (const x of BP[c]) for (const ref of bpRefs(x)) if (!BP_ROWS.some((row) => row[0] === bpRow(ref))) north.push('blueprint section without a row: ' + c + ' ' + ref);
+    for (const row of document.querySelectorAll('#cover [data-sec]')) if (row.dataset.sec !== '0' && /沒有寫進卡片$/.test(row.innerText.trim())) north.push('blueprint section with no home: ' + row.dataset.sec);
     for (const [c, at, df] of CW_BLOCKS) { const t = card(c); if (!t.includes(at) || !t.includes(df)) north.push('cw:' + c); }
     for (const [k, v] of [...CW.defs, ...CW.goals, ...CW.levels]) if (!card('規範與脈絡').includes(v)) north.push('cwdef:' + k);
     // ...and every sentence on the north-star page is in some card (headings and data-nav navigation aside).
@@ -206,6 +237,10 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     inOrder(WIRING.map((w) => w[0]), 'WIRING');
     inOrder(TOOL_ROWS.map((r) => r[0][0]), 'TOOL_ROWS');
     for (const l of LAYERS) inOrder(l[3], 'LAYERS ' + l[1]);
+    inOrder(ALWAYS_BLOCKS, 'ALWAYS_BLOCKS');
+    inOrder(FLOW_ROWS.map((r) => r[0][0]), 'FLOW_ROWS');
+    inOrder(SEES_CONTENT, 'SEES_CONTENT');
+    for (const r of WAR_BEFORE) inOrder(r[1], 'WAR_BEFORE ' + r[0]);   // its sentence names the blocks in the order of its chips
     for (const k of Object.keys(DRAWER_LIMIT)) { const [c, id] = k.split(':'); if (!canRead(c).includes(id)) arch.push('limit on a drawer not read ' + k); }
     // Data collected for one purpose goes only to that purpose (critic round 5c): every reader of a drawer that holds where
     // someone is says which items it reads, and the places a card says it reads are the places the architecture page gives it.
@@ -239,7 +274,11 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     if (flowSteps.join('|') !== want.join('|')) journey.push('walk-through shows ' + flowSteps.length + ' of ' + want.length + ' steps');
     const covered = new Set([...JOURNEY.map((s) => s.who), ...ALWAYS_BLOCKS, ...Object.keys(JOURNEY_ALWAYS)]);
     for (const c of codes) if (!covered.has(c)) journey.push('not in the journey: ' + c);
-    if (JOURNEY.filter((s) => s.round === 'first').length !== 6) journey.push('first round is not 6 blocks');
+    if (JOURNEY.filter((s) => s.round === 'first').length !== FIRST_MAX) journey.push('first round is not ' + FIRST_MAX + ' blocks');
+    for (const [k, , bs] of PK) if (bs.length > FIRST_MAX) journey.push('package longer than the first-round limit: ' + k);
+    // The blocks there from start to end: one list, both pages (round 8: the walk-through showed GOVERN only, the one-page both).
+    const always = (sel) => [...document.querySelectorAll(sel)].map((e) => e.dataset.always).join('|');
+    if (always('#steps-govern [data-always]') !== ALWAYS_BLOCKS.join('|') || always('#one-band [data-always]') !== ALWAYS_BLOCKS.join('|')) journey.push('start-to-end blocks: walk-through ' + always('#steps-govern [data-always]') + ' / one-page ' + always('#one-band [data-always]'));
     const five = CROSS.map((x) => x.code).join('|');
     for (const id of ['steps-always5', 'one-always5']) {
       const got = [...document.querySelectorAll('#' + id + ' [data-five]')].map((e) => e.dataset.five);
@@ -271,6 +310,19 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       const before = whole.slice(Math.max(0, m.index - 12), m.index);
       if (!m[1] && +m[2] !== NB && !/判斷卡|2026-/.test(before)) typed.push('block count typed by hand: ' + before.slice(-6) + m[0]);
     }
+    // A named set written out in brackets on any page has exactly its members (round 9: 「外殼」 had three member lists).
+    for (const [nm, ms] of [['外殼', LAYERS[1][3]], ['基本安全', GOVERN_FIRST], ['研究與治理', GOVERN_LATER]])
+      for (const mm of whole.matchAll(new RegExp(nm + '（([^）]*)）', 'g'))) if (mm[1] !== ms.join('、')) typed.push('named set ' + nm + '（' + mm[1] + '）');
+    // The worked example is one set of data: SENSE's example is EX_CARDS, and its labels are the kinds SENSE offers (round 9).
+    if (BLOCKS.find((b) => b.code === 'SENSE').example !== EX_CARDS) typed.push('SENSE example is not EX_CARDS');
+    for (const [k] of EX_CARDS) if (!CARD_KINDS.includes(k)) typed.push('example card kind not offered: ' + k);
+    // The first-round limit is written once (FIRST_MAX): 「第一輪…N 塊」 and 「不算在 N 塊裡」 on any page equal it.
+    for (const mm of whole.matchAll(/(第一輪[^。；\n]{0,14}?|不算在 )(\d+) 塊/g)) if (+mm[2] !== FIRST_MAX) typed.push('first-round limit typed as ' + mm[0]);
+    // A block's number written next to its code is the number in BLOCKS (2026-10-03: renumbered twice in one day).
+    for (const mm of whole.matchAll(/(?<![\d.])(\d{1,2})\s?([A-Z]{3,})(?![A-Za-z])|(?<![A-Za-z])([A-Z]{3,}) (\d{1,2})(?![\d.])/g)) {
+      const n = +(mm[1] || mm[4]), b = BLOCKS.find((x) => x.code === (mm[2] || mm[3]));
+      if (b && b.n !== n) typed.push('block number: ' + mm[0].replace(/\s/, ' '));
+    }
     // The blueprint's 任務 means the whole case in most boxes and one AI task in LEARN's: every box that uses it says which (round 5c).
     const taskBoxes = Object.keys(BP).filter((c) => BP[c].some((x) => /任務(?!卡)/.test(Array.isArray(x) ? x[0] + x[1].join('') : x)));
     for (const c of taskBoxes) if (!TASK_NOTE[c]) typed.push('任務 without a note: ' + c);
@@ -280,7 +332,28 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       const own = [...FIELDS.map(([, f]) => [].concat(b[f] || []).join(' ')), ...(ADD[b.code] || []).map((x) => (Array.isArray(x) ? x[0] + x[1].join('') : x))].join(' ');
       if (/任務(?!卡)/.test(own)) typed.push('bare 任務 in ' + b.code);
     }
-    return { toolRows, toolsMissing, journey, arch, purpose, seven, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, nb: NB, whole };
+    // One list of what is still undecided (round 8: the 「帶領」 question sat only inside a settled entry). Every line on any page
+    // that says 還沒定／等你定／等你決定 is covered by a line of the decided page's list (its pattern) or is listed there word for word;
+    // a settled entry may point to the list but must be covered too.
+    // Wordings beyond 還沒定 (round 9: 「等你看」「看過再定」「你還沒看過」 slipped past).
+    const PENDING_WORDS = /還沒定|等你定|等你決定|等你看|再定|還沒看過|還沒逐/;
+    const pending = [];
+    const openList = document.getElementById('open').innerText.replace(/\s+/g, '');
+    for (const v of VIEWS) {
+      window.show(v, true);
+      const el = document.getElementById('v-' + v);
+      el.querySelectorAll('details').forEach((d) => { d.open = true; });
+      el.querySelectorAll('[data-panel]').forEach((d) => { d.hidden = false; });
+      const ol = document.getElementById('open');
+      if (v === 'decided') ol.style.display = 'none';
+      const tx = el.innerText;
+      ol.style.display = '';
+      for (const line of tx.split('\n')) {
+        if (!PENDING_WORDS.test(line) || /寫「還沒定」的那幾條等你定/.test(line)) continue;
+        if (!OPEN.some(([, re]) => re && re.test(line)) && !openList.includes(line.replace(/\s+/g, ''))) pending.push(v + ': ' + line.trim().slice(0, 40));
+      }
+    }
+    return { toolRows, toolsMissing, journey, arch, purpose, seven, empty, noHandBack, noNever, handoff, pkgs, north, notBuilt, typed, pending, total: TOOL_TOTAL, art: TOOL_OF('SENSE'), contracts: all.length, nb: NB, whole };
   }, repo);
   rule(label, 'empty_fields', r.empty);
   rule(label, 'tool_rows_vs_repo', r.toolRows);
@@ -296,6 +369,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
   rule(label, 'sovereignty_check_owner', r.seven);
   rule(label, 'not_in_build_order', r.notBuilt);
   rule(label, 'stale_typed_numbers', r.typed);
+  rule(label, 'undecided_not_on_the_list', r.pending);
   rule(label, 'contract_count', r.contracts === r.nb + 5 ? '' : `${r.contracts} contracts for ${r.nb} blocks and the five`);
   rule(label, 'tool_total_vs_repo', r.total === repo.tools ? '' : `page ${r.total} repo ${repo.tools}`);
   rule(label, 'art_count_vs_repo', r.art === repo.art ? '' : `page ${r.art} repo ${repo.art}`);
