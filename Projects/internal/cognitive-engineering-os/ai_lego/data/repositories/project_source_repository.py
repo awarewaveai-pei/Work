@@ -920,6 +920,7 @@ class ProjectSourceRepository:
                 raise InvariantViolation("PROJECT_NOT_FOUND")
             source_ids = [row["source_id"] for row in connection.execute("SELECT source_id FROM prov_sources WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))]
             events_deleted = record_log.delete_owned(connection, tenant_id, record_log.case(project_id))
+            events_deleted += self._erase_records_from_case(connection, tenant_id, project_id)
             for table in ("prov_sources", *self._ARTIFACT_TABLES, "collection_runs", "platform_projects"):
                 connection.execute(f"DELETE FROM {table} WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))
             blobs_unlinked = self._collect_unreferenced_blobs(connection, tenant_id, cas)
@@ -927,6 +928,25 @@ class ProjectSourceRepository:
             record_log.append(connection, tenant_id, f"project:{project_id}", "ProjectErased", {"project_id": project_id, "erased_by_identity_id": erased_by_identity_id, **counts},
                               writer=record_log.user(erased_by_identity_id, "GOVERN"), owner=record_log.platform(tenant_id))
         return counts
+
+    @staticmethod
+    def _erase_records_from_case(connection: sqlite3.Connection, tenant_id: str, project_id: str) -> int:
+        """A person's record made from this case (a kind's ``from_case`` field names it: LEARN's 個人歷程 line) goes with
+        the case, every version -- otherwise an erased case keeps feeding the person's patterns (完整刪除)."""
+        from ai_lego.core.domain import doc_kinds
+
+        deleted = 0
+        for spec in doc_kinds.kinds().values():
+            if not spec.from_case:
+                continue
+            rows = connection.execute(
+                "SELECT DISTINCT owner_id, aggregate_id FROM events WHERE tenant_id=? AND owner_kind='person' AND event_type='DocSaved' "
+                "AND json_extract(payload_json, '$.kind')=? AND json_extract(payload_json, ?)=?",
+                (tenant_id, spec.kind, f"$.content.{spec.from_case}", project_id),
+            ).fetchall()
+            for row in rows:
+                deleted += record_log.delete_owned(connection, tenant_id, record_log.person(row["owner_id"]), aggregate_id=row["aggregate_id"])
+        return deleted
 
     def erased_projects(self, tenant_id: str, identity_id: str) -> list[dict[str, Any]]:
         """The ProjectErased tombstones of the cases ``identity_id`` erased, newest first (N-66 已抹除): the Project row

@@ -112,14 +112,16 @@ def _is_conclusion(name: str) -> bool:
 
 # -- the checks: (snapshot, block) -> problems; an empty list = pass ----------------------------------------------------
 
-WORD_TYPES = ("text", "choice", "choices", "list", "json")   # a conclusion is words; an int or a date (judgment_version) cannot hold one
+def _points_at(name: str) -> bool:
+    """A field that names another record (``judgment_version``, ``judgment_id``) points at a conclusion; it holds none."""
+    return name.endswith(("_version", "_id"))
 
 
 def human_only_conclusions(snap: Snapshot, block: str) -> list[str]:
-    """A field named like a conclusion that holds words, in a kind someone other than the person may author, must be
-    person-only (a kind only the person authors already keeps the AI out)."""
+    """A field named like a conclusion (a confidence number too), in a kind someone other than the person may author,
+    must be person-only (a kind only the person authors already keeps the AI out)."""
     return [f"{spec.kind}.{name} holds a conclusion and the AI can write it" for spec in snap.kinds_of(block) for name, field in spec.fields.items()
-            if _is_conclusion(name) and field.type in WORD_TYPES and not field.human_only and spec.authors != frozenset({"user"})]
+            if _is_conclusion(name) and not _points_at(name) and not field.human_only and spec.authors != frozenset({"user"})]
 
 
 def no_scores(snap: Snapshot, block: str) -> list[str]:
@@ -292,9 +294,18 @@ def crisis_on_save(snap: Snapshot, block: str) -> list[str]:
 
 
 def _writes_as_system(call: ast.Call) -> bool:
-    """A save whose writer is record_log.system(...) or record_log.ai(...): the platform's or the AI's words, not the person's."""
+    """A save that cannot carry the person's words: written as the AI (record_log refuses an AI writer on a kind the AI
+    may not author), or as the system into a literal kind only the system or the AI authors. Anything else -- a person
+    writer, a computed kind, ``docs.save`` handed to a helper -- counts as the person's save."""
+    from ai_lego.core.domain import doc_kinds
+
     writer = call.args[4] if len(call.args) > 4 else next((keyword.value for keyword in call.keywords if keyword.arg == "writer"), None)
-    return isinstance(writer, ast.Call) and isinstance(writer.func, ast.Attribute) and writer.func.attr in ("system", "ai")
+    if not (isinstance(writer, ast.Call) and isinstance(writer.func, ast.Attribute) and writer.func.attr in ("system", "ai")):
+        return False
+    if writer.func.attr == "ai":
+        return True
+    kind = call.args[2] if len(call.args) > 2 else next((keyword.value for keyword in call.keywords if keyword.arg == "kind"), None)
+    return isinstance(kind, ast.Constant) and kind.value in doc_kinds.kinds() and doc_kinds.require(kind.value).authors <= {"system", "ai"}
 
 
 def unsafe_route_modules(folder: Path) -> list[str]:
@@ -303,7 +314,8 @@ def unsafe_route_modules(folder: Path) -> list[str]:
     problems = []
     for path in sorted(folder.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        saves = any(isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "save" and not _writes_as_system(node) for node in ast.walk(tree))
+        calls = {id(node.func): node for node in ast.walk(tree) if isinstance(node, ast.Call)}
+        saves = any(isinstance(node, ast.Attribute) and node.attr == "save" and not (id(node) in calls and _writes_as_system(calls[id(node)])) for node in ast.walk(tree))
         goes_through = any(isinstance(node, ast.Name) and node.id in ("_saved", "after_save") for node in ast.walk(tree))
         if saves and not goes_through:
             problems.append(f"{path.name} saves documents but never goes through the save path (crisis notice, guardrails)")
@@ -357,7 +369,7 @@ class Check:
 
 PLATFORM = "PLATFORM"
 CHECKS = (
-    Check("human_only_conclusions", ("R1", "R2"), "結論的格子只收人寫的", "沒有叫結論、判斷、立場、信心、裝文字的格子，是 AI 或共同草稿寫得進去的（只有你能寫的紀錄種類本來就擋住 AI）。", "只看格子的名字。結論放在別的名字或 json 裡面，這裡看不到；數字格子（例如第幾版）不算結論。", human_only_conclusions),
+    Check("human_only_conclusions", ("R1", "R2"), "結論的格子只收人寫的", "沒有叫結論、判斷、立場、信心、裝文字的格子，是 AI 或共同草稿寫得進去的（只有你能寫的紀錄種類本來就擋住 AI）。", "只看格子的名字。結論放在別的名字或 json 裡面，這裡看不到；指向別筆紀錄的格子（第幾版、編號）不算結論，信心數字算。", human_only_conclusions),
     Check("no_scores", ("R6", "NOSCORE"), "沒有給人打分數的格子", "沒有格子或 AI 回答的欄位，叫分數、排名、評等，或自主、成熟、理性、服從。", "只看名字。放在 json 裡面的分數，由共用紀錄在寫入時擋（見 record_refuses_scores）。", no_scores),
     Check("ai_permissions", ("R10",), "每個 AI 動作都對得上一項看得見的權限", "每個 AI 動作要的權限，協作合約裡都列得出來，你可以收回；沒有案子也能做的，只要最低權限。", "不證明 AI 執行時守在權限內；那由 AI 閘擋，另外有測試。", ai_permissions, needs="actions"),
     Check("reads_within_card", ("R10",), "AI 只讀合約卡寫的那幾塊", "每個 AI 動作讀的紀錄，都屬於它那張卡准讀的積木。", "只到積木這一層。卡上寫「只讀一部分」的，只有「判斷只讀情緒強度」逐種檢查。", reads_within_card, needs="actions"),
@@ -376,7 +388,7 @@ CHECKS = (
     Check("shared_instructions", ("R2", "R10", "NOSCORE"), "給 AI 的共用指令寫著規則", "每次呼叫 AI 的開頭都寫著：不替你下結論、不打分、不診斷、自己記得的不算來源、不把某個立場說成中立。", "只證明這幾句在指令裡，不證明模型照做。", shared_instructions, blocks=(PLATFORM,)),
     Check("crisis_on_save", ("R1",), "存一張卡，出現危機訊號，會給求助資源", "真的走一次存卡的路，帶危機訊號的卡會得到求助資源。", "只試一句話，也只試外化卡。", crisis_on_save, blocks=(PLATFORM,)),
     Check("ai_inputs_are_readable", ("R1",), "AI 的輸入沒有把中文escape掉，危機詞看得到", "每個 AI 動作的檔案裡，json.dumps 都寫了 ensure_ascii=False，所以閘檢查的那段字，和送給 AI 的是同一段、讀得懂。", "只看 json.dumps；別種把字變形的寫法，這裡看不到。危機詞表漏掉的說法也看不到。", ai_inputs_are_readable, blocks=(PLATFORM,)),
-    Check("routes_keep_the_save_path", ("R1",), "每個存你寫的紀錄的路由檔，都接上危機和護欄那一關", "apps/api/blocks 裡凡是用你的身分存紀錄的檔，都用了存卡那條路（危機訊號給求助、高風險加護欄）；用系統或 AI 身分存的（整理出的歷程、攤開 AI 的卡）不是你寫的字。", "只看檔案有沒有接上，不看每一個寫入點是不是都走那條路。", routes_keep_the_save_path, blocks=(PLATFORM,)),
+    Check("routes_keep_the_save_path", ("R1",), "每個存你寫的紀錄的路由檔，都接上危機和護欄那一關", "apps/api/blocks 裡凡是可能存到你寫的字的檔，都用了存卡那條路（危機訊號給求助、高風險加護欄）。只有兩種不算：用 AI 身分存的（攤開 AI 的卡），和用系統身分存進只有系統能寫的紀錄種類（整理出的歷程）；把存的函式交給別的函式用，也算你的。", "只看檔案有沒有接上，不看每一個寫入點是不是都走那條路。", routes_keep_the_save_path, blocks=(PLATFORM,)),
 )
 assert len({check.id for check in CHECKS}) == len(CHECKS) and all(rule in RULES for check in CHECKS for rule in check.rules)
 assert all(SLOTS[check.id][0] == check.blocks[0] for check in CHECKS if check.id in SLOTS)
@@ -387,6 +399,7 @@ ROWS = (*BLOCKS, *ALWAYS_ON_WITH_KINDS, PLATFORM)
 RULES_HISTORY = (
     {"version": 1, "date": "2026-10-03", "fingerprint": "c692fa60074f", "change": "first version: 11 rules and 不打分 checked per block; 20 checks, each with what it proves and does not prove"},
     {"version": 2, "date": "2026-10-03", "fingerprint": "428dd046bfc7", "change": "integration: a conclusion is a field of words in a kind the AI may author (an int version number is not); a route must send the person's saves through the save path, a system or AI write is not the person's words"},
+    {"version": 3, "date": "2026-10-03", "fingerprint": "4f70873772a8", "change": "critic: a field that points at a record (*_version, *_id) is not a conclusion, a confidence number is; a save handed to a helper or written as the system into a kind the person may author counts as the person's"},
 )
 
 

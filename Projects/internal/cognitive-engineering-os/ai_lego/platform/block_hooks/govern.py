@@ -28,14 +28,15 @@ WATCHED_BLOCKS = ("SENSE", "GATHER", "MAP", "THINK", "VERIFY", "COMPUTE", "DECID
 OPEN_A_CASE = "這張卡寫到比較高風險的事。要不要開一個案子，在案子裡處理？卡上的內容不會自動帶過去，要的話你自己貼進開案資料。"
 
 
-def strings(value: Any) -> list[str]:
-    """Every text inside a document's content, however deep (a map's layers are nested)."""
+def strings(value: Any, skip: tuple[str, ...] = (), keys: bool = False) -> list[str]:
+    """Every text inside a document's content, however deep (a map's layers are nested); ``skip``: keys whose values are
+    left out; ``keys``: the keys too (the crisis check reads every word the person typed, a json key included)."""
     if isinstance(value, str):
         return [value]
     if isinstance(value, dict):
-        return [text for item in value.values() for text in strings(item)]
+        return [text for key, item in value.items() if key not in skip for text in ([key] if keys and isinstance(key, str) else []) + strings(item, skip, keys)]
     if isinstance(value, list):
-        return [text for item in value for text in strings(item)]
+        return [text for item in value for text in strings(item, skip, keys)]
     return []
 
 
@@ -44,7 +45,7 @@ def written(doc: dict[str, Any]) -> list[str]:
     system offers, and not a value that is one of the field's labels."""
     fields = doc_kinds.require(doc["kind"]).fields
     return [text for name, spec in fields.items() if spec.type in ("text", "list", "json") and spec.scan
-            for text in strings(doc["content"].get(name)) if text not in spec.labels]
+            for text in strings(doc["content"].get(name), spec.unread_keys) if text not in spec.labels]
 
 
 def _recognise(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dict[str, Any]) -> list[dict[str, Any]]:
@@ -55,6 +56,8 @@ def _recognise(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dic
         return []
     if owner.kind == "case":
         return add_guardrails(docs, tenant_id, owner, categories, doc["block"])
+    if "急性心理危機" in categories:   # the save already brings crisis help; 「開一個案子」 beside it would be the wrong next step
+        return []
     return [{"type": "suggest_case", "categories": categories, "notice": OPEN_A_CASE}]
 
 

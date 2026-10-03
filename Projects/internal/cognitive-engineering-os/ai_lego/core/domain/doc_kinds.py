@@ -33,6 +33,7 @@ class Field:
     human_only: bool = False    # only the person may write it
     labels: tuple[str, ...] = ()  # the system's fixed words that appear in it (a facet name, a claim kind): a value equal to one is a label, not the person's words
     scan: bool = True           # GOVERN reads it for high-risk words (places and what the system listed are not read: block_hooks/govern.py)
+    unread_keys: tuple[str, ...] = ()  # json: keys inside whose values GOVERN does not read for risk (a fact's place)
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,7 @@ class DocKind:
     authors: frozenset[str] = frozenset({"user"})
     deletable: bool = True      # False: every version stays (a judgment's versions are never deleted, only the case is)
     singleton: bool = False     # at most one live document of this kind per owner (協作合約、開案資料): a second is refused
+    from_case: str = ""         # a person's record made from one case: the field holding that case's id -- erased with the case
 
     def __post_init__(self) -> None:
         if self.block not in ALL_CODES or self.owner not in ("case", "person") or not self.fields:
@@ -56,6 +58,8 @@ class DocKind:
         for name, spec in self.fields.items():
             if spec.type not in FIELD_TYPES or (spec.type in ("choice", "choices") and not spec.choices):
                 raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind}.{name}")
+        if self.from_case and (self.owner != "person" or self.from_case not in self.fields or not self.from_case.isidentifier()):
+            raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} from_case names no field of a person's record")
 
 
 @lru_cache(maxsize=1)

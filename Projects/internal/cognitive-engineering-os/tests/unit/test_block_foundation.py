@@ -455,3 +455,74 @@ def sqlite_dump(path):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WhatIsNotReadForRiskTests(unittest.TestCase):
+    """critic 2026-10-03 (DECIDE/ACT/LEARN M1): system words and places must not become guardrails; each kind says so on
+    its own fields (labels / scan / unread_keys), GOVERN's one scanner reads only that."""
+
+    def test_system_words_and_places_add_no_guardrail_but_the_persons_words_do(self):
+        from ai_lego.platform.block_hooks.govern import written
+        from ai_lego.platform.safety.risk import high_risk_categories
+
+        quiet = [
+            {"kind": "decide.judgment", "content": {"influences_asked": [{"who": "法律", "answer": "沒有"}]}},
+            {"kind": "context.notes", "content": {"jurisdictions": ["台北地方法院管轄"]}},
+            {"kind": "map.map", "content": {"layers": {"facts": [{"id": "f1", "text": "他又改了時間", "by": "user", "place": "法院附近"}]}}},
+        ]
+        for doc in quiet:
+            self.assertEqual(high_risk_categories(*written(doc)), [], doc["kind"])
+        loud = {"kind": "map.map", "content": {"layers": {"facts": [{"id": "f1", "text": "他說要提告", "by": "user", "place": "台北"}]}}}
+        self.assertEqual(high_risk_categories(*written(loud)), ["法律"])
+
+    def test_crisis_help_comes_alone_outside_a_case(self):
+        from ai_lego.platform.block_hooks.govern import _recognise
+        doc = {"doc_id": "d", "kind": "learn.daily", "version": 1, "content": {"about": "情緒", "text": "我不想活了"}, "author": "user", "block": "LEARN", "at": ""}
+        self.assertEqual(_recognise(None, "t", record_log.person("me"), doc), [])   # the save brings help; 「開一個案子」 is not the next step
+
+    def test_a_crisis_word_in_a_json_key_is_read_on_save(self):
+        from ai_lego.platform.block_hooks.govern import strings
+        self.assertTrue(safety.crisis_signal(*strings({"one_lines": {"我想自殺": "x"}}, keys=True)))
+        self.assertFalse(safety.crisis_signal(*strings({"one_lines": {"我想自殺": "x"}})))
+
+
+class ErasureOfRecordsFromACaseTests(ProjectSourceApiTestCase):
+    def test_erasing_a_case_erases_the_personal_line_made_from_it(self):
+        """critic 2026-10-03 (LEARN M5): learn.history is the person's, not deletable, made from one case -- it outlived
+        the case and kept feeding the patterns. A kind's from_case names the case it came from."""
+        self._login()
+        keep, gone = self._create_project(name="留下的")["project_id"], self._create_project(name="刪掉的")["project_id"]
+        for pid in (keep, gone):
+            self.assertEqual(self.client.post(f"/projects/{pid}/learn/history").status_code, 200)
+        self.assertEqual(sorted(doc["content"]["project"] for doc in self.client.get("/me/docs/learn.history").json()), sorted([keep, gone]))
+        self.assertEqual(self.client.delete(f"/projects/{gone}").status_code, 200)
+        self.assertEqual([doc["content"]["project"] for doc in self.client.get("/me/docs/learn.history").json()], [keep])
+
+    def test_from_case_must_name_a_field_of_a_persons_record(self):
+        with self.assertRaises(InvariantViolation):
+            DocKind("x.bad", "LEARN", "x", {"project": Field("text")}, from_case="project")   # a case's own record
+        with self.assertRaises(InvariantViolation):
+            DocKind("x.bad", "LEARN", "x", {"project": Field("text")}, owner="person", from_case="case")
+
+
+class CheckTighteningTests(unittest.TestCase):
+    """critic 2026-10-03 (M6/m7): the pre-launch check's two refinements must not open holes."""
+
+    def test_a_confidence_number_the_ai_may_write_fails_and_a_version_pointer_does_not(self):
+        from ai_lego.platform import integrity
+        live = integrity.Snapshot.live()
+        bad = DocKind("decide.bad", "DECIDE", "x", {"confidence": Field("int", 100), "judgment_version": Field("int", 100)}, authors=frozenset({"user", "ai"}))
+        snap = dataclasses.replace(live, kinds={**live.kinds, bad.kind: bad})
+        self.assertEqual([p for p in integrity.human_only_conclusions(snap, "DECIDE") if p.startswith("decide.bad")], ["decide.bad.confidence holds a conclusion and the AI can write it"])
+
+    def test_a_save_handed_to_a_helper_or_written_as_the_system_into_a_persons_kind_counts_as_the_persons(self):
+        import tempfile
+        from pathlib import Path
+        from ai_lego.platform import integrity
+        with tempfile.TemporaryDirectory() as folder:
+            Path(folder, "handed.py").write_text("def f(docs):\n    return _call(docs.save, 't', o, 'sense.card', {}, me)\n", encoding="utf-8")
+            Path(folder, "posing.py").write_text("def f(docs):\n    docs.save('t', o, 'sense.card', {}, record_log.system('SENSE'))\n", encoding="utf-8")
+            Path(folder, "system.py").write_text("def f(docs):\n    docs.save('t', o, 'learn.history', {}, record_log.system('LEARN'))\n", encoding="utf-8")
+            Path(folder, "ai.py").write_text("def f(docs):\n    docs.save('t', o, 'think.card', {}, record_log.ai('THINK'))\n", encoding="utf-8")
+            flagged = sorted(problem.split(" ")[0] for problem in integrity.unsafe_route_modules(Path(folder)))
+        self.assertEqual(flagged, ["handed.py", "posing.py"])

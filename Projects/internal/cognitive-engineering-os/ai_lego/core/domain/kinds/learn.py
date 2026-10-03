@@ -101,7 +101,7 @@ KINDS = [
         "moves": Field("list", len(GROWTH)),                         # 這個案子你自己做到的思考動作（GROWTH 的項目）
         "ai_docs": Field("int", 100000),                             # 這個案子 AI 寫的（含 AI 起草你改過的）份數
         "own_docs": Field("int", 100000),                            # 你自己寫的份數
-    }, owner="person", authors=frozenset({"system"}), deletable=False),
+    }, owner="person", authors=frozenset({"system"}), deletable=False, from_case="project"),
 ]
 
 

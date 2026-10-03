@@ -79,7 +79,7 @@ def _save(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_
 
 def _saved(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_log.Owner, doc: dict[str, Any]) -> dict[str, Any]:
     docs = CaseDocs(repo)
-    words = strings(doc["content"])   # every text however deep: json fields (a map's layers) hold the person's words too
+    words = strings(doc["content"], keys=True)   # every word however deep, keys too: json fields (a map's layers) hold the person's words
     notices = [{"type": "crisis", "notice": safety.NOT_THERAPY, "resources": safety.resources(_where(docs, session["tenant_id"], session["identity_id"], owner))}] if safety.crisis_signal(*words) else []
     notices += _call(after_save, docs, session["tenant_id"], owner, doc)
     return {**doc, "notices": notices}

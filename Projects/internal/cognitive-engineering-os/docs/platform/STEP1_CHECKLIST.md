@@ -14,6 +14,9 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 - built (S): 「你同意才加…還沒蓋好…不能加」 on the server: an answer names a proposal of this case, one answer per proposal, 加 only a built block (`block_hooks.BEFORE_SAVE`); 不用 = not proposed again in the case; a proposal's words are the block's own fixed words, the triggering doc by id only (ProposalWordsTests) -- a quote would outlive a deleted card
 - built (S): 做過 = event types marked `done` in record_log (a result, a document, a task; never a request, a failure or a tombstone)
 - built (S): the AI gate sends the contract's scope / human_parts / basis / handback with every turn and crisis-checks them with the rest; object answers go through `ai_gateway.structured` like every other
+- built (S): one high-risk scanner (GOVERN's hook); what is not the person's words is said on each kind's fields: `labels` (system words: claim kinds, facet names, the eight asked influences), `scan=False` (places, what the system listed), `unread_keys` (a fact's place)
+- built (S): a person's record made from one case (`DocKind.from_case`: LEARN's 個人歷程 line) is erased with the case
+- built (S): a crisis signal across two lines, or in a json key, is read; outside a case crisis help comes without 「開一個案子」
 - KNOWN LIMIT (S, critic m4): two saves at the same moment can each record a proposal for the same block (check and insert are not one transaction); the person answers both, nothing is lost
 - fixed (S, critic M1, 3f26fc502): project name key is (tenant, workspace, creator, name)
 - fixed (S, critic M2, 3f26fc502): recipe-run journals live in the runner's folder; erasing a case erases its runs and artifacts
