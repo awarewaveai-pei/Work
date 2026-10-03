@@ -143,6 +143,10 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     for (const [k, bs, d] of [...SCALES, ...CITIZEN, ...CAPS, ...CW_DEFENCE, ...WAR_BEFORE]) for (const c of bs) if (!card(c).includes(d)) north.push(k + ':' + c);
     // Her framework (v0.1): every requirement is in the card of each block it names, and every step of her eight-step loop has a block.
     for (const [d, bs] of FRAME_REQ) for (const c of bs) if (!card(c).includes(d)) north.push('frame:' + c + ':' + d.slice(0, 10));
+    // Every section a framework row cites has a row in the v0.1 table (computed from the data, 2026-10-03 round 7).
+    for (const r of FRAME_REQ) if (!V01.some((v) => v[0] === r[2])) north.push('v0.1 section without a table row: ' + r[2]);
+    // Every package has an owner for each judgment-sovereignty check: a block in it, a always-on item, or the content-block list.
+    for (const [k, , bs] of PK) for (const [name, parts] of SEVEN) if (!parts.some(([o]) => Array.isArray(o) || CROSS.some((x) => x.code === o) || bs.includes(o))) north.push('package ' + k + ' has no owner for ' + name);
     for (const [s, ps] of LOOP) { if (!ps.length) north.push('loop step without a block: ' + s); for (const [c] of ps) if (!card(c).includes('「' + s + '」')) north.push('loop:' + s + ':' + c); }
     // Her five interface questions are in both cards that ask them, word for word from one list (2026-10-03).
     for (const q of INTERFACE_Q) for (const c of ['COLLAB', '規範與脈絡']) if (!card(c).includes(q)) north.push('interface question not in ' + c + ': ' + q.slice(0, 8));
@@ -195,6 +199,13 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       if (!canRead(c).includes('*') && !owns(a.code).some((id) => canRead(c).includes(id))) arch.push('handoff without drawer ' + a.code + '->' + c);
     }
     for (const c of codes) if (!WIRING.some((w) => w[0] === c)) arch.push('wiring?' + c);
+    // One order for the blocks and one for the five (2026-10-03: arranged by relation, not by when they were added);
+    // the lists written out by hand follow it.
+    const order = [...BLOCKS.map((b) => b.code), ...CROSS.map((x) => x.code)];
+    const inOrder = (list, name) => { const ix = list.filter((c) => order.includes(c)).map((c) => order.indexOf(c)); if (ix.some((v, i) => i && v < ix[i - 1])) arch.push(name + ' not in block order'); };
+    inOrder(WIRING.map((w) => w[0]), 'WIRING');
+    inOrder(TOOL_ROWS.map((r) => r[0][0]), 'TOOL_ROWS');
+    for (const l of LAYERS) inOrder(l[3], 'LAYERS ' + l[1]);
     for (const k of Object.keys(DRAWER_LIMIT)) { const [c, id] = k.split(':'); if (!canRead(c).includes(id)) arch.push('limit on a drawer not read ' + k); }
     // Data collected for one purpose goes only to that purpose (critic round 5c): every reader of a drawer that holds where
     // someone is says which items it reads, and the places a card says it reads are the places the architecture page gives it.
