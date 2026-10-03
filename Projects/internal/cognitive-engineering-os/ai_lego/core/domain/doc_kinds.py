@@ -34,6 +34,7 @@ class Field:
     labels: tuple[str, ...] = ()  # the system's fixed words that appear in it (a facet name, a claim kind): a value equal to one is a label, not the person's words
     scan: bool = True           # GOVERN reads it for high-risk words (places and what the system listed are not read: block_hooks/govern.py)
     unread_keys: tuple[str, ...] = ()  # json: keys inside whose values GOVERN does not read for risk (a fact's place)
+    cited: bool = False         # json: objects inside cite sources -- only an AI action that ``cites`` may write it (ai_gate checks each)
 
 
 @dataclass(frozen=True)

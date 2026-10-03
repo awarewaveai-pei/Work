@@ -3,25 +3,36 @@ block never edits a shared list:
 - ``BEFORE_SAVE = {kind: fn}``, ``fn(docs, tenant_id, owner, content, doc_id) -> None``: refuse a save the kind's own
   field rules cannot see (raises InvariantViolation); the docs routes call it before every person's save;
 - ``AFTER_SAVE = {kind: fn}``, ``fn(docs, tenant_id, owner, doc) -> list[notice]``: today, propose another block (各塊自己
-  發現該加哪一塊; the assembler only shows the proposal, the person decides).
+  發現該加哪一塊; the assembler only shows the proposal, the person decides);
+- ``AFTER_SOURCES = {block: fn}``, ``fn(docs, tenant_id, owner, arrived) -> None``: sources reached the case (a batch
+  was ingested, a collection run ended, the person pasted one); ``arrived`` = {"run": run id or None, "source_ids": [...]
+  or None (= every active source without a card), "aside": [{url, title, reason}], "channels": [{provider, lang, state,
+  why}], "pasted": bool}. The hooks run in one background pool, one case at a time, in ``AFTER_SOURCES_ORDER`` (GATHER's
+  cards first): a hook may do slow work (registries, archives) directly and never starts a thread of its own; one that
+  fails is logged and stops the later hooks for that arrival (VERIFY must not read a run GATHER could not card).
 A proposal's ``why`` is the proposing block's own fixed words, never the person's: proposals are kept (not deletable),
 so a quote would outlive a deleted card (完整刪除). ``source`` names the record that set it off, by id only."""
 
 from __future__ import annotations
 
 import importlib
+import logging
 import pkgutil
+import threading
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from functools import lru_cache
 from typing import Any, Callable
 
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 
+_log = logging.getLogger(__name__)
+
 Hook = Callable[[CaseDocs, str, record_log.Owner, dict[str, Any]], list[dict[str, Any]]]
 Check = Callable[[CaseDocs, str, record_log.Owner, dict[str, Any], "str | None"], None]
 
 
-@lru_cache(maxsize=2)
+@lru_cache(maxsize=3)
 def _registry(name: str) -> dict[str, list[Callable[..., Any]]]:
     found: dict[str, list[Callable[..., Any]]] = {}
     for info in sorted(pkgutil.iter_modules(__path__), key=lambda module: module.name):
@@ -68,3 +79,45 @@ def propose(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, by_block: s
     content = {"propose": block, "why": why[:500], "guardrail": guardrail, **({"source": source} if source else {}), **({"topic": topic} if topic else {})}
     saved = docs.save(tenant_id, owner, kind, content, record_log.system(by_block))
     return [{"type": "proposal", "doc_id": saved["doc_id"], "kind": kind, "by": by_block, "propose": block, "why": saved["content"]["why"], "open": block in OPEN_BLOCKS}]
+
+
+AFTER_SOURCES_ORDER = ("GATHER", "VERIFY")   # a block not listed runs after these, by name
+# One API process (Dockerfile CMD: a single uvicorn worker), so an in-process lock serialises a case's hooks.
+_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="after-sources")
+_CASE_LOCKS: dict[tuple[str, str], threading.Lock] = {}
+_LOCKS_GUARD = threading.Lock()
+_RUNNING: set[Future] = set()
+
+
+def _case_lock(tenant_id: str, owner: record_log.Owner) -> threading.Lock:
+    with _LOCKS_GUARD:
+        return _CASE_LOCKS.setdefault((tenant_id, owner.id), threading.Lock())
+
+
+def _run_after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arrived: dict[str, Any]) -> None:
+    registry = _registry("AFTER_SOURCES")
+    order = [block for block in AFTER_SOURCES_ORDER if block in registry] + sorted(set(registry) - set(AFTER_SOURCES_ORDER))
+    with _case_lock(tenant_id, owner):
+        for block in order:
+            for fn in registry[block]:
+                try:
+                    fn(docs, tenant_id, owner, arrived)
+                except Exception:   # noqa: BLE001 -- logged, not swallowed: the sources are stored; this follow-up stops here
+                    _log.exception("after_sources hook of %s failed for %s; the later hooks did not run", block, owner.id)
+                    return
+
+
+def after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arrived: dict[str, Any]) -> None:
+    """Returns at once (the caller is the collector's callback or the person's paste, which already succeeded); the
+    hooks run in the background pool. Hooks are idempotent, so the run's end may repeat what a batch already did."""
+    future = _POOL.submit(_run_after_sources, docs, tenant_id, owner, {"aside": [], "channels": [], **arrived})
+    with _LOCKS_GUARD:
+        _RUNNING.add(future)
+    future.add_done_callback(lambda done: _RUNNING.discard(done))
+
+
+def wait_idle(timeout: float = 60.0) -> None:
+    """Until every hook submitted so far has finished (tests; a CLI that must not exit early)."""
+    with _LOCKS_GUARD:
+        running = set(_RUNNING)
+    wait(running, timeout=timeout)

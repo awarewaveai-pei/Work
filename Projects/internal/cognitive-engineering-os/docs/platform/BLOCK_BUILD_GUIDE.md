@@ -32,7 +32,7 @@ Discovery is by import: a new module in those packages is live. Never edit `reco
   `reads` = exactly the card's 「讀什麼」 kinds (other reads are refused); `person_text` returns the person's words (crisis check).
   Instructions say only what this action asks; `ai_gate.PREAMBLE` already carries the shared don'ts.
 - A proposal to add a block: `block_hooks.propose(docs, tenant, owner, "<BY>", "<BLOCK>", why)`; the kind
-  `assembler.proposal.<by>` must exist (today: sense, map, decide, learn — need another → report it).
+  `assembler.proposal.<by>` must exist (sense, gather, map, verify, compute, decide, learn — need another → report it).
 - Crisis words in any saved text already return a crisis notice; a guardrail is written only by GOVERN (`govern.guardrail`, author system).
 - Owner check: every route goes through `main._project_or_404(repo, session, project_id)` (only the case's creator).
 - No score/rank/rating keys anywhere in a payload (refused).

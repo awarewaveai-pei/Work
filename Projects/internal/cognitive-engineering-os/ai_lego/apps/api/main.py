@@ -84,8 +84,10 @@ from ai_lego.core.domain.project import project_record
 from ai_lego.core.domain.source import TEXT_MEDIA_TYPES, source_record
 from ai_lego.core.domain.collection_run import MAX_FETCHES, MAX_SEEDS, collection_run_record
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
+from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.data.events import record_log
+from ai_lego.platform import block_hooks
 from ai_lego.core.domain.blocks import block_of_family
 from ai_lego.core.domain.custom_workflow import custom_workflow_record
 from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowRepository
@@ -2830,7 +2832,9 @@ def create_source(
         )
     except InvariantViolation as error:
         raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
-    return repo.add_source(record, cas_path, put_content=lambda: source_cas.put(session["tenant_id"], content_bytes), writer=_me(session, "GATHER"))
+    added = repo.add_source(record, cas_path, put_content=lambda: source_cas.put(session["tenant_id"], content_bytes), writer=_me(session, "GATHER"))
+    block_hooks.after_sources(CaseDocs(repo), session["tenant_id"], record_log.case(project_id), {"run": None, "source_ids": [source_id], "aside": [], "pasted": True})
+    return added
 
 
 @app.get("/projects/{project_id}/sources")
@@ -3219,6 +3223,8 @@ def complete_collection(
         store.close_collect_grant(grant["grant_ref"])
         raise HTTPException(status_code=400 if "REPORT_INVALID" in str(error) else 409, detail=str(error)) from error
     store.close_collect_grant(grant["grant_ref"])
+    # what the run delivered (healthy or not) gets its cards (GATHER); source_ids None = every active source without one
+    block_hooks.after_sources(CaseDocs(repo), grant["tenant_id"], record_log.case(project_id), {"run": run_id, "source_ids": None, "aside": [], "pasted": False})
     return {"run_id": run_id, "status": run["status"]}
 
 
@@ -3315,6 +3321,8 @@ def ingest_sources(
         results = repo.ingest_batch(tenant_id, project_id, items, put_content=lambda cas_path: source_cas.put(tenant_id, contents[cas_path["hash"]]))
     except InvariantViolation as error:
         raise HTTPException(status_code=400, detail=f"SOURCE_INGEST_REFUSED: {error}") from error
+    # every batch, not only the run's end: a run that dies after ingesting still gets its cards (GATHER)
+    block_hooks.after_sources(CaseDocs(repo), tenant_id, record_log.case(project_id), {"run": payload.run_id, "source_ids": None, "pasted": False})
     return {"results": results}
 
 

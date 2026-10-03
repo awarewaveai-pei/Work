@@ -64,6 +64,8 @@ const CODES: Record<string, string> = {
   AI_ACTION_UNKNOWN: "這個 AI 功能還沒開放。",
   AI_ANSWER_NOT_JSON: "AI 這次沒有給出可用的回答，再按一次即可。",
   AI_ANSWER_INVALID: "AI 這次的回答不合格式，再按一次即可。",
+  AI_ANSWER_UNCITED: "AI 這次引用了案子裡沒有的來源，或引文跟原文對不上，所以沒有存。再按一次即可。",
+  AI_TOO_MANY_SOURCES: "來源卡太多，AI 一次看不完。先勾選要給它看的幾張。",
   AI_CONTEXT_INVALID: "這個頁面送給 AI 的內容有問題，請重新整理頁面再試一次。",
   AI_NOTHING_TO_PICK: "這個案子能用的拆法都用過了。",
   AI_NOTHING_TO_PLACE: "每張卡都已經放進某一層了。",

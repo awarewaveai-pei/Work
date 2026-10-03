@@ -661,6 +661,15 @@ class ProjectSourceRepository:
             ).fetchone()
         return None if row is None else json.loads(row["cas_path_json"])
 
+    def active_source_reader(self, cas: TenantScopedCas, tenant_id: str, project_id: str) -> Callable[[str], "tuple[dict[str, Any], str] | None"]:
+        """``read(source_id) -> (row, text)`` of one active stored source of this case, or None (what an AI turn that
+        cites sources may read: ai_gate ``source_text``)."""
+        def read(source_id: str) -> tuple[dict[str, Any], str] | None:
+            row = self.get_source(tenant_id, project_id, source_id)
+            reference = self.get_source_content_reference(tenant_id, project_id, source_id) if row and row["status"] == "active" else None
+            return None if reference is None else (row, cas.read(tenant_id, reference).decode("utf-8"))
+        return read
+
     def list_events(self, tenant_id: str, aggregate_id: str) -> list[dict[str, Any]]:
         with self._connection() as connection:
             rows = connection.execute(

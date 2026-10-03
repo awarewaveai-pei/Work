@@ -46,7 +46,7 @@ KINDS = [
         "guardrail": Field("bool"),
         "source": Field("text", 64),                    # the doc that set it off, by id only
         "topic": Field("text", 120),                    # what it is about when a block is offered for different things (TEACH: a method id)
-    }, authors=frozenset({"system"}), deletable=False) for block in ("SENSE", "MAP", "DECIDE", "LEARN")],
+    }, authors=frozenset({"system"}), deletable=False) for block in ("SENSE", "GATHER", "MAP", "VERIFY", "COMPUTE", "DECIDE", "LEARN")],
     # The person's answer to one proposal (你同意才加): its own record, so the proposal's words stay the system's.
     DocKind("assembler.answer", "ASSEMBLER", "你對提議的回答", {
         "proposal": Field("text", 64, required=True),

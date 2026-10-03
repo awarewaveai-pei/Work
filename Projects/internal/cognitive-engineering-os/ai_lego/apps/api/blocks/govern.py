@@ -41,6 +41,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform import integrity, safety
 from ai_lego.platform.ai_gate import PREAMBLE
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.platform.rulesets import rulesets
 from ai_lego.platform.safety import risk
 from ai_lego.platform.workflow.run_lock import lock_path_for, run_lock_state
 
@@ -377,7 +378,7 @@ def erase_account(body: EraseBody, response: Response, session: dict[str, Any] =
 
 def kind_definition(spec: doc_kinds.DocKind) -> dict[str, Any]:
     return {"block": spec.block, "owner": spec.owner, "authors": sorted(spec.authors), "deletable": spec.deletable, "singleton": spec.singleton,
-            "fields": {name: [field.type, field.max, field.required, list(field.choices), field.human_only] for name, field in sorted(spec.fields.items())}}
+            "fields": {name: [field.type, field.max, field.required, list(field.choices), field.human_only, *(["cited"] if field.cited else [])] for name, field in sorted(spec.fields.items())}}
 
 
 def rules_in_use() -> list[dict[str, str]]:
@@ -388,6 +389,8 @@ def rules_in_use() -> list[dict[str, str]]:
         {"name": "high_risk", "label": "高風險分類詞表", "version": risk.fingerprint()},
         {"name": "record_kinds", "label": "每一種紀錄有哪些格子、誰能寫", "version": safety.digest({kind: kind_definition(spec) for kind, spec in sorted(doc_kinds.kinds().items())})},
         {"name": "integrity", "label": "完整性核心的規則", "version": integrity.rules_version()},
+        *[{"name": item.name, "label": item.title, "version": f"v{item.version}-{item.fingerprint()}", "maintainer": item.maintainer, "block": item.block}
+          for item in sorted(rulesets().values(), key=lambda ruleset: ruleset.name)],
     ]
 
 
