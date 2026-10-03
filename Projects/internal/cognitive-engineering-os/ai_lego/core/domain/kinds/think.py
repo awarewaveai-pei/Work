@@ -90,7 +90,13 @@ KINDS = [
     }, authors=frozenset({"ai"})),
     DocKind("think.response", "THINK", "你對 AI 整理的回應", {
         "reply": Field("text", 64, required=True),
+        "version": Field("int", 100000, required=True),                    # the version of the reply you answered
         "response": Field("choice", choices=RESPONSES, required=True),
         "note": Field("text", 1000),                                       # 改寫時，寫你自己的版本
     }),
+    # The system's note that a batch was laid out as cards: cards you delete never come back (apps/api/blocks/think.py).
+    DocKind("think.laid_out", "THINK", "這一批已展開成卡", {
+        "batch": Field("text", 64, required=True),
+        "created": Field("int", 100),
+    }, authors=frozenset({"system"}), deletable=False),
 ]

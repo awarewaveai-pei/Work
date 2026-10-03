@@ -100,6 +100,13 @@ class ThinkApiTests(ProjectSourceApiTestCase):
     def _cards(self) -> list[dict]:
         return self.client.get(f"{self.base}/docs/think.card").json()
 
+    def _answer_in(self, pid: str, action: str) -> dict:
+        round_ = self._round(pid=pid)
+        self.provider.answer = ANSWERS[action]
+        response = self.client.post(f"/projects/{pid}/ai/THINK/{action}", json={"context": {"round": round_["doc_id"]}})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()["saved"]
+
     def _card(self, round_id: str, claim: str = "我自己的想法", pid: str | None = None) -> dict:
         response = self.client.post(f"/projects/{pid or self.pid}/docs/think.card", json={"content": {"claim": claim, "round": round_id}})
         self.assertEqual(response.status_code, 200, response.text)
@@ -280,6 +287,15 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         self.client.delete(f"{self.base}/docs/think.card/{found[0]['doc_id']}")
         self.assertEqual(self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]}).json(), {"created": 0})
         self.assertEqual(len(self._cards()), 9)
+        for card in self._cards():
+            self.client.delete(f"{self.base}/docs/think.card/{card['doc_id']}")
+        self.assertEqual(self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]}).json(), {"created": 0})   # every card deleted: still not laid out again
+        self.assertEqual(self._cards(), [])
+        notes = self.client.get(f"{self.base}/docs/think.laid_out").json()
+        self.assertEqual([(note["author"], note["content"]) for note in notes], [("system", {"batch": batch["doc_id"], "created": 10})])
+        self.assertEqual(self.client.delete(f"{self.base}/docs/think.laid_out/{notes[0]['doc_id']}").status_code, 400)   # the note stays
+        forged = self.client.post(f"{self.base}/docs/think.laid_out", json={"content": {"batch": "x"}})
+        self.assertEqual(forged.status_code, 403, forged.text)
 
     def test_only_a_batch_the_ai_saved_can_be_laid_out(self):
         self.assertEqual(self.client.post(f"{self.base}/think/expand", json={"batch": str(uuid.uuid4())}).status_code, 404)
@@ -360,12 +376,81 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         reacted = self._react(card, reason="我怕被告，要找律師")
         self.assertEqual([notice["category"] for notice in reacted["notices"] if notice["type"] == "guardrail"], ["法律"])
 
+    def test_a_card_belongs_to_a_live_round_of_this_case(self):
+        mine = self._round()["doc_id"]
+        other = self._create_project(name="另一個案子")["project_id"]
+        elsewhere = self._round(pid=other)["doc_id"]
+        gone = self._round(problem="會刪掉的一輪")
+        self.client.delete(f"{self.base}/docs/think.round/{gone['doc_id']}")
+        for round_id in (elsewhere, "no-such-round", gone["doc_id"], ["x"]):
+            refused = self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "x", "round": round_id}})
+            self.assertEqual(refused.status_code, 404, (round_id, refused.text))
+            self.assertIn("THINK_ROUND_NOT_FOUND", refused.json()["detail"])
+        self.assertEqual(self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "x", "round": mine}}).status_code, 200)
+        self.assertEqual(len(self._cards()), 1)
+
+    def test_a_card_keeps_what_the_system_set_when_it_was_made(self):
+        self._grant("counter")
+        round_, second = self._round()["doc_id"], self._round(problem="另一輪")["doc_id"]
+        batch = self._answer("counter", round_)
+        self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]})
+        card = self._cards()[0]
+        url = f"{self.base}/docs/think.card/{card['doc_id']}"
+        for field, value in (("sourced", "有來源"), ("role", "鏡子"), ("method", "反例" if card["content"]["method"] != "反例" else "失敗模式"), ("batch", "other-batch"), ("batch_index", 9), ("round", second)):
+            refused = self.client.put(url, json={"content": {**card["content"], field: value}, "base_version": 1})
+            self.assertEqual(refused.status_code, 400, (field, refused.text))
+            self.assertIn("THINK_CARD_FIELD_FIXED", refused.json()["detail"])
+            self.assertIn(field, refused.json()["detail"])
+        dropped = self.client.put(url, json={"content": {key: value for key, value in card["content"].items() if key != "sourced"}, "base_version": 1})
+        self.assertEqual(dropped.status_code, 400, dropped.text)   # taking the label off is a change too
+        untouched = self._cards()[0]
+        self.assertEqual((untouched["author"], untouched["version"], untouched["content"]), ("ai", 1, card["content"]))
+        edited = self.client.put(url, json={"content": {**card["content"], "claim": "我改過的主張"}, "base_version": 1}).json()
+        self.assertEqual((edited["author"], edited["content"]["sourced"], edited["content"]["batch"]), ("joint", "它自己說的", batch["doc_id"]))
+        mine = self._card(round_, "我自己的")
+        for field, value in (("role", "反方教練"), ("sourced", "有來源"), ("batch", batch["doc_id"]), ("batch_index", 0), ("method", "反例")):
+            refused = self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "冒充", "round": round_, field: value}})
+            self.assertEqual(refused.status_code, 400, (field, refused.text))
+            self.assertIn("THINK_CARD_FIELD_FIXED", refused.json()["detail"])
+        self.assertEqual(self.client.put(f"{self.base}/docs/think.card/{mine['doc_id']}", json={"content": {"claim": "我改了字", "round": round_}, "base_version": 1}).status_code, 200)
+        self.assertEqual(len(self._cards()), 4)   # the AI's three and mine
+
+    def test_a_card_cannot_be_moved_out_of_a_full_round_to_get_a_fourth_pick(self):
+        round_, other = self._round()["doc_id"], self._round(problem="另一輪")["doc_id"]
+        cards = [self._card(round_, f"卡{index}") for index in range(4)]
+        for card in cards[:3]:
+            self._react(card, picked=True)
+        first = self._cards()[0]
+        moved = self.client.put(f"{self.base}/docs/think.card/{first['doc_id']}", json={"content": {**first["content"], "round": other}, "base_version": first["version"]})
+        self.assertEqual(moved.status_code, 400, moved.text)
+        self.assertIn("THINK_PICK_LIMIT", self._react(cards[3], 400, picked=True)["detail"])
+
+    def test_my_own_version_stays_once_the_ai_has_answered(self):
+        self._grant("propose_options")
+        asked, quiet = self._round(own=("觀察：他第三次改條件",)), self._round(problem="沒有問過 AI 的一輪")
+        self.assertEqual(self._set_round(quiet, own=["觀察：改了也行"])["version"], 2)   # nothing answered yet: still yours to change
+        self._answer("mirror", asked["doc_id"])
+        for own in (["觀察：換成 AI 的話"], [], ["觀察：他第三次改條件", "我不知道：多一項"]):
+            refused = self.client.put(f"{self.base}/docs/think.round/{asked['doc_id']}", json={"content": {**asked["content"], "own": own}, "base_version": 1})
+            self.assertEqual(refused.status_code, 400, (own, refused.text))
+            self.assertIn("THINK_OWN_VERSION_FIXED", refused.json()["detail"])
+        later = self._set_round(asked, problem="問題我可以再改", criteria=["能反悔"], reflection="我先寫了")   # everything else stays yours
+        self.assertEqual(later["content"]["own"], ["觀察：他第三次改條件"])
+        batched = self._round(problem="發散的一輪", own=("觀察：A",))
+        self._answer("diverge", batched["doc_id"])
+        self.assertEqual(self.client.put(f"{self.base}/docs/think.round/{batched['doc_id']}", json={"content": {**batched["content"], "own": ["觀察：B"]}, "base_version": 1}).status_code, 400)
+        reply = self.client.get(f"{self.base}/docs/think.reply").json()[0]
+        self.client.delete(f"{self.base}/docs/think.reply/{reply['doc_id']}")   # take the AI's turn away and the round is yours again
+        again = self.client.get(f"{self.base}/docs/think.round").json()
+        current = next(item for item in again if item["doc_id"] == asked["doc_id"])
+        self.assertEqual(self._set_round(current, own=["觀察：重寫"])["content"]["own"], ["觀察：重寫"])
+
     def test_a_card_i_write_is_mine_and_needs_its_round(self):
         round_ = self._round()
         mine = self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "我自己的想法", "round": round_["doc_id"]}}).json()
         self.assertEqual((mine["author"], mine["block"]), ("user", "THINK"))
         self.assertEqual(self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "沒有輪"}}).status_code, 400)
-        self.assertEqual(self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "x", "round": "r", "score": 3}}).status_code, 400)
+        self.assertEqual(self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "x", "round": round_["doc_id"], "score": 3}}).status_code, 400)
 
     # -- 回覆 -------------------------------------------------------------------------------------------------------------------
     def test_replies_keep_to_the_cards_own_sections(self):
@@ -391,6 +476,13 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         self.assertEqual(actions._one_question("What do you want? And why?", 300), "What do you want?")
         self.assertEqual(actions._one_question("先想想你要什麼", 300), "先想想你要什麼")
         self.assertEqual(actions._one_question(None, 300), "")
+        self.assertEqual(actions._one_question("他說「你要不要？ 你怎麼想？還有嗎？", 300), "他說「你要不要？")   # a quote that never closes hides nothing
+        self.assertEqual(actions._one_question("你怎麼看（他的條件？還有呢？ 還有嗎？", 300), "你怎麼看（他的條件？")
+        self.assertEqual(actions._one_question("他說「要不要？」，然後呢", 300), "他說「要不要？」，然後呢")   # a closed quote still hides its own mark
+        self.assertEqual(actions._one_sentence("資料不足，我先不給建議。你想先弄清楚哪一點？", 200), "資料不足，我先不給建議。")
+        self.assertEqual(actions._one_sentence("Not enough to go on. Which part matters?", 200), "Not enough to go on.")
+        self.assertEqual(actions._one_sentence("版本 3.5 還沒定", 200), "版本 3.5 還沒定")
+        self.assertEqual(len(actions._one_sentence("字" * 500, 200)), 200)
         round_ = self._round()
         saved = self._answer("socratic", round_["doc_id"], {"question": "你要先弄清楚什麼？他想要什麼？"})
         self.assertEqual(saved["content"]["question"], "你要先弄清楚什麼？")
@@ -399,6 +491,8 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         self._grant("propose_options")
         handed_back = self._answer("diverge", round_["doc_id"], {"handback": "資料不足", "question": "這件事會影響誰？誰會反對？"})
         self.assertEqual(handed_back["content"]["question"], "這件事會影響誰？")
+        wordy = self._answer("mirror", round_["doc_id"], {"handback": "資料不足，先不給建議。你可以這樣做：先談條件，再談期限。", "question": "你想先弄清楚哪一點？"})
+        self.assertEqual(wordy["content"]["handback"], "資料不足，先不給建議。")
 
     def test_the_look_back_names_two_strengths_and_one_practice(self):
         round_ = self._round()
@@ -435,9 +529,24 @@ class ThinkApiTests(ProjectSourceApiTestCase):
 
     def test_i_answer_a_reply_and_the_ai_cannot_answer_for_me(self):
         reply = self._answer("mirror", self._round()["doc_id"])
-        answer = self.client.post(f"{self.base}/docs/think.response", json={"content": {"reply": reply["doc_id"], "response": "改寫", "note": "其實他是在試探"}}).json()
-        self.assertEqual((answer["author"], answer["block"]), ("user", "THINK"))
-        self.assertEqual(self.client.post(f"{self.base}/docs/think.response", json={"content": {"reply": reply["doc_id"], "response": "同意"}}).status_code, 400)
+        answer = self.client.post(f"{self.base}/docs/think.response", json={"content": {"reply": reply["doc_id"], "version": reply["version"], "response": "改寫", "note": "其實他是在試探"}}).json()
+        self.assertEqual((answer["author"], answer["block"], answer["content"]["version"]), ("user", "THINK", 1))
+        self.assertEqual(self.client.post(f"{self.base}/docs/think.response", json={"content": {"reply": reply["doc_id"], "version": 1, "response": "同意"}}).status_code, 400)
+
+    def test_my_answer_names_a_reply_of_this_case_and_the_version_i_answered(self):
+        reply = self._answer("mirror", self._round()["doc_id"])
+        other = self._create_project(name="另一個案子")["project_id"]
+        elsewhere = self._answer_in(other, "mirror")
+        post = lambda content: self.client.post(f"{self.base}/docs/think.response", json={"content": content})
+        for content in ({"reply": "no-such-reply", "version": 1, "response": "確認"}, {"reply": elsewhere["doc_id"], "version": 1, "response": "確認"}, {"reply": ["x"], "version": 1, "response": "確認"}, {"version": 1, "response": "確認"}):
+            refused = post(content)
+            self.assertEqual(refused.status_code, 404, (content, refused.text))
+            self.assertIn("THINK_REPLY_NOT_FOUND", refused.json()["detail"])
+        stale = post({"reply": reply["doc_id"], "version": 7, "response": "確認"})
+        self.assertEqual(stale.status_code, 409, stale.text)
+        self.assertIn("THINK_REPLY_STALE", stale.json()["detail"])
+        self.assertEqual(post({"reply": reply["doc_id"], "response": "確認"}).status_code, 400)   # no version at all is the kind's own 「required」
+        self.assertEqual(post({"reply": reply["doc_id"], "version": 1, "response": "確認"}).status_code, 200)
 
     # -- 安全 -------------------------------------------------------------------------------------------------------------------
     def test_a_crisis_in_my_round_stops_the_ai_before_any_call(self):

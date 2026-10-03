@@ -74,8 +74,8 @@ export type Card = {
 export type Reaction = { card: string; reaction?: string; reason?: string; stance?: string; picked?: boolean };
 type Reply = { round: string; action: string; role: string; sections?: Array<{ title: string; items: string[] }>; question?: string; premise?: string; fails_when?: string; handback?: string; sourced: string };
 type Batch = { round: string; action: string; role: string; cards?: unknown[]; question?: string; handback?: string; sourced: string };
-type Answer = { reply: string; response: string; note?: string };
-type Loaded = { rounds: Doc<Round>[]; cards: Doc<Card>[]; reactions: Doc<Reaction>[]; batches: Doc<Batch>[]; replies: Doc<Reply>[]; answers: Doc<Answer>[]; permissions: string[]; emotion: { emotion: string; intensity: string } | null };
+type Answer = { reply: string; version?: number; response: string; note?: string };
+type Loaded = { rounds: Doc<Round>[]; cards: Doc<Card>[]; reactions: Doc<Reaction>[]; laidOut: Doc<{ batch: string }>[]; batches: Doc<Batch>[]; replies: Doc<Reply>[]; answers: Doc<Answer>[]; permissions: string[]; emotion: { emotion: string; intensity: string } | null };
 const CARD_TEXT = ["claim", "mechanism", "benefit", "risk", "assumption", "premise", "fails_when"] as const;
 const CARD_LABEL: Record<string, string> = { claim: "主張", mechanism: "機制", benefit: "可能好處", risk: "風險", assumption: "要驗證的假設", premise: "前提和適用條件", fails_when: "可能怎麼失敗" };
 
@@ -202,11 +202,12 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const [refresh, setRefresh] = useState(0);
 
   const load = async () => {
-    const [rounds, cards, reactions, batches, replies, answers, contract, state] = await Promise.all([
-      docs.list<Round>(projectId, "think.round"), docs.list<Card>(projectId, "think.card"), docs.list<Reaction>(projectId, "think.reaction"), docs.list<Batch>(projectId, "think.batch"), docs.list<Reply>(projectId, "think.reply"),
+    const [rounds, cards, reactions, laidOut, batches, replies, answers, contract, state] = await Promise.all([
+      docs.list<Round>(projectId, "think.round"), docs.list<Card>(projectId, "think.card"), docs.list<Reaction>(projectId, "think.reaction"), docs.list<{ batch: string }>(projectId, "think.laid_out"),
+      docs.list<Batch>(projectId, "think.batch"), docs.list<Reply>(projectId, "think.reply"),
       docs.list<Answer>(projectId, "think.response"), docs.list<{ permissions?: string[] }>(projectId, "collab_contract.terms"), docs.list<{ emotion: string; intensity: string }>(projectId, "sense.state"),
     ]);
-    setData({ rounds, cards, reactions, batches, replies, answers, permissions: contract.at(-1)?.content.permissions ?? [], emotion: state.at(-1)?.content ?? null });
+    setData({ rounds, cards, reactions, laidOut, batches, replies, answers, permissions: contract.at(-1)?.content.permissions ?? [], emotion: state.at(-1)?.content ?? null });
   };
   useEffect(() => { load().catch((reason) => setError(thinkError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -291,7 +292,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     if (!doc) setAdding((count) => count + 1);
   });
   const answer = (reply: Doc<Reply>, response: (typeof RESPONSES)[number], note = "") => act(async () => {
-    await docs.create(projectId, "think.response", { reply: reply.doc_id, response, ...(note.trim() ? { note: note.trim() } : {}) });
+    await docs.create(projectId, "think.response", { reply: reply.doc_id, version: reply.version, response, ...(note.trim() ? { note: note.trim() } : {}) });
     setRewrite(null);
   });
   const removeRound = () => act(async () => {
@@ -383,7 +384,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   };
 
   const grouped = (label: string, lines: string[]) => <div className="mcard"><b>{label}</b>{lines.length ? <ul>{lines.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul> : <span className="k">還沒有</span>}</div>;
-  const unexpanded = roundBatches.filter((batch) => (batch.content.cards ?? []).length > 0 && !data.cards.some((card) => card.content.batch === batch.doc_id));
+  const unexpanded = roundBatches.filter((batch) => (batch.content.cards ?? []).length > 0 && !data.laidOut.some((note) => note.content.batch === batch.doc_id));
 
   return (
     <BlockShell projectId={projectId} code="THINK" refresh={refresh}>

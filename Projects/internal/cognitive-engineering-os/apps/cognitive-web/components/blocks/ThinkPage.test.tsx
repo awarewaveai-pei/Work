@@ -172,4 +172,27 @@ describe("共思考 page", () => {
     expect(deleted).toEqual(["/projects/P/docs/think.reaction/x-a", "/projects/P/docs/think.card/a"]);
     await done();
   });
+
+  it("offers to lay a batch out only until the system has noted it laid out: deleted cards do not bring the button back", async () => {
+    const batch = doc("think.batch", "B1", { round: "R1", action: "diverge", role: "發散夥伴", sourced: "它自己說的", cards: [{}] }, "ai");
+    serve({ "think.round": [round], "think.batch": [batch] });
+    const waiting = await mount(<ThinkPage projectId="P" />);
+    expect(button(waiting.host, "展開成卡")).toBeTruthy();
+    await waiting.done();
+    serve({ "think.round": [round], "think.batch": [batch], "think.laid_out": [doc("think.laid_out", "N1", { batch: "B1" }, "system")] });
+    const laid = await mount(<ThinkPage projectId="P" />);
+    expect(button(laid.host, "展開成卡")).toBeUndefined();
+    await laid.done();
+  });
+
+  it("answers a reply with the version of it that is on the screen", async () => {
+    const reply = doc("think.reply", "Y1", { round: "R1", action: "mirror", role: "鏡子", sections: [{ title: "事實", items: ["他改了條件"] }], sourced: "它自己說的" }, "ai", 3);
+    serve({ "think.round": [round], "think.reply": [reply] });
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    vi.mocked(apiFetch).mockImplementation((async (_path: string, init?: RequestInit) => (init ? { ...doc("think.response", "Z1", { reply: "Y1", version: 3, response: "確認" }), notices: [] } : [])) as never);
+    await act(async () => { button(host, "對，是這樣").click(); });
+    const post = vi.mocked(apiFetch).mock.calls.find(([, init]) => init?.method === "POST")!;
+    expect([post[0], JSON.parse(post[1]!.body as string)]).toEqual(["/projects/P/docs/think.response", { content: { reply: "Y1", version: 3, response: "確認" } }]);
+    await done();
+  });
 });

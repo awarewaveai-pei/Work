@@ -117,14 +117,28 @@ def _text(value: Any, limit: int) -> str:
     return value.strip()[:limit] if isinstance(value, str) else ""
 
 
-def _one_question(value: Any, limit: int) -> str:
-    """一次只問一題: kept up to the first question mark outside quotes and brackets; what follows would be a second question."""
-    text, depth = _text(value, limit), 0
+def _cut(value: Any, limit: int, ends: str, dot: bool = False) -> str:
+    """The text up to its first end mark that is outside quotes and brackets; a quote or bracket that never closes does not
+    hide the marks, so the first mark anywhere ends it. No mark: the text as it is."""
+    text, depth, first = _text(value, limit), 0, None
     for index, char in enumerate(text):
         depth += (char in "「『（(“") - (char in "」』）)”")
-        if char in "？?" and depth <= 0:
+        mark = char in ends or (dot and char == "." and (index + 1 == len(text) or text[index + 1].isspace()))   # "3.5" is not the end of a sentence
+        if mark and depth <= 0:
             return text[:index + 1]
-    return text
+        if mark and first is None:
+            first = index
+    return text[:first + 1] if first is not None and depth > 0 else text
+
+
+def _one_question(value: Any, limit: int) -> str:
+    """一次只問一題: what follows the first question would be a second one."""
+    return _cut(value, limit, "？?")
+
+
+def _one_sentence(value: Any, limit: int) -> str:
+    """A hand-back is one plain sentence saying why (交還控制), not a second place to put questions or advice."""
+    return _cut(value, limit, "。！？!?", dot=True)
 
 
 def _invalid(why: str) -> InvariantViolation:
@@ -172,7 +186,7 @@ def _reply_shape(action: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
 
     def shape(answer: dict[str, Any]) -> dict[str, Any]:
         round_id = _round_id()
-        sections, question, handback = _sections(answer.get("sections"), titles), _one_question(answer.get("question"), 300), _text(answer.get("handback"), 500)
+        sections, question, handback = _sections(answer.get("sections"), titles), _one_question(answer.get("question"), 300), _one_sentence(answer.get("handback"), 200)
         shaped = {"round": round_id, "action": action, "role": role, "sections": sections, "question": question, "handback": handback, "sourced": SOURCED[1]}
         if action == "criteria":
             shaped.update(premise=_text(answer.get("premise"), 1000), fails_when=_text(answer.get("fails_when"), 1000))
@@ -220,7 +234,7 @@ def _batch_shape(action: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
 
     def shape(answer: dict[str, Any]) -> dict[str, Any]:
         round_id = _round_id()
-        question, handback = _one_question(answer.get("question"), 300), _text(answer.get("handback"), 500)
+        question, handback = _one_question(answer.get("question"), 300), _one_sentence(answer.get("handback"), 200)
         cards = [] if handback else _card_list(answer.get("cards"), methods=methods, required=required)[:most]
         if handback and not question:
             raise _invalid("a hand-back comes with the one question that replaces the advice")

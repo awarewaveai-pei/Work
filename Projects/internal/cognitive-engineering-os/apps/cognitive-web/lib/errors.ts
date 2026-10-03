@@ -92,6 +92,11 @@ const CODES: Record<string, string> = {
   THINK_PICK_LIMIT: "這一輪已經選了三張；先放回一張，再選這張。",
   THINK_REACTION_ALREADY_GIVEN: "這張卡你已經有反應了；請改那一個。",
   THINK_REACTION_CARD_FIXED: "反應跟著它寫的那張卡，不能換到別張。",
+  THINK_ROUND_NOT_FOUND: "找不到這一輪，可能已經刪除。",
+  THINK_CARD_FIELD_FIXED: "這張卡的輪次、角色、方法和來源在做卡時就定了，你不能改。你可以改它的字。",
+  THINK_OWN_VERSION_FIXED: "AI 已經回過這一輪，你最初的版本不再改。看過 AI 之後的新想法，寫成卡。",
+  THINK_REPLY_NOT_FOUND: "找不到 AI 的這份整理，可能已經刪除。",
+  THINK_REPLY_STALE: "這份整理在你回應之前又變了。請重新整理頁面，看過新的再回應。",
   ACCOUNT_ERASE_NOT_CONFIRMED: "要刪除帳號，請照畫面打一次確認的字。",
 };
 
