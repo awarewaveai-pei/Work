@@ -387,7 +387,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
 
 <div class="app">
   <nav class="side" aria-label="監工台畫面">
-    <div class="brand">認知主權平台<small>監工台　更新 2026-10-03</small></div>
+    <div class="brand">認知主權平台<small>監工台　更新 2026-10-04</small></div>
     <button class="navi" data-v="one" aria-current="page">一頁看懂</button>
     <button class="navi" data-v="north">北極星</button>
     <button class="navi" data-v="map">地圖</button>
@@ -677,7 +677,7 @@ body[data-view="one"] .app{padding-block:16px 8px}
 
     <section class="view" id="v-progress" hidden>
       <div class="stack"><h2>進度與順序</h2>
-        <p class="sub">三欄各自獨立：現況是今天有沒有這塊的能力；合約是有沒有寫清楚；建置是有沒有照合約蓋。</p></div>
+        <p class="sub">三欄各自獨立：現況是正式站今天有沒有這塊的能力；合約是有沒有寫清楚；建置是有沒有照合約蓋好（蓋好、還沒上正式站的，現況還是舊的）。</p></div>
       <div class="card"><div class="mx" id="matrix"></div></div>
       <div class="card stack">
         <h3>建置順序</h3>
@@ -1433,7 +1433,7 @@ const ARCH_DECIDED = [
 ];
 const BUILD = [
   [0,"第 0 步","寫 " + NB + " 份積木合約、5 份全程生效項合約","每塊說清楚十二個欄位。共用紀錄從這 " + NB + " 份推出來。全程生效的五樣也各寫一份。",() => "寫完了。第 " + CONFIRMED_STEP + " 步要用的 " + CONFIRMED().length + " 份已確認（" + DELEGATED + "）；其餘 " + (NB + 5 - CONFIRMED().length) + " 份在它那一步開工前確認",[],"寫合約"],
-  [1,"第 1 步","第一圈：個人複雜決策","外殼（" + LAYERS[1][3].join("、") + "）、案子的紀錄（共用紀錄）、" + zh(PK.find(p=>p[0]==="個人複雜決策")[2].length) + "塊、基本安全（" + GOVERN_FIRST.join("、") + "）一起做。MAP 這一步要做出六層地圖，用上「規範與脈絡」這個鏡頭。一塊一塊做到能拿真事進去用。","可以開工：合約已確認，第一個場景就是「" + FIRST_SCENE + "」（藍圖 13.1，" + DELEGATED + "）。開工第一件：每一筆紀錄記下誰寫的（架構頁「架構上定了的」第 2 條）",["SENSE","MAP","THINK","DECIDE","ACT","LEARN","GOVERN","完整性核心","規範與脈絡","組裝器","協作合約","共用紀錄"],"第一圈＋基本安全"],
+  [1,"第 1 步","第一圈：個人複雜決策","外殼（" + LAYERS[1][3].join("、") + "）、案子的紀錄（共用紀錄）、" + zh(PK.find(p=>p[0]==="個人複雜決策")[2].length) + "塊、基本安全（" + GOVERN_FIRST.join("、") + "）一起做。MAP 這一步要做出六層地圖，用上「規範與脈絡」這個鏡頭。一塊一塊做到能拿真事進去用。","做好了，在本機（2026-10-04）：七塊和全程生效的五樣都能用，上線前檢查全部通過。還沒上正式站，要你同意。GOVERN 的研究與治理在第 3 步。",["SENSE","MAP","THINK","DECIDE","ACT","LEARN","GOVERN","完整性核心","規範與脈絡","組裝器","協作合約","共用紀錄"],"第一圈＋基本安全"],
   [2,"第 2 步","接現有引擎當積木","東西已經有，缺的是積木的合約和畫面。","未開始",["GATHER","VERIFY","COMPUTE"],"接引擎"],
   [4,"第 3 步","公共決策","多人共同程序提前到這裡：它是北極星因果鏈的第四環。研究與治理（" + GOVERN_LATER.join("、") + "）也在這一步。","未開始",["COLLAB","GOVERN"],"公共決策"],
   [3,"第 4 步","教學、表達與帶領","情境演練、角色輪替；把判斷變成給別人看的東西；帶領者的訓練和督導。","未開始",["TEACH","EXPRESS","FACILITATE"],"教學、表達與帶領"],
@@ -1502,7 +1502,7 @@ const FACETS = [
 ];
 const FACET_NAMES = FACETS.filter(f=>!f[2]).map(f=>f[0]);
 const BLOCKS = [
- {n:1, code:"SENSE", name:"外化", role:"先攤出來", status:"無", contract:"草稿", build:"未開始",
+ {n:1, code:"SENSE", name:"外化", role:"先攤出來", status:"無", contract:"草稿", build:"完成",
   example:EX_CARDS},
  {n:2, code:"GATHER", name:"蒐集來源", role:"把資料找回來，看清楚是誰說的",
   words:[["來源","一個網頁或一份文件。"],["出處","最早的源頭。五個網頁抄同一篇文章，算五個來源、一個出處。"],["管道","怎麼找到的：哪一家搜尋引擎、哪種語言，或你自己貼的。"],["蒐集器","在背後抓資料的程式。你在 VERIFY 查一則訊息時，系統也用它。"]], status:"部分", contract:"草稿", build:"未開始",
@@ -1520,28 +1520,28 @@ const BLOCKS = [
   control:["你可以加來源。","你可以把出處標成不用。標成不用的出處不會消失。要徹底刪除，請 GOVERN 抹除整個案子。","你可以把系統分的組拆開。","你可以改系統的分類，改的時候寫理由。","你可以關掉某個搜尋管道，也可以要求重抓。","搜尋引擎少於兩家、或語言少於兩種時，畫面標「管道不足」，系統停下來讓你決定。","你可以不蒐集，只用自己寫的內容。這些內容標「我自己說的，還沒有外部出處」。"],
   data:["來源卡和網頁當時的樣子跟著案子。案子抹除時一起刪。","每張來源卡記下這次用的名單和規則是哪一版。","名單和規則改版時，由 GOVERN（治理那一塊）記錄是誰改的、改了什麼。","各地的名單由當地的人參與維護。平台不單方面定。"],
   now:["今天有蒐集器，但擋不住灌水。","它會抓網頁、搜尋結果、學術資料。","它替每份來源記網址、抓取時間、誰抓的，並存一份當時的內容。","它只做三道檢查：抓到的是不是內文、講的是不是這件事、是哪一類網站。","它不查網站是誰辦的。它不查十個網站是不是同一篇。","沒列在名單上的網站，它一律放行。","檢查沒過的網頁不會進到案子裡，只在蒐集報告裡留網址和原因。在案子的畫面上你看不到，也拿不回來。這跟上面「放一旁、可以拿回來」的要求不一樣，要改。","它一次只用一家搜尋引擎。","好的一點：它抓回來的東西一律標成「有人這樣說」，從不標成事實。"]},
- {n:3, code:"MAP", name:"拆解", role:"分開看", status:"部分", contract:"未寫", build:"未開始",
+ {n:3, code:"MAP", name:"拆解", role:"分開看", status:"部分", contract:"未寫", build:"完成",
   now:"做法庫有：" + TOOL_TOTAL + " 個工具裡 " + TOOL_OF("MAP") + " 個是拆解用的（例如冰山、魚骨、SWOT），都能跑、都有檢查。" + "六層地圖、規範檢查這塊積木本身沒有。資料上「事實／法律／價值」沒有分開的欄位。"},
- {n:4, code:"THINK", name:"共思考", role:"發散、反證", status:"無", contract:"未寫", build:"未開始"},
+ {n:4, code:"THINK", name:"共思考", role:"發散、反證", status:"無", contract:"未寫", build:"完成"},
  {n:5, code:"VERIFY", name:"查證主張", role:"對來源", status:"部分", contract:"草稿", build:"未開始",
   exampleTitle:"範例：群組裡瘋傳「下週起每人每天只能提領一萬元現金，快去領」",
   example:[["我先寫","有點慌，想轉給家人。信心六成"],["拆主張","可以查的事實 2 個：政府有這個規定（法律：要寫法域、時效、來源）；下週生效。叫你去做的事 1 個：快去領、快轉傳"],["主張帳本","「有這個規定」：官方公告查不到；3 個網站有寫，合併後是同 1 個出處，網域上個月才註冊"],["傳播","兩小時內 40 多個帳號貼同一段文字，多數是這個月建立的"],["手法","用量造勢；冒充來源（寫「銀行內部通知」但沒有文件）；情緒勒索（「不轉就來不及」）"],["三件事",THREE[0] + " ✓　" + THREE[1] + " ✗　" + THREE[2] + "？我判斷：站不住（網域上個月才註冊、查不到誰辦的）"],["它要我做","去領錢、轉傳。照做的人多了，真的會出事"],["我的判定","不採信。理由：沒有官方出處，出處只有一個而且很新。轉不轉傳，在判斷和行動那兩步決定"]]},
  {n:6, code:"COMPUTE", name:"計算與模擬", role:"真的算", status:"部分", contract:"未寫", build:"未開始"},
- {n:7, code:"DECIDE", name:"判斷", role:"我的結論", status:"無", contract:"未寫", build:"未開始"},
- {n:8, code:"ACT", name:"行動與觀察", role:"做一步，持續看", status:"部分", contract:"未寫", build:"未開始"},
- {n:9, code:"LEARN", name:"回顧校準", role:"回頭對結果", status:"無", contract:"未寫", build:"未開始"},
+ {n:7, code:"DECIDE", name:"判斷", role:"我的結論", status:"無", contract:"未寫", build:"完成"},
+ {n:8, code:"ACT", name:"行動與觀察", role:"做一步，持續看", status:"部分", contract:"未寫", build:"完成"},
+ {n:9, code:"LEARN", name:"回顧校準", role:"回頭對結果", status:"無", contract:"未寫", build:"完成"},
  {n:10, code:"TEACH", name:"課程與演練", role:"每一塊用之前先練", status:"部分", contract:"未寫", build:"未開始"},
  {n:11, code:"EXPRESS", name:"產出與表達", role:"任何一步都能輸出給別人", status:"部分", contract:"未寫", build:"未開始"},
  {n:12, code:"FACILITATE", name:"帶領", role:"有人帶的時候", status:"無", contract:"未寫", build:"未開始"},
  {n:13, code:"COLLAB", name:"共同程序", role:"有別人一起決定時", status:"無", contract:"未寫", build:"未開始"},
- {n:14, code:"GOVERN", name:"安全、資料與治理", role:"全程伴隨", status:"部分", contract:"未寫", build:"未開始"},
+ {n:14, code:"GOVERN", name:"安全、資料與治理", role:"全程伴隨", status:"部分", contract:"未寫", build:"進行中"},
 ];
 const CROSS = [
- {code:"完整性核心", name:"判斷權、可修正、非操控", status:"無", contract:"未寫", build:"未開始"},
- {code:"規範與脈絡", short:"這件事所在的世界", name:"這件事所在的世界：從地理、戰爭、政治、經濟、教育到宗教、道德", status:"無", contract:"未寫", build:"未開始"},
- {code:"組裝器", name:"依目的把積木組起來", status:"部分", contract:"未寫", build:"未開始"},
- {code:"協作合約", name:"AI 這次能做什麼", status:"無", contract:"未寫", build:"未開始"},
- {code:"共用紀錄", name:"案子的紀錄＋個人歷程", status:"部分", contract:"未寫", build:"未開始",
+ {code:"完整性核心", name:"判斷權、可修正、非操控", status:"無", contract:"未寫", build:"完成"},
+ {code:"規範與脈絡", short:"這件事所在的世界", name:"這件事所在的世界：從地理、戰爭、政治、經濟、教育到宗教、道德", status:"無", contract:"未寫", build:"完成"},
+ {code:"組裝器", name:"依目的把積木組起來", status:"部分", contract:"未寫", build:"完成"},
+ {code:"協作合約", name:"AI 這次能做什麼", status:"無", contract:"未寫", build:"完成"},
+ {code:"共用紀錄", name:"案子的紀錄＋個人歷程", status:"部分", contract:"未寫", build:"完成",
   now:["今天的專案頁已經有（2026-10-02 登入正式站親自看過冰山模型那個專案）：" + RECORD_HAVE.join("；") + "。","照最低標準，今天還缺：" + RECORD_LACK.join("；") + "。"]},
 ];
 /* 積木和五樣的順序只寫在 BLOCKS、CROSS（2026-10-03 她：照關聯排）。頁面上任何一組積木或五樣都用 ORD 排；
@@ -2231,11 +2231,11 @@ document.querySelectorAll("[data-cross5]").forEach(el => { el.innerHTML = CROSS.
   const drafts = BLOCKS.filter(b=>b.contract!=="未寫").length;
   const nx = byCode(NEXT_TALK);
   $("now").innerHTML = `
-    <div><div class="k">現在在哪一步</div><div class="v">第 0 步　寫 ${NB} 份合約</div>
-      <div class="bar" role="img" aria-label="${NB} 份合約有 ${drafts} 份草稿"><i style="width:${drafts/NB*100}%"></i></div>
-      <div class="d num">積木 ${drafts} ／ ${NB} 份有草稿；全程生效的五樣 ${CROSS.filter(b=>b.contract!=="未寫").length} ／ ${CROSS.length} 份有草稿</div></div>
-    <div><div class="k">下一塊要談</div><div class="v">${pad(nx.n)}　${nx.code}　${nx.name}</div>
-      <div class="d">${NB} 份草稿都寫了，等你一塊一塊看</div></div>
+    <div><div class="k">現在在哪一步</div><div class="v">第 1 步做好了，在本機</div>
+      <div class="bar" role="img" aria-label="${NB} 塊有 ${BLOCKS.filter(b=>b.build==="完成").length} 塊建好"><i style="width:${BLOCKS.filter(b=>b.build==="完成").length/NB*100}%"></i></div>
+      <div class="d num">積木 ${BLOCKS.filter(b=>b.build==="完成").length} ／ ${NB} 塊建好；全程生效的五樣 ${CROSS.filter(b=>b.build==="完成").length} ／ ${CROSS.length} 樣建好</div></div>
+    <div><div class="k">下一步</div><div class="v">上正式站，要你同意</div>
+      <div class="d">之後是第 2 步：${BUILD[2][2]}（${BUILD[2][5].join("、")}）；合約先談 ${pad(nx.n)} ${nx.code}</div></div>
     <div><div class="k">${NB} 塊積木今天的現況</div>
       <div class="counts">${["有","部分","無"].map(s=>`<span class="st num" data-s="${s}">${G[s]} ${s} ${c(s)}</span>`).join("")}</div>
       <div class="d">全程生效的五樣：${["有","部分","無"].map(s=>s+" "+CROSS.filter(b=>b.status===s).length).join("、")}</div>

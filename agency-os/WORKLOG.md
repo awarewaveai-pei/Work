@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-04（續1）認知主權平台第 1 步蓋好（本機）：七塊＋全程生效五樣、上線前檢查通過；4 個工人整合、7 次審查全修
+- [操作者] 「不要停 直到全部做好」「繼續加速 正確」；中途問「有可以更有效率的做法嗎?」→ 答：返工來自中途改共用規則、全套測試跑太多；下一步開工前先定好共用規則再派工，全套只在最後跑。
+- [做了什麼] 提交 `cd71058f1`..`8c8a95f90`（本機 main，未部署）：
+  - 每一塊頁面：現在在哪一塊、為什麼、下一塊（`GET /projects/{id}/route`）；14 格標做過；只有外框寫「下一塊」。
+  - MAP＋規範與脈絡（甲）、THINK＋協作合約（乙）、DECIDE／ACT／LEARN（丙）、GOVERN 基本安全＋完整性核心（丁）。
+  - 整合時定一個主人：高風險詞只有 GOVERN 一個掃描器（各紀錄種類在自己的欄位宣告 labels／scan／unread_keys）；危機詞在存檔時讀到每一層、含 json 的 key；「開一個案子」只有 GOVERN 一句。
+  - AI 閘：送協作合約五格、地點預設給（合約可關 `hide_places`）、物件回答走 `ai_gateway.structured`、答案種類放不進去就在叫模型前拒絕、可讀當時的版本。
+  - 提議不引用人的字（固定句＋來源 id）；`不用` 不再問；還沒蓋的積木不能加。
+  - 刪帳號不碰別人的檔（每次寫入獨立）、不會刪一半、壞參照不卡住；三個 SQLite 都 secure_delete；從案子來的個人紀錄跟著案子刪（`DocKind.from_case`）。
+- [審查] 7 次（2 次在刪帳號＝身分／個資，一次是 vuln-verifier 實跑 PoC）：
+  - C1：危機詞換行後，AI 閘看到的是 `\n` 兩個字，沒擋住 → `safety.normalise` 把 json 的空白跳脫當空白。
+  - M（17）：還沒蓋的積木可加、提議留下人的字、MAP 少於兩個出處的事實預設會送、method_id 是自由字、地點預設相反、刪帳號刪到別人的檔、壞參照讓帳號刪不掉、加密模式的輸出留在磁碟、THINK 自己的版本 AI 回答後還能改、卡片欄位可改、系統字變護欄、回顧提醒永不消、LEARN 對到改過的判斷、不可逆的保留只在頁面、刪案子留下個人歷程、檢查放寬開了洞。
+  - 全部修了；剩下的寫在 `docs/platform/STEP1_CHECKLIST.md`（KNOWN LIMIT／NOT YET）。
+- [效率] 4 個工人並行；審查發現的問題交回寫那塊的工人修（他們熟那段程式），我修跨塊的部分。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest discover -s tests/unit -t . | exit=0 | ms=1514788
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=1c/17m/23n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=use_location | hits=4
+- BUGHUNT_SCOPE_NARROW: 命中全是測試裡「這個權限已經不在」的斷言；被移除的名稱（judgment-errors、open_case、NOT_SCANNED、nested_notices）在 agency-os、scripts、引擎都已沒有引用（STEP1_CHECKLIST 一行歷史註記除外）。
+- ORACLE_WAIVED: 7 個獨立 critic agent 審（身分／刪除 2 個、其中 1 個實跑 PoC）；工人和我共做了約 300 個單一守衛突變，每個都讓指名測試變紅。
+- 驗證：
+  - 13 個積木／地基／完整性測試模組 358 項通過；vitest 264/264；tsc 乾淨。
+  - `python -m ai_lego.platform.integrity` → 上線關卡：通過。
+  - 本機 16 頁 × 電腦寬、手機寬共 33 次載入，0 錯誤、0 橫向捲動；登出也打得開 /help。
+  - 全套引擎測試 15062 項全過（8c8a95f90，25 分鐘）。
+  - 監工台 v53（進度：第 1 步做好了，在本機）；check-supervisor PASS。
+- rollback：`git revert --no-commit cd71058f1^..8c8a95f90` 再提交一次（本機 SQLite 的新欄位不會退回；正式站沒部署，不受影響）。
+- 下一步：
+  - 上正式站，要她同意（High-STOP）。
+  - 第 2 步開工前先把共用規則定好再派工（GATHER、VERIFY、COMPUTE）。
+  - 建議模型：Opus 5.5。
 ## 2026-10-03（續7）認知主權平台第 1 步地基：每筆紀錄記作者、積木和擁有者；案子只有開的人看得到；積木文件、AI 閘、SENSE、開案頁
 - [操作者] 「不要停 直到全部做好」；「我要盡快完成系統」→ 我當監工，地基自己做，14 塊分給 4 個工人。
 - [根因] 合約要的四件事引擎都沒有：
