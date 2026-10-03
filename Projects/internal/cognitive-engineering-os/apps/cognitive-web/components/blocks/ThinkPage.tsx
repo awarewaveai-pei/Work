@@ -7,7 +7,7 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { ApiError, apiFetch } from "../../lib/api";
-import { AUTHOR, ai, docs, type Author, type Doc, type Notice } from "../../lib/blocks";
+import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { BlockShell, Notices } from "./BlockShell";
 import { ALWAYS, GRANTABLE_WORDS } from "./CollabPermissions";
@@ -68,12 +68,14 @@ export const PHASES = [
 export type Round = { problem: string; own?: string[]; role?: string; mode?: string; criteria?: string[]; reflection?: string };
 export type Card = {
   claim: string; mechanism?: string; benefit?: string; risk?: string; assumption?: string; premise?: string; fails_when?: string; round: string; role?: string; method?: string;
-  sourced?: string; batch?: string; batch_index?: number; reaction?: string; reason?: string; stance?: string; picked?: boolean;
+  sourced?: string; batch?: string; batch_index?: number;
 };
+/** Your answer to one card, kept apart from the card so an AI card stays the AI's until you change its words. */
+export type Reaction = { card: string; reaction?: string; reason?: string; stance?: string; picked?: boolean };
 type Reply = { round: string; action: string; role: string; sections?: Array<{ title: string; items: string[] }>; question?: string; premise?: string; fails_when?: string; handback?: string; sourced: string };
 type Batch = { round: string; action: string; role: string; cards?: unknown[]; question?: string; handback?: string; sourced: string };
 type Answer = { reply: string; response: string; note?: string };
-type Loaded = { rounds: Doc<Round>[]; cards: Doc<Card>[]; batches: Doc<Batch>[]; replies: Doc<Reply>[]; answers: Doc<Answer>[]; permissions: string[]; emotion: { emotion: string; intensity: string } | null };
+type Loaded = { rounds: Doc<Round>[]; cards: Doc<Card>[]; reactions: Doc<Reaction>[]; batches: Doc<Batch>[]; replies: Doc<Reply>[]; answers: Doc<Answer>[]; permissions: string[]; emotion: { emotion: string; intensity: string } | null };
 const CARD_TEXT = ["claim", "mechanism", "benefit", "risk", "assumption", "premise", "fails_when"] as const;
 const CARD_LABEL: Record<string, string> = { claim: "主張", mechanism: "機制", benefit: "可能好處", risk: "風險", assumption: "要驗證的假設", premise: "前提和適用條件", fails_when: "可能怎麼失敗" };
 
@@ -92,20 +94,18 @@ export function splitOwn(item: string): { type: string; text: string } {
 /** The server's rule too: an own item counts when something is written after its type label. */
 export const hasOwn = (items: string[] | undefined) => (items ?? []).some((item) => splitOwn(item).text !== "");
 
-export type PickHistory = { pickedAt: string; firstAuthor: Author; changed: boolean };
-/** A picked card's history from its versions: when it was first picked, who first wrote it, whether its words changed since. */
-export function pickHistory(versions: Doc<Card>[]): PickHistory | null {
-  const first = versions[0];
-  const last = versions[versions.length - 1];
-  if (!first || !last.content.picked) return null;
-  const pickedAt = versions.find((version) => version.content.picked)!.at;
-  return { pickedAt, firstAuthor: first.author, changed: CARD_TEXT.some((field) => (first.content[field] ?? "") !== (last.content[field] ?? "")) };
+export type PickHistory = { pickedAt: string; aiAsIs: boolean };
+/** A pick from its reaction's versions (when it was last put on, the card's words being the AI's until you change them); null while it is not picked. */
+export function pickHistory(versions: Doc<Reaction>[], card: Doc<Card>): PickHistory | null {
+  let pickedAt: string | null = null;
+  for (const version of versions) pickedAt = version.content.picked ? pickedAt ?? version.at : null;
+  return pickedAt ? { pickedAt, aiAsIs: card.author === "ai" } : null;
 }
 /** How many of the most recent picks, in a row, are AI cards taken without changing a word. */
 export function unchangedStreak(picks: PickHistory[]): number {
   const ordered = [...picks].sort((a, b) => a.pickedAt.localeCompare(b.pickedAt));
   let count = 0;
-  for (let index = ordered.length - 1; index >= 0 && ordered[index].firstAuthor === "ai" && !ordered[index].changed; index--) count++;
+  for (let index = ordered.length - 1; index >= 0 && ordered[index].aiAsIs; index--) count++;
   return count;
 }
 
@@ -119,7 +119,11 @@ export function thinkError(reason: unknown): string {
   return (code && THINK_ERRORS[code]) || humanError(reason);
 }
 
-const without = (content: Card, ...keys: Array<"reaction" | "reason" | "stance" | "picked">): Card => { const copy = { ...content }; for (const key of keys) delete copy[key]; return copy; };
+/** A reaction with nothing left in it (no reaction, reason, stance or pick) is not kept. */
+const tidy = (content: Reaction): Reaction | null => {
+  const kept = Object.fromEntries(Object.entries(content).filter(([, value]) => value !== undefined && value !== "" && value !== false)) as Reaction;
+  return kept.reaction || kept.reason || kept.stance || kept.picked ? kept : null;
+};
 
 function Chips<T extends string>({ options, value, onPick, label, disabled }: { options: readonly T[]; value: T | "" | undefined; onPick: (value: T) => void; label: string; disabled?: (option: T) => boolean }) {
   return (
@@ -198,11 +202,11 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const [refresh, setRefresh] = useState(0);
 
   const load = async () => {
-    const [rounds, cards, batches, replies, answers, contract, state] = await Promise.all([
-      docs.list<Round>(projectId, "think.round"), docs.list<Card>(projectId, "think.card"), docs.list<Batch>(projectId, "think.batch"), docs.list<Reply>(projectId, "think.reply"),
+    const [rounds, cards, reactions, batches, replies, answers, contract, state] = await Promise.all([
+      docs.list<Round>(projectId, "think.round"), docs.list<Card>(projectId, "think.card"), docs.list<Reaction>(projectId, "think.reaction"), docs.list<Batch>(projectId, "think.batch"), docs.list<Reply>(projectId, "think.reply"),
       docs.list<Answer>(projectId, "think.response"), docs.list<{ permissions?: string[] }>(projectId, "collab_contract.terms"), docs.list<{ emotion: string; intensity: string }>(projectId, "sense.state"),
     ]);
-    setData({ rounds, cards, batches, replies, answers, permissions: contract.at(-1)?.content.permissions ?? [], emotion: state.at(-1)?.content ?? null });
+    setData({ rounds, cards, reactions, batches, replies, answers, permissions: contract.at(-1)?.content.permissions ?? [], emotion: state.at(-1)?.content ?? null });
   };
   useEffect(() => { load().catch((reason) => setError(thinkError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -213,12 +217,16 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     setRole(current?.content.role ?? ""); setMode(current?.content.mode ?? ""); setTarget(0); setRewrite(null); setArmed(false);
   }, [roundId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const pickedKey = (data?.cards ?? []).filter((card) => card.content.picked).map((card) => `${card.doc_id}:${card.version}`).join(",");
+  // every pick still on a card of the case, with the card it points at; the streak reads the AI's cards among them
+  const picks = (data?.reactions ?? []).flatMap((reaction) => {
+    const card = data?.cards.find((item) => item.doc_id === reaction.content.card);
+    return reaction.content.picked && card ? [{ reaction, card }] : [];
+  });
+  const pickedKey = picks.map(({ reaction, card }) => `${reaction.doc_id}:${reaction.version}:${card.author}`).join(",");
   useEffect(() => {
-    if (!data) return;
     let active = true;
-    Promise.all(data.cards.filter((card) => card.content.picked).map((card) => docs.versions<Card>(projectId, "think.card", card.doc_id)))
-      .then((all) => { if (active) setStreak(unchangedStreak(all.map(pickHistory).filter((item): item is PickHistory => item !== null))); })
+    Promise.all(picks.map(({ reaction, card }) => docs.versions<Reaction>(projectId, "think.reaction", reaction.doc_id).then((versions) => pickHistory(versions, card))))
+      .then((all) => { if (active) setStreak(unchangedStreak(all.filter((item): item is PickHistory => item !== null))); })
       .catch((reason) => { if (active) setError(thinkError(reason)); });
     return () => { active = false; };
   }, [pickedKey]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -237,7 +245,8 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const roundBatches = data.batches.filter((batch) => batch.content.round === roundId);
   const savedOwn = hasOwn(current?.content.own);
   const frozen = savedOwn && roundReplies.length + roundBatches.length > 0;   // once the AI has answered your version, it stays as you wrote it
-  const picked = data.cards.filter((card) => card.content.picked);
+  const reactionOf = (card: Doc<Card>) => data.reactions.find((item) => item.content.card === card.doc_id);
+  const picked = roundCards.filter((card) => reactionOf(card)?.content.picked);
   const ownCards = roundCards.filter((card) => card.author === "user");
   const phase = PHASES[phaseAt(clock.seconds)];
   const suggestion = clock.shown && (clock.running || clock.seconds > 0) ? phase.action : "";
@@ -263,7 +272,19 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     if (turn.stopped) { setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]); return; }
     if (turn.saved?.kind === "think.batch") await apiFetch(`/projects/${encodeURIComponent(projectId)}/think/expand`, { method: "POST", body: JSON.stringify({ batch: turn.saved.doc_id }) });
   });
-  const patchCard = (doc: Doc<Card>, content: Card) => act(async () => { setNotices((await docs.update(projectId, "think.card", doc, content)).notices); });
+  // ``patch`` goes onto the card's one reaction; clearing the last thing in it removes the reaction
+  const react = (card: Doc<Card>, patch: Partial<Reaction>) => act(async () => {
+    const held = reactionOf(card);
+    const content = tidy({ ...(held?.content ?? { card: card.doc_id }), ...patch });
+    if (!content) { if (held) await docs.remove(projectId, "think.reaction", held.doc_id); return; }
+    const saved = held ? await docs.update(projectId, "think.reaction", held, content) : await docs.create(projectId, "think.reaction", content);
+    setNotices(saved.notices);
+  });
+  const removeCard = async (card: Doc<Card>) => {
+    const held = reactionOf(card);
+    if (held) await docs.remove(projectId, "think.reaction", held.doc_id);
+    await docs.remove(projectId, "think.card", card.doc_id);
+  };
   const saveOwnCard = (card: Card, doc?: Doc<Card>) => act(async () => {
     const saved = doc ? await docs.update(projectId, "think.card", doc, { ...doc.content, ...card }) : await docs.create(projectId, "think.card", { ...card, round: roundId! });
     setNotices(saved.notices); setEditing(null);
@@ -279,7 +300,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     for (const item of data.answers.filter((entry) => replyIds.has(entry.content.reply))) await docs.remove(projectId, "think.response", item.doc_id);
     for (const item of roundReplies) await docs.remove(projectId, "think.reply", item.doc_id);
     for (const item of roundBatches) await docs.remove(projectId, "think.batch", item.doc_id);
-    for (const item of roundCards) await docs.remove(projectId, "think.card", item.doc_id);
+    for (const item of roundCards) await removeCard(item);
     await docs.remove(projectId, "think.round", current.doc_id);
     return () => setPick("");
   });
@@ -302,31 +323,35 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const messageFor = (reply: Doc<Reply>) => data.answers.filter((entry) => entry.content.reply === reply.doc_id).at(-1)?.content;
   const unpickedFull = picked.length >= MAX_PICKED;
 
-  const cardView = (doc: Doc<Card>) => editing === doc.doc_id ? (
-    <div key={doc.doc_id} className="mcard now"><CardForm initial={doc.content} busy={busy} onSave={(card) => saveOwnCard(card, doc)} onCancel={() => setEditing(null)} /></div>
-  ) : (
-    <div key={doc.doc_id} className="mcard">
-      <span className="tags"><span>{AUTHOR[doc.author]}</span>{doc.content.sourced && <span>{doc.content.sourced}</span>}{doc.content.role && <span>{doc.content.role}</span>}{doc.content.method && <span>{doc.content.method}</span>}{doc.content.picked && <span>你選了這張</span>}</span>
-      <b>{doc.content.claim}</b>
-      {CARD_TEXT.slice(1).filter((field) => doc.content[field]).map((field) => <span key={field}><span className="k">{CARD_LABEL[field]}：</span>{doc.content[field]}</span>)}
-      <span className="k">你覺得怎麼樣？</span>
-      <Chips options={REACTIONS} value={doc.content.reaction as (typeof REACTIONS)[number] | undefined} label="你的反應"
-        onPick={(reaction) => patchCard(doc, doc.content.reaction === reaction ? without(doc.content, "reaction") : { ...doc.content, reaction })} />
-      <label className="k" htmlFor={`reason-${doc.doc_id}`}>原因（寫了才存）</label>
-      <textarea id={`reason-${doc.doc_id}`} key={`${doc.doc_id}-${doc.version}`} defaultValue={doc.content.reason ?? ""} maxLength={1000}
-        onBlur={(event) => { const reason = event.target.value.trim(); if (reason !== (doc.content.reason ?? "")) patchCard(doc, reason ? { ...doc.content, reason } : without(doc.content, "reason")); }} />
-      {doc.content.role === "反方教練" && (
-        <><span className="k">你的回應</span><Chips options={STANCES} value={doc.content.stance as (typeof STANCES)[number] | undefined} label="對反方的回應"
-          onPick={(stance) => patchCard(doc, doc.content.stance === stance ? without(doc.content, "stance") : { ...doc.content, stance })} /></>
-      )}
-      <div className="btns">
-        <button className={`btn${doc.content.picked ? " primary" : ""}`} type="button" aria-pressed={Boolean(doc.content.picked)} disabled={busy || (!doc.content.picked && unpickedFull)}
-          onClick={() => patchCard(doc, doc.content.picked ? without(doc.content, "picked") : { ...doc.content, picked: true })}>{doc.content.picked ? "取消選這張" : "選這張帶走"}</button>
-        <button className="btn ghost" type="button" onClick={() => setEditing(doc.doc_id)}>改寫</button>
-        <button className="btn ghost" type="button" disabled={busy} onClick={() => act(async () => { await docs.remove(projectId, "think.card", doc.doc_id); })}>刪掉</button>
+  const cardView = (doc: Doc<Card>) => {
+    const mine = reactionOf(doc);
+    const given = mine?.content ?? ({ card: doc.doc_id } as Reaction);
+    return editing === doc.doc_id ? (
+      <div key={doc.doc_id} className="mcard now"><CardForm initial={doc.content} busy={busy} onSave={(card) => saveOwnCard(card, doc)} onCancel={() => setEditing(null)} /></div>
+    ) : (
+      <div key={doc.doc_id} className="mcard">
+        <span className="tags"><span>{AUTHOR[doc.author]}</span>{doc.content.sourced && <span>{doc.content.sourced}</span>}{doc.content.role && <span>{doc.content.role}</span>}{doc.content.method && <span>{doc.content.method}</span>}{given.picked && <span>你選了這張</span>}</span>
+        <b>{doc.content.claim}</b>
+        {CARD_TEXT.slice(1).filter((field) => doc.content[field]).map((field) => <span key={field}><span className="k">{CARD_LABEL[field]}：</span>{doc.content[field]}</span>)}
+        <span className="k">你覺得怎麼樣？</span>
+        <Chips options={REACTIONS} value={given.reaction as (typeof REACTIONS)[number] | undefined} label="你的反應" disabled={() => busy}
+          onPick={(reaction) => react(doc, { reaction: given.reaction === reaction ? undefined : reaction })} />
+        <label className="k" htmlFor={`reason-${doc.doc_id}`}>原因（寫了才存）</label>
+        <textarea id={`reason-${doc.doc_id}`} key={`${doc.doc_id}-${mine?.version ?? 0}`} defaultValue={given.reason ?? ""} maxLength={1000}
+          onBlur={(event) => { const reason = event.target.value.trim(); if (reason !== (given.reason ?? "")) react(doc, { reason: reason || undefined }); }} />
+        {doc.content.role === "反方教練" && (
+          <><span className="k">你的回應</span><Chips options={STANCES} value={given.stance as (typeof STANCES)[number] | undefined} label="對反方的回應" disabled={() => busy}
+            onPick={(stance) => react(doc, { stance: given.stance === stance ? undefined : stance })} /></>
+        )}
+        <div className="btns">
+          <button className={`btn${given.picked ? " primary" : ""}`} type="button" aria-pressed={Boolean(given.picked)} disabled={busy || (!given.picked && unpickedFull)}
+            onClick={() => react(doc, { picked: given.picked ? undefined : true })}>{given.picked ? "取消選這張" : "選這張帶走"}</button>
+          <button className="btn ghost" type="button" onClick={() => setEditing(doc.doc_id)}>改寫</button>
+          <button className="btn ghost" type="button" disabled={busy} onClick={() => act(async () => { await removeCard(doc); })}>刪掉</button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const replyView = (doc: Doc<Reply>) => {
     const given = messageFor(doc);
@@ -437,7 +462,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
         <div className="top"><h2>思考卡 <small>{roundCards.length} 張</small></h2>
           <button className="btn" type="button" disabled={Boolean(blocked("counter")) || busy} onClick={() => ask("counter", { target })}>請當最強的反方</button>
         </div>
-        <p className="how">每張卡標上你的反應和原因。你自己選三張帶到下一步；AI 的卡也可以改寫、不選。你自己至少再加兩張：{ownCards.length} / {MIN_OWN_CARDS}。你選了 {picked.length} / {MAX_PICKED} 張。</p>
+        <p className="how">每張卡標上你的反應和原因。你自己選三張帶到下一步；AI 的卡也可以改寫、不選。你自己至少再加兩張：{ownCards.length} / {MIN_OWN_CARDS}。這一輪你選了 {picked.length} / {MAX_PICKED} 張。</p>
         {streak >= STREAK_REMINDER && <p className="warn" role="status">你連續 {streak} 次，把 AI 的卡一個字沒改就選下來。先寫一張你自己的卡，再決定要不要選它。（這是系統的提醒，不是 AI 說的。）</p>}
         {unexpanded.map((batch) => <div key={batch.doc_id} className="btns"><span className="sub">AI 給的一批卡還沒展開。</span><button className="btn" type="button" disabled={busy} onClick={() => act(async () => { await apiFetch(`/projects/${encodeURIComponent(projectId)}/think/expand`, { method: "POST", body: JSON.stringify({ batch: batch.doc_id }) }); })}>展開成卡</button></div>)}
         {roundBatches.filter((batch) => batch.content.handback).map((batch) => <p key={batch.doc_id} className="warn">AI 這次把控制交還給你：{batch.content.handback}{batch.content.question ? ` 它問：${batch.content.question}` : ""}</p>)}
@@ -473,7 +498,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
             {grouped("假設", [...ownItems.filter((item) => item.type === "假設或替代解釋").map((item) => item.text), ...roundCards.map((card) => card.content.assumption ?? "").filter(Boolean)])}
             {grouped("證據", ownItems.filter((item) => item.type === "觀察" || item.type === "會改變判斷的證據條件").map((item) => `${item.type}：${item.text}`))}
             {grouped("情緒訊號", data.emotion ? [`${data.emotion.emotion}（${data.emotion.intensity}）`] : [])}
-            {grouped("選項", roundCards.map((card) => `${card.content.picked ? "（選了）" : ""}${card.content.claim}`))}
+            {grouped("選項", roundCards.map((card) => `${reactionOf(card)?.content.picked ? "（選了）" : ""}${card.content.claim}`))}
             {grouped("判準", current.content.criteria ?? [])}
           </div>
         </div>

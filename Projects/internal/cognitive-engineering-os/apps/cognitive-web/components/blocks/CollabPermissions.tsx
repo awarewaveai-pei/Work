@@ -16,12 +16,13 @@ export const GRANTABLE_WORDS: Record<string, string> = {
   rank: "排序（只是參考）",
   counter: "當反方",
   direct_advice: "給直接建議",
-  use_location: "知道發生地和你在哪裡",
 };
+// Not a permission: the places go to the AI unless you hold them back (hide_places).
+export const HIDE_PLACES_WORDS = "不讓 AI 知道發生地和你在哪裡";
 export const SCOPES = ["釐清", "探索", "比較", "做決定"] as const;
 export const KIND = "collab_contract.terms";
 
-export type Terms = { scope?: string; human_parts?: string; permissions?: string[]; basis?: string; handback?: string };
+export type Terms = { scope?: string; human_parts?: string; permissions?: string[]; basis?: string; handback?: string; hide_places?: boolean };
 const TEXT_FIELDS: Array<[keyof Terms, string]> = [["scope", "這次做什麼、決定到哪裡"], ["human_parts", "人不可委託的部分"], ["basis", "依據與脈絡"], ["handback", "交還控制的條件"]];
 // The permissions a block's AI turns may ask for; a block not listed here shows all six.
 const RELEVANT: Record<string, string[]> = { THINK: ["counter", "propose_options", "direct_advice"] };
@@ -35,6 +36,7 @@ export function describeChange(before: Terms | null, after: Terms): string[] {
     if (now.has(key) && !was.has(key)) changes.push(`准了「${words}」`);
     if (!now.has(key) && was.has(key)) changes.push(`收回「${words}」`);
   }
+  if (Boolean(before?.hide_places) !== Boolean(after.hide_places)) changes.push(after.hide_places ? `選了「${HIDE_PLACES_WORDS}」` : `不再選「${HIDE_PLACES_WORDS}」`);
   for (const [field, name] of TEXT_FIELDS) {
     const old = (before?.[field] as string | undefined) ?? "";
     const next = (after[field] as string | undefined) ?? "";
@@ -61,7 +63,7 @@ export function useContract(projectId: string) {
   const save = async (content: Terms): Promise<boolean> => {
     setBusy(true); setError("");
     try {
-      const clean = Object.fromEntries(Object.entries(content).filter(([, value]) => value !== "" && !(Array.isArray(value) && value.length === 0))) as Terms;
+      const clean = Object.fromEntries(Object.entries(content).filter(([, value]) => value !== "" && value !== false && !(Array.isArray(value) && value.length === 0))) as Terms;
       setDoc(doc ? await docs.update(projectId, KIND, doc, clean) : await docs.create(projectId, KIND, clean));
       return true;
     } catch (reason) {
@@ -87,6 +89,15 @@ export function PermissionChips({ value, onChange, only }: { value: string[]; on
   );
 }
 
+/** The one switch that holds the places back from the AI, a visible button (no <select>). */
+export function PlacesToggle({ value, onChange }: { value: boolean; onChange: (next: boolean) => void }) {
+  return (
+    <div className="chips" role="group" aria-label="發生地和你在哪裡">
+      <button type="button" className={`chip${value ? " on" : ""}`} aria-pressed={value} onClick={() => onChange(!value)}>{value ? "已選：" : "沒選："}{HIDE_PLACES_WORDS}</button>
+    </div>
+  );
+}
+
 /** The AI's permissions in one line (「畫面上一直看得到 AI 現在的權限」). */
 export function CollabPermissions({ projectId }: { projectId: string }) {
   const { doc, error } = useContract(projectId);
@@ -95,7 +106,7 @@ export function CollabPermissions({ projectId }: { projectId: string }) {
   const { granted } = allowedNow(doc?.content);
   return (
     <div className="carried" aria-label="AI 現在的權限">
-      <b>AI 現在能做：</b>{ALWAYS_WORDS}{granted.length > 0 ? `；你另外准了：${granted.map((key) => GRANTABLE_WORDS[key]).join("、")}` : "；其他的你還沒准"}。{" "}
+      <b>AI 現在能做：</b>{ALWAYS_WORDS}{granted.length > 0 ? `；你另外准了：${granted.map((key) => GRANTABLE_WORDS[key]).join("、")}` : "；其他的你還沒准"}。{doc?.content.hide_places ? " 你不讓它知道發生地和你在哪裡。" : ""}{" "}
       <Link href={`/projects/${encodeURIComponent(projectId)}/contract`}>改</Link>
     </div>
   );

@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiFetch } from "../../lib/api";
 import type { Author, Doc } from "../../lib/blocks";
-import { PHASES, ThinkPage, hasOwn, ownItem, phaseAt, pickHistory, splitOwn, thinkError, unchangedStreak, type Card, type PickHistory } from "./ThinkPage";
+import { PHASES, ThinkPage, hasOwn, ownItem, phaseAt, pickHistory, splitOwn, thinkError, unchangedStreak, type Card, type PickHistory, type Reaction } from "./ThinkPage";
 
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -49,26 +49,27 @@ describe("your own version", () => {
 });
 
 describe("accepting the AI's cards unchanged", () => {
-  const text = { claim: "先談條件", mechanism: "m", benefit: "b", risk: "r", assumption: "a", round: "R" };
-  const version = (author: Author, n: number, content: Partial<Card>, at: string) => doc<Card>("think.card", "K", { ...text, ...content }, author, n, at);
+  const card = (author: Author) => doc<Card>("think.card", "K", { claim: "先談條件", mechanism: "m", round: "R" }, author);
+  const reaction = (n: number, content: Partial<Reaction>, at: string) => doc<Reaction>("think.reaction", "X", { card: "K", ...content }, "user", n, at);
 
-  it("reads a pick's history from its versions: when picked, who first wrote it, whether a word changed", () => {
-    const untouched = [version("ai", 1, {}, "2026-10-03T08:00:00Z"), version("joint", 2, { reaction: "共鳴", picked: true }, "2026-10-03T08:05:00Z")];
-    expect(pickHistory(untouched)).toEqual({ pickedAt: "2026-10-03T08:05:00Z", firstAuthor: "ai", changed: false });
-    const edited = [...untouched, version("joint", 3, { reaction: "共鳴", picked: true, claim: "先談條件，再談期限" }, "2026-10-03T08:09:00Z")];
-    expect(pickHistory(edited)?.changed).toBe(true);
-    expect(pickHistory([version("user", 1, { picked: true }, "2026-10-03T08:01:00Z")])).toEqual({ pickedAt: "2026-10-03T08:01:00Z", firstAuthor: "user", changed: false });
-    expect(pickHistory([version("ai", 1, {}, "2026-10-03T08:00:00Z")])).toBeNull();
+  it("reads a pick from its reaction's versions: when it was put on, and whether the card is still the AI's words", () => {
+    const picked = [reaction(1, { reaction: "共鳴" }, "2026-10-03T08:00:00Z"), reaction(2, { reaction: "共鳴", picked: true }, "2026-10-03T08:05:00Z"), reaction(3, { picked: true }, "2026-10-03T08:09:00Z")];
+    expect(pickHistory(picked, card("ai"))).toEqual({ pickedAt: "2026-10-03T08:05:00Z", aiAsIs: true });   // the first time it was put on, not the latest save
+    expect(pickHistory(picked, card("joint"))?.aiAsIs).toBe(false);   // you changed its words
+    expect(pickHistory(picked, card("user"))?.aiAsIs).toBe(false);
+    const takenBack = [...picked, reaction(4, { reaction: "共鳴" }, "2026-10-03T08:12:00Z")];
+    expect(pickHistory(takenBack, card("ai"))).toBeNull();
+    expect(pickHistory([...takenBack, reaction(5, { picked: true }, "2026-10-03T08:20:00Z")], card("ai"))?.pickedAt).toBe("2026-10-03T08:20:00Z");   // picked again = a new pick
+    expect(pickHistory([], card("ai"))).toBeNull();
   });
 
   it("counts the latest picks in a row that are AI cards taken as they were; your own card or an edit breaks the run", () => {
-    const aiAsIs = (pickedAt: string): PickHistory => ({ pickedAt, firstAuthor: "ai", changed: false });
-    const mine: PickHistory = { pickedAt: "2026-10-03T09:00:00Z", firstAuthor: "user", changed: false };
+    const aiAsIs = (pickedAt: string): PickHistory => ({ pickedAt, aiAsIs: true });
+    const mine = (pickedAt: string): PickHistory => ({ pickedAt, aiAsIs: false });
     expect(unchangedStreak([])).toBe(0);
     expect(unchangedStreak([aiAsIs("2026-10-03T08:00:00Z"), aiAsIs("2026-10-03T08:10:00Z")])).toBe(2);
-    expect(unchangedStreak([aiAsIs("2026-10-03T10:00:00Z"), mine, aiAsIs("2026-10-03T08:00:00Z")])).toBe(1);   // order is by when picked, not by the list
-    expect(unchangedStreak([aiAsIs("2026-10-03T08:00:00Z"), { ...aiAsIs("2026-10-03T08:10:00Z"), changed: true }])).toBe(0);
-    expect(unchangedStreak([aiAsIs("2026-10-03T08:00:00Z"), aiAsIs("2026-10-03T08:10:00Z"), mine])).toBe(0);
+    expect(unchangedStreak([aiAsIs("2026-10-03T10:00:00Z"), mine("2026-10-03T09:00:00Z"), aiAsIs("2026-10-03T08:00:00Z")])).toBe(1);   // order is by when picked, not by the list
+    expect(unchangedStreak([aiAsIs("2026-10-03T08:00:00Z"), aiAsIs("2026-10-03T08:10:00Z"), mine("2026-10-03T09:00:00Z")])).toBe(0);
   });
 });
 
@@ -121,16 +122,54 @@ describe("共思考 page", () => {
     await done();
   });
 
-  it("shows an AI card with its author and 「它自己說的」, and limits what you take along to three", async () => {
-    const aiCard = (id: string, picked = false) => doc<Card>("think.card", id, { claim: `方向${id}`, mechanism: "m", round: "R1", sourced: "它自己說的", method: "反向思考", ...(picked ? { picked: true } : {}) }, "ai");
-    serve({ "think.round": [round], "think.card": [aiCard("a", true), aiCard("b", true), aiCard("c", true), aiCard("d")] });
+  const aiCard = (id: string, at = "R1") => doc<Card>("think.card", id, { claim: `方向${id}`, mechanism: "m", round: at, sourced: "它自己說的", method: "反向思考" }, "ai");
+  const picked = (card: string) => doc<Reaction>("think.reaction", `x-${card}`, { card, reaction: "共鳴", picked: true });
+  const cardOf = (host: HTMLElement, claim: string) => [...host.querySelectorAll(".mcards .mcard")].find((item) => item.textContent?.includes(claim)) as HTMLElement;
+
+  it("shows an AI card as the AI's with 「它自己說的」 even after you reacted to it, and stops a fourth pick in the round", async () => {
+    serve({ "think.round": [round], "think.card": [aiCard("a"), aiCard("b"), aiCard("c"), aiCard("d")], "think.reaction": [picked("a"), picked("b"), picked("c")] });
     const { host, done } = await mount(<ThinkPage projectId="P" />);
-    const fourth = [...host.querySelectorAll(".mcards .mcard")].find((card) => card.textContent?.includes("方向d"))!;
-    expect(fourth.textContent).toContain("AI 寫的");
-    expect(fourth.textContent).toContain("它自己說的");
-    expect((button(fourth as HTMLElement, "選這張帶走")).disabled).toBe(true);
-    expect(host.textContent).toContain("你選了 3 / 3 張");
+    const first = cardOf(host, "方向a");
+    expect(first.textContent).toContain("AI 寫的");
+    expect(first.textContent).not.toContain("AI 起草、你改過");
+    expect(first.textContent).toContain("你選了這張");
+    expect(first.textContent).toContain("它自己說的");
+    expect(button(cardOf(host, "方向d"), "選這張帶走").disabled).toBe(true);
+    expect(host.textContent).toContain("這一輪你選了 3 / 3 張");
     expect(host.textContent).toContain("你自己至少再加兩張：0 / 2");
+    await done();
+  });
+
+  it("counts only this round's picks: three picks in an older round do not block this one", async () => {
+    const older = doc("think.round", "R0", { problem: "上一次的問題" });
+    serve({ "think.round": [older, round], "think.card": [aiCard("a", "R0"), aiCard("b", "R0"), aiCard("c", "R0"), aiCard("d")], "think.reaction": [picked("a"), picked("b"), picked("c")] });
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    expect(button(cardOf(host, "方向d"), "選這張帶走").disabled).toBe(false);
+    expect(host.textContent).toContain("這一輪你選了 0 / 3 張");
+    await done();
+  });
+
+  it("puts a pick on the card's one reaction, and takes the reaction away when nothing is left in it", async () => {
+    serve({ "think.round": [round], "think.card": [aiCard("a")] });
+    const mounted = await mount(<ThinkPage projectId="P" />);
+    vi.mocked(apiFetch).mockImplementation((async (path: string, init?: RequestInit) => (init ? { ...picked("a"), notices: [] } : [])) as never);
+    await act(async () => { button(cardOf(mounted.host, "方向a"), "選這張帶走").click(); });
+    const post = vi.mocked(apiFetch).mock.calls.find(([, init]) => init?.method === "POST")!;
+    expect([post[0], JSON.parse(post[1]!.body as string)]).toEqual(["/projects/P/docs/think.reaction", { content: { card: "a", picked: true } }]);
+    await mounted.done();
+    serve({ "think.round": [round], "think.card": [aiCard("a")], "think.reaction": [doc<Reaction>("think.reaction", "x-a", { card: "a", picked: true })] });
+    const taken = await mount(<ThinkPage projectId="P" />);
+    await act(async () => { button(cardOf(taken.host, "方向a"), "取消選這張").click(); });
+    expect(vi.mocked(apiFetch).mock.calls.some(([path, init]) => path === "/projects/P/docs/think.reaction/x-a" && init?.method === "DELETE")).toBe(true);
+    await taken.done();
+  });
+
+  it("removes a card's reaction together with the card, so your reason does not outlive it", async () => {
+    serve({ "think.round": [round], "think.card": [aiCard("a")], "think.reaction": [doc<Reaction>("think.reaction", "x-a", { card: "a", reason: "太貴了" })] });
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    await act(async () => { button(cardOf(host, "方向a"), "刪掉").click(); });
+    const deleted = vi.mocked(apiFetch).mock.calls.filter(([, init]) => init?.method === "DELETE").map(([path]) => path);
+    expect(deleted).toEqual(["/projects/P/docs/think.reaction/x-a", "/projects/P/docs/think.card/a"]);
     await done();
   });
 });

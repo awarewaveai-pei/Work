@@ -100,6 +100,21 @@ class ThinkApiTests(ProjectSourceApiTestCase):
     def _cards(self) -> list[dict]:
         return self.client.get(f"{self.base}/docs/think.card").json()
 
+    def _card(self, round_id: str, claim: str = "我自己的想法", pid: str | None = None) -> dict:
+        response = self.client.post(f"/projects/{pid or self.pid}/docs/think.card", json={"content": {"claim": claim, "round": round_id}})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def _react(self, card: dict, expect: int = 200, **fields) -> dict:
+        response = self.client.post(f"{self.base}/docs/think.reaction", json={"content": {"card": card["doc_id"], **fields}})
+        self.assertEqual(response.status_code, expect, response.text)
+        return response.json()
+
+    def _put_reaction(self, reaction: dict, content: dict, expect: int = 200) -> dict:
+        response = self.client.put(f"{self.base}/docs/think.reaction/{reaction['doc_id']}", json={"content": content, "base_version": reaction["version"]})
+        self.assertEqual(response.status_code, expect, response.text)
+        return response.json()
+
     # -- 先想再看 -----------------------------------------------------------------------------------------------------------
     def test_the_ai_waits_for_my_own_version(self):
         self._grant(*collab_contract.GRANTABLE)
@@ -185,6 +200,16 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         versions = self.client.get(f"{self.base}/docs/collab_contract.terms/{self.contract['doc_id']}/versions").json()
         self.assertEqual([item["content"].get("permissions") for item in versions], [["counter"], None])
 
+    def test_the_places_switch_is_a_version_of_the_contract_like_every_other_change(self):
+        self._grant("counter")
+        url = f"{self.base}/docs/collab_contract.terms/{self.contract['doc_id']}"
+        held_back = self.client.put(url, json={"content": {"permissions": ["counter"], "hide_places": True}, "base_version": 1})
+        self.assertEqual(held_back.status_code, 200, held_back.text)
+        self.assertEqual(self.client.put(url, json={"content": {"permissions": ["counter"], "hide_places": "yes"}, "base_version": 2}).status_code, 400)
+        self.assertEqual(self.client.put(url, json={"content": {"permissions": ["counter"]}, "base_version": 2}).status_code, 200)
+        versions = self.client.get(f"{url}/versions").json()
+        self.assertEqual([item["content"].get("hide_places") for item in versions], [None, True, None])
+
     # -- 它自己說的 -------------------------------------------------------------------------------------------------------------
     def test_nothing_the_ai_says_has_a_source(self):
         round_ = self._round()
@@ -251,7 +276,6 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         found = self._cards()
         self.assertEqual(len(found), 10)
         self.assertEqual({(card["author"], card["block"], card["content"]["round"], card["content"]["role"], card["content"]["batch"]) for card in found}, {("ai", "THINK", round_["doc_id"], "發散夥伴", batch["doc_id"])})
-        self.assertTrue(all("reaction" not in card["content"] and "picked" not in card["content"] for card in found))
         self.assertEqual(self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]}).json(), {"created": 0})
         self.client.delete(f"{self.base}/docs/think.card/{found[0]['doc_id']}")
         self.assertEqual(self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]}).json(), {"created": 0})
@@ -268,18 +292,73 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         self.assertEqual(self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]}).status_code, 404)
         self.assertEqual(self.client.get(f"{self.base}/docs/think.round").status_code, 404)
 
-    def test_my_reaction_on_an_ai_card_keeps_its_first_version_the_ais(self):
+    def test_my_reaction_is_my_own_record_and_the_ai_card_stays_the_ais(self):
         self._grant("counter")
         batch = self._answer("counter", self._round()["doc_id"])
         self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]})
         card = self._cards()[0]
-        reacted = self.client.put(f"{self.base}/docs/think.card/{card['doc_id']}", json={"content": {**card["content"], "reaction": "反感", "reason": "他只是想談價", "stance": "維持", "picked": True}, "base_version": 1}).json()
-        self.assertEqual(reacted["author"], "joint")
-        versions = self.client.get(f"{self.base}/docs/think.card/{card['doc_id']}/versions").json()
-        self.assertEqual([version["author"] for version in versions], ["ai", "joint"])
-        text = ("claim", "mechanism", "benefit", "risk", "assumption")
-        self.assertEqual({key: versions[0]["content"].get(key) for key in text}, {key: versions[1]["content"].get(key) for key in text})
-        self.assertNotIn("reaction", versions[0]["content"])
+        reacted = self._react(card, reaction="反感", reason="他只是想談價", stance="維持", picked=True)
+        self.assertEqual((reacted["kind"], reacted["author"], reacted["block"]), ("think.reaction", "user", "THINK"))
+        after = self._cards()[0]
+        self.assertEqual((after["author"], after["version"], after["content"]), ("ai", 1, card["content"]))   # still the AI's words, untouched
+        self.assertEqual({"reaction", "reason", "stance", "picked"} & set(doc_kinds.require("think.card").fields), set())
+        edited = self.client.put(f"{self.base}/docs/think.card/{card['doc_id']}", json={"content": {**card["content"], "claim": "我改過的主張"}, "base_version": 1}).json()
+        self.assertEqual(edited["author"], "joint")   # only changing its words makes it 共同
+        self.assertTrue(self.client.get(f"{self.base}/docs/think.reaction").json()[0]["content"]["picked"])
+
+    def test_only_i_write_a_reaction_and_it_has_the_fields_the_card_names(self):
+        spec = doc_kinds.require("think.reaction")
+        self.assertEqual(spec.authors, frozenset({"user"}))
+        self.assertEqual(set(spec.fields), {"card", "reaction", "reason", "stance", "picked"})
+        with self.assertRaisesRegex(InvariantViolation, "RECORD_AUTHOR_NOT_ALLOWED"):
+            doc_kinds.check_record("DocSaved", {"kind": "think.reaction", "content": {"card": "x"}}, "ai", "THINK", "case")
+        card = self._card(self._round()["doc_id"])
+        for bad in ({"reaction": "喜歡"}, {"stance": "同意"}, {"picked": "yes"}, {"score": 3}):
+            response = self.client.post(f"{self.base}/docs/think.reaction", json={"content": {"card": card["doc_id"], **bad}})
+            self.assertEqual(response.status_code, 400, (bad, response.text))
+
+    def test_a_reaction_points_at_a_card_of_this_case(self):
+        mine = self._card(self._round()["doc_id"])
+        other = self._create_project(name="另一個案子")["project_id"]
+        elsewhere = self._card(self._round(pid=other)["doc_id"], pid=other)
+        for content in ({"card": elsewhere["doc_id"], "picked": True}, {"card": "no-such-card"}, {"card": ["x"]}, {"picked": True}):
+            refused = self.client.post(f"{self.base}/docs/think.reaction", json={"content": content})
+            self.assertEqual(refused.status_code, 404, (content, refused.text))
+            self.assertIn("THINK_CARD_NOT_FOUND", refused.json()["detail"])
+        self.client.delete(f"{self.base}/docs/think.card/{mine['doc_id']}")
+        self.assertEqual(self._react(mine, 404, picked=True)["detail"][:20], "THINK_CARD_NOT_FOUND")
+        self.assertEqual(self.client.get(f"{self.base}/docs/think.reaction").json(), [])
+
+    def test_one_reaction_per_card_and_it_stays_with_its_card(self):
+        round_ = self._round()["doc_id"]
+        first, second = self._card(round_, "一"), self._card(round_, "二")
+        mine = self._react(first, reaction="共鳴")
+        self.assertIn("THINK_REACTION_ALREADY_GIVEN", self._react(first, 409, reason="再一個")["detail"])
+        mine = self._put_reaction(mine, {"card": first["doc_id"], "reaction": "反感", "reason": "改了"})
+        self.assertIn("THINK_REACTION_CARD_FIXED", self._put_reaction(mine, {"card": second["doc_id"], "reaction": "反感"}, 400)["detail"])
+        theirs = self._react(second, picked=True)
+        self.assertIn("THINK_REACTION_ALREADY_GIVEN", self._put_reaction(theirs, {"card": first["doc_id"], "picked": True}, 409)["detail"])
+        self.assertEqual(sorted(item["content"]["card"] for item in self.client.get(f"{self.base}/docs/think.reaction").json()), sorted([first["doc_id"], second["doc_id"]]))
+
+    def test_at_most_three_picks_in_a_round(self):
+        round_, next_round = self._round()["doc_id"], self._round(problem="另一個問題")["doc_id"]
+        cards = [self._card(round_, f"卡{index}") for index in range(5)]
+        picks = [self._react(card, picked=True) for card in cards[:3]]
+        maybe = self._react(cards[3], reaction="共鳴", reason="先不選")   # a reaction that picks nothing is fine
+        refused = self._put_reaction(maybe, {"card": cards[3]["doc_id"], "picked": True}, 400)
+        self.assertIn("THINK_PICK_LIMIT", refused["detail"])
+        self._react(self._card(next_round, "另一輪的卡"), picked=True)   # the limit is per round
+        self._put_reaction(picks[0], {"card": cards[0]["doc_id"], "picked": True, "reason": "還是選這張"})   # saving a picked one again is not a fourth
+        self.client.delete(f"{self.base}/docs/think.card/{cards[2]['doc_id']}")   # a pick on a card that is gone counts for nothing
+        self._put_reaction(maybe, {"card": cards[3]["doc_id"], "picked": True})
+        self.assertIn("THINK_PICK_LIMIT", self._react(cards[4], 400, picked=True)["detail"])
+        self._put_reaction(picks[1], {"card": cards[1]["doc_id"], "reaction": "共鳴"})   # take one back: there is room again
+        self._react(cards[4], picked=True)
+
+    def test_a_reason_on_a_reaction_can_ask_govern_for_guardrails(self):
+        card = self._card(self._round(problem="換工作")["doc_id"])
+        reacted = self._react(card, reason="我怕被告，要找律師")
+        self.assertEqual([notice["category"] for notice in reacted["notices"] if notice["type"] == "guardrail"], ["法律"])
 
     def test_a_card_i_write_is_mine_and_needs_its_round(self):
         round_ = self._round()
@@ -384,11 +463,11 @@ class ThinkApiTests(ProjectSourceApiTestCase):
     def test_every_turn_reads_only_what_the_card_allows(self):
         thinks = {key: action for key, action in ai_gate.actions().items() if key[0] == "THINK"}
         self.assertEqual(len(thinks), 9)
-        allowed = {"think.round", "think.card", "map.map", "sense.card"}
+        allowed = {"think.round", "think.card", "think.reaction", "map.map", "sense.card"}
         for key, action in thinks.items():
             self.assertEqual(set(action.reads), allowed, key)
         round_doc = {"doc_id": "R1", "kind": "think.round", "author": "user", "content": {"problem": "要不要接", "own": ["觀察：他改了條件"], "criteria": ["能反悔"]}}
-        data = {"think.round": [round_doc], "think.card": [], "map.map": [], "sense.card": [{"content": {"category": "恐懼", "text": "怕被騙"}}]}
+        data = {"think.round": [round_doc], "think.card": [], "think.reaction": [], "map.map": [], "sense.card": [{"content": {"category": "恐懼", "text": "怕被騙"}}]}
         for key, action in thinks.items():
             asked: list[str] = []
 
@@ -406,7 +485,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         good = {"doc_id": "M", "author": "user", "content": {"layers": {"facts": [{"text": "他改了三次", "self_said": True}, {"text": "合約簽了"}], "interests": ["他要現金流"]}, "claims": [{"text": "合約有效", "kind": "法律"}],
                                                              "core_conflict": "我要尊重還是要錢", "unwinnable": True}}
         def message(maps):
-            data = {"think.round": [round_doc], "think.card": [], "map.map": maps, "sense.card": sense}
+            data = {"think.round": [round_doc], "think.card": [], "think.reaction": [], "map.map": maps, "sense.card": sense}
             return actions._message({"round": "R1"}, lambda kind: data[kind])
         shown = message([good])
         self.assertIn("他改了三次", shown)
@@ -419,8 +498,9 @@ class ThinkApiTests(ProjectSourceApiTestCase):
 
     def test_only_my_picks_and_my_reflection_go_to_the_look_back(self):
         round_ = self._round()
-        mine = self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "我選這個", "round": round_["doc_id"], "picked": True, "reaction": "共鳴", "reason": "因為便宜"}}).json()
-        self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "我沒選的", "round": round_["doc_id"]}})
+        mine = self._card(round_["doc_id"], "我選這個")
+        self._card(round_["doc_id"], "我沒選的")
+        self._react(mine, reaction="共鳴", reason="因為便宜", picked=True)
         self._set_round(round_, reflection="我太快相信第一個想法")
         self._answer("look_back", round_["doc_id"])
         sent = self.provider.calls[-1][1]
@@ -429,6 +509,17 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         self.assertIn("我太快相信第一個想法", sent)
         self.assertNotIn("我沒選的", sent)
         self.assertEqual(mine["author"], "user")
+
+    def test_an_ai_card_i_picked_goes_to_the_criteria_as_the_ais(self):
+        self._grant("propose_options")
+        round_ = self._round()
+        batch = self._answer("diverge", round_["doc_id"])
+        self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]})
+        card = self._cards()[0]
+        self._react(card, picked=True)
+        self._answer("criteria", round_["doc_id"])
+        picked = json.loads(self.provider.calls[-1][1].split("\n", 1)[1])["cards_the_person_picked"]
+        self.assertEqual([(row["by"], row["claim"]) for row in picked], [("an AI card the person kept as it was", card["content"]["claim"])])
 
 
 class ThinkWebTests(unittest.TestCase):
@@ -475,6 +566,13 @@ class ThinkWebTests(unittest.TestCase):
         self.assertEqual(words, collab_contract.GRANTABLE)
         self.assertEqual(self._list(self.contract, "ALWAYS"), list(collab_contract.ALWAYS))
         self.assertEqual(self._list(self.contract, "SCOPES"), list(doc_kinds.require("collab_contract.terms").fields["scope"].choices))
+
+    def test_the_places_switch_is_the_contracts_field_not_a_permission(self):
+        self.assertNotIn("use_location", collab_contract.GRANTABLE)
+        self.assertEqual(doc_kinds.require("collab_contract.terms").fields["hide_places"].type, "bool")
+        self.assertIn('hide_places?: boolean', self.contract)
+        self.assertNotIn("use_location", self.contract)
+        self.assertNotIn("use_location", (WEB / "ContractPage.tsx").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

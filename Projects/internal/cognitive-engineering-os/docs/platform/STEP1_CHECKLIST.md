@@ -83,7 +83,8 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 - round: you write the problem and your own version (>=1 of the six own items) first; the API refuses an AI turn for a round without one (`THINK_OWN_VERSION_REQUIRED`, `ai_actions/think.py` `_round`); the one exception is 「直接取得建議」, which needs the contract's `direct_advice`
 - 9 AI turns = 7 roles x 6 modes (mirror, diverge, counter, audit, socratic, ask_conclusion, criteria, look_back, direct_advice); the 7 command cards are one click for mode + role; a turn the contract does not grant is disabled with the reason and refused by the engine
 - diverge 8-15 directions with >=4 named methods; counter aims at the own item you mark; every AI card has the five fields, its author and 「它自己說的」 (forced by `shape`); advice carries premise + how it may fail; a hand-back replaces advice with one question; the AI asks one question at a time (kept to the first)
-- you react (共鳴/反感/不理解) with a reason, pick three, add >=2 own cards (counted on the page, not blocking), write the reflection (human-only); 25-minute 7-phase timer (client-side, can be turned off); reminder when the latest picks are AI cards taken unchanged (read from the card versions)
+- you react (共鳴/反感/不理解, 反方 cards also 修正/維持/暫停) with a reason, pick three **per round** (refused by the server: `block_hooks/think.py` BEFORE_SAVE `THINK_PICK_LIMIT`), add >=2 own cards (counted on the page, not blocking), write the reflection (human-only); 25-minute 7-phase timer (client-side, can be turned off); reminder when the latest picks are AI cards taken unchanged (from the reactions' versions + the card's author)
+- `think.reaction` {card, reaction, reason, stance, picked} = your own record pointing at a `think.card` (authors user only; one live reaction per card, fixed to its card; the card must be in this case); `think.card` keeps only the words, so an AI card stays 「AI 寫的」 until you change its words (then 共同). **DECIDE / LEARN read picks and reactions from `think.reaction`, never from `think.card`:** a pick = a reaction with `picked: true` whose `card` is a live `think.card` doc_id; the card's `round` says which round
 - own version and AI version apart (`think.round.own` vs `think.reply`/`think.batch`/AI-authored `think.card`); model + instruction hash per call = `govern.ai_call`; high-risk words in a round or card ask GOVERN for guardrails
 - NOT YET: 「有查證時…VERIFY 的主張帳本」, 找外部資料, 「有來源」 -- GATHER/VERIFY open in step 2, so every AI card is 「它自己說的」
 - NOT YET: 「AI 不排序，除非…准了」 -- THINK has no ranking turn (the three picks are yours); `rank` stays grantable for blocks that use it
@@ -92,12 +93,14 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 - NOT YET: 「現有工具 32 個…你先寫，AI 才回」 -- the 22 + 10 tools still run the old way (AI first)
 - NOT YET: 「理由與信心軌跡…權重、信心」 -- every round and card version is kept (first assumption, reasons); weight and confidence are DECIDE's judgment fields
 - NOT BUILT: 「對每項重要建議顯示…信心」 -- the card shows source, premise and how it may fail; a confidence the model states about itself is an unchecked number, so none is asked for
-- KNOWN: 「選三張」 counts per case (the interface says so), so a second round cannot pick until one pick is taken back; a reaction on an AI card makes its next version 共同 (`case_docs` counts any change), so the streak reads the words from the versions, not the tag
+- KNOWN: the pick limit and the one-reaction-per-card rule check then insert in separate transactions, so two saves at the same moment can pass both (one person, one page: not reachable from the UI)
+- KNOWN: deleting a card through the API alone leaves its reaction (and the reason text) behind -- there is no delete hook; the page removes a card's reaction with the card, and a pick on a gone card counts for nothing
 
 ## 協作合約 (乙) — built 2026-10-03
+- built: 「你也可以不讓 AI 知道發生地和你在哪裡」 as one visible switch beside the five permission chips (`hide_places` on the contract, not a permission; the engine side is S's); the one-line summary says when it is on
 - built: five fields; permissions as toggle chips in the card's words; every save = a version, listed with what it changed; `CollabPermissions` (the AI's permissions in one line) and `AskBeforeBlock` (asks once per block entry per case) exported from `components/blocks/CollabPermissions.tsx`
 - NOT YET (S): mount `CollabPermissions` and `AskBeforeBlock` in `BlockShell`; AskBeforeBlock remembers its answer in the browser, so another browser asks again
-- NOT YET (S): 「它讀：你填的五格」, 「交還控制的條件一到，AI 就停下來」, 「人不可委託的部分」 -- `ai_gate.ask_ai` uses only `allowed(terms)`; scope, human_parts, basis and handback never reach the model, and a met hand-back condition stops nothing
+- built (S, cd71058f1): 「它讀：你填的五格」, 「人不可委託的部分」, 「交還控制的條件一到，AI 就停下來」 -- the gate sends scope, human_parts, basis and handback and tells the model to stop at the hand-back condition (an instruction: whether it is met is the model's reading)
 - NOT YET: 「找外部資料」 is grantable and shown, but nothing uses it until GATHER (step 2)
 - 「AI 也不准做」 list: `ai_gate.PREAMBLE` carries no conclusion / sources apart / no law from memory / no position as the neutral one; the guardrail `professional` carries 「高風險提示專業支持」; alternatives to your story are THINK's diverge (替代假設) and counter turns; reject/override with a reason = the card reaction and `think.response`
 

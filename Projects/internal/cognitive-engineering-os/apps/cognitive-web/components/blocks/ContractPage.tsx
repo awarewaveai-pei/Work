@@ -8,9 +8,10 @@ import { docs, type Doc } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { formatTime } from "../../lib/time";
 import { BlockShell } from "./BlockShell";
-import { ALWAYS_WORDS, KIND, PermissionChips, SCOPES, describeChange, useContract, type Terms } from "./CollabPermissions";
+import { ALWAYS_WORDS, KIND, PermissionChips, PlacesToggle, SCOPES, describeChange, useContract, type Terms } from "./CollabPermissions";
 
-const same = (a: Terms, b: Terms) => JSON.stringify([a.scope ?? "", a.human_parts ?? "", [...(a.permissions ?? [])].sort(), a.basis ?? "", a.handback ?? ""]) === JSON.stringify([b.scope ?? "", b.human_parts ?? "", [...(b.permissions ?? [])].sort(), b.basis ?? "", b.handback ?? ""]);
+const key = (terms: Terms) => JSON.stringify([terms.scope ?? "", terms.human_parts ?? "", [...(terms.permissions ?? [])].sort(), terms.basis ?? "", terms.handback ?? "", Boolean(terms.hide_places)]);
+const same = (a: Terms, b: Terms) => key(a) === key(b);
 
 export function ContractPage({ projectId }: { projectId: string }) {
   const { doc, error, busy, save } = useContract(projectId);
@@ -48,7 +49,12 @@ export function ContractPage({ projectId }: { projectId: string }) {
           <b>AI 的角色與權限</b>
           <p className="hint">可不可以找資料、提出選項、排序、當反方、給直接建議？一定准的：{ALWAYS_WORDS}。</p>
           <PermissionChips value={draft.permissions ?? []} onChange={(permissions) => set({ permissions })} />
-          <p className="hint">「找外部資料」要等蒐集來源這一塊開放後才有用。不准「知道發生地和你在哪裡」時，碰到要看地點的事，AI 會說它不知道。</p>
+          <p className="hint">「找外部資料」要等蒐集來源這一塊開放後才有用。</p>
+        </div>
+        <div className="field">
+          <b>發生地和你在哪裡</b>
+          <p className="hint">平常每次呼叫 AI，系統都把這兩樣交給它。你可以不給；不給的時候，碰到要看地點的事，AI 會說它不知道。</p>
+          <PlacesToggle value={Boolean(draft.hide_places)} onChange={(hide_places) => set({ hide_places })} />
         </div>
         <div className="field">
           <label htmlFor="basis">依據與脈絡</label>

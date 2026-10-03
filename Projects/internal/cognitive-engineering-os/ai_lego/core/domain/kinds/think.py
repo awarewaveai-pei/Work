@@ -1,9 +1,9 @@
 """THINK 共思考 (contract card): the person writes first, the AI helps second. A round (``think.round``) is the person's own:
 the problem, their own version, the role and mode they picked, their candidate criteria and the look back at how they thought.
 What the AI gives back is its own kinds -- ``think.reply`` (a mirror, an audit, criteria, a question) and ``think.batch``
-(a set of cards, which ``apps/api/blocks/think.py`` lays out as one AI-authored ``think.card`` each, so every card carries its own
-reaction and pick). The person answers a reply with ``think.response``. Your own version and the AI-assisted one are never
-the same document."""
+(a set of cards, which ``apps/api/blocks/think.py`` lays out as one AI-authored ``think.card`` each, so every card can get its own
+reaction and pick). The person answers a card with ``think.reaction`` and a reply with ``think.response``. Your own version and
+the AI-assisted one are never the same document."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ REACTIONS = ("共鳴", "反感", "不理解")
 STANCES = ("修正", "維持", "暫停")           # 反方教練: 人要回應：修正、維持或暫停結論
 RESPONSES = ("確認", "改寫", "否定")         # 鏡子 / 證據稽核者: 人要確認、改寫或否定
 SOURCED = ("有來源", "它自己說的")           # in step 1 there are no source cards (GATHER, step 2), so an AI card is always the second
-MAX_PICKED = 3                              # 你自己選三張卡，帶到下一步 (the page's rule)
+MAX_PICKED = 3                              # 你自己選三張卡，帶到下一步: per round, refused by block_hooks/think.py BEFORE_SAVE
 MIN_OWN_CARDS = 2                           # 你自己至少加兩張思考卡
 
 # Which role and mode an AI action is (the page's role/mode chips and the seven command cards pick one of these).
@@ -59,11 +59,15 @@ KINDS = [
         "sourced": Field("choice", choices=SOURCED),                       # AI 的卡才有
         "batch": Field("text", 64),                                        # the think.batch an AI card was laid out from
         "batch_index": Field("int", 100),
-        "reaction": Field("choice", choices=REACTIONS),                    # 你寫的：共鳴、反感、不理解
-        "reason": Field("text", 1000),
-        "stance": Field("choice", choices=STANCES),
-        "picked": Field("bool"),
     }, authors=frozenset({"user", "ai", "joint"})),
+    # Your answer to a card, as your own record pointing at it (like assembler.answer): the card stays whoever wrote its words.
+    DocKind("think.reaction", "THINK", "你對一張卡的反應", {
+        "card": Field("text", 64, required=True),                          # the think.card doc_id; one live reaction per card (block_hooks/think.py)
+        "reaction": Field("choice", choices=REACTIONS),                    # 共鳴、反感、不理解
+        "reason": Field("text", 1000),
+        "stance": Field("choice", choices=STANCES),                        # 反方的卡：修正、維持、暫停
+        "picked": Field("bool"),                                           # 你選這張帶到下一步
+    }),
     DocKind("think.batch", "THINK", "AI 這一輪給的一批卡", {
         "round": Field("text", 64, required=True),
         "action": Field("text", 40, required=True),

@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "../../lib/api";
 import type { Doc } from "../../lib/blocks";
-import { AskBeforeBlock, CollabPermissions, describeChange, type Terms } from "./CollabPermissions";
+import { AskBeforeBlock, CollabPermissions, GRANTABLE_WORDS, HIDE_PLACES_WORDS, PlacesToggle, describeChange, type Terms } from "./CollabPermissions";
 
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -24,6 +24,36 @@ describe("協作合約: each change is a version you can read", () => {
     expect(describeChange({ permissions: ["counter", "rank"], handback: "累了就停" }, { permissions: ["counter"], handback: "累了就找人" })).toEqual(["收回「排序（只是參考）」", "改了「交還控制的條件」"]);
     expect(describeChange({ permissions: ["counter"] }, { permissions: ["counter"] })).toEqual([]);
   });
+
+  it("names the switch that holds the places back, and says nothing while it stays as it was", () => {
+    expect(describeChange(null, { hide_places: true })).toEqual([`選了「${HIDE_PLACES_WORDS}」`]);
+    expect(describeChange({ hide_places: true }, {})).toEqual([`不再選「${HIDE_PLACES_WORDS}」`]);
+    expect(describeChange({ hide_places: true }, { hide_places: true, handback: "累了就停" })).toEqual(["寫了「交還控制的條件」"]);
+    expect(describeChange(null, { hide_places: false })).toEqual([]);
+  });
+
+  it("holding the places back is not a permission you grant: no chip for it among the six that were", () => {
+    expect(Object.keys(GRANTABLE_WORDS)).not.toContain("use_location");
+    expect(Object.keys(GRANTABLE_WORDS)).toHaveLength(5);
+  });
+});
+
+describe("PlacesToggle", () => {
+  it("is one visible button that says where it stands and flips on a press", async () => {
+    const calls: boolean[] = [];
+    const off = await mount(<PlacesToggle value={false} onChange={(next) => calls.push(next)} />);
+    const toggle = off.host.querySelector("button") as HTMLButtonElement;
+    expect([toggle.getAttribute("aria-pressed"), toggle.textContent]).toEqual(["false", `沒選：${HIDE_PLACES_WORDS}`]);
+    await act(async () => { toggle.click(); });
+    expect(calls).toEqual([true]);
+    expect(off.host.querySelector("select")).toBeNull();
+    await off.done();
+    const on = await mount(<PlacesToggle value={true} onChange={(next) => calls.push(next)} />);
+    expect((on.host.querySelector("button") as HTMLButtonElement).getAttribute("aria-pressed")).toBe("true");
+    await act(async () => { (on.host.querySelector("button") as HTMLButtonElement).click(); });
+    expect(calls).toEqual([true, false]);
+    await on.done();
+  });
 });
 
 describe("CollabPermissions", () => {
@@ -36,7 +66,12 @@ describe("CollabPermissions", () => {
     vi.mocked(apiFetch).mockResolvedValue([] as never);
     const none = await mount(<CollabPermissions projectId="P" />);
     expect(none.host.textContent).toContain("其他的你還沒准");
+    expect(none.host.textContent).not.toContain("不讓它知道發生地");
     await none.done();
+    vi.mocked(apiFetch).mockResolvedValue([doc({ permissions: ["counter"], hide_places: true })] as never);
+    const hidden = await mount(<CollabPermissions projectId="P" />);
+    expect(hidden.host.textContent).toContain("你不讓它知道發生地和你在哪裡。");
+    await hidden.done();
   });
 });
 

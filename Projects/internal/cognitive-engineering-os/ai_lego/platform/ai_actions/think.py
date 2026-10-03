@@ -1,6 +1,6 @@
 """THINK's AI turns (contract card 「AI 能做什麼」). Nine actions, one per role-and-mode the card names; every one asks for the
 round first, and every one but ``direct_advice`` refuses a round with no version of the person's own (先想再看). It reads
-only the round, the cards of the round, the MAP's map (else SENSE's cards): never another case, never a judgment.
+only the round, the cards of the round and your reactions to them, the MAP's map (else SENSE's cards): never another case, never a judgment.
 
 What the AI saves is its own kind: ``think.reply`` (sections, one question) or ``think.batch`` (cards). It names no source
 (there are no source cards before GATHER opens), so ``shape`` marks everything 「它自己說的」 whatever the model says."""
@@ -16,7 +16,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gate import AiAction
 
 Read = Callable[[str], list[dict[str, Any]]]
-READS = ("think.round", "think.card", "map.map", "sense.card")
+READS = ("think.round", "think.card", "think.reaction", "map.map", "sense.card")
 CARD_TEXT = ("claim", "mechanism", "benefit", "risk", "assumption", "premise", "fails_when")
 CARD_CHARS = 160    # 15 cards x 7 fields x 160 characters stays under the 64KB a json field holds
 
@@ -75,13 +75,15 @@ def _map(read: Read) -> dict[str, Any] | None:
 
 
 def _cards(read: Read, round_id: str, *, picked_only: bool) -> list[dict[str, Any]]:
-    """The person's side of the round's cards: the ones they wrote, or the ones they picked, with their reaction and reason."""
+    """The person's side of the round's cards: the ones they wrote, or the ones they picked (a pick is their reaction's), with their reaction and reason."""
+    reactions = {doc["content"]["card"]: doc["content"] for doc in read("think.reaction")}
     rows = []
     for doc in read("think.card"):
-        content = doc["content"]
-        if content.get("round") != round_id or not (content.get("picked") if picked_only else doc["author"] == "user"):
+        content, reaction = doc["content"], reactions.get(doc["doc_id"], {})
+        if content.get("round") != round_id or not (reaction.get("picked") if picked_only else doc["author"] == "user"):
             continue
-        rows.append({"by": "the person" if doc["author"] == "user" else "an AI card the person picked", **{key: content[key] for key in (*CARD_TEXT[:5], "reaction", "reason") if content.get(key)}})
+        by = {"user": "the person", "joint": "an AI card the person rewrote"}.get(doc["author"], "an AI card the person kept as it was")
+        rows.append({"by": by, **{key: content[key] for key in CARD_TEXT[:5] if content.get(key)}, **{key: reaction[key] for key in ("reaction", "reason") if reaction.get(key)}})
     return rows[:15]
 
 
