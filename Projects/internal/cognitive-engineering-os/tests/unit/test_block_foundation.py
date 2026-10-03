@@ -4,6 +4,7 @@ and the crisis notice on a save."""
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import unittest
 import uuid
@@ -305,6 +306,18 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         self.client.post(f"{self.base}/docs/sense.state", json={"content": {"emotion": "絕望", "intensity": "強", "distance_note": "十年後我已經不想活了"}})
         self.assertEqual(self.client.post(f"{self.base}/ai/SENSE/mirror", json={"context": {}}).json().get("stopped"), "crisis")
         self.assertEqual(self.provider.calls, [])
+
+    def test_an_ai_turn_can_read_the_record_as_it_was_then(self):
+        """critic 2026-10-03 (LEARN M3): comparing with 「當初的判斷」 needs the version written then, not the current one."""
+        from ai_lego.data.repositories.case_docs import CaseDocs
+        card = self._card("第一版的字")
+        self.client.put(f"{self.base}/docs/sense.card/{card['doc_id']}", json={"content": {"category": "事件", "text": "第二版的字"}, "base_version": 1})
+        mirror = ai_gate.actions()[("SENSE", "mirror")]
+        seen: list[list[str]] = []
+        probe = dataclasses.replace(mirror, build_input=lambda context, read: seen.append([doc["content"]["text"] for doc in read("sense.card", every_version=True)]) or "x")
+        repo = api_main.app.dependency_overrides[api_main.get_project_source_repository]()
+        ai_gate.ask_ai(probe, tenant_id=self.tenant["tenant_id"], identity_id=self.identity["identity_id"], project_id=self.pid, context={}, docs=CaseDocs(repo), provider=self.provider)
+        self.assertEqual(seen, [["第一版的字", "第二版的字"]])
 
     def test_an_answer_that_could_not_be_kept_where_it_was_asked_is_refused_before_the_model(self):
         """worker 丁: an action whose answer is kept for the person, asked inside a case, paid for a model call and then

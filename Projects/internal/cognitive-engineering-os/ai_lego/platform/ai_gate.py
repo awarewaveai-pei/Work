@@ -55,7 +55,7 @@ class AiAction:
     output_kind: str                # the doc kind the answer is saved as (author ai)
     output_schema: Mapping[str, Any]
     reads: tuple[str, ...]          # the doc kinds it may read (the card's 「讀什麼」); any other read is refused
-    build_input: Callable[[Mapping[str, Any], Callable[[str], list[dict[str, Any]]]], str]   # (context, read) -> the user message
+    build_input: Callable[[Mapping[str, Any], Callable[..., list[dict[str, Any]]]], str]   # (context, read) -> the user message; read(kind, every_version=False)
     shape: Callable[[dict[str, Any]], dict[str, Any]] = lambda answer: answer   # holds the answer to the card (e.g. fixed questions) before it is validated
     outside_case: bool = False      # may run with no case (permission fixed by the card: only ALWAYS actions)
     places: tuple[str, ...] = ("happened_in", "you_are_in")   # 系統把發生地和你在哪裡交給 AI; a card that reads more (規範與脈絡: 當事人各在哪裡) names it
@@ -117,10 +117,13 @@ def ask_ai(action: AiAction, *, tenant_id: str, identity_id: str, project_id: st
     if where is None:
         location = docs.current(tenant_id, record_log.person(identity_id), "govern.location")
         where = location[-1]["content"]["where"] if location else None
-    def read(kind: str) -> list[dict[str, Any]]:
+    def read(kind: str, every_version: bool = False) -> list[dict[str, Any]]:
+        """The current version of each document of ``kind``; with ``every_version``, each document's every version,
+        oldest first (LEARN compares with the judgment as it was then: AI 不准改寫當初的紀錄)."""
         if kind not in action.reads:
             raise InvariantViolation(f"AI_READ_REFUSED: {action.block}.{action.name} does not read {kind}")
-        return docs.current(tenant_id, owner, kind)
+        current = docs.current(tenant_id, owner, kind)
+        return [version for doc in current for version in docs.versions(tenant_id, owner, kind, doc["doc_id"])] if every_version else current
 
     user = action.build_input(context, read)
     agreed = {key: terms[key] for key in ("scope", "human_parts", "basis", "handback") if terms and terms.get(key)}
