@@ -48,8 +48,13 @@ _INVISIBLE = dict.fromkeys(map(ord, "​‌‍⁠﻿"), None)
 _CJK_GAP = re.compile(r"(?<=[㐀-鿿])\s+(?=[㐀-鿿])")
 
 
+# A line break inside text the AI gate sends is JSON-escaped (json.dumps writes it as the two characters \ and n), so a
+# signal typed across two lines (「不想\n活」) would not match: the escapes of whitespace and control characters count as a space.
+_JSON_ESCAPED_SPACE = re.compile(r"\\(?:[nrtbf]|u00[01][0-9a-fA-F])")
+
+
 def normalise(text: str) -> str:
-    text = unicodedata.normalize("NFKC", text.translate(_QUOTES_AND_DASHES)).translate(_INVISIBLE)
+    text = unicodedata.normalize("NFKC", _JSON_ESCAPED_SPACE.sub(" ", text).translate(_QUOTES_AND_DASHES)).translate(_INVISIBLE)
     return _CJK_GAP.sub("", re.sub(r"\s+", " ", text))
 
 

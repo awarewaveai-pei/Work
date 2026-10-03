@@ -210,6 +210,12 @@ class SafetyTests(unittest.TestCase):
         self.assertIn("1925", [item["contact"] for item in safety.resources("台灣台北")])
         self.assertNotIn("1925", [item["contact"] for item in safety.resources(None)])
 
+    def test_a_signal_typed_across_two_lines_is_seen_in_what_the_ai_is_sent(self):
+        """critic 2026-10-03 (THINK C1): the gate checks the JSON it sends, where a line break is the two characters \\n."""
+        for text in ("不想\n活", "我不想\r\n活了", "I want to\ndie", "想\t自殺"):
+            self.assertTrue(safety.crisis_signal(json.dumps({"own": [text]}, ensure_ascii=False)), repr(text))
+        self.assertFalse(safety.crisis_signal(json.dumps({"own": ["合夥人\n又改條件"]}, ensure_ascii=False)))
+
 
 class BlockFoundationApiTests(ProjectSourceApiTestCase):
     def setUp(self):
