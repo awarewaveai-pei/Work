@@ -121,6 +121,13 @@ class CaseDocs:
             ).fetchall()
         return {row["block"] for row in rows}
 
+    def tools_run(self, tenant_id: str, owner: Owner) -> set[str]:
+        """The tools that finished on this case the older way (an analysis on the project page, DONE); a request still
+        pending or one that failed is not a use."""
+        if owner.kind != "case":
+            return set()
+        return {item["method_id"] for item in self._repo.analyses(tenant_id, owner.id).get(owner.id, []) if item.get("method_id") and item.get("status") == "DONE"}
+
     def versions(self, tenant_id: str, owner: Owner, kind: str, doc_id: str) -> list[dict[str, Any]]:
         """Every version of one document, oldest first (舊版不刪)."""
         with self._repo.connection() as connection:

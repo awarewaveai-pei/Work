@@ -44,24 +44,27 @@ def after_save(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dic
 
 
 def propose(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, by_block: str, block: str, why: str, guardrail: bool = False,
-            source: str | None = None) -> list[dict[str, Any]]:
+            source: str | None = None, topic: str | None = None) -> list[dict[str, Any]]:
     """Record ``by_block``'s proposal to add ``block`` unless the case already has that block (in the intake's list or
-    accepted earlier), any proposal for it stands unanswered, or the person declined it in this case (不用 = not asked
-    again; the slot still opens it). A proposal for a block not built yet is still recorded and says so (組裝器:
-    畫面寫「這一塊還沒開放」，不能加). ``why``: fixed words (see the module note); ``source``: the triggering doc's id."""
+    accepted earlier), a proposal for it stands unanswered, or the person declined it in this case (不用 = not asked
+    again; the slot still opens it). ``topic``: what the proposal is about when one block can be offered for different
+    things (TEACH: the method id) -- then 「already has / standing / declined」 are per block and topic. A proposal for a
+    block not built yet is still recorded and says so (組裝器: 畫面寫「這一塊還沒開放」，不能加). ``why``: fixed words (see
+    the module note); ``source``: the triggering doc's id."""
     from ai_lego.core.domain.kinds.assembler import OPEN_BLOCKS
     from ai_lego.platform.block_hooks.assembler import case_route, proposals
 
     if owner.kind != "case":
         return []
-    if any(item["code"] == block for item in case_route(docs, tenant_id, owner)["blocks"]):
+    if topic is None and any(item["code"] == block for item in case_route(docs, tenant_id, owner)["blocks"]):
         return []
     kind = f"assembler.proposal.{by_block.lower()}"
     answers = {doc["content"]["proposal"]: doc["content"]["answer"] for doc in docs.current(tenant_id, owner, "assembler.answer")}
-    # one standing proposal per block, whichever block found it first (MAP and SENSE both finding claims = one VERIFY);
-    # a block the person declined is not proposed again in this case
-    if any(item["content"].get("propose") == block and answers.get(item["doc_id"]) in (None, "declined") for item in proposals(docs, tenant_id, owner)):
+    # one standing proposal per block (and topic), whichever block found it first (MAP and SENSE both finding claims =
+    # one VERIFY); one the person declined is not proposed again in this case
+    if any(item["content"].get("propose") == block and item["content"].get("topic") == topic and answers.get(item["doc_id"]) in (None, "declined")
+           for item in proposals(docs, tenant_id, owner)):
         return []
-    content = {"propose": block, "why": why[:500], "guardrail": guardrail, **({"source": source} if source else {})}
+    content = {"propose": block, "why": why[:500], "guardrail": guardrail, **({"source": source} if source else {}), **({"topic": topic} if topic else {})}
     saved = docs.save(tenant_id, owner, kind, content, record_log.system(by_block))
     return [{"type": "proposal", "doc_id": saved["doc_id"], "kind": kind, "by": by_block, "propose": block, "why": saved["content"]["why"], "open": block in OPEN_BLOCKS}]

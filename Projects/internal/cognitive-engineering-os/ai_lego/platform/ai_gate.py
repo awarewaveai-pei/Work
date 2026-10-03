@@ -4,7 +4,7 @@ Before the model is called, in this order:
 1. the action's permission: always-allowed (organize, ask, point_gaps) or granted in the case's 協作合約 -- a case-less
    call (每天校準…) uses the permission its block's card fixes (``AiAction.outside_case``);
 2. the message is built whole: the action's input, the contract's own terms (scope, the parts the person keeps,
-   basis, the hand-back condition) and -- only when the contract grants ``use_location`` -- the places;
+   basis, the hand-back condition) and the places -- unless the contract withholds them (``hide_places``);
 3. a crisis signal anywhere in that message stops the AI (the exact text is checked, so what is checked and what is
    sent cannot drift apart): no model call, a ``govern.stop`` record, help for where they are;
 4. the case's 護欄 are added to the instructions (要求來源, 建議找專業的人).
@@ -26,7 +26,7 @@ from functools import lru_cache
 from typing import Any, Callable, Mapping
 
 from ai_lego.core.domain import doc_kinds
-from ai_lego.core.domain.kinds.collab_contract import ALWAYS, GRANTABLE, allowed
+from ai_lego.core.domain.kinds.collab_contract import ALWAYS, GRANTABLE, allowed, places_hidden
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
@@ -58,6 +58,7 @@ class AiAction:
     build_input: Callable[[Mapping[str, Any], Callable[[str], list[dict[str, Any]]]], str]   # (context, read) -> the user message
     shape: Callable[[dict[str, Any]], dict[str, Any]] = lambda answer: answer   # holds the answer to the card (e.g. fixed questions) before it is validated
     outside_case: bool = False      # may run with no case (permission fixed by the card: only ALWAYS actions)
+    places: tuple[str, ...] = ("happened_in", "you_are_in")   # 系統把發生地和你在哪裡交給 AI; a card that reads more (規範與脈絡: 當事人各在哪裡) names it
     max_tokens: int = 2000
 
     def __post_init__(self) -> None:
@@ -123,7 +124,7 @@ def ask_ai(action: AiAction, *, tenant_id: str, identity_id: str, project_id: st
     agreed = {key: terms[key] for key in ("scope", "human_parts", "basis", "handback") if terms and terms.get(key)}
     if agreed:
         user += "\n\n協作合約 (the person's own terms): " + json.dumps(agreed, ensure_ascii=False)
-    told = ("happened_in", "you_are_in", "others_in") if project_id and "use_location" in permitted and intake else ()
+    told = action.places if project_id and intake and not places_hidden(terms) else ()
     places = {key: intake[key] for key in told if intake.get(key)}
     if places:
         user += "\n\nWhere: " + json.dumps(places, ensure_ascii=False)
