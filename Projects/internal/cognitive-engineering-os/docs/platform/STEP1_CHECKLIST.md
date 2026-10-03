@@ -18,7 +18,29 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 - fixed (S, critic M1, 3f26fc502): project name key is (tenant, workspace, creator, name)
 - fixed (S, critic M2, 3f26fc502): recipe-run journals live in the runner's folder; erasing a case erases its runs and artifacts
 - KNOWN LIMIT: next-admin opens cases as one service identity, so its operators share ownership (critic m6)
-- GOVERN 丁: account deletion must also erase person-owned rows (`govern.location`, `/me/docs`) and `CustomWorkflowRepository.delete_person`
+- GOVERN 丁: account deletion erases person-owned rows, workflows and runs: built, see the GOVERN section below
+
+## GOVERN + 完整性核心 (丁) — built 2026-10-03
+- 「你可以匯出自己的資料」 built: `GET /projects/{id}/govern/export`, `GET /govern/export` (JSON + Markdown; every record with author + block; recipe runs and their artifacts included); pages: case 護欄與匯出頁 `/projects/{id}/govern`, 設定頁 `/settings`
+- 「你也可以完整刪除」 built: `POST /govern/account/erase` (cases through the case erase path, runs on no case, person records, workflows, then the identity; one empty tombstone stays; confirm phrase from the API; page confirms twice; 409 while a case or run is still running, a retry finishes)
+- 「清楚的非治療定位」 built: `safety.NOT_THERAPY` via `GET /govern/help`, shown on `/help` and `/settings`; `components/blocks/GovernParts.tsx NotTherapyNotice` is the piece for 「你開始的地方」 -- placing it on 開案 and 我的專案 is a shared-file change (report)
+- 「危機轉介」 built: `/help` (open without login) + the AI gate and every save give help for the place in the case's intake or the account's 「你在哪裡」; Taiwan lines + international only (step 3 adds places)
+- 「高風險的案子，系統自動加護欄」 built: `block_hooks/govern.py` on every watched block's person-written documents (category + block only, never the words; places and system-listed influences not scanned); the intake's risk goes through the assembler's own hook; with no case the save answers a `suggest_case` notice (rendering it on the daily-calibration page = 丙 / shared `Notice` type)
+- 「GOVERN 把這個案子加了哪些護欄」 built: guardrails view on the case page; the AI's stops are listed beside it
+- 「你可以查這個案子用了哪個模型、哪一版規則」 built: `/projects/{id}/govern/versions` (AI calls with model + instructions hash; the rules in use as fingerprints; the record kinds held with their definition fingerprint)
+- 「AI 解釋設定是什麼意思」 built: `GOVERN.explain` (no case; reads nothing the person wrote)
+- 「每一塊積木上線前…一條一條檢查」 built: `python -m ai_lego.platform.integrity` (20 checks per block, each with what it proves and does not; exit 1 when an open block fails; rules versioned in `RULES_HISTORY`, a test fails when they change without a new entry)
+- NOT YET (step 3, by the card): 同意與撤回、研究同意、申訴與對帶領者的異議、在地化（其他地方的求助電話與語言）、成效衡量十項、不留紀錄／只留本機、防假帳號與協同帳號帶風向、研究資料拿掉帳號和三個地點
+- NOT YET: 「來源名單、分類規則、分組規則、操弄手法清單、查核資料庫名單」的版本 -- they arrive with GATHER / VERIFY (step 2); step 1 versions the AI instructions, the model of each call, the crisis and high-risk word lists, the record kinds and the integrity rules
+- NOT YET: 「不用中國廠商的 AI 模型併進這裡」 -- the gateway has one provider and no model list; the list and its check come in step 3
+- NOT YET: 「規則檢查」 written as platform records -- the check result is printed for the launch step (text / JSON); `DocKind` has no platform owner yet
+- NOT YET: 「你可以對任何一條規則提出異議」 (appeals, step 3)
+- NOT YET: 「影響清單：AI、這次的拆法、平台本身一定在清單上」 checked by the core -- only that the judgment card keeps the system's list apart from the person's; the content is DECIDE's at run time
+- LIMIT: runs started before 2026-10-03 sit in the tenant folder with no owner on record -- neither exported nor erased with the account (`main._run_journal`)
+- LIMIT: a recipe run written with journal protection keeps its context as ciphertext in `workflow-cas`; erasing a case or an account removes the journal, not that blob (the deletion screen says so when it applies); fix = one helper in main.py used by `_erase_case_runs` and account deletion
+- LIMIT: artifact blobs are content-addressed; erasure deletes by reference without counting other references, so identical content held by two people is one blob
+- LIMIT: a second tab can open a case while the account is being deleted and keep it; closing it needs a `deleting` status on the identity that `require_session` refuses
+- LIMIT: the account export carries what the person owns in `projects.sqlite3`, the workflows file and the run folder; `collection_runs` rows (GATHER, step 2) are not exported separately, only their events
 
 ## MAP (甲) — built 2026-10-03
 - six layers each with its question and what it hands over; pick a 拆法 from the 116 tools of the MAP families (search chips, only ones not used in this case), or ask the AI (organize) for up to 3 with a reason; the tool and its version are kept with the map; one line per layer first; skip a layer

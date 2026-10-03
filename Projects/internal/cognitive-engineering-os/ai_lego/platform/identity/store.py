@@ -266,6 +266,21 @@ class IdentityStore:
             row = conn.execute("SELECT identity_id, tenant_id, email, display_name, status, created_at FROM identity WHERE identity_id = ?", (identity_id,)).fetchone()
         return dict(row) if row else None
 
+    def delete_identity(self, tenant_id: str, identity_id: str) -> bool:
+        """GOVERN 刪除帳號, the identity's part (the caller erased the person's cases and records first). One transaction:
+        every session, reset token, handoff code and the credential go; the row stays as the one tombstone, status
+        'deleted', with no email and no name (the address is free to register again); the AI-usage rows stay for the
+        tenant's budget but no longer name the person. False: no such live identity in this tenant."""
+        with self._connect() as conn:
+            row = conn.execute("SELECT status FROM identity WHERE identity_id = ? AND tenant_id = ?", (identity_id, tenant_id)).fetchone()
+            if row is None or row["status"] == "deleted":
+                return False
+            for table in ("session", "password_reset_token", "handoff_code", "identity_credential"):
+                conn.execute(f"DELETE FROM {table} WHERE identity_id = ?", (identity_id,))
+            conn.execute("UPDATE ai_usage SET identity_id = 'deleted' WHERE tenant_id = ? AND identity_id = ?", (tenant_id, identity_id))
+            conn.execute("UPDATE identity SET email = ?, display_name = ?, status = 'deleted' WHERE identity_id = ?", (f"deleted-{identity_id}@erased.invalid", "（已刪除）", identity_id))
+        return True
+
     def _find_identity_by_email(self, tenant_id: str, email: str) -> dict[str, Any] | None:
         with self._connect() as conn:
             row = conn.execute("SELECT identity_id, tenant_id, email, display_name, status, created_at FROM identity WHERE tenant_id = ? AND email = ?", (tenant_id, email.lower())).fetchone()
