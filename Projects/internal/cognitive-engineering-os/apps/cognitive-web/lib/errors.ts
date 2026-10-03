@@ -51,6 +51,18 @@ const CODES: Record<string, string> = {
   SOURCE_PROJECT_CLASSIFICATION_MISMATCH: "這個來源的資料分類跟專案不一致，沒辦法加入。",
   SOURCE_CONTENT_TOO_LARGE: "這段內容太長了，請縮短後再試一次。",
   AI_DRAFT_LABELS_REQUIRED: "一次能請 AI 起草的欄位數量超過上限，請減少後再試。",
+  // the platform's blocks (ai_lego/apps/api/blocks/)
+  DOC_STALE: "這張卡在別的地方被改過了，重新整理頁面看最新的版本，再改一次。",
+  DOC_NOT_FOUND: "找不到這張卡，可能已經刪除。",
+  DOC_NOT_DELETABLE: "這一種紀錄每一版都留著，不能刪；要整個刪，請刪掉這個案子。",
+  DOC_FIELD_REQUIRED: "還有必填的格子沒填。",
+  DOC_FIELD_INVALID: "有一格的內容不符合格式，請檢查後再試一次。",
+  DOC_FIELD_UNKNOWN: "這個頁面送了不該有的內容，請重新整理頁面再試一次。",
+  DOC_KIND_UNKNOWN: "這一塊還沒開放。",
+  RECORD_HUMAN_ONLY_FIELD: "這一格只收你自己寫的。",
+  AI_PERMISSION_DENIED: "協作合約沒有准 AI 做這件事；要的話，先到協作合約打開它。",
+  AI_ACTION_UNKNOWN: "這個 AI 功能還沒開放。",
+  AI_ANSWER_NOT_JSON: "AI 這次沒有給出可用的回答，再按一次即可。",
 };
 
 const STATUS_FALLBACK: Record<number, string> = {

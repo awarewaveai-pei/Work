@@ -26,7 +26,7 @@ class ProjectEraseTests(CollectionApiTestCase):
         self.client.post(f"/projects/{self.pid}/sources/ingest", json={"run_id": self.run_id, "sources": [c1("https://acme.example/a", "alpha")]}, headers={"Authorization": f"Grant {self.token}"})
         artifacts = api_main.app.dependency_overrides[api_main.get_artifact_store]()
         self.artifact_ref = artifacts.put(self.tid, "method_interpretation", {"record": {"who": "Jane Doe"}})
-        self._repo.save_interpretation(self.tid, self.pid, "INTERP-ERASE1", self.artifact_ref, "2026-09-26T00:00:00Z")
+        self._repo.save_interpretation(self.tid, self.pid, "INTERP-ERASE1", self.artifact_ref, "2026-09-26T00:00:00Z", block="MAP")
         self.note_cas = self._repo.get_source_content_reference(self.tid, self.pid, self.note["source_id"])
 
     def _erase(self, project_id: str | None = None):

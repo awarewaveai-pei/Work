@@ -20,10 +20,11 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
-from uuid import uuid4
 
 from ai_lego.core.domain.collection_run import OPEN_STATUSES, effective_status, run_report
 from ai_lego.core.support import canonical_json, sha256_bytes
+from ai_lego.data.events import record_log
+from ai_lego.data.events.record_log import Writer
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.errors import InvariantViolation
 
@@ -73,19 +74,6 @@ CREATE TABLE IF NOT EXISTS prov_sources (
     supersedes_source_id TEXT,
     PRIMARY KEY (tenant_id, project_id, source_id),
     FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
-);
-CREATE TABLE IF NOT EXISTS events (
-    event_id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
-    aggregate_id TEXT NOT NULL,
-    sequence INTEGER NOT NULL,
-    event_type TEXT NOT NULL,
-    occurred_at TEXT NOT NULL,
-    schema_version TEXT NOT NULL,
-    correlation_id TEXT NOT NULL,
-    causation_id TEXT,
-    payload_json TEXT NOT NULL,
-    UNIQUE (tenant_id, aggregate_id, sequence)
 );
 CREATE INDEX IF NOT EXISTS ix_platform_projects_workspace ON platform_projects (tenant_id, workspace_id, created_at, project_id);
 CREATE INDEX IF NOT EXISTS ix_prov_sources_project ON prov_sources (tenant_id, project_id, created_at, source_id);
@@ -206,6 +194,18 @@ _MIGRATION_COLUMNS: dict[str, tuple[tuple[str, str], ...]] = {
     "collection_runs": (("deadline_at", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'"),),
 }
 
+# Owner of a record written before owners existed, read off the record itself: a Project's own events belong to that
+# case, a Source's events name their Project in the payload, the erasure tombstone belongs to the platform.
+_LEGACY_OWNER_SQL = (
+    "UPDATE events SET owner_kind='platform', owner_id=tenant_id WHERE owner_kind IS NULL AND event_type='ProjectErased'",
+    "UPDATE events SET owner_kind='case', owner_id=substr(aggregate_id, 9) WHERE owner_kind IS NULL AND aggregate_id LIKE 'project:%'",
+    "UPDATE events SET owner_kind='case', owner_id=json_extract(payload_json, '$.project_id') "
+    "WHERE owner_kind IS NULL AND aggregate_id LIKE 'source:%' AND json_extract(payload_json, '$.project_id') IS NOT NULL",
+)
+
+
+_MIGRATED: set[str] = set()   # files brought up to date in this process: a request does not re-run the migration
+
 
 class ProjectSourceRepository:
     """SQLite adapter for the Project/Source repository contract."""
@@ -213,9 +213,17 @@ class ProjectSourceRepository:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        key = str(self.db_path.resolve())
+        if key in _MIGRATED and self.db_path.exists():
+            return
         with self._connection() as connection:
             connection.executescript(_SCHEMA)
             self._migrate_columns(connection)
+            record_log.migrate(connection, _LEGACY_OWNER_SQL)
+            unowned = connection.execute("SELECT COUNT(*) FROM events WHERE owner_kind IS NULL").fetchone()[0]
+            if unowned:   # erasure goes by owner: a row with none could never be erased
+                raise InvariantViolation(f"RECORD_OWNER_MISSING: {unowned} event(s) in {db_path.name} have no owner")
+        _MIGRATED.add(key)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path)
@@ -278,29 +286,18 @@ class ProjectSourceRepository:
         finally:
             connection.close()
 
+    def connection(self):
+        """A read (or simple write) connection on this file, for the other parts of the case layer (case_docs)."""
+        return self._connection()
+
+    def transaction(self):
+        """The file's write lock, taken up front: read-then-write under it never races another writer."""
+        return self._write_transaction()
+
     @staticmethod
-    def _append_event(connection: sqlite3.Connection, tenant_id: str, aggregate_id: str, event_type: str, payload: Mapping[str, Any]) -> None:
-        row = connection.execute(
-            "SELECT COALESCE(MAX(sequence), 0) AS current_sequence FROM events WHERE tenant_id=? AND aggregate_id=?",
-            (tenant_id, aggregate_id),
-        ).fetchone()
-        sequence = int(row["current_sequence"]) + 1
-        event_id = str(uuid4())
-        connection.execute(
-            "INSERT INTO events (event_id, tenant_id, aggregate_id, sequence, event_type, occurred_at, schema_version, correlation_id, causation_id, payload_json) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (
-                event_id,
-                tenant_id,
-                aggregate_id,
-                sequence,
-                event_type,
-                datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-                "1.0.0",
-                event_id,
-                None,
-                canonical_json(dict(payload)),
-            ),
-        )
+    def _append_event(connection: sqlite3.Connection, tenant_id: str, project_id: str, aggregate_id: str, event_type: str, payload: Mapping[str, Any], writer: Writer) -> None:
+        """Every record of this file belongs to one case: the Project's own aggregate or one of its Sources'."""
+        record_log.append(connection, tenant_id, aggregate_id, event_type, payload, writer=writer, owner=record_log.case(project_id))
 
     def create_project(self, record: Mapping[str, Any]) -> dict[str, Any]:
         project = {column: record[column] for column in _PROJECT_COLUMNS}
@@ -312,6 +309,7 @@ class ProjectSourceRepository:
             self._append_event(
                 connection,
                 project["tenant_id"],
+                project["project_id"],
                 f"project:{project['project_id']}",
                 "ProjectCreated",
                 {
@@ -320,6 +318,7 @@ class ProjectSourceRepository:
                     "data_classification": project["data_classification"],
                     "record_sha256": sha256_bytes(canonical_json(project).encode("utf-8")),
                 },
+                record_log.user(project["created_by_identity_id"], "ASSEMBLER"),
             )
         return project
 
@@ -343,8 +342,9 @@ class ProjectSourceRepository:
         return [dict(row) for row in rows]
 
     @classmethod
-    def _insert_source(cls, connection: sqlite3.Connection, record: Mapping[str, Any], cas_path: Mapping[str, str]) -> None:
-        """Insert one Source row + its SourceAdded event on an open transaction (add_source, supersede, ingest share it)."""
+    def _insert_source(cls, connection: sqlite3.Connection, record: Mapping[str, Any], cas_path: Mapping[str, str], writer: Writer) -> None:
+        """Insert one Source row + its SourceAdded event on an open transaction (add_source, supersede, ingest share it).
+        ``writer``: the person who typed it in, or the system that collected it."""
         source = {column: (record.get(column) if column in _PROVENANCE_COLUMNS else record[column]) for column in _SOURCE_COLUMNS}
         if cas_path.get("tenant_segment") != source["tenant_id"] or cas_path.get("hash") != source["content_sha256"]:
             raise InvariantViolation("SOURCE_STORAGE_REFERENCE_INVALID")
@@ -392,6 +392,7 @@ class ProjectSourceRepository:
         cls._append_event(
             connection,
             source["tenant_id"],
+            source["project_id"],
             f"source:{source['source_id']}",
             "SourceAdded",
             {
@@ -402,12 +403,13 @@ class ProjectSourceRepository:
                 "media_type": source["media_type"],
                 "content_role": source["content_role"],
             },
+            writer,
         )
 
-    def add_source(self, record: Mapping[str, Any], cas_path: Mapping[str, str], put_content: Callable[[], Any] | None = None) -> dict[str, Any]:
+    def add_source(self, record: Mapping[str, Any], cas_path: Mapping[str, str], put_content: Callable[[], Any] | None = None, *, writer: Writer) -> dict[str, Any]:
         """Row first, then the content, then commit: a failing insert writes no blob; ``put`` is atomic."""
         with self._write_transaction() as connection:
-            self._insert_source(connection, record, cas_path)
+            self._insert_source(connection, record, cas_path, writer)
             if put_content is not None:
                 put_content()
         return dict(record)
@@ -439,13 +441,15 @@ class ProjectSourceRepository:
             "UPDATE prov_sources SET status='superseded' WHERE tenant_id=? AND project_id=? AND source_id=? AND status='active'",
             (record["tenant_id"], record["project_id"], old_source_id),
         )
-        cls._insert_source(connection, record, cas_path)
+        cls._insert_source(connection, record, cas_path, record_log.system("GATHER"))
         cls._append_event(
             connection,
             record["tenant_id"],
+            record["project_id"],
             f"source:{old_source_id}",
             "SourceSuperseded",
             {"source_id": old_source_id, "superseded_by": record["source_id"], "project_id": record["project_id"]},
+            record_log.system("GATHER"),
         )
 
     def supersede(self, old_source_id: str, record: Mapping[str, Any], cas_path: Mapping[str, str], put_content: Callable[[], Any] | None = None) -> dict[str, Any]:
@@ -482,7 +486,7 @@ class ProjectSourceRepository:
                     results.append({"canonical_url": record["canonical_url"], "outcome": "superseded", "source_id": record["source_id"]})
                     to_write[cas_path["hash"]] = cas_path
                 else:
-                    self._insert_source(connection, record, cas_path)
+                    self._insert_source(connection, record, cas_path, record_log.system("GATHER"))
                     results.append({"canonical_url": record["canonical_url"], "outcome": "created", "source_id": record["source_id"]})
                     to_write[cas_path["hash"]] = cas_path
             for cas_path in to_write.values():
@@ -535,7 +539,9 @@ class ProjectSourceRepository:
                 "INSERT INTO collection_runs (tenant_id, project_id, run_id, status, seeds_json, budget_json, requested_by_identity_id, requested_at, deadline_at, completed_at, report_json) VALUES (?,?,?,?,?,?,?,?,?,NULL,NULL)",
                 (record["tenant_id"], record["project_id"], record["run_id"], "requested", canonical_json([dict(seed) for seed in seeds]), canonical_json({"fetches": record["max_fetches"]}), record["requested_by_identity_id"], record["requested_at"], record["deadline_at"]),
             )
-            self._append_event(connection, record["tenant_id"], f"project:{record['project_id']}", "CollectionRequested", {"run_id": record["run_id"], "seeds_count": record["seeds_count"], "max_fetches": record["max_fetches"]})
+            self._append_event(connection, record["tenant_id"], record["project_id"], f"project:{record['project_id']}", "CollectionRequested",
+                               {"run_id": record["run_id"], "seeds_count": record["seeds_count"], "max_fetches": record["max_fetches"]},
+                               record_log.user(record["requested_by_identity_id"], "GATHER"))
         return dict(record)
 
     def get_collection_run(self, tenant_id: str, project_id: str, run_id: str) -> dict[str, Any] | None:
@@ -557,7 +563,7 @@ class ProjectSourceRepository:
             ).rowcount
             if changed != 1:
                 raise InvariantViolation("COLLECTION_RUN_STATE_INVALID")
-            self._append_event(connection, tenant_id, f"project:{row['project_id']}", event_type, {"run_id": run_id, **payload})
+            self._append_event(connection, tenant_id, row["project_id"], f"project:{row['project_id']}", event_type, {"run_id": run_id, **payload}, record_log.system("GATHER"))
             final = connection.execute("SELECT * FROM collection_runs WHERE tenant_id=? AND run_id=?", (tenant_id, run_id)).fetchone()
         return self._run_from_row(final)
 
@@ -590,8 +596,8 @@ class ProjectSourceRepository:
             ).fetchall()
         return [self._source_from_row(row) for row in rows]
 
-    def search_active_sources(self, tenant_id: str, query: str, limit: int = 50) -> tuple[list[dict[str, Any]], bool]:
-        """Search active Sources across this tenant's Projects without wildcard injection.
+    def search_active_sources(self, tenant_id: str, query: str, limit: int, identity_id: str) -> tuple[list[dict[str, Any]], bool]:
+        """Search active Sources across the cases ``identity_id`` opened (no one else's) without wildcard injection.
         Returns ``(rows, truncated)``: ``truncated`` is True when more than ``limit`` Sources match (one extra row is
         fetched to know), so a caller never mistakes the first ``limit`` rows for the whole match set."""
         if not isinstance(query, str) or not query.strip():
@@ -605,11 +611,11 @@ class ProjectSourceRepository:
             rows = connection.execute(
                 f"SELECT {source_select}, p.name AS project_name, p.purpose AS project_purpose "
                 "FROM prov_sources s JOIN platform_projects p ON p.tenant_id=s.tenant_id AND p.project_id=s.project_id "
-                "WHERE s.tenant_id=? AND s.status='active' AND "
+                "WHERE s.tenant_id=? AND p.created_by_identity_id=? AND s.status='active' AND "
                 "(s.source_id LIKE ? ESCAPE '\\' OR s.title LIKE ? ESCAPE '\\' OR COALESCE(s.doi,'') LIKE ? ESCAPE '\\' "
                 "OR COALESCE(s.canonical_url,'') LIKE ? ESCAPE '\\' OR COALESCE(s.source_uri,'') LIKE ? ESCAPE '\\') "
                 "ORDER BY s.created_at, s.project_id, s.source_id LIMIT ?",
-                (tenant_id, pattern, pattern, pattern, pattern, pattern, limit + 1),
+                (tenant_id, identity_id, pattern, pattern, pattern, pattern, pattern, limit + 1),
             ).fetchall()
         found = [{**self._source_from_row(row), "project_name": row["project_name"], "project_purpose": row["project_purpose"]} for row in rows]
         return found[:limit], len(found) > limit
@@ -625,7 +631,7 @@ class ProjectSourceRepository:
     def list_events(self, tenant_id: str, aggregate_id: str) -> list[dict[str, Any]]:
         with self._connection() as connection:
             rows = connection.execute(
-                "SELECT event_id, tenant_id, aggregate_id, sequence, event_type, occurred_at, schema_version, correlation_id, causation_id, payload_json FROM events WHERE tenant_id=? AND aggregate_id=? ORDER BY sequence",
+                f"SELECT {record_log.ENVELOPE_COLUMNS} FROM events WHERE tenant_id=? AND aggregate_id=? ORDER BY sequence",
                 (tenant_id, aggregate_id),
             ).fetchall()
         events = []
@@ -635,10 +641,10 @@ class ProjectSourceRepository:
             events.append(event)
         return events
 
-    def append_event(self, tenant_id: str, aggregate_id: str, event_type: str, payload: Mapping[str, Any]) -> None:
-        """Public transactional event seam for project-bound artifacts."""
+    def append_event(self, tenant_id: str, project_id: str, event_type: str, payload: Mapping[str, Any], writer: Writer) -> None:
+        """One record on a case's own stream (record_log.append checks the writer, the block and the type)."""
         with self._connection() as connection:
-            self._append_event(connection, tenant_id, aggregate_id, event_type, payload)
+            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", event_type, payload, writer)
 
     # An interpretation's lifecycle, in the project's event stream: asked for, created or failed, judged (同意／部分／不同意),
     # approved or returned (核准／退回). GET /interpretations/{id}, analyses() and the project summaries read the same list.
@@ -649,7 +655,7 @@ class ProjectSourceRepository:
         placeholders = ",".join("?" * len(self.INTERPRETATION_EVENTS))
         with self._connection() as connection:
             rows = connection.execute(
-                "SELECT aggregate_id, sequence, event_type, occurred_at, payload_json FROM events "
+                "SELECT aggregate_id, sequence, event_type, occurred_at, payload_json, author, block FROM events "
                 f"WHERE tenant_id=? AND event_type IN ({placeholders}) "
                 "AND json_extract(payload_json, '$.interpretation_id')=? ORDER BY rowid",
                 (tenant_id, *self.INTERPRETATION_EVENTS, interpretation_id),
@@ -765,13 +771,14 @@ class ProjectSourceRepository:
             rows = connection.execute(query + " GROUP BY aggregate_id", parameters).fetchall()
         return {row["aggregate_id"].removeprefix("project:"): row["at"] for row in rows}
 
-    def save_interpretation(self, tenant_id: str, project_id: str, interpretation_id: str, artifact_reference: Mapping[str, Any], created_at: str) -> None:
+    def save_interpretation(self, tenant_id: str, project_id: str, interpretation_id: str, artifact_reference: Mapping[str, Any], created_at: str, *, block: str) -> None:
+        """``block``: the tool's block (its contract family); the AI wrote the result."""
         with self._connection() as connection:
             connection.execute(
                 "INSERT INTO project_interpretations (tenant_id, project_id, interpretation_id, artifact_reference_json, created_at) VALUES (?,?,?,?,?)",
                 (tenant_id, project_id, interpretation_id, json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), created_at),
             )
-            self._append_event(connection, tenant_id, f"project:{project_id}", "InterpretationCreated", {"interpretation_id": interpretation_id, "artifact_reference": dict(artifact_reference)})
+            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "InterpretationCreated", {"interpretation_id": interpretation_id, "artifact_reference": dict(artifact_reference)}, record_log.ai(block))
 
     def get_interpretation(self, tenant_id: str, interpretation_id: str) -> dict[str, Any] | None:
         with self._connection() as connection:
@@ -805,7 +812,7 @@ class ProjectSourceRepository:
                 "INSERT INTO project_syntheses (tenant_id, project_id, synthesis_id, kind, artifact_reference_json, created_at) VALUES (?,?,?,?,?,?)",
                 (tenant_id, project_id, synthesis_id, kind, json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), created_at),
             )
-            self._append_event(connection, tenant_id, f"project:{project_id}", "SynthesisCreated", {"synthesis_id": synthesis_id, "kind": kind, "artifact_reference": dict(artifact_reference)})
+            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "SynthesisCreated", {"synthesis_id": synthesis_id, "kind": kind, "artifact_reference": dict(artifact_reference)}, record_log.ai("VERIFY"))
 
     def get_synthesis(self, tenant_id: str, project_id: str, synthesis_id: str) -> dict[str, Any] | None:
         with self._connection() as connection:
@@ -826,7 +833,7 @@ class ProjectSourceRepository:
                 "INSERT INTO project_reports (tenant_id, project_id, report_id, artifact_reference_json, created_at) VALUES (?,?,?,?,?)",
                 (tenant_id, project_id, report_id, json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), created_at),
             )
-            self._append_event(connection, tenant_id, f"project:{project_id}", "ReportCreated", {"report_id": report_id, "artifact_reference": dict(artifact_reference)})
+            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "ReportCreated", {"report_id": report_id, "artifact_reference": dict(artifact_reference)}, record_log.system("VERIFY"))
 
     def get_report(self, tenant_id: str, project_id: str, report_id: str) -> dict[str, Any] | None:
         with self._connection() as connection:
@@ -842,7 +849,7 @@ class ProjectSourceRepository:
 
     def update_report_reference(
         self, tenant_id: str, project_id: str, report_id: str, expected_reference: Mapping[str, Any],
-        artifact_reference: Mapping[str, Any], event_type: str, payload: Mapping[str, Any],
+        artifact_reference: Mapping[str, Any], event_type: str, payload: Mapping[str, Any], *, writer: Writer,
     ) -> None:
         """Replace a report's CAS pointer only together with its lifecycle event, and only if the pointer is still
         ``expected_reference`` (compare-and-swap): a concurrent decision makes this one fail ``REPORT_STALE``
@@ -858,7 +865,7 @@ class ProjectSourceRepository:
             if updated != 1:
                 exists = connection.execute("SELECT 1 FROM project_reports WHERE tenant_id=? AND project_id=? AND report_id=?", (tenant_id, project_id, report_id)).fetchone()
                 raise InvariantViolation("REPORT_STALE" if exists else "REPORT_NOT_FOUND")
-            self._append_event(connection, tenant_id, f"project:{project_id}", event_type, dict(payload))
+            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", event_type, dict(payload), writer)
 
     # -- Project erasure (plan D10, K7) ---------------------------------------------------------------------------
 
@@ -871,35 +878,35 @@ class ProjectSourceRepository:
         return [json.loads(row["artifact_reference_json"]) for row in rows]
 
     def erase_project(self, tenant_id: str, project_id: str, erased_by_identity_id: str, cas: TenantScopedCas, artifacts_deleted: int) -> dict[str, int]:
-        """One write transaction: the Project's events (its own aggregate + each of its Sources'), Sources, AI artifact
+        """One write transaction: every record the case owns (record_log.delete_owned), Sources, AI artifact
         references (interpretations, syntheses), collection runs and the Project row go; the tenant's now-unreferenced blobs are removed before
-        commit (content shared with another Project stays referenced, so it stays); one ProjectErased tombstone.
+        commit (content shared with another Project stays referenced, so it stays); one ProjectErased tombstone, owned by the platform.
         A failure rolls the rows back, and a retry finishes the job."""
         with self._write_transaction() as connection:
             if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=? AND project_id=?", (tenant_id, project_id)).fetchone() is None:
                 raise InvariantViolation("PROJECT_NOT_FOUND")
             source_ids = [row["source_id"] for row in connection.execute("SELECT source_id FROM prov_sources WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))]
-            events_deleted = 0
-            for aggregate_id in [f"project:{project_id}", *(f"source:{source_id}" for source_id in source_ids)]:
-                events_deleted += connection.execute("DELETE FROM events WHERE tenant_id=? AND aggregate_id=?", (tenant_id, aggregate_id)).rowcount
+            events_deleted = record_log.delete_owned(connection, tenant_id, record_log.case(project_id))
             for table in ("prov_sources", *self._ARTIFACT_TABLES, "collection_runs", "platform_projects"):
                 connection.execute(f"DELETE FROM {table} WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))
             blobs_unlinked = self._collect_unreferenced_blobs(connection, tenant_id, cas)
             counts = {"sources": len(source_ids), "blobs_unlinked": blobs_unlinked, "artifacts_deleted": artifacts_deleted, "events_deleted": events_deleted}
-            self._append_event(connection, tenant_id, f"project:{project_id}", "ProjectErased", {"project_id": project_id, "erased_by_identity_id": erased_by_identity_id, **counts})
+            record_log.append(connection, tenant_id, f"project:{project_id}", "ProjectErased", {"project_id": project_id, "erased_by_identity_id": erased_by_identity_id, **counts},
+                              writer=record_log.user(erased_by_identity_id, "GOVERN"), owner=record_log.platform(tenant_id))
         return counts
 
-    def erased_projects(self, tenant_id: str) -> list[dict[str, Any]]:
-        """Every ProjectErased tombstone for this tenant, newest first (N-66 已抹除): the Project row itself is
-        gone by design (erase_project deletes it); this event is what stays."""
+    def erased_projects(self, tenant_id: str, identity_id: str) -> list[dict[str, Any]]:
+        """The ProjectErased tombstones of the cases ``identity_id`` erased, newest first (N-66 已抹除): the Project row
+        itself is gone by design (erase_project deletes it); this event is what stays."""
         with self._connection() as connection:
             rows = connection.execute(
-                "SELECT occurred_at, payload_json FROM events WHERE tenant_id=? AND event_type='ProjectErased' ORDER BY rowid DESC",
-                (tenant_id,),
+                "SELECT occurred_at, payload_json FROM events WHERE tenant_id=? AND event_type='ProjectErased' "
+                "AND json_extract(payload_json, '$.erased_by_identity_id')=? ORDER BY rowid DESC",
+                (tenant_id, identity_id),
             ).fetchall()
         return [{"erased_at": row["occurred_at"], **json.loads(row["payload_json"])} for row in rows]
 
-    def rename_project(self, tenant_id: str, project_id: str, name: str) -> dict[str, Any]:
+    def rename_project(self, tenant_id: str, project_id: str, name: str, identity_id: str) -> dict[str, Any]:
         """UPDATE platform_projects.name in place (current-state row, like create_project's INSERT) + a
         ProjectRenamed event; the UNIQUE(tenant_id, workspace_id, name) constraint refuses a duplicate the
         same way create_project's INSERT does (caller turns that IntegrityError into a 409)."""
@@ -907,7 +914,7 @@ class ProjectSourceRepository:
             cursor = connection.execute("UPDATE platform_projects SET name=? WHERE tenant_id=? AND project_id=?", (name, tenant_id, project_id))
             if cursor.rowcount == 0:
                 raise InvariantViolation("PROJECT_NOT_FOUND")
-            self._append_event(connection, tenant_id, f"project:{project_id}", "ProjectRenamed", {"project_id": project_id, "name": name})
+            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "ProjectRenamed", {"project_id": project_id, "name": name}, record_log.user(identity_id, "ASSEMBLER"))
             row = connection.execute(
                 "SELECT project_id, tenant_id, workspace_id, name, purpose, data_classification, status, version, created_by_identity_id, created_at FROM platform_projects WHERE tenant_id=? AND project_id=?",
                 (tenant_id, project_id),

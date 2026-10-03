@@ -50,7 +50,7 @@ T = TypeVar("T")
 
 
 def scan_contract_files(spec_root: Path, relative_dir: str, glob_pattern: str) -> dict[str, dict[str, Any]]:
-    """Return ``{contract_id: {path, status, version, content_sha256}}`` for every id-bearing YAML under ``spec_root/relative_dir``."""
+    """Return ``{contract_id: {path, status, version, content_sha256[, type][, family]}}`` for every id-bearing YAML under ``spec_root/relative_dir``."""
     suffix = glob_pattern.lstrip("*")
     contracts: dict[str, dict[str, Any]] = {}
     for path in sorted((spec_root / relative_dir).glob(glob_pattern)):
@@ -75,6 +75,8 @@ def scan_contract_files(spec_root: Path, relative_dir: str, glob_pattern: str) -
         }
         if document.get("type") is not None:
             contracts[contract_id]["type"] = document["type"]
+        if document.get("family") is not None:   # a method's family names its block (core/domain/blocks.py)
+            contracts[contract_id]["family"] = document["family"]
     return contracts
 
 

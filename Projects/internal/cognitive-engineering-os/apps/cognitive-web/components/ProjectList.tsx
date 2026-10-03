@@ -4,6 +4,8 @@
 // far it got (走到哪: AI 草稿／已核准／已退回, tasks due, a rerun due), when it was made and last moved (to the minute, in
 // your own time zone), and the button to its latest result. Most recently active first.
 import Link from "next/link";
+import { BLOCKS } from "../lib/blocks";
+import { Slots } from "./blocks/BlockShell";
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
 import { analysisHref, projectHref, toolHref } from "../lib/catalog";
@@ -57,11 +59,11 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
         )}
         <p className="sub mt8 mb0">你自己建立的專案會出現在這裡；建立第一個：到「首頁」說你卡在哪，或到「工具」挑一個按「開始」。刪除專案 = 來源與所有產出一起刪掉，留一筆「已抹除」。</p>
       </div>
-      {/* N-79: the six-step journey every project walks (docs/mockups/home-mock.html「每個專案都走同一條線」) */}
+      {/* A case is not one fixed line (藍圖 4; contract card 共用紀錄): the assembler puts blocks together by purpose. */}
       <div className="card">
-        <h2>每個專案都走同一條線<small>六步，每步一顆主按鈕</small></h2>
-        <div className="how"><b>怎麼讀</b>不管用哪個工具，專案都是這六步；關掉視窗再開，會回到走到的那一步。<b>你要做的</b>不用做；記住會花錢的步（蒐集、分析）按下去之前都會先告訴你要花多少。</div>
-        <div className="journey"><span>建立</span><i>→</i><span>蒐集</span><i>→</i><span>彙整</span><i>→</i><span>分析</span><i>→</i><span>報表</span><i>→</i><span>核准</span></div>
+        <h2>每個案子怎麼走<small>{BLOCKS.length} 塊積木，依目的組起來</small></h2>
+        <div className="how"><b>怎麼讀</b>開案時你選目的，系統推薦一組積木和順序；你可以重排、跳過、停止。其他積木在對的時機由各塊提出，你同意才加。個人的案子不用核准收尾。</div>
+        <Slots />
       </div>
       {erased.length > 0 && <div className="card" id="erased">
         <h2>已抹除<small>{erased.length} 個</small></h2>

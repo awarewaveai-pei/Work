@@ -12,9 +12,9 @@ import { failureReason, humanError } from "../lib/errors";
 import { STANCE, STATUS, TASK_STATUS, standing, todayIso, type Analysis, type Project, type Rerun, type Source, type Task, type TaskNumber, type TaskStatus } from "../lib/projects";
 import { formatTime } from "../lib/time";
 import { TrendChart, type TrendSeries } from "./result/Charts";
+import { Slots } from "./blocks/BlockShell";
 
 const OPEN: Record<Analysis["status"], string> = { DONE: "看結果 →", PENDING: "看進度 →", FAILED: "看原因 →" };
-const JOURNEY = ["建立", "蒐集", "彙整", "分析", "報表", "核准"] as const;
 const TASK_STATUS_LIST = Object.keys(TASK_STATUS) as TaskStatus[];
 
 // GET /projects/{id}/history: the project's own append-only event log, raw (main.py `project_history`).
@@ -93,12 +93,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
   const today = todayIso();
   const openTasks = tasks.filter((task) => !task.done);
   const dueReruns = reruns.filter((item) => !item.fulfilled_by && item.due <= today);
-  // N-79: only what this project actually reports gets marked done -- 彙整/分析 have no signal of their own here,
-  // so they stay unmarked rather than inferred from 蒐集/報表 (no invented facts).
-  const journeyDone: Record<(typeof JOURNEY)[number], boolean> = {
-    建立: true, 蒐集: (sources?.length ?? 0) > 0, 彙整: false, 分析: false,
-    報表: latest?.status === "DONE", 核准: latest?.approval?.decision === "approve",
-  };
+
   const setStatus = async (task: Task, status: TaskStatus) => {
     setActionError("");
     try {
@@ -343,7 +338,10 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
         <span>任務 {openTasks.length} 個進行中{openTasks.some((task) => task.due && task.due < today) ? `・${openTasks.filter((task) => task.due && task.due < today).length} 個逾期` : ""}</span>
         <span>來源 {sources?.length ?? 0} 筆</span>
       </div>
-      <div className="journey">{JOURNEY.map((step, index) => <React.Fragment key={step}><span className={journeyDone[step] ? "done" : undefined}>{step}</span>{index < JOURNEY.length - 1 && <i>→</i>}</React.Fragment>)}</div>
+      {/* The case's 14 slots (one per block) replace the old 建立→蒐集→彙整→分析→報表→核准 bar: the contract card 共用紀錄
+          says a personal case does not end in 核准. */}
+      <Slots projectId={project.project_id} />
+      <div className="btns"><Link className="btn" href={`/projects/${encodeURIComponent(project.project_id)}/start`}>開案資料：目的、風險、誰會受影響、這次走哪幾塊 →</Link></div>
       <div className="how"><b>怎麼讀</b>這個專案走到哪：每一次分析（新的在上面）、存下來的任務、到期要重跑的提醒；時間是你這裡的時間，到分鐘。<b>你要做的</b>按「看結果」打開那一次的完整結果；到期的提醒按「重跑並比較」；任務卡上按狀態按鈕更新進度。</div>
       {dueReruns.map((item) => <div className="finding warn" key={item.rerun_id}><b>到期了（{item.due}）：用新資料重跑並比較</b>打開 {formatTime(item.scheduled_at).slice(0, 10)} 排的那一次分析，更新格子裡的數字，按「執行分析」；跑完兩次會並排比較。<div className="btns mt6"><Link className="btn primary" href={`${analysisHref(project.project_id, item.interpretation_id)}?rerun=${encodeURIComponent(item.rerun_id)}`}>重跑並比較 →</Link></div></div>)}
     </div>

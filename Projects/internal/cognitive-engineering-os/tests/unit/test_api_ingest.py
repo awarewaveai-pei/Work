@@ -147,10 +147,10 @@ class IngestApiTests(CollectionApiTestCase):
         before = (len(self._rows()), self._blobs())
         real_insert = ProjectSourceRepository._insert_source
 
-        def refuse_the_new_url(connection, record, cas_path):
+        def refuse_the_new_url(connection, record, cas_path, writer):
             if record["canonical_url"].endswith("/new"):
                 raise InvariantViolation("SOURCE_STORAGE_REFERENCE_INVALID")
-            return real_insert(connection, record, cas_path)
+            return real_insert(connection, record, cas_path, writer)
 
         with patch.object(ProjectSourceRepository, "_insert_source", staticmethod(refuse_the_new_url)):
             response = self._ingest([c1("https://acme.example/b", "beta"), c1("https://acme.example/new", "brand new text")])

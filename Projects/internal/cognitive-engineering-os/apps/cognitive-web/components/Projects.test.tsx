@@ -7,6 +7,7 @@ import { formatTime } from "../lib/time";
 import { AnalysisPage } from "./AnalysisPage";
 import { ProjectList } from "./ProjectList";
 import { ProjectPage } from "./ProjectPage";
+import { BLOCKS, isOpen } from "../lib/blocks";
 
 vi.mock("../lib/api", async (original) => ({ ...(await original<typeof import("../lib/api")>()), apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -62,10 +63,13 @@ describe("我的專案", () => {
     await finish();
   });
 
-  it("shows the six-step journey every project walks (N-79)", async () => {
+  it("shows every block a case can use, not one fixed line (contract card 共用紀錄)", async () => {
     vi.mocked(apiFetch).mockImplementation(async (path) => (path === "/projects/erased" ? [] : [OLD]) as never);
     const { host, done: finish } = await mount(<ProjectList />);
-    expect([...host.querySelectorAll(".journey span")].map((span) => span.textContent)).toEqual(["建立", "蒐集", "彙整", "分析", "報表", "核准"]);
+    const slots = [...host.querySelectorAll(".journey span, .journey i")].map((node) => node.textContent);
+    expect(slots).toHaveLength(BLOCKS.length);
+    expect(slots[0]).toBe("1 外化");
+    expect(host.querySelector(".journey")?.textContent).not.toContain("核准");
     await finish();
   });
 
@@ -277,21 +281,20 @@ describe("one project", () => {
     await finish();
   });
 
-  it("marks the journey's 核准 step done once the latest analysis is approved (N-79)", async () => {
-    const approved = { ...done("I-1", "2026-09-26T11:42:11Z"), approval: { decision: "approve", at: "2026-09-26T12:00:00Z", by_name: "A" } };
+  it("puts the case's 14 slots and its intake on the case page (one link per open block)", async () => {
     vi.mocked(apiFetch).mockImplementation(async (path) => {
       if (path === "/projects/P-OLD") return OLD as never;
-      if (path === "/projects/P-OLD/analyses") return [approved] as never;
-      if (path === "/projects/P-OLD/sources") return [{ source_id: "S1", title: "x", created_at: "2026-09-26T10:00:00Z" }] as never;
+      if (path === "/projects/P-OLD/analyses") return [] as never;
+      if (path === "/projects/P-OLD/sources") return [] as never;
       if (path === "/projects/P-OLD/tasks") return [] as never;
       if (path === "/projects/P-OLD/reruns") return [] as never;
       if (path === "/projects/P-OLD/history") return [] as never;
       throw new Error(`unexpected: ${path}`);
     });
     const { host, done: finish } = await mount(<ProjectPage projectId="P-OLD" />);
-    const steps = [...host.querySelectorAll(".journey span")];
-    expect(steps.map((span) => span.textContent)).toEqual(["建立", "蒐集", "彙整", "分析", "報表", "核准"]);
-    expect(steps.map((span) => span.className)).toEqual(["done", "done", "", "", "done", "done"]);
+    const links = [...host.querySelectorAll(".journey a")].map((link) => link.getAttribute("href"));
+    expect(links).toEqual(BLOCKS.filter(isOpen).map((block) => `/projects/P-OLD/${block.path}`));
+    expect(host.querySelector('a[href="/projects/P-OLD/start"]')).not.toBeNull();
     await finish();
   });
 

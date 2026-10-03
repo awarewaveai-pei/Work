@@ -13,6 +13,7 @@ from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.data.events import record_log
 from tests.unit.test_api_main import ApiTestCase
 
 
@@ -141,10 +142,10 @@ class ReportApiTests(ApiTestCase):
         report_id = self._new_report()
         original = self.repo.update_report_reference
 
-        def racing(tenant_id, project_id, rid, expected, new, event_type, payload):
+        def racing(tenant_id, project_id, rid, expected, new, event_type, payload, *, writer):
             winner = self.artifacts.put(tenant_id, "ResearchReport", {"report": {"report_state": "AI_GENERATED", "approved_by": None, "markdown": "winner"}, "gate_results": []})
-            original(tenant_id, project_id, rid, expected, winner, "ReportRejected", {"report_id": rid, "reason": "winner"})
-            return original(tenant_id, project_id, rid, expected, new, event_type, payload)   # now stale
+            original(tenant_id, project_id, rid, expected, winner, "ReportRejected", {"report_id": rid, "reason": "winner"}, writer=writer)
+            return original(tenant_id, project_id, rid, expected, new, event_type, payload, writer=writer)   # now stale
 
         self.repo.update_report_reference = racing
         try:
@@ -161,10 +162,10 @@ class ReportApiTests(ApiTestCase):
         tenant_id = self.tenant["tenant_id"]
         other = self.artifacts.put(tenant_id, "ResearchReport", {"report": {}, "gate_results": []})
         with self.assertRaises(InvariantViolation) as caught:
-            self.repo.update_report_reference(tenant_id, self.project_id, report_id, other, other, "ReportApproved", {})
+            self.repo.update_report_reference(tenant_id, self.project_id, report_id, other, other, "ReportApproved", {}, writer=record_log.user("someone", "VERIFY"))
         self.assertEqual(str(caught.exception), "REPORT_STALE")
         with self.assertRaises(InvariantViolation) as caught:
-            self.repo.update_report_reference(tenant_id, self.project_id, "RPT-MISSING", other, other, "ReportApproved", {})
+            self.repo.update_report_reference(tenant_id, self.project_id, "RPT-MISSING", other, other, "ReportApproved", {}, writer=record_log.user("someone", "VERIFY"))
         self.assertEqual(str(caught.exception), "REPORT_NOT_FOUND")
 
     def _second_tenant_client(self):

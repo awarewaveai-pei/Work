@@ -13,6 +13,7 @@ from ai_lego.core.domain.project import project_record
 from ai_lego.core.domain.source import COLLECTED_PROVENANCE, source_record
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
+from ai_lego.data.events import record_log
 
 TENANT = "22222222-2222-4222-8222-222222222222"
 PROJECT = "11111111-1111-4111-8111-111111111111"
@@ -69,7 +70,7 @@ class SourceProvenanceTests(unittest.TestCase):
 
     def test_collected_fields_round_trip(self):
         source = _collected(OLD, "a" * 64)
-        self.repo.add_source(source, _cas("a" * 64))
+        self.repo.add_source(source, _cas("a" * 64), writer=record_log.system("GATHER"))
         self.assertEqual(self.repo.get_source(TENANT, PROJECT, OLD), source)
         self.assertEqual(self.repo.find_active_source(TENANT, PROJECT, URL)["source_id"], OLD)
 
@@ -79,7 +80,7 @@ class SourceProvenanceTests(unittest.TestCase):
         contracts.validate("ai-lego://specs/domain/source.schema.yaml", {**_collected(NEW, "b" * 64, supersedes=OLD), "status": "superseded"}, "source")
 
     def test_supersede_swaps_the_active_row_in_one_transaction(self):
-        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64))
+        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64), writer=record_log.system("GATHER"))
         self.repo.supersede(OLD, _collected(NEW, "b" * 64, supersedes=OLD), _cas("b" * 64))
         self.assertEqual(self.repo.get_source(TENANT, PROJECT, OLD)["status"], "superseded")
         new = self.repo.get_source(TENANT, PROJECT, NEW)
@@ -90,7 +91,7 @@ class SourceProvenanceTests(unittest.TestCase):
         self.assertEqual(set(events[-1]["payload"]), {"source_id", "superseded_by", "project_id"})
 
     def test_superseding_a_row_that_is_no_longer_active_writes_nothing(self):
-        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64))
+        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64), writer=record_log.system("GATHER"))
         self.repo.supersede(OLD, _collected(NEW, "b" * 64, supersedes=OLD), _cas("b" * 64))
         third = "77777777-7777-4777-8777-777777777777"
         with self.assertRaisesRegex(InvariantViolation, "SOURCE_SUPERSEDE_CONFLICT"):
@@ -99,16 +100,16 @@ class SourceProvenanceTests(unittest.TestCase):
         self.assertEqual(self.repo.find_active_source(TENANT, PROJECT, URL)["source_id"], NEW)
 
     def test_a_failed_insert_rolls_the_old_row_back_to_active(self):
-        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64))
+        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64), writer=record_log.system("GATHER"))
         with self.assertRaisesRegex(InvariantViolation, "SOURCE_STORAGE_REFERENCE_INVALID"):
             self.repo.supersede(OLD, _collected(NEW, "b" * 64, supersedes=OLD), _cas("not-the-hash"))
         self.assertEqual(self.repo.get_source(TENANT, PROJECT, OLD)["status"], "active")
         self.assertEqual(self.repo.list_events(TENANT, f"source:{OLD}")[-1]["event_type"], "SourceAdded")
 
     def test_the_database_refuses_two_active_versions_of_one_url(self):
-        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64))
+        self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64), writer=record_log.system("GATHER"))
         with self.assertRaises(sqlite3.IntegrityError):
-            self.repo.add_source(_collected(NEW, "b" * 64), _cas("b" * 64))
+            self.repo.add_source(_collected(NEW, "b" * 64), _cas("b" * 64), writer=record_log.system("GATHER"))
 
     def test_non_evidence_provenance_is_refused(self):
         bad = {"epistemic_type": "SOURCE_FACT", "authorship_state": "SOURCE_QUOTATION", "locked": None}

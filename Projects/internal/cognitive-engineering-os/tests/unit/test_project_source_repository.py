@@ -9,6 +9,7 @@ from ai_lego.core.domain.project import project_record
 from ai_lego.core.domain.source import source_record
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
+from ai_lego.data.events import record_log
 
 
 class ProjectSourceRepositoryTests(unittest.TestCase):
@@ -68,7 +69,7 @@ class ProjectSourceRepositoryTests(unittest.TestCase):
             cas_path = {"path": "/objects/tenant/sha256/aa/aa/" + "a" * 64, "tenant_segment": project["tenant_id"], "hash": "a" * 64, "shard_1": "aa", "shard_2": "aa"}
             repository.create_project(project)
 
-            repository.add_source(source, cas_path)
+            repository.add_source(source, cas_path, writer=record_log.system("GATHER"))
 
             self.assertEqual(repository.get_source(project["tenant_id"], project["project_id"], source["source_id"]), source)
             self.assertEqual(repository.get_source_content_reference(project["tenant_id"], project["project_id"], source["source_id"]), cas_path)
@@ -86,7 +87,7 @@ class ProjectSourceRepositoryTests(unittest.TestCase):
             repository.create_project(project)
 
             with self.assertRaisesRegex(InvariantViolation, "SOURCE_PROJECT_CLASSIFICATION_MISMATCH"):
-                repository.add_source(source, {"tenant_segment": project["tenant_id"], "hash": source["content_sha256"]})
+                repository.add_source(source, {"tenant_segment": project["tenant_id"], "hash": source["content_sha256"]}, writer=record_log.system("GATHER"))
 
     def test_source_metadata_round_trips_populated_citation_fields(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -119,7 +120,7 @@ class ProjectSourceRepositoryTests(unittest.TestCase):
             cas_path = {"path": "/objects/tenant/sha256/aa/aa/" + "a" * 64, "tenant_segment": project["tenant_id"], "hash": "a" * 64, "shard_1": "aa", "shard_2": "aa"}
             repository.create_project(project)
 
-            repository.add_source(source, cas_path)
+            repository.add_source(source, cas_path, writer=record_log.system("GATHER"))
 
             self.assertEqual(repository.get_source(project["tenant_id"], project["project_id"], source["source_id"]), source)
 
@@ -223,7 +224,7 @@ class ProjectSourceRepositoryTests(unittest.TestCase):
                 venue="Journal of Reflective Practice",
                 published_at="2020-05",
             )
-            repository.add_source(second_source, {"tenant_segment": project["tenant_id"], "hash": "b" * 64})
+            repository.add_source(second_source, {"tenant_segment": project["tenant_id"], "hash": "b" * 64}, writer=record_log.system("GATHER"))
 
             added = repository.get_source(project["tenant_id"], project["project_id"], second_source["source_id"])
             self.assertEqual(added["doi"], "10.1000/xyz123")
