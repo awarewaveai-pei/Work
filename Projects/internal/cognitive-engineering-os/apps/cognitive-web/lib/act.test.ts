@@ -63,9 +63,9 @@ describe("the task card", () => {
   });
 
   it("says the rhythm: weekly for the first month, then the month, quarter or year the person chose (month by default)", () => {
-    expect(rhythmLine(undefined)).toBe("前 4 週每週記一次，之後每月記一次。");
-    expect(rhythmLine("季")).toBe("前 4 週每週記一次，之後每季記一次。");
-    expect(rhythmLine("年")).toBe("前 4 週每週記一次，之後每年記一次。");
-    expect(rhythmLine("週")).toBe("前 4 週每週記一次，之後每月記一次。");
+    expect(rhythmLine(undefined)).toBe("從你按「進行中」那天算，前 4 週每週記一次，之後每月記一次。");
+    expect(rhythmLine("季")).toBe("從你按「進行中」那天算，前 4 週每週記一次，之後每季記一次。");
+    expect(rhythmLine("年")).toBe("從你按「進行中」那天算，前 4 週每週記一次，之後每年記一次。");
+    expect(rhythmLine("週")).toBe("從你按「進行中」那天算，前 4 週每週記一次，之後每月記一次。");
   });
 });

@@ -121,6 +121,8 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 ## ACT (丙) — built 2026-10-03
 - task card (prediction first, due, risk, stop / escalate conditions, owner, irreversible, whose wish, hold under the guardrail), notes (4 cells + numbers, trend from 2 points), status as buttons, history with quick flips folded (10 min window, all kept), weekly-then-月/季/年 reminders (`GET /me/reminders`, `/projects/{id}/act/reminders`), AI split / flag / trend
 - built (S): 「提醒出現在「我的案子」首頁」 -- RemindersPanel on the case list
+- built: 「行動後第一個月，每週提醒」 counts from the day the person first marked the task 進行中 or 完成 (`act.started_at`, from the task's versions); a card not begun has no observation reminder. A review counts from its latest version
+- built: 「有護欄時，不能反悔的行動要先等或請人覆核」 is the server's rule too (`block_hooks/act.py` BEFORE_SAVE, `ACT_HOLD_REQUIRED`): the guardrail, or the task's own words that would add it; LEARN compare sends the judgment version the review is about and each prediction as first written
 - NOT YET: 「也可以選寄 email」 (noreply@aware-wave.com, a link and no case content) for ACT / LEARN / practice reminders
 - NOT YET (S): 「⑦ 存成任務」 (TaskCreated events) stays as it is; it should also write `act.task` (needs a prediction the ⑦ row does not carry -- second wave, with 「你先寫，AI 才回」 for the old tools)
 - NOT YET (VERIFY, COMPUTE: step 2; COLLAB: step 3): reading their results and group actions; handing observations to COLLAB

@@ -23,8 +23,8 @@ export const taskFromNextStep = (nextStep: string): Pick<Task, "title" | "from_n
 /** 不能反悔的行動，這個案子有護欄 wait_or_review 時：標了不能反悔，卻還沒選先等一下或請人覆核。 */
 export const holdAsked = (guardrails: string[], task: Pick<Task, "irreversible" | "hold">): boolean => guardrails.includes("wait_or_review") && task.irreversible === true && !task.hold;
 
-/** The rhythm the person is on, in words (the engine's rule: weekly for the first month, then 月／季／年). */
-export const rhythmLine = (longRhythm: string | undefined): string => `前 4 週每週記一次，之後每${longRhythm && (LONG_RHYTHM as readonly string[]).includes(longRhythm) ? longRhythm : "月"}記一次。`;
+/** The rhythm the person is on, in words (the engine's rule: weekly for the first month after they began, then 月／季／年). */
+export const rhythmLine = (longRhythm: string | undefined): string => `從你按「進行中」那天算，前 4 週每週記一次，之後每${longRhythm && (LONG_RHYTHM as readonly string[]).includes(longRhythm) ? longRhythm : "月"}記一次。`;
 
 const withoutStatus = (task: Task): string => JSON.stringify(Object.entries(task).filter(([key]) => key !== "status").sort(([left], [right]) => left.localeCompare(right)));
 const sameButStatus = (a: Task, b: Task): boolean => withoutStatus(a) === withoutStatus(b);

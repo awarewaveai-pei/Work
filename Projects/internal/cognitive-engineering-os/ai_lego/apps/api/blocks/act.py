@@ -14,7 +14,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ai_lego.apps.api import main as api
-from ai_lego.core.domain.kinds.act import case_reminders, practice_reminders
+from ai_lego.core.domain.kinds.act import case_reminders, practice_reminders, started_at
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
@@ -33,7 +33,9 @@ def _today(today: str | None, utc_offset: int) -> datetime.date:
 
 def _case(docs: CaseDocs, tenant_id: str, project: dict[str, Any], today: datetime.date, utc_offset: int) -> list[dict[str, Any]]:
     owner = record_log.case(project["project_id"])
-    found = case_reminders(*(docs.current(tenant_id, owner, kind) for kind in ("act.task", "act.note", "learn.calibration", "learn.revisit")), today, utc_offset)
+    tasks, notes, calibrations, revisits = (docs.current(tenant_id, owner, kind) for kind in ("act.task", "act.note", "learn.calibration", "learn.revisit"))
+    tasks = [{**task, "started_at": started_at(docs.versions(tenant_id, owner, "act.task", task["doc_id"]))} for task in tasks]
+    found = case_reminders(tasks, notes, calibrations, revisits, today, utc_offset)
     return [{**item, "scope": "case", "project_id": project["project_id"], "project_name": project["name"], "path": f"/projects/{project['project_id']}/{item['block'].lower()}"} for item in found]
 
 

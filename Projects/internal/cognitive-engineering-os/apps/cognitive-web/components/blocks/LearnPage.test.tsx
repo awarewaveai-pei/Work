@@ -127,8 +127,10 @@ describe("LEARN 回顧校準", () => {
   it("the AI's comparison carries its author, two things done well and one to practise, and no verdict", async () => {
     const compare = doc("learn.compare", "P1", { side_by_side: "你預測他讓步一半；結果他又改了條件。", done_well: ["你先寫了預測", "你寫了什麼會改變結論"], practice: "下次先寫反例" }, { author: "ai", block: "LEARN" });
     let made = false;
-    const { host, done } = await open({ [`POST ${P}/ai/LEARN/compare`]: () => { made = true; return { saved: compare }; }, [`GET ${P}/docs/learn.compare`]: () => (made ? [compare] : []) });
+    const { host, done, calls } = await open({ [`POST ${P}/ai/LEARN/compare`]: () => { made = true; return { saved: compare }; }, [`GET ${P}/docs/learn.compare`]: () => (made ? [compare] : []) });
+    await click(chip(host, "回顧哪一版", "第 1 版"));
     await click(byText(host, "button", "請 AI 整理前後比較"));
+    expect(posts(calls, `${P}/ai/LEARN/compare`)[0].body.context).toEqual({ judgment_version: 1 });   // the version the review is about, not whatever is newest
     expect(host.textContent).toContain("AI 寫的");
     expect(host.textContent).toContain("你先寫了預測");
     expect(host.textContent).toContain("下次可以練的一處：下次先寫反例");

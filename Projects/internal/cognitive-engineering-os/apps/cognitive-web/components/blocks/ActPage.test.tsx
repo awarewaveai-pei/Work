@@ -58,6 +58,27 @@ describe("ACT 行動與觀察", () => {
     await done();
   });
 
+  it("a step marked irreversible offers the hold choice even with no guardrail yet; the server's refusal for high-risk words is said in plain words and can be answered", async () => {
+    let refuse = true;
+    const { host, done, calls } = await open({
+      [`POST ${P}/docs/act.task`]: (call: Call) => { if (refuse && !call.body.content.hold) throw new ApiError(400, "ACT_HOLD_REQUIRED: this step cannot be undone and touches something high-risk"); return saved("act.task", "T1", call.body.content); },
+    });
+    await type(field(host, "task-title"), "跟銀行借款");
+    await type(field(host, "task-prediction"), "他們會核准一半");
+    expect(host.querySelector('[aria-label="先等一下或請人覆核"]')).toBeNull();   // an undoable step: no question
+    await click(chip(host, "能不能反悔", "不能反悔"));
+    expect(host.querySelector('[aria-label="先等一下或請人覆核"]')).not.toBeNull();
+    expect((byText(host, "button", "存這張任務卡") as HTMLButtonElement).disabled).toBe(false);   // no guardrail the page knows of: the server decides
+    await click(byText(host, "button", "存這張任務卡"));
+    expect(host.querySelector(".error")?.textContent).toContain("先選「先等一下」、「請人覆核」，或「我想過了，照做」");
+    expect(host.querySelector(".error")?.textContent).not.toMatch(/ACT_HOLD_REQUIRED|API/);
+    refuse = false;
+    await click(chip(host, "先等一下或請人覆核", "先等一下"));
+    await click(byText(host, "button", "存這張任務卡"));
+    expect(posts(calls, `${P}/docs/act.task`).at(-1)!.body.content).toMatchObject({ irreversible: true, hold: "先等一下" });
+    await done();
+  });
+
   it("an action that can be undone is never held, guardrail or not", async () => {
     const guardrail = doc("govern.guardrail", "G1", { guardrail: "wait_or_review", category: "金錢", found_by: "ACT" }, { author: "system" });
     const { host, done } = await open({ [`GET ${P}/docs/govern.guardrail`]: [guardrail] });

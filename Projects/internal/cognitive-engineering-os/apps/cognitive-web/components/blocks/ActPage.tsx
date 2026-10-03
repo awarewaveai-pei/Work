@@ -44,7 +44,8 @@ function TaskForm({ initial, guardrails, onSave, onCancel, busy, label }: { init
         <b>做了以後，能反悔嗎？</b>
         <Chips options={["能反悔", "不能反悔"] as const} value={task.irreversible === undefined ? "" : task.irreversible ? "不能反悔" : "能反悔"} label="能不能反悔" onPick={(value) => set({ irreversible: value === "不能反悔", ...(value === "能反悔" ? { hold: undefined } : {}) })} />
         {holding && <p className="warn">這個案子有護欄：不能反悔的行動，請先等一下，或請人覆核。</p>}
-        {task.irreversible === true && guardrails.includes("wait_or_review") && <Chips options={HOLD} value={task.hold as (typeof HOLD)[number] | undefined} label="先等一下或請人覆核" onPick={(hold) => set({ hold })} />}
+        {task.irreversible === true && <Chips options={HOLD} value={task.hold as (typeof HOLD)[number] | undefined} label="先等一下或請人覆核" onPick={(hold) => set({ hold })} />}
+        {task.irreversible === true && !guardrails.includes("wait_or_review") && <p className="hint">這個案子有護欄，或這一步碰到高風險的事時，一定要選一個。</p>}
       </div>
       <div className="field">
         <b>第一個月之後，你多久回來記一次？</b>
@@ -238,6 +239,7 @@ export function ActPage({ projectId }: { projectId: string }) {
               <div className="tcard">
                 <div className="head"><h3>{task.content.title}</h3><span className="tags"><span>{task.content.status ?? "未開始"}</span></span></div>
                 <div className="meta"><span>期限：{task.content.due ?? "沒定"}</span><span>負責：{task.content.owner || "沒寫"}</span><span>{rhythmLine(task.content.long_rhythm)}</span></div>
+                {(task.content.status ?? "未開始") === "未開始" && <p className="hint mt0 mb8">開始做了，就按下面的「進行中」；從那天起，才開始提醒你記觀察。</p>}
                 <p className="mb8"><b>我的預測：</b>{task.content.prediction}</p>
                 {task.content.risk && <p className="mt0 mb8"><b>風險：</b>{task.content.risk}</p>}
                 {task.content.stop_condition && <p className="mt0 mb8"><b>停止條件：</b>{task.content.stop_condition}</p>}

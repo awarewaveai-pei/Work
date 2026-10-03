@@ -95,7 +95,7 @@ export function LearnPage({ projectId }: { projectId: string }) {
   });
   const writeHistory = run(async () => { await apiFetch(`/projects/${encodeURIComponent(projectId)}/learn/history`, { method: "POST" }); });
   const askCompare = run(async () => {
-    const turn = await ai<Compare>(projectId, "LEARN", "compare", {}, held?.compare);
+    const turn = await ai<Compare>(projectId, "LEARN", "compare", version ? { judgment_version: version } : {}, held?.compare);
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
   });
   const saveDay = run(async () => {

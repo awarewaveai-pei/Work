@@ -82,6 +82,7 @@ const CODES: Record<string, string> = {
   ACT_NO_NEXT_STEP: "判斷卡上還沒有「下一步」，沒有東西可以拆。",
   ACT_NO_TASK: "先寫一張任務卡，才能請 AI 看哪裡不能反悔。",
   ACT_NO_NUMBERS: "還沒有任何一筆紀錄記了數字。",
+  ACT_HOLD_REQUIRED: "這一步標了不能反悔，又碰到高風險的事：先選「先等一下」、「請人覆核」，或「我想過了，照做」，再存。",
   REMINDER_DATE_INVALID: "提醒的日期不對，請重新選一個日期。",
   LEARN_NOTHING_TO_COMPARE: "這個案子還沒有判斷或任務，沒有東西可以對照。",
   LEARN_NO_DAILY_CARD: "先寫今天的校準卡，才能請 AI 整理。",

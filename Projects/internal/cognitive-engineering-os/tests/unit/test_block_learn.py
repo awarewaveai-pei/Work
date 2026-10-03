@@ -4,6 +4,7 @@ daily calibration card outside any case with the AI as a mirror only."""
 
 from __future__ import annotations
 
+import json
 import re
 import unittest
 
@@ -260,6 +261,53 @@ class CompareTests(LearnBase):
         for seen in ("先談一次", "我猜他會讓步一半", "他下個月又改條件"):
             self.assertIn(seen, user)
         self.assertEqual(self.client.get(f"{self.base}/docs/decide.judgment").json()[0]["content"]["conclusion"], judgment["content"]["conclusion"])
+
+    def compare(self, **context):
+        held = self.client.get(f"{self.base}/docs/learn.compare").json()   # asking again = its next version
+        over = {"doc_id": held[0]["doc_id"], "base_version": held[0]["version"]} if held else {}
+        return self.client.post(f"{self.base}/ai/LEARN/compare", json={"context": context, **over})
+
+    def asked_about(self):
+        user = self.provider.calls[-1][1]
+        return json.loads(user.split("\n", 1)[1].split("\n\n", 1)[0])
+
+    def test_the_earlier_judgment_is_the_version_the_review_is_about_never_one_written_after_the_outcome(self):
+        """AI 不准改寫當初的紀錄: v2 written after the outcome must not be labelled the earlier judgment."""
+        v1 = self.save("decide.judgment", {**LEAN, "conclusion": "先談一次", "confidence": 60})
+        task = self.save("act.task", {"title": "跟他談", "prediction": "我猜他會讓步一半"})
+        self.client.put(f"{self.base}/docs/decide.judgment/{v1['doc_id']}", json={"content": {**LEAN, "conclusion": "改成直接退出", "confidence": 30, "revision_reason": "結果出來後我改了"}, "base_version": 1})
+        self.provider.answer = {"side_by_side": "x"}
+        self.assertEqual(self.compare(judgment_version=1).status_code, 200)
+        earlier = self.asked_about()["earlier_judgment"]
+        self.assertEqual((earlier["version"], earlier["conclusion"], earlier["confidence"]), (1, "先談一次", 60))
+        self.assertNotIn("改成直接退出", self.provider.calls[-1][1])
+        self.assertEqual(self.compare(judgment_version=2).status_code, 200)
+        self.assertEqual((self.asked_about()["earlier_judgment"]["version"], self.asked_about()["earlier_judgment"]["conclusion"]), (2, "改成直接退出"))
+        self.assertEqual(self.compare().status_code, 200)   # nothing named, no review yet: the latest
+        self.assertEqual(self.asked_about()["earlier_judgment"]["version"], 2)
+        self.save("learn.calibration", {**REVIEW, "judgment_version": 1})
+        self.assertEqual(self.compare().status_code, 200)   # a review names the version it is about
+        self.assertEqual(self.asked_about()["earlier_judgment"]["version"], 1)
+        calls = len(self.provider.calls)
+        for wrong in (9, 0):
+            refused = self.compare(judgment_version=wrong)
+            self.assertEqual((refused.status_code, "DOC_NOT_FOUND" in refused.text), (400, True), wrong)
+        self.assertEqual(len(self.provider.calls), calls)   # refused before any model call
+        self.assertEqual(task["version"], 1)
+
+    def test_the_prediction_is_sent_as_first_written_and_a_later_change_is_said(self):
+        task = self.save("act.task", {"title": "跟他談", "prediction": "我猜他會讓步一半"})
+        other = self.save("act.task", {"title": "寫信", "prediction": "他會回信"})
+        self.provider.answer = {"side_by_side": "x"}
+        self.assertEqual(self.compare().status_code, 200)
+        by_title = {item["title"]: item for item in self.asked_about()["predictions"]}
+        self.assertEqual(by_title["跟他談"], {"title": "跟他談", "prediction": "我猜他會讓步一半"})
+        self.client.put(f"{self.base}/docs/act.task/{task['doc_id']}", json={"content": {"title": "跟他談", "prediction": "我猜他會讓步七成", "status": "完成"}, "base_version": 1})
+        self.assertEqual(self.compare().status_code, 200)
+        by_title = {item["title"]: item for item in self.asked_about()["predictions"]}
+        self.assertEqual(by_title["跟他談"], {"title": "跟他談", "status": "完成", "prediction": "我猜他會讓步一半", "prediction_changed_later": True, "prediction_now": "我猜他會讓步七成"})
+        self.assertEqual(by_title["寫信"], {"title": "寫信", "prediction": "他會回信"})   # a task never changed says nothing extra
+        self.assertEqual(other["version"], 1)
 
     def test_it_reads_what_the_ai_said_and_what_the_person_answered(self):
         self.save("decide.judgment", LEAN)

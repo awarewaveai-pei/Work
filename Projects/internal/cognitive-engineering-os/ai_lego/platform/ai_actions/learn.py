@@ -32,18 +32,45 @@ MIRROR = (
 )
 MIRROR_SCHEMA = {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}
 
-Read = Callable[[str], list[dict[str, Any]]]
+Read = Callable[..., list[dict[str, Any]]]   # read(kind, every_version=False)
 
 
 def _text(content: Mapping[str, Any], *keys: str) -> dict[str, Any]:
     return {key: content[key] for key in keys if content.get(key) not in (None, "", [])}
 
 
+def _version_reviewed(context: Mapping[str, Any], versions: list[dict[str, Any]], read: Read) -> dict[str, Any] | None:
+    """The judgment as it was when the review is about it: the version in the context, else the one the person's latest review
+    names, else the latest. A version written after the outcome is never passed off as the earlier judgment (AI 不准改寫當初的紀錄)."""
+    if not versions:
+        return None
+    wanted = context.get("judgment_version")
+    if not isinstance(wanted, int) or isinstance(wanted, bool):
+        reviews = read("learn.calibration")
+        wanted = reviews[-1]["content"].get("judgment_version") if reviews else versions[-1]["version"]
+    found = next((version for version in versions if version["version"] == wanted), None)
+    if found is None:
+        raise InvariantViolation(f"DOC_NOT_FOUND: the judgment has no version {wanted!r}")
+    return found
+
+
+def _prediction_as_written(versions: list[dict[str, Any]]) -> dict[str, Any]:
+    """One task: its prediction as first written (what is compared with the outcome), and -- if the person changed it later --
+    that it was, with the later words."""
+    first, latest = versions[0]["content"], versions[-1]["content"]
+    view = {**_text(latest, "title", "due", "status"), "prediction": first.get("prediction", "")}
+    if latest.get("prediction") != first.get("prediction"):
+        view.update({"prediction_changed_later": True, "prediction_now": latest.get("prediction", "")})
+    return view
+
+
 def _compare_input(context: Mapping[str, Any], read: Read) -> str:
-    judgments = read("decide.judgment")
-    tasks = read("act.task")
-    if not judgments and not tasks:
+    judgments = read("decide.judgment", every_version=True)
+    task_versions = read("act.task", every_version=True)
+    if not judgments and not task_versions:
         raise InvariantViolation("LEARN_NOTHING_TO_COMPARE: there is no judgment or task in this case yet")
+    earlier = _version_reviewed(context, judgments, read)
+    tasks = [[version for version in task_versions if version["doc_id"] == doc_id] for doc_id in dict.fromkeys(version["doc_id"] for version in task_versions)]
     answered = {doc["content"].get("check"): doc["content"] for doc in read("decide.review")}
     ai_said = [{"from": "判斷檢查", "author": doc["author"], "said": _text(doc["content"], "clarity", "reversibility", "revisitable", "out_of_scope", "gaps", "contradictions"),
                 "your_answer": _text(answered.get(doc["doc_id"], {}), "irreversible", "hold", "note")} for doc in read("decide.check")]
@@ -53,8 +80,8 @@ def _compare_input(context: Mapping[str, Any], read: Read) -> str:
     ai_said += [{"from": "思考卡", "author": doc["author"], "said": _text(doc["content"], "claim"), "your_answer": _text(reactions.get(doc["doc_id"], {}), "reaction", "picked")}
                 for doc in read("think.card") if doc["author"] in ("ai", "joint")]
     payload = {
-        "earlier_judgment": ({"version": judgments[-1]["version"], **_text(judgments[-1]["content"], "conclusion", "confidence", "change_condition", "intensity_now", "next_step")} if judgments else None),
-        "predictions": [_text(task["content"], "title", "prediction", "due", "status") for task in tasks],
+        "earlier_judgment": ({"version": earlier["version"], **_text(earlier["content"], "conclusion", "confidence", "change_condition", "intensity_now", "next_step")} if earlier else None),
+        "predictions": [_prediction_as_written(versions) for versions in tasks],
         "afterwards": [{"on": note["created_at"][:10], **_text(note["content"], "happened", "thoughts", "adjustment", "blocker", "numbers")} for note in read("act.note")],
         "the_persons_review": [_text(doc["content"], "outcome", "prediction_result", "prediction_note", "missed", "process", "luck") for doc in read("learn.calibration")],
         "what_the_ai_said": ai_said,

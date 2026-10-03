@@ -3,7 +3,8 @@ prediction first), then observation notes -- weekly for the first month, then mo
 stay as written: LEARN compares them with what the person predicted, so a task and a note are never deleted.
 
 ``case_reminders`` / ``practice_reminders`` are the one place that decides what is due; the case list calls them
-through ``GET /me/reminders`` (ai_lego/apps/api/blocks/act.py)."""
+through ``GET /me/reminders`` (ai_lego/apps/api/blocks/act.py). The weekly rhythm starts when the person acted, not when the
+card was written: ``started_at`` is the first version of the task marked 進行中 or 完成."""
 
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from ai_lego.core.domain.kinds.decide import HOLD
 
 STATUS = ("未開始", "進行中", "完成", "擱置", "停掉")
 CLOSED = ("完成", "停掉", "擱置")      # no observation reminder for these
+ACTED = ("進行中", "完成")             # 行動後: the person has begun the step; the first month's weeks count from the day they first said so
 LONG_RHYTHM = ("月", "季", "年")
 _FIRST_MONTH = (7, 14, 21, 28)
 _LONG_MONTHS = {"月": 1, "季": 3, "年": 12}
@@ -105,18 +107,23 @@ def _day(doc: Mapping[str, Any], key: str, offset: int) -> datetime.date:
     return local_date(doc[key], offset)
 
 
+def started_at(versions: list[Mapping[str, Any]]) -> str | None:
+    """When the person first marked the task 進行中 or 完成 (every version of one task, oldest first); None while it has not begun."""
+    return next((version["at"] for version in versions if version["content"].get("status") in ACTED), None)
+
+
 def case_reminders(tasks: list[dict[str, Any]], notes: list[dict[str, Any]], calibrations: list[dict[str, Any]], revisits: list[dict[str, Any]],
                    today: datetime.date, utc_offset_minutes: int = 0) -> list[dict[str, Any]]:
     """What is due in one case (each item: block, kind, text, since). ``tasks`` etc. are the current documents of
-    act.task / act.note / learn.calibration / learn.revisit."""
+    act.task / act.note / learn.calibration / learn.revisit; a task carries ``started_at`` (see ``started_at``) -- one that has
+    not begun has nothing to observe yet. A review counts from its latest version: updating one after the due date settles it."""
     due: list[dict[str, Any]] = []
-    reviewed = [_day(doc, "created_at", utc_offset_minutes) for doc in calibrations]
+    reviewed = [_day(doc, "at", utc_offset_minutes) for doc in calibrations]
     for task in tasks:
         content = task["content"]
-        start = _day(task, "created_at", utc_offset_minutes)
         note_days = [_day(note, "created_at", utc_offset_minutes) for note in notes if note["content"].get("task") == task["doc_id"]]
-        if content.get("status") not in CLOSED:
-            found = observation_due(start, content.get("long_rhythm"), note_days, today)
+        if content.get("status") not in CLOSED and task.get("started_at"):
+            found = observation_due(_day(task, "started_at", utc_offset_minutes), content.get("long_rhythm"), note_days, today)
             if found:
                 due.append({"block": "ACT", "kind": "note", "since": found["since"], "text": f"該記一筆觀察了：{content['title']}", "weekly": found["weekly"]})
     deadlines = [datetime.date.fromisoformat(task["content"]["due"]) for task in tasks if task["content"].get("due") and task["content"].get("status") != "停掉"]
