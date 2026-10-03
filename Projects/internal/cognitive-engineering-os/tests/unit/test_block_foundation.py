@@ -309,7 +309,7 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         self.assertEqual(self.client.get(f"{self.base}/route").json()["done"], [])   # a tombstone is not 做過
         intake = {"purpose": "自我理解", "question": "要不要續約", "package": "自我理解", "blocks": ["SENSE", "THINK", "MAP"]}   # reordered, two skipped
         self.assertEqual(self.client.post(f"{self.base}/docs/assembler.intake", json={"content": intake}).status_code, 200)
-        verify = self._card("聽說他們也找了律師")["notices"][0]
+        verify = next(n for n in self._card("聽說他們也找了律師")["notices"] if n["type"] == "proposal")
         answer = lambda proposal, value: self.client.post(f"{self.base}/docs/assembler.answer", json={"content": {"proposal": proposal, "answer": value}})
         self.assertEqual(answer(verify["doc_id"], "accepted").status_code, 400)   # VERIFY is not built: 不能加
         self.assertEqual(answer("no-such-proposal", "declined").status_code, 404)

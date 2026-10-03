@@ -53,7 +53,7 @@ KINDS = [
         "stop_answers": _mine("json", 8000),                 # 什麼時候停止分析的四題，key = STOP_KEYS
         "pre_checks": _mine("json", 8000),                   # Farrell 的四個檢查題，key = PRE_CHECK_KEYS
         "intensity_now": _mine("choice", choices=INTENSITY, required=True),   # 下判斷前：情緒和急迫感多強
-        "influences_listed": _mine("json", 16000),           # 系統列的：[{"kind", "text"}]，存在你存的這一版
+        "influences_listed": _mine("json", 16000, scan=False),           # 系統列的：[{"kind", "text"}]，存在你存的這一版
         "influences_asked": _mine("json", 8000),             # 系統問的八項你怎麼答：[{"who", "answer", "note"}]
         "influences_added": _mine("list", 20),               # 你自己補的（跟系統列的分開記）
     }, deletable=False, singleton=True),

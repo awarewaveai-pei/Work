@@ -32,10 +32,10 @@ KINDS = [
         "affected": Field("list", 30),                             # 誰會受影響
         "rules": Field("text", 2000),                              # 跟這件事有關的法律或程序（知道的話）
         "done_when": Field("text", 1000),                          # 暫定的完成條件
-        "happened_in": Field("list", 10),                          # 發生地（可多個）
-        "you_are_in": Field("text", 200),                          # 你在哪裡
-        "others_in": Field("list", 20),                            # 其他當事人各在哪裡
-        "field_contact": Field("text", 500),                       # 有沒有到過現場的人可以問（選填）
+        "happened_in": Field("list", 10, scan=False),              # 發生地（可多個）
+        "you_are_in": Field("text", 200, scan=False),              # 你在哪裡
+        "others_in": Field("list", 20, scan=False),                # 其他當事人各在哪裡
+        "field_contact": Field("text", 500, scan=False),           # 有沒有到過現場的人可以問（選填）
         "package": Field("choice", choices=tuple(PACKAGES), required=True),
         "blocks": Field("choices", 20, choices=("SENSE", "GATHER", "MAP", "THINK", "VERIFY", "COMPUTE", "DECIDE", "ACT", "LEARN", "TEACH", "EXPRESS", "FACILITATE", "COLLAB", "GOVERN")),
     }, deletable=False, singleton=True),

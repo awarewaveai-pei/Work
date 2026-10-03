@@ -50,14 +50,14 @@ REVIEW_DECISIONS = ("採用", "不採用")
 
 KINDS = [
     DocKind("map.map", "MAP", "地圖", {
-        "method": Field("text", 200),                       # the 拆法 used, as the person reads it (工具名)
-        "method_id": Field("text", 120),                    # its catalog id, so a method already used in this case is known
+        "method": Field("text", 200, scan=False),           # the 拆法 used, as the person reads it (工具名: the catalog's words)
+        "method_id": Field("text", 120, scan=False),        # its catalog id, so a method already used in this case is known
         "method_version": Field("text", 40),                # the tool's version when it was picked (系統記下用的是哪一版)
         "one_lines": Field("json", 6000),                   # {layer key: the one line you write first}
         "layers": Field("json", 60000),                     # {layer key: [{id, text, by, card?, group?, place?, sources?, self_said?}]}
         "skipped": Field("choices", len(LAYER_KEYS), choices=LAYER_KEYS),
         "core_conflict": Field("text", 2000, human_only=True),
-        "claims": Field("json", 20000),                     # [{id, text, kind, by, item?, + the kind's detail fields}]
+        "claims": Field("json", 20000, labels=tuple(CLAIM_KINDS)),   # [{id, text, kind, by, item?, + the kind's detail fields}]
         "gaps": Field("list", 30),                          # 資訊缺口
         "assumptions": Field("json", 8000),                 # [{text, by}] 假設，誰提的
         "unwinnable": Field("bool"),                        # you judged this a game that cannot be won

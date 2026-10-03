@@ -56,7 +56,7 @@ INTERFACE_QUESTIONS = (
 KINDS = [
     DocKind("context.notes", "CONTEXT", "脈絡註記", {
         "facets_version": Field("text", 40),                # which list of facets this was written with
-        "facets": Field("json", 40000),                     # [{facet, relevant, defines_normal, is_cause, custom?, definition?}]
+        "facets": Field("json", 40000, labels=FACET_NAMES),  # [{facet, relevant, defines_normal, is_cause, custom?, definition?}]; a facet you name yourself is your words
         "jurisdictions": Field("list", 10),                 # 適用哪裡的法律 (places, from the intake or your own)
         "rights_duties": Field("text", 3000, human_only=True),
         "norm_origin": Field("text", 3000, human_only=True),

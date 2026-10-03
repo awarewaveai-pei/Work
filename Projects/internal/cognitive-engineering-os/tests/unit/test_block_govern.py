@@ -25,7 +25,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform import safety
 from ai_lego.platform.ai_actions.govern import TOPICS
 from ai_lego.platform.block_hooks import after_save
-from ai_lego.platform.block_hooks.govern import NOT_SCANNED, _recognise, written
+from ai_lego.platform.block_hooks.govern import _recognise, written
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.safety import risk
 from ai_lego.platform.workflow.run_lock import acquire_run_lock, lock_path_for
@@ -136,7 +136,8 @@ class RecognitionHookTests(unittest.TestCase):
 
     def test_with_no_case_the_person_is_told_to_open_one_and_nothing_is_added(self):
         doc = {"doc_id": "d", "kind": "sense.card", "version": 1, "content": {"category": "事件", "text": "要開刀手術"}, "author": "user", "block": "SENSE", "at": ""}
-        self.assertEqual(_recognise(self.docs, "t", record_log.person("me"), doc), [{"type": "suggest_case", "categories": ["健康"]}])
+        from ai_lego.platform.block_hooks.govern import OPEN_A_CASE
+        self.assertEqual(_recognise(self.docs, "t", record_log.person("me"), doc), [{"type": "suggest_case", "categories": ["健康"], "notice": OPEN_A_CASE}])
         self.assertEqual(self.docs.current("t", record_log.person("me"), "govern.guardrail"), [])
 
     def _intake(self, **fields):
@@ -154,11 +155,14 @@ class RecognitionHookTests(unittest.TestCase):
         self.assertEqual([(notice["category"], notice["found_by"]) for notice in notices], [("法律", "ASSEMBLER")])
         self.assertEqual(len(self._guardrails()), 3)
 
-    def test_what_the_system_listed_is_not_scanned_and_every_skipped_field_is_real(self):
-        for kind, names in NOT_SCANNED.items():
-            if kind in doc_kinds.kinds():
-                self.assertLessEqual(names, set(doc_kinds.require(kind).fields), kind)
+    def test_what_the_system_listed_is_not_scanned_and_its_own_labels_are_not_the_persons_words(self):
+        """Each kind says it on its fields (doc_kinds.Field scan / labels): places and what the system listed are not read;
+        a facet name or a claim kind the system offers is a label, a facet the person names is their words."""
+        self.assertFalse(doc_kinds.require("assembler.intake").fields["you_are_in"].scan)
+        self.assertFalse(doc_kinds.require("decide.judgment").fields["influences_listed"].scan)
         self.assertEqual(written({"kind": "sense.card", "content": {"category": "事件", "text": "他被打斷"}}), ["他被打斷"])
+        self.assertEqual(written({"kind": "context.notes", "content": {"facets": [{"facet": "法律", "relevant": True}, {"facet": "合約糾紛", "custom": True}]}}), ["合約糾紛"])
+        self.assertEqual(written({"kind": "map.map", "content": {"claims": [{"id": "c1", "text": "同業的做法", "kind": "法律", "by": "user"}]}}), ["c1", "同業的做法", "user"])
 
     def test_where_you_are_is_not_scanned(self):
         saved = self.docs.save("t", record_log.person("me"), "govern.location", {"where": "在醫院的律師事務所"}, record_log.user("me", "GOVERN"))

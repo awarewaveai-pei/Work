@@ -27,6 +27,7 @@ from ai_lego.data.repositories.project_source_repository import ProjectSourceRep
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import safety
 from ai_lego.platform.block_hooks import after_save, before_save
+from ai_lego.platform.block_hooks.govern import strings
 
 router = APIRouter()
 
@@ -78,7 +79,7 @@ def _save(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_
 
 def _saved(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_log.Owner, doc: dict[str, Any]) -> dict[str, Any]:
     docs = CaseDocs(repo)
-    words = [value for value in doc["content"].values() if isinstance(value, str)] + [item for value in doc["content"].values() if isinstance(value, list) for item in value if isinstance(item, str)]
+    words = strings(doc["content"])   # every text however deep: json fields (a map's layers) hold the person's words too
     notices = [{"type": "crisis", "notice": safety.NOT_THERAPY, "resources": safety.resources(_where(docs, session["tenant_id"], session["identity_id"], owner))}] if safety.crisis_signal(*words) else []
     notices += _call(after_save, docs, session["tenant_id"], owner, doc)
     return {**doc, "notices": notices}

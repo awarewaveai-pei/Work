@@ -23,7 +23,7 @@ type Any = Record<string, any>;
 type Held = {
   judgments: Array<Doc<Judgment>>; tasks: Array<Doc<Task>>; notes: Array<Doc<Note>>; checks: Array<Doc<Check>>; reviews: Array<Doc<Review>>;
   mirrors: Array<Doc<{ summary: string }>>; senseReviews: Array<Doc<{ mirror: string; version: number; decision: string }>>;
-  thinkCards: Array<Doc<{ claim?: string; reaction?: string; picked?: boolean }>>; mapReviews: Array<Doc<{ decision: string }>>;
+  thinkCards: Array<Doc<{ claim?: string }>>; thinkReactions: Array<Doc<{ card: string; reaction?: string; picked?: boolean }>>; mapReviews: Array<Doc<{ decision: string }>>;
   calibrations: Array<Doc<Calibration>>; revisit: Doc<{ on: string; note?: string }> | null; compare: Doc<Compare> | null; intake: Doc<Any> | null;
   moves: Move[]; unused: Array<{ code: string; open: boolean }>; hints: string[]; due: Reminder[]; habits: Array<Doc<{ keep?: string; change?: string }>>; guardrails: string[];
 };
@@ -50,10 +50,10 @@ export function LearnPage({ projectId }: { projectId: string }) {
 
   const load = async (): Promise<Held> => {
     const id = encodeURIComponent(projectId);
-    const [judgments, tasks, notes, checks, reviews, mirrors, senseReviews, thinkCards, mapReviews, calibrations, revisits, compares, intakes, guardrails, moves, unused, patterns, due, habits] = await Promise.all([
+    const [judgments, tasks, notes, checks, reviews, mirrors, senseReviews, thinkCards, thinkReactions, mapReviews, calibrations, revisits, compares, intakes, guardrails, moves, unused, patterns, due, habits] = await Promise.all([
       docs.list<Judgment>(projectId, "decide.judgment"), docs.list<Task>(projectId, "act.task"), docs.list<Note>(projectId, "act.note"), docs.list<Check>(projectId, "decide.check"), docs.list<Review>(projectId, "decide.review"),
       docs.list<{ summary: string }>(projectId, "sense.mirror"), docs.list<{ mirror: string; version: number; decision: string }>(projectId, "sense.review"),
-      optionalDocs<{ claim?: string; reaction?: string; picked?: boolean }>(projectId, "think.card"), optionalDocs<{ decision: string }>(projectId, "map.review"),
+      optionalDocs<{ claim?: string }>(projectId, "think.card"), optionalDocs<{ card: string; reaction?: string; picked?: boolean }>(projectId, "think.reaction"), optionalDocs<{ decision: string }>(projectId, "map.review"),
       docs.list<Calibration>(projectId, "learn.calibration"), docs.list<{ on: string; note?: string }>(projectId, "learn.revisit"), docs.list<Compare>(projectId, "learn.compare"), docs.list<Any>(projectId, "assembler.intake"),
       docs.list<{ guardrail: string }>(projectId, "govern.guardrail"),
       apiFetch<{ moves: Move[] }>(`/projects/${id}/learn/moves`), apiFetch<{ unused: Array<{ code: string; open: boolean }> }>(`/projects/${id}/learn/unused_blocks`),
@@ -61,7 +61,7 @@ export function LearnPage({ projectId }: { projectId: string }) {
       docs.list<{ keep?: string; change?: string }>(null, "learn.habit"),
     ]);
     const next: Held = {
-      judgments: await versionsOf(judgments), tasks, notes, checks, reviews, mirrors, senseReviews, thinkCards, mapReviews, calibrations, revisit: revisits.at(-1) ?? null, compare: compares.at(-1) ?? null,
+      judgments: await versionsOf(judgments), tasks, notes, checks, reviews, mirrors, senseReviews, thinkCards, thinkReactions, mapReviews, calibrations, revisit: revisits.at(-1) ?? null, compare: compares.at(-1) ?? null,
       intake: intakes.at(-1) ?? null, moves: moves.moves, unused: unused.unused, hints: patterns.hints, due: due.filter((item) => item.kind === "review"), habits, guardrails: [...new Set(guardrails.map((doc) => doc.content.guardrail))],
     };
     setHeld(next);
@@ -106,7 +106,7 @@ export function LearnPage({ projectId }: { projectId: string }) {
 
   if (!held) return <BlockShell projectId={projectId} code="LEARN"><div className="card"><p>{error || "載入中…"}</p></div></BlockShell>;
   const judgment = held.judgments.find((item) => item.version === version) ?? null;
-  const said = whatTheAiSaid({ checks: held.checks, reviews: held.reviews, mirrors: held.mirrors, senseReviews: held.senseReviews, thinkCards: held.thinkCards, mapReviews: held.mapReviews });
+  const said = whatTheAiSaid({ checks: held.checks, reviews: held.reviews, mirrors: held.mirrors, senseReviews: held.senseReviews, thinkCards: held.thinkCards, thinkReactions: held.thinkReactions, mapReviews: held.mapReviews });
   const noAct = !(held.intake?.content.blocks ?? []).includes("ACT");
   const afterJudgment = held.notes.filter((note) => held.tasks.some((task) => task.doc_id === note.content.task));
   const ready = (form.outcome ?? "").trim() !== "";

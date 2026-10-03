@@ -1,6 +1,6 @@
 """DECIDE (系統做什麼): a judgment that weighs cost, income or probability -> DECIDE proposes COMPUTE; someone listed as
-affected who also decides -> DECIDE proposes COLLAB (marked as a guardrail when the case has one); a high-risk word ->
-GOVERN adds the guardrails. GOVERN gets the category, never the text. Every proposal's ``why`` is a constant (never the
+affected who also decides -> DECIDE proposes COLLAB (marked as a guardrail when the case has one). High-risk words are
+GOVERN's own hook (block_hooks/govern.py). Every proposal's ``why`` is a constant (never the
 person's words: a proposal is never deleted)."""
 
 from __future__ import annotations
@@ -11,8 +11,6 @@ from typing import Any
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.platform.block_hooks import propose
-from ai_lego.platform.block_hooks.assembler import add_guardrails
-from ai_lego.platform.safety.risk import high_risk_categories
 
 COMPARING = re.compile(r"成本|收入|機率|報酬|獲利|利潤|預算|費用|損益|回收")
 # A proposal is never deleted, so its words are fixed text: nothing the person wrote (not even a name) goes into one.
@@ -36,21 +34,16 @@ def also_decides(content: dict[str, Any]) -> list[str]:
     return [name for name in content.get("affected") or [] if isinstance(name, str) and name.strip() and name.strip() in deciders]
 
 
-def _proposed(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, block: str) -> bool:
-    """One proposal per block per case: a declined one is not made again on the next version."""
-    return any(doc["content"]["propose"] == block for doc in docs.current(tenant_id, owner, "assembler.proposal.decide"))
-
-
 def _judgment_saved(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dict[str, Any]) -> list[dict[str, Any]]:
     content = doc["content"]
-    notices = add_guardrails(docs, tenant_id, owner, high_risk_categories(*_words(content)), "DECIDE")
-    if COMPARING.search(" ".join(_words(content))) and not _proposed(docs, tenant_id, owner, "COMPUTE"):
-        notices += propose(docs, tenant_id, owner, "DECIDE", "COMPUTE", COMPUTE_WHY)
-    if also_decides(content) and not _proposed(docs, tenant_id, owner, "COLLAB"):
+    notices: list[dict[str, Any]] = []   # once per block per case, declined ones not again: propose() keeps that
+    if COMPARING.search(" ".join(_words(content))):
+        notices += propose(docs, tenant_id, owner, "DECIDE", "COMPUTE", COMPUTE_WHY, source=doc["doc_id"])
+    if also_decides(content):
         if docs.current(tenant_id, owner, "govern.guardrail"):
-            notices += propose(docs, tenant_id, owner, "DECIDE", "COLLAB", COLLAB_GUARDRAIL_WHY, True)
+            notices += propose(docs, tenant_id, owner, "DECIDE", "COLLAB", COLLAB_GUARDRAIL_WHY, True, source=doc["doc_id"])
         else:
-            notices += propose(docs, tenant_id, owner, "DECIDE", "COLLAB", COLLAB_WHY)
+            notices += propose(docs, tenant_id, owner, "DECIDE", "COLLAB", COLLAB_WHY, source=doc["doc_id"])
     return notices
 
 

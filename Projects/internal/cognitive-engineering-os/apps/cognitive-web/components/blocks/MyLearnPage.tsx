@@ -65,7 +65,7 @@ export function MyLearnPage() {
     const content = Object.fromEntries(Object.entries({ ...form, text: form.text.trim() }).filter(([, value]) => value !== undefined && value !== "")) as Daily;
     const saved = todays ? await docs.update(null, "learn.daily", todays, content) : await docs.create(null, "learn.daily", content);
     setNotices(saved.notices);
-    setOpen((saved.notices as unknown as OpenCase[]).filter((notice) => notice.type === "open_case"));
+    setOpen((saved.notices as unknown as OpenCase[]).filter((notice) => notice.type === "suggest_case"));
   });
   const askMirror = run(async () => {
     if (!todays) return;

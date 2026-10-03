@@ -34,7 +34,7 @@ export type Calibration = {
 };
 export type Move = { item: string; seen: string };
 export type Compare = { side_by_side: string; done_well?: string[]; practice?: string };
-export type OpenCase = { type: "open_case"; categories: string[]; notice: string };
+export type OpenCase = { type: "suggest_case"; categories: string[]; notice: string };   // GOVERN's (block_hooks/govern.py)
 
 export type AiRow = { from: string; author: string; said: string; took: string };
 const cut = (text: string, length = 160): string => (text.length > length ? `${text.slice(0, length)}…` : text);
@@ -44,7 +44,7 @@ const cut = (text: string, length = 160): string => (text.length > length ? `${t
 export function whatTheAiSaid(input: {
   checks: Array<Doc<Check>>; reviews: Array<Doc<Review>>;
   mirrors: Array<Doc<{ summary: string }>>; senseReviews: Array<Doc<{ mirror: string; version: number; decision: string }>>;
-  thinkCards: Array<Doc<{ claim?: string; reaction?: string; picked?: boolean }>>; mapReviews: Array<Doc<{ decision: string }>>;
+  thinkCards: Array<Doc<{ claim?: string }>>; thinkReactions: Array<Doc<{ card: string; reaction?: string; picked?: boolean }>>; mapReviews: Array<Doc<{ decision: string }>>;
 }): AiRow[] {
   const rows: AiRow[] = [];
   for (const check of input.checks) {
@@ -62,8 +62,10 @@ export function whatTheAiSaid(input: {
   const kept = new Set(input.mirrors.map((mirror) => mirror.doc_id));
   const dropped = input.senseReviews.filter((review) => review.content.decision === "刪掉" && !kept.has(review.content.mirror)).length;
   if (dropped) rows.push({ from: "外化：AI 當鏡子", author: "ai", said: "（你刪掉的整理，內容不留）", took: `你刪掉了 ${dropped} 份` });
+  const reactionOf = new Map(input.thinkReactions.map((reaction) => [reaction.content.card, reaction.content]));   // your reaction is your own record (think.reaction)
   for (const card of input.thinkCards) {
-    rows.push({ from: "共思考：AI 的卡", author: card.author, said: cut(card.content.claim ?? ""), took: card.content.picked ? "你選了帶走" : card.content.reaction ? `你的反應：${card.content.reaction}` : "還沒回應" });
+    const mine = reactionOf.get(card.doc_id);
+    rows.push({ from: "共思考：AI 的卡", author: card.author, said: cut(card.content.claim ?? ""), took: mine?.picked ? "你選了帶走" : mine?.reaction ? `你的反應：${mine.reaction}` : "還沒回應" });
   }
   const used = input.mapReviews.filter((review) => review.content.decision === "採用").length;
   const unused = input.mapReviews.length - used;

@@ -32,7 +32,7 @@ describe("每天的校準 (outside any case)", () => {
   });
 
   it("a high-risk word suggests opening a case and says the card is not copied", async () => {
-    const notice = { type: "open_case", categories: ["金錢"], notice: "這張卡寫到比較高風險的事。要不要開一個案子，在案子裡處理？卡上的內容不會自動帶過去，要的話你自己貼進開案資料。" };
+    const notice = { type: "suggest_case", categories: ["金錢"], notice: "這張卡寫到比較高風險的事。要不要開一個案子，在案子裡處理？卡上的內容不會自動帶過去，要的話你自己貼進開案資料。" };
     const { host, done } = await open({ "POST /me/docs/learn.daily": (call: Call) => saved("learn.daily", "D1", call.body.content, [notice]) });
     await click(chip(host, "信念、情緒或決定", "決定"));
     await type(field(host, "daily-text"), "我想把存款全投進去");

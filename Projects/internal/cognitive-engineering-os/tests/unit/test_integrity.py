@@ -109,10 +109,12 @@ class TheLiveBlocks(unittest.TestCase):
         self.assertEqual({row.block: row.status for row in rows}["CONTEXT"], "PASS")
 
     def test_a_block_that_is_open_with_no_contract_on_the_record_is_listed_as_failing_not_hidden(self):
-        rows = integrity.run(dataclasses.replace(Snapshot.live(), open_blocks=("SENSE", "GOVERN", "MAP"), kinds={name: kind for name, kind in Snapshot.live().kinds.items() if kind.block != "MAP"}))
+        live = Snapshot.live()
+        rows = integrity.run(dataclasses.replace(live, open_blocks=("SENSE", "GOVERN", "MAP"), kinds={name: kind for name, kind in live.kinds.items() if kind.block != "MAP"},
+                                                 actions={key: action for key, action in live.actions.items() if action.block != "MAP"}))
         map_row = next(row for row in rows if row.block == "MAP")
         self.assertEqual((map_row.status, map_row.live), ("FAIL", True))
-        self.assertIn("MAP is open but keeps no kind", map_row.failures[0][1])
+        self.assertTrue(any(text.startswith("MAP is open but keeps no kind") for _, text in map_row.failures), map_row.failures)
         self.assertFalse(integrity.gate_passed(rows))
 
     def test_a_failing_block_that_is_not_open_is_listed_and_does_not_stop_the_others(self):
@@ -243,13 +245,16 @@ class TheGenericChecks(unittest.TestCase):
 
     def test_the_review_check_waits_for_a_block_that_can_hold_a_date_and_then_asks_for_one(self):
         check = next(item for item in CHECKS if item.id == "review_scheduled")
-        self.assertFalse(check.applies(Snapshot.live(), PLATFORM))   # neither ACT nor LEARN keeps a kind yet: nothing to ask, and no empty tick
-        undated = DocKind("act.task", "ACT", "x", {"title": Field("text")})
-        self.assertTrue(check.applies(with_kinds(undated), PLATFORM))
-        self.assertEqual(integrity.review_scheduled(with_kinds(undated), PLATFORM), ["neither ACT nor LEARN keeps a date to come back on"])
+        live = Snapshot.live()
+        bare = dataclasses.replace(live, kinds={name: kind for name, kind in live.kinds.items() if kind.block not in ("ACT", "LEARN")})
+        self.assertFalse(check.applies(bare, PLATFORM))   # neither ACT nor LEARN keeps a kind: nothing to ask, and no empty tick
+        self.assertEqual(integrity.review_scheduled(live, PLATFORM), [])   # today ACT and LEARN keep a date to come back on
+        undated = dataclasses.replace(bare, kinds={**bare.kinds, "act.task": DocKind("act.task", "ACT", "x", {"title": Field("text")})})
+        self.assertTrue(check.applies(undated, PLATFORM))
+        self.assertEqual(integrity.review_scheduled(undated, PLATFORM), ["neither ACT nor LEARN keeps a date to come back on"])
         self.assertEqual(integrity.review_scheduled(with_kinds(*INTERFACE), PLATFORM), [])
-        self.assertEqual({row.block: row.results["review_scheduled"] for row in integrity.run(with_kinds(undated)) if row.block == PLATFORM}, {PLATFORM: ["neither ACT nor LEARN keeps a date to come back on"]})
-        self.assertIsNone(next(row for row in integrity.run() if row.block == PLATFORM).results["review_scheduled"])
+        self.assertEqual({row.block: row.results["review_scheduled"] for row in integrity.run(undated) if row.block == PLATFORM}, {PLATFORM: ["neither ACT nor LEARN keeps a date to come back on"]})
+        self.assertEqual(next(row for row in integrity.run() if row.block == PLATFORM).results["review_scheduled"], [])
 
 
 class TheCardSlots(unittest.TestCase):

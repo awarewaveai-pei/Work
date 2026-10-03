@@ -61,7 +61,7 @@ FULL = {
     "pre_checks": {"resources": "夠", "warned": "沒有", "pulled": "沒有", "deadline": "沒有"}, "intensity_now": "中",
     "influences_listed": [{"kind": "ai", "text": "AI 在旁邊"}], "influences_asked": [{"who": "家庭", "answer": "有", "note": "媽媽很擔心"}], "influences_added": ["同學的意見"],
 }
-LEAN = {"uncertainty": "不知道", "change_condition": "他願意寫進合約", "confidence": 50, "intensity_now": "弱"}
+LEAN = {"uncertainty": "不知道", "change_condition": "他願意白紙黑字寫下來", "confidence": 50, "intensity_now": "弱"}
 
 
 class DecideBase(ProjectSourceApiTestCase):
@@ -262,15 +262,11 @@ class ProposalTests(DecideBase):
 
 class ProposalWordsTests(unittest.TestCase):
     def test_every_proposal_of_these_blocks_has_fixed_words(self):
-        """A proposal outlives deleted content, so its ``why`` is a string literal or a module-level UPPERCASE constant."""
-        checked = 0
-        for name in ("decide", "act", "learn"):
-            tree = ast.parse((PRODUCT_ROOT / "ai_lego" / "platform" / "block_hooks" / f"{name}.py").read_text(encoding="utf-8"))
-            for call in (node for node in ast.walk(tree) if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "propose"):
-                why = call.args[5]
-                self.assertTrue((isinstance(why, ast.Constant) and isinstance(why.value, str)) or (isinstance(why, ast.Name) and why.id.isupper()), f"{name}.py line {call.lineno}")
-                checked += 1
-        self.assertGreaterEqual(checked, 3)
+        """A proposal outlives deleted content, so its ``why`` is fixed words: one check for every hook file lives in
+        test_block_foundation.ProposalWordsTests; here, that DECIDE and LEARN do propose (the check is not vacuous for them)."""
+        calls = {name: sum(1 for node in ast.walk(ast.parse((PRODUCT_ROOT / "ai_lego" / "platform" / "block_hooks" / f"{name}.py").read_text(encoding="utf-8")))
+                           if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "propose") for name in ("decide", "learn")}
+        self.assertGreaterEqual(sum(calls.values()), 3, calls)
 
 
 class WebParityTests(unittest.TestCase):

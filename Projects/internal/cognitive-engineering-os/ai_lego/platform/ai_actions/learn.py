@@ -49,7 +49,8 @@ def _compare_input(context: Mapping[str, Any], read: Read) -> str:
                 "your_answer": _text(answered.get(doc["doc_id"], {}), "irreversible", "hold", "note")} for doc in read("decide.check")]
     reviews = {doc["content"].get("mirror"): doc["content"].get("decision") for doc in read("sense.review")}
     ai_said += [{"from": "外化的鏡子", "author": doc["author"], "said": _text(doc["content"], "summary", "gaps", "question"), "your_answer": reviews.get(doc["doc_id"], "")} for doc in read("sense.mirror")]
-    ai_said += [{"from": "思考卡", "author": doc["author"], "said": _text(doc["content"], "claim"), "your_answer": _text(doc["content"], "reaction", "picked")}
+    reactions = {doc["content"].get("card"): doc["content"] for doc in read("think.reaction")}
+    ai_said += [{"from": "思考卡", "author": doc["author"], "said": _text(doc["content"], "claim"), "your_answer": _text(reactions.get(doc["doc_id"], {}), "reaction", "picked")}
                 for doc in read("think.card") if doc["author"] in ("ai", "joint")]
     payload = {
         "earlier_judgment": ({"version": judgments[-1]["version"], **_text(judgments[-1]["content"], "conclusion", "confidence", "change_condition", "intensity_now", "next_step")} if judgments else None),
@@ -80,7 +81,7 @@ def _mirror_shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="LEARN", name="compare", needs="organize", instructions=COMPARE, output_kind="learn.compare", output_schema=COMPARE_SCHEMA,
-             reads=("decide.judgment", "decide.check", "decide.review", "act.task", "act.note", "learn.calibration", "sense.mirror", "sense.review", "think.card"),
+             reads=("decide.judgment", "decide.check", "decide.review", "act.task", "act.note", "learn.calibration", "sense.mirror", "sense.review", "think.card", "think.reaction"),
              build_input=_compare_input, shape=_compare_shape, max_tokens=1600),
     AiAction(block="LEARN", name="mirror", needs="organize", instructions=MIRROR, output_kind="learn.daily_mirror", output_schema=MIRROR_SCHEMA,
              reads=("learn.daily",), build_input=_mirror_input, shape=_mirror_shape, outside_case=True, max_tokens=700),

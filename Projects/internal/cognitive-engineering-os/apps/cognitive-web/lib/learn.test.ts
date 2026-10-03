@@ -3,7 +3,7 @@ import type { Doc } from "./blocks";
 import { sprintsThisWeek, weekStart, whatTheAiSaid } from "./learn";
 
 const doc = <C,>(doc_id: string, content: C, author: Doc["author"] = "ai", version = 1): Doc<C> => ({ doc_id, kind: "x", version, content, author, block: "X", at: "2026-10-03T08:00:00Z" });
-const none = { checks: [], reviews: [], mirrors: [], senseReviews: [], thinkCards: [], mapReviews: [] };
+const none = { checks: [], reviews: [], mirrors: [], senseReviews: [], thinkCards: [], thinkReactions: [], mapReviews: [] };
 
 describe("what the AI said, and whether you took it", () => {
   it("pairs an AI check with the person's answer to it, and says so when there is none", () => {
@@ -24,7 +24,8 @@ describe("what the AI said, and whether you took it", () => {
   });
 
   it("shows an AI thinking card with the pick or the reaction, and counts the map suggestions taken and not taken", () => {
-    const rows = whatTheAiSaid({ ...none, thinkCards: [doc("K1", { claim: "也許是成本漲了", picked: true }, "ai"), doc("K2", { claim: "他在試探", reaction: "反感" }, "joint"), doc("K3", { claim: "先談" }, "ai")], mapReviews: [doc("P1", { decision: "採用" }, "user"), doc("P2", { decision: "不採用" }, "user"), doc("P3", { decision: "不採用" }, "user")] });
+    const rows = whatTheAiSaid({ ...none, thinkCards: [doc("K1", { claim: "也許是成本漲了" }, "ai"), doc("K2", { claim: "他在試探" }, "joint"), doc("K3", { claim: "先談" }, "ai")],
+      thinkReactions: [doc("R1", { card: "K1", picked: true }, "user"), doc("R2", { card: "K2", reaction: "反感" }, "user")], mapReviews: [doc("P1", { decision: "採用" }, "user"), doc("P2", { decision: "不採用" }, "user"), doc("P3", { decision: "不採用" }, "user")] });
     expect(rows.map((row) => row.took)).toEqual(["你選了帶走", "你的反應：反感", "還沒回應", "你採用 1 條、不採用 2 條"]);
     expect(rows[1].author).toBe("joint");
   });

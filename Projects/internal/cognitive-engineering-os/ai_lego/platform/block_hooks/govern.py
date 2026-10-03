@@ -22,12 +22,10 @@ from ai_lego.platform.safety.risk import high_risk_categories
 WATCHED_BLOCKS = ("SENSE", "GATHER", "MAP", "THINK", "VERIFY", "COMPUTE", "DECIDE", "ACT", "LEARN", "TEACH", "EXPRESS", "FACILITATE", "COLLAB", "CONTEXT", "ASSEMBLER")
 
 
-# Fields that hold words but not the person's account of what happened: places and a contact (GOVERN reads 你在哪裡 only to
-# give help, never to judge risk) and what the system listed as influences (saved by the person, written by the system).
-NOT_SCANNED = {
-    "assembler.intake": frozenset({"happened_in", "you_are_in", "others_in", "field_contact"}),
-    "decide.judgment": frozenset({"influences_listed"}),
-}
+# Which fields are not the person's account (places, a contact, what the system listed) and which values are the system's
+# own labels is said by each kind's fields (doc_kinds.Field ``scan`` / ``labels``), not listed here: the block that owns a
+# kind owns that knowledge.
+OPEN_A_CASE = "這張卡寫到比較高風險的事。要不要開一個案子，在案子裡處理？卡上的內容不會自動帶過去，要的話你自己貼進開案資料。"
 
 
 def strings(value: Any) -> list[str]:
@@ -42,10 +40,11 @@ def strings(value: Any) -> list[str]:
 
 
 def written(doc: dict[str, Any]) -> list[str]:
-    """The person's own words in a document: its text, list and json fields -- not the choices the system offers."""
+    """The person's own words in a document: its text, list and json fields that are read for risk -- not the choices the
+    system offers, and not a value that is one of the field's labels."""
     fields = doc_kinds.require(doc["kind"]).fields
-    skipped = NOT_SCANNED.get(doc["kind"], frozenset())
-    return [text for name, spec in fields.items() if spec.type in ("text", "list", "json") and name not in skipped for text in strings(doc["content"].get(name))]
+    return [text for name, spec in fields.items() if spec.type in ("text", "list", "json") and spec.scan
+            for text in strings(doc["content"].get(name)) if text not in spec.labels]
 
 
 def _recognise(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dict[str, Any]) -> list[dict[str, Any]]:
@@ -56,7 +55,7 @@ def _recognise(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dic
         return []
     if owner.kind == "case":
         return add_guardrails(docs, tenant_id, owner, categories, doc["block"])
-    return [{"type": "suggest_case", "categories": categories}]
+    return [{"type": "suggest_case", "categories": categories, "notice": OPEN_A_CASE}]
 
 
 _recognise.recognises_high_risk = True   # type: ignore[attr-defined]  # integrity.py looks for it

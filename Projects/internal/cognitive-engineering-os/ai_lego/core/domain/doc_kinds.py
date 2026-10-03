@@ -31,6 +31,8 @@ class Field:
     required: bool = False
     choices: tuple[str, ...] = ()
     human_only: bool = False    # only the person may write it
+    labels: tuple[str, ...] = ()  # the system's fixed words that appear in it (a facet name, a claim kind): a value equal to one is a label, not the person's words
+    scan: bool = True           # GOVERN reads it for high-risk words (places and what the system listed are not read: block_hooks/govern.py)
 
 
 @dataclass(frozen=True)

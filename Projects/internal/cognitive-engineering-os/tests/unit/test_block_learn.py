@@ -198,11 +198,12 @@ class DailyCardTests(LearnBase):
 
     def test_a_high_risk_word_suggests_opening_a_case_without_copying_the_card(self):
         saved = self.mine("learn.daily", {"about": "決定", "text": "我想把存款全投進去"})
-        [notice] = [n for n in saved["notices"] if n["type"] == "open_case"]
+        [notice] = [n for n in saved["notices"] if n["type"] == "suggest_case"]   # GOVERN's one notice for this (block_hooks/govern.py)
         self.assertEqual(notice["categories"], ["金錢"])
         self.assertNotIn("存款", str(notice))
+        self.assertIn("開一個案子", notice["notice"])
         self.assertEqual(self.client.get(f"{self.base}/docs/govern.guardrail").json(), [])   # the guardrails are added inside a case, not by the card
-        self.assertEqual([n for n in self.mine("learn.daily", {"about": "情緒", "text": "今天有點累"})["notices"] if n["type"] == "open_case"], [])
+        self.assertEqual([n for n in self.mine("learn.daily", {"about": "情緒", "text": "今天有點累"})["notices"] if n["type"] == "suggest_case"], [])
 
     def test_the_ai_is_a_mirror_outside_a_case_and_needs_no_contract(self):
         card = self.mine("learn.daily", {"about": "信念", "text": "我一定要先講話才安全"})
