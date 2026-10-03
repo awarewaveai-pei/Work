@@ -3,6 +3,7 @@
 > Historical snapshot note: this file preserves cross-session context and may include decisions from older process versions. For current operating rules, use event SSOT docs: `docs/overview/REMOTE_WORKSTATION_STARTUP.md` (AO-RESUME/startup、**§2.5 日內 Git 節奏**) and `docs/operations/end-of-day-checklist.md` + `.cursor/rules/40-shutdown-closeout.mdc` (AO-CLOSE/shutdown). Agent-enforced Git detail: `.cursor/rules/50-operator-autopilot.mdc` §7.
 
 ## Current Operating Context
+- **2026-10-03 (AO-CLOSE, 視窗 2026-09-30 01:42 → 2026-10-03)** — 主線三條：(1) **Cognitive OS**：報告核准防偽造／競態、跨專案來源搜尋、字級 U22（10-01 部署 `b51095cbf`）；正式站舊專案抹除（WC-15 ⑤）、P2 DOD-2 PASS；要回 JSON 的 AI 呼叫一律帶 schema、schema 失敗只記違規路徑不記值（`118958b5f`）；新方法 生命時間線、個人 SWOT（案主版）、風險矩陣 5×5 圖、根因分析工作流（PR #28/#30），工具數 286；10-03 收工前部署 `ebbf363cc`（試跑 PASS，細節 WORKLOG 2026-10-03）。主機 checkout 改唯讀 deploy key，remote URL 不再含 token。(2) **治理／hooks**：AGENTS.md 模型路由表＋每輪觸發索引（由 TOOL_TRIGGER_MAP 產生，pointer 閘守）；file-claim-guard（同檔未提交只准一個 session 寫，含 Bash）；git-log-injector 截斷；CI perplexity 閘豁免 append-only 紀錄資料。(3) **認知主權平台**（新產品，Cognitive OS 為引擎）：13 塊積木、18 份 12 欄契約、supervisor 頁多輪重排成一頁圖；仍是設計文件，未寫程式。另：DMARC 第一階段 pct=25（10-15 升 100）、4 個漏套 migration 上 prod、0094 RLS 待 go。next-admin 自 10-01 `4fb538b5d` 後無改動，未部署。
 - **2026-08-29 (AO-CLOSE, session window 2026-08-27 → 2026-08-29, 三天兩段大整併+搬家後實战抛錯修復)** — **8/28 整併**：soulful（Hostinger）+ SG（5.223.93.113）+ EU（204.168.175.41）三台全部搬入 **ks-aw-01**（OVH，149.202.64.114，SSH -p 58122）；13 筆 DNS 切換、OVH Edge Firewall、三輪 Codex 安全覆審 15 findings 閉環、換機 runbook 建立。**8/29 發現並修復的真實缺陷（非搬家造成，既有架構問題）**：① Netdata Cloud claim（Ubuntu 發行版 --disable-cloud 不能 claim，換官方 stable 版）② aware-wave.com 補 DMARC ③ **studio.aware-wave.com 500** 真根因是 `.htpasswd_studio` 搬家漏拔被 Docker 自動建成空目錄（修復途中意外打掛 SG 站 90 秒，已復原）④ **CF Rate Limit 誤封 studio/trigger**：全域規則排除清單漏內部後台 SPA（已追加 studio/trigger/n8n/uptime/mainwp/postiz）⑤ **api.aware-wave.com / oracle.aware-wave.com 從未接線**（從 2026-06 建立就漏接，錯發到 WordPress 却同樣回 200，狀態碼看不出來）⑥ **wp-admin 無限重導真根因**：`lobster-nginx`（內部只聽 80 埠）的 13 處 `X-Forwarded-Proto $scheme` 把上一跳 host nginx 已正確設的 https 覆寫成 http，导致 WordPress is_ssl() 永遠失效，全改用 `$http_x_forwarded_proto` 修復。⑦自檢發現並修正兩次 R4「聲稱即驗證」違規：(a) 自己誤判 25 處舊 nginx SSOT 檔為「死檔」（grep include 方法論錯，這類檔用 cp+ln -sf 部署非 include）(b) 否正他人的推翻說「現行 production」也錯（SSH 進舊 SG/EU 檔案對了但檔案對應的容器全滞，本機直連實測全部 502，誤把公開網域（DNS 早已指新機）的回應算給舊機）——**正確結論：既非死檔亦非現行，是搬家前架構歷史快照**。⑧ CLAUDE.md/AGENTS.md 部署規則段補上「SG=ks-aw-01非5.223.93.113」明確警告，防未來 session SSH 去已停止的舊機部署。⑨ `check-deploy-drift.ps1` 實測：真實 app-code 落差只有 1 個 commit（就是自己修的 nginx 檔，已手動驗證上線），ks-aw-01 自動部署 cron（每 4 小時）journal 確認持續正常運作。**待辦**：KS-6 付款完成後執行換機 runbook；舊 SG/EU 容器已全滞但保留待操作者說「刪吧」才真删機。
 - **2026-07-05 (AO-CLOSE, session window 2026-07-04 → 2026-07-05)** — Short session focused on onboarding public intake + infrastructure fixes. Key completed: (1) **Phase 4 /intake 公開表單** — Next.js route group 重構 (shell)/(public)、5-step React form、intake-browser API with feature gate + rate limit、critic 安全閉環（2 Critical + 2 Major 全修，915245b0）; (2) **Phase 5 Cloudflare Turnstile 接入**（6306cd8e）— gate logic Critical fix（prod bypass 必須有 SECRET_KEY）+ 前端 widget explicit render + token refresh; (3) nginx /start/→intake redirect 建了再 revert — 還原 FluentForm 原始接單流程（WP→FluentCRM→Supabase→觸發建站，44da8365）; (4) **EU VPS ClickHouse OOM 根治** — mem_limit 1536m→3072m，20GB crash log 清除，restarts=0，healthy（00ea2e03）; (5) **trigger-build CF hairpin 修復**（11886d04）— 改用 http://next-admin:3000 內部路由 + fetchWithRetry（2 retries）+ failed 時 reset intake_form.status→"spec_generated"；MONGOLIA-03 手動解鎖可重試; (6) 蒙古旅遊客戶 handoff docs x4（現場開機 checklist + Cloudways 方案）; (7) repair_runs_source_check 補 'deploy'（0059 migration）; (8) human_only incident 改「已知悉」UI（70b17903）. 仍開放：Stage 4 開閘（High risk，需 go-ahead）、soulfulexpression.org CF DNS 遷移、POD Phase 4 e2e、Canvas 整輪瀏覽器實測。
 
@@ -516,7 +517,7 @@ node <WORK_ROOT>\lobster-factory\scripts\validate-dryrun-apply-manifest.mjs --mo
 - `docs/overview/EXECUTION_DASHBOARD.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 
-_Last synced: 2026-09-29 17:40:18 UTC_
+_Last synced: 2026-10-03 06:57:28 UTC_
 
 ## 2026-06-16 AO-CLOSE memory — session window 2026-06-11T05:07Z → 2026-06-16 afternoon
 
@@ -622,5 +623,9 @@ _Last synced: 2026-09-29 17:40:18 UTC_
 - Current Codex work: verified the Cognitive OS research-line closure status; delivered report API lifecycle and Markdown export in commit `53dc77535` (pushed); prepared an isolated, uncommitted cross-project source-search slice with unit/golden verification; preserved unrelated shared-worktree changes.
 - Current blockers remain operator/prod dependent: Cognitive OS P2-09 paid DOD gates, P1 WC-15 production verification, PI-b05/P-ARF-data, and remaining P4 exports/approval/recipe-binding work. No production mutation or Airtable import was performed.
 - AO-CLOSE policy: no reset, clean, broad staging, or deletion; foreign dirty/staged work remains preserved for the owning session.
+
+
+
+
 
 
