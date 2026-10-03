@@ -56,3 +56,30 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 - NOT YET: 「你用打字或講話寫卡…講話的錄音在我們自己的主機上轉成文字，轉完就刪」 voice input (needs the offline STT on the host)
 - NOT YET: 「藝術反思的工具…沒寫停止訊號的，先不給你用」 and 「工具進了這一塊…你先寫，AI 才回」 — the 16 art tools still run the old way
 - LATER BY DECISION: 藝術外化 (2026-10-03), 帶領者看哪幾張 (FACILITATE, step 4), 研究同意 (GOVERN step 3)
+
+## DECIDE (丙) — built 2026-10-03
+- judgment card: 11 cells + confidence + 「什麼會改變結論」 required (「沒有」 accepted, flagged 這一版不打算改) + 4 stop questions + Farrell's 4 checks + intensity (SENSE's strength shown, its cards not) + influence list (system's, asked 8, yours: kept apart, stored with the version) + 「這次沒做查證／計算」 + versions side by side + 「現在先不決定」 + 「現在我要自己下結論」 (no new AI answer for that version); unwinnable map → 退出／止損／換目標; COMPUTE / COLLAB proposals (fixed words, COLLAB marked guardrail); guardrail → ask to wait / have it reviewed
+- NOT YET (VERIFY, COMPUTE: step 2): 「沒有查證或計算時，…標「這次沒做查證」」 the two marks always show; when those blocks open, DecidePage must read what they hand over and drop a mark only then
+- NOT YET (COLLAB: step 3): 「多人時，這一步讀 COLLAB 群組紀錄裡的共同判斷和異議」
+- NOT YET (EXPRESS: step 4): 「判斷卡也交給 EXPRESS」 — EXPRESS reads `decide.judgment`; nothing to build here
+- NOT YET: 「現有工具 14 個…工具進了這一塊，要照這份合約走：你先寫，AI 才回」 the 14 decision tools and 6 business workflows still run the old way (AI first)
+- DECISION: 「有人帶的時候，帶領者也一定在清單上」 the intake has no facilitator field, so the page reads the case's block list (FACILITATE; opens in step 4)
+- DECISION: 「地圖上別人的聲音」 a map item carries only the card's id, so the page reads SENSE cards to learn the category of the cards already on the map; no other card is shown
+- OPEN (S): BlockShell's proposal card should show a 護欄 tag when `guardrail` is true (`/proposals` returns it; the COLLAB `why` also says it in words)
+- OPEN (S): lib/errors.ts has no sentence for AI_SEALED, DECIDE_NO_JUDGMENT, ACT_NO_*, LEARN_* (lib/judgment-errors.ts holds them until then)
+
+## ACT (丙) — built 2026-10-03
+- task card (prediction first, due, risk, stop / escalate conditions, owner, irreversible, whose wish, hold under the guardrail), notes (4 cells + numbers, trend from 2 points), status as buttons, history with quick flips folded (10 min window, all kept), weekly-then-月/季/年 reminders (`GET /me/reminders`, `/projects/{id}/act/reminders`), AI split / flag / trend
+- OPEN (S): 「提醒出現在「我的案子」首頁」 put `<RemindersPanel />` (components/blocks/RemindersPanel.tsx) in ProjectList; the engine side is done
+- NOT YET: 「也可以選寄 email」 (noreply@aware-wave.com, a link and no case content) for ACT / LEARN / practice reminders
+- OPEN (S): 「⑦ 存成任務」 (TaskCreated events) stays as it is; it should also write `act.task` so ACT shows those tasks
+- NOT YET (VERIFY, COMPUTE: step 2; COLLAB: step 3): reading their results and group actions; handing observations to COLLAB
+- NOT YET: 「現有工具 22 個…你先寫，AI 才回」 the 22 planning / small-trial tools still run the old way
+
+## LEARN (丙) — built 2026-10-03
+- review (`learn.calibration`: outcome, prediction vs result, missed, Farrell's 4, step vs direction, process apart from luck, done-when, trust in 5 aspects, delegate note, decision, new conditions, other method, next blocks, wrong sources), side by side with what the AI said and whether you took it, own moves (成長九項, no score), cross-case hint, revisit day (no ACT), AI compare; outside a case (`/me/learn`): daily card + AI mirror, the two practices, sprints, habits
+- NOT YET (GATHER: step 2): 「你標錯的出處交回 GATHER，存在那個出處的來源卡上」 stored in `learn.calibration.wrong_sources`; GATHER shows it when the same source comes back
+- NOT YET (MAP reads `other_method`; DECIDE shows `updated_conditions` already): MAP's side of 「要換方法時，交回 MAP」 is 甲's page
+- NOT YET: 「引擎裡有三個模組：預測追蹤、信心校準、決策日誌」 stay CLI-only; the page puts prediction and confidence beside the outcome by hand, computing no calibration number
+- NOT YET: 個人歷程「哪些事交給 AI 可靠」 is kept per review (`delegate_note`, `trust`); no cross-case roll-up
+- NOT YET: 「現有工具 11 個…你先寫，AI 才回」 the 11 look-back tools still run the old way
