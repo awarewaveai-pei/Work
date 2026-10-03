@@ -151,6 +151,16 @@ const CODES: Record<string, string> = {
   VERIFY_FACTCHECK_TARGET_INVALID: "請選一則訊息或一個主張再查。",
   VERIFY_SEARCH_ANGLES_INVALID: "請至少選一種要找的方向。",
   VERIFY_NO_CLAIMS: "還沒有確認過的主張。先確認或加一個主張。",
+  // COMPUTE
+  COMPUTE_INPUT_REFUSED: "有一個數字算不出來或格式不對，請檢查後再算一次。",
+  COMPUTE_ALGORITHM_UNKNOWN: "這個算法不在清單裡，請從清單裡選。",
+  COMPUTE_RUN_NOT_FOUND: "找不到這次計算，請重新整理頁面。",
+  COMPUTE_ADOPT_REASON_REQUIRED: "採用或不採用，都寫一句為什麼。",
+  COMPUTE_ADOPT_ALREADY_GIVEN: "這次計算你已經選過採不採用；要改，改那一筆。",
+  COMPUTE_ADOPT_RUN_FIXED: "採不採用跟著它寫的那次計算，不能換到別次。",
+  COMPUTE_QUESTION_REQUIRED: "先寫下你要算什麼，AI 才建議算法。",
+  AI_ANSWER_HAS_NUMBER: "AI 這次的回答自己寫了數字，系統不收：數字只由系統算。再按一次即可。",
+  AI_ANSWER_CALLS_IT_PREDICTION: "AI 這次把計算或模擬說成了預測或保證，系統不收。再按一次即可。",
 };
 
 const STATUS_FALLBACK: Record<number, string> = {
