@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-03（續6）認知主權平台監工台 v52：待定的事全部由我定（她授權）；第 1 步的 12 份合約確認；進度與順序更新
+- [操作者] 「都交給你做，需要決定的事都你決定…做好要去核對【進度與順序】並更新」。
+- [根因] 建置開不了工：
+  - 12 件產品問題、6 件架構問題沒定；
+  - 合約沒有一份確認；
+  - 進度頁寫「等你」。
+- [修] 細節：增補檔 A30、`CONTRACT_TEMPLATE.md` 規則 14a。
+  - 產品 12 件寫在 `MY_DECISIONS`（13.1 個人複雜決策、13.3–13.6、5.2 等）。
+  - 架構 6 件寫在 `ARCH_DECIDED`，依據是引擎程式的 file:line：
+    - 事件屬於案子或本人，照擁有者抹除；
+    - 寫事件只有一個入口，要記作者；
+    - 兩條 AI 路共用一個權限檢查；
+    - 讀案子查本人；
+    - 三個 SQLite 檔，和換資料庫的條件。
+  - 卡上所有「還沒定」都改成定案的字。
+  - 合約在它那一步開工前確認：`CONFIRMED` 從 `BUILD` 照步驟算；`CONFIRM_LOG` 存每張卡的指紋，卡改了要加一筆重新確認。
+  - 套件寫明主線（`PK_LINE`／`LINE_OPENS`），第 1 步正好開三種。
+- [審查] 第 17 次審查：3 C／7 M／4 m，另列 10 個建置會回頭問的問題；驗證一輪後新的 2 M／4 m。都修了，問題的答案寫在卡上。
+  - C1：試用要看的影響清單原本沒有存。
+  - C2：首批開了別條主線的套件。
+  - C3：抹除只認事件名稱的開頭，會漏。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/check-supervisor.mjs --root D:/Work --out check-out-r19 | exit=0 | ms=24000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=3c/9m/8m
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=CONFIRMED_SIG|ARCH_OPEN | hits=8
+- BUGHUNT_SCOPE_NARROW: 命中全在 handoff 資料夾的監工台、檢查腳本和增補檔（ARCH_OPEN 只剩增補檔的歷史敘述）。只動 handoff 資料夾的監工台、檢查腳本、模板、增補檔，和接手包的一行指標；架構決定的依據讀了 Projects/internal/cognitive-engineering-os/ai_lego，沒有改。
+- ORACLE_WAIVED: 監工台是討論用的頁面（handoff 資料夾，不是產品程式）。審查由獨立的 critic agent 做（第 17 次加驗證）；10 個突變副本全紅（mut-r16、mut-r17）。
+- 驗證：click-test 7/7；artifact v52；commit `4ba676f28`。
+- rollback：`git revert 4ba676f28`；artifact 退回 v51。
+- 下一步：第 1 步開工，第一件是每一筆事件記作者（寫入收成一個入口）。建議模型：Opus 5.5。
 ## 2026-10-03（續5）認知主權平台監工台 v50–v51：EXPRESS 不算第一輪 6 塊；合約卡照 12 欄整合，出處不顯示
 - [操作者]
   - EXPRESS 在第一輪叫出來時算不算：「不算」。
