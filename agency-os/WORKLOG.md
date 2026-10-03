@@ -1,4 +1,38 @@
 # Worklog
+## 2026-10-03（續4）認知主權平台監工台 v37–v49：十頁逐頁對一致（一份順序、一份資料、一張還沒定清單）；「帶領」不算第一輪 6 塊
+- [操作者] 「去100%確認是否10個頁面完全正確, 有沒有遺漏…不該落東落西, 或是A面改, B面或其他頁面忘記改」；「帶領」算不算 6 塊：「不知道, 你說呢? 給我專業建議」→ 我建議不算 →「好」。
+- [v37–v46，補記] 細節在 `agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/BLUEPRINT_ADDENDUM_2026-10-02.md` A22–A27；commits `628c989af`（第 14 塊 FACILITATE、白話合約卡、八步循環）、`f5a3016d5`（照關聯排、v0.1 表從資料算）。
+- [根因] 十頁畫出來的文字逐頁對照後，走樣歸成五類：
+  - 手寫名單沒照新順序（腳本只查三份資料）；
+  - 同一件事手打好幾處（「兩堂」6 處；一頁看懂的帶領禁忌少一條）；
+  - 講資料的句子是手寫的，其中兩句寫錯；
+  - 兩頁畫同一件事，卻用兩份資料；
+  - 還沒定的事散在清單外。
+  另外，「藍圖每一節寫在哪」是手寫的，26 列裡 12 列漏卡。第八到第十一次審查找到的也是這幾類：
+  - 第八次（0C/3M/6m）：異議只給帶領者自選的督導看；每日校準要跑五塊。
+  - 第九次（0C/2M/7m）：「外殼」有三種成員；分框的名單沒照順序；一頁看懂的「交出」漏項。
+  - 第十次（0C/1M/4m）：沒有案子時，讀不到「你在哪裡」，也沒有護欄和權限；同一欄位三個名字；抽屜和「寫什麼」不一致；上限的理由不一致。
+  - 第十一次（0C/0M/3m）：只驗證第十次的修法，找到的三處都是那次修法帶出來的。
+- [修]
+  - **順序**：`ORD` 加 `data-set`；TEACH 10、EXPRESS 11（擬稿）；套件照藍圖 3.4 目的的順序。
+  - **單一來源**：`LESSONS`、`HIGH_RISK`、`OPEN_HAS`、`FACIL_DONTS`、`BUILD`、`FIRST_MAX`／`FIRST_CAP_WHY`、`GOVERN_FIRST`／`GOVERN_LATER`、`NORM_CHECKS`、`THREE`、`OUT_CASE_CALLS`、`NO_CASE_RISK`、`EX_*`。
+  - **由資料算**：講資料的句子、一頁看懂的「這一步交出」、每張卡的「寫什麼」（＝抽屜）、藍圖表。
+  - **還沒定**：只剩一張 `OPEN` 清單，每一條附它管到的字。
+  - **「帶領」不算 6 塊**：記成她的裁定（A27），帶領稿加「大約多久」。EXPRESS 算不算，列進還沒定（我建議不算）。
+- [驗證]
+  - `check-supervisor.mjs` 新規則：`out_of_block_order`、`undecided_not_on_the_list`、兩頁「從頭到尾都在」、藍圖節號、有名字的一組、例子類別、號碼對代號、`FIRST_MAX`、`FLOW_ROWS`、舊說法、案子以外的呼叫、抽屜在主人卡上。
+  - `cramped_text` 改量文字自己的行寬：抓到談定頁子清單掉進 24px 欄，頁高 18,194px。
+  - 25 個故意改壞的副本全紅（scratchpad 的 mut-r11、mut-r12、mut-r13），真頁全綠。
+  - 一頁看懂在 1536×660、1280×660 不用捲；click-test 7/7。
+  - 發佈 artifact v47–v49（https://claude.ai/artifact/E8VKViRmycqsXySHdnhUSJ）。
+  - commits `34a8c0510`、`8ab8b435c`、`a21202a8c`。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/check-supervisor.mjs --root D:/Work --out check-out-r14 | exit=0 | ms=23333
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/6m/20m
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=JOURNEY_GOVERN|JOURNEY_FACILITATE | hits=2
+- BUGHUNT_SCOPE_NARROW: 只動 handoff 資料夾的監工台和它的檢查腳本。2 筆命中都在增補檔 A20／A22 的歷史敘述裡，沒有程式引用。
+- ORACLE_WAIVED: 監工台是討論用的頁面（handoff 資料夾，不是產品程式）。審查由獨立的 critic agent 跑第八到第十一次，另有 25 個突變證明。
+- [還沒定] EXPRESS 在第一輪叫出來時算不算 6 塊（等她回「不算／算」）。
+- rollback：`git revert a21202a8c 8ab8b435c 34a8c0510`；artifact 退回 v46（版本歷史）。
 ## 2026-10-03（續3）正式庫 0094 套用：3 張無 RLS 表鎖成 service_role only，新建 public 表自動開 RLS
 - [操作者] 「看要怎麼處理，你去做」（High-STOP go）。
 - [VBC 套用前] 正式庫無 RLS 表＝`kb_cleanup_20260920_bad_crawl`／`ops_health_probes`／`social_postiz_connections`，anon 各有 7 種權限（含 DELETE／TRUNCATE），與 10-01 續3 完全相同 → 0094 的「未審表即中止」不會觸發；ledger 無 0094；套用身分 superuser（event trigger 需要）。
