@@ -430,6 +430,64 @@ SENSE、GATHER、MAP、THINK、VERIFY、COMPUTE、DECIDE、ACT、LEARN、EXPRESS
   - 沒動：建置順序的句子留在「現在有沒有」（今天有什麼、接下來做什麼）。
 - **腳本**：新規則有卡上沒有出處框、看不到出處標籤（兩種查法）、舊框名、卡上不寫「任務」、還沒定不重複列。7 個故意改壞的副本都紅（`mut-r16`）。
 
+## A30　要定的事交給我定；第 1 步的合約確認（2026-10-03）｜裁定
+- **她**：「都交給你做…需要決定的事都你決定」；「做好要去核對【進度與順序】並更新」。
+- **我定的 12 件**：寫在監工台 `MY_DECISIONS`，每件附理由。
+  - 第一個場景是個人複雜決策（13.1）。
+  - AI 邊界（13.3）：挑戰強度由你選；只引用有來源卡的資料；危機時轉介、高風險時建議找專業的人。
+  - 資料承諾（13.4）：預設只有自己看得到；研究另外同意、可撤回、不叫匿名。
+  - 第一次試用只驗證「看得見自己怎麼判斷」（13.5）。
+  - 首批開第 1 步蓋得出的四種套件，不開自由組合（13.6）。
+  - 5.2 算做到。
+  - 創意與策略衝刺 SENSE 和 MAP 都走，SENSE 先。
+  - 卡上跟藍圖不同的 6 處照卡上做。
+  - 藍圖正文不改。
+  - 我擬的內容照做。
+  - 合約在它那一步開工前確認（`CONFIRMED_STEP` = 1，確認了 12 份）。
+  - Google 金鑰在第 2 步之前申請。
+- **架構上定的 6 件**：寫在 `ARCH_DECIDED`（第 17 次審查後依程式改寫）。依據（`Projects/internal/cognitive-engineering-os/` 底下）：
+  - **紀錄沿用事件表。**
+    - 平常只往後加：`events` 有 `schema_version`（`ai_lego/data/repositories/project_source_repository.py:77-90`），但寫死 "1.0.0"（同檔 `:298`；`custom_workflow_repository.py:89`）。
+    - 抹除時整批刪：今天只刪 `project:`、`source:` 開頭的（`project_source_repository.py:883-884`），所以改成每一筆記它屬於哪個案子，照案子刪。
+  - **作者，收成一個寫入入口。**
+    - 今天寫事件的有兩處：`project_source_repository.py:282` 和 `custom_workflow_repository.py:30`、`:72-94`。另外有一個公開的 `append_event`（`project_source_repository.py:638`）。
+    - 沒有作者欄（`:77-90`）。只有少數事件把人寫在內容裡：抹除記 `erased_by_identity_id`（`:889`），核准和退回記 `by`（`ai_lego/apps/api/main.py:1790`）。
+  - **兩條 AI 路共用一個權限檢查。**
+    - 網站走 `ai_lego/platform/ai_gateway/provider.py`（`main.py:78`、`:399`）。
+    - 命令列走 `ai_lego/platform/ai_execution/gateway.py`（`ai_lego/apps/cli/run_research_slice.py`、`run_coding_eval.py`、`ai_lego/modules/research/ai_coding.py`）。它今天只用測試用的組織（`run_research_slice.py:57`、`:213`），這是習慣，不是規定。
+  - **課程從現有說明自動組。** 今天的課是手做的頁面，由 `docs/mockups/sync-design-system.py` 產生 `apps/cognitive-web/lib/lessons.generated.ts:1`。
+  - **誰看得到哪個案子。**
+    - 案子記了建立者（`project_source_repository.py:41`），但 `list_projects` 只照組織篩（`:334-335`）。
+    - `workspace` 沒有成員名單（`ai_lego/platform/identity/store.py:65-81`）。
+    - 第 1 步先查本人；成員名單在第 3 步加。
+  - **三個 SQLite 檔。** 帳號 `main.py:106`、案子 `:364`、自訂工作流 `:1364`。租戶已有 `data_residency_region`（`identity/store.py:60`）。
+- **第 17 次審查**：3 C／7 M／4 m，另列 10 個建置會回頭問的問題。都修了，問題的答案寫在對應的卡上。
+  - C1：試用要看的「影響清單」原本沒有存。現在判斷卡的抽屜存它，系統列的和你補的分開記。
+  - C2：首批開了「課堂反思」，跟 13.1 只選一條主線矛盾。用 `PK_LINE` 把套件歸到主線，首批只開個人主線的（`FIRST_BATCH`）。
+  - C3：事件表其實會被抹除刪掉，而且只認名稱開頭。上面第 1 件已改。
+  - M：GOVERN 寫明第 1 步、第 3 步各做什麼。
+  - M：「確認」原本只是一個標籤，改成存確認那一版每張卡的指紋（`CONFIRMED_SIG`、`cardSig`）；卡改了任何一行，腳本就擋。
+  - M：`CONFIRMED` 原本用顏色組當步驟，改用 `stepNo`。
+  - M：北極星頁「等你併進藍圖」改了；還沒定的字加上「等你併」「待定」。
+- **驗證一輪**：新的 2 M／4 m，都修了。
+  - 事件不一定屬於案子。改成每一筆屬於一個案子或你本人：抹除案子刪案子的，刪帳號刪你的全部。
+  - 流程頁說「隨時可以要直接建議」，跟協作合約衝突，改了。
+  - 每個套件寫明主線（`PK_LINE`）。主線第幾步開寫在 `LINE_OPENS`：個人第 1 步、團隊協作第 3 步、師生反思第 4 步。一個套件在它的積木蓋好、主線也開了的那一步開（`pkOpensAt`）。第 1 步正好開三種。
+  - 提醒怎麼送只寫一處（`REMIND_HOW`）：首頁，或 email。email 不寫案子內容，由 noreply 寄。
+  - THINK 每張指令卡寫明選的是哪個模式和角色。
+  - 重新確認要在 `CONFIRM_LOG` 加一筆，寫日期和原因；不改舊的。
+- **監工台**：
+  - `OPEN` 清空，標題改成「待定的」。
+  - 卡上所有「還沒定」改成定案的字。
+  - 合約狀態從 `BUILD` 算：第 1 步的 12 份「已確認」，其餘「草稿」。
+- **進度與順序**：
+  - 第 0 步狀態寫完；第 1 步狀態改成「可以開工」，第一件是補作者。
+  - 首版十件事的上面標出第一次試用只驗證第 1 件。
+  - 「接下來」不再列第 0 步。
+  - 「已經發生」加兩筆。
+  - 藍圖優先級表保留藍圖原文，旁邊指到第 1 步。
+- **腳本**：已確認的合約卡上不能有還沒定的字；那一步要蓋的每一份都要確認；確認後內容不能變（指紋）。3 個故意改壞的副本都紅（`mut-r17`）。
+
 ## A9　還沒建的（不是設計缺口）
 
 六層地圖已在 MAP 合約（藍圖 5.1），今天的網站只有個別方法、沒有這塊積木；排在建置第 1 步。

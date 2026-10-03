@@ -348,12 +348,22 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // that says 還沒定／等你定／等你決定 is covered by a line of the decided page's list (its pattern) or is listed there word for word;
     // a settled entry may point to the list but must be covered too.
     // Wordings beyond 還沒定 (round 9: 「等你看」「看過再定」「你還沒看過」 slipped past).
-    const PENDING_WORDS = /還沒定|等你定|等你決定|等你看|再定|還沒看過|還沒逐/;
+    const PENDING_WORDS = /還沒定|等你定|等你決定|等你看|等你併|待定(?!決策)|再定|還沒看過|還沒逐/;   // 等你併、待定: round 17 M2/M4
     const pending = [];
     const openList = document.getElementById('open').innerText.replace(/\s+/g, '');
     // A line the OPEN list already covers is not listed a second time under 「從卡上自動列出」 (round 16 M1).
     for (const li of document.querySelectorAll('#open ul.pend li')) if (OPEN.some(([, re]) => re && re.test(li.innerText))) pending.push('listed twice: ' + li.innerText.slice(0, 40));
     // ...and judged on the stored line, which still has the section numbers the OPEN patterns match.
+    // A confirmed contract (2026-10-03: confirmed just before its build step, CONFIRMED_STEP) carries nothing undecided,
+    // and every card its step builds is confirmed.
+    for (const b of all) if (b.contract === '已確認' && PENDING_WORDS.test(card(b.code))) pending.push('undecided line on a confirmed contract: ' + b.code);
+    for (const c of CONFIRMED()) if (of(c).contract !== '已確認') pending.push('built in a confirmed step but not confirmed: ' + c);
+    // Confirmed means this exact content (round 17 M2): any changed line (shared north/framework/tool lines included) needs a new look.
+    for (const c of CONFIRMED()) if (cardSig(of(c)) !== CONFIRMED_SIG[c]) pending.push('confirmed contract changed since it was confirmed (re-read it, then update CONFIRMED_SIG): ' + c);
+    // Each confirmation is a dated entry with a reason (round 17 N6); every package names its main line and that line opens at a step (N4).
+    for (const e of CONFIRM_LOG) if (!/^\d{4}-\d{2}-\d{2}$/.test(e.on || '') || !(e.why || '').trim()) pending.push('confirmation entry without date or reason');
+    for (const [k] of PK) if (!PK_LINE[k] || !(PK_LINE[k] in LINE_OPENS)) pending.push('package without a main line: ' + k);
+    for (const c of Object.keys(CONFIRMED_SIG)) if (!CONFIRMED().includes(c)) pending.push('fingerprint for a card not in a confirmed step: ' + c);
     const pendTexts = [...document.querySelectorAll('#open ul.pend li')].map((li) => li.innerText.replace(/\s+/g, ''));
     for (const b of all) for (const raw of cardText(b)) if (PENDING_WORDS.test(raw) && OPEN.some(([, re]) => re && re.test(raw)) && pendTexts.some((t) => t.endsWith(plain(raw).replace(/\s+/g, '')))) pending.push('listed twice: ' + b.code + ': ' + plain(raw).slice(0, 30));
     for (const v of VIEWS) {
