@@ -1,0 +1,85 @@
+"""DECIDE's AI turn (contract card 「AI 能做什麼」): the AI checks what the person wrote -- clear, undoable, checkable
+later, within its scope, no empty cells, no contradictions -- and may ask one question. It never fills in a conclusion,
+never chooses, and gives no new answer for a version the person sealed with 「現在我要自己下結論」.
+Reads only the judgment, the seals and the norm notes (讀什麼: the case's other records are not its to read here)."""
+
+from __future__ import annotations
+
+import json
+from typing import Any, Callable, Mapping
+
+from ai_lego.errors import InvariantViolation
+from ai_lego.platform.ai_gate import AiAction, AiRefused
+
+CHECK = (
+    "Check what the person wrote on their judgment card. You do not write, complete or improve their conclusion, you "
+    "do not choose for them and you do not say which option is better. You only point at places in what they wrote:\n"
+    "- clarity: up to 6 places where the wording is unclear; quote the few words and say what is unclear.\n"
+    "- reversibility: up to 6 things in the conclusion, the next step or the options that cannot be undone once done "
+    "or are hard to undo, each as one line: what, and why it cannot be undone. Leave empty if nothing is.\n"
+    "- revisitable: whether the person could later check this against what happens, and what would be hard to check "
+    "(one or two sentences; leave empty if it can be checked).\n"
+    "- out_of_scope: places where a statement goes beyond the place, the law, the facts or the sources the person gave. "
+    "Never say what a law says.\n"
+    "- gaps: which cells of the card are still empty, by the cell's name.\n"
+    "- contradictions: statements on the card that contradict each other; quote both.\n"
+    "- question: at most one question that helps the person say it more clearly. Never a leading question."
+)
+
+CHECK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "clarity": {"type": "array", "items": {"type": "string"}, "maxItems": 6},
+        "reversibility": {"type": "array", "items": {"type": "string"}, "maxItems": 6},
+        "revisitable": {"type": "string"},
+        "out_of_scope": {"type": "array", "items": {"type": "string"}, "maxItems": 6},
+        "gaps": {"type": "array", "items": {"type": "string"}, "maxItems": 8},
+        "contradictions": {"type": "array", "items": {"type": "string"}, "maxItems": 6},
+        "question": {"type": "string"},
+    },
+}
+LISTS = {"clarity": 6, "reversibility": 6, "out_of_scope": 6, "gaps": 8, "contradictions": 6}
+# What the check reads of the card: the person's own words; the system's influence list is not theirs to be checked.
+SYSTEM_MADE = ("influences_listed",)
+# What it reads of 規範與脈絡 (the facets marked relevant, the places, three of the four checks with the person's stance, the public-issue answers)
+NORM_KEYS = ("jurisdictions", "rights_duties", "norm_origin", "stance_kind", "stance", "interface")
+
+
+def sealed(read: Callable[[str], list[dict[str, Any]]]) -> bool:
+    """The person pressed 「現在我要自己下結論」 for the version being written or for the one last saved."""
+    saved = read("decide.judgment")
+    latest = saved[-1]["version"] if saved else 0
+    seals = {doc["content"].get("for_version") for doc in read("decide.seal")}
+    return latest in seals or latest + 1 in seals
+
+
+def _check_input(context: Mapping[str, Any], read: Callable[[str], list[dict[str, Any]]]) -> str:
+    if sealed(read):
+        raise AiRefused("AI_SEALED: 你按了「現在我要自己下結論」，這一版 AI 不再給新答案；存下一版之後才能再請它檢查")
+    saved = read("decide.judgment")
+    if not saved:
+        raise InvariantViolation("DECIDE_NO_JUDGMENT: save the judgment card before asking for a check")
+    card = {key: value for key, value in saved[-1]["content"].items() if key not in SYSTEM_MADE}
+    payload: dict[str, Any] = {"judgment_card": card}
+    notes = read("context.notes")
+    if notes:
+        held = notes[-1]["content"]
+        found = {key: held[key] for key in NORM_KEYS if held.get(key)}
+        mattering = [item["facet"] for item in held.get("facets") or [] if isinstance(item, dict) and item.get("relevant") and item.get("facet")]
+        if mattering:
+            found["relevant_facets"] = mattering
+        if found:
+            payload["norm_notes"] = found
+    return "The person's judgment card:\n" + json.dumps(payload, ensure_ascii=False)
+
+
+def _shape(answer: dict[str, Any]) -> dict[str, Any]:
+    shaped = {key: [item for item in answer.get(key) or [] if isinstance(item, str) and item.strip()][:limit] for key, limit in LISTS.items() if isinstance(answer.get(key), list)}
+    shaped.update({key: answer[key] for key in ("revisitable", "question") if isinstance(answer.get(key), str)})
+    return {key: value for key, value in shaped.items() if value not in ([], None, "")}
+
+
+ACTIONS = [
+    AiAction(block="DECIDE", name="check", needs="organize", instructions=CHECK, output_kind="decide.check", output_schema=CHECK_SCHEMA,
+             reads=("decide.judgment", "decide.seal", "context.notes"), build_input=_check_input, shape=_shape, max_tokens=1800),
+]

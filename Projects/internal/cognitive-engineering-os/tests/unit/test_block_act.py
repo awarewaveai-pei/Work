@@ -1,0 +1,247 @@
+"""ACT 行動與觀察: a task card the person writes (prediction first), observation notes, the weekly-then-monthly/quarterly/
+yearly rhythm and the reminders it makes, and the AI's three turns (split, flag, trend) that never promise or set a number."""
+
+from __future__ import annotations
+
+import datetime
+import re
+import unittest
+
+from ai_lego import PRODUCT_ROOT
+from ai_lego.apps.api import main as api_main
+from ai_lego.core.domain import doc_kinds
+from ai_lego.core.domain.kinds import act
+from ai_lego.errors import InvariantViolation
+from ai_lego.platform import ai_gate
+from tests.unit.test_block_decide import Provider
+from tests.unit.test_project_source_api import ProjectSourceApiTestCase
+
+D = datetime.date
+TASK = {"title": "跟他談一次條件", "prediction": "我猜他會讓步一半", "due": "2099-01-01", "risk": "他可能翻臉", "stop_condition": "他再改一次就不談了", "escalate_condition": "談不攏就找人幫忙", "owner": "我", "irreversible": False,
+        "whose_wish": "是我自己想談"}
+
+
+def doc(doc_id, created_at, **content):
+    return {"doc_id": doc_id, "content": content, "created_at": created_at, "author": "user", "version": 1}
+
+
+class RhythmTests(unittest.TestCase):
+    start = D(2026, 10, 1)
+
+    def test_weekly_for_the_first_month_then_by_the_persons_long_rhythm(self):
+        weekly = [D(2026, 10, 8), D(2026, 10, 15), D(2026, 10, 22), D(2026, 10, 29)]
+        self.assertEqual(act.checkpoints(self.start, "月", D(2026, 12, 31)), weekly + [D(2026, 11, 1), D(2026, 12, 1)])
+        self.assertEqual(act.checkpoints(self.start, "季", D(2027, 1, 31)), weekly + [D(2027, 1, 1)])
+        self.assertEqual(act.checkpoints(self.start, "年", D(2027, 12, 31)), weekly + [D(2027, 10, 1)])
+        self.assertEqual(act.checkpoints(self.start, None, D(2026, 10, 7)), [])
+
+    def test_a_month_end_start_does_not_double_a_checkpoint(self):
+        self.assertEqual(act.add_months(D(2026, 1, 31), 1), D(2026, 2, 28))
+        self.assertEqual(act.checkpoints(D(2026, 1, 31), "月", D(2026, 3, 31))[-2:], [D(2026, 2, 28), D(2026, 3, 31)])
+
+    def test_one_note_in_a_period_settles_it(self):
+        today = D(2026, 10, 8)
+        self.assertEqual(act.observation_due(self.start, "月", [], D(2026, 10, 7)), None)
+        self.assertEqual(act.observation_due(self.start, "月", [], today), {"since": "2026-10-08", "weekly": True})
+        self.assertIsNone(act.observation_due(self.start, "月", [D(2026, 10, 5)], today))
+        self.assertEqual(act.observation_due(self.start, "月", [D(2026, 10, 8)], D(2026, 10, 16)), {"since": "2026-10-15", "weekly": True})   # a note on the checkpoint belongs to the week before
+        self.assertIsNone(act.observation_due(self.start, "月", [D(2026, 10, 9)], D(2026, 10, 16)))
+        self.assertEqual(act.observation_due(self.start, "月", [], D(2026, 11, 2)), {"since": "2026-11-01", "weekly": False})
+        self.assertIsNone(act.observation_due(self.start, "月", [D(2026, 10, 30)], D(2026, 11, 2)))
+
+    def test_what_is_due_in_a_case(self):
+        task = doc("T1", "2026-10-01T08:00:00Z", title="談一次", due="2026-10-20", status="進行中")
+        self.assertEqual(act.case_reminders([task], [], [], [], D(2026, 10, 7)), [])
+        self.assertEqual([(item["kind"], item["since"]) for item in act.case_reminders([task], [], [], [], D(2026, 10, 8))], [("note", "2026-10-08")])
+        noted = [doc("N1", "2026-10-05T08:00:00Z", task="T1", happened="談了")]
+        self.assertEqual(act.case_reminders([task], noted, [], [], D(2026, 10, 8)), [])
+        self.assertEqual(act.case_reminders([doc("T1", "2026-10-01T08:00:00Z", title="談一次", status="完成")], [], [], [], D(2026, 10, 8)), [])   # a finished task needs no more notes
+
+    def test_a_task_that_is_due_brings_the_person_back_to_review_until_they_do(self):
+        task = doc("T1", "2026-10-01T08:00:00Z", title="談一次", due="2026-10-20", status="完成")
+        [review] = act.case_reminders([task], [], [], [], D(2026, 10, 21))
+        self.assertEqual((review["block"], review["kind"], review["since"]), ("LEARN", "review", "2026-10-20"))
+        reviewed = [doc("C1", "2026-10-21T08:00:00Z", judgment_version=1, outcome="他讓步了")]
+        self.assertEqual(act.case_reminders([task], [], reviewed, [], D(2026, 10, 25)), [])
+        stopped = doc("T2", "2026-10-01T08:00:00Z", title="算了", due="2026-10-10", status="停掉")
+        self.assertEqual(act.case_reminders([stopped], [], [], [], D(2026, 10, 25)), [])   # a stopped task's date does not nag
+
+    def test_with_no_act_the_day_the_person_picked_brings_them_back(self):
+        revisit = doc("R1", "2026-10-01T08:00:00Z", on="2026-11-01")
+        self.assertEqual(act.case_reminders([], [], [], [revisit], D(2026, 10, 31)), [])
+        self.assertEqual([item["kind"] for item in act.case_reminders([], [], [], [revisit], D(2026, 11, 1))], ["review"])
+
+    def test_the_persons_own_day_decides_not_the_servers(self):
+        late = doc("T1", "2026-10-01T20:00:00Z", title="談一次", status="進行中")   # 10-02 in Taipei
+        self.assertEqual(act.case_reminders([late], [], [], [], D(2026, 10, 8), 480), [])
+        self.assertEqual([item["since"] for item in act.case_reminders([late], [], [], [], D(2026, 10, 9), 480)], ["2026-10-09"])
+        self.assertEqual(act.local_date("2026-10-02T18:30:00Z", 480), D(2026, 10, 3))
+
+    def test_the_two_practices(self):
+        today = D(2026, 10, 7)   # a Wednesday
+        self.assertEqual(act.practice_reminders(None, [], [], today), [])
+        self.assertEqual([item["kind"] for item in act.practice_reminders({"daily": True}, [], [], today)], ["daily"])
+        self.assertEqual(act.practice_reminders({"daily": True}, [doc("D1", "2026-10-07T01:00:00Z", about="決定", text="x")], [], today), [])
+        self.assertEqual(act.practice_reminders({"daily": True}, [doc("D1", "2026-10-06T18:30:00Z", about="決定", text="x")], [], today, 480), [])   # written at 02:30 on the 7th, Taipei
+        sprints = [doc("S1", "2026-10-06T08:00:00Z", project="P"), doc("S0", "2026-10-04T08:00:00Z", project="P")]   # Sunday = last week
+        [left] = act.practice_reminders({"weekly_sprints": 2}, [], sprints, today)
+        self.assertEqual((left["kind"], left["since"], left["text"]), ("sprint", "2026-10-05", "這週還差 1 次 30 分鐘的思考衝刺"))
+        self.assertEqual(act.practice_reminders({"weekly_sprints": 2}, [], sprints + [doc("S2", "2026-10-07T08:00:00Z", project="P")], today), [])
+        self.assertEqual(act.practice_reminders({"daily": False, "weekly_sprints": 0}, [], [], today), [])
+
+
+class ActBase(ProjectSourceApiTestCase):
+    def setUp(self):
+        super().setUp()
+        self.provider = Provider()
+        api_main.app.dependency_overrides[api_main.get_ai_provider] = lambda: self.provider
+        self._login()
+        self.pid = self._create_project()["project_id"]
+        self.base = f"/projects/{self.pid}"
+
+    def task(self, content=None, project=None):
+        response = self.client.post(f"/projects/{project or self.pid}/docs/act.task", json={"content": content or TASK})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def ask(self, name, **over):
+        return self.client.post(f"{self.base}/ai/ACT/{name}", json={"context": {}, **over})
+
+
+class TaskAndNoteTests(ActBase):
+    def test_the_task_is_the_persons_the_prediction_is_required_and_every_version_stays(self):
+        spec = doc_kinds.require("act.task")
+        self.assertEqual(spec.authors, frozenset({"user"}))
+        self.assertTrue(all(field.human_only for field in spec.fields.values()))
+        with self.assertRaisesRegex(InvariantViolation, "RECORD_HUMAN_ONLY_FIELD"):
+            doc_kinds.validate("act.task", TASK, "ai")
+        missing = self.client.post(f"{self.base}/docs/act.task", json={"content": {"title": "談一次"}})
+        self.assertIn("DOC_FIELD_REQUIRED: act.task.prediction", missing.text)
+        saved = self.task()
+        self.assertEqual((saved["author"], saved["block"], saved["version"]), ("user", "ACT", 1))
+        self.assertEqual(saved["content"]["whose_wish"], "是我自己想談")   # 行動前問：這正好是誰希望我做的
+        for status in ("進行中", "完成", "進行中"):   # rapid flips: every one stays
+            saved = self.client.put(f"{self.base}/docs/act.task/{saved['doc_id']}", json={"content": {**TASK, "status": status}, "base_version": saved["version"]}).json()
+        versions = self.client.get(f"{self.base}/docs/act.task/{saved['doc_id']}/versions").json()
+        self.assertEqual([item["content"].get("status") for item in versions], [None, "進行中", "完成", "進行中"])
+        removed = self.client.delete(f"{self.base}/docs/act.task/{saved['doc_id']}")
+        self.assertEqual(removed.status_code, 400)
+        self.assertIn("DOC_NOT_DELETABLE", removed.text)
+
+    def test_a_note_has_five_cells_and_numbers_and_stays(self):
+        task = self.task()
+        note = {"task": task["doc_id"], "happened": "他讓步了", "thoughts": "比我想的順", "adjustment": "下次先寫下來", "blocker": "他沒回訊息", "numbers": [{"name": "價格", "value": 90, "unit": "萬"}]}
+        saved = self.client.post(f"{self.base}/docs/act.note", json={"content": note})
+        self.assertEqual(saved.status_code, 200, saved.text)
+        self.assertEqual(saved.json()["content"]["numbers"], note["numbers"])
+        self.assertEqual(self.client.post(f"{self.base}/docs/act.note", json={"content": {"happened": "沒有指到哪個任務"}}).status_code, 400)
+        self.assertEqual(self.client.delete(f"{self.base}/docs/act.note/{saved.json()['doc_id']}").status_code, 400)
+        self.assertEqual(self.client.post(f"{self.base}/docs/act.note", json={"content": {**note, "numbers": [{"name": "價格", "value": 80, "unit": "萬"}], "score": 3}}).status_code, 400)
+
+    def test_a_high_risk_task_has_govern_add_the_guardrails_and_the_hold_is_the_persons(self):
+        saved = self.task({**TASK, "title": "跟銀行借款", "irreversible": True, "hold": "請人覆核"})
+        self.assertEqual([(n["type"], n["category"], n["found_by"]) for n in saved["notices"]], [("guardrail", "金錢", "ACT")])
+        self.assertEqual(saved["content"]["hold"], "請人覆核")
+        self.assertEqual(self.task({**TASK, "title": "跟銀行借款", "risk": "再借一次"})["notices"], [])   # once
+
+    def test_a_crisis_word_in_a_note_brings_help(self):
+        task = self.task()
+        saved = self.client.post(f"{self.base}/docs/act.note", json={"content": {"task": task["doc_id"], "thoughts": "我不想活了"}}).json()
+        self.assertEqual(saved["notices"][0]["type"], "crisis")
+
+    def test_a_colleague_reaches_none_of_it(self):
+        self.task()
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        store.create_identity("colleague-id", self.tenant["tenant_id"], "colleague@example.com", "Colleague", "correct-horse-battery")
+        self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "colleague@example.com", "password": "correct-horse-battery"})
+        self.assertEqual(self.client.get(f"{self.base}/docs/act.task").status_code, 404)
+        self.assertEqual(self.client.get(f"{self.base}/act/reminders").status_code, 404)
+        self.assertEqual(self.ask("flag").status_code, 404)
+
+
+class ReminderRouteTests(ActBase):
+    def test_the_case_list_gets_what_is_due_across_my_cases_and_nobody_elses(self):
+        today = (datetime.date.today() + datetime.timedelta(days=10)).isoformat()
+        self.task()
+        second = self._create_project(name="第二個案子")["project_id"]
+        self.client.post(f"/projects/{second}/docs/learn.revisit", json={"content": {"on": datetime.date.today().isoformat()}})
+        self.client.post("/me/docs/learn.practice", json={"content": {"daily": True, "weekly_sprints": 2}})
+        found = self.client.get(f"/me/reminders?today={today}").json()
+        self.assertEqual(sorted((item["scope"], item["kind"]) for item in found), [("case", "note"), ("case", "review"), ("person", "daily"), ("person", "sprint")])
+        note = next(item for item in found if item["kind"] == "note")
+        self.assertEqual((note["project_id"], note["project_name"], note["path"], note["block"]), (self.pid, "EdD study", f"/projects/{self.pid}/act", "ACT"))
+        self.assertEqual(next(item for item in found if item["kind"] == "review")["path"], f"/projects/{second}/learn")
+        self.assertEqual([item["kind"] for item in self.client.get(f"{self.base}/act/reminders?today={today}").json()], ["note"])
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        store.create_identity("colleague-id", self.tenant["tenant_id"], "colleague@example.com", "Colleague", "correct-horse-battery")
+        self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "colleague@example.com", "password": "correct-horse-battery"})
+        self.assertEqual(self.client.get(f"/me/reminders?today={today}").json(), [])
+
+    def test_a_bad_day_or_no_session_is_refused(self):
+        self.assertEqual(self.client.get("/me/reminders?today=next-week").status_code, 400)
+        self.assertEqual(self.client.get("/me/reminders?utc_offset=9999").status_code, 422)
+        self.client.cookies.clear()
+        self.assertEqual(self.client.get("/me/reminders").status_code, 401)
+
+
+class AiTurnTests(ActBase):
+    def test_splitting_the_next_step_needs_the_contracts_option_permission_and_the_person_picks(self):
+        self.client.post(f"{self.base}/docs/decide.judgment", json={"content": {"uncertainty": "不知道", "change_condition": "他願意寫進合約", "confidence": 50, "intensity_now": "弱", "next_step": "這週先跟他談一次條件"}})
+        self.provider.answer = {"options": [{"step": "先傳訊息約時間", "why_small": "只是約", "reversible": True, "undo": "取消約"}, {"step": "直接簽約", "why_small": "x", "reversible": False, "undo": "其實可以退"},
+                                            {"step": "", "reversible": True}, {"step": "壞的"}, "x"], "promise": "我替你談"}
+        denied = self.ask("split")
+        self.assertEqual(denied.status_code, 403)
+        self.assertEqual(self.provider.calls, [])
+        self.client.post(f"{self.base}/docs/collab_contract.terms", json={"content": {"permissions": ["propose_options"]}})
+        saved = self.ask("split").json()["saved"]
+        self.assertEqual((saved["author"], saved["kind"]), ("ai", "act.split"))
+        self.assertEqual([(item["step"], item["reversible"], item["undo"]) for item in saved["content"]["options"]], [("先傳訊息約時間", True, "取消約"), ("直接簽約", False, "")])
+        self.assertNotIn("promise", saved["content"])
+        self.assertIn("這週先跟他談一次條件", self.provider.calls[0][1])
+        self.assertIn("do not recommend one", self.provider.calls[0][0])
+
+    def test_there_must_be_a_next_step_to_split(self):
+        self.client.post(f"{self.base}/docs/collab_contract.terms", json={"content": {"permissions": ["propose_options"]}})
+        self.assertEqual(self.ask("split").status_code, 400)
+        self.assertEqual(self.provider.calls, [])
+
+    def test_flagging_what_cannot_be_undone_needs_no_permission_and_decides_nothing(self):
+        saved_task = self.task({**TASK, "irreversible": False})
+        self.provider.answer = {"irreversible": ["跟他談一次條件：話說出口收不回"], "affects_others": ["合夥人會知道你想退出"], "decision": "不要做"}
+        saved = self.ask("flag").json()["saved"]
+        self.assertEqual(saved["content"], {"irreversible": ["跟他談一次條件：話說出口收不回"], "affects_others": ["合夥人會知道你想退出"]})
+        self.assertIn(saved_task["doc_id"], self.provider.calls[0][1])
+        self.assertEqual(self.client.get(f"{self.base}/docs/act.task").json()[0]["content"]["irreversible"], False)   # the AI flagged; the task card is still the person's to tick
+
+    def test_the_trend_is_from_the_recorded_numbers_only(self):
+        self.assertEqual(self.ask("trend").status_code, 400)
+        task = self.task()
+        for value in (90, 80):
+            self.client.post(f"{self.base}/docs/act.note", json={"content": {"task": task["doc_id"], "numbers": [{"name": "價格", "value": value, "unit": "萬"}]}})
+        self.provider.answer = {"summary": "價格從 90 降到 80。", "unclear": ["訂單：只記了一次"], "target": "目標 70"}
+        saved = self.ask("trend").json()["saved"]
+        self.assertEqual(saved["content"], {"summary": "價格從 90 降到 80。", "unclear": ["訂單：只記了一次"]})
+        user = self.provider.calls[0][1]
+        self.assertIn("價格", user)
+        self.assertIn("90", user)
+        self.assertIn("Do not set a target", self.provider.calls[0][0])
+
+    def test_the_ai_cannot_write_the_persons_task_or_note_and_reads_only_the_cards_kinds(self):
+        for kind, content in (("act.split", {"options": [{"step": "x"}]}), ("act.flag", {"irreversible": ["x"]}), ("act.trend", {"summary": "x"})):
+            self.assertEqual(self.client.post(f"{self.base}/docs/{kind}", json={"content": content}).status_code, 403, kind)
+        reads = {name: set(ai_gate.actions()[("ACT", name)].reads) for name in ("split", "flag", "trend")}
+        self.assertEqual(reads, {"split": {"decide.judgment", "act.task"}, "flag": {"act.task", "assembler.intake"}, "trend": {"act.task", "act.note"}})
+        self.assertEqual({name: ai_gate.actions()[("ACT", name)].needs for name in reads}, {"split": "propose_options", "flag": "organize", "trend": "organize"})
+
+
+class WebParityTests(unittest.TestCase):
+    def test_the_status_and_rhythm_choices_match_the_engine(self):
+        page = (PRODUCT_ROOT / "apps" / "cognitive-web" / "lib" / "act.ts").read_text(encoding="utf-8")
+        for name, values in (("STATUS", act.STATUS), ("LONG_RHYTHM", act.LONG_RHYTHM)):
+            found = re.search(rf"export const {name} = \[(.*?)\] as const;", page, re.S)
+            self.assertIsNotNone(found, name)
+            self.assertEqual(tuple(re.findall(r'"([^"]+)"', found.group(1))), values, name)
+
+
+if __name__ == "__main__":
+    unittest.main()
