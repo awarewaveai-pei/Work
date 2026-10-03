@@ -11,12 +11,13 @@
 //     last 3 day-blocks" always works even on the 1st of a month).
 //   - Every older `## YYYY-MM-DD` block moves to
 //     agency-os/WORKLOG-archive/YYYY-MM.md (newest-first inside each file).
-//   - Kept blocks are re-emitted strictly newest-first (repairs the broken
-//     tail ordering observed in the 2026-07-02 audit).
+//   - Kept blocks are left byte-identical in their original order: a rotation
+//     only deletes. (Re-sorting them newest-first, added 2026-07-02, turned
+//     every rotation into a whole-file diff; removed 2026-10-03.)
 //   - Idempotent: re-running with nothing to move is a no-op.
 //
 // Usage:
-//   node scripts/rotate-worklog.mjs [--dry-run] [--repo <root>]
+//   node scripts/rotate-worklog.mjs [--dry-run] [--repo <root>] [--now YYYY-MM-DD]
 //
 // Invoked automatically by ao-close.ps1 (best-effort; failure never blocks
 // close-out — it prints a warning and the next close retries).
@@ -30,6 +31,12 @@ const DRY = args.includes('--dry-run');
 const repoIdx = args.indexOf('--repo');
 const REPO = repoIdx >= 0 ? args[repoIdx + 1]
   : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const nowIdx = args.indexOf('--now'); // YYYY-MM-DD; tests pin the keep window so a run across month-end cannot flake
+const NOW = nowIdx >= 0 ? new Date(`${args[nowIdx + 1]}T12:00:00Z`) : new Date();
+if (Number.isNaN(NOW.getTime())) {
+  console.error(`rotate-worklog: bad --now ${args[nowIdx + 1]} (want YYYY-MM-DD)`);
+  process.exit(2);
+}
 
 const WORKLOG = path.join(REPO, 'agency-os', 'WORKLOG.md');
 const ARCHIVE_DIR = path.join(REPO, 'agency-os', 'WORKLOG-archive');
@@ -77,7 +84,7 @@ function main() {
   }
   const original = fs.readFileSync(WORKLOG, 'utf8');
   const { header, blocks } = parse(original);
-  const keep = keepMonths();
+  const keep = keepMonths(NOW);
 
   const kept = blocks.filter((b) => keep.has(monthKey(b.date)));
   const moved = blocks.filter((b) => !keep.has(monthKey(b.date)));
@@ -95,8 +102,6 @@ function main() {
     byMonth.get(k).push(b);
   }
   for (const list of byMonth.values()) list.sort((a, b) => b.date.localeCompare(a.date));
-
-  const keptSorted = [...kept].sort((a, b) => b.date.localeCompare(a.date));
 
   if (DRY) {
     console.log(`rotate-worklog [dry-run]: would keep ${kept.length} blocks (${[...keep].join(', ')}), move ${moved.length} blocks:`);
@@ -124,8 +129,10 @@ function main() {
     fs.appendFileSync(file, head + fresh.map((b) => b.text.trimEnd() + '\n\n').join(''));
   }
 
-  const rebuilt = header.trimEnd() + '\n\n' +
-    keptSorted.map((b) => b.text.trimEnd() + '\n\n').join('');
+  // Kept blocks stay byte-identical and in their original order, so the WORKLOG.md diff of a rotation is
+  // deletions only. Re-sorting them (until 2026-10-03) moved every bottom-appended `## date` section next
+  // to its date: a +8475/-15778 diff for a rotation that removed 7300 lines.
+  const rebuilt = header + kept.map((b) => b.text).join('');
   const tmp = WORKLOG + '.rotate-tmp';
   fs.writeFileSync(tmp, rebuilt);
   fs.renameSync(tmp, WORKLOG);

@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-03（續2）WORKLOG 封存不再重排（上萬行差異的真因）；AO 檔案的寫入一律 LF、保留 BOM 狀態；健康檢查 12f 守住
+- [操作者] 「CRLF 11 支 處理好」「這是不是浪費了很多時間和 token?」
+- [更正] 續1／AO-CLOSE 報告稱「CRLF 讓 WORKLOG 差異看起來上萬行」不正確。實證：已提交的兩版（皆 LF）`git diff aac23629c~1 f3f945feb -- agency-os/WORKLOG.md` 仍是 +8475/-15778、406 個 `## ` 標題移位。真因 `scripts/rotate-worklog.mjs:99`（舊）把保留段落依日期重排，把底部附加的 `## 日期` 段全部搬到對應日期旁。CRLF 在 git diff／commit 時都被正規化，不產生差異；它的實害是讀工作樹的工具（regex／位元組比對）會撞到混用換行（2026-09-25 記憶）。
+- [改 1] `rotate-worklog.mjs`：保留段落原序、位元組不動（`header + kept.map(b => b.text)`），一次封存的差異只剩刪除；加 `--now YYYY-MM-DD`（測試固定月份，避免跨月偶發失敗）。測試 `tests/hooks/maintenance-scripts.test.mjs` 新案：輸出 == 輸入去掉被搬走的段（CRLF fixture）。
+- [改 2] 不變量：寫入 WORKLOG／TASKS／memory／自動同步文件的腳本輸出 LF（.gitattributes `eol=lf`），既有檔 BOM 狀態不變、新檔無 BOM。新 `scripts/lib/repo-text.ps1` `Write-RepoTextFile`；改走它的 7 支：apply-closeout-task-checkmarks、backfill-missed-daily、ensure-daily-progress-scaffold、merge-closeout-inbox-into-progress、verify-recent-ack（後二者刪掉各自的 Write-Utf8NoBomFile 複本）、monthly-system-review（原 `-join "`r`n"`＋Add-Content，critic M1）、doc-sync-automation（原 `Set-Content -Encoding UTF8`：CRLF 區塊＋每次都加 BOM，TASKS.md 首行因此在有／無 BOM 間翻轉；保留它原本多加的結尾換行，避免 170 份文件一次變動）。
+- [改 3] `system-health-check.ps1` 12f：`git ls-files --eol` 對 WORKLOG／TASKS／memory，任一 w/crlf|w/mixed → FAIL 並列檔名；git 失敗或 0 行 → FAIL（critic M2，不再「0 檔全 LF」假綠）。
+- [清理] memory／WORKLOG／TASKS 中 45 個 CRLF／混用檔改寫為 LF（只動與 index 內容相同的檔，寫入位元組 = index blob；`git add` 刷新 stat，無任何暫存變動）。
+- [範圍外] 原清單 11 支中 bughunt-oracle、machine-environment-audit 只在記憶體中組字串，不寫檔；codex-oracle／write-oracle-artifact／ao-close 報告骨架與 stamp 是單一寫入者的純 CRLF 檔，git 已正規化、不會混用，未改。其他約 70 支寫 reports／docs 的腳本同理；12f 只守 AO 檔。
+- [另記] 第二次私有 index 提交時 `GIT_INDEX_FILE=$I`（變數）→ `git-commit-scope-guard.js` 認不出，提交後沒同步共用 index（TASKS 留舊版，已 `git reset -q -- agency-os/TASKS.md` 修正）。照 `git-partial-worktree-commit.py` 印出的字面路徑下指令。
+- 浪費多少：誤判本身約 6 次工具呼叫（核對無遺失）；真正的成本是每月一次全檔重排讓之後讀差異的 agent 白讀上萬行，本次已關掉。
+- rollback：`git revert <本 commit>`；寫入函式只改換行與 BOM 判斷，文字內容不變。
 
 ## 2026-10-03（續1）Cognitive OS 部署 b51095cbf→ebbf363cc（structured answers＋生命時間線／個人 SWOT／風險矩陣圖／根因分析工作流）；live_check 的工具數不再寫死
 - [操作者] 「昨天做了很多事，沒有部署，你去處理」＝部署 go-ahead（TASKS 10-02「收工時一起部署」那條）。
@@ -25,6 +36,11 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,.github,Projects/internal/cognitive-engineering-os | grep=`"tools": ?28[0-9]|28[4-6] 個(思考)?工具` | hits=0
 - ORACLE_WAIVED: live_check.sh 7 行 dev 檢查腳本，以突變證據取代外部 oracle
 - 詳細：本檔頂部 2026-10-03（續1）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test tests/hooks/maintenance-scripts.test.mjs + eol_realtest.py（5 支寫入者在拋棄式 WorkRoot 真跑）+ eol_realtest2.ps1（doc-sync Upsert-RelatedBlock 由 AST 取出真跑、monthly append、BOM 保留）+ system-health-check.ps1 | exit=0 | ms=420000 | result=6/6；9/9；5/5；329/329（12f 180 檔全 LF）
+- MUTATION: 重排放回 → 新測試紅；拿掉 CRLF→LF → 6 項紅；BOM 判斷關掉 → 2 項紅；12f 翻一檔為 CRLF → 計 1；git 失敗 → 走 FAIL 分支（exit=128）。皆還原綠。
+- REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/2m/2n -- M1 monthly-system-review 漏網寫入者、M2 12f git 失敗假綠、m1 測試跨月、m2 .ps1 工作樹 LF（git 正規化，不處理）；另自查到 doc-sync 同類（每次加 BOM）一併修
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,runbooks | grep=`Write-Utf8NoBomFile|keptSorted|newest-first|WORKLOG.md|TASKS.md|memory[\/]daily` 寫入點 | hits=21 檔逐一判定，寫 AO 檔者 7 支全改，其餘寫 reports／暫存
+- ORACLE_WAIVED: 以 critic Standard＋5 組突變證據取代外部 oracle（操作者在意時間與 token）
 
 ## 2026-10-02（續5）Cognitive OS 個人 SWOT 案主版 `art_therapy.personal_swot`；PR #28 已合併
 - [操作者] 「合併」→ PR #28 合併（`dcc17c7`）；「個人 SWOT 要新建一個案主專用版」。

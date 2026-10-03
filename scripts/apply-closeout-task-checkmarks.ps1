@@ -19,6 +19,7 @@
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 if ($WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
@@ -160,9 +161,7 @@ foreach ($p in $planned) {
 }
 
 if ($planned.Count -gt 0) {
-    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-    $body = ($lines -join [Environment]::NewLine) + [Environment]::NewLine
-    [System.IO.File]::WriteAllText($tasksPath, $body, $utf8NoBom)
+    Write-RepoTextFile -Path $tasksPath -Content (($lines -join "`n") + "`n")
 }
 
 # --- Rewrite WORKLOG AUTO_TASK_DONE -> APPLIED (today section only)
@@ -194,8 +193,7 @@ if (-not $PendingFileOnly -and (Test-Path -LiteralPath $worklogPath) -and $workl
             }
         }
         if ($changedWl) {
-            $wbody = ($wl2 -join [Environment]::NewLine) + [Environment]::NewLine
-            [System.IO.File]::WriteAllText($worklogPath, $wbody, (New-Object System.Text.UTF8Encoding $false))
+            Write-RepoTextFile -Path $worklogPath -Content (($wl2 -join "`n") + "`n")
             Write-Host "apply-closeout-task-checkmarks: updated WORKLOG markers for $today." -ForegroundColor DarkGray
         }
     }

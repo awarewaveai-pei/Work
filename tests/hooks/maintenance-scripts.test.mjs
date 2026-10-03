@@ -21,12 +21,14 @@ function makeRepoRoot(worklog) {
   return dir;
 }
 
+// The keep window is pinned with --now so a run across UTC month-end cannot flake.
+const TODAY = new Date().toISOString().slice(0, 10);
 function runRotate(repo, ...extra) {
-  return spawnSync('node', [ROTATE, '--repo', repo, ...extra], { encoding: 'utf8' });
+  return spawnSync('node', [ROTATE, '--repo', repo, '--now', TODAY, ...extra], { encoding: 'utf8' });
 }
 
 const OLD = '2025-01'; // always outside the keep window
-const CUR = new Date().toISOString().slice(0, 7); // keep = {current, previous} month — exact membership
+const CUR = TODAY.slice(0, 7); // keep = {current, previous} month — exact membership
 const KEPT_DATE = `${CUR}-15`;
 
 test('rotate: fence-guarded — a ## date line inside a code fence is NOT a block boundary (critic-1)', () => {
@@ -64,6 +66,25 @@ test('rotate: idempotent — re-adding the same old block does not duplicate arc
   assert.equal(runRotate(repo).status, 0);
   const arch = fs.readFileSync(path.join(repo, 'agency-os', 'WORKLOG-archive', `${OLD}.md`), 'utf8');
   assert.equal((arch.match(/same old content/g) || []).length, 1);
+});
+
+test('rotate: kept blocks stay byte-identical in original order — the rotation diff is deletions only', () => {
+  const t = new Date(`${TODAY}T12:00:00Z`);
+  const PREV = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+  const worklog = [
+    '# Worklog',
+    `## ${CUR}-02（續1）newest entry, inserted at the top`, 'a', '',
+    `## ${PREV}-20（續3）older kept entry`, 'b',
+    `## ${OLD}-15`, 'old block to rotate', '', '',
+    `## ${CUR}-01`, '- machine appendix appended at the bottom', '',
+    `## ${PREV}-28`, '- bottom section, spacing kept   ', '',
+  ].join('\r\n'); // CRLF on purpose: bytes must survive untouched
+  const repo = makeRepoRoot(worklog);
+  assert.equal(runRotate(repo).status, 0);
+  const main = fs.readFileSync(path.join(repo, 'agency-os', 'WORKLOG.md'), 'utf8');
+  const oldBlock = `## ${OLD}-15\r\nold block to rotate\r\n\r\n\r\n`;
+  assert.ok(worklog.includes(oldBlock));
+  assert.equal(main, worklog.replace(oldBlock, ''));
 });
 
 test('rotate: no temp file left behind (atomic rename, critic-2b)', () => {

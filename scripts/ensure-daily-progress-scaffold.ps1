@@ -27,14 +27,7 @@ $dailyDir = Join-Path $agencyRoot "memory\daily"
 $dailyPath = Join-Path $dailyDir "$today.md"
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 
-function Write-Utf8NoBomFile {
-    param([string]$Path, [string]$Content)
-    $dir = Split-Path -Parent $Path
-    if (-not (Test-Path -LiteralPath $dir)) {
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    }
-    [System.IO.File]::WriteAllText($Path, $Content, $utf8)
-}
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 $did = $false
 
@@ -72,7 +65,7 @@ if (Test-Path -LiteralPath $worklogPath) {
             $after = $lines[$insertAt..($lines.Length - 1)]
             $newLines = @($before) + $block + @($after)
         }
-        Write-Utf8NoBomFile -Path $worklogPath -Content (($newLines -join [Environment]::NewLine).TrimEnd() + [Environment]::NewLine)
+        Write-RepoTextFile -Path $worklogPath -Content (($newLines -join [Environment]::NewLine).TrimEnd() + [Environment]::NewLine)
         Write-Host "ensure-daily-progress-scaffold: inserted WORKLOG $todayHeader" -ForegroundColor Green
         $did = $true
     }
@@ -95,7 +88,7 @@ if (-not (Test-Path -LiteralPath $dailyPath)) {
         "- (TBD)",
         ""
     ) -join [Environment]::NewLine
-    Write-Utf8NoBomFile -Path $dailyPath -Content $dailyBody
+    Write-RepoTextFile -Path $dailyPath -Content $dailyBody
     Write-Host "ensure-daily-progress-scaffold: created $dailyPath" -ForegroundColor Green
     $did = $true
 }

@@ -39,6 +39,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 if (-not $WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
@@ -127,9 +128,7 @@ if (-not (Test-Path -LiteralPath $dailyDir)) {
     New-Item -ItemType Directory -Path $dailyDir -Force | Out-Null
 }
 
-$utf8NoBom = New-Object System.Text.UTF8Encoding $false
-$body = ($lines -join [Environment]::NewLine) + [Environment]::NewLine
-[System.IO.File]::WriteAllText($dailyPath, $body, $utf8NoBom)
+Write-RepoTextFile -Path $dailyPath -Content (($lines -join "`n") + "`n")
 
 Write-Host ""
 Write-Host "backfill-missed-daily: wrote $dailyPath" -ForegroundColor Green

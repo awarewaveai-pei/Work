@@ -9,6 +9,7 @@
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 function Resolve-WorkspaceRoot {
     param([string]$InputRoot)
@@ -109,7 +110,7 @@ function Upsert-RelatedBlock {
     }
 
     if ($newContent -ne $content) {
-        Set-Content -Path $full -Value $newContent -Encoding UTF8
+        Write-RepoTextFile -Path $full -Content ($newContent + "`n")   # + the newline Set-Content used to add
         return $true
     }
     return $false

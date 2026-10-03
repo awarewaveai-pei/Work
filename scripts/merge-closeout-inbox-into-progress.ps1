@@ -34,14 +34,7 @@ $dailyPath = Join-Path $agencyRoot "memory\daily\$today.md"
 $convPath = Join-Path $agencyRoot "memory\CONVERSATION_MEMORY.md"
 $utf8 = [System.Text.UTF8Encoding]::new($false)
 
-function Write-Utf8NoBomFile {
-    param([string]$Path, [string]$Content)
-    $dir = Split-Path -Parent $Path
-    if (-not (Test-Path -LiteralPath $dir)) {
-        New-Item -ItemType Directory -Path $dir -Force | Out-Null
-    }
-    [System.IO.File]::WriteAllText($Path, $Content, $utf8)
-}
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 function Get-LastFencedDashIndex {
     param([string[]]$Lines)
@@ -201,7 +194,7 @@ if ($insertAt -lt $wlLines.Length) {
     $after = $wlLines[$insertAt..($wlLines.Length - 1)]
 }
 $newWl = @($before) + $mergeBlock + $after
-Write-Utf8NoBomFile -Path $worklogPath -Content (($newWl -join [Environment]::NewLine).TrimEnd() + [Environment]::NewLine)
+Write-RepoTextFile -Path $worklogPath -Content (($newWl -join [Environment]::NewLine).TrimEnd() + [Environment]::NewLine)
 Write-Host "merge-closeout-inbox: appended to WORKLOG $today" -ForegroundColor Green
 $modifiedTargets.Add("agency-os/WORKLOG.md (inbox verbatim block)") | Out-Null
 
@@ -216,7 +209,7 @@ if (Test-Path -LiteralPath $dailyPath) {
             $payload,
             ""
         ) -join [Environment]::NewLine
-        Write-Utf8NoBomFile -Path $dailyPath -Content ($dailyRaw.TrimEnd() + [Environment]::NewLine + $append)
+        Write-RepoTextFile -Path $dailyPath -Content ($dailyRaw.TrimEnd() + [Environment]::NewLine + $append)
         Write-Host "merge-closeout-inbox: appended to memory/daily/$today.md" -ForegroundColor Green
         $modifiedTargets.Add("agency-os/memory/daily/$today.md (inbox verbatim block)") | Out-Null
     }
@@ -248,7 +241,7 @@ if (Test-Path -LiteralPath $convPath) {
                 $bullet,
                 ""
             ) -join [Environment]::NewLine
-            Write-Utf8NoBomFile -Path $convPath -Content ($convRaw.TrimEnd() + [Environment]::NewLine + $append)
+            Write-RepoTextFile -Path $convPath -Content ($convRaw.TrimEnd() + [Environment]::NewLine + $append)
             Write-Warning "merge-closeout-inbox: CONVERSATION_MEMORY missing '## Current Operating Context'; appended ## AO-CLOSE inbox pointer"
         } else {
             $beforeC = @()
@@ -260,7 +253,7 @@ if (Test-Path -LiteralPath $convPath) {
                 $afterC = $convLines[$insertIdx..($convLines.Length - 1)]
             }
             $newConv = @($beforeC) + $bullet + $afterC
-            Write-Utf8NoBomFile -Path $convPath -Content (($newConv -join [Environment]::NewLine).TrimEnd() + [Environment]::NewLine)
+            Write-RepoTextFile -Path $convPath -Content (($newConv -join [Environment]::NewLine).TrimEnd() + [Environment]::NewLine)
         }
         Write-Host "merge-closeout-inbox: CONVERSATION_MEMORY updated (pointer line)" -ForegroundColor Green
         $modifiedTargets.Add("agency-os/memory/CONVERSATION_MEMORY.md (one AO-CLOSE pointer line)") | Out-Null
@@ -275,7 +268,7 @@ if (Test-Path -LiteralPath $templatePath) {
     $modifiedTargets.Add("agency-os/.agency-state/closeout-inbox.md (reset from TEMPLATE)") | Out-Null
 } else {
     $stub = "# Closeout inbox`n`nAppend-only. Template missing; restore from git.`n"
-    Write-Utf8NoBomFile -Path $inboxPath -Content $stub
+    Write-RepoTextFile -Path $inboxPath -Content $stub
     Write-Warning "merge-closeout-inbox: TEMPLATE missing; wrote minimal stub inbox"
 }
 

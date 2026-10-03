@@ -965,6 +965,27 @@ if (Test-Path -LiteralPath $fetchGateLib) {
     Add-CriticalFailure -Reason "Missing fetch-recency gate helper scripts/lib/fetch-recency-gate.ps1"
 }
 
+# 12f) AO pipeline files stay LF in the working tree (.gitattributes eol=lf). The AO-CLOSE/scaffold writers
+# joined with [Environment]::NewLine (CRLF on Windows) and left WORKLOG/TASKS/memory mixed, which breaks
+# byte/regex anchors in tools reading the worktree. Writers now go through scripts/lib/repo-text.ps1;
+# this check names any file a writer turns CRLF again (2026-10-03).
+$eolCheckName = "AO pipeline files LF in worktree (WORKLOG, TASKS, memory)"
+try {
+    $eolOut = @(& git -C $monoRoot ls-files --eol -- "agency-os/WORKLOG.md" "agency-os/TASKS.md" "agency-os/memory" 2>$null)
+    $eolExit = $LASTEXITCODE
+    $eolBad = @($eolOut | Where-Object { $_ -match '\sw/(crlf|mixed)\s' } | ForEach-Object { ($_ -split "`t", 2)[1] })
+    if ($eolExit -ne 0 -or $eolOut.Count -eq 0) {
+        Add-Check -Name $eolCheckName -Pass $false -Detail ("FAIL: git ls-files --eol exit=" + $eolExit + ", " + $eolOut.Count + " lines -- nothing was checked")
+    } elseif ($eolBad.Count -eq 0) {
+        Add-Check -Name $eolCheckName -Pass $true -Detail ("PASS: " + @($eolOut).Count + " tracked files, all LF")
+    } else {
+        $eolShow = ($eolBad | Select-Object -First 5) -join ", "
+        Add-Check -Name $eolCheckName -Pass $false -Detail ("FAIL: " + $eolBad.Count + " file(s) CRLF/mixed: " + $eolShow + " - find the writer (use Write-RepoTextFile), then rewrite the file with LF")
+    }
+} catch {
+    Add-Check -Name $eolCheckName -Pass $false -Detail ("FAIL: git ls-files --eol crashed: " + $_.Exception.Message)
+}
+
 $total = $checks.Count
 $passed = @($checks | Where-Object { $_.pass }).Count
 $failed = $total - $passed

@@ -10,6 +10,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 function Resolve-AgencyRoot {
     param([string]$InputRoot)
@@ -133,8 +134,9 @@ if (-not $SkipWorklog) {
         "### Machine appendix (monthly-system-review)",
         "- $stampLocal : $gateSummary ; integrated-status: generate-integrated-status-report.ps1 $reportLabel ; supabase-memory: $memStatus ($memSummary)",
         ""
-    ) -join "`r`n"
-    Add-Content -LiteralPath $worklogPath -Value $append -Encoding UTF8
+    ) -join "`n"
+    $wlNow = if (Test-Path -LiteralPath $worklogPath) { [System.IO.File]::ReadAllText($worklogPath, [System.Text.Encoding]::UTF8) } else { "" }
+    Write-RepoTextFile -Path $worklogPath -Content ($wlNow.TrimEnd("`r", "`n") + "`n" + $append)
 }
 
 Write-Output "monthly-system-review: done ($gateSummary, report $reportLabel)."

@@ -702,9 +702,7 @@
 - [x] **【2026-10-02 開出｜Cognitive OS｜收工時】待部署：`118958b5f`（structured answers）＋之後同批改動，一次 `deploy.sh`（High-STOP，收工時列清單再確認）**
   - `🟡 待部署` · `2026-10-02 開出` · `操作者要求收工時一起部署`
   - **一句話**：正式站仍是 `b51095cbf`；部署＝`/opt/cognitive-os` pull＋`deploy/deploy.sh`（受影響測試自 `.green-sha`，本批觸及 schema_contracts／errors ≈ 365 模組約 47 分）；部署後在「勿刪」專案 `857b6f41…` 實測一次 dossier_brief。WORKLOG 2026-10-02 續3。
-- [ ] **【2026-10-03 開出｜治理｜小】PowerShell 腳本重寫 repo 檔時用 `[Environment]::NewLine`（Windows=CRLF）：AO-CLOSE 後 WORKLOG／TASKS 工作樹變 CRLF，diff 假顯示上萬行**
-  - `🟡 未開始` · `2026-10-03 開出` · `不卡誰（commit 時 autocrlf 轉回 LF，已驗內容無遺失）`
-  - **一句話**：不變量＝重寫既有檔沿用該檔原本的換行。實例 `apply-closeout-task-checkmarks.ps1:164,197`（2026-10-03 AO-CLOSE 後 WORKLOG 15186 行 CRLF）；同模式 `-join [Environment]::NewLine` 的 11 支待逐支判定是否寫 repo 檔：ao-close、apply-closeout-task-checkmarks、backfill-missed-daily、bughunt-oracle、codex-oracle、ensure-agent-bootstrap-prompts、ensure-daily-progress-scaffold、machine-environment-audit、merge-closeout-inbox-into-progress、verify-recent-ack、write-oracle-artifact（`grep -rln "join \[Environment\]::NewLine" scripts/*.ps1`）。修法：共用一個「讀原換行→寫回」函式＋檢查器擋新增。WORKLOG 2026-10-03（續1）。
+- [x] **【2026-10-03 開出｜治理｜小】AO 檔案寫入混用換行＋WORKLOG 封存全檔重排** → ✅ 2026-10-03 續2：上萬行差異真因是 `rotate-worklog.mjs` 重排（已改為只刪除）；寫 WORKLOG／TASKS／memory／自動同步文件的 7 支腳本改走 `scripts/lib/repo-text.ps1`（LF、保留 BOM 狀態）；健康檢查 12f 守住。原「CRLF 造成上萬行差異」判斷錯誤，更正見 WORKLOG 2026-10-03（續2）。
 - [x] **【2026-10-02 開出｜Cognitive OS｜低優先】synthesis 失敗只存錯誤碼，事後看不到哪個欄位不合 schema** → ✅ 2026-10-02 續3：整類關閉（要回 JSON 物件的 AI 呼叫一律帶 schema；SynthesisFailed 帶違規路徑不帶值），未部署
   - `✅ 已完成` · `2026-10-02 開出` · `不卡誰`
   - **一句話**：真來源 `dossier_brief` 1/2 次整次 FAILED（`SCHEMA_VALIDATION_FAILED`，修復重試也失敗）；`main.py:2045` `_error_code` 只存碼（刻意不存模型／來源文字），違規 JSON path 也一起丟了 → 只能付費重放才診斷。方向：另存 path＋validator keyword（不含值）。WORKLOG 2026-10-02 續2。

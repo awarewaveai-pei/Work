@@ -34,6 +34,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
 if (-not $WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
@@ -119,7 +120,7 @@ try {
     if (-not (Test-Path -LiteralPath $dailyPath)) {
         # Scaffold the daily file if missing
         $header = "# Daily Note - $today" + [Environment]::NewLine + [Environment]::NewLine
-        [System.IO.File]::WriteAllText($dailyPath, $header + $body, $utf8NoBom)
+        Write-RepoTextFile -Path $dailyPath -Content ($header + $body)
     } else {
         # Read current, append, atomic-write back via tmp + Move-Item -Force.
         # NOTE: NO explicit BOM stripping needed. [System.IO.File]::ReadAllText with any UTF-8
@@ -127,9 +128,7 @@ try {
         # StreamReader default detectEncodingFromByteOrderMarks=true).
         $existing = [System.IO.File]::ReadAllText($dailyPath, [System.Text.Encoding]::UTF8)
         $combined = $existing.TrimEnd() + [Environment]::NewLine + [Environment]::NewLine + $body
-        $tmpPath = "$dailyPath.tmp"
-        [System.IO.File]::WriteAllText($tmpPath, $combined, $utf8NoBom)
-        Move-Item -LiteralPath $tmpPath -Destination $dailyPath -Force
+        Write-RepoTextFile -Path $dailyPath -Content $combined -Atomic
     }
     Write-Host "verify-recent-ack: audit record appended to $dailyPath" -ForegroundColor Cyan
 } catch {
