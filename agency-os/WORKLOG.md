@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-03（續7）認知主權平台第 1 步地基：每筆紀錄記作者、積木和擁有者；案子只有開的人看得到；積木文件、AI 閘、SENSE、開案頁
+- [操作者] 「不要停 直到全部做好」；「我要盡快完成系統」→ 我當監工，地基自己做，14 塊分給 4 個工人。
+- [根因] 合約要的四件事引擎都沒有：
+  - 寫事件有兩個入口，版本寫死、沒有作者；
+  - 同一個租戶的人看得到每個案子；
+  - 抹除用 aggregate id 開頭比對，會漏；
+  - AI 呼叫沒有權限檢查。
+- [修] `7c91b323b`：
+  - `ai_lego/data/events/record_log.py` 的 `append` 是唯一寫入口：作者、積木、擁有者（案子／本人／平台）、各事件型別的版本；拒收分數欄位；`delete_owned` 照擁有者抹除。舊資料的作者不猜，留空。
+  - `main.py` 的 `_project_or_404(repo, session, id)`：不是開案的人，一律同一個 404。
+  - `doc_kinds` + `case_docs` + `blocks/docs.py`：積木文件有版本；只能本人寫的欄位，AI 寫不進去；AI 沒改過＝ai，改過＝joint。
+  - `platform/ai_gate.py`：合約權限 → 危機檢查（不呼叫模型）→ 護欄 → 計費呼叫 → 驗答案 → 記 `govern.ai_call`。
+  - SENSE 頁、開案頁；案子頁的舊流程條換成 14 格。
+- [修] `3f26fc502`（審查 M1、M2）：
+  - 案名唯一鍵改成（租戶、工作區、開案的人、名稱）；舊檔用 SQLite 12 步重建。
+  - 配方執行紀錄放在執行人自己的資料夾；刪案子會一起刪它的執行和產物（執行中回 409）。
+- [審查] 2 個 critic。7 項在 `7c91b323b` 修：危機檢查只看部分輸入、兩份有效合約、提案回答存成本人的話、鏡子問題沒固定、合成中抹除、每次請求都跑遷移、刪掉的工作流標題還在。M1、M2 在 `3f26fc502` 修。
+- [已知限制] next-admin 用同一個服務身分開案，它的操作者共用擁有權（寫在 `docs/platform/STEP1_CHECKLIST.md`）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_record_log tests.unit.test_block_foundation tests.unit.test_every_paid_call_is_metered | exit=0 | ms=16189
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=9（2 個 critic；分級沒留存；7 項修在 7c91b323b，M1／M2 修在 3f26fc502）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,next-admin/lib,.claude | grep=_project_or_404 | hits=41
+- ORACLE_WAIVED: 兩個獨立 critic agent 審過（身分／權限改動，依 §4 用 2 個）；8 個突變（5 個地基守衛、3 個 M1／M2 修正）都讓指名測試變紅。
+- 驗證：API 測試 375 項、vitest 111/111、tsc 乾淨；SENSE 頁用 Playwright 在 1280 和 400 寬跑過，沒有頁面錯誤。
+- rollback：`git revert 3f26fc502 7c91b323b`。注意：已遷移的 SQLite 檔（owner 欄、新唯一鍵）不會跟著退回；正式站還沒部署，只有本機檔受影響。
+- 下一步：4 個工人做 MAP+CONTEXT、THINK+協作合約、DECIDE+ACT+LEARN、GOVERN+完整性；我逐一接進 main、審查、在 :3930 看頁面。建議模型：Opus 5.5。
 ## 2026-10-03（續6）認知主權平台監工台 v52：待定的事全部由我定（她授權）；第 1 步的 12 份合約確認；進度與順序更新
 - [操作者] 「都交給你做，需要決定的事都你決定…做好要去核對【進度與順序】並更新」。
 - [根因] 建置開不了工：
