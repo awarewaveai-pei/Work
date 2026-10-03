@@ -98,6 +98,7 @@ interface CrawlWithOptions {
   maxDepth: number;
   durableRateLimit: boolean;
   urlState: boolean;
+  keepAside: boolean;
   log: (msg: string) => void;
 }
 
@@ -117,6 +118,7 @@ function crawlWith(o: CrawlWithOptions): Promise<CrawlResult> {
     flushEvery: 10,
     blocks: collectors(),
     log: o.log,
+    keepAside: o.keepAside,
     // Off ⇒ the orchestrator's own NO_URL_STATE default: every page is fetched and delivered in full.
     urlState: o.urlState ? createSupabaseUrlStateStore() : undefined,
     fetch: createCollectFetch({ budget: o.budget, log: o.log, rateLimiter }),
@@ -132,6 +134,12 @@ function crawlWith(o: CrawlWithOptions): Promise<CrawlResult> {
  */
 export const RESEARCH_MAX_MS = 240_000;
 
+/** A URL the person pasted is that one page (wire v2): its links are not hers, and following them would fill the
+ *  case with the rest of the site. */
+export function researchSeeds(seeds: SeedInput[]): SeedInput[] {
+  return seeds.map((s) => (s.meta?.pasted === true ? { ...s, meta: { ...s.meta, maxDepth: 0 } } : s));
+}
+
 export interface ResearchCollectionOptions {
   projectId: string;
   runId: string;
@@ -146,11 +154,12 @@ export interface ResearchCollectionOptions {
  * an organization's approved sources, and nothing is written to this app's own run bookkeeping — the run belongs to
  * the COS Project. No url state: a 304 would deliver nothing, and COS must see every page to answer "unchanged"
  * itself (plan K6, I1). The rate limiter stays durable: politeness toward a host does not depend on who asked.
+ * keepAside: a refused page is labelled, never dropped (Cognitive OS wire v2, STEP2_SHARED_RULES §4.1).
  */
 export async function runResearchCollection(opts: ResearchCollectionOptions): Promise<Pick<CrawlResult, "report" | "sink">> {
   const budget = createBudget({ ...DEFAULT_BUDGET, ...opts.budget, ms: Math.min(opts.budget?.ms ?? RESEARCH_MAX_MS, RESEARCH_MAX_MS) });
   const result = await crawlWith({
-    seeds: opts.seeds,
+    seeds: researchSeeds(opts.seeds),
     sink: opts.sink,
     budget,
     tenantRef: `research:${opts.projectId}`,
@@ -158,6 +167,7 @@ export async function runResearchCollection(opts: ResearchCollectionOptions): Pr
     maxDepth: 2,
     durableRateLimit: true,
     urlState: false,
+    keepAside: true,
     log: opts.log ?? (() => {}),
   });
   return { report: result.report, sink: result.sink };
@@ -179,7 +189,7 @@ export async function runCollection(opts: RunCollectionOptions): Promise<RunColl
       // tenant with no approved sources looks identical to a tenant whose crawl is broken.
       report: {
         fetched: 0, outOfScope: 0, unhandled: [], gone: [], dirty: [], quarantined: [],
-        disallowed: [], offEntity: [], retried: 0, stoppedBy: "frontier_empty",
+        disallowed: [], offEntity: [], retried: 0, stoppedBy: "frontier_empty", aside: [], channels: [],
       },
       sink: { written: 0, skipped: 0 },
       persistedRunId: null,
@@ -202,6 +212,7 @@ export async function runCollection(opts: RunCollectionOptions): Promise<RunColl
     durableRateLimit: !opts.dryRun,
     // "A dry run leaves no trace anywhere" (see below) — a cached etag IS a trace.
     urlState: !opts.dryRun,
+    keepAside: false,
     log,
   });
 

@@ -3080,6 +3080,36 @@ class CollectionCompleteRequest(BaseModel):
     report: dict[str, Any] | None = None
     # Accepted for the caller's own logs, never stored: it can quote a URL (plan K8).
     error: str | None = None
+    # Wire v2 (STEP2_SHARED_RULES §4.1; examples specs/wire/collector.v2.json): pages set aside with no text, and the
+    # search channels the run used or could not use. Shapes are checked by wire_error inside the route, not here: a
+    # 422 before the handler would leave the run open until its deadline.
+    aside: list[dict[str, Any]] | None = None
+    channels: list[dict[str, Any]] | None = None
+
+    def wire_error(self) -> str | None:
+        def text(value: Any, low: int, high: int) -> bool:
+            return isinstance(value, str) and low <= len(value) <= high
+
+        aside, channels = self.aside or [], self.channels or []
+        if len(aside) > 200:
+            return "aside: at most 200 pages"
+        for item in aside:
+            if set(item) != {"url", "title", "reason"}:
+                return "aside: each page is {url, title, reason}"
+            if not (text(item["url"], 1, 2048) and item["url"].startswith(("https://", "http://"))):
+                return "aside: url is an http(s) address of at most 2048 characters"
+            if not text(item["title"], 0, 300) or not text(item["reason"], 1, 300):
+                return "aside: title at most 300 characters, reason 1..300"
+        if len(channels) > 20:
+            return "channels: at most 20"
+        for item in channels:
+            if set(item) != {"provider", "lang", "state", "why"}:
+                return "channels: each is {provider, lang, state, why}"
+            if not (isinstance(item["provider"], str) and re.fullmatch(r"[a-z][a-z0-9_-]{0,39}", item["provider"])):
+                return "channels: provider is a short lower-case id"
+            if item["lang"] not in ("zh", "en") or item["state"] not in ("ok", "unreachable", "no_key") or not text(item["why"], 0, 300):
+                return "channels: lang zh|en, state ok|unreachable|no_key, why at most 300 characters"
+        return None
 
 
 def get_collection_service() -> CollectionServiceClient | None:
@@ -3088,17 +3118,47 @@ def get_collection_service() -> CollectionServiceClient | None:
 
 
 def _research_seeds(payload: CollectionRequest) -> list[dict[str, Any]]:
+    # Wire v2 (STEP2_SHARED_RULES §4.1): a claim to search for, or a URL the person pasted. Perplexity is never a
+    # provider (the operator's decision after unexplained charges); = next-admin search/query-plan.ts CLAIM_ANGLES.
+    claim_lists = {
+        "angles": ("primary", "news", "factcheck", "precedent", "field", "opposite", "origin"),
+        "languages": ("zh", "en"),
+        "providers": ("serper", "brave"),
+    }
+
+    def refuse(why: str) -> HTTPException:
+        return HTTPException(status_code=400, detail=f"COLLECTION_SEEDS_INVALID: {why}")
+
     if not 1 <= len(payload.seeds) <= MAX_SEEDS:
-        raise HTTPException(status_code=400, detail=f"COLLECTION_SEEDS_INVALID: 1..{MAX_SEEDS} seeds")
+        raise refuse(f"1..{MAX_SEEDS} seeds")
     seeds: list[dict[str, Any]] = []
     for seed in payload.seeds:
         if not seed.uri.startswith(("entity://", "https://")) or len(seed.uri) > 2048:
-            raise HTTPException(status_code=400, detail="COLLECTION_SEEDS_INVALID: a seed uri starts with entity:// or https://")
+            raise refuse("a seed uri starts with entity:// or https://")
+        claim = seed.uri.startswith("entity://claim/")
+        if claim and not re.fullmatch(r"entity://claim/[A-Za-z0-9_-]{1,64}", seed.uri):
+            raise refuse("a claim seed is entity://claim/<id of 1..64 letters, digits, _ or ->")
         if seed.meta is None:
+            if claim:
+                raise refuse("a claim seed carries its meta")
             seeds.append({"uri": seed.uri})
             continue
         if len(json.dumps(seed.meta, ensure_ascii=False).encode("utf-8")) > MAX_RESEARCH_SEED_META_BYTES:
-            raise HTTPException(status_code=400, detail=f"COLLECTION_SEEDS_INVALID: meta over {MAX_RESEARCH_SEED_META_BYTES} bytes")
+            raise refuse(f"meta over {MAX_RESEARCH_SEED_META_BYTES} bytes")
+        if claim != (seed.meta.get("kind") == "claim"):
+            raise refuse("kind claim goes with an entity://claim/ uri, and only with it")
+        if claim:
+            meta = seed.meta
+            if set(meta) != {"kind", "entityName", *claim_lists}:
+                raise refuse("a claim seed's meta is exactly kind, entityName, angles, languages, providers")
+            if not isinstance(meta["entityName"], str) or not meta["entityName"].strip() or len(meta["entityName"]) > 200:
+                raise refuse("entityName is the claim, 1..200 characters")
+            for key, allowed in claim_lists.items():
+                values = meta[key]
+                if not isinstance(values, list) or not values or len(set(map(str, values))) != len(values) or not all(isinstance(v, str) and v in allowed for v in values):
+                    raise refuse(f"{key} is a non-empty list without repeats from {', '.join(allowed)}")
+        if "pasted" in seed.meta and (not isinstance(seed.meta["pasted"], bool) or not seed.uri.startswith("https://")):
+            raise refuse("pasted is true or false, on an https:// seed")
         seeds.append({"uri": seed.uri, "meta": seed.meta})
     return seeds
 
@@ -3215,16 +3275,23 @@ def complete_collection(
     """Ends the run and voids its grant (I-f). A malformed report still ends it, as failed -- never left running."""
     if grant["run_id"] != run_id:
         raise HTTPException(status_code=403, detail="GRANT_RUN_MISMATCH")
+    wire_error = payload.wire_error()
     try:
-        run = repo.finish_collection_run(grant["tenant_id"], run_id, payload.status, payload.report)
+        if wire_error is not None:
+            run = repo.finish_collection_run(grant["tenant_id"], run_id, "failed", None)
+        else:
+            run = repo.finish_collection_run(grant["tenant_id"], run_id, payload.status, payload.report)
     except InvariantViolation as error:
         if "REPORT_INVALID" in str(error):
             repo.finish_collection_run(grant["tenant_id"], run_id, "failed", None)
         store.close_collect_grant(grant["grant_ref"])
         raise HTTPException(status_code=400 if "REPORT_INVALID" in str(error) else 409, detail=str(error)) from error
     store.close_collect_grant(grant["grant_ref"])
+    if wire_error is not None:
+        raise HTTPException(status_code=400, detail=f"COLLECTION_COMPLETE_INVALID: {wire_error}")
     # what the run delivered (healthy or not) gets its cards (GATHER); source_ids None = every active source without one
-    block_hooks.after_sources(CaseDocs(repo), grant["tenant_id"], record_log.case(project_id), {"run": run_id, "source_ids": None, "aside": [], "pasted": False})
+    block_hooks.after_sources(CaseDocs(repo), grant["tenant_id"], record_log.case(project_id),
+                              {"run": run_id, "source_ids": None, "aside": payload.aside or [], "channels": payload.channels or [], "pasted": False})
     return {"run_id": run_id, "status": run["status"]}
 
 
@@ -3249,7 +3316,46 @@ class IngestSource(BaseModel):
     collector: str
     source_class: str | None = None
     relevance: dict[str, Any] = {}
-    schema_version: Literal["1"]
+    schema_version: Literal["1", "2"]
+
+    def relevance_error(self) -> str | None:
+        """v1 relevance stays free-form; v2 (STEP2_SHARED_RULES §4.1, specs/wire/collector.v2.json) names every key and
+        its type, so a block reading it never meets a shape it did not expect. The size cap is source_record's."""
+        if self.schema_version == "1":
+            return None
+
+        def text(high: int) -> Callable[[Any], bool]:
+            return lambda value: isinstance(value, str) and 1 <= len(value) <= high
+
+        def short_id(value: Any) -> bool:
+            return isinstance(value, str) and re.fullmatch(r"[a-z][a-z0-9_-]{0,39}", value) is not None
+
+        def texts(items: int, high: int) -> Callable[[Any], bool]:
+            return lambda value: isinstance(value, list) and len(value) <= items and all(text(high)(item) for item in value)
+
+        checks: dict[str, Callable[[Any], bool]] = {
+            "entityConfidence": lambda value: value in (None, "anchored", "name_only", "weak", "peripheral"),
+            "entityAnchorsHit": texts(12, 200),
+            "searchProvider": short_id,
+            "searchLang": lambda value: value in ("zh", "en"),
+            "searchQuery": text(500),
+            "searchAngle": short_id,
+            "pasted": lambda value: isinstance(value, bool),
+            "aside": text(300),
+            "imageUrl": lambda value: text(2048)(value) and value.startswith(("https://", "http://")),
+            "outlinks": texts(50, 253),
+        }
+        unknown = sorted(set(self.relevance) - set(checks))
+        if unknown:
+            return f"unknown key {unknown[0]!r}"
+        if "pasted" not in self.relevance:
+            return "pasted is missing"
+        for key, value in self.relevance.items():
+            if not checks[key](value):
+                return f"{key} has the wrong type or length"
+        if self.relevance["pasted"] and any(key.startswith("search") for key in self.relevance):
+            return "a pasted page carries no search keys"
+        return None
 
 
 class IngestRequest(BaseModel):
@@ -3284,6 +3390,9 @@ def ingest_sources(
             raise HTTPException(status_code=400, detail=f"SOURCE_HASH_MISMATCH: {item.canonical_url[:200]!r}")
         if not content or len(content) > MAX_SOURCE_CONTENT_BYTES:
             raise HTTPException(status_code=400, detail=f"SOURCE_CONTENT_SIZE_INVALID: {item.canonical_url[:200]!r}")
+        relevance_error = item.relevance_error()
+        if relevance_error is not None:
+            raise HTTPException(status_code=400, detail=f"SOURCE_RELEVANCE_INVALID: {item.canonical_url[:200]!r}: {relevance_error}")
         latest[item.canonical_url] = (item, content)  # the last copy of a URL in the batch wins
     now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     items: list[tuple[dict[str, Any], dict[str, str]]] = []

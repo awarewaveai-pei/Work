@@ -16,7 +16,8 @@ export interface GrantExchange {
   expires_at: string;
 }
 
-/** One Source as COS ingests it (plan §3.4 C1) -- exactly these fifteen keys. */
+/** One Source as COS ingests it (plan §3.4 C1) -- exactly these fifteen keys. `relevance` keys and types: wire v2,
+ *  Projects/internal/cognitive-engineering-os/specs/wire/collector.v2.json (both sides test against that file). */
 export interface SourceProjection {
   canonical_url: string;
   source_uri: string;
@@ -32,7 +33,22 @@ export interface SourceProjection {
   collector: string;
   source_class: string | null;
   relevance: Record<string, unknown>;
-  schema_version: "1";
+  schema_version: "2";
+}
+
+/** A page set aside with no text, in the run's completion (wire v2). */
+export interface CompletionAside {
+  url: string;
+  title: string;
+  reason: string;
+}
+
+/** One search engine in one language, in the run's completion (wire v2). */
+export interface CompletionChannel {
+  provider: string;
+  lang: string;
+  state: "ok" | "unreachable" | "no_key";
+  why: string;
 }
 
 export interface IngestOutcome {
@@ -93,7 +109,7 @@ export function ingestSources(projectId: string, runId: string, grantToken: stri
   return postJson(`/projects/${encodeURIComponent(projectId)}/sources/ingest`, `Grant ${grantToken}`, { run_id: runId, sources });
 }
 
-/** I-f. After this the grant is void on the COS side. */
+/** I-f. After this the grant is void on the COS side. `found` = wire v2: pages set aside with no text, channels. */
 export function completeRun(
   projectId: string,
   runId: string,
@@ -101,8 +117,9 @@ export function completeRun(
   status: "completed" | "failed",
   report: RunReportSummary,
   error?: string,
+  found?: { aside: CompletionAside[]; channels: CompletionChannel[] },
 ): Promise<ResearchResult<{ run_id: string; status: string }>> {
-  const body: Record<string, unknown> = { status, report };
+  const body: Record<string, unknown> = { status, report, ...found };
   if (error) body.error = error.slice(0, 200);
   return postJson(`/projects/${encodeURIComponent(projectId)}/collections/${encodeURIComponent(runId)}/complete`, `Grant ${grantToken}`, body);
 }

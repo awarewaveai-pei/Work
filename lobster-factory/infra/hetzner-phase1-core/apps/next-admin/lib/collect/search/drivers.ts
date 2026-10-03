@@ -38,6 +38,12 @@ export function searchProviderId(env: Record<string, string | undefined> = proce
  */
 export const SEARCH_KEYS = ["SERPER_API_KEY", "BRAVE_SEARCH_API_KEY"] as const;
 
+/**
+ * The engines a Cognitive OS claim may name (wire v2, = specs/wire/collector.v2.json `providers`). Perplexity is
+ * not one of them and no setting can add it: COLLECT_SEARCH_PROVIDER never applies to a claim.
+ */
+export const CLAIM_PROVIDERS = ["serper", "brave"] as const;
+
 /** One result, after each vendor's own shape has been flattened by `parseResults`. */
 interface SearchResult {
   title?: string;

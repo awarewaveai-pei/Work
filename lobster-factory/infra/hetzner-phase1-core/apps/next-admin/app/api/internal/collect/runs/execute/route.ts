@@ -13,7 +13,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { runResearchCollection } from "@/lib/collect/run";
-import { createCognitiveSink } from "@/lib/collect/sinks/cognitive";
+import { completionOf, createCognitiveSink } from "@/lib/collect/sinks/cognitive";
 import { completeRun, exchangeGrant, type RunReportSummary } from "@/lib/cognitive-os/research";
 import { parseResearchRunRequest } from "../research-run-request";
 import "@/lib/collect/blocks";
@@ -60,6 +60,8 @@ export async function POST(request: Request) {
   let status: "completed" | "failed" = "failed";
   let failure: string | undefined;
   const summary: RunReportSummary = { fetched: 0, written: 0, unchanged: 0, refused: 0, stopped_by: "not_started" };
+  // Wire v2: what the person sees set aside, and which search channels worked. Empty when the crawl threw.
+  let found: ReturnType<typeof completionOf> = { aside: [], channels: [] };
   try {
     const result = await runResearchCollection({
       projectId: run.project_id,
@@ -74,12 +76,13 @@ export async function POST(request: Request) {
     summary.unchanged = result.sink.skipped;
     summary.refused = r.dirty.length + r.quarantined.length + r.disallowed.length + r.offEntity.length;
     summary.stopped_by = r.stoppedBy ?? "unknown";
+    found = completionOf(r);
     failure = deliveryFailure(result.sink.errors);
     if (!failure) status = "completed";
   } catch (e) {
     failure = String(e).slice(0, 200);
   } finally {
-    const done = await completeRun(run.project_id, run.run_id, grantToken, status, summary, failure);
+    const done = await completeRun(run.project_id, run.run_id, grantToken, status, summary, failure, found);
     if (done.ok === false) failure = `${failure ?? ""} complete_${done.status}:${done.error}`.trim().slice(0, 200);
   }
   return NextResponse.json({ ok: true, status, report: summary, ...(failure ? { error: failure } : {}) });

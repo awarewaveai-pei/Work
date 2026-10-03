@@ -1,0 +1,259 @@
+{
+  "about": "Collector wire v2 (docs/platform/STEP2_SHARED_RULES.md 4.1). One set of examples for both sides: the engine posts them (tests/unit/test_collector_wire_v2.py), next-admin builds them from the seeds below (lib/collect/__tests__/collect-wire-v2.test.ts). Change both sides and this file in one commit.",
+  "schema_version": "2",
+  "claim_angles": [
+    "primary",
+    "news",
+    "factcheck",
+    "precedent",
+    "field",
+    "opposite",
+    "origin"
+  ],
+  "languages": [
+    "zh",
+    "en"
+  ],
+  "providers": [
+    "serper",
+    "brave"
+  ],
+  "claim_id_pattern": "^entity://claim/[A-Za-z0-9_-]{1,64}$",
+  "claim_max_chars": 200,
+  "relevance": {
+    "entityConfidence": {
+      "type": "enum",
+      "values": [
+        null,
+        "anchored",
+        "name_only",
+        "weak",
+        "peripheral"
+      ]
+    },
+    "entityAnchorsHit": {
+      "type": "texts",
+      "items": 12,
+      "max": 200
+    },
+    "searchProvider": {
+      "type": "id",
+      "max": 40
+    },
+    "searchLang": {
+      "type": "enum",
+      "values": [
+        "zh",
+        "en"
+      ]
+    },
+    "searchQuery": {
+      "type": "text",
+      "max": 500
+    },
+    "searchAngle": {
+      "type": "id",
+      "max": 40
+    },
+    "pasted": {
+      "type": "bool",
+      "required": true
+    },
+    "aside": {
+      "type": "text",
+      "max": 300
+    },
+    "imageUrl": {
+      "type": "url",
+      "max": 2048
+    },
+    "outlinks": {
+      "type": "texts",
+      "items": 50,
+      "max": 253
+    }
+  },
+  "relevance_rules": "Every key is optional except pasted. A pasted page carries no search* key. The whole object is at most max_relevance_bytes as Python json.dumps(ensure_ascii=False) measures it.",
+  "max_relevance_bytes": 4096,
+  "completion_limits": {
+    "aside": 200,
+    "aside_url": 2048,
+    "aside_title": 300,
+    "aside_reason": 300,
+    "channels": 20,
+    "channel_why": 300
+  },
+  "channel_states": [
+    "ok",
+    "unreachable",
+    "no_key"
+  ],
+  "seeds": [
+    {
+      "uri": "entity://claim/c7f3a1",
+      "meta": {
+        "kind": "claim",
+        "entityName": "台北市從 2027 年起家戶垃圾費加倍",
+        "angles": [
+          "factcheck",
+          "primary"
+        ],
+        "languages": [
+          "zh",
+          "en"
+        ],
+        "providers": [
+          "serper",
+          "brave"
+        ]
+      }
+    },
+    {
+      "uri": "https://www.example.gov.tw/news/2027-fee",
+      "meta": {
+        "pasted": true
+      }
+    }
+  ],
+  "ingest": {
+    "run_id": "run_example",
+    "sources": [
+      {
+        "canonical_url": "https://www.example.gov.tw/news/2027-fee",
+        "source_uri": "https://www.example.gov.tw/news/2027-fee",
+        "content_sha256": "bc1e2a08682997689bc90b8cfc8bf2ee2161379fd7debb180fedb649c268d7fa",
+        "mime": "text/html",
+        "content_type": "web_page",
+        "title": "家戶垃圾費調整公告",
+        "author": null,
+        "published_at": null,
+        "fetched_at": "2026-10-04T01:02:03.000Z",
+        "text": "家戶垃圾費調整公告\n\n環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。環保局說明：家戶垃圾費的費率由市議會審議，目前沒有任何加倍的決議。\n\n其他公告 環保局",
+        "provenance": {
+          "epistemic_type": "EVIDENCE",
+          "authorship_state": "SOURCE_QUOTATION",
+          "locked": null
+        },
+        "collector": "collect/http-html",
+        "source_class": "unknown",
+        "relevance": {
+          "pasted": true,
+          "imageUrl": "https://www.example.gov.tw/img/notice.png",
+          "outlinks": [
+            "dep.example.gov.tw"
+          ]
+        },
+        "schema_version": "2"
+      },
+      {
+        "canonical_url": "https://factcheck.example.tw/report/1",
+        "source_uri": "https://factcheck.example.tw/report/1",
+        "content_sha256": "83488b7376372ad93019b21ff0979bfc002bcc5564f798e382ababe24f2b8011",
+        "mime": "text/html",
+        "content_type": "web_page",
+        "title": "查核：垃圾費沒有加倍",
+        "author": null,
+        "published_at": null,
+        "fetched_at": "2026-10-04T01:02:03.000Z",
+        "text": "查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。查核結果：網傳台北市從 2027 年起家戶垃圾費加倍，與市府公告不符。\n\n公告原文 報導 關於我們",
+        "provenance": {
+          "epistemic_type": "EVIDENCE",
+          "authorship_state": "SOURCE_QUOTATION",
+          "locked": null
+        },
+        "collector": "collect/http-html",
+        "source_class": "unknown",
+        "relevance": {
+          "searchProvider": "serper",
+          "searchLang": "zh",
+          "searchAngle": "factcheck",
+          "searchQuery": "台北市從 2027 年起家戶垃圾費加倍 查核 事實",
+          "pasted": false,
+          "imageUrl": "https://factcheck.example.tw/img/cover.jpg",
+          "outlinks": [
+            "example.gov.tw",
+            "news.example.com"
+          ]
+        },
+        "schema_version": "2"
+      },
+      {
+        "canonical_url": "https://news.example.com/taipei-fee",
+        "source_uri": "https://news.example.com/taipei-fee",
+        "content_sha256": "e066aa92e8ae15dfcec13a45798d9e40a29a3636ba3beadc046a48e991e7b70f",
+        "mime": "text/html",
+        "content_type": "web_page",
+        "title": "Fact check: Taipei fee",
+        "author": null,
+        "published_at": null,
+        "fetched_at": "2026-10-04T01:02:03.000Z",
+        "text": "Short teaser only.",
+        "provenance": {
+          "epistemic_type": "EVIDENCE",
+          "authorship_state": "SOURCE_QUOTATION",
+          "locked": null
+        },
+        "collector": "collect/http-html",
+        "source_class": "unknown",
+        "relevance": {
+          "searchProvider": "serper",
+          "searchLang": "en",
+          "searchAngle": "factcheck",
+          "searchQuery": "台北市從 2027 年起家戶垃圾費加倍 fact check",
+          "pasted": false,
+          "aside": "系統只抓到很少的字，可能讀不到這種網頁",
+          "outlinks": []
+        },
+        "schema_version": "2"
+      }
+    ]
+  },
+  "complete": {
+    "status": "completed",
+    "report": {
+      "fetched": 5,
+      "written": 3,
+      "unchanged": 0,
+      "refused": 1,
+      "stopped_by": "frontier_empty"
+    },
+    "aside": [
+      {
+        "url": "https://www.facebook.com/somepage/posts/1",
+        "title": "臉書貼文",
+        "reason": "系統沒有去抓這類網頁：社群個人頁"
+      },
+      {
+        "url": "https://dep.example.gov.tw/notice/88",
+        "title": "環保局公告",
+        "reason": "系統只抓到很少的字，可能讀不到這種網頁"
+      }
+    ],
+    "channels": [
+      {
+        "provider": "serper",
+        "lang": "zh",
+        "state": "ok",
+        "why": ""
+      },
+      {
+        "provider": "serper",
+        "lang": "en",
+        "state": "ok",
+        "why": ""
+      },
+      {
+        "provider": "brave",
+        "lang": "zh",
+        "state": "no_key",
+        "why": "平台還沒有這個搜尋引擎的金鑰"
+      },
+      {
+        "provider": "brave",
+        "lang": "en",
+        "state": "no_key",
+        "why": "平台還沒有這個搜尋引擎的金鑰"
+      }
+    ]
+  }
+}

@@ -71,3 +71,12 @@ Owners: S = supervisor session; 甲 GATHER; 乙 VERIFY; 丙 COMPUTE; 丁 collect
 ## COMPUTE (丙)
 
 ## Collector wire (丁)
+- built: wire v2 on both sides against one example file (`specs/wire/collector.v2.json`): next-admin builds its batch and completion from its seeds (`collect-wire-v2.test.ts`), the engine posts them and breaks each rule once (`test_collector_wire_v2.py`); v1 still accepted
+- built: 「系統至少用兩家搜尋引擎找」「至少用兩種語言找」 -- a claim seed (`entity://claim/<id>`, 7 angles) runs every (angle × language × engine with a key); an engine without a key is a `no_key` channel, never an error; Perplexity is refused in a seed and ignored by the collector (also `COLLECT_SEARCH_PROVIDER`)
+- built: 「系統替每一筆記下：從哪個管道、用哪句查詢找到的」 -- `searchProvider/Lang/Query/Angle`, `pasted`, `imageUrl` (og:image), `outlinks` (other hosts, ≤50) in `relevance`, typed by the engine; the whole object cut to fit 4096 bytes
+- built: 「抓不到內文的網頁、講的不是這件事的網頁，系統不丟掉…寫理由」 -- a research run sends a refused page with text with `aside`; the completion lists the rest (no text, unreadable, gone, robots, planted instructions, shop/social results not fetched) with a plain reason; `channels` say which engine/language worked
+- built: a pasted URL is read as that one page (its links are not followed)
+- KNOWN LIMIT: a claim has no relevance gate (a sentence is not a name; only the quality gate runs), so an off-topic search result arrives as a normal card
+- KNOWN LIMIT: 16 billed calls per seed across engines (`MAX_QUERIES` = `RESEARCH_MAX_QUERIES_PER_ENTITY`); once a second engine has a key, 7 angles × 2 languages × 2 engines = 28, so the last angles are cut (S decides: raise both, or fewer angles per seed)
+- KNOWN LIMIT: a page found by two engines or queries is fetched once and stamped with the first; the completion lists the first 200 pages set aside
+- KNOWN LIMIT: the English query for a Chinese claim is the Chinese text plus English words; translating the claim is the AI's step (GATHER 「翻成別的語言再查一次」)

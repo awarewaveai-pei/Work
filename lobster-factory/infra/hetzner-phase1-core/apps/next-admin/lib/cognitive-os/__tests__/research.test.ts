@@ -83,5 +83,19 @@ describe("ingestSources / completeRun", () => {
     expect(body.status).toBe("failed");
     expect(body.report).toEqual(report);
     expect(body.error).toHaveLength(200);
+    expect(body).not.toHaveProperty("aside");
+  });
+
+  it("complete carries the wire v2 aside and channels when given", async () => {
+    const spy = respond(200, { run_id: "run-1", status: "completed" });
+    global.fetch = spy as unknown as typeof fetch;
+    const report = { fetched: 1, written: 1, unchanged: 0, refused: 0, stopped_by: "frontier_empty" };
+    const found = {
+      aside: [{ url: "https://a.example/x", title: "x", reason: "這一頁已經不在了" }],
+      channels: [{ provider: "serper", lang: "zh", state: "ok" as const, why: "" }],
+    };
+    await completeRun("p1", "run-1", "grant-tok", "completed", report, undefined, found);
+    const body = JSON.parse((spy.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body).toEqual({ status: "completed", report, ...found });
   });
 });

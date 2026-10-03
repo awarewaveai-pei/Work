@@ -24,11 +24,12 @@
 // tier. A vendor's three-line snippet stored as content would be an unverifiable paraphrase with a
 // real URL attached — the most convincing kind of wrong.
 
-import type { CollectBlock, CollectCtx, RawDoc, Target } from "@/lib/collect/types";
+import type { AsideEntry, ChannelState, CollectBlock, CollectCtx, RawDoc, Target } from "@/lib/collect/types";
 import { registerCollector } from "@/lib/collect/registry";
-import { providerConfigured } from "@/lib/collect/net/providers";
+import { ProviderCallError, providerConfigured } from "@/lib/collect/net/providers";
 import { CollectFetchError } from "@/lib/collect/net/fetcher";
 import {
+  CLAIM_PROVIDERS,
   SEARCH_DRIVERS,
   SEARCH_KEYS,
   domainFilter,
@@ -37,12 +38,16 @@ import {
 } from "@/lib/collect/search/drivers";
 import {
   ANGLES,
+  CLAIM_ANGLES,
   DEFAULT_ANGLES,
   MAX_QUERIES,
   buildQueryPlan,
   defaultLanguagesFor,
+  fanOut,
   parseLanguages,
   type PlannedQuery,
+  type QueryLang,
+  type SearchCall,
 } from "@/lib/collect/search/query-plan";
 import { DOSSIER_EXCLUDED_BY_DEFAULT, classifySource, sourceClassLabel } from "@/lib/collect/source-class";
 import { isEntityKind, parseTermList, type EntityKind, type EntityRef } from "@/lib/collect/entity";
@@ -92,6 +97,101 @@ export function anglesFromMeta(kind: EntityKind, value: unknown): string[] {
     .filter(([k, id]) => k === kind && ANGLES[kind].some((a) => a.id === id))
     .map(([, id]) => id);
   return chosen.length ? chosen : DEFAULT_ANGLES[kind];
+}
+
+/**
+ * A claim to check (Cognitive OS wire v2, STEP2_SHARED_RULES §4.1): `entity://claim/<id>` with meta.kind "claim".
+ * A claim is a sentence, not a name: no `entity` is stamped on its results, so the relevance gate's name matching
+ * never runs on them (the quality gate still does).
+ */
+export function isClaimTarget(t: Target): boolean {
+  return t.meta?.kind === "claim";
+}
+
+/** The wire sends JSON arrays; anything not on `allowed` is dropped, repeats once. */
+function listOf<T extends string>(value: unknown, allowed: readonly T[]): T[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((v): v is T => typeof v === "string" && (allowed as readonly string[]).includes(v)))];
+}
+
+/** What one search target asks for: its queries, the engines it names, which of them have a key, the stamp. */
+interface SearchPlan {
+  label: string;
+  plan: PlannedQuery[];
+  providers: string[];
+  keyed: string[];
+  stamp: (call: SearchCall) => Record<string, unknown>;
+}
+
+function entitySearch(t: Target): SearchPlan {
+  const entity = entityRefFromMeta(t);
+  if (!entity.name) throw Object.assign(new Error("entity_name_missing"), { status: 400 });
+  const providerId = searchProviderId();
+  if (!SEARCH_DRIVERS[providerId]) throw Object.assign(new Error(`unknown_search_provider_${providerId}`), { status: 501 });
+  const meta = t.meta ?? {};
+  return {
+    label: `dossier "${entity.name}" (${entity.kind})`,
+    plan: buildQueryPlan({
+      name: entity.name,
+      kind: entity.kind,
+      anchors: entity.anchors,
+      aliases: entity.aliases,
+      angleIds: anglesFromMeta(entity.kind, meta.angles),
+      // Empty means "decide from the name", not "search everything": see defaultLanguagesFor.
+      languages: parseLanguages(meta.languages).length
+        ? parseLanguages(meta.languages)
+        : defaultLanguagesFor(entity.name),
+    }),
+    providers: [providerId],
+    keyed: [providerId], // match() already scored 0 for an engine without a key
+    stamp: () => ({
+      // The assertion the relevance gate tests each fetched page against.
+      entity,
+      // The folder is named after the ENTITY, not the query, so all angles land together
+      // instead of scattering one folder per phrasing (sink/kb.ts).
+      searchQuery: entity.name,
+    }),
+  };
+}
+
+function claimSearch(t: Target): SearchPlan {
+  const meta = t.meta ?? {};
+  // The claim lives in meta only: the uri carries an id, and searching for "claim/<id>" would bill for nothing.
+  const name = typeof meta.entityName === "string" ? meta.entityName.trim() : "";
+  if (!name) throw Object.assign(new Error("entity_name_missing"), { status: 400 });
+  const allAngles = CLAIM_ANGLES.map((a) => a.id);
+  const angleIds = listOf(meta.angles, allAngles);
+  const languages = listOf<QueryLang>(meta.languages, ["zh", "en"]);
+  const listed = listOf(meta.providers, CLAIM_PROVIDERS);
+  const providers = listed.length ? listed : [...CLAIM_PROVIDERS];
+  return {
+    label: `claim "${name.slice(0, 60)}"`,
+    plan: buildQueryPlan({
+      name,
+      kind: "claim",
+      anchors: [],
+      aliases: [],
+      angleIds: angleIds.length ? angleIds : allAngles,
+      languages: languages.length ? languages : ["zh", "en"],
+    }),
+    providers,
+    // A listed engine without a key is reported as a `no_key` channel, never run and never an error.
+    keyed: providers.filter((p) => providerConfigured(p)),
+    // 「用哪句查詢找到的」: the query itself.
+    stamp: (call) => ({ searchQuery: call.query }),
+  };
+}
+
+/** A stop for the whole run, from the crawler's door or the provider door — not this query failing. */
+function isBudgetStop(e: unknown): boolean {
+  return (e instanceof CollectFetchError || e instanceof ProviderCallError) && e.kind === "budget";
+}
+
+/** ChannelState.why for a query that failed. */
+function failureCode(e: unknown): string {
+  const status = e && typeof e === "object" && "status" in e ? Number((e as { status: unknown }).status) : NaN;
+  if (Number.isFinite(status)) return `http_${status}`;
+  return e instanceof ProviderCallError && e.kind === "network" ? "network" : "error";
 }
 
 const KIND_CHOICES: Array<{ value: EntityKind; label: string; short: string }> = [
@@ -209,50 +309,47 @@ export const entityDossierCollector: CollectBlock = {
 
   /** 3 — the same tier as the other query sources; `entity://` is this block's scheme alone. */
   match(t: Target): number {
-    if (!providerConfigured(searchProviderId())) return 0;
-    return t.uri.startsWith(`${ENTITY_SCHEME}://`) ? 3 : 0;
+    if (!t.uri.startsWith(`${ENTITY_SCHEME}://`)) return 0;
+    // A claim runs even with no engine keyed: it reports each listed engine without a key as a channel.
+    if (isClaimTarget(t)) return 3;
+    return providerConfigured(searchProviderId()) ? 3 : 0;
   },
 
-  async run(t: Target, ctx: CollectCtx): Promise<{ docs: RawDoc[]; discovered: Target[] }> {
-    const entity = entityRefFromMeta(t);
-    if (!entity.name) throw Object.assign(new Error("entity_name_missing"), { status: 400 });
+  async run(
+    t: Target,
+    ctx: CollectCtx,
+  ): Promise<{ docs: RawDoc[]; discovered: Target[]; aside: AsideEntry[]; channels: ChannelState[] }> {
+    const search = isClaimTarget(t) ? claimSearch(t) : entitySearch(t);
     if (!ctx.callProvider) throw Object.assign(new Error("provider_call_unavailable"), { status: 501 });
 
-    const providerId = searchProviderId();
-    const driver = SEARCH_DRIVERS[providerId];
-    if (!driver) throw Object.assign(new Error(`unknown_search_provider_${providerId}`), { status: 501 });
-
     const meta = t.meta ?? {};
-    const angleIds = anglesFromMeta(entity.kind, meta.angles);
-    const plan = buildQueryPlan({
-      name: entity.name,
-      kind: entity.kind,
-      anchors: entity.anchors,
-      aliases: entity.aliases,
-      angleIds,
-      // Empty means "decide from the name", not "search everything": see defaultLanguagesFor.
-      languages: parseLanguages(meta.languages).length
-        ? parseLanguages(meta.languages)
-        : defaultLanguagesFor(entity.name),
-    });
     const maxResults = Math.min(Math.max(Number(meta.maxResultsPerQuery ?? 8) || 8, 1), 20);
     const domains = domainFilter(meta.domains);
     const recency = typeof meta.recency === "string" && meta.recency ? meta.recency : undefined;
+    const calls = fanOut(search.plan, search.keyed);
+    const langs = [...new Set(search.plan.map((q) => q.lang))];
+    // Per keyed (engine, language): answered at least once = ok; else why it never did ("budget" = not reached).
+    const tally = new Map<string, { answered: number; why: string }>(
+      search.keyed.flatMap((p) => langs.map((lang): [string, { answered: number; why: string }] => [`${p}/${lang}`, { answered: 0, why: "budget" }])),
+    );
 
-    ctx.log(`dossier "${entity.name}" (${entity.kind}) — ${plan.length} queries via ${providerId}`);
+    ctx.log(`${search.label} — ${calls.length} queries via ${search.keyed.join("+") || "no engine with a key"}`);
 
     const discovered: Target[] = [];
+    const aside: AsideEntry[] = [];
     const seen = new Set<string>();
     const skippedByClass: string[] = [];
     const excluded = meta.includeShops === true ? [] : DOSSIER_EXCLUDED_BY_DEFAULT;
     let executed = 0;
 
-    for (const planned of plan) {
+    for (const call of calls) {
+      const channel = tally.get(`${call.provider}/${call.lang}`)!;
+      const driver = SEARCH_DRIVERS[call.provider];
       let results;
       try {
         const res = await ctx.callProvider(
-          providerId,
-          driver.request({ query: planned.query, maxResults, domains, recency, languages: [planned.lang] }),
+          call.provider,
+          driver.request({ query: call.query, maxResults, domains, recency, languages: [call.lang] }),
         );
         results = driver.parse(await res.json());
       } catch (e) {
@@ -260,30 +357,36 @@ export const entityDossierCollector: CollectBlock = {
         // it all away. The orchestrator queues those roots, persists the frontier, and the resumed
         // run fetches them — whereas a throw here would requeue the entity target itself and the
         // queries that were already PAID FOR would be run again from scratch.
-        if (e instanceof CollectFetchError && e.kind === "budget") {
-          ctx.log(`dossier "${entity.name}": budget reached after ${executed}/${plan.length} queries`);
+        if (isBudgetStop(e)) {
+          ctx.log(`${search.label}: budget reached after ${executed}/${calls.length} queries`);
           break;
         }
         // One angle failing is not the dossier failing. A 4xx from one query (a vendor rejecting a
         // particular operator string, say) must not cost the other seven angles.
-        ctx.log(`dossier "${entity.name}": angle ${planned.angle}/${planned.lang} failed: ${String(e).slice(0, 120)}`);
+        if (!channel.answered) channel.why = failureCode(e);
+        ctx.log(`${search.label}: ${call.provider} ${call.angle}/${call.lang} failed: ${String(e).slice(0, 120)}`);
         continue;
       }
+      channel.answered++;
       executed++;
 
       for (const { url, r } of usableResults(results)) {
-        // Across angles as well as within one: the same profile page is returned by "who is this"
-        // and by "career", and paying to fetch it twice is avoidable here.
+        // Across angles and engines as well as within one: the same profile page is returned by
+        // "who is this" and by "career", and paying to fetch it twice is avoidable here. The first
+        // query that found it is the one stamped.
         const key = `${url.hostname}${url.pathname}`.toLowerCase();
         if (seen.has(key)) continue;
         seen.add(key);
 
         // Refused BEFORE it is fetched: a bookshop listing costs a fetch, a quality grade, an
         // injection screen and a row in the knowledge base to learn what its URL already said.
-        // Fails open — an unclassified host is admitted (lib/collect/source-class.ts).
+        // Fails open — an unclassified host is admitted (lib/collect/source-class.ts). Reported as
+        // aside, not dropped: the person can take it back.
         const cls = classifySource(url.toString());
+        const title = typeof r.title === "string" ? r.title.slice(0, 300) : "";
         if (excluded.includes(cls)) {
           skippedByClass.push(`${sourceClassLabel(cls)} ${url.hostname}`);
+          aside.push({ url: url.toString(), title, reason: `source_class:${cls}` });
           continue;
         }
         discovered.push({
@@ -295,18 +398,16 @@ export const entityDossierCollector: CollectBlock = {
           depth: 0,
           scope: { hosts: [url.hostname] },
           meta: {
-            // The assertion the relevance gate tests each fetched page against.
-            entity,
+            ...search.stamp(call),
             sourceClass: cls,
             // Belt and braces with the scope above: even if a later change made scope wider, this
             // says "read this page, follow nothing". A dossier is a set of pages, not a crawl.
             maxDepth: 0,
-            // The folder is named after the ENTITY, not the query, so all angles land together
-            // instead of scattering one folder per phrasing (sink/kb.ts).
-            searchQuery: entity.name,
-            searchAngle: planned.angle,
-            searchLang: planned.lang,
-            searchProvider: providerId,
+            searchAngle: call.angle,
+            searchLang: call.lang,
+            searchProvider: call.provider,
+            // The title an aside entry shows when the page itself cannot be read.
+            searchTitle: title || undefined,
             searchSnippet: typeof r.snippet === "string" ? r.snippet.slice(0, 300) : undefined,
             searchDate: r.date ?? r.last_updated ?? undefined,
           },
@@ -314,11 +415,19 @@ export const entityDossierCollector: CollectBlock = {
       }
     }
 
+    const channels: ChannelState[] = search.providers.flatMap((provider) =>
+      langs.map((lang): ChannelState => {
+        const c = tally.get(`${provider}/${lang}`);
+        if (!c) return { provider, lang, state: "no_key", why: "no_key" };
+        return c.answered ? { provider, lang, state: "ok", why: "" } : { provider, lang, state: "unreachable", why: c.why };
+      }),
+    );
+
     ctx.log(
-      `dossier "${entity.name}": ${executed} queries -> ${discovered.length} unique pages to read` +
+      `${search.label}: ${executed} queries -> ${discovered.length} unique pages to read` +
         (skippedByClass.length ? ` (skipped ${skippedByClass.length}: ${[...new Set(skippedByClass)].slice(0, 6).join(", ")})` : ""),
     );
-    return { docs: [], discovered };
+    return { docs: [], discovered, aside, channels };
   },
 };
 

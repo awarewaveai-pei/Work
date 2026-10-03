@@ -220,7 +220,29 @@ export interface CollectBlock {
      * replay a cached discoveredLinks list instead of recording an empty result (lib/collect/url-state.ts).
      */
     notModified?: boolean;
+    /** Pages a query block chose not to read (a shop, a social profile), with why. */
+    aside?: AsideEntry[];
+    /** The search channels a query block used or could not use. */
+    channels?: ChannelState[];
   }>;
+}
+
+/** A page the run did not deliver with text. `reason` is a machine code; sink/cognitive words it for the person. */
+export interface AsideEntry {
+  url: string;
+  title: string;
+  reason: string;
+}
+
+/**
+ * One search engine in one language, as this run found it. `why` is a machine code (`no_key`, `budget`,
+ * `http_<status>`, `network`, `error`; "" when ok); sink/cognitive words it for the person.
+ */
+export interface ChannelState {
+  provider: string;
+  lang: string;
+  state: "ok" | "unreachable" | "no_key";
+  why: string;
 }
 
 export interface SinkBlock {
@@ -280,6 +302,14 @@ export interface RunReport {
   offEntity: CollectIssue[];
   retried: number;
   stoppedBy: "frontier_empty" | "budget" | null;
+  /**
+   * keepAside runs only (a research run, STEP2_SHARED_RULES §4.1): every page that did not reach the sink with
+   * text — refused with no text, unreadable, gone, disallowed, quarantined, or skipped by a query block. The
+   * buckets above keep the operator's detail; this is the list the person sees and can take pages back from.
+   */
+  aside: AsideEntry[];
+  /** One entry per (search engine, language) any query block used or could not use; merged across seeds. */
+  channels: ChannelState[];
 }
 
 /** Resumable crawl state. Without it a budget-limited crawl re-reads page 1 forever. */

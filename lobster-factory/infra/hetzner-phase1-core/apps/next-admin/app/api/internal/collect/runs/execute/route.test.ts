@@ -26,7 +26,11 @@ function req(payload: unknown = body, auth = `Bearer ${EXEC_TOKEN}`): Request {
 
 function crawlResult(errors: string[] = []) {
   return {
-    report: { fetched: 3, dirty: [{}], quarantined: [], disallowed: [], offEntity: [{}], stoppedBy: "frontier_empty" },
+    report: {
+      fetched: 3, dirty: [{}], quarantined: [], disallowed: [], offEntity: [{}], stoppedBy: "frontier_empty",
+      aside: [{ url: "https://example.com/gone", title: "Gone", reason: "gone" }],
+      channels: [{ provider: "brave", lang: "en", state: "no_key", why: "no_key" }],
+    },
     sink: { written: 2, skipped: 1, errors },
   };
 }
@@ -90,12 +94,19 @@ describe("POST /api/internal/collect/runs/execute", () => {
     expect(runMod.runResearchCollection).toHaveBeenCalledTimes(1);
   });
 
+  it("the completion carries the pages set aside and the search channels, worded for the person (wire v2)", async () => {
+    await POST(req());
+    const sent = JSON.parse(completes()[0].init.body as string);
+    expect(sent.aside).toEqual([{ url: "https://example.com/gone", title: "Gone", reason: "這一頁已經不在了" }]);
+    expect(sent.channels).toEqual([{ provider: "brave", lang: "en", state: "no_key", why: "平台還沒有這個搜尋引擎的金鑰" }]);
+  });
+
   it("still completes, as failed, when the crawl throws", async () => {
     runMod.runResearchCollection.mockRejectedValue(new Error("renderer exploded"));
     const json = await (await POST(req())).json();
     expect(json.status).toBe("failed");
     expect(completes()).toHaveLength(1);
-    expect(JSON.parse(completes()[0].init.body as string)).toMatchObject({ status: "failed", error: expect.stringContaining("renderer exploded") });
+    expect(JSON.parse(completes()[0].init.body as string)).toMatchObject({ status: "failed", error: expect.stringContaining("renderer exploded"), aside: [], channels: [] });
   });
 
   it("reports failed when Cognitive OS refused the grant mid-run", async () => {

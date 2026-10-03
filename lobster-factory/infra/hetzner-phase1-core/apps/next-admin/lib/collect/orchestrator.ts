@@ -11,6 +11,7 @@
 
 import type {
   Budget,
+  ChannelState,
   CollectBlock,
   CollectCtx,
   CollectIssue,
@@ -61,6 +62,12 @@ export interface CrawlOptions {
   blocks?: CollectBlock[];
   maxAttemptsPerTarget?: number;
   log?: (msg: string) => void;
+  /**
+   * A research run (sink/cognitive; Cognitive OS STEP2_SHARED_RULES §4.1): nothing a gate refuses is dropped. A
+   * refused document WITH text still reaches the sink, with `meta.aside` = the gate's reason; every page that does
+   * not reach it with text is listed in `report.aside`. Off for the knowledge base, which must never store them.
+   */
+  keepAside?: boolean;
 }
 
 export interface CrawlResult {
@@ -169,6 +176,23 @@ function classify(e: unknown): Outcome {
   return /timeout|aborted|econnreset|etimedout|fetch failed/i.test(String(e)) ? "retry" : "extraction";
 }
 
+/**
+ * Which search found a document (or that the person pasted its URL), carried from the TARGET onto the document,
+ * once, in the orchestrator. It used to be copied by collect/http-html alone, which meant every other collector
+ * that could be reached from a search silently lost it — and losing it means sink/kb.ts cannot file the
+ * document, which is how 159 of 161 documents ended up unfiled.
+ */
+const CARRIED_TO_DOC = ["searchQuery", "searchAngle", "searchLang", "searchProvider", "pasted"] as const;
+
+const CHANNEL_RANK: Record<ChannelState["state"], number> = { no_key: 0, unreachable: 1, ok: 2 };
+
+/** One entry per (engine, language) across every query target of the run: an engine that answered once is ok. */
+function mergeChannel(into: ChannelState[], c: ChannelState): void {
+  const i = into.findIndex((x) => x.provider === c.provider && x.lang === c.lang);
+  if (i < 0) into.push(c);
+  else if (CHANNEL_RANK[c.state] > CHANNEL_RANK[into[i].state]) into[i] = c;
+}
+
 function emptySinkReport(): SinkReport {
   return { written: 0, skipped: 0 };
 }
@@ -202,6 +226,8 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
     offEntity: [],
     retried: 0,
     stoppedBy: null,
+    aside: [],
+    channels: [],
   };
 
   // Resume where the last run stopped; only fall back to the seeds for a genuinely new run.
@@ -280,6 +306,12 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
       seen.delete(target.canonicalUri);
       frontier.push(t);
     };
+    // keepAside: a page that will not reach the sink with text is listed for the person, not only counted.
+    const setAside = (uri: string, title: string | null, reason: string) => {
+      if (!opts.keepAside || !/^https?:\/\//i.test(uri)) return;
+      const searchTitle = typeof target.meta?.searchTitle === "string" ? target.meta.searchTitle : "";
+      report.aside.push({ url: uri, title: (title || searchTitle).slice(0, 300), reason });
+    };
 
     const candidates = blocks
       .map((b) => ({ block: b, score: b.match(target) }))
@@ -289,6 +321,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
 
     if (!candidates.length) {
       report.unhandled.push(target.uri);
+      setAside(target.uri, null, "unhandled");
       continue;
     }
 
@@ -332,7 +365,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
     let lastError: string | null = null;
     for (let i = 0; i < candidates.length; i++) {
       const { block } = candidates[i];
-      let result: { docs: RawDoc[]; discovered: Target[]; notModified?: boolean };
+      let result: Awaited<ReturnType<CollectBlock["run"]>>;
       try {
         result = await block.run(target, ctx);
       } catch (e) {
@@ -361,6 +394,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
             // the site recovers, starts clean instead of skipping the page for good.
             seen.delete(target.canonicalUri);
             report.dirty.push({ uri: target.uri, reason: `retry_exhausted:${errorLabel(e)}` });
+            setAside(target.uri, null, "retry_exhausted");
           }
           handled = true;
           break;
@@ -371,6 +405,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
           // `dirty` it would make C2's alert fire on correct behaviour until somebody turned the
           // alert down — and then the alert is gone for the case that mattered.
           report.disallowed.push({ uri: target.uri, reason: errorLabel(e) });
+          setAside(target.uri, null, "disallowed");
           handled = true;
           break;
         }
@@ -379,6 +414,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
           // Not an error to fix — the page is gone, and a tombstone pass turns that into an archive
           // so the knowledge base stops answering with a product that no longer exists.
           report.gone.push(target.uri);
+          setAside(target.uri, null, "gone");
           handled = true;
           break;
         }
@@ -387,6 +423,9 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         log(`block ${block.id} failed on ${target.uri}: ${String(e).slice(0, 160)}`);
         continue; // extraction problem: fall through to the next strategy
       }
+
+      if (opts.keepAside) report.aside.push(...(result.aside ?? []));
+      for (const channel of result.channels ?? []) mergeChannel(report.channels, channel);
 
       if (result.notModified) {
         // Confirmed unchanged: nothing new to grade or store, but the LINKS this page had are not
@@ -425,6 +464,29 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         continue;
       }
 
+      // Screens, stamps and queues one document for the sink; false = quarantined, never stored automatically
+      // (a human decides).
+      const deliver = (doc: RawDoc, extra: Record<string, unknown>): boolean => {
+        const screen = screenForInjection(doc.text, rawAsText(doc));
+        if (!screen.clean) {
+          const reason = `injection_${screen.hits.join("+")}`;
+          report.quarantined.push({ uri: doc.uri, reason });
+          setAside(doc.uri, doc.title, reason);
+          return false;
+        }
+        const carried: Record<string, unknown> = {};
+        for (const key of CARRIED_TO_DOC) {
+          if (doc.meta[key] === undefined && target.meta?.[key] !== undefined) carried[key] = target.meta[key];
+        }
+        // Why this document is in the dossier, stored WITH the document: six months later the run
+        // report is a row nobody opens, and "it names her and mentions La Trobe" is what makes the
+        // collection auditable rather than a pile of URLs somebody has to re-read.
+        const added = { ...carried, ...extra };
+        pending.push(stampProvenance(Object.keys(added).length ? { ...doc, meta: { ...doc.meta, ...added } } : doc));
+        delivered.add(doc.canonicalUrl);
+        return true;
+      };
+
       let admitted = 0;
       for (const { doc, verdict } of graded) {
         if (!verdict.ok) {
@@ -440,7 +502,14 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
           // would have to be configured.
           const thin = verdict.reason === "too_short" || verdict.reason === "low_text_density";
           const reason = thin && !hasNextTier ? `${verdict.reason}_no_heavier_tier` : (verdict.reason ?? "unknown");
+          // A research run keeps a refused page that has text, labelled with why; it is not admitted, so its
+          // links are not followed (below).
+          if (opts.keepAside && doc.text.trim()) {
+            deliver(doc, { aside: reason });
+            continue;
+          }
           report.dirty.push({ uri: doc.uri, reason, checks: verdict.checks });
+          setAside(doc.uri, doc.title, reason);
           continue;
         }
         // Relevance is judged only AFTER extraction quality, and never triggers the degrade-to-a-
@@ -449,30 +518,14 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         // harder; relevance cannot.
         const relevance = assessRelevance(doc, target.meta);
         if (!relevance.ok) {
+          if (opts.keepAside) {
+            deliver(doc, { ...(relevanceMetadata(relevance) ?? {}), aside: relevance.reason ?? "off_entity" });
+            continue;
+          }
           report.offEntity.push({ uri: doc.uri, reason: relevance.reason ?? "off_entity" });
           continue;
         }
-        const screen = screenForInjection(doc.text, rawAsText(doc));
-        if (!screen.clean) {
-          report.quarantined.push({ uri: doc.uri, reason: `injection_${screen.hits.join("+")}` });
-          continue; // never automatically stored; a human decides
-        }
-        const evidence = relevanceMetadata(relevance);
-        // Which search filed this document, carried from the TARGET onto the document, once, here.
-        // It used to be copied by collect/http-html alone, which meant every other collector that
-        // could be reached from a search silently lost it — and losing it means sink/kb.ts cannot
-        // file the document, which is how 159 of 161 documents ended up unfiled.
-        const provenanceOfSearch: Record<string, unknown> = {};
-        for (const key of ["searchQuery", "searchAngle", "searchLang"] as const) {
-          if (doc.meta[key] === undefined && target.meta?.[key] !== undefined) provenanceOfSearch[key] = target.meta[key];
-        }
-        // Why this document is in the dossier, stored WITH the document: six months later the run
-        // report is a row nobody opens, and "it names her and mentions La Trobe" is what makes the
-        // collection auditable rather than a pile of URLs somebody has to re-read.
-        const extra = { ...provenanceOfSearch, ...(evidence ?? {}) };
-        pending.push(stampProvenance(Object.keys(extra).length ? { ...doc, meta: { ...doc.meta, ...extra } } : doc));
-        delivered.add(doc.canonicalUrl);
-        admitted++;
+        if (deliver(doc, relevanceMetadata(relevance) ?? {})) admitted++;
       }
 
       // A page whose every document was refused does not get to nominate the next pages. Its links
@@ -489,6 +542,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
 
     if (!handled) {
       report.dirty.push({ uri: target.uri, reason: `all_strategies_failed:${lastError ?? "unknown"}` });
+      setAside(target.uri, null, "fetch_failed");
     }
     if (budgetStopped) break;
 

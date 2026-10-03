@@ -66,6 +66,24 @@ export const ANGLES: Record<EntityKind, Angle[]> = {
   ],
 };
 
+/** What a plan is built for: an entity (a name) or a claim (a sentence to check; Cognitive OS wire v2). */
+export type PlanKind = EntityKind | "claim";
+
+/**
+ * A claim's angles (Cognitive OS STEP2_SHARED_RULES §4.1; ids = specs/wire/collector.v2.json `claim_angles`,
+ * checked by a test). Kept out of ANGLES so the operator's dossier form never offers them. `{name}` is the claim
+ * and is never quoted: a quoted sentence finds only pages that repeat it word for word.
+ */
+export const CLAIM_ANGLES: Angle[] = [
+  { id: "primary", label: "原始文件與官方公告", templates: { zh: "{name} 官方 公告 原文", en: "{name} official statement document" } },
+  { id: "news", label: "報導", templates: { zh: "{name} 新聞 報導", en: "{name} news report" } },
+  { id: "factcheck", label: "查核", templates: { zh: "{name} 查核 事實", en: "{name} fact check" } },
+  { id: "precedent", label: "前例", templates: { zh: "{name} 過去 前例 歷史", en: "{name} precedent history" } },
+  { id: "field", label: "到過現場的人", templates: { zh: "{name} 現場 親身 目擊", en: "{name} eyewitness on the ground" } },
+  { id: "opposite", label: "相反的說法", templates: { zh: "{name} 不實 澄清 反駁", en: "{name} false misleading debunked" } },
+  { id: "origin", label: "最早的出處", templates: { zh: "{name} 最早 出處 來源", en: "{name} original source first reported" } },
+];
+
 /** Angles ticked by default: the ones a background check is incomplete without. */
 export const DEFAULT_ANGLES: Record<EntityKind, string[]> = {
   person: ["identity", "affiliation", "works", "news", "controversy"],
@@ -91,15 +109,28 @@ export interface PlannedQuery {
 
 export interface PlanInput {
   name: string;
-  kind: EntityKind;
+  kind: PlanKind;
   anchors: string[];
   aliases: string[];
   angleIds: string[];
   languages: QueryLang[];
 }
 
-export function angleById(kind: EntityKind, id: string): Angle | undefined {
-  return ANGLES[kind].find((a) => a.id === id);
+export function angleById(kind: PlanKind, id: string): Angle | undefined {
+  return (kind === "claim" ? CLAIM_ANGLES : ANGLES[kind]).find((a) => a.id === id);
+}
+
+/** One billed search call: a planned query on one engine. */
+export interface SearchCall extends PlannedQuery {
+  provider: string;
+}
+
+/**
+ * Every planned query on every engine, engine innermost, capped at MAX_QUERIES CALLS: a second engine never
+ * doubles the bill, and when the cap cuts, the angles that survive still ran on every engine.
+ */
+export function fanOut(plan: PlannedQuery[], providers: string[]): SearchCall[] {
+  return plan.flatMap((q) => providers.map((provider) => ({ ...q, provider }))).slice(0, MAX_QUERIES);
 }
 
 /**

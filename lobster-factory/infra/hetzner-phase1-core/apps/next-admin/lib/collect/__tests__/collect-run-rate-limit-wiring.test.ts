@@ -130,4 +130,19 @@ describe("runResearchCollection wiring", () => {
     expect(persistRunReport).not.toHaveBeenCalled();
     expect(recordRunOutcome).not.toHaveBeenCalled();
   });
+
+  it("keeps every refused page (keepAside) and reads a pasted URL as that one page (wire v2)", async () => {
+    const claim = { uri: "entity://claim/c1", meta: { kind: "claim", entityName: "x" } };
+    await runResearchCollection({
+      projectId: "p1", runId: "run_1", sink: { id: "sink/test", title: "t", run: vi.fn() },
+      seeds: [{ uri: "https://a.example/post", meta: { pasted: true } }, claim],
+    });
+    const [seeds, opts] = vi.mocked(crawl).mock.calls[0] as unknown as [Array<{ meta?: Record<string, unknown> }>, { keepAside?: boolean }];
+    expect(opts.keepAside).toBe(true);
+    expect(seeds[0].meta).toEqual({ pasted: true, maxDepth: 0 });
+    expect(seeds[1]).toEqual(claim);
+    vi.mocked(crawl).mockClear();
+    await runCollection({ organizationId: "11111111-1111-4111-8111-111111111111" });
+    expect((vi.mocked(crawl).mock.calls[0][1] as { keepAside?: boolean }).keepAside).toBe(false);
+  });
 });

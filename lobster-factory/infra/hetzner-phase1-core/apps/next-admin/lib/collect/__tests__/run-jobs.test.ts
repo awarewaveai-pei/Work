@@ -10,7 +10,7 @@ function fakeResult(overrides: Partial<RunCollectionResult> = {}): RunCollection
     runKey: "manual-test",
     sources: 1,
     dryRun: false,
-    report: { fetched: 1, outOfScope: 0, unhandled: [], gone: [], dirty: [], quarantined: [], disallowed: [], offEntity: [], retried: 0, stoppedBy: "frontier_empty" },
+    report: { fetched: 1, outOfScope: 0, unhandled: [], gone: [], dirty: [], quarantined: [], disallowed: [], offEntity: [], retried: 0, stoppedBy: "frontier_empty", aside: [], channels: [] },
     sink: { written: 1, skipped: 0 },
     persistedRunId: "run-1",
     incidentRaised: false,

@@ -53,9 +53,10 @@ describe("toSourceProjection", () => {
     expect(JSON.stringify(p)).not.toContain("W/1");
   });
 
-  it("keeps only the relevance whitelist from meta", () => {
-    const p = toSourceProjection(doc({ meta: { entityConfidence: 0.8, entityAnchorsHit: ["La Trobe"], searchAngle: "career", searchQuery: "x", etag: "e", entitySnippet: "s" } }));
-    expect(p.relevance).toEqual({ entityConfidence: 0.8, entityAnchorsHit: ["La Trobe"], searchAngle: "career", searchQuery: "x" });
+  it("keeps only the relevance whitelist from meta, and always says whether the page was pasted (wire v2)", () => {
+    const p = toSourceProjection(doc({ meta: { entityConfidence: "anchored", entityAnchorsHit: ["La Trobe"], searchAngle: "career", searchQuery: "x", etag: "e", entitySnippet: "s" } }));
+    expect(p.relevance).toEqual({ entityConfidence: "anchored", entityAnchorsHit: ["La Trobe"], searchAngle: "career", searchQuery: "x", pasted: false });
+    expect(p.schema_version).toBe("2");
   });
 
   it("never shortens the text (COS re-hashes it against content_sha256)", () => {

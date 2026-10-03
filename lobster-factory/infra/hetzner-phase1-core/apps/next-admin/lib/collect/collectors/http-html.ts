@@ -156,6 +156,34 @@ export function extractLinks(html: string, baseUrl: string): string[] {
   return [...out];
 }
 
+/** The page's main image as the page declares it (og:image, then twitter:image), absolute; null if none or not http(s). */
+export function extractImageUrl(html: string, baseUrl: string): string | null {
+  const declared = metaContent(html, /^og:image(:secure_url|:url)?$/i) ?? metaContent(html, /^twitter:image(:src)?$/i);
+  if (!declared) return null;
+  try {
+    const u = new URL(declared, baseUrl);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The OTHER hosts a page links to (`www.` folded, first seen first, at most `max`). Which sites cite which is how
+ * a ring of sites that only cite each other shows up (Cognitive OS GATHER); links to its own host say nothing.
+ */
+export function outlinkHosts(links: string[], pageUrl: string, max = 50): string[] {
+  const fold = (u: string) => new URL(u).hostname.toLowerCase().replace(/^www\./, "");
+  const own = fold(pageUrl);
+  const out = new Set<string>();
+  for (const link of links) {
+    const host = fold(link);
+    if (host && host !== own) out.add(host);
+    if (out.size >= max) break;
+  }
+  return [...out];
+}
+
 export function extractAuthor(html: string): string | null {
   const meta = metaContent(html, /^(author|article:author|dc\.creator|twitter:creator)$/i);
   if (meta) return meta.slice(0, 200);
@@ -231,6 +259,7 @@ export function docFromHtml(p: HtmlPageInput): { doc: RawDoc; discovered: Target
     return null;
   })();
 
+  const links = extractLinks(html, finalUrl);
   const doc: RawDoc = {
     uri: finalUrl,
     canonicalUrl: ctx.canonicalize(declaredCanonical ?? finalUrl),
@@ -254,10 +283,12 @@ export function docFromHtml(p: HtmlPageInput): { doc: RawDoc; discovered: Target
       // searchQuery used to be copied here, by this collector alone. The orchestrator now carries
       // it (and searchAngle/searchLang) from the target onto EVERY collector's documents, so a
       // page read by the rendered tier or the API tier is filed the same as one read here.
+      imageUrl: extractImageUrl(html, finalUrl) ?? undefined,
+      outlinks: outlinkHosts(links, finalUrl),
     },
   };
 
-  const discovered: Target[] = extractLinks(html, finalUrl).map((uri) => ({
+  const discovered: Target[] = links.map((uri) => ({
     uri,
     canonicalUri: ctx.canonicalize(uri), // the orchestrator recomputes this; kept consistent here
     scope: t.scope,

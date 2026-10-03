@@ -207,6 +207,8 @@ describe("severityFor", () => {
     offEntity: [],
     retried: 0,
     stoppedBy: "frontier_empty",
+    aside: [],
+    channels: [],
     ...over,
   });
   const sink = (written: number): SinkReport => ({ written, skipped: 0 });

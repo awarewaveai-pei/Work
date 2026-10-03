@@ -18,6 +18,8 @@ function report(overrides: Partial<RunReport> = {}): RunReport {
     offEntity: [],
     retried: 0,
     stoppedBy: "frontier_empty",
+    aside: [],
+    channels: [],
     ...overrides,
   };
 }
