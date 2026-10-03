@@ -306,7 +306,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     for (const s of ['同源合併', '同源群組', '來源地圖', '管道佔比', '來源身分卡']) if (whole.includes(s)) typed.push('retired word ' + s);
     // One word, one meaning (critic round 5): 關卡 = the three architecture gates; 任務 = one action (任務卡), the whole is a 案子;
     // COLLAB's record is 群組紀錄 (共用紀錄 is the case record); 所在地 is split into 發生地 and 你在哪裡; a thin result counts 出處.
-    for (const s of ['七道關卡', '建立任務', '每件任務', '我的任務', '共同紀錄', '案子的所在地', '找到的來源太少', '受影響的人', '找不找得到出處', '出處是不是彼此獨立']) if (whole.includes(s)) typed.push('ambiguous word ' + s);
+    for (const s of ['七道關卡', '建立任務', '每件任務', '我的任務', '共同紀錄', '案子的所在地', '找到的來源太少', '受影響的人', '找不找得到出處', '出處是不是彼此獨立', '參與者沒有多做一步', '管的是參與者', '把它開成一個案子']) if (whole.includes(s)) typed.push('ambiguous word ' + s);
     if (!whole.includes(FACET_NAMES.length + ' 個面向')) typed.push('facet count');
     // The block count is written once (NB). Any "N 塊積木 / N 份積木合約 / N 格" on any page equals it; a position (第 N 塊),
     // the judgment card's 11 boxes and dated history are not counts of blocks (2026-10-03: 55 hand-typed 13s when block 14 came).
