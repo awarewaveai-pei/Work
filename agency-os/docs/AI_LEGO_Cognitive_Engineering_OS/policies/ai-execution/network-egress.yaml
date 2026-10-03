@@ -387,6 +387,19 @@ seed_content:
         # 2026-09-17（續14/續15）與 agency-os/memory/feedback_route_data_fetch_through_ops_collect.md。
         # api.anthropic.com（已列於上方第三方整合）自 2026-09-17 起也是 AI gateway 的 runtime 目的地：
         # ai_lego/platform/ai_gateway/provider.py，key 走 COGNITIVE_OS_ANTHROPIC_API_KEY（deploy/.env，不進 git）。
+        # 2026-10-04 build step 2 GATHER（查來源的身分，不是蒐集資料；網頁一律由 next-admin 蒐集器抓）：
+        # archive.org = 網頁封存館最早存到的日期（ai_lego/platform/net/wayback.py）；
+        # 以下為各頂級網域的 RDAP 註冊資料庫，取自 IANA RDAP 名單（ai_lego/platform/rulesets/gather.py gather.registries）。
+        - "archive.org"
+        - "pubapi.registry.google"
+        - "rdap.centralnic.com"
+        - "rdap.identitydigital.services"
+        - "rdap.nic.gov"
+        - "rdap.nominet.uk"
+        - "rdap.publicinterestregistry.org"
+        - "rdap.radix.host"
+        - "rdap.verisign.com"
+        - "rdap.zdnsgtld.com"
       classification_tag_ref: null
       mechanism_ref: >-
         2026-08-30 操作者提供第一方網域清單（DNS zone 全文 + 口頭補充 4 個），

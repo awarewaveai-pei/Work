@@ -6,9 +6,12 @@ them through ``ai_lego.platform.evidence``); GATHER adds its own kinds below the
 from __future__ import annotations
 
 from ai_lego.core.domain.doc_kinds import DocKind, Field
-from ai_lego.core.domain.evidence_words import APPLIES, CARD_CELL_KEYS, MARKS
+from ai_lego.core.domain.evidence_words import APPLIES, CARD_CELL_KEYS, MARKS, OWN_WORDS
 
 OVERRIDABLE = (*CARD_CELL_KEYS, "lists")   # 你可以改系統的分類，改的時候寫理由
+# What a search looks for (STEP2_SHARED_RULES §4.1 angles of a claim seed): 系統先找最原始的、前例、到過現場的人
+ANGLES = (("primary", "原始文件與官方公告"), ("news", "報導"), ("factcheck", "查核"), ("precedent", "前例"), ("field", "到過現場的人"),
+          ("opposite", "相反的說法"), ("origin", "最早的出處"))
 
 KINDS = [
     # one card per stored source, or per page set aside with no text (source_id ""); the system's, never the person's words
@@ -54,4 +57,38 @@ KINDS = [
         "value": Field("text", 300, required=True, human_only=True),
         "reason": Field("text", 1000, required=True, human_only=True),
     }),
+    # ---- GATHER's own kinds (not read by other blocks) ----
+    # 你寫下要查什麼 (or a pasted URL, or 「找跟它說法相反的」 on a card); ``run`` = the collection it started
+    DocKind("gather.ask", "GATHER", "要查什麼", {
+        "text": Field("text", 2000, required=True),
+        "angles": Field("choices", len(ANGLES), choices=tuple(key for key, _ in ANGLES)),
+        "card": Field("text", 64, scan=False),          # the source card a 相反的說法 / 原始文件 search starts from
+        "url": Field("text", 2048, scan=False),         # a URL the person pasted
+        "run": Field("text", 64, scan=False),
+    }),
+    # 你貼的是一段沒有出處的文字：「我自己說的，還沒有外部出處」 -- kept here, never stored as a source
+    DocKind("gather.own", "GATHER", OWN_WORDS, {
+        "text": Field("text", 5000, required=True, human_only=True),
+    }),
+    # 在這裡連不上的管道: what each (engine, language) of one collection run did (ok | unreachable | no_key)
+    DocKind("gather.channels", "GATHER", "這次用的管道", {
+        "run": Field("text", 64, required=True, scan=False),
+        "channels": Field("json", 8000, required=True, scan=False),   # [{"provider", "lang", "state", "why"}]
+    }, authors=frozenset({"system"}), deletable=False),
+    # AI 幫你想查詢要怎麼下，並翻成別的語言再查一次
+    DocKind("gather.ai_queries", "GATHER", "AI 建議的查詢", {
+        "queries": Field("json", 8000, required=True),     # [{"text", "lang", "angle"}]
+        "note": Field("text", 600),
+    }, authors=frozenset({"ai"}), singleton=True),
+    # 「這個來源說……」 for each source (or what you pasted), what is still missing, one question
+    DocKind("gather.ai_says", "GATHER", "AI 摘要來源", {
+        "items": Field("json", 30000, cited=True),         # [{"card", "says", "quote", "citations"}]
+        "gaps": Field("list", 5),
+        "question": Field("text", 300),
+    }, authors=frozenset({"ai"})),
+    # AI 指出哪兩個來源互相矛盾（兩邊並排，不選邊）、可能還缺哪一方的說法
+    DocKind("gather.ai_compare", "GATHER", "AI 比對來源", {
+        "conflicts": Field("json", 30000, cited=True),     # [{"about", "a": {"card", "quote", "citations"}, "b": {...}}]
+        "missing": Field("json", 4000),                    # [{"side", "why"}]
+    }, authors=frozenset({"ai"}), singleton=True),
 ]

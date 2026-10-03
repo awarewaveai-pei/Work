@@ -104,6 +104,24 @@ const CODES: Record<string, string> = {
   THINK_REPLY_NOT_FOUND: "找不到 AI 的這份整理，可能已經刪除。",
   THINK_REPLY_STALE: "這份整理在你回應之前又變了。請重新整理頁面，看過新的再回應。",
   ACCOUNT_ERASE_NOT_CONFIRMED: "要刪除帳號，請照畫面打一次確認的字。",
+  // GATHER
+  GATHER_ORIGIN_NOT_FOUND: "這一組現在不在了（網頁重新分過組）。請重新整理頁面，標新的組。",
+  GATHER_ORIGIN_PENDING: "這一頁還在分組，分好之後再標。",
+  GATHER_MARK_CARDS_MISMATCH: "同一組裡的網頁要一起標。這一組的網頁變了，請重新整理頁面再標。",
+  GATHER_MARK_ALREADY_GIVEN: "這個出處你已經標過了。要改，改那一個標記。",
+  GATHER_MARK_ORIGIN_FIXED: "標記跟著它標的那一組，不能換到別組。要標新的組，另外標一個。",
+  GATHER_CARD_NOT_FOUND: "找不到這張來源卡，請重新整理頁面。",
+  GATHER_OVERRIDE_ALREADY_GIVEN: "這一格你已經改過了。要再改，改那一筆。",
+  GATHER_OVERRIDE_FIXED: "你的改法跟著它改的那張卡和那一格，不能換。",
+  GATHER_SPLIT_INVALID: "要拆開的網頁要在同一組裡，而且不能是整組。",
+  GATHER_SPLIT_FIXED: "拆開的網頁不能再換。要改，先刪掉這次拆開，再拆一次。",
+  GATHER_NOT_ASIDE: "這一頁沒有放一旁，不用拿回來。",
+  GATHER_TAKEBACK_ALREADY_GIVEN: "這一頁已經拿回來了。",
+  GATHER_ORGANIZE_PASTED_ONLY: "你沒准 AI 找外部資料，AI 只整理你貼的。請只勾你貼的來源。",
+  COLLECTION_SERVICE_UNCONFIGURED: "這裡還沒接上找資料的服務，系統現在不能去找。你可以自己貼網址或檔案。",
+  COLLECTION_SERVICE_UNAVAILABLE: "找資料的服務這次沒有回應，沒有開始找。請稍後再按一次。",
+  COLLECTOR_IDENTITY_MISSING: "找資料的服務還沒設定好，請聯絡管理員。",
+  COLLECTION_SEEDS_INVALID: "要找的內容格式不對，請重新整理頁面再試一次。",
 };
 
 const STATUS_FALLBACK: Record<number, string> = {
