@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-03（續3）正式庫 0094 套用：3 張無 RLS 表鎖成 service_role only，新建 public 表自動開 RLS
+- [操作者] 「看要怎麼處理，你去做」（High-STOP go）。
+- [VBC 套用前] 正式庫無 RLS 表＝`kb_cleanup_20260920_bad_crawl`／`ops_health_probes`／`social_postiz_connections`，anon 各有 7 種權限（含 DELETE／TRUNCATE），與 10-01 續3 完全相同 → 0094 的「未審表即中止」不會觸發；ledger 無 0094；套用身分 superuser（event trigger 需要）。
+- [消費者] app 讀寫三表皆走 service role：`connections/route.ts:40,121`、`api/ops/probe/route.ts:25`、`lib/content/postiz.ts:119`、`api/ops/inbox/health/route.ts:25`（getSupabaseServerClient 先用 write client）、command-plane health 由 `api/internal/commands/telegram/route.ts:66` 傳入 write client；容器內 `SUPABASE_SERVICE_ROLE_KEY` 存在。心跳 cron `ops-probe-heartbeat.sh` 打 `/api/ops/probe`，不直連 REST。kong 72h 內三表的 1678 次 REST 全來自 next-admin（UA node、docker 內網）。前端無程式碼碰三表。
+- [套用] `node scripts/apply-db-migration.mjs 0094` → APPLY_OK 1/1。
+- [事後] public 無 RLS 表 0；三表 anon／authenticated 權限 0、policy 皆 `service only {service_role}`；event trigger `public_tables_rls_default_deny` 啟用；ledger 有列；列數不變（1／1／159）。
+- [實測] 容器內 fetch：anon 對三表 GET、對 ops_health_probes POST 皆 401 `42501`；service role GET 200、POST 201（測試列立即 DELETE 204，事後列數 1）。手動跑心跳 `http=200`，`ops-inbox` 列 2 分鐘內更新。交易內建表／CTAS 皆自動 `relrowsecurity=t`，rollback 後不存在。套用後 15 分鐘 next-admin log `42501`／permission denied 0 次；kong 三表請求 200×19、401×4（＝本次 anon 測試）。
+- 無新增帳密／key／token（未寫入憑證檔）。
+- rollback：`drop event trigger public_tables_rls_default_deny; drop function public.enforce_public_table_rls();` 三表各 `alter table … disable row level security` 並視需要還原 anon 權限；ledger 刪 0094 列（見檔頭）。
 ## 2026-10-03（續2）WORKLOG 封存不再重排（上萬行差異的真因）；AO 檔案的寫入一律 LF、保留 BOM 狀態；健康檢查 12f 守住
 - [操作者] 「CRLF 11 支 處理好」「這是不是浪費了很多時間和 token?」
 - [更正] 續1／AO-CLOSE 報告稱「CRLF 讓 WORKLOG 差異看起來上萬行」不正確。實證：已提交的兩版（皆 LF）`git diff aac23629c~1 f3f945feb -- agency-os/WORKLOG.md` 仍是 +8475/-15778、406 個 `## ` 標題移位。真因 `scripts/rotate-worklog.mjs:99`（舊）把保留段落依日期重排，把底部附加的 `## 日期` 段全部搬到對應日期旁。CRLF 在 git diff／commit 時都被正規化，不產生差異；它的實害是讀工作樹的工具（regex／位元組比對）會撞到混用換行（2026-09-25 記憶）。
@@ -36,6 +45,8 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,.github,Projects/internal/cognitive-engineering-os | grep=`"tools": ?28[0-9]|28[4-6] 個(思考)?工具` | hits=0
 - ORACLE_WAIVED: live_check.sh 7 行 dev 檢查腳本，以突變證據取代外部 oracle
 - 詳細：本檔頂部 2026-10-03（續1）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=apply-db-migration.mjs 0094 + psql 事後查詢 + 容器內 anon/service REST fetch + ops-probe-heartbeat.sh + 交易內 event trigger 探測 | exit=0 | ms=300000 | result=anon 401×4、service 200/201、heartbeat 200、新表 RLS=t
+- AUTO_TASK_DONE_APPLIED (2026-10-03T07:49:48Z): 正式庫 3 張 public 表無 RLS、anon key 可 CRUD
 - REALTEST_EVIDENCE: tool=Bash | cmd=node --test tests/hooks/maintenance-scripts.test.mjs + eol_realtest.py（5 支寫入者在拋棄式 WorkRoot 真跑）+ eol_realtest2.ps1（doc-sync Upsert-RelatedBlock 由 AST 取出真跑、monthly append、BOM 保留）+ system-health-check.ps1 | exit=0 | ms=420000 | result=6/6；9/9；5/5；329/329（12f 180 檔全 LF）
 - MUTATION: 重排放回 → 新測試紅；拿掉 CRLF→LF → 6 項紅；BOM 判斷關掉 → 2 項紅；12f 翻一檔為 CRLF → 計 1；git 失敗 → 走 FAIL 分支（exit=128）。皆還原綠。
 - REVIEW_DONE: critic=Standard | verdict=warn→fixed | findings=0c/2m/2n -- M1 monthly-system-review 漏網寫入者、M2 12f git 失敗假綠、m1 測試跨月、m2 .ps1 工作樹 LF（git 正規化，不處理）；另自查到 doc-sync 同類（每次加 BOM）一併修
