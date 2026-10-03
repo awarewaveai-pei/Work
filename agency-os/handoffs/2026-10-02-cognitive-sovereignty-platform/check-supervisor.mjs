@@ -163,34 +163,35 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // The contract card is the only source: every north-star row must appear in the card of each block it names.
     window.show('contracts', true);
     const card = (c) => { const d = document.getElementById('b-' + c); d.open = true; return d.innerText; };
+    const has = (c, x) => card(c).includes(plain(x));
     const north = [];
-    for (const c of Object.keys(TRAINS)) if (!card(c).includes(TRAINS[c])) north.push('trains:' + c);
-    for (const [k, bs, d] of [...SCALES, ...CITIZEN, ...CAPS, ...CW_DEFENCE, ...WAR_BEFORE]) for (const c of bs) if (!card(c).includes(d)) north.push(k + ':' + c);
+    for (const c of Object.keys(TRAINS)) if (!has(c, TRAINS[c])) north.push('trains:' + c);
+    for (const [k, bs, d] of [...SCALES, ...CITIZEN, ...CAPS, ...CW_DEFENCE, ...WAR_BEFORE]) for (const c of bs) if (!has(c, d)) north.push(k + ':' + c);
     // Her framework (v0.1): every requirement is in the card of each block it names, and every step of her eight-step loop has a block.
-    for (const [d, bs] of FRAME_REQ) for (const c of bs) if (!card(c).includes(d)) north.push('frame:' + c + ':' + d.slice(0, 10));
+    for (const [d, bs] of FRAME_REQ) for (const c of bs) if (!has(c, d)) north.push('frame:' + c + ':' + d.slice(0, 10));
     // Every section a framework row cites has a row in the v0.1 table (computed from the data, 2026-10-03 round 7).
     for (const r of FRAME_REQ) if (!V01.some((v) => v[0] === r[2])) north.push('v0.1 section without a table row: ' + r[2]);
     // Every package has an owner for each judgment-sovereignty check: a block in it, a always-on item, or the content-block list.
     for (const [k, , bs] of PK) for (const [name, parts] of SEVEN) if (!parts.some(([o]) => Array.isArray(o) || CROSS.some((x) => x.code === o) || bs.includes(o))) north.push('package ' + k + ' has no owner for ' + name);
-    for (const [s, ps] of LOOP) { if (!ps.length) north.push('loop step without a block: ' + s); for (const [c] of ps) if (!card(c).includes('「' + s + '」')) north.push('loop:' + s + ':' + c); }
+    for (const [s, ps] of LOOP) { if (!ps.length) north.push('loop step without a block: ' + s); for (const [c] of ps) if (!has(c, '「' + s + '」')) north.push('loop:' + s + ':' + c); }
     // Her five interface questions are in both cards that ask them, word for word from one list (2026-10-03).
-    for (const q of INTERFACE_Q) for (const c of ['COLLAB', '規範與脈絡']) if (!card(c).includes(q)) north.push('interface question not in ' + c + ': ' + q.slice(0, 8));
-    for (const [k, d, bs] of MEASURE) for (const c of bs) if (!card(c).includes(d)) north.push('measure:' + k + ':' + c);
+    for (const q of INTERFACE_Q) for (const c of ['COLLAB', '規範與脈絡']) if (!has(c, q)) north.push('interface question not in ' + c + ': ' + q.slice(0, 8));
+    for (const [k, d, bs] of MEASURE) for (const c of bs) if (!has(c, d)) north.push('measure:' + k + ':' + c);
     // The north page says 「N 塊各自…」: every block has a row in TRAINS and in CW_BLOCKS.
     for (const b of BLOCKS) { if (!TRAINS[b.code]) north.push('trains: no row for ' + b.code); if (!CW_BLOCKS.some((x) => x[0] === b.code)) north.push('cw: no row for ' + b.code); }
     // The blueprint table is computed from the section number after each blueprint line (round 8: written by hand, 9 rows missed
     // cards). Every number has a row, and every section has a home (a card or a page).
-    for (const c of Object.keys(BP)) for (const x of BP[c]) for (const ref of bpRefs(x)) if (!BP_ROWS.some((row) => row[0] === bpRow(ref))) north.push('blueprint section without a row: ' + c + ' ' + ref);
+    for (const b of all) for (const x of cardText(b)) for (const ref of bpRefs(x)) if (!BP_ROWS.some((row) => row[0] === bpRow(ref))) north.push('blueprint section without a row: ' + b.code + ' ' + ref);
     for (const row of document.querySelectorAll('#cover [data-sec]')) if (row.dataset.sec !== '0' && /沒有寫進卡片$/.test(row.innerText.trim())) north.push('blueprint section with no home: ' + row.dataset.sec);
-    for (const [c, at, df] of CW_BLOCKS) { const t = card(c); if (!t.includes(at) || !t.includes(df)) north.push('cw:' + c); }
-    for (const [k, v] of [...CW.defs, ...CW.goals, ...CW.levels]) if (!card('規範與脈絡').includes(v)) north.push('cwdef:' + k);
+    for (const [c, at, df] of CW_BLOCKS) { if (!has(c, at) || !has(c, df)) north.push('cw:' + c); }
+    for (const [k, v] of [...CW.defs, ...CW.goals, ...CW.levels]) if (!has('規範與脈絡', v)) north.push('cwdef:' + k);
     // ...and every sentence on the north-star page is in some card (headings and data-nav navigation aside).
     const sq = (s) => s.replace(/\s+/g, '');
     const cardsText = sq(all.map((b) => card(b.code)).join('|'));
     const walker = document.createTreeWalker(document.getElementById('v-north'), NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
       if (n.parentElement.closest('[data-nav], h2, h3, .bk, [data-cross5]')) continue;
-      for (const s of n.textContent.split(/(?<=[。；])/)) { const k = sq(s); if (k.length >= 8 && !cardsText.includes(k)) north.push('sentence:' + k.slice(0, 20)); }
+      for (const s of n.textContent.split(/(?<=[。；])/)) { const k = sq(plain(s)); if (k.length >= 8 && !cardsText.includes(k)) north.push('sentence:' + k.slice(0, 20)); }
     }
     // Tools: each row's count, recounted from the repo by family; every family in exactly one row.
     const toolRows = [];
@@ -234,7 +235,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     const outside = [...new Set(DRAWERS.filter((d) => ['練習', '帶領', '個人'].includes(d.where)).map((d) => d.owner))].sort().join();
     if (outside !== OUT_CASE_CALLS.map((x) => x[0]).sort().join()) arch.push('calls outside a case: drawers ' + outside + ' / list ' + OUT_CASE_CALLS.map((x) => x[0]).join());
     // What a card writes is its drawers (round 10: 個人歷程 held two items LEARN's card did not list).
-    for (const d of DRAWERS) if (!card(d.owner).includes(d.has)) arch.push('drawer contents not on its writer card: ' + d.id);
+    for (const d of DRAWERS) if (!has(d.owner, d.has)) arch.push('drawer contents not on its writer card: ' + d.id);
     // One order for the blocks and one for the five (2026-10-03: arranged by relation, not by when they were added);
     // the lists written out by hand follow it.
     const order = [...BLOCKS.map((b) => b.code), ...CROSS.map((x) => x.code)];
@@ -269,7 +270,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     }
     // Each of the seven judgment-sovereignty checks has one owner, and the owner's card carries the sentence (round 5c).
     const seven = SEVEN.length === 7 ? [] : ['not seven: ' + SEVEN.length];
-    for (const [k, parts] of SEVEN) for (const [owner, quote] of parts) for (const c of [].concat(owner)) if (!card(c).includes(quote)) seven.push(k + ':' + c);
+    for (const [k, parts] of SEVEN) for (const [owner, quote] of parts) for (const c of [].concat(owner)) if (!has(c, quote)) seven.push(k + ':' + c);
     // One journey, two pages: same steps in the same order. A section that promises the five always-on items shows exactly those five.
     const journey = [];
     const oneSteps = [...document.querySelectorAll('#one-steps [data-step]')].map((e) => e.dataset.step);
@@ -293,8 +294,8 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // The tools page may hold nothing a contract card lacks: each row appears in the card of the block it belongs to.
     const toolsMissing = [];
     const ownerOf = (w) => TOOL_OWNER[w] || w;
-    for (const r of [...TOOL_ROWS, ...FLOW_ROWS]) for (const w of r[0]) { const c = ownerOf(w); if (codes.includes(c) && !card(c).includes(r[2])) toolsMissing.push(c + ':' + r[2].slice(0, 12)); }
-    for (const r of EXISTING_OTHER) for (const c of r[3]) if (!card(c).includes(r[2])) toolsMissing.push(c + ':' + r[0]);
+    for (const r of [...TOOL_ROWS, ...FLOW_ROWS]) for (const w of r[0]) { const c = ownerOf(w); if (codes.includes(c) && !has(c, r[2])) toolsMissing.push(c + ':' + r[2].slice(0, 12)); }
+    for (const r of EXISTING_OTHER) for (const c of r[3]) if (!has(c, r[2])) toolsMissing.push(c + ':' + r[0]);
     // Build order places every block and each of the five.
     window.show('progress', true);
     const chips = [...document.querySelectorAll('#order .bks .bk')].map((e) => e.textContent.trim());
@@ -331,15 +332,18 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       const n = +(mm[1] || mm[4]), b = BLOCKS.find((x) => x.code === (mm[2] || mm[3]));
       if (b && b.n !== n) typed.push('block number: ' + mm[0].replace(/\s/, ' '));
     }
-    // The blueprint's 任務 means the whole case in most boxes and one AI task in LEARN's: every box that uses it says which (round 5c).
-    const taskBoxes = Object.keys(BP).filter((c) => BP[c].some((x) => /任務(?!卡)/.test(Array.isArray(x) ? x[0] + x[1].join('') : x)));
-    for (const c of taskBoxes) if (!TASK_NOTE[c]) typed.push('任務 without a note: ' + c);
-    for (const c of Object.keys(TASK_NOTE)) if (!taskBoxes.includes(c)) typed.push('任務 note on a box without 任務: ' + c);
-    // Our own text (the twelve fields and 我們加的) says 案子; a bare 任務 is the blueprint's word only (round 5d).
-    for (const b of all) {
-      const own = [...FIELDS.map(([, f]) => [].concat(b[f] || []).join(' ')), ...(ADD[b.code] || []).map((x) => (Array.isArray(x) ? x[0] + x[1].join('') : x))].join(' ');
-      if (/任務(?!卡)/.test(own)) typed.push('bare 任務 in ' + b.code);
-    }
+    // One word on the cards (round 16): 案子 is the whole case, 任務卡 is ACT's card. Cards no longer show which lines quote the
+    // blueprint, so the blueprint's 任務 is written as what it means there (案子, or "the thing handed to the AI" in LEARN).
+    const itemText = (x) => (Array.isArray(x) ? x[0] + x[1].join('') : String(x));
+    for (const b of all) for (const x of cardItems(b)) if (/任務(?!卡)/.test(itemText(x))) typed.push('任務 on a card (write 案子 or what it means): ' + b.code + ': ' + itemText(x).slice(0, 12));
+    // A card is its twelve fields (2026-10-03: not boxes by source) and shows no source tags (she: 「不用」).
+    if (document.querySelectorAll('#v-contracts .cc .bp').length) typed.push('a source box on a contract card');
+    for (const b of all) { const t = card(b.code); if (plain(t) !== t) typed.push('source tag shown on ' + b.code + ': ' + (t.match(/（[^（）]*）/g) || []).find((g) => plain(g) !== g)); }
+    // ...checked a second way that does not reuse plain() (round 16 M3: plain(t) !== t only fails when the renderer skips plain):
+    // any bracket on a card that names a source document or a section is a visible tag.
+    const TAG_SEEN = /（[^（）]*(?:增補 A\d|藍圖 ?第? ?\d|第 \d+(?:\.\d+)? 節|研究線總計畫|講稿|》第)[^（）]*）/g;
+    for (const b of all) for (const g of card(b.code).match(TAG_SEEN) || []) typed.push('source tag visible on ' + b.code + ': ' + g.slice(0, 24));
+    for (const w of ['藍圖已經寫明的要求', '藍圖沒寫、我們加的', '北極星對這一塊的要求', '判斷主權框架對這一塊', '現有的東西裡歸這一塊', '「藍圖要求」']) if (whole.includes(w)) typed.push('retired box name ' + w);
     // One list of what is still undecided (round 8: the 「帶領」 question sat only inside a settled entry). Every line on any page
     // that says 還沒定／等你定／等你決定 is covered by a line of the decided page's list (its pattern) or is listed there word for word;
     // a settled entry may point to the list but must be covered too.
@@ -347,6 +351,11 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     const PENDING_WORDS = /還沒定|等你定|等你決定|等你看|再定|還沒看過|還沒逐/;
     const pending = [];
     const openList = document.getElementById('open').innerText.replace(/\s+/g, '');
+    // A line the OPEN list already covers is not listed a second time under 「從卡上自動列出」 (round 16 M1).
+    for (const li of document.querySelectorAll('#open ul.pend li')) if (OPEN.some(([, re]) => re && re.test(li.innerText))) pending.push('listed twice: ' + li.innerText.slice(0, 40));
+    // ...and judged on the stored line, which still has the section numbers the OPEN patterns match.
+    const pendTexts = [...document.querySelectorAll('#open ul.pend li')].map((li) => li.innerText.replace(/\s+/g, ''));
+    for (const b of all) for (const raw of cardText(b)) if (PENDING_WORDS.test(raw) && OPEN.some(([, re]) => re && re.test(raw)) && pendTexts.some((t) => t.endsWith(plain(raw).replace(/\s+/g, '')))) pending.push('listed twice: ' + b.code + ': ' + plain(raw).slice(0, 30));
     for (const v of VIEWS) {
       window.show(v, true);
       const el = document.getElementById('v-' + v);
@@ -357,7 +366,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       const tx = el.innerText;
       ol.style.display = '';
       for (const line of tx.split('\n')) {
-        if (!PENDING_WORDS.test(line) || /寫「還沒定」的那幾條等你定/.test(line)) continue;
+        if (!PENDING_WORDS.test(line)) continue;
         if (!OPEN.some(([, re]) => re && re.test(line)) && !openList.includes(line.replace(/\s+/g, ''))) pending.push(v + ': ' + line.trim().slice(0, 40));
       }
     }
