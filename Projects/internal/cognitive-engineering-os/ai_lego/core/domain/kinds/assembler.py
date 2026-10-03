@@ -42,8 +42,9 @@ KINDS = [
     # A block's proposal to add another block -- the system's words, written by the proposing block, never by the person.
     *[DocKind(f"assembler.proposal.{block.lower()}", block, "加一塊的提議", {
         "propose": Field("choice", choices=("GATHER", "MAP", "THINK", "VERIFY", "COMPUTE", "DECIDE", "ACT", "LEARN", "TEACH", "COLLAB", "EXPRESS"), required=True),
-        "why": Field("text", 500, required=True),
+        "why": Field("text", 500, required=True),      # the proposing block's fixed words, never the person's (block_hooks)
         "guardrail": Field("bool"),
+        "source": Field("text", 64),                    # the doc that set it off, by id only
     }, authors=frozenset({"system"}), deletable=False) for block in ("SENSE", "MAP", "DECIDE", "LEARN")],
     # The person's answer to one proposal (你同意才加): its own record, so the proposal's words stay the system's.
     DocKind("assembler.answer", "ASSEMBLER", "你對提議的回答", {

@@ -3,11 +3,13 @@
 Before the model is called, in this order:
 1. the action's permission: always-allowed (organize, ask, point_gaps) or granted in the case's 協作合約 -- a case-less
    call (每天校準…) uses the permission its block's card fixes (``AiAction.outside_case``);
-2. a crisis signal anywhere in the message the model would get stops the AI (the exact text is checked, so what is
-   checked and what is sent cannot drift apart): no model call, a ``govern.stop`` record, help for where they are;
-3. the case's 護欄 are added to the instructions (要求來源, 建議找專業的人);
-4. the places go to the model only when the contract grants ``use_location``.
-Then the call is metered (main._MeteredProvider, the API's one paid-call path) and the answer -- validated by the
+2. the message is built whole: the action's input, the contract's own terms (scope, the parts the person keeps,
+   basis, the hand-back condition) and -- only when the contract grants ``use_location`` -- the places;
+3. a crisis signal anywhere in that message stops the AI (the exact text is checked, so what is checked and what is
+   sent cannot drift apart): no model call, a ``govern.stop`` record, help for where they are;
+4. the case's 護欄 are added to the instructions (要求來源, 建議找專業的人).
+Then the call is metered (main._MeteredProvider, the API's one paid-call path; the object is asked for through
+ai_gateway.structured like every other object answer) and the answer -- validated by the
 action's output kind -- is saved as an AI-authored document. The AI never writes anywhere else.
 
 A block declares its actions in its own module: ``ACTIONS = [AiAction(...)]`` in ai_lego/platform/ai_actions/<block>.py.
@@ -29,6 +31,7 @@ from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import safety
+from ai_lego.platform.ai_gateway.structured import ask_object, parse_object
 
 # Every model call inside the platform starts with these (完整性核心 and the AI rules shared by every card).
 PREAMBLE = (
@@ -117,6 +120,13 @@ def ask_ai(action: AiAction, *, tenant_id: str, identity_id: str, project_id: st
         return docs.current(tenant_id, owner, kind)
 
     user = action.build_input(context, read)
+    agreed = {key: terms[key] for key in ("scope", "human_parts", "basis", "handback") if terms and terms.get(key)}
+    if agreed:
+        user += "\n\n協作合約 (the person's own terms): " + json.dumps(agreed, ensure_ascii=False)
+    told = ("happened_in", "you_are_in", "others_in") if project_id and "use_location" in permitted and intake else ()
+    places = {key: intake[key] for key in told if intake.get(key)}
+    if places:
+        user += "\n\nWhere: " + json.dumps(places, ensure_ascii=False)
     if safety.crisis_signal(user):
         if project_id:
             docs.save(tenant_id, owner, "govern.stop", {"reason": "crisis", "block": action.block}, record_log.system("GOVERN"))
@@ -128,24 +138,20 @@ def ask_ai(action: AiAction, *, tenant_id: str, identity_id: str, project_id: st
         instructions.append("This case has a guardrail: every factual statement names its source (which page or document); with no source, say there is none.")
     if "professional" in guardrails:
         instructions.append("This case has a guardrail: remind the person this can be taken to a professional, and say which parts a professional answers for and which are theirs.")
-    places = ""
-    if project_id and "use_location" in permitted and intake:
-        places = json.dumps({key: intake.get(key) for key in ("happened_in", "you_are_in", "others_in") if intake.get(key)}, ensure_ascii=False)
-    elif project_id:
+    if agreed:
+        instructions.append("The message ends with the person's 協作合約: stay inside its scope, leave the parts they keep for themselves to them, "
+                            "and when its hand-back condition is met, stop and say so instead of going on.")
+    if project_id and not places:
         instructions.append("You were not told where this happens or where the person is: for anything that depends on the place, say you do not know.")
-    if places:
-        user += f"\n\nWhere: {places}"
     system = "\n".join(instructions)
-    completion = provider.complete_json(system, user, max_tokens=action.max_tokens, input_schema=dict(action.output_schema))
+    completion = ask_object(provider, system, user, max_tokens=action.max_tokens, schema=action.output_schema)
     docs.save(tenant_id, owner, "govern.ai_call" if project_id else "govern.ai_call_personal",
               {"block": action.block, "action": action.name, "model": str(getattr(completion, "model", "") or "unknown")[:120],
                "instructions_sha256": hashlib.sha256(system.encode("utf-8")).hexdigest()}, record_log.system("GOVERN"))
     try:
-        answer = json.loads(completion.text)
-    except json.JSONDecodeError as error:
+        answer = parse_object(completion)
+    except InvariantViolation as error:
         raise InvariantViolation("AI_ANSWER_NOT_JSON: the model did not answer with the object asked for") from error
-    if not isinstance(answer, dict):
-        raise InvariantViolation("AI_ANSWER_NOT_JSON: the model did not answer with an object")
     fields = doc_kinds.require(action.output_kind).fields
     answer = action.shape({key: value for key, value in answer.items() if key in fields})   # extra keys the model added are dropped
     try:

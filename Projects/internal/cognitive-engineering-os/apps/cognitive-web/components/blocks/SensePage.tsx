@@ -3,7 +3,6 @@
 // SENSE 外化 (contract card): one thing per card, in your own words; drag cards into groups, link them, line them up
 // in time; name your strongest emotion and how strong it is; the AI only mirrors what you put out, and that version
 // counts only once you confirm or rewrite it. Every card is yours to edit or delete.
-import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
@@ -260,10 +259,6 @@ export function SensePage({ projectId }: { projectId: string }) {
       </div>
 
       {error && <p className="error">{error}</p>}
-      <div className="tabnext">
-        <Link className="btn primary" href={`/projects/${encodeURIComponent(projectId)}/map`}>下一塊：拆解 →</Link>
-        <span className="sub">不想寫了也可以直接往下走；這一塊隨時可以回來。</span>
-      </div>
     </BlockShell>
   );
 }

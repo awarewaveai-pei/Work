@@ -78,6 +78,15 @@ class WebBlockListTests(unittest.TestCase):
         self.assertEqual(sorted(code for code, _, step in rows if int(step) <= BUILD_STEP), sorted(OPEN_BLOCKS))
         self.assertIn(f"export const OPEN_STEP = {BUILD_STEP};", text)
 
+    def test_only_the_shell_says_which_block_is_next(self):
+        """「下一塊」 comes from the case's route (the person's own order + accepted proposals), drawn by BlockShell. A page
+        that writes its own next link contradicts it (2026-10-03: SENSE said 拆解 while the case's next was 共思考)."""
+        from ai_lego import PRODUCT_ROOT
+
+        pages = sorted((PRODUCT_ROOT / "apps" / "cognitive-web" / "components" / "blocks").glob("*Page.tsx"))
+        self.assertTrue(pages)
+        self.assertEqual([page.name for page in pages if "下一塊" in page.read_text(encoding="utf-8")], [])
+
     def test_the_intake_page_offers_the_engines_purposes_and_packages(self):
         import re
         from ai_lego import PRODUCT_ROOT
@@ -106,6 +115,63 @@ class WebBlockListTests(unittest.TestCase):
             self.assertEqual([notice["category"] for notice in notices], ["法律", "金錢"])
             self.assertEqual(len(docs.current("t", owner, "govern.guardrail")), 6)
             self.assertEqual(after_save(docs, "t", owner, intake), [])
+
+
+class AiPathTests(unittest.TestCase):
+    """呼叫 AI 的兩條路共用同一個權限檢查：命令列那條只給內部研究用；它要讀案子，一樣要過權限檢查（今天它只碰測試用的組織，是
+    習慣，不是規定）. The rule: nothing on the command-line path (any module importing ai_execution.gateway) can reach a
+    case store, directly or through what it imports; a command line that needs a case calls ai_gate.ask_ai instead."""
+
+    CASE_STORES = ("ai_lego.data.repositories.project_source_repository", "ai_lego.data.repositories.case_docs", "ai_lego.apps.api")
+
+    def test_the_command_line_ai_path_cannot_reach_a_case(self):
+        import ast
+        from ai_lego import PRODUCT_ROOT
+
+        files = {".".join(path.relative_to(PRODUCT_ROOT).with_suffix("").parts).removesuffix(".__init__"): path
+                 for path in (PRODUCT_ROOT / "ai_lego").rglob("*.py")}
+
+        def imports(module):
+            found = set()
+            for node in ast.walk(ast.parse(files[module].read_text(encoding="utf-8"))):
+                if isinstance(node, ast.Import):
+                    found |= {alias.name for alias in node.names}
+                elif isinstance(node, ast.ImportFrom) and node.module:
+                    found |= {node.module, *(f"{node.module}.{alias.name}" for alias in node.names)}
+            parents = {".".join(name.split(".")[:i]) for name in found for i in range(1, name.count(".") + 1)}   # a.b.c runs a/__init__, a/b/__init__
+            return {name for name in found | parents if name in files}
+
+        def reach(start):
+            seen, todo = set(), [start]
+            while todo:
+                module = todo.pop()
+                if module not in seen:
+                    seen.add(module)
+                    todo += imports(module)
+            return seen
+
+        cli = sorted(module for module in files if "ai_lego.platform.ai_execution.gateway" in imports(module))
+        self.assertIn("ai_lego.modules.research.ai_coding", cli)
+        leaks = {module: sorted(found for found in reach(module) if found.startswith(self.CASE_STORES)) for module in cli}
+        self.assertEqual({module: found for module, found in leaks.items() if found}, {})
+
+
+class ProposalWordsTests(unittest.TestCase):
+    def test_every_proposal_says_fixed_words(self):
+        """A proposal is kept for good, so its ``why`` is a literal or a module CONSTANT in every block's hook -- never
+        text built from what the person wrote (an f-string, a concatenation, a variable): see block_hooks/__init__.py."""
+        import ast
+        from ai_lego import PRODUCT_ROOT
+
+        bad = []
+        for path in sorted((PRODUCT_ROOT / "ai_lego" / "platform" / "block_hooks").glob("*.py")):
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                if isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", None)) == "propose":
+                    why = node.args[5] if len(node.args) > 5 else next((k.value for k in node.keywords if k.arg == "why"), None)
+                    fixed = (isinstance(why, ast.Constant) and isinstance(why.value, str)) or (isinstance(why, ast.Name) and why.id.isupper())
+                    if not fixed:
+                        bad.append(f"{path.name}:{node.lineno}")
+        self.assertEqual(bad, [])
 
 
 class SafetyTests(unittest.TestCase):
@@ -205,6 +271,21 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         self.assertEqual(self.client.post(f"{self.base}/ai/SENSE/mirror", json={"context": {}}).json().get("stopped"), "crisis")
         self.assertEqual(self.provider.calls, [])
 
+    def test_the_contracts_own_terms_reach_the_model_and_are_checked_too(self):
+        """worker 乙 2026-10-03: only the permissions reached the model; scope, the parts the person keeps and the
+        hand-back condition never did. They are the person's words, so they go through the crisis check like the rest."""
+        self._card()
+        terms = {"scope": "釐清", "human_parts": "要不要續約由我決定", "handback": "我說停就停", "permissions": []}
+        contract = self.client.post(f"{self.base}/docs/collab_contract.terms", json={"content": terms}).json()
+        self.client.post(f"{self.base}/ai/SENSE/mirror", json={"context": {}})
+        system, user = self.provider.calls[-1]
+        self.assertIn("要不要續約由我決定", user)
+        self.assertIn("我說停就停", user)
+        self.assertIn("hand-back condition", system)
+        self.client.put(f"{self.base}/docs/collab_contract.terms/{contract['doc_id']}", json={"content": {**terms, "handback": "我不想活了就停"}, "base_version": 1})
+        self.assertEqual(self.client.post(f"{self.base}/ai/SENSE/mirror", json={"context": {}}).json().get("stopped"), "crisis")
+        self.assertEqual(len(self.provider.calls), 1)
+
     def test_one_contract_one_intake_one_state_per_case(self):
         self.assertEqual(self.client.post(f"{self.base}/docs/collab_contract.terms", json={"content": {"permissions": []}}).status_code, 200)
         second = self.client.post(f"{self.base}/docs/collab_contract.terms", json={"content": {"permissions": ["counter"]}})
@@ -220,6 +301,61 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         self.assertEqual(self.client.get(f"{self.base}/proposals").json(), [])
         stored = self.client.get(f"{self.base}/docs/{proposal['kind']}").json()[0]
         self.assertEqual(stored["author"], "system")
+
+    def test_the_route_is_my_order_plus_what_i_accepted_and_shows_what_i_did(self):
+        self.assertEqual(self.client.get(f"{self.base}/route").json(), {"purpose": None, "package": None, "blocks": [], "done": []})
+        gone = self._card()
+        self.assertEqual(self.client.delete(f"{self.base}/docs/sense.card/{gone['doc_id']}").status_code, 200)
+        self.assertEqual(self.client.get(f"{self.base}/route").json()["done"], [])   # a tombstone is not 做過
+        intake = {"purpose": "自我理解", "question": "要不要續約", "package": "自我理解", "blocks": ["SENSE", "THINK", "MAP"]}   # reordered, two skipped
+        self.assertEqual(self.client.post(f"{self.base}/docs/assembler.intake", json={"content": intake}).status_code, 200)
+        verify = self._card("聽說他們也找了律師")["notices"][0]
+        answer = lambda proposal, value: self.client.post(f"{self.base}/docs/assembler.answer", json={"content": {"proposal": proposal, "answer": value}})
+        self.assertEqual(answer(verify["doc_id"], "accepted").status_code, 400)   # VERIFY is not built: 不能加
+        self.assertEqual(answer("no-such-proposal", "declined").status_code, 404)
+        self.assertEqual(answer(verify["doc_id"], "declined").status_code, 200)
+        self.assertEqual(answer(verify["doc_id"], "declined").status_code, 409)   # one answer per proposal; change that one
+        self.assertEqual(self._card("聽說同業都這樣改")["notices"], [])   # 不用 = not asked again in this case
+        repo = api_main.app.dependency_overrides[api_main.get_project_source_repository]()
+        from ai_lego.data.repositories.case_docs import CaseDocs
+        from ai_lego.platform.block_hooks import propose
+        ask = lambda by: propose(CaseDocs(repo), self.tenant["tenant_id"], record_log.case(self.pid), by, "DECIDE", "要比較幾個選項時，可以加判斷。")
+        decide = ask("MAP")[0]
+        self.assertEqual(ask("SENSE"), [])   # one standing proposal per block, whoever found it
+        self.assertEqual(answer(decide["doc_id"], "accepted").status_code, 200)
+        self.assertEqual(ask("MAP"), [])   # DECIDE is in the case now: never proposed again
+        route = self.client.get(f"{self.base}/route").json()
+        self.assertEqual([item["code"] for item in route["blocks"]], ["SENSE", "THINK", "MAP", "DECIDE"])
+        self.assertEqual(route["blocks"][0]["why"], {"from": "package", "package": "自我理解"})
+        self.assertEqual(route["blocks"][3]["why"], {"from": "proposal", "by": "MAP", "text": "要比較幾個選項時，可以加判斷。"})
+        self.assertEqual([(item["open"], item["done"]) for item in route["blocks"]], [(True, True), (True, False), (True, False), (True, False)])
+        self.assertEqual(route["done"], ["SENSE"])
+
+    def test_only_made_things_mark_a_slot_and_stored_answers_for_unbuilt_blocks_stay_out(self):
+        """critic 2026-10-03 m5: a failed request marked its block 做過; M1: the route took a block not built yet."""
+        repo = api_main.app.dependency_overrides[api_main.get_project_source_repository]()
+        tenant, case = self.tenant["tenant_id"], record_log.case(self.pid)
+        me = self.identity["identity_id"]
+        repo.append_event(tenant, self.pid, "InterpretationRequested", {"interpretation_id": "I-1"}, record_log.user(me, "MAP"))
+        self.assertEqual(self.client.get(f"{self.base}/route").json()["done"], [])   # asked, nothing made yet
+        repo.append_event(tenant, self.pid, "InterpretationCreated", {"interpretation_id": "I-1"}, record_log.ai("MAP"))
+        self.assertEqual(self.client.get(f"{self.base}/route").json()["done"], ["MAP"])
+        from ai_lego.data.repositories.case_docs import CaseDocs
+        self.client.post(f"{self.base}/docs/assembler.intake", json={"content": {"purpose": "自我理解", "question": "q", "package": "自我理解", "blocks": ["SENSE"]}})
+        verify = self._card("聽說要漲價")["notices"][0]
+        CaseDocs(repo).save(tenant, case, "assembler.answer", {"proposal": verify["doc_id"], "answer": "accepted"}, record_log.user(me, "ASSEMBLER"))   # past the check
+        self.assertEqual([item["code"] for item in self.client.get(f"{self.base}/route").json()["blocks"]], ["SENSE"])
+
+    def test_a_proposal_keeps_none_of_my_words(self):
+        """critic 2026-10-03 M2: SENSE quoted the card into the proposal, which is never deleted -- the quote outlived the
+        card. A proposal says the block's own words and points at the card by id."""
+        card = self._card("聽說王小明要告我們")
+        proposal = card["notices"][0]
+        self.assertNotIn("王小明", proposal["why"])
+        stored = self.client.get(f"{self.base}/docs/{proposal['kind']}").json()[0]
+        self.assertEqual(stored["content"]["source"], card["doc_id"])
+        self.client.delete(f"{self.base}/docs/sense.card/{card['doc_id']}")
+        self.assertNotIn("王小明", json.dumps(self.client.get(f"{self.base}/proposals").json(), ensure_ascii=False))
 
     def test_the_mirror_marks_only_the_seven_signals_with_the_cards_own_questions(self):
         self.provider.answer = {"summary": "s", "gaps": ["a", "b", "c", "d"], "explore": [{"signal": "x", "question": "你是不是童年創傷？"}, {"signal": "身份", "question": "自己編的問題"}]}
@@ -241,6 +377,7 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "colleague@example.com", "password": "correct-horse-battery"})
         self.assertEqual(self.client.get(f"{self.base}/docs/sense.card").status_code, 404)
         self.assertEqual(self.client.post(f"{self.base}/ai/SENSE/mirror", json={"context": {}}).status_code, 404)
+        self.assertEqual(self.client.get(f"{self.base}/route").status_code, 404)
 
     def test_the_ai_cannot_post_as_itself_and_unknown_kinds_are_404(self):
         self.assertEqual(self.client.get(f"{self.base}/docs/nope.kind").status_code, 404)

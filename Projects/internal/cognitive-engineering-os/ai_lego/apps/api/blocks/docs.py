@@ -26,7 +26,7 @@ from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import safety
-from ai_lego.platform.block_hooks import after_save
+from ai_lego.platform.block_hooks import after_save, before_save
 
 router = APIRouter()
 
@@ -48,7 +48,7 @@ def _kind(kind: str, owner_kind: str) -> doc_kinds.DocKind:
 
 def _status(error: InvariantViolation) -> int:
     text = str(error)
-    return 404 if "NOT_FOUND" in text else 409 if "STALE" in text or "SINGLETON" in text else 403 if text.startswith("RECORD_") else 400
+    return 404 if "NOT_FOUND" in text else 409 if "STALE" in text or "SINGLETON" in text or "ALREADY" in text else 403 if text.startswith("RECORD_") else 400
 
 
 def _call(fn, *args, **kwargs):
@@ -66,6 +66,14 @@ def _where(docs: CaseDocs, tenant_id: str, identity_id: str, owner: record_log.O
             return intake[-1]["content"]["you_are_in"]
     location = docs.current(tenant_id, record_log.person(identity_id), "govern.location")
     return location[-1]["content"]["where"] if location else None
+
+
+def _save(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_log.Owner, spec: doc_kinds.DocKind, body: "DocBody", doc_id: str | None = None) -> dict[str, Any]:
+    """Every person's save: the kind's own checks (block_hooks BEFORE_SAVE), the save, then notices."""
+    docs = CaseDocs(repo)
+    _call(before_save, docs, session["tenant_id"], owner, spec.kind, body.content, doc_id)
+    saved = _call(docs.save, session["tenant_id"], owner, spec.kind, body.content, api._me(session, spec.block), doc_id=doc_id, base_version=body.base_version if doc_id else None)
+    return _saved(repo, session, owner, saved)
 
 
 def _saved(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_log.Owner, doc: dict[str, Any]) -> dict[str, Any]:
@@ -91,16 +99,12 @@ def list_case_docs(project_id: str, kind: str, session: dict[str, Any] = Depends
 
 @router.post("/projects/{project_id}/docs/{kind}")
 def create_case_doc(project_id: str, kind: str, body: DocBody, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
-    owner = case_owner(project_id, session, repo)
-    spec = _kind(kind, "case")
-    return _saved(repo, session, owner, _call(CaseDocs(repo).save, session["tenant_id"], owner, kind, body.content, api._me(session, spec.block)))
+    return _save(repo, session, case_owner(project_id, session, repo), _kind(kind, "case"), body)
 
 
 @router.put("/projects/{project_id}/docs/{kind}/{doc_id}")
 def update_case_doc(project_id: str, kind: str, doc_id: str, body: DocBody, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
-    owner = case_owner(project_id, session, repo)
-    spec = _kind(kind, "case")
-    return _saved(repo, session, owner, _call(CaseDocs(repo).save, session["tenant_id"], owner, kind, body.content, api._me(session, spec.block), doc_id=doc_id, base_version=body.base_version))
+    return _save(repo, session, case_owner(project_id, session, repo), _kind(kind, "case"), body, doc_id)
 
 
 @router.delete("/projects/{project_id}/docs/{kind}/{doc_id}")
@@ -126,16 +130,12 @@ def list_my_docs(kind: str, session: dict[str, Any] = Depends(api.require_sessio
 
 @router.post("/me/docs/{kind}")
 def create_my_doc(kind: str, body: DocBody, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
-    spec = _kind(kind, "person")
-    owner = record_log.person(session["identity_id"])
-    return _saved(repo, session, owner, _call(CaseDocs(repo).save, session["tenant_id"], owner, kind, body.content, api._me(session, spec.block)))
+    return _save(repo, session, record_log.person(session["identity_id"]), _kind(kind, "person"), body)
 
 
 @router.put("/me/docs/{kind}/{doc_id}")
 def update_my_doc(kind: str, doc_id: str, body: DocBody, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
-    spec = _kind(kind, "person")
-    owner = record_log.person(session["identity_id"])
-    return _saved(repo, session, owner, _call(CaseDocs(repo).save, session["tenant_id"], owner, kind, body.content, api._me(session, spec.block), doc_id=doc_id, base_version=body.base_version))
+    return _save(repo, session, record_log.person(session["identity_id"]), _kind(kind, "person"), body, doc_id)
 
 
 @router.delete("/me/docs/{kind}/{doc_id}")

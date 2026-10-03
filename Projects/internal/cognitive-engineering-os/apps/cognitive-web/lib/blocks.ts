@@ -48,6 +48,12 @@ export const docs = {
   versions: <C,>(projectId: string | null, kind: string, docId: string) => apiFetch<Doc<C>[]>(`${base(projectId)}/docs/${enc(kind)}/${enc(docId)}/versions`),
 };
 
+// The case's route (ai_lego/platform/block_hooks/assembler.py case_route): the blocks in the order the person left them,
+// then the ones a proposal added that they accepted; `done` = the slots with something written (做過).
+export type RouteStop = { code: BlockCode; why: { from: "package"; package: string | null } | { from: "proposal"; by: string; text: string }; open: boolean; done: boolean };
+export type Route = { purpose: string | null; package: string | null; blocks: RouteStop[]; done: BlockCode[] };
+export const route = (projectId: string) => apiFetch<Route>(`/projects/${enc(projectId)}/route`);
+
 export type AiTurn<C = Record<string, any>> = { saved?: Doc<C>; stopped?: "crisis"; notice?: string; resources?: Array<{ name: string; contact: string }> };
 // ``over``: the AI's earlier version of a one-per-case document (再整理一次 = its next version, not a second document).
 export const ai = <C,>(projectId: string | null, block: BlockCode, action: string, context: Record<string, unknown> = {}, over?: Doc<C> | null) =>

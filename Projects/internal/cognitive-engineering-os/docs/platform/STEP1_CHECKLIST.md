@@ -7,11 +7,16 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 - a case is read only by its creator (`main._owned_project`), custom workflows only by their maker
 - documents (`doc_kinds`, `case_docs`, `/docs` routes), AI gate (`ai_gate`, `/ai` routes), hooks, proposals route
 - basic crisis stop + TW/international help (`platform/safety`) — 丁 extends
-- NOT YET (S): 「呼叫 AI 的兩條路共用同一個權限檢查」 the CLI path (`ai_execution/gateway.py`) does not go through `ai_gate`
+- built (S): 「呼叫 AI 的兩條路共用同一個權限檢查…命令列那條…要讀案子，一樣要過權限檢查」 — nothing on the command-line path (importers of `ai_execution/gateway.py`) can reach a case store, checked over the whole import graph (`test_block_foundation.AiPathTests`); a command line that needs a case calls `ai_gate.ask_ai`
+- NOT YET (S, second wave): the existing tool runs (`main.py` analyses / recipe runs) call the model on a case without the case's 協作合約 check; they move onto `ai_gate` together with 「你先寫，AI 才回」
 - built (S): 開案 page (`/projects/{id}/start`): purpose (7, unopened ones show their step), package, reorder/skip, places; high-risk words in the risk add GOVERN's guardrails; proposals stay until answered (`assembler.answer`)
-- NOT YET (S): 「現在在哪一塊、為什麼、下一塊」 on every block page; an accepted proposal shown in the case's block list
-- OPEN (S, critic 2026-10-03 M1): project name UNIQUE(tenant, workspace, name) tells a colleague that a case with that name exists -> rebuild with the owner in the key
-- OPEN (S, critic 2026-10-03 M2): recipe-run journals are tenant-scoped (`main.workflow_journal_path`): another person can read a run on my case by run_id; erasing a case leaves its run journals/artifacts -> owner-scoped journal dir + per-run project/artifact sidecar, erase deletes them
+- built (S): 「現在在哪一塊、為什麼在這一塊、下一塊做什麼」 on every block page (`BlockShell` Where/GoOn from GET `/projects/{id}/route`: the intake's order, then accepted proposals); 「你看得到哪幾格做過」 (✓ on the 14 slots); a block already in the case is never proposed again, one standing proposal per block; only the shell links 下一塊 (test_only_the_shell_says_which_block_is_next)
+- built (S): 「你同意才加…還沒蓋好…不能加」 on the server: an answer names a proposal of this case, one answer per proposal, 加 only a built block (`block_hooks.BEFORE_SAVE`); 不用 = not proposed again in the case; a proposal's words are the block's own fixed words, the triggering doc by id only (ProposalWordsTests) -- a quote would outlive a deleted card
+- built (S): 做過 = event types marked `done` in record_log (a result, a document, a task; never a request, a failure or a tombstone)
+- built (S): the AI gate sends the contract's scope / human_parts / basis / handback with every turn and crisis-checks them with the rest; object answers go through `ai_gateway.structured` like every other
+- KNOWN LIMIT (S, critic m4): two saves at the same moment can each record a proposal for the same block (check and insert are not one transaction); the person answers both, nothing is lost
+- fixed (S, critic M1, 3f26fc502): project name key is (tenant, workspace, creator, name)
+- fixed (S, critic M2, 3f26fc502): recipe-run journals live in the runner's folder; erasing a case erases its runs and artifacts
 - KNOWN LIMIT: next-admin opens cases as one service identity, so its operators share ownership (critic m6)
 - GOVERN 丁: account deletion must also erase person-owned rows (`govern.location`, `/me/docs`) and `CustomWorkflowRepository.delete_person`
 

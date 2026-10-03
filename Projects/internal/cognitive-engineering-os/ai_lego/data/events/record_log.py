@@ -42,53 +42,54 @@ class EventType:
     authors: frozenset[str]
     blocks: frozenset[str]
     owners: frozenset[str]
+    done: bool   # something made in its block (一格「做過」): a result, a document, a task. A request, a failure or a status change is not.
 
 
-def _t(version: str, authors: str, blocks: str | frozenset[str], owners: str = "case") -> EventType:
-    return EventType(version, frozenset(authors.split()), frozenset(blocks.split()) if isinstance(blocks, str) else blocks, frozenset(owners.split()))
+def _t(version: str, authors: str, blocks: str | frozenset[str], owners: str = "case", *, done: bool) -> EventType:
+    return EventType(version, frozenset(authors.split()), frozenset(blocks.split()) if isinstance(blocks, str) else blocks, frozenset(owners.split()), done)
 
 
 EVENT_TYPES: dict[str, EventType] = {
     # 開案資料 (組裝器)
-    "ProjectCreated": _t("1.0.0", "user", "ASSEMBLER"),
-    "ProjectRenamed": _t("1.0.0", "user", "ASSEMBLER"),
+    "ProjectCreated": _t("1.0.0", "user", "ASSEMBLER", done=False),
+    "ProjectRenamed": _t("1.0.0", "user", "ASSEMBLER", done=False),
     # Sources and collection (GATHER): typed in by the person, or fetched by the collector
-    "SourceAdded": _t("1.0.0", "user system", "GATHER"),
-    "SourceSuperseded": _t("1.0.0", "system", "GATHER"),
-    "CollectionRequested": _t("1.0.0", "user", "GATHER"),
-    "CollectionStarted": _t("1.0.0", "system", "GATHER"),
-    "CollectionCompleted": _t("1.0.0", "system", "GATHER"),
-    "CollectionFailed": _t("1.0.0", "system", "GATHER"),
+    "SourceAdded": _t("1.0.0", "user system", "GATHER", done=True),
+    "SourceSuperseded": _t("1.0.0", "system", "GATHER", done=False),
+    "CollectionRequested": _t("1.0.0", "user", "GATHER", done=False),
+    "CollectionStarted": _t("1.0.0", "system", "GATHER", done=False),
+    "CollectionCompleted": _t("1.0.0", "system", "GATHER", done=False),
+    "CollectionFailed": _t("1.0.0", "system", "GATHER", done=False),
     # A tool's analysis: the block is the tool's (its contract family)
-    "InterpretationRequested": _t("1.0.0", "user", _TOOL_BLOCKS),
-    "InterpretationCreated": _t("1.0.0", "ai", _TOOL_BLOCKS),
-    "InterpretationFailed": _t("1.0.0", "system", _TOOL_BLOCKS),
-    "InterpretationJudged": _t("1.0.0", "user", _TOOL_BLOCKS),
-    "InterpretationApproved": _t("1.0.0", "user", _TOOL_BLOCKS),
-    "InterpretationReturned": _t("1.0.0", "user", _TOOL_BLOCKS),
+    "InterpretationRequested": _t("1.0.0", "user", _TOOL_BLOCKS, done=False),
+    "InterpretationCreated": _t("1.0.0", "ai", _TOOL_BLOCKS, done=True),
+    "InterpretationFailed": _t("1.0.0", "system", _TOOL_BLOCKS, done=False),
+    "InterpretationJudged": _t("1.0.0", "user", _TOOL_BLOCKS, done=True),
+    "InterpretationApproved": _t("1.0.0", "user", _TOOL_BLOCKS, done=False),
+    "InterpretationReturned": _t("1.0.0", "user", _TOOL_BLOCKS, done=False),
     # Tasks, notes, rerun reminders (ACT). A task saved from an AI-drafted plan is ai (unchanged) or joint (edited).
-    "TaskCreated": _t("1.0.0", "user ai joint", "ACT"),
-    "TaskDone": _t("1.0.0", "user", "ACT"),
-    "TaskUpdated": _t("1.0.0", "user", "ACT"),
-    "TaskNoted": _t("1.0.0", "user", "ACT"),
-    "RerunScheduled": _t("1.0.0", "user", "ACT"),
-    "RerunFulfilled": _t("1.0.0", "system", "ACT"),
+    "TaskCreated": _t("1.0.0", "user ai joint", "ACT", done=True),
+    "TaskDone": _t("1.0.0", "user", "ACT", done=True),
+    "TaskUpdated": _t("1.0.0", "user", "ACT", done=False),
+    "TaskNoted": _t("1.0.0", "user", "ACT", done=True),
+    "RerunScheduled": _t("1.0.0", "user", "ACT", done=False),
+    "RerunFulfilled": _t("1.0.0", "system", "ACT", done=False),
     # Research synthesis and reports (彙整與引註閘 -> VERIFY)
-    "SynthesisRequested": _t("1.0.0", "user", "VERIFY"),
-    "SynthesisCreated": _t("1.0.0", "ai", "VERIFY"),
-    "SynthesisFailed": _t("1.0.0", "system", "VERIFY"),
-    "ReportCreated": _t("1.0.0", "system", "VERIFY"),
-    "ReportApproved": _t("1.0.0", "user", "VERIFY"),
-    "ReportRejected": _t("1.0.0", "user", "VERIFY"),
+    "SynthesisRequested": _t("1.0.0", "user", "VERIFY", done=False),
+    "SynthesisCreated": _t("1.0.0", "ai", "VERIFY", done=True),
+    "SynthesisFailed": _t("1.0.0", "system", "VERIFY", done=False),
+    "ReportCreated": _t("1.0.0", "system", "VERIFY", done=False),
+    "ReportApproved": _t("1.0.0", "user", "VERIFY", done=False),
+    "ReportRejected": _t("1.0.0", "user", "VERIFY", done=False),
     # GOVERN: the tombstone outlives the case it records
-    "ProjectErased": _t("1.0.0", "user", "GOVERN", "platform"),
+    "ProjectErased": _t("1.0.0", "user", "GOVERN", "platform", done=False),
     # A person's own assembled tool chains (自訂工作流)
-    "CustomWorkflowCreated": _t("1.0.0", "user", "ASSEMBLER", "person"),
-    "CustomWorkflowUpdated": _t("1.0.0", "user", "ASSEMBLER", "person"),
-    "CustomWorkflowDeleted": _t("1.0.0", "user", "ASSEMBLER", "person"),
+    "CustomWorkflowCreated": _t("1.0.0", "user", "ASSEMBLER", "person", done=False),
+    "CustomWorkflowUpdated": _t("1.0.0", "user", "ASSEMBLER", "person", done=False),
+    "CustomWorkflowDeleted": _t("1.0.0", "user", "ASSEMBLER", "person", done=False),
     # A block's documents (core/domain/doc_kinds.py): the kind narrows author, block and owner further, per record
-    "DocSaved": _t("1.0.0", "user ai joint system", frozenset(ALL_CODES), "case person"),
-    "DocDeleted": _t("1.0.0", "user", frozenset(ALL_CODES), "case person"),
+    "DocSaved": _t("1.0.0", "user ai joint system", frozenset(ALL_CODES), "case person", done=True),
+    "DocDeleted": _t("1.0.0", "user", frozenset(ALL_CODES), "case person", done=False),
 }
 DOC_EVENTS = ("DocSaved", "DocDeleted")
 

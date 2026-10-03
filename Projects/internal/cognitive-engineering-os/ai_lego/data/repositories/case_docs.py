@@ -108,6 +108,19 @@ class CaseDocs:
                 latest[item["doc_id"]] = {**item, "created_at": first}
         return list(latest.values())
 
+    def blocks_used(self, tenant_id: str, owner: Owner) -> set[str]:
+        """The blocks something was made in by the person or the AI (你看得到哪幾格做過): event types marked ``done`` in
+        record_log (a result, a document, a task -- never a request, a failure or a tombstone; deleting every card
+        empties the slot). Reads the envelope's block only, never a payload (組裝器不讀各塊的其他內容)."""
+        done = sorted(name for name, spec in record_log.EVENT_TYPES.items() if spec.done)
+        with self._repo.connection() as connection:
+            rows = connection.execute(
+                f"SELECT DISTINCT block FROM events WHERE tenant_id=? AND owner_kind=? AND owner_id=? AND author IN ('user','ai','joint') "
+                f"AND block IS NOT NULL AND event_type IN ({','.join('?' * len(done))})",
+                (tenant_id, owner.kind, owner.id, *done),
+            ).fetchall()
+        return {row["block"] for row in rows}
+
     def versions(self, tenant_id: str, owner: Owner, kind: str, doc_id: str) -> list[dict[str, Any]]:
         """Every version of one document, oldest first (舊版不刪)."""
         with self._repo.connection() as connection:

@@ -428,6 +428,37 @@ for (const [w, h, all] of [[1536, 660, true], [1280, 660, true], [1100, 660, fal
   rule(`${w}x${h}`, 'one.needs_scroll', bad);
   await ctx.close();
 }
+// The engine copies two tables from this page: the packages (kinds/assembler.py PACKAGES) and the block of each tool
+// family (core/domain/blocks.py FAMILY_BLOCK). Both must equal the page; a family whose every file is a lens
+// (stakeholder.*, not counted as a tool above) may be mapped by the engine without a row here.
+{
+  const engine = path.join(root, 'Projects/internal/cognitive-engineering-os/ai_lego');
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto(pathToFileURL(wrappedPath).href);
+  const { pk, rows } = await page.evaluate(() => ({ pk: PK.map(([name, , blocks]) => [name, blocks]), rows: TOOL_ROWS.map((r) => [r[0][0], (r[3] || []).flatMap((g) => g[1])]) }));
+  await ctx.close();
+  const pyDict = (file, name) => { const src = readFileSync(path.join(engine, file), 'utf8'); const at = src.indexOf('\n' + name + ' = {'); return at < 0 ? '' : src.slice(at).split('\n}')[0]; };
+  const enginePk = Object.fromEntries([...pyDict('core/domain/kinds/assembler.py', 'PACKAGES').matchAll(/"([^"]+)":\s*\(([^)]*)\)/g)].map(([, k, v]) => [k, [...v.matchAll(/"([A-Z]+)"/g)].map((m) => m[1])]));
+  const pagePk = Object.fromEntries(pk.map(([name, blocks]) => [name.replace(/（我們加的）$/, ''), blocks]));
+  const pkBad = [];
+  if (!Object.keys(enginePk).length) pkBad.push('PACKAGES not found in the engine');
+  for (const k of new Set([...Object.keys(pagePk), ...Object.keys(enginePk)])) if ((pagePk[k] || []).join() !== (enginePk[k] || []).join()) pkBad.push(`${k}: page ${(pagePk[k] || []).join('>')} engine ${(enginePk[k] || []).join('>')}`);
+  rule('engine', 'packages_vs_engine', pkBad);
+  const CODE = { '規範與脈絡': 'CONTEXT', '不給一般使用者': 'INTERNAL' };
+  const pageFam = {};
+  for (const [code, fams] of rows) for (const f of fams) pageFam[f] = CODE[code] || code;
+  const engineFam = Object.fromEntries([...pyDict('core/domain/blocks.py', 'FAMILY_BLOCK').matchAll(/"(\w+)":\s*(?:"(\w+)"|(INTERNAL))/g)].map(([, f, c, i]) => [f, c || i]));
+  const familyOf = (f) => (readFileSync(path.join(methods, 'methods/contracts', f), 'utf8').match(/^family:\s*(\S+)/m) || [])[1];
+  const lens = new Set(contractFiles.filter((f) => f.startsWith('stakeholder.')).map(familyOf));
+  const famBad = [];
+  if (!Object.keys(engineFam).length) famBad.push('FAMILY_BLOCK not found in the engine');
+  for (const f of new Set([...Object.keys(pageFam), ...Object.keys(engineFam)])) {
+    if (!(f in pageFam) && lens.has(f) && !(f in repo.families)) continue;
+    if (pageFam[f] !== engineFam[f]) famBad.push(`${f}: page ${pageFam[f] || '-'} engine ${engineFam[f] || '-'}`);
+  }
+  rule('engine', 'tool_blocks_vs_engine', famBad);
+}
 await browser.close();
 // Every tool and workflow is named on the page from a block generated out of the repo; it must be current.
 rule('repo', 'tools_block_out_of_date', pageBlock(readFileSync(pageFile, 'utf8')) === buildBlock(root) ? '' : 'run gen-tools-data.mjs --write');
