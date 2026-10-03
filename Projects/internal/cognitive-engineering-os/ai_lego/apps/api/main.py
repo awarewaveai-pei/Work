@@ -52,7 +52,7 @@ import sys
 import uuid
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Iterable, Literal
 from urllib.parse import urlparse
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Response
@@ -246,7 +246,9 @@ def _run_journal(session: dict[str, Any], run_id: str) -> Path:
 
 
 def _run_case_path(journal: Path) -> Path:
-    """Beside a run on a case: which case, and every artifact the run stored -- so erasing the case erases the run."""
+    """Beside every run of the runner's own folder: which case (none for a run on no case) and every artifact the run stored,
+    written by the server when the artifact is stored -- so erasing the case or the account erases the run, whether or not the
+    journal is encrypted."""
     return journal.with_name(journal.name.replace(".journal.json", ".case.json"))
 
 
@@ -261,21 +263,61 @@ def _record_run_artifact(case_file: Path, output: Any) -> Any:
     return output
 
 
-def _erase_case_runs(tenant_id: str, identity_id: str, project_id: str, artifact_store: JsonArtifactStore) -> int:
-    """Every recipe run the person ran on this case: its artifacts, journal, lock and case file. Refuses while one runs."""
+_CAS_PATH = re.compile(r"/objects/[A-Za-z0-9_-]{1,128}/sha256/[0-9a-f]{2}/[0-9a-f]{2}/[0-9a-f]{64}")
+
+
+def artifact_reference_ok(reference: Any) -> bool:
+    """A reference as ``JsonArtifactStore.put`` makes it. A reference read out of a file is a claim: only one of this shape is
+    handed to the store (a path with a null byte or a drive letter never reaches the filesystem)."""
+    return (isinstance(reference, dict) and isinstance(reference.get("cas_path"), dict) and isinstance(reference["cas_path"].get("path"), str)
+            and _CAS_PATH.fullmatch(reference["cas_path"]["path"]) is not None
+            and isinstance(reference.get("content_sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", reference["content_sha256"]) is not None)
+
+
+def delete_artifacts(tenant_id: str, artifact_store: JsonArtifactStore, references: Iterable[Any], failed: list[dict[str, str]] | None = None) -> int:
+    """Delete what each reference names; returns how many went. A reference that cannot be deleted -- malformed, another
+    tenant's, a blob that no longer matches its hash -- is added to ``failed`` and skipped, never raised: erasing is the
+    person's right and a retry cannot mend a corrupt reference. (A filesystem error is not that: it raises and a retry finishes.)"""
+    deleted = 0
+    for reference in references:
+        try:
+            if not artifact_reference_ok(reference):
+                raise InvariantViolation("ARTIFACT_REFERENCE_MALFORMED")
+            if artifact_store.delete_if_present(tenant_id, reference):
+                deleted += 1
+        except InvariantViolation as error:
+            if failed is not None:
+                failed.append({"artifact_type": str(reference.get("artifact_type"))[:80] if isinstance(reference, dict) else "?", "error": str(error)[:80]})
+    return deleted
+
+
+def _case_run_files(tenant_id: str, identity_id: str, project_id: str) -> list[tuple[Path, Path]]:
+    """(sidecar, journal) of every run the person ran on this case."""
     folder = workflow_journal_path(tenant_id, "x", identity_id).parent
-    runs = [path for path in folder.glob("*.case.json") if read_json(path).get("project_id") == project_id] if folder.is_dir() else []
-    journals = [path.with_name(path.name.replace(".case.json", ".journal.json")) for path in runs]
-    if any(run_lock_state(lock_path_for(journal)) == "held" for journal in journals):
+    sidecars = [path for path in folder.glob("*.case.json") if read_json(path).get("project_id") == project_id] if folder.is_dir() else []
+    return [(path, path.with_name(path.name.replace(".case.json", ".journal.json"))) for path in sidecars]
+
+
+def case_blocker(repo: ProjectSourceRepository, tenant_id: str, identity_id: str, project_id: str) -> str | None:
+    """Why this case cannot be erased right now, in words, or None: an analysis or a synthesis is writing into it (the account deletion
+    asks every case before it deletes anything; a run still going is asked of the runner's whole run folder, one place)."""
+    if any(item["status"] == "PENDING" for item in _analyses(repo, tenant_id, project_id).get(project_id, [])):
+        return "an analysis is still running"
+    if run_lock_state(_synthesis_lock_path(tenant_id, project_id)) == "held":
+        return "a synthesis is still running"
+    return None
+
+
+def _erase_case_runs(tenant_id: str, identity_id: str, project_id: str, artifact_store: JsonArtifactStore, failed: list[dict[str, str]] | None = None) -> int:
+    """Every recipe run the person ran on this case: its artifacts, journal, lock and case file. Refuses while one runs."""
+    runs = _case_run_files(tenant_id, identity_id, project_id)
+    if any(run_lock_state(lock_path_for(journal)) == "held" for _, journal in runs):
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a workflow run on this case is still running; wait for it to finish, then delete")
-    removed = 0
-    for case_file, journal in zip(runs, journals):
-        for reference in read_json(case_file).get("artifacts", []):
-            artifact_store.delete_if_present(tenant_id, reference)
+    for case_file, journal in runs:
+        delete_artifacts(tenant_id, artifact_store, read_json(case_file).get("artifacts", []), failed)
         for path in (journal, lock_path_for(journal), case_file):
             path.unlink(missing_ok=True)
-        removed += 1
-    return removed
+    return len(runs)
 
 
 def workflow_journal_ref(tenant_id: str, run_id: str) -> str:
@@ -992,7 +1034,7 @@ def run_recipe(
         method_handlers, gate_runners = build_method_components(nodes, validator="api.recipe")
     except MethodDispatchError as error:
         raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
-    if isinstance(project_id, str) and journal == workflow_journal_path(session["tenant_id"], run_id, session["identity_id"]):
+    if journal == workflow_journal_path(session["tenant_id"], run_id, session["identity_id"]):
         case_file = _run_case_path(journal)
         if not case_file.exists():
             case_file.parent.mkdir(parents=True, exist_ok=True)
@@ -2713,22 +2755,28 @@ def erase_project(
     if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
     _project_or_404(repo, session, project_id)
+    return erase_case(store, repo, source_cas, artifact_store, tenant_id, session["identity_id"], project_id)
+
+
+def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore,
+               tenant_id: str, identity_id: str, project_id: str) -> dict[str, Any]:
+    """The case erasure itself, for a case the caller has already shown is the person's. No entitlement gate: it is also what
+    the account deletion calls, and deleting what is yours is a right a suspended tenant does not take away. What cannot be
+    deleted (a corrupt artifact reference) comes back in ``failed`` and does not stop the erasure."""
     if any(item["status"] == "PENDING" for item in _analyses(repo, tenant_id, project_id).get(project_id, [])):
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: an analysis is still running; wait for it to finish, then delete")
     synthesis_lock = acquire_run_lock(_synthesis_lock_path(tenant_id, project_id), tag="erase")
     if synthesis_lock is None:   # a synthesis is writing into this case; held for the whole erase so none can start
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a synthesis is still running; wait for it to finish, then delete")
+    failed: list[dict[str, str]] = []
     try:
-        _erase_case_runs(tenant_id, session["identity_id"], project_id, artifact_store)
+        _erase_case_runs(tenant_id, identity_id, project_id, artifact_store, failed)
         store.close_collect_grants_for_project(tenant_id, project_id)
-        artifacts = 0
-        for reference in repo.project_artifact_references(tenant_id, project_id):
-            if artifact_store.delete_if_present(tenant_id, reference):
-                artifacts += 1
-        erased = repo.erase_project(tenant_id, project_id, session["identity_id"], source_cas, artifacts)
+        artifacts = delete_artifacts(tenant_id, artifact_store, repo.project_artifact_references(tenant_id, project_id), failed)
+        erased = repo.erase_project(tenant_id, project_id, identity_id, source_cas, artifacts)
     finally:
         synthesis_lock.release()
-    return {"project_id": project_id, "erased": erased}
+    return {"project_id": project_id, "erased": erased, **({"failed": failed} if failed else {})}
 
 
 @app.post("/projects/{project_id}/sources")

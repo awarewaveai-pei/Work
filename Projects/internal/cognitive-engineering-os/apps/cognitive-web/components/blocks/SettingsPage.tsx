@@ -8,7 +8,7 @@ import React, { useEffect, useState } from "react";
 import { ApiError } from "../../lib/api";
 import { docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
-import { accountSummary, eraseAccount, helpFor, type AccountSummary, type Help } from "../../lib/govern";
+import { accountSummary, eraseAccount, helpFor, type AccountSummary, type ErasedAccount, type Help } from "../../lib/govern";
 import { Notices } from "./BlockShell";
 import { Explain, ExportLinks, HelpLines } from "./GovernParts";
 
@@ -27,6 +27,7 @@ export function SettingsPage() {
   const [typed, setTyped] = useState("");
   const [eraseError, setEraseError] = useState("");
   const [erasing, setErasing] = useState(false);
+  const [leftover, setLeftover] = useState<ErasedAccount["failed"] | null>(null);   // set once the account is gone but some files could not be deleted
 
   const load = async () => {
     const [found, places] = await Promise.all([helpFor(), docs.list<Where>(null, "govern.location")]);
@@ -64,17 +65,30 @@ export function SettingsPage() {
     if (!summary || typed.trim() !== summary.phrase) return;
     setErasing(true); setEraseError("");
     try {
-      await eraseAccount(typed.trim());
-      window.location.assign("/login");
+      const done = await eraseAccount(typed.trim());
+      if (done.failed.length > 0) setLeftover(done.failed);
+      else window.location.assign("/login");
     } catch (reason) {
       setEraseError(reason instanceof ApiError && reason.status === 409
-        ? "還有東西在跑（分析、整理或工作流）。等它跑完，再刪一次。已經刪掉的不會回來；還沒刪的還在。"
+        ? "還有東西在跑（分析、整理或工作流）。等它跑完，再刪一次。如果有刪到一半，再刪一次就會刪完。"
         : humanError(reason));
     } finally {
       setErasing(false);
     }
   };
 
+  if (leftover) {
+    return (
+      <>
+        <h1>帳號已經刪除</h1>
+        <div className="card accent" role="status">
+          <p className="mt0">你的帳號和資料都刪了。有 {leftover.length} 份 AI 產出的檔案沒能刪掉（{[...new Set(leftover.map((item) => item.artifact_type))].join("、")}）：檔案壞了，或對不上。</p>
+          <p>它們已經不連到你的帳號。請告訴管理員，讓他們從主機上清掉。</p>
+          <p className="mb0"><Link className="btn" href="/login">回登入頁</Link></p>
+        </div>
+      </>
+    );
+  }
   if (location === undefined) return <><div className="crumbs"><Link href="/">首頁</Link> › 設定</div><h1>設定</h1><div className="card"><p>{error || "載入中…"}</p></div></>;
   const typedRight = !!summary && typed.trim() === summary.phrase;
 

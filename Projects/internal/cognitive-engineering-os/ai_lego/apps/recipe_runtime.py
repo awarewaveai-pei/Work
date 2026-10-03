@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import uuid
 from typing import Any, Callable, Mapping
 
 from ai_lego.apps.api.dispatch import invoke_builder, invoke_gate_runner, resolve_builder, resolve_gate_runner
@@ -128,7 +129,11 @@ def persist_artifact_output(tenant_id: str, artifact_store: JsonArtifactStore, o
     artifact = output.get("artifact")
     if not isinstance(artifact, Mapping) or not isinstance(artifact.get("artifact_type"), str) or not isinstance(artifact.get("content"), str):
         return dict(output)
-    reference = artifact_store.put(tenant_id, artifact["artifact_type"], dict(artifact))
+    # instance_id makes every write's bytes its own: the CAS is content-addressed and a deterministic capability (chart_render,
+    # the proposal) returns the same bytes for the same input, so without it two people's runs would share one blob and
+    # erasing one person's run would delete the other's (the report decision_id in main.py closes the same trap).
+    artifact = {**artifact, "instance_id": uuid.uuid4().hex}
+    reference = artifact_store.put(tenant_id, artifact["artifact_type"], artifact)
     enriched = dict(output)
     enriched["artifact"] = {**artifact, "cas_reference": reference}
     return enriched

@@ -48,11 +48,12 @@ router = APIRouter()
 
 EXPORT_FORMAT = "cognitive-os-export/1"
 ERASE_PHRASE = "刪除我的帳號"
-PROTECTED_RUNS_KEPT = "加密保護的工作流執行（{count} 筆）：它們的加密內容檔還留在主機上，沒有金鑰的人讀不出來；這一項還不能一起刪。"
+PROTECTED_RUNS_KEPT = "加密保護的工作流執行（{count} 筆）：它們每一步的加密內容檔還留在主機上，沒有金鑰的人讀不出來；這一項還不能一起刪。"
 KEPT_AFTER_ERASURE = [
     "每個被刪掉的案子，留一筆「已抹除」：只有案子的代號、什麼時候刪的、刪了多少筆，沒有任何你寫的內容。",
     "帳號本身留一個空殼，標成「已刪除」：沒有信箱、沒有名字，也登不進去。同一個信箱可以重新註冊。",
     "AI 用量只記次數和 token 數，用來算全站的每日額度；不再連到你。",
+    "2026-10-03 以前跑的工作流執行，留在主機的共用資料夾，沒有記是誰跑的，所以不會在這裡一起刪。",
 ]
 AUTHOR_LABEL = {"user": "你寫的", "ai": "AI 寫的", "joint": "AI 起草、你改過", "system": "系統"}
 
@@ -86,58 +87,85 @@ def _run_ids(folder: Path) -> list[str]:
     return sorted({path.name.split(".")[0] for path in folder.iterdir() if path.name.endswith((JOURNAL_SUFFIX, ".lock", ".case.json"))}) if folder.is_dir() else []
 
 
-def _references(value: Any) -> list[dict[str, Any]]:
-    """Every artifact a journal points at: a step's output carries ``artifact.cas_reference`` (a protected journal keeps its
-    context as ciphertext in workflow-cas, so it names none -- see STEP1_CHECKLIST)."""
+def _read_journal(folder: Path, run_id: str) -> Any:
+    """The journal as written, or None when there is none or it is not JSON (a half-written file names nothing)."""
+    path = folder / f"{run_id}{JOURNAL_SUFFIX}"
+    try:
+        return read_json(path) if path.is_file() else None
+    except (ValueError, OSError):
+        return None
+
+
+def _references(value: Any) -> list[Any]:
+    """Every ``cas_reference`` anywhere in a journal -- the way to find a run's artifacts only for a run made before the server
+    recorded them for runs on no case. Whatever it finds is a claim in a file, so each use treats it as one."""
     if isinstance(value, dict):
-        found = [value["cas_reference"]] if isinstance(value.get("cas_reference"), dict) else []
+        found = [value["cas_reference"]] if "cas_reference" in value else []
         return found + [reference for item in value.values() for reference in _references(item)]
     if isinstance(value, list):
         return [reference for item in value for reference in _references(item)]
     return []
 
 
-def _run_references(folder: Path, run_id: str) -> list[dict[str, Any]]:
-    journal, sidecar = folder / f"{run_id}{JOURNAL_SUFFIX}", folder / f"{run_id}.case.json"
-    return [*(read_json(sidecar).get("artifacts", []) if sidecar.is_file() else []), *(_references(read_json(journal)) if journal.is_file() else [])]
+def _listed(folder: Path, run_id: str) -> list[Any]:
+    """The artifacts a run stored: what the server wrote beside it when each was stored (main._record_run_artifact; the journal
+    may be encrypted and names nothing then). Only a run with no such record is read from its journal."""
+    sidecar = folder / f"{run_id}.case.json"
+    if sidecar.is_file():
+        return list(read_json(sidecar).get("artifacts", []))
+    return _references(_read_journal(folder, run_id))
 
 
 def _person_runs(tenant_id: str, identity_id: str, artifact_store: JsonArtifactStore, only_case: str | None = None) -> list[dict[str, Any]]:
-    """The person's runs with their journals and artifacts; ``only_case``: just the runs made on that case."""
+    """The person's runs with their journals and artifacts; ``only_case``: just the runs made on that case. An artifact that
+    cannot be read comes out with ``value: null`` and the reason, never as an error for the whole export."""
     folder = _runs_folder(tenant_id, identity_id)
     runs = []
     for run_id in _run_ids(folder):
-        journal_path, sidecar = folder / f"{run_id}{JOURNAL_SUFFIX}", folder / f"{run_id}.case.json"
-        if only_case is not None and not (sidecar.is_file() and read_json(sidecar).get("project_id") == only_case):
+        sidecar = folder / f"{run_id}.case.json"
+        project_id = read_json(sidecar).get("project_id") if sidecar.is_file() else None
+        if only_case is not None and project_id != only_case:
             continue
-        artifacts: dict[str, dict[str, Any]] = {}
-        for reference in _run_references(folder, run_id):
+        artifacts, seen = [], set()
+        for reference in _listed(folder, run_id):
+            key = json.dumps(reference, sort_keys=True, default=str)
+            if key in seen:
+                continue
+            seen.add(key)
+            kind = reference.get("artifact_type") if isinstance(reference, dict) else None
+            if not api.artifact_reference_ok(reference):   # a field in the export, not a refusal shown to a person
+                artifacts.append({"artifact_type": kind, "value": None, "error": "ARTIFACT_REFERENCE_MALFORMED"})
+                continue
             try:
-                artifacts[reference["content_sha256"]] = {"artifact_type": reference.get("artifact_type"), "value": artifact_store.read(tenant_id, reference)}
-            except InvariantViolation:
-                artifacts[reference["content_sha256"]] = {"artifact_type": reference.get("artifact_type"), "value": None}
-        runs.append({"run_id": run_id, "project_id": read_json(sidecar).get("project_id") if sidecar.is_file() else None,
-                     "journal": read_json(journal_path) if journal_path.is_file() else None, "artifacts": list(artifacts.values())})
+                artifacts.append({"artifact_type": kind, "value": artifact_store.read(tenant_id, reference)})
+            except InvariantViolation as error:
+                artifacts.append({"artifact_type": kind, "value": None, "error": str(error)[:80]})
+        runs.append({"run_id": run_id, "project_id": project_id, "journal": _read_journal(folder, run_id), "artifacts": artifacts})
     return runs
 
 
 def _protected_runs(tenant_id: str, identity_id: str) -> int:
-    """Runs whose journal keeps its context as ciphertext in workflow-cas: erasing removes the journal, not that file."""
+    """Runs whose journal keeps its context as ciphertext in workflow-cas: erasing removes the journal and the artifacts
+    the server recorded, not those ciphertext files (one per saved step)."""
     folder = _runs_folder(tenant_id, identity_id)
-    journals = [folder / f"{run_id}{JOURNAL_SUFFIX}" for run_id in _run_ids(folder)]
-    return sum(1 for journal in journals if journal.is_file() and (read_json(journal).get("context") or {}).get("protected") is True)
+    journals = [_read_journal(folder, run_id) for run_id in _run_ids(folder)]
+    return sum(1 for journal in journals if isinstance(journal, dict) and isinstance(journal.get("context"), dict) and journal["context"].get("protected") is True)
 
 
-def _erase_person_runs(tenant_id: str, identity_id: str, artifact_store: JsonArtifactStore) -> int:
+def _run_still_going(tenant_id: str, identity_id: str) -> bool:
+    folder = _runs_folder(tenant_id, identity_id)
+    return any(run_lock_state(lock_path_for(folder / f"{run_id}{JOURNAL_SUFFIX}")) == "held" for run_id in _run_ids(folder))
+
+
+def _erase_person_runs(tenant_id: str, identity_id: str, artifact_store: JsonArtifactStore, failed: list[dict[str, str]]) -> int:
     """What is left in the person's run folder once their cases are erased (those took their own runs): runs on no case, and
-    the artifacts those journals name. Refuses while one runs."""
+    the artifacts recorded for them. Refuses while one runs."""
     folder = _runs_folder(tenant_id, identity_id)
-    run_ids = _run_ids(folder)
-    if any(run_lock_state(lock_path_for(folder / f"{run_id}{JOURNAL_SUFFIX}")) == "held" for run_id in run_ids):
+    if _run_still_going(tenant_id, identity_id):
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a workflow run is still running; wait for it to finish, then delete the account")
+    run_ids = _run_ids(folder)
     for run_id in run_ids:
-        for reference in _run_references(folder, run_id):
-            artifact_store.delete_if_present(tenant_id, reference)
+        api.delete_artifacts(tenant_id, artifact_store, _listed(folder, run_id), failed)
         journal = folder / f"{run_id}{JOURNAL_SUFFIX}"
         for path in (journal, lock_path_for(journal), folder / f"{run_id}.case.json"):
             path.unlink(missing_ok=True)
@@ -320,22 +348,29 @@ class EraseBody(BaseModel):
 def erase_account(body: EraseBody, response: Response, session: dict[str, Any] = Depends(api.require_session), store: IdentityStore = Depends(api.get_store),
                   repo: ProjectSourceRepository = Depends(api.get_project_source_repository), source_cas: TenantScopedCas = Depends(api.get_source_cas),
                   artifact_store: JsonArtifactStore = Depends(api.get_artifact_store), workflows: CustomWorkflowRepository = Depends(api.get_custom_workflow_repository)) -> dict[str, Any]:
-    """Cases first, each through the case erasure itself (a case still being worked on stops the whole thing, with the
-    person's account intact; a retry finishes what is left), then the runs on no case, the person's own records and
-    workflows, and the identity last -- so every step before it can still be retried by someone who can sign in."""
+    """First ask every case and run whether it is still being worked on: one that is stops the whole thing before anything
+    is deleted. Then each case through the case erasure itself (no entitlement gate: deleting what is yours is a right), the
+    runs on no case, the person's own records and workflows, and the identity last -- so a step that fails midway can be
+    retried by someone who can sign in. What cannot be deleted (a corrupt artifact reference) is listed in ``failed``."""
     if body.confirm.strip() != ERASE_PHRASE:
         raise HTTPException(status_code=400, detail=f"ACCOUNT_ERASE_NOT_CONFIRMED: type {ERASE_PHRASE!r} to confirm")
     tenant_id, me = session["tenant_id"], session["identity_id"]
     cases = _my_cases(repo, session)
+    reasons = [reason for project in cases if (reason := api.case_blocker(repo, tenant_id, me, project["project_id"]))]
+    if _run_still_going(tenant_id, me):
+        reasons.append("a workflow run is still running")
+    if reasons:
+        raise HTTPException(status_code=409, detail=f"PROJECT_BUSY: {reasons[0]}; wait for it to finish, then delete the account")
+    failed: list[dict[str, str]] = []
     for project in cases:
-        api.erase_project(project["project_id"], session, store, repo, source_cas, artifact_store)
-    runs = _erase_person_runs(tenant_id, me, artifact_store)
+        failed += api.erase_case(store, repo, source_cas, artifact_store, tenant_id, me, project["project_id"]).get("failed", [])
+    runs = _erase_person_runs(tenant_id, me, artifact_store, failed)
     with repo.transaction() as connection:
         records = record_log.delete_owned(connection, tenant_id, record_log.person(me))
     removed = workflows.delete_person(tenant_id, me)
     store.delete_identity(tenant_id, me)
     response.delete_cookie(api.SESSION_COOKIE)
-    return {"cases": len(cases), "runs": runs, "records": records, "workflows": removed, "tombstone": True}
+    return {"cases": len(cases), "runs": runs, "records": records, "workflows": removed, "tombstone": True, "failed": failed}
 
 
 # -- version records --------------------------------------------------------------------------------------------------

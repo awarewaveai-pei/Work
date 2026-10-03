@@ -25,7 +25,7 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 
 ## GOVERN + 完整性核心 (丁) — built 2026-10-03
 - 「你可以匯出自己的資料」 built: `GET /projects/{id}/govern/export`, `GET /govern/export` (JSON + Markdown; every record with author + block; recipe runs and their artifacts included); pages: case 護欄與匯出頁 `/projects/{id}/govern`, 設定頁 `/settings`
-- 「你也可以完整刪除」 built: `POST /govern/account/erase` (cases through the case erase path, runs on no case, person records, workflows, then the identity; one empty tombstone stays; confirm phrase from the API; page confirms twice; 409 while a case or run is still running, a retry finishes)
+- 「你也可以完整刪除」 built: `POST /govern/account/erase` -- first asks every case, synthesis, analysis and run whether it is still going (409 and nothing deleted if so); then each case through `main.erase_case` (no entitlement gate: a suspended tenant does not take the right away), the runs on no case, the person's records, the workflows, the identity; one empty tombstone stays; what cannot be deleted (a corrupt artifact reference) is listed in `failed`, never raised; the page confirms twice and names what could not be deleted
 - 「清楚的非治療定位」 built: `safety.NOT_THERAPY` via `GET /govern/help`, shown on `/help` and `/settings`; `components/blocks/GovernParts.tsx NotTherapyNotice` is the piece for 「你開始的地方」 -- placing it on 開案 and 我的專案 is a shared-file change (report)
 - 「危機轉介」 built: `/help` (open without login) + the AI gate and every save give help for the place in the case's intake or the account's 「你在哪裡」; Taiwan lines + international only (step 3 adds places)
 - 「高風險的案子，系統自動加護欄」 built: `block_hooks/govern.py` on every watched block's person-written documents (category + block only, never the words; places and system-listed influences not scanned); the intake's risk goes through the assembler's own hook; with no case the save answers a `suggest_case` notice (rendering it on the daily-calibration page = 丙 / shared `Notice` type)
@@ -39,10 +39,12 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 - NOT YET: 「規則檢查」 written as platform records -- the check result is printed for the launch step (text / JSON); `DocKind` has no platform owner yet
 - NOT YET: 「你可以對任何一條規則提出異議」 (appeals, step 3)
 - NOT YET: 「影響清單：AI、這次的拆法、平台本身一定在清單上」 checked by the core -- only that the judgment card keeps the system's list apart from the person's; the content is DECIDE's at run time
-- LIMIT: runs started before 2026-10-03 sit in the tenant folder with no owner on record -- neither exported nor erased with the account (`main._run_journal`)
-- LIMIT: a recipe run written with journal protection keeps its context as ciphertext in `workflow-cas`; erasing a case or an account removes the journal, not that blob (the deletion screen says so when it applies); fix = one helper in main.py used by `_erase_case_runs` and account deletion
-- LIMIT: artifact blobs are content-addressed; erasure deletes by reference without counting other references, so identical content held by two people is one blob
+- LIMIT: runs started before 2026-10-03 sit in the tenant folder with no owner on record -- neither exported nor erased with the account (`main._run_journal`); the deletion screen says so
+- LIMIT: a recipe run written with journal protection keeps its context as ciphertext in `workflow-cas`, one file per saved step; erasing a case or an account removes the journal and the artifacts the server recorded for the run (`main._record_run_artifact`, a sidecar beside every run, encrypted or not), not those ciphertext files (the deletion screen says so when it applies); fix = list the ciphertext paths in the sidecar and delete them
+- LIMIT: a run artifact stored from 2026-10-03 carries its own `instance_id` (`recipe_runtime.persist_artifact_output`), so no two writes share a blob; one stored before has none, so two people's identical old output may be one blob and deleting it by reference removes both copies
 - LIMIT: a second tab can open a case while the account is being deleted and keep it; closing it needs a `deleting` status on the identity that `require_session` refuses
+- NOT YET: asking for the password again before the account is deleted (the session cookie and the typed phrase are the only checks today)
+- built: deleted rows are overwritten in the workflow file and the identity file (`PRAGMA secure_delete`), as in the project file; tested on the raw bytes of all three
 - LIMIT: the account export carries what the person owns in `projects.sqlite3`, the workflows file and the run folder; `collection_runs` rows (GATHER, step 2) are not exported separately, only their events
 
 ## MAP (甲) — built 2026-10-03

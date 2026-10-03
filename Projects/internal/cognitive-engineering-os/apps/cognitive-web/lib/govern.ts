@@ -11,7 +11,7 @@ export type AccountSummary = {
   cases: Array<{ project_id: string; name: string; created_at: string }>;
   personal_records: number; workflows: number; runs: number; keeps: string[]; phrase: string;
 };
-export type ErasedAccount = { cases: number; runs: number; records: number; workflows: number; tombstone: boolean };
+export type ErasedAccount = { cases: number; runs: number; records: number; workflows: number; tombstone: boolean; failed: Array<{ artifact_type: string; error: string }> };
 export type AiCall = { block: string; action: string; model: string; instructions_sha256: string; at: string };
 export type RuleVersion = { name: string; label: string; version: string };
 export type HeldKind = { kind: string; block: string | null; title: string | null; definition: string | null; documents: number; versions: number };

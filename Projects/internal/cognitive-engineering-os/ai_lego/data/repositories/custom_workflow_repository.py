@@ -56,6 +56,7 @@ class CustomWorkflowRepository:
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA secure_delete = ON")   # a deleted workflow's title must not stay in the file's free pages (as project_source_repository)
         return connection
 
     @contextmanager

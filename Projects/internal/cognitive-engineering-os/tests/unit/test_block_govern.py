@@ -4,7 +4,9 @@ the AI that explains a setting, and the rule that GOVERN moves data without read
 from __future__ import annotations
 
 import ast
+import base64
 import json
+import os
 import re
 import sqlite3
 import tempfile
@@ -15,6 +17,7 @@ from unittest import mock
 
 from ai_lego import PRODUCT_ROOT
 from ai_lego.apps.api import main as api_main
+from ai_lego.apps.recipe_runtime import persist_artifact_output
 from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.blocks import ALL_CODES
 from ai_lego.data.events import record_log
@@ -30,6 +33,7 @@ from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.safety import risk
 from ai_lego.platform.workflow.run_lock import acquire_run_lock, lock_path_for
 from tests.unit.test_block_foundation import MirrorProvider, sqlite_dump
+from tests.unit.test_business_plan_full_recipe import full_source
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
 HIGH_RISK_NAMES = {"健康", "法律", "金錢", "人身安全", "急性心理危機", "要公開散布"}
@@ -207,16 +211,29 @@ class GovernApiTestCase(ProjectSourceApiTestCase):
             store.create_identity(str(uuid.uuid4()), self.tenant["tenant_id"], email, email.split("@")[0], "correct-horse-battery")
         self.assertEqual(self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": email, "password": "correct-horse-battery"}).status_code, 200)
 
-    def _run(self, identity_id, run_id, project_id=None, text="RUN-OUTPUT"):
-        """A recipe run's files as main.py leaves them: a journal that names the artifact its step stored, and on a case the sidecar."""
+    def _run(self, identity_id, run_id, project_id=None, text="RUN-OUTPUT", sidecar=True):
+        """A recipe run's files: a journal that names the artifact its step stored and the sidecar the server writes beside every
+        run (``sidecar=False``: a run from before it was written for runs on no case)."""
         tenant_id = self.tenant["tenant_id"]
         reference = api_main.app.dependency_overrides[api_main.get_artifact_store]().put(tenant_id, "ProposalDraft", {"content": f"{text} {run_id}"})
         journal = api_main.workflow_journal_path(tenant_id, run_id, identity_id)
         journal.parent.mkdir(parents=True, exist_ok=True)
         journal.write_text(json.dumps({"status": "SUCCEEDED", "context": {"outputs": {"step-1": {"artifact": {"cas_reference": reference}}}}}), encoding="utf-8")
-        if project_id:
+        if sidecar:
             api_main._run_case_path(journal).write_text(json.dumps({"project_id": project_id, "artifacts": [reference]}), encoding="utf-8")
         return journal, reference
+
+    def _stored_run(self, identity_id, run_id, project_id=None, content="SAME-CHART-BYTES"):
+        """A run as the server really leaves it: the artifact stored by the runtime, recorded beside the journal by the server's own function."""
+        tenant_id = self.tenant["tenant_id"]
+        journal = api_main.workflow_journal_path(tenant_id, run_id, identity_id)
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        sidecar = api_main._run_case_path(journal)
+        sidecar.write_text(json.dumps({"project_id": project_id, "artifacts": []}), encoding="utf-8")
+        stored = persist_artifact_output(tenant_id, api_main.app.dependency_overrides[api_main.get_artifact_store](), {"artifact": {"artifact_type": "image/png", "content": content}})
+        output = api_main._record_run_artifact(sidecar, stored)
+        journal.write_text(json.dumps({"status": "SUCCEEDED", "context": {"outputs": {"chart": output}}}), encoding="utf-8")
+        return journal, output["artifact"]["cas_reference"]
 
     def _workflow(self, identity_id, title="Mine"):
         self.workflows.create({"workflow_id": str(uuid.uuid4()), "tenant_id": self.tenant["tenant_id"], "title": title, "method_ids": ["a.b"], "created_by_identity_id": identity_id,
@@ -399,7 +416,8 @@ class AccountErasureTests(GovernApiTestCase):
         summary = self.client.get("/govern/account").json()
         self.assertEqual([case["name"] for case in summary["cases"]], ["EdD study", "Second case"])
         self.assertEqual((summary["personal_records"], summary["workflows"], summary["phrase"]), (1, 1, self.PHRASE))
-        self.assertEqual(len(summary["keeps"]), 3)
+        self.assertEqual(len(summary["keeps"]), 4)
+        self.assertIn("2026-10-03 以前跑的工作流執行", summary["keeps"][3])
 
     def test_without_the_exact_phrase_nothing_is_deleted(self):
         for confirm in ("", "刪除", "DELETE"):
@@ -450,10 +468,21 @@ class AccountErasureTests(GovernApiTestCase):
         finally:
             lock.release()
         self.assertEqual(self.store.get_identity(self.me)["status"], "active")
-        self.assertEqual([case["name"] for case in self.client.get("/govern/account").json()["cases"]], ["Second case"])
+        self.assertEqual([case["name"] for case in self.client.get("/govern/account").json()["cases"]], ["EdD study", "Second case"])   # nothing was deleted
+        self.assertEqual(self.client.get(f"/projects/{self.pid}/docs/sense.card").json()[0]["content"]["text"], "PRIVATE-CARD-ONE")
         self.assertEqual(len(self.client.get("/me/docs/govern.location").json()), 1)
         self.assertEqual(self.client.post("/govern/account/erase", json={"confirm": self.PHRASE}).status_code, 200)
         self.assertEqual(self.store.get_identity(self.me)["status"], "deleted")
+
+    def test_a_run_on_a_case_that_is_still_going_stops_the_deletion_before_anything_goes(self):
+        journal, _ = self._run(self.me, "run-on-second", self.second)
+        lock = acquire_run_lock(lock_path_for(journal), tag="recipe")
+        try:
+            self.assertEqual(self.client.post("/govern/account/erase", json={"confirm": self.PHRASE}).status_code, 409)
+        finally:
+            lock.release()
+        self.assertEqual(len(self.client.get("/govern/account").json()["cases"]), 2)
+        self.assertTrue(journal.is_file())
 
     def test_nobody_elses_data_is_touched(self):
         other = self._everyone_elses()
@@ -491,16 +520,132 @@ class AccountErasureTests(GovernApiTestCase):
         finally:
             lock.release()
         self.assertEqual(self.store.get_identity(self.me)["status"], "active")
+        self.assertEqual(len(self.client.get("/govern/account").json()["cases"]), 2)   # the cases were not touched either
         self.assertTrue(loose.is_file())
         self.assertEqual(self.client.post("/govern/account/erase", json={"confirm": self.PHRASE}).status_code, 200)
         self.assertFalse(loose.exists() or lock_path_for(loose).exists())
+
+    # -- a blob is never shared between two people --------------------------------------------------------------------
+
+    def test_the_same_output_written_twice_is_two_blobs_and_deleting_one_leaves_the_other(self):
+        tenant_id = self.tenant_id
+        artifacts = api_main.app.dependency_overrides[api_main.get_artifact_store]()
+        made = [persist_artifact_output(tenant_id, artifacts, {"artifact": {"artifact_type": "image/png", "content": "SAME"}})["artifact"] for _ in range(2)]
+        first, second = made[0]["cas_reference"], made[1]["cas_reference"]
+        self.assertNotEqual(first["cas_path"], second["cas_path"])
+        self.assertEqual(api_main.delete_artifacts(tenant_id, artifacts, [first]), 1)
+        self.assertEqual(artifacts.read(tenant_id, second)["content"], "SAME")
+
+    def test_my_account_deletion_leaves_a_colleagues_identical_output_and_their_export_still_has_it(self):
+        artifacts = api_main.app.dependency_overrides[api_main.get_artifact_store]()
+        self._login_as("colleague@example.com")
+        colleague = store_identity(self, "colleague@example.com")
+        _, theirs = self._stored_run(colleague, "colleague-chart")
+        self._login_as("user@example.com")
+        _, mine = self._stored_run(self.me, "my-chart", self.pid)
+        self.assertNotEqual(mine["cas_path"], theirs["cas_path"])
+        self.assertEqual(self.client.post("/govern/account/erase", json={"confirm": self.PHRASE}).status_code, 200)
+        with self.assertRaises(InvariantViolation):
+            artifacts.read(self.tenant_id, mine)
+        self._login_as("colleague@example.com")
+        self.assertEqual(artifacts.read(self.tenant_id, theirs)["content"], "SAME-CHART-BYTES")
+        exported = self.client.get("/govern/export").json()["person"]["runs"]
+        self.assertEqual([item["value"]["content"] for run in exported for item in run["artifacts"]], ["SAME-CHART-BYTES"])
+
+    def _recipe_run(self, run_id):
+        response = self.client.post("/recipes/business-plan-full-v1/run", json={"source": full_source(), "run_id": run_id})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()["workflow"]["context"]["outputs"]["proposal"]["artifact"]["cas_reference"]
+
+    def test_a_real_run_on_no_case_is_recorded_by_the_server_and_two_people_running_the_same_thing_do_not_share_a_blob(self):
+        artifacts = api_main.app.dependency_overrides[api_main.get_artifact_store]()
+        mine = self._recipe_run("my-business-plan")
+        sidecar = api_main._run_case_path(api_main.workflow_journal_path(self.tenant_id, "my-business-plan", self.me))
+        self.assertEqual(json.loads(sidecar.read_text(encoding="utf-8")), {"project_id": None, "artifacts": [mine]})
+        self._login_as("colleague@example.com")
+        theirs = self._recipe_run("their-business-plan")
+        self.assertNotEqual(mine["cas_path"], theirs["cas_path"])
+        self._login_as("user@example.com")
+        exported = self.client.get("/govern/export").json()["person"]["runs"]
+        self.assertEqual([item["artifact_type"] for run in exported for item in run["artifacts"]], ["BusinessProposalArtifact"])
+        self.assertEqual(self.client.post("/govern/account/erase", json={"confirm": self.PHRASE}).status_code, 200)
+        with self.assertRaises(InvariantViolation):
+            artifacts.read(self.tenant_id, mine)
+        self.assertEqual(artifacts.read(self.tenant_id, theirs)["artifact_type"], "BusinessProposalArtifact")
+
+    def test_a_run_with_an_encrypted_journal_is_recorded_exported_and_deleted_like_any_other(self):
+        artifacts = api_main.app.dependency_overrides[api_main.get_artifact_store]()
+        settings = {"COGNITIVE_OS_JOURNAL_KEY_MODE": "local-dev", "COGNITIVE_OS_JOURNAL_KEY_B64": base64.b64encode(b"k" * 32).decode("ascii")}
+        with mock.patch.dict(os.environ, settings, clear=False):
+            reference = self._recipe_run("my-encrypted-plan")
+            journal = api_main.workflow_journal_path(self.tenant_id, "my-encrypted-plan", self.me)
+            self.assertTrue(json.loads(journal.read_text(encoding="utf-8"))["context"]["protected"])
+            self.assertNotIn("cas_reference", journal.read_text(encoding="utf-8"))   # the journal names nothing: only the server's own record does
+            self.assertEqual(json.loads(api_main._run_case_path(journal).read_text(encoding="utf-8"))["artifacts"], [reference])
+            run = self.client.get("/govern/export").json()["person"]["runs"][0]
+            self.assertEqual(run["artifacts"][0]["artifact_type"], "BusinessProposalArtifact")
+            self.assertIn("1 筆", self.client.get("/govern/account").json()["keeps"][4])
+            self.assertEqual(self.client.post("/govern/account/erase", json={"confirm": self.PHRASE}).status_code, 200)
+        with self.assertRaises(InvariantViolation):
+            artifacts.read(self.tenant_id, reference)
+        self.assertFalse(journal.exists())
+
+    # -- a reference that is not what it claims never stops an export or a deletion ---------------------------------------
+
+    def test_a_malformed_reference_in_a_run_from_before_the_sidecar_does_not_stop_the_export_or_the_deletion(self):
+        journal = api_main.workflow_journal_path(self.tenant_id, "odd-run", self.me)
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        claims = [{"artifact_type": "X"}, "not even a mapping", {"artifact_type": "Y", "content_sha256": "0" * 64, "cas_path": {"path": "/objects/x/../../etc/passwd"}}, {"cas_path": {"path": "\u0000"}}]
+        journal.write_text(json.dumps({"status": "SUCCEEDED", "context": {"outputs": {"s": {"note": {"cas_reference": claims[0]}, "more": [{"cas_reference": claim} for claim in claims[1:]]}}}}), encoding="utf-8")
+        exported = self.client.get("/govern/export")
+        self.assertEqual(exported.status_code, 200, exported.text)
+        self.assertEqual([item["error"] for item in exported.json()["person"]["runs"][0]["artifacts"]], ["ARTIFACT_REFERENCE_MALFORMED"] * 4)
+        response = self.client.post("/govern/account/erase", json={"confirm": self.PHRASE})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(len(response.json()["failed"]), 4)
+        self.assertEqual(self.store.get_identity(self.me)["status"], "deleted")
+        self.assertFalse(journal.exists())
+
+    def test_a_journal_that_is_not_json_or_a_recorded_blob_that_no_longer_matches_does_not_stop_it_either(self):
+        broken = api_main.workflow_journal_path(self.tenant_id, "half-written", self.me)
+        broken.parent.mkdir(parents=True, exist_ok=True)
+        broken.write_text('{"status": "SUCCEED', encoding="utf-8")
+        _, reference = self._stored_run(self.me, "tampered", self.pid)
+        blob = api_main.app.dependency_overrides[api_main.get_artifact_store]().cas._resolve_owned(self.tenant_id, reference["cas_path"])
+        blob.write_bytes(b"{}")
+        runs = self.client.get("/govern/export").json()
+        self.assertEqual(runs["cases"][0]["runs"][0]["artifacts"][0]["error"], "JSON_ARTIFACT_HASH_MISMATCH")
+        response = self.client.post("/govern/account/erase", json={"confirm": self.PHRASE})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual([item["error"] for item in response.json()["failed"]], ["JSON_ARTIFACT_HASH_MISMATCH"])
+        self.assertEqual(self.store.get_identity(self.me)["status"], "deleted")
+        self.assertFalse(broken.exists())
+
+    def test_a_suspended_tenant_does_not_take_the_right_to_delete_away(self):
+        with mock.patch.object(api_main, "check_entitlement", return_value=False):
+            self.assertEqual(self.client.delete(f"/projects/{self.second}").status_code, 403)   # the case route still asks (control)
+            response = self.client.post("/govern/account/erase", json={"confirm": self.PHRASE})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.store.get_identity(self.me)["status"], "deleted")
+
+    def test_what_was_deleted_is_gone_from_the_bytes_of_the_three_files_not_only_from_a_query(self):
+        secret_card, secret_flow = "PRIVATE-CARD-ONE " + "x" * 1900, "PRIVATE-FLOW-RAW"
+        self._card(secret_card)
+        self._workflow(self.me, secret_flow)
+        self.assertIn(b"PRIVATE-FLOW-RAW", Path(self.workflows.db_path).read_bytes())   # it is in the file before
+        self.assertIn(b"user@example.com", Path(self.store.db_path).read_bytes())
+        self.assertEqual(self.client.post("/govern/account/erase", json={"confirm": self.PHRASE}).status_code, 200)
+        repo = api_main.app.dependency_overrides[api_main.get_project_source_repository]()
+        self.assertNotIn(b"PRIVATE-CARD-ONE", Path(repo.db_path).read_bytes())
+        self.assertNotIn(b"PRIVATE-FLOW-RAW", Path(self.workflows.db_path).read_bytes())
+        self.assertNotIn(b"user@example.com", Path(self.store.db_path).read_bytes())
 
     def test_a_protected_run_is_named_among_what_stays_because_its_ciphertext_cannot_be_deleted_yet(self):
         journal, _ = self._run(self.me, "run-protected")
         journal.write_text(json.dumps({"status": "SUCCEEDED", "context": {"protected": True, "storage": "TENANT_SCOPED_CAS", "cas_path": {}}}), encoding="utf-8")
         keeps = self.client.get("/govern/account").json()["keeps"]
-        self.assertEqual(len(keeps), 4)
-        self.assertIn("1 筆", keeps[3])
+        self.assertEqual(len(keeps), 5)
+        self.assertIn("1 筆", keeps[4])
 
 
 class IdentityStoreTests(unittest.TestCase):
@@ -536,6 +681,23 @@ class IdentityStoreTests(unittest.TestCase):
         self.store.delete_identity(self.tenant, self.me)
         self.assertEqual(self.store.ai_usage_totals(self.tenant), before)
         self.assertEqual(self._count("ai_usage", self.me), 0)
+
+    def test_what_was_deleted_is_overwritten_in_the_file_not_only_unlinked(self):
+        tokens = [self.store.issue_session_for_identity(self.me, self.tenant) for _ in range(3)]
+        handoff = self.store.issue_handoff_code(self.me, self.tenant, "/RAW-REDIRECT-SECRET")
+        raw = Path(self.store.db_path).read_bytes()
+        for token in tokens:
+            self.assertIn(token.encode("utf-8"), raw)   # it is in the file before
+        with self.store._connect() as connection:
+            self.assertEqual(connection.execute("PRAGMA secure_delete").fetchone()[0], 1)
+        self.assertTrue(self.store.delete_identity(self.tenant, self.me))
+        raw = Path(self.store.db_path).read_bytes()
+        for token in tokens:
+            self.assertNotIn(token.encode("utf-8"), raw)
+        self.assertNotIn(b"RAW-REDIRECT-SECRET", raw)
+        self.assertNotIn(b"me@example.com", raw)
+        self.assertIn(b"other@example.com", raw)   # somebody else's row is left as it was
+        self.assertTrue(handoff)
 
     def test_deleting_twice_or_in_another_tenant_does_nothing(self):
         self.assertFalse(self.store.delete_identity("ELSEWHERE", self.me))
@@ -596,7 +758,9 @@ class ExplainSettingTests(GovernApiTestCase):
             self.assertTrue(self.client.post("/me/ai/GOVERN/explain", json={"context": {"topic": topic}}).json().get("saved"), topic)
 
     def test_it_runs_with_no_case_only(self):
-        self.assertEqual(self.client.post(f"{self.base}/ai/GOVERN/explain", json={"context": {"topic": "where"}}).status_code, 400)
+        """Its answer is kept for the person, not in a case: the gate refuses before any model call is paid for."""
+        self.assertEqual(self.client.post(f"{self.base}/ai/GOVERN/explain", json={"context": {"topic": "where"}}).status_code, 403)
+        self.assertEqual(self.provider.calls, [])
 
 
 class NeverReadsIntoAnAiTests(unittest.TestCase):

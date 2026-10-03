@@ -101,7 +101,7 @@ describe("設定：刪除帳號要確認兩次", () => {
     const assign = vi.fn();
     const originalLocation = window.location;
     Object.defineProperty(window, "location", { value: { ...originalLocation, assign }, writable: true, configurable: true });
-    routes(settingsRoutes({ "POST /govern/account/erase": { cases: 2, runs: 2, records: 3, workflows: 1, tombstone: true } }));
+    routes(settingsRoutes({ "POST /govern/account/erase": { cases: 2, runs: 2, records: 3, workflows: 1, tombstone: true, failed: [] } }));
     const { host, done } = await mount(<SettingsPage />);
     await click(button(host, "我要刪除我的帳號"));
     await act(async () => { type(host.querySelector("#erase-phrase") as HTMLInputElement, PHRASE); });
@@ -110,6 +110,23 @@ describe("設定：刪除帳號要確認兩次", () => {
     expect(posted).toHaveLength(1);
     expect(JSON.parse(posted[0][1]!.body as string)).toEqual({ confirm: PHRASE });
     expect(assign).toHaveBeenCalledWith("/login");
+    Object.defineProperty(window, "location", { value: originalLocation, writable: true, configurable: true });
+    await done();
+  });
+
+  it("when the account is gone but some files could not be deleted it says which instead of leaving silently", async () => {
+    const assign = vi.fn();
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", { value: { ...originalLocation, assign }, writable: true, configurable: true });
+    const failed = [{ artifact_type: "image/png", error: "JSON_ARTIFACT_HASH_MISMATCH" }, { artifact_type: "image/png", error: "ARTIFACT_REFERENCE_MALFORMED" }];
+    routes(settingsRoutes({ "POST /govern/account/erase": { cases: 1, runs: 1, records: 0, workflows: 0, tombstone: true, failed } }));
+    const { host, done } = await mount(<SettingsPage />);
+    await click(button(host, "我要刪除我的帳號"));
+    await act(async () => { type(host.querySelector("#erase-phrase") as HTMLInputElement, PHRASE); });
+    await click(button(host, "永遠刪除"));
+    expect(host.textContent).toContain("有 2 份 AI 產出的檔案沒能刪掉（image/png）");
+    expect(host.querySelector('a[href="/login"]')).not.toBeNull();
+    expect(assign).not.toHaveBeenCalled();
     Object.defineProperty(window, "location", { value: originalLocation, writable: true, configurable: true });
     await done();
   });
