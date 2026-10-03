@@ -5,6 +5,7 @@
 // weekly for the first month, then monthly, quarterly or yearly. The AI may split the step into smaller undoable ones (you
 // pick), point at what cannot be undone and summarise the numbers; it never promises, sets a target or does the step for you.
 import Link from "next/link";
+import { humanError } from "../../lib/errors";
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { ai, docs, type Doc, type Notice } from "../../lib/blocks";
@@ -13,7 +14,6 @@ import {
   type Flag, type Note, type Num, type Reminder, type Split, type Task,
 } from "../../lib/act";
 import { GUARDRAIL_NAME, HOLD, newPeople, type Judgment } from "../../lib/decide";
-import { judgmentError } from "../../lib/judgment-errors";
 import { formatTime } from "../../lib/time";
 import { BlockShell, Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips, optionalDocs } from "./JudgmentParts";
@@ -139,11 +139,11 @@ export function ActPage({ projectId }: { projectId: string }) {
     setGuardrails([...new Set(guards.map((doc) => doc.content.guardrail))]);
     setSplit(splits.at(-1) ?? null); setFlag(flags.at(-1) ?? null); setTrend(trends.at(-1) ?? null); setDue(reminders);
   };
-  useEffect(() => { load().catch((reason) => setError(judgmentError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load().catch((reason) => setError(humanError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = (work: () => Promise<void>) => async () => {
     setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(judgmentError(reason)); } finally { setBusy(false); }
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
   };
   const doing = async (work: () => Promise<void>) => run(work)();
   const crisis = (turn: { stopped?: string; notice?: string; resources?: Array<{ name: string; contact: string }> }) => { if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]); };
@@ -166,7 +166,7 @@ export function ActPage({ projectId }: { projectId: string }) {
   const askTrend = run(async () => { const turn = await ai<{ summary: string }>(projectId, "ACT", "trend", {}, trend); crisis(turn); });
   const openHistory = async (doc: Doc<Task>) => {
     if (history[doc.doc_id]) return;
-    try { const found = await docs.versions<Task>(projectId, "act.task", doc.doc_id); setHistory((held) => ({ ...held, [doc.doc_id]: found })); } catch (reason) { setError(judgmentError(reason)); }
+    try { const found = await docs.versions<Task>(projectId, "act.task", doc.doc_id); setHistory((held) => ({ ...held, [doc.doc_id]: found })); } catch (reason) { setError(humanError(reason)); }
   };
 
   if (!tasks) return <BlockShell projectId={projectId} code="ACT"><div className="card"><p>{error || "載入中…"}</p></div></BlockShell>;

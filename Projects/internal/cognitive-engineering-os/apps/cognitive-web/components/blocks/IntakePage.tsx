@@ -5,6 +5,7 @@
 // skip blocks. A purpose whose package is not open yet is shown with the step it opens in, never selectable.
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
+import { NotTherapyNotice } from "./GovernParts";
 import { BLOCKS, OPEN_STEP, blockOf, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { BlockShell, Notices } from "./BlockShell";
@@ -69,6 +70,7 @@ export function IntakePage({ projectId }: { projectId: string }) {
 
   return (
     <BlockShell projectId={projectId} title="開案" refresh={refresh}>
+      <NotTherapyNotice />
       <Notices notices={notices} />
       {guarded.length > 0 && <div className="card accent"><p className="mt0">你寫的風險碰到：{guarded.map((notice) => notice.type === "guardrail" ? notice.category : "").join("、")}。這個案子加了護欄：AI 說到事實一定附來源、會提醒你可以找專業的人、不能反悔的決定會請你先等一下。</p></div>}
       <div className="card cta">

@@ -5,11 +5,11 @@
 // your trust; then you decide -- keep the judgment, write a new version, or change method. The page lists what you did
 // without the AI; it never scores, grades or ranks you, and the AI never decides for you whether to revise.
 import Link from "next/link";
+import { humanError } from "../../lib/errors";
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { ai, blockOf, docs, type Doc, type Notice } from "../../lib/blocks";
 import { GUARDRAIL_NAME, wontChange, type Check, type Judgment, type Review } from "../../lib/decide";
-import { judgmentError } from "../../lib/judgment-errors";
 import {
   DECISIONS, DONE_WHEN, NEXT_BLOCKS, PREDICTION_RESULT, REVIEW_CHECKS, TRUST, whatTheAiSaid,
   type Calibration, type Compare, type Move, type Wrong,
@@ -76,12 +76,12 @@ export function LearnPage({ projectId }: { projectId: string }) {
       setVersion(latest);
       fill(next.calibrations.filter((doc) => doc.content.judgment_version === latest).at(-1) ?? null);
       setDay(next.revisit?.content.on ?? "");
-    }).catch((reason) => setError(judgmentError(reason)));
+    }).catch((reason) => setError(humanError(reason)));
   }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = (work: () => Promise<void>) => async () => {
     setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(judgmentError(reason)); } finally { setBusy(false); }
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
   };
   const set = (patch: Partial<Calibration>) => setForm((current) => ({ ...current, ...patch }));
   const pick = (next: Held, chosen: number) => { setVersion(chosen); fill(next.calibrations.filter((doc) => doc.content.judgment_version === chosen).at(-1) ?? null); };

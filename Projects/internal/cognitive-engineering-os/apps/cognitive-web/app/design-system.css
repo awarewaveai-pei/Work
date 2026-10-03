@@ -160,6 +160,7 @@
   .mcard b{font-size:var(--fs-body)}
   .mcard .k{color:var(--muted);font-size:var(--fs-tag)}
   .mcard .need{color:var(--warn)}
+  .card .tag{display:inline-block;font-size:var(--fs-tag);padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);vertical-align:middle}
   .mcard .tag{display:inline-block;font-size:var(--fs-tag);padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
   h2 small{font-weight:400;color:var(--muted);font-size:var(--fs-small);margin-left:8px}
   .grid2{display:grid;grid-template-columns:1fr;gap:12px}

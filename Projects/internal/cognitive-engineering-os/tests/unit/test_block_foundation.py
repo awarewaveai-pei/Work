@@ -78,6 +78,35 @@ class WebBlockListTests(unittest.TestCase):
         self.assertEqual(sorted(code for code, _, step in rows if int(step) <= BUILD_STEP), sorted(OPEN_BLOCKS))
         self.assertIn(f"export const OPEN_STEP = {BUILD_STEP};", text)
 
+    def test_every_open_block_has_its_page(self):
+        """The 下一塊 button links /projects/{id}/<path>; an open block with no page would be a 404 (critic 2026-10-03 m7)."""
+        import re
+        from ai_lego import PRODUCT_ROOT
+        from ai_lego.core.domain.kinds.assembler import OPEN_BLOCKS
+
+        web = PRODUCT_ROOT / "apps" / "cognitive-web"
+        paths = dict(re.findall(r'\{ code: "([A-Z]+)", n: \d+,.*?path: "([a-z]+)"', (web / "lib" / "blocks.ts").read_text(encoding="utf-8")))
+        missing = [code for code in OPEN_BLOCKS if not (web / "app" / "(shell)" / "projects" / "[id]" / paths[code] / "page.tsx").is_file()]
+        self.assertEqual(missing, [])
+
+    def test_every_refusal_a_block_can_give_has_a_sentence(self):
+        """拒收用人話: every code the blocks, the gate and the record raise is in lib/errors.ts CODES, or named here as a
+        programming error no person can cause from a page (a kind or an action declared wrong, a writer missing)."""
+        import re
+        from ai_lego import PRODUCT_ROOT
+
+        internal = {"AI_ACTION_DUPLICATE", "AI_ACTION_INVALID", "AI_READ_REFUSED", "DOC_CONTENT_NOT_NORMALISED", "DOC_KIND_DUPLICATE", "DOC_KIND_INVALID",
+                    "DOC_KIND_NOT_SINGLETON", "DOC_SINGLETON_BROKEN", "RECORD_AUTHOR_IDENTITY_REQUIRED", "RECORD_AUTHOR_INVALID", "RECORD_BLOCK_NOT_ALLOWED",
+                    "RECORD_OWNER_INVALID", "RECORD_OWNER_NOT_ALLOWED", "RECORD_TYPE_UNREGISTERED", "RECORD_WRITER_AND_OWNER_REQUIRED"}
+        lego = PRODUCT_ROOT / "ai_lego"
+        sources = [*(lego / "platform" / "block_hooks").glob("*.py"), *(lego / "platform" / "ai_actions").glob("*.py"), *(lego / "apps" / "api" / "blocks").glob("*.py"),
+                   lego / "platform" / "ai_gate.py", lego / "core" / "domain" / "doc_kinds.py", lego / "data" / "repositories" / "case_docs.py", lego / "data" / "events" / "record_log.py"]
+        raised = {code for path in sources for code in re.findall(r'(?:InvariantViolation|AiRefused)\(f?"([A-Z][A-Z0-9_]+)|detail=f?"([A-Z][A-Z0-9_]+)', path.read_text(encoding="utf-8")) for code in code if code}
+        sentences = set(re.findall(r"^  ([A-Z][A-Z0-9_]+): \"", (PRODUCT_ROOT / "apps" / "cognitive-web" / "lib" / "errors.ts").read_text(encoding="utf-8"), re.M))
+        self.assertGreater(len(raised), 40)
+        self.assertEqual(sorted(raised - sentences - internal), [])
+        self.assertEqual(sorted(internal - raised), [])   # a name listed here that nothing raises any more goes
+
     def test_only_the_shell_says_which_block_is_next(self):
         """「下一塊」 comes from the case's route (the person's own order + accepted proposals), drawn by BlockShell. A page
         that writes its own next link contradicts it (2026-10-03: SENSE said 拆解 while the case's next was 共思考)."""
@@ -269,6 +298,16 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         self._card()
         self.client.post(f"{self.base}/docs/sense.state", json={"content": {"emotion": "絕望", "intensity": "強", "distance_note": "十年後我已經不想活了"}})
         self.assertEqual(self.client.post(f"{self.base}/ai/SENSE/mirror", json={"context": {}}).json().get("stopped"), "crisis")
+        self.assertEqual(self.provider.calls, [])
+
+    def test_an_answer_that_could_not_be_kept_where_it_was_asked_is_refused_before_the_model(self):
+        """worker 丁: an action whose answer is kept for the person, asked inside a case, paid for a model call and then
+        failed on the save."""
+        from ai_lego.data.repositories.case_docs import CaseDocs
+        personal = next(action for action in ai_gate.actions().values() if doc_kinds.require(action.output_kind).owner == "person")
+        repo = api_main.app.dependency_overrides[api_main.get_project_source_repository]()
+        with self.assertRaises(ai_gate.AiRefused):
+            ai_gate.ask_ai(personal, tenant_id=self.tenant["tenant_id"], identity_id=self.identity["identity_id"], project_id=self.pid, context={}, docs=CaseDocs(repo), provider=self.provider)
         self.assertEqual(self.provider.calls, [])
 
     def test_the_contracts_own_terms_reach_the_model_and_are_checked_too(self):

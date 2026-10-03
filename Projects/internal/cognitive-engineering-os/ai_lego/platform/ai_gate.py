@@ -105,6 +105,8 @@ def ask_ai(action: AiAction, *, tenant_id: str, identity_id: str, project_id: st
     if project_id is None and not action.outside_case:
         raise AiRefused(f"AI_PERMISSION_DENIED: {action.block}.{action.name} runs only inside a case")
     owner = record_log.case(project_id) if project_id else record_log.person(identity_id)
+    if doc_kinds.require(action.output_kind).owner != owner.kind:   # refused before anything is paid for (the save would refuse after)
+        raise AiRefused(f"AI_PERMISSION_DENIED: {action.block}.{action.name} answers into {action.output_kind}, which is kept {'for you' if owner.kind == 'case' else 'in a case'}")
     terms = _latest(docs, tenant_id, owner, "collab_contract.terms") if project_id else None
     permitted = allowed(terms)
     if action.needs not in permitted:

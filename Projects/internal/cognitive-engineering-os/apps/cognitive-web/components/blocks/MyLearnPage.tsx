@@ -5,10 +5,10 @@
 // would change it. You also set the two practices (10 minutes a day, 2 to 3 thinking sprints a week) and keep your own
 // habits. Nothing here is copied into a case, and nothing here is scored or compared with anyone.
 import Link from "next/link";
+import { humanError } from "../../lib/errors";
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { ai, docs, type Doc, type Notice } from "../../lib/blocks";
-import { judgmentError } from "../../lib/judgment-errors";
 import { DAILY_ABOUT, SPRINTS, sprintsThisWeek, type OpenCase } from "../../lib/learn";
 import type { Project } from "../../lib/projects";
 import { formatTime } from "../../lib/time";
@@ -53,12 +53,12 @@ export function MyLearnPage() {
       const todays = found.cards.filter((card) => day(card.at) === today).at(-1);
       setForm(todays ? todays.content : EMPTY);
       setSetting(found.practice?.content ?? {});
-    }).catch((reason) => setError(judgmentError(reason)));
+    }).catch((reason) => setError(humanError(reason)));
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = (work: () => Promise<void>) => async () => {
     setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(judgmentError(reason)); } finally { setBusy(false); }
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
   };
   const todays = dailies?.filter((card) => day(card.at) === today).at(-1) ?? null;
   const save = run(async () => {

@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-type Section = "home" | "tools" | "workflows" | "projects";
+type Section = "home" | "tools" | "workflows" | "projects" | "settings" | "help";
 // Menu glyphs are the app's own chrome (same paths as display_catalog.py GLYPHS home / grid / flow / folder), so the
 // menu renders even when the catalog cannot be read.
 const NAV: Array<{ id: Section; href: string; label: string; icon: string }> = [
@@ -14,10 +14,14 @@ const NAV: Array<{ id: Section; href: string; label: string; icon: string }> = [
   { id: "tools", href: "/methods", label: "工具", icon: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>' },
   { id: "workflows", href: "/workflows", label: "工作流", icon: '<circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.5 12h4M11.5 12c3 0 3-6 5-6M11.5 12c3 0 3 6 5 6"/>' },
   { id: "projects", href: "/projects", label: "我的專案", icon: '<path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>' },
+  { id: "settings", href: "/settings", label: "設定", icon: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>' },
+  { id: "help", href: "/help", label: "求助", icon: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7"/><path d="M12 17h.01"/>' },
 ];
 
 export function sectionOf(path: string): Section {
   if (path === "/") return "home";
+  if (path.startsWith("/settings")) return "settings";
+  if (path.startsWith("/help")) return "help";
   if (/^\/methods\/[^/]+\/run\/?$/.test(path) || path.startsWith("/projects")) return "projects";
   if (path.startsWith("/workflows") || path.startsWith("/learn/workflow/")) return "workflows";
   return "tools";

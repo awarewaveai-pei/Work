@@ -31,8 +31,9 @@ export type Author = "user" | "ai" | "joint" | "system";
 export type Doc<C = Record<string, any>> = { doc_id: string; kind: string; version: number; content: C; author: Author; block: string; at: string; created_at?: string };
 export type Notice =
   | { type: "crisis"; notice: string; resources: Array<{ name: string; contact: string }> }
-  | { type: "proposal"; doc_id: string; kind: string; by: string; propose: string; why: string; open: boolean }
-  | { type: "guardrail"; category: string; found_by: string };
+  | { type: "proposal"; doc_id: string; kind: string; by: string; propose: string; why: string; open: boolean; guardrail?: boolean }
+  | { type: "guardrail"; category: string; found_by: string }
+  | { type: "suggest_case"; categories: string[]; notice: string };   // outside a case: a high-risk word -> open a case (GOVERN's sentence)
 export type Saved<C = Record<string, any>> = Doc<C> & { notices: Notice[] };
 export const AUTHOR: Record<Author, string> = { user: "你寫的", ai: "AI 寫的", joint: "AI 起草、你改過", system: "系統" };
 

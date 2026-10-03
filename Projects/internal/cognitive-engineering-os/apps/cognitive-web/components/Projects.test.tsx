@@ -10,6 +10,9 @@ import { ProjectPage } from "./ProjectPage";
 import { BLOCKS, isOpen } from "../lib/blocks";
 
 vi.mock("../lib/api", async (original) => ({ ...(await original<typeof import("../lib/api")>()), apiFetch: vi.fn() }));
+// the case list's two panels read their own endpoints and have their own tests (RemindersPanel, GovernParts)
+vi.mock("./blocks/RemindersPanel", () => ({ RemindersPanel: () => null }));
+vi.mock("./blocks/GovernParts", async (original) => ({ ...(await original<typeof import("./blocks/GovernParts")>()), NotTherapyNotice: () => null }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 afterEach(() => vi.resetAllMocks());
 

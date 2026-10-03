@@ -4,13 +4,13 @@
 // Every cell is yours. The AI only checks what you wrote (clear? undoable? checkable later?) and gives nothing new once you
 // press 「現在我要自己下結論」. The system lists what may be influencing you and asks about eight more; what it listed and
 // what you added are kept apart, with the version you save. Every version stays; two can be read side by side.
+import { humanError } from "../../lib/errors";
 import React, { useEffect, useMemo, useState } from "react";
 import { ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import {
   ASKED, ASKED_ANSWER, CREDIBILITY, GUARDRAIL_NAME, HOLD, INTENSITY, PRE_CHECKS, STOP_QUESTIONS, UNWINNABLE, cannotSave, emptyCells, holdAsked, influencesFrom, intensityAdvice, newPeople,
   sealedNow, sourceLine, versionRows, voicesOnMap, withMapFacts, wontChange, type Asked, type CardView, type Check, type Fact, type Judgment, type MapView, type Review, type ThinkCardView,
 } from "../../lib/decide";
-import { judgmentError } from "../../lib/judgment-errors";
 import type { Calibration } from "../../lib/learn";
 import { BlockShell, Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips, linesOf, optionalDocs } from "./JudgmentParts";
@@ -73,11 +73,11 @@ export function DecidePage({ projectId }: { projectId: string }) {
     if (next.judgment && next.judgment.version > 1) docs.versions<Judgment>(projectId, "decide.judgment", next.judgment.doc_id).then((found) => { setVersions(found); setPair([found.length - 1, found.length]); }).catch(() => undefined);
     return next;
   };
-  useEffect(() => { load().then((next) => fill(next.judgment, next.intake)).catch((reason) => setError(judgmentError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load().then((next) => fill(next.judgment, next.intake)).catch((reason) => setError(humanError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const run = (work: () => Promise<void>) => async () => {
     setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(judgmentError(reason)); } finally { setBusy(false); }
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
   };
 
   const judgment = held?.judgment ?? null;

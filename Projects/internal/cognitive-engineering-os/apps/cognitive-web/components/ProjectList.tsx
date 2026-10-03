@@ -3,6 +3,8 @@
 // 我的專案 (docs/mockups/home-mock.html section#projects): one row per project -- its name opens it, what it used, how
 // far it got (走到哪: AI 草稿／已核准／已退回, tasks due, a rerun due), when it was made and last moved (to the minute, in
 // your own time zone), and the button to its latest result. Most recently active first.
+import { NotTherapyNotice } from "./blocks/GovernParts";
+import { RemindersPanel } from "./blocks/RemindersPanel";
 import Link from "next/link";
 import { BLOCKS } from "../lib/blocks";
 import { Slots } from "./blocks/BlockShell";
@@ -22,6 +24,8 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
   return (
     <section className="view" id="projects">
       <div className="top"><div><h1>我的專案</h1><div className="sub">每次用工具分析都會開一個新專案，結果存在裡面，隨時回來看。</div></div><Link className="btn primary" href="/">開新的分析：先說你卡在哪 →</Link></div>
+      <NotTherapyNotice />
+      <RemindersPanel />
       <div className="card">
         <h2>你的專案<small>{projects ? `${projects.length} 個你自己的・1 個示範` : "載入中"}</small></h2>
         <div className="how"><b>怎麼讀</b>一列一個專案：用了哪個工具、走到哪、建立和最後更新的時間（到分鐘）、下一步；最近動過的在上面。<b>你要做的</b>按專案名稱打開它，看裡面每一次分析和任務；按「看結果」直接看最近一次。</div>

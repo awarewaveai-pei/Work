@@ -8,6 +8,7 @@ import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { BLOCKS, blockOf, docs, isOpen, route, type BlockCode, type Notice, type Route, type RouteStop } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
+import { AskBeforeBlock, CollabPermissions } from "./CollabPermissions";
 import type { Project } from "../../lib/projects";
 
 export function useProject(projectId: string) {
@@ -147,7 +148,7 @@ function Proposals({ projectId, refresh, onAnswered }: { projectId: string; refr
     <>
       {proposals.map((proposal) => (
         <div key={proposal.doc_id} className="card">
-          <p className="mt0"><b>{blockOf(proposal.by)?.name ?? proposal.by}</b> 提議加「{blockOf(proposal.propose)?.name ?? proposal.propose}」：{proposal.why}</p>
+          <p className="mt0">{proposal.guardrail && <span className="tag">護欄</span>} <b>{blockOf(proposal.by)?.name ?? proposal.by}</b> 提議加「{blockOf(proposal.propose)?.name ?? proposal.propose}」：{proposal.why}</p>
           {proposal.open
             ? <div className="btns"><button className="btn primary" onClick={() => answer(proposal, "accepted")}>加</button><button className="btn" onClick={() => answer(proposal, "declined")}>不用</button></div>
             : <div className="btns"><span className="sub">這一塊還沒開放（第 {blockOf(proposal.propose)?.step} 步才蓋），提議先記著。</span><button className="btn ghost" onClick={() => answer(proposal, "declined")}>不用了</button></div>}
@@ -173,6 +174,8 @@ export function BlockShell({ projectId, code, title, refresh = 0, children }: { 
       {block && <p className="sub">{block.does}。你隨時可以停，也可以跳過這一塊。</p>}
       <Slots projectId={projectId} current={code} route={path} />
       {code && <Where projectId={projectId} code={code} path={path} error={routeError} />}
+      {code && <CollabPermissions projectId={projectId} />}
+      {code && <AskBeforeBlock projectId={projectId} block={code} />}
       <Proposals projectId={projectId} refresh={refresh} onAnswered={() => setAnswered((count) => count + 1)} />
       {children}
       {code && path && <GoOn projectId={projectId} code={code} path={path} />}

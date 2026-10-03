@@ -1,7 +1,7 @@
 // LEARN 回顧校準 as the page holds it: the review's shape (ai_lego/core/domain/kinds/learn.py) and the small rules the page
 // applies. The lists are copies of the engine's (test_block_learn.WebParityTests compares them). Nothing here scores,
 // grades or ranks: a number is never computed from a belief.
-import type { Doc } from "./blocks";
+import type { Doc, Notice } from "./blocks";
 import type { Check, Review } from "./decide";
 
 export const DECISIONS = ["維持判斷", "出新版判斷", "換方法再做一輪", "還沒決定"] as const;
@@ -34,7 +34,7 @@ export type Calibration = {
 };
 export type Move = { item: string; seen: string };
 export type Compare = { side_by_side: string; done_well?: string[]; practice?: string };
-export type OpenCase = { type: "suggest_case"; categories: string[]; notice: string };   // GOVERN's (block_hooks/govern.py)
+export type OpenCase = Extract<Notice, { type: "suggest_case" }>;   // GOVERN's (block_hooks/govern.py)
 
 export type AiRow = { from: string; author: string; said: string; took: string };
 const cut = (text: string, length = 160): string => (text.length > length ? `${text.slice(0, length)}…` : text);

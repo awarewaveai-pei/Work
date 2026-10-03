@@ -99,7 +99,7 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 ## 協作合約 (乙) — built 2026-10-03
 - built: 「你也可以不讓 AI 知道發生地和你在哪裡」 as one visible switch beside the five permission chips (`hide_places` on the contract, not a permission; the engine side is S's); the one-line summary says when it is on
 - built: five fields; permissions as toggle chips in the card's words; every save = a version, listed with what it changed; `CollabPermissions` (the AI's permissions in one line) and `AskBeforeBlock` (asks once per block entry per case) exported from `components/blocks/CollabPermissions.tsx`
-- NOT YET (S): mount `CollabPermissions` and `AskBeforeBlock` in `BlockShell`; AskBeforeBlock remembers its answer in the browser, so another browser asks again
+- built (S): `CollabPermissions` (one line, 「畫面上一直看得到 AI 現在的權限」) and `AskBeforeBlock` on every block page (BlockShell); KNOWN LIMIT: AskBeforeBlock remembers its answer in the browser, so another browser asks again
 - built (S, cd71058f1): 「它讀：你填的五格」, 「人不可委託的部分」, 「交還控制的條件一到，AI 就停下來」 -- the gate sends scope, human_parts, basis and handback and tells the model to stop at the hand-back condition (an instruction: whether it is met is the model's reading)
 - NOT YET: 「找外部資料」 is grantable and shown, but nothing uses it until GATHER (step 2)
 - 「AI 也不准做」 list: `ai_gate.PREAMBLE` carries no conclusion / sources apart / no law from memory / no position as the neutral one; the guardrail `professional` carries 「高風險提示專業支持」; alternatives to your story are THINK's diverge (替代假設) and counter turns; reject/override with a reason = the card reaction and `think.response`
@@ -112,14 +112,14 @@ Owners: S = supervisor session; 甲 MAP+規範與脈絡; 乙 THINK+協作合約;
 - NOT YET: 「現有工具 14 個…工具進了這一塊，要照這份合約走：你先寫，AI 才回」 the 14 decision tools and 6 business workflows still run the old way (AI first)
 - DECISION: 「有人帶的時候，帶領者也一定在清單上」 the intake has no facilitator field, so the page reads the case's block list (FACILITATE; opens in step 4)
 - DECISION: 「地圖上別人的聲音」 a map item carries only the card's id, so the page reads SENSE cards to learn the category of the cards already on the map; no other card is shown
-- OPEN (S): BlockShell's proposal card should show a 護欄 tag when `guardrail` is true (`/proposals` returns it; the COLLAB `why` also says it in words)
-- OPEN (S): lib/errors.ts has no sentence for AI_SEALED, DECIDE_NO_JUDGMENT, ACT_NO_*, LEARN_* (lib/judgment-errors.ts holds them until then)
+- built (S): a proposal marked as a guardrail shows 護欄 on its card (BlockShell)
+- built (S): every refusal code has its sentence in lib/errors.ts (judgment-errors.ts folded in; test_every_refusal_a_block_can_give_has_a_sentence)
 
 ## ACT (丙) — built 2026-10-03
 - task card (prediction first, due, risk, stop / escalate conditions, owner, irreversible, whose wish, hold under the guardrail), notes (4 cells + numbers, trend from 2 points), status as buttons, history with quick flips folded (10 min window, all kept), weekly-then-月/季/年 reminders (`GET /me/reminders`, `/projects/{id}/act/reminders`), AI split / flag / trend
-- OPEN (S): 「提醒出現在「我的案子」首頁」 put `<RemindersPanel />` (components/blocks/RemindersPanel.tsx) in ProjectList; the engine side is done
+- built (S): 「提醒出現在「我的案子」首頁」 -- RemindersPanel on the case list
 - NOT YET: 「也可以選寄 email」 (noreply@aware-wave.com, a link and no case content) for ACT / LEARN / practice reminders
-- OPEN (S): 「⑦ 存成任務」 (TaskCreated events) stays as it is; it should also write `act.task` so ACT shows those tasks
+- NOT YET (S): 「⑦ 存成任務」 (TaskCreated events) stays as it is; it should also write `act.task` (needs a prediction the ⑦ row does not carry -- second wave, with 「你先寫，AI 才回」 for the old tools)
 - NOT YET (VERIFY, COMPUTE: step 2; COLLAB: step 3): reading their results and group actions; handing observations to COLLAB
 - NOT YET: 「現有工具 22 個…你先寫，AI 才回」 the 22 planning / small-trial tools still run the old way
 
