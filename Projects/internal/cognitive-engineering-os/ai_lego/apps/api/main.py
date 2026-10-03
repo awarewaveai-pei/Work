@@ -225,12 +225,57 @@ def build_api_journal_protector(tenant_id: str, run_id: str) -> CasJournalContex
     )
 
 
-def workflow_journal_path(tenant_id: str, run_id: str) -> Path:
-    """Resolve a journal path internally without exposing the host path to API clients."""
+def workflow_journal_path(tenant_id: str, run_id: str, identity_id: str | None = None) -> Path:
+    """Resolve a journal path internally without exposing the host path to API clients. With ``identity_id``: the
+    run's owner's own folder (every run since 2026-10-03); without: the tenant folder runs used before."""
     if not isinstance(tenant_id, str) or not tenant_id or not isinstance(run_id, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id) is None:
         raise InvariantViolation("WORKFLOW_JOURNAL_REFERENCE_INVALID")
     tenant_key = hashlib.sha256(tenant_id.encode("utf-8")).hexdigest()[:32]
-    return PRODUCT_ROOT / ".runtime" / "workflows" / tenant_key / f"{run_id}.journal.json"
+    folder = PRODUCT_ROOT / ".runtime" / "workflows" / tenant_key
+    if identity_id is not None:
+        folder = folder / hashlib.sha256(identity_id.encode("utf-8")).hexdigest()[:32]
+    return folder / f"{run_id}.journal.json"
+
+
+def _run_journal(session: dict[str, Any], run_id: str) -> Path:
+    """A recipe run is its runner's (critic 2026-10-03: a run on my case was readable by run_id from the whole tenant).
+    A run started before then lives in the tenant folder with no owner on record: it stays readable as it was."""
+    own = workflow_journal_path(session["tenant_id"], run_id, session["identity_id"])
+    legacy = workflow_journal_path(session["tenant_id"], run_id)
+    return legacy if not own.exists() and not lock_path_for(own).exists() and legacy.exists() else own
+
+
+def _run_case_path(journal: Path) -> Path:
+    """Beside a run on a case: which case, and every artifact the run stored -- so erasing the case erases the run."""
+    return journal.with_name(journal.name.replace(".journal.json", ".case.json"))
+
+
+def _record_run_artifact(case_file: Path, output: Any) -> Any:
+    reference = output.get("artifact", {}).get("cas_reference") if isinstance(output, dict) and isinstance(output.get("artifact"), dict) else None
+    if reference is not None:
+        record = read_json(case_file)
+        record["artifacts"].append(reference)
+        tmp = case_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(case_file)
+    return output
+
+
+def _erase_case_runs(tenant_id: str, identity_id: str, project_id: str, artifact_store: JsonArtifactStore) -> int:
+    """Every recipe run the person ran on this case: its artifacts, journal, lock and case file. Refuses while one runs."""
+    folder = workflow_journal_path(tenant_id, "x", identity_id).parent
+    runs = [path for path in folder.glob("*.case.json") if read_json(path).get("project_id") == project_id] if folder.is_dir() else []
+    journals = [path.with_name(path.name.replace(".case.json", ".journal.json")) for path in runs]
+    if any(run_lock_state(lock_path_for(journal)) == "held" for journal in journals):
+        raise HTTPException(status_code=409, detail="PROJECT_BUSY: a workflow run on this case is still running; wait for it to finish, then delete")
+    removed = 0
+    for case_file, journal in zip(runs, journals):
+        for reference in read_json(case_file).get("artifacts", []):
+            artifact_store.delete_if_present(tenant_id, reference)
+        for path in (journal, lock_path_for(journal), case_file):
+            path.unlink(missing_ok=True)
+        removed += 1
+    return removed
 
 
 def workflow_journal_ref(tenant_id: str, run_id: str) -> str:
@@ -313,7 +358,7 @@ def _journal_run_result(journal: dict[str, Any], context: Any) -> dict[str, Any]
 def _load_recipe_journal(session: dict[str, Any], recipe_id: str, run_id: str) -> dict[str, Any]:
     """Load and validate one tenant-scoped journal without exposing its filesystem path."""
     try:
-        journal = workflow_journal_path(session["tenant_id"], run_id)
+        journal = _run_journal(session, run_id)
     except (KeyError, InvariantViolation) as error:
         raise HTTPException(status_code=400, detail="WORKFLOW_RUN_ID_INVALID") from error
     if not journal.is_file():
@@ -923,7 +968,7 @@ def run_recipe(
     async_run = body.get("async", False)
     if not isinstance(async_run, bool):
         raise HTTPException(status_code=400, detail="WORKFLOW_ASYNC_INVALID: async must be boolean")
-    journal = workflow_journal_path(session["tenant_id"], run_id)
+    journal = _run_journal(session, run_id)
     journal_ref = workflow_journal_ref(session["tenant_id"], run_id)
     # The classification is the Project's, never the caller's (RESEARCH_LINES_MASTER_PLAN K9): a body value is refused
     # rather than ignored, because silently ignoring CONFIDENTIAL would drop the encrypted-journal requirement below.
@@ -947,6 +992,12 @@ def run_recipe(
         method_handlers, gate_runners = build_method_components(nodes, validator="api.recipe")
     except MethodDispatchError as error:
         raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
+    if isinstance(project_id, str) and journal == workflow_journal_path(session["tenant_id"], run_id, session["identity_id"]):
+        case_file = _run_case_path(journal)
+        if not case_file.exists():
+            case_file.parent.mkdir(parents=True, exist_ok=True)
+            case_file.write_text(json.dumps({"project_id": project_id, "artifacts": []}), encoding="utf-8")
+        capability_handlers = {ref: (lambda payload, node, inner=handler: _record_run_artifact(case_file, inner(payload, node))) for ref, handler in capability_handlers.items()}
     handlers: dict[str, Any] = dict(capability_handlers)
     handlers.update(method_handlers)
 
@@ -1038,7 +1089,7 @@ def recipe_run_status(
     accepted run whose runner died before its first journal record is ``LOST`` (submit it again)."""
     tenant_id = session["tenant_id"]
     try:
-        journal_path: Path | None = workflow_journal_path(tenant_id, run_id)
+        journal_path: Path | None = _run_journal(session, run_id)
     except (KeyError, InvariantViolation):
         journal_path = None  # _load_recipe_journal below answers the 400
     if journal_path is not None and not journal_path.is_file():
@@ -2668,6 +2719,7 @@ def erase_project(
     if synthesis_lock is None:   # a synthesis is writing into this case; held for the whole erase so none can start
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a synthesis is still running; wait for it to finish, then delete")
     try:
+        _erase_case_runs(tenant_id, session["identity_id"], project_id, artifact_store)
         store.close_collect_grants_for_project(tenant_id, project_id)
         artifacts = 0
         for reference in repo.project_artifact_references(tenant_id, project_id):

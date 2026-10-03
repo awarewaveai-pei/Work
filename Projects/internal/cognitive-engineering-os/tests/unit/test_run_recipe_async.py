@@ -166,7 +166,7 @@ class RunRecipeAsyncTests(ApiTestCase):
         ``workflow_journal_path``'s docstring already says stays API-internal) survive into the journal's
         own error text just because the raising exception happened to mention it."""
         run_id = _run_id()
-        journal_path = api_main.workflow_journal_path(self.tenant["tenant_id"], run_id)
+        journal_path = api_main.workflow_journal_path(self.tenant["tenant_id"], run_id, self.identity["identity_id"])
 
         def _raise_with_path(workflow_ir, initial_context, handlers, **kwargs):
             raise RuntimeError(f"boom while touching {journal_path}")
@@ -232,7 +232,7 @@ class RunLockAcrossProcessesTests(ApiTestCase):
     _post = RunRecipeAsyncTests._post
 
     def _journal(self, run_id: str) -> Path:
-        return api_main.workflow_journal_path(self.tenant["tenant_id"], run_id)
+        return api_main.workflow_journal_path(self.tenant["tenant_id"], run_id, self.identity["identity_id"])
 
     def _status(self, run_id: str):
         return self.client.get(f"/recipes/life-decision-v1/runs/{run_id}")

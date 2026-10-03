@@ -1289,8 +1289,40 @@ class RecipeRunTests(ApiTestCase):
         self.assertNotIn(str(api_main.PRODUCT_ROOT), json.dumps(payload))
         self.assertNotIn("DO_NOT_ECHO_RAW_SOURCE", json.dumps(payload))
         self.assertNotIn("source", payload["workflow"]["context"])
-        journal = json.loads(api_main.workflow_journal_path(self.tenant["tenant_id"], payload["run_id"]).read_text(encoding="utf-8"))
+        journal = json.loads(api_main.workflow_journal_path(self.tenant["tenant_id"], payload["run_id"], self.identity["identity_id"]).read_text(encoding="utf-8"))
         self.assertNotIn("source", journal["context"])
+
+    def test_a_run_is_only_its_runners(self):
+        """critic 2026-10-03 M2: a run was readable by run_id from the whole tenant."""
+        self._login()
+        run_id = "api-life-owner-" + uuid.uuid4().hex[:12]
+        self.assertEqual(self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source(), "run_id": run_id}).status_code, 200)
+        store = IdentityStore(self.db_path)
+        store.create_identity(str(uuid.uuid4()), self.tenant["tenant_id"], "colleague@example.com", "Colleague", "correct-horse-battery")
+        self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "colleague@example.com", "password": "correct-horse-battery"})
+        self.assertEqual(self.client.get(f"/recipes/life-decision-v1/runs/{run_id}").status_code, 404)
+        self.assertEqual(self.client.get(f"/recipes/life-decision-v1/runs/{run_id}/result").status_code, 404)
+
+    def test_erasing_a_case_erases_the_runs_on_it(self):
+        """critic 2026-10-03 M2: a run's journal and the artifacts it stored outlived the case it ran on."""
+        tenant, me = self.tenant["tenant_id"], self.identity["identity_id"]
+        store = api_main.app.dependency_overrides[api_main.get_artifact_store]()
+        reference = store.put(tenant, "ProposalDraft", {"content": "from my case"})
+        journal = api_main.workflow_journal_path(tenant, "run-on-case-" + uuid.uuid4().hex[:8], me)
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        journal.write_text("{}", encoding="utf-8")
+        case_file = api_main._run_case_path(journal)
+        case_file.write_text(json.dumps({"project_id": "P-ERASED", "artifacts": [reference]}), encoding="utf-8")
+        other = api_main._run_case_path(api_main.workflow_journal_path(tenant, "run-on-other-" + uuid.uuid4().hex[:8], me))
+        other.write_text(json.dumps({"project_id": "P-KEPT", "artifacts": []}), encoding="utf-8")
+        try:
+            self.assertEqual(api_main._erase_case_runs(tenant, me, "P-ERASED", store), 1)
+            self.assertFalse(journal.exists() or case_file.exists())
+            with self.assertRaises(InvariantViolation):
+                store.read(tenant, reference)
+            self.assertTrue(other.exists())
+        finally:
+            other.unlink(missing_ok=True)
 
     def test_life_recipe_resume_reuses_stable_journal_namespace(self):
         self._login()
@@ -1484,7 +1516,7 @@ class RecipeRunTests(ApiTestCase):
             result_payload = response.json()
             self.assertTrue(result_payload["journal_ref"].startswith("workflow-journal://"))
             self.assertNotIn(str(api_main.PRODUCT_ROOT), json.dumps(result_payload))
-            journal = json.loads(api_main.workflow_journal_path(self.tenant["tenant_id"], result_payload["run_id"]).read_text(encoding="utf-8"))
+            journal = json.loads(api_main.workflow_journal_path(self.tenant["tenant_id"], result_payload["run_id"], self.identity["identity_id"]).read_text(encoding="utf-8"))
             self.assertTrue(journal["context"]["protected"])
             self.assertEqual(journal["context"]["storage"], "TENANT_SCOPED_CAS")
             self.assertNotIn("source", journal["context"])

@@ -128,6 +128,29 @@ class LegacyFileTests(unittest.TestCase):
             ProjectSourceRepository(self.path)
 
 
+class OwnerScopedNameTests(unittest.TestCase):
+    """critic 2026-10-03 M1: a workspace-wide unique name told a colleague my case's name existed."""
+
+    def test_an_old_file_moves_to_names_unique_per_person_and_keeps_its_rows(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "projects.sqlite3"
+            old = sqlite3.connect(path)
+            old.executescript(
+                "CREATE TABLE platform_projects (tenant_id TEXT NOT NULL, project_id TEXT NOT NULL, workspace_id TEXT NOT NULL, name TEXT NOT NULL,"
+                " purpose TEXT NOT NULL, data_classification TEXT NOT NULL, status TEXT NOT NULL, version INTEGER NOT NULL,"
+                " created_by_identity_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (tenant_id, project_id), UNIQUE (tenant_id, workspace_id, name));"
+                "INSERT INTO platform_projects VALUES ('t','P1','w','合作','p','Confidential','active',1,'A','2026-09-01T00:00:00Z');"
+            )
+            old.commit()
+            old.close()
+            repo = ProjectSourceRepository(path)
+            row = {"tenant_id": "t", "workspace_id": "w", "name": "合作", "purpose": "p", "data_classification": "Confidential", "status": "active", "version": 1, "created_at": "2026-10-03T00:00:00Z"}
+            repo.create_project({**row, "project_id": "P2", "created_by_identity_id": "B"})   # a colleague may use the same name
+            with self.assertRaises(sqlite3.IntegrityError):
+                repo.create_project({**row, "project_id": "P3", "created_by_identity_id": "A"})   # I may not, twice
+            self.assertEqual(sorted(project["project_id"] for project in repo.list_projects("t")), ["P1", "P2"])
+
+
 class CustomWorkflowOwnerTests(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -184,6 +207,21 @@ class CaseOwnerApiTests(ProjectSourceApiTestCase):
         finally:
             lock.release()
         self.assertEqual(self.client.delete(f"/projects/{self.pid}").status_code, 200)
+
+    def test_deleting_the_case_through_the_api_erases_its_runs(self):
+        import json as _json
+        connection = sqlite3.connect(self.db_path)
+        try:
+            me = connection.execute("SELECT identity_id FROM identity WHERE email='user@example.com'").fetchone()[0]
+        finally:
+            connection.close()
+        journal = api_main.workflow_journal_path(self.tenant["tenant_id"], "run-" + uuid.uuid4().hex[:8], me)
+        journal.parent.mkdir(parents=True, exist_ok=True)
+        journal.write_text("{}", encoding="utf-8")
+        case_file = api_main._run_case_path(journal)
+        case_file.write_text(_json.dumps({"project_id": self.pid, "artifacts": []}), encoding="utf-8")
+        self.assertEqual(self.client.delete(f"/projects/{self.pid}").status_code, 200)
+        self.assertFalse(journal.exists() or case_file.exists())
 
     def test_my_case_records_name_me_and_the_block(self):
         self.client.post(f"/projects/{self.pid}/sources", json={"title": "Note", "media_type": "text/plain", "data_classification": "Confidential", "content": "hello"})

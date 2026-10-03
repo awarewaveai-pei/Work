@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS platform_projects (
     created_by_identity_id TEXT NOT NULL,
     created_at TEXT NOT NULL,
     PRIMARY KEY (tenant_id, project_id),
-    UNIQUE (tenant_id, workspace_id, name)
+    UNIQUE (tenant_id, workspace_id, created_by_identity_id, name)
 );
 CREATE TABLE IF NOT EXISTS prov_sources (
     tenant_id TEXT NOT NULL,
@@ -206,6 +206,37 @@ _LEGACY_OWNER_SQL = (
 
 _MIGRATED: set[str] = set()   # files brought up to date in this process: a request does not re-run the migration
 
+# 2026-10-03: a name is unique among ONE person's cases. Unique across the workspace, a 409 on create/rename told a
+# colleague that someone else had a case with that name (critic: existence leak). An old file still carries the
+# workspace-wide key; SQLite cannot drop a table constraint, so the table is rebuilt (SQLite's documented 12 steps).
+_OLD_NAME_KEY = "UNIQUE (tenant_id, workspace_id, name)"
+
+
+def _owner_scoped_names(db_path: Path) -> None:
+    connection = sqlite3.connect(db_path, isolation_level=None)
+    try:
+        row = connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='platform_projects'").fetchone()
+        if row is None or _OLD_NAME_KEY not in row[0]:
+            return
+        connection.execute("PRAGMA foreign_keys = OFF")   # only outside a transaction; children keep their rows
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            connection.execute(row[0].replace("CREATE TABLE platform_projects", "CREATE TABLE platform_projects_owner_names", 1)
+                               .replace(_OLD_NAME_KEY, "UNIQUE (tenant_id, workspace_id, created_by_identity_id, name)"))
+            connection.execute("INSERT INTO platform_projects_owner_names SELECT * FROM platform_projects")
+            connection.execute("DROP TABLE platform_projects")
+            connection.execute("ALTER TABLE platform_projects_owner_names RENAME TO platform_projects")
+            connection.execute("CREATE INDEX IF NOT EXISTS ix_platform_projects_workspace ON platform_projects (tenant_id, workspace_id, created_at, project_id)")
+            broken = connection.execute("PRAGMA foreign_key_check").fetchall()
+            if broken:
+                raise InvariantViolation(f"PROJECT_NAME_KEY_MIGRATION_BROKE_REFERENCES: {len(broken)}")
+            connection.execute("COMMIT")
+        except BaseException:
+            connection.execute("ROLLBACK")
+            raise
+    finally:
+        connection.close()
+
 
 class ProjectSourceRepository:
     """SQLite adapter for the Project/Source repository contract."""
@@ -216,6 +247,8 @@ class ProjectSourceRepository:
         key = str(self.db_path.resolve())
         if key in _MIGRATED and self.db_path.exists():
             return
+        if self.db_path.exists():
+            _owner_scoped_names(self.db_path)
         with self._connection() as connection:
             connection.executescript(_SCHEMA)
             self._migrate_columns(connection)
