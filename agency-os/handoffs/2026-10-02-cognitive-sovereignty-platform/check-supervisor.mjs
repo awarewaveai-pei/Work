@@ -230,6 +230,11 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
       if (!canRead(c).includes('*') && !owns(a.code).some((id) => canRead(c).includes(id))) arch.push('handoff without drawer ' + a.code + '->' + c);
     }
     for (const c of codes) if (!WIRING.some((w) => w[0] === c)) arch.push('wiring?' + c);
+    // Work outside a case has no 協作合約 and no 開案資料 (round 10: the daily calibration was missing from the list of such calls).
+    const outside = [...new Set(DRAWERS.filter((d) => ['練習', '帶領', '個人'].includes(d.where)).map((d) => d.owner))].sort().join();
+    if (outside !== OUT_CASE_CALLS.map((x) => x[0]).sort().join()) arch.push('calls outside a case: drawers ' + outside + ' / list ' + OUT_CASE_CALLS.map((x) => x[0]).join());
+    // What a card writes is its drawers (round 10: 個人歷程 held two items LEARN's card did not list).
+    for (const d of DRAWERS) if (!card(d.owner).includes(d.has)) arch.push('drawer contents not on its writer card: ' + d.id);
     // One order for the blocks and one for the five (2026-10-03: arranged by relation, not by when they were added);
     // the lists written out by hand follow it.
     const order = [...BLOCKS.map((b) => b.code), ...CROSS.map((x) => x.code)];
@@ -301,7 +306,7 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     for (const s of ['同源合併', '同源群組', '來源地圖', '管道佔比', '來源身分卡']) if (whole.includes(s)) typed.push('retired word ' + s);
     // One word, one meaning (critic round 5): 關卡 = the three architecture gates; 任務 = one action (任務卡), the whole is a 案子;
     // COLLAB's record is 群組紀錄 (共用紀錄 is the case record); 所在地 is split into 發生地 and 你在哪裡; a thin result counts 出處.
-    for (const s of ['七道關卡', '建立任務', '每件任務', '我的任務', '共同紀錄', '案子的所在地', '找到的來源太少']) if (whole.includes(s)) typed.push('ambiguous word ' + s);
+    for (const s of ['七道關卡', '建立任務', '每件任務', '我的任務', '共同紀錄', '案子的所在地', '找到的來源太少', '受影響的人', '找不找得到出處', '出處是不是彼此獨立']) if (whole.includes(s)) typed.push('ambiguous word ' + s);
     if (!whole.includes(FACET_NAMES.length + ' 個面向')) typed.push('facet count');
     // The block count is written once (NB). Any "N 塊積木 / N 份積木合約 / N 格" on any page equals it; a position (第 N 塊),
     // the judgment card's 11 boxes and dated history are not counts of blocks (2026-10-03: 55 hand-typed 13s when block 14 came).
@@ -313,6 +318,9 @@ for (const [label, width] of [['wide', 1280], ['narrow', 400]]) {
     // A named set written out in brackets on any page has exactly its members (round 9: 「外殼」 had three member lists).
     for (const [nm, ms] of [['外殼', LAYERS[1][3]], ['基本安全', GOVERN_FIRST], ['研究與治理', GOVERN_LATER]])
       for (const mm of whole.matchAll(new RegExp(nm + '（([^）]*)）', 'g'))) if (mm[1] !== ms.join('、')) typed.push('named set ' + nm + '（' + mm[1] + '）');
+    // ...and the four norm checks and VERIFY's three things, wherever they are written out (round 10: three wordings each).
+    for (const mm of whole.matchAll(/四個檢查：([^。]*)。/g)) if (mm[1] !== NORM_CHECKS.join('；')) typed.push('named set 四個檢查：' + mm[1].slice(0, 30));
+    for (const mm of whole.matchAll(/找得到出處、[^，。；\n]*/g)) if (mm[0] !== THREE.join('、')) typed.push('named set 三件事：' + mm[0]);
     // The worked example is one set of data: SENSE's example is EX_CARDS, and its labels are the kinds SENSE offers (round 9).
     if (BLOCKS.find((b) => b.code === 'SENSE').example !== EX_CARDS) typed.push('SENSE example is not EX_CARDS');
     for (const [k] of EX_CARDS) if (!CARD_KINDS.includes(k)) typed.push('example card kind not offered: ' + k);
