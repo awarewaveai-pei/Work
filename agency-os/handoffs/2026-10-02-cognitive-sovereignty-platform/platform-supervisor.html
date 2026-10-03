@@ -1386,7 +1386,7 @@ document.querySelectorAll(".n-pk").forEach(e => { e.textContent = PK.length; });
 /* 2026-10-03 她：「都交給你做，需要決定的事都你決定」。我定的每一件寫在這裡，談定頁和架構頁都從這裡畫。 */
 const DELEGATED = "2026-10-03 你交給我定";
 /* 合約在它那一步開工前確認（前一步蓋出來學到的會改後面的合約）。確認到第幾步只寫這裡；哪幾份算確認，從 BUILD 算。 */
-const CONFIRMED_STEP = 1;
+const CONFIRMED_STEP = 2;
 const stepNo = r => +r[1].match(/\d+/)[0];   /* BUILD 每一列的 r[0] 是顏色組，不是第幾步 */
 const CONFIRMED = () => [...new Set(BUILD.filter(r=>stepNo(r) >= 1 && stepNo(r) <= CONFIRMED_STEP).flatMap(r=>r[5]))];
 /* 確認＝確認這一版的內容。卡上任何一行（含北極星、框架、工具那幾行）改了，指紋就不同，腳本擋，要重看再更新這裡（第 17 輪審查：確認原本只是一個標籤）。 */
@@ -1394,6 +1394,7 @@ const CONFIRMED = () => [...new Set(BUILD.filter(r=>stepNo(r) >= 1 && stepNo(r) 
 const CONFIRM_LOG = [
   {on:"2026-10-03", why:"第 1 步要用的 12 份第一次確認（她交給我定）", sigs:{"SENSE": "ek2pvi","MAP": "ol16qm","THINK": "1l08sa8","DECIDE": "3nuw7q","ACT": "1jhdz1h","LEARN": "89otcx","GOVERN": "c9xa52","完整性核心": "1szg6ih","規範與脈絡": "uvzsp","組裝器": "1oi4xob","協作合約": "9tjmyh","共用紀錄": "i2gh9d"}},
   {on:"2026-10-03", why:"第 17 次審查驗證後改了這幾張（THINK 指令卡對應的模式和角色；ACT、LEARN 提醒怎麼送；組裝器還沒開放的目的怎麼標），重看過", sigs:{"THINK": "df8n7y","ACT": "1sfkj6c","LEARN": "1qq7qzh","組裝器": "47u5ct"}},
+  {on:"2026-10-04", why:"第 2 步要用的 3 份開工前重讀、確認（她交給我定）；卡上寫不到的（語言只有中英、社群傳播沒有資料）記在 STEP2_CHECKLIST，不改卡", sigs:{"GATHER": "n2n827","VERIFY": "18fquxs","COMPUTE": "1q6kmp3"}},
 ];
 const CONFIRMED_SIG = Object.assign({}, ...CONFIRM_LOG.map(e=>e.sigs));
 const FIRST_SCENE = "個人複雜決策";
@@ -1434,7 +1435,7 @@ const ARCH_DECIDED = [
 const BUILD = [
   [0,"第 0 步","寫 " + NB + " 份積木合約、5 份全程生效項合約","每塊說清楚十二個欄位。共用紀錄從這 " + NB + " 份推出來。全程生效的五樣也各寫一份。",() => "寫完了。第 " + CONFIRMED_STEP + " 步要用的 " + CONFIRMED().length + " 份已確認（" + DELEGATED + "）；其餘 " + (NB + 5 - CONFIRMED().length) + " 份在它那一步開工前確認",[],"寫合約"],
   [1,"第 1 步","第一圈：個人複雜決策","外殼（" + LAYERS[1][3].join("、") + "）、案子的紀錄（共用紀錄）、" + zh(PK.find(p=>p[0]==="個人複雜決策")[2].length) + "塊、基本安全（" + GOVERN_FIRST.join("、") + "）一起做。MAP 這一步要做出六層地圖，用上「規範與脈絡」這個鏡頭。一塊一塊做到能拿真事進去用。","做好了，在本機（2026-10-04）：七塊和全程生效的五樣都能用，上線前檢查全部通過。還沒上正式站，要你同意。GOVERN 的研究與治理在第 3 步。",["SENSE","MAP","THINK","DECIDE","ACT","LEARN","GOVERN","完整性核心","規範與脈絡","組裝器","協作合約","共用紀錄"],"第一圈＋基本安全"],
-  [2,"第 2 步","接現有引擎當積木","東西已經有，缺的是積木的合約和畫面。","未開始",["GATHER","VERIFY","COMPUTE"],"接引擎"],
+  [2,"第 2 步","接現有引擎當積木","東西已經有，缺的是積木的合約和畫面。","進行中（2026-10-04）：三份合約確認了。三塊共用的規則先定好才派工：出處怎麼算只寫一處；AI 只能引用案子裡找回來的來源，引文要對得上原文；出處不到兩個，系統在叫 AI 之前就停。全部做好，再一起上正式站。",["GATHER","VERIFY","COMPUTE"],"接引擎"],
   [4,"第 3 步","公共決策","多人共同程序提前到這裡：它是北極星因果鏈的第四環。研究與治理（" + GOVERN_LATER.join("、") + "）也在這一步。","未開始",["COLLAB","GOVERN"],"公共決策"],
   [3,"第 4 步","教學、表達與帶領","情境演練、角色輪替；把判斷變成給別人看的東西；帶領者的訓練和督導。","未開始",["TEACH","EXPRESS","FACILITATE"],"教學、表達與帶領"],
 ];
@@ -1505,7 +1506,7 @@ const BLOCKS = [
  {n:1, code:"SENSE", name:"外化", role:"先攤出來", status:"無", contract:"草稿", build:"完成",
   example:EX_CARDS},
  {n:2, code:"GATHER", name:"蒐集來源", role:"把資料找回來，看清楚是誰說的",
-  words:[["來源","一個網頁或一份文件。"],["出處","最早的源頭。五個網頁抄同一篇文章，算五個來源、一個出處。"],["管道","怎麼找到的：哪一家搜尋引擎、哪種語言，或你自己貼的。"],["蒐集器","在背後抓資料的程式。你在 VERIFY 查一則訊息時，系統也用它。"]], status:"部分", contract:"草稿", build:"未開始",
+  words:[["來源","一個網頁或一份文件。"],["出處","最早的源頭。五個網頁抄同一篇文章，算五個來源、一個出處。"],["管道","怎麼找到的：哪一家搜尋引擎、哪種語言，或你自己貼的。"],["蒐集器","在背後抓資料的程式。你在 VERIFY 查一則訊息時，系統也用它。"]], status:"部分", contract:"草稿", build:"進行中",
   exampleTitle:"範例：合夥人說「同業都這樣改合約」，我想查是不是真的",
   example:[["我寫","同業都這樣改合約，是真的嗎？然後按「去找」"],["系統找到","9 個網頁。其中 5 個貼的是同一篇文章，算 1 個出處。另外 2 個各算 1 個出處。所以是 3 個獨立出處。還有 2 個抓不到內文"],["來源總覽","出處一：某產業公會的公告，2019 年就有。出處二：一家顧問公司的文章，查得到是誰辦的。出處三：一個網站，網域上個月才註冊，查不到誰辦的"],["放一旁","2 個網頁抓不到內文，放在一旁，沒算進去"],["我標記","出處一：採用。出處二：存疑，因為它在賣顧問服務。出處三：不用，因為查不到誰辦的"],["交出去","三筆都標「有人這樣說」，連同我的標記交給查證。我標「不用」的那一筆照樣交出去，但不算進支持或反對的數量"]],
   problem:["GATHER 幫你把外面的資料找回來。它讓你看得出每一筆是誰說的。它也讓你看得出幾個網頁是不是抄自同一個源頭。它不替你判斷真假。這一步是你自己看來源，再對每個出處決定採不採用。","藍圖沒有這一塊。藍圖的 VERIFY 同時包含「找來源」和「查主張」（藍圖 3.2），談定拆成 GATHER 和 VERIFY；藍圖 4.1 步驟 3 另外把「聽到的資訊」和外化寫在同一步。","蒐集是整個平台的入口：這裡進來的東西被灌水，後面的拆解、計算、判斷全部跟著錯，而且每一句都還「有引註」。所以防線要做在這一塊，不能只提醒使用者小心。（增補 A12）"],
@@ -1523,10 +1524,10 @@ const BLOCKS = [
  {n:3, code:"MAP", name:"拆解", role:"分開看", status:"部分", contract:"未寫", build:"完成",
   now:"做法庫有：" + TOOL_TOTAL + " 個工具裡 " + TOOL_OF("MAP") + " 個是拆解用的（例如冰山、魚骨、SWOT），都能跑、都有檢查。" + "六層地圖、規範檢查這塊積木本身沒有。資料上「事實／法律／價值」沒有分開的欄位。"},
  {n:4, code:"THINK", name:"共思考", role:"發散、反證", status:"無", contract:"未寫", build:"完成"},
- {n:5, code:"VERIFY", name:"查證主張", role:"對來源", status:"部分", contract:"草稿", build:"未開始",
+ {n:5, code:"VERIFY", name:"查證主張", role:"對來源", status:"部分", contract:"草稿", build:"進行中",
   exampleTitle:"範例：群組裡瘋傳「下週起每人每天只能提領一萬元現金，快去領」",
   example:[["我先寫","有點慌，想轉給家人。信心六成"],["拆主張","可以查的事實 2 個：政府有這個規定（法律：要寫法域、時效、來源）；下週生效。叫你去做的事 1 個：快去領、快轉傳"],["主張帳本","「有這個規定」：官方公告查不到；3 個網站有寫，合併後是同 1 個出處，網域上個月才註冊"],["傳播","兩小時內 40 多個帳號貼同一段文字，多數是這個月建立的"],["手法","用量造勢；冒充來源（寫「銀行內部通知」但沒有文件）；情緒勒索（「不轉就來不及」）"],["三件事",THREE[0] + " ✓　" + THREE[1] + " ✗　" + THREE[2] + "？我判斷：站不住（網域上個月才註冊、查不到誰辦的）"],["它要我做","去領錢、轉傳。照做的人多了，真的會出事"],["我的判定","不採信。理由：沒有官方出處，出處只有一個而且很新。轉不轉傳，在判斷和行動那兩步決定"]]},
- {n:6, code:"COMPUTE", name:"計算與模擬", role:"真的算", status:"部分", contract:"未寫", build:"未開始"},
+ {n:6, code:"COMPUTE", name:"計算與模擬", role:"真的算", status:"部分", contract:"未寫", build:"進行中"},
  {n:7, code:"DECIDE", name:"判斷", role:"我的結論", status:"無", contract:"未寫", build:"完成"},
  {n:8, code:"ACT", name:"行動與觀察", role:"做一步，持續看", status:"部分", contract:"未寫", build:"完成"},
  {n:9, code:"LEARN", name:"回顧校準", role:"回頭對結果", status:"無", contract:"未寫", build:"完成"},
@@ -2047,7 +2048,8 @@ const CONTRACTS = {
   data:["合約的每一版都跟著案子存。"],
   now:["今天沒有這一樣。","今天 AI 每次都是全權。"]},
 };
-[...BLOCKS, ...CROSS].forEach(b => { const c = CONTRACTS[b.code]; if (c) { Object.assign(b, c); b.contract = CONFIRMED().includes(b.code) ? "已確認" : "草稿"; } });
+/* 一張卡寫在 CONTRACTS 或直接寫在 BLOCKS 裡（GATHER）；有卡（有「解決什麼問題」）的，狀態都照確認紀錄算。 */
+[...BLOCKS, ...CROSS].forEach(b => { const c = CONTRACTS[b.code]; if (c) Object.assign(b, c); if (b.problem) b.contract = CONFIRMED().includes(b.code) ? "已確認" : "草稿"; });
 /* 「寫什麼」＝這一塊的抽屜裝什麼（架構頁同一份），再加不是抽屜內容的說明（第十次審查：個人歷程的抽屜比 LEARN 卡上寫的多兩樣）。 */
 [...BLOCKS, ...CROSS].forEach(b => { const ds = DRAWERS.filter(d=>d.owner===b.code); if (ds.length) b.writes = [...ds.map(d=>`「${d.name}」：${d.has}。`), ...(b.writesNote || [])]; });
 /* 看得到你內容的積木（SEES_CONTENT，定義在 CONTRACTS 前面）：危機和高風險那幾句由名單加到每張卡，不在各卡手寫。 */
@@ -2231,11 +2233,11 @@ document.querySelectorAll("[data-cross5]").forEach(el => { el.innerHTML = CROSS.
   const drafts = BLOCKS.filter(b=>b.contract!=="未寫").length;
   const nx = byCode(NEXT_TALK);
   $("now").innerHTML = `
-    <div><div class="k">現在在哪一步</div><div class="v">第 1 步做好了，在本機</div>
+    <div><div class="k">現在在哪一步</div><div class="v">第 2 步　${BUILD[2][2]}　進行中</div>
       <div class="bar" role="img" aria-label="${NB} 塊有 ${BLOCKS.filter(b=>b.build==="完成").length} 塊建好"><i style="width:${BLOCKS.filter(b=>b.build==="完成").length/NB*100}%"></i></div>
       <div class="d num">積木 ${BLOCKS.filter(b=>b.build==="完成").length} ／ ${NB} 塊建好；全程生效的五樣 ${CROSS.filter(b=>b.build==="完成").length} ／ ${CROSS.length} 樣建好</div></div>
-    <div><div class="k">下一步</div><div class="v">上正式站，要你同意</div>
-      <div class="d">之後是第 2 步：${BUILD[2][2]}（${BUILD[2][5].join("、")}）；合約先談 ${pad(nx.n)} ${nx.code}</div></div>
+    <div><div class="k">下一步</div><div class="v">全部做好，再一起上正式站</div>
+      <div class="d">你 2026-10-04 說的。第 1 步做好了，在本機；第 2 步在做（${BUILD[2][5].join("、")}）。上正式站那天還是要你說一聲</div></div>
     <div><div class="k">${NB} 塊積木今天的現況</div>
       <div class="counts">${["有","部分","無"].map(s=>`<span class="st num" data-s="${s}">${G[s]} ${s} ${c(s)}</span>`).join("")}</div>
       <div class="d">全程生效的五樣：${["有","部分","無"].map(s=>s+" "+CROSS.filter(b=>b.status===s).length).join("、")}</div>
