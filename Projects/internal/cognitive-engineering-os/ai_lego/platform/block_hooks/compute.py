@@ -35,6 +35,7 @@ WALL = None   # the sweep's mark for numbers no module can compute with: it stop
 OTHERS = tuple(name for name in SCENARIOS if name != BASE)   # set beside each input; 一般 is the input's own value
 INPUT_KEYS = {"key", "name", "value", "unit", "cards", "own"}
 MAX_CARDS, NAME_CHARS, UNIT_CHARS, NOT_PRICED_MAX, WHAT_CHARS = 12, 60, 20, 10, 200
+CHANGE_DIGITS = 4   # a flip's relative change is stored to 0.01%: under 0.005% it is 0, the one change the page calls 就在線上 (flipWords)
 SENSITIVITY = "系統一次改一個輸入，找出讓結果翻過來的那一個。"
 NO_FLIP = "每一個數字單獨往上、往下改（改到跟它本身一樣大，或到你給的樂觀、悲觀那麼遠），結果都沒有翻過來。"
 ZERO_SPAN = "這個數字是 0，也沒有樂觀、悲觀的值，不知道要改多少。"
@@ -56,8 +57,10 @@ MODULE_WORDS = {
 # with no number. A 悲觀 that truly never breaks even is a result, never a reason to refuse the request.
 MODULE_ANSWERS: dict[str, Callable[[Mapping[str, Any]], tuple[int, str]]] = {
     "BREAKEVEN_NONPOSITIVE_CONTRIBUTION_MARGIN": lambda v: (1, "每單位的毛利是 0 或負的：做越多賠越多，永遠打不平。"),
-    "IRR_UNDEFINED_SAME_SIGN_CASH_FLOWS": lambda v: (1, "之後每年沒有淨收入：投入的拿不回來，算不出報酬率。") if v["yearly"] <= 0
-    else (0, "一開始沒有投入：之後只有收入，報酬率沒有上限。"),
+    # IRR's flows are -投入 then 每年的淨收入 (投入 is never below 0): only income, only outflow with something invested, or neither
+    "IRR_UNDEFINED_SAME_SIGN_CASH_FLOWS": lambda v: (0, "一開始沒有投入：之後只有收入，報酬率沒有上限。") if v["yearly"] > 0
+    else (1, "之後每年沒有淨收入：投入的拿不回來，算不出報酬率。") if v["initial"] > 0
+    else (1, "一開始沒有投入，之後每年也沒有淨收入：算不出報酬率。"),
 }
 
 
@@ -136,9 +139,11 @@ def _input(item: Any, specs: Mapping[str, Mapping[str, Any]], types: Mapping[str
         _refuse(f"「{name}」要寫單位，最多 {UNIT_CHARS} 個字。")
     if kind.get("fixed_unit") and unit != kind["unit"]:
         _refuse(f"「{name}」的單位是「{kind['unit']}」。")
-    own, picked = item.get("own"), item.get("cards") or []
+    own, picked = item.get("own"), [] if item.get("cards") is None else item.get("cards")
     if not isinstance(own, bool):
         _refuse(f"「{name}」要選來源卡，或標「{OWN_WORDS}」。")
+    if not isinstance(picked, list):
+        _refuse(f"「{name}」選的來源卡格式不對，請重新整理頁面再試一次。")
     if own and picked:
         _refuse(f"「{name}」標了「{OWN_WORDS}」，就不能同時選來源卡。")
     if not own:
@@ -179,12 +184,14 @@ def plan(content: Mapping[str, Any], cards: set[str] | None) -> dict[str, Any]:
         _refuse(f"同一個算式裡的金額要用同一種單位，現在有：{'、'.join(sorted(units))}。")
 
     values = {BASE: {item["name"]: item["value"] for item in inputs}}
-    scenarios = content.get("scenarios") or {}
-    if not isinstance(scenarios, Mapping) or set(scenarios) - set(OTHERS):
+    scenarios = {} if content.get("scenarios") is None else content.get("scenarios")   # only None is none: 悲觀 0 is no scenario, never 一般's
+    if not isinstance(scenarios, Mapping):
+        _refuse("情境的格式不對，請重新整理頁面再試一次。")
+    if set(scenarios) - set(OTHERS):
         _refuse(f"情境只有{'和'.join(OTHERS)}兩種；{BASE}就是你填的數字。")
     by_name = {item["name"]: item for item in inputs}
     for scenario in OTHERS:
-        given = scenarios.get(scenario) or {}
+        given = {} if scenarios.get(scenario) is None else scenarios.get(scenario)
         if not isinstance(given, Mapping):
             _refuse(f"{scenario}情境的格式不對，請重新整理頁面再試一次。")
         values[scenario] = dict(values[BASE])
@@ -210,17 +217,17 @@ def plan(content: Mapping[str, Any], cards: set[str] | None) -> dict[str, Any]:
             _refuse(f"「{item['name']}」的{BASE}值要在{'和'.join(OTHERS)}之間。")
 
     extras = set(algo.get("extras") or ())
-    not_priced, who_bears = content.get("not_priced"), content.get("who_bears")
-    if (not_priced or who_bears) and not extras:
+    rows = [] if content.get("not_priced") is None else content.get("not_priced")
+    bears = "" if content.get("who_bears") is None else content.get("who_bears")
+    if (rows != [] or bears != "") and not extras:
         _refuse(f"只有成本效益會用到「換不成金額的東西」和「誰得到效益、誰付成本」；{algo['name']}不用填。")
-    if "who_bears" in extras and not (isinstance(who_bears, str) and who_bears.strip()):
+    if "who_bears" in extras and not (isinstance(bears, str) and bears.strip()):
         _refuse("成本效益要寫：誰得到效益、誰付成本。")
-    rows = not_priced or []
     if not isinstance(rows, list) or len(rows) > NOT_PRICED_MAX or any(
             not isinstance(row, Mapping) or set(row) != {"side", "what"} or row["side"] not in NOT_PRICED_SIDES
             or not isinstance(row["what"], str) or not row["what"].strip() or len(row["what"]) > WHAT_CHARS for row in rows):
         _refuse(f"換不成金額的東西，最多 {NOT_PRICED_MAX} 項，每項標{'或'.join(NOT_PRICED_SIDES)}、寫一句（最多 {WHAT_CHARS} 字）。")
-    return {"algo": algo, "inputs": inputs, "values": values, "not_priced": [dict(row) for row in rows], "who_bears": (who_bears or "").strip()}
+    return {"algo": algo, "inputs": inputs, "values": values, "not_priced": [dict(row) for row in rows], "who_bears": bears.strip()}
 
 
 def case_cards(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> set[str]:
@@ -411,7 +418,7 @@ def _sweep(found: Mapping[str, Any], side_at: Callable[[str, float], str | None]
         flipped, stop = _nearest_flip(lambda x, name=name: side_at(name, x), base, base_side, span, _bounds(spec, types[spec["type"]]), steps, narrow)
         scale[name] = abs(base) or span
         if flipped:
-            each.append({"input": name, "base": base, "at": flipped[0], "to": flipped[1], "change": round((flipped[0] - base) / abs(base), 4) if base else None})
+            each.append({"input": name, "base": base, "at": flipped[0], "to": flipped[1], "change": round((flipped[0] - base) / abs(base), CHANGE_DIGITS) if base else None})
         else:
             each.append({"input": name, "base": base, "at": None, **({"stop": round(stop, 8)} if stop is not None else {})})
     flips = [entry for entry in each if entry.get("at") is not None]
@@ -477,16 +484,19 @@ def outcome(found: Mapping[str, Any], seed: int) -> tuple[dict[str, Any], dict[s
 
 # -- where each number comes from ---------------------------------------------------------------------------------------
 
-def sourcing(inputs: list[Mapping[str, Any]], counts: Mapping[str, int]) -> list[dict[str, Any]]:
-    """Each number's source in words; ``counts`` = ``calc_results()[].input_origins`` (counted there, never here)."""
+def sourcing(inputs: list[Mapping[str, Any]], counts: Mapping[str, int], cards: Mapping[str, Mapping[str, Any]] | None = None) -> list[dict[str, Any]]:
+    """Each number's source in words; ``counts`` = ``calc_results()[].input_origins`` (counted there, never here).
+    ``cards`` (the case's source cards by id, from ``evidence.origins``): each row then names the cards its number was
+    picked from -- title, address, whether its origin counts. A card not in the case any more names only its id."""
     rows = []
     for item in inputs:
         if item.get("own"):
-            rows.append({"input": item["name"], "own": True, "origins": 0, "words": OWN_WORDS})
+            rows.append({"input": item["name"], "own": True, "origins": 0, "words": OWN_WORDS, **({"cards": []} if cards is not None else {})})
             continue
         count = counts.get(item["name"], 0)
         words = f"有 {count} 個獨立出處" if count >= MIN_ORIGINS else f"只有 {count} 個算數的獨立出處（要 {MIN_ORIGINS} 個）"
-        rows.append({"input": item["name"], "own": False, "origins": count, "words": words})
+        named = {"cards": [{"card": card, **cards.get(card, {"title": "", "url": "", "counts": False})} for card in item["cards"]]} if cards is not None else {}
+        rows.append({"input": item["name"], "own": False, "origins": count, "words": words, **named})
     return rows
 
 
@@ -501,11 +511,13 @@ def weakest(rows: list[Mapping[str, Any]]) -> str:
 
 
 def case_runs(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> list[dict[str, Any]]:
-    """Every run of the case as ``evidence.calc_results`` gives it, with where each number comes from and the sentence
-    that keeps the result no surer than its weakest number."""
+    """Every run of the case as ``evidence.calc_results`` gives it, with where each number comes from (the cards by
+    name) and the sentence that keeps the result no surer than its weakest number."""
+    found = evidence.origins(docs, tenant_id, owner, with_reviews=False)
+    cards = {card["card"]: {"title": card.get("title", ""), "url": card.get("url", ""), "counts": origin["counts"]} for origin in found for card in origin["cards"]}
     out = []
-    for run in evidence.calc_results(docs, tenant_id, owner):
-        rows = sourcing(run.get("inputs") or [], run["input_origins"])
+    for run in evidence.calc_results(docs, tenant_id, owner, found):
+        rows = sourcing(run.get("inputs") or [], run["input_origins"], cards)
         out.append({**run, "sourcing": rows, "weakest": weakest(rows)})
     return out
 

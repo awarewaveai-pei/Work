@@ -6,6 +6,7 @@ AI suggests and explains without a number or a forecast and hands back under two
 
 from __future__ import annotations
 
+import hashlib
 import json
 import unittest
 from unittest import mock
@@ -26,7 +27,7 @@ from ai_lego.platform.ai_actions import compute as compute_ai
 from ai_lego.platform.block_hooks import compute
 from ai_lego.platform.safety.risk import high_risk_categories
 from tests.unit.test_block_decide import Provider
-from tests.unit.test_step2_foundation import Step2Case
+from tests.unit.test_step2_foundation import CELLS, Step2Case
 
 YEARLY = "之後每年的淨收入"
 EXPLAINED = {"points": [{"part": "推論", "text": "悲觀情境下淨現值是負的，主要因為每年的淨收入比較低。"}], "influential": YEARLY}
@@ -288,6 +289,34 @@ class RequestTests(ComputeCase):
         self.refused(npv_with(0, key=["initial"]), "不是淨現值要用的數字")
         self.assertEqual((self.docs.current(self.tenant_id, self.owner, "compute.request"), self.docs.current(self.tenant_id, self.owner, "compute.run")), ([], []))
 
+    def test_a_value_of_the_wrong_kind_is_refused_never_read_as_none(self):
+        """Codex F1: `x or {}` read 0, "", [] and False as "none given", so 悲觀: 0 silently reused 一般's number and the
+        range was wrong. In a request only an absent value (None) is none; anything else of the wrong kind is refused."""
+        content = self.npv()
+        cba = {"question": "成本效益", "algorithm": "cost_benefit", "inputs": [
+            item("one_time_cost", "一開始的成本", 1), item("yearly_cost", "每年的成本", 1), item("yearly_benefit", "每年的效益", 1), item("years", "年數", 1, "年"),
+            item("rate", "折現率", 3, "%")], "scenarios": {"悲觀": {"每年的效益": 0}}, "who_bears": "我"}
+        for wrong in (0, "", [], False):
+            with self.subTest(scenario=wrong):
+                self.refused({**content, "scenarios": {"樂觀": {YEARLY: 40000}, "悲觀": wrong}}, "悲觀情境的格式不對")
+            with self.subTest(scenarios=wrong):
+                self.refused({**content, "scenarios": wrong}, "情境的格式不對")
+        for wrong in (0, "", {}, False):
+            with self.subTest(cards=wrong):
+                own = self.npv()
+                own["inputs"][1] = {**own["inputs"][1], "cards": wrong}   # 我自己說的, with a card list that is not one
+                self.refused(own, f"「{YEARLY}」選的來源卡格式不對")
+            with self.subTest(not_priced=wrong):
+                self.refused({**content, "not_priced": wrong}, "只有成本效益會用到")
+                self.refused({**cba, "not_priced": wrong}, "換不成金額的東西，最多")
+        for wrong in (0, [], {}, False):
+            with self.subTest(who_bears=wrong):
+                self.refused({**content, "who_bears": wrong}, "只有成本效益會用到")
+                self.refused({**cba, "who_bears": wrong}, "成本效益要寫：誰得到效益、誰付成本")
+        self.assertEqual((self.docs.current(self.tenant_id, self.owner, "compute.request"), self.docs.current(self.tenant_id, self.owner, "compute.run")), ([], []))
+        self.request({**content, "scenarios": {"樂觀": None, "悲觀": {YEARLY: 15000}}})   # None is the one way to give none
+        self.request({**cba, "not_priced": [], "inputs": [{**cba["inputs"][0], "cards": None}, *cba["inputs"][1:]]})
+
     def test_only_the_person_writes_a_request_and_only_the_system_a_run(self):
         request, run = doc_kinds.require("compute.request"), doc_kinds.require("compute.run")
         self.assertEqual((request.authors, request.deletable, run.authors, run.deletable), (frozenset({"user"}), False, frozenset({"system"}), False))
@@ -373,6 +402,25 @@ class SourcingTests(ComputeCase):
         self.assertEqual(self.runs()[1]["input_origins"], {YEARLY: 2})
         self.assertIn(f"最弱的是「一開始投入的金額」", run["weakest"])
         self.assertIn("只有 1 個算數的獨立出處（要 2 個）", {row["input"]: row["words"] for row in run["sourcing"]}[YEARLY])
+
+    def titled(self, title, url):
+        return self.docs.save(self.tenant_id, self.owner, "gather.source", {"source_id": "", "url": url, "title": title, "found_by": {"by": "系統找的"},
+                              "cells": CELLS, "aside": "", "snapshot": {"sha256": hashlib.sha256(url.encode("utf-8")).hexdigest(), "fetched_at": "2026-10-04T00:00:00Z"}},
+                              record_log.system("GATHER"))["doc_id"]
+
+    def test_each_outside_number_names_the_cards_it_came_from(self):
+        """Codex F2: 「有 2 個獨立出處」 alone did not say which cards. Each outside number names its cards (title, address)
+        and whether each one's origin counts, read from evidence.origins; the person's own numbers have none."""
+        a, b = self.titled("勞動部新聞稿", "https://example.org/mol"), self.titled("公會公告", "https://example.org/guild")
+        waiting = self.titled("", "https://example.org/new")   # grouped by no one yet: shown, never counted
+        self.group([a], [b])
+        self.request(self.npv(yearly_cards=[a, b, waiting]))
+        [run] = self.runs()
+        rows = {row["input"]: row for row in run["sourcing"]}
+        self.assertEqual(rows[YEARLY]["cards"], [{"card": a, "title": "勞動部新聞稿", "url": "https://example.org/mol", "counts": True},
+                                                 {"card": b, "title": "公會公告", "url": "https://example.org/guild", "counts": True},
+                                                 {"card": waiting, "title": "", "url": "https://example.org/new", "counts": False}])
+        self.assertEqual((rows[YEARLY]["origins"], rows["年數"]["cards"]), (2, []))
 
 
 class AiTests(ComputeCase):
@@ -464,6 +512,18 @@ class AnswerTests(ComputeCase):
         self.assertEqual((by["樂觀"]["value"], by["樂觀"]["side"]), (None, "達到你要求的報酬率"))
         self.assertIsInstance(by["一般"]["value"], float)
 
+    def test_each_same_sign_case_says_its_own_cause(self):
+        """Codex F7: nothing invested and -5000 a year was told 「投入的拿不回來」. Each case says what is true of it."""
+        self.request(self.irr(悲觀={YEARLY: -5000}, 樂觀={"一開始投入的金額": 0}))
+        self.request(self.irr(悲觀={YEARLY: -5000, "一開始投入的金額": 0}, 樂觀={YEARLY: 0, "一開始投入的金額": 0}))
+        first, second = (run["result"]["by_scenario"] for run in self.runs())
+        cases = {"income <= 0": first["悲觀"], "no investment": first["樂觀"], "both, paying out": second["悲觀"], "both, nothing at all": second["樂觀"]}
+        self.assertEqual({case: (row["side"], row["words"]) for case, row in cases.items()}, {
+            "income <= 0": ("沒達到你要求的報酬率", "之後每年沒有淨收入：投入的拿不回來，算不出報酬率。"),
+            "no investment": ("達到你要求的報酬率", "一開始沒有投入：之後只有收入，報酬率沒有上限。"),
+            "both, paying out": ("沒達到你要求的報酬率", "一開始沒有投入，之後每年也沒有淨收入：算不出報酬率。"),
+            "both, nothing at all": ("沒達到你要求的報酬率", "一開始沒有投入，之後每年也沒有淨收入：算不出報酬率。")})
+
     def test_a_margin_swept_to_zero_stays_on_its_side_instead_of_flipping_to_uncomputable(self):
         found = compute.plan({**self.break_even(悲觀={"每單位的毛利": 900}), "inputs": [
             item("fixed_cost", "固定成本", 60000), item("margin", "每單位的毛利", 1000), item("expected", "你預計做得到的量", 20, "件")]}, None)
@@ -554,20 +614,26 @@ FORECASTS = ["悲觀情境下你會虧錢。", "這樣做會賺。", "you'll los
 # critic M2 round 3: certainty and likelihood
 CERTAINTY_LINES = ["穩賺。", "穩穩回本。", "穩了。", "保本沒問題。", "包賺不賠。", "鐵定虧。", "準虧。", "必虧無疑。", "絕對划算。", "結果是確定的。",
                    "you're set to lose", "it is sure to pay back", "you're destined to lose", "this is a sure thing", "it is guaranteed to work"]
-LIKELIHOOD_LINES = ["很可能虧損。", "大概率虧損。", "多半虧損。", "應該會回本。", "you're likely to lose money", "expect to lose", "this probably pays off"]
+LIKELIHOOD_LINES = ["很可能虧損。", "大概率虧損。", "多半虧損。", "應該會回本。", "you're likely to lose money", "expect to lose", "this probably pays off",
+                    # Codex F4: the standalone likelihood words; 不可能 says it is certain not to, 可能性很高 how likely it is
+                    "這個結果可能發生。", "也許虧損。", "或許虧損。", "大概虧損。", "恐怕虧損。", "說不定虧損。", "興許回本。", "有望回本。", "可望回本。",
+                    "虧損是不可能的。", "虧損的可能性很高。", "a loss is likely", "a loss is unlikely", "perhaps it pays off", "maybe you lose money",
+                    "possibly a loss", "a loss is probable"]
 # KNOWN LIMIT (STEP2_CHECKLIST, COMPUTE): a forecast with no listed marker -- a time word, 就 and the outcome -- is still saved;
 # the page's 「模擬不是預測，計算也不是」 beside every explanation is the backstop. A change that catches these updates the doc.
 KNOWN_LIMIT_LINES = ["下個月就回本。", "明年就回本了。", "這樣就虧了。", "this pays off next year"]
 PLAIN = ["悲觀情境下淨現值是負的，主要因為每年的淨收入比較低。", "模擬不是預測，悲觀情境不一定會發生；千萬不要只看一個數。", "這一項是你自己估的，還沒有外部出處。",
          "一般情境和樂觀情境落在同一邊，只有悲觀情境不一樣。", "這個結果不保證發生，也無法預測未來。", "每一項各抽各的，假設它們不會一起變好或變壞。",
          "一半以上的模擬達到你要的最低結果。", "十分依賴每年的淨收入這一個數字。", "悲觀情境下的計算結果低於打平。",
-         "one of the inputs is your own guess, not a prediction"]
+         "one of the inputs is your own guess, not a prediction",
+         "結果大約在打平的位置。"]   # 大約 is about an amount, not how likely an outcome is: decided, not a marker
 # the allow-listed modal words in sentences an explanation could really say
 MODAL_WORDS_IN_USE = ["這個數字還有機會找到別的出處。", "會計上怎麼記，要問專業的人。", "工會或公會的公告，可以當成來源卡。", "社會上的看法，屬於價值選擇。",
                       "將來每年的淨收入，是你自己估的。", "在一定程度上，結果取決於每年的淨收入。", "如果有誤會，可以改輸入再算。", "開會之前可以先並排比。",
                       "悲觀情境不代表一定會發生。", "free will is not part of this calculation", "there is no guarantee here",
                       "這個數字的來源很穩定。", "必要的話，可以再找一個出處。", "標準的做法是先用定存利率。", "這包括每年的成本。", "結果的不確定性來自每年的淨收入。",
-                      "絕對值越大，影響越大。", "這個方案不保本。", "說不準落在哪一邊。", "make sure the numbers are yours"]
+                      "絕對值越大，影響越大。", "這個方案不保本。", "說不準落在哪一邊。", "make sure the numbers are yours",
+                      "盡可能多找一些獨立出處。"]
 
 
 class AnswerWordsTests(unittest.TestCase):
@@ -609,12 +675,35 @@ class AnswerWordsTests(unittest.TestCase):
                    "會面", "會合", "會場", "會長", "研討會", "大會", "國會", "議會", "領會", "將近", "將軍", "將就", "將來", "不一定", "不一定會", "不等於一定會",
                    "不代表一定會", "不代表會", "不保證", "無法保證", "不能保證", "沒有保證", "不必然", "不肯定", "一定程度",
                    "穩定", "不穩", "穩健", "必要", "必須", "必需", "不必", "未必", "何必", "準確", "標準", "準備", "水準", "基準", "精準", "準則", "不準", "批准",
-                   "包括", "包含", "外包", "打包", "絕對值", "不確定", "無法確定", "不保本",
+                   "包括", "包含", "外包", "打包", "絕對值", "不確定", "無法確定", "不保本", "盡可能",
                    "free will", "no guarantee", "not guaranteed", "make sure")
         self.assertEqual(set(allowed), set(compute_ai.NOT_MARKERS + compute_ai.ENGLISH_NOT_MARKERS))
         for word in allowed:
             with self.subTest(word=word):
                 compute_ai._guard_words([f"這裡說的是「{word}」這個詞。"], [])
+
+    def test_every_numeral_form_of_written_chinese_is_a_number(self):
+        """Codex F3: simplified and financial numerals (两万、叁、陆) were saved. The forms are decided here, apart from the
+        code's one list: each is refused, and an item the person named with it never unlocks it."""
+        forms = ("〇零一二三四五六七八九十百千", "萬万億亿兆", "兩两", "壹貳贰參叁叄肆伍陸陆柒捌玖拾佰仟", "廿卄卅卌", "仨倆俩")
+        self.assertEqual(set("".join(forms)), set("".join(compute_ai.NUMERAL_FORMS)))
+        for char in "".join(forms):
+            with self.subTest(char=char):
+                with self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_HAS_NUMBER"):
+                    compute_ai._guard_words([f"差了{char}"], compute_ai._names())
+                with self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_HAS_NUMBER"):
+                    compute_ai._guard_words([f"「{char}」和「{char * 2}」"], [char, char * 2])
+
+    def test_a_persons_words_never_unlock_a_forecast_word(self):
+        """Codex F5: an item named 「保證」 let 「保證成功」 through, since known words were taken out of the whole answer.
+        The person's words (item names, question) are taken out for the number check only; the system's own names may
+        still be quoted (「你預計做得到的量」 holds 預計)."""
+        for name, text in (("保證", "保證成功。"), ("保證", "「保證」這一項是你估的。"), ("會費", "「會費」是你估的。"), ("穩賺方案", "穩賺方案"),
+                           ("可能的收入", "可能的收入比較低。"), ("預估的房租", "預估的房租是你自己估的。")):
+            with self.subTest(name=name, text=text), self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_CALLS_IT_PREDICTION"):
+                compute_ai._guard_words([text], [name])
+        compute_ai._guard_words(["「你預計做得到的量」比打平要的量少。"], [])
+        compute_ai._guard_words(["「2027 年房租」是你估的。"], ["2027 年房租"])
 
     def test_a_persons_name_never_unlocks_a_numeral_or_a_modal_elsewhere(self):
         """critic M1 round 2: an item named 「五」 is quoted as itself, but 「五」 written anywhere else is still a number."""

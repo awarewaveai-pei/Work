@@ -32,7 +32,9 @@ const SIMULATION: Run = {
     simulation: { runs: 10000, value: 280000, mean: 279000, chance: 0.83, threshold: 150000, side: "一半以上", assumes: "每一項各抽各的，假設它們不會一起變好或變壞。", every: { 樂觀: 420000, 悲觀: 120000 } } },
   flip: { input: "接案收入", base: 300000, at: 170000, from: "一半以上", to: "不到一半", change: -0.4333, each: [] },
   rules: { version: "2" }, request: "Q0", thin_inputs: ["接案收入"], adopt: null,
-  sourcing: [{ input: "接案收入", own: false, origins: 1, words: "只有 1 個算數的獨立出處（要 2 個）" }, { input: "你要的最低結果", own: true, origins: 0, words: OWN }],
+  sourcing: [{ input: "接案收入", own: false, origins: 1, words: "只有 1 個算數的獨立出處（要 2 個）",
+    cards: [{ card: "C1", title: "公會公告", url: "https://example.org/guild", counts: true }, { card: "C2", title: "", url: "https://example.org/x", counts: false }] },
+  { input: "你要的最低結果", own: true, origins: 0, words: OWN, cards: [] }],
   weakest: `結果不會比最弱的那個數字更可靠。最弱的是「你要的最低結果」：${OWN}。`,
 };
 const npvRun = (runId: string, yearly: number, extra: Partial<Run> = {}): Run => ({
@@ -106,11 +108,15 @@ describe("計算與模擬：送出去的內容", () => {
   });
 
   it("says which number alone flips the result, moves only an item as a whole, and says when the result sits on the line", () => {
-    expect(flipWords(SIMULATION, SPEC)).toBe("只改「接案收入」（這一項的樂觀、一般、悲觀一起移）：從 300,000 元 變成大約 170,000 元（少 43%），結果就從「一半以上」變成「不到一半」。其他數字都不動。");
+    expect(flipWords(SIMULATION, SPEC)).toBe("只改「接案收入」（這一項的樂觀、一般、悲觀一起移）：從 300,000 元 變成大約 170,000 元（少 43.3%），結果就從「一半以上」變成「不到一半」。其他數字都不動。");
     const threshold = { ...SIMULATION, flip: { ...SIMULATION.flip, input: "你要的最低結果", base: 150000, at: 280000, change: 0.8667 } };
     expect(flipWords(threshold, SPEC)).not.toContain("一起移");
     expect(flipWords(npvRun("R1", 100, { flip: { input: YEARLY, base: 100, at: 100.000006, from: "淨現值是 0 或更少", to: "淨現值大於 0", change: 0, each: [] } }), SPEC))
       .toBe(`結果就在線上：「${YEARLY}」稍微一動，結果就從「淨現值是 0 或更少」變成「淨現值大於 0」。`);
+    // Codex F6: 0.4% from the line is not on it -- 就在線上 only when the stored change is 0
+    expect(flipWords(npvRun("R1", 100, { flip: { input: YEARLY, base: 100, at: 100.4, from: "淨現值是 0 或更少", to: "淨現值大於 0", change: 0.004, each: [] } }), SPEC))
+      .toBe(`只改「${YEARLY}」：從 100 元 變成大約 100.4 元（多不到 1%），結果就從「淨現值是 0 或更少」變成「淨現值大於 0」。其他數字都不動。`);
+    expect(flipWords(npvRun("R1", 100, { flip: { input: YEARLY, base: 100, at: 98.7, from: "淨現值大於 0", to: "淨現值是 0 或更少", change: -0.013, each: [] } }), SPEC)).toContain("（少 1.3%）");
     expect(flipWords({ ...SIMULATION, flip: { input: null, from: "一半以上", why: "結果離那條線太近。", each: [] } }, SPEC)).toBe("結果離那條線太近。");
     expect([fmt(0.00083447), fmt(1234.567), fmt(0), fmt(null)]).toEqual(["0.000834", "1,234.57", "0", "—"]);
   });
@@ -128,6 +134,9 @@ describe("計算與模擬：頁面", () => {
     expect(run.textContent).toContain("每一項都在樂觀時，加起來是 420,000 元");
     expect(run.textContent).toContain("只有 1 個算數的獨立出處（要 2 個）");
     expect(run.textContent).toContain(SIMULATION.weakest);
+    // Codex F2: each outside number names the cards it came from, and whether each counts
+    expect(run.textContent).toContain("只有 1 個算數的獨立出處（要 2 個）：「公會公告」「https://example.org/x」（不算數）");
+    expect(run.querySelector('a[href="/projects/P1/gather"]')?.textContent).toBe("到蒐集來源看");
     expect(host.querySelector("select")).toBeNull();
     await done();
   });

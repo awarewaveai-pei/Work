@@ -29,9 +29,12 @@ READS = ("compute.run",)
 # AI 不准自己編數字 is an allow list: any digit, percent sign, Roman numeral, CJK numeral or English number word is a
 # number the AI wrote, unless it sits inside one of these fixed words with no unit right after it (「一個」 is a word,
 # 「一個月」 is a number). A word missing here costs a retry; a number let through would break the card.
-NUMERAL = re.compile(r"[\d%‰零〇一二兩三四五六七八九十廿卅卌百千萬億兆半倍壹貳參肆伍陸柒捌玖拾佰仟]")
+# Every numeral form of written Chinese, in one list (Codex F3): the digits, the large units in both scripts, 兩/两, the
+# financial forms in both scripts (with 叄), 廿卅卌 (and 卄), and the numerals fused with a measure word.
+NUMERAL_FORMS = ("〇零一二三四五六七八九十百千", "萬万億亿兆", "兩两", "壹貳贰參叁叄肆伍陸陆柒捌玖拾佰仟", "廿卄卅卌", "仨倆俩")
+NUMERAL = re.compile(r"[\d%‰半倍" + "".join(NUMERAL_FORMS) + "]")
 ROMAN = re.compile("[\u2160-\u2188]")   # checked before NFKC turns Ⅻ into letters
-UNIT_AFTER = "年月週周天日季歲時分秒鐘倍成元塊萬千百億兆%次趟件人"
+UNIT_AFTER = "年月週周天日季歲時分秒鐘倍成元塊千百%次趟件人" + NUMERAL_FORMS[1]
 IDIOMS = ("一個", "一起", "一般", "一定", "一樣", "萬一", "一些", "一點", "一直", "一下", "一種", "一次", "一邊", "一方面", "統一", "唯一", "一致",
           "進一步", "一旦", "一切", "一同", "單一", "同一", "不一", "每一", "任一", "另一", "其一", "之一", "一律", "一併", "一向", "一套", "一份",
           "一筆", "一句", "一張", "一項", "這一塊", "那一塊", "每一塊", "一端", "兩端", "兩邊", "兩者", "兩種", "兩難", "第一", "十分", "萬分", "千萬",
@@ -52,7 +55,9 @@ ENGLISH_IDIOM = re.compile(r"\b(?:no one|one of|one another|the one|each one|one
 # A refusal costs one retry; the AI can say what the calculation shows without one (「悲觀情境下的計算結果低於打平」).
 MODALS = r"[會將]|一定|肯定|勢必|保證|註定|注定"
 CERTAINTY = r"穩|鐵定|必|絕對|準|包|保本|保賺|確定"
-LIKELIHOOD = r"很可能|大概率|多半"   # 八成 is refused as a number first, 應該會 by its 會
+# how likely an outcome is (Codex F4; 很可能、大概率 hold these): 不可能 and 可能性 stay markers, 盡可能 is allowed below;
+# 大約 is about an amount, not a likelihood. 八成 is refused as a number first, 應該會 by its 會
+LIKELIHOOD = r"可能|也許|或許|大概|恐怕|說不定|興許|有望|可望|多半"
 MARKER = re.compile("|".join((MODALS, CERTAINTY, LIKELIHOOD)))
 NOT_MARKERS = (
     # 會 as meeting, body, occasion or understanding
@@ -66,15 +71,18 @@ NOT_MARKERS = (
     # absolute value; 確定 and 保本 negated
     "穩定", "不穩", "穩健", "必要", "必須", "必需", "不必", "未必", "何必", "準確", "標準", "準備", "水準", "基準", "精準", "準則", "不準", "批准",
     "包括", "包含", "外包", "打包", "絕對值", "不確定", "無法確定", "不保本",
+    # 可能 as an effort (盡可能多找出處), not how likely an outcome is
+    "盡可能",
 )
 NOT_MARKER = re.compile("|".join(sorted(map(re.escape, NOT_MARKERS), key=len, reverse=True)))
 ENGLISH_MODALS = r"\b(?:will|shall|gonna|going to)\b|\bwon['’]t\b|['’]ll\b"
 ENGLISH_CERTAINTY = r"\b(?:certain to|bound to|sure to|destined|sure thing|guarantee[sd]?|certainly|surely)\b|\b(?:is|are|am|was|were|be|['’]re|['’]s) set to\b"
-ENGLISH_LIKELIHOOD = r"\b(?:likely to|most likely|probably|expects? to)\b"
+ENGLISH_LIKELIHOOD = r"\b(?:(?:un)?likely|(?:im)?probabl[ey]|perhaps|maybe|possibly|expects? to)\b"
 ENGLISH_MARKER = re.compile("|".join((ENGLISH_MODALS, ENGLISH_CERTAINTY, ENGLISH_LIKELIHOOD)), re.IGNORECASE)
 ENGLISH_NOT_MARKERS = ("free will", "no guarantee", "not guaranteed", "make sure")
 ENGLISH_NOT_MARKER = re.compile(r"\b(?:" + "|".join(map(re.escape, ENGLISH_NOT_MARKERS)) + r")\b", re.IGNORECASE)
-MARKER_WORDS = "會、將、一定、肯定、勢必、保證、穩、鐵定、必、絕對、準、包賺、確定、很可能、大概率、多半 or will, 'll, going to, sure to, set to, likely to, probably"   # told to the model
+MARKER_WORDS = ("會、將、一定、肯定、勢必、保證、穩、鐵定、必、絕對、準、包賺、確定、可能、也許、或許、大概、恐怕、說不定、有望、多半 or will, 'll, "
+                "going to, sure to, set to, likely, probably, perhaps, maybe, possibly")   # told to the model
 # The words for predicting itself (calling the result a prediction), and their negations.
 PREDICTION_WORDS = ("預測", "預計", "預估", "估計", "預期", "predict", "forecast", "foresee", "expected to")
 NOT_PREDICTION_WORDS = ("不是預測", "不等於預測", "不是在預測", "不能當成預測", "並不是預測", "無法預測", "不能預測", "沒辦法預測", "你的估計", "你估計的",
@@ -85,23 +93,34 @@ NOT_PREDICTION_WORDS = ("不是預測", "不等於預測", "不是在預測", "�
 _TURN: ContextVar[dict[str, Any] | None] = ContextVar("compute_turn", default=None)
 
 
-def _guard_words(texts: list[str], known: list[str]) -> None:
-    """Refuses an answer that writes a number or calls a result a prediction. ``known``: the person's own words and the
-    system's names the answer may quote (an input named 「2027 年的房租」 is not a number the AI made up)."""
-    quotable = sorted((word for word in (unicodedata.normalize("NFKC", item) for item in known if item) if _quotable(word)), key=len, reverse=True)
+def _guard_words(texts: list[str], persons: list[str]) -> None:
+    """Refuses an answer that writes a number or calls a result a prediction. The system's own names (``_names``) may be
+    quoted anywhere. ``persons``: the person's own words (question, item names, notes) -- taken out for the number check
+    only (an item named 「2027 年的房租」 is not a number the AI made up); a forecast word in them is still one (Codex F5:
+    an item named 「保證」 let 「保證成功」 through)."""
+    names = _names()
+    system, every = _quotable_words(names), _quotable_words([*names, *persons])
     for text in texts:
         plain = unicodedata.normalize("NFKC", text)
-        for word in quotable:
-            plain = plain.replace(word, " ")
-        bare = ENGLISH_IDIOM.sub(" ", IDIOM.sub(" ", plain))
+        bare = ENGLISH_IDIOM.sub(" ", IDIOM.sub(" ", _without(plain, every)))
         if ROMAN.search(text) or NUMERAL.search(bare) or ENGLISH_NUMBER.search(bare):
             raise InvariantViolation("AI_ANSWER_HAS_NUMBER: AI 寫了數字（AI 不准自己編數字），這次沒有存。")
-        said = plain.lower()
+        said = _without(plain, system).lower()
         unmarked = ENGLISH_NOT_MARKER.sub(" ", NOT_MARKER.sub(" ", said))
         for phrase in NOT_PREDICTION_WORDS:
             said = said.replace(phrase, " ")
         if MARKER.search(unmarked) or ENGLISH_MARKER.search(unmarked) or any(word in said for word in PREDICTION_WORDS):
             raise InvariantViolation("AI_ANSWER_CALLS_IT_PREDICTION: AI 把計算或模擬說成了預測或保證，這次沒有存。")
+
+
+def _quotable_words(known: list[str]) -> list[str]:
+    return sorted((word for word in (unicodedata.normalize("NFKC", item) for item in known if item) if _quotable(word)), key=len, reverse=True)
+
+
+def _without(text: str, words: list[str]) -> str:
+    for word in words:   # longest first, so a name holding a shorter one goes whole
+        text = text.replace(word, " ")
+    return text
 
 
 def _quotable(word: str) -> bool:
@@ -146,7 +165,7 @@ def _suggest_input(context: Mapping[str, Any], read: Read) -> str:
     if not isinstance(question, str) or not question.strip():
         raise InvariantViolation("COMPUTE_QUESTION_REQUIRED: 先寫下你要算什麼，AI 才建議算法。")
     question = question.strip()[:1000]
-    _TURN.set({"known": [question, *_names()]})
+    _TURN.set({"persons": [question]})
     catalog = [{"id": algo["id"], "name": algo["name"], "label": algo["label"], "formula": algo["formula"], "inputs": [spec["name"] for spec in algo["inputs"]]}
                for algo in algorithms().values()]
     return ("What the person wants to calculate:\n" + json.dumps({"question": question}, ensure_ascii=False)
@@ -154,7 +173,7 @@ def _suggest_input(context: Mapping[str, Any], read: Read) -> str:
 
 
 def _suggest_shape(answer: dict[str, Any]) -> dict[str, Any]:
-    turn, ids = _TURN.get() or {"known": []}, set(algorithms())
+    turn, ids = _TURN.get() or {"persons": []}, set(algorithms())
     _TURN.set(None)
     picked, seen = [], set()
     for item in answer.get("algorithms") if isinstance(answer.get("algorithms"), list) else []:
@@ -163,7 +182,7 @@ def _suggest_shape(answer: dict[str, Any]) -> dict[str, Any]:
             picked.append({"id": item["id"], "why": item["why"].strip()[:300]})
     ideas = [idea.strip() for idea in answer.get("ideas") or [] if isinstance(idea, str) and idea.strip()][:5] if isinstance(answer.get("ideas"), list) else []
     question = answer.get("question").strip()[:300] if isinstance(answer.get("question"), str) else ""
-    _guard_words([item["why"] for item in picked] + ideas + [question], turn["known"])
+    _guard_words([item["why"] for item in picked] + ideas + [question], turn["persons"])
     return {key: value for key, value in {"algorithms": picked[:3], "ideas": ideas, "question": question}.items() if value}
 
 
@@ -208,7 +227,7 @@ def _explain_input(context: Mapping[str, Any], read: Read) -> str:
     names = [item["name"] for item in inputs]
     result = run.get("result") or {}
     persons = [run.get("question") or "", result.get("who_bears") or "", *(row.get("what", "") for row in result.get("not_priced") or [])]
-    _TURN.set({"run": run["run_id"], "inputs": names, "known": [*names, *persons, *_names()]})
+    _TURN.set({"run": run["run_id"], "inputs": names, "persons": [*names, *persons]})
     source = {row["input"]: row["words"] for row in rows}
     payload = {
         "question (the person's)": run.get("question"), "label": run.get("label"), "algorithm": (run.get("algorithm") or {}).get("name"),
@@ -242,7 +261,7 @@ def _explain_shape(answer: dict[str, Any]) -> dict[str, Any]:
     influential = answer.get("influential").strip() if isinstance(answer.get("influential"), str) else ""
     if influential not in turn["inputs"]:
         raise InvariantViolation("AI_ANSWER_INVALID: the most influential assumption is not one of the run's inputs")
-    _guard_words([item["text"] for item in points], turn["known"])
+    _guard_words([item["text"] for item in points], turn["persons"])
     return {"run": turn["run"], "points": points, "influential": influential, "rests_on": turn["inputs"]}
 
 

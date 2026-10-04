@@ -5,6 +5,7 @@
 // every run: formula, inputs with sources, a range, the one number that flips it, the label. Every rule and every
 // refusal lives on the server (GET /blocks/compute/spec); this page only shows them. The AI suggests an algorithm and
 // explains a run in words; it never writes a number.
+import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { ApiError, apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type AiTurn, type Doc, type Notice } from "../../lib/blocks";
@@ -28,9 +29,12 @@ export type Run = {
   scenarios: Record<string, Record<string, number>>; flip: Flip; rules: { version: string }; request: string; rerun_of?: string; thin_inputs: string[];
   result: { what: string; unit: string; range: { low: number | null; high: number | null; unit: string }; by_scenario?: Record<string, { value: number | null; side: string; words?: string; benefits_now?: number; costs_now?: number }>;
     simulation?: { runs: number; value: number; mean: number; chance: number; threshold: number; side: string; assumes: string; every: Record<string, number> }; not_priced?: NotPriced[]; who_bears?: string };
-  adopt: { adopt: string; reason: string } | null; sourcing: Array<{ input: string; own: boolean; origins: number; words: string }>; weakest: string;
+  adopt: { adopt: string; reason: string } | null; weakest: string;
+  sourcing: Array<{ input: string; own: boolean; origins: number; words: string; cards: Array<{ card: string; title: string; url: string; counts: boolean }> }>;
 };
 type Origin = { origin_id: string; counts: boolean; cards: Array<{ card: string; title?: string; url?: string }> };
+/** How this page names a source card: its title, else its address, else its id. */
+const cardName = (card: { card: string; title?: string; url?: string }) => card.title || card.url || card.card;
 type Explanation = { run: string; points: Array<{ part: string; text: string }>; influential: string; rests_on: string[] };
 type Suggestion = { algorithms: Array<{ id: string; why: string }>; ideas?: string[]; question?: string };
 type Adopt = { run: string; adopt: string; reason?: string };
@@ -100,8 +104,10 @@ export function flipWords(run: Run, spec: Spec): string {
   if (!flip.input) return flip.why ?? "";
   const row = run.inputs.find((item) => item.name === flip.input);
   const unit = row?.unit ?? "";
-  if (typeof flip.change === "number" && Math.round(flip.change * 100) === 0) return `結果就在線上：「${flip.input}」稍微一動，結果就從「${flip.from}」變成「${flip.to}」。`;
-  const change = typeof flip.change === "number" ? `（${flip.change > 0 ? "多" : "少"} ${Math.abs(Math.round(flip.change * 100))}%）` : "";
+  // the server stores the change to 0.01% (block_hooks/compute.py CHANGE_DIGITS): only its 0 is on the line
+  if (flip.change === 0) return `結果就在線上：「${flip.input}」稍微一動，結果就從「${flip.from}」變成「${flip.to}」。`;
+  const percent = typeof flip.change === "number" ? Math.abs(flip.change) * 100 : null;
+  const change = percent === null ? "" : `（${flip.change! > 0 ? "多" : "少"}${percent < 1 ? "不到 1%" : ` ${new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 1 }).format(percent)}%`}）`;
   const spread = spec.algorithms.find((item) => item.id === run.algorithm.id)?.inputs.find((input) => input.key === row?.key)?.spread;
   const whole = spread ? "（這一項的樂觀、一般、悲觀一起移）" : "";
   return `只改「${flip.input}」${whole}：從 ${fmt(flip.base)} ${unit} 變成大約 ${fmt(flip.at)} ${unit}${change}，結果就從「${flip.from}」變成「${flip.to}」。其他數字都不動。`;
@@ -111,8 +117,8 @@ function Chips({ options, value, onPick, label }: { options: string[]; value: st
   return <div className="chips" role="group" aria-label={label}>{options.map((option) => <button key={option} type="button" className={`chip${value === option ? " on" : ""}`} aria-pressed={value === option} onClick={() => onPick(option)}>{option}</button>)}</div>;
 }
 
-function RunSummary({ run, spec }: { run: Run; spec: Spec }) {
-  const source = Object.fromEntries(run.sourcing.map((row) => [row.input, row.words]));
+function RunSummary({ run, spec, projectId }: { run: Run; spec: Spec; projectId: string }) {
+  const source = Object.fromEntries(run.sourcing.map((row) => [row.input, row]));
   return (
     <>
       <span className="tags"><span>{run.label}</span><span>{run.algorithm.name}・算法第 {run.algorithm.version} 版</span><span>{AUTHOR.system}算的</span></span>
@@ -124,7 +130,9 @@ function RunSummary({ run, spec }: { run: Run; spec: Spec }) {
           <b>{row.name}</b>
           <span className="q">{fmt(row.value)} {row.unit}
             {others(spec).filter((name) => run.scenarios[name]?.[row.name] !== row.value).map((name) => <span key={name} className="k">　{name}：{fmt(run.scenarios[name][row.name])}</span>)}
-            <br /><span className={row.own ? "warn" : "k"}>{source[row.name]}</span></span>
+            <br /><span className={row.own ? "warn" : "k"}>{source[row.name]?.words}</span>
+            {source[row.name]?.cards.length > 0 && <span className="k">：{source[row.name].cards.map((card) => `「${cardName(card)}」${card.counts ? "" : "（不算數）"}`).join("")}{"　"}
+              <Link href={`/projects/${encodeURIComponent(projectId)}/gather`}>到蒐集來源看</Link></span>}</span>
         </div>
       ))}
       <div className="kpis mt8">
@@ -288,7 +296,7 @@ export function ComputePage({ projectId }: { projectId: string }) {
                   const on = !row.own && row.cards.includes(card.card);
                   return <button key={card.card} type="button" className={`chip${on ? " on" : ""}`} aria-pressed={on}
                     onClick={() => setRow(index, { own: false, cards: on ? row.cards.filter((item) => item !== card.card) : [...(row.own ? [] : row.cards), card.card] })}>
-                    {(card.title || card.url || card.card).slice(0, 30)}{card.counts ? "" : "・不算數"}</button>;
+                    {cardName(card).slice(0, 30)}{card.counts ? "" : "・不算數"}</button>;
                 })}
               </div>
               {cards.length === 0 && <p className="hint">這個案子還沒有來源卡。到「蒐集來源」找回資料，或先標「{spec.own_words}」。</p>}
@@ -327,7 +335,7 @@ export function ComputePage({ projectId }: { projectId: string }) {
       {compared.length === 2 && (
         <div className="card">
           <div className="top"><h2>並排比</h2><button className="btn ghost" type="button" onClick={() => setPicked([])}>收起來</button></div>
-          <div className="grid2">{compared.map((run) => <div key={run.run_id} className="judge"><RunSummary run={run} spec={spec} /></div>)}</div>
+          <div className="grid2">{compared.map((run) => <div key={run.run_id} className="judge"><RunSummary run={run} spec={spec} projectId={projectId} /></div>)}</div>
         </div>
       )}
 
@@ -339,7 +347,7 @@ export function ComputePage({ projectId }: { projectId: string }) {
           const choice = adopting[run.run_id];
           return (
             <div key={run.run_id} className="judge">
-              <RunSummary run={run} spec={spec} />
+              <RunSummary run={run} spec={spec} projectId={projectId} />
               <div className="btns">
                 <button className="btn ghost" type="button" disabled={busy} onClick={() => { const request = requests.find((doc) => doc.doc_id === run.request); if (request) { setEditing(request); setDraft(fromRun(run)); } }}>改輸入再算</button>
                 <button className="btn ghost" type="button" disabled={busy} onClick={() => again(run)}>用同樣的數字再算一次</button>
