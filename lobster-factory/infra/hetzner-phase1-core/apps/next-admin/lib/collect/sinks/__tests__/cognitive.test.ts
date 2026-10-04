@@ -36,7 +36,7 @@ function doc(overrides: Partial<RawDoc> = {}): RawDoc {
 }
 
 const ctx: SinkCtx = { tenantRef: "research:p1", runId: "run-1", log: () => {} };
-const sink = () => createCognitiveSink({ projectId: "p1", runId: "run-1", grantToken: "tok" });
+const sink = () => createCognitiveSink({ projectId: "p1", runId: "run-1", grantToken: "tok", wire: "2" });
 
 beforeEach(() => {
   research.ingestSources.mockReset();

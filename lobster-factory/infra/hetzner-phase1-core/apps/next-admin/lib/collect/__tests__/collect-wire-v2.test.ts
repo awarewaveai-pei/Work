@@ -22,6 +22,7 @@ const { CLAIM_ANGLES, MAX_QUERIES } = await import("@/lib/collect/search/query-p
 const { CLAIM_PROVIDERS } = await import("@/lib/collect/search/drivers");
 const sinkMod = await import("@/lib/collect/sinks/cognitive");
 const { researchSeeds } = await import("@/lib/collect/run");
+const { parseResearchRunRequest } = await import("@/app/api/internal/collect/runs/research-run-request");
 
 // apps/next-admin/lib/collect/__tests__ -> repo root is eight levels up.
 const SPEC_PATH = path.resolve(__dirname, "../../../../../../../..", "Projects/internal/cognitive-engineering-os/specs/wire/collector.v2.json");
@@ -108,7 +109,7 @@ afterEach(() => {
 
 function researchCrawl(seeds: Array<{ uri: string; meta?: Record<string, unknown> }>, ctx: { fetch: CollectCtx["fetch"]; callProvider: CollectCtx["callProvider"]; blocks?: CollectBlock[] }, keepAside = true) {
   return crawl(researchSeeds(seeds), {
-    sink: sinkMod.createCognitiveSink({ projectId: "p1", runId: "run_example", grantToken: "tok" }),
+    sink: sinkMod.createCognitiveSink({ projectId: "p1", runId: "run_example", grantToken: "tok", wire: "2" }),
     budget: createBudget(),
     tenantRef: "research:p1",
     runId: "run_example",
@@ -267,7 +268,7 @@ describe("keepAside: nothing a gate refuses is dropped (research runs only)", ()
     ];
     const result = await researchCrawl(seeds, { fetch: webOf({ "https://a.example/other-person": offEntity, "https://b.example/planted": injected }), callProvider: undefined });
     expect(sent.map((s) => [s.canonical_url, (s.relevance as Record<string, unknown>).aside])).toEqual([["https://a.example/other-person", "這一頁沒有提到要查的對象"]]);
-    expect(result.report.offEntity).toEqual([]); // delivered, so not counted as refused
+    expect(result.report.offEntity.map((o) => o.uri)).toEqual(["https://a.example/other-person"]); // kept, and still counted as refused
     expect(result.report.quarantined.map((q) => q.uri)).toEqual(["https://b.example/planted"]);
     expect(sinkMod.completionOf(result.report).aside).toEqual([{ url: "https://b.example/planted", title: "Planted", reason: "這一頁藏有給 AI 的指令，系統沒有收內文" }]);
   });
@@ -355,5 +356,90 @@ describe("what a page says about itself (http-html)", () => {
     expect(outlinkHosts(links, "https://www.s.example/page")).toEqual(["a.example", "b.example"]);
     const many = Array.from({ length: 70 }, (_, i) => `https://h${i}.example/`);
     expect(outlinkHosts(many, "https://s.example/")).toHaveLength(50);
+  });
+});
+
+describe("round 2: what the critic found, each closed for the whole class", () => {
+  const request = (seeds: unknown[]) =>
+    parseResearchRunRequest({ grant_ref: "grantref-123", project_id: "3fa85f64-5717-4562-b3fc-2c963f66afa6", run_id: "run_1", seeds });
+
+  it("a research run takes only the two seed shapes, each once, so no seed can reach a name search (Perplexity) or carry meta onto pages", () => {
+    expect(request(spec.seeds).ok).toBe(true);
+    const claim = spec.seeds[0];
+    const refused = [
+      [{ uri: "entity://Acme%20Ltd", meta: { entityKind: "organization" } }],
+      [{ uri: "entity://Acme%20Ltd" }],
+      [{ uri: "https://a.example/", meta: { pasted: true, searchQuery: "x" } }],
+      [{ uri: "https://a.example/", meta: { maxDepth: 5 } }],
+      [{ ...claim, meta: { ...claim.meta, providers: ["perplexity"] } }],
+      [{ ...claim, meta: { ...claim.meta, extra: 1 } }],
+      [claim, claim],
+      [{ uri: "http://a.example/" }],
+    ];
+    for (const seeds of refused) expect([JSON.stringify(seeds).slice(0, 70), request(seeds).ok]).toEqual([JSON.stringify(seeds).slice(0, 70), false]);
+  });
+
+  it("relevance follows the one rule set: a key that breaks its rule is dropped, never sent (the engine refuses a whole batch)", () => {
+    expect(sinkMod.RELEVANCE_RULES).toEqual(spec.relevance);
+    expect(sinkMod.relevanceOf({ searchProvider: "perplexity", searchAngle: "Bad Angle", searchLang: "fr", searchQuery: "q", imageUrl: "javascript:alert(1)", entityConfidence: 0.9 }))
+      .toEqual({ searchQuery: "q", pasted: false });
+    expect(sinkMod.relevanceOf({ pasted: true, searchProvider: "serper", searchQuery: "q", outlinks: ["a.example"] })).toEqual({ pasted: true, outlinks: ["a.example"] });
+  });
+
+  it("an engine without wire v2 gets the v1 shape: schema 1, only the v1 keys", () => {
+    const doc = {
+      uri: "https://a.example/", canonicalUrl: "https://a.example/", contentHash: "a".repeat(64), mime: "text/html", title: "A", author: null,
+      contentType: "web_page", text: "t", raw: null, fetchedAt: "2026-10-04T00:00:00.000Z", publishedAt: null, collector: "collect/http-html",
+      tenantRef: "t", provenance: { epistemic_type: "EVIDENCE" as const, authorship_state: "SOURCE_QUOTATION" as const, locked: null },
+      meta: { searchProvider: "serper", searchAngle: "news", searchQuery: "q", aside: "too_short", outlinks: ["b.example"] },
+    };
+    const v1 = sinkMod.toSourceProjection(doc, "1");
+    expect([v1.schema_version, v1.relevance]).toEqual(["1", { searchAngle: "news", searchQuery: "q" }]);
+    expect(sinkMod.toSourceProjection(doc, "2").schema_version).toBe("2");
+  });
+
+  it("a budget stop lists every page still queued and says which searches never ran", async () => {
+    const budget = createBudget({ fetches: 1 });
+    const fetch: CollectCtx["fetch"] = async (url) => {
+      budget.spend({ fetches: 1 });
+      return webOf({ [url]: PAGES["https://factcheck.example.tw/report/1"] })(url);
+    };
+    const seeds = [{ uri: "https://q.example/1" }, { uri: "https://q.example/2" }, spec.seeds[0]];
+    const result = await crawl(researchSeeds(seeds), {
+      sink: sinkMod.createCognitiveSink({ projectId: "p1", runId: "r", grantToken: "t", wire: "2" }),
+      budget, tenantRef: "research:p1", runId: "r", fetch, callProvider: engine({}, []), blocks: [entityDossierCollector, httpHtmlCollector], keepAside: true,
+    });
+    expect(result.report.stoppedBy).toBe("budget");
+    // the seed never reached, and the link the one fetched page added to the queue
+    expect(result.report.aside).toEqual([
+      { url: "https://q.example/2", title: "", reason: "budget" },
+      { url: "https://q.example/about", title: "", reason: "budget" },
+    ]);
+    expect(result.report.channels).toEqual([
+      { provider: "serper", lang: "zh", state: "unreachable", why: "budget" },
+      { provider: "serper", lang: "en", state: "unreachable", why: "budget" },
+      { provider: "brave", lang: "zh", state: "no_key", why: "no_key" },
+      { provider: "brave", lang: "en", state: "no_key", why: "no_key" },
+    ]);
+    expect(sinkMod.completionOf(result.report).aside[0].reason).toBe("這次的抓取額度或時間用完了，這一頁沒有抓");
+  });
+
+  it("when two engines have keys the call ceiling cuts the last angles, and the completion names them", async () => {
+    process.env.BRAVE_SEARCH_API_KEY = "test-brave";
+    const out = await entityDossierCollector.run(claimTarget({ angles: spec.claim_angles, languages: ["zh", "en"], providers: ["serper", "brave"] }), ctxFor(engine({}, [])));
+    expect(out.channels.map((c) => [c.provider, c.lang, c.state, c.why])).toEqual([
+      ["serper", "zh", "ok", "cut:field,opposite,origin"],
+      ["serper", "en", "ok", "cut:field,opposite,origin"],
+      ["brave", "zh", "ok", "cut:field,opposite,origin"],
+      ["brave", "en", "ok", "cut:field,opposite,origin"],
+    ]);
+    expect(sinkMod.channelWhy(out.channels[0])).toBe(`每個問題最多查 ${MAX_QUERIES} 次，這些角度沒有查：到過現場的人、相反的說法、最早的出處`);
+  });
+
+  it("the first 200 pages set aside are the ones read and refused, not search results skipped for their kind", () => {
+    const skipped = Array.from({ length: 210 }, (_, i) => ({ url: `https://shop.example/${i}`, title: "", reason: "source_class:retail" }));
+    const out = sinkMod.completionOf({ aside: [...skipped, { url: "https://x.example/planted", title: "", reason: "injection_cn_override" }, { url: "https://x.example/gone", title: "", reason: "gone" }], channels: [] });
+    expect(out.aside).toHaveLength(200);
+    expect(out.aside.slice(0, 2).map((a) => a.url)).toEqual(["https://x.example/planted", "https://x.example/gone"]);
   });
 });

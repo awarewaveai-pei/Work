@@ -10,6 +10,7 @@ import { describe, type DescribeDeps, type LookupFetch } from "@/lib/collect/loo
 import { factcheck, type FactcheckDeps } from "@/lib/collect/lookups/factcheck";
 import {
   REFRESH_EVERY_HOURS,
+  RETRY_AFTER_HOURS,
   refreshClaimReview,
   supabaseClaimReviewStore,
   type ClaimReviewStore,
@@ -20,7 +21,7 @@ export type LookupDeps = DescribeDeps & FactcheckDeps;
 
 export async function answerLookup(request: LookupRequest, deps: LookupDeps): Promise<LookupAnswer> {
   if (request.kind === "describe") return { kind: "describe", items: await describe(request.urls, deps) };
-  return { kind: "factcheck", items: await factcheck(request.texts, deps) };
+  return { kind: "factcheck", items: await factcheck(request.texts, deps, request.dbs) };
 }
 
 /**
@@ -31,7 +32,9 @@ export function lookupFetch(log: (msg: string) => void): LookupFetch {
   return createCollectFetch({
     budget: createBudget({ fetches: 120 }),
     robots: null,
-    rateLimiter: new RateLimiter({ store: createSupabaseRateLimitStore(log) }),
+    // 1 request/s per host: 25 sites queue ~24 s on one registry. A wait over 25 s plus a 10 s call would pass the
+    // 38 s deadline, so it is refused at once and that cell says why (contract.ts whyFailed).
+    rateLimiter: new RateLimiter({ store: createSupabaseRateLimitStore(log), maxWaitMs: 25_000 }),
     timeoutMs: 10_000,
     deadlineMs: 35_000,
     maxBytes: 2_000_000,
@@ -58,7 +61,8 @@ function feedFetch(log: (msg: string) => void): LookupFetch {
 
 /**
  * Called by the hourly collection heartbeat after it has answered (R4: a public dataset refreshed on collect's own
- * schedule, never per case). Starts a refresh at most once per REFRESH_EVERY_HOURS across every process; never throws.
+ * schedule, never per case). Starts a refresh when the last success is REFRESH_EVERY_HOURS old and the last attempt
+ * RETRY_AFTER_HOURS old, for one process at a time; a failed refresh is retried the next hour. Never throws.
  */
 export async function refreshClaimReviewIfDue(opts: {
   log: (msg: string) => void;
@@ -71,7 +75,7 @@ export async function refreshClaimReviewIfDue(opts: {
       opts.log("claimreview refresh skipped: no Supabase client");
       return;
     }
-    if (!(await store.beginRefresh(REFRESH_EVERY_HOURS))) return;
+    if (!(await store.beginRefresh(REFRESH_EVERY_HOURS, RETRY_AFTER_HOURS))) return;
     await refreshClaimReview({ fetch: opts.fetch ?? feedFetch(opts.log), store, log: opts.log });
   } catch (e) {
     opts.log(`claimreview refresh not started: ${String(e).slice(0, 200)}`);

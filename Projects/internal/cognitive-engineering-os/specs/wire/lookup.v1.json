@@ -2,6 +2,7 @@
   "about": "Collect lookups v1. The cognitive platform reaches nothing outside itself: every outside question (domain registry, web archive, fact-check databases) is asked of collect through this one endpoint. One file for both sides: the engine parses the example answers below (tests/unit/test_block_gather.py, tests/unit/test_block_verify.py), next-admin answers in exactly this shape (lib/collect/__tests__/collect-lookups.test.ts). Change both sides and this file in one commit.",
   "decided": "2026-09-17 operator: the cognitive platform has no data collection of its own (WORKLOG 2026-09-17 續14). 2026-10-04 operator, why: each LEGO block is built separately and then chained; collect is the searcher block. So lookups that only describe a source are collect's too.",
   "schema_version": "1",
+  "optional_v1_fields": "Added 2026-10-04, still v1 (backward compatible both ways): the factcheck request's dbs (absent = every database, today's behaviour) and a ClaimReview hit's license (an engine that does not read it loses nothing).",
   "endpoint": "POST /api/internal/collect/lookups",
   "auth": "Authorization: Bearer <COLLECT_RESEARCH_RUNS_TOKEN>, the same token and the same base URL (COGNITIVE_OS_COLLECTION_SERVICE_URL) as /api/internal/collect/runs. No token on either side = 401 / the engine does not call.",
   "engine_timeout_seconds": 45,
@@ -22,12 +23,12 @@
     "factcheck": {
       "max_items": 1,
       "max_text_chars": 4000,
-      "request": {"project_id": "string", "kind": "factcheck", "items": [{"text": "the claim's words"}]},
+      "request": {"project_id": "string", "kind": "factcheck", "dbs": "optional: a non-empty subset of [\"claimreview\", \"cofacts\"], each once; absent = both. Only those databases see the words and are answered, in that order (someone outside Taiwan: never Cofacts)", "items": [{"text": "the claim's words"}]},
       "answer_item": {
         "text": "echoed",
         "dbs": [
           {"db": "claimreview", "state": "查到 | 查不到 | 無法檢查", "why": "required unless 查到", "attribution": "who publishes the data and its licence, shown under every hit",
-           "hits": [{"claim": "string", "url": "string", "publisher": "string", "publisher_url": "string", "judged_as": "string", "date": "YYYY-MM-DD or empty", "claimant": "string"}]},
+           "hits": [{"claim": "string", "url": "string", "publisher": "string", "publisher_url": "string", "judged_as": "string", "date": "YYYY-MM-DD or empty", "claimant": "string", "license": "the item's own licence (the feed's sdLicense), at most 200 characters; empty when the feed has none"}]},
           {"db": "cofacts", "state": "查到 | 查不到 | 無法檢查", "why": "required unless 查到", "attribution": "string",
            "hits": [{"article_id": "string", "url": "string", "date": "YYYY-MM-DD or empty", "replies": [{"judged_as": "string", "text": "string", "reference": "string", "date": "YYYY-MM-DD or empty"}]}]}
         ]
@@ -36,7 +37,7 @@
   },
   "rules": [
     "R1 One answer item per request item, same order, url or text echoed.",
-    "R2 A lookup that failed (timeout, 5xx, refused, registry not on collect's list, fact-check mirror not downloaded yet) is 無法檢查 with why. The whole request fails only on 401 (token) or 400 (unknown kind, too many items, a URL that is not http(s), text too long).",
+    "R2 A lookup that failed (timeout, 5xx, refused, registry not on collect's list, fact-check mirror not downloaded yet) is 無法檢查 with why. The whole request fails only on 401 (token) or 400 (unknown kind, too many items, a URL that is not http(s), text too long, dbs that are not a non-empty subset of the databases).",
     "R3 查不到 only when the outside source answered and said it has nothing: RDAP 404, no archive capture, no fact-check match.",
     "R4 collect keeps nothing from the case. project_id is for its rate limit and log only. The ClaimReview mirror is a public dataset collect refreshes once a day on its own schedule (the hourly collection heartbeat), never per case.",
     "R5 Matching thresholds and lists live in collect only: RDAP registry list and country names, ClaimReview minimum overlap 0.6 (share of the claim's 3-character pieces), Cofacts minimumShouldMatch 50%, at most 5 hits per database. The engine never sends or stores them.",
@@ -64,8 +65,17 @@
       "answer": {"kind": "factcheck", "items": [
         {"text": "下週起每天只能領兩萬元", "dbs": [
           {"db": "claimreview", "state": "查到", "attribution": "查核結果來自各查核組織，由 Data Commons 彙整成公開資料檔，以 CC BY 4.0 授權。",
-           "hits": [{"claim": "銀行下週起每日提款上限兩萬", "url": "https://tfc-taiwan.org.tw/articles/1", "publisher": "台灣事實查核中心", "publisher_url": "https://tfc-taiwan.org.tw", "judged_as": "錯誤", "date": "2026-05-01", "claimant": "網傳訊息"}]},
+           "hits": [{"claim": "銀行下週起每天只能領兩萬元", "url": "https://tfc-taiwan.org.tw/articles/1", "publisher": "台灣事實查核中心", "publisher_url": "https://tfc-taiwan.org.tw", "judged_as": "錯誤", "date": "2026-05-01", "claimant": "網傳訊息", "license": ""}]},
           {"db": "cofacts", "state": "無法檢查", "why": "Cofacts 這次沒有回應", "attribution": "資料來自 Cofacts 真的假的（cofacts.tw），以 CC BY-SA 4.0 授權：用了要標出處，並用同樣方式分享。", "hits": []}
+        ]}
+      ]}
+    },
+    "factcheck_claimreview_only": {
+      "request": {"project_id": "p-1", "kind": "factcheck", "dbs": ["claimreview"], "items": [{"text": "疫苗含有晶片可以追蹤位置"}]},
+      "answer": {"kind": "factcheck", "items": [
+        {"text": "疫苗含有晶片可以追蹤位置", "dbs": [
+          {"db": "claimreview", "state": "查到", "attribution": "查核結果來自各查核組織，由 Data Commons 彙整成公開資料檔，以 CC BY 4.0 授權。",
+           "hits": [{"claim": "疫苗含有晶片可以追蹤", "url": "https://factcheck.example/vaccine-chip", "publisher": "Example Fact Check", "publisher_url": "https://factcheck.example", "judged_as": "False", "date": "2021-05-01", "claimant": "", "license": "https://creativecommons.org/licenses/by/4.0/"}]}
         ]}
       ]}
     },

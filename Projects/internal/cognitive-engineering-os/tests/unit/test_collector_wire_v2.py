@@ -83,6 +83,17 @@ class SpecExamplesTests(WireV2Case):
         self.assertEqual(len(end), 1)
         self.assertEqual((end[0]["run"], end[0]["aside"], end[0]["channels"]), (self.run_id, SPEC["complete"]["aside"], SPEC["complete"]["channels"]))
 
+    def test_the_exchange_answer_lists_the_wire_versions_so_next_admin_never_sends_what_this_engine_refuses(self):
+        self._request(SPEC["seeds"], confirm=True)
+        answer = self._exchange(self.service.calls[-1]["grant_ref"]).json()
+        self.assertEqual(answer["wire_versions"], ["1", "2"])
+
+    def test_v1_is_stored_in_the_v2_shape_keeping_only_what_v2_allows(self):
+        self._start()
+        v1 = {"entityConfidence": "anchored", "searchQuery": "q", "searchProvider": "perplexity", "anything": [1], "pasted": True}
+        self.assertEqual(self._ingest([self._source(v1, schema_version="1")]).status_code, 200)
+        self.assertEqual(self._rows()[0]["relevance"], {"entityConfidence": "anchored", "searchQuery": "q", "pasted": False})
+
     def test_v1_is_still_accepted_free_form_and_a_completion_without_lists_hands_on_empty_ones(self):
         self._start()
         self.assertEqual(self._ingest([self._source({"entityConfidence": 0.9, "anything": [1]}, schema_version="1")]).status_code, 200)
@@ -195,6 +206,10 @@ class CompletionRuleTests(WireV2Case):
             "too many channels": {"channels": [channel] * (limits["channels"] + 1)},
             "a channel with another key": {"channels": [{**channel, "count": 1}]},
             "a provider that is not an id": {"channels": [{**channel, "provider": "Serper API"}]},
+            "perplexity as a channel": {"channels": [{**channel, "provider": "perplexity", "state": "ok", "why": ""}]},
+            "aside items that are not pages": {"aside": ["x"]},
+            "aside that is not a list": {"aside": {"url": "https://a.example/"}},
+            "channels that are not a list": {"channels": "serper"},
             "a language outside zh and en": {"channels": [{**channel, "lang": "fr"}]},
             "a state outside the three": {"channels": [{**channel, "state": "down"}]},
             "a why too long": {"channels": [{**channel, "why": "w" * (limits["channel_why"] + 1)}]},
@@ -250,3 +265,24 @@ class ClaimSeedTests(WireV2Case):
         for name, seed in cases.items():
             with self.subTest(name):
                 self.assert_refused(seed)
+
+    def test_only_the_two_seed_shapes_pass_never_a_name_search_and_never_extra_meta(self):
+        cases = {
+            # a name seed reached the collector's name search, which honours COLLECT_SEARCH_PROVIDER (Perplexity)
+            "a name seed": {"uri": "entity://Acme%20Ltd", "meta": {"entityKind": "organization"}},
+            "a name seed without meta": {"uri": "entity://Acme%20Ltd"},
+            # extra meta was copied onto every page and made the engine refuse the whole batch
+            "an https seed with extra meta": {"uri": "https://acme.example/a", "meta": {"pasted": True, "searchQuery": "x"}},
+            "an https seed with only other meta": {"uri": "https://acme.example/a", "meta": {"maxDepth": 5}},
+            "plain http": {"uri": "http://acme.example/a"},
+        }
+        for name, seed in cases.items():
+            with self.subTest(name):
+                self.assert_refused(seed)
+        self.assertEqual(self._request([{"uri": "https://acme.example/a"}, {"uri": "https://acme.example/b", "meta": {"pasted": False}}]).status_code, 200)
+
+    def test_a_seed_uri_is_given_once(self):
+        for seeds in ([SPEC["seeds"][0], copy.deepcopy(SPEC["seeds"][0])], [{"uri": "https://acme.example/a"}, {"uri": "https://acme.example/a", "meta": {"pasted": True}}]):
+            response = self._request(seeds, confirm=True)
+            self.assertEqual(response.status_code, 400)
+            self.assertIn("COLLECTION_SEEDS_INVALID", response.text)

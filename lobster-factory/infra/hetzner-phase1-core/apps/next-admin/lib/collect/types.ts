@@ -225,6 +225,11 @@ export interface CollectBlock {
     /** The search channels a query block used or could not use. */
     channels?: ChannelState[];
   }>;
+  /**
+   * A query block's channels for a target the run stopped before reaching (`why` = "budget"): "never searched" must not
+   * read as "searched, found nothing". Called by the orchestrator only; never calls out.
+   */
+  notRun?: (t: Target, why: string) => { channels: ChannelState[] };
 }
 
 /** A page the run did not deliver with text. `reason` is a machine code; sink/cognitive words it for the person. */
@@ -304,8 +309,9 @@ export interface RunReport {
   stoppedBy: "frontier_empty" | "budget" | null;
   /**
    * keepAside runs only (a research run, STEP2_SHARED_RULES §4.1): every page that did not reach the sink with
-   * text — refused with no text, unreadable, gone, disallowed, quarantined, or skipped by a query block. The
-   * buckets above keep the operator's detail; this is the list the person sees and can take pages back from.
+   * text — refused with no text, unreadable, gone, disallowed, quarantined, skipped by a query block, or still queued
+   * when the run stopped (reason "budget"). The buckets above keep the operator's detail and also count the pages
+   * delivered with `aside`; this is the list the person sees and can take pages back from.
    */
   aside: AsideEntry[];
   /** One entry per (search engine, language) any query block used or could not use; merged across seeds. */

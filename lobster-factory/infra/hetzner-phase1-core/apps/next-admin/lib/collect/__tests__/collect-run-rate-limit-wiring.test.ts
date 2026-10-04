@@ -101,7 +101,7 @@ describe("runCollection × rate limiter wiring", () => {
 // runResearchCollection (RESEARCH_LINES_MASTER_PLAN WC-P1-12): same assembly, research-specific switches.
 describe("runResearchCollection wiring", () => {
   const research = (budget?: { ms?: number; fetches?: number }) =>
-    runResearchCollection({ projectId: "p1", runId: "run_1", seeds: [{ uri: "https://example.com" }], sink: { id: "sink/test", title: "t", run: vi.fn() }, budget });
+    runResearchCollection({ projectId: "p1", runId: "run_1", seeds: [{ uri: "https://example.com" }], sink: { id: "sink/test", title: "t", run: vi.fn() }, budget, wire: "2" });
 
   beforeEach(() => {
     vi.mocked(createBudget).mockClear();
@@ -116,7 +116,7 @@ describe("runResearchCollection wiring", () => {
     expect(limits.ms).toBe(RESEARCH_MAX_MS);
     expect(limits.fetches).toBe(50);
     await research();
-    expect((vi.mocked(createBudget).mock.calls[1][0] as { ms: number }).ms).toBe(RESEARCH_MAX_MS);
+    expect((vi.mocked(createBudget).mock.calls[2][0] as { ms: number }).ms).toBe(RESEARCH_MAX_MS);
     expect(RESEARCH_MAX_MS).toBeLessThan(300_000); // the execute route's maxDuration
   });
 
@@ -136,6 +136,7 @@ describe("runResearchCollection wiring", () => {
     await runResearchCollection({
       projectId: "p1", runId: "run_1", sink: { id: "sink/test", title: "t", run: vi.fn() },
       seeds: [{ uri: "https://a.example/post", meta: { pasted: true } }, claim],
+      wire: "2",
     });
     const [seeds, opts] = vi.mocked(crawl).mock.calls[0] as unknown as [Array<{ meta?: Record<string, unknown> }>, { keepAside?: boolean }];
     expect(opts.keepAside).toBe(true);
@@ -144,5 +145,21 @@ describe("runResearchCollection wiring", () => {
     vi.mocked(crawl).mockClear();
     await runCollection({ organizationId: "11111111-1111-4111-8111-111111111111" });
     expect((vi.mocked(crawl).mock.calls[0][1] as { keepAside?: boolean }).keepAside).toBe(false);
+  });
+
+  it("an engine that does not list wire v2 gets the old behaviour: refused pages are dropped, not kept aside", async () => {
+    await runResearchCollection({ projectId: "p1", runId: "run_1", seeds: [{ uri: "https://a.example/" }], sink: { id: "sink/test", title: "t", run: vi.fn() }, wire: "1" });
+    expect((vi.mocked(crawl).mock.calls[0][1] as { keepAside?: boolean }).keepAside).toBe(false);
+  });
+
+  it("search calls draw from their own budget (MAX_QUERIES per search seed, same clock), so pages keep max_fetches", async () => {
+    const { createProviderCall } = await import("@/lib/collect/net/providers");
+    vi.mocked(createProviderCall).mockClear();
+    const claim = (id: string) => ({ uri: `entity://claim/${id}`, meta: { kind: "claim" } });
+    await runResearchCollection({ projectId: "p1", runId: "run_1", seeds: [claim("a"), claim("b"), { uri: "https://a.example/" }], sink: { id: "sink/test", title: "t", run: vi.fn() }, budget: { fetches: 50 }, wire: "2" });
+    const [pages, queries] = vi.mocked(createBudget).mock.calls.map((c) => c[0] as { fetches: number; ms: number });
+    expect([pages.fetches, queries.fetches, queries.ms]).toEqual([50, 32, pages.ms]);
+    const queryBudget = vi.mocked(createBudget).mock.results[1].value;
+    expect((vi.mocked(createProviderCall).mock.calls[0][0] as { budget: unknown }).budget).toBe(queryBudget);
   });
 });

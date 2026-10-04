@@ -8,14 +8,19 @@
 // Built per run (it carries that run's grant token), so it is not in the sink registry. No finalize: for research
 // "not delivered this run" is not "gone", and the run's completion is sent by the execute route after the crawl
 // returns, healthy or not — the orchestrator only calls finalize on healthy runs (plan K2).
+//
+// Two wire versions: "2" only when the engine listed it at the grant exchange (an older engine refuses v2 with 422,
+// so a run against it would hang to its deadline); otherwise the v1 shape.
 
 import type { ChannelState, RawDoc, RunReport, SinkBlock, SinkCtx, SinkReport } from "@/lib/collect/types";
 import { classifySource, sourceClassLabel, type SourceClass } from "@/lib/collect/source-class";
+import { ANGLES, CLAIM_ANGLES, MAX_QUERIES } from "@/lib/collect/search/query-plan";
 import {
   ingestSources,
   type CompletionAside,
   type CompletionChannel,
   type SourceProjection,
+  type WireVersion,
 } from "@/lib/cognitive-os/research";
 
 /** = COS ingest's per-request ceiling (I-e). */
@@ -27,6 +32,54 @@ export const MAX_RELEVANCE_BYTES = 4096;
 /** = COS CollectionCompleteRequest.wire_error. */
 export const MAX_COMPLETION_ASIDE = 200;
 export const MAX_COMPLETION_CHANNELS = 20;
+
+type Rule =
+  | { type: "enum"; values: ReadonlyArray<string | null> }
+  | { type: "text" | "id" | "url"; max: number }
+  | { type: "texts"; items: number; max: number }
+  | { type: "bool"; required: true };
+
+/**
+ * Every v2 relevance key and its rule: a copy of collector.v2.json `relevance` (the one rule set; the engine checks
+ * the same; collect-wire-v2.test.ts fails if the two differ). A key whose value breaks its rule is dropped, never
+ * sent: the engine refuses a whole batch of 25 pages for one bad value.
+ */
+export const RELEVANCE_RULES: Record<string, Rule> = {
+  entityConfidence: { type: "enum", values: [null, "anchored", "name_only", "weak", "peripheral"] },
+  entityAnchorsHit: { type: "texts", items: 12, max: 200 },
+  searchProvider: { type: "enum", values: ["serper", "brave"] },
+  searchLang: { type: "enum", values: ["zh", "en"] },
+  searchQuery: { type: "text", max: 500 },
+  searchAngle: { type: "id", max: 40 },
+  pasted: { type: "bool", required: true },
+  aside: { type: "text", max: 300 },
+  imageUrl: { type: "url", max: 2048 },
+  outlinks: { type: "texts", items: 50, max: 253 },
+};
+
+/** The v1 shape's keys (an engine that does not list "2"); free-form there, so only what v2 also allows is sent. */
+const V1_KEYS = ["entityConfidence", "entityAnchorsHit", "searchAngle", "searchQuery"] as const;
+
+function text(value: unknown, max: number): value is string {
+  return typeof value === "string" && value.length >= 1 && value.length <= max;
+}
+
+export function fitsRule(rule: Rule, value: unknown): boolean {
+  switch (rule.type) {
+    case "enum":
+      return rule.values.includes(value as string | null);
+    case "bool":
+      return typeof value === "boolean";
+    case "text":
+      return text(value, rule.max);
+    case "id":
+      return text(value, rule.max) && /^[a-z][a-z0-9_-]*$/.test(value);
+    case "url":
+      return text(value, rule.max) && /^https?:\/\//.test(value);
+    case "texts":
+      return Array.isArray(value) && value.length <= rule.items && value.every((v) => text(v, rule.max));
+  }
+}
 
 /** What the person reads for each machine reason a page was set aside (GATHER 「放一旁」 shows it as is). */
 const ASIDE_WHY: Record<string, string> = {
@@ -44,6 +97,7 @@ const ASIDE_WHY: Record<string, string> = {
   disallowed: "這個網站不讓系統抓這一頁",
   gone: "這一頁已經不在了",
   unhandled: "系統還不能讀這種檔案",
+  budget: "這次的抓取額度或時間用完了，這一頁沒有抓",
 };
 
 export function asideWhy(code: string): string {
@@ -52,10 +106,29 @@ export function asideWhy(code: string): string {
   return ASIDE_WHY[code] ?? "系統沒有收這一頁";
 }
 
+/**
+ * Which pages keep a place when more than MAX_COMPLETION_ASIDE were set aside: a page that was read and refused, or
+ * could not be read, before a page that was never fetched (budget), before a search result skipped for its kind.
+ */
+function asidePriority(code: string): number {
+  if (code.startsWith("source_class:")) return 2;
+  if (code === "budget") return 1;
+  return 0;
+}
+
+const ANGLE_LABELS = new Map<string, string>([
+  ...Object.values(ANGLES).flat().map((a) => [a.id, a.label] as [string, string]),
+  ...CLAIM_ANGLES.map((a) => [a.id, a.label] as [string, string]),
+]);
+
 export function channelWhy(c: ChannelState): string {
-  if (c.state === "ok") return "";
+  if (c.state === "ok") {
+    // An engine that answered, whose later angles the per-question call ceiling cut (query-plan.ts fanOut).
+    const cut = c.why.startsWith("cut:") ? c.why.slice(4).split(",").filter(Boolean) : [];
+    return cut.length ? `每個問題最多查 ${MAX_QUERIES} 次，這些角度沒有查：${cut.map((id) => ANGLE_LABELS.get(id) ?? id).join("、")}` : "";
+  }
   if (c.state === "no_key") return "平台還沒有這個搜尋引擎的金鑰";
-  if (c.why === "budget") return "這次的抓取額度用完了，沒有查";
+  if (c.why === "budget") return "這次的查詢額度或時間用完了，沒有查";
   if (c.why === "network") return "連不上這個搜尋引擎";
   const http = /^http_(\d+)$/.exec(c.why);
   return http ? `這個搜尋引擎回了錯誤（HTTP ${http[1]}）` : "這個搜尋引擎沒有回應";
@@ -63,13 +136,13 @@ export function channelWhy(c: ChannelState): string {
 
 /** Byte length as COS measures it: Python json.dumps(ensure_ascii=False), whose separators are ", " and ": ". */
 export function pyJsonBytes(value: unknown): number {
-  const text = (v: unknown): string =>
+  const serial = (v: unknown): string =>
     Array.isArray(v)
-      ? `[${v.map(text).join(", ")}]`
+      ? `[${v.map(serial).join(", ")}]`
       : v !== null && typeof v === "object"
-        ? `{${Object.entries(v).map(([k, x]) => `${JSON.stringify(k)}: ${text(x)}`).join(", ")}}`
+        ? `{${Object.entries(v).map(([k, x]) => `${JSON.stringify(k)}: ${serial(x)}`).join(", ")}}`
         : JSON.stringify(v);
-  return Buffer.byteLength(text(value), "utf8");
+  return Buffer.byteLength(serial(value), "utf8");
 }
 
 function texts(value: unknown, items: number, chars: number): string[] | undefined {
@@ -78,9 +151,9 @@ function texts(value: unknown, items: number, chars: number): string[] | undefin
 }
 
 /**
- * How the source was found and why it is in the case (wire v2). Keys, types and limits =
- * Projects/internal/cognitive-engineering-os/specs/wire/collector.v2.json `relevance`, which COS enforces: one bad
- * value refuses the whole batch, so every value is cut to its limit here and the whole fits MAX_RELEVANCE_BYTES.
+ * How the source was found and why it is in the case (wire v2): each value cut to its limit, each key checked against
+ * RELEVANCE_RULES (a key that breaks its rule is dropped), a pasted page without search keys, the whole within
+ * MAX_RELEVANCE_BYTES.
  */
 export function relevanceOf(meta: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -88,14 +161,19 @@ export function relevanceOf(meta: Record<string, unknown>): Record<string, unkno
   const anchors = texts(meta.entityAnchorsHit, 12, 200);
   if (anchors) out.entityAnchorsHit = anchors;
   for (const key of ["searchProvider", "searchLang", "searchAngle"] as const) {
-    if (typeof meta[key] === "string") out[key] = meta[key];
+    if (meta[key] !== undefined) out[key] = meta[key];
   }
   if (typeof meta.searchQuery === "string" && meta.searchQuery.trim()) out.searchQuery = meta.searchQuery.slice(0, 500);
   out.pasted = meta.pasted === true;
   if (typeof meta.aside === "string") out.aside = asideWhy(meta.aside);
-  if (typeof meta.imageUrl === "string" && meta.imageUrl.length <= 2048) out.imageUrl = meta.imageUrl;
+  if (meta.imageUrl !== undefined) out.imageUrl = meta.imageUrl;
   const outlinks = texts(meta.outlinks, 50, 253);
   if (outlinks) out.outlinks = outlinks;
+  for (const [key, value] of Object.entries(out)) {
+    const rule = RELEVANCE_RULES[key];
+    if (!rule || !fitsRule(rule, value)) delete out[key];
+  }
+  if (out.pasted) for (const key of Object.keys(out)) if (key.startsWith("search")) delete out[key];
   // Over the cap, the least telling parts go first: links one at a time, then the image, the anchors, the query.
   while (pyJsonBytes(out) > MAX_RELEVANCE_BYTES) {
     if (Array.isArray(out.outlinks) && out.outlinks.length) out.outlinks = out.outlinks.slice(0, -1);
@@ -107,11 +185,13 @@ export function relevanceOf(meta: Record<string, unknown>): Record<string, unkno
   return out;
 }
 
-/** The run's completion, wire v2: pages set aside with no text (each URL once, the first 200) and the channels. */
+/** The run's completion, wire v2: pages set aside with no text (each URL once, the first 200 by asidePriority) and
+ *  the channels. */
 export function completionOf(report: Pick<RunReport, "aside" | "channels">): { aside: CompletionAside[]; channels: CompletionChannel[] } {
   const aside: CompletionAside[] = [];
   const seen = new Set<string>();
-  for (const a of report.aside) {
+  const ordered = report.aside.map((a, i) => ({ a, i })).sort((x, y) => asidePriority(x.a.reason) - asidePriority(y.a.reason) || x.i - y.i);
+  for (const { a } of ordered) {
     if (aside.length >= MAX_COMPLETION_ASIDE) break;
     if (a.url.length > 2048 || seen.has(a.url)) continue;
     seen.add(a.url);
@@ -123,7 +203,8 @@ export function completionOf(report: Pick<RunReport, "aside" | "channels">): { a
   return { aside, channels };
 }
 
-export function toSourceProjection(doc: RawDoc): SourceProjection {
+export function toSourceProjection(doc: RawDoc, wire: WireVersion = "2"): SourceProjection {
+  const relevance = relevanceOf(doc.meta);
   return {
     canonical_url: doc.canonicalUrl,
     source_uri: doc.uri,
@@ -141,8 +222,8 @@ export function toSourceProjection(doc: RawDoc): SourceProjection {
     // where it came from, not a guess from its URL shape (which the fallback below still is).
     // RESEARCH_LINES_MASTER_PLAN WC-P2-07b, P-K11.
     source_class: doc.collector.startsWith("collect/academic:") ? "academic" : classifySource(doc.canonicalUrl),
-    relevance: relevanceOf(doc.meta),
-    schema_version: "2",
+    relevance: wire === "2" ? relevance : Object.fromEntries(V1_KEYS.filter((k) => k in relevance).map((k) => [k, relevance[k]])),
+    schema_version: wire,
   };
 }
 
@@ -150,6 +231,8 @@ export interface CognitiveSinkOptions {
   projectId: string;
   runId: string;
   grantToken: string;
+  /** What the engine listed at the grant exchange; "1" when it did not list "2". */
+  wire: WireVersion;
 }
 
 export function createCognitiveSink(opts: CognitiveSinkOptions): SinkBlock {
@@ -167,7 +250,7 @@ export function createCognitiveSink(opts: CognitiveSinkOptions): SinkBlock {
           report.skipped++;
           continue;
         }
-        sendable.push(toSourceProjection(doc));
+        sendable.push(toSourceProjection(doc, opts.wire));
       }
       for (let i = 0; i < sendable.length; i += INGEST_BATCH) {
         const batch = sendable.slice(i, i + INGEST_BATCH);

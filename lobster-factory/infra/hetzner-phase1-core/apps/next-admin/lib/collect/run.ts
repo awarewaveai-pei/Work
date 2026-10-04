@@ -20,6 +20,8 @@ import { createKbSink } from "@/lib/collect/sinks/kb";
 import { createNullSink } from "@/lib/collect/sinks/null";
 import { createSupabaseUrlStateStore } from "@/lib/collect/url-state";
 import type { SinkBlock } from "@/lib/collect/types";
+import { MAX_QUERIES } from "@/lib/collect/search/query-plan";
+import type { WireVersion } from "@/lib/cognitive-os/research";
 import "@/lib/collect/blocks"; // registering the built-in sources is the point of calling this
 
 /**
@@ -99,6 +101,8 @@ interface CrawlWithOptions {
   durableRateLimit: boolean;
   urlState: boolean;
   keepAside: boolean;
+  /** Search calls draw from this one when given (a research run), page fetches from `budget`. */
+  queryBudget?: ReturnType<typeof createBudget>;
   log: (msg: string) => void;
 }
 
@@ -123,7 +127,7 @@ function crawlWith(o: CrawlWithOptions): Promise<CrawlResult> {
     urlState: o.urlState ? createSupabaseUrlStateStore() : undefined,
     fetch: createCollectFetch({ budget: o.budget, log: o.log, rateLimiter }),
     // Present only so a provider-backed tier CAN run; it still scores 0 without a key.
-    callProvider: createProviderCall({ budget: o.budget, log: o.log }),
+    callProvider: createProviderCall({ budget: o.queryBudget ?? o.budget, log: o.log }),
   });
 }
 
@@ -146,6 +150,8 @@ export interface ResearchCollectionOptions {
   seeds: SeedInput[];
   sink: SinkBlock;
   budget?: BudgetLimits;
+  /** What the engine listed at the grant exchange: "2" keeps refused pages (keepAside), "1" drops them as before. */
+  wire: WireVersion;
   log?: (msg: string) => void;
 }
 
@@ -157,7 +163,12 @@ export interface ResearchCollectionOptions {
  * keepAside: a refused page is labelled, never dropped (Cognitive OS wire v2, STEP2_SHARED_RULES §4.1).
  */
 export async function runResearchCollection(opts: ResearchCollectionOptions): Promise<Pick<CrawlResult, "report" | "sink">> {
-  const budget = createBudget({ ...DEFAULT_BUDGET, ...opts.budget, ms: Math.min(opts.budget?.ms ?? RESEARCH_MAX_MS, RESEARCH_MAX_MS) });
+  const ms = Math.min(opts.budget?.ms ?? RESEARCH_MAX_MS, RESEARCH_MAX_MS);
+  const budget = createBudget({ ...DEFAULT_BUDGET, ...opts.budget, ms });
+  // The engine's plan shows max_queries (MAX_QUERIES per search seed) and max_fetches (pages) as two ceilings, so
+  // search calls do not eat the page budget: their own count, the same clock.
+  const searchSeeds = opts.seeds.filter((s) => s.uri.startsWith("entity://")).length;
+  const queryBudget = createBudget({ fetches: searchSeeds * MAX_QUERIES, ms });
   const result = await crawlWith({
     seeds: researchSeeds(opts.seeds),
     sink: opts.sink,
@@ -167,7 +178,8 @@ export async function runResearchCollection(opts: ResearchCollectionOptions): Pr
     maxDepth: 2,
     durableRateLimit: true,
     urlState: false,
-    keepAside: true,
+    keepAside: opts.wire === "2",
+    queryBudget,
     log: opts.log ?? (() => {}),
   });
   return { report: result.report, sink: result.sink };

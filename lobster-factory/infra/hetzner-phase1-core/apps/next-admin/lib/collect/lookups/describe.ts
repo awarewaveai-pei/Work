@@ -8,13 +8,18 @@
 // holds captures from 1999 (a false 查不到, R3), and its CDX index took 15-17 s for that URL.
 
 import {
+  LOOKUP_DEADLINE_MS,
+  TOO_SLOW,
+  deadline,
   found,
   notFound,
   unchecked,
+  whyFailed,
+  whyStatus,
   type Cell,
   type DescribeAnswerItem,
 } from "@/lib/collect/lookups/contract";
-import { COUNTRIES, RDAP_BASES, RDAP_NOT_LISTED, SECOND_LEVEL } from "@/lib/collect/lookups/lists";
+import { COUNTRIES, FIRST_REGISTRATION, RDAP_BASES, RDAP_NOT_LISTED, SECOND_LEVEL } from "@/lib/collect/lookups/lists";
 
 /** collect's fetcher (lib/collect/net/fetcher.ts createCollectFetch), or a fake in tests. */
 export type LookupFetch = (
@@ -24,12 +29,9 @@ export type LookupFetch = (
 
 const ARCHIVE_REPLAY = "https://web.archive.org/web/1996/";
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Under the engine's 45 s (lookup.v1.json engine_timeout_seconds): what is not done by then is 無法檢查. */
-export const DESCRIBE_DEADLINE_MS = 38_000;
 
-const REGISTRY_DOWN = "網域註冊資料庫這次沒有回應";
-const ARCHIVE_DOWN = "網頁封存館這次沒有回應";
-const TOO_SLOW = "這一項這次查太久，沒有查完";
+const REGISTRY = "網域註冊資料庫";
+const ARCHIVE = "網頁封存館";
 const IP_HOST = "這個網址用的是 IP 位址，沒有網域註冊資料";
 
 type Registry = { registered: Cell; country: Cell };
@@ -107,18 +109,20 @@ function countryOf(entities: unknown): string | null {
 }
 
 async function registry(name: string, deps: DescribeDeps): Promise<Registry> {
-  const tld = name.split(".").pop() ?? "";
+  const labels = name.split(".");
+  const tld = labels[labels.length - 1] ?? "";
   const bases = deps.registries?.bases ?? RDAP_BASES;
   const notListed = deps.registries?.notListed ?? RDAP_NOT_LISTED;
+  const suffix = labels.map((_, i) => labels.slice(i).join(".")).find((s) => s !== name && notListed[s] !== undefined);
   const base = bases[tld];
-  if (!base) {
-    const why = notListed[tld] ?? `「.${tld}」的網域註冊資料庫不在蒐集器的名單上`;
+  if (suffix !== undefined || !base) {
+    const why = suffix !== undefined ? notListed[suffix] : `「.${tld}」的網域註冊資料庫不在蒐集器的名單上`;
     return { registered: unchecked(why), country: unchecked(why) };
   }
   const cache = deps.cache ?? RDAP_CACHE;
   const cached = cache.get(name);
   if (cached) return cached;
-  const down = { registered: unchecked(REGISTRY_DOWN), country: unchecked(REGISTRY_DOWN) };
+  const failed = (why: string): Registry => ({ registered: unchecked(why), country: unchecked(why) });
   let record: unknown;
   try {
     const res = await deps.fetch(`${base}domain/${name}`, { headers: { accept: "application/rdap+json" } });
@@ -128,18 +132,23 @@ async function registry(name: string, deps: DescribeDeps): Promise<Registry> {
       cache.set(name, none);
       return none;
     }
-    if (!res.ok || res.headers.get("x-collect-truncated") === "1") return down;
-    record = await res.json();
-  } catch {
-    return down;
+    if (!res.ok) return failed(whyStatus(res.status, REGISTRY));
+    if (res.headers.get("x-collect-truncated") === "1") return failed(`${REGISTRY}的回答太大，蒐集器沒有讀完`);
+    record = await res.json().catch(() => null);
+  } catch (e) {
+    return failed(whyFailed(e, REGISTRY));
   }
-  if (!isObject(record)) return down;
+  if (!isObject(record)) return failed(`${REGISTRY}的回答格式不對`);
   const events = Array.isArray(record.events) ? record.events : [];
   const event = events.find((e) => isObject(e) && e.eventAction === "registration") as Record<string, unknown> | undefined;
   const date = typeof event?.eventDate === "string" ? event.eventDate.slice(0, 10) : "";
   const country = countryOf(record.entities);
   const cells: Registry = {
-    registered: /^\d{4}-\d{2}-\d{2}$/.test(date) ? found(date, `${name} 在網域註冊資料庫的註冊日`) : notFound("註冊資料沒有寫註冊日期"),
+    registered: !/^\d{4}-\d{2}-\d{2}$/.test(date)
+      ? notFound("註冊資料沒有寫註冊日期")
+      : date < FIRST_REGISTRATION
+        ? notFound("註冊資料寫的註冊日早於 1985 年，不是真的註冊日")
+        : found(date, `${name} 在網域註冊資料庫的註冊日`),
     country: country ? found(COUNTRIES[country.toUpperCase()] ?? country, "網域註冊資料寫的") : notFound("註冊資料沒有寫國家（常被隱藏）"),
   };
   cache.set(name, cells);
@@ -158,25 +167,19 @@ async function firstArchived(url: string, deps: DescribeDeps): Promise<Cell> {
   let res: Response;
   try {
     res = await deps.fetch(archiveReplayUrl(url), { method: "HEAD", redirect: "manual" });
-  } catch {
-    return unchecked(ARCHIVE_DOWN);
+  } catch (e) {
+    return unchecked(whyFailed(e, ARCHIVE));
   }
   if (res.status === 404) return notFound("網頁封存館沒有存過這一頁");
+  if (res.status >= 400) return unchecked(whyStatus(res.status, ARCHIVE));
   const stamp = /\/web\/(\d{8})\d*/.exec(res.headers.get("location") ?? "")?.[1];
-  if (res.status < 300 || res.status >= 400 || !stamp) return unchecked(ARCHIVE_DOWN);
+  if (res.status < 300 || !stamp) return unchecked(`${ARCHIVE}的回答格式不對`);
   return found(`${stamp.slice(0, 4)}-${stamp.slice(4, 6)}-${stamp.slice(6, 8)}`);
 }
 
 /** One answer item per URL, same order (R1). A site is asked once per request; nothing here throws. */
 export async function describe(urls: string[], deps: DescribeDeps): Promise<DescribeAnswerItem[]> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<"late">((resolve) => {
-    timer = setTimeout(() => resolve("late"), deps.deadlineMs ?? DESCRIBE_DEADLINE_MS);
-  });
-  const inTime = async <T>(work: Promise<T>, onLate: T): Promise<T> => {
-    const first = await Promise.race([work, late]);
-    return first === "late" ? onLate : (first as T);
-  };
+  const { inTime, clear } = deadline(deps.deadlineMs ?? LOOKUP_DEADLINE_MS);
   const perSite = new Map<string, Promise<Registry>>();
   try {
     return await Promise.all(
@@ -193,6 +196,6 @@ export async function describe(urls: string[], deps: DescribeDeps): Promise<Desc
       }),
     );
   } finally {
-    clearTimeout(timer);
+    clear();
   }
 }

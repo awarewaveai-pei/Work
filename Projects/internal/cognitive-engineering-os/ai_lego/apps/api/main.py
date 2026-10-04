@@ -3101,16 +3101,20 @@ class CollectionCompleteRequest(BaseModel):
     # Accepted for the caller's own logs, never stored: it can quote a URL (plan K8).
     error: str | None = None
     # Wire v2 (STEP2_SHARED_RULES §4.1; examples specs/wire/collector.v2.json): pages set aside with no text, and the
-    # search channels the run used or could not use. Shapes are checked by wire_error inside the route, not here: a
-    # 422 before the handler would leave the run open until its deadline.
-    aside: list[dict[str, Any]] | None = None
-    channels: list[dict[str, Any]] | None = None
+    # search channels the run used or could not use. Typed Any and checked by wire_error inside the route: a 422 before
+    # the handler would leave the run open until its deadline.
+    aside: Any = None
+    channels: Any = None
 
     def wire_error(self) -> str | None:
         def text(value: Any, low: int, high: int) -> bool:
             return isinstance(value, str) and low <= len(value) <= high
 
         aside, channels = self.aside or [], self.channels or []
+        if not isinstance(aside, list) or not all(isinstance(item, dict) for item in aside):
+            return "aside: a list of pages"
+        if not isinstance(channels, list) or not all(isinstance(item, dict) for item in channels):
+            return "channels: a list"
         if len(aside) > 200:
             return "aside: at most 200 pages"
         for item in aside:
@@ -3125,8 +3129,9 @@ class CollectionCompleteRequest(BaseModel):
         for item in channels:
             if set(item) != {"provider", "lang", "state", "why"}:
                 return "channels: each is {provider, lang, state, why}"
-            if not (isinstance(item["provider"], str) and re.fullmatch(r"[a-z][a-z0-9_-]{0,39}", item["provider"])):
-                return "channels: provider is a short lower-case id"
+            # Never Perplexity (the operator's decision after unexplained charges): a run that used it is refused.
+            if item["provider"] not in ("serper", "brave"):
+                return "channels: provider is serper or brave"
             if item["lang"] not in ("zh", "en") or item["state"] not in ("ok", "unreachable", "no_key") or not text(item["why"], 0, 300):
                 return "channels: lang zh|en, state ok|unreachable|no_key, why at most 300 characters"
         return None
@@ -3138,8 +3143,10 @@ def get_collection_service() -> CollectionServiceClient | None:
 
 
 def _research_seeds(payload: CollectionRequest) -> list[dict[str, Any]]:
-    # Wire v2 (STEP2_SHARED_RULES §4.1): a claim to search for, or a URL the person pasted. Perplexity is never a
-    # provider (the operator's decision after unexplained charges); = next-admin search/query-plan.ts CLAIM_ANGLES.
+    # Wire v2 (STEP2_SHARED_RULES §4.1): exactly two shapes -- a claim to search for (engines serper|brave only: never
+    # Perplexity, the operator's decision after unexplained charges), or an https URL with no meta or only `pasted`.
+    # Any other entity:// seed would reach the collector's name search, which honours its own engine setting.
+    # = next-admin search/query-plan.ts CLAIM_ANGLES and app/api/internal/collect/runs/research-run-request.ts.
     claim_lists = {
         "angles": ("primary", "news", "factcheck", "precedent", "field", "opposite", "origin"),
         "languages": ("zh", "en"),
@@ -3153,33 +3160,27 @@ def _research_seeds(payload: CollectionRequest) -> list[dict[str, Any]]:
         raise refuse(f"1..{MAX_SEEDS} seeds")
     seeds: list[dict[str, Any]] = []
     for seed in payload.seeds:
-        if not seed.uri.startswith(("entity://", "https://")) or len(seed.uri) > 2048:
-            raise refuse("a seed uri starts with entity:// or https://")
-        claim = seed.uri.startswith("entity://claim/")
-        if claim and not re.fullmatch(r"entity://claim/[A-Za-z0-9_-]{1,64}", seed.uri):
-            raise refuse("a claim seed is entity://claim/<id of 1..64 letters, digits, _ or ->")
-        if seed.meta is None:
-            if claim:
-                raise refuse("a claim seed carries its meta")
-            seeds.append({"uri": seed.uri})
+        if len(seed.uri) > 2048 or any(seed.uri == kept["uri"] for kept in seeds):
+            raise refuse("each seed uri at most 2048 characters, and given once")
+        if seed.uri.startswith("https://"):
+            if seed.meta is not None and (set(seed.meta) != {"pasted"} or not isinstance(seed.meta["pasted"], bool)):
+                raise refuse("an https:// seed has no meta, or only pasted: true or false")
+            seeds.append({"uri": seed.uri} if seed.meta is None else {"uri": seed.uri, "meta": {"pasted": seed.meta["pasted"]}})
             continue
-        if len(json.dumps(seed.meta, ensure_ascii=False).encode("utf-8")) > MAX_RESEARCH_SEED_META_BYTES:
+        if not re.fullmatch(r"entity://claim/[A-Za-z0-9_-]{1,64}", seed.uri):
+            raise refuse("a seed is an https:// URL or entity://claim/<id of 1..64 letters, digits, _ or ->")
+        meta = seed.meta
+        if meta is None or set(meta) != {"kind", "entityName", *claim_lists} or meta["kind"] != "claim":
+            raise refuse("a claim seed's meta is exactly kind (claim), entityName, angles, languages, providers")
+        if len(json.dumps(meta, ensure_ascii=False).encode("utf-8")) > MAX_RESEARCH_SEED_META_BYTES:
             raise refuse(f"meta over {MAX_RESEARCH_SEED_META_BYTES} bytes")
-        if claim != (seed.meta.get("kind") == "claim"):
-            raise refuse("kind claim goes with an entity://claim/ uri, and only with it")
-        if claim:
-            meta = seed.meta
-            if set(meta) != {"kind", "entityName", *claim_lists}:
-                raise refuse("a claim seed's meta is exactly kind, entityName, angles, languages, providers")
-            if not isinstance(meta["entityName"], str) or not meta["entityName"].strip() or len(meta["entityName"]) > 200:
-                raise refuse("entityName is the claim, 1..200 characters")
-            for key, allowed in claim_lists.items():
-                values = meta[key]
-                if not isinstance(values, list) or not values or len(set(map(str, values))) != len(values) or not all(isinstance(v, str) and v in allowed for v in values):
-                    raise refuse(f"{key} is a non-empty list without repeats from {', '.join(allowed)}")
-        if "pasted" in seed.meta and (not isinstance(seed.meta["pasted"], bool) or not seed.uri.startswith("https://")):
-            raise refuse("pasted is true or false, on an https:// seed")
-        seeds.append({"uri": seed.uri, "meta": seed.meta})
+        if not isinstance(meta["entityName"], str) or not meta["entityName"].strip() or len(meta["entityName"]) > 200:
+            raise refuse("entityName is the claim, 1..200 characters")
+        for key, allowed in claim_lists.items():
+            values = meta[key]
+            if not isinstance(values, list) or not values or len(set(map(str, values))) != len(values) or not all(isinstance(v, str) and v in allowed for v in values):
+                raise refuse(f"{key} is a non-empty list without repeats from {', '.join(allowed)}")
+        seeds.append({"uri": seed.uri, "meta": meta})
     return seeds
 
 
@@ -3255,8 +3256,10 @@ def exchange_collect_grant(
     authorization: str | None = Header(default=None),
     store: IdentityStore = Depends(get_store),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
-) -> dict[str, str]:
-    """next-admin trades the run's grant reference for its token, once (I-d). Bearer = COLLECT_RESEARCH_RUNS_TOKEN."""
+) -> dict[str, Any]:
+    """next-admin trades the run's grant reference for its token, once (I-d). Bearer = COLLECT_RESEARCH_RUNS_TOKEN.
+    ``wire_versions``: the ingest/completion shapes this engine accepts (IngestSource.schema_version); next-admin sends
+    v2 only when it is listed, so either side can deploy first (an older engine answers without the key = v1 only)."""
     if not _collection_bearer_ok(authorization):
         raise HTTPException(status_code=401, detail="COLLECT_TOKEN_INVALID")
     try:
@@ -3269,7 +3272,8 @@ def exchange_collect_grant(
     except InvariantViolation as error:
         store.close_collect_grant(grant_ref)  # the run already ended; its grant dies with it
         raise HTTPException(status_code=410, detail="GRANT_EXPIRED") from error
-    return {"grant_token": grant["grant_token"], "project_id": grant["project_id"], "run_id": grant["run_id"], "expires_at": grant["expires_at"]}
+    return {"grant_token": grant["grant_token"], "project_id": grant["project_id"], "run_id": grant["run_id"], "expires_at": grant["expires_at"],
+            "wire_versions": IngestSource.model_json_schema()["properties"]["schema_version"]["enum"]}
 
 
 def require_grant(project_id: str, authorization: str | None = Header(default=None), store: IdentityStore = Depends(get_store)) -> dict[str, str]:
@@ -3338,11 +3342,10 @@ class IngestSource(BaseModel):
     relevance: dict[str, Any] = {}
     schema_version: Literal["1", "2"]
 
-    def relevance_error(self) -> str | None:
-        """v1 relevance stays free-form; v2 (STEP2_SHARED_RULES §4.1, specs/wire/collector.v2.json) names every key and
-        its type, so a block reading it never meets a shape it did not expect. The size cap is source_record's."""
-        if self.schema_version == "1":
-            return None
+    @staticmethod
+    def relevance_checks() -> dict[str, Callable[[Any], bool]]:
+        """Every v2 relevance key and its type (= specs/wire/collector.v2.json `relevance`, one rule set both sides
+        test against), so a block reading relevance never meets a shape it did not expect."""
 
         def text(high: int) -> Callable[[Any], bool]:
             return lambda value: isinstance(value, str) and 1 <= len(value) <= high
@@ -3353,10 +3356,10 @@ class IngestSource(BaseModel):
         def texts(items: int, high: int) -> Callable[[Any], bool]:
             return lambda value: isinstance(value, list) and len(value) <= items and all(text(high)(item) for item in value)
 
-        checks: dict[str, Callable[[Any], bool]] = {
+        return {
             "entityConfidence": lambda value: value in (None, "anchored", "name_only", "weak", "peripheral"),
             "entityAnchorsHit": texts(12, 200),
-            "searchProvider": short_id,
+            "searchProvider": lambda value: value in ("serper", "brave"),
             "searchLang": lambda value: value in ("zh", "en"),
             "searchQuery": text(500),
             "searchAngle": short_id,
@@ -3365,6 +3368,22 @@ class IngestSource(BaseModel):
             "imageUrl": lambda value: text(2048)(value) and value.startswith(("https://", "http://")),
             "outlinks": texts(50, 253),
         }
+
+    def stored_relevance(self) -> dict[str, Any]:
+        """What is stored: one shape whatever the wire version. v1 (free-form) keeps only the keys and values v2 allows,
+        and is not pasted (v1 had no pasted seed)."""
+        if self.schema_version == "2":
+            return dict(self.relevance)
+        checks = self.relevance_checks()
+        kept = {key: value for key, value in self.relevance.items() if key in checks and key != "pasted" and checks[key](value)}
+        return {**kept, "pasted": False}
+
+    def relevance_error(self) -> str | None:
+        """v1 is converted (stored_relevance), never refused; a v2 key or value outside the rules refuses the batch.
+        The size cap is source_record's."""
+        if self.schema_version == "1":
+            return None
+        checks = self.relevance_checks()
         unknown = sorted(set(self.relevance) - set(checks))
         if unknown:
             return f"unknown key {unknown[0]!r}"
@@ -3440,7 +3459,7 @@ def ingest_sources(
                 fetched_at=item.fetched_at,
                 provenance=item.provenance,
                 source_class=item.source_class,
-                relevance=item.relevance,
+                relevance=item.stored_relevance(),
             )
         except InvariantViolation as error:
             raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error

@@ -21,11 +21,21 @@ export const RDAP_BASES: Record<string, string> = {
   gov: "https://rdap.nic.gov/rdap/",
 };
 
-/** On IANA's list but not reachable from collect; each says why. */
+/**
+ * Suffixes collect cannot answer for, each with why; the longest suffix of a site's name wins over RDAP_BASES. A
+ * second level registered somewhere other than its top-level domain's RDAP is here too: asking that RDAP gives a
+ * false 查不到 or a false date (R3).
+ */
 export const RDAP_NOT_LISTED: Record<string, string> = {
   // 2026-10-04 from this collector: HTTP/1.1 answers 426, HTTP/2 answers 500 「Web Page Blocked!」.
   tw: "台灣的網域註冊資料庫擋下蒐集器的連線",
+  // 2026-10-04: Nominet's .uk RDAP answers 404 for ox.ac.uk, and for ons.gov.uk redirects to a record dated 1970-01-01.
+  "ac.uk": "英國學術網域（ac.uk）不在 .uk 的網域註冊資料庫裡，蒐集器沒有它的註冊資料庫可以問",
+  "gov.uk": "英國政府網域（gov.uk）不在 .uk 的網域註冊資料庫裡，蒐集器沒有它的註冊資料庫可以問",
 };
+
+/** No domain name was registered before the first ones in March 1985: an earlier date is a placeholder, not a fact. */
+export const FIRST_REGISTRATION = "1985-01-01";
 
 /** Where the registrable name is three labels (bbc.co.uk, cna.com.tw), not two. */
 export const SECOND_LEVEL = new Set([

@@ -43,7 +43,7 @@ beforeEach(() => {
   process.env.COLLECT_RESEARCH_RUNS_TOKEN = "runs-token";
   process.env.COGNITIVE_OS_API_BASE_URL = "http://cos.internal:8420";
   calls = [];
-  exchangeReply = { status: 200, body: { grant_token: GRANT_TOKEN, project_id: PROJECT, run_id: "run_1", expires_at: "t" } };
+  exchangeReply = { status: 200, body: { grant_token: GRANT_TOKEN, project_id: PROJECT, run_id: "run_1", expires_at: "t", wire_versions: ["1", "2"] } };
   global.fetch = vi.fn(async (url: string, init: RequestInit) => {
     calls.push({ url, init });
     if (url.endsWith("/exchange")) return new Response(JSON.stringify(exchangeReply.body), { status: exchangeReply.status });
@@ -99,6 +99,15 @@ describe("POST /api/internal/collect/runs/execute", () => {
     const sent = JSON.parse(completes()[0].init.body as string);
     expect(sent.aside).toEqual([{ url: "https://example.com/gone", title: "Gone", reason: "這一頁已經不在了" }]);
     expect(sent.channels).toEqual([{ provider: "brave", lang: "en", state: "no_key", why: "平台還沒有這個搜尋引擎的金鑰" }]);
+  });
+
+  it("an engine that does not list wire v2 gets v1: no aside or channels in the completion, refused pages not kept", async () => {
+    exchangeReply = { status: 200, body: { grant_token: GRANT_TOKEN, project_id: PROJECT, run_id: "run_1", expires_at: "t" } };
+    await POST(req());
+    const sent = JSON.parse(completes()[0].init.body as string);
+    expect(sent).not.toHaveProperty("aside");
+    expect(sent).not.toHaveProperty("channels");
+    expect((runMod.runResearchCollection.mock.calls[0][0] as { wire: string }).wire).toBe("1");
   });
 
   it("still completes, as failed, when the crawl throws", async () => {

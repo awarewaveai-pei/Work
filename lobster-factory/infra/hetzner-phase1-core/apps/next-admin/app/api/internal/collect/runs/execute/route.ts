@@ -14,7 +14,7 @@ import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { runResearchCollection } from "@/lib/collect/run";
 import { completionOf, createCognitiveSink } from "@/lib/collect/sinks/cognitive";
-import { completeRun, exchangeGrant, type RunReportSummary } from "@/lib/cognitive-os/research";
+import { completeRun, exchangeGrant, wireVersionOf, type RunReportSummary } from "@/lib/cognitive-os/research";
 import { parseResearchRunRequest } from "../research-run-request";
 import "@/lib/collect/blocks";
 
@@ -56,6 +56,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "grant_mismatch" }, { status: 502 });
   }
   const grantToken = grant.value.grant_token;
+  // v2 (aside, channels, set-aside pages kept) only when this engine listed it; an older engine gets v1 and the old
+  // behaviour (refused pages dropped), so either side can be deployed first.
+  const wire = wireVersionOf(grant.value);
 
   let status: "completed" | "failed" = "failed";
   let failure: string | undefined;
@@ -67,8 +70,9 @@ export async function POST(request: Request) {
       projectId: run.project_id,
       runId: run.run_id,
       seeds: run.seeds,
-      sink: createCognitiveSink({ projectId: run.project_id, runId: run.run_id, grantToken }),
+      sink: createCognitiveSink({ projectId: run.project_id, runId: run.run_id, grantToken, wire }),
       budget: { fetches: run.budget.fetches },
+      wire,
     });
     const r = result.report;
     summary.fetched = r.fetched;
@@ -82,7 +86,7 @@ export async function POST(request: Request) {
   } catch (e) {
     failure = String(e).slice(0, 200);
   } finally {
-    const done = await completeRun(run.project_id, run.run_id, grantToken, status, summary, failure, found);
+    const done = await completeRun(run.project_id, run.run_id, grantToken, status, summary, failure, wire === "2" ? found : undefined);
     if (done.ok === false) failure = `${failure ?? ""} complete_${done.status}:${done.error}`.trim().slice(0, 200);
   }
   return NextResponse.json({ ok: true, status, report: summary, ...(failure ? { error: failure } : {}) });

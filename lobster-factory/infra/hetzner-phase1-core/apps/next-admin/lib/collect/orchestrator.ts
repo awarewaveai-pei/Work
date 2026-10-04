@@ -186,11 +186,16 @@ const CARRIED_TO_DOC = ["searchQuery", "searchAngle", "searchLang", "searchProvi
 
 const CHANNEL_RANK: Record<ChannelState["state"], number> = { no_key: 0, unreachable: 1, ok: 2 };
 
-/** One entry per (engine, language) across every query target of the run: an engine that answered once is ok. */
+/** One entry per (engine, language) across every query target of the run: an engine that answered once is ok, and
+ *  an ok channel lists every angle a call ceiling cut for any target (why `cut:<angle,...>`). */
 function mergeChannel(into: ChannelState[], c: ChannelState): void {
   const i = into.findIndex((x) => x.provider === c.provider && x.lang === c.lang);
   if (i < 0) into.push(c);
   else if (CHANNEL_RANK[c.state] > CHANNEL_RANK[into[i].state]) into[i] = c;
+  else if (c.state === "ok" && into[i].state === "ok") {
+    const cut = new Set([into[i].why, c.why].flatMap((why) => (why.startsWith("cut:") ? why.slice(4).split(",") : [])).filter(Boolean));
+    into[i] = { ...into[i], why: cut.size ? `cut:${[...cut].join(",")}` : "" };
+  }
 }
 
 function emptySinkReport(): SinkReport {
@@ -503,8 +508,9 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
           const thin = verdict.reason === "too_short" || verdict.reason === "low_text_density";
           const reason = thin && !hasNextTier ? `${verdict.reason}_no_heavier_tier` : (verdict.reason ?? "unknown");
           // A research run keeps a refused page that has text, labelled with why; it is not admitted, so its
-          // links are not followed (below).
+          // links are not followed (below). Still counted as refused: the gate did refuse it.
           if (opts.keepAside && doc.text.trim()) {
+            report.dirty.push({ uri: doc.uri, reason, checks: verdict.checks });
             deliver(doc, { aside: reason });
             continue;
           }
@@ -519,6 +525,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         const relevance = assessRelevance(doc, target.meta);
         if (!relevance.ok) {
           if (opts.keepAside) {
+            report.offEntity.push({ uri: doc.uri, reason: relevance.reason ?? "off_entity" });
             deliver(doc, { ...(relevanceMetadata(relevance) ?? {}), aside: relevance.reason ?? "off_entity" });
             continue;
           }
@@ -553,6 +560,22 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
   }
 
   if (report.stoppedBy === null) report.stoppedBy = "frontier_empty";
+  // keepAside: a stop is not silent. Every page still queued is listed (reason budget), and a query target that never
+  // ran says so per channel — "never searched" must not read as "searched, found nothing".
+  if (opts.keepAside && report.stoppedBy === "budget") {
+    const listed = new Set<string>();
+    for (const left of frontier) {
+      if (seen.has(left.canonicalUri) || listed.has(left.canonicalUri)) continue;
+      listed.add(left.canonicalUri);
+      if (/^https?:\/\//i.test(left.uri)) {
+        const searchTitle = typeof left.meta?.searchTitle === "string" ? left.meta.searchTitle : "";
+        report.aside.push({ url: left.uri, title: searchTitle.slice(0, 300), reason: "budget" });
+        continue;
+      }
+      const owner = blocks.find((b) => b.notRun && b.match(left) > 0);
+      for (const channel of owner?.notRun?.(left, "budget").channels ?? []) mergeChannel(report.channels, channel);
+    }
+  }
   await flush();
   await persist();
 

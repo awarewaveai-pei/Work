@@ -6,21 +6,34 @@
 // Traps:
 // - The feed is ~200 MB of JSON. It is read as a stream, one feed element at a time, and written in batches; holding it
 //   (the Python version peaked ~820 MB) is not an option inside next-admin.
-// - A refresh writes a new generation beside the old one; the switch (and the cleanup) is one database function that
-//   refuses an incomplete generation. A failed refresh leaves the old mirror answering.
+// - A refresh writes a new generation beside the old one; the switch is one database function that refuses an
+//   incomplete generation, and old rows go in short batches (prune). A failed refresh leaves the old mirror answering.
 // - normalise() and pieces() must stay the same function for the stored claims and the looked-up text.
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { ClaimReviewHit } from "@/lib/collect/lookups/contract";
 import type { LookupFetch } from "@/lib/collect/lookups/describe";
 import { FACTCHECK } from "@/lib/collect/lookups/lists";
+import COMMON_PIECE_LIST from "@/lib/collect/lookups/claimreview-common-pieces.json";
 
 /** Pieces of the looked-up text sent to the index (spread across it), and how many candidates it may return. */
 const MAX_QUERY_PIECES = 96;
-const MAX_CANDIDATES = 300;
+const MAX_CANDIDATES = 1000;
+/**
+ * A piece in at least this share of the claims (" th", "the", "ion": 1,669 of 253,728 distinct pieces in the
+ * 2026-10-04 feed) is left out of the candidate query: with them an English text matched 67k of 99k reviews and read
+ * the whole table (1.9 s); without them 14k (0.23 s). Measured on 2,000 real claims set inside a longer text, the
+ * candidate step then misses 0.75% instead of 5.75% (common pieces drowned the ranking), reworded claims 0.4% instead
+ * of 0.15%; 155 claims made only of common pieces can no longer be found. The match itself (minOverlap) is unchanged.
+ * Regenerate claimreview-common-pieces.json: lib/collect/__tests__/collect-lookups-live.test.ts COLLECT_LOOKUPS_COMMON_FROM.
+ */
+export const COMMON_PIECE_SHARE = 0.01;
+const COMMON_PIECES: ReadonlySet<string> = new Set(COMMON_PIECE_LIST as string[]);
 const INSERT_BATCH = 500;
-/** The hourly heartbeat asks; a refresh starts when the last one started this long ago (23 h keeps the daily slot). */
+/** The hourly heartbeat asks; a refresh starts when the last success is this old (23 h keeps the daily slot)... */
 export const REFRESH_EVERY_HOURS = 23;
+/** ...and the last attempt this old: a failed refresh is retried the next hour, not the next day. */
+export const RETRY_AFTER_HOURS = 1;
 
 const CJK = "⺀-〿぀-鿿가-힯豈-﫿";
 const SPACE_IN_CJK = new RegExp(`(?<=[${CJK}])\\s+(?=[${CJK}])`, "g");
@@ -52,9 +65,9 @@ export function share(claimNorm: string, wanted: Set<string>): number {
   return inText / theirs.size;
 }
 
-/** Up to MAX_QUERY_PIECES of the text's pieces, evenly spread over their sorted order. */
+/** Up to MAX_QUERY_PIECES of the text's pieces that are not common, evenly spread over their sorted order. */
 export function queryPieces(wanted: Set<string>): string[] {
-  const ordered = [...wanted].sort();
+  const ordered = [...wanted].filter((piece) => !COMMON_PIECES.has(piece)).sort();
   const step = Math.max(1, Math.floor(ordered.length / MAX_QUERY_PIECES));
   return ordered.filter((_, i) => i % step === 0).slice(0, MAX_QUERY_PIECES);
 }
@@ -95,6 +108,8 @@ export function reviewsOf(element: unknown): ClaimReviewHit[] {
     const reviewed = isObject(item.itemReviewed) ? item.itemReviewed : {};
     const claimant = isObject(reviewed.author) ? reviewed.author : {};
     const date = text(item.datePublished, 40).slice(0, 10) || text(element.dateCreated, 40).slice(0, 10);
+    // schema.org sdLicense is a URL or a CreativeWork; the item's own, not the compilation's (none in today's feed head)
+    const license = isObject(item.sdLicense) ? text(item.sdLicense.url, 200) || text(item.sdLicense.name, 200) : text(item.sdLicense, 200);
     out.push({
       claim,
       url,
@@ -103,6 +118,7 @@ export function reviewsOf(element: unknown): ClaimReviewHit[] {
       judged_as: text(rating.alternateName, 500),
       date: DATE.test(date) ? date : "",
       claimant: text(claimant.name, 300),
+      license,
     });
   }
   return out;
@@ -182,16 +198,20 @@ export async function scanFeed(
 export type ClaimReviewRow = ClaimReviewHit & { norm: string };
 export type Candidates = { kind: "no_mirror" } | { kind: "error"; error: string } | { kind: "rows"; rows: ClaimReviewRow[] };
 
-/** Where the mirror lives (Supabase in production, a fake in tests). */
+/** Where the mirror lives (Supabase in production, a fake in tests). Policy (which feed is good enough) is not here. */
 export interface ClaimReviewStore {
   candidates(pieces: string[], limit: number): Promise<Candidates>;
-  /** True when this caller may refresh now (the last refresh started at least `minHours` ago); atomic. */
-  beginRefresh(minHours: number): Promise<boolean>;
+  /** How many reviews the mirror answering now holds; null = no mirror yet. */
+  currentReviews(): Promise<number | null>;
+  /** True for one caller when a refresh is due (last success >= successHours ago, last attempt >= retryHours ago). */
+  beginRefresh(successHours: number, retryHours: number): Promise<boolean>;
   insert(generation: number, rows: ClaimReviewRow[]): Promise<void>;
-  /** Switches to `generation` only if it holds exactly `reviews` rows, then drops every other generation. */
+  /** Points the mirror at `generation`, only if it holds exactly `reviews` rows. Deletes nothing (prune does). */
   finish(generation: number, info: { reviews: number; publishers: number; feedModified: string }): Promise<void>;
-  /** Drops what a failed refresh wrote and records why; the current mirror is untouched. */
-  fail(generation: number, error: string): Promise<void>;
+  /** Records why a refresh failed; the mirror answering now is untouched. */
+  fail(error: string): Promise<void>;
+  /** Deletes at most `batch` rows of any generation but the current one; how many it deleted. */
+  prune(batch: number): Promise<number>;
 }
 
 export function supabaseClaimReviewStore(): ClaimReviewStore | null {
@@ -202,18 +222,23 @@ export function supabaseClaimReviewStore(): ClaimReviewStore | null {
     if (error) throw new Error(`${name}: ${error.message}`);
     return data as unknown;
   };
+  const mirror = () => sb.from("collect_claimreview_mirror").select("current_generation, reviews").eq("id", 1).maybeSingle();
   return {
     async candidates(wanted, limit) {
-      const mirror = await sb.from("collect_claimreview_mirror").select("current_generation").eq("id", 1).maybeSingle();
-      if (mirror.error) return { kind: "error", error: mirror.error.message };
-      if (!mirror.data || mirror.data.current_generation === null) return { kind: "no_mirror" };
-      if (!wanted.length) return { kind: "rows", rows: [] };
+      const current = await mirror();
+      if (current.error) return { kind: "error", error: current.error.message };
+      if (!current.data || current.data.current_generation === null) return { kind: "no_mirror" };
       const { data, error } = await sb.rpc("collect_claimreview_candidates", { p_pieces: wanted, p_limit: limit });
       if (error || !Array.isArray(data)) return { kind: "error", error: error?.message ?? "not_a_list" };
       return { kind: "rows", rows: data as ClaimReviewRow[] };
     },
-    async beginRefresh(minHours) {
-      return (await rpc("collect_claimreview_begin_refresh", { p_min_hours: minHours })) === true;
+    async currentReviews() {
+      const current = await mirror();
+      if (current.error) throw new Error(`collect_claimreview_mirror: ${current.error.message}`);
+      return current.data && current.data.current_generation !== null ? Number(current.data.reviews) : null;
+    },
+    async beginRefresh(successHours, retryHours) {
+      return (await rpc("collect_claimreview_begin_refresh", { p_success_hours: successHours, p_retry_hours: retryHours })) === true;
     },
     async insert(generation, rows) {
       const { error } = await sb.from("collect_claimreview_reviews").insert(rows.map((row) => ({ generation, ...row })));
@@ -227,19 +252,28 @@ export function supabaseClaimReviewStore(): ClaimReviewStore | null {
         p_feed_modified: info.feedModified,
       });
     },
-    async fail(generation, error) {
-      await rpc("collect_claimreview_fail_refresh", { p_generation: generation, p_error: error });
+    async fail(error) {
+      await rpc("collect_claimreview_fail_refresh", { p_error: error });
+    },
+    async prune(batch) {
+      return Number(await rpc("collect_claimreview_prune", { p_batch: batch }));
     },
   };
 }
 
+export type ClaimReviewAnswer =
+  | { kind: "no_store" }
+  | { kind: "nothing_to_compare" }
+  | { kind: "no_mirror" }
+  | { kind: "error"; error: string }
+  | { kind: "hits"; hits: ClaimReviewHit[] };
+
 /** The reviews whose claim is mostly inside `text`, closest first, at most FACTCHECK.maxHits. */
-export async function lookupClaimReview(
-  textToCheck: string,
-  store: ClaimReviewStore | null,
-): Promise<{ kind: "no_mirror" } | { kind: "error"; error: string } | { kind: "hits"; hits: ClaimReviewHit[] }> {
-  if (!store) return { kind: "error", error: "no_supabase_client" };
+export async function lookupClaimReview(textToCheck: string, store: ClaimReviewStore | null): Promise<ClaimReviewAnswer> {
+  if (!store) return { kind: "no_store" };
   const wanted = pieces(normalise(textToCheck));
+  // Nothing of three characters to compare: there is no way to look, which is not "looked and found none".
+  if (!wanted.size) return { kind: "nothing_to_compare" };
   const found = await store.candidates(queryPieces(wanted), MAX_CANDIDATES);
   if (found.kind !== "rows") return found;
   const hits = found.rows
@@ -255,8 +289,23 @@ export async function lookupClaimReview(
       judged_as: row.judged_as ?? "",
       date: row.date ?? "",
       claimant: row.claimant ?? "",
+      license: row.license ?? "",
     }));
   return { kind: "hits", hits };
+}
+
+/** A new feed below this share of the mirror answering now is refused: a cut or broken feed is not a smaller world. */
+export const MIN_SHARE_OF_CURRENT = 0.8;
+/** Rows per prune call: one short statement each (Supabase's statement timeout is 8 s on a small database). */
+export const PRUNE_BATCH = 5000;
+
+/** Delete every row of a generation that is not current, a batch at a time; never throws. */
+async function pruneAll(store: ClaimReviewStore, log: (msg: string) => void): Promise<void> {
+  try {
+    for (let i = 0; i < 2000; i++) if ((await store.prune(PRUNE_BATCH)) === 0) return;
+  } catch (e) {
+    log(`claimreview prune stopped, the next refresh continues it: ${String(e).slice(0, 200)}`);
+  }
 }
 
 /** Download the feed (streamed) and replace the mirror; the old one stays if anything fails. */
@@ -270,6 +319,8 @@ export async function refreshClaimReview(deps: {
   const publishers = new Set<string>();
   let batch: ClaimReviewRow[] = [];
   let reviews = 0;
+  // What an earlier refresh left (a restart mid-download, a failed refresh) goes before this one writes anything.
+  await pruneAll(deps.store, deps.log);
   try {
     const res = await deps.fetch(FACTCHECK.claimreview.feedUrl, { stream: true, headers: { accept: "application/json" } });
     if (!res.ok || !res.body) throw new Error(`claimreview_feed_http_${res.status}`);
@@ -286,12 +337,18 @@ export async function refreshClaimReview(deps: {
       }
     });
     if (batch.length) await deps.store.insert(generation, batch);
+    const current = await deps.store.currentReviews();
+    if (reviews < 1 || (current !== null && reviews < current * MIN_SHARE_OF_CURRENT)) {
+      throw new Error(`claimreview_feed_too_small: ${reviews} reviews, the mirror holds ${current ?? 0}`);
+    }
     await deps.store.finish(generation, { reviews, publishers: publishers.size, feedModified: text(dateModified, 40) });
     deps.log(`claimreview mirror refreshed: ${reviews} reviews, ${publishers.size} publishers`);
+    await pruneAll(deps.store, deps.log);
     return { ok: true, reviews, publishers: publishers.size };
   } catch (e) {
     const error = String(e).slice(0, 300);
-    await deps.store.fail(generation, error).catch((failed) => deps.log(`claimreview cleanup failed: ${String(failed).slice(0, 200)}`));
+    await deps.store.fail(error).catch((failed) => deps.log(`claimreview could not record the failure: ${String(failed).slice(0, 200)}`));
+    await pruneAll(deps.store, deps.log);
     deps.log(`claimreview refresh failed, the old mirror stays: ${error}`);
     return { ok: false, error };
   }

@@ -7,6 +7,37 @@
 // this server's env only (plan K5).
 
 import type { SeedInput } from "@/lib/collect/orchestrator";
+import { CLAIM_PROVIDERS } from "@/lib/collect/search/drivers";
+import { CLAIM_ANGLES } from "@/lib/collect/search/query-plan";
+
+/**
+ * Exactly the two seed shapes of the collector wire v2 (Projects/internal/cognitive-engineering-os/specs/wire/
+ * collector.v2.json seed_shapes, = the engine's _research_seeds): a claim, or an https URL with no meta or only
+ * `pasted`. A name seed would reach the dossier's name search, which honours COLLECT_SEARCH_PROVIDER; a claim never
+ * does — so no research run can reach Perplexity. Extra meta would be copied onto every page.
+ */
+function seedError(seed: { uri: string; meta?: unknown }): string | null {
+  const meta = seed.meta;
+  if (seed.uri.startsWith("https://")) {
+    if (meta === undefined) return null;
+    return isPlainObject(meta) && Object.keys(meta).join() === "pasted" && typeof meta.pasted === "boolean" ? null : "seed_meta_invalid";
+  }
+  if (!/^entity:\/\/claim\/[A-Za-z0-9_-]{1,64}$/.test(seed.uri)) return "seed_scheme_invalid";
+  if (!isPlainObject(meta) || Buffer.byteLength(JSON.stringify(meta), "utf8") > MAX_META_BYTES) return "seed_meta_invalid";
+  const keys = Object.keys(meta).sort().join();
+  if (keys !== "angles,entityName,kind,languages,providers" || meta.kind !== "claim") return "seed_meta_invalid";
+  if (typeof meta.entityName !== "string" || !meta.entityName.trim() || meta.entityName.length > 200) return "seed_meta_invalid";
+  const lists: Array<[unknown, readonly string[]]> = [
+    [meta.angles, CLAIM_ANGLES.map((a) => a.id)],
+    [meta.languages, ["zh", "en"]],
+    [meta.providers, CLAIM_PROVIDERS],
+  ];
+  for (const [values, allowed] of lists) {
+    if (!Array.isArray(values) || !values.length || new Set(values).size !== values.length) return "seed_meta_invalid";
+    if (!values.every((v) => typeof v === "string" && allowed.includes(v))) return "seed_meta_invalid";
+  }
+  return null;
+}
 
 export interface ResearchRunRequest {
   grant_ref: string;
@@ -39,16 +70,12 @@ export function parseResearchRunRequest(body: unknown): { ok: true; value: Resea
   if (!Array.isArray(seeds) || seeds.length < 1 || seeds.length > MAX_SEEDS) return { ok: false, error: "seeds_count_invalid" };
   const cleanSeeds: ResearchRunRequest["seeds"] = [];
   for (const seed of seeds) {
-    if (!isPlainObject(seed) || typeof seed.uri !== "string") return { ok: false, error: "seed_invalid" };
-    if (!seed.uri.startsWith("entity://") && !seed.uri.startsWith("https://")) return { ok: false, error: "seed_scheme_invalid" };
+    if (!isPlainObject(seed) || typeof seed.uri !== "string" || seed.uri.length > 2048) return { ok: false, error: "seed_invalid" };
     if (Object.keys(seed).some((k) => k !== "uri" && k !== "meta")) return { ok: false, error: "seed_invalid" };
-    const meta = seed.meta;
-    if (meta === undefined) {
-      cleanSeeds.push({ uri: seed.uri });
-      continue;
-    }
-    if (!isPlainObject(meta) || Buffer.byteLength(JSON.stringify(meta), "utf8") > MAX_META_BYTES) return { ok: false, error: "seed_meta_invalid" };
-    cleanSeeds.push({ uri: seed.uri, meta });
+    if (cleanSeeds.some((kept) => kept.uri === seed.uri)) return { ok: false, error: "seed_repeated" };
+    const error = seedError(seed as { uri: string; meta?: unknown });
+    if (error) return { ok: false, error };
+    cleanSeeds.push(seed.meta === undefined ? { uri: seed.uri } : { uri: seed.uri, meta: seed.meta as Record<string, unknown> });
   }
   let fetches = MAX_FETCHES;
   if (budget !== undefined) {

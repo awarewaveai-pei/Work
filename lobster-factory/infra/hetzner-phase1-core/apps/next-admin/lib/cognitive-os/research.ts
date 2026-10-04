@@ -14,6 +14,15 @@ export interface GrantExchange {
   project_id: string;
   run_id: string;
   expires_at: string;
+  /** The ingest/completion shapes this engine accepts; absent = an engine older than wire v2 (v1 only). */
+  wire_versions?: string[];
+}
+
+export type WireVersion = "1" | "2";
+
+/** v2 only when the engine listed it: an older engine refuses v2 (422) and the run would hang to its deadline. */
+export function wireVersionOf(grant: GrantExchange): WireVersion {
+  return Array.isArray(grant.wire_versions) && grant.wire_versions.includes("2") ? "2" : "1";
 }
 
 /** One Source as COS ingests it (plan §3.4 C1) -- exactly these fifteen keys. `relevance` keys and types: wire v2,
@@ -33,7 +42,7 @@ export interface SourceProjection {
   collector: string;
   source_class: string | null;
   relevance: Record<string, unknown>;
-  schema_version: "2";
+  schema_version: WireVersion;
 }
 
 /** A page set aside with no text, in the run's completion (wire v2). */

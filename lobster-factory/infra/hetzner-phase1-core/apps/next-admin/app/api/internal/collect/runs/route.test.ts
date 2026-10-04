@@ -9,7 +9,7 @@ const originalFetch = global.fetch;
 const originalEnv = { ...process.env };
 
 function valid(overrides: Record<string, unknown> = {}) {
-  return { grant_ref: "grantref-123", project_id: PROJECT, run_id: "run_1", seeds: [{ uri: "entity://Acme%20Ltd", meta: { entityKind: "organization" } }], ...overrides };
+  return { grant_ref: "grantref-123", project_id: PROJECT, run_id: "run_1", seeds: [{ uri: "entity://claim/acme1", meta: { kind: "claim", entityName: "Acme 改了合約", angles: ["news"], languages: ["zh"], providers: ["serper", "brave"] } }], ...overrides };
 }
 
 function req(body: unknown, auth: string | null = `Bearer ${TOKEN}`): Request {

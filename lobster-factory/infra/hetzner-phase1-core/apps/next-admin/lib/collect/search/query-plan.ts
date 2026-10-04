@@ -127,10 +127,12 @@ export interface SearchCall extends PlannedQuery {
 
 /**
  * Every planned query on every engine, engine innermost, capped at MAX_QUERIES CALLS: a second engine never
- * doubles the bill, and when the cap cuts, the angles that survive still ran on every engine.
+ * doubles the bill, and when the cap cuts, the angles that survive still ran on every engine. `cut` is what the cap
+ * left out, so the run can say which angles were not searched.
  */
-export function fanOut(plan: PlannedQuery[], providers: string[]): SearchCall[] {
-  return plan.flatMap((q) => providers.map((provider) => ({ ...q, provider }))).slice(0, MAX_QUERIES);
+export function fanOut(plan: PlannedQuery[], providers: string[]): { calls: SearchCall[]; cut: SearchCall[] } {
+  const all = plan.flatMap((q) => providers.map((provider) => ({ ...q, provider })));
+  return { calls: all.slice(0, MAX_QUERIES), cut: all.slice(MAX_QUERIES) };
 }
 
 /**

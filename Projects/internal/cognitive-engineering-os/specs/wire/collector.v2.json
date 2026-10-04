@@ -1,6 +1,8 @@
 {
   "about": "Collector wire v2 (docs/platform/STEP2_SHARED_RULES.md 4.1). One set of examples for both sides: the engine posts them (tests/unit/test_collector_wire_v2.py), next-admin builds them from the seeds below (lib/collect/__tests__/collect-wire-v2.test.ts). Change both sides and this file in one commit.",
   "schema_version": "2",
+  "wire_versions": "The engine lists the versions it accepts in its grant-exchange answer (wire_versions); next-admin sends v2 (this file's shapes, aside, channels, keepAside) only when \"2\" is listed, else the v1 shape. An engine that answers without the key accepts v1 only.",
+  "seed_shapes": "Exactly two: a claim (entity://claim/<id>, meta exactly kind, entityName, angles, languages, providers) or an https:// URL with no meta or meta exactly {\"pasted\": bool}. Every seed uri once. Never Perplexity: providers and every channel and searchProvider are serper or brave.",
   "claim_angles": [
     "primary",
     "news",
@@ -37,8 +39,11 @@
       "max": 200
     },
     "searchProvider": {
-      "type": "id",
-      "max": 40
+      "type": "enum",
+      "values": [
+        "serper",
+        "brave"
+      ]
     },
     "searchLang": {
       "type": "enum",
@@ -219,14 +224,14 @@
     },
     "aside": [
       {
-        "url": "https://www.facebook.com/somepage/posts/1",
-        "title": "臉書貼文",
-        "reason": "系統沒有去抓這類網頁：社群個人頁"
-      },
-      {
         "url": "https://dep.example.gov.tw/notice/88",
         "title": "環保局公告",
         "reason": "系統只抓到很少的字，可能讀不到這種網頁"
+      },
+      {
+        "url": "https://www.facebook.com/somepage/posts/1",
+        "title": "臉書貼文",
+        "reason": "系統沒有去抓這類網頁：社群個人頁"
       }
     ],
     "channels": [

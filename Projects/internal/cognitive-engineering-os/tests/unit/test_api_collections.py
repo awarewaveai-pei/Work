@@ -14,7 +14,9 @@ from ai_lego.platform.identity.store import COLLECTOR_EMAIL
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
 RUNS_TOKEN = "runs-token-for-tests-only"
-SEEDS = [{"uri": "entity://Acme%20Ltd", "meta": {"entityKind": "organization"}}, {"uri": "https://acme.example/about"}]
+# the two seed shapes of wire v2 (specs/wire/collector.v2.json seed_shapes)
+SEEDS = [{"uri": "entity://claim/acme1", "meta": {"kind": "claim", "entityName": "Acme Ltd 改了合約", "angles": ["news"], "languages": ["zh"], "providers": ["serper", "brave"]}},
+         {"uri": "https://acme.example/about"}]
 REPORT = {"fetched": 4, "written": 3, "unchanged": 0, "refused": 1, "stopped_by": "frontier_empty"}
 
 
@@ -151,7 +153,7 @@ class GrantExchangeAndCompleteTests(CollectionApiTestCase):
     def test_exchange_is_one_shot_and_starts_the_run(self):
         first = self._exchange(self.grant_ref)
         self.assertEqual(first.status_code, 200, first.text)
-        self.assertEqual(set(first.json()), {"grant_token", "project_id", "run_id", "expires_at"})
+        self.assertEqual(set(first.json()), {"grant_token", "project_id", "run_id", "expires_at", "wire_versions"})
         self.assertEqual(self._exchange(self.grant_ref).status_code, 409)
         self.assertEqual(self._exchange("no-such-reference").status_code, 404)
         self.assertEqual(self.client.get(f"/projects/{self.project['project_id']}/collections/{self.run_id}").json()["status"], "running")

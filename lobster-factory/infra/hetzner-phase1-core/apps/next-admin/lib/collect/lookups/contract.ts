@@ -18,6 +18,39 @@ export const MAX_DESCRIBE_ITEMS = 25;
 export const MAX_FACTCHECK_ITEMS = 1;
 export const MAX_TEXT_CHARS = 4000;
 
+/** Under the engine's 45 s (lookup.v1.json engine_timeout_seconds): what is not done by then is 無法檢查. */
+export const LOOKUP_DEADLINE_MS = 38_000;
+export const TOO_SLOW = "這一項這次查太久，沒有查完";
+
+/** One deadline for a whole request: `inTime(work, onLate)` answers `onLate` for work still running at the deadline. */
+export function deadline(ms: number): { inTime: <T>(work: Promise<T>, onLate: T) => Promise<T>; clear: () => void } {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<"late">((resolve) => {
+    timer = setTimeout(() => resolve("late"), ms);
+  });
+  return {
+    async inTime<T>(work: Promise<T>, onLate: T): Promise<T> {
+      const first = await Promise.race([work, late]);
+      return first === "late" ? onLate : (first as T);
+    },
+    clear: () => clearTimeout(timer),
+  };
+}
+
+/** Why an outside call failed, from what failed (collect's fetcher sets `kind` and `status`), never a guess. */
+export function whyFailed(e: unknown, who: string): string {
+  const kind = e && typeof e === "object" && "kind" in e ? (e as { kind: unknown }).kind : null;
+  const status = e && typeof e === "object" && "status" in e ? Number((e as { status: unknown }).status) : NaN;
+  if (kind === "http" && Number.isFinite(status)) return `${who}回了錯誤（HTTP ${status}）`;
+  if (kind === "blocked") return `蒐集器的安全規則不讓它連到${who}`;
+  if (kind === "budget") return "這次的查詢額度用完了";
+  // collect's own per-host politeness (net/rate-limit.ts): too many lookups queued for one host to wait for
+  if (String(e).includes("rate_limit_wait_too_long")) return `這次要問${who}的太多，排不到`;
+  return `${who}這次沒有回應`;
+}
+
+export const whyStatus = (status: number, who: string): string => `${who}回了錯誤（HTTP ${status}）`;
+
 export interface DescribeAnswerItem {
   url: string;
   site: string;
@@ -34,6 +67,8 @@ export interface ClaimReviewHit {
   judged_as: string;
   date: string;
   claimant: string;
+  /** The item's own licence (the feed's sdLicense, at most 200 characters); "" when the feed has none. */
+  license: string;
 }
 
 export interface CofactsHit {
@@ -48,14 +83,19 @@ export type DbAnswer<Db extends string, Hit> =
   | { db: Db; state: typeof FOUND; attribution: string; hits: Hit[] }
   | { db: Db; state: typeof NOT_FOUND | typeof UNCHECKABLE; why: string; attribution: string; hits: Hit[] };
 
+/** The fact-check databases, in the order an answer lists them. */
+export const DBS = ["claimreview", "cofacts"] as const;
+export type Db = (typeof DBS)[number];
+
 export interface FactcheckAnswerItem {
   text: string;
-  dbs: [DbAnswer<"claimreview", ClaimReviewHit>, DbAnswer<"cofacts", CofactsHit>];
+  /** Only the databases asked for, in DBS order. */
+  dbs: Array<DbAnswer<"claimreview", ClaimReviewHit> | DbAnswer<"cofacts", CofactsHit>>;
 }
 
 export type LookupRequest =
   | { kind: "describe"; projectId: string; urls: string[] }
-  | { kind: "factcheck"; projectId: string; texts: string[] };
+  | { kind: "factcheck"; projectId: string; texts: string[]; dbs: Db[] };
 
 export type LookupAnswer = { kind: "describe"; items: DescribeAnswerItem[] } | { kind: "factcheck"; items: FactcheckAnswerItem[] };
 
@@ -73,7 +113,8 @@ function isWebUrl(value: unknown): value is string {
   }
 }
 
-/** R2's 400s: unknown kind, too many items, a URL that is not http(s), text too long (and a body that is not a request). */
+/** R2's 400s: unknown kind, too many items, a URL that is not http(s), text too long, dbs that are not a subset of DBS
+ *  (and a body that is not a request). */
 export function parseLookupRequest(body: unknown): { ok: true; value: LookupRequest } | { ok: false; error: string } {
   if (!isPlainObject(body)) return { ok: false, error: "body_not_object" };
   const { kind, items } = body;
@@ -91,6 +132,16 @@ export function parseLookupRequest(body: unknown): { ok: true; value: LookupRequ
     return { ok: true, value: { kind, projectId, urls } };
   }
   if (items.length > MAX_FACTCHECK_ITEMS) return { ok: false, error: `too_many_items:${MAX_FACTCHECK_ITEMS}` };
+  // Optional `dbs` (v1, added 2026-10-04): which databases may see the words -- someone outside Taiwan's text is never
+  // sent to Cofacts. Absent = every database; present = a non-empty subset of DBS, each once.
+  let dbs: Db[] = [...DBS];
+  if (body.dbs !== undefined) {
+    const asked = body.dbs;
+    if (!Array.isArray(asked) || !asked.length || new Set(asked).size !== asked.length || !asked.every((d) => (DBS as readonly unknown[]).includes(d))) {
+      return { ok: false, error: "dbs_not_a_subset" };
+    }
+    dbs = DBS.filter((d) => asked.includes(d));
+  }
   const texts: string[] = [];
   for (const item of items) {
     if (!isPlainObject(item) || typeof item.text !== "string") return { ok: false, error: "text_not_a_string" };
@@ -98,5 +149,5 @@ export function parseLookupRequest(body: unknown): { ok: true; value: LookupRequ
     if (Array.from(item.text).length > MAX_TEXT_CHARS) return { ok: false, error: `text_too_long:${MAX_TEXT_CHARS}` };
     texts.push(item.text);
   }
-  return { ok: true, value: { kind, projectId, texts } };
+  return { ok: true, value: { kind, projectId, texts, dbs } };
 }

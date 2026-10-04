@@ -6,8 +6,15 @@
 
 import {
   FOUND,
+  LOOKUP_DEADLINE_MS,
   NOT_FOUND,
+  TOO_SLOW,
+  DBS,
   UNCHECKABLE,
+  deadline,
+  type Db,
+  whyFailed,
+  whyStatus,
   type ClaimReviewHit,
   type CofactsHit,
   type DbAnswer,
@@ -19,8 +26,14 @@ import { FACTCHECK } from "@/lib/collect/lookups/lists";
 
 const NOTHING_CLOSE = "資料庫裡沒有相近的查核";
 const NO_MIRROR = "還沒有下載查核資料";
-const COFACTS_DOWN = `${FACTCHECK.cofacts.name} 這次沒有回應`;
-const CLAIMREVIEW_DOWN = `${FACTCHECK.claimreview.name}這次沒有回應`;
+const COFACTS = `${FACTCHECK.cofacts.name} `;
+/** Why the mirror could not be asked, by what happened (never 「沒有回應」 for a mirror nobody connected). */
+const CLAIMREVIEW_WHY: Record<string, string> = {
+  no_store: "蒐集器沒有接上查核資料庫",
+  nothing_to_compare: "這段文字太短，沒辦法跟查核資料比對",
+  no_mirror: NO_MIRROR,
+  error: "蒐集器這次讀不到查核資料",
+};
 
 /** The reply types as Cofacts' own site words them. */
 const REPLY_TYPES: Record<string, string> = {
@@ -39,6 +52,7 @@ const QUERY = `query CollectLookup($text: String!, $match: String!, $first: Int!
 export interface FactcheckDeps {
   fetch: LookupFetch;
   claimreview: ClaimReviewStore | null;
+  deadlineMs?: number;
 }
 
 function isObject(v: unknown): v is Record<string, unknown> {
@@ -65,14 +79,15 @@ async function claimreview(textToCheck: string, deps: FactcheckDeps): Promise<Db
   try {
     const found = await lookupClaimReview(textToCheck, deps.claimreview);
     if (found.kind === "hits") return answer("claimreview", attribution, found.hits, "");
-    return answer("claimreview", attribution, null, found.kind === "no_mirror" ? NO_MIRROR : CLAIMREVIEW_DOWN);
+    return answer("claimreview", attribution, null, CLAIMREVIEW_WHY[found.kind]);
   } catch {
-    return answer("claimreview", attribution, null, CLAIMREVIEW_DOWN);
+    return answer("claimreview", attribution, null, CLAIMREVIEW_WHY.error);
   }
 }
 
-/** Articles like the text, most alike first (Cofacts' own moreLikeThis), at most FACTCHECK.maxHits; null = no answer. */
-async function cofactsArticles(textToCheck: string, deps: FactcheckDeps): Promise<CofactsHit[] | null> {
+/** Articles like the text, most alike first (Cofacts' own moreLikeThis), at most FACTCHECK.maxHits; a string = why
+ *  there is no answer. */
+async function cofactsArticles(textToCheck: string, deps: FactcheckDeps): Promise<CofactsHit[] | string> {
   let body: unknown;
   try {
     const res = await deps.fetch(FACTCHECK.cofacts.apiUrl, {
@@ -83,13 +98,14 @@ async function cofactsArticles(textToCheck: string, deps: FactcheckDeps): Promis
         variables: { text: textToCheck, match: FACTCHECK.cofacts.minimumShouldMatch, first: FACTCHECK.maxHits },
       }),
     });
-    if (!res.ok) return null;
-    body = await res.json();
-  } catch {
-    return null;
+    if (!res.ok) return whyStatus(res.status, COFACTS);
+    body = await res.json().catch(() => null);
+  } catch (e) {
+    return whyFailed(e, COFACTS);
   }
+  if (isObject(body) && body.errors) return `${COFACTS}回了錯誤`;
   const listed = isObject(body) && isObject(body.data) ? body.data.ListArticles : null;
-  if (!isObject(body) || body.errors || !isObject(listed) || !Array.isArray(listed.edges)) return null;
+  if (!isObject(listed) || !Array.isArray(listed.edges)) return `${COFACTS}的回答格式不對`;
   const articles: CofactsHit[] = [];
   for (const edge of listed.edges) {
     const node = isObject(edge) ? edge.node : null;
@@ -112,15 +128,25 @@ async function cofactsArticles(textToCheck: string, deps: FactcheckDeps): Promis
 }
 
 async function cofacts(textToCheck: string, deps: FactcheckDeps): Promise<DbAnswer<"cofacts", CofactsHit>> {
-  return answer("cofacts", FACTCHECK.cofacts.attribution, await cofactsArticles(textToCheck, deps), COFACTS_DOWN);
+  const articles = await cofactsArticles(textToCheck, deps);
+  return typeof articles === "string"
+    ? answer("cofacts", FACTCHECK.cofacts.attribution, null, articles)
+    : answer("cofacts", FACTCHECK.cofacts.attribution, articles, "");
 }
 
-/** One answer item per text, same order (R1); both databases asked at once. Nothing here throws. */
-export async function factcheck(texts: string[], deps: FactcheckDeps): Promise<FactcheckAnswerItem[]> {
-  return Promise.all(
-    texts.map(async (t): Promise<FactcheckAnswerItem> => {
-      const [first, second] = await Promise.all([claimreview(t, deps), cofacts(t, deps)]);
-      return { text: t, dbs: [first, second] };
-    }),
-  );
+/** One answer item per text, same order (R1); only the databases in `dbs` are asked (a text from outside Taiwan never
+ *  reaches Cofacts), answered in DBS order, inside one deadline. Nothing throws. */
+export async function factcheck(texts: string[], deps: FactcheckDeps, dbs: readonly Db[] = DBS): Promise<FactcheckAnswerItem[]> {
+  const { inTime, clear } = deadline(deps.deadlineMs ?? LOOKUP_DEADLINE_MS);
+  const ask = (db: Db, t: string): Promise<FactcheckAnswerItem["dbs"][number]> =>
+    db === "claimreview"
+      ? inTime(claimreview(t, deps), answer<"claimreview", ClaimReviewHit>("claimreview", FACTCHECK.claimreview.attribution, null, TOO_SLOW))
+      : inTime(cofacts(t, deps), answer<"cofacts", CofactsHit>("cofacts", FACTCHECK.cofacts.attribution, null, TOO_SLOW));
+  try {
+    return await Promise.all(
+      texts.map(async (t): Promise<FactcheckAnswerItem> => ({ text: t, dbs: await Promise.all(DBS.filter((db) => dbs.includes(db)).map((db) => ask(db, t))) })),
+    );
+  } finally {
+    clear();
+  }
 }

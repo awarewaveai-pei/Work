@@ -315,6 +315,24 @@ export const entityDossierCollector: CollectBlock = {
     return providerConfigured(searchProviderId()) ? 3 : 0;
   },
 
+  /** The channels a target would have used, for a run that stopped before reaching it; a target with no plan has none. */
+  notRun(t: Target, why: string): { channels: ChannelState[] } {
+    let search: SearchPlan;
+    try {
+      search = isClaimTarget(t) ? claimSearch(t) : entitySearch(t);
+    } catch {
+      return { channels: [] };
+    }
+    const langs = [...new Set(search.plan.map((q) => q.lang))];
+    return {
+      channels: search.providers.flatMap((provider) =>
+        langs.map((lang): ChannelState =>
+          search.keyed.includes(provider) ? { provider, lang, state: "unreachable", why } : { provider, lang, state: "no_key", why: "no_key" },
+        ),
+      ),
+    };
+  },
+
   async run(
     t: Target,
     ctx: CollectCtx,
@@ -326,7 +344,7 @@ export const entityDossierCollector: CollectBlock = {
     const maxResults = Math.min(Math.max(Number(meta.maxResultsPerQuery ?? 8) || 8, 1), 20);
     const domains = domainFilter(meta.domains);
     const recency = typeof meta.recency === "string" && meta.recency ? meta.recency : undefined;
-    const calls = fanOut(search.plan, search.keyed);
+    const { calls, cut } = fanOut(search.plan, search.keyed);
     const langs = [...new Set(search.plan.map((q) => q.lang))];
     // Per keyed (engine, language): answered at least once = ok; else why it never did ("budget" = not reached).
     const tally = new Map<string, { answered: number; why: string }>(
@@ -419,7 +437,10 @@ export const entityDossierCollector: CollectBlock = {
       langs.map((lang): ChannelState => {
         const c = tally.get(`${provider}/${lang}`);
         if (!c) return { provider, lang, state: "no_key", why: "no_key" };
-        return c.answered ? { provider, lang, state: "ok", why: "" } : { provider, lang, state: "unreachable", why: c.why };
+        if (!c.answered) return { provider, lang, state: "unreachable", why: c.why };
+        // The ceiling's cut is said, never silent: the angles this engine and language did not search.
+        const notSearched = [...new Set(cut.filter((x) => x.provider === provider && x.lang === lang).map((x) => x.angle))];
+        return { provider, lang, state: "ok", why: notSearched.length ? `cut:${notSearched.join(",")}` : "" };
       }),
     );
 
