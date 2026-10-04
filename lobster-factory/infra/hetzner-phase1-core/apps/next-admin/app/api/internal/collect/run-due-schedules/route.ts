@@ -13,11 +13,12 @@
 // NEXT heartbeat (within the same due hour, or the next day/week) retries rather than silently
 // skipping a tenant forever.
 
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { listEnabledSchedules, recordScheduleRun } from "@/lib/collect/schedule-store";
 import { isDueNow, scheduledRunKey } from "@/lib/collect/schedule";
 import { runCollection } from "@/lib/collect/run";
+import { refreshClaimReviewIfDue } from "@/lib/collect/lookups/answer";
 import "@/lib/collect/blocks";
 
 export const runtime = "nodejs";
@@ -33,6 +34,9 @@ function verifyToken(request: Request): boolean {
 
 export async function POST(request: Request) {
   if (!verifyToken(request)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+
+  // The fact-check mirror for collect lookups: at most once a day, after this answer (a refresh takes minutes).
+  after(() => refreshClaimReviewIfDue({ log: (msg) => console.info(`[collect/claimreview] ${msg}`) }));
 
   const now = new Date();
   const schedules = await listEnabledSchedules();

@@ -73,6 +73,12 @@ export interface CollectFetchOptions {
   /** Ceiling on one call including every redirect hop and every politeness wait. */
   deadlineMs?: number;
   log?: (msg: string) => void;
+  /**
+   * Exact hosts THIS fetch may POST to: a documented JSON API (lib/collect/lookups, Cofacts GraphQL). Empty by
+   * default — a crawler fetches documents, and a POST to a host named by a crawled page is a different capability.
+   * A POST follows no redirect: an API that redirects us is doing something unexpected.
+   */
+  postHosts?: readonly string[];
 }
 
 /** Headers a collector may not set: they would change who we are or who we are talking to. */
@@ -171,7 +177,11 @@ export function createCollectFetch(opts: CollectFetchOptions) {
 
   return async function collectFetch(
     url: string,
-    init: { headers?: Record<string, string>; method?: string } = {},
+    /**
+     * `stream`: the body is handed back unread, failing once it passes maxBytes (a download too big to hold).
+     * `redirect: "manual"`: a redirect is handed back, not followed (where a URL points is the answer).
+     */
+    init: { headers?: Record<string, string>; method?: string; body?: string; stream?: boolean; redirect?: "manual" } = {},
   ): Promise<Response> {
     let current = url;
     const startedWholeCall = Date.now();
@@ -179,7 +189,14 @@ export function createCollectFetch(opts: CollectFetchOptions) {
     const method = (init.method ?? "GET").toUpperCase();
     // A collector fetches documents. POST/PUT/DELETE to arbitrary hosts found on crawled pages is a
     // different capability, and it arrives here as a one-word argument if this is not checked.
-    if (method !== "GET" && method !== "HEAD") {
+    let postHost = "";
+    try {
+      postHost = new URL(url).hostname.toLowerCase();
+    } catch {
+      // an unparseable URL is refused by the gate below
+    }
+    const postAllowed = method === "POST" && (opts.postHosts ?? []).includes(postHost);
+    if (method !== "GET" && method !== "HEAD" && !postAllowed) {
       throw new CollectFetchError(`method_not_allowed_${method}`, "blocked");
     }
 
@@ -222,6 +239,7 @@ export function createCollectFetch(opts: CollectFetchOptions) {
               ...sanitizeHeaders(init.headers),
               "user-agent": userAgent,
             },
+            body: postAllowed ? init.body : undefined,
             redirect: "manual", // load-bearing: see the file header
             signal: AbortSignal.timeout(timeoutMs),
             // Not part of the standard fetch types (a Node/undici extension) — real fetch reads it,
@@ -244,10 +262,34 @@ export function createCollectFetch(opts: CollectFetchOptions) {
       if (REDIRECT_STATUS.has(res.status)) {
         const location = res.headers.get("location");
         opts.budget.spend({ fetches: 1, ms: Date.now() - startedAt });
+        if (postAllowed) throw new CollectFetchError(`redirect_on_post_${res.status}`, "http", res.status);
+        if (init.redirect === "manual") {
+          const pointer = new Response(null, { status: res.status, statusText: res.statusText, headers: new Headers(res.headers) });
+          Object.defineProperty(pointer, "url", { value: current, enumerable: true });
+          return pointer;
+        }
         if (!location) throw new CollectFetchError(`redirect_without_location_${res.status}`, "http", res.status);
         current = new URL(location, current).toString(); // relative Location headers are legal
         log(`redirect ${res.status} -> ${current}`);
         continue; // and the gate runs again for this new URL
+      }
+
+      if (init.stream && res.body && !NULL_BODY_STATUS.has(res.status)) {
+        opts.budget.spend({ fetches: 1, ms: Date.now() - startedAt });
+        // Errors rather than truncating: half a dataset is not a smaller dataset, it is a wrong one.
+        let seen = 0;
+        const capped = res.body.pipeThrough(
+          new TransformStream<Uint8Array, Uint8Array>({
+            transform(chunk, controller) {
+              seen += chunk.byteLength;
+              if (seen > maxBytes) controller.error(new CollectFetchError(`stream_over_${maxBytes}_bytes`, "http"));
+              else controller.enqueue(chunk);
+            },
+          }),
+        );
+        const streamed = new Response(capped, { status: res.status, statusText: res.statusText, headers: new Headers(res.headers) });
+        Object.defineProperty(streamed, "url", { value: current, enumerable: true });
+        return streamed;
       }
 
       const { bytes, truncated } = NULL_BODY_STATUS.has(res.status)

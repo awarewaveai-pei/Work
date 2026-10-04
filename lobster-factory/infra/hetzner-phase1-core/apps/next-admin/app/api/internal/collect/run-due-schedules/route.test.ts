@@ -3,8 +3,13 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 const listEnabledSchedules = vi.hoisted(() => vi.fn());
 const recordScheduleRun = vi.hoisted(() => vi.fn());
 const runCollection = vi.hoisted(() => vi.fn());
+const refreshClaimReviewIfDue = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/collect/schedule-store", () => ({ listEnabledSchedules, recordScheduleRun }));
 vi.mock("@/lib/collect/run", () => ({ runCollection }));
+vi.mock("@/lib/collect/lookups/answer", () => ({ refreshClaimReviewIfDue }));
+// next/server's after() needs a request scope; collect the callbacks and run them on demand.
+const afterCallbacks = vi.hoisted(() => [] as Array<() => unknown>);
+vi.mock("next/server", async (orig) => ({ ...(await orig<typeof import("next/server")>()), after: (fn: () => unknown) => void afterCallbacks.push(fn) }));
 
 const { POST } = await import("./route");
 
@@ -32,6 +37,7 @@ const dueSchedule = (organizationId: string) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  afterCallbacks.length = 0;
   process.env.COLLECT_SCHEDULE_INGEST_TOKEN = TOKEN;
   runCollection.mockResolvedValue({ sink: { written: 3 } });
 });
@@ -45,6 +51,17 @@ describe("POST /api/internal/collect/run-due-schedules", () => {
     expect((await POST(req())).status).toBe(401);
     expect((await POST(req("Bearer wrong"))).status).toBe(401);
     expect(runCollection).not.toHaveBeenCalled();
+    expect(afterCallbacks).toHaveLength(0); // no fact-check mirror refresh for an unauthenticated caller
+  });
+
+  it("asks for the daily fact-check mirror refresh after answering, never before", async () => {
+    listEnabledSchedules.mockResolvedValue([]);
+    const res = await POST(req(`Bearer ${TOKEN}`));
+    expect(res.status).toBe(200);
+    expect(refreshClaimReviewIfDue).not.toHaveBeenCalled();
+    expect(afterCallbacks).toHaveLength(1);
+    await afterCallbacks[0]();
+    expect(refreshClaimReviewIfDue).toHaveBeenCalledTimes(1);
   });
 
   it("fails closed when the token is not configured at all", async () => {
