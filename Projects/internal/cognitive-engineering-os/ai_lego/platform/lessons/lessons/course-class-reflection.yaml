@@ -1,0 +1,14 @@
+id: course-class-reflection
+subject: 課堂反思
+version: 1
+state: draft
+minutes: 5
+title: 把一次學習留下來
+text: 先寫原本想做到什麼。再對照實際發生的事。最後寫下下次要調整的協作條件。
+example: 一次小組活動結束後，記下原本的安排和實際的差異。只寫活動本身看得到的內容。
+teaches:
+  - 比較預期和實際
+  - 寫下下次調整
+course:
+  package: 課堂反思
+  order: 1

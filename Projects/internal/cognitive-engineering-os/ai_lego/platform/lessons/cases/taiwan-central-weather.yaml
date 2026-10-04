@@ -1,0 +1,9 @@
+id: taiwan-central-weather
+version: 1
+title: 台灣的公開天氣公告
+text: 練習閱讀一則天氣預報公告。只討論公告的時間、地點和查找步驟。
+source:
+  kind: publisher
+  name: 中央氣象署
+  checked_on: '2026-10-04'
+place: 台灣

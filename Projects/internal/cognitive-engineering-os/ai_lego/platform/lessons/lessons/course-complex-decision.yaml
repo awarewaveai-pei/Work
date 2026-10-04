@@ -1,0 +1,14 @@
+id: course-complex-decision
+subject: 個人複雜決策
+version: 1
+state: draft
+minutes: 5
+title: 把複雜選擇拆開
+text: 先寫清楚要決定的是哪一件事。再列出選項和每個選項的限制。最後由自己說明什麼新資料會改變方向。
+example: 你在兩個工作安排之間選擇。先寫共同要達到的條件，再比較兩個安排。
+teaches:
+  - 寫清楚決定
+  - 說明改變條件
+course:
+  package: 個人複雜決策
+  order: 1

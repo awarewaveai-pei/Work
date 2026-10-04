@@ -1,0 +1,11 @@
+id: sources-independent-origins
+subject: 可疑訊息判斷
+version: 1
+state: draft
+minutes: 5
+title: 有引註不等於是真的
+text: 有引註不等於是真的。先讀引用的原文，再另開視窗找不同出處。看兩個出處是否各自查到同一件事。出處互相抄寫時，不能當成獨立出處。
+example: 一篇文章引用一份報告。你先查報告，再找另一個沒有只引用該文章的出處。
+teaches:
+  - 看原文
+  - 找獨立出處

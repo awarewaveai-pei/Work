@@ -1,0 +1,14 @@
+id: course-suspicious-message
+subject: 可疑訊息判斷
+version: 1
+state: draft
+minutes: 5
+title: 先停下來看訊息
+text: 先把訊息中的主張拆成可以查的句子。再找原始出處和不同出處。沒有足夠資料時，就保留不確定。
+example: 你收到一則要求立刻轉傳的訊息。先不轉傳，記下它要求你相信的那一句話。
+teaches:
+  - 拆出可查主張
+  - 保留不確定
+course:
+  package: 可疑訊息判斷
+  order: 1

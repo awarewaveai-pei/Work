@@ -1,0 +1,14 @@
+id: course-team-review
+subject: 團隊審議
+version: 1
+state: draft
+minutes: 5
+title: 讓不同意見留下來
+text: 先讓每個人各自寫下理由。再把相同和不同的地方並排看。最後記下仍然保留的少數意見。
+example: 小組要在兩個方案中選一個。每個人先寫一個支持理由和一個疑問，再一起整理。
+teaches:
+  - 保存不同意見
+  - 並排看理由
+course:
+  package: 團隊審議
+  order: 1

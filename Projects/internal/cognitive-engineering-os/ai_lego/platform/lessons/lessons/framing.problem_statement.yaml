@@ -1,0 +1,10 @@
+id: framing.problem_statement
+subject: framing.problem_statement
+version: 1
+state: draft
+minutes: 5
+title: 問題陳述：開始前 5 分鐘
+text: 問題陳述是用來整理問題的工具。描述現況→預期→落差→影響→限制，建立跨人共同的問題定義。團隊需要先對齊「問題到底是什麼」再吵解法時用。
+example: 示範案例：建立跨部門對「客服處理效率低落」問題的共同定義。客服平均要在3個不同系統間切換才能處理一張客訴單。客服可以在單一介面看到客戶完整歷程並直接處理客訴。缺少一個整合訂單、金流、歷史客服紀錄的統一工作台。
+teaches:
+- 問題陳述

@@ -1,0 +1,14 @@
+id: course-creative-strategy
+subject: 創意與策略衝刺
+version: 1
+state: draft
+minutes: 5
+title: 先開出不同做法
+text: 先把問題換一種說法。再提出幾個不同方向。最後選一個低風險的小試驗來學習。
+example: 你想改善一個活動的參與情況。先不要急著改答案，先提出三種不同的活動安排。
+teaches:
+  - 改寫問題
+  - 用小試驗學習
+course:
+  package: 創意與策略衝刺
+  order: 1

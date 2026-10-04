@@ -1,0 +1,9 @@
+id: taiwan-ntu-notice
+version: 1
+title: 台灣大學的公開活動公告
+text: 練習閱讀一則大學公開活動公告。只討論公告中的日期、地點和報名方式。
+source:
+  kind: publisher
+  name: 國立臺灣大學
+  checked_on: '2026-10-04'
+place: 台灣

@@ -1,0 +1,10 @@
+id: learning.after_action_review
+subject: learning.after_action_review
+version: 1
+state: draft
+minutes: 5
+title: 行動後檢討：開始前 5 分鐘
+text: 行動後檢討是用來整理問題的工具。比較預期與實際結果，問為什麼，訂出下一步——快速的單輪回顧。任何活動或專案結束後，想快速整理學到什麼時用。
+example: 示範案例：檢討新版結帳流程上線後轉換率不升反降。轉換率反而下降 3%。新版結帳流程上線後轉換率應提升 10%。移除多餘確認步驟並重新測試。
+teaches:
+- 行動後檢討

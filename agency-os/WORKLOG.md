@@ -96,6 +96,32 @@
 - 驗證：11 個相關 unittest 模組共 452 tests PASS；13 個修改檔 `py_compile` PASS；`git diff --check` PASS。記憶體內突變：去共用形狀檢查→registry 測試 58 failures；58 個宣告逐一拔掉→各 1 failure、還原全綠；正常程式 targeted 7/7 PASS。
 - 自審：檢查空陣列繞過、必填欄位、`human_only`、AI 答案入口及 API 回應；新增錯誤碼只會由壞程式宣告產生，列為內部錯誤；既有 `DOC_FIELD_INVALID` 供使用者錯值。剩餘：舊資料若已有錯形狀，這次不回寫；目前不上線。
 - rollback：對本次獨立程式提交做 `git revert <hash>`；沒有 schema 或資料搬移。
+
+## 2026-10-04（續3）
+
+### feat(cognitive-os): add versioned TEACH content and loader
+
+**根本問題**：TEACH 沒有可驗證的課程與練習案例內容邊界，工具頁的摘要和示範案例也沒有不覆寫的草稿產生器。
+
+**已修改**：
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/lessons/`：新增兩個規則集的 YAML loader、指紋歷史、七個套件課程、獨立出處課程與四個有查核日期的公開來源案例。
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/rulesets/teach.py`：接入既有規則集發現。
+- `Projects/internal/cognitive-engineering-os/ai_lego/apps/cli/generate_lessons.py`：重用工具目錄與示範案例來源，產生確定性的草稿且不覆寫既有檔案。
+- `Projects/internal/cognitive-engineering-os/tests/unit/test_teach_content.py`、`docs/platform/STEP34_CHECKLIST.md`、`agency-os/reports/review-debt.md`：補上閘門測試、卡片清單和待審記錄。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_teach_content` | exit=0 | ms=11848
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_step2_foundation` | exit=0 | ms=27755
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n — source read-back、diff check、四個 guard mutation red/green 完成。
+- ORACLE_WAIVED: 沒有可用的 Claude review session；以完整自審、四個突變紅綠證據和現有 foundation suite 取代本輪外部 oracle。
+- BUGHUNT_DONE: scope=`agency-os,reports,scripts,Projects/internal/cognitive-engineering-os/ai_lego/platform/lessons,Projects/internal/cognitive-engineering-os/ai_lego/platform/rulesets,Projects/internal/cognitive-engineering-os/ai_lego/apps/cli,Projects/internal/cognitive-engineering-os/tests/unit,Projects/internal/cognitive-engineering-os/docs/platform` | grep=`teach.lessons|teach.practice_cases|generate_lessons|40-teach-content-and-loader` | hits=23
+- WORKLOG: 本條目
+
+**突變證據**：移除指紋檢查、放寬分鐘上限、移除案例來源守衛、讓產生器覆寫既有檔案，指定測試都先紅；還原後指定測試都綠。
+
+**剩餘風險**：TEACH 的人員紀錄、AI 動作、API route 和頁面留給後續卡片；操作者仍需審閱 draft 課程。
+
+**rollback**：`git revert <本次 commit>` 可移除本卡新增的 content loader、fixtures、generator、tests 和 checklist；不涉及資料庫或外部服務。
 ## 2026-10-04（續1）認知主權平台第 1 步蓋好（本機）：七塊＋全程生效五樣、上線前檢查通過；4 個工人整合、7 次審查全修
 - [操作者] 「不要停 直到全部做好」「繼續加速 正確」；中途問「有可以更有效率的做法嗎?」→ 答：返工來自中途改共用規則、全套測試跑太多；下一步開工前先定好共用規則再派工，全套只在最後跑。
 - [做了什麼] 提交 `cd71058f1`..`8c8a95f90`（本機 main，未部署）：

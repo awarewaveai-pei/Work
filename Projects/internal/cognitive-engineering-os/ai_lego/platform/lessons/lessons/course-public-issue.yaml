@@ -1,0 +1,14 @@
+id: course-public-issue
+subject: 公共議題判斷
+version: 1
+state: draft
+minutes: 5
+title: 把公共議題分層看
+text: 先分開可查的事實、規則和價值取捨。再看不同出處和受影響的人。最後由自己說明還缺什麼資料。
+example: 你在閱讀一項公共建設的公告。先分出公告寫的事實、適用的規則和你在意的取捨。
+teaches:
+  - 分開事實和取捨
+  - 看受影響的人
+course:
+  package: 公共議題判斷
+  order: 1

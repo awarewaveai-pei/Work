@@ -1,0 +1,14 @@
+id: course-self-understanding
+subject: 自我理解
+version: 1
+state: draft
+minutes: 5
+title: 先把自己看清楚
+text: 先把看到的事情和自己的解讀分開。再寫下還不知道的地方。最後由自己決定下一個小動作。
+example: 你想整理一個最近反覆出現的小困擾。先寫看得到的情況，再寫自己的猜測。
+teaches:
+  - 分開觀察和解讀
+  - 寫下一個小動作
+course:
+  package: 自我理解
+  order: 1
