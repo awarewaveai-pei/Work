@@ -44,6 +44,7 @@ CONTRACT = json.loads((PRODUCT_ROOT / "specs" / "wire" / "lookup.v1.json").read_
 SPEC_ANSWER = CONTRACT["examples"]["factcheck"]["answer"]
 COFACTS_ATTRIBUTION = SPEC_ANSWER["items"][0]["dbs"][1]["attribution"]
 CLAIMREVIEW_ATTRIBUTION = SPEC_ANSWER["items"][0]["dbs"][0]["attribution"]
+HIT_CLAIM = SPEC_ANSWER["items"][0]["dbs"][0]["hits"][0]["claim"]   # the claim the checker reviewed: read from the contract, never retyped
 COFACTS_FOUND = {"db": "cofacts", "state": "查到", "attribution": COFACTS_ATTRIBUTION, "hits": [
     {"article_id": "a1", "url": "https://cofacts.tw/article/a1", "date": "2026-09-30",
      "replies": [{"judged_as": "含有不實訊息", "text": "央行澄清：沒有每日提款上限。", "reference": "https://www.cbc.gov.tw/news/1", "date": "2026-09-30"}]},
@@ -476,14 +477,14 @@ class FactcheckTests(VerifyCase):
         self.assertEqual((dbs["claimreview"]["state"], hit["publisher"], hit["judged_as"], hit["local"]), ("查到", "台灣事實查核中心", "錯誤", True))
         self.assertEqual(self.lookups.calls, [(self.pid, "factcheck", [{"text": MESSAGE}])])
         [source] = self._repo.list_sources(self.tenant_id, self.pid)
-        address = hit_address("claimreview", "https://tfc-taiwan.org.tw/articles/1", "銀行下週起每日提款上限兩萬")
+        address = hit_address("claimreview", "https://tfc-taiwan.org.tw/articles/1", HIT_CLAIM)
         self.assertEqual((source["source_class"], source["canonical_url"], source["source_uri"], saved["content"]["rules"]["version"]),
                          ("fact_check", address, "https://tfc-taiwan.org.tw/articles/1", "2"))
         text = self.text_of(address)
         for line in ("查核組織：台灣事實查核中心", "他們的判定：錯誤", "查核報告：https://tfc-taiwan.org.tw/articles/1"):
             self.assertIn(line, text)
-        self.assertEqual((hit["claim"], dbs["claimreview"]["attribution"]), ("銀行下週起每日提款上限兩萬", CLAIMREVIEW_ATTRIBUTION))   # in the record
-        for kept_out in ("銀行下週起每日提款上限兩萬", CLAIMREVIEW_ATTRIBUTION):
+        self.assertEqual((hit["claim"], dbs["claimreview"]["attribution"]), (HIT_CLAIM, CLAIMREVIEW_ATTRIBUTION))   # in the record
+        for kept_out in (HIT_CLAIM, CLAIMREVIEW_ATTRIBUTION):
             self.assertNotIn(kept_out, text + source["title"])
         [event] = [event for event in self._repo.list_events(self.tenant_id, f"source:{source['source_id']}") if event["event_type"] == "SourceAdded"]
         self.assertEqual((event["author"], event["block"]), ("system", "GATHER"))   # written as GATHER: its slot stays dark
@@ -537,7 +538,7 @@ class FactcheckTests(VerifyCase):
     def test_a_hit_never_replaces_a_stored_page_and_two_reviews_on_one_report_are_two_sources(self):
         """critic M2: the report page the collector stored keeps its place; a hit has its own address (report URL + fragment)."""
         report = "https://tfc-taiwan.org.tw/articles/1"
-        page = self.stored(report, "台灣事實查核中心報告全文：網傳銀行下週起每日提款上限兩萬，經查為錯誤訊息。")
+        page = self.stored(report, f"台灣事實查核中心報告全文：網傳{HIT_CLAIM}，經查為錯誤訊息。")
         claimreview = json.loads(json.dumps(SPEC_ANSWER["items"][0]["dbs"][0]))
         claimreview["hits"].append({**claimreview["hits"][0], "claim": "銀行下週起停止營業", "judged_as": "錯誤"})
         self.lookups.answer = answer_with(claimreview=claimreview)
@@ -576,7 +577,7 @@ class FactcheckTests(VerifyCase):
         origin, never 「出處彼此獨立」."""
         report = "https://tfc-taiwan.org.tw/articles/1"
         cid = self.claim(message=self.mid)["doc_id"]
-        self.stored(report, "台灣事實查核中心報告全文：網傳銀行下週起每日提款上限兩萬，經查為錯誤訊息。")
+        self.stored(report, f"台灣事實查核中心報告全文：網傳{HIT_CLAIM}，經查為錯誤訊息。")
         self.lookups.answer = SPEC_ANSWER
         self.post("/verify/factcheck", {"message": self.mid})
         block_hooks.wait_idle()
@@ -617,7 +618,7 @@ class FactcheckTests(VerifyCase):
 
     def test_elsewhere_only_the_global_databases_are_shown_and_the_local_checker_is_not_first(self):
         self.client.post("/me/docs/govern.location", json={"content": {"where": "東京"}})
-        other = {"claim": "銀行下週起每日提款上限兩萬", "url": "https://example.org/review/1", "publisher": "Other Checker", "publisher_url": "https://example.org",
+        other = {"claim": HIT_CLAIM, "url": "https://example.org/review/1", "publisher": "Other Checker", "publisher_url": "https://example.org",
                  "judged_as": "False", "date": "2026-05-02", "claimant": ""}
         claimreview = json.loads(json.dumps(SPEC_ANSWER["items"][0]["dbs"][0]))
         claimreview["hits"].append(other)
@@ -628,7 +629,7 @@ class FactcheckTests(VerifyCase):
         self.assertIsNone(self._repo.find_active_source(self.tenant_id, self.pid, "https://cofacts.tw/article/a1"))
 
     def test_in_taiwan_the_local_checker_comes_first(self):
-        other = {"claim": "銀行下週起每日提款上限兩萬", "url": "https://example.org/review/1", "publisher": "Other Checker", "publisher_url": "https://example.org",
+        other = {"claim": HIT_CLAIM, "url": "https://example.org/review/1", "publisher": "Other Checker", "publisher_url": "https://example.org",
                  "judged_as": "False", "date": "2026-05-02", "claimant": ""}
         claimreview = json.loads(json.dumps(SPEC_ANSWER["items"][0]["dbs"][0]))
         claimreview["hits"].insert(0, other)
