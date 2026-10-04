@@ -16,6 +16,7 @@ is stored as a source like any other (repo.add_source, written as GATHER; GATHER
 from __future__ import annotations
 
 import datetime
+import hashlib
 import uuid
 from typing import Any
 
@@ -24,15 +25,15 @@ from pydantic import BaseModel
 
 from ai_lego.apps.api import main as api
 from ai_lego.apps.api.blocks.docs import DocBody, _call, _kind, _save, _where, case_owner
-from ai_lego.core.domain.evidence_words import CHECKABLE, FOUND, MIN_ORIGINS, SENTENCE_KINDS, STANCES, UNCHECKABLE, VERDICTS, quote_in
-from ai_lego.core.domain.kinds.verify import ASKS, CHECK_QUESTIONS, LAW_UNCONFIRMED, MESSAGE_FORMS, SEARCH_ANGLES, SPREAD, claim_key, law_unconfirmed
+from ai_lego.core.domain.evidence_words import CHECKABLE, FOUND, MIN_ORIGINS, NOT_FOUND, SENTENCE_KINDS, STANCES, UNCHECKABLE, VERDICTS, quote_in
+from ai_lego.core.domain.kinds.verify import ASKS, CHECK_QUESTIONS, LAW_UNCONFIRMED, MESSAGE_FORMS, SEARCH_ANGLES, SPREAD, claim_key, law_unconfirmed, weak_line
 from ai_lego.core.domain.source import COLLECTED_PROVENANCE, source_record
 from ai_lego.data.events import record_log
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.platform import block_hooks, evidence, safety
-from ai_lego.platform.block_hooks.verify import card_sha, message_sha, require_first, vouched
+from ai_lego.platform.block_hooks.verify import card_sha, message_sha, require_first, settle_dead_runs, vouched
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.net.collection_service import CollectionServiceClient
@@ -40,6 +41,7 @@ from ai_lego.platform.rulesets.verify import FACTCHECK_DBS, TECHNIQUES
 
 router = APIRouter()
 PLACE_TAIWAN = "台灣"
+NO_ATTRIBUTION = "找資料的服務沒有附上這份資料的出處和授權，所以先不用"
 
 
 @router.get("/blocks/verify/spec")
@@ -51,7 +53,7 @@ def verify_spec(session: dict[str, Any] = Depends(api.require_session)) -> dict[
         "angles": list(SEARCH_ANGLES), "min_origins": MIN_ORIGINS, "law_unconfirmed": LAW_UNCONFIRMED,
         "techniques": {"title": TECHNIQUES.title, "version": TECHNIQUES.version, "maintainer": TECHNIQUES.maintainer, "items": TECHNIQUES.items},
         "factcheck_dbs": {"title": FACTCHECK_DBS.title, "version": FACTCHECK_DBS.version, "maintainer": FACTCHECK_DBS.maintainer,
-                          "dbs": {key: {k: db[k] for k in ("name", "by")} for key, db in dbs["dbs"].items()}},
+                          "dbs": {key: {k: db[k] for k in ("name", "by")} for key, db in dbs["dbs"].items()}, "asked": list(collect_lookups.DBS)},
     }
 
 
@@ -79,20 +81,27 @@ def _now() -> str:
     return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _store_hit(repo: ProjectSourceRepository, cas: TenantScopedCas, session: dict[str, Any], project: dict[str, Any], url: str, title: str, text: str,
-               published: str, db: str) -> tuple[str, bool]:
-    """One fact-check result as a source of the case (written as GATHER, rules §4): the same page again is the same source;
-    changed words are its next version. Returns (source_id, new)."""
+def hit_address(db: str, url: str, claim: str) -> str:
+    """A fact-check hit's own address: the report's URL plus a fragment naming the database and the reviewed claim. The
+    collector's canonical URLs never carry a fragment (next-admin lib/collect/canonical.ts), so a hit never supersedes a
+    page the collector or the person stored, and two reviews on one report page are two sources."""
+    digest = hashlib.sha256(f"{db}\n{url}\n{claim}".encode("utf-8")).hexdigest()[:16]
+    return f"{url.split('#', 1)[0]}#factcheck-{db}-{digest}"
+
+
+def _store_hit(repo: ProjectSourceRepository, cas: TenantScopedCas, session: dict[str, Any], project: dict[str, Any], hit: dict[str, Any], db: str) -> str:
+    """One fact-check result as a source of the case (written as GATHER, rules §4): the same (database, report, claim) is
+    the same source; changed words are its next version."""
     tenant_id, project_id = session["tenant_id"], project["project_id"]
-    content = text.encode("utf-8")
+    content = hit["text"].encode("utf-8")
     cas_path = TenantScopedCas.cas_path_for(tenant_id, content)
-    current = repo.find_active_source(tenant_id, project_id, url)
+    current = repo.find_active_source(tenant_id, project_id, hit["address"])
     if current is not None and current["content_sha256"] == cas_path["hash"]:
-        return current["source_id"], False
+        return current["source_id"]
     source_id = str(uuid.uuid4())
-    record = source_record(source_id, project_id, tenant_id, title[:300], "text/plain", project["data_classification"], cas_path["hash"], len(content),
+    record = source_record(source_id, project_id, tenant_id, hit["title"][:300], "text/plain", project["data_classification"], cas_path["hash"], len(content),
                            TenantScopedCas.artifact_uri(tenant_id, project_id, source_id, cas_path), session["identity_id"], _now(),
-                           published_at=published or None, canonical_url=url, source_uri=url, fetched_at=_now(), provenance=COLLECTED_PROVENANCE,
+                           published_at=hit["date"] or None, canonical_url=hit["address"], source_uri=hit["url"], fetched_at=_now(), provenance=COLLECTED_PROVENANCE,
                            source_class="fact_check", relevance={"searchProvider": db, "searchAngle": "factcheck", "pasted": False},
                            supersedes_source_id=current["source_id"] if current else None)
     put = lambda: cas.put(tenant_id, content)   # noqa: E731
@@ -100,24 +109,27 @@ def _store_hit(repo: ProjectSourceRepository, cas: TenantScopedCas, session: dic
         repo.add_source(record, cas_path, put_content=put, writer=record_log.system("GATHER"))
     else:
         repo.supersede(current["source_id"], record, cas_path, put_content=put)
-    return source_id, True
+    return source_id
 
 
+# A fact-check source's text holds who judged, the verdict word, the grounds and the link -- never the reviewed claim: it
+# repeats the message almost word for word, so a reading quoting it would count a 「錯誤」 report as support. The claim and
+# the attribution stay in the verify.factcheck record (the page shows them from there).
 def _claimreview_hits(entry: dict[str, Any], local: list[str]) -> list[dict[str, Any]]:
     is_local = lambda hit: any(host in hit["publisher_url"] or host in hit["url"] for host in local)   # noqa: E731
     out = []
     for hit in sorted(entry["hits"], key=lambda hit: not is_local(hit)):   # 當地的查核組織 first
-        page = "\n".join(line for line in (
+        judged = hit["judged_as"] or "資料檔裡沒有寫"
+        page = "\n".join((
             f"查核組織：{hit['publisher']}" + (f"（{hit['publisher_url']}）" if hit["publisher_url"] else ""),
-            f"他們查的說法（不是他們的結論）：{hit['claim']}",
-            f"他們的判定：{hit['judged_as'] or '資料檔裡沒有寫'}",
-            f"說這句話的人：{hit['claimant']}" if hit["claimant"] else "",
+            f"他們的判定：{judged}",
             f"發布日期：{hit['date'] or '資料檔裡沒有寫'}",
             f"查核報告：{hit['url']}",
-            f"資料來源：{entry['attribution']}" if entry["attribution"] else "",
-        ) if line)
-        out.append({"url": hit["url"], "title": f"{hit['publisher']} 的查核：{hit['claim'][:120]}", "text": page, "date": hit["date"],
-                    "shown": {"publisher": hit["publisher"], "judged_as": hit["judged_as"], "date": hit["date"], "url": hit["url"], "local": is_local(hit)}})
+        ))
+        out.append({"address": hit_address("claimreview", hit["url"], hit["claim"]), "url": hit["url"], "title": f"{hit['publisher']} 的查核：{judged}"[:300],
+                    "text": page, "date": hit["date"],
+                    "shown": {"publisher": hit["publisher"], "judged_as": hit["judged_as"], "date": hit["date"], "url": hit["url"], "local": is_local(hit),
+                              "claim": hit["claim"], **({"claimant": hit["claimant"]} if hit["claimant"] else {}), **({"license": hit["license"]} if hit.get("license") else {})}})
     return out
 
 
@@ -129,13 +141,12 @@ def _cofacts_hits(entry: dict[str, Any]) -> tuple[list[dict[str, Any]], int]:
         if not article["replies"]:
             unanswered += 1
             continue
-        lines = [f"Cofacts 真的假的：有人把一則訊息傳到 Cofacts，志工回應了 {len(article['replies'])} 次。", f"Cofacts 上的這一則：{article['url']}"]
+        lines = [f"Cofacts 真的假的：志工回應了 {len(article['replies'])} 次。", f"Cofacts 上的這一則：{article['url']}"]
         for index, reply in enumerate(article["replies"], 1):
             lines += [f"回應 {index}（{reply['judged_as']}，{reply['date'] or '沒有日期'}）：{reply['text']}"] + ([f"回應 {index} 的出處：{reply['reference']}"] if reply["reference"] else [])
-        lines += [f"資料來源：{entry['attribution']}"] if entry["attribution"] else []
         judged = "、".join(dict.fromkeys(reply["judged_as"] for reply in article["replies"]))
-        out.append({"url": article["url"], "title": f"Cofacts 志工的回應：{judged}", "text": "\n".join(lines), "date": article["date"],
-                    "shown": {"publisher": "Cofacts 志工", "judged_as": judged, "date": article["date"], "url": article["url"], "local": True}})
+        out.append({"address": hit_address("cofacts", article["url"], ""), "url": article["url"], "title": f"Cofacts 志工的回應：{judged}", "text": "\n".join(lines),
+                    "date": article["date"], "shown": {"publisher": "Cofacts 志工", "judged_as": judged, "date": article["date"], "url": article["url"], "local": True}})
     return out, unanswered
 
 
@@ -149,7 +160,8 @@ def factcheck(project_id: str, body: FactcheckBody, session: dict[str, Any] = De
               repo: ProjectSourceRepository = Depends(api.get_project_source_repository), cas: TenantScopedCas = Depends(api.get_source_cas),
               service: CollectionServiceClient | None = Depends(api.get_collection_service)) -> dict[str, Any]:
     """系統查別人是不是已經查過這一則: collect asks the databases once; each database of the place's list says 查到／查不到／
-    無法檢查 with collect's why (collect down or no token: 無法檢查 「蒐集器這次沒有回應」, never an error)."""
+    無法檢查 with collect's why (collect down or no token: 無法檢查 with collect_lookups' why, never an error). A 查到 needs the
+    attribution collect sent (the data's licence asks for it): without it nothing is used."""
     project = api._project_or_404(repo, session, project_id)
     owner = record_log.case(project_id)
     docs, tenant_id = CaseDocs(repo), session["tenant_id"]
@@ -170,7 +182,7 @@ def factcheck(project_id: str, body: FactcheckBody, session: dict[str, Any] = De
     place = _place(docs, session, owner)
     plan = rules["places"].get(place) or rules["elsewhere"]
     answered = {entry["db"]: entry for entry in collect_lookups.factcheck(project_id, text, client=service)}
-    results, new_sources = [], []
+    results, stored = [], []
     for db in plan["use"]:
         if db == "google":
             results.append({"db": db, "state": UNCHECKABLE, "why": "平台還沒有這個金鑰", "hits": []})
@@ -179,17 +191,20 @@ def factcheck(project_id: str, body: FactcheckBody, session: dict[str, Any] = De
         if entry["state"] != FOUND:
             results.append({"db": db, "state": entry["state"], "why": entry["why"], "attribution": entry["attribution"], "hits": []})
             continue
+        if not entry["attribution"].strip():
+            results.append({"db": db, "state": UNCHECKABLE, "why": NO_ATTRIBUTION, "attribution": "", "hits": []})
+            continue
         hits, unanswered = (_claimreview_hits(entry, plan["local_publishers"]), 0) if db == "claimreview" else _cofacts_hits(entry)
         shown = []
         for hit in hits:
-            source_id, new = _store_hit(repo, cas, session, project, hit["url"], hit["title"], hit["text"], hit["date"], db)
-            new_sources += [source_id] if new else []
+            source_id = _store_hit(repo, cas, session, project, hit, db)
+            stored.append(source_id)
             shown.append({"source_id": source_id, **hit["shown"]})
-        waiting = {"why": f"{'另外' if shown else ''}有 {unanswered} 則相近的訊息有人問過，還沒有人回應"} if unanswered else {}
-        results.append({"db": db, "state": FOUND, "attribution": entry["attribution"], "hits": shown, **waiting})
+        waiting = f"{'另外' if shown else ''}有 {unanswered} 則相近的訊息有人問過，還沒有人回應" if unanswered else ""
+        results.append({"db": db, "state": FOUND if shown else NOT_FOUND, "attribution": entry["attribution"], "hits": shown, **({"why": waiting} if waiting else {})})
     saved = docs.save(tenant_id, owner, "verify.factcheck", {**about, "place": place, "dbs": results, "rules": FACTCHECK_DBS.stamp()}, record_log.system("VERIFY"))
-    if new_sources:   # GATHER cards them (its slot stays dark: written by the system)
-        block_hooks.after_sources(docs, tenant_id, owner, {"run": None, "source_ids": new_sources, "aside": [], "channels": [], "pasted": False})
+    if stored:   # GATHER cards them (idempotent; its slot stays dark: written by the system)
+        block_hooks.after_sources(docs, tenant_id, owner, {"run": None, "source_ids": stored, "aside": [], "channels": [], "pasted": False})
     return saved
 
 
@@ -231,6 +246,7 @@ def ledger(project_id: str, session: dict[str, Any] = Depends(api.require_sessio
     出處 ✓, 出處彼此獨立 ✓, 出處站得住: never ticked, only what was found), 法律 未確認, 「你查過」 in this case, the search."""
     owner = case_owner(project_id, session, repo)
     docs, tenant_id = CaseDocs(repo), session["tenant_id"]
+    settle_dead_runs(docs, tenant_id, owner)   # a run that will never call back reads 無法檢查 here, not 還沒查 for ever
     found = evidence.origins(docs, tenant_id, owner, with_reviews=False)
     by_origin = {origin["origin_id"]: origin for origin in found}
     claims = {doc["doc_id"]: doc for doc in docs.current(tenant_id, owner, "verify.claim")}   # oldest first (CaseDocs.current)
@@ -253,6 +269,7 @@ def ledger(project_id: str, session: dict[str, Any] = Depends(api.require_sessio
             "law_state": LAW_UNCONFIRMED if law_unconfirmed(claim["content"]) else ("寫了法域、時效、來源" if claim["content"].get("law") else None),
             "needs_alternative": claim["content"].get("sentence") == SENTENCE_KINDS[1] and not (claim["content"].get("alternative") or "").strip(),
             "earlier": [other for other, doc in claims.items() if order[other] < order[line["claim_id"]] and claim_key(doc["content"].get("text")) == key],
+            "weak_line": weak_line(len(line["support"]), len(line["oppose"])) if line["few"] else None,
             "three": {"found": bool(read_origins), "independent": len(read_origins), "independent_enough": len(read_origins) >= MIN_ORIGINS, "stands": stands},
             "search": {key_: search["content"].get(key_) for key_ in ("state", "why")} if search else None,
             "lookup": {"run": lookup["content"]["run"], "status": run["status"] if run else "failed", "angles": lookup["content"].get("angles") or []} if lookup else None,
@@ -295,7 +312,9 @@ class ConfirmBody(BaseModel):
 def confirm_readings(project_id: str, body: ConfirmBody, session: dict[str, Any] = Depends(api.require_session),
                      repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
     """One click for every AI reading of one claim -- still your save, one stance each. A card you already read for this
-    claim, or a reading of an older claim or page, is left alone (and counted)."""
+    claim's current version and page is left alone, and so is a reading of an older claim version or page (both counted
+    as skipped); a stance of yours read from an older version or page no longer counts, so this one replaces it (one live
+    stance per claim and card; the old one stays in its history)."""
     owner = case_owner(project_id, session, repo)
     docs, tenant_id = CaseDocs(repo), session["tenant_id"]
     reading = next((doc for doc in docs.current(tenant_id, owner, "verify.reading") if doc["doc_id"] == body.reading), None)
@@ -303,17 +322,20 @@ def confirm_readings(project_id: str, body: ConfirmBody, session: dict[str, Any]
     if reading is None or claim is None:
         raise HTTPException(status_code=404, detail="VERIFY_READING_NOT_FOUND: no such AI reading or claim in this case")
     cards = {doc["doc_id"]: card_sha(doc) for doc in docs.current(tenant_id, owner, "gather.source")}
-    have = {doc["content"].get("card") for doc in docs.current(tenant_id, owner, "verify.stance") if doc["content"].get("claim") == body.claim}
+    held = {doc["content"].get("card"): doc for doc in docs.current(tenant_id, owner, "verify.stance") if doc["content"].get("claim") == body.claim}
     saved, skipped, notices = 0, 0, []
     for entry in reading["content"].get("readings") or []:
         if entry.get("claim") != body.claim:
             continue
-        if entry.get("card") in have or entry.get("claim_version") != claim["version"] or entry.get("snapshot") != cards.get(entry.get("card")):
+        mine = held.get(entry.get("card"))
+        current = mine is not None and (mine["content"].get("claim_version"), mine["content"].get("snapshot")) == (claim["version"], cards.get(entry.get("card")))
+        if current or entry.get("claim_version") != claim["version"] or entry.get("snapshot") != cards.get(entry.get("card")):
             skipped += 1
             continue
         content = {key: entry[key] for key in ("claim", "claim_version", "card", "snapshot") if key in entry}
         content.update(stance=entry["reads_as"], reading=body.reading, **({"quote": entry["quote"]} if entry.get("quote") else {}))
-        notices += _save(repo, session, owner, _kind("verify.stance", "case"), DocBody(content=content))["notices"]
-        have.add(entry["card"])
+        done = _save(repo, session, owner, _kind("verify.stance", "case"), DocBody(content=content, base_version=mine["version"] if mine else None), mine["doc_id"] if mine else None)
+        notices += done["notices"]
+        held[entry["card"]] = done
         saved += 1
     return {"saved": saved, "skipped": skipped, "notices": notices}

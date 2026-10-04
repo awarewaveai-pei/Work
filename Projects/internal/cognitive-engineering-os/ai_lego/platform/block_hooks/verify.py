@@ -5,12 +5,13 @@ BEFORE_SAVE, what a person's save may not do (every path: the generic /docs rout
 - ``verify.first``: come twice for one message, or change -- the first reaction is what you thought before looking;
 - ``verify.claim`` / ``verify.stance`` / ``verify.verdict`` / ``verify.seen``: touch a message whose first reaction is not
   written (寫完，你才看系統查到什麼); a claim names a real source (its message, its MAP claim, the AI proposal it
-  confirms) and a changed claim says why; one live stance per (claim, card) and one live verdict per claim (edit the
+  confirms) and a changed claim (its words, its kind, its law details, its other reading) says why; one live stance per (claim, card) and one live verdict per claim (edit the
   first), each for the claim's current version and the card's current page; a stance that differs from the AI reading it
   confirms says why; a quote is the card's own words -- the AI reading's quote (the gate checked it) or one VERIFY's
   stance route checked against the stored page (``vouched``).
 AFTER_SAVE: your first reaction writes what the platform cannot check about how the message spread (verify.spread).
-AFTER_SOURCES: a 「去查」 run that ended writes verify.search for its claim; more cards than one AI turn reads -> propose GATHER.
+AFTER_SOURCES: a 「去查」 run that ended writes verify.search for its claim, and one that will never call back (past its
+deadline) is settled as 無法檢查 on any arrival or ledger read; more cards than one AI turn reads -> propose GATHER.
 """
 
 from __future__ import annotations
@@ -29,6 +30,9 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform.block_hooks import propose
 
 WHY_GATHER = "這個案子找回來的來源，比 AI 一次能讀的還多。要不要加「蒐集來源」，自己一張一張篩？"
+DEAD_RUN = "這次查詢沒有跑完"
+NO_CHANNELS = "找資料的服務沒有回報搜尋管道"
+NO_REPORT = "找資料的服務沒有回報找到幾頁"
 FIRST_REQUIRED = "VERIFY_FIRST_REACTION_REQUIRED: write your first reaction and confidence for this message first; nothing about it is shown or asked of the AI before that"
 
 # A quote VERIFY's stance route checked against the stored page, for the save it is making (same call, same thread).
@@ -100,7 +104,7 @@ def _claim_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, cont
         fixed = [key for key in ("from", "message", "map_claim", "proposal") if (content.get(key) or None) != (held["content"].get(key) or None)]
         if fixed:
             raise InvariantViolation(f"VERIFY_CLAIM_FIXED: {', '.join(fixed)} stays as when the claim was made")
-        changed = any(content.get(key) != held["content"].get(key) for key in ("text", "sentence"))
+        changed = any(content.get(key) != held["content"].get(key) for key in ("text", "sentence", "law", "jurisdiction", "limitation", "law_source", "alternative"))
         if changed and not (isinstance(content.get("reason"), str) and content["reason"].strip() and content["reason"] != held["content"].get("reason")):
             raise InvariantViolation("VERIFY_CLAIM_REASON_REQUIRED: say why you changed the claim")
         return
@@ -184,17 +188,49 @@ def _first_saved(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: d
 
 
 def search_result(run: Mapping[str, Any], channels: list[Any]) -> tuple[str, str]:
-    """What a finished 「去查」 run says for its claim: 查到 (pages came back), 查不到 (looked, none), 無法檢查 (it could not look)."""
+    """What a finished 「去查」 run says for its claim: 查到 (pages came back), 查不到 (every engine answered, none had a
+    page), 無法檢查 (it could not look, or did not say where it looked -- zero pages is then not 「找過，沒有」)."""
     if run.get("status") != "completed":
-        return UNCHECKABLE, "蒐集器這次沒有跑完"
+        return UNCHECKABLE, DEAD_RUN
     tried = [item for item in channels if isinstance(item, Mapping)]
     if tried and not any(item.get("state") == "ok" for item in tried):
         return UNCHECKABLE, "這次的搜尋管道都連不上：" + "、".join(sorted({f"{item.get('provider')}（{item.get('lang')}）" for item in tried}))[:200]
     report = run.get("report")
     if not isinstance(report, Mapping):
-        return UNCHECKABLE, "蒐集器沒有回報找到幾頁"
+        return UNCHECKABLE, NO_REPORT
     pages = int(report.get("written") or 0) + int(report.get("unchanged") or 0)
-    return (FOUND, f"找回 {pages} 頁") if pages else (NOT_FOUND, "找過，沒有找到相關的網頁")
+    if pages:
+        return FOUND, f"找回 {pages} 頁"
+    if not tried:
+        return UNCHECKABLE, NO_CHANNELS
+    return NOT_FOUND, "找過，沒有找到相關的網頁"
+
+
+def _run_of(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, run_id: str) -> dict[str, Any] | None:
+    return docs._repo.get_collection_run(tenant_id, owner.id, run_id)   # noqa: SLF001 -- CaseDocs has no public reader for runs (report)
+
+
+def _searched(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> set[tuple[Any, Any, Any]]:
+    return {(doc["content"].get("claim"), doc["content"].get("claim_version"), doc["content"].get("run")) for doc in docs.current(tenant_id, owner, "verify.search")}
+
+
+def _write_search(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, lookup: Mapping[str, Any], state: str, why: str) -> None:
+    content = lookup["content"]
+    docs.save(tenant_id, owner, "verify.search", {"claim": content["claim"], "claim_version": content["claim_version"], "state": state, "why": why, "run": content["run"]},
+              record_log.system("VERIFY"))
+
+
+def settle_dead_runs(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> None:
+    """A 「去查」 run that ended without its end reaching the case (past its deadline a run reads as failed and nobody can
+    finish it) gets 無法檢查 「這次查詢沒有跑完」 for its claim, instead of staying 還沒查. Idempotent."""
+    written = _searched(docs, tenant_id, owner)
+    for lookup in docs.current(tenant_id, owner, "verify.lookup"):
+        content = lookup["content"]
+        if (content["claim"], content["claim_version"], content["run"]) in written:
+            continue
+        run = _run_of(docs, tenant_id, owner, content["run"])
+        if run is None or run["status"] == "failed":
+            _write_search(docs, tenant_id, owner, lookup, UNCHECKABLE, DEAD_RUN)
 
 
 def usable_cards(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> int:
@@ -207,21 +243,20 @@ def usable_cards(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> int
 def _after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arrived: dict[str, Any]) -> None:
     from ai_lego.platform.ai_gate import MAX_SOURCES_PER_TURN
 
+    settle_dead_runs(docs, tenant_id, owner)
     run_id = arrived.get("run")
     lookups = [doc for doc in docs.current(tenant_id, owner, "verify.lookup") if run_id and doc["content"].get("run") == run_id]
     if not lookups:
         return
-    run = docs._repo.get_collection_run(tenant_id, owner.id, run_id)   # noqa: SLF001 -- CaseDocs has no public reader for runs (report)
+    run = _run_of(docs, tenant_id, owner, run_id)
     if run is None or run["status"] in ("requested", "running"):
         return   # a batch arrived; the run's end says what was found
-    written = {(doc["content"].get("claim"), doc["content"].get("claim_version"), doc["content"].get("run")) for doc in docs.current(tenant_id, owner, "verify.search")}
+    written = _searched(docs, tenant_id, owner)
     state, why = search_result(run, list(arrived.get("channels") or []))
     for lookup in lookups:
         content = lookup["content"]
-        if (content["claim"], content["claim_version"], run_id) in written:
-            continue
-        docs.save(tenant_id, owner, "verify.search", {"claim": content["claim"], "claim_version": content["claim_version"], "state": state, "why": why, "run": run_id},
-                  record_log.system("VERIFY"))
+        if (content["claim"], content["claim_version"], run_id) not in written:
+            _write_search(docs, tenant_id, owner, lookup, state, why)
     if usable_cards(docs, tenant_id, owner) > MAX_SOURCES_PER_TURN:
         propose(docs, tenant_id, owner, "VERIFY", "GATHER", WHY_GATHER, source=lookups[0]["doc_id"])
 

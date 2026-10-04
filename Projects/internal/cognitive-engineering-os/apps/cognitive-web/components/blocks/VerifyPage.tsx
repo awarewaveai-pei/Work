@@ -20,7 +20,7 @@ export type Split = { message: string; claims: Array<{ text: string; sentence: s
 type Techniques = { message: string; techniques?: Array<{ name: string; quote: string; why: string }>; asks?: Array<{ what: string; quote: string }>; rules?: { version: string } };
 type Spread = { message: string; cells: Record<string, Cell> };
 type Seen = { message: string; about: string; text: string };
-type Hit = { source_id: string; publisher: string; judged_as: string; date: string; url: string; local: boolean };
+type Hit = { source_id: string; publisher: string; judged_as: string; date: string; url: string; local: boolean; claim?: string; claimant?: string; license?: string };
 type Factcheck = { message?: string; claim?: string; place?: string; dbs: Array<{ db: string; state: string; why?: string; attribution?: string; hits: Hit[] }> };
 export type ReadingEntry = { claim: string; claim_version: number; card: string; snapshot: string; reads_as: string; quote?: string };
 type Reading = { readings: ReadingEntry[] };
@@ -37,13 +37,13 @@ type Line = {
   claim_id: string; version: number; text: string; sentence: string; law: boolean; state: string; support: string[]; oppose: string[]; stale: number; few: boolean;
   verdict: { verdict: string; reason: string; earlier: boolean } | null; message?: string; from?: string; law_state: string | null; needs_alternative: boolean; earlier: string[];
   three: { found: boolean; independent: number; independent_enough: boolean; stands: Stand[] }; search: { state: string; why?: string } | null;
-  lookup: { run: string; status: string; angles: string[] } | null;
+  lookup: { run: string; status: string; angles: string[] } | null; weak_line: string | null;
 };
 type Spec = {
   forms: string[]; sentence_kinds: string[]; checkable: string; stances: string[]; verdicts: string[]; asks: string[]; spread: Array<{ key: string; question: string }>;
   check_questions: string[]; angles: string[]; min_origins: number; law_unconfirmed: string;
   techniques: { title: string; version: string; maintainer: string; items: Array<{ name: string; looks_like: string }> };
-  factcheck_dbs: { title: string; version: string; maintainer: string; dbs: Record<string, { name: string; by: string }> };
+  factcheck_dbs: { title: string; version: string; maintainer: string; dbs: Record<string, { name: string; by: string }>; asked: string[] };
 };
 type Turn<C> = AiTurn<C> & { handback?: string };
 
@@ -258,6 +258,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         <div className="card">
           <h2>別人查過嗎</h2>
           <p className="how">系統拿這則訊息去比對查核資料庫。查到的，是查核組織的結論，不是平台的結論。它跟別的來源一樣，由你判斷。</p>
+          <p className="hint">{sentTo(spec)}</p>
           <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => lookUp({ message: message.doc_id })}>{checks ? "再查一次" : "查查核資料庫"}</button></div>
           {checks && <FactcheckResult result={checks.content} spec={spec} />}
         </div>
@@ -373,6 +374,11 @@ export function VerifyPage({ projectId }: { projectId: string }) {
 }
 
 // The attribution lines are the ones collect sent with the data (specs/wire/lookup.v1.json): the data and its licence are collect's.
+/** Where the words go when you look them up (the databases collect asks; collect_lookups.DBS on the server). */
+export function sentTo(spec: Spec): string {
+  return `按下去，這段字會送到找資料的服務，由它去問：${spec.factcheck_dbs.asked.map((db) => spec.factcheck_dbs.dbs[db]?.name ?? db).join("、")}。`;
+}
+
 function FactcheckResult({ result, spec }: { result: Factcheck; spec: Spec }) {
   const lines = [...new Set(result.dbs.map((item) => item.attribution ?? "").filter(Boolean))];
   return (
@@ -382,7 +388,7 @@ function FactcheckResult({ result, spec }: { result: Factcheck; spec: Spec }) {
         <div key={item.db}>
           <b>{spec.factcheck_dbs.dbs[item.db]?.name ?? item.db}：{item.state}</b>{item.why && <span className="sub">（{item.why}）</span>}
           {item.hits.length > 0 && <ul>{item.hits.map((hit) => (
-            <li key={hit.source_id}>誰判的：{hit.publisher}{hit.local ? "（當地）" : ""}；判定：{hit.judged_as || "沒有寫"}；{hit.date || "沒有日期"}　<a href={hit.url} target="_blank" rel="noreferrer">看依據</a></li>
+            <li key={hit.source_id}>{hit.claim && <>他們查的說法：{hit.claim}；</>}誰判的：{hit.publisher}{hit.local ? "（當地）" : ""}；判定：{hit.judged_as || "沒有寫"}；{hit.date || "沒有日期"}{hit.license ? `；授權：${hit.license}` : ""}　<a href={hit.url} target="_blank" rel="noreferrer">看依據</a></li>
           ))}</ul>}
         </div>
       ))}
@@ -403,7 +409,10 @@ function LedgerLine({ projectId, line, spec, busy, base, claims, cards, cardTitl
   const [own, setOwn] = useState<{ card: string; stance: string; quote: string; reason: string; reading?: ReadingEntry & { reading: string } }>({ card: "", stance: "", quote: "", reason: "" });
   const [judge, setJudge] = useState<{ verdict: string; reason: string }>({ verdict: verdict?.content.verdict ?? "", reason: verdict?.content.reason ?? "" });
   const checkable = line.sentence === spec.checkable;
-  const mine = (card: string) => stances.find((item) => item.content.card === card);
+  // one live stance per claim and card: ``held`` is it, whatever version it was read from; ``mine`` only when it counts now
+  const held = (card: string) => stances.find((item) => item.content.card === card);
+  const sha = (card: string) => cards.find((item) => item.card === card)?.snapshot?.sha256;
+  const mine = (card: string) => { const stance = held(card); return stance && stance.content.claim_version === line.version && stance.content.snapshot === sha(card) ? stance : undefined; };
   const post = (path: string, body: unknown) => apiFetch<Record<string, any>>(`${base}${path}`, { method: "POST", body: JSON.stringify(body) });
   const saveStance = (content: Stance, held?: Doc<Stance>) => act(async () => {
     const saved = await post("/verify/stances", { content, ...(held ? { doc_id: held.doc_id, base_version: held.version } : {}) });
@@ -414,7 +423,7 @@ function LedgerLine({ projectId, line, spec, busy, base, claims, cards, cardTitl
     if (!card?.snapshot?.sha256) return;
     const content: Stance = { claim: line.claim_id, claim_version: line.version, card: own.card, snapshot: card.snapshot.sha256, stance: own.stance,
       ...(own.quote.trim() ? { quote: own.quote.trim() } : {}), ...(own.reading ? { reading: own.reading.reading } : {}), ...(own.reason.trim() ? { reason: own.reason.trim() } : {}) };
-    return saveStance(content, mine(own.card));
+    return saveStance(content, held(own.card));
   };
   const goCheck = (confirm: boolean) => act(async () => {
     const answer = await post(`/verify/claims/${enc(line.claim_id)}/search`, { angles, confirm });
@@ -436,7 +445,7 @@ function LedgerLine({ projectId, line, spec, busy, base, claims, cards, cardTitl
         {earlier.map((item) => <p key={item.claim_id} className="hint">你查過：這個案子裡同一個說法寫過一次。{item.verdict ? `當時你標「${item.verdict.verdict}」：${item.verdict.reason}` : "當時還沒有判定。"}</p>)}
       </>}
       <p><b>帳本：</b>{line.state}{checkable && <>　支持的獨立出處 {line.support.length} 個、反對的 {line.oppose.length} 個</>}{line.stale > 0 && <span className="sub">（{line.stale} 筆讀法是舊版的，不算）</span>}</p>
-      {line.few && <p className="warn">獨立出處不到 {spec.min_origins} 個。{line.support.length + line.oppose.length === 1 ? "只有一個出處這樣說。" : "還沒有獨立出處說到它。"}AI 摘要時會先停下來，由你決定。</p>}
+      {line.few && <p className="warn">獨立出處不到 {spec.min_origins} 個：{line.weak_line}。AI 摘要時會先停下來，由你決定。</p>}
       {line.needs_alternative && <p className="hint">這是對事實的解釋，不查真假。請你至少寫一個別的解釋（按「改」）。</p>}
       {checkable && <ul className="check">
         <li>{line.three.found ? "✓" : "・"} 找得到出處</li>
@@ -451,7 +460,7 @@ function LedgerLine({ projectId, line, spec, busy, base, claims, cards, cardTitl
         <div className="chips" role="group" aria-label="要找的方向">{spec.angles.map((angle) => (
           <button key={angle} type="button" className={`chip${angles.includes(angle) ? " on" : ""}`} aria-pressed={angles.includes(angle)} onClick={() => setAngles(angles.includes(angle) ? angles.filter((item) => item !== angle) : [...angles, angle])}>{ANGLE_NAMES[angle] ?? angle}</button>
         ))}</div>
-        {plan ? <p className="hint">計畫：最多 {plan.max_queries} 次搜尋、讀 {plan.max_fetches} 頁。蒐集器在背後找，找回來的寫進來源。</p> : null}
+        {plan ? <p className="hint">計畫：最多 {plan.max_queries} 次搜尋、讀 {plan.max_fetches} 頁。找資料的服務在背後找，找回來的寫進來源。</p> : null}
         <div className="btns">
           {plan ? <button className="btn primary" type="button" disabled={busy || angles.length === 0} onClick={() => goCheck(true)}>確認去查</button>
             : <button className="btn" type="button" disabled={busy || angles.length === 0} onClick={() => goCheck(false)}>去查（先看計畫）</button>}
@@ -465,7 +474,7 @@ function LedgerLine({ projectId, line, spec, busy, base, claims, cards, cardTitl
           <div key={entry.card} className="mcard">
             <span className="k">{cardTitle(entry.card)}</span><span>{entry.reads_as}{entry.quote ? `：「${entry.quote}」` : ""}</span><span className="tags"><span>{AUTHOR.ai}</span>{mine(entry.card) && <span>你讀過了</span>}</span>
             {!mine(entry.card) && <div className="btns">
-              <button className="btn" type="button" disabled={busy} onClick={() => saveStance({ claim: line.claim_id, claim_version: entry.claim_version, card: entry.card, snapshot: entry.snapshot, stance: entry.reads_as, reading: entry.reading, ...(entry.quote ? { quote: entry.quote } : {}) })}>照這樣記</button>
+              <button className="btn" type="button" disabled={busy} onClick={() => saveStance({ claim: line.claim_id, claim_version: entry.claim_version, card: entry.card, snapshot: entry.snapshot, stance: entry.reads_as, reading: entry.reading, ...(entry.quote ? { quote: entry.quote } : {}) }, held(entry.card))}>照這樣記</button>
               <button className="btn ghost" type="button" onClick={() => setOwn({ card: entry.card, stance: "", quote: "", reason: "", reading: entry })}>我讀的不一樣</button>
             </div>}
           </div>

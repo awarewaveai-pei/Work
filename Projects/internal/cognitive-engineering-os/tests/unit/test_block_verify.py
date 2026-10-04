@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sqlite3
 import unittest
+import uuid
 from unittest import mock
 
 from ai_lego import PRODUCT_ROOT
@@ -20,6 +22,9 @@ from ai_lego.data.repositories.project_source_repository import ProjectSourceRep
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import block_hooks, integrity
 from ai_lego.platform.block_hooks import verify as hooks
+from ai_lego.apps.api.blocks.verify import NO_ATTRIBUTION, hit_address
+from ai_lego.core.domain.source import COLLECTED_PROVENANCE, source_record
+from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.rulesets.verify import TECHNIQUES
 from tests.unit.test_api_collections import REPORT, CollectionApiTestCase
@@ -148,6 +153,20 @@ class FirstReactionTests(VerifyCase):
             self.assertIn("VERIFY_FIRST_REACTION_REQUIRED", response.text, action)
         self.assertEqual(self.provider.calls, [])
 
+    def test_a_claim_of_a_message_without_a_first_reaction_reaches_no_route_either(self):
+        """The claim's own routes re-check the message's first reaction: look-up, 「去查」, a stance, a verdict."""
+        mid = self.message()["doc_id"]
+        cid = self.docs.save(self.tenant_id, self.owner, "verify.claim", {"text": CLAIM, "sentence": CHECKABLE, "from": "訊息", "message": mid}, record_log.user(self.identity["identity_id"], "VERIFY"))["doc_id"]
+        card = self.card()
+        refused = [
+            self.client.post(f"{self.base}/verify/factcheck", json={"claim": cid}),
+            self.client.post(f"{self.base}/verify/claims/{cid}/search", json={"confirm": False}),
+            self.client.post(f"{self.base}/verify/stances", json={"content": {"claim": cid, "claim_version": 1, "card": card, "snapshot": self.sha(card), "stance": "反對"}}),
+            self.client.post(f"{self.base}/docs/verify.verdict", json={"content": {"claim": cid, "claim_version": 1, "verdict": "存疑", "reason": "x"}}),
+        ]
+        self.assertEqual([(response.status_code, "VERIFY_FIRST_REACTION_REQUIRED" in response.text) for response in refused], [(400, True)] * 4)
+        self.assertEqual(self.lookups.calls, [])
+
     def test_the_first_reaction_is_written_once_and_kept(self):
         mid = self.message()["doc_id"]
         first = self.first(mid)
@@ -210,6 +229,10 @@ class SplitAndClaimTests(VerifyCase):
         self.assertEqual((claim["author"], claim["content"]["proposal"]), ("user", f"{split['doc_id']}#0"))
         wrong = self.client.post(f"{self.base}/docs/verify.claim", json={"content": {"text": CLAIM, "sentence": CHECKABLE, "from": "訊息", "message": mid, "proposal": f"{split['doc_id']}#9"}})
         self.assertIn("VERIFY_CLAIM_FROM_INVALID", wrong.text)
+        other = self.message("另一則：銀行下週停止營業")["doc_id"]
+        self.first(other)
+        borrowed = self.client.post(f"{self.base}/docs/verify.claim", json={"content": {"text": CLAIM, "sentence": CHECKABLE, "from": "訊息", "message": other, "proposal": f"{split['doc_id']}#0"}})
+        self.assertIn("VERIFY_CLAIM_FROM_INVALID", borrowed.text)   # a proposal of another message's split
 
     def test_a_claim_from_map_names_a_fact_or_law_claim_of_the_map(self):
         self.post("/docs/map.map", {"content": {"claims": [{"id": "c1", "text": "公會改了合約範本", "kind": "事實", "by": "user"}, {"id": "c2", "text": "公會不該這樣", "kind": "價值", "by": "user"}]}})
@@ -227,6 +250,14 @@ class SplitAndClaimTests(VerifyCase):
         self.assertIn("VERIFY_CLAIM_REASON_REQUIRED", put({**claim["content"], "text": "央行宣布每天只能領三萬元", "reason": "原文是兩萬"}, 2).text)
         self.assertIn("VERIFY_CLAIM_FIXED", put({**claim["content"], "from": "MAP", "reason": "x"}, 2).text)
 
+    def test_changing_a_claims_law_details_or_other_reading_says_why_too(self):
+        """Unticking 法律 would drop 未確認 silently; writing the other reading changes what the claim stands for."""
+        claim = self.claim("提款上限依銀行法", law=True, jurisdiction="台灣")
+        put = lambda content: self.client.put(f"{self.base}/docs/verify.claim/{claim['doc_id']}", json={"content": content, "base_version": 1})   # noqa: E731
+        for change in ({"law": False}, {"jurisdiction": "日本"}, {"law_source": "銀行法第 45 條"}, {"alternative": "可能只是一家銀行的規定"}):
+            self.assertIn("VERIFY_CLAIM_REASON_REQUIRED", put({**claim["content"], **change}).text, change)
+        self.assertEqual(put({**claim["content"], "law_source": "銀行法第 45 條", "reason": "補上條文"}).status_code, 200)
+
 
 class TechniquesTests(VerifyCase):
     def test_a_technique_is_named_only_with_the_messages_own_words(self):
@@ -240,6 +271,10 @@ class TechniquesTests(VerifyCase):
         self.assertEqual(response.status_code, 502)
         self.assertIn("AI_ANSWER_INVALID", response.text)
         self.assertEqual(len(self.current("verify.techniques")), 1)   # a made-up quote saves nothing
+        self.provider.answer = {"techniques": [], "asks": [{"what": "捐款", "quote": "請大家捐款給央行"}]}
+        self.assertIn("AI_ANSWER_INVALID", self.client.post(f"{self.base}/ai/VERIFY/techniques", json={"context": {"message": mid}}).text)
+        short = self.ai("techniques", {"message": mid}, {"techniques": [{"name": "情緒勒索", "quote": "不轉就來不及", "why": "x"}], "asks": [{"what": "轉傳", "quote": "快轉給"}]})["saved"]
+        self.assertEqual(([item["name"] for item in short["content"]["techniques"]], short["content"].get("asks")), (["情緒勒索"], None))   # 3 characters prove nothing; the rest is kept
 
 
 class ReadingTests(VerifyCase):
@@ -262,6 +297,34 @@ class ReadingTests(VerifyCase):
         self.assertEqual(self.ledger()[self.cid]["oppose"], [])   # a reading never counts by itself
         self.assertEqual(self.ai("read", {}, {"readings": [self.reading(claim="made-up")]}, 502)["detail"].split(":")[0], "AI_ANSWER_INVALID")
         self.assertEqual(self.ai("read", {}, {"readings": [self.reading(quote="央行說可以領兩萬元")]}, 502)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
+        unquoted = {key: value for key, value in self.reading().items() if key != "quote"}
+        self.assertEqual(self.ai("read", {}, {"readings": [unquoted]}, 502)["detail"].split(":")[0], "AI_ANSWER_INVALID")   # an unquoted 反對 cannot be checked
+        self.assertIn("saved", self.ai("read", {}, {"readings": [{**unquoted, "reads_as": "無關"}]}))
+
+    def edit_claim(self):
+        claim = self.current("verify.claim")[0]
+        response = self.client.put(f"{self.base}/docs/verify.claim/{claim['doc_id']}", json={"content": {**claim["content"], "text": "央行宣布下週起每天只能領兩萬元", "reason": "原文是兩萬"},
+                                                                                         "base_version": claim["version"]})
+        self.assertEqual(response.status_code, 200, response.text)
+
+    def test_after_the_claim_changes_old_readings_are_skipped_and_a_new_one_replaces_my_old_stance(self):
+        """A stance from an older claim version no longer counts: re-confirming for the new version edits it (one live per
+        claim and card), never blocks on it; a reading of the old version is never confirmed for the new one."""
+        self.grant("search_external")
+        old = self.ai("read", {}, {"readings": [self.reading()]})["saved"]
+        self.post("/verify/stances/confirm", {"reading": old["doc_id"], "claim": self.cid})
+        self.edit_claim()
+        stale = self.post("/verify/stances/confirm", {"reading": old["doc_id"], "claim": self.cid})
+        self.assertEqual((stale["saved"], stale["skipped"]), (0, 1))
+        named = {"claim": self.cid, "claim_version": 2, "card": self.cardid, "snapshot": self.sha(self.cardid), "stance": "反對", "reading": old["doc_id"]}
+        mine = self.current("verify.stance")[0]
+        refused = self.client.post(f"{self.base}/verify/stances", json={"content": named, "doc_id": mine["doc_id"], "base_version": mine["version"]})
+        self.assertIn("VERIFY_READING_NOT_FOUND", refused.text)   # the reading named was of version 1
+        new = self.ai("read", {}, {"readings": [self.reading()]})["saved"]
+        done = self.post("/verify/stances/confirm", {"reading": new["doc_id"], "claim": self.cid})
+        [stance] = self.current("verify.stance")
+        self.assertEqual((done["saved"], stance["version"], stance["content"]["claim_version"], stance["content"]["reading"]), (1, 2, 2, new["doc_id"]))
+        self.assertEqual(len(self.ledger()[self.cid]["oppose"]), 1)
 
     def test_confirming_one_claims_readings_at_once_is_my_save_and_then_they_count(self):
         self.grant("search_external")
@@ -306,6 +369,21 @@ class VerdictAndLedgerTests(VerifyCase):
         self.post("/docs/verify.verdict", {"content": verdict})
         self.assertEqual(self.client.post(f"{self.base}/docs/verify.verdict", json={"content": verdict}).status_code, 409)
         self.assertIn("VERIFY_CLAIM_VERSION_STALE", self.client.post(f"{self.base}/docs/verify.verdict", json={"content": {**verdict, "claim_version": 3}}).text)
+        held = self.current("verify.verdict")[0]
+        other = self.claim("銀行下週停止營業")["doc_id"]
+        moved = self.client.put(f"{self.base}/docs/verify.verdict/{held['doc_id']}", json={"content": {**verdict, "claim": other}, "base_version": 1})
+        self.assertIn("VERIFY_VERDICT_FIXED", moved.text)
+
+    def test_the_ledger_says_what_one_origin_says_in_the_one_rule(self):
+        """One opposing origin is not 「只有一個出處這樣說」; one origin on both sides is not 「還沒有獨立出處」 (kinds.verify.weak_line)."""
+        against, both = self.claim()["doc_id"], self.claim("銀行下週停止營業")["doc_id"]
+        a, b, c = self.card(url="https://a"), self.card(url="https://b"), self.card(url="https://c")
+        self.group([a], [b, c])
+        me = record_log.user(self.identity["identity_id"], "VERIFY")
+        for claim, card, stance in ((against, a, "反對"), (both, b, "支持"), (both, c, "反對")):
+            self.save("verify.stance", {"claim": claim, "claim_version": 1, "card": card, "snapshot": self.sha(card), "stance": stance}, me)
+        lines = self.ledger()
+        self.assertEqual((lines[against]["weak_line"], lines[both]["weak_line"]), ("只有一個出處說不是這樣", "只有一個出處說到它，裡面兩種說法都有"))
 
     def test_you_checked_this_before_in_this_case_and_never_across_cases(self):
         first = self.claim("央行宣布下週起每天只能領一萬元！")["doc_id"]
@@ -373,9 +451,19 @@ class FactcheckTests(VerifyCase):
             saved = self.post("/verify/factcheck", body or {"message": self.mid})
         return {item["db"]: item for item in saved["content"]["dbs"]}, saved, arrived
 
-    def text_of(self, url):
-        source = self._repo.find_active_source(self.tenant_id, self.pid, url)
+    def text_of(self, address):
+        source = self._repo.find_active_source(self.tenant_id, self.pid, address)
         return self._source_cas.read(self.tenant_id, self._repo.get_source_content_reference(self.tenant_id, self.pid, source["source_id"])).decode("utf-8")
+
+    def stored(self, url, text):
+        """A page the collector stored under its canonical URL (no fragment)."""
+        content, source_id = text.encode("utf-8"), str(uuid.uuid4())
+        cas_path = TenantScopedCas.cas_path_for(self.tenant_id, content)
+        record = source_record(source_id, self.pid, self.tenant_id, "TFC 報告", "text/plain", "Confidential", cas_path["hash"], len(content),
+                               TenantScopedCas.artifact_uri(self.tenant_id, self.pid, source_id, cas_path), self.identity["identity_id"], "2026-10-04T00:00:00Z",
+                               canonical_url=url, source_uri=url, fetched_at="2026-10-04T00:00:00Z", provenance=COLLECTED_PROVENANCE)
+        self._repo.add_source(record, cas_path, put_content=lambda: self._source_cas.put(self.tenant_id, content), writer=record_log.system("GATHER"))
+        return source_id
 
     def test_each_database_says_what_collect_found_and_a_hit_is_a_source(self):
         self.lookups.answer = SPEC_ANSWER
@@ -387,10 +475,15 @@ class FactcheckTests(VerifyCase):
         self.assertEqual((dbs["claimreview"]["state"], hit["publisher"], hit["judged_as"], hit["local"]), ("查到", "台灣事實查核中心", "錯誤", True))
         self.assertEqual(self.lookups.calls, [(self.pid, "factcheck", [{"text": MESSAGE}])])
         [source] = self._repo.list_sources(self.tenant_id, self.pid)
-        self.assertEqual((source["source_class"], source["canonical_url"], saved["content"]["rules"]["version"]), ("fact_check", "https://tfc-taiwan.org.tw/articles/1", "2"))
-        text = self.text_of("https://tfc-taiwan.org.tw/articles/1")
-        for line in ("他們查的說法（不是他們的結論）：銀行下週起每日提款上限兩萬", "他們的判定：錯誤", f"資料來源：{CLAIMREVIEW_ATTRIBUTION}"):
+        address = hit_address("claimreview", "https://tfc-taiwan.org.tw/articles/1", "銀行下週起每日提款上限兩萬")
+        self.assertEqual((source["source_class"], source["canonical_url"], source["source_uri"], saved["content"]["rules"]["version"]),
+                         ("fact_check", address, "https://tfc-taiwan.org.tw/articles/1", "2"))
+        text = self.text_of(address)
+        for line in ("查核組織：台灣事實查核中心", "他們的判定：錯誤", "查核報告：https://tfc-taiwan.org.tw/articles/1"):
             self.assertIn(line, text)
+        self.assertEqual((hit["claim"], dbs["claimreview"]["attribution"]), ("銀行下週起每日提款上限兩萬", CLAIMREVIEW_ATTRIBUTION))   # in the record
+        for kept_out in ("銀行下週起每日提款上限兩萬", CLAIMREVIEW_ATTRIBUTION):
+            self.assertNotIn(kept_out, text + source["title"])
         [event] = [event for event in self._repo.list_events(self.tenant_id, f"source:{source['source_id']}") if event["event_type"] == "SourceAdded"]
         self.assertEqual((event["author"], event["block"]), ("system", "GATHER"))   # written as GATHER: its slot stays dark
         self.assertEqual(arrived.call_args.args[3]["source_ids"], [source["source_id"]])
@@ -422,16 +515,60 @@ class FactcheckTests(VerifyCase):
         dbs, _, _ = self.check()
         self.assertEqual((dbs["cofacts"]["state"], [hit["judged_as"] for hit in dbs["cofacts"]["hits"]]), ("查到", ["含有不實訊息"]))
         self.assertEqual(dbs["cofacts"]["why"], "另外有 1 則相近的訊息有人問過，還沒有人回應")
-        self.assertIsNone(self._repo.find_active_source(self.tenant_id, self.pid, "https://cofacts.tw/article/a2"))
-        text = self.text_of("https://cofacts.tw/article/a1")
-        for line in ("央行澄清：沒有每日提款上限。", "回應 1 的出處：https://www.cbc.gov.tw/news/1", f"資料來源：{COFACTS_ATTRIBUTION}"):
+        self.assertIsNone(self._repo.find_active_source(self.tenant_id, self.pid, hit_address("cofacts", "https://cofacts.tw/article/a2", "")))
+        text = self.text_of(hit_address("cofacts", "https://cofacts.tw/article/a1", ""))
+        for line in ("央行澄清：沒有每日提款上限。", "回應 1 的出處：https://www.cbc.gov.tw/news/1"):
             self.assertIn(line, text)
+        self.assertNotIn(COFACTS_ATTRIBUTION, text)
+
+    def test_cofacts_with_only_unanswered_articles_is_not_found(self):
+        self.lookups.answer = answer_with(cofacts={**COFACTS_FOUND, "hits": COFACTS_FOUND["hits"][1:]})
+        dbs, _, _ = self.check()
+        self.assertEqual((dbs["cofacts"]["state"], dbs["cofacts"]["why"], dbs["cofacts"]["hits"]), ("查不到", "有 1 則相近的訊息有人問過，還沒有人回應", []))
+
+    def test_a_result_without_its_attribution_is_not_used(self):
+        """The data's licence asks for the attribution; a 查到 that comes without it stores nothing."""
+        claimreview = {**SPEC_ANSWER["items"][0]["dbs"][0], "attribution": " "}
+        self.lookups.answer = answer_with(claimreview=claimreview)
+        dbs, _, _ = self.check()
+        self.assertEqual((dbs["claimreview"]["state"], dbs["claimreview"]["why"], self._repo.list_sources(self.tenant_id, self.pid)), ("無法檢查", NO_ATTRIBUTION, []))
+
+    def test_a_hit_never_replaces_a_stored_page_and_two_reviews_on_one_report_are_two_sources(self):
+        """critic M2: the report page the collector stored keeps its place; a hit has its own address (report URL + fragment)."""
+        report = "https://tfc-taiwan.org.tw/articles/1"
+        page = self.stored(report, "台灣事實查核中心報告全文：網傳銀行下週起每日提款上限兩萬，經查為錯誤訊息。")
+        claimreview = json.loads(json.dumps(SPEC_ANSWER["items"][0]["dbs"][0]))
+        claimreview["hits"].append({**claimreview["hits"][0], "claim": "銀行下週起停止營業", "judged_as": "錯誤"})
+        self.lookups.answer = answer_with(claimreview=claimreview)
+        self.check()
+        self.check()
+        rows = self._repo.list_sources(self.tenant_id, self.pid)
+        self.assertEqual((len(rows), {row["status"] for row in rows}), (3, {"active"}))   # nothing superseded, nothing added the second time
+        self.assertEqual(self._repo.find_active_source(self.tenant_id, self.pid, report)["source_id"], page)
+        self.assertEqual(len({row["canonical_url"] for row in rows}), 3)
+
+    def test_a_failed_report_can_never_count_as_support(self):
+        """critic M1: the reviewed claim repeats the message; it is not in the fact-check source's text, so no reading can
+        quote it as support, and a support or opposition without a quote is refused."""
+        self.lookups.answer = SPEC_ANSWER
+        cid = self.claim(message=self.mid)["doc_id"]
+        self.post("/verify/factcheck", {"message": self.mid})
+        block_hooks.wait_idle()
+        [source] = self._repo.list_sources(self.tenant_id, self.pid)
+        [card] = [doc["doc_id"] for doc in self.current("gather.source") if doc["content"]["source_id"] == source["source_id"]]
+        self.group([card])
+        self.grant("search_external")
+        support = {"claim": cid, "card": card, "reads_as": "支持", "quote": "銀行下週起每日提款上限兩萬", "citations": [f"source:{source['source_id']}"]}
+        self.assertEqual(self.ai("read", {}, {"readings": [support]}, 502)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
+        self.assertEqual(self.ai("read", {}, {"readings": [{k: v for k, v in support.items() if k != "quote"}]}, 502)["detail"].split(":")[0], "AI_ANSWER_INVALID")
+        self.assertEqual((self.current("verify.reading"), self.ledger()[cid]["support"]), ([], []))
 
     def test_the_same_result_twice_is_one_source(self):
         self.lookups.answer = SPEC_ANSWER
         self.check()
         _, _, arrived = self.check()
-        self.assertEqual((len(self._repo.list_sources(self.tenant_id, self.pid)), arrived.called), (1, False))
+        [source] = self._repo.list_sources(self.tenant_id, self.pid)
+        self.assertEqual(arrived.call_args.args[3]["source_ids"], [source["source_id"]])   # every hit goes to the (idempotent) hooks, new or not
 
     def test_elsewhere_only_the_global_databases_are_shown_and_the_local_checker_is_not_first(self):
         self.client.post("/me/docs/govern.location", json={"content": {"where": "東京"}})
@@ -515,10 +652,37 @@ class SearchTests(CollectionApiTestCase):
         self.assertNotIn("GATHER", self.docs.blocks_used(self.tenant_id, self.owner))   # the background search lights no GATHER slot
 
     def test_a_run_that_could_not_look_is_uncheckable_and_one_that_found_nothing_says_so(self):
-        self.assertEqual(hooks.search_result({"status": "failed"}, []), ("無法檢查", "蒐集器這次沒有跑完"))
+        self.assertEqual(hooks.search_result({"status": "failed"}, []), ("無法檢查", "這次查詢沒有跑完"))
+        self.assertEqual(hooks.search_result({"status": "completed", "report": {**REPORT, "written": 0}}, []), ("無法檢查", "找資料的服務沒有回報搜尋管道"))   # critic M4
+        self.assertEqual(hooks.search_result({"status": "completed", "report": REPORT}, [])[0], "查到")
         self.assertEqual(hooks.search_result({"status": "completed", "report": REPORT}, [{"provider": "serper", "lang": "zh", "state": "unreachable"}, {"provider": "brave", "lang": "zh", "state": "no_key"}])[0], "無法檢查")
         self.assertEqual(hooks.search_result({"status": "completed", "report": {**REPORT, "written": 0}}, [{"provider": "serper", "lang": "zh", "state": "ok"}]), ("查不到", "找過，沒有找到相關的網頁"))
         self.assertEqual(hooks.search_result({"status": "completed", "report": None}, [])[0], "無法檢查")
+
+
+    def test_a_run_that_will_never_call_back_is_settled_on_a_ledger_read_or_the_next_arrival(self):
+        """critic m7: past its deadline a run reads as failed and nobody can finish it -- its claim says 無法檢查, not 還沒查."""
+        first, second = self.claim(), self.claim()
+        self._collector()
+        runs = [self.go(claim, confirm=True).json()["run_id"] for claim in (first, second)]
+        connection = sqlite3.connect(self._repo.db_path)
+        try:
+            connection.execute("UPDATE collection_runs SET deadline_at='2000-01-01T00:00:00Z' WHERE run_id=?", (runs[0],))
+            connection.commit()
+        finally:
+            connection.close()
+        self.client.get(f"/projects/{self.pid}/verify/ledger")
+        self.assertEqual([(item["claim"], item["state"], item["why"]) for item in self.searches()], [(first, "無法檢查", "這次查詢沒有跑完")])
+        self.client.get(f"/projects/{self.pid}/verify/ledger")
+        self.assertEqual(len(self.searches()), 1)   # settled once
+        connection = sqlite3.connect(self._repo.db_path)
+        try:
+            connection.execute("UPDATE collection_runs SET deadline_at='2000-01-01T00:00:00Z' WHERE run_id=?", (runs[1],))
+            connection.commit()
+        finally:
+            connection.close()
+        hooks._after_sources(self.docs, self.tenant_id, self.owner, {"run": None, "channels": []})   # any arrival in the case
+        self.assertEqual(sorted(item["claim"] for item in self.searches()), sorted([first, second]))
 
 
 class ProposeGatherTests(Step2Case):
