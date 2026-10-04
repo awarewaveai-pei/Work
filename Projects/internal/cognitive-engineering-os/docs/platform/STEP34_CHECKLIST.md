@@ -12,5 +12,5 @@
 - [x] Person-owned `teach.run`, `teach.aar`, and `teach.practice_consent` records use generic `/me/docs/{kind}` routes; completion is system-only and is written by the completion hook after every required lesson has a run.
 - [x] TEACH's AI opponent and thinking-move feedback read only the selected lesson, checked practice case, run notes, and consent guard; their output has no score or ranking fields and real-case context needs consent.
 - [x] Lesson and practice-case reads include drafts, prefer the person's `govern.location`, and explain the fallback when no local case exists.
-- [ ] TEACH page and browser walk are not part of card 41; the page card owns that surface.
+- [x] TEACH page is a case-free `/me/teach` surface: visible subject, lesson, case, role and action controls use design-system classes, and the person's words stay beside tagged AI output.
 - [ ] The 90-second manipulation-technique content is not invented here; it remains operator-reviewed content work from the confirmed card.

@@ -14,6 +14,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | 00-queue-integrity | 新增測試驗證佇列欄位、檔案、依賴、閘門、檢查指令與 High-STOP 限制 | 佇列完整、依賴只能指向前卡、檢查命令可追溯且高風險卡不得執行危險命令 | 5 個 tempfile 壞副本由同一驗證器攔截；每項規則刪除守衛後測試轉紅並還原為綠 | 待審 |
 | Codex | 40-teach-content-and-loader | 新增 TEACH 課程與練習案例內容載入器、版本指紋閘與不覆寫產生器 | 課程內容與練習案例為檔案且來源可追溯；草稿不可冒充已審；版本指紋一致 | 11 個 TEACH 單元測試；54 個基礎規則集測試；4 個突變測試各紅後綠 | 待審 |
 | Codex | 41-teach-block | 新增 TEACH 人員紀錄、完成 hook、AI 練習對手與課程／案例讀取路由 | person-only records、system-only completion、完整課程才完成、練習與真實案子分離、AI 不評分且只讀允許內容 | `test_block_teach` 的拒絕與路由測試；版本／同意／輸出形狀／完成時機四個 mutation 轉紅後還原綠 | 待審 |
+| Codex | 42-teach-page | 新增不綁案例的 TEACH 課程與演練頁，讓課程、案例、角色、自己的話與 AI 回應分開呈現 | 草稿只在草稿課顯示；選項可見且沒有下拉；AI 有作者標籤；頁面不顯示分數、排名、進度百分比或連勝 | `TeachPage.test.tsx` 3 個頁面守衛；移除草稿標記／加入 `<select>`／加入「進度」各轉紅後還原綠；`tsc` 與 vitest 綠 | 待審 |
 
 ## deferred, before D7 second region
 
