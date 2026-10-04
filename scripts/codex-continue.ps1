@@ -208,7 +208,10 @@ try {
 
             $rawLog = ''
             foreach ($f in @(($logBase + '.out.txt'), ($logBase + '.err.txt'))) { if (Test-Path -LiteralPath $f) { $rawLog += (Get-Content -LiteralPath $f -Raw -ErrorAction SilentlyContinue) } }
-            if ($rawLog -match '(?i)usage limit|rate limit|try again at|\b429\b') {
+            # Only the CLI's own error lines count. The raw log also holds files Codex READ (AGENTS.md mentions 429 and
+            # "rate limit"), which made the first smoke run stop on a card that had in fact been committed.
+            $hasLast = (Test-Path -LiteralPath $outFile) -and ((Get-Content -LiteralPath $outFile -Raw -ErrorAction SilentlyContinue) -match '\S')
+            if (-not $hasLast -and $rawLog -match '(?im)^\s*(ERROR|Error)\b[^\r\n]*(usage limit|rate limit|try again at|\b429\b)') {
                 & powershell -NoProfile -ExecutionPolicy Bypass -File $quotaScript -Action set -Tool codex -Hours 5 -Reason 'codex-continue saw a quota message' | Out-Null
                 Set-Card $id @{ status = 'pending'; note = 'stopped: Codex quota' }
                 Say 'Codex quota reached; recorded in oracle-quota; stopping' 'Yellow'; $exitCode = 3; break
