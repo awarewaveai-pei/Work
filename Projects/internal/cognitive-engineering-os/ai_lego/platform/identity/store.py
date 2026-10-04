@@ -88,9 +88,9 @@ class IdentityStore:
         data_residency_region: str,
         encryption_root_key_ref: str,
     ) -> dict[str, Any]:
-        """The tenant row in its region and its line in the directory, one unit of work: the directory's transaction
-        commits last, so a failure leaves no line that routes to a tenant that is not there. ``data_residency_region``
-        must be a configured region (DB_REGION_UNKNOWN otherwise, nothing written)."""
+        """Publish the directory last, so a failed create never routes to a missing tenant. Two regions cannot commit
+        atomically: if the directory commit fails after the home commit, retrying the same request adopts the matching
+        home row instead of stranding it. A conflicting orphan is refused. No second region is live before D7."""
         region = self._db.require_region(data_residency_region)
         record = {
             "tenant_id": tenant_id,
@@ -112,7 +112,12 @@ class IdentityStore:
                 directory.execute(*insert)
             else:
                 with self._db.transaction(region) as home:
-                    home.execute(*insert)
+                    created = home.execute(insert[0] + " ON CONFLICT (tenant_id) DO NOTHING RETURNING tenant_id", insert[1]).fetchone()
+                    if created is None:
+                        existing = home.execute("SELECT * FROM tenant WHERE tenant_id = %s", (tenant_id,)).fetchone()
+                        if existing is None or any(existing[key] != record[key] for key in record if key != "created_at"):
+                            raise InvariantViolation(f"TENANT_CREATE_ORPHAN_CONFLICT: tenant {tenant_id!r} already exists with different values")
+                        record["created_at"] = existing["created_at"]
         return record
 
     def get_tenant(self, tenant_id: str) -> dict[str, Any] | None:

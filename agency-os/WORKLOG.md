@@ -30,6 +30,14 @@
 - ORACLE_WAIVED: 本次 staged 無程式檔；本條就是 Claude 對 Codex 提交 `c55b64c35` 的跨模型審查本身，直接審查，未走 `claude-oracle.ps1`。
 - 驗證：10 模組各自獨立行程共 437 tests PASS（step2_foundation 54／foundation 43／map 32／think 48／decide 26／learn 27／act 25／gather 68／verify 62／compute 52）。
 - rollback：還原 `agency-os/reports/review-debt.md` 該行即可；無程式、資料變更。
+## 2026-10-05 COS 跨區租戶建立故障恢復
+
+- 根因：`identity/store.py:create_tenant` 的 home 與 directory 分屬兩個 PostgreSQL 交易；directory 提交失敗後留下不可路由的 home 列，同參數重試撞主鍵。
+- 修改：directory 仍最後公開；跨區重試僅在全部原始欄位相同時接納孤兒列，保留原建檔時間；資料不符拒絕。D7 與棄置孤兒清理程序完成前，第二區域不得上線。
+- REALTEST_EVIDENCE: 故障注入修前 `UniqueViolation` 失敗，修後指定測試 PASS；`python -m unittest tests.unit.test_pg_foundation` 27 PASS、`test_identity_store` 36 PASS。
+- REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，僅隔離工作樹，不 push／部署。
+- rollback：revert 本次獨立 commit；無正式資料移轉。
+
 ## 2026-10-04（續2）COS JSON 欄位形狀在存檔時驗證
 - 根因：`Projects/internal/cognitive-engineering-os/ai_lego/core/domain/doc_kinds.py:134` 原先只驗 JSON 是物件或陣列；`ai_lego/platform/ai_actions/map.py:175` 對 `one_lines` 呼叫 `.items()`，錯形狀可經通用存檔路徑留下並讓 AI 動作 500。
 - 修正：`doc_kinds.py:38` 加 `Field.shape` 宣告與宣告合法性；`:130`、`:154` 存檔拒絕錯形狀（含空容器）；`kinds/` 58 個 JSON 欄位依讀取契約標為物件 21、陣列 37，沒有任意 JSON 例外；`tests/unit/test_block_foundation.py:70` 掃全 registry，`test_block_map.py:90` 實測 API 拒絕。

@@ -103,7 +103,10 @@ the API host and work across its processes; a write they let through still meets
   (`get_tenant`, `list_workspaces`, `get_workspace`, login), and an unknown tenant's denied entitlement check is audited
   in the first region.
 - `create_tenant` writes the tenant row in its region and the directory line in the first region, the directory's
-  transaction committing last; `data_residency_region` must be a configured region (`DB_REGION_UNKNOWN`, nothing written).
+  transaction committing last; `data_residency_region` must be configured (`DB_REGION_UNKNOWN`, nothing written).
+  Cross-region commits are not atomic: a directory commit failure can leave an unrouteable home row. Retrying the same
+  create adopts that row only when all supplied values match; a conflicting orphan is refused. A second live region
+  still requires D7 and an operator-owned recovery procedure for abandoned creates.
 - A credential that names no tenant (session token, handoff code, reset token, grant reference or token, identity id) is
   looked up region by region: the random value, or its hash, is in at most one.
 - There is no tenant deletion yet (no route). When there is, the directory line goes last, with the tenant.

@@ -200,7 +200,7 @@ class Databases:
 
     @staticmethod
     def add_to_directory(connection: psycopg.Connection, tenant_id: str, region: str) -> None:
-        """On a transaction of the directory region (the caller writes the tenant's own row in the same unit of work)."""
+        """On the directory region's transaction; a different home region commits separately (see create_tenant)."""
         connection.execute("INSERT INTO tenant_directory (tenant_id, region) VALUES (%s, %s)", (tenant_id, region))
 
     @contextmanager

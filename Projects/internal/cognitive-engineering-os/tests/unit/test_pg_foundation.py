@@ -17,7 +17,9 @@ import uuid
 from datetime import datetime, timezone
 
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 import psycopg
 from psycopg import errors
@@ -413,6 +415,31 @@ class RegionRoutingTests(PgTestCase):
         with self.assertRaisesRegex(InvariantViolation, r"^DB_REGION_UNKNOWN: 'three'"):
             self.store.create_tenant(tenant, "x", "jurisdiction-pack.tw.v1", "three", "kek")
         self.assertIsNone(self.regions.region_of(tenant))
+
+    def test_a_directory_commit_failure_can_be_retried_without_stranding_a_home_row(self):
+        tenant = str(uuid.uuid4())
+        create = (tenant, "Recoverable tenant", "jurisdiction-pack.tw.v1", "two", "kek")
+        original = self.regions.transaction
+
+        @contextmanager
+        def fail_directory_commit(region):
+            with original(region) as connection:
+                yield connection
+                if region == "one":
+                    raise RuntimeError("injected directory commit failure")
+
+        with patch.object(self.regions, "transaction", fail_directory_commit):
+            with self.assertRaisesRegex(RuntimeError, "injected directory commit failure"):
+                self.store.create_tenant(*create)
+        self.assertIsNone(self.store.get_tenant(tenant), "an uncommitted directory entry cannot route a tenant")
+        with original("two") as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM tenant WHERE tenant_id = %s", (tenant,)).fetchone()[0], 1)
+        with self.assertRaisesRegex(InvariantViolation, "^TENANT_CREATE_ORPHAN_CONFLICT"):
+            self.store.create_tenant(tenant, "Different tenant", *create[2:])
+        self.assertIsNone(self.regions.region_of(tenant))
+        recovered = self.store.create_tenant(*create)
+        self.assertEqual(recovered["tenant_id"], tenant)
+        self.assertEqual(self.store.get_tenant(tenant)["created_at"], recovered["created_at"])
 
 
 if __name__ == "__main__":
