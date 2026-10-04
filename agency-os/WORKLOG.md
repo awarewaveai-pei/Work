@@ -97,6 +97,38 @@
 - 自審：檢查空陣列繞過、必填欄位、`human_only`、AI 答案入口及 API 回應；新增錯誤碼只會由壞程式宣告產生，列為內部錯誤；既有 `DOC_FIELD_INVALID` 供使用者錯值。剩餘：舊資料若已有錯形狀，這次不回寫；目前不上線。
 - rollback：對本次獨立程式提交做 `git revert <hash>`；沒有 schema 或資料搬移。
 
+## 2026-10-04（續4）
+
+### feat(teach): add person practice records, AI partner, completion hook and content reads
+
+**根本問題**：TEACH 已有課程／案例檔案，但沒有把練習留在本人資料、限制 AI 讀取、拒絕未同意的真實案子，或在完整課程完成時由系統留下紀錄。
+
+**已修改**：
+- `Projects/internal/cognitive-engineering-os/ai_lego/core/domain/kinds/teach.py`：新增 `teach.run`、`teach.aar`、`teach.practice_consent`、system-only `teach.completion`，以及 AI 對手／動作回饋輸出 kinds。
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/block_hooks/teach.py`：拒絕未知 lesson version／practice case；所有 required lesson 都有本人 run 後才寫一次 completion 和純通知。
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/ai_actions/teach.py`：AI 只讀 run／同意守衛並直接載入 lesson／practice-case 檔，真實案子無同意先拒絕；輸出不含分數或排名欄位。
+- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/teach.py`：課程（含草稿）與練習案例讀取；案例依 `govern.location` 排序，無當地案例時說明 fallback。person records 沿用 `/me/docs/{kind}`。
+- `Projects/internal/cognitive-engineering-os/tests/unit/test_block_teach.py`、`docs/platform/STEP34_CHECKLIST.md`、`apps/cognitive-web/lib/errors.ts`、`agency-os/reports/review-debt.md`：加入拒絕、完成、路由、私有讀取與 user-facing error gate。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_teach` | exit=0 | ms=8103（12 tests）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | ms=14366（41 tests）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_record_log` | exit=0 | ms=7651（20 tests）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_teach_content` | exit=0 | ms=11976（11 tests）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_step2_foundation` | exit=0 | ms=30009（54 tests）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | ms=1725
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile ai_lego/core/domain/kinds/teach.py ai_lego/platform/ai_actions/teach.py ai_lego/platform/block_hooks/teach.py ai_lego/apps/api/blocks/teach.py tests/unit/test_block_teach.py` | exit=0 | ms=185
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n — read-back of all changed files, diff check, route/kind/action/hook cross-check.
+- ORACLE_WAIVED: hooks heartbeat stayed stale and no independent Claude review session was available; completed adversarial self-review and four required mutation tests.
+- BUGHUNT_DONE: scope=`agency-os,scripts,Projects/internal/cognitive-engineering-os` | grep=`teach.run|teach.aar|teach.completion|teach.practice_consent|TEACH_PRACTICE_CONSENT_REQUIRED|teach.opponent|teach.feedback|teach_completion` | hits=59; output-schema scan=`opponent:[challenge,question], feedback_on_moves:[move_feedback]`.
+- WORKLOG: 本條目
+
+**突變證據**：將 completion 作者改成 user、移除 real-case consent 條件、在 opponent schema 加入 `score`、以及跳過 required-lesson completeness guard，指定測試各自先紅；全部立即還原並由完整測試綠回證明。
+
+**剩餘風險**：TEACH page、瀏覽器 walk、FACILITATE eligibility 仍由後續卡片負責；本卡沒有資料庫 migration、部署或真實案子讀取。
+
+**rollback**：`git revert <本次 commit>` 可移除本卡 runtime kinds、AI actions、hook、routes、tests、checklist/error/debt/worklog 變更；不涉及資料庫或外部服務。
+
 ## 2026-10-04（續3）
 
 ### feat(cognitive-os): add versioned TEACH content and loader
@@ -16905,4 +16937,3 @@ WORKLOG 先前的 `REALTEST_WAIVED: Docker Desktop 未啟動` 是誠實的，但
 **剩餘風險**: HD-03～HD-23 未獲人類選項批准；尤其 HD-03/10/20/21 會阻擋資料主體 rights、Case aggregate、法域/市場與 DPA 角色的 production implementation。所有 four artifacts 都是 design input，不能作為任何處理 real-person data 的許可。
 
 **Rollback**: `git revert <this commit>` 可移除本輪 specification 與 ADR links；因未建立 schema/data/migration，不需要資料回滾。
-

@@ -13,6 +13,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | storage-erasure-blocker | 記錄 W1-W3 的資料庫回滾後 Source CAS 已刪，以及 API 更早刪 artifact/journal 的實證 | 不可把可回滾的 row 與不可回滾的檔案刪除假裝成同一交易 | 一次性 PostgreSQL 故障注入：`row_survives=True blob_survives=False`，預期不變量斷言 exit 1；24 個跨檔命中逐一查 | Critical，儲存分支不得合併／推送／部署；待耐故障抹除協定與跨模型審查 |
 | Codex | 00-queue-integrity | 新增測試驗證佇列欄位、檔案、依賴、閘門、檢查指令與 High-STOP 限制 | 佇列完整、依賴只能指向前卡、檢查命令可追溯且高風險卡不得執行危險命令 | 5 個 tempfile 壞副本由同一驗證器攔截；每項規則刪除守衛後測試轉紅並還原為綠 | 待審 |
 | Codex | 40-teach-content-and-loader | 新增 TEACH 課程與練習案例內容載入器、版本指紋閘與不覆寫產生器 | 課程內容與練習案例為檔案且來源可追溯；草稿不可冒充已審；版本指紋一致 | 11 個 TEACH 單元測試；54 個基礎規則集測試；4 個突變測試各紅後綠 | 待審 |
+| Codex | 41-teach-block | 新增 TEACH 人員紀錄、完成 hook、AI 練習對手與課程／案例讀取路由 | person-only records、system-only completion、完整課程才完成、練習與真實案子分離、AI 不評分且只讀允許內容 | `test_block_teach` 的拒絕與路由測試；版本／同意／輸出形狀／完成時機四個 mutation 轉紅後還原綠 | 待審 |
 
 ## deferred, before D7 second region
 
