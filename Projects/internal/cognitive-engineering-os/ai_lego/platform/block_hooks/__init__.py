@@ -83,22 +83,18 @@ def propose(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, by_block: s
 
 
 AFTER_SOURCES_ORDER = ("GATHER", "VERIFY")   # a block not listed runs after these, by name
-# One API process (Dockerfile CMD: a single uvicorn worker), so an in-process lock serialises a case's hooks.
 _POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="after-sources")
-_CASE_LOCKS: dict[tuple[str, str], threading.Lock] = {}
 _LOCKS_GUARD = threading.Lock()
 _RUNNING: set[Future] = set()
-
-
-def _case_lock(tenant_id: str, owner: record_log.Owner) -> threading.Lock:
-    with _LOCKS_GUARD:
-        return _CASE_LOCKS.setdefault((tenant_id, owner.id), threading.Lock())
 
 
 def _run_after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arrived: dict[str, Any]) -> None:
     registry = _registry("AFTER_SOURCES")
     order = [block for block in AFTER_SOURCES_ORDER if block in registry] + sorted(set(registry) - set(AFTER_SOURCES_ORDER))
-    with _case_lock(tenant_id, owner):
+    # A case's hooks one run at a time across every API process and worker: a database session lock (docs.hooks_lock),
+    # not an in-process one, because what it guards is database state (the cards a run writes). Its own name, so the
+    # erase -- which takes the case lock -- never waits for a hook; a hook's late write gets CASE_ERASED instead.
+    with docs.hooks_lock(tenant_id, owner):
         if owner.kind == "case" and docs.reads.case(tenant_id, owner.id) is None:
             return   # erased before this run's turn: nothing is written back
         for block in order:

@@ -4,17 +4,18 @@ of the tenant survives."""
 
 from __future__ import annotations
 
-import sqlite3
-
 from ai_lego.apps.api import main as api_main
 from ai_lego.errors import InvariantViolation
 from tests.unit.test_api_collections import CollectionApiTestCase
+from tests.pg import dump
 from tests.unit.test_api_ingest import c1
 
 NOTE = {"title": "Interview notes", "media_type": "text/plain", "data_classification": "Confidential", "content": "Jane Doe said the gallery paid late."}
 
 
 class ProjectEraseTests(CollectionApiTestCase):
+    FRESH_TABLES = True   # a test reads the whole database for what must be gone
+
     def setUp(self):
         super().setUp()
         self.pid = self.project["project_id"]
@@ -51,18 +52,14 @@ class ProjectEraseTests(CollectionApiTestCase):
         self.assertNotIn("Jane", str(events[0]["payload"]))
         self.assertEqual(self._repo.list_events(self.tid, f"source:{self.note['source_id']}"), [])
 
-    def test_nothing_personal_is_left_in_the_database_file(self):
+    def test_nothing_personal_is_left_in_any_row_of_the_database(self):
+        """Every row of every table. SQLite's secure_delete also kept this for the file's free pages; PostgreSQL keeps a
+        deleted row's bytes until a vacuum reuses the space (docs/platform/STORAGE_SWITCH.md "Erasure and the bytes on
+        disk", an open decision): that half does not carry over."""
         self._erase()
-        conn = sqlite3.connect(self._repo.db_path)
-        try:
-            dump = "\n".join(conn.iterdump())
-        finally:
-            conn.close()
-        self.assertNotIn("Jane Doe", dump)
-        self.assertNotIn("acme.example", dump)
-        raw = self._repo.db_path.read_bytes()  # free pages too, not only what a query can see
-        self.assertNotIn(b"acme.example", raw)
-        self.assertNotIn(b"Interview notes", raw)
+        everything = "\n".join(dump(self.databases))
+        for personal in ("Jane Doe", "acme.example", "Interview notes"):
+            self.assertNotIn(personal, everything)
 
     def test_content_shared_with_another_project_survives(self):
         other = self._create_project(name="Other project")

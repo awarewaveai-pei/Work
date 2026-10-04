@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import sqlite3
-import tempfile
 import unittest
-from pathlib import Path
+
+from psycopg import errors
 
 from ai_lego import resolve_spec_root
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
@@ -14,6 +13,7 @@ from ai_lego.core.domain.source import COLLECTED_PROVENANCE, source_record
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.data.events import record_log
+from tests.pg import PgTestCase, add_tenant, empty_tables
 
 TENANT = "22222222-2222-4222-8222-222222222222"
 PROJECT = "11111111-1111-4111-8111-111111111111"
@@ -58,20 +58,18 @@ OLD = "55555555-5555-4555-8555-555555555555"
 NEW = "66666666-6666-4666-8666-666666666666"
 
 
-class SourceProvenanceTests(unittest.TestCase):
+class SourceProvenanceTests(PgTestCase):
     def setUp(self):
-        self._dir = tempfile.TemporaryDirectory()
-        self.path = Path(self._dir.name) / "projects.sqlite3"
-        self.repo = ProjectSourceRepository(self.path)
+        empty_tables(self.databases)   # fixed ids: a fresh database per test, as the temp file was
+        add_tenant(self.databases, TENANT)
+        self.repo = ProjectSourceRepository(self.databases)
         self.repo.create_project(_project())
-
-    def tearDown(self):
-        self._dir.cleanup()
 
     def test_collected_fields_round_trip(self):
         source = _collected(OLD, "a" * 64)
         self.repo.add_source(source, _cas("a" * 64), writer=record_log.system("GATHER"))
-        self.assertEqual(self.repo.get_source(TENANT, PROJECT, OLD), source)
+        # the times come back in the database's form: the same instants, six fraction digits (D4)
+        self.assertEqual(self.repo.get_source(TENANT, PROJECT, OLD), {**source, "created_at": "2026-09-26T01:02:04.000000Z", "fetched_at": "2026-09-26T01:02:03.456000Z"})
         self.assertEqual(self.repo.find_active_source(TENANT, PROJECT, URL)["source_id"], OLD)
 
     def test_collected_source_matches_the_schema(self):
@@ -108,37 +106,14 @@ class SourceProvenanceTests(unittest.TestCase):
 
     def test_the_database_refuses_two_active_versions_of_one_url(self):
         self.repo.add_source(_collected(OLD, "a" * 64), _cas("a" * 64), writer=record_log.system("GATHER"))
-        with self.assertRaises(sqlite3.IntegrityError):
+        with self.assertRaises(errors.UniqueViolation) as caught:
             self.repo.add_source(_collected(NEW, "b" * 64), _cas("b" * 64), writer=record_log.system("GATHER"))
+        self.assertEqual(caught.exception.diag.constraint_name, "ux_prov_sources_active_canonical")
 
     def test_non_evidence_provenance_is_refused(self):
         bad = {"epistemic_type": "SOURCE_FACT", "authorship_state": "SOURCE_QUOTATION", "locked": None}
         with self.assertRaisesRegex(InvariantViolation, "SOURCE_PROVENANCE_INVALID"):
             _collected(OLD, "a" * 64, provenance=bad)
-
-    def test_an_old_file_gains_the_columns_and_the_active_url_index_on_open(self):
-        old_path = Path(self._dir.name) / "old.sqlite3"
-        raw = sqlite3.connect(old_path)
-        try:
-            raw.executescript(
-                "CREATE TABLE prov_sources (tenant_id TEXT NOT NULL, project_id TEXT NOT NULL, source_id TEXT NOT NULL, title TEXT NOT NULL, "
-                "media_type TEXT NOT NULL, data_classification TEXT NOT NULL, content_sha256 TEXT NOT NULL, size_bytes INTEGER NOT NULL, "
-                "artifact_uri_json TEXT NOT NULL, content_role TEXT NOT NULL, verification_status TEXT NOT NULL, status TEXT NOT NULL, "
-                "version INTEGER NOT NULL, created_by_identity_id TEXT NOT NULL, created_at TEXT NOT NULL, cas_path_json TEXT NOT NULL, "
-                "PRIMARY KEY (tenant_id, project_id, source_id));"
-            )
-            raw.commit()
-        finally:
-            raw.close()
-        ProjectSourceRepository(old_path)
-        raw = sqlite3.connect(old_path)
-        try:
-            columns = {row[1] for row in raw.execute("PRAGMA table_info(prov_sources)")}
-            indexes = {row[1] for row in raw.execute("PRAGMA index_list(prov_sources)")}
-        finally:
-            raw.close()
-        self.assertTrue({"canonical_url", "provenance_json", "relevance_json", "supersedes_source_id"} <= columns)
-        self.assertIn("ux_prov_sources_active_canonical", indexes)
 
 
 if __name__ == "__main__":

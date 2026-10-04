@@ -1,129 +1,37 @@
-"""Local-first Project/Source repository using the canonical relational table names.
+"""Project/Source repository on PostgreSQL (docs/platform/STORAGE_SWITCH.md W2), the canonical relational table names.
+Every call goes tenant -> region -> pool (``Databases.for_tenant``); the schema is Alembic's (ai_lego/data/migrations).
 
-Current-state rows and their append-only event are committed in one SQLite
-transaction. Raw Source bytes are never accepted by this adapter: the caller passes a
-``put_content`` callback, which runs inside the write transaction.
+Current-state rows and their append-only event are committed in one transaction. Raw Source bytes are never accepted by
+this adapter: the caller passes a ``put_content`` callback, which runs inside the write transaction.
 
-Blob lifecycle (one rule): committed rows are the only record of which Source blobs are live.
-Content is written only under SQLite's write lock (``_write_transaction``), after its rows and
-before commit; a blob no committed row references is garbage (a refused batch writes none, a
-crash or failed write between content and commit can leave one). ``collect_unreferenced_blobs``
-removes garbage under the same lock -- so it never sees another write in flight -- and every
-Project erasure runs it. There is no per-request cleanup.
+Blob lifecycle (one rule): committed rows are the only record of which Source blobs are live. Content is written only
+under the tenant's source-blob lock held shared (``_lock_source_blobs``), after its rows and before commit; a blob no
+committed row references is garbage (a refused batch writes none, a crash or failed write between content and commit can
+leave one). ``collect_unreferenced_blobs`` removes garbage under the same lock held exclusive -- so it never sees another
+write in flight -- and every Project erasure runs it. There is no per-request cleanup.
+
+A case is written only while it exists (invariant 3): every writer takes the case lock shared as the first statement of
+its transaction (``lock_case``; a child row written first would hold the parent row the erase deletes: a deadlock) and
+checks the case row under it (``require_case``); ``erase_project`` takes the same lock exclusive. Writers do not wait for
+each other; the erase waits only for the transactions in flight, and one that comes after it finds no case (CASE_ERASED).
 """
 
 from __future__ import annotations
 
-import json
-import sqlite3
-from contextlib import contextmanager
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import datetime
 from typing import Any, Callable, Mapping
+
+import psycopg
 
 from ai_lego.core.domain.collection_run import OPEN_STATUSES, effective_status, run_report
 from ai_lego.core.support import canonical_json, sha256_bytes
+from ai_lego.data import db
+from ai_lego.data.db import Databases, Jsonb, Row
 from ai_lego.data.events import record_log
 from ai_lego.data.events.record_log import Writer
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.errors import InvariantViolation
 
-
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS platform_projects (
-    tenant_id TEXT NOT NULL,
-    project_id TEXT NOT NULL,
-    workspace_id TEXT NOT NULL,
-    name TEXT NOT NULL,
-    purpose TEXT NOT NULL,
-    data_classification TEXT NOT NULL,
-    status TEXT NOT NULL,
-    version INTEGER NOT NULL,
-    created_by_identity_id TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (tenant_id, project_id),
-    UNIQUE (tenant_id, workspace_id, created_by_identity_id, name)
-);
-CREATE TABLE IF NOT EXISTS prov_sources (
-    tenant_id TEXT NOT NULL,
-    project_id TEXT NOT NULL,
-    source_id TEXT NOT NULL,
-    title TEXT NOT NULL,
-    media_type TEXT NOT NULL,
-    data_classification TEXT NOT NULL,
-    content_sha256 TEXT NOT NULL,
-    size_bytes INTEGER NOT NULL,
-    artifact_uri_json TEXT NOT NULL,
-    content_role TEXT NOT NULL,
-    verification_status TEXT NOT NULL,
-    status TEXT NOT NULL,
-    version INTEGER NOT NULL,
-    created_by_identity_id TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    cas_path_json TEXT NOT NULL,
-    doi TEXT,
-    authors_json TEXT,
-    venue TEXT,
-    published_at TEXT,
-    canonical_url TEXT,
-    source_uri TEXT,
-    fetched_at TEXT,
-    provenance_json TEXT,
-    source_class TEXT,
-    relevance_json TEXT,
-    supersedes_source_id TEXT,
-    PRIMARY KEY (tenant_id, project_id, source_id),
-    FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
-);
-CREATE INDEX IF NOT EXISTS ix_platform_projects_workspace ON platform_projects (tenant_id, workspace_id, created_at, project_id);
-CREATE INDEX IF NOT EXISTS ix_prov_sources_project ON prov_sources (tenant_id, project_id, created_at, source_id);
-CREATE TABLE IF NOT EXISTS project_interpretations (
-    tenant_id TEXT NOT NULL,
-    project_id TEXT NOT NULL,
-    interpretation_id TEXT NOT NULL,
-    artifact_reference_json TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (tenant_id, interpretation_id),
-    FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
-);
-CREATE INDEX IF NOT EXISTS ix_project_interpretations_project ON project_interpretations (tenant_id, project_id, created_at);
-CREATE TABLE IF NOT EXISTS project_syntheses (
-    tenant_id TEXT NOT NULL,
-    project_id TEXT NOT NULL,
-    synthesis_id TEXT NOT NULL,
-    kind TEXT NOT NULL,
-    artifact_reference_json TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (tenant_id, synthesis_id),
-    FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
-);
-CREATE INDEX IF NOT EXISTS ix_project_syntheses_project ON project_syntheses (tenant_id, project_id, created_at);
-CREATE TABLE IF NOT EXISTS project_reports (
-    tenant_id TEXT NOT NULL,
-    project_id TEXT NOT NULL,
-    report_id TEXT NOT NULL,
-    artifact_reference_json TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    PRIMARY KEY (tenant_id, report_id),
-    FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
-);
-CREATE INDEX IF NOT EXISTS ix_project_reports_project ON project_reports (tenant_id, project_id, created_at);
-CREATE TABLE IF NOT EXISTS collection_runs (
-    tenant_id TEXT NOT NULL,
-    project_id TEXT NOT NULL,
-    run_id TEXT NOT NULL,
-    status TEXT NOT NULL,
-    seeds_json TEXT NOT NULL,
-    budget_json TEXT NOT NULL,
-    requested_by_identity_id TEXT NOT NULL,
-    requested_at TEXT NOT NULL,
-    deadline_at TEXT NOT NULL,
-    completed_at TEXT,
-    report_json TEXT,
-    PRIMARY KEY (tenant_id, run_id),
-    FOREIGN KEY (tenant_id, project_id) REFERENCES platform_projects (tenant_id, project_id)
-);
-"""
 
 _PROJECT_COLUMNS = (
     "project_id",
@@ -137,6 +45,7 @@ _PROJECT_COLUMNS = (
     "created_by_identity_id",
     "created_at",
 )
+_PROJECT_SELECT = ", ".join(_PROJECT_COLUMNS)
 
 _SOURCE_COLUMNS = (
     "source_id",
@@ -171,186 +80,77 @@ _PROVENANCE_COLUMNS = frozenset({"canonical_url", "source_uri", "fetched_at", "p
 
 _SOURCE_SELECT = "source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri_json, content_role, verification_status, status, version, created_by_identity_id, created_at, doi, authors_json, venue, published_at, canonical_url, source_uri, fetched_at, provenance_json, source_class, relevance_json, supersedes_source_id"
 
-# Columns added after a table first shipped. ``CREATE TABLE IF NOT EXISTS`` above is a no-op against an existing table,
-# so a pre-existing database file gains them only here (ProjectSourceRepository._migrate_columns), per table.
-_MIGRATION_COLUMNS: dict[str, tuple[tuple[str, str], ...]] = {
-    # 2026-09-18: citation metadata.
-    "prov_sources": (
-        ("doi", "TEXT"),
-        ("authors_json", "TEXT"),
-        ("venue", "TEXT"),
-        ("published_at", "TEXT"),
-        # 2026-09-26: collection provenance (RESEARCH_LINES_MASTER_PLAN WC-P1-01).
-        ("canonical_url", "TEXT"),
-        ("source_uri", "TEXT"),
-        ("fetched_at", "TEXT"),
-        ("provenance_json", "TEXT"),
-        ("source_class", "TEXT"),
-        ("relevance_json", "TEXT"),
-        ("supersedes_source_id", "TEXT"),
-    ),
-    # 2026-09-26: a run's deadline. A row from before it existed has no grant that could still finish it, so it reads
-    # as past its deadline.
-    "collection_runs": (("deadline_at", "TEXT NOT NULL DEFAULT '1970-01-01T00:00:00Z'"),),
-}
 
-# Owner of a record written before owners existed, read off the record itself: a Project's own events belong to that
-# case, a Source's events name their Project in the payload, the erasure tombstone belongs to the platform.
-_LEGACY_OWNER_SQL = (
-    "UPDATE events SET owner_kind='platform', owner_id=tenant_id WHERE owner_kind IS NULL AND event_type='ProjectErased'",
-    "UPDATE events SET owner_kind='case', owner_id=substr(aggregate_id, 9) WHERE owner_kind IS NULL AND aggregate_id LIKE 'project:%'",
-    "UPDATE events SET owner_kind='case', owner_id=json_extract(payload_json, '$.project_id') "
-    "WHERE owner_kind IS NULL AND aggregate_id LIKE 'source:%' AND json_extract(payload_json, '$.project_id') IS NOT NULL",
-)
+def _jsonb_or_none(value: Any) -> Jsonb | None:
+    return None if value is None else Jsonb(value)
 
 
-_MIGRATED: set[str] = set()   # files brought up to date in this process: a request does not re-run the migration
-
-# 2026-10-03: a name is unique among ONE person's cases. Unique across the workspace, a 409 on create/rename told a
-# colleague that someone else had a case with that name (critic: existence leak). An old file still carries the
-# workspace-wide key; SQLite cannot drop a table constraint, so the table is rebuilt (SQLite's documented 12 steps).
-_OLD_NAME_KEY = "UNIQUE (tenant_id, workspace_id, name)"
-
-
-def _owner_scoped_names(db_path: Path) -> None:
-    connection = sqlite3.connect(db_path, isolation_level=None)
-    try:
-        row = connection.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='platform_projects'").fetchone()
-        if row is None or _OLD_NAME_KEY not in row[0]:
-            return
-        connection.execute("PRAGMA foreign_keys = OFF")   # only outside a transaction; children keep their rows
-        connection.execute("BEGIN IMMEDIATE")
-        try:
-            connection.execute(row[0].replace("CREATE TABLE platform_projects", "CREATE TABLE platform_projects_owner_names", 1)
-                               .replace(_OLD_NAME_KEY, "UNIQUE (tenant_id, workspace_id, created_by_identity_id, name)"))
-            connection.execute("INSERT INTO platform_projects_owner_names SELECT * FROM platform_projects")
-            connection.execute("DROP TABLE platform_projects")
-            connection.execute("ALTER TABLE platform_projects_owner_names RENAME TO platform_projects")
-            connection.execute("CREATE INDEX IF NOT EXISTS ix_platform_projects_workspace ON platform_projects (tenant_id, workspace_id, created_at, project_id)")
-            broken = connection.execute("PRAGMA foreign_key_check").fetchall()
-            if broken:
-                raise InvariantViolation(f"PROJECT_NAME_KEY_MIGRATION_BROKE_REFERENCES: {len(broken)}")
-            connection.execute("COMMIT")
-        except BaseException:
-            connection.execute("ROLLBACK")
-            raise
-    finally:
-        connection.close()
+def _instant(value: str) -> datetime:
+    return datetime.fromisoformat(value)
 
 
 class ProjectSourceRepository:
-    """SQLite adapter for the Project/Source repository contract."""
+    """PostgreSQL adapter for the Project/Source repository contract."""
 
-    def __init__(self, db_path: Path) -> None:
-        self.db_path = db_path
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        key = str(self.db_path.resolve())
-        if key in _MIGRATED and self.db_path.exists():
-            return
-        if self.db_path.exists():
-            _owner_scoped_names(self.db_path)
-        with self._connection() as connection:
-            connection.executescript(_SCHEMA)
-            self._migrate_columns(connection)
-            record_log.migrate(connection, _LEGACY_OWNER_SQL)
-            unowned = connection.execute("SELECT COUNT(*) FROM events WHERE owner_kind IS NULL").fetchone()[0]
-            if unowned:   # erasure goes by owner: a row with none could never be erased
-                raise InvariantViolation(f"RECORD_OWNER_MISSING: {unowned} event(s) in {db_path.name} have no owner")
-        _MIGRATED.add(key)
-
-    def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        # Deleted rows are overwritten, not just unlinked: without this an erased Project's text stays readable in the
-        # file's free pages (plan D10 -- erasure has to hold for the bytes on disk, not only for queries).
-        connection.execute("PRAGMA secure_delete = ON")
-        return connection
+    def __init__(self, databases: Databases) -> None:
+        self._db = databases
 
     @staticmethod
-    def _migrate_columns(connection: sqlite3.Connection) -> None:
-        for table, columns in _MIGRATION_COLUMNS.items():
-            existing_columns = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
-            for column, column_type in columns:
-                if column not in existing_columns:
-                    connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}")
-        # One ACTIVE version per canonical URL per Project (plan I1), enforced by the database itself; a superseded
-        # row keeps its canonical_url, so the index is partial. Created here, not in _SCHEMA, because an old file
-        # only gains the column in the loop above.
-        connection.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS ux_prov_sources_active_canonical ON prov_sources (tenant_id, project_id, canonical_url) "
-            "WHERE status = 'active' AND canonical_url IS NOT NULL"
-        )
-
-    @staticmethod
-    def _source_from_row(row: sqlite3.Row) -> dict[str, Any]:
+    def _source_from_row(row: Row) -> dict[str, Any]:
         source = dict(row)
-        source["artifact_uri"] = json.loads(source.pop("artifact_uri_json"))
-        authors_json = source.pop("authors_json")
-        source["authors"] = None if authors_json is None else json.loads(authors_json)
+        source["artifact_uri"] = source.pop("artifact_uri_json")
+        source["authors"] = source.pop("authors_json")
         for column in ("provenance", "relevance"):
-            raw = source.pop(f"{column}_json")
-            source[column] = None if raw is None else json.loads(raw)
+            source[column] = source.pop(f"{column}_json")
         return source
 
-    @contextmanager
-    def _connection(self):
-        connection = self._connect()
-        try:
-            with connection:
-                yield connection
-        finally:
-            connection.close()
+    def transaction(self, tenant_id: str):
+        """A transaction in the tenant's region, for the other parts of the case layer (case_docs, GOVERN's export)."""
+        return self._db.for_tenant(tenant_id)
 
-    @contextmanager
-    def _write_transaction(self):
-        """SQLite's write lock taken up front (BEGIN IMMEDIATE): the one writer at a time for Source content."""
-        connection = self._connect()
-        connection.isolation_level = None
-        try:
-            connection.execute("BEGIN IMMEDIATE")
-            try:
-                yield connection
-            except BaseException:
-                if connection.in_transaction:
-                    connection.execute("ROLLBACK")
-                raise
-            connection.execute("COMMIT")
-        finally:
-            connection.close()
-
-    def connection(self):
-        """A read (or simple write) connection on this file, for the other parts of the case layer (case_docs)."""
-        return self._connection()
-
-    def transaction(self):
-        """The file's write lock, taken up front: read-then-write under it never races another writer."""
-        return self._write_transaction()
+    def hooks_lock(self, tenant_id: str, case_id: str):
+        """Held across one run of a case's after-sources hooks (block_hooks), one run at a time in every process: a session
+        lock under its own name, so the erase -- which takes the case lock -- never waits for a hook to finish."""
+        region = self._db.region_of(tenant_id)
+        if region is None:
+            raise InvariantViolation(f"TENANT_REGION_UNKNOWN: tenant {tenant_id!r} is not in the tenant directory")
+        return self._db.session_lock(region, "case-hooks", tenant_id, case_id)
 
     @staticmethod
-    def require_case(connection: sqlite3.Connection, tenant_id: str, project_id: str) -> None:
-        """A case's records are written only while the case exists (完整刪除): late writers get CASE_ERASED. The check
-        must hold the write lock to be atomic with erase_project, so a connection with no transaction open takes it here
-        (BEGIN IMMEDIATE; a connection that already wrote holds it). A plain SELECT under a deferred transaction would
-        let an erase commit between the check and the write (critic 2026-10-04, probe P4)."""
-        if not connection.in_transaction:
-            connection.execute("BEGIN IMMEDIATE")
-        if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=? AND project_id=?", (tenant_id, project_id)).fetchone() is None:
+    def lock_case(connection: psycopg.Connection, tenant_id: str, project_id: str, *, exclusive: bool = False) -> None:
+        """Invariant 3: the case's owner lock (db.owner_lock) -- every writer of a case's records shared, first in its
+        transaction; the erase, and a batch whose checks must hold (CaseDocs.save_many), exclusive."""
+        db.owner_lock(connection, "case", tenant_id, project_id, exclusive=exclusive)
+
+    @staticmethod
+    def _lock_source_blobs(connection: psycopg.Connection, tenant_id: str, *, collect: bool = False) -> None:
+        """The blob lifecycle rule's lock (module note): shared while a write puts content, exclusive while garbage goes."""
+        db.advisory_xact_lock(connection, "source-blobs", tenant_id, shared=not collect)
+
+    @classmethod
+    def require_case(cls, connection: psycopg.Connection, tenant_id: str, project_id: str) -> None:
+        """A case's records are written only while the case exists (完整刪除): late writers get CASE_ERASED. The check runs
+        under the case lock held shared, so it is atomic with erase_project, which holds it exclusive; a plain SELECT
+        would let an erase commit between the check and the write (critic 2026-10-04, probe P4)."""
+        cls.lock_case(connection, tenant_id, project_id)
+        if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id)).fetchone() is None:
             raise InvariantViolation(f"CASE_ERASED: case {project_id!r} no longer exists; nothing is written to it")
 
-    @staticmethod
-    def _append_event(connection: sqlite3.Connection, tenant_id: str, project_id: str, aggregate_id: str, event_type: str, payload: Mapping[str, Any], writer: Writer) -> None:
-        """Every record of this file belongs to one case: the Project's own aggregate or one of its Sources'."""
-        ProjectSourceRepository.require_case(connection, tenant_id, project_id)
-        record_log.append(connection, tenant_id, aggregate_id, event_type, payload, writer=writer, owner=record_log.case(project_id))
+    @classmethod
+    def _append_event(cls, connection: psycopg.Connection, tenant_id: str, project_id: str, aggregate_id: str, event_type: str, payload: Mapping[str, Any], writer: Writer,
+                      at: datetime | None = None) -> None:
+        """Every record of this repository belongs to one case: the Project's own aggregate or one of its Sources'."""
+        cls.require_case(connection, tenant_id, project_id)
+        record_log.append(connection, tenant_id, aggregate_id, event_type, payload, writer=writer, owner=record_log.case(project_id), at=at)
 
     def create_project(self, record: Mapping[str, Any]) -> dict[str, Any]:
+        """The Project as stored (its created_at read back as the database keeps it)."""
         project = {column: record[column] for column in _PROJECT_COLUMNS}
-        with self._connection() as connection:
-            connection.execute(
-                "INSERT INTO platform_projects (project_id, tenant_id, workspace_id, name, purpose, data_classification, status, version, created_by_identity_id, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+        with self._db.for_tenant(project["tenant_id"]) as connection:
+            stored = connection.execute(
+                f"INSERT INTO platform_projects ({_PROJECT_SELECT}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING {_PROJECT_SELECT}",
                 tuple(project[column] for column in _PROJECT_COLUMNS),
-            )
+            ).fetchone()
             self._append_event(
                 connection,
                 project["tenant_id"],
@@ -365,45 +165,42 @@ class ProjectSourceRepository:
                 },
                 record_log.user(project["created_by_identity_id"], "ASSEMBLER"),
             )
-        return project
+        return dict(stored)
 
     def get_project(self, tenant_id: str, project_id: str) -> dict[str, Any] | None:
-        with self._connection() as connection:
-            row = connection.execute(
-                "SELECT project_id, tenant_id, workspace_id, name, purpose, data_classification, status, version, created_by_identity_id, created_at FROM platform_projects WHERE tenant_id=? AND project_id=?",
-                (tenant_id, project_id),
-            ).fetchone()
+        with self._db.for_tenant(tenant_id) as connection:
+            row = connection.execute(f"SELECT {_PROJECT_SELECT} FROM platform_projects WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id)).fetchone()
         return None if row is None else dict(row)
 
     def list_projects(self, tenant_id: str, workspace_id: str | None = None) -> list[dict[str, Any]]:
-        query = "SELECT project_id, tenant_id, workspace_id, name, purpose, data_classification, status, version, created_by_identity_id, created_at FROM platform_projects WHERE tenant_id=?"
+        query = f"SELECT {_PROJECT_SELECT} FROM platform_projects WHERE tenant_id=%s"
         parameters: tuple[Any, ...] = (tenant_id,)
         if workspace_id is not None:
-            query += " AND workspace_id=?"
+            query += " AND workspace_id=%s"
             parameters += (workspace_id,)
         query += " ORDER BY created_at, project_id"
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(query, parameters).fetchall()
         return [dict(row) for row in rows]
 
     @classmethod
-    def _insert_source(cls, connection: sqlite3.Connection, record: Mapping[str, Any], cas_path: Mapping[str, str], writer: Writer) -> None:
-        """Insert one Source row + its SourceAdded event on an open transaction (add_source, supersede, ingest share it).
-        ``writer``: the person who typed it in, or the system that collected it."""
+    def _insert_source(cls, connection: psycopg.Connection, record: Mapping[str, Any], cas_path: Mapping[str, str], writer: Writer) -> dict[str, Any]:
+        """Insert one Source row + its SourceAdded event on an open transaction (add_source, supersede, ingest share it); the
+        row as stored. ``writer``: the person who typed it in, or the system that collected it."""
         source = {column: (record.get(column) if column in _PROVENANCE_COLUMNS else record[column]) for column in _SOURCE_COLUMNS}
         if cas_path.get("tenant_segment") != source["tenant_id"] or cas_path.get("hash") != source["content_sha256"]:
             raise InvariantViolation("SOURCE_STORAGE_REFERENCE_INVALID")
         project = connection.execute(
-            "SELECT data_classification FROM platform_projects WHERE tenant_id=? AND project_id=?",
+            "SELECT data_classification FROM platform_projects WHERE tenant_id=%s AND project_id=%s",
             (source["tenant_id"], source["project_id"]),
         ).fetchone()
         if project is None:
             raise InvariantViolation("SOURCE_PROJECT_NOT_FOUND")
         if project["data_classification"] != source["data_classification"]:
             raise InvariantViolation("SOURCE_PROJECT_CLASSIFICATION_MISMATCH")
-        json_or_none = lambda value: None if value is None else canonical_json(value)  # noqa: E731
-        connection.execute(
-            "INSERT INTO prov_sources (source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri_json, content_role, verification_status, status, version, created_by_identity_id, created_at, cas_path_json, doi, authors_json, venue, published_at, canonical_url, source_uri, fetched_at, provenance_json, source_class, relevance_json, supersedes_source_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        stored = connection.execute(
+            "INSERT INTO prov_sources (source_id, project_id, tenant_id, title, media_type, data_classification, content_sha256, size_bytes, artifact_uri_json, content_role, verification_status, status, version, created_by_identity_id, created_at, cas_path_json, doi, authors_json, venue, published_at, canonical_url, source_uri, fetched_at, provenance_json, source_class, relevance_json, supersedes_source_id) "
+            f"VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING {_SOURCE_SELECT}",
             (
                 source["source_id"],
                 source["project_id"],
@@ -413,27 +210,27 @@ class ProjectSourceRepository:
                 source["data_classification"],
                 source["content_sha256"],
                 source["size_bytes"],
-                canonical_json(source["artifact_uri"]),
+                Jsonb(source["artifact_uri"]),
                 source["content_role"],
                 source["verification_status"],
                 source["status"],
                 source["version"],
                 source["created_by_identity_id"],
                 source["created_at"],
-                canonical_json(dict(cas_path)),
+                Jsonb(dict(cas_path)),
                 source["doi"],
-                json_or_none(source["authors"]),
+                _jsonb_or_none(source["authors"]),
                 source["venue"],
                 source["published_at"],
                 source["canonical_url"],
                 source["source_uri"],
                 source["fetched_at"],
-                json_or_none(source["provenance"]),
+                _jsonb_or_none(source["provenance"]),
                 source["source_class"],
-                json_or_none(source["relevance"]),
+                _jsonb_or_none(source["relevance"]),
                 source["supersedes_source_id"],
             ),
-        )
+        ).fetchone()
         cls._append_event(
             connection,
             source["tenant_id"],
@@ -450,43 +247,52 @@ class ProjectSourceRepository:
             },
             writer,
         )
-
-    def add_source(self, record: Mapping[str, Any], cas_path: Mapping[str, str], put_content: Callable[[], Any] | None = None, *, writer: Writer) -> dict[str, Any]:
-        """Row first, then the content, then commit: a failing insert writes no blob; ``put`` is atomic."""
-        with self._write_transaction() as connection:
-            self._insert_source(connection, record, cas_path, writer)
-            if put_content is not None:
-                put_content()
-        return dict(record)
+        return cls._source_from_row(stored)
 
     @classmethod
-    def _find_active_source(cls, connection: sqlite3.Connection, tenant_id: str, project_id: str, canonical_url: str) -> dict[str, Any] | None:
+    def _content_write(cls, connection: psycopg.Connection, tenant_id: str, project_id: str) -> None:
+        """First in a transaction that adds Sources: the case lock (shared), then the blob lock (shared), in that order
+        everywhere (the erase takes both exclusive, in the same order)."""
+        cls.lock_case(connection, tenant_id, project_id)
+        cls._lock_source_blobs(connection, tenant_id)
+
+    def add_source(self, record: Mapping[str, Any], cas_path: Mapping[str, str], put_content: Callable[[], Any] | None = None, *, writer: Writer) -> dict[str, Any]:
+        """Row first, then the content, then commit: a failing insert writes no blob; ``put`` is atomic. Returns the Source as stored."""
+        with self._db.for_tenant(record["tenant_id"]) as connection:
+            self._content_write(connection, record["tenant_id"], record["project_id"])
+            stored = self._insert_source(connection, record, cas_path, writer)
+            if put_content is not None:
+                put_content()
+        return stored
+
+    @classmethod
+    def _find_active_source(cls, connection: psycopg.Connection, tenant_id: str, project_id: str, canonical_url: str) -> dict[str, Any] | None:
         row = connection.execute(
-            f"SELECT {_SOURCE_SELECT} FROM prov_sources WHERE tenant_id=? AND project_id=? AND canonical_url=? AND status='active'",
+            f"SELECT {_SOURCE_SELECT} FROM prov_sources WHERE tenant_id=%s AND project_id=%s AND canonical_url=%s AND status='active'",
             (tenant_id, project_id, canonical_url),
         ).fetchone()
         return None if row is None else cls._source_from_row(row)
 
     def find_active_source(self, tenant_id: str, project_id: str, canonical_url: str) -> dict[str, Any] | None:
         """The current version of a collected URL in this Project, or None."""
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             return self._find_active_source(connection, tenant_id, project_id, canonical_url)
 
     @classmethod
-    def _supersede(cls, connection: sqlite3.Connection, old_source_id: str, record: Mapping[str, Any], cas_path: Mapping[str, str]) -> None:
+    def _supersede(cls, connection: psycopg.Connection, old_source_id: str, record: Mapping[str, Any], cas_path: Mapping[str, str]) -> dict[str, Any]:
         if record.get("supersedes_source_id") != old_source_id:
             raise InvariantViolation("SOURCE_SUPERSEDE_POINTER_INVALID")
         old = connection.execute(
-            "SELECT canonical_url FROM prov_sources WHERE tenant_id=? AND project_id=? AND source_id=? AND status='active'",
+            "SELECT canonical_url FROM prov_sources WHERE tenant_id=%s AND project_id=%s AND source_id=%s AND status='active'",
             (record["tenant_id"], record["project_id"], old_source_id),
         ).fetchone()
         if old is None or old["canonical_url"] is None or old["canonical_url"] != record.get("canonical_url"):
             raise InvariantViolation("SOURCE_SUPERSEDE_CONFLICT")
         connection.execute(
-            "UPDATE prov_sources SET status='superseded' WHERE tenant_id=? AND project_id=? AND source_id=? AND status='active'",
+            "UPDATE prov_sources SET status='superseded' WHERE tenant_id=%s AND project_id=%s AND source_id=%s AND status='active'",
             (record["tenant_id"], record["project_id"], old_source_id),
         )
-        cls._insert_source(connection, record, cas_path, record_log.system("GATHER"))
+        stored = cls._insert_source(connection, record, cas_path, record_log.system("GATHER"))
         cls._append_event(
             connection,
             record["tenant_id"],
@@ -496,15 +302,17 @@ class ProjectSourceRepository:
             {"source_id": old_source_id, "superseded_by": record["source_id"], "project_id": record["project_id"]},
             record_log.system("GATHER"),
         )
+        return stored
 
     def supersede(self, old_source_id: str, record: Mapping[str, Any], cas_path: Mapping[str, str], put_content: Callable[[], Any] | None = None) -> dict[str, Any]:
         """Replace the active version of a collected URL: old row -> superseded, new row -> active, both events,
         one write transaction (plan I1); content as in ``add_source``. Any failure leaves the old row active."""
-        with self._write_transaction() as connection:
-            self._supersede(connection, old_source_id, record, cas_path)
+        with self._db.for_tenant(record["tenant_id"]) as connection:
+            self._content_write(connection, record["tenant_id"], record["project_id"])
+            stored = self._supersede(connection, old_source_id, record, cas_path)
             if put_content is not None:
                 put_content()
-        return dict(record)
+        return stored
 
     def ingest_batch(
         self,
@@ -513,13 +321,14 @@ class ProjectSourceRepository:
         items: list[tuple[Mapping[str, Any], Mapping[str, str]]],
         put_content: Callable[[Mapping[str, str]], Any],
     ) -> list[dict[str, str]]:
-        """Collected Sources, one write transaction for the whole batch (plan C2, R2). Per item, decided under the lock:
+        """Collected Sources, one write transaction for the whole batch (plan C2, R2). Per item, decided under the locks:
         same canonical_url + same sha256 = unchanged (nothing written); same URL + new sha256 = supersede; new URL =
         insert. All rows first, then each new content once (``put_content(cas_path)``), then commit.
         ``items`` = (record with supersedes_source_id None, cas_path)."""
         results: list[dict[str, str]] = []
         to_write: dict[str, Mapping[str, str]] = {}
-        with self._write_transaction() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
+            self._content_write(connection, tenant_id, project_id)
             for record, cas_path in items:
                 if record["tenant_id"] != tenant_id or record["project_id"] != project_id or not record.get("canonical_url"):
                     raise InvariantViolation("SOURCE_INGEST_SCOPE_INVALID")
@@ -538,9 +347,10 @@ class ProjectSourceRepository:
                 put_content(cas_path)
         return results
 
-    @staticmethod
-    def _collect_unreferenced_blobs(connection: sqlite3.Connection, tenant_id: str, cas: TenantScopedCas) -> int:
-        referenced = {row["content_sha256"] for row in connection.execute("SELECT DISTINCT content_sha256 FROM prov_sources WHERE tenant_id=?", (tenant_id,))}
+    @classmethod
+    def _collect_unreferenced_blobs(cls, connection: psycopg.Connection, tenant_id: str, cas: TenantScopedCas) -> int:
+        cls._lock_source_blobs(connection, tenant_id, collect=True)
+        referenced = {row["content_sha256"] for row in connection.execute("SELECT DISTINCT content_sha256 FROM prov_sources WHERE tenant_id=%s", (tenant_id,))}
         removed = 0
         for object_path in cas.list_objects(tenant_id):
             if object_path.rsplit("/", 1)[-1] not in referenced:
@@ -550,8 +360,8 @@ class ProjectSourceRepository:
 
     def collect_unreferenced_blobs(self, tenant_id: str, cas: TenantScopedCas) -> int:
         """Remove every Source blob of the tenant that no committed row references (the blob lifecycle rule above);
-        under the write lock, so nothing in flight can be mistaken for garbage. Returns how many were removed."""
-        with self._write_transaction() as connection:
+        under the blob lock held exclusive, so nothing in flight can be mistaken for garbage. Returns how many were removed."""
+        with self._db.for_tenant(tenant_id) as connection:
             return self._collect_unreferenced_blobs(connection, tenant_id, cas)
 
     # -- Collection runs (specs/domain/collection-run.schema.yaml) ---------------------------------------------
@@ -559,90 +369,92 @@ class ProjectSourceRepository:
     # person (RESEARCH_LINES_MASTER_PLAN K8); erasing the Project removes the run rows with it.
 
     @staticmethod
-    def _run_from_row(row: sqlite3.Row) -> dict[str, Any]:
-        seeds = json.loads(row["seeds_json"])
-        budget = json.loads(row["budget_json"])
+    def _run_from_row(row: Row) -> dict[str, Any]:
         return {
             "run_id": row["run_id"],
             "project_id": row["project_id"],
             "tenant_id": row["tenant_id"],
             "status": effective_status(row["status"], row["deadline_at"]),
-            "seeds_count": len(seeds),
-            "max_fetches": budget["fetches"],
+            "seeds_count": len(row["seeds_json"]),
+            "max_fetches": row["budget_json"]["fetches"],
             "requested_by_identity_id": row["requested_by_identity_id"],
             "requested_at": row["requested_at"],
             "deadline_at": row["deadline_at"],
             "completed_at": row["completed_at"],
-            "report": None if row["report_json"] is None else json.loads(row["report_json"]),
+            "report": row["report_json"],
         }
 
     def create_collection_run(self, record: Mapping[str, Any], seeds: list[Mapping[str, Any]]) -> dict[str, Any]:
+        """The run as stored."""
         if record["status"] != "requested" or len(seeds) != record["seeds_count"]:
             raise InvariantViolation("COLLECTION_RUN_STATE_INVALID")
-        with self._connection() as connection:
-            connection.execute(
-                "INSERT INTO collection_runs (tenant_id, project_id, run_id, status, seeds_json, budget_json, requested_by_identity_id, requested_at, deadline_at, completed_at, report_json) VALUES (?,?,?,?,?,?,?,?,?,NULL,NULL)",
-                (record["tenant_id"], record["project_id"], record["run_id"], "requested", canonical_json([dict(seed) for seed in seeds]), canonical_json({"fetches": record["max_fetches"]}), record["requested_by_identity_id"], record["requested_at"], record["deadline_at"]),
-            )
+        with self._db.for_tenant(record["tenant_id"]) as connection:
+            self.require_case(connection, record["tenant_id"], record["project_id"])
+            stored = connection.execute(
+                "INSERT INTO collection_runs (tenant_id, project_id, run_id, status, seeds_json, budget_json, requested_by_identity_id, requested_at, deadline_at, completed_at, report_json) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,NULL,NULL) RETURNING *",
+                (record["tenant_id"], record["project_id"], record["run_id"], "requested", Jsonb([dict(seed) for seed in seeds]), Jsonb({"fetches": record["max_fetches"]}),
+                 record["requested_by_identity_id"], record["requested_at"], record["deadline_at"]),
+            ).fetchone()
             self._append_event(connection, record["tenant_id"], record["project_id"], f"project:{record['project_id']}", "CollectionRequested",
                                {"run_id": record["run_id"], "seeds_count": record["seeds_count"], "max_fetches": record["max_fetches"]},
                                record_log.user(record["requested_by_identity_id"], "GATHER"))
-        return dict(record)
+        return self._run_from_row(stored)
 
     def get_collection_run(self, tenant_id: str, project_id: str, run_id: str) -> dict[str, Any] | None:
-        with self._connection() as connection:
-            row = connection.execute("SELECT * FROM collection_runs WHERE tenant_id=? AND project_id=? AND run_id=?", (tenant_id, project_id, run_id)).fetchone()
+        with self._db.for_tenant(tenant_id) as connection:
+            row = connection.execute("SELECT * FROM collection_runs WHERE tenant_id=%s AND project_id=%s AND run_id=%s", (tenant_id, project_id, run_id)).fetchone()
         return None if row is None else self._run_from_row(row)
 
-    def _transition(self, tenant_id: str, run_id: str, allowed_from: tuple[str, ...], to: str, event_type: str, payload: Mapping[str, Any], completed_at: str | None, report_json: str | None) -> dict[str, Any]:
-        with self._connection() as connection:
-            row = connection.execute("SELECT project_id FROM collection_runs WHERE tenant_id=? AND run_id=?", (tenant_id, run_id)).fetchone()
+    def _transition(self, tenant_id: str, run_id: str, allowed_from: tuple[str, ...], to: str, event_type: str, payload: Mapping[str, Any], completed: bool, report: Mapping[str, Any] | None) -> dict[str, Any]:
+        with self._db.for_tenant(tenant_id) as connection:
+            row = connection.execute("SELECT project_id FROM collection_runs WHERE tenant_id=%s AND run_id=%s", (tenant_id, run_id)).fetchone()
             if row is None:
                 raise InvariantViolation("COLLECTION_RUN_STATE_INVALID")
+            self.require_case(connection, tenant_id, row["project_id"])
             # Only an open run before its deadline moves; past it the run IS failed (effective_status) and stays so.
-            now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-            placeholders = ",".join("?" for _ in allowed_from)
-            changed = connection.execute(
-                f"UPDATE collection_runs SET status=?, completed_at=COALESCE(?, completed_at), report_json=COALESCE(?, report_json) WHERE tenant_id=? AND run_id=? AND status IN ({placeholders}) AND deadline_at > ?",
-                (to, completed_at, report_json, tenant_id, run_id, *allowed_from, now),
-            ).rowcount
-            if changed != 1:
+            moment = db.now()
+            placeholders = ",".join("%s" for _ in allowed_from)
+            final = connection.execute(
+                f"UPDATE collection_runs SET status=%s, completed_at=COALESCE(%s, completed_at), report_json=COALESCE(%s, report_json) WHERE tenant_id=%s AND run_id=%s AND status IN ({placeholders}) AND deadline_at > %s RETURNING *",
+                (to, moment if completed else None, _jsonb_or_none(report), tenant_id, run_id, *allowed_from, moment),
+            ).fetchone()
+            if final is None:
                 raise InvariantViolation("COLLECTION_RUN_STATE_INVALID")
             self._append_event(connection, tenant_id, row["project_id"], f"project:{row['project_id']}", event_type, {"run_id": run_id, **payload}, record_log.system("GATHER"))
-            final = connection.execute("SELECT * FROM collection_runs WHERE tenant_id=? AND run_id=?", (tenant_id, run_id)).fetchone()
         return self._run_from_row(final)
 
     def mark_collection_running(self, tenant_id: str, run_id: str) -> dict[str, Any]:
         """requested -> running: the Collection Service has exchanged the run's grant."""
-        return self._transition(tenant_id, run_id, ("requested",), "running", "CollectionStarted", {}, None, None)
+        return self._transition(tenant_id, run_id, ("requested",), "running", "CollectionStarted", {}, False, None)
 
     def finish_collection_run(self, tenant_id: str, run_id: str, status: str, report: Mapping[str, Any] | None) -> dict[str, Any]:
         """requested|running -> completed|failed. ``failed`` from requested = the Collection Service was never reached."""
         if status not in ("completed", "failed"):
             raise InvariantViolation("COLLECTION_RUN_STATE_INVALID")
         clean = run_report(report)
-        now = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         event_type = "CollectionCompleted" if status == "completed" else "CollectionFailed"
-        return self._transition(tenant_id, run_id, OPEN_STATUSES, status, event_type, {"status": status, "report": clean}, now, None if clean is None else canonical_json(clean))
+        return self._transition(tenant_id, run_id, OPEN_STATUSES, status, event_type, {"status": status, "report": clean}, True, clean)
 
     def get_source(self, tenant_id: str, project_id: str, source_id: str) -> dict[str, Any] | None:
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             row = connection.execute(
-                f"SELECT {_SOURCE_SELECT} FROM prov_sources WHERE tenant_id=? AND project_id=? AND source_id=?",
+                f"SELECT {_SOURCE_SELECT} FROM prov_sources WHERE tenant_id=%s AND project_id=%s AND source_id=%s",
                 (tenant_id, project_id, source_id),
             ).fetchone()
         return None if row is None else self._source_from_row(row)
 
     def list_sources(self, tenant_id: str, project_id: str) -> list[dict[str, Any]]:
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(
-                f"SELECT {_SOURCE_SELECT} FROM prov_sources WHERE tenant_id=? AND project_id=? ORDER BY created_at, source_id",
+                f"SELECT {_SOURCE_SELECT} FROM prov_sources WHERE tenant_id=%s AND project_id=%s ORDER BY created_at, source_id",
                 (tenant_id, project_id),
             ).fetchall()
         return [self._source_from_row(row) for row in rows]
 
     def search_active_sources(self, tenant_id: str, query: str, limit: int, identity_id: str) -> tuple[list[dict[str, Any]], bool]:
-        """Search active Sources across the cases ``identity_id`` opened (no one else's) without wildcard injection.
+        """Search active Sources across the cases ``identity_id`` opened (no one else's) without wildcard injection, case
+        folded (ILIKE: SQLite's LIKE folded ASCII; PostgreSQL's ILIKE folds every letter the database's locale knows).
         Returns ``(rows, truncated)``: ``truncated`` is True when more than ``limit`` Sources match (one extra row is
         fetched to know), so a caller never mistakes the first ``limit`` rows for the whole match set."""
         if not isinstance(query, str) or not query.strip():
@@ -652,26 +464,26 @@ class ProjectSourceRepository:
         escaped = query.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
         source_select = ", ".join(f"s.{column}" for column in _SOURCE_SELECT.split(", "))
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(
                 f"SELECT {source_select}, p.name AS project_name, p.purpose AS project_purpose "
                 "FROM prov_sources s JOIN platform_projects p ON p.tenant_id=s.tenant_id AND p.project_id=s.project_id "
-                "WHERE s.tenant_id=? AND p.created_by_identity_id=? AND s.status='active' AND "
-                "(s.source_id LIKE ? ESCAPE '\\' OR s.title LIKE ? ESCAPE '\\' OR COALESCE(s.doi,'') LIKE ? ESCAPE '\\' "
-                "OR COALESCE(s.canonical_url,'') LIKE ? ESCAPE '\\' OR COALESCE(s.source_uri,'') LIKE ? ESCAPE '\\') "
-                "ORDER BY s.created_at, s.project_id, s.source_id LIMIT ?",
+                "WHERE s.tenant_id=%s AND p.created_by_identity_id=%s AND s.status='active' AND "
+                "(s.source_id ILIKE %s ESCAPE '\\' OR s.title ILIKE %s ESCAPE '\\' OR COALESCE(s.doi,'') ILIKE %s ESCAPE '\\' "
+                "OR COALESCE(s.canonical_url,'') ILIKE %s ESCAPE '\\' OR COALESCE(s.source_uri,'') ILIKE %s ESCAPE '\\') "
+                "ORDER BY s.created_at, s.project_id, s.source_id LIMIT %s",
                 (tenant_id, identity_id, pattern, pattern, pattern, pattern, pattern, limit + 1),
             ).fetchall()
         found = [{**self._source_from_row(row), "project_name": row["project_name"], "project_purpose": row["project_purpose"]} for row in rows]
         return found[:limit], len(found) > limit
 
     def get_source_content_reference(self, tenant_id: str, project_id: str, source_id: str) -> dict[str, str] | None:
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             row = connection.execute(
-                "SELECT cas_path_json FROM prov_sources WHERE tenant_id=? AND project_id=? AND source_id=?",
+                "SELECT cas_path_json FROM prov_sources WHERE tenant_id=%s AND project_id=%s AND source_id=%s",
                 (tenant_id, project_id, source_id),
             ).fetchone()
-        return None if row is None else json.loads(row["cas_path_json"])
+        return None if row is None else row["cas_path_json"]
 
     def active_source_reader(self, cas: TenantScopedCas, tenant_id: str, project_id: str) -> Callable[[str], "tuple[dict[str, Any], str] | None"]:
         """``read(source_id) -> (row, text)`` of one active stored source of this case, or None (what an AI turn that
@@ -683,21 +495,21 @@ class ProjectSourceRepository:
         return read
 
     def list_events(self, tenant_id: str, aggregate_id: str) -> list[dict[str, Any]]:
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(
-                f"SELECT {record_log.ENVELOPE_COLUMNS} FROM events WHERE tenant_id=? AND aggregate_id=? ORDER BY sequence",
+                f"SELECT {record_log.ENVELOPE_COLUMNS} FROM events WHERE tenant_id=%s AND aggregate_id=%s ORDER BY sequence",
                 (tenant_id, aggregate_id),
             ).fetchall()
         events = []
         for row in rows:
             event = dict(row)
-            event["payload"] = json.loads(event.pop("payload_json"))
+            event["payload"] = event.pop("payload_json")
             events.append(event)
         return events
 
     def append_event(self, tenant_id: str, project_id: str, event_type: str, payload: Mapping[str, Any], writer: Writer) -> None:
         """One record on a case's own stream (record_log.append checks the writer, the block and the type)."""
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             self._append_event(connection, tenant_id, project_id, f"project:{project_id}", event_type, payload, writer)
 
     # An interpretation's lifecycle, in the project's event stream: asked for, created or failed, judged (同意／部分／不同意),
@@ -705,26 +517,26 @@ class ProjectSourceRepository:
     INTERPRETATION_EVENTS = ("InterpretationRequested", "InterpretationCreated", "InterpretationFailed", "InterpretationJudged", "InterpretationApproved", "InterpretationReturned")
 
     def interpretation_events(self, tenant_id: str, interpretation_id: str) -> list[dict[str, Any]]:
-        """Read one interpretation's lifecycle from the tenant's project event stream."""
-        placeholders = ",".join("?" * len(self.INTERPRETATION_EVENTS))
-        with self._connection() as connection:
+        """Read one interpretation's lifecycle from the tenant's project event stream, in the order written."""
+        placeholders = ",".join("%s" for _ in self.INTERPRETATION_EVENTS)
+        with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(
                 "SELECT aggregate_id, sequence, event_type, occurred_at, payload_json, author, block FROM events "
-                f"WHERE tenant_id=? AND event_type IN ({placeholders}) "
-                "AND json_extract(payload_json, '$.interpretation_id')=? ORDER BY rowid",
+                f"WHERE tenant_id=%s AND event_type IN ({placeholders}) "
+                "AND payload_json->>'interpretation_id' = %s ORDER BY write_order",
                 (tenant_id, *self.INTERPRETATION_EVENTS, interpretation_id),
             ).fetchall()
-        return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
+        return [{**dict(row), "payload": row["payload_json"]} for row in rows]
 
-    def _project_events(self, tenant_id: str, event_types: tuple[str, ...], project_id: str | None) -> list[sqlite3.Row]:
-        placeholders = ",".join("?" * len(event_types))
-        query = f"SELECT aggregate_id, event_type, occurred_at, payload_json FROM events WHERE tenant_id=? AND event_type IN ({placeholders})"
+    def _project_events(self, tenant_id: str, event_types: tuple[str, ...], project_id: str | None) -> list[Row]:
+        placeholders = ",".join("%s" for _ in event_types)
+        query = f"SELECT aggregate_id, event_type, occurred_at, payload_json FROM events WHERE tenant_id=%s AND event_type IN ({placeholders})"
         parameters: tuple[Any, ...] = (tenant_id, *event_types)
         if project_id is not None:
-            query += " AND aggregate_id=?"
+            query += " AND aggregate_id=%s"
             parameters += (f"project:{project_id}",)
-        with self._connection() as connection:
-            return connection.execute(query + " ORDER BY rowid", parameters).fetchall()
+        with self._db.for_tenant(tenant_id) as connection:
+            return connection.execute(query + " ORDER BY write_order", parameters).fetchall()
 
     def analyses(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
         """project_id -> its analyses, oldest first, read from the event stream (their one record): the tool, when it was
@@ -734,7 +546,7 @@ class ProjectSourceRepository:
         projects: dict[str, list[dict[str, Any]]] = {}
         by_id: dict[str, dict[str, Any]] = {}
         for row in self._project_events(tenant_id, self.INTERPRETATION_EVENTS, project_id):
-            payload = json.loads(row["payload_json"])
+            payload = row["payload_json"]
             key = payload.get("interpretation_id")
             kind = row["event_type"]
             if kind == "InterpretationRequested":
@@ -768,7 +580,7 @@ class ProjectSourceRepository:
         projects: dict[str, list[dict[str, Any]]] = {}
         by_id: dict[str, dict[str, Any]] = {}
         for row in self._project_events(tenant_id, self.TASK_EVENTS, project_id):
-            payload = json.loads(row["payload_json"])
+            payload = row["payload_json"]
             key = payload.get("task_id")
             event_type = row["event_type"]
             if event_type == "TaskCreated":
@@ -805,7 +617,7 @@ class ProjectSourceRepository:
         projects: dict[str, list[dict[str, Any]]] = {}
         by_id: dict[str, dict[str, Any]] = {}
         for row in self._project_events(tenant_id, self.RERUN_EVENTS, project_id):
-            payload = json.loads(row["payload_json"])
+            payload = row["payload_json"]
             key = payload.get("rerun_id")
             if row["event_type"] == "RerunScheduled":
                 by_id[key] = {"rerun_id": key, "interpretation_id": payload.get("interpretation_id"), "method_id": payload.get("method_id"), "due": payload.get("due"), "scheduled_at": row["occurred_at"], "fulfilled_by": None, "fulfilled_at": None}
@@ -816,89 +628,95 @@ class ProjectSourceRepository:
 
     def last_activity(self, tenant_id: str, project_id: str | None = None) -> dict[str, str]:
         """project_id -> when its own event stream last moved (created, collections, analyses, judgments)."""
-        query = "SELECT aggregate_id, MAX(occurred_at) AS at FROM events WHERE tenant_id=? AND aggregate_id LIKE 'project:%'"
+        query = "SELECT aggregate_id, MAX(occurred_at) AS at FROM events WHERE tenant_id=%s AND aggregate_id LIKE 'project:%%'"
         parameters: tuple[Any, ...] = (tenant_id,)
         if project_id is not None:
-            query += " AND aggregate_id=?"
+            query += " AND aggregate_id=%s"
             parameters += (f"project:{project_id}",)
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(query + " GROUP BY aggregate_id", parameters).fetchall()
         return {row["aggregate_id"].removeprefix("project:"): row["at"] for row in rows}
 
     def save_interpretation(self, tenant_id: str, project_id: str, interpretation_id: str, artifact_reference: Mapping[str, Any], created_at: str, *, block: str) -> None:
         """``block``: the tool's block (its contract family); the AI wrote the result."""
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
+            self.require_case(connection, tenant_id, project_id)
             connection.execute(
-                "INSERT INTO project_interpretations (tenant_id, project_id, interpretation_id, artifact_reference_json, created_at) VALUES (?,?,?,?,?)",
-                (tenant_id, project_id, interpretation_id, json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), created_at),
+                "INSERT INTO project_interpretations (tenant_id, project_id, interpretation_id, artifact_reference_json, created_at) VALUES (%s,%s,%s,%s,%s)",
+                (tenant_id, project_id, interpretation_id, Jsonb(dict(artifact_reference)), created_at),
             )
-            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "InterpretationCreated", {"interpretation_id": interpretation_id, "artifact_reference": dict(artifact_reference)}, record_log.ai(block))
+            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "InterpretationCreated", {"interpretation_id": interpretation_id, "artifact_reference": dict(artifact_reference)}, record_log.ai(block),
+                               at=_instant(created_at))
 
     def get_interpretation(self, tenant_id: str, interpretation_id: str) -> dict[str, Any] | None:
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             row = connection.execute(
-                "SELECT tenant_id, project_id, interpretation_id, artifact_reference_json, created_at FROM project_interpretations WHERE tenant_id=? AND interpretation_id=?",
+                "SELECT tenant_id, project_id, interpretation_id, artifact_reference_json, created_at FROM project_interpretations WHERE tenant_id=%s AND interpretation_id=%s",
                 (tenant_id, interpretation_id),
             ).fetchone()
         if row is None:
             return None
         result = dict(row)
-        result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
+        result["artifact_reference"] = result.pop("artifact_reference_json")
         return result
 
     # -- Syntheses (P2 WC-06): same lifecycle shape as interpretations, their own table ---------------------------
 
     def synthesis_events(self, tenant_id: str, project_id: str, synthesis_id: str) -> list[dict[str, Any]]:
         """One synthesis's lifecycle (Requested -> Created | Failed) on its Project's event stream."""
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(
-                "SELECT event_type, occurred_at, payload_json FROM events WHERE tenant_id=? AND aggregate_id=? "
+                "SELECT event_type, occurred_at, payload_json FROM events WHERE tenant_id=%s AND aggregate_id=%s "
                 "AND event_type IN ('SynthesisRequested', 'SynthesisCreated', 'SynthesisFailed') "
-                "AND json_extract(payload_json, '$.synthesis_id')=? ORDER BY rowid",
+                "AND payload_json->>'synthesis_id' = %s ORDER BY sequence",
                 (tenant_id, f"project:{project_id}", synthesis_id),
             ).fetchall()
-        return [{**dict(row), "payload": json.loads(row["payload_json"])} for row in rows]
+        return [{**dict(row), "payload": row["payload_json"]} for row in rows]
 
     def save_synthesis(self, tenant_id: str, project_id: str, synthesis_id: str, kind: str, artifact_reference: Mapping[str, Any], created_at: str) -> None:
         """Row and SynthesisCreated in one transaction; the event carries ids and hashes only (K8)."""
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
+            self.require_case(connection, tenant_id, project_id)
             connection.execute(
-                "INSERT INTO project_syntheses (tenant_id, project_id, synthesis_id, kind, artifact_reference_json, created_at) VALUES (?,?,?,?,?,?)",
-                (tenant_id, project_id, synthesis_id, kind, json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), created_at),
+                "INSERT INTO project_syntheses (tenant_id, project_id, synthesis_id, kind, artifact_reference_json, created_at) VALUES (%s,%s,%s,%s,%s,%s)",
+                (tenant_id, project_id, synthesis_id, kind, Jsonb(dict(artifact_reference)), created_at),
             )
-            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "SynthesisCreated", {"synthesis_id": synthesis_id, "kind": kind, "artifact_reference": dict(artifact_reference)}, record_log.ai("VERIFY"))
+            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "SynthesisCreated", {"synthesis_id": synthesis_id, "kind": kind, "artifact_reference": dict(artifact_reference)}, record_log.ai("VERIFY"),
+                               at=_instant(created_at))
 
     def get_synthesis(self, tenant_id: str, project_id: str, synthesis_id: str) -> dict[str, Any] | None:
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             row = connection.execute(
-                "SELECT project_id, synthesis_id, kind, artifact_reference_json, created_at FROM project_syntheses WHERE tenant_id=? AND project_id=? AND synthesis_id=?",
+                "SELECT project_id, synthesis_id, kind, artifact_reference_json, created_at FROM project_syntheses WHERE tenant_id=%s AND project_id=%s AND synthesis_id=%s",
                 (tenant_id, project_id, synthesis_id),
             ).fetchone()
         if row is None:
             return None
         result = dict(row)
-        result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
+        result["artifact_reference"] = result.pop("artifact_reference_json")
         return result
 
     def save_report(self, tenant_id: str, project_id: str, report_id: str, artifact_reference: Mapping[str, Any], created_at: str) -> None:
         """Persist one immutable report artifact and its creation event atomically."""
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
+            self.require_case(connection, tenant_id, project_id)
             connection.execute(
-                "INSERT INTO project_reports (tenant_id, project_id, report_id, artifact_reference_json, created_at) VALUES (?,?,?,?,?)",
-                (tenant_id, project_id, report_id, json.dumps(dict(artifact_reference), ensure_ascii=False, sort_keys=True), created_at),
+                "INSERT INTO project_reports (tenant_id, project_id, report_id, artifact_reference_json, created_at) VALUES (%s,%s,%s,%s,%s)",
+                (tenant_id, project_id, report_id, Jsonb(dict(artifact_reference)), created_at),
             )
-            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "ReportCreated", {"report_id": report_id, "artifact_reference": dict(artifact_reference)}, record_log.system("VERIFY"))
+            self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "ReportCreated", {"report_id": report_id, "artifact_reference": dict(artifact_reference)}, record_log.system("VERIFY"),
+                               at=_instant(created_at))
 
     def get_report(self, tenant_id: str, project_id: str, report_id: str) -> dict[str, Any] | None:
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             row = connection.execute(
-                "SELECT project_id, report_id, artifact_reference_json, created_at FROM project_reports WHERE tenant_id=? AND project_id=? AND report_id=?",
+                "SELECT project_id, report_id, artifact_reference_json, created_at FROM project_reports WHERE tenant_id=%s AND project_id=%s AND report_id=%s",
                 (tenant_id, project_id, report_id),
             ).fetchone()
         if row is None:
             return None
         result = dict(row)
-        result["artifact_reference"] = json.loads(result.pop("artifact_reference_json"))
+        result["artifact_reference"] = result.pop("artifact_reference_json")
         return result
 
     def update_report_reference(
@@ -906,18 +724,16 @@ class ProjectSourceRepository:
         artifact_reference: Mapping[str, Any], event_type: str, payload: Mapping[str, Any], *, writer: Writer,
     ) -> None:
         """Replace a report's CAS pointer only together with its lifecycle event, and only if the pointer is still
-        ``expected_reference`` (compare-and-swap): a concurrent decision makes this one fail ``REPORT_STALE``
-        instead of silently overwriting it."""
-        def encode(reference: Mapping[str, Any]) -> str:
-            return json.dumps(dict(reference), ensure_ascii=False, sort_keys=True)
-
-        with self._connection() as connection:
+        ``expected_reference`` (compare-and-swap, jsonb = compares values): a concurrent decision makes this one fail
+        ``REPORT_STALE`` instead of silently overwriting it."""
+        with self._db.for_tenant(tenant_id) as connection:
+            self.lock_case(connection, tenant_id, project_id)
             updated = connection.execute(
-                "UPDATE project_reports SET artifact_reference_json=? WHERE tenant_id=? AND project_id=? AND report_id=? AND artifact_reference_json=?",
-                (encode(artifact_reference), tenant_id, project_id, report_id, encode(expected_reference)),
+                "UPDATE project_reports SET artifact_reference_json=%s WHERE tenant_id=%s AND project_id=%s AND report_id=%s AND artifact_reference_json=%s",
+                (Jsonb(dict(artifact_reference)), tenant_id, project_id, report_id, Jsonb(dict(expected_reference))),
             ).rowcount
             if updated != 1:
-                exists = connection.execute("SELECT 1 FROM project_reports WHERE tenant_id=? AND project_id=? AND report_id=?", (tenant_id, project_id, report_id)).fetchone()
+                exists = connection.execute("SELECT 1 FROM project_reports WHERE tenant_id=%s AND project_id=%s AND report_id=%s", (tenant_id, project_id, report_id)).fetchone()
                 raise InvariantViolation("REPORT_STALE" if exists else "REPORT_NOT_FOUND")
             self._append_event(connection, tenant_id, project_id, f"project:{project_id}", event_type, dict(payload), writer)
 
@@ -927,23 +743,25 @@ class ProjectSourceRepository:
 
     def project_artifact_references(self, tenant_id: str, project_id: str) -> list[dict[str, Any]]:
         """The Project's AI artifacts -- interpretations and syntheses (their own CAS, one per result, never shared)."""
-        with self._connection() as connection:
-            rows = [row for table in self._ARTIFACT_TABLES for row in connection.execute(f"SELECT artifact_reference_json FROM {table} WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))]
-        return [json.loads(row["artifact_reference_json"]) for row in rows]
+        with self._db.for_tenant(tenant_id) as connection:
+            rows = [row for table in self._ARTIFACT_TABLES for row in connection.execute(f"SELECT artifact_reference_json FROM {table} WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id))]
+        return [row["artifact_reference_json"] for row in rows]
 
     def erase_project(self, tenant_id: str, project_id: str, erased_by_identity_id: str, cas: TenantScopedCas, artifacts_deleted: int) -> dict[str, int]:
         """One write transaction: every record the case owns (record_log.delete_owned), Sources, AI artifact
         references (interpretations, syntheses), collection runs and the Project row go; the tenant's now-unreferenced blobs are removed before
         commit (content shared with another Project stays referenced, so it stays); one ProjectErased tombstone, owned by the platform.
-        A failure rolls the rows back, and a retry finishes the job."""
-        with self._write_transaction() as connection:
-            if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=? AND project_id=?", (tenant_id, project_id)).fetchone() is None:
+        A failure rolls the rows back, and a retry finishes the job. The case lock held exclusive first: the writers in flight
+        finish, and every later one finds no case (require_case); a hook between two writes is not waited for."""
+        with self._db.for_tenant(tenant_id) as connection:
+            self.lock_case(connection, tenant_id, project_id, exclusive=True)
+            if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id)).fetchone() is None:
                 raise InvariantViolation("PROJECT_NOT_FOUND")
-            source_ids = [row["source_id"] for row in connection.execute("SELECT source_id FROM prov_sources WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))]
+            source_ids = [row["source_id"] for row in connection.execute("SELECT source_id FROM prov_sources WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id))]
             events_deleted = record_log.delete_owned(connection, tenant_id, record_log.case(project_id))
             events_deleted += self._erase_records_from_case(connection, tenant_id, project_id)
             for table in ("prov_sources", *self._ARTIFACT_TABLES, "collection_runs", "platform_projects"):
-                connection.execute(f"DELETE FROM {table} WHERE tenant_id=? AND project_id=?", (tenant_id, project_id))
+                connection.execute(f"DELETE FROM {table} WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id))
             blobs_unlinked = self._collect_unreferenced_blobs(connection, tenant_id, cas)
             counts = {"sources": len(source_ids), "blobs_unlinked": blobs_unlinked, "artifacts_deleted": artifacts_deleted, "events_deleted": events_deleted}
             record_log.append(connection, tenant_id, f"project:{project_id}", "ProjectErased", {"project_id": project_id, "erased_by_identity_id": erased_by_identity_id, **counts},
@@ -951,7 +769,7 @@ class ProjectSourceRepository:
         return counts
 
     @staticmethod
-    def _erase_records_from_case(connection: sqlite3.Connection, tenant_id: str, project_id: str) -> int:
+    def _erase_records_from_case(connection: psycopg.Connection, tenant_id: str, project_id: str) -> int:
         """A person's record made from this case (a kind's ``from_case`` field names it: LEARN's 個人歷程 line) goes with
         the case, every version -- otherwise an erased case keeps feeding the person's patterns (完整刪除)."""
         from ai_lego.core.domain import doc_kinds
@@ -961,9 +779,9 @@ class ProjectSourceRepository:
             if not spec.from_case:
                 continue
             rows = connection.execute(
-                "SELECT DISTINCT owner_id, aggregate_id FROM events WHERE tenant_id=? AND owner_kind='person' AND event_type='DocSaved' "
-                "AND json_extract(payload_json, '$.kind')=? AND json_extract(payload_json, ?)=?",
-                (tenant_id, spec.kind, f"$.content.{spec.from_case}", project_id),
+                "SELECT DISTINCT owner_id, aggregate_id FROM events WHERE tenant_id=%s AND owner_kind='person' AND event_type='DocSaved' "
+                "AND payload_json->>'kind' = %s AND payload_json->'content'->>%s = %s",
+                (tenant_id, spec.kind, spec.from_case, project_id),
             ).fetchall()
             for row in rows:
                 deleted += record_log.delete_owned(connection, tenant_id, record_log.person(row["owner_id"]), aggregate_id=row["aggregate_id"])
@@ -972,25 +790,22 @@ class ProjectSourceRepository:
     def erased_projects(self, tenant_id: str, identity_id: str) -> list[dict[str, Any]]:
         """The ProjectErased tombstones of the cases ``identity_id`` erased, newest first (N-66 已抹除): the Project row
         itself is gone by design (erase_project deletes it); this event is what stays."""
-        with self._connection() as connection:
+        with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(
-                "SELECT occurred_at, payload_json FROM events WHERE tenant_id=? AND event_type='ProjectErased' "
-                "AND json_extract(payload_json, '$.erased_by_identity_id')=? ORDER BY rowid DESC",
+                "SELECT occurred_at, payload_json FROM events WHERE tenant_id=%s AND event_type='ProjectErased' "
+                "AND payload_json->>'erased_by_identity_id' = %s ORDER BY write_order DESC",
                 (tenant_id, identity_id),
             ).fetchall()
-        return [{"erased_at": row["occurred_at"], **json.loads(row["payload_json"])} for row in rows]
+        return [{"erased_at": row["occurred_at"], **row["payload_json"]} for row in rows]
 
     def rename_project(self, tenant_id: str, project_id: str, name: str, identity_id: str) -> dict[str, Any]:
         """UPDATE platform_projects.name in place (current-state row, like create_project's INSERT) + a
-        ProjectRenamed event; the UNIQUE(tenant_id, workspace_id, name) constraint refuses a duplicate the
-        same way create_project's INSERT does (caller turns that IntegrityError into a 409)."""
-        with self._connection() as connection:
-            cursor = connection.execute("UPDATE platform_projects SET name=? WHERE tenant_id=? AND project_id=?", (name, tenant_id, project_id))
-            if cursor.rowcount == 0:
+        ProjectRenamed event; the UNIQUE (tenant_id, workspace_id, created_by_identity_id, name) constraint refuses a
+        duplicate the same way create_project's INSERT does (the caller turns that UniqueViolation into a 409)."""
+        with self._db.for_tenant(tenant_id) as connection:
+            self.lock_case(connection, tenant_id, project_id)
+            row = connection.execute(f"UPDATE platform_projects SET name=%s WHERE tenant_id=%s AND project_id=%s RETURNING {_PROJECT_SELECT}", (name, tenant_id, project_id)).fetchone()
+            if row is None:
                 raise InvariantViolation("PROJECT_NOT_FOUND")
             self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "ProjectRenamed", {"project_id": project_id, "name": name}, record_log.user(identity_id, "ASSEMBLER"))
-            row = connection.execute(
-                "SELECT project_id, tenant_id, workspace_id, name, purpose, data_classification, status, version, created_by_identity_id, created_at FROM platform_projects WHERE tenant_id=? AND project_id=?",
-                (tenant_id, project_id),
-            ).fetchone()
         return dict(row)

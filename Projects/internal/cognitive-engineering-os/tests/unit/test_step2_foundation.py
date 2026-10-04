@@ -7,20 +7,30 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import tempfile
 import threading
+import time
 import unittest
 import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 from unittest import mock
 
+from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain import evidence_words as words
+from ai_lego.data.db import Databases
 from ai_lego.data.events import record_log
+from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.case_docs import CaseDocs
+from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import ai_gate, block_hooks, evidence, rulesets
 from ai_lego.platform.ai_gate import AiAction
 from tests.unit.test_api_collections import CollectionApiTestCase
 from tests.unit.test_api_ingest import c1
 from tests.unit.test_block_foundation import MirrorProvider
+from tests.pg import PgTestCase, add_tenant
+from tests.unit.case_fixture import a_case
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
 CELLS = {key: words.cell(words.NOT_FOUND, why="沒有寫") for key in words.CARD_CELL_KEYS}
@@ -196,7 +206,7 @@ class ClaimLedgerTests(Step2Case):
         not the one created last."""
         claim, a = self.claim()["doc_id"], self.card()
         self.group([a])
-        times = iter(["2026-10-04T01:00:01Z", "2026-10-04T01:00:02Z", "2026-10-04T01:00:03Z"])
+        times = iter([datetime(2026, 10, 4, 1, 0, second, tzinfo=timezone.utc) for second in (1, 2, 3)])
         with mock.patch.object(record_log, "_now", lambda: next(times)):
             first = self.stance(claim, a, "支持")
             self.stance(claim, a, "反對")
@@ -412,8 +422,8 @@ class ErasedCaseTests(Step2Case):
         self.assertEqual(self.client.delete(f"/projects/{self.pid}").status_code, 200)
         with self.assertRaisesRegex(InvariantViolation, "DOC_NOT_FOUND"):
             self.docs.delete(self.tenant_id, person, "learn.history", held["doc_id"], record_log.system("LEARN"))
-        with self._repo.connection() as connection:
-            left = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=? AND aggregate_id=?", (self.tenant_id, f"doc:{held['doc_id']}")).fetchone()[0]
+        with self._repo.transaction(self.tenant_id) as connection:
+            left = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=%s AND aggregate_id=%s", (self.tenant_id, f"doc:{held['doc_id']}")).fetchone()[0]
         self.assertEqual(left, 0)
 
     def test_an_erase_cannot_slip_between_the_check_and_the_write(self):
@@ -425,15 +435,15 @@ class ErasedCaseTests(Step2Case):
             if event_type == "RerunFulfilled" and not erased:
                 eraser = threading.Thread(target=lambda: (erased.append(self.client.delete(f"/projects/{self.pid}").status_code), done.set()))
                 eraser.start()
-                done.wait(1.0)   # without the write lock the erase finishes here; with it, it waits for this write
+                done.wait(1.0)   # without the case lock the erase finishes here; with it, it waits for this write
             return real(connection, tenant_id, aggregate_id, event_type, payload, **kwargs)
 
         with mock.patch.object(record_log, "append", append_racing):
             self._repo.append_event(self.tenant_id, self.pid, "RerunFulfilled", {"rerun_id": "r", "interpretation_id": "i"}, record_log.system("ACT"))
         self.assertTrue(done.wait(20))
         self.assertEqual(erased, [200])
-        with self._repo.connection() as connection:
-            left = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=? AND owner_kind='case' AND owner_id=?", (self.tenant_id, self.pid)).fetchone()[0]
+        with self._repo.transaction(self.tenant_id) as connection:
+            left = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s", (self.tenant_id, self.pid)).fetchone()[0]
         self.assertEqual(left, 0)   # the write came first and went with the case; nothing lands after the erase
 
     def test_a_case_gone_midway_is_a_404_with_words_not_a_server_error(self):
@@ -488,6 +498,147 @@ class ErasedCaseTests(Step2Case):
         logged.assert_not_called()   # an erase is not a failure to report
         self.assertEqual(calls, [self.pid])   # the next run found no case and ran nothing
         self.assertEqual(self.docs.current(self.tenant_id, self.owner, "gather.source"), [])
+
+
+def _card(url: str = "https://late.example/") -> dict:
+    return {"source_id": "", "url": url, "title": "t", "found_by": {"by": "系統找的"}, "cells": CELLS, "aside": "x",
+            "snapshot": {"sha256": "b" * 64, "fetched_at": "2026-10-04T00:00:00Z"}}
+
+
+class _TwoConnections(PgTestCase):
+    """A case in its own tenant, and a way to hold one writer inside its save (after its checks, before its write) while
+    another connection acts: ``paused`` stops the first save that calls doc_kinds.validate until ``release`` is set."""
+
+    def setUp(self):
+        self.tenant = add_tenant(self.databases, str(uuid.uuid4()))
+        self.repo = ProjectSourceRepository(self.databases)
+        self.docs = CaseDocs(self.repo)
+        self.owner = a_case(self.repo, self.tenant, str(uuid.uuid4()))
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.cas = TenantScopedCas(Path(folder.name) / "source-cas")
+        self.holding, self.release, self.outcomes = threading.Event(), threading.Event(), {}
+        real, first = doc_kinds.validate, threading.Lock()
+
+        def validate(*args, **kwargs):
+            if first.acquire(blocking=False):   # the first save only: it holds what it took and waits
+                self.holding.set()
+                self.release.wait(20)
+            return real(*args, **kwargs)
+        patcher = mock.patch.object(doc_kinds, "validate", validate)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def run_as(self, name: str, action) -> threading.Thread:
+        def target():
+            try:
+                self.outcomes[name] = action()
+            except InvariantViolation as error:
+                self.outcomes[name] = str(error).split(":")[0]
+        thread = threading.Thread(target=target)
+        thread.start()
+        return thread
+
+    def case_events(self) -> int:
+        with self.repo.transaction(self.tenant) as connection:
+            return connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s", (self.tenant, self.owner.id)).fetchone()[0]
+
+
+class CaseLockTests(_TwoConnections):
+    """Invariant 3 with two real connections (docs/platform/STORAGE_SWITCH.md): every case writer holds the case lock shared
+    from its first statement; erase_project holds the same lock exclusive. Writers do not wait for each other, the erase
+    waits only for the writes in flight, and nothing lands after it."""
+
+    def save(self, url: str = "https://late.example/"):
+        return lambda: self.docs.save(self.tenant, self.owner, "gather.source", _card(url), record_log.system("GATHER"))["doc_id"]
+
+    def erase(self):
+        return lambda: self.repo.erase_project(self.tenant, self.owner.id, "me", self.cas, 0)["events_deleted"]
+
+    def test_the_erase_waits_for_the_write_in_flight_and_takes_it_with_the_case(self):
+        writer = self.run_as("writer", self.save())
+        self.assertTrue(self.holding.wait(10))
+        eraser = self.run_as("eraser", self.erase())
+        eraser.join(0.5)
+        self.assertTrue(eraser.is_alive(), "the erase did not wait for the writer holding the case lock")
+        self.release.set()
+        writer.join(20)
+        eraser.join(20)
+        self.assertNotIn(self.outcomes["writer"], ("CASE_ERASED",))   # it was in first: it wrote
+        self.assertGreater(self.outcomes["eraser"], 0)
+        self.assertEqual(self.case_events(), 0)   # and its write went with the case
+
+    def _while_the_erase_holds_the_case(self, write) -> None:
+        """``write`` starts while the erase is inside its transaction (locks held): it waits, then gets CASE_ERASED."""
+        erasing, go, real = threading.Event(), threading.Event(), ProjectSourceRepository._collect_unreferenced_blobs
+
+        def collect_slowly(connection, tenant_id, cas):   # inside the erase's transaction, its locks held
+            erasing.set()
+            go.wait(20)
+            return real(connection, tenant_id, cas)
+
+        with mock.patch.object(ProjectSourceRepository, "_collect_unreferenced_blobs", staticmethod(collect_slowly)):
+            eraser = self.run_as("eraser", self.erase())
+            self.assertTrue(erasing.wait(10))
+            writer = self.run_as("writer", write)
+            writer.join(0.5)
+            self.assertTrue(writer.is_alive(), "the writer did not wait for the erase holding the case lock")
+            go.set()
+            self.release.set()   # a save that skipped the lock is paused inside itself: let it finish, so it shows
+            eraser.join(20)
+            writer.join(20)
+        self.assertEqual(self.outcomes["writer"], "CASE_ERASED")
+        self.assertEqual(self.case_events(), 0)
+
+    def test_a_writer_that_comes_while_the_erase_holds_the_case_gets_case_erased_and_writes_nothing(self):
+        self._while_the_erase_holds_the_case(lambda: self.repo.append_event(self.tenant, self.owner.id, "TaskNoted", {"task_id": "x"}, record_log.user("me", "ACT")))
+
+    def test_a_document_saved_while_the_erase_holds_the_case_is_refused(self):
+        """The same through CaseDocs.save, the writer every block hook uses."""
+        self._while_the_erase_holds_the_case(self.save())
+
+    def test_writers_do_not_wait_for_each_other(self):
+        first = self.run_as("first", self.save("https://a.example/"))
+        self.assertTrue(self.holding.wait(10))
+        second = self.run_as("second", self.save("https://b.example/"))
+        second.join(10)
+        self.assertFalse(second.is_alive(), "a second writer waited for the first one's case lock")
+        self.release.set()
+        first.join(20)
+        self.assertEqual(len(self.docs.current(self.tenant, self.owner, "gather.source")), 2)
+
+
+class DocLockTests(_TwoConnections):
+    """Invariant 2 with two real connections: a next version is decided under the document's lock (DOC_STALE), a new
+    one-per-case document under the (owner, kind) lock (DOC_SINGLETON_EXISTS)."""
+
+    def test_two_editors_of_the_same_version_one_gets_doc_stale(self):
+        self.release.set()   # the first save (version 1) passes straight through
+        doc_id = self.docs.save(self.tenant, self.owner, "gather.source", _card(), record_log.system("GATHER"))["doc_id"]
+        self.release.clear()
+        edit = lambda url: lambda: self.docs.save(self.tenant, self.owner, "gather.source", _card(url), record_log.system("GATHER"), doc_id=doc_id, base_version=1)["version"]   # noqa: E731
+        first = self.run_as("first", edit("https://first.example/"))
+        self.assertTrue(self.holding.wait(10))
+        second = self.run_as("second", edit("https://second.example/"))
+        second.join(0.5)
+        self.release.set()
+        first.join(20)
+        second.join(20)
+        self.assertEqual(sorted(map(str, self.outcomes.values())), ["2", "DOC_STALE"])
+        self.assertEqual([version["version"] for version in self.docs.versions(self.tenant, self.owner, "gather.source", doc_id)], [1, 2])
+
+    def test_two_first_saves_of_a_one_per_case_kind_one_gets_doc_singleton_exists(self):
+        origins = {"groups": [{"cards": ["c1"], "how": "單獨"}], "rules_version": "1"}
+        new = lambda: self.docs.save(self.tenant, self.owner, "gather.origins", origins, record_log.system("GATHER"))["version"]   # noqa: E731
+        first = self.run_as("first", new)
+        self.assertTrue(self.holding.wait(10))
+        second = self.run_as("second", new)
+        second.join(0.5)
+        self.release.set()
+        first.join(20)
+        second.join(20)
+        self.assertEqual(sorted(map(str, self.outcomes.values())), ["1", "DOC_SINGLETON_EXISTS"])
+        self.assertEqual(len(self.docs.current(self.tenant, self.owner, "gather.origins")), 1)
 
 
 class HooksReadOnlyTests(unittest.TestCase):
@@ -652,6 +803,17 @@ class AfterSourcesTests(Step2Case):
         with self.hooks({"VERIFY": [lambda *args: seen.append("verify")], "GATHER": [broken]}), self.assertLogs("ai_lego.platform.block_hooks", "ERROR"):
             self.source()
         self.assertEqual(seen, ["gather"])   # VERIFY must not read a run GATHER could not card
+
+    def test_a_cases_hooks_wait_for_a_run_holding_the_case_in_another_process(self):
+        """One after-sources run per case across every API process: the lock is the database's, not this process's."""
+        seen = []
+        with Databases({self.REGION: self.url}) as other_process, self.hooks({"GATHER": [lambda docs, tenant, owner, arrived: seen.append("ran")]}):
+            with CaseDocs(ProjectSourceRepository(other_process)).hooks_lock(self.tenant_id, self.owner):
+                block_hooks.after_sources(self.docs, self.tenant_id, self.owner, {})
+                time.sleep(0.5)
+                self.assertEqual(seen, [])   # the other process holds this case's hooks: the run waits
+            block_hooks.wait_idle()
+        self.assertEqual(seen, ["ran"])
 
 
 class IngestHookTests(CollectionApiTestCase):
