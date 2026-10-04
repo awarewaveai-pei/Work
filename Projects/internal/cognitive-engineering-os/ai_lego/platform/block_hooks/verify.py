@@ -12,6 +12,8 @@ BEFORE_SAVE, what a person's save may not do (every path: the generic /docs rout
 AFTER_SAVE: your first reaction writes what the platform cannot check about how the message spread (verify.spread).
 AFTER_SOURCES: a 「去查」 run that ended writes verify.search for its claim, and one that will never call back (past its
 deadline) is settled as 無法檢查 on any arrival or ledger read; more cards than one AI turn reads -> propose GATHER.
+Beside them, the rules VERIFY's routes and AI turns share: which cards only the person reads (``person_reads``) and one
+open 「去查」 per claim version (``refuse_open_search``).
 """
 
 from __future__ import annotations
@@ -21,9 +23,10 @@ import hashlib
 from contextvars import ContextVar
 from typing import Any, Iterator, Mapping
 
+from ai_lego.core.domain.collection_run import OPEN_STATUSES
 from ai_lego.core.domain.evidence_words import FOUND, NOT_FOUND, UNCHECKABLE, cell, normalise_quote
 from ai_lego.core.domain.kinds.map import CHECKABLE as MAP_CHECKABLE
-from ai_lego.core.domain.kinds.verify import SPREAD
+from ai_lego.core.domain.kinds.verify import FACTCHECK_ANGLE, SEARCH_LANGUAGES, SEARCH_PROVIDERS, SPREAD
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
@@ -33,6 +36,9 @@ WHY_GATHER = "這個案子找回來的來源，比 AI 一次能讀的還多。�
 DEAD_RUN = "這次查詢沒有跑完"
 NO_CHANNELS = "找資料的服務沒有回報搜尋管道"
 NO_REPORT = "找資料的服務沒有回報找到幾頁"
+CHANNEL_SAID = {"ok": "找過沒有找到", "unreachable": "沒有回應", "no_key": "還沒有設定金鑰"}   # wire v2 channel states
+NOT_REPORTED = "沒有回報"
+SEARCH_OPEN = "VERIFY_SEARCH_ALREADY_RUNNING: 這個主張的這一版已經在找了；等它跑完，或過了期限，再查一次"
 FIRST_REQUIRED = "VERIFY_FIRST_REACTION_REQUIRED: write your first reaction and confidence for this message first; nothing about it is shown or asked of the AI before that"
 
 # A quote VERIFY's stance route checked against the stored page, for the save it is making (same call, same thread).
@@ -147,8 +153,17 @@ def hit_address(db: str, url: str, claim: str) -> str:
 
 
 def is_hit(url: Any) -> bool:
-    """A card on a fact-check hit (``hit_address``): the person reads it; an AI reading turn is never given it."""
+    """A card on a fact-check hit (``hit_address``)."""
     return isinstance(url, str) and url.partition("#")[2].startswith(HIT_FRAGMENT)
+
+
+def person_reads(card: Mapping[str, Any]) -> bool:
+    """A card (``gather.source`` content) only the person reads; an AI reading turn is never given it: a fact-check hit,
+    or a page 「去查」 found through its fact-check angle. A fact-check report restates the claim it reviewed, so a quote of
+    it reads as support whatever the verdict. KNOWN LIMIT: a report pasted or found by another angle is not recognised
+    (no maintained list of fact-checkers yet)."""
+    found_by = card.get("found_by")
+    return is_hit(card.get("url")) or (isinstance(found_by, Mapping) and found_by.get("angle") == FACTCHECK_ANGLE)
 
 
 def reading_entry(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, reading_id: Any, claim: Any, card: Any) -> dict[str, Any] | None:
@@ -203,14 +218,29 @@ def _first_saved(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: d
     return []
 
 
+def _channels_said(states: Mapping[tuple[Any, Any], Any]) -> str:
+    """What each planned engine said, the ones that did not look first: 「Brave 沒有回應；Serper 找過沒有找到」 (a language
+    is named only when an engine's two languages differ)."""
+    failed, looked = [], []
+    for provider, name in SEARCH_PROVIDERS.items():
+        said = {lang: CHANNEL_SAID.get(states.get((provider, lang)), NOT_REPORTED) for lang in SEARCH_LANGUAGES}
+        same = set(said.values())
+        parts = [(f"{name} {words}", words) for words in same] if len(same) == 1 else [(f"{name}（{SEARCH_LANGUAGES[lang]}）{words}", words) for lang, words in said.items()]
+        for text, words in parts:
+            (looked if words == CHANNEL_SAID["ok"] else failed).append(text)
+    return "；".join(failed + looked)[:300]
+
+
 def search_result(run: Mapping[str, Any], channels: list[Any]) -> tuple[str, str]:
-    """What a finished 「去查」 run says for its claim: 查到 (pages came back), 查不到 (every engine answered, none had a
-    page), 無法檢查 (it could not look, or did not say where it looked -- zero pages is then not 「找過，沒有」)."""
+    """What a finished 「去查」 run says for its claim: 查到 (pages came back), 查不到 (every channel the run planned --
+    SEARCH_PROVIDERS x SEARCH_LANGUAGES -- answered and none had a page), 無法檢查 (it could not look everywhere it
+    planned, or did not say where it looked: zero pages is then not 「找過，沒有」; the why says what each engine did)."""
     if run.get("status") != "completed":
         return UNCHECKABLE, DEAD_RUN
     tried = [item for item in channels if isinstance(item, Mapping)]
+    states = {(item.get("provider"), item.get("lang")): item.get("state") for item in tried}
     if tried and not any(item.get("state") == "ok" for item in tried):
-        return UNCHECKABLE, "這次的搜尋管道都連不上：" + "、".join(sorted({f"{item.get('provider')}（{item.get('lang')}）" for item in tried}))[:200]
+        return UNCHECKABLE, _channels_said(states)
     report = run.get("report")
     if not isinstance(report, Mapping):
         return UNCHECKABLE, NO_REPORT
@@ -219,7 +249,9 @@ def search_result(run: Mapping[str, Any], channels: list[Any]) -> tuple[str, str
         return FOUND, f"找回 {pages} 頁"
     if not tried:
         return UNCHECKABLE, NO_CHANNELS
-    return NOT_FOUND, "找過，沒有找到相關的網頁"
+    if all(states.get((provider, lang)) == "ok" for provider in SEARCH_PROVIDERS for lang in SEARCH_LANGUAGES):
+        return NOT_FOUND, "找過，沒有找到相關的網頁"
+    return UNCHECKABLE, _channels_said(states)
 
 
 def _run_of(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, run_id: str) -> dict[str, Any] | None:
@@ -236,6 +268,18 @@ def _write_search(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, looku
               record_log.system("VERIFY"))
 
 
+def refuse_open_search(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, claim_id: str, version: int) -> None:
+    """One open 「去查」 per claim version: a second would ask outside twice and two run ends would write one claim's
+    result. VERIFY's search route calls it before a run is made (the quick answer) and again inside the save of the
+    run's verify.lookup, under the write lock, before collect is asked (the answer that holds)."""
+    for lookup in docs.current(tenant_id, owner, "verify.lookup"):
+        content = lookup["content"]
+        if (content["claim"], content["claim_version"]) == (claim_id, version):
+            run = _run_of(docs, tenant_id, owner, content["run"])
+            if run is not None and run["status"] in OPEN_STATUSES:
+                raise InvariantViolation(SEARCH_OPEN)
+
+
 def settle_dead_runs(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> None:
     """A 「去查」 run that ended without its end reaching the case (past its deadline a run reads as failed and nobody can
     finish it) gets 無法檢查 「這次查詢沒有跑完」 for its claim, instead of staying 還沒查. Idempotent."""
@@ -250,10 +294,10 @@ def settle_dead_runs(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) ->
 
 
 def usable_cards(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> int:
-    """Stored pages an AI reading turn could be given (one per stored page, not set aside or taken back, not a fact-check hit)."""
+    """Stored pages an AI reading turn could be given (one per stored page, not set aside or taken back, not one only the person reads)."""
     taken_back = {doc["content"]["card"] for doc in docs.current(tenant_id, owner, "gather.takeback")}
     return len({doc["content"]["source_id"] for doc in docs.current(tenant_id, owner, "gather.source")
-                if doc["content"].get("source_id") and (not doc["content"].get("aside") or doc["doc_id"] in taken_back) and not is_hit(doc["content"].get("url"))})
+                if doc["content"].get("source_id") and (not doc["content"].get("aside") or doc["doc_id"] in taken_back) and not person_reads(doc["content"])})
 
 
 def _after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arrived: dict[str, Any]) -> None:

@@ -5,7 +5,8 @@
 // Each claim's ledger line comes from the system (GET /verify/ledger over evidence.checked_claims): independent origins for
 // and against, the three things apart. Only your own reading of a source card counts. A fact-checker's result is a source
 // like any other -- who judged and on what grounds -- never the platform's verdict. The pasted message is never sent to
-// /sources: it would support itself.
+// /sources: it would support itself. Every record about a claim is shown for the claim's current version only. Which
+// databases a look-up sends the words to, and which cards only you read, come from the server (GET /verify/ledger).
 import React, { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type AiTurn, type Doc, type Notice } from "../../lib/blocks";
@@ -21,7 +22,7 @@ type Techniques = { message: string; techniques?: Array<{ name: string; quote: s
 type Spread = { message: string; cells: Record<string, Cell> };
 type Seen = { message: string; about: string; text: string };
 type Hit = { source_id: string; publisher: string; judged_as: string; date: string; url: string; local: boolean; claim?: string; claimant?: string; license?: string };
-type Factcheck = { message?: string; claim?: string; place?: string; dbs: Array<{ db: string; state: string; why?: string; attribution?: string; hits: Hit[] }> };
+type Factcheck = { message?: string; claim?: string; claim_version?: number; place?: string; dbs: Array<{ db: string; state: string; why?: string; attribution?: string; hits: Hit[] }> };
 type HeldHit = Hit & { attribution?: string };
 export type ReadingEntry = { claim: string; claim_version: number; card: string; snapshot: string; reads_as: string; quote?: string };
 type Reading = { readings: ReadingEntry[] };
@@ -42,11 +43,12 @@ type Line = {
 };
 type Spec = {
   forms: string[]; sentence_kinds: string[]; checkable: string; stances: string[]; verdicts: string[]; asks: string[]; spread: Array<{ key: string; question: string }>;
-  check_questions: string[]; angles: string[]; min_origins: number; law_unconfirmed: string;
+  check_questions: string[]; angles: string[]; search_by: string[]; min_origins: number; law_unconfirmed: string;
   techniques: { title: string; version: string; maintainer: string; items: Array<{ name: string; looks_like: string }> };
-  factcheck_dbs: { title: string; version: string; maintainer: string; dbs: Record<string, { name: string; by: string }>; asked: string[] };
+  factcheck_dbs: { title: string; version: string; maintainer: string; dbs: Record<string, { name: string; by: string }> };
 };
 type Turn<C> = AiTurn<C> & { handback?: string };
+type Ledger = { claims: Line[]; factcheck_asks: string[]; person_reads: string[] };
 
 const enc = encodeURIComponent;
 const CONFIDENCE = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
@@ -140,6 +142,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
   const [map, setMap] = useState<MapDoc | undefined>(undefined);
   const [evidence, setEvidence] = useState<Evidence>({ origins: [] });
   const [lines, setLines] = useState<Line[] | null>(null);
+  const [asks, setAsks] = useState<string[]>([]);
+  const [personReads, setPersonReads] = useState<Set<string>>(new Set());
   const [picked, setPicked] = useState("");
   const [draft, setDraft] = useState<{ form: string; text: string; url: string }>({ form: "訊息", text: "", url: "" });
   const [first, setFirst] = useState<{ reaction: string; confidence: number | null }>({ reaction: "", confidence: null });
@@ -158,10 +162,11 @@ export function VerifyPage({ projectId }: { projectId: string }) {
       docs.list<Split>(projectId, "verify.split"), docs.list<Techniques>(projectId, "verify.techniques"), docs.list<Spread>(projectId, "verify.spread"),
       docs.list<Seen>(projectId, "verify.seen"), docs.list<Factcheck>(projectId, "verify.factcheck"), docs.list<Reading>(projectId, "verify.reading"),
       docs.list<Stance>(projectId, "verify.stance"), docs.list<Verdict>(projectId, "verify.verdict"), docs.list<Summary>(projectId, "verify.summary"),
-      docs.list<Next>(projectId, "verify.next"), docs.list<MapDoc>(projectId, "map.map"), apiFetch<Evidence>(`${base}/evidence`), apiFetch<{ claims: Line[] }>(`${base}/verify/ledger`),
+      docs.list<Next>(projectId, "verify.next"), docs.list<MapDoc>(projectId, "map.map"), apiFetch<Evidence>(`${base}/evidence`), apiFetch<Ledger>(`${base}/verify/ledger`),
     ]);
     setMessages(m); setFirsts(f); setClaims(c); setSplits(s); setTechniques(t); setSpreads(sp); setSeen(se); setFactchecks(fc); setReadings(r);
     setStances(st); setVerdicts(v); setSummaries(su); setNexts(n); setMap(maps.at(-1)?.content); setEvidence(ev); setLines(ledger.claims);
+    setAsks(ledger.factcheck_asks); setPersonReads(new Set(ledger.person_reads));
     setPicked((held) => held || m.at(-1)?.doc_id || "");
   };
   useEffect(() => {
@@ -193,7 +198,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
   const spread = message && spreads.find((doc) => doc.content.message === message.doc_id);
   const checks = message && factchecks.filter((doc) => doc.content.message === message.doc_id).at(-1);
   const toBring = mapClaimsToBring(map, claims);
-  const forAi = cards.filter((card) => !hitOf.has(card.source_id ?? ""));
+  const forAi = cards.filter((card) => !personReads.has(card.card));
+  const current = (claim: string, version: number) => claims.some((doc) => doc.doc_id === claim && doc.version === version);
   const summary = summaries.at(-1);
   const next = nexts.at(-1);
 
@@ -262,7 +268,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         <div className="card">
           <h2>別人查過嗎</h2>
           <p className="how">系統拿這則訊息去比對查核資料庫。查到的，是查核組織的結論，不是平台的結論。它跟別的來源一樣，由你判斷。</p>
-          <p className="hint">{sentTo(spec)}</p>
+          <p className="hint">{sentTo(spec, asks)}</p>
           <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => lookUp({ message: message.doc_id })}>{checks ? "再查一次" : "查查核資料庫"}</button></div>
           {checks && <FactcheckResult result={checks.content} spec={spec} />}
         </div>
@@ -333,10 +339,10 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         <p className="how">帳本由系統排：每個主張有幾個獨立出處支持、幾個反對。只有你自己確認過的讀法才算數。三件事分開看：找得到出處、出處彼此獨立、出處站得住。這三件，沒有一件等於「這是真的」。</p>
         {lines.length === 0 && <p className="sub">還沒有主張。</p>}
         {lines.map((line) => (
-          <LedgerLine key={line.claim_id} projectId={projectId} line={line} spec={spec} busy={busy} base={base} claims={claims} cards={cards} hitOf={hitOf} cardTitle={cardTitle} lines={lines}
+          <LedgerLine key={line.claim_id} projectId={projectId} line={line} spec={spec} asks={asks} busy={busy} base={base} claims={claims} cards={cards} hitOf={hitOf} cardTitle={cardTitle} lines={lines}
             readings={readingsFor(readings, line.claim_id, line.version)} stances={stances.filter((doc) => doc.content.claim === line.claim_id)}
             verdict={verdicts.find((doc) => doc.content.claim === line.claim_id)} editing={editing === line.claim_id} setEditing={setEditing}
-            factcheck={factchecks.filter((doc) => doc.content.claim === line.claim_id).at(-1)} act={act} saveClaim={saveClaim} lookUp={lookUp} setNotices={setNotices} />
+            factcheck={factchecks.filter((doc) => doc.content.claim === line.claim_id && doc.content.claim_version === line.version).at(-1)} act={act} saveClaim={saveClaim} lookUp={lookUp} setNotices={setNotices} />
         ))}
       </div>
 
@@ -344,7 +350,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         <div className="card">
           <h2>請 AI 讀來源</h2>
           <p className="how">AI 讀每張來源卡怎麼說每個主張，附上原文。它的讀法不算數，你確認了才算。一次最多 {MAX_READ_CARDS} 張。要協作合約准「找外部資料」。</p>
-          <p className="hint">查核資料庫查到的卡，不給 AI 讀。那種卡會重述被查的說法，AI 一引用，看起來就像支持。請你在主張下面自己讀。</p>
+          <p className="hint">查核資料庫查到的卡、「去查」用「查核」方向找到的網頁，不給 AI 讀。查核報告會重述被查的說法，AI 一引用，看起來就像支持。請你在主張下面自己讀。</p>
           <div className="chips" role="group" aria-label="給 AI 讀的來源卡">{forAi.map((card) => (
             <button key={card.card} type="button" className={`chip${readCards.includes(card.card) ? " on" : ""}`} aria-pressed={readCards.includes(card.card)}
               disabled={!readCards.includes(card.card) && readCards.length >= MAX_READ_CARDS}
@@ -361,7 +367,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
           {handback && <div className="judge"><p className="warn">{handback}</p><div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => summarise(true)}>照樣請 AI 摘要</button></div></div>}
           {summary && <div className="judge">
             <span className="tags"><span>{AUTHOR[summary.author]}</span></span>
-            <ul>{summary.content.lines.map((item) => <li key={item.claim}>{claims.find((doc) => doc.doc_id === item.claim)?.content.text.slice(0, 30)}：{item.line}</li>)}</ul>
+            <ul>{summary.content.lines.filter((item) => current(item.claim, item.claim_version)).map((item) => <li key={item.claim}>{claims.find((doc) => doc.doc_id === item.claim)?.content.text.slice(0, 30)}：{item.line}</li>)}</ul>
+            {summary.content.lines.some((item) => !current(item.claim, item.claim_version)) && <p className="hint">有主張在摘要之後改過；它們的那一行說的是舊版，沒有列出來。要的話，請 AI 再摘要一次。</p>}
             {summary.content.overview && <p>{summary.content.overview}</p>}
           </div>}
         </div>
@@ -379,9 +386,11 @@ export function VerifyPage({ projectId }: { projectId: string }) {
 }
 
 // The attribution lines are the ones collect sent with the data (specs/wire/lookup.v1.json): the data and its licence are collect's.
-/** Where the words go when you look them up (the databases collect asks; collect_lookups.DBS on the server). */
-export function sentTo(spec: Spec): string {
-  return `按下去，這段字會送到找資料的服務，由它去問：${spec.factcheck_dbs.asked.map((db) => spec.factcheck_dbs.dbs[db]?.name ?? db).join("、")}。`;
+/** Where the words go when you look them up: only the databases collect is asked for where you are (the ledger's
+ * factcheck_asks, the server's collect_asks). */
+export function sentTo(spec: Spec, asks: string[]): string {
+  if (asks.length === 0) return "按下去，這段字不會送出去：你所在的地方，沒有找資料的服務能問的查核資料庫。";
+  return `按下去，這段字會送到找資料的服務，由它去問：${asks.map((db) => spec.factcheck_dbs.dbs[db]?.name ?? db).join("、")}。`;
 }
 
 /** One fact-check result as the verify.factcheck record holds it: the claim they reviewed, who judged, the verdict word, the licence, the link. */
@@ -407,8 +416,8 @@ function FactcheckResult({ result, spec }: { result: Factcheck; spec: Spec }) {
   );
 }
 
-function LedgerLine({ projectId, line, spec, busy, base, claims, cards, hitOf, cardTitle, lines, readings, stances, verdict, editing, setEditing, factcheck, act, saveClaim, lookUp, setNotices }: {
-  projectId: string; line: Line; spec: Spec; busy: boolean; base: string; claims: Doc<Claim>[]; cards: EvidenceCard[]; hitOf: Map<string, HeldHit>; cardTitle: (id: string) => string; lines: Line[];
+function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hitOf, cardTitle, lines, readings, stances, verdict, editing, setEditing, factcheck, act, saveClaim, lookUp, setNotices }: {
+  projectId: string; line: Line; spec: Spec; asks: string[]; busy: boolean; base: string; claims: Doc<Claim>[]; cards: EvidenceCard[]; hitOf: Map<string, HeldHit>; cardTitle: (id: string) => string; lines: Line[];
   readings: Array<ReadingEntry & { reading: string }>; stances: Doc<Stance>[]; verdict?: Doc<Verdict>; editing: boolean; setEditing: (value: string | null) => void;
   factcheck?: Doc<Factcheck>; act: (work: () => Promise<void>) => Promise<void>; saveClaim: (claim: Claim, doc?: Doc<Claim>) => Promise<void>;
   lookUp: (body: Record<string, string>) => Promise<void>; setNotices: (notices: Notice[]) => void;
@@ -471,13 +480,13 @@ function LedgerLine({ projectId, line, spec, busy, base, claims, cards, hitOf, c
         <div className="chips" role="group" aria-label="要找的方向">{spec.angles.map((angle) => (
           <button key={angle} type="button" className={`chip${angles.includes(angle) ? " on" : ""}`} aria-pressed={angles.includes(angle)} onClick={() => setAngles(angles.includes(angle) ? angles.filter((item) => item !== angle) : [...angles, angle])}>{ANGLE_NAMES[angle] ?? angle}</button>
         ))}</div>
-        {plan ? <p className="hint">計畫：最多 {plan.max_queries} 次搜尋、讀 {plan.max_fetches} 頁。找資料的服務在背後找，找回來的寫進來源。</p> : null}
+        {plan ? <p className="hint">計畫：最多 {plan.max_queries} 次搜尋、讀 {plan.max_fetches} 頁。找資料的服務在背後找，找回來的寫進來源。確認後，這個主張會送到找資料的服務，由它用 {spec.search_by.join("、")} 去搜尋。</p> : null}
         <div className="btns">
           {plan ? <button className="btn primary" type="button" disabled={busy || angles.length === 0} onClick={() => goCheck(true)}>確認去查</button>
             : <button className="btn" type="button" disabled={busy || angles.length === 0} onClick={() => goCheck(false)}>去查（先看計畫）</button>}
           <button className="btn ghost" type="button" disabled={busy} onClick={() => lookUp({ claim: line.claim_id })}>查查核資料庫</button>
         </div>
-        <p className="hint">「查查核資料庫」：{sentTo(spec)}</p>
+        <p className="hint">「查查核資料庫」：{sentTo(spec, asks)}</p>
         {factcheck && <FactcheckResult result={factcheck.content} spec={spec} />}
       </div>}
       {readings.length > 0 && <div className="field">

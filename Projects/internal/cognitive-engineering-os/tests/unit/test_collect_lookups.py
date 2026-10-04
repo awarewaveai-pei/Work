@@ -18,10 +18,11 @@ EXAMPLES = CONTRACT["examples"]
 
 class Fake:
     def __init__(self, answer=None, error=None):
-        self.answer, self.error, self.calls = answer, error, []
+        self.answer, self.error, self.calls, self.dbs = answer, error, [], []
 
-    def lookup(self, project_id, kind, items, timeout):
+    def lookup(self, project_id, kind, items, timeout, **asked):
         self.calls.append((kind, items, timeout))
+        self.dbs.append(asked.get("dbs"))
         if self.error:
             raise self.error
         return self.answer(items) if callable(self.answer) else self.answer
@@ -127,6 +128,36 @@ class FactcheckTests(unittest.TestCase):
         lying["items"][0]["dbs"][1] = {"db": "cofacts", "state": "查不到", "attribution": "", "hits": []}   # 查不到 without why
         got = lookups.factcheck("p-1", self.text, client=Fake(lying))
         self.assertEqual((got[0]["why"], got[1]["why"]), (lookups.MALFORMED, lookups.MALFORMED))
+
+    def test_only_the_databases_asked_see_the_words_and_come_back_with_the_licence(self):
+        """P2 (lookup.v1 optional dbs and license): someone outside Taiwan asks ClaimReview only; a hit keeps its licence."""
+        example = EXAMPLES["factcheck_claimreview_only"]
+        client = Fake(example["answer"])
+        got = lookups.factcheck("p-1", example["request"]["items"][0]["text"], client=client, dbs=example["request"]["dbs"])
+        self.assertEqual(([entry["db"] for entry in got], client.dbs), (["claimreview"], [["claimreview"]]))
+        self.assertEqual(got[0]["hits"][0]["license"], example["answer"]["items"][0]["dbs"][0]["hits"][0]["license"])
+        lookups.factcheck("p-1", self.text, client=client)
+        self.assertEqual(client.dbs[-1], None)   # absent = both, as before
+        self.assertEqual((lookups.factcheck("p-1", self.text, client=client, dbs=[]), len(client.calls)), ([], 2))   # none to ask: nothing is sent
+
+    def test_a_licence_is_capped(self):
+        long = json.loads(json.dumps(EXAMPLES["factcheck_claimreview_only"]["answer"]))
+        long["items"][0]["dbs"][0]["hits"][0]["license"] = "授" * 500
+        got = lookups.factcheck("p-1", long["items"][0]["text"], client=Fake(long), dbs=["claimreview"])
+        self.assertEqual(len(got[0]["hits"][0]["license"]), 200)
+
+    def test_the_request_names_the_databases_only_when_asked(self):
+        bodies = []
+
+        def fetch(url, timeout, *, body, **kwargs):
+            bodies.append(body)
+            return {"kind": "factcheck", "items": []}
+
+        client = CollectionServiceClient("https://app.aware-wave.com", "t", fetch=fetch)
+        client.lookup("p-1", "factcheck", [{"text": "x"}], 1.0, dbs=["claimreview"])
+        client.lookup("p-1", "factcheck", [{"text": "x"}], 1.0)
+        self.assertEqual([body.get("dbs") for body in bodies], [["claimreview"], None])
+        self.assertNotIn("dbs", bodies[1])
 
 
 if __name__ == "__main__":

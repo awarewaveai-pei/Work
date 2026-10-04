@@ -151,6 +151,7 @@ const CODES: Record<string, string> = {
   VERIFY_VERDICT_FIXED: "判定跟著它的主張，不能換到別的主張。",
   VERIFY_FACTCHECK_TARGET_INVALID: "請選一則訊息或一個主張再查。",
   VERIFY_SEARCH_ANGLES_INVALID: "請至少選一種要找的方向。",
+  VERIFY_SEARCH_ALREADY_RUNNING: "這個主張的這一版已經在找了。等它跑完，或過了期限，再查一次。",
   VERIFY_NO_CLAIMS: "還沒有確認過的主張。先確認或加一個主張。",
   // COMPUTE
   COMPUTE_INPUT_REFUSED: "有一個數字算不出來或格式不對，請檢查後再算一次。",

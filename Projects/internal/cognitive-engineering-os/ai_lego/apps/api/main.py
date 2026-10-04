@@ -3196,6 +3196,14 @@ def request_collection(
     service: CollectionServiceClient | None = Depends(get_collection_service),
 ) -> dict[str, Any]:
     """Without ``confirm: true`` this only returns the plan and writes nothing (C7)."""
+    return start_collection(project_id, payload, response, session, store, repo, service)
+
+
+def start_collection(project_id: str, payload: CollectionRequest, response: Response, session: dict[str, Any], store: IdentityStore,
+                     repo: ProjectSourceRepository, service: CollectionServiceClient | None, *, reserve: Callable[[str], None] | None = None) -> dict[str, Any]:
+    """The collections route's work, for a block's own route too. ``reserve(run_id)``: that block's record of the run,
+    saved once the run exists and before the Collection Service is asked; it raises to refuse, and the run then fails
+    with nothing sent (VERIFY: one open 「去查」 per claim version, checked in the same save)."""
     tenant_id = session["tenant_id"]
     if not check_entitlement(store, tenant_id, RESEARCH_COLLECT_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {RESEARCH_COLLECT_CAPABILITY!r}")
@@ -3220,6 +3228,13 @@ def request_collection(
     # the deadline passes, and the grant stops working at the same instant.
     run = repo.create_collection_run(collection_run_record(run_id, project_id, tenant_id, len(seeds), fetches, session["identity_id"], now), seeds)
     grant_ref = store.issue_collect_grant(tenant_id, project_id, run_id, collector["identity_id"], run["deadline_at"])
+    if reserve is not None:
+        try:
+            reserve(run_id)
+        except BaseException:
+            repo.finish_collection_run(tenant_id, run_id, "failed", None)
+            store.close_collect_grant(grant_ref)
+            raise
     try:
         service.start_run(grant_ref, project_id, run_id, seeds, {"fetches": fetches})
     except InvariantViolation as error:

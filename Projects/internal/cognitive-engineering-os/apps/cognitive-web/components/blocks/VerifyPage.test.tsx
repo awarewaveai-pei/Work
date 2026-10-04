@@ -12,7 +12,8 @@ const SPEC = {
   forms: ["訊息", "截圖文字", "連結"], sentence_kinds: ["可以查的事實", "對事實的解釋", "價值判斷", "叫你去做的事"], checkable: "可以查的事實", stances: ["支持", "反對", "無關", "看不出"],
   verdicts: ["採信", "存疑", "不採信"], asks: ["轉傳"], spread: [{ key: "spread", question: "這則訊息怎麼傳開" }], check_questions: ["量是自然的嗎？"], angles: ["primary", "news"], min_origins: 2,
   law_unconfirmed: "未確認", techniques: { title: "操弄手法清單", version: "1", maintainer: "平台", items: [] },
-  factcheck_dbs: { title: "查核資料庫名單", version: "3", maintainer: "平台", dbs: { cofacts: { name: "Cofacts 真的假的", by: "志工" }, claimreview: { name: "全球查核結果公開資料檔", by: "各查核組織" } }, asked: ["claimreview", "cofacts"] },
+  factcheck_dbs: { title: "查核資料庫名單", version: "3", maintainer: "平台", dbs: { cofacts: { name: "Cofacts 真的假的", by: "志工" }, claimreview: { name: "全球查核結果公開資料檔", by: "各查核組織" } } },
+  search_by: ["Serper", "Brave"],
 };
 const MSG = doc("verify.message", "M1", { text: MESSAGE, form: "訊息", sha256: "a".repeat(64) });
 const FIRST = doc("verify.first", "F1", { message: "M1", reaction: "有點慌", confidence: 60 });
@@ -24,7 +25,7 @@ const LINE = {
 const posts = (calls: Call[], path: string) => calls.filter((call) => call.method !== "GET" && call.path === path);
 
 async function open(routes: Record<string, unknown> = {}) {
-  const calls = serve({ ...shell(), "/blocks/verify/spec": SPEC, [`${P}/evidence`]: { origins: [] }, [`${P}/verify/ledger`]: { claims: [] }, ...routes });
+  const calls = serve({ ...shell(), "/blocks/verify/spec": SPEC, [`${P}/evidence`]: { origins: [] }, [`${P}/verify/ledger`]: { claims: [], factcheck_asks: ["cofacts", "claimreview"], person_reads: [] }, ...routes });
   const page = await mount(<VerifyPage projectId="P1" />);
   return { ...page, calls };
 }
@@ -68,7 +69,7 @@ describe("VERIFY 查證主張", () => {
   it("under two origins the summary hands back with the count, and going on is my choice", async () => {
     let asked = 0;
     const { host, done, calls } = await open({
-      [`GET ${P}/docs/verify.claim`]: [doc<Claim>("verify.claim", "C1", { text: LINE.text, sentence: LINE.sentence, from: "訊息", message: "M1" })], [`${P}/verify/ledger`]: { claims: [LINE] },
+      [`GET ${P}/docs/verify.claim`]: [doc<Claim>("verify.claim", "C1", { text: LINE.text, sentence: LINE.sentence, from: "訊息", message: "M1" })], [`${P}/verify/ledger`]: { claims: [LINE], factcheck_asks: ["cofacts", "claimreview"], person_reads: [] },
       [`POST ${P}/ai/VERIFY/summary`]: () => (asked++ === 0 ? { handback: "有 1 個主張的獨立出處不到 2 個（各是 1 個）。AI 先停下來，由你決定要不要照樣請它摘要。" } : { saved: {} }),
     });
     expect(host.textContent).toContain("只有一個出處這樣說");
@@ -91,8 +92,8 @@ describe("VERIFY 查證主張", () => {
     expect(text).toContain("CC BY-SA 4.0");
     expect(text).toContain("google：無法檢查（找資料的服務這次沒有回應）");
     expect(text).toContain("他們查的說法：銀行下週起每日提款上限兩萬；誰判的：台灣事實查核中心（當地）；判定：錯誤");   // the reviewed claim comes from the record, never from the source's text
-    expect(text).toContain(sentTo(SPEC as never));
-    expect(text).toContain("由它去問：全球查核結果公開資料檔、Cofacts 真的假的。");
+    expect(text).toContain(sentTo(SPEC as never, ["cofacts", "claimreview"]));
+    expect(text).toContain("由它去問：Cofacts 真的假的、全球查核結果公開資料檔。");
     expect(text).not.toContain("蒐集器");   // one term for the service on every page
     await done();
   });
@@ -102,7 +103,7 @@ describe("VERIFY ledger lines", () => {
   const CARD = { card: "K1", title: "央行新聞稿", source_id: "s1", snapshot: { sha256: "h1" } };
   const ledger = (line: Record<string, unknown>, routes: Record<string, unknown> = {}) => open({
     [`GET ${P}/docs/verify.claim`]: [doc<Claim>("verify.claim", "C1", { text: LINE.text, sentence: LINE.sentence, from: "訊息", message: "M1" }, { version: (line.version as number) ?? 1 })],
-    [`${P}/verify/ledger`]: { claims: [{ ...LINE, ...line }] }, [`${P}/evidence`]: { origins: [{ origin_id: "o:1", cards: [CARD] }] }, ...routes,
+    [`${P}/verify/ledger`]: { claims: [{ ...LINE, ...line }], factcheck_asks: ["claimreview"], person_reads: (line.person_reads as string[]) ?? [] }, [`${P}/evidence`]: { origins: [{ origin_id: "o:1", cards: [CARD] }] }, ...routes,
   });
 
   it("says what one origin says with the server's one rule, never a support line for an opposing origin", async () => {
@@ -116,13 +117,42 @@ describe("VERIFY ledger lines", () => {
     const HIT = { card: "K2", title: "TFC 的查核：錯誤", url: "https://tfc-taiwan.org.tw/articles/1#factcheck-claimreview-ab", source_id: "s2", snapshot: { sha256: "h2" } };
     const record = doc("verify.factcheck", "X1", { message: "M1", dbs: [{ db: "claimreview", state: "查到", attribution: "查核結果來自各查核組織。", hits: [
       { source_id: "s2", publisher: "台灣事實查核中心", judged_as: "錯誤", date: "2026-05-01", url: "https://tfc-taiwan.org.tw/articles/1", local: true, claim: "銀行下週起停止營業", license: "CC BY 4.0" }] }] }, { author: "system" });
-    const { host, done } = await ledger({}, { [`${P}/evidence`]: { origins: [{ origin_id: "o:1", cards: [CARD] }, { origin_id: "o:2", cards: [HIT] }] }, [`GET ${P}/docs/verify.factcheck`]: [record] });
+    const { host, done } = await ledger({ person_reads: ["K2"] }, { [`${P}/evidence`]: { origins: [{ origin_id: "o:1", cards: [CARD] }, { origin_id: "o:2", cards: [HIT] }] }, [`GET ${P}/docs/verify.factcheck`]: [record] });
     const forAi = host.querySelector('[aria-label="給 AI 讀的來源卡"]')!;
     expect([byText(forAi, "button", "央行新聞稿") !== undefined, byText(forAi, "button", HIT.title)]).toEqual([true, undefined]);
     expect(host.textContent).not.toContain("他們查的說法");
     await click(byText(host.querySelector('[aria-label="讀哪一張"]')!, "button", HIT.title)!);
     expect(host.textContent).toContain("他們查的說法：銀行下週起停止營業；誰判的：台灣事實查核中心（當地）；判定：錯誤；2026-05-01；授權：CC BY 4.0");   // from the record, never the source's text
-    expect(host.textContent).toContain(`「查查核資料庫」：${sentTo(SPEC as never)}`);
+    expect(host.textContent).toContain(`「查查核資料庫」：${sentTo(SPEC as never, ["claimreview"])}`);
+    await done();
+  });
+
+  it("the look-up notice names only the databases asked for where I am, and 去查 says where the claim goes", async () => {
+    const { host, done } = await ledger({}, { [`POST ${P}/verify/claims/C1/search`]: { plan: { seeds: 1, max_queries: 16, max_fetches: 200 }, confirm_required: true } });
+    const text = host.textContent ?? "";
+    expect(text).toContain("「查查核資料庫」：按下去，這段字會送到找資料的服務，由它去問：全球查核結果公開資料檔。");   // outside Taiwan: never Cofacts
+    expect(text).not.toContain("由它去問：Cofacts");
+    await click(byText(host, "button", "去查（先看計畫）")!);
+    expect(host.textContent).toContain("確認後，這個主張會送到找資料的服務，由它用 Serper、Brave 去搜尋。");
+    await done();
+  });
+
+  it("a page only I read (the server's list) is never offered to the AI", async () => {
+    const ARTICLE = { card: "K3", title: "查核報告：錯誤", url: "https://factcheck.example/a", source_id: "s3", snapshot: { sha256: "h3" }, found_by: { by: "系統找的", angle: "factcheck" } };
+    const { host, done } = await ledger({ person_reads: ["K3"] }, { [`${P}/evidence`]: { origins: [{ origin_id: "o:1", cards: [CARD] }, { origin_id: "o:3", cards: [ARTICLE] }] } });
+    const forAi = host.querySelector('[aria-label="給 AI 讀的來源卡"]')!;
+    expect([byText(forAi, "button", "央行新聞稿") !== undefined, byText(forAi, "button", ARTICLE.title)]).toEqual([true, undefined]);
+    expect(byText(host.querySelector('[aria-label="讀哪一張"]')!, "button", ARTICLE.title)).toBeDefined();   // I read it myself
+    await done();
+  });
+
+  it("after the claim changed, the old version's fact-check result and summary line are not shown as current", async () => {
+    const old = doc("verify.factcheck", "X1", { claim: "C1", claim_version: 1, dbs: [{ db: "claimreview", state: "查到", attribution: "a", hits: [
+      { source_id: "s2", publisher: "台灣事實查核中心", judged_as: "錯誤", date: "", url: "https://tfc-taiwan.org.tw/articles/1", local: true }] }] }, { author: "system" });
+    const summary = doc("verify.summary", "U1", { lines: [{ claim: "C1", claim_version: 1, line: "帳本上有一個出處支持它" }] }, { author: "ai" });
+    const { host, done } = await ledger({ version: 2 }, { [`GET ${P}/docs/verify.factcheck`]: [old], [`GET ${P}/docs/verify.summary`]: [summary] });
+    expect(host.textContent).not.toContain("誰判的：台灣事實查核中心");
+    expect(host.textContent).not.toContain("帳本上有一個出處支持它");
     await done();
   });
 

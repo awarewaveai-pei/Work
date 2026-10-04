@@ -3,8 +3,9 @@ site's registry record, a page's first archive capture, the fact-check databases
 (operator 2026-09-17; why, 2026-10-04: each block is built separately and then chained, collect is the searcher).
 
 Traps for future readers:
-- Never raises. Collect down, no token, an answer not in the spec's shape: every cell is 無法檢查 with why (R7, R8),
-  so a hook carries on and the card says what happened instead of guessing.
+- Never raises for what collect does. Collect down, no token, an answer not in the spec's shape: every cell is 無法檢查
+  with why (R7, R8), so a hook carries on and the card says what happened instead of guessing. (A caller naming a
+  database collect has not is the caller's bug and is refused.)
 - Lists and thresholds are collect's (R5). Nothing here decides what matches or which registry to ask.
 """
 
@@ -28,29 +29,30 @@ MAX_VALUE, MAX_WHY = 200, 300   # collect's words in a cell; ten cells stay far 
 MAX_TEXT = 4000
 TIMEOUT_SECONDS = 45.0
 _HIT_KEYS = {
-    "claimreview": ("claim", "url", "publisher", "publisher_url", "judged_as", "date", "claimant"),
+    "claimreview": ("claim", "url", "publisher", "publisher_url", "judged_as", "date", "claimant", "license"),
     "cofacts": ("article_id", "url", "date"),
 }
+_HIT_CAPS = {"license": 200}   # lookup.v1: the item's own licence, at most 200 characters
 _REPLY_KEYS = ("judged_as", "text", "reference", "date")
 
 
 class LookupClient(Protocol):
-    def lookup(self, project_id: str, kind: str, items: list[dict[str, Any]], timeout: float) -> dict[str, Any]: ...
+    def lookup(self, project_id: str, kind: str, items: list[dict[str, Any]], timeout: float, dbs: list[str] | None = None) -> dict[str, Any]: ...
 
 
 _FROM_ENV = object()
 
 
-def _ask(client: Any, project_id: str, kind: str, items: list[dict[str, Any]]) -> tuple[list[Any] | None, str]:
+def _ask(client: Any, project_id: str, kind: str, items: list[dict[str, Any]], **asked: Any) -> tuple[list[Any] | None, str]:
     """(the answer's items, "") when collect answered in shape (one per item), else (None, DOWN or MALFORMED) -- logged,
-    never raised."""
+    never raised. ``asked``: the request's optional fields (factcheck ``dbs``), passed only when given."""
     if client is _FROM_ENV:
         client = collection_service_from_env()
     if client is None:
         _log.warning("collect lookup %s skipped: COLLECT_RESEARCH_RUNS_TOKEN is not set", kind)
         return None, DOWN
     try:
-        answer = client.lookup(project_id, kind, items, TIMEOUT_SECONDS)
+        answer = client.lookup(project_id, kind, items, TIMEOUT_SECONDS, **asked)
     except InvariantViolation as error:
         _log.warning("collect lookup %s failed: %s", kind, error)
         answered = str(error).startswith(f"{LOOKUP_ERRORS}_MALFORMED_RESPONSE")   # a body that is not JSON or too large (R7)
@@ -108,7 +110,7 @@ def _hits(db: str, hits: Any) -> list[dict[str, Any]] | None:
     for hit in hits:
         if not isinstance(hit, Mapping) or not _text(hit.get("url"), 2000).startswith(("http://", "https://")):
             return None
-        kept: dict[str, Any] = {key: _text(hit.get(key), 1200) for key in _HIT_KEYS[db]}
+        kept: dict[str, Any] = {key: _text(hit.get(key), _HIT_CAPS.get(key, 1200)) for key in _HIT_KEYS[db]}
         if db == "cofacts":
             replies = hit.get("replies")
             if not isinstance(replies, list) or not all(isinstance(reply, Mapping) for reply in replies):
@@ -132,17 +134,23 @@ def _unchecked_db(db: str, why: str) -> dict[str, Any]:
     return {"db": db, **cell(UNCHECKABLE, why=why), "attribution": "", "hits": []}
 
 
-def factcheck(project_id: str, text: str, *, client: Any = _FROM_ENV) -> list[dict[str, Any]]:
-    """One entry per database in DBS order: ``{"db", "state", "why"?, "attribution", "hits"}``. 查到 always has at
-    least one hit; anything else collect said is kept with its why."""
-    listed, why = _ask(client, project_id, "factcheck", [{"text": text[:MAX_TEXT]}])
+def factcheck(project_id: str, text: str, *, client: Any = _FROM_ENV, dbs: list[str] | None = None) -> list[dict[str, Any]]:
+    """One entry per database asked: ``{"db", "state", "why"?, "attribution", "hits"}``. 查到 always has at least one
+    hit; anything else collect said is kept with its why. ``dbs``: only these see the words and come back, in that
+    order (lookup.v1; None = every one in DBS order, an empty list = nothing is sent)."""
+    if dbs is not None and (any(db not in DBS for db in dbs) or len(set(dbs)) != len(dbs)):
+        raise InvariantViolation(f"COLLECT_LOOKUP_DBS_INVALID: each of {list(DBS)} at most once")
+    if dbs is not None and not dbs:
+        return []
+    asked = tuple(dbs) if dbs is not None else DBS
+    listed, why = _ask(client, project_id, "factcheck", [{"text": text[:MAX_TEXT]}], **({"dbs": list(dbs)} if dbs is not None else {}))
     item = listed[0] if listed else None
     if listed is None:
-        return [_unchecked_db(db, why) for db in DBS]
+        return [_unchecked_db(db, why) for db in asked]
     answered = item.get("dbs") if isinstance(item, Mapping) and item.get("text") == text[:MAX_TEXT] else None
     by_db = {entry.get("db"): entry for entry in answered if isinstance(entry, Mapping)} if isinstance(answered, list) else {}
     out = []
-    for db in DBS:
+    for db in asked:
         entry = by_db.get(db)
         hits = _hits(db, entry.get("hits")) if isinstance(entry, Mapping) else None
         state = _db_state(entry) if isinstance(entry, Mapping) else None

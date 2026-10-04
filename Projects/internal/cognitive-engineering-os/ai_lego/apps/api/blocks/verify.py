@@ -2,11 +2,14 @@
 
     GET  /blocks/verify/spec                               the lists the page shows (versions, maintainers, licences)
     POST /projects/{project_id}/verify/messages            {text, form, url?}  a pasted message, stamped with its sha256
-    POST /projects/{project_id}/verify/factcheck           {message | claim}   ask collect's fact-check databases
+    POST /projects/{project_id}/verify/factcheck           {message | claim}   ask collect the place's fact-check databases
     POST /projects/{project_id}/verify/claims/{claim}/search {angles?, confirm}  「去查」: a collection run for one claim
-    GET  /projects/{project_id}/verify/ledger              the ledger with what VERIFY adds to evidence.checked_claims
+                                                           version, one open at a time (409 VERIFY_SEARCH_ALREADY_RUNNING)
+    GET  /projects/{project_id}/verify/ledger              the ledger with what VERIFY adds to evidence.checked_claims, the
+                                                           databases a look-up sends the words to here, the cards only you read
     POST /projects/{project_id}/verify/stances             {content, doc_id?, base_version?}  your stance, its quote checked
     POST /projects/{project_id}/verify/stances/confirm     {reading, claim}  confirm every AI reading of one claim at once
+                                                           (every stance or none)
 
 Nothing about a message is looked up or shown before its first reaction (block_hooks.verify.require_first). The
 fact-check databases are collect's (collect_lookups, specs/wire/lookup.v1.json): the engine reaches nothing outside. A hit
@@ -23,16 +26,17 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from ai_lego.apps.api import main as api
-from ai_lego.apps.api.blocks.docs import DocBody, _call, _kind, _save, _where, case_owner
+from ai_lego.apps.api.blocks.docs import DocBody, _call, _kind, _save, _saved, _where, case_owner
 from ai_lego.core.domain.evidence_words import CHECKABLE, FOUND, MIN_ORIGINS, NOT_FOUND, SENTENCE_KINDS, STANCES, UNCHECKABLE, VERDICTS, quote_in
-from ai_lego.core.domain.kinds.verify import ASKS, CHECK_QUESTIONS, LAW_UNCONFIRMED, MESSAGE_FORMS, SEARCH_ANGLES, SPREAD, claim_key, law_unconfirmed, weak_line
+from ai_lego.core.domain.kinds.verify import (ASKS, CHECK_QUESTIONS, FACTCHECK_ANGLE, LAW_UNCONFIRMED, MESSAGE_FORMS, SEARCH_ANGLES, SEARCH_LANGUAGES, SEARCH_PROVIDERS,
+                                               SPREAD, claim_key, law_unconfirmed, weak_line)
 from ai_lego.core.domain.source import COLLECTED_PROVENANCE, source_record
 from ai_lego.data.events import record_log
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.platform import block_hooks, evidence, safety
-from ai_lego.platform.block_hooks.verify import card_sha, hit_address, message_sha, require_first, settle_dead_runs, vouched
+from ai_lego.platform.block_hooks.verify import card_sha, hit_address, message_sha, person_reads, refuse_open_search, require_first, settle_dead_runs, vouched
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.net.collection_service import CollectionServiceClient
@@ -49,10 +53,10 @@ def verify_spec(session: dict[str, Any] = Depends(api.require_session)) -> dict[
     return {
         "forms": list(MESSAGE_FORMS), "sentence_kinds": list(SENTENCE_KINDS), "checkable": CHECKABLE, "stances": list(STANCES), "verdicts": list(VERDICTS),
         "asks": list(ASKS), "spread": [{"key": key, "question": question} for key, question, _ in SPREAD], "check_questions": list(CHECK_QUESTIONS),
-        "angles": list(SEARCH_ANGLES), "min_origins": MIN_ORIGINS, "law_unconfirmed": LAW_UNCONFIRMED,
+        "angles": list(SEARCH_ANGLES), "search_by": list(SEARCH_PROVIDERS.values()), "min_origins": MIN_ORIGINS, "law_unconfirmed": LAW_UNCONFIRMED,
         "techniques": {"title": TECHNIQUES.title, "version": TECHNIQUES.version, "maintainer": TECHNIQUES.maintainer, "items": TECHNIQUES.items},
         "factcheck_dbs": {"title": FACTCHECK_DBS.title, "version": FACTCHECK_DBS.version, "maintainer": FACTCHECK_DBS.maintainer,
-                          "dbs": {key: {k: db[k] for k in ("name", "by")} for key, db in dbs["dbs"].items()}, "asked": list(collect_lookups.DBS)},
+                          "dbs": {key: {k: db[k] for k in ("name", "by")} for key, db in dbs["dbs"].items()}},
     }
 
 
@@ -71,9 +75,17 @@ def paste_message(project_id: str, body: MessageBody, session: dict[str, Any] = 
     return _save(repo, session, owner, _kind("verify.message", "case"), DocBody(content=content))
 
 
-def _place(docs: CaseDocs, session: dict[str, Any], owner: record_log.Owner) -> str:
-    """The place whose list is used: only 「你在哪裡」 is read (VERIFY 卡: 只讀這一項，用來換成當地的查核組織)."""
-    return PLACE_TAIWAN if safety.covers(_where(docs, session["tenant_id"], session["identity_id"], owner)) else ""
+def _factcheck_plan(docs: CaseDocs, session: dict[str, Any], owner: record_log.Owner) -> tuple[str, dict[str, Any]]:
+    """The place whose list is used, and that list: only 「你在哪裡」 is read (VERIFY 卡: 只讀這一項，用來換成當地的查核組織)."""
+    place = PLACE_TAIWAN if safety.covers(_where(docs, session["tenant_id"], session["identity_id"], owner)) else ""
+    rules = FACTCHECK_DBS.items
+    return place, rules["places"].get(place) or rules["elsewhere"]
+
+
+def collect_asks(plan: dict[str, Any]) -> list[str]:
+    """The databases of a place's list that collect answers, in the list's order: only these are sent the words (lookup.v1
+    ``dbs``; someone outside Taiwan never sends them to Cofacts). The page says exactly these before a look-up."""
+    return [db for db in plan["use"] if db in collect_lookups.DBS]
 
 
 def _now() -> str:
@@ -93,7 +105,7 @@ def _store_hit(repo: ProjectSourceRepository, cas: TenantScopedCas, session: dic
     record = source_record(source_id, project_id, tenant_id, hit["title"][:300], "text/plain", project["data_classification"], cas_path["hash"], len(content),
                            TenantScopedCas.artifact_uri(tenant_id, project_id, source_id, cas_path), session["identity_id"], _now(),
                            published_at=hit["date"] or None, canonical_url=hit["address"], source_uri=hit["url"], fetched_at=_now(), provenance=COLLECTED_PROVENANCE,
-                           source_class="fact_check", relevance={"searchProvider": db, "searchAngle": "factcheck", "pasted": False},
+                           source_class="fact_check", relevance={"searchProvider": db, "searchAngle": FACTCHECK_ANGLE, "pasted": False},
                            supersedes_source_id=current["source_id"] if current else None)
     put = lambda: cas.put(tenant_id, content)   # noqa: E731
     if current is None:
@@ -150,9 +162,9 @@ class FactcheckBody(BaseModel):
 def factcheck(project_id: str, body: FactcheckBody, session: dict[str, Any] = Depends(api.require_session),
               repo: ProjectSourceRepository = Depends(api.get_project_source_repository), cas: TenantScopedCas = Depends(api.get_source_cas),
               service: CollectionServiceClient | None = Depends(api.get_collection_service)) -> dict[str, Any]:
-    """系統查別人是不是已經查過這一則: collect asks the databases once; each database of the place's list says 查到／查不到／
-    無法檢查 with collect's why (collect down or no token: 無法檢查 with collect_lookups' why, never an error). A 查到 needs the
-    attribution collect sent (the data's licence asks for it): without it nothing is used."""
+    """系統查別人是不是已經查過這一則: collect asks the place's databases once (only those see the words); each database of
+    the place's list says 查到／查不到／無法檢查 with collect's why (collect down or no token: 無法檢查 with collect_lookups'
+    why, never an error). A 查到 needs the attribution collect sent (the data's licence asks for it): without it nothing is used."""
     project = api._project_or_404(repo, session, project_id)
     owner = record_log.case(project_id)
     docs, tenant_id = CaseDocs(repo), session["tenant_id"]
@@ -169,10 +181,9 @@ def factcheck(project_id: str, body: FactcheckBody, session: dict[str, Any] = De
         if target["content"].get("message"):
             _call(require_first, docs, tenant_id, owner, target["content"]["message"])
         about = {"claim": target["doc_id"], "claim_version": target["version"]}
-    text, rules = target["content"]["text"], FACTCHECK_DBS.items
-    place = _place(docs, session, owner)
-    plan = rules["places"].get(place) or rules["elsewhere"]
-    answered = {entry["db"]: entry for entry in collect_lookups.factcheck(project_id, text, client=service)}
+    text = target["content"]["text"]
+    place, plan = _factcheck_plan(docs, session, owner)
+    answered = {entry["db"]: entry for entry in collect_lookups.factcheck(project_id, text, client=service, dbs=collect_asks(plan))}
     results, stored = [], []
     for db in plan["use"]:
         if db == "google":
@@ -212,7 +223,9 @@ def search_claim(project_id: str, claim_id: str, body: SearchBody, response: Res
                  store: IdentityStore = Depends(api.get_store), repo: ProjectSourceRepository = Depends(api.get_project_source_repository),
                  service: CollectionServiceClient | None = Depends(api.get_collection_service)) -> dict[str, Any]:
     """「去查」: one collection run for one checkable claim (the collector wire v2's claim seed), plan first, then confirm;
-    the run is remembered for the claim's version so its end writes verify.search for it."""
+    the run is remembered for the claim's version (verify.lookup) so its end writes verify.search for it. One open run per
+    claim version: refused before any run is made, and again in the lookup's own save before collect is asked (a second
+    request racing the first loses there, its run failed with nothing sent)."""
     owner = case_owner(project_id, session, repo)
     docs, tenant_id = CaseDocs(repo), session["tenant_id"]
     claim = next((doc for doc in docs.current(tenant_id, owner, "verify.claim") if doc["doc_id"] == claim_id), None)
@@ -226,11 +239,16 @@ def search_claim(project_id: str, claim_id: str, body: SearchBody, response: Res
     if not angles or any(angle not in SEARCH_ANGLES for angle in angles) or len(set(angles)) != len(angles):
         raise HTTPException(status_code=400, detail=f"VERIFY_SEARCH_ANGLES_INVALID: a non-empty choice of {list(SEARCH_ANGLES)}")
     seed = api.CollectionSeed(uri=f"entity://claim/{claim_id.replace('-', '')[:12]}", meta={
-        "kind": "claim", "entityName": claim["content"]["text"][:200], "angles": angles, "languages": ["zh", "en"], "providers": ["serper", "brave"]})
-    result = api.request_collection(project_id, api.CollectionRequest(seeds=[seed], confirm=body.confirm), response, session, store, repo, service)
-    if body.confirm and result.get("run_id"):
-        docs.save(tenant_id, owner, "verify.lookup", {"claim": claim_id, "claim_version": claim["version"], "run": result["run_id"], "angles": angles}, record_log.system("VERIFY"))
-    return result
+        "kind": "claim", "entityName": claim["content"]["text"][:200], "angles": angles, "languages": list(SEARCH_LANGUAGES), "providers": list(SEARCH_PROVIDERS)})
+    version = claim["version"]
+    if body.confirm:
+        _call(refuse_open_search, docs, tenant_id, owner, claim_id, version)
+
+    def reserve(run_id: str) -> None:
+        lookup = {"kind": "verify.lookup", "content": {"claim": claim_id, "claim_version": version, "run": run_id, "angles": angles}}
+        _call(docs.save_many, tenant_id, owner, [lookup], record_log.system("VERIFY"), check=lambda: refuse_open_search(docs, tenant_id, owner, claim_id, version))
+
+    return api.start_collection(project_id, api.CollectionRequest(seeds=[seed], confirm=body.confirm), response, session, store, repo, service, reserve=reserve)
 
 
 @router.get("/projects/{project_id}/verify/ledger")
@@ -245,7 +263,8 @@ def ledger(project_id: str, session: dict[str, Any] = Depends(api.require_sessio
     by_origin = {origin["origin_id"]: origin for origin in found}
     claims = {doc["doc_id"]: doc for doc in docs.current(tenant_id, owner, "verify.claim")}   # oldest first (CaseDocs.current)
     order = {claim_id: index for index, claim_id in enumerate(claims)}
-    lookups = {doc["content"]["claim"]: doc for doc in sorted(docs.current(tenant_id, owner, "verify.lookup"), key=lambda doc: doc["at"])}
+    # every record about one claim is about one version of it: version 1's run or result is never shown on version 2
+    lookups = {(doc["content"]["claim"], doc["content"]["claim_version"]): doc for doc in sorted(docs.current(tenant_id, owner, "verify.lookup"), key=lambda doc: doc["at"])}
     searches = {(doc["content"]["claim"], doc["content"]["claim_version"]): doc for doc in sorted(docs.current(tenant_id, owner, "verify.search"), key=lambda doc: doc["at"])}
     lines = []
     for line in evidence.checked_claims(docs, tenant_id, owner, found):
@@ -254,7 +273,7 @@ def ledger(project_id: str, session: dict[str, Any] = Depends(api.require_sessio
         stands = [{"origin_id": oid, "how": by_origin[oid]["how"], "cards": [{"card": card["card"], "title": card.get("title"), "url": card.get("url"),
                    "operator": (card.get("cells") or {}).get("operator"), "original": (card.get("cells") or {}).get("original"), "lists": card.get("lists") or [],
                    "mine": card.get("mine") or {}} for card in by_origin[oid]["cards"]]} for oid in read_origins if oid in by_origin]
-        lookup = lookups.get(line["claim_id"])
+        lookup = lookups.get((line["claim_id"], line["version"]))
         run = repo.get_collection_run(tenant_id, project_id, lookup["content"]["run"]) if lookup else None
         search = searches.get((line["claim_id"], line["version"]))
         key = claim_key(claim["content"].get("text"))
@@ -268,7 +287,9 @@ def ledger(project_id: str, session: dict[str, Any] = Depends(api.require_sessio
             "search": {key_: search["content"].get(key_) for key_ in ("state", "why")} if search else None,
             "lookup": {"run": lookup["content"]["run"], "status": run["status"] if run else "failed", "angles": lookup["content"].get("angles") or []} if lookup else None,
         })
-    return {"claims": lines, "min_origins": MIN_ORIGINS}
+    _, plan = _factcheck_plan(docs, session, owner)
+    return {"claims": lines, "min_origins": MIN_ORIGINS, "factcheck_asks": collect_asks(plan),
+            "person_reads": [doc["doc_id"] for doc in docs.current(tenant_id, owner, "gather.source") if person_reads(doc["content"])]}
 
 
 class StanceBody(BaseModel):
@@ -305,10 +326,11 @@ class ConfirmBody(BaseModel):
 @router.post("/projects/{project_id}/verify/stances/confirm")
 def confirm_readings(project_id: str, body: ConfirmBody, session: dict[str, Any] = Depends(api.require_session),
                      repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
-    """One click for every AI reading of one claim -- still your save, one stance each. A card you already read for this
-    claim's current version and page is left alone, and so is a reading of an older claim version or page (both counted
-    as skipped); a stance of yours read from an older version or page no longer counts, so this one replaces it (one live
-    stance per claim and card; the old one stays in its history)."""
+    """One click for every AI reading of one claim -- still your save, one stance each, and every one or none: each
+    stance's checks (block_hooks.verify) run under the write lock that saves them all, so a claim edited meanwhile leaves
+    nothing half-confirmed. A card you already read for this claim's current version and page is left alone, and so is a
+    reading of an older claim version or page (both counted as skipped); a stance of yours read from an older version or
+    page no longer counts, so this one replaces it (one live stance per claim and card; the old one stays in its history)."""
     owner = case_owner(project_id, session, repo)
     docs, tenant_id = CaseDocs(repo), session["tenant_id"]
     reading = next((doc for doc in docs.current(tenant_id, owner, "verify.reading") if doc["doc_id"] == body.reading), None)
@@ -317,19 +339,23 @@ def confirm_readings(project_id: str, body: ConfirmBody, session: dict[str, Any]
         raise HTTPException(status_code=404, detail="VERIFY_READING_NOT_FOUND: no such AI reading or claim in this case")
     cards = {doc["doc_id"]: card_sha(doc) for doc in docs.current(tenant_id, owner, "gather.source")}
     held = {doc["content"].get("card"): doc for doc in docs.current(tenant_id, owner, "verify.stance") if doc["content"].get("claim") == body.claim}
-    saved, skipped, notices = 0, 0, []
+    items, skipped = [], 0
     for entry in reading["content"].get("readings") or []:
         if entry.get("claim") != body.claim:
             continue
         mine = held.get(entry.get("card"))
         current = mine is not None and (mine["content"].get("claim_version"), mine["content"].get("snapshot")) == (claim["version"], cards.get(entry.get("card")))
-        if current or entry.get("claim_version") != claim["version"] or entry.get("snapshot") != cards.get(entry.get("card")):
+        twice = any(item["content"]["card"] == entry.get("card") for item in items)
+        if current or twice or entry.get("claim_version") != claim["version"] or entry.get("snapshot") != cards.get(entry.get("card")):
             skipped += 1
             continue
         content = {key: entry[key] for key in ("claim", "claim_version", "card", "snapshot") if key in entry}
         content.update(stance=entry["reads_as"], reading=body.reading, **({"quote": entry["quote"]} if entry.get("quote") else {}))
-        done = _save(repo, session, owner, _kind("verify.stance", "case"), DocBody(content=content, base_version=mine["version"] if mine else None), mine["doc_id"] if mine else None)
-        notices += done["notices"]
-        held[entry["card"]] = done
-        saved += 1
-    return {"saved": saved, "skipped": skipped, "notices": notices}
+        items.append({"kind": "verify.stance", "content": content, "doc_id": mine["doc_id"] if mine else None, "base_version": mine["version"] if mine else None})
+
+    def check() -> None:
+        for item in items:
+            block_hooks.before_save(docs, tenant_id, owner, item["kind"], item["content"], item["doc_id"])
+
+    saved = _call(docs.save_many, tenant_id, owner, items, api._me(session, "VERIFY"), check=check) if items else []
+    return {"saved": len(saved), "skipped": skipped, "notices": [notice for doc in saved for notice in _saved(repo, session, owner, doc)["notices"]]}

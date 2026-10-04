@@ -37,15 +37,16 @@ class CollectionServiceClient:
             error_prefix="COLLECTION_SERVICE",
         )
 
-    def lookup(self, project_id: str, kind: str, items: list[dict[str, Any]], timeout: float) -> dict[str, Any]:
+    def lookup(self, project_id: str, kind: str, items: list[dict[str, Any]], timeout: float, dbs: list[str] | None = None) -> dict[str, Any]:
         """Collect lookups v1 (specs/wire/lookup.v1.json). Raises ``InvariantViolation`` like ``start_run``; read the
-        answer only through ``collect_lookups``, which never lets that reach a hook."""
+        answer only through ``collect_lookups``, which never lets that reach a hook. ``dbs``: the fact-check databases
+        that see the words (absent = every one)."""
         return self._fetch(
             f"{self._base_url}/api/internal/collect/lookups",
             timeout,
             method="POST",
             headers={"Authorization": f"Bearer {self._token}"},
-            body={"project_id": project_id, "kind": kind, "items": items},
+            body={"project_id": project_id, "kind": kind, **({"dbs": dbs} if dbs is not None else {}), "items": items},
             error_prefix=LOOKUP_ERRORS,
         )
 

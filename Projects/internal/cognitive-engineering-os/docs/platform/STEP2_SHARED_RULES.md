@@ -53,7 +53,9 @@ Read them only through `evidence.origins()`, `evidence.checked_claims()`, `evide
 /projects/{id}/evidence`, `apps/api/blocks/evidence.py`, S's) — the counting
 rules live there once, fail-closed:
 - an origin counts unless it is still being grouped (a card no grouping has seen: 還在分組), every card in it is set aside
-  and not taken back, or the person marked it 不用; cards on one stored page or one snapshot are always one origin;
+  and not taken back, or the person marked it 不用; cards on one stored page, one snapshot or one address (the URL
+  without its #fragment: a fact-check hit and the report page it points at) are always one origin, and so is every
+  card chained to them through these;
 - a mark applies only to the exact group it was made on (the id is computed from the cards); after a regroup it is
   listed in `marks_on_changed_groups`, never moved;
 - only the person's stance counts (a stance is a conclusion: the integrity core keeps the AI out of it; the AI's

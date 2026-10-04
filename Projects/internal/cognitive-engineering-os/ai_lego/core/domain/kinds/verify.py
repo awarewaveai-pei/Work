@@ -28,7 +28,11 @@ SPREAD = (
 SPREAD_KEYS = tuple(key for key, *_ in SPREAD)
 # 「去查」: the claim angles of the collector wire v2 (STEP2_SHARED_RULES §4.1) in the checker's order -- who said it
 # first (原始文件), then how others report it, a fact-check, the earliest copy, and the opposite claim.
-SEARCH_ANGLES = ("primary", "news", "factcheck", "origin", "opposite")
+FACTCHECK_ANGLE = "factcheck"
+SEARCH_ANGLES = ("primary", "news", FACTCHECK_ANGLE, "origin", "opposite")
+# the channels one 「去查」 run plans (wire v2: engine x language); 查不到 needs every one of them to answer
+SEARCH_PROVIDERS = {"serper": "Serper", "brave": "Brave"}
+SEARCH_LANGUAGES = {"zh": "中文", "en": "英文"}
 
 KINDS = [
     # one claim the person confirmed (你確認了才算)
@@ -164,6 +168,7 @@ CHECK_QUESTIONS = (
     "很多人這樣說，不等於是真的；留言區、熱門、搜尋排名都可以用量灌出來。",
 )
 LAW_UNCONFIRMED = "未確認"   # a 法律 claim without its 法域、時效、來源: 不能當成確定的結論
+LAW_UNCONFIRMED_LINE = "法律的說法還沒寫法域、時效、來源，不能當成確定的結論"   # the summary's line for it, whatever the AI wrote
 
 
 def law_unconfirmed(claim: Mapping[str, Any]) -> bool:

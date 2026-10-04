@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 import unittest
 import uuid
@@ -14,7 +15,9 @@ from unittest import mock
 
 from ai_lego import PRODUCT_ROOT
 from ai_lego.apps.api import main as api_main
+from ai_lego.apps.api.blocks import verify as verify_route
 from ai_lego.core.domain import evidence_words as words
+from ai_lego.core.domain.kinds import verify as kinds_verify
 from ai_lego.core.domain.kinds.verify import SEARCH_ANGLES, SPREAD_KEYS, claim_key
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
@@ -54,6 +57,11 @@ NOTHING_FOUND = {"kind": "factcheck", "items": [{"text": "", "dbs": [
     {"db": "cofacts", "state": "查不到", "why": "Cofacts 沒有相近的訊息", "attribution": COFACTS_ATTRIBUTION, "hits": []}]}]}
 
 
+def channels(**states):
+    """Every channel 「去查」 plans (serper and brave, zh and en) as the run's end reports it: ok unless named."""
+    return [{"provider": provider, "lang": lang, "state": states.get(provider, "ok"), "why": ""} for provider in ("serper", "brave") for lang in ("zh", "en")]
+
+
 def answer_with(**entries):
     """The spec's factcheck answer with some databases' entries replaced."""
     answer = json.loads(json.dumps(SPEC_ANSWER))
@@ -62,18 +70,22 @@ def answer_with(**entries):
 
 
 class Lookups:
-    """Collect's lookups endpoint as a fake ``CollectionServiceClient.lookup``: answers with the asked text echoed."""
+    """Collect's lookups endpoint as a fake ``CollectionServiceClient.lookup``: answers with the asked text echoed and,
+    when the request names databases (``dbs``), only those (lookup.v1)."""
 
     def __init__(self, answer=None, error=None):
-        self.answer, self.error, self.calls = answer, error, []
+        self.answer, self.error, self.calls, self.dbs = answer, error, [], []
 
-    def lookup(self, project_id, kind, items, timeout):
+    def lookup(self, project_id, kind, items, timeout, dbs=None):
         self.calls.append((project_id, kind, items))
+        self.dbs.append(dbs)
         if self.error:
             raise self.error
         answer = json.loads(json.dumps(self.answer))
         for item, asked in zip(answer.get("items") or [], items):
             item["text"] = asked["text"]
+            if dbs is not None:
+                item["dbs"] = [entry for db in dbs for entry in item["dbs"] if entry["db"] == db]
         return answer
 
 
@@ -125,6 +137,20 @@ class VerifyCase(Step2Case):
         sid = self.source(text, "央行新聞稿")
         [card] = [doc["doc_id"] for doc in self.docs.current(self.tenant_id, self.owner, "gather.source") if doc["content"]["source_id"] == sid]
         return sid, card
+
+    def a_rumour_is_quoted_not_a_crisis(self, action, answer, kind):
+        """P1 (Codex, an earlier pass, F2): a pasted rumour that mentions 自殺 is someone else's words -- the gate quotes the
+        stored message after its crisis check (AiAction.quoted), fenced; the person's own words still stop the turn."""
+        rumour = "網傳：有人因為提款限制自殺了，快轉給家人！"
+        mid = self.message(rumour)["doc_id"]
+        self.first(mid)
+        saved = self.ai(action, {"message": mid}, answer)
+        self.assertEqual((saved.get("saved") or {}).get("kind"), kind, saved)
+        self.assertRegex(self.provider.calls[-1][1], r"<<<QUOTED 1 BEGIN (\w{16,})>>>\n\[1\] 要查的訊息\n---\n" + re.escape(rumour) + r"\n<<<QUOTED 1 END \1>>>")
+        self.assertEqual(self.current("govern.stop"), [])
+        self.post("/docs/collab_contract.terms", {"content": {"basis": "我不想活了"}})
+        calls = len(self.provider.calls)
+        self.assertEqual((self.ai(action, {"message": mid}, answer)["stopped"], len(self.provider.calls)), ("crisis", calls))
 
 
 class FirstReactionTests(VerifyCase):
@@ -260,6 +286,9 @@ class SplitAndClaimTests(VerifyCase):
             self.assertIn("VERIFY_CLAIM_REASON_REQUIRED", put({**claim["content"], **change}).text, change)
         self.assertEqual(put({**claim["content"], "law_source": "銀行法第 45 條", "reason": "補上條文"}).status_code, 200)
 
+    def test_a_rumour_mentioning_suicide_is_split_and_my_own_words_still_stop_it(self):
+        self.a_rumour_is_quoted_not_a_crisis("split", {"claims": [{"text": "有人因為提款限制自殺了", "sentence": CHECKABLE}]}, "verify.split")
+
 
 class TechniquesTests(VerifyCase):
     def test_a_technique_is_named_only_with_the_messages_own_words(self):
@@ -277,6 +306,9 @@ class TechniquesTests(VerifyCase):
         self.assertIn("AI_ANSWER_INVALID", self.client.post(f"{self.base}/ai/VERIFY/techniques", json={"context": {"message": mid}}).text)
         short = self.ai("techniques", {"message": mid}, {"techniques": [{"name": "情緒勒索", "quote": "不轉就來不及", "why": "x"}], "asks": [{"what": "轉傳", "quote": "快轉給"}]})["saved"]
         self.assertEqual(([item["name"] for item in short["content"]["techniques"]], short["content"].get("asks")), (["情緒勒索"], None))   # 3 characters prove nothing; the rest is kept
+
+    def test_a_rumour_mentioning_suicide_is_read_for_techniques_and_my_own_words_still_stop_it(self):
+        self.a_rumour_is_quoted_not_a_crisis("techniques", {"techniques": [], "asks": [{"what": "轉傳", "quote": "快轉給家人！"}]}, "verify.techniques")
 
 
 class ReadingTests(VerifyCase):
@@ -358,6 +390,51 @@ class ReadingTests(VerifyCase):
         saved = self.post("/verify/stances", {"content": {**content, "quote": "本行從未宣布每日\n提款上限"}})
         self.assertEqual(saved["content"]["quote"], "本行從未宣布每日\n提款上限")
 
+    def test_a_quote_is_the_named_cards_own_words_even_when_two_sources_are_cited(self):
+        """Codex round 4 F1: an answer citing two sources passed with the other page's words quoted for the card it names;
+        「全部照這樣記」 trusts a reading's quote (the gate checked it), so those words counted as this page's support."""
+        other = self.source("財經週刊：央行宣布下週起每天只能領一萬元，民眾一早排隊。", "財經週刊")
+        self.grant("search_external")
+        borrowed = self.reading(reads_as="支持", quote="央行宣布下週起每天只能領一萬元，民眾一早排隊", citations=[f"source:{self.sid}", f"source:{other}"])
+        self.assertEqual(self.ai("read", {}, {"readings": [borrowed]}, 502)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
+        self.assertEqual(self.current("verify.reading"), [])
+
+    def test_confirming_all_of_a_claims_readings_saves_every_stance_or_none(self):
+        """Codex round 4 F7: the batch saved stance by stance, so a claim edited between two of them left the first saved
+        and the second refused -- half a confirmation. Every stance is checked and written under one write lock now."""
+        sid, card = self.page("央行另一份說明：提款規定和以前一樣，沒有上限。")
+        self.group([self.cardid], [card])
+        self.grant("search_external")
+        unrelated = [{key: value for key, value in self.reading(card=item, citations=[f"source:{source}"], reads_as="無關").items() if key != "quote"}
+                     for item, source in ((self.cardid, self.sid), (card, sid))]
+        reading = self.ai("read", {}, {"readings": unrelated})["saved"]
+        real, calls = hooks._claim_now, []
+
+        def edited_after_the_first(*args):
+            calls.append(args)
+            if len(calls) == 2:
+                raise InvariantViolation("VERIFY_CLAIM_VERSION_STALE: the claim is at version 2; read it again")
+            return real(*args)
+
+        with mock.patch.object(hooks, "_claim_now", side_effect=edited_after_the_first):
+            refused = self.client.post(f"{self.base}/verify/stances/confirm", json={"reading": reading["doc_id"], "claim": self.cid})
+        self.assertEqual((refused.status_code, self.current("verify.stance")), (409, []))
+        done = self.post("/verify/stances/confirm", {"reading": reading["doc_id"], "claim": self.cid})
+        self.assertEqual((done["saved"], len(self.current("verify.stance"))), (2, 2))
+
+    def test_save_many_writes_every_item_or_none(self):
+        """F7's primitive: one repository transaction for every item; the second item stale -> the first is not written."""
+        me = record_log.user(self.identity["identity_id"], "VERIFY")
+        seen = self.docs.save(self.tenant_id, self.owner, "verify.seen", {"message": self.mid, "about": "spread", "text": "家族群組"}, me)
+        self.docs.save(self.tenant_id, self.owner, "verify.seen", {**seen["content"], "text": "兩個家族群組"}, me, doc_id=seen["doc_id"], base_version=1)
+        items = [{"kind": "verify.seen", "content": {"message": self.mid, "about": "earliest", "text": "最早是阿姨傳的"}},
+                 {"kind": "verify.seen", "content": {**seen["content"], "text": "三個群組"}, "doc_id": seen["doc_id"], "base_version": 1}]
+        with self.assertRaisesRegex(InvariantViolation, "DOC_STALE"):
+            self.docs.save_many(self.tenant_id, self.owner, items, me)
+        self.assertEqual([doc["content"]["text"] for doc in self.current("verify.seen")], ["兩個家族群組"])
+        items[1]["base_version"] = 2
+        self.assertEqual([doc["version"] for doc in self.docs.save_many(self.tenant_id, self.owner, items, me)], [1, 3])
+
     def test_a_stance_is_for_the_claims_current_version_and_the_cards_current_page(self):
         content = {"claim": self.cid, "claim_version": 2, "card": self.cardid, "snapshot": self.sha(self.cardid), "stance": "反對"}
         self.assertIn("VERIFY_CLAIM_VERSION_STALE", self.client.post(f"{self.base}/verify/stances", json={"content": content}).text)
@@ -435,6 +512,17 @@ class SummaryAndNextTests(VerifyCase):
         self.assertNotIn("country", sent)
         self.assertIn('"support": 1', sent)
 
+    def test_a_law_claim_without_its_details_gets_fixed_words_whatever_the_ai_writes(self):
+        """Codex round 4 F10: 未確認 was only a hint in the prompt; like 無法檢查 and under two origins, the system writes
+        that claim's line -- the AI never writes a conclusion for it."""
+        law = self.claim("提款上限依銀行法第 45 條", law=True, jurisdiction="台灣")["doc_id"]
+        a, b = self.card(url="https://law-a"), self.card(url="https://law-b")
+        self.group([self.cardid], [a], [b])
+        for card in (a, b):
+            self.save("verify.stance", {"claim": law, "claim_version": 1, "card": card, "snapshot": self.sha(card), "stance": "支持"}, record_log.user(self.identity["identity_id"], "VERIFY"))
+        saved = self.ai("summary", {"claims": [law]}, {"lines": [{"claim": law, "line": "法律已確定：銀行法第 45 條規定了提款上限"}]})["saved"]
+        self.assertEqual(saved["content"]["lines"], [{"claim": law, "claim_version": 1, "line": kinds_verify.LAW_UNCONFIRMED_LINE}])
+
     def test_what_is_still_worth_checking_needs_no_grant(self):
         saved = self.ai("next", {}, {"items": ["央行官網的新聞稿", ""], "question": "最早是誰傳的？還有別的嗎？"})["saved"]
         self.assertEqual((saved["content"]["items"], saved["content"]["question"]), (["央行官網的新聞稿"], "最早是誰傳的？"))
@@ -457,13 +545,14 @@ class FactcheckTests(VerifyCase):
         source = self._repo.find_active_source(self.tenant_id, self.pid, address)
         return self._source_cas.read(self.tenant_id, self._repo.get_source_content_reference(self.tenant_id, self.pid, source["source_id"])).decode("utf-8")
 
-    def stored(self, url, text):
-        """A page the collector stored under its canonical URL (no fragment)."""
+    def stored(self, url, text, angle=None):
+        """A page the collector stored under its canonical URL (no fragment); ``angle``: the search angle that found it."""
         content, source_id = text.encode("utf-8"), str(uuid.uuid4())
         cas_path = TenantScopedCas.cas_path_for(self.tenant_id, content)
         record = source_record(source_id, self.pid, self.tenant_id, "TFC 報告", "text/plain", "Confidential", cas_path["hash"], len(content),
                                TenantScopedCas.artifact_uri(self.tenant_id, self.pid, source_id, cas_path), self.identity["identity_id"], "2026-10-04T00:00:00Z",
-                               canonical_url=url, source_uri=url, fetched_at="2026-10-04T00:00:00Z", provenance=COLLECTED_PROVENANCE)
+                               canonical_url=url, source_uri=url, fetched_at="2026-10-04T00:00:00Z", provenance=COLLECTED_PROVENANCE,
+                               **({"relevance": {"searchProvider": "serper", "searchLang": "zh", "searchAngle": angle, "pasted": False}} if angle else {}))
         self._repo.add_source(record, cas_path, put_content=lambda: self._source_cas.put(self.tenant_id, content), writer=record_log.system("GATHER"))
         return source_id
 
@@ -637,6 +726,32 @@ class FactcheckTests(VerifyCase):
         dbs, _, _ = self.check()
         self.assertEqual([(hit["publisher"], hit["local"]) for hit in dbs["claimreview"]["hits"]], [("台灣事實查核中心", True), ("Other Checker", False)])
 
+    def test_only_the_databases_of_my_place_are_sent_the_words_and_the_page_is_told_which(self):
+        """P2 (critic round 2 m8): collect is asked only the place's databases that collect answers (lookup.v1 dbs), so
+        someone outside Taiwan never sends their words to Cofacts; the ledger tells the page which ones, for its notice."""
+        self.check()   # 台北
+        self.client.post("/me/docs/govern.location", json={"content": {"where": "東京"}})
+        dbs, _, _ = self.check()
+        self.assertEqual((self.lookups.dbs, list(dbs)), ([["cofacts", "claimreview"], ["claimreview"]], ["claimreview", "google"]))
+        self.assertEqual(self.client.get(f"{self.base}/verify/ledger").json()["factcheck_asks"], ["claimreview"])
+        self.assertEqual(verify_route.collect_asks({"use": ["google"]}), [])   # a place whose list collect answers none of: nothing is sent
+
+    def test_a_page_found_through_the_fact_check_angle_is_read_by_me_not_the_ai(self):
+        """P4: a fact-check article 「去查」 found through its 查核 angle restates the claim it reviewed, like a hit; quoted,
+        a 「錯誤」 report reads as support. The AI reading turn is never given it (named or not); the person reads it."""
+        cid = self.claim(message=self.mid)["doc_id"]
+        article = self.stored("https://factcheck.example/withdrawal", f"查核報告：網傳「{CLAIM}」，經查為錯誤訊息。", angle="factcheck")
+        block_hooks.after_sources(self.docs, self.tenant_id, self.owner, {"run": None, "source_ids": [article], "aside": [], "channels": [], "pasted": False})
+        block_hooks.wait_idle()
+        [card] = [doc["doc_id"] for doc in self.current("gather.source") if doc["content"]["source_id"] == article]
+        _, page = self.page()
+        self.grant("search_external")
+        support = {"claim": cid, "card": card, "reads_as": "支持", "quote": CLAIM, "citations": [f"source:{article}"]}
+        for context in ({}, {"cards": [card]}, {"cards": [page, card]}):
+            self.assertIn("VERIFY_FACTCHECK_CARD_NOT_FOR_AI", self.ai("read", context, {"readings": [support]}, 400)["detail"], context)
+        self.assertEqual((self.provider.calls, self.current("verify.reading")), ([], []))
+        self.assertEqual((hooks.usable_cards(self.docs, self.tenant_id, self.owner), self.client.get(f"{self.base}/verify/ledger").json()["person_reads"]), (1, [card]))
+
     def test_a_claim_can_be_looked_up_too(self):
         cid = self.claim(message=self.mid)["doc_id"]
         _, saved, _ = self.check({"claim": cid})
@@ -702,8 +817,67 @@ class SearchTests(CollectionApiTestCase):
         self.assertEqual(hooks.search_result({"status": "completed", "report": {**REPORT, "written": 0}}, []), ("無法檢查", "找資料的服務沒有回報搜尋管道"))   # critic M4
         self.assertEqual(hooks.search_result({"status": "completed", "report": REPORT}, [])[0], "查到")
         self.assertEqual(hooks.search_result({"status": "completed", "report": REPORT}, [{"provider": "serper", "lang": "zh", "state": "unreachable"}, {"provider": "brave", "lang": "zh", "state": "no_key"}])[0], "無法檢查")
-        self.assertEqual(hooks.search_result({"status": "completed", "report": {**REPORT, "written": 0}}, [{"provider": "serper", "lang": "zh", "state": "ok"}]), ("查不到", "找過，沒有找到相關的網頁"))
+        self.assertEqual(hooks.search_result({"status": "completed", "report": {**REPORT, "written": 0}}, channels()), ("查不到", "找過，沒有找到相關的網頁"))
         self.assertEqual(hooks.search_result({"status": "completed", "report": None}, [])[0], "無法檢查")
+
+    def test_nothing_found_only_when_every_planned_channel_answered(self):
+        """Codex round 4 F5 (decision S): Serper answered, Brave did not, no page -- that is not 「找過，沒有」. 查不到 only
+        when every channel the run planned (engines x languages) reported ok; else 無法檢查 naming what each engine said."""
+        empty = {"status": "completed", "report": {**REPORT, "written": 0}}
+        self.assertEqual(hooks.search_result(empty, channels(brave="unreachable")), ("無法檢查", "Brave 沒有回應；Serper 找過沒有找到"))
+        self.assertEqual(hooks.search_result(empty, channels(brave="no_key")), ("無法檢查", "Brave 還沒有設定金鑰；Serper 找過沒有找到"))
+        self.assertEqual(hooks.search_result(empty, channels()[:1]), ("無法檢查", "Serper（英文）沒有回報；Brave 沒有回報；Serper（中文）找過沒有找到"))
+        self.assertEqual(hooks.search_result({**empty, "report": REPORT}, channels(brave="unreachable")), ("查到", "找回 3 頁"))   # pages came back: found
+
+    def test_a_claims_new_version_shows_no_run_or_result_of_the_old_one(self):
+        """Codex round 4 F3/F4: a record about one claim is about one version of it -- the ledger matched 「去查」's run on
+        the claim id only, so version 1's run showed on version 2."""
+        claim = self.claim()
+        run_id, grant = self.start_run(claim)
+        self.client.post(f"/projects/{self.pid}/collections/{run_id}/complete", json={"status": "completed", "report": REPORT}, headers=grant)
+        self.assertEqual(len(self.searches()), 1)
+        held = next(doc for doc in self.docs.current(self.tenant_id, self.owner, "verify.claim") if doc["doc_id"] == claim)
+        edited = self.client.put(f"/projects/{self.pid}/docs/verify.claim/{claim}", json={"content": {**held["content"], "text": "央行宣布下週起每天只能領兩萬元", "reason": "原文是兩萬"}, "base_version": 1})
+        self.assertEqual(edited.status_code, 200, edited.text)
+        [line] = self.client.get(f"/projects/{self.pid}/verify/ledger").json()["claims"]
+        self.assertEqual((line["version"], line["lookup"], line["search"], line["state"]), (2, None, None, words.NOT_SEARCHED))
+
+    def test_one_open_go_check_per_claim_version(self):
+        """Codex round 4 F6: a second confirm (or a second tab) started another run for the same claim version -- the
+        outside queries twice, and two ends writing one claim's result."""
+        claim = self.claim()
+        self.start_run(claim)
+        again = self.go(claim, confirm=True)
+        self.assertEqual(again.status_code, 409, again.text)
+        self.assertIn("VERIFY_SEARCH_ALREADY_RUNNING", again.text)
+        connection = sqlite3.connect(self._repo.db_path)
+        try:
+            runs = connection.execute("SELECT COUNT(*) FROM collection_runs").fetchone()[0]
+        finally:
+            connection.close()
+        self.assertEqual((runs, len(self.service.calls), len(self.docs.current(self.tenant_id, self.owner, "verify.lookup"))), (1, 1, 1))   # refused before any run was made
+
+    def test_two_racing_go_checks_start_one_run(self):
+        """The check before the run is the quick answer; the one that holds is made under the write lock that saves the
+        run's verify.lookup, before collect is asked: the loser's run fails there and collect never hears of it."""
+        claim = self.claim()
+        self.start_run(claim)
+        real, calls = verify_route.refuse_open_search, []
+
+        def before_the_other_saved(*args):   # the first check runs before the other request's lookup was saved
+            calls.append(args)
+            if len(calls) > 1:
+                real(*args)
+
+        with mock.patch.object(verify_route, "refuse_open_search", side_effect=before_the_other_saved):
+            second = self.go(claim, confirm=True)
+        self.assertEqual(second.status_code, 409, second.text)
+        connection = sqlite3.connect(self._repo.db_path)
+        try:
+            statuses = sorted(row[0] for row in connection.execute("SELECT status FROM collection_runs"))
+        finally:
+            connection.close()
+        self.assertEqual((statuses, len(self.service.calls), len(self.docs.current(self.tenant_id, self.owner, "verify.lookup"))), (["failed", "running"], 1, 1))
 
 
     def test_a_run_that_will_never_call_back_is_settled_on_a_ledger_read_or_the_next_arrival(self):

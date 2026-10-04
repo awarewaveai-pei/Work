@@ -12,7 +12,7 @@ Before the model is called, in this order:
    nothing paid for;
 6. an action that reads sources (``cites``) gets the case's source cards that are not set aside, fenced, after the crisis
    check (a source's words are not the person's); every object in its answer that quotes, names a card or cites must
-   cite only those, its quote must be in what it cites and its card must be the cited source's card, or nothing is
+   cite only those, its quote must be in what it cites (for the card it names) and its card must be the cited source's card, or nothing is
    saved (AI_ANSWER_UNCITED). An output kind with a ``citations`` or ``Field(cited=True)`` field can only be written by a
    ``cites`` action.
 ``build_input(context, read)`` and ``handback(context, read)``: ``read(kind)`` reads the listed kinds; ``read.evidence``
@@ -174,7 +174,8 @@ def _cited_objects(value: Any, path: str = "$"):
 def uncited(answer: Any, texts: Mapping[str, str], card_of: Mapping[str, str]) -> list[str]:
     """What breaks 「只能引用 GATHER 找回來的」 in an answer. ``texts``: source:<id> -> that source's text as the model saw
     it; ``card_of``: source:<id> -> its source card. Every object that cites, quotes or names a card cites only given
-    sources; its quote is in one of them (evidence_words.quote_in); the card it names is one of their cards."""
+    sources; its quote is in one of them (evidence_words.quote_in) -- in the one of the card it names, when it names one:
+    a quote from another cited page must not stand as this card's words; the card it names is one of their cards."""
     problems = []
     for path, item in _cited_objects(answer):
         citations = item.get("citations")
@@ -183,8 +184,9 @@ def uncited(answer: Any, texts: Mapping[str, str], card_of: Mapping[str, str]) -
         if not citations or outside:
             problems.append(f"{path} cites {outside[:2] if outside else 'nothing'}")
             continue
-        if "quote" in item and not any(quote_in(item["quote"], texts[citation]) for citation in citations):
-            problems.append(f"{path} quotes words not in the source it cites (or fewer than {MIN_QUOTE} characters)")
+        quoted_from = [citation for citation in citations if "card" not in item or card_of[citation] == item["card"]]
+        if "quote" in item and not any(quote_in(item["quote"], texts[citation]) for citation in quoted_from):
+            problems.append(f"{path} quotes words not in the source it cites for its card (or fewer than {MIN_QUOTE} characters)")
         if "card" in item and item["card"] not in {card_of[citation] for citation in citations}:
             problems.append(f"{path} names a card that is not the cited source's card")
     return problems

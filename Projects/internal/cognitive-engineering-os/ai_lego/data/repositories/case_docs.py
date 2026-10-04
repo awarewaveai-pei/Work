@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 from uuid import uuid4
 
 from ai_lego.core.domain import doc_kinds
@@ -49,29 +49,43 @@ class CaseDocs:
 
         The person saving over an AI or joint version: unchanged = the AI's (一字沒改照收的算「AI」), changed = joint
         (AI 起草、你改過的算「共同」)."""
-        spec = doc_kinds.require(kind)
         with self._repo.transaction() as connection:
-            if owner.kind == "case":
-                self._repo.require_case(connection, tenant_id, owner.id)
-            if doc_id is None:
-                if spec.singleton and self._live_ids(connection, tenant_id, owner, kind):
-                    raise InvariantViolation(f"DOC_SINGLETON_EXISTS: there is already a {kind}; save a new version of it")
-                doc_id, version, previous = str(uuid4()), 1, None
-            else:
-                history = [item for item in self._history(connection, tenant_id, owner, doc_id) if not item["deleted"]]
-                if not history or history[-1]["kind"] != kind:
-                    raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
-                previous = history[-1]
-                if base_version != previous["version"]:
-                    raise InvariantViolation(f"DOC_STALE: {doc_id!r} is at version {previous['version']}, not {base_version}")
-                version = previous["version"] + 1
-            clean = doc_kinds.validate(kind, content, writer.author)
-            if writer.author == "user" and previous is not None and previous["author"] in ("ai", "joint"):
-                writer = Writer("ai", writer.block) if clean == previous["content"] and previous["author"] == "ai" else Writer("joint", writer.block, writer.identity_id)
-            event = record_log.append(connection, tenant_id, f"doc:{doc_id}", "DocSaved", {"kind": spec.kind, "doc_id": doc_id, "version": version, "content": clean},
-                                      writer=writer, owner=owner)
-            if spec.from_case:   # a person's record made from one case goes with that case (erase_project): checked after the
-                self._repo.require_case(connection, tenant_id, clean[spec.from_case])   # writer's own checks; a refusal rolls the save back
+            return self._save(connection, tenant_id, owner, kind, content, writer, doc_id, base_version)
+
+    def save_many(self, tenant_id: str, owner: Owner, items: list[Mapping[str, Any]], writer: Writer,
+                  check: Callable[[], None] | None = None) -> list[dict[str, Any]]:
+        """Every item (``{"kind", "content", "doc_id"?, "base_version"?}``, each as ``save``) or none: one transaction.
+        ``check()`` runs first under the same write lock (a block's own checks of the batch), so nothing it read can
+        change before the writes; it raises to refuse."""
+        with self._repo.transaction() as connection:
+            if check is not None:
+                check()
+            return [self._save(connection, tenant_id, owner, item["kind"], item["content"], writer, item.get("doc_id"), item.get("base_version")) for item in items]
+
+    def _save(self, connection: sqlite3.Connection, tenant_id: str, owner: Owner, kind: str, content: Mapping[str, Any], writer: Writer,
+              doc_id: str | None, base_version: int | None) -> dict[str, Any]:
+        spec = doc_kinds.require(kind)
+        if owner.kind == "case":
+            self._repo.require_case(connection, tenant_id, owner.id)
+        if doc_id is None:
+            if spec.singleton and self._live_ids(connection, tenant_id, owner, kind):
+                raise InvariantViolation(f"DOC_SINGLETON_EXISTS: there is already a {kind}; save a new version of it")
+            doc_id, version, previous = str(uuid4()), 1, None
+        else:
+            history = [item for item in self._history(connection, tenant_id, owner, doc_id) if not item["deleted"]]
+            if not history or history[-1]["kind"] != kind:
+                raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
+            previous = history[-1]
+            if base_version != previous["version"]:
+                raise InvariantViolation(f"DOC_STALE: {doc_id!r} is at version {previous['version']}, not {base_version}")
+            version = previous["version"] + 1
+        clean = doc_kinds.validate(kind, content, writer.author)
+        if writer.author == "user" and previous is not None and previous["author"] in ("ai", "joint"):
+            writer = Writer("ai", writer.block) if clean == previous["content"] and previous["author"] == "ai" else Writer("joint", writer.block, writer.identity_id)
+        event = record_log.append(connection, tenant_id, f"doc:{doc_id}", "DocSaved", {"kind": spec.kind, "doc_id": doc_id, "version": version, "content": clean},
+                                  writer=writer, owner=owner)
+        if spec.from_case:   # a person's record made from one case goes with that case (erase_project): checked after the
+            self._repo.require_case(connection, tenant_id, clean[spec.from_case])   # writer's own checks; a refusal rolls the save back
         return {"doc_id": doc_id, "kind": kind, "version": version, "content": clean, "author": writer.author, "block": writer.block, "at": event["occurred_at"], "deleted": False}
 
     @staticmethod
