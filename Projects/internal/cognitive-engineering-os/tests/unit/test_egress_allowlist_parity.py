@@ -83,11 +83,11 @@ class EgressAllowlistParityTests(unittest.TestCase):
         self.assertEqual(_engine_modules(lambda source: _imports_any(source, _PROCESS_MODULES) or bool(_PROCESS_CALLS.search(source))),
                          {"ai_lego/apps/api/main.py", "ai_lego/modules/knowledge/ingest/audio_fixtures.py", "ai_lego/platform/ai_execution/manifest.py"})
         # imports by computed name cannot be read here. Each resolves the engine's own packages (blocks, doc kinds,
-        # rulesets, AI actions, block hooks), a method contract's builder path (dispatch and the methods' self-checks), an
-        # optional speech package (transcription) or os (journal_protection). A new one is reviewed here.
+        # rulesets, AI actions, block hooks), a method contract's builder path (dispatch, the methods' self-checks, COMPUTE's
+        # ruleset), an optional speech package (transcription) or os (journal_protection). A new one is reviewed here.
         self.assertEqual(_engine_modules(lambda source: bool(_DYNAMIC_IMPORT.search(source))), {
             "ai_lego/apps/api/blocks/__init__.py", "ai_lego/core/domain/doc_kinds.py", "ai_lego/platform/rulesets/__init__.py",
-            "ai_lego/platform/ai_gate.py", "ai_lego/platform/block_hooks/__init__.py",
+            "ai_lego/platform/ai_gate.py", "ai_lego/platform/block_hooks/__init__.py", "ai_lego/platform/block_hooks/compute.py",
             "ai_lego/apps/api/dispatch.py", "ai_lego/modules/computation/monte_carlo.py", "ai_lego/modules/decision/expected_value.py",
             "ai_lego/modules/decision/rice.py", "ai_lego/modules/decision/topsis.py", "ai_lego/modules/decision/wsjf.py",
             "ai_lego/modules/learning/prediction_tracking.py", "ai_lego/modules/research/gates.py",
