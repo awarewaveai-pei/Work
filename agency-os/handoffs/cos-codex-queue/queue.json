@@ -1,0 +1,38 @@
+{
+  "about": "Card queue for scripts/codex-continue.ps1. Cards run in order; a card waits for its depends and its gate; high_stop cards are never run by the driver. Add a card = a file in cards/ + an entry here + cards/<id> starts with '# Card <number>'. See README.md.",
+  "cards": [
+    {
+      "id": "00-queue-integrity",
+      "file": "cards/00-queue-integrity.md",
+      "gate": null,
+      "depends": [],
+      "high_stop": false,
+      "check": [
+        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_codex_queue" }
+      ]
+    },
+    {
+      "id": "01-ci-postgres",
+      "file": "cards/01-ci-postgres.md",
+      "gate": null,
+      "depends": ["00-queue-integrity"],
+      "high_stop": false,
+      "check": [
+        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_ci_postgres" },
+        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_pg_foundation" },
+        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_codex_queue" }
+      ]
+    },
+    {
+      "id": "02-cognitive-db-ops",
+      "file": "cards/02-cognitive-db-ops.md",
+      "gate": null,
+      "depends": ["01-ci-postgres"],
+      "high_stop": false,
+      "check": [
+        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_cognitive_db_ops" },
+        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_codex_queue" }
+      ]
+    }
+  ]
+}
