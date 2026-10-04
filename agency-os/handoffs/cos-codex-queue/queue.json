@@ -1,5 +1,5 @@
 {
-  "about": "Card queue for scripts/codex-continue.ps1. Cards run in order; a card waits for its depends and its gate; high_stop cards are never run by the driver. Add a card = a file in cards/ + an entry here + cards/<id> starts with '# Card <number>'. See README.md.",
+  "about": "Card queue for scripts/codex-continue.ps1. Cards run in order; a card waits for its depends and its gate; high_stop cards are never run by the driver; done_elsewhere (a note naming where) marks a card another worker finished. Commit queue changes on main before running (the driver rebases Codex's worktree onto main per card). Add a card = a file in cards/ + an entry here + the file starts with '# Card <number>'. See README.md.",
   "cards": [
     {
       "id": "00-queue-integrity",
@@ -8,30 +8,615 @@
       "depends": [],
       "high_stop": false,
       "check": [
-        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_codex_queue" }
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
       ]
     },
     {
       "id": "01-ci-postgres",
       "file": "cards/01-ci-postgres.md",
       "gate": null,
-      "depends": ["00-queue-integrity"],
+      "depends": [
+        "00-queue-integrity"
+      ],
       "high_stop": false,
       "check": [
-        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_ci_postgres" },
-        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_pg_foundation" },
-        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_codex_queue" }
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_ci_postgres"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_pg_foundation"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
       ]
     },
     {
       "id": "02-cognitive-db-ops",
       "file": "cards/02-cognitive-db-ops.md",
       "gate": null,
-      "depends": ["01-ci-postgres"],
+      "depends": [
+        "01-ci-postgres"
+      ],
       "high_stop": false,
       "check": [
-        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_cognitive_db_ops" },
-        { "cwd": "Projects/internal/cognitive-engineering-os", "cmd": "python -m unittest tests.unit.test_codex_queue" }
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_cognitive_db_ops"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "40-teach-content-and-loader",
+      "file": "cards/40-teach-content-and-loader.md",
+      "gate": null,
+      "depends": [
+        "00-queue-integrity"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_teach_content"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_step2_foundation"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "41-teach-block",
+      "file": "cards/41-teach-block.md",
+      "gate": null,
+      "depends": [
+        "40-teach-content-and-loader"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_block_teach"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_block_foundation"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_record_log"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "42-teach-page",
+      "file": "cards/42-teach-page.md",
+      "gate": null,
+      "depends": [
+        "41-teach-block"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx tsc --noEmit"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx vitest run components/blocks/TeachPage.test.tsx"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "50-express-outline-and-draft",
+      "file": "cards/50-express-outline-and-draft.md",
+      "gate": null,
+      "depends": [
+        "00-queue-integrity"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_block_express"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_block_foundation"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_record_log"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "51-express-export-send",
+      "file": "cards/51-express-export-send.md",
+      "gate": null,
+      "depends": [
+        "50-express-outline-and-draft"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_express_export"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_block_express"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "52-express-page",
+      "file": "cards/52-express-page.md",
+      "gate": null,
+      "depends": [
+        "51-express-export-send"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx tsc --noEmit"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx vitest run components/blocks/ExpressPage.test.tsx"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "10-group-core",
+      "file": "cards/10-group-core.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "00-queue-integrity"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_groups_core"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_pg_foundation"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_record_log"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_step2_foundation"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "11-visibility",
+      "file": "cards/11-visibility.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "10-group-core"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_visibility"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_groups_core"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "12-invitations",
+      "file": "cards/12-invitations.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "11-visibility"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_group_invites"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_visibility"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_step2_foundation"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "13-roles-consent",
+      "file": "cards/13-roles-consent.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "12-invitations"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_consent"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_visibility"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_group_invites"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "20-collab-kinds-routes",
+      "file": "cards/20-collab-kinds-routes.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "13-roles-consent"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_block_collab"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_visibility"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_consent"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "21-collab-agreement-ai",
+      "file": "cards/21-collab-agreement-ai.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "20-collab-kinds-routes"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_collab_agreement"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_collab_ai"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_block_collab"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "22-collab-page",
+      "file": "cards/22-collab-page.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "21-collab-agreement-ai"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx tsc --noEmit"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx vitest run components/blocks/CollabPage.test.tsx"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "30-govern-appeals",
+      "file": "cards/30-govern-appeals.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "13-roles-consent"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_appeals"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_visibility"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_consent"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "31-govern-research-export",
+      "file": "cards/31-govern-research-export.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "30-govern-appeals"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_research_export"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_consent"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "32-govern-no-record-and-resources",
+      "file": "cards/32-govern-no-record-and-resources.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "13-roles-consent"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_govern_no_record"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_resources"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_block_govern"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "33-govern-page",
+      "file": "cards/33-govern-page.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "31-govern-research-export",
+        "32-govern-no-record-and-resources"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx tsc --noEmit"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx vitest run components/blocks/GovernPage.test.tsx"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "60-facilitate-content",
+      "file": "cards/60-facilitate-content.md",
+      "gate": null,
+      "depends": [
+        "40-teach-content-and-loader"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_facilitate_content"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_teach_content"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "61-facilitate-records-eligibility",
+      "file": "cards/61-facilitate-records-eligibility.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "30-govern-appeals",
+        "41-teach-block",
+        "60-facilitate-content"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_block_facilitate"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_appeals"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_consent"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_visibility"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "62-facilitate-ai-page",
+      "file": "cards/62-facilitate-ai-page.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "61-facilitate-records-eligibility"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_facilitate_ai"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx tsc --noEmit"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os/apps/cognitive-web",
+          "cmd": "npx vitest run components/blocks/FacilitatePage.test.tsx"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "70-process-indicators",
+      "file": "cards/70-process-indicators.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "21-collab-agreement-ai",
+        "31-govern-research-export"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_indicators"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
+      ]
+    },
+    {
+      "id": "80-wave-close",
+      "file": "cards/80-wave-close.md",
+      "gate": "pg-port-merged",
+      "depends": [
+        "22-collab-page",
+        "33-govern-page",
+        "42-teach-page",
+        "52-express-page",
+        "62-facilitate-ai-page",
+        "70-process-indicators"
+      ],
+      "high_stop": false,
+      "check": [
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_step34_checklist"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_integrity"
+        },
+        {
+          "cwd": "Projects/internal/cognitive-engineering-os",
+          "cmd": "python -m unittest tests.unit.test_codex_queue"
+        }
       ]
     }
   ]

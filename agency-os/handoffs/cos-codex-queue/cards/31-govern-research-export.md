@@ -1,0 +1,18 @@
+# Card 31 — GOVERN: the research export (what leaves, what is left out, and why)
+
+## Decision
+Required reading: `STEP34_SHARED_RULES.md` §6 (research consent), §10; `GOVERN.card.txt` lines on 研究 / 同意 / 匿名 / 「不保證認不出是誰」; blueprint §11-12 in `agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/BLUEPRINT_v0.7.md`. Research is the person's explicit, withdrawable choice. The export removes the account and the three places, never the content; it keeps the cases that did not change, failed or were withdrawn; it never calls itself anonymous.
+
+## Constraints
+- `COS/ai_lego/platform/research_export.py`: `export(study_id, *, now)` -> writes a JSONL file (path from the caller) and returns a manifest dict. Inputs: all live `govern.consent` records with `purpose: "research"` and `target == study_id` across the tenant, not withdrawn at `now`. Output per consented item: the doc content exactly as stored, the kind, a stable pseudonymous `subject` (HMAC-SHA256 of identity_id with a per-study secret from an env var `COGNITIVE_OS_STUDY_SECRET_<STUDY>`; if the secret is unset, REFUSE to export, no fallback), the version number; REMOVED: identity fields, and the three places (`happened_in`, `you_are_in`, each party's place, wherever they appear: scan with the same key names GOVERN's `Field.labels`/`unread_keys` use and a test that fails if a new place-bearing key is added to a kind without being handled: gate over `kinds/*.py` for fields named like `*place*|*where*|happened_in|you_are_in`), and name-like fields are NOT scrubbed from free text (the page tells the person to remove names first; the export documents that it does not).
+- Completeness: cases that did not change, failed, or were abandoned are INCLUDED when their consent is live; a manifest line lists, per excluded subject, only the reason class (`consent_withdrawn`, `consent_missing_item`, `case_erased`), never an identity.
+- FACILITATE drift records come in only when the facilitator and the participants of that group all hold live research consents for the study; otherwise they are excluded with reason `not_all_consented`.
+- Consent withdrawn after an export: the next export omits it; the manifest of the next export lists the count of withdrawals since the last export manifest (kept in a small `research_exports` table row per export: study, at, manifest hash).
+- CLI `ai_lego/apps/cli/research_export.py --study S --out file.jsonl` for the operator; no web route exports research data.
+- The manifest header text: `this file removes the account and three places; it does not guarantee that a person cannot be recognised` (Chinese + English).
+
+## Files
+`ai_lego/platform/research_export.py`, `ai_lego/apps/cli/research_export.py`, migration `ai_lego/data/migrations/versions/0005_research_exports.py`, `tests/unit/test_research_export.py`, `docs/platform/STEP34_CHECKLIST.md`, `agency-os/reports/review-debt.md`.
+
+## Acceptance
+`tests/unit/test_research_export.py`: only consented, non-withdrawn items appear; withdrawn consent removes the item from the next export; identity, email, display name and the three places never appear (assert on the full serialized output against a seeded set of strings); a case marked failed/unchanged is included; the manifest never contains an identity; the same input twice gives the same pseudonym; a missing study secret refuses; drift records excluded unless all consent; no web route can reach the exporter (source scan of `apps/api/`); the new-place-key gate fails on a temp copy of a kind with an unhandled `place` field; header text present. Mutations: skip the place removal -> red; include a withdrawn consent -> red; export without the secret -> red; drop failed cases -> red.

@@ -55,9 +55,14 @@ function Resolve-CodexExe {
     return $null
 }
 
-function Git([string[]]$GitArgs, [string]$Dir = $root) {
-    $out = & git -C $Dir @GitArgs 2>&1
-    return @{ Text = (@($out) -join "`n"); Exit = $LASTEXITCODE }
+function GitRun([string[]]$GitArgs, [string]$Dir = $root) {
+    # git writes progress ("Preparing worktree") to stderr; under -ErrorAction Stop that would be a terminating error
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $out = & git -C $Dir @GitArgs 2>&1
+        return @{ Text = (@($out | ForEach-Object { "$_" }) -join "`n"); Exit = $LASTEXITCODE }
+    } finally { $ErrorActionPreference = $prev }
 }
 
 function Read-Json([string]$Path) { return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json) }
@@ -102,7 +107,13 @@ function Set-Card([string]$Id, [hashtable]$Fields) {
     }
     Save-State $state
 }
-function Is-Done([string]$Id) { $s = Card-State $Id; return ($s -and $s.status -eq 'done') }
+function Is-Done([string]$Id) {
+    $s = Card-State $Id
+    if ($s -and $s.status -eq 'done') { return $true }
+    $c = @($queue.cards | Where-Object { $_.id -eq $Id }) | Select-Object -First 1
+    if ($c -and $c.PSObject.Properties['done_elsewhere'] -and $c.done_elsewhere) { return $true }   # finished by another worker (the note names where)
+    return $false
+}
 function Gate-Open($Card) {
     if (-not $Card.PSObject.Properties['gate'] -or -not $Card.gate) { return $true }
     return (Test-Path -LiteralPath (Join-Path $queueRoot ("gates/" + $Card.gate)))
@@ -111,9 +122,9 @@ function Gate-Open($Card) {
 # ---- worktree (detached; its commits stay reachable as refs/codex/work) ----------------------------------------
 if (-not $DryRun) {
     if (-not (Test-Path -LiteralPath $Worktree)) {
-        $base = (Git @('rev-parse', '--verify', '-q', 'refs/codex/work')).Text
-        if (-not $base -or $base -match 'fatal') { $base = (Git @('rev-parse', 'HEAD')).Text }
-        $r = Git @('worktree', 'add', '--detach', $Worktree, $base.Trim())
+        $base = (GitRun @('rev-parse', '--verify', '-q', 'refs/codex/work')).Text
+        if (-not $base -or $base -match 'fatal') { $base = (GitRun @('rev-parse', 'HEAD')).Text }
+        $r = GitRun @('worktree', 'add', '--detach', $Worktree, $base.Trim())
         if ($r.Exit -ne 0) { Write-Error "worktree add failed: $($r.Text)"; exit 2 }
         Say "worktree created at $Worktree from $($base.Trim().Substring(0, 9))"
     }
@@ -158,12 +169,22 @@ try {
         Say "card $id" 'Cyan'
         if ($DryRun) { Say "  (dry run) would run $($card.file)"; $done++; continue }
 
+        # keep the chain on top of the current main: new rules, cards and merged code appear in the worktree
+        $mainHead = (GitRun @('rev-parse', 'main')).Text.Trim()
+        $rb = GitRun @('rebase', $mainHead) $Worktree
+        if ($rb.Exit -ne 0) {
+            $null = GitRun @('rebase', '--abort') $Worktree
+            Set-Card $id @{ status = 'blocked'; note = "rebase of the Codex chain onto main failed: $($rb.Text.Split("`n")[0])" }
+            Say "blocked: the Codex chain does not rebase onto main (conflict). A person resolves it in $Worktree" 'Red'; $exitCode = 1; break
+        }
+        $null = GitRun @('update-ref', 'refs/codex/work', (GitRun @('rev-parse', 'HEAD') $Worktree).Text.Trim())
+
         $cardOk = $false
         $feedback = ''
+        $cardBase = (GitRun @('rev-parse', 'HEAD') $Worktree).Text.Trim()   # the card is judged on everything since here, across attempts
         for ($attempt = 1; $attempt -le $MaxAttempts -and -not $cardOk; $attempt++) {
             & powershell -NoProfile -ExecutionPolicy Bypass -File $quotaScript -Action check -Tool codex | Out-Null
             if ($LASTEXITCODE -eq 3) { Say 'Codex quota is blocked; stopping' 'Yellow'; $exitCode = 3; break }
-            $startHead = (Git @('rev-parse', 'HEAD') $Worktree).Text.Trim()
             Set-Card $id @{ status = 'running'; attempts = $attempt; started = (Get-Date).ToString('s') }
 
             $logBase = Join-Path $StateDir "logs/$id-$attempt"
@@ -199,10 +220,10 @@ try {
 
             # ---- acceptance, run here (outside Codex) ----
             $problems = @()
-            $newCommits = [int](Git @('rev-list', '--count', "$startHead..HEAD") $Worktree).Text.Trim()
+            $newCommits = [int](GitRun @('rev-list', '--count', "$cardBase..HEAD") $Worktree).Text.Trim()
             if ($newCommits -lt 1) { $problems += 'no new commit in the worktree' }
-            if ((Git @('status', '--porcelain') $Worktree).Text.Trim()) { $problems += 'the worktree is not clean (uncommitted or untracked files)' }
-            $touched = (Git @('diff', '--name-only', "$startHead..HEAD") $Worktree).Text
+            if ((GitRun @('status', '--porcelain') $Worktree).Text.Trim()) { $problems += 'the worktree is not clean (uncommitted or untracked files)' }
+            $touched = (GitRun @('diff', '--name-only', "$cardBase..HEAD") $Worktree).Text
             if ($newCommits -ge 1 -and $touched -notmatch 'agency-os/reports/review-debt\.md') { $problems += 'the commit(s) did not add a row to agency-os/reports/review-debt.md' }
             $n = 0
             foreach ($chk in @($card.check)) {
@@ -217,8 +238,8 @@ try {
                 }
             }
             if ($problems.Count -eq 0) {
-                $head = (Git @('rev-parse', 'HEAD') $Worktree).Text.Trim()
-                $null = Git @('update-ref', 'refs/codex/work', $head)
+                $head = (GitRun @('rev-parse', 'HEAD') $Worktree).Text.Trim()
+                $null = GitRun @('update-ref', 'refs/codex/work', $head)
                 Set-Card $id @{ status = 'done'; commit = $head; finished = (Get-Date).ToString('s'); note = '' }
                 Say "  done: $id at $($head.Substring(0, 9)) (kept as refs/codex/work; review-debt.md lists it)" 'Green'
                 $cardOk = $true; $done++

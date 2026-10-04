@@ -1,0 +1,17 @@
+# Card 30 — GOVERN: appeals (anonymous by default; never readable by their subject)
+
+## Decision
+Required reading: `STEP34_SHARED_RULES.md` §9; `docs/platform/step34-cards/GOVERN.card.txt` and `FACILITATE.card.txt` lines on 申訴 / 異議; cards 10-13 on this tree. A participant can object to how a facilitator led. The objection is theirs: they can export and delete it; the facilitator can never read or change it; the supervisor and the platform's appeal handler always can.
+
+## Constraints
+- Kind `govern.appeal` in `kinds/govern_group.py`: `owner="platform"` (owner id = the tenant id; read how `Owner.platform` is used today), authors `{"user"}`, fields `{group_id, about_identity_id, text (human_only), named: bool}`, `deletable=True` (the author deletes: full removal through `record_log.delete_owned` semantics like other deletable docs). The event's writer identity stays in the event so the author can find, export and delete their own.
+- One read function in `platform/visibility.py`: `appeals_for(viewer)` returns, per reader class: the AUTHOR: their own appeals with everything; an `appeal_handler` (card 13): all appeals of the tenant with `author` masked unless `named`; a derived SUPERVISOR of `about_identity_id` (stub until card 61 makes eligibility real: until then returns nothing for this class; the test for that class is written now against a fake supervision link and is marked `skip` ONLY with the reason "card 61"): appeals about their supervisee, masked unless named; EVERYONE ELSE, including the facilitator the appeal is about: nothing, not even a count. The mask removes `author_identity_id`, the event writer and any field that could identify (display name, email) from the returned dict; `text` is returned as written.
+- Routes (`apps/api/blocks/govern_group.py`): `POST /me/appeals` (membership of `group_id` checked: only a participant of that group may appeal about a facilitator of it; `named` defaults false), `GET /me/appeals` (own), `DELETE /me/appeals/{id}`, `GET /me/appeals/export` (own, JSON), `GET /govern/appeals` (handlers/supervisors, masked). A person who left the group may still delete their own appeal.
+- High-risk text in an appeal is read by the existing GOVERN guardrails like any other text; an appeal saying a participant is in danger shows the crisis notice to the writer (existing behaviour of the save path: do not re-implement).
+- Add every use of `record_log.platform(` / writer-based lookup you write to card 11's reviewed list.
+
+## Files
+`ai_lego/core/domain/kinds/govern_group.py`, `ai_lego/platform/visibility.py` (add `appeals_for`), `ai_lego/apps/api/blocks/govern_group.py`, `tests/unit/test_appeals.py`, `docs/platform/STEP34_CHECKLIST.md`, `agency-os/reports/review-debt.md`.
+
+## Acceptance
+`tests/unit/test_appeals.py` with a group of facilitator F, participants P1 P2, handler H, outsider X: P1 appeals about F anonymously: F reads nothing (list, by id, export, counts: all empty/404); H reads it with no author field and no way to infer it (compare the full JSON keys); X reads nothing; P1 reads, exports and deletes it (after deletion nobody reads it); `named: true` shows the author to H; P2 cannot read P1's; an appeal about F by a non-member of the group is refused; the supervisor class test exists (skipped with reason card 61). Mutations: remove the mask -> red; let F read -> red; drop the group-membership check on create -> red; let deletion keep the record -> red.

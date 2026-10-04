@@ -1,0 +1,17 @@
+# Card 60 — FACILITATE: the script content, its loader, and "no stop signal, no use" (research plan R21)
+
+## Decision
+Required reading: `STEP34_SHARED_RULES.md` §5, §11, §13; `docs/platform/step34-cards/FACILITATE.card.txt` (every line is a requirement); card 40 (the lessons loader is the model for this one); `agency-os/docs/` research plan R21 (`grep -rn "R21" agency-os/docs | head`). A facilitator script says how to lead one tool or package: each step, how long, what NOT to do, and the signals to stop. A tool without stop signals is not offered to participants.
+
+## Constraints
+- `COS/ai_lego/platform/scripts/`: `__init__.py` (loader -> `Ruleset("facilitate.scripts", "FACILITATE", "帶領稿", version, maintainer, items)`), `HISTORY.json`, `scripts/*.yaml`, plus `FACIL_DONTS` content file `dont-list.yaml` (the card's fixed list of things a facilitator never does: take the wording from `FACILITATE.card.txt` line by line; do not paraphrase or add) shown permanently during leading. Script file: `{id, subject, version, state: draft|reviewed, steps: [{what, minutes, dont: [..], stop_signals: [..]}], escalation: {who, how}}`.
+- Loader rules (tests): a script with a subject that has no `stop_signals` in ANY step is `unavailable` for participants: `available_subjects()` excludes it and `report()` lists it with the reason 「沒有停止訊號」; a script whose state is `draft` can never be used to lead (`usable_for_leading()` returns only reviewed ones); a changed text without a version bump fails (HISTORY fingerprint test as in card 40).
+- Importer `ai_lego/apps/cli/import_scripts.py --csv <path>`: reads a CSV exported by the operator from the art-reflection tool table (columns include the per-tool 「帶活動者提示用語」 and 「停止活動訊號」; the real column names are not known to you: take them from `--map` JSON argument) and writes `state: draft` script files; rows with an empty stop-signal column are written with an empty `stop_signals` list and listed in the report (NEVER guess or fill them). No network, no Airtable client. Commit NO real data: your tests use a 4-row fixture CSV that you write.
+- Seed three hand-written reviewed-state-NOT-allowed (`draft`) scripts for tools of the platform, with escalation text that points to GOVERN's resources instead of listing numbers (numbers belong to card 32).
+- Supervisor eligibility needs the lessons course for facilitators: define in `platform/lessons/` (card 40's folder; add a lesson file with `course: {package: facilitator, order: 1..n}` — three short lesson drafts: how to lead, the don'ts, when to escalate) so card 61's `is_eligible_facilitator` has something to check.
+
+## Files
+`ai_lego/platform/scripts/__init__.py`, `HISTORY.json`, `scripts/*.yaml`, `dont-list.yaml`, `ai_lego/apps/cli/import_scripts.py`, `ai_lego/platform/lessons/lessons/facilitator-*.yaml`, `ai_lego/platform/lessons/HISTORY.json`, `ai_lego/platform/rulesets/facilitate.py`, `tests/unit/test_facilitate_content.py`, `tests/fixtures/art_tools_sample.csv`, `docs/platform/STEP34_CHECKLIST.md`, `agency-os/reports/review-debt.md`.
+
+## Acceptance
+`tests/unit/test_facilitate_content.py`: the don't list equals the card lines (compare with the card file, line by line); a subject without stop signals is excluded and reported; drafts cannot lead; the importer writes drafts, lists empty-stop rows, never fills them; version-bump test; deterministic output (twice identical). Mutations: let a no-stop-signal subject through -> red; let a draft lead -> red; make the importer fill an empty stop signal -> red; edit the don't list -> red.

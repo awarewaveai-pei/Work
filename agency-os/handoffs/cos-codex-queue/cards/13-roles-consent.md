@@ -1,0 +1,18 @@
+# Card 13 — roles and consent: the only way another person's case is shared (foundation F4-F6; ACCESS CONTROL: two reviewers)
+
+## Decision
+Required reading: `STEP34_SHARED_RULES.md` §3 (R2), §5, §6. Consent names DOCUMENTS (a copy is a pointer); withdrawal acts at the next read; facilitator and supervisor eligibility are derived from records, never granted.
+
+## Constraints
+- Migration `0004_identity_roles.py` only if `identity_roles` did not already ship in card 10 (it did: reuse it). CLI `COS/ai_lego/apps/cli/grant_role.py`: `python -m ai_lego.apps.cli.grant_role --tenant T --identity I --role appeal_handler [--revoke]` writes `identity_roles` rows (granted_by = the operator name from `--by`); no web route may grant a role; a test greps `apps/api/` for `identity_roles` writes and finds none.
+- `platform/visibility.py` (card 11) gains `shared_with(docs, repo, viewer, grantee_kind, grantee_id)` (R2): returns the latest version (or the version a consent names when `follow_versions` is false) of case-owned docs listed in live `govern.consent` records of other members, only for a current member of the target group (or the named facilitator of a group the owner is in), only while `withdrawn` is false, and ONLY items whose case still exists. `is_appeal_handler` becomes real (reads `identity_roles`, not revoked). `is_eligible_facilitator` / `is_eligible_supervisor` stay stubs until card 60 (they must raise `NotImplementedError` naming that card, so nothing silently passes).
+- Kind `govern.consent` (person-owned, versions kept, `deletable=False` for the audit trail except a person erasing their whole account): fields `purpose` in ('group','facilitator','research'), `target`, `items` (json list of `{project_id, kind, doc_id}`, max 500), `follow_versions` (bool), `withdrawn` (bool). Put it in `kinds/govern_group.py` (new). Writer must be the person themselves; refuse a consent whose items name a case the person does not own (re-check ownership of every project_id on save, in a hook or the route — read how `_project_or_404` decides) or a kind/doc that does not exist.
+- Routes (`apps/api/blocks/govern_group.py`): `GET/POST /me/consents` (list, create a new version), `POST /me/consents/{id}/withdraw`. The page comes later (card 33).
+- A consent for purpose `research` is stored but is NOT a read path here.
+- Every read through `shared_with` is by the viewer's membership at that moment: a member removed from the group loses access immediately.
+
+## Files
+`ai_lego/platform/visibility.py`, `ai_lego/core/domain/kinds/govern_group.py`, `ai_lego/apps/api/blocks/govern_group.py`, `ai_lego/apps/cli/grant_role.py`, `tests/unit/test_consent.py`, `agency-os/reports/review-debt.md`.
+
+## Acceptance
+`tests/unit/test_consent.py`: a member sees exactly the consented docs (not the person's other docs, not the same case's unlisted docs); a doc added later is not visible unless listed; withdraw -> next read empty; a withdrawn consent re-created is a new version and works; a viewer who left the group loses access; a non-member never gets access even with a consent naming the group; a consent naming someone else's case is refused; the facilitator target works only for the named identity and only inside a group both are in; the read returns the version the consent names when `follow_versions` is false and the current one when true; role CLI grants and revokes, no web route writes roles (source scan); `is_eligible_*` raise `NotImplementedError`. Mutations to report: ignore `withdrawn` -> red; skip the membership check -> red; return all docs of the case -> red; skip the ownership check on save -> red; return the newest version when pinned -> red.
