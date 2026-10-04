@@ -1318,6 +1318,9 @@
 
 #### I. 📥 收件匣（`/tomo` 落地區，待分類）
 
+- [ ] **認知主權平台：步驟 2 已併進 main（未 push）；接下來儲存切換 W1–W3（PostgreSQL 每區域一台）→ 步驟 3+4 → 才問上線；Codex 可照接手包接手** → handoffs/2026-10-04-1400-cos-step2-merged-storage-next.md
+  - `▶️ 可動工` · `2026-10-04 開` · `不上線，全部蓋完才問；上線動作皆 High-STOP`
+
 - [x] **`scripts/verify-head-typecheck.ps1:43` 同 class 依賴漂移：拿 node_modules 目錄存在當「依賴符合該 ref 的 lockfile」** ✅ 2026-09-23 結案
   - **修法**：新增 `scripts/lib/compare-installed-deps.mjs` 走訪實體目錄比對 ref lockfile vs 裝在磁碟上的套件集合；漂移在 tsc 前拒絕並指名套件；`-Install` 可改在 worktree 內跑 `npm ci`。呼叫點查證：唯一 caller 是 `.claude/commands/verify-recent.md:61`（手動指令），無自動流程受影響。
   - **驗證**：三分支實測（同步→過／漂移→exit 1 指名 pixelmatch＋pngjs／`-Install`→過）＋ 13/13 fixture ＋ 突變測試（拔 gate 回到舊假綠）；Codex 四輪，C1–C3 已修、C4（同版本內容竄改）列書面邊界。
