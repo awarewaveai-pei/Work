@@ -43,7 +43,7 @@ class InterpretApiTests(ApiTestCase):
     def setUp(self):
         super().setUp()
         self._project_tmpdir = tempfile.TemporaryDirectory()
-        self.repo = ProjectSourceRepository(Path(self._project_tmpdir.name) / "projects.sqlite3")
+        self.repo = ProjectSourceRepository(self.databases)
         self.artifacts = JsonArtifactStore(TenantScopedCas(Path(self._project_tmpdir.name) / "artifact-cas"))
         api_main.app.dependency_overrides[api_main.get_project_source_repository] = lambda: self.repo
         api_main.app.dependency_overrides[api_main.get_artifact_store] = lambda: self.artifacts
@@ -298,7 +298,7 @@ class InterpretApiTests(ApiTestCase):
                 reserved.append(self._reserved())   # the call's row, written before the model was asked
                 other = api_main.app.dependency_overrides[api_main.get_store]().reserve_ai_usage(   # nothing else waits on it
                     tenant, self.identity["identity_id"], "draft:x", "m", 1, 1, since=api_main._today_utc_start_iso(), fits=lambda used: True)[0]
-                api_main.app.dependency_overrides[api_main.get_store]().settle_ai_usage(other, "m", 0, 0)
+                api_main.app.dependency_overrides[api_main.get_store]().settle_ai_usage(tenant, other, "m", 0, 0)
             finally:   # a failed assertion still lets the worker finish before tearDown removes its files
                 release.set()
                 join_all(self, worker)
@@ -387,7 +387,7 @@ class InterpretApiTests(ApiTestCase):
         worst = api_main.worst_input_tokens("s", "u") + 10
         self.assertEqual(self._reserved(), worst)
         from ai_lego.platform.identity.store import IdentityStore
-        restarted = IdentityStore(store.db_path)   # a new process on the same file
+        restarted = IdentityStore(self.databases)   # a new process on the same database
         self.assertEqual(restarted.ai_usage_totals(session["tenant_id"], since=api_main._today_utc_start_iso())["reserved"], worst)
 
     def test_a_billed_failure_is_metered_and_its_reservation_released(self):

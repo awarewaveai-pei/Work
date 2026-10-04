@@ -1,10 +1,9 @@
 """Project collection runs over HTTP: plan/confirm, grant exchange, completion (RESEARCH_LINES_MASTER_PLAN WC-P1-04,
-§12.7 I-d/I-f/I-g/I-h). Real TestClient, real SQLite for both stores; the Collection Service is a recording fake."""
+§12.7 I-d/I-f/I-g/I-h). Real TestClient, real PostgreSQL for both stores; the Collection Service is a recording fake."""
 
 from __future__ import annotations
 
 import os
-import sqlite3
 import uuid
 from unittest.mock import patch
 
@@ -57,18 +56,10 @@ class CollectionApiTestCase(ProjectSourceApiTestCase):
         return self.client.post(f"/collect-grants/{grant_ref}/exchange", headers={"Authorization": f"Bearer {token}"})
 
     def _run_count(self) -> int:
-        conn = sqlite3.connect(self._repo.db_path)
-        try:
-            return conn.execute("SELECT COUNT(*) FROM collection_runs").fetchone()[0]
-        finally:
-            conn.close()
+        return self._sql("SELECT COUNT(*) FROM collection_runs WHERE tenant_id=%s", self.tenant["tenant_id"])[0][0]
 
     def _grant_count(self) -> int:
-        conn = sqlite3.connect(self.db_path)
-        try:
-            return conn.execute("SELECT COUNT(*) FROM collect_grant").fetchone()[0]
-        finally:
-            conn.close()
+        return self._sql("SELECT COUNT(*) FROM collect_grant WHERE tenant_id=%s", self.tenant["tenant_id"])[0][0]
 
 
 class CollectionRequestTests(CollectionApiTestCase):
@@ -96,11 +87,7 @@ class CollectionRequestTests(CollectionApiTestCase):
         run_id = response.json()["run_id"]
         call = self.service.calls[0]
         self.assertEqual((call["project_id"], call["run_id"], call["seeds"], call["budget"]), (self.project["project_id"], run_id, SEEDS, {"fetches": 50}))
-        conn = sqlite3.connect(self.db_path)
-        try:
-            token_hash = conn.execute("SELECT token_hash FROM collect_grant WHERE grant_ref=?", (call["grant_ref"],)).fetchone()[0]
-        finally:
-            conn.close()
+        token_hash = self._sql("SELECT token_hash FROM collect_grant WHERE grant_ref=%s", call["grant_ref"])[0][0]
         self.assertIsNone(token_hash)  # no token exists until next-admin exchanges the reference
         self.assertEqual(self.client.get(f"/projects/{self.project['project_id']}/collections/{run_id}").json()["status"], "requested")
 
@@ -191,13 +178,8 @@ class RunDeadlineTests(CollectionApiTestCase):
     PAST = "2000-01-01T00:00:00Z"
 
     def _expire(self, run_id: str) -> None:
-        for db, statement in ((self._repo.db_path, "UPDATE collection_runs SET deadline_at=? WHERE run_id=?"), (self.db_path, "UPDATE collect_grant SET expires_at=? WHERE run_id=?")):
-            conn = sqlite3.connect(db)
-            try:
-                conn.execute(statement, (self.PAST, run_id))
-                conn.commit()
-            finally:
-                conn.close()
+        for statement in ("UPDATE collection_runs SET deadline_at=%s WHERE run_id=%s", "UPDATE collect_grant SET expires_at=%s WHERE run_id=%s"):
+            self._sql(statement, self.PAST, run_id)
 
     def _get(self, run_id: str) -> dict:
         return self.client.get(f"/projects/{self.project['project_id']}/collections/{run_id}").json()
@@ -205,11 +187,7 @@ class RunDeadlineTests(CollectionApiTestCase):
     def test_the_grant_expires_exactly_at_the_run_deadline(self):
         self._collector()
         run_id = self._confirm().json()["run_id"]
-        conn = sqlite3.connect(self.db_path)
-        try:
-            grant_expiry = conn.execute("SELECT expires_at FROM collect_grant WHERE run_id=?", (run_id,)).fetchone()[0]
-        finally:
-            conn.close()
+        grant_expiry = self._sql("SELECT expires_at FROM collect_grant WHERE run_id=%s", run_id)[0][0]
         self.assertEqual(grant_expiry, self._get(run_id)["deadline_at"])
 
     def test_a_run_nobody_finished_reads_failed_after_its_deadline_without_any_write(self):
@@ -226,11 +204,7 @@ class RunDeadlineTests(CollectionApiTestCase):
         with patch.object(type(self.store), "issue_collect_grant", side_effect=RuntimeError("identity db unavailable")):
             with self.assertRaises(RuntimeError):
                 self._confirm()
-        conn = sqlite3.connect(self._repo.db_path)
-        try:
-            run_id = conn.execute("SELECT run_id FROM collection_runs").fetchone()[0]
-        finally:
-            conn.close()
+        run_id = self._sql("SELECT run_id FROM collection_runs WHERE tenant_id=%s", self.tenant["tenant_id"])[0][0]
         self.assertEqual(self._get(run_id)["status"], "requested")  # open until its deadline, never forever
         self._expire(run_id)
         self.assertEqual(self._get(run_id)["status"], "failed")

@@ -1,5 +1,5 @@
 """``/projects``/``/projects/{id}/sources`` -- first HTTP surface for Master Plan Phase 1's Project/Source
-Import planes (2026-09-17). Real FastAPI TestClient, real temp-file SQLite for both stores, real CAS on disk.
+Import planes (2026-09-17). Real FastAPI TestClient, real PostgreSQL for both stores (tests/pg.py), real CAS on disk.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ class ProjectSourceApiTestCase(ApiTestCase):
     def setUp(self):
         super().setUp()
         self._proj_tmpdir = tempfile.TemporaryDirectory()
-        self._repo = ProjectSourceRepository(Path(self._proj_tmpdir.name) / "projects.sqlite3")
+        self._repo = ProjectSourceRepository(self.databases)
         self._source_cas = TenantScopedCas(Path(self._proj_tmpdir.name) / "source-cas")
         api_main.app.dependency_overrides[api_main.get_project_source_repository] = lambda: self._repo
         api_main.app.dependency_overrides[api_main.get_source_cas] = lambda: self._source_cas
@@ -91,7 +91,7 @@ class ProjectApiTests(ProjectSourceApiTestCase):
 
     def test_duplicate_project_name_in_the_same_workspace_is_a_clean_409_not_a_raw_500(self):
         """Critic finding 2026-09-17: platform_projects has UNIQUE(tenant_id, workspace_id, name); a bare
-        INSERT on a double-submit/client-retry raised an uncaught sqlite3.IntegrityError -> Starlette 500."""
+        INSERT on a double-submit/client-retry raised an uncaught IntegrityError (now psycopg's UniqueViolation) -> Starlette 500."""
         self._login()
         self._create_project(name="Same Name")
         response = self.client.post("/projects", json={"name": "Same Name", "purpose": "different purpose", "data_classification": "Confidential"})
@@ -180,7 +180,7 @@ class ProjectApiTests(ProjectSourceApiTestCase):
                 tenant = super().get_tenant(tenant_id)
                 return {**tenant, "status": "suspended"} if tenant else None
 
-        api_main.app.dependency_overrides[api_main.get_store] = lambda: DenyingStore(self.db_path)
+        api_main.app.dependency_overrides[api_main.get_store] = lambda: DenyingStore(self.databases)
         response = self.client.post("/projects", json={"name": "n", "purpose": "p", "data_classification": "Confidential"})
         self.assertEqual(response.status_code, 403, response.text)
         self.assertIn("ENTITLEMENT_DENIED", response.json()["detail"])

@@ -5,8 +5,6 @@ artifact passes the P-c contract and goes with the Project on erase."""
 from __future__ import annotations
 
 import json
-import sqlite3
-from contextlib import closing
 import sys
 import urllib.error
 from pathlib import Path
@@ -79,8 +77,7 @@ class SynthesisApiTests(ProjectSourceApiTestCase):
         return self.client.get(f"/projects/{project_id or self.pid}/synthesis/{synthesis_id}")
 
     def _usage(self) -> list[tuple]:
-        with closing(sqlite3.connect(self.db_path)) as conn:
-            return conn.execute("SELECT purpose, input_tokens, output_tokens FROM ai_usage WHERE tenant_id=?", (self.tid,)).fetchall()
+        return [tuple(row) for row in self._sql("SELECT purpose, input_tokens, output_tokens FROM ai_usage WHERE tenant_id=%s ORDER BY id", self.tid)]
 
     def _events(self) -> list[dict]:
         return [event for event in self._repo.list_events(self.tid, f"project:{self.pid}") if event["event_type"].startswith("Synthesis")]
@@ -217,8 +214,7 @@ class SynthesisApiTests(ProjectSourceApiTestCase):
         self.assertEqual(erased.json()["erased"]["artifacts_deleted"], 1)
         with self.assertRaises(InvariantViolation):
             artifacts.read(self.tid, reference)
-        with closing(sqlite3.connect(self._repo.db_path)) as conn:
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM project_syntheses").fetchone()[0], 0)
+        self.assertEqual(self._sql("SELECT COUNT(*) FROM project_syntheses WHERE tenant_id=%s", self.tid)[0][0], 0)
 
     def test_a_runner_crash_after_a_paid_call_is_still_metered(self):
         """The runner raises (RecursionError from a deeply nested answer) after the provider was paid: the call is

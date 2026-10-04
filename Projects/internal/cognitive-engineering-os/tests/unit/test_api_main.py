@@ -1,6 +1,6 @@
 """End-to-end tests for the Cognitive OS Phase 1 API (``ai_lego.apps.api.main``) via FastAPI's
 real ``TestClient`` (a real ASGI request/response cycle, not a mocked router) against a real
-temp-file SQLite identity store."""
+PostgreSQL database (tests/pg.py: one per test class)."""
 
 from __future__ import annotations
 
@@ -31,13 +31,20 @@ from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.core.support import b64
 from ai_lego.core.domain.provenance import make_provenance
 from ai_lego.errors import InvariantViolation
+from tests.pg import PgTestCase, empty_tables
 
 
-class ApiTestCase(unittest.TestCase):
+class ApiTestCase(PgTestCase):
+    REGION = "local-dev"   # the region every test tenant names (data_residency_region)
+    FRESH_TABLES = False   # True: every table is emptied before each test (a class whose tests read the whole database)
+
     def setUp(self):
+        if self.FRESH_TABLES:
+            empty_tables(self.databases)
         self._tmpdir = tempfile.TemporaryDirectory()
-        self.db_path = Path(self._tmpdir.name) / "identity.sqlite3"
-        api_main.app.dependency_overrides[api_main.get_store] = lambda: IdentityStore(self.db_path)
+        # Every dependency reaches this class's database: the one provider all repositories and the store take.
+        api_main.app.dependency_overrides[api_main.get_databases] = lambda: self.databases
+        api_main.app.dependency_overrides[api_main.get_store] = lambda: IdentityStore(self.databases)
         # Isolates artifact CAS writes from the real PRODUCT_ROOT/.runtime/artifact-cas (critic finding
         # 2026-09-17: run_recipe originally called get_artifact_store() directly, bypassing overrides
         # entirely -- fixed to use Depends(get_artifact_store), which is what makes this override effective).
@@ -50,7 +57,7 @@ class ApiTestCase(unittest.TestCase):
         # that has nothing to do with the code under test.
         self.client = TestClient(api_main.app, base_url="https://testserver")
 
-        store = IdentityStore(self.db_path)
+        store = IdentityStore(self.databases)
         self.tenant = store.create_tenant(
             tenant_id=str(uuid.uuid4()),
             legal_name="Test Tenant",
@@ -65,6 +72,12 @@ class ApiTestCase(unittest.TestCase):
         api_main.app.dependency_overrides.clear()
         self._tmpdir.cleanup()
 
+    def _sql(self, query: str, *parameters):
+        """One statement on this test's tenant's database (rows, or the row count of a write)."""
+        with self.databases.for_tenant(self.tenant["tenant_id"]) as connection:
+            cursor = connection.execute(query, parameters)
+            return cursor.fetchall() if cursor.description else cursor.rowcount
+
     def _login(self) -> None:
         response = self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "user@example.com", "password": "correct-horse-battery"})
         self.assertEqual(response.status_code, 200, response.text)
@@ -72,7 +85,7 @@ class ApiTestCase(unittest.TestCase):
     def _confidential_project_id(self) -> str:
         """A real Confidential Project in this test's own temp repository: a run takes its classification from here
         (RESEARCH_LINES_MASTER_PLAN K9), never from the request body."""
-        repo = ProjectSourceRepository(Path(self._tmpdir.name) / "projects.sqlite3")
+        repo = ProjectSourceRepository(self.databases)
         api_main.app.dependency_overrides[api_main.get_project_source_repository] = lambda: repo
         response = self.client.post("/projects", json={"name": f"Confidential {uuid.uuid4().hex[:8]}", "purpose": "Run classification.", "data_classification": "Confidential"})
         self.assertEqual(response.status_code, 200, response.text)
@@ -694,9 +707,7 @@ class InvokeTests(ApiTestCase):
 
     def test_invoke_denied_for_suspended_tenant(self):
         self._login()
-        store = IdentityStore(self.db_path)
-        with store._connect() as conn:  # noqa: SLF001
-            conn.execute("UPDATE tenant SET status = 'suspended' WHERE tenant_id = ?", (self.tenant["tenant_id"],))
+        self._sql("UPDATE tenant SET status = 'suspended' WHERE tenant_id = %s", self.tenant["tenant_id"])
         body = {
             "events": [{"event_id": "E1", "description": "d1"}, {"event_id": "E2", "description": "d2"}],
             "impact_pairs": [{"event_a_id": "E1", "event_b_id": "E2", "conditional_probability_shift": 0.1}],
@@ -1090,9 +1101,7 @@ class CapabilityInvokeTests(ApiTestCase):
 
     def test_invoke_denied_for_suspended_tenant(self):
         self._login()
-        store = IdentityStore(self.db_path)
-        with store._connect() as conn:  # noqa: SLF001
-            conn.execute("UPDATE tenant SET status = 'suspended' WHERE tenant_id = ?", (self.tenant["tenant_id"],))
+        self._sql("UPDATE tenant SET status = 'suspended' WHERE tenant_id = %s", self.tenant["tenant_id"])
         response = self.client.post("/capabilities/artifact.generate_chart/invoke", json={"chart_type": "forest_plot", "rows": []})
         self.assertEqual(response.status_code, 403)
 
@@ -1226,7 +1235,7 @@ class RecipeRunTests(ApiTestCase):
         test_literature_search_v2.py already covers -- and the Source becomes academic at write time
         (P-K11) via a plain POST /projects/{id}/sources with a doi, no fixture backdoor."""
         self._login()
-        repo = ProjectSourceRepository(Path(self._tmpdir.name) / "projects.sqlite3")
+        repo = ProjectSourceRepository(self.databases)
         source_cas = TenantScopedCas(Path(self._tmpdir.name) / "source-cas")
         api_main.app.dependency_overrides[api_main.get_project_source_repository] = lambda: repo
         api_main.app.dependency_overrides[api_main.get_source_cas] = lambda: source_cas
@@ -1297,7 +1306,7 @@ class RecipeRunTests(ApiTestCase):
         self._login()
         run_id = "api-life-owner-" + uuid.uuid4().hex[:12]
         self.assertEqual(self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source(), "run_id": run_id}).status_code, 200)
-        store = IdentityStore(self.db_path)
+        store = IdentityStore(self.databases)
         store.create_identity(str(uuid.uuid4()), self.tenant["tenant_id"], "colleague@example.com", "Colleague", "correct-horse-battery")
         self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "colleague@example.com", "password": "correct-horse-battery"})
         self.assertEqual(self.client.get(f"/recipes/life-decision-v1/runs/{run_id}").status_code, 404)
@@ -1377,7 +1386,7 @@ class RecipeRunTests(ApiTestCase):
         executed = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source(), "run_id": run_id})
         self.assertEqual(executed.status_code, 200, executed.text)
 
-        store = IdentityStore(self.db_path)
+        store = IdentityStore(self.databases)
         other_tenant_id = str(uuid.uuid4())
         store.create_tenant(
             tenant_id=other_tenant_id,
@@ -1435,7 +1444,7 @@ class RecipeRunTests(ApiTestCase):
         executed = self.client.post("/recipes/life-decision-v1/run", json={"source": fixture_source(), "run_id": run_id})
         self.assertEqual(executed.status_code, 200, executed.text)
 
-        store = IdentityStore(self.db_path)
+        store = IdentityStore(self.databases)
         other_tenant_id = str(uuid.uuid4())
         store.create_tenant(
             tenant_id=other_tenant_id,

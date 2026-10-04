@@ -101,7 +101,7 @@ class BusinessPlanFullRecipeTests(ApiTestCase):
         self.assertEqual(response.status_code, 200, response.text)
         reference = response.json()["workflow"]["context"]["outputs"]["proposal"]["artifact"]["cas_reference"]
 
-        other_store = IdentityStore(self.db_path)
+        other_store = IdentityStore(self.databases)
         other_tenant = other_store.create_tenant(tenant_id=str(uuid.uuid4()), legal_name="Other", home_jurisdiction="jurisdiction-pack.tw.v1", data_residency_region="local-dev", encryption_root_key_ref="other-kek")
         other_store.create_workspace(str(uuid.uuid4()), other_tenant["tenant_id"], "Default")
         other_store.create_identity(str(uuid.uuid4()), other_tenant["tenant_id"], "other@example.com", "Other", "correct-horse-battery")

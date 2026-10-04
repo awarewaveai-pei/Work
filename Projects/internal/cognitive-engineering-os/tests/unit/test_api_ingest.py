@@ -4,7 +4,7 @@ re-verified, idempotent, supersede, one write transaction; content follows the r
 from __future__ import annotations
 
 import hashlib
-import sqlite3
+import threading
 from unittest.mock import patch
 
 from ai_lego.core.domain.source import COLLECTED_PROVENANCE
@@ -100,12 +100,7 @@ class IngestApiTests(CollectionApiTestCase):
         no_header = self.client.post(f"/projects/{self.pid}/sources/ingest", json={"run_id": self.run_id, "sources": [c1("https://acme.example/a", "alpha")]})
         self.assertEqual(no_header.status_code, 401)
         self.assertEqual(self._ingest([c1("https://acme.example/a", "alpha")], token="not-a-token").status_code, 401)
-        conn = sqlite3.connect(self.db_path)
-        try:
-            conn.execute("UPDATE collect_grant SET expires_at='2000-01-01T00:00:00Z' WHERE grant_ref=?", (self.grant_ref,))
-            conn.commit()
-        finally:
-            conn.close()
+        self._sql("UPDATE collect_grant SET expires_at='2000-01-01T00:00:00Z' WHERE grant_ref=%s", self.grant_ref)
         self.assertEqual(self._ingest([c1("https://acme.example/a", "alpha")]).status_code, 401)
         self.assertEqual(len(self._rows()), 0)
 
@@ -130,7 +125,7 @@ class IngestApiTests(CollectionApiTestCase):
         self.assertEqual((row["data_classification"], row["media_type"]), ("Confidential", "text/plain"))
         self.assertEqual((row["canonical_url"], row["source_class"], row["authors"]), ("https://acme.example/a", "reference", ["Jane Doe"]))
         self.assertEqual(row["provenance"], COLLECTED_PROVENANCE)
-        self.assertEqual(row["fetched_at"], "2026-09-26T01:02:03.456Z")
+        self.assertEqual(row["fetched_at"], "2026-09-26T01:02:03.456000Z")   # the instant sent, read back in the database's form (D4)
 
     def test_provenance_other_than_collected_evidence_is_refused(self):
         bad = c1("https://acme.example/a", "alpha", provenance={"epistemic_type": "SOURCE_FACT", "authorship_state": "SOURCE_QUOTATION", "locked": None})
@@ -138,12 +133,7 @@ class IngestApiTests(CollectionApiTestCase):
         self.assertEqual(len(self._rows()), 0)
 
     def test_a_run_that_is_not_running_takes_no_sources(self):
-        conn = sqlite3.connect(self._repo.db_path)
-        try:
-            conn.execute("UPDATE collection_runs SET status='failed' WHERE run_id=?", (self.run_id,))
-            conn.commit()
-        finally:
-            conn.close()
+        self._sql("UPDATE collection_runs SET status='failed' WHERE run_id=%s", self.run_id)
         response = self._ingest([c1("https://acme.example/a", "alpha")])
         self.assertEqual(response.status_code, 409)
         self.assertIn("COLLECTION_RUN_NOT_RUNNING", response.text)
@@ -191,24 +181,27 @@ class IngestApiTests(CollectionApiTestCase):
         self.assertEqual(self._blobs(), blobs_before)  # the referenced "kept" blob stayed
 
     def test_the_collector_cannot_run_between_a_content_write_and_its_commit(self):
-        """Codex F2: a collection between the blob write and the rows' commit would delete a live blob. The write lock
-        makes the collector wait instead (timeout 0 here, so waiting shows up as 'database is locked')."""
-        real_put, real_connect = self._source_cas.put, sqlite3.connect
+        """Codex F2: a collection between the blob write and the rows' commit would delete a live blob. The source-blob
+        lock (shared while content is written, exclusive while garbage goes) makes the collector, on its own connection,
+        wait for the commit; then the blob is referenced and stays."""
+        real_put = self._source_cas.put
         outcome: list[object] = []
+        collector: list[threading.Thread] = []
 
         def put_then_collect(tenant_id, content):
             written = real_put(tenant_id, content)
-            with patch("sqlite3.connect", lambda path, **_: real_connect(path, timeout=0)):
-                try:
-                    outcome.append(self._repo.collect_unreferenced_blobs(tenant_id, self._source_cas))
-                except sqlite3.OperationalError as error:
-                    outcome.append(str(error))
+            thread = threading.Thread(target=lambda: outcome.append(self._repo.collect_unreferenced_blobs(tenant_id, self._source_cas)))
+            thread.start()
+            thread.join(0.5)
+            outcome.append("waiting" if thread.is_alive() else "ran inside the write")
+            collector.append(thread)
             return written
 
         with patch.object(self._source_cas, "put", side_effect=put_then_collect):
             response = self._ingest([c1("https://acme.example/a", "alpha")])
+        collector[0].join(30)
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(outcome, ["database is locked"])
+        self.assertEqual(outcome, ["waiting", 0])   # it waited for the commit, then found nothing to remove
         source_id = response.json()["results"][0]["source_id"]
         cas_path = self._repo.get_source_content_reference(self.tenant["tenant_id"], self.pid, source_id)
         self.assertEqual(self._source_cas.read(self.tenant["tenant_id"], cas_path), b"alpha")

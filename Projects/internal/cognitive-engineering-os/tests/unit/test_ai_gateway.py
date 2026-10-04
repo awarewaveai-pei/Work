@@ -369,10 +369,9 @@ class ApiRouteTests(ApiTestCase):
     def test_daily_token_budget_only_counts_todays_usage(self):
         self._login()
         store = api_main.app.dependency_overrides[api_main.get_store]()
-        usage_id, _ = store.reserve_ai_usage(self.tenant["tenant_id"], self.identity["identity_id"], "draft:x", "m", 500, 500, since="", fits=lambda used: True)
-        store.settle_ai_usage(usage_id, "m", 500, 500)   # written "today"; moved to 2000 below
-        with store._connect() as conn:
-            conn.execute("UPDATE ai_usage SET used_at = '2000-01-01T00:00:00Z'")
+        usage_id, _ = store.reserve_ai_usage(self.tenant["tenant_id"], self.identity["identity_id"], "draft:x", "m", 500, 500, since="1970-01-01T00:00:00Z", fits=lambda used: True)
+        store.settle_ai_usage(self.tenant["tenant_id"], usage_id, "m", 500, 500)   # written "today"; moved to 2000 below
+        self._sql("UPDATE ai_usage SET used_at = '2000-01-01T00:00:00Z' WHERE tenant_id = %s", self.tenant["tenant_id"])
         with patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: "100"}):
             status = self.client.get("/ai/status").json()
             self.assertEqual(status["usage"]["input_tokens"], 500, "all-time total still includes it")

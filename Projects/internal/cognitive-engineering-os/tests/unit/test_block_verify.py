@@ -8,7 +8,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import sqlite3
 import unittest
 import uuid
 from unittest import mock
@@ -35,6 +34,7 @@ from ai_lego.platform.rulesets.verify import TECHNIQUES
 from tests.unit.test_api_collections import REPORT, CollectionApiTestCase
 from tests.unit.test_api_ingest import c1
 from tests.unit.test_block_foundation import MirrorProvider
+from tests.pg import PgTestCase
 from tests.unit.test_step2_foundation import Step2Case
 
 MESSAGE = "【緊急】央行宣布下週起每天只能領一萬元！不轉就來不及，快轉給家人！"
@@ -988,16 +988,13 @@ class SearchTests(CollectionApiTestCase):
         again = self.go(claim, confirm=True)
         self.assertEqual(again.status_code, 409, again.text)
         self.assertIn("VERIFY_SEARCH_ALREADY_RUNNING", again.text)
-        connection = sqlite3.connect(self._repo.db_path)
-        try:
-            runs = connection.execute("SELECT COUNT(*) FROM collection_runs").fetchone()[0]
-        finally:
-            connection.close()
+        runs = self._sql("SELECT COUNT(*) FROM collection_runs WHERE tenant_id=%s", self.tenant_id)[0][0]
         self.assertEqual((runs, len(self.service.calls), len(self.docs.current(self.tenant_id, self.owner, "verify.lookup"))), (1, 1, 1))   # refused before any run was made
 
     def test_two_racing_go_checks_start_one_run(self):
-        """The check before the run is the quick answer; the one that holds is made under the write lock that saves the
-        run's verify.lookup, before collect is asked: the loser's run fails there and collect never hears of it."""
+        """The check before the run is the quick answer; the one that holds is made under the case's lock, held exclusive
+        by the save of the run's verify.lookup, before collect is asked: the loser's run fails there and collect never
+        hears of it."""
         claim = self.claim()
         self.start_run(claim)
         real, calls = verify_route.refuse_open_search, []
@@ -1010,11 +1007,7 @@ class SearchTests(CollectionApiTestCase):
         with mock.patch.object(verify_route, "refuse_open_search", side_effect=before_the_other_saved):
             second = self.go(claim, confirm=True)
         self.assertEqual(second.status_code, 409, second.text)
-        connection = sqlite3.connect(self._repo.db_path)
-        try:
-            statuses = sorted(row[0] for row in connection.execute("SELECT status FROM collection_runs"))
-        finally:
-            connection.close()
+        statuses = sorted(row[0] for row in self._sql("SELECT status FROM collection_runs WHERE tenant_id=%s", self.tenant_id))
         self.assertEqual((statuses, len(self.service.calls), len(self.docs.current(self.tenant_id, self.owner, "verify.lookup"))), (["failed", "running"], 1, 1))
 
 
@@ -1023,22 +1016,12 @@ class SearchTests(CollectionApiTestCase):
         first, second = self.claim(), self.claim()
         self._collector()
         runs = [self.go(claim, confirm=True).json()["run_id"] for claim in (first, second)]
-        connection = sqlite3.connect(self._repo.db_path)
-        try:
-            connection.execute("UPDATE collection_runs SET deadline_at='2000-01-01T00:00:00Z' WHERE run_id=?", (runs[0],))
-            connection.commit()
-        finally:
-            connection.close()
+        self._sql("UPDATE collection_runs SET deadline_at='2000-01-01T00:00:00Z' WHERE run_id=%s", runs[0])
         self.client.get(f"/projects/{self.pid}/verify/ledger")
         self.assertEqual([(item["claim"], item["state"], item["why"]) for item in self.searches()], [(first, "無法檢查", "這次查詢沒有跑完")])
         self.client.get(f"/projects/{self.pid}/verify/ledger")
         self.assertEqual(len(self.searches()), 1)   # settled once
-        connection = sqlite3.connect(self._repo.db_path)
-        try:
-            connection.execute("UPDATE collection_runs SET deadline_at='2000-01-01T00:00:00Z' WHERE run_id=?", (runs[1],))
-            connection.commit()
-        finally:
-            connection.close()
+        self._sql("UPDATE collection_runs SET deadline_at='2000-01-01T00:00:00Z' WHERE run_id=%s", runs[1])
         hooks._after_sources(self.docs, self.tenant_id, self.owner, {"run": None, "channels": []})   # any arrival in the case
         self.assertEqual(sorted(item["claim"] for item in self.searches()), sorted([first, second]))
 
@@ -1079,7 +1062,7 @@ class EngineReachesNothingOutsideTests(unittest.TestCase):
         self.assertEqual(_compose_allowlist(), frozenset({"api.anthropic.com", "app.aware-wave.com"}))
 
 
-class IntegrityTests(unittest.TestCase):
+class IntegrityTests(PgTestCase):   # the check's real-save rows rehearse on a database
     def test_verify_passes_the_integrity_core(self):
         """結論只收人寫的, no scores, every AI action a visible permission reading only the card's drawers, a crisis stops it,
         high risk recognised on every kind of the person's words, routes keep the save path."""

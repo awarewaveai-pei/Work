@@ -17,6 +17,7 @@ from ai_lego.data.events import record_log
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import ai_gate, safety
 from ai_lego.platform.ai_gateway.provider import AiCompletion
+from tests.pg import PgTestCase, add_tenant, dump
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
 
@@ -87,7 +88,7 @@ class DocKindRulesTests(unittest.TestCase):
         self.assertIn(("SENSE", "mirror"), ai_gate.actions())
 
 
-class WebBlockListTests(unittest.TestCase):
+class WebBlockListTests(PgTestCase):
     """apps/cognitive-web/lib/blocks.ts names the blocks for the pages; the codes, their order and which are open come
     from the engine (core/domain/blocks.py, kinds/assembler.py OPEN_BLOCKS)."""
 
@@ -158,22 +159,19 @@ class WebBlockListTests(unittest.TestCase):
             self.assertEqual(int(opens), PACKAGE_OPENS_AT[package], package)
 
     def test_a_high_risk_intake_adds_the_guardrails_once(self):
-        import tempfile
-        from pathlib import Path
         from ai_lego.data.repositories.case_docs import CaseDocs
         from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
         from ai_lego.platform.block_hooks import after_save
+        from tests.unit.case_fixture import a_case
 
-        with tempfile.TemporaryDirectory() as folder:
-            from tests.unit.case_fixture import a_case
-
-            repo = ProjectSourceRepository(Path(folder) / "p.sqlite3")
-            docs, owner = CaseDocs(repo), a_case(repo, "t", "P")
-            intake = docs.save("t", owner, "assembler.intake", {"purpose": "複雜決策", "question": "要不要續約", "risk": "合約和錢", "package": "個人複雜決策"}, record_log.user("me", "ASSEMBLER"))
-            notices = after_save(docs, "t", owner, intake)
-            self.assertEqual([notice["category"] for notice in notices], ["法律", "金錢"])
-            self.assertEqual(len(docs.current("t", owner, "govern.guardrail")), 6)
-            self.assertEqual(after_save(docs, "t", owner, intake), [])
+        tenant = add_tenant(self.databases, str(uuid.uuid4()))
+        repo = ProjectSourceRepository(self.databases)
+        docs, owner = CaseDocs(repo), a_case(repo, tenant, "P")
+        intake = docs.save(tenant, owner, "assembler.intake", {"purpose": "複雜決策", "question": "要不要續約", "risk": "合約和錢", "package": "個人複雜決策"}, record_log.user("me", "ASSEMBLER"))
+        notices = after_save(docs, tenant, owner, intake)
+        self.assertEqual([notice["category"] for notice in notices], ["法律", "金錢"])
+        self.assertEqual(len(docs.current(tenant, owner, "govern.guardrail")), 6)
+        self.assertEqual(after_save(docs, tenant, owner, intake), [])
 
 
 class AiPathTests(unittest.TestCase):
@@ -248,6 +246,8 @@ class SafetyTests(unittest.TestCase):
 
 
 class BlockFoundationApiTests(ProjectSourceApiTestCase):
+    FRESH_TABLES = True   # a test reads the whole database for a deleted card's words
+
     def setUp(self):
         super().setUp()
         self.provider = MirrorProvider()
@@ -271,9 +271,8 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         self.assertEqual(len(self.client.get(f"{self.base}/docs/sense.card/{card['doc_id']}/versions").json()), 2)
         self.assertEqual(self.client.delete(f"{self.base}/docs/sense.card/{card['doc_id']}").status_code, 200)
         self.assertEqual(self.client.get(f"{self.base}/docs/sense.card").json(), [])
-        history = self.client.get(f"{self.base}/history").json()   # the case's own stream; the card's content is gone from the file
-        dump = "\n".join(sqlite_dump(self._repo.db_path))
-        self.assertNotIn("第三次改條件", dump)
+        history = self.client.get(f"{self.base}/history").json()   # the case's own stream; the card's content is gone from every row
+        self.assertNotIn("第三次改條件", "\n".join(dump(self.databases)))
 
     def test_someone_elses_claim_proposes_verify(self):
         card = self._card("聽說同業都這樣改")
@@ -471,15 +470,6 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         self.assertEqual(self.client.get(f"{self.base}/docs/govern.location").status_code, 404)   # a person's kind, not a case's
         guardrail = self.client.post(f"{self.base}/docs/govern.guardrail", json={"content": {"guardrail": "professional", "category": "健康", "found_by": "SENSE"}})
         self.assertEqual(guardrail.status_code, 403)   # system-only: a person cannot write GOVERN's guardrail
-
-
-def sqlite_dump(path):
-    import sqlite3
-    connection = sqlite3.connect(path)
-    try:
-        return list(connection.iterdump())
-    finally:
-        connection.close()
 
 
 if __name__ == "__main__":

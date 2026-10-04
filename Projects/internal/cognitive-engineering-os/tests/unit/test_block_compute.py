@@ -21,6 +21,7 @@ from ai_lego.data.events import record_log
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.feasibility.break_even import compute_break_even_volume
 from ai_lego.modules.feasibility.irr import compute_irr
+from tests.pg import PgTestCase
 from ai_lego.modules.feasibility.npv import compute_npv
 from ai_lego.platform import ai_gate, evidence, integrity, rulesets
 from ai_lego.platform.ai_actions import compute as compute_ai
@@ -721,7 +722,7 @@ class AnswerWordsTests(unittest.TestCase):
         compute_ai._guard_words(["「2027 年房租」是你估的，「五月房租」也是。"], ["2027 年房租", "五月房租"])
 
 
-class IntegrityTests(unittest.TestCase):
+class IntegrityTests(PgTestCase):   # the check's real-save rows rehearse on a database
     def test_compute_passes_the_integrity_check(self):
         row = next(row for row in integrity.run() if row.block == "COMPUTE")
         self.assertTrue(row.built)

@@ -22,7 +22,7 @@ class ReportApiTests(ApiTestCase):
         super().setUp()
         self._tmp = tempfile.TemporaryDirectory()
         root = Path(self._tmp.name)
-        self.repo = ProjectSourceRepository(root / "projects.sqlite3")
+        self.repo = ProjectSourceRepository(self.databases)
         self.artifacts = JsonArtifactStore(TenantScopedCas(root / "artifact-cas"))
         self.source_cas = TenantScopedCas(root / "source-cas")
         api_main.app.dependency_overrides[api_main.get_project_source_repository] = lambda: self.repo
@@ -169,7 +169,7 @@ class ReportApiTests(ApiTestCase):
         self.assertEqual(str(caught.exception), "REPORT_NOT_FOUND")
 
     def _second_tenant_client(self):
-        store = IdentityStore(self.db_path)
+        store = IdentityStore(self.databases)
         tenant = store.create_tenant(tenant_id=str(uuid.uuid4()), legal_name="Other Tenant", home_jurisdiction="jurisdiction-pack.tw.v1",
                                      data_residency_region="local-dev", encryption_root_key_ref="test-kek-ref")
         workspace_id = store.create_workspace(str(uuid.uuid4()), tenant["tenant_id"], "Default")["workspace_id"]

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import copy
 import json
-import sqlite3
 from pathlib import Path
 from unittest import mock
 
@@ -233,11 +232,7 @@ class ClaimSeedTests(WireV2Case):
         response = self._request([seed], confirm=True)
         self.assertEqual(response.status_code, 400, json.dumps(seed, ensure_ascii=False)[:200])
         self.assertIn("COLLECTION_SEEDS_INVALID", response.text)
-        conn = sqlite3.connect(self._repo.db_path)
-        try:
-            self.assertEqual(conn.execute("SELECT COUNT(*) FROM collection_runs").fetchone()[0], 0)
-        finally:
-            conn.close()
+        self.assertEqual(self._sql("SELECT COUNT(*) FROM collection_runs WHERE tenant_id=%s", self.tenant["tenant_id"])[0][0], 0)
 
     def claim(self, **meta) -> dict:
         seed = copy.deepcopy(SPEC["seeds"][0])
