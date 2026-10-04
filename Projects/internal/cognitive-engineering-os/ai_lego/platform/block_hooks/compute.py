@@ -39,7 +39,7 @@ SENSITIVITY = "系統一次改一個輸入，找出讓結果翻過來的那一�
 NO_FLIP = "每一個數字單獨往上、往下改（改到跟它本身一樣大，或到你給的樂觀、悲觀那麼遠），結果都沒有翻過來。"
 ZERO_SPAN = "這個數字是 0，也沒有樂觀、悲觀的值，不知道要改多少。"
 NEAR_LINE = "結果離那條線太近，說不準會落在哪一邊：光是隨機抽的不同，就可能讓它翻過來。"
-NO_RANGE = "至少一個數字要寫樂觀或悲觀時的值（跟一般不一樣），結果才是一個範圍，不只一個數字。"
+NO_RANGE = "至少一個參與計算的數字要寫樂觀或悲觀時的值（跟一般不一樣），結果才是一個範圍，不只一個數字。"
 NO_SPREAD = "至少一項要寫樂觀或悲觀時的值（跟一般不一樣），模擬才有範圍可以抽。"
 CALCULATED = make_provenance("CALCULATED_RESULT", "HUMAN_APPROVED")   # the person's numbers, the module's formula
 SIMULATED = make_provenance("SIMULATED_RESULT", "HUMAN_APPROVED")
@@ -200,8 +200,10 @@ def plan(content: Mapping[str, Any], cards: set[str] | None) -> dict[str, Any]:
     spread = [item for item in inputs if specs[item["key"]].get("spread")]
     if spread and not varied & {item["name"] for item in spread}:
         _refuse(NO_SPREAD)
-    if not varied:
-        _refuse(NO_RANGE)
+    fed = {item["name"] for item in inputs if not specs[item["key"]].get("line")}   # a comparison line changes the side, never the number
+    if not varied & fed:
+        lines = [item["name"] for item in inputs if specs[item["key"]].get("line")]
+        _refuse(NO_RANGE + (f"「{'」「'.join(lines)}」只是拿來比的線，不算。" if lines else ""))
     for item in spread:
         low, high = sorted(values[scenario][item["name"]] for scenario in OTHERS)
         if not low <= item["value"] <= high:

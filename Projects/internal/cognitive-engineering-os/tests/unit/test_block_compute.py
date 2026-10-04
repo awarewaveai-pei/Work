@@ -43,7 +43,7 @@ def flows(first, yearly, years):
 class RulesetTests(unittest.TestCase):
     def test_the_algorithms_a_personal_decision_needs_each_call_a_module(self):
         found = rulesets.rulesets()["compute.algorithms"]
-        self.assertEqual((found.block, found.version), ("COMPUTE", "2"))
+        self.assertEqual((found.block, found.version), ("COMPUTE", "3"))
         algos = compute.algorithms()
         self.assertEqual(set(algos), {"break_even", "npv", "irr", "expected_value", "cost_benefit", "monte_carlo"})
         self.assertEqual(set(algos), set(compute.POINTS) | set(compute.SIMULATIONS))
@@ -273,6 +273,8 @@ class RequestTests(ComputeCase):
             item("one_time_cost", "一開始的成本", 1), item("yearly_cost", "每年的成本", 1), item("yearly_benefit", "每年的效益", 1), item("years", "年數", 1, "年"), item("rate", "折現率", 3, "%")],
             "scenarios": {"悲觀": {"每年的效益": 0}}}, "誰得到效益、誰付成本")
         self.refused({**content, "scenarios": {}}, compute.NO_RANGE)   # critic M3: a range, never one number
+        self.refused(self.break_even(悲觀={"你預計做得到的量": 30}), "「你預計做得到的量」只是拿來比的線，不算。")   # a comparison line feeds no number
+        self.refused(self.irr(悲觀={"你要求的報酬率": 15}), "「你要求的報酬率」只是拿來比的線，不算。")
         self.refused({**content, "scenarios": {"樂觀": {YEARLY: 30000}}}, compute.NO_RANGE)   # equal to 一般 is no scenario
         self.refused({**npv_with(1, unit="元\u200b")}, f"「{YEARLY}」要寫單位")
         simulation = {"question": "六個月", "algorithm": "monte_carlo", "inputs": [item("item", "接案收入", 300000), item("threshold", "你要的最低結果", 1)]}
@@ -543,12 +545,20 @@ class RawBodyTests(ComputeCase):
 # critic M1/M2 corpora: what an AI answer may not say, and plain sentences it may.
 WRITES_A_NUMBER = ["大約第七年才回本。", "五年後淨現值轉正。", "要撐三個月。", "撐一個月就好。", "十五年", "收入少掉三分之一就不划算。", "打七折就虧。", "虧損上百萬。",
                    "大概一半的機會。", "差了好幾萬", "兩倍", "八成", "第二年", "每年四次", "十分鐘後", "淨現值大約是 3 萬", "報酬大概 15%", "Ⅻ", "①", "５", "壹萬",
-                   "about ten percent lower", "roughly five million", "IRR is twenty", "half of it", "double the rent"]
-FORECASTS = ["這個結果很可能會發生", "未來會虧", "估計會虧損", "預估明年會賺", "預計會賺", "將會虧本", "依這個結果預測你會賺。", "這樣一定會賺。", "保證回本",
-             "will lose money", "you are going to profit", "I foresee a loss"]
+                   "廿年後", "卅年", "卌", "about ten percent lower", "roughly five million", "IRR is twenty", "half of it", "double the rent", "the first year",
+                   "a third of it", "the fifth scenario", "two fifths of the income"]
+# critic M2 round 2: the outcome verb is open-ended, the future marker is not
+FORECASTS = ["悲觀情境下你會虧錢。", "這樣做會賺。", "you'll lose money", "it'll pay off", "你會虧", "這個結果很可能會發生", "未來會虧", "估計會虧損", "預估明年會賺",
+             "預計會賺", "將會虧本", "依這個結果預測你會賺。", "這樣一定會賺。", "保證回本", "撐得下去是必然的", "you won't lose", "it is bound to work", "will lose money",
+             "you are going to profit", "I foresee a loss"]
 PLAIN = ["悲觀情境下淨現值是負的，主要因為每年的淨收入比較低。", "模擬不是預測，悲觀情境不一定會發生；千萬不要只看一個數。", "這一項是你自己估的，還沒有外部出處。",
-         "一般情境和樂觀情境落在同一邊，只有悲觀情境不一樣。", "這個結果不保證會發生，也無法預測未來。", "每一項各抽各的，假設它們不會一起變好或變壞。",
-         "一半以上的模擬達到你要的最低結果。", "十分依賴每年的淨收入這一個數字。", "one of the inputs is your own guess, not a prediction"]
+         "一般情境和樂觀情境落在同一邊，只有悲觀情境不一樣。", "這個結果不保證發生，也無法預測未來。", "每一項各抽各的，假設它們不會一起變好或變壞。",
+         "一半以上的模擬達到你要的最低結果。", "十分依賴每年的淨收入這一個數字。", "悲觀情境下的計算結果低於打平。",
+         "one of the inputs is your own guess, not a prediction"]
+# the allow-listed modal words in sentences an explanation could really say
+MODAL_WORDS_IN_USE = ["這個數字還有機會找到別的出處。", "會計上怎麼記，要問專業的人。", "工會或公會的公告，可以當成來源卡。", "社會上的看法，屬於價值選擇。",
+                      "將來每年的淨收入，是你自己估的。", "在一定程度上，結果取決於每年的淨收入。", "如果有誤會，可以改輸入再算。", "開會之前可以先並排比。",
+                      "悲觀情境不代表一定會發生。", "free will is not part of this calculation", "there is no guarantee here"]
 
 
 class AnswerWordsTests(unittest.TestCase):
@@ -563,9 +573,29 @@ class AnswerWordsTests(unittest.TestCase):
                 compute_ai._guard_words([text], compute_ai._names())
 
     def test_plain_sentences_and_their_negations_pass(self):
-        for text in PLAIN:
+        for text in PLAIN + MODAL_WORDS_IN_USE:
             with self.subTest(text=text):
                 compute_ai._guard_words([text], compute_ai._names())
+
+    def test_every_word_on_the_modal_allow_list_is_one_where_it_marks_no_future(self):
+        """Each allowed word is decided here, apart from the code's list: dropping one from the code turns its case red,
+        adding one to the code without deciding it here fails the comparison."""
+        allowed = ("機會", "社會", "會議", "會計", "協會", "學會", "公會", "工會", "委員會", "會員", "體會", "誤會", "理會", "開會", "聚會", "約會", "會談",
+                   "會面", "會合", "會場", "會長", "研討會", "大會", "國會", "議會", "領會", "將近", "將軍", "將就", "將來", "不一定", "不一定會", "不等於一定會",
+                   "不代表一定會", "不代表會", "不保證", "無法保證", "不能保證", "沒有保證", "不必然", "不肯定", "一定程度", "free will", "no guarantee", "not guaranteed")
+        self.assertEqual(set(allowed), set(compute_ai.NOT_MARKERS + compute_ai.ENGLISH_NOT_MARKERS))
+        for word in allowed:
+            with self.subTest(word=word):
+                compute_ai._guard_words([f"這裡說的是「{word}」這個詞。"], [])
+
+    def test_a_persons_name_never_unlocks_a_numeral_or_a_modal_elsewhere(self):
+        """critic M1 round 2: an item named 「五」 is quoted as itself, but 「五」 written anywhere else is still a number."""
+        for text, name in (("大概是五倍", "五"), ("少了五萬", "五萬"), ("少了十二", "12")):
+            with self.subTest(name=name), self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_HAS_NUMBER"):
+                compute_ai._guard_words([text], [name])
+        with self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_CALLS_IT_PREDICTION"):
+            compute_ai._guard_words(["這會讓結果變"], ["會"])
+        compute_ai._guard_words(["「2027 年房租」是你估的，「五月房租」也是。"], ["2027 年房租", "五月房租"])
 
 
 class IntegrityTests(unittest.TestCase):

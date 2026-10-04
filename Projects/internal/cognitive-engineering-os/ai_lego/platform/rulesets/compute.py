@@ -3,7 +3,8 @@ range), the module it calls and its label -- versioned, so every run says which 
 
 Every algorithm calls an existing module's builder and that module's own gates (``calls`` = [builder, gates] pairs,
 resolved by ``block_hooks/compute.py``): the formula lives in the module, never here. 年數 stops at 100 because the
-system builds one cash flow per year. v2: 蒙地卡羅 says it draws each item on its own (no item moves with another)."""
+system builds one cash flow per year. v2: 蒙地卡羅 says it draws each item on its own (no item moves with another).
+v3: an input marked ``line`` is only the line the result is compared with (it feeds no number): a range needs another."""
 
 from __future__ import annotations
 
@@ -43,7 +44,7 @@ ITEMS = {
             "inputs": [
                 {"key": "fixed_cost", "name": "固定成本", "type": "money", "min": 0, "hint": "不管做多少都要付的，例如房租、月費。"},
                 {"key": "margin", "name": "每單位的毛利", "type": "money", "hint": "每做一單位，售價減掉這一單位的成本。"},
-                {"key": "expected", "name": "你預計做得到的量", "type": "count"},
+                {"key": "expected", "name": "你預計做得到的量", "type": "count", "line": True},
             ],
         },
         {
@@ -66,7 +67,7 @@ ITEMS = {
                 {"key": "initial", "name": "一開始投入的金額", "type": "money", "min": 0},
                 {"key": "yearly", "name": "之後每年的淨收入", "type": "money", "hint": "每年收進來的減掉每年付出去的。"},
                 YEARS,
-                {"key": "hurdle", "name": "你要求的報酬率", "type": "percent", "min": -99, "max": 1000, "hint": "低於這個，你就覺得不值得。"},
+                {"key": "hurdle", "name": "你要求的報酬率", "type": "percent", "min": -99, "max": 1000, "line": True, "hint": "低於這個，你就覺得不值得。"},
             ],
         },
         {
@@ -105,11 +106,11 @@ ITEMS = {
             "inputs": [
                 {"key": "item", "name": "要加起來的一項", "type": "money", "repeat": [1, 6], "spread": True,
                  "hint": "自己取名字。收進來的寫正的，付出去的寫負的；樂觀和悲觀是它可能落在的兩端。"},
-                {"key": "threshold", "name": "你要的最低結果", "type": "money", "scenarios": False},
+                {"key": "threshold", "name": "你要的最低結果", "type": "money", "scenarios": False, "line": True},
             ],
         },
     ],
 }
 
-RULESETS = [Ruleset("compute.algorithms", "COMPUTE", "算法", "2", "平台（第 2 步）", ITEMS)]
-HISTORY = {"compute.algorithms": {"1": "3552fa2b8bae", "2": "505cca86a1d2"}}
+RULESETS = [Ruleset("compute.algorithms", "COMPUTE", "算法", "3", "平台（第 2 步）", ITEMS)]
+HISTORY = {"compute.algorithms": {"1": "3552fa2b8bae", "2": "505cca86a1d2", "3": "4a5e053b0bc6"}}

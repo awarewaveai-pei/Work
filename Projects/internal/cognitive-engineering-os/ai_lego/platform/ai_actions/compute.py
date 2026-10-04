@@ -29,7 +29,7 @@ READS = ("compute.run",)
 # AI 不准自己編數字 is an allow list: any digit, percent sign, Roman numeral, CJK numeral or English number word is a
 # number the AI wrote, unless it sits inside one of these fixed words with no unit right after it (「一個」 is a word,
 # 「一個月」 is a number). A word missing here costs a retry; a number let through would break the card.
-NUMERAL = re.compile(r"[\d%‰零〇一二兩三四五六七八九十百千萬億兆半倍壹貳參肆伍陸柒捌玖拾佰仟]")
+NUMERAL = re.compile(r"[\d%‰零〇一二兩三四五六七八九十廿卅卌百千萬億兆半倍壹貳參肆伍陸柒捌玖拾佰仟]")
 ROMAN = re.compile("[\u2160-\u2188]")   # checked before NFKC turns Ⅻ into letters
 UNIT_AFTER = "年月週周天日季歲時分秒鐘倍成元塊萬千百億兆%次趟件人"
 IDIOMS = ("一個", "一起", "一般", "一定", "一樣", "萬一", "一些", "一點", "一直", "一下", "一種", "一次", "一邊", "一方面", "統一", "唯一", "一致",
@@ -39,17 +39,35 @@ IDIOMS = ("一個", "一起", "一般", "一定", "一樣", "萬一", "一些", 
 IDIOM = re.compile("(?:" + "|".join(sorted(map(re.escape, IDIOMS), key=len, reverse=True)) + f")(?![{UNIT_AFTER}])")
 ENGLISH_NUMBER = re.compile(r"\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|"
                             r"eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?|millions?|billions?|"
-                            r"trillions?|dozens?|half|halves|quarters?|twice|thrice|double|triple|percent|percentage)\b", re.IGNORECASE)
-ENGLISH_IDIOM = re.compile(r"\b(?:no one|one of|one another|the one|each one|one at a time|double[- ]check)\b", re.IGNORECASE)
-# 模擬不是預測: one list of the ways to say what will happen or that it is certain, and one list of their negations
-# (which may be said). Matched after NFKC and lower-casing.
-FORECASTS = ("預測", "預計", "預估", "估計", "預期", "將會", "將要", "未來會", "以後會", "之後會", "明年會", "今年會", "到時候會", "將來會",
-             "一定會", "必然", "必定", "肯定會", "保證", "很可能會", "大概會", "應該會", "多半會", "勢必", "註定", "注定",
-             "predict", "forecast", "guarantee", "certainly", "surely", "will lose", "will make", "will earn", "will gain", "will profit",
-             "will break even", "will pay", "will happen", "going to", "foresee", "expected to")
-NEGATED = ("不是預測", "不等於預測", "不是在預測", "不能當成預測", "並不是預測", "無法預測", "不能預測", "沒辦法預測", "不一定會", "不等於一定會",
-           "不代表一定會", "不保證", "無法保證", "不能保證", "沒有保證", "你的估計", "你估計的", "自己估計", "not a prediction", "not a forecast",
-           "cannot predict", "can't predict", "does not predict", "no guarantee", "not guaranteed")
+                            r"trillions?|dozens?|half|halves|quarters?|twice|thrice|double|triple|percent|percentage|"
+                            r"(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth|thirteenth|fourteenth|fifteenth|"
+                            r"sixteenth|seventeenth|eighteenth|nineteenth|twentieth|thirtieth|fortieth|fiftieth|sixtieth|seventieth|eightieth|"
+                            r"ninetieth|hundredth|thousandth|millionth)s?)\b", re.IGNORECASE)
+ENGLISH_IDIOM = re.compile(r"\b(?:no one|one of|one another|the one|each one|one at a time|double[- ]check|at first|first of all)\b", re.IGNORECASE)
+
+# 模擬不是預測 is an allow list too. Outcome verbs (虧、賺、回本、撐不下去…) are an open class, so a list of forecasts leaks
+# forever; the claim that something will happen or is certain rides a closed class: 會、將、一定、必然、必定、肯定、勢必、
+# 保證、註定 and will / 'll / shall / won't / gonna / going to / certain to / bound to / guarantee. Any of them is refused unless
+# it sits inside one of these words, where it is not a future or certainty marker. A refusal costs one retry; the AI can
+# always say what the calculation shows without one (「悲觀情境下的計算結果低於打平」).
+MARKER = re.compile(r"[會將]|一定|必然|必定|肯定|勢必|保證|註定|注定")
+NOT_MARKERS = (
+    # 會 as meeting, body, occasion or understanding
+    "機會", "社會", "會議", "會計", "協會", "學會", "公會", "工會", "委員會", "會員", "體會", "誤會", "理會", "開會", "聚會", "約會", "會談",
+    "會面", "會合", "會場", "會長", "研討會", "大會", "國會", "議會", "領會",
+    # 將 as nearly, a general, making do, or the future named as a time
+    "將近", "將軍", "將就", "將來",
+    # a certainty word negated says it is not certain; 一定程度 is "to some extent"
+    "不一定", "不一定會", "不等於一定會", "不代表一定會", "不代表會", "不保證", "無法保證", "不能保證", "沒有保證", "不必然", "不肯定", "一定程度",
+)
+NOT_MARKER = re.compile("|".join(sorted(map(re.escape, NOT_MARKERS), key=len, reverse=True)))
+ENGLISH_MARKER = re.compile(r"\b(?:will|shall|gonna|going to|certain to|bound to|guarantee[sd]?|certainly|surely)\b|\bwon['’]t\b|['’]ll\b", re.IGNORECASE)
+ENGLISH_NOT_MARKERS = ("free will", "no guarantee", "not guaranteed")
+ENGLISH_NOT_MARKER = re.compile(r"\b(?:" + "|".join(map(re.escape, ENGLISH_NOT_MARKERS)) + r")\b", re.IGNORECASE)
+# The words for predicting itself (calling the result a prediction), a closed class too, and their negations.
+PREDICTION_WORDS = ("預測", "預計", "預估", "估計", "預期", "predict", "forecast", "foresee", "expected to")
+NOT_PREDICTION_WORDS = ("不是預測", "不等於預測", "不是在預測", "不能當成預測", "並不是預測", "無法預測", "不能預測", "沒辦法預測", "你的估計", "你估計的",
+                        "自己估計", "not a prediction", "not a forecast", "cannot predict", "can't predict", "does not predict")
 
 # shape() gets only the model's answer: build_input, in the same call and thread, leaves the turn's record here
 # (ask_ai always runs build_input first), the same way THINK's turns name their round.
@@ -59,24 +77,33 @@ _TURN: ContextVar[dict[str, Any] | None] = ContextVar("compute_turn", default=No
 def _guard_words(texts: list[str], known: list[str]) -> None:
     """Refuses an answer that writes a number or calls a result a prediction. ``known``: the person's own words and the
     system's names the answer may quote (an input named 「2027 年的房租」 is not a number the AI made up)."""
+    quotable = sorted((word for word in (unicodedata.normalize("NFKC", item) for item in known if item) if _quotable(word)), key=len, reverse=True)
     for text in texts:
         plain = unicodedata.normalize("NFKC", text)
-        for word in sorted((unicodedata.normalize("NFKC", item) for item in known if item), key=len, reverse=True):
+        for word in quotable:
             plain = plain.replace(word, " ")
         bare = ENGLISH_IDIOM.sub(" ", IDIOM.sub(" ", plain))
         if ROMAN.search(text) or NUMERAL.search(bare) or ENGLISH_NUMBER.search(bare):
             raise InvariantViolation("AI_ANSWER_HAS_NUMBER: AI 寫了數字（AI 不准自己編數字），這次沒有存。")
         said = plain.lower()
-        for phrase in NEGATED:
+        unmarked = ENGLISH_NOT_MARKER.sub(" ", NOT_MARKER.sub(" ", said))
+        for phrase in NOT_PREDICTION_WORDS:
             said = said.replace(phrase, " ")
-        if any(form in said for form in FORECASTS):
+        if MARKER.search(unmarked) or ENGLISH_MARKER.search(unmarked) or any(word in said for word in PREDICTION_WORDS):
             raise InvariantViolation("AI_ANSWER_CALLS_IT_PREDICTION: AI 把計算或模擬說成了預測或保證，這次沒有存。")
+
+
+def _quotable(word: str) -> bool:
+    """A known word may be quoted only if it carries more than a guarded word: a person's item named 「五」 or 「會」 must not
+    unlock that numeral or modal anywhere else in the answer."""
+    return len(word) > 1 and any(not NUMERAL.match(char) and char not in "會將" and not char.isspace() for char in word)
 
 
 def _names() -> list[str]:
     """The system's own words an answer may quote (a side reads 「一半以上的模擬…」; that is not the AI's number)."""
     words = [word for algo in algorithms().values()
-             for word in (algo["name"], algo["result"]["name"], algo.get("assumes", ""), *algo["sides"], *(spec["name"] for spec in algo["inputs"]))]
+             for word in (algo["name"], algo["result"]["name"], *algo["sides"], *(spec["name"] for spec in algo["inputs"]),
+                          *(f"{sentence}。" for text in (algo["formula"], algo.get("assumes", "")) for sentence in text.split("。") if sentence))]
     return [*words, *SCENARIOS, *LABELS, *AI_PARTS, OWN_WORDS, NOT_PREDICTION]
 
 
@@ -89,7 +116,8 @@ SUGGEST = (
     "- Never write a number, an amount, a percentage or a range: the person picks every number and where it comes from; "
     "the system computes.\n"
     "- This is a suggestion, not the one right method; when several fit, say what each would show.\n"
-    "- A calculation or simulation is not a prediction: never say what will happen."
+    "- A calculation or simulation is not a prediction: never say what will happen. Do not use 會、將、一定、必然、肯定、勢必、"
+    "保證 or will / 'll / going to about any outcome; say what a calculation would show."
 )
 SUGGEST_SCHEMA = {
     "type": "object",
@@ -139,7 +167,9 @@ EXPLAIN = (
     "- Never write a number, an amount, a percentage or a ratio: refer to inputs and results by name; the page shows "
     "every number beside your words.\n"
     f"- A calculation or a simulation is not a prediction ({NOT_PREDICTION}): a pessimistic scenario that loses money "
-    "does not mean the person will lose money. Never say what will happen and never call a result certain.\n"
+    "does not mean the person will lose money. Never say what will happen and never call a result certain: do not use "
+    "會、將、一定、必然、肯定、勢必、保證 or will / 'll / going to about any outcome; say what the calculation shows "
+    "(「悲觀情境下的計算結果低於打平」).\n"
     "- Say which numbers are the person's own (no outside source) and which have few independent origins; the result "
     "is no surer than its least-sourced number. Never present the result as objective truth or as a recommendation."
 )
