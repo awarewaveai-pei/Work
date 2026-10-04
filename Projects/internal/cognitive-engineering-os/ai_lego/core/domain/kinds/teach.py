@@ -33,7 +33,7 @@ KINDS = [
     }, owner="person"),
     DocKind("teach.completion", "TEACH", "課程完成紀錄", {
         "course": Field("choice", choices=tuple(PACKAGES), required=True),
-        "lesson_versions": Field("json", 8000, required=True),
+        "lesson_versions": Field("json", 8000, required=True, shape="object"),
         "at": Field("date", required=True),
     }, owner="person", authors=frozenset({"system"}), deletable=False),
     DocKind("teach.opponent", "TEACH", "練習對手的回應", {
@@ -41,6 +41,6 @@ KINDS = [
         "question": Field("text", 500),
     }, owner="person", authors=frozenset({"ai"})),
     DocKind("teach.feedback", "TEACH", "思考動作回饋", {
-        "move_feedback": Field("json", 8000, required=True),
+        "move_feedback": Field("json", 8000, required=True, shape="array"),
     }, owner="person", authors=frozenset({"ai"})),
 ]

@@ -86,6 +86,18 @@
 - MUTATION_EVIDENCE: 記憶體內移除 Future 完成回呼，`test_wait_idle_waits_for_a_submitted_hook_without_a_future_registry` 轉紅；原版 3/3 綠。
 - REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，main 合併仍封鎖。
 
+## 2026-10-04（續6）COS 步驟 3 整合 JSON 形狀契約
+
+- 根因：新 TEACH／EXPRESS 紀錄在獨立 Codex 鏈建立，尚未繼承 main 的 `Field.shape` 不變量；合併前 `test_block_foundation` 精確報出 4 個漏宣告欄位。
+- 修改：`kinds/express.py` 的 `items`／`sentences` 為陣列；`kinds/teach.py` 的 `lesson_versions` 為物件、`move_feedback` 為陣列，按既有讀取與輸出形狀宣告。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_foundation | exit=0 | ms=12559（43 tests；修前 4 failures）
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_teach | exit=0 | ms=6398（12 tests）
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_express | exit=0 | ms=6904（14 tests）
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/0m/0n（Codex 自審；Claude 尚未覆審）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=lesson_versions|move_feedback|express.selection|express.draft | hits=67
+- ORACLE_WAIVED: Claude 週額度用完；合併前 4 個漏宣告各使 registry gate 失敗，補後全綠；本 commit 留本機審查債，不 push／部署。
+- rollback：revert 此 commit；不含資料遷移。
+
 ## 2026-10-04（續2）COS JSON 欄位形狀在存檔時驗證
 - 根因：`Projects/internal/cognitive-engineering-os/ai_lego/core/domain/doc_kinds.py:134` 原先只驗 JSON 是物件或陣列；`ai_lego/platform/ai_actions/map.py:175` 對 `one_lines` 呼叫 `.items()`，錯形狀可經通用存檔路徑留下並讓 AI 動作 500。
 - 修正：`doc_kinds.py:38` 加 `Field.shape` 宣告與宣告合法性；`:130`、`:154` 存檔拒絕錯形狀（含空容器）；`kinds/` 58 個 JSON 欄位依讀取契約標為物件 21、陣列 37，沒有任意 JSON 例外；`tests/unit/test_block_foundation.py:70` 掃全 registry，`test_block_map.py:90` 實測 API 拒絕。
