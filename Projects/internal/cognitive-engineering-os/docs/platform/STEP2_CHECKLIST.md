@@ -72,14 +72,14 @@ Owners: S = supervisor session; 甲 GATHER; 乙 VERIFY; 丙 COMPUTE; 丁 collect
 - built: 「COMPUTE 替你真的把數字算出來…標成「計算結果」或「模擬結果」」「分清算出來的和感覺的」 -- ruleset `compute.algorithms` v1 (`platform/rulesets/compute.py`): 損益平衡、淨現值、內部報酬率、期望值、成本效益、蒙地卡羅, each calling an existing module's builder and that module's own gates; label from `LABELS`
 - built: 「你說要算什麼／你挑要用的數字／你確認每個數字從哪裡來／你設情境」 -- `compute.request` (person-only, every version kept): question, algorithm, inputs {number, unit, cards from `evidence.origins()` or OWN_WORDS}, 樂觀／悲觀 beside 一般
 - built: 「系統真的執行計算，不是讓 AI 用講的」 -- saving a request runs it (AFTER_SAVE → `compute.run`, author system); a test patches the module and the run follows it
-- built: a bad number is a refusal in plain words naming the scenario (`COMPUTE_INPUT_REFUSED`), nothing saved -- BEFORE_SAVE computes every scenario once
+- built: a bad number is a refusal in plain words naming the scenario (`COMPUTE_INPUT_REFUSED`), nothing saved -- BEFORE_SAVE computes every scenario once; a module refusal that is itself the answer (毛利 0 以下 = 永遠打不平; no inflow / no outlay for 內部報酬率) is a result with no number (`MODULE_ANSWERS`), never a refusal
 - built: 「畫面上列出公式和每一個輸入」「每個輸入都帶著來源」「你自己給的數字，系統標…」 -- ComputePage + GET `/projects/{id}/compute/runs` (each input's source in words)
-- built: 「系統指出：哪一個輸入一變，結果就翻過來」 -- one at a time, from each 一般 value up and down by its own size (or its 樂觀／悲觀 spread); the nearest flip is named with its value
-- built: 「系統把每次計算都存起來。你可以重跑」「每次計算都可以重跑，跟之前的對照」「系統記下算法是哪一版」 -- a new request version = a new run with `rerun_of`; 並排比 any two; each run keeps the ruleset stamp
-- built: 「系統給一個範圍」「結果的可信度，不會高過輸入的來源」 -- range (a simulation: 5%–95% of its draws); one sentence names the least-sourced number
+- built: 「系統指出：哪一個輸入一變，結果就翻過來」 -- one at a time, from each 一般 value up and down by its own size (or its 樂觀／悲觀 spread); the nearest flip is named with its value; numbers no module can compute with are a wall (no flip claimed past it); a simulation within two standard errors of the line names no flip
+- built: 「系統把每次計算都存起來。你可以重跑」「每次計算都可以重跑，跟之前的對照」「系統記下算法是哪一版」 -- a new request version = a new run; rerun and 改輸入再算 start from the run's own record (`from_run` → `rerun_of`); 並排比 any two; each run keeps the ruleset stamp
+- built: 「系統給一個範圍」「結果的可信度，不會高過輸入的來源」 -- a request with no 樂觀 or 悲觀 value different from 一般 is refused (a simulation: no item with a spread); range (a simulation: 5%–95% of its draws); one sentence names the least-sourced number
 - built: 「AI 建議適合的算法」 (`suggest`, propose_options) 「AI 用白話解釋結果」「AI 指出哪一個假設最影響結果」 (`explain`, organize); 「模擬是 AI 權限的一種」 per rules §11
-- built: 「AI 不准自己編數字」 -- `compute.request` is person-only; an AI answer with a digit, %, or a Chinese numeral with a magnitude or unit is not saved (`AI_ANSWER_HAS_NUMBER`)
-- built: 「AI 不准把模擬說成預測」 -- page and instruction say 模擬不是預測; 預測／一定會／保證 outside 「不是預測」-type phrases is not saved (`AI_ANSWER_CALLS_IT_PREDICTION`)
+- built: 「AI 不准自己編數字」 -- `compute.request` is person-only; an AI answer with any digit, %, Roman, CJK numeral or English number word outside a fixed idiom list (no unit after it) is not saved (`AI_ANSWER_HAS_NUMBER`; test corpus)
+- built: 「AI 不准把模擬說成預測」 -- the page says 模擬不是預測 beside every explanation and every simulation, the instruction too; one list of forecast forms (預計、預估、將會、未來會、很可能會、will lose…) with their negations allowed (`AI_ANSWER_CALLS_IT_PREDICTION`; test corpus)
 - built: 「AI 不准把假設藏起來」 -- `rests_on` = every input of the run, filled from the record, never by the model
 - built: 「交還控制：某個外部數字的獨立出處不到兩個時，AI 停下來…你自己給的數字不算」 -- `explain.handback` from `calc_results()[].thin_inputs`, count shown, 「仍然繼續」 sends `go_on`
 - built: 「出現自傷、暴力、急性危機的訊號時，AI 停下來」「COMPUTE 叫 GOVERN」「碰到 GOVERN 列的高風險時…加護欄」 -- the gate's crisis stop; GOVERN's hook on `compute.request` and `compute.adopt` (tests)
@@ -89,16 +89,16 @@ Owners: S = supervisor session; 甲 GATHER; 乙 VERIFY; 丙 COMPUTE; 丁 collect
 - built: 「你可以改輸入、換算法」「你可以不採用結果」 -- 改輸入再算 (the algorithm too); `compute.adopt` one live per run, with a reason
 - built: 「工具進了這一塊，要照這份合約走：你先寫，AI 才回」 -- `suggest` needs your question; `explain` needs a run you made
 - DECISION: 成本效益 -- `cost_benefit_analysis.py` computes no number (it keeps the unpriced unpriced and asks who bears what); NPV gives each stream's value today; the one subtraction (效益 − 成本) is in `block_hooks/compute.py`
-- DECISION: a simulation's 樂觀／悲觀 are the two ends each item is drawn between (一般 most often): one range, not a result per scenario; its sweep moves an item's three values together with 2000 draws and names no flip when fewer draws alone change the side
-- KNOWN LIMIT: 內部報酬率 -- `irr.py:143` divides by zero from 54 periods on; 年數 stops at 50 (淨現值 and 內部報酬率 share it); flows are one outlay then equal years, so there is one IRR
+- DECISION: a simulation's 樂觀／悲觀 are the two ends each item is drawn between (一般 most often): one range, not a result per scenario; ruleset v2 says the items are drawn on their own (不會一起變好或變壞) and the page shows every item at its 悲觀 and at its 樂觀 beside the band; the sweep moves an item's three values together with 2000 draws
+- built: `irr.py` solved by dividing by (1+r)**period, which underflowed to 0.0 at its low bound from 54 periods on; it now bisects on NPV's sign with every power at most 1 (tested at 54, 60, 100 periods); 年數 stops at 100 (one cash flow per year); flows are one outlay then equal years, so there is one IRR
 - KNOWN LIMIT: the sweep reaches each number's own size (or its 樂觀／悲觀 spread); a flip further out reads 「沒有翻過來」; 期望值's probabilities are not swept alone (they must sum to 100%)
-- KNOWN LIMIT: the no-number check misses a number in words (「一半」) and refuses idioms like 「一成不變」「十萬火急」
+- KNOWN LIMIT: the no-number check is an allow list: a harmless word missing from its idioms (e.g. 「三思而行」 is there, a rarer one may not be) costs the person one retry; a forecast said without any listed form (「會賺錢」 alone) passes
 - KNOWN LIMIT: 蒙地卡羅 sums independent items only (`run_simulation` supports `sum`, no correlation)
 - NOT YET: 「統計」「因果圖」 -- `compute/statistics` holds only Cohen's kappa (agreement between two coders), nothing a personal decision asks; 因果圖 is not a numeric module
 - NOT YET: the rest of 「做不做得起來、划不划算」 (成本效果、實質選擇權、總持有成本、TELOS、單位經濟效益、財務假設) and the six business-* workflows -- a new algorithm = a new ruleset version
 - NOT YET: 「看見長期後果：第二序後果」 -- no algorithm chains consequences; years (淨現值、成本效益) and scenarios are built; 按月季年 observation is ACT's
 - NOT YET (S, at integration): 「計算結果交給 DECIDE…交給 ACT」 -- they read `evidence.calc_results`; 「結果頁歸 MAP／COMPUTE」 -- the project's older result page (⑧) does not link here
-- NOT YET (S): `calc_results()` names thin inputs, not each input's origin count; COMPUTE counts from `evidence.origins()` output (`input_origins`; a test keeps it equal to `thin_inputs`)
+- built: each number's counted origins live in `evidence.calc_results()[].input_origins` (`thin_inputs` derives from it); COMPUTE's hook, page and AI turn read it there, never recount
 
 ## Collector wire (丁)
 - built: wire v2 on both sides against one example file (`specs/wire/collector.v2.json`): next-admin builds its batch and completion from its seeds (`collect-wire-v2.test.ts`), the engine posts them and breaks each rule once (`test_collector_wire_v2.py`); v1 still accepted

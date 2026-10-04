@@ -2,8 +2,8 @@
 range), the module it calls and its label -- versioned, so every run says which version of the rules it used.
 
 Every algorithm calls an existing module's builder and that module's own gates (``calls`` = [builder, gates] pairs,
-resolved by ``block_hooks/compute.py``): the formula lives in the module, never here. 年數 stops at 50: the IRR
-module's solver divides by zero from 54 periods on (modules/feasibility/irr.py:143), and NPV shares the inputs."""
+resolved by ``block_hooks/compute.py``): the formula lives in the module, never here. 年數 stops at 100 because the
+system builds one cash flow per year. v2: 蒙地卡羅 says it draws each item on its own (no item moves with another)."""
 
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ ITEMS = {
         "money": {"unit": "元", "fixed_unit": False, "same_unit": True, "max": 1e12},
         "count": {"unit": "件", "fixed_unit": False, "min": 0, "max": 1e12},
         "percent": {"unit": "%", "fixed_unit": True},
-        "years": {"unit": "年", "fixed_unit": True, "integer": True, "min": 1, "max": 50},
+        "years": {"unit": "年", "fixed_unit": True, "integer": True, "min": 1, "max": 100},
     },
     # 哪一個輸入一變，結果就翻過來: one input at a time, from its 一般 value up and down by as much as itself (or as far
     # as its 樂觀/悲觀), in ``steps`` steps each way, then narrowed down ``narrow`` times; a simulation redraws at every
@@ -98,7 +98,8 @@ ITEMS = {
         },
         {
             "id": "monte_carlo", "name": "蒙地卡羅", "label": "模擬結果", "calls": [MONTE_CARLO],
-            "formula": "每一項在悲觀和樂觀之間隨機抽一個數（越接近一般的值越常抽到），全部加起來。這樣抽 10000 次，看結果落在哪裡。模擬不是預測。",
+            "formula": "每一項在悲觀和樂觀之間隨機抽一個數（越接近一般的值越常抽到），全部加起來。這樣抽 10000 次，看結果落在哪裡。每一項各抽各的，假設它們不會一起變好或變壞。模擬不是預測。",
+            "assumes": "每一項各抽各的，假設它們不會一起變好或變壞。真的會一起變的話，結果會比這個範圍更散。",
             "result": {"name": "加起來的結果", "unit": "money"},
             "sides": ["一半以上的模擬達到你要的最低結果", "不到一半的模擬達到你要的最低結果"],
             "inputs": [
@@ -110,5 +111,5 @@ ITEMS = {
     ],
 }
 
-RULESETS = [Ruleset("compute.algorithms", "COMPUTE", "算法", "1", "平台（第 2 步）", ITEMS)]
-HISTORY = {"compute.algorithms": {"1": "3552fa2b8bae"}}
+RULESETS = [Ruleset("compute.algorithms", "COMPUTE", "算法", "2", "平台（第 2 步）", ITEMS)]
+HISTORY = {"compute.algorithms": {"1": "3552fa2b8bae", "2": "505cca86a1d2"}}

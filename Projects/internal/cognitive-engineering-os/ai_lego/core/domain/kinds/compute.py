@@ -39,6 +39,7 @@ KINDS = [
         "scenarios": Field("json", 8000, human_only=True, scan=False),                        # {"樂觀"|"悲觀": {input name: value}}; 一般 = each input's value
         "not_priced": Field("json", 4000, human_only=True),                                    # 成本效益: [{"side": NOT_PRICED_SIDES, "what"}] -- listed, never priced
         "who_bears": Field("text", 1000, human_only=True),                                     # 成本效益: 誰得到效益、誰付成本
+        "from_run": Field("text", 64, human_only=True, scan=False),                            # the run this version reran or edited (its rerun_of)
     }, deletable=False),
     # AI 建議適合的算法 (propose_options): ids from the ruleset and words only -- never a number
     DocKind("compute.suggestion", "COMPUTE", "AI 建議的算法", {

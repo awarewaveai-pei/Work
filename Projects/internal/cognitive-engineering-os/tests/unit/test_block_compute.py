@@ -6,6 +6,7 @@ AI suggests and explains without a number or a forecast and hands back under two
 
 from __future__ import annotations
 
+import json
 import unittest
 from unittest import mock
 
@@ -42,7 +43,7 @@ def flows(first, yearly, years):
 class RulesetTests(unittest.TestCase):
     def test_the_algorithms_a_personal_decision_needs_each_call_a_module(self):
         found = rulesets.rulesets()["compute.algorithms"]
-        self.assertEqual((found.block, found.version), ("COMPUTE", "1"))
+        self.assertEqual((found.block, found.version), ("COMPUTE", "2"))
         algos = compute.algorithms()
         self.assertEqual(set(algos), {"break_even", "npv", "irr", "expected_value", "cost_benefit", "monte_carlo"})
         self.assertEqual(set(algos), set(compute.POINTS) | set(compute.SIMULATIONS))
@@ -59,22 +60,36 @@ class RulesetTests(unittest.TestCase):
         saved += [kind["unit"] for kind in compute.ruleset().items["types"].values()]
         self.assertEqual(high_risk_categories(*saved), [])
 
-    def test_years_stop_where_the_irr_module_still_solves(self):
-        """irr.py:143 divides by zero from 54 periods on; 年數 stops at 50 (KNOWN LIMIT in STEP2_CHECKLIST)."""
-        self.assertLessEqual(compute.ruleset().items["types"]["years"]["max"], 50)
-        self.assertIsInstance(compute_irr(flows(-1000, 100, 50)), float)
-        with self.assertRaises(ZeroDivisionError):
-            compute_irr(flows(-1000, 100, 54))
+    def test_the_irr_module_solves_long_horizons(self):
+        """irr.py divided by (1+r)**period, which underflowed to 0.0 at its low bound from 54 periods on; it now reads NPV's
+        sign with every power at most 1. The rate it returns makes NPV zero, through the NPV module."""
+        for years in (54, 60, 100):
+            rate = compute_irr(flows(-1000, 100, years))
+            self.assertAlmostEqual(compute_npv(flows(-1000, 100, years), rate), 0, delta=1e-3, msg=years)
+        self.assertEqual(compute_irr(flows(-1000, 1200, 1)), 0.2)
+        self.assertEqual(compute_irr(flows(-1000, 3e8, 100)), 300000.0)   # a huge rate over many periods no longer overflows
+
+    def test_monte_carlo_says_it_draws_each_item_on_its_own(self):
+        algo = compute.algorithms()["monte_carlo"]
+        self.assertIn("每一項各抽各的，假設它們不會一起變好或變壞", algo["formula"])
+        self.assertTrue(algo["assumes"].startswith("每一項各抽各的"))
 
 
 class SweepTests(unittest.TestCase):
     def test_the_flip_is_the_nearest_value_on_the_other_side(self):
         side = lambda x: "above" if x > 10 else "below"   # noqa: E731
-        at, to = compute._nearest_flip(side, 20.0, "above", 20.0, (None, None, False), 16, 30)
-        self.assertEqual(to, "below")
+        (at, to), stop = compute._nearest_flip(side, 20.0, "above", 20.0, (None, None, False), 16, 30)
+        self.assertEqual((to, stop), ("below", None))
         self.assertAlmostEqual(at, 10.0, places=4)
-        self.assertEqual(compute._nearest_flip(side, 7, "below", 7, (1, 50, True), 16, 30), (11, "above"))   # whole years: the first year past the line
-        self.assertIsNone(compute._nearest_flip(side, 40.0, "above", 5.0, (None, None, False), 16, 30))   # beyond the reach: no flip claimed
+        self.assertEqual(compute._nearest_flip(side, 7, "below", 7, (1, 50, True), 16, 30), ((11, "above"), None))   # whole years: the first year past the line
+        self.assertEqual(compute._nearest_flip(side, 40.0, "above", 5.0, (None, None, False), 16, 30), (None, None))   # beyond the reach: no flip claimed
+
+    def test_numbers_no_module_can_compute_are_a_wall_never_a_flip(self):
+        """critic M4b: past a number the modules refuse, the sweep stops that way and claims nothing."""
+        walled = lambda x: None if x < 12 else ("above" if x > 10 else "below")   # noqa: E731  -- the line at 10 sits behind a wall at 12
+        self.assertEqual(compute._nearest_flip(walled, 20.0, "above", 20.0, (None, None, False), 16, 30), (None, 11.25))
+        inside = lambda x: None if 12 < x < 13 else ("above" if x > 10 else "below")   # noqa: E731  -- a wall met while narrowing down (first midpoint 12.5)
+        self.assertEqual(compute._nearest_flip(inside, 20.0, "above", 20.0, (None, None, False), 4, 30), (None, None))
 
     def test_a_simulation_near_its_line_claims_no_flip(self):
         """The sweep draws fewer times; if that alone changes the side, the run says so instead of naming an input."""
@@ -82,11 +97,24 @@ class SweepTests(unittest.TestCase):
                  "values": {scenario: {"接案收入": 100, "你要的最低結果": 100} for scenario in ("樂觀", "一般", "悲觀")}, "not_priced": [], "who_bears": ""}
 
         def fake(algo, values, found, runs, seed):
-            return {"value": 100, "side": algo["sides"][0 if runs == compute.ruleset().items["simulation_runs"] else 1], "low": 90, "high": 110, "mean": 100, "chance": 0.5, "threshold": 100}
+            return {"value": 100, "side": algo["sides"][0 if runs != compute.ruleset().items["sweep"]["simulation_runs"] else 1], "low": 90, "high": 110, "mean": 100, "chance": 0.9, "threshold": 100}
 
         with mock.patch.dict(compute.SIMULATIONS, {"monte_carlo": fake}):
             _, flip = compute.outcome(found, 1)
         self.assertEqual((flip["input"], flip["why"]), (None, compute.NEAR_LINE))
+
+    def test_a_flip_within_two_standard_errors_of_the_line_is_too_close_to_call(self):
+        """critic m2: a chance of 0.5011 over 10000 draws (standard error 0.005) names no flip; 0.52 does."""
+        def found(threshold):
+            values = {"樂觀": {"收入": 200, "你要的最低結果": threshold}, "一般": {"收入": 100, "你要的最低結果": threshold}, "悲觀": {"收入": 0, "你要的最低結果": threshold}}
+            return {"algo": compute.algorithms()["monte_carlo"], "inputs": [item("item", "收入", 100), item("threshold", "你要的最低結果", threshold)], "values": values,
+                    "not_priced": [], "who_bears": ""}
+        near, flip = compute.outcome(found(101.0), 424242)
+        self.assertLess(abs(near["simulation"]["chance"] - 0.5), 0.01)
+        self.assertEqual((flip["input"], flip["why"]), (None, compute.NEAR_LINE))
+        far, flip = compute.outcome(found(95.0), 424242)
+        self.assertGreater(abs(far["simulation"]["chance"] - 0.5), 0.01)
+        self.assertIsNotNone(flip["input"])
 
 
 class ComputeCase(Step2Case):
@@ -100,6 +128,16 @@ class ComputeCase(Step2Case):
         cards = [self.card(url=f"https://example.org/{index}") for index in range(count)]
         self.group(*[[card] for card in cards])
         return cards
+
+    def break_even(self, **scenarios):
+        return {"question": "接案多少才打平", "algorithm": "break_even", "inputs": [
+            item("fixed_cost", "固定成本", 60000), item("margin", "每單位的毛利", 2000), item("expected", "你預計做得到的量", 40, "件")],
+            "scenarios": scenarios or {"悲觀": {"每單位的毛利": 1500}}}
+
+    def irr(self, years=5, **scenarios):
+        return {"question": "報酬率夠不夠", "algorithm": "irr", "inputs": [
+            item("initial", "一開始投入的金額", 100000), item("yearly", YEARLY, 30000), item("years", "年數", years, "年"), item("hurdle", "你要求的報酬率", 10, "%")],
+            "scenarios": scenarios or {"悲觀": {YEARLY: 25000}}}
 
     def npv(self, yearly_cards=None, yearly=30000, **over):
         return {"question": "開工作室五年划不划算", "algorithm": "npv", "inputs": [
@@ -155,16 +193,15 @@ class RequestTests(ComputeCase):
         self.assertEqual(len(flip["each"]), 4)
 
     def test_every_algorithm_runs_through_its_module(self):
-        self.request({"question": "接案多少才打平", "algorithm": "break_even", "inputs": [
-            item("fixed_cost", "固定成本", 60000), item("margin", "每單位的毛利", 2000), item("expected", "你預計做得到的量", 40, "件")]})
-        self.request({"question": "報酬率夠不夠", "algorithm": "irr", "inputs": [
-            item("initial", "一開始投入的金額", 100000), item("yearly", YEARLY, 30000), item("years", "年數", 5, "年"), item("hurdle", "你要求的報酬率", 10, "%")]})
+        self.request(self.break_even())
+        self.request(self.irr())
         self.request({"question": "這個案子平均起來賺不賺", "algorithm": "expected_value", "inputs": [
             item("p_good", "好的情況的機率", 30, "%"), item("v_good", "好的情況的金額", 100000), item("p_mid", "普通情況的機率", 50, "%"),
-            item("v_mid", "普通情況的金額", 10000), item("p_bad", "壞的情況的機率", 20, "%"), item("v_bad", "壞的情況的金額", -120000)]})
+            item("v_mid", "普通情況的金額", 10000), item("p_bad", "壞的情況的機率", 20, "%"), item("v_bad", "壞的情況的金額", -120000)],
+            "scenarios": {"悲觀": {"壞的情況的金額": -150000}}})
         self.request({"question": "換工作值不值得", "algorithm": "cost_benefit", "inputs": [
             item("one_time_cost", "一開始的成本", 50000), item("yearly_cost", "每年的成本", 10000), item("yearly_benefit", "每年的效益", 25000),
-            item("years", "年數", 5, "年"), item("rate", "折現率", 3, "%")],
+            item("years", "年數", 5, "年"), item("rate", "折現率", 3, "%")], "scenarios": {"悲觀": {"每年的效益": 20000}},
             "not_priced": [{"side": "效益", "what": "每天多一小時陪家人"}], "who_bears": "我得到效益，家人分擔家務"})
         self.request({"question": "拆夥後六個月的收入", "algorithm": "monte_carlo", "inputs": [
             item("item", "接案收入", 300000), item("item", "房租", -90000), item("threshold", "你要的最低結果", 150000)],
@@ -215,7 +252,7 @@ class RequestTests(ComputeCase):
         self.refused(npv_with(1, own=True, cards=case_card), "就不能同時選來源卡")
         self.refused(npv_with(1, own=False, cards=[]), "要選至少一張來源卡")
         self.refused(npv_with(1, own=False, cards=["not-in-this-case"]), "選的來源卡不在這個案子裡")
-        self.refused(npv_with(2, value=51), "「年數」不能大於 50")
+        self.refused(npv_with(2, value=101), "「年數」不能大於 100")
         self.refused(npv_with(2, value=2.5), "「年數」要是整數")
         self.refused(npv_with(3, value=-100), "「折現率」不能小於 -99")
         self.refused(npv_with(0, value=-1), "「一開始投入的金額」不能小於 0")
@@ -226,20 +263,21 @@ class RequestTests(ComputeCase):
         self.refused({**content, "inputs": content["inputs"] + [content["inputs"][0]]}, "出現了兩次")
         self.refused({**content, "scenarios": {"一般": {YEARLY: 1}}}, "情境只有樂觀和悲觀兩種")
         self.refused({**content, "scenarios": {"悲觀": {"房租": 1}}}, "悲觀情境裡的「房租」不是這次要用的數字")
-        self.refused({**content, "scenarios": {"悲觀": {"年數": 60}}}, "悲觀情境的「年數」不能大於 50")
+        self.refused({**content, "scenarios": {"悲觀": {"年數": 160}}}, "悲觀情境的「年數」不能大於 100")
         self.refused({**content, "who_bears": "我"}, "只有成本效益會用到")
-        self.refused({"question": "打不打得平", "algorithm": "break_even", "inputs": [
-            item("fixed_cost", "固定成本", 60000), item("margin", "每單位的毛利", 2000), item("expected", "你預計做得到的量", 40, "件")],
-            "scenarios": {"悲觀": {"每單位的毛利": -10}}}, "悲觀情境：每單位的毛利是 0 或負的：做越多賠越多，永遠打不平。")
         self.refused({"question": "平均起來", "algorithm": "expected_value", "inputs": [
             item("p_good", "好的情況的機率", 30, "%"), item("v_good", "好的情況的金額", 1), item("p_mid", "普通情況的機率", 50, "%"),
-            item("v_mid", "普通情況的金額", 1), item("p_bad", "壞的情況的機率", 10, "%"), item("v_bad", "壞的情況的金額", 1)]}, "三個機率加起來要剛好是 100%")
-        self.refused({"question": "報酬率", "algorithm": "irr", "inputs": [
-            item("initial", "一開始投入的金額", 100000), item("yearly", YEARLY, -5000), item("years", "年數", 5, "年"), item("hurdle", "你要求的報酬率", 10, "%")]}, "才算得出內部報酬率")
+            item("v_mid", "普通情況的金額", 1), item("p_bad", "壞的情況的機率", 10, "%"), item("v_bad", "壞的情況的金額", 1)],
+            "scenarios": {"悲觀": {"壞的情況的金額": 0}}}, "一般情境：三個機率加起來要剛好是 100%")
         self.refused({"question": "成本效益", "algorithm": "cost_benefit", "inputs": [
-            item("one_time_cost", "一開始的成本", 1), item("yearly_cost", "每年的成本", 1), item("yearly_benefit", "每年的效益", 1), item("years", "年數", 1, "年"), item("rate", "折現率", 3, "%")]},
-            "誰得到效益、誰付成本")
+            item("one_time_cost", "一開始的成本", 1), item("yearly_cost", "每年的成本", 1), item("yearly_benefit", "每年的效益", 1), item("years", "年數", 1, "年"), item("rate", "折現率", 3, "%")],
+            "scenarios": {"悲觀": {"每年的效益": 0}}}, "誰得到效益、誰付成本")
+        self.refused({**content, "scenarios": {}}, compute.NO_RANGE)   # critic M3: a range, never one number
+        self.refused({**content, "scenarios": {"樂觀": {YEARLY: 30000}}}, compute.NO_RANGE)   # equal to 一般 is no scenario
+        self.refused({**npv_with(1, unit="元\u200b")}, f"「{YEARLY}」要寫單位")
         simulation = {"question": "六個月", "algorithm": "monte_carlo", "inputs": [item("item", "接案收入", 300000), item("threshold", "你要的最低結果", 1)]}
+        self.refused(simulation, compute.NO_SPREAD)
+        self.refused({**simulation, "inputs": [item("item", "收\u0001入", 1), item("threshold", "你要的最低結果", 1)], "scenarios": {"悲觀": {"收\u0001入": 0}}}, "不含看不見的字元")
         self.refused({**simulation, "scenarios": {"樂觀": {"接案收入": 200000}, "悲觀": {"接案收入": 250000}}}, "「接案收入」的一般值要在樂觀和悲觀之間")
         self.refused({**simulation, "scenarios": {"悲觀": {"你要的最低結果": 0}}}, "「你要的最低結果」不分情境")
         self.refused({**simulation, "inputs": simulation["inputs"][1:]}, "少了「要加起來的一項」")
@@ -262,9 +300,7 @@ class RequestTests(ComputeCase):
         first = self.request(self.npv())
         changed = self.client.put(f"{self.base}/docs/compute.request/{first['doc_id']}", json={"content": self.npv(yearly=20000), "base_version": 1})
         self.assertEqual(changed.status_code, 200, changed.text)
-        irr = {"question": "報酬率夠不夠", "algorithm": "irr", "inputs": [
-            item("initial", "一開始投入的金額", 100000), item("yearly", YEARLY, 30000), item("years", "年數", 5, "年"), item("hurdle", "你要求的報酬率", 10, "%")]}
-        self.assertEqual(self.client.put(f"{self.base}/docs/compute.request/{first['doc_id']}", json={"content": irr, "base_version": 2}).status_code, 200)
+        self.assertEqual(self.client.put(f"{self.base}/docs/compute.request/{first['doc_id']}", json={"content": self.irr(), "base_version": 2}).status_code, 200)
         one, two, three = self.runs()
         self.assertEqual((one.get("rerun_of"), two["rerun_of"], three["rerun_of"]), (None, one["run_id"], two["run_id"]))
         self.assertEqual([run["algorithm"]["id"] for run in (one, two, three)], ["npv", "npv", "irr"])
@@ -329,9 +365,10 @@ class SourcingTests(ComputeCase):
         self.group([a], [b])
         self.request(self.npv(yearly_cards=[a, b]))
         [run] = self.runs()
-        self.assertEqual(run["thin_inputs"], [YEARLY])
-        counts = compute.input_origins(evidence.origins(self.docs, self.tenant_id, self.owner), run["inputs"])
-        self.assertEqual(sorted(name for name, count in counts.items() if count < words.MIN_ORIGINS), run["thin_inputs"])
+        self.assertEqual((run["thin_inputs"], run["input_origins"]), ([YEARLY], {YEARLY: 1}))   # counted once, in evidence.calc_results
+        self.assertEqual(sorted(name for name, count in run["input_origins"].items() if count < words.MIN_ORIGINS), run["thin_inputs"])
+        self.request(self.npv(yearly_cards=self.counted(2)))
+        self.assertEqual(self.runs()[1]["input_origins"], {YEARLY: 2})
         self.assertIn(f"最弱的是「一開始投入的金額」", run["weakest"])
         self.assertIn("只有 1 個算數的獨立出處（要 2 個）", {row["input"]: row["words"] for row in run["sourcing"]}[YEARLY])
 
@@ -349,6 +386,7 @@ class AiTests(ComputeCase):
         self.assertEqual(self.provider.calls, [])
         went_on = self.ask("explain", run=run, go_on=True)
         self.assertEqual((went_on.status_code, len(self.provider.calls)), (200, 1), went_on.text)
+        self.assertIn("只有 1 個算數的獨立出處（要 2 個）", self.provider.calls[0][1])   # the AI is told each number's source, from calc_results
 
     def test_own_numbers_never_hand_back(self):
         self.assertIn("saved", self.ask("explain", run=self.run_id()).json())
@@ -404,6 +442,130 @@ class AiTests(ComputeCase):
         self.docs.save(self.tenant_id, self.owner, "sense.card", {"category": "感受", "text": "我其實很怕跟他談"}, record_log.user(self.identity["identity_id"], "SENSE"))
         self.ask("explain", run=self.run_id())
         self.assertNotIn("很怕跟他談", self.provider.calls[0][1])
+
+
+class AnswerTests(ComputeCase):
+    """critic M4a: a module refusal that is itself an answer is a result with no number, never a reason to refuse."""
+
+    def test_a_pessimistic_scenario_that_never_breaks_even_is_saved_as_its_answer(self):
+        self.request(self.break_even(悲觀={"每單位的毛利": -10}))
+        [run] = self.runs()
+        never = run["result"]["by_scenario"]["悲觀"]
+        self.assertEqual((never["value"], never["side"], never["words"]), (None, "做得到的量不夠打平", "每單位的毛利是 0 或負的：做越多賠越多，永遠打不平。"))
+        self.assertEqual(run["result"]["range"]["low"], run["result"]["range"]["high"])   # the two scenarios with a number
+        self.assertTrue(all(entry.get("to") != "算不出來" for entry in run["flip"]["each"]))
+
+    def test_no_inflow_never_meets_the_hurdle_and_no_outlay_always_does(self):
+        self.request(self.irr(悲觀={YEARLY: -5000}, 樂觀={"一開始投入的金額": 0}))
+        by = self.runs()[0]["result"]["by_scenario"]
+        self.assertEqual((by["悲觀"]["value"], by["悲觀"]["side"]), (None, "沒達到你要求的報酬率"))
+        self.assertEqual((by["樂觀"]["value"], by["樂觀"]["side"]), (None, "達到你要求的報酬率"))
+        self.assertIsInstance(by["一般"]["value"], float)
+
+    def test_a_margin_swept_to_zero_stays_on_its_side_instead_of_flipping_to_uncomputable(self):
+        found = compute.plan({**self.break_even(悲觀={"每單位的毛利": 900}), "inputs": [
+            item("fixed_cost", "固定成本", 60000), item("margin", "每單位的毛利", 1000), item("expected", "你預計做得到的量", 20, "件")]}, None)
+        _, flip = compute.outcome(found, 1)
+        margin = next(entry for entry in flip["each"] if entry["input"] == "每單位的毛利")
+        self.assertIsNone(margin["at"])   # 0 means 永遠打不平: still 不夠打平, the side it started on
+        self.assertEqual(flip["input"], "固定成本")
+
+    def test_irr_runs_past_the_old_fifty_year_cap(self):
+        self.request(self.irr(years=60))
+        self.assertIsInstance(self.runs()[0]["result"]["by_scenario"]["一般"]["value"], float)
+
+
+class RerunTests(ComputeCase):
+    def test_a_rerun_names_the_run_it_started_from(self):
+        """critic M5: rerunning run 1 after run 2 is a rerun of run 1, with run 1's numbers (the page sends them)."""
+        first = self.request(self.npv())
+        self.client.put(f"{self.base}/docs/compute.request/{first['doc_id']}", json={"content": self.npv(yearly=20000), "base_version": 1})
+        one, two = self.runs()
+        again = self.client.put(f"{self.base}/docs/compute.request/{first['doc_id']}", json={"content": {**self.npv(), "from_run": one["run_id"]}, "base_version": 2})
+        self.assertEqual(again.status_code, 200, again.text)
+        three = self.runs()[2]
+        self.assertEqual((three["rerun_of"], three["inputs"][1]["value"], two["rerun_of"]), (one["run_id"], 30000, one["run_id"]))
+        unknown = self.client.put(f"{self.base}/docs/compute.request/{first['doc_id']}", json={"content": {**self.npv(), "from_run": "no-such-run"}, "base_version": 3})
+        self.assertEqual((unknown.status_code, unknown.json()["detail"].split(":")[0]), (404, "COMPUTE_RUN_NOT_FOUND"))
+
+    def test_the_save_never_leaves_a_request_without_its_run(self):
+        """critic m3: what BEFORE_SAVE checked is not checked again after the save (a card gone since must not refuse)."""
+        content = self.npv(yearly_cards=["a-card-this-case-no-longer-has"])
+        notices = compute._request_saved(self.docs, self.tenant_id, self.owner, {"doc_id": "Q-after", "version": 1, "content": content})
+        self.assertEqual([notice["type"] for notice in notices], ["computed"])
+        self.assertEqual([run["content"]["request"] for run in self.docs.current(self.tenant_id, self.owner, "compute.run")], ["Q-after"])
+
+
+class SimulationTests(ComputeCase):
+    def test_a_simulation_shows_its_assumption_and_every_item_at_its_own_ends(self):
+        """critic M6: the band assumes the items move on their own; beside it, all at 悲觀 and all at 樂觀, summed by the module."""
+        self.request({"question": "拆夥後六個月的收入", "algorithm": "monte_carlo", "inputs": [
+            item("item", "接案收入", 300000), item("item", "房租", -90000), item("threshold", "你要的最低結果", 150000)],
+            "scenarios": {"樂觀": {"接案收入": 420000, "房租": -80000}, "悲觀": {"接案收入": 120000, "房租": -100000}}})
+        drawn = self.runs()[0]["result"]["simulation"]
+        self.assertEqual(drawn["assumes"], compute.algorithms()["monte_carlo"]["assumes"])
+        self.assertEqual(drawn["every"], {"樂觀": 340000, "悲觀": 20000})
+
+    def test_long_names_on_every_item_still_fit_the_run(self):
+        """The flip field holds 4000 bytes: six items with sixty-character names and the threshold still save a run."""
+        names = ["收" * 59 + chr(0x4E00 + index) for index in range(6)]
+        self.request({"question": "六個月", "algorithm": "monte_carlo", "inputs": [item("item", name, 100000 * (index + 1)) for index, name in enumerate(names)]
+                      + [item("threshold", "你要的最低結果", 1234567)], "scenarios": {"樂觀": {name: 150000 * (index + 1) for index, name in enumerate(names)},
+                                                                          "悲觀": {name: 50000 * (index + 1) for index, name in enumerate(names)}}})
+        flip = self.runs()[0]["flip"]
+        self.assertLess(len(json.dumps(flip, ensure_ascii=False).encode("utf-8")), 4000)
+
+
+class RawBodyTests(ComputeCase):
+    """critic m1 and probe_api: numbers JSON can carry that Python cannot hold as a float."""
+
+    def raw(self, body):
+        return self.client.post(f"{self.base}/docs/compute.request", content=body, headers={"content-type": "application/json"})
+
+    def test_a_huge_whole_number_or_nan_is_refused_in_words_never_a_500(self):
+        content = self.npv()
+        content["inputs"][2]["value"] = 777777
+        response = self.raw(json.dumps({"content": content}).replace("777777", "1" + "0" * 400))
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("「年數」不能大於 100", response.json()["detail"])
+        content = self.npv()
+        content["scenarios"] = {"悲觀": {"年數": 777777}}
+        response = self.raw(json.dumps({"content": content}, ensure_ascii=False).replace("777777", "1" + "0" * 400))
+        self.assertIn("悲觀情境的「年數」不能大於 100", response.json()["detail"])
+        response = self.raw(json.dumps({"content": self.npv()}).replace('"value": 30000', '"value": NaN'))
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn(f"「{YEARLY}」要填一個數字", response.json()["detail"])
+
+    def test_an_adopt_naming_a_list_is_not_found_never_a_500(self):
+        self.assertEqual(self.post({"run": ["x"], "adopt": "採用", "reason": "x"}, "compute.adopt").status_code, 404)
+
+
+# critic M1/M2 corpora: what an AI answer may not say, and plain sentences it may.
+WRITES_A_NUMBER = ["大約第七年才回本。", "五年後淨現值轉正。", "要撐三個月。", "撐一個月就好。", "十五年", "收入少掉三分之一就不划算。", "打七折就虧。", "虧損上百萬。",
+                   "大概一半的機會。", "差了好幾萬", "兩倍", "八成", "第二年", "每年四次", "十分鐘後", "淨現值大約是 3 萬", "報酬大概 15%", "Ⅻ", "①", "５", "壹萬",
+                   "about ten percent lower", "roughly five million", "IRR is twenty", "half of it", "double the rent"]
+FORECASTS = ["這個結果很可能會發生", "未來會虧", "估計會虧損", "預估明年會賺", "預計會賺", "將會虧本", "依這個結果預測你會賺。", "這樣一定會賺。", "保證回本",
+             "will lose money", "you are going to profit", "I foresee a loss"]
+PLAIN = ["悲觀情境下淨現值是負的，主要因為每年的淨收入比較低。", "模擬不是預測，悲觀情境不一定會發生；千萬不要只看一個數。", "這一項是你自己估的，還沒有外部出處。",
+         "一般情境和樂觀情境落在同一邊，只有悲觀情境不一樣。", "這個結果不保證會發生，也無法預測未來。", "每一項各抽各的，假設它們不會一起變好或變壞。",
+         "一半以上的模擬達到你要的最低結果。", "十分依賴每年的淨收入這一個數字。", "one of the inputs is your own guess, not a prediction"]
+
+
+class AnswerWordsTests(unittest.TestCase):
+    def test_every_way_of_writing_a_number_is_refused(self):
+        for text in WRITES_A_NUMBER:
+            with self.subTest(text=text), self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_HAS_NUMBER"):
+                compute_ai._guard_words([text], compute_ai._names())
+
+    def test_every_way_of_saying_what_will_happen_is_refused(self):
+        for text in FORECASTS:
+            with self.subTest(text=text), self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_CALLS_IT_PREDICTION"):
+                compute_ai._guard_words([text], compute_ai._names())
+
+    def test_plain_sentences_and_their_negations_pass(self):
+        for text in PLAIN:
+            with self.subTest(text=text):
+                compute_ai._guard_words([text], compute_ai._names())
 
 
 class IntegrityTests(unittest.TestCase):

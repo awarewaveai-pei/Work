@@ -247,8 +247,9 @@ def checked_claims(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, foun
 
 
 def calc_results(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, found: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
-    """Every calculation run in the case (計算結果交給 DECIDE、ACT), with the person's 採用／不採用. ``thin_inputs``: the
-    outside numbers backed by under MIN_ORIGINS counted origins (the person's own numbers never are)."""
+    """Every calculation run in the case (計算結果交給 DECIDE、ACT), with the person's 採用／不採用. ``input_origins``: each
+    outside number's counted independent origins (the person's own numbers have none); ``thin_inputs``: those under
+    MIN_ORIGINS."""
     if owner.kind != "case":
         return []
     origin_of, counted, _ = _counted(found if found is not None else origins(docs, tenant_id, owner, with_reviews=False))
@@ -256,14 +257,14 @@ def calc_results(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, found:
     out = []
     for run in docs.current(tenant_id, owner, "compute.run"):
         content = run["content"]
-        thin = [item.get("name") for item in content.get("inputs") or []
-                if isinstance(item, Mapping) and not item.get("own")
-                and len({origin_of[card] for card in item.get("cards") or [] if origin_of.get(card) in counted}) < MIN_ORIGINS]
+        outside = [item for item in content.get("inputs") or [] if isinstance(item, Mapping) and not item.get("own")]
+        counts = {item.get("name"): len({origin_of[card] for card in item.get("cards") or [] if origin_of.get(card) in counted}) for item in outside}
+        thin = [item.get("name") for item in outside if counts[item.get("name")] < MIN_ORIGINS]
         adopt = adopts.get(run["doc_id"])
         out.append({
             "run_id": run["doc_id"], "version": run["version"], "at": run["at"],
             **{key: content.get(key) for key in ("question", "label", "algorithm", "formula", "inputs", "scenarios", "result", "flip", "rules", "request", "rerun_of")},
-            "thin_inputs": thin,
+            "input_origins": counts, "thin_inputs": thin,
             "adopt": {key: adopt["content"].get(key) for key in ("adopt", "reason")} if adopt else None,
         })
     return out

@@ -32,13 +32,15 @@ trace, same algorithm), so its raw result and the stored 8dp-rounded value
 can differ by 8dp-rounding noise; 1e-6 absorbs that noise while still
 catching a real tamper (e.g. a stored ``irr`` off by 1%).
 
-Bracket search: fixed low bound ``lo=-0.999999`` (rate must stay > -1, the
-domain boundary where ``(1+r)`` denominators diverge), exponentially
-doubling ``hi`` from 1.0 until ``NPV(lo)`` and ``NPV(hi)`` have opposite
-signs (or a cap is hit) -- a real non-convergence case (e.g. cash flows with
-multiple sign changes whose actual root lies outside this search's own
-bracket) raises the distinct ``IRR_NO_SOLUTION_FOUND``, never a silent wrong
-answer and never an infinite loop.
+Bracket search: fixed low bound ``lo=-0.999999`` (rate must stay > -1),
+exponentially doubling ``hi`` from 1.0 until ``NPV(lo)`` and ``NPV(hi)`` have
+opposite signs (or a cap is hit) -- a real non-convergence case (e.g. cash
+flows with multiple sign changes whose actual root lies outside this search's
+own bracket) raises the distinct ``IRR_NO_SOLUTION_FOUND``, never a silent
+wrong answer and never an infinite loop. Bisection needs only NPV's sign, read
+from ``_scaled_npv`` (NPV times a positive factor, every power at most 1): the
+plain ``amount / (1+r)**period`` divided by an underflowed 0.0 at the low bound
+from 54 periods on, and overflows at a large ``hi`` over many periods.
 
 Independently verified (not merely trusted) in
 ``tests/unit/test_irr.py``/``run_irr_slice.py``: a 2-cash-flow case has a
@@ -139,8 +141,18 @@ def cash_flow(period: int, amount: float) -> dict[str, Any]:
     return record
 
 
-def _npv_at_rate(cash_flows: list[dict[str, Any]], rate: float) -> float:
-    return sum(cf["amount"] / (1.0 + rate) ** cf["period"] for cf in cash_flows)
+def _scaled_npv(cash_flows: list[dict[str, Any]], rate: float) -> float:
+    """NPV(rate) times a positive factor -- (1+rate)**horizon when rate <= 0, 1 otherwise -- so it has NPV's sign for every
+    rate > -1, and every power in it is at most 1: nothing divides by a power that underflows to zero or overflows."""
+    base = 1.0 + rate
+    if base <= 1.0:
+        horizon = max(cf["period"] for cf in cash_flows)
+        return sum(cf["amount"] * base ** (horizon - cf["period"]) for cf in cash_flows)
+    return sum(cf["amount"] * base ** -cf["period"] for cf in cash_flows)
+
+
+def _sign(value: float) -> int:
+    return (value > 0) - (value < 0)
 
 
 def _solve_irr_bisection(cash_flows: list[dict[str, Any]]) -> float:
@@ -151,12 +163,12 @@ def _solve_irr_bisection(cash_flows: list[dict[str, Any]]) -> float:
     -- never an infinite loop, never a silently-wrong extrapolated answer."""
     lo = _SOLVER_LOW_RATE
     hi = 1.0
-    f_lo = _npv_at_rate(cash_flows, lo)
-    f_hi = _npv_at_rate(cash_flows, hi)
+    f_lo = _sign(_scaled_npv(cash_flows, lo))
+    f_hi = _sign(_scaled_npv(cash_flows, hi))
     expansions = 0
     while f_lo * f_hi > 0 and expansions < _SOLVER_MAX_BRACKET_EXPANSIONS:
         hi *= 2
-        f_hi = _npv_at_rate(cash_flows, hi)
+        f_hi = _sign(_scaled_npv(cash_flows, hi))
         expansions += 1
     if f_lo * f_hi > 0:
         raise InvariantViolation(
@@ -167,7 +179,7 @@ def _solve_irr_bisection(cash_flows: list[dict[str, Any]]) -> float:
         if (hi - lo) / 2 < _SOLVER_INTERVAL_TOLERANCE:
             break
         mid = (lo + hi) / 2
-        f_mid = _npv_at_rate(cash_flows, mid)
+        f_mid = _sign(_scaled_npv(cash_flows, mid))
         if f_mid == 0:
             lo = hi = mid
             break

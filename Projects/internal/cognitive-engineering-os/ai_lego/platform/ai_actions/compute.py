@@ -3,9 +3,10 @@ and explain a run in plain words, naming the assumption that moves it most (``or
 calculation; the AI never writes a number, never calls a calculation or a simulation a prediction, and never hides an
 assumption: ``rests_on`` is every input of the run, filled from the record, not by the model.
 
-They read only COMPUTE's own records and GATHER's source cards (via ``read.evidence``: the counts, never a recount) --
-nothing else the person keeps (讀什麼：GATHER 的來源卡、你給的數字；絕不讀跟這次計算無關的個人資料). ``explain`` hands
-back (交還控制) while an outside number has under two independent origins, unless the person chose to go on."""
+They read only the case's runs through ``read.evidence.calcs()`` -- each number with its counted origins, counted in
+``evidence.calc_results`` from GATHER's cards, never here -- and nothing else the person keeps (讀什麼：GATHER 的來源卡、
+你給的數字；絕不讀跟這次計算無關的個人資料). ``explain`` hands back (交還控制) while an outside number has under two
+independent origins, unless the person chose to go on."""
 
 from __future__ import annotations
 
@@ -16,20 +17,39 @@ from contextvars import ContextVar
 from typing import Any, Callable, Mapping
 
 from ai_lego.core.domain.evidence_words import MIN_ORIGINS
-from ai_lego.core.domain.kinds.compute import AI_PARTS, NOT_PREDICTION
+from ai_lego.core.domain.evidence_words import LABELS, OWN_WORDS
+from ai_lego.core.domain.kinds.compute import AI_PARTS, NOT_PREDICTION, SCENARIOS
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gate import AiAction
-from ai_lego.platform.block_hooks.compute import algorithms, input_origins, sourcing, weakest
+from ai_lego.platform.block_hooks.compute import algorithms, sourcing, weakest
 
 Read = Callable[..., list[dict[str, Any]]]
-READS = ("compute.run", "gather.source")
+READS = ("compute.run",)
 
-# A number the AI wrote: a digit (any script, after NFKC), a percent, or a Chinese numeral with a magnitude or a unit
-# (五萬、三千、兩成、一倍、十元). 「一個」「兩邊」「千萬不要」 stay words.
-NUMBER = re.compile(r"\d|%|百分之|[零〇一二兩三四五六七八九十][十百千萬億]|[零〇一二兩三四五六七八九十百千萬億]+[元塊成倍]")
-# 「模擬不是預測」 and its plain variants may be said; anything else calling it a forecast or a certainty is refused.
-NOT_A_FORECAST = ("不是預測", "不等於預測", "不是在預測", "不能當成預測", "並不是預測", "不一定會", "不等於一定會", "不保證")
-FORECAST = re.compile(r"預測|一定會|保證|predict|forecast|guarantee", re.IGNORECASE)
+# AI 不准自己編數字 is an allow list: any digit, percent sign, Roman numeral, CJK numeral or English number word is a
+# number the AI wrote, unless it sits inside one of these fixed words with no unit right after it (「一個」 is a word,
+# 「一個月」 is a number). A word missing here costs a retry; a number let through would break the card.
+NUMERAL = re.compile(r"[\d%‰零〇一二兩三四五六七八九十百千萬億兆半倍壹貳參肆伍陸柒捌玖拾佰仟]")
+ROMAN = re.compile("[\u2160-\u2188]")   # checked before NFKC turns Ⅻ into letters
+UNIT_AFTER = "年月週周天日季歲時分秒鐘倍成元塊萬千百億兆%次趟件人"
+IDIOMS = ("一個", "一起", "一般", "一定", "一樣", "萬一", "一些", "一點", "一直", "一下", "一種", "一次", "一邊", "一方面", "統一", "唯一", "一致",
+          "進一步", "一旦", "一切", "一同", "單一", "同一", "不一", "每一", "任一", "另一", "其一", "之一", "一律", "一併", "一向", "一套", "一份",
+          "一筆", "一句", "一張", "一項", "這一塊", "那一塊", "每一塊", "一端", "兩端", "兩邊", "兩者", "兩種", "兩難", "第一", "十分", "萬分", "千萬",
+          "多半", "一來", "一成不變", "一清二楚", "一模一樣", "獨一無二", "數一數二", "三思", "加倍")
+IDIOM = re.compile("(?:" + "|".join(sorted(map(re.escape, IDIOMS), key=len, reverse=True)) + f")(?![{UNIT_AFTER}])")
+ENGLISH_NUMBER = re.compile(r"\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|"
+                            r"eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundreds?|thousands?|millions?|billions?|"
+                            r"trillions?|dozens?|half|halves|quarters?|twice|thrice|double|triple|percent|percentage)\b", re.IGNORECASE)
+ENGLISH_IDIOM = re.compile(r"\b(?:no one|one of|one another|the one|each one|one at a time|double[- ]check)\b", re.IGNORECASE)
+# 模擬不是預測: one list of the ways to say what will happen or that it is certain, and one list of their negations
+# (which may be said). Matched after NFKC and lower-casing.
+FORECASTS = ("預測", "預計", "預估", "估計", "預期", "將會", "將要", "未來會", "以後會", "之後會", "明年會", "今年會", "到時候會", "將來會",
+             "一定會", "必然", "必定", "肯定會", "保證", "很可能會", "大概會", "應該會", "多半會", "勢必", "註定", "注定",
+             "predict", "forecast", "guarantee", "certainly", "surely", "will lose", "will make", "will earn", "will gain", "will profit",
+             "will break even", "will pay", "will happen", "going to", "foresee", "expected to")
+NEGATED = ("不是預測", "不等於預測", "不是在預測", "不能當成預測", "並不是預測", "無法預測", "不能預測", "沒辦法預測", "不一定會", "不等於一定會",
+           "不代表一定會", "不保證", "無法保證", "不能保證", "沒有保證", "你的估計", "你估計的", "自己估計", "not a prediction", "not a forecast",
+           "cannot predict", "can't predict", "does not predict", "no guarantee", "not guaranteed")
 
 # shape() gets only the model's answer: build_input, in the same call and thread, leaves the turn's record here
 # (ask_ai always runs build_input first), the same way THINK's turns name their round.
@@ -43,16 +63,21 @@ def _guard_words(texts: list[str], known: list[str]) -> None:
         plain = unicodedata.normalize("NFKC", text)
         for word in sorted((unicodedata.normalize("NFKC", item) for item in known if item), key=len, reverse=True):
             plain = plain.replace(word, " ")
-        if NUMBER.search(plain):
+        bare = ENGLISH_IDIOM.sub(" ", IDIOM.sub(" ", plain))
+        if ROMAN.search(text) or NUMERAL.search(bare) or ENGLISH_NUMBER.search(bare):
             raise InvariantViolation("AI_ANSWER_HAS_NUMBER: AI 寫了數字（AI 不准自己編數字），這次沒有存。")
-        for allowed in NOT_A_FORECAST:
-            plain = plain.replace(allowed, " ")
-        if FORECAST.search(plain):
+        said = plain.lower()
+        for phrase in NEGATED:
+            said = said.replace(phrase, " ")
+        if any(form in said for form in FORECASTS):
             raise InvariantViolation("AI_ANSWER_CALLS_IT_PREDICTION: AI 把計算或模擬說成了預測或保證，這次沒有存。")
 
 
 def _names() -> list[str]:
-    return [word for algo in algorithms().values() for word in (algo["name"], algo["result"]["name"], *(spec["name"] for spec in algo["inputs"]))]
+    """The system's own words an answer may quote (a side reads 「一半以上的模擬…」; that is not the AI's number)."""
+    words = [word for algo in algorithms().values()
+             for word in (algo["name"], algo["result"]["name"], algo.get("assumes", ""), *algo["sides"], *(spec["name"] for spec in algo["inputs"]))]
+    return [*words, *SCENARIOS, *LABELS, *AI_PARTS, OWN_WORDS, NOT_PREDICTION]
 
 
 # -- suggest: which algorithm fits (提出選項) ----------------------------------------------------------------------------
@@ -139,9 +164,11 @@ def _run(context: Mapping[str, Any], read: Read) -> dict[str, Any]:
 def _explain_input(context: Mapping[str, Any], read: Read) -> str:
     run = _run(context, read)
     inputs = [item for item in run.get("inputs") or [] if isinstance(item, Mapping)]
-    rows = sourcing(inputs, input_origins(read.evidence.origins(), inputs))
+    rows = sourcing(inputs, run["input_origins"])
     names = [item["name"] for item in inputs]
-    _TURN.set({"run": run["run_id"], "inputs": names, "known": [*names, run.get("question") or "", *_names()]})
+    result = run.get("result") or {}
+    persons = [run.get("question") or "", result.get("who_bears") or "", *(row.get("what", "") for row in result.get("not_priced") or [])]
+    _TURN.set({"run": run["run_id"], "inputs": names, "known": [*names, *persons, *_names()]})
     source = {row["input"]: row["words"] for row in rows}
     payload = {
         "question (the person's)": run.get("question"), "label": run.get("label"), "algorithm": (run.get("algorithm") or {}).get("name"),
@@ -160,8 +187,7 @@ def _explain_handback(context: Mapping[str, Any], read: Read) -> str | None:
     thin = run.get("thin_inputs") or []
     if not thin:
         return None
-    counts = input_origins(read.evidence.origins(), [item for item in run.get("inputs") or [] if isinstance(item, Mapping)])
-    named = "、".join(f"「{name}」只有 {counts.get(name, 0)} 個" for name in thin)
+    named = "、".join(f"「{name}」只有 {run['input_origins'].get(name, 0)} 個" for name in thin)
     return f"{named}算數的獨立出處（要 {MIN_ORIGINS} 個）。AI 先停下來，由你決定：可以先去找出處，或按「仍然繼續」。"
 
 

@@ -1,12 +1,13 @@
 """COMPUTE 計算與模擬 (contract card 「系統做什麼」): the system really runs the calculation; the AI never writes a number.
 
 - BEFORE_SAVE ``compute.request``: every input is a number in its range with a unit (one unit for every amount) and
-  either names the case's source cards or is marked 我自己說的; then every scenario is computed once, so a number the
-  module cannot work with (每單位的毛利是 0 以下…) refuses the whole request in plain words (COMPUTE_INPUT_REFUSED) --
-  never a half result.
+  either names the case's source cards or is marked 我自己說的; at least one number has a 樂觀 or 悲觀 value, so the
+  result is a range; then every scenario is computed once. A number the module cannot work with refuses the whole
+  request in plain words (COMPUTE_INPUT_REFUSED) -- never a half result. A module refusal that is itself an answer
+  (每單位的毛利是 0 以下 = 永遠打不平) is a result with no number: ``MODULE_ANSWERS``.
 - AFTER_SAVE ``compute.request``: the system runs it and saves ``compute.run`` (author system): formula, every input
   with its source, the result per scenario and the range, the input whose change flips the result (one at a time),
-  label, ruleset stamp. A new version of the request is a new run with ``rerun_of``.
+  label, ruleset stamp. A new version of the request is a new run with ``rerun_of`` (the run it started from, if any).
 - BEFORE_SAVE ``compute.adopt``: one live 採用／不採用 per run, with a reason; the page edits the first.
 
 The formulas are the modules' (ruleset ``compute.algorithms`` names each one's [builder, gates]); this file arranges
@@ -17,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import importlib
+import unicodedata
 from typing import Any, Callable, Mapping
 
 from ai_lego.core.domain.evidence_words import ADOPT, LABELS, MIN_ORIGINS, OWN_WORDS
@@ -29,31 +31,42 @@ from ai_lego.platform import evidence
 from ai_lego.platform.rulesets import Ruleset, require
 
 RULESET = "compute.algorithms"
-UNCOMPUTABLE = "算不出來"
+WALL = None   # the sweep's mark for numbers no module can compute with: it stops there and claims no flip
 OTHERS = tuple(name for name in SCENARIOS if name != BASE)   # set beside each input; 一般 is the input's own value
 INPUT_KEYS = {"key", "name", "value", "unit", "cards", "own"}
 MAX_CARDS, NAME_CHARS, UNIT_CHARS, NOT_PRICED_MAX, WHAT_CHARS = 12, 60, 20, 10, 200
 SENSITIVITY = "系統一次改一個輸入，找出讓結果翻過來的那一個。"
 NO_FLIP = "每一個數字單獨往上、往下改（改到跟它本身一樣大，或到你給的樂觀、悲觀那麼遠），結果都沒有翻過來。"
 ZERO_SPAN = "這個數字是 0，也沒有樂觀、悲觀的值，不知道要改多少。"
-NEAR_LINE = "結果離那條線太近：光是隨機抽的不同，就可能讓它翻過來。"
+NEAR_LINE = "結果離那條線太近，說不準會落在哪一邊：光是隨機抽的不同，就可能讓它翻過來。"
+NO_RANGE = "至少一個數字要寫樂觀或悲觀時的值（跟一般不一樣），結果才是一個範圍，不只一個數字。"
+NO_SPREAD = "至少一項要寫樂觀或悲觀時的值（跟一般不一樣），模擬才有範圍可以抽。"
 CALCULATED = make_provenance("CALCULATED_RESULT", "HUMAN_APPROVED")   # the person's numbers, the module's formula
 SIMULATED = make_provenance("SIMULATED_RESULT", "HUMAN_APPROVED")
 
-# A module's refusal, in what it means for the person's numbers (the modules' codes: modules/feasibility/*.py,
-# modules/decision/expected_value.py, compute/montecarlo/simulation.py).
+# A module's refusal that means the numbers cannot be computed with (the modules' codes: modules/feasibility/*.py,
+# modules/decision/expected_value.py, compute/montecarlo/simulation.py), in what it means for the person's numbers.
 MODULE_WORDS = {
-    "BREAKEVEN_NONPOSITIVE_CONTRIBUTION_MARGIN": "每單位的毛利是 0 或負的：做越多賠越多，永遠打不平。",
-    "IRR_UNDEFINED_SAME_SIGN_CASH_FLOWS": "要有一開始投入的金額，之後每年的淨收入也要是正的，才算得出內部報酬率。",
     "IRR_NO_SOLUTION_FOUND": "這組數字找不到內部報酬率。",
     "IRR_DID_NOT_CONVERGE": "這組數字找不到內部報酬率。",
     "EXPECTEDVALUE_PROBABILITIES_DO_NOT_SUM_TO_ONE": "三個機率加起來要剛好是 100%。",
     "EXPECTEDVALUE_SUM_OVERFLOW": "數字太大，算不出來。",
 }
+# A module's refusal that is itself the answer: which side of the line (index into the algorithm's ``sides``), in words,
+# with no number. A 悲觀 that truly never breaks even is a result, never a reason to refuse the request.
+MODULE_ANSWERS: dict[str, Callable[[Mapping[str, Any]], tuple[int, str]]] = {
+    "BREAKEVEN_NONPOSITIVE_CONTRIBUTION_MARGIN": lambda v: (1, "每單位的毛利是 0 或負的：做越多賠越多，永遠打不平。"),
+    "IRR_UNDEFINED_SAME_SIGN_CASH_FLOWS": lambda v: (1, "之後每年沒有淨收入：投入的拿不回來，算不出報酬率。") if v["yearly"] <= 0
+    else (0, "一開始沒有投入：之後只有收入，報酬率沒有上限。"),
+}
 
 
 class Refused(Exception):
-    """A module could not compute with these numbers; the message is in the person's words."""
+    """A module could not compute with these numbers; the message is in the person's words, ``code`` is the module's."""
+
+    def __init__(self, words: str, code: str = "") -> None:
+        super().__init__(words)
+        self.code = code
 
 
 def ruleset() -> Ruleset:
@@ -88,16 +101,20 @@ def _value(name: str, value: Any, spec: Mapping[str, Any], kind: Mapping[str, An
     lower, upper, integer = _bounds(spec, kind)
     if not _number(value):
         _refuse(f"{where}「{name}」要填一個數字。")
-    if integer and float(value) != int(value):
-        _refuse(f"{where}「{name}」要是整數。")
-    if lower is not None and value < lower:
+    if lower is not None and value < lower:   # the range first: a whole number past every float would overflow float()
         _refuse(f"{where}「{name}」不能小於 {_shown(lower)}。")
     if upper is not None and value > upper:
         _refuse(f"{where}「{name}」不能大於 {_shown(upper)}。")
+    if integer and float(value) != int(value):
+        _refuse(f"{where}「{name}」要是整數。")
     return int(value) if integer else value
 
 
-def _input(item: Any, specs: Mapping[str, Mapping[str, Any]], types: Mapping[str, Any], cards: set[str], algorithm: str) -> dict[str, Any]:
+def _visible(text: str) -> bool:
+    return not any(unicodedata.category(char) in ("Cc", "Cf") for char in text)
+
+
+def _input(item: Any, specs: Mapping[str, Mapping[str, Any]], types: Mapping[str, Any], cards: set[str] | None, algorithm: str) -> dict[str, Any]:
     if not isinstance(item, Mapping) or set(item) - INPUT_KEYS:
         _refuse("有一個數字的格式不對，請重新整理頁面再試一次。")
     spec = specs.get(item.get("key")) if isinstance(item.get("key"), str) else None   # raw content: BEFORE_SAVE runs before the kind's own checks
@@ -107,15 +124,15 @@ def _input(item: Any, specs: Mapping[str, Mapping[str, Any]], types: Mapping[str
     kind = types[spec["type"]]
     if spec.get("repeat"):
         name = item.get("name").strip() if isinstance(item.get("name"), str) else ""
-        if not name or len(name) > NAME_CHARS:
-            _refuse(f"每一項要有名字，最多 {NAME_CHARS} 個字。")
+        if not name or len(name) > NAME_CHARS or not _visible(name):
+            _refuse(f"每一項要有名字，最多 {NAME_CHARS} 個字，不含看不見的字元。")
     else:
         name = spec["name"]
         if item.get("name") != name:   # the system's word for a fixed input; a stale page is told, never guessed at
             _refuse(f"「{shown}」不是{algorithm}這一版的輸入名稱，請重新整理頁面。")
     value = _value(name, item.get("value"), spec, kind)
     unit = item.get("unit").strip() if isinstance(item.get("unit"), str) else ""
-    if not unit or len(unit) > UNIT_CHARS:
+    if not unit or len(unit) > UNIT_CHARS or not _visible(unit):
         _refuse(f"「{name}」要寫單位，最多 {UNIT_CHARS} 個字。")
     if kind.get("fixed_unit") and unit != kind["unit"]:
         _refuse(f"「{name}」的單位是「{kind['unit']}」。")
@@ -129,14 +146,15 @@ def _input(item: Any, specs: Mapping[str, Mapping[str, Any]], types: Mapping[str
             _refuse(f"「{name}」要選至少一張來源卡（不重複），或標「{OWN_WORDS}」。")
         if len(picked) > MAX_CARDS:
             _refuse(f"「{name}」最多選 {MAX_CARDS} 張來源卡。")
-        if set(picked) - cards:
+        if cards is not None and set(picked) - cards:
             _refuse(f"「{name}」選的來源卡不在這個案子裡。")
     return {"key": spec["key"], "name": name, "value": value, "unit": unit, "cards": [] if own else list(picked), "own": own}
 
 
-def plan(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: Mapping[str, Any]) -> dict[str, Any]:
+def plan(content: Mapping[str, Any], cards: set[str] | None) -> dict[str, Any]:
     """The request as the system runs it: the algorithm, the inputs (each with its source) and every scenario's values.
-    Anything a page could send wrong is refused here in the person's words, before anything is saved."""
+    Anything a page could send wrong is refused here in the person's words, before anything is saved. ``cards``: the
+    case's source cards each picked card must be one of; None after the save, which never refuses what was saved."""
     algo = algorithms().get(content.get("algorithm")) if isinstance(content.get("algorithm"), str) else None
     if algo is None:
         raise InvariantViolation("COMPUTE_ALGORITHM_UNKNOWN: 這個算法不在清單裡，請從清單裡選。")
@@ -145,7 +163,6 @@ def plan(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: Mappi
     raw = content.get("inputs")
     if not isinstance(raw, list) or not raw:
         _refuse("還沒有填任何數字。")
-    cards = {card["card"] for origin in evidence.origins(docs, tenant_id, owner, with_reviews=False) for card in origin["cards"]}
     inputs = [_input(item, specs, types, cards, algo["name"]) for item in raw]
     names = [item["name"] for item in inputs]
     if len(set(names)) != len(names):
@@ -179,11 +196,16 @@ def plan(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: Mappi
             if spec.get("scenarios") is False:
                 _refuse(f"「{name}」不分情境，只填一個數字。")
             values[scenario][name] = _value(name, value, spec, types[spec["type"]], f"{scenario}情境的")
-    for item in inputs:
-        if specs[item["key"]].get("spread"):
-            low, high = sorted(values[scenario][item["name"]] for scenario in OTHERS)
-            if not low <= item["value"] <= high:
-                _refuse(f"「{item['name']}」的{BASE}值要在{'和'.join(OTHERS)}之間。")
+    varied = {item["name"] for item in inputs if any(values[scenario][item["name"]] != item["value"] for scenario in OTHERS)}
+    spread = [item for item in inputs if specs[item["key"]].get("spread")]
+    if spread and not varied & {item["name"] for item in spread}:
+        _refuse(NO_SPREAD)
+    if not varied:
+        _refuse(NO_RANGE)
+    for item in spread:
+        low, high = sorted(values[scenario][item["name"]] for scenario in OTHERS)
+        if not low <= item["value"] <= high:
+            _refuse(f"「{item['name']}」的{BASE}值要在{'和'.join(OTHERS)}之間。")
 
     extras = set(algo.get("extras") or ())
     not_priced, who_bears = content.get("not_priced"), content.get("who_bears")
@@ -199,6 +221,10 @@ def plan(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: Mappi
     return {"algo": algo, "inputs": inputs, "values": values, "not_priced": [dict(row) for row in rows], "who_bears": (who_bears or "").strip()}
 
 
+def case_cards(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> set[str]:
+    return {card["card"] for origin in evidence.origins(docs, tenant_id, owner, with_reviews=False) for card in origin["cards"]}
+
+
 # -- the modules ------------------------------------------------------------------------------------------------------
 
 def _resolve(path: str) -> Callable[..., Any]:
@@ -212,7 +238,8 @@ def _record(pair: list[str], **arguments: Any) -> dict[str, Any]:
     try:
         record = builder(**arguments)
     except InvariantViolation as error:
-        raise Refused(MODULE_WORDS.get(str(error).split(":", 1)[0], "這組數字算不出來。")) from error
+        code = str(error).split(":", 1)[0]
+        raise Refused(MODULE_WORDS.get(code, "這組數字算不出來。"), code) from error
     except ArithmeticError as error:   # a float that overflows or underflows inside the module's own arithmetic
         raise Refused("數字太大或太小，算不出來。") from error
     if not importlib.import_module(pair[0].rpartition(".")[0]).all_gates_pass(gates(record, "COMPUTE", "compute")):
@@ -274,7 +301,7 @@ def _cost_benefit(algo: Mapping[str, Any], v: Mapping[str, Any], found: Mapping[
 
 
 def _monte_carlo(algo: Mapping[str, Any], values: Mapping[str, Mapping[str, Any]], found: Mapping[str, Any], runs: int, seed: int) -> dict[str, Any]:
-    """Each item drawn between its 悲觀 and 樂觀 values (most often near 一般), summed, ``runs`` times."""
+    """Each item drawn on its own between its 悲觀 and 樂觀 values (most often near 一般), summed, ``runs`` times."""
     items = [item["name"] for item in found["inputs"] if item["key"] == "item"]
     threshold = next(values[BASE][item["name"]] for item in found["inputs"] if item["key"] == "threshold")
     distributions = []
@@ -294,8 +321,16 @@ SIMULATIONS = {"monte_carlo": _monte_carlo}
 
 
 def _point(found: Mapping[str, Any], values: Mapping[str, Any]) -> dict[str, Any]:
+    """One scenario's result; a refusal in ``MODULE_ANSWERS`` comes back as its side with no number, any other is raised."""
     keyed = {item["key"]: values[item["name"]] for item in found["inputs"]}
-    return POINTS[found["algo"]["id"]](found["algo"], keyed, found)
+    try:
+        return POINTS[found["algo"]["id"]](found["algo"], keyed, found)
+    except Refused as refused:
+        answer = MODULE_ANSWERS.get(refused.code)
+        if answer is None:
+            raise
+        side, words = answer(keyed)
+        return {"value": None, "side": found["algo"]["sides"][side], "words": words}
 
 
 def check(found: Mapping[str, Any]) -> None:
@@ -316,12 +351,15 @@ def check(found: Mapping[str, Any]) -> None:
 
 # -- 哪一個輸入一變，結果就翻過來 ----------------------------------------------------------------------------------------
 
-def _nearest_flip(side_of: Callable[[float], str], base: float, base_side: str, span: float, bounds: tuple[float | None, float | None, bool],
-                  steps: int, narrow: int) -> tuple[float, str] | None:
+def _nearest_flip(side_of: Callable[[float], str | None], base: float, base_side: str, span: float, bounds: tuple[float | None, float | None, bool],
+                  steps: int, narrow: int) -> tuple[tuple[float, str] | None, float | None]:
     """From ``base`` outward each way in ``steps`` steps up to ``span``; at the first step whose side differs, narrow
-    down between it and the step before. Returns the first value on the other side nearest to ``base``, and that side."""
+    down between it and the step before. Returns (the first value on the other side nearest to ``base`` and that side,
+    or None; the nearest value where no module could compute, or None). A WALL stops that direction: past numbers that
+    cannot be computed with, nothing is claimed."""
     lower, upper, integer = bounds
     best: tuple[float, str] | None = None
+    stop: float | None = None
     for direction in (-1, 1):
         previous = base
         for step in range(1, steps + 1):
@@ -332,6 +370,9 @@ def _nearest_flip(side_of: Callable[[float], str], base: float, base_side: str, 
             if x == previous:
                 continue
             side = side_of(x)
+            if side is WALL:
+                stop = x if stop is None or abs(x - base) < abs(stop - base) else stop
+                break
             if side == base_side:
                 previous = x
                 continue
@@ -345,13 +386,13 @@ def _nearest_flip(side_of: Callable[[float], str], base: float, base_side: str, 
                     near = middle
                 else:
                     far, far_side = middle, middle_side
-            if best is None or abs(far - base) < abs(best[0] - base):
+            if far_side is not WALL and (best is None or abs(far - base) < abs(best[0] - base)):   # narrowing that ends on a wall claims nothing
                 best = (far if integer else round(far, 8), far_side)
             break
-    return best
+    return best, stop
 
 
-def _sweep(found: Mapping[str, Any], side_at: Callable[[str, float], str], base_side: str, steps: int, narrow: int) -> dict[str, Any]:
+def _sweep(found: Mapping[str, Any], side_at: Callable[[str, float], str | None], base_side: str, steps: int, narrow: int) -> dict[str, Any]:
     algo, types = found["algo"], ruleset().items["types"]
     specs = {spec["key"]: spec for spec in algo["inputs"]}
     each, scale = [], {}
@@ -365,10 +406,12 @@ def _sweep(found: Mapping[str, Any], side_at: Callable[[str, float], str], base_
         if span == 0:
             each.append({"input": name, "base": base, "at": None, "why": ZERO_SPAN})
             continue
-        flipped = _nearest_flip(lambda x, name=name: side_at(name, x), base, base_side, span, _bounds(spec, types[spec["type"]]), steps, narrow)
+        flipped, stop = _nearest_flip(lambda x, name=name: side_at(name, x), base, base_side, span, _bounds(spec, types[spec["type"]]), steps, narrow)
         scale[name] = abs(base) or span
-        each.append({"input": name, "base": base, "at": flipped[0], "to": flipped[1], "change": round((flipped[0] - base) / abs(base), 4) if base else None}
-                    if flipped else {"input": name, "base": base, "at": None})
+        if flipped:
+            each.append({"input": name, "base": base, "at": flipped[0], "to": flipped[1], "change": round((flipped[0] - base) / abs(base), 4) if base else None})
+        else:
+            each.append({"input": name, "base": base, "at": None, **({"stop": round(stop, 8)} if stop is not None else {})})
     flips = [entry for entry in each if entry.get("at") is not None]
     if not flips:
         return {"input": None, "from": base_side, "why": NO_FLIP, "each": each}
@@ -389,49 +432,51 @@ def outcome(found: Mapping[str, Any], seed: int) -> tuple[dict[str, Any], dict[s
         simulate = SIMULATIONS[algo["id"]]
         draws = items["simulation_runs"]
         drawn = simulate(algo, found["values"], found, draws, seed)
-        result.update({"range": {"low": drawn["low"], "high": drawn["high"], "unit": unit},
-                       "simulation": {"runs": draws, "seed": seed, **{key: drawn[key] for key in ("value", "mean", "chance", "threshold", "side")}}})
+        spread = [item["name"] for item in found["inputs"] if specs[item["key"]].get("spread")]
 
-        def side_at(name: str, x: float) -> str:
+        def all_at(scenario: str) -> float:
+            """Every item at its own 悲觀 (or 樂觀) at once: the module's sum of fixed values (three equal points per item)."""
+            fixed = {name: found["values"][scenario][name] for name in spread}
+            return simulate(algo, {each: {**found["values"][each], **fixed} for each in SCENARIOS}, found, 2, seed)["value"]
+
+        every = {scenario: all_at(scenario) for scenario in OTHERS}
+        result.update({"range": {"low": drawn["low"], "high": drawn["high"], "unit": unit},
+                       "simulation": {"runs": draws, "seed": seed, **{key: drawn[key] for key in ("value", "mean", "chance", "threshold", "side")},
+                                      "assumes": algo["assumes"], "every": every}})
+
+        def side_at(name: str, x: float) -> str | None:
             # a number moves as a whole: its three scenario values shift together (one without scenarios has three equal ones)
             shift = x - found["values"][BASE][name]
             moved = {scenario: {**found["values"][scenario], name: found["values"][scenario][name] + shift} for scenario in SCENARIOS}
             try:
                 return simulate(algo, moved, found, sweep["simulation_runs"], seed)["side"]
             except Refused:
-                return UNCOMPUTABLE
+                return WALL
 
-        # the sweep redraws at every step, so it draws fewer times; where that alone changes the side, no flip is claimed
-        if simulate(algo, found["values"], found, sweep["simulation_runs"], seed)["side"] != drawn["side"]:
+        # within two standard errors of the line, or where the sweep's fewer draws alone change the side: too close to call
+        error = (drawn["chance"] * (1 - drawn["chance"]) / draws) ** 0.5
+        if abs(drawn["chance"] - 0.5) < 2 * error or simulate(algo, found["values"], found, sweep["simulation_runs"], seed)["side"] != drawn["side"]:
             return result, {"input": None, "from": drawn["side"], "why": NEAR_LINE, "each": []}
         return result, _sweep(found, side_at, drawn["side"], sweep["simulation_steps"], sweep["simulation_narrow"])
     by_scenario = {scenario: _point(found, found["values"][scenario]) for scenario in SCENARIOS}
-    numbers = [row["value"] for row in by_scenario.values()]
-    result.update({"range": {"low": min(numbers), "high": max(numbers), "unit": unit}, "by_scenario": by_scenario})
+    numbers = [row["value"] for row in by_scenario.values() if row["value"] is not None]
+    result.update({"range": {"low": min(numbers, default=None), "high": max(numbers, default=None), "unit": unit}, "by_scenario": by_scenario})
     if found["not_priced"] or found["who_bears"]:
         result.update({"not_priced": found["not_priced"], "who_bears": found["who_bears"]})
 
-    def side_at(name: str, x: float) -> str:
+    def side_at(name: str, x: float) -> str | None:
         try:
             return _point(found, {**found["values"][BASE], name: x})["side"]
         except Refused:
-            return UNCOMPUTABLE
+            return WALL
 
     return result, _sweep(found, side_at, by_scenario[BASE]["side"], sweep["steps"], sweep["narrow"])
 
 
 # -- where each number comes from ---------------------------------------------------------------------------------------
 
-def input_origins(found: list[dict[str, Any]], inputs: list[Mapping[str, Any]]) -> dict[str, int]:
-    """How many counted independent origins back each outside number (``evidence.origins``' counting, read, never
-    redone); the person's own numbers have none. Under MIN_ORIGINS here is ``calc_results()[].thin_inputs``."""
-    origin_of = {card["card"]: origin["origin_id"] for origin in found for card in origin["cards"]}
-    counted = {origin["origin_id"] for origin in found if origin["counts"]}
-    return {item["name"]: len({origin_of[card] for card in item.get("cards") or [] if origin_of.get(card) in counted})
-            for item in inputs if isinstance(item, Mapping) and not item.get("own")}
-
-
 def sourcing(inputs: list[Mapping[str, Any]], counts: Mapping[str, int]) -> list[dict[str, Any]]:
+    """Each number's source in words; ``counts`` = ``calc_results()[].input_origins`` (counted there, never here)."""
     rows = []
     for item in inputs:
         if item.get("own"):
@@ -456,10 +501,9 @@ def weakest(rows: list[Mapping[str, Any]]) -> str:
 def case_runs(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> list[dict[str, Any]]:
     """Every run of the case as ``evidence.calc_results`` gives it, with where each number comes from and the sentence
     that keeps the result no surer than its weakest number."""
-    found = evidence.origins(docs, tenant_id, owner, with_reviews=False)
     out = []
-    for run in evidence.calc_results(docs, tenant_id, owner, found):
-        rows = sourcing(run.get("inputs") or [], input_origins(found, run.get("inputs") or []))
+    for run in evidence.calc_results(docs, tenant_id, owner):
+        rows = sourcing(run.get("inputs") or [], run["input_origins"])
         out.append({**run, "sourcing": rows, "weakest": weakest(rows)})
     return out
 
@@ -469,34 +513,44 @@ def spec() -> dict[str, Any]:
     found = ruleset()
     return {"ruleset": {**found.stamp(), "title": found.title, "maintainer": found.maintainer}, "types": found.items["types"],
             "algorithms": found.items["algorithms"], "scenarios": list(SCENARIOS), "base": BASE, "own_words": OWN_WORDS, "min_origins": MIN_ORIGINS,
-            "labels": list(LABELS), "adopt": list(ADOPT), "parts": list(AI_PARTS), "not_priced_sides": list(NOT_PRICED_SIDES),
-            "not_prediction": NOT_PREDICTION, "uncomputable": UNCOMPUTABLE}
+            "labels": list(LABELS), "adopt": list(ADOPT), "parts": list(AI_PARTS), "not_priced_sides": list(NOT_PRICED_SIDES), "not_prediction": NOT_PREDICTION}
 
 
 # -- the hooks ----------------------------------------------------------------------------------------------------------
 
+def _run_ids(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> set[str]:
+    return {doc["doc_id"] for doc in docs.current(tenant_id, owner, "compute.run")}
+
+
 def _request_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: dict[str, Any], doc_id: str | None) -> None:
-    check(plan(docs, tenant_id, owner, content))
+    started = content.get("from_run")
+    if started is not None and not (isinstance(started, str) and started in _run_ids(docs, tenant_id, owner)):
+        raise InvariantViolation("COMPUTE_RUN_NOT_FOUND: 找不到這次計算。")
+    check(plan(content, case_cards(docs, tenant_id, owner)))
 
 
 def _request_saved(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dict[str, Any]) -> list[dict[str, Any]]:
-    found = plan(docs, tenant_id, owner, doc["content"])
+    found = plan(doc["content"], None)   # checked before the save; a card removed since must not leave a request with no run
     seed = int(hashlib.sha256(f"{doc['doc_id']}:{doc['version']}".encode("utf-8")).hexdigest()[:8], 16)   # replayable, stored with the run
     result, flip = outcome(found, seed)
     stamp, algo = ruleset().stamp(), found["algo"]
     content = {"request": doc["doc_id"], "question": doc["content"]["question"], "label": algo["label"],
                "algorithm": {"id": algo["id"], "version": stamp["version"], "name": algo["name"]}, "formula": algo["formula"],
                "inputs": found["inputs"], "scenarios": found["values"], "result": result, "flip": flip, "rules": stamp}
-    earlier = [run for run in docs.current(tenant_id, owner, "compute.run") if run["content"].get("request") == doc["doc_id"]]
-    if earlier:
-        content["rerun_of"] = earlier[-1]["doc_id"]
+    runs = docs.current(tenant_id, owner, "compute.run")
+    earlier = [run["doc_id"] for run in runs if run["content"].get("request") == doc["doc_id"]]
+    started = doc["content"].get("from_run")   # the run the person reran or edited; else this request's last run
+    if started in {run["doc_id"] for run in runs}:
+        content["rerun_of"] = started
+    elif earlier:
+        content["rerun_of"] = earlier[-1]
     saved = docs.save(tenant_id, owner, "compute.run", content, record_log.system("COMPUTE"))
     return [{"type": "computed", "run": saved["doc_id"]}]
 
 
 def _adopt_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: dict[str, Any], doc_id: str | None) -> None:
     run = content.get("run")
-    if run not in {doc["doc_id"] for doc in docs.current(tenant_id, owner, "compute.run")}:
+    if not (isinstance(run, str) and run in _run_ids(docs, tenant_id, owner)):
         raise InvariantViolation("COMPUTE_RUN_NOT_FOUND: 找不到這次計算。")
     if not (isinstance(content.get("reason"), str) and content["reason"].strip()):
         raise InvariantViolation("COMPUTE_ADOPT_REASON_REQUIRED: 採用或不採用，都寫一句為什麼。")

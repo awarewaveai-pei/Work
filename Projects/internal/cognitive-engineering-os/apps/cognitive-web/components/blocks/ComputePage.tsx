@@ -17,17 +17,17 @@ export type Algorithm = { id: string; name: string; label: string; formula: stri
 export type Spec = {
   ruleset: { name: string; version: string; fingerprint: string; title: string; maintainer: string }; types: Record<string, TypeSpec>; algorithms: Algorithm[];
   scenarios: string[]; base: string; own_words: string; min_origins: number; labels: string[]; adopt: string[]; parts: string[]; not_priced_sides: string[];
-  not_prediction: string; uncomputable: string;
+  not_prediction: string;
 };
 type InputRow = { key: string; name: string; value: number; unit: string; cards?: string[]; own: boolean };
 type NotPriced = { side: string; what: string };
-export type Request = { question: string; algorithm: string; inputs: Array<Omit<InputRow, "value"> & { value: number | null }>; scenarios?: Record<string, Record<string, number | null>>; not_priced?: NotPriced[]; who_bears?: string };
-type Flip = { input: string | null; base?: number; at?: number; from: string; to?: string; change?: number | null; why?: string; each: Array<{ input: string; base: number; at: number | null; to?: string; why?: string }> };
+export type Request = { question: string; algorithm: string; inputs: Array<Omit<InputRow, "value"> & { value: number | null }>; scenarios?: Record<string, Record<string, number | null>>; not_priced?: NotPriced[]; who_bears?: string; from_run?: string };
+type Flip = { input: string | null; base?: number; at?: number; from: string; to?: string; change?: number | null; why?: string; each: Array<{ input: string; base: number; at: number | null; to?: string; why?: string; stop?: number }> };
 export type Run = {
   run_id: string; at: string; question: string; label: string; algorithm: { id: string; version: string; name: string }; formula: string; inputs: InputRow[];
   scenarios: Record<string, Record<string, number>>; flip: Flip; rules: { version: string }; request: string; rerun_of?: string; thin_inputs: string[];
-  result: { what: string; unit: string; range: { low: number; high: number; unit: string }; by_scenario?: Record<string, { value: number; side: string; benefits_now?: number; costs_now?: number }>;
-    simulation?: { runs: number; value: number; mean: number; chance: number; threshold: number; side: string }; not_priced?: NotPriced[]; who_bears?: string };
+  result: { what: string; unit: string; range: { low: number | null; high: number | null; unit: string }; by_scenario?: Record<string, { value: number | null; side: string; words?: string; benefits_now?: number; costs_now?: number }>;
+    simulation?: { runs: number; value: number; mean: number; chance: number; threshold: number; side: string; assumes: string; every: Record<string, number> }; not_priced?: NotPriced[]; who_bears?: string };
   adopt: { adopt: string; reason: string } | null; sourcing: Array<{ input: string; own: boolean; origins: number; words: string }>; weakest: string;
 };
 type Origin = { origin_id: string; counts: boolean; cards: Array<{ card: string; title?: string; url?: string }> };
@@ -36,11 +36,13 @@ type Suggestion = { algorithms: Array<{ id: string; why: string }>; ideas?: stri
 type Adopt = { run: string; adopt: string; reason?: string };
 
 export type DraftInput = { key: string; name: string; value: string; unit: string; own: boolean; cards: string[]; scenarios: Record<string, string> };
-export type Draft = { question: string; algorithm: string; inputs: DraftInput[]; not_priced: NotPriced[]; who_bears: string };
+export type Draft = { question: string; algorithm: string; inputs: DraftInput[]; not_priced: NotPriced[]; who_bears: string; from_run?: string };
 
 const others = (spec: Spec) => spec.scenarios.filter((name) => name !== spec.base);
 const number = (text: string): number | null => (text.trim() === "" ? null : Number(text));
-export const fmt = (value: number | null | undefined) => (typeof value === "number" && Number.isFinite(value) ? new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 2 }).format(value) : "—");
+// a small number keeps three significant digits (0.00083, not 0)
+export const fmt = (value: number | null | undefined) => (typeof value === "number" && Number.isFinite(value)
+  ? new Intl.NumberFormat("zh-TW", value !== 0 && Math.abs(value) < 1 ? { maximumSignificantDigits: 3 } : { maximumFractionDigits: 2 }).format(value) : "—");
 
 /** The empty rows an algorithm asks for: one per input, a repeated one as many times as it needs at least. */
 export function draftFor(spec: Spec, algorithm: Algorithm, question = ""): Draft {
@@ -67,16 +69,18 @@ export function toRequest(spec: Spec, draft: Draft): Request {
     ...(Object.keys(scenarios).length ? { scenarios } : {}),
     ...(extras.has("not_priced") && draft.not_priced.length ? { not_priced: draft.not_priced.map((row) => ({ side: row.side, what: row.what.trim() })) } : {}),
     ...(extras.has("who_bears") ? { who_bears: draft.who_bears.trim() } : {}),
+    ...(draft.from_run ? { from_run: draft.from_run } : {}),
   };
 }
 
-/** A saved request back into the form (改輸入再算). */
-export function fromRequest(spec: Spec, content: Request): Draft {
+/** A run back into the form, from the run's own record -- never the request's latest numbers -- naming the run it starts
+ *  from (its rerun_of). A scenario value equal to 一般 is the same as none. */
+export function fromRun(run: Run): Draft {
   return {
-    question: content.question, algorithm: content.algorithm, not_priced: content.not_priced ?? [], who_bears: content.who_bears ?? "",
-    inputs: content.inputs.map((row) => ({
-      key: row.key, name: row.name, value: row.value === null ? "" : String(row.value), unit: row.unit, own: row.own, cards: row.cards ?? [],
-      scenarios: Object.fromEntries(others(spec).filter((name) => content.scenarios?.[name]?.[row.name] != null).map((name) => [name, String(content.scenarios![name][row.name])])),
+    question: run.question, algorithm: run.algorithm.id, not_priced: run.result.not_priced ?? [], who_bears: run.result.who_bears ?? "", from_run: run.run_id,
+    inputs: run.inputs.map((row) => ({
+      key: row.key, name: row.name, value: String(row.value), unit: row.unit, own: row.own, cards: row.cards ?? [],
+      scenarios: Object.fromEntries(Object.entries(run.scenarios).filter(([, values]) => values[row.name] !== row.value).map(([name, values]) => [name, String(values[row.name])])),
     })),
   };
 }
@@ -91,12 +95,15 @@ export function refusal(reason: unknown): string {
 }
 
 /** 哪一個輸入一變，結果就翻過來 -- in one sentence, from the run's own sweep. */
-export function flipWords(run: Run): string {
+export function flipWords(run: Run, spec: Spec): string {
   const flip = run.flip;
   if (!flip.input) return flip.why ?? "";
-  const unit = run.inputs.find((row) => row.name === flip.input)?.unit ?? "";
+  const row = run.inputs.find((item) => item.name === flip.input);
+  const unit = row?.unit ?? "";
+  if (typeof flip.change === "number" && Math.round(flip.change * 100) === 0) return `結果就在線上：「${flip.input}」稍微一動，結果就從「${flip.from}」變成「${flip.to}」。`;
   const change = typeof flip.change === "number" ? `（${flip.change > 0 ? "多" : "少"} ${Math.abs(Math.round(flip.change * 100))}%）` : "";
-  const whole = run.result.simulation ? "（這一項的樂觀、一般、悲觀一起移）" : "";
+  const spread = spec.algorithms.find((item) => item.id === run.algorithm.id)?.inputs.find((input) => input.key === row?.key)?.spread;
+  const whole = spread ? "（這一項的樂觀、一般、悲觀一起移）" : "";
   return `只改「${flip.input}」${whole}：從 ${fmt(flip.base)} ${unit} 變成大約 ${fmt(flip.at)} ${unit}${change}，結果就從「${flip.from}」變成「${flip.to}」。其他數字都不動。`;
 }
 
@@ -121,9 +128,14 @@ function RunSummary({ run, spec }: { run: Run; spec: Spec }) {
         </div>
       ))}
       <div className="kpis mt8">
-        <div className="kpi"><b>{run.result.what}{run.result.simulation ? "：中間 90% 的模擬落在" : "：範圍"}</b><span>{fmt(run.result.range.low)} 到 {fmt(run.result.range.high)} {run.result.range.unit}</span></div>
+        <div className="kpi"><b>{run.result.what}{run.result.simulation ? "：中間 90% 的模擬落在" : "：範圍"}</b>
+          <span>{run.result.range.low === null ? "沒有數字：每個情境都落在線的同一邊，見下面" : `${fmt(run.result.range.low)} 到 ${fmt(run.result.range.high)} ${run.result.range.unit}`}</span>
+          {run.result.simulation && <>
+            <span className="when">{run.result.simulation.assumes}</span>
+            {Object.entries(run.result.simulation.every).map(([name, sum]) => <span key={name} className="when">每一項都在{name}時，加起來是 {fmt(sum)} {run.result.unit}</span>)}
+          </>}</div>
         {run.result.by_scenario && spec.scenarios.map((name) => run.result.by_scenario![name] && (
-          <div key={name} className="kpi"><b>{name}</b><span>{fmt(run.result.by_scenario![name].value)} {run.result.unit}</span><span className="when">{run.result.by_scenario![name].side}</span>
+          <div key={name} className="kpi"><b>{name}</b><span>{run.result.by_scenario![name].value === null ? run.result.by_scenario![name].words : `${fmt(run.result.by_scenario![name].value)} ${run.result.unit}`}</span><span className="when">{run.result.by_scenario![name].side}</span>
             {run.result.by_scenario![name].benefits_now !== undefined && <span className="when">效益的現值 {fmt(run.result.by_scenario![name].benefits_now)}・成本的現值 {fmt(run.result.by_scenario![name].costs_now)}</span>}</div>
         ))}
         {run.result.simulation && (
@@ -132,8 +144,9 @@ function RunSummary({ run, spec }: { run: Run; spec: Spec }) {
             <span className="when">{run.result.simulation.side}</span></div>
         )}
       </div>
-      <p className="mt8"><b>哪一個數字一變，結果就翻過來：</b>{flipWords(run)}</p>
+      <p className="mt8"><b>哪一個數字一變，結果就翻過來：</b>{flipWords(run, spec)}</p>
       {run.flip.each.filter((entry) => entry.why && entry.input !== run.flip.input).map((entry) => <p key={entry.input} className="hint">「{entry.input}」沒有單獨改：{entry.why}</p>)}
+      {run.flip.each.filter((entry) => entry.stop !== undefined && entry.at === null).map((entry) => <p key={entry.input} className="hint">「{entry.input}」改到 {fmt(entry.stop)} 就算不出來了；在那之前結果沒有翻過來。</p>)}
       <p className="warn">{run.weakest}</p>
       {run.result.not_priced && run.result.not_priced.length > 0 && <><b>換不成金額的，另外列（沒有算進去）</b><ul>{run.result.not_priced.map((row) => <li key={`${row.side}${row.what}`}>{row.side}：{row.what}</li>)}</ul></>}
       {run.result.who_bears && <p><b>誰得到效益、誰付成本：</b>{run.result.who_bears}</p>}
@@ -185,9 +198,10 @@ export function ComputePage({ projectId }: { projectId: string }) {
     const saved = editing ? await docs.update(projectId, "compute.request", editing, content) : await docs.create(projectId, "compute.request", content);
     setNotices(saved.notices); setEditing(null); setDraft(draftFor(spec, algorithm));
   }, refusal);
+  // 用同樣的數字再算一次: the run's own numbers, saved as the request's next version
   const again = (run: Run) => act(async () => {
     const request = requests.find((doc) => doc.doc_id === run.request);
-    if (request) setNotices((await docs.update(projectId, "compute.request", request, request.content)).notices);
+    if (request) setNotices((await docs.update(projectId, "compute.request", request, toRequest(spec, fromRun(run)))).notices);
   }, refusal);
   const suggest = () => act(async () => {
     const turn = await ai<Suggestion>(projectId, "COMPUTE", "suggest", { question: draft.question });
@@ -313,7 +327,7 @@ export function ComputePage({ projectId }: { projectId: string }) {
             <div key={run.run_id} className="judge">
               <RunSummary run={run} spec={spec} />
               <div className="btns">
-                <button className="btn ghost" type="button" disabled={busy} onClick={() => { const request = requests.find((doc) => doc.doc_id === run.request); if (request) { setEditing(request); setDraft(fromRequest(spec, request.content)); } }}>改輸入再算</button>
+                <button className="btn ghost" type="button" disabled={busy} onClick={() => { const request = requests.find((doc) => doc.doc_id === run.request); if (request) { setEditing(request); setDraft(fromRun(run)); } }}>改輸入再算</button>
                 <button className="btn ghost" type="button" disabled={busy} onClick={() => again(run)}>用同樣的數字再算一次</button>
                 {run.rerun_of && <button className="btn ghost" type="button" onClick={() => setPicked([run.rerun_of!, run.run_id])}>跟上一次並排比</button>}
                 <button className={`chip${picked.includes(run.run_id) ? " on" : ""}`} type="button" aria-pressed={picked.includes(run.run_id)} onClick={() => pick(run.run_id)}>選來比較</button>
@@ -329,6 +343,7 @@ export function ComputePage({ projectId }: { projectId: string }) {
                   <ul>{explained.content.points.map((point, index) => <li key={index}><span className="tag">{point.part}</span> {point.text}</li>)}</ul>
                   <p><b>AI 認為最影響結果的：</b>「{explained.content.influential}」</p>
                   <p className="hint">這個解釋靠的數字：{explained.content.rests_on.map((name) => `「${name}」`).join("、")}。數字都是系統算的，AI 沒有寫數字。</p>
+                  <p className="warn">{spec.not_prediction}，計算也不是：算出來的不等於會發生。</p>
                 </div>
               )}
               {run.adopt && !choice
