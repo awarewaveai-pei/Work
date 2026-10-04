@@ -17,7 +17,7 @@ const card = (id: string, extra: Record<string, unknown> = {}) => ({
 function overview(patch: Partial<Overview> = {}): Overview {
   return {
     origins: [{ origin_id: "o:1", cards: [card("a"), card("b")], how: "同一篇", pending: false, aside: false, counts: true, mark: null, wrong_in_review: [] }],
-    changed_marks: [], counted: 1, min_origins: 2, aside: 0, data_classification: "Confidential",
+    changed_marks: [], counted: 1, min_origins: 2, aside: 0, data_classification: "Confidential", card_limit: { max: 800, cards: 2, uncarded: 0, notice: "" },
     channels: { engines: [{ key: "serper", name: "Serper（Google 的結果）" }], languages: [{ key: "zh", name: "中文" }], blocked: [{ provider: "brave", lang: "zh", state: "no_key", why: "", says: "平台還沒有Brave的金鑰" }],
                 short: ["只用了 1 家搜尋引擎（Serper（Google 的結果））"], ask: [], looked: true },
     distribution: { engine: { "Serper（Google 的結果）": 2 }, language: { 查不到: 2 }, country: { 查不到: 2 } },
@@ -52,6 +52,10 @@ function server(view: Overview, initial: Record<string, any[]> = {}) {
       const doc = { doc_id: `${one[1]}-${(store[one[1]] ?? []).length + 1}`, kind: one[1], version: 1, content: body.content, author: "user", block: "GATHER", at: "2026-10-04T09:00:00Z" };
       store[one[1]] = [...(store[one[1]] ?? []), doc];
       return { ...doc, notices: [] } as never;
+    }
+    if (one && method === "DELETE") {
+      store[one[1]] = (store[one[1]] ?? []).filter((doc) => doc.doc_id !== one[2]);
+      return { status: "deleted" } as never;
     }
     if (one && method === "PUT") {
       const found = store[one[1]].find((doc) => doc.doc_id === one[2]);
@@ -94,7 +98,10 @@ describe("蒐集來源", () => {
     await click(byText(host, "button", "去找"));
     expect(writes.map((write) => [write.method, write.path, write.body?.confirm])).toEqual([["POST", "/projects/P1/docs/gather.ask", undefined], ["POST", "/projects/P1/collections", undefined]]);
     expect(writes[1].body.seeds[0].meta).toMatchObject({ kind: "claim", entityName: "公會有沒有改合約", languages: ["zh", "en"], providers: ["serper"] });
-    expect(host.querySelector('[aria-label="會怎麼找"]')?.textContent).toContain("最多 16 組查詢");
+    const plan = host.querySelector('[aria-label="會怎麼找"]')?.textContent ?? "";
+    expect(plan).toContain("最多 16 組查詢");
+    expect(plan).toContain("上一次真的用上：Serper（Google 的結果）。平台還沒有Brave的金鑰。");   // the channels' real state, not a fixed claim
+    expect(host.textContent).not.toContain("兩家搜尋引擎");
     await click(byText(host, "button", "確定去找"));
     expect(writes.at(-1)!.body.confirm).toBe(true);
     expect(host.querySelector(".error")?.textContent).toBe("這裡還沒接上找資料的服務，系統現在不能去找。你可以自己貼網址或檔案。");
@@ -139,6 +146,23 @@ describe("蒐集來源", () => {
     await type(host.querySelector("#reason-o\\:1"), "兩頁都沒寫誰辦的");
     await click(byText(host, "button", "存標記"));
     expect(writes.at(-1)).toMatchObject({ method: "POST", path: "/projects/P1/docs/gather.mark", body: { content: { origin: "o:1", cards: ["a", "b"], mark: "存疑", reason: "兩頁都沒寫誰辦的" } } });
+    await done();
+  });
+
+  it("lists my splits and lets me take one back", async () => {
+    const { writes } = server(overview(), { "gather.split": [{ cards: ["b"], reason: "改寫過，不是同一篇" }] });
+    const { host, done } = await mount(<GatherPage projectId="P1" />);
+    expect(host.textContent).toContain("頁面 b（改寫過，不是同一篇）");
+    await click(byText(host, "button", "取消拆開"));
+    expect(writes.at(-1)).toMatchObject({ method: "DELETE", path: "/projects/P1/docs/gather.split/gather.split-1" });
+    expect(host.textContent).not.toContain("取消拆開");
+    await done();
+  });
+
+  it("says when the case holds the most source cards it can", async () => {
+    server(overview({ card_limit: { max: 800, cards: 800, uncarded: 3, notice: "這個案子的來源卡已經到上限 800 張，之後存進來的網頁沒有做卡" } }));
+    const { host, done } = await mount(<GatherPage projectId="P1" />);
+    expect(host.querySelector(".warn[role=status]")?.textContent).toBe("這個案子的來源卡已經到上限 800 張，之後存進來的網頁沒有做卡；現在有 3 頁沒有做卡，不算進出處。");
     await done();
   });
 });

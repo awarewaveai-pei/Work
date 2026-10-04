@@ -25,6 +25,7 @@ type Channel = { provider: string; lang: string; state: string; why: string; say
 export type Overview = {
   origins: Origin[]; changed_marks: Array<{ doc_id: string; origin: string; cards: string[]; mark: string; reason: string }>;
   counted: number; min_origins: number; aside: number; data_classification: string;
+  card_limit: { max: number; cards: number; uncarded: number; notice: string };
   channels: { engines: Array<{ key: string; name: string }>; languages: Array<{ key: string; name: string }>; blocked: Channel[]; short: string[]; ask: string[]; looked: boolean };
   distribution: Record<"engine" | "language" | "country", Record<string, number>>;
   rules: Array<{ name: string; title: string; version: string; maintainer: string; items: any }>;
@@ -33,6 +34,7 @@ export type Overview = {
 };
 type Ask = { text: string; angles?: string[]; card?: string; url?: string; run?: string };
 type Mark = { origin: string; cards: string[]; mark: string; reason: string; applies?: string };
+type Split = { cards: string[]; reason: string };
 type Override = { card: string; key: string; value: string; reason: string };
 type Query = { text: string; lang: string; angle: string };
 type Says = { items?: Array<{ card: string; says: string; quote?: string; citations: string[] }>; gaps?: string[]; question?: string };
@@ -185,6 +187,7 @@ export function GatherPage({ projectId }: { projectId: string }) {
   const [asks, setAsks] = useState<Doc<Ask>[]>([]);
   const [owns, setOwns] = useState<Doc<{ text: string }>[]>([]);
   const [marks, setMarks] = useState<Doc<Mark>[]>([]);
+  const [splits, setSplits] = useState<Doc<Split>[]>([]);
   const [overrides, setOverrides] = useState<Doc<Override>[]>([]);
   const [gaps, setGaps] = useState<string[]>([]);
   const [queries, setQueries] = useState<Doc<{ queries: Query[]; note?: string }> | null>(null);
@@ -208,12 +211,13 @@ export function GatherPage({ projectId }: { projectId: string }) {
 
   const engines = providers ?? (view?.words.providers ?? []).map((item) => item.key);
   const load = async () => {
-    const [overview, askDocs, ownDocs, markDocs, overrideDocs, maps, queryDocs, sayDocs, compareDocs] = await Promise.all([
+    const [overview, askDocs, ownDocs, markDocs, overrideDocs, maps, queryDocs, sayDocs, compareDocs, splitDocs] = await Promise.all([
       apiFetch<Overview>(`${base}/gather`), docs.list<Ask>(projectId, "gather.ask"), docs.list<{ text: string }>(projectId, "gather.own"),
       docs.list<Mark>(projectId, "gather.mark"), docs.list<Override>(projectId, "gather.override"), docs.list<{ gaps?: string[] }>(projectId, "map.map"),
       docs.list<{ queries: Query[]; note?: string }>(projectId, "gather.ai_queries"), docs.list<Says>(projectId, "gather.ai_says"), docs.list<Compare>(projectId, "gather.ai_compare"),
+      docs.list<Split>(projectId, "gather.split"),
     ]);
-    setView(overview); setAsks(askDocs); setOwns(ownDocs); setMarks(markDocs); setOverrides(overrideDocs);
+    setView(overview); setAsks(askDocs); setOwns(ownDocs); setMarks(markDocs); setOverrides(overrideDocs); setSplits(splitDocs);
     setGaps(maps.at(-1)?.content.gaps ?? []); setQueries(queryDocs.at(-1) ?? null); setSays(sayDocs); setCompare(compareDocs.at(-1) ?? null);
     const found = await Promise.all(askDocs.filter((doc) => doc.content.run).map(async (doc) => [doc.content.run!, (await apiFetch<Run>(`${base}/collections/${enc(doc.content.run!)}`).catch(() => ({ status: "" }))).status] as const));
     setRuns(Object.fromEntries(found));
@@ -284,7 +288,7 @@ export function GatherPage({ projectId }: { projectId: string }) {
       <Notices notices={notices} />
       <div className="card cta">
         <h2>要查什麼</h2>
-        <p className="how">寫下你要查的事。按「去找」，系統先給你看會怎麼找，你確定了才開始。系統用兩家搜尋引擎、中文和英文找；找回來的每一頁都標「{view.words.someone_said}」，不是事實。</p>
+        <p className="how">寫下你要查的事。按「去找」，系統先給你看會怎麼找，你確定了才開始。找回來的每一頁都標「{view.words.someone_said}」，不是事實。</p>
         {gaps.length > 0 && <><p className="hint">你的地圖寫了還缺的資料（點一下帶進來）：</p>
           <div className="chips">{gaps.map((gap) => <button key={gap} type="button" className="chip" onClick={() => setQuestion(gap)}>{gap}</button>)}</div></>}
         <label htmlFor="gather-question">要查的事</label>
@@ -297,7 +301,9 @@ export function GatherPage({ projectId }: { projectId: string }) {
         {pending && (
           <div className="judge" role="dialog" aria-label="會怎麼找">
             <b>會怎麼找</b>
-            <p>最多 {pending.plan.max_queries} 組查詢，最多抓 {pending.plan.max_fetches} 頁。用 {view.words.providers.filter((item) => engines.includes(item.key)).map((item) => item.name).join("、")} 找，中文和英文都找。</p>
+            <p>最多 {pending.plan.max_queries} 組查詢，最多抓 {pending.plan.max_fetches} 頁。會請蒐集器用 {view.words.providers.filter((item) => engines.includes(item.key)).map((item) => item.name).join("、")} 找，中文和英文各找一次；真的用上哪些，找完才知道。</p>
+            <p className="sub">{view.channels.looked ? `上一次真的用上：${view.channels.engines.map((item) => item.name).join("、") || "沒有搜尋引擎"}。` : "這個案子還沒找過。"}
+              {view.channels.blocked.map((item) => `${item.says}。`).join("")}</p>
             <div className="btns"><button className="btn primary" type="button" disabled={busy} onClick={confirm}>確定去找</button><button className="btn ghost" type="button" onClick={() => setPending(null)}>先不要</button></div>
           </div>
         )}
@@ -353,6 +359,10 @@ export function GatherPage({ projectId }: { projectId: string }) {
             {Object.entries(view.distribution[key]).map(([name, count]) => <span key={name}>{name}：{count} 頁</span>)}</div>
         ))}</div>}
         <p className="sub">列在哪份名單上、被分在哪一組，都不代表它是假的。被刪掉的文章、私人群組裡的訊息，系統看不到。</p>
+        {view.card_limit.notice && <p className="warn" role="status">{view.card_limit.notice}{view.card_limit.uncarded ? `；現在有 ${view.card_limit.uncarded} 頁沒有做卡，不算進出處` : ""}。</p>}
+        {splits.length > 0 && <div className="judge"><b>你拆開的</b>
+          <ul>{splits.map((doc) => <li key={doc.doc_id}>{doc.content.cards.map(titleOf).join("、")}（{doc.content.reason}）
+            <button className="btn ghost" type="button" disabled={busy} onClick={() => act(async () => { await docs.remove(projectId, "gather.split", doc.doc_id); })}>取消拆開</button></li>)}</ul></div>}
         {view.changed_marks.length > 0 && <div className="judge"><b>這些標記標的那一組變了，請重看：</b>
           <ul>{view.changed_marks.map((item) => <li key={item.doc_id}>{item.mark}（{item.reason}）：{item.cards.map(titleOf).join("、")}</li>)}</ul></div>}
         {shown.length === 0 && <p className="sub">還沒有來源。</p>}

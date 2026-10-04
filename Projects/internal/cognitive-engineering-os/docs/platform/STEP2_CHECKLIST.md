@@ -16,7 +16,7 @@ Owners: S = supervisor session; 甲 GATHER; 乙 VERIFY; 丙 COMPUTE; 丁 collect
 
 ## GATHER (甲)
 - built: 「替每一筆記下：從哪個管道、用哪句查詢找到的」「系統查每個來源是誰辦的」「每一格都寫三種之一」 -- `block_hooks/gather.py` AFTER_SOURCES: one `gather.source` per active stored page (a new version of its card when the page comes back with a new hash), one per page set aside with no text; registry and archive cells from one `collect_lookups.describe` call per run (collect answers, `specs/wire/lookup.v1.json`), the rest from a versioned list (`platform/rulesets/gather.py`) or the page itself; `found_by` from wire v2 `relevance`; idempotent
-- built: 「同出處分組」「怎樣算同一組的規則寫出來，標明第幾版」「改寫過拿不準標可能同出處」「分組不是刪除，你可以拆開」 -- `gather.origins` (同一篇／可能同出處／同一張圖／只互相引用, rule `gather.grouping` v1 on the page); `gather.split`; 「原始的還是轉貼的」 read off the grouping and first-seen dates
+- built: 「同出處分組」「怎樣算同一組的規則寫出來，標明第幾版」「改寫過拿不準標可能同出處」「分組不是刪除，你可以拆開」 -- `gather.origins` (同一篇／可能同出處／同一張圖／只互相引用, rule `gather.grouping` v2 on the page: near-identical text, or most of a shorter page inside a longer one); `gather.split` (listed and undone on the page; one stored text is never split); 「原始的還是轉貼的」 decided only for 同一篇, a page's own date said as its claim
 - built: 「放一旁…你可以拿回來」「放一旁的不算進出處的數量」「網頁被改過核對碼會不一樣，被刪了存的那一份還在」「來源分佈」「管道不足，系統停下來讓你決定」「發生地的語言一筆都找不到時，系統停下來問你」「獨立出處不到兩個時，系統停下來」 -- page `/projects/[id]/gather` + `GET /projects/{id}/gather`; the AI's summary and comparison hand back first (`go_on` to continue)
 - built: 「你標採用、存疑、不用並寫理由；同一組一起標」「你可以改系統的分類，寫理由」「別國的資料先標適不適用這裡」「回顧時你標錯的出處」 -- BEFORE_SAVE: one mark per origin on exactly its pages, one change per card and cell, a split takes part of one group, a take-back once; `origins()[].wrong_in_review` shown
 - built: 「你貼的網址和檔案標我貼的」「沒有出處的文字標我自己說的，不算外部來源」 -- a file needs 出處 (`venue`) or it is saved as `gather.own`, never as a source; `GatherPage.test.tsx` proves the page cannot send it to /sources
@@ -28,10 +28,12 @@ Owners: S = supervisor session; 甲 GATHER; 乙 VERIFY; 丙 COMPUTE; 丁 collect
 - built: 「來源卡和網頁當時的樣子跟著案子，抹除時一起刪」 -- case-owned records, existing case erasure (test)
 - KNOWN LIMIT: 「系統至少用兩家搜尋引擎找」 -- Brave has no key (`no_key` channel), so every run says 「管道不足：只用了 1 家搜尋引擎」 until a key exists (rules §11)
 - KNOWN LIMIT: 「至少用兩種語言：事情發生地的語言」 -- the collector searches 中文 and English only; a place in another language is 管道不足 with that reason (rules §11)
-- KNOWN LIMIT: 「網站自己寫的經營者是誰」 -- read only from the stored page (a copyright line) or the known-outlets list; the site's 「關於我們」 page is not fetched, so most cards say 查不到 with that reason
+- KNOWN LIMIT: 「網站自己寫的經營者是誰」 -- read only from the known-outlets list or a copyright line in the page's last 800 characters, said as 「網頁上的版權字樣，不一定是經營者」; the site's 「關於我們」 page is not fetched, so most cards say 查不到 with that reason
+- KNOWN LIMIT: 「網站的名字像國際媒體…查這家媒體是不是真的存在」 -- the known-outlets list (v2) is not every domain an outlet has: a look-alike is said as 「名字像X，不在X的已知網域名單上」; a name under 5 letters must be a whole host piece; with no site name in the title the cell is 無法檢查 「標題沒寫網站名字」
 - KNOWN LIMIT: 「網域什麼時候註冊」「最早何時出現」 -- as collect answers them (lookup.v1 R2, R7): a registry not on collect's list, or collect not answering, is 無法檢查 with collect's why
 - KNOWN LIMIT: 「國家或地區」 -- only from a government/academic domain suffix, the known-outlets list or the registrant line collect reads (most registries hide it)
-- KNOWN LIMIT: grouping compares the first 20000 characters, one in eight pieces when both texts are long (rule v1); collect answers each batch of 25 addresses within 45 s, so a large run's cards can take minutes to appear
+- KNOWN LIMIT: one case holds at most `MAX_CASE_CARDS` = 800 source cards (`kinds/gather.py`): every card sits in one gather.origins group (70 bytes alone) and a json field holds at most 64 KiB (`doc_kinds.MAX_JSON_BYTES`), so 2000 would not fit; pages past it stay stored with no card, never count, and the GATHER page says 「這個案子的來源卡已經到上限 800 張…」 (derived from the cards, not a stored notice)
+- KNOWN LIMIT: grouping compares the first 20000 characters, one in eight pieces when both texts are long, and a shorter page of at least 300 characters by how much of it is inside the longer one (rule v2); every batch regroups the whole case (at 800 cards about 320 000 pairs); collect answers each batch of 25 addresses within 45 s, so a large run's cards can take minutes to appear
 - NOT YET: 「來源名單（媒體、查核組織、內容農場）」 -- no maintained list the platform can cite yet (IFCN's signatory list is page-rendered only); the three lists are empty and say why; 官方 and 學術 are domain-suffix lists
 - NOT YET: 「它自己宣稱的立場」「跟當事方的關係」 -- 無法檢查 with why; the person can write their own value (`gather.override`)
 - NOT YET: 「截圖」 -- no OCR in step 2; the page asks for the screenshot's text as a file

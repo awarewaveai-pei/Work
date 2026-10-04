@@ -9,6 +9,11 @@ from ai_lego.core.domain.doc_kinds import DocKind, Field
 from ai_lego.core.domain.evidence_words import APPLIES, CARD_CELL_KEYS, MARKS, OWN_WORDS
 
 OVERRIDABLE = (*CARD_CELL_KEYS, "lists")   # 你可以改系統的分類，改的時候寫理由
+# The most source cards one case holds (GATHER makes none past it; the page says so). Every card sits in one group of
+# gather.origins, 70 bytes for a card alone (measured), and a json field holds at most 64 KiB (doc_kinds.MAX_JSON_BYTES):
+# 800 cards = 56000 bytes at worst, four full 去找 runs of 200 pages.
+MAX_CASE_CARDS = 800
+GROUP_BYTES_PER_CARD = 80   # the measured 70 plus headroom: the groups cap below is derived from the card maximum
 # What a search looks for (STEP2_SHARED_RULES §4.1 angles of a claim seed): 系統先找最原始的、前例、到過現場的人
 ANGLES = (("primary", "原始文件與官方公告"), ("news", "報導"), ("factcheck", "查核"), ("precedent", "前例"), ("field", "到過現場的人"),
           ("opposite", "相反的說法"), ("origin", "最早的出處"))
@@ -29,7 +34,7 @@ KINDS = [
     # the system's grouping into independent origins (同一篇、同一張圖、只互相引用、可能同出處); every version stays.
     # An origin's id is computed from its cards (evidence.origins), never stored: a regroup cannot move a mark.
     DocKind("gather.origins", "GATHER", "出處分組", {
-        "groups": Field("json", 60000, required=True, scan=False),   # [{"cards": [card doc ids], "how": GROUP_HOW}]: evidence_words.grouping_errors
+        "groups": Field("json", MAX_CASE_CARDS * GROUP_BYTES_PER_CARD, required=True, scan=False),   # [{"cards": [card doc ids], "how": GROUP_HOW}]: evidence_words.grouping_errors
         "rules_version": Field("text", 40, required=True, scan=False),
     }, authors=frozenset({"system"}), deletable=False, singleton=True),
     # 你可以把系統分的組拆開: these cards become one origin of their own

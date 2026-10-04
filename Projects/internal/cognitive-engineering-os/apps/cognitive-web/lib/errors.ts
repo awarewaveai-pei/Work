@@ -117,6 +117,7 @@ const CODES: Record<string, string> = {
   GATHER_OVERRIDE_FIXED: "你的改法跟著它改的那張卡和那一格，不能換。",
   GATHER_SPLIT_INVALID: "要拆開的網頁要在同一組裡，而且不能是整組。",
   GATHER_SPLIT_FIXED: "拆開的網頁不能再換。要改，先刪掉這次拆開，再拆一次。",
+  GATHER_SPLIT_SAME_PAGE: "這幾頁跟留在組裡的頁是同一份內容（同一個核對碼），不能拆開。",
   GATHER_NOT_ASIDE: "這一頁沒有放一旁，不用拿回來。",
   GATHER_TAKEBACK_ALREADY_GIVEN: "這一頁已經拿回來了。",
   GATHER_ORGANIZE_PASTED_ONLY: "你沒准 AI 找外部資料，AI 只整理你貼的。請只勾你貼的來源。",

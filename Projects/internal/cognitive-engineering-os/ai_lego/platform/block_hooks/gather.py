@@ -12,6 +12,7 @@ the platform reaches nothing outside itself (specs/wire/lookup.v1.json; STEP2_SH
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 import urllib.parse
@@ -21,12 +22,15 @@ from typing import Any, Callable, Iterable, Mapping
 
 from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.evidence_words import FOUND, FOUND_BY, MIN_ORIGINS, NOT_FOUND, UNCHECKABLE, cell
+from ai_lego.core.domain.kinds.gather import MAX_CASE_CARDS
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import evidence, safety
 from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.rulesets import require
+
+_log = logging.getLogger(__name__)
 
 SYSTEM = record_log.system("GATHER")
 SEARCHED, PASTED = FOUND_BY
@@ -37,6 +41,8 @@ PROVIDER_NAMES = {"serper": "Serper（Google 的結果）", "brave": "Brave"}
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 _COPYRIGHT = re.compile(r"(?:©|\(c\)|Copyright|版權所有)\s*(?:©)?\s*(?:\d{4}(?:\s*[-–~]\s*\d{4})?)?\s*([^\n|｜。，,]{2,80})", re.I)
 _TITLE_SEPARATORS = re.compile(r"\s[-|–—]\s|｜|－")
+STATED = "網頁自己寫的日期"   # first_seen from the page's own claim, not from the archive: 原始的 says so
+FOOTER_CHARS = 800   # a site's own copyright line is at the end; one higher up is usually a photo or quote credit
 _EN_WORDS = frozenset("the and of to in is that for it with as was on are by this be from or at".split())
 
 
@@ -73,7 +79,7 @@ def _lists(host: str) -> tuple[list[dict[str, str]], tuple[str, str, str] | None
             found.append({key: item[key] for key in ("list", "category", "maintainer", "version")})
             if suffix and restricted is None:
                 place, body = item["suffixes"][suffix], RESTRICTED_TO[item["category"]]
-                restricted = (place, body, f"{suffix} 只發給{place}的{body}")
+                restricted = (place, body, f"{suffix} 只發給{place}的{body}" if place else f"{suffix} 只發給{body}")
     return found, restricted
 
 
@@ -98,21 +104,24 @@ def _name_tokens(host: str, site: str) -> list[str]:
     return [token for label in labels for token in re.split(r"[^a-z0-9]+", label) if token]
 
 
-def _outlet(host: str, site: str, title: str) -> tuple[dict[str, Any] | None, bool, bool]:
-    """(the outlet, whether the site IS it, whether the site's name reads like a news outlet)."""
+def _outlet(host: str, site: str, title: str) -> tuple[dict[str, Any] | None, bool, bool, str]:
+    """(the outlet, whether the site IS it, whether the site's name reads like a news outlet, the name the title gives).
+    ``site``: the name the registry holds (collect); a name under ``prefix_from`` letters must be a whole host piece."""
     rules = require("gather.outlets").items
     for outlet in rules["outlets"]:
         if host and any(host == domain or host.endswith(f".{domain}") for domain in outlet["domains"]):
-            return outlet, True, True
-    site = _site_name(title)
+            return outlet, True, True, _site_name(title)
+    named = _site_name(title)
     tokens = _name_tokens(host, site)
     for outlet in rules["outlets"]:
         for name in outlet["names"]:
             squeezed = re.sub(r"[^a-z0-9]", "", name.lower())
-            in_host = name.isascii() and len(squeezed) >= rules["min_host_name"] and any(token.startswith(squeezed) for token in tokens)
-            if _named(site, name) or in_host:
-                return outlet, False, True
-    return None, False, any(_named(site, word) for word in rules["media_words"])
+            in_host = name.isascii() and len(squeezed) >= rules["min_host_name"] and any(
+                token == squeezed or (len(squeezed) >= rules["prefix_from"] and token.startswith(squeezed)) for token in tokens)
+            if _named(named, name) or in_host:
+                return outlet, False, True, named
+    newsy = any(_named(named, word) for word in rules["media_words"]) or any(token == word.lower() for token in tokens for word in rules["media_words"] if word.isascii())
+    return None, False, newsy, named
 
 
 def _language(text: str | None) -> dict[str, str]:
@@ -126,7 +135,9 @@ def _language(text: str | None) -> dict[str, str]:
     latin = len(re.findall(r"[A-Za-z]", sample))
     cjk = han + kana + hangul
     if not cjk and not latin:
-        return cell(NOT_FOUND, why="網頁沒有看得出語言的文字")
+        if any(ch.isalpha() for ch in sample):
+            return cell(UNCHECKABLE, why="系統只分得出中文、英文、日文、韓文")
+        return cell(NOT_FOUND, why="網頁沒有文字")
     if cjk * 3 >= latin:
         code = "ja" if kana >= max(10, cjk // 10) else "ko" if hangul * 2 >= cjk else "zh"
         return cell(FOUND, names[code])
@@ -141,21 +152,25 @@ def _operator(text: str | None, outlet: dict[str, Any] | None, is_outlet: bool) 
         return cell(FOUND, outlet["name"], why=f"網域在已知媒體名單上（v{require('gather.outlets').version}）")
     if text is None:
         return cell(UNCHECKABLE, why="抓不到內文，看不到網頁寫誰經營")
-    lines = [match.group(0).strip() for match in _COPYRIGHT.finditer(text)]
+    lines = [match.group(0).strip() for match in _COPYRIGHT.finditer(text[-FOOTER_CHARS:])]
     if lines:
-        return cell(FOUND, lines[-1][:120], why="網頁上自己寫的")
+        return cell(FOUND, lines[-1][:120], why="網頁上的版權字樣，不一定是經營者")
     return cell(NOT_FOUND, why="這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁")
 
 
-def _outlet_cell(host: str, title: str, outlet: dict[str, Any] | None, is_outlet: bool, newsy: bool) -> dict[str, str]:
+def _outlet_cell(host: str, named: str, outlet: dict[str, Any] | None, is_outlet: bool, newsy: bool) -> dict[str, str]:
+    """The known-outlets list is not every domain an outlet has: a name like one is said as 「不在已知網域名單上」, and
+    查不到 only when there was a site name to look at."""
     if outlet and is_outlet:
         return cell(FOUND, f"是{outlet['name']}的網域")
     if outlet:
-        return cell(FOUND, f"名字像{outlet['name']}，但不是{outlet['name']}的網域")
-    if not host and not _site_name(title):
+        return cell(FOUND, f"名字像{outlet['name']}，不在{outlet['name']}的已知網域名單上（v{require('gather.outlets').version}）")
+    if not host and not named:
         return cell(UNCHECKABLE, why="你貼的是檔案，沒有網域可以對")
     if newsy:
         return cell(UNCHECKABLE, why="名字像媒體，但不在已知媒體名單上；系統沒辦法查它存不存在")
+    if not named:
+        return cell(UNCHECKABLE, why="標題沒寫網站名字")
     return cell(NOT_FOUND, why="名字不像媒體")
 
 
@@ -164,13 +179,13 @@ def _first_seen(published: Any, archived: dict[str, str] | None) -> dict[str, st
     ``first_archived``; ``None`` = a pasted file with no address to ask about)."""
     stated = _date(published)
     if archived is None:
-        return cell(FOUND, stated, why="網頁自己寫的日期") if stated else cell(UNCHECKABLE, why="你貼的檔案沒寫日期，也沒有網址可以查網頁封存館")
+        return cell(FOUND, stated, why=STATED) if stated else cell(UNCHECKABLE, why="你貼的檔案沒寫日期，也沒有網址可以查網頁封存館")
     if archived["state"] == FOUND and not _date(archived["value"]):   # compared as a date below, so it must be one
         archived = cell(UNCHECKABLE, why=collect_lookups.MALFORMED)
     if archived["state"] == FOUND and (not stated or archived["value"][:10] < stated):
         return cell(FOUND, archived["value"][:10], why=archived.get("why") or "網頁封存館最早存到的日期")
     if stated:
-        return cell(FOUND, stated, why="網頁自己寫的日期" + (f"；網頁封存館：{archived['why']}" if archived["state"] == UNCHECKABLE else ""))
+        return cell(FOUND, stated, why=STATED + (f"；網頁封存館：{archived['why']}" if archived["state"] == UNCHECKABLE else ""))
     return cell(archived["state"], why=f"網頁沒寫日期；{archived['why']}")
 
 
@@ -182,10 +197,10 @@ def _cells(url: str, title: str, text: str | None, published: Any, looked: Mappi
     """``looked``: collect's answer for ``url`` (collect_lookups.describe), ``None`` for a pasted file with no address."""
     host = _host(url)
     lists, restricted = _lists(host)
-    outlet, is_outlet, newsy = _outlet(host, (looked or {}).get("site") or "", title)
+    outlet, is_outlet, newsy, named = _outlet(host, (looked or {}).get("site") or "", title)
     no_site = cell(UNCHECKABLE, why="你貼的是檔案，沒有網域可以查")
     looked_up = {"registered": looked["registered"], "country": looked["country"]} if looked else {"registered": no_site, "country": no_site}
-    if restricted:
+    if restricted and restricted[0]:
         country = cell(FOUND, restricted[0], why=restricted[2])
     elif outlet and is_outlet and outlet.get("country"):
         country = cell(FOUND, outlet["country"], why="已知媒體名單")
@@ -202,7 +217,7 @@ def _cells(url: str, title: str, text: str | None, published: Any, looked: Mappi
         "stance": cell(UNCHECKABLE, why="系統沒有讀網站的「關於我們」頁，不知道它自己宣稱的立場；你可以自己補上"),
         "affiliation": affiliation,
         "party_relation": cell(UNCHECKABLE, why="系統不知道它跟這件事的當事方有什麼關係；你可以自己寫"),
-        "outlet_exists": _outlet_cell(host, title, outlet, is_outlet, newsy),
+        "outlet_exists": _outlet_cell(host, named, outlet, is_outlet, newsy),
     }, lists
 
 
@@ -253,6 +268,7 @@ class _Item:
         self.outlinks = {_link_host(link) for link in links if isinstance(link, str) and link} - {self.host, ""} if isinstance(links, list) else set()
         first = (content.get("cells") or {}).get("first_seen") or {}
         self.first_seen = _date(first.get("value")) if first.get("state") == FOUND else None
+        self.stated = str(first.get("why") or "").startswith(STATED)
 
     def pieces(self, sampled: bool) -> frozenset[int]:
         if sampled not in self._pieces:
@@ -263,14 +279,17 @@ class _Item:
 
 
 def _likeness(a: _Item, b: _Item, rules: Mapping[str, Any]) -> float:
-    """Share of text pieces two pages have in common (Jaccard); 0 when it cannot reach 「可能同出處」 by length alone."""
-    short, long = sorted((len(a.letters), len(b.letters)))
-    if not short or short / long < rules["maybe_same"]:
-        return 0.0
+    """How alike two pages are: the larger of the share of all their text pieces in common (Jaccard) and the share of
+    the shorter page found in the longer one (an excerpt, a copy with more around it), the second only when the shorter
+    page has at least ``contained_min`` characters."""
+    short = min(len(a.letters), len(b.letters))
     sampled = short > rules["sample_above"]
     x, y = a.pieces(sampled), b.pieces(sampled)
+    if not x or not y:
+        return 0.0
     both = len(x & y)
-    return both / (len(x) + len(y) - both) if x and y else 0.0
+    contained = both / min(len(x), len(y)) if short >= rules["contained_min"] else 0.0
+    return max(both / (len(x) + len(y) - both), contained)
 
 
 def _groups(items: list[_Item], rules: Mapping[str, Any]) -> list[tuple[list[_Item], str]]:
@@ -342,19 +361,22 @@ def _original(group: list[_Item], how: str, item: _Item) -> dict[str, str]:
     """原始的還是轉貼的, read off the grouping."""
     if len(group) == 1:
         return cell(NOT_FOUND, why="沒有找到別的網頁有同一篇，看不出是不是轉貼")
-    if how == "可能同出處":
-        return cell(NOT_FOUND, why="跟同組的網頁很像，但拿不準是不是改寫，由你決定")
     if how == "只互相引用":
         return cell(FOUND, "只互相引用，沒有別的依據")
+    if how == "可能同出處":
+        return cell(NOT_FOUND, why="跟同組的網頁很像，但拿不準是不是改寫，由你決定")
+    if how != "同一篇":   # a shared image (a default og:image, a blank.jpg) says nothing about who copied whom
+        return cell(NOT_FOUND, why="只是用了同一張圖，看不出誰轉貼誰")
     dates = [member.first_seen for member in group]
     if None in dates:
         return cell(UNCHECKABLE, why="同組有網頁查不到最早出現的時間，排不出先後")
     earliest = min(dates)
+    claim = "（這個日期是網頁自己寫的，不一定可信）" if any(member.stated and member.first_seen == earliest for member in group) else ""
     if item.first_seen != earliest:
-        return cell(FOUND, "轉貼的", why=f"{how}在 {earliest} 已經出現")
+        return cell(FOUND, "轉貼的", why=f"同一篇在 {earliest} 已經出現{claim}")
     if dates.count(earliest) > 1:
         return cell(NOT_FOUND, why=f"同組有網頁同一天（{earliest}）出現，排不出誰先")
-    return cell(FOUND, "原始的", why="這一組裡最早出現的")
+    return cell(FOUND, "原始的", why=f"這一組裡最早出現的{claim}")
 
 
 # ---- the hook ----
@@ -411,13 +433,30 @@ def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, ar
     aside_cards = {doc["content"].get("url"): doc for doc in cards if not doc["content"].get("source_id") and doc["content"].get("url")}
     active = sorted((row for row in rows.values() if row["status"] == "active"), key=lambda row: (row["created_at"], row["source_id"]))
     known = {row.get("canonical_url") for row in active if row.get("canonical_url")}
-    new_rows = [(_ancestor_card(row, rows, carded) or aside_cards.get(row.get("canonical_url")), row) for row in active if row["source_id"] not in carded]
-    new_aside = []
+    url_max = doc_kinds.require("gather.source").fields["url"].max   # a card keeps this much of a URL: compare that
+    room, skipped = MAX_CASE_CARDS - len(cards), 0   # a new version of a card takes no room; a new card does
+    new_rows, new_aside = [], []
+    for row in active:
+        if row["source_id"] in carded:
+            continue
+        prior = _ancestor_card(row, rows, carded) or aside_cards.get(row.get("canonical_url"))
+        if prior is None and room <= 0:
+            skipped += 1
+            continue
+        if prior is None:
+            room -= 1
+        new_rows.append((prior, row))
     for entry in arrived.get("aside") or []:
         url = entry.get("url") if isinstance(entry, Mapping) else None
-        if isinstance(url, str) and url.startswith(("http://", "https://")) and url not in aside_cards and url not in known:
-            known.add(url)
+        if isinstance(url, str) and url.startswith(("http://", "https://")) and url[:url_max] not in aside_cards and url[:url_max] not in known:
+            if room <= 0:
+                skipped += 1
+                continue
+            room -= 1
+            known.add(url[:url_max])
             new_aside.append(entry)
+    if skipped:   # fail closed: a page with no card never counts; the page shows the limit (apps/api/blocks/gather.py)
+        _log.warning("case %s holds %s source cards (the most): %s new pages got no card", owner.id, MAX_CASE_CARDS, skipped)
     # one question to collect for every address of this run (it batches and never raises: R7, R8)
     answers = collect_lookups.describe(owner.id, [row.get("canonical_url") for _, row in new_rows] + [entry["url"] for entry in new_aside])
     planned: list[tuple[dict[str, Any] | None, dict[str, Any]]] = [   # (the card this is a new version of, the content)
@@ -440,8 +479,9 @@ def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, ar
         return
     ids: dict[str, str] = {}
     by_id = {doc["doc_id"]: doc for doc in cards}
+    grouping = {key: value for key, value in require("gather.grouping").stamp().items() if key != "name"}
     for one in items:
-        content = {**one.content, "cells": {**one.content["cells"], "original": original[one.key]}}
+        content = {**one.content, "cells": {**one.content["cells"], "original": original[one.key]}, "rules": {**(one.content.get("rules") or {}), "gather.grouping": grouping}}
         held = by_id.get(one.key)
         if held is None:
             ids[one.key] = docs.save(tenant_id, owner, "gather.source", content, SYSTEM)["doc_id"]
@@ -522,6 +562,15 @@ def _split_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, cont
     members = {card["card"] for card in origin["cards"]} if origin else set()
     if not cards or not set(cards) <= members or set(cards) == members:
         raise InvariantViolation("GATHER_SPLIT_INVALID: split takes some pages, not all, out of one group")
+    held_cards = {doc["doc_id"]: doc["content"] for doc in docs.current(tenant_id, owner, "gather.source")}
+
+    def same_text(card: str) -> set[str]:   # what evidence.origins keeps together whatever a split says
+        content = held_cards[card]
+        sha = (content.get("snapshot") or {}).get("sha256")
+        return {key for key in (f"source:{content.get('source_id')}" if content.get("source_id") else "", f"sha:{sha}" if sha else "") if key}
+
+    if set().union(*map(same_text, cards)) & set().union(set(), *map(same_text, set(held_cards) - set(cards))):
+        raise InvariantViolation("GATHER_SPLIT_SAME_PAGE: a page that is the same stored text as a page left in the group stays with it")
 
 
 def _takeback_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: dict[str, Any], doc_id: str | None) -> None:

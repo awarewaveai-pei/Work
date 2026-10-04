@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import copy
 import datetime
+import hashlib
 import json
 import re
 import urllib.parse
@@ -41,8 +42,8 @@ ZH_SAYS = "公會公告：自二〇一九年起，合約範本第七條改為按
 
 
 def zh(seed: int, length: int = 400) -> str:
-    """Chinese-looking text that shares almost no five-character piece with another seed's."""
-    return "".join(COMMON[(seed * 7919 + index * 104729 + index * index * seed) % len(COMMON)] for index in range(length))
+    """Chinese-looking text that shares almost no five-character piece with another seed's, nor repeats its own."""
+    return "".join(COMMON[int.from_bytes(hashlib.sha256(f"{seed}:{index}".encode()).digest()[:2], "big") % len(COMMON)] for index in range(length))
 
 
 EN = ("The association said on Monday that the standard contract will be settled every month from next year. "
@@ -214,9 +215,9 @@ class CardTests(GatherCase):
         self.collected("https://bbc-news-today.xyz/a", zh(4), title="震撼消息 | BBC News")
         self.collected("https://www.bbc.com/zhongwen/b", zh(5), title="報導 - BBC News 中文")
         self.collected("https://dailytruth.example.com/c", zh(6), title="消息 | Daily Truth News")
-        self.collected("https://shop.example.com/d", zh(7), title="店家公告")
+        self.collected("https://shop.example.com/d", zh(7), title="店家公告 | 某某商店")
         self.arrive()
-        self.assertEqual(self.cell("https://bbc-news-today.xyz/a", "outlet_exists")["value"], "名字像BBC，但不是BBC的網域")
+        self.assertEqual(self.cell("https://bbc-news-today.xyz/a", "outlet_exists")["value"], "名字像BBC，不在BBC的已知網域名單上（v" + require("gather.outlets").version + "）")
         self.assertEqual(self.cell("https://www.bbc.com/zhongwen/b", "outlet_exists")["value"], "是BBC的網域")
         self.assertEqual((self.cell("https://www.bbc.com/zhongwen/b", "operator")["value"], self.cell("https://www.bbc.com/zhongwen/b", "country")["value"]), ("BBC", "英國"))
         self.assertEqual(self.cell("https://dailytruth.example.com/c", "outlet_exists")["state"], "無法檢查")
@@ -291,11 +292,11 @@ class CollectLookupTests(GatherCase):
         self.collect.answers["https://bbc.fakehost.xyz/a"] = {**copy.deepcopy(FOUND_ITEM), "url": "https://bbc.fakehost.xyz/a", "site": "fakehost.xyz"}
         self.collected("https://bbc.fakehost.xyz/a", zh(1), title="店家公告")
         self.arrive()
-        self.assertEqual(self.cell("https://bbc.fakehost.xyz/a", "outlet_exists")["value"], "名字像BBC，但不是BBC的網域")
+        self.assertEqual(self.cell("https://bbc.fakehost.xyz/a", "outlet_exists")["value"], "名字像BBC，不在BBC的已知網域名單上（v" + require("gather.outlets").version + "）")
         self.collect.down = True
-        self.collected("https://bbcnews-today.example.com/b", zh(2), title="店家公告")
+        self.collected("https://bbc-today.example.com/b", zh(2), title="店家公告")
         self.arrive()
-        self.assertEqual(self.cell("https://bbcnews-today.example.com/b", "outlet_exists")["value"], "名字像BBC，但不是BBC的網域")
+        self.assertEqual(self.cell("https://bbc-today.example.com/b", "outlet_exists")["value"], "名字像BBC，不在BBC的已知網域名單上（v" + require("gather.outlets").version + "）")
         self.assertEqual((hooks._name_tokens("a.b.example.com.tw", "example.com.tw"), hooks._name_tokens("x.example.com", "")), (["a", "b", "example"], ["x", "example", "com"]))
 
     def test_the_engine_reaches_nothing_outside_itself(self):
@@ -337,6 +338,7 @@ class GroupingTests(GatherCase):
         self.collected("https://b.example.com/2", zh(31), imageUrl="https://img.example.com/fire.jpg")
         self.arrive()
         self.assertEqual(list(self.grouping().values()), ["同一張圖"])
+        self.assertEqual(self.cell("https://a.example.com/1", "original"), {"state": "查不到", "why": "只是用了同一張圖，看不出誰轉貼誰"})   # critic M4
 
     def test_sites_that_only_cite_each_other_are_one_origin_even_when_another_page_cites_them(self):
         self.collected("https://a.example.com/1", zh(40), outlinks=["b.example.net", "c.example.org"])
@@ -568,6 +570,150 @@ class RouteAndEgressTests(GatherCase):
         self.collect.before = lambda: erased.append(self.client.delete(self.base).status_code)   # the hook's thread: record, assert here
         self.arrive()
         self.assertEqual((erased, self.cards()), ([200], []))
+
+
+class RoundTwoTests(GatherCase):
+    """GATHER critic 2026-10-04 (M1-M5, minors)."""
+
+    def test_collects_registry_name_decides_where_a_sites_own_name_ends(self):
+        """minor 1: the title's site name used to overwrite collect's ``site``, so a suffix label counted as the name."""
+        self.collect.answers["https://www2.example.cnn/a"] = {**copy.deepcopy(FOUND_ITEM), "url": "https://www2.example.cnn/a", "site": "example.cnn"}
+        self.collected("https://www2.example.cnn/a", zh(1), title="店家公告 | 某某商店")
+        self.arrive()
+        self.assertEqual(self.cell("https://www2.example.cnn/a", "outlet_exists"), {"state": "查不到", "why": "名字不像媒體"})
+
+    def test_a_short_outlet_name_matches_only_a_whole_piece_and_no_site_name_is_not_looked_at(self):
+        """M1: voachinese.com, ptsd.va.gov, afpc.af.mil are not 美國之音, 公視, 法新社; with no name to look at, 查不到 is not said."""
+        for url in ("https://voachinese.com/a", "https://ptsd.va.gov/b", "https://afpc.af.mil/c"):
+            self.collected(url, zh(len(url)))
+        self.collected("https://news.example.com/d", zh(80))
+        self.collected("https://shop.example.com/e", zh(81), title="公告 | 某某商店")
+        self.arrive()
+        for url in ("https://voachinese.com/a", "https://ptsd.va.gov/b", "https://afpc.af.mil/c"):
+            self.assertEqual(self.cell(url, "outlet_exists"), {"state": "無法檢查", "why": "標題沒寫網站名字"}, url)
+        self.assertEqual(self.cell("https://news.example.com/d", "outlet_exists")["why"], "名字像媒體，但不在已知媒體名單上；系統沒辦法查它存不存在")
+        self.assertEqual(self.cell("https://shop.example.com/e", "outlet_exists"), {"state": "查不到", "why": "名字不像媒體"})
+
+    def test_who_runs_a_site_is_read_only_from_the_pages_footer_and_said_as_a_copyright_line(self):
+        """M2: a photo credit high up the page is not the operator."""
+        self.collected("https://a.example.com/1", "© Reuters 2024 / John Smith\n" + zh(82, 1200))
+        self.collected("https://b.example.com/2", zh(83, 1200) + "\n© 2024 某產業公會 版權所有")
+        self.arrive()
+        self.assertEqual(self.cell("https://a.example.com/1", "operator")["state"], "查不到")
+        self.assertEqual(self.cell("https://b.example.com/2", "operator"), {"state": "查到", "value": "© 2024 某產業公會 版權所有", "why": "網頁上的版權字樣，不一定是經營者"})
+
+    def test_an_excerpt_and_a_copy_with_more_around_it_are_one_origin_with_the_article(self):
+        """M3 (grouping v2): under half or over double the length, Jaccard alone kept them three origins."""
+        article = zh(90, 2000)
+        self.collected("https://a.example.com/full", article)
+        self.collected("https://b.example.com/excerpt", article[500:1100])
+        self.collected("https://c.example.com/padded", zh(91, 3000) + article)
+        self.collected("https://d.example.com/snippet", article[0:200])   # wholly inside, but under contained_min: a short line is in everything
+        self.arrive()
+        full, excerpt, padded, snippet = (self.card(url)["doc_id"] for url in ("https://a.example.com/full", "https://b.example.com/excerpt", "https://c.example.com/padded", "https://d.example.com/snippet"))
+        self.assertEqual(self.grouping(), {frozenset({full, excerpt, padded}): "同一篇", frozenset({snippet}): "單獨"})
+        self.assertTrue(any("至少 300 字" in sentence for sentence in require("gather.grouping").items["rules"]))   # the rule shown says it
+
+    def test_a_copy_that_dates_itself_earlier_is_original_only_as_the_pages_own_claim(self):
+        """M4: the deciding date, when the page wrote it itself, is said to be its own claim."""
+        article = zh(93)
+        self.collected("https://a.example.com/1", article)
+        self.collect.captures["https://a.example.com/1"] = "2024-05-01"
+        self.collected("https://b.example.com/2", article[:390] + zh(94, 10), published_at="2020-01-01")
+        self.arrive()
+        self.assertEqual(self.cell("https://b.example.com/2", "original"), {"state": "查到", "value": "原始的", "why": "這一組裡最早出現的（這個日期是網頁自己寫的，不一定可信）"})
+        self.assertEqual(self.cell("https://a.example.com/1", "original")["why"], "同一篇在 2020-01-01 已經出現（這個日期是網頁自己寫的，不一定可信）")
+
+    def test_a_script_the_system_cannot_tell_is_uncheckable(self):
+        """minor 2: 查不到 would say we looked and there is none."""
+        self.assertEqual(hooks._language("ภาษาไทยเป็นภาษาราชการของประเทศไทย" * 3), {"state": "無法檢查", "why": "系統只分得出中文、英文、日文、韓文"})
+        self.assertEqual(hooks._language("12 345 678 -- 2026"), {"state": "查不到", "why": "網頁沒有文字"})
+
+    def test_an_edu_domain_says_school_but_not_a_country(self):
+        """minor 3 (source lists v2): .edu is not tied to one country."""
+        self.collected("https://www.example.edu/x", zh(95))
+        self.arrive()
+        self.assertEqual(self.cell("https://www.example.edu/x", "affiliation"), {"state": "查到", "value": "學校和研究機構", "why": ".edu 只發給學校和研究機構"})
+        self.assertEqual(self.cell("https://www.example.edu/x", "country"), FOUND_ITEM["country"])   # collect's answer, not the list's guess
+
+    def test_a_page_that_is_the_same_stored_text_as_another_cannot_be_split_from_it(self):
+        """minor 4: origins() keeps one snapshot in one origin, so such a split was accepted and then undone."""
+        article = zh(96)
+        self.collected("https://a.example.com/1", article)
+        self.collected("https://b.example.com/2", article)
+        self.collected("https://c.example.com/3", article[:390] + zh(97, 10))
+        self.arrive()
+        a, c = self.card("https://a.example.com/1")["doc_id"], self.card("https://c.example.com/3")["doc_id"]
+        refused = self.client.post(f"{self.base}/docs/gather.split", json={"content": {"cards": [a], "reason": "分開看"}})
+        self.assertEqual((refused.status_code, refused.json()["detail"].split(":")[0]), (400, "GATHER_SPLIT_SAME_PAGE"))
+        self.assertEqual(self.client.post(f"{self.base}/docs/gather.split", json={"content": {"cards": [c], "reason": "改寫過"}}).status_code, 200)
+
+    def test_an_aside_url_already_stored_gets_no_second_card_and_a_set_aside_page_stored_later_keeps_its_card(self):
+        """minor 6: both guards had no test."""
+        self.collected("https://a.example.com/1", zh(98))
+        self.arrive(aside=[{"url": "https://a.example.com/1", "title": "A", "reason": "抓不到內文"}])
+        self.assertEqual(len(self.cards()), 1)
+        self.arrive(aside=[{"url": "https://b.example.com/2", "title": "B", "reason": "抓不到內文"}])
+        aside = self.card("https://b.example.com/2")
+        source_id = self.collected("https://b.example.com/2", zh(99))
+        self.arrive()
+        stored = self.card("https://b.example.com/2")
+        self.assertEqual((stored["doc_id"], stored["version"], stored["content"]["source_id"], stored["content"].get("aside", "")), (aside["doc_id"], 2, source_id, ""))
+        self.assertEqual(len(self.cards()), 2)
+
+    def test_a_very_long_set_aside_url_is_one_card_however_often_it_arrives(self):
+        """minor 7: the card keeps 2048 characters of a URL; comparing the whole URL made a new card on every arrival."""
+        url = "https://a.example.com/" + "x" * 2100
+        for _ in range(3):
+            self.arrive(aside=[{"url": url, "title": "長網址", "reason": "抓不到內文"}])
+        self.assertEqual(len(self.cards()), 1)
+
+    def test_a_card_read_by_an_older_grouping_rule_gets_the_current_rules_stamp(self):
+        """grouping v2: 原始的還是轉貼的 is re-read on every run, so the card says which rule it was read by."""
+        self.collected("https://a.example.com/1", zh(100))
+        self.arrive()
+        card = self.card("https://a.example.com/1")
+        old = {**card["content"], "rules": {**card["content"]["rules"], "gather.grouping": {"version": "1", "fingerprint": "f34dbf8167ad"}}}
+        self.docs.save(self.tenant_id, self.owner, "gather.source", old, record_log.system("GATHER"), doc_id=card["doc_id"], base_version=card["version"])
+        self.arrive()
+        self.assertEqual(self.card("https://a.example.com/1")["content"]["rules"]["gather.grouping"]["version"], require("gather.grouping").version)
+
+
+class CardLimitTests(GatherCase):
+    """critic M5: a system record that grows with the case never reaches its field cap."""
+
+    def test_the_grouping_of_the_most_cards_a_case_can_hold_fits_its_field(self):
+        from ai_lego.core.domain import doc_kinds
+        from ai_lego.core.domain.kinds.gather import MAX_CASE_CARDS
+
+        worst = {"groups": [{"cards": [str(uuid.uuid4())], "how": "單獨"} for _ in range(MAX_CASE_CARDS)], "rules_version": "2"}
+        self.assertEqual(doc_kinds.validate("gather.origins", worst, "system")["groups"], worst["groups"])
+
+    def test_past_the_maximum_no_card_is_made_and_the_page_says_so(self):
+        from ai_lego.apps.api.blocks import gather as route
+
+        with mock.patch.object(hooks, "MAX_CASE_CARDS", 3), mock.patch.object(route, "MAX_CASE_CARDS", 3):
+            for index in range(3):
+                self.collected(f"https://a.example.com/{index}", zh(110 + index))
+            self.arrive()
+            self.collected("https://a.example.com/late", zh(120))
+            self.arrive(aside=[{"url": "https://b.example.com/aside", "title": "B", "reason": "抓不到內文"}])
+            self.arrive()
+            self.assertEqual(len(self.cards()), 3)
+            self.assertEqual(len(self.grouping()), 3)
+            limit = self.client.get(f"{self.base}/gather").json()["card_limit"]
+        self.assertEqual(limit, {"max": 3, "cards": 3, "uncarded": 1, "notice": "這個案子的來源卡已經到上限 3 張，之後存進來的網頁沒有做卡"})
+        self.assertEqual([origin["counts"] for origin in evidence.origins(self.docs, self.tenant_id, self.owner)], [True, True, True])   # the page with no card counts for nothing
+        self.assertEqual(self.client.get(f"{self.base}/gather").json()["card_limit"]["notice"], "")   # under the real maximum: no notice
+
+    def test_a_new_version_of_a_card_takes_no_room(self):
+        with mock.patch.object(hooks, "MAX_CASE_CARDS", 1):
+            self.collected("https://a.example.com/1", zh(130))
+            self.arrive()
+            self.collected("https://a.example.com/1", zh(130) + "（更正）")
+            self.arrive()
+        [card] = self.cards()
+        self.assertEqual(card["version"], 2)
 
 
 if __name__ == "__main__":

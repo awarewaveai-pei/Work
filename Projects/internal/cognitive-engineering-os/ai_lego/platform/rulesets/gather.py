@@ -7,11 +7,12 @@ from __future__ import annotations
 from ai_lego.platform.rulesets import Ruleset
 
 # 列在哪一份名單上（官方、媒體、學術、查核組織、內容農場）。A list with no maintained source starts empty and says why.
-SOURCE_LISTS = Ruleset("gather.source_lists", "GATHER", "來源名單", "1", "平台（第 2 步）；每份名單寫各自的維護者", [
+# A suffix maps to the one place it is only given in, or "" when it is not tied to one place (.edu: v2).
+SOURCE_LISTS = Ruleset("gather.source_lists", "GATHER", "來源名單", "2", "平台（第 2 步）；每份名單寫各自的維護者", [
     {"list": "政府網域", "category": "官方", "maintainer": "各國網域註冊單位（這些網域只發給政府機關）", "version": "2026-10",
      "suffixes": {".gov": "美國", ".gov.tw": "台灣", ".gov.uk": "英國", ".go.jp": "日本", ".gov.hk": "香港", ".gov.sg": "新加坡", ".gov.au": "澳洲", ".mil": "美國"}},
     {"list": "學術網域", "category": "學術", "maintainer": "各國網域註冊單位（這些網域只發給學校和研究機構）", "version": "2026-10",
-     "suffixes": {".edu": "美國", ".edu.tw": "台灣", ".ac.uk": "英國", ".ac.jp": "日本", ".edu.hk": "香港", ".edu.au": "澳洲"}},
+     "suffixes": {".edu": "", ".edu.tw": "台灣", ".ac.uk": "英國", ".ac.jp": "日本", ".edu.hk": "香港", ".edu.au": "澳洲"}},
     {"list": "媒體名單", "category": "媒體", "maintainer": "還沒有", "version": "", "domains": [],
      "empty_because": "平台還沒有找到有人維護、可以引用的媒體名單，所以這份名單是空的。"},
     {"list": "查核組織名單", "category": "查核組織", "maintainer": "還沒有", "version": "", "domains": [],
@@ -21,7 +22,7 @@ SOURCE_LISTS = Ruleset("gather.source_lists", "GATHER", "來源名單", "1", "�
 ])
 
 # 網站的名字像國際媒體或中立的新聞網站時，查這家媒體是不是真的存在: an outlet's own domains, from its own site.
-OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "1", "平台（第 2 步），從各媒體自己的網站抄錄網域", {
+OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "2", "平台（第 2 步），從各媒體自己的網站抄錄網域", {
     "outlets": [
         {"name": "BBC", "names": ["BBC", "英國廣播公司"], "domains": ["bbc.com", "bbc.co.uk"], "country": "英國"},
         {"name": "路透社", "names": ["Reuters", "路透"], "domains": ["reuters.com"], "country": "英國"},
@@ -54,22 +55,27 @@ OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "1", "平台
     # a site name with one of these words reads like a news outlet; one not on the list above cannot be checked
     "media_words": ["新聞", "日報", "時報", "晚報", "週刊", "周刊", "電視", "廣播", "通訊社", "News", "Times", "Post", "Daily", "Herald",
                     "Tribune", "Journal", "Gazette", "Press", "Media", "TV", "Radio"],
-    # a name shorter than this is not looked for inside a host (「AP」 is in every other host)
-    "min_host_name": 3,
+    # a name shorter than min_host_name is not looked for in a host (「AP」 is in every other host); one shorter than
+    # prefix_from must be a whole label piece (「voa」 is not in voachinese, 「pts」 not in ptsd): v2
+    "min_host_name": 3, "prefix_from": 5,
 })
 
 # 平台把「怎樣算同一組」的規則寫出來給你看: the numbers and the sentences the page shows come from here together.
-GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "1", "平台（第 2 步）", {
+GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "2", "平台（第 2 步）", {
     "shingle": 5, "compare_chars": 20000, "same_text": 0.8, "maybe_same": 0.5,
+    # v2: the share of the shorter page found in the longer one (an excerpt, a copy with more around it), when the shorter
+    # one has at least contained_min characters (a short boilerplate line is in everything)
+    "contained_min": 300,
     # two texts both longer than sample_above are compared on one in keep_one_in of their pieces (same pieces on both sides)
     "keep_one_in": 8, "sample_above": 2000,
     "order": ["同一篇", "同一張圖", "只互相引用", "可能同出處"],
     "rules": [
-        "同一篇：兩頁的文字有八成以上一樣（每 5 個字一段來比，只比前 20000 字）。",
-        "可能同出處：一樣的部分在五成到八成之間。系統拿不準是不是改寫，由你決定算不算。",
+        "同一篇：兩頁的文字有八成以上一樣；或較短的一頁（至少 300 字）有八成以上出現在另一頁裡，例如摘錄、前後加了別的內容的轉貼。每 5 個字一段來比，只比前 20000 字。",
+        "可能同出處：一樣的部分在五成到八成之間（兩種比法都算）。系統拿不準是不是改寫，由你決定算不算。",
         "同一張圖：兩頁的主圖是同一個網址。",
         "只互相引用：幾個網站對外的連結只連到彼此，沒有別的依據。",
         "一組裡有不同的理由時，標最拿不準的那一個。",
+        "只有「同一篇」的組才分原始的和轉貼的：最早出現的是原始的。最早的日期如果是網頁自己寫的，畫面會寫明，那不一定可信。",
         "分組不是刪除。組裡每一頁都還看得到，你可以拆開。",
     ],
 })
@@ -113,10 +119,10 @@ PLACE_LANGUAGES = Ruleset("gather.place_languages", "GATHER", "發生地的語�
 RULESETS = [SOURCE_LISTS, OUTLETS, GROUPING, PLACE_LANGUAGES]
 
 HISTORY = {
-    "gather.source_lists": {"1": "475d3ede5bdb"},
-    "gather.outlets": {"1": "a494e918033c"},
+    "gather.source_lists": {"1": "475d3ede5bdb", "2": "146bfc52ca8a"},
+    "gather.outlets": {"1": "a494e918033c", "2": "fb9c00d12bf6"},
     # retired 2026-10-04 (lookups moved to collect); a recorded version stays as it was (rulesets/__init__.py)
     "gather.registries": {"1": "2b04ec23212b"},
-    "gather.grouping": {"1": "f34dbf8167ad"},
+    "gather.grouping": {"1": "f34dbf8167ad", "2": "5795497cc81a"},
     "gather.place_languages": {"1": "279db02ce9fe"},
 }
