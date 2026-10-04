@@ -14,6 +14,7 @@ from ai_lego.modules.research.qualitative_coding import assemble_coding_outputs
 from ai_lego.modules.research.review import fixture_review
 from ai_lego.modules.research.synthetic_fixtures import SUGGESTED_LABEL
 from ai_lego.platform.ai_execution.gateway import AIGateway
+from ai_lego.platform.net import egress
 from tests.unit.test_ai_coding import UNITS, _StubGateway
 
 CODEBOOK = ["after_hours_monitoring", "emotional_exhaustion", "late_night_rumination"]
@@ -147,12 +148,12 @@ class AssembleWithModelSecondCoderTests(unittest.TestCase):
 class GatewayOptionsTests(unittest.TestCase):
     def test_ollama_payload_carries_seed_and_temperature_only_when_given(self):
         gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b"}})
-        with mock.patch("urllib.request.urlopen") as urlopen:
-            urlopen.return_value.__enter__.return_value.read.return_value = json.dumps({"message": {"content": "[]"}}).encode("utf-8")
+        with mock.patch.object(egress._LOOPBACK_OPENER, "open") as opened:
+            opened.return_value.__enter__.return_value.read.return_value = json.dumps({"message": {"content": "[]"}}).encode("utf-8")
             gateway.complete("local", system="s", prompt="p", seed=42, temperature=0.0)
-            with_options = json.loads(urlopen.call_args[0][0].data.decode("utf-8"))
+            with_options = json.loads(opened.call_args[0][0].data.decode("utf-8"))
             gateway.complete("local", system="s", prompt="p")
-            without_options = json.loads(urlopen.call_args[0][0].data.decode("utf-8"))
+            without_options = json.loads(opened.call_args[0][0].data.decode("utf-8"))
         self.assertEqual(with_options["options"], {"seed": 42, "temperature": 0.0})
         self.assertNotIn("options", without_options)
 

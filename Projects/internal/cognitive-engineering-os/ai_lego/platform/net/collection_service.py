@@ -16,6 +16,7 @@ from typing import Any, Callable, Mapping
 from ai_lego.platform.net.egress import fetch_json
 
 DEFAULT_COLLECTION_SERVICE_URL = "https://app.aware-wave.com"
+LOOKUP_ERRORS = "COLLECT_LOOKUP"   # egress.fetch_json raises COLLECT_LOOKUP_UNAVAILABLE (no answer) or _MALFORMED_RESPONSE (an answer)
 TIMEOUT_SECONDS = 20.0
 
 
@@ -45,7 +46,7 @@ class CollectionServiceClient:
             method="POST",
             headers={"Authorization": f"Bearer {self._token}"},
             body={"project_id": project_id, "kind": kind, "items": items},
-            error_prefix="COLLECT_LOOKUP",
+            error_prefix=LOOKUP_ERRORS,
         )
 
 

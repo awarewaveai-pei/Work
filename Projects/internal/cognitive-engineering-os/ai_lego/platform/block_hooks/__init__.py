@@ -24,6 +24,7 @@ from functools import lru_cache
 from typing import Any, Callable
 
 from ai_lego.data.events import record_log
+from ai_lego.errors import InvariantViolation
 from ai_lego.data.repositories.case_docs import CaseDocs
 
 _log = logging.getLogger(__name__)
@@ -98,10 +99,17 @@ def _run_after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, 
     registry = _registry("AFTER_SOURCES")
     order = [block for block in AFTER_SOURCES_ORDER if block in registry] + sorted(set(registry) - set(AFTER_SOURCES_ORDER))
     with _case_lock(tenant_id, owner):
+        if owner.kind == "case" and docs.reads.case(tenant_id, owner.id) is None:
+            return   # erased before this run's turn: nothing is written back
         for block in order:
             for fn in registry[block]:
                 try:
                     fn(docs, tenant_id, owner, arrived)
+                except InvariantViolation as error:
+                    if str(error).startswith("CASE_ERASED"):
+                        return   # erased while the hook ran: the repository refused the rest (完整刪除), nothing to report
+                    _log.exception("after_sources hook of %s failed for %s; the later hooks did not run", block, owner.id)
+                    return
                 except Exception:   # noqa: BLE001 -- logged, not swallowed: the sources are stored; this follow-up stops here
                     _log.exception("after_sources hook of %s failed for %s; the later hooks did not run", block, owner.id)
                     return

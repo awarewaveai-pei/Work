@@ -55,9 +55,10 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Literal
 from urllib.parse import urlparse
 
-from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 import yaml
 
@@ -69,7 +70,7 @@ from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.support import read_json
 import logging
 
-from ai_lego.errors import InvariantViolation
+from ai_lego.errors import InvariantViolation, case_gone
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
 from ai_lego.platform.entitlement.check import check_entitlement
@@ -1565,6 +1566,25 @@ def _domain_error_status(error: InvariantViolation) -> int:
     return 404 if "NOT_FOUND" in str(error) else 400
 
 
+@app.exception_handler(InvariantViolation)
+async def _case_gone_midway(request: Request, error: InvariantViolation) -> JSONResponse:
+    """A write that lost the race with the case's erasure (CASE_ERASED, SOURCE_PROJECT_NOT_FOUND) reaches no route's own
+    handler; it is a 404 like any other request for that case now, not a server error. Anything else is re-raised."""
+    if case_gone(error):
+        return JSONResponse(status_code=404, content={"detail": str(error)})
+    raise error
+
+
+@app.exception_handler(HTTPException)
+async def _case_gone_behind_a_status(request: Request, error: HTTPException) -> JSONResponse:
+    """The same rule where a route caught the error and chose its own status (ingest's 400, a block's 409 or 500): a case
+    erased while the request ran is a 404 whatever the route would have said (Codex 2026-10-04 F3). Routes keep no copy."""
+    cause = error.__cause__ or error.__context__
+    if isinstance(cause, InvariantViolation) and case_gone(cause):
+        return JSONResponse(status_code=404, content={"detail": str(cause)})
+    return await http_exception_handler(request, error)
+
+
 def _record_schema_properties(spec_root: Path, catalog: MethodCatalog, method_id: str) -> set[str] | None:
     """Top-level field names of ``method_id``'s own output record schema, or None when it cannot be
     resolved. Used to keep a next step's prefill/needs_input honest about the TARGET tool's real fields
@@ -2775,7 +2795,7 @@ def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: 
         _erase_case_runs(tenant_id, identity_id, project_id, artifact_store, failed)
         store.close_collect_grants_for_project(tenant_id, project_id)
         artifacts = delete_artifacts(tenant_id, artifact_store, repo.project_artifact_references(tenant_id, project_id), failed)
-        erased = repo.erase_project(tenant_id, project_id, identity_id, source_cas, artifacts)
+        erased = repo.erase_project(tenant_id, project_id, identity_id, source_cas, artifacts)   # later writes to the case: CASE_ERASED
     finally:
         synthesis_lock.release()
     return {"project_id": project_id, "erased": erased, **({"failed": failed} if failed else {})}

@@ -13,6 +13,13 @@ class InvariantViolation(RuntimeError):
     """A safety invariant, contract validation, or tenant boundary was violated."""
 
 
+CASE_GONE = ("CASE_ERASED", "SOURCE_PROJECT_NOT_FOUND")   # the case was erased while the request ran: a 404, like asking for it now
+
+
+def case_gone(error: BaseException) -> bool:
+    return str(error).startswith(CASE_GONE)
+
+
 class SpecRootNotFound(InvariantViolation):
     """The read-only spec root could not be located."""
 

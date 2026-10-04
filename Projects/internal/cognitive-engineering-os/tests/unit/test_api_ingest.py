@@ -76,6 +76,20 @@ class IngestApiTests(CollectionApiTestCase):
         events = self._repo.list_events(self.tenant["tenant_id"], f"source:{created}")
         self.assertEqual(events[-1]["event_type"], "SourceSuperseded")
 
+    def test_a_case_erased_while_the_batch_is_written_is_a_404_like_asking_for_it_now(self):
+        """Codex 2026-10-04 F3: the route turned CASE_ERASED into SOURCE_INGEST_REFUSED 400."""
+        real = ProjectSourceRepository.ingest_batch
+        tenant_id = self.tenant["tenant_id"]
+
+        def erased_first(repo, tenant, project_id, *args, **kwargs):
+            repo.erase_project(tenant_id, project_id, self.identity["identity_id"], self._source_cas, 0)
+            return real(repo, tenant, project_id, *args, **kwargs)
+
+        with patch.object(ProjectSourceRepository, "ingest_batch", erased_first):
+            response = self._ingest([c1("https://acme.example/a", "alpha")])
+        self.assertEqual(response.status_code, 404, response.text)
+        self.assertTrue(response.json()["detail"].startswith(("CASE_ERASED", "SOURCE_PROJECT_NOT_FOUND")), response.text)
+
     def test_a_bad_hash_refuses_the_whole_batch_before_any_write(self):
         response = self._ingest([c1("https://acme.example/a", "alpha"), c1("https://acme.example/b", "beta", content_sha256="0" * 64)])
         self.assertEqual(response.status_code, 400)

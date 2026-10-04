@@ -11,10 +11,10 @@ file S owns.
 | Owner | Files |
 |---|---|
 | S | `platform/evidence.py`, `platform/rulesets/__init__.py`, `ai_gate.py`, `block_hooks/__init__.py`, `apps/api/blocks/ai.py`, `doc_kinds.py`, `record_log.py`, `case_docs.py`, `main.py`, `kinds/assembler.py`, `lib/blocks.ts`, `BlockShell.tsx`, the step-1 block pages (MAP/THINK/DECIDE/ACT/LEARN read the new results — S builds that), `lib/errors.ts` (see §9) |
-| 甲 GATHER | `kinds/gather.py` (add kinds below the frozen ones), `ai_actions/gather.py`, `block_hooks/gather.py`, `apps/api/blocks/gather.py`, `platform/rulesets/gather.py`, `platform/net/{rdap,wayback}.py`, page `GatherPage.tsx` + route, `tests/unit/test_block_gather.py` |
-| 乙 VERIFY | `kinds/verify.py` (add below the frozen ones), `ai_actions/verify.py`, `block_hooks/verify.py`, `apps/api/blocks/verify.py`, `platform/rulesets/verify.py`, `platform/net/{claimreview,cofacts}.py`, page `VerifyPage.tsx` + route, `tests/unit/test_block_verify.py` |
+| 甲 GATHER | `kinds/gather.py` (add kinds below the frozen ones), `ai_actions/gather.py`, `block_hooks/gather.py`, `apps/api/blocks/gather.py`, `platform/rulesets/gather.py`, page `GatherPage.tsx` + route, `tests/unit/test_block_gather.py` |
+| 乙 VERIFY | `kinds/verify.py` (add below the frozen ones), `ai_actions/verify.py`, `block_hooks/verify.py`, `apps/api/blocks/verify.py`, `platform/rulesets/verify.py`, page `VerifyPage.tsx` + route, `tests/unit/test_block_verify.py` |
 | 丙 COMPUTE | `kinds/compute.py` (add below the frozen ones), `ai_actions/compute.py`, `block_hooks/compute.py`, `apps/api/blocks/compute.py`, `platform/rulesets/compute.py`, page `ComputePage.tsx` + route, `tests/unit/test_block_compute.py` |
-| 丁 collector wire | next-admin `lib/collect/**` (§4.1), in `main.py` only `IngestSource`, `IngestRequest`, `CollectionCompleteRequest`, `ingest_sources`, `complete_collection`, `_research_seeds`; `specs/wire/collector.v2.json` (examples both sides test against); tests on both sides |
+| 丁 collector wire | next-admin `lib/collect/**` (§4.1), in `main.py` only `IngestSource`, `IngestRequest`, `CollectionCompleteRequest`, `ingest_sources`, `complete_collection`, `_research_seeds`; `specs/wire/collector.v2.json` (examples both sides test against); next-admin `lib/collect/lookups/**` + `app/api/internal/collect/lookups` (§4.2); tests on both sides |
 
 ## 2. Words and states (one place: `core/domain/evidence_words.py`, re-exported by `platform/evidence.py`; never retype them)
 
@@ -103,6 +103,13 @@ an error that takes the evidence read down.
   [{provider, lang, state: ok|unreachable|no_key, why}] — both reach `after_sources` as `arrived["aside"]` and
   `arrived["channels"]`.
 
+### 4.2 Lookups, version 1 (amended 2026-10-04: every outside question is asked of collect)
+
+- Registry and archive facts about a page (`describe`) and fact-check databases (`factcheck`) are asked of collect at
+  `POST /api/internal/collect/lookups`, contract and examples in `specs/wire/lookup.v1.json` (R1-R9), through the one
+  engine module `platform/net/collect_lookups.py` (S owns it). It never raises: collect down or an answer out of shape =
+  無法檢查 with why. Lists and thresholds (registries, country names, match share, hit cap) live in collect only.
+
 ## 5. The AI and sources
 
 - An AI action that reads sources sets `AiAction.cites = True` and lists `gather.source` in `reads` (never
@@ -113,6 +120,7 @@ an error that takes the evidence read down.
   saved. An output kind with a `citations` field or a `Field(cited=True)` can only be written by a `cites` action.
 - A card line 「交還控制：…AI 停下來」 is `AiAction.handback(context, read) -> str | None`, checked after the crisis check
   (a person in crisis gets help, not a hand-back) and before any model call: `{"handback": reason}`, nothing paid for.
+- Someone else's words the person brought (a pasted message) are a stored record whose kind declares `others_words`; an action returns its doc ids from `AiAction.quoted(context, read)` and never puts the words in `build_input`. The gate reads the text itself and adds it after the crisis check, fenced as QUOTED (amended 2026-10-04: a rumour that mentions 自殺 is not the person's crisis signal; no request text can take this way round the check). A case's records are written only while the case exists (`CASE_ERASED`, checked inside the writer's transaction).
 - `build_input` and `handback` count through `read.evidence.origins() / .claims() / .calcs()` (only for kinds the
   action lists in `reads`), never by reading the kinds and recounting.
 - The AI never writes a source card, a mark, a verdict, a claim the person has not confirmed, or a number.
@@ -125,14 +133,20 @@ an error that takes the evidence read down.
 - Every card, ledger line and run stores `ruleset.stamp()` (name, version, fingerprint); GOVERN's versions page lists
   every ruleset. A recorded HISTORY entry is never edited (a test compares it with the last commit).
 
-## 7. Outside services (one module each under `platform/net/`)
+## 7. Outside services: none in the engine (amended 2026-10-04)
 
-- Only through `egress.fetch_json`. A new host goes into `docker-compose.yml` `COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST`
-  and policy `EGRESS-EC99-2` in the same commit (`test_egress_allowlist_parity`). A host per registry (RDAP) is a list;
-  a registry not on it is 無法檢查.
-- Tests never touch the network: patch `egress.fetch_json`. One real call per service is made once by hand and its
-  command + result go in your report.
-- A key the platform does not have (Google Fact Check) = that service is 無法檢查 「平台還沒有這個金鑰」.
+- The engine reaches only two hosts: the AI provider and collect. Every other outside question is a collect lookup
+  (§4.2); a new kind of question = a new lookup kind in the spec (version bump), never engine code. Operator 2026-09-17:
+  the platform has no data collection of its own; 2026-10-04, why: each LEGO block is built separately and then chained,
+  collect is the searcher block.
+- Gate: `test_egress_allowlist_parity` requires the engine's runtime allowlist to be exactly those two hosts (policy
+  `EGRESS-EC99-2` is the ceiling for several services and contains them), and `platform/net/` to hold only `egress`,
+  `collection_service` and `collect_lookups`.
+- Root cause on record: this section first read "one module each under `platform/net/`" and invited four outside
+  lookups into the engine (RDAP, Wayback, ClaimReview, Cofacts); they moved to collect the same day.
+- Tests never touch the network: a fake lookup client fed from the spec's examples. One real call per lookup is made once
+  on the collect side and its result goes in the report.
+- A key the platform does not have (Google Fact Check) = that database is 無法檢查 「平台還沒有這個金鑰」.
 
 ## 8. Slots, proposals, packages
 

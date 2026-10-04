@@ -25,6 +25,7 @@ from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.platform.rulesets import rulesets
 from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowRepository
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
+from tests.unit.case_fixture import a_case
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import safety
 from ai_lego.platform.ai_actions.govern import TOPICS
@@ -98,7 +99,7 @@ class RecognitionHookTests(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.repo = ProjectSourceRepository(Path(self._tmp.name) / "p.sqlite3")
         self.docs = CaseDocs(self.repo)
-        self.owner = record_log.case("C1")
+        self.owner = a_case(self.repo, "t", "C1")
 
     def tearDown(self):
         self._tmp.cleanup()

@@ -170,13 +170,22 @@ class _NoModel:
     complete_json = complete
 
 
+def _a_case(repo: ProjectSourceRepository, case: str) -> str:
+    """A real case in the check's own temporary file: a case's records are written only while the case exists (CASE_ERASED)."""
+    repo.create_project({"project_id": case, "tenant_id": "integrity", "workspace_id": "integrity", "name": case, "purpose": "integrity check",
+                         "data_classification": "Confidential", "status": "active", "version": 1, "created_by_identity_id": "integrity",
+                         "created_at": "2026-10-04T00:00:00Z"})
+    return case
+
+
 def crisis_stops_ai(snap: Snapshot, block: str) -> list[str]:
     """Runs the real gate: each action is fed one crisis sentence in place of its own input, with a provider that must not be called."""
     problems = []
     with tempfile.TemporaryDirectory() as folder:
-        docs = CaseDocs(ProjectSourceRepository(Path(folder) / "integrity.sqlite3"))
+        repo = ProjectSourceRepository(Path(folder) / "integrity.sqlite3")
+        docs = CaseDocs(repo)
         for action in snap.actions_of(block):
-            case = f"integrity-{action.block}-{action.name}"
+            case = _a_case(repo, f"integrity-{action.block}-{action.name}")
             probe = dataclasses.replace(action, build_input=lambda context, read: "我想結束自己")
             if probe.needs not in ALWAYS:
                 docs.save("integrity", record_log.case(case), "collab_contract.terms", {"permissions": [probe.needs]}, record_log.user("integrity", "COLLAB_CONTRACT"))
@@ -285,6 +294,7 @@ def crisis_on_save(snap: Snapshot, block: str) -> list[str]:
 
     with tempfile.TemporaryDirectory() as folder:
         repo = ProjectSourceRepository(Path(folder) / "integrity.sqlite3")
+        _a_case(repo, "integrity")
         doc = {"doc_id": "integrity", "kind": "sense.card", "version": 1, "content": {"category": "感受", "text": "我想結束自己"}, "author": "user", "block": "SENSE", "at": ""}
         try:
             notices = _saved(repo, {"tenant_id": "integrity", "identity_id": "integrity"}, record_log.case("integrity"), doc)["notices"]

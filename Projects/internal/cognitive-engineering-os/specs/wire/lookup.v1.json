@@ -6,7 +6,7 @@
   "auth": "Authorization: Bearer <COLLECT_RESEARCH_RUNS_TOKEN>, the same token and the same base URL (COGNITIVE_OS_COLLECTION_SERVICE_URL) as /api/internal/collect/runs. No token on either side = 401 / the engine does not call.",
   "engine_timeout_seconds": 45,
   "states": {"found": "查到", "not_found": "查不到", "uncheckable": "無法檢查"},
-  "cell": "{\"state\", \"value\"?, \"why\"?}. 查到 carries a non-empty value. 查不到 and 無法檢查 carry a non-empty why in plain Chinese that says what happened. No other keys.",
+  "cell": "{\"state\", \"value\"?, \"why\"?}. 查到 carries a non-empty value. 查不到 and 無法檢查 carry a non-empty why in plain Chinese that says what happened, and no value. No other keys.",
   "kinds": {
     "describe": {
       "max_items": 25,
@@ -41,7 +41,7 @@
     "R4 collect keeps nothing from the case. project_id is for its rate limit and log only. The ClaimReview mirror is a public dataset collect refreshes once a day on its own schedule (the hourly collection heartbeat), never per case.",
     "R5 Matching thresholds and lists live in collect only: RDAP registry list and country names, ClaimReview minimum overlap 0.6 (share of the claim's 3-character pieces), Cofacts minimumShouldMatch 50%, at most 5 hits per database. The engine never sends or stores them.",
     "R6 Every outside call in collect goes through collect's own fetcher (lib/collect/net): its address guard, per-host rate limit and timeouts.",
-    "R7 The engine, when collect fails as a whole (no token, unreachable, 401, 5xx, timeout, an answer not in this shape): every describe cell is 無法檢查 「蒐集器這次沒有回應」, every fact-check db is 無法檢查 with the same why. It never raises out of a hook and never retries inside the same run.",
+    "R7 The engine, when collect cannot be asked or does not answer (no token, unreachable, 401, 5xx, timeout): every describe cell is 無法檢查 「蒐集器這次沒有回應」, every fact-check db is 無法檢查 with the same why, and the run's later describe batches are not asked. An answer that came back but is not in this shape (not JSON, too large, wrong kind or item count) is 無法檢查 「蒐集器的回答格式不對」 for that request only. It never raises out of a hook and never retries inside the same run.",
     "R8 The engine checks every cell with evidence_words.cell(); a malformed cell becomes 無法檢查 「蒐集器的回答格式不對」. It asks once per site per hook run.",
     "R9 The engine's egress allowlist keeps only the AI provider and the collect service. RDAP hosts, archive.org, storage.googleapis.com and api.cofacts.tw leave docker-compose.yml and policies/ai-execution/network-egress.yaml; the engine has no platform/net/rdap.py, wayback.py, claimreview.py or cofacts.py."
   ],

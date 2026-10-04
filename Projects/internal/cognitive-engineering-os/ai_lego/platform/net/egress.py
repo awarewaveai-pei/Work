@@ -2,13 +2,16 @@
 so the AI gateway shares one allowlist instead of a second copy).
 
 Traps for future readers:
-- ``fetch_json`` is the only place ``_OPENER.open`` is called; tests patch ``_OPENER.open`` or ``fetch_json``.
-- Redirects are re-gated per hop by ``_NoCrossHostRedirects`` -- do not build a second opener.
+- ``_read`` is the only place a connection is opened in the engine (test_egress_allowlist_parity): ``fetch_json`` for
+  allowlisted https hosts, ``fetch_loopback_json`` for a model served on this machine. Tests patch ``_OPENER.open``,
+  ``_LOOPBACK_OPENER.open`` or the two functions.
+- Redirects are re-gated per hop by ``_NoCrossHostRedirects``; the loopback opener follows none and uses no proxy.
 """
 
 from __future__ import annotations
 
 import http.client
+import ipaddress
 import json
 import os
 import time
@@ -70,6 +73,26 @@ class _NoCrossHostRedirects(urllib.request.HTTPRedirectHandler):
 _OPENER = urllib.request.build_opener(_NoCrossHostRedirects)
 
 
+class _NoRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401 -- urllib hook signature
+        raise InvariantViolation(f"NETWORK_EGRESS_DENIED: a service on this machine redirected to {newurl!r}")
+
+
+def _direct_opener() -> urllib.request.OpenerDirector:
+    """No proxy (one from the environment would carry the words off the machine) and no redirect."""
+    return urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirects)
+
+
+_LOOPBACK_OPENER = _direct_opener()
+
+
+def _loopback(host: str) -> bool:
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False   # a name: a hosts file or DNS can point it anywhere
+
+
 def fetch_json(
     url: str,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
@@ -96,10 +119,36 @@ def fetch_json(
     if body is not None:
         data = json.dumps(body).encode("utf-8")
         request_headers.setdefault("Content-Type", "application/json")
-    request = urllib.request.Request(url, data=data, headers=request_headers, method=method)
+    return _read(_OPENER, urllib.request.Request(url, data=data, headers=request_headers, method=method), host, timeout, max_bytes, error_prefix)
+
+
+def fetch_loopback_json(
+    url: str,
+    timeout: float = DEFAULT_TIMEOUT_SECONDS,
+    *,
+    method: str = "GET",
+    body: dict[str, Any] | None = None,
+    max_bytes: int = MAX_BODY_BYTES,
+    error_prefix: str = "LOOPBACK",
+) -> dict[str, Any]:
+    """A model served on this machine (Ollama): http(s) to a loopback address literal only, no proxy, no redirect. The
+    words never leave the machine, so no allowlist entry is involved; any other host is refused before any I/O."""
+    parts = urllib.parse.urlsplit(url)
+    host = parts.hostname or ""
+    if parts.scheme not in ("http", "https") or not _loopback(host):
+        raise InvariantViolation(f"NETWORK_EGRESS_DENIED: a model on this machine is reached at 127.0.0.1 or ::1 only, got {url!r}")
+    headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    return _read(_LOOPBACK_OPENER, urllib.request.Request(url, data=data, headers=headers, method=method), host, timeout, max_bytes, error_prefix)
+
+
+def _read(opener: urllib.request.OpenerDirector, request: urllib.request.Request, host: str, timeout: float, max_bytes: int, error_prefix: str) -> dict[str, Any]:
     started = time.monotonic()
     try:
-        with _OPENER.open(request, timeout=timeout) as response:  # noqa: S310 -- host allowlisted; redirects re-gated
+        with opener.open(request, timeout=timeout) as response:  # noqa: S310 -- host checked by the caller; redirects gated
             raw = response.read(max_bytes + 1)
     except urllib.error.HTTPError as error:
         raise InvariantViolation(f"{error_prefix}_UNAVAILABLE: HTTP {error.code} from {host}") from None

@@ -15,7 +15,7 @@ from typing import Any, Mapping, Protocol
 
 from ai_lego.core.domain.evidence_words import FOUND, NOT_FOUND, UNCHECKABLE, cell
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform.net.collection_service import collection_service_from_env
+from ai_lego.platform.net.collection_service import LOOKUP_ERRORS, collection_service_from_env
 
 _log = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ MALFORMED = "蒐集器的回答格式不對"
 DESCRIBE_CELLS = ("registered", "country", "first_archived")
 DBS = ("claimreview", "cofacts")
 MAX_DESCRIBE = 25
+MAX_VALUE, MAX_WHY = 200, 300   # collect's words in a cell; ten cells stay far under gather.source's cells cap
 MAX_TEXT = 4000
 TIMEOUT_SECONDS = 45.0
 _HIT_KEYS = {
@@ -40,30 +41,33 @@ class LookupClient(Protocol):
 _FROM_ENV = object()
 
 
-def _ask(client: Any, project_id: str, kind: str, items: list[dict[str, Any]]) -> list[Any] | None:
-    """The answer's items when collect answered in shape (one per item), else ``None`` (logged, never raised)."""
+def _ask(client: Any, project_id: str, kind: str, items: list[dict[str, Any]]) -> tuple[list[Any] | None, str]:
+    """(the answer's items, "") when collect answered in shape (one per item), else (None, DOWN or MALFORMED) -- logged,
+    never raised."""
     if client is _FROM_ENV:
         client = collection_service_from_env()
     if client is None:
         _log.warning("collect lookup %s skipped: COLLECT_RESEARCH_RUNS_TOKEN is not set", kind)
-        return None
+        return None, DOWN
     try:
         answer = client.lookup(project_id, kind, items, TIMEOUT_SECONDS)
     except InvariantViolation as error:
         _log.warning("collect lookup %s failed: %s", kind, error)
-        return None
+        answered = str(error).startswith(f"{LOOKUP_ERRORS}_MALFORMED_RESPONSE")   # a body that is not JSON or too large (R7)
+        return None, MALFORMED if answered else DOWN
     listed = answer.get("items") if isinstance(answer, Mapping) and answer.get("kind") == kind else None
     if not isinstance(listed, list) or len(listed) != len(items):
         _log.warning("collect lookup %s answered out of shape", kind)
-        return None
-    return listed
+        return None, MALFORMED
+    return listed, ""
 
 
 def _cell(value: Any) -> dict[str, str]:
     try:
         if not isinstance(value, Mapping) or set(value) - {"state", "value", "why"}:
             raise InvariantViolation("shape")
-        return cell(value.get("state"), value.get("value"), value.get("why"))
+        given, why = value.get("value"), value.get("why")
+        return cell(value.get("state"), given.strip()[:MAX_VALUE] if isinstance(given, str) else given, why.strip()[:MAX_WHY] if isinstance(why, str) else why)
     except InvariantViolation:
         return cell(UNCHECKABLE, why=MALFORMED)
 
@@ -77,13 +81,15 @@ def describe(project_id: str, urls: list[str], *, client: Any = _FROM_ENV) -> di
     of MAX_DESCRIBE. A batch collect did not answer is 無法檢查 「蒐集器這次沒有回應」."""
     distinct = list(dict.fromkeys(url for url in urls if isinstance(url, str) and url))
     out: dict[str, dict[str, Any]] = {}
+    down = False
     for start in range(0, len(distinct), MAX_DESCRIBE):
         batch = distinct[start:start + MAX_DESCRIBE]
-        listed = _ask(client, project_id, "describe", [{"url": url} for url in batch])
+        listed, why = (None, DOWN) if down else _ask(client, project_id, "describe", [{"url": url} for url in batch])
+        down = why == DOWN   # collect did not answer: the rest of this run is not asked again (each ask may wait the full timeout)
         for index, url in enumerate(batch):
             item = listed[index] if listed is not None else None
             if listed is None:
-                out[url] = _unchecked(url, DOWN)
+                out[url] = _unchecked(url, why)
             elif not isinstance(item, Mapping) or item.get("url") != url or not isinstance(item.get("site"), str):
                 out[url] = _unchecked(url, MALFORMED)
             else:
@@ -129,10 +135,10 @@ def _unchecked_db(db: str, why: str) -> dict[str, Any]:
 def factcheck(project_id: str, text: str, *, client: Any = _FROM_ENV) -> list[dict[str, Any]]:
     """One entry per database in DBS order: ``{"db", "state", "why"?, "attribution", "hits"}``. 查到 always has at
     least one hit; anything else collect said is kept with its why."""
-    listed = _ask(client, project_id, "factcheck", [{"text": text[:MAX_TEXT]}])
+    listed, why = _ask(client, project_id, "factcheck", [{"text": text[:MAX_TEXT]}])
     item = listed[0] if listed else None
     if listed is None:
-        return [_unchecked_db(db, DOWN) for db in DBS]
+        return [_unchecked_db(db, why) for db in DBS]
     answered = item.get("dbs") if isinstance(item, Mapping) and item.get("text") == text[:MAX_TEXT] else None
     by_db = {entry.get("db"): entry for entry in answered if isinstance(entry, Mapping)} if isinstance(answered, list) else {}
     out = []

@@ -90,7 +90,7 @@ KINDS = [
         "form": Field("choice", choices=MESSAGE_FORMS, required=True, labels=MESSAGE_FORMS),
         "url": Field("text", 2048, scan=False),
         "sha256": Field("text", 64, required=True, scan=False),
-    }, deletable=False),
+    }, deletable=False, others_words="text"),
     # 先停一下，寫下第一反應和信心: until it exists nothing about the message is shown or asked of the AI
     DocKind("verify.first", "VERIFY", "你的第一反應", {
         "message": Field("text", 64, required=True, scan=False),

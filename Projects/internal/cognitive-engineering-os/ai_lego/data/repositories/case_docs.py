@@ -29,6 +29,11 @@ class CaseDocs:
     def __init__(self, repo: ProjectSourceRepository) -> None:
         self._repo = repo
 
+    @property
+    def reads(self) -> "CaseReads":
+        """What block hooks may read beside the docs: the case itself, its stored pages, their events, its collection runs."""
+        return CaseReads(self._repo)
+
     @staticmethod
     def _history(connection: sqlite3.Connection, tenant_id: str, owner: Owner, doc_id: str) -> list[dict[str, Any]]:
         rows = connection.execute(
@@ -46,6 +51,8 @@ class CaseDocs:
         (AI 起草、你改過的算「共同」)."""
         spec = doc_kinds.require(kind)
         with self._repo.transaction() as connection:
+            if owner.kind == "case":
+                self._repo.require_case(connection, tenant_id, owner.id)
             if doc_id is None:
                 if spec.singleton and self._live_ids(connection, tenant_id, owner, kind):
                     raise InvariantViolation(f"DOC_SINGLETON_EXISTS: there is already a {kind}; save a new version of it")
@@ -63,6 +70,8 @@ class CaseDocs:
                 writer = Writer("ai", writer.block) if clean == previous["content"] and previous["author"] == "ai" else Writer("joint", writer.block, writer.identity_id)
             event = record_log.append(connection, tenant_id, f"doc:{doc_id}", "DocSaved", {"kind": spec.kind, "doc_id": doc_id, "version": version, "content": clean},
                                       writer=writer, owner=owner)
+            if spec.from_case:   # a person's record made from one case goes with that case (erase_project): checked after the
+                self._repo.require_case(connection, tenant_id, clean[spec.from_case])   # writer's own checks; a refusal rolls the save back
         return {"doc_id": doc_id, "kind": kind, "version": version, "content": clean, "author": writer.author, "block": writer.block, "at": event["occurred_at"], "deleted": False}
 
     @staticmethod
@@ -82,6 +91,8 @@ class CaseDocs:
         card was removed without showing what it said."""
         spec = doc_kinds.require(kind)
         with self._repo.transaction() as connection:
+            if owner.kind == "case":
+                self._repo.require_case(connection, tenant_id, owner.id)
             history = [item for item in self._history(connection, tenant_id, owner, doc_id) if not item["deleted"]]
             if not history or history[-1]["kind"] != kind:
                 raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
@@ -135,3 +146,25 @@ class CaseDocs:
         if not history or history[-1]["kind"] != kind:
             raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
         return history
+
+
+class CaseReads:
+    """Read-only: the repository's readers a block hook needs, and nothing that writes."""
+
+    def __init__(self, repo: ProjectSourceRepository) -> None:
+        self._repo = repo
+
+    def case(self, tenant_id: str, project_id: str) -> dict[str, Any] | None:
+        return self._repo.get_project(tenant_id, project_id)
+
+    def sources(self, tenant_id: str, project_id: str) -> list[dict[str, Any]]:
+        return self._repo.list_sources(tenant_id, project_id)
+
+    def source_text(self, cas: Any, tenant_id: str, project_id: str) -> Any:
+        return self._repo.active_source_reader(cas, tenant_id, project_id)
+
+    def events(self, tenant_id: str, aggregate_id: str) -> list[dict[str, Any]]:
+        return self._repo.list_events(tenant_id, aggregate_id)
+
+    def collection_run(self, tenant_id: str, project_id: str, run_id: str) -> dict[str, Any] | None:
+        return self._repo.get_collection_run(tenant_id, project_id, run_id)

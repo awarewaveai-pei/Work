@@ -66,13 +66,16 @@ _SPACE_IN_CJK = re.compile(rf"(?<=[{_CJK}])\s+(?=[{_CJK}])")
 
 
 def cell(state: str, value: str | None = None, why: str | None = None) -> dict[str, str]:
-    """One cell: 查到 carries a value; 查不到 and 無法檢查 carry why (「這裡連不上 X」, 「平台還沒有這個金鑰」)."""
+    """One cell: 查到 carries a value; 查不到 and 無法檢查 carry why (「這裡連不上 X」, 「平台還沒有這個金鑰」) and no value --
+    a value beside 查不到 would be shown as if something were found."""
     if state not in STATES:
         raise InvariantViolation(f"EVIDENCE_CELL_INVALID: state is one of {list(STATES)}")
     if state == FOUND and not (isinstance(value, str) and value.strip()):
         raise InvariantViolation("EVIDENCE_CELL_INVALID: 查到 needs what was found")
     if state != FOUND and not (isinstance(why, str) and why.strip()):
         raise InvariantViolation(f"EVIDENCE_CELL_INVALID: {state} needs why")
+    if state != FOUND and value is not None:
+        raise InvariantViolation(f"EVIDENCE_CELL_INVALID: {state} has no value")
     out = {"state": state}
     if value is not None:
         out["value"] = value

@@ -10,7 +10,9 @@ that assumption true.
 
 Two providers, both real:
 
-* ``anthropic`` -- cloud API via the ``anthropic`` SDK. The key is supplied
+* ``anthropic`` -- cloud API through the platform's one Anthropic seam (``ai_gateway.provider.AnthropicProvider``:
+  the egress allowlist, no SDK; until 2026-10-04 the SDK, which also took ANTHROPIC_BASE_URL from the environment and
+  so could send a prompt anywhere -- Codex F1). The key is supplied
   by the CALLER at construction time (``AIGateway(registry, api_key=...)``),
   never read from ``ANTHROPIC_API_KEY`` in the process environment. This
   mirrors ``lobster-factory``'s meeting-service (``lib/settings.py``): that
@@ -23,8 +25,8 @@ Two providers, both real:
   The BYOK settings surface (where the key comes from) is out of this
   module's scope -- see meeting-service's ``/api/settings`` for the
   reference UI pattern this Gateway is designed to sit behind.
-* ``ollama`` -- local HTTP to 127.0.0.1 (default port 11434), no network
-  egress, no key. Chosen for the "resident data never leaves this machine"
+* ``ollama`` -- local HTTP to a loopback address only (``egress.fetch_loopback_json``; an ``endpoint.uri`` on any
+  other host, a name included, is refused), no network egress, no key. Chosen for the "resident data never leaves this machine"
   posture (``policies/ai-execution/network-egress.yaml``); quality is lower
   than the cloud model, which is why the caller picks per ``model_profile_id``
   rather than this module silently preferring one.
@@ -59,14 +61,13 @@ silently skipped.
 
 from __future__ import annotations
 
-import json
 import time
-import urllib.error
-import urllib.request
 from dataclasses import dataclass
 from typing import Any
 
 from ai_lego.errors import AdapterUnavailable, InvariantViolation
+from ai_lego.platform.ai_gateway.provider import AnthropicProvider
+from ai_lego.platform.net.egress import fetch_loopback_json
 
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_ANTHROPIC_MODEL_MAX_TOKENS = 4096
@@ -144,25 +145,19 @@ class AIGateway:
         api_key = self._api_key
         if not api_key:
             raise AdapterUnavailable("ANTHROPIC_API_KEY_MISSING: construct AIGateway(..., api_key=...) with a caller-supplied key before selecting an 'anthropic' model profile -- this Gateway does not read ANTHROPIC_API_KEY from the environment (see module docstring)")
-        try:
-            import anthropic
-        except ImportError as error:
-            raise AdapterUnavailable("ANTHROPIC_SDK_MISSING: pip install anthropic") from error
-        client = anthropic.Anthropic(api_key=api_key)
         started = time.monotonic()
         try:
-            response = client.messages.create(model=entry["model_identifier"], max_tokens=max_tokens, system=system, messages=[{"role": "user", "content": prompt}])
-        except anthropic.APIError as error:
+            completion = AnthropicProvider(api_key, entry["model_identifier"]).complete(system, prompt, max_tokens=max_tokens)
+        except InvariantViolation as error:
             raise AdapterUnavailable(f"ANTHROPIC_CALL_FAILED: {error}") from error
         latency_ms = int((time.monotonic() - started) * 1000)
-        text = "".join(block.text for block in response.content if getattr(block, "type", None) == "text")
         return GatewayResult(
-            text=text,
+            text=completion.text,
             provider="anthropic",
             model_identifier=entry["model_identifier"],
             model_profile_id=model_profile_id,
-            input_tokens=response.usage.input_tokens,
-            output_tokens=response.usage.output_tokens,
+            input_tokens=completion.input_tokens,
+            output_tokens=completion.output_tokens,
             latency_ms=latency_ms,
             trace_id=trace_id,
             prompt_version=prompt_version,
@@ -182,13 +177,12 @@ class AIGateway:
         }
         if options:
             body_out["options"] = options
-        payload = json.dumps(body_out).encode("utf-8")
-        request = urllib.request.Request(f"{base_url.rstrip('/')}/api/chat", data=payload, headers={"Content-Type": "application/json"}, method="POST")
         started = time.monotonic()
         try:
-            with urllib.request.urlopen(request, timeout=180) as response:
-                body = json.loads(response.read().decode("utf-8"))
-        except urllib.error.URLError as error:
+            body = fetch_loopback_json(f"{base_url.rstrip('/')}/api/chat", 180, method="POST", body=body_out, error_prefix="OLLAMA")
+        except InvariantViolation as error:
+            if not str(error).startswith("OLLAMA_UNAVAILABLE"):
+                raise   # not on this machine, or not JSON: named as it is
             raise AdapterUnavailable(f"OLLAMA_UNAVAILABLE: could not reach {base_url} ({error}) -- is the Ollama service running?") from error
         latency_ms = int((time.monotonic() - started) * 1000)
         if "error" in body:
@@ -208,10 +202,8 @@ class AIGateway:
 
 def ollama_available(base_url: str = DEFAULT_OLLAMA_BASE_URL) -> tuple[bool, str]:
     """Availability probe mirroring ``WindowsSapiSpeechAudioFactory.availability()``'s (bool, reason) shape."""
-    request = urllib.request.Request(f"{base_url.rstrip('/')}/api/version", method="GET")
     try:
-        with urllib.request.urlopen(request, timeout=5) as response:
-            body = json.loads(response.read().decode("utf-8"))
-        return True, f"ollama {body.get('version', 'unknown')} at {base_url}"
-    except urllib.error.URLError as error:
+        body = fetch_loopback_json(f"{base_url.rstrip('/')}/api/version", 5, error_prefix="OLLAMA")
+    except InvariantViolation as error:
         return False, f"could not reach {base_url}: {error}"
+    return True, f"ollama {body.get('version', 'unknown')} at {base_url}"

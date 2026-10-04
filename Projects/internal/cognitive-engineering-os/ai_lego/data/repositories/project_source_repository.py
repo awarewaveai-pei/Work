@@ -328,8 +328,20 @@ class ProjectSourceRepository:
         return self._write_transaction()
 
     @staticmethod
+    def require_case(connection: sqlite3.Connection, tenant_id: str, project_id: str) -> None:
+        """A case's records are written only while the case exists (完整刪除): late writers get CASE_ERASED. The check
+        must hold the write lock to be atomic with erase_project, so a connection with no transaction open takes it here
+        (BEGIN IMMEDIATE; a connection that already wrote holds it). A plain SELECT under a deferred transaction would
+        let an erase commit between the check and the write (critic 2026-10-04, probe P4)."""
+        if not connection.in_transaction:
+            connection.execute("BEGIN IMMEDIATE")
+        if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=? AND project_id=?", (tenant_id, project_id)).fetchone() is None:
+            raise InvariantViolation(f"CASE_ERASED: case {project_id!r} no longer exists; nothing is written to it")
+
+    @staticmethod
     def _append_event(connection: sqlite3.Connection, tenant_id: str, project_id: str, aggregate_id: str, event_type: str, payload: Mapping[str, Any], writer: Writer) -> None:
         """Every record of this file belongs to one case: the Project's own aggregate or one of its Sources'."""
+        ProjectSourceRepository.require_case(connection, tenant_id, project_id)
         record_log.append(connection, tenant_id, aggregate_id, event_type, payload, writer=writer, owner=record_log.case(project_id))
 
     def create_project(self, record: Mapping[str, Any]) -> dict[str, Any]:

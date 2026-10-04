@@ -95,7 +95,7 @@ def new_fence_nonce() -> str:
     return secrets.token_hex(8)
 
 
-def render_source_block(entry: Mapping[str, Any], text: str, *, nonce: str) -> str:
+def render_source_block(entry: Mapping[str, Any], text: str, *, nonce: str, label: str = "SOURCE") -> str:
     """Render one manifest entry as a fenced, numbered prompt block.
 
     Fence from ``report.ts:93-105`` plus the prompt's random code (v1.yaml rule 5, third documented deviation):
@@ -115,7 +115,7 @@ def render_source_block(entry: Mapping[str, Any], text: str, *, nonce: str) -> s
         head_lines.append(f"擷取日期: {entry['fetched_at'][:10]}")
     head = "\n".join(head_lines)
     body = text[entry.get("start", 0) : entry.get("end", len(text))]
-    return f"<<<SOURCE {n} BEGIN {nonce}>>>\n{head}\n---\n{body}\n<<<SOURCE {n} END {nonce}>>>"
+    return f"<<<{label} {n} BEGIN {nonce}>>>\n{head}\n---\n{body}\n<<<{label} {n} END {nonce}>>>"
 
 
 def _one_line(value: Any) -> str:

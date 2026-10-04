@@ -140,8 +140,10 @@ class WebBlockListTests(unittest.TestCase):
         from ai_lego.platform.block_hooks import after_save
 
         with tempfile.TemporaryDirectory() as folder:
-            docs = CaseDocs(ProjectSourceRepository(Path(folder) / "p.sqlite3"))
-            owner = record_log.case("P")
+            from tests.unit.case_fixture import a_case
+
+            repo = ProjectSourceRepository(Path(folder) / "p.sqlite3")
+            docs, owner = CaseDocs(repo), a_case(repo, "t", "P")
             intake = docs.save("t", owner, "assembler.intake", {"purpose": "複雜決策", "question": "要不要續約", "risk": "合約和錢", "package": "個人複雜決策"}, record_log.user("me", "ASSEMBLER"))
             notices = after_save(docs, "t", owner, intake)
             self.assertEqual([notice["category"] for notice in notices], ["法律", "金錢"])
