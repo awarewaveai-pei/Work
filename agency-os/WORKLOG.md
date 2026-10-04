@@ -91,6 +91,7 @@
 - 根因：CI 容器內沒有 PostgreSQL，資料庫測試可 SKIP 成綠；佇列重試沿用舊 `.last.txt`，配額錯誤誤判成前次 BLOCKED。
 - 修改：CI 建立隔離網路與 digest-pinned PostgreSQL，隨機密碼只在本步使用並遮罩，`always()` 清理；`COGNITIVE_OS_REQUIRE_POSTGRES=1` 令缺服務失敗，筆電仍帶理由跳過；資料層變更強制選到 PostgreSQL／repository 測試；佇列每次唯一日誌、未知退出碼不算成功。
 - REALTEST_EVIDENCE: `python -m unittest tests.unit.test_ci_postgres` 6 PASS；`test_pg_foundation` 18 PASS；`test_codex_queue` 4 PASS；`test_affected_tests` 15 PASS。
+- MUTATION_EVIDENCE: 記憶體內逐一移除清理步驟、改映像 digest、移除遮罩、移除觸發路徑、關掉 REQUIRE 環境鍵、清空 selector 結果，6 個對應測試各轉紅；原版 6/6 綠，未改動磁碟原始碼。
 - REVIEW_DONE: Codex 對抗自審；Claude 跨模型審查待清，勿 push／部署。
 - rollback：revert 此獨立 commit；沒有正式資料庫或資料搬移。
 
