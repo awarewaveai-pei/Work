@@ -19,6 +19,9 @@ on:
       - "Projects/internal/cognitive-engineering-os/docker-compose.yml"
       - "Projects/internal/cognitive-engineering-os/scripts/affected_tests.py"
       - "Projects/internal/cognitive-engineering-os/scripts/test-gate.sh"
+      - "Projects/internal/cognitive-engineering-os/tests/pg.py"
+      - "Projects/internal/cognitive-engineering-os/ai_lego/data/**"
+      - "Projects/internal/cognitive-engineering-os/ai_lego/data/migrations/**"
       - ".dockerignore"
       - ".github/workflows/cognitive-os-full-suite.yml"
 
@@ -45,8 +48,32 @@ jobs:
 
       - name: Full suite
         run: |
-          set -o pipefail
-          docker run --rm -e COS_GIT_SHA="$GITHUB_SHA" cognitive-os-api:test bash scripts/test-gate.sh --all | tee full-suite.log
+          set -euo pipefail
+          PG_PASSWORD="$(openssl rand -hex 16)"
+          echo "::add-mask::$PG_PASSWORD"
+          PG_IMAGE="postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
+          docker network create cos-ci-net
+          docker run -d --rm --name cos-ci-postgres --network cos-ci-net --network-alias postgres \
+            -e POSTGRES_PASSWORD="$PG_PASSWORD" "$PG_IMAGE"
+          ready=0
+          for attempt in $(seq 1 90); do
+            if docker exec cos-ci-postgres pg_isready -h 127.0.0.1 -U postgres -d postgres >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then docker logs cos-ci-postgres; exit 1; fi
+          docker run --rm --network cos-ci-net -e COS_GIT_SHA="$GITHUB_SHA" \
+            -e COGNITIVE_OS_REQUIRE_POSTGRES=1 \
+            -e COGNITIVE_OS_TEST_DATABASE_URL="postgresql://postgres:$PG_PASSWORD@postgres:5432/postgres" \
+            cognitive-os-api:test bash scripts/test-gate.sh --all | tee full-suite.log
+
+      - name: Remove test PostgreSQL and network
+        if: always()
+        run: |
+          docker rm -f cos-ci-postgres 2>/dev/null || true
+          docker network rm cos-ci-net 2>/dev/null || true
 
       - name: Summary
         if: always()

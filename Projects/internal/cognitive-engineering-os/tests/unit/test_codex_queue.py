@@ -223,6 +223,12 @@ class CodexQueueTests(unittest.TestCase):
     def test_the_real_queue_is_valid(self) -> None:
         self.assertEqual(validate_queue(self.queue, self.repo), [])
 
+    def test_retry_logs_cannot_reuse_a_prior_result_or_hide_a_failed_check(self) -> None:
+        driver = (self.repo / "scripts" / "codex-continue.ps1").read_text(encoding="utf-8")
+        self.assertIn("[guid]::NewGuid().ToString('N')", driver)
+        self.assertIn("if ($null -eq $p.ExitCode) { return 125 }", driver)
+        self.assertIn("$proc.ExitCode -ne 0 -and $rawLog -match", driver)
+
     def test_missing_module_requires_own_or_dependency_card(self) -> None:
         module = "tests.unit.test_future_dependency_example"
         changed = deepcopy(self.queue)

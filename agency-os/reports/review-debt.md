@@ -17,6 +17,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | 42-teach-page | 新增不綁案例的 TEACH 課程與演練頁，讓課程、案例、角色、自己的話與 AI 回應分開呈現 | 草稿只在草稿課顯示；選項可見且沒有下拉；AI 有作者標籤；頁面不顯示分數、排名、進度百分比或連勝 | `TeachPage.test.tsx` 3 個頁面守衛；移除草稿標記／加入 `<select>`／加入「進度」各轉紅後還原綠；`tsc` 與 vitest 綠 | 待審 |
 | Codex | 50-express-outline-and-draft | EXPRESS 選擇、大綱、可追溯草稿與送出紀錄；修正佇列測試依賴鏈 | 錯來源與假送出不得存；未查證標記不可移除；前置卡的測試須被佇列閘承認 | `test_block_express` 14、`test_codex_queue` 3；拔掉送出／草稿守衛與依賴鏈判定各紅後綠 | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
 | Codex | integration-json-shapes | 對齊 main 的 JSON 形狀契約：TEACH 2 欄、EXPRESS 2 欄 | 新增 JSON 欄位不可逃過存檔形狀驗證 | 合併前 registry gate 精確 4 failures；補後 foundation 43、TEACH 12、EXPRESS 14 tests PASS | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
+| Codex | 01-ci-postgres | CI 配備 digest-pinned PostgreSQL 並要求資料庫測試不能跳過；重試日誌獨立 | CI 缺 PostgreSQL 必須紅、筆電仍明示跳過；舊結果不得誤判新代理 | `test_ci_postgres` 6、`test_pg_foundation` 18、`test_codex_queue` 4、`test_affected_tests` 15 PASS；待跨模型審查 | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
 
 ## deferred, before D7 second region
 

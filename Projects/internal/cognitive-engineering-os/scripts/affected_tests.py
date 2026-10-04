@@ -290,6 +290,13 @@ def affected_test_modules(files: list[str], cos: Path = COS, repo: Path = REPO) 
     present = set(on_disk)
     tests = sorted(m[:-3].replace("/", ".") for m in affected
                    if m in present and m.startswith("tests/unit/test_") and "/" not in m[len("tests/unit/"):])
+    # Database files change the PostgreSQL contract even when static imports do not name them.
+    if any(rel.startswith(cos_rel + "/ai_lego/data/") for rel in files):
+        tests = sorted(set(tests) | {
+            "tests.unit.test_pg_foundation",
+            "tests.unit.test_collection_run_repository",
+            "tests.unit.test_project_source_repository",
+        })
     return tests, sorted(changed), unreferenced
 
 

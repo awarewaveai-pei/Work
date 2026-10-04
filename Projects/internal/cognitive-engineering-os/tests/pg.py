@@ -29,6 +29,7 @@ from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from ai_lego.data.db import DATABASE_URLS_ENV, Databases, migrate
 
 TEST_DATABASE_URL_ENV = "COGNITIVE_OS_TEST_DATABASE_URL"
+REQUIRE_POSTGRES_ENV = "COGNITIVE_OS_REQUIRE_POSTGRES"
 IMAGE = "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
 CONTAINER_PREFIX = "cos-db-test-"
 READY_TIMEOUT_S = 90
@@ -107,12 +108,12 @@ def _start_container() -> PgServer:
 
 
 def server() -> PgServer:
-    """The process's PostgreSQL server with a migrated template, started on first use; SkipTest when there is none."""
+    """The process's PostgreSQL server; fail in CI or skip with a reason on a laptop when unavailable."""
     global _server, _unavailable
     if _server is not None:
         return _server
     if _unavailable is not None:
-        raise unittest.SkipTest(_unavailable)
+        _raise_or_skip(_unavailable)
     external = os.environ.get(TEST_DATABASE_URL_ENV, "").strip()
     if external:
         candidate = PgServer(external)
@@ -121,11 +122,17 @@ def server() -> PgServer:
         if problem is not None:
             _unavailable = f"NO POSTGRESQL: {TEST_DATABASE_URL_ENV} is unset and {problem} -- the PostgreSQL tests did NOT run"
             print(f"\n*** {_unavailable} ***", file=sys.stderr)
-            raise unittest.SkipTest(_unavailable)
+            _raise_or_skip(_unavailable)
         candidate = _start_container()
     candidate.prepare_template()
     _server = candidate
     return _server
+
+
+def _raise_or_skip(reason: str) -> None:
+    if os.environ.get(REQUIRE_POSTGRES_ENV) == "1":
+        raise RuntimeError(f"{REQUIRE_POSTGRES_ENV}=1: {reason}")
+    raise unittest.SkipTest(reason)
 
 
 class PgTestCase(unittest.TestCase):
