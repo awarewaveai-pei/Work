@@ -22,7 +22,7 @@ SOURCE_LISTS = Ruleset("gather.source_lists", "GATHER", "來源名單", "2", "�
 ])
 
 # 網站的名字像國際媒體或中立的新聞網站時，查這家媒體是不是真的存在: an outlet's own domains, from its own site.
-OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "2", "平台（第 2 步），從各媒體自己的網站抄錄網域", {
+OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "3", "平台（第 2 步），從各媒體自己的網站抄錄網域", {
     "outlets": [
         {"name": "BBC", "names": ["BBC", "英國廣播公司"], "domains": ["bbc.com", "bbc.co.uk"], "country": "英國"},
         {"name": "路透社", "names": ["Reuters", "路透"], "domains": ["reuters.com"], "country": "英國"},
@@ -58,23 +58,31 @@ OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "2", "平台
     # a name shorter than min_host_name is not looked for in a host (「AP」 is in every other host); one shorter than
     # prefix_from must be a whole label piece (「voa」 is not in voachinese, 「pts」 not in ptsd): v2
     "min_host_name": 3, "prefix_from": 5,
+    # v3: how a name is read (v2 took a Chinese name anywhere in the site name: 台北市中央社區大學 read as 中央社)
+    "reading": [
+        "網站的名字是標題的最後一段，或標題第一段整段就是一家媒體的名字，或找資料的服務查到的網域名字。",
+        "英文名字要是完整的一個字。中文名字不能跟前後的中文字連在一起（「台北市中央社區大學」不是中央社），後面直接接著「新聞」「日報」這類字的除外（「中央社新聞網」）。",
+        "網址裡的名字不看最後的 .com、.tv 這一段：那是網域的種類，不是網站的名字。",
+    ],
 })
 
 # 平台把「怎樣算同一組」的規則寫出來給你看: the numbers and the sentences the page shows come from here together.
-GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "2", "平台（第 2 步）", {
+GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "3", "平台（第 2 步）", {
     "shingle": 5, "compare_chars": 20000, "same_text": 0.8, "maybe_same": 0.5,
-    # v2: the share of the shorter page found in the longer one (an excerpt, a copy with more around it), when the shorter
-    # one has at least contained_min characters (a short boilerplate line is in everything)
-    "contained_min": 300,
+    # the share of the shorter page found in the longer one (an excerpt, a copy with more around it), when both pages have
+    # at least contained_min_pieces different pieces. v3: v2 counted letters, so one phrase repeated was "contained"
+    # in any page holding it twice
+    "contained_min_pieces": 300,
     # two texts both longer than sample_above are compared on one in keep_one_in of their pieces (same pieces on both sides)
     "keep_one_in": 8, "sample_above": 2000,
     "order": ["同一篇", "同一張圖", "只互相引用", "可能同出處"],
     "rules": [
-        "同一篇：兩頁的文字有八成以上一樣；或較短的一頁（至少 300 字）有八成以上出現在另一頁裡，例如摘錄、前後加了別的內容的轉貼。每 5 個字一段來比，只比前 20000 字。",
+        "同一篇：兩頁的文字有八成以上一樣；或較短的一頁有八成以上出現在另一頁裡，例如摘錄、前後加了別的內容的轉貼（兩頁都要有至少 300 段不一樣的片段，同一句話重複很多次不算）。每 5 個字一段來比，只比前 20000 字。",
+        "一組要每兩頁都是同一篇，才標同一篇（就算也用了同一張圖或只互相引用，還是同一篇）。甲像乙、乙像丙，甲卻不像丙，標可能同出處。",
         "可能同出處：一樣的部分在五成到八成之間（兩種比法都算）。系統拿不準是不是改寫，由你決定算不算。",
         "同一張圖：兩頁的主圖是同一個網址。",
         "只互相引用：幾個網站對外的連結只連到彼此，沒有別的依據。",
-        "一組裡有不同的理由時，標最拿不準的那一個。",
+        "其他的組裡有不同的理由時，標最拿不準的那一個；每一頁寫它跟組裡哪一頁、因為什麼連在一起。",
         "只有「同一篇」的組才分原始的和轉貼的：最早出現的是原始的。最早的日期如果是網頁自己寫的，畫面會寫明，那不一定可信。",
         "分組不是刪除。組裡每一頁都還看得到，你可以拆開。",
     ],
@@ -120,9 +128,9 @@ RULESETS = [SOURCE_LISTS, OUTLETS, GROUPING, PLACE_LANGUAGES]
 
 HISTORY = {
     "gather.source_lists": {"1": "475d3ede5bdb", "2": "146bfc52ca8a"},
-    "gather.outlets": {"1": "a494e918033c", "2": "fb9c00d12bf6"},
+    "gather.outlets": {"1": "a494e918033c", "2": "fb9c00d12bf6", "3": "ce6b4b77697f"},
     # retired 2026-10-04 (lookups moved to collect); a recorded version stays as it was (rulesets/__init__.py)
     "gather.registries": {"1": "2b04ec23212b"},
-    "gather.grouping": {"1": "f34dbf8167ad", "2": "5795497cc81a"},
+    "gather.grouping": {"1": "f34dbf8167ad", "2": "5795497cc81a", "3": "40ef446e323d"},
     "gather.place_languages": {"1": "279db02ce9fe"},
 }

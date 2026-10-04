@@ -39,11 +39,13 @@ MIN_ENGINES = MIN_LANGUAGES = 2   # 系統至少用兩家搜尋引擎、兩種�
 CHANNEL_STATES = ("ok", "unreachable", "no_key")
 PROVIDER_NAMES = {"serper": "Serper（Google 的結果）", "brave": "Brave"}
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
-_COPYRIGHT = re.compile(r"(?:©|\(c\)|Copyright|版權所有)\s*(?:©)?\s*(?:\d{4}(?:\s*[-–~]\s*\d{4})?)?\s*([^\n|｜。，,]{2,80})", re.I)
+# (c) only on its own and before a year or a name: 「第5(c)項」「Article 5(c) applies」 are clauses, not a copyright line
+_COPYRIGHT = re.compile(r"(?:©|(?<!\w)\([cC]\)(?=\s*\d{4}|\s+[^\W\d_a-z])|(?i:copyright)|版權所有)\s*(?:©)?\s*(?:\d{4}(?:\s*[-–~]\s*\d{4})?)?\s*([^\n|｜。，,]{2,80})")
 _TITLE_SEPARATORS = re.compile(r"\s[-|–—]\s|｜|－")
 STATED = "網頁自己寫的日期"   # first_seen from the page's own claim, not from the archive: 原始的 says so
 FOOTER_CHARS = 800   # a site's own copyright line is at the end; one higher up is usually a photo or quote credit
 _EN_WORDS = frozenset("the and of to in is that for it with as was on are by this be from or at".split())
+_LATIN = "A-Za-zÀ-ÖØ-öø-ɏḀ-ỿ"   # Latin letters with their accented forms (French, German, Vietnamese)
 
 
 # ---- reading what is stored ----
@@ -83,9 +85,13 @@ def _lists(host: str) -> tuple[list[dict[str, str]], tuple[str, str, str] | None
     return found, restricted
 
 
+def _title_parts(title: str) -> list[str]:
+    return [part.strip() for part in _TITLE_SEPARATORS.split(title or "") if part.strip()]
+
+
 def _site_name(title: str) -> str:
     """The site's own name, when the title carries one after a separator (「文章 | BBC News」)."""
-    parts = [part.strip() for part in _TITLE_SEPARATORS.split(title or "") if part.strip()]
+    parts = _title_parts(title)
     return parts[-1] if len(parts) > 1 else ""
 
 
@@ -95,30 +101,57 @@ def _named(text: str, name: str) -> bool:
     return bool(re.search(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", text, re.I)) if name.isascii() else name in text
 
 
+def _script_letter(char: str) -> bool:
+    return char.isalpha() and not char.isascii()
+
+
+def _names_outlet(text: str, name: str, media_words: Iterable[str]) -> bool:
+    """Whether a site name says an outlet's name. A Latin name is a whole word in it; a Chinese one has no space to end it,
+    so it must touch no other letter of its script (「中央社 CNA」) or run straight into a media word (「中央社新聞網」):
+    in 台北市中央社區大學, 彭博士診所, 新華社區發展協會 it is part of another name."""
+    if name.isascii():
+        return _named(text, name)
+    for found in re.finditer(re.escape(name), text):
+        after = text[found.end():]
+        if not _script_letter(text[found.start() - 1: found.start()]) and not _script_letter(after[:1]):
+            return True
+        if any(after.casefold().startswith(word.casefold()) for word in media_words):
+            return True
+    return False
+
+
 def _name_tokens(host: str, site: str) -> list[str]:
     """Where a site's own name can be: the host's labels up to the first label of the name the registry holds
-    (collect's ``site``: bbc.fakehost.xyz -> bbc, fakehost); every label when collect did not answer."""
+    (collect's ``site``: bbc.fakehost.xyz -> bbc, fakehost); without it every label but the top-level one, which anyone
+    can have (twitch.tv is not a TV station)."""
     labels = host.split(".") if host else []
     if site and (host == site or host.endswith(f".{site}")):
         labels = labels[: len(labels) - len(site.split(".")) + 1]
+    elif len(labels) > 1:
+        labels = labels[:-1]
     return [token for label in labels for token in re.split(r"[^a-z0-9]+", label) if token]
 
 
 def _outlet(host: str, site: str, title: str) -> tuple[dict[str, Any] | None, bool, bool, str]:
     """(the outlet, whether the site IS it, whether the site's name reads like a news outlet, the name the title gives).
-    ``site``: the name the registry holds (collect); a name under ``prefix_from`` letters must be a whole host piece."""
+    ``site``: the name the registry holds (collect); a name under ``prefix_from`` letters must be a whole host piece. A
+    site name is the title's last part, a first part that is the whole name (「中央社 | 新聞」), or the registry's name."""
     rules = require("gather.outlets").items
     for outlet in rules["outlets"]:
         if host and any(host == domain or host.endswith(f".{domain}") for domain in outlet["domains"]):
             return outlet, True, True, _site_name(title)
-    named = _site_name(title)
+    parts = _title_parts(title)
+    named, first = (parts[-1], parts[0]) if len(parts) > 1 else ("", "")
+    registered = site.split(".")[0] if site else ""
     tokens = _name_tokens(host, site)
     for outlet in rules["outlets"]:
         for name in outlet["names"]:
             squeezed = re.sub(r"[^a-z0-9]", "", name.lower())
             in_host = name.isascii() and len(squeezed) >= rules["min_host_name"] and any(
                 token == squeezed or (len(squeezed) >= rules["prefix_from"] and token.startswith(squeezed)) for token in tokens)
-            if _named(named, name) or in_host:
+            in_name = first.casefold() == name.casefold() or _names_outlet(named, name, rules["media_words"]) or (
+                not name.isascii() and _names_outlet(registered, name, rules["media_words"]))
+            if in_name or in_host:
                 return outlet, False, True, named
     newsy = any(_named(named, word) for word in rules["media_words"]) or any(token == word.lower() for token in tokens for word in rules["media_words"] if word.isascii())
     return None, False, newsy, named
@@ -132,12 +165,13 @@ def _language(text: str | None) -> dict[str, str]:
     han = len(re.findall(r"[㐀-䶿一-鿿]", sample))
     kana = len(re.findall(r"[぀-ヿ]", sample))
     hangul = len(re.findall(r"[가-힯]", sample))
-    latin = len(re.findall(r"[A-Za-z]", sample))
+    latin = len(re.findall(rf"[{_LATIN}]", sample))
+    other = len(re.findall(rf"[^\W\d_㐀-䶿一-鿿぀-ヿ가-힯{_LATIN}]", sample))   # every other letter (Arabic, Thai, Cyrillic…)
     cjk = han + kana + hangul
-    if not cjk and not latin:
-        if any(ch.isalpha() for ch in sample):
-            return cell(UNCHECKABLE, why="系統只分得出中文、英文、日文、韓文")
+    if not cjk + latin + other:
         return cell(NOT_FOUND, why="網頁沒有文字")
+    if other * 2 > cjk + latin + other:
+        return cell(UNCHECKABLE, why="系統只分得出中文、英文、日文、韓文")
     if cjk * 3 >= latin:
         code = "ja" if kana >= max(10, cjk // 10) else "ko" if hangul * 2 >= cjk else "zh"
         return cell(FOUND, names[code])
@@ -163,6 +197,8 @@ def _outlet_cell(host: str, named: str, outlet: dict[str, Any] | None, is_outlet
     查不到 only when there was a site name to look at."""
     if outlet and is_outlet:
         return cell(FOUND, f"是{outlet['name']}的網域")
+    if outlet and not host:
+        return cell(UNCHECKABLE, why=f"名字像{outlet['name']}；你貼的是檔案，沒有網域可以對")
     if outlet:
         return cell(FOUND, f"名字像{outlet['name']}，不在{outlet['name']}的已知網域名單上（v{require('gather.outlets').version}）")
     if not host and not named:
@@ -261,9 +297,11 @@ class _Item:
         folded = unicodedata.normalize("NFKC", (text or "")[: rules["compare_chars"] * 2]).casefold()
         self.letters = "".join(ch for ch in folded if not ch.isspace() and not unicodedata.category(ch).startswith("P"))[: rules["compare_chars"]]
         self._pieces: dict[bool, frozenset[int]] = {}
+        self.distinct = 0   # how many different pieces the text has, counted with its first pieces()
         image = relevance.get("imageUrl")
         self.image = image if isinstance(image, str) and image.startswith(("http://", "https://")) else None
         self.host = _host(content.get("url") or "")
+        self.label = (self.host or str(content.get("title") or "") or "一份你貼的檔案")[:60]   # how another page's cell names it
         links = relevance.get("outlinks")
         self.outlinks = {_link_host(link) for link in links if isinstance(link, str) and link} - {self.host, ""} if isinstance(links, list) else set()
         first = (content.get("cells") or {}).get("first_seen") or {}
@@ -273,29 +311,35 @@ class _Item:
     def pieces(self, sampled: bool) -> frozenset[int]:
         if sampled not in self._pieces:
             size, every = self._rules["shingle"], self._rules["keep_one_in"] if sampled else 1
-            hashed = (zlib.crc32(self.letters[i:i + size].encode("utf-8")) for i in range(max(0, len(self.letters) - size + 1)))
+            hashed = {zlib.crc32(self.letters[i:i + size].encode("utf-8")) for i in range(max(0, len(self.letters) - size + 1))}
+            self.distinct = len(hashed)
             self._pieces[sampled] = frozenset(value for value in hashed if value % every == 0)
         return self._pieces[sampled]
 
 
 def _likeness(a: _Item, b: _Item, rules: Mapping[str, Any]) -> float:
     """How alike two pages are: the larger of the share of all their text pieces in common (Jaccard) and the share of
-    the shorter page found in the longer one (an excerpt, a copy with more around it), the second only when the shorter
-    page has at least ``contained_min`` characters."""
+    the shorter page found in the longer one (an excerpt, a copy with more around it), the second only when both pages
+    have at least ``contained_min_pieces`` different pieces (one phrase repeated is in every page that has it twice)."""
     short = min(len(a.letters), len(b.letters))
     sampled = short > rules["sample_above"]
     x, y = a.pieces(sampled), b.pieces(sampled)
     if not x or not y:
         return 0.0
     both = len(x & y)
-    contained = both / min(len(x), len(y)) if short >= rules["contained_min"] else 0.0
+    contained = both / min(len(x), len(y)) if min(a.distinct, b.distinct) >= rules["contained_min_pieces"] else 0.0
     return max(both / (len(x) + len(y) - both), contained)
 
 
-def _groups(items: list[_Item], rules: Mapping[str, Any]) -> list[tuple[list[_Item], str]]:
-    """Every item in exactly one group: (items, how). Two pages join on near-identical text (同一篇), text between the
-    thresholds (可能同出處), the same main image (同一張圖), or links that only point at each other (只互相引用); a
-    group joined for different reasons says the least certain one."""
+Join = tuple[_Item, _Item, str]
+
+
+def _groups(items: list[_Item], rules: Mapping[str, Any]) -> list[tuple[list[_Item], str, list[Join]]]:
+    """Every item in exactly one group: (items, how, what joins which). Two pages join on near-identical text (同一篇),
+    text between the thresholds (可能同出處), the same main image (同一張圖), or links that only point at each other
+    (只互相引用). Joins chain, likeness does not: a group is 同一篇 only when every two of its pages are (whatever else
+    joins them), a chain of 同一篇 alone is 可能同出處, and any other group joined for different reasons says the least
+    certain one."""
     parent = list(range(len(items)))
 
     def root(index: int) -> int:
@@ -317,15 +361,26 @@ def _groups(items: list[_Item], rules: Mapping[str, Any]) -> list[tuple[list[_It
     edges += _only_each_other(items)
     for i, j, _ in edges:
         parent[root(i)] = root(j)
-    order = rules["order"]
     members: dict[int, list[int]] = {}
     for index in range(len(items)):
         members.setdefault(root(index), []).append(index)
-    how: dict[int, str] = {}
-    for i, _, kind in edges:
-        top = root(i)
-        how[top] = max(how.get(top, kind), kind, key=order.index)
-    return [([items[index] for index in indexes], how.get(top, "單獨")) for top, indexes in sorted(members.items(), key=lambda pair: pair[1][0])]
+    joins: dict[int, list[tuple[int, int, str]]] = {}
+    for edge in edges:
+        joins.setdefault(root(edge[0]), []).append(edge)
+    out = []
+    for top, indexes in sorted(members.items(), key=lambda pair: pair[1][0]):
+        found = joins.get(top, [])
+        kinds = {kind for _, _, kind in found}
+        if len(indexes) == 1:
+            how = "單獨"
+        elif sum(kind == "同一篇" for _, _, kind in found) == len(indexes) * (len(indexes) - 1) // 2:   # one 同一篇 edge per pair at most
+            how = "同一篇"
+        elif kinds == {"同一篇"}:
+            how = "可能同出處"
+        else:
+            how = max(kinds, key=rules["order"].index)
+        out.append(([items[index] for index in indexes], how, [(items[i], items[j], kind) for i, j, kind in found]))
+    return out
 
 
 def _only_each_other(items: list[_Item]) -> list[tuple[int, int, str]]:
@@ -357,16 +412,44 @@ def _only_each_other(items: list[_Item]) -> list[tuple[int, int, str]]:
     return edges
 
 
-def _original(group: list[_Item], how: str, item: _Item) -> dict[str, str]:
+JOINED = {"同一篇": "是同一篇", "可能同出處": "文字很像", "同一張圖": "用了同一張圖", "只互相引用": "在只互相引用的同一圈網站裡"}
+
+
+def _some(labels: list[str]) -> str:
+    unique = sorted(set(labels))   # the same words whatever order the pages came in
+    return "、".join(unique[:3]) + (f" 等 {len(unique)} 頁" if len(unique) > 3 else "")
+
+
+def _joined(item: _Item, joins: list[Join]) -> str:
+    """Why a page is in a group joined for more than one reason (or by a chain of 同一篇): what joins it to which page,
+    and what else joins the group -- true for every page in it, unlike any one reason said for all."""
+    kinds = {kind for _, _, kind in joins}
+    mine: dict[str, list[str]] = {}
+    for a, b, kind in joins:
+        if item is a or item is b:
+            mine.setdefault(kind, []).append((b if item is a else a).label)
+    said = [f"跟{_some(mine[kind])}{JOINED[kind]}" for kind in JOINED if kind in mine]
+    rest = [JOINED[kind] for kind in JOINED if kind in kinds and kind not in mine]
+    if rest:
+        said.append("組裡還有別的網頁" + "、".join(rest))
+    if kinds == {"同一篇"}:
+        said.append("但組裡不是每兩頁都是同一篇")
+    return "；".join(said) + "；看不出誰轉貼誰"
+
+
+def _original(group: list[_Item], how: str, joins: list[Join], item: _Item) -> dict[str, str]:
     """原始的還是轉貼的, read off the grouping."""
     if len(group) == 1:
         return cell(NOT_FOUND, why="沒有找到別的網頁有同一篇，看不出是不是轉貼")
-    if how == "只互相引用":
-        return cell(FOUND, "只互相引用，沒有別的依據")
-    if how == "可能同出處":
-        return cell(NOT_FOUND, why="跟同組的網頁很像，但拿不準是不是改寫，由你決定")
-    if how != "同一篇":   # a shared image (a default og:image, a blank.jpg) says nothing about who copied whom
-        return cell(NOT_FOUND, why="只是用了同一張圖，看不出誰轉貼誰")
+    kinds = {kind for _, _, kind in joins}
+    if how != "同一篇":
+        if kinds == {"只互相引用"}:
+            return cell(FOUND, "只互相引用，沒有別的依據")
+        if kinds == {"可能同出處"}:
+            return cell(NOT_FOUND, why="跟同組的網頁很像，但拿不準是不是改寫，由你決定")
+        if kinds == {"同一張圖"}:   # a shared image (a default og:image, a blank.jpg) says nothing about who copied whom
+            return cell(NOT_FOUND, why="只是用了同一張圖，看不出誰轉貼誰")
+        return cell(NOT_FOUND, why=_joined(item, joins))
     dates = [member.first_seen for member in group]
     if None in dates:
         return cell(UNCHECKABLE, why="同組有網頁查不到最早出現的時間，排不出先後")
@@ -472,7 +555,7 @@ def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, ar
     items = [item(doc["doc_id"], replaced.get(doc["doc_id"], doc["content"])) for doc in cards]
     items += [item(f"new:{index}", content) for index, (prior, content) in enumerate(planned) if prior is None]
     groups = _groups(items, rules)
-    original = {one.key: _original(group, how, one) for group, how in groups for one in group}
+    original = {one.key: _original(group, how, joins, one) for group, how, joins in groups for one in group}
 
     # the lookups above can take seconds: a case erased meanwhile gets nothing written back (the rest of the window is S's: report)
     if repo.get_project(tenant_id, owner.id) is None:
@@ -491,7 +574,7 @@ def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, ar
             docs.save(tenant_id, owner, "gather.source", content, SYSTEM, doc_id=held["doc_id"], base_version=held["version"])
 
     if items:
-        content = {"groups": [{"cards": [ids[one.key] for one in group], "how": how} for group, how in groups], "rules_version": require("gather.grouping").version}
+        content = {"groups": [{"cards": [ids[one.key] for one in group], "how": how} for group, how, _ in groups], "rules_version": require("gather.grouping").version}
         current = docs.current(tenant_id, owner, "gather.origins")
         if not current:
             docs.save(tenant_id, owner, "gather.origins", content, SYSTEM)

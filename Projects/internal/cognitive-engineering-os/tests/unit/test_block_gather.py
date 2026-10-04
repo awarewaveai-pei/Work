@@ -297,7 +297,7 @@ class CollectLookupTests(GatherCase):
         self.collected("https://bbc-today.example.com/b", zh(2), title="店家公告")
         self.arrive()
         self.assertEqual(self.cell("https://bbc-today.example.com/b", "outlet_exists")["value"], "名字像BBC，不在BBC的已知網域名單上（v" + require("gather.outlets").version + "）")
-        self.assertEqual((hooks._name_tokens("a.b.example.com.tw", "example.com.tw"), hooks._name_tokens("x.example.com", "")), (["a", "b", "example"], ["x", "example", "com"]))
+        self.assertEqual((hooks._name_tokens("a.b.example.com.tw", "example.com.tw"), hooks._name_tokens("x.example.com", "")), (["a", "b", "example"], ["x", "example"]))
 
     def test_the_engine_reaches_nothing_outside_itself(self):
         """lookups v1 R9: no registry, archive or fact-check host is the engine's; every outside question goes to collect."""
@@ -608,11 +608,11 @@ class RoundTwoTests(GatherCase):
         self.collected("https://a.example.com/full", article)
         self.collected("https://b.example.com/excerpt", article[500:1100])
         self.collected("https://c.example.com/padded", zh(91, 3000) + article)
-        self.collected("https://d.example.com/snippet", article[0:200])   # wholly inside, but under contained_min: a short line is in everything
+        self.collected("https://d.example.com/snippet", article[0:200])   # wholly inside, but under contained_min_pieces: a short line is in everything
         self.arrive()
         full, excerpt, padded, snippet = (self.card(url)["doc_id"] for url in ("https://a.example.com/full", "https://b.example.com/excerpt", "https://c.example.com/padded", "https://d.example.com/snippet"))
         self.assertEqual(self.grouping(), {frozenset({full, excerpt, padded}): "同一篇", frozenset({snippet}): "單獨"})
-        self.assertTrue(any("至少 300 字" in sentence for sentence in require("gather.grouping").items["rules"]))   # the rule shown says it
+        self.assertTrue(any("至少 300 段不一樣的片段" in sentence for sentence in require("gather.grouping").items["rules"]))   # the rule shown says it
 
     def test_a_copy_that_dates_itself_earlier_is_original_only_as_the_pages_own_claim(self):
         """M4: the deciding date, when the page wrote it itself, is said to be its own claim."""
@@ -677,6 +677,86 @@ class RoundTwoTests(GatherCase):
         self.docs.save(self.tenant_id, self.owner, "gather.source", old, record_log.system("GATHER"), doc_id=card["doc_id"], base_version=card["version"])
         self.arrive()
         self.assertEqual(self.card("https://a.example.com/1")["content"]["rules"]["gather.grouping"]["version"], require("gather.grouping").version)
+
+
+class RoundThreeTests(GatherCase):
+    """GATHER critic re-check of d497bf203 (M1, N1-N4, minor 2)."""
+
+    def outlet_cell(self, host, title, site=""):
+        outlet, is_outlet, newsy, named = hooks._outlet(host, site, title)
+        return hooks._outlet_cell(host, named, outlet, is_outlet, newsy)
+
+    def test_a_chinese_outlet_name_is_a_whole_name_or_runs_into_a_media_word(self):
+        """M1: 中央社 inside 台北市中央社區大學 is part of another name; 「中央社 | 新聞」 and 中央社新聞網 elsewhere are look-alikes."""
+        for title in ("活動公告 | 台北市中央社區大學", "健康專欄 | 彭博士診所", "里民大會 | 新華社區發展協會", "颱風消息 - 地方聯合報導"):
+            self.assertEqual(self.outlet_cell("x.example.org", title, "example.org"), {"state": "查不到", "why": "名字不像媒體"}, title)
+        like = {"state": "查到", "value": "名字像中央社，不在中央社的已知網域名單上（v" + require("gather.outlets").version + "）"}
+        for title in ("中央社 | 新聞", "颱風消息 | 中央社新聞網", "颱風 | 政治 | 中央社 CNA"):
+            self.assertEqual(self.outlet_cell("x.example.org", title, "example.org"), like, title)
+        self.assertEqual(self.outlet_cell("x.中央社新聞.org", "店家", "中央社新聞.org"), like)   # the registry's name is read the same way
+        self.assertEqual(self.outlet_cell("x.中央社區.org", "店家", "中央社區.org"), {"state": "無法檢查", "why": "標題沒寫網站名字"})
+
+    def test_the_top_level_domain_is_no_name_and_a_pasted_file_has_no_domain_to_check(self):
+        """N4: with collect silent, .tv read as a TV station; a pasted file was said to be off an outlet's domains."""
+        self.collect.down = True
+        self.collected("https://twitch.tv/a", zh(170), title="直播 | Twitch")
+        self.collected("https://www.twitch.tv/b", zh(171))
+        self.arrive()
+        self.assertEqual(self.cell("https://twitch.tv/a", "outlet_exists"), {"state": "查不到", "why": "名字不像媒體"})
+        self.assertEqual(self.cell("https://www.twitch.tv/b", "outlet_exists"), {"state": "無法檢查", "why": "標題沒寫網站名字"})
+        self.pasted(ZH_SAYS, title="內部報告 | BBC")
+        pasted = next(doc for doc in self.cards() if doc["content"]["title"] == "內部報告 | BBC")
+        self.assertEqual(pasted["content"]["cells"]["outlet_exists"], {"state": "無法檢查", "why": "名字像BBC；你貼的是檔案，沒有網域可以對"})
+
+    def test_a_clause_letter_is_not_a_copyright_line(self):
+        """N2: (c) stands alone, before a year or a name."""
+        for footer in ("第5(c)項規定 the treaty… Article 5(c) applies", "Section 5(c) The Licensee shall", "under (c) applies to members"):
+            self.assertEqual(hooks._operator(zh(172) + "\n" + footer, None, False)["state"], "查不到", footer)
+        for footer in ("(c) 2024 Acme Ltd", "(C) Acme Ltd", "(c) 某產業公會"):
+            self.assertEqual(hooks._operator(zh(173) + "\n" + footer, None, False)["value"], footer)
+
+    def test_a_page_mostly_in_another_script_is_uncheckable_whatever_latin_it_has(self):
+        """minor 2: one English sentence made a page of Arabic 英文."""
+        arabic = "اللغة العربية هي لغة رسمية في العديد من الدول " * 45
+        self.assertEqual(hooks._language(arabic + EN[:90]), {"state": "無法檢查", "why": "系統只分得出中文、英文、日文、韓文"})
+        self.assertEqual(hooks._language(EN + "مرحبا بكم")["value"], "英文")
+
+    def test_pages_alike_only_through_a_third_are_not_one_article(self):
+        """N1: S is inside A and inside B, A and B share nothing else; B was said 轉貼的 of A."""
+        shared = zh(140, 350)
+        urls = ("https://s.example.com/1", "https://a.example.com/2", "https://b.example.com/3")
+        for url, text, date in zip(urls, (shared, shared + zh(141, 4000), zh(142, 4000) + shared), ("2024-05-01", "2024-01-01", "2024-03-01")):
+            self.collected(url, text)
+            self.collect.captures[url] = date
+        self.arrive()
+        self.assertEqual(self.grouping(), {frozenset(self.card(url)["doc_id"] for url in urls): "可能同出處"})
+        self.assertEqual(self.cell(urls[2], "original"), {"state": "查不到", "why": "跟s.example.com是同一篇；但組裡不是每兩頁都是同一篇；看不出誰轉貼誰"})
+        self.assertEqual(self.cell(urls[0], "original")["why"], "跟a.example.com、b.example.com是同一篇；但組裡不是每兩頁都是同一篇；看不出誰轉貼誰")
+
+    def test_one_phrase_repeated_is_not_inside_every_page_that_has_it_twice(self):
+        """N1: the minimum counts different pieces, not letters."""
+        self.collected("https://a.example.com/1", "甲乙丙丁戊" * 80)
+        self.collected("https://b.example.com/2", zh(150) + "甲乙丙丁戊" * 2 + zh(151))
+        self.arrive()
+        self.assertEqual(sorted(self.grouping().values()), ["單獨", "單獨"])
+
+    def test_each_page_of_a_group_joined_for_different_reasons_says_what_joins_it(self):
+        """N3: A and B one article, B and C one image: all three said 「只是用了同一張圖」."""
+        article, image = zh(160), "https://img.example.com/x.jpg"
+        self.collected("https://a.example.com/1", article)
+        self.collected("https://b.example.com/2", article[:390] + zh(161, 10), imageUrl=image)
+        self.collected("https://c.example.com/3", zh(162), imageUrl=image)
+        copy_of = zh(163)   # two copies that also share their image are still one article
+        self.collected("https://d.example.com/4", copy_of, imageUrl="https://img.example.com/y.jpg", published_at="2024-01-01")
+        self.collected("https://e.example.com/5", copy_of[:390] + zh(164, 10), imageUrl="https://img.example.com/y.jpg", published_at="2024-02-01")
+        self.arrive()
+        a, b, c, d, e = (self.card(f"https://{host}.example.com/{index}")["doc_id"] for index, host in enumerate("abcde", 1))
+        self.assertEqual(self.grouping(), {frozenset({a, b, c}): "同一張圖", frozenset({d, e}): "同一篇"})
+        said = "；看不出誰轉貼誰"
+        self.assertEqual(self.cell("https://a.example.com/1", "original"), {"state": "查不到", "why": "跟b.example.com是同一篇；組裡還有別的網頁用了同一張圖" + said})
+        self.assertEqual(self.cell("https://b.example.com/2", "original")["why"], "跟a.example.com是同一篇；跟c.example.com用了同一張圖" + said)
+        self.assertEqual(self.cell("https://c.example.com/3", "original")["why"], "跟b.example.com用了同一張圖；組裡還有別的網頁是同一篇" + said)
+        self.assertEqual((self.cell("https://d.example.com/4", "original")["value"], self.cell("https://e.example.com/5", "original")["value"]), ("原始的", "轉貼的"))
 
 
 class CardLimitTests(GatherCase):
