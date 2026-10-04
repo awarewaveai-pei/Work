@@ -160,11 +160,11 @@ try {
         $id = [string]$card.id
         if (Is-Done $id) { continue }
         $cur = Card-State $id
-        if ($cur -and $cur.status -in @('blocked', 'needs_decision')) { Say "stopped at $id ($($cur.status)): $($cur.note)" 'Yellow'; $exitCode = 1; break }
+        if ($cur -and $cur.status -in @('blocked', 'needs_decision')) { Say "skipping $id ($($cur.status)): $($cur.note)" 'Yellow'; $exitCode = 1; continue }
         if ($card.PSObject.Properties['high_stop'] -and $card.high_stop) { Say "$id is a High-STOP card (needs the operator's go-ahead): skipped" 'Yellow'; continue }
-        if (-not (Gate-Open $card)) { Say "$id waits for gate '$($card.gate)': not open, stopping here" 'Yellow'; break }
+        if (-not (Gate-Open $card)) { Say "$id waits for gate '$($card.gate)' (not open): skipped" 'Yellow'; continue }
         $missing = @($card.depends | Where-Object { $_ -and -not (Is-Done $_) })
-        if ($missing.Count -gt 0) { Say "$id waits for $($missing -join ', ')" 'Yellow'; break }
+        if ($missing.Count -gt 0) { Say "$id waits for $($missing -join ', '): skipped" 'Yellow'; continue }
 
         Say "card $id" 'Cyan'
         if ($DryRun) { Say "  (dry run) would run $($card.file)"; $done++; continue }
@@ -254,7 +254,8 @@ try {
         if (-not $cardOk) {
             $s = Card-State $id
             if ($s.status -eq 'running') { Set-Card $id @{ status = 'blocked'; note = "failed $MaxAttempts attempts: $($feedback.Split("`n")[0])" }; $exitCode = 1 }
-            break
+            if ($exitCode -eq 3) { break }   # the quota is gone: nothing else can run
+            continue
         }
     }
 } finally {
