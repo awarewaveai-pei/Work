@@ -1,0 +1,564 @@
+"""VERIFY 查證主張 (contract card; docs/platform/STEP2_SHARED_RULES.md): a pasted message waits for the person's first
+reaction; claims are the person's (the AI proposes); only the person's stance counts; fact-check databases are sources,
+never the platform's verdict, and collect asks them (the engine reaches nothing outside); 「去查」 is one collection run
+per claim; the AI stops under two independent origins."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import unittest
+from unittest import mock
+
+from ai_lego import PRODUCT_ROOT
+from ai_lego.apps.api import main as api_main
+from ai_lego.core.domain import evidence_words as words
+from ai_lego.core.domain.kinds.verify import SEARCH_ANGLES, SPREAD_KEYS, claim_key
+from ai_lego.data.events import record_log
+from ai_lego.data.repositories.case_docs import CaseDocs
+from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
+from ai_lego.errors import InvariantViolation
+from ai_lego.platform import block_hooks, integrity
+from ai_lego.platform.block_hooks import verify as hooks
+from ai_lego.platform.net import collect_lookups
+from ai_lego.platform.rulesets.verify import TECHNIQUES
+from tests.unit.test_api_collections import REPORT, CollectionApiTestCase
+from tests.unit.test_api_ingest import c1
+from tests.unit.test_block_foundation import MirrorProvider
+from tests.unit.test_step2_foundation import Step2Case
+
+MESSAGE = "【緊急】央行宣布下週起每天只能領一萬元！不轉就來不及，快轉給家人！"
+CLAIM = "央行宣布下週起每天只能領一萬元"
+PAGE = "央行新聞稿：本行從未宣布每日提款上限，下週起提款規定不變。"
+CHECKABLE = words.CHECKABLE
+
+
+# Collect's lookups (specs/wire/lookup.v1.json): the engine's tests read the same examples next-admin answers with.
+CONTRACT = json.loads((PRODUCT_ROOT / "specs" / "wire" / "lookup.v1.json").read_text(encoding="utf-8"))
+SPEC_ANSWER = CONTRACT["examples"]["factcheck"]["answer"]
+COFACTS_ATTRIBUTION = SPEC_ANSWER["items"][0]["dbs"][1]["attribution"]
+CLAIMREVIEW_ATTRIBUTION = SPEC_ANSWER["items"][0]["dbs"][0]["attribution"]
+COFACTS_FOUND = {"db": "cofacts", "state": "查到", "attribution": COFACTS_ATTRIBUTION, "hits": [
+    {"article_id": "a1", "url": "https://cofacts.tw/article/a1", "date": "2026-09-30",
+     "replies": [{"judged_as": "含有不實訊息", "text": "央行澄清：沒有每日提款上限。", "reference": "https://www.cbc.gov.tw/news/1", "date": "2026-09-30"}]},
+    {"article_id": "a2", "url": "https://cofacts.tw/article/a2", "date": "2026-09-30", "replies": []}]}
+NOTHING_FOUND = {"kind": "factcheck", "items": [{"text": "", "dbs": [
+    {"db": "claimreview", "state": "查不到", "why": "資料檔裡沒有相近的查核", "attribution": CLAIMREVIEW_ATTRIBUTION, "hits": []},
+    {"db": "cofacts", "state": "查不到", "why": "Cofacts 沒有相近的訊息", "attribution": COFACTS_ATTRIBUTION, "hits": []}]}]}
+
+
+def answer_with(**entries):
+    """The spec's factcheck answer with some databases' entries replaced."""
+    answer = json.loads(json.dumps(SPEC_ANSWER))
+    answer["items"][0]["dbs"] = [entries.get(entry["db"], entry) for entry in answer["items"][0]["dbs"]]
+    return answer
+
+
+class Lookups:
+    """Collect's lookups endpoint as a fake ``CollectionServiceClient.lookup``: answers with the asked text echoed."""
+
+    def __init__(self, answer=None, error=None):
+        self.answer, self.error, self.calls = answer, error, []
+
+    def lookup(self, project_id, kind, items, timeout):
+        self.calls.append((project_id, kind, items))
+        if self.error:
+            raise self.error
+        answer = json.loads(json.dumps(self.answer))
+        for item, asked in zip(answer.get("items") or [], items):
+            item["text"] = asked["text"]
+        return answer
+
+
+class VerifyCase(Step2Case):
+    def setUp(self):
+        super().setUp()
+        self.provider = MirrorProvider({})
+        api_main.app.dependency_overrides[api_main.get_ai_provider] = lambda: self.provider
+        self.base = f"/projects/{self.pid}"
+        self.lookups = Lookups(NOTHING_FOUND)
+        api_main.app.dependency_overrides[api_main.get_collection_service] = lambda: self.lookups
+
+    def post(self, path, body, status=200):
+        response = self.client.post(f"{self.base}{path}", json=body)
+        self.assertEqual(response.status_code, status, response.text)
+        return response.json()
+
+    def message(self, text=MESSAGE, form="訊息", url=None):
+        return self.post("/verify/messages", {"text": text, "form": form, **({"url": url} if url else {})})
+
+    def first(self, message, reaction="有點慌", confidence=60):
+        return self.post("/docs/verify.first", {"content": {"message": message, "reaction": reaction, "confidence": confidence}})
+
+    def opened(self):
+        mid = self.message()["doc_id"]
+        self.first(mid)
+        return mid
+
+    def claim(self, text=CLAIM, sentence=CHECKABLE, message=None, source="我加的", **more):
+        content = {"text": text, "sentence": sentence, "from": "訊息" if message else source, **({"message": message} if message else {}), **more}
+        return self.post("/docs/verify.claim", {"content": content})
+
+    def ai(self, action, context, answer=None, status=200):
+        self.provider.answer = answer or {}
+        return self.post(f"/ai/VERIFY/{action}", {"context": context}, status)
+
+    def grant(self, *permissions):
+        self.post("/docs/collab_contract.terms", {"content": {"permissions": list(permissions)}})
+
+    def current(self, kind):
+        return self.docs.current(self.tenant_id, self.owner, kind)
+
+    def ledger(self):
+        return {line["claim_id"]: line for line in self.client.get(f"{self.base}/verify/ledger").json()["claims"]}
+
+    def page(self, text=PAGE):
+        """A stored page and GATHER's card for it -- one card per stored page; a second, made-up card would be a state the
+        system never reaches (it made AI citations fail against the other card once GATHER ran on arrival)."""
+        sid = self.source(text, "央行新聞稿")
+        [card] = [doc["doc_id"] for doc in self.docs.current(self.tenant_id, self.owner, "gather.source") if doc["content"]["source_id"] == sid]
+        return sid, card
+
+
+class FirstReactionTests(VerifyCase):
+    def test_nothing_about_a_message_is_looked_up_shown_or_asked_before_the_first_reaction(self):
+        """寫完第一反應，才看系統查到什麼: every result route and AI turn of that message is refused until it exists."""
+        mid = self.message()["doc_id"]
+        refused = [
+            self.client.post(f"{self.base}/verify/factcheck", json={"message": mid}),
+            self.client.post(f"{self.base}/ai/VERIFY/split", json={"context": {"message": mid}}),
+            self.client.post(f"{self.base}/ai/VERIFY/techniques", json={"context": {"message": mid}}),
+            self.client.post(f"{self.base}/docs/verify.claim", json={"content": {"text": CLAIM, "sentence": CHECKABLE, "from": "訊息", "message": mid}}),
+            self.client.post(f"{self.base}/docs/verify.seen", json={"content": {"message": mid, "about": "spread", "text": "家族群組裡看到"}}),
+        ]
+        self.assertEqual([(response.status_code, "VERIFY_FIRST_REACTION_REQUIRED" in response.text) for response in refused], [(400, True)] * len(refused))
+        self.assertEqual((self.provider.calls, self.lookups.calls, self.current("verify.factcheck"), self.current("verify.spread")), ([], [], [], []))
+        self.first(mid)
+        saved = self.ai("split", {"message": mid}, {"claims": [{"text": CLAIM, "sentence": CHECKABLE}]})["saved"]
+        self.assertEqual(saved["kind"], "verify.split")
+        self.assertEqual(self.post("/verify/factcheck", {"message": mid})["kind"], "verify.factcheck")
+
+    def test_a_claim_of_a_message_without_a_first_reaction_reaches_no_turn(self):
+        """A claim slipped in before the gate existed still gates every turn about it."""
+        mid = self.message()["doc_id"]
+        self.docs.save(self.tenant_id, self.owner, "verify.claim", {"text": CLAIM, "sentence": CHECKABLE, "from": "訊息", "message": mid}, record_log.user(self.identity["identity_id"], "VERIFY"))
+        self.grant("search_external")
+        for action in ("read", "summary", "next"):
+            response = self.client.post(f"{self.base}/ai/VERIFY/{action}", json={"context": {}})
+            self.assertIn("VERIFY_FIRST_REACTION_REQUIRED", response.text, action)
+        self.assertEqual(self.provider.calls, [])
+
+    def test_the_first_reaction_is_written_once_and_kept(self):
+        mid = self.message()["doc_id"]
+        first = self.first(mid)
+        again = self.client.post(f"{self.base}/docs/verify.first", json={"content": {"message": mid, "reaction": "其實還好", "confidence": 20}})
+        changed = self.client.put(f"{self.base}/docs/verify.first/{first['doc_id']}", json={"content": {"message": mid, "reaction": "其實還好", "confidence": 20}, "base_version": 1})
+        gone = self.client.delete(f"{self.base}/docs/verify.first/{first['doc_id']}")
+        self.assertEqual((again.status_code, changed.status_code, gone.status_code), (409, 400, 400))
+        self.assertIn("VERIFY_FIRST_REACTION_FIXED", changed.text)
+        self.assertEqual(self.client.post(f"{self.base}/docs/verify.first", json={"content": {"message": "nope", "reaction": "x", "confidence": 1}}).status_code, 404)
+
+    def test_the_first_reaction_writes_what_the_platform_cannot_check_about_how_it_spread(self):
+        mid = self.opened()
+        [spread] = self.current("verify.spread")
+        self.assertEqual((spread["author"], sorted(spread["content"]["cells"])), ("system", sorted(SPREAD_KEYS)))
+        self.assertEqual({cell["state"] for cell in spread["content"]["cells"].values()}, {words.UNCHECKABLE})
+        self.assertEqual(spread["content"]["cells"]["coordinated"]["why"], "平台沒有接社群平台的資料")
+        hooks._first_saved(self.docs, self.tenant_id, self.owner, self.current("verify.first")[0])
+        self.assertEqual(len(self.current("verify.spread")), 1)
+        seen = self.post("/docs/verify.seen", {"content": {"message": mid, "about": "coordinated", "text": "兩小時內好幾個群組都在傳"}})
+        self.assertEqual(seen["author"], "user")
+
+
+class MessageTests(VerifyCase):
+    def test_a_message_is_stamped_and_kept_as_it_was(self):
+        saved = self.message()
+        self.assertEqual(saved["content"]["sha256"], hashlib.sha256(MESSAGE.encode("utf-8")).hexdigest())
+        forged = self.client.post(f"{self.base}/docs/verify.message", json={"content": {"text": MESSAGE, "form": "訊息", "sha256": "0" * 64}})
+        edited = self.client.put(f"{self.base}/docs/verify.message/{saved['doc_id']}", json={"content": {**saved["content"], "text": "改過"}, "base_version": 1})
+        link = self.client.post(f"{self.base}/verify/messages", json={"text": "看這個", "form": "連結"})
+        self.assertEqual([(response.status_code, code in response.text) for response, code in ((forged, "VERIFY_MESSAGE_STAMP_INVALID"), (edited, "VERIFY_MESSAGE_FIXED"), (link, "VERIFY_MESSAGE_LINK_REQUIRED"))],
+                         [(400, True)] * 3)
+        self.assertEqual(self.message("看這個", "連結", "https://example.org/x")["content"]["url"], "https://example.org/x")
+
+    def test_a_crisis_word_in_a_pasted_message_brings_help(self):
+        self.assertEqual([notice["type"] for notice in self.message("他說他不想活了，大家快轉")["notices"]][:1], ["crisis"])
+
+    def test_the_message_is_never_a_source(self):
+        """A message stored as a source would support itself with an exact quote (rules §4)."""
+        mid = self.opened()
+        self.client.post("/me/docs/govern.location", json={"content": {"where": "台北"}})
+        self.lookups.answer = answer_with(cofacts=COFACTS_FOUND)
+        with mock.patch.object(block_hooks, "after_sources"):
+            self.post("/verify/factcheck", {"message": mid})
+        sources = self._repo.list_sources(self.tenant_id, self.pid)
+        self.assertEqual(len(sources), 2)   # the TFC review and the answered Cofacts article; the message is none of them
+        self.assertNotIn(hashlib.sha256(MESSAGE.encode("utf-8")).hexdigest(), {source["content_sha256"] for source in sources})
+        for source in sources:
+            text = self._source_cas.read(self.tenant_id, self._repo.get_source_content_reference(self.tenant_id, self.pid, source["source_id"])).decode("utf-8")
+            self.assertNotIn("不轉就來不及", text)
+
+
+class SplitAndClaimTests(VerifyCase):
+    def test_the_ai_proposes_a_split_and_only_my_confirmation_makes_a_claim(self):
+        mid = self.opened()
+        split = self.ai("split", {"message": mid}, {"message": "someone-else", "claims": [
+            {"text": CLAIM, "sentence": CHECKABLE, "law": False}, {"text": "快轉給家人", "sentence": "叫你去做的事"}, {"text": "亂寫的", "sentence": "不存在"}]})["saved"]
+        self.assertEqual((split["author"], split["content"]["message"], [item["sentence"] for item in split["content"]["claims"]]), ("ai", mid, [CHECKABLE, "叫你去做的事"]))
+        self.assertEqual(self.current("verify.claim"), [])
+        claim = self.claim(message=mid, proposal=f"{split['doc_id']}#0")
+        self.assertEqual((claim["author"], claim["content"]["proposal"]), ("user", f"{split['doc_id']}#0"))
+        wrong = self.client.post(f"{self.base}/docs/verify.claim", json={"content": {"text": CLAIM, "sentence": CHECKABLE, "from": "訊息", "message": mid, "proposal": f"{split['doc_id']}#9"}})
+        self.assertIn("VERIFY_CLAIM_FROM_INVALID", wrong.text)
+
+    def test_a_claim_from_map_names_a_fact_or_law_claim_of_the_map(self):
+        self.post("/docs/map.map", {"content": {"claims": [{"id": "c1", "text": "公會改了合約範本", "kind": "事實", "by": "user"}, {"id": "c2", "text": "公會不該這樣", "kind": "價值", "by": "user"}]}})
+        self.assertEqual(self.claim("公會改了合約範本", source="MAP", map_claim="c1")["content"]["from"], "MAP")
+        for map_claim in ("c2", "c9"):
+            response = self.client.post(f"{self.base}/docs/verify.claim", json={"content": {"text": "x", "sentence": CHECKABLE, "from": "MAP", "map_claim": map_claim}})
+            self.assertIn("VERIFY_CLAIM_FROM_INVALID", response.text, map_claim)
+
+    def test_changing_a_claim_says_why_and_keeps_where_it_came_from(self):
+        """你可以改拆法、補主張；你改的時候，要留下理由."""
+        claim = self.claim()
+        put = lambda content, version: self.client.put(f"{self.base}/docs/verify.claim/{claim['doc_id']}", json={"content": content, "base_version": version})   # noqa: E731
+        self.assertIn("VERIFY_CLAIM_REASON_REQUIRED", put({**claim["content"], "text": "央行宣布每天只能領兩萬元"}, 1).text)
+        self.assertEqual(put({**claim["content"], "text": "央行宣布每天只能領兩萬元", "reason": "原文是兩萬"}, 1).status_code, 200)
+        self.assertIn("VERIFY_CLAIM_REASON_REQUIRED", put({**claim["content"], "text": "央行宣布每天只能領三萬元", "reason": "原文是兩萬"}, 2).text)
+        self.assertIn("VERIFY_CLAIM_FIXED", put({**claim["content"], "from": "MAP", "reason": "x"}, 2).text)
+
+
+class TechniquesTests(VerifyCase):
+    def test_a_technique_is_named_only_with_the_messages_own_words(self):
+        mid = self.opened()
+        saved = self.ai("techniques", {"message": mid}, {"techniques": [{"name": "情緒勒索", "quote": "不轉就來不及", "why": "用時間壓力逼你"}, {"name": "不在清單上", "quote": "不轉就來不及", "why": "x"}],
+                                                         "asks": [{"what": "轉傳", "quote": "不轉就來不及，快轉給家人"}]})["saved"]
+        self.assertEqual([item["name"] for item in saved["content"]["techniques"]], ["情緒勒索"])
+        self.assertEqual((saved["content"]["asks"][0]["what"], saved["content"]["rules"]), ("轉傳", TECHNIQUES.stamp()))
+        self.provider.answer = {"techniques": [{"name": "冒充來源", "quote": "央行總裁親口說的", "why": "x"}], "asks": []}
+        response = self.client.post(f"{self.base}/ai/VERIFY/techniques", json={"context": {"message": mid}})
+        self.assertEqual(response.status_code, 502)
+        self.assertIn("AI_ANSWER_INVALID", response.text)
+        self.assertEqual(len(self.current("verify.techniques")), 1)   # a made-up quote saves nothing
+
+
+class ReadingTests(VerifyCase):
+    def setUp(self):
+        super().setUp()
+        self.mid = self.opened()
+        self.cid = self.claim(message=self.mid)["doc_id"]
+        self.sid, self.cardid = self.page()
+        self.group([self.cardid])
+
+    def reading(self, **changes):
+        return {"claim": self.cid, "card": self.cardid, "reads_as": "反對", "quote": "本行從未宣布每日提款上限", "citations": [f"source:{self.sid}"], **changes}
+
+    def test_reading_sources_needs_the_grant_and_takes_versions_from_the_records(self):
+        self.assertEqual(self.ai("read", {}, {"readings": [self.reading()]}, 403)["detail"].split(":")[0], "AI_PERMISSION_DENIED")
+        self.grant("search_external")
+        saved = self.ai("read", {}, {"readings": [self.reading(claim_version=99, snapshot="x")]})["saved"]
+        [entry] = saved["content"]["readings"]
+        self.assertEqual((entry["claim_version"], entry["snapshot"], saved["author"]), (1, self.sha(self.cardid), "ai"))
+        self.assertEqual(self.ledger()[self.cid]["oppose"], [])   # a reading never counts by itself
+        self.assertEqual(self.ai("read", {}, {"readings": [self.reading(claim="made-up")]}, 502)["detail"].split(":")[0], "AI_ANSWER_INVALID")
+        self.assertEqual(self.ai("read", {}, {"readings": [self.reading(quote="央行說可以領兩萬元")]}, 502)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
+
+    def test_confirming_one_claims_readings_at_once_is_my_save_and_then_they_count(self):
+        self.grant("search_external")
+        reading = self.ai("read", {}, {"readings": [self.reading()]})["saved"]
+        done = self.post("/verify/stances/confirm", {"reading": reading["doc_id"], "claim": self.cid})
+        self.assertEqual((done["saved"], done["skipped"]), (1, 0))
+        [stance] = self.current("verify.stance")
+        self.assertEqual((stance["author"], stance["content"]["reading"], stance["content"]["stance"]), ("user", reading["doc_id"], "反對"))
+        line = self.ledger()[self.cid]
+        self.assertEqual((len(line["oppose"]), line["few"], line["three"]["found"], line["three"]["independent_enough"]), (1, True, True, False))
+        self.assertEqual(self.post("/verify/stances/confirm", {"reading": reading["doc_id"], "claim": self.cid})["skipped"], 1)
+
+    def test_one_live_stance_per_claim_and_card_and_reading_it_differently_says_why(self):
+        self.grant("search_external")
+        reading = self.ai("read", {}, {"readings": [self.reading()]})["saved"]
+        content = {"claim": self.cid, "claim_version": 1, "card": self.cardid, "snapshot": self.sha(self.cardid), "stance": "支持", "reading": reading["doc_id"]}
+        self.assertIn("VERIFY_STANCE_REASON_REQUIRED", self.client.post(f"{self.base}/verify/stances", json={"content": content}).text)
+        mine = self.post("/verify/stances", {"content": {**content, "reason": "它講的是別家銀行"}})
+        again = self.client.post(f"{self.base}/verify/stances", json={"content": {**content, "stance": "看不出", "reason": "重讀"}})
+        self.assertEqual(again.status_code, 409)
+        self.assertIn("VERIFY_STANCE_ALREADY_GIVEN", again.text)
+        moved = self.client.post(f"{self.base}/verify/stances", json={"content": {**content, "card": self.card(), "reason": "x"}, "doc_id": mine["doc_id"], "base_version": 1})
+        self.assertIn("VERIFY_STANCE_FIXED", moved.text)
+
+    def test_a_quote_i_type_is_the_cards_own_stored_words(self):
+        content = {"claim": self.cid, "claim_version": 1, "card": self.cardid, "snapshot": self.sha(self.cardid), "stance": "反對"}
+        self.assertIn("VERIFY_QUOTE_NOT_IN_SOURCE", self.client.post(f"{self.base}/verify/stances", json={"content": {**content, "quote": "央行說可以領兩萬元"}}).text)
+        self.assertIn("VERIFY_QUOTE_UNCHECKED", self.client.post(f"{self.base}/docs/verify.stance", json={"content": {**content, "quote": "本行從未宣布每日提款上限"}}).text)
+        saved = self.post("/verify/stances", {"content": {**content, "quote": "本行從未宣布每日\n提款上限"}})
+        self.assertEqual(saved["content"]["quote"], "本行從未宣布每日\n提款上限")
+
+    def test_a_stance_is_for_the_claims_current_version_and_the_cards_current_page(self):
+        content = {"claim": self.cid, "claim_version": 2, "card": self.cardid, "snapshot": self.sha(self.cardid), "stance": "反對"}
+        self.assertIn("VERIFY_CLAIM_VERSION_STALE", self.client.post(f"{self.base}/verify/stances", json={"content": content}).text)
+        self.assertIn("VERIFY_SNAPSHOT_STALE", self.client.post(f"{self.base}/verify/stances", json={"content": {**content, "claim_version": 1, "snapshot": "0" * 64}}).text)
+
+
+class VerdictAndLedgerTests(VerifyCase):
+    def test_one_live_verdict_per_claim_for_its_current_version(self):
+        cid = self.claim()["doc_id"]
+        verdict = {"claim": cid, "claim_version": 1, "verdict": "存疑", "reason": "只有一個出處"}
+        self.post("/docs/verify.verdict", {"content": verdict})
+        self.assertEqual(self.client.post(f"{self.base}/docs/verify.verdict", json={"content": verdict}).status_code, 409)
+        self.assertIn("VERIFY_CLAIM_VERSION_STALE", self.client.post(f"{self.base}/docs/verify.verdict", json={"content": {**verdict, "claim_version": 3}}).text)
+
+    def test_you_checked_this_before_in_this_case_and_never_across_cases(self):
+        first = self.claim("央行宣布下週起每天只能領一萬元！")["doc_id"]
+        second = self.claim("央行宣布：下週起，每天只能領 一萬元")["doc_id"]
+        self.claim("央行宣布下週起每天只能領兩萬元")
+        self.assertEqual((self.ledger()[second]["earlier"], self.ledger()[first]["earlier"]), ([first], []))
+        self.assertEqual(claim_key("央行宣布下週起每天只能領一萬元！"), claim_key("央行宣布：下週起，每天只能領 一萬元"))
+        other = self._create_project(name="另一個案子")["project_id"]
+        theirs = self.client.post(f"/projects/{other}/docs/verify.claim", json={"content": {"text": "央行宣布下週起每天只能領一萬元！", "sentence": CHECKABLE, "from": "我加的"}}).json()["doc_id"]
+        self.assertEqual([line["earlier"] for line in self.client.get(f"/projects/{other}/verify/ledger").json()["claims"] if line["claim_id"] == theirs], [[]])
+
+    def test_the_ledger_keeps_the_three_things_apart_and_marks_law_without_its_details(self):
+        law = self.claim("提款上限依銀行法第 45 條", law=True, jurisdiction="台灣")["doc_id"]
+        reading = self.claim("這代表銀行快倒了", sentence="對事實的解釋")["doc_id"]
+        fact = self.claim()["doc_id"]
+        a, b = self.card(url="https://a"), self.card(url="https://b")
+        self.group([a], [b])
+        for card in (a, b):
+            self.save("verify.stance", {"claim": fact, "claim_version": 1, "card": card, "snapshot": self.sha(card), "stance": "反對"}, record_log.user(self.identity["identity_id"], "VERIFY"))
+        lines = self.ledger()
+        self.assertEqual((lines[law]["law_state"], lines[reading]["needs_alternative"], lines[reading]["state"]), ("未確認", True, words.NOT_CHECKABLE))
+        three = lines[fact]["three"]
+        self.assertEqual((three["found"], three["independent"], three["independent_enough"], len(three["stands"])), (True, 2, True, 2))
+        self.assertEqual(three["stands"][0]["cards"][0]["operator"], {"state": "查不到", "why": "沒有寫"})   # only what was found; never a tick
+
+
+class SummaryAndNextTests(VerifyCase):
+    def setUp(self):
+        super().setUp()
+        self.cid = self.claim()["doc_id"]
+        self.cardid = self.card(url="https://a")
+        self.group([self.cardid])
+        self.save("verify.stance", {"claim": self.cid, "claim_version": 1, "card": self.cardid, "snapshot": self.sha(self.cardid), "stance": "支持"}, record_log.user(self.identity["identity_id"], "VERIFY"))
+
+    def test_under_two_independent_origins_the_ai_stops_before_any_call_and_says_how_many(self):
+        stopped = self.ai("summary", {})
+        self.assertEqual((sorted(stopped), self.provider.calls), (["handback"], []))
+        self.assertIn("1 個", stopped["handback"])
+        saved = self.ai("summary", {"go_on": True}, {"lines": [{"claim": self.cid, "line": "這是真的，大家可以放心轉傳"}], "overview": "帳本上有一個主張。"})["saved"]
+        self.assertEqual(saved["content"]["lines"], [{"claim": self.cid, "claim_version": 1, "line": "只有一個出處這樣說"}])
+
+    def test_the_summary_is_given_counts_never_a_sources_country_or_my_verdict(self):
+        self.save("verify.verdict", {"claim": self.cid, "claim_version": 1, "verdict": "不採信", "reason": "我覺得發訊的人是對岸的"}, record_log.user(self.identity["identity_id"], "VERIFY"))
+        self.ai("summary", {"go_on": True}, {"lines": [], "overview": "x"})
+        sent = self.provider.calls[0][1]
+        self.assertNotIn("對岸", sent)
+        self.assertNotIn("country", sent)
+        self.assertIn('"support": 1', sent)
+
+    def test_what_is_still_worth_checking_needs_no_grant(self):
+        saved = self.ai("next", {}, {"items": ["央行官網的新聞稿", ""], "question": "最早是誰傳的？還有別的嗎？"})["saved"]
+        self.assertEqual((saved["content"]["items"], saved["content"]["question"]), (["央行官網的新聞稿"], "最早是誰傳的？"))
+
+
+class FactcheckTests(VerifyCase):
+    """系統查別人是不是已經查過這一則: collect asks the databases (specs/wire/lookup.v1.json); VERIFY shows what each said."""
+
+    def setUp(self):
+        super().setUp()
+        self.mid = self.opened()
+        self.client.post("/me/docs/govern.location", json={"content": {"where": "台北"}})
+
+    def check(self, body=None):
+        with mock.patch.object(block_hooks, "after_sources") as arrived:
+            saved = self.post("/verify/factcheck", body or {"message": self.mid})
+        return {item["db"]: item for item in saved["content"]["dbs"]}, saved, arrived
+
+    def text_of(self, url):
+        source = self._repo.find_active_source(self.tenant_id, self.pid, url)
+        return self._source_cas.read(self.tenant_id, self._repo.get_source_content_reference(self.tenant_id, self.pid, source["source_id"])).decode("utf-8")
+
+    def test_each_database_says_what_collect_found_and_a_hit_is_a_source(self):
+        self.lookups.answer = SPEC_ANSWER
+        dbs, saved, arrived = self.check()
+        self.assertEqual(list(dbs), ["cofacts", "claimreview", "google"])   # 台灣: the local database first
+        self.assertEqual((dbs["cofacts"]["state"], dbs["cofacts"]["why"]), ("無法檢查", "Cofacts 這次沒有回應"))   # collect's own why
+        self.assertEqual((dbs["google"]["state"], dbs["google"]["why"]), ("無法檢查", "平台還沒有這個金鑰"))
+        [hit] = dbs["claimreview"]["hits"]
+        self.assertEqual((dbs["claimreview"]["state"], hit["publisher"], hit["judged_as"], hit["local"]), ("查到", "台灣事實查核中心", "錯誤", True))
+        self.assertEqual(self.lookups.calls, [(self.pid, "factcheck", [{"text": MESSAGE}])])
+        [source] = self._repo.list_sources(self.tenant_id, self.pid)
+        self.assertEqual((source["source_class"], source["canonical_url"], saved["content"]["rules"]["version"]), ("fact_check", "https://tfc-taiwan.org.tw/articles/1", "2"))
+        text = self.text_of("https://tfc-taiwan.org.tw/articles/1")
+        for line in ("他們查的說法（不是他們的結論）：銀行下週起每日提款上限兩萬", "他們的判定：錯誤", f"資料來源：{CLAIMREVIEW_ATTRIBUTION}"):
+            self.assertIn(line, text)
+        [event] = [event for event in self._repo.list_events(self.tenant_id, f"source:{source['source_id']}") if event["event_type"] == "SourceAdded"]
+        self.assertEqual((event["author"], event["block"]), ("system", "GATHER"))   # written as GATHER: its slot stays dark
+        self.assertEqual(arrived.call_args.args[3]["source_ids"], [source["source_id"]])
+        self.assertNotIn("GATHER", CaseDocs(self._repo).blocks_used(self.tenant_id, self.owner))
+
+    def test_collect_down_or_not_set_up_makes_both_databases_uncheckable_never_an_error(self):
+        """lookup.v1 R7: no token, unreachable, 5xx -- every fact-check database is 無法檢查 「蒐集器這次沒有回應」."""
+        down = [("claimreview", "無法檢查", collect_lookups.DOWN), ("cofacts", "無法檢查", collect_lookups.DOWN)]
+        self.lookups.error = InvariantViolation("COLLECT_LOOKUP_UNAVAILABLE: HTTP 503 from app.aware-wave.com")
+        with self.assertLogs("ai_lego.platform.net.collect_lookups", "WARNING"):   # logged, never raised
+            dbs, _, arrived = self.check()
+        self.assertEqual([(db, dbs[db]["state"], dbs[db]["why"]) for db in ("claimreview", "cofacts")], down)
+        api_main.app.dependency_overrides[api_main.get_collection_service] = lambda: None   # COLLECT_RESEARCH_RUNS_TOKEN unset
+        with self.assertLogs("ai_lego.platform.net.collect_lookups", "WARNING"):
+            dbs, _, _ = self.check()
+        self.assertEqual([(db, dbs[db]["state"], dbs[db]["why"]) for db in ("claimreview", "cofacts")], down)
+        self.assertEqual((self._repo.list_sources(self.tenant_id, self.pid), arrived.called), ([], False))
+
+    def test_an_answer_not_in_the_spec_shape_is_uncheckable_not_an_error(self):
+        """lookup.v1 R8: 查到 with nothing found, 查不到 without why."""
+        self.lookups.answer = answer_with(claimreview={"db": "claimreview", "state": "查到", "attribution": "", "hits": []},
+                                          cofacts={"db": "cofacts", "state": "查不到", "attribution": "", "hits": []})
+        dbs, _, _ = self.check()
+        self.assertEqual({dbs[db]["why"] for db in ("claimreview", "cofacts")}, {collect_lookups.MALFORMED})
+        self.assertEqual(self._repo.list_sources(self.tenant_id, self.pid), [])
+
+    def test_a_cofacts_article_with_replies_is_a_source_and_one_nobody_answered_is_only_counted(self):
+        self.lookups.answer = answer_with(cofacts=COFACTS_FOUND)
+        dbs, _, _ = self.check()
+        self.assertEqual((dbs["cofacts"]["state"], [hit["judged_as"] for hit in dbs["cofacts"]["hits"]]), ("查到", ["含有不實訊息"]))
+        self.assertEqual(dbs["cofacts"]["why"], "另外有 1 則相近的訊息有人問過，還沒有人回應")
+        self.assertIsNone(self._repo.find_active_source(self.tenant_id, self.pid, "https://cofacts.tw/article/a2"))
+        text = self.text_of("https://cofacts.tw/article/a1")
+        for line in ("央行澄清：沒有每日提款上限。", "回應 1 的出處：https://www.cbc.gov.tw/news/1", f"資料來源：{COFACTS_ATTRIBUTION}"):
+            self.assertIn(line, text)
+
+    def test_the_same_result_twice_is_one_source(self):
+        self.lookups.answer = SPEC_ANSWER
+        self.check()
+        _, _, arrived = self.check()
+        self.assertEqual((len(self._repo.list_sources(self.tenant_id, self.pid)), arrived.called), (1, False))
+
+    def test_elsewhere_only_the_global_databases_are_shown_and_the_local_checker_is_not_first(self):
+        self.client.post("/me/docs/govern.location", json={"content": {"where": "東京"}})
+        other = {"claim": "銀行下週起每日提款上限兩萬", "url": "https://example.org/review/1", "publisher": "Other Checker", "publisher_url": "https://example.org",
+                 "judged_as": "False", "date": "2026-05-02", "claimant": ""}
+        claimreview = json.loads(json.dumps(SPEC_ANSWER["items"][0]["dbs"][0]))
+        claimreview["hits"].append(other)
+        self.lookups.answer = answer_with(claimreview=claimreview, cofacts=COFACTS_FOUND)
+        dbs, saved, _ = self.check()
+        self.assertEqual((list(dbs), saved["content"].get("place")), (["claimreview", "google"], None))
+        self.assertEqual([(hit["publisher"], hit["local"]) for hit in dbs["claimreview"]["hits"]], [("台灣事實查核中心", False), ("Other Checker", False)])
+        self.assertIsNone(self._repo.find_active_source(self.tenant_id, self.pid, "https://cofacts.tw/article/a1"))
+
+    def test_in_taiwan_the_local_checker_comes_first(self):
+        other = {"claim": "銀行下週起每日提款上限兩萬", "url": "https://example.org/review/1", "publisher": "Other Checker", "publisher_url": "https://example.org",
+                 "judged_as": "False", "date": "2026-05-02", "claimant": ""}
+        claimreview = json.loads(json.dumps(SPEC_ANSWER["items"][0]["dbs"][0]))
+        claimreview["hits"].insert(0, other)
+        self.lookups.answer = answer_with(claimreview=claimreview)
+        dbs, _, _ = self.check()
+        self.assertEqual([(hit["publisher"], hit["local"]) for hit in dbs["claimreview"]["hits"]], [("台灣事實查核中心", True), ("Other Checker", False)])
+
+    def test_a_claim_can_be_looked_up_too(self):
+        cid = self.claim(message=self.mid)["doc_id"]
+        _, saved, _ = self.check({"claim": cid})
+        self.assertEqual((saved["content"]["claim"], saved["content"]["claim_version"], self.lookups.calls[-1][2]), (cid, 1, [{"text": CLAIM}]))
+        self.assertEqual(self.client.post(f"{self.base}/verify/factcheck", json={}).status_code, 400)
+
+
+class SearchTests(CollectionApiTestCase):
+    """「去查」: one collection run per checkable claim, plan first; its end writes verify.search for that claim."""
+
+    def setUp(self):
+        super().setUp()
+        self.pid = self.project["project_id"]
+        self.docs, self.tenant_id, self.owner = CaseDocs(self._repo), self.tenant["tenant_id"], record_log.case(self.project["project_id"])
+
+    def claim(self, sentence=CHECKABLE):
+        response = self.client.post(f"/projects/{self.pid}/docs/verify.claim", json={"content": {"text": CLAIM, "sentence": sentence, "from": "我加的"}})
+        return response.json()["doc_id"]
+
+    def go(self, claim, **body):
+        return self.client.post(f"/projects/{self.pid}/verify/claims/{claim}/search", json=body)
+
+    def start_run(self, claim):
+        self._collector()
+        response = self.go(claim, confirm=True)
+        self.assertEqual(response.status_code, 202, response.text)
+        token = self._exchange(self.service.calls[-1]["grant_ref"]).json()["grant_token"]
+        return response.json()["run_id"], {"Authorization": f"Grant {token}"}
+
+    def searches(self):
+        block_hooks.wait_idle()
+        return [doc["content"] for doc in self.docs.current(self.tenant_id, self.owner, "verify.search")]
+
+    def test_go_check_shows_the_plan_then_runs_one_claim_seed_of_the_wire(self):
+        self.assertIn("VERIFY_CLAIM_NOT_CHECKABLE", self.go(self.claim("價值判斷")).text)
+        claim = self.claim()
+        plan = self.go(claim)
+        self.assertEqual((plan.status_code, plan.json()["confirm_required"], self.service.calls), (200, True, []))
+        self.assertIn("VERIFY_SEARCH_ANGLES_INVALID", self.go(claim, angles=["perplexity"]).text)
+        run_id, _ = self.start_run(claim)
+        [seed] = self.service.calls[0]["seeds"]
+        self.assertTrue(seed["uri"].startswith("entity://claim/"))
+        self.assertEqual(seed["meta"], {"kind": "claim", "entityName": CLAIM, "angles": list(SEARCH_ANGLES), "languages": ["zh", "en"], "providers": ["serper", "brave"]})
+        [lookup] = self.docs.current(self.tenant_id, self.owner, "verify.lookup")
+        self.assertEqual((lookup["content"]["claim"], lookup["content"]["run"], lookup["author"]), (claim, run_id, "system"))
+
+    def test_the_runs_end_says_what_was_found_for_that_claim_once(self):
+        claim = self.claim()
+        run_id, grant = self.start_run(claim)
+        ingest = self.client.post(f"/projects/{self.pid}/sources/ingest", json={"run_id": run_id, "sources": [c1("https://acme.example/a", "alpha")]}, headers=grant)
+        self.assertEqual((ingest.status_code, self.searches()), (200, []))   # a batch is not the end
+        done = self.client.post(f"/projects/{self.pid}/collections/{run_id}/complete", json={"status": "completed", "report": REPORT}, headers=grant)
+        self.assertEqual(done.status_code, 200, done.text)
+        self.assertEqual(self.searches(), [{"claim": claim, "claim_version": 1, "state": "查到", "why": "找回 3 頁", "run": run_id}])
+        hooks._after_sources(self.docs, self.tenant_id, self.owner, {"run": run_id, "channels": []})
+        self.assertEqual(len(self.searches()), 1)
+        [line] = self.client.get(f"/projects/{self.pid}/verify/ledger").json()["claims"]
+        self.assertEqual((line["state"], line["lookup"]["status"], line["search"]["state"]), (words.NOT_READ, "completed", "查到"))
+        self.assertNotIn("GATHER", self.docs.blocks_used(self.tenant_id, self.owner))   # the background search lights no GATHER slot
+
+    def test_a_run_that_could_not_look_is_uncheckable_and_one_that_found_nothing_says_so(self):
+        self.assertEqual(hooks.search_result({"status": "failed"}, []), ("無法檢查", "蒐集器這次沒有跑完"))
+        self.assertEqual(hooks.search_result({"status": "completed", "report": REPORT}, [{"provider": "serper", "lang": "zh", "state": "unreachable"}, {"provider": "brave", "lang": "zh", "state": "no_key"}])[0], "無法檢查")
+        self.assertEqual(hooks.search_result({"status": "completed", "report": {**REPORT, "written": 0}}, [{"provider": "serper", "lang": "zh", "state": "ok"}]), ("查不到", "找過，沒有找到相關的網頁"))
+        self.assertEqual(hooks.search_result({"status": "completed", "report": None}, [])[0], "無法檢查")
+
+
+class ProposeGatherTests(Step2Case):
+    def test_more_cards_than_one_ai_turn_reads_proposes_gather(self):
+        for index in range(13):
+            self.card(source_id=f"s{index}", url=f"https://p{index}")
+        self.docs.save(self.tenant_id, self.owner, "verify.lookup", {"claim": "c", "claim_version": 1, "run": "r1"}, record_log.system("VERIFY"))
+        with mock.patch.object(ProjectSourceRepository, "get_collection_run", return_value={"status": "completed", "report": REPORT}):
+            hooks._after_sources(self.docs, self.tenant_id, self.owner, {"run": "r1", "channels": []})
+        [proposal] = self.docs.current(self.tenant_id, self.owner, "assembler.proposal.verify")
+        self.assertEqual((proposal["content"]["propose"], proposal["content"]["why"]), ("GATHER", hooks.WHY_GATHER))
+
+
+class EngineReachesNothingOutsideTests(unittest.TestCase):
+    """lookup.v1 R9 (operator 2026-09-17; why, 2026-10-04: each block is built separately and then chained, collect is
+    the searcher): the engine has no fact-check fetch of its own and its allowlist holds only the AI provider and collect."""
+
+    def test_the_engine_package_has_no_fact_check_fetch_and_names_no_such_host(self):
+        lego = PRODUCT_ROOT / "ai_lego"
+        self.assertEqual([name for name in ("claimreview.py", "cofacts.py", "rdap.py", "wayback.py") if (lego / "platform" / "net" / name).exists()], [])
+        banned = ("api.cofacts.tw", "storage.googleapis.com", "datacommons-feeds", "ListArticles", "factchecktools.googleapis.com")
+        texts = {path.relative_to(lego).as_posix(): path.read_text(encoding="utf-8") for path in lego.rglob("*.py")}
+        self.assertEqual(sorted(f"{name}: {word}" for name, text in texts.items() for word in banned if word in text), [])
+        self.assertEqual(sorted(name for name, text in texts.items() if "fetch_json" in text),
+                         ["platform/ai_gateway/provider.py", "platform/net/collection_service.py", "platform/net/egress.py"])
+
+    def test_the_allowlist_keeps_only_the_ai_provider_and_collect(self):
+        from tests.unit.test_egress_allowlist_parity import _compose_allowlist
+
+        self.assertEqual(_compose_allowlist(), frozenset({"api.anthropic.com", "app.aware-wave.com"}))
+
+
+class IntegrityTests(unittest.TestCase):
+    def test_verify_passes_the_integrity_core(self):
+        """結論只收人寫的, no scores, every AI action a visible permission reading only the card's drawers, a crisis stops it,
+        high risk recognised on every kind of the person's words, routes keep the save path."""
+        rows = {row.block: row for row in integrity.run()}
+        self.assertEqual(rows["VERIFY"].failures, [])
+        self.assertEqual([failure for failure in rows["PLATFORM"].failures if failure[0] in ("routes_keep_the_save_path", "ai_inputs_are_readable")], [])
+
+
+if __name__ == "__main__":
+    unittest.main()

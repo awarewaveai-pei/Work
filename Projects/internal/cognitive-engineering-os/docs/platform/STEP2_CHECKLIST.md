@@ -41,6 +41,32 @@ Owners: S = supervisor session; 甲 GATHER; 乙 VERIFY; 丙 COMPUTE; 丁 collect
 - DECISION: 2026-10-04 她確認 9/17 規則涵蓋查詢：積木分開再串聯，對外查詢都在 collect（specs/wire/lookup.v1.json），平台不連外。
 
 ## VERIFY (乙)
+- built: 「你貼上訊息、截圖或連結」「系統替訊息原文存一份當時的樣子」 -- `verify.message` (person, never edited, `deletable=False`), the server stamps the text's sha256 (`POST /verify/messages`; a wrong stamp is refused on every path); the message is never sent to /sources
+- built: 「你先停一下，寫下第一反應和信心」「寫完，你才看系統查到什麼」 -- `verify.first` (person-only, once per message, never edited); until it exists the fact-check route, every AI turn and every claim, stance, verdict and note about that message are refused (`VERIFY_FIRST_REACTION_REQUIRED`)
+- built: 「AI 先提出一則訊息怎麼拆成主張。你確認了才算」「訊息裡的四種句子」「講法律的句子另外標法律」 -- AI `split` (organize) -> `verify.split`; each confirmed line is the person's `verify.claim` naming its proposal; MAP's 事實／法律 claims come in with `from = MAP`
+- built: 「要寫法域、時效、來源；沒寫的，不能當成確定的結論」 -- the ledger marks it 未確認; 「系統請你至少寫一個別的解釋」 -- the form asks and the ledger flags `needs_alternative` (asked, not refused)
+- 2026-10-04 她確認 9/17 規則涵蓋查詢：積木分開再串聯，查核資料庫在 collect（specs/wire/lookup.v1.json），平台不連外。
+- built: 「系統查別人是不是已經查過這一則」「查核組織的結論，系統當成一個來源」「標明是誰判的、依據什麼」「系統不把它當成平台的結論」 -- one `collect_lookups.factcheck` call per lookup (ClaimReview and Cofacts are asked by collect; matching thresholds are collect's, lookup.v1 R5); each hit is a source written as GATHER with who judged, on what grounds, the link and the attribution collect sent; a database collect could not ask shows collect's why; collect down or not set up = both 無法檢查 「蒐集器這次沒有回應」; ruleset `verify.factcheck_dbs` v2 keeps only which databases are shown per place and whose hits come first
+- built: 「你在別的地方時，系統換成當地的查核組織」 -- the place's list from 「你在哪裡」 (台灣: Cofacts first, TFC and MyGoPen first among ClaimReview); KNOWN LIMIT: only 台灣 has a local list, anywhere else uses the global feed and says so
+- NOT YET: 「Google 的查核搜尋介面也能用，但要先申請金鑰」 -- no key (MY_DECISIONS: the operator applies before VERIFY opens); shown as 無法檢查 「平台還沒有這個金鑰」; with a key it is asked by collect like the other two, never by the engine
+- DECISION: 「每個事實主張，系統在背後用蒐集器找來源」 -- starts when the person presses 「去查」 on a claim, after the plan is shown (the collections route's plan-then-confirm rule); one run per claim, so the run's end says 查到／查不到／無法檢查 for that claim (`verify.search`)
+- KNOWN LIMIT: a 「去查」 run that dies without calling back gets no `verify.search` until a later arrival in the case; the ledger shows the run as 沒有跑完 and the person can press 「去查」 again
+- built: 「來源多到要你自己篩時，系統才問你要不要加 GATHER」 -- more usable cards than one AI reading turn takes (`ai_gate.MAX_SOURCES_PER_TURN`) proposes GATHER with fixed words
+- built: 「系統把結果排成一張表，叫主張帳本」「幾個獨立出處支持、幾個反對」「查不到」「無法檢查」 -- `GET /verify/ledger` over `evidence.checked_claims`; the AI's reading (`read`, cites, needs 找外部資料) never counts until the person confirms it into `verify.stance` (one by one or all of a claim at once)
+- built: 「三件事分開顯示：找得到出處、出處彼此獨立、出處站得住」「前兩件打勾，第三件不打勾」「只列查得到的事」 -- the ledger line's `three` (who runs it, original or repost, which list)
+- built: 「系統拿訊息對照一份操弄手法的清單。這份清單有版本」「附上原文的哪一段」「清單至少有」九種 -- ruleset `verify.techniques` v1; AI `techniques` refuses a quote not in the message; 「手法不等於假」 on the page; 「系統找出它要你做什麼」 -- `asks` with the quote
+- NOT YET: 「系統查是不是很多帳號同時貼同一句」「短時間內暴增…標疑似協同」「系統查這則訊息最早從哪裡出來、怎麼傳開」 -- no social-network data (rules §11): `verify.spread` writes 無法檢查 「平台沒有接社群平台的資料」; the person's own note is `verify.seen`, never counted; 「去查」 includes the 最早的出處 angle
+- NOT YET: 「圖片和影片，系統拿去搜尋」「內容來源憑證…讀出來顯示」 -- no tool in step 2 and only text is pasted: 無法檢查 with why; 「是不是 AI 生成的」 -- 無法檢查 「沒有工具給得出依據，無法判定」
+- built: 「你對每個主張標採信、存疑或不採信，並寫一句理由」 -- `verify.verdict`, one live per claim; 「同一個案子裡，同一個說法再出現時，系統提醒你查過」 -- the ledger's `earlier` (width, spaces and punctuation ignored); 「別的案子出現，不提醒」 -- computed inside one case only (a test)
+- built: 「AI 用白話摘要主張帳本」「一個主張的獨立出處不到兩個時，AI 停下來。畫面顯示有幾個出處」「只有一個出處時，AI 只能說只有一個出處這樣說」 -- `summary` hands back before any call; going on is the person's button; a weak claim's line is fixed words whatever the model says
+- built: 「AI 提出還該查什麼」 -- `next` (point_gaps, no grant)
+- KNOWN LIMIT: 「AI 不准宣判真假」「不准替你決定轉不轉、信不信」 -- held by the instructions and by structure (no AI kind holds a verdict, the ledger is the system's, a weak claim's line is fixed, no turn is shown a source's country or the person's verdict); a model sentence that rules anyway is not caught by a word list (one would also catch questions like 「是不是真的」)
+- built: 「你可以改拆法、補主張、覆寫任何一格。你改的時候，要留下理由」 -- a changed claim needs a new reason; a stance unlike the AI reading it names needs a reason; KNOWN LIMIT: confirming an AI proposal in other words records which proposal it was, not why it was reworded
+- DECISION (brief): 「你可以只看結果，跳過練習」 -- the 檢查題 and the order of steps can be skipped; the first reaction cannot (the server refuses results before it; one short line is enough)
+- NOT YET: 「共同決定時，每一方的立場由本人確認轉述得對不對」 -- COLLAB (step 3); 「社群註解」 -- needs several people (COLLAB)
+- DECISION: 「來源評等…給網站打分數」 is not built: the platform gives what it found and the person marks (MY_DECISIONS 5.2)
+- NOT YET: 「現有工具 11 個」 (證據檢查) and the two research workflows are not wired into VERIFY in step 2; 「轉傳前有沒有查證」 as a measure is LEARN's (the first reaction, the techniques named and the verdicts are on the record)
+- built: 「系統記下這次用的手法清單、查核資料庫名單、模型是哪一版」 -- each `verify.techniques` and `verify.factcheck` stores its ruleset stamp; the model is `govern.ai_call`; 「案子抹除時，這些一起刪」 -- every VERIFY record and every fact-check source is the case's
 
 ## COMPUTE (丙)
 
