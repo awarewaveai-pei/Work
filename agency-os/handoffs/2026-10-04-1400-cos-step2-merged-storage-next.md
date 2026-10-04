@@ -70,6 +70,17 @@ source_session_summary: "Claude 監工一輪：整合 GATHER／VERIFY／COMPUTE�
 - **規矩**：Claude 與 Codex 不同時改同一檔；不用中國廠商 AI；不用 Perplexity；搜尋走 Serper（Brave 沒有金鑰）；在 main 直接 commit，不開 branch，不 force push；政治例子只寫成「使用者可能帶來的判斷」；操作者個人命盤筆記不進平台。
 - **怎麼給 Codex 下任務**（操作者在互動 Codex app 裡貼）：只放 Decision／Constraints／Files／Acceptance 四段；Acceptance 必含「指名測試 + 拔守衛變紅」；寫入前叫它先讀 `COS/docs/platform/STORAGE_SWITCH.md` 與本檔。互動模式遇到指令請求，由操作者按核准。
 
+### 審查債（Claude 沒額度時，Codex 寫的東西怎麼辦）
+
+審查者必須是沒寫這段改動的模型（`agency-os/AGENTS.md` §4）。Claude 額度用完時：
+
+1. **Codex 寫的 commit 先留在本機 main，不 push、不部署**（本來就要等全部蓋完才問上線，所以審查可以晚一點，但不能省）。
+2. **每個 Codex commit 必附機器證據**：每個守衛一個「拔掉守衛 → 指名測試變紅 → 還原變綠」；整類問題要有掃全部程式碼的閘門測試（例如 `test_egress_allowlist_parity`、`HooksReadOnlyTests`）。這種證據不靠任何模型。
+3. **Codex 把自己寫的 commit 逐條記在 `agency-os/reports/review-debt.md`**（一行：commit hash、一句話它改了什麼、碰了哪些不變量）。不要用它自己的第二次審查當作審查。
+4. **Claude 額度回來後第一件事**：讀 `review-debt.md`，對每個 hash 跑 `/claude-review`（碰身分、案件刪除、個資、金流的，要兩位獨立審查），每個 finding 先 grep 驗 `file:line`；通過的行劃掉，才能 push。
+5. 兩邊都沒額度、又急著要動：寫「書面對抗自審 + 突變證據 + WORKLOG `ORACLE_WAIVED: <理由>`」，並在 `review-debt.md` 標 **未經跨模型審查**，之後補審。
+6. 禁止拿 `chatgpt-*`、`gemini-*`、`grok-*` 這些 MCP 當審查者（按 token 計費，規則禁用）。
+
 ### 步驟 3+4 設計筆記（草稿，凍結前要補讀程式）
 
 - 一波做完：COLLAB（群組協作）＋ GOVERN（研究／治理）＋ TEACH ＋ EXPRESS ＋ FACILITATE；一次凍結、五個工作者、一次整合、最後一次全套。
