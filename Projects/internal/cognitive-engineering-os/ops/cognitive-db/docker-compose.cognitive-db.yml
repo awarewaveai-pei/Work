@@ -1,0 +1,47 @@
+services:
+  cognitive-db:
+    image: postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cognitive
+      POSTGRES_DB: cognitive_os
+      POSTGRES_PASSWORD_FILE: /run/secrets/cognitive_db_password
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    secrets:
+      - cognitive_db_password
+    # Bound connection slots keep memory use predictable for the small first region.
+    command:
+      - postgres
+      # Keep the number of backend connections within the memory budget.
+      - -c
+      - max_connections=100
+      # Reserve a useful shared cache without crowding out connections and maintenance.
+      - -c
+      - shared_buffers=128MB
+      # Make statements slower than one second visible during operations review.
+      - -c
+      - log_min_duration_statement=1000
+    mem_limit: 512m
+    shm_size: 128m
+    volumes:
+      - cognitive-db-data:/var/lib/postgresql/data
+    networks:
+      - lobster-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+volumes:
+  cognitive-db-data:
+
+networks:
+  lobster-net:
+    external: true
+    name: lobster-net
+
+secrets:
+  cognitive_db_password:
+    file: ${COGNITIVE_DB_PASSWORD_FILE:-./cognitive-db-password}
