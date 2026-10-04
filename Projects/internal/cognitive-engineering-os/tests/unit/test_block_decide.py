@@ -16,6 +16,7 @@ from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.doc_kinds import DocKind, Field
 from ai_lego.core.domain.kinds import decide
 from ai_lego.data.events import record_log
+from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import ai_gate
 from ai_lego.platform.ai_actions import decide as decide_actions
@@ -172,7 +173,35 @@ class CheckTests(DecideBase):
         self.assertIn("經濟", user)   # a facet marked relevant is read; one marked not relevant is not
         self.assertNotIn("宗教", user)
         self.assertIn("各自的界線", user)
-        self.assertEqual({"decide.judgment", "decide.seal", "context.notes"}, set(ai_gate.actions()[("DECIDE", "check")].reads))
+        self.assertEqual({"decide.judgment", "decide.seal", "context.notes", "verify.claim"}, set(ai_gate.actions()[("DECIDE", "check")].reads))
+
+    def test_the_check_sends_each_fact_as_it_stands_now_never_its_stored_count(self):
+        """critic 2026-10-04 round 3 A: the card's stored counts went to the model as if they were current."""
+        docs, owner, me = CaseDocs(self._repo), record_log.case(self.pid), record_log.user(self.identity["identity_id"], "VERIFY")
+        claim = docs.save(self.tenant["tenant_id"], owner, "verify.claim", {"text": "公會 2019 年改了範本", "sentence": "可以查的事實", "from": "訊息"}, me)["doc_id"]
+        facts = [{"text": "他三次改價", "sources": 0, "self_said": True, "credibility": "中"},
+                 {"text": "公會 2019 年改了範本", "sources": 5, "self_said": False, "claim": claim, "claim_version": 1, "against": 3},
+                 {"text": "公會也改了第 8 條", "sources": 2, "self_said": False, "claim": "gone", "claim_version": 1},
+                 {"text": "同業都這樣改", "sources": 4, "self_said": False, "cards": ["k1", "k2"]}]
+        self.judge({**LEAN, "facts": facts})
+        self.assertEqual(self.check().status_code, 200)
+        _, user = self.provider.calls[-1]
+        sent = json.loads(user.split("\n", 1)[1])["judgment_card"]["facts"]
+        self.assertEqual([(fact["text"], fact["basis"]) for fact in sent], [
+            ("他三次改價", "the person's own words; no outside source"),
+            ("公會 2019 年改了範本", "a checked claim that cannot stand as a fact now"),   # no stance and no verdict in the ledger, whatever the card says
+            ("公會也改了第 8 條", "a checked claim that was deleted since; no outside source now"),
+            ("同業都這樣改", "linked to source pages; how many independent origins is not given here")])   # DECIDE does not read source cards
+        self.assertEqual(sent[0]["credibility"], "中")
+        for stored in ('"sources"', '"against"', '"self_said"', '"cards"'):
+            self.assertNotIn(stored, user)
+
+    def test_the_check_and_the_page_read_a_fact_the_same_way(self):
+        """critic 2026-10-04 round 4: the check missed a reworded claim the page caught. One fixture, both sides."""
+        cases = json.loads((PRODUCT_ROOT / "tests" / "fixtures" / "fact_standing.json").read_text(encoding="utf-8"))["cases"]
+        self.assertEqual({case["standing"] for case in cases}, {"own", "linked", "deleted", "older", "not_usable", "current"})
+        for case in cases:
+            self.assertEqual(decide_actions._standing(case["fact"], case["claims"])[0], case["standing"], case["name"])
 
     def test_a_check_before_any_judgment_is_refused_without_a_model_call(self):
         self.assertEqual(self.check().status_code, 400)

@@ -130,6 +130,15 @@ class OriginTests(Step2Case):
         self.save("gather.override", {"card": a, "key": "operator", "value": "某產業公會", "reason": "官網頁尾寫的"})
         self.assertEqual(self.origin_of(a)["cards"][0]["mine"], {"operator": {"value": "某產業公會", "reason": "官網頁尾寫的"}})
 
+    def test_a_wrong_origin_named_by_its_cards_survives_a_regroup(self):
+        """critic 2026-10-04 M2: an origin's id changes when its cards do; LEARN names it by its cards."""
+        a, b = self.card(url="https://a"), self.card(url="https://b")
+        self.group([a])
+        review = self.docs.save(self.tenant_id, self.owner, "learn.calibration", {"judgment_version": 1, "outcome": "x", "wrong_sources": [{"source": "顧問文章", "cards": [a], "why": "它在賣服務"}]},
+                                record_log.user(self.identity["identity_id"], "LEARN"))
+        self.group([a, b])   # the same page found again with another: a new origin id
+        self.assertEqual(self.origin_of(a)["wrong_in_review"], [review["doc_id"]])
+
     def test_a_review_that_named_an_origin_wrong_shows_on_it(self):
         a = self.card()
         self.group([a])
@@ -223,6 +232,35 @@ class ClaimLedgerTests(Step2Case):
         self.stance(claim, b, "反對")
         self.assertEqual(self.line()["state"], "兩邊都有")
 
+    def test_a_claim_may_stand_as_a_fact_only_when_trusted_on_its_current_version_with_support(self):
+        claim, a = self.claim(), self.card()
+        self.group([a])
+        self.stance(claim["doc_id"], a, "支持")
+        verdict = lambda value, version=1: self.save("verify.verdict", {"claim": claim["doc_id"], "claim_version": version, "verdict": value, "reason": "r"}, record_log.user(self.identity["identity_id"], "VERIFY"))
+        self.assertFalse(self.line()["usable"])   # no verdict yet
+        verdict("不採信")
+        self.assertFalse(self.line()["usable"])
+        verdict("存疑")
+        self.assertTrue(self.line()["usable"])
+        self.claim(text="下週起每天只能領兩萬元", doc_id=claim["doc_id"], base_version=1)
+        self.stance(claim["doc_id"], a, "支持", version=2)
+        self.assertEqual(self.line()["support"], [self.origin_of(a)["origin_id"]])   # supported on the new words ...
+        self.assertFalse(self.line()["usable"])   # ... but the verdict was on the older words
+        self.assertEqual(evidence.not_usable_because(self.line()), "earlier")
+        verdict("採信", version=2)
+        self.assertTrue(self.line()["usable"])
+        self.assertIsNone(evidence.not_usable_because(self.line()))
+
+    def test_a_malformed_wrong_source_never_takes_the_evidence_read_down(self):
+        """critic 2026-10-04 N2: a review is not deletable; one bad entry once raised in every page that reads evidence."""
+        a = self.card()
+        self.group([a])
+        self.docs.save(self.tenant_id, self.owner, "learn.calibration", {"judgment_version": 1, "outcome": "x", "wrong_sources": [{"source": "x", "cards": [{"a": 1}, a]}]},
+                       record_log.user(self.identity["identity_id"], "LEARN"))
+        self.assertEqual(len(self.origin_of(a)["wrong_in_review"]), 1)
+        refused = self.client.post(f"/projects/{self.pid}/docs/learn.calibration", json={"content": {"judgment_version": 1, "outcome": "x", "wrong_sources": [{"source": "x", "cards": [{"a": 1}]}]}})
+        self.assertIn("LEARN_WRONG_SOURCE_INVALID", refused.json()["detail"])
+
     def test_a_value_judgment_is_not_checked(self):
         self.claim(sentence="價值判斷")
         self.assertEqual(self.line()["state"], words.NOT_CHECKABLE)
@@ -276,6 +314,17 @@ class WordsTests(unittest.TestCase):
         self.assertEqual(words.grouping_errors([{"cards": ["a", "b"], "how": "同一篇"}, {"cards": ["c"], "how": "單獨"}]), [])
         self.assertTrue(words.grouping_errors([{"cards": ["a"], "how": "同一篇"}, {"cards": ["a"], "how": "單獨"}]))
         self.assertTrue(words.grouping_errors([{"cards": [], "how": "單獨"}]))
+
+
+class WebWordsTests(unittest.TestCase):
+    def test_the_pages_copies_of_the_engines_words_are_the_same(self):
+        """critic 2026-10-04 m5: lib/evidence.ts names three of the engine's words; they cannot drift apart."""
+        import re
+        from ai_lego import PRODUCT_ROOT
+
+        text = (PRODUCT_ROOT / "apps" / "cognitive-web" / "lib" / "evidence.ts").read_text(encoding="utf-8")
+        copies = dict(re.findall(r'^export const ([A-Z_]+) = "([^"]+)";', text, re.M))
+        self.assertEqual(copies, {"CHECKABLE": words.CHECKABLE, "NOT_SEARCHED": words.NOT_SEARCHED, "NOT_TRUSTED": words.VERDICTS[2]})
 
 
 class RulesetTests(unittest.TestCase):

@@ -74,6 +74,47 @@ describe("LEARN 回顧校準", () => {
     await done();
   });
 
+  it("a wrong source found in this case is picked by its origin, so GATHER can show it there; one not found is written", async () => {
+    const card = { card: "K1", version: 1, source_id: "S1", url: "https://consult.example/post", title: "顧問公司的文章", aside: "", found_by: { by: "系統找的" }, cells: {}, mine: {} };
+    const origin = { origin_id: "o:abc", cards: [card], how: "單獨", pending: false, aside: false, counts: true, mark: null };
+    const { host, done, calls } = await open({
+      [`POST ${P}/docs/learn.calibration`]: (call: Call) => saved("learn.calibration", "C1", call.body.content),
+      [`POST ${P}/learn/history`]: { entry: {}, hints: [] },
+      [`${P}/evidence`]: { origins: [origin], changed_marks: [], claims: [], calcs: [], min_origins: 2 },
+    });
+    await type(field(host, "outcome"), "他下個月又改條件");
+    await click(chip(host, "錯的出處 1 是哪一個", "顧問公司的文章｜consult.example"));
+    expect(labelled(host, "錯的出處 1").value).toBe("");   // the picked origin is shown by its chip, not as an id
+    await type(labelled(host, "錯的出處 1 為什麼"), "它在賣顧問服務");
+    await click(byText(host, "button", "存這次回顧"));
+    const [call] = posts(calls, `${P}/docs/learn.calibration`);
+    expect(call.body.content.wrong_sources).toEqual([{ source: "顧問公司的文章｜consult.example", why: "它在賣顧問服務", cards: ["K1"] }]);   // by its pages: a regroup does not lose it
+    await done();
+  });
+
+  it("a second press takes a picked origin back, and typing a name instead drops its cards", async () => {
+    const card = { card: "K1", version: 1, source_id: "S1", url: "https://consult.example/post", title: "顧問公司的文章", aside: "", found_by: { by: "系統找的" }, cells: {}, mine: {} };
+    const origin = { origin_id: "o:abc", cards: [card], how: "單獨", pending: false, aside: false, counts: true, mark: null };
+    const { host, done, calls } = await open({
+      [`POST ${P}/docs/learn.calibration`]: (call: Call) => saved("learn.calibration", "C1", call.body.content),
+      [`POST ${P}/learn/history`]: { entry: {}, hints: [] },
+      [`${P}/evidence`]: { origins: [origin], changed_marks: [], claims: [], calcs: [], min_origins: 2 },
+    });
+    await type(field(host, "outcome"), "他下個月又改條件");
+    const pick = () => chip(host, "錯的出處 1 是哪一個", "顧問公司的文章｜consult.example")!;
+    await click(pick());
+    expect(pick().getAttribute("aria-pressed")).toBe("true");
+    await click(pick());
+    expect(pick().getAttribute("aria-pressed")).toBe("false");   // taken back
+    await click(pick());
+    await type(labelled(host, "錯的出處 1"), "朋友轉傳的截圖");
+    expect(pick().getAttribute("aria-pressed")).toBe("false");   // a typed name is not that origin
+    await click(byText(host, "button", "存這次回顧"));
+    const [call] = posts(calls, `${P}/docs/learn.calibration`);
+    expect(call.body.content.wrong_sources).toEqual([{ source: "朋友轉傳的截圖" }]);
+    await done();
+  });
+
   it("an unused block is chosen by a button that can be taken back; a block not open yet says which step opens it", async () => {
     const { host, done } = await open({ [`GET ${P}/learn/unused_blocks`]: { unused: [{ code: "ACT", open: true }, { code: "COMPUTE", open: false }] } });
     const group = host.querySelector('[aria-label="下一輪要加的積木"]')!;

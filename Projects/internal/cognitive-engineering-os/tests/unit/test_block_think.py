@@ -15,6 +15,9 @@ from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.kinds import collab_contract
 from ai_lego.core.domain.kinds import think as kinds
 from ai_lego.errors import InvariantViolation
+from ai_lego.core.domain.evidence_words import CARD_CELL_KEYS, NOT_FOUND, cell
+from ai_lego.data.events import record_log
+from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.platform import ai_gate
 from ai_lego.platform.ai_actions import think as actions
 from ai_lego.platform.ai_gateway.provider import AiCompletion
@@ -55,6 +58,9 @@ class ThinkProvider:
     def complete_json(self, system, user, *, max_tokens, **options):
         self.calls.append((system, user))
         return AiCompletion(text=json.dumps(self.answer, ensure_ascii=False), model=self.model, input_tokens=10, output_tokens=20)
+
+
+NO_LEDGER = type("NoLedger", (), {"claims": staticmethod(lambda: [])})()
 
 
 class ThinkApiTests(ProjectSourceApiTestCase):
@@ -273,6 +279,49 @@ class ThinkApiTests(ProjectSourceApiTestCase):
             self._answer("counter", round_["doc_id"], target=target)
             self.assertNotIn("strongest_argument", self.provider.calls[-1][1])
 
+    def test_a_card_is_sourced_only_when_it_rests_on_a_checked_claim_that_origins_support(self):
+        """有查證時讀 VERIFY 的主張帳本: 「有來源」 is the system's reading of the ledger, never the model's say."""
+        docs, owner, me = CaseDocs(self._repo), record_log.case(self.pid), record_log.user(self.identity["identity_id"], "VERIFY")
+        tenant = self.tenant["tenant_id"]
+        supported = docs.save(tenant, owner, "verify.claim", {"text": "公會 2019 年改了範本", "sentence": "可以查的事實", "from": "訊息"}, me)["doc_id"]
+        unsupported = docs.save(tenant, owner, "verify.claim", {"text": "同業都這樣改", "sentence": "可以查的事實", "from": "訊息"}, me)["doc_id"]
+        cells = {key: cell(NOT_FOUND, why="沒有寫") for key in CARD_CELL_KEYS}
+        card = docs.save(tenant, owner, "gather.source", {"source_id": "", "url": "https://a.example", "found_by": {"by": "系統找的"}, "cells": cells,
+                                                         "snapshot": {"sha256": "a" * 64, "fetched_at": "2026-10-04T00:00:00Z"}}, record_log.system("GATHER"))["doc_id"]
+        docs.save(tenant, owner, "gather.origins", {"groups": [{"cards": [card], "how": "單獨"}], "rules_version": "1"}, record_log.system("GATHER"))
+        distrusted = docs.save(tenant, owner, "verify.claim", {"text": "公會也改了第 8 條", "sentence": "可以查的事實", "from": "訊息"}, me)["doc_id"]
+        for claim in (supported, distrusted):
+            docs.save(tenant, owner, "verify.stance", {"claim": claim, "claim_version": 1, "card": card, "snapshot": "a" * 64, "stance": "支持"}, me)
+        docs.save(tenant, owner, "verify.verdict", {"claim": supported, "claim_version": 1, "verdict": "採信", "reason": "公告原文"}, me)
+        docs.save(tenant, owner, "verify.verdict", {"claim": distrusted, "claim_version": 1, "verdict": "不採信", "reason": "只有一個出處"}, me)
+        docs.save(tenant, owner, "verify.search", {"claim": unsupported, "claim_version": 1, "state": "查不到"}, record_log.system("VERIFY"))
+        self._grant("propose_options")
+        round_ = self._round()
+        answer = cards(10)
+        answer[0], answer[1], answer[2], answer[3], answer[4] = ({**answer[0], "rests_on": 1}, {**answer[1], "rests_on": 2}, {**answer[2], "rests_on": 9},
+                                                              {**answer[3], "rests_on": -1}, {**answer[4], "rests_on": 3})
+        batch = self._answer("diverge", round_["doc_id"], {"cards": answer})
+        shown = json.loads(self.provider.calls[-1][1].split("\n", 1)[1])["checked_claims"]
+        self.assertEqual([(item["n"], item["text"], item["origins_for"]) for item in shown], [(1, "公會 2019 年改了範本", 1), (2, "同業都這樣改", 0), (3, "公會也改了第 8 條", 1)])
+        self.assertIn("never state it as fact", shown[2]["note"])   # the person does not trust it: said so, not left to the model
+        self.assertNotIn("note", shown[0])
+        self.assertEqual(shown[1]["note"], "the person has not judged this claim yet: do not state it as fact")   # the true reason, never "does not trust"
+        laid = batch["content"]["cards"]
+        # only a claim that may stand as a fact (evidence.usable_as_fact) gives 有來源: supported AND trusted on its current version
+        self.assertEqual([(item["sourced"], item.get("rests_on")) for item in laid[:5]], [("有來源", supported)] + [("它自己說的", None)] * 4)
+        schema = ai_gate.actions()[("THINK", "diverge")].output_schema["properties"]["cards"]["items"]
+        self.assertNotIn("rests_on", schema["required"])   # a card that rests on nothing leaves it out
+        self.assertEqual(batch["content"]["sourced"], "它自己說的")   # not every card rests on a sourced claim
+        self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]})
+        first = next(card for card in self._cards() if card["content"]["batch_index"] == 0)
+        self.assertEqual((first["content"]["sourced"], first["content"]["rests_on"]), ("有來源", supported))
+        url = f"{self.base}/docs/think.card/{first['doc_id']}"
+        kept_label = self.client.put(url, json={"content": {**first["content"], "claim": "我改過的說法"}, "base_version": first["version"]})
+        self.assertIn("THINK_CARD_SOURCE_GOES_WITH_WORDS", kept_label.json()["detail"])   # rewritten words cannot keep the claim's label
+        body = {key: value for key, value in first["content"].items() if key != "rests_on"}
+        rewritten = self.client.put(url, json={"content": {**body, "claim": "我改過的說法", "sourced": "它自己說的"}, "base_version": first["version"]})
+        self.assertEqual((rewritten.status_code, rewritten.json()["author"], rewritten.json()["content"]["sourced"]), (200, "joint", "它自己說的"))
+
     # -- 卡 ---------------------------------------------------------------------------------------------------------------------
     def test_a_batch_becomes_ai_cards_once_and_a_deleted_one_stays_deleted(self):
         self._grant("propose_options")
@@ -396,7 +445,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]})
         card = self._cards()[0]
         url = f"{self.base}/docs/think.card/{card['doc_id']}"
-        for field, value in (("sourced", "有來源"), ("role", "鏡子"), ("method", "反例" if card["content"]["method"] != "反例" else "失敗模式"), ("batch", "other-batch"), ("batch_index", 9), ("round", second)):
+        for field, value in (("sourced", "有來源"), ("rests_on", "C1"), ("role", "鏡子"), ("method", "反例" if card["content"]["method"] != "反例" else "失敗模式"), ("batch", "other-batch"), ("batch_index", 9), ("round", second)):
             refused = self.client.put(url, json={"content": {**card["content"], field: value}, "base_version": 1})
             self.assertEqual(refused.status_code, 400, (field, refused.text))
             self.assertIn("THINK_CARD_FIELD_FIXED", refused.json()["detail"])
@@ -408,7 +457,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         edited = self.client.put(url, json={"content": {**card["content"], "claim": "我改過的主張"}, "base_version": 1}).json()
         self.assertEqual((edited["author"], edited["content"]["sourced"], edited["content"]["batch"]), ("joint", "它自己說的", batch["doc_id"]))
         mine = self._card(round_, "我自己的")
-        for field, value in (("role", "反方教練"), ("sourced", "有來源"), ("batch", batch["doc_id"]), ("batch_index", 0), ("method", "反例")):
+        for field, value in (("role", "反方教練"), ("sourced", "有來源"), ("rests_on", "C1"), ("batch", batch["doc_id"]), ("batch_index", 0), ("method", "反例")):
             refused = self.client.post(f"{self.base}/docs/think.card", json={"content": {"claim": "冒充", "round": round_, field: value}})
             self.assertEqual(refused.status_code, 400, (field, refused.text))
             self.assertIn("THINK_CARD_FIELD_FIXED", refused.json()["detail"])
@@ -572,7 +621,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
     def test_every_turn_reads_only_what_the_card_allows(self):
         thinks = {key: action for key, action in ai_gate.actions().items() if key[0] == "THINK"}
         self.assertEqual(len(thinks), 9)
-        allowed = {"think.round", "think.card", "think.reaction", "map.map", "sense.card"}
+        allowed = {"think.round", "think.card", "think.reaction", "map.map", "sense.card", "verify.claim"}   # verify.claim: 有查證時讀主張帳本
         for key, action in thinks.items():
             self.assertEqual(set(action.reads), allowed, key)
         round_doc = {"doc_id": "R1", "kind": "think.round", "author": "user", "content": {"problem": "要不要接", "own": ["觀察：他改了條件"], "criteria": ["能反悔"]}}
@@ -585,6 +634,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
                 if kind not in action.reads:
                     raise InvariantViolation(f"AI_READ_REFUSED: {key} read {kind}")
                 return data[kind]
+            read.evidence = NO_LEDGER
             action.build_input({"round": "R1"}, read)
             self.assertTrue(set(asked) <= allowed, (key, asked))
 
@@ -595,7 +645,9 @@ class ThinkApiTests(ProjectSourceApiTestCase):
                                                              "core_conflict": "我要尊重還是要錢", "unwinnable": True}}
         def message(maps):
             data = {"think.round": [round_doc], "think.card": [], "think.reaction": [], "map.map": maps, "sense.card": sense}
-            return actions._message({"round": "R1"}, lambda kind: data[kind])
+            read = lambda kind: data[kind]
+            read.evidence = NO_LEDGER
+            return actions._message({"round": "R1"}, read)
         shown = message([good])
         self.assertIn("他改了三次", shown)
         self.assertIn("no outside source", shown)

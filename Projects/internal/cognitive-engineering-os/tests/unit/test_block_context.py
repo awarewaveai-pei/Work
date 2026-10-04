@@ -8,7 +8,10 @@ import unittest
 
 from ai_lego.apps.api import main as api_main
 from ai_lego.core.domain import doc_kinds
+from ai_lego.core.domain.evidence_words import CARD_CELL_KEYS, NOT_FOUND, cell
 from ai_lego.core.domain.kinds.context import FACET_NAMES, FACETS_VERSION
+from ai_lego.data.events import record_log
+from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import ai_gate
 from ai_lego.platform.ai_gateway.provider import AiCompletion
@@ -127,17 +130,25 @@ class ContextAiTests(ContextTestCase):
         self.assertIn("do not assume any country", self.provider.calls[0][0])
         self.assertIn("do not speak for any party", self.provider.calls[0][0])
 
-    def test_a_fact_from_outside_with_under_two_sources_is_not_sent_but_my_own_words_are(self):
+    def test_a_fact_from_outside_is_not_sent_but_my_own_words_are(self):
+        """CONTEXT reads no source cards, so it cannot count a linked fact's origins: it holds every outside fact back
+        (critic 2026-10-04 C1: the stored count went stale once an origin was marked 不用)."""
         self._intake()
+        docs, owner = CaseDocs(self._repo), record_log.case(self.pid)
+        cells = {key: cell(NOT_FOUND, why="沒有寫") for key in CARD_CELL_KEYS}
+        cards = [docs.save(self.tenant["tenant_id"], owner, "gather.source", {"source_id": "", "url": f"https://{n}.example", "found_by": {"by": "系統找的"}, "cells": cells,
+                                                                            "snapshot": {"sha256": n * 64, "fetched_at": "2026-10-04T00:00:00Z"}}, record_log.system("GATHER"))["doc_id"] for n in "ab"]
+        docs.save(self.tenant["tenant_id"], owner, "gather.origins", {"groups": [{"cards": [card], "how": "單獨"} for card in cards], "rules_version": "1"}, record_log.system("GATHER"))
         mine = {"id": "f1", "text": "合夥人第三次改條件", "by": "user", "sources": 0, "self_said": True}
-        thin = {"id": "f2", "text": "網路上說同業都這樣改", "by": "user", "sources": 1, "self_said": False}
-        enough = {"id": "f3", "text": "公告寫明下月調價", "by": "user", "sources": 2, "self_said": False}
-        self.client.post(f"{self.base}/docs/map.map", json={"content": {"layers": {"facts": [mine, thin, enough, {"text": "沒有編號的外部說法", "self_said": False}]}}})
+        thin = {"id": "f2", "text": "網路上說同業都這樣改", "by": "user", "sources": 0, "self_said": False}
+        linked = {"id": "f3", "text": "公告寫明下月調價", "by": "user", "sources": 2, "self_said": False, "cards": cards}
+        saved = self.client.post(f"{self.base}/docs/map.map", json={"content": {"layers": {"facts": [mine, thin, linked, {"text": "沒有編號的外部說法", "self_said": False}]}}})
+        self.assertEqual(saved.status_code, 200, saved.text)
         self.provider.answer = {"facets": []}
         self.assertEqual(self._point().status_code, 200)
         user = self.provider.calls[0][1]
         self.assertIn("合夥人第三次改條件", user)
-        self.assertIn("公告寫明下月調價", user)
+        self.assertNotIn("公告寫明下月調價", user)   # two origins, but CONTEXT cannot count them: held back, never trusted from the map's copy
         self.assertNotIn("網路上說同業都這樣改", user)
         self.assertNotIn("沒有編號的外部說法", user)
 

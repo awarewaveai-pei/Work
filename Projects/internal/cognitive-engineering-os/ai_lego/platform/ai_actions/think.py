@@ -2,8 +2,9 @@
 round first, and every one but ``direct_advice`` refuses a round with no version of the person's own (先想再看). It reads
 only the round, the cards of the round and your reactions to them, the MAP's map (else SENSE's cards): never another case, never a judgment.
 
-What the AI saves is its own kind: ``think.reply`` (sections, one question) or ``think.batch`` (cards). It names no source
-(there are no source cards before GATHER opens), so ``shape`` marks everything 「它自己說的」 whatever the model says."""
+What the AI saves is its own kind: ``think.reply`` (sections, one question) or ``think.batch`` (cards). A reply is always
+「它自己說的」. A card is 「有來源」 only when it names (``rests_on``) a claim from VERIFY's ledger that counted origins support:
+``shape`` decides from the ledger it was shown, whatever the model says (有查證時，這一步也讀 VERIFY 的主張帳本)."""
 
 from __future__ import annotations
 
@@ -11,18 +12,22 @@ import json
 from contextvars import ContextVar
 from typing import Any, Callable, Mapping
 
+from ai_lego.core.domain.evidence_words import CHECKABLE, CLAIM_STATES
 from ai_lego.core.domain.kinds.think import ACTION_FACETS, COUNTER_ANGLES, DIVERGE_METHODS, OWN_TYPES, SOURCED
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gate import AiAction
+from ai_lego.platform.evidence import not_usable_because
 
 Read = Callable[[str], list[dict[str, Any]]]
-READS = ("think.round", "think.card", "think.reaction", "map.map", "sense.card")
+READS = ("think.round", "think.card", "think.reaction", "map.map", "sense.card", "verify.claim")
 CARD_TEXT = ("claim", "mechanism", "benefit", "risk", "assumption", "premise", "fails_when")
 CARD_CHARS = 160    # 15 cards x 7 fields x 160 characters stays under the 64KB a json field holds
 
 # shape() gets only the model's answer, but the saved document must name its round: build_input, in the same call and thread,
 # leaves it here. ask_ai always runs build_input first, so a turn that reaches shape has set it.
 _ROUND: ContextVar[str | None] = ContextVar("think_round", default=None)
+# the checked claims this turn was shown, numbered from 1 (shape reads which ones a card may rest on); set with _ROUND
+_CLAIMS: ContextVar[list[dict[str, Any]]] = ContextVar("think_claims", default=[])
 
 
 def own_texts(content: Mapping[str, Any]) -> list[str]:
@@ -104,6 +109,10 @@ def _message(context: Mapping[str, Any], read: Read, *, need_own: bool = True, c
         sense = [{"category": item["content"].get("category"), "text": str(item["content"].get("text", ""))[:200]} for item in read("sense.card")[:20]]
         if sense:
             payload["sense_cards"] = sense
+    checked = [claim for claim in read.evidence.claims() if claim["sentence"] == CHECKABLE and claim["state"] in CLAIM_STATES]
+    _CLAIMS.set(checked)
+    if checked:   # a verdict on an older version is no verdict; why a claim cannot stand as a fact is said as it is, never left to the model
+        payload["checked_claims"] = [_claim_row(n, claim) for n, claim in enumerate(checked, start=1)]
     rows = _cards(read, doc["doc_id"], picked_only=cards == "picked")
     if rows:
         payload["cards_the_person_wrote" if cards == "own" else "cards_the_person_picked"] = rows
@@ -156,7 +165,9 @@ def _round_id() -> str:
 COMMON = (
     "The person wrote their own version first; it is the centre of this round and yours is only help. Never decide for them, never "
     "state their conclusion, never rank or pick among their options, never use anything personal they wrote to persuade them. "
-    "You have no sources in this step: everything you say is your own, so never cite a study, a statistic, a law or an expert. "
+    "Your only sources are the checked_claims the message lists, if any (the person checked them); everything else you say is your own, "
+    "so never cite a study, a statistic, a law or an expert. A card resting on a checked claim gives its number as rests_on (leave rests_on out otherwise); never "
+    "present a claim the person did not trust as fact. "
     "If you lack the information, the question is outside what you can responsibly help with, or the risk is high (health, law, money, "
     "safety), do not advise: set handback to one plain sentence saying why, and ask one question instead. Never ask more than one question."
 )
@@ -187,6 +198,7 @@ def _reply_shape(action: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def shape(answer: dict[str, Any]) -> dict[str, Any]:
         round_id = _round_id()
         sections, question, handback = _sections(answer.get("sections"), titles), _one_question(answer.get("question"), 300), _one_sentence(answer.get("handback"), 200)
+        _CLAIMS.set([])   # a reply rests on no claim; what this turn was shown ends with it
         shaped = {"round": round_id, "action": action, "role": role, "sections": sections, "question": question, "handback": handback, "sourced": SOURCED[1]}
         if action == "criteria":
             shaped.update(premise=_text(answer.get("premise"), 1000), fails_when=_text(answer.get("fails_when"), 1000))
@@ -205,8 +217,9 @@ def _reply_shape(action: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     return shape
 
 
-def _card_list(raw: Any, *, methods: tuple[str, ...], required: tuple[str, ...]) -> list[dict[str, Any]]:
-    cards: list[dict[str, Any]] = []
+def _card_list(raw: Any, *, methods: tuple[str, ...], required: tuple[str, ...]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """The cards kept, each with the model's own item it came from (so a card's rests_on is read from that item only)."""
+    cards: list[tuple[dict[str, Any], dict[str, Any]]] = []
     seen: set[str] = set()
     for item in raw if isinstance(raw, list) else []:
         if not isinstance(item, dict):
@@ -216,7 +229,7 @@ def _card_list(raw: Any, *, methods: tuple[str, ...], required: tuple[str, ...])
         if any(not card[field] for field in required) or card["claim"] in seen:
             continue
         seen.add(card["claim"])
-        cards.append({key: value for key, value in card.items() if value})
+        cards.append(({key: value for key, value in card.items() if value}, item))
     return cards
 
 
@@ -228,6 +241,24 @@ BATCHES = {
 }
 
 
+_NOT_USABLE_NOTE = {
+    "no_verdict": "the person has not judged this claim yet: do not state it as fact",
+    "earlier": "the person judged an older wording of this claim: do not state it as fact",
+    "not_trusted": "the person does not trust this claim: never state it as fact",
+    "no_support": "no counted independent origin supports this claim: do not state it as fact",
+}
+
+
+def _claim_row(n: int, claim: Mapping[str, Any]) -> dict[str, Any]:
+    row: dict[str, Any] = {"n": n, "text": claim["text"][:200], "state": claim["state"], "origins_for": len(claim["support"]), "origins_against": len(claim["oppose"])}
+    if claim["verdict"] and not claim["verdict"]["earlier"]:
+        row["the_persons_verdict"] = claim["verdict"]["verdict"]
+    why = not_usable_because(claim)
+    if why:
+        row["note"] = _NOT_USABLE_NOTE[why]
+    return row
+
+
 def _batch_shape(action: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     methods, least, most, least_methods, required = BATCHES[action]
     role = ACTION_FACETS[action][0]
@@ -235,14 +266,27 @@ def _batch_shape(action: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
     def shape(answer: dict[str, Any]) -> dict[str, Any]:
         round_id = _round_id()
         question, handback = _one_question(answer.get("question"), 300), _one_sentence(answer.get("handback"), 200)
-        cards = [] if handback else _card_list(answer.get("cards"), methods=methods, required=required)[:most]
+        cards = [] if handback else [_sourced(card, raw) for card, raw in _card_list(answer.get("cards"), methods=methods, required=required)[:most]]
+        _CLAIMS.set([])   # what this turn was shown ends with it
         if handback and not question:
             raise _invalid("a hand-back comes with the one question that replaces the advice")
         if not handback and (len(cards) < least or len({card.get("method") for card in cards}) < least_methods):
             raise _invalid(f"{action} needs at least {least} cards using at least {least_methods} different methods; got {len(cards)}")
-        shaped = {"round": round_id, "action": action, "role": role, "cards": cards, "question": question, "handback": handback, "sourced": SOURCED[1]}
+        every = cards and all(card.get("sourced") == SOURCED[0] for card in cards)
+        shaped = {"round": round_id, "action": action, "role": role, "cards": cards, "question": question, "handback": handback, "sourced": SOURCED[0] if every else SOURCED[1]}
         return {key: value for key, value in shaped.items() if value not in ([], None, "")}
     return shape
+
+
+def _sourced(card: dict[str, Any], raw: Mapping[str, Any]) -> dict[str, Any]:
+    """有來源 only for a card resting on a claim of this turn's ledger that may stand as a fact (evidence.usable_as_fact);
+    else 它自己說的."""
+    shown = _CLAIMS.get()
+    n = raw.get("rests_on")
+    claim = shown[n - 1] if isinstance(n, int) and not isinstance(n, bool) and 1 <= n <= len(shown) else None
+    if claim and claim["usable"]:
+        return {**card, "sourced": SOURCED[0], "rests_on": claim["claim_id"]}
+    return {**card, "sourced": SOURCED[1]}
 
 
 def _reply_schema(titles: tuple[str, ...], *, advice: bool = False) -> dict[str, Any]:
@@ -256,11 +300,12 @@ def _reply_schema(titles: tuple[str, ...], *, advice: bool = False) -> dict[str,
 
 def _batch_schema(methods: tuple[str, ...], *, advice: bool = False) -> dict[str, Any]:
     card: dict[str, Any] = {name: {"type": "string"} for name in ("claim", "mechanism", "benefit", "risk", "assumption")}
+    optional = {"rests_on": {"type": "integer"}}   # the number of a checked claim the card rests on; left out when it rests on none
     if methods:
         card["method"] = {"type": "string", "enum": list(methods)}
     if advice:
         card.update(premise={"type": "string"}, fails_when={"type": "string"})
-    return {"type": "object", "properties": {"cards": {"type": "array", "items": {"type": "object", "properties": card, "required": list(card)}}, "question": {"type": "string"}, "handback": {"type": "string"}}}
+    return {"type": "object", "properties": {"cards": {"type": "array", "items": {"type": "object", "properties": {**card, **optional}, "required": list(card)}}, "question": {"type": "string"}, "handback": {"type": "string"}}}
 
 
 FOCUS = {

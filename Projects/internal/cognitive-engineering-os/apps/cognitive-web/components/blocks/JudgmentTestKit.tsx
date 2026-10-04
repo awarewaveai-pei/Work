@@ -58,4 +58,5 @@ export const saved = <C,>(kind: string, doc_id: string, content: C, notices: unk
 export const shell = (projectId = "P1") => ({
   [`/projects/${projectId}`]: { project_id: projectId, name: "合夥案", created_at: "2026-10-01T08:00:00Z" },
   [`/projects/${projectId}/proposals`]: [],
+  [`/projects/${projectId}/evidence`]: { origins: [], changed_marks: [], claims: [], calcs: [], min_origins: 2 },
 });

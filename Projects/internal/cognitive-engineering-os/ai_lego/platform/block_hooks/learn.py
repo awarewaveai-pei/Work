@@ -8,6 +8,7 @@ from typing import Any
 
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
+from ai_lego.errors import InvariantViolation
 from ai_lego.platform.block_hooks import propose
 
 WORDS = ("outcome", "prediction_note", "missed", "step_done", "direction", "process", "luck", "other_method", "updated_conditions", "delegate_note")
@@ -24,4 +25,16 @@ def _calibration_saved(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, 
     return notices
 
 
+def _calibration_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: dict[str, Any], doc_id: str | None) -> None:
+    """「當時哪個出處錯了」: each entry names a source in words, may say why, and may carry the source cards it was picked
+    by (GATHER shows it there) -- nothing else, so a review can never break the evidence read."""
+    for item in content.get("wrong_sources") or []:
+        cards = item.get("cards") if isinstance(item, dict) else None
+        if (not isinstance(item, dict) or set(item) - {"source", "why", "cards"} or not isinstance(item.get("source"), str) or not 0 < len(item["source"]) <= 300
+                or not isinstance(item.get("why", ""), str) or len(item.get("why", "")) > 500
+                or (cards is not None and (not isinstance(cards, list) or len(cards) > 200 or any(not isinstance(card, str) or not 0 < len(card) <= 64 for card in cards)))):
+            raise InvariantViolation("LEARN_WRONG_SOURCE_INVALID: a wrong source is a name, an optional reason and the source cards it was picked by")
+
+
+BEFORE_SAVE = {"learn.calibration": _calibration_checked}
 AFTER_SAVE = {"learn.calibration": _calibration_saved}

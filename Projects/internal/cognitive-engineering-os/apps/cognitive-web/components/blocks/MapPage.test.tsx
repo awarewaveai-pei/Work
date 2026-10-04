@@ -33,6 +33,13 @@ const TOOLS = [
 
 type Stored = { doc_id: string; kind: string; version: number; content: any; author: string; block: string; at: string };
 /** A small stand-in for the API: documents by kind, a save is the next version, the rest answers what the page asks. */
+const NO_EVIDENCE = { origins: [], changed_marks: [], claims: [], calcs: [], min_origins: 2 };
+let evidence: unknown = NO_EVIDENCE;
+const origin = (id: string, card: string, title: string, counts = true) => ({
+  origin_id: id, how: "單獨", pending: false, aside: false, counts, mark: null,
+  cards: [{ card, version: 1, source_id: card, url: `https://${card}.example/x`, title, aside: "", found_by: { by: "系統找的" }, cells: {}, mine: {} }],
+});
+
 function server(initial: Record<string, any[]>) {
   const store: Record<string, Stored[]> = Object.fromEntries(Object.entries(initial).map(([kind, contents]) => [kind, contents.map((content, index) => ({ doc_id: `${kind}-${index + 1}`, kind, version: content.__version ?? 1, content: (({ __version, ...rest }) => rest)(content), author: "user", block: "MAP", at: "2026-10-03T08:00:00Z" }))]));
   const writes: Array<{ method: string; path: string; body: any }> = [];
@@ -42,6 +49,7 @@ function server(initial: Record<string, any[]>) {
     if (method !== "GET") writes.push({ method, path, body });
     if (path === "/blocks/map/spec") return SPEC as never;
     if (path.endsWith("/map/methods")) return TOOLS as never;
+    if (path.endsWith("/evidence")) return evidence as never;
     if (path.endsWith("/proposals")) return [] as never;
     if (/^\/projects\/[^/]+$/.test(path)) return { project_id: "P1", name: "續約", created_at: "2026-10-03T08:00:00Z" } as never;
     const versions = /\/docs\/([^/]+)\/([^/]+)\/versions$/.exec(path);
@@ -186,10 +194,62 @@ describe("拆解", () => {
     await done();
   });
 
+  it("links a fact to the sources GATHER found; the count is the origins behind them, and an origin marked 不用 does not count", async () => {
+    evidence = { ...NO_EVIDENCE, origins: [origin("o:1", "k1", "公會公告"), origin("o:2", "k2", "顧問文章"), origin("o:3", "k3", "新網站", false)] };
+    try {
+      const { writes } = server({ "map.map": [{ layers: { facts: [FACT] } }] });
+      const { host, done } = await mount(<MapPage projectId="P1" />);
+      await click(byText(host, "button", "連到找回來的來源"));
+      const group = host.querySelector('[aria-label="這一條靠哪些來源"]')!;
+      expect(group.textContent).toContain("新網站｜k3.example（不算進數量）");
+      await click(byText(group as HTMLElement, "button", "公會公告｜k1.example"));
+      await click(byText(group as HTMLElement, "button", "顧問文章｜k2.example"));
+      await click(byText(group as HTMLElement, "button", "新網站｜k3.example（不算進數量）"));
+      expect(host.textContent).toContain("2 個獨立出處");
+      await click(byText(host, "button", "存成新的一版"));
+      const fact = writes.find((write) => write.method === "PUT" && write.path.endsWith("/docs/map.map/map.map-1"))!.body.content.layers.facts[0];
+      expect(fact).toMatchObject({ cards: ["k1", "k2", "k3"], sources: 2, self_said: false });
+      await done();
+    } finally { evidence = NO_EVIDENCE; }
+  });
+
+  it("a fact linked before shows and saves the live count after one of its origins is marked 不用", async () => {
+    evidence = { ...NO_EVIDENCE, origins: [origin("o:1", "k1", "公會公告"), origin("o:2", "k2", "顧問文章", false)] };
+    try {
+      const linked = { id: "f3", text: "公會 2019 年改了範本", by: "user", sources: 2, self_said: false, cards: ["k1", "k2"] };
+      const { writes } = server({ "map.map": [{ layers: { facts: [FACT, linked] } }] });
+      const { host, done } = await mount(<MapPage projectId="P1" />);
+      const row = [...host.querySelectorAll("#layer-facts .mcard")].find((node) => node.textContent?.includes("公會 2019 年改了範本"))!;
+      expect(row.textContent).toContain("只有 1 個出處");   // the row itself, not the hand-back list
+      expect(row.textContent).not.toContain("2 個獨立出處");
+      await click(byText(host, "button", "刪掉"));   // any change, then save
+      await click(byText(host, "button", "存成新的一版"));
+      const facts = writes.find((write) => write.method === "PUT")!.body.content.layers.facts;
+      expect(facts).toEqual([expect.objectContaining({ id: "f3", sources: 1, cards: ["k1", "k2"] })]);
+      await done();
+    } finally { evidence = NO_EVIDENCE; }
+  });
+
+  it("saves the count of the moment it saves, not of the moment the page opened", async () => {
+    evidence = { ...NO_EVIDENCE, origins: [origin("o:1", "k1", "公會公告"), origin("o:2", "k2", "顧問文章")] };
+    try {
+      const linked = { id: "f3", text: "公會 2019 年改了範本", by: "user", sources: 2, self_said: false, cards: ["k1", "k2"] };
+      const { writes } = server({ "map.map": [{ layers: { facts: [FACT, linked] } }] });
+      const { host, done } = await mount(<MapPage projectId="P1" />);
+      evidence = { ...NO_EVIDENCE, origins: [origin("o:1", "k1", "公會公告"), origin("o:2", "k2", "顧問文章", false)] };   // marked 不用 in another tab
+      await click(byText(host, "button", "刪掉"));
+      await click(byText(host, "button", "存成新的一版"));
+      const facts = writes.find((write) => write.method === "PUT")!.body.content.layers.facts;
+      expect(facts).toEqual([expect.objectContaining({ id: "f3", sources: 1 })]);
+      await done();
+    } finally { evidence = NO_EVIDENCE; }
+  });
+
   it("puts two versions side by side after a method is changed", async () => {
     vi.mocked(apiFetch).mockImplementation(async (path: string) => {
       if (path === "/blocks/map/spec") return SPEC as never;
       if (path.endsWith("/map/methods")) return TOOLS as never;
+      if (path.endsWith("/evidence")) return NO_EVIDENCE as never;
       if (path.endsWith("/proposals")) return [] as never;
       if (/^\/projects\/[^/]+$/.test(path)) return { project_id: "P1", name: "續約", created_at: "x" } as never;
       if (path.endsWith("/versions")) return [

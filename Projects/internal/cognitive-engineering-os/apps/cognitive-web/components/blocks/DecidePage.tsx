@@ -9,8 +9,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import {
   ASKED, ASKED_ANSWER, CREDIBILITY, GUARDRAIL_NAME, HOLD, INTENSITY, PRE_CHECKS, STOP_QUESTIONS, UNWINNABLE, cannotSave, emptyCells, holdAsked, influencesFrom, intensityAdvice, newPeople,
-  sealedNow, sourceLine, versionRows, voicesOnMap, withMapFacts, wontChange, type Asked, type CardView, type Check, type Fact, type Judgment, type MapView, type Review, type ThinkCardView,
+  claimDrift, current, liveMap, mapDrift, refreshed, sealedNow, sourceLine, versionRows, voicesOnMap, withCheckedClaims, withMapFacts, wontChange, type Asked, type CardView, type Check, type Fact, type Judgment, type MapView, type Review, type ThinkCardView,
 } from "../../lib/decide";
+import { NONE, calcLine, caseEvidence, claimLine, live, somethingChecked, type Evidence } from "../../lib/evidence";
 import type { Calibration } from "../../lib/learn";
 import { BlockShell, Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips, linesOf, optionalDocs } from "./JudgmentParts";
@@ -19,7 +20,7 @@ type Any = Record<string, any>;
 type Held = {
   judgment: Doc<Judgment> | null; check: Doc<Check> | null; reviews: Array<Doc<Review>>; seals: number[]; pause: Doc<{ why?: string }> | null;
   intake: Doc<Any> | null; guardrails: string[]; senseIntensity: string; cards: CardView[]; map: MapView | null; thinkCards: ThinkCardView[]; criteria: string[];
-  notes: Any | null; updated: string; acted: string[];
+  notes: Any | null; updated: string; acted: string[]; evidence: Evidence;
 };
 
 const compact = (content: Judgment): Judgment => {
@@ -51,23 +52,25 @@ export function DecidePage({ projectId }: { projectId: string }) {
   };
 
   const load = async (): Promise<Held> => {
-    const [judgments, checks, reviews, seals, pauses, intakes, guardrails, states, cards, maps, thinkCards, rounds, notes, calibrations, actNotes] = await Promise.all([
+    const [judgments, checks, reviews, seals, pauses, intakes, guardrails, states, cards, maps, thinkCards, rounds, notes, calibrations, actNotes, evidence] = await Promise.all([
       docs.list<Judgment>(projectId, "decide.judgment"), docs.list<Check>(projectId, "decide.check"), docs.list<Review>(projectId, "decide.review"),
       docs.list<{ for_version: number }>(projectId, "decide.seal"), docs.list<{ why?: string }>(projectId, "decide.pause"),
       docs.list<Any>(projectId, "assembler.intake"), docs.list<{ guardrail: string }>(projectId, "govern.guardrail"), docs.list<{ intensity?: string }>(projectId, "sense.state"),
       optionalDocs<CardView["content"]>(projectId, "sense.card"), optionalDocs<MapView>(projectId, "map.map"), optionalDocs<ThinkCardView["content"]>(projectId, "think.card"),
       optionalDocs<{ criteria?: string[] }>(projectId, "think.round"), optionalDocs<Any>(projectId, "context.notes"), optionalDocs<Calibration>(projectId, "learn.calibration"),
       optionalDocs<{ happened?: string }>(projectId, "act.note"),
+      caseEvidence(projectId),   // what GATHER, VERIFY and COMPUTE handed over, counted once on the server
     ]);
     const next: Held = {
       judgment: judgments.at(-1) ?? null, check: checks.at(-1) ?? null, reviews, seals: seals.map((seal) => seal.content.for_version), pause: pauses.at(-1) ?? null,
       intake: intakes.at(-1) ?? null, guardrails: guardrails.map((doc) => doc.content.guardrail),
       senseIntensity: states.at(-1)?.content.intensity ?? "",   // only the strength: the cards of 外化 are not read here
-      cards, map: maps.at(-1)?.content ?? null, thinkCards: thinkCards.map((doc) => ({ author: doc.author, content: doc.content })),
+      cards, map: liveMap(maps.at(-1)?.content ?? null, evidence), thinkCards: thinkCards.map((doc) => ({ author: doc.author, content: doc.content })),
       criteria: [...new Set(rounds.flatMap((round) => round.content.criteria ?? []))],
       notes: notes.at(-1)?.content ?? null,
       updated: calibrations.filter((doc) => doc.content.decision === "出新版判斷" && doc.content.updated_conditions).at(-1)?.content.updated_conditions ?? "",
       acted: actNotes.map((doc) => doc.content.happened ?? "").filter(Boolean).slice(-3),
+      evidence,
     };
     setHeld(next);
     if (next.judgment && next.judgment.version > 1) docs.versions<Judgment>(projectId, "decide.judgment", next.judgment.doc_id).then((found) => { setVersions(found); setPair([found.length - 1, found.length]); }).catch(() => undefined);
@@ -88,12 +91,15 @@ export function DecidePage({ projectId }: { projectId: string }) {
     facts: (form.facts ?? []).filter((fact) => fact.text.trim()),
   });
   const set = (patch: Judgment) => setForm((current) => ({ ...current, ...patch }));
-  const setFact = (index: number, patch: Partial<Fact>) => set({ facts: (form.facts ?? []).map((fact, at) => (at === index ? { ...fact, ...patch } : fact)) });
+  // a fact brought from VERIFY whose words you change is your own say from then on: it no longer carries that claim's count
+  // a fact brought from VERIFY or the map whose words you change is your own say from then on: its count does not stay with them
+  const setFact = (index: number, patch: Partial<Fact>) => set({ facts: (form.facts ?? []).map((fact, at) => (at !== index ? fact
+    : patch.text !== undefined && (fact.claim || fact.cards?.length) && patch.text !== fact.text ? { text: patch.text, sources: 0, self_said: true, ...(fact.credibility ? { credibility: fact.credibility } : {}) } : { ...fact, ...patch })) });
   const addToLines = (key: "options", line: string) => setText((current) => ({ ...current, [key]: linesOf(current[key]).includes(line) ? current[key] : [...linesOf(current[key]), line].join("\n") }));
 
   const sealed = sealedNow(judgment?.version ?? 0, held?.seals ?? []);
   const voices = useMemo(() => voicesOnMap(held?.map ?? null, held?.cards ?? []), [held]);
-  const listed = useMemo(() => influencesFrom({ facts: form.facts ?? [], map: held?.map ?? null, voices, thinkCards: held?.thinkCards ?? [], facilitated: (held?.intake?.content.blocks ?? []).includes("FACILITATE") }), [form.facts, held, voices]);
+  const listed = useMemo(() => influencesFrom({ facts: form.facts ?? [], map: held?.map ?? null, evidence: held?.evidence ?? NONE, voices, thinkCards: held?.thinkCards ?? [], facilitated: (held?.intake?.content.blocks ?? []).includes("FACILITATE") }), [form.facts, held, voices]);
 
   const save = run(async () => {
     const content = { ...draft(), influences_listed: listed };
@@ -192,14 +198,30 @@ export function DecidePage({ projectId }: { projectId: string }) {
         <Cell id="problem" label="問題目前怎麼被定義，為什麼這樣定義"><textarea id="problem" value={form.problem_definition ?? ""} maxLength={2000} onChange={(event) => set({ problem_definition: event.target.value })} /></Cell>
 
         <div className="field">
-          <b>已知事實、來源與可信度 <span className="tags"><span>這次沒做查證</span></span></b>
+          <b>已知事實、來源與可信度 {!(held && somethingChecked(held.evidence)) && <span className="tags"><span>這次沒做查證</span></span>}</b>
           <p className="hint">系統只告訴你有幾個獨立出處；可不可信，由你標。</p>
+          {held && somethingChecked(held.evidence) && (
+            <div className="carried">
+              <b>你在「查證主張」查過的</b>
+              {held.evidence.claims.map((claim) => <p key={claim.claim_id} className="mt4 mb0">「{claim.text}」{claimLine(claim, held.evidence.min_origins)}</p>)}
+            </div>
+          )}
           {(form.facts ?? []).map((fact, index) => {
-            const line = sourceLine(fact);
+            const line = sourceLine(current(fact, held?.evidence ?? NONE));   // as it stands now; the notes below say when the saved copy differs
             return (
               <div key={index} className="mcard">
                 <input className="search" aria-label={`事實 ${index + 1}`} value={fact.text} maxLength={500} onChange={(event) => setFact(index, { text: event.target.value })} />
                 <span className={line.warn ? "need" : "k"}>{line.text}</span>
+                {held && mapDrift(fact, held.evidence) && (
+                  <span className="need">{mapDrift(fact, held.evidence)}。
+                    <button className="btn ghost" type="button" onClick={() => setFact(index, { sources: live(fact, held.evidence).sources })}>照現在的出處數更新</button>
+                  </span>
+                )}
+                {held && claimDrift(fact, held.evidence.claims) && (
+                  <span className="need">查證結果變了：{claimDrift(fact, held.evidence.claims)}。
+                    <button className="btn ghost" type="button" onClick={() => { const next = refreshed(fact, held.evidence.claims); set({ facts: (form.facts ?? []).flatMap((item, at) => (at !== index ? [item] : next ? [next] : [])) }); }}>{refreshed(fact, held.evidence.claims) ? "照現在的查證結果更新" : "從判斷卡拿掉"}</button>
+                  </span>
+                )}
                 <Chips options={CREDIBILITY} value={fact.credibility as (typeof CREDIBILITY)[number] | undefined} label={`事實 ${index + 1} 可不可信`} onPick={(credibility) => setFact(index, { credibility })} />
                 <div className="btns"><button className="btn ghost" type="button" onClick={() => set({ facts: (form.facts ?? []).filter((_, at) => at !== index) })}>拿掉這一條</button></div>
               </div>
@@ -208,6 +230,7 @@ export function DecidePage({ projectId }: { projectId: string }) {
           <div className="btns">
             <button className="btn" type="button" onClick={() => set({ facts: [...(form.facts ?? []), { text: "", sources: 0, self_said: true }] })}>加一條事實</button>
             {withMapFacts(form.facts ?? [], held.map).length > (form.facts ?? []).length && <button className="btn" type="button" onClick={() => set({ facts: withMapFacts(form.facts ?? [], held.map) })}>把地圖上的事實帶進來</button>}
+            {withCheckedClaims(form.facts ?? [], held.evidence.claims).length > (form.facts ?? []).length && <button className="btn" type="button" onClick={() => set({ facts: withCheckedClaims(form.facts ?? [], held.evidence.claims) })}>把查過的主張帶進來</button>}
           </div>
         </div>
 
@@ -228,7 +251,13 @@ export function DecidePage({ projectId }: { projectId: string }) {
         </Cell>
         <Cell id="alt" label="至少一個替代假設或反例"><textarea id="alt" value={form.alternative ?? ""} maxLength={2000} onChange={(event) => set({ alternative: event.target.value })} /></Cell>
         <Cell id="criteria" label="判準和權衡" hint="你用什麼標準比較，各占多重。">
-          <span className="tags"><span>這次沒做計算</span></span>
+          {!held?.evidence.calcs.length && <span className="tags"><span>這次沒做計算</span></span>}
+          {(held?.evidence.calcs.length ?? 0) > 0 && (
+            <div className="carried">
+              <b>你在「計算與模擬」算過的（按一下放進來）</b>
+              <div className="chips">{held!.evidence.calcs.map((calc) => <button key={calc.run_id} type="button" className="chip" onClick={() => set({ criteria: [form.criteria ?? "", calcLine(calc, held!.evidence.min_origins)].filter(Boolean).join("\n") })}>{calcLine(calc, held!.evidence.min_origins)}</button>)}</div>
+            </div>
+          )}
           {held.criteria.length > 0 && (
             <div className="carried">
               <b>你在「共思考」寫的候選判準（按一下放進來）</b>

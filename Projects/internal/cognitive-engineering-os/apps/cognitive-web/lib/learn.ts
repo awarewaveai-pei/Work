@@ -26,7 +26,7 @@ export const TRUST: Array<{ key: string; name: string; question: string }> = [
   { key: "bias_dependence", name: "偏誤與依賴", question: "資料偏誤、框架限制、過度順從有沒有出現？要不要主動要反例、換框架，或改用自己的判斷？" },
 ];
 
-export type Wrong = { source: string; why?: string };
+export type Wrong = { source: string; why?: string; cards?: string[] };   // cards: the GATHER cards of the origin picked
 export type Calibration = {
   judgment_version: number; outcome: string; prediction_result?: string; prediction_note?: string; missed?: string; review_checks?: Record<string, string>;
   step_done?: string; direction?: string; process?: string; luck?: string; decision?: string; other_method?: string; updated_conditions?: string;

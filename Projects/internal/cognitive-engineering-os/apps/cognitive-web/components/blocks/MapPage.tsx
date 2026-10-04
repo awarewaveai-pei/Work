@@ -12,10 +12,11 @@ import { toolHref } from "../../lib/catalog";
 import { humanError } from "../../lib/errors";
 import {
   allItems, compareRows, confirmClaim, detailsMissing, editedBy, interestGroups, itemsOf, layerFlags, newId, pendingKeys, placeCard, sourceLine, takeAlternative,
-  thinFacts, unconfirmedLaw, unplacedCards, usablePlacements, withItems,
+  linkSources, thinFacts, unconfirmedLaw, unplacedCards, usablePlacements, withItems, withLiveSources,
   type Decision, type Item, type MapContent, type MapSpec, type Placement, type SenseCard, type Tool,
 } from "../../lib/map";
 import { formatTime } from "../../lib/time";
+import { NONE, caseEvidence, originName, type Evidence, type Origin } from "../../lib/evidence";
 import { BlockShell, Notices } from "./BlockShell";
 
 type Intake = { question?: string; affected?: string[] };
@@ -36,11 +37,13 @@ function Chips<T extends string>({ options, value, onPick, label }: { options: r
   );
 }
 
-function ItemRow({ layer, item, claimed, kinds, onSave, onDelete, onClaim }: {
-  layer: string; item: Item; claimed: boolean; kinds: string[]; onSave: (patch: { text: string; place?: string }) => void; onDelete: () => void; onClaim: (kind: string) => void;
+function ItemRow({ layer, item, claimed, kinds, origins, onSave, onDelete, onClaim, onLink }: {
+  layer: string; item: Item; claimed: boolean; kinds: string[]; origins: Origin[]; onSave: (patch: { text: string; place?: string }) => void; onDelete: () => void; onClaim: (kind: string) => void;
+  onLink: (cards: string[]) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [text, setText] = useState(item.text);
   const [place, setPlace] = useState(item.place ?? "");
   if (editing) {
@@ -62,12 +65,25 @@ function ItemRow({ layer, item, claimed, kinds, onSave, onDelete, onClaim }: {
       <span className="tags"><span>{AUTHOR[item.by]}</span>{claimed && <span>已標成主張</span>}</span>
       {layer === "facts" && item.place && <span className="k">發生在：{item.place}</span>}
       {source && <span className={source.warn ? "need" : "k"}>{source.text}</span>}
+      {layer === "facts" && (item.cards?.length ?? 0) > 0 && <span className="k">靠的來源：{origins.filter((origin) => origin.cards.some((card) => item.cards!.includes(card.card))).map((origin) => `${originName(origin)}${origin.pending ? "（還在分組）" : origin.counts ? "" : "（不算進數量）"}`).join("、") || "（連到的來源已經不在了）"}</span>}
       <div className="btns">
         <button className="btn ghost" type="button" onClick={() => setEditing(true)}>改</button>
         <button className="btn ghost" type="button" onClick={onDelete}>刪掉</button>
         {!claimed && <button className="btn ghost" type="button" aria-expanded={marking} onClick={() => setMarking(!marking)}>標成主張</button>}
+        {layer === "facts" && origins.length > 0 && <button className="btn ghost" type="button" aria-expanded={linking} onClick={() => setLinking(!linking)}>連到找回來的來源</button>}
       </div>
       {marking && <Chips options={kinds} onPick={(kind) => { onClaim(kind); setMarking(false); }} label="這是哪一種主張" />}
+      {linking && <p className="hint">出處不到兩個時，AI 會先不用這一條，等你說可以。</p>}
+      {linking && (
+        <div className="chips" role="group" aria-label="這一條靠哪些來源">
+          {origins.map((origin) => {
+            const ids = origin.cards.map((card) => card.card);
+            const on = ids.some((id) => (item.cards ?? []).includes(id));
+            const next = on ? (item.cards ?? []).filter((id) => !ids.includes(id)) : [...(item.cards ?? []), ...ids];
+            return <button key={origin.origin_id} type="button" className={`chip${on ? " on" : ""}`} aria-pressed={on} onClick={() => onLink(next)}>{originName(origin)}{origin.pending ? "（還在分組）" : origin.counts ? "" : "（不算進數量）"}</button>;
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -100,13 +116,16 @@ export function MapPage({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [evidence, setEvidence] = useState<Evidence>(NONE);
 
   const load = async (resetDraft: boolean) => {
     const list = <C,>(kind: string) => docs.list<C>(projectId, kind);
-    const [maps, sense, intakes, notesDocs, places, alts, picks, props, reviewDocs] = await Promise.all([
+    const [maps, sense, intakes, notesDocs, places, alts, picks, props, reviewDocs, found] = await Promise.all([
       list<MapContent>("map.map"), list<SenseCard>("sense.card"), list<Intake>("assembler.intake"), list<Notes>("context.notes"),
       list<{ placements?: Placement[] }>("map.placement"), list<Alternatives>("map.alternatives"), list<Picks>("map.method_pick"), list<Proposals>("map.claim_proposal"), list<Review>("map.review"),
+      caseEvidence(projectId),   // GATHER's origins: a fact links to them, the count is the server's
     ]);
+    setEvidence(found);
     const latest = maps.at(-1) ?? null;
     setHeld(latest);
     if (resetDraft) setDraft(latest?.content ?? {});
@@ -136,7 +155,10 @@ export function MapPage({ projectId }: { projectId: string }) {
   const persist = async (): Promise<Doc<MapContent> | null> => {
     let saved = held;
     if (dirty) {
-      const result = held ? await docs.update(projectId, "map.map", held, draft) : await docs.create(projectId, "map.map", draft);
+      const now = await caseEvidence(projectId);   // the count at the moment of saving (an origin may have been marked 不用 since the page opened)
+      setEvidence(now);
+      const content = withLiveSources(draft, now);
+      const result = held ? await docs.update(projectId, "map.map", held, content) : await docs.create(projectId, "map.map", content);
       setNotices(result.notices);
       saved = result;
     }
@@ -163,7 +185,7 @@ export function MapPage({ projectId }: { projectId: string }) {
   const kinds = spec.claim_kinds.map((entry) => entry.kind);
   const layerName = Object.fromEntries(spec.layers.map((layer) => [layer.key, layer.name]));
   const flags = layerFlags(draft, layerKeys);
-  const thin = thinFacts(draft);
+  const thin = thinFacts(draft, evidence);
   const toolName = (id: string) => tools.find((tool) => tool.method_id === id)?.name ?? id;
   const unplaced = unplacedCards(cards, draft);
   const placements = usablePlacements(placeDoc?.content.placements, cards, draft, layerKeys);
@@ -295,7 +317,10 @@ export function MapPage({ projectId }: { projectId: string }) {
         const items = itemsOf(draft, layer.key);
         const form = adding[layer.key] ?? NO_FORM;
         const row = (item: Item) => (
-          <ItemRow key={item.id} layer={layer.key} item={item} claimed={claimedItems.has(item.id)} kinds={kinds} onSave={(patch) => saveItem(layer.key, item, patch)} onDelete={() => removeItem(layer.key, item)}
+          <ItemRow key={item.id} layer={layer.key} item={item.cards?.length ? linkSources(item, item.cards, evidence) : item} claimed={claimedItems.has(item.id)} kinds={kinds}
+            origins={evidence.origins.filter((origin) => !origin.pending || origin.cards.some((card) => (item.cards ?? []).includes(card.card)))}
+            onSave={(patch) => saveItem(layer.key, item, patch)} onDelete={() => removeItem(layer.key, item)}
+            onLink={(linked) => setDraft((current) => withItems(current, "facts", itemsOf(current, "facts").map((found) => (found.id === item.id ? linkSources(found, linked, evidence) : found))))}
             onClaim={(kind) => setDraft((current) => confirmClaim(current, item.id, kind, "user"))} />
         );
         return (

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NONE } from "./evidence";
 
 import {
   compareRows, confirmClaim, detailsMissing, editedBy, interestGroups, layerFlags, pendingKeys, placeCard, sourceLine, takeAlternative, thinFacts, unconfirmedLaw, unplacedCards, usablePlacements,
@@ -67,7 +68,14 @@ describe("sources of a fact", () => {
     expect(sourceLine(two)).toEqual({ text: "2 個獨立出處", warn: false });
   });
   it("is thin only when it came from outside with under two sources; the person's own say never stops the AI", () => {
-    expect(thinFacts({ layers: { facts: [own, one, none, two] } }).map((found) => found.id)).toEqual(["b", "c"]);
+    expect(thinFacts({ layers: { facts: [own, one, none, two] } }, NONE).map((found) => found.id)).toEqual(["b", "c"]);
+  });
+  it("counts a linked fact from the server's origins, never the number the map stored", () => {
+    const origin = (id: string, card: string, counts: boolean) => ({ origin_id: id, how: "單獨", pending: false, aside: false, counts, mark: null,
+      cards: [{ card, version: 1, source_id: card, url: "https://x.example", title: card, aside: "", found_by: { by: "系統找的" }, cells: {}, mine: {} }] });
+    const evidence = { ...NONE, origins: [origin("o:1", "k1", true), origin("o:2", "k2", false)] };
+    const linked = item("e", { self_said: false, sources: 2, cards: ["k1", "k2"] });
+    expect(thinFacts({ layers: { facts: [linked] } }, evidence).map((found) => [found.id, found.sources])).toEqual([["e", 1]]);
   });
 });
 

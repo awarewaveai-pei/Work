@@ -16,6 +16,7 @@ import {
 } from "../../lib/learn";
 import type { Reminder, Task, Note } from "../../lib/act";
 import { formatTime } from "../../lib/time";
+import { caseEvidence, originName, type Origin } from "../../lib/evidence";
 import { BlockShell, Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips, optionalDocs } from "./JudgmentParts";
 
@@ -26,6 +27,7 @@ type Held = {
   thinkCards: Array<Doc<{ claim?: string }>>; thinkReactions: Array<Doc<{ card: string; reaction?: string; picked?: boolean }>>; mapReviews: Array<Doc<{ decision: string }>>;
   calibrations: Array<Doc<Calibration>>; revisit: Doc<{ on: string; note?: string }> | null; compare: Doc<Compare> | null; intake: Doc<Any> | null;
   moves: Move[]; unused: Array<{ code: string; open: boolean }>; hints: string[]; due: Reminder[]; habits: Array<Doc<{ keep?: string; change?: string }>>; guardrails: string[];
+  origins: Origin[];
 };
 
 const clean = (values: Record<string, string> | undefined): Record<string, string> => Object.fromEntries(Object.entries(values ?? {}).filter(([, value]) => value.trim()));
@@ -50,7 +52,7 @@ export function LearnPage({ projectId }: { projectId: string }) {
 
   const load = async (): Promise<Held> => {
     const id = encodeURIComponent(projectId);
-    const [judgments, tasks, notes, checks, reviews, mirrors, senseReviews, thinkCards, thinkReactions, mapReviews, calibrations, revisits, compares, intakes, guardrails, moves, unused, patterns, due, habits] = await Promise.all([
+    const [judgments, tasks, notes, checks, reviews, mirrors, senseReviews, thinkCards, thinkReactions, mapReviews, calibrations, revisits, compares, intakes, guardrails, moves, unused, patterns, due, habits, evidence] = await Promise.all([
       docs.list<Judgment>(projectId, "decide.judgment"), docs.list<Task>(projectId, "act.task"), docs.list<Note>(projectId, "act.note"), docs.list<Check>(projectId, "decide.check"), docs.list<Review>(projectId, "decide.review"),
       docs.list<{ summary: string }>(projectId, "sense.mirror"), docs.list<{ mirror: string; version: number; decision: string }>(projectId, "sense.review"),
       optionalDocs<{ claim?: string }>(projectId, "think.card"), optionalDocs<{ card: string; reaction?: string; picked?: boolean }>(projectId, "think.reaction"), optionalDocs<{ decision: string }>(projectId, "map.review"),
@@ -59,10 +61,12 @@ export function LearnPage({ projectId }: { projectId: string }) {
       apiFetch<{ moves: Move[] }>(`/projects/${id}/learn/moves`), apiFetch<{ unused: Array<{ code: string; open: boolean }> }>(`/projects/${id}/learn/unused_blocks`),
       apiFetch<{ hints: string[] }>("/me/learn/patterns"), apiFetch<Reminder[]>(`/projects/${id}/act/reminders?utc_offset=${-new Date().getTimezoneOffset()}`),
       docs.list<{ keep?: string; change?: string }>(null, "learn.habit"),
+      caseEvidence(projectId),   // the case's origins: a wrong one is named by its pages (GATHER shows it on that origin)
     ]);
     const next: Held = {
       judgments: await versionsOf(judgments), tasks, notes, checks, reviews, mirrors, senseReviews, thinkCards, thinkReactions, mapReviews, calibrations, revisit: revisits.at(-1) ?? null, compare: compares.at(-1) ?? null,
       intake: intakes.at(-1) ?? null, moves: moves.moves, unused: unused.unused, hints: patterns.hints, due: due.filter((item) => item.kind === "review"), habits, guardrails: [...new Set(guardrails.map((doc) => doc.content.guardrail))],
+      origins: evidence.origins.filter((origin) => !origin.pending),
     };
     setHeld(next);
     return next;
@@ -88,7 +92,7 @@ export function LearnPage({ projectId }: { projectId: string }) {
 
   const mine = held?.calibrations.filter((doc) => doc.content.judgment_version === version).at(-1) ?? null;
   const save = run(async () => {
-    const content = compact({ ...form, judgment_version: version, outcome: (form.outcome ?? "").trim(), review_checks: clean(form.review_checks), trust: clean(form.trust), wrong_sources: wrong.filter((item) => item.source.trim()).map((item) => compact({ source: item.source.trim(), why: item.why?.trim() })) }) as Calibration;
+    const content = compact({ ...form, judgment_version: version, outcome: (form.outcome ?? "").trim(), review_checks: clean(form.review_checks), trust: clean(form.trust), wrong_sources: wrong.filter((item) => item.source.trim()).map((item) => compact({ source: item.source.trim(), why: item.why?.trim(), cards: item.cards })) }) as Calibration;
     const saved = mine ? await docs.update(projectId, "learn.calibration", mine, content) : await docs.create(projectId, "learn.calibration", content);
     setNotices(saved.notices);
     await apiFetch(`/projects/${encodeURIComponent(projectId)}/learn/history`, { method: "POST" });   // this case's line in your own history, written by the platform
@@ -221,10 +225,19 @@ export function LearnPage({ projectId }: { projectId: string }) {
 
         <div className="field">
           <b>當時哪個出處錯了（選填）</b>
-          <p className="hint">標出來，以後同一個出處再出現時，會提醒你。系統不會自動降低它的分量。</p>
+          <p className="hint">標出來，以後同一個出處再出現時，會提醒你。系統不會自動降低它的分量。{held && held.origins.length > 0 ? "這個案子找回來的出處，直接點；不在裡面的，寫它的名字。" : ""}</p>
           {wrong.map((item, index) => (
             <div key={index} className="btns">
-              <input className="search" aria-label={`錯的出處 ${index + 1}`} placeholder="哪個出處" value={item.source} maxLength={300} onChange={(event) => setWrong(wrong.map((entry, at) => (at === index ? { ...entry, source: event.target.value } : entry)))} />
+              {held && held.origins.length > 0 && (
+                <div className="chips" role="group" aria-label={`錯的出處 ${index + 1} 是哪一個`}>
+                  {held.origins.map((origin) => {
+                    const on = origin.cards.some((card) => (item.cards ?? []).includes(card.card));   // by its pages: a regroup does not lose it
+                    // a second press takes the pick back; typing a name instead drops the cards
+                    return <button key={origin.origin_id} type="button" className={`chip${on ? " on" : ""}`} aria-pressed={on} onClick={() => setWrong(wrong.map((entry, at) => (at !== index ? entry : on ? { source: "", why: entry.why } : { ...entry, source: originName(origin), cards: origin.cards.map((card) => card.card) })))}>{originName(origin)}</button>;
+                  })}
+                </div>
+              )}
+              <input className="search" aria-label={`錯的出處 ${index + 1}`} placeholder="哪個出處" value={item.cards?.length ? "" : item.source} maxLength={300} onChange={(event) => setWrong(wrong.map((entry, at) => (at === index ? { source: event.target.value, why: entry.why } : entry)))} />
               <input className="search" aria-label={`錯的出處 ${index + 1} 為什麼`} placeholder="錯在哪" value={item.why ?? ""} maxLength={500} onChange={(event) => setWrong(wrong.map((entry, at) => (at === index ? { ...entry, why: event.target.value } : entry)))} />
             </div>
           ))}

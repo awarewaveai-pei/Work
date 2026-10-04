@@ -9,6 +9,7 @@ import React, { useEffect, useState } from "react";
 import { ApiError, apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
+import { NONE, caseEvidence, type Evidence } from "../../lib/evidence";
 import { BlockShell, Notices } from "./BlockShell";
 import { ALWAYS, GRANTABLE_WORDS } from "./CollabPermissions";
 
@@ -68,7 +69,7 @@ export const PHASES = [
 export type Round = { problem: string; own?: string[]; role?: string; mode?: string; criteria?: string[]; reflection?: string };
 export type Card = {
   claim: string; mechanism?: string; benefit?: string; risk?: string; assumption?: string; premise?: string; fails_when?: string; round: string; role?: string; method?: string;
-  sourced?: string; batch?: string; batch_index?: number;
+  sourced?: string; rests_on?: string; batch?: string; batch_index?: number;   // rests_on: the VERIFY claim an AI card rests on
 };
 /** Your answer to one card, kept apart from the card so an AI card stays the AI's until you change its words. */
 export type Reaction = { card: string; reaction?: string; reason?: string; stance?: string; picked?: boolean };
@@ -200,14 +201,17 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [evidence, setEvidence] = useState<Evidence>(NONE);
 
   const load = async () => {
-    const [rounds, cards, reactions, laidOut, batches, replies, answers, contract, state] = await Promise.all([
+    const [rounds, cards, reactions, laidOut, batches, replies, answers, contract, state, found] = await Promise.all([
       docs.list<Round>(projectId, "think.round"), docs.list<Card>(projectId, "think.card"), docs.list<Reaction>(projectId, "think.reaction"), docs.list<{ batch: string }>(projectId, "think.laid_out"),
       docs.list<Batch>(projectId, "think.batch"), docs.list<Reply>(projectId, "think.reply"),
       docs.list<Answer>(projectId, "think.response"), docs.list<{ permissions?: string[] }>(projectId, "collab_contract.terms"), docs.list<{ emotion: string; intensity: string }>(projectId, "sense.state"),
+      caseEvidence(projectId),   // which checked claim a 「有來源」 card rests on, and whether it still may stand as a fact
     ]);
     setData({ rounds, cards, reactions, laidOut, batches, replies, answers, permissions: contract.at(-1)?.content.permissions ?? [], emotion: state.at(-1)?.content ?? null });
+    setEvidence(found);
   };
   useEffect(() => { load().catch((reason) => setError(thinkError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -287,7 +291,11 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     await docs.remove(projectId, "think.card", card.doc_id);
   };
   const saveOwnCard = (card: Card, doc?: Doc<Card>) => act(async () => {
-    const saved = doc ? await docs.update(projectId, "think.card", doc, { ...doc.content, ...card }) : await docs.create(projectId, "think.card", { ...card, round: roundId! });
+    // a card you rewrite no longer rests on the checked claim: 「有來源」 and its claim go with the old words (the server insists)
+    const reworded = doc && CARD_TEXT.some((field) => (card[field] ?? "") !== (doc.content[field] ?? ""));
+    const { rests_on: _claim, ...rest } = doc?.content ?? ({} as Card);
+    const content = doc ? (reworded && doc.content.sourced === "有來源" ? { ...rest, ...card, sourced: "它自己說的" } : { ...doc.content, ...card }) : null;
+    const saved = doc ? await docs.update(projectId, "think.card", doc, content!) : await docs.create(projectId, "think.card", { ...card, round: roundId! });
     setNotices(saved.notices); setEditing(null);
     if (!doc) setAdding((count) => count + 1);
   });
@@ -324,6 +332,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const messageFor = (reply: Doc<Reply>) => data.answers.filter((entry) => entry.content.reply === reply.doc_id).at(-1)?.content;
   const unpickedFull = picked.length >= MAX_PICKED;
 
+  const restsOn = (doc: Doc<Card>) => (doc.content.rests_on ? evidence.claims.find((claim) => claim.claim_id === doc.content.rests_on) ?? null : null);
   const cardView = (doc: Doc<Card>) => {
     const mine = reactionOf(doc);
     const given = mine?.content ?? ({ card: doc.doc_id } as Reaction);
@@ -331,8 +340,11 @@ export function ThinkPage({ projectId }: { projectId: string }) {
       <div key={doc.doc_id} className="mcard now"><CardForm initial={doc.content} busy={busy} onSave={(card) => saveOwnCard(card, doc)} onCancel={() => setEditing(null)} /></div>
     ) : (
       <div key={doc.doc_id} className="mcard">
-        <span className="tags"><span>{AUTHOR[doc.author]}</span>{doc.content.sourced && <span>{doc.content.sourced}</span>}{doc.content.role && <span>{doc.content.role}</span>}{doc.content.method && <span>{doc.content.method}</span>}{given.picked && <span>你選了這張</span>}</span>
+        <span className="tags"><span>{AUTHOR[doc.author]}</span>{doc.content.sourced && <span>{doc.content.rests_on && !restsOn(doc)?.usable ? "它自己說的" : doc.content.sourced}</span>}{doc.content.role && <span>{doc.content.role}</span>}{doc.content.method && <span>{doc.content.method}</span>}{given.picked && <span>你選了這張</span>}</span>
         <b>{doc.content.claim}</b>
+        {doc.content.rests_on && (restsOn(doc)?.usable
+          ? <span className="k">靠的是你查證過的：「{restsOn(doc)!.text}」</span>
+          : <span className="need">查證結果變了：{restsOn(doc) ? `「${restsOn(doc)!.text}」現在不能當事實（你不採信、改過主張，或沒有算數的出處）` : "這個主張已經刪掉了"}，這張卡現在算它自己說的。</span>)}
         {CARD_TEXT.slice(1).filter((field) => doc.content[field]).map((field) => <span key={field}><span className="k">{CARD_LABEL[field]}：</span>{doc.content[field]}</span>)}
         <span className="k">你覺得怎麼樣？</span>
         <Chips options={REACTIONS} value={given.reaction as (typeof REACTIONS)[number] | undefined} label="你的反應" disabled={() => busy}

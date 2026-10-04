@@ -22,6 +22,17 @@ async function open(routes: Record<string, unknown> = {}) {
 }
 
 describe("ACT 行動與觀察", () => {
+  it("shows what VERIFY checked and COMPUTE calculated before I write my prediction, and says a simulation is not a prediction", async () => {
+    const claims = [{ claim_id: "C1", version: 1, text: "下週起每天只能領一萬元", sentence: "可以查的事實", law: false, state: "查不到", support: [], oppose: [], stale: 0, few: true, verdict: { verdict: "不採信", reason: "沒有官方出處", earlier: false } }];
+    const calcs = [{ run_id: "R1", version: 1, at: "2026-10-04T01:00:00Z", label: "模擬結果", algorithm: { id: "computation.monte_carlo", version: "1", name: "蒙地卡羅" }, inputs: [], result: { range: { low: -2, high: 5, unit: "萬" } }, thin_inputs: ["月營收"], adopt: { adopt: "採用", reason: "範圍夠用" } }];
+    const { host, done } = await open({ ["/projects/P1/evidence"]: { origins: [], changed_marks: [], claims, calcs, min_origins: 2 } });
+    const text = host.textContent ?? "";
+    expect(text).toContain("查不到：0 個出處支持、0 個反對（出處不到 2 個）；你判定「不採信」");
+    expect(text).toContain("模擬結果（蒙地卡羅）：-2～5 萬；月營收的出處不到 2 個；你採用");
+    expect(text).toContain("模擬不是預測");
+    await done();
+  });
+
   it("starts a task card from the judgment's one sentence; the prediction is required before it is saved", async () => {
     const { host, done, calls } = await open({ [`GET ${P}/docs/decide.judgment`]: [JUDGMENT], [`POST ${P}/docs/act.task`]: (call: Call) => saved("act.task", "T1", call.body.content) });
     expect(host.textContent).toContain("你在「判斷」寫的下一步：這週先跟他談一次條件");

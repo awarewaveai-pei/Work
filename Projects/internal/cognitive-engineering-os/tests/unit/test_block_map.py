@@ -9,10 +9,12 @@ import unittest
 
 from ai_lego.apps.api import main as api_main
 from ai_lego.core.domain import doc_kinds
+from ai_lego.core.domain.evidence_words import CARD_CELL_KEYS, NOT_FOUND, cell
 from ai_lego.core.domain.kinds.map import LAYER_KEYS, thin_facts
 from ai_lego.data.events import record_log
+from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform import ai_gate
+from ai_lego.platform import ai_gate, evidence
 from ai_lego.platform.ai_actions.map import map_tools
 from ai_lego.platform.ai_gateway.provider import AiCompletion
 from ai_lego.platform.block_hooks.map import WHY_GATHER, WHY_TEACH, WHY_VERIFY
@@ -36,7 +38,7 @@ class ScriptedProvider:
 
 FACT = {"id": "f1", "text": "合夥人第三次改條件", "by": "user", "sources": 0, "self_said": True, "place": "台北"}
 READING = {"id": "i1", "text": "他沒把我當夥伴", "by": "user"}
-OUTSIDE = {"id": "f2", "text": "網路上說他同業都這樣改", "by": "user", "sources": 1, "self_said": False}
+OUTSIDE = {"id": "f2", "text": "網路上說他同業都這樣改", "by": "user", "sources": 0, "self_said": False}   # from outside, no source card linked: counts 0
 
 
 class MapApiTestCase(ProjectSourceApiTestCase):
@@ -67,6 +69,18 @@ class MapApiTestCase(ProjectSourceApiTestCase):
     def _ask(self, name, context=None, over=None):
         body = {"context": context or {}, **({"doc_id": over["doc_id"], "base_version": over["version"]} if over else {})}
         return self.client.post(f"{self.base}/ai/MAP/{name}", json=body)
+
+    def _source_card(self, url):
+        """A source card on its own grouped origin, as GATHER leaves it (the system writes both)."""
+        docs, owner = CaseDocs(self._repo), record_log.case(self.pid)
+        cells = {key: cell(NOT_FOUND, why="沒有寫") for key in CARD_CELL_KEYS}
+        card = docs.save(self.tenant["tenant_id"], owner, "gather.source", {"source_id": "", "url": url, "title": url, "found_by": {"by": "系統找的"}, "cells": cells,
+                         "snapshot": {"sha256": url.encode().hex()[:64].ljust(64, "0"), "fetched_at": "2026-10-04T00:00:00Z"}}, record_log.system("GATHER"))["doc_id"]
+        current = docs.current(self.tenant["tenant_id"], owner, "gather.origins")
+        groups = (current[0]["content"]["groups"] if current else []) + [{"cards": [card], "how": "單獨"}]
+        docs.save(self.tenant["tenant_id"], owner, "gather.origins", {"groups": groups, "rules_version": "1"}, record_log.system("GATHER"),
+                  doc_id=current[0]["doc_id"] if current else None, base_version=current[0]["version"] if current else None)
+        return card
 
     def _proposals(self):
         return [item["propose"] for item in self.client.get(f"{self.base}/proposals").json()]
@@ -151,7 +165,8 @@ class MapAiTests(MapApiTestCase):
     def test_each_action_reads_and_needs_what_the_card_says(self):
         found = {name: action for (block, name), action in ai_gate.actions().items() if block == "MAP"}
         self.assertEqual({name: action.reads for name, action in found.items()}, {
-            "place": ("sense.card", "map.map"), "alternatives": ("map.map", "context.notes"), "method": ("assembler.intake", "map.map"), "claims": ("map.map", "context.notes")})
+            "place": ("sense.card", "map.map"), "alternatives": ("map.map", "context.notes", "gather.source"), "method": ("assembler.intake", "map.map"),
+            "claims": ("map.map", "context.notes", "gather.source")})   # gather.source: a fact linked to source cards is counted live
         self.assertEqual({name: action.needs for name, action in found.items()}, {"place": "organize", "alternatives": "propose_options", "method": "organize", "claims": "organize"})
 
     def test_placing_cards_offers_only_cards_not_in_a_layer_and_the_answer_is_held_to_the_six_layers(self):
@@ -196,6 +211,32 @@ class MapAiTests(MapApiTestCase):
         self.assertNotIn("網路上說他同業都這樣改", self.provider.calls[0][1])
         self._ask("alternatives", {"use_thin": ["f2"]}, over=self.client.get(f"{self.base}/docs/map.alternatives").json()[0])
         self.assertIn("網路上說他同業都這樣改", self.provider.calls[1][1])
+
+    def test_a_fact_linked_to_source_cards_is_counted_live_and_held_back_when_its_origins_drop(self):
+        """Step 2: 分到六層的來源卡 -- the count behind a fact is the system's (evidence), never the number the page sent."""
+        self._grant("propose_options")
+        a, b = self._source_card("https://a.example"), self._source_card("https://b.example")
+        linked = {"id": "f3", "text": "公會 2019 年改了範本", "by": "user", "sources": 2, "self_said": False, "cards": [a, b]}
+        self._save_map({"layers": {"facts": [FACT, linked]}})
+        self.provider.answer = {"items": [{"about": "f1", "view": "也許是市場變了"}]}
+        self._ask("alternatives")
+        self.assertIn("公會 2019 年改了範本", self.provider.calls[0][1])
+        found = evidence.origins(CaseDocs(self._repo), self.tenant["tenant_id"], record_log.case(self.pid))
+        dropped = next(origin for origin in found if any(card["card"] == b for card in origin["cards"]))
+        self.client.post(f"{self.base}/docs/gather.mark", json={"content": {"origin": dropped["origin_id"], "cards": [b], "mark": "不用", "reason": "查不到誰辦的"}})
+        self._ask("alternatives", over=self.client.get(f"{self.base}/docs/map.alternatives").json()[0])
+        self.assertNotIn("公會 2019 年改了範本", self.provider.calls[1][1])   # one origin left: held back, though the map still says 2
+
+    def test_the_page_cannot_overstate_a_facts_sources_or_link_a_card_from_elsewhere(self):
+        a = self._source_card("https://a.example")
+        for fact, code in (({"id": "f3", "text": "x", "by": "user", "sources": 5, "self_said": False}, "MAP_FACT_SOURCES_WRONG"),   # critic m1: no card, no count
+                           ({"id": "f3", "text": "x", "by": "user", "sources": 2, "self_said": False, "cards": [a]}, "MAP_FACT_SOURCES_WRONG"),
+                           ({"id": "f3", "text": "x", "by": "user", "sources": 1, "self_said": True, "cards": [a]}, "MAP_FACT_SOURCES_WRONG"),
+                           ({"id": "f3", "text": "x", "by": "user", "sources": 0, "self_said": False, "cards": ["not-a-card"]}, "MAP_FACT_CARD_UNKNOWN")):
+            response = self.client.post(f"{self.base}/docs/map.map", json={"content": {"layers": {"facts": [fact]}}})
+            self.assertEqual(response.status_code, 400, response.text)
+            self.assertIn(code, response.json()["detail"])
+        self._save_map({"layers": {"facts": [{"id": "f3", "text": "x", "by": "user", "sources": 1, "self_said": False, "cards": [a]}]}})
 
     def test_my_own_stance_never_reaches_the_model_but_the_facets_i_ticked_do(self):
         self._grant("propose_options")

@@ -42,7 +42,8 @@ def expand_batch(project_id: str, body: ExpandBody, session: dict[str, Any] = De
     content = batch["content"]
     try:
         for index, card in enumerate(content.get("cards") or []):
-            docs.save(tenant_id, owner, "think.card", {**{key: card[key] for key in LAID_OUT if key in card}, "round": content["round"], "role": content["role"], "sourced": content["sourced"],
+            docs.save(tenant_id, owner, "think.card", {**{key: card[key] for key in LAID_OUT if key in card}, "round": content["round"], "role": content["role"],
+                                                      "sourced": card.get("sourced") or content["sourced"], **({"rests_on": card["rests_on"]} if card.get("rests_on") else {}),
                                                       "batch": batch["doc_id"], "batch_index": index}, record_log.ai("THINK"))
         docs.save(tenant_id, owner, "think.laid_out", {"batch": batch["doc_id"], "created": len(content.get("cards") or [])}, record_log.system("THINK"))
     except InvariantViolation as error:

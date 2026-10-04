@@ -12,12 +12,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from ai_lego.core.domain.kinds.think import MAX_PICKED
+from ai_lego.core.domain.kinds.think import MAX_PICKED, SOURCED
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
 
-SET_BY_THE_SYSTEM = ("role", "method", "sourced", "batch", "batch_index")   # what laying out a batch fills in; your own card has none of it
+CARD_WORDS = ("claim", "mechanism", "benefit", "risk", "assumption", "premise", "fails_when")   # what the person may rewrite
+SET_BY_THE_SYSTEM = ("role", "method", "sourced", "rests_on", "batch", "batch_index")   # what laying out a batch fills in; your own card has none of it
 
 
 def _blank(value: Any) -> bool:
@@ -44,6 +45,12 @@ def _card_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, conte
         fixed = [field for field in SET_BY_THE_SYSTEM if not _blank(content.get(field))]
     elif held is not None:
         fixed = [field for field in ("round", *SET_BY_THE_SYSTEM) if (None if _blank(content.get(field)) else content[field]) != held["content"].get(field)]
+        reworded = any((content.get(field) or "") != (held["content"].get(field) or "") for field in CARD_WORDS)
+        if reworded and held["content"].get("sourced") == SOURCED[0]:
+            # 「有來源」 and the claim it rests on belong to the old words: a rewritten card is 它自己說的, with no claim
+            if content.get("sourced") != SOURCED[1] or not _blank(content.get("rests_on")):
+                raise InvariantViolation("THINK_CARD_SOURCE_GOES_WITH_WORDS: a card you rewrite no longer rests on the checked claim; it says 它自己說的")
+            fixed = [field for field in fixed if field not in ("sourced", "rests_on")]
     else:
         return
     if fixed:

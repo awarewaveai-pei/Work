@@ -57,6 +57,75 @@ describe("DECIDE 判斷", () => {
     await done();
   });
 
+  it("says 這次沒做查證／計算 only when nothing was checked or calculated; then shows the results and brings a checked fact in", async () => {
+    const empty = await open();
+    expect(empty.host.textContent).toContain("這次沒做查證");
+    expect(empty.host.textContent).toContain("這次沒做計算");
+    await empty.done();
+    const claims = [
+      { claim_id: "C1", version: 1, text: "公會 2019 年改了範本", sentence: "可以查的事實", law: false, state: "有獨立出處支持", support: ["o:a", "o:b"], oppose: [], stale: 0, few: false, verdict: { verdict: "採信", reason: "兩個出處", earlier: false }, usable: true },
+      { claim_id: "C2", version: 1, text: "同業都這樣改", sentence: "可以查的事實", law: false, state: "查不到", support: [], oppose: [], stale: 0, few: true, verdict: { verdict: "不採信", reason: "沒有出處", earlier: false }, usable: false },
+    ];
+    const calcs = [{ run_id: "R1", version: 1, at: "2026-10-04T01:00:00Z", label: "計算結果", algorithm: { id: "feasibility.break_even", version: "1", name: "損益平衡" }, inputs: [], result: { range: { low: 4, high: 6, unit: "件／月" } }, thin_inputs: [], adopt: null }];
+    const { host, done } = await open({ [`${P}/evidence`]: { origins: [], changed_marks: [], claims, calcs, min_origins: 2 } });
+    const text = host.textContent ?? "";
+    expect(text).not.toContain("這次沒做查證");
+    expect(text).not.toContain("這次沒做計算");
+    expect(text).toContain("有獨立出處支持：2 個出處支持、0 個反對；你判定「採信」");
+    expect(text).toContain("計算結果（損益平衡）：4～6 件／月");
+    await click(byText(host, "button", "把查過的主張帶進來"));
+    expect((host.querySelector('[aria-label="事實 1"]') as HTMLInputElement).value).toBe("公會 2019 年改了範本");   // 不採信 is not offered as a fact
+    expect(host.querySelector('[aria-label="事實 2"]')).toBeNull();
+    expect(host.textContent).toContain("2 個獨立出處");
+    await done();
+  });
+
+  it("brings a linked map fact in with the count the server gives now, not the one the map stored", async () => {
+    const origin = (id: string, card: string, counts: boolean) => ({ origin_id: id, how: "單獨", pending: false, aside: false, counts, mark: null,
+      cards: [{ card, version: 1, source_id: card, url: "https://x.example", title: card, aside: "", found_by: { by: "系統找的" }, cells: {}, mine: {} }] });
+    const map = doc("map.map", "M1", { layers: { facts: [{ text: "公會 2019 年改了範本", sources: 2, self_said: false, cards: ["k1", "k2"] }] } });
+    const { host, done } = await open({ [`GET ${P}/docs/map.map`]: [map], [`${P}/evidence`]: { origins: [origin("o:1", "k1", true), origin("o:2", "k2", false)], changed_marks: [], claims: [], calcs: [], min_origins: 2 } });
+    await click(byText(host, "button", "把地圖上的事實帶進來"));
+    expect(host.textContent).toContain("只靠 1 個出處");
+    expect(host.textContent).toContain("「公會 2019 年改了範本」：只靠 1 個出處");   // the influence list reads the same live count
+    await done();
+  });
+
+  it("a map fact already on the card says when its sources changed, and loses its count when I change its words", async () => {
+    const origin = (id: string, card: string, counts: boolean) => ({ origin_id: id, how: "單獨", pending: false, aside: false, counts, mark: null,
+      cards: [{ card, version: 1, source_id: card, url: "https://x.example", title: card, aside: "", found_by: { by: "系統找的" }, cells: {}, mine: {} }] });
+    const held = { ...JUDGMENT, content: { ...LEAN, facts: [{ text: "公會 2019 年改了範本", sources: 2, self_said: false, cards: ["k1", "k2"] }] } };
+    const { host, done } = await open({ [`GET ${P}/docs/decide.judgment`]: [held], [`${P}/evidence`]: { origins: [origin("o:1", "k1", true), origin("o:2", "k2", false)], changed_marks: [], claims: [], calcs: [], min_origins: 2 } });
+    expect(host.textContent).toContain("出處數變了：現在 1 個獨立出處");
+    expect(host.textContent).toContain("「公會 2019 年改了範本」：只靠 1 個出處");   // the influence list reads it as it is now, before any refresh
+    await click(byText(host, "button", "照現在的出處數更新"));
+    expect(host.textContent).toContain("只靠 1 個出處");
+    await type(host.querySelector('[aria-label="事實 1"]') as HTMLInputElement, "公會改過範本吧");
+    expect(host.textContent).toContain("我自己說的，還沒有外部出處");
+    await done();
+  });
+
+  it("keeps 這次沒做查證 while VERIFY has only listed sentences nobody looked for", async () => {
+    const listed = [{ claim_id: "C1", version: 1, text: "同業都這樣改", sentence: "可以查的事實", law: false, state: "還沒查", support: [], oppose: [], stale: 0, few: true, verdict: null, usable: false }];
+    const { host, done } = await open({ [`${P}/evidence`]: { origins: [], changed_marks: [], claims: listed, calcs: [], min_origins: 2 } });
+    expect(host.textContent).toContain("這次沒做查證");
+    expect(host.textContent).not.toContain("你在「查證主張」查過的");
+    await done();
+  });
+
+  it("a fact brought from VERIFY says when the ledger changed, carries its opposition, and becomes my own say when I change its words", async () => {
+    const now = { claim_id: "C1", version: 2, text: "公會 2019 年改了範本", sentence: "可以查的事實", law: false, state: "兩邊都有", support: ["o:a", "o:b"], oppose: ["o:c"], stale: 0, few: false, verdict: { verdict: "存疑", reason: "有人反對", earlier: false }, usable: true };
+    const held = { ...JUDGMENT, content: { ...LEAN, facts: [{ text: "公會 2019 年改了範本", sources: 2, self_said: false, claim: "C1", claim_version: 1 }] } };
+    const { host, done } = await open({ [`GET ${P}/docs/decide.judgment`]: [held], [`${P}/evidence`]: { origins: [], changed_marks: [], claims: [now], calcs: [], min_origins: 2 } });
+    expect(host.textContent).toContain("查證結果變了：這個主張在查證那一步改過了");
+    await click(byText(host, "button", "照現在的查證結果更新"));
+    expect(host.textContent).toContain("2 個獨立出處支持、1 個反對");   // the opposition is on the card, as a warning
+    expect(host.textContent).not.toContain("查證結果變了");
+    await type(host.querySelector('[aria-label="事實 1"]') as HTMLInputElement, "公會改了範本，我記得是 2019");
+    expect(host.textContent).toContain("我自己說的，還沒有外部出處");   // my words now: the claim's count does not stay with them
+    await done();
+  });
+
   it("flags 「沒有」 as 這一版不打算改 and accepts it", async () => {
     const { host, done } = await open();
     const flagged = () => host.querySelector("p.warn")?.textContent ?? "";

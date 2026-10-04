@@ -1,9 +1,10 @@
 // MAP 拆解 as the pages hold it: the map's shape (ai_lego/core/domain/kinds/map.py `map.map`) and the small rules the page
 // applies to it. The words (layers, questions, claim kinds) come from GET /blocks/map/spec, not from here.
+import { live, originsBehind, type Evidence } from "./evidence";
 import type { Author } from "./blocks";
 
 export type By = Exclude<Author, "system">;   // who wrote a line: user | ai | joint
-export type Item = { id: string; text: string; by: By; card?: string; group?: string; place?: string; sources?: number; self_said?: boolean };
+export type Item = { id: string; text: string; by: By; card?: string; group?: string; place?: string; sources?: number; self_said?: boolean; cards?: string[] };   // cards: GATHER source cards
 export type Claim = { id: string; text: string; kind: string; by: By; item?: string; details?: Record<string, string> };
 export type Answer = { q: number; answer: string; note?: string };
 export type MapContent = {
@@ -56,7 +57,8 @@ export function layerFlags(content: MapContent, layers: string[]): { empty: stri
 }
 
 /** A fact from outside with fewer than two independent sources: the AI stops on it until the person says so (mirrors kinds/map.py thin_facts). */
-export const thinFacts = (content: MapContent): Item[] => itemsOf(content, "facts").filter((item) => item.self_said === false && !(typeof item.sources === "number" && item.sources >= 2));
+export const thinFacts = (content: MapContent, evidence: Evidence): Item[] => itemsOf(content, "facts").map((item) => live(item, evidence))
+  .filter((item) => item.self_said !== true && !(typeof item.sources === "number" && item.sources >= evidence.min_origins));   // no mark = from outside, as the server reads it
 
 /** The line under a fact: how many independent sources it has, or that it is the person's own say. */
 export function sourceLine(item: Item): { text: string; warn: boolean } {
@@ -64,6 +66,17 @@ export function sourceLine(item: Item): { text: string; warn: boolean } {
   const count = typeof item.sources === "number" ? item.sources : 0;
   return count >= 2 ? { text: `${count} 個獨立出處`, warn: false } : { text: count === 1 ? "只有 1 個出處" : "查不到出處", warn: true };
 }
+
+/** A fact linked to source cards carries the count the server would give (never more: the save check refuses that);
+ * with no cards left it is the person's own say again. */
+export function linkSources(item: Item, cards: string[], evidence: Evidence): Item {
+  if (!cards.length) return { ...item, cards: undefined, sources: 0, self_said: true };
+  return { ...item, cards, sources: originsBehind(evidence, cards), self_said: false };
+}
+
+/** Before a save: every linked fact's count is the live one (an origin marked 不用 since then counts no more). */
+export const withLiveSources = (content: MapContent, evidence: Evidence): MapContent =>
+  withItems(content, "facts", itemsOf(content, "facts").map((item) => (item.cards?.length ? linkSources(item, item.cards, evidence) : item)));
 
 /** An AI line the person changed is theirs together; one left as it was stays the AI's. */
 export const editedBy = (by: By): By => (by === "ai" ? "joint" : by);

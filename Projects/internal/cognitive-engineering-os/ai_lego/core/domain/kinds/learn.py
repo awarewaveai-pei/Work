@@ -60,7 +60,7 @@ KINDS = [
         "trust": _mine("json", 8000),                                # 信任校準五個面向，key = TRUST_KEYS
         "delegate_note": _mine(max=1000),                            # 哪些事還交給 AI，哪些不交
         "next_blocks": _mine("choices", len(PROPOSABLE), choices=PROPOSABLE),
-        "wrong_sources": _mine("json", 8000),                        # [{"source", "why"}]：當時哪個出處錯了（GATHER 第 2 步讀）
+        "wrong_sources": _mine("json", 8000),                        # [{"source", "why", "cards"?}]：當時哪個出處錯了；cards = the GATHER cards of the origin picked (evidence.origins reads them)
     }, deletable=False),
     DocKind("learn.revisit", "LEARN", "回來重看的日子", {
         "on": Field("date", required=True),

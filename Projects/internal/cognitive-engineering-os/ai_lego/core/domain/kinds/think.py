@@ -57,6 +57,7 @@ KINDS = [
         "role": Field("choice", choices=ROLES),                            # 哪個角色給的（AI 的卡）
         "method": Field("choice", choices=METHODS),                        # 發散法／挑戰的角度
         "sourced": Field("choice", choices=SOURCED),                       # AI 的卡才有
+        "rests_on": Field("text", 64, scan=False),                         # the VERIFY claim an AI card rests on (有來源), set by the system
         "batch": Field("text", 64),                                        # the think.batch an AI card was laid out from
         "batch_index": Field("int", 100),
     }, authors=frozenset({"user", "ai", "joint"})),
@@ -72,7 +73,7 @@ KINDS = [
         "round": Field("text", 64, required=True),
         "action": Field("text", 40, required=True),
         "role": Field("choice", choices=ROLES, required=True),
-        "cards": Field("json", 60000),                                     # [{claim, mechanism, benefit, risk, assumption, method?, premise?, fails_when?}]
+        "cards": Field("json", 60000),                                     # [{claim, mechanism, benefit, risk, assumption, method?, premise?, fails_when?, sourced, rests_on?}]
         "question": Field("text", 300),
         "handback": Field("text", 500),                                    # 交還控制: why it gave no cards
         "sourced": Field("choice", choices=SOURCED, required=True),

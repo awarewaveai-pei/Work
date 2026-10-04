@@ -15,7 +15,7 @@ from typing import Any, Iterable, Mapping
 
 from ai_lego.core.domain.evidence_words import *  # noqa: F401,F403 -- re-exported (evidence_words.__all__)
 from ai_lego.core.domain.evidence_words import (CHECKABLE, CLAIM_STATES, MIN_ORIGINS, NOT_CHECKABLE, NOT_READ, NOT_SEARCHED,
-                                                NOT_USED, PENDING_HOW, SAME_TEXT_HOW, SPLIT_HOW, UNCHECKABLE, grouping_errors)
+                                                NOT_USED, PENDING_HOW, SAME_TEXT_HOW, SPLIT_HOW, UNCHECKABLE, VERDICTS, grouping_errors)
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
@@ -101,8 +101,9 @@ def origins(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, *, with_rev
         grouped.setdefault(place, []).append(card)
     marks = _latest_by(docs.current(tenant_id, owner, "gather.mark"), "origin")
     overrides = _latest_by(docs.current(tenant_id, owner, "gather.override"), "card", "key")
-    named = [(doc["doc_id"], item.get("source")) for doc in docs.current(tenant_id, owner, "learn.calibration")
-             for item in (doc["content"].get("wrong_sources") or []) if isinstance(item, Mapping)] if with_reviews else []
+    named = [(doc["doc_id"], item.get("source"), {card for card in item.get("cards") or [] if isinstance(card, str)} if isinstance(item.get("cards"), list) else set())
+             for doc in docs.current(tenant_id, owner, "learn.calibration")
+             for item in (doc["content"].get("wrong_sources") or []) if isinstance(item, Mapping)] if with_reviews else []   # a malformed entry is skipped, never an error
     out = []
     for place, members in sorted(grouped.items(), key=lambda item: min(cards[card]["created_at"] for card in item[1])):
         members.sort(key=lambda card: cards[card]["created_at"])
@@ -123,9 +124,16 @@ def origins(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, *, with_rev
             "counts": not pending and not aside and not (mark and mark["content"].get("mark") == NOT_USED),
         }
         if with_reviews:
-            item["wrong_in_review"] = sorted({doc_id for doc_id, source in named if source == oid or source in members})
+            # by the cards it was marked on, so a regroup or the same page found again still finds it
+            item["wrong_in_review"] = sorted({doc_id for doc_id, source, named_cards in named if source == oid or source in members or named_cards & set(members)})
         out.append(item)
     return out
+
+
+def origins_behind(found: list[dict[str, Any]], cards: Iterable[str]) -> int:
+    """How many counted origins stand behind these source cards (a MAP fact, a COMPUTE input): never the pages."""
+    wanted = set(cards)
+    return sum(1 for origin in found if origin["counts"] and any(card["card"] in wanted for card in origin["cards"]))
 
 
 def marks_on_changed_groups(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, found: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
@@ -166,6 +174,28 @@ def _counted(found: list[dict[str, Any]]) -> tuple[dict[str, str], set[str], dic
     return origin_of, counted, sha
 
 
+def not_usable_because(line: Mapping[str, Any]) -> str | None:
+    """Why a checked claim may not stand as a fact, or None when it may -- the one rule (THINK's 「有來源」, DECIDE's
+    帶進來): a checkable claim, the person's verdict on its current version that is not 不採信, and at least one
+    counted supporting origin. The reason is said to the person and the model as it is, never guessed."""
+    verdict = line.get("verdict")
+    if line.get("sentence") != CHECKABLE:
+        return "not_checkable"
+    if not isinstance(verdict, Mapping) or verdict.get("verdict") not in VERDICTS:
+        return "no_verdict"
+    if verdict.get("earlier"):
+        return "earlier"
+    if verdict.get("verdict") not in VERDICTS[:2]:
+        return "not_trusted"
+    if not line.get("support"):
+        return "no_support"
+    return None
+
+
+def usable_as_fact(line: Mapping[str, Any]) -> bool:
+    return not_usable_because(line) is None
+
+
 def checked_claims(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, found: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """The claim ledger as every block reads it (查證結果交給 THINK、DECIDE、ACT、LEARN、COLLAB).
 
@@ -176,9 +206,9 @@ def checked_claims(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, foun
         return []
     origin_of, counted, sha = _counted(found if found is not None else origins(docs, tenant_id, owner, with_reviews=False))
     stances = docs.current(tenant_id, owner, "verify.stance")
+    lines = []
     searches = docs.current(tenant_id, owner, "verify.search")
     verdicts = _latest_by(docs.current(tenant_id, owner, "verify.verdict"), "claim")
-    out = []
     for claim in docs.current(tenant_id, owner, "verify.claim"):
         content, version = claim["content"], claim["version"]
         best: dict[str, Mapping[str, Any]] = {}
@@ -205,7 +235,7 @@ def checked_claims(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, foun
         current_searches = [doc for doc in searches if doc["content"].get("claim") == claim["doc_id"] and doc["content"].get("claim_version") == version]
         searched = sorted(current_searches, key=lambda doc: doc["at"])[-1]["content"] if current_searches else None   # stable: same-second saves keep their order
         verdict = verdicts.get(claim["doc_id"])
-        out.append({
+        lines.append({
             "claim_id": claim["doc_id"], "version": version, "text": content.get("text"), "sentence": content.get("sentence"),
             "law": bool(content.get("law")),
             "state": claim_state(support, oppose, searched, bool(counted) and counted <= read_origins) if checkable else NOT_CHECKABLE,
@@ -213,7 +243,7 @@ def checked_claims(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, foun
             "few": checkable and len(set(support) | set(oppose)) < MIN_ORIGINS,
             "verdict": {**{key: verdict["content"].get(key) for key in ("verdict", "reason")}, "earlier": verdict["content"].get("claim_version") != version} if verdict else None,
         })
-    return out
+    return [{**line, "usable": usable_as_fact(line)} for line in lines]
 
 
 def calc_results(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, found: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:

@@ -1,7 +1,8 @@
 """DECIDE's AI turn (contract card 「AI 能做什麼」): the AI checks what the person wrote -- clear, undoable, checkable
 later, within its scope, no empty cells, no contradictions -- and may ask one question. It never fills in a conclusion,
 never chooses, and gives no new answer for a version the person sealed with 「現在我要自己下結論」.
-Reads only the judgment, the seals and the norm notes (讀什麼: the case's other records are not its to read here)."""
+Reads only the judgment, the seals, the norm notes and the claim ledger (讀什麼). A fact's count is never sent as stored: it is
+recomputed from what the fact points at (STEP2_SHARED_RULES §3, a copy is a pointer, never a fact)."""
 
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ from typing import Any, Callable, Mapping
 
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gate import AiAction, AiRefused
+from ai_lego.platform.evidence import not_usable_because
 
 CHECK = (
     "Check what the person wrote on their judgment card. You do not write, complete or improve their conclusion, you "
@@ -53,6 +55,40 @@ def sealed(read: Callable[[str], list[dict[str, Any]]]) -> bool:
     return latest in seals or latest + 1 in seals
 
 
+def _standing(fact: Mapping[str, Any], claims: list[dict[str, Any]]) -> tuple[str, dict[str, Any] | None]:
+    """Where a card fact stands now, from its pointer -- the same answer as the page's current() (lib/decide.ts); both
+    are checked against tests/fixtures/fact_standing.json."""
+    if fact.get("claim"):
+        claim = next((line for line in claims if line["claim_id"] == fact["claim"]), None)
+        if claim is None:
+            return "deleted", None
+        if fact.get("claim_version") != claim["version"]:
+            return "older", claim   # the card holds the old words; the ledger's counts are for the new ones
+        return ("not_usable" if not_usable_because(claim) else "current"), claim
+    return ("linked" if fact.get("cards") else "own"), None
+
+
+_BASIS = {
+    "own": "the person's own words; no outside source",
+    "linked": "linked to source pages; how many independent origins is not given here",   # DECIDE does not read source cards: fail closed
+    "deleted": "a checked claim that was deleted since; no outside source now",
+    "older": "an older wording of a checked claim; no count now",
+    "not_usable": "a checked claim that cannot stand as a fact now",
+}
+
+
+def _basis(fact: Mapping[str, Any], claims: list[dict[str, Any]]) -> str:
+    standing, claim = _standing(fact, claims)
+    if standing == "current" and claim is not None:
+        return f"a checked claim: {len(claim['support'])} independent origins support it, {len(claim['oppose'])} oppose it"
+    return _BASIS[standing]
+
+
+def _facts_now(facts: Any, claims: list[dict[str, Any]]) -> list[dict[str, str]]:
+    return [{"text": fact["text"], "basis": _basis(fact, claims), **({"credibility": fact["credibility"]} if isinstance(fact.get("credibility"), str) else {})}
+            for fact in facts if isinstance(fact, dict) and isinstance(fact.get("text"), str) and fact["text"].strip()] if isinstance(facts, list) else []
+
+
 def _check_input(context: Mapping[str, Any], read: Callable[[str], list[dict[str, Any]]]) -> str:
     if sealed(read):
         raise AiRefused("AI_SEALED: 你按了「現在我要自己下結論」，這一版 AI 不再給新答案；存下一版之後才能再請它檢查")
@@ -60,6 +96,8 @@ def _check_input(context: Mapping[str, Any], read: Callable[[str], list[dict[str
     if not saved:
         raise InvariantViolation("DECIDE_NO_JUDGMENT: save the judgment card before asking for a check")
     card = {key: value for key, value in saved[-1]["content"].items() if key not in SYSTEM_MADE}
+    if "facts" in card:
+        card["facts"] = _facts_now(card["facts"], read.evidence.claims())   # never the stored count
     payload: dict[str, Any] = {"judgment_card": card}
     notes = read("context.notes")
     if notes:
@@ -81,5 +119,5 @@ def _shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="DECIDE", name="check", needs="organize", instructions=CHECK, output_kind="decide.check", output_schema=CHECK_SCHEMA,
-             reads=("decide.judgment", "decide.seal", "context.notes"), build_input=_check_input, shape=_shape, max_tokens=1800),
+             reads=("decide.judgment", "decide.seal", "context.notes", "verify.claim"), build_input=_check_input, shape=_shape, max_tokens=1800),
 ]

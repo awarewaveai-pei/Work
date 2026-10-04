@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { ASKED, CELLS, STOP_QUESTIONS, cannotSave, emptyCells, holdAsked, influencesFrom, intensityAdvice, newPeople, sealedNow, sourceLine, versionRows, voicesOnMap, withMapFacts, wontChange } from "./decide";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { NONE, type Evidence } from "./evidence";
+import { ASKED, CELLS, STANDING, STOP_QUESTIONS, cannotSave, current, type Fact, emptyCells, holdAsked, influencesFrom, intensityAdvice, newPeople, sealedNow, sourceLine, versionRows, voicesOnMap, withMapFacts, wontChange } from "./decide";
 
 const LEAN = { intensity_now: "弱", uncertainty: "不知道", change_condition: "他願意寫進合約", confidence: 50 };
 
@@ -46,10 +49,35 @@ describe("the system's check of the cells", () => {
 
 describe("sources under a fact", () => {
   it("says how many independent sources there are, and marks a fact on one or none, or the person's own say", () => {
-    expect(sourceLine({ sources: 0, self_said: true })).toEqual({ text: "我自己說的，還沒有外部出處", warn: true });
-    expect(sourceLine({ sources: 1, self_said: false })).toEqual({ text: "只靠 1 個出處", warn: true });
-    expect(sourceLine({ sources: 0, self_said: false })).toEqual({ text: "查不到出處", warn: true });
-    expect(sourceLine({ sources: 3, self_said: false })).toEqual({ text: "3 個獨立出處", warn: false });
+    const now = (fact: { sources: number; self_said: boolean }) => sourceLine(current({ text: "x", ...fact }, NONE));
+    expect(now({ sources: 0, self_said: true })).toEqual({ text: "我自己說的，還沒有外部出處", warn: true });
+    expect(now({ sources: 1, self_said: false })).toEqual({ text: "只靠 1 個出處", warn: true });
+    expect(now({ sources: 0, self_said: false })).toEqual({ text: "查不到出處", warn: true });
+    expect(now({ sources: 3, self_said: false })).toEqual({ text: "3 個獨立出處", warn: false });
+  });
+
+  it("reads a fact's count from what it points at, never from the stored copy", () => {
+    const card = (id: string) => ({ card: id, version: 1, source_id: id, url: "https://x.example", title: id, aside: "", found_by: { by: "系統找的" }, cells: {}, mine: {} });
+    const claim = { claim_id: "C1", version: 1, text: "t", sentence: "可以查的事實", law: false, state: "有獨立出處支持", support: ["o:1"], oppose: [], stale: 0, few: true, verdict: { verdict: "採信", reason: "r", earlier: false }, usable: true };
+    const evidence: Evidence = { ...NONE, origins: [{ origin_id: "o:1", how: "單獨", pending: false, aside: false, counts: true, mark: null, cards: [card("k1")] },
+                                                    { origin_id: "o:2", how: "單獨", pending: false, aside: false, counts: false, mark: null, cards: [card("k2")] }], claims: [claim] };
+    expect(sourceLine(current({ text: "a", sources: 2, self_said: false, cards: ["k1", "k2"] }, evidence)).text).toBe("只靠 1 個出處");
+    expect(sourceLine(current({ text: "b", sources: 5, self_said: false, claim: "C1", claim_version: 1, against: 2 }, evidence)).text).toBe("只靠 1 個出處");
+    expect(sourceLine(current({ text: "c", sources: 2, self_said: false, claim: "C1", claim_version: 1 }, { ...evidence, claims: [{ ...claim, usable: false }] }))).toEqual({ text: "查證那一步現在不能當事實", warn: true });
+    expect(sourceLine(current({ text: "d", sources: 2, self_said: false, claim: "C1", claim_version: 0 }, evidence))).toEqual({ text: "查證那一步改過這個主張，這句是舊的說法", warn: true });   // an older wording
+    expect(sourceLine(current({ text: "e", sources: 2, self_said: false, claim: "C9", claim_version: 1 }, evidence))).toEqual({ text: "查證那一步已經沒有這個主張", warn: true });
+    const listed = influencesFrom({ facts: [{ text: "a", sources: 2, self_said: false, cards: ["k1", "k2"] }], map: null, evidence, voices: [], thinkCards: [], facilitated: false });
+    expect(listed.map((item) => item.text)).toContain("「a」：只靠 1 個出處");   // the influence list reads the same rule
+  });
+
+  it("reads a fact the same way as the DECIDE check (one fixture for both sides)", () => {
+    const fixture = JSON.parse(readFileSync(path.resolve(process.cwd(), "../../tests/fixtures/fact_standing.json"), "utf8")) as { cases: Array<{ name: string; standing: string; fact: Fact; claims: Evidence["claims"] }> };
+    const byText = Object.fromEntries(Object.entries(STANDING).map(([key, text]) => [text, key]));
+    for (const { name, standing, fact, claims } of fixture.cases) {
+      const now = current(fact, { ...NONE, claims });
+      const got = fact.cards?.length ? "linked" : !fact.claim ? "own" : now.standing ? byText[now.standing] : "current";
+      expect([name, got]).toEqual([name, standing]);
+    }
   });
 });
 
@@ -67,9 +95,9 @@ describe("the influence list the system makes", () => {
   });
 
   it("always lists the AI and this platform; the method, one-source facts, voices and AI thinking cards when there are any", () => {
-    const bare = influencesFrom({ facts: [], map: null, voices: [], thinkCards: [], facilitated: false });
+    const bare = influencesFrom({ facts: [], map: null, evidence: NONE, voices: [], thinkCards: [], facilitated: false });
     expect(bare.map((item) => item.kind)).toEqual(["ai", "platform"]);
-    const full = influencesFrom({ facts: [], map, voices: voicesOnMap(map, cards), thinkCards: [{ author: "ai", content: { claim: "也許是成本漲了" } }, { author: "joint", content: { claim: "先談一次" } }, { author: "user", content: { claim: "我自己想的" } }], facilitated: false });
+    const full = influencesFrom({ facts: [], map, evidence: NONE, voices: voicesOnMap(map, cards), thinkCards: [{ author: "ai", content: { claim: "也許是成本漲了" } }, { author: "joint", content: { claim: "先談一次" } }, { author: "user", content: { claim: "我自己想的" } }], facilitated: false });
     expect(full.map((item) => item.kind)).toEqual(["voice", "single_source", "single_source", "ai_think", "ai_think", "method", "ai", "platform"]);
     const texts = full.map((item) => item.text).join("\n");
     expect(texts).toContain("別人的聲音：「朋友說他不可靠」（來自：同學）");
@@ -83,11 +111,11 @@ describe("the influence list the system makes", () => {
   });
 
   it("lists the facilitator only when someone leads the case", () => {
-    expect(influencesFrom({ facts: [], map: null, voices: [], thinkCards: [], facilitated: true }).map((item) => item.kind)).toEqual(["ai", "platform", "facilitator"]);
+    expect(influencesFrom({ facts: [], map: null, evidence: NONE, voices: [], thinkCards: [], facilitated: true }).map((item) => item.kind)).toEqual(["ai", "platform", "facilitator"]);
   });
 
   it("a fact on the card counts once even when the map has the same words", () => {
-    const listed = influencesFrom({ facts: [{ text: "同業都這樣改", sources: 1, self_said: false }], map, voices: [], thinkCards: [], facilitated: false });
+    const listed = influencesFrom({ facts: [{ text: "同業都這樣改", sources: 1, self_said: false }], map, evidence: NONE, voices: [], thinkCards: [], facilitated: false });
     expect(listed.filter((item) => item.text.includes("同業都這樣改"))).toHaveLength(1);
   });
 

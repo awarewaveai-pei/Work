@@ -6,7 +6,10 @@ confirms or drops (``map.review``); a confirmed one lands in the map as the pers
 
 from __future__ import annotations
 
+from typing import Callable
+
 from ai_lego.core.domain.doc_kinds import DocKind, Field
+from ai_lego.core.domain.evidence_words import MIN_ORIGINS
 
 # (key, name, the question the layer answers, what it hands over) -- 系統做什麼
 LAYERS = (
@@ -54,7 +57,7 @@ KINDS = [
         "method_id": Field("text", 120, scan=False),        # its catalog id, so a method already used in this case is known
         "method_version": Field("text", 40),                # the tool's version when it was picked (系統記下用的是哪一版)
         "one_lines": Field("json", 6000),                   # {layer key: the one line you write first}
-        "layers": Field("json", 60000, unread_keys=("place",)),   # {layer key: [{id, text, by, card?, group?, place?, sources?, self_said?}]}
+        "layers": Field("json", 60000, unread_keys=("place",)),   # {layer key: [{id, text, by, card?, group?, place?, sources?, self_said?, cards?}]}; a fact's cards = GATHER source cards
         "skipped": Field("choices", len(LAYER_KEYS), choices=LAYER_KEYS),
         "core_conflict": Field("text", 2000, human_only=True),
         "claims": Field("json", 20000, labels=tuple(CLAIM_KINDS)),   # [{id, text, kind, by, item?, + the kind's detail fields}]
@@ -86,19 +89,24 @@ KINDS = [
 ]
 
 
-def is_thin(item: object) -> bool:
+def is_thin(item: object, behind: "Callable[[list[str]], int] | None" = None) -> bool:
     """A fact not marked as the person's own say (「我自己說的」) with fewer than two independent sources: the AI stops on
-    it (card 「交還控制」), the person decides. A fact with no mark counts as from outside -- this fails closed."""
+    it (card 「交還控制」), the person decides. A fact with no mark counts as from outside -- this fails closed. A fact
+    linked to source cards (``cards``) is counted live by ``behind`` (ai_lego.platform.evidence.origins_behind); a caller
+    that cannot count (CONTEXT reads no source cards) holds it back -- the stored ``sources`` is never trusted for it."""
     if not isinstance(item, dict) or item.get("self_said") is True:
         return False
+    cards = item.get("cards")
+    if isinstance(cards, list) and cards:   # a linked fact's count is only the live one; a caller that cannot count holds it back
+        return behind is None or behind([card for card in cards if isinstance(card, str)]) < MIN_ORIGINS
     sources = item.get("sources")
-    return isinstance(sources, bool) or not isinstance(sources, int) or sources < 2
+    return isinstance(sources, bool) or not isinstance(sources, int) or sources < MIN_ORIGINS
 
 
-def thin_facts(layers: object) -> list[str]:
+def thin_facts(layers: object, behind: "Callable[[list[str]], int] | None" = None) -> list[str]:
     """Ids of the thin facts in the facts layer."""
     items = layers.get("facts") if isinstance(layers, dict) else None
-    return [item["id"] for item in items if is_thin(item) and item.get("id")] if isinstance(items, list) else []
+    return [item["id"] for item in items if is_thin(item, behind) and item.get("id")] if isinstance(items, list) else []
 
 
 def spec() -> dict:

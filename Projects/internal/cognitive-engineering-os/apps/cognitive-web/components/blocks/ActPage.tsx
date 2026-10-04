@@ -14,6 +14,7 @@ import {
   type Flag, type Note, type Num, type Reminder, type Split, type Task,
 } from "../../lib/act";
 import { GUARDRAIL_NAME, HOLD, newPeople, type Judgment } from "../../lib/decide";
+import { NONE, calcLine, caseEvidence, claimLine, somethingChecked, type Evidence } from "../../lib/evidence";
 import { formatTime } from "../../lib/time";
 import { BlockShell, Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips, optionalDocs } from "./JudgmentParts";
@@ -120,6 +121,7 @@ export function ActPage({ projectId }: { projectId: string }) {
   const [flag, setFlag] = useState<Doc<Flag> | null>(null);
   const [trend, setTrend] = useState<Doc<{ summary: string; unclear?: string[] }> | null>(null);
   const [due, setDue] = useState<Reminder[]>([]);
+  const [evidence, setEvidence] = useState<Evidence>(NONE);
   const [history, setHistory] = useState<Record<string, Array<Doc<Task>>>>({});
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Task>(EMPTY);
@@ -131,11 +133,13 @@ export function ActPage({ projectId }: { projectId: string }) {
   const [refresh, setRefresh] = useState(0);
 
   const load = async () => {
-    const [judgments, taskDocs, noteDocs, intakes, guards, splits, flags, trends, reminders] = await Promise.all([
+    const [judgments, taskDocs, noteDocs, intakes, guards, splits, flags, trends, reminders, found] = await Promise.all([
       optionalDocs<Judgment>(projectId, "decide.judgment"), docs.list<Task>(projectId, "act.task"), docs.list<Note>(projectId, "act.note"), docs.list<Any>(projectId, "assembler.intake"),
       docs.list<{ guardrail: string }>(projectId, "govern.guardrail"), docs.list<Split>(projectId, "act.split"), docs.list<Flag>(projectId, "act.flag"), docs.list<{ summary: string; unclear?: string[] }>(projectId, "act.trend"),
       apiFetch<Reminder[]>(`/projects/${encodeURIComponent(projectId)}/act/reminders?utc_offset=${-new Date().getTimezoneOffset()}`),
+      caseEvidence(projectId),   // 查證結果讓你決定轉不轉、做不做；計算結果用來寫預測
     ]);
+    setEvidence(found);
     setJudgment(judgments.at(-1) ?? null); setTasks(taskDocs); setNotes(noteDocs); setIntake(intakes.at(-1) ?? null);
     setGuardrails([...new Set(guards.map((doc) => doc.content.guardrail))]);
     setSplit(splits.at(-1) ?? null); setFlag(flags.at(-1) ?? null); setTrend(trends.at(-1) ?? null); setDue(reminders);
@@ -219,6 +223,14 @@ export function ActPage({ projectId }: { projectId: string }) {
       <div className="card cta">
         <h2>任務卡</h2>
         <p className="how">誰會受影響，沿用開案時寫的：{affected.length ? affected.join("、") : "還沒寫"}。</p>
+        {(somethingChecked(evidence) || evidence.calcs.length > 0) && (
+          <div className="carried">
+            <b>寫預測之前，看一下{somethingChecked(evidence) ? "查過" : ""}{somethingChecked(evidence) && evidence.calcs.length ? "和" : ""}{evidence.calcs.length ? "算過" : ""}的</b>
+            {somethingChecked(evidence) && evidence.claims.map((claim) => <p key={claim.claim_id} className="mt4 mb0">「{claim.text}」{claimLine(claim, evidence.min_origins)}</p>)}
+            {evidence.calcs.map((calc) => <p key={calc.run_id} className="mt4 mb0">{calcLine(calc, evidence.min_origins)}</p>)}
+            <p className="hint mt4 mb0">模擬不是預測：你的預測由你自己寫。</p>
+          </div>
+        )}
         <TaskForm key={formKey} initial={draft} guardrails={guardrails} busy={busy} label="存這張任務卡" onSave={createTask} />
         <div className="field">
           <label htmlFor="more-person">這一步多出來的受影響的人（選填）</label>

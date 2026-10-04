@@ -19,6 +19,7 @@ import yaml
 from ai_lego import resolve_spec_root
 from ai_lego.core.domain.blocks import FAMILY_BLOCK
 from ai_lego.core.domain.kinds.map import CLAIM_KINDS, LAYER_KEYS, LAYERS, thin_facts
+from ai_lego.platform.evidence import origins_behind
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.contract_catalog import is_active
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
@@ -59,9 +60,11 @@ def _items(content: Mapping[str, Any], held_back: set[str]) -> list[dict[str, An
             if isinstance(item, dict) and item.get("id") and isinstance(item.get("text"), str) and item["id"] not in held_back]
 
 
-def _held_back(content: Mapping[str, Any], context: Mapping[str, Any]) -> set[str]:
+def _held_back(content: Mapping[str, Any], context: Mapping[str, Any], read: Read) -> set[str]:
+    """Thin facts the person has not let the AI use; a fact linked to source cards is counted live (evidence)."""
     allowed = set(context.get("use_thin") or []) if isinstance(context.get("use_thin"), list) else set()
-    return set(thin_facts(content.get("layers"))) - allowed
+    found = read.evidence.origins()
+    return set(thin_facts(content.get("layers"), lambda cards: origins_behind(found, cards))) - allowed
 
 
 def _lens(read: Read) -> dict[str, Any]:
@@ -136,7 +139,7 @@ ALTERNATIVES_SCHEMA = {
 
 def _facts_and_readings(context: Mapping[str, Any], read: Read) -> str:
     content = _map(read)
-    held = _held_back(content, context)
+    held = _held_back(content, context, read)
     items = [item for item in _items(content, held) if item["layer"] in (LAYER_NAME["facts"], LAYER_NAME["interpretations"])]
     if not items:
         raise InvariantViolation("AI_NOTHING_TO_READ: write at least one fact or reading first")
@@ -204,7 +207,7 @@ CLAIMS_SCHEMA = {
 
 
 def _claims_input(context: Mapping[str, Any], read: Read) -> str:
-    items = _items(_map(read), _held_back(_map(read), context))
+    items = _items(_map(read), _held_back(_map(read), context, read))
     if not items:
         raise InvariantViolation("AI_NOTHING_TO_READ: write at least one line in the map first")
     return "The lines of the person's map:\n" + json.dumps(items, ensure_ascii=False) + _lens_text(read)
@@ -223,9 +226,9 @@ ACTIONS = [
     AiAction(block="MAP", name="place", needs="organize", instructions=PLACE, output_kind="map.placement", output_schema=PLACE_SCHEMA,
              reads=("sense.card", "map.map"), build_input=_place_input, shape=_place_shape, max_tokens=1500),
     AiAction(block="MAP", name="alternatives", needs="propose_options", instructions=ALTERNATIVES, output_kind="map.alternatives", output_schema=ALTERNATIVES_SCHEMA,
-             reads=("map.map", "context.notes"), build_input=_facts_and_readings, shape=_alternatives_shape, max_tokens=1800),
+             reads=("map.map", "context.notes", "gather.source"), build_input=_facts_and_readings, shape=_alternatives_shape, max_tokens=1800),
     AiAction(block="MAP", name="method", needs="organize", instructions=METHOD, output_kind="map.method_pick", output_schema=METHOD_SCHEMA,
              reads=("assembler.intake", "map.map"), build_input=_method_input, shape=_method_shape, max_tokens=900),
     AiAction(block="MAP", name="claims", needs="organize", instructions=CLAIMS, output_kind="map.claim_proposal", output_schema=CLAIMS_SCHEMA,
-             reads=("map.map", "context.notes"), build_input=_claims_input, shape=_claims_shape, max_tokens=1500),
+             reads=("map.map", "context.notes", "gather.source"), build_input=_claims_input, shape=_claims_shape, max_tokens=1500),
 ]

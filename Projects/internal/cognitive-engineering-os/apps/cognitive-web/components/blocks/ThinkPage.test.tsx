@@ -19,9 +19,12 @@ const button = (host: HTMLElement, text: string) => [...host.querySelectorAll("b
 const doc = <C,>(kind: string, doc_id: string, content: C, author: Author = "user", version = 1, at = "2026-10-03T08:00:00Z"): Doc<C> => ({ doc_id, kind, version, content, author, block: "THINK", at });
 
 /** The case's documents by kind; anything else the shell asks for is an empty answer. */
+let ledger: unknown[] = [];
+
 function serve(held: Record<string, unknown[]>) {
   vi.mocked(apiFetch).mockImplementation((async (path: string, init?: RequestInit) => {
     if (path === "/projects/P") return { project_id: "P", name: "要不要接案" };
+    if (path === "/projects/P/evidence") return { origins: [], changed_marks: [], claims: ledger, calcs: [], min_origins: 2 };
     const match = /^\/projects\/P\/docs\/([^/]+)$/.exec(path);
     if (match && !init) return held[match[1]] ?? [];
     return [];
@@ -125,6 +128,26 @@ describe("共思考 page", () => {
   const aiCard = (id: string, at = "R1") => doc<Card>("think.card", id, { claim: `方向${id}`, mechanism: "m", round: at, sourced: "它自己說的", method: "反向思考" }, "ai");
   const picked = (card: string) => doc<Reaction>("think.reaction", `x-${card}`, { card, reaction: "共鳴", picked: true });
   const cardOf = (host: HTMLElement, claim: string) => [...host.querySelectorAll(".mcards .mcard")].find((item) => item.textContent?.includes(claim)) as HTMLElement;
+
+  it("an AI card resting on a checked claim says which one; the label is the one the system set", async () => {
+    ledger = [{ claim_id: "C1", version: 1, text: "公會 2019 年改了範本", sentence: "可以查的事實", law: false, state: "有獨立出處支持", support: ["o:a"], oppose: [], stale: 0, few: true, verdict: { verdict: "採信", reason: "r", earlier: false }, usable: true },
+              { claim_id: "C2", version: 1, text: "公會也改了第 8 條", sentence: "可以查的事實", law: false, state: "有獨立出處支持", support: ["o:a"], oppose: [], stale: 0, few: true, verdict: { verdict: "不採信", reason: "r", earlier: false }, usable: false }];
+    try {
+      const sourced = doc<Card>("think.card", "s1", { claim: "照公會範本談", mechanism: "m", round: "R1", sourced: "有來源", rests_on: "C1", method: "類比遷移" }, "ai");
+      const gone = doc<Card>("think.card", "s2", { claim: "照舊範本談", mechanism: "m", round: "R1", sourced: "有來源", rests_on: "C9", method: "類比遷移" }, "ai");
+      const distrusted = doc<Card>("think.card", "s3", { claim: "照第 8 條談", mechanism: "m", round: "R1", sourced: "有來源", rests_on: "C2", method: "類比遷移" }, "ai");
+      serve({ "think.round": [round], "think.card": [sourced, gone, distrusted] });
+      const mounted = await mount(<ThinkPage projectId="P" />);
+      expect(cardOf(mounted.host, "照公會範本談").textContent).toContain("靠的是你查證過的：「公會 2019 年改了範本」");
+      expect(cardOf(mounted.host, "照舊範本談").textContent).toContain("查證結果變了：這個主張已經刪掉了");
+      expect(cardOf(mounted.host, "照舊範本談").textContent).not.toContain("有來源");   // the tag says the same as the line under it
+      const later = cardOf(mounted.host, "照第 8 條談").textContent ?? "";
+      expect(later).toContain("現在不能當事實");   // the person no longer trusts it: the card reads as 它自己說的 now
+      expect(later).toContain("它自己說的");
+      expect(later).not.toContain("有來源");
+      await mounted.done();
+    } finally { ledger = []; }
+  });
 
   it("shows an AI card as the AI's with 「它自己說的」 even after you reacted to it, and stops a fourth pick in the round", async () => {
     serve({ "think.round": [round], "think.card": [aiCard("a"), aiCard("b"), aiCard("c"), aiCard("d")], "think.reaction": [picked("a"), picked("b"), picked("c")] });

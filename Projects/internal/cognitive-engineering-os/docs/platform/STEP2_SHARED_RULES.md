@@ -61,6 +61,16 @@ rules live there once, fail-closed:
   older ones are counted as `stale`; a claim is 查不到 only when the search found nothing or every counted origin was
   read for it (else 找到來源，還沒讀完).
 
+**Invariant: a copy is a pointer, never a fact** (written 2026-10-04 after two review rounds kept finding instances of
+one class). A count of origins, an 「有來源」 label or a fact brought from another block may be stored as a copy (a MAP
+fact's `sources`, a judgment fact, a THINK card's `sourced`), but every reader recomputes it from what the copy points
+at (`cards`, `claim`, `rests_on`) through `evidence` on every read, and shows the difference when they disagree. One
+rule decides whether a checked claim may stand as a fact anywhere: `evidence.usable_as_fact` (checkable, the person's
+verdict on the current version, not 不採信, at least one counted supporting origin) — THINK's 「有來源」 and DECIDE's
+bring-in both use it, from the `usable` flag `/evidence` returns. When the person rewrites the words of something that
+carried a derived label, the label and its pointer go with the old words. A malformed stored pointer is skipped, never
+an error that takes the evidence read down.
+
 ## 4. Sources
 
 - The web is searched and fetched only by the collector (next-admin). The engine never calls a search engine.

@@ -11,6 +11,7 @@ from ai_lego.core.domain.kinds.map import CHECKABLE
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
+from ai_lego.platform import evidence
 from ai_lego.platform.block_hooks import propose
 
 
@@ -65,6 +66,23 @@ def _map_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, conten
     method_id = content.get("method_id")
     if method_id not in (None, "") and method_id not in map_tools():
         raise InvariantViolation(f"MAP_METHOD_UNKNOWN: {str(method_id)[:40]!r} is not a MAP tool")
+    # a fact's count of independent sources comes only from GATHER's cards: none linked = 0; linked = this case's cards,
+    # never more than the system counts
+    facts = (content.get("layers") or {}).get("facts") if isinstance(content.get("layers"), dict) else None
+    for item in facts or []:
+        if isinstance(item, dict) and not item.get("cards") and item.get("sources") not in (None, 0):
+            raise InvariantViolation("MAP_FACT_SOURCES_WRONG: a fact's count of independent sources is the system's, not more")
+    linked = [item for item in facts or [] if isinstance(item, dict) and item.get("cards")]
+    if linked:
+        found = evidence.origins(docs, tenant_id, owner, with_reviews=False)
+        known = {card["card"] for origin in found for card in origin["cards"]}
+        for item in linked:
+            cards = item["cards"]
+            if not isinstance(cards, list) or any(not isinstance(card, str) or card not in known for card in cards):
+                raise InvariantViolation("MAP_FACT_CARD_UNKNOWN: a fact names a source card this case does not have")
+            sources = item.get("sources")
+            if not isinstance(sources, int) or isinstance(sources, bool) or sources > evidence.origins_behind(found, cards) or item.get("self_said") is True:
+                raise InvariantViolation("MAP_FACT_SOURCES_WRONG: a fact's count of independent sources is the system's, not more")
 
 
 BEFORE_SAVE = {"map.map": _map_checked}

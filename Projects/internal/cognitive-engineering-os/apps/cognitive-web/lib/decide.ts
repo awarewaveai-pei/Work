@@ -1,6 +1,7 @@
 // DECIDE 判斷 as the page holds it: the card's shape (ai_lego/core/domain/kinds/decide.py `decide.judgment`) and the small
 // rules the page applies. The lists and the no-change pattern are copies of the engine's: test_block_decide.WebParityTests
 // compares them, so a word changed on one side fails there.
+import { CHECKABLE, NOT_TRUSTED, live, type CheckedClaim, type Evidence } from "./evidence";
 import { blockOf } from "./blocks";
 
 export const INTENSITY = ["弱", "中", "強"] as const;
@@ -40,7 +41,8 @@ export const ASKED: Array<{ who: string; hint: string }> = [
 // 護欄 as the person reads them (ai_lego/core/domain/kinds/govern.py GUARDRAILS)
 export const GUARDRAIL_NAME: Record<string, string> = { require_sources: "要求來源", professional: "建議找專業的人", wait_or_review: "先等一下或請人覆核", group_procedure: "群組程序" };
 
-export type Fact = { text: string; sources: number; self_said: boolean; credibility?: string };
+// claim / claim_version: the VERIFY claim it came from; against: origins opposing it; cards: a MAP fact's source cards (counted live)
+export type Fact = { text: string; sources: number; self_said: boolean; credibility?: string; claim?: string; claim_version?: number; against?: number; cards?: string[] };
 export type Influence = { kind: "voice" | "single_source" | "ai_think" | "method" | "ai" | "platform" | "facilitator"; text: string };
 export type Asked = { who: string; answer: string; note?: string };
 export type Judgment = {
@@ -90,20 +92,44 @@ export function cannotSave(judgment: Judgment, version: number): string | null {
 }
 
 /** The one line under a fact: how many independent sources it has, or that it is the person's own say. */
-export function sourceLine(fact: Pick<Fact, "sources" | "self_said">): { text: string; warn: boolean } {
+/** A fact as it stands now (STEP2_SHARED_RULES §3: a stored count is a pointer, never a fact). Only `current` makes one,
+ *  so a reader of a count or a label cannot be handed the stored copy -- tsc refuses it. The drift notes are the one
+ *  reader of the stored copy, and their job is to say it differs. */
+export type CurrentFact = Fact & { readonly asOfNow: true; standing?: string };
+/** Why a fact brought from VERIFY no longer carries a count; the DECIDE check reads the same (tests/fixtures/fact_standing.json). */
+export const STANDING = { deleted: "查證那一步已經沒有這個主張", older: "查證那一步改過這個主張，這句是舊的說法", not_usable: "查證那一步現在不能當事實" } as const;
+
+export function current(fact: Fact, evidence: Evidence): CurrentFact {
+  if (fact.cards?.length) return { ...live(fact, evidence), asOfNow: true };
+  if (!fact.claim) return { ...fact, asOfNow: true };
+  const { against: _stored, ...rest } = fact;
+  const claim = evidence.claims.find((item) => item.claim_id === fact.claim);
+  if (!claim) return { ...rest, sources: 0, self_said: false, asOfNow: true, standing: STANDING.deleted };
+  if (claim.version !== fact.claim_version) return { ...rest, sources: 0, self_said: false, asOfNow: true, standing: STANDING.older };
+  const counts = { sources: claim.support.length, self_said: false, ...(claim.oppose.length ? { against: claim.oppose.length } : {}) };
+  return { ...rest, ...counts, asOfNow: true, ...(claim.usable ? {} : { standing: STANDING.not_usable }) };
+}
+
+export function sourceLine(fact: CurrentFact): { text: string; warn: boolean } {
+  if (fact.standing) return { text: fact.standing, warn: true };
   if (fact.self_said) return { text: "我自己說的，還沒有外部出處", warn: true };
+  if (fact.against) return { text: `${fact.sources} 個獨立出處支持、${fact.against} 個反對`, warn: true };
   if (fact.sources >= 2) return { text: `${fact.sources} 個獨立出處`, warn: false };
   return { text: fact.sources === 1 ? "只靠 1 個出處" : "查不到出處", warn: true };
 }
 
-export type MapView = { method?: string; unwinnable?: boolean; layers?: Record<string, Array<{ text: string; card?: string; sources?: number; self_said?: boolean }>> };
+export type MapView = { method?: string; unwinnable?: boolean; layers?: Record<string, Array<{ text: string; card?: string; sources?: number; self_said?: boolean; cards?: string[] }>> };
+
+/** The map as DECIDE reads it: every linked fact with the count the server gives now (never the copy the map stored). */
+export const liveMap = (map: MapView | null, evidence: Evidence): MapView | null =>
+  map && { ...map, layers: { ...map.layers, facts: (map.layers?.facts ?? []).map((item) => live(item, evidence)) } };
 export type CardView = { doc_id: string; content: { category?: string; text?: string; from_whom?: string } };
 export type ThinkCardView = { author: string; content: { claim?: string } };
 
 const mapItems = (map: MapView | null) => Object.values(map?.layers ?? {}).flat();
 
 /** The map's facts as the card holds them (the person's own say when the map does not say otherwise). */
-export const mapFacts = (map: MapView | null): Fact[] => (map?.layers?.facts ?? []).map((item) => ({ text: item.text, sources: item.sources ?? 0, self_said: item.self_said !== false }));
+export const mapFacts = (map: MapView | null): Fact[] => (map?.layers?.facts ?? []).map((item) => ({ text: item.text, sources: item.sources ?? 0, self_said: item.self_said !== false, ...(item.cards?.length ? { cards: item.cards } : {}) }));
 
 /** The map's facts not on the card yet, added after the ones already there; what the person already wrote stays as it is. */
 export const withMapFacts = (held: Fact[], map: MapView | null): Fact[] => [...held, ...mapFacts(map).filter((fact) => !held.some((item) => item.text === fact.text))];
@@ -118,8 +144,8 @@ export function voicesOnMap(map: MapView | null, cards: CardView[]): Array<{ tex
 /** What the system lists as possibly influencing the person (系統做什麼): the voices on the map, facts resting on one source
  *  or none, AI-written or jointly written thinking cards, the method used; the AI, this platform and -- when someone leads
  *  the case -- the facilitator are always on it. Stored with the version the person saves. */
-export function influencesFrom(input: { facts: Fact[]; map: MapView | null; voices: Array<{ text: string; from_whom?: string }>; thinkCards: ThinkCardView[]; facilitated: boolean }): Influence[] {
-  const facts = [...input.facts, ...mapFacts(input.map).filter((fact) => !input.facts.some((held) => held.text === fact.text))];
+export function influencesFrom(input: { facts: Fact[]; map: MapView | null; evidence: Evidence; voices: Array<{ text: string; from_whom?: string }>; thinkCards: ThinkCardView[]; facilitated: boolean }): Influence[] {
+  const facts = [...input.facts, ...mapFacts(input.map).filter((fact) => !input.facts.some((held) => held.text === fact.text))].map((fact) => current(fact, input.evidence));
   const listed: Influence[] = [
     ...input.voices.map((voice) => ({ kind: "voice" as const, text: `別人的聲音：「${voice.text}」${voice.from_whom ? `（來自：${voice.from_whom}）` : ""}` })),
     ...facts.filter((fact) => fact.text.trim() && sourceLine(fact).warn).map((fact) => ({ kind: "single_source" as const, text: `「${fact.text}」：${sourceLine(fact).text}` })),
@@ -130,6 +156,46 @@ export function influencesFrom(input: { facts: Fact[]; map: MapView | null; voic
     ...(input.facilitated ? [{ kind: "facilitator" as const, text: `${blockOf("FACILITATE")?.name ?? "帶領者"}：有人帶這個案子，帶領者的提問和說法也可能影響你。` }] : []),
   ];
   return listed;
+}
+
+/** VERIFY's checked facts the person judged 採信 or 存疑, offered as judgment-card facts with their supporting origins
+ * (查證結果交給 DECIDE，當判斷卡上的已知事實). 不採信 is not offered; can it be trusted stays the person's mark. */
+export function withCheckedClaims(facts: Fact[], claims: CheckedClaim[]): Fact[] {
+  const offered = claims
+    .filter((claim) => claim.usable)   // the server's one rule (evidence.usable_as_fact)
+    .filter((claim) => !facts.some((fact) => fact.claim === claim.claim_id || fact.text === claim.text))
+    .map(factOf);
+  return [...facts, ...offered];
+}
+
+const factOf = (claim: CheckedClaim): Fact => ({ text: claim.text, sources: claim.support.length, self_said: false, claim: claim.claim_id, claim_version: claim.version, ...(claim.oppose.length ? { against: claim.oppose.length } : {}) });
+
+/** A fact brought from the map whose stored count is not the count its source cards give now (null = it is). */
+export function mapDrift(fact: Fact, evidence: Evidence): string | null {
+  if (!fact.cards?.length) return null;
+  const now = live(fact, evidence).sources;
+  return now === fact.sources ? null : `出處數變了：現在 ${now} 個獨立出處`;
+}
+
+/** Why a fact brought from VERIFY no longer says what the ledger says now (null = it still does). */
+export function claimDrift(fact: Fact, claims: CheckedClaim[]): string | null {
+  if (!fact.claim) return null;
+  const claim = claims.find((item) => item.claim_id === fact.claim);
+  if (!claim) return "這個主張在查證那一步刪掉了";
+  if (claim.version !== fact.claim_version || claim.verdict?.earlier) return "這個主張在查證那一步改過了";
+  if (!claim.verdict) return "你在查證那一步拿掉了判定";
+  if (claim.verdict.verdict === NOT_TRUSTED) return "你在查證那一步改成不採信";
+  if (!claim.usable) return "現在沒有算數的出處支持它";
+  if (claim.support.length !== fact.sources || claim.oppose.length !== (fact.against ?? 0)) return `出處變了：現在 ${claim.support.length} 個支持、${claim.oppose.length} 個反對`;
+  return null;
+}
+
+/** The fact as the ledger says it now; null when it should come off the card (gone, or no longer trusted). */
+export function refreshed(fact: Fact, claims: CheckedClaim[]): Fact | null {
+  const claim = claims.find((item) => item.claim_id === fact.claim);
+  if (!claim || !claim.usable) return null;
+  const { against: _old, ...rest } = fact;
+  return { ...rest, ...factOf(claim), credibility: fact.credibility };
 }
 
 /** People named on the card as affected that the case's intake does not list yet: they are written back to the intake. */

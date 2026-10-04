@@ -1,0 +1,21 @@
+{
+  "about": "One judgment-card fact against different ledgers. The DECIDE page (apps/cognitive-web/lib/decide.ts current) and the DECIDE check (ai_lego/platform/ai_actions/decide.py _standing) must reach the same standing; lib/decide.test.ts and tests/unit/test_block_decide.py both read this file. Change both sides and this file together.",
+  "standings": ["own", "linked", "deleted", "older", "not_usable", "current"],
+  "cases": [
+    {"name": "the person's own words", "standing": "own",
+     "fact": {"text": "他三次改價", "sources": 0, "self_said": true}, "claims": []},
+    {"name": "linked to source pages", "standing": "linked",
+     "fact": {"text": "同業都這樣改", "sources": 4, "self_said": false, "cards": ["k1", "k2"]}, "claims": []},
+    {"name": "the claim was deleted", "standing": "deleted",
+     "fact": {"text": "公會 2019 年改了範本", "sources": 2, "self_said": false, "claim": "C1", "claim_version": 1}, "claims": []},
+    {"name": "the claim was reworded", "standing": "older",
+     "fact": {"text": "公會 2019 年改了範本", "sources": 2, "self_said": false, "claim": "C1", "claim_version": 1},
+     "claims": [{"claim_id": "C1", "version": 2, "text": "公會 2020 年改了範本", "sentence": "可以查的事實", "law": false, "state": "有獨立出處支持", "support": ["o:1", "o:2"], "oppose": [], "stale": 0, "few": false, "verdict": {"verdict": "採信", "reason": "r", "earlier": false}, "usable": true}]},
+    {"name": "the person no longer trusts it", "standing": "not_usable",
+     "fact": {"text": "公會 2019 年改了範本", "sources": 2, "self_said": false, "claim": "C1", "claim_version": 1},
+     "claims": [{"claim_id": "C1", "version": 1, "text": "公會 2019 年改了範本", "sentence": "可以查的事實", "law": false, "state": "有獨立出處支持", "support": ["o:1", "o:2"], "oppose": [], "stale": 0, "few": false, "verdict": {"verdict": "不採信", "reason": "r", "earlier": false}, "usable": false}]},
+    {"name": "trusted on its current words", "standing": "current",
+     "fact": {"text": "公會 2019 年改了範本", "sources": 5, "self_said": false, "claim": "C1", "claim_version": 1, "against": 3},
+     "claims": [{"claim_id": "C1", "version": 1, "text": "公會 2019 年改了範本", "sentence": "可以查的事實", "law": false, "state": "兩邊都有", "support": ["o:1", "o:2"], "oppose": ["o:3"], "stale": 0, "few": false, "verdict": {"verdict": "存疑", "reason": "r", "earlier": false}, "usable": true}]}
+  ]
+}
