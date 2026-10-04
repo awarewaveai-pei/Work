@@ -1,11 +1,15 @@
 """GATHER 蒐集來源 (contract card): a source card for every stored page and every page set aside, every cell one of three
 states with why; the grouping into origins and the rule it used; channels and the place's language (管道不足, the system
 asks); the person's marks, splits, changes and take-backs (one live record per key); the AI's four turns and what it may
-not do. Outside services are fakes (egress.fetch_json patched); the collector is never called."""
+not do. Registry and archive facts come from collect (specs/wire/lookup.v1.json): a fake client answers from the
+spec's own examples; nothing reaches outside."""
 
 from __future__ import annotations
 
+import copy
 import datetime
+import json
+import re
 import urllib.parse
 import uuid
 from unittest import mock
@@ -23,11 +27,14 @@ from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import ai_gate, block_hooks, evidence
 from ai_lego.platform.block_hooks import gather as hooks
-from ai_lego.platform.net import rdap, wayback
+from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.net.egress import EGRESS_ALLOWLIST_ENV, egress_allowlist
 from ai_lego.platform.rulesets import require
 from tests.unit.test_block_foundation import MirrorProvider
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
+
+SPEC = json.loads((PRODUCT_ROOT / "specs" / "wire" / "lookup.v1.json").read_text(encoding="utf-8"))
+FOUND_ITEM, UNLISTED_ITEM = SPEC["examples"]["describe"]["answer"]["items"]
 
 COMMON = "的一是在不了有和人這中大為上個國我以要他時來用們生到作地於出就分對成會可主發年動同工也能下過子說產種面而方後多定行學法所民得經十三之進著等部度家電力裡如水化高自二理起小物現實加量都兩體制機當使點從業本去把性好應開它合還因由其些然前外天政四日那社義事平形相全表間樣與關各重新線內數正心反你明看原又麼利比或但質氣第向道命此變條只沒結解問意建月公無系軍很情者最立代想已通並提直題黨程展五果料象員革位入常文總次品式活設及管特件長求老頭基資邊流路級少圖山統接知較將組見計別她手角期根論運農指幾九區強放決西被幹做必戰先回則任取據處府研"
 ZH_SAYS = "公會公告：自二〇一九年起，合約範本第七條改為按月結算。"
@@ -42,6 +49,34 @@ EN = ("The association said on Monday that the standard contract will be settled
       "It is the first change to the template since it was written, and members were told in a letter. ") * 3
 
 
+class FakeCollect:
+    """collect's lookups endpoint as the spec shows it: by default every URL gets the spec's found registry record and
+    its no-capture archive cell; ``answers`` sets one URL's whole item, ``captures`` its first capture date."""
+
+    def __init__(self):
+        self.calls: list[tuple[str, list[dict]]] = []
+        self.answers: dict[str, dict] = {}
+        self.captures: dict[str, str] = {}
+        self.down = False
+        self.before = None   # runs at the start of a call (in the hook's thread)
+
+    def lookup(self, project_id, kind, items, timeout):
+        self.calls.append((kind, items))
+        if self.before:
+            self.before()
+        if self.down:
+            raise InvariantViolation("COLLECT_LOOKUP_UNAVAILABLE: HTTP 503 from app.aware-wave.com")
+        return {"kind": kind, "items": [self.item(entry["url"]) for entry in items]}
+
+    def item(self, url):
+        if url in self.answers:
+            return copy.deepcopy(self.answers[url])
+        host = (urllib.parse.urlsplit(url).hostname or "").removeprefix("www.")
+        archived = {"state": "查到", "value": self.captures[url]} if url in self.captures else copy.deepcopy(UNLISTED_ITEM["first_archived"])
+        return {"url": url, "site": ".".join(host.split(".")[-2:]), "registered": copy.deepcopy(FOUND_ITEM["registered"]),
+                "country": copy.deepcopy(FOUND_ITEM["country"]), "first_archived": archived}
+
+
 class GatherCase(ProjectSourceApiTestCase):
     def setUp(self):
         super().setUp()
@@ -51,26 +86,12 @@ class GatherCase(ProjectSourceApiTestCase):
         self.docs = CaseDocs(self._repo)
         self.tenant_id = self.tenant["tenant_id"]
         self.owner = record_log.case(self.pid)
-        self.registry: dict[str, object] = {}   # registrable name -> RDAP record, or an error to raise
-        self.captures: dict[str, str] = {}      # page URL -> the archive's first capture timestamp
-        self.calls: list[str] = []
-        for module in (rdap, wayback):
-            patcher = mock.patch.object(module, "fetch_json", self._fetch)
-            patcher.start()
-            self.addCleanup(patcher.stop)
+        self.collect = FakeCollect()
+        patcher = mock.patch.object(collect_lookups, "collection_service_from_env", lambda: self.collect)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.provider = MirrorProvider({})
         api_main.app.dependency_overrides[api_main.get_ai_provider] = lambda: self.provider
-
-    def _fetch(self, url, timeout=0.0, **kwargs):
-        self.calls.append(url)
-        if url.startswith("https://archive.org/"):
-            target = urllib.parse.unquote(urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)["url"][0])
-            stamp = self.captures.get(target)
-            return {"archived_snapshots": {"closest": {"available": True, "timestamp": stamp}} if stamp else {}}
-        answer = self.registry.get(url.rsplit("/domain/", 1)[1], {"events": [{"eventAction": "registration", "eventDate": "2001-02-03T00:00:00Z"}]})
-        if isinstance(answer, Exception):
-            raise answer
-        return answer
 
     def collected(self, url: str, text: str, *, title: str | None = None, published_at: str | None = None, **relevance) -> str:
         """A page the collector stored (same URL + new text = its new version, as ingest does)."""
@@ -125,7 +146,7 @@ class GatherCase(ProjectSourceApiTestCase):
 class CardTests(GatherCase):
     def test_a_collected_page_gets_one_card_with_every_cell_said_and_a_second_run_adds_nothing(self):
         url = "https://news.example.com/a"
-        self.captures[url] = "20251201000000"
+        self.collect.captures[url] = "2025-12-01"
         source_id = self.collected(url, zh(1), published_at="2026-01-02", searchQuery="公會 合約", searchAngle="primary")
         self.arrive()
         [card] = self.cards()
@@ -134,7 +155,7 @@ class CardTests(GatherCase):
         self.assertEqual(content["found_by"], {"by": "系統找的", "provider": "serper", "lang": "zh", "query": "公會 合約", "angle": "primary"})
         row = self._repo.get_source(self.tenant_id, self.pid, source_id)
         self.assertEqual((content["source_id"], content["snapshot"]["sha256"]), (source_id, row["content_sha256"]))
-        self.assertEqual((content["cells"]["registered"]["value"], content["cells"]["language"]["value"]), ("2001-02-03", "中文"))
+        self.assertEqual((content["cells"]["registered"], content["cells"]["language"]["value"]), (FOUND_ITEM["registered"], "中文"))
         self.assertEqual((content["cells"]["first_seen"]["value"], content["cells"]["first_seen"]["why"]), ("2025-12-01", "網頁封存館最早存到的日期"))
         self.assertEqual(set(content["rules"]), set(hooks.CARD_RULES))
         self.assertEqual(content["rules"]["gather.grouping"], {"version": require("gather.grouping").version, "fingerprint": require("gather.grouping").fingerprint()})
@@ -150,7 +171,7 @@ class CardTests(GatherCase):
         self.assertEqual(card["content"]["found_by"], {"by": "我貼的"})
         self.assertEqual((cells["registered"]["state"], cells["first_seen"]["state"], cells["outlet_exists"]["state"]), ("無法檢查", "無法檢查", "無法檢查"))
         self.assertEqual((cells["operator"]["state"], cells["operator"]["value"]), ("查到", "© 2024 某產業公會 版權所有"))
-        self.assertEqual(self.calls, [])   # no address: nothing asked outside
+        self.assertEqual(self.collect.calls, [])   # no address: collect is not asked
 
     def test_a_url_the_person_pasted_is_marked_mine(self):
         self.collected("https://acme.example.com/about", zh(2), pasted=True)
@@ -221,37 +242,73 @@ class CardTests(GatherCase):
         self.assertEqual(hooks._language(None)["state"], "無法檢查")
 
 
-class RegistryAndArchiveTests(GatherCase):
-    def test_a_registry_on_the_list_says_when_and_where(self):
-        self.registry["acme.com"] = {"events": [{"eventAction": "registration", "eventDate": "1999-05-06T00:00:00Z"}],
-                                     "entities": [{"roles": ["registrant"], "vcardArray": ["vcard", [["version", {}, "text", "4.0"], ["adr", {"cc": "US"}, "text", ["", "", "", "", "", "", ""]]]]}]}
-        found = rdap.lookup("news.acme.com")
-        self.assertEqual((found["registered"]["value"], found["country"]["value"]), ("1999-05-06", "美國"))
-        self.assertEqual(self.calls, ["https://rdap.verisign.com/com/v1/domain/acme.com"])
+class CollectLookupTests(GatherCase):
+    def test_the_spec_examples_fill_the_registry_and_first_seen_cells(self):
+        found, unlisted = FOUND_ITEM["url"], UNLISTED_ITEM["url"]
+        self.collect.answers = {found: FOUND_ITEM, unlisted: UNLISTED_ITEM}
+        self.collected(found, zh(1))
+        self.collected(unlisted, zh(2))
+        self.arrive()
+        self.assertEqual((self.cell(found, "registered"), self.cell(found, "country")), (FOUND_ITEM["registered"], FOUND_ITEM["country"]))
+        self.assertEqual(self.cell(found, "first_seen"), {"state": "查到", "value": "2005-01-02", "why": "網頁封存館最早存到的日期"})
+        self.assertEqual(self.cell(unlisted, "registered"), UNLISTED_ITEM["registered"])
+        self.assertEqual(self.cell(unlisted, "first_seen"), {"state": "查不到", "why": "網頁沒寫日期；網頁封存館沒有存過這一頁"})
 
-    def test_a_registry_not_on_the_list_or_not_answering_is_uncheckable_and_a_missing_name_is_not_found(self):
-        self.assertEqual(rdap.lookup("www.cna.com.tw")["registered"], {"state": "無法檢查", "why": "台灣的網域註冊資料庫要求平台還不支援的連線方式（HTTP/2）"})
-        self.assertEqual(rdap.lookup("example.io")["registered"]["state"], "無法檢查")
-        self.assertEqual(self.calls, [])   # a registry not on the list is never asked
-        self.registry["gone.com"] = InvariantViolation("RDAP_UNAVAILABLE: HTTP 404 from rdap.verisign.com")
-        self.registry["down.com"] = InvariantViolation("RDAP_UNAVAILABLE: TimeoutError reaching rdap.verisign.com")
-        self.assertEqual((rdap.lookup("gone.com")["registered"]["state"], rdap.lookup("down.com")["registered"]["state"]), ("查不到", "無法檢查"))
+    def test_when_collect_does_not_answer_every_lookup_cell_says_so(self):
+        self.collect.down = True
+        self.collected("https://a.example.com/1", zh(1))
+        self.collected("https://b.example.com/2", zh(2), published_at="2026-01-02")
+        self.arrive()
+        down = SPEC["examples"]["collect_down"]["engine_describe_cell"]
+        for url in ("https://a.example.com/1", "https://b.example.com/2"):
+            self.assertEqual((self.cell(url, "registered"), self.cell(url, "country")), (down, down))
+        self.assertEqual(self.cell("https://a.example.com/1", "first_seen"), {"state": "無法檢查", "why": "網頁沒寫日期；蒐集器這次沒有回應"})
+        self.assertEqual(self.cell("https://b.example.com/2", "first_seen"), {"state": "查到", "value": "2026-01-02", "why": "網頁自己寫的日期；網頁封存館：蒐集器這次沒有回應"})
 
-    def test_the_registrable_name_keeps_a_second_level(self):
-        self.assertEqual((rdap.registrable("news.bbc.co.uk"), rdap.registrable("www.cna.com.tw"), rdap.registrable("a.b.example.com")), ("bbc.co.uk", "cna.com.tw", "example.com"))
+    def test_a_malformed_cell_from_collect_is_uncheckable(self):
+        url = "https://a.example.com/1"
+        self.collect.answers[url] = {**copy.deepcopy(FOUND_ITEM), "url": url, "country": {"state": "查到"}, "first_archived": {"state": "查到", "value": "去年"}}
+        self.collected(url, zh(1))
+        self.arrive()
+        self.assertEqual(self.cell(url, "country"), {"state": "無法檢查", "why": "蒐集器的回答格式不對"})
+        self.assertEqual(self.cell(url, "first_seen"), {"state": "無法檢查", "why": "網頁沒寫日期；蒐集器的回答格式不對"})   # a value that is no date
+        self.assertEqual(self.cell(url, "registered"), FOUND_ITEM["registered"])
 
-    def test_the_archive_says_its_first_capture_or_that_it_has_none(self):
-        self.captures["https://a.example.com/x?q=1"] = "20190304050607"
-        self.assertEqual(wayback.first_capture("https://a.example.com/x?q=1"), {"state": "查到", "value": "2019-03-04"})
-        self.assertEqual(wayback.first_capture("https://a.example.com/never")["state"], "查不到")
-        with mock.patch.object(wayback, "fetch_json", side_effect=InvariantViolation("WAYBACK_UNAVAILABLE: HTTP 503 from archive.org")):
-            self.assertEqual(wayback.first_capture("https://a.example.com/x")["state"], "無法檢查")
+    def test_ten_pages_of_one_site_ask_collect_once_per_run(self):
+        for index in range(10):
+            self.collected(f"https://news.example.com/{index}", zh(60 + index))
+        self.arrive()
+        self.arrive()
+        self.assertEqual([(kind, len(items)) for kind, items in self.collect.calls], [("describe", 10)])
 
     def test_the_earliest_of_the_pages_date_and_the_archive_is_first_seen(self):
         self.collected("https://a.example.com/1", zh(1), published_at="2026-01-02")
-        self.captures["https://a.example.com/1"] = "20270101000000"
+        self.collect.captures["https://a.example.com/1"] = "2027-01-01"
         self.arrive()
         self.assertEqual((self.cell("https://a.example.com/1", "first_seen")["value"], self.cell("https://a.example.com/1", "first_seen")["why"]), ("2026-01-02", "網頁自己寫的日期"))
+
+    def test_a_lookalike_name_is_found_in_the_registry_name_or_without_collect_in_the_host(self):
+        self.collect.answers["https://bbc.fakehost.xyz/a"] = {**copy.deepcopy(FOUND_ITEM), "url": "https://bbc.fakehost.xyz/a", "site": "fakehost.xyz"}
+        self.collected("https://bbc.fakehost.xyz/a", zh(1), title="店家公告")
+        self.arrive()
+        self.assertEqual(self.cell("https://bbc.fakehost.xyz/a", "outlet_exists")["value"], "名字像BBC，但不是BBC的網域")
+        self.collect.down = True
+        self.collected("https://bbcnews-today.example.com/b", zh(2), title="店家公告")
+        self.arrive()
+        self.assertEqual(self.cell("https://bbcnews-today.example.com/b", "outlet_exists")["value"], "名字像BBC，但不是BBC的網域")
+        self.assertEqual((hooks._name_tokens("a.b.example.com.tw", "example.com.tw"), hooks._name_tokens("x.example.com", "")), (["a", "b", "example"], ["x", "example", "com"]))
+
+    def test_the_engine_reaches_nothing_outside_itself(self):
+        """lookups v1 R9: no registry, archive or fact-check host is the engine's; every outside question goes to collect."""
+        found = [f"{path.relative_to(PRODUCT_ROOT)}:{number}" for path in sorted((PRODUCT_ROOT / "ai_lego").rglob("*.py"))
+                 for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1) if re.search(r"rdap|wayback|archive\.org", line, re.I)]
+        self.assertEqual(found, [])
+        compose = yaml.safe_load((PRODUCT_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
+        env = dict(entry.split("=", 1) for entry in compose["services"]["cognitive-os-api"]["environment"] if "=" in entry)
+        self.assertEqual(egress_allowlist({EGRESS_ALLOWLIST_ENV: env[EGRESS_ALLOWLIST_ENV]}), {"api.anthropic.com", "app.aware-wave.com"})
+        policy = yaml.safe_load((resolve_spec_root() / "policies" / "ai-execution" / "network-egress.yaml").read_text(encoding="utf-8"))
+        [rule] = [rule for rule in policy["seed_content"]["rules"] if rule["rule_id"] == "EGRESS-EC99-2"]
+        self.assertEqual([host for host in rule["allowlist"] if re.search(r"rdap|archive\.org|registry\.google", host)], [])
 
 
 class GroupingTests(GatherCase):
@@ -507,24 +564,10 @@ class RouteAndEgressTests(GatherCase):
 
     def test_a_case_erased_while_its_pages_are_looked_up_gets_nothing_written_back(self):
         self.collected("https://a.example.com/1", zh(1))
-        real, erased = rdap.lookup, []
-
-        def erase_then_answer(host):   # runs in the hook's thread: record, assert on the test's own thread
-            erased.append(self.client.delete(self.base).status_code)
-            return real(host)
-
-        with mock.patch.object(rdap, "lookup", erase_then_answer):
-            self.arrive()
+        erased = []
+        self.collect.before = lambda: erased.append(self.client.delete(self.base).status_code)   # the hook's thread: record, assert here
+        self.arrive()
         self.assertEqual((erased, self.cards()), ([200], []))
-
-    def test_every_outside_host_gather_asks_is_allowed_in_both_places(self):
-        hosts = {urllib.parse.urlsplit(base).hostname for base in require("gather.registries").items["rdap"].values()} | {wayback.HOST}
-        compose = yaml.safe_load((PRODUCT_ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
-        env = dict(entry.split("=", 1) for entry in compose["services"]["cognitive-os-api"]["environment"] if "=" in entry)
-        policy = yaml.safe_load((resolve_spec_root() / "policies" / "ai-execution" / "network-egress.yaml").read_text(encoding="utf-8"))
-        [rule] = [rule for rule in policy["seed_content"]["rules"] if rule["rule_id"] == "EGRESS-EC99-2"]
-        self.assertEqual(sorted(hosts - egress_allowlist({EGRESS_ALLOWLIST_ENV: env[EGRESS_ALLOWLIST_ENV]})), [])
-        self.assertEqual(sorted(hosts - set(rule["allowlist"])), [])
 
 
 if __name__ == "__main__":

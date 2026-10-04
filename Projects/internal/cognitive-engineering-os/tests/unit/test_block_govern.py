@@ -22,6 +22,7 @@ from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.blocks import ALL_CODES
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
+from ai_lego.platform.rulesets import rulesets
 from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowRepository
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
@@ -712,7 +713,9 @@ class VersionRecordTests(GovernApiTestCase):
         self.assertEqual(self.client.post(f"{self.base}/ai/SENSE/mirror", json={"context": {}}).status_code, 200)
         body = self.client.get(f"{self.base}/govern/versions").json()
         self.assertEqual([(call["block"], call["action"], call["model"], len(call["instructions_sha256"])) for call in body["ai_calls"]], [("SENSE", "mirror", "test-mirror-model", 64)])
-        self.assertEqual([rule["name"] for rule in body["rules"]], ["ai_preamble", "crisis", "high_risk", "record_kinds", "integrity"])
+        names = [rule["name"] for rule in body["rules"]]
+        self.assertEqual(names[:5], ["ai_preamble", "crisis", "high_risk", "record_kinds", "integrity"])
+        self.assertLessEqual(set(rulesets()), set(names))   # then every block's list and rule (STEP2_SHARED_RULES §6)
         for rule in body["rules"][:4]:
             self.assertRegex(rule["version"], r"^[0-9a-f]{12}$")
         self.assertRegex(body["rules"][4]["version"], r"^v\d+-[0-9a-f]{12}$")

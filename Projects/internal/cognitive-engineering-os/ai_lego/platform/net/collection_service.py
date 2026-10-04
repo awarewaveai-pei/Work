@@ -36,6 +36,18 @@ class CollectionServiceClient:
             error_prefix="COLLECTION_SERVICE",
         )
 
+    def lookup(self, project_id: str, kind: str, items: list[dict[str, Any]], timeout: float) -> dict[str, Any]:
+        """Collect lookups v1 (specs/wire/lookup.v1.json). Raises ``InvariantViolation`` like ``start_run``; read the
+        answer only through ``collect_lookups``, which never lets that reach a hook."""
+        return self._fetch(
+            f"{self._base_url}/api/internal/collect/lookups",
+            timeout,
+            method="POST",
+            headers={"Authorization": f"Bearer {self._token}"},
+            body={"project_id": project_id, "kind": kind, "items": items},
+            error_prefix="COLLECT_LOOKUP",
+        )
+
 
 def collection_service_from_env(environ: Mapping[str, str] | None = None) -> CollectionServiceClient | None:
     """``None`` when COLLECT_RESEARCH_RUNS_TOKEN is unset: collections answer 503 instead of calling out unauthenticated."""

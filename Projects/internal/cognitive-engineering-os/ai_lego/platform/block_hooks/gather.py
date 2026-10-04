@@ -7,7 +7,8 @@
   a split takes part of one group; a take-back is for a page set aside, once.
 - ``channel_state`` / ``distribution``: 管道不足, the place's language, where the pages came from -- read by the page
   (apps/api/blocks/gather.py) and by the AI's hand-back (ai_actions/gather.py).
-Every cell says only what a registry, an archive, a list or the page itself states (STEP2_SHARED_RULES §2)."""
+Every cell says only what a list or the page itself states, or what collect learnt from a registry or the web archive:
+the platform reaches nothing outside itself (specs/wire/lookup.v1.json; STEP2_SHARED_RULES §2)."""
 
 from __future__ import annotations
 
@@ -24,12 +25,12 @@ from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import evidence, safety
-from ai_lego.platform.net import rdap, wayback
+from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.rulesets import require
 
 SYSTEM = record_log.system("GATHER")
 SEARCHED, PASTED = FOUND_BY
-CARD_RULES = ("gather.source_lists", "gather.outlets", "gather.registries", "gather.grouping")
+CARD_RULES = ("gather.source_lists", "gather.outlets", "gather.grouping")
 MIN_ENGINES = MIN_LANGUAGES = 2   # 系統至少用兩家搜尋引擎、兩種語言找
 CHANNEL_STATES = ("ok", "unreachable", "no_key")
 PROVIDER_NAMES = {"serper": "Serper（Google 的結果）", "brave": "Brave"}
@@ -88,14 +89,23 @@ def _named(text: str, name: str) -> bool:
     return bool(re.search(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", text, re.I)) if name.isascii() else name in text
 
 
-def _outlet(host: str, title: str) -> tuple[dict[str, Any] | None, bool, bool]:
+def _name_tokens(host: str, site: str) -> list[str]:
+    """Where a site's own name can be: the host's labels up to the first label of the name the registry holds
+    (collect's ``site``: bbc.fakehost.xyz -> bbc, fakehost); every label when collect did not answer."""
+    labels = host.split(".") if host else []
+    if site and (host == site or host.endswith(f".{site}")):
+        labels = labels[: len(labels) - len(site.split(".")) + 1]
+    return [token for label in labels for token in re.split(r"[^a-z0-9]+", label) if token]
+
+
+def _outlet(host: str, site: str, title: str) -> tuple[dict[str, Any] | None, bool, bool]:
     """(the outlet, whether the site IS it, whether the site's name reads like a news outlet)."""
     rules = require("gather.outlets").items
     for outlet in rules["outlets"]:
         if host and any(host == domain or host.endswith(f".{domain}") for domain in outlet["domains"]):
             return outlet, True, True
     site = _site_name(title)
-    tokens = re.split(r"[^a-z0-9]+", rdap.registrable(host).split(".")[0]) if host else []
+    tokens = _name_tokens(host, site)
     for outlet in rules["outlets"]:
         for name in outlet["names"]:
             squeezed = re.sub(r"[^a-z0-9]", "", name.lower())
@@ -149,46 +159,32 @@ def _outlet_cell(host: str, title: str, outlet: dict[str, Any] | None, is_outlet
     return cell(NOT_FOUND, why="名字不像媒體")
 
 
-def _first_seen(url: str, published: Any) -> dict[str, str]:
-    """最早何時出現: the earlier of the date the page states and the archive's first capture."""
+def _first_seen(published: Any, archived: dict[str, str] | None) -> dict[str, str]:
+    """最早何時出現: the earlier of the date the page states and the archive's first capture (collect's
+    ``first_archived``; ``None`` = a pasted file with no address to ask about)."""
     stated = _date(published)
-    if not url:
+    if archived is None:
         return cell(FOUND, stated, why="網頁自己寫的日期") if stated else cell(UNCHECKABLE, why="你貼的檔案沒寫日期，也沒有網址可以查網頁封存館")
-    captured = wayback.first_capture(url)
-    if captured["state"] == FOUND and (not stated or captured["value"] < stated):
-        return cell(FOUND, captured["value"], why="網頁封存館最早存到的日期")
+    if archived["state"] == FOUND and not _date(archived["value"]):   # compared as a date below, so it must be one
+        archived = cell(UNCHECKABLE, why=collect_lookups.MALFORMED)
+    if archived["state"] == FOUND and (not stated or archived["value"][:10] < stated):
+        return cell(FOUND, archived["value"][:10], why=archived.get("why") or "網頁封存館最早存到的日期")
     if stated:
-        return cell(FOUND, stated, why="網頁自己寫的日期" + ("；網頁封存館這次沒有回應" if captured["state"] == UNCHECKABLE else ""))
-    if captured["state"] == NOT_FOUND:
-        return cell(NOT_FOUND, why="網頁沒寫日期，網頁封存館也沒存過")
-    return cell(UNCHECKABLE, why="網頁沒寫日期，網頁封存館這次沒有回應")
-
-
-class _Registry:
-    """One registry question per site in a hook run (ten pages of one site ask once)."""
-
-    def __init__(self) -> None:
-        self._seen: dict[str, dict[str, dict[str, str]]] = {}
-
-    def __call__(self, host: str) -> dict[str, dict[str, str]]:
-        if not host:
-            why = "你貼的是檔案，沒有網域可以查"
-            return {"registered": cell(UNCHECKABLE, why=why), "country": cell(UNCHECKABLE, why=why)}
-        name = rdap.registrable(host)
-        if name not in self._seen:
-            self._seen[name] = rdap.lookup(host)
-        return self._seen[name]
+        return cell(FOUND, stated, why="網頁自己寫的日期" + (f"；網頁封存館：{archived['why']}" if archived["state"] == UNCHECKABLE else ""))
+    return cell(archived["state"], why=f"網頁沒寫日期；{archived['why']}")
 
 
 def _stamps() -> dict[str, dict[str, str]]:
     return {name: {key: value for key, value in require(name).stamp().items() if key != "name"} for name in CARD_RULES}
 
 
-def _cells(url: str, title: str, text: str | None, published: Any, registry: _Registry) -> tuple[dict[str, dict[str, str]], list[dict[str, str]]]:
+def _cells(url: str, title: str, text: str | None, published: Any, looked: Mapping[str, Any] | None) -> tuple[dict[str, dict[str, str]], list[dict[str, str]]]:
+    """``looked``: collect's answer for ``url`` (collect_lookups.describe), ``None`` for a pasted file with no address."""
     host = _host(url)
     lists, restricted = _lists(host)
-    outlet, is_outlet, newsy = _outlet(host, title)
-    looked_up = registry(host)
+    outlet, is_outlet, newsy = _outlet(host, (looked or {}).get("site") or "", title)
+    no_site = cell(UNCHECKABLE, why="你貼的是檔案，沒有網域可以查")
+    looked_up = {"registered": looked["registered"], "country": looked["country"]} if looked else {"registered": no_site, "country": no_site}
     if restricted:
         country = cell(FOUND, restricted[0], why=restricted[2])
     elif outlet and is_outlet and outlet.get("country"):
@@ -202,7 +198,7 @@ def _cells(url: str, title: str, text: str | None, published: Any, registry: _Re
         "country": country,
         "language": _language(text),
         "original": cell(NOT_FOUND, why="還在分組"),   # replaced from the grouping before the card is saved
-        "first_seen": _first_seen(url, published),
+        "first_seen": _first_seen(published, looked["first_archived"] if looked else None),
         "stance": cell(UNCHECKABLE, why="系統沒有讀網站的「關於我們」頁，不知道它自己宣稱的立場；你可以自己補上"),
         "affiliation": affiliation,
         "party_relation": cell(UNCHECKABLE, why="系統不知道它跟這件事的當事方有什麼關係；你可以自己寫"),
@@ -218,9 +214,9 @@ def _found_by(row: Mapping[str, Any], author: str | None) -> dict[str, str]:
     return {"by": SEARCHED, **{key: relevance[name][:limit] for key, name, limit in keys if isinstance(relevance.get(name), str) and relevance[name]}}
 
 
-def _source_card(row: Mapping[str, Any], text: str | None, author: str | None, registry: _Registry) -> dict[str, Any]:
+def _source_card(row: Mapping[str, Any], text: str | None, author: str | None, answers: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     url = row.get("canonical_url") or ""
-    cells, lists = _cells(url, row.get("title") or "", text, row.get("published_at"), registry)
+    cells, lists = _cells(url, row.get("title") or "", text, row.get("published_at"), answers.get(url) if url else None)
     relevance = row.get("relevance") if isinstance(row.get("relevance"), Mapping) else {}
     aside = relevance.get("aside") if isinstance(relevance.get("aside"), str) else ""
     return {"source_id": row["source_id"], "url": url[:2048], "title": (row.get("title") or "")[:300], "found_by": _found_by(row, author),
@@ -228,10 +224,10 @@ def _source_card(row: Mapping[str, Any], text: str | None, author: str | None, r
             "aside": aside[:300], "rules": _stamps()}
 
 
-def _aside_card(entry: Mapping[str, Any], registry: _Registry) -> dict[str, Any]:
+def _aside_card(entry: Mapping[str, Any], answers: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     """A page the collector could not get text from (放一旁): a card all the same, with what its address tells."""
     url, title = entry["url"][:2048], str(entry.get("title") or "")[:300]
-    cells, lists = _cells(url, title, None, None, registry)
+    cells, lists = _cells(url, title, None, None, answers.get(entry["url"]))
     reason = entry.get("reason") if isinstance(entry.get("reason"), str) and entry["reason"].strip() else "抓不到內文"
     return {"source_id": "", "url": url, "title": title, "found_by": {"by": SEARCHED}, "cells": cells, "lists": lists, "aside": reason[:300], "rules": _stamps()}
 
@@ -413,20 +409,20 @@ def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, ar
     cards = docs.current(tenant_id, owner, "gather.source")
     carded = {doc["content"]["source_id"]: doc for doc in cards if doc["content"].get("source_id")}
     aside_cards = {doc["content"].get("url"): doc for doc in cards if not doc["content"].get("source_id") and doc["content"].get("url")}
-    registry = _Registry()
-    planned: list[tuple[dict[str, Any] | None, dict[str, Any]]] = []   # (the card this is a new version of, the content)
     active = sorted((row for row in rows.values() if row["status"] == "active"), key=lambda row: (row["created_at"], row["source_id"]))
-    urls = {row.get("canonical_url") for row in active if row.get("canonical_url")}
-    for row in active:
-        if row["source_id"] in carded:
-            continue
-        prior = _ancestor_card(row, rows, carded) or aside_cards.get(row.get("canonical_url"))
-        planned.append((prior, _source_card(row, text(row["source_id"]), author(row["source_id"]), registry)))
+    known = {row.get("canonical_url") for row in active if row.get("canonical_url")}
+    new_rows = [(_ancestor_card(row, rows, carded) or aside_cards.get(row.get("canonical_url")), row) for row in active if row["source_id"] not in carded]
+    new_aside = []
     for entry in arrived.get("aside") or []:
         url = entry.get("url") if isinstance(entry, Mapping) else None
-        if isinstance(url, str) and url.startswith(("http://", "https://")) and url not in aside_cards and url not in urls:
-            urls.add(url)
-            planned.append((None, _aside_card(entry, registry)))
+        if isinstance(url, str) and url.startswith(("http://", "https://")) and url not in aside_cards and url not in known:
+            known.add(url)
+            new_aside.append(entry)
+    # one question to collect for every address of this run (it batches and never raises: R7, R8)
+    answers = collect_lookups.describe(owner.id, [row.get("canonical_url") for _, row in new_rows] + [entry["url"] for entry in new_aside])
+    planned: list[tuple[dict[str, Any] | None, dict[str, Any]]] = [   # (the card this is a new version of, the content)
+        (prior, _source_card(row, text(row["source_id"]), author(row["source_id"]), answers)) for prior, row in new_rows]
+    planned += [(None, _aside_card(entry, answers)) for entry in new_aside]
 
     rules = require("gather.grouping").items
     replaced = {prior["doc_id"]: content for prior, content in planned if prior is not None}

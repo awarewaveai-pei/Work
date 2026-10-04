@@ -374,6 +374,11 @@ def cite_action(**overrides) -> AiAction:
 
 class GateCitesTests(Step2Case):
     def setUp(self):
+        # these tests write their own source cards: a block's arrival hook would card the same page first
+        real = block_hooks._registry
+        patcher = mock.patch.object(block_hooks, "_registry", lambda name: {} if name == "AFTER_SOURCES" else real(name))
+        patcher.start()
+        self.addCleanup(patcher.stop)
         super().setUp()
         self.source_id = self.source()
         self.card_id = self.card(source_id=self.source_id)

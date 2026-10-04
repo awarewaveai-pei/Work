@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 from ai_lego.apps.api import main as api_main
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
+from ai_lego.platform import block_hooks
 from tests.unit.test_api_main import ApiTestCase
 from urllib.parse import urljoin
 
@@ -27,6 +28,7 @@ class ProjectSourceApiTestCase(ApiTestCase):
         api_main.app.dependency_overrides[api_main.get_source_cas] = lambda: self._source_cas
 
     def tearDown(self):
+        block_hooks.wait_idle()   # a paste or an ingest starts the arrival hooks in the background; they hold the store open
         self._proj_tmpdir.cleanup()
         super().tearDown()
 

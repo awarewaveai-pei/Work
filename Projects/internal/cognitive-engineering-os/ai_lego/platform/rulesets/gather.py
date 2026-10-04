@@ -1,6 +1,6 @@
-"""GATHER's lists and rules (STEP2_SHARED_RULES §6): the source lists a card names, the known outlets, the registries the
-platform asks who registered a site, the grouping rule, and which language a place speaks. Each card stores the
-stamp of every one it used; a change is a new version (HISTORY)."""
+"""GATHER's lists and rules (STEP2_SHARED_RULES §6): the source lists a card names, the known outlets, the grouping
+rule, and which language a place speaks. Each card stores the stamp of every one it used; a change is a new version
+(HISTORY). Which registry or archive answers is collect's (specs/wire/lookup.v1.json R5), not a list here."""
 
 from __future__ import annotations
 
@@ -58,32 +58,6 @@ OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "1", "平台
     "min_host_name": 3,
 })
 
-# 網域什麼時候註冊: the registry of each top-level domain the platform asks, from IANA's RDAP list. A domain whose
-# registry is not here is 無法檢查.
-REGISTRIES = Ruleset("gather.registries", "GATHER", "網域註冊資料庫", "1", "IANA 的 RDAP 名單（data.iana.org/rdap/dns.json，2026-09-30 版），平台抄錄", {
-    "rdap": {
-        "com": "https://rdap.verisign.com/com/v1/", "net": "https://rdap.verisign.com/net/v1/",
-        "org": "https://rdap.publicinterestregistry.org/rdap/",
-        "info": "https://rdap.identitydigital.services/rdap/", "news": "https://rdap.identitydigital.services/rdap/",
-        "media": "https://rdap.identitydigital.services/rdap/", "asia": "https://rdap.identitydigital.services/rdap/",
-        "uk": "https://rdap.nominet.uk/uk/",
-        "xyz": "https://rdap.centralnic.com/xyz/",
-        "top": "https://rdap.zdnsgtld.com/top/",
-        "online": "https://rdap.radix.host/rdap/", "site": "https://rdap.radix.host/rdap/", "press": "https://rdap.radix.host/rdap/",
-        "app": "https://pubapi.registry.google/rdap/",
-        "gov": "https://rdap.nic.gov/rdap/",
-    },
-    # 「.tw」is on IANA's list, but its registry answers HTTP 426 to the platform's HTTP/1.1 connection (2026-10-04)
-    "not_listed": {"tw": "台灣的網域註冊資料庫要求平台還不支援的連線方式（HTTP/2）"},
-    # where the registrable name is three labels (bbc.co.uk, cna.com.tw), not two
-    "second_level": ["com.tw", "org.tw", "net.tw", "edu.tw", "gov.tw", "idv.tw", "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "ltd.uk", "plc.uk",
-                     "co.jp", "or.jp", "ac.jp", "go.jp", "com.hk", "org.hk", "edu.hk", "gov.hk", "com.cn", "com.au", "org.au", "edu.au", "gov.au"],
-    # a registry writes the country as a two-letter code; these are shown by name, any other as the code
-    "countries": {"TW": "台灣", "CN": "中國", "HK": "香港", "MO": "澳門", "SG": "新加坡", "MY": "馬來西亞", "JP": "日本", "KR": "韓國", "US": "美國",
-                  "GB": "英國", "CA": "加拿大", "AU": "澳洲", "NZ": "紐西蘭", "IE": "愛爾蘭", "DE": "德國", "FR": "法國", "NL": "荷蘭", "RU": "俄羅斯",
-                  "UA": "烏克蘭", "IN": "印度", "QA": "卡達", "PA": "巴拿馬", "IS": "冰島"},
-})
-
 # 平台把「怎樣算同一組」的規則寫出來給你看: the numbers and the sentences the page shows come from here together.
 GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "1", "平台（第 2 步）", {
     "shingle": 5, "compare_chars": 20000, "same_text": 0.8, "maybe_same": 0.5,
@@ -136,11 +110,12 @@ PLACE_LANGUAGES = Ruleset("gather.place_languages", "GATHER", "發生地的語�
     ],
 })
 
-RULESETS = [SOURCE_LISTS, OUTLETS, REGISTRIES, GROUPING, PLACE_LANGUAGES]
+RULESETS = [SOURCE_LISTS, OUTLETS, GROUPING, PLACE_LANGUAGES]
 
 HISTORY = {
     "gather.source_lists": {"1": "475d3ede5bdb"},
     "gather.outlets": {"1": "a494e918033c"},
+    # retired 2026-10-04 (lookups moved to collect); a recorded version stays as it was (rulesets/__init__.py)
     "gather.registries": {"1": "2b04ec23212b"},
     "gather.grouping": {"1": "f34dbf8167ad"},
     "gather.place_languages": {"1": "279db02ce9fe"},
