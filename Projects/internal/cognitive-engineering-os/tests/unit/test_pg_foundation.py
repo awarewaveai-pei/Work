@@ -312,6 +312,12 @@ class DatabaseUrlsTests(unittest.TestCase):
         with self.assertRaisesRegex(InvariantViolation, r"^DB_URLS_MISSING"):
             db.Databases.from_env({})
 
+    def test_runtime_refuses_a_second_region_until_blobs_are_routed(self):
+        urls = "one=postgresql://db-one/cognitive,two=postgresql://db-two/cognitive"
+        with patch.object(db, "ConnectionPool", side_effect=AssertionError("no pool may open")):
+            with self.assertRaisesRegex(InvariantViolation, r"^DB_MULTI_REGION_BLOBS_NOT_READY"):
+                db.Databases.from_env({db.DATABASE_URLS_ENV: urls})
+
 
 class RowTests(PgTestCase):
     def test_a_row_reads_by_name_by_position_and_as_a_dict(self):

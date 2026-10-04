@@ -46,6 +46,13 @@
 - REALTEST_EVIDENCE: 原指定 10 模組逐一命令，step2 63、foundation 43、map 32、think 48、decide 26、learn 27、act 25、gather 68、verify 62、compute 52，合計 446 PASS。
 - REVIEW_DONE: Codex 對抗審查找出跨區建租戶重試缺陷（前節）；Claude 審查工具無有效答案，main 合併仍封鎖。
 
+## 2026-10-05 COS 多區域上線守衛
+
+- 根因：`Databases.from_env` 允許兩區域，API/CLI 卻仍用單一 `.runtime` 存來源／產物／流程檔，違反區域隔離。
+- 修改：正式環境入口在開 pool 前拒絕多於一區域；D7 完成檔案路由及跨區駐留測試後才能解除。DB 層兩區測試不受限。
+- REALTEST_EVIDENCE: 新測試修前 `AssertionError: no pool may open` 紅，修後 `python -m unittest tests.unit.test_pg_foundation` 28 PASS；`test_api_main` 109 PASS。
+- REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，僅隔離提交。
+
 ## 2026-10-04（續2）COS JSON 欄位形狀在存檔時驗證
 - 根因：`Projects/internal/cognitive-engineering-os/ai_lego/core/domain/doc_kinds.py:134` 原先只驗 JSON 是物件或陣列；`ai_lego/platform/ai_actions/map.py:175` 對 `one_lines` 呼叫 `.items()`，錯形狀可經通用存檔路徑留下並讓 AI 動作 500。
 - 修正：`doc_kinds.py:38` 加 `Field.shape` 宣告與宣告合法性；`:130`、`:154` 存檔拒絕錯形狀（含空容器）；`kinds/` 58 個 JSON 欄位依讀取契約標為物件 21、陣列 37，沒有任意 JSON 例外；`tests/unit/test_block_foundation.py:70` 掃全 registry，`test_block_map.py:90` 實測 API 拒絕。

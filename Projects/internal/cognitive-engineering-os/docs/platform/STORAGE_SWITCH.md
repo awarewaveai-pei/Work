@@ -123,8 +123,10 @@ the API host and work across its processes; a write they let through still meets
 - JSON read back has its object keys sorted (as canonical_json wrote them); jsonb's own order is never seen.
 - Unchanged on purpose: the account export lists a workflow's records with the workflows, not among the person's other
   records, and the erase's `records` count leaves them out -- as when they were two files (one events table now).
-- Not built: D7's per-region blob root. Source and artifact blobs stay under one `.runtime` root, which is the first
-  region's while there is one; a second region needs the CAS routed tenant -> region before it takes a tenant.
+- Not built: D7's per-region blob root. Source, artifact and journal files stay under one `.runtime` root. Production
+  `Databases.from_env` refuses more than one configured region (`DB_MULTI_REGION_BLOBS_NOT_READY`) before opening pools;
+  the two-region database test constructs `Databases` directly. Remove this guard only after all file roots route by
+  tenant -> region and a real multi-region residency test covers them.
 - On this Windows laptop Python 3.12's clock ticks every 15.6 ms: rows written in one tick share a time, which is why
   nothing orders by time to tell rows apart (write_order, sequence).
 - Text ordering (`ORDER BY name`, `ORDER BY kind`) follows the database collation. The pinned `postgres:17-alpine` (musl)

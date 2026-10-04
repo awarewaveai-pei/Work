@@ -160,7 +160,10 @@ class Databases:
         value = environ.get(DATABASE_URLS_ENV, "").strip()
         if not value:
             raise InvariantViolation(f"DB_URLS_MISSING: {DATABASE_URLS_ENV} is not set (region=postgresql://...,region=postgresql://...)")
-        return cls(parse_database_urls(value), min_size=min_size, max_size=max_size)
+        urls = parse_database_urls(value)
+        if len(urls) > 1:
+            raise InvariantViolation("DB_MULTI_REGION_BLOBS_NOT_READY: one region only until source, artifact and journal roots are routed per region (D7)")
+        return cls(urls, min_size=min_size, max_size=max_size)
 
     def regions(self) -> tuple[str, ...]:
         return tuple(sorted(self._pools))
