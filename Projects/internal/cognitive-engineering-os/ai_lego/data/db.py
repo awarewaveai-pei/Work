@@ -1,16 +1,40 @@
 """PostgreSQL for the engine: one connection pool per region, one transaction per unit of work (docs/platform/
 STORAGE_SWITCH.md D1, D2, D4, D6). psycopg 3, no ORM. The schema belongs to Alembic (ai_lego/data/migrations): the
 engine never migrates by itself, it refuses to run on a region whose schema is not at head (``require_schema_at_head``).
+
+Conventions -- every SQL call site follows them (STORAGE_SWITCH.md "Conventions"):
+- Placeholders are %s. A literal % in a query that takes parameters is written %%.
+- A row is ``Row``: ``row["column"]``, ``row[0]`` and ``dict(row)`` all work, as with SQLite's Row.
+- jsonb is written as ``Jsonb(value)`` and read back as the Python value, every object's keys in sorted order (the order
+  the SQLite text had: canonical_json), never jsonb's own. Stored JSON is compared as jsonb (= compares values), never as
+  text; one field is ``column->>'key'``.
+- timestamptz is written as an aware datetime or an ISO-8601 string with its offset ('Z') and read back as ``iso()`` text
+  (six fraction digits, 'Z'), so two times read from the database compare correctly as strings. Within one aggregate the
+  order is by sequence, never by time; across aggregates time orders a display only, with an id as the tiebreak.
+- LIKE is case-sensitive here (SQLite's folded ASCII): a person's search uses ILIKE; a fixed lowercase prefix keeps LIKE.
+- INSERT OR IGNORE / OR REPLACE is INSERT ... ON CONFLICT (its key) DO NOTHING / DO UPDATE.
+- An identity column (SQLite AUTOINCREMENT) numbers rows per region: a row is found by (tenant, id), never by id alone.
+- Booleans are what the baseline kept (entitlement_audit.granted: 0/1).
+- A tenant's rows are reached only through ``Databases.for_tenant`` (tenant -> region -> pool); a credential that names no
+  tenant (a session token, a code, a grant) is looked up region by region (``regions``).
+- A lock is ``advisory_xact_lock`` named by parts, the first part the kind of thing locked; one function per lock builds
+  its name, so a reader and a writer can never name it differently. The lock map: STORAGE_SWITCH.md "Locks".
 """
 
 from __future__ import annotations
 
+import json
 import os
 import re
-from collections.abc import Iterator, Mapping
+import threading
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import datetime, timezone
+from functools import lru_cache, partial
+from operator import itemgetter
 from pathlib import Path
+from types import MappingProxyType
+from typing import Any
 
 import psycopg
 from alembic import command
@@ -18,9 +42,13 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from psycopg.conninfo import conninfo_to_dict
 from psycopg.pq import TransactionStatus
+from psycopg.types.datetime import TimestamptzBinaryLoader, TimestamptzLoader
+from psycopg.types.json import Jsonb, set_json_loads
 from psycopg_pool import ConnectionPool
 
 from ai_lego.errors import InvariantViolation
+
+__all__ = ["Databases", "Jsonb", "Rehearsal", "Row", "advisory_xact_lock", "iso", "now", "owner_lock"]
 
 DATABASE_URLS_ENV = "COGNITIVE_OS_DATABASE_URLS"
 MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
@@ -51,17 +79,75 @@ def parse_database_urls(value: str) -> dict[str, str]:
     return urls
 
 
+class Row(tuple):
+    """A result row read like SQLite's Row: by column name or by position, and ``dict(row)``."""
+
+    __slots__ = ()
+    _positions: Mapping[str, int] = MappingProxyType({})
+
+    def __getitem__(self, key: Any) -> Any:
+        if isinstance(key, str):
+            try:
+                key = self._positions[key]
+            except KeyError:
+                raise IndexError(f"no column named {key!r}") from None
+        return tuple.__getitem__(self, key)
+
+    def keys(self) -> list[str]:
+        return list(self._positions)
+
+
+@lru_cache(maxsize=4096)
+def _row_type(names: tuple[str, ...]) -> type[Row]:
+    positions: dict[str, int] = {}
+    for index, name in enumerate(names):
+        positions.setdefault(name, index)   # a repeated name reads its first column
+    return type("Row", (Row,), {"__slots__": (), "_positions": MappingProxyType(positions)})
+
+
+def row_factory(cursor: psycopg.Cursor[Any]) -> Callable[[Sequence[Any]], Any]:
+    if cursor.description is None:
+        return tuple
+    return _row_type(tuple(column.name for column in cursor.description))
+
+
+def _sorted_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    return dict(sorted(pairs, key=itemgetter(0)))
+
+
+class _IsoTimestamptzLoader(TimestamptzLoader):
+    def load(self, data: Any) -> str:
+        return iso(super().load(data))
+
+
+class _IsoTimestamptzBinaryLoader(TimestamptzBinaryLoader):
+    def load(self, data: Any) -> str:
+        return iso(super().load(data))
+
+
 def _configure(connection: psycopg.Connection) -> None:
     # A time string without an offset is then read as UTC, not as the server's zone.
     connection.execute("SET TIME ZONE 'UTC'")
+    connection.row_factory = row_factory
+    connection.adapters.register_loader("timestamptz", _IsoTimestamptzLoader)
+    connection.adapters.register_loader("timestamptz", _IsoTimestamptzBinaryLoader)
+    set_json_loads(partial(json.loads, object_pairs_hook=_sorted_object), connection)
+
+
+def _lock_key(parts: tuple[str, ...]) -> str:
+    if not parts or any(not isinstance(part, str) or LOCK_KEY_SEPARATOR in part for part in parts):
+        raise InvariantViolation("DB_LOCK_KEY_INVALID: a lock is named by one or more text parts, none containing the separator")
+    return LOCK_KEY_SEPARATOR.join(parts)
 
 
 class Databases:
-    """One pool per region. Build it once per process (``from_env``) and ``close`` it at shutdown."""
+    """One pool per region. Build it once per process (``from_env``) and ``close`` it at shutdown. The first region
+    configured holds the tenant directory (D6)."""
 
     def __init__(self, urls: Mapping[str, str], *, min_size: int = 1, max_size: int = 10) -> None:
         if not urls:
             raise InvariantViolation(f"DB_URLS_MISSING: no region configured ({DATABASE_URLS_ENV})")
+        self._directory_region = next(iter(urls))
         # autocommit: every transaction is an explicit connection.transaction() block, nothing is left open between them.
         self._pools = {
             region: ConnectionPool(url, min_size=min_size, max_size=max_size, kwargs={"autocommit": True}, configure=_configure,
@@ -79,17 +165,76 @@ class Databases:
     def regions(self) -> tuple[str, ...]:
         return tuple(sorted(self._pools))
 
+    @property
+    def directory_region(self) -> str:
+        """Where the tenant directory lives: the first region in COGNITIVE_OS_DATABASE_URLS (reordering the list moves it)."""
+        return self._directory_region
+
     def _pool(self, region: str) -> ConnectionPool:
         pool = self._pools.get(region)
         if pool is None:
             raise InvariantViolation(f"DB_REGION_UNKNOWN: {region!r} (configured: {', '.join(self.regions())})")
         return pool
 
+    def require_region(self, region: str) -> str:
+        self._pool(region)
+        return region
+
     @contextmanager
     def transaction(self, region: str) -> Iterator[psycopg.Connection]:
         """One pooled connection, one transaction: committed when the block ends, rolled back when it raises."""
         with self._pool(region).connection() as connection, connection.transaction():
             yield connection
+
+    def _read_one(self, region: str, query: str, parameters: Sequence[Any]) -> Row | None:
+        """One statement, its own transaction (autocommit): a single round trip."""
+        with self._pool(region).connection() as connection:
+            return connection.execute(query, parameters).fetchone()
+
+    # -- the tenant directory: tenant -> region, nothing else (no personal data) -----------------------------------
+
+    def region_of(self, tenant_id: str) -> str | None:
+        """The one place a tenant is mapped to its region; None for a tenant the directory does not hold."""
+        row = self._read_one(self.directory_region, "SELECT region FROM tenant_directory WHERE tenant_id = %s", (tenant_id,))
+        return None if row is None else self.require_region(row[0])
+
+    @staticmethod
+    def add_to_directory(connection: psycopg.Connection, tenant_id: str, region: str) -> None:
+        """On a transaction of the directory region (the caller writes the tenant's own row in the same unit of work)."""
+        connection.execute("INSERT INTO tenant_directory (tenant_id, region) VALUES (%s, %s)", (tenant_id, region))
+
+    @contextmanager
+    def for_tenant(self, tenant_id: str) -> Iterator[psycopg.Connection]:
+        """A transaction in the tenant's region: every repository call goes tenant -> region -> pool through here."""
+        region = self.region_of(tenant_id)
+        if region is None:
+            raise InvariantViolation(f"TENANT_REGION_UNKNOWN: tenant {tenant_id!r} is not in the tenant directory")
+        with self.transaction(region) as connection:
+            yield connection
+
+    # -- locks held across transactions, and the rehearsal ---------------------------------------------------------
+
+    @contextmanager
+    def session_lock(self, region: str, *parts: str) -> Iterator[None]:
+        """Hold the lock named by ``parts`` across many transactions, on a connection kept for it alone; the server drops
+        it if this process dies. Same name space as ``advisory_xact_lock``."""
+        key = _lock_key(parts)
+        with self._pool(region).connection() as connection:
+            connection.execute("SELECT pg_advisory_lock(hashtextextended(%s, 0))", (key,))
+            try:
+                yield
+            finally:
+                try:
+                    connection.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))", (key,))
+                except BaseException:
+                    connection.close()   # a closed connection drops the lock; the pool throws it away
+                    raise
+
+    @contextmanager
+    def rehearsal(self) -> Iterator[Rehearsal]:
+        """The real repository code on this database, nothing kept (see ``Rehearsal``)."""
+        with self._pool(self.directory_region).connection() as connection, connection.transaction(force_rollback=True):
+            yield Rehearsal(connection, self.directory_region)
 
     def require_schema_at_head(self, region: str) -> None:
         with self.transaction(region) as connection:
@@ -112,14 +257,63 @@ class Databases:
         self.close()
 
 
-def advisory_xact_lock(connection: psycopg.Connection, *parts: str) -> None:
+class Rehearsal(Databases):
+    """One connection, one outer transaction that is always rolled back: every ``transaction`` is a savepoint in it and every
+    region is this one. The pre-launch integrity check runs the real save path here and leaves nothing behind. One thread
+    only (a savepoint stack cannot be shared); a session lock is a no-op (nothing else runs inside it)."""
+
+    def __init__(self, connection: psycopg.Connection, region: str) -> None:   # no super().__init__: it would open pools
+        self._connection = connection
+        self._directory_region = region
+        self._thread = threading.get_ident()
+
+    def regions(self) -> tuple[str, ...]:
+        return (self._directory_region,)
+
+    def require_region(self, region: str) -> str:
+        return region
+
+    @contextmanager
+    def transaction(self, region: str) -> Iterator[psycopg.Connection]:
+        if threading.get_ident() != self._thread:
+            raise InvariantViolation("DB_REHEARSAL_THREAD: a rehearsal runs in the thread that opened it")
+        with self._connection.transaction():
+            yield self._connection
+
+    def _read_one(self, region: str, query: str, parameters: Sequence[Any]) -> Row | None:
+        with self.transaction(region) as connection:
+            return connection.execute(query, parameters).fetchone()
+
+    @contextmanager
+    def session_lock(self, region: str, *parts: str) -> Iterator[None]:
+        yield
+
+    @contextmanager
+    def rehearsal(self) -> Iterator[Rehearsal]:
+        yield self
+
+    def close(self) -> None:
+        pass
+
+
+def advisory_xact_lock(connection: psycopg.Connection, *parts: str, shared: bool = False) -> None:
     """Wait for the lock named by ``parts`` (first part = the kind of thing locked, e.g. "events"). It is held until
-    the transaction ends; two names sharing a 64-bit hash only wait for each other, never interleave wrongly."""
+    the transaction ends; two names sharing a 64-bit hash only wait for each other, never interleave wrongly.
+    ``shared``: holders of the shared lock do not wait for each other; an exclusive holder waits for all of them, and a
+    shared request that comes after a waiting exclusive one queues behind it."""
     if connection.info.transaction_status != TransactionStatus.INTRANS:
         raise InvariantViolation("DB_LOCK_OUTSIDE_TRANSACTION: an advisory xact lock taken outside a transaction is released at once")
-    if not parts or any(LOCK_KEY_SEPARATOR in part for part in parts):
-        raise InvariantViolation("DB_LOCK_KEY_INVALID: a lock is named by one or more parts, none containing the separator")
-    connection.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (LOCK_KEY_SEPARATOR.join(parts),))
+    function = "pg_advisory_xact_lock_shared" if shared else "pg_advisory_xact_lock"
+    connection.execute(f"SELECT {function}(hashtextextended(%s, 0))", (_lock_key(parts),))
+
+
+def owner_lock(connection: psycopg.Connection, kind: str, tenant_id: str, owner_id: str, *, exclusive: bool = False) -> None:
+    """The lock of a thing many write into and one erase removes whole -- a case today, a group next (STORAGE_SWITCH.md
+    "Locks"). Every writer takes it shared as its transaction's first statement and checks under it that the thing still
+    exists; the erase -- or a batch whose own checks must hold until its writes -- takes it exclusive. Writers never wait
+    for each other; an exclusive holder waits only for the writes in flight, and a writer that comes after it waits, then
+    reads what it left (no case: CASE_ERASED). The name is (kind, tenant, owner) for both modes: one key, never two."""
+    advisory_xact_lock(connection, kind, tenant_id, owner_id, shared=not exclusive)
 
 
 def now() -> datetime:

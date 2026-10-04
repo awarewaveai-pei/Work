@@ -1,6 +1,8 @@
-"""The PostgreSQL foundation (docs/platform/STORAGE_SWITCH.md W4): the baseline migration against the SQLite text it
-replaces, the advisory lock behind invariants 1-2 (two connections racing), the schema-at-head refusal, the region
-URL parsing and the time helpers. Runs on a real PostgreSQL only (tests/pg.py)."""
+"""The PostgreSQL foundation (docs/platform/STORAGE_SWITCH.md W4): the baseline migration against the SQLite schema it
+replaces (frozen in ai_lego/data/migrations/sqlite_schema_2026_10_04.sql: the data move reads the old files by it), the
+advisory lock behind invariants 1-2 (two connections racing), the schema-at-head refusal, the region URL parsing, the
+time helpers, the row type, and the tenant -> region routing of invariant 4 with two real regions. Runs on a real
+PostgreSQL only (tests/pg.py). sqlite3 is imported here only to read that frozen schema."""
 
 from __future__ import annotations
 
@@ -14,15 +16,27 @@ import unittest
 import uuid
 from datetime import datetime, timezone
 
+import tempfile
+from pathlib import Path
+
 import psycopg
 from psycopg import errors
 
 from ai_lego import PRODUCT_ROOT
 from ai_lego.data import db
+from ai_lego.data.events import record_log
+from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
+from ai_lego.data.repositories.case_docs import CaseDocs
+from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowRepository
+from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
-from tests.pg import PgTestCase
+from ai_lego.platform.identity.store import IdentityStore
+from tests.pg import PgTestCase, dump
 
 MIGRATIONS = PRODUCT_ROOT / "ai_lego" / "data" / "migrations"
+FROZEN_SQLITE_SCHEMA = MIGRATIONS / "sqlite_schema_2026_10_04.sql"
+# Columns a later migration added after the SQLite ones: 0003 write_order, where the engine read SQLite's rowid.
+ADDED_AFTER_SQLITE = {"events": ["write_order"], "workspace": ["write_order"]}
 _CREATE_TABLE = re.compile(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(\w+)\s*\(", re.IGNORECASE)
 _CREATE_INDEX = re.compile(r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+\w+\s+ON\s+\w+\s*\([^)]*\)(?:\s+WHERE\s+[^;]+)?", re.IGNORECASE)
 # A citation's own printed date ("2019", "Spring 2020"): text, not a moment (0001_baseline.py type rules).
@@ -30,33 +44,24 @@ _FREE_TEXT_DATES = {"published_at"}
 _ISO_MICRO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$")
 
 
-def _closing_paren(text: str, opening: int) -> int:
-    depth = 0
-    for index in range(opening, len(text)):
-        depth += {"(": 1, ")": -1}.get(text[index], 0)
-        if depth == 0:
-            return index
-    raise AssertionError(f"unbalanced CREATE TABLE text: {text[opening:opening + 80]!r}")
-
-
-def sqlite_schema() -> sqlite3.Connection:
-    """Every SQLite CREATE TABLE / CREATE INDEX the engine's source still holds, run into an in-memory SQLite. Read
-    from the string constants (ast joins the adjacent literals a statement is split across), not from a list here."""
-    tables: dict[str, str] = {}
-    indexes: list[str] = []
+def sqlite_ddl_in_the_engine() -> list[str]:
+    """Every SQLite CREATE TABLE / CREATE INDEX the engine's source still holds, read from its string constants (ast
+    joins the adjacent literals a statement is split across)."""
+    found: list[str] = []
     for path in sorted((PRODUCT_ROOT / "ai_lego").rglob("*.py")):
         if MIGRATIONS in path.parents:
             continue
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                for match in _CREATE_TABLE.finditer(node.value):
-                    statement = node.value[match.start():_closing_paren(node.value, match.end() - 1) + 1]
-                    assert tables.get(match.group(1), statement) == statement, f"two different definitions of {match.group(1)}"
-                    tables[match.group(1)] = statement
-                indexes += [match.group(0) for match in _CREATE_INDEX.finditer(node.value)]
+                found += [f"{path.name}: {match.group(1)}" for match in _CREATE_TABLE.finditer(node.value)]
+                found += [f"{path.name}: {match.group(0)[:60]}" for match in _CREATE_INDEX.finditer(node.value)]
+    return found
+
+
+def sqlite_schema() -> sqlite3.Connection:
+    """The SQLite schema the engine kept until the switch (the frozen file), run into an in-memory SQLite."""
     connection = sqlite3.connect(":memory:")
-    for statement in [*tables.values(), *indexes]:
-        connection.execute(statement)
+    connection.executescript(FROZEN_SQLITE_SCHEMA.read_text(encoding="utf-8"))
     return connection
 
 
@@ -115,7 +120,7 @@ class BaselineMigrationTests(PgTestCase):
     def test_every_sqlite_table_exists_with_its_columns_keys_and_indexes(self):
         lite = sqlite_schema()
         tables = _sqlite_tables(lite)
-        self.assertTrue(tables, "no SQLite CREATE TABLE left in ai_lego: the port is done, retire this comparison")
+        self.assertEqual(len(tables), 19, "the frozen SQLite schema holds the 19 tables the engine kept")
         with psycopg.connect(self.url) as connection:
             for table in tables:
                 with self.subTest(table=table):
@@ -123,7 +128,7 @@ class BaselineMigrationTests(PgTestCase):
                     pg_columns = connection.execute(
                         "SELECT column_name, data_type, is_nullable FROM information_schema.columns"
                         " WHERE table_schema = current_schema() AND table_name = %s ORDER BY ordinal_position", (table,)).fetchall()
-                    self.assertEqual([c[1] for c in sqlite_columns], [c[0] for c in pg_columns], "column names and order")
+                    self.assertEqual([c[1] for c in sqlite_columns] + ADDED_AFTER_SQLITE.get(table, []), [c[0] for c in pg_columns], "column names and order")
                     primary_key = tuple(c[1] for c in sorted(sqlite_columns, key=lambda c: c[5]) if c[5])
                     self.assertEqual(primary_key, _pg_primary_key(connection, table))
                     for (_, name, sqlite_type, notnull, _, _), (_, pg_type, nullable) in zip(sqlite_columns, pg_columns):
@@ -134,6 +139,10 @@ class BaselineMigrationTests(PgTestCase):
                         for _, index, unique, _, partial in lite.execute(f"PRAGMA index_list({table})")
                     }
                     self.assertLessEqual(sqlite_indexes, _pg_indexes(connection, table), "every SQLite key and index (unique, partial, columns)")
+
+
+    def test_the_engine_holds_no_sqlite_schema_any_more(self):
+        self.assertEqual(sqlite_ddl_in_the_engine(), [], "the port is not done: SQLite DDL is still in ai_lego")
 
 
 class SchemaAtHeadTests(PgTestCase):
@@ -250,14 +259,15 @@ class AdvisoryLockTests(PgTestCase):
 
 class TimeRoundTripTests(PgTestCase):
     def test_now_survives_a_timestamptz_column_with_its_microseconds(self):
+        """A pooled connection reads a time back as the API's string (iso()), microseconds kept."""
         for aggregate, moment in (("project:now", db.now()), ("project:fixed", db.now().replace(microsecond=123456))):
             with self.databases.transaction(self.REGION) as connection:
                 _insert_event(connection, "t-time", aggregate, 1, occurred_at=moment)
                 (stored,) = connection.execute("SELECT occurred_at FROM events WHERE tenant_id = 't-time' AND aggregate_id = %s", (aggregate,)).fetchone()
-            self.assertEqual(stored, moment)
-            self.assertEqual(db.iso(stored), db.iso(moment))
-            self.assertRegex(db.iso(stored), _ISO_MICRO)
-        self.assertTrue(db.iso(stored).endswith(".123456Z"), db.iso(stored))
+            self.assertEqual(stored, db.iso(moment))
+            self.assertEqual(datetime.fromisoformat(stored), moment)
+            self.assertRegex(stored, _ISO_MICRO)
+        self.assertTrue(stored.endswith(".123456Z"), stored)
 
 
 class TimeHelperTests(unittest.TestCase):
@@ -299,6 +309,110 @@ class DatabaseUrlsTests(unittest.TestCase):
     def test_no_urls_at_all_is_refused(self):
         with self.assertRaisesRegex(InvariantViolation, r"^DB_URLS_MISSING"):
             db.Databases.from_env({})
+
+
+class RowTests(PgTestCase):
+    def test_a_row_reads_by_name_by_position_and_as_a_dict(self):
+        with self.databases.transaction(self.REGION) as connection:
+            row = connection.execute("SELECT 1 AS one, 'two' AS two").fetchone()
+        self.assertEqual((row["one"], row[1], dict(row), tuple(row)), (1, "two", {"one": 1, "two": "two"}, (1, "two")))
+        with self.assertRaises(IndexError):
+            row["three"]
+
+    def test_json_comes_back_with_sorted_keys_and_times_as_the_api_string(self):
+        with self.databases.transaction(self.REGION) as connection:
+            value, moment = connection.execute("SELECT %s::jsonb, %s::timestamptz", (db.Jsonb({"bb": 1, "a": {"d": 2, "c": 3}}), "2026-10-04T01:02:03Z")).fetchone()
+        self.assertEqual(list(value), ["a", "bb"])   # jsonb's own order is by length: bb would come last only by luck
+        self.assertEqual(list(value["a"]), ["c", "d"])
+        self.assertEqual(moment, "2026-10-04T01:02:03.000000Z")
+
+
+class RegionRoutingTests(PgTestCase):
+    """Invariant 4 with two real regions: one tenant per region, every repository writing for both; a tenant's rows are
+    only in its own region's database, the directory (in the first region) holds tenant -> region and nothing else, and
+    erasing one tenant's case touches only its region."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        second = cls.pg.create_database()
+        cls.addClassCleanup(cls.pg.drop_database, second)
+        cls.regions = db.Databases({"one": cls.url, "two": cls.pg.url(second)})   # "one" first: it holds the directory
+        cls.addClassCleanup(cls.regions.close)
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.cas = TenantScopedCas(Path(folder.name) / "source-cas")
+        self.store = IdentityStore(self.regions)
+        self.repo = ProjectSourceRepository(self.regions)
+        self.tenants = {region: self._tenant_writing_everywhere(region) for region in ("one", "two")}
+
+    def _tenant_writing_everywhere(self, region: str) -> dict[str, str]:
+        marker = f"MARKER-{region.upper()}-{uuid.uuid4().hex[:8]}"
+        tenant = self.store.create_tenant(str(uuid.uuid4()), f"{marker} tenant", "jurisdiction-pack.tw.v1", region, "kek")["tenant_id"]
+        workspace = self.store.create_workspace(str(uuid.uuid4()), tenant, f"{marker} workspace")["workspace_id"]
+        identity = self.store.create_identity(str(uuid.uuid4()), tenant, f"{marker.lower()}@example.com", marker, "correct-horse-battery")["identity_id"]
+        self.assertIsNotNone(self.store.authenticate(tenant, f"{marker.lower()}@example.com", "correct-horse-battery"))
+        project = str(uuid.uuid4())
+        self.repo.create_project({"project_id": project, "tenant_id": tenant, "workspace_id": workspace, "name": f"{marker} case", "purpose": "p",
+                                  "data_classification": "Confidential", "status": "active", "version": 1, "created_by_identity_id": identity, "created_at": "2026-10-04T00:00:00Z"})
+        content = f"{marker} source".encode("utf-8")
+        cas_path = TenantScopedCas.cas_path_for(tenant, content)
+        self.repo.add_source({"source_id": str(uuid.uuid4()), "project_id": project, "tenant_id": tenant, "title": f"{marker} title", "media_type": "text/plain",
+                              "data_classification": "Confidential", "content_sha256": cas_path["hash"], "size_bytes": len(content), "artifact_uri": {"uri": "x"},
+                              "content_role": "primary", "verification_status": "unverified", "status": "active", "version": 1, "created_by_identity_id": identity,
+                              "created_at": "2026-10-04T00:00:00Z", "doi": None, "authors": None, "venue": None, "published_at": None},
+                             cas_path, lambda: self.cas.put(tenant, content), writer=record_log.user(identity, "GATHER"))
+        CaseDocs(self.repo).save(tenant, record_log.person(identity), "govern.location", {"where": f"{marker} place"}, record_log.user(identity, "GOVERN"))
+        CustomWorkflowRepository(self.regions).create({"workflow_id": str(uuid.uuid4()), "tenant_id": tenant, "title": f"{marker} flow", "method_ids": ["a.b"],
+                                                       "created_by_identity_id": identity, "created_at": "2026-10-04T00:00:00Z", "updated_at": "2026-10-04T00:00:00Z"})
+        return {"tenant": tenant, "marker": marker, "project": project, "identity": identity}
+
+    def _region_text(self, region: str) -> str:
+        return "\n".join(line for line in dump(self.regions, region) if not line.startswith("tenant_directory:"))
+
+    def test_a_tenants_rows_are_only_in_its_own_regions_database(self):
+        for region, other in (("one", "two"), ("two", "one")):
+            mine, theirs = self.tenants[region], self.tenants[other]
+            text = self._region_text(region)
+            for item in (mine["marker"], mine["tenant"], mine["identity"]):
+                self.assertIn(item, text, f"{item} missing from region {region}")
+            for item in (theirs["marker"], theirs["tenant"], theirs["identity"]):
+                self.assertNotIn(item, text, f"region {other}'s tenant has a row in region {region}")
+
+    def test_the_directory_is_in_the_first_region_and_holds_only_tenant_and_region(self):
+        with self.regions.transaction("one") as connection:
+            lines = {tuple(row) for row in connection.execute("SELECT * FROM tenant_directory")}
+        self.assertLessEqual({(self.tenants[region]["tenant"], region) for region in ("one", "two")}, lines)
+        self.assertTrue(all(len(line) == 2 for line in lines))
+        with self.regions.transaction("two") as connection:
+            self.assertEqual(connection.execute("SELECT COUNT(*) FROM tenant_directory").fetchone()[0], 0)
+
+    def test_erasing_a_case_removes_it_from_its_region_and_touches_no_other(self):
+        two_before = self._region_text("two")
+        one = self.tenants["one"]
+        self.repo.erase_project(one["tenant"], one["project"], one["identity"], self.cas, 0)
+        self.assertNotIn(f"{one['marker']} title", self._region_text("one"))
+        self.assertNotIn(f"{one['marker']} case", self._region_text("one"))
+        self.assertEqual(self._region_text("two"), two_before)
+        self.assertEqual(self.cas.list_objects(one["tenant"]), [])
+
+    def test_a_credential_naming_no_tenant_is_found_in_its_region(self):
+        two = self.tenants["two"]
+        token = self.store.issue_session_for_identity(two["identity"], two["tenant"])
+        self.assertEqual(self.store.resolve_session(token), {"identity_id": two["identity"], "tenant_id": two["tenant"]})
+        self.assertEqual(self.store.get_identity(two["identity"])["tenant_id"], two["tenant"])
+        self.store.revoke_session(token)
+        self.assertIsNone(self.store.resolve_session(token))
+
+    def test_an_unknown_tenant_or_region_is_refused_and_nothing_is_written(self):
+        with self.assertRaisesRegex(InvariantViolation, "^TENANT_REGION_UNKNOWN"):
+            self.repo.get_project(str(uuid.uuid4()), "p")
+        tenant = str(uuid.uuid4())
+        with self.assertRaisesRegex(InvariantViolation, r"^DB_REGION_UNKNOWN: 'three'"):
+            self.store.create_tenant(tenant, "x", "jurisdiction-pack.tw.v1", "three", "kek")
+        self.assertIsNone(self.regions.region_of(tenant))
 
 
 if __name__ == "__main__":

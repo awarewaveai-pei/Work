@@ -4,6 +4,9 @@ The server is ``COGNITIVE_OS_TEST_DATABASE_URL`` (a role allowed to CREATE DATAB
 Docker container per test process, removed at exit. A template database is migrated to head once; every
 ``PgTestCase`` class gets its own copy (CREATE DATABASE ... TEMPLATE), dropped after the class. With neither a URL nor a
 working Docker, the classes are skipped and the reason is printed: they did not pass, they did not run.
+
+Tests of one class share its database: each test makes its own tenant (a fresh id), and a test that needs empty tables
+calls ``empty_tables``. A tenant id a unit test makes up is routed with ``add_tenant`` (the directory line only).
 """
 
 from __future__ import annotations
@@ -16,12 +19,14 @@ import subprocess
 import sys
 import time
 import unittest
+from unittest import mock
+from urllib.parse import quote, urlencode
 
 import psycopg
 from psycopg import sql
-from psycopg.conninfo import make_conninfo
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from ai_lego.data.db import Databases, migrate
+from ai_lego.data.db import DATABASE_URLS_ENV, Databases, migrate
 
 TEST_DATABASE_URL_ENV = "COGNITIVE_OS_TEST_DATABASE_URL"
 IMAGE = "postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24"
@@ -125,7 +130,8 @@ def server() -> PgServer:
 
 class PgTestCase(unittest.TestCase):
     """Each class gets ``cls.pg`` (the server), ``cls.url`` (its own migrated database) and ``cls.databases``
-    (a ``Databases`` with that database as region ``REGION``)."""
+    (a ``Databases`` with that database as region ``REGION``). For the class's duration COGNITIVE_OS_DATABASE_URLS names
+    that database too, so code that reads the environment (a command line, the integrity check) uses it."""
 
     REGION = "test"
 
@@ -138,3 +144,41 @@ class PgTestCase(unittest.TestCase):
         cls.url = cls.pg.url(database)
         cls.databases = Databases({cls.REGION: cls.url})
         cls.addClassCleanup(cls.databases.close)
+        cls.enterClassContext(mock.patch.dict(os.environ, cls.database_urls()))
+
+    @classmethod
+    def database_urls(cls) -> dict[str, str]:
+        """``COGNITIVE_OS_DATABASE_URLS`` naming this class's database, for code that reads the environment."""
+        return {DATABASE_URLS_ENV: f"{cls.REGION}={as_url(cls.url)}"}
+
+
+def as_url(conninfo: str) -> str:
+    """A key=value connection string as the postgresql:// URL that COGNITIVE_OS_DATABASE_URLS takes."""
+    parts = conninfo_to_dict(conninfo)
+    user, password, host, port, dbname = (parts.pop(key, None) for key in ("user", "password", "host", "port", "dbname"))
+    auth = quote(user or "", safe="") + (":" + quote(password, safe="") if password else "")
+    address = (host or "localhost") + (f":{port}" if port else "")
+    return f"postgresql://{auth + '@' if auth else ''}{address}/{quote(dbname or '', safe='')}" + (f"?{urlencode(parts)}" if parts else "")
+
+
+def add_tenant(databases: Databases, tenant_id: str, region: str | None = None) -> str:
+    """Route a tenant id a unit test made up (no tenant row): its line in the directory, nothing else."""
+    with databases.transaction(databases.directory_region) as connection:
+        Databases.add_to_directory(connection, tenant_id, region or databases.directory_region)
+    return tenant_id
+
+
+def empty_tables(databases: Databases, region: str | None = None) -> None:
+    """Every table of the region empty (alembic_version kept), for a test that counts rows a class-mate may have left."""
+    with databases.transaction(region or databases.directory_region) as connection:
+        tables = [row[0] for row in connection.execute("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename <> 'alembic_version'")]
+        connection.execute("TRUNCATE " + ", ".join(f'"{table}"' for table in tables) + " RESTART IDENTITY")
+
+
+def dump(databases: Databases, region: str | None = None) -> list[str]:
+    """Every row of every table of the region as text, one line per row: "the content is gone from the database" is that
+    no line holds it. Rows only -- unlike SQLite with secure_delete, PostgreSQL keeps a deleted row's bytes in its data
+    files until a vacuum reuses the space (STORAGE_SWITCH.md "Erasure and the bytes on disk")."""
+    with databases.transaction(region or databases.directory_region) as connection:
+        tables = [row[0] for row in connection.execute("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() ORDER BY tablename")]
+        return [f"{table}: {row[0]}" for table in tables for row in connection.execute(f'SELECT t::text FROM "{table}" t')]

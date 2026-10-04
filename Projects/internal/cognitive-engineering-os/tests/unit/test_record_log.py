@@ -1,15 +1,18 @@
 """共用紀錄's one write entry (ai_lego/data/events/record_log.py) and the owner rule (ARCH_DECIDED 1, 2, 5 on the
 cognitive-sovereignty supervisor page): every record names its author, its block and its owner; erasure goes by owner;
-a case is read only by the person who opened it."""
+a case is read only by the person who opened it. One aggregate's records are totally ordered across connections
+(docs/platform/STORAGE_SWITCH.md invariant 1)."""
 
 from __future__ import annotations
 
 import re
-import sqlite3
-import tempfile
+import threading
+import time
 import unittest
 import uuid
-from pathlib import Path
+from unittest import mock
+
+from psycopg import errors
 
 from ai_lego import PRODUCT_ROOT
 from ai_lego.apps.api import main as api_main
@@ -18,21 +21,17 @@ from ai_lego.data.events import record_log
 from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowRepository
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
+from tests.pg import PgTestCase, add_tenant
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
 ME = str(uuid.uuid4())
 
 
-def _conn() -> sqlite3.Connection:
-    connection = sqlite3.connect(":memory:")
-    record_log.migrate(connection)
-    return connection
-
-
-class AppendRefusesTests(unittest.TestCase):
+class AppendRefusesTests(PgTestCase):
     def _append(self, event_type="TaskNoted", payload=None, writer=None, owner=None):
-        return record_log.append(_conn(), "t", "project:p", event_type, payload or {"task_id": "x"},
-                                 writer=writer or record_log.user(ME, "ACT"), owner=owner or record_log.case("p"))
+        with self.databases.transaction(self.REGION) as connection:
+            return record_log.append(connection, "t", "project:p", event_type, payload or {"task_id": "x"},
+                                     writer=writer or record_log.user(ME, "ACT"), owner=owner or record_log.case("p"))
 
     def test_a_good_record_carries_author_block_owner_and_its_type_version(self):
         event = self._append()
@@ -90,91 +89,114 @@ class OneEntryTests(unittest.TestCase):
         self.assertEqual(sorted(family for family in families if family not in FAMILY_BLOCK), [])
 
 
-class LegacyFileTests(unittest.TestCase):
-    """A database written before authors and owners existed opens, gets owners from what each row names, keeps no guessed author."""
-
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.path = Path(self._tmp.name) / "projects.sqlite3"
-        old = sqlite3.connect(self.path)
-        old.executescript(
-            "CREATE TABLE events (event_id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, aggregate_id TEXT NOT NULL, sequence INTEGER NOT NULL,"
-            " event_type TEXT NOT NULL, occurred_at TEXT NOT NULL, schema_version TEXT NOT NULL, correlation_id TEXT NOT NULL, causation_id TEXT,"
-            " payload_json TEXT NOT NULL, UNIQUE (tenant_id, aggregate_id, sequence));"
-        )
-        rows = [("e1", "project:P1", "ProjectCreated", '{"project_id":"P1"}'), ("e2", "source:S1", "SourceAdded", '{"project_id":"P1","source_id":"S1"}'),
-                ("e3", "project:P0", "ProjectErased", '{"project_id":"P0","erased_by_identity_id":"X"}')]
-        for event_id, aggregate, kind, payload in rows:
-            old.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?)", (event_id, "t", aggregate, 1, kind, "2026-09-01T00:00:00Z", "1.0.0", event_id, None, payload))
-        old.commit()
-        old.close()
-
-    def tearDown(self):
-        self._tmp.cleanup()
-
-    def test_owners_come_from_the_row_authors_stay_unrecorded(self):
-        ProjectSourceRepository(self.path)
-        connection = sqlite3.connect(self.path)
-        got = {row[0]: row[1:] for row in connection.execute("SELECT event_id, owner_kind, owner_id, author, block FROM events")}
-        connection.close()
-        self.assertEqual(got, {"e1": ("case", "P1", None, None), "e2": ("case", "P1", None, None), "e3": ("platform", "t", None, None)})
-
-    def test_a_row_with_no_derivable_owner_stops_the_file_from_opening(self):
-        connection = sqlite3.connect(self.path)
-        connection.execute("INSERT INTO events VALUES (?,?,?,?,?,?,?,?,?,?)", ("e9", "t", "mystery:1", 1, "X", "2026-09-01T00:00:00Z", "1.0.0", "e9", None, "{}"))
-        connection.commit()
-        connection.close()
-        with self.assertRaisesRegex(InvariantViolation, "RECORD_OWNER_MISSING"):
-            ProjectSourceRepository(self.path)
-
-
-class OwnerScopedNameTests(unittest.TestCase):
+class OwnerScopedNameTests(PgTestCase):
     """critic 2026-10-03 M1: a workspace-wide unique name told a colleague my case's name existed."""
 
-    def test_an_old_file_moves_to_names_unique_per_person_and_keeps_its_rows(self):
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder) / "projects.sqlite3"
-            old = sqlite3.connect(path)
-            old.executescript(
-                "CREATE TABLE platform_projects (tenant_id TEXT NOT NULL, project_id TEXT NOT NULL, workspace_id TEXT NOT NULL, name TEXT NOT NULL,"
-                " purpose TEXT NOT NULL, data_classification TEXT NOT NULL, status TEXT NOT NULL, version INTEGER NOT NULL,"
-                " created_by_identity_id TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY (tenant_id, project_id), UNIQUE (tenant_id, workspace_id, name));"
-                "INSERT INTO platform_projects VALUES ('t','P1','w','合作','p','Confidential','active',1,'A','2026-09-01T00:00:00Z');"
-            )
-            old.commit()
-            old.close()
-            repo = ProjectSourceRepository(path)
-            row = {"tenant_id": "t", "workspace_id": "w", "name": "合作", "purpose": "p", "data_classification": "Confidential", "status": "active", "version": 1, "created_at": "2026-10-03T00:00:00Z"}
-            repo.create_project({**row, "project_id": "P2", "created_by_identity_id": "B"})   # a colleague may use the same name
-            with self.assertRaises(sqlite3.IntegrityError):
-                repo.create_project({**row, "project_id": "P3", "created_by_identity_id": "A"})   # I may not, twice
-            self.assertEqual(sorted(project["project_id"] for project in repo.list_projects("t")), ["P1", "P2"])
+    def test_a_name_is_unique_per_person_not_per_workspace(self):
+        tenant = add_tenant(self.databases, str(uuid.uuid4()))
+        repo = ProjectSourceRepository(self.databases)
+        row = {"tenant_id": tenant, "workspace_id": "w", "name": "合作", "purpose": "p", "data_classification": "Confidential", "status": "active", "version": 1, "created_at": "2026-10-03T00:00:00Z"}
+        repo.create_project({**row, "project_id": "P1", "created_by_identity_id": "A"})
+        repo.create_project({**row, "project_id": "P2", "created_by_identity_id": "B"})   # a colleague may use the same name
+        with self.assertRaises(errors.UniqueViolation):
+            repo.create_project({**row, "project_id": "P3", "created_by_identity_id": "A"})   # I may not, twice
+        self.assertEqual(sorted(project["project_id"] for project in repo.list_projects(tenant)), ["P1", "P2"])
 
 
-class CustomWorkflowOwnerTests(unittest.TestCase):
+class CustomWorkflowOwnerTests(PgTestCase):
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.repo = CustomWorkflowRepository(Path(self._tmp.name) / "wf.sqlite3")
-        self.record = {"workflow_id": "W1", "tenant_id": "t", "title": "Mine", "method_ids": ["a.b"], "created_by_identity_id": ME, "created_at": "2026-10-03T00:00:00Z", "updated_at": "2026-10-03T00:00:00Z"}
+        self.tenant = add_tenant(self.databases, str(uuid.uuid4()))
+        self.repo = CustomWorkflowRepository(self.databases)
+        self.record = {"workflow_id": "W1", "tenant_id": self.tenant, "title": "Mine", "method_ids": ["a.b"], "created_by_identity_id": ME, "created_at": "2026-10-03T00:00:00Z", "updated_at": "2026-10-03T00:00:00Z"}
         self.repo.create(self.record)
-
-    def tearDown(self):
-        self._tmp.cleanup()
 
     def test_only_its_maker_sees_or_changes_it(self):
         other = str(uuid.uuid4())
-        self.assertIsNone(self.repo.get("t", "W1", other))
-        self.assertEqual(self.repo.list("t", other), [])
-        self.assertIsNone(self.repo.update("t", "W1", "x", ["a.b"], "2026-10-03T00:00:01Z", other))
-        self.assertFalse(self.repo.delete("t", "W1", other))
-        self.assertEqual(self.repo.get("t", "W1", ME)["title"], "Mine")
+        self.assertIsNone(self.repo.get(self.tenant, "W1", other))
+        self.assertEqual(self.repo.list(self.tenant, other), [])
+        self.assertIsNone(self.repo.update(self.tenant, "W1", "x", ["a.b"], "2026-10-03T00:00:01Z", other))
+        self.assertFalse(self.repo.delete(self.tenant, "W1", other))
+        self.assertEqual(self.repo.get(self.tenant, "W1", ME)["title"], "Mine")
 
     def test_deleting_it_leaves_nothing_of_it(self):
-        self.assertTrue(self.repo.delete("t", "W1", ME))
-        connection = sqlite3.connect(self.repo.db_path)
-        left = connection.execute("SELECT COUNT(*) FROM events").fetchone()[0]
-        connection.close()
+        self.assertTrue(self.repo.delete(self.tenant, "W1", ME))
+        with self.databases.transaction(self.REGION) as connection:
+            left = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=%s", (self.tenant,)).fetchone()[0]
         self.assertEqual(left, 0)
+
+
+class AppendOrderTests(PgTestCase):
+    """Invariant 1 through the real append: one aggregate's records, written by many connections at once, are numbered
+    1..n with no gap and no duplicate; the aggregate's lock is what orders them, the UNIQUE key is the backstop."""
+
+    WRITERS, APPENDS = 4, 25
+
+    def _append(self, tenant: str, aggregate: str) -> dict:
+        with self.databases.transaction(self.REGION) as connection:
+            return record_log.append(connection, tenant, aggregate, "TaskNoted", {"task_id": "x"}, writer=record_log.user(ME, "ACT"), owner=record_log.case("p"))
+
+    def _sequences(self, tenant: str, aggregate: str) -> list[int]:
+        with self.databases.transaction(self.REGION) as connection:
+            return [row[0] for row in connection.execute("SELECT sequence FROM events WHERE tenant_id=%s AND aggregate_id=%s ORDER BY sequence", (tenant, aggregate))]
+
+    @staticmethod
+    def _slow_now():
+        """record_log._now() runs between the MAX(sequence) read and the INSERT: a pause there opens the race on every run."""
+        real = record_log._now
+
+        def slow():
+            time.sleep(0.003)
+            return real()
+        return mock.patch.object(record_log, "_now", slow)
+
+    def test_writers_racing_on_one_aggregate_leave_no_gap_and_no_duplicate(self):
+        tenant, aggregate = "t-race", f"project:{uuid.uuid4()}"
+        failures: list[str] = []
+        start = threading.Barrier(self.WRITERS, timeout=30)
+
+        def writer() -> None:
+            try:
+                start.wait()
+                for _ in range(self.APPENDS):
+                    self._append(tenant, aggregate)
+            except Exception as error:   # noqa: BLE001 -- collected, asserted empty below
+                failures.append(f"{type(error).__name__}: {error}")
+
+        with self._slow_now():
+            threads = [threading.Thread(target=writer) for _ in range(self.WRITERS)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=120)
+        self.assertEqual(failures, [])
+        self.assertEqual(self._sequences(tenant, aggregate), list(range(1, self.WRITERS * self.APPENDS + 1)))
+
+    def test_without_the_lock_the_unique_key_refuses_the_second_writer(self):
+        """Both writers read MAX(sequence) before either inserts (the lock switched off, a barrier inside the window): the
+        UNIQUE key turns the second insert into an error, never a second record numbered 1."""
+        tenant, aggregate = "t-backstop", f"project:{uuid.uuid4()}"
+        both_read = threading.Barrier(2, timeout=10)
+        real_now, outcomes = record_log._now, []
+
+        def now_after_both_read():
+            both_read.wait()
+            return real_now()
+
+        def writer() -> None:
+            try:
+                self._append(tenant, aggregate)
+                outcomes.append("written")
+            except errors.UniqueViolation as error:
+                outcomes.append(error.diag.constraint_name)
+
+        with mock.patch.object(record_log, "lock_aggregate", lambda *args: None), mock.patch.object(record_log, "_now", now_after_both_read):
+            threads = [threading.Thread(target=writer) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=30)
+        self.assertEqual(sorted(outcomes), ["uq_events_aggregate_sequence", "written"])
+        self.assertEqual(self._sequences(tenant, aggregate), [1])
 
 
 class CaseOwnerApiTests(ProjectSourceApiTestCase):
@@ -210,11 +232,8 @@ class CaseOwnerApiTests(ProjectSourceApiTestCase):
 
     def test_deleting_the_case_through_the_api_erases_its_runs(self):
         import json as _json
-        connection = sqlite3.connect(self.db_path)
-        try:
-            me = connection.execute("SELECT identity_id FROM identity WHERE email='user@example.com'").fetchone()[0]
-        finally:
-            connection.close()
+        with self.databases.for_tenant(self.tenant["tenant_id"]) as connection:
+            me = connection.execute("SELECT identity_id FROM identity WHERE tenant_id=%s AND email='user@example.com'", (self.tenant["tenant_id"],)).fetchone()[0]
         journal = api_main.workflow_journal_path(self.tenant["tenant_id"], "run-" + uuid.uuid4().hex[:8], me)
         journal.parent.mkdir(parents=True, exist_ok=True)
         journal.write_text("{}", encoding="utf-8")

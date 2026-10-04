@@ -16,15 +16,16 @@ Erasure goes by owner (``delete_owned``), never by an aggregate-id prefix.
 
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Mapping
 from uuid import uuid4
 
+import psycopg
+
 from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.blocks import ALL_CODES, FAMILY_BLOCK, require_block
-from ai_lego.core.support import canonical_json
+from ai_lego.data import db
 from ai_lego.errors import InvariantViolation
 
 AUTHORS = ("user", "ai", "joint", "system")
@@ -146,44 +147,6 @@ def ai(block: str) -> Writer:
     return Writer("ai", block)
 
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS events (
-    event_id TEXT PRIMARY KEY,
-    tenant_id TEXT NOT NULL,
-    aggregate_id TEXT NOT NULL,
-    sequence INTEGER NOT NULL,
-    event_type TEXT NOT NULL,
-    occurred_at TEXT NOT NULL,
-    schema_version TEXT NOT NULL,
-    correlation_id TEXT NOT NULL,
-    causation_id TEXT,
-    payload_json TEXT NOT NULL,
-    author TEXT,
-    author_identity_id TEXT,
-    block TEXT,
-    owner_kind TEXT,
-    owner_id TEXT,
-    UNIQUE (tenant_id, aggregate_id, sequence)
-);
-"""
-# author/block are NULL only on rows written before 2026-10-03 (nobody recorded them; readers show 「記作者之前的紀錄」, never a
-# guess). owner is filled for those rows by ``migrate`` from what the row itself names.
-_ADDED_COLUMNS = (("author", "TEXT"), ("author_identity_id", "TEXT"), ("block", "TEXT"), ("owner_kind", "TEXT"), ("owner_id", "TEXT"))
-
-
-def migrate(connection: sqlite3.Connection, legacy_owner_sql: tuple[str, ...] = ()) -> None:
-    """Bring an events table to this shape. ``legacy_owner_sql``: UPDATEs that fill owner_kind/owner_id on rows that
-    predate it, each derived from the row's own aggregate (the repository that owns the file knows how)."""
-    connection.executescript(SCHEMA)
-    existing = {row[1] for row in connection.execute("PRAGMA table_info(events)")}
-    for column, column_type in _ADDED_COLUMNS:
-        if column not in existing:
-            connection.execute(f"ALTER TABLE events ADD COLUMN {column} {column_type}")
-    for statement in legacy_owner_sql:
-        connection.execute(statement)
-    connection.execute("CREATE INDEX IF NOT EXISTS ix_events_owner ON events (tenant_id, owner_kind, owner_id)")
-
-
 def _score_keys(value: Any) -> set[str]:
     if isinstance(value, Mapping):
         return {key for key in value if key in SCORE_KEYS} | {found for item in value.values() for found in _score_keys(item)}
@@ -192,12 +155,22 @@ def _score_keys(value: Any) -> set[str]:
     return set()
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+def _now() -> datetime:
+    return db.now()
 
 
-def append(connection: sqlite3.Connection, tenant_id: str, aggregate_id: str, event_type: str, payload: Mapping[str, Any], *, writer: Writer, owner: Owner) -> dict[str, Any]:
-    """Append one record on an open transaction; returns its envelope. Every check runs before the INSERT."""
+def lock_aggregate(connection: psycopg.Connection, tenant_id: str, aggregate_id: str) -> None:
+    """The aggregate's lock (STORAGE_SWITCH.md invariant 1): taken first by every append, so MAX(sequence)+1 cannot race,
+    and by a writer that decides the aggregate's next record from what it read (a document's next version: case_docs)."""
+    db.advisory_xact_lock(connection, "events", tenant_id, aggregate_id)
+
+
+def append(connection: psycopg.Connection, tenant_id: str, aggregate_id: str, event_type: str, payload: Mapping[str, Any], *, writer: Writer, owner: Owner,
+           at: datetime | None = None) -> dict[str, Any]:
+    """Append one record on an open transaction; returns its envelope. Every check runs before the INSERT. The sequence is
+    the aggregate's next under its lock; UNIQUE (tenant_id, aggregate_id, sequence) refuses a duplicate if a writer ever
+    skipped the lock. ``at``: the instant a row the caller stores beside this record already names (its created_at),
+    so the two never differ; otherwise the record log's own clock. Order is by sequence either way."""
     if not isinstance(writer, Writer) or not isinstance(owner, Owner):
         raise InvariantViolation("RECORD_WRITER_AND_OWNER_REQUIRED")
     kind = EVENT_TYPES.get(event_type)
@@ -214,28 +187,32 @@ def append(connection: sqlite3.Connection, tenant_id: str, aggregate_id: str, ev
     scored = _score_keys(payload)
     if scored:
         raise InvariantViolation(f"RECORD_SCORE_REFUSED: {sorted(scored)} -- the platform does not score beliefs or conclusions")
-    row = connection.execute("SELECT COALESCE(MAX(sequence), 0) FROM events WHERE tenant_id=? AND aggregate_id=?", (tenant_id, aggregate_id)).fetchone()
+    lock_aggregate(connection, tenant_id, aggregate_id)   # first: the read below and the insert are one step for any other writer
+    row = connection.execute("SELECT COALESCE(MAX(sequence), 0) FROM events WHERE tenant_id=%s AND aggregate_id=%s", (tenant_id, aggregate_id)).fetchone()
+    moment = at if at is not None else _now()
     event = {
         "event_id": str(uuid4()), "tenant_id": tenant_id, "aggregate_id": aggregate_id, "sequence": int(row[0]) + 1,
-        "event_type": event_type, "occurred_at": _now(), "schema_version": kind.version, "payload": dict(payload),
+        "event_type": event_type, "occurred_at": db.iso(moment), "schema_version": kind.version, "payload": dict(payload),
         "author": writer.author, "author_identity_id": writer.identity_id, "block": writer.block, "owner_kind": owner.kind, "owner_id": owner.id,
     }
     connection.execute(
         "INSERT INTO events (event_id, tenant_id, aggregate_id, sequence, event_type, occurred_at, schema_version, correlation_id, causation_id, payload_json,"
-        " author, author_identity_id, block, owner_kind, owner_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (event["event_id"], tenant_id, aggregate_id, event["sequence"], event_type, event["occurred_at"], kind.version, event["event_id"], None,
-         canonical_json(event["payload"]), writer.author, writer.identity_id, writer.block, owner.kind, owner.id),
+        " author, author_identity_id, block, owner_kind, owner_id) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+        (event["event_id"], tenant_id, aggregate_id, event["sequence"], event_type, moment, kind.version, event["event_id"], None,
+         db.Jsonb(event["payload"]), writer.author, writer.identity_id, writer.block, owner.kind, owner.id),
     )
     return event
 
 
-def delete_owned(connection: sqlite3.Connection, tenant_id: str, owner: Owner, *, aggregate_id: str | None = None) -> int:
+def delete_owned(connection: psycopg.Connection, tenant_id: str, owner: Owner, *, aggregate_id: str | None = None) -> int:
     """Erase every record the owner holds -- or, with ``aggregate_id``, only that one thing of theirs -- on an open
     transaction. Returns how many rows went."""
-    query, parameters = "DELETE FROM events WHERE tenant_id=? AND owner_kind=? AND owner_id=?", (tenant_id, owner.kind, owner.id)
+    query, parameters = "DELETE FROM events WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s", (tenant_id, owner.kind, owner.id)
     if aggregate_id is not None:
-        query, parameters = query + " AND aggregate_id=?", (*parameters, aggregate_id)
+        query, parameters = query + " AND aggregate_id=%s", (*parameters, aggregate_id)
     return connection.execute(query, parameters).rowcount
 
 
-ENVELOPE_COLUMNS = "event_id, tenant_id, aggregate_id, sequence, event_type, occurred_at, schema_version, correlation_id, causation_id, payload_json, author, author_identity_id, block, owner_kind, owner_id"
+# author/block are NULL only on rows written before 2026-10-03 (nobody recorded them; readers show 「記作者之前的紀錄」, never a
+# guess); the data move brings them over as they are, with the owner the SQLite migration derived for them.
+ENVELOPE_COLUMNS ="event_id, tenant_id, aggregate_id, sequence, event_type, occurred_at, schema_version, correlation_id, causation_id, payload_json, author, author_identity_id, block, owner_kind, owner_id"
