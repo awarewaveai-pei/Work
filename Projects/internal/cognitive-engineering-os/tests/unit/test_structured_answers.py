@@ -31,6 +31,7 @@ PLAIN_CALLS = {
     # its answers are validated by validate_codebook_response.
     ("modules/research/ai_coding.py", "gateway.complete"): "model-profile gateway, not the AnthropicProvider seam",
     ("modules/research/coding_eval.py", "self.inner.complete"): "model-profile gateway wrapper",
+    ("platform/ai_execution/gateway.py", "AnthropicProvider(api_key, entry['model_identifier']).complete"): "model-profile transport; ai_coding validates the answer after this call",
 }
 SCHEMA_CALLS = {
     ("platform/ai_gateway/structured.py", "provider.complete_json"),

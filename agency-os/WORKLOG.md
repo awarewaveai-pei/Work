@@ -53,6 +53,14 @@
 - REALTEST_EVIDENCE: 新測試修前 `AssertionError: no pool may open` 紅，修後 `python -m unittest tests.unit.test_pg_foundation` 28 PASS；`test_api_main` 109 PASS。
 - REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，僅隔離提交。
 
+## 2026-10-05 COS 既有整合紅燈
+
+- main 基線原有 `_RUNNING` 全域 Future 集合和模型通道白名單漏項，讓受影響模組閘報兩個紅燈；未把它們誤記為移植退化。
+- 修改：hook 的資料庫 session lock 仍負責跨程序互斥；測試／CLI 的 `wait_idle` 改為條件計數，提交失敗也歸零；白名單補上實際純文字模型通道與下游驗證理由。
+- REALTEST_EVIDENCE: `test_no_process_local_run_registry` 3、`test_structured_answers` 11、`test_step2_foundation` 63、`test_block_gather` 68、`test_block_verify` 62，逐模組 PASS。
+- MUTATION_EVIDENCE: 記憶體內移除 Future 完成回呼，`test_wait_idle_waits_for_a_submitted_hook_without_a_future_registry` 轉紅；原版 3/3 綠。
+- REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，main 合併仍封鎖。
+
 ## 2026-10-04（續2）COS JSON 欄位形狀在存檔時驗證
 - 根因：`Projects/internal/cognitive-engineering-os/ai_lego/core/domain/doc_kinds.py:134` 原先只驗 JSON 是物件或陣列；`ai_lego/platform/ai_actions/map.py:175` 對 `one_lines` 呼叫 `.items()`，錯形狀可經通用存檔路徑留下並讓 AI 動作 500。
 - 修正：`doc_kinds.py:38` 加 `Field.shape` 宣告與宣告合法性；`:130`、`:154` 存檔拒絕錯形狀（含空容器）；`kinds/` 58 個 JSON 欄位依讀取契約標為物件 21、陣列 37，沒有任意 JSON 例外；`tests/unit/test_block_foundation.py:70` 掃全 registry，`test_block_map.py:90` 實測 API 拒絕。

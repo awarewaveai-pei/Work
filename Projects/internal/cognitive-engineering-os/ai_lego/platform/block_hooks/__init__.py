@@ -19,7 +19,8 @@ import importlib
 import logging
 import pkgutil
 import threading
-from concurrent.futures import Future, ThreadPoolExecutor, wait
+import time
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from typing import Any, Callable
 
@@ -84,8 +85,8 @@ def propose(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, by_block: s
 
 AFTER_SOURCES_ORDER = ("GATHER", "VERIFY")   # a block not listed runs after these, by name
 _POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="after-sources")
-_LOCKS_GUARD = threading.Lock()
-_RUNNING: set[Future] = set()
+_IDLE_CONDITION = threading.Condition()
+_PENDING_HOOKS = 0  # Test/CLI wait only; database session_lock decides whether a hook may run.
 
 
 def _run_after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arrived: dict[str, Any]) -> None:
@@ -114,14 +115,32 @@ def _run_after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, 
 def after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arrived: dict[str, Any]) -> None:
     """Returns at once (the caller is the collector's callback or the person's paste, which already succeeded); the
     hooks run in the background pool. Hooks are idempotent, so the run's end may repeat what a batch already did."""
-    future = _POOL.submit(_run_after_sources, docs, tenant_id, owner, {"aside": [], "channels": [], **arrived})
-    with _LOCKS_GUARD:
-        _RUNNING.add(future)
-    future.add_done_callback(lambda done: _RUNNING.discard(done))
+    global _PENDING_HOOKS
+    with _IDLE_CONDITION:
+        _PENDING_HOOKS += 1
+    try:
+        future = _POOL.submit(_run_after_sources, docs, tenant_id, owner, {"aside": [], "channels": [], **arrived})
+    except BaseException:
+        with _IDLE_CONDITION:
+            _PENDING_HOOKS -= 1
+            _IDLE_CONDITION.notify_all()
+        raise
+
+    def finished(_future: object) -> None:
+        global _PENDING_HOOKS
+        with _IDLE_CONDITION:
+            _PENDING_HOOKS -= 1
+            _IDLE_CONDITION.notify_all()
+
+    future.add_done_callback(finished)
 
 
 def wait_idle(timeout: float = 60.0) -> None:
     """Until every hook submitted so far has finished (tests; a CLI that must not exit early)."""
-    with _LOCKS_GUARD:
-        running = set(_RUNNING)
-    wait(running, timeout=timeout)
+    deadline = time.monotonic() + timeout
+    with _IDLE_CONDITION:
+        while _PENDING_HOOKS:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            _IDLE_CONDITION.wait(remaining)

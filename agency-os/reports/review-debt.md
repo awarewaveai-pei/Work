@@ -9,3 +9,4 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | storage-cross-region-retry | W3 跨區建租戶在目錄提交失敗後可用相同資料重試；衝突孤兒拒絕 | 不可把不存在的租戶對外路由；可恢復部分提交且不可覆蓋別人的區域列 | 故障注入測試修前 `UniqueViolation` 紅、修後 `test_pg_foundation` 27 與 `test_identity_store` 36 PASS | 待 Claude 跨模型審查；勿 push／部署／啟用第二區域 |
 | Codex | storage-integration-error-class | 把 `save_many(check)` 的無 case 誤用列為內部程式錯誤 | 使用者可造成的拒絕須有人話；無法由頁面造成的程式錯誤不冒充使用者輸入 | `test_block_foundation` 修前缺 1 碼紅、修後 43 PASS；原指定 10 模組共 446 PASS | 待 Claude 跨模型審查；勿 push／部署 |
 | Codex | storage-single-region-runtime-gate | D7 檔案分區完成前正式入口拒絕多區域 | 不可宣稱資料駐留而把不同區域的來源／產物／流程檔放在同一根目錄 | 守衛測試修前先開 pool 紅、修後 `test_pg_foundation` 28 PASS；兩區域 DB 測試保留 | 待 Claude 跨模型審查；勿 push／部署／啟用第二區域 |
+| Codex | storage-integration-baseline-gates | 移除只供測試等待的 Future 全域集合，補模型通道白名單的實際用途 | 生產互斥只靠跨程序資料庫鎖；等待器不遺漏已送出的 hook；純文字呼叫有白名單理由 | `test_no_process_local_run_registry` 3、`test_structured_answers` 11、step2 63、GATHER 68、VERIFY 62 PASS；拔回呼突變紅後綠 | 待 Claude 跨模型審查；勿 push／部署 |

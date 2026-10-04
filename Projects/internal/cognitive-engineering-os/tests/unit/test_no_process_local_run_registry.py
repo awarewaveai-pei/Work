@@ -6,8 +6,13 @@ from __future__ import annotations
 
 import ast
 import re
+import threading
 import unittest
 from pathlib import Path
+from unittest import mock
+
+from ai_lego.data.events import record_log
+from ai_lego.platform import block_hooks
 
 AI_LEGO = Path(__file__).resolve().parents[2] / "ai_lego"
 REGISTRY_NAME = re.compile(r"IN_FLIGHT|RUNNING|ACTIVE_RUN|INFLIGHT|_RUNS\b|_JOBS\b|_TASKS\b", re.IGNORECASE)
@@ -33,6 +38,26 @@ class NoProcessLocalRunRegistryTests(unittest.TestCase):
     def test_the_detector_sees_the_pattern_it_forbids(self):
         tree = ast.parse("_RUNS_IN_FLIGHT: set[tuple[str, str]] = set()\n_ACTIVE_RUNS = {}\n_CATALOG_CACHE = {}\n")
         self.assertEqual([name for node in tree.body for name in _registry_like(node)], ["_RUNS_IN_FLIGHT", "_ACTIVE_RUNS"])
+
+    def test_wait_idle_waits_for_a_submitted_hook_without_a_future_registry(self):
+        entered, release = threading.Event(), threading.Event()
+
+        def slow_hook(*_args):
+            entered.set()
+            release.wait(5)
+
+        with mock.patch.object(block_hooks, "_run_after_sources", side_effect=slow_hook):
+            block_hooks.after_sources(None, "tenant", record_log.case("case"), {})
+            self.assertTrue(entered.wait(3))
+            waiter = threading.Thread(target=block_hooks.wait_idle, kwargs={"timeout": 3})
+            waiter.start()
+            try:
+                waiter.join(0.1)
+                self.assertTrue(waiter.is_alive())
+            finally:
+                release.set()
+                waiter.join(1)
+            self.assertFalse(waiter.is_alive())
 
 
 if __name__ == "__main__":
