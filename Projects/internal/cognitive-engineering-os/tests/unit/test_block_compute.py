@@ -606,7 +606,9 @@ class RawBodyTests(ComputeCase):
 WRITES_A_NUMBER = ["大約第七年才回本。", "五年後淨現值轉正。", "要撐三個月。", "撐一個月就好。", "十五年", "收入少掉三分之一就不划算。", "打七折就虧。", "虧損上百萬。",
                    "大概一半的機會。", "差了好幾萬", "兩倍", "八成", "第二年", "每年四次", "十分鐘後", "淨現值大約是 3 萬", "報酬大概 15%", "Ⅻ", "①", "５", "壹萬",
                    "廿年後", "卅年", "卌", "about ten percent lower", "roughly five million", "IRR is twenty", "half of it", "double the rent", "the first year",
-                   "a third of it", "the fifth scenario", "two fifths of the income"]
+                   "a third of it", "the fifth scenario", "two fifths of the income",
+                   # Codex round-4 review F2: ASCII Roman numerals
+                   "There are IV periods.", "the XII months", "scenario III", "year MMXXV"]
 # the future markers (critic M2 round 2)
 FORECASTS = ["悲觀情境下你會虧錢。", "這樣做會賺。", "you'll lose money", "it'll pay off", "你會虧", "這個結果很可能會發生", "未來會虧", "估計會虧損", "預估明年會賺",
              "預計會賺", "將會虧本", "依這個結果預測你會賺。", "這樣一定會賺。", "保證回本", "撐得下去是必然的", "you won't lose", "it is bound to work", "will lose money",
@@ -618,7 +620,9 @@ LIKELIHOOD_LINES = ["很可能虧損。", "大概率虧損。", "多半虧損。
                     # Codex F4: the standalone likelihood words; 不可能 says it is certain not to, 可能性很高 how likely it is
                     "這個結果可能發生。", "也許虧損。", "或許虧損。", "大概虧損。", "恐怕虧損。", "說不定虧損。", "興許回本。", "有望回本。", "可望回本。",
                     "虧損是不可能的。", "虧損的可能性很高。", "a loss is likely", "a loss is unlikely", "perhaps it pays off", "maybe you lose money",
-                    "possibly a loss", "a loss is probable"]
+                    "possibly a loss", "a loss is probable",
+                    # Codex round-4 review F1: the possibility modals
+                    "The project might lose money.", "you may lose money", "it could pay off", "this would lose money"]
 # KNOWN LIMIT (STEP2_CHECKLIST, COMPUTE): a forecast with no listed marker -- a time word, 就 and the outcome -- is still saved;
 # the page's 「模擬不是預測，計算也不是」 beside every explanation is the backstop. A change that catches these updates the doc.
 KNOWN_LIMIT_LINES = ["下個月就回本。", "明年就回本了。", "這樣就虧了。", "this pays off next year"]
@@ -633,7 +637,9 @@ MODAL_WORDS_IN_USE = ["這個數字還有機會找到別的出處。", "會計�
                       "悲觀情境不代表一定會發生。", "free will is not part of this calculation", "there is no guarantee here",
                       "這個數字的來源很穩定。", "必要的話，可以再找一個出處。", "標準的做法是先用定存利率。", "這包括每年的成本。", "結果的不確定性來自每年的淨收入。",
                       "絕對值越大，影響越大。", "這個方案不保本。", "說不準落在哪一邊。", "make sure the numbers are yours",
-                      "盡可能多找一些獨立出處。"]
+                      "盡可能多找一些獨立出處。",
+                      # capitals that are not numbers: an acronym with a letter that is not a numeral, a single capital, a word
+                      "The IRR needs another input.", "I read the result as lower than break-even.", "a DIM view of the inputs is not what this shows"]
 
 
 class AnswerWordsTests(unittest.TestCase):

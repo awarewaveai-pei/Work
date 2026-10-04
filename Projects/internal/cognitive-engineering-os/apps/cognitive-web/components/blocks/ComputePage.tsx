@@ -107,7 +107,7 @@ export function flipWords(run: Run, spec: Spec): string {
   // the server stores the change to 0.01% (block_hooks/compute.py CHANGE_DIGITS): only its 0 is on the line
   if (flip.change === 0) return `結果就在線上：「${flip.input}」稍微一動，結果就從「${flip.from}」變成「${flip.to}」。`;
   const percent = typeof flip.change === "number" ? Math.abs(flip.change) * 100 : null;
-  const change = percent === null ? "" : `（${flip.change! > 0 ? "多" : "少"}${percent < 1 ? "不到 1%" : ` ${new Intl.NumberFormat("zh-TW", { maximumFractionDigits: 1 }).format(percent)}%`}）`;
+  const change = percent === null ? "" : `（${flip.change! > 0 ? "多" : "少"}${percent < 1 ? "不到 1%" : ` ${new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(percent)}%`}）`;
   const spread = spec.algorithms.find((item) => item.id === run.algorithm.id)?.inputs.find((input) => input.key === row?.key)?.spread;
   const whole = spread ? "（這一項的樂觀、一般、悲觀一起移）" : "";
   return `只改「${flip.input}」${whole}：從 ${fmt(flip.base)} ${unit} 變成大約 ${fmt(flip.at)} ${unit}${change}，結果就從「${flip.from}」變成「${flip.to}」。其他數字都不動。`;

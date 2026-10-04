@@ -117,6 +117,8 @@ describe("計算與模擬：送出去的內容", () => {
     expect(flipWords(npvRun("R1", 100, { flip: { input: YEARLY, base: 100, at: 100.4, from: "淨現值是 0 或更少", to: "淨現值大於 0", change: 0.004, each: [] } }), SPEC))
       .toBe(`只改「${YEARLY}」：從 100 元 變成大約 100.4 元（多不到 1%），結果就從「淨現值是 0 或更少」變成「淨現值大於 0」。其他數字都不動。`);
     expect(flipWords(npvRun("R1", 100, { flip: { input: YEARLY, base: 100, at: 98.7, from: "淨現值大於 0", to: "淨現值是 0 或更少", change: -0.013, each: [] } }), SPEC)).toContain("（少 1.3%）");
+    // Codex round-4 review F3: a whole percentage still shows its one decimal (the stored change is to 0.01%)
+    expect(flipWords(npvRun("R1", 100, { flip: { input: YEARLY, base: 100, at: 99, from: "淨現值大於 0", to: "淨現值是 0 或更少", change: -0.01, each: [] } }), SPEC)).toContain("（少 1.0%）");
     expect(flipWords({ ...SIMULATION, flip: { input: null, from: "一半以上", why: "結果離那條線太近。", each: [] } }, SPEC)).toBe("結果離那條線太近。");
     expect([fmt(0.00083447), fmt(1234.567), fmt(0), fmt(null)]).toEqual(["0.000834", "1,234.57", "0", "—"]);
   });

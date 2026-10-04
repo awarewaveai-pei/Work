@@ -33,7 +33,7 @@ READS = ("compute.run",)
 # financial forms in both scripts (with 叄), 廿卅卌 (and 卄), and the numerals fused with a measure word.
 NUMERAL_FORMS = ("〇零一二三四五六七八九十百千", "萬万億亿兆", "兩两", "壹貳贰參叁叄肆伍陸陆柒捌玖拾佰仟", "廿卄卅卌", "仨倆俩")
 NUMERAL = re.compile(r"[\d%‰半倍" + "".join(NUMERAL_FORMS) + "]")
-ROMAN = re.compile("[\u2160-\u2188]")   # checked before NFKC turns Ⅻ into letters
+ROMAN = re.compile("[\u2160-\u2188]|(?<![A-Za-z])(?=[IVXLCDM]{2,}(?![A-Za-z]))M{0,4}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})(?![A-Za-z])")   # Ⅻ before NFKC turns it into letters; and ASCII IV, XII (two or more capitals, a valid numeral)
 UNIT_AFTER = "年月週周天日季歲時分秒鐘倍成元塊千百%次趟件人" + NUMERAL_FORMS[1]
 IDIOMS = ("一個", "一起", "一般", "一定", "一樣", "萬一", "一些", "一點", "一直", "一下", "一種", "一次", "一邊", "一方面", "統一", "唯一", "一致",
           "進一步", "一旦", "一切", "一同", "單一", "同一", "不一", "每一", "任一", "另一", "其一", "之一", "一律", "一併", "一向", "一套", "一份",
@@ -77,7 +77,7 @@ NOT_MARKERS = (
 NOT_MARKER = re.compile("|".join(sorted(map(re.escape, NOT_MARKERS), key=len, reverse=True)))
 ENGLISH_MODALS = r"\b(?:will|shall|gonna|going to)\b|\bwon['’]t\b|['’]ll\b"
 ENGLISH_CERTAINTY = r"\b(?:certain to|bound to|sure to|destined|sure thing|guarantee[sd]?|certainly|surely)\b|\b(?:is|are|am|was|were|be|['’]re|['’]s) set to\b"
-ENGLISH_LIKELIHOOD = r"\b(?:(?:un)?likely|(?:im)?probabl[ey]|perhaps|maybe|possibly|expects? to)\b"
+ENGLISH_LIKELIHOOD = r"\b(?:(?:un)?likely|(?:im)?probabl[ey]|perhaps|maybe|possibly|expects? to|might|may|could|would)\b"   # might/may/could/would: how likely an outcome is
 ENGLISH_MARKER = re.compile("|".join((ENGLISH_MODALS, ENGLISH_CERTAINTY, ENGLISH_LIKELIHOOD)), re.IGNORECASE)
 ENGLISH_NOT_MARKERS = ("free will", "no guarantee", "not guaranteed", "make sure")
 ENGLISH_NOT_MARKER = re.compile(r"\b(?:" + "|".join(map(re.escape, ENGLISH_NOT_MARKERS)) + r")\b", re.IGNORECASE)
