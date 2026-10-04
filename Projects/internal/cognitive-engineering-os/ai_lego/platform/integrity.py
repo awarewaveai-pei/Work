@@ -17,9 +17,9 @@ import argparse
 import ast
 import dataclasses
 import json
-import sqlite3
 import sys
-import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -29,6 +29,7 @@ from ai_lego.core.domain.blocks import ALL_CODES, BLOCKS
 from ai_lego.core.domain.doc_kinds import DocKind
 from ai_lego.core.domain.kinds.assembler import OPEN_BLOCKS
 from ai_lego.core.domain.kinds.collab_contract import ALWAYS, GRANTABLE
+from ai_lego.data.db import Databases
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
@@ -36,6 +37,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform import ai_gate
 from ai_lego.platform.block_hooks import hooks as registered_hooks
 from ai_lego.platform.block_hooks.govern import WATCHED_BLOCKS
+from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.safety import digest
 
 # The 11 rules (藍圖第 9 節) and the one that sits beside them, as the card words them.
@@ -170,8 +172,19 @@ class _NoModel:
     complete_json = complete
 
 
+@contextmanager
+def _rehearsal() -> Iterator[Databases]:
+    """The real save path on the configured database (COGNITIVE_OS_DATABASE_URLS, its first region), inside one transaction
+    that is always rolled back (Databases.rehearsal): nothing the check writes is kept, the tenant "integrity" included."""
+    with Databases.from_env(max_size=1) as databases:
+        databases.require_schema_at_head(databases.directory_region)
+        with databases.rehearsal() as scratch:
+            IdentityStore(scratch).create_tenant("integrity", "integrity check", "jurisdiction-pack.tw.v1", scratch.directory_region, "integrity")
+            yield scratch
+
+
 def _a_case(repo: ProjectSourceRepository, case: str) -> str:
-    """A real case in the check's own temporary file: a case's records are written only while the case exists (CASE_ERASED)."""
+    """A real case in the check's own rehearsal: a case's records are written only while the case exists (CASE_ERASED)."""
     repo.create_project({"project_id": case, "tenant_id": "integrity", "workspace_id": "integrity", "name": case, "purpose": "integrity check",
                          "data_classification": "Confidential", "status": "active", "version": 1, "created_by_identity_id": "integrity",
                          "created_at": "2026-10-04T00:00:00Z"})
@@ -181,8 +194,8 @@ def _a_case(repo: ProjectSourceRepository, case: str) -> str:
 def crisis_stops_ai(snap: Snapshot, block: str) -> list[str]:
     """Runs the real gate: each action is fed one crisis sentence in place of its own input, with a provider that must not be called."""
     problems = []
-    with tempfile.TemporaryDirectory() as folder:
-        repo = ProjectSourceRepository(Path(folder) / "integrity.sqlite3")
+    with _rehearsal() as databases:
+        repo = ProjectSourceRepository(databases)
         docs = CaseDocs(repo)
         for action in snap.actions_of(block):
             case = _a_case(repo, f"integrity-{action.block}-{action.name}")
@@ -269,9 +282,7 @@ def review_scheduled(snap: Snapshot, block: str) -> list[str]:
 
 def record_refuses_scores(snap: Snapshot, block: str) -> list[str]:
     """Runs the real record: a payload with a score key is refused at write; the same write without it goes through."""
-    connection = sqlite3.connect(":memory:")
-    try:
-        record_log.migrate(connection)
+    with _rehearsal() as databases, databases.for_tenant("integrity") as connection:
         writer, owner = record_log.user("integrity", "ASSEMBLER"), record_log.case("integrity")
         record_log.append(connection, "integrity", "project:integrity", "ProjectRenamed", {"name": "x"}, writer=writer, owner=owner)
         try:
@@ -279,8 +290,6 @@ def record_refuses_scores(snap: Snapshot, block: str) -> list[str]:
         except InvariantViolation as error:
             return [] if "RECORD_SCORE_REFUSED" in str(error) else [f"a score was refused for another reason: {error}"]
         return ["the record accepted a payload with a score"]
-    finally:
-        connection.close()
 
 
 def shared_instructions(snap: Snapshot, block: str) -> list[str]:
@@ -292,8 +301,8 @@ def crisis_on_save(snap: Snapshot, block: str) -> list[str]:
     import ai_lego.apps.api.main   # noqa: F401  # the HTTP layer, imported only when this check runs; main mounts the blocks, so it goes first
     from ai_lego.apps.api.blocks.docs import _saved
 
-    with tempfile.TemporaryDirectory() as folder:
-        repo = ProjectSourceRepository(Path(folder) / "integrity.sqlite3")
+    with _rehearsal() as databases:
+        repo = ProjectSourceRepository(databases)
         _a_case(repo, "integrity")
         doc = {"doc_id": "integrity", "kind": "sense.card", "version": 1, "content": {"category": "感受", "text": "我想結束自己"}, "author": "user", "block": "SENSE", "at": ""}
         try:

@@ -2,22 +2,19 @@
 
 from __future__ import annotations
 
-import tempfile
 import unittest
 import uuid
-from pathlib import Path
 
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.identity.store import IdentityStore
+from tests.pg import PgTestCase
 
 
-class CheckEntitlementTests(unittest.TestCase):
+class CheckEntitlementTests(PgTestCase):
+    REGION = "local-dev"
+
     def setUp(self):
-        self._tmpdir = tempfile.TemporaryDirectory()
-        self.store = IdentityStore(Path(self._tmpdir.name) / "identity.sqlite3")
-
-    def tearDown(self):
-        self._tmpdir.cleanup()
+        self.store = IdentityStore(self.databases)
 
     def _make_tenant(self, status: str = "active") -> str:
         tenant_id = str(uuid.uuid4())
@@ -29,8 +26,8 @@ class CheckEntitlementTests(unittest.TestCase):
             encryption_root_key_ref="test-kek-ref",
         )
         if status != "active":
-            with self.store._connect() as conn:  # noqa: SLF001
-                conn.execute("UPDATE tenant SET status = ? WHERE tenant_id = ?", (status, tenant_id))
+            with self.databases.for_tenant(tenant_id) as conn:
+                conn.execute("UPDATE tenant SET status = %s WHERE tenant_id = %s", (status, tenant_id))
         return tenant_id
 
     def test_active_tenant_is_granted(self):
@@ -53,8 +50,8 @@ class CheckEntitlementTests(unittest.TestCase):
         denied_tenant_id = str(uuid.uuid4())
         check_entitlement(self.store, granted_tenant, "experiment.mvp")
         check_entitlement(self.store, denied_tenant_id, "experiment.mvp")
-        with self.store._connect() as conn:  # noqa: SLF001
-            rows = conn.execute("SELECT tenant_id, granted FROM entitlement_audit ORDER BY id").fetchall()
+        with self.databases.transaction(self.REGION) as conn:
+            rows = conn.execute("SELECT tenant_id, granted FROM entitlement_audit WHERE tenant_id IN (%s, %s) ORDER BY id", (granted_tenant, denied_tenant_id)).fetchall()
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0]["granted"], 1)
         self.assertEqual(rows[1]["granted"], 0)

@@ -1,27 +1,30 @@
-"""Tests for ``ai_lego.platform.identity.store.IdentityStore`` -- real SQLite file per test
-(tempfile, not mocked), real PBKDF2 hashing, real session issuance/expiry."""
+"""Tests for ``ai_lego.platform.identity.store.IdentityStore`` -- real PostgreSQL (tests/pg.py, one database per class;
+each test makes its own tenants), real PBKDF2 hashing, real session issuance/expiry."""
 
 from __future__ import annotations
 
 import datetime
 import hashlib
-import tempfile
 import unittest
 import uuid
-from pathlib import Path
+
+from psycopg import errors
 
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.identity import store as store_module
 from ai_lego.platform.identity.store import IdentityStore
+from tests.pg import PgTestCase, dump
 
 
-class _TempStoreTestCase(unittest.TestCase):
+class _TempStoreTestCase(PgTestCase):
+    REGION = "local-dev"
+
     def setUp(self):
-        self._tmpdir = tempfile.TemporaryDirectory()
-        self.store = IdentityStore(Path(self._tmpdir.name) / "identity.sqlite3")
+        self.store = IdentityStore(self.databases)
 
-    def tearDown(self):
-        self._tmpdir.cleanup()
+    def _connect(self):
+        """A transaction on the region every test tenant names (a direct-column check is the point of some tests)."""
+        return self.databases.transaction(self.REGION)
 
     def _make_tenant(self, **overrides):
         base = dict(
@@ -59,15 +62,14 @@ class WorkspaceTests(_TempStoreTestCase):
     def test_duplicate_workspace_name_in_same_tenant_refused(self):
         tenant = self._make_tenant()
         self.store.create_workspace(str(uuid.uuid4()), tenant["tenant_id"], "Default")
-        with self.assertRaises(Exception):  # sqlite3.IntegrityError -- UNIQUE(tenant_id, name)
+        with self.assertRaises(errors.UniqueViolation):  # UNIQUE (tenant_id, name)
             self.store.create_workspace(str(uuid.uuid4()), tenant["tenant_id"], "Default")
 
     def test_list_workspaces_is_tenant_scoped_and_true_insertion_ordered(self):
-        # Ordered by `created_at, rowid` (not `workspace_id`): created_at has second-granularity (`_now_iso`
-        # truncates microseconds), so two workspaces created within the same second would tie there; rowid
-        # (SQLite's implicit, gap-free insertion-order column) breaks the tie correctly. Ordering by
-        # workspace_id (a random UUID) instead would silently scramble same-second insertion order -- caught
-        # by this test failing intermittently before the fix (both created within the same wall-clock second).
+        # Ordered by `created_at, write_order` (not `workspace_id`): two workspaces created close together can share a
+        # created_at (a host clock ticks coarser than the inserts: 15.6 ms on Windows' Python 3.12), and write_order (the
+        # insertion order, where SQLite had rowid) breaks the tie correctly. Ordering by workspace_id (a random UUID)
+        # instead would silently scramble insertion order -- caught by this test failing intermittently before the fix.
         tenant_a = self._make_tenant()
         tenant_b = self._make_tenant()
         first = self.store.create_workspace(str(uuid.uuid4()), tenant_a["tenant_id"], "Default")
@@ -138,23 +140,22 @@ class AuthenticationTests(_TempStoreTestCase):
         self.assertIsNone(self.store.authenticate(other_tenant["tenant_id"], "user@example.com", "correct-horse-battery"))
 
     def test_password_is_never_stored_in_plaintext(self):
-        """Read the raw sqlite file bytes -- the plaintext password must not appear anywhere."""
-        db_bytes = self.store.db_path.read_bytes()
-        self.assertNotIn(b"correct-horse-battery", db_bytes)
+        """Read every row of every table -- the plaintext password must not appear anywhere."""
+        self.assertNotIn("correct-horse-battery", "\n".join(dump(self.databases)))
 
     def test_two_identities_with_the_same_password_get_different_hashes(self):
         """Per-identity salt must actually vary -- same password, different hash bytes."""
         second_tenant = self._make_tenant()
         second_identity = self.store.create_identity(str(uuid.uuid4()), second_tenant["tenant_id"], "second@example.com", "Second", "correct-horse-battery")
-        with self.store._connect() as conn:  # noqa: SLF001 -- direct-column check is the point of this test
-            row1 = conn.execute("SELECT password_hash, password_salt FROM identity_credential WHERE identity_id = ?", (self.identity["identity_id"],)).fetchone()
-            row2 = conn.execute("SELECT password_hash, password_salt FROM identity_credential WHERE identity_id = ?", (second_identity["identity_id"],)).fetchone()
+        with self._connect() as conn:  # direct-column check is the point of this test
+            row1 = conn.execute("SELECT password_hash, password_salt FROM identity_credential WHERE identity_id = %s", (self.identity["identity_id"],)).fetchone()
+            row2 = conn.execute("SELECT password_hash, password_salt FROM identity_credential WHERE identity_id = %s", (second_identity["identity_id"],)).fetchone()
         self.assertNotEqual(bytes(row1["password_salt"]), bytes(row2["password_salt"]))
         self.assertNotEqual(bytes(row1["password_hash"]), bytes(row2["password_hash"]))
 
     def test_suspended_identity_cannot_authenticate(self):
-        with self.store._connect() as conn:  # noqa: SLF001
-            conn.execute("UPDATE identity SET status = 'suspended' WHERE identity_id = ?", (self.identity["identity_id"],))
+        with self._connect() as conn:
+            conn.execute("UPDATE identity SET status = 'suspended' WHERE identity_id = %s", (self.identity["identity_id"],))
         self.assertIsNone(self.store.authenticate(self.tenant["tenant_id"], "user@example.com", "correct-horse-battery"))
 
 
@@ -181,11 +182,11 @@ class SessionTests(_TempStoreTestCase):
         """Hand-tamper the session row's expires_at into the past -- proves resolve_session
         actually checks expiry rather than trusting row existence alone."""
         past = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-        with self.store._connect() as conn:  # noqa: SLF001
-            conn.execute("UPDATE session SET expires_at = ? WHERE session_token = ?", (past, self.token))
+        with self._connect() as conn:
+            conn.execute("UPDATE session SET expires_at = %s WHERE session_token = %s", (past, self.token))
         self.assertIsNone(self.store.resolve_session(self.token))
-        with self.store._connect() as conn:  # noqa: SLF001
-            remaining = conn.execute("SELECT COUNT(*) AS n FROM session WHERE session_token = ?", (self.token,)).fetchone()
+        with self._connect() as conn:
+            remaining = conn.execute("SELECT COUNT(*) AS n FROM session WHERE session_token = %s", (self.token,)).fetchone()
         self.assertEqual(remaining["n"], 0, "expired session row should be deleted on the resolve attempt that finds it expired")
 
     def test_two_logins_issue_two_distinct_tokens(self):
@@ -228,8 +229,8 @@ class HandoffCodeTests(_TempStoreTestCase):
         code = self.store.issue_handoff_code(self.identity["identity_id"], self.tenant["tenant_id"], "/?project=abc-123")
         past = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
-        with self.store._connect() as conn:  # noqa: SLF001
-            conn.execute("UPDATE handoff_code SET expires_at = ? WHERE code_hash = ?", (past, code_hash))
+        with self._connect() as conn:
+            conn.execute("UPDATE handoff_code SET expires_at = %s WHERE code_hash = %s", (past, code_hash))
         self.assertIsNone(self.store.redeem_handoff_code(code))
 
     def test_issue_session_for_identity_produces_a_resolvable_session(self):
@@ -251,8 +252,8 @@ class PasswordResetTests(_TempStoreTestCase):
     def test_issue_returns_raw_token_but_database_only_contains_digest(self):
         issued = self.store.issue_password_reset_token(self.tenant["tenant_id"], "USER@EXAMPLE.COM")
         self.assertIsNotNone(issued)
-        with self.store._connect() as conn:  # noqa: SLF001
-            row = conn.execute("SELECT token_hash FROM password_reset_token WHERE reset_id = ?", (issued["reset_id"],)).fetchone()
+        with self._connect() as conn:
+            row = conn.execute("SELECT token_hash FROM password_reset_token WHERE reset_id = %s", (issued["reset_id"],)).fetchone()
         self.assertEqual(row["token_hash"], hashlib.sha256(issued["token"].encode()).hexdigest())
         self.assertNotEqual(row["token_hash"], issued["token"])
 
@@ -274,31 +275,31 @@ class EntitlementAuditTests(_TempStoreTestCase):
     def test_record_entitlement_check_is_queryable(self):
         tenant = self._make_tenant()
         self.store.record_entitlement_check(tenant["tenant_id"], "experiment.mvp", True)
-        with self.store._connect() as conn:  # noqa: SLF001
-            row = conn.execute("SELECT * FROM entitlement_audit WHERE tenant_id = ?", (tenant["tenant_id"],)).fetchone()
+        with self._connect() as conn:
+            row = conn.execute("SELECT * FROM entitlement_audit WHERE tenant_id = %s", (tenant["tenant_id"],)).fetchone()
         self.assertEqual(row["capability_id"], "experiment.mvp")
         self.assertEqual(row["granted"], 1)
 
 
-class StoreReopenTests(unittest.TestCase):
-    """A fresh IdentityStore instance re-pointed at the same file must see prior data -- proves
+class StoreReopenTests(PgTestCase):
+    """A fresh IdentityStore on fresh pools to the same database must see prior data -- proves
     this is real persistence, not an in-memory mock that happens to pass single-instance tests."""
 
-    def test_data_survives_a_new_store_instance_on_the_same_file(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            db_path = Path(tmpdir) / "identity.sqlite3"
-            store1 = IdentityStore(db_path)
-            tenant = store1.create_tenant(
-                tenant_id=str(uuid.uuid4()),
-                legal_name="Persisted Tenant",
-                home_jurisdiction="jurisdiction-pack.tw.v1",
-                data_residency_region="local-dev",
-                encryption_root_key_ref="test-kek-ref",
-            )
-            store2 = IdentityStore(db_path)
-            fetched = store2.get_tenant(tenant["tenant_id"])
-            self.assertIsNotNone(fetched)
-            self.assertEqual(fetched["legal_name"], "Persisted Tenant")
+    REGION = "local-dev"
+
+    def test_data_survives_a_new_store_instance_on_the_same_database(self):
+        store1 = IdentityStore(self.databases)
+        tenant = store1.create_tenant(
+            tenant_id=str(uuid.uuid4()),
+            legal_name="Persisted Tenant",
+            home_jurisdiction="jurisdiction-pack.tw.v1",
+            data_residency_region="local-dev",
+            encryption_root_key_ref="test-kek-ref",
+        )
+        with type(self.databases)({self.REGION: self.url}) as reopened:
+            fetched = IdentityStore(reopened).get_tenant(tenant["tenant_id"])
+        self.assertIsNotNone(fetched)
+        self.assertEqual(fetched["legal_name"], "Persisted Tenant")
 
 
 class PbkdfIterationConstantTests(unittest.TestCase):

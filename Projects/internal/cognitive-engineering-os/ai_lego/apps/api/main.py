@@ -29,9 +29,9 @@ COGNITIVE_OS_DEPLOYMENT_BLUEPRINT.md``. No billing, no multi-tenant isolation te
 (single tenant), no rate limiting beyond "must be authenticated" (tracked as a Phase 1 build
 task, not solved here -- see that blueprint's risk-classification.json entry).
 
-``get_store``/``get_catalog`` are real FastAPI dependencies (``Depends(...)``), not plain
-functions called from inside handlers -- this is what lets tests swap in a temp-file store via
-``app.dependency_overrides`` without touching the real ``.runtime/identity.sqlite3``. A handler
+``get_databases``/``get_store``/``get_catalog`` are real FastAPI dependencies (``Depends(...)``), not plain
+functions called from inside handlers -- this is what lets tests swap in their own PostgreSQL database via
+``app.dependency_overrides`` without touching the configured one (COGNITIVE_OS_DATABASE_URLS). A handler
 that called ``get_store()`` directly would silently bypass any override and hit the real DB even
 under test, which is exactly the bug this design avoids.
 """
@@ -46,7 +46,6 @@ import json
 import os
 import re
 import secrets
-import sqlite3
 import subprocess
 import sys
 import uuid
@@ -59,6 +58,7 @@ from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Requ
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from psycopg.errors import UniqueViolation
 from pydantic import BaseModel, ConfigDict, Field
 import yaml
 
@@ -84,6 +84,7 @@ from ai_lego.core.domain._intake_validation import require_text, require_uuid
 from ai_lego.core.domain.project import project_record
 from ai_lego.core.domain.source import OUTLINK_CHARS, OUTLINKS_ITEMS, TEXT_MEDIA_TYPES, source_record
 from ai_lego.core.domain.collection_run import MAX_FETCHES, MAX_SEEDS, collection_run_record
+from ai_lego.data.db import Databases
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
@@ -108,7 +109,6 @@ from ai_lego.modules.research.synthesis import run_synthesis, validate_subject
 from ai_lego.modules.research.report_render import render_research_report
 
 SESSION_COOKIE = "cognitive_os_session"
-DEFAULT_DB_PATH = PRODUCT_ROOT / ".runtime" / "identity.sqlite3"
 
 app = FastAPI(title="Cognitive OS API", version="0.1.0-phase1")
 
@@ -440,9 +440,22 @@ def _restore_api_result_context(record: dict[str, Any], tenant_id: str, run_id: 
     return _api_result_context(stored_context)
 
 
-def get_store() -> IdentityStore:
-    db_path = Path(os.environ.get("COGNITIVE_OS_DB_PATH", DEFAULT_DB_PATH))
-    return IdentityStore(db_path)
+@lru_cache(maxsize=1)
+def _process_databases() -> Databases:
+    """The process's pools, one per region of COGNITIVE_OS_DATABASE_URLS, built on first use. A region whose schema is not
+    at head stops it here (the engine never migrates by itself: docs/platform/STORAGE_SWITCH.md D2)."""
+    databases = Databases.from_env()
+    for region in databases.regions():
+        databases.require_schema_at_head(region)
+    return databases
+
+
+def get_databases() -> Databases:
+    return _process_databases()
+
+
+def get_store(databases: Databases = Depends(get_databases)) -> IdentityStore:
+    return IdentityStore(databases)
 
 
 def get_artifact_store() -> JsonArtifactStore:
@@ -452,8 +465,8 @@ def get_artifact_store() -> JsonArtifactStore:
     return JsonArtifactStore(TenantScopedCas(PRODUCT_ROOT / ".runtime" / "artifact-cas"))
 
 
-def get_project_source_repository() -> ProjectSourceRepository:
-    return ProjectSourceRepository(PRODUCT_ROOT / ".runtime" / "projects.sqlite3")
+def get_project_source_repository(databases: Databases = Depends(get_databases)) -> ProjectSourceRepository:
+    return ProjectSourceRepository(databases)
 
 
 def _safe_cost_twd(model: str, input_tokens: int, output_tokens: int) -> float | None:
@@ -1504,11 +1517,11 @@ MAX_SOURCE_CONTENT_BYTES = 5 * 1024 * 1024  # 5 MiB; Phase 1 Source Import is UT
 MAX_SOURCE_BRIEF_CHARS = MAX_BRIEF_CHARS
 
 
-def get_custom_workflow_repository() -> CustomWorkflowRepository:
-    """Own SQLite file, not ``projects.sqlite3`` -- a Custom Workflow is an ordered list of
+def get_custom_workflow_repository(databases: Databases = Depends(get_databases)) -> CustomWorkflowRepository:
+    """Own repository and table, not the Project/Source one -- a Custom Workflow is an ordered list of
     method_ids the tenant picked, not a Project/Source aggregate; see
     ``ai_lego/core/domain/custom_workflow.py`` for the full separation rationale."""
-    return CustomWorkflowRepository(PRODUCT_ROOT / ".runtime" / "custom_workflows.sqlite3")
+    return CustomWorkflowRepository(databases)
 
 
 @app.post("/auth/handoff/mint")
@@ -2295,7 +2308,7 @@ class _MeteredProvider:
         self.input_tokens += input_tokens   # every call made is recorded, an unbilled failure as a 0-token call
         self.output_tokens += output_tokens
         try:
-            self._store.settle_ai_usage(usage_id, model, input_tokens, output_tokens)
+            self._store.settle_ai_usage(self._session["tenant_id"], usage_id, model, input_tokens, output_tokens)
         except Exception as failure:   # the row stays reserved at its worst case: the budget never loses the bill
             raise InvariantViolation("AI_USAGE_RECORD_FAILED") from failure
 
@@ -2654,9 +2667,9 @@ def create_project(
         return repo.create_project(record)
     except InvariantViolation as error:
         raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
-    except sqlite3.IntegrityError as error:
-        # platform_projects has UNIQUE(tenant_id, workspace_id, name) -- a double-submit or client retry
-        # after a timeout hits this, not a programming error; answer a clean 409, not a raw 500.
+    except UniqueViolation as error:
+        # platform_projects has UNIQUE (tenant_id, workspace_id, created_by_identity_id, name) -- a double-submit or
+        # client retry after a timeout hits this, not a programming error; answer a clean 409, not a raw 500.
         raise HTTPException(status_code=409, detail=f"PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE: {payload.name!r}") from error
 
 
@@ -2744,7 +2757,7 @@ def rename_project(
         project = repo.rename_project(tenant_id, project_id, name, session["identity_id"])
     except InvariantViolation as error:
         raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
-    except sqlite3.IntegrityError as error:
+    except UniqueViolation as error:
         raise HTTPException(status_code=409, detail=f"PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE: {payload.name!r}") from error
     return _project_with_activity(project, _analyses(repo, tenant_id, project_id), repo.last_activity(tenant_id, project_id), repo.tasks(tenant_id, project_id), repo.reruns(tenant_id, project_id))
 
@@ -3528,7 +3541,7 @@ def create_custom_workflow(
         return repo.create(record)
     except InvariantViolation as error:
         raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
-    except sqlite3.IntegrityError as error:
+    except UniqueViolation as error:
         # workflow_id is a fresh uuid4() (line above), so this is only reachable via an
         # astronomically unlikely UUID collision -- caught anyway to match the sibling
         # create_project/create_source convention (critic finding 2026-09-18: a raw 500 here

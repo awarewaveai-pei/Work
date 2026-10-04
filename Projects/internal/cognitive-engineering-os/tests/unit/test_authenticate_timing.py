@@ -14,7 +14,7 @@ them, showed all three paths doing exactly one hash at the same iteration count)
 * the two paths are sampled **interleaved and order-balanced** (A,B then B,A), so drift and any
   second-call cache advantage hit both paths equally instead of one of them;
 * the statistic is the **median**, which a single GC pause or preemption cannot move;
-* one warm-up call per path is discarded (first call also pays sqlite open + page cache).
+* one warm-up call per path is discarded (first call also pays the pool's connection + the server's cache).
 
 The thresholds below are deliberately unchanged from the version that caught the original bug --
 widening them to make a red test go green would silence the detector, which is the failure mode
@@ -28,13 +28,12 @@ being statistically meaningful.
 from __future__ import annotations
 
 import statistics
-import tempfile
 import time
 import unittest
 import uuid
-from pathlib import Path
 
 from ai_lego.platform.identity.store import IdentityStore
+from tests.pg import PgTestCase
 
 PAIRS = 12
 # Generous tolerance -- this is a regression guard against a ~730x/182ms gap, not a precise
@@ -44,10 +43,11 @@ MAX_ACCEPTABLE_RATIO = 3.0
 MAX_ACCEPTABLE_ABSOLUTE_DELTA_SECONDS = 0.06
 
 
-class AuthenticateTimingTests(unittest.TestCase):
+class AuthenticateTimingTests(PgTestCase):
+    REGION = "local-dev"
+
     def setUp(self):
-        self._tmpdir = tempfile.TemporaryDirectory()
-        self.store = IdentityStore(Path(self._tmpdir.name) / "identity.sqlite3")
+        self.store = IdentityStore(self.databases)
         self.tenant_id = str(uuid.uuid4())
         self.store.create_tenant(
             tenant_id=self.tenant_id,
@@ -57,9 +57,6 @@ class AuthenticateTimingTests(unittest.TestCase):
             encryption_root_key_ref="test-kek-ref",
         )
         self.store.create_identity(str(uuid.uuid4()), self.tenant_id, "real@example.com", "Real User", "correct-horse-battery")
-
-    def tearDown(self):
-        self._tmpdir.cleanup()
 
     def _time_one(self, email: str, password: str) -> float:
         start = time.perf_counter()
@@ -109,11 +106,11 @@ class AuthenticateTimingTests(unittest.TestCase):
         self._assert_comparable("nonexistent-email", nonexistent, wrong_password, check_absolute=True)
 
     def test_suspended_identity_and_wrong_password_take_comparable_time(self):
-        with self.store._connect() as conn:  # noqa: SLF001
-            row = conn.execute("SELECT identity_id FROM identity WHERE email = ?", ("real@example.com",)).fetchone()
+        with self.databases.for_tenant(self.tenant_id) as conn:
+            row = conn.execute("SELECT identity_id FROM identity WHERE tenant_id = %s AND email = %s", (self.tenant_id, "real@example.com")).fetchone()
             second_id = str(uuid.uuid4())
             conn.execute(
-                "INSERT INTO identity (identity_id, tenant_id, email, display_name, status, created_at) SELECT ?, tenant_id, 'suspended@example.com', display_name, 'suspended', created_at FROM identity WHERE identity_id = ?",
+                "INSERT INTO identity (identity_id, tenant_id, email, display_name, status, created_at) SELECT %s, tenant_id, 'suspended@example.com', display_name, 'suspended', created_at FROM identity WHERE identity_id = %s",
                 (second_id, row["identity_id"]),
             )
 

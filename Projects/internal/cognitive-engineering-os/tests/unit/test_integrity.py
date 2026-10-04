@@ -8,6 +8,7 @@ import contextlib
 import dataclasses
 import io
 import json
+import os
 import re
 import subprocess
 import sys
@@ -20,9 +21,21 @@ from ai_lego.data.events import record_log
 from ai_lego.platform import ai_gate, integrity, safety
 from ai_lego.platform.ai_gate import AiAction
 from ai_lego.platform.integrity import CHECKS, PLATFORM, RULES, Snapshot
+from tests import pg
 
 PAGE = PRODUCT_ROOT.parents[2] / "agency-os" / "handoffs" / "2026-10-02-cognitive-sovereignty-platform" / "platform-supervisor.html"
 PAGE_OWNER_CODE = {"組裝器": "ASSEMBLER", "協作合約": "COLLAB_CONTRACT", "規範與脈絡": "CONTEXT", "完整性核心": "INTEGRITY", "共用紀錄": "RECORD"}
+
+
+def setUpModule() -> None:
+    """The checks that run the real save path do it in a rehearsal on the configured database (integrity._rehearsal): here a
+    migrated test database of its own, named in COGNITIVE_OS_DATABASE_URLS for this module and the command it starts."""
+    server = pg.server()
+    database = server.create_database()
+    unittest.addModuleCleanup(server.drop_database, database)
+    environment = mock.patch.dict(os.environ, {pg.DATABASE_URLS_ENV: f"integrity={pg.as_url(server.url(database))}"})
+    environment.start()
+    unittest.addModuleCleanup(environment.stop)
 
 
 def mine(type_: str = "text", **options) -> Field:
@@ -374,6 +387,17 @@ class TheCopiedTablesMatchThePage(unittest.TestCase):
         self.assertEqual(integrity.DRAWER_READS, reads)
         limits = source[source.index("const DRAWER_LIMIT = {"):]
         self.assertIn('"DECIDE:sense":"只讀情緒強度，不讀卡片內容"', limits[:limits.index("};")])
+
+
+class TheRehearsalKeepsNothing(unittest.TestCase):
+    def test_the_checks_that_save_leave_no_row_behind(self):
+        """crisis_on_save and the others write a tenant, a case and its records for real, then roll it all back."""
+        self.assertEqual(integrity.crisis_on_save(Snapshot.live(), PLATFORM), [])
+        self.assertEqual(integrity.record_refuses_scores(Snapshot.live(), PLATFORM), [])
+        with pg.Databases.from_env() as databases, databases.transaction(databases.directory_region) as connection:
+            tables = [row[0] for row in connection.execute("SELECT tablename FROM pg_tables WHERE schemaname = current_schema() AND tablename <> 'alembic_version'")]
+            left = {table: connection.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0] for table in tables}
+        self.assertEqual({table: count for table, count in left.items() if count}, {})
 
 
 class TheCommand(unittest.TestCase):
