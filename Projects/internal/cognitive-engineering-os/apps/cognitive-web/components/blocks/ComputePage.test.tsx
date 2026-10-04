@@ -160,6 +160,19 @@ describe("計算與模擬：頁面", () => {
     await done();
   });
 
+  it("draws every AI explanation beside the system's own 模擬不是預測 line -- on a plain run, a rerun and an adopted run", async () => {
+    // No word filter stops every forecast (STEP2_CHECKLIST KNOWN LIMIT); this line is the guarantee, so no explanation may render without it.
+    const explanation = (run: string) => ({ doc_id: `E-${run}`, kind: "compute.explanation", version: 1, author: "ai", block: "COMPUTE", at: "",
+      content: { run, points: [{ part: "推論", text: "悲觀情境下淨現值是負的。" }], influential: YEARLY, rests_on: [YEARLY] } });
+    const runs = [npvRun("R1", 30000), npvRun("R2", 20000, { rerun_of: "R1" }), npvRun("R3", 25000, { adopt: { adopt: "採用", reason: "數字有出處" } })];
+    server(runs, {}, { "compute.explanation": runs.map((run) => explanation(run.run_id)) });
+    const { host, done } = await mount(<ComputePage projectId="P1" />);
+    const boxes = [...host.querySelectorAll(".finding")].filter((node) => node.textContent?.includes("AI 認為最影響結果的"));
+    expect(boxes).toHaveLength(3);
+    for (const box of boxes) expect(box.textContent).toContain("模擬不是預測，計算也不是：算出來的不等於會發生。");
+    await done();
+  });
+
   it("shows the AI's hand-back, goes on only when you press 仍然繼續, and says 模擬不是預測 beside every explanation", async () => {
     const explained = { doc_id: "E1", kind: "compute.explanation", version: 1, author: "ai", block: "COMPUTE", at: "",
       content: { run: "R9", points: [{ part: "推論", text: "悲觀情境下淨現值是負的。" }], influential: YEARLY, rests_on: [YEARLY] } };

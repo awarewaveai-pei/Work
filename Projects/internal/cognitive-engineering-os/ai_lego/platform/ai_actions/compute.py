@@ -45,12 +45,15 @@ ENGLISH_NUMBER = re.compile(r"\b(?:zero|one|two|three|four|five|six|seven|eight|
                             r"ninetieth|hundredth|thousandth|millionth)s?)\b", re.IGNORECASE)
 ENGLISH_IDIOM = re.compile(r"\b(?:no one|one of|one another|the one|each one|one at a time|double[- ]check|at first|first of all)\b", re.IGNORECASE)
 
-# 模擬不是預測 is an allow list too. Outcome verbs (虧、賺、回本、撐不下去…) are an open class, so a list of forecasts leaks
-# forever; the claim that something will happen or is certain rides a closed class: 會、將、一定、必然、必定、肯定、勢必、
-# 保證、註定 and will / 'll / shall / won't / gonna / going to / certain to / bound to / guarantee. Any of them is refused unless
-# it sits inside one of these words, where it is not a future or certainty marker. A refusal costs one retry; the AI can
-# always say what the calculation shows without one (「悲觀情境下的計算結果低於打平」).
-MARKER = re.compile(r"[會將]|一定|必然|必定|肯定|勢必|保證|註定|注定")
+# 模擬不是預測: no filter can stop every forecast in free prose (「下個月就回本」 carries none of these words). The guarantee
+# is the frame -- the page shows the system's own 「模擬不是預測，計算也不是」 beside every explanation; this guard is a
+# best effort on top of it. It refuses three groups of markers -- the future (會、將…), certainty (穩、鐵定、必…) and
+# likelihood (很可能、大概率…) -- unless the marker sits inside a fixed word where it claims nothing (機會、穩定、必要…).
+# A refusal costs one retry; the AI can say what the calculation shows without one (「悲觀情境下的計算結果低於打平」).
+MODALS = r"[會將]|一定|肯定|勢必|保證|註定|注定"
+CERTAINTY = r"穩|鐵定|必|絕對|準|包|保本|保賺|確定"
+LIKELIHOOD = r"很可能|大概率|多半"   # 八成 is refused as a number first, 應該會 by its 會
+MARKER = re.compile("|".join((MODALS, CERTAINTY, LIKELIHOOD)))
 NOT_MARKERS = (
     # 會 as meeting, body, occasion or understanding
     "機會", "社會", "會議", "會計", "協會", "學會", "公會", "工會", "委員會", "會員", "體會", "誤會", "理會", "開會", "聚會", "約會", "會談",
@@ -59,12 +62,20 @@ NOT_MARKERS = (
     "將近", "將軍", "將就", "將來",
     # a certainty word negated says it is not certain; 一定程度 is "to some extent"
     "不一定", "不一定會", "不等於一定會", "不代表一定會", "不代表會", "不保證", "無法保證", "不能保證", "沒有保證", "不必然", "不肯定", "一定程度",
+    # 穩 as stable or prudent, 必 as necessary or needless, 準 as accurate, standard or ready, 包 as including, 絕對 as an
+    # absolute value; 確定 and 保本 negated
+    "穩定", "不穩", "穩健", "必要", "必須", "必需", "不必", "未必", "何必", "準確", "標準", "準備", "水準", "基準", "精準", "準則", "不準", "批准",
+    "包括", "包含", "外包", "打包", "絕對值", "不確定", "無法確定", "不保本",
 )
 NOT_MARKER = re.compile("|".join(sorted(map(re.escape, NOT_MARKERS), key=len, reverse=True)))
-ENGLISH_MARKER = re.compile(r"\b(?:will|shall|gonna|going to|certain to|bound to|guarantee[sd]?|certainly|surely)\b|\bwon['’]t\b|['’]ll\b", re.IGNORECASE)
-ENGLISH_NOT_MARKERS = ("free will", "no guarantee", "not guaranteed")
+ENGLISH_MODALS = r"\b(?:will|shall|gonna|going to)\b|\bwon['’]t\b|['’]ll\b"
+ENGLISH_CERTAINTY = r"\b(?:certain to|bound to|sure to|destined|sure thing|guarantee[sd]?|certainly|surely)\b|\b(?:is|are|am|was|were|be|['’]re|['’]s) set to\b"
+ENGLISH_LIKELIHOOD = r"\b(?:likely to|most likely|probably|expects? to)\b"
+ENGLISH_MARKER = re.compile("|".join((ENGLISH_MODALS, ENGLISH_CERTAINTY, ENGLISH_LIKELIHOOD)), re.IGNORECASE)
+ENGLISH_NOT_MARKERS = ("free will", "no guarantee", "not guaranteed", "make sure")
 ENGLISH_NOT_MARKER = re.compile(r"\b(?:" + "|".join(map(re.escape, ENGLISH_NOT_MARKERS)) + r")\b", re.IGNORECASE)
-# The words for predicting itself (calling the result a prediction), a closed class too, and their negations.
+MARKER_WORDS = "會、將、一定、肯定、勢必、保證、穩、鐵定、必、絕對、準、包賺、確定、很可能、大概率、多半 or will, 'll, going to, sure to, set to, likely to, probably"   # told to the model
+# The words for predicting itself (calling the result a prediction), and their negations.
 PREDICTION_WORDS = ("預測", "預計", "預估", "估計", "預期", "predict", "forecast", "foresee", "expected to")
 NOT_PREDICTION_WORDS = ("不是預測", "不等於預測", "不是在預測", "不能當成預測", "並不是預測", "無法預測", "不能預測", "沒辦法預測", "你的估計", "你估計的",
                         "自己估計", "not a prediction", "not a forecast", "cannot predict", "can't predict", "does not predict")
@@ -116,8 +127,8 @@ SUGGEST = (
     "- Never write a number, an amount, a percentage or a range: the person picks every number and where it comes from; "
     "the system computes.\n"
     "- This is a suggestion, not the one right method; when several fit, say what each would show.\n"
-    "- A calculation or simulation is not a prediction: never say what will happen. Do not use 會、將、一定、必然、肯定、勢必、"
-    "保證 or will / 'll / going to about any outcome; say what a calculation would show."
+    "- A calculation or simulation is not a prediction: never say what will happen, how sure or how likely it is. Do not use "
+    f"{MARKER_WORDS} about any outcome; say what a calculation would show."
 )
 SUGGEST_SCHEMA = {
     "type": "object",
@@ -167,9 +178,8 @@ EXPLAIN = (
     "- Never write a number, an amount, a percentage or a ratio: refer to inputs and results by name; the page shows "
     "every number beside your words.\n"
     f"- A calculation or a simulation is not a prediction ({NOT_PREDICTION}): a pessimistic scenario that loses money "
-    "does not mean the person will lose money. Never say what will happen and never call a result certain: do not use "
-    "會、將、一定、必然、肯定、勢必、保證 or will / 'll / going to about any outcome; say what the calculation shows "
-    "(「悲觀情境下的計算結果低於打平」).\n"
+    "does not mean the person will lose money. Never say what will happen, how sure or how likely it is: do not use "
+    f"{MARKER_WORDS} about any outcome; say what the calculation shows (「悲觀情境下的計算結果低於打平」).\n"
     "- Say which numbers are the person's own (no outside source) and which have few independent origins; the result "
     "is no surer than its least-sourced number. Never present the result as objective truth or as a recommendation."
 )

@@ -154,6 +154,20 @@ function RunSummary({ run, spec }: { run: Run; spec: Spec }) {
   );
 }
 
+/** The one place an AI explanation is drawn. No word filter stops every forecast, so the system's own line always sits
+ *  beside the AI's words -- the guarantee the AI guard only backs up. */
+function ExplanationBox({ doc, spec }: { doc: Doc<Explanation>; spec: Spec }) {
+  return (
+    <div className="finding">
+      <span className="tags"><span>{AUTHOR[doc.author]}</span></span>
+      <ul>{doc.content.points.map((point, index) => <li key={index}><span className="tag">{point.part}</span> {point.text}</li>)}</ul>
+      <p><b>AI 認為最影響結果的：</b>「{doc.content.influential}」</p>
+      <p className="hint">這個解釋靠的數字：{doc.content.rests_on.map((name) => `「${name}」`).join("、")}。數字都是系統算的，AI 沒有寫數字。</p>
+      <p className="warn">{spec.not_prediction}，計算也不是：算出來的不等於會發生。</p>
+    </div>
+  );
+}
+
 export function ComputePage({ projectId }: { projectId: string }) {
   const [spec, setSpec] = useState<Spec | null>(null);
   const [origins, setOrigins] = useState<Origin[]>([]);
@@ -337,15 +351,7 @@ export function ComputePage({ projectId }: { projectId: string }) {
                 <div className="finding warn" role="status"><b>AI 先停下來</b>{handback[run.run_id]}
                   <div className="btns mt8"><button className="btn" type="button" disabled={busy} onClick={() => explain(run, true)}>仍然繼續</button></div></div>
               )}
-              {explained && (
-                <div className="finding">
-                  <span className="tags"><span>{AUTHOR[explained.author]}</span></span>
-                  <ul>{explained.content.points.map((point, index) => <li key={index}><span className="tag">{point.part}</span> {point.text}</li>)}</ul>
-                  <p><b>AI 認為最影響結果的：</b>「{explained.content.influential}」</p>
-                  <p className="hint">這個解釋靠的數字：{explained.content.rests_on.map((name) => `「${name}」`).join("、")}。數字都是系統算的，AI 沒有寫數字。</p>
-                  <p className="warn">{spec.not_prediction}，計算也不是：算出來的不等於會發生。</p>
-                </div>
-              )}
+              {explained && <ExplanationBox doc={explained} spec={spec} />}
               {run.adopt && !choice
                 ? <p><b>你{run.adopt.adopt}：</b>{run.adopt.reason} <button className="btn ghost" type="button" onClick={() => setAdopting({ ...adopting, [run.run_id]: { ...run.adopt! } })}>改</button></p>
                 : (

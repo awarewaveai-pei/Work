@@ -547,10 +547,17 @@ WRITES_A_NUMBER = ["大約第七年才回本。", "五年後淨現值轉正。",
                    "大概一半的機會。", "差了好幾萬", "兩倍", "八成", "第二年", "每年四次", "十分鐘後", "淨現值大約是 3 萬", "報酬大概 15%", "Ⅻ", "①", "５", "壹萬",
                    "廿年後", "卅年", "卌", "about ten percent lower", "roughly five million", "IRR is twenty", "half of it", "double the rent", "the first year",
                    "a third of it", "the fifth scenario", "two fifths of the income"]
-# critic M2 round 2: the outcome verb is open-ended, the future marker is not
+# the future markers (critic M2 round 2)
 FORECASTS = ["悲觀情境下你會虧錢。", "這樣做會賺。", "you'll lose money", "it'll pay off", "你會虧", "這個結果很可能會發生", "未來會虧", "估計會虧損", "預估明年會賺",
              "預計會賺", "將會虧本", "依這個結果預測你會賺。", "這樣一定會賺。", "保證回本", "撐得下去是必然的", "you won't lose", "it is bound to work", "will lose money",
              "you are going to profit", "I foresee a loss"]
+# critic M2 round 3: certainty and likelihood
+CERTAINTY_LINES = ["穩賺。", "穩穩回本。", "穩了。", "保本沒問題。", "包賺不賠。", "鐵定虧。", "準虧。", "必虧無疑。", "絕對划算。", "結果是確定的。",
+                   "you're set to lose", "it is sure to pay back", "you're destined to lose", "this is a sure thing", "it is guaranteed to work"]
+LIKELIHOOD_LINES = ["很可能虧損。", "大概率虧損。", "多半虧損。", "應該會回本。", "you're likely to lose money", "expect to lose", "this probably pays off"]
+# KNOWN LIMIT (STEP2_CHECKLIST, COMPUTE): a forecast with no listed marker -- a time word, 就 and the outcome -- is still saved;
+# the page's 「模擬不是預測，計算也不是」 beside every explanation is the backstop. A change that catches these updates the doc.
+KNOWN_LIMIT_LINES = ["下個月就回本。", "明年就回本了。", "這樣就虧了。", "this pays off next year"]
 PLAIN = ["悲觀情境下淨現值是負的，主要因為每年的淨收入比較低。", "模擬不是預測，悲觀情境不一定會發生；千萬不要只看一個數。", "這一項是你自己估的，還沒有外部出處。",
          "一般情境和樂觀情境落在同一邊，只有悲觀情境不一樣。", "這個結果不保證發生，也無法預測未來。", "每一項各抽各的，假設它們不會一起變好或變壞。",
          "一半以上的模擬達到你要的最低結果。", "十分依賴每年的淨收入這一個數字。", "悲觀情境下的計算結果低於打平。",
@@ -558,18 +565,36 @@ PLAIN = ["悲觀情境下淨現值是負的，主要因為每年的淨收入比�
 # the allow-listed modal words in sentences an explanation could really say
 MODAL_WORDS_IN_USE = ["這個數字還有機會找到別的出處。", "會計上怎麼記，要問專業的人。", "工會或公會的公告，可以當成來源卡。", "社會上的看法，屬於價值選擇。",
                       "將來每年的淨收入，是你自己估的。", "在一定程度上，結果取決於每年的淨收入。", "如果有誤會，可以改輸入再算。", "開會之前可以先並排比。",
-                      "悲觀情境不代表一定會發生。", "free will is not part of this calculation", "there is no guarantee here"]
+                      "悲觀情境不代表一定會發生。", "free will is not part of this calculation", "there is no guarantee here",
+                      "這個數字的來源很穩定。", "必要的話，可以再找一個出處。", "標準的做法是先用定存利率。", "這包括每年的成本。", "結果的不確定性來自每年的淨收入。",
+                      "絕對值越大，影響越大。", "這個方案不保本。", "說不準落在哪一邊。", "make sure the numbers are yours"]
 
 
 class AnswerWordsTests(unittest.TestCase):
-    def test_every_way_of_writing_a_number_is_refused(self):
+    def test_the_written_numbers_corpus_is_refused(self):
         for text in WRITES_A_NUMBER:
             with self.subTest(text=text), self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_HAS_NUMBER"):
                 compute_ai._guard_words([text], compute_ai._names())
 
-    def test_every_way_of_saying_what_will_happen_is_refused(self):
+    def test_the_listed_future_markers_are_refused(self):
         for text in FORECASTS:
             with self.subTest(text=text), self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_CALLS_IT_PREDICTION"):
+                compute_ai._guard_words([text], compute_ai._names())
+
+    def test_the_listed_certainty_markers_are_refused(self):
+        for text in CERTAINTY_LINES:
+            with self.subTest(text=text), self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_CALLS_IT_PREDICTION"):
+                compute_ai._guard_words([text], compute_ai._names())
+
+    def test_the_listed_likelihood_markers_are_refused(self):
+        for text in LIKELIHOOD_LINES:
+            with self.subTest(text=text), self.assertRaisesRegex(InvariantViolation, "AI_ANSWER_CALLS_IT_PREDICTION"):
+                compute_ai._guard_words([text], compute_ai._names())
+
+    def test_a_forecast_with_no_listed_marker_is_the_documented_known_limit(self):
+        """Not refused, on purpose of the record: the guard is best effort; the page line is the guarantee."""
+        for text in KNOWN_LIMIT_LINES:
+            with self.subTest(text=text):
                 compute_ai._guard_words([text], compute_ai._names())
 
     def test_plain_sentences_and_their_negations_pass(self):
@@ -582,7 +607,10 @@ class AnswerWordsTests(unittest.TestCase):
         adding one to the code without deciding it here fails the comparison."""
         allowed = ("機會", "社會", "會議", "會計", "協會", "學會", "公會", "工會", "委員會", "會員", "體會", "誤會", "理會", "開會", "聚會", "約會", "會談",
                    "會面", "會合", "會場", "會長", "研討會", "大會", "國會", "議會", "領會", "將近", "將軍", "將就", "將來", "不一定", "不一定會", "不等於一定會",
-                   "不代表一定會", "不代表會", "不保證", "無法保證", "不能保證", "沒有保證", "不必然", "不肯定", "一定程度", "free will", "no guarantee", "not guaranteed")
+                   "不代表一定會", "不代表會", "不保證", "無法保證", "不能保證", "沒有保證", "不必然", "不肯定", "一定程度",
+                   "穩定", "不穩", "穩健", "必要", "必須", "必需", "不必", "未必", "何必", "準確", "標準", "準備", "水準", "基準", "精準", "準則", "不準", "批准",
+                   "包括", "包含", "外包", "打包", "絕對值", "不確定", "無法確定", "不保本",
+                   "free will", "no guarantee", "not guaranteed", "make sure")
         self.assertEqual(set(allowed), set(compute_ai.NOT_MARKERS + compute_ai.ENGLISH_NOT_MARKERS))
         for word in allowed:
             with self.subTest(word=word):
