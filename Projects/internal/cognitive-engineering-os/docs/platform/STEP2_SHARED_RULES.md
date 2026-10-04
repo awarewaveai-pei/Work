@@ -31,7 +31,7 @@ file S owns.
 
 | Kind | Author | Holds |
 |---|---|---|
-| `gather.source` | system | one source card per stored source (or per page set aside with no text): `source_id`, `url`, `title`, `found_by`, `cells` (keys `CARD_CELLS`, each `cell()`), `lists`, `snapshot`, `aside`, `rules` |
+| `gather.source` | system | one source card per stored source (or per page set aside with no text): `source_id`, `url`, `title`, `found_by`, `cells` (keys `CARD_CELLS`, each `cell()`), `lists`, `snapshot`, `archived` (the web archive's first capture, absent = none), `aside`, `rules` |
 | `gather.origins` | system | the grouping: `groups` = [{cards, how}] checked with `grouping_errors` before saving; every version stays. No ids: an origin's id is computed from its cards |
 | `gather.split` | person | cards the person takes out of a group into their own origin, with a reason |
 | `gather.takeback` | person | a set-aside page taken back |

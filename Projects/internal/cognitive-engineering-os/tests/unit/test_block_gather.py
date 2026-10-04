@@ -171,7 +171,7 @@ class CardTests(GatherCase):
         cells = card["content"]["cells"]
         self.assertEqual(card["content"]["found_by"], {"by": "我貼的"})
         self.assertEqual((cells["registered"]["state"], cells["first_seen"]["state"], cells["outlet_exists"]["state"]), ("無法檢查", "無法檢查", "無法檢查"))
-        self.assertEqual((cells["operator"]["state"], cells["operator"]["value"]), ("查到", "© 2024 某產業公會 版權所有"))
+        self.assertEqual(cells["operator"], {"state": "查不到", "why": "頁尾只有版權字樣（© 2024 某產業公會 版權所有），沒有寫誰經營；版權所有人不一定是經營者"})
         self.assertEqual(self.collect.calls, [])   # no address: collect is not asked
 
     def test_a_url_the_person_pasted_is_marked_mine(self):
@@ -318,6 +318,7 @@ class GroupingTests(GatherCase):
         self.collected("https://a.example.com/1", base, published_at="2026-01-01")
         self.collected("https://b.example.org/2", base[:380] + zh(11, 20), published_at="2026-01-05")
         self.collected("https://c.example.net/3", zh(12))
+        self.collect.captures.update({"https://a.example.com/1": "2026-01-02", "https://b.example.org/2": "2026-01-06"})   # who came first is the archive's
         self.arrive()
         a, b, c = (self.card(url)["doc_id"] for url in ("https://a.example.com/1", "https://b.example.org/2", "https://c.example.net/3"))
         self.assertEqual(self.grouping(), {frozenset({a, b}): "同一篇", frozenset({c}): "單獨"})
@@ -342,13 +343,14 @@ class GroupingTests(GatherCase):
 
     def test_sites_that_only_cite_each_other_are_one_origin_even_when_another_page_cites_them(self):
         self.collected("https://a.example.com/1", zh(40), outlinks=["b.example.net", "c.example.org"])
-        self.collected("https://b.example.net/2", zh(41), outlinks=["a.example.com"])
+        self.collected("https://b.example.net/2", zh(41), outlinks=["a.example.com", "c.example.org"])
         self.collected("https://c.example.org/3", zh(42), outlinks=["www.a.example.com", "b.example.net"])
         self.collected("https://d.example.info/4", zh(43), outlinks=["a.example.com", "wikipedia.org"])
         self.arrive()
         a, b, c, d = (self.card(url)["doc_id"] for url in ("https://a.example.com/1", "https://b.example.net/2", "https://c.example.org/3", "https://d.example.info/4"))
         self.assertEqual(self.grouping(), {frozenset({a, b, c}): "只互相引用", frozenset({d}): "單獨"})
-        self.assertEqual(self.cell("https://a.example.com/1", "original")["value"], "只互相引用，沒有別的依據")
+        # F6: not enough to say who copied whom is never a found value
+        self.assertEqual(self.cell("https://a.example.com/1", "original"), {"state": "查不到", "why": "只互相引用，沒有別的依據，看不出誰轉貼誰"})
 
     def test_the_grouping_rule_is_shown_with_its_version(self):
         overview = self.client.get(f"{self.base}/gather").json()
@@ -594,13 +596,13 @@ class RoundTwoTests(GatherCase):
         self.assertEqual(self.cell("https://news.example.com/d", "outlet_exists")["why"], "名字像媒體，但不在已知媒體名單上；系統沒辦法查它存不存在")
         self.assertEqual(self.cell("https://shop.example.com/e", "outlet_exists"), {"state": "查不到", "why": "名字不像媒體"})
 
-    def test_who_runs_a_site_is_read_only_from_the_pages_footer_and_said_as_a_copyright_line(self):
-        """M2: a photo credit high up the page is not the operator."""
+    def test_a_copyright_line_is_read_only_from_the_pages_footer(self):
+        """M2: a photo credit high up the page is not the site's copyright line (F2: neither says who runs the site)."""
         self.collected("https://a.example.com/1", "© Reuters 2024 / John Smith\n" + zh(82, 1200))
         self.collected("https://b.example.com/2", zh(83, 1200) + "\n© 2024 某產業公會 版權所有")
         self.arrive()
-        self.assertEqual(self.cell("https://a.example.com/1", "operator")["state"], "查不到")
-        self.assertEqual(self.cell("https://b.example.com/2", "operator"), {"state": "查到", "value": "© 2024 某產業公會 版權所有", "why": "網頁上的版權字樣，不一定是經營者"})
+        self.assertEqual(self.cell("https://a.example.com/1", "operator"), {"state": "查不到", "why": "這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁"})
+        self.assertEqual(self.cell("https://b.example.com/2", "operator"), {"state": "查不到", "why": "頁尾只有版權字樣（© 2024 某產業公會 版權所有），沒有寫誰經營；版權所有人不一定是經營者"})
 
     def test_an_excerpt_and_a_copy_with_more_around_it_are_one_origin_with_the_article(self):
         """M3 (grouping v2): under half or over double the length, Jaccard alone kept them three origins."""
@@ -614,15 +616,15 @@ class RoundTwoTests(GatherCase):
         self.assertEqual(self.grouping(), {frozenset({full, excerpt, padded}): "同一篇", frozenset({snippet}): "單獨"})
         self.assertTrue(any("至少 300 段不一樣的片段" in sentence for sentence in require("gather.grouping").items["rules"]))   # the rule shown says it
 
-    def test_a_copy_that_dates_itself_earlier_is_original_only_as_the_pages_own_claim(self):
-        """M4: the deciding date, when the page wrote it itself, is said to be its own claim."""
+    def test_a_copy_that_dates_itself_earlier_decides_nothing(self):
+        """M4, then F4 (grouping v4): a date the page wrote itself is never the deciding date."""
         article = zh(93)
         self.collected("https://a.example.com/1", article)
         self.collect.captures["https://a.example.com/1"] = "2024-05-01"
         self.collected("https://b.example.com/2", article[:390] + zh(94, 10), published_at="2020-01-01")
         self.arrive()
-        self.assertEqual(self.cell("https://b.example.com/2", "original"), {"state": "查到", "value": "原始的", "why": "這一組裡最早出現的（這個日期是網頁自己寫的，不一定可信）"})
-        self.assertEqual(self.cell("https://a.example.com/1", "original")["why"], "同一篇在 2020-01-01 已經出現（這個日期是網頁自己寫的，不一定可信）")
+        self.assertEqual(self.cell("https://b.example.com/2", "original"), {"state": "查不到", "why": "只有網頁自己寫的日期，沒有封存館的紀錄，看不出誰先誰後"})
+        self.assertEqual(self.cell("https://a.example.com/1", "original")["state"], "查不到")
 
     def test_a_script_the_system_cannot_tell_is_uncheckable(self):
         """minor 2: 查不到 would say we looked and there is none."""
@@ -711,9 +713,9 @@ class RoundThreeTests(GatherCase):
     def test_a_clause_letter_is_not_a_copyright_line(self):
         """N2: (c) stands alone, before a year or a name."""
         for footer in ("第5(c)項規定 the treaty… Article 5(c) applies", "Section 5(c) The Licensee shall", "under (c) applies to members"):
-            self.assertEqual(hooks._operator(zh(172) + "\n" + footer, None, False)["state"], "查不到", footer)
+            self.assertEqual(hooks._operator(zh(172) + "\n" + footer, None, False), {"state": "查不到", "why": "這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁"}, footer)
         for footer in ("(c) 2024 Acme Ltd", "(C) Acme Ltd", "(c) 某產業公會"):
-            self.assertEqual(hooks._operator(zh(173) + "\n" + footer, None, False)["value"], footer)
+            self.assertEqual(hooks._operator(zh(173) + "\n" + footer, None, False)["why"], f"頁尾只有版權字樣（{footer}），沒有寫誰經營；版權所有人不一定是經營者")
 
     def test_a_page_mostly_in_another_script_is_uncheckable_whatever_latin_it_has(self):
         """minor 2: one English sentence made a page of Arabic 英文."""
@@ -749,6 +751,7 @@ class RoundThreeTests(GatherCase):
         copy_of = zh(163)   # two copies that also share their image are still one article
         self.collected("https://d.example.com/4", copy_of, imageUrl="https://img.example.com/y.jpg", published_at="2024-01-01")
         self.collected("https://e.example.com/5", copy_of[:390] + zh(164, 10), imageUrl="https://img.example.com/y.jpg", published_at="2024-02-01")
+        self.collect.captures.update({"https://d.example.com/4": "2024-01-02", "https://e.example.com/5": "2024-02-02"})
         self.arrive()
         a, b, c, d, e = (self.card(f"https://{host}.example.com/{index}")["doc_id"] for index, host in enumerate("abcde", 1))
         self.assertEqual(self.grouping(), {frozenset({a, b, c}): "同一張圖", frozenset({d, e}): "同一篇"})
@@ -757,6 +760,98 @@ class RoundThreeTests(GatherCase):
         self.assertEqual(self.cell("https://b.example.com/2", "original")["why"], "跟a.example.com是同一篇；跟c.example.com用了同一張圖" + said)
         self.assertEqual(self.cell("https://c.example.com/3", "original")["why"], "跟b.example.com用了同一張圖；組裡還有別的網頁是同一篇" + said)
         self.assertEqual((self.cell("https://d.example.com/4", "original")["value"], self.cell("https://e.example.com/5", "original")["value"]), ("原始的", "轉貼的"))
+
+
+class RoundFourTests(GatherCase):
+    """GATHER cross-model review of the whole block (F2-F7; F8 is GatherPage.test.tsx)."""
+
+    PLAIN = {"state": "查不到", "why": "這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁"}
+
+    def test_a_copyright_line_alone_names_a_holder_not_who_runs_the_site(self):
+        """F2: 「© 2024 Acme Photography」 in the footer was the 誰辦的 cell as 查到."""
+        self.assertEqual(hooks._operator(zh(180, 1200) + "\n© 2024 Acme Photography", None, False),
+                         {"state": "查不到", "why": "頁尾只有版權字樣（© 2024 Acme Photography），沒有寫誰經營；版權所有人不一定是經營者"})
+        said = hooks._operator(zh(180, 1200) + "\n© 2024 Acme Photography. Operated by Acme Media Ltd. All rights reserved", None, False)
+        self.assertEqual(said, {"state": "查到", "value": "Acme Media Ltd", "why": "網頁寫著「Operated by Acme Media Ltd」"})
+        self.assertTrue(any("版權所有人不一定是經營者" in sentence for sentence in require("gather.outlets").items["reading"]))   # the rule shown says it
+
+    def test_who_runs_a_site_is_looked_for_on_the_whole_page(self):
+        """F3: 查不到 was said after reading only the last 800 characters."""
+        for head, name in (("經營者：某某媒體股份有限公司\n", "某某媒體股份有限公司"), ("本網站由某某文化基金會經營。", "某某文化基金會"),
+                           ("發行人：王大明｜", "王大明"), ("出版者: 某某出版社\n", "某某出版社"), ("Published by Acme Media Ltd. ", "Acme Media Ltd")):
+            cell = hooks._operator(head + zh(181, 3000), None, False)
+            self.assertEqual((cell["state"], cell.get("value")), ("查到", name), head)
+        url = "https://a.example.com/1"
+        self.collected(url, "經營者：某某媒體股份有限公司\n" + zh(182, 3000) + "\n© 2024 Acme Photography")
+        self.arrive()
+        self.assertEqual(self.cell(url, "operator"), {"state": "查到", "value": "某某媒體股份有限公司", "why": "網頁寫著「經營者：某某媒體股份有限公司」"})
+        for prose in (zh(183, 500) + "該刊發行人表示，" + zh(184, 500), "The report was published by the ministry. " + EN, "這家店由陳先生經營，" + zh(185, 500)):
+            self.assertEqual(hooks._operator(prose, None, False), self.PLAIN, prose[:40])   # a mention in a sentence is not the page saying who runs it
+
+    def test_who_came_first_is_read_only_from_the_archive_for_every_page(self):
+        """F4: a page's own date decided 原始的 when the archive had no record of it, or overruled the archive's."""
+        article = zh(186)
+        a, b = "https://a.example.com/1", "https://b.example.com/2"
+        self.collected(a, article)
+        self.collect.captures[a] = "2024-05-01"
+        self.collected(b, article[:390] + zh(187, 10), published_at="2020-01-01")   # the archive has no record of b
+        other = zh(188)
+        c, d = "https://c.example.com/3", "https://d.example.com/4"
+        self.collected(c, other)
+        self.collect.captures[c] = "2024-05-01"
+        self.collected(d, other[:390] + zh(189, 10), published_at="2020-01-01")
+        self.collect.captures[d] = "2024-06-01"
+        self.arrive()
+        self.assertEqual(self.cell(b, "first_seen"), {"state": "查到", "value": "2020-01-01", "why": "網頁自己寫的日期"})   # a page's own date still fills 最早何時出現
+        self.assertEqual(self.cell(b, "original"), {"state": "查不到", "why": "只有網頁自己寫的日期，沒有封存館的紀錄，看不出誰先誰後"})
+        self.assertEqual(self.cell(a, "original"), {"state": "查不到", "why": "同組有網頁只有網頁自己寫的日期，沒有封存館的紀錄，看不出誰先誰後"})
+        self.assertEqual(self.cell(d, "first_seen")["value"], "2020-01-01")
+        self.assertEqual(self.cell(c, "original"), {"state": "查到", "value": "原始的", "why": "這一組裡網頁封存館最早存到的"})
+        self.assertEqual(self.cell(d, "original"), {"state": "查到", "value": "轉貼的", "why": "同一篇網頁封存館在 2024-05-01 已經存到"})
+
+    def test_a_link_group_needs_every_two_sites_to_link_each_other_and_nowhere_else(self):
+        """F5: A<->B with C linking only A was one 只互相引用 group (one origin for three sites)."""
+        pages = {"https://a.example.com/1": ["b.example.net"], "https://b.example.net/2": ["a.example.com"], "https://c.example.org/3": ["a.example.com"],
+                 # a chain: D<->E and E<->F, but D and F never link each other
+                 "https://d.example.info/4": ["e.example.biz"], "https://e.example.biz/5": ["d.example.info", "f.example.name"], "https://f.example.name/6": ["e.example.biz"],
+                 # G<->H, but G also links I (I<->J): G and H do not link only each other, I and J do
+                 "https://g.example.dev/7": ["h.example.app", "i.example.page"], "https://h.example.app/8": ["g.example.dev"],
+                 "https://i.example.page/9": ["j.example.blog"], "https://j.example.blog/10": ["i.example.page"]}
+        for index, (url, links) in enumerate(pages.items()):
+            self.collected(url, zh(190 + index), outlinks=links)
+        self.arrive()
+        a, b, c, d, e, f, g, h, i, j = (self.card(url)["doc_id"] for url in pages)
+        self.assertEqual(self.grouping(), {frozenset({a, b}): "只互相引用", frozenset({i, j}): "只互相引用",
+                                           **{frozenset({one}): "單獨" for one in (c, d, e, f, g, h)}})
+        self.assertTrue(any("要每兩個網站都互相連結" in sentence for sentence in require("gather.grouping").items["rules"]))
+
+    def test_the_whole_text_is_compared_not_its_first_part(self):
+        """F7: only the first 20,000 letters were compared, so copies under long different headers were two origins."""
+        article, long_article = zh(200, 8000), zh(201, 200000)
+        pages = {"https://a.example.com/1": article, "https://b.example.com/2": zh(202, 30000) + article,
+                 "https://c.example.com/3": zh(203, 30000) + long_article, "https://d.example.com/4": zh(204, 30000) + long_article,
+                 "https://e.example.com/5": long_article[150000:150600]}   # an excerpt far down a page 50 times its length
+        for url, text in pages.items():
+            self.collected(url, text)
+        self.arrive()
+        a, b, c, d, e = (self.card(url)["doc_id"] for url in pages)
+        self.assertEqual(self.grouping(), {frozenset({a, b}): "同一篇", frozenset({c, d, e}): "同一篇"})
+        self.assertFalse(any("只比前" in sentence for sentence in require("gather.grouping").items["rules"]))
+
+    def test_a_few_sampled_pieces_found_in_a_long_page_are_no_basis(self):
+        """F7: a short page compared on the few pieces a long page's rate leaves it is looked up in the long page's whole
+        text: a long page holding exactly those few pieces of it is not where the short page came from."""
+        rules = require("gather.grouping").items
+        item = lambda key, text: hooks._Item(key, {"url": f"https://{key}.example.com/", "cells": {}}, text, {}, rules)   # noqa: E731
+        long_text = zh(205, 200000)
+        probe = item("probe", long_text)
+        rate = probe.rate
+        self.assertLessEqual(len(probe.pieces), rules["max_pieces"])   # the whole text, a bounded number of pieces
+        short = zh(206, 2000)
+        planted = [short[index:index + 5] for index in range(len(short) - 4) if next(iter(item("one", short[index:index + 5]).pieces)) % rate == 0]
+        self.assertGreater(len(planted), 2)
+        groups = hooks._groups([item("short", short), item("long", long_text + "".join(planted))], rules)
+        self.assertEqual(sorted(how for _, how, _ in groups), ["單獨", "單獨"])
 
 
 class CardLimitTests(GatherCase):

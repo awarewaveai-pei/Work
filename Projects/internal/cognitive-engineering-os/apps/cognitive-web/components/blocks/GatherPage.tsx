@@ -50,6 +50,7 @@ const DEFAULT_ANGLES = ["primary", "news", "factcheck", "precedent", "field"];
 export const SEARCH_LANGUAGES = ["zh", "en"];
 const MAX_AI_CARDS = 12;
 const RUN_WORDS: Record<string, string> = { requested: "系統正在找", running: "系統正在找", completed: "找完了", failed: "沒找成" };
+const FINISHED = ["completed", "failed"];
 const enc = encodeURIComponent;
 
 /** One search as the collector takes it (STEP2_SHARED_RULES §4.1): each (angle × language × provider) is its own query. */
@@ -280,7 +281,9 @@ export function GatherPage({ projectId }: { projectId: string }) {
   const shown = view.origins.filter((origin) => !origin.aside);
   const setAside = cards.filter((card) => card.aside);
   const angleName = (key: string) => view.words.angles.find((item) => item.key === key)?.name ?? key;
-  const few = cards.length > 0 && view.counted < view.min_origins;
+  // under two origins stops once a search finished (an empty one too) or anything was gathered -- never before
+  const gathered = view.origins.length > 0 || Object.values(runs).some((status) => FINISHED.includes(status));
+  const few = gathered && view.counted < view.min_origins;
   const stop = few || view.channels.short.length > 0 || view.channels.ask.length > 0;
 
   return (

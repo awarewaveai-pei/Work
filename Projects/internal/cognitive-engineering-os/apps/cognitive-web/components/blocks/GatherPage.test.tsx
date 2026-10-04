@@ -30,8 +30,9 @@ function overview(patch: Partial<Overview> = {}): Overview {
   };
 }
 
-/** A small stand-in for the API: documents by kind; the collection service is not configured (503 on confirm). */
-function server(view: Overview, initial: Record<string, any[]> = {}) {
+/** A small stand-in for the API: documents by kind; the collection service is not configured (503 on confirm); ``runs``
+ *  answers GET /collections/{run} with that run's status. */
+function server(view: Overview, initial: Record<string, any[]> = {}, runs: Record<string, string> = {}) {
   const store: Record<string, any[]> = Object.fromEntries(Object.entries(initial).map(([kind, contents]) => [kind, contents.map((content, index) => ({ doc_id: `${kind}-${index + 1}`, kind, version: 1, content, author: "user", block: "GATHER", at: "2026-10-04T08:00:00Z" }))]));
   const writes: Array<{ method: string; path: string; body: any }> = [];
   vi.mocked(apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
@@ -45,6 +46,8 @@ function server(view: Overview, initial: Record<string, any[]> = {}) {
       if (body.confirm) throw new ApiError(503, "COLLECTION_SERVICE_UNCONFIGURED: COLLECT_RESEARCH_RUNS_TOKEN is not set");
       return { plan: { seeds: body.seeds.length, max_queries: 16, max_fetches: 200 }, confirm_required: true } as never;
     }
+    const run = /^\/projects\/P1\/collections\/([^/]+)$/.exec(path);
+    if (run && method === "GET" && runs[run[1]]) return { status: runs[run[1]] } as never;
     if (path === "/projects/P1/sources" && method === "POST") return { source_id: "s-new" } as never;
     const one = /\/docs\/([^/]+)(?:\/([^/]+))?$/.exec(path);
     if (one && method === "GET") return (store[one[1]] ?? []) as never;
@@ -135,6 +138,22 @@ describe("蒐集來源", () => {
     await click(byText(stop as HTMLElement, "button", "照樣繼續"));
     expect(host.textContent).toContain("你選了照樣繼續");
     expect(host.querySelector("select")).toBeNull();
+    await done();
+  });
+
+  it("stops under two origins after a search that finished with nothing, never before any search ran", async () => {
+    const empty = overview({ origins: [], counted: 0, channels: { engines: [{ key: "serper", name: "Serper（Google 的結果）" }, { key: "brave", name: "Brave" }],
+      languages: [{ key: "zh", name: "中文" }, { key: "en", name: "英文" }], blocked: [], short: [], ask: [], looked: true } });
+    const ask = { text: "公會有沒有改合約", angles: ["primary"], run: "r1" };
+    for (const [status, shown] of [["completed", true], ["failed", true], ["running", false]] as const) {
+      server(empty, { "gather.ask": [ask] }, { r1: status });
+      const { host, done } = await mount(<GatherPage projectId="P1" />);
+      expect(host.querySelector(".card.accent[role=status]")?.textContent ?? "", status).toBe(shown ? "系統先停在這裡，由你決定找到 0 個獨立出處，不到 2 個。很多網頁可能出自同一個地方。再去找照樣繼續" : "");
+      await done();
+    }
+    server(overview({ origins: [], counted: 0, channels: { engines: [], languages: [], blocked: [], short: [], ask: [], looked: false } }));
+    const { host, done } = await mount(<GatherPage projectId="P1" />);
+    expect(host.querySelector(".card.accent[role=status]")).toBeNull();   // nothing searched yet: nothing to stop on
     await done();
   });
 

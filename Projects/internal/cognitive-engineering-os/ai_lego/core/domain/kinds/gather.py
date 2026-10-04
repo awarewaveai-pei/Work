@@ -28,6 +28,7 @@ KINDS = [
         "cells": Field("json", 20000, required=True, scan=False),     # {CARD_CELL_KEYS: evidence_words.cell(...)}: every key, 不留空白
         "lists": Field("json", 4000, scan=False),           # [{"list", "category", "maintainer", "version"}] 列在哪一份名單
         "snapshot": Field("json", 1000, scan=False),        # {"sha256", "fetched_at"} of the stored row
+        "archived": Field("text", 10, scan=False),          # the web archive's first capture (YYYY-MM-DD), absent = none or not asked: 原始的還是轉貼的 is read only from it
         "aside": Field("text", 300, scan=False),            # why it is set aside (放一旁); "" = not
         "rules": Field("json", 2000, scan=False),           # {ruleset name: version} used for this card
     }, authors=frozenset({"system"}), deletable=False),

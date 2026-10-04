@@ -12,13 +12,15 @@ the platform reaches nothing outside itself (specs/wire/lookup.v1.json; STEP2_SH
 
 from __future__ import annotations
 
+import functools
+import itertools
 import logging
 import re
 import unicodedata
 import urllib.parse
 import zlib
 from collections import Counter
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Iterator, Mapping
 
 from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.evidence_words import FOUND, FOUND_BY, MIN_ORIGINS, NOT_FOUND, UNCHECKABLE, cell
@@ -42,8 +44,9 @@ _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
 # (c) only on its own and before a year or a name: 「第5(c)項」「Article 5(c) applies」 are clauses, not a copyright line
 _COPYRIGHT = re.compile(r"(?:©|(?<!\w)\([cC]\)(?=\s*\d{4}|\s+[^\W\d_a-z])|(?i:copyright)|版權所有)\s*(?:©)?\s*(?:\d{4}(?:\s*[-–~]\s*\d{4})?)?\s*([^\n|｜。，,]{2,80})")
 _TITLE_SEPARATORS = re.compile(r"\s[-|–—]\s|｜|－")
-STATED = "網頁自己寫的日期"   # first_seen from the page's own claim, not from the archive: 原始的 says so
-FOOTER_CHARS = 800   # a site's own copyright line is at the end; one higher up is usually a photo or quote credit
+STATED = "網頁自己寫的日期"   # first_seen from the page's own claim, not from the archive: 原始的還是轉貼的 never reads it
+_START = r"(?:^|(?<=[\n。！？；;|｜•·])|(?<=[.!?]\s))[^\S\n]*"   # the start of the page, a line, a field or a sentence
+_NAME = r"(?=\S)(?:(?![.!?](?:\s|$))[^\n|｜。，,；;：:]){2,80}"   # a name runs to the end of its line, field or sentence
 _EN_WORDS = frozenset("the and of to in is that for it with as was on are by this be from or at".split())
 _LATIN = "A-Za-zÀ-ÖØ-öø-ɏḀ-ỿ"   # Latin letters with their accented forms (French, German, Vietnamese)
 
@@ -181,14 +184,38 @@ def _language(text: str | None) -> dict[str, str]:
     return cell(UNCHECKABLE, why="拉丁字母寫的，但看不出是英文；系統只分得出中文、英文、日文、韓文")
 
 
+@functools.lru_cache(maxsize=4)
+def _operator_phrases(labels: tuple[str, ...], run_by: str, by: tuple[str, ...], own: tuple[str, ...]) -> tuple[re.Pattern[str], ...]:
+    """The ways a page says who runs it (gather.outlets ``operator``), each at the start of a line or a sentence: in the
+    middle of one (「該刊發行人表示」「was published by the ministry」) it is about someone else."""
+    def either(words: Iterable[str]) -> str:
+        return "|".join(map(re.escape, words))
+
+    own_part = rf"(?:(?:{either(own)})[^\S\n]*)?"
+    return (re.compile(rf"{_START}(?P<phrase>{own_part}(?:{either(labels)})[^\S\n]*[:：][^\S\n]*(?P<name>{_NAME}))"),
+            re.compile(rf"{_START}(?P<phrase>{own_part}由[^\S\n]*(?P<name>(?=\S)[^\n|｜。，,；;：:由]{{2,40}}?)[^\S\n]*{re.escape(run_by)})"),
+            re.compile(rf"{_START}(?P<phrase>{own_part}(?:{either(by)})[^\S\n]+(?P<name>{_NAME}))", re.I))
+
+
+def _says_who_runs(text: str, rules: Mapping[str, Any]) -> tuple[str, str] | None:
+    """(the page's words, the name) where the page last says who runs it, looked for on the whole page."""
+    patterns = _operator_phrases(tuple(rules["labels"]), rules["run_by"], tuple(rules["by"]), tuple(rules["own"]))
+    found = max((match for pattern in patterns for match in pattern.finditer(text)), key=lambda match: match.start("phrase"), default=None)
+    return (found["phrase"].strip(), found["name"].strip()) if found else None
+
+
 def _operator(text: str | None, outlet: dict[str, Any] | None, is_outlet: bool) -> dict[str, str]:
     if outlet and is_outlet:
         return cell(FOUND, outlet["name"], why=f"網域在已知媒體名單上（v{require('gather.outlets').version}）")
     if text is None:
         return cell(UNCHECKABLE, why="抓不到內文，看不到網頁寫誰經營")
-    lines = [match.group(0).strip() for match in _COPYRIGHT.finditer(text[-FOOTER_CHARS:])]
-    if lines:
-        return cell(FOUND, lines[-1][:120], why="網頁上的版權字樣，不一定是經營者")
+    rules = require("gather.outlets").items["operator"]
+    said = _says_who_runs(text, rules)
+    if said:
+        return cell(FOUND, said[1][:120], why=f"網頁寫著「{said[0][:120]}」")
+    lines = [match.group(0).strip() for match in _COPYRIGHT.finditer(text[-rules["footer_chars"]:])]
+    if lines:   # a copyright holder is not who runs the site: the line goes in why, never as the value
+        return cell(NOT_FOUND, why=f"頁尾只有版權字樣（{lines[-1][:120]}），沒有寫誰經營；版權所有人不一定是經營者")
     return cell(NOT_FOUND, why="這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁")
 
 
@@ -223,6 +250,12 @@ def _first_seen(published: Any, archived: dict[str, str] | None) -> dict[str, st
     if stated:
         return cell(FOUND, stated, why=STATED + (f"；網頁封存館：{archived['why']}" if archived["state"] == UNCHECKABLE else ""))
     return cell(archived["state"], why=f"網頁沒寫日期；{archived['why']}")
+
+
+def _archived(looked: Mapping[str, Any] | None) -> str:
+    """The web archive's first capture of the page: the only date 原始的還是轉貼的 is read from ("" = none or not asked)."""
+    found = (looked or {}).get("first_archived") or {}
+    return (_date(found.get("value")) or "") if found.get("state") == FOUND else ""
 
 
 def _stamps() -> dict[str, dict[str, str]]:
@@ -267,20 +300,23 @@ def _found_by(row: Mapping[str, Any], author: str | None) -> dict[str, str]:
 
 def _source_card(row: Mapping[str, Any], text: str | None, author: str | None, answers: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     url = row.get("canonical_url") or ""
-    cells, lists = _cells(url, row.get("title") or "", text, row.get("published_at"), answers.get(url) if url else None)
+    looked = answers.get(url) if url else None
+    cells, lists = _cells(url, row.get("title") or "", text, row.get("published_at"), looked)
     relevance = row.get("relevance") if isinstance(row.get("relevance"), Mapping) else {}
     aside = relevance.get("aside") if isinstance(relevance.get("aside"), str) else ""
     return {"source_id": row["source_id"], "url": url[:2048], "title": (row.get("title") or "")[:300], "found_by": _found_by(row, author),
             "cells": cells, "lists": lists, "snapshot": {"sha256": row["content_sha256"], "fetched_at": row.get("fetched_at") or row["created_at"]},
-            "aside": aside[:300], "rules": _stamps()}
+            "archived": _archived(looked), "aside": aside[:300], "rules": _stamps()}
 
 
 def _aside_card(entry: Mapping[str, Any], answers: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     """A page the collector could not get text from (放一旁): a card all the same, with what its address tells."""
     url, title = entry["url"][:2048], str(entry.get("title") or "")[:300]
-    cells, lists = _cells(url, title, None, None, answers.get(entry["url"]))
+    looked = answers.get(entry["url"])
+    cells, lists = _cells(url, title, None, None, looked)
     reason = entry.get("reason") if isinstance(entry.get("reason"), str) and entry["reason"].strip() else "抓不到內文"
-    return {"source_id": "", "url": url, "title": title, "found_by": {"by": SEARCHED}, "cells": cells, "lists": lists, "aside": reason[:300], "rules": _stamps()}
+    return {"source_id": "", "url": url, "title": title, "found_by": {"by": SEARCHED}, "cells": cells, "lists": lists, "archived": _archived(looked),
+            "aside": reason[:300], "rules": _stamps()}
 
 
 # ---- grouping (同一出處的分組) ----
@@ -289,15 +325,48 @@ def _link_host(link: str) -> str:
     return _host(link if "://" in link else f"https://{link}")
 
 
+def _numbers(letters: str, size: int) -> Iterator[int]:
+    """Every piece of ``size`` letters of the text as a number: the same letters give the same number wherever they sit."""
+    data, width = letters.encode("utf-32-le"), 4 * size
+    return (zlib.crc32(data[index:index + width]) for index in range(0, 4 * (len(letters) - size + 1), 4))
+
+
+def _pieces(letters: str, rules: Mapping[str, Any]) -> tuple[int, frozenset[int]]:
+    """(rate, the pieces a page keeps): from the whole text, the pieces whose number is a multiple of the rate -- 1 up to
+    ``sample_above`` letters, else ``keep_one_in``, doubled until at most ``max_pieces`` are left. One rule for every page,
+    so a passage leaves the same pieces in every page that holds it, and a rate is a multiple of every lower one."""
+    size, most = rules["shingle"], rules["max_pieces"]
+    rate = 1 if len(letters) <= rules["sample_above"] else rules["keep_one_in"]
+    while len(letters) - size + 1 > rate * most:
+        rate *= 2
+    kept = {number for number in _numbers(letters, size) if number % rate == 0}
+    while len(kept) > most:
+        rate *= 2
+        kept = {number for number in kept if number % rate == 0}
+    return rate, frozenset(kept)
+
+
+def _distinct(letters: str, size: int, enough: int) -> int:
+    """How many different pieces the text has, counted up to ``enough`` (all the containment rule needs to know)."""
+    seen: set[int] = set()
+    for number in _numbers(letters, size):
+        seen.add(number)
+        if len(seen) >= enough:
+            break
+    return len(seen)
+
+
 class _Item:
-    """One card as the grouping sees it: its text in pieces, its main image, its site and the sites it links to."""
+    """One card as the grouping sees it: the pieces of its whole text, its main image, its site and the sites it links to,
+    the web archive's first capture of it."""
 
     def __init__(self, key: str, content: Mapping[str, Any], text: str | None, relevance: Mapping[str, Any], rules: Mapping[str, Any]) -> None:
-        self.key, self.content, self._rules = key, content, rules
-        folded = unicodedata.normalize("NFKC", (text or "")[: rules["compare_chars"] * 2]).casefold()
-        self.letters = "".join(ch for ch in folded if not ch.isspace() and not unicodedata.category(ch).startswith("P"))[: rules["compare_chars"]]
-        self._pieces: dict[bool, frozenset[int]] = {}
-        self.distinct = 0   # how many different pieces the text has, counted with its first pieces()
+        self.key, self.content = key, content
+        folded = unicodedata.normalize("NFKC", text or "").casefold()
+        self.letters = "".join(ch for ch in folded if not ch.isspace() and not unicodedata.category(ch).startswith("P"))
+        self.rate, self.pieces = _pieces(self.letters, rules)
+        self._at = {self.rate: self.pieces}
+        self.distinct = _distinct(self.letters, rules["shingle"], rules["contained_min_pieces"])
         image = relevance.get("imageUrl")
         self.image = image if isinstance(image, str) and image.startswith(("http://", "https://")) else None
         self.host = _host(content.get("url") or "")
@@ -306,29 +375,60 @@ class _Item:
         self.outlinks = {_link_host(link) for link in links if isinstance(link, str) and link} - {self.host, ""} if isinstance(links, list) else set()
         first = (content.get("cells") or {}).get("first_seen") or {}
         self.first_seen = _date(first.get("value")) if first.get("state") == FOUND else None
-        self.stated = str(first.get("why") or "").startswith(STATED)
+        # a card made before grouping v4 holds no `archived`; its first_seen, when not the page's own date, is the archive's
+        stated = str(first.get("why") or "").startswith(STATED)
+        self.archived = _date(content.get("archived")) or (None if stated else self.first_seen)
 
-    def pieces(self, sampled: bool) -> frozenset[int]:
-        if sampled not in self._pieces:
-            size, every = self._rules["shingle"], self._rules["keep_one_in"] if sampled else 1
-            hashed = {zlib.crc32(self.letters[i:i + size].encode("utf-8")) for i in range(max(0, len(self.letters) - size + 1))}
-            self.distinct = len(hashed)
-            self._pieces[sampled] = frozenset(value for value in hashed if value % every == 0)
-        return self._pieces[sampled]
+    def at(self, rate: int) -> frozenset[int]:
+        """The pieces this page keeps at a coarser rate (a multiple of its own): those any page would keep there."""
+        if rate not in self._at:
+            self._at[rate] = frozenset(number for number in self.pieces if number % rate == 0)
+        return self._at[rate]
 
 
-def _likeness(a: _Item, b: _Item, rules: Mapping[str, Any]) -> float:
-    """How alike two pages are: the larger of the share of all their text pieces in common (Jaccard) and the share of
-    the shorter page found in the longer one (an excerpt, a copy with more around it), the second only when both pages
-    have at least ``contained_min_pieces`` different pieces (one phrase repeated is in every page that has it twice)."""
-    short = min(len(a.letters), len(b.letters))
-    sampled = short > rules["sample_above"]
-    x, y = a.pieces(sampled), b.pieces(sampled)
-    if not x or not y:
-        return 0.0
+def _by_length(items: list[_Item], i: int, j: int) -> tuple[int, int]:
+    return (i, j) if len(items[i].letters) <= len(items[j].letters) else (j, i)
+
+
+def _looked_up(short: _Item, long: _Item, rules: Mapping[str, Any]) -> bool:
+    """Whether the shorter page keeps too few pieces at the pair's rate to read a share from (a few pieces can be in a long
+    page by chance): then its own pieces are looked up in the longer page's whole text."""
+    return min(short.distinct, long.distinct) >= rules["contained_min_pieces"] and len(short.at(max(short.rate, long.rate))) < rules["min_compared"]
+
+
+def _lookups(items: list[_Item], rules: Mapping[str, Any]) -> dict[int, frozenset[int]]:
+    """For each page a shorter one is looked up in: which pieces of the pages looked up its whole text holds -- one pass
+    over its text however many shorter pages ask (a pair reads only its shorter page's own pieces of it)."""
+    shorter, longer = set(), set()
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            short, long = _by_length(items, i, j)
+            if _looked_up(items[short], items[long], rules):
+                shorter.add(short)
+                longer.add(long)
+    wanted = frozenset().union(*(items[index].pieces for index in shorter))
+    return {long: frozenset(number for number in _numbers(items[long].letters, rules["shingle"]) if number in wanted) for long in longer}
+
+
+def _likeness(short: _Item, long: _Item, rules: Mapping[str, Any], present: frozenset[int]) -> float:
+    """How alike two pages are: the larger of the share of their pieces in common (Jaccard) and the share of the shorter
+    page found in the longer one (an excerpt, a copy with more around it), the second only when both pages have at least
+    ``contained_min_pieces`` different pieces (one phrase repeated is in every page that has it twice). Both are read at
+    the coarser page's rate; ``present``: the longer page's pieces among the shorter one's own, when _looked_up."""
+    x, y = short.at(max(short.rate, long.rate)), long.at(max(short.rate, long.rate))
     both = len(x & y)
-    contained = both / min(len(x), len(y)) if min(a.distinct, b.distinct) >= rules["contained_min_pieces"] else 0.0
-    return max(both / (len(x) + len(y) - both), contained)
+    jaccard = both / (len(x) + len(y) - both) if x or y else 0.0
+    if min(short.distinct, long.distinct) < rules["contained_min_pieces"]:
+        return jaccard
+    if _looked_up(short, long, rules):
+        return max(jaccard, len(short.pieces & present) / len(short.pieces) if short.pieces else 0.0)
+    return max(jaccard, both / len(x))
+
+
+def _every_pair(members: Iterable[Any], joined: Callable[[Any, Any], bool]) -> bool:
+    """One rule for a reason that joins two pages (同一篇) or two sites (只互相引用): a group is said to be joined by it
+    only when every two of its members are."""
+    return all(joined(a, b) for a, b in itertools.combinations(members, 2))
 
 
 Join = tuple[_Item, _Item, str]
@@ -336,10 +436,10 @@ Join = tuple[_Item, _Item, str]
 
 def _groups(items: list[_Item], rules: Mapping[str, Any]) -> list[tuple[list[_Item], str, list[Join]]]:
     """Every item in exactly one group: (items, how, what joins which). Two pages join on near-identical text (同一篇),
-    text between the thresholds (可能同出處), the same main image (同一張圖), or links that only point at each other
-    (只互相引用). Joins chain, likeness does not: a group is 同一篇 only when every two of its pages are (whatever else
-    joins them), a chain of 同一篇 alone is 可能同出處, and any other group joined for different reasons says the least
-    certain one."""
+    text between the thresholds (可能同出處), the same main image (同一張圖), or sites that link each other and nowhere
+    else (只互相引用). Joins chain, likeness does not: a group is 同一篇 only when every two of its pages are (whatever
+    else joins them), a chain of 同一篇 alone is 可能同出處, and any other group joined for different reasons says the
+    least certain one."""
     parent = list(range(len(items)))
 
     def root(index: int) -> int:
@@ -348,10 +448,12 @@ def _groups(items: list[_Item], rules: Mapping[str, Any]) -> list[tuple[list[_It
             index = parent[index]
         return index
 
+    present = _lookups(items, rules)
     edges: list[tuple[int, int, str]] = []
     for i in range(len(items)):
         for j in range(i + 1, len(items)):
-            likeness = _likeness(items[i], items[j], rules)
+            short, long = _by_length(items, i, j)
+            likeness = _likeness(items[short], items[long], rules, present.get(long, frozenset()))
             if likeness >= rules["same_text"]:
                 edges.append((i, j, "同一篇"))
             elif likeness >= rules["maybe_same"]:
@@ -371,9 +473,10 @@ def _groups(items: list[_Item], rules: Mapping[str, Any]) -> list[tuple[list[_It
     for top, indexes in sorted(members.items(), key=lambda pair: pair[1][0]):
         found = joins.get(top, [])
         kinds = {kind for _, _, kind in found}
+        same = {(i, j) for i, j, kind in found if kind == "同一篇"}
         if len(indexes) == 1:
             how = "單獨"
-        elif sum(kind == "同一篇" for _, _, kind in found) == len(indexes) * (len(indexes) - 1) // 2:   # one 同一篇 edge per pair at most
+        elif _every_pair(indexes, lambda i, j: (i, j) in same):   # indexes ascend, as every edge's (i, j) does
             how = "同一篇"
         elif kinds == {"同一篇"}:
             how = "可能同出處"
@@ -384,9 +487,10 @@ def _groups(items: list[_Item], rules: Mapping[str, Any]) -> list[tuple[list[_It
 
 
 def _only_each_other(items: list[_Item]) -> list[tuple[int, int, str]]:
-    """Sites whose outgoing links all point at each other and nowhere else (假網站互相引用). Pages linking anywhere
-    outside are dropped until none is left (a page outside that cites the circle cannot hide it); what remains,
-    joined by its links, is one circle per connected set of two or more sites."""
+    """Sites that link each other and nowhere else (假網站互相引用). Pages linking anywhere outside are dropped until none
+    is left (a page outside that cites them cannot hide them). Sites joined by links both ways form one set per connected
+    part; it is a circle when every two of its sites link each other (_every_pair, the rule 同一篇 has) and none links
+    outside it -- a one-way link or a chain joins nothing. Every two pages of a circle are joined."""
     kept = {index for index, item in enumerate(items) if item.host and item.outlinks}
     while True:
         hosts = {items[index].host for index in kept}
@@ -394,21 +498,24 @@ def _only_each_other(items: list[_Item]) -> list[tuple[int, int, str]]:
         if not out:
             break
         kept -= out
-    by_host: dict[str, list[int]] = {}
+    links: dict[str, set[str]] = {}
     for index in kept:
-        by_host.setdefault(items[index].host, []).append(index)
-    circle = {index: frozenset({index}) for index in kept}
-    for index in kept:
-        for host in items[index].outlinks:
-            for other in by_host[host]:
-                joined = circle[index] | circle[other]
+        links.setdefault(items[index].host, set()).update(items[index].outlinks)
+
+    def both_ways(a: str, b: str) -> bool:
+        return b in links[a] and a in links[b]
+
+    part = {host: frozenset({host}) for host in links}
+    for host in links:
+        for other in links[host]:
+            if both_ways(host, other) and part[host] is not part[other]:
+                joined = part[host] | part[other]
                 for member in joined:
-                    circle[member] = joined
+                    part[member] = joined
     edges = []
-    for group in set(circle.values()):
-        if len({items[member].host for member in group}) >= 2:
-            ordered = sorted(group)
-            edges += [(ordered[0], member, "只互相引用") for member in ordered[1:]]
+    for sites in set(part.values()):
+        if len(sites) >= 2 and _every_pair(sorted(sites), both_ways) and all(links[site] <= sites for site in sites):
+            edges += [(i, j, "只互相引用") for i, j in itertools.combinations(sorted(index for index in kept if items[index].host in sites), 2)]
     return edges
 
 
@@ -438,28 +545,32 @@ def _joined(item: _Item, joins: list[Join]) -> str:
 
 
 def _original(group: list[_Item], how: str, joins: list[Join], item: _Item) -> dict[str, str]:
-    """原始的還是轉貼的, read off the grouping."""
+    """原始的還是轉貼的, read off the grouping: said only for 同一篇, and only from the dates the web archive saw for every
+    page of it (a page can write any date it likes); anything less is no basis, so never 查到."""
     if len(group) == 1:
         return cell(NOT_FOUND, why="沒有找到別的網頁有同一篇，看不出是不是轉貼")
     kinds = {kind for _, _, kind in joins}
     if how != "同一篇":
         if kinds == {"只互相引用"}:
-            return cell(FOUND, "只互相引用，沒有別的依據")
+            return cell(NOT_FOUND, why="只互相引用，沒有別的依據，看不出誰轉貼誰")
         if kinds == {"可能同出處"}:
             return cell(NOT_FOUND, why="跟同組的網頁很像，但拿不準是不是改寫，由你決定")
         if kinds == {"同一張圖"}:   # a shared image (a default og:image, a blank.jpg) says nothing about who copied whom
             return cell(NOT_FOUND, why="只是用了同一張圖，看不出誰轉貼誰")
         return cell(NOT_FOUND, why=_joined(item, joins))
-    dates = [member.first_seen for member in group]
-    if None in dates:
+    if any(member.first_seen is None for member in group):
         return cell(UNCHECKABLE, why="同組有網頁查不到最早出現的時間，排不出先後")
+    if item.archived is None:
+        return cell(NOT_FOUND, why="只有網頁自己寫的日期，沒有封存館的紀錄，看不出誰先誰後")
+    if any(member.archived is None for member in group):
+        return cell(NOT_FOUND, why="同組有網頁只有網頁自己寫的日期，沒有封存館的紀錄，看不出誰先誰後")
+    dates = [member.archived for member in group]
     earliest = min(dates)
-    claim = "（這個日期是網頁自己寫的，不一定可信）" if any(member.stated and member.first_seen == earliest for member in group) else ""
-    if item.first_seen != earliest:
-        return cell(FOUND, "轉貼的", why=f"同一篇在 {earliest} 已經出現{claim}")
+    if item.archived != earliest:
+        return cell(FOUND, "轉貼的", why=f"同一篇網頁封存館在 {earliest} 已經存到")
     if dates.count(earliest) > 1:
-        return cell(NOT_FOUND, why=f"同組有網頁同一天（{earliest}）出現，排不出誰先")
-    return cell(FOUND, "原始的", why=f"這一組裡最早出現的{claim}")
+        return cell(NOT_FOUND, why=f"同組有網頁同一天（{earliest}）被網頁封存館存到，排不出誰先")
+    return cell(FOUND, "原始的", why="這一組裡網頁封存館最早存到的")
 
 
 # ---- the hook ----
