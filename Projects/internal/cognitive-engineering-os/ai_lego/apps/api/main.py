@@ -3110,7 +3110,8 @@ class CollectionCompleteRequest(BaseModel):
         def text(value: Any, low: int, high: int) -> bool:
             return isinstance(value, str) and low <= len(value) <= high
 
-        aside, channels = self.aside or [], self.channels or []
+        # only an absent list is empty: `or []` let "" and 0 through as no pages (Codex 2026-10-04)
+        aside, channels = [] if self.aside is None else self.aside, [] if self.channels is None else self.channels
         if not isinstance(aside, list) or not all(isinstance(item, dict) for item in aside):
             return "aside: a list of pages"
         if not isinstance(channels, list) or not all(isinstance(item, dict) for item in channels):
