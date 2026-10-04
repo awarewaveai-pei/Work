@@ -490,6 +490,15 @@ class ErasedCaseTests(Step2Case):
         self.assertEqual(self.docs.current(self.tenant_id, self.owner, "gather.source"), [])
 
 
+class HooksReadOnlyTests(unittest.TestCase):
+    def test_a_block_hook_reads_the_case_only_through_the_read_only_facade(self):
+        """A hook is handed CaseDocs. Reaching `_repo` gave it every writer of the repository; `docs.reads` has only readers
+        (case, sources, source text, events, collection runs), so a hook that writes has to go through CaseDocs.save."""
+        from ai_lego import PRODUCT_ROOT
+        found = [path.name for path in (PRODUCT_ROOT / "ai_lego" / "platform" / "block_hooks").glob("*.py") if "._repo" in path.read_text(encoding="utf-8")]
+        self.assertEqual(found, [])
+
+
 class GateCitesTests(Step2Case):
     def setUp(self):
         # these tests write their own source cards: a block's arrival hook would card the same page first

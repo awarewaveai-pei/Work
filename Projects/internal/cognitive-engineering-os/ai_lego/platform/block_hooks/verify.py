@@ -223,7 +223,7 @@ def search_result(run: Mapping[str, Any], channels: list[Any]) -> tuple[str, str
 
 
 def _run_of(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, run_id: str) -> dict[str, Any] | None:
-    return docs._repo.get_collection_run(tenant_id, owner.id, run_id)   # noqa: SLF001 -- CaseDocs has no public reader for runs (report)
+    return docs.reads.collection_run(tenant_id, owner.id, run_id)
 
 
 def _searched(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> set[tuple[Any, Any, Any]]:

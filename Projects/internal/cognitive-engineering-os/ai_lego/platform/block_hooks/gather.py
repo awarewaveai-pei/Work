@@ -51,11 +51,11 @@ _LATIN = "A-Za-zÀ-ÖØ-öø-ɏḀ-ỿ"   # Latin letters with their accented fo
 # ---- reading what is stored ----
 
 def _store(docs: CaseDocs) -> tuple[Any, Any]:
-    """The case's stored pages (the repository CaseDocs writes to) and their content store (the API's, its test override
-    included). A hook is handed only CaseDocs (block_hooks.after_sources); see the step-2 report for the change asked of S."""
+    """The case's stored pages through CaseDocs' read-only facade (a hook never writes through it) and their content
+    store (the API's, its test override included)."""
     from ai_lego.apps.api import main as api
 
-    return docs._repo, api.app.dependency_overrides.get(api.get_source_cas, api.get_source_cas)()   # noqa: SLF001
+    return docs.reads, api.app.dependency_overrides.get(api.get_source_cas, api.get_source_cas)()
 
 
 def _host(url: str) -> str:
@@ -494,9 +494,9 @@ def _canonical(groups: Iterable[Mapping[str, Any]]) -> frozenset:
 def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arrived: dict[str, Any]) -> None:
     if owner.kind != "case":
         return
-    repo, cas = _store(docs)
-    rows = {row["source_id"]: row for row in repo.list_sources(tenant_id, owner.id)}
-    read = repo.active_source_reader(cas, tenant_id, owner.id)
+    reads, cas = _store(docs)
+    rows = {row["source_id"]: row for row in reads.sources(tenant_id, owner.id)}
+    read = reads.source_text(cas, tenant_id, owner.id)
     texts: dict[str, str | None] = {}
 
     def text(source_id: str | None) -> str | None:
@@ -508,7 +508,7 @@ def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, ar
         return texts[source_id]
 
     def author(source_id: str) -> str | None:
-        events = repo.list_events(tenant_id, f"source:{source_id}")
+        events = reads.events(tenant_id, f"source:{source_id}")
         return events[0]["author"] if events else None
 
     cards = docs.current(tenant_id, owner, "gather.source")
@@ -558,7 +558,7 @@ def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, ar
     original = {one.key: _original(group, how, joins, one) for group, how, joins in groups for one in group}
 
     # the lookups above can take seconds: a case erased meanwhile gets nothing written back (the rest of the window is S's: report)
-    if repo.get_project(tenant_id, owner.id) is None:
+    if reads.case(tenant_id, owner.id) is None:
         return
     ids: dict[str, str] = {}
     by_id = {doc["doc_id"]: doc for doc in cards}
