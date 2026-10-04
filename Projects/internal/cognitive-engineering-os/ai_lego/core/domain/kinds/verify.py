@@ -67,7 +67,7 @@ KINDS = [
     # the AI's reading of sources for claims: what each card says, with the exact quote the gate checked; never counted
     # until the person confirms it into verify.stance (AI 不准宣判真假)
     DocKind("verify.reading", "VERIFY", "AI 讀來源", {
-        "readings": Field("json", 60000, required=True, scan=False, cited=True),   # [{"claim", "claim_version", "card", "snapshot", "reads_as": STANCES, "quote", "citations"}]
+        "readings": Field("json", 60000, required=True, scan=False, cited=True, shape="array"),  # [{"claim", "claim_version", "card", "snapshot", "reads_as": STANCES, "quote", "citations"}]
     }, authors=frozenset({"ai"})),
     # the background search for one claim ended: 查到 / 查不到 / 無法檢查 (private group, no tool)
     DocKind("verify.search", "VERIFY", "背後找來源", {
@@ -76,7 +76,7 @@ KINDS = [
         "state": Field("choice", choices=STATES, required=True, scan=False),
         "why": Field("text", 300, scan=False),
         "run": Field("text", 64, scan=False),
-        "rules": Field("json", 2000, scan=False),
+        "rules": Field("json", 2000, scan=False, shape="object"),
     }, authors=frozenset({"system"}), deletable=False),
     # 你對每個主張標採信、存疑或不採信，並寫一句理由
     DocKind("verify.verdict", "VERIFY", "你的判定", {
@@ -104,19 +104,19 @@ KINDS = [
     # the AI's proposed split of a message (AI 先提出怎麼拆成主張，你確認了才算: each confirmed one becomes a verify.claim)
     DocKind("verify.split", "VERIFY", "AI 提的拆法", {
         "message": Field("text", 64, required=True, scan=False),
-        "claims": Field("json", 20000, required=True),   # [{"text", "sentence": SENTENCE_KINDS, "law": bool}]
+        "claims": Field("json", 20000, required=True, shape="array"),  # [{"text", "sentence": SENTENCE_KINDS, "law": bool}]
     }, authors=frozenset({"ai"})),
     # the manipulation patterns the AI named, each with the exact part of the message (找到手法，不等於訊息是假的)
     DocKind("verify.techniques", "VERIFY", "AI 指出的手法", {
         "message": Field("text", 64, required=True, scan=False),
-        "techniques": Field("json", 20000),   # [{"name": a verify.techniques item, "quote": words of the message, "why"}]
-        "asks": Field("json", 8000),          # [{"what": ASKS, "quote"}]: what it wants you to do
-        "rules": Field("json", 2000, scan=False),   # the ruleset stamp it was named with
+        "techniques": Field("json", 20000, shape="array"),  # [{"name": a verify.techniques item, "quote": words of the message, "why"}]
+        "asks": Field("json", 8000, shape="array"),         # [{"what": ASKS, "quote"}]: what it wants you to do
+        "rules": Field("json", 2000, scan=False, shape="object"),  # the ruleset stamp it was named with
     }, authors=frozenset({"ai"})),
     # what the platform could not check about how the message spread (SPREAD), written when you wrote your first reaction
     DocKind("verify.spread", "VERIFY", "訊息怎麼傳開", {
         "message": Field("text", 64, required=True, scan=False),
-        "cells": Field("json", 4000, required=True, scan=False),   # {SPREAD_KEYS: evidence_words.cell(...)}
+        "cells": Field("json", 4000, required=True, scan=False, shape="object"),  # {SPREAD_KEYS: evidence_words.cell(...)}
     }, authors=frozenset({"system"}), deletable=False),
     # what you saw yourself about how it spread: your own words, never counted as a source
     DocKind("verify.seen", "VERIFY", "你自己看到的", {
@@ -139,12 +139,12 @@ KINDS = [
         "claim": Field("text", 64, scan=False),
         "claim_version": Field("int", 100000),
         "place": Field("text", 200, scan=False),                # the place whose list was used; absent = none matched (elsewhere)
-        "dbs": Field("json", 30000, required=True, scan=False),   # [{"db", "state", "why"?, "hits": [{"source_id", "publisher", "judged_as", "date", "url"}]}]
-        "rules": Field("json", 2000, scan=False),
+        "dbs": Field("json", 30000, required=True, scan=False, shape="array"),  # [{"db", "state", "why"?, "hits": [{"source_id", "publisher", "judged_as", "date", "url"}]}]
+        "rules": Field("json", 2000, scan=False, shape="object"),
     }, authors=frozenset({"system"}), deletable=False),
     # AI 用白話摘要主張帳本 (the ledger itself is the system's: evidence.checked_claims)
     DocKind("verify.summary", "VERIFY", "AI 白話摘要帳本", {
-        "lines": Field("json", 20000, required=True),   # [{"claim", "claim_version", "line"}]
+        "lines": Field("json", 20000, required=True, shape="array"),  # [{"claim", "claim_version", "line"}]
         "overview": Field("text", 1000),
     }, authors=frozenset({"ai"})),
     # AI 提出還該查什麼

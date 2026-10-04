@@ -37,7 +37,7 @@ KINDS = [
     DocKind("decide.judgment", "DECIDE", "判斷卡", {
         "conclusion": _mine(max=4000),                       # 暫定結論
         "problem_definition": _mine(),                       # 1 問題目前怎麼被定義，為什麼這樣定義
-        "facts": _mine("json", 16000),                       # 2 [{"text", "sources": int, "self_said": bool, "credibility": CREDIBILITY}]
+        "facts": _mine("json", 16000, shape="array"),        # 2 [{"text", "sources": int, "self_said": bool, "credibility": CREDIBILITY}]
         "assumptions": _mine(),                              # 3 假設與它的依據
         "norm_context": _mine(),                             # 4 適用法域、權利與義務、價值、由誰承擔後果
         "alternative": _mine(),                              # 5 至少一個替代假設或反例
@@ -50,11 +50,11 @@ KINDS = [
         "affected": _mine("list", 30),                       # 10 誰會受影響（先帶入開案資料）
         "revision_reason": _mine(max=1000),                  # 11 這一版為什麼改
         "confidence": _mine("int", 100, required=True),      # 信心（百分比）
-        "stop_answers": _mine("json", 8000),                 # 什麼時候停止分析的四題，key = STOP_KEYS
-        "pre_checks": _mine("json", 8000),                   # Farrell 的四個檢查題，key = PRE_CHECK_KEYS
+        "stop_answers": _mine("json", 8000, shape="object"),  # 什麼時候停止分析的四題，key = STOP_KEYS
+        "pre_checks": _mine("json", 8000, shape="object"),    # Farrell 的四個檢查題，key = PRE_CHECK_KEYS
         "intensity_now": _mine("choice", choices=INTENSITY, required=True),   # 下判斷前：情緒和急迫感多強
-        "influences_listed": _mine("json", 16000, scan=False),           # 系統列的：[{"kind", "text"}]，存在你存的這一版
-        "influences_asked": _mine("json", 8000, labels=ASKED),             # 系統問的八項你怎麼答：[{"who", "answer", "note"}]
+        "influences_listed": _mine("json", 16000, scan=False, shape="array"),  # 系統列的：[{"kind", "text"}]，存在你存的這一版
+        "influences_asked": _mine("json", 8000, labels=ASKED, shape="array"),  # 系統問的八項你怎麼答：[{"who", "answer", "note"}]
         "influences_added": _mine("list", 20),               # 你自己補的（跟系統列的分開記）
     }, deletable=False, singleton=True),
     # The AI's check of what the person wrote: it never rewrites the card (關卡二), it points.

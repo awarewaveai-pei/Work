@@ -35,6 +35,11 @@ class Field:
     scan: bool = True           # GOVERN reads it for high-risk words (places and what the system listed are not read: block_hooks/govern.py)
     unread_keys: tuple[str, ...] = ()  # json: keys inside whose values GOVERN does not read for risk (a fact's place)
     cited: bool = False         # json: objects inside cite sources -- only an AI action that ``cites`` may write it (ai_gate checks each)
+    shape: str = ""            # json: "object" | "array"; empty means either is intentional
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.shape, str) or self.shape not in ("", "object", "array") or (self.shape and self.type != "json"):
+            raise InvariantViolation(f"DOC_FIELD_SHAPE_INVALID: {self.type} cannot have shape {self.shape!r}")
 
 
 @dataclass(frozen=True)
@@ -122,6 +127,10 @@ def _check_value(kind: str, name: str, spec: Field, value: Any) -> Any:
         if not isinstance(value, int) or isinstance(value, bool) or not 0 <= value <= spec.max:
             raise InvariantViolation(f"DOC_FIELD_INVALID: {where} is a whole number 0..{spec.max}")
         return value
+    if spec.shape == "object" and not isinstance(value, dict):
+        raise InvariantViolation(f"DOC_FIELD_INVALID: {where} must be a JSON object")
+    if spec.shape == "array" and not isinstance(value, list):
+        raise InvariantViolation(f"DOC_FIELD_INVALID: {where} must be a JSON array")
     if not isinstance(value, (dict, list)) or len(json.dumps(value, ensure_ascii=False).encode("utf-8")) > min(spec.max, MAX_JSON_BYTES):
         raise InvariantViolation(f"DOC_FIELD_INVALID: {where} is an object or list of at most {min(spec.max, MAX_JSON_BYTES)} bytes")
     return value
@@ -143,6 +152,8 @@ def validate(kind: str, content: Any, author: str) -> dict[str, Any]:
     for name, field_spec in spec.fields.items():
         value = content.get(name)
         if _empty(value):
+            if name in content and value is not None and field_spec.type == "json":
+                _check_value(kind, name, field_spec, value)  # even [] cannot stand in for an object (or vice versa)
             if field_spec.required:
                 raise InvariantViolation(f"DOC_FIELD_REQUIRED: {kind}.{name}")
             continue

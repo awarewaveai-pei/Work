@@ -48,7 +48,7 @@ KINDS = [
         "prediction_result": _mine("choice", choices=PREDICTION_RESULT),
         "prediction_note": _mine(max=1000),                          # 預測對上結果：差在哪
         "missed": _mine(),                                           # 當時漏看了什麼
-        "review_checks": _mine("json", 8000),                        # Farrell 的四個檢查題，key = REVIEW_CHECK_KEYS
+        "review_checks": _mine("json", 8000, shape="object"),        # Farrell 的四個檢查題，key = REVIEW_CHECK_KEYS
         "step_done": _mine(),                                        # 這一步有沒有做好（清得掉）
         "direction": _mine(),                                        # 整件事有沒有往解決的方向走（守得住）
         "process": _mine(),                                          # 過程：我做對、做錯了什麼
@@ -57,10 +57,10 @@ KINDS = [
         "other_method": _mine(max=500),                              # 換方法時：換什麼（MAP 讀）
         "updated_conditions": _mine(),                               # 更新後的判斷條件（DECIDE 讀）
         "done_when_met": _mine("choice", choices=DONE_WHEN),         # 開案時寫的暫定完成條件，做到了沒有
-        "trust": _mine("json", 8000),                                # 信任校準五個面向，key = TRUST_KEYS
+        "trust": _mine("json", 8000, shape="object"),                # 信任校準五個面向，key = TRUST_KEYS
         "delegate_note": _mine(max=1000),                            # 哪些事還交給 AI，哪些不交
         "next_blocks": _mine("choices", len(PROPOSABLE), choices=PROPOSABLE),
-        "wrong_sources": _mine("json", 8000),                        # [{"source", "why", "cards"?}]：當時哪個出處錯了；cards = the GATHER cards of the origin picked (evidence.origins reads them)
+        "wrong_sources": _mine("json", 8000, shape="array"),         # [{"source", "why", "cards"?}]：當時哪個出處錯了；cards = the GATHER cards of the origin picked (evidence.origins reads them)
     }, deletable=False),
     DocKind("learn.revisit", "LEARN", "回來重看的日子", {
         "on": Field("date", required=True),

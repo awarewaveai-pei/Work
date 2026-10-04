@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-04（續2）COS JSON 欄位形狀在存檔時驗證
+- 根因：`Projects/internal/cognitive-engineering-os/ai_lego/core/domain/doc_kinds.py:134` 原先只驗 JSON 是物件或陣列；`ai_lego/platform/ai_actions/map.py:175` 對 `one_lines` 呼叫 `.items()`，錯形狀可經通用存檔路徑留下並讓 AI 動作 500。
+- 修正：`doc_kinds.py:38` 加 `Field.shape` 宣告與宣告合法性；`:130`、`:154` 存檔拒絕錯形狀（含空容器）；`kinds/` 58 個 JSON 欄位依讀取契約標為物件 21、陣列 37，沒有任意 JSON 例外；`tests/unit/test_block_foundation.py:70` 掃全 registry，`test_block_map.py:90` 實測 API 拒絕。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_map.MapKindTests.test_wrong_one_lines_shape_is_refused_before_it_can_reach_the_ai_action | exit=0 | ms=1989
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=one_lines | hits=14
+- ORACLE_WAIVED: Claude 週額度用完（操作者確認）；Codex 書面對抗自審完成，跨模型審查列入 agency-os/reports/review-debt.md，通過前不 push／部署。
+- 驗證：11 個相關 unittest 模組共 452 tests PASS；13 個修改檔 `py_compile` PASS；`git diff --check` PASS。記憶體內突變：去共用形狀檢查→registry 測試 58 failures；58 個宣告逐一拔掉→各 1 failure、還原全綠；正常程式 targeted 7/7 PASS。
+- 自審：檢查空陣列繞過、必填欄位、`human_only`、AI 答案入口及 API 回應；新增錯誤碼只會由壞程式宣告產生，列為內部錯誤；既有 `DOC_FIELD_INVALID` 供使用者錯值。剩餘：舊資料若已有錯形狀，這次不回寫；目前不上線。
+- rollback：對本次獨立程式提交做 `git revert <hash>`；沒有 schema 或資料搬移。
 ## 2026-10-04（續1）認知主權平台第 1 步蓋好（本機）：七塊＋全程生效五樣、上線前檢查通過；4 個工人整合、7 次審查全修
 - [操作者] 「不要停 直到全部做好」「繼續加速 正確」；中途問「有可以更有效率的做法嗎?」→ 答：返工來自中途改共用規則、全套測試跑太多；下一步開工前先定好共用規則再派工，全套只在最後跑。
 - [做了什麼] 提交 `cd71058f1`..`8c8a95f90`（本機 main，未部署）：

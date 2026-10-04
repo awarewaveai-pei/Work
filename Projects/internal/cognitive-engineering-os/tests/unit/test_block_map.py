@@ -87,6 +87,16 @@ class MapApiTestCase(ProjectSourceApiTestCase):
 
 
 class MapKindTests(MapApiTestCase):
+    def test_wrong_one_lines_shape_is_refused_before_it_can_reach_the_ai_action(self):
+        for value in (["text"], [], "text"):
+            with self.subTest(value=value):
+                response = self.client.post(f"{self.base}/docs/map.map", json={"content": {"one_lines": value}})
+                self.assertEqual(response.status_code, 400, response.text)
+                self.assertIn("DOC_FIELD_INVALID: map.map.one_lines", response.text)
+        self.assertEqual(self.client.get(f"{self.base}/docs/map.map").json(), [])
+        saved = self._save_map({"one_lines": {"facts": "一件事"}})
+        self.assertEqual(saved["content"]["one_lines"], {"facts": "一件事"})
+
     def test_every_save_is_a_new_version_and_none_can_be_deleted(self):
         first = self._save_map({"layers": {"facts": [FACT]}})
         self.assertEqual((first["author"], first["block"], first["version"]), ("user", "MAP", 1))

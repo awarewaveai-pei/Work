@@ -8,6 +8,7 @@ import dataclasses
 import json
 import unittest
 import uuid
+from unittest.mock import patch
 
 from ai_lego.apps.api import main as api_main
 from ai_lego.core.domain import doc_kinds
@@ -57,6 +58,30 @@ class DocKindRulesTests(unittest.TestCase):
         with self.assertRaisesRegex(InvariantViolation, "DOC_FIELD_INVALID"):
             doc_kinds.validate("sense.card", {"category": "不存在", "text": "x"}, "user")
 
+    def test_json_shape_metadata_only_names_supported_shapes_on_json_fields(self):
+        with self.assertRaisesRegex(InvariantViolation, "DOC_FIELD_SHAPE_INVALID"):
+            Field("text", shape="object")
+        with self.assertRaisesRegex(InvariantViolation, "DOC_FIELD_SHAPE_INVALID"):
+            Field("json", shape="scalar")
+        with self.assertRaisesRegex(InvariantViolation, "DOC_FIELD_SHAPE_INVALID"):
+            Field("json", shape=None)
+        self.assertEqual(Field("json").shape, "")  # intentionally untyped JSON remains possible for a future contract
+
+    def test_every_registered_json_field_has_a_shape_and_rejects_the_other_shape_on_save(self):
+        fields = [(kind, name, spec) for kind in doc_kinds.kinds().values() for name, spec in kind.fields.items() if spec.type == "json"]
+        self.assertTrue(fields)
+        for kind, name, spec in fields:
+            with self.subTest(kind=kind.kind, field=name):
+                self.assertIn(spec.shape, ("object", "array"))  # no any-JSON exceptions among registered kinds
+                single = DocKind(kind.kind, kind.block, kind.title, {name: spec})
+                good = {"example": 1} if spec.shape == "object" else [{"example": 1}]
+                wrong = ([{"example": 1}], []) if spec.shape == "object" else ({"example": 1}, {})
+                with patch.object(doc_kinds, "require", return_value=single):
+                    self.assertEqual(doc_kinds.validate(kind.kind, {name: good}, "user"), {name: good})
+                    for value in (*wrong, "bad"):
+                        with self.assertRaisesRegex(InvariantViolation, f"DOC_FIELD_INVALID: {kind.kind}\\.{name}.*{spec.shape}"):
+                            doc_kinds.validate(kind.kind, {name: value}, "user")
+
     def test_every_kind_and_action_loads(self):
         self.assertIn("sense.card", doc_kinds.kinds())
         self.assertIn(("SENSE", "mirror"), ai_gate.actions())
@@ -96,7 +121,7 @@ class WebBlockListTests(unittest.TestCase):
         import re
         from ai_lego import PRODUCT_ROOT
 
-        internal = {"AI_ACTION_DUPLICATE", "AI_ACTION_INVALID", "AI_READ_REFUSED", "DOC_CONTENT_NOT_NORMALISED", "DOC_KIND_DUPLICATE", "DOC_KIND_INVALID",
+        internal = {"AI_ACTION_DUPLICATE", "AI_ACTION_INVALID", "AI_READ_REFUSED", "DOC_CONTENT_NOT_NORMALISED", "DOC_FIELD_SHAPE_INVALID", "DOC_KIND_DUPLICATE", "DOC_KIND_INVALID",
                     "DOC_KIND_NOT_SINGLETON", "DOC_SINGLETON_BROKEN", "RECORD_AUTHOR_IDENTITY_REQUIRED", "RECORD_AUTHOR_INVALID", "RECORD_BLOCK_NOT_ALLOWED",
                     "RECORD_OWNER_INVALID", "RECORD_OWNER_NOT_ALLOWED", "RECORD_TYPE_UNREGISTERED", "RECORD_WRITER_AND_OWNER_REQUIRED",
                     "AI_SOURCES_UNAVAILABLE", "EVIDENCE_CELL_INVALID", "RULESET_DUPLICATE", "RULESET_INVALID", "RULESET_CHANGED_WITHOUT_VERSION", "RULESET_UNKNOWN"}

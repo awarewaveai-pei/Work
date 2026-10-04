@@ -14,13 +14,13 @@ KINDS = [
         "request": Field("text", 64, required=True, scan=False),    # the person's request it ran for
         "question": Field("text", 1000, scan=False),               # copied from the request (scanned there)
         "label": Field("choice", choices=LABELS, required=True, labels=LABELS),
-        "algorithm": Field("json", 1000, required=True, scan=False),   # {"id", "version", "name"}
+        "algorithm": Field("json", 1000, required=True, scan=False, shape="object"),   # {"id", "version", "name"}
         "formula": Field("text", 2000, scan=False),
-        "inputs": Field("json", 20000, required=True, scan=False),     # [{"name", "value", "unit", "cards": [card doc ids], "own": bool}]
-        "scenarios": Field("json", 20000, scan=False),              # {"樂觀"|"一般"|"悲觀"|...: {input name: value}}
-        "result": Field("json", 20000, required=True, scan=False),  # {"range": {"low", "high", "unit"}, "by_scenario": {...}}
-        "flip": Field("json", 4000, scan=False),                    # {"input", "at"}: 哪一個輸入一變，結果就翻過來
-        "rules": Field("json", 2000, scan=False),
+        "inputs": Field("json", 20000, required=True, scan=False, shape="array"),     # [{"name", "value", "unit", "cards": [card doc ids], "own": bool}]
+        "scenarios": Field("json", 20000, scan=False, shape="object"),             # {"樂觀"|"一般"|"悲觀"|...: {input name: value}}
+        "result": Field("json", 20000, required=True, scan=False, shape="object"),  # {"range": {"low", "high", "unit"}, "by_scenario": {...}}
+        "flip": Field("json", 4000, scan=False, shape="object"),                   # {"input", "at"}: 哪一個輸入一變，結果就翻過來
+        "rules": Field("json", 2000, scan=False, shape="object"),
         "rerun_of": Field("text", 64, scan=False),
     }, authors=frozenset({"system"}), deletable=False),
     # 你可以不採用結果
@@ -35,15 +35,15 @@ KINDS = [
     DocKind("compute.request", "COMPUTE", "要算什麼", {
         "question": Field("text", 1000, required=True, human_only=True),
         "algorithm": Field("text", 40, required=True, human_only=True, scan=False),           # an id of ruleset compute.algorithms
-        "inputs": Field("json", 12000, required=True, human_only=True),                       # [{"key", "name", "value", "unit", "cards": [card ids], "own": bool}]
-        "scenarios": Field("json", 8000, human_only=True, scan=False),                        # {"樂觀"|"悲觀": {input name: value}}; 一般 = each input's value
-        "not_priced": Field("json", 4000, human_only=True),                                    # 成本效益: [{"side": NOT_PRICED_SIDES, "what"}] -- listed, never priced
+        "inputs": Field("json", 12000, required=True, human_only=True, shape="array"),       # [{"key", "name", "value", "unit", "cards": [card ids], "own": bool}]
+        "scenarios": Field("json", 8000, human_only=True, scan=False, shape="object"),       # {"樂觀"|"悲觀": {input name: value}}; 一般 = each input's value
+        "not_priced": Field("json", 4000, human_only=True, shape="array"),                   # 成本效益: [{"side": NOT_PRICED_SIDES, "what"}] -- listed, never priced
         "who_bears": Field("text", 1000, human_only=True),                                     # 成本效益: 誰得到效益、誰付成本
         "from_run": Field("text", 64, human_only=True, scan=False),                            # the run this version reran or edited (its rerun_of)
     }, deletable=False),
     # AI 建議適合的算法 (propose_options): ids from the ruleset and words only -- never a number
     DocKind("compute.suggestion", "COMPUTE", "AI 建議的算法", {
-        "algorithms": Field("json", 3000, required=True),   # [{"id", "why"}]
+        "algorithms": Field("json", 3000, required=True, shape="array"),   # [{"id", "why"}]
         "ideas": Field("list", 5),                          # 情境可以怎麼想，只有字
         "question": Field("text", 300),
     }, authors=frozenset({"ai"})),
@@ -51,7 +51,7 @@ KINDS = [
     # (every input the result rests on: AI 不准把假設藏起來) are filled from the run, never by the model
     DocKind("compute.explanation", "COMPUTE", "AI 的白話解釋", {
         "run": Field("text", 64, required=True, scan=False),
-        "points": Field("json", 8000, required=True),       # [{"part": AI_PARTS, "text"}]
+        "points": Field("json", 8000, required=True, shape="array"),       # [{"part": AI_PARTS, "text"}]
         "influential": Field("text", 120, required=True),   # one input's name
         "rests_on": Field("list", 20, required=True),
     }, authors=frozenset({"ai"})),

@@ -23,7 +23,7 @@ KINDS = [
         "from_whom": Field("text", 300),                    # 是誰、從哪裡傳來的（別人的聲音）
         "group": Field("text", 60),                         # 你分的組
         "when": Field("text", 40),                          # 時間線上的位置（日期或「三年前」）
-        "links": Field("json", 8000),                       # [{"to": doc_id, "relation": "..."}]：關係圖
+        "links": Field("json", 8000, shape="array"),        # [{"to": doc_id, "relation": "..."}]：關係圖
         "share_with_facilitator": Field("bool"),            # 有人帶的時候，給不給帶領者看（GOVERN 記同意）
     }),
     # 你自己替現在最強的情緒標強度; DECIDE reads only this, never the cards
@@ -37,7 +37,7 @@ KINDS = [
     DocKind("sense.mirror", "SENSE", "AI 當鏡子整理回來的", {
         "summary": Field("text", 1500, required=True),      # 把你放的東西整理回給你看
         "gaps": Field("list", 3),                           # 哪裡是空的（例：沒有一張卡講到錢）
-        "explore": Field("json", 4000),                     # [{"signal": one of SIGNALS, "question": "..."}]，只標記可探索的點
+        "explore": Field("json", 4000, shape="array"),      # [{"signal": one of SIGNALS, "question": "..."}]，只標記可探索的點
         "question": Field("text", 300),                     # 一次只問一題
     }, authors=frozenset({"ai", "joint", "user"}), singleton=True),   # 再整理一次 = its next version
     DocKind("sense.review", "SENSE", "你對鏡子的回應", {

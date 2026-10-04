@@ -56,28 +56,28 @@ KINDS = [
         "method": Field("text", 200, scan=False),           # the 拆法 used, as the person reads it (工具名: the catalog's words)
         "method_id": Field("text", 120, scan=False),        # its catalog id, so a method already used in this case is known
         "method_version": Field("text", 40),                # the tool's version when it was picked (系統記下用的是哪一版)
-        "one_lines": Field("json", 6000),                   # {layer key: the one line you write first}
-        "layers": Field("json", 60000, unread_keys=("place",)),   # {layer key: [{id, text, by, card?, group?, place?, sources?, self_said?, cards?}]}; a fact's cards = GATHER source cards
+        "one_lines": Field("json", 6000, shape="object"),   # {layer key: the one line you write first}
+        "layers": Field("json", 60000, unread_keys=("place",), shape="object"),   # {layer key: [{id, text, by, card?, group?, place?, sources?, self_said?, cards?}]}; a fact's cards = GATHER source cards
         "skipped": Field("choices", len(LAYER_KEYS), choices=LAYER_KEYS),
         "core_conflict": Field("text", 2000, human_only=True),
-        "claims": Field("json", 20000, labels=tuple(CLAIM_KINDS)),   # [{id, text, kind, by, item?, + the kind's detail fields}]
+        "claims": Field("json", 20000, labels=tuple(CLAIM_KINDS), shape="array"),   # [{id, text, kind, by, item?, + the kind's detail fields}]
         "gaps": Field("list", 30),                          # 資訊缺口
-        "assumptions": Field("json", 8000),                 # [{text, by}] 假設，誰提的
+        "assumptions": Field("json", 8000, shape="array"),  # [{text, by}] 假設，誰提的
         "unwinnable": Field("bool"),                        # you judged this a game that cannot be won
-        "unwinnable_answers": Field("json", 8000),          # [{q: 0..7, answer, note?}]
+        "unwinnable_answers": Field("json", 8000, shape="array"),  # [{q: 0..7, answer, note?}]
     }, deletable=False, singleton=True),
     # What the AI offers. Each is the AI's alone; the person confirms or drops each line (map.review).
     DocKind("map.placement", "MAP", "AI 建議的層", {
-        "placements": Field("json", 20000), # [{card: sense.card doc_id, layer}]
+        "placements": Field("json", 20000, shape="array"), # [{card: sense.card doc_id, layer}]
     }, authors=frozenset({"ai"}), singleton=True),
     DocKind("map.alternatives", "MAP", "AI 提的別的解釋", {
-        "items": Field("json", 20000),      # [{about: item id, view, check}]
+        "items": Field("json", 20000, shape="array"),      # [{about: item id, view, check}]
     }, authors=frozenset({"ai"}), singleton=True),
     DocKind("map.method_pick", "MAP", "AI 推薦的拆法", {
-        "picks": Field("json", 8000),      # [{method_id, reason}]
+        "picks": Field("json", 8000, shape="array"),      # [{method_id, reason}]
     }, authors=frozenset({"ai"}), singleton=True),
     DocKind("map.claim_proposal", "MAP", "AI 提議的主張", {
-        "proposals": Field("json", 20000),  # [{item: item id, kind}]
+        "proposals": Field("json", 20000, shape="array"),  # [{item: item id, kind}]
     }, authors=frozenset({"ai"}), singleton=True),
     # The person's answer to one line of an AI offer: kept, so 回顧 can show whether you took it.
     DocKind("map.review", "MAP", "你對 AI 建議的回應", {

@@ -49,11 +49,11 @@ KINDS = [
         "thoughts": Field("text", 2000),                     # 想法
         "adjustment": Field("text", 2000),                   # 要調整什麼
         "blocker": Field("text", 2000),                      # 卡在哪
-        "numbers": Field("json", 8000),                      # [{"name", "value": number, "unit"}]：同一個名字兩筆就畫趨勢
+        "numbers": Field("json", 8000, shape="array"),       # [{"name", "value": number, "unit"}]：同一個名字兩筆就畫趨勢
     }, deletable=False),
     # The AI's three turns (each only reads and gives back; it never promises, never sets a number, never does the step)
     DocKind("act.split", "ACT", "AI 拆出來的小步", {
-        "options": Field("json", 6000, required=True),       # [{"step", "why_small", "reversible": bool, "undo"}]，由你挑
+        "options": Field("json", 6000, required=True, shape="array"),  # [{"step", "why_small", "reversible": bool, "undo"}]，由你挑
     }, authors=frozenset({"ai"}), singleton=True),
     DocKind("act.flag", "ACT", "AI 提醒不能反悔的地方", {
         "irreversible": Field("list", 6),                    # 「任務：為什麼不能反悔」

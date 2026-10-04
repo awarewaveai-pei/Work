@@ -24,18 +24,18 @@ KINDS = [
         "source_id": Field("text", 64, scan=False),        # the stored row (網頁當時的樣子); "" = a page set aside with no text
         "url": Field("text", 2048, scan=False),             # "" for a file the person pasted
         "title": Field("text", 300, scan=False),
-        "found_by": Field("json", 2000, required=True, scan=False),   # {"by": FOUND_BY, "provider"?, "lang"?, "query"?, "angle"?}
-        "cells": Field("json", 20000, required=True, scan=False),     # {CARD_CELL_KEYS: evidence_words.cell(...)}: every key, 不留空白
-        "lists": Field("json", 4000, scan=False),           # [{"list", "category", "maintainer", "version"}] 列在哪一份名單
-        "snapshot": Field("json", 1000, scan=False),        # {"sha256", "fetched_at"} of the stored row
+        "found_by": Field("json", 2000, required=True, scan=False, shape="object"),  # {"by": FOUND_BY, "provider"?, "lang"?, "query"?, "angle"?}
+        "cells": Field("json", 20000, required=True, scan=False, shape="object"),    # {CARD_CELL_KEYS: evidence_words.cell(...)}: every key, 不留空白
+        "lists": Field("json", 4000, scan=False, shape="array"),    # [{"list", "category", "maintainer", "version"}] 列在哪一份名單
+        "snapshot": Field("json", 1000, scan=False, shape="object"), # {"sha256", "fetched_at"} of the stored row
         "archived": Field("text", 10, scan=False),          # the web archive's first capture (YYYY-MM-DD), absent = none or not asked: 原始的還是轉貼的 is read only from it
         "aside": Field("text", 300, scan=False),            # why it is set aside (放一旁); "" = not
-        "rules": Field("json", 2000, scan=False),           # {ruleset name: version} used for this card
+        "rules": Field("json", 2000, scan=False, shape="object"),  # {ruleset name: version} used for this card
     }, authors=frozenset({"system"}), deletable=False),
     # the system's grouping into independent origins (同一篇、同一張圖、只互相引用、可能同出處); every version stays.
     # An origin's id is computed from its cards (evidence.origins), never stored: a regroup cannot move a mark.
     DocKind("gather.origins", "GATHER", "出處分組", {
-        "groups": Field("json", MAX_CASE_CARDS * GROUP_BYTES_PER_CARD, required=True, scan=False),   # [{"cards": [card doc ids], "how": GROUP_HOW}]: evidence_words.grouping_errors
+        "groups": Field("json", MAX_CASE_CARDS * GROUP_BYTES_PER_CARD, required=True, scan=False, shape="array"),  # [{"cards": [card doc ids], "how": GROUP_HOW}]: evidence_words.grouping_errors
         "rules_version": Field("text", 40, required=True, scan=False),
     }, authors=frozenset({"system"}), deletable=False, singleton=True),
     # 你可以把系統分的組拆開: these cards become one origin of their own
@@ -79,22 +79,22 @@ KINDS = [
     # 在這裡連不上的管道: what each (engine, language) of one collection run did (ok | unreachable | no_key)
     DocKind("gather.channels", "GATHER", "這次用的管道", {
         "run": Field("text", 64, required=True, scan=False),
-        "channels": Field("json", 8000, required=True, scan=False),   # [{"provider", "lang", "state", "why"}]
+        "channels": Field("json", 8000, required=True, scan=False, shape="array"),  # [{"provider", "lang", "state", "why"}]
     }, authors=frozenset({"system"}), deletable=False),
     # AI 幫你想查詢要怎麼下，並翻成別的語言再查一次
     DocKind("gather.ai_queries", "GATHER", "AI 建議的查詢", {
-        "queries": Field("json", 8000, required=True),     # [{"text", "lang", "angle"}]
+        "queries": Field("json", 8000, required=True, shape="array"),  # [{"text", "lang", "angle"}]
         "note": Field("text", 600),
     }, authors=frozenset({"ai"}), singleton=True),
     # 「這個來源說……」 for each source (or what you pasted), what is still missing, one question
     DocKind("gather.ai_says", "GATHER", "AI 摘要來源", {
-        "items": Field("json", 30000, cited=True),         # [{"card", "says", "quote", "citations"}]
+        "items": Field("json", 30000, cited=True, shape="array"),  # [{"card", "says", "quote", "citations"}]
         "gaps": Field("list", 5),
         "question": Field("text", 300),
     }, authors=frozenset({"ai"})),
     # AI 指出哪兩個來源互相矛盾（兩邊並排，不選邊）、可能還缺哪一方的說法
     DocKind("gather.ai_compare", "GATHER", "AI 比對來源", {
-        "conflicts": Field("json", 30000, cited=True),     # [{"about", "a": {"card", "quote", "citations"}, "b": {...}}]
-        "missing": Field("json", 4000),                    # [{"side", "why"}]
+        "conflicts": Field("json", 30000, cited=True, shape="array"),  # [{"about", "a": {"card", "quote", "citations"}, "b": {...}}]
+        "missing": Field("json", 4000, shape="array"),     # [{"side", "why"}]
     }, authors=frozenset({"ai"}), singleton=True),
 ]

@@ -73,7 +73,7 @@ KINDS = [
         "round": Field("text", 64, required=True),
         "action": Field("text", 40, required=True),
         "role": Field("choice", choices=ROLES, required=True),
-        "cards": Field("json", 60000),                                     # [{claim, mechanism, benefit, risk, assumption, method?, premise?, fails_when?, sourced, rests_on?}]
+        "cards": Field("json", 60000, shape="array"),                      # [{claim, mechanism, benefit, risk, assumption, method?, premise?, fails_when?, sourced, rests_on?}]
         "question": Field("text", 300),
         "handback": Field("text", 500),                                    # 交還控制: why it gave no cards
         "sourced": Field("choice", choices=SOURCED, required=True),
@@ -82,7 +82,7 @@ KINDS = [
         "round": Field("text", 64, required=True),
         "action": Field("text", 40, required=True),
         "role": Field("choice", choices=ROLES, required=True),
-        "sections": Field("json", 30000),                                  # [{"title", "items": [text]}]
+        "sections": Field("json", 30000, shape="array"),                   # [{"title", "items": [text]}]
         "question": Field("text", 300),                                    # 一次只問一題
         "premise": Field("text", 1000),
         "fails_when": Field("text", 1000),
