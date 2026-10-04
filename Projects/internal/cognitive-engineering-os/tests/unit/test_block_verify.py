@@ -22,7 +22,8 @@ from ai_lego.data.repositories.project_source_repository import ProjectSourceRep
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import block_hooks, integrity
 from ai_lego.platform.block_hooks import verify as hooks
-from ai_lego.apps.api.blocks.verify import NO_ATTRIBUTION, hit_address
+from ai_lego.apps.api.blocks.verify import NO_ATTRIBUTION
+from ai_lego.platform.block_hooks.verify import hit_address
 from ai_lego.core.domain.source import COLLECTED_PROVENANCE, source_record
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.platform.net import collect_lookups
@@ -547,21 +548,65 @@ class FactcheckTests(VerifyCase):
         self.assertEqual(self._repo.find_active_source(self.tenant_id, self.pid, report)["source_id"], page)
         self.assertEqual(len({row["canonical_url"] for row in rows}), 3)
 
-    def test_a_failed_report_can_never_count_as_support(self):
-        """critic M1: the reviewed claim repeats the message; it is not in the fact-check source's text, so no reading can
-        quote it as support, and a support or opposition without a quote is refused."""
+    def test_a_fact_check_card_never_enters_the_ai_reading_turn(self):
+        """critic round 3 M1: a review rated 錯誤 repeats the claim (「網傳「…」並非事實」) and a review of another claim
+        says 「他們的判定：錯誤」 -- quoted, either passes as support or opposition. The AI turn is never given a fact-check
+        card, named or not; an answer citing one is refused as uncited; the person sets its stance."""
         self.lookups.answer = SPEC_ANSWER
         cid = self.claim(message=self.mid)["doc_id"]
         self.post("/verify/factcheck", {"message": self.mid})
         block_hooks.wait_idle()
         [source] = self._repo.list_sources(self.tenant_id, self.pid)
-        [card] = [doc["doc_id"] for doc in self.current("gather.source") if doc["content"]["source_id"] == source["source_id"]]
-        self.group([card])
+        [hit] = [doc["doc_id"] for doc in self.current("gather.source") if doc["content"]["source_id"] == source["source_id"]]
+        _, page = self.page()
         self.grant("search_external")
-        support = {"claim": cid, "card": card, "reads_as": "支持", "quote": "銀行下週起每日提款上限兩萬", "citations": [f"source:{source['source_id']}"]}
-        self.assertEqual(self.ai("read", {}, {"readings": [support]}, 502)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
-        self.assertEqual(self.ai("read", {}, {"readings": [{k: v for k, v in support.items() if k != "quote"}]}, 502)["detail"].split(":")[0], "AI_ANSWER_INVALID")
-        self.assertEqual((self.current("verify.reading"), self.ledger()[cid]["support"]), ([], []))
+        oppose = {"claim": cid, "card": hit, "reads_as": "反對", "quote": "他們的判定：錯誤", "citations": [f"source:{source['source_id']}"]}
+        for context in ({}, {"cards": [hit]}, {"cards": [page, hit]}):
+            self.assertIn("VERIFY_FACTCHECK_CARD_NOT_FOR_AI", self.ai("read", context, {"readings": [oppose]}, 400)["detail"], context)
+        self.assertEqual(self.provider.calls, [])
+        for reading in (oppose, {**oppose, "card": page}):
+            self.assertEqual(self.ai("read", {"cards": [page]}, {"readings": [reading]}, 502)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
+        self.assertNotIn("他們的判定", self.provider.calls[0][1])   # the hit's text was never sent
+        self.assertEqual(self.current("verify.reading"), [])
+        mine = self.post("/verify/stances", {"content": {"claim": cid, "claim_version": 1, "card": hit, "snapshot": self.sha(hit), "stance": "反對"}})
+        self.assertEqual(mine["author"], "user")
+
+    def test_a_report_the_collector_stored_and_its_fact_check_hit_are_one_origin(self):
+        """critic round 3 N1: the hit's address is the report URL + #fragment; both cards read as 反對 are one opposing
+        origin, never 「出處彼此獨立」."""
+        report = "https://tfc-taiwan.org.tw/articles/1"
+        cid = self.claim(message=self.mid)["doc_id"]
+        self.stored(report, "台灣事實查核中心報告全文：網傳銀行下週起每日提款上限兩萬，經查為錯誤訊息。")
+        self.lookups.answer = SPEC_ANSWER
+        self.post("/verify/factcheck", {"message": self.mid})
+        block_hooks.wait_idle()
+        cards = self.current("gather.source")
+        self.assertEqual([card["content"]["url"].split("#")[0] for card in cards], [report, report])
+        for card in cards:
+            self.save("verify.stance", {"claim": cid, "claim_version": 1, "card": card["doc_id"], "snapshot": self.sha(card["doc_id"]), "stance": "反對"},
+                      record_log.user(self.identity["identity_id"], "VERIFY"))
+        line = self.ledger()[cid]
+        self.assertEqual((len(line["oppose"]), line["three"]["independent"], line["three"]["independent_enough"]), (1, 1, False))
+
+    def test_a_copy_of_the_report_joins_the_report_and_its_hit_in_one_origin(self):
+        """critic round 3 N1, chained: a mirror with the report's exact text (one snapshot) and the hit (one address) both
+        join the report page, so all three are one origin whatever order they came in."""
+        report = "https://tfc-taiwan.org.tw/articles/1"
+        mirror = self.card(url="https://mirror.example/1", sha="e" * 64)
+        hit = self.card(url=hit_address("claimreview", report, CLAIM))
+        page = self.card(url=report, sha="e" * 64)
+        self.group([mirror], [hit], [page])
+        self.assertEqual([sorted(card["card"] for card in origin["cards"]) for origin in self.origins()], [sorted([mirror, hit, page])])
+
+    def test_the_same_report_and_claim_twice_in_one_answer_is_stored_once(self):
+        """critic round 3 N3: the second would supersede the first and the record would name a source no longer active."""
+        claimreview = json.loads(json.dumps(SPEC_ANSWER["items"][0]["dbs"][0]))
+        claimreview["hits"].append({**claimreview["hits"][0], "judged_as": "部分錯誤"})
+        self.lookups.answer = answer_with(claimreview=claimreview)
+        dbs, _, _ = self.check()
+        [hit] = dbs["claimreview"]["hits"]
+        rows = self._repo.list_sources(self.tenant_id, self.pid)
+        self.assertEqual(([(row["source_id"], row["status"]) for row in rows], hit["judged_as"]), ([(hit["source_id"], "active")], "錯誤"))
 
     def test_the_same_result_twice_is_one_source(self):
         self.lookups.answer = SPEC_ANSWER
@@ -694,6 +739,12 @@ class ProposeGatherTests(Step2Case):
             hooks._after_sources(self.docs, self.tenant_id, self.owner, {"run": "r1", "channels": []})
         [proposal] = self.docs.current(self.tenant_id, self.owner, "assembler.proposal.verify")
         self.assertEqual((proposal["content"]["propose"], proposal["content"]["why"]), ("GATHER", hooks.WHY_GATHER))
+
+    def test_a_fact_check_card_is_not_one_an_ai_turn_could_read(self):
+        for index in range(12):
+            self.card(source_id=f"s{index}", url=f"https://p{index}")
+        self.card(source_id="s12", url=hit_address("claimreview", "https://tfc-taiwan.org.tw/articles/1", CLAIM))
+        self.assertEqual(hooks.usable_cards(self.docs, self.tenant_id, self.owner), 12)
 
 
 class EngineReachesNothingOutsideTests(unittest.TestCase):

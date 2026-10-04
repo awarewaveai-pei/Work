@@ -112,6 +112,20 @@ describe("VERIFY ledger lines", () => {
     await done();
   });
 
+  it("a fact-check card is never offered to the AI; reading it myself shows the record's words; the claim's look-up says where the words go", async () => {
+    const HIT = { card: "K2", title: "TFC 的查核：錯誤", url: "https://tfc-taiwan.org.tw/articles/1#factcheck-claimreview-ab", source_id: "s2", snapshot: { sha256: "h2" } };
+    const record = doc("verify.factcheck", "X1", { message: "M1", dbs: [{ db: "claimreview", state: "查到", attribution: "查核結果來自各查核組織。", hits: [
+      { source_id: "s2", publisher: "台灣事實查核中心", judged_as: "錯誤", date: "2026-05-01", url: "https://tfc-taiwan.org.tw/articles/1", local: true, claim: "銀行下週起停止營業", license: "CC BY 4.0" }] }] }, { author: "system" });
+    const { host, done } = await ledger({}, { [`${P}/evidence`]: { origins: [{ origin_id: "o:1", cards: [CARD] }, { origin_id: "o:2", cards: [HIT] }] }, [`GET ${P}/docs/verify.factcheck`]: [record] });
+    const forAi = host.querySelector('[aria-label="給 AI 讀的來源卡"]')!;
+    expect([byText(forAi, "button", "央行新聞稿") !== undefined, byText(forAi, "button", HIT.title)]).toEqual([true, undefined]);
+    expect(host.textContent).not.toContain("他們查的說法");
+    await click(byText(host.querySelector('[aria-label="讀哪一張"]')!, "button", HIT.title)!);
+    expect(host.textContent).toContain("他們查的說法：銀行下週起停止營業；誰判的：台灣事實查核中心（當地）；判定：錯誤；2026-05-01；授權：CC BY 4.0");   // from the record, never the source's text
+    expect(host.textContent).toContain(`「查查核資料庫」：${sentTo(SPEC as never)}`);
+    await done();
+  });
+
   it("after the claim changed, an old stance does not count as read: confirming the new reading edits it", async () => {
     const reading = doc("verify.reading", "R2", { readings: [{ claim: "C1", claim_version: 2, card: "K1", snapshot: "h1", reads_as: "反對", quote: "本行從未宣布每日提款上限" }] }, { author: "ai" });
     const old = doc("verify.stance", "S1", { claim: "C1", claim_version: 1, card: "K1", snapshot: "h1", stance: "反對" });

@@ -22,6 +22,7 @@ type Spread = { message: string; cells: Record<string, Cell> };
 type Seen = { message: string; about: string; text: string };
 type Hit = { source_id: string; publisher: string; judged_as: string; date: string; url: string; local: boolean; claim?: string; claimant?: string; license?: string };
 type Factcheck = { message?: string; claim?: string; place?: string; dbs: Array<{ db: string; state: string; why?: string; attribution?: string; hits: Hit[] }> };
+type HeldHit = Hit & { attribution?: string };
 export type ReadingEntry = { claim: string; claim_version: number; card: string; snapshot: string; reads_as: string; quote?: string };
 type Reading = { readings: ReadingEntry[] };
 type Stance = { claim: string; claim_version: number; card: string; snapshot: string; stance: string; quote?: string; reading?: string; reason?: string };
@@ -179,6 +180,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
   };
 
   const cards = useMemo(() => evidence.origins.flatMap((origin) => origin.cards).filter((card) => card.source_id && card.snapshot?.sha256 && !card.aside), [evidence]);
+  // a fact-check card's source, from the verify.factcheck records (never from the source's text): the person reads it, the AI never does
+  const hitOf = useMemo(() => new Map(factchecks.flatMap((doc) => doc.content.dbs.flatMap((item) => item.hits.map((hit): [string, HeldHit] => [hit.source_id, { ...hit, attribution: item.attribution }])))), [factchecks]);
   const cardTitle = (id: string) => { const card = evidence.origins.flatMap((origin) => origin.cards).find((item) => item.card === id); return card?.title || card?.url || "來源卡"; };
   if (!spec || !lines) return <BlockShell projectId={projectId} code="VERIFY"><div className="card"><p>{error || "載入中…"}</p></div></BlockShell>;
 
@@ -190,6 +193,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
   const spread = message && spreads.find((doc) => doc.content.message === message.doc_id);
   const checks = message && factchecks.filter((doc) => doc.content.message === message.doc_id).at(-1);
   const toBring = mapClaimsToBring(map, claims);
+  const forAi = cards.filter((card) => !hitOf.has(card.source_id ?? ""));
   const summary = summaries.at(-1);
   const next = nexts.at(-1);
 
@@ -329,7 +333,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         <p className="how">帳本由系統排：每個主張有幾個獨立出處支持、幾個反對。只有你自己確認過的讀法才算數。三件事分開看：找得到出處、出處彼此獨立、出處站得住。這三件，沒有一件等於「這是真的」。</p>
         {lines.length === 0 && <p className="sub">還沒有主張。</p>}
         {lines.map((line) => (
-          <LedgerLine key={line.claim_id} projectId={projectId} line={line} spec={spec} busy={busy} base={base} claims={claims} cards={cards} cardTitle={cardTitle} lines={lines}
+          <LedgerLine key={line.claim_id} projectId={projectId} line={line} spec={spec} busy={busy} base={base} claims={claims} cards={cards} hitOf={hitOf} cardTitle={cardTitle} lines={lines}
             readings={readingsFor(readings, line.claim_id, line.version)} stances={stances.filter((doc) => doc.content.claim === line.claim_id)}
             verdict={verdicts.find((doc) => doc.content.claim === line.claim_id)} editing={editing === line.claim_id} setEditing={setEditing}
             factcheck={factchecks.filter((doc) => doc.content.claim === line.claim_id).at(-1)} act={act} saveClaim={saveClaim} lookUp={lookUp} setNotices={setNotices} />
@@ -340,12 +344,13 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         <div className="card">
           <h2>請 AI 讀來源</h2>
           <p className="how">AI 讀每張來源卡怎麼說每個主張，附上原文。它的讀法不算數，你確認了才算。一次最多 {MAX_READ_CARDS} 張。要協作合約准「找外部資料」。</p>
-          <div className="chips" role="group" aria-label="給 AI 讀的來源卡">{cards.map((card) => (
+          <p className="hint">查核資料庫查到的卡，不給 AI 讀。那種卡會重述被查的說法，AI 一引用，看起來就像支持。請你在主張下面自己讀。</p>
+          <div className="chips" role="group" aria-label="給 AI 讀的來源卡">{forAi.map((card) => (
             <button key={card.card} type="button" className={`chip${readCards.includes(card.card) ? " on" : ""}`} aria-pressed={readCards.includes(card.card)}
               disabled={!readCards.includes(card.card) && readCards.length >= MAX_READ_CARDS}
               onClick={() => setReadCards(readCards.includes(card.card) ? readCards.filter((item) => item !== card.card) : [...readCards, card.card])}>{(card.title || card.url || "來源卡").slice(0, 24)}</button>
           ))}</div>
-          {cards.length === 0 && <p className="sub">還沒有可以讀的來源卡。先「去查」，或查查核資料庫。</p>}
+          {forAi.length === 0 && <p className="sub">還沒有可以給 AI 讀的來源卡。先「去查」。</p>}
           <div className="btns mt8"><button className="btn" type="button" disabled={busy || readCards.length === 0} onClick={() => act(async () => { await turn("read", { cards: readCards }); })}>請 AI 讀這些來源</button></div>
         </div>
 
@@ -379,6 +384,11 @@ export function sentTo(spec: Spec): string {
   return `按下去，這段字會送到找資料的服務，由它去問：${spec.factcheck_dbs.asked.map((db) => spec.factcheck_dbs.dbs[db]?.name ?? db).join("、")}。`;
 }
 
+/** One fact-check result as the verify.factcheck record holds it: the claim they reviewed, who judged, the verdict word, the licence, the link. */
+function HitLine({ hit }: { hit: Hit }) {
+  return <>{hit.claim && <>他們查的說法：{hit.claim}；</>}誰判的：{hit.publisher}{hit.local ? "（當地）" : ""}；判定：{hit.judged_as || "沒有寫"}；{hit.date || "沒有日期"}{hit.license ? `；授權：${hit.license}` : ""}　<a href={hit.url} target="_blank" rel="noreferrer">看依據</a></>;
+}
+
 function FactcheckResult({ result, spec }: { result: Factcheck; spec: Spec }) {
   const lines = [...new Set(result.dbs.map((item) => item.attribution ?? "").filter(Boolean))];
   return (
@@ -388,7 +398,7 @@ function FactcheckResult({ result, spec }: { result: Factcheck; spec: Spec }) {
         <div key={item.db}>
           <b>{spec.factcheck_dbs.dbs[item.db]?.name ?? item.db}：{item.state}</b>{item.why && <span className="sub">（{item.why}）</span>}
           {item.hits.length > 0 && <ul>{item.hits.map((hit) => (
-            <li key={hit.source_id}>{hit.claim && <>他們查的說法：{hit.claim}；</>}誰判的：{hit.publisher}{hit.local ? "（當地）" : ""}；判定：{hit.judged_as || "沒有寫"}；{hit.date || "沒有日期"}{hit.license ? `；授權：${hit.license}` : ""}　<a href={hit.url} target="_blank" rel="noreferrer">看依據</a></li>
+            <li key={hit.source_id}><HitLine hit={hit} /></li>
           ))}</ul>}
         </div>
       ))}
@@ -397,8 +407,8 @@ function FactcheckResult({ result, spec }: { result: Factcheck; spec: Spec }) {
   );
 }
 
-function LedgerLine({ projectId, line, spec, busy, base, claims, cards, cardTitle, lines, readings, stances, verdict, editing, setEditing, factcheck, act, saveClaim, lookUp, setNotices }: {
-  projectId: string; line: Line; spec: Spec; busy: boolean; base: string; claims: Doc<Claim>[]; cards: EvidenceCard[]; cardTitle: (id: string) => string; lines: Line[];
+function LedgerLine({ projectId, line, spec, busy, base, claims, cards, hitOf, cardTitle, lines, readings, stances, verdict, editing, setEditing, factcheck, act, saveClaim, lookUp, setNotices }: {
+  projectId: string; line: Line; spec: Spec; busy: boolean; base: string; claims: Doc<Claim>[]; cards: EvidenceCard[]; hitOf: Map<string, HeldHit>; cardTitle: (id: string) => string; lines: Line[];
   readings: Array<ReadingEntry & { reading: string }>; stances: Doc<Stance>[]; verdict?: Doc<Verdict>; editing: boolean; setEditing: (value: string | null) => void;
   factcheck?: Doc<Factcheck>; act: (work: () => Promise<void>) => Promise<void>; saveClaim: (claim: Claim, doc?: Doc<Claim>) => Promise<void>;
   lookUp: (body: Record<string, string>) => Promise<void>; setNotices: (notices: Notice[]) => void;
@@ -434,6 +444,7 @@ function LedgerLine({ projectId, line, spec, busy, base, claims, cards, cardTitl
     setNotices((verdict ? await docs.update(projectId, "verify.verdict", verdict, content) : await docs.create(projectId, "verify.verdict", content)).notices);
   });
   const earlier = line.earlier.map((id) => lines.find((item) => item.claim_id === id)).filter(Boolean) as Line[];
+  const ownHit = hitOf.get(cards.find((item) => item.card === own.card)?.source_id ?? "");
   return (
     <div className="judge">
       {editing ? <ClaimForm spec={spec} busy={busy} initial={{ ...doc.content, reason: "" }} needReason onSave={(claim) => saveClaim(claim, doc)} onCancel={() => setEditing(null)} /> : <>
@@ -466,6 +477,7 @@ function LedgerLine({ projectId, line, spec, busy, base, claims, cards, cardTitl
             : <button className="btn" type="button" disabled={busy || angles.length === 0} onClick={() => goCheck(false)}>去查（先看計畫）</button>}
           <button className="btn ghost" type="button" disabled={busy} onClick={() => lookUp({ claim: line.claim_id })}>查查核資料庫</button>
         </div>
+        <p className="hint">「查查核資料庫」：{sentTo(spec)}</p>
         {factcheck && <FactcheckResult result={factcheck.content} spec={spec} />}
       </div>}
       {readings.length > 0 && <div className="field">
@@ -487,6 +499,7 @@ function LedgerLine({ projectId, line, spec, busy, base, claims, cards, cardTitl
         <b>你讀一張來源卡</b>
         <Chips options={cards.map((card) => card.card)} value={own.card} onPick={(card) => setOwn({ ...own, card, reading: readings.find((entry) => entry.card === card) })} label="讀哪一張"
           names={Object.fromEntries(cards.map((card) => [card.card, (card.title || card.url || "來源卡").slice(0, 24)]))} />
+        {ownHit && <p className="hint">這張是查核結果，AI 不讀，由你判斷它怎麼說這個主張（他們查的說法，可能不是這一個）：<HitLine hit={ownHit} />{ownHit.attribution && <span className="sub">　{ownHit.attribution}</span>}</p>}
         <Chips options={spec.stances} value={own.stance} onPick={(stance) => setOwn({ ...own, stance })} label="它怎麼說這個主張" />
         <input className="search" aria-label="原文的哪一段（選填，要照抄）" placeholder="原文的哪一段（選填，要照抄）" value={own.quote} maxLength={2000} onChange={(event) => setOwn({ ...own, quote: event.target.value })} />
         {own.reading && own.stance && own.stance !== own.reading.reads_as && <input className="search" aria-label="為什麼跟 AI 讀的不一樣" placeholder="為什麼跟 AI 讀的不一樣（必填）" value={own.reason} maxLength={1000} onChange={(event) => setOwn({ ...own, reason: event.target.value })} />}

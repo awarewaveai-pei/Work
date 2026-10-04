@@ -16,7 +16,6 @@ is stored as a source like any other (repo.add_source, written as GATHER; GATHER
 from __future__ import annotations
 
 import datetime
-import hashlib
 import uuid
 from typing import Any
 
@@ -33,7 +32,7 @@ from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.platform import block_hooks, evidence, safety
-from ai_lego.platform.block_hooks.verify import card_sha, message_sha, require_first, settle_dead_runs, vouched
+from ai_lego.platform.block_hooks.verify import card_sha, hit_address, message_sha, require_first, settle_dead_runs, vouched
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.net.collection_service import CollectionServiceClient
@@ -79,14 +78,6 @@ def _place(docs: CaseDocs, session: dict[str, Any], owner: record_log.Owner) -> 
 
 def _now() -> str:
     return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def hit_address(db: str, url: str, claim: str) -> str:
-    """A fact-check hit's own address: the report's URL plus a fragment naming the database and the reviewed claim. The
-    collector's canonical URLs never carry a fragment (next-admin lib/collect/canonical.ts), so a hit never supersedes a
-    page the collector or the person stored, and two reviews on one report page are two sources."""
-    digest = hashlib.sha256(f"{db}\n{url}\n{claim}".encode("utf-8")).hexdigest()[:16]
-    return f"{url.split('#', 1)[0]}#factcheck-{db}-{digest}"
 
 
 def _store_hit(repo: ProjectSourceRepository, cas: TenantScopedCas, session: dict[str, Any], project: dict[str, Any], hit: dict[str, Any], db: str) -> str:
@@ -195,8 +186,11 @@ def factcheck(project_id: str, body: FactcheckBody, session: dict[str, Any] = De
             results.append({"db": db, "state": UNCHECKABLE, "why": NO_ATTRIBUTION, "attribution": "", "hits": []})
             continue
         hits, unanswered = (_claimreview_hits(entry, plan["local_publishers"]), 0) if db == "claimreview" else _cofacts_hits(entry)
-        shown = []
+        shown, addresses = [], set()
         for hit in hits:
+            if hit["address"] in addresses:   # the same report and claim twice in one answer: the first stands (a second would supersede it)
+                continue
+            addresses.add(hit["address"])
             source_id = _store_hit(repo, cas, session, project, hit, db)
             stored.append(source_id)
             shown.append({"source_id": source_id, **hit["shown"]})

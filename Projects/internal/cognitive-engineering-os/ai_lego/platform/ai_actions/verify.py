@@ -1,7 +1,7 @@
 """VERIFY's AI turns (contract card 「AI 能做什麼」): propose how a message splits into claims (``split``), name the
 manipulation patterns with the message's own words (``techniques``), read what each source card says about each claim
-(``read``: cites the case's cards only), summarise the ledger in plain words (``summary``: hands back under two
-independent origins), and say what is still worth checking (``next``).
+(``read``: cites the case's cards only, never a fact-check card -- the person reads those), summarise the ledger in
+plain words (``summary``: hands back under two independent origins), and say what is still worth checking (``next``).
 
 Every turn about a message waits for the person's first reaction to it (先寫第一反應，才看結果). The AI never rules a claim
 true or false and never decides what to forward: no AI kind holds a verdict, the ledger is the system's
@@ -19,11 +19,12 @@ from ai_lego.core.domain.evidence_words import CHECKABLE, MIN_ORIGINS, MIN_QUOTE
 from ai_lego.core.domain.kinds.verify import ASKS, law_unconfirmed, weak_line
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gate import AiAction
-from ai_lego.platform.block_hooks.verify import FIRST_REQUIRED, card_sha, first_written
+from ai_lego.platform.block_hooks.verify import FIRST_REQUIRED, card_sha, first_written, is_hit
 from ai_lego.platform.rulesets.verify import TECHNIQUES
 
 Read = Callable[..., list[dict[str, Any]]]
 MAX_CLAIMS = 12
+FACTCHECK_NOT_FOR_AI = "VERIFY_FACTCHECK_CARD_NOT_FOR_AI: a fact-check card is yours to read, never the AI's; name the cards the AI reads (context.cards) without it"
 
 # shape() gets only the model's answer, but the saved document is filled from the records (the message, a claim's
 # version, a card's page): build_input, in the same call and thread, leaves them here (the THINK pattern).
@@ -188,8 +189,16 @@ READ_SCHEMA = {"type": "object", "properties": {"readings": {"type": "array", "i
 
 
 def _read_input(context: Mapping[str, Any], read: Read) -> str:
+    """A fact-check card is never given to this turn: it repeats the claim it reviewed, so a quote of it could pass as
+    support, and a review of another claim could pass as opposition. The gate gives every usable card unless the turn
+    names them (context.cards), so with one in the case the cards must be named, without it."""
     claims = _claims(context, read, checkable_only=context.get("claims") is None)
-    shas = {doc["doc_id"]: card_sha(doc) for doc in read("gather.source")}
+    cards = read("gather.source")
+    hits = {doc["doc_id"] for doc in cards if is_hit(doc["content"].get("url"))}
+    named = context.get("cards")
+    if hits and (named is None or (isinstance(named, list) and any(isinstance(card, str) and card in hits for card in named))):
+        raise InvariantViolation(FACTCHECK_NOT_FOR_AI)
+    shas = {doc["doc_id"]: card_sha(doc) for doc in cards}
     _TURN.set({"claims": {doc["doc_id"]: doc["version"] for doc in claims}, "shas": {card: sha for card, sha in shas.items() if sha}})
     rows = [{"claim": doc["doc_id"], "text": doc["content"]["text"], "kind": doc["content"]["sentence"]} for doc in claims]
     return "The claims:\n" + json.dumps(rows, ensure_ascii=False)

@@ -45,6 +45,11 @@ def _sha(card: Mapping[str, Any]) -> str | None:
     return sha if isinstance(sha, str) and sha else None
 
 
+def _address(card: Mapping[str, Any]) -> str | None:
+    url = (card.get("content") or {}).get("url")
+    return (url.split("#", 1)[0] or None) if isinstance(url, str) else None
+
+
 def origin_id(cards: Iterable[str], pending: bool = False) -> str:
     """An origin is its cards: the id is computed from them, so a mark made on one set of pages never lands on another."""
     digest = hashlib.sha256("\n".join(sorted(cards)).encode("utf-8")).hexdigest()[:16]
@@ -55,8 +60,9 @@ def origins(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, *, with_rev
     """The case's independent origins (出處): every source card in exactly one.
 
     The system's latest grouping (``gather.origins``) first; then the person's splits (oldest first) take their cards
-    out into an origin of their own; then cards on one stored page or one snapshot are put together whatever the
-    grouping said (同一份內容 is never two origins). A card no grouping has seen yet is 還在分組: shown, never counted.
+    out into an origin of their own; then cards on one stored page, one snapshot or one address (URL without #fragment)
+    are put together whatever the grouping said (同一份內容 is never two origins). A card no grouping has seen yet is
+    還在分組: shown, never counted.
     An origin counts unless it is pending, every card in it is set aside and not taken back, or the person marked it
     不用 (「不用」的出處照樣交出去，但不算). ``wrong_in_review`` (LEARN's reviews that named it) only ``with_reviews``."""
     if owner.kind != "case":
@@ -84,12 +90,27 @@ def origins(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, *, with_rev
         if card not in key:
             key[card] = ("pending", card)
             how[key[card]] = PENDING_HOW
-    # one stored page or one snapshot is one origin: the earliest card's place wins (a grouped place over a pending one)
-    same: dict[str, list[str]] = {}
+    # one stored page, one snapshot or one address (the URL without its #fragment: a fact-check hit and the report page
+    # it points at) is one origin, and so is every card chained to it through them; the earliest card's place wins (a
+    # grouped place over a pending one)
+    joined = {card: card for card in cards}
+
+    def top(card: str) -> str:
+        while joined[card] != card:
+            card = joined[card]
+        return card
+
+    first_with: dict[str, str] = {}
     for card, doc in cards.items():
-        for mark in (f"source:{doc['content'].get('source_id')}" if doc["content"].get("source_id") else None, f"sha:{_sha(doc)}" if _sha(doc) else None):
-            if mark:
-                same.setdefault(mark, []).append(card)
+        for mark in (f"source:{doc['content'].get('source_id')}" if doc["content"].get("source_id") else None, f"sha:{_sha(doc)}" if _sha(doc) else None,
+                     f"url:{_address(doc)}" if _address(doc) else None):
+            if mark and mark in first_with:
+                joined[top(card)] = top(first_with[mark])
+            elif mark:
+                first_with[mark] = card
+    same: dict[str, list[str]] = {}
+    for card in cards:
+        same.setdefault(top(card), []).append(card)
     for members in same.values():
         if len(members) > 1:
             members.sort(key=lambda card: cards[card]["created_at"])

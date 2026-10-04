@@ -135,6 +135,22 @@ def card_sha(card: Mapping[str, Any]) -> str | None:
     return snapshot.get("sha256") if isinstance(snapshot, Mapping) else None
 
 
+HIT_FRAGMENT = "factcheck-"
+
+
+def hit_address(db: str, url: str, claim: str) -> str:
+    """A fact-check hit's own address: the report's URL plus a fragment naming the database and the reviewed claim. The
+    collector's canonical URLs never carry a fragment (next-admin lib/collect/canonical.ts), so a hit never supersedes a
+    page the collector or the person stored, and two reviews on one report page are two sources (one origin: evidence)."""
+    digest = hashlib.sha256(f"{db}\n{url}\n{claim}".encode("utf-8")).hexdigest()[:16]
+    return f"{url.split('#', 1)[0]}#{HIT_FRAGMENT}{db}-{digest}"
+
+
+def is_hit(url: Any) -> bool:
+    """A card on a fact-check hit (``hit_address``): the person reads it; an AI reading turn is never given it."""
+    return isinstance(url, str) and url.partition("#")[2].startswith(HIT_FRAGMENT)
+
+
 def reading_entry(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, reading_id: Any, claim: Any, card: Any) -> dict[str, Any] | None:
     reading = _live(docs, tenant_id, owner, "verify.reading", reading_id)
     entries = reading["content"].get("readings") if reading else None
@@ -234,10 +250,10 @@ def settle_dead_runs(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) ->
 
 
 def usable_cards(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> int:
-    """Stored pages an AI reading turn could be given (one per stored page, not set aside or taken back)."""
+    """Stored pages an AI reading turn could be given (one per stored page, not set aside or taken back, not a fact-check hit)."""
     taken_back = {doc["content"]["card"] for doc in docs.current(tenant_id, owner, "gather.takeback")}
     return len({doc["content"]["source_id"] for doc in docs.current(tenant_id, owner, "gather.source")
-                if doc["content"].get("source_id") and (not doc["content"].get("aside") or doc["doc_id"] in taken_back)})
+                if doc["content"].get("source_id") and (not doc["content"].get("aside") or doc["doc_id"] in taken_back) and not is_hit(doc["content"].get("url"))})
 
 
 def _after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arrived: dict[str, Any]) -> None:
