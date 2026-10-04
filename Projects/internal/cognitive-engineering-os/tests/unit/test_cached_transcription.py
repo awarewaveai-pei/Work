@@ -6,6 +6,7 @@ from ai_lego.data.object.derived_artifact_cache import DerivedArtifactCache
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.errors import InvariantViolation
 from ai_lego.modules.knowledge.ingest.cached_transcription import CachedTranscriber
+from tests.pg import PgTestCase, add_tenant, empty_tables
 
 
 class _Delegate:
@@ -19,11 +20,15 @@ class _Delegate:
         return {**audio_metadata, "transcription_mode": self.mode, "text": declared_speech_text, "segments": []}
 
 
-class CachedTranscriptionTests(unittest.TestCase):
+class CachedTranscriptionTests(PgTestCase):
+    def setUp(self):
+        empty_tables(self.databases)   # fixed keys: a fresh index per test, as the temp file was
+        add_tenant(self.databases, "tenant-a")
+
     def test_second_request_hits_cache_and_does_not_call_delegate(self):
         with tempfile.TemporaryDirectory() as directory:
             delegate = _Delegate()
-            cache = DerivedArtifactCache(TenantScopedCas(Path(directory) / "cas"), Path(directory) / "index.sqlite3")
+            cache = DerivedArtifactCache(TenantScopedCas(Path(directory) / "cas"), self.databases)
             adapter = CachedTranscriber(delegate, cache, "tenant-a", "fixture-v1")
             metadata = {"audio_path": "C:/private/source.wav", "audio_sha256": "a" * 64, "duration_seconds": 1.0}
             first = adapter.transcribe(metadata, "hello")
@@ -37,7 +42,7 @@ class CachedTranscriptionTests(unittest.TestCase):
     def test_cached_payload_does_not_persist_local_audio_path(self):
         with tempfile.TemporaryDirectory() as directory:
             delegate = _Delegate()
-            cache = DerivedArtifactCache(TenantScopedCas(Path(directory) / "cas"), Path(directory) / "index.sqlite3")
+            cache = DerivedArtifactCache(TenantScopedCas(Path(directory) / "cas"), self.databases)
             adapter = CachedTranscriber(delegate, cache, "tenant-a", "fixture-v1")
             metadata = {"audio_path": "C:/private/source.wav", "audio_sha256": "b" * 64}
             adapter.transcribe(metadata, "hello")
@@ -47,7 +52,7 @@ class CachedTranscriptionTests(unittest.TestCase):
     def test_missing_audio_hash_fails_closed_before_delegate(self):
         with tempfile.TemporaryDirectory() as directory:
             delegate = _Delegate()
-            adapter = CachedTranscriber(delegate, DerivedArtifactCache(TenantScopedCas(Path(directory) / "cas"), Path(directory) / "index.sqlite3"), "tenant-a", "fixture-v1")
+            adapter = CachedTranscriber(delegate, DerivedArtifactCache(TenantScopedCas(Path(directory) / "cas"), self.databases), "tenant-a", "fixture-v1")
             with self.assertRaisesRegex(InvariantViolation, "TRANSCRIPTION_CACHE_SOURCE_HASH_REQUIRED"):
                 adapter.transcribe({"audio_path": "source.wav"}, "hello")
             self.assertEqual(delegate.calls, 0)

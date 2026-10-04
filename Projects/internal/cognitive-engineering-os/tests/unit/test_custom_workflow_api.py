@@ -20,7 +20,7 @@ class CustomWorkflowApiTestCase(ApiTestCase):
     def setUp(self):
         super().setUp()
         self._workflow_tmpdir = tempfile.TemporaryDirectory()
-        self._repo = CustomWorkflowRepository(Path(self._workflow_tmpdir.name) / "custom_workflows.sqlite3")
+        self._repo = CustomWorkflowRepository(self.databases)
         api_main.app.dependency_overrides[api_main.get_custom_workflow_repository] = lambda: self._repo
 
     def tearDown(self):

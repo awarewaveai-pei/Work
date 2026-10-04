@@ -19,12 +19,12 @@ from __future__ import annotations
 
 import json
 import re
-import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response
+import psycopg
 from pydantic import BaseModel
 
 from ai_lego.apps.api import main as api
@@ -177,20 +177,20 @@ def _erase_person_runs(tenant_id: str, identity_id: str, artifact_store: JsonArt
 
 # -- export -----------------------------------------------------------------------------------------------------------
 
-def _records(connection: sqlite3.Connection, tenant_id: str, owner: record_log.Owner) -> list[dict[str, Any]]:
+def _records(connection: psycopg.Connection, tenant_id: str, owner: record_log.Owner) -> list[dict[str, Any]]:
     """Every record an owner holds, in the order written, each with its author and block (a row from before they were
     recorded says so: author null)."""
     rows = connection.execute(
         "SELECT aggregate_id, sequence, event_type, occurred_at, schema_version, payload_json, author, block FROM events "
-        "WHERE tenant_id=? AND owner_kind=? AND owner_id=? ORDER BY rowid", (tenant_id, owner.kind, owner.id)).fetchall()
+        "WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s ORDER BY write_order", (tenant_id, owner.kind, owner.id)).fetchall()
     return [{"aggregate_id": row["aggregate_id"], "sequence": row["sequence"], "type": row["event_type"], "at": row["occurred_at"], "schema_version": row["schema_version"],
-             "author": row["author"], "block": row["block"], "payload": json.loads(row["payload_json"])} for row in rows]
+             "author": row["author"], "block": row["block"], "payload": row["payload_json"]} for row in rows]
 
 
 def _case_export(repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore, tenant_id: str, project: dict[str, Any],
                  runs: list[dict[str, Any]]) -> dict[str, Any]:
     project_id = project["project_id"]
-    with repo.connection() as connection:
+    with repo.transaction(tenant_id) as connection:
         records = _records(connection, tenant_id, record_log.case(project_id))
     sources = []
     for source in repo.list_sources(tenant_id, project_id):
@@ -315,8 +315,8 @@ def export_account(fmt: Format = Query(default="json", alias="format"), session:
                    artifact_store: JsonArtifactStore = Depends(api.get_artifact_store), workflows: CustomWorkflowRepository = Depends(api.get_custom_workflow_repository)) -> Response:
     tenant_id, me = session["tenant_id"], session["identity_id"]
     identity = store.get_identity(me) or {}
-    with repo.connection() as connection:
-        records = _records(connection, tenant_id, record_log.person(me))
+    with repo.transaction(tenant_id) as connection:   # a workflow's own records go with the workflows, as when they had their own file
+        records = [record for record in _records(connection, tenant_id, record_log.person(me)) if not record["aggregate_id"].startswith(CustomWorkflowRepository.AGGREGATE_PREFIX)]
     runs = _person_runs(tenant_id, me, artifact_store)
     export = {
         "format": EXPORT_FORMAT, "exported_at": _now(), "scope": "account",
@@ -333,8 +333,8 @@ def export_account(fmt: Format = Query(default="json", alias="format"), session:
 def account_summary(session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository),
                     workflows: CustomWorkflowRepository = Depends(api.get_custom_workflow_repository)) -> dict[str, Any]:
     tenant_id, me = session["tenant_id"], session["identity_id"]
-    with repo.connection() as connection:
-        personal = connection.execute("SELECT COUNT(DISTINCT aggregate_id) FROM events WHERE tenant_id=? AND owner_kind='person' AND owner_id=? AND event_type='DocSaved'", (tenant_id, me)).fetchone()[0]
+    with repo.transaction(tenant_id) as connection:
+        personal = connection.execute("SELECT COUNT(DISTINCT aggregate_id) FROM events WHERE tenant_id=%s AND owner_kind='person' AND owner_id=%s AND event_type='DocSaved'", (tenant_id, me)).fetchone()[0]
     protected = _protected_runs(tenant_id, me)
     return {"cases": [{"project_id": project["project_id"], "name": project["name"], "created_at": project["created_at"]} for project in _my_cases(repo, session)],
             "personal_records": personal, "workflows": len(workflows.list(tenant_id, me)), "runs": len(_run_ids(_runs_folder(tenant_id, me))),
@@ -366,9 +366,9 @@ def erase_account(body: EraseBody, response: Response, session: dict[str, Any] =
     for project in cases:
         failed += api.erase_case(store, repo, source_cas, artifact_store, tenant_id, me, project["project_id"]).get("failed", [])
     runs = _erase_person_runs(tenant_id, me, artifact_store, failed)
-    with repo.transaction() as connection:
+    removed = workflows.delete_person(tenant_id, me)   # the workflows and their records first: one events table holds both
+    with repo.transaction(tenant_id) as connection:
         records = record_log.delete_owned(connection, tenant_id, record_log.person(me))
-    removed = workflows.delete_person(tenant_id, me)
     store.delete_identity(tenant_id, me)
     response.delete_cookie(api.SESSION_COOKIE)
     return {"cases": len(cases), "runs": runs, "records": records, "workflows": removed, "tombstone": True, "failed": failed}
@@ -398,10 +398,10 @@ def rules_in_use() -> list[dict[str, str]]:
 def versions(project_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
     owner = case_owner(project_id, session, repo)
     calls = [{**{key: doc["content"][key] for key in ("block", "action", "model", "instructions_sha256")}, "at": doc["at"]} for doc in CaseDocs(repo).current(session["tenant_id"], owner, "govern.ai_call")]
-    with repo.connection() as connection:
+    with repo.transaction(session["tenant_id"]) as connection:
         rows = connection.execute(
-            "SELECT json_extract(payload_json, '$.kind') AS kind, COUNT(DISTINCT json_extract(payload_json, '$.doc_id')) AS documents, COUNT(*) AS versions FROM events "
-            "WHERE tenant_id=? AND owner_kind='case' AND owner_id=? AND event_type='DocSaved' GROUP BY kind ORDER BY kind", (session["tenant_id"], project_id)).fetchall()
+            "SELECT payload_json->>'kind' AS kind, COUNT(DISTINCT payload_json->>'doc_id') AS documents, COUNT(*) AS versions FROM events "
+            "WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s AND event_type='DocSaved' GROUP BY 1 ORDER BY 1", (session["tenant_id"], project_id)).fetchall()
     known = doc_kinds.kinds()
     held = [{"kind": row["kind"], "block": known[row["kind"]].block if row["kind"] in known else None, "title": known[row["kind"]].title if row["kind"] in known else None,
              "definition": safety.digest(kind_definition(known[row["kind"]])) if row["kind"] in known else None, "documents": row["documents"], "versions": row["versions"]} for row in rows]

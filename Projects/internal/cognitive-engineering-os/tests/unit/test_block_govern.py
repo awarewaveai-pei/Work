@@ -8,8 +8,6 @@ import base64
 import json
 import os
 import re
-import sqlite3
-import tempfile
 import unittest
 import uuid
 from pathlib import Path
@@ -34,7 +32,8 @@ from ai_lego.platform.block_hooks.govern import _recognise, written
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.safety import risk
 from ai_lego.platform.workflow.run_lock import acquire_run_lock, lock_path_for
-from tests.unit.test_block_foundation import MirrorProvider, sqlite_dump
+from tests.pg import PgTestCase, add_tenant, dump, empty_tables
+from tests.unit.test_block_foundation import MirrorProvider
 from tests.unit.test_business_plan_full_recipe import full_source
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
@@ -94,15 +93,12 @@ class HighRiskDetectionTests(unittest.TestCase):
         self.assertEqual(risk.high_risk_categories(), [])
 
 
-class RecognitionHookTests(unittest.TestCase):
+class RecognitionHookTests(PgTestCase):
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.repo = ProjectSourceRepository(Path(self._tmp.name) / "p.sqlite3")
+        empty_tables(self.databases)   # a fresh database per test, as the temp file was
+        self.repo = ProjectSourceRepository(self.databases)
         self.docs = CaseDocs(self.repo)
-        self.owner = a_case(self.repo, "t", "C1")
-
-    def tearDown(self):
-        self._tmp.cleanup()
+        self.owner = a_case(self.repo, add_tenant(self.databases, "t"), "C1")
 
     def _card(self, text, writer=None):
         doc = self.docs.save("t", self.owner, "sense.card", {"category": "事件", "text": text}, writer or record_log.user("me", "SENSE"))
@@ -124,7 +120,7 @@ class RecognitionHookTests(unittest.TestCase):
     def test_the_guardrail_keeps_the_category_never_the_words(self):
         marker = "ZQX-HOSPITAL-NOTE"
         self._card(f"{marker} 要手術")
-        govern_rows = [row for row in sqlite_dump(self.repo.db_path) if "govern.guardrail" in row]
+        govern_rows = [row for row in dump(self.databases) if row.startswith("events:") and "govern.guardrail" in row]
         self.assertEqual(len(govern_rows), 3)
         self.assertFalse(any(marker in row for row in govern_rows))
 
@@ -191,7 +187,7 @@ class TwoAnswerProvider(MirrorProvider):
 class GovernApiTestCase(ProjectSourceApiTestCase):
     def setUp(self):
         super().setUp()
-        self.workflows = CustomWorkflowRepository(Path(self._proj_tmpdir.name) / "workflows.sqlite3")
+        self.workflows = CustomWorkflowRepository(self.databases)
         api_main.app.dependency_overrides[api_main.get_custom_workflow_repository] = lambda: self.workflows
         patcher = mock.patch.object(api_main, "PRODUCT_ROOT", Path(self._proj_tmpdir.name))   # recipe-run files go to this test's folder
         patcher.start()
@@ -392,6 +388,7 @@ def store_identity(case, email):
 
 class AccountErasureTests(GovernApiTestCase):
     PHRASE = "刪除我的帳號"
+    FRESH_TABLES = True   # its tests read the whole database for what must be gone
 
     def setUp(self):
         super().setUp()
@@ -434,19 +431,17 @@ class AccountErasureTests(GovernApiTestCase):
         self.assertEqual((response.json()["cases"], response.json()["records"], response.json()["workflows"], response.json()["tombstone"]), (2, 1, 1, True))
         repo = api_main.app.dependency_overrides[api_main.get_project_source_repository]()
         self.assertEqual([p["project_id"] for p in repo.list_projects(self.tenant_id)], [other])
-        dump = "\n".join(sqlite_dump(repo.db_path))
-        for secret in ("PRIVATE-CARD-ONE", "PRIVATE-CARD-TWO", "PRIVATE-PLACE"):
-            self.assertNotIn(secret, dump)
-        connection = sqlite3.connect(repo.db_path)
-        stays = [json.loads(row[0]) for row in connection.execute("SELECT payload_json FROM events WHERE event_type='ProjectErased'")]
-        mine_left = connection.execute("SELECT COUNT(*) FROM events WHERE (owner_kind='person' AND owner_id=?) OR (owner_kind='case' AND owner_id IN (?, ?))", (self.me, self.pid, self.second)).fetchone()[0]
-        connection.close()
+        everything = "\n".join(dump(self.databases))
+        for secret in ("PRIVATE-CARD-ONE", "PRIVATE-CARD-TWO", "PRIVATE-PLACE", "PRIVATE-FLOW"):
+            self.assertNotIn(secret, everything)
+        with self.databases.for_tenant(self.tenant_id) as connection:
+            stays = [row[0] for row in connection.execute("SELECT payload_json FROM events WHERE tenant_id=%s AND event_type='ProjectErased'", (self.tenant_id,))]
+            mine_left = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=%s AND ((owner_kind='person' AND owner_id=%s) OR (owner_kind='case' AND owner_id IN (%s, %s)))",
+                                           (self.tenant_id, self.me, self.pid, self.second)).fetchone()[0]
         self.assertEqual(len(stays), 2)
         self.assertTrue(all(set(item) <= {"project_id", "erased_by_identity_id", "sources", "blobs_unlinked", "artifacts_deleted", "events_deleted"} for item in stays))
         self.assertEqual(mine_left, 0)
         self.assertEqual(self.workflows.list(self.tenant_id, self.me), [])
-        workflow_dump = "\n".join(sqlite_dump(self.workflows.db_path))
-        self.assertNotIn("PRIVATE-FLOW", workflow_dump)
 
     def test_the_identity_is_an_empty_marker_nobody_can_sign_in_as_and_the_address_is_free(self):
         self.client.post("/govern/account/erase", json={"confirm": self.PHRASE})
@@ -630,17 +625,20 @@ class AccountErasureTests(GovernApiTestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(self.store.get_identity(self.me)["status"], "deleted")
 
-    def test_what_was_deleted_is_gone_from_the_bytes_of_the_three_files_not_only_from_a_query(self):
+    def test_what_was_deleted_is_gone_from_every_row_of_the_database_not_only_from_a_query_of_mine(self):
+        """SQLite's secure_delete also kept this for the bytes of the file; PostgreSQL keeps a deleted row's bytes until a
+        vacuum reuses the space (docs/platform/STORAGE_SWITCH.md "Erasure and the bytes on disk": an open decision).
+        What is checked here: no row of any table, the region's whole database, still holds it."""
         secret_card, secret_flow = "PRIVATE-CARD-ONE " + "x" * 1900, "PRIVATE-FLOW-RAW"
         self._card(secret_card)
         self._workflow(self.me, secret_flow)
-        self.assertIn(b"PRIVATE-FLOW-RAW", Path(self.workflows.db_path).read_bytes())   # it is in the file before
-        self.assertIn(b"user@example.com", Path(self.store.db_path).read_bytes())
+        before = "\n".join(dump(self.databases))
+        self.assertIn("PRIVATE-FLOW-RAW", before)   # it is in the database before
+        self.assertIn("user@example.com", before)
         self.assertEqual(self.client.post("/govern/account/erase", json={"confirm": self.PHRASE}).status_code, 200)
-        repo = api_main.app.dependency_overrides[api_main.get_project_source_repository]()
-        self.assertNotIn(b"PRIVATE-CARD-ONE", Path(repo.db_path).read_bytes())
-        self.assertNotIn(b"PRIVATE-FLOW-RAW", Path(self.workflows.db_path).read_bytes())
-        self.assertNotIn(b"user@example.com", Path(self.store.db_path).read_bytes())
+        after = "\n".join(dump(self.databases))
+        for secret in ("PRIVATE-CARD-ONE", "PRIVATE-FLOW-RAW", "user@example.com"):
+            self.assertNotIn(secret, after)
 
     def test_a_protected_run_is_named_among_what_stays_because_its_ciphertext_cannot_be_deleted_yet(self):
         journal, _ = self._run(self.me, "run-protected")
@@ -650,20 +648,19 @@ class AccountErasureTests(GovernApiTestCase):
         self.assertIn("1 筆", keeps[4])
 
 
-class IdentityStoreTests(unittest.TestCase):
+class IdentityStoreTests(PgTestCase):
+    REGION = "local-dev"
+
     def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.store = IdentityStore(Path(self._tmp.name) / "identity.sqlite3")
+        empty_tables(self.databases)   # fixed ids (T, ME, OTHER): a fresh database per test, as the temp file was
+        self.store = IdentityStore(self.databases)
         self.tenant = self.store.create_tenant("T", "T", "jurisdiction-pack.tw.v1", "local-dev", "k")["tenant_id"]
         self.me = self.store.create_identity("ME", self.tenant, "me@example.com", "Me", "correct-horse-battery")["identity_id"]
         self.other = self.store.create_identity("OTHER", self.tenant, "other@example.com", "Other", "correct-horse-battery")["identity_id"]
 
-    def tearDown(self):
-        self._tmp.cleanup()
-
     def _count(self, table, identity):
-        with self.store._connect() as connection:
-            return connection.execute(f"SELECT COUNT(*) FROM {table} WHERE identity_id=?", (identity,)).fetchone()[0]
+        with self.databases.transaction(self.REGION) as connection:
+            return connection.execute(f"SELECT COUNT(*) FROM {table} WHERE identity_id=%s", (identity,)).fetchone()[0]
 
     def test_everything_that_signs_in_as_the_person_goes_and_the_other_is_untouched(self):
         for who in (self.me, self.other):
@@ -678,27 +675,27 @@ class IdentityStoreTests(unittest.TestCase):
 
     def test_usage_stays_for_the_tenants_budget_but_stops_naming_the_person(self):
         usage_id, _ = self.store.reserve_ai_usage(self.tenant, self.me, "p", "m", 10, 10, since="1970-01-01T00:00:00Z", fits=lambda used: True)
-        self.store.settle_ai_usage(usage_id, "m", 5, 5)
+        self.store.settle_ai_usage(self.tenant, usage_id, "m", 5, 5)
         before = self.store.ai_usage_totals(self.tenant)
         self.store.delete_identity(self.tenant, self.me)
         self.assertEqual(self.store.ai_usage_totals(self.tenant), before)
         self.assertEqual(self._count("ai_usage", self.me), 0)
 
-    def test_what_was_deleted_is_overwritten_in_the_file_not_only_unlinked(self):
+    def test_what_was_deleted_is_gone_from_every_row_not_only_from_its_own_table(self):
+        """The bytes-on-disk half of this test (SQLite's secure_delete) does not carry over: STORAGE_SWITCH.md "Erasure and
+        the bytes on disk". Every row of every table is checked instead."""
         tokens = [self.store.issue_session_for_identity(self.me, self.tenant) for _ in range(3)]
         handoff = self.store.issue_handoff_code(self.me, self.tenant, "/RAW-REDIRECT-SECRET")
-        raw = Path(self.store.db_path).read_bytes()
+        raw = "\n".join(dump(self.databases))
         for token in tokens:
-            self.assertIn(token.encode("utf-8"), raw)   # it is in the file before
-        with self.store._connect() as connection:
-            self.assertEqual(connection.execute("PRAGMA secure_delete").fetchone()[0], 1)
+            self.assertIn(token, raw)   # it is in the database before
         self.assertTrue(self.store.delete_identity(self.tenant, self.me))
-        raw = Path(self.store.db_path).read_bytes()
+        raw = "\n".join(dump(self.databases))
         for token in tokens:
-            self.assertNotIn(token.encode("utf-8"), raw)
-        self.assertNotIn(b"RAW-REDIRECT-SECRET", raw)
-        self.assertNotIn(b"me@example.com", raw)
-        self.assertIn(b"other@example.com", raw)   # somebody else's row is left as it was
+            self.assertNotIn(token, raw)
+        self.assertNotIn("RAW-REDIRECT-SECRET", raw)
+        self.assertNotIn("me@example.com", raw)
+        self.assertIn("other@example.com", raw)   # somebody else's row is left as it was
         self.assertTrue(handoff)
 
     def test_deleting_twice_or_in_another_tenant_does_nothing(self):
