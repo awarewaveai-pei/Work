@@ -116,7 +116,7 @@ async function registry(name: string, deps: DescribeDeps): Promise<Registry> {
   const suffix = labels.map((_, i) => labels.slice(i).join(".")).find((s) => s !== name && notListed[s] !== undefined);
   const base = bases[tld];
   if (suffix !== undefined || !base) {
-    const why = suffix !== undefined ? notListed[suffix] : `「.${tld}」的網域註冊資料庫不在蒐集器的名單上`;
+    const why = suffix !== undefined ? notListed[suffix] : `「.${tld}」的網域註冊資料庫不在找資料的服務的名單上`;
     return { registered: unchecked(why), country: unchecked(why) };
   }
   const cache = deps.cache ?? RDAP_CACHE;
@@ -133,7 +133,7 @@ async function registry(name: string, deps: DescribeDeps): Promise<Registry> {
       return none;
     }
     if (!res.ok) return failed(whyStatus(res.status, REGISTRY));
-    if (res.headers.get("x-collect-truncated") === "1") return failed(`${REGISTRY}的回答太大，蒐集器沒有讀完`);
+    if (res.headers.get("x-collect-truncated") === "1") return failed(`${REGISTRY}的回答太大，找資料的服務沒有讀完`);
     record = await res.json().catch(() => null);
   } catch (e) {
     return failed(whyFailed(e, REGISTRY));

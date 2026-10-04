@@ -301,7 +301,7 @@ export function GatherPage({ projectId }: { projectId: string }) {
         {pending && (
           <div className="judge" role="dialog" aria-label="會怎麼找">
             <b>會怎麼找</b>
-            <p>最多 {pending.plan.max_queries} 組查詢，最多抓 {pending.plan.max_fetches} 頁。會請蒐集器用 {view.words.providers.filter((item) => engines.includes(item.key)).map((item) => item.name).join("、")} 找，中文和英文各找一次；真的用上哪些，找完才知道。</p>
+            <p>最多 {pending.plan.max_queries} 組查詢，最多抓 {pending.plan.max_fetches} 頁。會請找資料的服務用 {view.words.providers.filter((item) => engines.includes(item.key)).map((item) => item.name).join("、")} 找，中文和英文各找一次；真的用上哪些，找完才知道。</p>
             <p className="sub">{view.channels.looked ? `上一次真的用上：${view.channels.engines.map((item) => item.name).join("、") || "沒有搜尋引擎"}。` : "這個案子還沒找過。"}
               {view.channels.blocked.map((item) => `${item.says}。`).join("")}</p>
             <div className="btns"><button className="btn primary" type="button" disabled={busy} onClick={confirm}>確定去找</button><button className="btn ghost" type="button" onClick={() => setPending(null)}>先不要</button></div>

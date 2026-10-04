@@ -42,8 +42,8 @@
     "R4 collect keeps nothing from the case. project_id is for its rate limit and log only. The ClaimReview mirror is a public dataset collect refreshes once a day on its own schedule (the hourly collection heartbeat), never per case.",
     "R5 Matching thresholds and lists live in collect only: RDAP registry list and country names, ClaimReview minimum overlap 0.6 (share of the claim's 3-character pieces), Cofacts minimumShouldMatch 50%, at most 5 hits per database. The engine never sends or stores them.",
     "R6 Every outside call in collect goes through collect's own fetcher (lib/collect/net): its address guard, per-host rate limit and timeouts.",
-    "R7 The engine, when collect cannot be asked or does not answer (no token, unreachable, 401, 5xx, timeout): every describe cell is 無法檢查 「蒐集器這次沒有回應」, every fact-check db is 無法檢查 with the same why, and the run's later describe batches are not asked. An answer that came back but is not in this shape (not JSON, too large, wrong kind or item count) is 無法檢查 「蒐集器的回答格式不對」 for that request only. It never raises out of a hook and never retries inside the same run.",
-    "R8 The engine checks every cell with evidence_words.cell(); a malformed cell becomes 無法檢查 「蒐集器的回答格式不對」. It asks once per site per hook run.",
+    "R7 The engine, when collect cannot be asked or does not answer (no token, unreachable, 401, 5xx, timeout): every describe cell is 無法檢查 「找資料的服務這次沒有回應」, every fact-check db is 無法檢查 with the same why, and the run's later describe batches are not asked. An answer that came back but is not in this shape (not JSON, too large, wrong kind or item count) is 無法檢查 「找資料的服務回的格式不對」 for that request only. It never raises out of a hook and never retries inside the same run.",
+    "R8 The engine checks every cell with evidence_words.cell(); a malformed cell becomes 無法檢查 「找資料的服務回的格式不對」. It asks once per site per hook run.",
     "R9 The engine's egress allowlist keeps only the AI provider and the collect service. RDAP hosts, archive.org, storage.googleapis.com and api.cofacts.tw leave docker-compose.yml and policies/ai-execution/network-egress.yaml; the engine has no platform/net/rdap.py, wayback.py, claimreview.py or cofacts.py."
   ],
   "examples": {
@@ -55,8 +55,8 @@
          "country": {"state": "查不到", "why": "註冊資料沒有寫國家（常被隱藏）"},
          "first_archived": {"state": "查到", "value": "2005-01-02"}},
         {"url": "https://unlisted.zz/a", "site": "unlisted.zz",
-         "registered": {"state": "無法檢查", "why": "「.zz」的網域註冊資料庫不在蒐集器的名單上"},
-         "country": {"state": "無法檢查", "why": "「.zz」的網域註冊資料庫不在蒐集器的名單上"},
+         "registered": {"state": "無法檢查", "why": "「.zz」的網域註冊資料庫不在找資料的服務的名單上"},
+         "country": {"state": "無法檢查", "why": "「.zz」的網域註冊資料庫不在找資料的服務的名單上"},
          "first_archived": {"state": "查不到", "why": "網頁封存館沒有存過這一頁"}}
       ]}
     },
@@ -80,8 +80,8 @@
       ]}
     },
     "collect_down": {
-      "engine_describe_cell": {"state": "無法檢查", "why": "蒐集器這次沒有回應"},
-      "engine_factcheck_db": {"db": "claimreview", "state": "無法檢查", "why": "蒐集器這次沒有回應", "attribution": "", "hits": []}
+      "engine_describe_cell": {"state": "無法檢查", "why": "找資料的服務這次沒有回應"},
+      "engine_factcheck_db": {"db": "claimreview", "state": "無法檢查", "why": "找資料的服務這次沒有回應", "attribution": "", "hits": []}
     }
   }
 }

@@ -100,6 +100,15 @@ class DescribeTests(unittest.TestCase):
         self.assertTrue(all(cells["registered"]["why"] == lookups.DOWN for cells in got.values()))
 
 
+class OneTermTests(unittest.TestCase):
+    def test_no_page_or_message_calls_the_service_that_looks_things_up_a_蒐集器(self):
+        """2026-10-04: one user-facing term, 「找資料的服務」. 蒐集器 was the developers' word and reached a page through a
+        DOWN message, a ruleset line and an example why; a source file that says it again fails here."""
+        found = [path.relative_to(PRODUCT_ROOT).as_posix() for folder, suffixes in (("ai_lego", {".py"}), ("apps/cognitive-web/components", {".tsx"}), ("apps/cognitive-web/lib", {".ts"}), ("specs/wire", {".json"}))
+                 for path in (PRODUCT_ROOT / folder).rglob("*") if path.suffix in suffixes and ".test." not in path.name and "蒐集器" in path.read_text(encoding="utf-8")]
+        self.assertEqual(found, [])
+
+
 class FactcheckTests(unittest.TestCase):
     text = EXAMPLES["factcheck"]["request"]["items"][0]["text"]
 

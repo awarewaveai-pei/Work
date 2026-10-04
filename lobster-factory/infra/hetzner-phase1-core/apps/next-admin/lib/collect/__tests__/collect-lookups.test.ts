@@ -114,6 +114,14 @@ function memoryStore(): ClaimReviewStore & { rows: Map<number, ClaimReviewRow[]>
   return store;
 }
 
+describe("one term for the service on every page", () => {
+  it("no lookup says 蒐集器: the person-facing word is 找資料的服務", () => {
+    const dir = path.resolve(__dirname, "..", "lookups");
+    const said = fs.readdirSync(dir).filter((file) => file.endsWith(".ts") && fs.readFileSync(path.join(dir, file), "utf8").includes("蒐集器"));
+    expect(said).toEqual([]);
+  });
+});
+
 describe("the contract file", () => {
   it("resolves and is the frozen v1 (a broken relative path would silently test nothing)", () => {
     expect(fs.existsSync(SPEC_PATH), SPEC_PATH).toBe(true);
@@ -186,9 +194,9 @@ describe("describe: a lookup that failed is a cell, never a failed request (R2, 
       [Object.assign(new Error("network_x"), { kind: "network" }), "網域註冊資料庫這次沒有回應"],
       [json({}, 503), "網域註冊資料庫回了錯誤（HTTP 503）"],
       [Object.assign(new Error("too_many_redirects_5"), { kind: "http", status: 308 }), "網域註冊資料庫回了錯誤（HTTP 308）"],
-      [Object.assign(new Error("ssrf_blocked_private_address"), { kind: "blocked" }), "蒐集器的安全規則不讓它連到網域註冊資料庫"],
+      [Object.assign(new Error("ssrf_blocked_private_address"), { kind: "blocked" }), "找資料的服務的安全規則不讓它連到網域註冊資料庫"],
       [new Error("rate_limit_wait_too_long_rdap.verisign.com_31000ms"), "這次要問網域註冊資料庫的太多，排不到"],
-      [truncated, "網域註冊資料庫的回答太大，蒐集器沒有讀完"],
+      [truncated, "網域註冊資料庫的回答太大，找資料的服務沒有讀完"],
       [new Response("<html>", { status: 200 }), "網域註冊資料庫的回答格式不對"],
     ];
     for (const [reply, why] of cases) {
@@ -202,7 +210,7 @@ describe("describe: a lookup that failed is a cell, never a failed request (R2, 
 
   it("a registry not on collect's list is 無法檢查 and says so; .tw says why it is not reachable", async () => {
     const zz = await one({ [archiveUrl("https://a.zz/x")]: noCapture() }, {}, "https://a.zz/x");
-    expect(zz.registered).toEqual({ state: "無法檢查", why: "「.zz」的網域註冊資料庫不在蒐集器的名單上" });
+    expect(zz.registered).toEqual({ state: "無法檢查", why: "「.zz」的網域註冊資料庫不在找資料的服務的名單上" });
     const tw = await one({ [archiveUrl("https://www.cna.com.tw/n")]: noCapture() }, {}, "https://www.cna.com.tw/n");
     expect([tw.site, tw.registered]).toEqual(["cna.com.tw", { state: "無法檢查", why: RDAP_NOT_LISTED.tw }]);
   });
@@ -315,8 +323,8 @@ describe("factcheck: each database answers for itself (R2, R3)", () => {
   it("no mirror yet is 無法檢查 「還沒有下載查核資料」; an unreadable or unconnected mirror says which", async () => {
     expect((await ask(cofactsWith(noArticles), memoryStore())).dbs[0]).toMatchObject({ db: "claimreview", state: "無法檢查", why: "還沒有下載查核資料" });
     const broken: ClaimReviewStore = { ...memoryStore(), candidates: async () => ({ kind: "error", error: "PGRST202" }) };
-    expect((await ask(cofactsWith(noArticles), broken)).dbs[0]).toMatchObject({ state: "無法檢查", why: "蒐集器這次讀不到查核資料" });
-    expect((await ask(cofactsWith(noArticles), null)).dbs[0]).toMatchObject({ state: "無法檢查", why: "蒐集器沒有接上查核資料庫" });
+    expect((await ask(cofactsWith(noArticles), broken)).dbs[0]).toMatchObject({ state: "無法檢查", why: "找資料的服務這次讀不到查核資料" });
+    expect((await ask(cofactsWith(noArticles), null)).dbs[0]).toMatchObject({ state: "無法檢查", why: "找資料的服務沒有接上查核資料庫" });
   });
 
   it("a text with no 3-character piece cannot be compared: 無法檢查, and the mirror is not asked", async () => {

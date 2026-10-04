@@ -42,7 +42,7 @@ export function whyFailed(e: unknown, who: string): string {
   const kind = e && typeof e === "object" && "kind" in e ? (e as { kind: unknown }).kind : null;
   const status = e && typeof e === "object" && "status" in e ? Number((e as { status: unknown }).status) : NaN;
   if (kind === "http" && Number.isFinite(status)) return `${who}回了錯誤（HTTP ${status}）`;
-  if (kind === "blocked") return `蒐集器的安全規則不讓它連到${who}`;
+  if (kind === "blocked") return `找資料的服務的安全規則不讓它連到${who}`;
   if (kind === "budget") return "這次的查詢額度用完了";
   // collect's own per-host politeness (net/rate-limit.ts): too many lookups queued for one host to wait for
   if (String(e).includes("rate_limit_wait_too_long")) return `這次要問${who}的太多，排不到`;

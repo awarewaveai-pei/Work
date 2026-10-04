@@ -263,16 +263,16 @@ class CollectLookupTests(GatherCase):
         down = SPEC["examples"]["collect_down"]["engine_describe_cell"]
         for url in ("https://a.example.com/1", "https://b.example.com/2"):
             self.assertEqual((self.cell(url, "registered"), self.cell(url, "country")), (down, down))
-        self.assertEqual(self.cell("https://a.example.com/1", "first_seen"), {"state": "無法檢查", "why": "網頁沒寫日期；蒐集器這次沒有回應"})
-        self.assertEqual(self.cell("https://b.example.com/2", "first_seen"), {"state": "查到", "value": "2026-01-02", "why": "網頁自己寫的日期；網頁封存館：蒐集器這次沒有回應"})
+        self.assertEqual(self.cell("https://a.example.com/1", "first_seen"), {"state": "無法檢查", "why": "網頁沒寫日期；找資料的服務這次沒有回應"})
+        self.assertEqual(self.cell("https://b.example.com/2", "first_seen"), {"state": "查到", "value": "2026-01-02", "why": "網頁自己寫的日期；網頁封存館：找資料的服務這次沒有回應"})
 
     def test_a_malformed_cell_from_collect_is_uncheckable(self):
         url = "https://a.example.com/1"
         self.collect.answers[url] = {**copy.deepcopy(FOUND_ITEM), "url": url, "country": {"state": "查到"}, "first_archived": {"state": "查到", "value": "去年"}}
         self.collected(url, zh(1))
         self.arrive()
-        self.assertEqual(self.cell(url, "country"), {"state": "無法檢查", "why": "蒐集器的回答格式不對"})
-        self.assertEqual(self.cell(url, "first_seen"), {"state": "無法檢查", "why": "網頁沒寫日期；蒐集器的回答格式不對"})   # a value that is no date
+        self.assertEqual(self.cell(url, "country"), {"state": "無法檢查", "why": "找資料的服務回的格式不對"})
+        self.assertEqual(self.cell(url, "first_seen"), {"state": "無法檢查", "why": "網頁沒寫日期；找資料的服務回的格式不對"})   # a value that is no date
         self.assertEqual(self.cell(url, "registered"), FOUND_ITEM["registered"])
 
     def test_ten_pages_of_one_site_ask_collect_once_per_run(self):

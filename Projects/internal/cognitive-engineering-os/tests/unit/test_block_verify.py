@@ -479,7 +479,7 @@ class FactcheckTests(VerifyCase):
         [source] = self._repo.list_sources(self.tenant_id, self.pid)
         address = hit_address("claimreview", "https://tfc-taiwan.org.tw/articles/1", HIT_CLAIM)
         self.assertEqual((source["source_class"], source["canonical_url"], source["source_uri"], saved["content"]["rules"]["version"]),
-                         ("fact_check", address, "https://tfc-taiwan.org.tw/articles/1", "2"))
+                         ("fact_check", address, "https://tfc-taiwan.org.tw/articles/1", "3"))
         text = self.text_of(address)
         for line in ("查核組織：台灣事實查核中心", "他們的判定：錯誤", "查核報告：https://tfc-taiwan.org.tw/articles/1"):
             self.assertIn(line, text)
@@ -492,7 +492,7 @@ class FactcheckTests(VerifyCase):
         self.assertNotIn("GATHER", CaseDocs(self._repo).blocks_used(self.tenant_id, self.owner))
 
     def test_collect_down_or_not_set_up_makes_both_databases_uncheckable_never_an_error(self):
-        """lookup.v1 R7: no token, unreachable, 5xx -- every fact-check database is 無法檢查 「蒐集器這次沒有回應」."""
+        """lookup.v1 R7: no token, unreachable, 5xx -- every fact-check database is 無法檢查 「找資料的服務這次沒有回應」."""
         down = [("claimreview", "無法檢查", collect_lookups.DOWN), ("cofacts", "無法檢查", collect_lookups.DOWN)]
         self.lookups.error = InvariantViolation("COLLECT_LOOKUP_UNAVAILABLE: HTTP 503 from app.aware-wave.com")
         with self.assertLogs("ai_lego.platform.net.collect_lookups", "WARNING"):   # logged, never raised

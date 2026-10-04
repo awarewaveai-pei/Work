@@ -23,7 +23,7 @@ TECHNIQUES = Ruleset("verify.techniques", "VERIFY", "操弄手法清單", "1", "
     {"name": "冒充在地人", "looks_like": "假裝是本地人或某個群體的一份子來說話"},
 ])
 
-FACTCHECK_DBS = Ruleset("verify.factcheck_dbs", "VERIFY", "查核資料庫名單", "2", "平台（蒐集器查的兩個資料庫，加上要金鑰的一個；比對門檻和授權文字在蒐集器）", {
+FACTCHECK_DBS = Ruleset("verify.factcheck_dbs", "VERIFY", "查核資料庫名單", "3", "平台（找資料的服務查的兩個資料庫，加上要金鑰的一個；比對門檻和授權文字在找資料的服務）", {
     "dbs": {
         "claimreview": {"name": "全球查核結果公開資料檔", "by": "各查核組織，由 Data Commons 彙整"},
         "cofacts": {"name": "Cofacts 真的假的", "by": "Cofacts 志工"},
@@ -37,5 +37,5 @@ RULESETS = [TECHNIQUES, FACTCHECK_DBS]
 
 HISTORY = {
     "verify.techniques": {"1": "91c7b1062b44"},
-    "verify.factcheck_dbs": {"1": "8581426e417e", "2": "30fa10ec9bb1"},
+    "verify.factcheck_dbs": {"1": "8581426e417e", "2": "30fa10ec9bb1", "3": "8156e9c223f2"},
 }

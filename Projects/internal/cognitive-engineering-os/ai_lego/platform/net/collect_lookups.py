@@ -19,8 +19,8 @@ from ai_lego.platform.net.collection_service import LOOKUP_ERRORS, collection_se
 
 _log = logging.getLogger(__name__)
 
-DOWN = "蒐集器這次沒有回應"
-MALFORMED = "蒐集器的回答格式不對"
+DOWN = "找資料的服務這次沒有回應"
+MALFORMED = "找資料的服務回的格式不對"
 DESCRIBE_CELLS = ("registered", "country", "first_archived")
 DBS = ("claimreview", "cofacts")
 MAX_DESCRIBE = 25
@@ -78,7 +78,7 @@ def _unchecked(url: str, why: str) -> dict[str, Any]:
 
 def describe(project_id: str, urls: list[str], *, client: Any = _FROM_ENV) -> dict[str, dict[str, Any]]:
     """``{url: {"url", "site", "registered", "country", "first_archived"}}`` for every distinct URL, asked in batches
-    of MAX_DESCRIBE. A batch collect did not answer is 無法檢查 「蒐集器這次沒有回應」."""
+    of MAX_DESCRIBE. A batch collect did not answer is 無法檢查 「找資料的服務這次沒有回應」."""
     distinct = list(dict.fromkeys(url for url in urls if isinstance(url, str) and url))
     out: dict[str, dict[str, Any]] = {}
     down = False

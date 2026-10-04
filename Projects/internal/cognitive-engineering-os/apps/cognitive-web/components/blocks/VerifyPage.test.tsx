@@ -12,7 +12,7 @@ const SPEC = {
   forms: ["訊息", "截圖文字", "連結"], sentence_kinds: ["可以查的事實", "對事實的解釋", "價值判斷", "叫你去做的事"], checkable: "可以查的事實", stances: ["支持", "反對", "無關", "看不出"],
   verdicts: ["採信", "存疑", "不採信"], asks: ["轉傳"], spread: [{ key: "spread", question: "這則訊息怎麼傳開" }], check_questions: ["量是自然的嗎？"], angles: ["primary", "news"], min_origins: 2,
   law_unconfirmed: "未確認", techniques: { title: "操弄手法清單", version: "1", maintainer: "平台", items: [] },
-  factcheck_dbs: { title: "查核資料庫名單", version: "2", maintainer: "平台", dbs: { cofacts: { name: "Cofacts 真的假的", by: "志工" }, claimreview: { name: "全球查核結果公開資料檔", by: "各查核組織" } }, asked: ["claimreview", "cofacts"] },
+  factcheck_dbs: { title: "查核資料庫名單", version: "3", maintainer: "平台", dbs: { cofacts: { name: "Cofacts 真的假的", by: "志工" }, claimreview: { name: "全球查核結果公開資料檔", by: "各查核組織" } }, asked: ["claimreview", "cofacts"] },
 };
 const MSG = doc("verify.message", "M1", { text: MESSAGE, form: "訊息", sha256: "a".repeat(64) });
 const FIRST = doc("verify.first", "F1", { message: "M1", reaction: "有點慌", confidence: 60 });
@@ -93,7 +93,7 @@ describe("VERIFY 查證主張", () => {
     expect(text).toContain("他們查的說法：銀行下週起每日提款上限兩萬；誰判的：台灣事實查核中心（當地）；判定：錯誤");   // the reviewed claim comes from the record, never from the source's text
     expect(text).toContain(sentTo(SPEC as never));
     expect(text).toContain("由它去問：全球查核結果公開資料檔、Cofacts 真的假的。");
-    expect(text).not.toContain("蒐集器");
+    expect(text).not.toContain("蒐集器");   // one term for the service on every page
     await done();
   });
 });

@@ -29,10 +29,10 @@ const NO_MIRROR = "還沒有下載查核資料";
 const COFACTS = `${FACTCHECK.cofacts.name} `;
 /** Why the mirror could not be asked, by what happened (never 「沒有回應」 for a mirror nobody connected). */
 const CLAIMREVIEW_WHY: Record<string, string> = {
-  no_store: "蒐集器沒有接上查核資料庫",
+  no_store: "找資料的服務沒有接上查核資料庫",
   nothing_to_compare: "這段文字太短，沒辦法跟查核資料比對",
   no_mirror: NO_MIRROR,
-  error: "蒐集器這次讀不到查核資料",
+  error: "找資料的服務這次讀不到查核資料",
 };
 
 /** The reply types as Cofacts' own site words them. */
