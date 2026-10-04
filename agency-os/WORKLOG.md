@@ -97,6 +97,20 @@
 - 自審：檢查空陣列繞過、必填欄位、`human_only`、AI 答案入口及 API 回應；新增錯誤碼只會由壞程式宣告產生，列為內部錯誤；既有 `DOC_FIELD_INVALID` 供使用者錯值。剩餘：舊資料若已有錯形狀，這次不回寫；目前不上線。
 - rollback：對本次獨立程式提交做 `git revert <hash>`；沒有 schema 或資料搬移。
 
+## 2026-10-04（續5）
+
+### COS EXPRESS 卡 50 與佇列依賴閘
+
+- 根因：佇列測試只看本卡名稱，誤拒前置卡建立的測試；EXPRESS 一般存檔路徑可偽造已送出稿件，或移除未查證提示。
+- 修改：`tests/unit/test_codex_queue.py` 按依賴鏈查測試來源；`block_hooks/express.py` 驗證一般 API 存檔的 `express.sent` 指向本案既存稿件版本，且草稿一般 API 存檔會保留未查證主張標記；AI 明確指定不存在的選擇／稿件不再退回最新版；`test_integrity.py` 以合成未建 TEACH 驗證舊不變量，不把已建 TEACH 當未建。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_express | exit=0 | ms=8270（14 tests）
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_codex_queue | exit=0 | ms=912（3 tests）
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_integrity | exit=0 | ms=11058（41 tests）
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/0m/0n（Codex 對抗自審，不是獨立跨模型審查）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=express.sent|EXPRESS_DRAFT_UNCHECKED_REQUIRED|_module_is_named_in_dependency_chain | hits=22
+- ORACLE_WAIVED: Claude 週額度用完；三個守衛在記憶體中逐一拔除後指名測試各轉紅，正常狀態復綠。commit 僅留本機，審查債見 `agency-os/reports/review-debt.md`。
+- 回滾：revert 本卡 commit；不要先 push／部署。既有資料未遷移。
+
 ## 2026-10-04（續4）
 
 ### feat(teach): add person practice records, AI partner, completion hook and content reads

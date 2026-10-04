@@ -138,7 +138,11 @@ class TheLiveBlocks(unittest.TestCase):
         self.assertTrue(integrity.gate_passed(rows))
 
     def test_a_block_that_is_not_open_and_not_built_is_not_a_failure(self):
-        rows = {row.block: row for row in integrity.run()}
+        live = Snapshot.live()
+        unbuilt = dataclasses.replace(live, kinds={name: kind for name, kind in live.kinds.items() if kind.block != "TEACH"},
+                                      actions={name: action for name, action in live.actions.items() if action.block != "TEACH"},
+                                      hooks={name: hooks for name, hooks in live.hooks.items() if not name.startswith("teach.")})
+        rows = {row.block: row for row in integrity.run(unbuilt)}
         self.assertEqual(rows["TEACH"].status, "NOT BUILT")
 
 

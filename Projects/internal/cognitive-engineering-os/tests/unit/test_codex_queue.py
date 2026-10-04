@@ -51,6 +51,21 @@ def _module_is_named_in_card(module: str, card_text: str) -> bool:
     return any(name in card_text for name in (module, path_name, f"{path_name}.py", leaf, f"{leaf}.py"))
 
 
+def _module_is_named_in_dependency_chain(module: str, card: dict, cards_by_id: dict[str, dict], queue_root: Path) -> bool:
+    pending = [card]
+    seen: set[str] = set()
+    while pending:
+        current = pending.pop()
+        card_id = current.get("id")
+        if not isinstance(card_id, str) or card_id in seen:
+            continue
+        seen.add(card_id)
+        if _module_is_named_in_card(module, _card_text(queue_root, current.get("file"))):
+            return True
+        pending.extend(cards_by_id[dep] for dep in current.get("depends", ()) if isinstance(dep, str) and dep in cards_by_id)
+    return False
+
+
 def validate_queue(queue: dict, base_folder: Path) -> list[str]:
     """Return every queue contract violation, using only the supplied queue and base folder."""
     errors: list[str] = []
@@ -60,6 +75,7 @@ def validate_queue(queue: dict, base_folder: Path) -> list[str]:
     if not isinstance(cards, list) or not cards:
         errors.append("queue.cards must be a non-empty list")
         cards = []
+    cards_by_id = {card["id"]: card for card in cards if isinstance(card, dict) and isinstance(card.get("id"), str)}
 
     ids: list[str | None] = []
     for index, card in enumerate(cards):
@@ -122,8 +138,8 @@ def validate_queue(queue: dict, base_folder: Path) -> list[str]:
                 else:
                     module_path = base / COS_TESTS_REL.parent / Path(*module.split("."))
                     module_path = module_path.with_suffix(".py")
-                    if not module_path.is_file() and not _module_is_named_in_card(module, text):
-                        errors.append(f"card {card_id}: missing unittest module is not named in its card: {module}")
+                    if not module_path.is_file() and not _module_is_named_in_dependency_chain(module, card, cards_by_id, queue_root):
+                        errors.append(f"card {card_id}: missing unittest module is not named in its card or dependency chain: {module}")
 
             if card.get("high_stop") is True:
                 lowered = command.casefold()
@@ -206,6 +222,23 @@ class CodexQueueTests(unittest.TestCase):
 
     def test_the_real_queue_is_valid(self) -> None:
         self.assertEqual(validate_queue(self.queue, self.repo), [])
+
+    def test_missing_module_requires_own_or_dependency_card(self) -> None:
+        module = "tests.unit.test_future_dependency_example"
+        changed = deepcopy(self.queue)
+        changed["cards"][1]["check"][0]["cmd"] = f"python -m unittest {module}"
+        temporary = self._temporary_repo(changed)
+        try:
+            root = Path(temporary.name)
+            queue_root = root / QUEUE_REL
+            card_00 = queue_root / changed["cards"][0]["file"]
+            card_40 = queue_root / next(card["file"] for card in changed["cards"] if card["id"] == "40-teach-content-and-loader")
+            card_40.write_text(card_40.read_text(encoding="utf-8") + f"\n{module}\n", encoding="utf-8")
+            self.assertTrue(any(module in error for error in validate_queue(changed, root)))
+            card_00.write_text(card_00.read_text(encoding="utf-8") + f"\n{module}\n", encoding="utf-8")
+            self.assertFalse(any(module in error for error in validate_queue(changed, root)))
+        finally:
+            temporary.cleanup()
 
     def test_broken_copies_are_reported_by_the_same_validator(self) -> None:
         cases = {
