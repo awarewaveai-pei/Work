@@ -607,6 +607,35 @@ class CaseLockTests(_TwoConnections):
         first.join(20)
         self.assertEqual(len(self.docs.current(self.tenant, self.owner, "gather.source")), 2)
 
+    def test_what_a_batch_check_read_holds_until_its_writes(self):
+        """CaseDocs.save_many(check=...): the check runs, then the batch writes, and no other writer of the case commits
+        in between (the case lock exclusive for the batch, where SQLite's write lock was): a save that starts while the
+        check runs waits for the batch, and the check never sees it."""
+        checking, seen = threading.Event(), []
+
+        def check():
+            checking.set()
+            self.release.wait(20)
+            seen.append(len(self.docs.current(self.tenant, self.owner, "gather.source")))
+
+        self.release.set()   # no pause inside a save here: the check is what holds
+        self.release.clear()
+        batch = self.run_as("batch", lambda: len(self.docs.save_many(self.tenant, self.owner, [{"kind": "gather.source", "content": _card("https://batch.example/")}],
+                                                                     record_log.system("GATHER"), check=check)))
+        self.assertTrue(checking.wait(10))
+        writer = self.run_as("writer", self.save("https://other.example/"))
+        writer.join(0.5)
+        self.assertTrue(writer.is_alive(), "a writer of the case committed while a batch's check held it")
+        self.release.set()
+        batch.join(20)
+        writer.join(20)
+        self.assertEqual((self.outcomes["batch"], seen), (1, [0]))
+        self.assertEqual(len(self.docs.current(self.tenant, self.owner, "gather.source")), 2)
+
+    def test_a_batch_check_needs_a_case(self):
+        with self.assertRaisesRegex(InvariantViolation, "^DOC_BATCH_CHECK_NEEDS_A_CASE"):
+            self.docs.save_many(self.tenant, record_log.person("me"), [], record_log.user("me", "GOVERN"), check=lambda: None)
+
 
 class DocLockTests(_TwoConnections):
     """Invariant 2 with two real connections: a next version is decided under the document's lock (DOC_STALE), a new
