@@ -1260,6 +1260,7 @@ Repair it first, then re-run:
     $hasStaged = $staged.Count -gt 0
     if ($hasStaged) {
         $resolvedMsgFile = $null
+        $fileBody = $null
         if ($CommitMessageFile) {
             $resolvedMsgFile = if ([System.IO.Path]::IsPathRooted($CommitMessageFile)) { $CommitMessageFile } else { Join-Path $WorkRoot $CommitMessageFile }
             if (-not (Test-Path -LiteralPath $resolvedMsgFile)) {
@@ -1291,13 +1292,39 @@ Repair it first, then re-run:
             $autoCloseStamp = (Get-Date -Format "yyyy-MM-dd HHmm")
             $CommitMessage = "$autoPrefix chore: AO-CLOSE sync $autoCloseStamp"
         }
-        if ($resolvedMsgFile) {
-            git commit -F $resolvedMsgFile
-        } else {
-            git commit -m $CommitMessage
+        # `git commit -m $CommitMessage` hands the string to PowerShell's native-command argv
+        # marshalling, which (PS 5.1, CommandLineToArgvW) does not escape an embedded literal
+        # `"` -- a -CommitMessage like `fix: add "X" class` gets re-split at the quote and fails
+        # (live-reproduced 2026-09-05 in commit-checkpoint.ps1, same `-m $var` shape). `-F <file>`
+        # reads the message as file content, bypassing argv marshalling entirely.
+        #
+        # Critic review (2026-09-05) found the first draft of this fix only normalized the
+        # auto-generated / -CommitMessage path: -CommitMessageFile's raw bytes went straight to
+        # `-F` unchanged, so the identical BOM bug survived on that path, and a UTF-16 file made
+        # git fail with "a NUL byte in commit log message not allowed" (exit 128) as the LAST
+        # step of AO-CLOSE, after every gate had already passed and `git add` had already run.
+        # Fix: always normalize through the same BOM-free temp file, sourced from $fileBody
+        # (already read + .Trim()'d above, PS Get-Content -Encoding UTF8 strips a BOM itself)
+        # when -CommitMessageFile was given, or $CommitMessage otherwise -- one write path for
+        # every source, so $resolvedMsgFile keeps meaning "the file the operator gave us" and
+        # is never itself the thing `-F` reads.
+        #
+        # As a side effect this also closes a second, worse class the critic found live: `-m`
+        # with a message near/over the ~32K Win32 command-line limit fails to even start the
+        # git.exe process while leaving $LASTEXITCODE at its previous value (0), so the old code
+        # would report a false success and continue on to push a commit that was never made.
+        # `-F` has no such limit and fails loudly (non-zero exit) if git itself rejects it.
+        $msgContent = if ($fileBody) { $fileBody } else { $CommitMessage }
+        $tempMsgFile = Join-Path ([System.IO.Path]::GetTempPath()) "ao-close-commit-msg-$([guid]::NewGuid()).txt"
+        try {
+            [System.IO.File]::WriteAllText($tempMsgFile, $msgContent, (New-Object System.Text.UTF8Encoding $false))
+            git commit -F $tempMsgFile
+            $commitExitCode = $LASTEXITCODE
+        } finally {
+            Remove-Item -LiteralPath $tempMsgFile -ErrorAction SilentlyContinue
         }
-        if ($LASTEXITCODE -ne 0) {
-            Write-Error "ao-close: git commit failed"
+        if ($commitExitCode -ne 0) {
+            Write-Error "ao-close: git commit failed (exit $commitExitCode)"
             exit 1
         }
 

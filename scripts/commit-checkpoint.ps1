@@ -5,6 +5,10 @@
 # committing a NAMED set of paths on behalf of a command that knows exactly what it changed
 # (today: .claude/commands/tomo.md). For ordinary work use `git commit -m "<message>"` --
 # it is the same thing, and CLAUDE.md R2 wants the message to carry root cause + verification.
+# CAUTION if your message contains a literal `"`: PowerShell 5.1's argv marshalling does not
+# escape an embedded quote, so `git commit -m "fix: add ""X"" class"` (or an unescaped one)
+# can re-split at the quote and fail with a pathspec error. Prefer `git commit -F <file>`, or
+# avoid embedded double quotes in the -m string, when composing a message by hand.
 #
 # Why the change: as an automated whole-tree committer this script produced 2,568 commits
 # (56.4% of repo history) and six documented harm classes -- 49 tracked files committed as
@@ -89,7 +93,7 @@ try {
     }
 
     if ($DryRun) {
-        Write-Host "[dry-run] would: git commit -m <message> -- $($Paths -join ' ')" -ForegroundColor Cyan
+        Write-Host "[dry-run] would: git commit -F <message-file> -- $($Paths -join ' ')" -ForegroundColor Cyan
         exit 0
     }
 
@@ -130,9 +134,30 @@ try {
         throw "commit-checkpoint: working tree changed for one of `$Paths between staging and commit (concurrent write?) -- aborting instead of committing unscanned content. Re-run."
     }
 
-    git commit -m $Message -- $Paths
-    if ($LASTEXITCODE -ne 0) {
-        exit $LASTEXITCODE
+    # `git commit -m $Message` hands $Message to PowerShell's native-command argv marshalling,
+    # which (PS 5.1, CommandLineToArgvW) does not escape an embedded literal `"` -- a message
+    # like `fix: add "Repo-hygiene audit" class` gets re-split at the quote and the tail lands
+    # as extra pathspec args after `--`, failing with "pathspec '...' did not match any file(s)"
+    # (live-reproduced 2026-09-05). `-F <file>` reads the message as file content, bypassing
+    # argv marshalling entirely, so no embedded character -- quote, backtick, `$`, newline -- can
+    # break it. Removes the class instead of guarding for the one character that was reported.
+    # BOM-free write (Set-Content -Encoding UTF8 on PS 5.1 adds a BOM, which git would then
+    # embed as a leading U+FEFF in the commit subject line -- caught live 2026-09-05 by
+    # inspecting `git log` output, not just the exit code).
+    # Critic review (2026-09-05): cleanup must never be able to flip a successful commit into a
+    # reported failure (or vice versa), and a temp file must not leak if `git commit` throws
+    # (e.g. git missing from PATH under $ErrorActionPreference = "Stop"). try/finally + capturing
+    # $LASTEXITCODE inside the try, immediately after the call, keeps both invariants.
+    $tempMsgFile = Join-Path ([System.IO.Path]::GetTempPath()) "commit-checkpoint-msg-$([guid]::NewGuid()).txt"
+    try {
+        [System.IO.File]::WriteAllText($tempMsgFile, $Message, (New-Object System.Text.UTF8Encoding $false))
+        git commit -F $tempMsgFile -- $Paths
+        $commitExitCode = $LASTEXITCODE
+    } finally {
+        Remove-Item -LiteralPath $tempMsgFile -ErrorAction SilentlyContinue
+    }
+    if ($commitExitCode -ne 0) {
+        exit $commitExitCode
     }
     Write-Host "commit-checkpoint: local commit created (not pushed)." -ForegroundColor Green
 
