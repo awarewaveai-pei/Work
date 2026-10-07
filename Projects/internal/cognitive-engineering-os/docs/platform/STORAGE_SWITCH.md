@@ -15,7 +15,7 @@ PostgreSQL service, not inside the self-hosted Supabase. The engine speaks plain
 | D5 | JSON columns are `jsonb`; ids stay text (uuid strings) | same values the API already returns |
 | D6 | Regions: `COGNITIVE_OS_DATABASE_URLS` = `region=dsn,region=dsn`; one small directory (tenant → region, no personal data) is the only cross-region table, in the first region's database | residency per tenant |
 | D7 | Blobs (TenantScopedCas, JsonArtifactStore) on disk under a per-region root now; object storage when a second region opens | no new service yet |
-| D8 | A `cognitive-db` compose service, own volume, nightly pg_dump into the existing backup path, health check; added only via `scripts/safe-infra-patch.sh` with the operator's go-ahead (High-STOP) | AGENTS.md §0 |
+| D8 | A separate `cognitive-db` compose service, own volume, nightly host-side pg_dump, health check. Card 02's files are in isolated `refs/codex/work` (`842ab3941`), not this branch; current `safe-infra-patch.sh compose` operates the main compose and cannot install that separate project. A governed installer and operator approval are required (High-STOP). | AGENTS.md §0; `agency-os/handoffs/cos-codex-queue/cards/02-cognitive-db-ops.md` |
 
 ## Invariants the port keeps (each has a test that fails on a naive port)
 
@@ -24,7 +24,7 @@ PostgreSQL service, not inside the self-hosted Supabase. The engine speaks plain
 2. DOC_STALE and DOC_SINGLETON_EXISTS hold across processes: an advisory lock per doc / per (owner, kind) inside the save.
 3. Nothing is written to an erased case (`ProjectSourceRepository.require_case`, CASE_ERASED): the check and the erase
    take the same per-(tenant, case) lock in their own transactions (today SQLite's single writer gives this for free).
-4. A tenant's rows and blobs live only in its region; erasure removes rows in one region transaction, then blobs.
+4. A tenant's rows and blobs live only in its region. Erasure must never remove a blob while its row can still roll back; **blocked** by the fault below.
 5. Every SQLite `BEGIN IMMEDIATE` (project_source_repository.py) is replaced by the narrowest lock that gives the same
    guarantee, named in a comment; none becomes "no lock".
 
@@ -133,6 +133,14 @@ the API host and work across its processes; a write they let through still meets
   orders by bytes, as SQLite did; D8 must use the same image, or create the database with `LC_COLLATE=C`.
 
 ## Erasure and the bytes on disk (open decision)
+
+### Merge blocker: erasure across DB and filesystem
+
+The current `erase_case` deletes run artifacts/journals and AI artifacts before the DB erase (`ai_lego/apps/api/main.py:2808-2811`). The repository then unlinks Source CAS inside the DB transaction, before the tombstone append and commit (`ai_lego/data/repositories/project_source_repository.py:750-769`). Fault injection of `record_log.append` on a disposable PostgreSQL database returned `row_survives=True blob_survives=False`: the row rolled back but its content was gone. `close_collect_grants_for_project` is also a separate transaction before the erase. This violates invariant 4; W1-W3 must not merge to main or serve people as-is.
+
+Required repair boundary: one durable, idempotent erasure workflow covering DB rows, Source CAS, AI artifacts, run journals and grants. DB commit must precede irreversible file deletion; a committed-but-unfinished cleanup must be discoverable and retryable after process crash. The tombstone/API must not claim physical completion until cleanup succeeds. Test failures before DB commit, after commit, during each unlink, and during retry; preserve shared Source blobs. Do not replace this with a post-commit best-effort call that can strand personal files.
+
+### Physical retention decision
 
 SQLite ran with `secure_delete = ON`: an erased row was overwritten in the file (plan D10). PostgreSQL has no such
 switch. A deleted row's bytes stay in its data file until VACUUM prunes the page (probe 2026-10-04 with pageinspect on the

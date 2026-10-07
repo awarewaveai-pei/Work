@@ -30,6 +30,16 @@
 - ORACLE_WAIVED: 本次 staged 無程式檔；本條就是 Claude 對 Codex 提交 `c55b64c35` 的跨模型審查本身，直接審查，未走 `claude-oracle.ps1`。
 - 驗證：10 模組各自獨立行程共 437 tests PASS（step2_foundation 54／foundation 43／map 32／think 48／decide 26／learn 27／act 25／gather 68／verify 62／compute 52）。
 - rollback：還原 `agency-os/reports/review-debt.md` 該行即可；無程式、資料變更。
+## 2026-10-07（續1）COS 儲存抹除一致性阻擋
+
+- Critical 根因：`ai_lego/apps/api/main.py:2808-2811` 在 repository 抹除前刪 journal/artifact 並另行關 grant；`ai_lego/data/repositories/project_source_repository.py:750-769` 在可回滾的 PostgreSQL 交易內呼叫 CAS unlink，後續 tombstone append 或 commit 失敗無法還原實體檔。
+- 修改：`docs/platform/STORAGE_SWITCH.md` 把 invariant 4 與 D8 改成明確未完成，界定 durable/idempotent cleanup、失敗恢復與不可誤稱完成的驗收；未改風險程式碼，主線合併閘維持關閉。
+- REALTEST_EVIDENCE: tool=Bash | cmd=一次性 PostgreSQL 中 patch record_log.append 為失敗後呼叫 erase_project 並驗 row/blob 同時存活 | exit=1 | ms=6036；實際輸出 `row_survives=True blob_survives=False`，證明回滾後資料遺失。
+- REVIEW_DONE: critic=Deep | verdict=fail | findings=1c/0m/0n；不是單純移動 CAS unlink：commit 後失敗仍須持久化重試，且 API 更早刪其他檔與 grant。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/ai_lego,Projects/internal/cognitive-engineering-os/tests/unit | grep=erase_case|erase_project|delete_artifacts|_erase_case_runs|collect_unreferenced_blobs|close_collect_grants_for_project | hits=24；已核對呼叫順序與其他入口。
+- ORACLE_PENDING: Claude 尚無有效審查產物；本 Critical 未修，不得 ORACLE_WAIVED 為合併許可。
+- WORKLOG: 本條；rollback=`git revert <本次 doc-only commit>`，無正式資料異動。下一步先設計並實測完整 erasure workflow，再跑儲存 affected tests 與雙審。
+
 ## 2026-10-05 COS 跨區租戶建立故障恢復
 
 - 根因：`identity/store.py:create_tenant` 的 home 與 directory 分屬兩個 PostgreSQL 交易；directory 提交失敗後留下不可路由的 home 列，同參數重試撞主鍵。
