@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -226,8 +228,33 @@ class CodexQueueTests(unittest.TestCase):
     def test_retry_logs_cannot_reuse_a_prior_result_or_hide_a_failed_check(self) -> None:
         driver = (self.repo / "scripts" / "codex-continue.ps1").read_text(encoding="utf-8")
         self.assertIn("[guid]::NewGuid().ToString('N')", driver)
-        self.assertIn("if ($null -eq $p.ExitCode) { return 125 }", driver)
+        self.assertIn("New-Object System.Diagnostics.ProcessStartInfo", driver)
+        self.assertIn("return [int]$p.ExitCode", driver)
+        self.assertNotIn("Start-Process -FilePath 'cmd.exe'", driver)
         self.assertIn("$proc.ExitCode -ne 0 -and $rawLog -match", driver)
+
+    @unittest.skipUnless(os.name == "nt" and shutil.which("powershell"), "Windows PowerShell 5.1 is unavailable")
+    def test_acceptance_check_observes_real_process_exit_status(self) -> None:
+        script = r'''
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($env:CODEX_DRIVER_SOURCE, [ref]$tokens, [ref]$errors)
+if ($errors.Count) { throw $errors[0] }
+$fn = $ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Run-Command'}, $true)
+if (-not $fn) { throw 'Run-Command not found' }
+. ([scriptblock]::Create($fn.Extent.Text))
+$log = Join-Path $env:CODEX_DRIVER_TEMP 'check.txt'
+if ((Run-Command 'exit 0' $env:CODEX_DRIVER_TEMP $log 10) -ne 0) { throw 'success was not exit 0' }
+if ((Run-Command 'exit 7' $env:CODEX_DRIVER_TEMP $log 10) -ne 7) { throw 'failure was not exit 7' }
+'''
+        with tempfile.TemporaryDirectory() as temporary:
+            environment = dict(os.environ)
+            environment["CODEX_DRIVER_SOURCE"] = str(self.repo / "scripts" / "codex-continue.ps1")
+            environment["CODEX_DRIVER_TEMP"] = temporary
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", script], env=environment,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_missing_module_requires_own_or_dependency_card(self) -> None:
         module = "tests.unit.test_future_dependency_example"

@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
-# The service account supplies the connection through standard PostgreSQL PG* variables.
 BACKUP_DIR="${COGNITIVE_DB_BACKUP_DIR:-${BACKUP_DIR:-/root/backups/cognitive-db}}"
 KEEP_DAYS="${COGNITIVE_DB_BACKUP_KEEP_DAYS:-${KEEP_DAYS:-14}}"
 MIN_OBJECTS="${COGNITIVE_DB_BACKUP_MIN_OBJECTS:-${MIN_OBJECTS:-1}}"
+DB_USER="${COGNITIVE_DB_USER:-cognitive}"
+MAINTENANCE_DB="${COGNITIVE_DB_MAINTENANCE_DB:-cognitive_os}"
+COMPOSE_FILE="${COGNITIVE_DB_COMPOSE_FILE:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/docker-compose.cognitive-db.yml}"
 FAILURE_REASON="backup command failed"
 ERROR_LOG="${TMPDIR:-/tmp}/cognitive-db-backup-${BASHPID}.log"
 TEMP_FILES=()
@@ -40,15 +43,33 @@ if ! mkdir -p -- "$BACKUP_DIR" 2>"$ERROR_LOG"; then
   exit 1
 fi
 
+if ! now_epoch="$(date -u +%s 2>"$ERROR_LOG")" || ! [[ "$now_epoch" =~ ^[0-9]+$ ]]; then
+  FAILURE_REASON="could not determine the current time"
+  exit 1
+fi
 if ! today="$(date -u +%F 2>"$ERROR_LOG")"; then
   FAILURE_REASON="could not determine the backup date"
   exit 1
 fi
-if ! cutoff_date="$(date -u -d "$today - $KEEP_DAYS days" +%F 2>"$ERROR_LOG")"; then
-  if ! cutoff_date="$(date -u -d "-$KEEP_DAYS days" +%F 2>"$ERROR_LOG")"; then
-    FAILURE_REASON="could not determine the retention date"
+cutoff_epoch=$(( now_epoch - (KEEP_DAYS - 1) * 86400 ))
+if ! cutoff_date="$(date -u -d "@$cutoff_epoch" +%F 2>"$ERROR_LOG")"; then
+  FAILURE_REASON="could not determine the retention date"
+  exit 1
+fi
+run_id="$(date -u +%H%M%S)-${BASHPID}"
+
+# The production service is private: run PostgreSQL tools in its own container,
+# stream archive bytes to the host backup directory, and never copy the secret out.
+CONTAINER="${COGNITIVE_DB_CONTAINER:-}"
+if [ -z "$CONTAINER" ]; then
+  if ! CONTAINER="$(docker compose -f "$COMPOSE_FILE" ps -q cognitive-db 2>"$ERROR_LOG")"; then
+    FAILURE_REASON="could not find the cognitive-db service"
     exit 1
   fi
+fi
+if [ -z "$CONTAINER" ] || [ "$(docker inspect --format '{{.State.Running}}' "$CONTAINER" 2>"$ERROR_LOG")" != true ]; then
+  FAILURE_REASON="cognitive-db is not running"
+  exit 1
 fi
 
 validate_dump() {
@@ -57,11 +78,12 @@ validate_dump() {
   local object_count
 
   # A retained corrupt archive is a backup failure, not something rotation may hide.
-  if ! listing="$(pg_restore --list "$dump" 2>"$ERROR_LOG")"; then
+  if ! listing="$(docker exec -i "$CONTAINER" pg_restore --list < "$dump" 2>"$ERROR_LOG")"; then
     FAILURE_REASON="pg_restore could not list $(basename -- "$dump")"
     return 1
   fi
-  object_count="$(printf '%s\n' "$listing" | awk '/^[[:space:]]*[0-9]+;/{count++} END {print count+0}')"
+  # The TOC header remains present for an empty database, where no entry lines follow it.
+  object_count="$(printf '%s\n' "$listing" | awk -F': ' '/^;[[:space:]]*TOC Entries:/{count=$2} END {print count+0}')"
   if [ "$object_count" -lt "$MIN_OBJECTS" ]; then
     FAILURE_REASON="$(basename -- "$dump") has too few archive objects"
     return 1
@@ -76,35 +98,38 @@ for dump in "$BACKUP_DIR"/cognitive-db-????-??-??-*.dump; do
   fi
 done
 
-if ! database_list="$(psql --no-psqlrc --tuples-only --no-align \
-  --dbname="${PGDATABASE:-postgres}" \
+database_list="${TMPDIR:-/tmp}/cognitive-db-databases-${BASHPID}.list"
+TEMP_FILES+=("$database_list")
+if ! docker exec "$CONTAINER" psql -U "$DB_USER" --no-psqlrc --tuples-only --no-align --record-separator-zero \
+  --dbname="$MAINTENANCE_DB" \
   --command='SELECT datname FROM pg_database WHERE NOT datistemplate ORDER BY datname;' \
-  2>"$ERROR_LOG")"; then
+  >"$database_list" 2>"$ERROR_LOG"; then
   FAILURE_REASON="could not list PostgreSQL databases"
   exit 1
 fi
 
 found_database=0
-while IFS= read -r database; do
+while IFS= read -r -d '' database; do
   [ -n "$database" ] || continue
   found_database=1
-  safe_database="$(printf '%s' "$database" | tr -c 'A-Za-z0-9_.-' '_')"
-  target="$BACKUP_DIR/cognitive-db-${today}-${safe_database}.dump"
-  part="${target}.${BASHPID}.part"
+  # Hex is injective for all legal database names; replacing punctuation with '_' is not.
+  safe_database="$(printf '%s' "$database" | od -An -tx1 | tr -d '[:space:]')"
+  target="$BACKUP_DIR/cognitive-db-${today}-${safe_database}-${run_id}.dump"
+  part="${target}.part"
   TEMP_FILES+=("$part")
 
-  if ! pg_dump -Fc --file="$part" "$database" 2>"$ERROR_LOG"; then
+  if ! docker exec "$CONTAINER" pg_dump -U "$DB_USER" -Fc --dbname="$database" >"$part" 2>"$ERROR_LOG"; then
     FAILURE_REASON="pg_dump failed for ${safe_database}"
     exit 1
   fi
   if ! validate_dump "$part"; then
     exit 1
   fi
-  if ! mv -f -- "$part" "$target" 2>"$ERROR_LOG"; then
+  if [ -e "$target" ] || ! mv -- "$part" "$target" 2>"$ERROR_LOG"; then
     FAILURE_REASON="could not publish ${safe_database} backup"
     exit 1
   fi
-done <<< "$database_list"
+done < "$database_list"
 
 if [ "$found_database" -ne 1 ]; then
   FAILURE_REASON="the cluster has no non-template databases"

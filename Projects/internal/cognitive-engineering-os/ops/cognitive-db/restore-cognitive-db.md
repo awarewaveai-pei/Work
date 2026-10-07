@@ -9,7 +9,8 @@
 ```bash
 export RESTORE_PASSWORD_FILE=/tmp/cognitive-db-restore-password
 test -s "$RESTORE_PASSWORD_FILE"
-export DUMP_FILE=/root/backups/cognitive-db/$(ls -1t /root/backups/cognitive-db/cognitive-db-*.dump | head -n 1 | xargs -n 1 basename)
+db_hex=$(printf %s cognitive_os | od -An -tx1 | tr -d '[:space:]')
+export DUMP_FILE=$(find /root/backups/cognitive-db -maxdepth 1 -type f -name "cognitive-db-????-??-??-${db_hex}-*.dump" -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)
 test -s "$DUMP_FILE"
 ```
 
@@ -31,7 +32,7 @@ until docker exec cognitive-db-restore-test pg_isready -U cognitive -d cognitive
 docker exec cognitive-db-restore-test createdb -U cognitive restore_check
 docker cp "$DUMP_FILE" cognitive-db-restore-test:/tmp/restore.dump
 docker exec cognitive-db-restore-test pg_restore --list /tmp/restore.dump >/tmp/cognitive-db-restore-list.txt
-docker exec cognitive-db-restore-test pg_restore --clean --if-exists --exit-on-error \
+docker exec cognitive-db-restore-test pg_restore -U cognitive --clean --if-exists --exit-on-error \
   --no-owner --dbname=restore_check /tmp/restore.dump
 docker exec cognitive-db-restore-test psql -U cognitive -d restore_check -c '\dt'
 ```

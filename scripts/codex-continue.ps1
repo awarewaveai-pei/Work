@@ -73,12 +73,27 @@ function Save-State($State) {
 }
 
 function Run-Command([string]$CmdLine, [string]$Dir, [string]$LogFile, [int]$TimeoutSec) {
-    $p = Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', $CmdLine) -WorkingDirectory $Dir `
-         -RedirectStandardOutput $LogFile -RedirectStandardError ($LogFile + '.err') -NoNewWindow -PassThru
-    if (-not $p.WaitForExit($TimeoutSec * 1000)) { try { $p.Kill() } catch { } ; return 124 }
-    $p.WaitForExit()
-    if ($null -eq $p.ExitCode) { return 125 } # unknown is never a passing acceptance check
-    return $p.ExitCode
+    # Windows PowerShell 5.1 can leave Start-Process -PassThru.ExitCode null after WaitForExit.
+    $start = New-Object System.Diagnostics.ProcessStartInfo
+    $start.FileName = 'cmd.exe'
+    $start.Arguments = "/d /s /c `"$CmdLine`""
+    $start.WorkingDirectory = $Dir
+    $start.UseShellExecute = $false
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $p = New-Object System.Diagnostics.Process
+    $p.StartInfo = $start
+    try {
+        if (-not $p.Start()) { return 125 }
+        $out = $p.StandardOutput.ReadToEndAsync()
+        $err = $p.StandardError.ReadToEndAsync()
+        if (-not $p.WaitForExit($TimeoutSec * 1000)) { try { $p.Kill() } catch { }; $p.WaitForExit(); return 124 }
+        $out.Wait()
+        $err.Wait()
+        [System.IO.File]::WriteAllText($LogFile, $out.Result)
+        [System.IO.File]::WriteAllText(($LogFile + '.err'), $err.Result)
+        return [int]$p.ExitCode
+    } finally { $p.Dispose() }
 }
 
 # ---- preflight ----------------------------------------------------------------------------------------------

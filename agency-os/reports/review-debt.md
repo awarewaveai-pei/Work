@@ -19,6 +19,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | integration-json-shapes | 對齊 main 的 JSON 形狀契約：TEACH 2 欄、EXPRESS 2 欄 | 新增 JSON 欄位不可逃過存檔形狀驗證 | 合併前 registry gate 精確 4 failures；補後 foundation 43、TEACH 12、EXPRESS 14 tests PASS | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
 | Codex | 01-ci-postgres | CI 配備 digest-pinned PostgreSQL 並要求資料庫測試不能跳過；重試日誌獨立 | CI 缺 PostgreSQL 必須紅、筆電仍明示跳過；舊結果不得誤判新代理 | `test_ci_postgres` 6、`test_pg_foundation` 18、`test_codex_queue` 4、`test_affected_tests` 15 PASS；待跨模型審查 | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
 | Codex | 02-cognitive-db-ops | 新增未套用的 cognitive-db compose、備份／還原文件與操作閘門測試 | 資料庫只在 lobster-net 內可達；密碼只經 secret file；備份須通過 pg_restore 列表與輪替邊界 | `test_cognitive_db_ops` source/config/syntax gates；Docker backup dump/list/rotate/corrupt test loudly skipped because the daemon was unavailable；ports、密碼、pg_restore、pipefail、digest mutations 均轉紅 | 待審 |
+| Codex | queue-check-exit | Windows PowerShell 5.1 的驗收命令改讀真實程序退出碼 | 失敗碼不能誤判為通過；成功碼不能誤判為失敗而重派 agent | WinPS5.1 退出碼 0/7 實測；`test_codex_queue` 5 PASS、affected 56 PASS | 待 Claude 跨模型審查；勿 push |
 
 ## deferred, before D7 second region
 

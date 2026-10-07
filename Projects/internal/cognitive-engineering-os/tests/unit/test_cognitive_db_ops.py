@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import secrets
-import shlex
 import shutil
 import subprocess
 import tempfile
@@ -49,6 +48,13 @@ def _run_docker(*args: str, timeout: int = 120) -> subprocess.CompletedProcess[s
     return subprocess.run(
         ["docker", *args], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout
     )
+
+
+def _bash_path(path: Path) -> str:
+    resolved = path.resolve().as_posix()
+    if os.name == "nt":
+        return f"/{resolved[0].lower()}{resolved[2:]}"
+    return resolved
 
 
 class CognitiveDbOpsTests(unittest.TestCase):
@@ -100,8 +106,9 @@ class CognitiveDbOpsTests(unittest.TestCase):
 
     def test_backup_script_has_fail_closed_proof_and_safe_rotation(self) -> None:
         self.assertIn("set -euo pipefail", self.backup_text)
-        self.assertIn("pg_dump -Fc", self.backup_text)
+        self.assertRegex(self.backup_text, r"pg_dump\b[^\n]*-Fc")
         self.assertIn("pg_restore --list", self.backup_text)
+        self.assertIn("TOC Entries:", self.backup_text)
         self.assertIn("BACKUP FAILED:", self.backup_text)
         self.assertNotRegex(self.backup_text, r"\brm\s+-rf\b")
         self.assertIn('"$BACKUP_DIR"/cognitive-db-????-??-??-*.dump', self.backup_text)
@@ -112,6 +119,8 @@ class CognitiveDbOpsTests(unittest.TestCase):
     def test_readme_records_unapplied_state_and_go_live_checks(self) -> None:
         self.assertIn("Nothing in this folder has been applied.", self.readme_text)
         self.assertIn("safe-infra-patch.sh compose", self.readme_text)
+        self.assertIn("沒有可執行的套用命令", self.readme_text)
+        self.assertIn("docker exec", self.backup_text)
         self.assertIn("/etc/cron.d/ks-stack-backup", self.readme_text)
         for required in ("pg_isready", "EMPTY database", "migration to head", "backup", "restore", "ClaimReview"):
             self.assertIn(required, self.readme_text)
@@ -129,6 +138,13 @@ class CognitiveDbOpsTests(unittest.TestCase):
             [bash, "-n", script_arg], capture_output=True, text=True, encoding="utf-8", errors="replace"
         )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_backup_retention_date_uses_alpine_compatible_epoch_arithmetic(self) -> None:
+        self.assertIn('date -u +%s', self.backup_text)
+        self.assertIn('cutoff_epoch=$(( now_epoch - (KEEP_DAYS - 1) * 86400 ))', self.backup_text)
+        self.assertIn('date -u -d "@$cutoff_epoch" +%F', self.backup_text)
+        self.assertNotIn('date -u -d "$today - $KEEP_DAYS days" +%F', self.backup_text)
+        self.assertNotIn('date -u -d "-$KEEP_DAYS days" +%F', self.backup_text)
 
     def test_docker_compose_config_with_dummy_secret(self) -> None:
         problem = _docker_problem()
@@ -154,10 +170,13 @@ class CognitiveDbOpsTests(unittest.TestCase):
         problem = _docker_problem()
         if problem:
             self.skipTest(f"LOUD SKIP: optional Docker backup test did not run because {problem}")
+        git_bash = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git" / "bin" / "bash.exe"
+        bash = str(git_bash) if git_bash.is_file() else shutil.which("bash")
+        if bash is None:
+            self.skipTest("LOUD SKIP: host bash is unavailable")
 
         name = f"cos-db-test-backup-{secrets.token_hex(4)}"
         password = secrets.token_urlsafe(18)
-        script_path = "/tmp/backup-cognitive-db.sh"
         container = _run_docker(
             "run",
             "-d",
@@ -165,75 +184,74 @@ class CognitiveDbOpsTests(unittest.TestCase):
             name,
             "--env",
             "POSTGRES_PASSWORD=" + password,
+            "--env",
+            "POSTGRES_USER=cognitive",
+            "--env",
+            "POSTGRES_DB=cognitive_os",
             pg.IMAGE,
         )
         self.assertEqual(container.returncode, 0, container.stderr)
         try:
             ready = False
             for _ in range(90):
-                probe = _run_docker("exec", name, "pg_isready", "-U", "postgres")
+                probe = _run_docker("exec", name, "pg_isready", "-U", "cognitive", "-d", "cognitive_os")
                 if probe.returncode == 0:
                     ready = True
                     break
                 time.sleep(1)
             self.assertTrue(ready, "throwaway PostgreSQL did not become ready")
-            copied = _run_docker("cp", str(BACKUP), f"{name}:{script_path}")
-            self.assertEqual(copied.returncode, 0, copied.stderr)
+            proof = _run_docker("exec", name, "psql", "-U", "cognitive", "-d", "cognitive_os", "-c", "CREATE TABLE backup_proof (id integer); INSERT INTO backup_proof VALUES (7);")
+            self.assertEqual(proof.returncode, 0, proof.stderr)
+            for database in ("a b", "a_b"):
+                created = _run_docker("exec", name, "createdb", "-U", "cognitive", database)
+                self.assertEqual(created.returncode, 0, created.stderr)
 
-            def run_backup() -> subprocess.CompletedProcess[str]:
-                return _run_docker(
-                    "exec",
-                    "--env",
-                    "BACKUP_DIR=/tmp/cognitive-db-backups",
-                    "--env",
-                    "KEEP_DAYS=14",
-                    "--env",
-                    "PGHOST=127.0.0.1",
-                    "--env",
-                    "PGUSER=postgres",
-                    "--env",
-                    "PGPASSWORD=" + password,
-                    name,
-                    "bash",
-                    script_path,
+            with tempfile.TemporaryDirectory() as temporary:
+                backup_dir = Path(temporary) / "backups"
+                environment = dict(os.environ)
+                environment.update(
+                    COGNITIVE_DB_CONTAINER=name,
+                    COGNITIVE_DB_BACKUP_DIR=_bash_path(backup_dir),
+                    COGNITIVE_DB_USER="cognitive",
+                    COGNITIVE_DB_MAINTENANCE_DB="cognitive_os",
                 )
 
-            first = run_backup()
-            self.assertEqual(first.returncode, 0, first.stderr)
-            listed = _run_docker(
-                "exec",
-                name,
-                "sh",
-                "-c",
-                "find /tmp/cognitive-db-backups -maxdepth 1 -type f -name 'cognitive-db-*.dump' -print",
-            )
-            self.assertEqual(listed.returncode, 0, listed.stderr)
-            dumps = [line.strip() for line in listed.stdout.splitlines() if line.strip()]
-            self.assertTrue(dumps, "the first backup did not create a dump")
-            archive_check = _run_docker("exec", name, "pg_restore", "--list", dumps[0])
-            self.assertEqual(archive_check.returncode, 0, archive_check.stderr)
+                def run_backup() -> subprocess.CompletedProcess[str]:
+                    return subprocess.run(
+                        [bash, _bash_path(BACKUP)], cwd=COS, env=environment,
+                        capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120,
+                    )
 
-            old_dump = "/tmp/cognitive-db-backups/cognitive-db-2000-01-01-rotation.dump"
-            old_copy = _run_docker("exec", name, "sh", "-c", f"cp {shlex.quote(dumps[0])} {shlex.quote(old_dump)}")
-            self.assertEqual(old_copy.returncode, 0, old_copy.stderr)
-            second = run_backup()
-            self.assertEqual(second.returncode, 0, second.stderr)
-            rotated = _run_docker("exec", name, "test", "!", "-e", old_dump)
-            self.assertEqual(rotated.returncode, 0, "an expired dated dump was not rotated")
+                first = run_backup()
+                self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+                dumps = sorted(backup_dir.glob("cognitive-db-*.dump"))
+                self.assertEqual(len(dumps), 4, [path.name for path in dumps])
+                for database in ("a b", "a_b"):
+                    encoded = database.encode().hex()
+                    self.assertEqual(len([path for path in dumps if f"-{encoded}-" in path.name]), 1)
+                source_dump = next(path for path in dumps if f"-{b'cognitive_os'.hex()}-" in path.name)
+                created = _run_docker("exec", name, "createdb", "-U", "cognitive", "restore_check")
+                self.assertEqual(created.returncode, 0, created.stderr)
+                copied = _run_docker("cp", str(source_dump), f"{name}:/tmp/restore.dump")
+                self.assertEqual(copied.returncode, 0, copied.stderr)
+                restored = _run_docker("exec", name, "pg_restore", "-U", "cognitive", "--exit-on-error", "--no-owner", "--dbname=restore_check", "/tmp/restore.dump")
+                self.assertEqual(restored.returncode, 0, restored.stderr)
+                proof = _run_docker("exec", name, "psql", "-U", "cognitive", "-d", "restore_check", "-At", "-c", "SELECT id FROM backup_proof")
+                self.assertEqual(proof.returncode, 0, proof.stderr)
+                self.assertEqual(proof.stdout.strip(), "7")
 
-            current_date = datetime.now(timezone.utc).date().isoformat()
-            corrupt_dump = f"/tmp/cognitive-db-backups/cognitive-db-{current_date}-corrupt.dump"
-            corrupt = _run_docker(
-                "exec",
-                name,
-                "sh",
-                "-c",
-                f"head -c 7 {shlex.quote(dumps[0])} > {shlex.quote(corrupt_dump)}",
-            )
-            self.assertEqual(corrupt.returncode, 0, corrupt.stderr)
-            failed = run_backup()
-            self.assertNotEqual(failed.returncode, 0)
-            self.assertIn("BACKUP FAILED:", failed.stdout + failed.stderr)
+                old_dump = backup_dir / "cognitive-db-2000-01-01-rotation.dump"
+                shutil.copy2(source_dump, old_dump)
+                second = run_backup()
+                self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+                self.assertFalse(old_dump.exists(), "an expired dated dump was not rotated")
+
+                current_date = datetime.now(timezone.utc).date().isoformat()
+                corrupt_dump = backup_dir / f"cognitive-db-{current_date}-corrupt.dump"
+                corrupt_dump.write_bytes(source_dump.read_bytes()[:7])
+                failed = run_backup()
+                self.assertNotEqual(failed.returncode, 0)
+                self.assertIn("BACKUP FAILED:", failed.stdout + failed.stderr)
         finally:
             _run_docker("rm", "-f", name)
 
