@@ -7,7 +7,7 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { AUTHOR, docs, type Doc } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
-import { GUARDRAIL_LABEL, GUARDRAIL_ORDER, HIGH_RISK, STOP_REASON, partName, versionRecords, type VersionRecords } from "../../lib/govern";
+import { GUARDRAIL_LABEL, GUARDRAIL_ORDER, HIGH_RISK, STOP_REASON, caseUsed, closeCase, governSpec, partName, versionRecords, type CaseUsed, type VersionRecords } from "../../lib/govern";
 import { formatTime } from "../../lib/time";
 import { BlockShell } from "./BlockShell";
 import { Explain, ExportLinks } from "./GovernParts";
@@ -65,7 +65,7 @@ export function GovernPage({ projectId }: { projectId: string }) {
         <h2>匯出這個案子</h2>
         <p className="how">每一版的卡和紀錄，都寫著是你寫的、AI 寫的、共同或系統，和哪一塊寫的。匯出只是把資料搬出來，不經過 AI。刪掉的卡只留「已刪除」。</p>
         <ExportLinks projectId={projectId} />
-        <p className="sub mt8 mb0">要刪掉整個案子，到<Link href={`/projects/${enc(projectId)}`}>案子頁</Link>按「刪除專案」。你的帳號資料在<Link href="/settings">設定</Link>。</p>
+        <p className="sub mt8 mb0">要刪掉整個案子，到<Link href={`/projects/${enc(projectId)}`}>案子頁</Link>按「刪除專案」。你的帳號資料在<Link href="/settings">設定</Link>。你分享給別人的東西、申訴和研究，在<Link href="/me/data">我的資料</Link>。</p>
       </div>
 
       <div className="card">
@@ -74,8 +74,84 @@ export function GovernPage({ projectId }: { projectId: string }) {
         <div className="btns"><Link className="btn" href={`/projects/${enc(projectId)}/govern/versions`}>看版本紀錄</Link></div>
         <Explain topic="versions" />
       </div>
+      <CaseUsedCard projectId={projectId} />
+      <NoRecordSwitch projectId={projectId} />
       {error && <p className="error">{error}</p>}
     </BlockShell>
+  );
+}
+
+/** Card 32's audit line in words: which model and instructions each AI turn used, and which rules and lists the case's
+ * records were made with -- names and versions only. */
+export function CaseUsedCard({ projectId }: { projectId: string }) {
+  const [used, setUsed] = useState<CaseUsed | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    caseUsed(projectId).then((found) => { if (active) setUsed(found); }).catch((reason) => { if (active) setError(humanError(reason)); });
+    return () => { active = false; };
+  }, [projectId]);
+  if (!used) return error ? <div className="card"><p className="error">{error}</p></div> : null;
+  return (
+    <div className="card">
+      <h2>{used.labels.rulesets}</h2>
+      <p className="how">這裡只列名稱和版本，不列你寫的內容。</p>
+      {used.ai_turns.length === 0 && <p className="sub">這個案子還沒有 AI 回答過。</p>}
+      {used.ai_turns.map((turn, index) => (
+        <div key={`${turn.at}-${index}`} className="row">
+          <b>{formatTime(turn.at)}</b>
+          <span>{partName(turn.block)}：{used.labels.model} {turn.model}；{used.labels.instructions} <code>{turn.instructions.slice(0, 12)}</code></span>
+        </div>
+      ))}
+      {used.rulesets.map((stamp) => (
+        <div key={`${stamp.name}-${stamp.version}-${stamp.fingerprint}`} className="row">
+          <b>{stamp.title}</b><span>{used.labels.version} {stamp.version}；{used.labels.fingerprint} <code>{stamp.fingerprint.slice(0, 12)}</code></span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type Intake = Record<string, unknown> & { no_record?: boolean };
+
+/** 不留紀錄: the words come first; the switch is there only once they are shown. On: ending the case deletes it whole. */
+export function NoRecordSwitch({ projectId }: { projectId: string }) {
+  const [warning, setWarning] = useState("");
+  const [intake, setIntake] = useState<Doc<Intake> | null>(null);
+  const [closed, setClosed] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    const failed = (reason: unknown) => { if (active) setError(humanError(reason)); };
+    governSpec().then((spec) => { if (active) setWarning(spec.no_record.warning); }).catch(failed);
+    docs.list<Intake>(projectId, "assembler.intake").then((held) => { if (active) setIntake(held[0] ?? null); }).catch(failed);
+    return () => { active = false; };
+  }, [projectId]);
+  const on = Boolean(intake?.content.no_record);
+  const flip = async () => {
+    try { const saved = await docs.update(projectId, "assembler.intake", intake!, { ...intake!.content, no_record: !on }); setIntake(saved); setError(""); }
+    catch (reason) { setError(humanError(reason)); }
+  };
+  const end = async () => { try { await closeCase(projectId); setClosed(true); } catch (reason) { setError(humanError(reason)); } };
+  if (closed) return <div className="card"><p>這個案子已經整個刪掉了。<Link href="/">回首頁</Link></p></div>;
+  return (
+    <div className="card">
+      <h2>不留紀錄</h2>
+      {warning && <p className="how" id="no-record-warning">{warning}。回顧也會用不了。</p>}
+      {warning && intake && (
+        <label><input type="checkbox" checked={on} onChange={flip} aria-describedby="no-record-warning" /> 這個案子不留紀錄</label>
+      )}
+      {warning && !intake && <p className="sub">先寫好開案資料，才能選這一項。</p>}
+      {on && !asking && <div className="btns"><button type="button" className="btn" onClick={() => setAsking(true)}>結束這個案子（整個刪掉）</button></div>}
+      {on && asking && (
+        <div className="judge" role="dialog" aria-label="確認刪掉整個案子">
+          <p>{warning}。確定要現在結束嗎？</p>
+          <div className="btns"><button type="button" className="btn" onClick={end}>確定刪掉</button><button type="button" className="btn ghost" onClick={() => setAsking(false)}>先不要</button></div>
+        </div>
+      )}
+      {error && <p className="error" role="alert">{error}</p>}
+    </div>
   );
 }
 

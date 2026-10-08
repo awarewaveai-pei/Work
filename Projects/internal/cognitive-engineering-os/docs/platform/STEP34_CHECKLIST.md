@@ -56,3 +56,7 @@
   `platform/resources/` (台灣 + 國際通用, versioned, sourced); `GET /projects/{id}/govern/used`.
   - Not built: device-only mode (§10); resource files for other places (localisation content); 112 / 911 / 999 is
     marked 尚未查核 (`resources.unchecked()`).
+- 33 pages: `/me/data` (`MyDataPage.tsx`: consents with preview and withdraw, appeals, research, export / erase) and on
+  the case's GOVERN page the audit line and the 不留紀錄 switch.
+  - Not built: the switch on the intake page itself (`IntakePage.tsx` is S's); the page walk at 1280 / 400 wide (§16,
+    end of the wave).

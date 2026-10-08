@@ -44,3 +44,38 @@ export const helpFor = (where?: string) => apiFetch<Help>(`/govern/help${where ?
 export const accountSummary = () => apiFetch<AccountSummary>("/govern/account");
 export const eraseAccount = (confirm: string) => apiFetch<ErasedAccount>("/govern/account/erase", { method: "POST", body: JSON.stringify({ confirm }) });
 export const versionRecords = (projectId: string) => apiFetch<VersionRecords>(`/projects/${enc(projectId)}/govern/versions`);
+
+// Consents, appeals, research, 不留紀錄 and the case's audit line (ai_lego/apps/api/blocks/govern_group.py, cards 13 and 30-32).
+export type ConsentItem = { project_id: string; kind: string; doc_id: string; version?: number };
+export type ConsentPurpose = "group" | "facilitator" | "research";
+export type Consent = { doc_id: string; version: number; at: string; created_at?: string;
+  content: { purpose: ConsentPurpose; target: string; items: ConsentItem[]; follow_versions: boolean; withdrawn: boolean } };
+export type Appeal = { doc_id: string; group_id: string; about_identity_id: string; text: string; named: boolean;
+  mine?: boolean; at?: string; on?: string; author_identity_id?: string; author_name?: string };
+export type GroupMember = { identity_id: string; display_name: string; role: "convener" | "participant" | "facilitator" };
+export type MyGroup = { group_id: string; name: string; purpose: string; my_role: GroupMember["role"] };
+export type GovernSpec = { no_record: { label: string; warning: string }; resources: Record<string, string> };
+export type Stamp = { name: string; version: string; fingerprint: string; title: string };
+export type CaseUsed = { labels: Record<string, string>; ai_turns: Array<{ block: string; action: string; model: string; instructions: string; at: string }>;
+  rulesets: Stamp[]; resources: Record<string, string> };
+
+export const consents = () => apiFetch<Consent[]>("/me/consents");
+export const giveConsent = (purpose: ConsentPurpose, target: string, items: ConsentItem[]) =>
+  apiFetch<Consent>("/me/consents", { method: "POST", body: JSON.stringify({ purpose, target, items, follow_versions: true }) });
+export const withdrawConsent = (docId: string) => apiFetch<Consent>(`/me/consents/${enc(docId)}/withdraw`, { method: "POST" });
+export const myGroups = () => apiFetch<MyGroup[]>("/groups");
+export const groupMembers = (groupId: string) => apiFetch<{ members: GroupMember[] }>(`/groups/${enc(groupId)}`).then((group) => group.members);
+export const myAppeals = () => apiFetch<Appeal[]>("/me/appeals");
+export const appealsToHandle = () => apiFetch<Appeal[]>("/govern/appeals");
+export const makeAppeal = (groupId: string, aboutIdentityId: string, text: string, named: boolean) =>
+  apiFetch<Appeal>("/me/appeals", { method: "POST", body: JSON.stringify({ group_id: groupId, about_identity_id: aboutIdentityId, text, named }) });
+export const deleteAppeal = (docId: string) => apiFetch<{ status: string }>(`/me/appeals/${enc(docId)}`, { method: "DELETE" });
+export const appealsExportHref = () => apiHref("/me/appeals/export");
+export const governSpec = () => apiFetch<GovernSpec>("/blocks/govern/spec");
+export const closeCase = (projectId: string) => apiFetch<{ closed: boolean }>(`/projects/${enc(projectId)}/govern/close`, { method: "POST" });
+export const caseUsed = (projectId: string) => apiFetch<CaseUsed>(`/projects/${enc(projectId)}/govern/used`);
+// What a person can share from a case, item by item (STEP34 §6): the cards, the maps and the thinking cards.
+export const SHAREABLE: Array<[string, string]> = [["sense.card", "外化卡"], ["map.map", "地圖"], ["think.card", "思考卡"]];
+export const PURPOSE_LABEL: Record<ConsentPurpose, string> = { group: "給群組", facilitator: "給帶領的人", research: "給研究" };
+export const RESEARCH_SENTENCE = "研究用的檔案會拿掉你的帳號和三個地點（發生地、你在哪裡、當事人各在哪裡），但不保證別人認不出是誰。";
+export const REMOVE_NAMES_FIRST = "內文裡的人名不會被拿掉。同意之前，請先把你寫的人名刪掉或改掉。";

@@ -177,6 +177,8 @@ const CODES: Record<string, string> = {
   CONSENT_ITEM_NOT_FOUND: "有一份要分享的東西找不到，或不是你自己案子裡的。請重新選一次。",
   CONSENT_TARGET_NOT_FOUND: "你不在這個群組裡，不能分享給它。",
   CONSENT_NOT_FOUND: "找不到這個同意，請重新整理頁面。",
+  APPEAL_NOT_FOUND: "找不到這個申訴，可能已經刪除。",
+  CASE_KEEPS_RECORDS: "這個案子沒有選「不留紀錄」，不會在結束時刪掉。要刪掉，請到案子頁按「刪除專案」。",
   DOC_NOT_YOURS: "在群組裡，只有寫的人可以刪掉自己寫的東西。",
   ACCOUNT_IS_LAST_CONVENER: "你是某個群組唯一的召集人。請先讓另一位成員也當召集人，或刪除那個群組，再刪除帳號。這次什麼都沒刪。",
   // GATHER
