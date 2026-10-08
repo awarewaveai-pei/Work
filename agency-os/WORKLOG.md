@@ -86,6 +86,34 @@
 - MUTATION_EVIDENCE: 記憶體內移除 Future 完成回呼，`test_wait_idle_waits_for_a_submitted_hook_without_a_future_registry` 轉紅；原版 3/3 綠。
 - REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，main 合併仍封鎖。
 
+## 2026-10-08（續5）
+
+### feat(cos): add facilitator course lessons and completion support
+
+- AUTO_TASK_DONE: card 60b facilitator lessons and special course support
+
+**根本問題**: card 60 的 script content 已完成，但 facilitator eligibility 需要一個可載入、可完成、可版本追蹤的 `facilitator` lesson course；TEACH loader 和 completion shape 原本只接受 assembler 的七個 package。
+
+**已修改**:
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/lessons/lessons/facilitator-*.yaml`：新增三課 draft，依序涵蓋 how to lead、FACIL_DONTS、交給 GOVERN。
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/lessons/__init__.py`、`ai_lego/core/domain/kinds/teach.py`：接受 special `facilitator` course，讓 course list 與 system completion 使用同一組 choices。
+- `ai_lego/platform/lessons/HISTORY.json`：保留 v1 fingerprint，新增 v2 `0cee91b5e39d`。
+- `docs/platform/STEP34_CHECKLIST.md`、`agency-os/reports/review-debt.md`：標記 card 60b 完成並登記一筆待 Claude 審查。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_teach_content | exit=0 | tests=13 | ms=13728
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_facilitate_content | exit=0 | tests=10 | ms=5630
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_teach | exit=0 | tests=22 | ms=12565
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_step2_foundation | exit=0 | tests=54 | ms=29211
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m py_compile ai_lego/platform/lessons/__init__.py ai_lego/core/domain/kinds/teach.py tests/unit/test_teach_content.py | exit=0 | ms=178
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`COURSE_PACKAGES|FACILITATOR_COURSE|facilitator` | hits=119
+- ORACLE: `agency-os/reports/oracle/2026-10-08-review-ebfc9e65.md` reviewer=claude verdict=approve findings=0
+- MUTATION_WAIVED: no privacy/visibility/erasure/consent/ownership guard changed; queue preamble limits mutations to those guards.
+
+**剩餘風險**: 三課仍是 draft，必須由 operator review 後才可作為 facilitator training content；本卡不建立 facilitator records、eligibility query 或 page。
+
+**Rollback**: `git revert <card-60b-commit>` 移除三課、course support、HISTORY v2、checklist row、review-debt row 與本次 oracle artifact；不涉及資料庫或部署。
 ## 2026-10-08（續4）
 
 ### fix(cos): close Card 51 EXPRESS export/send review gaps

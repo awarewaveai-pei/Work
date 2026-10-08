@@ -38,5 +38,5 @@
 - [x] A subject with no stop signal in any step is excluded from `available_subjects()` and reported as `沒有停止訊號`.
 - [x] Draft scripts never appear in `usable_for_leading()`; the three seed scripts remain drafts until operator review.
 - [x] The CSV importer maps operator-selected headers, writes drafts, preserves empty stop-signal cells as empty lists, reports those rows, and never calls a network client.
-- [ ] card 60b: facilitator lessons, after the TEACH fixes merge.
+- [x] card 60b: facilitator course has three draft lessons for leading, the fixed FACIL_DONTS, and escalation to GOVERN; the TEACH loader and completion shape accept the special `facilitator` course.
 - [ ] Showing `FACIL_DONTS` on screen the whole time someone leads belongs to the later FACILITATE page card; this card supplies the list.

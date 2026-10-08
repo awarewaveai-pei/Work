@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ai_lego.core.domain.doc_kinds import DocKind, Field
-from ai_lego.core.domain.kinds.assembler import PACKAGES
+from ai_lego.platform.lessons import COURSE_PACKAGES
 
 
 ROLES = ("提出者", "反方", "證據稽核者", "決策者", "回顧者")
@@ -34,10 +34,10 @@ KINDS = [
     DocKind("teach.completion_preference", "TEACH", "完成紀錄保留偏好", {
         "keep": Field("bool", required=True, human_only=True),
         # a course whose completion the person deleted: never written for them again (the delete saves this)
-        "declined": Field("choices", len(PACKAGES), choices=tuple(PACKAGES), human_only=True),
+        "declined": Field("choices", len(COURSE_PACKAGES), choices=COURSE_PACKAGES, human_only=True),
     }, owner="person", singleton=True),
     DocKind("teach.completion", "TEACH", "課程完成紀錄", {
-        "course": Field("choice", choices=tuple(PACKAGES), required=True),
+        "course": Field("choice", choices=COURSE_PACKAGES, required=True),
         "lesson_versions": Field("json", 8000, required=True, shape="object"),
         "at": Field("date", required=True),
     }, owner="person", authors=frozenset({"system"}), deletable=True),

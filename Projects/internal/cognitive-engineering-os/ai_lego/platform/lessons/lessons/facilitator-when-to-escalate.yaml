@@ -1,0 +1,15 @@
+id: facilitator-when-to-escalate
+subject: 課堂反思
+version: 2
+state: draft
+minutes: 3
+title: 何時停下並交給 GOVERN
+text: 出現自傷、暴力、急性危機，或事情超出帶領範圍時，立刻停下。把危機交給 GOVERN，求助資源依參與者所在地方提供。不要自己判斷處理，也不要在課程裡繼續追問。
+example: 參與者出現急性危機訊號時，先停止工具，告知接下來交由 GOVERN 協助，再依他的所在地取得求助資源。
+teaches:
+  - 辨認危機和範圍外情況
+  - 停下並交給 GOVERN
+  - 依所在地取得求助資源
+course:
+  package: facilitator
+  order: 3

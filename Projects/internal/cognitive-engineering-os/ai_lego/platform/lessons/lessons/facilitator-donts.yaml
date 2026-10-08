@@ -1,0 +1,16 @@
+id: facilitator-donts
+subject: 課堂反思
+version: 2
+state: draft
+minutes: 3
+title: 帶領時永遠不做的事
+text: 帶領者永遠不做四件事：替參與者下結論；逼人分享私密或受傷經驗；有停止訊號還繼續；把服從或反抗說成錯。這四件事要在每次帶領時放在眼前。
+example: 參與者不想分享時，不追問私密內容，也不把他的停止或拒絕說成做錯。
+teaches:
+  - 不替參與者下結論
+  - 不要求脆弱揭露
+  - 停止就停
+  - 不把服從或反抗當成錯
+course:
+  package: facilitator
+  order: 2

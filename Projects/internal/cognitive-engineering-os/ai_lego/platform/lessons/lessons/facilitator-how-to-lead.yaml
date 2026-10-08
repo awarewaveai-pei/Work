@@ -1,0 +1,15 @@
+id: facilitator-how-to-lead
+subject: 課堂反思
+version: 2
+state: draft
+minutes: 3
+title: 帶人想，但不替人想
+text: 先說明這一步怎麼做和大約多久。用問題讓參與者自己整理，不替參與者下結論。照帶領稿走，但依現場寫下調整理由。參與者一說要停，就停下這一步。
+example: 帶一班人回顧一次活動時，請每個人先寫自己的觀察，再問他想怎麼理解，不代替他決定答案。
+teaches:
+  - 說明步驟和時間
+  - 把判斷留給參與者
+  - 記下帶法調整
+course:
+  package: facilitator
+  order: 1

@@ -9,10 +9,9 @@ from pathlib import Path
 
 import yaml
 
-from ai_lego.core.domain.kinds.assembler import PACKAGES
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import rulesets
-from ai_lego.platform.lessons import ROOT, courses, load_lessons, load_practice_cases, reviewed_only
+from ai_lego.platform.lessons import COURSE_PACKAGES, ROOT, courses, load_lessons, load_practice_cases, reviewed_only
 from ai_lego.apps.cli.generate_lessons import generate_lessons
 
 
@@ -42,7 +41,8 @@ class TeachContentTests(unittest.TestCase):
         case_ruleset = load_practice_cases()
         self.assertEqual(len(lesson_ruleset.items), len(lesson_files))
         self.assertEqual(len(case_ruleset.items), len(case_files))
-        self.assertEqual(lesson_ruleset.stamp()["fingerprint"], "553f964de991")
+        self.assertEqual(lesson_ruleset.stamp()["version"], "2")
+        self.assertEqual(lesson_ruleset.stamp()["fingerprint"], "0cee91b5e39d")
         self.assertEqual(case_ruleset.stamp()["fingerprint"], "bb655a3aa4a8")
         self.assertEqual({lesson["source"]["kind"] for lesson in case_ruleset.items}, {"publisher"})
         self.assertIn("sources-independent-origins", {lesson["id"] for lesson in lesson_ruleset.items})
@@ -116,7 +116,7 @@ class TeachContentTests(unittest.TestCase):
 
     def test_course_lists_cover_each_package_with_a_course_lesson(self):
         actual = courses()
-        self.assertEqual(set(actual), set(PACKAGES))
+        self.assertEqual(set(actual), set(COURSE_PACKAGES))
         self.assertTrue(all(values for values in actual.values()))
 
     def test_generator_is_deterministic_and_never_overwrites(self):

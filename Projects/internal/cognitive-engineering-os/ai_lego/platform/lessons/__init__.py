@@ -25,6 +25,8 @@ from ai_lego.platform.rulesets import Ruleset, check
 
 ROOT = Path(__file__).resolve().parent
 HISTORY_PATH = ROOT / "HISTORY.json"
+FACILITATOR_COURSE = "facilitator"
+COURSE_PACKAGES = (*PACKAGES, FACILITATOR_COURSE)
 _LESSON_REQUIRED = {"id", "subject", "version", "state", "minutes", "title", "text", "example", "teaches"}
 _CASE_REQUIRED = {"id", "version", "title", "text", "source", "place"}
 _ID = re.compile(r"[a-z0-9][a-z0-9_.-]*\Z")
@@ -152,7 +154,7 @@ def validate_lesson(document: dict[str, Any], path: Path | str = "lesson") -> di
     if course is not None:
         if not isinstance(course, dict) or set(course) != {"package", "order"}:
             raise InvariantViolation(f"TEACH_COURSE_INVALID: {label}: course needs package and order")
-        if course["package"] not in PACKAGES:
+        if course["package"] not in COURSE_PACKAGES:
             raise InvariantViolation(f"TEACH_COURSE_UNKNOWN_PACKAGE: {label}: {course['package']!r}")
         if isinstance(course["order"], bool) or not isinstance(course["order"], int) or course["order"] < 1:
             raise InvariantViolation(f"TEACH_COURSE_INVALID: {label}: order must be positive")
@@ -269,5 +271,5 @@ def reviewed_only(root: Path | str | None = None) -> list[dict[str, Any]]:
 HISTORY = _read_history(ROOT)
 
 __all__ = [
-    "HISTORY", "NOT_YET_CHECKED", "ROOT", "course_lists", "courses", "load_lessons", "load_practice_cases", "reviewed_only", "scan_ai_text", "validate_lesson",
+    "COURSE_PACKAGES", "FACILITATOR_COURSE", "HISTORY", "NOT_YET_CHECKED", "ROOT", "course_lists", "courses", "load_lessons", "load_practice_cases", "reviewed_only", "scan_ai_text", "validate_lesson",
 ]
