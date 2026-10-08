@@ -1374,6 +1374,8 @@
   - **完成定義**：該檔 import 加 `genuine_compute_provenance`，`generate_eisenhower_matrix_classification` 內聯正規化行換成呼叫共用函式，`tests/unit/test_eisenhower_matrix.py` 零修改全過。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-18（續18）與（續19）。
 
+- [ ] **COS Codex→Claude 接手（未完成；主線勿合併）**：隔離樹 `D:/tmp/cos-codex` 的卡 51 已暫存未提交，`D:/tmp/cos-pg` 的 W1–W3 被實測擦除資料遺失擋住；全情見 `agency-os/handoffs/2026-10-08-cos-codex-to-claude.md`。根因/卡點：`ai_lego/platform/exports/render.py:153` 的固定字數換行裁切 PDF 中文；PG `ai_lego/data/repositories/project_source_repository.py:765` 先 unlink CAS 再 commit，故障注入得 `row_survives=True blob_survives=False`。已試：卡 51 局部測試 8+14+43+20+109 綠，5 突變紅；真 PG 重現資料遺失。**下一步**：① 讀交接包，核對兩樹 `git status` 與 queue 過期 `running` ② 修卡 51 排版/已讀/並發並完成私有索引提交、Claude review ③ 以可重試擦除流程修 PG P0 並做故障回歸，雙重審查和真 PG 過閘前不 merge／push／部署。
+
 > `/tomo` 自動寫入此分類
 > **原名 `#### 待釐清 / 明日提醒`**（2026-08-26 更名並清空）。它原本裝了 86 條 —— 31 條開放項已歸入 A–H、55 條已完成項已移入歷程。
 > 此區**刻意允許未分類**：`/tomo` 交接包落地時還不知道卡在誰身上，下一次 AO-RESUME 或整理時再分派到 A–H。空著是正常狀態。
