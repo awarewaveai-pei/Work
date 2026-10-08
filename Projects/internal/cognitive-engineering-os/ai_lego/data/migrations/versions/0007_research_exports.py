@@ -1,14 +1,13 @@
 """Research exports (docs/platform/STEP34_SHARED_RULES.md §10, card 31): one row per export of a study -- when, and the
 hash of its manifest -- so the next export counts the consents withdrawn in between. No identity, no content. Named
-0005 in the card (0005-0006 were taken by groups and invitations); 0007 is left to COLLAB's card, so at merge this
-revision's down_revision becomes the last one on main.
+0005 in the card (0005-0006 were taken by groups and invitations); COLLAB's card takes 0008.
 """
 
 from __future__ import annotations
 
 from alembic import op
 
-revision = "0008"
+revision = "0007"
 down_revision = "0006"
 branch_labels = None
 depends_on = None

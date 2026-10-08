@@ -36,7 +36,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Claude | 13-roles-consent（修） | 同意的擁有者檢查搬進 GOVERN 的 BEFORE_SAVE（`block_hooks/govern_group.py`），/me/consents 走共用存檔路；原本通用的 /me/docs/govern.consent 可以繞過檢查 | 同意的每一條存檔路都跑同一個檢查；identity.invited_by 登記為 SQLite 之後加的欄位 | affected_tests --base 8567da9bf：391 模組 15511 tests，修前 6 failures（integrity 存檔路 5、pg_foundation 欄位 1）；修後這 6 個與 test_consent 8、test_visibility 14 PASS；突變：存檔不查擁有者 → 紅→還原綠 | 待 Codex 審 |
 | Claude | 10-13 Codex F1-F5 | 待確認的人不能當召集人、待確認的召集人什麼都不能做；存同意與讀群組歷史都持群組鎖；刪帳號先在 person 鎖下決定群組部分再刪案子；帳號匯出含自己在群組寫的 | 隱私／抹除：同意不會指向已抹除的群組；離開的人拿不到別人的完整歷史；不會「案子刪了帳號卻被拒」；只匯出自己寫的版本 | 每項一個測試（F2、F5 兩執行緒）；突變 6/6 紅→還原綠；affected_tests --base 5dbff71c0：56 模組 1293 tests OK | 待 Codex 複審 F1-F5 |
 | Claude | 30-govern-appeals | `govern.appeal`（平台擁有、預設匿名）；`visibility.appeals_for` 唯一讀法：作者看全部、處理申訴的人看遮掉作者的、被申訴的帶領者什麼都看不到（連有沒有都不知道）；/me/appeals 建立（只限該群組參與者、對象是該群組帶領者）、看、匯出、刪除；帳號抹除帶走自己寫的申訴；CaseDocs 讀平台文件只走 `current_on_platform` | 匿名申訴不露作者；被申訴者不可讀；只有作者能刪；抹除帳號不留申訴 | `test_appeals` 11 pass + 1 skip(card 61)；突變 5 紅：遮罩、帶領者可讀、建立不檢查成員、刪除留紀錄、帳號抹除留申訴；`test_visibility` 閘門加 platform | 待審 |
-| Claude | 31-govern-research-export | `platform/research_export.py`＋營運者 CLI：只匯出研究同意（當下未撤回）列出的文件，原樣保留內容，拿掉帳號和三個地點（任何深度的鍵）；HMAC 假名需研究金鑰，沒有就拒絕；清單只寫排除原因、不寫是誰；撤回數由 0008 `research_exports` 列計；帶領偏離只在帶領者和所有參與者都同意時才進 | 研究同意是唯一入口；不叫匿名；不篩掉失敗／沒改變的案子；新的地點鍵必須處理（閘門） | `test_research_export` 12 pass；突變 4 紅：留下地點、含撤回同意、沒金鑰也匯出、偏離不需全員同意 | 待審 |
+| Claude | 31-govern-research-export | `platform/research_export.py`＋營運者 CLI：只匯出研究同意（當下未撤回）列出的文件，原樣保留內容，拿掉帳號和三個地點（任何深度的鍵）；HMAC 假名需研究金鑰，沒有就拒絕；清單只寫排除原因、不寫是誰；撤回數由 0007 `research_exports` 列計；帶領偏離只在帶領者和所有參與者都同意時才進 | 研究同意是唯一入口；不叫匿名；不篩掉失敗／沒改變的案子；新的地點鍵必須處理（閘門） | `test_research_export` 12 pass；突變 4 紅：留下地點、含撤回同意、沒金鑰也匯出、偏離不需全員同意 | 待審 |
 | Claude | 32-govern-no-record-and-resources | 開案資料加 `no_record`；`/govern/close` 只結束不留紀錄的案子（抹除鎖內再讀一次，關掉了就 409）；不留紀錄的案子怎麼刪都不留「已抹除」，結束後任何表都沒有它；求助資源改成 `platform/resources/` 版本化檔案（每筆有來源，改字不升版即拒絕），危機通知都帶「這裡的資源我們還沒有」；群組裡用自己的 `collab.place`；`/govern/used` 只回模型、指令雜湊和規則印記 | 不留紀錄＝不留任何列；資源有來源有版本；別人看不到我的所在地；稽核線不含內容 | `test_govern_no_record` 8 pass、`test_resources` 9 pass；突變 5 紅：結束不刪、留墓碑、無來源可載、所在地外洩、稽核含內容 | 待審 |
 | Claude | 33-govern-page | 新頁 `/me/data`：同意（逐份勾選、先看誰會看到什麼再確定、可撤回）、申訴（預設不具名）、研究（說明不保證認不出、先刪人名）、匯出和刪除；案子的 GOVERN 頁加稽核線和「不留紀錄」開關（先顯示警告才有開關、結束前再確認一次） | 不預設分享、沒有全部分享；申訴預設匿名；不留紀錄先講清楚 | tsc 0；vitest 26 pass；突變 4 紅：加全部分享、預設具名、警告前出現開關、拿掉警告 | 待審 |
 
@@ -58,6 +58,5 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 - 邀請（card 12）：接受邀請的網頁（讀網址 #token 再 POST）未做，隨群組頁面的卡；訪客接受後要自己登入一次。
 - 申訴（card 30）：`POST /me/appeals` 的參與者／帶領者檢查在存檔交易外（平台紀錄沒有擁有者鎖；同一瞬間離開群組的人仍可送出）；帶領者離開群組後無法再對他申訴（只認現任帶領者）。
 - 申訴（card 30）：作者刪除後留一筆 DocDeleted（無內容，信封仍有作者身分），直到帳號抹除才一併刪；若要連這筆都不留，需改 `CaseDocs.delete` 的墓碑規則。
-- 研究匯出（card 31）：遷移編號 0008，down_revision 暫指 0006；與 COLLAB 的 0007 在合併時接成一條鏈。
 - 不留紀錄（card 32）：抹除工作被另一個 worker 完成時，`_completed_elsewhere` 找不到墓碑會回 pending（不留紀錄的案子本來就沒有墓碑）；只影響回應字樣，不影響刪除。
 - 求助資源（card 32）：「112 / 911 / 999（依所在地）」尚未查核；張老師等專線的語言欄只寫查得到的。
