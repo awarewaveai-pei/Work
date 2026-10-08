@@ -80,7 +80,7 @@ def _draft_refs(content: Mapping[str, Any]) -> Iterable[Mapping[str, Any]]:
         refs = sentence.get("refs")
         if not isinstance(text, str) or not text.strip() or not isinstance(refs, list) or not refs:
             raise InvariantViolation(f"EXPRESS_DRAFT_SENTENCE_INVALID: sentence {index} needs text and refs")
-        if sentence.get("author") not in ("ai", "joint", "user") or not isinstance(sentence.get("unchecked"), bool):
+        if sentence.get("author") not in ("ai", "user") or not isinstance(sentence.get("unchecked"), bool):
             raise InvariantViolation(f"EXPRESS_DRAFT_SENTENCE_INVALID: sentence {index} has an invalid author or unchecked flag")
         for ref in refs:
             if not isinstance(ref, Mapping) or set(ref) != {"kind", "doc_id"} or any(not isinstance(ref.get(key), str) or not ref[key] for key in ("kind", "doc_id")):
@@ -92,6 +92,20 @@ def draft_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, conte
     selections = docs.current(tenant_id, owner, "express.selection")
     if not selections:
         raise InvariantViolation("EXPRESS_SELECTION_REQUIRED: choose records before saving a draft")
+    if _doc_id is not None:
+        try:
+            earlier = docs.versions(tenant_id, owner, "express.draft", _doc_id)
+        except InvariantViolation as error:
+            raise InvariantViolation("EXPRESS_DRAFT_NOT_FOUND: choose a saved draft") from error
+        ai_texts = {
+            sentence.get("text")
+            for version in earlier
+            for sentence in version["content"].get("sentences", [])
+            if isinstance(sentence, Mapping) and sentence.get("author") == "ai"
+        }
+        for sentence in content.get("sentences", []):
+            if isinstance(sentence, dict) and sentence.get("text") in ai_texts:
+                sentence["author"] = "ai"
     selected = _selected_refs(selections[-1]["content"], owner)
     for ref in _draft_refs(content):
         if (ref["kind"], ref["doc_id"]) not in selected:

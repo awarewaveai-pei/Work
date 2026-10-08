@@ -37,6 +37,15 @@ _VULNERABLE_DEMAND = (
     re.compile(r"(?:脆弱|創傷|自傷|私密|秘密).{0,12}(?:必須|一定要).{0,12}(?:說|透露|揭露|分享)"),
 )
 _SCORE_OR_RANK_WORDS = ("分數", "排名", "評分", "打分", "排行", "名次")
+NOT_YET_CHECKED = "尚未查核"
+
+
+def scan_ai_text(value: str) -> None:
+    """The one content scanner shared by reviewed lessons and every TEACH AI string."""
+    if any(word in value for word in _SCORE_OR_RANK_WORDS):
+        raise InvariantViolation("TEACH_AI_OUTPUT_REFUSED: score or rank language is not allowed")
+    if any(pattern.search(value) for pattern in _VULNERABLE_DEMAND):
+        raise InvariantViolation("TEACH_PRIVATE_DISCLOSURE_REFUSED: practice feedback cannot ask for private disclosure")
 
 
 def _content_root(root: Path | str | None) -> Path:
@@ -96,9 +105,10 @@ def _require_text(document: dict[str, Any], key: str, path: Path) -> None:
 
 def _validate_lesson_text(document: dict[str, Any], path: str) -> None:
     text = "\n".join(str(document.get(key, "")) for key in ("title", "text", "example", "teaches"))
-    for word in _SCORE_OR_RANK_WORDS:
-        if word in text:
-            raise InvariantViolation(f"TEACH_TEXT_FORBIDDEN: {path}: score/rank word {word}")
+    try:
+        scan_ai_text(text)
+    except InvariantViolation as error:
+        raise InvariantViolation(f"TEACH_TEXT_FORBIDDEN: {path}: {error}") from error
     if any(pattern.search(text) for pattern in _CITED_AS_TRUE):
         raise InvariantViolation(f"TEACH_TEXT_FORBIDDEN: {path}: a citation cannot be treated as proof")
     if any(pattern.search(text) for pattern in _VULNERABLE_DEMAND):
@@ -171,6 +181,8 @@ def _validate_case(item: dict[str, Any], path: Path) -> dict[str, Any]:
     if source["kind"] not in {"publisher", "source_card"} or not isinstance(source["name"], str) or not source["name"].strip():
         raise InvariantViolation(f"TEACH_CASE_SOURCE_INVALID: {path.name}: source kind and name are invalid")
     checked_on = source["checked_on"]
+    if checked_on == NOT_YET_CHECKED:
+        return item
     if not isinstance(checked_on, str) or not _DATE.fullmatch(checked_on):
         raise InvariantViolation(f"TEACH_CASE_SOURCE_INVALID: {path.name}: checked_on must be a date")
     try:
@@ -247,5 +259,5 @@ def reviewed_only(root: Path | str | None = None) -> list[dict[str, Any]]:
 HISTORY = _read_history(ROOT)
 
 __all__ = [
-    "HISTORY", "ROOT", "course_lists", "courses", "load_lessons", "load_practice_cases", "reviewed_only", "validate_lesson",
+    "HISTORY", "NOT_YET_CHECKED", "ROOT", "course_lists", "courses", "load_lessons", "load_practice_cases", "reviewed_only", "scan_ai_text", "validate_lesson",
 ]

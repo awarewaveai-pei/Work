@@ -1,9 +1,9 @@
 id: taiwan-dgbas-household
-version: 1
+version: 2
 title: 台灣家庭收支的公開統計
 text: 練習閱讀一則家庭收支統計公告。只討論公開數字和查找步驟。
 source:
   kind: publisher
   name: 行政院主計總處
-  checked_on: '2026-10-04'
+  checked_on: 尚未查核
 place: 台灣

@@ -47,8 +47,16 @@ def _course_lessons() -> dict[str, dict[str, dict[str, Any]]]:
 def _completion_for(
     docs: CaseDocs, tenant_id: str, owner: record_log.Owner, course: str, required: list[str], lessons: dict[str, dict[str, Any]]
 ) -> dict[str, Any] | None:
+    preferences = docs.current(tenant_id, owner, "teach.completion_preference")
+    if preferences and preferences[-1]["content"].get("keep") is False:
+        return None
     runs = docs.current(tenant_id, owner, "teach.run")
-    used = {doc["content"].get("lesson"): doc["content"].get("lesson_version") for doc in runs}
+    used: dict[str, int] = {}
+    for doc in runs:
+        lesson_id = doc["content"].get("lesson")
+        version = doc["content"].get("lesson_version")
+        if isinstance(lesson_id, str) and isinstance(version, int) and version >= used.get(lesson_id, 0):
+            used[lesson_id] = version
     if any(used.get(lesson_id) != lessons[lesson_id]["version"] for lesson_id in required):
         return None
     if any(doc["content"].get("course") == course for doc in docs.current(tenant_id, owner, "teach.completion")):

@@ -30,12 +30,15 @@ KINDS = [
     }, owner="person"),
     DocKind("teach.practice_consent", "TEACH", "拿真實案子練習的同意", {
         "project_id": Field("text", 64, required=True, human_only=True),
-    }, owner="person"),
+    }, owner="person", from_case="project_id"),
+    DocKind("teach.completion_preference", "TEACH", "完成紀錄保留偏好", {
+        "keep": Field("bool", required=True, human_only=True),
+    }, owner="person", singleton=True),
     DocKind("teach.completion", "TEACH", "課程完成紀錄", {
         "course": Field("choice", choices=tuple(PACKAGES), required=True),
         "lesson_versions": Field("json", 8000, required=True, shape="object"),
         "at": Field("date", required=True),
-    }, owner="person", authors=frozenset({"system"}), deletable=False),
+    }, owner="person", authors=frozenset({"system"}), deletable=True),
     DocKind("teach.opponent", "TEACH", "練習對手的回應", {
         "challenge": Field("text", 2400, required=True),
         "question": Field("text", 500),

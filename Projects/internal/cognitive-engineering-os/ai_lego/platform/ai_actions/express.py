@@ -185,7 +185,7 @@ def _shape(answer: dict[str, Any]) -> dict[str, Any]:
                 clean_refs.append({"kind": pair[0], "doc_id": pair[1]})
         if item.get("author") == "user":
             raise InvariantViolation("AI_ANSWER_INVALID: an AI action cannot label its sentence as the person's words")
-        if item.get("author") not in (None, "ai", "joint"):
+        if item.get("author") not in (None, "ai"):
             raise InvariantViolation(f"AI_ANSWER_INVALID: sentence {index} has an invalid author")
         unchecked = bool(item.get("unchecked"))
         for ref in clean_refs:

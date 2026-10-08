@@ -36,6 +36,7 @@ type Opponent = { challenge: string; question?: string };
 type MoveFeedback = { move: string; feedback: string; next_practice?: string };
 type Feedback = { move_feedback: MoveFeedback[] };
 type Completion = { course: string; lesson_versions: Record<string, number>; at: string };
+type CompletionPreference = { keep: boolean };
 type PracticeResponse = { cases: PracticeCase[]; place: string | null; fallback: boolean; message: string };
 type TeachNotice = Notice | { type: "teach_completion"; notice: string };
 
@@ -73,7 +74,7 @@ function CasePanel({ practiceCase }: { practiceCase: PracticeCase }) {
       <span className="lab">練習案例</span>
       <b>{practiceCase.title}</b>
       <p className="mb0">{practiceCase.text}</p>
-      <p className="sub mb0">來源：{practiceCase.source.name}。查核日期：{practiceCase.source.checked_on}。</p>
+      <p className="sub mb0">來源：{practiceCase.source.name}。{practiceCase.source.checked_on === "尚未查核" ? "查核狀態：尚未查核。" : `查核日期：${practiceCase.source.checked_on}。`}</p>
     </div>
   );
 }
@@ -85,6 +86,7 @@ export function TeachPage() {
   const [run, setRun] = useState<Doc<TeachRun> | null>(null);
   const [aarDoc, setAarDoc] = useState<Doc<AfterActionReview> | null>(null);
   const [completions, setCompletions] = useState<Doc<Completion>[]>([]);
+  const [completionPreference, setCompletionPreference] = useState<Doc<CompletionPreference> | null>(null);
   const [opponent, setOpponent] = useState<Doc<Opponent> | null>(null);
   const [feedback, setFeedback] = useState<Doc<Feedback> | null>(null);
   const [subject, setSubject] = useState("");
@@ -101,12 +103,13 @@ export function TeachPage() {
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
-    const [lessonRows, caseResult, runRows, aarRows, completionRows, opponentRows, feedbackRows] = await Promise.all([
+    const [lessonRows, caseResult, runRows, aarRows, completionRows, preferenceRows, opponentRows, feedbackRows] = await Promise.all([
       apiFetch<Lesson[]>("/blocks/teach/lessons"),
       apiFetch<PracticeResponse>("/blocks/teach/practice-cases"),
       docs.list<TeachRun>(null, "teach.run"),
       docs.list<AfterActionReview>(null, "teach.aar"),
       docs.list<Completion>(null, "teach.completion"),
+      docs.list<CompletionPreference>(null, "teach.completion_preference"),
       docs.list<Opponent>(null, "teach.opponent"),
       docs.list<Feedback>(null, "teach.feedback"),
     ]);
@@ -119,6 +122,7 @@ export function TeachPage() {
     setAarDoc(aarRows.at(-1) ?? null);
     setAarForm((current) => (hasText(current) ? current : aarRows.at(-1)?.content ?? EMPTY_AAR));
     setCompletions(completionRows);
+    setCompletionPreference(preferenceRows.at(-1) ?? null);
     setOpponent(opponentRows.at(-1) ?? null);
     setFeedback(feedbackRows.at(-1) ?? null);
     setSubject((current) => current || initialLesson?.subject || "");
@@ -150,7 +154,8 @@ export function TeachPage() {
   const saveRun = () => act(async () => {
     if (!lesson || !practiceCase) return;
     const content: TeachRun = { lesson: lesson.id, lesson_version: lesson.version, practice_case: practiceCase.id, role, notes: notes.trim() };
-    const saved = run ? await docs.update(null, "teach.run", run, content) : await docs.create(null, "teach.run", content);
+    const sameLesson = run?.content.lesson === lesson.id && run.content.lesson_version === lesson.version;
+    const saved = sameLesson ? await docs.update(null, "teach.run", run!, content) : await docs.create(null, "teach.run", content);
     setRun(saved); setDirty(false); setOpponent(null); setFeedback(null);
     const found = (saved.notices as TeachNotice[]).find((notice) => notice.type === "teach_completion");
     setCompletionNotice(found?.type === "teach_completion" ? found.notice : "");
@@ -179,6 +184,17 @@ export function TeachPage() {
     const index = practiceCases.findIndex((item) => item.id === practiceCaseId);
     chooseCase(practiceCases[(index + 1) % practiceCases.length].id);
   };
+  const toggleCompletionKeeping = () => act(async () => {
+    const content = { keep: !(completionPreference?.content.keep ?? true) };
+    const saved = completionPreference
+      ? await docs.update(null, "teach.completion_preference", completionPreference, content)
+      : await docs.create(null, "teach.completion_preference", content);
+    setCompletionPreference(saved);
+  });
+  const removeCompletion = (completion: Doc<Completion>) => act(async () => {
+    await docs.remove(null, "teach.completion", completion.doc_id);
+    setCompletions((current) => current.filter((item) => item.doc_id !== completion.doc_id));
+  });
 
   if (!lessons || !lesson || !practiceCase) return <><div className="crumbs"><Link href="/projects">我的專案</Link> › 課程與演練</div><div className="card"><p>{error || "載入中…"}</p></div></>;
 
@@ -250,7 +266,9 @@ export function TeachPage() {
 
       <div className="card">
         <h2>我已完成的課</h2>
-        {completions.length === 0 ? <p className="sub mb0">還沒有完成紀錄。</p> : <ul>{completions.map((item) => <li key={item.doc_id}>{item.content.course}：{item.content.at}</li>)}</ul>}
+        <p className="sub">完成紀錄預設保留；你可以選擇不留。</p>
+        <button className="btn" type="button" onClick={toggleCompletionKeeping}>{completionPreference?.content.keep === false ? "保留完成紀錄" : "不保留完成紀錄"}</button>
+        {completions.length === 0 ? <p className="sub mb0">還沒有完成紀錄。</p> : <ul>{completions.map((item) => <li key={item.doc_id}>{item.content.course}：{item.content.at} <button className="btn ghost" type="button" onClick={() => removeCompletion(item)}>刪除這筆紀錄</button></li>)}</ul>}
       </div>
     </>
   );

@@ -142,6 +142,28 @@ class ExpressApiTests(ProjectSourceApiTestCase):
             self.assertIn("AI_ANSWER_INVALID", response.text)
         self.assertEqual(self.client.get(f"{self.base}/express/drafts").json(), [])
 
+    def test_normal_save_also_rejects_a_ref_outside_the_selection(self):
+        selected = self.save_case_record("sense.card", SENSE)
+        outside = self.save_case_record("sense.card", {**SENSE, "text": "沒有選進來的卡片"})
+        self.selection([{"project_id": self.project["project_id"], "kind": "sense.card", "doc_id": selected["doc_id"]}])
+        refused = self.client.post(f"{self.base}/docs/express.draft", json={"content": {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "越界", "refs": [{"kind": "sense.card", "doc_id": outside["doc_id"]}], "unchecked": True, "author": "user"}]}})
+        self.assertEqual(refused.status_code, 400, refused.text)
+        self.assertIn("EXPRESS_DRAFT_REF_OUTSIDE_SELECTION", refused.text)
+
+    def test_same_ai_sentence_stays_ai_changed_text_may_be_user_and_joint_is_refused(self):
+        record = self.save_case_record("sense.card", SENSE)
+        self.selection([{"project_id": self.project["project_id"], "kind": "sense.card", "doc_id": record["doc_id"]}])
+        first = self.save_case_record("express.draft", {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "AI 原句", "refs": [{"kind": "sense.card", "doc_id": record["doc_id"]}], "unchecked": False, "author": "ai"}]})
+        same = self.client.put(f"{self.base}/docs/express.draft/{first['doc_id']}", json={"content": {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "AI 原句", "refs": [{"kind": "sense.card", "doc_id": record["doc_id"]}], "unchecked": False, "author": "user"}]}, "base_version": 1})
+        self.assertEqual(same.status_code, 200, same.text)
+        self.assertEqual(same.json()["content"]["sentences"][0]["author"], "ai")
+        changed = self.client.put(f"{self.base}/docs/express.draft/{first['doc_id']}", json={"content": {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "AI 原句，但我改過了", "refs": [{"kind": "sense.card", "doc_id": record["doc_id"]}], "unchecked": False, "author": "user"}]}, "base_version": 2})
+        self.assertEqual(changed.status_code, 200, changed.text)
+        self.assertEqual(changed.json()["content"]["sentences"][0]["author"], "user")
+        joint = self.client.put(f"{self.base}/docs/express.draft/{first['doc_id']}", json={"content": {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "不應有共同作者", "refs": [{"kind": "sense.card", "doc_id": record["doc_id"]}], "unchecked": False, "author": "joint"}]}, "base_version": 3})
+        self.assertEqual(joint.status_code, 400, joint.text)
+        self.assertIn("EXPRESS_DRAFT_SENTENCE_INVALID", joint.text)
+
     def test_unchecked_claim_is_marked_and_handback_happens_before_model(self):
         claim = self.save_case_record("verify.claim", {"text": "某件事真的發生了", "sentence": "可以查的事實", "from": "我加的"})
         self.selection([{"project_id": self.project["project_id"], "kind": "verify.claim", "doc_id": claim["doc_id"]}])
@@ -169,6 +191,14 @@ class ExpressApiTests(ProjectSourceApiTestCase):
     def test_person_confidence_and_uncertainty_survive_and_ai_cannot_be_user(self):
         judgment = self.save_case_record("decide.judgment", JUDGMENT)
         self.selection([{"project_id": self.project["project_id"], "kind": "decide.judgment", "doc_id": judgment["doc_id"]}])
+        self.provider.answer = {"sentences": [{"text": "信心：60；我還不確定合作方是否會改變條件。", "refs": [{"kind": "decide.judgment", "doc_id": judgment["doc_id"]}], "unchecked": False, "author": "joint"}]}
+        joint = self.client.post(f"{self.base}/ai/EXPRESS/draft_from_outline", json={"context": {}})
+        self.assertEqual(joint.status_code, 502, joint.text)
+        self.assertIn("invalid author", joint.text)
+        self.provider.answer = {"sentences": [{"text": "只寫一般摘要", "refs": [{"kind": "decide.judgment", "doc_id": judgment["doc_id"]}], "unchecked": False, "author": "ai"}]}
+        missing_person_line = self.client.post(f"{self.base}/ai/EXPRESS/draft_from_outline", json={"context": {}})
+        self.assertEqual(missing_person_line.status_code, 502, missing_person_line.text)
+        self.assertIn("person's confidence or uncertainty", missing_person_line.text)
         self.provider.answer = {"sentences": [{"text": "信心：60；我還不確定合作方是否會改變條件。", "refs": [{"kind": "decide.judgment", "doc_id": judgment["doc_id"]}], "unchecked": False, "author": "ai"}]}
         response = self.client.post(f"{self.base}/ai/EXPRESS/draft_from_outline", json={"context": {}})
         self.assertEqual(response.status_code, 200, response.text)

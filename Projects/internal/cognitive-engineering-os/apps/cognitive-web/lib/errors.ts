@@ -95,6 +95,7 @@ const CODES: Record<string, string> = {
   TEACH_PRIVATE_DISCLOSURE_REFUSED: "練習不需要透露脆弱或私密的事，請換一個問題。",
   TEACH_REAL_CASE_INVALID: "真實案子的編號格式不對，請重新整理頁面。",
   TEACH_RUN_CONTEXT_MISMATCH: "練習紀錄和這次選的內容不一致，請重新整理後再試。",
+  TEACH_RUN_NOT_FOUND: "找不到這筆練習紀錄，請重新整理後再選一次。",
   TEACH_RUN_REQUIRED: "先存一筆練習紀錄，才能請練習對手回應。",
   EXPRESS_SELECTION_ITEMS_REQUIRED: "請至少選一筆這個案子的紀錄。",
   EXPRESS_SELECTION_REF_INVALID: "選到的紀錄格式不對，請重新整理後再選一次。",

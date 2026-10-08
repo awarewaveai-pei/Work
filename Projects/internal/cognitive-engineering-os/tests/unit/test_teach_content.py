@@ -43,7 +43,7 @@ class TeachContentTests(unittest.TestCase):
         self.assertEqual(len(lesson_ruleset.items), len(lesson_files))
         self.assertEqual(len(case_ruleset.items), len(case_files))
         self.assertEqual(lesson_ruleset.stamp()["fingerprint"], "553f964de991")
-        self.assertEqual(case_ruleset.stamp()["fingerprint"], "92af6eaa3924")
+        self.assertEqual(case_ruleset.stamp()["fingerprint"], "bb655a3aa4a8")
         self.assertEqual({lesson["source"]["kind"] for lesson in case_ruleset.items}, {"publisher"})
         self.assertIn("sources-independent-origins", {lesson["id"] for lesson in lesson_ruleset.items})
 
@@ -74,6 +74,21 @@ class TeachContentTests(unittest.TestCase):
         self.rewrite(path, lambda document: document["source"].pop("checked_on"))
         with self.assertRaisesRegex(InvariantViolation, "TEACH_CASE_SOURCE_INVALID"):
             load_practice_cases(root)
+
+    def test_case_may_explicitly_be_not_yet_checked(self):
+        root = self.copy_content()
+        path = next((root / "cases").glob("*.yaml"))
+        self.rewrite(path, lambda document: document["source"].__setitem__("checked_on", "尚未查核"))
+        cases = load_practice_cases(root)
+        self.assertEqual(cases.items[0]["source"]["checked_on"], "尚未查核")
+
+    def test_loader_runs_the_cited_as_true_guard_on_a_broken_lesson(self):
+        path = next((ROOT / "lessons").glob("*.yaml"))
+        document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        document["text"] = "因為有引註所以是真的。"
+        with self.assertRaisesRegex(InvariantViolation, "TEACH_TEXT_FORBIDDEN"):
+            from ai_lego.platform.lessons import validate_lesson
+            validate_lesson(document, path)
 
     def test_text_change_without_version_bump_is_refused_against_history(self):
         root = self.copy_content()

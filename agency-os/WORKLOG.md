@@ -86,6 +86,25 @@
 - MUTATION_EVIDENCE: 記憶體內移除 Future 完成回呼，`test_wait_idle_waits_for_a_submitted_hook_without_a_future_registry` 轉紅；原版 3/3 綠。
 - REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，main 合併仍封鎖。
 
+## 2026-10-08（續3）COS 卡 40/41/42/50：修正 Claude 審查發現
+
+- 根本問題：TEACH AI action 只擋一種私密要求，沒有擋自由文字評分／排名；練習同意沒有綁真實案；完成紀錄不可刪且沒有 opt-out；課程完成只取每課最後一筆 run；EXPRESS 草稿可把舊 AI 原句標成本人或 joint，且新增拒絕碼未進 web 錯誤句表。
+- 修改：loader 提供唯一 AI 文字 scanner，action 直接引用 loader 的 score／rank 與 vulnerable-demand patterns；practice consent 用 `from_case`，完成紀錄可刪並新增預設保留的 person preference；hook 取各 lesson 最高版本；缺 run id、越界 ref、`joint` 與缺 person-lines 都拒絕；EXPRESS draft 比對所有舊版本的 AI sentence，未改文字維持 `ai`；頁面以新 lesson/version 建立新 run，支援完成紀錄 opt-out／刪除，未查核案例顯示「尚未查核」。
+- 內容：四個練習案例改為 v2，`checked_on: 尚未查核`，HISTORY 加入 `bb655a3aa4a8`；STEP34 checklist 明列練習紀錄控制與情境演練／共同實作／GOVERN 高風險護欄尚未建置。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_teach_content` | exit=0 | 13 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_teach` | exit=0 | 18 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_express` | exit=0 | 16 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_express_export` | exit=0 | 11 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | 43 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_record_log` | exit=0 | 20 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_step2_foundation` | exit=0 | 54 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_integrity` | exit=0 | 41 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_codex_queue` | exit=0 | 7 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | cognitive-web typecheck PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run components/blocks/TeachPage.test.tsx components/blocks/ExpressPage.test.tsx` | exit=0 | TeachPage 4 tests PASS；ExpressPage.test.tsx 不存在，Vitest 只執行現存檔案。
+- MUTATION_EVIDENCE: cited-as-true／not-yet-checked loader guard、TEACH shared scanner、missing run、from_case、completion deletable／opt-out／version aggregation、EXPRESS outside-selection／old-AI-author／joint／person-lines、page version routing／not-yet-checked rendering；每項移除後指定測試紅，byte-exact 還原後綠，並清理 engine `__pycache__`。
+- REVIEW_WAIVED: NA -- Claude cross-model review deliberately remains pending in `agency-os/reports/review-debt.md`。
+- BUILD_GATE: `powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-build-gates.ps1` 通過 bootstrap、ADR、secret scan、git EAP、Sentry 與前置文件閘；本地 runner 在 `system-health-check` 階段未返回結果，未顯示本次變更失敗；不做 push、merge、deploy 或 compose apply。
 ## 2026-10-08（續2）COS 卡 00/01/02：修正 Claude 審查發現
 
 - 根本問題：CI test image 用 unittest discover 執行了讀取 checkout 外檔案的測試；備份腳本先驗證舊檔，會被損壞舊 dump 阻塞；佇列危險命令只在 high-stop 檢查，PowerShell 驗收又可能把退出碼、timeout 輸出與 PostgreSQL skip 判錯。

@@ -3,18 +3,15 @@
 from __future__ import annotations
 
 import json
-import re
 from typing import Any, Callable, Mapping
 
 from ai_lego.errors import InvariantViolation
 from ai_lego.core.domain.kinds.teach import OPPOSITE_ROLES
 from ai_lego.platform.ai_gate import AiAction
-from ai_lego.platform.lessons import load_lessons, load_practice_cases
+from ai_lego.platform.lessons import _SCORE_OR_RANK_WORDS, _VULNERABLE_DEMAND, load_lessons, load_practice_cases, scan_ai_text
 
 
 _REAL_CASE_KEYS = ("real_case", "real_case_id", "project_id")
-_PRIVATE_REQUEST = re.compile(r"(?:請|要|必須).{0,12}(?:說出|透露|揭露|分享).{0,12}(?:脆弱|創傷|自傷|私密|秘密)")
-
 OPPONENT = (
     "Act as the practice opponent for the role the learner chose. Read only the selected lesson, its practice case, and "
     "the learner's selected teach.run notes. Challenge the thinking move, not the person. Do not decide for the learner, "
@@ -85,6 +82,8 @@ def _run(context: Mapping[str, Any], read: Read) -> tuple[dict[str, Any], dict[s
     runs = read("teach.run")
     wanted_id = context.get("run") or context.get("run_id")
     selected = next((doc for doc in runs if wanted_id and doc["doc_id"] == wanted_id), None) if wanted_id else None
+    if wanted_id is not None and selected is None:
+        raise InvariantViolation("TEACH_RUN_NOT_FOUND: choose an existing practice run")
     if selected is None:
         selected = runs[-1] if runs else None
     if selected is None:
@@ -121,9 +120,9 @@ def _feedback_input(context: Mapping[str, Any], read: Read) -> str:
 def _safe(value: Any) -> str | None:
     if not isinstance(value, str) or not value.strip():
         return None
-    if _PRIVATE_REQUEST.search(value):
-        raise InvariantViolation("TEACH_PRIVATE_DISCLOSURE_REFUSED: practice feedback cannot ask for private disclosure")
-    return value.strip()
+    clean = value.strip()
+    scan_ai_text(clean)
+    return clean
 
 
 def _opponent_shape(answer: dict[str, Any]) -> dict[str, Any]:
