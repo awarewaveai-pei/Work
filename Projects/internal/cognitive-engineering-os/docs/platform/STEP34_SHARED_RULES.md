@@ -228,3 +228,8 @@ page error; the supervisor page updated.
   last convener cannot leave a closed group either (only a convener erases it). An account erasure removes the person's memberships
   and every group record they wrote, and is refused while they are a group's only convener (ACCOUNT_IS_LAST_CONVENER). In a group,
   only the person who wrote every version of a document deletes it (also after leaving: G3).
+- 2026-10-08 (card 12): `identity.invited_by` is migration `0006_identity_invited_by.py`. An invitation brings a participant or a
+  facilitator (a convener only by hand-over); a facilitator invites participants of a class or workshop; someone held for review
+  invites nobody. The flooding count is the distinct accounts that used one inviter's invitations in the window (visitors and
+  signed-in alike), its numbers in `govern.invites`. An account erasure removes the invitations it made or used and every
+  `invited_by` naming it. Accepting does not sign the visitor in.

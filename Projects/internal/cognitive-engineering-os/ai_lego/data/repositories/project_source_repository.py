@@ -945,6 +945,14 @@ class ProjectSourceRepository:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def agreement_members(self, tenant_id: str, group_id: str) -> list[str]:
+        """The members whose stances count in the group's agreement (§8): current and confirmed -- one held for review
+        (§4 pending_review) is left out until a convener confirms them."""
+        with self._db.for_tenant(tenant_id) as connection:
+            rows = connection.execute("SELECT identity_id FROM group_members WHERE tenant_id=%s AND group_id=%s AND left_at IS NULL AND review_state='confirmed' "
+                                      "ORDER BY identity_id", (tenant_id, group_id)).fetchall()
+        return [row["identity_id"] for row in rows]
+
     @classmethod
     def add_member(cls, connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str, role: str, *, review_state: str = "confirmed") -> None:
         """One person into an open group, on the caller's transaction (the invitation's accept marks the invite used in the
@@ -990,8 +998,8 @@ class ProjectSourceRepository:
             connection.execute("UPDATE group_members SET left_at=%s WHERE tenant_id=%s AND group_id=%s AND identity_id=%s", (db.now(), tenant_id, group_id, identity_id))
 
     @classmethod
-    def _require_convener(cls, connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str) -> None:
-        """Membership first (G2: not a member = GROUP_NOT_FOUND), then the role."""
+    def require_convener(cls, connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str) -> None:
+        """Membership first (G2: not a member = GROUP_NOT_FOUND), then the role. On the caller's transaction."""
         mine = cls._membership(connection, tenant_id, group_id, identity_id, lock="FOR SHARE")
         if mine is None:
             raise InvariantViolation(f"GROUP_NOT_FOUND: {group_id!r}")
@@ -1002,7 +1010,7 @@ class ProjectSourceRepository:
         """A convener makes another current member a convener too (G5: then the first may leave)."""
         with self._db.for_tenant(tenant_id) as connection:
             self.require_group(connection, tenant_id, group_id, after_close=True)
-            self._require_convener(connection, tenant_id, group_id, by_identity_id)
+            self.require_convener(connection, tenant_id, group_id, by_identity_id)
             if connection.execute("UPDATE group_members SET role='convener' WHERE tenant_id=%s AND group_id=%s AND identity_id=%s AND left_at IS NULL",
                                   (tenant_id, group_id, to_identity_id)).rowcount != 1:
                 raise InvariantViolation("GROUP_MEMBER_NOT_FOUND: that person is not in the group")
@@ -1015,7 +1023,7 @@ class ProjectSourceRepository:
         row = cls._group_row(connection, tenant_id, group_id)
         if row is None or row["status"] == "erased":
             raise InvariantViolation(f"GROUP_NOT_FOUND: {group_id!r}")
-        cls._require_convener(connection, tenant_id, group_id, identity_id)
+        cls.require_convener(connection, tenant_id, group_id, identity_id)
         return row
 
     def close_group(self, tenant_id: str, group_id: str, identity_id: str) -> dict[str, Any]:
@@ -1067,7 +1075,8 @@ class ProjectSourceRepository:
     def erase_person_from_groups(cls, connection: psycopg.Connection, tenant_id: str, identity_id: str) -> dict[str, int]:
         """The account erasure's part in groups, on its decision transaction (under the person lock held exclusive):
         refused while the person is a group's only convener (G5; the conveners' rows locked as leaving locks them), else
-        their memberships and every record they wrote in a group go; the others' records there stay."""
+        their memberships, the invitations they made or used, and every record they wrote in a group go; the others'
+        records there stay."""
         led = [row["group_id"] for row in connection.execute(
             "SELECT group_id FROM group_members WHERE tenant_id=%s AND identity_id=%s AND role='convener' AND left_at IS NULL", (tenant_id, identity_id))]
         if led:
@@ -1076,4 +1085,6 @@ class ProjectSourceRepository:
             if connection.execute(cls._ALONE, (tenant_id, identity_id)).fetchone() is not None:
                 raise InvariantViolation("ACCOUNT_IS_LAST_CONVENER: the account leads a group alone; hand it over or erase the group first")
         memberships = connection.execute("DELETE FROM group_members WHERE tenant_id=%s AND identity_id=%s", (tenant_id, identity_id)).rowcount
-        return {"memberships": memberships, "group_records": record_log.delete_written_by(connection, tenant_id, identity_id, "group")}
+        invites = connection.execute("DELETE FROM group_invites WHERE tenant_id=%s AND (inviter_identity_id=%s OR used_by_identity_id=%s)",
+                                     (tenant_id, identity_id, identity_id)).rowcount   # who invited whom names the person
+        return {"memberships": memberships, "invites": invites, "group_records": record_log.delete_written_by(connection, tenant_id, identity_id, "group")}

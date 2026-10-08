@@ -31,6 +31,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Claude | codex-line-pg-port | Codex 線 cherry-pick 到 PostgreSQL main 的移植：ON_DELETE 在刪除交易內、owner 鎖 exclusive；DocRead 讀寫 PG 化並取 aggregate 鎖；`image_test_modules.py` 需 `COS_FULL_SUITE=1`；CI checkout job 必有 PG | hook 讀到的偏好在寫入前不變；讀的版本＝記的版本；點名模組不能繞過全套守衛；CI 的 DB 測試不能靜默 skip | affected 356 模組 15023 OK（真 PG）；`then()`→`[]` 突變使 `test_a_deleted_completion_is_not_written_again_by_the_next_run` 紅、還原綠；tsc／ExpressPage+TeachPage vitest 綠 | 待 Codex 審（Claude 寫的）；只在 refs/claude/codex-line-rebased，勿 merge／push |
 | Claude | 10-group-core | 群組容器：0005 遷移（四表＋租戶內外鍵＋CHECK）、group 擁有者、require_group 鎖、成員／離開／交接／結束／抹除路由；帳號刪除帶走成員資格與自己在群組寫的紀錄 | G1 寫入只在群組開著且寫的人是現任成員（group 鎖 shared，結束／抹除 exclusive）；G2 非成員＝不存在（同一個 404）；G3 離開後不讀不寫、可刪自己寫的；G4 一筆交易刪群組紀錄、成員、邀請、指名它的同意；G5 最後一位召集人不能走（也不能刪帳號） | test_groups_core 27 PASS（真 PostgreSQL，兩連線競態 3 個）；突變 11/11 紅→還原綠（require_group、shared 鎖、403、同意、邀請、最後召集人、CHECK、成員檢查、DOC_NOT_YOURS、FOR UPDATE、帳號刪除）；pg_foundation 29、record_log 20、step2 67、block_foundation 43、block_govern 67、erasure_workflow 35 PASS；tsc、errors vitest 綠 | 待 Codex 審（身分／存取控制／抹除：兩 critic＋Codex） |
 | Claude | 11-visibility | `platform/visibility.py`：讀別人紀錄的唯一入口 R1 `visible`（四種 visibility、先寫後看 blind、離開／待確認／非成員只看到自己寫的）；CaseDocs 讀群組只走 `current_in_group`，`current`/`versions` 遇群組拒絕 | R1 只有現任、已確認成員讀他人紀錄；blind 召集人不豁免、依 id 取也不例外；讀群組只有一個地方 | test_visibility 15 PASS（真 PostgreSQL 三人群組）＋閘門 (a)(b)(c) 在暫存副本植入一筆未審用法皆紅；突變 6/6 紅→還原綠（blind、召集人豁免、全員可見、離開、待確認、CaseDocs 直讀群組）；test_groups_core 27 PASS | 待 Codex 審（存取控制：兩 critic＋Codex） |
+| Claude | 12-invitations | 邀請是進群組的唯一路：一次性 token 只存 sha256、常數時間比對、7 天、可收回；接受（登入者同租戶／訪客經 create_identity 建帳號）與標記已用、加入成員同一交易；上限與帳號灌入規則在 `govern.invites` 規則集；被擋的帳號由召集人確認 | token 不出現在建立以外的任何回應、網址、log、錯誤；所有拒絕同一個 404；參與者不能邀請；同租戶；6 個以上帳號 24 小時內經同一邀請人加入＝待確認（看不到別人、不算進共識） | test_group_invites 10 PASS（真 PostgreSQL）；突變 7/7 紅→還原綠（存原 token、不在同交易標記、過期另一個 404、參與者可邀、拿掉待確認、== 比對、跨租戶接受）；test_visibility 15、test_step2_foundation 67、test_groups_core 27 PASS；tsc、errors vitest 綠 | 待 Codex 審（AUTH：兩 critic＋Codex） |
 
 ## deferred, before D7 second region
 
@@ -47,3 +48,4 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 - r2-fix: `restore-cognitive-db.sh` 只驗 `SELECT 1`，沒驗還原後的表與筆數。
 - 群組（card 10）：G3「離開的人可匯出自己寫的」未做——`/govern/export` 只匯出個人與自己案子的紀錄，不含自己在群組寫的；群組紀錄的刪除只在 `CaseDocs.delete`，路由隨 card 20 起的區塊。
 - 群組（card 10）：抹除群組與抹除帳號同時刪重疊的成員列／紀錄列時，PostgreSQL deadlock detector 可能中止其一（錯誤可重試，非卡死）；同上一條 person/case 鎖序。
+- 邀請（card 12）：接受邀請的網頁（讀網址 #token 再 POST）未做，隨群組頁面的卡；訪客接受後要自己登入一次。

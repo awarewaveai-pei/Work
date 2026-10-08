@@ -27,6 +27,7 @@ import hmac
 import secrets
 from datetime import datetime, timedelta
 from typing import Any, Callable
+from uuid import uuid4
 
 import psycopg
 
@@ -34,6 +35,7 @@ from ai_lego.core.domain.identity import identity_record
 from ai_lego.core.domain.workspace import workspace_record
 from ai_lego.data import db
 from ai_lego.data.db import Databases
+from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 
 PBKDF2_ITERATIONS = 600_000
@@ -208,6 +210,8 @@ class IdentityStore:
             conn.execute(f"DELETE FROM {table} WHERE identity_id = %s", (identity_id,))
         conn.execute("UPDATE ai_usage SET identity_id = 'deleted' WHERE tenant_id = %s AND identity_id = %s", (tenant_id, identity_id))
         conn.execute("UPDATE identity SET email = %s, display_name = %s, status = 'deleted' WHERE identity_id = %s", (f"deleted-{identity_id}@erased.invalid", "（已刪除）", identity_id))
+        # who brought whom in (card 12) names a person: it goes with either of the two
+        conn.execute("UPDATE identity SET invited_by = NULL WHERE tenant_id = %s AND (identity_id = %s OR invited_by = %s)", (tenant_id, identity_id, identity_id))
         return True
 
     def _find_identity_by_email(self, tenant_id: str, email: str) -> dict[str, Any] | None:
@@ -565,3 +569,125 @@ class IdentityStore:
         with self._db.for_tenant(tenant_id) as conn:
             row = conn.execute(query, params).fetchone()
         return {"calls": int(row["calls"]), "input_tokens": int(row["input_tokens"]), "output_tokens": int(row["output_tokens"]), "reserved": int(row["reserved"])}
+
+    # -- Group invitations (STEP34_SHARED_RULES.md §4, card 12): the only way into a group; no open signup ------------
+    # The reset-token / handoff-code shape above: a random token shown once to the inviter, only its sha256 kept, the
+    # match confirmed in constant time, used once inside the transaction that adds the member. The limits and the
+    # account-flooding hold are GOVERN's ruleset (platform/rulesets/govern.py "govern.invites"), never constants here.
+    #
+    # Who may invite: a convener always (a participant or a facilitator); a facilitator in a 'class' or 'workshop'
+    # group (a participant); a participant never; nobody held for review.
+
+    INVITE_REFUSED = "INVITE_NOT_FOUND: this invitation opens nothing"   # every refusal of accept: one text, no reason
+
+    @staticmethod
+    def _invite_rules() -> dict[str, int]:
+        from ai_lego.platform.rulesets import require
+
+        return require("govern.invites").items
+
+    def create_invite(self, tenant_id: str, group_id: str, inviter_identity_id: str, role: str = "participant") -> dict[str, Any]:
+        """A new invitation; the token is in this return value only (the caller shows it once, never logs it)."""
+        if role not in ("participant", "facilitator"):
+            raise InvariantViolation("GROUP_ROLE_INVALID: an invitation brings a participant or a facilitator")
+        rules, token, now = self._invite_rules(), secrets.token_urlsafe(32), db.now()
+        with self._db.for_tenant(tenant_id) as conn:
+            group = ProjectSourceRepository.require_group(conn, tenant_id, group_id, member=inviter_identity_id)
+            mine = conn.execute("SELECT role, review_state FROM group_members WHERE tenant_id = %s AND group_id = %s AND identity_id = %s AND left_at IS NULL",
+                                (tenant_id, group_id, inviter_identity_id)).fetchone()
+            allowed = mine["review_state"] == "confirmed" and (
+                mine["role"] == "convener" or (mine["role"] == "facilitator" and group["purpose"] in ("class", "workshop") and role == "participant"))
+            if not allowed:
+                raise InvariantViolation("GROUP_INVITE_NOT_ALLOWED: a convener invites; a facilitator invites participants to a class or a workshop")
+            db.advisory_xact_lock(conn, "group-invites", tenant_id, group_id)   # the two counts below hold until this commits
+            db.advisory_xact_lock(conn, "inviter", tenant_id, inviter_identity_id)
+            open_now = conn.execute("SELECT COUNT(*) FROM group_invites WHERE tenant_id = %s AND group_id = %s AND used_at IS NULL AND revoked_at IS NULL AND expires_at > %s",
+                                    (tenant_id, group_id, now)).fetchone()[0]
+            if open_now >= rules["open_per_group"]:
+                raise InvariantViolation(f"GROUP_INVITES_TOO_MANY: a group has at most {rules['open_per_group']} open invitations")
+            made = conn.execute("SELECT COUNT(*) FROM group_invites WHERE tenant_id = %s AND inviter_identity_id = %s AND created_at > %s",
+                                (tenant_id, inviter_identity_id, now - timedelta(hours=24))).fetchone()[0]
+            if made >= rules["created_per_identity_per_day"]:
+                raise InvariantViolation(f"GROUP_INVITES_PER_DAY: one person makes at most {rules['created_per_identity_per_day']} invitations a day")
+            invite_id, expires = str(uuid4()), now + timedelta(days=rules["expires_days"])
+            conn.execute("INSERT INTO group_invites (invite_id, tenant_id, group_id, role, token_hash, inviter_identity_id, created_at, expires_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                         (invite_id, tenant_id, group_id, role, hashlib.sha256(token.encode("utf-8")).hexdigest(), inviter_identity_id, now, expires))
+        return {"invite_id": invite_id, "group_id": group_id, "role": role, "expires_at": db.iso(expires), "token": token}
+
+    def list_invites(self, tenant_id: str, group_id: str, identity_id: str) -> list[dict[str, Any]]:
+        """A convener's view of the group's open invitations: never the token, never its hash."""
+        with self._db.for_tenant(tenant_id) as conn:
+            ProjectSourceRepository.require_group(conn, tenant_id, group_id, after_close=True)
+            ProjectSourceRepository.require_convener(conn, tenant_id, group_id, identity_id)
+            rows = conn.execute("SELECT invite_id, role, inviter_identity_id, created_at, expires_at FROM group_invites WHERE tenant_id = %s AND group_id = %s "
+                                "AND used_at IS NULL AND revoked_at IS NULL AND expires_at > %s ORDER BY created_at, invite_id", (tenant_id, group_id, db.now())).fetchall()
+        return [dict(row) for row in rows]
+
+    def revoke_invite(self, tenant_id: str, group_id: str, invite_id: str, identity_id: str) -> None:
+        """By the person who made it or by a convener; a used or revoked one cannot be revoked again."""
+        with self._db.for_tenant(tenant_id) as conn:
+            ProjectSourceRepository.require_group(conn, tenant_id, group_id, after_close=True, member=identity_id)
+            row = conn.execute("SELECT inviter_identity_id FROM group_invites WHERE tenant_id = %s AND group_id = %s AND invite_id = %s AND used_at IS NULL AND revoked_at IS NULL FOR UPDATE",
+                               (tenant_id, group_id, invite_id)).fetchone()
+            if row is None:
+                raise InvariantViolation("GROUP_INVITE_NOT_FOUND: no open invitation of this group has that id")
+            if row["inviter_identity_id"] != identity_id:
+                ProjectSourceRepository.require_convener(conn, tenant_id, group_id, identity_id)
+            conn.execute("UPDATE group_invites SET revoked_at = %s WHERE tenant_id = %s AND invite_id = %s", (db.now(), tenant_id, invite_id))
+
+    def accept_invite(self, token: Any, *, identity: dict[str, Any] | None = None, visitor: dict[str, str] | None = None) -> dict[str, Any]:
+        """Join the invitation's group: a signed-in ``identity`` ({identity_id, tenant_id}) of the same tenant, or a
+        ``visitor`` ({email, display_name, password}) whose identity is made here by ``create_identity`` -- in one
+        transaction with adding the member and marking the invitation used. Unknown, used, expired, revoked, another
+        tenant's, a closed or erased group: INVITE_REFUSED, after the same hash and lookup.
+
+        Account flooding: when more than ``hold_after_accepts`` accounts joined through one inviter's invitations within
+        ``hold_window_hours``, this one is held (pending_review) until a convener confirms it."""
+        if (identity is None) == (visitor is None):
+            raise InvariantViolation("INVITE_ACCEPT_INVALID: a signed-in person or a visitor, not both")
+        token_hash = hashlib.sha256(token.encode("utf-8") if isinstance(token, str) else b"").hexdigest()
+        found = None
+        for region in self._each_region():
+            with self._db.transaction(region) as conn:
+                found = conn.execute("SELECT tenant_id, group_id, token_hash FROM group_invites WHERE token_hash = %s", (token_hash,)).fetchone()
+            if found is not None:
+                break
+        if found is None or not hmac.compare_digest(found["token_hash"], token_hash) or (identity is not None and identity["tenant_id"] != found["tenant_id"]):
+            raise InvariantViolation(self.INVITE_REFUSED)
+        tenant_id, rules, now = found["tenant_id"], self._invite_rules(), db.now()
+        with self._db.for_tenant(tenant_id) as conn:
+            try:   # the group lock first, as every writer of the group (then the invitation's row)
+                ProjectSourceRepository.require_group(conn, tenant_id, found["group_id"])
+            except InvariantViolation as error:
+                if str(error).startswith(("GROUP_CLOSED", "GROUP_ERASED", "GROUP_NOT_FOUND")):
+                    raise InvariantViolation(self.INVITE_REFUSED) from None
+                raise
+            invite = conn.execute("SELECT invite_id, group_id, role, inviter_identity_id, expires_at, used_at, revoked_at FROM group_invites WHERE tenant_id = %s AND token_hash = %s FOR UPDATE",
+                                  (tenant_id, token_hash)).fetchone()
+            if invite is None or invite["used_at"] is not None or invite["revoked_at"] is not None or now >= _instant(invite["expires_at"]):
+                raise InvariantViolation(self.INVITE_REFUSED)
+            inviter = invite["inviter_identity_id"]
+            if visitor is not None:   # a savepoint of this transaction (db: one connection per thread): it goes if anything after fails
+                joining = self.create_identity(str(uuid4()), tenant_id, visitor["email"], visitor["display_name"], visitor["password"])["identity_id"]
+                conn.execute("UPDATE identity SET invited_by = %s WHERE tenant_id = %s AND identity_id = %s", (inviter, tenant_id, joining))
+            else:
+                joining = identity["identity_id"]
+            db.advisory_xact_lock(conn, "invite-accepts", tenant_id, inviter)   # the count below and this accept are one step
+            joined = conn.execute("SELECT COUNT(DISTINCT used_by_identity_id) FROM group_invites WHERE tenant_id = %s AND inviter_identity_id = %s "
+                                  "AND used_at > %s AND used_by_identity_id <> %s",
+                                  (tenant_id, inviter, now - timedelta(hours=rules["hold_window_hours"]), joining)).fetchone()[0]
+            state = "pending_review" if joined >= rules["hold_after_accepts"] else "confirmed"
+            ProjectSourceRepository.add_member(conn, tenant_id, invite["group_id"], joining, invite["role"], review_state=state)
+            if conn.execute("UPDATE group_invites SET used_at = %s, used_by_identity_id = %s WHERE tenant_id = %s AND invite_id = %s AND used_at IS NULL AND revoked_at IS NULL",
+                            (now, joining, tenant_id, invite["invite_id"])).rowcount != 1:
+                raise InvariantViolation(self.INVITE_REFUSED)
+        return {"group_id": invite["group_id"], "identity_id": joining, "review_state": state}
+
+    def confirm_member(self, tenant_id: str, group_id: str, convener_identity_id: str, identity_id: str) -> None:
+        """A convener lets a held member read the others' records and count in the group's agreement."""
+        with self._db.for_tenant(tenant_id) as conn:
+            ProjectSourceRepository.require_group(conn, tenant_id, group_id, after_close=True)
+            ProjectSourceRepository.require_convener(conn, tenant_id, group_id, convener_identity_id)
+            if conn.execute("UPDATE group_members SET review_state = 'confirmed' WHERE tenant_id = %s AND group_id = %s AND identity_id = %s AND left_at IS NULL AND review_state = 'pending_review'",
+                            (tenant_id, group_id, identity_id)).rowcount != 1:
+                raise InvariantViolation("GROUP_MEMBER_NOT_FOUND: nobody of the group waits for that confirmation")
