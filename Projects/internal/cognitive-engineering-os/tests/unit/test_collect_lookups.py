@@ -140,6 +140,22 @@ class FactcheckTests(unittest.TestCase):
         self.assertEqual(client.dbs[-1], None)   # absent = both, as before
         self.assertEqual((lookups.factcheck("p-1", self.text, client=client, dbs=[]), len(client.calls)), ([], 2))   # none to ask: nothing is sent
 
+    def test_a_database_answered_twice_is_malformed_never_the_last_one(self):
+        """Codex VERIFY r5 (class of F1): the answer was read into a dict by name, so a second entry for one database
+        silently replaced the first. Two answers for one database are ambiguous: 格式不對 for that one, the other read."""
+        twice = json.loads(json.dumps(EXAMPLES["factcheck"]["answer"]))
+        twice["items"][0]["dbs"].insert(1, {"db": "claimreview", "state": "查不到", "why": "資料庫裡沒有相近的查核", "attribution": "", "hits": []})
+        got = lookups.factcheck("p-1", self.text, client=Fake(twice))
+        self.assertEqual([(entry["db"], entry["state"], entry.get("why")) for entry in got],
+                         [("claimreview", "無法檢查", lookups.MALFORMED), ("cofacts", "無法檢查", "Cofacts 這次沒有回應")])
+
+    def test_an_answer_in_another_order_is_still_read_by_name(self):
+        """collect answers in the request's order (lookup.v1 dbs; next-admin collect-lookups.test.ts holds it from the
+        producer's side); the engine reads by name, so an older collect's fixed order still lands each answer right."""
+        example = json.loads(json.dumps(EXAMPLES["factcheck"]["answer"]))
+        got = lookups.factcheck("p-1", self.text, client=Fake(example), dbs=["cofacts", "claimreview"])
+        self.assertEqual([(entry["db"], entry["state"]) for entry in got], [("cofacts", "無法檢查"), ("claimreview", "查到")])
+
     def test_a_licence_is_capped(self):
         long = json.loads(json.dumps(EXAMPLES["factcheck_claimreview_only"]["answer"]))
         long["items"][0]["dbs"][0]["hits"][0]["license"] = "授" * 500

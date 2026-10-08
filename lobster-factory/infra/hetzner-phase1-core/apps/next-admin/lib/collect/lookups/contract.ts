@@ -83,13 +83,13 @@ export type DbAnswer<Db extends string, Hit> =
   | { db: Db; state: typeof FOUND; attribution: string; hits: Hit[] }
   | { db: Db; state: typeof NOT_FOUND | typeof UNCHECKABLE; why: string; attribution: string; hits: Hit[] };
 
-/** The fact-check databases, in the order an answer lists them. */
+/** The fact-check databases collect answers; absent `dbs` = these, in this order. */
 export const DBS = ["claimreview", "cofacts"] as const;
 export type Db = (typeof DBS)[number];
 
 export interface FactcheckAnswerItem {
   text: string;
-  /** Only the databases asked for, in DBS order. */
+  /** Only the databases asked for, in the order the request named them (lookup.v1 `dbs`: "in that order"). */
   dbs: Array<DbAnswer<"claimreview", ClaimReviewHit> | DbAnswer<"cofacts", CofactsHit>>;
 }
 
@@ -133,14 +133,15 @@ export function parseLookupRequest(body: unknown): { ok: true; value: LookupRequ
   }
   if (items.length > MAX_FACTCHECK_ITEMS) return { ok: false, error: `too_many_items:${MAX_FACTCHECK_ITEMS}` };
   // Optional `dbs` (v1, added 2026-10-04): which databases may see the words -- someone outside Taiwan's text is never
-  // sent to Cofacts. Absent = every database; present = a non-empty subset of DBS, each once.
+  // sent to Cofacts. Absent = every database; present = a non-empty subset of DBS, each once, answered in the request's
+  // order (an index-based consumer reads dbs[i] as the i-th it asked for; Codex VERIFY r5 F4).
   let dbs: Db[] = [...DBS];
   if (body.dbs !== undefined) {
     const asked = body.dbs;
     if (!Array.isArray(asked) || !asked.length || new Set(asked).size !== asked.length || !asked.every((d) => (DBS as readonly unknown[]).includes(d))) {
       return { ok: false, error: "dbs_not_a_subset" };
     }
-    dbs = DBS.filter((d) => asked.includes(d));
+    dbs = asked as Db[];
   }
   const texts: string[] = [];
   for (const item of items) {

@@ -15,6 +15,7 @@ from unittest import mock
 
 from ai_lego import PRODUCT_ROOT
 from ai_lego.apps.api import main as api_main
+from ai_lego.apps.api.blocks import docs as docs_route
 from ai_lego.apps.api.blocks import verify as verify_route
 from ai_lego.core.domain import evidence_words as words
 from ai_lego.core.domain.kinds import verify as kinds_verify
@@ -435,6 +436,39 @@ class ReadingTests(VerifyCase):
         items[1]["base_version"] = 2
         self.assertEqual([doc["version"] for doc in self.docs.save_many(self.tenant_id, self.owner, items, me)], [1, 3])
 
+    def test_one_card_read_two_ways_for_one_claim_is_refused_and_the_same_reading_twice_is_one(self):
+        """Codex VERIFY r5 (class of F1): a repeated (claim, card) kept the first reading silently, whatever the second said;
+        「全部照這樣記」 would then count the one the model may not have meant. Two different readings refuse the answer."""
+        self.grant("search_external")
+        unrelated = {key: value for key, value in self.reading(reads_as="無關").items() if key != "quote"}
+        self.assertEqual(self.ai("read", {}, {"readings": [self.reading(), unrelated]}, 502)["detail"].split(":")[0], "AI_ANSWER_INVALID")
+        same = self.ai("read", {}, {"readings": [self.reading(), self.reading(quote="本行從未宣布每日提款上限 ")]})["saved"]
+        self.assertEqual(len(same["content"]["readings"]), 1)
+
+    def test_every_save_checks_the_claim_version_under_its_own_write_lock(self):
+        """Codex VERIFY r5 F2 (class): BEFORE_SAVE ran before the save's transaction, so a claim edited between the check and
+        the write left a stance or verdict filed against a version that was no longer current. The check now runs with
+        the file's write lock held: another writer cannot start until the save is done."""
+        held, real = [], docs_route.before_save
+
+        def probe(*args):
+            other = sqlite3.connect(self._repo.db_path, timeout=0)
+            try:
+                other.execute("BEGIN IMMEDIATE")
+                other.execute("ROLLBACK")
+                held.append(False)
+            except sqlite3.OperationalError:
+                held.append(True)
+            finally:
+                other.close()
+            return real(*args)
+
+        with mock.patch.object(docs_route, "before_save", side_effect=probe):
+            self.post("/docs/verify.verdict", {"content": {"claim": self.cid, "claim_version": 1, "verdict": "存疑", "reason": "只有一個出處"}})
+            self.post("/verify/stances", {"content": {"claim": self.cid, "claim_version": 1, "card": self.cardid, "snapshot": self.sha(self.cardid), "stance": "反對",
+                                                      "quote": "本行從未宣布每日提款上限"}})
+        self.assertEqual(held, [True, True])
+
     def test_a_stance_is_for_the_claims_current_version_and_the_cards_current_page(self):
         content = {"claim": self.cid, "claim_version": 2, "card": self.cardid, "snapshot": self.sha(self.cardid), "stance": "反對"}
         self.assertIn("VERIFY_CLAIM_VERSION_STALE", self.client.post(f"{self.base}/verify/stances", json={"content": content}).text)
@@ -522,6 +556,20 @@ class SummaryAndNextTests(VerifyCase):
             self.save("verify.stance", {"claim": law, "claim_version": 1, "card": card, "snapshot": self.sha(card), "stance": "支持"}, record_log.user(self.identity["identity_id"], "VERIFY"))
         saved = self.ai("summary", {"claims": [law]}, {"lines": [{"claim": law, "line": "法律已確定：銀行法第 45 條規定了提款上限"}]})["saved"]
         self.assertEqual(saved["content"]["lines"], [{"claim": law, "claim_version": 1, "line": kinds_verify.LAW_UNCONFIRMED_LINE}])
+
+    def test_a_claim_given_two_different_lines_gets_the_ledgers_own_words(self):
+        """Codex VERIFY r5 (class of F1): the model's lines were read into a dict, the last line for a claim winning."""
+        other = self.claim("銀行下週停止營業")["doc_id"]
+        a, b = self.card(url="https://two-a"), self.card(url="https://two-b")
+        self.group([self.cardid], [a], [b])
+        for card in (a, b):
+            self.save("verify.stance", {"claim": other, "claim_version": 1, "card": card, "snapshot": self.sha(card), "stance": "反對"}, record_log.user(self.identity["identity_id"], "VERIFY"))
+        answer = {"lines": [{"claim": other, "line": "兩個出處都說不是這樣"}, {"claim": other, "line": "沒有出處說到它"}]}
+        saved = self.ai("summary", {"go_on": True}, answer)["saved"]
+        state = self.ledger()[other]["state"]
+        self.assertEqual([line["line"] for line in saved["content"]["lines"] if line["claim"] == other], [f"帳本上是「{state}」"])
+        same = self.ai("summary", {"go_on": True}, {"lines": [answer["lines"][0], answer["lines"][0]]})["saved"]
+        self.assertEqual([line["line"] for line in same["content"]["lines"] if line["claim"] == other], ["兩個出處都說不是這樣"])
 
     def test_what_is_still_worth_checking_needs_no_grant(self):
         saved = self.ai("next", {}, {"items": ["央行官網的新聞稿", ""], "question": "最早是誰傳的？還有別的嗎？"})["saved"]
@@ -752,6 +800,45 @@ class FactcheckTests(VerifyCase):
         self.assertEqual((self.provider.calls, self.current("verify.reading")), ([], []))
         self.assertEqual((hooks.usable_cards(self.docs, self.tenant_id, self.owner), self.client.get(f"{self.base}/verify/ledger").json()["person_reads"]), (1, [card]))
 
+    def edit(self, cid):
+        held = next(doc for doc in self.current("verify.claim") if doc["doc_id"] == cid)
+        edited = self.client.put(f"{self.base}/docs/verify.claim/{cid}", json={"content": {**held["content"], "text": "央行宣布下週起每天只能領兩萬元", "reason": "原文是兩萬"},
+                                                                                 "base_version": held["version"]})
+        self.assertEqual(edited.status_code, 200, edited.text)
+
+    def test_a_claim_edited_while_collect_answered_gets_no_result_for_its_old_words(self):
+        """Codex VERIFY r5 F2: the look-up read version 1, the person saved version 2 meanwhile, and version 1's result and
+        hits were filed. The result is now saved only while the claim is still at the version whose words were sent."""
+        cid = self.claim(message=self.mid)["doc_id"]
+        self.lookups.answer = SPEC_ANSWER
+        real = self.lookups.lookup
+
+        def edited_meanwhile(*args, **kwargs):
+            self.edit(cid)
+            return real(*args, **kwargs)
+
+        with mock.patch.object(self.lookups, "lookup", side_effect=edited_meanwhile):
+            stale = self.client.post(f"{self.base}/verify/factcheck", json={"claim": cid})
+        self.assertEqual(stale.status_code, 409, stale.text)
+        self.assertIn("VERIFY_CLAIM_VERSION_STALE", stale.text)
+        self.assertEqual((self.current("verify.factcheck"), self._repo.list_sources(self.tenant_id, self.pid)), ([], []))
+
+    def test_a_claim_edited_just_before_the_result_is_saved_is_refused_under_the_write_lock(self):
+        """The check that holds is the one inside the record's save (same write lock), not the one after collect answered."""
+        cid = self.claim(message=self.mid)["doc_id"]
+        self.lookups.answer = SPEC_ANSWER
+        real = verify_route._store_hit
+
+        def edited_meanwhile(*args, **kwargs):
+            stored = real(*args, **kwargs)
+            self.edit(cid)
+            return stored
+
+        with mock.patch.object(verify_route, "_store_hit", side_effect=edited_meanwhile):
+            stale = self.client.post(f"{self.base}/verify/factcheck", json={"claim": cid})
+        self.assertEqual((stale.status_code, self.current("verify.factcheck")), (409, []), stale.text)
+        self.assertEqual(self.post("/verify/factcheck", {"claim": cid})["content"]["claim_version"], 2)
+
     def test_a_claim_can_be_looked_up_too(self):
         cid = self.claim(message=self.mid)["doc_id"]
         _, saved, _ = self.check({"claim": cid})
@@ -828,6 +915,57 @@ class SearchTests(CollectionApiTestCase):
         self.assertEqual(hooks.search_result(empty, channels(brave="no_key")), ("無法檢查", "Brave 還沒有設定金鑰；Serper 找過沒有找到"))
         self.assertEqual(hooks.search_result(empty, channels()[:1]), ("無法檢查", "Serper（英文）沒有回報；Brave 沒有回報；Serper（中文）找過沒有找到"))
         self.assertEqual(hooks.search_result({**empty, "report": REPORT}, channels(brave="unreachable")), ("查到", "找回 3 頁"))   # pages came back: found
+
+    def test_a_channel_reported_twice_reads_as_its_worse_report_never_the_last(self):
+        """Codex VERIFY r5 F1: serper/zh 「unreachable」 then a duplicate serper/zh 「ok」, zero pages: the dict kept the last
+        row and the ledger said 查不到. A fact from a list of reports is a function of every row."""
+        empty = {"status": "completed", "report": {**REPORT, "written": 0}}
+        unreachable = {"provider": "serper", "lang": "zh", "state": "unreachable", "why": ""}
+        for rows in ([unreachable, *channels()], [*channels(), unreachable]):
+            self.assertEqual(hooks.search_result(empty, rows), ("無法檢查", "Serper（中文）沒有回應；Serper（英文）找過沒有找到；Brave 找過沒有找到"))
+        self.assertEqual(hooks.channel_states([{"provider": "brave", "lang": "en", "state": "no_key"}, {"provider": "brave", "lang": "en", "state": "unreachable"}]),
+                         {("brave", "en"): "no_key"})
+        self.assertEqual(hooks.channel_states([{"provider": "brave", "lang": "en", "state": "ok"}, {"provider": "brave", "lang": "en", "state": "?"}]), {("brave", "en"): "?"})
+
+    def test_a_completion_that_repeats_a_channel_is_refused_and_never_reads_as_nothing_found(self):
+        """The wire's one row per (provider, lang) (collector.v2.json channel_rules): a repeat is malformed -- the run ends
+        failed and its claim says 無法檢查 「這次查詢沒有跑完」, never 查不到."""
+        claim = self.claim()
+        run_id, grant = self.start_run(claim)
+        rows = [{"provider": "serper", "lang": "zh", "state": "unreachable", "why": "http_502"}, *channels()]
+        done = self.client.post(f"/projects/{self.pid}/collections/{run_id}/complete", json={"status": "completed", "report": {**REPORT, "written": 0, "unchanged": 0}, "channels": rows}, headers=grant)
+        self.assertEqual(done.status_code, 400, done.text)
+        self.assertIn("channels: each (provider, lang) once", done.text)
+        self.client.get(f"/projects/{self.pid}/verify/ledger")
+        self.assertEqual([(item["state"], item["why"]) for item in self.searches()], [("無法檢查", "這次查詢沒有跑完")])
+
+    def test_a_claim_edited_before_its_run_is_reserved_sends_nothing(self):
+        """Codex VERIFY r5 F2: the route read version 1, the person saved version 2, and the reservation only looked for
+        another open run -- version 1's words went out and its result was filed. The reservation (under the write lock)
+        now also needs the claim still at the version read: the run fails before collect is asked."""
+        claim = self.claim()
+        self._collector()
+        real = verify_route.refuse_open_search
+
+        def edited_after_the_route_read_it(*args):
+            if not edits:
+                held = next(doc for doc in self.docs.current(self.tenant_id, self.owner, "verify.claim") if doc["doc_id"] == claim)
+                edits.append(self.client.put(f"/projects/{self.pid}/docs/verify.claim/{claim}", json={"content": {**held["content"], "text": "央行宣布下週起每天只能領兩萬元", "reason": "原文是兩萬"},
+                                                                                                    "base_version": held["version"]}).status_code)
+            return real(*args)
+
+        edits: list[int] = []
+        with mock.patch.object(verify_route, "refuse_open_search", side_effect=edited_after_the_route_read_it):
+            stale = self.go(claim, confirm=True)
+        self.assertEqual((edits, stale.status_code), ([200], 409), stale.text)
+        self.assertIn("VERIFY_CLAIM_VERSION_STALE", stale.text)
+        connection = sqlite3.connect(self._repo.db_path)
+        try:
+            statuses = [row[0] for row in connection.execute("SELECT status FROM collection_runs")]
+        finally:
+            connection.close()
+        self.assertEqual((statuses, self.service.calls, self.docs.current(self.tenant_id, self.owner, "verify.lookup")), (["failed"], [], []))
+        self.assertEqual(self.go(claim, confirm=True).status_code, 202)   # read again: version 2 goes out
 
     def test_a_claims_new_version_shows_no_run_or_result_of_the_old_one(self):
         """Codex round 4 F3/F4: a record about one claim is about one version of it -- the ledger matched 「去查」's run on

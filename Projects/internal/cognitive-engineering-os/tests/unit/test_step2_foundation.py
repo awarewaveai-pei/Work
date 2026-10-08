@@ -442,13 +442,13 @@ class ErasedCaseTests(Step2Case):
                 response = self.client.post(f"/projects/{self.pid}/sources", json={"title": "t", "media_type": "text/plain", "data_classification": "Confidential", "content": "一段文字"})
             self.assertEqual((response.status_code, response.json()["detail"]), (404, gone))
         # a block route that maps errors to its own statuses (docs: 400, 403, 409) says the same
-        real = CaseDocs.save
+        real = CaseDocs.save_many   # a person's save: its checks and the write under one lock (blocks.docs._save, VERIFY r5)
 
         def erased_first(docs, tenant_id, *args, **kwargs):
             self._repo.erase_project(tenant_id, self.pid, self.identity["identity_id"], self._source_cas, 0)
             return real(docs, tenant_id, *args, **kwargs)
 
-        with mock.patch.object(CaseDocs, "save", erased_first):
+        with mock.patch.object(CaseDocs, "save_many", erased_first):
             response = self.client.post(f"/projects/{self.pid}/docs/verify.claim", json={"content": {"text": "t", "sentence": words.CHECKABLE, "from": "我加的"}})
         self.assertEqual(response.status_code, 404, response.text)
         self.assertTrue(response.json()["detail"].startswith("CASE_ERASED"), response.text)

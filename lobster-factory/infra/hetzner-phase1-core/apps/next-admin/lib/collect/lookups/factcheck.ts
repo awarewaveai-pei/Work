@@ -1,5 +1,5 @@
-// lookups v1 `factcheck`: has someone already checked this? Two databases, always in this order: the ClaimReview
-// mirror (claimreview.ts) and Cofacts 真的假的 (its public GraphQL API, ported from the engine's
+// lookups v1 `factcheck`: has someone already checked this? Two databases, answered in the order the request names
+// them (absent = this order): the ClaimReview mirror (claimreview.ts) and Cofacts 真的假的 (its public GraphQL API, ported from the engine's
 // platform/net/cofacts.py, worktree commit 988a52e29). A database that failed is 無法檢查 with why (R2); 查不到 only
 // when it answered with nothing (R3). Cofacts articles nobody has replied to come back with `replies: []` -- the
 // engine decides how to count them.
@@ -135,7 +135,7 @@ async function cofacts(textToCheck: string, deps: FactcheckDeps): Promise<DbAnsw
 }
 
 /** One answer item per text, same order (R1); only the databases in `dbs` are asked (a text from outside Taiwan never
- *  reaches Cofacts), answered in DBS order, inside one deadline. Nothing throws. */
+ *  reaches Cofacts), answered in the order `dbs` names them, inside one deadline. Nothing throws. */
 export async function factcheck(texts: string[], deps: FactcheckDeps, dbs: readonly Db[] = DBS): Promise<FactcheckAnswerItem[]> {
   const { inTime, clear } = deadline(deps.deadlineMs ?? LOOKUP_DEADLINE_MS);
   const ask = (db: Db, t: string): Promise<FactcheckAnswerItem["dbs"][number]> =>
@@ -144,7 +144,7 @@ export async function factcheck(texts: string[], deps: FactcheckDeps, dbs: reado
       : inTime(cofacts(t, deps), answer<"cofacts", CofactsHit>("cofacts", FACTCHECK.cofacts.attribution, null, TOO_SLOW));
   try {
     return await Promise.all(
-      texts.map(async (t): Promise<FactcheckAnswerItem> => ({ text: t, dbs: await Promise.all(DBS.filter((db) => dbs.includes(db)).map((db) => ask(db, t))) })),
+      texts.map(async (t): Promise<FactcheckAnswerItem> => ({ text: t, dbs: await Promise.all(dbs.map((db) => ask(db, t))) })),
     );
   } finally {
     clear();

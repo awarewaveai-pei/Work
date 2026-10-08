@@ -3135,6 +3135,10 @@ class CollectionCompleteRequest(BaseModel):
                 return "channels: provider is serper or brave"
             if item["lang"] not in ("zh", "en") or item["state"] not in ("ok", "unreachable", "no_key") or not text(item["why"], 0, 300):
                 return "channels: lang zh|en, state ok|unreachable|no_key, why at most 300 characters"
+        # collect merges a channel's reports into one row (orchestrator.ts mergeChannel); two rows for one pair are
+        # ambiguous -- the second 「ok」 would hide the first 「unreachable」 and read as 查不到 (Codex VERIFY r5 F1)
+        if len({(item["provider"], item["lang"]) for item in channels}) != len(channels):
+            return "channels: each (provider, lang) once"
         return None
 
 

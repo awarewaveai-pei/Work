@@ -93,6 +93,7 @@
     "unreachable",
     "no_key"
   ],
+  "channel_rules": "One row per (provider, lang) for the whole run: collect merges a channel's reports into one (an engine that answered once is ok; next-admin orchestrator.ts mergeChannel). A completion that repeats a pair is refused by the engine (400, the run ends failed): two rows for one channel are ambiguous, and the engine would read the worse one.",
   "seeds": [
     {
       "uri": "entity://claim/c7f3a1",

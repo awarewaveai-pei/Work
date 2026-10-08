@@ -73,6 +73,18 @@ export function claimFromMap(item: MapClaim, checkable: string): Claim {
   return { text: item.text, sentence: checkable, from: "MAP", map_claim: item.id, ...(law ? { law: true, jurisdiction: item.jurisdiction ?? "", limitation: item.limitation ?? "", law_source: item.source ?? "" } : {}) };
 }
 
+/** Every record about a claim is about one version of it: what a ledger line SHOWS is its claim's records for the line's
+ *  version only (Codex VERIFY r5 F3: a v1 stance and verdict showed under v2). The one reader of records by claim id. */
+export function ofVersion<T extends { claim?: string; claim_version?: number }>(records: Doc<T>[], claim: string, version: number): Doc<T>[] {
+  return records.filter((doc) => doc.content.claim === claim && doc.content.claim_version === version);
+}
+
+/** The live record(s) about a claim whatever version they were saved for -- only to EDIT them (one live stance per claim
+ *  and card, one live verdict per claim: a new version's save replaces the old one), never to show them. */
+export function liveOf<T extends { claim?: string; claim_version?: number }>(records: Doc<T>[], claim: string): Doc<T>[] {
+  return records.filter((doc) => doc.content.claim === claim);
+}
+
 /** The AI's readings of one claim's current version, the latest per card, each with the reading it came from. */
 export function readingsFor(readings: Doc<Reading>[], claim: string, version: number): Array<ReadingEntry & { reading: string }> {
   const byCard = new Map<string, ReadingEntry & { reading: string }>();
@@ -339,10 +351,10 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         <p className="how">帳本由系統排：每個主張有幾個獨立出處支持、幾個反對。只有你自己確認過的讀法才算數。三件事分開看：找得到出處、出處彼此獨立、出處站得住。這三件，沒有一件等於「這是真的」。</p>
         {lines.length === 0 && <p className="sub">還沒有主張。</p>}
         {lines.map((line) => (
-          <LedgerLine key={line.claim_id} projectId={projectId} line={line} spec={spec} asks={asks} busy={busy} base={base} claims={claims} cards={cards} hitOf={hitOf} cardTitle={cardTitle} lines={lines}
-            readings={readingsFor(readings, line.claim_id, line.version)} stances={stances.filter((doc) => doc.content.claim === line.claim_id)}
-            verdict={verdicts.find((doc) => doc.content.claim === line.claim_id)} editing={editing === line.claim_id} setEditing={setEditing}
-            factcheck={factchecks.filter((doc) => doc.content.claim === line.claim_id && doc.content.claim_version === line.version).at(-1)} act={act} saveClaim={saveClaim} lookUp={lookUp} setNotices={setNotices} />
+          <LedgerLine key={`${line.claim_id}:${line.version}`} projectId={projectId} line={line} spec={spec} asks={asks} busy={busy} base={base} claims={claims} cards={cards} hitOf={hitOf} cardTitle={cardTitle} lines={lines}
+            readings={readingsFor(readings, line.claim_id, line.version)} stances={liveOf(stances, line.claim_id)}
+            verdict={liveOf(verdicts, line.claim_id).at(-1)} editing={editing === line.claim_id} setEditing={setEditing}
+            factcheck={ofVersion(factchecks, line.claim_id, line.version).at(-1)} act={act} saveClaim={saveClaim} lookUp={lookUp} setNotices={setNotices} />
         ))}
       </div>
 
@@ -418,6 +430,7 @@ function FactcheckResult({ result, spec }: { result: Factcheck; spec: Spec }) {
 
 function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hitOf, cardTitle, lines, readings, stances, verdict, editing, setEditing, factcheck, act, saveClaim, lookUp, setNotices }: {
   projectId: string; line: Line; spec: Spec; asks: string[]; busy: boolean; base: string; claims: Doc<Claim>[]; cards: EvidenceCard[]; hitOf: Map<string, HeldHit>; cardTitle: (id: string) => string; lines: Line[];
+  // stances / verdict: the live ones of this claim, any version -- to edit them; shown only for this line's version and page
   readings: Array<ReadingEntry & { reading: string }>; stances: Doc<Stance>[]; verdict?: Doc<Verdict>; editing: boolean; setEditing: (value: string | null) => void;
   factcheck?: Doc<Factcheck>; act: (work: () => Promise<void>) => Promise<void>; saveClaim: (claim: Claim, doc?: Doc<Claim>) => Promise<void>;
   lookUp: (body: Record<string, string>) => Promise<void>; setNotices: (notices: Notice[]) => void;
@@ -426,12 +439,16 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
   const [angles, setAngles] = useState<string[]>(spec.angles);
   const [plan, setPlan] = useState<{ seeds: number; max_queries: number; max_fetches: number } | null>(null);
   const [own, setOwn] = useState<{ card: string; stance: string; quote: string; reason: string; reading?: ReadingEntry & { reading: string } }>({ card: "", stance: "", quote: "", reason: "" });
-  const [judge, setJudge] = useState<{ verdict: string; reason: string }>({ verdict: verdict?.content.verdict ?? "", reason: verdict?.content.reason ?? "" });
+  // the line remounts on a new claim version (its key): nothing typed or judged for the old words carries over
+  const judged = ofVersion(verdict ? [verdict] : [], line.claim_id, line.version).at(0);
+  const [judge, setJudge] = useState<{ verdict: string; reason: string }>({ verdict: judged?.content.verdict ?? "", reason: judged?.content.reason ?? "" });
   const checkable = line.sentence === spec.checkable;
-  // one live stance per claim and card: ``held`` is it, whatever version it was read from; ``mine`` only when it counts now
+  // one live stance per claim and card: ``held`` is it, whatever version it was read from (to edit it); ``mine`` only
+  // when it counts now -- this claim version and the card's current page, as the ledger counts it -- and only those show
   const held = (card: string) => stances.find((item) => item.content.card === card);
   const sha = (card: string) => cards.find((item) => item.card === card)?.snapshot?.sha256;
-  const mine = (card: string) => { const stance = held(card); return stance && stance.content.claim_version === line.version && stance.content.snapshot === sha(card) ? stance : undefined; };
+  const mine = (card: string) => ofVersion(stances, line.claim_id, line.version).find((item) => item.content.card === card && item.content.snapshot === sha(card));
+  const shown = stances.filter((item) => mine(item.content.card) === item);
   const post = (path: string, body: unknown) => apiFetch<Record<string, any>>(`${base}${path}`, { method: "POST", body: JSON.stringify(body) });
   const saveStance = (content: Stance, held?: Doc<Stance>) => act(async () => {
     const saved = await post("/verify/stances", { content, ...(held ? { doc_id: held.doc_id, base_version: held.version } : {}) });
@@ -503,7 +520,7 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
         {readings.some((entry) => !mine(entry.card)) && <div className="btns"><button className="btn" type="button" disabled={busy}
           onClick={() => act(async () => { for (const reading of [...new Set(readings.filter((entry) => !mine(entry.card)).map((entry) => entry.reading))]) setNotices((await post("/verify/stances/confirm", { reading, claim: line.claim_id })).notices ?? []); })}>這個主張的全部照這樣記</button></div>}
       </div>}
-      {stances.length > 0 && <ul>{stances.map((item) => <li key={item.doc_id}>{cardTitle(item.content.card)}：{item.content.stance}{item.content.quote ? `「${item.content.quote}」` : ""}<span className="tags"><span>{AUTHOR[item.author]}</span>{item.content.claim_version !== line.version && <span>讀的是舊版的主張</span>}</span></li>)}</ul>}
+      {shown.length > 0 && <ul>{shown.map((item) => <li key={item.doc_id}>{cardTitle(item.content.card)}：{item.content.stance}{item.content.quote ? `「${item.content.quote}」` : ""}<span className="tags"><span>{AUTHOR[item.author]}</span></span></li>)}</ul>}
       <div className="field">
         <b>你讀一張來源卡</b>
         <Chips options={cards.map((card) => card.card)} value={own.card} onPick={(card) => setOwn({ ...own, card, reading: readings.find((entry) => entry.card === card) })} label="讀哪一張"

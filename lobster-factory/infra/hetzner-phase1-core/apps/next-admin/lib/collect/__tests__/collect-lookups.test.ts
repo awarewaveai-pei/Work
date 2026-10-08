@@ -437,10 +437,18 @@ describe("the request: the whole request fails only on R2's 400s", () => {
     for (const body of bad) expect(parseLookupRequest(body).ok, JSON.stringify(body).slice(0, 60)).toBe(false);
   });
 
-  it("answers the databases asked for in DBS order whatever order they were asked in; absent = both", () => {
-    expect(parsed({ kind: "factcheck", dbs: ["cofacts", "claimreview"], items: [{ text: "a" }] })).toMatchObject({ dbs: ["claimreview", "cofacts"] });
+  it("answers the databases in the order the request named them (lookup.v1 dbs: in that order); absent = both, DBS order", async () => {
+    // Codex VERIFY r5 F4: collect answered in its fixed DBS order, so an index-based consumer asking [cofacts, claimreview]
+    // read Cofacts' answer as ClaimReview's. Held here from the producer's side, request to answer, not through the engine
+    // (which reads by name and so never saw it).
+    const noArticles = world({ [FACTCHECK.cofacts.apiUrl]: () => json({ data: { ListArticles: { edges: [] } } }) });
+    for (const order of [["cofacts", "claimreview"], ["claimreview", "cofacts"], ["cofacts"], ["claimreview"]]) {
+      const request = parsed({ kind: "factcheck", dbs: order, items: [{ text: "下週起每天只能領兩萬元" }] });
+      expect(request).toMatchObject({ dbs: order });
+      const answer = await answerLookup(request, deps(noArticles, { claimreview: memoryStore() }));
+      expect((answer.items[0] as { dbs: Array<{ db: string }> }).dbs.map((item) => item.db)).toEqual(order);
+    }
     expect(parsed({ kind: "factcheck", items: [{ text: "a" }] })).toMatchObject({ dbs: ["claimreview", "cofacts"] });
-    expect(parsed({ kind: "factcheck", dbs: ["cofacts"], items: [{ text: "a" }] })).toMatchObject({ dbs: ["cofacts"] });
   });
 
   it("accepts the limits themselves, counting characters the way the engine does", () => {

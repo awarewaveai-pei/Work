@@ -70,10 +70,12 @@ def _where(docs: CaseDocs, tenant_id: str, identity_id: str, owner: record_log.O
 
 
 def _save(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_log.Owner, spec: doc_kinds.DocKind, body: "DocBody", doc_id: str | None = None) -> dict[str, Any]:
-    """Every person's save: the kind's own checks (block_hooks BEFORE_SAVE), the save, then notices."""
-    docs = CaseDocs(repo)
-    _call(before_save, docs, session["tenant_id"], owner, spec.kind, body.content, doc_id)
-    saved = _call(docs.save, session["tenant_id"], owner, spec.kind, body.content, api._me(session, spec.block), doc_id=doc_id, base_version=body.base_version if doc_id else None)
+    """Every person's save: the kind's own checks (block_hooks BEFORE_SAVE), the save, then notices. The checks run
+    inside the save's write lock (CaseDocs.save_many): what they read -- a claim's current version, one live stance per
+    card -- cannot change between the check and the write (Codex VERIFY r5 F2: a check outside it is a compare, not a set)."""
+    docs, tenant_id = CaseDocs(repo), session["tenant_id"]
+    item = {"kind": spec.kind, "content": body.content, "doc_id": doc_id, "base_version": body.base_version if doc_id else None}
+    [saved] = _call(docs.save_many, tenant_id, owner, [item], api._me(session, spec.block), check=lambda: before_save(docs, tenant_id, owner, spec.kind, body.content, doc_id))
     return _saved(repo, session, owner, saved)
 
 

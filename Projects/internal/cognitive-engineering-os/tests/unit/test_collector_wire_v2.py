@@ -188,9 +188,11 @@ class CompletionRuleTests(WireV2Case):
     def test_at_every_limit_it_is_accepted(self):
         limits = SPEC["completion_limits"]
         page = {"url": "https://a.example/" + "u" * (limits["aside_url"] - len("https://a.example/")), "title": "t" * limits["aside_title"], "reason": "r" * limits["aside_reason"]}
-        channel = {"provider": "serper", "lang": "zh", "state": "unreachable", "why": "w" * limits["channel_why"]}
+        # one row per (provider, lang) (channel_rules): every pair there is, each at the why limit -- the count limit
+        # (completion_limits.channels) stays a cap, and 20 copies of one pair are the ambiguity VERIFY r5 F1 refused
+        channels = [{"provider": provider, "lang": lang, "state": "unreachable", "why": "w" * limits["channel_why"]} for provider in SPEC["providers"] for lang in SPEC["languages"]]
         self._start()
-        response = self._complete({**SPEC["complete"], "aside": [page] * limits["aside"], "channels": [channel] * limits["channels"]})
+        response = self._complete({**SPEC["complete"], "aside": [page] * limits["aside"], "channels": channels})
         self.assertEqual(response.status_code, 200, response.text[:300])
 
     def test_each_rule_past_its_limit_is_refused(self):
@@ -205,6 +207,7 @@ class CompletionRuleTests(WireV2Case):
             "an empty reason": {"aside": [{**page, "reason": ""}]},
             "too many channels": {"channels": [channel] * (limits["channels"] + 1)},
             "a channel with another key": {"channels": [{**channel, "count": 1}]},
+            "one channel reported twice": {"channels": [channel, {**channel, "state": "ok", "why": ""}]},
             "a provider that is not an id": {"channels": [{**channel, "provider": "Serper API"}]},
             "perplexity as a channel": {"channels": [{**channel, "provider": "perplexity", "state": "ok", "why": ""}]},
             "aside items that are not pages": {"aside": ["x"]},

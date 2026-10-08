@@ -220,6 +220,9 @@ def _read_shape(answer: dict[str, Any]) -> dict[str, Any]:
         if item["reads_as"] in STANCES[:2] and not (isinstance(item.get("quote"), str) and item["quote"].strip()):
             raise _invalid("a reading that supports or opposes a claim quotes the source")   # an unquoted 支持 cannot be checked against the page
         if (item["claim"], item["card"]) in seen:
+            kept = next(entry for entry in readings if (entry["claim"], entry["card"]) == (item["claim"], item["card"]))
+            if (kept["reads_as"], kept.get("quote")) != (item["reads_as"], item["quote"].strip()[:1000] if isinstance(item.get("quote"), str) and item["quote"].strip() else None):
+                raise _invalid("one card is read two ways for one claim")   # which one the model meant is unknown: never the first or the last
             continue
         seen.add((item["claim"], item["card"]))
         entry = {"claim": item["claim"], "claim_version": turn["claims"][item["claim"]], "card": item["card"], "snapshot": turn["shas"][item["card"]],
@@ -279,9 +282,10 @@ def _summary_input(context: Mapping[str, Any], read: Read) -> str:
 
 def _summary_shape(answer: dict[str, Any]) -> dict[str, Any]:
     """A claim under two origins, one that cannot be checked, or a 法律 claim without its 法域、時效、來源 gets fixed words
-    whatever the model wrote."""
+    whatever the model wrote. A claim given two different lines gets the ledger's own words: which one it meant is unknown."""
     turn = _turn()
-    said = {item["claim"]: _text(item.get("line"), 300) for item in answer.get("lines") or [] if isinstance(item, dict) and isinstance(item.get("claim"), str)}
+    given = [(item["claim"], _text(item.get("line"), 300)) for item in answer.get("lines") or [] if isinstance(item, dict) and isinstance(item.get("claim"), str)]
+    said = {claim: line for claim, line in given if len({other for named, other in given if named == claim}) == 1}
     lines = [{"claim": claim, "claim_version": version, "line": turn["fixed"].get(claim) or said.get(claim) or f"帳本上是「{turn['states'][claim]}」"}
              for claim, version in turn["versions"].items()]
     shaped = {"lines": lines, "overview": _text(answer.get("overview"), 1000)}

@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VerifyPage, claimFromMap, mapClaimsToBring, pendingProposals, readingsFor, sentTo, type Claim, type Split } from "./VerifyPage";
-import { byText, click, doc, labelled, mount, saved, serve, shell, type, type Call } from "./JudgmentTestKit";
+import { VerifyPage, claimFromMap, liveOf, mapClaimsToBring, ofVersion, pendingProposals, readingsFor, sentTo, type Claim, type Split } from "./VerifyPage";
+import { byText, click, doc, field, labelled, mount, saved, serve, shell, type, type Call } from "./JudgmentTestKit";
 
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
@@ -166,6 +168,66 @@ describe("VERIFY ledger lines", () => {
     await click(byText(host, "button", "照這樣記"));
     expect(posts(calls, `${P}/verify/stances`)[0].body).toEqual({ content: { claim: "C1", claim_version: 2, card: "K1", snapshot: "h1", stance: "反對", reading: "R2", quote: "本行從未宣布每日提款上限" }, doc_id: "S1", base_version: 1 });
     await done();
+  });
+
+  it("after the claim changed, my old stance and verdict are not shown under the new version; judging it again edits the old verdict", async () => {
+    // Codex VERIFY r5 F3: stance and verdict props were filtered by claim id only, so version 1's reading and 存疑 sat
+    // on version 2's line as if they were about the new words.
+    const stance = doc("verify.stance", "S1", { claim: "C1", claim_version: 1, card: "K1", snapshot: "h1", stance: "反對", quote: "本行從未宣布每日提款上限" });
+    const verdict = doc("verify.verdict", "V1", { claim: "C1", claim_version: 1, verdict: "存疑", reason: "舊的理由" });
+    const { host, done, calls } = await ledger({ version: 2, stale: 1, verdict: { verdict: "存疑", reason: "舊的理由", earlier: true } }, {
+      [`GET ${P}/docs/verify.stance`]: [stance], [`GET ${P}/docs/verify.verdict`]: [verdict], [`PUT ${P}/docs/verify.verdict/V1`]: (call: Call) => saved("verify.verdict", "V1", call.body.content),
+    });
+    expect(host.textContent).not.toContain("「本行從未宣布每日提款上限」");
+    expect(host.textContent).toContain("1 筆讀法是舊版的，不算");
+    expect(host.textContent).toContain("你判的是這個主張的舊版");
+    const verdicts = host.querySelector('[aria-label="採信、存疑或不採信"]')!;
+    expect([...verdicts.querySelectorAll("button")].map((button) => button.getAttribute("aria-pressed"))).toEqual(["false", "false", "false"]);
+    expect(labelled(host, "一句理由").value).toBe("");
+    await click(byText(verdicts, "button", "採信"));
+    await type(labelled(host, "一句理由"), "新版有兩個出處");
+    await click(byText(host, "button", "存判定"));
+    const [put] = calls.filter((call) => call.method === "PUT" && call.path === `${P}/docs/verify.verdict/V1`);
+    expect(put.body).toEqual({ content: { claim: "C1", claim_version: 2, verdict: "採信", reason: "新版有兩個出處" }, base_version: 1 });
+    await done();
+  });
+
+  it("editing the claim on the page clears the verdict I had picked for its old words", async () => {
+    let version = 1;
+    const claim = () => [doc<Claim>("verify.claim", "C1", { text: LINE.text, sentence: LINE.sentence, from: "訊息", message: "M1" }, { version })];
+    const verdict = doc("verify.verdict", "V1", { claim: "C1", claim_version: 1, verdict: "存疑", reason: "舊的理由" });
+    const { host, done } = await open({
+      [`GET ${P}/docs/verify.claim`]: () => claim(), [`GET ${P}/docs/verify.verdict`]: [verdict],
+      [`${P}/verify/ledger`]: () => ({ claims: [{ ...LINE, version, verdict: { verdict: "存疑", reason: "舊的理由", earlier: version !== 1 } }], factcheck_asks: [], person_reads: [] }),
+      [`PUT ${P}/docs/verify.claim/C1`]: (call: Call) => { version = 2; return saved("verify.claim", "C1", call.body.content); },
+    });
+    const pressed = () => [...host.querySelector('[aria-label="採信、存疑或不採信"]')!.querySelectorAll("button")].filter((button) => button.getAttribute("aria-pressed") === "true").map((button) => button.textContent);
+    expect(pressed()).toEqual(["存疑"]);   // judged for these words
+    await click(byText(host, "button", "改主張"));
+    await type(field(host, "claim-reason"), "原文是兩萬");
+    await click(byText(host, "button", "存這個主張"));
+    expect([pressed(), labelled(host, "一句理由").value]).toEqual([[], ""]);
+    await done();
+  });
+
+  it("my stance read from the card's older page is not shown as my reading of it", async () => {
+    const stance = doc("verify.stance", "S1", { claim: "C1", claim_version: 1, card: "K1", snapshot: "old-page", stance: "反對", quote: "本行從未宣布每日提款上限" });
+    const { host, done } = await ledger({ stale: 1 }, { [`GET ${P}/docs/verify.stance`]: [stance] });
+    expect(host.textContent).not.toContain("「本行從未宣布每日提款上限」");
+    await done();
+  });
+});
+
+describe("VERIFY: every record about a claim is read for one version (gate)", () => {
+  it("only ofVersion and liveOf read records by claim id, and liveOf feeds only the edit props", () => {
+    // A new reader filtering by claim id alone is how F3 came back after round 4 fixed readings and fact-checks: make it
+    // go through ofVersion (shown) or, to edit the one live record, liveOf -- and say so here.
+    const source = readFileSync(path.resolve(process.cwd(), "components/blocks/VerifyPage.tsx"), "utf8");
+    expect(source.match(/content\.claim\s*===/g)).toHaveLength(2);   // the two helpers' bodies
+    expect([...source.matchAll(/(\w+)=\{liveOf\(/g)].map((match) => match[1]).sort()).toEqual(["stances", "verdict"]);
+    expect(source.match(/liveOf\(/g)).toHaveLength(2);   // those two props are its only calls
+    const records = [doc("verify.stance", "A", { claim: "C1", claim_version: 1 }), doc("verify.stance", "B", { claim: "C1", claim_version: 2 }), doc("verify.stance", "C", { claim: "C2", claim_version: 2 })];
+    expect([ofVersion(records, "C1", 2).map((item) => item.doc_id), liveOf(records, "C1").map((item) => item.doc_id)]).toEqual([["B"], ["A", "B"]]);
   });
 });
 

@@ -36,7 +36,8 @@ from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.platform import block_hooks, evidence, safety
-from ai_lego.platform.block_hooks.verify import card_sha, hit_address, message_sha, person_reads, refuse_open_search, require_first, settle_dead_runs, vouched
+from ai_lego.platform.block_hooks.verify import (card_sha, hit_address, message_sha, person_reads, refuse_open_search, require_claim_version, require_first,
+                                                settle_dead_runs, vouched)
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.net.collection_service import CollectionServiceClient
@@ -182,8 +183,14 @@ def factcheck(project_id: str, body: FactcheckBody, session: dict[str, Any] = De
             _call(require_first, docs, tenant_id, owner, target["content"]["message"])
         about = {"claim": target["doc_id"], "claim_version": target["version"]}
     text = target["content"]["text"]
+
+    def still_this_version() -> None:   # a claim's result is filed for the version whose words were looked up
+        if "claim" in about:
+            require_claim_version(docs, tenant_id, owner, about["claim"], about["claim_version"])
+
     place, plan = _factcheck_plan(docs, session, owner)
     answered = {entry["db"]: entry for entry in collect_lookups.factcheck(project_id, text, client=service, dbs=collect_asks(plan))}
+    _call(still_this_version)   # edited while collect answered: nothing is stored for the old words (409, ask again)
     results, stored = [], []
     for db in plan["use"]:
         if db == "google":
@@ -207,7 +214,8 @@ def factcheck(project_id: str, body: FactcheckBody, session: dict[str, Any] = De
             shown.append({"source_id": source_id, **hit["shown"]})
         waiting = f"{'另外' if shown else ''}有 {unanswered} 則相近的訊息有人問過，還沒有人回應" if unanswered else ""
         results.append({"db": db, "state": FOUND if shown else NOT_FOUND, "attribution": entry["attribution"], "hits": shown, **({"why": waiting} if waiting else {})})
-    saved = docs.save(tenant_id, owner, "verify.factcheck", {**about, "place": place, "dbs": results, "rules": FACTCHECK_DBS.stamp()}, record_log.system("VERIFY"))
+    record = {"kind": "verify.factcheck", "content": {**about, "place": place, "dbs": results, "rules": FACTCHECK_DBS.stamp()}}
+    [saved] = _call(docs.save_many, tenant_id, owner, [record], record_log.system("VERIFY"), check=still_this_version)
     if stored:   # GATHER cards them (idempotent; its slot stays dark: written by the system)
         block_hooks.after_sources(docs, tenant_id, owner, {"run": None, "source_ids": stored, "aside": [], "channels": [], "pasted": False})
     return saved
@@ -225,7 +233,8 @@ def search_claim(project_id: str, claim_id: str, body: SearchBody, response: Res
     """「去查」: one collection run for one checkable claim (the collector wire v2's claim seed), plan first, then confirm;
     the run is remembered for the claim's version (verify.lookup) so its end writes verify.search for it. One open run per
     claim version: refused before any run is made, and again in the lookup's own save before collect is asked (a second
-    request racing the first loses there, its run failed with nothing sent)."""
+    request racing the first loses there, its run failed with nothing sent). That save also re-checks the claim is still
+    at the version read here (require_claim_version): a claim edited meanwhile fails the run before its old words go out."""
     owner = case_owner(project_id, session, repo)
     docs, tenant_id = CaseDocs(repo), session["tenant_id"]
     claim = next((doc for doc in docs.current(tenant_id, owner, "verify.claim") if doc["doc_id"] == claim_id), None)
@@ -244,9 +253,13 @@ def search_claim(project_id: str, claim_id: str, body: SearchBody, response: Res
     if body.confirm:
         _call(refuse_open_search, docs, tenant_id, owner, claim_id, version)
 
+    def still_this_version() -> None:   # under the lookup's write lock: the text in ``seed`` is the version reserved
+        require_claim_version(docs, tenant_id, owner, claim_id, version)
+        refuse_open_search(docs, tenant_id, owner, claim_id, version)
+
     def reserve(run_id: str) -> None:
         lookup = {"kind": "verify.lookup", "content": {"claim": claim_id, "claim_version": version, "run": run_id, "angles": angles}}
-        _call(docs.save_many, tenant_id, owner, [lookup], record_log.system("VERIFY"), check=lambda: refuse_open_search(docs, tenant_id, owner, claim_id, version))
+        _call(docs.save_many, tenant_id, owner, [lookup], record_log.system("VERIFY"), check=still_this_version)
 
     return api.start_collection(project_id, api.CollectionRequest(seeds=[seed], confirm=body.confirm), response, session, store, repo, service, reserve=reserve)
 

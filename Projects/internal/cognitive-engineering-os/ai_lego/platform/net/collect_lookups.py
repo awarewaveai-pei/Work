@@ -148,7 +148,9 @@ def factcheck(project_id: str, text: str, *, client: Any = _FROM_ENV, dbs: list[
     if listed is None:
         return [_unchecked_db(db, why) for db in asked]
     answered = item.get("dbs") if isinstance(item, Mapping) and item.get("text") == text[:MAX_TEXT] else None
-    by_db = {entry.get("db"): entry for entry in answered if isinstance(entry, Mapping)} if isinstance(answered, list) else {}
+    named = [entry.get("db") for entry in answered if isinstance(entry, Mapping)] if isinstance(answered, list) else []
+    # read by name (an older collect answers in its own order); a database answered twice is ambiguous -> 格式不對, never last-wins
+    by_db = {entry.get("db"): entry for entry in answered if isinstance(entry, Mapping) and named.count(entry.get("db")) == 1} if isinstance(answered, list) else {}
     out = []
     for db in asked:
         entry = by_db.get(db)

@@ -12,8 +12,9 @@ BEFORE_SAVE, what a person's save may not do (every path: the generic /docs rout
 AFTER_SAVE: your first reaction writes what the platform cannot check about how the message spread (verify.spread).
 AFTER_SOURCES: a 「去查」 run that ended writes verify.search for its claim, and one that will never call back (past its
 deadline) is settled as 無法檢查 on any arrival or ledger read; more cards than one AI turn reads -> propose GATHER.
-Beside them, the rules VERIFY's routes and AI turns share: which cards only the person reads (``person_reads``) and one
-open 「去查」 per claim version (``refuse_open_search``).
+Beside them, the rules VERIFY's routes and AI turns share: which cards only the person reads (``person_reads``), one
+open 「去查」 per claim version (``refuse_open_search``), and a record about a claim saved only while the claim is still at
+the version it was made for (``require_claim_version``, under the write lock).
 """
 
 from __future__ import annotations
@@ -136,6 +137,13 @@ def _claim_now(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, claim_id
     return claim
 
 
+def require_claim_version(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, claim_id: Any, version: Any) -> dict[str, Any]:
+    """Compare-and-set on a claim's version: a record about 「the claim as it is now」 (a look-up's result, a 「去查」 run)
+    calls this inside the write lock that saves it (CaseDocs.save_many check), so a claim edited meanwhile refuses the
+    save instead of filing version 1's result as current. BEFORE_SAVE runs under that lock too (blocks.docs._save)."""
+    return _claim_now(docs, tenant_id, owner, claim_id, version)
+
+
 def card_sha(card: Mapping[str, Any]) -> str | None:
     snapshot = card["content"].get("snapshot")
     return snapshot.get("sha256") if isinstance(snapshot, Mapping) else None
@@ -231,15 +239,31 @@ def _channels_said(states: Mapping[tuple[Any, Any], Any]) -> str:
     return "；".join(failed + looked)[:300]
 
 
+CHANNEL_RANK = {"no_key": 0, "unreachable": 1, "ok": 2}   # = next-admin lib/collect/orchestrator.ts CHANNEL_RANK; lower is worse
+
+
+def channel_states(channels: list[Any]) -> dict[tuple[Any, Any], Any]:
+    """(provider, lang) -> what that channel said, from every row: a pair reported twice reads as its worse report (an
+    unknown state is the worst), never the last row -- a duplicate 「ok」 must not erase an 「unreachable」 into 查不到.
+    The completion route already refuses a repeated pair (main.CollectionCompleteRequest.wire_error); this holds without it."""
+    states: dict[tuple[Any, Any], Any] = {}
+    for item in channels:
+        if isinstance(item, Mapping):
+            key, state = (item.get("provider"), item.get("lang")), item.get("state")
+            if key not in states or CHANNEL_RANK.get(state, -1) < CHANNEL_RANK.get(states[key], -1):
+                states[key] = state
+    return states
+
+
 def search_result(run: Mapping[str, Any], channels: list[Any]) -> tuple[str, str]:
     """What a finished 「去查」 run says for its claim: 查到 (pages came back), 查不到 (every channel the run planned --
     SEARCH_PROVIDERS x SEARCH_LANGUAGES -- answered and none had a page), 無法檢查 (it could not look everywhere it
     planned, or did not say where it looked: zero pages is then not 「找過，沒有」; the why says what each engine did)."""
     if run.get("status") != "completed":
         return UNCHECKABLE, DEAD_RUN
-    tried = [item for item in channels if isinstance(item, Mapping)]
-    states = {(item.get("provider"), item.get("lang")): item.get("state") for item in tried}
-    if tried and not any(item.get("state") == "ok" for item in tried):
+    states = channel_states(channels)
+    tried = bool(states)
+    if tried and not any(state == "ok" for state in states.values()):
         return UNCHECKABLE, _channels_said(states)
     report = run.get("report")
     if not isinstance(report, Mapping):
