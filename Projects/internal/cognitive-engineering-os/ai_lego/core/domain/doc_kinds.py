@@ -22,6 +22,8 @@ from ai_lego.errors import InvariantViolation
 
 FIELD_TYPES = ("text", "choice", "choices", "list", "date", "bool", "int", "json")
 OWNERS = ("case", "person", "group")
+# Who of a group reads another member's record of a kind (platform/visibility.py, STEP34_SHARED_RULES.md §3 R1).
+VISIBILITIES = ("members", "author_only", "convener_and_author", "self_and_govern")
 MAX_JSON_BYTES = 64 * 1024
 
 
@@ -58,6 +60,8 @@ class DocKind:
                                 # gate shows them fenced after its crisis check, not as the person's; saving still runs
                                 # the save-time crisis scan and the high-risk check on them
     after_close: bool = False   # a group's kind that may still be written once the group is closed (a review); never for others
+    blind: str = ""             # a group's kind written before seen: the field keying a round (visibility.visible)
+    visibility: str = "members" # a group's kind: who reads another member's record (VISIBILITIES)
 
     def __post_init__(self) -> None:
         if self.block not in ALL_CODES or self.owner not in OWNERS or not self.fields or (self.after_close and self.owner != "group"):
@@ -71,6 +75,10 @@ class DocKind:
                 raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind}.{name}")
         if self.from_case and (self.owner != "person" or self.from_case not in self.fields or not self.from_case.isidentifier()):
             raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} from_case names no field of a person's record")
+        if self.visibility not in VISIBILITIES or (self.visibility != "members" and self.owner != "group"):
+            raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} visibility {self.visibility!r} (a group's kind only)")
+        if self.blind and (self.owner != "group" or self.blind not in self.fields or not self.fields[self.blind].required or self.authors != frozenset({"user"})):
+            raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} blind names no field of a group's kind only the person writes")
         if self.others_words and (self.others_words not in self.fields or self.fields[self.others_words].type != "text" or self.authors != frozenset({"user"})):
             raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} others_words names no text field the person saved")
 

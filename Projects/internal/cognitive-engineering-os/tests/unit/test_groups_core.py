@@ -206,14 +206,14 @@ class G3LeaveTests(GroupCase):
         self.assertEqual([group["group_id"] for group in self.repo.list_groups_for(self.tenant, self.b)], [])
         self.assertNotIn(self.b, [member["identity_id"] for member in self.repo.group_members(self.tenant, self.group)])
         self.assertEqual(self.refused(lambda: self.write(self.b)), "GROUP_NOT_FOUND")
-        self.assertEqual([doc["doc_id"] for doc in self.docs.current(self.tenant, self.owner, "collab.s34_note")], [mine["doc_id"]])
+        self.assertEqual([doc["doc_id"] for doc in self.docs.current_in_group(self.tenant, self.group, "collab.s34_note")], [mine["doc_id"]])
 
     def test_one_who_left_may_delete_what_they_wrote_and_nobody_deletes_anothers(self):
         mine, theirs = self.write(self.b), self.write(self.c)
         self.assertEqual(self.refused(lambda: self.docs.delete(self.tenant, self.owner, "collab.s34_note", theirs["doc_id"], record_log.user(self.b, "COLLAB"))), "DOC_NOT_YOURS")
         self.repo.leave_group(self.tenant, self.group, self.b)
         self.docs.delete(self.tenant, self.owner, "collab.s34_note", mine["doc_id"], record_log.user(self.b, "COLLAB"))
-        self.assertEqual([doc["doc_id"] for doc in self.docs.current(self.tenant, self.owner, "collab.s34_note")], [theirs["doc_id"]])
+        self.assertEqual([doc["doc_id"] for doc in self.docs.current_in_group(self.tenant, self.group, "collab.s34_note")], [theirs["doc_id"]])
 
     def test_one_who_left_and_is_invited_back_is_a_member_again(self):
         self.repo.leave_group(self.tenant, self.group, self.b)
@@ -307,7 +307,7 @@ class AccountErasureInGroupsTests(GroupCase):
         counts = erasure.decide_person(self.tenant, self.b, lambda: [])
         self.assertEqual((counts["memberships"], counts["group_records"]), (1, 1))
         self.assertEqual([member["identity_id"] for member in self.repo.group_members(self.tenant, self.group)], [self.a, self.c])
-        self.assertEqual([doc["doc_id"] for doc in self.docs.current(self.tenant, self.owner, "collab.s34_note")], [others["doc_id"]])
+        self.assertEqual([doc["doc_id"] for doc in self.docs.current_in_group(self.tenant, self.group, "collab.s34_note")], [others["doc_id"]])
         self.assertNotIn("B-IN-GROUP", "\n".join(dump(self.databases)))
 
     def test_the_only_convener_is_not_erased_until_the_group_is_handed_over(self):

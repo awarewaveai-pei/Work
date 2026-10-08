@@ -39,6 +39,11 @@ def _lock_singleton(connection: psycopg.Connection, tenant_id: str, owner: Owner
     db.advisory_xact_lock(connection, "doc-singleton", tenant_id, owner.kind, owner.id, kind)
 
 
+def _not_a_group(owner: Owner) -> None:
+    if owner.kind == "group":
+        raise InvariantViolation("DOC_GROUP_READ_NEEDS_VISIBILITY: a group's records are read through platform/visibility.py")
+
+
 class CaseDocs:
     def __init__(self, repo: ProjectSourceRepository) -> None:
         self._repo = repo
@@ -215,10 +220,20 @@ class CaseDocs:
                 self._save(connection, tenant_id, owner, item["kind"], item["content"], writer, item.get("doc_id"), item.get("base_version"))
 
     def current(self, tenant_id: str, owner: Owner, kind: str) -> list[dict[str, Any]]:
-        """The latest version of every live document of this kind, oldest first (in the order written: write_order)."""
+        """The latest version of every live document of this kind, oldest first (in the order written: write_order). Not
+        for a group: its records are read only through platform/visibility.py (STEP34_SHARED_RULES.md §3)."""
+        _not_a_group(owner)
+        return self._current(tenant_id, owner, kind)
+
+    def current_in_group(self, tenant_id: str, group_id: str, kind: str) -> list[dict[str, Any]]:
+        """Every member's live documents of a group's kind, each with ``written_by`` (who wrote its first version). Called
+        by platform/visibility.py only (tests/unit/test_visibility.py's gate): it decides what a viewer gets of these."""
+        return self._current(tenant_id, record_log.group(group_id), kind)
+
+    def _current(self, tenant_id: str, owner: Owner, kind: str) -> list[dict[str, Any]]:
         with self._repo.transaction(tenant_id) as connection:
             rows = connection.execute(
-                "SELECT event_type, occurred_at, payload_json, author, block, aggregate_id FROM events WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s "
+                "SELECT event_type, occurred_at, payload_json, author, block, aggregate_id, author_identity_id FROM events WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s "
                 "AND event_type IN ('DocSaved','DocDeleted') AND payload_json->>'kind' = %s ORDER BY write_order",
                 (tenant_id, owner.kind, owner.id, kind),
             ).fetchall()
@@ -228,8 +243,10 @@ class CaseDocs:
             if item["deleted"]:
                 latest.pop(item["doc_id"], None)
             else:
-                first = latest.get(item["doc_id"], {}).get("created_at", item["at"])
-                latest[item["doc_id"]] = {**item, "created_at": first}
+                before = latest.get(item["doc_id"], {})
+                latest[item["doc_id"]] = {**item, "created_at": before.get("created_at", item["at"])}
+                if owner.kind == "group":
+                    latest[item["doc_id"]]["written_by"] = before.get("written_by", row["author_identity_id"])
         return list(latest.values())
 
     def blocks_used(self, tenant_id: str, owner: Owner) -> set[str]:
@@ -253,7 +270,15 @@ class CaseDocs:
         return {item["method_id"] for item in self._repo.analyses(tenant_id, owner.id).get(owner.id, []) if item.get("method_id") and item.get("status") == "DONE"}
 
     def versions(self, tenant_id: str, owner: Owner, kind: str, doc_id: str) -> list[dict[str, Any]]:
-        """Every version of one document, oldest first (舊版不刪)."""
+        """Every version of one document, oldest first (舊版不刪). Not for a group (as ``current``)."""
+        _not_a_group(owner)
+        return self._versions(tenant_id, owner, kind, doc_id)
+
+    def versions_in_group(self, tenant_id: str, group_id: str, kind: str, doc_id: str) -> list[dict[str, Any]]:
+        """platform/visibility.py only, after it decided the viewer may read this document."""
+        return self._versions(tenant_id, record_log.group(group_id), kind, doc_id)
+
+    def _versions(self, tenant_id: str, owner: Owner, kind: str, doc_id: str) -> list[dict[str, Any]]:
         with self._repo.transaction(tenant_id) as connection:
             history = [item for item in self._history(connection, tenant_id, owner, doc_id) if not item["deleted"]]
         if not history or history[-1]["kind"] != kind:
@@ -281,3 +306,7 @@ class CaseReads:
 
     def collection_run(self, tenant_id: str, project_id: str, run_id: str) -> dict[str, Any] | None:
         return self._repo.get_collection_run(tenant_id, project_id, run_id)
+
+    def membership(self, tenant_id: str, group_id: str, identity_id: str) -> dict[str, Any] | None:
+        """The person's current membership of a group (its role and review state), or None (platform/visibility.py)."""
+        return self._repo.get_group_for(tenant_id, group_id, identity_id)
