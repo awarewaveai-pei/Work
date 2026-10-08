@@ -19,12 +19,9 @@ def a_case(repo: ProjectSourceRepository, tenant_id: str, case_id: str) -> recor
     return record_log.case(case_id)
 
 
-def _no_runs(*_: Any) -> Any:
-    raise AssertionError("this erasure names no recipe runs")
-
-
 def erase(repo: ProjectSourceRepository, tenant_id: str, case_id: str, identity_id: str, source_cas: TenantScopedCas) -> dict[str, Any]:
     """Erase a case the way DELETE /projects/{id} does (ai_lego/platform/erasure.py: decide, then clean up), for a test that
     has no recipe runs; its AI artifacts (if any) live beside ``source_cas``."""
     artifacts = JsonArtifactStore(TenantScopedCas(source_cas.root.parent / "erase-artifact-cas"))
-    return Erasure(repo, source_cas, artifacts, _no_runs).erase_case(tenant_id, case_id, identity_id, [])
+    no_runs = source_cas.root.parent / "erase-runs" / "x.journal.json"   # a folder that holds no run
+    return Erasure(repo, source_cas, artifacts, lambda *_: no_runs).erase_case(tenant_id, case_id, identity_id, lambda: [])

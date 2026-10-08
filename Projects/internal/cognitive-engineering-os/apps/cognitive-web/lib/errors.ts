@@ -104,6 +104,9 @@ const CODES: Record<string, string> = {
   THINK_REPLY_NOT_FOUND: "找不到 AI 的這份整理，可能已經刪除。",
   THINK_REPLY_STALE: "這份整理在你回應之前又變了。請重新整理頁面，看過新的再回應。",
   ACCOUNT_ERASE_NOT_CONFIRMED: "要刪除帳號，請照畫面打一次確認的字。",
+  ACCOUNT_HAS_LIVE_CASES: "刪除帳號的同時你又開了一個案子，這次什麼都沒刪。請再按一次刪除帳號。",
+  ACCOUNT_ALREADY_ERASED: "這個帳號已經刪除了。",
+  IDENTITY_ERASED: "這個帳號已經刪除了，這次沒有存任何東西。",
   CASE_ERASED: "這個案子已經刪除了，這次沒有存任何東西。",
   SOURCE_PROJECT_NOT_FOUND: "找不到這個案子，可能剛刪除了；這次沒有存任何東西。",
   // GATHER

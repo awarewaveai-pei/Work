@@ -85,6 +85,7 @@ The engine reads and writes PostgreSQL only; no SQLite path, file or fallback is
 | `doc-singleton`, tenant, owner kind, owner id, kind | `CaseDocs.save` of a new document of a one-per-owner kind, before `_live_ids` | xact, exclusive | invariant 2 DOC_SINGLETON_EXISTS |
 | `case`, tenant, case (`db.owner_lock` via `ProjectSourceRepository.lock_case`) | every case writer, first in its transaction (`require_case`, `_content_write`, rename, report CAS); a person's `from_case` record (save: after its own checks -- an events row has no foreign key to the case, so it cannot hold the row the erase deletes; delete: before it writes); the erasure's decision (`erase_case_rows`); `CaseDocs.save_many` with a `check` | xact; writers **shared**; the erase and a checked batch **exclusive** | invariant 3: writers do not wait for each other; an exclusive holder waits for the writes in flight only; a write after the erase gets CASE_ERASED; nothing a batch's check read changes before its writes (was SQLite's file write lock) |
 | `source-blobs`, tenant | `add_source`, `supersede`, `ingest_batch` (after the case lock); `collect_unreferenced_blobs`, the erasure's decision (`unreferenced_blobs`) and each blob item of its cleanup (`blob_referenced`) | xact; writes shared, garbage collection exclusive | the blob lifecycle rule (no blob of an uncommitted row is collected; a blob a committed row names is never removed) -- was BEGIN IMMEDIATE |
+| `person`, tenant, identity (`record_log.require_person`) | every person-owned record (`record_log.append`, and first in `CaseDocs.save`/`save_many`/`delete` of a person's documents, custom workflow create/update/delete, `create_project` of the opener), a recipe run's admission (`erasure.admit_run`, after the case lock and `require_case` when the run is on a case): shared; the account erasure's decision: exclusive | xact | nothing person-owned is written, no case opened and no run admitted for a person after the account decision commits (IDENTITY_ERASED); what started before it is seen by it (a live case refuses the decision: ACCOUNT_HAS_LIVE_CASES, 409) |
 | row locks on `erasure_items` / `erasure_jobs` | the erasure's cleanup: an item `FOR UPDATE SKIP LOCKED`, the job `FOR UPDATE` when it completes | row, until the transaction ends | two workers (a second DELETE, another process's start) never work one item at once; a job completes, and gets its tombstone, once |
 | `ai-usage`, tenant | `reserve_ai_usage` | xact, exclusive | the budget check and the reservation are one step across processes -- was BEGIN IMMEDIATE |
 | `case-hooks`, tenant, case (`CaseDocs.hooks_lock`) | `block_hooks._run_after_sources`, the whole run | session (a pooled connection held for it), exclusive | one after-sources run per case across processes -- was an in-process `threading.Lock`; its own name, so the erase never waits for a hook |
@@ -146,35 +147,42 @@ is durable, and a durable decision to erase can always be finished.** One workfl
 
 | Step | What | Where |
 |---|---|---|
-| 1 Decide (one transaction) | Case: case lock exclusive, every row of the case (`erase_case_rows`), its collect grants closed (`IdentityStore.close_collect_grants_on`), the tenant's unreferenced Source blobs listed under the source-blobs lock, and the outbox: one `erasure_jobs` row + one `erasure_items` row per blob / AI artifact (case rows and run sidecars) / run. Person: workflows, person records, identity marker, outbox of the runs on no case. References only (path, hash, artifact reference, run id), never content. Nothing on disk is touched; a failure leaves everything as it was. | `Erasure.decide_case`, `decide_person`; `erasure_outbox.write_job`; migration 0004 |
-| 2 Clean up (after commit) | Each item in its own transaction, `FOR UPDATE SKIP LOCKED`. A Source blob is re-checked under the source-blobs lock (`blob_referenced`): named by any committed row = `kept`. An artifact is re-checked against committed artifact rows. Already gone = `absent`. A filesystem error leaves it `pending` (attempts + 1). Malformed / another tenant's / hash mismatch = `unremovable`, reported in `failed` (a retry cannot mend it). | `Erasure.finish`, `_remove` |
-| 3 Complete | Job `FOR UPDATE`; no item pending: the ProjectErased tombstone (platform-owned; counts of what was actually removed) and the job delete commit together, then `physical_retention_hook` (empty: see below). | `Erasure._complete` |
+| 1 Decide (one transaction) | Case: case lock exclusive, every row of the case (`erase_case_rows`), the person's runs on it read under that lock (a run's admission holds it shared and writes its sidecar under it: `admit_run`; a run still going refuses the erase), its collect grants closed (`IdentityStore.close_collect_grants_on`), the tenant's unreferenced Source blobs listed under the source-blobs lock, and the outbox: one `erasure_jobs` row + one `erasure_items` row per blob / AI artifact (case rows and run sidecars) / run. Person: person lock exclusive, refused while the person still has a case (`ACCOUNT_HAS_LIVE_CASES`) or is already deleted (`ACCOUNT_ALREADY_ERASED`), the runs left in the folder read under it, workflows, person records, identity marker, outbox of those runs. References only (path, hash, artifact reference, run id), never content. Nothing on disk is touched; a failure leaves everything as it was. | `Erasure.decide_case`, `decide_person`; `erasure_outbox.write_job`; migration 0004 |
+| 2 Clean up (after commit) | Each item in its own transaction, `FOR UPDATE SKIP LOCKED`. A Source blob is re-checked under the source-blobs lock (`blob_referenced`), an artifact against committed artifact rows: still named = `kept`. A run's artifact is never shared (`recipe_runtime.persist_artifact_output` gives each write its own bytes; pinned by two `test_block_govern` tests). A well-formed path of the tenant is removed by its path, even when its bytes no longer match the reference's hash. Already gone = `absent`. A filesystem error leaves it `pending` (attempts + 1; from `ATTENTION_ATTEMPTS` on, logged as an error). A reference that names no file of the tenant (malformed, another tenant's, a run id that leaves its folder) = `unresolvable`. | `Erasure.finish`, `_remove` |
+| 3 Complete | Job `FOR UPDATE`; every item `removed`/`absent`/`kept` ("done" = every target accounted for): the ProjectErased tombstone (platform-owned; counts of what was actually removed) and the job delete commit together, then `physical_retention_hook` (empty: see below). | `Erasure._complete` |
 
-An unfinished job (its row exists exactly while files remain) is found again by a repeated `DELETE` of the case by the
-person who erased it, by that person's account deletion (`resume` narrowed to them), and at every API start
-(`main._lifespan` -> `resume_pending_erasures`; logged, never fatal). Nothing waits for a case's hooks.
+An unfinished job (its row exists exactly while something is left) is found again by a repeated `DELETE` of the case by
+the person who erased it (nobody else: another person gets 404), by that person's account deletion (`resume` narrowed
+to them), and at every API start (`main._lifespan` -> `resume_pending_erasures`; logged, never fatal). Items no retry
+will settle, and items that kept failing, are logged at error level at every start and listed by
+`python -m ai_lego.platform.erasure` (`Erasure.needs_attention`, read only; acknowledging an unresolvable item is not
+built yet). Nothing waits for a case's hooks. The run routes (`GET /recipes/{id}/runs/{run_id}[/result]`) refuse a run
+whose sidecar names a case that is gone (CASE_ERASED 404), so files waiting for the cleanup are read by nobody.
 
 API: `DELETE /projects/{id}` answers 200 `{project_id, erased: {sources, blobs_unlinked, artifacts_deleted,
-events_deleted}, physical_cleanup: "done"}` or 202 `{..., physical_cleanup: "pending", pending_items}`; the account
-erase adds `physical_cleanup`, and `tombstone` is false (202) while a file remains. `GET /projects/erased` lists
-finished erasures only. The web client needs no change: `apiFetch` accepts any 2xx (`apps/cognitive-web/lib/api.ts:9`)
-and ignores the DELETE body (`components/ProjectPage.tsx:131`, `components/result/ResultPage.tsx:351`).
+events_deleted}, physical_cleanup: "done"}` or 202 `{..., physical_cleanup: "pending" | "blocked", pending_items,
+failed?}` (`pending`: a retry will do it; `blocked`: only unresolvable items are left, an operator must look); the
+account erase adds `physical_cleanup`, and `tombstone` is false (202) while anything is left. `GET /projects/erased`
+lists finished erasures only. The web client needs no change: `apiFetch` accepts any 2xx
+(`apps/cognitive-web/lib/api.ts:9`) and ignores the DELETE body (`components/ProjectPage.tsx:131`,
+`components/result/ResultPage.tsx:351`).
 
 Cost of this shape (an outbox/saga) over the rejected ones: one migration (head moves to 0004: prod is migrated before
 the code that requires it, `require_schema_at_head`), one short transaction per file, a source-blob item holding the
-tenant's source-blobs lock for one unlink (source writes of that tenant wait that long), a start-up scan of
-`erasure_jobs` per region. Rejected: a post-commit best-effort unlink (a crash strands personal files with nothing to
-find them); files first (the original fault).
+tenant's source-blobs lock for one unlink (source writes of that tenant wait that long), a person lock and one identity
+read per person-owned record, a start-up scan of `erasure_jobs` per region. Rejected: a post-commit best-effort unlink
+(a crash strands personal files with nothing to find them); files first (the original fault).
 
-Gate: `tests/unit/test_erasure_workflow.py` -- fault injection at each decision step, after commit, at each file kind,
+Gates (`tests/unit/test_erasure_workflow.py`): fault injection at each decision step, after commit, at each file kind,
 during the resume, a fresh process, a concurrent DELETE, the account path, shared blobs (also one added after the
-decision); and `IrreversibleGateTests`, which fails when any path from an erasure entry point reaches a removal
-(`unlink`, `rmdir`, `remove`, `rmtree`, `delete_if_present`, ...) or a split-transaction write (`close_collect_grants_for_project`,
-`delete_identity`, `delete_person`) without passing through `finish` / `resume`.
+decision), run admission and a personal record racing each decision; `NothingIrreversibleDuringTheDecisionTests` and
+the account test beside it run every erase entry point with every file mutator (`Path.unlink/rmdir/replace/rename/
+write_*/touch/mkdir`, `os.remove/unlink/rmdir/replace/rename`, `shutil.rmtree`, the CAS and artifact store writers)
+raising while a decision is open; `IrreversibleGateTests` statically walks the calls from the entry points to the
+same names (it matches names only: the runtime trap is the stronger one).
 
-Not covered: an artifact's put and its row are not under one lock, so the re-check sees committed rows only (artifact
-content carries its ids; unchanged from before); encrypted-journal ciphertext in `workflow-cas` stays (named in the
-account summary, unchanged); a run started on a case after its decision is not in the outbox (it finds no case).
+Not covered: encrypted-journal ciphertext in `workflow-cas` stays (named in the account summary, unchanged); an
+unresolvable item cannot be acknowledged yet, so its job stays `blocked` until an operator removes the row by hand.
 
 ### Physical retention decision
 

@@ -151,9 +151,13 @@ class ProjectSourceRepository:
         record_log.append(connection, tenant_id, aggregate_id, event_type, payload, writer=writer, owner=record_log.case(project_id), at=at)
 
     def create_project(self, record: Mapping[str, Any]) -> dict[str, Any]:
-        """The Project as stored (its created_at read back as the database keeps it)."""
+        """The Project as stored (its created_at read back as the database keeps it). Under the opener's person lock (shared;
+        the account erasure's decision holds it exclusive and refuses while the person still has a case): a case opened
+        during an account deletion is either seen by it or refused here (IDENTITY_ERASED, record_log.require_person), never
+        left with no owner."""
         project = {column: record[column] for column in _PROJECT_COLUMNS}
         with self._db.for_tenant(project["tenant_id"]) as connection:
+            record_log.require_person(connection, project["tenant_id"], project["created_by_identity_id"])
             stored = connection.execute(
                 f"INSERT INTO platform_projects ({_PROJECT_SELECT}) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING {_PROJECT_SELECT}",
                 tuple(project[column] for column in _PROJECT_COLUMNS),

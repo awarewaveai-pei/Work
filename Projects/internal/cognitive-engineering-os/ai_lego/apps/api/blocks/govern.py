@@ -358,24 +358,30 @@ def erase_account(body: EraseBody, response: Response, session: dict[str, Any] =
     if reasons:
         raise HTTPException(status_code=409, detail=f"PROJECT_BUSY: {reasons[0]}; wait for it to finish, then delete the account")
     failed: list[dict[str, str]] = []
-    pending = False
+    states: set[str] = set()   # each erasure's physical_cleanup: done, pending (a retry will do it), blocked (an operator must look)
     for project in cases:
         erased = api.erase_case(store, repo, source_cas, artifact_store, tenant_id, me, project["project_id"])
         failed += erased.get("failed", [])
-        pending |= erased["physical_cleanup"] != "done"
+        states.add(erased["physical_cleanup"])
     erasure = api.erasure_for(repo, source_cas, artifact_store)
     for earlier in erasure.resume(tenant_id=tenant_id, erased_by_identity_id=me):   # a case erased before whose files were not all gone
         if earlier["subject_kind"] != PERSON:
             failed += earlier.get("failed", [])
-            pending |= earlier["physical_cleanup"] != "done"
-    counts = erasure.decide_person(tenant_id, me, _person_runs_to_erase(tenant_id, me))
+            states.add(earlier["physical_cleanup"])
+    try:
+        counts = erasure.decide_person(tenant_id, me, lambda: _person_runs_to_erase(tenant_id, me))   # read inside the decision, under the person lock
+    except InvariantViolation as error:   # a case opened meanwhile, or a second deletion that waited for the first: nothing decided
+        if str(error).startswith(("ACCOUNT_HAS_LIVE_CASES", "ACCOUNT_ALREADY_ERASED")):
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        raise
     person = erasure.finish(tenant_id, PERSON, me)
     failed += person["failed"]
-    pending |= person["physical_cleanup"] != "done"
+    states.add(person["physical_cleanup"])
+    cleanup = next((state for state in ("pending", "blocked") if state in states), "done")
     response.delete_cookie(api.SESSION_COOKIE)
-    if pending:
+    if cleanup != "done":
         response.status_code = 202
-    return {"cases": len(cases), **counts, "tombstone": not pending, "physical_cleanup": "pending" if pending else "done", "failed": failed}
+    return {"cases": len(cases), **counts, "tombstone": cleanup == "done", "physical_cleanup": cleanup, "failed": failed}
 
 
 # -- version records --------------------------------------------------------------------------------------------------

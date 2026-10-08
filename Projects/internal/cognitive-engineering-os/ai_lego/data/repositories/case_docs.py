@@ -66,6 +66,8 @@ class CaseDocs:
         The person saving over an AI or joint version: unchanged = the AI's (一字沒改照收的算「AI」), changed = joint
         (AI 起草、你改過的算「共同」)."""
         with self._repo.transaction(tenant_id) as connection:
+            if owner.kind == "person":   # first, as a case writer takes the case lock (record_log.require_person)
+                record_log.require_person(connection, tenant_id, owner.id)
             return self._save(connection, tenant_id, owner, kind, content, writer, doc_id, base_version)
 
     def save_many(self, tenant_id: str, owner: Owner, items: list[Mapping[str, Any]], writer: Writer,
@@ -81,6 +83,8 @@ class CaseDocs:
         with self._repo.transaction(tenant_id) as connection:
             if owner.kind == "case":
                 self._repo.lock_case(connection, tenant_id, owner.id, exclusive=check is not None)
+            elif owner.kind == "person":
+                record_log.require_person(connection, tenant_id, owner.id)
             for doc_id in sorted({item["doc_id"] for item in items if item.get("doc_id")}):
                 record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
             if check is not None:
@@ -135,6 +139,8 @@ class CaseDocs:
         with self._repo.transaction(tenant_id) as connection:
             if owner.kind == "case":
                 self._repo.require_case(connection, tenant_id, owner.id)
+            elif owner.kind == "person":
+                record_log.require_person(connection, tenant_id, owner.id)
             record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
             history = [item for item in self._history(connection, tenant_id, owner, doc_id) if not item["deleted"]]
             if not history or history[-1]["kind"] != kind:

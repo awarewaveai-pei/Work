@@ -40,7 +40,7 @@ def upgrade() -> None:
             item_no integer NOT NULL,
             kind text NOT NULL CHECK (kind IN ('source_blob', 'artifact', 'run_files')),
             target_json jsonb NOT NULL,
-            state text NOT NULL CHECK (state IN ('pending', 'removed', 'absent', 'kept', 'unremovable')),
+            state text NOT NULL CHECK (state IN ('pending', 'removed', 'absent', 'kept', 'unresolvable')),
             error text,
             attempts integer NOT NULL DEFAULT 0,
             PRIMARY KEY (tenant_id, subject_kind, subject_id, item_no),

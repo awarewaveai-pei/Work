@@ -598,7 +598,8 @@ class AccountErasureTests(GovernApiTestCase):
         self.assertEqual(exported.status_code, 200, exported.text)
         self.assertEqual([item["error"] for item in exported.json()["person"]["runs"][0]["artifacts"]], ["ARTIFACT_REFERENCE_MALFORMED"] * 4)
         response = self.client.post("/govern/account/erase", json={"confirm": self.PHRASE})
-        self.assertEqual(response.status_code, 200, response.text)
+        # a claim that names no file is never called done: the account is deleted, the claims are listed, no "done"
+        self.assertEqual((response.status_code, response.json()["physical_cleanup"], response.json()["tombstone"]), (202, "blocked", False), response.text)
         self.assertEqual(len(response.json()["failed"]), 4)
         self.assertEqual(self.store.get_identity(self.me)["status"], "deleted")
         self.assertFalse(journal.exists())
@@ -613,10 +614,10 @@ class AccountErasureTests(GovernApiTestCase):
         runs = self.client.get("/govern/export").json()
         self.assertEqual(runs["cases"][0]["runs"][0]["artifacts"][0]["error"], "JSON_ARTIFACT_HASH_MISMATCH")
         response = self.client.post("/govern/account/erase", json={"confirm": self.PHRASE})
-        self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual([item["error"] for item in response.json()["failed"]], ["JSON_ARTIFACT_HASH_MISMATCH"])
+        # the erasure removes the person's file by its path even when its bytes no longer match: nothing is left, so "done"
+        self.assertEqual((response.status_code, response.json()["physical_cleanup"], response.json()["failed"]), (200, "done", []), response.text)
         self.assertEqual(self.store.get_identity(self.me)["status"], "deleted")
-        self.assertFalse(broken.exists())
+        self.assertFalse(broken.exists() or blob.exists())
 
     def test_a_suspended_tenant_does_not_take_the_right_to_delete_away(self):
         with mock.patch.object(api_main, "check_entitlement", return_value=False):

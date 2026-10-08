@@ -159,6 +159,18 @@ def _now() -> datetime:
     return db.now()
 
 
+def require_person(connection: psycopg.Connection, tenant_id: str, identity_id: str) -> None:
+    """The person's owner lock, shared (db.owner_lock "person"; the account erasure's decision holds it exclusive), and the
+    person still there: an identity the account deletion marked deleted gets IDENTITY_ERASED and nothing is written. Every
+    person-owned record passes here (``append``); a writer that also changes rows of its own takes it first in its
+    transaction, as case writers take the case lock, so it never holds a row the erasure deletes while it waits. An
+    identity with no row at all (a unit test's made-up owner) is not refused: only a deleted one is."""
+    db.owner_lock(connection, "person", tenant_id, identity_id)
+    row = connection.execute("SELECT status FROM identity WHERE tenant_id=%s AND identity_id=%s", (tenant_id, identity_id)).fetchone()
+    if row is not None and row[0] != "active":
+        raise InvariantViolation("IDENTITY_ERASED: the account is deleted; nothing more is written for it")
+
+
 def lock_aggregate(connection: psycopg.Connection, tenant_id: str, aggregate_id: str) -> None:
     """The aggregate's lock (STORAGE_SWITCH.md invariant 1): taken first by every append, so MAX(sequence)+1 cannot race,
     and by a writer that decides the aggregate's next record from what it read (a document's next version: case_docs)."""
@@ -187,6 +199,8 @@ def append(connection: psycopg.Connection, tenant_id: str, aggregate_id: str, ev
     scored = _score_keys(payload)
     if scored:
         raise InvariantViolation(f"RECORD_SCORE_REFUSED: {sorted(scored)} -- the platform does not score beliefs or conclusions")
+    if owner.kind == "person":   # every person-owned record, whoever writes it (a shared lock is taken again for free)
+        require_person(connection, tenant_id, owner.id)
     lock_aggregate(connection, tenant_id, aggregate_id)   # first: the read below and the insert are one step for any other writer
     row = connection.execute("SELECT COALESCE(MAX(sequence), 0) FROM events WHERE tenant_id=%s AND aggregate_id=%s", (tenant_id, aggregate_id)).fetchone()
     moment = at if at is not None else _now()

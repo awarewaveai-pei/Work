@@ -42,6 +42,7 @@ class CustomWorkflowRepository:
         """The workflow as stored."""
         workflow = {column: record[column] for column in _WORKFLOW_COLUMNS}
         with self._db.for_tenant(workflow["tenant_id"]) as connection:
+            record_log.require_person(connection, workflow["tenant_id"], workflow["created_by_identity_id"])   # first: before a row of its own
             stored = connection.execute(
                 f"INSERT INTO custom_workflows ({_WORKFLOW_SELECT}) VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING {_WORKFLOW_SELECT}",
                 (workflow["workflow_id"], workflow["tenant_id"], workflow["title"], Jsonb(list(workflow["method_ids"])), workflow["created_by_identity_id"], workflow["created_at"], workflow["updated_at"]),
@@ -59,6 +60,7 @@ class CustomWorkflowRepository:
     def update(self, tenant_id: str, workflow_id: str, title: str, method_ids: list[str], updated_at: str, identity_id: str) -> dict[str, Any] | None:
         """Only its maker's workflow changes; anyone else's reads as not found (None)."""
         with self._db.for_tenant(tenant_id) as connection:
+            record_log.require_person(connection, tenant_id, identity_id)   # first: the erasure deletes the row this would hold
             stored = connection.execute(
                 f"UPDATE custom_workflows SET title=%s, method_ids_json=%s, updated_at=%s WHERE tenant_id=%s AND workflow_id=%s AND created_by_identity_id=%s RETURNING {_WORKFLOW_SELECT}",
                 (title, Jsonb(list(method_ids)), updated_at, tenant_id, workflow_id, identity_id),
@@ -94,6 +96,7 @@ class CustomWorkflowRepository:
     def delete(self, tenant_id: str, workflow_id: str, identity_id: str) -> bool:
         """Removes the workflow and every record of it (完整刪除: nothing of it stays, not even its title in a log)."""
         with self._db.for_tenant(tenant_id) as connection:
+            record_log.require_person(connection, tenant_id, identity_id)
             deleted = connection.execute("DELETE FROM custom_workflows WHERE tenant_id=%s AND workflow_id=%s AND created_by_identity_id=%s", (tenant_id, workflow_id, identity_id)).rowcount > 0
             if deleted:
                 record_log.delete_owned(connection, tenant_id, record_log.person(identity_id), aggregate_id=f"{self.AGGREGATE_PREFIX}{workflow_id}")

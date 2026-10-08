@@ -598,6 +598,26 @@ class InterpretApiTests(ApiTestCase):
         self.assertEqual(self.client.get(f"/interpretations/{response.json()['interpretation_id']}").status_code, 404)
         self.assertEqual(len(launch.call_args.kwargs["repo"].interpretation_events(self.tenant["tenant_id"], response.json()["interpretation_id"])), before)
 
+    def test_a_result_stored_as_its_case_is_erased_leaves_no_artifact_behind(self):
+        """The artifact is put before its row; the case erased in between refuses the row, and no outbox names the file:
+        the runner removes what it put (as synthesis and report do)."""
+        with patch("ai_lego.apps.api.main._launch_interpretation") as launch:
+            response = self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": ["release incidents"], "patterns": [], "structures": [], "mental_models": []})
+        self.assertEqual(response.status_code, 202, response.text)
+        kwargs, tenant_id = launch.call_args.kwargs, self.tenant["tenant_id"]
+        before = set(kwargs["artifact_store"].cas.list_objects(tenant_id))
+        real = ProjectSourceRepository.save_interpretation
+
+        def erased_first(repo, tenant, project_id, *args, **kw):
+            with tempfile.TemporaryDirectory() as cas_dir:
+                erase(repo, tenant, project_id, self.identity["identity_id"], TenantScopedCas(Path(cas_dir)))
+            return real(repo, tenant, project_id, *args, **kw)
+
+        with patch.object(ProjectSourceRepository, "save_interpretation", erased_first):
+            api_main._run_interpretation(**kwargs)
+        self.assertEqual(set(kwargs["artifact_store"].cas.list_objects(tenant_id)), before)
+        self.assertEqual(self.client.get(f"/projects/{self.project_id}").status_code, 404)
+
     def test_a_runner_that_died_leaves_a_failed_analysis_and_a_deletable_project_not_pending_forever(self):
         """N-64 / plan P-k: the runner holds the Project's run lock until its outcome is written; a dead process lets go
         without an outcome (the kernel releases it), which reads as RUNNER_LOST instead of PENDING forever."""

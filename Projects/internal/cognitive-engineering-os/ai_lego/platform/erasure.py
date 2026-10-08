@@ -10,12 +10,20 @@ erase can always be finished.
    outbox (ai_lego/data/repositories/erasure_outbox.py) names what is left on disk: unreferenced Source blobs, AI
    artifacts, run journals. References only, never content. Nothing on disk is touched before this commits; if it
    fails, everything is as it was.
+   The runs are read inside the decision, under the lock their admission takes (``admit_run``): a run admitted
+   before the decision is named in the outbox (or, still running, refuses the erase); one admitted after finds no
+   case, or no identity, and writes nothing.
 2. Clean up (``finish``), after that commit: each item in its own short transaction, held by one worker (SKIP LOCKED),
    removed idempotently (an item already gone is ``absent``). A Source blob is removed only if, under the blob lock,
-   no committed row names it any more (another case's Source sharing the content keeps it). A filesystem error leaves
-   the item pending for the next try.
-3. Complete: when no item is pending, the case's ProjectErased tombstone is appended and the job row goes, in one
-   transaction. Until then the API says the cleanup is pending and no tombstone exists.
+   no committed row names it any more (another case's Source sharing the content keeps it); an AI artifact only if no
+   committed artifact row names it (a run's artifact is never shared: recipe_runtime.persist_artifact_output gives each
+   write its own bytes). A well-formed path of this tenant is removed even when its bytes no longer match the
+   reference's hash: erasing removes the person's file, it does not vouch for it. A filesystem error leaves the item
+   pending for the next try; one that keeps failing is logged as an error and listed by ``needs_attention``.
+3. Complete: when every item is settled and none is ``unresolvable`` (a reference that names no file of this tenant:
+   nothing a retry can reach, so "done" cannot be claimed), the case's ProjectErased tombstone is appended and the job
+   row goes, in one transaction. Until then the API says ``pending`` (a retry will do it) or ``blocked`` (an operator
+   must look: ``needs_attention``), and no tombstone exists.
 
 An unfinished job is found again by a repeated DELETE of the case by the person who erased it, by an account
 deletion of that person (``resume`` narrowed to them), and by ``resume`` at every API start. Nothing here waits for a
@@ -34,6 +42,7 @@ from typing import Any, Callable, Iterable, Mapping
 
 import psycopg
 
+from ai_lego.data import db
 from ai_lego.data.events import record_log
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
@@ -50,6 +59,7 @@ CASE, PERSON = "case", "person"
 JOURNAL_SUFFIX = ".journal.json"
 # A filesystem refusal the next try may get past; any other InvariantViolation of a store is a reference a retry cannot mend.
 _RETRYABLE = ("CAS_OBJECT_UNLINK_FAILED",)
+ATTENTION_ATTEMPTS = 5   # a pending item that failed this often is logged as an error and listed by needs_attention
 
 JournalPath = Callable[..., Path]   # (tenant_id, run_id, identity_id) -> the run's journal path (main.workflow_journal_path)
 
@@ -67,6 +77,15 @@ def artifact_reference_ok(reference: Any) -> bool:
 def sidecar_of(journal: Path) -> Path:
     """The file the server writes beside every run: which case it ran on and every artifact it stored."""
     return journal.with_name(journal.name.replace(JOURNAL_SUFFIX, ".case.json"))
+
+
+def admit_run(connection: psycopg.Connection, tenant_id: str, identity_id: str, project_id: str | None) -> None:
+    """The lock a recipe run's admission holds while it takes its run lock and writes its sidecar (main.run_recipe): the
+    case lock (shared) and the case still there, then the person lock (shared) and the identity still active. Each
+    decision takes its own one exclusive and reads the runs after it, so no run slips between that read and the commit."""
+    if project_id is not None:
+        ProjectSourceRepository.require_case(connection, tenant_id, project_id)
+    record_log.require_person(connection, tenant_id, identity_id)
 
 
 def physical_retention_hook(tenant_id: str, subject_kind: str, subject_id: str) -> None:
@@ -93,12 +112,12 @@ def _label(reference: Any) -> str:
 
 
 def _artifact_items(references: Iterable[Any]) -> list[tuple[str, dict[str, Any], str, str | None]]:
-    """One item per distinct artifact. A malformed reference (or one jsonb cannot hold) is settled at once as unremovable:
-    it names no file a retry could reach, and the person is told in ``failed``."""
+    """One item per distinct artifact. A malformed reference (or one jsonb cannot hold) is settled at once as unresolvable:
+    it names no file a retry could reach; the person is told in ``failed`` and the job stays open for an operator."""
     items, seen = [], set()
     for reference in references:
         if not artifact_reference_ok(reference) or _unstorable(reference):
-            items.append(("artifact", {"artifact_type": _label(reference)}, "unremovable", "ARTIFACT_REFERENCE_MALFORMED"))
+            items.append(("artifact", {"artifact_type": _label(reference)}, "unresolvable", "ARTIFACT_REFERENCE_MALFORMED"))
             continue
         if reference["cas_path"]["path"] in seen:
             continue
@@ -123,23 +142,31 @@ class Erasure:
 
     # -- 1. the decisions --------------------------------------------------------------------------------------------
 
-    def decide_case(self, tenant_id: str, project_id: str, identity_id: str, runs: list[Mapping[str, Any]]) -> None:
-        """``runs``: the person's recipe runs on this case ({run_id, identity_id, artifacts}), none of them running."""
+    def decide_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]]) -> None:
+        """``runs()``: the person's recipe runs on this case ({run_id, identity_id, artifacts}); read under the case lock,
+        after every admission in flight (admit_run); raises (and nothing is decided) while one still runs."""
         with self._repo.transaction(tenant_id) as connection:
             erased = ProjectSourceRepository.erase_case_rows(connection, tenant_id, project_id)
+            runs = runs()
             items = [("source_blob", {"path": path}, "pending", None) for path in ProjectSourceRepository.unreferenced_blobs(connection, tenant_id, self._source_cas)]
             items += _artifact_items([*erased["artifact_references"], *(reference for run in runs for reference in run["artifacts"])])
             items += _run_items(runs)
             grants = IdentityStore.close_collect_grants_on(connection, tenant_id, project_id)
             outbox.write_job(connection, tenant_id, CASE, project_id, identity_id, {"sources": erased["sources"], "events_deleted": erased["events_deleted"], "grants_closed": grants}, items)
 
-    def decide_person(self, tenant_id: str, identity_id: str, runs: list[Mapping[str, Any]]) -> dict[str, int]:
+    def decide_person(self, tenant_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]]) -> dict[str, int]:
         """The person's own part, after their cases: the workflows and their records, the person's other records and the
-        identity (a marker stays: IdentityStore.delete_identity) in one transaction, with the runs on no case as the outbox."""
+        identity (a marker stays: IdentityStore.delete_identity) in one transaction, with the runs left in their folder as
+        the outbox -- read under the person lock, after every admission in flight (admit_run)."""
         with self._repo.transaction(tenant_id) as connection:
+            db.owner_lock(connection, "person", tenant_id, identity_id, exclusive=True)
+            if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=%s AND created_by_identity_id=%s LIMIT 1", (tenant_id, identity_id)).fetchone():
+                raise InvariantViolation("ACCOUNT_HAS_LIVE_CASES: a case was opened while the account was being deleted; delete the account again")
+            runs = runs()
             workflows = CustomWorkflowRepository.delete_person_on(connection, tenant_id, identity_id)   # first: one events table holds both
             records = record_log.delete_owned(connection, tenant_id, record_log.person(identity_id))
-            IdentityStore.delete_identity_on(connection, tenant_id, identity_id)
+            if not IdentityStore.delete_identity_on(connection, tenant_id, identity_id):   # a second deletion that waited for the first
+                raise InvariantViolation("ACCOUNT_ALREADY_ERASED: this account is already deleted")
             items = _artifact_items(reference for run in runs for reference in run["artifacts"]) + _run_items(runs)
             counts = {"records": records, "workflows": workflows, "runs": len(runs)}
             outbox.write_job(connection, tenant_id, PERSON, identity_id, identity_id, counts, items)
@@ -147,7 +174,7 @@ class Erasure:
 
     # -- the entry points --------------------------------------------------------------------------------------------
 
-    def erase_case(self, tenant_id: str, project_id: str, identity_id: str, runs: list[Mapping[str, Any]]) -> dict[str, Any]:
+    def erase_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]]) -> dict[str, Any]:
         """Decide, then clean up. A second DELETE that lost the race to the first finds no case: it finishes the first's job
         instead (same person) -- never a second decision."""
         try:
@@ -173,10 +200,20 @@ class Erasure:
         return [{"tenant_id": job["tenant_id"], "subject_kind": job["subject_kind"], "subject_id": job["subject_id"], **self.finish(job["tenant_id"], job["subject_kind"], job["subject_id"])}
                 for job in found]
 
+    def needs_attention(self) -> list[dict[str, Any]]:
+        """For an operator (``python -m ai_lego.platform.erasure``, and logged at every API start): every item of an unfinished
+        erasure that no retry will settle (unresolvable) or that kept failing (pending, ATTENTION_ATTEMPTS tries or more)."""
+        databases = self._repo.databases
+        found = []
+        for region in databases.regions():
+            with databases.transaction(region) as connection:
+                found += [{"region": region, **dict(row)} for row in outbox.needs_attention(connection, ATTENTION_ATTEMPTS)]
+        return found
+
     # -- 2. the cleanup, after the decision committed -----------------------------------------------------------------
 
     def finish(self, tenant_id: str, subject_kind: str, subject_id: str) -> dict[str, Any]:
-        """Work the job's pending items, then complete it if none is left. Never raises once the decision is committed: a
+        """Work the job's pending items, then complete it if none is open. Never raises once the decision is committed: a
         failure is logged and the answer says the cleanup is pending (the job is still there for the next try)."""
         try:
             with self._repo.transaction(tenant_id) as connection:
@@ -196,8 +233,9 @@ class Erasure:
             try:
                 state, error = self._remove(connection, tenant_id, item["kind"], item["target_json"])
             except OSError as failure:
-                _log.warning("erasure item not removed yet (%s %s #%s): %s", subject_kind, subject_id, number, type(failure).__name__)
-                outbox.note_attempt(connection, tenant_id, subject_kind, subject_id, number, f"{type(failure).__name__}: {getattr(failure, 'errno', '')}"[:80])
+                attempts = outbox.note_attempt(connection, tenant_id, subject_kind, subject_id, number, f"{type(failure).__name__}: {getattr(failure, 'errno', '')}"[:80])
+                log = _log.error if attempts >= ATTENTION_ATTEMPTS else _log.warning
+                log("erasure item not removed yet (tenant %s %s %s #%s, try %s): %s", tenant_id, subject_kind, subject_id, number, attempts, type(failure).__name__)
                 return
             outbox.settle(connection, tenant_id, subject_kind, subject_id, number, state, error)
 
@@ -208,33 +246,37 @@ class Erasure:
                 path = target["path"]
                 if ProjectSourceRepository.blob_referenced(connection, tenant_id, path.rsplit("/", 1)[-1]):
                     return "kept", None
-                try:
-                    self._source_cas.unlink(tenant_id, {"path": path, "tenant_segment": tenant_id})
-                except InvariantViolation as error:
-                    if str(error).startswith("CAS_OBJECT_NOT_FOUND"):
-                        return "absent", None
-                    raise
-                return "removed", None
+                return self._unlink(self._source_cas, tenant_id, {"path": path, "tenant_segment": tenant_id})
             if kind == "artifact":
-                reference = target["reference"]
-                if ProjectSourceRepository.artifact_referenced(connection, tenant_id, reference["cas_path"]["path"]):
+                cas_path = dict(target["reference"]["cas_path"])
+                if ProjectSourceRepository.artifact_referenced(connection, tenant_id, cas_path["path"]):
                     return "kept", None
-                return ("removed" if self._artifacts.delete_if_present(tenant_id, reference) else "absent"), None
+                return self._unlink(self._artifacts.cas, tenant_id, cas_path)   # by its path: a hash mismatch does not keep the file
             if kind == "run_files":
                 folder = self._journal_path(tenant_id, "x", target["identity_id"]).parent
                 run_id = target["run_id"]
                 if not isinstance(run_id, str) or not run_id or "/" in run_id or "\\" in run_id or run_id in (".", ".."):
-                    raise InvariantViolation("RUN_REFERENCE_INVALID")
+                    return "unresolvable", "RUN_REFERENCE_INVALID"
                 journal = folder / f"{run_id}{JOURNAL_SUFFIX}"
                 present = [path for path in (journal, lock_path_for(journal), sidecar_of(journal)) if path.exists()]
                 for path in present:
                     path.unlink(missing_ok=True)
                 return ("removed" if present else "absent"), None
-            raise InvariantViolation(f"ERASURE_ITEM_KIND_UNKNOWN: {kind!r}")
+            return "unresolvable", f"ERASURE_ITEM_KIND_UNKNOWN: {kind!r}"[:80]
         except InvariantViolation as error:
             if str(error).startswith(_RETRYABLE):
                 raise OSError(str(error)) from error
-            return "unremovable", str(error)[:80]
+            return "unresolvable", str(error)[:80]   # another tenant's path, or none: nothing of this tenant to reach
+
+    @staticmethod
+    def _unlink(cas: TenantScopedCas, tenant_id: str, cas_path: dict[str, str]) -> tuple[str, str | None]:
+        try:
+            cas.unlink(tenant_id, cas_path)
+        except InvariantViolation as error:
+            if str(error).startswith("CAS_OBJECT_NOT_FOUND"):
+                return "absent", None
+            raise
+        return "removed", None
 
     def _complete(self, tenant_id: str, subject_kind: str, subject_id: str) -> dict[str, Any]:
         with self._repo.transaction(tenant_id) as connection:
@@ -242,11 +284,15 @@ class Erasure:
             if job is None:   # another worker completed it after this one's items
                 return self._completed_elsewhere(tenant_id, subject_kind, subject_id)
             tally = outbox.tally(connection, tenant_id, subject_kind, subject_id)
-            failed = outbox.unremovable(connection, tenant_id, subject_kind, subject_id)
+            failed = outbox.failed(connection, tenant_id, subject_kind, subject_id)
             pending = sum(count for (_, state), count in tally.items() if state == "pending")
+            unresolved = sum(count for (_, state), count in tally.items() if state == "unresolvable")
             summary = self._summary(subject_kind, job["counts_json"], tally)
-            if pending:
-                return {**summary, "physical_cleanup": "pending", "pending_items": pending, "failed": failed}
+            if pending or unresolved:   # "done" only when every target is accounted for
+                if not pending:
+                    _log.error("erasure blocked: tenant %s %s %s has %d reference(s) that name no file of the tenant; an operator must look (python -m ai_lego.platform.erasure)",
+                               tenant_id, subject_kind, subject_id, unresolved)
+                return {**summary, "physical_cleanup": "pending" if pending else "blocked", "pending_items": pending + unresolved, "failed": failed}
             if subject_kind == CASE:
                 ProjectSourceRepository.append_tombstone(connection, tenant_id, subject_id, job["erased_by_identity_id"], summary["erased"])
             outbox.delete_job(connection, tenant_id, subject_kind, subject_id)
@@ -277,3 +323,19 @@ class Erasure:
             except OSError:
                 _log.warning("an emptied run folder stays (tenant %s): it holds nothing", tenant_id)
         physical_retention_hook(tenant_id, subject_kind, subject_id)
+
+
+def main() -> int:
+    """``python -m ai_lego.platform.erasure``: print, one JSON line each, the erasure items an operator must look at (read only)."""
+    import json
+
+    from ai_lego.data.db import Databases
+
+    with Databases.from_env() as databases:
+        for item in Erasure(ProjectSourceRepository(databases), TenantScopedCas(Path(".")), JsonArtifactStore(TenantScopedCas(Path("."))), lambda *_: Path(".")).needs_attention():
+            print(json.dumps(item, ensure_ascii=False, default=str))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -103,7 +103,7 @@ from ai_lego.platform.workflow.run_lock import RunLock, acquire_run_lock, lock_p
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
-from ai_lego.platform.erasure import CASE as ERASURE_CASE, Erasure, sidecar_of
+from ai_lego.platform.erasure import CASE as ERASURE_CASE, Erasure, admit_run, sidecar_of
 from ai_lego.modules.research.interpret_method_record import INTERPRET_MAX_TOKENS, INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, result_page_shows, run_interpretation
 from ai_lego.modules.research.gates import claim_citations, iter_claims
 from ai_lego.modules.research.source_manifest import DEFAULT_MAX_CHARS
@@ -124,6 +124,9 @@ async def _lifespan(started: FastAPI) -> AsyncIterator[None]:
         finished = resume_pending_erasures(repo, overrides.get(get_source_cas, get_source_cas)(), overrides.get(get_artifact_store, get_artifact_store)())
         if finished:
             logging.getLogger(__name__).info("erasures resumed at start: %s", [(job["subject_kind"], job["subject_id"], job["physical_cleanup"]) for job in finished])
+        attention = erasure_for(repo, overrides.get(get_source_cas, get_source_cas)(), overrides.get(get_artifact_store, get_artifact_store)()).needs_attention()
+        if attention:   # an operator must look: python -m ai_lego.platform.erasure lists the same
+            logging.getLogger(__name__).error("erasure items need an operator: %s", [(item["subject_kind"], item["subject_id"], item["item_no"], item["state"], item["error"], item["attempts"]) for item in attention])
     except Exception:
         logging.getLogger(__name__).exception("erasures could not be resumed at start; they stay pending")
     yield
@@ -311,6 +314,33 @@ def _case_runs(tenant_id: str, identity_id: str, project_id: str) -> list[dict[s
     return [{"run_id": journal.name[: -len(".journal.json")], "identity_id": identity_id, "artifacts": list(read_json(case_file).get("artifacts", []))} for case_file, journal in runs]
 
 
+def _admit_run(repo: ProjectSourceRepository, session: dict[str, Any], project_id: str | None, journal: Path, recipe_id: str, run_id: str,
+               case_file: Path | None) -> RunLock:
+    """The run's lock taken and its sidecar written under the admission locks (erasure.admit_run): an erase deciding at the
+    same time either waits for this and then finds the run (refusing while it runs), or commits first and this finds no
+    case (CASE_ERASED, a 404) or no identity (401) and writes nothing."""
+    lease: RunLock | None = None
+    try:
+        with repo.transaction(session["tenant_id"]) as connection:
+            try:
+                admit_run(connection, session["tenant_id"], session["identity_id"], project_id)
+            except InvariantViolation as error:
+                if str(error).startswith("IDENTITY_ERASED"):
+                    raise HTTPException(status_code=401, detail=str(error)) from error
+                raise
+            lease = _acquire_run_lock(journal, recipe_id)
+            if lease is None:
+                raise HTTPException(status_code=409, detail={"code": "WORKFLOW_RUN_IN_FLIGHT", "run_id": run_id})
+            if case_file is not None and not case_file.exists():
+                case_file.parent.mkdir(parents=True, exist_ok=True)
+                case_file.write_text(json.dumps({"project_id": project_id, "artifacts": []}), encoding="utf-8")
+    except BaseException:
+        if lease is not None:
+            lease.release()
+        raise
+    return lease
+
+
 def erasure_for(repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore) -> Erasure:
     """The erasure workflow over this request's stores (ai_lego/platform/erasure.py); runs are found where this API keeps them."""
     return Erasure(repo, source_cas, artifact_store, workflow_journal_path)
@@ -396,6 +426,18 @@ def _journal_run_result(journal: dict[str, Any], context: Any) -> dict[str, Any]
             "workflow_gates": summary["workflow_gates"],
         },
     }
+
+
+def _refuse_run_of_erased_case(repo: ProjectSourceRepository, session: dict[str, Any], run_id: str) -> None:
+    """A run on a case is read only while the case is there: after an erase is decided its files may still be on disk until
+    the cleanup removes them, and nobody reads them meanwhile (CASE_ERASED, the 404 every other read of the case gives)."""
+    try:
+        sidecar = _run_case_path(_run_journal(session, run_id))
+    except (KeyError, InvariantViolation):
+        return   # the route's own 400
+    project_id = read_json(sidecar).get("project_id") if sidecar.is_file() else None
+    if isinstance(project_id, str) and repo.get_project(session["tenant_id"], project_id) is None:
+        raise HTTPException(status_code=404, detail=f"CASE_ERASED: case {project_id!r} no longer exists; its runs are not read")
 
 
 def _load_recipe_journal(session: dict[str, Any], recipe_id: str, run_id: str) -> dict[str, Any]:
@@ -1048,11 +1090,8 @@ def run_recipe(
         method_handlers, gate_runners = build_method_components(nodes, validator="api.recipe")
     except MethodDispatchError as error:
         raise HTTPException(status_code=501, detail=f"DISPATCH_UNAVAILABLE: {error}") from error
-    if journal == workflow_journal_path(session["tenant_id"], run_id, session["identity_id"]):
-        case_file = _run_case_path(journal)
-        if not case_file.exists():
-            case_file.parent.mkdir(parents=True, exist_ok=True)
-            case_file.write_text(json.dumps({"project_id": project_id, "artifacts": []}), encoding="utf-8")
+    case_file = _run_case_path(journal) if journal == workflow_journal_path(session["tenant_id"], run_id, session["identity_id"]) else None
+    if case_file is not None:   # written at admission (_admit_run), before any handler runs
         capability_handlers = {ref: (lambda payload, node, inner=handler: _record_run_artifact(case_file, inner(payload, node))) for ref, handler in capability_handlers.items()}
     handlers: dict[str, Any] = dict(capability_handlers)
     handlers.update(method_handlers)
@@ -1078,9 +1117,7 @@ def run_recipe(
         raise HTTPException(status_code=409, detail={"code": "WORKFLOW_RUN_EXISTS_REQUIRES_RESUME", "run_id": run_id})
     if resume and not journal.is_file():
         raise HTTPException(status_code=404, detail={"code": "WORKFLOW_RUN_NOT_FOUND", "run_id": run_id})
-    lease = _acquire_run_lock(journal, recipe_id)
-    if lease is None:
-        raise HTTPException(status_code=409, detail={"code": "WORKFLOW_RUN_IN_FLIGHT", "run_id": run_id})
+    lease = _admit_run(repo, session, project_id if isinstance(project_id, str) else None, journal, recipe_id, run_id, case_file)
     try:
         if resume and _journal_status(journal) == "RUNNING":
             # We hold the run lock, so no live runner owns this RUNNING journal: its runner died mid-run. Record
@@ -1139,11 +1176,13 @@ def recipe_run_status(
     recipe_id: str,
     run_id: str,
     session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> dict[str, Any]:
     """Return a tenant-scoped, metadata-only view of one durable Recipe run. A RUNNING run also carries
     ``runner``: ``alive`` (its run lock is held) or ``lost`` (its runner died; ``resume:true`` recovers it). An
     accepted run whose runner died before its first journal record is ``LOST`` (submit it again)."""
     tenant_id = session["tenant_id"]
+    _refuse_run_of_erased_case(repo, session, run_id)
     try:
         journal_path: Path | None = _run_journal(session, run_id)
     except (KeyError, InvariantViolation):
@@ -1175,8 +1214,10 @@ def recipe_run_result(
     recipe_id: str,
     run_id: str,
     session: dict[str, Any] = Depends(require_session),
+    repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> dict[str, Any]:
     """Return tenant-scoped durable outputs, restoring protected journal context when needed."""
+    _refuse_run_of_erased_case(repo, session, run_id)
     record = _load_recipe_journal(session, recipe_id, run_id)
     try:
         context = _restore_api_result_context(record, session["tenant_id"], run_id)
@@ -1689,6 +1730,7 @@ def _interpret_and_record(
             failure.update({"input_tokens": metered.input_tokens, "output_tokens": metered.output_tokens})
         repo.append_event(tenant_id, project_id, "InterpretationFailed", failure, record_log.system(block))
         return
+    reference, saved = None, False
     try:
         reference = artifact_store.put(tenant_id, "MethodInterpretation", {
             "record": record, "interpretation": outcome["interpretation"], "gate_results": outcome["gate_results"],
@@ -1701,9 +1743,14 @@ def _interpret_and_record(
             tenant_id, project_id, interpretation_id, reference,
             datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"), block=block,
         )
+        saved = True
         if rerun_id:
             repo.append_event(tenant_id, project_id, "RerunFulfilled", {"rerun_id": rerun_id, "interpretation_id": interpretation_id}, record_log.system("ACT"))
     except Exception as failure:
+        if reference is not None and not saved:   # never an artifact no row points at: a case erased meanwhile names it nowhere
+            artifact_store.delete_if_present(tenant_id, reference)
+        if case_gone(failure):   # erased while the result was being stored: nothing to write to, not even a failure
+            return
         repo.append_event(tenant_id, project_id, "InterpretationFailed", {"interpretation_id": interpretation_id, "error": str(failure)}, record_log.system(block))
 
 
@@ -2814,7 +2861,7 @@ def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: 
     if synthesis_lock is None:   # a synthesis is writing into this case; held until the decision commits so none can start
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a synthesis is still running; wait for it to finish, then delete")
     try:
-        runs = _case_runs(tenant_id, identity_id, project_id)
+        runs = lambda: _case_runs(tenant_id, identity_id, project_id)   # noqa: E731 -- read inside the decision, under the case lock
         result = erasure_for(repo, source_cas, artifact_store).erase_case(tenant_id, project_id, identity_id, runs)   # later writes to the case: CASE_ERASED
     except InvariantViolation as error:
         if str(error).startswith("PROJECT_NOT_FOUND"):
