@@ -72,28 +72,60 @@ function Save-State($State) {
     [System.IO.File]::WriteAllText((Join-Path $StateDir 'state.json'), $json, (New-Object System.Text.UTF8Encoding($false)))
 }
 
-function Run-Command([string]$CmdLine, [string]$Dir, [string]$LogFile, [int]$TimeoutSec) {
-    # Windows PowerShell 5.1 can leave Start-Process -PassThru.ExitCode null after WaitForExit.
+function Invoke-LoggedProcess {
+    param(
+        [string]$FileName,
+        [string[]]$Arguments,
+        [string]$WorkingDirectory,
+        [string]$InputFile,
+        [string]$OutputFile,
+        [string]$ErrorFile,
+        [int]$TimeoutSec
+    )
     $start = New-Object System.Diagnostics.ProcessStartInfo
-    $start.FileName = 'cmd.exe'
-    $start.Arguments = "/d /s /c `"$CmdLine`""
-    $start.WorkingDirectory = $Dir
+    $start.FileName = $FileName
+    $start.Arguments = (($Arguments | ForEach-Object {
+        $argument = [string]$_
+        if ($argument -notmatch '[\s"]') { $argument } else { '"' + $argument.Replace('\', '\\').Replace('"', '\"') + '"' }
+    }) -join ' ')
+    $start.WorkingDirectory = $WorkingDirectory
     $start.UseShellExecute = $false
+    $start.CreateNoWindow = $true
+    $start.RedirectStandardInput = $true
     $start.RedirectStandardOutput = $true
     $start.RedirectStandardError = $true
     $p = New-Object System.Diagnostics.Process
     $p.StartInfo = $start
+    $timedOut = $false
     try {
-        if (-not $p.Start()) { return 125 }
+        if (-not $p.Start()) {
+            [System.IO.File]::WriteAllText($OutputFile, '')
+            [System.IO.File]::WriteAllText($ErrorFile, '')
+            return @{ Exit = 125; TimedOut = $false }
+        }
         $out = $p.StandardOutput.ReadToEndAsync()
         $err = $p.StandardError.ReadToEndAsync()
-        if (-not $p.WaitForExit($TimeoutSec * 1000)) { try { $p.Kill() } catch { }; $p.WaitForExit(); return 124 }
+        if ($InputFile) {
+            $input = [System.IO.File]::ReadAllText($InputFile)
+            $p.StandardInput.Write($input)
+        }
+        $p.StandardInput.Close()
+        if (-not $p.WaitForExit($TimeoutSec * 1000)) {
+            $timedOut = $true
+            try { & taskkill.exe /T /F /PID $p.Id 2>$null | Out-Null } catch { }
+        }
+        $p.WaitForExit()
         $out.Wait()
         $err.Wait()
-        [System.IO.File]::WriteAllText($LogFile, $out.Result)
-        [System.IO.File]::WriteAllText(($LogFile + '.err'), $err.Result)
-        return [int]$p.ExitCode
+        [System.IO.File]::WriteAllText($OutputFile, $out.Result)
+        [System.IO.File]::WriteAllText($ErrorFile, $err.Result)
+        return @{ Exit = if ($timedOut) { 124 } else { [int]$p.ExitCode }; TimedOut = $timedOut }
     } finally { $p.Dispose() }
+}
+
+function Run-Command([string]$CmdLine, [string]$Dir, [string]$LogFile, [int]$TimeoutSec) {
+    $result = Invoke-LoggedProcess 'cmd.exe' @('/d', '/s', '/c', $CmdLine) $Dir $null $LogFile ($LogFile + '.err') $TimeoutSec
+    return [int]$result.Exit
 }
 
 # ---- preflight ----------------------------------------------------------------------------------------------
@@ -106,6 +138,13 @@ $null = New-Item -ItemType Directory -Force -Path $StateDir, (Join-Path $StateDi
 if ($LASTEXITCODE -eq 3) { Say 'Codex quota is blocked (oracle-quota.ps1); nothing started' 'Yellow'; exit 3 }
 
 $queue = Read-Json (Join-Path $queueRoot 'queue.json')
+$queueValidator = Join-Path $root 'Projects/internal/cognitive-engineering-os/scripts/validate-codex-queue.py'
+$queueValidation = & python $queueValidator 2>&1
+$queueValidationExit = $LASTEXITCODE
+if ($queueValidationExit -ne 0) {
+    Say "queue validation failed before any card: $($queueValidation -join "`n")" 'Red'
+    exit 2
+}
 $statePath = Join-Path $StateDir 'state.json'
 if (Test-Path -LiteralPath $statePath) { $state = Read-Json $statePath } else { $state = [pscustomobject]@{ cards = [pscustomobject]@{} } }
 
@@ -169,7 +208,9 @@ if (-not $NoPostgres -and -not $DryRun) {
 # ---- the loop -------------------------------------------------------------------------------------------------
 $done = 0
 $exitCode = 0
+$previousRequirePostgres = [Environment]::GetEnvironmentVariable('COGNITIVE_OS_REQUIRE_POSTGRES', 'Process')
 try {
+    $env:COGNITIVE_OS_REQUIRE_POSTGRES = '1'
     foreach ($card in $queue.cards) {
         if ($done -ge $MaxCards) { break }
         $id = [string]$card.id
@@ -218,16 +259,15 @@ try {
 
             $outFile = $logBase + '.last.txt'
             $codexArgs = @('exec', '--approve-for-me', '-C', $Worktree, '--skip-git-repo-check', '-c', 'mcp_servers={}', '-o', $outFile, '-')
-            $proc = Start-Process -FilePath $codexExe -ArgumentList $codexArgs -RedirectStandardInput $promptFile `
-                    -RedirectStandardOutput ($logBase + '.out.txt') -RedirectStandardError ($logBase + '.err.txt') -NoNewWindow -PassThru
-            if (-not $proc.WaitForExit($CardTimeoutMin * 60 * 1000)) { try { $proc.Kill() } catch { }; $feedback = "codex timed out after $CardTimeoutMin minutes"; Say "  attempt $attempt timed out" 'Yellow'; continue }
-            $proc.WaitForExit()
+            $codexRun = Invoke-LoggedProcess $codexExe $codexArgs $Worktree $promptFile ($logBase + '.out.txt') ($logBase + '.err.txt') ($CardTimeoutMin * 60)
+            $codexExit = [int]$codexRun.Exit
 
             $rawLog = ''
-            foreach ($f in @(($logBase + '.out.txt'), ($logBase + '.err.txt'))) { if (Test-Path -LiteralPath $f) { $rawLog += (Get-Content -LiteralPath $f -Raw -ErrorAction SilentlyContinue) } }
+            foreach ($f in @(($logBase + '.out.txt'), ($logBase + '.err.txt'))) { if (Test-Path -LiteralPath $f) { $rawLog += (Get-Content -LiteralPath $f -Raw -Encoding UTF8 -ErrorAction SilentlyContinue) } }
+            if ($codexRun.TimedOut) { $feedback = "codex timed out after $CardTimeoutMin minutes`n$rawLog"; Say "  attempt $attempt timed out; captured output is in $logBase" 'Yellow'; continue }
             # Only the CLI's own error lines count. The raw log also holds files Codex READ (AGENTS.md mentions 429 and
             # "rate limit"), which made the first smoke run stop on a card that had in fact been committed.
-            if ($proc.ExitCode -ne 0 -and $rawLog -match '(?im)^\s*(ERROR|Error)\b[^\r\n]*(usage limit|rate limit|try again at|\b429\b)') {
+            if ($codexExit -ne 0 -and $rawLog -match '(?im)^\s*(ERROR|Error)\b[^\r\n]*(usage limit|rate limit|try again at|\b429\b)') {
                 & powershell -NoProfile -ExecutionPolicy Bypass -File $quotaScript -Action set -Tool codex -Hours 5 -Reason 'codex-continue saw a quota message' | Out-Null
                 Set-Card $id @{ status = 'pending'; note = 'stopped: Codex quota' }
                 Say 'Codex quota reached; recorded in oracle-quota; stopping' 'Yellow'; $exitCode = 3; break
@@ -276,6 +316,7 @@ try {
     }
 } finally {
     if ($startedPg) { & docker stop $pgName 2>$null | Out-Null }
+    if ($null -eq $previousRequirePostgres) { Remove-Item Env:COGNITIVE_OS_REQUIRE_POSTGRES -ErrorAction SilentlyContinue } else { $env:COGNITIVE_OS_REQUIRE_POSTGRES = $previousRequirePostgres }
 }
 Say "finished: $done card(s) done this run" 'Cyan'
 exit $exitCode

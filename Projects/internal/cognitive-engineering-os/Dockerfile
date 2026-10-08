@@ -45,9 +45,10 @@ FROM runtime AS test
 USER root
 COPY Projects/internal/cognitive-engineering-os/requirements-test.lock /app/Projects/internal/cognitive-engineering-os/requirements-test.lock
 RUN pip install --no-cache-dir --require-hashes -r /app/Projects/internal/cognitive-engineering-os/requirements-test.lock
-# What the tests read besides the package and SPEC: tests/, eval/ (harness), scripts/ (selector tests, eval gate),
-# the web fixtures two payload tests compare against, docker-compose.yml (egress allowlist parity). The SPEC golden
-# runs on the checkout, not here (it cross-checks repo documents outside SPEC).
+# What the image tests read besides the package and SPEC: tests/, eval/ (harness), scripts/ (selector tests, eval
+# gate), the web fixtures two payload tests compare against, docker-compose.yml (egress allowlist parity). The
+# explicit checkout-only manifest in scripts/image_test_modules.py covers tests that read other repository files;
+# the SPEC golden also runs on the checkout because it cross-checks documents outside SPEC.
 COPY --chown=cognitive:cognitive Projects/internal/cognitive-engineering-os/docker-compose.yml /app/Projects/internal/cognitive-engineering-os/docker-compose.yml
 COPY --chown=cognitive:cognitive Projects/internal/cognitive-engineering-os/tests /app/Projects/internal/cognitive-engineering-os/tests
 COPY --chown=cognitive:cognitive Projects/internal/cognitive-engineering-os/eval /app/Projects/internal/cognitive-engineering-os/eval

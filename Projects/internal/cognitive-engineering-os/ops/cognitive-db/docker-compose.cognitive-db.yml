@@ -44,4 +44,4 @@ networks:
 
 secrets:
   cognitive_db_password:
-    file: ${COGNITIVE_DB_PASSWORD_FILE:-./cognitive-db-password}
+    file: '${COGNITIVE_DB_PASSWORD_FILE:?COGNITIVE_DB_PASSWORD_FILE must be set}'

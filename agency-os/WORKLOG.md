@@ -86,6 +86,19 @@
 - MUTATION_EVIDENCE: 記憶體內移除 Future 完成回呼，`test_wait_idle_waits_for_a_submitted_hook_without_a_future_registry` 轉紅；原版 3/3 綠。
 - REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，main 合併仍封鎖。
 
+## 2026-10-08（續2）COS 卡 00/01/02：修正 Claude 審查發現
+
+- 根本問題：CI test image 用 unittest discover 執行了讀取 checkout 外檔案的測試；備份腳本先驗證舊檔，會被損壞舊 dump 阻塞；佇列危險命令只在 high-stop 檢查，PowerShell 驗收又可能把退出碼、timeout 輸出與 PostgreSQL skip 判錯。
+- 修改：新增明確 image／checkout 測試 manifest 與 checkout job；新 dump 先完整讀取並發布，再將舊損壞檔改名 `.corrupt` 後非零回報；compose 密碼檔改為必填；佇列啟動前由同一 validator 拒絕空 check 與所有卡的危險 check；driver 用 .NET Process、taskkill tree、captured logs、required PostgreSQL。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_ci_postgres` | exit=0 | ms=7140；7 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_cognitive_db_ops` | exit=0 | ms=26638；12 tests PASS，包含 throwaway Docker dump／restore／rotation／corrupt-old-dump。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_codex_queue` | exit=0 | ms=2853；7 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`COGNITIVE_OS_REQUIRE_POSTGRES=1 python -m unittest tests.unit.test_pg_foundation` | exit=0 | ms=7672；18 tests PASS。
+- REVIEW_WAIVED: NA -- Claude cross-model review deliberately remains pending in `agency-os/reports/review-debt.md`.
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`pg_restore --list|COGNITIVE_DB_PASSWORD_FILE|FORBIDDEN_CHECK_COMMANDS|COGNITIVE_OS_REQUIRE_POSTGRES|taskkill.exe|image_test_modules.py` | hits=35。
+- ORACLE_WAIVED: 本輪不重複 Claude oracle；本提交新增 review-debt row，狀態為未經 Claude 跨模型審查。
+- BUILD_GATE: `powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-build-gates.ps1` exit=1；改動新增的 CP950 raw-read 已修正，剩餘 AO-CLOSE archive-lift 與 Claude sync infrastructure 為既有全域阻塞。
+- 回滾：`git revert <本次 commit>`；沒有 compose apply、migration、部署、push、遠端或正式資料庫寫入。
 ## 2026-10-08（續1）COS 卡 51 缺陷修正：PDF 換行、已讀與原子送出
 
 **根本問題**：EXPRESS 的 PDF 以字數而不是字形寬度換行；讀取路由把已讀標記做成新草稿版本；缺少或錯形狀的 `seen` 會被當成已讀；送出先查版本再另寫紀錄，存在並發編輯窗口。
@@ -144,7 +157,7 @@
 
 - 根因：`ops/cognitive-db/backup-cognitive-db.sh:83,100` 曾在主機直接呼叫 `psql/pg_dump`，但 compose 不發布主機埠；`scripts/codex-continue.ps1:75-82` 在 Windows PowerShell 5.1 用 `Start-Process -PassThru` 後取得 null `ExitCode`，每個驗收都誤報 125。
 - 修改：備份由主機以 `docker exec` 串流進出私有服務；NUL 分隔資料庫清單、可逆十六進位檔名、含當日的 N 天輪替；還原演練只選 `cognitive_os` dump。驅動器以 .NET Process 讀真實退出碼。README 明示現有 `safe-infra-patch.sh` 不支援獨立 compose，套用閘仍關閉。
-- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --base 51bd56954 --run | exit=0 | ms=25225；56 tests PASS，含真實 Docker 主機腳本 dump/list/restore/rotate/corrupt 10 tests、WinPS5.1 0/7 退出碼。5 個 in-memory 守衛突變（ports/password/pg_restore/pipefail/digest）各紅。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --base 51bd56954 --run | exit=0 | ms=25225；56 tests PASS。舊版 `test_cognitive_db_ops.py:169` 是唯一執行備份腳本的測試；compose 檢查在沒有 Docker 的測試映像中 skip，現在由 checkout job／本機 Docker 執行；WinPS5.1 0/7 退出碼。5 個 in-memory 守衛突變（ports/password/pg_restore/pipefail/digest）各紅。
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n；獨立 compose 沒有安全套用器，已移除假的操作命令，非本卡上線許可；Claude 跨模型審查仍欠。
 - ORACLE_WAIVED: Claude 週額度中斷，前次 oracle 呼叫 exit 1 且無審查產物；以真實 Docker 還原與 5 個守衛突變作暫代證據，不視為跨模型審查，不合併／推送。
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/ops/cognitive-db,Projects/internal/cognitive-engineering-os/tests/unit | grep=COGNITIVE_DB_CONTAINER|COGNITIVE_DB_BACKUP_DIR|backup-cognitive-db|safe-infra-patch.sh compose|Run-Command | hits=54；逐一核對主機/容器位置與部署聲稱。

@@ -4,7 +4,6 @@ umask 077
 
 BACKUP_DIR="${COGNITIVE_DB_BACKUP_DIR:-${BACKUP_DIR:-/root/backups/cognitive-db}}"
 KEEP_DAYS="${COGNITIVE_DB_BACKUP_KEEP_DAYS:-${KEEP_DAYS:-14}}"
-MIN_OBJECTS="${COGNITIVE_DB_BACKUP_MIN_OBJECTS:-${MIN_OBJECTS:-1}}"
 DB_USER="${COGNITIVE_DB_USER:-cognitive}"
 MAINTENANCE_DB="${COGNITIVE_DB_MAINTENANCE_DB:-cognitive_os}"
 COMPOSE_FILE="${COGNITIVE_DB_COMPOSE_FILE:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/docker-compose.cognitive-db.yml}"
@@ -18,10 +17,14 @@ cleanup() {
   for path in "${TEMP_FILES[@]}"; do
     rm -f -- "$path" >/dev/null 2>&1 || true
   done
-  rm -f -- "$ERROR_LOG" >/dev/null 2>&1 || true
   if (( status != 0 )); then
     printf 'BACKUP FAILED: %s\n' "$FAILURE_REASON" >&2
+    if [ -s "$ERROR_LOG" ]; then
+      printf 'backup error log (last 20 lines):\n' >&2
+      tail -n 20 -- "$ERROR_LOG" >&2 || true
+    fi
   fi
+  rm -f -- "$ERROR_LOG" >/dev/null 2>&1 || true
   exit "$status"
 }
 trap cleanup EXIT
@@ -32,10 +35,6 @@ if ! touch "$ERROR_LOG" 2>/dev/null; then
 fi
 if ! [[ "$KEEP_DAYS" =~ ^[1-9][0-9]*$ ]]; then
   FAILURE_REASON="COGNITIVE_DB_BACKUP_KEEP_DAYS must be a positive integer"
-  exit 1
-fi
-if ! [[ "$MIN_OBJECTS" =~ ^[1-9][0-9]*$ ]]; then
-  FAILURE_REASON="COGNITIVE_DB_BACKUP_MIN_OBJECTS must be a positive integer"
   exit 1
 fi
 if ! mkdir -p -- "$BACKUP_DIR" 2>"$ERROR_LOG"; then
@@ -74,30 +73,14 @@ fi
 
 validate_dump() {
   local dump=$1
-  local listing
-  local object_count
-
-  # A retained corrupt archive is a backup failure, not something rotation may hide.
-  if ! listing="$(docker exec -i "$CONTAINER" pg_restore --list < "$dump" 2>"$ERROR_LOG")"; then
-    FAILURE_REASON="pg_restore could not list $(basename -- "$dump")"
-    return 1
-  fi
-  # The TOC header remains present for an empty database, where no entry lines follow it.
-  object_count="$(printf '%s\n' "$listing" | awk -F': ' '/^;[[:space:]]*TOC Entries:/{count=$2} END {print count+0}')"
-  if [ "$object_count" -lt "$MIN_OBJECTS" ]; then
-    FAILURE_REASON="$(basename -- "$dump") has too few archive objects"
+  # A full read catches payload truncation that pg_restore --list can miss.
+  if ! docker exec -i "$CONTAINER" pg_restore --exit-on-error -f /dev/null <"$dump" 2>"$ERROR_LOG"; then
+    FAILURE_REASON="pg_restore could not fully read $(basename -- "$dump")"
     return 1
   fi
 }
 
 shopt -s nullglob
-for dump in "$BACKUP_DIR"/cognitive-db-????-??-??-*.dump; do
-  [ -f "$dump" ] || continue
-  if ! validate_dump "$dump"; then
-    exit 1
-  fi
-done
-
 database_list="${TMPDIR:-/tmp}/cognitive-db-databases-${BASHPID}.list"
 TEMP_FILES+=("$database_list")
 if ! docker exec "$CONTAINER" psql -U "$DB_USER" --no-psqlrc --tuples-only --no-align --record-separator-zero \
@@ -136,10 +119,21 @@ if [ "$found_database" -ne 1 ]; then
   exit 1
 fi
 
-# This glob is the deletion boundary: only our dated custom-format dumps can be removed.
+# Validate retained dumps only after the new dumps have been published. A corrupt
+# old dump is quarantined and reported without blocking tonight's new backup.
+corrupt_dumps=()
 for dump in "$BACKUP_DIR"/cognitive-db-????-??-??-*.dump; do
   [ -f "$dump" ] || continue
   name="$(basename -- "$dump")"
+  if ! validate_dump "$dump"; then
+    if ! mv -- "$dump" "${dump}.corrupt" 2>"$ERROR_LOG"; then
+      FAILURE_REASON="could not quarantine corrupt old dump ${name}"
+      exit 1
+    fi
+    printf 'BACKUP WARNING: quarantined corrupt old dump %s\n' "$name" >&2
+    corrupt_dumps+=("$name")
+    continue
+  fi
   if [[ "$name" =~ ^cognitive-db-([0-9]{4}-[0-9]{2}-[0-9]{2})-.*\.dump$ ]] && [[ "${BASH_REMATCH[1]}" < "$cutoff_date" ]]; then
     if ! rm -f -- "$dump" 2>"$ERROR_LOG"; then
       FAILURE_REASON="could not remove an expired dated dump"
@@ -147,3 +141,8 @@ for dump in "$BACKUP_DIR"/cognitive-db-????-??-??-*.dump; do
     fi
   fi
 done
+
+if ((${#corrupt_dumps[@]} > 0)); then
+  FAILURE_REASON="pg_restore rejected and quarantined corrupt old dump(s): ${corrupt_dumps[*]}"
+  exit 1
+fi

@@ -16,7 +16,7 @@ import unittest
 QUEUE_REL = Path("agency-os/handoffs/cos-codex-queue")
 COS_TESTS_REL = Path("Projects/internal/cognitive-engineering-os/tests")
 REQUIRED_TOKENS = ("CARD_DONE", "DECISION_NEEDED:", "BLOCKED:")
-HIGH_STOP_COMMANDS = ("docker compose up", "ssh", "safe-infra-patch", "git push", "apply-db-migration")
+FORBIDDEN_CHECK_COMMANDS = ("docker compose up", "ssh", "safe-infra-patch", "git push", "apply-db-migration")
 UNITTEST_COMMAND = re.compile(r"^python\s+-m\s+unittest(?:\s+(.+?))?\s*$")
 UNITTEST_MODULE = re.compile(r"^tests\.unit(?:\.[A-Za-z_]\w*)+$")
 CARD_NUMBER = re.compile(r"^(\d+)-")
@@ -143,11 +143,10 @@ def validate_queue(queue: dict, base_folder: Path) -> list[str]:
                     if not module_path.is_file() and not _module_is_named_in_dependency_chain(module, card, cards_by_id, queue_root):
                         errors.append(f"card {card_id}: missing unittest module is not named in its card or dependency chain: {module}")
 
-            if card.get("high_stop") is True:
-                lowered = command.casefold()
-                for forbidden in HIGH_STOP_COMMANDS:
-                    if forbidden in lowered:
-                        errors.append(f"card {card_id}: high_stop check contains forbidden command: {forbidden}")
+            lowered = command.casefold()
+            for forbidden in FORBIDDEN_CHECK_COMMANDS:
+                if forbidden in lowered:
+                    errors.append(f"card {card_id}: check contains forbidden command: {forbidden}")
 
         depends = card.get("depends")
         if not isinstance(depends, list):
@@ -229,9 +228,12 @@ class CodexQueueTests(unittest.TestCase):
         driver = (self.repo / "scripts" / "codex-continue.ps1").read_text(encoding="utf-8")
         self.assertIn("[guid]::NewGuid().ToString('N')", driver)
         self.assertIn("New-Object System.Diagnostics.ProcessStartInfo", driver)
-        self.assertIn("return [int]$p.ExitCode", driver)
+        self.assertIn("[int]$p.ExitCode", driver)
         self.assertNotIn("Start-Process -FilePath 'cmd.exe'", driver)
-        self.assertIn("$proc.ExitCode -ne 0 -and $rawLog -match", driver)
+        self.assertIn("$codexExit -ne 0 -and $rawLog -match", driver)
+        self.assertIn("validate-codex-queue.py", driver)
+        self.assertIn("$env:COGNITIVE_OS_REQUIRE_POSTGRES = '1'", driver)
+        self.assertIn("taskkill.exe", driver)
 
     @unittest.skipUnless(os.name == "nt" and shutil.which("powershell"), "Windows PowerShell 5.1 is unavailable")
     def test_acceptance_check_observes_real_process_exit_status(self) -> None:
@@ -239,12 +241,12 @@ class CodexQueueTests(unittest.TestCase):
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($env:CODEX_DRIVER_SOURCE, [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw $errors[0] }
-$fn = $ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Run-Command'}, $true)
-if (-not $fn) { throw 'Run-Command not found' }
-. ([scriptblock]::Create($fn.Extent.Text))
-$log = Join-Path $env:CODEX_DRIVER_TEMP 'check.txt'
-if ((Run-Command 'exit 0' $env:CODEX_DRIVER_TEMP $log 10) -ne 0) { throw 'success was not exit 0' }
-if ((Run-Command 'exit 7' $env:CODEX_DRIVER_TEMP $log 10) -ne 7) { throw 'failure was not exit 7' }
+        $fn = $ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-LoggedProcess'}, $true)
+        if (-not $fn) { throw 'Invoke-LoggedProcess not found' }
+        . ([scriptblock]::Create($fn.Extent.Text))
+        $ok = Invoke-LoggedProcess 'cmd.exe' @('/d','/s','/c','exit 0') $env:CODEX_DRIVER_TEMP $null (Join-Path $env:CODEX_DRIVER_TEMP 'ok.out') (Join-Path $env:CODEX_DRIVER_TEMP 'ok.err') 10
+        $bad = Invoke-LoggedProcess 'cmd.exe' @('/d','/s','/c','exit 7') $env:CODEX_DRIVER_TEMP $null (Join-Path $env:CODEX_DRIVER_TEMP 'bad.out') (Join-Path $env:CODEX_DRIVER_TEMP 'bad.err') 10
+        if ($ok.Exit -ne 0 -or $bad.Exit -ne 7) { throw "exit statuses were $($ok.Exit) and $($bad.Exit)" }
 '''
         with tempfile.TemporaryDirectory() as temporary:
             environment = dict(os.environ)
@@ -255,6 +257,37 @@ if ((Run-Command 'exit 7' $env:CODEX_DRIVER_TEMP $log 10) -ne 7) { throw 'failur
                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    @unittest.skipUnless(os.name == "nt" and shutil.which("powershell"), "Windows PowerShell 5.1 is unavailable")
+    def test_timeout_kills_process_tree_and_preserves_captured_output(self) -> None:
+        script = r'''
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($env:CODEX_DRIVER_SOURCE, [ref]$tokens, [ref]$errors)
+if ($errors.Count) { throw $errors[0] }
+$fn = $ast.Find({param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Invoke-LoggedProcess'}, $true)
+if (-not $fn) { throw 'Invoke-LoggedProcess not found' }
+. ([scriptblock]::Create($fn.Extent.Text))
+$outPath = Join-Path $env:CODEX_DRIVER_TEMP 'timeout.out'
+$errPath = Join-Path $env:CODEX_DRIVER_TEMP 'timeout.err'
+$result = Invoke-LoggedProcess 'cmd.exe' @('/d','/s','/c','echo before & ping 127.0.0.1 -n 6 >nul') $env:CODEX_DRIVER_TEMP $null $outPath $errPath 1
+if (-not $result.TimedOut -or $result.Exit -ne 124) { throw "unexpected timeout result: $($result | Out-String)" }
+if ((Get-Content -LiteralPath $outPath -Raw) -notmatch 'before') { throw 'captured timeout output was not logged' }
+if (-not (Test-Path -LiteralPath $errPath)) { throw 'captured stderr log was not written' }
+'''
+        with tempfile.TemporaryDirectory() as temporary:
+            environment = dict(os.environ)
+            environment["CODEX_DRIVER_SOURCE"] = str(self.repo / "scripts" / "codex-continue.ps1")
+            environment["CODEX_DRIVER_TEMP"] = temporary
+            result = subprocess.run(
+                ["powershell", "-NoProfile", "-Command", script], env=environment,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_driver_validates_queue_and_requires_postgres_before_cards(self) -> None:
+        driver = (self.repo / "scripts" / "codex-continue.ps1").read_text(encoding="utf-8")
+        self.assertLess(driver.index("$queueValidation"), driver.index("foreach ($card in $queue.cards)"))
+        self.assertLess(driver.index("$env:COGNITIVE_OS_REQUIRE_POSTGRES = '1'"), driver.index("foreach ($card in $queue.cards)"))
 
     def test_missing_module_requires_own_or_dependency_card(self) -> None:
         module = "tests.unit.test_future_dependency_example"
@@ -279,7 +312,9 @@ if ((Run-Command 'exit 7' $env:CODEX_DRIVER_TEMP $log 10) -ne 7) { throw 'failur
             "missing file": (lambda queue: queue["cards"][0].update(file="cards/does-not-exist.md"), "file does not exist"),
             "forward dependency": (lambda queue: queue["cards"][0].update(depends=["02-cognitive-db-ops"]), "not an earlier card"),
             "empty command": (lambda queue: queue["cards"][0]["check"][0].update(cmd=""), "cmd must be non-empty"),
+            "empty check list": (lambda queue: queue["cards"][0].update(check=[]), "check must be a non-empty list"),
             "high stop ssh": (lambda queue: (queue["cards"][0].update(high_stop=True), queue["cards"][0]["check"][0].update(cmd="ssh host true")), "forbidden command: ssh"),
+            "ordinary card ssh": (lambda queue: queue["cards"][0]["check"][0].update(cmd="ssh host docker compose up -d"), "forbidden command: ssh"),
         }
         for name, (mutate, expected) in cases.items():
             with self.subTest(name=name):

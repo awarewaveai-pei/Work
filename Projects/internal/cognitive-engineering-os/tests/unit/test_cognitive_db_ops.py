@@ -23,6 +23,8 @@ COMPOSE = OPS / "docker-compose.cognitive-db.yml"
 BACKUP = OPS / "backup-cognitive-db.sh"
 README = OPS / "README.md"
 RESTORE = OPS / "restore-cognitive-db.md"
+RESTORE_SCRIPT = OPS / "restore-cognitive-db.sh"
+REPO = COS.parents[2]
 
 
 def _docker_problem() -> str | None:
@@ -89,10 +91,12 @@ class CognitiveDbOpsTests(unittest.TestCase):
         self.assertEqual(environment["POSTGRES_INITDB_ARGS"], "--data-checksums")
         self.assertEqual(self.service["secrets"], ["cognitive_db_password"])
         self.assertIn("file:", self.compose_text)
+        self.assertIn("COGNITIVE_DB_PASSWORD_FILE:?", self.compose_text)
         self.assertNotIn("POSTGRES_PASSWORD", environment)
         folder_text = "\n".join(path.read_text(encoding="utf-8") for path in OPS.glob("*") if path.is_file())
         self.assertNotIn("POSTGRES_PASSWORD=", folder_text)
         self.assertNotIn("POSTGRES_PASSWORD:", self.compose_text)
+        self.assertIn("cognitive-db-password", (REPO / ".gitignore").read_text(encoding="utf-8"))
 
     def test_postgres_flags_have_reasons(self) -> None:
         for flag, reason in (
@@ -107,9 +111,12 @@ class CognitiveDbOpsTests(unittest.TestCase):
     def test_backup_script_has_fail_closed_proof_and_safe_rotation(self) -> None:
         self.assertIn("set -euo pipefail", self.backup_text)
         self.assertRegex(self.backup_text, r"pg_dump\b[^\n]*-Fc")
-        self.assertIn("pg_restore --list", self.backup_text)
-        self.assertIn("TOC Entries:", self.backup_text)
+        self.assertIn("pg_restore --exit-on-error -f /dev/null", self.backup_text)
+        self.assertNotIn("TOC Entries:", self.backup_text)
+        self.assertNotIn("MIN_OBJECTS", self.backup_text)
+        self.assertIn("quarantined", self.backup_text)
         self.assertIn("BACKUP FAILED:", self.backup_text)
+        self.assertIn('tail -n 20 -- "$ERROR_LOG"', self.backup_text)
         self.assertNotRegex(self.backup_text, r"\brm\s+-rf\b")
         self.assertIn('"$BACKUP_DIR"/cognitive-db-????-??-??-*.dump', self.backup_text)
         self.assertIn('rm -f -- "$dump"', self.backup_text)
@@ -127,6 +134,30 @@ class CognitiveDbOpsTests(unittest.TestCase):
         self.assertRegex(self.readme_text, r"(?i)(?:small|很小).*?(?:GiB|GB|MB)")
         self.assertIn("ClaimReview mirror is NOT in this database.", self.readme_text)
         self.assertIn("throwaway", RESTORE.read_text(encoding="utf-8"))
+        self.assertIn("Every container on the external `lobster-net` can reach this service by name.", self.readme_text)
+        self.assertIn("dedicated network is an unapplied hardening step", self.readme_text)
+        self.assertIn("restore-cognitive-db.sh", self.readme_text)
+        self.assertIn("periodic", self.readme_text.lower())
+
+    def test_periodic_restore_script_is_unapplied_and_bash_valid(self) -> None:
+        text = RESTORE_SCRIPT.read_text(encoding="utf-8")
+        self.assertIn("COGNITIVE_DB_PASSWORD_FILE:?", text)
+        self.assertIn("COGNITIVE_DB_DUMP_FILE:?", text)
+        self.assertIn("pg_restore", text)
+        self.assertIn("docker run", text)
+        self.assertNotIn("docker compose up", text)
+        git_bash = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git" / "bin" / "bash.exe"
+        bash = str(git_bash) if git_bash.is_file() else shutil.which("bash")
+        if bash is None:
+            self.skipTest("LOUD SKIP: bash is not on PATH; run bash -n on a Unix host")
+        result = subprocess.run(
+            [bash, "-n", str(RESTORE_SCRIPT).replace("\\", "/")],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_backup_script_is_bash_syntax_valid(self) -> None:
         git_bash = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git" / "bin" / "bash.exe"
@@ -165,6 +196,24 @@ class CognitiveDbOpsTests(unittest.TestCase):
                 errors="replace",
             )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_docker_compose_config_requires_password_file_environment(self) -> None:
+        problem = _docker_problem()
+        if problem:
+            self.skipTest(f"LOUD SKIP: docker compose config did not run because {problem}")
+        environment = dict(os.environ)
+        environment.pop("COGNITIVE_DB_PASSWORD_FILE", None)
+        result = subprocess.run(
+            ["docker", "compose", "-f", str(COMPOSE), "config", "-q"],
+            cwd=OPS,
+            env=environment,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("COGNITIVE_DB_PASSWORD_FILE", result.stderr)
 
     def test_optional_docker_backup_dump_restore_listing_rotation_and_corruption(self) -> None:
         problem = _docker_problem()
@@ -248,10 +297,15 @@ class CognitiveDbOpsTests(unittest.TestCase):
 
                 current_date = datetime.now(timezone.utc).date().isoformat()
                 corrupt_dump = backup_dir / f"cognitive-db-{current_date}-corrupt.dump"
-                corrupt_dump.write_bytes(source_dump.read_bytes()[:7])
+                before_corrupt = len(list(backup_dir.glob("cognitive-db-*.dump")))
+                source_bytes = source_dump.read_bytes()
+                corrupt_dump.write_bytes(source_bytes[: max(7, len(source_bytes) // 2)])
                 failed = run_backup()
                 self.assertNotEqual(failed.returncode, 0)
                 self.assertIn("BACKUP FAILED:", failed.stdout + failed.stderr)
+                self.assertGreater(len(list(backup_dir.glob("cognitive-db-*.dump"))), before_corrupt)
+                self.assertTrue((backup_dir / (corrupt_dump.name + ".corrupt")).is_file())
+                self.assertIn("pg_restore", failed.stdout + failed.stderr)
         finally:
             _run_docker("rm", "-f", name)
 

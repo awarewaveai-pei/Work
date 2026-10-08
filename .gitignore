@@ -118,6 +118,7 @@ hostinger-recovery-codes.txt
 id_rsa
 id_ed25519
 *.key
+**/cognitive-db-password
 
 # --- OS & editors ---
 Thumbs.db

@@ -1,6 +1,8 @@
 # cognitive-db
 
-這個資料夾提供每個區域自己的 PostgreSQL 服務檔案。服務名是 `cognitive-db`。資料留在自己的 named volume。資料庫只加入 `lobster-net`，沒有主機埠，因此只有同一個 Docker 網路上的引擎容器能連線。
+這個資料夾提供每個區域自己的 PostgreSQL 服務檔案。服務名是 `cognitive-db`。資料留在自己的 named volume。資料庫只加入 `lobster-net`，沒有主機埠，因此同一個 Docker 網路上的容器都能以服務名連線。
+
+Every container on the external `lobster-net` can reach this service by name. This folder does not create a dedicated network. A dedicated network is an unapplied hardening step and requires a separate deployment decision.
 
 密碼只從 Docker secret file 讀取。請在套用時讓 `COGNITIVE_DB_PASSWORD_FILE` 指向本機未追蹤的密碼檔。不要把密碼放進 compose、環境檔或版本庫。
 
@@ -12,7 +14,7 @@ Nothing in this folder has been applied.
 
 ## 備份
 
-主機上的腳本透過 `docker compose ps` 定位私有容器，再以 `docker exec` 執行 PostgreSQL 工具；dump 串流到主機目錄，密碼不離開容器。每個非 template 資料庫各有一份 custom-format dump；檔名中的資料庫名稱是 UTF-8 十六進位，避免不同名稱碰撞。每份檔案先通過 `pg_restore --list` 和最少一個 archive object 的檢查，才會成為正式檔名。預設保留含當天在內的 14 個 UTC 日期。
+主機上的腳本透過 `docker compose ps` 定位私有容器，再以 `docker exec` 執行 PostgreSQL 工具；dump 串流到主機目錄，密碼不離開容器。每個非 template 資料庫各有一份 custom-format dump；檔名中的資料庫名稱是 UTF-8 十六進位，避免不同名稱碰撞。每份新檔案先以 `pg_restore --exit-on-error -f /dev/null` 完整讀取；舊檔案若損壞會先改名為 `.corrupt`，新備份仍會保留，腳本最後才以非零回報。預設保留含當天在內的 14 個 UTC 日期。
 
 預設目錄是 `/root/backups/cognitive-db`。可用 `COGNITIVE_DB_BACKUP_DIR` 改變目錄。可用 `COGNITIVE_DB_BACKUP_KEEP_DAYS` 改變保留天數。腳本失敗只會回報 `BACKUP FAILED:`，不會回報密碼。
 
@@ -30,6 +32,8 @@ Nothing in this folder has been applied.
 - 在 EMPTY database 上先跑一次真的 migration to head，確認全新資料庫能到最新版本。
 - 備份腳本真的跑一次。
 - 依照 `restore-cognitive-db.md` 真的還原一次到一次性容器。
+- 定期用未套用的 `restore-cognitive-db.sh` 把最新 dump 還原到 scratch database；週期由維運排程決定，腳本不會自動套用 compose。
+- Run the periodic restore rehearsal with `restore-cognitive-db.sh` into a scratch database; this script is unapplied.
 - 確認引擎使用正確的區域資料庫連線，不把 ClaimReview mirror 放進這個資料庫。
 - 預估容量目前很小。今天以低於 1 GiB 的引擎資料加上 14 天備份作規劃，正式上線前再用實際 dump 大小校正。
 

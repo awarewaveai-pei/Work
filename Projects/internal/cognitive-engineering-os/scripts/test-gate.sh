@@ -3,7 +3,7 @@
 # the command line (deploy.sh passes `scripts/affected_tests.py --base <last all-green sha>`'s list) +
 # scripts/eval_gate.py. The SPEC golden is NOT here: it cross-checks repo documents outside SPEC (e.g.
 # search_content_pack rule6 -> agency-os/reports/audit/), so every caller runs it on the checkout.
-# `--all` = the full suite (unittest discover); only rule 11 ③ uses it: a runtime or selector
+# `--all` = the full image-safe suite from scripts/image_test_modules.py; only rule 11 ③ uses it: a runtime or selector
 # change, run by .github/workflows/cognitive-os-full-suite.yml in GitHub, never on a laptop or on every deploy.
 # Prints what it tested first. Every step runs; exit 0 only if all passed.
 #   bash scripts/test-gate.sh tests.unit.test_a tests.unit.test_b     # affected modules (none = eval gate only)
@@ -18,8 +18,8 @@ echo "packages: $(pip freeze 2>/dev/null | tr '\n' ' ')"
 
 fail=0
 if [[ "${1:-}" == "--all" ]]; then
-  echo "== 1/2 unittest: full suite (discover -s tests -t .) =="
-  COS_FULL_SUITE=1 python -m unittest discover -s tests -t . -q || fail=1  # opt-in the guard in tests/__init__.py wants
+  echo "== 1/2 unittest: full image suite (checkout-only list excluded explicitly) =="
+  COS_FULL_SUITE=1 python scripts/image_test_modules.py --image || fail=1  # the opt-in tests/__init__.py's guard wants
 elif [[ $# -gt 0 ]]; then
   echo "== 1/2 unittest: $# affected module(s) =="
   python -m unittest "$@" -q || fail=1
