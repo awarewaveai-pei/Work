@@ -8,7 +8,17 @@
 - ``channel_state`` / ``distribution``: 管道不足, the place's language, where the pages came from -- read by the page
   (apps/api/blocks/gather.py) and by the AI's hand-back (ai_actions/gather.py).
 Every cell says only what a list or the page itself states, or what collect learnt from a registry or the web archive:
-the platform reaches nothing outside itself (specs/wire/lookup.v1.json; STEP2_SHARED_RULES §2)."""
+the platform reaches nothing outside itself (specs/wire/lookup.v1.json; STEP2_SHARED_RULES §2).
+
+Read whole or say so (the invariant every cap below answers to): a conclusion that rests on something being ABSENT --
+查不到 in a cell, a page 「只互相引用」 with no link outside its group -- is drawn only from input read whole. Each
+reader that may be bounded says it is: a page collect read is its body (READ_BODY: header, footer and menus dropped by
+next-admin lib/collect/collectors/http-html.ts extractText), a fact-check hit is the database's record (READ_RECORD), a
+links list may be cut (core/domain/source.py outlinks_whole), a title may be cut at COLLECT_TITLE_CHARS. On such input
+what rests on absence is 無法檢查, or the page stays out of what needs the whole; a 查到 quotes words that are there and
+stands on any reading. Only the person's own file (READ_WHOLE) is read whole. tests/unit/test_block_gather.py
+CapsTests lists every cap of the extractor and of this module, so a new one with no answer here fails by name.
+Grouping keeps of each page only its pieces, never its text (_Print): memory grows with the cards, not their size."""
 
 from __future__ import annotations
 
@@ -16,6 +26,7 @@ import functools
 import itertools
 import logging
 import re
+import sys
 import unicodedata
 import urllib.parse
 import zlib
@@ -25,10 +36,12 @@ from typing import Any, Callable, Iterable, Iterator, Mapping
 from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.evidence_words import FOUND, FOUND_BY, MIN_ORIGINS, NOT_FOUND, UNCHECKABLE, cell
 from ai_lego.core.domain.kinds.gather import MAX_CASE_CARDS
+from ai_lego.core.domain.source import outlinks_whole
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import evidence, safety
+from ai_lego.platform.block_hooks.verify import is_hit
 from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.rulesets import require
 
@@ -49,6 +62,21 @@ _START = r"(?:^|(?<=[\n。！？；;|｜•·])|(?<=[.!?]\s))[^\S\n]*"   # the s
 _NAME = r"(?=\S)(?:(?![.!?](?:\s|$))[^\n|｜。，,；;：:]){2,80}"   # a name runs to the end of its line, field or sentence
 _EN_WORDS = frozenset("the and of to in is that for it with as was on are by this be from or at".split())
 _LATIN = "A-Za-zÀ-ÖØ-öø-ɏḀ-ỿ"   # Latin letters with their accented forms (French, German, Vietnamese)
+# What the stored text of a page is (the module docstring): the person's own file, whole; the body collect extracted
+# from a page; the record a fact-check database gave (VERIFY hit_address), not the report page.
+READ_WHOLE, READ_BODY, READ_RECORD = "whole", "body", "record"
+NOT_ON_IT = {READ_BODY: "系統存的是找資料的服務抽出的網頁正文，頁首、頁尾和選單不在裡面，看不到網頁在那裡寫誰經營",
+             READ_RECORD: "系統存的是查核資料庫給的紀錄，不是查核報告那一頁，看不到網頁寫誰經營"}
+COLLECT_TITLE_CHARS = 300   # collect cuts every title here (sinks/cognitive.ts toSourceProjection, orchestrator.ts aside)
+LINKS_CUT = "這一頁連到的網站太多，找資料的服務沒有全部記下，看不出它是不是只跟某幾個網站互相引用"
+_CHUNK = 20000   # letters counted at a time: the whole text is read, a bounded part of it held
+
+
+def _reading(url: str) -> str:
+    """How much of the page its stored text is: no address = the person's own file, read whole."""
+    if not url:
+        return READ_WHOLE
+    return READ_RECORD if is_hit(url) else READ_BODY
 
 
 # ---- reading what is stored ----
@@ -164,22 +192,26 @@ def _language(text: str | None) -> dict[str, str]:
     names = require("gather.place_languages").items["names"]
     if text is None:
         return cell(UNCHECKABLE, why="抓不到內文")
-    sample = text[:20000]
-    han = len(re.findall(r"[㐀-䶿一-鿿]", sample))
-    kana = len(re.findall(r"[぀-ヿ]", sample))
-    hangul = len(re.findall(r"[가-힯]", sample))
-    latin = len(re.findall(rf"[{_LATIN}]", sample))
-    other = len(re.findall(rf"[^\W\d_㐀-䶿一-鿿぀-ヿ가-힯{_LATIN}]", sample))   # every other letter (Arabic, Thai, Cyrillic…)
+    han = kana = hangul = latin = other = english = words = 0
+    for start in range(0, len(text), _CHUNK):   # the whole text: 查不到 below says there is no letter in any of it
+        sample = text[start:start + _CHUNK]
+        han += len(re.findall(r"[㐀-䶿一-鿿]", sample))
+        kana += len(re.findall(r"[぀-ヿ]", sample))
+        hangul += len(re.findall(r"[가-힯]", sample))
+        latin += len(re.findall(rf"[{_LATIN}]", sample))
+        other += len(re.findall(rf"[^\W\d_㐀-䶿一-鿿぀-ヿ가-힯{_LATIN}]", sample))   # every other letter (Arabic, Thai, Cyrillic…)
+        found = re.findall(r"[a-z]+", sample.lower())
+        words += len(found)
+        english += sum(word in _EN_WORDS for word in found)
     cjk = han + kana + hangul
     if not cjk + latin + other:
-        return cell(NOT_FOUND, why="網頁沒有文字")
+        return cell(NOT_FOUND, why="系統讀到的內容裡沒有文字")
     if other * 2 > cjk + latin + other:
         return cell(UNCHECKABLE, why="系統只分得出中文、英文、日文、韓文")
     if cjk * 3 >= latin:
         code = "ja" if kana >= max(10, cjk // 10) else "ko" if hangul * 2 >= cjk else "zh"
         return cell(FOUND, names[code])
-    words = re.findall(r"[a-z]+", sample.lower())[:3000]
-    if sum(word in _EN_WORDS for word in words) * 100 >= 8 * len(words):
+    if english * 100 >= 8 * words:
         return cell(FOUND, names["en"])
     return cell(UNCHECKABLE, why="拉丁字母寫的，但看不出是英文；系統只分得出中文、英文、日文、韓文")
 
@@ -204,7 +236,8 @@ def _says_who_runs(text: str, rules: Mapping[str, Any]) -> tuple[str, str] | Non
     return (found["phrase"].strip(), found["name"].strip()) if found else None
 
 
-def _operator(text: str | None, outlet: dict[str, Any] | None, is_outlet: bool) -> dict[str, str]:
+def _operator(text: str | None, outlet: dict[str, Any] | None, is_outlet: bool, reading: str) -> dict[str, str]:
+    """``reading`` (READ_*): 查不到 「這一頁沒寫」 only of a text read whole; collect's body has no footer to look in."""
     if outlet and is_outlet:
         return cell(FOUND, outlet["name"], why=f"網域在已知媒體名單上（v{require('gather.outlets').version}）")
     if text is None:
@@ -213,15 +246,18 @@ def _operator(text: str | None, outlet: dict[str, Any] | None, is_outlet: bool) 
     said = _says_who_runs(text, rules)
     if said:
         return cell(FOUND, said[1][:120], why=f"網頁寫著「{said[0][:120]}」")
+    # the last footer_chars only (higher up a © line is usually a photo credit); it goes in why, never as the value
     lines = [match.group(0).strip() for match in _COPYRIGHT.finditer(text[-rules["footer_chars"]:])]
-    if lines:   # a copyright holder is not who runs the site: the line goes in why, never as the value
+    if reading != READ_WHOLE:
+        return cell(UNCHECKABLE, why=NOT_ON_IT[reading] + (f"；內文裡只有版權字樣（{lines[-1][:120]}），版權所有人不一定是經營者" if lines else ""))
+    if lines:
         return cell(NOT_FOUND, why=f"頁尾只有版權字樣（{lines[-1][:120]}），沒有寫誰經營；版權所有人不一定是經營者")
     return cell(NOT_FOUND, why="這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁")
 
 
-def _outlet_cell(host: str, named: str, outlet: dict[str, Any] | None, is_outlet: bool, newsy: bool) -> dict[str, str]:
+def _outlet_cell(host: str, named: str, outlet: dict[str, Any] | None, is_outlet: bool, newsy: bool, title_cut: bool = False) -> dict[str, str]:
     """The known-outlets list is not every domain an outlet has: a name like one is said as 「不在已知網域名單上」, and
-    查不到 only when there was a site name to look at."""
+    查不到 only when there was a site name to look at -- not in a title collect cut (``title_cut``), whose end is gone."""
     if outlet and is_outlet:
         return cell(FOUND, f"是{outlet['name']}的網域")
     if outlet and not host:
@@ -232,6 +268,8 @@ def _outlet_cell(host: str, named: str, outlet: dict[str, Any] | None, is_outlet
         return cell(UNCHECKABLE, why="你貼的是檔案，沒有網域可以對")
     if newsy:
         return cell(UNCHECKABLE, why="名字像媒體，但不在已知媒體名單上；系統沒辦法查它存不存在")
+    if title_cut:
+        return cell(UNCHECKABLE, why=f"標題超過 {COLLECT_TITLE_CHARS} 個字，只存了前面，網站的名字可能被切掉")
     if not named:
         return cell(UNCHECKABLE, why="標題沒寫網站名字")
     return cell(NOT_FOUND, why="名字不像媒體")
@@ -254,8 +292,11 @@ def _first_seen(published: Any, archived: dict[str, str] | None) -> dict[str, st
 
 def _archived(looked: Mapping[str, Any] | None) -> str:
     """The web archive's first capture of the page: the only date 原始的還是轉貼的 is read from ("" = none or not asked)."""
-    found = (looked or {}).get("first_archived") or {}
-    return (_date(found.get("value")) or "") if found.get("state") == FOUND else ""
+    found = None if looked is None else looked.get("first_archived")
+    if not isinstance(found, Mapping) or found.get("state") != FOUND:
+        return ""
+    date = _date(found.get("value"))
+    return "" if date is None else date
 
 
 def _stamps() -> dict[str, dict[str, str]]:
@@ -275,9 +316,13 @@ def _cells(url: str, title: str, text: str | None, published: Any, looked: Mappi
         country = cell(FOUND, outlet["country"], why="已知媒體名單")
     else:
         country = looked_up["country"]
-    affiliation = cell(FOUND, restricted[1], why=restricted[2]) if restricted else cell(NOT_FOUND, why="名單上沒有寫它隸屬誰")
+    if restricted:
+        affiliation = cell(FOUND, restricted[1], why=restricted[2])
+    else:   # the lists are of domains: a file has none to find on them
+        affiliation = cell(NOT_FOUND, why="名單上沒有寫它隸屬誰") if host else cell(UNCHECKABLE, why="你貼的是檔案，沒有網域可以對")
+    title_cut = bool(url) and len(title) >= COLLECT_TITLE_CHARS
     return {
-        "operator": _operator(text, outlet, is_outlet),
+        "operator": _operator(text, outlet, is_outlet, _reading(url)),
         "registered": looked_up["registered"],
         "country": country,
         "language": _language(text),
@@ -286,7 +331,7 @@ def _cells(url: str, title: str, text: str | None, published: Any, looked: Mappi
         "stance": cell(UNCHECKABLE, why="系統沒有讀網站的「關於我們」頁，不知道它自己宣稱的立場；你可以自己補上"),
         "affiliation": affiliation,
         "party_relation": cell(UNCHECKABLE, why="系統不知道它跟這件事的當事方有什麼關係；你可以自己寫"),
-        "outlet_exists": _outlet_cell(host, named, outlet, is_outlet, newsy),
+        "outlet_exists": _outlet_cell(host, named, outlet, is_outlet, newsy, title_cut),
     }, lists
 
 
@@ -325,10 +370,26 @@ def _link_host(link: str) -> str:
     return _host(link if "://" in link else f"https://{link}")
 
 
+@functools.lru_cache(maxsize=1)
+def _dropped() -> dict[int, None]:
+    """Every space and punctuation mark (Unicode category P*), for str.translate: one C pass, no Python step per letter."""
+    return {code: None for code in range(sys.maxunicode + 1) if chr(code).isspace() or unicodedata.category(chr(code)).startswith("P")}
+
+
+def _letters(text: str) -> str:
+    """The text as grouping compares it: NFKC, case folded, without spaces and punctuation."""
+    return unicodedata.normalize("NFKC", text).casefold().translate(_dropped())
+
+
 def _numbers(letters: str, size: int) -> Iterator[int]:
     """Every piece of ``size`` letters of the text as a number: the same letters give the same number wherever they sit."""
     data, width = letters.encode("utf-32-le"), 4 * size
     return (zlib.crc32(data[index:index + width]) for index in range(0, 4 * (len(letters) - size + 1), 4))
+
+
+def _kept(letters: str, size: int, rate: int) -> set[int]:
+    """The pieces whose number is a multiple of ``rate``."""
+    return {number for number in _numbers(letters, size) if number % rate == 0}
 
 
 def _pieces(letters: str, rules: Mapping[str, Any]) -> tuple[int, frozenset[int]]:
@@ -339,7 +400,7 @@ def _pieces(letters: str, rules: Mapping[str, Any]) -> tuple[int, frozenset[int]
     rate = 1 if len(letters) <= rules["sample_above"] else rules["keep_one_in"]
     while len(letters) - size + 1 > rate * most:
         rate *= 2
-    kept = {number for number in _numbers(letters, size) if number % rate == 0}
+    kept = _kept(letters, size, rate)
     while len(kept) > most:
         rate *= 2
         kept = {number for number in kept if number % rate == 0}
@@ -356,23 +417,37 @@ def _distinct(letters: str, size: int, enough: int) -> int:
     return len(seen)
 
 
-class _Item:
-    """One card as the grouping sees it: the pieces of its whole text, its main image, its site and the sites it links to,
-    the web archive's first capture of it."""
+class _Print:
+    """What grouping keeps of one page's whole text, read once: how many letters, its rate and pieces (at most
+    ``max_pieces``), how many different pieces (up to ``contained_min_pieces``). Never the text: a card costs the same
+    whatever its page's size (F3: 800 pages of a million letters held whole were gigabytes)."""
 
-    def __init__(self, key: str, content: Mapping[str, Any], text: str | None, relevance: Mapping[str, Any], rules: Mapping[str, Any]) -> None:
-        self.key, self.content = key, content
-        folded = unicodedata.normalize("NFKC", text or "").casefold()
-        self.letters = "".join(ch for ch in folded if not ch.isspace() and not unicodedata.category(ch).startswith("P"))
-        self.rate, self.pieces = _pieces(self.letters, rules)
+    __slots__ = ("length", "rate", "pieces", "distinct")
+
+    def __init__(self, text: str | None, rules: Mapping[str, Any]) -> None:
+        letters = _letters("" if text is None else text)
+        self.length = len(letters)
+        self.rate, self.pieces = _pieces(letters, rules)
+        self.distinct = _distinct(letters, rules["shingle"], rules["contained_min_pieces"])
+
+
+class _Item:
+    """One card as the grouping sees it: the pieces of its whole text (``fingerprint``), its main image, its site and the
+    sites it links to, whether that list is whole, the web archive's first capture of it. ``reread`` reads the text again
+    for the one pass _lookups makes over a longer page."""
+
+    def __init__(self, key: str, content: Mapping[str, Any], fingerprint: _Print, reread: Callable[[], str | None], relevance: Mapping[str, Any]) -> None:
+        self.key, self.content, self.reread = key, content, reread
+        self.length, self.rate, self.pieces, self.distinct = fingerprint.length, fingerprint.rate, fingerprint.pieces, fingerprint.distinct
         self._at = {self.rate: self.pieces}
-        self.distinct = _distinct(self.letters, rules["shingle"], rules["contained_min_pieces"])
         image = relevance.get("imageUrl")
         self.image = image if isinstance(image, str) and image.startswith(("http://", "https://")) else None
         self.host = _host(content.get("url") or "")
         self.label = (self.host or str(content.get("title") or "") or "一份你貼的檔案")[:60]   # how another page's cell names it
         links = relevance.get("outlinks")
         self.outlinks = {_link_host(link) for link in links if isinstance(link, str) and link} - {self.host, ""} if isinstance(links, list) else set()
+        self.links_whole = outlinks_whole(relevance)   # absent or maybe cut: never in an 只互相引用 group
+        self.links_cut = isinstance(links, list) and not self.links_whole   # a list collect sent and may have cut: said on the card
         first = (content.get("cells") or {}).get("first_seen") or {}
         self.first_seen = _date(first.get("value")) if first.get("state") == FOUND else None
         # a card made before grouping v4 holds no `archived`; its first_seen, when not the page's own date, is the archive's
@@ -387,7 +462,7 @@ class _Item:
 
 
 def _by_length(items: list[_Item], i: int, j: int) -> tuple[int, int]:
-    return (i, j) if len(items[i].letters) <= len(items[j].letters) else (j, i)
+    return (i, j) if items[i].length <= items[j].length else (j, i)
 
 
 def _looked_up(short: _Item, long: _Item, rules: Mapping[str, Any]) -> bool:
@@ -407,7 +482,12 @@ def _lookups(items: list[_Item], rules: Mapping[str, Any]) -> dict[int, frozense
                 shorter.add(short)
                 longer.add(long)
     wanted = frozenset().union(*(items[index].pieces for index in shorter))
-    return {long: frozenset(number for number in _numbers(items[long].letters, rules["shingle"]) if number in wanted) for long in longer}
+    # one longer page's text at a time, read again and let go: what is kept is a subset of `wanted`
+    present = {}
+    for long in sorted(longer):
+        text = items[long].reread()
+        present[long] = frozenset(number for number in _numbers(_letters("" if text is None else text), rules["shingle"]) if number in wanted)
+    return present
 
 
 def _likeness(short: _Item, long: _Item, rules: Mapping[str, Any], present: frozenset[int]) -> float:
@@ -490,8 +570,10 @@ def _only_each_other(items: list[_Item]) -> list[tuple[int, int, str]]:
     """Sites that link each other and nowhere else (假網站互相引用). Pages linking anywhere outside are dropped until none
     is left (a page outside that cites them cannot hide them). Sites joined by links both ways form one set per connected
     part; it is a circle when every two of its sites link each other (_every_pair, the rule 同一篇 has) and none links
-    outside it -- a one-way link or a chain joins nothing. Every two pages of a circle are joined."""
-    kept = {index for index, item in enumerate(items) if item.host and item.outlinks}
+    outside it -- a one-way link or a chain joins nothing. Every two pages of a circle are joined. A page whose list is
+    not whole (outlinks_whole: absent, or maybe cut by collect) is left out like one linking outside: a link it lost may
+    be one."""
+    kept = {index for index, item in enumerate(items) if item.host and item.outlinks and item.links_whole}
     while True:
         hosts = {items[index].host for index in kept}
         out = {index for index in kept if not items[index].outlinks <= hosts}
@@ -545,6 +627,14 @@ def _joined(item: _Item, joins: list[Join]) -> str:
 
 
 def _original(group: list[_Item], how: str, joins: list[Join], item: _Item) -> dict[str, str]:
+    """原始的還是轉貼的, and what the grouping could not check for this page: a links list collect may have cut."""
+    said = _origin_said(group, how, joins, item)
+    if item.links_cut and said["state"] != FOUND:
+        return {**said, "why": f"{said['why']}；{LINKS_CUT}"}
+    return said
+
+
+def _origin_said(group: list[_Item], how: str, joins: list[Join], item: _Item) -> dict[str, str]:
     """原始的還是轉貼的, read off the grouping: said only for 同一篇, and only from the dates the web archive saw for every
     page of it (a page can write any date it likes); anything less is no basis, so never 查到."""
     if len(group) == 1:
@@ -608,15 +698,19 @@ def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, ar
     reads, cas = _store(docs)
     rows = {row["source_id"]: row for row in reads.sources(tenant_id, owner.id)}
     read = reads.source_text(cas, tenant_id, owner.id)
-    texts: dict[str, str | None] = {}
+    rules = require("gather.grouping").items
 
     def text(source_id: str | None) -> str | None:
-        if not source_id:
-            return None
-        if source_id not in texts:
-            found = read(source_id)
-            texts[source_id] = found[1] if found else None
-        return texts[source_id]
+        """Read from the store each time, never kept: one page's text is held at a time (F3)."""
+        found = read(source_id) if source_id else None
+        return found[1] if found else None
+
+    prints: dict[str, _Print] = {}   # source_id -> its fingerprint, taken while the text is in hand for the card
+
+    def new_card(row: Mapping[str, Any]) -> dict[str, Any]:
+        body = text(row["source_id"])
+        prints[row["source_id"]] = _Print(body, rules)
+        return _source_card(row, body, author(row["source_id"]), answers)
 
     def author(source_id: str) -> str | None:
         events = reads.events(tenant_id, f"source:{source_id}")
@@ -653,15 +747,16 @@ def _sources_arrived(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, ar
         _log.warning("case %s holds %s source cards (the most): %s new pages got no card", owner.id, MAX_CASE_CARDS, skipped)
     # one question to collect for every address of this run (it batches and never raises: R7, R8)
     answers = collect_lookups.describe(owner.id, [row.get("canonical_url") for _, row in new_rows] + [entry["url"] for entry in new_aside])
-    planned: list[tuple[dict[str, Any] | None, dict[str, Any]]] = [   # (the card this is a new version of, the content)
-        (prior, _source_card(row, text(row["source_id"]), author(row["source_id"]), answers)) for prior, row in new_rows]
+    planned: list[tuple[dict[str, Any] | None, dict[str, Any]]] = [(prior, new_card(row)) for prior, row in new_rows]   # (the card this is a new version of, the content)
     planned += [(None, _aside_card(entry, answers)) for entry in new_aside]
 
-    rules = require("gather.grouping").items
     replaced = {prior["doc_id"]: content for prior, content in planned if prior is not None}
 
     def item(key: str, content: Mapping[str, Any]) -> _Item:
-        return _Item(key, content, text(content.get("source_id")), (rows.get(content.get("source_id")) or {}).get("relevance") or {}, rules)
+        source_id = content.get("source_id")
+        fingerprint = prints.pop(source_id, None) if source_id else None
+        return _Item(key, content, fingerprint or _Print(text(source_id), rules), lambda: text(source_id),
+                     (rows.get(source_id) or {}).get("relevance") or {})
 
     items = [item(doc["doc_id"], replaced.get(doc["doc_id"], doc["content"])) for doc in cards]
     items += [item(f"new:{index}", content) for index, (prior, content) in enumerate(planned) if prior is None]

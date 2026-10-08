@@ -261,5 +261,18 @@
         "why": "平台還沒有這個搜尋引擎的金鑰"
       }
     ]
+  },
+  "reading": {
+    "about": "What the engine may conclude from what collect sends (cognitive-engineering-os ai_lego/platform/block_hooks/gather.py: a conclusion that rests on something being absent needs input read whole). text: a page's body only -- its header, footer, menus and asides are dropped (next-admin collectors/http-html.ts extractText), so 誰辦的 not said in it is 無法檢查, never 查不到; the examples below are run through extractText on next-admin's side. title: cut at 300 characters. outlinks: every other host the page links to only when it holds fewer than relevance.outlinks.items hosts, every host is ASCII, and the relevance has room for one more host of relevance.outlinks.max characters; otherwise collect may have cut it and the page is never in an 只互相引用 group. A collector that drops a host for any other reason omits the key (no list = not whole).",
+    "extract": [
+      {
+        "html": "<!doctype html><html lang=\"zh-Hant\"><head><title>公會調整合約範本 | 某某產業新聞網</title></head>\n<body>\n<header><a href=\"/\">某某產業新聞網</a><nav><a href=\"/news\">新聞</a> <a href=\"/about\">關於我們</a></nav></header>\n<main>\n<h1>公會調整合約範本</h1>\n<p>公會公告：自二〇一九年起，合約範本第七條改為按月結算。公會在週一寄給會員的信裡說，這是範本寫成以來第一次修改，舊合約到期前仍照原本的方式按件結算。</p>\n<p>多位會員表示，按月結算可以減少對帳的時間，但也有人擔心小型工作室的現金週轉會變得比較緊。公會說，下個月會舉辦兩場說明會，回答會員對新條文的疑問，並收集修改意見。</p>\n</main>\n<aside>熱門文章：工會聲明合約範本第七條沒有改</aside>\n<footer><p>本網站由某某媒體股份有限公司經營</p><p>© 2024 Acme Photography 版權所有</p><a href=\"/about\">關於我們</a></footer>\n</body></html>\n",
+        "text": "公會調整合約範本\n\n公會公告：自二〇一九年起，合約範本第七條改為按月結算。公會在週一寄給會員的信裡說，這是範本寫成以來第一次修改，舊合約到期前仍照原本的方式按件結算。\n\n多位會員表示，按月結算可以減少對帳的時間，但也有人擔心小型工作室的現金週轉會變得比較緊。公會說，下個月會舉辦兩場說明會，回答會員對新條文的疑問，並收集修改意見。"
+      },
+      {
+        "html": "<!doctype html><html lang=\"zh-Hant\"><head><title>公會調整合約範本 | 某某產業新聞網</title></head>\n<body>\n<nav><a href=\"/about\">關於我們</a></nav>\n<div class=\"content\"><p>公會公告：自二〇一九年起，合約範本第七條改為按月結算。</p></div>\n<div class=\"site-footer\">© 2024 Acme Photography</div>\n<footer>本網站由某某媒體股份有限公司經營</footer>\n</body></html>\n",
+        "text": "公會公告：自二〇一九年起，合約範本第七條改為按月結算。\n\n© 2024 Acme Photography"
+      }
+    ]
   }
 }

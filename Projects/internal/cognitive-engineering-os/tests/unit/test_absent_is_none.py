@@ -39,7 +39,7 @@ HARMLESS: dict[str, dict[str, int]] = {
     SYSTEM: {
         "blocks/govern.py:_records_markdown": 1, "blocks/verify.py:ledger": 4, "ai_actions/compute.py:_explain_handback": 1,
         "ai_actions/compute.py:_explain_input": 6, "ai_actions/gather.py:_organize_input": 1, "ai_actions/map.py:_tools": 5,
-        "block_hooks/compute.py:case_runs": 1, "block_hooks/compute.py:plan": 1, "block_hooks/gather.py:_Item.__init__": 6,
+        "block_hooks/compute.py:case_runs": 1, "block_hooks/compute.py:plan": 1, "block_hooks/gather.py:_Item.__init__": 5,
         "block_hooks/gather.py:_ancestor_card": 1, "block_hooks/gather.py:_source_card": 3, "block_hooks/gather.py:_sources_arrived": 2,
         "block_hooks/gather.py:_sources_arrived.item": 2, "block_hooks/gather.py:_split_checked.same_text": 1, "block_hooks/gather.py:_title_parts": 1,
         "block_hooks/gather.py:channel_state": 6, "block_hooks/gather.py:distribution.engine": 1, "block_hooks/gather.py:distribution.value.read": 2,

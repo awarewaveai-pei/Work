@@ -17,7 +17,7 @@ const { createBudget } = await import("@/lib/collect/budget");
 const { canonicalize } = await import("@/lib/collect/canonical");
 const { CollectFetchError } = await import("@/lib/collect/net/fetcher");
 const { entityDossierCollector } = await import("@/lib/collect/collectors/entity-dossier");
-const { httpHtmlCollector, extractImageUrl, outlinkHosts } = await import("@/lib/collect/collectors/http-html");
+const { httpHtmlCollector, extractImageUrl, extractText, outlinkHosts } = await import("@/lib/collect/collectors/http-html");
 const { CLAIM_ANGLES, MAX_QUERIES } = await import("@/lib/collect/search/query-plan");
 const { CLAIM_PROVIDERS } = await import("@/lib/collect/search/drivers");
 const sinkMod = await import("@/lib/collect/sinks/cognitive");
@@ -356,6 +356,27 @@ describe("what a page says about itself (http-html)", () => {
     expect(outlinkHosts(links, "https://www.s.example/page")).toEqual(["a.example", "b.example"]);
     const many = Array.from({ length: 70 }, (_, i) => `https://h${i}.example/`);
     expect(outlinkHosts(many, "https://s.example/")).toHaveLength(50);
+  });
+});
+
+describe("what the engine may conclude from what collect sends (collector.v2.json `reading`)", () => {
+  it("the text is the page's body: the spec's pages extract to the spec's text, the footer saying who runs the site gone", () => {
+    for (const { html, text } of spec.reading.extract as { html: string; text: string }[]) {
+      expect(extractText(html)).toBe(text);
+      expect(html).toContain("本網站由某某媒體股份有限公司經營");
+      expect(text).not.toContain("經營");
+    }
+  });
+
+  it("a links list is sent whole or cut where the engine can see it: at 50 hosts, or with no room for one more", () => {
+    const rule = spec.relevance.outlinks as { items: number; max: number };
+    const long = `${"h".repeat(rule.max + 10)}.example`; // a host no list may carry: the list is not sent at all
+    expect(sinkMod.relevanceOf({ outlinks: ["a.example", long, "b.example"] })).toEqual({ pasted: false });
+    const fifty = Array.from({ length: 70 }, (_, i) => `h${i}.example`);
+    expect((sinkMod.relevanceOf({ outlinks: fifty }).outlinks as string[]).length).toBe(rule.items);
+    const trimmed = sinkMod.relevanceOf({ entityAnchorsHit: Array.from({ length: 12 }, () => "錨".repeat(80)), outlinks: Array.from({ length: 40 }, (_, i) => `${"h".repeat(60)}-${i}.example`) });
+    expect((trimmed.outlinks as string[]).length).toBeLessThan(40);
+    expect(sinkMod.pyJsonBytes(trimmed) + rule.max + 4).toBeGreaterThan(spec.max_relevance_bytes); // the engine's outlinks_whole: not whole
   });
 });
 

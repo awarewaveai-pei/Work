@@ -17,6 +17,30 @@ TEXT_MEDIA_TYPES = frozenset({"text/plain", "text/markdown", "text/csv", "applic
 # Everything fetched from the web proves only that someone SAID it (RESEARCH_LINES_MASTER_PLAN I2).
 COLLECTED_PROVENANCE = {"epistemic_type": "EVIDENCE", "authorship_state": "SOURCE_QUOTATION", "locked": None}
 MAX_RELEVANCE_BYTES = 4096
+# A page's ``outlinks`` (specs/wire/collector.v2.json relevance.outlinks): the other hosts it links to, at most
+# OUTLINKS_ITEMS of at most OUTLINK_CHARS ASCII characters (a URL's hostname, punycode). collect cuts a list at
+# OUTLINKS_ITEMS and drops hosts from its end until the relevance fits MAX_RELEVANCE_BYTES; ``outlinks_whole`` reads
+# both cuts back, so a list that may be cut is never read as every link of the page.
+OUTLINKS_ITEMS = 50
+OUTLINK_CHARS = 253
+
+
+def relevance_bytes(relevance: Mapping[str, Any]) -> int:
+    """The size MAX_RELEVANCE_BYTES caps: Python json.dumps(ensure_ascii=False), as source_record measures it."""
+    return len(json.dumps(dict(relevance), ensure_ascii=False, sort_keys=True).encode("utf-8"))
+
+
+def outlinks_whole(relevance: Mapping[str, Any]) -> bool:
+    """Whether ``relevance["outlinks"]`` is every other host the page links to. Fail closed: no list, a list of
+    OUTLINKS_ITEMS (collect stops there), a host that is not ASCII, or a relevance with no room left for one more host
+    of OUTLINK_CHARS (collect may have dropped hosts to fit) is not whole."""
+    links = relevance.get("outlinks")
+    if not isinstance(links, list) or len(links) >= OUTLINKS_ITEMS:
+        return False
+    if not all(isinstance(link, str) and link.isascii() for link in links):
+        return False
+    room = OUTLINK_CHARS + len('"", ')   # one more host in the list: its quotes and the ", " before it
+    return relevance_bytes(relevance) + room <= MAX_RELEVANCE_BYTES
 
 
 def source_record(
@@ -105,7 +129,7 @@ def source_record(
             encoded = json.dumps(dict(relevance), ensure_ascii=False, sort_keys=True)
         except (TypeError, ValueError) as error:
             raise InvariantViolation("SOURCE_RELEVANCE_INVALID") from error
-        if len(encoded.encode("utf-8")) > MAX_RELEVANCE_BYTES:
+        if relevance_bytes(relevance) > MAX_RELEVANCE_BYTES:
             raise InvariantViolation("SOURCE_RELEVANCE_INVALID")
         relevance = json.loads(encoded)
     if supersedes_source_id is not None:

@@ -167,14 +167,18 @@ export function relevanceOf(meta: Record<string, unknown>): Record<string, unkno
   out.pasted = meta.pasted === true;
   if (typeof meta.aside === "string") out.aside = asideWhy(meta.aside);
   if (meta.imageUrl !== undefined) out.imageUrl = meta.imageUrl;
-  const outlinks = texts(meta.outlinks, 50, 253);
-  if (outlinks) out.outlinks = outlinks;
+  // The engine reads a list of fewer than 50 hosts with room left for one more as EVERY host the page links to (its
+  // 只互相引用 check; collector.v2.json `reading`): a host dropped here for its length would hide a link, so the list
+  // goes whole or not at all. The two cuts the engine can see stay: the 50th host, and hosts trimmed to fit below.
+  const rule = RELEVANCE_RULES.outlinks as { items: number; max: number };
+  if (Array.isArray(meta.outlinks) && meta.outlinks.every((v) => text(v, rule.max))) out.outlinks = meta.outlinks.slice(0, rule.items);
   for (const [key, value] of Object.entries(out)) {
     const rule = RELEVANCE_RULES[key];
     if (!rule || !fitsRule(rule, value)) delete out[key];
   }
   if (out.pasted) for (const key of Object.keys(out)) if (key.startsWith("search")) delete out[key];
-  // Over the cap, the least telling parts go first: links one at a time, then the image, the anchors, the query.
+  // Over the cap, the least telling parts go first: links one at a time, then the image, the anchors, the query. A list
+  // cut here keeps no room for one more host, which is how the engine knows it may be cut (outlinks_whole).
   while (pyJsonBytes(out) > MAX_RELEVANCE_BYTES) {
     if (Array.isArray(out.outlinks) && out.outlinks.length) out.outlinks = out.outlinks.slice(0, -1);
     else if ("imageUrl" in out) delete out.imageUrl;

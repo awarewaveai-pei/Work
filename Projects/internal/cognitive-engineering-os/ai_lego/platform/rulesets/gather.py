@@ -4,6 +4,7 @@ rule, and which language a place speaks. Each card stores the stamp of every one
 
 from __future__ import annotations
 
+from ai_lego.core.domain.source import OUTLINKS_ITEMS
 from ai_lego.platform.rulesets import Ruleset
 
 # 列在哪一份名單上（官方、媒體、學術、查核組織、內容農場）。A list with no maintained source starts empty and says why.
@@ -22,7 +23,7 @@ SOURCE_LISTS = Ruleset("gather.source_lists", "GATHER", "來源名單", "2", "�
 ])
 
 # 網站的名字像國際媒體或中立的新聞網站時，查這家媒體是不是真的存在: an outlet's own domains, from its own site.
-OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "4", "平台（第 2 步），從各媒體自己的網站抄錄網域", {
+OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "5", "平台（第 2 步），從各媒體自己的網站抄錄網域", {
     "outlets": [
         {"name": "BBC", "names": ["BBC", "英國廣播公司"], "domains": ["bbc.com", "bbc.co.uk"], "country": "英國"},
         {"name": "路透社", "names": ["Reuters", "路透"], "domains": ["reuters.com"], "country": "英國"},
@@ -64,18 +65,22 @@ OUTLETS = Ruleset("gather.outlets", "GATHER", "已知媒體名單", "4", "平台
     # usually a photo credit) and only to say what the page shows instead.
     "operator": {"labels": ["經營者", "發行人", "出版者"], "run_by": "經營", "by": ["Published by", "Operated by"],
                  "own": ["本網站", "本站", "本刊", "本報", "This site is", "This website is"], "footer_chars": 800},
-    # v3: how a name is read (v2 took a Chinese name anywhere in the site name: 台北市中央社區大學 read as 中央社)
+    # v3: how a name is read (v2 took a Chinese name anywhere in the site name: 台北市中央社區大學 read as 中央社). v5: a
+    # page collect read is its body only (header, footer and menus are dropped), so 誰辦的 not found there is 無法檢查,
+    # and a title collect cut at 300 characters has no site name to read
     "reading": [
         "網站的名字是標題的最後一段，或標題第一段整段就是一家媒體的名字，或找資料的服務查到的網域名字。",
         "英文名字要是完整的一個字。中文名字不能跟前後的中文字連在一起（「台北市中央社區大學」不是中央社），後面直接接著「新聞」「日報」這類字的除外（「中央社新聞網」）。",
         "網址裡的名字不看最後的 .com、.tv 這一段：那是網域的種類，不是網站的名字。",
         "誰辦的：網域在已知媒體名單上，就是那家媒體。不然要網頁自己寫明誰經營才算查到：「經營者：」「發行人：」「出版者：」後面的名字，或一句話開頭的「（本網站）由某某經營」「Published by」「Operated by」；整頁都找，句子中間提到的不算。",
         "只有頁尾的版權字樣（©、版權所有）不算查到：版權所有人不一定是經營者。畫面會寫出那一行字，你可以自己判斷。",
+        "找資料的服務只存網頁的正文，頁首、頁尾和選單不在裡面。正文沒寫誰經營時，標無法檢查，不標查不到。你自己貼的檔案整份都讀。",
+        "標題超過 300 個字時只存前 300 個字，網站的名字可能被切掉，這時看不出名字像不像媒體。",
     ],
 })
 
 # 平台把「怎樣算同一組」的規則寫出來給你看: the numbers and the sentences the page shows come from here together.
-GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "4", "平台（第 2 步）", {
+GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "5", "平台（第 2 步）", {
     "shingle": 5, "same_text": 0.8, "maybe_same": 0.5,
     # the share of the shorter page found in the longer one (an excerpt, a copy with more around it), when both pages have
     # at least contained_min_pieces different pieces. v3: v2 counted letters, so one phrase repeated was "contained"
@@ -85,7 +90,8 @@ GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "4", "平台（�
     # keeps the pieces whose number is a multiple of its rate -- 1 up to sample_above letters, else keep_one_in, doubled
     # until at most max_pieces are left -- the same rule on every page, so one passage leaves the same pieces wherever it
     # sits. Two pages compare at the coarser rate; when that leaves the shorter page under min_compared pieces, its own
-    # pieces are looked up in the longer page's whole text (a few pieces found by chance are no basis).
+    # pieces are looked up in the longer page's whole text (a few pieces found by chance are no basis). v5: a page whose
+    # links collect may have cut (core/domain/source.py outlinks_whole) is never in an 只互相引用 group.
     "keep_one_in": 8, "sample_above": 2000, "max_pieces": 2500, "min_compared": 250,
     "order": ["同一篇", "同一張圖", "只互相引用", "可能同出處"],
     "rules": [
@@ -95,6 +101,7 @@ GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "4", "平台（�
         "可能同出處：一樣的部分在五成到八成之間（兩種比法都算）。系統拿不準是不是改寫，由你決定算不算。",
         "同一張圖：兩頁的主圖是同一個網址。",
         "只互相引用：幾個網站每兩個都互相連結，對外的連結也只連到彼此，沒有別的依據。只是單向連過去，或還連到別的網站的，不算一組（文字像的照文字分）。",
+        f"找資料的服務每一頁最多記 {OUTLINKS_ITEMS} 個連到的網站，放不下時還會少記幾個。連結可能沒記全的網頁，看不出是不是只連到彼此，不算進只互相引用的組。",
         "其他的組裡有不同的理由時，標最拿不準的那一個；每一頁寫它跟組裡哪一頁、因為什麼連在一起。",
         "只有「同一篇」的組才分原始的和轉貼的，而且只看網頁封存館存到的日期：組裡每一頁都有封存館的紀錄時，最早存到的是原始的。有一頁只有網頁自己寫的日期，就看不出誰先誰後。",
         "只互相引用、用了同一張圖、可能同出處的組，看不出誰轉貼誰。",
@@ -142,9 +149,9 @@ RULESETS = [SOURCE_LISTS, OUTLETS, GROUPING, PLACE_LANGUAGES]
 
 HISTORY = {
     "gather.source_lists": {"1": "475d3ede5bdb", "2": "146bfc52ca8a"},
-    "gather.outlets": {"1": "a494e918033c", "2": "fb9c00d12bf6", "3": "ce6b4b77697f", "4": "515aa0caf3dd"},
+    "gather.outlets": {"1": "a494e918033c", "2": "fb9c00d12bf6", "3": "ce6b4b77697f", "4": "515aa0caf3dd", "5": "f0521df15caf"},
     # retired 2026-10-04 (lookups moved to collect); a recorded version stays as it was (rulesets/__init__.py)
     "gather.registries": {"1": "2b04ec23212b"},
-    "gather.grouping": {"1": "f34dbf8167ad", "2": "5795497cc81a", "3": "40ef446e323d", "4": "1f6e2c1413c3"},
+    "gather.grouping": {"1": "f34dbf8167ad", "2": "5795497cc81a", "3": "40ef446e323d", "4": "1f6e2c1413c3", "5": "8d34ef843dd2"},
     "gather.place_languages": {"1": "279db02ce9fe"},
 }

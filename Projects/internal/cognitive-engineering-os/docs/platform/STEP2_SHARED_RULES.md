@@ -99,7 +99,7 @@ an error that takes the evidence read down.
 - Seed for a pasted URL: `{"uri": "https://...", "meta": {"pasted": true}}`.
 - Each ingested source (`schema_version: "2"`) carries in `relevance`: `searchProvider`, `searchLang`, `searchQuery`,
   `searchAngle` (absent for a pasted URL), `pasted` (bool), `aside` (why a gate would have refused it, absent if not),
-  `imageUrl` (the page's main image), `outlinks` (≤50 hosts it links to). A page a gate refuses is sent with `aside`
+  `imageUrl` (the page's main image), `outlinks` (≤50 hosts it links to; read as every link only per `collector.v2.json` `reading`). A page a gate refuses is sent with `aside`
   instead of dropped, when it has text.
 - The run's completion adds `aside`: [{url, title, reason}] (≤200; pages with no text) and `channels`:
   [{provider, lang, state: ok|unreachable|no_key, why}] — both reach `after_sources` as `arrived["aside"]` and

@@ -14,7 +14,10 @@ import type { CollectBlock, CollectCtx, RawDoc, Target } from "@/lib/collect/typ
 import { registerCollector } from "@/lib/collect/registry";
 import { COLLECTED_PROVENANCE } from "@/lib/collect/provenance";
 
-/** Elements whose text is never the document. */
+/**
+ * Elements whose text is never the document. So `text` is a page's body, not the page: who runs the site, usually said
+ * in the footer, is not in it, and the engine says so instead of 「沒寫」 (collector.v2.json `reading`).
+ */
 const DROP_TAGS = [
   "script", "style", "noscript", "template", "svg", "nav", "header", "footer", "aside", "form",
   "iframe", "button", "select",
@@ -171,6 +174,8 @@ export function extractImageUrl(html: string, baseUrl: string): string | null {
 /**
  * The OTHER hosts a page links to (`www.` folded, first seen first, at most `max`). Which sites cite which is how
  * a ring of sites that only cite each other shows up (Cognitive OS GATHER); links to its own host say nothing.
+ * A page with more is cut at exactly `max`, and the engine reads a list that long as maybe cut (collector.v2.json
+ * `reading`): never stop short of `max` for another reason, or a cut list reads as whole.
  */
 export function outlinkHosts(links: string[], pageUrl: string, max = 50): string[] {
   const fold = (u: string) => new URL(u).hostname.toLowerCase().replace(/^www\./, "");

@@ -10,24 +10,31 @@ import copy
 import datetime
 import hashlib
 import json
+import random
 import re
+import tracemalloc
+import unicodedata
+import unittest
 import urllib.parse
 import uuid
+from pathlib import Path
+from typing import Mapping
 from unittest import mock
 
 import yaml
 
-from ai_lego import PRODUCT_ROOT, resolve_spec_root
+from ai_lego import PRODUCT_ROOT, REPO_ROOT, resolve_spec_root
 from ai_lego.apps.api import main as api_main
 from ai_lego.core.domain import evidence_words as words
 from ai_lego.core.domain.kinds.assembler import PURPOSE_PACKAGE, PURPOSES
-from ai_lego.core.domain.source import COLLECTED_PROVENANCE, source_record
+from ai_lego.core.domain.source import COLLECTED_PROVENANCE, MAX_RELEVANCE_BYTES, OUTLINK_CHARS, OUTLINKS_ITEMS, outlinks_whole, source_record
 from ai_lego.data.events import record_log
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import ai_gate, block_hooks, evidence
 from ai_lego.platform.block_hooks import gather as hooks
+from ai_lego.platform.block_hooks.verify import hit_address
 from ai_lego.platform.net import collect_lookups
 from ai_lego.platform.net.egress import EGRESS_ALLOWLIST_ENV, egress_allowlist
 from ai_lego.platform.rulesets import require
@@ -48,6 +55,12 @@ def zh(seed: int, length: int = 400) -> str:
 
 EN = ("The association said on Monday that the standard contract will be settled every month from next year. "
       "It is the first change to the template since it was written, and members were told in a letter. ") * 3
+
+# What collect sends and what the engine may conclude from it: the pages run through next-admin's extractText on its
+# side (collect-wire-v2.test.ts) -- header, nav, aside and footer dropped, so the footer saying who runs the site never arrives.
+WIRE = json.loads((PRODUCT_ROOT / "specs" / "wire" / "collector.v2.json").read_text(encoding="utf-8"))
+(PAGE_HTML, PAGE_EXTRACTED), (DIV_FOOTER_HTML, DIV_FOOTER_EXTRACTED) = ((page["html"], page["text"]) for page in WIRE["reading"]["extract"])
+NEXT_ADMIN_COLLECT = REPO_ROOT / "lobster-factory" / "infra" / "hetzner-phase1-core" / "apps" / "next-admin" / "lib" / "collect"
 
 
 class FakeCollect:
@@ -601,8 +614,12 @@ class RoundTwoTests(GatherCase):
         self.collected("https://a.example.com/1", "© Reuters 2024 / John Smith\n" + zh(82, 1200))
         self.collected("https://b.example.com/2", zh(83, 1200) + "\n© 2024 某產業公會 版權所有")
         self.arrive()
-        self.assertEqual(self.cell("https://a.example.com/1", "operator"), {"state": "查不到", "why": "這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁"})
-        self.assertEqual(self.cell("https://b.example.com/2", "operator"), {"state": "查不到", "why": "頁尾只有版權字樣（© 2024 某產業公會 版權所有），沒有寫誰經營；版權所有人不一定是經營者"})
+        # a page collect read is its body (round 5 F1): 無法檢查, with the © line it shows at its end
+        self.assertEqual(self.cell("https://a.example.com/1", "operator"), {"state": "無法檢查", "why": hooks.NOT_ON_IT[hooks.READ_BODY]})
+        self.assertEqual(self.cell("https://b.example.com/2", "operator"), {"state": "無法檢查", "why": hooks.NOT_ON_IT[hooks.READ_BODY] + "；內文裡只有版權字樣（© 2024 某產業公會 版權所有），版權所有人不一定是經營者"})
+        for text in ("© Reuters 2024 / John Smith\n" + zh(82, 1200), zh(83, 1200) + "\n© 2024 某產業公會 版權所有"):   # the person's file, read whole
+            self.assertEqual(hooks._operator(text, None, False, hooks.READ_WHOLE)["state"], "查不到")
+        self.assertEqual(hooks._operator("© Reuters 2024 / John Smith\n" + zh(82, 1200), None, False, hooks.READ_WHOLE)["why"], "這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁")
 
     def test_an_excerpt_and_a_copy_with_more_around_it_are_one_origin_with_the_article(self):
         """M3 (grouping v2): under half or over double the length, Jaccard alone kept them three origins."""
@@ -629,7 +646,7 @@ class RoundTwoTests(GatherCase):
     def test_a_script_the_system_cannot_tell_is_uncheckable(self):
         """minor 2: 查不到 would say we looked and there is none."""
         self.assertEqual(hooks._language("ภาษาไทยเป็นภาษาราชการของประเทศไทย" * 3), {"state": "無法檢查", "why": "系統只分得出中文、英文、日文、韓文"})
-        self.assertEqual(hooks._language("12 345 678 -- 2026"), {"state": "查不到", "why": "網頁沒有文字"})
+        self.assertEqual(hooks._language("12 345 678 -- 2026"), {"state": "查不到", "why": "系統讀到的內容裡沒有文字"})
 
     def test_an_edu_domain_says_school_but_not_a_country(self):
         """minor 3 (source lists v2): .edu is not tied to one country."""
@@ -713,9 +730,9 @@ class RoundThreeTests(GatherCase):
     def test_a_clause_letter_is_not_a_copyright_line(self):
         """N2: (c) stands alone, before a year or a name."""
         for footer in ("第5(c)項規定 the treaty… Article 5(c) applies", "Section 5(c) The Licensee shall", "under (c) applies to members"):
-            self.assertEqual(hooks._operator(zh(172) + "\n" + footer, None, False), {"state": "查不到", "why": "這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁"}, footer)
+            self.assertEqual(hooks._operator(zh(172) + "\n" + footer, None, False, hooks.READ_WHOLE), {"state": "查不到", "why": "這一頁沒寫是誰經營的；系統沒有讀網站的「關於我們」頁"}, footer)
         for footer in ("(c) 2024 Acme Ltd", "(C) Acme Ltd", "(c) 某產業公會"):
-            self.assertEqual(hooks._operator(zh(173) + "\n" + footer, None, False)["why"], f"頁尾只有版權字樣（{footer}），沒有寫誰經營；版權所有人不一定是經營者")
+            self.assertEqual(hooks._operator(zh(173) + "\n" + footer, None, False, hooks.READ_WHOLE)["why"], f"頁尾只有版權字樣（{footer}），沒有寫誰經營；版權所有人不一定是經營者")
 
     def test_a_page_mostly_in_another_script_is_uncheckable_whatever_latin_it_has(self):
         """minor 2: one English sentence made a page of Arabic 英文."""
@@ -769,9 +786,9 @@ class RoundFourTests(GatherCase):
 
     def test_a_copyright_line_alone_names_a_holder_not_who_runs_the_site(self):
         """F2: 「© 2024 Acme Photography」 in the footer was the 誰辦的 cell as 查到."""
-        self.assertEqual(hooks._operator(zh(180, 1200) + "\n© 2024 Acme Photography", None, False),
+        self.assertEqual(hooks._operator(zh(180, 1200) + "\n© 2024 Acme Photography", None, False, hooks.READ_WHOLE),
                          {"state": "查不到", "why": "頁尾只有版權字樣（© 2024 Acme Photography），沒有寫誰經營；版權所有人不一定是經營者"})
-        said = hooks._operator(zh(180, 1200) + "\n© 2024 Acme Photography. Operated by Acme Media Ltd. All rights reserved", None, False)
+        said = hooks._operator(zh(180, 1200) + "\n© 2024 Acme Photography. Operated by Acme Media Ltd. All rights reserved", None, False, hooks.READ_WHOLE)
         self.assertEqual(said, {"state": "查到", "value": "Acme Media Ltd", "why": "網頁寫著「Operated by Acme Media Ltd」"})
         self.assertTrue(any("版權所有人不一定是經營者" in sentence for sentence in require("gather.outlets").items["reading"]))   # the rule shown says it
 
@@ -779,14 +796,14 @@ class RoundFourTests(GatherCase):
         """F3: 查不到 was said after reading only the last 800 characters."""
         for head, name in (("經營者：某某媒體股份有限公司\n", "某某媒體股份有限公司"), ("本網站由某某文化基金會經營。", "某某文化基金會"),
                            ("發行人：王大明｜", "王大明"), ("出版者: 某某出版社\n", "某某出版社"), ("Published by Acme Media Ltd. ", "Acme Media Ltd")):
-            cell = hooks._operator(head + zh(181, 3000), None, False)
+            cell = hooks._operator(head + zh(181, 3000), None, False, hooks.READ_WHOLE)
             self.assertEqual((cell["state"], cell.get("value")), ("查到", name), head)
         url = "https://a.example.com/1"
         self.collected(url, "經營者：某某媒體股份有限公司\n" + zh(182, 3000) + "\n© 2024 Acme Photography")
         self.arrive()
         self.assertEqual(self.cell(url, "operator"), {"state": "查到", "value": "某某媒體股份有限公司", "why": "網頁寫著「經營者：某某媒體股份有限公司」"})
         for prose in (zh(183, 500) + "該刊發行人表示，" + zh(184, 500), "The report was published by the ministry. " + EN, "這家店由陳先生經營，" + zh(185, 500)):
-            self.assertEqual(hooks._operator(prose, None, False), self.PLAIN, prose[:40])   # a mention in a sentence is not the page saying who runs it
+            self.assertEqual(hooks._operator(prose, None, False, hooks.READ_WHOLE), self.PLAIN, prose[:40])   # a mention in a sentence is not the page saying who runs it
 
     def test_who_came_first_is_read_only_from_the_archive_for_every_page(self):
         """F4: a page's own date decided 原始的 when the archive had no record of it, or overruled the archive's."""
@@ -842,7 +859,7 @@ class RoundFourTests(GatherCase):
         """F7: a short page compared on the few pieces a long page's rate leaves it is looked up in the long page's whole
         text: a long page holding exactly those few pieces of it is not where the short page came from."""
         rules = require("gather.grouping").items
-        item = lambda key, text: hooks._Item(key, {"url": f"https://{key}.example.com/", "cells": {}}, text, {}, rules)   # noqa: E731
+        item = lambda key, text: hooks._Item(key, {"url": f"https://{key}.example.com/", "cells": {}}, hooks._Print(text, rules), lambda: text, {})   # noqa: E731
         long_text = zh(205, 200000)
         probe = item("probe", long_text)
         rate = probe.rate
@@ -852,6 +869,228 @@ class RoundFourTests(GatherCase):
         self.assertGreater(len(planted), 2)
         groups = hooks._groups([item("short", short), item("long", long_text + "".join(planted))], rules)
         self.assertEqual(sorted(how for _, how, _ in groups), ["單獨", "單獨"])
+
+
+class RoundFiveTests(GatherCase):
+    """GATHER second cross-model review of the whole block (F1-F3): what rests on something being absent is said only of
+    input read whole (block_hooks/gather.py module docstring); grouping keeps no page's text."""
+
+    BODY = {"state": "無法檢查", "why": hooks.NOT_ON_IT[hooks.READ_BODY]}
+
+    def test_a_page_read_through_collect_never_says_its_operator_is_not_there(self):
+        """F1: collect drops the footer before the text arrives, so 查不到 「這一頁沒寫是誰經營的」 spoke of a part of
+        the page the engine never had -- here that footer says who runs the site."""
+        self.assertIn("本網站由某某媒體股份有限公司經營", PAGE_HTML.split("<footer>")[1])
+        self.assertNotIn("經營", PAGE_EXTRACTED)
+        searched, mine, div = "https://news.example.com/a", "https://news.example.com/b", "https://news.example.com/c"
+        self.collected(searched, PAGE_EXTRACTED)
+        self.collected(mine, PAGE_EXTRACTED + "\n", pasted=True)   # a URL the person pasted: 我貼的, read by the same extractor
+        self.collected(div, DIV_FOOTER_EXTRACTED)
+        self.arrive()
+        self.assertEqual(self.cell(searched, "operator"), self.BODY)
+        self.assertEqual((self.card(mine)["content"]["found_by"], self.cell(mine, "operator")), ({"by": "我貼的"}, self.BODY))
+        self.assertEqual(self.cell(div, "operator"), {"state": "無法檢查", "why": hooks.NOT_ON_IT[hooks.READ_BODY] + "；內文裡只有版權字樣（© 2024 Acme Photography），版權所有人不一定是經營者"})
+        # the person's own file is read whole: what it does not say, 查不到; what it says, 查到
+        body = self.pasted(PAGE_EXTRACTED, title="會員轉來的公告")
+        whole = self.pasted(PAGE_EXTRACTED + "\n本網站由某某媒體股份有限公司經營\n© 2024 Acme Photography 版權所有", title="整頁複製")
+        operator = {doc["content"]["source_id"]: doc["content"]["cells"]["operator"] for doc in self.cards()}
+        self.assertEqual(operator[body], RoundFourTests.PLAIN)
+        self.assertEqual(operator[whole], {"state": "查到", "value": "某某媒體股份有限公司", "why": "網頁寫著「本網站由某某媒體股份有限公司經營」"})
+        self.assertTrue(any("頁首、頁尾" in sentence for sentence in require("gather.outlets").items["reading"]))   # the rule shown says it
+
+    def test_a_fact_check_databases_record_is_not_the_report_page(self):
+        """F1, the same class: VERIFY stores what a fact-check database gave (blocks/verify.py), never the report page;
+        its card said 查不到 「這一頁沒寫是誰經營的」 of a page nobody read."""
+        url = hit_address("claimreview", "https://tfc-taiwan.org.tw/articles/1", "央行宣布下週起每天只能領一萬元")
+        self.collected(url, "查核組織：台灣事實查核中心（https://tfc-taiwan.org.tw）\n他們的判定：錯誤\n發布日期：2024-05-01\n查核報告：https://tfc-taiwan.org.tw/articles/1")
+        self.arrive()
+        self.assertEqual(self.cell(url, "operator"), {"state": "無法檢查", "why": hooks.NOT_ON_IT[hooks.READ_RECORD]})
+
+    def test_no_letter_in_the_first_part_is_not_no_letter_in_the_text(self):
+        """F1 audit, language: 查不到 「網頁沒有文字」 was said after the first 20 000 characters only."""
+        self.assertEqual(hooks._language("12 345 678 -- 2026 " * 2000 + EN), {"state": "查到", "value": "英文"})
+        self.assertEqual(hooks._language("12 345 678 -- 2026"), {"state": "查不到", "why": "系統讀到的內容裡沒有文字"})
+
+    def test_a_pasted_file_has_no_domain_to_find_on_a_list(self):
+        """F1 audit, affiliation: 查不到 「名單上沒有寫它隸屬誰」 for a file -- the lists are of domains, and it has none."""
+        self.pasted(ZH_SAYS)
+        self.assertEqual(self.cards()[0]["content"]["cells"]["affiliation"], {"state": "無法檢查", "why": "你貼的是檔案，沒有網域可以對"})
+
+    def test_a_title_collect_cut_has_no_site_name_to_judge(self):
+        """F1 audit, outlet_exists: 查不到 「名字不像媒體」 was read off the last part of a title collect cut at 300."""
+        short, cut = "https://shop.example.com/1", "https://shop.example.com/2"
+        self.collected(short, zh(310), title="店家公告 | 某某商店")
+        self.collected(cut, zh(311), title=("長" * 296 + " | 某某商店")[:hooks.COLLECT_TITLE_CHARS])
+        self.arrive()
+        self.assertEqual(self.cell(short, "outlet_exists"), {"state": "查不到", "why": "名字不像媒體"})
+        self.assertEqual(self.cell(cut, "outlet_exists"), {"state": "無法檢查", "why": "標題超過 300 個字，只存了前面，網站的名字可能被切掉"})
+
+    def test_a_page_whose_links_collect_cut_is_never_in_a_circle(self):
+        """F2: collect keeps the first 50 other hosts of a page; 51 sites that each link the other 50 and then a site
+        outside were one 「只互相引用」 group."""
+        hosts = [f"s{index}.example.com" for index in range(OUTLINKS_ITEMS + 1)]
+        for index, host in enumerate(hosts):
+            links = [other for other in hosts if other != host] + ["outside.example.org"]
+            self.collected(f"https://{host}/1", zh(300 + index), outlinks=links[:OUTLINKS_ITEMS])   # what collect stores
+        self.arrive()
+        self.assertEqual(set(self.grouping().values()), {"單獨"})
+        self.assertEqual(self.cell(f"https://{hosts[0]}/1", "original"), {"state": "查不到", "why": "沒有找到別的網頁有同一篇，看不出是不是轉貼；" + hooks.LINKS_CUT})
+        self.assertTrue(any(f"最多記 {OUTLINKS_ITEMS} 個" in sentence for sentence in require("gather.grouping").items["rules"]))
+
+    def test_a_page_whose_links_the_sink_dropped_to_fit_is_never_in_a_circle(self):
+        """F2, the same class: collect's sink drops links from the end until relevance fits MAX_RELEVANCE_BYTES, so a
+        short list can be cut too: one with no room for one more host may be."""
+        pages = {"https://a.example.com/1": ["b.example.net", "c.example.org"], "https://b.example.net/2": ["a.example.com", "c.example.org"],
+                 "https://c.example.org/3": ["a.example.com", "b.example.net"]}
+        full = {"searchProvider": "serper", "searchLang": "zh", "outlinks": pages["https://a.example.com/1"], "entityAnchorsHit": [""]}
+        while len(json.dumps(full, ensure_ascii=False).encode("utf-8")) <= MAX_RELEVANCE_BYTES - OUTLINK_CHARS - 4:   # wire v2: 12 anchors of 200
+            full["entityAnchorsHit"] += [""] if len(full["entityAnchorsHit"][-1]) == 200 else []
+            full["entityAnchorsHit"][-1] += "錨"
+        self.assertLessEqual(len(json.dumps(full, ensure_ascii=False).encode("utf-8")), MAX_RELEVANCE_BYTES)
+        self.assertLessEqual(len(full["entityAnchorsHit"]), 12)
+        self.assertEqual((outlinks_whole(full), outlinks_whole({**full, "entityAnchorsHit": ["錨"]})), (False, True))
+        for index, (url, links) in enumerate(pages.items()):
+            self.collected(url, zh(360 + index), outlinks=links, **({"entityAnchorsHit": full["entityAnchorsHit"]} if index == 0 else {}))
+        self.arrive()
+        self.assertEqual(set(self.grouping().values()), {"單獨"})
+        self.assertTrue(self.cell("https://a.example.com/1", "original")["why"].endswith(hooks.LINKS_CUT))
+        self.assertFalse(self.cell("https://b.example.net/2", "original")["why"].endswith(hooks.LINKS_CUT))
+
+    def test_a_page_with_no_links_list_is_never_in_a_circle(self):
+        """F2: absence is not whole (wire v1, another collector, a list collect did not send)."""
+        self.assertFalse(outlinks_whole({"pasted": False}))
+        self.assertFalse(outlinks_whole({"outlinks": ["例子.example"]}))   # a hostname collect sends is ASCII (punycode)
+        self.assertTrue(outlinks_whole({"outlinks": ["a.example"] * (OUTLINKS_ITEMS - 1)}))
+        self.assertFalse(outlinks_whole({"outlinks": ["a.example"] * OUTLINKS_ITEMS}))
+
+    def test_the_letters_and_pieces_are_the_rule_ones(self):
+        """F3: grouping drops spaces and punctuation in one pass (str.translate) and reads a page's pieces once; both
+        must give exactly what the rule's plain definition gives."""
+        size = require("gather.grouping").items["shingle"]
+        chance = random.Random(5)
+        planes = ((0x20, 0x80), (0x80, 0x3000), (0x3000, 0xA000), (0xE000, 0x10000), (0x10000, 0x30000), (0xE0000, 0x110000))
+        for trial in range(120):
+            low, high = chance.choice(planes)
+            text = "".join(chr(chance.randrange(low, high)) if chance.random() < 0.8 else chance.choice(" \n\t。，、.!?「」—…　 ")
+                           for _ in range(chance.choice([0, 3, 5, 6, 40, 700, 5000])))
+            folded = unicodedata.normalize("NFKC", text).casefold()
+            letters = "".join(ch for ch in folded if not ch.isspace() and not unicodedata.category(ch).startswith("P"))
+            self.assertEqual(hooks._letters(text), letters, trial)
+            for rate in (1, 2, 8, 64, 256, 512, 1 << 14):
+                self.assertEqual(hooks._kept(letters, size, rate), {number for number in hooks._numbers(letters, size) if number % rate == 0}, (trial, rate))
+
+
+class MemoryTests(GatherCase):
+    """F3: grouping read every page's whole text and kept all of them (and their letters) until the cards were saved: 800
+    pages of a million letters is gigabytes, enough to kill the process before anything is written. Now a card holds a
+    bounded number of bytes (_Print: at most max_pieces numbers) whatever its page's size, and one page's text is held at
+    a time."""
+
+    # one page in hand: its stored bytes, text, NFKC and folded copies, letters and their UTF-32 bytes, ~15 MiB at a million
+    # letters; 24 pages measured 2026-10-08 at a 19.5 MiB peak for 32 (texts held whole were over 128 MiB)
+    PAGES, PER_CARD, ONE_PAGE = 24, 256 * 1024, 24 * 1024 * 1024
+
+    def test_pages_of_a_million_letters_cost_a_card_each_not_their_text(self):
+        alphabet = dict(enumerate(dict.fromkeys(COMMON)))   # 256+ different Chinese letters, a byte each
+        for index in range(self.PAGES):
+            self.collected(f"https://p{index}.example.com/1", random.Random(index).randbytes(1_000_000).decode("latin-1").translate(alphabet))
+        hooks._dropped()   # the translate table is built once per process, not per case
+        tracemalloc.start()
+        try:
+            block_hooks.after_sources(self.docs, self.tenant_id, self.owner, {"run": None, "source_ids": None, "pasted": False})
+            block_hooks.wait_idle(timeout=900)   # tracing slows every allocation
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+        self.assertEqual(sorted(self.grouping().values()), ["單獨"] * self.PAGES)
+        texts = self.PAGES * 2 * 1_000_000   # what holding the texts alone costs (two bytes a letter), before their letters
+        self.assertLess(peak, self.PAGES * self.PER_CARD + self.ONE_PAGE, f"peak {peak / 2**20:.1f} MiB")
+        self.assertLess(self.PAGES * self.PER_CARD + self.ONE_PAGE, texts)   # so the bound above is not O(the text)
+
+
+class CapsTests(unittest.TestCase):
+    """The invariant's gate (block_hooks/gather.py module docstring): every place collect's extractor and wire builder, or
+    this hook, cut or drop part of what GATHER concludes from, with the answer each one has. A cut added without an
+    answer here fails test_every_cut_of_the_extractor_is_answered or test_every_cut_of_the_hook_is_answered by name."""
+
+    HTML, SINK = NEXT_ADMIN_COLLECT / "collectors" / "http-html.ts", NEXT_ADMIN_COLLECT / "sinks" / "cognitive.ts"
+    TS_CUT = re.compile(r"\.slice\(0,|\bmax = \d|\btexts\(meta\.|DROP_TAGS = \[|contentRegion\(html\)|>=? MAX_\w+")
+    TS_CAPS = {
+        HTML: {
+            "DROP_TAGS = [": "text is a page's body (header, footer, nav, aside gone): READ_BODY, 誰辦的 無法檢查",
+            "stripElements(contentRegion(html))": "only <main>/<article> when marked: READ_BODY, as above",
+            "max = 50": "outlinks cut at exactly 50: outlinks_whole needs fewer than OUTLINKS_ITEMS",
+            "meta.slice(0, 200)": "author: GATHER reads none",
+            ".trim().slice(0, 200)": "author: GATHER reads none",
+        },
+        SINK: {
+            ".slice(0, items)": "texts(): anchors only (GATHER reads none)",
+            "texts(meta.entityAnchorsHit, 12, 200)": "anchors: GATHER reads none",
+            "meta.searchQuery.slice(0, 500)": "query: shown on the card as said, no conclusion",
+            "meta.outlinks.slice(0, rule.items)": "outlinks: a list with a host too long is not sent (no list = not whole); cut at 50 as above",
+            "pyJsonBytes(out) > MAX_RELEVANCE_BYTES": "hosts trimmed to fit leave no room for one more: outlinks_whole; a dropped image joins nothing",
+            "out.outlinks.slice(0, -1)": "as above",
+            "aside.length >= MAX_COMPLETION_ASIDE": "pages set aside past 200 get no card: GATHER concludes nothing from the aside list being whole",
+            "a.title.slice(0, 300)": "title cut: COLLECT_TITLE_CHARS, outlet_exists 無法檢查",
+            ".slice(0, MAX_COMPLETION_CHANNELS)": "channels: at most 4 exist (2 engines, 2 languages)",
+            "(doc.title ?? doc.canonicalUrl).slice(0, 300)": "title cut: COLLECT_TITLE_CHARS",
+            "> MAX_TEXT_BYTES": "a page over 5 MiB is not sent at all, never cut",
+            "result.error.slice(0, 120)": "an error message, not a page",
+        },
+    }
+    PY_CUT = re.compile(r"\[:|\[-\w+(?:\[|:)")   # [:n] and [-x:] / [-name[...]:], not [-1]
+    PY_CAPS = {
+        "value[:10]": "a date's first ten characters",
+        "_script_letter(after[:1])": "the letter after a name",
+        "labels[: len(labels)": "a host's labels up to the registered name",
+        "labels[:-1]": "every label but the top-level one",
+        "[:：]": "a regex class, not a cut",
+        "said[1][:120]": "a quote's length on the card (查到 quotes what is there)",
+        "lines[-1][:120]": "a quote's length in why",
+        'text[-rules["footer_chars"]:]': "a © line read in the footer only: it goes in why, never decides a state",
+        'archived["value"][:10]': "a date",
+        "relevance[name][:limit]": "found_by as said, cut to its field",
+        '"url": url[:2048]': "the card's url field",
+        '(row.get("title") or "")[:300]': "the card's title field (the cells read the row's whole title)",
+        'aside[:300]': "the card's aside field",
+        'entry["url"][:2048]': "the card's url field",
+        'reason[:300]': "the card's aside field",
+        '"一份你貼的檔案")[:60]': "how another page's why names a page",
+        "unique[:3]": "how many names a why lists (it says how many there are)",
+        'item["provider"][:40]': "a channel's fields",
+        "url[:url_max]": "a page set aside compared as its card keeps it",
+    }
+
+    def found(self, path: Path, pattern: re.Pattern[str]) -> list[str]:
+        return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if pattern.search(line) and not line.strip().startswith(("//", "#", "*"))]
+
+    def unanswered(self, lines: list[str], needles: Mapping[str, str]) -> list[str]:
+        return [line for line in lines if not any(needle in line for needle in needles)]
+
+    def test_every_cut_of_the_extractor_is_answered(self):
+        for path, needles in self.TS_CAPS.items():
+            lines = self.found(path, self.TS_CUT)
+            self.assertEqual(self.unanswered(lines, needles), [], path.name)
+            self.assertEqual([needle for needle in needles if not any(needle in line for line in lines)], [], path.name)   # no stale answer
+
+    def test_every_cut_of_the_hook_is_answered(self):
+        lines = self.found(PRODUCT_ROOT / "ai_lego" / "platform" / "block_hooks" / "gather.py", self.PY_CUT)
+        self.assertEqual(self.unanswered(lines, self.PY_CAPS), [])
+        self.assertEqual([needle for needle in self.PY_CAPS if not any(needle in line for line in lines)], [])
+
+    def test_each_cut_is_one_number_on_both_sides(self):
+        html, sink = self.HTML.read_text(encoding="utf-8"), self.SINK.read_text(encoding="utf-8")
+        rule = WIRE["relevance"]["outlinks"]
+        [cap] = re.findall(r"export function outlinkHosts\([^)]*\bmax = (\d+)\)", html)
+        [(items, longest)] = re.findall(r'outlinks: \{ type: "texts", items: (\d+), max: (\d+) \}', sink)
+        self.assertEqual({int(cap), int(items), rule["items"]}, {OUTLINKS_ITEMS})
+        self.assertEqual({int(longest), rule["max"]}, {OUTLINK_CHARS})
+        [sink_bytes] = re.findall(r"export const MAX_RELEVANCE_BYTES = (\d+);", sink)
+        self.assertEqual({int(sink_bytes), WIRE["max_relevance_bytes"]}, {MAX_RELEVANCE_BYTES})
+        titles = re.findall(r"a\.title\.slice\(0, (\d+)\)|doc\.canonicalUrl\)\.slice\(0, (\d+)\)", sink)
+        self.assertEqual((len(titles), {int(one or other) for one, other in titles}), (2, {hooks.COLLECT_TITLE_CHARS}))
+        checks = api_main.IngestSource.relevance_checks()["outlinks"]   # the engine refuses what the rule refuses
+        self.assertEqual((checks(["a.example"] * OUTLINKS_ITEMS), checks(["a.example"] * (OUTLINKS_ITEMS + 1)), checks(["h" * (OUTLINK_CHARS + 1)])), (True, False, False))
 
 
 class CardLimitTests(GatherCase):

@@ -82,7 +82,7 @@ from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net.collection_service import CollectionServiceClient, collection_service_from_env
 from ai_lego.core.domain._intake_validation import require_text, require_uuid
 from ai_lego.core.domain.project import project_record
-from ai_lego.core.domain.source import TEXT_MEDIA_TYPES, source_record
+from ai_lego.core.domain.source import OUTLINK_CHARS, OUTLINKS_ITEMS, TEXT_MEDIA_TYPES, source_record
 from ai_lego.core.domain.collection_run import MAX_FETCHES, MAX_SEEDS, collection_run_record
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.case_docs import CaseDocs
@@ -3386,7 +3386,7 @@ class IngestSource(BaseModel):
             "pasted": lambda value: isinstance(value, bool),
             "aside": text(300),
             "imageUrl": lambda value: text(2048)(value) and value.startswith(("https://", "http://")),
-            "outlinks": texts(50, 253),
+            "outlinks": texts(OUTLINKS_ITEMS, OUTLINK_CHARS),
         }
 
     def stored_relevance(self) -> dict[str, Any]:
