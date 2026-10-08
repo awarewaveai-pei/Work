@@ -14,7 +14,8 @@ member (ProjectSourceRepository.require_group: G1, G3); only the person who wrot
 
 from __future__ import annotations
 
-from typing import Any, Callable, Mapping
+from contextlib import contextmanager
+from typing import Any, Callable, Iterator, Mapping
 from uuid import uuid4
 
 import psycopg
@@ -225,6 +226,16 @@ class CaseDocs:
         _not_a_group(owner)
         return self._current(tenant_id, owner, kind)
 
+    @contextmanager
+    def reading_group(self, tenant_id: str, group_id: str, identity_id: str) -> Iterator[None]:
+        """One transaction for a read of a group's records (platform/visibility.py): the group lock shared (an erase waits)
+        and the reader's membership row FOR SHARE (their leaving waits), so what was decided is what is fetched (Codex
+        F5). Reads inside are savepoints of it (db: one connection per thread)."""
+        with self._repo.transaction(tenant_id) as connection:
+            self._repo.lock_group(connection, tenant_id, group_id)
+            ProjectSourceRepository._membership(connection, tenant_id, group_id, identity_id, lock="FOR SHARE")
+            yield
+
     def current_in_group(self, tenant_id: str, group_id: str, kind: str) -> list[dict[str, Any]]:
         """Every member's live documents of a group's kind, each with ``written_by`` (who wrote its first version). Called
         by platform/visibility.py only (tests/unit/test_visibility.py's gate): it decides what a viewer gets of these."""
@@ -306,6 +317,12 @@ class CaseReads:
 
     def collection_run(self, tenant_id: str, project_id: str, run_id: str) -> dict[str, Any] | None:
         return self._repo.get_collection_run(tenant_id, project_id, run_id)
+
+    def hold_group(self, tenant_id: str, group_id: str, identity_id: str | None) -> None:
+        """For a hook's check: the group still there (and ``identity_id`` a current member), under the group lock held
+        shared until the hook's save commits -- an erase of the group waits for it (Codex F2). Raises as require_group."""
+        with self._repo.transaction(tenant_id) as connection:
+            ProjectSourceRepository.require_group(connection, tenant_id, group_id, after_close=True, member=identity_id)
 
     def membership(self, tenant_id: str, group_id: str, identity_id: str) -> dict[str, Any] | None:
         """The person's current membership of a group (its role and review state), or None (platform/visibility.py)."""

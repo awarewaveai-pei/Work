@@ -19,13 +19,19 @@ ITEM_KEYS = {"project_id", "kind", "doc_id", "version"}
 
 
 def _check_consent(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: dict[str, Any], doc_id: str | None) -> None:
-    if content.get("withdrawn") is True:
+    me, withdrawn = owner.id, content.get("withdrawn") is True
+    if content.get("purpose") == "group":   # under the group lock until this save commits: an erase of the group waits (Codex F2)
+        try:
+            docs.reads.hold_group(tenant_id, str(content.get("target")), None if withdrawn else me)
+        except InvariantViolation as error:
+            if str(error).startswith(("GROUP_NOT_FOUND", "GROUP_ERASED")):
+                raise InvariantViolation("CONSENT_TARGET_NOT_FOUND: a consent for a group names a group you are in") from None
+            raise
+    if withdrawn:
         return
-    me, items = owner.id, content.get("items") or []
+    items = content.get("items") or []
     if not isinstance(items, list) or len(items) > MAX_ITEMS:
         raise InvariantViolation(f"CONSENT_ITEMS_INVALID: at most {MAX_ITEMS} documents in one consent")
-    if content.get("purpose") == "group" and docs.reads.membership(tenant_id, str(content.get("target")), me) is None:
-        raise InvariantViolation("CONSENT_TARGET_NOT_FOUND: a consent for a group names a group you are in")
     for item in items:
         if not isinstance(item, dict) or set(item) - ITEM_KEYS or not all(isinstance(item.get(key), str) for key in ("project_id", "kind", "doc_id")):
             raise InvariantViolation("CONSENT_ITEMS_INVALID: each item is {project_id, kind, doc_id, version?}")

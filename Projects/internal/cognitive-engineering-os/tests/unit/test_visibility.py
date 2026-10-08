@@ -187,6 +187,32 @@ class WhoReadsTests(VisibilityCase):
         self.assertEqual(self.sees(outsider, "collab.s34_members", tenant=other_tenant), set())
         self.assertFalse(visibility.is_member(self.docs, Viewer(other_tenant, outsider), self.group))
 
+    def test_a_member_leaving_while_reading_a_history_waits_for_the_read(self):
+        """Codex F5: decided and fetched in one transaction; leaving waits for it, so no history is handed to one who left."""
+        import threading
+        from unittest import mock
+
+        theirs = self.put(self.c, "collab.s34_members", text="C")
+        holding, release, real, outcome = threading.Event(), threading.Event(), self.docs.versions_in_group, {}
+
+        def slowly(*args, **kwargs):   # authorized, about to fetch
+            holding.set()
+            release.wait(20)
+            return real(*args, **kwargs)
+        with mock.patch.object(self.docs, "versions_in_group", slowly):
+            reader = threading.Thread(target=lambda: outcome.setdefault("read", len(visibility.versions(self.docs, Viewer(self.tenant, self.b), self.group, "collab.s34_members", theirs))), daemon=True)
+            reader.start()
+            self.assertTrue(holding.wait(10))
+            leaver = threading.Thread(target=lambda: self.repo.leave_group(self.tenant, self.group, self.b), daemon=True)
+            leaver.start()
+            leaver.join(0.5)
+            self.assertTrue(leaver.is_alive(), "the leave did not wait for the read in flight")
+            release.set()
+            reader.join(20)
+            leaver.join(20)
+        self.assertEqual(outcome["read"], 1)   # it was a member when it read
+        self.assertEqual(self.sees(self.b, "collab.s34_members"), set())
+
     def test_role_helpers(self):
         self.assertTrue(visibility.is_convener(self.docs, Viewer(self.tenant, self.a), self.group))
         self.assertFalse(visibility.is_convener(self.docs, Viewer(self.tenant, self.b), self.group))

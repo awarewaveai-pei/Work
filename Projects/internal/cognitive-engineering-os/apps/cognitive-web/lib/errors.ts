@@ -158,6 +158,7 @@ const CODES: Record<string, string> = {
   GROUP_CONVENER_ONLY: "只有召集人可以做這件事。",
   GROUP_LAST_CONVENER: "你是這個群組唯一的召集人，還不能離開。請先讓另一位成員也當召集人。",
   GROUP_MEMBER_NOT_FOUND: "這個人不在群組裡。",
+  GROUP_MEMBER_HELD: "這個人還在等確認，確認之後才能當召集人。",
   GROUP_MEMBER_UNKNOWN: "找不到這個人。",
   GROUP_ALREADY_MEMBER: "這個人已經在群組裡了。",
   GROUP_NAME_INVALID: "群組的名字不能留白，最多 120 個字。",

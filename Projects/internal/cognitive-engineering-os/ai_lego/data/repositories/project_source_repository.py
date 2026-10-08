@@ -1011,21 +1011,27 @@ class ProjectSourceRepository:
 
     @classmethod
     def require_convener(cls, connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str) -> None:
-        """Membership first (G2: not a member = GROUP_NOT_FOUND), then the role. On the caller's transaction."""
+        """Membership first (G2: not a member = GROUP_NOT_FOUND), then the role -- held for review (§4) acts as no
+        convener (Codex F1). On the caller's transaction."""
         mine = cls._membership(connection, tenant_id, group_id, identity_id, lock="FOR SHARE")
         if mine is None:
             raise InvariantViolation(f"GROUP_NOT_FOUND: {group_id!r}")
-        if mine["role"] != "convener":
+        if mine["role"] != "convener" or mine["review_state"] != "confirmed":
             raise InvariantViolation("GROUP_CONVENER_ONLY: only a convener does this")
 
     def hand_over(self, tenant_id: str, group_id: str, by_identity_id: str, to_identity_id: str) -> None:
-        """A convener makes another current member a convener too (G5: then the first may leave)."""
+        """A convener makes another current, confirmed member a convener too (G5: then the first may leave); one held
+        for review (§4) is not made one (Codex F1)."""
         with self._db.for_tenant(tenant_id) as connection:
             self.require_group(connection, tenant_id, group_id, after_close=True)
             self.require_convener(connection, tenant_id, group_id, by_identity_id)
-            if connection.execute("UPDATE group_members SET role='convener' WHERE tenant_id=%s AND group_id=%s AND identity_id=%s AND left_at IS NULL",
-                                  (tenant_id, group_id, to_identity_id)).rowcount != 1:
+            target = self._membership(connection, tenant_id, group_id, to_identity_id, lock="FOR UPDATE")
+            if target is None:
                 raise InvariantViolation("GROUP_MEMBER_NOT_FOUND: that person is not in the group")
+            if target["review_state"] != "confirmed":
+                raise InvariantViolation("GROUP_MEMBER_HELD: a member held for review is confirmed before they lead the group")
+            connection.execute("UPDATE group_members SET role='convener' WHERE tenant_id=%s AND group_id=%s AND identity_id=%s AND left_at IS NULL",
+                               (tenant_id, group_id, to_identity_id))
 
     @classmethod
     def _owned_group(cls, connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str) -> Row:

@@ -68,6 +68,12 @@ def visible(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, *, doc_id:
     spec = doc_kinds.require(kind)
     if spec.owner != "group":
         raise InvariantViolation(f"VISIBILITY_NOT_A_GROUP_KIND: {kind!r}")
+    with docs.reading_group(viewer.tenant_id, group_id, viewer.identity_id):
+        return _visible(docs, viewer, group_id, spec, doc_id)
+
+
+def _visible(docs: CaseDocs, viewer: Viewer, group_id: str, spec: doc_kinds.DocKind, doc_id: str | None) -> list[dict[str, Any]]:
+    kind = spec.kind
     items = docs.current_in_group(viewer.tenant_id, group_id, kind)
     mine = [item for item in items if item["written_by"] == viewer.identity_id]
     membership = _membership(docs, viewer, group_id)
@@ -85,9 +91,10 @@ def visible(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, *, doc_id:
 
 def versions(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, doc_id: str) -> list[dict[str, Any]]:
     """Every version of one group document the viewer may read (``visible``); DOC_NOT_FOUND otherwise, as for none."""
-    if not visible(docs, viewer, group_id, kind, doc_id=doc_id):
-        raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
-    return docs.versions_in_group(viewer.tenant_id, group_id, kind, doc_id)
+    with docs.reading_group(viewer.tenant_id, group_id, viewer.identity_id):   # decided and fetched in one transaction (Codex F5)
+        if not visible(docs, viewer, group_id, kind, doc_id=doc_id):
+            raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
+        return docs.versions_in_group(viewer.tenant_id, group_id, kind, doc_id)
 
 
 def shared_with(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer, grantee_kind: str, grantee_id: str) -> list[dict[str, Any]]:

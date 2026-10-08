@@ -154,6 +154,14 @@ class Erasure:
             grants = IdentityStore.close_collect_grants_on(connection, tenant_id, project_id)
             outbox.write_job(connection, tenant_id, CASE, project_id, identity_id, {"sources": erased["sources"], "events_deleted": erased["events_deleted"], "grants_closed": grants}, items)
 
+    def decide_groups(self, tenant_id: str, identity_id: str) -> dict[str, int]:
+        """The account erasure's first step, before any case is erased (Codex F3): under the person lock held exclusive,
+        refused while the person leads a group alone (ACCOUNT_IS_LAST_CONVENER -- nothing is erased then), else their
+        memberships, invitations and group records go. decide_person runs the same part again for anything since."""
+        with self._repo.transaction(tenant_id) as connection:
+            db.owner_lock(connection, "person", tenant_id, identity_id, exclusive=True)
+            return ProjectSourceRepository.erase_person_from_groups(connection, tenant_id, identity_id)
+
     def decide_person(self, tenant_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]]) -> dict[str, int]:
         """The person's own part, after their cases: the workflows and their records, their memberships and what they wrote
         in groups (refused while they lead a group alone: ACCOUNT_IS_LAST_CONVENER), the person's other records and the

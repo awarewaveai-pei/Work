@@ -180,6 +180,16 @@ def _records(connection: psycopg.Connection, tenant_id: str, owner: record_log.O
              "author": row["author"], "block": row["block"], "payload": row["payload_json"]} for row in rows]
 
 
+def _written_in_groups(connection: psycopg.Connection, tenant_id: str, identity_id: str) -> list[dict[str, Any]]:
+    """What the person wrote in groups, also ones they left (G3: theirs to export) -- only the versions they wrote, never
+    another member's (Codex F4). By the record's writer, like the account erasure that removes them."""
+    rows = connection.execute(
+        "SELECT owner_id, aggregate_id, sequence, event_type, occurred_at, schema_version, payload_json, author, block FROM events "
+        "WHERE tenant_id=%s AND owner_kind='group' AND author_identity_id=%s ORDER BY write_order", (tenant_id, identity_id)).fetchall()
+    return [{"group_id": row["owner_id"], "aggregate_id": row["aggregate_id"], "sequence": row["sequence"], "type": row["event_type"], "at": row["occurred_at"],
+             "schema_version": row["schema_version"], "author": row["author"], "block": row["block"], "payload": row["payload_json"]} for row in rows]
+
+
 def _case_export(repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore, tenant_id: str, project: dict[str, Any],
                  runs: list[dict[str, Any]]) -> dict[str, Any]:
     project_id = project["project_id"]
@@ -310,12 +320,14 @@ def export_account(fmt: Format = Query(default="json", alias="format"), session:
     identity = store.get_identity(me) or {}
     with repo.transaction(tenant_id) as connection:   # a workflow's own records go with the workflows, as when they had their own file
         records = [record for record in _records(connection, tenant_id, record_log.person(me)) if not record["aggregate_id"].startswith(CustomWorkflowRepository.AGGREGATE_PREFIX)]
+        group_records = _written_in_groups(connection, tenant_id, me)
     runs = _person_runs(tenant_id, me, artifact_store)
     export = {
         "format": EXPORT_FORMAT, "exported_at": _now(), "scope": "account",
         "identity": {key: identity.get(key) for key in ("identity_id", "email", "display_name", "created_at")},
         "cases": [_case_export(repo, source_cas, artifact_store, tenant_id, project, runs) for project in _my_cases(repo, session)],
         "person": {"records": records, "workflows": workflows.list(tenant_id, me), "runs": [run for run in runs if run["project_id"] is None]},
+        "groups": group_records,
     }
     return _download(export, fmt, "cognitive-os-account")
 
@@ -357,15 +369,19 @@ def erase_account(body: EraseBody, response: Response, session: dict[str, Any] =
         reasons.append("a workflow run is still running")
     if reasons:
         raise HTTPException(status_code=409, detail=f"PROJECT_BUSY: {reasons[0]}; wait for it to finish, then delete the account")
-    if repo.groups_led_alone(tenant_id, me):   # G5, before anything is erased (the decision checks it again under its locks)
-        raise HTTPException(status_code=409, detail="ACCOUNT_IS_LAST_CONVENER: the account leads a group alone; hand it over or erase the group first")
+    erasure = api.erasure_for(repo, source_cas, artifact_store)
+    try:   # G5 decided under the person lock before any case is erased; the person's group part goes with it (Codex F3)
+        in_groups = erasure.decide_groups(tenant_id, me)
+    except InvariantViolation as error:
+        if str(error).startswith("ACCOUNT_IS_LAST_CONVENER"):
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        raise
     failed: list[dict[str, str]] = []
     states: set[str] = set()   # each erasure's physical_cleanup: done, pending (a retry will do it), blocked (an operator must look)
     for project in cases:
         erased = api.erase_case(store, repo, source_cas, artifact_store, tenant_id, me, project["project_id"])
         failed += erased.get("failed", [])
         states.add(erased["physical_cleanup"])
-    erasure = api.erasure_for(repo, source_cas, artifact_store)
     for earlier in erasure.resume(tenant_id=tenant_id, erased_by_identity_id=me):   # a case erased before whose files were not all gone
         if earlier["subject_kind"] != PERSON:
             failed += earlier.get("failed", [])
@@ -376,6 +392,7 @@ def erase_account(body: EraseBody, response: Response, session: dict[str, Any] =
         if str(error).startswith(("ACCOUNT_HAS_LIVE_CASES", "ACCOUNT_ALREADY_ERASED", "ACCOUNT_IS_LAST_CONVENER")):
             raise HTTPException(status_code=409, detail=str(error)) from error
         raise
+    counts = {**counts, **{key: counts.get(key, 0) + value for key, value in in_groups.items()}}
     person = erasure.finish(tenant_id, PERSON, me)
     failed += person["failed"]
     states.add(person["physical_cleanup"])

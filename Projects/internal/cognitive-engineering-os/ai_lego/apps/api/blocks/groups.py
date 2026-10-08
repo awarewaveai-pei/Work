@@ -50,7 +50,7 @@ def _status(text: str) -> int:
         return 404
     if text.startswith(("GROUP_INVITES_TOO_MANY", "GROUP_INVITES_PER_DAY")):
         return 429
-    if text.startswith(("GROUP_CLOSED", "GROUP_LAST_CONVENER", "GROUP_ALREADY_MEMBER", "IDENTITY_ERASED")):
+    if text.startswith(("GROUP_CLOSED", "GROUP_LAST_CONVENER", "GROUP_ALREADY_MEMBER", "GROUP_MEMBER_HELD", "IDENTITY_ERASED")):
         return 409
     return 400
 

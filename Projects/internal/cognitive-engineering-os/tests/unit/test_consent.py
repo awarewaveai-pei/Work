@@ -102,6 +102,37 @@ class GroupConsentTests(ConsentCase):
         self.assertEqual(generic.status_code, 404, generic.text)   # every save path runs the same check
         self.assertEqual(self.client.get("/me/consents").json(), [])
 
+    def test_a_group_erased_while_a_consent_is_saved_leaves_no_consent_naming_it(self):
+        """Codex F2: the save holds the group lock from its check to its commit; the erase waits, then takes the consent."""
+        import threading
+        from unittest import mock
+
+        from ai_lego.core.domain import doc_kinds
+
+        holding, release, real, first, outcome = threading.Event(), threading.Event(), doc_kinds.validate, threading.Lock(), {}
+
+        def validate(*args, **kwargs):   # inside the consent's save, after its check
+            if first.acquire(blocking=False):
+                holding.set()
+                release.wait(20)
+            return real(*args, **kwargs)
+
+        def erase():
+            outcome["erased"] = self.repo.erase_group(self.tenant_id, self.group, self.me)["consents"]
+        with mock.patch.object(doc_kinds, "validate", validate):
+            saver = threading.Thread(target=lambda: outcome.setdefault("saved", self.consent(self.shared).status_code), daemon=True)
+            saver.start()
+            self.assertTrue(holding.wait(10))
+            eraser = threading.Thread(target=erase, daemon=True)
+            eraser.start()
+            eraser.join(0.5)
+            self.assertTrue(eraser.is_alive(), "the erase did not wait for the consent's save")
+            release.set()
+            saver.join(20)
+            eraser.join(20)
+        self.assertEqual((outcome["saved"], outcome["erased"]), (200, 1))
+        self.assertEqual(self.client.get("/me/consents").json(), [])
+
     def test_a_pinned_consent_reads_its_version_and_a_following_one_the_newest(self):
         self.client.put(f"/projects/{self.case}/docs/sense.card/{self.shared}", json={"content": {"category": "事件", "text": "改過的卡"}, "base_version": 1})
         self.consent(self.shared, follow=False, version=1)

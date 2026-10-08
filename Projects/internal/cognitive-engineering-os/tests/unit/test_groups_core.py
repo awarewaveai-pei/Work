@@ -273,6 +273,17 @@ class G5ConvenerTests(_Racing):
         self.repo.leave_group(self.tenant, self.group, self.a)
         self.assertEqual([(m["identity_id"], m["role"]) for m in self.repo.group_members(self.tenant, self.group)], [(self.b, "convener"), (self.c, "participant")])
 
+    def test_a_member_held_for_review_is_not_made_convener_and_a_held_convener_leads_nothing(self):
+        """Codex F1: hand-over refuses a held member; a convener who is held closes and erases nothing."""
+        with self.databases.for_tenant(self.tenant) as connection:
+            connection.execute("UPDATE group_members SET review_state='pending_review' WHERE group_id=%s AND identity_id=%s", (self.group, self.b))
+        self.assertEqual(self.refused(lambda: self.repo.hand_over(self.tenant, self.group, self.a, self.b)), "GROUP_MEMBER_HELD")
+        with self.databases.for_tenant(self.tenant) as connection:   # a held convener however it came about
+            connection.execute("UPDATE group_members SET role='convener' WHERE group_id=%s AND identity_id=%s", (self.group, self.b))
+        for act in (self.repo.close_group, self.repo.erase_group):
+            self.assertEqual(self.refused(lambda: act(self.tenant, self.group, self.b)), "GROUP_CONVENER_ONLY")
+        self.assertEqual(self.repo.get_group_for(self.tenant, self.group, self.a)["status"], "open")
+
     def test_two_conveners_leaving_at_once_leave_one(self):
         self.repo.hand_over(self.tenant, self.group, self.a, self.b)
         holding, go, real = threading.Event(), threading.Event(), ProjectSourceRepository._conveners_and
@@ -449,3 +460,46 @@ class GroupApiTests(ApiTestCase):
         response = self.client.post("/govern/account/erase", json={"confirm": "刪除我的帳號"})
         self.assertEqual((response.status_code, response.json()["detail"].split(":")[0]), (409, "ACCOUNT_IS_LAST_CONVENER"))
         self.assertEqual(self.client.get(f"/projects/{project}").status_code, 200)
+
+    def test_the_account_export_holds_what_the_person_wrote_in_groups_and_nothing_of_others(self):
+        """Codex F4 / G3: also in a group the person left; only their own versions."""
+        group_id = self.make()
+        other = self.login_as("co@example.com")
+        tenant_id, repo = self.tenant["tenant_id"], ProjectSourceRepository(self.databases)
+        with self.databases.for_tenant(tenant_id) as connection:
+            ProjectSourceRepository.add_member(connection, tenant_id, group_id, other, "participant")
+        docs = CaseDocs(repo)
+        with registered(NOTE):
+            mine = docs.save(tenant_id, record_log.group(group_id), "collab.s34_note", {"text": "OTHER-MINE"}, record_log.user(other, "COLLAB"))
+            docs.save(tenant_id, record_log.group(group_id), "collab.s34_note", {"text": "CONVENER-WORDS"}, record_log.user(self.me, "COLLAB"))
+            repo.leave_group(tenant_id, group_id, other)
+            exported = self.client.get("/govern/export").json()
+        self.assertEqual([(item["group_id"], item["payload"]["doc_id"], item["payload"]["content"]["text"]) for item in exported["groups"]],
+                         [(group_id, mine["doc_id"], "OTHER-MINE")])
+        self.assertNotIn("CONVENER-WORDS", str(exported))
+
+    def test_a_convener_leaving_while_the_account_is_erased_never_leaves_cases_gone_and_the_account_kept(self):
+        """Codex F3: the other convener leaves after the old precheck, while the cases are being erased. The group part is
+        decided under the person lock before any case: the account goes, the group keeps a convener."""
+        group_id = self.make()
+        other = self.login_as("co@example.com")
+        with self.databases.for_tenant(self.tenant["tenant_id"]) as connection:
+            ProjectSourceRepository.add_member(connection, self.tenant["tenant_id"], group_id, other, "participant")
+        repo = ProjectSourceRepository(self.databases)
+        repo.hand_over(self.tenant["tenant_id"], group_id, self.me, other)
+        self._login()
+        self.client.post("/projects", json={"name": "我的案子", "purpose": "p", "data_classification": "Confidential"})
+        real, outcome = api_main.erase_case, {}
+
+        def erase_case(*args, **kwargs):
+            try:   # the other convener tries to leave between the start and the first case erase
+                repo.leave_group(self.tenant["tenant_id"], group_id, other)
+                outcome["left"] = True
+            except InvariantViolation as error:
+                outcome["left"] = str(error).split(":")[0]
+            return real(*args, **kwargs)
+        with mock.patch.object(api_main, "erase_case", erase_case):
+            response = self.client.post("/govern/account/erase", json={"confirm": "刪除我的帳號"})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(outcome["left"], "GROUP_LAST_CONVENER")
+        self.assertEqual([(m["identity_id"], m["role"]) for m in repo.group_members(self.tenant["tenant_id"], group_id)], [(other, "convener")])
