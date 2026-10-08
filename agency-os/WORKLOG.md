@@ -114,6 +114,18 @@
 **剩餘風險**: 三課仍是 draft，必須由 operator review 後才可作為 facilitator training content；本卡不建立 facilitator records、eligibility query 或 page。
 
 **Rollback**: `git revert <card-60b-commit>` 移除三課、course support、HISTORY v2、checklist row、review-debt row 與本次 oracle artifact；不涉及資料庫或部署。
+
+## 2026-10-08（續5）COS 卡 52：EXPRESS 頁面
+
+- 根本問題：EXPRESS 後端已有選擇、大綱、草稿、讀取、匯出與本人送出路由，但案子裡沒有把讀者、格式、勾選紀錄、逐句來源和未查證確認串成一個人能操作的畫面；`collab.proposal` 不在本 worktree 的 `ai_lego` 樹，因此群組提案按鈕等待 card 20。
+- 修改：新增 `Projects/internal/cognitive-engineering-os/apps/cognitive-web/components/blocks/ExpressPage.tsx`、頁面 route 與 `ExpressPage.test.tsx`；更新 `docs/platform/STEP34_CHECKLIST.md`、review-debt row。既有 `EXPRESS` registry 與 EXPRESS error map 已符合本卡，不重複修改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | cognitive-web typecheck PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run components/blocks/ExpressPage.test.tsx` | exit=0 | 3 tests PASS。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n；第二次 Claude oracle artifact `agency-os/reports/oracle/2026-10-08-review-c760c487.md` approve，第一次 2 findings 已修正後重審。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`ExpressPage|express.selection|還沒查證|collab.proposal` | hits=69；核對 page、route、API selection／draft／send call sites、checklist、cards 與 shared rules，`collab.proposal` 僅在規格／shared rules，未在 `ai_lego` kind 樹可供 Part B 使用。
+- MUTATION_EVIDENCE: 移除句子 `還沒查證` mark、移除送出二次確認、加入 `<select>` 各使 `ExpressPage.test.tsx` 轉紅；每次立即還原，最後 `ExpressPage.tsx` SHA256 回到 `F075D07FEE870FA277F73B13717ED394E241D1D3D668D2AF899EFCD21C4B8ED4`。
+- SCOPE: no group proposal, no backend route, no database migration, no external delivery, no push／merge／deploy；`.docx` 維持 card 51 的未建置決定。
+- WORKLOG: 本條目由 `scripts/worklog-insert-entry.py` 配號；`agency-os/WORKLOG.md` 透過 `scripts/git-partial-worktree-commit.py` private index staged。
 ## 2026-10-08（續4）
 
 ### fix(cos): close Card 51 EXPRESS export/send review gaps

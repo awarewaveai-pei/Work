@@ -29,7 +29,8 @@
 - [x] `express.sent` is user-only, points to a saved draft and version in this case, and is not written by the EXPRESS AI actions or hook; selection CRUD, outline, draft listing, format listing and version routes are covered.
 - [x] EXPRESS exports each draft in Markdown, plain text, and PDF with sentence marks and a final confidence/uncertainty section; export is read-only and the send route records the person's confirmed version only after the read and acknowledgement gates.
 - [x] EXPRESS has no automatic delivery path: no recipient service is called; `.docx` is deliberately not built in this card, and group sharing belongs to the next card.
-- [ ] The person-facing EXPRESS page and export/send presentation belong to the later EXPRESS page/export cards; this card supplies the record and AI contract underneath them.
+- [x] The person-facing EXPRESS page keeps reader, format, key points, checked case records, outline, sentence sources, unchecked and AI marks, confidence, uncertainty, exports, and the person-confirmed send flow on one screen; it uses the existing EXPRESS routes and design-system classes.
+- [ ] The EXPRESS group proposal button is waiting for card 20 because `collab.proposal` is not present in this worktree's `ai_lego` tree; no case record is shared by this card.
 
 ## FACILITATE
 

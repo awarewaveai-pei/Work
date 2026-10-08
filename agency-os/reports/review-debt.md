@@ -35,6 +35,8 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 - F4 `platform/identity/store.py:create_tenant` home 與 directory 兩交易非原子（process 死在中間留孤兒 home 列；4c13c954b 只讓同資料重試可恢復）；開第二區前需孤兒清理或兩階段。
 - F5 source/artifact/journal CAS 根目錄不分區，第二區租戶的檔案不在其區域；= STORAGE_SWITCH D7。
 
+| Codex | 52-express-page | 建立 EXPRESS 單頁流程，讓人選讀者、格式與紀錄，逐句看來源並確認後匯出或送出 | selection.items 只含勾選紀錄；未查證句子必先確認；句子來源、信心與不確定性保持可見；送出仍由人觸發 | `ExpressPage.test.tsx` 3 tests；`npx tsc --noEmit`；mutation：移除未查證二次確認後 named test 應紅；無 `<select>` 與 AI 標記／來源檢查 | 未經 Claude 跨模型審查 |
+
 ## deferred
 
 - `scripts/dev/prod_projects_check.py`、`scripts/dev/prod_read_analyses.py` 仍以 sqlite3 讀 `repo.db_path`（PG 版 repo 無此屬性）；dev 工具、非 CI/主路徑，切換上線後改讀 PG 或刪除。
