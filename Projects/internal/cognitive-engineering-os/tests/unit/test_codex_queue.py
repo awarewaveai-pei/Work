@@ -57,7 +57,8 @@ def command_shape_error(command: str) -> str | None:
                 index += 2
             else:
                 return f"affected_tests argument is not allowed: {rest[index]}"
-        return None
+        # without --run it only prints test names and exits 0: a card would pass having run nothing (Codex r2 review F1)
+        return None if "--run" in rest else "affected_tests check must pass --run"
     return "check is not an allowed command shape"
 
 
@@ -366,6 +367,7 @@ if (-not (Test-Path -LiteralPath $errPath)) { throw 'captured stderr log was not
             "python -m unittest -k x tests.unit.test_a", "python -c print(1)", "python scripts/other.py",
             "python scripts/affected_tests.py --run | sh", "python scripts/affected_tests.py --exec x",
             "python scripts/affected_tests.py --base ../x", "npx tsc --noEmit --watch", "npx tsc",
+            "python scripts/affected_tests.py --base HEAD~1", "python scripts/affected_tests.py",
             "npx vitest run", "npx vitest run ../../evil.test.ts", "npx vitest run components/a.test.tsx>out",
             "npx vitest run --config x", "npx vite build", "npm test", "python  -m unittest tests.unit.test_a",
             " python -m unittest tests.unit.test_a", "python -m unittest tests.unit.test_a%PATH%",

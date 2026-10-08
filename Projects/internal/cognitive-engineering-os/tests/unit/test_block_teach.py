@@ -42,7 +42,7 @@ class TeachKindTests(unittest.TestCase):
                      "ＳＣＯＲＥ ７", "６／１０"):
             with self.subTest(text=text), self.assertRaisesRegex(InvariantViolation, "TEACH_AI_OUTPUT_REFUSED"):
                 teach_lessons.scan_ai_text(text)
-        for text in ("開始前 5 分鐘", "2026/10/08 那次 session", "8 位參與者只有 2 位", "三分之一的人", "你提出了反例。"):
+        for text in ("開始前 5 分鐘", "2026/10/08 那次 session", "課程在 10/08 開始", "3/12 那天的討論", "8 位參與者只有 2 位", "三分之一的人", "你提出了反例。"):
             with self.subTest(text=text):
                 teach_lessons.scan_ai_text(text)
 
