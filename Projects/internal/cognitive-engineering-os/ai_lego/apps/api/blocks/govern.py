@@ -172,10 +172,10 @@ def _person_runs_to_erase(tenant_id: str, identity_id: str) -> list[dict[str, An
 
 def _records(connection: psycopg.Connection, tenant_id: str, owner: record_log.Owner) -> list[dict[str, Any]]:
     """Every record an owner holds, in the order written, each with its author and block (a row from before they were
-    recorded says so: author null)."""
+    recorded says so: author null); not DocRead, the bookkeeping of having viewed a document."""
     rows = connection.execute(
         "SELECT aggregate_id, sequence, event_type, occurred_at, schema_version, payload_json, author, block FROM events "
-        "WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s ORDER BY write_order", (tenant_id, owner.kind, owner.id)).fetchall()
+        "WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s AND event_type <> 'DocRead' ORDER BY write_order", (tenant_id, owner.kind, owner.id)).fetchall()
     return [{"aggregate_id": row["aggregate_id"], "sequence": row["sequence"], "type": row["event_type"], "at": row["occurred_at"], "schema_version": row["schema_version"],
              "author": row["author"], "block": row["block"], "payload": row["payload_json"]} for row in rows]
 

@@ -31,6 +31,7 @@ class ExpressKindTests(unittest.TestCase):
         sent = doc_kinds.require("express.sent")
         self.assertEqual(selection.owner, draft.owner, "case")
         self.assertEqual(draft.authors, frozenset({"ai", "joint", "user"}))
+        self.assertNotIn("last_read_version", draft.fields)
         self.assertEqual(sent.authors, frozenset({"user"}))
         self.assertTrue(all(field.human_only for field in sent.fields.values()))
         self.assertEqual(set(sent.fields), {"draft", "version", "to"})
@@ -232,10 +233,36 @@ class ExpressApiTests(ProjectSourceApiTestCase):
 
 
 class ExpressSourceScanTests(unittest.TestCase):
-    def test_routes_never_write_sent(self):
-        tree = ast.parse((PRODUCT_ROOT / "ai_lego" / "apps" / "api" / "blocks" / "express.py").read_text(encoding="utf-8"))
+    @staticmethod
+    def _assert_sent_route_contract(source: str) -> None:
+        tree = ast.parse(source)
         writes_sent = [node for node in ast.walk(tree) if isinstance(node, ast.Call) and "express.sent" in ast.unparse(node)]
-        self.assertEqual(writes_sent, [], "the EXPRESS route module never names express.sent")
+        owners = []
+        for function in [node for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]:
+            if any(node in writes_sent for node in ast.walk(function)):
+                owners.append(function.name)
+        if owners != ["send_draft"]:
+            raise AssertionError(f"only send_draft may write express.sent: {owners}")
+        send = next(node for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == "send_draft")
+        save_calls = [node for node in ast.walk(send) if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "save_many"]
+        if len(save_calls) != 1 or "express.sent" not in ast.unparse(save_calls[0]) or not any(keyword.arg == "check" for keyword in save_calls[0].keywords):
+            raise AssertionError("send_draft must write express.sent through save_many(check=...)")
+
+    def test_only_send_route_writes_sent_through_checked_save_many(self):
+        source = (PRODUCT_ROOT / "ai_lego" / "apps" / "api" / "blocks" / "express.py").read_text(encoding="utf-8")
+        self._assert_sent_route_contract(source)
+
+    def test_a_second_sent_writer_is_rejected(self):
+        source = (PRODUCT_ROOT / "ai_lego" / "apps" / "api" / "blocks" / "express.py").read_text(encoding="utf-8")
+        mutated = source + "\n\ndef bad_route(docs):\n    docs.save_many([], [], [{\"kind\": \"express.sent\"}], None)\n"
+        with self.assertRaises(AssertionError):
+            self._assert_sent_route_contract(mutated)
+
+    def test_send_route_without_check_is_rejected(self):
+        source = (PRODUCT_ROOT / "ai_lego" / "apps" / "api" / "blocks" / "express.py").read_text(encoding="utf-8")
+        mutated = source.replace("api._me(session, \"EXPRESS\"), check=check_current,", "api._me(session, \"EXPRESS\"),")
+        with self.assertRaises(AssertionError):
+            self._assert_sent_route_contract(mutated)
 
 
 if __name__ == "__main__":

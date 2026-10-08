@@ -86,6 +86,15 @@
 - MUTATION_EVIDENCE: 記憶體內移除 Future 完成回呼，`test_wait_idle_waits_for_a_submitted_hook_without_a_future_registry` 轉紅；原版 3/3 綠。
 - REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，main 合併仍封鎖。
 
+## 2026-10-08（續4）
+
+### fix(cos): close Card 51 EXPRESS export/send review gaps
+
+- AUTO_TASK_DONE: C51 EXPRESS export/send review fixes — PDF text is drawn and measured as unparsed text; rendering happens inside the checked `save_many` transaction before `express.sent`; duplicate `DocRead` events are avoided; read markers do not create content versions; GOVERN exports exclude read bookkeeping; the route's sole `express.sent` writer is AST-tested; unused read-marker fields/errors were removed; the test image installs pinned `poppler-utils`.
+- MODIFIED: `Projects/internal/cognitive-engineering-os/Dockerfile`; COS EXPRESS render, route, generic docs save, GOVERN export, EXPRESS kind and web errors; `test_express_export.py` and `test_block_express.py`.
+- TEST_EVIDENCE: `COGNITIVE_OS_REQUIRE_POSTGRES=1 python -m unittest tests.unit.test_express_export tests.unit.test_block_express tests.unit.test_block_foundation tests.unit.test_record_log tests.unit.test_step2_foundation tests.unit.test_api_main tests.unit.test_block_govern tests.unit.test_egress_allowlist_parity tests.unit.test_codex_queue` — 341 tests PASS; `npx tsc --noEmit` PASS; `docker build --target test -t cognitive-os-api:c51-test-final -f Projects/internal/cognitive-engineering-os/Dockerfile .` PASS; `docker run --rm cognitive-os-api:c51-test-final python -m unittest tests.unit.test_express_export` — 18 tests PASS.
+- MUTATION_EVIDENCE: PDF `parse_math=False`, renderer width measurement, render-before-write rollback, duplicate DocRead suppression, GOVERN DocRead exclusion, `seen` no-op, checked save lock, AI-author preservation, and removed `last_read_version` field each turned red under one temporary mutation and were byte-exact restored; `__pycache__` purged; `git diff --check` PASS.
+- GOVERNANCE: no push, merge, deploy, or compose apply; review debt row added for this Codex commit with status `未經 Claude 跨模型審查`.
 ## 2026-10-08（續3）COS 卡 40/41/42/50：修正 Claude 審查發現
 
 - 根本問題：TEACH AI action 只擋一種私密要求，沒有擋自由文字評分／排名；練習同意沒有綁真實案；完成紀錄不可刪且沒有 opt-out；課程完成只取每課最後一筆 run；EXPRESS 草稿可把舊 AI 原句標成本人或 joint，且新增拒絕碼未進 web 錯誤句表。

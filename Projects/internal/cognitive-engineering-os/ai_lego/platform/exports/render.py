@@ -18,9 +18,8 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt  # noqa: E402 -- the backend must be selected first
-from matplotlib.backends.backend_pdf import PdfPages  # noqa: E402
+from matplotlib.backends.backend_pdf import PdfPages, RendererPdf  # noqa: E402
 from matplotlib.font_manager import FontProperties  # noqa: E402
-from matplotlib.textpath import TextPath  # noqa: E402
 
 from ai_lego.errors import InvariantViolation
 
@@ -42,6 +41,7 @@ _PDF_RIGHT_FRACTION = 0.92
 _PDF_PAGE_WIDTH_INCHES = 8.27
 _PDF_FONT = FontProperties(family="sans-serif", size=_PDF_FONT_SIZE)
 _PDF_PRINTABLE_WIDTH = _PDF_PAGE_WIDTH_INCHES * 72 * (_PDF_RIGHT_FRACTION - _PDF_LEFT_FRACTION)
+_PDF_RENDERER = RendererPdf(None, 72, 11.69 * 72, _PDF_PAGE_WIDTH_INCHES * 72)
 
 
 def _content(draft: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -152,8 +152,9 @@ def _pdf_lines(draft: Mapping[str, Any]) -> list[str]:
 
 
 def _pdf_text_width(text: str) -> float:
-    """Measure with the same resolved font and size that the PDF text uses."""
-    return float(TextPath((0, 0), text, prop=_PDF_FONT).get_extents().width)
+    """Measure the unparsed string with the PDF renderer's text metrics."""
+    width, _height, _descent = _PDF_RENDERER.get_text_width_height_descent(text, _PDF_FONT, False)
+    return float(width)
 
 
 def _wrap_pdf_line(line: str) -> list[str]:
@@ -193,7 +194,7 @@ def render_pdf(draft: Mapping[str, Any]) -> bytes:
                 try:
                     y = 0.95
                     for line in page_lines[start:start + 42]:
-                        figure.text(_PDF_LEFT_FRACTION, y, line, fontproperties=_PDF_FONT, va="top")
+                        figure.text(_PDF_LEFT_FRACTION, y, line, fontproperties=_PDF_FONT, va="top", parse_math=False)
                         y -= 0.021
                     pages.savefig(figure)
                 finally:

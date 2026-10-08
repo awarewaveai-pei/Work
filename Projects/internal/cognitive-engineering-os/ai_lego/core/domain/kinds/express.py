@@ -18,7 +18,6 @@ KINDS = [
         "format": Field("choice", choices=FORMAT_NAMES, required=True),
         "reader": Field("text", 500, required=True),
         "sentences": Field("json", 60000, required=True, shape="array"),
-        "last_read_version": Field("int", 100000),
     }, authors=frozenset({"ai", "joint", "user"})),
     DocKind("express.sent", "EXPRESS", "已送出的稿", {
         "draft": Field("text", 64, required=True, human_only=True, scan=False),

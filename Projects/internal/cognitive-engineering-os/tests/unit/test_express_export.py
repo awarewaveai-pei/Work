@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -68,6 +69,20 @@ class ExpressRendererTests(unittest.TestCase):
 
     def test_pdf_has_the_pdf_signature(self):
         self.assertTrue(render_pdf(_draft()).startswith(b"%PDF"))
+
+    def test_pdf_preserves_dollar_signs_without_math_parsing(self):
+        for text in ("price $5 and $10 total", "a $_$ b"):
+            with self.subTest(text=text):
+                draft = {**_draft(), "sentences": [{**_draft()["sentences"][0], "text": text}]}
+                extracted = re.sub(r"\s+", "", _pdf_text(render_pdf(draft)))
+                self.assertIn(re.sub(r"\s+", "", text), extracted)
+
+    def test_pdf_width_uses_the_renderer_and_stays_inside_the_printable_limit(self):
+        with patch.object(render_module._PDF_RENDERER, "get_text_width_height_descent", wraps=render_module._PDF_RENDERER.get_text_width_height_descent) as measure:
+            width = _pdf_text_width("price $5 and $10 total")
+        self.assertGreater(width, 0)
+        self.assertLessEqual(width, _PDF_PRINTABLE_WIDTH)
+        self.assertTrue(measure.called)
 
     def test_pdf_wraps_by_glyph_width_and_keeps_long_sentences_across_pages(self):
         sentences = [
@@ -180,12 +195,32 @@ class ExpressExportApiTests(ProjectSourceApiTestCase):
         sent = self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/send", json={"version": 2, "to": "合夥人"})
         self.assertEqual(sent.status_code, 200, sent.text)
 
+    def test_repeated_reads_write_one_bookkeeping_event_and_exports_omit_it(self):
+        draft = self._save_draft()
+        for _ in range(2):
+            read = self.client.get(f"{self.base}/express/drafts/{draft['doc_id']}")
+            self.assertEqual(read.status_code, 200, read.text)
+        with self._repo.connection() as connection:
+            reads = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=? AND owner_kind='case' AND owner_id=? AND event_type='DocRead'", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0]
+        self.assertEqual(reads, 1)
+        exported = self.client.get(f"{self.base}/govern/export")
+        self.assertEqual(exported.status_code, 200, exported.text)
+        self.assertNotIn('"type": "DocRead"', exported.text)
+
+    def test_unchanged_ai_sentence_keeps_its_export_mark(self):
+        content = {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "AI 原句", "refs": [{"kind": "sense.card", "doc_id": self.record["doc_id"]}], "unchecked": False, "author": "ai"}]}
+        draft = self.client.post(f"{self.base}/docs/express.draft", json={"content": content}).json()
+        changed_label = self.client.put(f"{self.base}/docs/express.draft/{draft['doc_id']}", json={"base_version": 1, "content": {**content, "sentences": [{**content["sentences"][0], "author": "user"}]}})
+        self.assertEqual(changed_label.status_code, 200, changed_label.text)
+        self.assertEqual(changed_label.json()["content"]["sentences"][0]["author"], "ai")
+        exported = self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/export", params={"format": "text"})
+        self.assertEqual(exported.status_code, 200, exported.text)
+        self.assertIn("AI 原句 （AI 寫的）", exported.text)
+
     def test_missing_or_non_boolean_seen_is_unread(self):
         for seen in (MISSING, "yes"):
             with self.subTest(seen=seen):
                 draft = self._save_draft(seen=seen)
-                read = self.client.get(f"{self.base}/express/drafts/{draft['doc_id']}")
-                self.assertEqual(read.status_code, 200, read.text)
                 refused = self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/send", json={"version": 1, "to": "合夥人", "acknowledge_unchecked": True})
                 self.assertEqual(refused.status_code, 409, refused.text)
                 self.assertIn("請重新讀一次再送", refused.text)
@@ -218,6 +253,79 @@ class ExpressExportApiTests(ProjectSourceApiTestCase):
         with self._repo.connection() as connection:
             sent = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=? AND owner_kind='case' AND owner_id=? AND json_extract(payload_json, '$.kind')='express.sent'", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0]
         self.assertEqual(sent, 0)
+
+    def test_render_failure_happens_before_sent_write(self):
+        from ai_lego.apps.api.blocks import express as express_routes
+
+        draft = self._save_draft()
+        read = self.client.get(f"{self.base}/express/drafts/{draft['doc_id']}")
+        self.assertEqual(read.status_code, 200, read.text)
+        with patch.object(express_routes, "render_pdf", side_effect=RuntimeError("renderer failed")):
+            with self.assertRaises(RuntimeError):
+                self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/send", params={"format": "pdf"}, json={"version": 1, "to": "合夥人"})
+        with self._repo.connection() as connection:
+            sent = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=? AND owner_kind='case' AND owner_id=? AND json_extract(payload_json, '$.kind')='express.sent'", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0]
+        self.assertEqual(sent, 0)
+
+    def test_edit_after_recheck_is_blocked_until_sent_write_commits(self):
+        draft = self._save_draft()
+        read = self.client.get(f"{self.base}/express/drafts/{draft['doc_id']}")
+        self.assertEqual(read.status_code, 200, read.text)
+        original_save_many = CaseDocs.save_many
+        original_save = CaseDocs._save
+        writer_started = threading.Event()
+        writer_committed = threading.Event()
+        sent_write_started = threading.Event()
+        writer_errors = []
+        thread_holder = []
+
+        def competing_edit():
+            try:
+                writer_started.set()
+                CaseDocs(self._repo).save(
+                    self.tenant["tenant_id"], record_log.case(self.project["project_id"]), "express.draft",
+                    {**draft["content"], "sentences": [{**draft["content"]["sentences"][0], "text": "鎖外的競爭編輯。"}]},
+                    record_log.user(self.identity["identity_id"], "EXPRESS"), doc_id=draft["doc_id"], base_version=1,
+                )
+                writer_committed.set()
+            except BaseException as error:  # surfaced below; do not hide a failed competing writer
+                writer_errors.append(error)
+
+        def wrapped_save_many(self, tenant_id, owner, items, writer, check=None):
+            def check_then_start_writer():
+                check()
+                thread = threading.Thread(target=competing_edit)
+                thread.start()
+                thread_holder.append(thread)
+
+            return original_save_many(self, tenant_id, owner, items, writer, check=check_then_start_writer)
+
+        def wrapped_save(self, connection, tenant_id, owner, kind, content, writer, doc_id, base_version):
+            if kind == "express.sent":
+                sent_write_started.set()
+            return original_save(self, connection, tenant_id, owner, kind, content, writer, doc_id, base_version)
+
+        with patch.object(CaseDocs, "save_many", wrapped_save_many), patch.object(CaseDocs, "_save", wrapped_save):
+            sent = self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/send", json={"version": 1, "to": "合夥人"})
+        for thread in thread_holder:
+            thread.join(timeout=5)
+        self.assertFalse(writer_errors, writer_errors)
+        self.assertTrue(writer_started.is_set())
+        self.assertTrue(sent_write_started.is_set())
+        self.assertTrue(writer_committed.is_set())
+        self.assertEqual(sent.status_code, 200, sent.text)
+
+    def test_seen_only_update_records_a_read_without_a_content_version(self):
+        draft = self._save_draft(seen=MISSING)
+        update = {**draft["content"], "sentences": [{**draft["content"]["sentences"][0], "seen": True}]}
+        response = self.client.put(f"{self.base}/docs/express.draft/{draft['doc_id']}", json={"base_version": 1, "content": update})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["version"], 1)
+        self.assertNotIn("seen", response.json()["content"]["sentences"][0])
+        versions = self.client.get(f"{self.base}/express/drafts/{draft['doc_id']}/versions")
+        self.assertEqual([item["version"] for item in versions.json()], [1])
+        sent = self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/send", json={"version": 1, "to": "合夥人"})
+        self.assertEqual(sent.status_code, 200, sent.text)
 
     def test_generic_sent_document_route_cannot_bypass_send(self):
         draft = self._save_draft()

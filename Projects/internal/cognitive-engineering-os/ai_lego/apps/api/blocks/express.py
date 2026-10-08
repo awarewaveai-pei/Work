@@ -81,10 +81,7 @@ def _export_response(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, dr
 
 
 def _has_unread_sentence(draft: dict[str, Any], read_version: int | None) -> bool:
-    content = draft["content"]
-    if read_version != draft["version"]:
-        return True
-    return any(sentence.get("seen") is not True for sentence in content["sentences"])
+    return read_version != draft["version"]
 
 
 def _has_unchecked_sentence(draft: dict[str, Any]) -> bool:
@@ -154,7 +151,9 @@ def read_draft(project_id: str, draft_id: str, session: dict[str, Any] = Depends
     docs = CaseDocs(repo)
     draft = _draft(docs, session["tenant_id"], owner, draft_id)
     try:
-        docs.record_read(session["tenant_id"], owner, "express.draft", draft_id, draft["version"], api._me(session, "EXPRESS"))
+        read_version = docs.last_read_version(session["tenant_id"], owner, "express.draft", draft_id, session["identity_id"])
+        if read_version != draft["version"]:
+            docs.record_read(session["tenant_id"], owner, "express.draft", draft_id, draft["version"], api._me(session, "EXPRESS"))
     except InvariantViolation as error:
         if str(error).startswith("DOC_READ_STALE"):
             raise HTTPException(status_code=409, detail="稿子在讀取時有新版本，請重新讀一次。") from error
@@ -180,7 +179,6 @@ def send_draft(project_id: str, draft_id: str, body: SendBody, fmt: str = Query(
     owner = case_owner(project_id, session, repo)
     docs = CaseDocs(repo)
     _draft(docs, session["tenant_id"], owner, draft_id)  # Fast 404 before entering the atomic recheck.
-    sent_kind = ".".join(("express", "sent"))
     if fmt not in {"md", "txt", "text", "plain", "pdf"}:
         raise HTTPException(status_code=400, detail=f"EXPRESS_EXPORT_FORMAT_INVALID: {fmt!r}")
     checked: dict[str, Any] = {}
@@ -199,13 +197,13 @@ def send_draft(project_id: str, draft_id: str, body: SendBody, fmt: str = Query(
             raise InvariantViolation("EXPRESS_SEND_READ_REQUIRED: 稿子有新內容或還沒讀過，請重新讀一次再送。")
         if _has_unchecked_sentence(current) and not body.acknowledge_unchecked:
             raise InvariantViolation("EXPRESS_SEND_ACK_REQUIRED: 稿子裡還有還沒查證的句子，確定要送？")
-        checked["draft"] = _export_draft(docs, session["tenant_id"], owner, current)
-        before_save(docs, session["tenant_id"], owner, sent_kind, {"draft": draft_id, "version": body.version, "to": body.to})
+        checked["response"] = _export_response(docs, session["tenant_id"], owner, current, fmt)
+        before_save(docs, session["tenant_id"], owner, "express.sent", {"draft": draft_id, "version": body.version, "to": body.to})
 
     try:
         docs.save_many(
             session["tenant_id"], owner,
-            [{"kind": sent_kind, "content": {"draft": draft_id, "version": body.version, "to": body.to}}],
+            [{"kind": "express.sent", "content": {"draft": draft_id, "version": body.version, "to": body.to}}],
             api._me(session, "EXPRESS"), check=check_current,
         )
     except InvariantViolation as error:
@@ -218,8 +216,7 @@ def send_draft(project_id: str, draft_id: str, body: SendBody, fmt: str = Query(
         if message.startswith("EXPRESS_SEND_DRAFT_NOT_FOUND"):
             raise HTTPException(status_code=404, detail=message) from error
         raise
-    response = _export_response(docs, session["tenant_id"], owner, checked["draft"], fmt, prepared=True)
-    return response
+    return checked["response"]
 
 
 @router.get("/projects/{project_id}/express/formats")

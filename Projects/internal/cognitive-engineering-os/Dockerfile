@@ -43,6 +43,9 @@ CMD ["uvicorn", "ai_lego.apps.api.main:app", "--host", "0.0.0.0", "--port", "842
 
 FROM runtime AS test
 USER root
+# The PDF export tests extract text with Poppler; keep the apt package pinned like the Python locks.
+RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils=25.03.0-5+deb13u4 \
+    && rm -rf /var/lib/apt/lists/*
 COPY Projects/internal/cognitive-engineering-os/requirements-test.lock /app/Projects/internal/cognitive-engineering-os/requirements-test.lock
 RUN pip install --no-cache-dir --require-hashes -r /app/Projects/internal/cognitive-engineering-os/requirements-test.lock
 # What the image tests read besides the package and SPEC: tests/, eval/ (harness), scripts/ (selector tests, eval
