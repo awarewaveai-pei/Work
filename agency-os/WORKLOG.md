@@ -115,6 +115,31 @@
 **剩餘風險**：PDF 的字型顯示依執行環境已安裝的 CJK 字型而定；`.docx`、群組分享、外部實際投遞不在本卡；Claude 跨模型審查尚未完成。沒有資料庫 migration、外部投遞、部署或遠端寫入。
 
 **rollback**：`git revert <本次 commit>` 可移除本輪 renderer、read event、routes、guards、tests、error codes、review-debt 與本條 WORKLOG；沒有資料遷移或外部服務狀態需要回復。
+## 2026-10-07（續2）COS 卡 51：EXPRESS 匯出與本人送出
+
+**根本問題**：EXPRESS 已能保存可追溯草稿，但沒有把草稿安全轉成可攜格式，也沒有把「本人看過目前版本、本人確認後才送」落成一條不可繞過的路徑；一般文件路由還能直接建立 `express.sent`，讀取標記也能被偽造。
+
+**已修改**：
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/exports/{__init__,render}.py`：新增 Markdown、純文字、PDF renderers；句子順序固定，未查證與 AI 句子都保留可見標記，信心與仍不確定的地方在最後一節；PDF 沿用既有 matplotlib 依賴，沒有加入新依賴。
+- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/express.py`：新增個別草稿讀取（寫入 `last_read_version`）、唯讀匯出、本人送出路由；版本、已讀、未查證確認和 ASCII 檔名都在邊界處檢查。
+- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/docs.py`、`core/domain/kinds/express.py`、`platform/block_hooks/express.py`：讀取標記只能由讀取路由寫入；`express.sent` 只能由送出路由寫入；送出版本只能是目前版本。
+- `apps/cognitive-web/lib/errors.ts`、`docs/platform/STEP34_CHECKLIST.md`、`tests/unit/test_express_export.py`、`tests/unit/test_block_express.py`、`agency-os/reports/review-debt.md`：補錯誤句、清單、路由／格式／掃描／突變測試與待審列。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_express_export` | exit=0 | ms=5175；8 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_express` | exit=0 | ms=14512；14 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | ms=26255；43 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0；cognitive-web typecheck PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile` on all changed Python modules | exit=0；syntax PASS。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n；逐檔讀回 routes、renderers、kind、hook、generic save gate、frontend codes、checklist、tests；Claude 跨模型審查仍待審。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`express export/send symbols, express.sent, last_read_version, outbound scan words` | hits=58；逐一核對目前 call sites，沒有 stale route 或 checklist claim。
+- ORACLE_WAIVED: 目前沒有可用的獨立 Claude review session；以指定測試、讀回、靜態掃描和突變紅綠證據替代，不代表跨模型審查已完成。
+
+**突變證據**：移除未查證標記後 `ExpressRendererTests.test_every_renderer_keeps_order_marks_and_final_disclosures` 紅；移除共用目前版本守衛後 `ExpressExportApiTests.test_send_requires_current_version_and_acknowledgement_then_records_sent` 紅；加入 `import urllib.request` 後 `ExpressOutboundScanTests.test_real_tree_has_no_outbound_path_and_temp_import_is_caught` 紅；在匯出路由寫 `express.sent` 後 `ExpressExportApiTests.test_export_formats_are_downloads_and_export_does_not_record` 紅；移除 generic save 的讀取標記守衛後 `ExpressExportApiTests.test_generic_draft_save_cannot_forge_the_read_marker` 紅；每次還原後 focused suite 綠。
+
+**剩餘風險**：PDF 的字型顯示依執行環境已安裝的 CJK 字型而定；`.docx`、群組分享、外部實際投遞不在本卡；Claude 跨模型審查尚未完成。沒有資料庫 migration、外部投遞、部署或遠端寫入。
+
+**rollback**：`git revert <本次 commit>` 可移除本卡新增的 renderer、routes、read/send guards、tests、checklist、error codes、review-debt 與本條 WORKLOG；沒有資料遷移或外部服務狀態需要回復。
 ## 2026-10-07（續1）COS 卡 02 備份與佇列驗收碼
 
 - 根因：`ops/cognitive-db/backup-cognitive-db.sh:83,100` 曾在主機直接呼叫 `psql/pg_dump`，但 compose 不發布主機埠；`scripts/codex-continue.ps1:75-82` 在 Windows PowerShell 5.1 用 `Start-Process -PassThru` 後取得 null `ExitCode`，每個驗收都誤報 125。
