@@ -175,11 +175,13 @@ class RelevanceRuleTests(WireV2Case):
 class CompletionRuleTests(WireV2Case):
     """A completion whose lists break the spec still ends the run (as failed) and kills the grant -- never left open."""
 
-    def assert_refused(self, **lists) -> None:
+    def assert_refused(self, reason: str, **lists) -> None:
         self._start()
         response = self._complete({**SPEC["complete"], **lists})
         self.assertEqual(response.status_code, 400, str(lists)[:200])
-        self.assertIn("COLLECTION_COMPLETE_INVALID", response.text)
+        # refused by the rule the case is about: a payload that breaks two rules let a removed guard hide behind the
+        # other one (Codex VERIFY r5 review: 21 copies of one channel were refused as a repeated pair, not as too many)
+        self.assertIn(f"COLLECTION_COMPLETE_INVALID: {reason}", response.text)
         self.assertEqual(self._run_status(), "failed")
         self.assertEqual(self._complete(SPEC["complete"]).status_code, 401)
         block_hooks.wait_idle()
@@ -198,31 +200,32 @@ class CompletionRuleTests(WireV2Case):
     def test_each_rule_past_its_limit_is_refused(self):
         limits = SPEC["completion_limits"]
         page, channel = SPEC["complete"]["aside"][0], SPEC["complete"]["channels"][0]
+        # each case breaks exactly one rule and names the refusal that rule gives
         cases = {
-            "too many pages": {"aside": [page] * (limits["aside"] + 1)},
-            "a page with another key": {"aside": [{**page, "text": "x"}]},
-            "a page that is not a web address": {"aside": [{**page, "url": "file:///etc/passwd"}]},
-            "a url too long": {"aside": [{**page, "url": "https://a.example/" + "u" * limits["aside_url"]}]},
-            "a title too long": {"aside": [{**page, "title": "t" * (limits["aside_title"] + 1)}]},
-            "an empty reason": {"aside": [{**page, "reason": ""}]},
-            "too many channels": {"channels": [channel] * (limits["channels"] + 1)},
-            "a channel with another key": {"channels": [{**channel, "count": 1}]},
-            "one channel reported twice": {"channels": [channel, {**channel, "state": "ok", "why": ""}]},
-            "a provider that is not an id": {"channels": [{**channel, "provider": "Serper API"}]},
-            "perplexity as a channel": {"channels": [{**channel, "provider": "perplexity", "state": "ok", "why": ""}]},
-            "aside items that are not pages": {"aside": ["x"]},
-            "aside that is not a list": {"aside": {"url": "https://a.example/"}},
-            "channels that are not a list": {"channels": "serper"},
-            "an empty string for pages": {"aside": ""},
-            "a zero for channels": {"channels": 0},
-            "false for pages": {"aside": False},
-            "a language outside zh and en": {"channels": [{**channel, "lang": "fr"}]},
-            "a state outside the three": {"channels": [{**channel, "state": "down"}]},
-            "a why too long": {"channels": [{**channel, "why": "w" * (limits["channel_why"] + 1)}]},
+            "too many pages": ("aside: at most", {"aside": [page] * (limits["aside"] + 1)}),
+            "a page with another key": ("aside: each page is", {"aside": [{**page, "text": "x"}]}),
+            "a page that is not a web address": ("aside: url is", {"aside": [{**page, "url": "file:///etc/passwd"}]}),
+            "a url too long": ("aside: url is", {"aside": [{**page, "url": "https://a.example/" + "u" * limits["aside_url"]}]}),
+            "a title too long": ("aside: title at most", {"aside": [{**page, "title": "t" * (limits["aside_title"] + 1)}]}),
+            "an empty reason": ("aside: title at most", {"aside": [{**page, "reason": ""}]}),
+            "too many channels": ("channels: at most", {"channels": [channel] * (limits["channels"] + 1)}),
+            "a channel with another key": ("channels: each is", {"channels": [{**channel, "count": 1}]}),
+            "one channel reported twice": ("channels: each (provider, lang) once", {"channels": [channel, {**channel, "state": "ok", "why": ""}]}),
+            "a provider that is not an id": ("channels: provider is", {"channels": [{**channel, "provider": "Serper API"}]}),
+            "perplexity as a channel": ("channels: provider is", {"channels": [{**channel, "provider": "perplexity", "state": "ok", "why": ""}]}),
+            "aside items that are not pages": ("aside: a list of pages", {"aside": ["x"]}),
+            "aside that is not a list": ("aside: a list of pages", {"aside": {"url": "https://a.example/"}}),
+            "channels that are not a list": ("channels: a list", {"channels": "serper"}),
+            "an empty string for pages": ("aside: a list of pages", {"aside": ""}),
+            "a zero for channels": ("channels: a list", {"channels": 0}),
+            "false for pages": ("aside: a list of pages", {"aside": False}),
+            "a language outside zh and en": ("channels: lang zh|en", {"channels": [{**channel, "lang": "fr"}]}),
+            "a state outside the three": ("channels: lang zh|en", {"channels": [{**channel, "state": "down"}]}),
+            "a why too long": ("channels: lang zh|en", {"channels": [{**channel, "why": "w" * (limits["channel_why"] + 1)}]}),
         }
-        for name, lists in cases.items():
+        for name, (reason, lists) in cases.items():
             with self.subTest(name):
-                self.assert_refused(**lists)
+                self.assert_refused(reason, **lists)
 
 
 class ClaimSeedTests(WireV2Case):
