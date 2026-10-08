@@ -1,0 +1,27 @@
+id: framing.problem_statement
+subject: framing.problem_statement
+version: 1
+state: draft
+steps:
+  - what: 請參與者用自己的話說明想處理的問題，不替他改寫成結論。
+    minutes: 3
+    dont:
+      - 替參與者下結論
+      - 要求參與者說出脆弱的事
+      - 停止訊號出現了還繼續
+      - 把服從或反抗當成錯
+    stop_signals:
+      - 參與者說想停下來。
+      - 參與者不想分享這個問題。
+  - what: 把參與者同意給你看的部分寫下來，確認他要不要繼續。
+    minutes: 4
+    dont:
+      - 替參與者下結論
+      - 要求參與者說出脆弱的事
+      - 停止訊號出現了還繼續
+      - 把服從或反抗當成錯
+    stop_signals:
+      - 參與者撤回同意。
+escalation:
+  who: GOVERN
+  how: 交給 GOVERN，依參與者所在地提供求助資源與申訴管道。

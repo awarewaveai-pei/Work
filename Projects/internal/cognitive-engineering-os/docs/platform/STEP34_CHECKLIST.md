@@ -30,3 +30,13 @@
 - [x] EXPRESS exports each draft in Markdown, plain text, and PDF with sentence marks and a final confidence/uncertainty section; export is read-only and the send route records the person's confirmed version only after the read and acknowledgement gates.
 - [x] EXPRESS has no automatic delivery path: no recipient service is called; `.docx` is deliberately not built in this card, and group sharing belongs to the next card.
 - [ ] The person-facing EXPRESS page and export/send presentation belong to the later EXPRESS page/export cards; this card supplies the record and AI contract underneath them.
+
+## FACILITATE
+
+- [x] Facilitator scripts are versioned YAML content under `ai_lego/platform/scripts/`, loaded as `facilitate.scripts`, with the card's four-item dont list as `FACIL_DONTS` (`dont-list.yaml`).
+- [x] A script records each step's wording, minutes, donts and stop signals, plus an escalation path to GOVERN resources.
+- [x] A subject with no stop signal in any step is excluded from `available_subjects()` and reported as `沒有停止訊號`.
+- [x] Draft scripts never appear in `usable_for_leading()`; the three seed scripts remain drafts until operator review.
+- [x] The CSV importer maps operator-selected headers, writes drafts, preserves empty stop-signal cells as empty lists, reports those rows, and never calls a network client.
+- [ ] card 60b: facilitator lessons, after the TEACH fixes merge.
+- [ ] Showing `FACIL_DONTS` on screen the whole time someone leads belongs to the later FACILITATE page card; this card supplies the list.

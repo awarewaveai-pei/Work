@@ -1,0 +1,5 @@
+工具 id,主題,帶活動者提示用語,停止活動訊號
+systems.iceberg_model,systems.iceberg_model,請參與者描述看得見的事件。,參與者說想停下來；出現危機訊號
+framing.problem_statement,framing.problem_statement,請參與者用自己的話說明問題。,參與者撤回同意
+learning.after_action_review,learning.after_action_review,請參與者描述發生了什麼。,參與者說想停下來
+art.no-stop,decision.ice,請參與者自己決定是否繼續,

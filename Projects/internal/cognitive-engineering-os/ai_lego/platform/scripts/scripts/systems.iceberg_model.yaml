@@ -1,0 +1,27 @@
+id: systems.iceberg_model
+subject: systems.iceberg_model
+version: 1
+state: draft
+steps:
+  - what: 先說明這一步要做什麼，再請參與者描述看得見的事件。
+    minutes: 3
+    dont:
+      - 替參與者下結論
+      - 要求參與者說出脆弱的事
+      - 停止訊號出現了還繼續
+      - 把服從或反抗當成錯
+    stop_signals:
+      - 參與者說想停下來。
+      - 出現自傷、暴力或急性危機的訊號。
+  - what: 請參與者自己選一個想再看的模式，不替他說明原因。
+    minutes: 4
+    dont:
+      - 替參與者下結論
+      - 要求參與者說出脆弱的事
+      - 停止訊號出現了還繼續
+      - 把服從或反抗當成錯
+    stop_signals:
+      - 參與者不同意繼續這一步。
+escalation:
+  who: GOVERN
+  how: 交給 GOVERN，依參與者所在地提供求助資源與申訴管道。

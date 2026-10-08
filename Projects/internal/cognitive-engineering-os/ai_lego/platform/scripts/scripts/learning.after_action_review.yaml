@@ -1,0 +1,27 @@
+id: learning.after_action_review
+subject: learning.after_action_review
+version: 1
+state: draft
+steps:
+  - what: 請參與者描述發生了什麼，分開記錄觀察與自己的理解。
+    minutes: 3
+    dont:
+      - 替參與者下結論
+      - 要求參與者說出脆弱的事
+      - 停止訊號出現了還繼續
+      - 把服從或反抗當成錯
+    stop_signals:
+      - 參與者說想停下來。
+      - 出現自傷、暴力或急性危機的訊號。
+  - what: 請參與者自己決定下一次想調整哪一件事。
+    minutes: 4
+    dont:
+      - 替參與者下結論
+      - 要求參與者說出脆弱的事
+      - 停止訊號出現了還繼續
+      - 把服從或反抗當成錯
+    stop_signals:
+      - 參與者不同意繼續這一步。
+escalation:
+  who: GOVERN
+  how: 交給 GOVERN，依參與者所在地提供求助資源與申訴管道。
