@@ -48,6 +48,10 @@ def _minutes(value: str | None) -> int:
 
 
 def _document(row: dict[str, str], columns: dict[str, str], donts: list[str]) -> tuple[str, dict[str, Any], bool]:
+    # a row that ends early gives None for its missing cells: an invalid row, never a crash (Codex card 60 review F2)
+    missing = sorted(key for key, column in columns.items() if key != "minutes" and row.get(column) is None)
+    if missing:
+        raise ValueError(f"row has no cell for {missing}")
     script_id = row[columns["id"]].strip()
     subject = row[columns["subject"]].strip()
     prompt = row[columns["prompt"]].strip()
@@ -84,7 +88,15 @@ def _write_yaml(path: Path, document: dict[str, Any]) -> None:
 def import_scripts(csv_path: Path | str, output_dir: Path | str | None, mapping: dict[str, str]) -> list[str]:
     """Write deterministic draft files and return a deterministic operator report."""
     source = Path(csv_path)
-    target = Path(output_dir) if output_dir is not None else Path(__file__).resolve().parents[2] / "platform" / "scripts" / "scripts"
+    # Imports land outside the reviewed set: a new file in platform/scripts/scripts changes the FACILITATE ruleset
+    # without a version, and the loader then refuses every script (Codex card 60 review F1). A maintainer moves a
+    # reviewed draft in by hand with a version bump.
+    managed = (Path(__file__).resolve().parents[2] / "platform" / "scripts" / "scripts").resolve()
+    if output_dir is None:
+        raise ValueError("--output-dir is required: imported drafts never go into the reviewed scripts folder")
+    target = Path(output_dir)
+    if target.resolve() == managed:
+        raise ValueError("--output-dir must not be the reviewed scripts folder: move a draft in by hand with a version bump")
     donts = load_donts()
     with source.open("r", encoding="utf-8-sig", newline="") as stream:
         reader = csv.DictReader(stream)
@@ -122,7 +134,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="匯入本機 CSV 的帶領稿草稿")
     parser.add_argument("--csv", required=True, type=Path)
     parser.add_argument("--map", required=True, help="JSON object: id, subject, prompt, stop_signals; minutes is optional")
-    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args(argv)
     try:
         mapping = json.loads(args.map)

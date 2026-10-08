@@ -114,6 +114,29 @@ class FacilitateContentTests(unittest.TestCase):
         self.assertEqual(other, first)
         self.assertEqual(before, {path.name: path.read_bytes() for path in (output / "two").glob("*.yaml")})
 
+    def test_importer_never_writes_into_the_reviewed_scripts_folder(self):
+        for target in (None, ROOT / "scripts"):
+            with self.subTest(target=target), self.assertRaisesRegex(ValueError, "output-dir"):
+                import_scripts(FIXTURE, target, MAPPING)
+        load_scripts()   # the managed set is unchanged: the ruleset still loads
+
+    def test_a_row_that_ends_early_is_an_invalid_row_not_a_crash(self):
+        output = Path(tempfile.mkdtemp(prefix="facilitate-import-"))
+        self.addCleanup(shutil.rmtree, output, True)
+        short = output / "short.csv"
+        short.write_text(FIXTURE.read_text(encoding="utf-8").rstrip("\n") + "\nzz.short,zz.short\n", encoding="utf-8", newline="")
+        with self.assertRaisesRegex(ValueError, "no cell"):
+            import_scripts(short, output / "out", MAPPING)
+        self.assertFalse((output / "out").exists())
+
+    def test_a_reviewed_script_must_escalate_to_govern(self):
+        root = self.copy_content()
+        path = root / "scripts" / "systems.iceberg_model.yaml"
+        self.rewrite(path, lambda document: (document.__setitem__("state", "reviewed"), document["escalation"].__setitem__("who", "OTHER")))
+        self.refresh_history(root)
+        with self.assertRaisesRegex(InvariantViolation, "escalation.who must be GOVERN"):
+            load_scripts(root)
+
     def test_importer_writes_nothing_when_any_row_is_invalid(self):
         output = Path(tempfile.mkdtemp(prefix="facilitate-import-"))
         self.addCleanup(shutil.rmtree, output, True)

@@ -131,6 +131,8 @@ def validate_script(document: dict[str, Any], path: Path | str = "script", donts
     if not isinstance(escalation, dict) or not _ESCALATION_REQUIRED.issubset(escalation):
         raise InvariantViolation(f"FACILITATE_ESCALATION_INVALID: {label.name}: escalation needs who and how")
     _non_empty_text(escalation["who"], "escalation.who", label)
+    if escalation["who"] != "GOVERN":   # the card: escalation goes to GOVERN's resources (Codex card 60 review F3)
+        raise InvariantViolation(f"FACILITATE_ESCALATION_INVALID: {label.name}: escalation.who must be GOVERN")
     _non_empty_text(escalation["how"], "escalation.how", label)
     return document
 
