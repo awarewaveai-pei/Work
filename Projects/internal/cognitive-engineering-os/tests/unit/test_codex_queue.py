@@ -16,11 +16,49 @@ import unittest
 QUEUE_REL = Path("agency-os/handoffs/cos-codex-queue")
 COS_TESTS_REL = Path("Projects/internal/cognitive-engineering-os/tests")
 REQUIRED_TOKENS = ("CARD_DONE", "DECISION_NEEDED:", "BLOCKED:")
-FORBIDDEN_CHECK_COMMANDS = ("docker compose up", "ssh", "safe-infra-patch", "git push", "apply-db-migration")
+# A check runs through cmd.exe, so only these command shapes pass and every argument is one
+# plain token (no quotes, &, |, >, %, ^ or ".."). Anything else is refused, not denylisted.
+SAFE_TOKEN = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./=~-]*$")
+VITEST_PATH = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_./-]*\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs)$")
 UNITTEST_COMMAND = re.compile(r"^python\s+-m\s+unittest(?:\s+(.+?))?\s*$")
 UNITTEST_MODULE = re.compile(r"^tests\.unit(?:\.[A-Za-z_]\w*)+$")
 CARD_NUMBER = re.compile(r"^(\d+)-")
 GATE_LINE = re.compile(r"^\s*-\s+([^:\s]+)\s*:")
+
+
+def command_shape_error(command: str) -> str | None:
+    """Return why a check command is not an allowed shape, or None when it is."""
+    if command != command.strip() or "  " in command or any(ch in command for ch in "\t\r\n"):
+        return "check must be single-spaced on one line"
+    tokens = command.split(" ")
+    if any(token.startswith("-") is False and (not SAFE_TOKEN.match(token) or ".." in token) for token in tokens):
+        return "check argument is not a plain token"
+    if tokens[:3] == ["python", "-m", "unittest"]:
+        modules = tokens[3:]
+        if not modules:
+            return "unittest check has no module"
+        bad = [module for module in modules if not UNITTEST_MODULE.fullmatch(module)]
+        return f"unittest module is outside tests.unit: {bad[0]}" if bad else None
+    if tokens == ["npx", "tsc", "--noEmit"]:
+        return None
+    if tokens[:3] == ["npx", "vitest", "run"]:
+        paths = tokens[3:]
+        if not paths:
+            return "vitest check names no test file"
+        bad = [path for path in paths if not VITEST_PATH.match(path)]
+        return f"vitest path is not a test file inside the app: {bad[0]}" if bad else None
+    if tokens[:2] == ["python", "scripts/affected_tests.py"]:
+        rest = tokens[2:]
+        index = 0
+        while index < len(rest):
+            if rest[index] == "--run":
+                index += 1
+            elif rest[index] == "--base" and index + 1 < len(rest) and not rest[index + 1].startswith("-"):
+                index += 2
+            else:
+                return f"affected_tests argument is not allowed: {rest[index]}"
+        return None
+    return "check is not an allowed command shape"
 
 
 def _repository_root() -> Path:
@@ -129,24 +167,17 @@ def validate_queue(queue: dict, base_folder: Path) -> list[str]:
             if "cwd" in check and check["cwd"] is not None and not isinstance(check["cwd"], str):
                 errors.append(f"card {card_id}: check {check_index} cwd must be a string")
 
-            match = UNITTEST_COMMAND.match(command.strip())
+            shape_error = command_shape_error(command)
+            if shape_error:
+                errors.append(f"card {card_id}: check {check_index} refused: {shape_error}: {command}")
+                continue
+            match = UNITTEST_COMMAND.match(command)
             if match:
-                module_text = (match.group(1) or "").strip()
-                module = module_text.split()[0] if module_text else ""
-                if not module:
-                    errors.append(f"card {card_id}: unittest check {check_index} has no module")
-                elif not UNITTEST_MODULE.fullmatch(module):
-                    errors.append(f"card {card_id}: unittest module is outside tests.unit: {module}")
-                else:
+                for module in (match.group(1) or "").split():
                     module_path = base / COS_TESTS_REL.parent / Path(*module.split("."))
                     module_path = module_path.with_suffix(".py")
                     if not module_path.is_file() and not _module_is_named_in_dependency_chain(module, card, cards_by_id, queue_root):
                         errors.append(f"card {card_id}: missing unittest module is not named in its card or dependency chain: {module}")
-
-            lowered = command.casefold()
-            for forbidden in FORBIDDEN_CHECK_COMMANDS:
-                if forbidden in lowered:
-                    errors.append(f"card {card_id}: check contains forbidden command: {forbidden}")
 
         depends = card.get("depends")
         if not isinstance(depends, list):
@@ -313,8 +344,8 @@ if (-not (Test-Path -LiteralPath $errPath)) { throw 'captured stderr log was not
             "forward dependency": (lambda queue: queue["cards"][0].update(depends=["02-cognitive-db-ops"]), "not an earlier card"),
             "empty command": (lambda queue: queue["cards"][0]["check"][0].update(cmd=""), "cmd must be non-empty"),
             "empty check list": (lambda queue: queue["cards"][0].update(check=[]), "check must be a non-empty list"),
-            "high stop ssh": (lambda queue: (queue["cards"][0].update(high_stop=True), queue["cards"][0]["check"][0].update(cmd="ssh host true")), "forbidden command: ssh"),
-            "ordinary card ssh": (lambda queue: queue["cards"][0]["check"][0].update(cmd="ssh host docker compose up -d"), "forbidden command: ssh"),
+            "high stop ssh": (lambda queue: (queue["cards"][0].update(high_stop=True), queue["cards"][0]["check"][0].update(cmd="ssh host true")), "refused"),
+            "ordinary card ssh": (lambda queue: queue["cards"][0]["check"][0].update(cmd="ssh host docker compose up -d"), "refused"),
         }
         for name, (mutate, expected) in cases.items():
             with self.subTest(name=name):
@@ -326,6 +357,31 @@ if (-not (Test-Path -LiteralPath $errPath)) { throw 'captured stderr log was not
                 finally:
                     temporary.cleanup()
                 self.assertTrue(any(expected in error for error in errors), errors)
+
+    def test_only_allowed_command_shapes_pass(self) -> None:
+        refused = (
+            "docker compose -f x up", "docker-compose up", "git -C . push", "ssh host true",
+            "python -m unittest", "python -m unittest tests.unit.test_a && git push",
+            "python -m unittest tests.unit.test_a & docker-compose up", "python -m unittest tests.integration.test_a",
+            "python -m unittest -k x tests.unit.test_a", "python -c print(1)", "python scripts/other.py",
+            "python scripts/affected_tests.py --run | sh", "python scripts/affected_tests.py --exec x",
+            "python scripts/affected_tests.py --base ../x", "npx tsc --noEmit --watch", "npx tsc",
+            "npx vitest run", "npx vitest run ../../evil.test.ts", "npx vitest run components/a.test.tsx>out",
+            "npx vitest run --config x", "npx vite build", "npm test", "python  -m unittest tests.unit.test_a",
+            " python -m unittest tests.unit.test_a", "python -m unittest tests.unit.test_a%PATH%",
+        )
+        for command in refused:
+            with self.subTest(command=command):
+                self.assertIsNotNone(command_shape_error(command))
+        allowed = (
+            "python -m unittest tests.unit.test_a", "python -m unittest tests.unit.test_a tests.unit.test_b",
+            "npx tsc --noEmit", "npx vitest run components/blocks/TeachPage.test.tsx",
+            "npx vitest run components/a.test.tsx lib/b.test.ts", "python scripts/affected_tests.py --run",
+            "python scripts/affected_tests.py --base HEAD~1 --run",
+        )
+        for command in allowed:
+            with self.subTest(command=command):
+                self.assertIsNone(command_shape_error(command))
 
 
 if __name__ == "__main__":

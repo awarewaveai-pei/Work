@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as _datetime
 import json
 import re
+import unicodedata
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -36,13 +37,20 @@ _VULNERABLE_DEMAND = (
     re.compile(r"(?:請|要|必須).{0,12}(?:說出|透露|揭露|分享).{0,12}(?:脆弱|創傷|自傷|私密|秘密)"),
     re.compile(r"(?:脆弱|創傷|自傷|私密|秘密).{0,12}(?:必須|一定要).{0,12}(?:說|透露|揭露|分享)"),
 )
-_SCORE_OR_RANK_WORDS = ("分數", "排名", "評分", "打分", "排行", "名次")
+_SCORE_OR_RANK_WORDS = ("分數", "排名", "評分", "打分", "排行", "名次", "等第", "及格")
+# "5 分鐘" is a duration and 2026/10/08 is a date; "6 分", "3/5" and "6/10" are scores.
+_SCORE_OR_RANK_PATTERNS = (
+    re.compile(r"\d+(?:\.\d+)?\s*分(?![鐘钟之])"),
+    re.compile(r"(?<![\d/])\d+(?:\.\d+)?\s*/\s*\d+(?!\s*/\s*\d)(?![\d.])"),
+    re.compile(r"\b(?:scor(?:e|es|ed|ing)|rank(?:s|ed|ing|ings)?|grad(?:e|es|ed|ing)|points?)\b", re.IGNORECASE),
+)
 NOT_YET_CHECKED = "尚未查核"
 
 
 def scan_ai_text(value: str) -> None:
     """The one content scanner shared by reviewed lessons and every TEACH AI string."""
-    if any(word in value for word in _SCORE_OR_RANK_WORDS):
+    value = unicodedata.normalize("NFKC", value)
+    if any(word in value for word in _SCORE_OR_RANK_WORDS) or any(pattern.search(value) for pattern in _SCORE_OR_RANK_PATTERNS):
         raise InvariantViolation("TEACH_AI_OUTPUT_REFUSED: score or rank language is not allowed")
     if any(pattern.search(value) for pattern in _VULNERABLE_DEMAND):
         raise InvariantViolation("TEACH_PRIVATE_DISCLOSURE_REFUSED: practice feedback cannot ask for private disclosure")

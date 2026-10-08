@@ -48,7 +48,7 @@ def _completion_for(
     docs: CaseDocs, tenant_id: str, owner: record_log.Owner, course: str, required: list[str], lessons: dict[str, dict[str, Any]]
 ) -> dict[str, Any] | None:
     preferences = docs.current(tenant_id, owner, "teach.completion_preference")
-    if preferences and preferences[-1]["content"].get("keep") is False:
+    if preferences and (preferences[-1]["content"].get("keep") is False or course in preferences[-1]["content"].get("declined", [])):
         return None
     runs = docs.current(tenant_id, owner, "teach.run")
     used: dict[str, int] = {}
@@ -82,5 +82,20 @@ def _run_saved(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, _doc: di
     return notices
 
 
+def _completion_deleted(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dict[str, Any]) -> list[dict[str, Any]]:
+    """Deleting a completion means 「我不要這筆紀錄」: the course is remembered as declined, so no later run writes it again."""
+    course = doc["content"].get("course")
+    preferences = docs.current(tenant_id, owner, "teach.completion_preference")
+    if not preferences:
+        return [{"kind": "teach.completion_preference", "content": {"keep": True, "declined": [course]}}]
+    current = preferences[-1]
+    declined = list(current["content"].get("declined", []))
+    if course in declined:
+        return []
+    return [{"kind": "teach.completion_preference", "content": {**current["content"], "declined": [*declined, course]},
+             "doc_id": current["doc_id"], "base_version": current["version"]}]
+
+
 BEFORE_SAVE = {"teach.run": _run_checked}
+ON_DELETE = {"teach.completion": _completion_deleted}
 AFTER_SAVE = {"teach.run": _run_saved}

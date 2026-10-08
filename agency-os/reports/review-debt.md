@@ -24,6 +24,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | 02-cognitive-db-review-fixes | 修正 CI 映像與 checkout 測試邊界、備份先寫後驗證與舊檔隔離、佇列危險檢查與 PowerShell 驗收 | 映像不執行缺檔測試；新備份不被舊損壞檔阻塞；所有卡檢查先驗證且不得危險；資料庫檢查不能悄悄 skip | `test_ci_postgres` 7、`test_cognitive_db_ops` 12、`test_codex_queue` 7、`test_pg_foundation` 18；C1／quarantine／full-read／dangerous-check／empty-check／WinPS exit／required PG／timeout／error-log／password-file／network truth 各突變轉紅後 byte-exact 還原 | 未經 Claude 跨模型審查 |
 | Codex | 40-42-50-review-fixes | 修正 TEACH AI 輸出、真實案同意、完成紀錄偏好／版本聚合、未查核案例顯示，以及 EXPRESS 草稿作者與選取守衛 | AI 不得評分、排名或索取脆弱揭露；同意隨 case 綁定；完成紀錄可刪且可選擇不留；AI 原句不可被重標為本人或 joint；越界 ref、person lines 與錯誤 run 必須拒絕 | `test_teach_content` 13、`test_block_teach` 18、`test_block_express` 16、`test_express_export` 11、`test_block_foundation` 43、`test_record_log` 20、`test_step2_foundation` 54、`test_integrity` 41、`test_codex_queue` 7；web `tsc`／TeachPage Vitest PASS；loader／AI scanner／case 綁定／opt-out／version aggregation／EXPRESS ref-author／page guards 各突變轉紅後 byte-exact 還原 | 未經 Claude 跨模型審查 |
 | Codex | 51-express-export-send-review-fixes | 修正 EXPRESS PDF 文字／寬度、送出原子性、DocRead bookkeeping、`seen` 已讀語意與唯一 `express.sent` 寫入路徑 | person's words unchanged; render failure cannot leave sent row; reads are not content; only checked send route writes the current draft | `test_express_export` 18、`test_block_express` 18、指定清單 341 PASS；Docker test stage build + container test PASS；web `tsc` PASS；parse-math／renderer-width／render-before-write／DocRead／seen／lock／AI-mark／kind-field mutations each red then byte-exact restored | 未經 Claude 跨模型審查 |
+| Claude（接手 Codex 額度用完） | r2-fix | 還原演練加 `pg_restore -U`、`--network none`、有界等待並真跑 Docker；佇列檢查改指令形狀白名單；共用掃描器擋數字／英文分數與名次；練習同意只能指自己的案子；刪掉的完成紀錄記為該課不再記；新草稿與改空白的 AI 句仍算 AI | 還原演練每次都能跑完；只有白名單形狀的檢查能執行；AI 文字不評分不排名；別人的案子與不存在的案子回同一個拒絕；刪除＝不要這筆，不會再寫回；AI 句不能靠新稿或空白改成本人 | r2_* 突變 16 個各轉紅、byte-exact 還原後綠（-U、network、allowlist×2、scanner×3、owner×2、declined×3、web spread、AI-text×3）；真 Docker 還原演練 PASS | 待 Codex 審（Claude 寫的）|
 
 ## deferred, before D7 second region
 
@@ -36,3 +37,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 
 - `scripts/dev/prod_projects_check.py`、`scripts/dev/prod_read_analyses.py` 仍以 sqlite3 讀 `repo.db_path`（PG 版 repo 無此屬性）；dev 工具、非 CI/主路徑，切換上線後改讀 PG 或刪除。
 - `CaseDocs.save_many` 個人批次 check 持 person 鎖 exclusive，其 `from_case` 項再取 case 鎖 shared；`erasure.admit_run` 為 case→person 順序。同時有 case 抹除排隊 exclusive 時可成三方環，PostgreSQL deadlock detector 中止其一（錯誤，非卡死）；如出現再統一 person/case 取鎖順序。
+
+
+- r2-fix: TEACH 頁沒有按鈕把「不再記下的課」改回會記（只能 PUT 偏好）。
+- r2-fix: `restore-cognitive-db.sh` 只驗 `SELECT 1`，沒驗還原後的表與筆數。

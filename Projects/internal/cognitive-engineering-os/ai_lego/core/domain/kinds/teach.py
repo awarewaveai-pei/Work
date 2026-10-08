@@ -33,6 +33,8 @@ KINDS = [
     }, owner="person", from_case="project_id"),
     DocKind("teach.completion_preference", "TEACH", "完成紀錄保留偏好", {
         "keep": Field("bool", required=True, human_only=True),
+        # a course whose completion the person deleted: never written for them again (the delete saves this)
+        "declined": Field("choices", len(PACKAGES), choices=tuple(PACKAGES), human_only=True),
     }, owner="person", singleton=True),
     DocKind("teach.completion", "TEACH", "課程完成紀錄", {
         "course": Field("choice", choices=tuple(PACKAGES), required=True),

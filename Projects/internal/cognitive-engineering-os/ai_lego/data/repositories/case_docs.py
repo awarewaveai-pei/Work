@@ -163,9 +163,11 @@ class CaseDocs:
             (live.discard if row["event_type"] == "DocDeleted" else live.add)(row["doc_id"])
         return live
 
-    def delete(self, tenant_id: str, owner: Owner, kind: str, doc_id: str, writer: Writer) -> None:
+    def delete(self, tenant_id: str, owner: Owner, kind: str, doc_id: str, writer: Writer,
+               then: list[Mapping[str, Any]] | None = None) -> None:
         """Every version of it goes (完整刪除); one DocDeleted with only its kind and id stays, so the history shows a
-        card was removed without showing what it said."""
+        card was removed without showing what it said. ``then``: items (as ``save_many``) the same writer saves in the
+        same transaction -- what the delete means to its block (block_hooks ON_DELETE)."""
         spec = doc_kinds.require(kind)
         with self._repo.transaction(tenant_id) as connection:
             if owner.kind == "case":
@@ -182,6 +184,8 @@ class CaseDocs:
                 self._repo.require_case(connection, tenant_id, history[-1]["content"][spec.from_case])
             record_log.delete_owned(connection, tenant_id, owner, aggregate_id=f"doc:{doc_id}")
             record_log.append(connection, tenant_id, f"doc:{doc_id}", "DocDeleted", {"kind": kind, "doc_id": doc_id}, writer=writer, owner=owner)
+            for item in then or ():
+                self._save(connection, tenant_id, owner, item["kind"], item["content"], writer, item.get("doc_id"), item.get("base_version"))
 
     def current(self, tenant_id: str, owner: Owner, kind: str) -> list[dict[str, Any]]:
         """The latest version of every live document of this kind, oldest first (in the order written: write_order)."""

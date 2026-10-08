@@ -26,7 +26,7 @@ from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import safety
-from ai_lego.platform.block_hooks import after_save, before_save
+from ai_lego.platform.block_hooks import after_save, before_save, on_delete
 from ai_lego.platform.block_hooks.govern import strings
 
 router = APIRouter()
@@ -106,6 +106,13 @@ def _save(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_
             if current is not None and current["content"] == content:
                 _call(docs.record_read, tenant_id, owner, spec.kind, doc_id, current["version"], api._me(session, spec.block))
                 return _saved(repo, session, owner, current)
+    if owner.kind == "person" and spec.from_case and "user" in spec.authors:
+        # A record the person makes from a case names one of their own cases; not yours and not existing answer alike.
+        # (A kind only the platform writes is refused by the save itself: RECORD_AUTHOR_NOT_ALLOWED, 403.) Ownership
+        # never changes; the case's erasure in between is CaseDocs._save's require_case under the case lock.
+        case_id = content.get(spec.from_case)
+        if not isinstance(case_id, str) or api._owned_project(repo, session, case_id) is None:
+            raise HTTPException(status_code=404, detail="PROJECT_NOT_FOUND: that case is not one of yours")
     item = {"kind": spec.kind, "content": content, "doc_id": doc_id, "base_version": body.base_version if doc_id else None}
     [saved] = _call(docs.save_many, tenant_id, owner, [item], api._me(session, spec.block), check=lambda: before_save(docs, tenant_id, owner, spec.kind, content, doc_id))
     return _saved(repo, session, owner, saved)
@@ -146,7 +153,8 @@ def update_case_doc(project_id: str, kind: str, doc_id: str, body: DocBody, sess
 def delete_case_doc(project_id: str, kind: str, doc_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, str]:
     owner = case_owner(project_id, session, repo)
     spec = _kind(kind, "case")
-    _call(CaseDocs(repo).delete, session["tenant_id"], owner, kind, doc_id, api._me(session, spec.block))
+    docs = CaseDocs(repo)
+    _call(docs.delete, session["tenant_id"], owner, kind, doc_id, api._me(session, spec.block), then=on_delete(docs, session["tenant_id"], owner, kind, doc_id))
     return {"status": "deleted", "doc_id": doc_id}
 
 
@@ -176,7 +184,8 @@ def update_my_doc(kind: str, doc_id: str, body: DocBody, session: dict[str, Any]
 @router.delete("/me/docs/{kind}/{doc_id}")
 def delete_my_doc(kind: str, doc_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, str]:
     spec = _kind(kind, "person")
-    _call(CaseDocs(repo).delete, session["tenant_id"], record_log.person(session["identity_id"]), kind, doc_id, api._me(session, spec.block))
+    docs, owner = CaseDocs(repo), record_log.person(session["identity_id"])
+    _call(docs.delete, session["tenant_id"], owner, kind, doc_id, api._me(session, spec.block), then=on_delete(docs, session["tenant_id"], owner, kind, doc_id))
     return {"status": "deleted", "doc_id": doc_id}
 
 

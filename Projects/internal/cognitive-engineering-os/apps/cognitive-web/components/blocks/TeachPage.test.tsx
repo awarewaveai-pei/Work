@@ -26,6 +26,7 @@ async function openPage(config: { lessons?: Lesson[]; runs?: any[]; aars?: any[]
     if (path === "/me/docs/teach.run" && method !== "GET") return { ...doc("teach.run", body?.content, "user"), notices: [] } as never;
     if (path === "/me/docs/teach.aar" && method !== "GET") return { ...doc("teach.aar", body?.content, "user"), notices: [] } as never;
     if (path === "/me/docs/teach.completion_preference" && method !== "GET") return { ...doc("teach.completion_preference", body?.content, "user"), notices: [] } as never;
+    if (path.startsWith("/me/docs/teach.completion/") && method === "DELETE") { config.preferences = [doc("teach.completion_preference", { keep: true, declined: ["自我理解"] })]; return { status: "deleted" } as never; }
     if (path === "/blocks/teach/lessons") return (config.lessons ?? LESSONS) as never;
     if (path === "/blocks/teach/practice-cases") return { cases: [CASE, CASE_TWO], place: "台灣", fallback: false, message: "" } as never;
     if (path === "/me/docs/teach.run") return (config.runs ?? []) as never;
@@ -88,6 +89,21 @@ describe("TEACH page", () => {
     const save = [...host.querySelectorAll("button")].find((item) => item.textContent?.includes("存這次練習")) as HTMLButtonElement;
     await act(async () => { save.click(); });
     expect(writes.some((write) => write.path === "/me/docs/teach.run" && write.method === "POST")).toBe(true);
+    await done();
+  });
+
+  it("says a deleted course is not recorded again and keeps that when the keep switch is pressed", async () => {
+    const completion = doc("teach.completion", { course: "自我理解", lesson_versions: {}, at: "2026-10-04" }, "user");
+    const { host, writes, done } = await openPage({ completions: [completion] });
+    expect(host.textContent).toContain("刪除一門課的紀錄後，那門課不會再自動記下。");
+    const remove = [...host.querySelectorAll("button")].find((item) => item.textContent?.includes("刪除這筆紀錄")) as HTMLButtonElement;
+    await act(async () => { remove.click(); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(host.textContent).toContain("不再記下的課：自我理解");
+    const toggle = [...host.querySelectorAll("button")].find((item) => item.textContent?.includes("不保留完成紀錄")) as HTMLButtonElement;
+    await act(async () => { toggle.click(); });
+    const saved = writes.find((write) => write.path.startsWith("/me/docs/teach.completion_preference") && write.method !== "GET");
+    expect(saved?.body?.content).toEqual({ keep: false, declined: ["自我理解"] });
     await done();
   });
 });

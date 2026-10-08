@@ -36,6 +36,16 @@ class TeachKindTests(unittest.TestCase):
         self.assertIs(teach_actions._SCORE_OR_RANK_WORDS, teach_lessons._SCORE_OR_RANK_WORDS)
         self.assertIs(teach_actions._VULNERABLE_DEMAND, teach_lessons._VULNERABLE_DEMAND)
 
+    def test_the_shared_scanner_refuses_numeric_and_english_scores_but_not_durations_or_dates(self):
+        for text in ("這次我給你 6 分。", "Score: 6/10, you rank second.", "3/5", "給你 ６ 分", "7.5分", "你的等第是甲",
+                     "這次不及格", "You earned 3 points.", "graded B", "RANKING: 2", "3 / 5 這一輪",
+                     "ＳＣＯＲＥ ７", "６／１０"):
+            with self.subTest(text=text), self.assertRaisesRegex(InvariantViolation, "TEACH_AI_OUTPUT_REFUSED"):
+                teach_lessons.scan_ai_text(text)
+        for text in ("開始前 5 分鐘", "2026/10/08 那次 session", "8 位參與者只有 2 位", "三分之一的人", "你提出了反例。"):
+            with self.subTest(text=text):
+                teach_lessons.scan_ai_text(text)
+
     def test_completion_cannot_be_written_by_the_person(self):
         with self.assertRaisesRegex(InvariantViolation, "RECORD_AUTHOR_NOT_ALLOWED"):
             doc_kinds.check_record("DocSaved", {"kind": "teach.completion", "content": {"course": "自我理解", "lesson_versions": {"course-self-understanding": 1}, "at": "2026-10-04"}}, "user", "TEACH", "person")
@@ -134,12 +144,28 @@ class TeachApiTests(ProjectSourceApiTestCase):
         self.assertEqual(erased.status_code, 200, erased.text)
         self.assertEqual(self.client.get("/me/docs/teach.practice_consent").json(), [])
 
+    def test_consent_names_only_my_own_case_and_not_mine_answers_like_not_existing(self):
+        project = self._create_project()
+        mine = self.client.post("/me/docs/teach.practice_consent", json={"content": {"project_id": project["project_id"]}})
+        self.assertEqual(mine.status_code, 200, mine.text)
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        store.create_identity("teach-consent-colleague", self.tenant["tenant_id"], "teach-consent-colleague@example.com", "Colleague", "correct-horse-battery")
+        self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "teach-consent-colleague@example.com", "password": "correct-horse-battery"})
+        not_mine = self.client.post("/me/docs/teach.practice_consent", json={"content": {"project_id": project["project_id"]}})
+        missing = self.client.post("/me/docs/teach.practice_consent", json={"content": {"project_id": "no-such-case"}})
+        self.assertEqual(not_mine.status_code, 404, not_mine.text)
+        self.assertEqual((not_mine.status_code, not_mine.json()), (missing.status_code, missing.json()))
+        self.assertEqual(self.client.get("/me/docs/teach.practice_consent").json(), [])
+
     def test_ai_text_cannot_score_rank_or_request_vulnerable_disclosure(self):
         self.save("teach.run", RUN)
         for answer, action, expected in (
             ({"challenge": "這次我給你 6 分，排名在中間。"}, "opponent", "TEACH_AI_OUTPUT_REFUSED"),
             ({"move_feedback": [{"move": "提出反例", "feedback": "這一輪評分 3/5，名次第二。"}]}, "feedback_on_moves", "TEACH_AI_OUTPUT_REFUSED"),
             ({"challenge": "請說出你的創傷，才可以繼續。"}, "opponent", "TEACH_PRIVATE_DISCLOSURE_REFUSED"),
+            ({"challenge": "這次我給你 6 分。"}, "opponent", "TEACH_AI_OUTPUT_REFUSED"),
+            ({"move_feedback": [{"move": "提出反例", "feedback": "Score: 6/10, you rank second."}]}, "feedback_on_moves", "TEACH_AI_OUTPUT_REFUSED"),
+            ({"move_feedback": [{"move": "提出反例", "feedback": "3/5"}]}, "feedback_on_moves", "TEACH_AI_OUTPUT_REFUSED"),
         ):
             self.provider.answer = answer
             response = self.client.post(f"/me/ai/TEACH/{action}", json={"context": {"run": self.client.get("/me/docs/teach.run").json()[0]["doc_id"]}})
@@ -158,11 +184,27 @@ class TeachApiTests(ProjectSourceApiTestCase):
     def test_completion_opt_out_is_person_controlled_and_defaults_to_keep(self):
         self.save("teach.run", RUN)
         self.assertEqual(len(self.client.get("/me/docs/teach.completion").json()), 1)
-        self.client.delete(f"/me/docs/teach.completion/{self.client.get('/me/docs/teach.completion').json()[0]['doc_id']}")
+
+    def test_keep_false_alone_stops_completion_records(self):
+        # no delete first: a delete now declines its course by itself (test below), which would hide this flag
         preference = self.save("teach.completion_preference", {"keep": False})
         self.assertEqual(preference["content"]["keep"], False)
         response = self.client.post("/me/docs/teach.run", json={"content": {**RUN, "notes": "選擇不保留這次完成紀錄。"}})
         self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.client.get("/me/docs/teach.completion").json(), [])
+
+    def test_a_deleted_completion_is_not_written_again_by_the_next_run(self):
+        self.save("teach.run", RUN)
+        completions = self.client.get("/me/docs/teach.completion").json()
+        self.assertEqual(len(completions), 1)
+        course = completions[0]["content"]["course"]
+        deleted = self.client.delete(f"/me/docs/teach.completion/{completions[0]['doc_id']}")
+        self.assertEqual(deleted.status_code, 200, deleted.text)
+        preference = self.client.get("/me/docs/teach.completion_preference").json()
+        self.assertEqual(preference[-1]["content"], {"keep": True, "declined": [course]})
+        response = self.client.post("/me/docs/teach.run", json={"content": {**RUN, "notes": "又練了一次。"}})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertNotIn("teach_completion", [notice["type"] for notice in response.json()["notices"]])
         self.assertEqual(self.client.get("/me/docs/teach.completion").json(), [])
 
     def test_another_person_cannot_read_my_runs(self):

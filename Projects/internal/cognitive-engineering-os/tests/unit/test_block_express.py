@@ -165,6 +165,22 @@ class ExpressApiTests(ProjectSourceApiTestCase):
         self.assertEqual(joint.status_code, 400, joint.text)
         self.assertIn("EXPRESS_DRAFT_SENTENCE_INVALID", joint.text)
 
+    def test_ai_words_stay_ai_in_a_new_draft_and_with_changed_spacing(self):
+        record = self.save_case_record("sense.card", SENSE)
+        self.selection([{"project_id": self.project["project_id"], "kind": "sense.card", "doc_id": record["doc_id"]}])
+        refs = [{"kind": "sense.card", "doc_id": record["doc_id"]}]
+        first = self.save_case_record("express.draft", {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "AI 原句", "refs": refs, "unchecked": False, "author": "ai"}]})
+        for text in ("AI 原句", "AI 原句 ", "  AI　原句", "AI原句", "ＡＩ 原句"):
+            with self.subTest(text=text):
+                copied = self.client.post(f"{self.base}/docs/express.draft", json={"content": {"format": "摘要", "reader": "合夥人", "sentences": [{"text": text, "refs": refs, "unchecked": False, "author": "user"}]}})
+                self.assertEqual(copied.status_code, 200, copied.text)
+                self.assertEqual(copied.json()["content"]["sentences"][0]["author"], "ai")
+        spaced = self.client.put(f"{self.base}/docs/express.draft/{first['doc_id']}", json={"content": {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "AI 原句 ", "refs": refs, "unchecked": False, "author": "user"}]}, "base_version": 1})
+        self.assertEqual(spaced.status_code, 200, spaced.text)
+        self.assertEqual(spaced.json()["content"]["sentences"][0]["author"], "ai")
+        own = self.client.post(f"{self.base}/docs/express.draft", json={"content": {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "AI 原句，但我改過了", "refs": refs, "unchecked": False, "author": "user"}]}})
+        self.assertEqual(own.json()["content"]["sentences"][0]["author"], "user")
+
     def test_unchecked_claim_is_marked_and_handback_happens_before_model(self):
         claim = self.save_case_record("verify.claim", {"text": "某件事真的發生了", "sentence": "可以查的事實", "from": "我加的"})
         self.selection([{"project_id": self.project["project_id"], "kind": "verify.claim", "doc_id": claim["doc_id"]}])

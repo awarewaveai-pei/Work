@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import unicodedata
 from typing import Any, Iterable, Mapping
 
 from ai_lego.core.domain import doc_kinds
@@ -88,24 +89,35 @@ def _draft_refs(content: Mapping[str, Any]) -> Iterable[Mapping[str, Any]]:
             yield ref
 
 
+def _same_words(text: str) -> str:
+    """What counts as the same sentence: NFKC, every whitespace removed (a space added or dropped is not an edit)."""
+    return "".join(unicodedata.normalize("NFKC", text).split())
+
+
+def _ai_sentences(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> set[str]:
+    """Every sentence the AI wrote in any version of any of this case's drafts (the AI's outputs are drafts)."""
+    found: set[str] = set()
+    for draft in docs.current(tenant_id, owner, "express.draft"):
+        for version in docs.versions(tenant_id, owner, "express.draft", draft["doc_id"]):
+            for sentence in version["content"].get("sentences", []):
+                if isinstance(sentence, Mapping) and isinstance(sentence.get("text"), str) and (sentence.get("author") == "ai" or version["author"] == "ai"):
+                    found.add(_same_words(sentence["text"]))
+    return found
+
+
 def draft_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, content: dict[str, Any], _doc_id: str | None) -> None:
     selections = docs.current(tenant_id, owner, "express.selection")
     if not selections:
         raise InvariantViolation("EXPRESS_SELECTION_REQUIRED: choose records before saving a draft")
     if _doc_id is not None:
         try:
-            earlier = docs.versions(tenant_id, owner, "express.draft", _doc_id)
+            docs.versions(tenant_id, owner, "express.draft", _doc_id)
         except InvariantViolation as error:
             raise InvariantViolation("EXPRESS_DRAFT_NOT_FOUND: choose a saved draft") from error
-        ai_texts = {
-            sentence.get("text")
-            for version in earlier
-            for sentence in version["content"].get("sentences", [])
-            if isinstance(sentence, Mapping) and sentence.get("author") == "ai"
-        }
-        for sentence in content.get("sentences", []):
-            if isinstance(sentence, dict) and sentence.get("text") in ai_texts:
-                sentence["author"] = "ai"
+    ai_texts = _ai_sentences(docs, tenant_id, owner)   # on create too: a new draft copying AI words is still the AI's
+    for sentence in content.get("sentences", []):
+        if isinstance(sentence, dict) and isinstance(sentence.get("text"), str) and _same_words(sentence["text"]) in ai_texts:
+            sentence["author"] = "ai"
     selected = _selected_refs(selections[-1]["content"], owner)
     for ref in _draft_refs(content):
         if (ref["kind"], ref["doc_id"]) not in selected:

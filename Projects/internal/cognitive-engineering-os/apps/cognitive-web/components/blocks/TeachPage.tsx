@@ -36,7 +36,7 @@ type Opponent = { challenge: string; question?: string };
 type MoveFeedback = { move: string; feedback: string; next_practice?: string };
 type Feedback = { move_feedback: MoveFeedback[] };
 type Completion = { course: string; lesson_versions: Record<string, number>; at: string };
-type CompletionPreference = { keep: boolean };
+type CompletionPreference = { keep: boolean; declined?: string[] };
 type PracticeResponse = { cases: PracticeCase[]; place: string | null; fallback: boolean; message: string };
 type TeachNotice = Notice | { type: "teach_completion"; notice: string };
 
@@ -185,7 +185,7 @@ export function TeachPage() {
     chooseCase(practiceCases[(index + 1) % practiceCases.length].id);
   };
   const toggleCompletionKeeping = () => act(async () => {
-    const content = { keep: !(completionPreference?.content.keep ?? true) };
+    const content = { ...completionPreference?.content, keep: !(completionPreference?.content.keep ?? true) };
     const saved = completionPreference
       ? await docs.update(null, "teach.completion_preference", completionPreference, content)
       : await docs.create(null, "teach.completion_preference", content);
@@ -267,6 +267,8 @@ export function TeachPage() {
       <div className="card">
         <h2>我已完成的課</h2>
         <p className="sub">完成紀錄預設保留；你可以選擇不留。</p>
+        <p className="sub">刪除一門課的紀錄後，那門課不會再自動記下。</p>
+        {(completionPreference?.content.declined ?? []).length > 0 && <p className="sub">不再記下的課：{completionPreference?.content.declined?.join("、")}</p>}
         <button className="btn" type="button" onClick={toggleCompletionKeeping}>{completionPreference?.content.keep === false ? "保留完成紀錄" : "不保留完成紀錄"}</button>
         {completions.length === 0 ? <p className="sub mb0">還沒有完成紀錄。</p> : <ul>{completions.map((item) => <li key={item.doc_id}>{item.content.course}：{item.content.at} <button className="btn ghost" type="button" onClick={() => removeCompletion(item)}>刪除這筆紀錄</button></li>)}</ul>}
       </div>

@@ -144,6 +144,9 @@ class CognitiveDbOpsTests(unittest.TestCase):
         self.assertIn("COGNITIVE_DB_PASSWORD_FILE:?", text)
         self.assertIn("COGNITIVE_DB_DUMP_FILE:?", text)
         self.assertIn("pg_restore", text)
+        self.assertIn('--network none', text)
+        self.assertNotIn('docker network inspect', text)
+        self.assertRegex(text, r'pg_restore\s+-U "\$USER"\s+')
         self.assertIn("docker run", text)
         self.assertNotIn("docker compose up", text)
         git_bash = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git" / "bin" / "bash.exe"
@@ -158,6 +161,77 @@ class CognitiveDbOpsTests(unittest.TestCase):
             errors="replace",
         )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_restore_script_runs_the_real_docker_drill_with_a_private_restore_container(self) -> None:
+        problem = _docker_problem()
+        if problem:
+            self.skipTest(f"LOUD SKIP: restore Docker drill did not run because {problem}")
+        git_bash = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git" / "bin" / "bash.exe"
+        bash = str(git_bash) if git_bash.is_file() else shutil.which("bash")
+        if bash is None:
+            self.skipTest("LOUD SKIP: host bash is unavailable")
+
+        source_name = f"cos-db-test-restore-source-{secrets.token_hex(4)}"
+        restore_name = f"cos-db-test-restore-drill-{secrets.token_hex(4)}"
+        password = secrets.token_urlsafe(18)
+        source = _run_docker(
+            "run", "-d", "--name", source_name,
+            "--env", "POSTGRES_PASSWORD=" + password,
+            "--env", "POSTGRES_USER=cognitive",
+            "--env", "POSTGRES_DB=cognitive_os",
+            pg.IMAGE,
+        )
+        self.assertEqual(source.returncode, 0, source.stderr)
+        try:
+            ready = False
+            for _ in range(90):
+                probe = _run_docker("exec", source_name, "pg_isready", "-U", "cognitive", "-d", "cognitive_os")
+                if probe.returncode == 0:
+                    ready = True
+                    break
+                time.sleep(1)
+            self.assertTrue(ready, "throwaway PostgreSQL did not become ready")
+            proof = _run_docker(
+                "exec", source_name, "psql", "-U", "cognitive", "-d", "cognitive_os",
+                "-c", "CREATE TABLE restore_proof (id integer); INSERT INTO restore_proof VALUES (11);",
+            )
+            self.assertEqual(proof.returncode, 0, proof.stderr)
+
+            with tempfile.TemporaryDirectory() as temporary:
+                temporary_path = Path(temporary)
+                dump = temporary_path / "source.dump"
+                password_file = temporary_path / "password"
+                password_file.write_text(password + "\n", encoding="utf-8")
+                dumped = _run_docker(
+                    "exec", source_name, "pg_dump", "-U", "cognitive", "-Fc", "-d", "cognitive_os",
+                    "-f", "/tmp/source.dump",
+                )
+                self.assertEqual(dumped.returncode, 0, dumped.stderr)
+                copied = _run_docker("cp", f"{source_name}:/tmp/source.dump", str(dump))
+                self.assertEqual(copied.returncode, 0, copied.stderr)
+
+                environment = dict(os.environ)
+                # Git Bash would rewrite /run/secrets/... into a Windows path; docker.exe
+                # needs C:/ style host paths, so hand it those.
+                environment["MSYS_NO_PATHCONV"] = "1"
+                environment.update(
+                    COGNITIVE_DB_PASSWORD_FILE=password_file.resolve().as_posix(),
+                    COGNITIVE_DB_DUMP_FILE=dump.resolve().as_posix(),
+                    COGNITIVE_DB_RESTORE_CONTAINER=restore_name,
+                    COGNITIVE_DB_RESTORE_USER="cognitive",
+                    COGNITIVE_DB_RESTORE_DATABASE="cognitive_os",
+                    COGNITIVE_DB_RESTORE_TARGET_DATABASE="restore_check",
+                )
+                result = subprocess.run(
+                    [bash, _bash_path(RESTORE_SCRIPT)], cwd=COS, env=environment,
+                    capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("RESTORE OK:", result.stdout)
+                leftover = _run_docker("ps", "-a", "-q", "--filter", f"name={restore_name}")
+                self.assertEqual(leftover.stdout.strip(), "", "the restore drill left its container behind")
+        finally:
+            _run_docker("rm", "-f", source_name)
 
     def test_backup_script_is_bash_syntax_valid(self) -> None:
         git_bash = Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "Git" / "bin" / "bash.exe"

@@ -2,6 +2,8 @@
 block never edits a shared list:
 - ``BEFORE_SAVE = {kind: fn}``, ``fn(docs, tenant_id, owner, content, doc_id) -> None``: refuse a save the kind's own
   field rules cannot see (raises InvariantViolation); the docs routes call it before every person's save;
+- ``ON_DELETE = {kind: fn}``, ``fn(docs, tenant_id, owner, doc) -> list[item]``: what the person's delete of ``doc``
+  also saves, in the delete's own transaction (items as ``CaseDocs.save_many``); the docs routes call it on every delete;
 - ``AFTER_SAVE = {kind: fn}``, ``fn(docs, tenant_id, owner, doc) -> list[notice]``: today, propose another block (各塊自己
   發現該加哪一塊; the assembler only shows the proposal, the person decides);
 - ``AFTER_SOURCES = {block: fn}``, ``fn(docs, tenant_id, owner, arrived) -> None``: sources reached the case (a batch
@@ -34,7 +36,7 @@ Hook = Callable[[CaseDocs, str, record_log.Owner, dict[str, Any]], list[dict[str
 Check = Callable[[CaseDocs, str, record_log.Owner, dict[str, Any], "str | None"], None]
 
 
-@lru_cache(maxsize=3)
+@lru_cache(maxsize=4)
 def _registry(name: str) -> dict[str, list[Callable[..., Any]]]:
     found: dict[str, list[Callable[..., Any]]] = {}
     for info in sorted(pkgutil.iter_modules(__path__), key=lambda module: module.name):
@@ -50,6 +52,12 @@ def hooks() -> dict[str, list[Hook]]:
 def before_save(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, kind: str, content: dict[str, Any], doc_id: str | None = None) -> None:
     for fn in _registry("BEFORE_SAVE").get(kind, ()):
         fn(docs, tenant_id, owner, content, doc_id)
+
+
+def on_delete(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, kind: str, doc_id: str) -> list[dict[str, Any]]:
+    fns = _registry("ON_DELETE").get(kind, ())
+    doc = next((item for item in docs.current(tenant_id, owner, kind) if item["doc_id"] == doc_id), None) if fns else None
+    return [] if doc is None else [item for fn in fns for item in fn(docs, tenant_id, owner, doc)]
 
 
 def after_save(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dict[str, Any]) -> list[dict[str, Any]]:
