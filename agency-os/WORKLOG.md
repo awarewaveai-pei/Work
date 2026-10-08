@@ -86,6 +86,35 @@
 - MUTATION_EVIDENCE: 記憶體內移除 Future 完成回呼，`test_wait_idle_waits_for_a_submitted_hook_without_a_future_registry` 轉紅；原版 3/3 綠。
 - REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，main 合併仍封鎖。
 
+## 2026-10-08（續1）COS 卡 51 缺陷修正：PDF 換行、已讀與原子送出
+
+**根本問題**：EXPRESS 的 PDF 以字數而不是字形寬度換行；讀取路由把已讀標記做成新草稿版本；缺少或錯形狀的 `seen` 會被當成已讀；送出先查版本再另寫紀錄，存在並發編輯窗口。
+
+**已修改**：
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/exports/render.py`：沿用 matplotlib，以同一個 `FontProperties` 的 `TextPath` 寬度表換行，PDF 文字使用同一組字型；長 CJK、無空格英文、混合文字和多頁稿不會越過可印寬度。
+- `Projects/internal/cognitive-engineering-os/ai_lego/data/events/record_log.py`、`data/repositories/case_docs.py`：新增本人可寫、按身份查詢的 `DocRead` 事件；讀取不再增加草稿內容版本，歷史查詢不把讀取事件當內容版本。
+- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/express.py`、`apps/api/blocks/docs.py`：缺少或非布林 `seen` 一律未讀；編輯丟掉只供頁面顯示的已讀欄位；送出在既有 write lock 內重新查版本、已讀和標記，同一交易寫入 `express.sent`。
+- `apps/cognitive-web/lib/errors.ts`、`tests/unit/test_express_export.py`、`tests/unit/test_block_express.py`：補錯誤句和讀取／編輯／並發送出／PDF 回歸測試。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_express_export` | exit=0 | 11 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_express` | exit=0 | 14 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | 43 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_record_log` | exit=0 | 20 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main` | exit=0 | 109 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_step2_foundation` | exit=0 | 54 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_codex_queue` | exit=0 | 5 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | cognitive-web typecheck PASS。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n；已讀回 renderer、read event、repository transaction、routes、guards、error map 和 tests；Claude 跨模型審查仍待審。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`DocRead|last_read_version|seen|express.sent|_wrap_pdf_line|EXPRESS_SEND_` | hits=reviewed；核對 event history、路由 call sites、錯誤碼與卡片聲稱。
+- WORKLOG: 本條目；PDF QA 已重產並檢查頁面影像；`git diff --check`、py_compile、private-index commit gate 待最後一輪完成。
+- ORACLE_WAIVED: 目前沒有可用的獨立 Claude review session；以指定測試、讀回、靜態掃描和突變紅綠證據替代，不代表跨模型審查已完成。
+
+**突變證據**：四個本輪缺陷各自拔守衛後轉紅並 byte-exact 還原後轉綠：PDF render 不呼叫 measured wrapper → `test_pdf_wraps_by_glyph_width_and_keeps_long_sentences_across_pages`；`seen is not True` 改回 `seen is False` → `test_missing_or_non_boolean_seen_is_unread`；GET 再存 draft version → `test_draft_read_route_marks_the_current_version_as_read`；send 使用初始快照而非 write-lock recheck → `test_send_rechecks_after_an_injected_edit_and_records_nothing`。卡片原有四個突變證據仍保留：未查證標記、版本守衛、外連掃描、匯出誤寫 sent。
+
+**剩餘風險**：PDF 的字型顯示依執行環境已安裝的 CJK 字型而定；`.docx`、群組分享、外部實際投遞不在本卡；Claude 跨模型審查尚未完成。沒有資料庫 migration、外部投遞、部署或遠端寫入。
+
+**rollback**：`git revert <本次 commit>` 可移除本輪 renderer、read event、routes、guards、tests、error codes、review-debt 與本條 WORKLOG；沒有資料遷移或外部服務狀態需要回復。
 ## 2026-10-07（續1）COS 卡 02 備份與佇列驗收碼
 
 - 根因：`ops/cognitive-db/backup-cognitive-db.sh:83,100` 曾在主機直接呼叫 `psql/pg_dump`，但 compose 不發布主機埠；`scripts/codex-continue.ps1:75-82` 在 Windows PowerShell 5.1 用 `Start-Process -PassThru` 後取得 null `ExitCode`，每個驗收都誤報 125。

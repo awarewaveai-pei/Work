@@ -53,7 +53,8 @@ class CaseDocs:
     @staticmethod
     def _history(connection: psycopg.Connection, tenant_id: str, owner: Owner, doc_id: str) -> list[dict[str, Any]]:
         rows = connection.execute(
-            "SELECT event_type, occurred_at, payload_json, author, block FROM events WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s AND aggregate_id=%s ORDER BY sequence",
+            "SELECT event_type, occurred_at, payload_json, author, block FROM events WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s AND aggregate_id=%s "
+            "AND event_type IN ('DocSaved','DocDeleted') ORDER BY sequence",
             (tenant_id, owner.kind, owner.id, f"doc:{doc_id}"),
         ).fetchall()
         return [_row(row) for row in rows]
@@ -91,6 +92,35 @@ class CaseDocs:
             if check is not None:
                 check()
             return [self._save(connection, tenant_id, owner, item["kind"], item["content"], writer, item.get("doc_id"), item.get("base_version")) for item in items]
+
+    def record_read(self, tenant_id: str, owner: Owner, kind: str, doc_id: str, version: int, writer: Writer) -> dict[str, Any]:
+        """Record that the person fetched one current document version without making a content version. Under the case
+        lock (shared, as every case writer) and the document's aggregate lock, taken before its history is read, so the
+        version checked is the version recorded (as DOC_STALE in ``_save``)."""
+        if kind != "express.draft":
+            raise InvariantViolation(f"DOC_READ_KIND_INVALID: {kind!r}")
+        with self._repo.transaction(tenant_id) as connection:
+            self._repo.require_case(connection, tenant_id, owner.id)
+            record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
+            history = [item for item in self._history(connection, tenant_id, owner, doc_id) if not item["deleted"]]
+            if not history or history[-1]["kind"] != kind:
+                raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
+            current = history[-1]["version"]
+            if current != version:
+                raise InvariantViolation(f"DOC_READ_STALE: {doc_id!r} is at version {current}, not {version}")
+            return record_log.append(connection, tenant_id, f"doc:{doc_id}", "DocRead",
+                                    {"kind": kind, "doc_id": doc_id, "version": version}, writer=writer, owner=owner)
+
+    def last_read_version(self, tenant_id: str, owner: Owner, kind: str, doc_id: str, identity_id: str) -> int | None:
+        """Return the latest version this signed-in person fetched, not a client-supplied marker."""
+        with self._repo.transaction(tenant_id) as connection:
+            row = connection.execute(
+                "SELECT payload_json->>'version' AS version FROM events "
+                "WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s AND aggregate_id=%s AND event_type='DocRead' "
+                "AND author_identity_id=%s AND payload_json->>'kind' = %s ORDER BY sequence DESC LIMIT 1",
+                (tenant_id, owner.kind, owner.id, f"doc:{doc_id}", identity_id, kind),
+            ).fetchone()
+        return None if row is None else int(row["version"])
 
     def _save(self, connection: psycopg.Connection, tenant_id: str, owner: Owner, kind: str, content: Mapping[str, Any], writer: Writer,
               doc_id: str | None, base_version: int | None) -> dict[str, Any]:

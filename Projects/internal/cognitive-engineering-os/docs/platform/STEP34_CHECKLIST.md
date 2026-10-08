@@ -25,4 +25,6 @@
 - [x] A claim that is not usable as fact or has fewer than two independent origins is saved with `unchecked: true`; the handback question occurs before the model call until the person saves `unchecked_ok: true`.
 - [x] The person's confidence and uncertainty text is included unchanged; selected `verify.message` text reaches the model only through `AiAction.quoted` after the crisis check, and selected sources are narrowed for the citation gate.
 - [x] `express.sent` is user-only, points to a saved draft and version in this case, and is not written by the EXPRESS AI actions or hook; selection CRUD, outline, draft listing, format listing and version routes are covered.
+- [x] EXPRESS exports each draft in Markdown, plain text, and PDF with sentence marks and a final confidence/uncertainty section; export is read-only and the send route records the person's confirmed version only after the read and acknowledgement gates.
+- [x] EXPRESS has no automatic delivery path: no recipient service is called; `.docx` is deliberately not built in this card, and group sharing belongs to the next card.
 - [ ] The person-facing EXPRESS page and export/send presentation belong to the later EXPRESS page/export cards; this card supplies the record and AI contract underneath them.

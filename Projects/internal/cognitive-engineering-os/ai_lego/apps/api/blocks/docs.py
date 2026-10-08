@@ -49,7 +49,7 @@ def _kind(kind: str, owner_kind: str) -> doc_kinds.DocKind:
 
 def _status(error: InvariantViolation) -> int:
     text = str(error)
-    return 404 if "NOT_FOUND" in text else 409 if "STALE" in text or "SINGLETON" in text or "ALREADY" in text else 403 if text.startswith("RECORD_") else 400
+    return 404 if "NOT_FOUND" in text else 409 if "STALE" in text or "SINGLETON" in text or "ALREADY" in text or "VERSION_NOT_CURRENT" in text else 403 if text.startswith("RECORD_") else 400
 
 
 def _call(fn, *args, **kwargs):
@@ -69,13 +69,19 @@ def _where(docs: CaseDocs, tenant_id: str, identity_id: str, owner: record_log.O
     return location[-1]["content"]["where"] if location else None
 
 
-def _save(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_log.Owner, spec: doc_kinds.DocKind, body: "DocBody", doc_id: str | None = None) -> dict[str, Any]:
+def _save(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_log.Owner, spec: doc_kinds.DocKind, body: "DocBody", doc_id: str | None = None, *, allow_read_marker: bool = False, allow_sent: bool = False) -> dict[str, Any]:
     """Every person's save: the kind's own checks (block_hooks BEFORE_SAVE), the save, then notices. The checks run
     inside the save's write lock (CaseDocs.save_many): what they read -- a claim's current version, one live stance per
     card -- cannot change between the check and the write (Codex VERIFY r5 F2: a check outside it is a compare, not a set)."""
+    if spec.kind == "express.sent" and not allow_sent:
+        raise HTTPException(status_code=403, detail="EXPRESS_SENT_ROUTE_ONLY: use the send action after reading the current draft")
+    content = dict(body.content)
+    if spec.kind == "express.draft" and not allow_read_marker:
+        # GET exposes this for the page, but the read receipt is an event; never carry a client marker into content.
+        content.pop("last_read_version", None)
     docs, tenant_id = CaseDocs(repo), session["tenant_id"]
-    item = {"kind": spec.kind, "content": body.content, "doc_id": doc_id, "base_version": body.base_version if doc_id else None}
-    [saved] = _call(docs.save_many, tenant_id, owner, [item], api._me(session, spec.block), check=lambda: before_save(docs, tenant_id, owner, spec.kind, body.content, doc_id))
+    item = {"kind": spec.kind, "content": content, "doc_id": doc_id, "base_version": body.base_version if doc_id else None}
+    [saved] = _call(docs.save_many, tenant_id, owner, [item], api._me(session, spec.block), check=lambda: before_save(docs, tenant_id, owner, spec.kind, content, doc_id))
     return _saved(repo, session, owner, saved)
 
 

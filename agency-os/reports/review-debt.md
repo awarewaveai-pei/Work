@@ -20,6 +20,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | 01-ci-postgres | CI 配備 digest-pinned PostgreSQL 並要求資料庫測試不能跳過；重試日誌獨立 | CI 缺 PostgreSQL 必須紅、筆電仍明示跳過；舊結果不得誤判新代理 | `test_ci_postgres` 6、`test_pg_foundation` 18、`test_codex_queue` 4、`test_affected_tests` 15 PASS；待跨模型審查 | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
 | Codex | 02-cognitive-db-ops | 新增未套用的 cognitive-db compose、備份／還原文件與操作閘門測試 | 資料庫只在 lobster-net 內可達；密碼只經 secret file；備份須通過 pg_restore 列表與輪替邊界 | `test_cognitive_db_ops` source/config/syntax gates；Docker backup dump/list/rotate/corrupt test loudly skipped because the daemon was unavailable；ports、密碼、pg_restore、pipefail、digest mutations 均轉紅 | 待審 |
 | Codex | queue-check-exit | Windows PowerShell 5.1 的驗收命令改讀真實程序退出碼 | 失敗碼不能誤判為通過；成功碼不能誤判為失敗而重派 agent | WinPS5.1 退出碼 0/7 實測；`test_codex_queue` 5 PASS、affected 56 PASS | 待 Claude 跨模型審查；勿 push |
+| Codex | 51-express-export-send | 新增 EXPRESS Markdown／純文字／PDF 匯出，並修正 glyph-width 換行、DocRead 已讀、fail-closed `seen` 和 write-lock 原子送出 | 匯出不寫紀錄；每句順序／標記／信心／不確定保留；讀取不增加草稿版本；缺少或非布林 `seen` 不算已讀；只有本人送出目前且重新讀過的版本才寫 `express.sent` | `test_express_export` 11、`test_block_express` 14、foundation 43、record log 20、API main 109、step2 54、queue 5 PASS；本輪四個缺陷各拔守衛轉紅、byte-exact 還原後綠；卡片原有四個突變證據保留 | 未經 Claude 跨模型審查 |
 
 ## deferred, before D7 second region
 

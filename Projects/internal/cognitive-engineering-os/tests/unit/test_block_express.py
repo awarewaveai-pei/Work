@@ -185,14 +185,17 @@ class ExpressApiTests(ProjectSourceApiTestCase):
         record = self.save_case_record("sense.card", SENSE)
         ref = {"project_id": self.project["project_id"], "kind": "sense.card", "doc_id": record["doc_id"]}
         self.selection([ref])
-        draft = self.save_case_record("express.draft", {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "我看到了一個選項。", "refs": [{"kind": "sense.card", "doc_id": record["doc_id"]}], "unchecked": False, "author": "user"}]})
-        for invalid, code in (({"draft": "missing", "version": 1, "to": "合夥人"}, "EXPRESS_SENT_DRAFT_NOT_FOUND"),
-                              ({"draft": draft["doc_id"], "version": 2, "to": "合夥人"}, "EXPRESS_SENT_VERSION_NOT_FOUND")):
+        draft = self.save_case_record("express.draft", {"format": "摘要", "reader": "合夥人", "sentences": [{"text": "我看到了一個選項。", "refs": [{"kind": "sense.card", "doc_id": record["doc_id"]}], "unchecked": False, "author": "user", "seen": True}]})
+        for invalid in ({"draft": "missing", "version": 1, "to": "合夥人"},
+                        {"draft": draft["doc_id"], "version": 2, "to": "合夥人"}):
             refused = self.client.post(f"{self.base}/docs/express.sent", json={"content": invalid})
-            self.assertNotEqual(refused.status_code, 200, refused.text)
-            self.assertIn(code, refused.text)
-        sent = self.save_case_record("express.sent", {"draft": draft["doc_id"], "version": 1, "to": "合夥人"})
-        self.assertEqual(sent["author"], "user")
+            self.assertEqual(refused.status_code, 403, refused.text)
+            self.assertIn("EXPRESS_SENT_ROUTE_ONLY", refused.text)
+        read = self.client.get(f"{self.base}/express/drafts/{draft['doc_id']}")
+        self.assertEqual(read.status_code, 200, read.text)
+        self.assertEqual(read.json()["content"]["last_read_version"], read.json()["version"])
+        sent = self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/send", json={"version": read.json()["version"], "to": "合夥人"})
+        self.assertEqual(sent.status_code, 200, sent.text)
         with self.assertRaisesRegex(InvariantViolation, "RECORD_AUTHOR_NOT_ALLOWED"):
             doc_kinds.check_record("DocSaved", {"kind": "express.sent", "content": {"draft": draft["doc_id"], "version": 1, "to": "合夥人"}}, "ai", "EXPRESS", "case")
         self.assertNotIn("express.sent", (PRODUCT_ROOT / "ai_lego" / "platform" / "ai_actions" / "express.py").read_text(encoding="utf-8"))

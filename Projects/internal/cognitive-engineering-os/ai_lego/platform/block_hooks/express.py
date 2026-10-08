@@ -15,6 +15,11 @@ SELECTABLE_BLOCKS = frozenset({"SENSE", "GATHER", "MAP", "THINK", "VERIFY", "COM
 REF_KEYS = frozenset({"project_id", "kind", "doc_id"})
 
 
+def require_current_draft_version(current_version: int, requested_version: int) -> None:
+    if current_version != requested_version:
+        raise InvariantViolation(f"EXPRESS_SENT_VERSION_NOT_CURRENT: draft is now version {current_version}; read it again before sending")
+
+
 def _items(content: Mapping[str, Any]) -> list[dict[str, str]]:
     items = content.get("items")
     if not isinstance(items, list) or not items:
@@ -107,8 +112,7 @@ def sent_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, conten
         versions = docs.versions(tenant_id, owner, "express.draft", draft_id)
     except InvariantViolation as error:
         raise InvariantViolation("EXPRESS_SENT_DRAFT_NOT_FOUND: choose a draft in this case") from error
-    if not any(item["version"] == version for item in versions):
-        raise InvariantViolation("EXPRESS_SENT_VERSION_NOT_FOUND: choose a saved version of the draft")
+    require_current_draft_version(versions[-1]["version"], version)
 
 
 def _record_view(doc: Mapping[str, Any]) -> dict[str, Any]:

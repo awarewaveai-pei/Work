@@ -91,6 +91,7 @@ EVENT_TYPES: dict[str, EventType] = {
     # A block's documents (core/domain/doc_kinds.py): the kind narrows author, block and owner further, per record
     "DocSaved": _t("1.0.0", "user ai joint system", frozenset(ALL_CODES), "case person", done=True),
     "DocDeleted": _t("1.0.0", "user", frozenset(ALL_CODES), "case person", done=False),
+    "DocRead": _t("1.0.0", "user", "EXPRESS", "case", done=False),
 }
 DOC_EVENTS = ("DocSaved", "DocDeleted")
 
