@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-08（續1）COS JSON 欄位形狀守衛：Claude 跨模型審查 Codex 的 `c55b64c35`，審查債清除（無程式改動）
+- 結論：`c55b64c35` 符合任務 5 點，未發現需修的缺陷。審查者 Claude（Sonnet 5.5）≠ 作者 Codex。
+- 宣告核對（兩個獨立來源，不採信作者自述）：①寫入端：探針（scratchpad，不入 repo）包 `doc_kinds._check_value`，跑 11 模組 519 tests，只計被接受的值 → 58/58 欄位都被存過、每欄只以宣告形狀被接受，不符 0。②讀取端：`ai_actions/map.py:175` 的 `.items()`、`MapPage.tsx:350` 的 spread、`lib/map.ts:11` 的 `Record` 皆物件；`block_hooks/gather.py:807` 迭代 `channels`、`gather.py:692`／`evidence.py:75` 的 `groups` 預設 `[]` 皆陣列；前端 TS 型別對 56/58 欄一致，其餘為同名他型別的假警報，逐一排除。
+- 突變（記憶體內，不動工作樹）：去 `_check_value` 形狀分支 → 閘測試 58 紅、API 測試 4 紅；去 `validate` 空容器分支 → 58／3 紅；去 `Field.__post_init__` 檢查 → meta 測試 1 紅；58 個宣告逐一拔掉 → 58/58 紅、存活 0；還原全綠。
+- 唯一入口：`data/events/record_log.py:213` 每筆 `DocSaved` 都 `check_record`→`validate`；`case_docs.py:82`、`ai_gate.py:321`、`block_hooks/gather.py:598` 皆先 validate，無旁路。
+- 未涵蓋（照實記）：①舊資料不回寫（尚未上線，無資料）；②只驗頂層，巢狀值（如 `one_lines` 的值非字串）仍靠 reader 自己的 `isinstance`（`map.py:175`），本次不新增；③前端未跑 TS 測試，只對照型別。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_foundation tests.unit.test_block_map | exit=0 | ms=34142
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=shape= | hits=86
+- ORACLE_WAIVED: 本次 staged 無程式檔；本條就是 Claude 對 Codex 提交 `c55b64c35` 的跨模型審查本身，直接審查，未走 `claude-oracle.ps1`。
+- 驗證：10 模組各自獨立行程共 437 tests PASS（step2_foundation 54／foundation 43／map 32／think 48／decide 26／learn 27／act 25／gather 68／verify 62／compute 52）。
+- rollback：還原 `agency-os/reports/review-debt.md` 該行即可；無程式、資料變更。
 ## 2026-10-04（續1）認知主權平台第 1 步蓋好（本機）：七塊＋全程生效五樣、上線前檢查通過；4 個工人整合、7 次審查全修
 - [操作者] 「不要停 直到全部做好」「繼續加速 正確」；中途問「有可以更有效率的做法嗎?」→ 答：返工來自中途改共用規則、全套測試跑太多；下一步開工前先定好共用規則再派工，全套只在最後跑。
 - [做了什麼] 提交 `cd71058f1`..`8c8a95f90`（本機 main，未部署）：
