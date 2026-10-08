@@ -39,7 +39,7 @@ from tests.unit.case_fixture import erase
 MIGRATIONS = PRODUCT_ROOT / "ai_lego" / "data" / "migrations"
 FROZEN_SQLITE_SCHEMA = MIGRATIONS / "sqlite_schema_2026_10_04.sql"
 # Columns a later migration added after the SQLite ones: 0003 write_order, where the engine read SQLite's rowid.
-ADDED_AFTER_SQLITE = {"events": ["write_order"], "workspace": ["write_order"]}
+ADDED_AFTER_SQLITE = {"events": ["write_order"], "workspace": ["write_order"], "identity": ["invited_by"]}   # identity: 0006 (card 12)
 # A name may be a placeholder: an f-string's {...} (read as {}), a %s or a .format {} -- DDL built at run time counts.
 _CREATE_TABLE = re.compile(r"CREATE\s+(?:TEMP(?:ORARY)?\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w{}%]+)\s*\(", re.IGNORECASE)
 _CREATE_INDEX = re.compile(r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?[\w{}%]+\s+ON\s+[\w{}%]+\s*\([^)]*\)(?:\s+WHERE\s+[^;]+)?", re.IGNORECASE)

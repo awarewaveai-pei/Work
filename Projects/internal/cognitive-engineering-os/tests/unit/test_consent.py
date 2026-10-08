@@ -97,6 +97,9 @@ class GroupConsentTests(ConsentCase):
         their_card = self.docs.save(self.tenant_id, record_log.case(theirs), "sense.card", {"category": "事件", "text": "別人的卡"}, record_log.user(self.viewer, "SENSE"))["doc_id"]
         response = self.consent(their_card, case=theirs)
         self.assertEqual((response.status_code, response.json()["detail"].split(":")[0]), (404, "CONSENT_ITEM_NOT_FOUND"))
+        generic = self.client.post("/me/docs/govern.consent", json={"content": {"purpose": "group", "target": self.group, "follow_versions": True, "withdrawn": False,
+                                                                                "items": [{"project_id": theirs, "kind": "sense.card", "doc_id": their_card}]}})
+        self.assertEqual(generic.status_code, 404, generic.text)   # every save path runs the same check
         self.assertEqual(self.client.get("/me/consents").json(), [])
 
     def test_a_pinned_consent_reads_its_version_and_a_following_one_the_newest(self):
