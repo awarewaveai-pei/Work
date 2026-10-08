@@ -19,7 +19,7 @@ echo "packages: $(pip freeze 2>/dev/null | tr '\n' ' ')"
 fail=0
 if [[ "${1:-}" == "--all" ]]; then
   echo "== 1/2 unittest: full suite (discover -s tests -t .) =="
-  python -m unittest discover -s tests -t . -q || fail=1
+  COS_FULL_SUITE=1 python -m unittest discover -s tests -t . -q || fail=1  # opt-in the guard in tests/__init__.py wants
 elif [[ $# -gt 0 ]]; then
   echo "== 1/2 unittest: $# affected module(s) =="
   python -m unittest "$@" -q || fail=1

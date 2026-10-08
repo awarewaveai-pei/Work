@@ -6,14 +6,19 @@ What is here today: the **Phase 5 Research Mode vertical slice** (`MVP_VERTICAL_
 
 ## Run
 
+Tests: only what a change can affect (plan rule 11, `docs/RESEARCH_LINES_MASTER_PLAN.md` §12.1):
+
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\test-phase5-local.ps1
+python scripts/affected_tests.py --run
 ```
 
-or directly:
+The full suite (~14k tests, 25-55 min) runs in GitHub CI on a lock/pyproject/Dockerfile/selector change, or locally only
+when the operator asks for a wave close-out; a whole-tree discovery without `COS_FULL_SUITE=1` stops at once and prints
+this (`tests/__init__.py`).
+
+Research slice CLI:
 
 ```powershell
-python -m unittest discover -s tests -t . -v
 python -m ai_lego.apps.cli.run_research_slice --transcription fixture
 python -m ai_lego.apps.cli.run_research_slice --transcription offline-stt --review interactive
 ```

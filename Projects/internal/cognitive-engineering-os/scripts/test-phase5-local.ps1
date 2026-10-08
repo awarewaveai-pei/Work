@@ -28,6 +28,11 @@ try {
   cmd /c "python -m compileall -q ai_lego tests 2>&1"
   if ($LASTEXITCODE -ne 0) { throw 'compileall failed' }
 
+  # Step 2 is the full suite: only on purpose (plan rule 11, guard in tests/__init__.py). Stop here with the reason
+  # instead of letting the guard's exit look like a test failure.
+  if ($env:COS_FULL_SUITE -ne '1') {
+    throw "step 2 is the full suite (~14k tests, 25-55 min): set `$env:COS_FULL_SUITE='1' only for a close-out the operator asked for; after a change run python scripts/affected_tests.py --run"
+  }
   Write-Host '== 2/3 unittest discover =='
   $testLines = cmd /c "python -m unittest discover -s tests -t . -v 2>&1"
   $testExit = $LASTEXITCODE

@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-08（續2）COS 本機全套測試改由測試樹自己擋（`COS_FULL_SUITE=1` 才跑）
+- [操作者] 「claude 在做一個工具裡的更正後測試 會跑300個工具 很蠢」；問「什麼時候要跑整套」「所以要跑整套都會問我?」；選定「全套自己擋住自己」後 go。
+- 根因：規則 11（`Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md:356`）只在長 plan 裡；每輪載入的 AGENTS.md §1「實測」不限範圍；COS `README.md:16`、`tests/__init__.py:3`、plan `:334`「本機跑」、各 slice 文件驗證表都寫 `unittest discover`。Claude 湊 `REALTEST_EVIDENCE` 時照抄最大指令（實例：本檔 2026-10-04（續1）`cmd=python -m unittest discover -s tests/unit -t . | ms=1514788`）。hook／verify 腳本都沒有自動跑全套（已查 `test-runner.js` 只跑 JS 旁測、`/verify-recent` 步驟 3 為單檔）。
+- 不變量：會跑整棵 COS 測試樹的執行，必須明示 `COS_FULL_SUITE=1`；守衛自己的端對端測試永不遞迴。
+- 改動：
+  - `tests/__init__.py`：discovery 從 product root 先 import 本 package；呼叫堆疊有 `unittest/loader.py:discover` 且其 pattern 會選到守衛檔 → 印指令、`os._exit(2)`（discovery 把 import 例外吞成單一失敗後續跑，故不用 raise；訊息純 ASCII 防 cp950）。
+  - `tests/unit/test_00_full_suite_guard.py`：`discover -s tests/unit` 的入口（排序第一）；6 個測試含子行程端對端；子行程帶 `COS_GUARD_PROBE=1`，探針內不再開行程，且 argv 有 `discover` 卻 import 到本檔＝守衛失效 → `os._exit(3)`（不依賴守衛程式碼）。`CONFTEST` 路徑運算式讓 `affected_tests.py` 在 conftest 改動時選中本檔（已驗 `affected_test_modules(['…/tests/conftest.py'])` → 本模組）。
+  - `tests/conftest.py`：pytest `config.args` 有目錄（無參數＝執行目錄）→ `pytest.exit(2)`；檔案／node id 放行；`--ignore` 繞不過。
+  - `scripts/test-gate.sh:22` `--all` 帶 `COS_FULL_SUITE=1`（CI `cognitive-os-full-suite.yml` 經此；本次改此檔會觸發 CI 全套＝驗證放行路徑）。`scripts/test-phase5-local.ps1` 第 2 步前未設變數即明講停止。README Run 段、plan `:334`、AGENTS.md §1 實測列改為 `affected_tests.py --run`。舊 slice 文件為歷史紀錄不改（§9），守衛使其無效。
+- 事故（本 session 造成）：第一版守衛測試的子行程 discover 在「守衛失效」突變下再跑同一測試 → 行程遞迴，機器資源耗盡（bash fork 失敗、PowerShell 報分頁檔太小），session 重啟後無殘留行程。修法即上述 `COS_GUARD_PROBE` 兩層；突變改在 scratchpad 複本並以 `taskkill /T` 收整棵樹，重跑 10 s 無殘留。
+- 實測矩陣（未設變數）：`discover -s tests -t .` exit 2 / 119 ms（原 103 s 才擋：acceptance 先 import）；`-s tests/unit` 2 / 127 ms；bare `python -m unittest` 2；`pytest tests --ignore=<守衛>` 2；bare `pytest` 2；`-p "test_5w1h*.py"` 0；指名模組 0；pytest 單檔 0；`COS_FULL_SUITE=1` discover 25 s 仍在跑（未擋）；`eval_gate.py` PASS。
+- 突變（scratchpad 複本）：conftest 失效 → `test_a_directory_argument_or_none_is_blocked` 紅；unittest 守衛失效 → `test_whole_tree_discovery_stops_before_any_test` 紅；拿掉 pattern 判斷 → 同前紅；基準綠。
+- Codex 三輪：r1 3m（pytest `--ignore` 繞過、pytest 單跑守衛檔被擋、本機入口未改）全修；r2 bare pytest 繞過＝不成立（實測 exit 2，已入端對端測試）、選擇器看不到 conftest＝成立已修；r3 「test-gate.sh --all 的 pytest 階段」＝不成立（`test-gate.sh:20-31` 只有 unittest＋`eval_gate.py`，scripts/deploy/Dockerfile/CI 皆無 pytest 呼叫）。
+- 已知範圍：`discover -k`／`pytest <dir> -k` 仍擋（仍 import 整棵樹）；另一 session 的 `test_absent_is_none` 紅（`block_hooks/compute.py` 的 `or <empty>`）與本改動無關，未碰。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_00_full_suite_guard -v | exit=0 | ms=2574
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/4m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=unittest discover | hits=180
+- ORACLE: `agency-os/reports/oracle/2026-10-08-partialreview-7cac6c98.md`、`-bbbe483c.md`、`-65b88435.md`
+- rollback：`git revert <本 commit>`；或刪 `tests/conftest.py`、`tests/unit/test_00_full_suite_guard.py` 並還原 `tests/__init__.py`。
 ## 2026-10-08（續1）COS JSON 欄位形狀守衛：Claude 跨模型審查 Codex 的 `c55b64c35`，審查債清除（無程式改動）
 - 結論：`c55b64c35` 符合任務 5 點，未發現需修的缺陷。審查者 Claude（Sonnet 5.5）≠ 作者 Codex。
 - 宣告核對（兩個獨立來源，不採信作者自述）：①寫入端：探針（scratchpad，不入 repo）包 `doc_kinds._check_value`，跑 11 模組 519 tests，只計被接受的值 → 58/58 欄位都被存過、每欄只以宣告形狀被接受，不符 0。②讀取端：`ai_actions/map.py:175` 的 `.items()`、`MapPage.tsx:350` 的 spread、`lib/map.ts:11` 的 `Record` 皆物件；`block_hooks/gather.py:807` 迭代 `channels`、`gather.py:692`／`evidence.py:75` 的 `groups` 預設 `[]` 皆陣列；前端 TS 型別對 56/58 欄一致，其餘為同名他型別的假警報，逐一排除。
