@@ -37,6 +37,7 @@ REVIEWED_OWNER_USES = {
     ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): "_mine: /me/consents, the signed-in person's own consents",
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): "_history: called with the session's identity only",
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): "learn.history save: the signed-in person's own",
+    ("apps/api/blocks/teach.py", "record_log.person(session['identity_id'])"): "/blocks/teach/practice-cases: the signed-in person's own saved place",
 }
 REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/act.py", "record_log.person(session['identity_id'])"): 1,
@@ -47,6 +48,7 @@ REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): 1,
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): 1,
+    ("apps/api/blocks/teach.py", "record_log.person(session['identity_id'])"): 1,
 })
 # (c) Group kinds that keep visibility="members" without saying so. Empty: every group kind names its visibility.
 DEFAULT_VISIBILITY_ON_PURPOSE: set[str] = set()

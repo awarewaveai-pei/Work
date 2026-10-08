@@ -29,7 +29,8 @@ def _check_consent(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, cont
             raise
     if withdrawn:
         return
-    items = content.get("items") or []
+    items = content.get("items")
+    items = [] if items is None else items   # anything else that is no list is refused just below
     if not isinstance(items, list) or len(items) > MAX_ITEMS:
         raise InvariantViolation(f"CONSENT_ITEMS_INVALID: at most {MAX_ITEMS} documents in one consent")
     for item in items:
