@@ -324,7 +324,7 @@ describe("relevance never exceeds what the engine accepts", () => {
     const rel = sinkMod.relevanceOf(meta);
     expect(relevanceProblems(rel)).toEqual([]);
     expect(rel.pasted).toBe(false);
-    expect((rel.outlinks as string[]).length).toBeLessThan(50); // trimmed to fit the byte cap, not only the count
+    expect(rel).not.toHaveProperty("outlinks"); // over the byte cap the links go whole, never some of them
     expect(sinkMod.relevanceOf({ ...meta, imageUrl: `https://img.example/${"p".repeat(2100)}` })).not.toHaveProperty("imageUrl");
   });
 
@@ -374,9 +374,13 @@ describe("what the engine may conclude from what collect sends (collector.v2.jso
     expect(sinkMod.relevanceOf({ outlinks: ["a.example", long, "b.example"] })).toEqual({ pasted: false });
     const fifty = Array.from({ length: 70 }, (_, i) => `h${i}.example`);
     expect((sinkMod.relevanceOf({ outlinks: fifty }).outlinks as string[]).length).toBe(rule.items);
-    const trimmed = sinkMod.relevanceOf({ entityAnchorsHit: Array.from({ length: 12 }, () => "錨".repeat(80)), outlinks: Array.from({ length: 40 }, (_, i) => `${"h".repeat(60)}-${i}.example`) });
-    expect((trimmed.outlinks as string[]).length).toBeLessThan(40);
-    expect(sinkMod.pyJsonBytes(trimmed) + rule.max + 4).toBeGreaterThan(spec.max_relevance_bytes); // the engine's outlinks_whole: not whole
+    const anchors = Array.from({ length: 12 }, () => "錨".repeat(80));
+    const trimmed = sinkMod.relevanceOf({ entityAnchorsHit: anchors, outlinks: Array.from({ length: 40 }, (_, i) => `${"h".repeat(60)}-${i}.example`) });
+    expect(trimmed).not.toHaveProperty("outlinks"); // no list = not whole on the engine's side
+    // one link with an image and anchors too big: the link goes and no empty list is left to read as "links nowhere"
+    const one = sinkMod.relevanceOf({ entityAnchorsHit: anchors, imageUrl: `https://img.example/${"p".repeat(2000)}`, outlinks: ["a.example"] });
+    expect(one).not.toHaveProperty("outlinks");
+    expect(sinkMod.pyJsonBytes(one)).toBeLessThanOrEqual(spec.max_relevance_bytes);
   });
 });
 

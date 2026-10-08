@@ -33,9 +33,13 @@ def relevance_bytes(relevance: Mapping[str, Any]) -> int:
 def outlinks_whole(relevance: Mapping[str, Any]) -> bool:
     """Whether ``relevance["outlinks"]`` is every other host the page links to. Fail closed: no list, a list of
     OUTLINKS_ITEMS (collect stops there), a host that is not ASCII, or a relevance with no room left for one more host
-    of OUTLINK_CHARS (collect may have dropped hosts to fit) is not whole."""
+    of OUTLINK_CHARS (collect may have dropped hosts to fit) is not whole; nor is an empty list without ``imageUrl``:
+    an older collect trimmed a list to [] and then dropped the image and more to fit, leaving room it never had. (Now
+    collect drops the whole key when it must cut for size, so an empty list it sends is one the page has.)"""
     links = relevance.get("outlinks")
     if not isinstance(links, list) or len(links) >= OUTLINKS_ITEMS:
+        return False
+    if not links and "imageUrl" not in relevance:
         return False
     if not all(isinstance(link, str) and link.isascii() for link in links):
         return False

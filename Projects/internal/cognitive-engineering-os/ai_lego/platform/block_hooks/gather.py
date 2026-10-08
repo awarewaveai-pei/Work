@@ -68,8 +68,13 @@ READ_WHOLE, READ_BODY, READ_RECORD = "whole", "body", "record"
 NOT_ON_IT = {READ_BODY: "系統存的是找資料的服務抽出的網頁正文，頁首、頁尾和選單不在裡面，看不到網頁在那裡寫誰經營",
              READ_RECORD: "系統存的是查核資料庫給的紀錄，不是查核報告那一頁，看不到網頁寫誰經營"}
 COLLECT_TITLE_CHARS = 300   # collect cuts every title here (sinks/cognitive.ts toSourceProjection, orchestrator.ts aside)
-LINKS_CUT = "這一頁連到的網站太多，找資料的服務沒有全部記下，看不出它是不是只跟某幾個網站互相引用"
+TITLE_CUT = f"標題不完整（超過 {COLLECT_TITLE_CHARS} 個字只存了前面，或搜尋結果只給了前面一段），網站的名字可能被切掉"
+LINKS_CUT = "找資料的服務可能沒有記下這一頁連到的全部網站，看不出它是不是只跟某幾個網站互相引用"
+NO_LETTER = {READ_BODY: "系統存的網頁正文裡沒有文字（頁首、頁尾和選單不在裡面），看不出網頁用什麼語言",
+             READ_RECORD: "查核資料庫給的紀錄裡沒有文字，看不出網頁用什麼語言"}
 _CHUNK = 20000   # letters counted at a time: the whole text is read, a bounded part of it held
+_WORD = re.compile(r"[a-z]+")
+_LONGEST_EN = max(map(len, _EN_WORDS))   # a word cut to one letter more than this is still no _EN_WORDS word
 
 
 def _reading(url: str) -> str:
@@ -188,29 +193,55 @@ def _outlet(host: str, site: str, title: str) -> tuple[dict[str, Any] | None, bo
     return None, False, newsy, named
 
 
-def _language(text: str | None) -> dict[str, str]:
+def _english_words(text: str) -> tuple[int, int]:
+    """(how many [a-z]+ words text.lower() has, how many are _EN_WORDS), counted _CHUNK letters at a time and exactly
+    as on the whole text: a word that runs over a chunk's end is carried into the next (only its first _LONGEST_EN + 1
+    letters: past that it is no _EN_WORDS word whatever follows) and counted once, where it ends."""
+    words = english = 0
+    carry = ""   # the start of a word still open at the end of the last chunk
+    for start in range(0, len(text), _CHUNK):
+        lowered = text[start:start + _CHUNK].lower()   # str.lower is letter by letter: chunks lower as the whole does
+        found = _WORD.findall(lowered)
+        if carry and found and lowered[0] in "abcdefghijklmnopqrstuvwxyz":
+            found[0] = (carry + found[0])[:_LONGEST_EN + 1]
+        elif carry:
+            found.insert(0, carry)
+        carry = ""
+        if found and lowered[-1] in "abcdefghijklmnopqrstuvwxyz" and start + _CHUNK < len(text):
+            carry = found.pop()[:_LONGEST_EN + 1]
+        words += len(found)
+        english += sum(word in _EN_WORDS for word in found)
+    if carry:
+        words += 1
+        english += carry in _EN_WORDS
+    return words, english
+
+
+def _language(text: str | None, reading: str = READ_WHOLE) -> dict[str, str]:
+    """``reading`` (READ_*): 查不到 「沒有文字」 only of a text read whole -- collect's body may have none while the
+    footer it dropped has."""
     names = require("gather.place_languages").items["names"]
     if text is None:
         return cell(UNCHECKABLE, why="抓不到內文")
-    han = kana = hangul = latin = other = english = words = 0
-    for start in range(0, len(text), _CHUNK):   # the whole text: 查不到 below says there is no letter in any of it
+    han = kana = hangul = latin = other = 0
+    for start in range(0, len(text), _CHUNK):   # the whole text, letter by letter: a chunk's end splits no count
         sample = text[start:start + _CHUNK]
         han += len(re.findall(r"[㐀-䶿一-鿿]", sample))
         kana += len(re.findall(r"[぀-ヿ]", sample))
         hangul += len(re.findall(r"[가-힯]", sample))
         latin += len(re.findall(rf"[{_LATIN}]", sample))
         other += len(re.findall(rf"[^\W\d_㐀-䶿一-鿿぀-ヿ가-힯{_LATIN}]", sample))   # every other letter (Arabic, Thai, Cyrillic…)
-        found = re.findall(r"[a-z]+", sample.lower())
-        words += len(found)
-        english += sum(word in _EN_WORDS for word in found)
     cjk = han + kana + hangul
     if not cjk + latin + other:
+        if reading != READ_WHOLE:
+            return cell(UNCHECKABLE, why=NO_LETTER[reading])
         return cell(NOT_FOUND, why="系統讀到的內容裡沒有文字")
     if other * 2 > cjk + latin + other:
         return cell(UNCHECKABLE, why="系統只分得出中文、英文、日文、韓文")
     if cjk * 3 >= latin:
         code = "ja" if kana >= max(10, cjk // 10) else "ko" if hangul * 2 >= cjk else "zh"
         return cell(FOUND, names[code])
+    words, english = _english_words(text)
     if english * 100 >= 8 * words:
         return cell(FOUND, names["en"])
     return cell(UNCHECKABLE, why="拉丁字母寫的，但看不出是英文；系統只分得出中文、英文、日文、韓文")
@@ -269,15 +300,16 @@ def _outlet_cell(host: str, named: str, outlet: dict[str, Any] | None, is_outlet
     if newsy:
         return cell(UNCHECKABLE, why="名字像媒體，但不在已知媒體名單上；系統沒辦法查它存不存在")
     if title_cut:
-        return cell(UNCHECKABLE, why=f"標題超過 {COLLECT_TITLE_CHARS} 個字，只存了前面，網站的名字可能被切掉")
+        return cell(UNCHECKABLE, why=TITLE_CUT)
     if not named:
         return cell(UNCHECKABLE, why="標題沒寫網站名字")
     return cell(NOT_FOUND, why="名字不像媒體")
 
 
-def _first_seen(published: Any, archived: dict[str, str] | None) -> dict[str, str]:
+def _first_seen(published: Any, archived: dict[str, str] | None, read: bool = True) -> dict[str, str]:
     """最早何時出現: the earlier of the date the page states and the archive's first capture (collect's
-    ``first_archived``; ``None`` = a pasted file with no address to ask about)."""
+    ``first_archived``; ``None`` = a pasted file with no address to ask about). ``read``: whether the page itself was
+    read -- a page set aside never was, so 「網頁沒寫日期」 is not known there and 查不到 is 無法檢查."""
     stated = _date(published)
     if archived is None:
         return cell(FOUND, stated, why=STATED) if stated else cell(UNCHECKABLE, why="你貼的檔案沒寫日期，也沒有網址可以查網頁封存館")
@@ -287,6 +319,8 @@ def _first_seen(published: Any, archived: dict[str, str] | None) -> dict[str, st
         return cell(FOUND, archived["value"][:10], why=archived.get("why") or "網頁封存館最早存到的日期")
     if stated:
         return cell(FOUND, stated, why=STATED + (f"；網頁封存館：{archived['why']}" if archived["state"] == UNCHECKABLE else ""))
+    if not read:
+        return cell(UNCHECKABLE, why=f"沒有抓到這一頁的內文，不知道網頁寫的日期；{archived['why']}")
     return cell(archived["state"], why=f"網頁沒寫日期；{archived['why']}")
 
 
@@ -320,14 +354,15 @@ def _cells(url: str, title: str, text: str | None, published: Any, looked: Mappi
         affiliation = cell(FOUND, restricted[1], why=restricted[2])
     else:   # the lists are of domains: a file has none to find on them
         affiliation = cell(NOT_FOUND, why="名單上沒有寫它隸屬誰") if host else cell(UNCHECKABLE, why="你貼的是檔案，沒有網域可以對")
-    title_cut = bool(url) and len(title) >= COLLECT_TITLE_CHARS
+    # cut by collect at COLLECT_TITLE_CHARS, or a search result's title (a page set aside) the engine cut with an ellipsis
+    title_cut = bool(url) and (len(title) >= COLLECT_TITLE_CHARS or title.rstrip().endswith(("...", "…")))
     return {
         "operator": _operator(text, outlet, is_outlet, _reading(url)),
         "registered": looked_up["registered"],
         "country": country,
-        "language": _language(text),
+        "language": _language(text, _reading(url)),
         "original": cell(NOT_FOUND, why="還在分組"),   # replaced from the grouping before the card is saved
-        "first_seen": _first_seen(published, looked["first_archived"] if looked else None),
+        "first_seen": _first_seen(published, looked["first_archived"] if looked else None, text is not None),
         "stance": cell(UNCHECKABLE, why="系統沒有讀網站的「關於我們」頁，不知道它自己宣稱的立場；你可以自己補上"),
         "affiliation": affiliation,
         "party_relation": cell(UNCHECKABLE, why="系統不知道它跟這件事的當事方有什麼關係；你可以自己寫"),
@@ -447,7 +482,7 @@ class _Item:
         links = relevance.get("outlinks")
         self.outlinks = {_link_host(link) for link in links if isinstance(link, str) and link} - {self.host, ""} if isinstance(links, list) else set()
         self.links_whole = outlinks_whole(relevance)   # absent or maybe cut: never in an 只互相引用 group
-        self.links_cut = isinstance(links, list) and not self.links_whole   # a list collect sent and may have cut: said on the card
+        self.links_cut = bool(self.host) and not self.links_whole   # a site whose links are not known whole: said on the card
         first = (content.get("cells") or {}).get("first_seen") or {}
         self.first_seen = _date(first.get("value")) if first.get("state") == FOUND else None
         # a card made before grouping v4 holds no `archived`; its first_seen, when not the page's own date, is the archive's

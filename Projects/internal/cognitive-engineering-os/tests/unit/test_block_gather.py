@@ -116,7 +116,8 @@ class GatherCase(ProjectSourceApiTestCase):
         record = source_record(source_id, self.pid, self.tenant_id, title or url, "text/plain", "Confidential", cas_path["hash"], len(content),
                                TenantScopedCas.artifact_uri(self.tenant_id, self.pid, source_id, cas_path), self.identity["identity_id"], now,
                                published_at=published_at, canonical_url=url, source_uri=url, fetched_at=now, provenance=COLLECTED_PROVENANCE,
-                               relevance={"searchProvider": "serper", "searchLang": "zh", **relevance})
+                               relevance={key: value for key, value in {"searchProvider": "serper", "searchLang": "zh", "outlinks": ["elsewhere.example.org"], **relevance}.items()
+                                          if value is not None})   # a key given None is left out
         [result] = self._repo.ingest_batch(self.tenant_id, self.pid, [(record, cas_path)], put_content=lambda path: self._source_cas.put(self.tenant_id, content))
         return result["source_id"]
 
@@ -923,7 +924,19 @@ class RoundFiveTests(GatherCase):
         self.collected(cut, zh(311), title=("長" * 296 + " | 某某商店")[:hooks.COLLECT_TITLE_CHARS])
         self.arrive()
         self.assertEqual(self.cell(short, "outlet_exists"), {"state": "查不到", "why": "名字不像媒體"})
-        self.assertEqual(self.cell(cut, "outlet_exists"), {"state": "無法檢查", "why": "標題超過 300 個字，只存了前面，網站的名字可能被切掉"})
+        self.assertEqual(self.cell(cut, "outlet_exists"), {"state": "無法檢查", "why": hooks.TITLE_CUT})
+
+    def test_a_page_set_aside_was_not_read_for_its_date_or_its_whole_title(self):
+        """Round 5 review, the class swept through _cells: a page set aside was never read, so 「網頁沒寫日期」 查不到 was
+        said of a page nobody read; and its title is often the search engine's, cut with an ellipsis."""
+        url = "https://shop.example.com/aside"
+        self.arrive(aside=[{"url": url, "title": "店家公告 | 某某商...", "reason": "抓不到內文"}])
+        self.assertEqual(self.cell(url, "first_seen"), {"state": "無法檢查", "why": "沒有抓到這一頁的內文，不知道網頁寫的日期；網頁封存館沒有存過這一頁"})
+        self.assertEqual(self.cell(url, "outlet_exists"), {"state": "無法檢查", "why": hooks.TITLE_CUT})
+        read = "https://shop.example.com/read"
+        self.collected(read, zh(312), title="店家公告 | 某某商店")
+        self.arrive()
+        self.assertEqual((self.cell(read, "first_seen")["state"], self.cell(read, "outlet_exists")["state"]), ("查不到", "查不到"))
 
     def test_a_page_whose_links_collect_cut_is_never_in_a_circle(self):
         """F2: collect keeps the first 50 other hosts of a page; 51 sites that each link the other 50 and then a site
@@ -962,6 +975,51 @@ class RoundFiveTests(GatherCase):
         self.assertFalse(outlinks_whole({"outlinks": ["例子.example"]}))   # a hostname collect sends is ASCII (punycode)
         self.assertTrue(outlinks_whole({"outlinks": ["a.example"] * (OUTLINKS_ITEMS - 1)}))
         self.assertFalse(outlinks_whole({"outlinks": ["a.example"] * OUTLINKS_ITEMS}))
+
+    def test_a_collected_body_with_no_letter_has_no_language_to_say(self):
+        """Round 5 review F1: a body of digits (the footer with the words dropped) was 查不到 「沒有文字」 -- through _cells,
+        as the hook makes the card; the person's own file of the same text is read whole: 查不到."""
+        url = "https://stats.example.com/1"
+        self.collected(url, "2026 / 03 / 01 -- 12 345 678")
+        self.arrive()
+        self.assertEqual(self.cell(url, "language"), {"state": "無法檢查", "why": hooks.NO_LETTER[hooks.READ_BODY]})
+        mine = self.pasted("2026 / 03 / 01 -- 12 345 678", title="數字")
+        [card] = [doc for doc in self.cards() if doc["content"]["source_id"] == mine]
+        self.assertEqual(card["content"]["cells"]["language"], {"state": "查不到", "why": "系統讀到的內容裡沒有文字"})
+
+    def test_counting_a_chunk_at_a_time_is_counting_the_whole_text(self):
+        """Round 5 review F2: a word running over a chunk's end was two words (「the」|「and」 of 「theand」 made a page
+        English). Every count must equal the whole text's, wherever the chunks end."""
+        def whole(text):
+            found = re.findall(r"[a-z]+", text.lower())
+            return len(found), sum(word in hooks._EN_WORDS for word in found)
+
+        straddle = "q" * (hooks._CHUNK - 3) + "theand" + " xq" * 10
+        self.assertEqual(hooks._language(straddle)["state"], "無法檢查")   # 「qq…qtheand」 is no English word
+        chance = random.Random(8)
+        pieces = ["the", "and", "of", "to", "in", "is", "that", "with", "theand", "x", "Q", "İ", "K", "ΣΑΣ", " ", "\n", "，", "中", "1"]
+        for size in (1, 2, 3, 4, 5, 7, 64):
+            with mock.patch.object(hooks, "_CHUNK", size):
+                for trial in range(150):
+                    text = "".join(chance.choice(pieces) for _ in range(chance.randrange(0, 60)))
+                    self.assertEqual(hooks._english_words(text), whole(text), (size, text))
+                    with mock.patch.object(hooks, "_CHUNK", 10 ** 9):
+                        unchunked = hooks._language(text)
+                    self.assertEqual(hooks._language(text), unchunked, (size, text))
+
+    def test_an_empty_links_list_is_not_trusted_without_its_image(self):
+        """Round 5 review F3: an older collect trimmed one link to [] and then dropped the image to fit; [] read as
+        "links nowhere" and the card did not say its links may be cut."""
+        self.assertFalse(outlinks_whole({"pasted": False, "outlinks": []}))
+        self.assertTrue(outlinks_whole({"pasted": False, "outlinks": [], "imageUrl": "https://img.example.com/a.jpg"}))
+        bare, pictured, unsent = "https://a.example.com/1", "https://b.example.net/2", "https://c.example.org/3"
+        self.collected(bare, zh(380), outlinks=[])
+        self.collected(pictured, zh(381), outlinks=[], imageUrl="https://img.example.com/a.jpg")
+        self.collected(unsent, zh(382), outlinks=None)   # collect now drops the whole list when it must cut for size
+        self.arrive()
+        self.assertTrue(self.cell(unsent, "original")["why"].endswith(hooks.LINKS_CUT))
+        self.assertEqual(self.cell(bare, "original"), {"state": "查不到", "why": "沒有找到別的網頁有同一篇，看不出是不是轉貼；" + hooks.LINKS_CUT})
+        self.assertEqual(self.cell(pictured, "original"), {"state": "查不到", "why": "沒有找到別的網頁有同一篇，看不出是不是轉貼"})
 
     def test_the_letters_and_pieces_are_the_rule_ones(self):
         """F3: grouping drops spaces and punctuation in one pass (str.translate) and reads a page's pieces once; both
@@ -1028,8 +1086,7 @@ class CapsTests(unittest.TestCase):
             "texts(meta.entityAnchorsHit, 12, 200)": "anchors: GATHER reads none",
             "meta.searchQuery.slice(0, 500)": "query: shown on the card as said, no conclusion",
             "meta.outlinks.slice(0, rule.items)": "outlinks: a list with a host too long is not sent (no list = not whole); cut at 50 as above",
-            "pyJsonBytes(out) > MAX_RELEVANCE_BYTES": "hosts trimmed to fit leave no room for one more: outlinks_whole; a dropped image joins nothing",
-            "out.outlinks.slice(0, -1)": "as above",
+            "pyJsonBytes(out) > MAX_RELEVANCE_BYTES": "over the byte cap the links go whole (no list = not whole); a dropped image joins nothing",
             "aside.length >= MAX_COMPLETION_ASIDE": "pages set aside past 200 get no card: GATHER concludes nothing from the aside list being whole",
             "a.title.slice(0, 300)": "title cut: COLLECT_TITLE_CHARS, outlet_exists 無法檢查",
             ".slice(0, MAX_COMPLETION_CHANNELS)": "channels: at most 4 exist (2 engines, 2 languages)",
@@ -1059,6 +1116,7 @@ class CapsTests(unittest.TestCase):
         "unique[:3]": "how many names a why lists (it says how many there are)",
         'item["provider"][:40]': "a channel's fields",
         "url[:url_max]": "a page set aside compared as its card keeps it",
+        "[:_LONGEST_EN + 1]": "a word carried over a chunk's end: past _LONGEST_EN letters it is no _EN_WORDS word (counts equal the whole text's)",
     }
 
     def found(self, path: Path, pattern: re.Pattern[str]) -> list[str]:

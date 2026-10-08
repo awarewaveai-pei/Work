@@ -177,10 +177,11 @@ export function relevanceOf(meta: Record<string, unknown>): Record<string, unkno
     if (!rule || !fitsRule(rule, value)) delete out[key];
   }
   if (out.pasted) for (const key of Object.keys(out)) if (key.startsWith("search")) delete out[key];
-  // Over the cap, the least telling parts go first: links one at a time, then the image, the anchors, the query. A list
-  // cut here keeps no room for one more host, which is how the engine knows it may be cut (outlinks_whole).
+  // Over the cap, the least telling parts go first: the links, then the image, the anchors, the query. The links go
+  // whole, never some of them: a cut list (an empty one above all) would read as every link the page has
+  // (engine outlinks_whole; collector.v2.json `reading`), and no list reads as not whole.
   while (pyJsonBytes(out) > MAX_RELEVANCE_BYTES) {
-    if (Array.isArray(out.outlinks) && out.outlinks.length) out.outlinks = out.outlinks.slice(0, -1);
+    if ("outlinks" in out) delete out.outlinks;
     else if ("imageUrl" in out) delete out.imageUrl;
     else if ("entityAnchorsHit" in out) delete out.entityAnchorsHit;
     else if ("searchQuery" in out) delete out.searchQuery;
