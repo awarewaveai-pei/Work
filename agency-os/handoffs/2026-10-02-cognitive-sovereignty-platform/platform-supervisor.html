@@ -1386,7 +1386,7 @@ document.querySelectorAll(".n-pk").forEach(e => { e.textContent = PK.length; });
 /* 2026-10-03 她：「都交給你做，需要決定的事都你決定」。我定的每一件寫在這裡，談定頁和架構頁都從這裡畫。 */
 const DELEGATED = "2026-10-03 你交給我定";
 /* 合約在它那一步開工前確認（前一步蓋出來學到的會改後面的合約）。確認到第幾步只寫這裡；哪幾份算確認，從 BUILD 算。 */
-const CONFIRMED_STEP = 2;
+const CONFIRMED_STEP = 4;
 const stepNo = r => +r[1].match(/\d+/)[0];   /* BUILD 每一列的 r[0] 是顏色組，不是第幾步 */
 const CONFIRMED = () => [...new Set(BUILD.filter(r=>stepNo(r) >= 1 && stepNo(r) <= CONFIRMED_STEP).flatMap(r=>r[5]))];
 /* 確認＝確認這一版的內容。卡上任何一行（含北極星、框架、工具那幾行）改了，指紋就不同，腳本擋，要重看再更新這裡（第 17 輪審查：確認原本只是一個標籤）。 */
@@ -1395,6 +1395,7 @@ const CONFIRM_LOG = [
   {on:"2026-10-03", why:"第 1 步要用的 12 份第一次確認（她交給我定）", sigs:{"SENSE": "ek2pvi","MAP": "ol16qm","THINK": "1l08sa8","DECIDE": "3nuw7q","ACT": "1jhdz1h","LEARN": "89otcx","GOVERN": "c9xa52","完整性核心": "1szg6ih","規範與脈絡": "uvzsp","組裝器": "1oi4xob","協作合約": "9tjmyh","共用紀錄": "i2gh9d"}},
   {on:"2026-10-03", why:"第 17 次審查驗證後改了這幾張（THINK 指令卡對應的模式和角色；ACT、LEARN 提醒怎麼送；組裝器還沒開放的目的怎麼標），重看過", sigs:{"THINK": "df8n7y","ACT": "1sfkj6c","LEARN": "1qq7qzh","組裝器": "47u5ct"}},
   {on:"2026-10-04", why:"第 2 步要用的 3 份開工前重讀、確認（她交給我定）；卡上寫不到的（語言只有中英、社群傳播沒有資料）記在 STEP2_CHECKLIST，不改卡", sigs:{"GATHER": "n2n827","VERIFY": "18fquxs","COMPUTE": "1q6kmp3"}},
+  {on:"2026-10-04", why:"第 3、4 步要用的 5 份開工前重讀、確認（她交給我定）；工人照這一版印出的卡片文字蓋（docs/platform/step34-cards/），共用規則在 STEP34_SHARED_RULES.md。2026-10-08 才補記在這裡", sigs:{"TEACH": "13alc0x","EXPRESS": "17gnx5y","FACILITATE": "1s3xh7q","COLLAB": "mdurdy","GOVERN": "c9xa52"}},
 ];
 const CONFIRMED_SIG = Object.assign({}, ...CONFIRM_LOG.map(e=>e.sigs));
 const FIRST_SCENE = "個人複雜決策";
@@ -1420,7 +1421,7 @@ const MY_DECISIONS = () => [
   "合約卡上跟藍圖不同的地方，照卡上的做：SENSE 的材料分類；VERIFY 不跨案子提醒（它讀不到你的個人歷程）；EXPRESS 不交研究資料、不做匯出；群組程序是提議，你同意才加；研究資料不叫匿名。",
   "藍圖正文不改。藍圖是起點；建置看合約卡，增補檔記下哪裡跟藍圖不同、為什麼。",
   "我擬的內容照現在的做：情緒調節的五個做法、公共議題判斷套件的順序、每一環的量法、各積木的觸發時機、積木的排法。",
-  "合約：第 1 步要用的 " + CONFIRMED().length + " 份確認了（" + ORD(CONFIRMED()).join("、") + "）。確認的是這一版的內容：卡上改了任何一行，就要重看。其餘 " + (NB + 5 - CONFIRMED().length) + " 份在它那一步開工前確認，因為前一步蓋出來學到的，會改它們。",
+  "合約：第 1 到第 " + CONFIRMED_STEP + " 步要用的 " + CONFIRMED().length + " 份確認了（" + ORD(CONFIRMED()).join("、") + "）。確認的是這一版的內容：卡上改了任何一行，就要重看。" + (NB + 5 > CONFIRMED().length ? "其餘 " + (NB + 5 - CONFIRMED().length) + " 份在它那一步開工前確認，因為前一步蓋出來學到的，會改它們。" : "每一份都在它那一步開工前確認，因為前一步蓋出來學到的，會改它們。"),
   "Google 查核搜尋的金鑰：第 2 步接 VERIFY 開工前再申請。申請要用你的 Google 帳號，到時候我請你按一下。",
 ];
 /* 架構上我定的（2026-10-03）。依據寫在增補檔 A30（程式檔名和行號）。 */
@@ -1433,11 +1434,11 @@ const ARCH_DECIDED = [
   "資料庫（2026-10-04 你定的）：上線前就換成資料庫伺服器，不等第 3 步。平台要給全世界、數百到數千人用，資料依帳號所在的區域分開存，第一個區域用自己的一台 PostgreSQL（不放在你自架的 Supabase 裡，之後每個區域照樣再開一台）。換的時候只動資料那一層：鎖改成資料庫的鎖，測試也跑在真的資料庫上。地基已蓋好，搬資料和上線都還沒做，要你同意。",
 ];
 const BUILD = [
-  [0,"第 0 步","寫 " + NB + " 份積木合約、5 份全程生效項合約","每塊說清楚十二個欄位。共用紀錄從這 " + NB + " 份推出來。全程生效的五樣也各寫一份。",() => "寫完了。第 " + CONFIRMED_STEP + " 步要用的 " + CONFIRMED().length + " 份已確認（" + DELEGATED + "）；其餘 " + (NB + 5 - CONFIRMED().length) + " 份在它那一步開工前確認",[],"寫合約"],
+  [0,"第 0 步","寫 " + NB + " 份積木合約、5 份全程生效項合約","每塊說清楚十二個欄位。共用紀錄從這 " + NB + " 份推出來。全程生效的五樣也各寫一份。",() => "寫完了。第 " + CONFIRMED_STEP + " 步要用的 " + CONFIRMED().length + " 份已確認（" + DELEGATED + "）" + (NB + 5 > CONFIRMED().length ? "；其餘 " + (NB + 5 - CONFIRMED().length) + " 份在它那一步開工前確認" : "，就是全部"),[],"寫合約"],
   [1,"第 1 步","第一圈：個人複雜決策","外殼（" + LAYERS[1][3].join("、") + "）、案子的紀錄（共用紀錄）、" + zh(PK.find(p=>p[0]==="個人複雜決策")[2].length) + "塊、基本安全（" + GOVERN_FIRST.join("、") + "）一起做。MAP 這一步要做出六層地圖，用上「規範與脈絡」這個鏡頭。一塊一塊做到能拿真事進去用。","做好了，在本機（2026-10-04）：七塊和全程生效的五樣都能用，上線前檢查全部通過。還沒上正式站，要你同意。GOVERN 的研究與治理在第 3 步。",["SENSE","MAP","THINK","DECIDE","ACT","LEARN","GOVERN","完整性核心","規範與脈絡","組裝器","協作合約","共用紀錄"],"第一圈＋基本安全"],
   [2,"第 2 步","接現有引擎當積木","東西已經有，缺的是積木的合約和畫面。","做好了，在本機（2026-10-04）：三塊都能用，每一塊都有獨立審查和「拔掉守衛就變紅」的測試。三塊共用的規則：出處怎麼算只寫一處；AI 只能引用案子裡找回來的來源，引文要對得上原文；出處不到兩個，系統在叫 AI 之前就停；所有對外查詢（網域登記、網頁封存、查核資料庫）都交給找資料的服務，引擎自己不抓。還沒上正式站，要你同意。",["GATHER","VERIFY","COMPUTE"],"接引擎"],
-  [4,"第 3 步","公共決策","多人共同程序提前到這裡：它是北極星因果鏈的第四環。研究與治理（" + GOVERN_LATER.join("、") + "）也在這一步。","未開始",["COLLAB","GOVERN"],"公共決策"],
-  [3,"第 4 步","教學、表達與帶領","情境演練、角色輪替；把判斷變成給別人看的東西；帶領者的訓練和督導。","未開始",["TEACH","EXPRESS","FACILITATE"],"教學、表達與帶領"],
+  [4,"第 3 步","公共決策","多人共同程序提前到這裡：它是北極星因果鏈的第四環。研究與治理（" + GOVERN_LATER.join("、") + "）也在這一步。","進行中，在本機（2026-10-08）：群組、邀請、同意、抹除已做好；COLLAB 三張卡做好，正在修審查找到的 3 個隱私問題；GOVERN 四張卡做好、審查問題修好，正在接上主線。還沒上線。",["COLLAB","GOVERN"],"公共決策"],
+  [3,"第 4 步","教學、表達與帶領","情境演練、角色輪替；把判斷變成給別人看的東西；帶領者的訓練和督導。","進行中，在本機（2026-10-08）：TEACH 做好；EXPRESS 做好一半（另一半要等 COLLAB）；FACILITATE 做好腳本，紀錄和 AI 頁還沒做。還沒上線。",["TEACH","EXPRESS","FACILITATE"],"教學、表達與帶領"],
 ];
 /* 做完第 k 步（0 起算）能開的套件：套件裡每一塊在第 0 到第 k 步都蓋了。 */
 const opensBy = k => PK.filter(p=>p[2].every(b=>BUILD.slice(0, k+1).some(o=>o[5].includes(b))));
@@ -1531,10 +1532,10 @@ const BLOCKS = [
  {n:7, code:"DECIDE", name:"判斷", role:"我的結論", status:"無", contract:"未寫", build:"完成"},
  {n:8, code:"ACT", name:"行動與觀察", role:"做一步，持續看", status:"部分", contract:"未寫", build:"完成"},
  {n:9, code:"LEARN", name:"回顧校準", role:"回頭對結果", status:"無", contract:"未寫", build:"完成"},
- {n:10, code:"TEACH", name:"課程與演練", role:"每一塊用之前先練", status:"部分", contract:"未寫", build:"未開始"},
- {n:11, code:"EXPRESS", name:"產出與表達", role:"任何一步都能輸出給別人", status:"部分", contract:"未寫", build:"未開始"},
- {n:12, code:"FACILITATE", name:"帶領", role:"有人帶的時候", status:"無", contract:"未寫", build:"未開始"},
- {n:13, code:"COLLAB", name:"共同程序", role:"有別人一起決定時", status:"無", contract:"未寫", build:"未開始"},
+ {n:10, code:"TEACH", name:"課程與演練", role:"每一塊用之前先練", status:"部分", contract:"未寫", build:"完成"},
+ {n:11, code:"EXPRESS", name:"產出與表達", role:"任何一步都能輸出給別人", status:"部分", contract:"未寫", build:"進行中"},
+ {n:12, code:"FACILITATE", name:"帶領", role:"有人帶的時候", status:"無", contract:"未寫", build:"進行中"},
+ {n:13, code:"COLLAB", name:"共同程序", role:"有別人一起決定時", status:"無", contract:"未寫", build:"進行中"},
  {n:14, code:"GOVERN", name:"安全、資料與治理", role:"全程伴隨", status:"部分", contract:"未寫", build:"進行中"},
 ];
 const CROSS = [
