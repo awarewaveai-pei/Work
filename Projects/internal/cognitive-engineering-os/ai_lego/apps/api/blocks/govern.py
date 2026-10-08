@@ -72,7 +72,7 @@ def help_for(where: str | None = Query(default=None, max_length=200), cognitive_
     if session is not None:
         saved = CaseDocs(repo).current(session["tenant_id"], record_log.person(session["identity_id"]), "govern.location")
         place = saved[-1]["content"]["where"] if saved else None
-    return {"notice": safety.NOT_THERAPY, "where": place, "covered": safety.covers(place), "resources": safety.resources(place)}
+    return {"where": place, "covered": safety.covers(place), **safety.help_for(place)}
 
 
 # -- recipe runs ------------------------------------------------------------------------------------------------------

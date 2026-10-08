@@ -7,7 +7,8 @@ not a therapy service -- it only decides that the AI should step back.
 A word list over-triggers on purpose: a false stop costs one screen (the person can continue on their own); a missed
 crisis costs more. What it must not do is fire on the same characters inside another word (被打斷, 跳樓大拍賣, "skill
 here" holds "kill her"), and it must not miss a signal because of how it was typed (curly apostrophe, full-width
-letters, spaces between Chinese characters, simplified characters). Build step 3 (在地化) adds other places' resources.
+letters, spaces between Chinese characters, simplified characters). The lines of help per place are content files in
+platform/resources/ (card 32: versioned, each with its source); this module reads them.
 """
 
 from __future__ import annotations
@@ -63,22 +64,16 @@ def digest(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:12]
 
 
-TAIWAN_PLACES = (
-    "台灣", "臺灣", "台湾", "台北", "臺北", "新北", "桃園", "桃园", "台中", "臺中", "台南", "臺南", "高雄", "基隆", "新竹", "嘉義", "嘉义", "苗栗", "彰化", "南投",
-    "雲林", "云林", "屏東", "屏东", "宜蘭", "宜兰", "花蓮", "花莲", "台東", "臺東", "台东", "澎湖", "金門", "金门", "連江", "馬祖", "马祖",
-    "taiwan", "taipei", "kaohsiung", "taichung", "tainan", "taoyuan", "hsinchu", "keelung", "chiayi", "yilan", "hualien", "penghu", "kinmen",
-)
-TAIWAN_RESOURCES = (
-    {"name": "安心專線（衛福部，24 小時）", "contact": "1925"},
-    {"name": "生命線", "contact": "1995"},
-    {"name": "張老師專線", "contact": "1980"},
-    {"name": "保護專線（家暴、性侵、兒少保護）", "contact": "113"},
-    {"name": "緊急：警察 110、救護 119", "contact": "110 / 119"},
-)
-INTERNATIONAL_RESOURCES = (
-    {"name": "Find A Helpline：依國家找免費、保密的求助專線", "contact": "https://findahelpline.com"},
-    {"name": "有立即危險時：打你所在地的緊急電話", "contact": "112 / 911 / 999（依所在地）"},
-)
+from ai_lego.platform import resources as _resources   # after digest and normalise: the loader uses both
+
+
+def _lines(place: str) -> tuple[dict[str, str], ...]:
+    return tuple({"name": entry["name"], "contact": entry["how_to_reach"]} for entry in _resources.places()[place]["entries"])
+
+
+TAIWAN_PLACES = tuple(_resources.places()["台灣"]["matches"])   # GATHER's 發生地的語言 names it (govern.taiwan_places)
+TAIWAN_RESOURCES = _lines("台灣")
+INTERNATIONAL_RESOURCES = _lines(_resources.INTERNATIONAL)
 NOT_THERAPY = "這個平台幫你看見自己怎麼判斷，不是治療或諮商服務。遇到危機時，請找下面的專線或你身邊信任的人。"
 
 
@@ -88,16 +83,22 @@ def crisis_signal(*texts: Any) -> bool:
 
 
 def covers(where: str | None) -> bool:
-    """True when this place has its own lines (build step 1: Taiwan); anywhere else gets the international list."""
-    place = normalise(where or "").lower()
-    return bool(place) and any(name in place for name in TAIWAN_PLACES)
+    """True when this place has its own lines (a file in platform/resources/); anywhere else gets the international list."""
+    return _resources.place_of(where) is not None
 
 
 def resources(where: str | None) -> list[dict[str, str]]:
     """Help for where the person is; unknown or not given = the international list (contract: 沒填時，給國際通用的)."""
-    return (list(TAIWAN_RESOURCES) if covers(where) else []) + list(INTERNATIONAL_RESOURCES)
+    return [{"name": entry["name"], "contact": entry["how_to_reach"]} for entry in _resources.for_place(where)["resources"]]
+
+
+def help_for(where: str | None) -> dict[str, Any]:
+    """Every crisis notice's words: the notice, the lines for where the person is, and -- where we have no lines yet --
+    the sentence that says so (「這裡的資源我們還沒有，先給國際通用的」)."""
+    return {"notice": NOT_THERAPY, "resources": resources(where), "fallback": _resources.for_place(where)["fallback"]}
 
 
 def fingerprint() -> str:
     """The version of everything this module decides with: signals, places, lines of help, the notice."""
-    return digest({"signals": SIGNALS, "places": TAIWAN_PLACES, "taiwan": TAIWAN_RESOURCES, "international": INTERNATIONAL_RESOURCES, "notice": NOT_THERAPY})
+    return digest({"signals": SIGNALS, "places": TAIWAN_PLACES, "taiwan": TAIWAN_RESOURCES, "international": INTERNATIONAL_RESOURCES, "notice": NOT_THERAPY,
+                   "resources": _resources.version()})

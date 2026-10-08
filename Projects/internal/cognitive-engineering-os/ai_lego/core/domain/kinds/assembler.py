@@ -36,6 +36,7 @@ KINDS = [
         "you_are_in": Field("text", 200, scan=False),              # 你在哪裡
         "others_in": Field("list", 20, scan=False),                # 其他當事人各在哪裡
         "field_contact": Field("text", 500, scan=False),           # 有沒有到過現場的人可以問（選填）
+        "no_record": Field("bool", human_only=True),               # 不留紀錄：關掉這個案子時整個刪掉 (GOVERN, card 32)
         "package": Field("choice", choices=tuple(PACKAGES), required=True),
         "blocks": Field("choices", 20, choices=("SENSE", "GATHER", "MAP", "THINK", "VERIFY", "COMPUTE", "DECIDE", "ACT", "LEARN", "TEACH", "EXPRESS", "FACILITATE", "COLLAB", "GOVERN")),
     }, deletable=False, singleton=True),

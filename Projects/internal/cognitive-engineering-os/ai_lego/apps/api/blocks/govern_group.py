@@ -12,6 +12,12 @@ Appeals (§9, card 30), read only through platform/visibility.py ``appeals_for``
     GET    /me/appeals                     mine          GET /me/appeals/export   mine, as a file
     DELETE /me/appeals/{doc_id}            mine, also after leaving the group
     GET    /govern/appeals[/{doc_id}]      what appeals_for gives a handler or supervisor; anyone else gets [] / the 404
+
+不留紀錄 and the case's audit line (card 32):
+    GET  /blocks/govern/spec                 the words the page shows before the person chooses 不留紀錄
+    POST /projects/{id}/govern/close         closing a 不留紀錄 case erases it whole (the case erasure; no tombstone)
+    GET  /projects/{id}/govern/used          which model and instructions each AI turn used, and every ruleset stamped on the
+                                             case's records -- names, versions and fingerprints only, never what the records say
 """
 
 from __future__ import annotations
@@ -19,19 +25,24 @@ from __future__ import annotations
 from typing import Any
 
 import json
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from ai_lego.apps.api import main as api
-from ai_lego.apps.api.blocks.docs import DocBody, _call, _save, _saved
+from ai_lego.apps.api.blocks.docs import DocBody, _call, _save, _saved, case_owner
 from ai_lego.core.domain import doc_kinds
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import visibility
+from ai_lego.data.object.json_artifact_store import JsonArtifactStore
+from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
+from ai_lego.platform import resources
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.platform.rulesets import rulesets
 from ai_lego.platform.visibility import Viewer
 
 router = APIRouter()
@@ -143,3 +154,70 @@ def appeal_to_handle(doc_id: str, session: dict[str, Any] = Depends(api.require_
         raise HTTPException(status_code=404, detail=APPEAL_NOT_FOUND)
     return found
 
+
+# -- 不留紀錄 and the audit line ----------------------------------------------------------------------------------------
+
+NO_RECORD_WARNING = "關掉之後整個案子會刪掉，不能匯出"
+USED_LABELS = {"ai_turns": "每一次 AI 回答", "block": "哪一塊", "action": "做了什麼", "model": "用的模型", "instructions": "給 AI 的指令是哪一版",
+               "at": "時間", "rulesets": "這個案子用到的規則和名單", "title": "名稱", "version": "版本", "fingerprint": "內容指紋",
+               "resources": "求助資源的版本"}
+_FINGERPRINT = re.compile(r"^[0-9a-f]{6,64}$")
+_VERSION = re.compile(r"^[0-9][0-9A-Za-z.-]{0,19}$")
+
+
+@router.get("/blocks/govern/spec")
+def govern_spec() -> dict[str, Any]:
+    return {"no_record": {"label": "不留紀錄", "warning": NO_RECORD_WARNING}, "resources": resources.version()}
+
+
+@router.post("/projects/{project_id}/govern/close")
+def close_case(project_id: str, session: dict[str, Any] = Depends(api.require_session), store: IdentityStore = Depends(api.get_store),
+               repo: ProjectSourceRepository = Depends(api.get_project_source_repository), source_cas: TenantScopedCas = Depends(api.get_source_cas),
+               artifact_store: JsonArtifactStore = Depends(api.get_artifact_store)) -> dict[str, Any]:
+    """Closing a 不留紀錄 case: the case erasure, decided only if the intake still says so under the erasure's lock."""
+    case_owner(project_id, session, repo)
+    try:
+        result = api.erase_case(store, repo, source_cas, artifact_store, session["tenant_id"], session["identity_id"], project_id, only_if_no_record=True)
+    except InvariantViolation as error:
+        if str(error).startswith("CASE_KEEPS_RECORDS"):
+            raise HTTPException(status_code=409, detail=str(error)) from error
+        raise
+    return {"closed": True, "physical_cleanup": result["physical_cleanup"]}
+
+
+def stamps(content: Any) -> list[dict[str, str]]:
+    """Every ruleset stamp (Ruleset.stamp(): name, version, fingerprint) inside a record, by shape: a known ruleset's name,
+    a version and a fingerprint of their own form -- nothing else of the record is read out."""
+    known = rulesets()
+    found: dict[tuple[str, str, str], dict[str, str]] = {}
+
+    def take(name: Any, value: Any) -> None:
+        if (isinstance(name, str) and name in known and isinstance(value, dict) and isinstance(value.get("version"), str) and _VERSION.match(value["version"])
+                and isinstance(value.get("fingerprint"), str) and _FINGERPRINT.match(value["fingerprint"])):
+            found[(name, value["version"], value["fingerprint"])] = {"name": name, "version": value["version"], "fingerprint": value["fingerprint"], "title": known[name].title}
+
+    def walk(value: Any) -> None:
+        if isinstance(value, dict):
+            take(value.get("name"), value)
+            for key, item in value.items():
+                take(key, item)
+                walk(item)
+        elif isinstance(value, list):
+            for item in value:
+                walk(item)
+
+    walk(content)
+    return [found[key] for key in sorted(found)]
+
+
+@router.get("/projects/{project_id}/govern/used")
+def case_used(project_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
+    owner = case_owner(project_id, session, repo)
+    tenant_id = session["tenant_id"]
+    turns = [{"block": doc["content"]["block"], "action": doc["content"]["action"], "model": doc["content"]["model"],
+              "instructions": doc["content"]["instructions_sha256"], "at": doc["at"]} for doc in CaseDocs(repo).current(tenant_id, owner, "govern.ai_call")]
+    with repo.transaction(tenant_id) as connection:
+        rows = connection.execute("SELECT payload_json->'content' AS content FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s AND event_type='DocSaved'",
+                                  (tenant_id, project_id)).fetchall()
+    found = {(item["name"], item["version"], item["fingerprint"]): item for row in rows for item in stamps(row["content"])}
+    return {"labels": USED_LABELS, "ai_turns": turns, "rulesets": [found[key] for key in sorted(found)], "resources": resources.version()}

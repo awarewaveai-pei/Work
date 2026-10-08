@@ -130,6 +130,14 @@ def _run_items(runs: Iterable[Mapping[str, Any]]) -> list[tuple[str, dict[str, A
     return [("run_files", {"run_id": run["run_id"], "identity_id": run["identity_id"]}, "pending", None) for run in runs]
 
 
+def _no_record(connection: psycopg.Connection, tenant_id: str, project_id: str) -> bool:
+    """Whether the case's intake (its latest version) chose 不留紀錄 -- read on the erasure's own connection, under its lock."""
+    row = connection.execute(
+        "SELECT payload_json->'content'->>'no_record' AS no_record FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s "
+        "AND event_type='DocSaved' AND payload_json->>'kind' = 'assembler.intake' ORDER BY write_order DESC LIMIT 1", (tenant_id, project_id)).fetchone()
+    return row is not None and row["no_record"] == "true"
+
+
 class Erasure:
     """``journal_path``: where a run's journal lives (main.workflow_journal_path); runs are named to it by
     (run_id, identity_id), so the outbox never holds a host path."""
@@ -142,17 +150,24 @@ class Erasure:
 
     # -- 1. the decisions --------------------------------------------------------------------------------------------
 
-    def decide_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]]) -> None:
+    def decide_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]], *, only_if_no_record: bool = False) -> None:
         """``runs()``: the person's recipe runs on this case ({run_id, identity_id, artifacts}); read under the case lock,
-        after every admission in flight (admit_run); raises (and nothing is decided) while one still runs."""
+        after every admission in flight (admit_run); raises (and nothing is decided) while one still runs. A case whose
+        intake says 不留紀錄 (card 32) gets no tombstone, read under the same lock; ``only_if_no_record`` (closing it)
+        refuses a case that keeps its records (CASE_KEEPS_RECORDS)."""
         with self._repo.transaction(tenant_id) as connection:
+            ProjectSourceRepository.lock_case(connection, tenant_id, project_id, exclusive=True)
+            no_record = _no_record(connection, tenant_id, project_id)
+            if only_if_no_record and not no_record:
+                raise InvariantViolation("CASE_KEEPS_RECORDS: this case did not choose 不留紀錄; delete it instead")
             erased = ProjectSourceRepository.erase_case_rows(connection, tenant_id, project_id)
             runs = runs()
             items = [("source_blob", {"path": path}, "pending", None) for path in ProjectSourceRepository.unreferenced_blobs(connection, tenant_id, self._source_cas)]
             items += _artifact_items([*erased["artifact_references"], *(reference for run in runs for reference in run["artifacts"])])
             items += _run_items(runs)
             grants = IdentityStore.close_collect_grants_on(connection, tenant_id, project_id)
-            outbox.write_job(connection, tenant_id, CASE, project_id, identity_id, {"sources": erased["sources"], "events_deleted": erased["events_deleted"], "grants_closed": grants}, items)
+            counts = {"sources": erased["sources"], "events_deleted": erased["events_deleted"], "grants_closed": grants, **({"no_record": True} if no_record else {})}
+            outbox.write_job(connection, tenant_id, CASE, project_id, identity_id, counts, items)
 
     def decide_groups(self, tenant_id: str, identity_id: str) -> dict[str, int]:
         """The account erasure's first step, before any case is erased (Codex F3): under the person lock held exclusive,
@@ -185,11 +200,11 @@ class Erasure:
 
     # -- the entry points --------------------------------------------------------------------------------------------
 
-    def erase_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]]) -> dict[str, Any]:
+    def erase_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]], *, only_if_no_record: bool = False) -> dict[str, Any]:
         """Decide, then clean up. A second DELETE that lost the race to the first finds no case: it finishes the first's job
         instead (same person) -- never a second decision."""
         try:
-            self.decide_case(tenant_id, project_id, identity_id, runs)
+            self.decide_case(tenant_id, project_id, identity_id, runs, only_if_no_record=only_if_no_record)
         except InvariantViolation as error:
             if not str(error).startswith("PROJECT_NOT_FOUND") or not self.pending_for(tenant_id, CASE, project_id, identity_id):
                 raise
@@ -304,7 +319,7 @@ class Erasure:
                     _log.error("erasure blocked: tenant %s %s %s has %d reference(s) that name no file of the tenant; an operator must look (python -m ai_lego.platform.erasure)",
                                tenant_id, subject_kind, subject_id, unresolved)
                 return {**summary, "physical_cleanup": "pending" if pending else "blocked", "pending_items": pending + unresolved, "failed": failed}
-            if subject_kind == CASE:
+            if subject_kind == CASE and not job["counts_json"].get("no_record"):   # 不留紀錄: not even 「已抹除」
                 ProjectSourceRepository.append_tombstone(connection, tenant_id, subject_id, job["erased_by_identity_id"], summary["erased"])
             outbox.delete_job(connection, tenant_id, subject_kind, subject_id)
         self._after_cleanup(tenant_id, subject_kind, subject_id)

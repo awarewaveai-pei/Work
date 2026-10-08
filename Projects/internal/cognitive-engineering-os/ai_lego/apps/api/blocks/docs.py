@@ -25,7 +25,7 @@ from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform import safety
+from ai_lego.platform import safety, visibility
 from ai_lego.platform.block_hooks import after_save, before_save, on_delete
 from ai_lego.platform.block_hooks.govern import strings
 
@@ -60,7 +60,13 @@ def _call(fn, *args, **kwargs):
 
 
 def _where(docs: CaseDocs, tenant_id: str, identity_id: str, owner: record_log.Owner) -> str | None:
-    """Where the person is: the case's intake, else the account's 「你在哪裡」 (GOVERN reads only this, only for help)."""
+    """Where the person is: the case's intake (in a group: their own place there, ``collab.place``, read as its writer --
+    never another member's), else the account's 「你在哪裡」 (GOVERN reads only this, only for help)."""
+    if owner.kind == "group" and "collab.place" in doc_kinds.kinds():
+        mine = visibility.visible(docs, visibility.Viewer(tenant_id, identity_id), owner.id, "collab.place")
+        mine = [item for item in mine if item["written_by"] == identity_id]
+        if mine:
+            return mine[-1]["content"]["where"]
     if owner.kind == "case":
         intake = docs.current(tenant_id, owner, "assembler.intake")
         if intake and intake[-1]["content"].get("you_are_in"):
@@ -121,7 +127,7 @@ def _save(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_
 def _saved(repo: ProjectSourceRepository, session: dict[str, Any], owner: record_log.Owner, doc: dict[str, Any]) -> dict[str, Any]:
     docs = CaseDocs(repo)
     words = strings(doc["content"], keys=True)   # every word however deep, keys too: json fields (a map's layers) hold the person's words
-    notices = [{"type": "crisis", "notice": safety.NOT_THERAPY, "resources": safety.resources(_where(docs, session["tenant_id"], session["identity_id"], owner))}] if safety.crisis_signal(*words) else []
+    notices = [{"type": "crisis", **safety.help_for(_where(docs, session["tenant_id"], session["identity_id"], owner))}] if safety.crisis_signal(*words) else []
     notices += _call(after_save, docs, session["tenant_id"], owner, doc)
     return {**doc, "notices": notices}
 

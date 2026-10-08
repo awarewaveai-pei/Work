@@ -2849,7 +2849,7 @@ def _without_empty_failed(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore,
-               tenant_id: str, identity_id: str, project_id: str) -> dict[str, Any]:
+               tenant_id: str, identity_id: str, project_id: str, *, only_if_no_record: bool = False) -> dict[str, Any]:
     """The case erasure itself, for a case the caller has already shown is the person's. No entitlement gate: it is also what
     the account deletion calls, and deleting what is yours is a right a suspended tenant does not take away. What cannot be
     deleted (a corrupt artifact reference) comes back in ``failed`` and does not stop the erasure. ``physical_cleanup``
@@ -2862,7 +2862,7 @@ def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: 
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a synthesis is still running; wait for it to finish, then delete")
     try:
         runs = lambda: _case_runs(tenant_id, identity_id, project_id)   # noqa: E731 -- read inside the decision, under the case lock
-        result = erasure_for(repo, source_cas, artifact_store).erase_case(tenant_id, project_id, identity_id, runs)   # later writes to the case: CASE_ERASED
+        result = erasure_for(repo, source_cas, artifact_store).erase_case(tenant_id, project_id, identity_id, runs, only_if_no_record=only_if_no_record)   # later writes: CASE_ERASED
     except InvariantViolation as error:
         if str(error).startswith("PROJECT_NOT_FOUND"):
             raise HTTPException(status_code=404, detail=f"PROJECT_NOT_FOUND: {project_id!r}") from error

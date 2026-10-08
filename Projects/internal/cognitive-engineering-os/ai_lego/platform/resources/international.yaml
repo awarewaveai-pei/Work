@@ -1,0 +1,18 @@
+# 國際通用的求助資源 (GOVERN, card 32): given everywhere, and alone where we have no list yet. A change of any text here
+# needs a new version and its line in HISTORY.json.
+place: 國際通用
+version: "1"
+matches: []
+entries:
+  - kind: hotline
+    name: Find A Helpline：依國家找免費、保密的求助專線
+    how_to_reach: https://findahelpline.com
+    languages: [多種語言]
+    hours: 依各專線
+    source: {name: ThroughLine Limited findahelpline.com, checked_on: "2026-10-08"}
+  - kind: emergency
+    name: 有立即危險時：打你所在地的緊急電話
+    how_to_reach: 112 / 911 / 999（依所在地）
+    languages: [依所在地]
+    hours: 24 小時
+    source: {name: 各地政府的緊急電話公告, checked_on: 尚未查核}

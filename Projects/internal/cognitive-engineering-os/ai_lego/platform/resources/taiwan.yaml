@@ -1,0 +1,38 @@
+# 台灣的求助資源 (GOVERN, card 32). A change of any text here needs a new version and its line in HISTORY.json.
+# matches: the place names a person may write for 台灣 (the same list step 1 kept in platform/safety; GATHER reads it too).
+place: 台灣
+version: "1"
+matches: [台灣, 臺灣, 台湾, 台北, 臺北, 新北, 桃園, 桃园, 台中, 臺中, 台南, 臺南, 高雄, 基隆, 新竹, 嘉義, 嘉义, 苗栗, 彰化, 南投,
+          雲林, 云林, 屏東, 屏东, 宜蘭, 宜兰, 花蓮, 花莲, 台東, 臺東, 台东, 澎湖, 金門, 金门, 連江, 馬祖, 马祖,
+          taiwan, taipei, kaohsiung, taichung, tainan, taoyuan, hsinchu, keelung, chiayi, yilan, hualien, penghu, kinmen]
+entries:
+  - kind: hotline
+    name: 安心專線（衛福部，24 小時）
+    how_to_reach: "1925"
+    languages: [中文]
+    hours: 24 小時
+    source: {name: 衛生福利部 mohw.gov.tw/cp-16-85625-1.html, checked_on: "2026-10-08"}
+  - kind: hotline
+    name: 生命線
+    how_to_reach: "1995"
+    languages: [中文]
+    hours: 24 小時
+    source: {name: 中央研究院心理諮商中心 counseling.sinica.edu.tw/pages/2747, checked_on: "2026-10-08"}
+  - kind: hotline
+    name: 張老師專線
+    how_to_reach: "1980"
+    languages: [中文]
+    hours: 週一至週六 9:00-12:00、14:00-17:00、18:00-21:30；週日 9:00-12:00、14:00-17:00
+    source: {name: 中央研究院心理諮商中心 counseling.sinica.edu.tw/pages/2747, checked_on: "2026-10-08"}
+  - kind: hotline
+    name: 保護專線（家暴、性侵、兒少保護）
+    how_to_reach: "113"
+    languages: [中文, 其他語言尚未查核]
+    hours: 24 小時
+    source: {name: 衛生福利部 mohw.gov.tw/cp-16-85625-1.html, checked_on: "2026-10-08"}
+  - kind: emergency
+    name: 緊急：警察 110、救護 119
+    how_to_reach: 110 / 119
+    languages: [中文]
+    hours: 24 小時
+    source: {name: "內政部消防署（台灣事實查核中心 tfc-taiwan.org.tw/?p=108722 引述）", checked_on: "2026-10-08"}

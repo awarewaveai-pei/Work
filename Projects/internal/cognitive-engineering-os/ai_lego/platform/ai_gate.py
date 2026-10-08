@@ -253,7 +253,7 @@ def ask_ai(action: AiAction, *, tenant_id: str, identity_id: str, project_id: st
     if safety.crisis_signal(user):
         if project_id:
             docs.save(tenant_id, owner, "govern.stop", {"reason": "crisis", "block": action.block}, record_log.system("GOVERN"))
-        return {"stopped": "crisis", "notice": safety.NOT_THERAPY, "resources": safety.resources(where)}
+        return {"stopped": "crisis", **safety.help_for(where)}
     if action.handback is not None:   # after the crisis check: a person in crisis gets help, not a hand-back
         why = action.handback(context, read)
         if why:

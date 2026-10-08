@@ -51,3 +51,8 @@
 - 31 research export: `platform/research_export.py` + CLI `apps/cli/research_export.py` + migration `0008_research_exports.py`
   (0007 left to COLLAB; down_revision fixed at merge). No web route.
   - Not built: FACILITATE drift records are read only once card 61 registers `facilitate.log` (tested with a stand-in).
+- 32 no record, resources per place, audit line: `assembler.intake.no_record`; `POST /projects/{id}/govern/close` (no close
+  action existed before; it erases a 不留紀錄 case, and every erase of such a case leaves no tombstone);
+  `platform/resources/` (台灣 + 國際通用, versioned, sourced); `GET /projects/{id}/govern/used`.
+  - Not built: device-only mode (§10); resource files for other places (localisation content); 112 / 911 / 999 is
+    marked 尚未查核 (`resources.unchecked()`).
