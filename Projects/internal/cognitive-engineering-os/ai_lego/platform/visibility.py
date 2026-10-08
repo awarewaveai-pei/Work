@@ -21,6 +21,12 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform.identity.store import IdentityStore
 
 
+# ``subject_confirmed`` (COLLAB's restatement, §7): an AI's words about one member's record are that member's first (the
+# record's writer identity is theirs). Another member reads it once the member's latest answer to it (``collab.confirm``)
+# says 說得對, and only if they may read the record it restates (write before see holds through it).
+SUBJECT_CONFIRMED = {"collab.restatement": ("collab.confirm", "restatement", "verdict", "說得對", "position", "collab.position")}
+
+
 @dataclass(frozen=True)
 class Viewer:
     tenant_id: str
@@ -63,7 +69,7 @@ def visible(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, *, doc_id:
     - What the viewer wrote (the first version is theirs) is always theirs to read -- also after leaving (G3).
     - Others' records only for a current member who is not held for review (§4 pending_review), as the kind's
       ``visibility`` allows: members | author_only (none) | convener_and_author (the convener) | self_and_govern (none
-      here: GOVERN reads the place on its own path).
+      here: GOVERN reads the place on its own path) | subject_confirmed (once its subject confirmed it: ``SUBJECT_CONFIRMED``).
     - Blind (write before see): of a kind with ``blind=<field>``, another's record with round value v only when the
       viewer has a live record of their own with the same v. The convener is not exempt."""
     spec = doc_kinds.require(kind)
@@ -82,12 +88,48 @@ def _visible(docs: CaseDocs, viewer: Viewer, group_id: str, spec: doc_kinds.DocK
         shown = mine
     elif spec.visibility in ("author_only", "self_and_govern") or (spec.visibility == "convener_and_author" and membership["my_role"] != "convener"):
         shown = mine
+    elif spec.visibility == "subject_confirmed":
+        shown = [item for item in items if item["written_by"] == viewer.identity_id or _confirmed(docs, viewer, group_id, kind, item)]
     elif spec.blind:   # the rounds come from all the viewer's own records, whatever one document was asked for
         rounds = {item["content"][spec.blind] for item in mine}
         shown = [item for item in items if item["written_by"] == viewer.identity_id or item["content"].get(spec.blind) in rounds]
     else:
         shown = items
     return [item for item in shown if doc_id is None or item["doc_id"] == doc_id]
+
+
+def _confirmed(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, item: dict[str, Any]) -> bool:
+    confirm_kind, points_at, verdict, yes, restated_field, restated_kind = SUBJECT_CONFIRMED[kind]
+    said = [answer for answer in docs.current_in_group(viewer.tenant_id, group_id, confirm_kind)
+            if answer["written_by"] == item["written_by"] and answer["content"].get(points_at) == item["doc_id"]]
+    return (bool(said) and said[-1]["content"].get(verdict) == yes
+            and bool(visible(docs, viewer, group_id, restated_kind, doc_id=item["content"].get(restated_field))))
+
+
+def for_agreement(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer, group_id: str) -> tuple[dict[str, dict[str, dict[str, str]]], list[dict[str, str]]]:
+    """§8's input, for a current confirmed member only (else nothing): every current member's live ``collab.stance`` per
+    option ({member: {option: {stance, reason}}}) and the members with their review state. Read for the pure rule
+    (platform/collab_agreement.py), whose answer is all a route shows of it, and only for the options the viewer marked."""
+    mine = repo.get_group_for(viewer.tenant_id, group_id, viewer.identity_id)
+    if mine is None or mine["my_review_state"] != "confirmed":
+        return {}, []
+    members = [{"identity_id": member["identity_id"], "review_state": member["review_state"]} for member in repo.group_members(viewer.tenant_id, group_id)]
+    current = {member["identity_id"] for member in members}
+    stances: dict[str, dict[str, dict[str, str]]] = {}
+    for item in docs.current_in_group(viewer.tenant_id, group_id, "collab.stance"):
+        if item["written_by"] in current:
+            stances.setdefault(item["written_by"], {})[item["content"]["option"]] = {"stance": item["content"]["stance"], "reason": item["content"]["reason"]}
+    return stances, members
+
+
+def wrote_in_round(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, value: Any) -> set[str] | None:
+    """Who has a live record of a blind kind for one round -- that they wrote, never what (「指出還沒被聽到的人」). For a
+    current confirmed member; None otherwise."""
+    spec = doc_kinds.require(kind)
+    membership = _membership(docs, viewer, group_id)
+    if not spec.blind or spec.owner != "group" or membership is None or membership["my_review_state"] != "confirmed":
+        return None
+    return {item["written_by"] for item in docs.current_in_group(viewer.tenant_id, group_id, kind) if item["content"].get(spec.blind) == value}
 
 
 def versions(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, doc_id: str) -> list[dict[str, Any]]:

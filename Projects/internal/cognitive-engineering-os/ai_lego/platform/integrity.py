@@ -29,7 +29,7 @@ from ai_lego.core.domain.blocks import ALL_CODES, BLOCKS
 from ai_lego.core.domain.doc_kinds import DocKind
 from ai_lego.core.domain.kinds.assembler import OPEN_BLOCKS
 from ai_lego.core.domain.kinds.collab_contract import ALWAYS, GRANTABLE
-from ai_lego.data.db import Databases
+from ai_lego.data.db import Databases, now
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
@@ -191,6 +191,18 @@ def _a_case(repo: ProjectSourceRepository, case: str) -> str:
     return case
 
 
+def _a_group(databases: Databases, repo: ProjectSourceRepository) -> str:
+    """A real group in the check's own rehearsal, the probe's identity its convener (a group's AI turn runs for a member)."""
+    store = IdentityStore(databases)
+    if store.get_workspace("integrity", "integrity") is None:
+        store.create_workspace("integrity", "integrity", "integrity")
+    with databases.for_tenant("integrity") as connection:
+        if connection.execute("SELECT 1 FROM identity WHERE tenant_id='integrity' AND identity_id='integrity'").fetchone() is None:
+            connection.execute("INSERT INTO identity (identity_id, tenant_id, email, display_name, status, created_at) VALUES ('integrity','integrity','integrity@example.invalid','integrity','active',%s)",
+                               (now(),))
+    return repo.create_group("integrity", "integrity", "decision", "integrity", "integrity")["group_id"]
+
+
 def crisis_stops_ai(snap: Snapshot, block: str) -> list[str]:
     """Runs the real gate: each action is fed one crisis sentence in place of its own input, with a provider that must not be called."""
     problems = []
@@ -204,7 +216,9 @@ def crisis_stops_ai(snap: Snapshot, block: str) -> list[str]:
                 docs.save("integrity", record_log.case(case), "collab_contract.terms", {"permissions": [probe.needs]}, record_log.user("integrity", "COLLAB_CONTRACT"))
             model = _NoModel()
             try:
-                answer = ai_gate.ask_ai(probe, tenant_id="integrity", identity_id="integrity", project_id=None if probe.outside_case else case, context={}, docs=docs, provider=model)
+                group = _a_group(databases, repo) if probe.in_group else None
+                answer = ai_gate.ask_ai(probe, tenant_id="integrity", identity_id="integrity", project_id=None if probe.outside_case or probe.in_group else case, context={},
+                                        docs=docs, provider=model, group_id=group)
             except Exception as error:   # any failure before the stop is a failure of the stop
                 problems.append(f"{action.block}.{action.name} failed on a crisis signal: {error}")
                 continue

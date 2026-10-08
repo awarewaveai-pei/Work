@@ -105,7 +105,20 @@ def _closing(docs: CaseDocs, me: Viewer, group_id: str, content: dict[str, Any],
         raise InvariantViolation("GROUP_CONVENER_ONLY: only a convener writes how the discussion ends")
 
 
+def _confirm(docs: CaseDocs, me: Viewer, group_id: str, content: dict[str, Any], doc_id: str | None, mine: list) -> None:
+    """Only the member a restatement is about answers it (its writer identity is theirs); one answer each, versioned."""
+    restatement = content.get("restatement")
+    found = visibility.visible(docs, me, group_id, "collab.restatement", doc_id=restatement)
+    if not found:
+        raise InvariantViolation(f"COLLAB_RESTATEMENT_NOT_FOUND: {restatement!r}")
+    if found[0]["written_by"] != me.identity_id:
+        raise InvariantViolation("COLLAB_CONFIRM_SUBJECT_ONLY: only the person it is about says whether a restatement is right")
+    if any(item["content"]["restatement"] == restatement for item in _own(docs, me, group_id, "collab.confirm") if item["doc_id"] != doc_id):
+        raise _already()
+
+
 RULES: dict[str, Callable[..., None]] = {
+    "collab.confirm": _confirm,
     "collab.change": _change, "collab.interface_answers": _interface, "collab.option": _option, "collab.stance": _stance,
     "collab.authority": _authority, "collab.closing": _closing,
 }

@@ -70,7 +70,7 @@ class CollabCase(ApiTestCase):
     def everything(self, who: str) -> str:
         """Every read route of the block, as one text: what this member could ever be shown."""
         bodies = [self.as_(who).get(f"{self.base}/{kind}").json() for kind in GROUP_KINDS]
-        bodies += [self.as_(who).get(f"{self.base}/view/{view}").json() for view in ("dissent", "authority", "shared")]
+        bodies += [self.as_(who).get(f"{self.base}/view/{view}").json() for view in ("dissent", "authority", "shared", "agreement", "not-heard?round=1")]
         return json.dumps(bodies, ensure_ascii=False)
 
     def option(self, who: str = None, text: str = "先試做三個月") -> str:
@@ -229,7 +229,8 @@ class ClosingTests(CollabCase):
 class MembershipAndConsentTests(CollabCase):
     def routes(self, doc_id: str) -> list[tuple[str, str, dict | None]]:
         calls = [("get", f"{self.base}/{kind}", None) for kind in GROUP_KINDS] + [("post", f"{self.base}/{kind}", {"content": {}}) for kind in GROUP_KINDS]
-        calls += [("get", f"{self.base}/view/{view}", None) for view in ("dissent", "authority", "shared")]
+        calls += [("get", f"{self.base}/view/{view}", None) for view in ("dissent", "authority", "shared", "agreement", "not-heard?round=1")]
+        calls += [("post", f"/groups/{self.group}/ai/{action}", {"context": {"round": 1, "seen": []}}) for action in ("organise_differences", "restate_positions")]
         calls += [("put", f"{self.base}/collab.option/{doc_id}", {"content": {"round": 1, "text": "x"}, "base_version": 1}),
                   ("delete", f"{self.base}/collab.option/{doc_id}", None), ("get", f"{self.base}/collab.option/{doc_id}/versions", None),
                   ("post", f"{self.base}/handoff", {"project_id": "x", "closing": "x", "to": "DECIDE"})]

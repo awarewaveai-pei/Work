@@ -16,6 +16,7 @@ from ai_lego.core.domain.kinds.context import INTERFACE_QUESTIONS
 
 STANCES = ("同意", "異議")
 CHANGE = ("no change", "changed")             # §7's values; the page says 沒變 / 有變
+VERDICTS = ("說得對", "說錯了")                 # the subject's answer to the AI's restatement of them
 ANONYMOUS = "匿名"
 MAX_ROUND = 1000
 
@@ -88,6 +89,19 @@ KINDS = [
     DocKind("collab.reopen", "COLLAB", "要求重開", {
         "reason": Field("text", 2000, required=True),
     }, owner="group", deletable=False, after_close=True, visibility="members"),   # never refused, also once the group is closed
+    DocKind("collab.restatement", "COLLAB", "AI 轉述的立場", {
+        "about": _id(),                                             # the member restated (the record's writer identity too)
+        "position": _id(),                                          # the collab.position it restates
+        "text": Field("text", 2000, required=True),
+    }, owner="group", authors=frozenset({"ai"}), visibility="subject_confirmed"),
+    DocKind("collab.confirm", "COLLAB", "轉述對不對", {
+        "restatement": _id(),
+        "verdict": Field("choice", choices=VERDICTS, required=True, human_only=True),
+    }, owner="group", visibility="members"),
+    DocKind("collab.differences", "COLLAB", "AI 整理的分歧", {
+        "round": _round(),
+        "differences": Field("list", 10, required=True),
+    }, owner="group", authors=frozenset({"ai"}), visibility="author_only"),   # for the one who asked: written with their identity
     DocKind("collab.proposal", "COLLAB", "提案", {
         "express_draft": _id(required=False),
         "text": Field("text", 4000, required=True),

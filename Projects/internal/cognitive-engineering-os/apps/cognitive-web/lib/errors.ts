@@ -190,6 +190,8 @@ const CODES: Record<string, string> = {
   COLLAB_AUTHORITY_TO_NOT_MEMBER: "授權要給群組裡的人。",
   COLLAB_AUTHORITY_TO_FIXED: "一份授權只給一個人。要給別人，請另外寫一份。",
   COLLAB_REVOKED_STAYS: "收回的授權不能再改回來。要再授權，請另外寫一份。",
+  COLLAB_RESTATEMENT_NOT_FOUND: "找不到這段轉述，可能還在等本人確認，或已經刪掉了。",
+  COLLAB_CONFIRM_SUBJECT_ONLY: "轉述說得對不對，只有被轉述的本人可以回答。",
   ACCOUNT_IS_LAST_CONVENER: "你是某個群組唯一的召集人。請先讓另一位成員也當召集人，或刪除那個群組，再刪除帳號。這次什麼都沒刪。",
   // GATHER
   GATHER_ORIGIN_NOT_FOUND: "這一組現在不在了（網頁重新分過組）。請重新整理頁面，標新的組。",

@@ -23,7 +23,7 @@ from ai_lego.errors import InvariantViolation
 FIELD_TYPES = ("text", "choice", "choices", "list", "date", "bool", "int", "json")
 OWNERS = ("case", "person", "group", "platform")   # platform: the tenant's own (an appeal: no person owns it; visibility.py reads it)
 # Who of a group reads another member's record of a kind (platform/visibility.py, STEP34_SHARED_RULES.md §3 R1).
-VISIBILITIES = ("members", "author_only", "convener_and_author", "self_and_govern")
+VISIBILITIES = ("members", "author_only", "convener_and_author", "self_and_govern", "subject_confirmed")
 MAX_JSON_BYTES = 64 * 1024
 
 
