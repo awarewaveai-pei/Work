@@ -1,13 +1,15 @@
 """A block's documents in the record stream (共用紀錄): save a new version, delete, read the current versions or one
 document's history. Every write goes through record_log (author, block, owner, the kind's own rules).
 
-A document lives on its own aggregate ``doc:<doc_id>`` and belongs to a case or to the person (its kind says which), in
-the tenant's region with the case it belongs to, so erasing the case or the person erases it.
+A document lives on its own aggregate ``doc:<doc_id>`` and belongs to a case, to the person or to a group (its kind says
+which), in the tenant's region, so erasing the case, the person or the group erases it.
 
 Across processes (docs/platform/STORAGE_SWITCH.md invariant 2): a next version is decided under the document's aggregate
 lock (record_log.lock_aggregate), taken before its history is read, so DOC_STALE holds; a new document of a one-per-owner
 kind under the (owner, kind) lock, so DOC_SINGLETON_EXISTS holds. A case's document is written under the case lock
-(ProjectSourceRepository.require_case), and so is a person's record made from a case (its ``from_case`` field).
+(ProjectSourceRepository.require_case), and so is a person's record made from a case (its ``from_case`` field). A
+group's document is written under the group lock while the group is open and, from a person, while they are a current
+member (ProjectSourceRepository.require_group: G1, G3); only the person who wrote every version of one deletes it.
 """
 
 from __future__ import annotations
@@ -87,6 +89,10 @@ class CaseDocs:
                 self._repo.lock_case(connection, tenant_id, owner.id, exclusive=check is not None)
             elif owner.kind == "person":
                 record_log.require_person(connection, tenant_id, owner.id, exclusive=check is not None)
+            elif owner.kind == "group":   # first, in save's order (group, the writing person, documents); _save checks under them
+                self._repo.lock_group(connection, tenant_id, owner.id)
+                if writer.author in ("user", "joint"):
+                    record_log.require_person(connection, tenant_id, writer.identity_id)
             for doc_id in sorted({item["doc_id"] for item in items if item.get("doc_id")}):
                 record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
             if check is not None:
@@ -127,6 +133,9 @@ class CaseDocs:
         spec = doc_kinds.require(kind)
         if owner.kind == "case":
             self._repo.require_case(connection, tenant_id, owner.id)
+        elif owner.kind == "group":
+            self._repo.require_group(connection, tenant_id, owner.id, after_close=spec.after_close,
+                                     member=writer.identity_id if writer.author in ("user", "joint") else None)
         if doc_id is None:
             if spec.singleton:
                 _lock_singleton(connection, tenant_id, owner, kind)
@@ -150,6 +159,12 @@ class CaseDocs:
         if spec.from_case:   # a person's record made from one case goes with that case (erase_case_rows): checked after the
             self._repo.require_case(connection, tenant_id, clean[spec.from_case])   # writer's own checks; a refusal rolls the save back
         return {"doc_id": doc_id, "kind": kind, "version": version, "content": clean, "author": writer.author, "block": writer.block, "at": event["occurred_at"], "deleted": False}
+
+    @staticmethod
+    def _writers(connection: psycopg.Connection, tenant_id: str, owner: Owner, doc_id: str) -> set[str | None]:
+        rows = connection.execute("SELECT DISTINCT author_identity_id FROM events WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s AND aggregate_id=%s",
+                                  (tenant_id, owner.kind, owner.id, f"doc:{doc_id}")).fetchall()
+        return {row[0] for row in rows}
 
     @staticmethod
     def _live_ids(connection: psycopg.Connection, tenant_id: str, owner: Owner, kind: str) -> set[str]:
@@ -178,6 +193,9 @@ class CaseDocs:
                 self._repo.require_case(connection, tenant_id, owner.id)
             elif owner.kind == "person":
                 record_log.require_person(connection, tenant_id, owner.id, exclusive=then is not None)
+            elif owner.kind == "group" and then is None:   # G3: one who left may still delete what they wrote; a closed group too
+                self._repo.require_group(connection, tenant_id, owner.id, after_close=True)
+                record_log.require_person(connection, tenant_id, writer.identity_id)
             elif then is not None:
                 raise InvariantViolation("DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK: a delete's follow-up reads hold only under a case's or a person's lock")
             record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
@@ -186,6 +204,8 @@ class CaseDocs:
                 raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
             if not spec.deletable:
                 raise InvariantViolation(f"DOC_NOT_DELETABLE: every version of {kind} stays")
+            if owner.kind == "group" and self._writers(connection, tenant_id, owner, doc_id) != {writer.identity_id}:
+                raise InvariantViolation("DOC_NOT_YOURS: in a group, only the person who wrote every version of a document deletes it")
             if spec.from_case:   # its case's erase may be deleting it right now: no tombstone after the erase
                 self._repo.require_case(connection, tenant_id, history[-1]["content"][spec.from_case])
             items = then() if then is not None else []   # reads the document before it goes, on this connection

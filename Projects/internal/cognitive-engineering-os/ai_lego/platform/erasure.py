@@ -155,20 +155,22 @@ class Erasure:
             outbox.write_job(connection, tenant_id, CASE, project_id, identity_id, {"sources": erased["sources"], "events_deleted": erased["events_deleted"], "grants_closed": grants}, items)
 
     def decide_person(self, tenant_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]]) -> dict[str, int]:
-        """The person's own part, after their cases: the workflows and their records, the person's other records and the
+        """The person's own part, after their cases: the workflows and their records, their memberships and what they wrote
+        in groups (refused while they lead a group alone: ACCOUNT_IS_LAST_CONVENER), the person's other records and the
         identity (a marker stays: IdentityStore.delete_identity) in one transaction, with the runs left in their folder as
         the outbox -- read under the person lock, after every admission in flight (admit_run)."""
         with self._repo.transaction(tenant_id) as connection:
             db.owner_lock(connection, "person", tenant_id, identity_id, exclusive=True)
             if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=%s AND created_by_identity_id=%s LIMIT 1", (tenant_id, identity_id)).fetchone():
                 raise InvariantViolation("ACCOUNT_HAS_LIVE_CASES: a case was opened while the account was being deleted; delete the account again")
+            groups = ProjectSourceRepository.erase_person_from_groups(connection, tenant_id, identity_id)
             runs = runs()
             workflows = CustomWorkflowRepository.delete_person_on(connection, tenant_id, identity_id)   # first: one events table holds both
             records = record_log.delete_owned(connection, tenant_id, record_log.person(identity_id))
             if not IdentityStore.delete_identity_on(connection, tenant_id, identity_id):   # a second deletion that waited for the first
                 raise InvariantViolation("ACCOUNT_ALREADY_ERASED: this account is already deleted")
             items = _artifact_items(reference for run in runs for reference in run["artifacts"]) + _run_items(runs)
-            counts = {"records": records, "workflows": workflows, "runs": len(runs)}
+            counts = {"records": records, "workflows": workflows, "runs": len(runs), **groups}
             outbox.write_job(connection, tenant_id, PERSON, identity_id, identity_id, counts, items)
         return counts
 

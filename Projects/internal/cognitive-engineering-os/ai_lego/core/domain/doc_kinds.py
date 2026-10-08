@@ -1,6 +1,6 @@
 """What a block keeps (its contract card's 「寫什麼」) as documents in the record stream.
 
-A document kind names its block, its owner (a case, or the person across cases), who may author it and its fields.
+A document kind names its block, its owner (a case, the person across cases, or a group), who may author it and its fields.
 Each block declares its kinds in its own module under ``ai_lego/core/domain/kinds/`` (``KINDS = [...]``); they are
 found by import, so a new block never edits a shared list. record_log.append runs ``check`` on every DocSaved, so the
 rules hold for every writer: a field only the person writes (結論、依據、信心…) is refused from the AI or from a joint
@@ -21,6 +21,7 @@ from ai_lego.core.domain.blocks import ALL_CODES
 from ai_lego.errors import InvariantViolation
 
 FIELD_TYPES = ("text", "choice", "choices", "list", "date", "bool", "int", "json")
+OWNERS = ("case", "person", "group")
 MAX_JSON_BYTES = 64 * 1024
 
 
@@ -48,7 +49,7 @@ class DocKind:
     block: str
     title: str                  # what the person sees, e.g. 「外化卡」
     fields: Mapping[str, Field] = field(default_factory=dict)
-    owner: str = "case"         # "case" | "person"
+    owner: str = "case"         # "case" | "person" | "group" (written while the group is open: ProjectSourceRepository.require_group)
     authors: frozenset[str] = frozenset({"user"})
     deletable: bool = True      # False: every version stays (a judgment's versions are never deleted, only the case is)
     singleton: bool = False     # at most one live document of this kind per owner (協作合約、開案資料): a second is refused
@@ -56,9 +57,10 @@ class DocKind:
     others_words: str = ""      # the field holding words the person brought from someone else (a pasted message): the AI
                                 # gate shows them fenced after its crisis check, not as the person's; saving still runs
                                 # the save-time crisis scan and the high-risk check on them
+    after_close: bool = False   # a group's kind that may still be written once the group is closed (a review); never for others
 
     def __post_init__(self) -> None:
-        if self.block not in ALL_CODES or self.owner not in ("case", "person") or not self.fields:
+        if self.block not in ALL_CODES or self.owner not in OWNERS or not self.fields or (self.after_close and self.owner != "group"):
             raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind}")
         if not self.authors <= {"user", "ai", "joint", "system"}:
             raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} authors {sorted(self.authors)}")

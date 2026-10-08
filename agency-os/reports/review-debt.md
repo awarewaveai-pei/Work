@@ -29,6 +29,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | 60b | 新增 facilitator 三課草稿並讓 TEACH loader、course list、completion shape 接受 facilitator 課程 | 帶領者必須完成完整 facilitator course 才能取得資格；課程內容為版本化、可追溯的草稿 | `test_teach_content` 含 course/history/草稿守衛；新增 course package guard 與 completion choices 的 affected tests；未做隱私／可見範圍／擦除／同意／擁有權 mutation | 待審 |
 | Codex | 52-express-page | 建立 EXPRESS 單頁流程，讓人選讀者、格式與紀錄，逐句看來源並確認後匯出或送出 | selection.items 只含勾選紀錄；未查證句子必先確認；句子來源、信心與不確定性保持可見；送出仍由人觸發 | `ExpressPage.test.tsx` 3 tests；`npx tsc --noEmit`；mutation：移除未查證二次確認後 named test 應紅；無 `<select>` 與 AI 標記／來源檢查 | 未經 Claude 跨模型審查 |
 | Claude | codex-line-pg-port | Codex 線 cherry-pick 到 PostgreSQL main 的移植：ON_DELETE 在刪除交易內、owner 鎖 exclusive；DocRead 讀寫 PG 化並取 aggregate 鎖；`image_test_modules.py` 需 `COS_FULL_SUITE=1`；CI checkout job 必有 PG | hook 讀到的偏好在寫入前不變；讀的版本＝記的版本；點名模組不能繞過全套守衛；CI 的 DB 測試不能靜默 skip | affected 356 模組 15023 OK（真 PG）；`then()`→`[]` 突變使 `test_a_deleted_completion_is_not_written_again_by_the_next_run` 紅、還原綠；tsc／ExpressPage+TeachPage vitest 綠 | 待 Codex 審（Claude 寫的）；只在 refs/claude/codex-line-rebased，勿 merge／push |
+| Claude | 10-group-core | 群組容器：0005 遷移（四表＋租戶內外鍵＋CHECK）、group 擁有者、require_group 鎖、成員／離開／交接／結束／抹除路由；帳號刪除帶走成員資格與自己在群組寫的紀錄 | G1 寫入只在群組開著且寫的人是現任成員（group 鎖 shared，結束／抹除 exclusive）；G2 非成員＝不存在（同一個 404）；G3 離開後不讀不寫、可刪自己寫的；G4 一筆交易刪群組紀錄、成員、邀請、指名它的同意；G5 最後一位召集人不能走（也不能刪帳號） | test_groups_core 27 PASS（真 PostgreSQL，兩連線競態 3 個）；突變 11/11 紅→還原綠（require_group、shared 鎖、403、同意、邀請、最後召集人、CHECK、成員檢查、DOC_NOT_YOURS、FOR UPDATE、帳號刪除）；pg_foundation 29、record_log 20、step2 67、block_foundation 43、block_govern 67、erasure_workflow 35 PASS；tsc、errors vitest 綠 | 待 Codex 審（身分／存取控制／抹除：兩 critic＋Codex） |
 
 ## deferred, before D7 second region
 
@@ -43,3 +44,5 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 - `CaseDocs.save_many` 個人批次 check 持 person 鎖 exclusive，其 `from_case` 項再取 case 鎖 shared；`erasure.admit_run` 為 case→person 順序。同時有 case 抹除排隊 exclusive 時可成三方環，PostgreSQL deadlock detector 中止其一（錯誤，非卡死）；如出現再統一 person/case 取鎖順序。
 - r2-fix: TEACH 頁沒有按鈕把「不再記下的課」改回會記（只能 PUT 偏好）。
 - r2-fix: `restore-cognitive-db.sh` 只驗 `SELECT 1`，沒驗還原後的表與筆數。
+- 群組（card 10）：G3「離開的人可匯出自己寫的」未做——`/govern/export` 只匯出個人與自己案子的紀錄，不含自己在群組寫的；群組紀錄的刪除只在 `CaseDocs.delete`，路由隨 card 20 起的區塊。
+- 群組（card 10）：抹除群組與抹除帳號同時刪重疊的成員列／紀錄列時，PostgreSQL deadlock detector 可能中止其一（錯誤可重試，非卡死）；同上一條 person/case 鎖序。

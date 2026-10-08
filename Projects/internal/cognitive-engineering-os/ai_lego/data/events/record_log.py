@@ -7,7 +7,8 @@ Every repository that keeps an ``events`` table writes through ``append`` -- not
   一字沒改照收 = ai) -- so the AI cannot land a conclusion in a field only the person writes (關卡二);
 * names no block, or a block its type does not allow;
 * has no owner: a case (``case``), the person (``person`` -- the daily calibration card, the cross-case history, the
-  account's location) or the platform (``platform`` -- tombstones that must outlive what they record);
+  account's location), a group (``group`` -- what a few people write together: STEP34_SHARED_RULES.md §2) or the
+  platform (``platform`` -- tombstones that must outlive what they record);
 * is of an unregistered type (each type carries its own schema version, not a hard-coded 1.0.0);
 * carries a key that scores a belief or a conclusion (不給信念打分).
 
@@ -29,7 +30,7 @@ from ai_lego.data import db
 from ai_lego.errors import InvariantViolation
 
 AUTHORS = ("user", "ai", "joint", "system")
-OWNER_KINDS = ("case", "person", "platform")
+OWNER_KINDS = ("case", "person", "platform", "group")
 # A payload key that grades what someone believes or concluded. Counts, sizes and an option's computed weight in a
 # decision tool are not here; those live in the tool's own record, never in an event.
 SCORE_KEYS = frozenset({"score", "scores", "rank", "ranking", "rating", "grade", "autonomy_score", "belief_score"})
@@ -89,8 +90,8 @@ EVENT_TYPES: dict[str, EventType] = {
     "CustomWorkflowUpdated": _t("1.0.0", "user", "ASSEMBLER", "person", done=False),
     "CustomWorkflowDeleted": _t("1.0.0", "user", "ASSEMBLER", "person", done=False),
     # A block's documents (core/domain/doc_kinds.py): the kind narrows author, block and owner further, per record
-    "DocSaved": _t("1.0.0", "user ai joint system", frozenset(ALL_CODES), "case person", done=True),
-    "DocDeleted": _t("1.0.0", "user", frozenset(ALL_CODES), "case person", done=False),
+    "DocSaved": _t("1.0.0", "user ai joint system", frozenset(ALL_CODES), "case person group", done=True),
+    "DocDeleted": _t("1.0.0", "user", frozenset(ALL_CODES), "case person group", done=False),
     "DocRead": _t("1.0.0", "user", "EXPRESS", "case", done=False),
 }
 DOC_EVENTS = ("DocSaved", "DocDeleted")
@@ -108,6 +109,10 @@ class Owner:
         if self.kind not in OWNER_KINDS or not isinstance(self.id, str) or not self.id:
             raise InvariantViolation(f"RECORD_OWNER_INVALID: {self.kind!r}/{self.id!r}")
 
+    @staticmethod
+    def group(group_id: str) -> Owner:
+        return group(group_id)
+
 
 def case(project_id: str) -> Owner:
     return Owner("case", project_id)
@@ -119,6 +124,12 @@ def person(identity_id: str) -> Owner:
 
 def platform(tenant_id: str) -> Owner:
     return Owner("platform", tenant_id)
+
+
+def group(group_id: str) -> Owner:
+    """A group's records: written only while the group is open and the writer a current member
+    (ProjectSourceRepository.require_group, in CaseDocs); read by others only through platform/visibility.py."""
+    return Owner("group", group_id)
 
 
 @dataclass(frozen=True)
@@ -227,6 +238,14 @@ def delete_owned(connection: psycopg.Connection, tenant_id: str, owner: Owner, *
     if aggregate_id is not None:
         query, parameters = query + " AND aggregate_id=%s", (*parameters, aggregate_id)
     return connection.execute(query, parameters).rowcount
+
+
+def delete_written_by(connection: psycopg.Connection, tenant_id: str, identity_id: str, owner_kind: str) -> int:
+    """Erase every record ``identity_id`` wrote (as user or joint) into owners of ``owner_kind`` -- a person's own part of
+    the groups they wrote in, when their account is erased; the others' records there stay. On an open transaction."""
+    if owner_kind not in OWNER_KINDS:
+        raise InvariantViolation(f"RECORD_OWNER_INVALID: {owner_kind!r}")
+    return connection.execute("DELETE FROM events WHERE tenant_id=%s AND owner_kind=%s AND author_identity_id=%s", (tenant_id, owner_kind, identity_id)).rowcount
 
 
 # author/block are NULL only on rows written before 2026-10-03 (nobody recorded them; readers show 「記作者之前的紀錄」, never a

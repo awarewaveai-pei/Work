@@ -22,6 +22,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any, Callable, Mapping
+from uuid import uuid4
 
 import psycopg
 
@@ -841,3 +842,238 @@ class ProjectSourceRepository:
                 raise InvariantViolation("PROJECT_NOT_FOUND")
             self._append_event(connection, tenant_id, project_id, f"project:{project_id}", "ProjectRenamed", {"project_id": project_id, "name": name}, record_log.user(identity_id, "ASSEMBLER"))
         return dict(row)
+
+    # -- Groups (STEP34_SHARED_RULES.md §2): the owner of what a few people write together -----------------------------
+    # The group lock is the case lock's twin (db.owner_lock "group"): every writer of a group's records takes it shared
+    # first (require_group), close and erase take it exclusive. A writer reads its membership row FOR SHARE; leaving and
+    # the account erasure lock the conveners' rows FOR UPDATE in (group_id, identity_id) order -- so a member's write and
+    # their leaving, and two conveners leaving at once, never interleave (G3, G5).
+
+    GROUP_PURPOSES = ("decision", "class", "workshop", "research")
+    GROUP_ROLES = ("convener", "participant", "facilitator")
+    GROUP_NAME_MAX = 120
+    _GROUP_SELECT = "group_id, tenant_id, workspace_id, purpose, name, created_by_identity_id, status, created_at, closed_at"
+    # The consent that names a group (card 13's ``govern.consent``, kinds/govern_group.py; tests/unit/test_consent.py
+    # pins the shape): erased with the group (G4).
+    _GROUP_CONSENT = ("govern.consent", "group")
+
+    @staticmethod
+    def lock_group(connection: psycopg.Connection, tenant_id: str, group_id: str, *, exclusive: bool = False) -> None:
+        """G1: the group's owner lock (db.owner_lock) -- every writer of a group's records shared, first in its transaction;
+        close and erase exclusive."""
+        db.owner_lock(connection, "group", tenant_id, group_id, exclusive=exclusive)
+
+    @classmethod
+    def _group_row(cls, connection: psycopg.Connection, tenant_id: str, group_id: str) -> Row | None:
+        return connection.execute(f"SELECT {cls._GROUP_SELECT} FROM platform_groups WHERE tenant_id=%s AND group_id=%s", (tenant_id, group_id)).fetchone()
+
+    @staticmethod
+    def _membership(connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str, *, lock: str = "") -> Row | None:
+        """The person's current membership (left_at empty), or None. ``lock``: "FOR SHARE" (a writer) or "FOR UPDATE"."""
+        if lock not in ("", "FOR SHARE", "FOR UPDATE"):
+            raise InvariantViolation("GROUP_LOCK_INVALID")
+        return connection.execute(
+            f"SELECT role, review_state, joined_at FROM group_members WHERE tenant_id=%s AND group_id=%s AND identity_id=%s AND left_at IS NULL {lock}",
+            (tenant_id, group_id, identity_id),
+        ).fetchone()
+
+    @classmethod
+    def require_group(cls, connection: psycopg.Connection, tenant_id: str, group_id: str, *, after_close: bool = False, member: str | None = None) -> dict[str, Any]:
+        """G1: a group's records are written only while it exists and is open (a kind ``after_close`` also while it is
+        closed), under the group lock held shared -- atomic with close and erase, which hold it exclusive. ``member``: the
+        person writing must be a current member (G3: one who left writes nothing), checked under their person lock (their
+        account erasure takes it exclusive) with their membership row held FOR SHARE (leaving waits for this write).
+        GROUP_NOT_FOUND for a group that is not there and for a writer who is not in it: the same refusal (G2)."""
+        cls.lock_group(connection, tenant_id, group_id)
+        row = cls._group_row(connection, tenant_id, group_id)
+        if row is None:
+            raise InvariantViolation(f"GROUP_NOT_FOUND: {group_id!r}")
+        if row["status"] == "erased":
+            raise InvariantViolation(f"GROUP_ERASED: group {group_id!r} no longer exists; nothing is written to it")
+        if row["status"] == "closed" and not after_close:
+            raise InvariantViolation(f"GROUP_CLOSED: group {group_id!r} is closed; nothing new is written to it")
+        if member is not None:
+            record_log.require_person(connection, tenant_id, member)
+            if cls._membership(connection, tenant_id, group_id, member, lock="FOR SHARE") is None:
+                raise InvariantViolation(f"GROUP_NOT_FOUND: {group_id!r}")
+        return dict(row)
+
+    def create_group(self, tenant_id: str, workspace_id: str, purpose: str, name: Any, identity_id: str) -> dict[str, Any]:
+        """The group and its first convener (the creator) in one transaction, under the creator's person lock: a group made
+        while the account is being erased is either seen by that erasure or refused (IDENTITY_ERASED)."""
+        clean = name.strip() if isinstance(name, str) else ""
+        if not 1 <= len(clean) <= self.GROUP_NAME_MAX:
+            raise InvariantViolation(f"GROUP_NAME_INVALID: a group's name is 1 to {self.GROUP_NAME_MAX} characters")
+        if purpose not in self.GROUP_PURPOSES:
+            raise InvariantViolation(f"GROUP_PURPOSE_INVALID: one of {list(self.GROUP_PURPOSES)}")
+        group_id, moment = str(uuid4()), db.now()
+        with self._db.for_tenant(tenant_id) as connection:
+            record_log.require_person(connection, tenant_id, identity_id)
+            row = connection.execute(
+                f"INSERT INTO platform_groups ({self._GROUP_SELECT}) VALUES (%s,%s,%s,%s,%s,%s,'open',%s,NULL) RETURNING {self._GROUP_SELECT}",
+                (group_id, tenant_id, workspace_id, purpose, clean, identity_id, moment),
+            ).fetchone()
+            connection.execute("INSERT INTO group_members (group_id, tenant_id, identity_id, role, joined_at) VALUES (%s,%s,%s,'convener',%s)",
+                               (group_id, tenant_id, identity_id, moment))
+        return {**dict(row), "my_role": "convener", "my_review_state": "confirmed"}
+
+    _MY_GROUP = ("SELECT g.group_id, g.tenant_id, g.workspace_id, g.purpose, g.name, g.created_by_identity_id, g.status, g.created_at, g.closed_at, "
+                 "m.role AS my_role, m.review_state AS my_review_state "
+                 "FROM platform_groups g JOIN group_members m ON m.tenant_id = g.tenant_id AND m.group_id = g.group_id "
+                 "WHERE g.tenant_id=%s AND m.identity_id=%s AND m.left_at IS NULL AND g.status <> 'erased'")
+
+    def get_group_for(self, tenant_id: str, group_id: str, identity_id: str) -> dict[str, Any] | None:
+        """The group as its current member sees it, or None -- for a group that is not there, erased, or one the person is
+        not (or no longer) in: callers answer all of them with one 404 (G2)."""
+        with self._db.for_tenant(tenant_id) as connection:
+            row = connection.execute(self._MY_GROUP + " AND g.group_id=%s", (tenant_id, identity_id, group_id)).fetchone()
+        return None if row is None else dict(row)
+
+    def list_groups_for(self, tenant_id: str, identity_id: str) -> list[dict[str, Any]]:
+        with self._db.for_tenant(tenant_id) as connection:
+            rows = connection.execute(self._MY_GROUP + " ORDER BY g.created_at, g.group_id", (tenant_id, identity_id)).fetchall()
+        return [dict(row) for row in rows]
+
+    def group_members(self, tenant_id: str, group_id: str) -> list[dict[str, Any]]:
+        """The current members (who joined first, first), with the name each chose; a caller shows them only to a member."""
+        with self._db.for_tenant(tenant_id) as connection:
+            rows = connection.execute(
+                "SELECT m.identity_id, i.display_name, m.role, m.review_state, m.joined_at FROM group_members m "
+                "JOIN identity i ON i.tenant_id = m.tenant_id AND i.identity_id = m.identity_id "
+                "WHERE m.tenant_id=%s AND m.group_id=%s AND m.left_at IS NULL ORDER BY m.joined_at, m.identity_id",
+                (tenant_id, group_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    @classmethod
+    def add_member(cls, connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str, role: str, *, review_state: str = "confirmed") -> None:
+        """One person into an open group, on the caller's transaction (the invitation's accept marks the invite used in the
+        same one). Same tenant only: the identity is looked up in the group's tenant (the foreign key is the backstop).
+        Someone who left comes back as a new membership of the same row."""
+        if role not in cls.GROUP_ROLES:
+            raise InvariantViolation(f"GROUP_ROLE_INVALID: one of {list(cls.GROUP_ROLES)}")
+        cls.require_group(connection, tenant_id, group_id)
+        record_log.require_person(connection, tenant_id, identity_id)
+        if connection.execute("SELECT 1 FROM identity WHERE tenant_id=%s AND identity_id=%s", (tenant_id, identity_id)).fetchone() is None:
+            raise InvariantViolation("GROUP_MEMBER_UNKNOWN: no such person in this tenant")
+        existing = connection.execute("SELECT left_at FROM group_members WHERE tenant_id=%s AND group_id=%s AND identity_id=%s FOR UPDATE", (tenant_id, group_id, identity_id)).fetchone()
+        if existing is not None and existing["left_at"] is None:
+            raise InvariantViolation("GROUP_ALREADY_MEMBER: this person is already in the group")
+        if existing is None:
+            connection.execute("INSERT INTO group_members (group_id, tenant_id, identity_id, role, joined_at, review_state) VALUES (%s,%s,%s,%s,%s,%s)",
+                               (group_id, tenant_id, identity_id, role, db.now(), review_state))
+        else:
+            connection.execute("UPDATE group_members SET role=%s, joined_at=%s, left_at=NULL, review_state=%s WHERE tenant_id=%s AND group_id=%s AND identity_id=%s",
+                               (role, db.now(), review_state, tenant_id, group_id, identity_id))
+
+    @staticmethod
+    def _conveners_and(connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str) -> tuple[Row | None, int]:
+        """(the person's current membership, how many current conveners), the rows locked FOR UPDATE in identity order: two
+        conveners leaving at once wait for each other, and the second sees the first gone (G5)."""
+        rows = connection.execute(
+            "SELECT identity_id, role FROM group_members WHERE tenant_id=%s AND group_id=%s AND left_at IS NULL AND (role='convener' OR identity_id=%s) "
+            "ORDER BY identity_id FOR UPDATE",
+            (tenant_id, group_id, identity_id),
+        ).fetchall()
+        return next((row for row in rows if row["identity_id"] == identity_id), None), sum(row["role"] == "convener" for row in rows)
+
+    def leave_group(self, tenant_id: str, group_id: str, identity_id: str) -> None:
+        """G3: the person stops being a member; what they wrote stays. G5: the last convener cannot leave -- they hand the
+        group over first (a closed group keeps its convener: only a convener can erase it)."""
+        with self._db.for_tenant(tenant_id) as connection:
+            self.require_group(connection, tenant_id, group_id, after_close=True)
+            mine, conveners = self._conveners_and(connection, tenant_id, group_id, identity_id)
+            if mine is None:
+                raise InvariantViolation(f"GROUP_NOT_FOUND: {group_id!r}")
+            if mine["role"] == "convener" and conveners == 1:
+                raise InvariantViolation("GROUP_LAST_CONVENER: the only convener cannot leave; hand the group to another member first")
+            connection.execute("UPDATE group_members SET left_at=%s WHERE tenant_id=%s AND group_id=%s AND identity_id=%s", (db.now(), tenant_id, group_id, identity_id))
+
+    @classmethod
+    def _require_convener(cls, connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str) -> None:
+        """Membership first (G2: not a member = GROUP_NOT_FOUND), then the role."""
+        mine = cls._membership(connection, tenant_id, group_id, identity_id, lock="FOR SHARE")
+        if mine is None:
+            raise InvariantViolation(f"GROUP_NOT_FOUND: {group_id!r}")
+        if mine["role"] != "convener":
+            raise InvariantViolation("GROUP_CONVENER_ONLY: only a convener does this")
+
+    def hand_over(self, tenant_id: str, group_id: str, by_identity_id: str, to_identity_id: str) -> None:
+        """A convener makes another current member a convener too (G5: then the first may leave)."""
+        with self._db.for_tenant(tenant_id) as connection:
+            self.require_group(connection, tenant_id, group_id, after_close=True)
+            self._require_convener(connection, tenant_id, group_id, by_identity_id)
+            if connection.execute("UPDATE group_members SET role='convener' WHERE tenant_id=%s AND group_id=%s AND identity_id=%s AND left_at IS NULL",
+                                  (tenant_id, group_id, to_identity_id)).rowcount != 1:
+                raise InvariantViolation("GROUP_MEMBER_NOT_FOUND: that person is not in the group")
+
+    @classmethod
+    def _owned_group(cls, connection: psycopg.Connection, tenant_id: str, group_id: str, identity_id: str) -> Row:
+        """Close's and erase's start: the group lock exclusive (the writes in flight finish first; later ones see the new
+        state), the group there, the person its convener."""
+        cls.lock_group(connection, tenant_id, group_id, exclusive=True)
+        row = cls._group_row(connection, tenant_id, group_id)
+        if row is None or row["status"] == "erased":
+            raise InvariantViolation(f"GROUP_NOT_FOUND: {group_id!r}")
+        cls._require_convener(connection, tenant_id, group_id, identity_id)
+        return row
+
+    def close_group(self, tenant_id: str, group_id: str, identity_id: str) -> dict[str, Any]:
+        """The convener ends the group: nothing new is written to it except kinds flagged ``after_close`` (G1)."""
+        with self._db.for_tenant(tenant_id) as connection:
+            if self._owned_group(connection, tenant_id, group_id, identity_id)["status"] == "closed":
+                raise InvariantViolation("GROUP_CLOSED: the group is already closed")
+            row = connection.execute(f"UPDATE platform_groups SET status='closed', closed_at=%s WHERE tenant_id=%s AND group_id=%s RETURNING {self._GROUP_SELECT}",
+                                     (db.now(), tenant_id, group_id)).fetchone()
+        return dict(row)
+
+    def erase_group(self, tenant_id: str, group_id: str, identity_id: str) -> dict[str, int]:
+        """G4, one region transaction: its members, every record the group owns, every consent that names it and its
+        invitations go; the row stays with status 'erased' and no name, so a writer that waited gets GROUP_ERASED. The
+        members' own cases and person records are not touched. Nothing of a group is on disk: nothing else to remove."""
+        with self._db.for_tenant(tenant_id) as connection:
+            self._owned_group(connection, tenant_id, group_id, identity_id)
+            members = connection.execute("DELETE FROM group_members WHERE tenant_id=%s AND group_id=%s", (tenant_id, group_id)).rowcount
+            records = record_log.delete_owned(connection, tenant_id, record_log.group(group_id))
+            consents = self._erase_consents_naming(connection, tenant_id, group_id)
+            invites = connection.execute("DELETE FROM group_invites WHERE tenant_id=%s AND group_id=%s", (tenant_id, group_id)).rowcount
+            connection.execute("UPDATE platform_groups SET status='erased', name='', closed_at=COALESCE(closed_at, %s) WHERE tenant_id=%s AND group_id=%s",
+                               (db.now(), tenant_id, group_id))
+        return {"records": records, "consents": consents, "invites": invites, "members": members}
+
+    @classmethod
+    def _erase_consents_naming(cls, connection: psycopg.Connection, tenant_id: str, group_id: str) -> int:
+        """Every version of every consent any version of which shares with this group (a person's record: removed by its
+        owner, as a case's ``from_case`` records are)."""
+        kind, purpose = cls._GROUP_CONSENT
+        rows = connection.execute(
+            "SELECT DISTINCT owner_id, aggregate_id FROM events WHERE tenant_id=%s AND owner_kind='person' AND event_type='DocSaved' "
+            "AND payload_json->>'kind' = %s AND payload_json->'content'->>'purpose' = %s AND payload_json->'content'->>'target' = %s",
+            (tenant_id, kind, purpose, group_id),
+        ).fetchall()
+        return sum(record_log.delete_owned(connection, tenant_id, record_log.person(row["owner_id"]), aggregate_id=row["aggregate_id"]) for row in rows)
+
+    _ALONE = ("SELECT m.group_id FROM group_members m JOIN platform_groups g ON g.tenant_id = m.tenant_id AND g.group_id = m.group_id "
+              "WHERE m.tenant_id=%s AND m.identity_id=%s AND m.role='convener' AND m.left_at IS NULL AND g.status <> 'erased' "
+              "AND NOT EXISTS (SELECT 1 FROM group_members o WHERE o.tenant_id = m.tenant_id AND o.group_id = m.group_id AND o.role='convener' "
+              "AND o.left_at IS NULL AND o.identity_id <> m.identity_id) ORDER BY m.group_id")
+
+    def groups_led_alone(self, tenant_id: str, identity_id: str) -> list[str]:
+        """The groups this person is the only convener of (G5): their account is not erased while there is one."""
+        with self._db.for_tenant(tenant_id) as connection:
+            return [row["group_id"] for row in connection.execute(self._ALONE, (tenant_id, identity_id))]
+
+    @classmethod
+    def erase_person_from_groups(cls, connection: psycopg.Connection, tenant_id: str, identity_id: str) -> dict[str, int]:
+        """The account erasure's part in groups, on its decision transaction (under the person lock held exclusive):
+        refused while the person is a group's only convener (G5; the conveners' rows locked as leaving locks them), else
+        their memberships and every record they wrote in a group go; the others' records there stay."""
+        led = [row["group_id"] for row in connection.execute(
+            "SELECT group_id FROM group_members WHERE tenant_id=%s AND identity_id=%s AND role='convener' AND left_at IS NULL", (tenant_id, identity_id))]
+        if led:
+            connection.execute("SELECT 1 FROM group_members WHERE tenant_id=%s AND group_id = ANY(%s) AND role='convener' AND left_at IS NULL "
+                               "ORDER BY group_id, identity_id FOR UPDATE", (tenant_id, led))
+            if connection.execute(cls._ALONE, (tenant_id, identity_id)).fetchone() is not None:
+                raise InvariantViolation("ACCOUNT_IS_LAST_CONVENER: the account leads a group alone; hand it over or erase the group first")
+        memberships = connection.execute("DELETE FROM group_members WHERE tenant_id=%s AND identity_id=%s", (tenant_id, identity_id)).rowcount
+        return {"memberships": memberships, "group_records": record_log.delete_written_by(connection, tenant_id, identity_id, "group")}

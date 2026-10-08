@@ -223,3 +223,8 @@ page error; the supervisor page updated.
 - Appeals are platform-owned, anonymous by default, never readable by their subject.
 - "No record" = the case erases itself at close; device-only is not built.
 - All outside data is collect's.
+- 2026-10-08 (card 10): the groups' migration is `0005_groups.py` (0002-0004 are the storage port's). `group_members.review_state`
+  ('confirmed' | 'pending_review') holds §4's held state. G5's hand-over is `POST /groups/{id}/members/{identity_id}/convener`; the
+  last convener cannot leave a closed group either (only a convener erases it). An account erasure removes the person's memberships
+  and every group record they wrote, and is refused while they are a group's only convener (ACCOUNT_IS_LAST_CONVENER). In a group,
+  only the person who wrote every version of a document deletes it (also after leaving: G3).

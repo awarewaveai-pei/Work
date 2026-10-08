@@ -357,6 +357,8 @@ def erase_account(body: EraseBody, response: Response, session: dict[str, Any] =
         reasons.append("a workflow run is still running")
     if reasons:
         raise HTTPException(status_code=409, detail=f"PROJECT_BUSY: {reasons[0]}; wait for it to finish, then delete the account")
+    if repo.groups_led_alone(tenant_id, me):   # G5, before anything is erased (the decision checks it again under its locks)
+        raise HTTPException(status_code=409, detail="ACCOUNT_IS_LAST_CONVENER: the account leads a group alone; hand it over or erase the group first")
     failed: list[dict[str, str]] = []
     states: set[str] = set()   # each erasure's physical_cleanup: done, pending (a retry will do it), blocked (an operator must look)
     for project in cases:
@@ -371,7 +373,7 @@ def erase_account(body: EraseBody, response: Response, session: dict[str, Any] =
     try:
         counts = erasure.decide_person(tenant_id, me, lambda: _person_runs_to_erase(tenant_id, me))   # read inside the decision, under the person lock
     except InvariantViolation as error:   # a case opened meanwhile, or a second deletion that waited for the first: nothing decided
-        if str(error).startswith(("ACCOUNT_HAS_LIVE_CASES", "ACCOUNT_ALREADY_ERASED")):
+        if str(error).startswith(("ACCOUNT_HAS_LIVE_CASES", "ACCOUNT_ALREADY_ERASED", "ACCOUNT_IS_LAST_CONVENER")):
             raise HTTPException(status_code=409, detail=str(error)) from error
         raise
     person = erasure.finish(tenant_id, PERSON, me)

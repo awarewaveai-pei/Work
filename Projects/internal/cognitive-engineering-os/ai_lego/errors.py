@@ -20,6 +20,15 @@ def case_gone(error: BaseException) -> bool:
     return str(error).startswith(CASE_GONE)
 
 
+# A group erased or never there, and a person who is not (or no longer) a member: one 404, so a group's existence is never
+# disclosed to someone outside it (STEP34_SHARED_RULES.md G2). GROUP_CLOSED is not here: a member sees the group is closed.
+GROUP_GONE = ("GROUP_ERASED", "GROUP_NOT_FOUND")
+
+
+def group_gone(error: BaseException) -> bool:
+    return str(error).startswith(GROUP_GONE)
+
+
 class SpecRootNotFound(InvariantViolation):
     """The read-only spec root could not be located."""
 
