@@ -3,7 +3,8 @@ block never edits a shared list:
 - ``BEFORE_SAVE = {kind: fn}``, ``fn(docs, tenant_id, owner, content, doc_id) -> None``: refuse a save the kind's own
   field rules cannot see (raises InvariantViolation); the docs routes call it before every person's save;
 - ``ON_DELETE = {kind: fn}``, ``fn(docs, tenant_id, owner, doc) -> list[item]``: what the person's delete of ``doc``
-  also saves, in the delete's own transaction (items as ``CaseDocs.save_many``); the docs routes call it on every delete;
+  also saves, in the delete's own transaction (items as ``CaseDocs.save_many``), read there under the owner's exclusive
+  lock (``on_delete`` hands ``CaseDocs.delete`` a ``then``); the docs routes call it on every delete;
 - ``AFTER_SAVE = {kind: fn}``, ``fn(docs, tenant_id, owner, doc) -> list[notice]``: today, propose another block (各塊自己
   發現該加哪一塊; the assembler only shows the proposal, the person decides);
 - ``AFTER_SOURCES = {block: fn}``, ``fn(docs, tenant_id, owner, arrived) -> None``: sources reached the case (a batch
@@ -54,10 +55,17 @@ def before_save(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, kind: s
         fn(docs, tenant_id, owner, content, doc_id)
 
 
-def on_delete(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, kind: str, doc_id: str) -> list[dict[str, Any]]:
+def on_delete(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, kind: str, doc_id: str) -> Callable[[], list[dict[str, Any]]] | None:
+    """``CaseDocs.delete``'s ``then``: None when the kind has no ON_DELETE hook (the delete takes no exclusive lock),
+    else what the hooks save, read inside the delete's transaction."""
     fns = _registry("ON_DELETE").get(kind, ())
-    doc = next((item for item in docs.current(tenant_id, owner, kind) if item["doc_id"] == doc_id), None) if fns else None
-    return [] if doc is None else [item for fn in fns for item in fn(docs, tenant_id, owner, doc)]
+    if not fns:
+        return None
+
+    def items() -> list[dict[str, Any]]:
+        doc = next((item for item in docs.current(tenant_id, owner, kind) if item["doc_id"] == doc_id), None)
+        return [] if doc is None else [item for fn in fns for item in fn(docs, tenant_id, owner, doc)]
+    return items
 
 
 def after_save(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dict[str, Any]) -> list[dict[str, Any]]:

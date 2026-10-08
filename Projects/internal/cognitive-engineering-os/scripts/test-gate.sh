@@ -19,7 +19,7 @@ echo "packages: $(pip freeze 2>/dev/null | tr '\n' ' ')"
 fail=0
 if [[ "${1:-}" == "--all" ]]; then
   echo "== 1/2 unittest: full image suite (checkout-only list excluded explicitly) =="
-  COS_FULL_SUITE=1 python scripts/image_test_modules.py --image || fail=1  # the opt-in tests/__init__.py's guard wants
+  COS_FULL_SUITE=1 python scripts/image_test_modules.py --image || fail=1  # the full-suite opt-in (image_test_modules.py, tests/__init__.py)
 elif [[ $# -gt 0 ]]; then
   echo "== 1/2 unittest: $# affected module(s) =="
   python -m unittest "$@" -q || fail=1

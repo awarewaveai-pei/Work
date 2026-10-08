@@ -102,6 +102,9 @@ jobs:
           python -m pip install --no-deps -e Projects/internal/cognitive-engineering-os
       - name: Run the explicit checkout-only test list
         working-directory: Projects/internal/cognitive-engineering-os
+        env:
+          COS_FULL_SUITE: "1"
+          COGNITIVE_OS_REQUIRE_POSTGRES: "1"   # the block tests here use PostgreSQL (tests/pg.py starts one in Docker): never a silent skip
         run: python scripts/image_test_modules.py --checkout
 
   golden:

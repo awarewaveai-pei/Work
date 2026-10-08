@@ -8,6 +8,7 @@ checkout job instead; they must never become a silent missing-file skip.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -62,6 +63,12 @@ def main() -> int:
     if args.image == args.checkout:
         parser.error("choose exactly one of --image or --checkout")
 
+    if os.environ.get("COS_FULL_SUITE") != "1":
+        # Either list is a large share of the full suite: the same opt-in as tests/__init__.py's discovery guard
+        # (named modules do not trip that guard, so this entry point carries it). CI sets it (test-gate.sh --all and
+        # the checkout job); on a laptop run scripts/affected_tests.py --run.
+        print("FULL SUITE BLOCKED (scripts/image_test_modules.py): set COS_FULL_SUITE=1 on purpose, or run python scripts/affected_tests.py --run", file=sys.stderr)
+        return 2
     modules = image_test_modules(Path("tests")) if args.image else checkout_test_modules(Path("tests"))
     print("test modules:")
     print("\n".join(modules))

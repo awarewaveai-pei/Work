@@ -164,16 +164,22 @@ class CaseDocs:
         return live
 
     def delete(self, tenant_id: str, owner: Owner, kind: str, doc_id: str, writer: Writer,
-               then: list[Mapping[str, Any]] | None = None) -> None:
+               then: Callable[[], list[Mapping[str, Any]]] | None = None) -> None:
         """Every version of it goes (完整刪除); one DocDeleted with only its kind and id stays, so the history shows a
-        card was removed without showing what it said. ``then``: items (as ``save_many``) the same writer saves in the
-        same transaction -- what the delete means to its block (block_hooks ON_DELETE)."""
+        card was removed without showing what it said. ``then()``: items (as ``save_many``) the same writer saves in the
+        same transaction -- what the delete means to its block (block_hooks ON_DELETE). It runs inside, before the
+        delete, under the owner's lock taken exclusive (as ``save_many``'s check): what it read holds until the commit,
+        and the documents it names are locked after this one with no other writer of the owner in between."""
         spec = doc_kinds.require(kind)
         with self._repo.transaction(tenant_id) as connection:
             if owner.kind == "case":
+                if then is not None:
+                    self._repo.lock_case(connection, tenant_id, owner.id, exclusive=True)
                 self._repo.require_case(connection, tenant_id, owner.id)
             elif owner.kind == "person":
-                record_log.require_person(connection, tenant_id, owner.id)
+                record_log.require_person(connection, tenant_id, owner.id, exclusive=then is not None)
+            elif then is not None:
+                raise InvariantViolation("DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK: a delete's follow-up reads hold only under a case's or a person's lock")
             record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
             history = [item for item in self._history(connection, tenant_id, owner, doc_id) if not item["deleted"]]
             if not history or history[-1]["kind"] != kind:
@@ -182,9 +188,10 @@ class CaseDocs:
                 raise InvariantViolation(f"DOC_NOT_DELETABLE: every version of {kind} stays")
             if spec.from_case:   # its case's erase may be deleting it right now: no tombstone after the erase
                 self._repo.require_case(connection, tenant_id, history[-1]["content"][spec.from_case])
+            items = then() if then is not None else []   # reads the document before it goes, on this connection
             record_log.delete_owned(connection, tenant_id, owner, aggregate_id=f"doc:{doc_id}")
             record_log.append(connection, tenant_id, f"doc:{doc_id}", "DocDeleted", {"kind": kind, "doc_id": doc_id}, writer=writer, owner=owner)
-            for item in then or ():
+            for item in items:
                 self._save(connection, tenant_id, owner, item["kind"], item["content"], writer, item.get("doc_id"), item.get("base_version"))
 
     def current(self, tenant_id: str, owner: Owner, kind: str) -> list[dict[str, Any]]:

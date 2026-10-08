@@ -17,8 +17,8 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | 42-teach-page | 新增不綁案例的 TEACH 課程與演練頁，讓課程、案例、角色、自己的話與 AI 回應分開呈現 | 草稿只在草稿課顯示；選項可見且沒有下拉；AI 有作者標籤；頁面不顯示分數、排名、進度百分比或連勝 | `TeachPage.test.tsx` 3 個頁面守衛；移除草稿標記／加入 `<select>`／加入「進度」各轉紅後還原綠；`tsc` 與 vitest 綠 | 待審 |
 | Codex | 50-express-outline-and-draft | EXPRESS 選擇、大綱、可追溯草稿與送出紀錄；修正佇列測試依賴鏈 | 錯來源與假送出不得存；未查證標記不可移除；前置卡的測試須被佇列閘承認 | `test_block_express` 14、`test_codex_queue` 3；拔掉送出／草稿守衛與依賴鏈判定各紅後綠 | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
 | Codex | integration-json-shapes | 對齊 main 的 JSON 形狀契約：TEACH 2 欄、EXPRESS 2 欄 | 新增 JSON 欄位不可逃過存檔形狀驗證 | 合併前 registry gate 精確 4 failures；補後 foundation 43、TEACH 12、EXPRESS 14 tests PASS | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
-| Codex | 01-ci-postgres | CI 配備 digest-pinned PostgreSQL 並要求資料庫測試不能跳過；重試日誌獨立 | CI 缺 PostgreSQL 必須紅、筆電仍明示跳過；舊結果不得誤判新代理 | `test_ci_postgres` 6、`test_pg_foundation` 18、`test_codex_queue` 4、`test_affected_tests` 15 PASS；待跨模型審查 | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
-| Codex | 02-cognitive-db-ops | 新增未套用的 cognitive-db compose、備份／還原文件與操作閘門測試 | 資料庫只在 lobster-net 內可達；密碼只經 secret file；備份須通過 pg_restore 列表與輪替邊界 | `test_cognitive_db_ops` source/config/syntax gates；Docker backup dump/list/rotate/corrupt test loudly skipped because the daemon was unavailable；ports、密碼、pg_restore、pipefail、digest mutations 均轉紅 | 待審 |
+| Codex | 01-ci-postgres | CI 配備 digest-pinned PostgreSQL 並要求資料庫測試不能跳過；重試日誌獨立 | CI 缺 PostgreSQL 必須紅、筆電仍明示跳過；舊結果不得誤判新代理 | `test_ci_postgres` 6、`test_pg_foundation` 18、`test_codex_queue` 4、`test_affected_tests` 15 PASS；6 個記憶體內守衛突變各紅後還原綠 | 未經 Claude 跨模型審查；僅本機，勿 push／部署 |
+| Codex | 02-cognitive-db-ops | 未套用的 cognitive-db compose；主機備份串流、還原說明與部署閘 | 無主機埠；密碼只在容器；每個非 template DB 有唯一檔名、可還原且毀損檔拒絕；獨立 compose 尚無安全套用器 | `test_cognitive_db_ops.py:169`（現行行號：218）唯一執行備份腳本；兩個 compose Docker 檢查在沒有 Docker 的測試映像中明示 skip，實際在 checkout job／本機 Docker 跑 | 待 Claude 跨模型審查；套用機制未完成，勿 push／部署 |
 | Codex | queue-check-exit | Windows PowerShell 5.1 的驗收命令改讀真實程序退出碼 | 失敗碼不能誤判為通過；成功碼不能誤判為失敗而重派 agent | WinPS5.1 退出碼 0/7 實測；`test_codex_queue` 5 PASS、affected 56 PASS | 待 Claude 跨模型審查；勿 push |
 | Codex | 51-express-export-send | 新增 EXPRESS Markdown／純文字／PDF 匯出，並修正 glyph-width 換行、DocRead 已讀、fail-closed `seen` 和 write-lock 原子送出 | 匯出不寫紀錄；每句順序／標記／信心／不確定保留；讀取不增加草稿版本；缺少或非布林 `seen` 不算已讀；只有本人送出目前且重新讀過的版本才寫 `express.sent` | `test_express_export` 11、`test_block_express` 14、foundation 43、record log 20、API main 109、step2 54、queue 5 PASS；本輪四個缺陷各拔守衛轉紅、byte-exact 還原後綠；卡片原有四個突變證據保留 | 未經 Claude 跨模型審查 |
 | Codex | 02-cognitive-db-review-fixes | 修正 CI 映像與 checkout 測試邊界、備份先寫後驗證與舊檔隔離、佇列危險檢查與 PowerShell 驗收 | 映像不執行缺檔測試；新備份不被舊損壞檔阻塞；所有卡檢查先驗證且不得危險；資料庫檢查不能悄悄 skip | `test_ci_postgres` 7、`test_cognitive_db_ops` 12、`test_codex_queue` 7、`test_pg_foundation` 18；C1／quarantine／full-read／dangerous-check／empty-check／WinPS exit／required PG／timeout／error-log／password-file／network truth 各突變轉紅後 byte-exact 還原 | 未經 Claude 跨模型審查 |
@@ -27,6 +27,8 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Claude（接手 Codex 額度用完） | r2-fix | 還原演練加 `pg_restore -U`、`--network none`、有界等待並真跑 Docker；佇列檢查改指令形狀白名單；共用掃描器擋數字／英文分數與名次；練習同意只能指自己的案子；刪掉的完成紀錄記為該課不再記；新草稿與改空白的 AI 句仍算 AI | 還原演練每次都能跑完；只有白名單形狀的檢查能執行；AI 文字不評分不排名；別人的案子與不存在的案子回同一個拒絕；刪除＝不要這筆，不會再寫回；AI 句不能靠新稿或空白改成本人 | r2_* 突變 16 個各轉紅、byte-exact 還原後綠（-U、network、allowlist×2、scanner×3、owner×2、declined×3、web spread、AI-text×3）；真 Docker 還原演練 PASS | 待 Codex 審（Claude 寫的）|
 | Codex→Claude | 60-facilitate-content | Adds the FACILITATE script loader, fixed dont list, draft-only seeds, and mapped CSV importer (Codex quota stop; Claude finished: importer checks every row and repeated ids before writing any file). | No-stop-signal subjects stay unavailable, drafts cannot lead, empty CSV stop cells stay empty, and script text needs a versioned HISTORY fingerprint. | `test_facilitate_content` covers card-list equality, unavailable/report, draft gate, importer empty-row and deterministic output; plus a bad row writes nothing; 4 card mutations red then byte-exact revert green. | Codex part: Claude oracle approve (2026-10-08-review-e8ce14ab); Claude part: 未經 Codex 跨模型審查 |
 | Codex | 60b | 新增 facilitator 三課草稿並讓 TEACH loader、course list、completion shape 接受 facilitator 課程 | 帶領者必須完成完整 facilitator course 才能取得資格；課程內容為版本化、可追溯的草稿 | `test_teach_content` 含 course/history/草稿守衛；新增 course package guard 與 completion choices 的 affected tests；未做隱私／可見範圍／擦除／同意／擁有權 mutation | 待審 |
+| Codex | 52-express-page | 建立 EXPRESS 單頁流程，讓人選讀者、格式與紀錄，逐句看來源並確認後匯出或送出 | selection.items 只含勾選紀錄；未查證句子必先確認；句子來源、信心與不確定性保持可見；送出仍由人觸發 | `ExpressPage.test.tsx` 3 tests；`npx tsc --noEmit`；mutation：移除未查證二次確認後 named test 應紅；無 `<select>` 與 AI 標記／來源檢查 | 未經 Claude 跨模型審查 |
+| Claude | codex-line-pg-port | Codex 線 cherry-pick 到 PostgreSQL main 的移植：ON_DELETE 在刪除交易內、owner 鎖 exclusive；DocRead 讀寫 PG 化並取 aggregate 鎖；`image_test_modules.py` 需 `COS_FULL_SUITE=1`；CI checkout job 必有 PG | hook 讀到的偏好在寫入前不變；讀的版本＝記的版本；點名模組不能繞過全套守衛；CI 的 DB 測試不能靜默 skip | affected 356 模組 15023 OK（真 PG）；`then()`→`[]` 突變使 `test_a_deleted_completion_is_not_written_again_by_the_next_run` 紅、還原綠；tsc／ExpressPage+TeachPage vitest 綠 | 待 Codex 審（Claude 寫的）；只在 refs/claude/codex-line-rebased，勿 merge／push |
 
 ## deferred, before D7 second region
 
@@ -35,13 +37,9 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 - F4 `platform/identity/store.py:create_tenant` home 與 directory 兩交易非原子（process 死在中間留孤兒 home 列；4c13c954b 只讓同資料重試可恢復）；開第二區前需孤兒清理或兩階段。
 - F5 source/artifact/journal CAS 根目錄不分區，第二區租戶的檔案不在其區域；= STORAGE_SWITCH D7。
 
-| Codex | 52-express-page | 建立 EXPRESS 單頁流程，讓人選讀者、格式與紀錄，逐句看來源並確認後匯出或送出 | selection.items 只含勾選紀錄；未查證句子必先確認；句子來源、信心與不確定性保持可見；送出仍由人觸發 | `ExpressPage.test.tsx` 3 tests；`npx tsc --noEmit`；mutation：移除未查證二次確認後 named test 應紅；無 `<select>` 與 AI 標記／來源檢查 | 未經 Claude 跨模型審查 |
-
 ## deferred
 
 - `scripts/dev/prod_projects_check.py`、`scripts/dev/prod_read_analyses.py` 仍以 sqlite3 讀 `repo.db_path`（PG 版 repo 無此屬性）；dev 工具、非 CI/主路徑，切換上線後改讀 PG 或刪除。
 - `CaseDocs.save_many` 個人批次 check 持 person 鎖 exclusive，其 `from_case` 項再取 case 鎖 shared；`erasure.admit_run` 為 case→person 順序。同時有 case 抹除排隊 exclusive 時可成三方環，PostgreSQL deadlock detector 中止其一（錯誤，非卡死）；如出現再統一 person/case 取鎖順序。
-
-
 - r2-fix: TEACH 頁沒有按鈕把「不再記下的課」改回會記（只能 PUT 偏好）。
 - r2-fix: `restore-cognitive-db.sh` 只驗 `SELECT 1`，沒驗還原後的表與筆數。

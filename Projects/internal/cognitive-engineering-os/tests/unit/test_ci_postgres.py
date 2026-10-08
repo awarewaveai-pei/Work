@@ -97,6 +97,9 @@ class CiPostgresTests(unittest.TestCase):
             step["run"] for step in checkout_job["steps"] if step.get("name") == "Run the explicit checkout-only test list"
         )
         self.assertIn("--checkout", checkout_run)
+        checkout_env = next(step for step in checkout_job["steps"] if step.get("name") == "Run the explicit checkout-only test list").get("env", {})
+        self.assertEqual(checkout_env.get(pg.REQUIRE_POSTGRES_ENV), "1")   # its block tests need PostgreSQL: red, not skipped
+        self.assertEqual(checkout_env.get("COS_FULL_SUITE"), "1")
 
         all_modules = set(all_test_modules(COS / "tests"))
         checkout_modules = set(CHECKOUT_ONLY_TEST_MODULES)

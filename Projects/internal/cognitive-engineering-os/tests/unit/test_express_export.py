@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 import shutil
 import subprocess
@@ -133,8 +132,8 @@ class ExpressExportApiTests(ProjectSourceApiTestCase):
         return response.json()
 
     def _event_count(self) -> int:
-        with self._repo.connection() as connection:
-            return int(connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=? AND owner_kind='case' AND owner_id=?", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0])
+        with self._repo.transaction(self.tenant["tenant_id"]) as connection:
+            return int(connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0])
 
     def test_export_formats_are_downloads_and_export_does_not_record(self):
         draft = self._save_draft()
@@ -162,9 +161,9 @@ class ExpressExportApiTests(ProjectSourceApiTestCase):
         self.assertIn("稿子裡還有還沒查證的句子，確定要送？", needs_ack.text)
         sent = self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/send", params={"format": "text"}, json={"version": 1, "to": "合夥人", "acknowledge_unchecked": True})
         self.assertEqual(sent.status_code, 200, sent.text)
-        with self._repo.connection() as connection:
-            row = connection.execute("SELECT payload_json FROM events WHERE tenant_id=? AND owner_kind='case' AND owner_id=? AND event_type='DocSaved' ORDER BY rowid DESC LIMIT 1", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()
-        self.assertEqual(json.loads(row["payload_json"])["content"]["version"], 1)
+        with self._repo.transaction(self.tenant["tenant_id"]) as connection:
+            row = connection.execute("SELECT payload_json FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s AND event_type='DocSaved' ORDER BY write_order DESC LIMIT 1", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()
+        self.assertEqual(row["payload_json"]["content"]["version"], 1)
 
     def test_draft_read_route_marks_the_current_version_as_read(self):
         draft = self._save_draft()
@@ -200,8 +199,8 @@ class ExpressExportApiTests(ProjectSourceApiTestCase):
         for _ in range(2):
             read = self.client.get(f"{self.base}/express/drafts/{draft['doc_id']}")
             self.assertEqual(read.status_code, 200, read.text)
-        with self._repo.connection() as connection:
-            reads = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=? AND owner_kind='case' AND owner_id=? AND event_type='DocRead'", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0]
+        with self._repo.transaction(self.tenant["tenant_id"]) as connection:
+            reads = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s AND event_type='DocRead'", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0]
         self.assertEqual(reads, 1)
         exported = self.client.get(f"{self.base}/govern/export")
         self.assertEqual(exported.status_code, 200, exported.text)
@@ -250,8 +249,8 @@ class ExpressExportApiTests(ProjectSourceApiTestCase):
             refused = self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/send", json={"version": 1, "to": "合夥人"})
         self.assertEqual(refused.status_code, 409, refused.text)
         self.assertIn("版本不對", refused.text)
-        with self._repo.connection() as connection:
-            sent = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=? AND owner_kind='case' AND owner_id=? AND json_extract(payload_json, '$.kind')='express.sent'", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0]
+        with self._repo.transaction(self.tenant["tenant_id"]) as connection:
+            sent = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s AND payload_json->>'kind' = 'express.sent'", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0]
         self.assertEqual(sent, 0)
 
     def test_render_failure_happens_before_sent_write(self):
@@ -263,8 +262,8 @@ class ExpressExportApiTests(ProjectSourceApiTestCase):
         with patch.object(express_routes, "render_pdf", side_effect=RuntimeError("renderer failed")):
             with self.assertRaises(RuntimeError):
                 self.client.post(f"{self.base}/express/drafts/{draft['doc_id']}/send", params={"format": "pdf"}, json={"version": 1, "to": "合夥人"})
-        with self._repo.connection() as connection:
-            sent = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=? AND owner_kind='case' AND owner_id=? AND json_extract(payload_json, '$.kind')='express.sent'", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0]
+        with self._repo.transaction(self.tenant["tenant_id"]) as connection:
+            sent = connection.execute("SELECT COUNT(*) FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s AND payload_json->>'kind' = 'express.sent'", (self.tenant["tenant_id"], self.project["project_id"])).fetchone()[0]
         self.assertEqual(sent, 0)
 
     def test_edit_after_recheck_is_blocked_until_sent_write_commits(self):

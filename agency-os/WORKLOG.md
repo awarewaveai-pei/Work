@@ -1,4 +1,135 @@
 # Worklog
+## 2026-10-08（續10）COS Codex 線（refs/codex/work 17 + card 60 2 + 60b 1 + 52A 1）cherry-pick 到 PostgreSQL main＋移植
+- 範圍：`445f39e51..9ab233f7f` 17 commits、`4208af89b..15b7bfa97` 2 commits、`1fb5ed9de`（60b）、`3ff8fa1a1`（52A），`-x` 逐一 cherry-pick 到 main `d1540e11d`（throwaway worktree `D:/tmp/cos-cx-rb`）；成果 `refs/claude/codex-line-rebased`，不 merge／push／部署。
+- 衝突（兩邊意圖都留）：
+  - C1 `blocks/docs.py:_save`：main 的 `save_many(check=before_save)`（person/case 鎖下檢查）＋ Codex 的 `express.sent` 只走送出路由、`_read_markers`/`record_read` 讀取不算版本、round 2 的 from_case 本人案件檢查（在 save_many 前；抹除仍由 `_save` 的 `require_case` 擋）。
+  - C2 `case_docs.py`：`_history` 只取 DocSaved/DocDeleted（PG `%s`）；`record_read` 改 `transaction(tenant_id)`＋`require_case`＋`lock_aggregate` 再讀歷史（讀的版本＝記的版本）；`last_read_version` `json_extract`→`payload_json->>'…'`、`connection()`→`transaction(tenant_id)`。
+  - C3 `blocks/govern.py:_records`：`ORDER BY rowid`→`write_order`＋排除 `DocRead`。
+  - C4 `scripts/test-gate.sh --all`：Codex 的 `image_test_modules.py --image` 清單＋main 的 `COS_FULL_SUITE=1`。
+  - C5 `docs/platform/STEP34_CHECKLIST.md`（52A）：EXPRESS 段取 52A 的頁面已建＋group 待卡 20，FACILITATE 段（60/60b）整段保留。
+  - 共用檔：`agency-os/WORKLOG.md` 兩邊條目全留，Codex 的同日重號改號（10-08 續1-4→續4-7、60b 續5→續8、52A 續5→續9、10-07 續1-2→續2-3）並依日期排序；`agency-os/reports/review-debt.md` 兩邊列全留（Codex 後續改寫的 01-ci-postgres／02-cognitive-db-ops 列取 Codex 最終版），deferred 合為一節。
+- 移植（本 commit）：
+  - ON_DELETE：`CaseDocs.delete(then=)` 由清單改為 callable，在刪除交易內、刪除前執行，owner 鎖改 exclusive（同 `save_many` check；不變量：hook 讀到的偏好版本在寫入前不變）；`block_hooks.on_delete` 無 hook 時回 None（一般刪除不拿 exclusive）。
+  - `tests/unit/test_express_export.py`：`_repo.connection()`/`?`/`rowid`/`json_extract`/`json.loads` → `transaction(tenant_id)`/`%s`/`write_order`/`->>`/jsonb 值。
+  - `scripts/image_test_modules.py`：未設 `COS_FULL_SUITE=1` 拒跑（點名模組繞過 `tests/__init__.py` 的 discovery 守衛＝同類漏洞）；CI checkout job 設 `COS_FULL_SUITE=1`＋`COGNITIVE_OS_REQUIRE_POSTGRES=1`（其 block 測試要 PG，不得靜默 skip），`test_ci_postgres` 斷言之。
+  - `docs/platform/STORAGE_SWITCH.md` 鎖表：`record_read`、`delete(then)`。
+- 引擎碼 grep `sqlite|BEGIN IMMEDIATE|rowid|json_extract|lastrowid|connection\(\)` 於 Codex 改動檔：只剩註解。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --base main --run（真 PostgreSQL 17 容器） | exit=0 | ms=2231006（356 模組 15023 tests OK；含 60b；52A 只改 web/docs，選擇器無單元測試，另跑 `python -m unittest tests.unit.test_integrity` 42 OK 33907 ms）
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（cognitive-web）＋ npx vitest run components/blocks/ExpressPage.test.tsx components/blocks/TeachPage.test.tsx | exit=0 | ms=5930（8 tests）
+- 突變（刪除／同意守衛，一次）：`case_docs.delete` 的 `items = then()` 改 `[]` → `test_block_teach.test_a_deleted_completion_is_not_written_again_by_the_next_run` ERROR；byte-exact 還原、清 __pycache__ 後 22 OK。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n（m：ON_DELETE exclusive 鎖模式無並發測試，僅邏輯與既有 save_many 同型）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=image_test_modules|on_delete\(|then=|DocRead | hits=26
+- ORACLE_WAIVED: Claude 寫的移植；協調者合併前送 Codex 審（review-debt 已記一行）；本 commit 只進 refs/claude/codex-line-rebased。
+- rollback：`git update-ref -d refs/claude/codex-line-rebased`；main 與 refs/codex/* 未動。
+## 2026-10-08（續9）COS 卡 52：EXPRESS 頁面
+
+- 根本問題：EXPRESS 後端已有選擇、大綱、草稿、讀取、匯出與本人送出路由，但案子裡沒有把讀者、格式、勾選紀錄、逐句來源和未查證確認串成一個人能操作的畫面；`collab.proposal` 不在本 worktree 的 `ai_lego` 樹，因此群組提案按鈕等待 card 20。
+- 修改：新增 `Projects/internal/cognitive-engineering-os/apps/cognitive-web/components/blocks/ExpressPage.tsx`、頁面 route 與 `ExpressPage.test.tsx`；更新 `docs/platform/STEP34_CHECKLIST.md`、review-debt row。既有 `EXPRESS` registry 與 EXPRESS error map 已符合本卡，不重複修改。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | cognitive-web typecheck PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run components/blocks/ExpressPage.test.tsx` | exit=0 | 3 tests PASS。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n；第二次 Claude oracle artifact `agency-os/reports/oracle/2026-10-08-review-c760c487.md` approve，第一次 2 findings 已修正後重審。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`ExpressPage|express.selection|還沒查證|collab.proposal` | hits=69；核對 page、route、API selection／draft／send call sites、checklist、cards 與 shared rules，`collab.proposal` 僅在規格／shared rules，未在 `ai_lego` kind 樹可供 Part B 使用。
+- MUTATION_EVIDENCE: 移除句子 `還沒查證` mark、移除送出二次確認、加入 `<select>` 各使 `ExpressPage.test.tsx` 轉紅；每次立即還原，最後 `ExpressPage.tsx` SHA256 回到 `F075D07FEE870FA277F73B13717ED394E241D1D3D668D2AF899EFCD21C4B8ED4`。
+- SCOPE: no group proposal, no backend route, no database migration, no external delivery, no push／merge／deploy；`.docx` 維持 card 51 的未建置決定。
+- WORKLOG: 本條目由 `scripts/worklog-insert-entry.py` 配號；`agency-os/WORKLOG.md` 透過 `scripts/git-partial-worktree-commit.py` private index staged。
+## 2026-10-08（續8）
+
+### feat(cos): add facilitator course lessons and completion support
+
+- AUTO_TASK_DONE: card 60b facilitator lessons and special course support
+
+**根本問題**: card 60 的 script content 已完成，但 facilitator eligibility 需要一個可載入、可完成、可版本追蹤的 `facilitator` lesson course；TEACH loader 和 completion shape 原本只接受 assembler 的七個 package。
+
+**已修改**:
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/lessons/lessons/facilitator-*.yaml`：新增三課 draft，依序涵蓋 how to lead、FACIL_DONTS、交給 GOVERN。
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/lessons/__init__.py`、`ai_lego/core/domain/kinds/teach.py`：接受 special `facilitator` course，讓 course list 與 system completion 使用同一組 choices。
+- `ai_lego/platform/lessons/HISTORY.json`：保留 v1 fingerprint，新增 v2 `0cee91b5e39d`。
+- `docs/platform/STEP34_CHECKLIST.md`、`agency-os/reports/review-debt.md`：標記 card 60b 完成並登記一筆待 Claude 審查。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_teach_content | exit=0 | tests=13 | ms=13728
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_facilitate_content | exit=0 | tests=10 | ms=5630
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_teach | exit=0 | tests=22 | ms=12565
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_step2_foundation | exit=0 | tests=54 | ms=29211
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m py_compile ai_lego/platform/lessons/__init__.py ai_lego/core/domain/kinds/teach.py tests/unit/test_teach_content.py | exit=0 | ms=178
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`COURSE_PACKAGES|FACILITATOR_COURSE|facilitator` | hits=119
+- ORACLE: `agency-os/reports/oracle/2026-10-08-review-ebfc9e65.md` reviewer=claude verdict=approve findings=0
+- MUTATION_WAIVED: no privacy/visibility/erasure/consent/ownership guard changed; queue preamble limits mutations to those guards.
+
+**剩餘風險**: 三課仍是 draft，必須由 operator review 後才可作為 facilitator training content；本卡不建立 facilitator records、eligibility query 或 page。
+
+**Rollback**: `git revert <card-60b-commit>` 移除三課、course support、HISTORY v2、checklist row、review-debt row 與本次 oracle artifact；不涉及資料庫或部署。
+## 2026-10-08（續7）
+
+### fix(cos): close Card 51 EXPRESS export/send review gaps
+
+- AUTO_TASK_DONE: C51 EXPRESS export/send review fixes — PDF text is drawn and measured as unparsed text; rendering happens inside the checked `save_many` transaction before `express.sent`; duplicate `DocRead` events are avoided; read markers do not create content versions; GOVERN exports exclude read bookkeeping; the route's sole `express.sent` writer is AST-tested; unused read-marker fields/errors were removed; the test image installs pinned `poppler-utils`.
+- MODIFIED: `Projects/internal/cognitive-engineering-os/Dockerfile`; COS EXPRESS render, route, generic docs save, GOVERN export, EXPRESS kind and web errors; `test_express_export.py` and `test_block_express.py`.
+- TEST_EVIDENCE: `COGNITIVE_OS_REQUIRE_POSTGRES=1 python -m unittest tests.unit.test_express_export tests.unit.test_block_express tests.unit.test_block_foundation tests.unit.test_record_log tests.unit.test_step2_foundation tests.unit.test_api_main tests.unit.test_block_govern tests.unit.test_egress_allowlist_parity tests.unit.test_codex_queue` — 341 tests PASS; `npx tsc --noEmit` PASS; `docker build --target test -t cognitive-os-api:c51-test-final -f Projects/internal/cognitive-engineering-os/Dockerfile .` PASS; `docker run --rm cognitive-os-api:c51-test-final python -m unittest tests.unit.test_express_export` — 18 tests PASS.
+- MUTATION_EVIDENCE: PDF `parse_math=False`, renderer width measurement, render-before-write rollback, duplicate DocRead suppression, GOVERN DocRead exclusion, `seen` no-op, checked save lock, AI-author preservation, and removed `last_read_version` field each turned red under one temporary mutation and were byte-exact restored; `__pycache__` purged; `git diff --check` PASS.
+- GOVERNANCE: no push, merge, deploy, or compose apply; review debt row added for this Codex commit with status `未經 Claude 跨模型審查`.
+## 2026-10-08（續6）COS 卡 40/41/42/50：修正 Claude 審查發現
+
+- 根本問題：TEACH AI action 只擋一種私密要求，沒有擋自由文字評分／排名；練習同意沒有綁真實案；完成紀錄不可刪且沒有 opt-out；課程完成只取每課最後一筆 run；EXPRESS 草稿可把舊 AI 原句標成本人或 joint，且新增拒絕碼未進 web 錯誤句表。
+- 修改：loader 提供唯一 AI 文字 scanner，action 直接引用 loader 的 score／rank 與 vulnerable-demand patterns；practice consent 用 `from_case`，完成紀錄可刪並新增預設保留的 person preference；hook 取各 lesson 最高版本；缺 run id、越界 ref、`joint` 與缺 person-lines 都拒絕；EXPRESS draft 比對所有舊版本的 AI sentence，未改文字維持 `ai`；頁面以新 lesson/version 建立新 run，支援完成紀錄 opt-out／刪除，未查核案例顯示「尚未查核」。
+- 內容：四個練習案例改為 v2，`checked_on: 尚未查核`，HISTORY 加入 `bb655a3aa4a8`；STEP34 checklist 明列練習紀錄控制與情境演練／共同實作／GOVERN 高風險護欄尚未建置。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_teach_content` | exit=0 | 13 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_teach` | exit=0 | 18 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_express` | exit=0 | 16 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_express_export` | exit=0 | 11 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | 43 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_record_log` | exit=0 | 20 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_step2_foundation` | exit=0 | 54 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_integrity` | exit=0 | 41 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_codex_queue` | exit=0 | 7 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | cognitive-web typecheck PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run components/blocks/TeachPage.test.tsx components/blocks/ExpressPage.test.tsx` | exit=0 | TeachPage 4 tests PASS；ExpressPage.test.tsx 不存在，Vitest 只執行現存檔案。
+- MUTATION_EVIDENCE: cited-as-true／not-yet-checked loader guard、TEACH shared scanner、missing run、from_case、completion deletable／opt-out／version aggregation、EXPRESS outside-selection／old-AI-author／joint／person-lines、page version routing／not-yet-checked rendering；每項移除後指定測試紅，byte-exact 還原後綠，並清理 engine `__pycache__`。
+- REVIEW_WAIVED: NA -- Claude cross-model review deliberately remains pending in `agency-os/reports/review-debt.md`。
+- BUILD_GATE: `powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-build-gates.ps1` 通過 bootstrap、ADR、secret scan、git EAP、Sentry 與前置文件閘；本地 runner 在 `system-health-check` 階段未返回結果，未顯示本次變更失敗；不做 push、merge、deploy 或 compose apply。
+## 2026-10-08（續5）COS 卡 00/01/02：修正 Claude 審查發現
+
+- 根本問題：CI test image 用 unittest discover 執行了讀取 checkout 外檔案的測試；備份腳本先驗證舊檔，會被損壞舊 dump 阻塞；佇列危險命令只在 high-stop 檢查，PowerShell 驗收又可能把退出碼、timeout 輸出與 PostgreSQL skip 判錯。
+- 修改：新增明確 image／checkout 測試 manifest 與 checkout job；新 dump 先完整讀取並發布，再將舊損壞檔改名 `.corrupt` 後非零回報；compose 密碼檔改為必填；佇列啟動前由同一 validator 拒絕空 check 與所有卡的危險 check；driver 用 .NET Process、taskkill tree、captured logs、required PostgreSQL。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_ci_postgres` | exit=0 | ms=7140；7 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_cognitive_db_ops` | exit=0 | ms=26638；12 tests PASS，包含 throwaway Docker dump／restore／rotation／corrupt-old-dump。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_codex_queue` | exit=0 | ms=2853；7 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`COGNITIVE_OS_REQUIRE_POSTGRES=1 python -m unittest tests.unit.test_pg_foundation` | exit=0 | ms=7672；18 tests PASS。
+- REVIEW_WAIVED: NA -- Claude cross-model review deliberately remains pending in `agency-os/reports/review-debt.md`.
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`pg_restore --list|COGNITIVE_DB_PASSWORD_FILE|FORBIDDEN_CHECK_COMMANDS|COGNITIVE_OS_REQUIRE_POSTGRES|taskkill.exe|image_test_modules.py` | hits=35。
+- ORACLE_WAIVED: 本輪不重複 Claude oracle；本提交新增 review-debt row，狀態為未經 Claude 跨模型審查。
+- BUILD_GATE: `powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-build-gates.ps1` exit=1；改動新增的 CP950 raw-read 已修正，剩餘 AO-CLOSE archive-lift 與 Claude sync infrastructure 為既有全域阻塞。
+- 回滾：`git revert <本次 commit>`；沒有 compose apply、migration、部署、push、遠端或正式資料庫寫入。
+## 2026-10-08（續4）COS 卡 51 缺陷修正：PDF 換行、已讀與原子送出
+
+**根本問題**：EXPRESS 的 PDF 以字數而不是字形寬度換行；讀取路由把已讀標記做成新草稿版本；缺少或錯形狀的 `seen` 會被當成已讀；送出先查版本再另寫紀錄，存在並發編輯窗口。
+
+**已修改**：
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/exports/render.py`：沿用 matplotlib，以同一個 `FontProperties` 的 `TextPath` 寬度表換行，PDF 文字使用同一組字型；長 CJK、無空格英文、混合文字和多頁稿不會越過可印寬度。
+- `Projects/internal/cognitive-engineering-os/ai_lego/data/events/record_log.py`、`data/repositories/case_docs.py`：新增本人可寫、按身份查詢的 `DocRead` 事件；讀取不再增加草稿內容版本，歷史查詢不把讀取事件當內容版本。
+- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/express.py`、`apps/api/blocks/docs.py`：缺少或非布林 `seen` 一律未讀；編輯丟掉只供頁面顯示的已讀欄位；送出在既有 write lock 內重新查版本、已讀和標記，同一交易寫入 `express.sent`。
+- `apps/cognitive-web/lib/errors.ts`、`tests/unit/test_express_export.py`、`tests/unit/test_block_express.py`：補錯誤句和讀取／編輯／並發送出／PDF 回歸測試。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_express_export` | exit=0 | 11 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_express` | exit=0 | 14 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | 43 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_record_log` | exit=0 | 20 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main` | exit=0 | 109 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_step2_foundation` | exit=0 | 54 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_codex_queue` | exit=0 | 5 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | cognitive-web typecheck PASS。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n；已讀回 renderer、read event、repository transaction、routes、guards、error map 和 tests；Claude 跨模型審查仍待審。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`DocRead|last_read_version|seen|express.sent|_wrap_pdf_line|EXPRESS_SEND_` | hits=reviewed；核對 event history、路由 call sites、錯誤碼與卡片聲稱。
+- WORKLOG: 本條目；PDF QA 已重產並檢查頁面影像；`git diff --check`、py_compile、private-index commit gate 待最後一輪完成。
+- ORACLE_WAIVED: 目前沒有可用的獨立 Claude review session；以指定測試、讀回、靜態掃描和突變紅綠證據替代，不代表跨模型審查已完成。
+
+**突變證據**：四個本輪缺陷各自拔守衛後轉紅並 byte-exact 還原後轉綠：PDF render 不呼叫 measured wrapper → `test_pdf_wraps_by_glyph_width_and_keeps_long_sentences_across_pages`；`seen is not True` 改回 `seen is False` → `test_missing_or_non_boolean_seen_is_unread`；GET 再存 draft version → `test_draft_read_route_marks_the_current_version_as_read`；send 使用初始快照而非 write-lock recheck → `test_send_rechecks_after_an_injected_edit_and_records_nothing`。卡片原有四個突變證據仍保留：未查證標記、版本守衛、外連掃描、匯出誤寫 sent。
+
+**剩餘風險**：PDF 的字型顯示依執行環境已安裝的 CJK 字型而定；`.docx`、群組分享、外部實際投遞不在本卡；Claude 跨模型審查尚未完成。沒有資料庫 migration、外部投遞、部署或遠端寫入。
+
+**rollback**：`git revert <本次 commit>` 可移除本輪 renderer、read event、routes、guards、tests、error codes、review-debt 與本條 WORKLOG；沒有資料遷移或外部服務狀態需要回復。
 ## 2026-10-08（續3）COS 儲存切換鏈 rebase 到 main（VERIFY r5／GATHER r5）＋ Codex W1-W3 F2/F6
 - rebase：`refs/claude/storage-erasure`（4d9f9a59c）`--onto main 445f39e51`，14 commits；文字衝突只有 `agency-os/WORKLOG.md`（兩邊條目都留）與 `agency-os/reports/review-debt.md`（main 已審畢的 c55b64c35 列 + 鏈上 Codex 列）。程式無文字衝突，語意衝突 3 處：
   - C1 main `blocks/docs.py:_save` 每次存檔都走 `CaseDocs.save_many(check=before_save)`；PG 版 `save_many` 對 person 擁有者拒絕 check（`DOC_BATCH_CHECK_NEEDS_A_CASE`）→ 所有 `/me/docs` 存檔 400（rebase 後 govern/learn 實跑 10F/2E）。修：person 批次 check 取 person 鎖 exclusive（`record_log.require_person(exclusive=)`），平台擁有者仍拒（改名 `DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK`）。
@@ -45,6 +176,41 @@
 - ORACLE_WAIVED: 本次 staged 無程式檔；本條就是 Claude 對 Codex 提交 `c55b64c35` 的跨模型審查本身，直接審查，未走 `claude-oracle.ps1`。
 - 驗證：10 模組各自獨立行程共 437 tests PASS（step2_foundation 54／foundation 43／map 32／think 48／decide 26／learn 27／act 25／gather 68／verify 62／compute 52）。
 - rollback：還原 `agency-os/reports/review-debt.md` 該行即可；無程式、資料變更。
+## 2026-10-07（續3）COS 卡 51：EXPRESS 匯出與本人送出
+
+**根本問題**：EXPRESS 已能保存可追溯草稿，但沒有把草稿安全轉成可攜格式，也沒有把「本人看過目前版本、本人確認後才送」落成一條不可繞過的路徑；一般文件路由還能直接建立 `express.sent`，讀取標記也能被偽造。
+
+**已修改**：
+- `Projects/internal/cognitive-engineering-os/ai_lego/platform/exports/{__init__,render}.py`：新增 Markdown、純文字、PDF renderers；句子順序固定，未查證與 AI 句子都保留可見標記，信心與仍不確定的地方在最後一節；PDF 沿用既有 matplotlib 依賴，沒有加入新依賴。
+- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/express.py`：新增個別草稿讀取（寫入 `last_read_version`）、唯讀匯出、本人送出路由；版本、已讀、未查證確認和 ASCII 檔名都在邊界處檢查。
+- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/docs.py`、`core/domain/kinds/express.py`、`platform/block_hooks/express.py`：讀取標記只能由讀取路由寫入；`express.sent` 只能由送出路由寫入；送出版本只能是目前版本。
+- `apps/cognitive-web/lib/errors.ts`、`docs/platform/STEP34_CHECKLIST.md`、`tests/unit/test_express_export.py`、`tests/unit/test_block_express.py`、`agency-os/reports/review-debt.md`：補錯誤句、清單、路由／格式／掃描／突變測試與待審列。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_express_export` | exit=0 | ms=5175；8 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_express` | exit=0 | ms=14512；14 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | ms=26255；43 tests PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0；cognitive-web typecheck PASS。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile` on all changed Python modules | exit=0；syntax PASS。
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n；逐檔讀回 routes、renderers、kind、hook、generic save gate、frontend codes、checklist、tests；Claude 跨模型審查仍待審。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`express export/send symbols, express.sent, last_read_version, outbound scan words` | hits=58；逐一核對目前 call sites，沒有 stale route 或 checklist claim。
+- ORACLE_WAIVED: 目前沒有可用的獨立 Claude review session；以指定測試、讀回、靜態掃描和突變紅綠證據替代，不代表跨模型審查已完成。
+
+**突變證據**：移除未查證標記後 `ExpressRendererTests.test_every_renderer_keeps_order_marks_and_final_disclosures` 紅；移除共用目前版本守衛後 `ExpressExportApiTests.test_send_requires_current_version_and_acknowledgement_then_records_sent` 紅；加入 `import urllib.request` 後 `ExpressOutboundScanTests.test_real_tree_has_no_outbound_path_and_temp_import_is_caught` 紅；在匯出路由寫 `express.sent` 後 `ExpressExportApiTests.test_export_formats_are_downloads_and_export_does_not_record` 紅；移除 generic save 的讀取標記守衛後 `ExpressExportApiTests.test_generic_draft_save_cannot_forge_the_read_marker` 紅；每次還原後 focused suite 綠。
+
+**剩餘風險**：PDF 的字型顯示依執行環境已安裝的 CJK 字型而定；`.docx`、群組分享、外部實際投遞不在本卡；Claude 跨模型審查尚未完成。沒有資料庫 migration、外部投遞、部署或遠端寫入。
+
+**rollback**：`git revert <本次 commit>` 可移除本卡新增的 renderer、routes、read/send guards、tests、checklist、error codes、review-debt 與本條 WORKLOG；沒有資料遷移或外部服務狀態需要回復。
+## 2026-10-07（續2）COS 卡 02 備份與佇列驗收碼
+
+- 根因：`ops/cognitive-db/backup-cognitive-db.sh:83,100` 曾在主機直接呼叫 `psql/pg_dump`，但 compose 不發布主機埠；`scripts/codex-continue.ps1:75-82` 在 Windows PowerShell 5.1 用 `Start-Process -PassThru` 後取得 null `ExitCode`，每個驗收都誤報 125。
+- 修改：備份由主機以 `docker exec` 串流進出私有服務；NUL 分隔資料庫清單、可逆十六進位檔名、含當日的 N 天輪替；還原演練只選 `cognitive_os` dump。驅動器以 .NET Process 讀真實退出碼。README 明示現有 `safe-infra-patch.sh` 不支援獨立 compose，套用閘仍關閉。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --base 51bd56954 --run | exit=0 | ms=25225；56 tests PASS。舊版 `test_cognitive_db_ops.py:169` 是唯一執行備份腳本的測試；compose 檢查在沒有 Docker 的測試映像中 skip，現在由 checkout job／本機 Docker 執行；WinPS5.1 0/7 退出碼。5 個 in-memory 守衛突變（ports/password/pg_restore/pipefail/digest）各紅。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n；獨立 compose 沒有安全套用器，已移除假的操作命令，非本卡上線許可；Claude 跨模型審查仍欠。
+- ORACLE_WAIVED: Claude 週額度中斷，前次 oracle 呼叫 exit 1 且無審查產物；以真實 Docker 還原與 5 個守衛突變作暫代證據，不視為跨模型審查，不合併／推送。
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/ops/cognitive-db,Projects/internal/cognitive-engineering-os/tests/unit | grep=COGNITIVE_DB_CONTAINER|COGNITIVE_DB_BACKUP_DIR|backup-cognitive-db|safe-infra-patch.sh compose|Run-Command | hits=54；逐一核對主機/容器位置與部署聲稱。
+- WORKLOG: 本條；rollback=`git revert <本次 commit>`，沒有正式主機寫入。套用機制與儲存刪除一致性仍不得視為完成。
+
 ## 2026-10-07（續1）COS 儲存抹除一致性阻擋
 
 - Critical 根因：`ai_lego/apps/api/main.py:2808-2811` 在 repository 抹除前刪 journal/artifact 並另行關 grant；`ai_lego/data/repositories/project_source_repository.py:750-769` 在可回滾的 PostgreSQL 交易內呼叫 CAS unlink，後續 tombstone append 或 commit 失敗無法還原實體檔。
@@ -85,151 +251,6 @@
 - REALTEST_EVIDENCE: `test_no_process_local_run_registry` 3、`test_structured_answers` 11、`test_step2_foundation` 63、`test_block_gather` 68、`test_block_verify` 62，逐模組 PASS。
 - MUTATION_EVIDENCE: 記憶體內移除 Future 完成回呼，`test_wait_idle_waits_for_a_submitted_hook_without_a_future_registry` 轉紅；原版 3/3 綠。
 - REVIEW_DONE: Codex 自審；Claude 跨模型審查待清，main 合併仍封鎖。
-
-## 2026-10-08（續5）
-
-### feat(cos): add facilitator course lessons and completion support
-
-- AUTO_TASK_DONE: card 60b facilitator lessons and special course support
-
-**根本問題**: card 60 的 script content 已完成，但 facilitator eligibility 需要一個可載入、可完成、可版本追蹤的 `facilitator` lesson course；TEACH loader 和 completion shape 原本只接受 assembler 的七個 package。
-
-**已修改**:
-- `Projects/internal/cognitive-engineering-os/ai_lego/platform/lessons/lessons/facilitator-*.yaml`：新增三課 draft，依序涵蓋 how to lead、FACIL_DONTS、交給 GOVERN。
-- `Projects/internal/cognitive-engineering-os/ai_lego/platform/lessons/__init__.py`、`ai_lego/core/domain/kinds/teach.py`：接受 special `facilitator` course，讓 course list 與 system completion 使用同一組 choices。
-- `ai_lego/platform/lessons/HISTORY.json`：保留 v1 fingerprint，新增 v2 `0cee91b5e39d`。
-- `docs/platform/STEP34_CHECKLIST.md`、`agency-os/reports/review-debt.md`：標記 card 60b 完成並登記一筆待 Claude 審查。
-
-**驗證結果**:
-- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_teach_content | exit=0 | tests=13 | ms=13728
-- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_facilitate_content | exit=0 | tests=10 | ms=5630
-- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_teach | exit=0 | tests=22 | ms=12565
-- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_step2_foundation | exit=0 | tests=54 | ms=29211
-- REALTEST_EVIDENCE: tool=Bash | cmd=python -m py_compile ai_lego/platform/lessons/__init__.py ai_lego/core/domain/kinds/teach.py tests/unit/test_teach_content.py | exit=0 | ms=178
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0
-- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`COURSE_PACKAGES|FACILITATOR_COURSE|facilitator` | hits=119
-- ORACLE: `agency-os/reports/oracle/2026-10-08-review-ebfc9e65.md` reviewer=claude verdict=approve findings=0
-- MUTATION_WAIVED: no privacy/visibility/erasure/consent/ownership guard changed; queue preamble limits mutations to those guards.
-
-**剩餘風險**: 三課仍是 draft，必須由 operator review 後才可作為 facilitator training content；本卡不建立 facilitator records、eligibility query 或 page。
-
-**Rollback**: `git revert <card-60b-commit>` 移除三課、course support、HISTORY v2、checklist row、review-debt row 與本次 oracle artifact；不涉及資料庫或部署。
-
-## 2026-10-08（續5）COS 卡 52：EXPRESS 頁面
-
-- 根本問題：EXPRESS 後端已有選擇、大綱、草稿、讀取、匯出與本人送出路由，但案子裡沒有把讀者、格式、勾選紀錄、逐句來源和未查證確認串成一個人能操作的畫面；`collab.proposal` 不在本 worktree 的 `ai_lego` 樹，因此群組提案按鈕等待 card 20。
-- 修改：新增 `Projects/internal/cognitive-engineering-os/apps/cognitive-web/components/blocks/ExpressPage.tsx`、頁面 route 與 `ExpressPage.test.tsx`；更新 `docs/platform/STEP34_CHECKLIST.md`、review-debt row。既有 `EXPRESS` registry 與 EXPRESS error map 已符合本卡，不重複修改。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | cognitive-web typecheck PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run components/blocks/ExpressPage.test.tsx` | exit=0 | 3 tests PASS。
-- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n；第二次 Claude oracle artifact `agency-os/reports/oracle/2026-10-08-review-c760c487.md` approve，第一次 2 findings 已修正後重審。
-- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`ExpressPage|express.selection|還沒查證|collab.proposal` | hits=69；核對 page、route、API selection／draft／send call sites、checklist、cards 與 shared rules，`collab.proposal` 僅在規格／shared rules，未在 `ai_lego` kind 樹可供 Part B 使用。
-- MUTATION_EVIDENCE: 移除句子 `還沒查證` mark、移除送出二次確認、加入 `<select>` 各使 `ExpressPage.test.tsx` 轉紅；每次立即還原，最後 `ExpressPage.tsx` SHA256 回到 `F075D07FEE870FA277F73B13717ED394E241D1D3D668D2AF899EFCD21C4B8ED4`。
-- SCOPE: no group proposal, no backend route, no database migration, no external delivery, no push／merge／deploy；`.docx` 維持 card 51 的未建置決定。
-- WORKLOG: 本條目由 `scripts/worklog-insert-entry.py` 配號；`agency-os/WORKLOG.md` 透過 `scripts/git-partial-worktree-commit.py` private index staged。
-## 2026-10-08（續4）
-
-### fix(cos): close Card 51 EXPRESS export/send review gaps
-
-- AUTO_TASK_DONE: C51 EXPRESS export/send review fixes — PDF text is drawn and measured as unparsed text; rendering happens inside the checked `save_many` transaction before `express.sent`; duplicate `DocRead` events are avoided; read markers do not create content versions; GOVERN exports exclude read bookkeeping; the route's sole `express.sent` writer is AST-tested; unused read-marker fields/errors were removed; the test image installs pinned `poppler-utils`.
-- MODIFIED: `Projects/internal/cognitive-engineering-os/Dockerfile`; COS EXPRESS render, route, generic docs save, GOVERN export, EXPRESS kind and web errors; `test_express_export.py` and `test_block_express.py`.
-- TEST_EVIDENCE: `COGNITIVE_OS_REQUIRE_POSTGRES=1 python -m unittest tests.unit.test_express_export tests.unit.test_block_express tests.unit.test_block_foundation tests.unit.test_record_log tests.unit.test_step2_foundation tests.unit.test_api_main tests.unit.test_block_govern tests.unit.test_egress_allowlist_parity tests.unit.test_codex_queue` — 341 tests PASS; `npx tsc --noEmit` PASS; `docker build --target test -t cognitive-os-api:c51-test-final -f Projects/internal/cognitive-engineering-os/Dockerfile .` PASS; `docker run --rm cognitive-os-api:c51-test-final python -m unittest tests.unit.test_express_export` — 18 tests PASS.
-- MUTATION_EVIDENCE: PDF `parse_math=False`, renderer width measurement, render-before-write rollback, duplicate DocRead suppression, GOVERN DocRead exclusion, `seen` no-op, checked save lock, AI-author preservation, and removed `last_read_version` field each turned red under one temporary mutation and were byte-exact restored; `__pycache__` purged; `git diff --check` PASS.
-- GOVERNANCE: no push, merge, deploy, or compose apply; review debt row added for this Codex commit with status `未經 Claude 跨模型審查`.
-## 2026-10-08（續3）COS 卡 40/41/42/50：修正 Claude 審查發現
-
-- 根本問題：TEACH AI action 只擋一種私密要求，沒有擋自由文字評分／排名；練習同意沒有綁真實案；完成紀錄不可刪且沒有 opt-out；課程完成只取每課最後一筆 run；EXPRESS 草稿可把舊 AI 原句標成本人或 joint，且新增拒絕碼未進 web 錯誤句表。
-- 修改：loader 提供唯一 AI 文字 scanner，action 直接引用 loader 的 score／rank 與 vulnerable-demand patterns；practice consent 用 `from_case`，完成紀錄可刪並新增預設保留的 person preference；hook 取各 lesson 最高版本；缺 run id、越界 ref、`joint` 與缺 person-lines 都拒絕；EXPRESS draft 比對所有舊版本的 AI sentence，未改文字維持 `ai`；頁面以新 lesson/version 建立新 run，支援完成紀錄 opt-out／刪除，未查核案例顯示「尚未查核」。
-- 內容：四個練習案例改為 v2，`checked_on: 尚未查核`，HISTORY 加入 `bb655a3aa4a8`；STEP34 checklist 明列練習紀錄控制與情境演練／共同實作／GOVERN 高風險護欄尚未建置。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_teach_content` | exit=0 | 13 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_teach` | exit=0 | 18 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_express` | exit=0 | 16 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_express_export` | exit=0 | 11 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | 43 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_record_log` | exit=0 | 20 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_step2_foundation` | exit=0 | 54 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_integrity` | exit=0 | 41 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_codex_queue` | exit=0 | 7 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | cognitive-web typecheck PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run components/blocks/TeachPage.test.tsx components/blocks/ExpressPage.test.tsx` | exit=0 | TeachPage 4 tests PASS；ExpressPage.test.tsx 不存在，Vitest 只執行現存檔案。
-- MUTATION_EVIDENCE: cited-as-true／not-yet-checked loader guard、TEACH shared scanner、missing run、from_case、completion deletable／opt-out／version aggregation、EXPRESS outside-selection／old-AI-author／joint／person-lines、page version routing／not-yet-checked rendering；每項移除後指定測試紅，byte-exact 還原後綠，並清理 engine `__pycache__`。
-- REVIEW_WAIVED: NA -- Claude cross-model review deliberately remains pending in `agency-os/reports/review-debt.md`。
-- BUILD_GATE: `powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-build-gates.ps1` 通過 bootstrap、ADR、secret scan、git EAP、Sentry 與前置文件閘；本地 runner 在 `system-health-check` 階段未返回結果，未顯示本次變更失敗；不做 push、merge、deploy 或 compose apply。
-## 2026-10-08（續2）COS 卡 00/01/02：修正 Claude 審查發現
-
-- 根本問題：CI test image 用 unittest discover 執行了讀取 checkout 外檔案的測試；備份腳本先驗證舊檔，會被損壞舊 dump 阻塞；佇列危險命令只在 high-stop 檢查，PowerShell 驗收又可能把退出碼、timeout 輸出與 PostgreSQL skip 判錯。
-- 修改：新增明確 image／checkout 測試 manifest 與 checkout job；新 dump 先完整讀取並發布，再將舊損壞檔改名 `.corrupt` 後非零回報；compose 密碼檔改為必填；佇列啟動前由同一 validator 拒絕空 check 與所有卡的危險 check；driver 用 .NET Process、taskkill tree、captured logs、required PostgreSQL。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_ci_postgres` | exit=0 | ms=7140；7 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_cognitive_db_ops` | exit=0 | ms=26638；12 tests PASS，包含 throwaway Docker dump／restore／rotation／corrupt-old-dump。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_codex_queue` | exit=0 | ms=2853；7 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`COGNITIVE_OS_REQUIRE_POSTGRES=1 python -m unittest tests.unit.test_pg_foundation` | exit=0 | ms=7672；18 tests PASS。
-- REVIEW_WAIVED: NA -- Claude cross-model review deliberately remains pending in `agency-os/reports/review-debt.md`.
-- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`pg_restore --list|COGNITIVE_DB_PASSWORD_FILE|FORBIDDEN_CHECK_COMMANDS|COGNITIVE_OS_REQUIRE_POSTGRES|taskkill.exe|image_test_modules.py` | hits=35。
-- ORACLE_WAIVED: 本輪不重複 Claude oracle；本提交新增 review-debt row，狀態為未經 Claude 跨模型審查。
-- BUILD_GATE: `powershell -ExecutionPolicy Bypass -File .\\scripts\\verify-build-gates.ps1` exit=1；改動新增的 CP950 raw-read 已修正，剩餘 AO-CLOSE archive-lift 與 Claude sync infrastructure 為既有全域阻塞。
-- 回滾：`git revert <本次 commit>`；沒有 compose apply、migration、部署、push、遠端或正式資料庫寫入。
-## 2026-10-08（續1）COS 卡 51 缺陷修正：PDF 換行、已讀與原子送出
-
-**根本問題**：EXPRESS 的 PDF 以字數而不是字形寬度換行；讀取路由把已讀標記做成新草稿版本；缺少或錯形狀的 `seen` 會被當成已讀；送出先查版本再另寫紀錄，存在並發編輯窗口。
-
-**已修改**：
-- `Projects/internal/cognitive-engineering-os/ai_lego/platform/exports/render.py`：沿用 matplotlib，以同一個 `FontProperties` 的 `TextPath` 寬度表換行，PDF 文字使用同一組字型；長 CJK、無空格英文、混合文字和多頁稿不會越過可印寬度。
-- `Projects/internal/cognitive-engineering-os/ai_lego/data/events/record_log.py`、`data/repositories/case_docs.py`：新增本人可寫、按身份查詢的 `DocRead` 事件；讀取不再增加草稿內容版本，歷史查詢不把讀取事件當內容版本。
-- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/express.py`、`apps/api/blocks/docs.py`：缺少或非布林 `seen` 一律未讀；編輯丟掉只供頁面顯示的已讀欄位；送出在既有 write lock 內重新查版本、已讀和標記，同一交易寫入 `express.sent`。
-- `apps/cognitive-web/lib/errors.ts`、`tests/unit/test_express_export.py`、`tests/unit/test_block_express.py`：補錯誤句和讀取／編輯／並發送出／PDF 回歸測試。
-
-**驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_express_export` | exit=0 | 11 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_express` | exit=0 | 14 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | 43 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_record_log` | exit=0 | 20 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_api_main` | exit=0 | 109 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_step2_foundation` | exit=0 | 54 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_codex_queue` | exit=0 | 5 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0 | cognitive-web typecheck PASS。
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n；已讀回 renderer、read event、repository transaction、routes、guards、error map 和 tests；Claude 跨模型審查仍待審。
-- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`DocRead|last_read_version|seen|express.sent|_wrap_pdf_line|EXPRESS_SEND_` | hits=reviewed；核對 event history、路由 call sites、錯誤碼與卡片聲稱。
-- WORKLOG: 本條目；PDF QA 已重產並檢查頁面影像；`git diff --check`、py_compile、private-index commit gate 待最後一輪完成。
-- ORACLE_WAIVED: 目前沒有可用的獨立 Claude review session；以指定測試、讀回、靜態掃描和突變紅綠證據替代，不代表跨模型審查已完成。
-
-**突變證據**：四個本輪缺陷各自拔守衛後轉紅並 byte-exact 還原後轉綠：PDF render 不呼叫 measured wrapper → `test_pdf_wraps_by_glyph_width_and_keeps_long_sentences_across_pages`；`seen is not True` 改回 `seen is False` → `test_missing_or_non_boolean_seen_is_unread`；GET 再存 draft version → `test_draft_read_route_marks_the_current_version_as_read`；send 使用初始快照而非 write-lock recheck → `test_send_rechecks_after_an_injected_edit_and_records_nothing`。卡片原有四個突變證據仍保留：未查證標記、版本守衛、外連掃描、匯出誤寫 sent。
-
-**剩餘風險**：PDF 的字型顯示依執行環境已安裝的 CJK 字型而定；`.docx`、群組分享、外部實際投遞不在本卡；Claude 跨模型審查尚未完成。沒有資料庫 migration、外部投遞、部署或遠端寫入。
-
-**rollback**：`git revert <本次 commit>` 可移除本輪 renderer、read event、routes、guards、tests、error codes、review-debt 與本條 WORKLOG；沒有資料遷移或外部服務狀態需要回復。
-## 2026-10-07（續2）COS 卡 51：EXPRESS 匯出與本人送出
-
-**根本問題**：EXPRESS 已能保存可追溯草稿，但沒有把草稿安全轉成可攜格式，也沒有把「本人看過目前版本、本人確認後才送」落成一條不可繞過的路徑；一般文件路由還能直接建立 `express.sent`，讀取標記也能被偽造。
-
-**已修改**：
-- `Projects/internal/cognitive-engineering-os/ai_lego/platform/exports/{__init__,render}.py`：新增 Markdown、純文字、PDF renderers；句子順序固定，未查證與 AI 句子都保留可見標記，信心與仍不確定的地方在最後一節；PDF 沿用既有 matplotlib 依賴，沒有加入新依賴。
-- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/express.py`：新增個別草稿讀取（寫入 `last_read_version`）、唯讀匯出、本人送出路由；版本、已讀、未查證確認和 ASCII 檔名都在邊界處檢查。
-- `Projects/internal/cognitive-engineering-os/ai_lego/apps/api/blocks/docs.py`、`core/domain/kinds/express.py`、`platform/block_hooks/express.py`：讀取標記只能由讀取路由寫入；`express.sent` 只能由送出路由寫入；送出版本只能是目前版本。
-- `apps/cognitive-web/lib/errors.ts`、`docs/platform/STEP34_CHECKLIST.md`、`tests/unit/test_express_export.py`、`tests/unit/test_block_express.py`、`agency-os/reports/review-debt.md`：補錯誤句、清單、路由／格式／掃描／突變測試與待審列。
-
-**驗證結果**：
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_express_export` | exit=0 | ms=5175；8 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_express` | exit=0 | ms=14512；14 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m unittest tests.unit.test_block_foundation` | exit=0 | ms=26255；43 tests PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` | exit=0；cognitive-web typecheck PASS。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m py_compile` on all changed Python modules | exit=0；syntax PASS。
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n；逐檔讀回 routes、renderers、kind、hook、generic save gate、frontend codes、checklist、tests；Claude 跨模型審查仍待審。
-- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=`express export/send symbols, express.sent, last_read_version, outbound scan words` | hits=58；逐一核對目前 call sites，沒有 stale route 或 checklist claim。
-- ORACLE_WAIVED: 目前沒有可用的獨立 Claude review session；以指定測試、讀回、靜態掃描和突變紅綠證據替代，不代表跨模型審查已完成。
-
-**突變證據**：移除未查證標記後 `ExpressRendererTests.test_every_renderer_keeps_order_marks_and_final_disclosures` 紅；移除共用目前版本守衛後 `ExpressExportApiTests.test_send_requires_current_version_and_acknowledgement_then_records_sent` 紅；加入 `import urllib.request` 後 `ExpressOutboundScanTests.test_real_tree_has_no_outbound_path_and_temp_import_is_caught` 紅；在匯出路由寫 `express.sent` 後 `ExpressExportApiTests.test_export_formats_are_downloads_and_export_does_not_record` 紅；移除 generic save 的讀取標記守衛後 `ExpressExportApiTests.test_generic_draft_save_cannot_forge_the_read_marker` 紅；每次還原後 focused suite 綠。
-
-**剩餘風險**：PDF 的字型顯示依執行環境已安裝的 CJK 字型而定；`.docx`、群組分享、外部實際投遞不在本卡；Claude 跨模型審查尚未完成。沒有資料庫 migration、外部投遞、部署或遠端寫入。
-
-**rollback**：`git revert <本次 commit>` 可移除本卡新增的 renderer、routes、read/send guards、tests、checklist、error codes、review-debt 與本條 WORKLOG；沒有資料遷移或外部服務狀態需要回復。
-## 2026-10-07（續1）COS 卡 02 備份與佇列驗收碼
-
-- 根因：`ops/cognitive-db/backup-cognitive-db.sh:83,100` 曾在主機直接呼叫 `psql/pg_dump`，但 compose 不發布主機埠；`scripts/codex-continue.ps1:75-82` 在 Windows PowerShell 5.1 用 `Start-Process -PassThru` 後取得 null `ExitCode`，每個驗收都誤報 125。
-- 修改：備份由主機以 `docker exec` 串流進出私有服務；NUL 分隔資料庫清單、可逆十六進位檔名、含當日的 N 天輪替；還原演練只選 `cognitive_os` dump。驅動器以 .NET Process 讀真實退出碼。README 明示現有 `safe-infra-patch.sh` 不支援獨立 compose，套用閘仍關閉。
-- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --base 51bd56954 --run | exit=0 | ms=25225；56 tests PASS。舊版 `test_cognitive_db_ops.py:169` 是唯一執行備份腳本的測試；compose 檢查在沒有 Docker 的測試映像中 skip，現在由 checkout job／本機 Docker 執行；WinPS5.1 0/7 退出碼。5 個 in-memory 守衛突變（ports/password/pg_restore/pipefail/digest）各紅。
-- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n；獨立 compose 沒有安全套用器，已移除假的操作命令，非本卡上線許可；Claude 跨模型審查仍欠。
-- ORACLE_WAIVED: Claude 週額度中斷，前次 oracle 呼叫 exit 1 且無審查產物；以真實 Docker 還原與 5 個守衛突變作暫代證據，不視為跨模型審查，不合併／推送。
-- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os/ops/cognitive-db,Projects/internal/cognitive-engineering-os/tests/unit | grep=COGNITIVE_DB_CONTAINER|COGNITIVE_DB_BACKUP_DIR|backup-cognitive-db|safe-infra-patch.sh compose|Run-Command | hits=54；逐一核對主機/容器位置與部署聲稱。
-- WORKLOG: 本條；rollback=`git revert <本次 commit>`，沒有正式主機寫入。套用機制與儲存刪除一致性仍不得視為完成。
 
 ## 2026-10-05 COS 卡 01：CI PostgreSQL 與佇列重試隔離
 
