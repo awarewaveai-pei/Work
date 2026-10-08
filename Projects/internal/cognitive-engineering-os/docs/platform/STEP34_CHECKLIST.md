@@ -48,3 +48,6 @@
   supervisor / nobody else), `/me/appeals` + `/govern/appeals`; account erasure removes the appeals its person wrote.
   - Not built: the supervisor reader class (`visibility._supervisees` is empty until card 61 makes `facilitate.supervision`
     real; its test is skipped with reason "card 61").
+- 31 research export: `platform/research_export.py` + CLI `apps/cli/research_export.py` + migration `0008_research_exports.py`
+  (0007 left to COLLAB; down_revision fixed at merge). No web route.
+  - Not built: FACILITATE drift records are read only once card 61 registers `facilitate.log` (tested with a stand-in).

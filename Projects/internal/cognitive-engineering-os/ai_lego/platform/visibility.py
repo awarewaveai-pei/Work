@@ -126,13 +126,13 @@ def shared_with(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer, g
             if terms["purpose"] != grantee_kind or terms["target"] != grantee_id or terms.get("withdrawn"):
                 continue
             for item in terms.get("items", []):
-                found = _named_document(docs, repo, tenant_id, owner_id, item, bool(terms.get("follow_versions")))
+                found = named_document(docs, repo, tenant_id, owner_id, item, bool(terms.get("follow_versions")))
                 if found is not None:
                     shown.append({"owner_identity_id": owner_id, "consent_id": consent["doc_id"], "project_id": item["project_id"], **found})
     return shown
 
 
-def _named_document(docs: CaseDocs, repo: ProjectSourceRepository, tenant_id: str, owner_id: str, item: dict[str, Any], follow: bool) -> dict[str, Any] | None:
+def named_document(docs: CaseDocs, repo: ProjectSourceRepository, tenant_id: str, owner_id: str, item: dict[str, Any], follow: bool) -> dict[str, Any] | None:
     """The document one consent item names, from the sharer's own case only, or None (the case erased, not theirs, the
     document gone, the version not there)."""
     project = repo.get_project(tenant_id, item["project_id"])
