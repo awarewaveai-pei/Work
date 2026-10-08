@@ -306,13 +306,18 @@ def _outlet_cell(host: str, named: str, outlet: dict[str, Any] | None, is_outlet
     return cell(NOT_FOUND, why="名字不像媒體")
 
 
-def _first_seen(published: Any, archived: dict[str, str] | None, read: bool = True) -> dict[str, str]:
+def _first_seen(published: Any, archived: dict[str, str] | None, read: bool = True, address: bool = False) -> dict[str, str]:
     """最早何時出現: the earlier of the date the page states and the archive's first capture (collect's
-    ``first_archived``; ``None`` = a pasted file with no address to ask about). ``read``: whether the page itself was
-    read -- a page set aside never was, so 「網頁沒寫日期」 is not known there and 查不到 is 無法檢查."""
+    ``first_archived``; ``None`` = not asked). ``read``: whether the page itself was read -- a page set aside never was,
+    so 「網頁沒寫日期」 is not known there and 查不到 is 無法檢查. ``address``: the card has a web address; only a card
+    without one is the person's pasted file (Codex GATHER r5b: an unread page with no archive answer was called a file)."""
     stated = _date(published)
     if archived is None:
-        return cell(FOUND, stated, why=STATED) if stated else cell(UNCHECKABLE, why="你貼的檔案沒寫日期，也沒有網址可以查網頁封存館")
+        if stated:
+            return cell(FOUND, stated, why=STATED)
+        if not address:
+            return cell(UNCHECKABLE, why="你貼的檔案沒寫日期，也沒有網址可以查網頁封存館")
+        return cell(UNCHECKABLE, why=("網頁沒寫日期" if read else "沒有抓到這一頁的內文，不知道網頁寫的日期") + "；這次沒有問到網頁封存館")
     if archived["state"] == FOUND and not _date(archived["value"]):   # compared as a date below, so it must be one
         archived = cell(UNCHECKABLE, why=collect_lookups.MALFORMED)
     if archived["state"] == FOUND and (not stated or archived["value"][:10] < stated):
@@ -362,7 +367,7 @@ def _cells(url: str, title: str, text: str | None, published: Any, looked: Mappi
         "country": country,
         "language": _language(text, _reading(url)),
         "original": cell(NOT_FOUND, why="還在分組"),   # replaced from the grouping before the card is saved
-        "first_seen": _first_seen(published, looked["first_archived"] if looked else None, text is not None),
+        "first_seen": _first_seen(published, looked["first_archived"] if looked else None, text is not None, bool(url)),
         "stance": cell(UNCHECKABLE, why="系統沒有讀網站的「關於我們」頁，不知道它自己宣稱的立場；你可以自己補上"),
         "affiliation": affiliation,
         "party_relation": cell(UNCHECKABLE, why="系統不知道它跟這件事的當事方有什麼關係；你可以自己寫"),

@@ -296,6 +296,19 @@ class CollectLookupTests(GatherCase):
         self.arrive()
         self.assertEqual([(kind, len(items)) for kind, items in self.collect.calls], [("describe", 10)])
 
+    def test_a_page_with_an_address_and_no_archive_answer_is_never_called_a_pasted_file(self):
+        # Codex GATHER r5b: text None (set aside), an address, no archive answer -> it is not the person's file
+        for read in (False, True):
+            with self.subTest(read=read):
+                result = hooks._first_seen(None, None, read, address=True)
+                self.assertEqual(result["state"], "無法檢查")
+                self.assertNotIn("你貼的檔案", result["why"])
+                self.assertIn("網頁封存館", result["why"])
+        cells, _ = hooks._cells("https://a.example/x", "標題", None, None, None)
+        self.assertEqual(cells["first_seen"]["state"], "無法檢查")
+        self.assertNotIn("你貼的檔案", cells["first_seen"]["why"])
+        self.assertIn("你貼的檔案", hooks._first_seen(None, None, True)["why"])   # no address: it is the pasted file
+
     def test_the_earliest_of_the_pages_date_and_the_archive_is_first_seen(self):
         self.collected("https://a.example.com/1", zh(1), published_at="2026-01-02")
         self.collect.captures["https://a.example.com/1"] = "2027-01-01"
