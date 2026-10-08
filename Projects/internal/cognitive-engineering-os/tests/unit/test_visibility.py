@@ -26,8 +26,9 @@ BY_VISIBILITY = {value: DocKind(f"collab.s34_{value}", "COLLAB", value, {"text":
 
 LEGO = PRODUCT_ROOT / "ai_lego"
 SCANNED = ("apps/api/blocks", "platform/ai_actions", "platform/block_hooks")
-# (a) Every use of a person's or a group's owner in the routes, the AI actions and the hooks, reviewed: why it is the
-# caller's own record or a membership-checked group. A new use fails until it is read and added here.
+# (a) Every use of a person's, a group's or the platform's owner in the routes, the AI actions and the hooks, reviewed: why
+# it is the caller's own record, a membership-checked group or a write checked by its route. A new use fails until it is
+# read and added here.
 REVIEWED_OWNER_USES = {
     ("apps/api/blocks/act.py", "record_log.person(session['identity_id'])"): "/me/reminders: the signed-in person's own practice records",
     ("apps/api/blocks/docs.py", "record_log.person(identity_id)"): "_where: called with the session's identity only (docs.py _save)",
@@ -35,6 +36,8 @@ REVIEWED_OWNER_USES = {
     ("apps/api/blocks/govern.py", "record_log.person(session['identity_id'])"): "/govern/help: the signed-in person's own saved place",
     ("apps/api/blocks/govern.py", "record_log.person(me)"): "/govern/export: me = the session's identity",
     ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): "_mine: /me/consents, the signed-in person's own consents",
+    ("apps/api/blocks/govern_group.py", "record_log.platform(tenant_id)"): "POST /me/appeals: a write only, after the participant/facilitator check; read back by appeals_for",
+    ("apps/api/blocks/govern_group.py", "record_log.platform(session['tenant_id'])"): "DELETE /me/appeals: only after appeals_for says it is the caller's own; CaseDocs re-checks the sole writer",
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): "_history: called with the session's identity only",
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): "learn.history save: the signed-in person's own",
     ("apps/api/blocks/teach.py", "record_log.person(session['identity_id'])"): "/blocks/teach/practice-cases: the signed-in person's own saved place",
@@ -46,6 +49,8 @@ REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/govern.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/govern.py", "record_log.person(me)"): 1,
     ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): 1,
+    ("apps/api/blocks/govern_group.py", "record_log.platform(tenant_id)"): 1,
+    ("apps/api/blocks/govern_group.py", "record_log.platform(session['tenant_id'])"): 1,
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): 1,
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/teach.py", "record_log.person(session['identity_id'])"): 1,
@@ -59,12 +64,12 @@ def _is_owner_call(node: ast.AST) -> bool:
         return False
     func = node.func
     if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name):
-        if func.value.id == "record_log" and func.attr in ("person", "group"):
+        if func.value.id == "record_log" and func.attr in ("person", "group", "platform"):
             return True
         if func.value.id == "Owner" and func.attr == "group":
             return True
     return (isinstance(func, (ast.Name, ast.Attribute)) and (getattr(func, "id", None) or getattr(func, "attr", None)) == "Owner"
-            and bool(node.args) and isinstance(node.args[0], ast.Constant) and node.args[0].value in ("person", "group"))
+            and bool(node.args) and isinstance(node.args[0], ast.Constant) and node.args[0].value in ("person", "group", "platform"))
 
 
 def owner_uses(root: Path) -> Counter:
@@ -78,14 +83,14 @@ def owner_uses(root: Path) -> Counter:
 
 
 def group_readers(root: Path) -> list[str]:
-    """(b) Every call of CaseDocs' group readers outside platform/visibility.py."""
+    """(b) Every call of CaseDocs' group and platform readers outside platform/visibility.py."""
     offenders = []
     for path in sorted(root.rglob("*.py")):
         relative = path.relative_to(root).as_posix()
         if relative in ("platform/visibility.py", "data/repositories/case_docs.py"):
             continue
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in ("current_in_group", "versions_in_group"):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in ("current_in_group", "versions_in_group", "current_on_platform"):
                 offenders.append(f"{relative}:{node.lineno}")
     return offenders
 

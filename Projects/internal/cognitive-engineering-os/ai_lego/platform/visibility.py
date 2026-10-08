@@ -1,6 +1,7 @@
 """The only ways to read another person's record (docs/platform/STEP34_SHARED_RULES.md §3), so a leak has one place to
 be found. R1 ``visible``: a group's records. R2 ``shared_with``: documents of another person's case, through their live
-consent. R3, a person's own case and person records, stays with the routes that check the owner.
+consent. R3, a person's own case and person records, stays with the routes that check the owner. ``appeals_for`` (§9):
+the platform's appeals, with who wrote them masked.
 
 CaseDocs refuses to read a group's records any other way (``current`` / ``versions`` with a group owner); its
 ``current_in_group`` / ``versions_in_group`` are called from this module only (tests/unit/test_visibility.py).
@@ -144,3 +145,43 @@ def _named_document(docs: CaseDocs, repo: ProjectSourceRepository, tenant_id: st
         return next((doc for doc in docs.versions(tenant_id, case, item["kind"], item["doc_id"]) if doc["version"] == item.get("version")), None)
     except InvariantViolation:
         return None
+
+
+APPEAL = "govern.appeal"
+# What a reader other than its author gets of an anonymous appeal: no writer, no name, no email, no instant (a time of
+# day can point at who was online); the words as written. A named one adds who wrote it.
+MASKED_KEYS = ("doc_id", "group_id", "about_identity_id", "text", "named", "on")
+
+
+def _supervisees(docs: CaseDocs, viewer: Viewer) -> set[str]:
+    """Whom this viewer supervises (``facilitate.supervision``, §9) -- card 61 makes it real. Until then nobody, so a
+    supervisor reads no appeal yet: never wider than built."""
+    return set()
+
+
+def appeals_for(docs: CaseDocs, store: IdentityStore, viewer: Viewer) -> list[dict[str, Any]]:
+    """§9: the appeals of the viewer's tenant this viewer reads now. The author: their own, whole. Else never the
+    facilitator an appeal is about (whatever role they also hold); an ``appeal_handler``: every other one; a supervisor of
+    the facilitator it is about: those -- masked unless ``named``. Anyone else: nothing, not even how many."""
+    handler = is_appeal_handler(store, viewer)
+    supervised = _supervisees(docs, viewer)
+    shown: list[dict[str, Any]] = []
+    for item in docs.current_on_platform(viewer.tenant_id, APPEAL):
+        content, writer = item["content"], item["written_by"]
+        if writer == viewer.identity_id:
+            shown.append({**{key: content.get(key, False) for key in ("group_id", "about_identity_id", "text", "named")},
+                          "doc_id": item["doc_id"], "at": item["at"], "author_identity_id": writer, "mine": True})
+        elif content["about_identity_id"] != viewer.identity_id and (handler or content["about_identity_id"] in supervised):
+            shown.append(_masked(store, item))
+    return shown
+
+
+def _masked(store: IdentityStore, item: dict[str, Any]) -> dict[str, Any]:
+    content = item["content"]
+    named = content.get("named") is True
+    masked = {"doc_id": item["doc_id"], "group_id": content["group_id"], "about_identity_id": content["about_identity_id"], "text": content["text"],
+              "named": named, "on": str(item["at"])[:10]}
+    if named:
+        author = store.get_identity(item["written_by"]) or {}
+        masked |= {"author_identity_id": item["written_by"], "author_name": author.get("display_name", "")}
+    return masked

@@ -35,6 +35,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Claude | 13-roles-consent | `govern.consent`（個人擁有、版本全留）與 /me/consents 路由；R2 `shared_with` 只回同意書列出的、仍存在的、本人案子的文件（跟版本或釘版本），只給目標群組的現任已確認成員或被指名且同在一組的帶領者；appeal_handler 只能用 CLI 授與／收回；資格推導未做前一律 NotImplementedError | 同意列的是文件不是複本；撤回下一次讀就生效；離開即失去；他人案子不能被同意；網頁路由不寫 identity_roles；帳號刪除帶走角色 | test_consent 8 PASS（真 PostgreSQL）；突變 5/5 紅→還原綠（忽略撤回、不查成員、回整個案子、存檔不查擁有者、釘版本卻回最新）；test_visibility 14、test_group_invites 10、test_groups_core 27 PASS；tsc、errors vitest 綠 | 待 Codex 審（存取控制：兩 critic＋Codex） |
 | Claude | 13-roles-consent（修） | 同意的擁有者檢查搬進 GOVERN 的 BEFORE_SAVE（`block_hooks/govern_group.py`），/me/consents 走共用存檔路；原本通用的 /me/docs/govern.consent 可以繞過檢查 | 同意的每一條存檔路都跑同一個檢查；identity.invited_by 登記為 SQLite 之後加的欄位 | affected_tests --base 8567da9bf：391 模組 15511 tests，修前 6 failures（integrity 存檔路 5、pg_foundation 欄位 1）；修後這 6 個與 test_consent 8、test_visibility 14 PASS；突變：存檔不查擁有者 → 紅→還原綠 | 待 Codex 審 |
 | Claude | 10-13 Codex F1-F5 | 待確認的人不能當召集人、待確認的召集人什麼都不能做；存同意與讀群組歷史都持群組鎖；刪帳號先在 person 鎖下決定群組部分再刪案子；帳號匯出含自己在群組寫的 | 隱私／抹除：同意不會指向已抹除的群組；離開的人拿不到別人的完整歷史；不會「案子刪了帳號卻被拒」；只匯出自己寫的版本 | 每項一個測試（F2、F5 兩執行緒）；突變 6/6 紅→還原綠；affected_tests --base 5dbff71c0：56 模組 1293 tests OK | 待 Codex 複審 F1-F5 |
+| Claude | 30-govern-appeals | `govern.appeal`（平台擁有、預設匿名）；`visibility.appeals_for` 唯一讀法：作者看全部、處理申訴的人看遮掉作者的、被申訴的帶領者什麼都看不到（連有沒有都不知道）；/me/appeals 建立（只限該群組參與者、對象是該群組帶領者）、看、匯出、刪除；帳號抹除帶走自己寫的申訴；CaseDocs 讀平台文件只走 `current_on_platform` | 匿名申訴不露作者；被申訴者不可讀；只有作者能刪；抹除帳號不留申訴 | `test_appeals` 11 pass + 1 skip(card 61)；突變 5 紅：遮罩、帶領者可讀、建立不檢查成員、刪除留紀錄、帳號抹除留申訴；`test_visibility` 閘門加 platform | 待審 |
 
 ## deferred, before D7 second region
 
@@ -52,3 +53,5 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 - 群組（card 10）：G3「離開的人可匯出自己寫的」未做——`/govern/export` 只匯出個人與自己案子的紀錄，不含自己在群組寫的；群組紀錄的刪除只在 `CaseDocs.delete`，路由隨 card 20 起的區塊。
 - 群組（card 10）：抹除群組與抹除帳號同時刪重疊的成員列／紀錄列時，PostgreSQL deadlock detector 可能中止其一（錯誤可重試，非卡死）；同上一條 person/case 鎖序。
 - 邀請（card 12）：接受邀請的網頁（讀網址 #token 再 POST）未做，隨群組頁面的卡；訪客接受後要自己登入一次。
+- 申訴（card 30）：`POST /me/appeals` 的參與者／帶領者檢查在存檔交易外（平台紀錄沒有擁有者鎖；同一瞬間離開群組的人仍可送出）；帶領者離開群組後無法再對他申訴（只認現任帶領者）。
+- 申訴（card 30）：作者刪除後留一筆 DocDeleted（無內容，信封仍有作者身分），直到帳號抹除才一併刪；若要連這筆都不留，需改 `CaseDocs.delete` 的墓碑規則。

@@ -41,3 +41,10 @@
 - [x] The CSV importer maps operator-selected headers, writes drafts, preserves empty stop-signal cells as empty lists, reports those rows, and never calls a network client.
 - [x] card 60b: facilitator course has three draft lessons for leading, the fixed FACIL_DONTS, and escalation to GOVERN; the TEACH loader and completion shape accept the special `facilitator` course.
 - [ ] Showing `FACIL_DONTS` on screen the whole time someone leads belongs to the later FACILITATE page card; this card supplies the list.
+
+## GOVERN (cards 30-33)
+
+- 30 appeals: `govern.appeal` (platform-owned, anonymous by default), `visibility.appeals_for` (author / appeal_handler /
+  supervisor / nobody else), `/me/appeals` + `/govern/appeals`; account erasure removes the appeals its person wrote.
+  - Not built: the supervisor reader class (`visibility._supervisees` is empty until card 61 makes `facilitate.supervision`
+    real; its test is skipped with reason "card 61").

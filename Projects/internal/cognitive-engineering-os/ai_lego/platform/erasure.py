@@ -175,6 +175,7 @@ class Erasure:
             runs = runs()
             workflows = CustomWorkflowRepository.delete_person_on(connection, tenant_id, identity_id)   # first: one events table holds both
             records = record_log.delete_owned(connection, tenant_id, record_log.person(identity_id))
+            records += record_log.delete_written_by(connection, tenant_id, identity_id, "platform", documents_only=True)   # their appeals
             if not IdentityStore.delete_identity_on(connection, tenant_id, identity_id):   # a second deletion that waited for the first
                 raise InvariantViolation("ACCOUNT_ALREADY_ERASED: this account is already deleted")
             items = _artifact_items(reference for run in runs for reference in run["artifacts"]) + _run_items(runs)

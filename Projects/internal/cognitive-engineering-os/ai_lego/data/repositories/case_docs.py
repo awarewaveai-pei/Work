@@ -43,6 +43,8 @@ def _lock_singleton(connection: psycopg.Connection, tenant_id: str, owner: Owner
 def _not_a_group(owner: Owner) -> None:
     if owner.kind == "group":
         raise InvariantViolation("DOC_GROUP_READ_NEEDS_VISIBILITY: a group's records are read through platform/visibility.py")
+    if owner.kind == "platform":   # an appeal: who wrote it is masked by its one read path
+        raise InvariantViolation("DOC_PLATFORM_READ_NEEDS_VISIBILITY: the platform's documents are read through platform/visibility.py")
 
 
 class CaseDocs:
@@ -99,6 +101,8 @@ class CaseDocs:
                 self._repo.lock_group(connection, tenant_id, owner.id)
                 if writer.author in ("user", "joint"):
                     record_log.require_person(connection, tenant_id, writer.identity_id)
+            elif owner.kind == "platform" and writer.author in ("user", "joint"):   # an erased account writes nothing more
+                record_log.require_person(connection, tenant_id, writer.identity_id)
             for doc_id in sorted({item["doc_id"] for item in items if item.get("doc_id")}):
                 record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
             if check is not None:
@@ -202,6 +206,8 @@ class CaseDocs:
             elif owner.kind == "group" and then is None:   # G3: one who left may still delete what they wrote; a closed group too
                 self._repo.require_group(connection, tenant_id, owner.id, after_close=True)
                 record_log.require_person(connection, tenant_id, writer.identity_id)
+            elif owner.kind == "platform" and then is None:
+                record_log.require_person(connection, tenant_id, writer.identity_id)
             elif then is not None:
                 raise InvariantViolation("DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK: a delete's follow-up reads hold only under a case's or a person's lock")
             record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
@@ -210,8 +216,8 @@ class CaseDocs:
                 raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
             if not spec.deletable:
                 raise InvariantViolation(f"DOC_NOT_DELETABLE: every version of {kind} stays")
-            if owner.kind == "group" and self._writers(connection, tenant_id, owner, doc_id) != {writer.identity_id}:
-                raise InvariantViolation("DOC_NOT_YOURS: in a group, only the person who wrote every version of a document deletes it")
+            if owner.kind in ("group", "platform") and self._writers(connection, tenant_id, owner, doc_id) != {writer.identity_id}:
+                raise InvariantViolation("DOC_NOT_YOURS: in a group or the platform's, only the person who wrote every version of a document deletes it")
             if spec.from_case:   # its case's erase may be deleting it right now: no tombstone after the erase
                 self._repo.require_case(connection, tenant_id, history[-1]["content"][spec.from_case])
             items = then() if then is not None else []   # reads the document before it goes, on this connection
@@ -241,6 +247,11 @@ class CaseDocs:
         by platform/visibility.py only (tests/unit/test_visibility.py's gate): it decides what a viewer gets of these."""
         return self._current(tenant_id, record_log.group(group_id), kind)
 
+    def current_on_platform(self, tenant_id: str, kind: str) -> list[dict[str, Any]]:
+        """The tenant's live platform documents of a kind (an appeal), each with ``written_by``. platform/visibility.py only
+        (tests/unit/test_visibility.py's gate): it masks the writer."""
+        return self._current(tenant_id, record_log.platform(tenant_id), kind)
+
     def _current(self, tenant_id: str, owner: Owner, kind: str) -> list[dict[str, Any]]:
         with self._repo.transaction(tenant_id) as connection:
             rows = connection.execute(
@@ -256,7 +267,7 @@ class CaseDocs:
             else:
                 before = latest.get(item["doc_id"], {})
                 latest[item["doc_id"]] = {**item, "created_at": before.get("created_at", item["at"])}
-                if owner.kind == "group":
+                if owner.kind in ("group", "platform"):
                     latest[item["doc_id"]]["written_by"] = before.get("written_by", row["author_identity_id"])
         return list(latest.values())
 

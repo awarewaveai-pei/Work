@@ -8,7 +8,7 @@ Every repository that keeps an ``events`` table writes through ``append`` -- not
 * names no block, or a block its type does not allow;
 * has no owner: a case (``case``), the person (``person`` -- the daily calibration card, the cross-case history, the
   account's location), a group (``group`` -- what a few people write together: STEP34_SHARED_RULES.md §2) or the
-  platform (``platform`` -- tombstones that must outlive what they record);
+  platform (``platform`` -- tombstones that must outlive what they record; an appeal, read only through platform/visibility.py);
 * is of an unregistered type (each type carries its own schema version, not a hard-coded 1.0.0);
 * carries a key that scores a belief or a conclusion (不給信念打分).
 
@@ -90,8 +90,8 @@ EVENT_TYPES: dict[str, EventType] = {
     "CustomWorkflowUpdated": _t("1.0.0", "user", "ASSEMBLER", "person", done=False),
     "CustomWorkflowDeleted": _t("1.0.0", "user", "ASSEMBLER", "person", done=False),
     # A block's documents (core/domain/doc_kinds.py): the kind narrows author, block and owner further, per record
-    "DocSaved": _t("1.0.0", "user ai joint system", frozenset(ALL_CODES), "case person group", done=True),
-    "DocDeleted": _t("1.0.0", "user", frozenset(ALL_CODES), "case person group", done=False),
+    "DocSaved": _t("1.0.0", "user ai joint system", frozenset(ALL_CODES), "case person group platform", done=True),
+    "DocDeleted": _t("1.0.0", "user", frozenset(ALL_CODES), "case person group platform", done=False),
     "DocRead": _t("1.0.0", "user", "EXPRESS", "case", done=False),
 }
 DOC_EVENTS = ("DocSaved", "DocDeleted")
@@ -240,12 +240,14 @@ def delete_owned(connection: psycopg.Connection, tenant_id: str, owner: Owner, *
     return connection.execute(query, parameters).rowcount
 
 
-def delete_written_by(connection: psycopg.Connection, tenant_id: str, identity_id: str, owner_kind: str) -> int:
+def delete_written_by(connection: psycopg.Connection, tenant_id: str, identity_id: str, owner_kind: str, *, documents_only: bool = False) -> int:
     """Erase every record ``identity_id`` wrote (as user or joint) into owners of ``owner_kind`` -- a person's own part of
-    the groups they wrote in, when their account is erased; the others' records there stay. On an open transaction."""
+    the groups they wrote in, when their account is erased; the others' records there stay. ``documents_only``: their
+    documents only (the platform's: their appeals go, the tombstones of cases they erased stay). On an open transaction."""
     if owner_kind not in OWNER_KINDS:
         raise InvariantViolation(f"RECORD_OWNER_INVALID: {owner_kind!r}")
-    return connection.execute("DELETE FROM events WHERE tenant_id=%s AND owner_kind=%s AND author_identity_id=%s", (tenant_id, owner_kind, identity_id)).rowcount
+    documents = " AND event_type IN ('DocSaved','DocDeleted')" if documents_only else ""
+    return connection.execute("DELETE FROM events WHERE tenant_id=%s AND owner_kind=%s AND author_identity_id=%s" + documents, (tenant_id, owner_kind, identity_id)).rowcount
 
 
 # author/block are NULL only on rows written before 2026-10-03 (nobody recorded them; readers show 「記作者之前的紀錄」, never a

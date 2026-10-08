@@ -21,7 +21,7 @@ from ai_lego.core.domain.blocks import ALL_CODES
 from ai_lego.errors import InvariantViolation
 
 FIELD_TYPES = ("text", "choice", "choices", "list", "date", "bool", "int", "json")
-OWNERS = ("case", "person", "group")
+OWNERS = ("case", "person", "group", "platform")   # platform: the tenant's own (an appeal: no person owns it; visibility.py reads it)
 # Who of a group reads another member's record of a kind (platform/visibility.py, STEP34_SHARED_RULES.md §3 R1).
 VISIBILITIES = ("members", "author_only", "convener_and_author", "self_and_govern")
 MAX_JSON_BYTES = 64 * 1024
@@ -51,7 +51,7 @@ class DocKind:
     block: str
     title: str                  # what the person sees, e.g. 「外化卡」
     fields: Mapping[str, Field] = field(default_factory=dict)
-    owner: str = "case"         # "case" | "person" | "group" (written while the group is open: ProjectSourceRepository.require_group)
+    owner: str = "case"         # "case" | "person" | "group" (written while the group is open: ProjectSourceRepository.require_group) | "platform"
     authors: frozenset[str] = frozenset({"user"})
     deletable: bool = True      # False: every version stays (a judgment's versions are never deleted, only the case is)
     singleton: bool = False     # at most one live document of this kind per owner (協作合約、開案資料): a second is refused
