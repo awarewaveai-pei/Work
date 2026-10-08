@@ -172,7 +172,11 @@ const CODES: Record<string, string> = {
   INVITE_VISITOR_FIELDS_REQUIRED: "請填信箱、名字和密碼，建立你的帳號。",
   IDENTITY_EMAIL_TAKEN: "這個信箱已經有帳號了。請先登入，再打開一次邀請連結。",
   IDENTITY_WEAK_PASSWORD: "密碼至少要 12 個字。",
-  DOC_NOT_YOURS:"在群組裡，只有寫的人可以刪掉自己寫的東西。",
+  CONSENT_ITEMS_INVALID: "要分享的東西格式不對，或一次超過 500 份。請重新選一次。",
+  CONSENT_ITEM_NOT_FOUND: "有一份要分享的東西找不到，或不是你自己案子裡的。請重新選一次。",
+  CONSENT_TARGET_NOT_FOUND: "你不在這個群組裡，不能分享給它。",
+  CONSENT_NOT_FOUND: "找不到這個同意，請重新整理頁面。",
+  DOC_NOT_YOURS: "在群組裡，只有寫的人可以刪掉自己寫的東西。",
   ACCOUNT_IS_LAST_CONVENER: "你是某個群組唯一的召集人。請先讓另一位成員也當召集人，或刪除那個群組，再刪除帳號。這次什麼都沒刪。",
   // GATHER
   GATHER_ORIGIN_NOT_FOUND: "這一組現在不在了（網頁重新分過組）。請重新整理頁面，標新的組。",

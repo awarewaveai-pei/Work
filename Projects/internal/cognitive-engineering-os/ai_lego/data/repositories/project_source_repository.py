@@ -945,6 +945,18 @@ class ProjectSourceRepository:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def facilitated_by(self, tenant_id: str, identity_id: str) -> list[str]:
+        """The people in a group where this person is a current, confirmed facilitator (R2's facilitator path)."""
+        with self._db.for_tenant(tenant_id) as connection:
+            rows = connection.execute(
+                "SELECT DISTINCT o.identity_id FROM group_members f JOIN group_members o ON o.tenant_id = f.tenant_id AND o.group_id = f.group_id "
+                "JOIN platform_groups g ON g.tenant_id = f.tenant_id AND g.group_id = f.group_id "
+                "WHERE f.tenant_id=%s AND f.identity_id=%s AND f.role='facilitator' AND f.left_at IS NULL AND f.review_state='confirmed' "
+                "AND o.left_at IS NULL AND o.identity_id <> f.identity_id AND g.status <> 'erased' ORDER BY o.identity_id",
+                (tenant_id, identity_id),
+            ).fetchall()
+        return [row["identity_id"] for row in rows]
+
     def agreement_members(self, tenant_id: str, group_id: str) -> list[str]:
         """The members whose stances count in the group's agreement (§8): current and confirmed -- one held for review
         (§4 pending_review) is left out until a convener confirms them."""

@@ -212,6 +212,7 @@ class IdentityStore:
         conn.execute("UPDATE identity SET email = %s, display_name = %s, status = 'deleted' WHERE identity_id = %s", (f"deleted-{identity_id}@erased.invalid", "（已刪除）", identity_id))
         # who brought whom in (card 12) names a person: it goes with either of the two
         conn.execute("UPDATE identity SET invited_by = NULL WHERE tenant_id = %s AND (identity_id = %s OR invited_by = %s)", (tenant_id, identity_id, identity_id))
+        conn.execute("DELETE FROM identity_roles WHERE tenant_id = %s AND identity_id = %s", (tenant_id, identity_id))
         return True
 
     def _find_identity_by_email(self, tenant_id: str, email: str) -> dict[str, Any] | None:
@@ -691,3 +692,35 @@ class IdentityStore:
             if conn.execute("UPDATE group_members SET review_state = 'confirmed' WHERE tenant_id = %s AND group_id = %s AND identity_id = %s AND left_at IS NULL AND review_state = 'pending_review'",
                             (tenant_id, group_id, identity_id)).rowcount != 1:
                 raise InvariantViolation("GROUP_MEMBER_NOT_FOUND: nobody of the group waits for that confirmation")
+
+    # -- The one granted role (STEP34_SHARED_RULES.md §5, card 13) -----------------------------------------------------
+    # appeal_handler, granted and revoked by the operator through ai_lego/apps/cli/grant_role.py only: no web route
+    # writes identity_roles (tests/unit/test_consent.py scans apps/api for it). Facilitator and supervisor are derived
+    # from records (platform/visibility.py), never granted.
+
+    GRANTED_ROLES = ("appeal_handler",)
+
+    def grant_role(self, tenant_id: str, identity_id: str, role: str, granted_by: str) -> bool:
+        """False when the person already holds it. The identity must be an active one of this tenant."""
+        if role not in self.GRANTED_ROLES or not isinstance(granted_by, str) or not granted_by.strip():
+            raise InvariantViolation(f"ROLE_INVALID: one of {list(self.GRANTED_ROLES)}, granted by a named operator")
+        with self._db.for_tenant(tenant_id) as conn:
+            person = conn.execute("SELECT status FROM identity WHERE tenant_id = %s AND identity_id = %s", (tenant_id, identity_id)).fetchone()
+            if person is None or person["status"] != "active":
+                raise InvariantViolation("ROLE_IDENTITY_UNKNOWN: no active person with that id in this tenant")
+            return conn.execute("INSERT INTO identity_roles (tenant_id, identity_id, role, granted_by, granted_at) VALUES (%s,%s,%s,%s,%s) "
+                                "ON CONFLICT (tenant_id, identity_id, role) WHERE revoked_at IS NULL DO NOTHING",
+                                (tenant_id, identity_id, role, granted_by.strip(), db.now())).rowcount == 1
+
+    def revoke_role(self, tenant_id: str, identity_id: str, role: str) -> bool:
+        """False when the person does not hold it. The row stays with its revoked_at (who held it, when)."""
+        with self._db.for_tenant(tenant_id) as conn:
+            return conn.execute("UPDATE identity_roles SET revoked_at = %s WHERE tenant_id = %s AND identity_id = %s AND role = %s AND revoked_at IS NULL",
+                                (db.now(), tenant_id, identity_id, role)).rowcount == 1
+
+    def has_role(self, tenant_id: str, identity_id: str, role: str) -> bool:
+        if self._db.region_of(tenant_id) is None:
+            return False
+        with self._db.for_tenant(tenant_id) as conn:
+            return conn.execute("SELECT 1 FROM identity_roles WHERE tenant_id = %s AND identity_id = %s AND role = %s AND revoked_at IS NULL",
+                                (tenant_id, identity_id, role)).fetchone() is not None

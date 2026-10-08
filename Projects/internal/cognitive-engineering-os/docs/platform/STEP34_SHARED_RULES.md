@@ -233,3 +233,7 @@ page error; the supervisor page updated.
   invites nobody. The flooding count is the distinct accounts that used one inviter's invitations in the window (visitors and
   signed-in alike), its numbers in `govern.invites`. An account erasure removes the invitations it made or used and every
   `invited_by` naming it. Accepting does not sign the visitor in.
+- 2026-10-08 (card 13): a consent item is `{project_id, kind, doc_id, version?}` -- `version` is what a consent that does not follow
+  versions names, checked on save; a group consent must name a group the person is in. `shared_with(docs, repo, viewer, kind, id)`
+  reads consents of the group's other current members for a confirmed member, or, for a facilitator, of people in a group where
+  the viewer is a current facilitator. `is_appeal_handler(store, viewer)`. An account erasure removes the person's identity_roles.

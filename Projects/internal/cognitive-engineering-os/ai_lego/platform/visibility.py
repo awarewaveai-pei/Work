@@ -1,6 +1,6 @@
 """The only ways to read another person's record (docs/platform/STEP34_SHARED_RULES.md §3), so a leak has one place to
-be found. R1 ``visible``: a group's records. R2 (consent, card 13) comes here too. R3, a person's own case and person
-records, stays with the routes that check the owner.
+be found. R1 ``visible``: a group's records. R2 ``shared_with``: documents of another person's case, through their live
+consent. R3, a person's own case and person records, stays with the routes that check the owner.
 
 CaseDocs refuses to read a group's records any other way (``current`` / ``versions`` with a group owner); its
 ``current_in_group`` / ``versions_in_group`` are called from this module only (tests/unit/test_visibility.py).
@@ -13,8 +13,11 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai_lego.core.domain import doc_kinds
+from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
+from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
+from ai_lego.platform.identity.store import IdentityStore
 
 
 @dataclass(frozen=True)
@@ -37,19 +40,20 @@ def is_convener(docs: CaseDocs, viewer: Viewer, group_id: str) -> bool:
     return membership is not None and membership["my_role"] == "convener"
 
 
-def is_appeal_handler(viewer: Viewer) -> bool:
-    """Stub until card 13 reads identity_roles: nobody handles appeals yet."""
-    return False
+def is_appeal_handler(store: IdentityStore, viewer: Viewer) -> bool:
+    """The one granted role (§5): a live identity_roles row the operator wrote (apps/cli/grant_role.py)."""
+    return store.has_role(viewer.tenant_id, viewer.identity_id, "appeal_handler")
 
 
 def is_eligible_facilitator(viewer: Viewer) -> bool:
-    """Stub until card 60 derives it from a teach.completion record: nobody is eligible yet."""
-    return False
+    """Derived from a teach.completion of the facilitator course (§5) -- built by card 60. Until then it refuses to
+    answer, so nothing passes on a guess."""
+    raise NotImplementedError("is_eligible_facilitator: derived from teach.completion records, built by card 60")
 
 
 def is_eligible_supervisor(viewer: Viewer) -> bool:
-    """Stub until card 60 derives it (facilitator + a facilitate.log): nobody is eligible yet."""
-    return False
+    """Facilitator + at least one facilitate.log (§5) -- built by card 60; refuses to answer until then."""
+    raise NotImplementedError("is_eligible_supervisor: derived from facilitate.log records, built by card 60")
 
 
 def visible(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, *, doc_id: str | None = None) -> list[dict[str, Any]]:
@@ -84,3 +88,52 @@ def versions(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, doc_id: s
     if not visible(docs, viewer, group_id, kind, doc_id=doc_id):
         raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
     return docs.versions_in_group(viewer.tenant_id, group_id, kind, doc_id)
+
+
+def shared_with(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer, grantee_kind: str, grantee_id: str) -> list[dict[str, Any]]:
+    """R2 (§6): documents of other people's cases that their live consents share with this viewer, decided now.
+
+    ``grantee_kind`` "group": the viewer must be a current, confirmed member of group ``grantee_id``; the consents read
+    are those of its other current members naming that group. "facilitator": ``grantee_id`` must be the viewer, and the
+    consents read are those naming them, of people in a group where the viewer is a current facilitator. A consent
+    that is withdrawn shares nothing. Each item is the document it names, in that person's own case while the case
+    exists: its current version when the consent follows versions, else the version the item names. "research" is not
+    a read path."""
+    tenant_id = viewer.tenant_id
+    if grantee_kind == "group":
+        mine = repo.get_group_for(tenant_id, grantee_id, viewer.identity_id)
+        if mine is None or mine["my_review_state"] != "confirmed":
+            return []
+        sharers = [member["identity_id"] for member in repo.group_members(tenant_id, grantee_id) if member["identity_id"] != viewer.identity_id]
+    elif grantee_kind == "facilitator":
+        if grantee_id != viewer.identity_id:
+            return []
+        sharers = repo.facilitated_by(tenant_id, viewer.identity_id)
+    else:
+        raise InvariantViolation(f"VISIBILITY_GRANTEE_INVALID: {grantee_kind!r}")
+    shown: list[dict[str, Any]] = []
+    for owner_id in sharers:
+        for consent in docs.current(tenant_id, record_log.person(owner_id), "govern.consent"):
+            terms = consent["content"]
+            if terms["purpose"] != grantee_kind or terms["target"] != grantee_id or terms.get("withdrawn"):
+                continue
+            for item in terms.get("items", []):
+                found = _named_document(docs, repo, tenant_id, owner_id, item, bool(terms.get("follow_versions")))
+                if found is not None:
+                    shown.append({"owner_identity_id": owner_id, "consent_id": consent["doc_id"], "project_id": item["project_id"], **found})
+    return shown
+
+
+def _named_document(docs: CaseDocs, repo: ProjectSourceRepository, tenant_id: str, owner_id: str, item: dict[str, Any], follow: bool) -> dict[str, Any] | None:
+    """The document one consent item names, from the sharer's own case only, or None (the case erased, not theirs, the
+    document gone, the version not there)."""
+    project = repo.get_project(tenant_id, item["project_id"])
+    if project is None or project["created_by_identity_id"] != owner_id or doc_kinds.kinds().get(item["kind"]) is None or doc_kinds.require(item["kind"]).owner != "case":
+        return None
+    case = record_log.case(item["project_id"])
+    if follow:
+        return next((doc for doc in docs.current(tenant_id, case, item["kind"]) if doc["doc_id"] == item["doc_id"]), None)
+    try:
+        return next((doc for doc in docs.versions(tenant_id, case, item["kind"], item["doc_id"]) if doc["version"] == item.get("version")), None)
+    except InvariantViolation:
+        return None

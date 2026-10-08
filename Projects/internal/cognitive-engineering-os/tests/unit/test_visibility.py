@@ -34,6 +34,7 @@ REVIEWED_OWNER_USES = {
     ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): "/me/docs/*: the signed-in person's own records",
     ("apps/api/blocks/govern.py", "record_log.person(session['identity_id'])"): "/govern/help: the signed-in person's own saved place",
     ("apps/api/blocks/govern.py", "record_log.person(me)"): "/govern/export: me = the session's identity",
+    ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): "_mine: /me/consents, the signed-in person's own consents",
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): "_history: called with the session's identity only",
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): "learn.history save: the signed-in person's own",
 }
@@ -43,6 +44,7 @@ REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): 5,
     ("apps/api/blocks/govern.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/govern.py", "record_log.person(me)"): 1,
+    ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): 1,
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): 1,
 })
@@ -223,7 +225,3 @@ class GateTests(GroupCase):
             self.assertEqual(owner_uses(root) - REVIEWED_COUNTS, Counter({("apps/api/blocks/act.py", "record_log.group(group_id)"): 1}))
             self.assertEqual([hit.split(":")[0] for hit in group_readers(root)], ["platform/ai_actions/__init__.py"])
             self.assertEqual(unnamed_group_visibility(root), ["s34_planted.py: collab.planted"])
-
-    def test_the_stubs_say_no(self):
-        viewer = Viewer(self.tenant, self.a)
-        self.assertEqual((visibility.is_appeal_handler(viewer), visibility.is_eligible_facilitator(viewer), visibility.is_eligible_supervisor(viewer)), (False, False, False))
