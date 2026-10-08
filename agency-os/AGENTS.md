@@ -29,7 +29,7 @@
 
 | 動作 | 做法 | WORKLOG 必填行（二擇一） |
 |------|------|------------------------|
-| 實測 | curl／SSH／docker exec／npm test 對真實狀態跑，不可只 grep -c；COS 只跑 `python scripts/affected_tests.py --run`（全套 = CI 或操作者指定收尾，`tests/__init__.py` 擋本機全套） | `- REALTEST_EVIDENCE: tool=<Bash\|SSH\|curl\|WebFetch> \| cmd=<cmd> \| exit=<code> \| ms=<N>` 或 `- REALTEST_WAIVED: <DOC_ONLY\|SMOKE_COVERED\|QUERY_ONLY\|NA> -- <reason>` |
+| 實測 | curl／SSH／docker exec／npm test 對真實狀態跑，不可只 grep -c；COS 只跑 `python scripts/affected_tests.py --run`（全套 = CI 或操作者指定收尾，`tests/__init__.py` 擋本機全套）。**不做無效益測試**（操作者講過兩次）：只寫卡片／finding 點名的測試；突變只做在隱私／可見範圍／擦除／同意／擁有權的守衛，一個守衛一次；給 worker／Codex 的 brief 照抄此句 | `- REALTEST_EVIDENCE: tool=<Bash\|SSH\|curl\|WebFetch> \| cmd=<cmd> \| exit=<code> \| ms=<N>` 或 `- REALTEST_WAIVED: <DOC_ONLY\|SMOKE_COVERED\|QUERY_ONLY\|NA> -- <reason>` |
 | Review | 讀回改後產物；code-fence 成對 | `- REVIEW_DONE: critic=<Quick\|Standard\|Deep> \| verdict=<pass/warn/fail> \| findings=<Nc/Nm/Nn>` 或 `- REVIEW_WAIVED: <DOC_ONLY\|NA> -- <reason>` |
 | 抓蟲 | Grep 跨檔：改動的 symbol／string literal／schema 欄位 call sites + docs stale 主張。**scope 必含 `agency-os`,`scripts`**；涉 `.claude/` 加之；涉 lobster-factory 加之；有 downstream consumers 加路徑（SSOT `verify-closeout-completeness.ps1` `$bhRequiredRoots`）。含 `.md` 另跑 `audit-cross-machine-bom` | `- BUGHUNT_DONE: scope=<paths> \| grep=<pattern> \| hits=<N>` 或 `- BUGHUNT_WAIVED: <DOC_ONLY\|NA> -- <reason>`；scope 不含必填根時加 `- BUGHUNT_SCOPE_NARROW: <理由>`。`hits=0` 且 pattern 為 ≥5 字 ASCII 識別符時 `bughunt-oracle.ps1` 於 commit 機器驗真，宣告 0 實際命中 = HARD FAIL |
 | WORKLOG | [驗證結果] 以 `file:line` 引用實際指令與輸出 | 同日 entry 含四動作各自結果 |
