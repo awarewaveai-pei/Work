@@ -9,7 +9,8 @@ differences. The platform offers a procedure; nothing here says the decision was
     POST   /groups/{id}/ai/{action}                {context}  an AI turn in the group (ai_gate's group path)
     POST   /groups/{id}/collab/handoff             {project_id, closing, to}  convener: a pointer in their own case
     GET    /projects/{project_id}/collab/handoffs  those pointers, each read through the group as it is now
-    GET    /groups/{id}/collab/{kind}              what of that kind you may read (platform/visibility.py)
+    POST   /groups/{id}/collab/collab.authority/{doc_id}/revoke   take back your own share (the API names you)
+    GET    /groups/{id}/collab/{kind}?mine=true    what of that kind you may read (platform/visibility.py); mine: only yours
     POST   /groups/{id}/collab/{kind}              {content}
     PUT    /groups/{id}/collab/{kind}/{doc_id}     {content, base_version}   only its writer (a question: any member)
     DELETE /groups/{id}/collab/{kind}/{doc_id}     only the person who wrote every version (also after leaving: G3)
@@ -278,6 +279,19 @@ def group_ai_turn(group_id: str, action_name: str, body: AiBody, session: dict[s
     return result
 
 
+@router.post("/groups/{group_id}/collab/collab.authority/{doc_id}/revoke")
+def revoke_share(group_id: str, doc_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
+    """The next version of the caller's own share, taken back by them (check_save refuses anyone else's share)."""
+    member_group(repo, session, group_id)
+    docs, viewer = CaseDocs(repo), _viewer(session)
+    found = _call(group_id, visibility.visible, docs, viewer, group_id, "collab.authority", doc_id=doc_id)
+    if not found:
+        raise HTTPException(status_code=404, detail=f"DOC_NOT_FOUND: {doc_id!r}")
+    share = found[0]
+    content = {**share["content"], "revoked_by": [session["identity_id"]]}
+    return _save_group(repo, session, group_id, GROUP_KINDS["collab.authority"], DocBody(content=content, base_version=share["version"]), doc_id)
+
+
 class HandoffBody(BaseModel):
     project_id: str
     closing: str
@@ -316,11 +330,14 @@ def handoffs(project_id: str, session: dict[str, Any] = Depends(api.require_sess
 # -- every kind -----------------------------------------------------------------------------------------------------------
 
 @router.get("/groups/{group_id}/collab/{kind}")
-def list_records(group_id: str, kind: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> list[dict[str, Any]]:
+def list_records(group_id: str, kind: str, mine: bool = False, session: dict[str, Any] = Depends(api.require_session),
+                 repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> list[dict[str, Any]]:
+    """``mine``: only what the caller wrote -- what a page asks before they wrote theirs of a round (write before see)."""
     member_group(repo, session, group_id)
     _kind(kind)
     docs, viewer = CaseDocs(repo), _viewer(session)
-    return _shown(_call(group_id, visibility.visible, docs, viewer, group_id, kind), Names(docs, repo, viewer, group_id))
+    items = _call(group_id, visibility.visible, docs, viewer, group_id, kind)
+    return _shown([item for item in items if not mine or item["written_by"] == viewer.identity_id], Names(docs, repo, viewer, group_id))
 
 
 @router.post("/groups/{group_id}/collab/{kind}")

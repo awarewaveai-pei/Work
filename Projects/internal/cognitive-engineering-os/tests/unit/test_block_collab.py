@@ -91,6 +91,7 @@ class BlindTests(CollabCase):
         seen = {item["content"]["text"] for item in self.get(self.b, "collab.position")}
         self.assertEqual(seen, {"甲的立場一", "乙的立場一"})
         self.assertNotIn("甲的立場二", self.everything(self.b))
+        self.assertEqual([item["content"]["text"] for item in self.get(self.b, "collab.position?mine=true")], ["乙的立場一"])
 
     def test_the_convener_is_not_exempt_and_the_interface_answers_are_blind_too(self):
         self.post(self.b, "collab.position", round=1, text="乙的立場")
@@ -173,7 +174,8 @@ class AuthorityTests(CollabCase):
         self.assertEqual((given["to"], sorted(given["grantors"])), ("甲", sorted(["甲", "你", "乙"])))
         self.assertEqual(self.put(self.b, "collab.authority", shares[self.c]["doc_id"], 1, to=self.a, scope="代表大家談合約", revoked_by=[self.b]).status_code, 403)
         self.assertEqual(self.put(self.b, "collab.authority", shares[self.b]["doc_id"], 1, to=self.a, scope="代表大家談合約", revoked_by=[self.c]).status_code, 403)
-        revoked = self.put(self.b, "collab.authority", shares[self.b]["doc_id"], 1, to=self.a, scope="代表大家談合約", revoked_by=[self.b])
+        self.assertEqual(self.as_(self.b).post(f"{self.base}/collab.authority/{shares[self.c]['doc_id']}/revoke").status_code, 403)   # not b's share
+        revoked = self.as_(self.b).post(f"{self.base}/collab.authority/{shares[self.b]['doc_id']}/revoke")
         self.assertEqual(revoked.status_code, 200, revoked.text)
         self.assertEqual(revoked.json()["notices"][-1]["notice"], "範圍要重新談")
         view = self.get(self.a, "view/authority")
