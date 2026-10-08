@@ -85,20 +85,20 @@ class CaseDocs:
                   check: Callable[[], None] | None = None) -> list[dict[str, Any]]:
         """Every item (``{"kind", "content", "doc_id"?, "base_version"?}``, each as ``save``) or none: one transaction.
         ``check()`` runs first and what it read holds until the writes commit: with a check the batch takes its owner's
-        lock exclusive -- the case's, or the person's (where SQLite's file write lock was) -- so no other writer of that
+        lock exclusive -- the case's, the person's (where SQLite's file write lock was) or the group's -- so no other writer of that
         owner's records commits in between; it raises to refuse. Its reads run on this batch's connection (db: one per
         thread), inside this transaction. It must only read: a write would join the batch. The platform's records have
         no owner lock: a check is refused there. The documents the items name are locked first in one order, so two
         batches never wait on each other crosswise."""
-        if check is not None and owner.kind not in ("case", "person"):
-            raise InvariantViolation("DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK: a batch's check holds only under a case's or a person's lock")
+        if check is not None and owner.kind not in ("case", "person", "group"):
+            raise InvariantViolation("DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK: a batch's check holds only under a case's, a person's or a group's lock")
         with self._repo.transaction(tenant_id) as connection:
             if owner.kind == "case":
                 self._repo.lock_case(connection, tenant_id, owner.id, exclusive=check is not None)
             elif owner.kind == "person":
                 record_log.require_person(connection, tenant_id, owner.id, exclusive=check is not None)
             elif owner.kind == "group":   # first, in save's order (group, the writing person, documents); _save checks under them
-                self._repo.lock_group(connection, tenant_id, owner.id)
+                self._repo.lock_group(connection, tenant_id, owner.id, exclusive=check is not None)
                 if writer.author in ("user", "joint"):
                     record_log.require_person(connection, tenant_id, writer.identity_id)
             elif owner.kind == "platform" and writer.author in ("user", "joint"):   # an erased account writes nothing more

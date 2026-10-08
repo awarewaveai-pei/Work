@@ -31,6 +31,7 @@ SCANNED = ("apps/api/blocks", "platform/ai_actions", "platform/block_hooks")
 # read and added here.
 REVIEWED_OWNER_USES = {
     ("apps/api/blocks/act.py", "record_log.person(session['identity_id'])"): "/me/reminders: the signed-in person's own practice records",
+    ("apps/api/blocks/collab.py", "record_log.group(group_id)"): "_owner: called only after groups.member_group let the caller in (or, to delete, after visible() found their own record: G3)",
     ("apps/api/blocks/docs.py", "record_log.person(identity_id)"): "_where: called with the session's identity only (docs.py _save)",
     ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): "/me/docs/*: the signed-in person's own records",
     ("apps/api/blocks/govern.py", "record_log.person(session['identity_id'])"): "/govern/help: the signed-in person's own saved place",
@@ -38,12 +39,14 @@ REVIEWED_OWNER_USES = {
     ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): "_mine: /me/consents, the signed-in person's own consents",
     ("apps/api/blocks/govern_group.py", "record_log.platform(tenant_id)"): "POST /me/appeals: a write only, after the participant/facilitator check; read back by appeals_for",
     ("apps/api/blocks/govern_group.py", "record_log.platform(session['tenant_id'])"): "DELETE /me/appeals: only after appeals_for says it is the caller's own; CaseDocs re-checks the sole writer",
+    ("platform/block_hooks/collab.py", "record_log.group(group_id)"): "_group: after_group_save, called by blocks/collab.py _save_group after a member's save of that group committed",
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): "_history: called with the session's identity only",
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): "learn.history save: the signed-in person's own",
     ("apps/api/blocks/teach.py", "record_log.person(session['identity_id'])"): "/blocks/teach/practice-cases: the signed-in person's own saved place",
 }
 REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/act.py", "record_log.person(session['identity_id'])"): 1,
+    ("apps/api/blocks/collab.py", "record_log.group(group_id)"): 1,
     ("apps/api/blocks/docs.py", "record_log.person(identity_id)"): 1,
     ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): 5,
     ("apps/api/blocks/govern.py", "record_log.person(session['identity_id'])"): 1,
@@ -51,6 +54,7 @@ REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/govern_group.py", "record_log.platform(tenant_id)"): 1,
     ("apps/api/blocks/govern_group.py", "record_log.platform(session['tenant_id'])"): 1,
+    ("platform/block_hooks/collab.py", "record_log.group(group_id)"): 1,
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): 1,
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/teach.py", "record_log.person(session['identity_id'])"): 1,

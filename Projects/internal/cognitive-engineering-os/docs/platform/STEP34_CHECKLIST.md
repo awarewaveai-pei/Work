@@ -60,3 +60,24 @@
   the case's GOVERN page the audit line and the 不留紀錄 switch.
   - Not built: the switch on the intake page itself (`IntakePage.tsx` is S's); the page walk at 1280 / 400 wide (§16,
     end of the wave).
+
+
+## COLLAB (cards 20-22)
+- built (card 20): §7's kinds in `kinds/collab.py`, all the group's, each naming its visibility; routes `apps/api/blocks/collab.py` (list / new / next version / delete / versions per kind; views dissent, authority, shared; handoff); COLLAB's checks `block_hooks/collab.py` run as the save's batch check under the group lock held exclusive (`CaseDocs.save_many` now takes a check for a group owner)
+- built: 「每個人先各自寫自己的立場。寫完，才看得到別人的」「做共同決定之前，每個人先各自回答這 5 個問題…寫完才看得到別人的」 -- `blind="round"` on position, change, interface answers; the convener is not exempt; by id too
+- built: 「各自寫完之前，系統不顯示多數意見」 -- `collab.stance` is blind by `option` (a field the card's line needs): another member's mark on an option is shown once you marked it; so is its kept dissent
+- built: 「你們對每個方案標同意或異議，並寫理由」「系統把異議和理由存下來。異議不會被多數蓋掉」 -- one live stance per (member, option), reason required, every version kept; each 異議 version leaves a `collab.dissent` (system, after_close) naming the stance and its version (a pointer: the reason and the name are read from them each time); nobody but the writer versions a record (`COLLAB_NOT_YOURS`), a stance and a dissent are never deleted
+- built: 「每個參與者在哪裡，只有他本人和 GOVERN 讀得到」 -- `collab.place` `self_and_govern`, one per member
+- built: anonymity of a dissent -- `collab.label` {label}, one per member, 匿名 allowed; every answer shows `who` (你 / the label / the name) and never another member's identity, so a label holds wherever the member's records appear
+- built: 「授權可以收回。每個人收回的是自己那一份。例：三個人授權給甲，乙收回後，甲只代表兩個人；範圍要重新談」 -- one `collab.authority` = one grantor's share (its writer); `revoked_by` holds only the writer's own id and stays; the view recomputes who represents whom from the shares still given; a share taken back leaves `collab.renegotiate` (system, pointer) shown as 「範圍要重新談」
+- built: 「你們一起訂：什麼情況結束討論、什麼情況重新開」「系統記下結束討論的理由、重開條件、檢討日期、負責的人」 -- `collab.closing` needs all four; a convener writes it
+- built: 「任何參與者都可以提出重開」 -- `collab.reopen` by any member, never deleted, the group's status unchanged; DECISION: also accepted once the group is closed (`after_close`), following the card text over card 20 (8)'s list -- otherwise the convener's close would refuse a reopening
+- built: 「系統之後把決定的後果寫回來，帶進下一輪」 -- `collab.consequence` and `collab.review`, both after_close (the page offers them: card 22)
+- built: 「這一步讀：每個參與者同意分享的地圖、查證結果、提案」「ACT 的觀察紀錄（只讀群組決定之後的觀察）」「開案資料裡誰會受影響（只讀這一項）」「絕不讀：參與者沒分享的個人案子」 -- view `shared` reads only `visibility.shared_with`, keeps MAP / VERIFY / EXPRESS records whole, `act.note` only after the group's first closing, of `assembler.intake` only `affected`, drops the rest
+- built: 「共同的判斷交給 DECIDE。要做的行動交給 ACT」 -- POINTER ONLY: `collab.handoff` {group_id, closing, to} in the convener's own case; the closing is read through the group each time. Not a DECIDE judgment draft or an ACT task: `decide.judgment` is the person's own words field by field (human_only) and one per case, so a copy of the group's words cannot stand in it; the DECIDE and ACT pages do not show the pointer yet
+- built: the interface questions are `kinds/context.py` `INTERFACE_QUESTIONS` (a test compares them with the card file): FIVE, as the card text says; card 20 said six
+- built: an account erasure takes the member's dissent and renegotiation notices too (written as the system on their behalf, so `delete_written_by` removes them)
+- NOT YET: 「系統畫出分歧地圖」 as a drawing -- the positions, options (evidence, risks, values trade-off) and stances are side by side on the page (card 22); the AI's 「整理大家的分歧」 is card 21
+- NOT YET: 「系統確認每個參與者是受邀的那個帳號」「一個人用多個帳號，由 GOVERN 的帳號檢查擋」 -- cards 12 (invitations) and GOVERN, not COLLAB
+- NOT YET: 「公共決策怎麼量，只量過程」 -- the process indicators are card 70
+- NOT YET: 「治理支線：提案／報表 → 共同審議 → 授權、退回或重開 → 行動 → 回顧」 -- `collab.proposal` is stored; EXPRESS's link to it is EXPRESS's card
