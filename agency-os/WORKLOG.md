@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-08（續3）COS 儲存切換鏈 rebase 到 main（VERIFY r5／GATHER r5）＋ Codex W1-W3 F2/F6
+- rebase：`refs/claude/storage-erasure`（4d9f9a59c）`--onto main 445f39e51`，14 commits；文字衝突只有 `agency-os/WORKLOG.md`（兩邊條目都留）與 `agency-os/reports/review-debt.md`（main 已審畢的 c55b64c35 列 + 鏈上 Codex 列）。程式無文字衝突，語意衝突 3 處：
+  - C1 main `blocks/docs.py:_save` 每次存檔都走 `CaseDocs.save_many(check=before_save)`；PG 版 `save_many` 對 person 擁有者拒絕 check（`DOC_BATCH_CHECK_NEEDS_A_CASE`）→ 所有 `/me/docs` 存檔 400（rebase 後 govern/learn 實跑 10F/2E）。修：person 批次 check 取 person 鎖 exclusive（`record_log.require_person(exclusive=)`），平台擁有者仍拒（改名 `DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK`）。
+  - C2 main `test_block_verify.py` 兩個 VERIFY r5 測試用 `sqlite3`（`BEGIN IMMEDIATE` 探寫鎖、讀 `collection_runs`），PG 下 NameError：改為另一 psycopg 連線 `lock_timeout` 取 case 鎖 shared、`repo.transaction` 讀（加 tenant/project 條件）。
+  - C3 check 內的讀取另向 pool 要連線（與 F2 同類）。
+- F2 不變量：一個 thread 對一個 pool 最多持一條連線。`db.Databases._held_connection`：同 thread 同 region 再要交易＝savepoint；session lock 的交易跑在鎖的連線；session lock 只能是 thread 第一個持有（`DB_SESSION_LOCK_NESTED`）。探針（scratch，包 pool.connection）16 模組 592 tests：巢狀取連線只有兩類——hooks 鎖下（變成同連線上的獨立交易，提交語意不變）與 save_many check 內唯讀（變 savepoint）；無依賴內層獨立提交者。
+- F6：`test_pg_foundation.sqlite_ddl_in` 讀 f-string 全文（`{}` 代佔位）、名稱可為 `{}`/`%s`、`IF NOT EXISTS` 可省。
+- 突變：拿掉連線重用 → `PoolHoldTests` 2 紅（max_size=2 兩 hook、max_size=1 check）；person 鎖改 shared → `test_a_persons_batch_check_holds_until_its_writes_too` 紅；person check 改回拒絕 → 該測試＋learn 6 紅；engine 加 f-string `CREATE TABLE IF NOT EXISTS {table}` → 新 guard 紅、舊 guard 0 命中。
+- 測試修正（前提而非放寬）：`AdvisoryLockTests._try_lock` 原以同 thread `databases.transaction` 當「第二連線」，重用後同 session 鎖可重入 → 改真第二條 psycopg 連線。
+- 延後（review-debt.md「deferred」）：F3/F4/F5（多區域被拒期間潛伏）、`scripts/dev/prod_*.py` 仍讀 SQLite、person→case 與 admit_run case→person 取鎖順序的三方環（deadlock detector 中止其一）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --base main --run（真 PostgreSQL 17 容器） | exit=1 | ms=1054603；1418 tests 1 failure（`_try_lock` 前提，已修，該模組重跑 29 OK）；各模組獨立重跑 OK：pg_foundation 29／erasure_workflow 35／block_verify 70／block_gather 86／collector_wire_v2 17／absent_is_none 2／step2_foundation 67；web `npx tsc --noEmit` exit 0、`npx vitest run lib` 77 OK、VerifyPage 17 OK
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/0n（m：person/case 鎖序三方環，已列 deferred）
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=NEEDS_A_CASE|kept for it alone|session_lock\(|\._pool\( | hits=6
+- ORACLE_WAIVED: Claude 寫；協調者合併前送 Codex 審（本 commit 只進 refs/claude/storage-rebased，不 merge／push／部署）
+- rollback：`git update-ref -d refs/claude/storage-rebased`；原鏈 `refs/claude/storage-erasure` 未動。
 ## 2026-10-08（續2）COS 本機全套測試改由測試樹自己擋（`COS_FULL_SUITE=1` 才跑）
 - [操作者] 「claude 在做一個工具裡的更正後測試 會跑300個工具 很蠢」；問「什麼時候要跑整套」「所以要跑整套都會問我?」；選定「全套自己擋住自己」後 go。
 - 根因：規則 11（`Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md:356`）只在長 plan 裡；每輪載入的 AGENTS.md §1「實測」不限範圍；COS `README.md:16`、`tests/__init__.py:3`、plan `:334`「本機跑」、各 slice 文件驗證表都寫 `unittest discover`。Claude 湊 `REALTEST_EVIDENCE` 時照抄最大指令（實例：本檔 2026-10-04（續1）`cmd=python -m unittest discover -s tests/unit -t . | ms=1514788`）。hook／verify 腳本都沒有自動跑全套（已查 `test-runner.js` 只跑 JS 旁測、`/verify-recent` 步驟 3 為單檔）。

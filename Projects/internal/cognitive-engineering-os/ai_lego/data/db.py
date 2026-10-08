@@ -142,12 +142,19 @@ def _lock_key(parts: tuple[str, ...]) -> str:
 
 class Databases:
     """One pool per region. Build it once per process (``from_env``) and ``close`` it at shutdown. The first region
-    configured holds the tenant directory (D6)."""
+    configured holds the tenant directory (D6).
+
+    A thread holds at most one connection of a pool (``_held_connection``): a transaction asked for inside another of the
+    same thread and region is a savepoint of it (it commits with the outer one), and the transactions under a session lock
+    run on the lock's connection. So no thread waits on a pool while it holds a connection of it, and threads on a pool of
+    any size cannot all wait for each other (Codex W1-W3 F2: two hooks each holding a session-lock connection, each asking
+    for a second, on max_size=2)."""
 
     def __init__(self, urls: Mapping[str, str], *, min_size: int = 1, max_size: int = 10) -> None:
         if not urls:
             raise InvariantViolation(f"DB_URLS_MISSING: no region configured ({DATABASE_URLS_ENV})")
         self._directory_region = next(iter(urls))
+        self._held = threading.local()   # .connections: {region: the connection this thread holds}
         # autocommit: every transaction is an explicit connection.transaction() block, nothing is left open between them.
         self._pools = {
             region: ConnectionPool(url, min_size=min_size, max_size=max_size, kwargs={"autocommit": True}, configure=_configure,
@@ -184,14 +191,30 @@ class Databases:
         return region
 
     @contextmanager
+    def _held_connection(self, region: str) -> Iterator[psycopg.Connection]:
+        """This thread's connection to ``region``: the one it already holds, else one from the pool, held until the block
+        ends. The only way to a pooled connection (see the class note)."""
+        held = self._held.__dict__.setdefault("connections", {})
+        if region in held:
+            yield held[region]
+            return
+        with self._pool(region).connection() as connection:
+            held[region] = connection
+            try:
+                yield connection
+            finally:
+                del held[region]
+
+    @contextmanager
     def transaction(self, region: str) -> Iterator[psycopg.Connection]:
-        """One pooled connection, one transaction: committed when the block ends, rolled back when it raises."""
-        with self._pool(region).connection() as connection, connection.transaction():
+        """One transaction on this thread's connection: committed when the block ends, rolled back when it raises. Inside
+        another transaction of this thread and region it is a savepoint: rolled back alone, committed with the outer one."""
+        with self._held_connection(region) as connection, connection.transaction():
             yield connection
 
     def _read_one(self, region: str, query: str, parameters: Sequence[Any]) -> Row | None:
-        """One statement, its own transaction (autocommit): a single round trip."""
-        with self._pool(region).connection() as connection:
+        """One statement on this thread's connection: its own transaction (autocommit), or the open one's."""
+        with self._held_connection(region) as connection:
             return connection.execute(query, parameters).fetchone()
 
     # -- the tenant directory: tenant -> region, nothing else (no personal data) -----------------------------------
@@ -219,10 +242,14 @@ class Databases:
 
     @contextmanager
     def session_lock(self, region: str, *parts: str) -> Iterator[None]:
-        """Hold the lock named by ``parts`` across many transactions, on a connection kept for it alone; the server drops
-        it if this process dies. Same name space as ``advisory_xact_lock``."""
+        """Hold the lock named by ``parts`` across many transactions; the server drops it if this process dies. Same name
+        space as ``advisory_xact_lock``. The lock's connection is the thread's: the transactions inside run on it, so the
+        holder never asks the pool for a second one. It is the thread's first hold of that pool (refused inside a
+        transaction or another session lock): closing it on a failed unlock must not end anything else."""
         key = _lock_key(parts)
-        with self._pool(region).connection() as connection:
+        if region in self._held.__dict__.get("connections", {}):
+            raise InvariantViolation("DB_SESSION_LOCK_NESTED: a session lock is taken before anything else holds this thread's connection")
+        with self._held_connection(region) as connection:
             connection.execute("SELECT pg_advisory_lock(hashtextextended(%s, 0))", (key,))
             try:
                 yield
@@ -236,7 +263,7 @@ class Databases:
     @contextmanager
     def rehearsal(self) -> Iterator[Rehearsal]:
         """The real repository code on this database, nothing kept (see ``Rehearsal``)."""
-        with self._pool(self.directory_region).connection() as connection, connection.transaction(force_rollback=True):
+        with self._held_connection(self.directory_region) as connection, connection.transaction(force_rollback=True):
             yield Rehearsal(connection, self.directory_region)
 
     def require_schema_at_head(self, region: str) -> None:

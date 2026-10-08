@@ -632,9 +632,77 @@ class CaseLockTests(_TwoConnections):
         self.assertEqual((self.outcomes["batch"], seen), (1, [0]))
         self.assertEqual(len(self.docs.current(self.tenant, self.owner, "gather.source")), 2)
 
-    def test_a_batch_check_needs_a_case(self):
-        with self.assertRaisesRegex(InvariantViolation, "^DOC_BATCH_CHECK_NEEDS_A_CASE"):
-            self.docs.save_many(self.tenant, record_log.person("me"), [], record_log.user("me", "GOVERN"), check=lambda: None)
+    def test_a_batch_check_needs_an_owner_lock(self):
+        with self.assertRaisesRegex(InvariantViolation, "^DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK"):
+            self.docs.save_many(self.tenant, record_log.platform(self.tenant), [], record_log.system("GOVERN"), check=lambda: None)
+
+    def test_a_persons_batch_check_holds_until_its_writes_too(self):
+        """/me/docs saves run BEFORE_SAVE as the batch's check (blocks.docs._save): the person's lock exclusive, so another
+        save of the person's records waits for the batch and the check never sees it."""
+        me, checking, seen = record_log.person(str(uuid.uuid4())), threading.Event(), []
+        where = lambda text: {"kind": "govern.location", "content": {"where": text}}   # noqa: E731
+
+        def check():
+            checking.set()
+            self.release.wait(20)
+            seen.append(len(self.docs.current(self.tenant, me, "govern.location")))
+
+        self.release.set()
+        doc_kinds.validate("govern.location", {"where": "-"}, "user")   # the setUp pause spent here: only the lock may hold the writer
+        self.release.clear()
+        batch = self.run_as("batch", lambda: len(self.docs.save_many(self.tenant, me, [where("台北")], record_log.user(me.id, "GOVERN"), check=check)))
+        self.assertTrue(checking.wait(10))
+        writer = self.run_as("writer", lambda: self.docs.save(self.tenant, me, "govern.location", {"where": "台中"}, record_log.user(me.id, "GOVERN"))["version"])
+        writer.join(0.5)
+        self.assertTrue(writer.is_alive(), "a save of the person's records committed while a batch's check held them")
+        self.release.set()
+        batch.join(20)
+        writer.join(20)
+        self.assertEqual((self.outcomes, seen), ({"batch": 1, "writer": 1}, [0]))
+
+
+class PoolHoldTests(PgTestCase):
+    """db.Databases: a thread holds one connection of a pool. A session lock's holder and a batch's check write and read
+    on the connection they hold, so a small pool cannot starve them (Codex W1-W3 F2: two after-sources runs on
+    max_size=2, each holding its hooks lock's connection and asking for a second, waited until the pool timed out)."""
+
+    def small(self, size: int) -> ProjectSourceRepository:
+        databases = Databases({self.REGION: self.url}, min_size=1, max_size=size)
+        self.addCleanup(databases.close)
+        return ProjectSourceRepository(databases)
+
+    def test_two_hook_runs_write_on_a_pool_of_two(self):
+        repo, tenant = self.small(2), add_tenant(self.databases, str(uuid.uuid4()))
+        docs, both, done = CaseDocs(repo), threading.Barrier(2, timeout=10), {}
+
+        def run(owner):
+            with docs.hooks_lock(tenant, owner):
+                both.wait()   # both hold their hooks lock now
+                done[owner.id] = docs.save(tenant, owner, "gather.source", _card(f"https://{owner.id}.example/"), record_log.system("GATHER"))["version"]
+
+        owners = [a_case(repo, tenant, str(uuid.uuid4())) for _ in range(2)]
+        threads = [threading.Thread(target=run, args=(owner,), daemon=True) for owner in owners]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(15)
+        self.assertEqual(done, {owner.id: 1 for owner in owners}, "a hook run waited for a second connection of a full pool")
+
+    def test_a_batch_check_reads_on_the_batch_connection_on_a_pool_of_one(self):
+        repo, tenant = self.small(1), add_tenant(self.databases, str(uuid.uuid4()))
+        docs = CaseDocs(repo)
+        owner = a_case(repo, tenant, str(uuid.uuid4()))
+        done = []
+        batch = threading.Thread(target=lambda: done.append(docs.save_many(tenant, owner, [{"kind": "gather.source", "content": _card()}], record_log.system("GATHER"),
+                                                                           check=lambda: docs.current(tenant, owner, "gather.source"))), daemon=True)
+        batch.start()
+        batch.join(15)
+        self.assertEqual([len(saved) for saved in done], [1], "a batch's check waited for a second connection")
+
+    def test_a_session_lock_is_the_first_hold_of_the_thread(self):
+        with self.databases.transaction(self.REGION), self.assertRaisesRegex(InvariantViolation, "^DB_SESSION_LOCK_NESTED"):
+            with self.databases.session_lock(self.REGION, "case-hooks", "t", "c"):
+                pass
 
 
 class DocLockTests(_TwoConnections):

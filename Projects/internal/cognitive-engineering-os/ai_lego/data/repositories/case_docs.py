@@ -73,18 +73,19 @@ class CaseDocs:
     def save_many(self, tenant_id: str, owner: Owner, items: list[Mapping[str, Any]], writer: Writer,
                   check: Callable[[], None] | None = None) -> list[dict[str, Any]]:
         """Every item (``{"kind", "content", "doc_id"?, "base_version"?}``, each as ``save``) or none: one transaction.
-        ``check()`` runs first and what it read holds until the writes commit: with a check the batch takes the case's
-        lock exclusive (where SQLite's file write lock was), so no other writer of the case commits in between; it
-        raises to refuse. It must only read -- a write of its own would wait on this batch. A check needs a case: a
-        person's records have no owner lock. The documents the items name are locked first in one order, so two batches
-        never wait on each other crosswise."""
-        if check is not None and owner.kind != "case":
-            raise InvariantViolation("DOC_BATCH_CHECK_NEEDS_A_CASE: a batch's check holds only under a case's lock")
+        ``check()`` runs first and what it read holds until the writes commit: with a check the batch takes its owner's
+        lock exclusive -- the case's, or the person's (where SQLite's file write lock was) -- so no other writer of that
+        owner's records commits in between; it raises to refuse. Its reads run on this batch's connection (db: one per
+        thread), inside this transaction. It must only read: a write would join the batch. The platform's records have
+        no owner lock: a check is refused there. The documents the items name are locked first in one order, so two
+        batches never wait on each other crosswise."""
+        if check is not None and owner.kind not in ("case", "person"):
+            raise InvariantViolation("DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK: a batch's check holds only under a case's or a person's lock")
         with self._repo.transaction(tenant_id) as connection:
             if owner.kind == "case":
                 self._repo.lock_case(connection, tenant_id, owner.id, exclusive=check is not None)
             elif owner.kind == "person":
-                record_log.require_person(connection, tenant_id, owner.id)
+                record_log.require_person(connection, tenant_id, owner.id, exclusive=check is not None)
             for doc_id in sorted({item["doc_id"] for item in items if item.get("doc_id")}):
                 record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
             if check is not None:

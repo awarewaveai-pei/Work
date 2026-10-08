@@ -40,25 +40,34 @@ MIGRATIONS = PRODUCT_ROOT / "ai_lego" / "data" / "migrations"
 FROZEN_SQLITE_SCHEMA = MIGRATIONS / "sqlite_schema_2026_10_04.sql"
 # Columns a later migration added after the SQLite ones: 0003 write_order, where the engine read SQLite's rowid.
 ADDED_AFTER_SQLITE = {"events": ["write_order"], "workspace": ["write_order"]}
-_CREATE_TABLE = re.compile(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+(\w+)\s*\(", re.IGNORECASE)
-_CREATE_INDEX = re.compile(r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+\w+\s+ON\s+\w+\s*\([^)]*\)(?:\s+WHERE\s+[^;]+)?", re.IGNORECASE)
+# A name may be a placeholder: an f-string's {...} (read as {}), a %s or a .format {} -- DDL built at run time counts.
+_CREATE_TABLE = re.compile(r"CREATE\s+(?:TEMP(?:ORARY)?\s+)?TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w{}%]+)\s*\(", re.IGNORECASE)
+_CREATE_INDEX = re.compile(r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?[\w{}%]+\s+ON\s+[\w{}%]+\s*\([^)]*\)(?:\s+WHERE\s+[^;]+)?", re.IGNORECASE)
 # A citation's own printed date ("2019", "Spring 2020"): text, not a moment (0001_baseline.py type rules).
 _FREE_TEXT_DATES = {"published_at"}
 _ISO_MICRO = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$")
 
 
-def sqlite_ddl_in_the_engine() -> list[str]:
-    """Every SQLite CREATE TABLE / CREATE INDEX the engine's source still holds, read from its string constants (ast
-    joins the adjacent literals a statement is split across)."""
+def string_texts(tree: ast.AST) -> list[str]:
+    """Every string the source spells out: a literal (ast joins the adjacent literals a statement is split across), and
+    an f-string whole, each {...} read as {} -- its literal parts alone split a statement at every placeholder."""
+    joined = [node for node in ast.walk(tree) if isinstance(node, ast.JoinedStr)]
+    inside = {id(part) for node in joined for part in node.values}
+    texts = ["".join(part.value if isinstance(part, ast.Constant) else "{}" for part in node.values) for node in joined]
+    return texts + [node.value for node in ast.walk(tree) if isinstance(node, ast.Constant) and isinstance(node.value, str) and id(node) not in inside]
+
+
+def sqlite_ddl_in(path: Path) -> list[str]:
     found: list[str] = []
-    for path in sorted((PRODUCT_ROOT / "ai_lego").rglob("*.py")):
-        if MIGRATIONS in path.parents:
-            continue
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.Constant) and isinstance(node.value, str):
-                found += [f"{path.name}: {match.group(1)}" for match in _CREATE_TABLE.finditer(node.value)]
-                found += [f"{path.name}: {match.group(0)[:60]}" for match in _CREATE_INDEX.finditer(node.value)]
+    for text in string_texts(ast.parse(path.read_text(encoding="utf-8"))):
+        found += [f"{path.name}: {match.group(1)}" for match in _CREATE_TABLE.finditer(text)]
+        found += [f"{path.name}: {match.group(0)[:60]}" for match in _CREATE_INDEX.finditer(text)]
     return found
+
+
+def sqlite_ddl_in_the_engine() -> list[str]:
+    """Every CREATE TABLE / CREATE INDEX the engine's source still holds outside its migrations (= SQLite DDL left)."""
+    return [hit for path in sorted((PRODUCT_ROOT / "ai_lego").rglob("*.py")) if MIGRATIONS not in path.parents for hit in sqlite_ddl_in(path)]
 
 
 def sqlite_schema() -> sqlite3.Connection:
@@ -147,6 +156,15 @@ class BaselineMigrationTests(PgTestCase):
     def test_the_engine_holds_no_sqlite_schema_any_more(self):
         self.assertEqual(sqlite_ddl_in_the_engine(), [], "the port is not done: SQLite DDL is still in ai_lego")
 
+    def test_ddl_built_at_run_time_is_found_too(self):
+        """An f-string's literal parts split a statement at each placeholder: the guard reads the f-string whole."""
+        source = ('def make(c, t, i):\n    c.execute(f"CREATE TABLE IF NOT EXISTS {t} (id INTEGER)")\n'
+                  '    c.execute("CREATE INDEX IF NOT EXISTS %s ON %s (id)" % (i, t))\n    c.execute(f"CREATE TABLE plain_{t} (id)")\n')
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "made.py"
+            path.write_text(source, encoding="utf-8")
+            self.assertEqual(sqlite_ddl_in(path), ["made.py: {}", "made.py: plain_{}", "made.py: CREATE INDEX IF NOT EXISTS %s ON %s (id)"])
+
 
 class SchemaAtHeadTests(PgTestCase):
     def test_a_database_at_head_passes(self):
@@ -230,9 +248,11 @@ class AdvisoryLockTests(PgTestCase):
     """Invariant 2 at helper level: a name excludes a second connection until the first one's transaction ends."""
 
     def _try_lock(self, *parts: str) -> bool:
-        """In a second connection: True if the lock was free, False if it is held elsewhere."""
+        """In a second connection: True if the lock was free, False if it is held elsewhere. Its own psycopg connection:
+        a transaction of this thread's Databases would be the holder's session (db: one connection per thread), where an
+        advisory lock is reentrant."""
         try:
-            with self.databases.transaction(self.REGION) as connection:
+            with psycopg.connect(self.url, autocommit=True) as connection, connection.transaction():
                 connection.execute("SET LOCAL lock_timeout = '300ms'")
                 db.advisory_xact_lock(connection, *parts)
         except errors.LockNotAvailable:

@@ -11,3 +11,15 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Codex | storage-single-region-runtime-gate | D7 檔案分區完成前正式入口拒絕多區域 | 不可宣稱資料駐留而把不同區域的來源／產物／流程檔放在同一根目錄 | 守衛測試修前先開 pool 紅、修後 `test_pg_foundation` 28 PASS；兩區域 DB 測試保留 | 待 Claude 跨模型審查；勿 push／部署／啟用第二區域 |
 | Codex | storage-integration-baseline-gates | 移除只供測試等待的 Future 全域集合，補模型通道白名單的實際用途 | 生產互斥只靠跨程序資料庫鎖；等待器不遺漏已送出的 hook；純文字呼叫有白名單理由 | `test_no_process_local_run_registry` 3、`test_structured_answers` 11、step2 63、GATHER 68、VERIFY 62 PASS；拔回呼突變紅後綠 | 待 Claude 跨模型審查；勿 push／部署 |
 | Codex | storage-erasure-blocker | 記錄 W1-W3 的資料庫回滾後 Source CAS 已刪，以及 API 更早刪 artifact/journal 的實證 | 不可把可回滾的 row 與不可回滾的檔案刪除假裝成同一交易 | 一次性 PostgreSQL 故障注入：`row_survives=True blob_survives=False`，預期不變量斷言 exit 1；24 個跨檔命中逐一查 | Critical，儲存分支不得合併／推送／部署；待耐故障抹除協定與跨模型審查 |
+
+## deferred, before D7 second region
+
+（Codex W1-W3 審查 `agency-os/reports/oracle/2026-10-08-partialreview-8fb16d14.md`；`Databases.from_env` 拒絕多區域（`DB_MULTI_REGION_BLOBS_NOT_READY`）期間皆潛伏）
+- F3 `ai_lego/data/db.py` `directory_region` = 設定清單第一個：重排 `COGNITIVE_OS_DATABASE_URLS` 即讀到空目錄，所有租戶 TENANT_REGION_UNKNOWN；開第二區前目錄區域要明示設定。
+- F4 `platform/identity/store.py:create_tenant` home 與 directory 兩交易非原子（process 死在中間留孤兒 home 列；4c13c954b 只讓同資料重試可恢復）；開第二區前需孤兒清理或兩階段。
+- F5 source/artifact/journal CAS 根目錄不分區，第二區租戶的檔案不在其區域；= STORAGE_SWITCH D7。
+
+## deferred
+
+- `scripts/dev/prod_projects_check.py`、`scripts/dev/prod_read_analyses.py` 仍以 sqlite3 讀 `repo.db_path`（PG 版 repo 無此屬性）；dev 工具、非 CI/主路徑，切換上線後改讀 PG 或刪除。
+- `CaseDocs.save_many` 個人批次 check 持 person 鎖 exclusive，其 `from_case` 項再取 case 鎖 shared；`erasure.admit_run` 為 case→person 順序。同時有 case 抹除排隊 exclusive 時可成三方環，PostgreSQL deadlock detector 中止其一（錯誤，非卡死）；如出現再統一 person/case 取鎖順序。

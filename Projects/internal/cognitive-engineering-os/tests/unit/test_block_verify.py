@@ -12,6 +12,8 @@ import unittest
 import uuid
 from unittest import mock
 
+import psycopg
+
 from ai_lego import PRODUCT_ROOT
 from ai_lego.apps.api import main as api_main
 from ai_lego.apps.api.blocks import docs as docs_route
@@ -19,6 +21,7 @@ from ai_lego.apps.api.blocks import verify as verify_route
 from ai_lego.core.domain import evidence_words as words
 from ai_lego.core.domain.kinds import verify as kinds_verify
 from ai_lego.core.domain.kinds.verify import SEARCH_ANGLES, SPREAD_KEYS, claim_key
+from ai_lego.data import db
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
@@ -448,19 +451,18 @@ class ReadingTests(VerifyCase):
     def test_every_save_checks_the_claim_version_under_its_own_write_lock(self):
         """Codex VERIFY r5 F2 (class): BEFORE_SAVE ran before the save's transaction, so a claim edited between the check and
         the write left a stance or verdict filed against a version that was no longer current. The check now runs with
-        the file's write lock held: another writer cannot start until the save is done."""
+        the case lock held exclusive (CaseDocs.save_many): another writer of the case cannot start until the save is done."""
         held, real = [], docs_route.before_save
 
         def probe(*args):
-            other = sqlite3.connect(self._repo.db_path, timeout=0)
-            try:
-                other.execute("BEGIN IMMEDIATE")
-                other.execute("ROLLBACK")
-                held.append(False)
-            except sqlite3.OperationalError:
-                held.append(True)
-            finally:
-                other.close()
+            with psycopg.connect(self.url, autocommit=True) as other:   # another writer: the case lock shared, first
+                try:
+                    with other.transaction():
+                        other.execute("SET LOCAL lock_timeout = '200ms'")
+                        db.owner_lock(other, "case", self.tenant_id, self.pid)
+                    held.append(False)
+                except psycopg.errors.LockNotAvailable:
+                    held.append(True)
             return real(*args)
 
         with mock.patch.object(docs_route, "before_save", side_effect=probe):
@@ -959,11 +961,8 @@ class SearchTests(CollectionApiTestCase):
             stale = self.go(claim, confirm=True)
         self.assertEqual((edits, stale.status_code), ([200], 409), stale.text)
         self.assertIn("VERIFY_CLAIM_VERSION_STALE", stale.text)
-        connection = sqlite3.connect(self._repo.db_path)
-        try:
-            statuses = [row[0] for row in connection.execute("SELECT status FROM collection_runs")]
-        finally:
-            connection.close()
+        with self._repo.transaction(self.tenant_id) as connection:
+            statuses = [row[0] for row in connection.execute("SELECT status FROM collection_runs WHERE tenant_id=%s AND project_id=%s", (self.tenant_id, self.pid))]
         self.assertEqual((statuses, self.service.calls, self.docs.current(self.tenant_id, self.owner, "verify.lookup")), (["failed"], [], []))
         self.assertEqual(self.go(claim, confirm=True).status_code, 202)   # read again: version 2 goes out
 

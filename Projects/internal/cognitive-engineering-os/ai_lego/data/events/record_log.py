@@ -159,13 +159,14 @@ def _now() -> datetime:
     return db.now()
 
 
-def require_person(connection: psycopg.Connection, tenant_id: str, identity_id: str) -> None:
+def require_person(connection: psycopg.Connection, tenant_id: str, identity_id: str, *, exclusive: bool = False) -> None:
     """The person's owner lock, shared (db.owner_lock "person"; the account erasure's decision holds it exclusive), and the
     person still there: an identity the account deletion marked deleted gets IDENTITY_ERASED and nothing is written. Every
     person-owned record passes here (``append``); a writer that also changes rows of its own takes it first in its
     transaction, as case writers take the case lock, so it never holds a row the erasure deletes while it waits. An
-    identity with no row at all (a unit test's made-up owner) is not refused: only a deleted one is."""
-    db.owner_lock(connection, "person", tenant_id, identity_id)
+    identity with no row at all (a unit test's made-up owner) is not refused: only a deleted one is. ``exclusive``: a batch
+    whose own checks must hold until its writes (CaseDocs.save_many), as a case's batch takes the case lock."""
+    db.owner_lock(connection, "person", tenant_id, identity_id, exclusive=exclusive)
     row = connection.execute("SELECT status FROM identity WHERE tenant_id=%s AND identity_id=%s", (tenant_id, identity_id)).fetchone()
     if row is not None and row[0] != "active":
         raise InvariantViolation("IDENTITY_ERASED: the account is deleted; nothing more is written for it")
