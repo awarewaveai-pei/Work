@@ -112,7 +112,7 @@ class CaseDocs:
             writer = Writer("ai", writer.block) if clean == previous["content"] and previous["author"] == "ai" else Writer("joint", writer.block, writer.identity_id)
         event = record_log.append(connection, tenant_id, f"doc:{doc_id}", "DocSaved", {"kind": spec.kind, "doc_id": doc_id, "version": version, "content": clean},
                                   writer=writer, owner=owner)
-        if spec.from_case:   # a person's record made from one case goes with that case (erase_project): checked after the
+        if spec.from_case:   # a person's record made from one case goes with that case (erase_case_rows): checked after the
             self._repo.require_case(connection, tenant_id, clean[spec.from_case])   # writer's own checks; a refusal rolls the save back
         return {"doc_id": doc_id, "kind": kind, "version": version, "content": clean, "author": writer.author, "block": writer.block, "at": event["occurred_at"], "deleted": False}
 

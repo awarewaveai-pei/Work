@@ -28,6 +28,8 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Any, Callable
 
+import psycopg
+
 from ai_lego.core.domain.identity import identity_record
 from ai_lego.core.domain.workspace import workspace_record
 from ai_lego.data import db
@@ -194,13 +196,18 @@ class IdentityStore:
         if self._db.region_of(tenant_id) is None:
             return False
         with self._db.for_tenant(tenant_id) as conn:
-            row = conn.execute("SELECT status FROM identity WHERE identity_id = %s AND tenant_id = %s", (identity_id, tenant_id)).fetchone()
-            if row is None or row["status"] == "deleted":
-                return False
-            for table in ("session", "password_reset_token", "handoff_code", "identity_credential"):
-                conn.execute(f"DELETE FROM {table} WHERE identity_id = %s", (identity_id,))
-            conn.execute("UPDATE ai_usage SET identity_id = 'deleted' WHERE tenant_id = %s AND identity_id = %s", (tenant_id, identity_id))
-            conn.execute("UPDATE identity SET email = %s, display_name = %s, status = 'deleted' WHERE identity_id = %s", (f"deleted-{identity_id}@erased.invalid", "（已刪除）", identity_id))
+            return self.delete_identity_on(conn, tenant_id, identity_id)
+
+    @staticmethod
+    def delete_identity_on(conn: psycopg.Connection, tenant_id: str, identity_id: str) -> bool:
+        """``delete_identity`` on a transaction the caller opened (the account erasure's decision: ai_lego/platform/erasure.py)."""
+        row = conn.execute("SELECT status FROM identity WHERE identity_id = %s AND tenant_id = %s", (identity_id, tenant_id)).fetchone()
+        if row is None or row["status"] == "deleted":
+            return False
+        for table in ("session", "password_reset_token", "handoff_code", "identity_credential"):
+            conn.execute(f"DELETE FROM {table} WHERE identity_id = %s", (identity_id,))
+        conn.execute("UPDATE ai_usage SET identity_id = 'deleted' WHERE tenant_id = %s AND identity_id = %s", (tenant_id, identity_id))
+        conn.execute("UPDATE identity SET email = %s, display_name = %s, status = 'deleted' WHERE identity_id = %s", (f"deleted-{identity_id}@erased.invalid", "（已刪除）", identity_id))
         return True
 
     def _find_identity_by_email(self, tenant_id: str, email: str) -> dict[str, Any] | None:
@@ -411,10 +418,16 @@ class IdentityStore:
 
     def close_collect_grants_for_project(self, tenant_id: str, project_id: str) -> int:
         with self._db.for_tenant(tenant_id) as conn:
-            return conn.execute(
-                "UPDATE collect_grant SET closed_at = %s WHERE tenant_id = %s AND project_id = %s AND closed_at IS NULL",
-                (db.now(), tenant_id, project_id),
-            ).rowcount
+            return self.close_collect_grants_on(conn, tenant_id, project_id)
+
+    @staticmethod
+    def close_collect_grants_on(conn: psycopg.Connection, tenant_id: str, project_id: str) -> int:
+        """On a transaction the caller opened: a case's erasure closes its grants in its own decision transaction, so a
+        failed erasure leaves them open and a committed one leaves none (ai_lego/platform/erasure.py)."""
+        return conn.execute(
+            "UPDATE collect_grant SET closed_at = %s WHERE tenant_id = %s AND project_id = %s AND closed_at IS NULL",
+            (db.now(), tenant_id, project_id),
+        ).rowcount
 
     # -- Password reset -----------------------------------------------------------
 

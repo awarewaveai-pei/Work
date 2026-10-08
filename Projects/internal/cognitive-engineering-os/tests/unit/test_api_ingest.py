@@ -10,6 +10,7 @@ from unittest.mock import patch
 from ai_lego.core.domain.source import COLLECTED_PROVENANCE
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
+from tests.unit.case_fixture import erase
 from tests.unit.test_api_collections import CollectionApiTestCase
 
 
@@ -82,7 +83,7 @@ class IngestApiTests(CollectionApiTestCase):
         tenant_id = self.tenant["tenant_id"]
 
         def erased_first(repo, tenant, project_id, *args, **kwargs):
-            repo.erase_project(tenant_id, project_id, self.identity["identity_id"], self._source_cas, 0)
+            erase(repo, tenant_id, project_id, self.identity["identity_id"], self._source_cas)
             return real(repo, tenant, project_id, *args, **kwargs)
 
         with patch.object(ProjectSourceRepository, "ingest_batch", erased_first):

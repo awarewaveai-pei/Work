@@ -8,12 +8,14 @@ Blob lifecycle (one rule): committed rows are the only record of which Source bl
 under the tenant's source-blob lock held shared (``_lock_source_blobs``), after its rows and before commit; a blob no
 committed row references is garbage (a refused batch writes none, a crash or failed write between content and commit can
 leave one). ``collect_unreferenced_blobs`` removes garbage under the same lock held exclusive -- so it never sees another
-write in flight -- and every Project erasure runs it. There is no per-request cleanup.
+write in flight. Every erasure lists the garbage in its decision (``unreferenced_blobs``) and removes it only after
+that decision commits (ai_lego/platform/erasure.py). There is no per-request cleanup.
 
 A case is written only while it exists (invariant 3): every writer takes the case lock shared as the first statement of
 its transaction (``lock_case``; a child row written first would hold the parent row the erase deletes: a deadlock) and
-checks the case row under it (``require_case``); ``erase_project`` takes the same lock exclusive. Writers do not wait for
-each other; the erase waits only for the transactions in flight, and one that comes after it finds no case (CASE_ERASED).
+checks the case row under it (``require_case``); ``erase_case_rows`` takes the same lock exclusive. Writers do not wait
+for each other; the erase waits only for the transactions in flight, and one that comes after it finds no case
+(CASE_ERASED).
 """
 
 from __future__ import annotations
@@ -95,6 +97,11 @@ class ProjectSourceRepository:
     def __init__(self, databases: Databases) -> None:
         self._db = databases
 
+    @property
+    def databases(self) -> Databases:
+        """The pools this repository reaches (the erasure's restart scan walks every region of them)."""
+        return self._db
+
     @staticmethod
     def _source_from_row(row: Row) -> dict[str, Any]:
         source = dict(row)
@@ -130,7 +137,7 @@ class ProjectSourceRepository:
     @classmethod
     def require_case(cls, connection: psycopg.Connection, tenant_id: str, project_id: str) -> None:
         """A case's records are written only while the case exists (完整刪除): late writers get CASE_ERASED. The check runs
-        under the case lock held shared, so it is atomic with erase_project, which holds it exclusive; a plain SELECT
+        under the case lock held shared, so it is atomic with erase_case_rows, which holds it exclusive; a plain SELECT
         would let an erase commit between the check and the write (critic 2026-10-04, probe P4)."""
         cls.lock_case(connection, tenant_id, project_id)
         if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id)).fetchone() is None:
@@ -348,21 +355,35 @@ class ProjectSourceRepository:
         return results
 
     @classmethod
-    def _collect_unreferenced_blobs(cls, connection: psycopg.Connection, tenant_id: str, cas: TenantScopedCas) -> int:
+    def unreferenced_blobs(cls, connection: psycopg.Connection, tenant_id: str, cas: TenantScopedCas) -> list[str]:
+        """Every Source object path of the tenant that no row this transaction sees references, under the blob lock held
+        exclusive (until the transaction ends). Lists; removes nothing."""
         cls._lock_source_blobs(connection, tenant_id, collect=True)
         referenced = {row["content_sha256"] for row in connection.execute("SELECT DISTINCT content_sha256 FROM prov_sources WHERE tenant_id=%s", (tenant_id,))}
-        removed = 0
-        for object_path in cas.list_objects(tenant_id):
-            if object_path.rsplit("/", 1)[-1] not in referenced:
-                cas.unlink(tenant_id, {"path": object_path, "tenant_segment": tenant_id})
-                removed += 1
-        return removed
+        return [object_path for object_path in cas.list_objects(tenant_id) if object_path.rsplit("/", 1)[-1] not in referenced]
 
     def collect_unreferenced_blobs(self, tenant_id: str, cas: TenantScopedCas) -> int:
         """Remove every Source blob of the tenant that no committed row references (the blob lifecycle rule above);
-        under the blob lock held exclusive, so nothing in flight can be mistaken for garbage. Returns how many were removed."""
+        under the blob lock held exclusive, so nothing in flight can be mistaken for garbage. Returns how many were removed.
+        The unlink inside this transaction is safe because the transaction decides nothing: it only reads committed rows."""
         with self._db.for_tenant(tenant_id) as connection:
-            return self._collect_unreferenced_blobs(connection, tenant_id, cas)
+            garbage = self.unreferenced_blobs(connection, tenant_id, cas)
+            for object_path in garbage:
+                cas.unlink(tenant_id, {"path": object_path, "tenant_segment": tenant_id})
+        return len(garbage)
+
+    @classmethod
+    def blob_referenced(cls, connection: psycopg.Connection, tenant_id: str, content_sha256: str) -> bool:
+        """Whether a committed Source row of the tenant still names this content, read under the blob lock held exclusive:
+        no write is between its content and its commit, and one that starts after waits for this transaction."""
+        cls._lock_source_blobs(connection, tenant_id, collect=True)
+        return connection.execute("SELECT 1 FROM prov_sources WHERE tenant_id=%s AND content_sha256=%s LIMIT 1", (tenant_id, content_sha256)).fetchone() is not None
+
+    @classmethod
+    def artifact_referenced(cls, connection: psycopg.Connection, tenant_id: str, cas_path: str) -> bool:
+        """Whether a committed interpretation, synthesis or report row of the tenant still points at this artifact path."""
+        return any(connection.execute(f"SELECT 1 FROM {table} WHERE tenant_id=%s AND artifact_reference_json->'cas_path'->>'path' = %s LIMIT 1", (tenant_id, cas_path)).fetchone()
+                   for table in cls._ARTIFACT_TABLES)
 
     # -- Collection runs (specs/domain/collection-run.schema.yaml) ---------------------------------------------
     # Events go on the Project's own aggregate and carry ids, counts and status only -- never seeds, which may name a
@@ -747,26 +768,32 @@ class ProjectSourceRepository:
             rows = [row for table in self._ARTIFACT_TABLES for row in connection.execute(f"SELECT artifact_reference_json FROM {table} WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id))]
         return [row["artifact_reference_json"] for row in rows]
 
-    def erase_project(self, tenant_id: str, project_id: str, erased_by_identity_id: str, cas: TenantScopedCas, artifacts_deleted: int) -> dict[str, int]:
-        """One write transaction: every record the case owns (record_log.delete_owned), Sources, AI artifact
-        references (interpretations, syntheses), collection runs and the Project row go; the tenant's now-unreferenced blobs are removed before
-        commit (content shared with another Project stays referenced, so it stays); one ProjectErased tombstone, owned by the platform.
-        A failure rolls the rows back, and a retry finishes the job. The case lock held exclusive first: the writers in flight
-        finish, and every later one finds no case (require_case); a hook between two writes is not waited for."""
-        with self._db.for_tenant(tenant_id) as connection:
-            self.lock_case(connection, tenant_id, project_id, exclusive=True)
-            if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id)).fetchone() is None:
-                raise InvariantViolation("PROJECT_NOT_FOUND")
-            source_ids = [row["source_id"] for row in connection.execute("SELECT source_id FROM prov_sources WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id))]
-            events_deleted = record_log.delete_owned(connection, tenant_id, record_log.case(project_id))
-            events_deleted += self._erase_records_from_case(connection, tenant_id, project_id)
-            for table in ("prov_sources", *self._ARTIFACT_TABLES, "collection_runs", "platform_projects"):
-                connection.execute(f"DELETE FROM {table} WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id))
-            blobs_unlinked = self._collect_unreferenced_blobs(connection, tenant_id, cas)
-            counts = {"sources": len(source_ids), "blobs_unlinked": blobs_unlinked, "artifacts_deleted": artifacts_deleted, "events_deleted": events_deleted}
-            record_log.append(connection, tenant_id, f"project:{project_id}", "ProjectErased", {"project_id": project_id, "erased_by_identity_id": erased_by_identity_id, **counts},
-                              writer=record_log.user(erased_by_identity_id, "GOVERN"), owner=record_log.platform(tenant_id))
-        return counts
+    @classmethod
+    def erase_case_rows(cls, connection: psycopg.Connection, tenant_id: str, project_id: str) -> dict[str, Any]:
+        """The database half of a case's erasure, on the erasure's decision transaction (ai_lego/platform/erasure.py): every
+        record the case owns (record_log.delete_owned) and every record made from it, Sources, AI artifact rows,
+        collection runs and the Project row go. Returns the counts and the AI artifact references the rows held (read before
+        they go), for the outbox. Removes no file: that happens only after this transaction commits. The case lock held
+        exclusive first: the writers in flight finish, and every later one finds no case (require_case); a hook between two
+        writes is not waited for."""
+        cls.lock_case(connection, tenant_id, project_id, exclusive=True)
+        if connection.execute("SELECT 1 FROM platform_projects WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id)).fetchone() is None:
+            raise InvariantViolation("PROJECT_NOT_FOUND")
+        sources = connection.execute("SELECT COUNT(*) FROM prov_sources WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id)).fetchone()[0]
+        references = [row["artifact_reference_json"] for table in cls._ARTIFACT_TABLES
+                      for row in connection.execute(f"SELECT artifact_reference_json FROM {table} WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id))]
+        events_deleted = record_log.delete_owned(connection, tenant_id, record_log.case(project_id))
+        events_deleted += cls._erase_records_from_case(connection, tenant_id, project_id)
+        for table in ("prov_sources", *cls._ARTIFACT_TABLES, "collection_runs", "platform_projects"):
+            connection.execute(f"DELETE FROM {table} WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id))
+        return {"sources": int(sources), "events_deleted": events_deleted, "artifact_references": references}
+
+    @staticmethod
+    def append_tombstone(connection: psycopg.Connection, tenant_id: str, project_id: str, erased_by_identity_id: str, counts: Mapping[str, int]) -> None:
+        """The one ProjectErased record, owned by the platform: appended only by the step that finished the physical
+        cleanup, so a tombstone never claims more than was done."""
+        record_log.append(connection, tenant_id, f"project:{project_id}", "ProjectErased", {"project_id": project_id, "erased_by_identity_id": erased_by_identity_id, **counts},
+                          writer=record_log.user(erased_by_identity_id, "GOVERN"), owner=record_log.platform(tenant_id))
 
     @staticmethod
     def _erase_records_from_case(connection: psycopg.Connection, tenant_id: str, project_id: str) -> int:
@@ -789,7 +816,8 @@ class ProjectSourceRepository:
 
     def erased_projects(self, tenant_id: str, identity_id: str) -> list[dict[str, Any]]:
         """The ProjectErased tombstones of the cases ``identity_id`` erased, newest first (N-66 已抹除): the Project row
-        itself is gone by design (erase_project deletes it); this event is what stays."""
+        itself is gone by design (erase_case_rows deletes it); this event is what stays, written once the files are gone
+        too (a case whose cleanup is still pending is not listed yet)."""
         with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(
                 "SELECT occurred_at, payload_json FROM events WHERE tenant_id=%s AND event_type='ProjectErased' "

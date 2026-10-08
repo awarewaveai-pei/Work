@@ -16,6 +16,7 @@ from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.platform.ai_gateway.provider import AiCompletion
+from tests.unit.case_fixture import erase
 from tests.unit.test_api_main import ApiTestCase
 
 
@@ -591,7 +592,7 @@ class InterpretApiTests(ApiTestCase):
         # the project is erased between the request and the answer (the 409 is bypassed by going to the repository):
         # the late answer, and a late failure, write nothing - not even InterpretationFailed on the erased aggregate
         with tempfile.TemporaryDirectory() as cas_dir:
-            launch.call_args.kwargs["repo"].erase_project(self.tenant["tenant_id"], self.project_id, self.identity["identity_id"], TenantScopedCas(Path(cas_dir)), 0)
+            erase(launch.call_args.kwargs["repo"], self.tenant["tenant_id"], self.project_id, self.identity["identity_id"], TenantScopedCas(Path(cas_dir)))
         before = len(launch.call_args.kwargs["repo"].interpretation_events(self.tenant["tenant_id"], response.json()["interpretation_id"]))
         api_main._run_interpretation(**launch.call_args.kwargs)
         self.assertEqual(self.client.get(f"/interpretations/{response.json()['interpretation_id']}").status_code, 404)

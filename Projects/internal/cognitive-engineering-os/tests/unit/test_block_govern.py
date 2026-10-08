@@ -530,7 +530,7 @@ class AccountErasureTests(GovernApiTestCase):
         made = [persist_artifact_output(tenant_id, artifacts, {"artifact": {"artifact_type": "image/png", "content": "SAME"}})["artifact"] for _ in range(2)]
         first, second = made[0]["cas_reference"], made[1]["cas_reference"]
         self.assertNotEqual(first["cas_path"], second["cas_path"])
-        self.assertEqual(api_main.delete_artifacts(tenant_id, artifacts, [first]), 1)
+        self.assertTrue(artifacts.delete_if_present(tenant_id, first))
         self.assertEqual(artifacts.read(tenant_id, second)["content"], "SAME")
 
     def test_my_account_deletion_leaves_a_colleagues_identical_output_and_their_export_still_has_it(self):

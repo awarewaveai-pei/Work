@@ -30,7 +30,7 @@ from tests.unit.test_api_collections import CollectionApiTestCase
 from tests.unit.test_api_ingest import c1
 from tests.unit.test_block_foundation import MirrorProvider
 from tests.pg import PgTestCase, add_tenant
-from tests.unit.case_fixture import a_case
+from tests.unit.case_fixture import a_case, erase
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
 CELLS = {key: words.cell(words.NOT_FOUND, why="沒有寫") for key in words.CARD_CELL_KEYS}
@@ -455,7 +455,7 @@ class ErasedCaseTests(Step2Case):
         real = CaseDocs.save_many   # a person's save: its checks and the write under one lock (blocks.docs._save, VERIFY r5)
 
         def erased_first(docs, tenant_id, *args, **kwargs):
-            self._repo.erase_project(tenant_id, self.pid, self.identity["identity_id"], self._source_cas, 0)
+            erase(self._repo, tenant_id, self.pid, self.identity["identity_id"], self._source_cas)
             return real(docs, tenant_id, *args, **kwargs)
 
         with mock.patch.object(CaseDocs, "save_many", erased_first):
@@ -553,7 +553,7 @@ class CaseLockTests(_TwoConnections):
         return lambda: self.docs.save(self.tenant, self.owner, "gather.source", _card(url), record_log.system("GATHER"))["doc_id"]
 
     def erase(self):
-        return lambda: self.repo.erase_project(self.tenant, self.owner.id, "me", self.cas, 0)["events_deleted"]
+        return lambda: erase(self.repo, self.tenant, self.owner.id, "me", self.cas)["erased"]["events_deleted"]
 
     def test_the_erase_waits_for_the_write_in_flight_and_takes_it_with_the_case(self):
         writer = self.run_as("writer", self.save())
@@ -570,14 +570,14 @@ class CaseLockTests(_TwoConnections):
 
     def _while_the_erase_holds_the_case(self, write) -> None:
         """``write`` starts while the erase is inside its transaction (locks held): it waits, then gets CASE_ERASED."""
-        erasing, go, real = threading.Event(), threading.Event(), ProjectSourceRepository._collect_unreferenced_blobs
+        erasing, go, real = threading.Event(), threading.Event(), ProjectSourceRepository.unreferenced_blobs
 
-        def collect_slowly(connection, tenant_id, cas):   # inside the erase's transaction, its locks held
+        def collect_slowly(connection, tenant_id, cas):   # inside the erase's decision transaction, its locks held
             erasing.set()
             go.wait(20)
             return real(connection, tenant_id, cas)
 
-        with mock.patch.object(ProjectSourceRepository, "_collect_unreferenced_blobs", staticmethod(collect_slowly)):
+        with mock.patch.object(ProjectSourceRepository, "unreferenced_blobs", staticmethod(collect_slowly)):
             eraser = self.run_as("eraser", self.erase())
             self.assertTrue(erasing.wait(10))
             writer = self.run_as("writer", write)

@@ -34,6 +34,7 @@ from ai_lego.data.repositories.project_source_repository import ProjectSourceRep
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.identity.store import IdentityStore
 from tests.pg import PgTestCase, dump
+from tests.unit.case_fixture import erase
 
 MIGRATIONS = PRODUCT_ROOT / "ai_lego" / "data" / "migrations"
 FROZEN_SQLITE_SCHEMA = MIGRATIONS / "sqlite_schema_2026_10_04.sql"
@@ -400,7 +401,7 @@ class RegionRoutingTests(PgTestCase):
     def test_erasing_a_case_removes_it_from_its_region_and_touches_no_other(self):
         two_before = self._region_text("two")
         one = self.tenants["one"]
-        self.repo.erase_project(one["tenant"], one["project"], one["identity"], self.cas, 0)
+        erase(self.repo, one["tenant"], one["project"], one["identity"], self.cas)
         self.assertNotIn(f"{one['marker']} title", self._region_text("one"))
         self.assertNotIn(f"{one['marker']} case", self._region_text("one"))
         self.assertEqual(self._region_text("two"), two_before)

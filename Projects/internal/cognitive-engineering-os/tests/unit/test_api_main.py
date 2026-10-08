@@ -1313,19 +1313,24 @@ class RecipeRunTests(ApiTestCase):
         self.assertEqual(self.client.get(f"/recipes/life-decision-v1/runs/{run_id}/result").status_code, 404)
 
     def test_erasing_a_case_erases_the_runs_on_it(self):
-        """critic 2026-10-03 M2: a run's journal and the artifacts it stored outlived the case it ran on."""
+        """critic 2026-10-03 M2: a run's journal and the artifacts it stored outlived the case it ran on. Through the route
+        (the erasure workflow names the run in its outbox and removes it after the decision commits)."""
+        self._login()
         tenant, me = self.tenant["tenant_id"], self.identity["identity_id"]
         store = api_main.app.dependency_overrides[api_main.get_artifact_store]()
+        api_main.app.dependency_overrides[api_main.get_source_cas] = lambda: TenantScopedCas(Path(self._tmpdir.name) / "source-cas")
+        project_id = self._confidential_project_id()
         reference = store.put(tenant, "ProposalDraft", {"content": "from my case"})
         journal = api_main.workflow_journal_path(tenant, "run-on-case-" + uuid.uuid4().hex[:8], me)
         journal.parent.mkdir(parents=True, exist_ok=True)
         journal.write_text("{}", encoding="utf-8")
         case_file = api_main._run_case_path(journal)
-        case_file.write_text(json.dumps({"project_id": "P-ERASED", "artifacts": [reference]}), encoding="utf-8")
+        case_file.write_text(json.dumps({"project_id": project_id, "artifacts": [reference]}), encoding="utf-8")
         other = api_main._run_case_path(api_main.workflow_journal_path(tenant, "run-on-other-" + uuid.uuid4().hex[:8], me))
         other.write_text(json.dumps({"project_id": "P-KEPT", "artifacts": []}), encoding="utf-8")
         try:
-            self.assertEqual(api_main._erase_case_runs(tenant, me, "P-ERASED", store), 1)
+            response = self.client.delete(f"/projects/{project_id}")
+            self.assertEqual((response.status_code, response.json()["physical_cleanup"], response.json()["erased"]["artifacts_deleted"]), (200, "done", 1), response.text)
             self.assertFalse(journal.exists() or case_file.exists())
             with self.assertRaises(InvariantViolation):
                 store.read(tenant, reference)

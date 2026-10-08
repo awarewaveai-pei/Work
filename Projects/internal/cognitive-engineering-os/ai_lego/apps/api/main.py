@@ -49,9 +49,10 @@ import secrets
 import subprocess
 import sys
 import uuid
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal
+from typing import Any, AsyncIterator, Callable, Literal
 from urllib.parse import urlparse
 
 from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request, Response
@@ -102,6 +103,7 @@ from ai_lego.platform.workflow.run_lock import RunLock, acquire_run_lock, lock_p
 from ai_lego.platform.workflow.workflow_gates import WorkflowGateRegistry
 from ai_lego.apps.recipe_runtime import build_method_components, build_registered_capability_adapters, build_registered_workflow_gate_registry, wrap_capability_handlers_with_artifact_persistence
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
+from ai_lego.platform.erasure import CASE as ERASURE_CASE, Erasure, sidecar_of
 from ai_lego.modules.research.interpret_method_record import INTERPRET_MAX_TOKENS, INTERPRET_TIMEOUT_SECONDS, build_prompt_manifest, record_sha256, result_page_shows, run_interpretation
 from ai_lego.modules.research.gates import claim_citations, iter_claims
 from ai_lego.modules.research.source_manifest import DEFAULT_MAX_CHARS
@@ -110,7 +112,24 @@ from ai_lego.modules.research.report_render import render_research_report
 
 SESSION_COOKIE = "cognitive_os_session"
 
-app = FastAPI(title="Cognitive OS API", version="0.1.0-phase1")
+
+
+@asynccontextmanager
+async def _lifespan(started: FastAPI) -> AsyncIterator[None]:
+    """At start: finish every erasure a crash or a filesystem error left with files still on disk (ai_lego/platform/
+    erasure.py). Logged, never fatal: an unfinished job stays for the next start or a repeated DELETE."""
+    overrides = started.dependency_overrides
+    try:
+        repo = overrides[get_project_source_repository]() if get_project_source_repository in overrides else ProjectSourceRepository(overrides.get(get_databases, get_databases)())
+        finished = resume_pending_erasures(repo, overrides.get(get_source_cas, get_source_cas)(), overrides.get(get_artifact_store, get_artifact_store)())
+        if finished:
+            logging.getLogger(__name__).info("erasures resumed at start: %s", [(job["subject_kind"], job["subject_id"], job["physical_cleanup"]) for job in finished])
+    except Exception:
+        logging.getLogger(__name__).exception("erasures could not be resumed at start; they stay pending")
+    yield
+
+
+app = FastAPI(title="Cognitive OS API", version="0.1.0-phase1", lifespan=_lifespan)
 
 
 def configure_cors(target_app: FastAPI, raw_origins: str | None = None) -> tuple[str, ...]:
@@ -252,7 +271,7 @@ def _run_case_path(journal: Path) -> Path:
     """Beside every run of the runner's own folder: which case (none for a run on no case) and every artifact the run stored,
     written by the server when the artifact is stored -- so erasing the case or the account erases the run, whether or not the
     journal is encrypted."""
-    return journal.with_name(journal.name.replace(".journal.json", ".case.json"))
+    return sidecar_of(journal)
 
 
 def _record_run_artifact(case_file: Path, output: Any) -> Any:
@@ -264,34 +283,6 @@ def _record_run_artifact(case_file: Path, output: Any) -> Any:
         tmp.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
         tmp.replace(case_file)
     return output
-
-
-_CAS_PATH = re.compile(r"/objects/[A-Za-z0-9_-]{1,128}/sha256/[0-9a-f]{2}/[0-9a-f]{2}/[0-9a-f]{64}")
-
-
-def artifact_reference_ok(reference: Any) -> bool:
-    """A reference as ``JsonArtifactStore.put`` makes it. A reference read out of a file is a claim: only one of this shape is
-    handed to the store (a path with a null byte or a drive letter never reaches the filesystem)."""
-    return (isinstance(reference, dict) and isinstance(reference.get("cas_path"), dict) and isinstance(reference["cas_path"].get("path"), str)
-            and _CAS_PATH.fullmatch(reference["cas_path"]["path"]) is not None
-            and isinstance(reference.get("content_sha256"), str) and re.fullmatch(r"[0-9a-f]{64}", reference["content_sha256"]) is not None)
-
-
-def delete_artifacts(tenant_id: str, artifact_store: JsonArtifactStore, references: Iterable[Any], failed: list[dict[str, str]] | None = None) -> int:
-    """Delete what each reference names; returns how many went. A reference that cannot be deleted -- malformed, another
-    tenant's, a blob that no longer matches its hash -- is added to ``failed`` and skipped, never raised: erasing is the
-    person's right and a retry cannot mend a corrupt reference. (A filesystem error is not that: it raises and a retry finishes.)"""
-    deleted = 0
-    for reference in references:
-        try:
-            if not artifact_reference_ok(reference):
-                raise InvariantViolation("ARTIFACT_REFERENCE_MALFORMED")
-            if artifact_store.delete_if_present(tenant_id, reference):
-                deleted += 1
-        except InvariantViolation as error:
-            if failed is not None:
-                failed.append({"artifact_type": str(reference.get("artifact_type"))[:80] if isinstance(reference, dict) else "?", "error": str(error)[:80]})
-    return deleted
 
 
 def _case_run_files(tenant_id: str, identity_id: str, project_id: str) -> list[tuple[Path, Path]]:
@@ -311,16 +302,23 @@ def case_blocker(repo: ProjectSourceRepository, tenant_id: str, identity_id: str
     return None
 
 
-def _erase_case_runs(tenant_id: str, identity_id: str, project_id: str, artifact_store: JsonArtifactStore, failed: list[dict[str, str]] | None = None) -> int:
-    """Every recipe run the person ran on this case: its artifacts, journal, lock and case file. Refuses while one runs."""
+def _case_runs(tenant_id: str, identity_id: str, project_id: str) -> list[dict[str, Any]]:
+    """Every recipe run the person ran on this case, as the erasure's outbox names it (run id, runner, the artifacts its
+    sidecar recorded). Reads only; refuses while one runs."""
     runs = _case_run_files(tenant_id, identity_id, project_id)
     if any(run_lock_state(lock_path_for(journal)) == "held" for _, journal in runs):
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a workflow run on this case is still running; wait for it to finish, then delete")
-    for case_file, journal in runs:
-        delete_artifacts(tenant_id, artifact_store, read_json(case_file).get("artifacts", []), failed)
-        for path in (journal, lock_path_for(journal), case_file):
-            path.unlink(missing_ok=True)
-    return len(runs)
+    return [{"run_id": journal.name[: -len(".journal.json")], "identity_id": identity_id, "artifacts": list(read_json(case_file).get("artifacts", []))} for case_file, journal in runs]
+
+
+def erasure_for(repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore) -> Erasure:
+    """The erasure workflow over this request's stores (ai_lego/platform/erasure.py); runs are found where this API keeps them."""
+    return Erasure(repo, source_cas, artifact_store, workflow_journal_path)
+
+
+def resume_pending_erasures(repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore) -> list[dict[str, Any]]:
+    """Finish every erasure whose decision committed but whose files are not all gone (a crash, a filesystem error)."""
+    return erasure_for(repo, source_cas, artifact_store).resume()
 
 
 def workflow_journal_ref(tenant_id: str, run_id: str) -> str:
@@ -2718,8 +2716,8 @@ def list_erased_projects(
     session: dict[str, Any] = Depends(require_session),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> list[dict[str, Any]]:
-    """已抹除 (N-66): every deleted Project's tombstone -- the row and its content are already gone (erase_project),
-    only this ProjectErased event stays."""
+    """已抹除 (N-66): every deleted Project's tombstone -- the row and its content are already gone (ai_lego/platform/erasure.py),
+    only this ProjectErased event stays, written once its files are gone too."""
     return repo.erased_projects(session["tenant_id"], session["identity_id"])
 
 
@@ -2781,37 +2779,50 @@ def erase_project(
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
     source_cas: TenantScopedCas = Depends(get_source_cas),
     artifact_store: JsonArtifactStore = Depends(get_artifact_store),
-) -> dict[str, Any]:
-    """Project-level erasure (RESEARCH_LINES_MASTER_PLAN D10, K7): AI artifacts (interpretations, syntheses), then -- in one repository
-    transaction -- Source rows, runs, the Project's events and every Source blob no other Project still references;
-    one ProjectErased tombstone stays. Artifacts go first so a failure leaves rows that still point at what is left:
-    a retry finishes the job."""
+) -> Any:
+    """Project-level erasure (RESEARCH_LINES_MASTER_PLAN D10, K7; ai_lego/platform/erasure.py): one transaction erases the
+    case's rows, closes its grants and names what is left on disk; the files go after it commits. 200 with
+    ``physical_cleanup: "done"`` when every file is gone and the ProjectErased tombstone is written; 202 with
+    ``"pending"`` when the case is already unreadable but a file is not gone yet -- DELETE again (the case answers 404
+    to everything else) or the server finishes it at its next start."""
     tenant_id = session["tenant_id"]
     if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
-    _project_or_404(repo, session, project_id)
-    return erase_case(store, repo, source_cas, artifact_store, tenant_id, session["identity_id"], project_id)
+    erasure = erasure_for(repo, source_cas, artifact_store)
+    if erasure.pending_for(tenant_id, ERASURE_CASE, project_id, session["identity_id"]):   # decided before, files not all gone yet
+        result = _without_empty_failed({"project_id": project_id, **erasure.finish(tenant_id, ERASURE_CASE, project_id)})
+    else:
+        _project_or_404(repo, session, project_id)
+        result = erase_case(store, repo, source_cas, artifact_store, tenant_id, session["identity_id"], project_id)
+    return result if result["physical_cleanup"] == "done" else JSONResponse(status_code=202, content=result)
+
+
+def _without_empty_failed(result: dict[str, Any]) -> dict[str, Any]:
+    return result if result.get("failed") else {key: value for key, value in result.items() if key != "failed"}
 
 
 def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore,
                tenant_id: str, identity_id: str, project_id: str) -> dict[str, Any]:
     """The case erasure itself, for a case the caller has already shown is the person's. No entitlement gate: it is also what
     the account deletion calls, and deleting what is yours is a right a suspended tenant does not take away. What cannot be
-    deleted (a corrupt artifact reference) comes back in ``failed`` and does not stop the erasure."""
+    deleted (a corrupt artifact reference) comes back in ``failed`` and does not stop the erasure. ``physical_cleanup``
+    says whether every file is gone yet. ``store`` stays in the signature for the callers; the grants close inside the
+    erasure's own decision transaction."""
     if any(item["status"] == "PENDING" for item in _analyses(repo, tenant_id, project_id).get(project_id, [])):
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: an analysis is still running; wait for it to finish, then delete")
     synthesis_lock = acquire_run_lock(_synthesis_lock_path(tenant_id, project_id), tag="erase")
-    if synthesis_lock is None:   # a synthesis is writing into this case; held for the whole erase so none can start
+    if synthesis_lock is None:   # a synthesis is writing into this case; held until the decision commits so none can start
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a synthesis is still running; wait for it to finish, then delete")
-    failed: list[dict[str, str]] = []
     try:
-        _erase_case_runs(tenant_id, identity_id, project_id, artifact_store, failed)
-        store.close_collect_grants_for_project(tenant_id, project_id)
-        artifacts = delete_artifacts(tenant_id, artifact_store, repo.project_artifact_references(tenant_id, project_id), failed)
-        erased = repo.erase_project(tenant_id, project_id, identity_id, source_cas, artifacts)   # later writes to the case: CASE_ERASED
+        runs = _case_runs(tenant_id, identity_id, project_id)
+        result = erasure_for(repo, source_cas, artifact_store).erase_case(tenant_id, project_id, identity_id, runs)   # later writes to the case: CASE_ERASED
+    except InvariantViolation as error:
+        if str(error).startswith("PROJECT_NOT_FOUND"):
+            raise HTTPException(status_code=404, detail=f"PROJECT_NOT_FOUND: {project_id!r}") from error
+        raise
     finally:
         synthesis_lock.release()
-    return {"project_id": project_id, "erased": erased, **({"failed": failed} if failed else {})}
+    return _without_empty_failed({"project_id": project_id, **result})
 
 
 @app.post("/projects/{project_id}/sources")

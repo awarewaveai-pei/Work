@@ -103,7 +103,12 @@ class CustomWorkflowRepository:
         """Erase what this person holds here (GOVERN 刪除帳號): their workflows and every record of each. The person's other
         records share the events table (one per region since 2026-10-04) and go with GOVERN's own erasure."""
         with self._db.for_tenant(tenant_id) as connection:
-            removed = connection.execute("DELETE FROM custom_workflows WHERE tenant_id=%s AND created_by_identity_id=%s RETURNING workflow_id", (tenant_id, identity_id)).fetchall()
-            for row in removed:
-                record_log.delete_owned(connection, tenant_id, record_log.person(identity_id), aggregate_id=f"{self.AGGREGATE_PREFIX}{row['workflow_id']}")
+            return self.delete_person_on(connection, tenant_id, identity_id)
+
+    @classmethod
+    def delete_person_on(cls, connection: psycopg.Connection, tenant_id: str, identity_id: str) -> int:
+        """``delete_person`` on a transaction the caller opened (the account erasure's decision: ai_lego/platform/erasure.py)."""
+        removed = connection.execute("DELETE FROM custom_workflows WHERE tenant_id=%s AND created_by_identity_id=%s RETURNING workflow_id", (tenant_id, identity_id)).fetchall()
+        for row in removed:
+            record_log.delete_owned(connection, tenant_id, record_log.person(identity_id), aggregate_id=f"{cls.AGGREGATE_PREFIX}{row['workflow_id']}")
         return len(removed)

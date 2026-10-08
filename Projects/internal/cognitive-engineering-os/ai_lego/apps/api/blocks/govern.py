@@ -39,6 +39,7 @@ from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowR
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import integrity, safety
+from ai_lego.platform.erasure import PERSON, Erasure, artifact_reference_ok
 from ai_lego.platform.ai_gate import PREAMBLE
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.rulesets import rulesets
@@ -134,7 +135,7 @@ def _person_runs(tenant_id: str, identity_id: str, artifact_store: JsonArtifactS
                 continue
             seen.add(key)
             kind = reference.get("artifact_type") if isinstance(reference, dict) else None
-            if not api.artifact_reference_ok(reference):   # a field in the export, not a refusal shown to a person
+            if not artifact_reference_ok(reference):   # a field in the export, not a refusal shown to a person
                 artifacts.append({"artifact_type": kind, "value": None, "error": "ARTIFACT_REFERENCE_MALFORMED"})
                 continue
             try:
@@ -158,21 +159,13 @@ def _run_still_going(tenant_id: str, identity_id: str) -> bool:
     return any(run_lock_state(lock_path_for(folder / f"{run_id}{JOURNAL_SUFFIX}")) == "held" for run_id in _run_ids(folder))
 
 
-def _erase_person_runs(tenant_id: str, identity_id: str, artifact_store: JsonArtifactStore, failed: list[dict[str, str]]) -> int:
-    """What is left in the person's run folder once their cases are erased (those took their own runs): runs on no case, and
-    the artifacts recorded for them. Refuses while one runs."""
+def _person_runs_to_erase(tenant_id: str, identity_id: str) -> list[dict[str, Any]]:
+    """What is left in the person's run folder once their cases are decided (those named their own runs): every run, with
+    the artifacts recorded for it, as the erasure's outbox names them. Reads only; refuses while one runs."""
     folder = _runs_folder(tenant_id, identity_id)
     if _run_still_going(tenant_id, identity_id):
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a workflow run is still running; wait for it to finish, then delete the account")
-    run_ids = _run_ids(folder)
-    for run_id in run_ids:
-        api.delete_artifacts(tenant_id, artifact_store, _listed(folder, run_id), failed)
-        journal = folder / f"{run_id}{JOURNAL_SUFFIX}"
-        for path in (journal, lock_path_for(journal), folder / f"{run_id}.case.json"):
-            path.unlink(missing_ok=True)
-    if folder.is_dir() and not any(folder.iterdir()):
-        folder.rmdir()
-    return len(run_ids)
+    return [{"run_id": run_id, "identity_id": identity_id, "artifacts": _listed(folder, run_id)} for run_id in _run_ids(folder)]
 
 
 # -- export -----------------------------------------------------------------------------------------------------------
@@ -350,9 +343,11 @@ def erase_account(body: EraseBody, response: Response, session: dict[str, Any] =
                   repo: ProjectSourceRepository = Depends(api.get_project_source_repository), source_cas: TenantScopedCas = Depends(api.get_source_cas),
                   artifact_store: JsonArtifactStore = Depends(api.get_artifact_store), workflows: CustomWorkflowRepository = Depends(api.get_custom_workflow_repository)) -> dict[str, Any]:
     """First ask every case and run whether it is still being worked on: one that is stops the whole thing before anything
-    is deleted. Then each case through the case erasure itself (no entitlement gate: deleting what is yours is a right), the
-    runs on no case, the person's own records and workflows, and the identity last -- so a step that fails midway can be
-    retried by someone who can sign in. What cannot be deleted (a corrupt artifact reference) is listed in ``failed``."""
+    is deleted. Then each case through the case erasure itself (no entitlement gate: deleting what is yours is a right),
+    then the person's own part -- workflows, records and identity in one decision, the runs on no case in its outbox
+    (ai_lego/platform/erasure.py). A failure before that decision commits leaves the person able to sign in and retry;
+    after it, the files are finished by the erasure workflow. What cannot be deleted (a corrupt artifact reference) is
+    listed in ``failed``; 202 with ``physical_cleanup: "pending"`` while a file is not gone yet."""
     if body.confirm.strip() != ERASE_PHRASE:
         raise HTTPException(status_code=400, detail=f"ACCOUNT_ERASE_NOT_CONFIRMED: type {ERASE_PHRASE!r} to confirm")
     tenant_id, me = session["tenant_id"], session["identity_id"]
@@ -363,15 +358,24 @@ def erase_account(body: EraseBody, response: Response, session: dict[str, Any] =
     if reasons:
         raise HTTPException(status_code=409, detail=f"PROJECT_BUSY: {reasons[0]}; wait for it to finish, then delete the account")
     failed: list[dict[str, str]] = []
+    pending = False
     for project in cases:
-        failed += api.erase_case(store, repo, source_cas, artifact_store, tenant_id, me, project["project_id"]).get("failed", [])
-    runs = _erase_person_runs(tenant_id, me, artifact_store, failed)
-    removed = workflows.delete_person(tenant_id, me)   # the workflows and their records first: one events table holds both
-    with repo.transaction(tenant_id) as connection:
-        records = record_log.delete_owned(connection, tenant_id, record_log.person(me))
-    store.delete_identity(tenant_id, me)
+        erased = api.erase_case(store, repo, source_cas, artifact_store, tenant_id, me, project["project_id"])
+        failed += erased.get("failed", [])
+        pending |= erased["physical_cleanup"] != "done"
+    erasure = api.erasure_for(repo, source_cas, artifact_store)
+    for earlier in erasure.resume(tenant_id=tenant_id, erased_by_identity_id=me):   # a case erased before whose files were not all gone
+        if earlier["subject_kind"] != PERSON:
+            failed += earlier.get("failed", [])
+            pending |= earlier["physical_cleanup"] != "done"
+    counts = erasure.decide_person(tenant_id, me, _person_runs_to_erase(tenant_id, me))
+    person = erasure.finish(tenant_id, PERSON, me)
+    failed += person["failed"]
+    pending |= person["physical_cleanup"] != "done"
     response.delete_cookie(api.SESSION_COOKIE)
-    return {"cases": len(cases), "runs": runs, "records": records, "workflows": removed, "tombstone": True, "failed": failed}
+    if pending:
+        response.status_code = 202
+    return {"cases": len(cases), **counts, "tombstone": not pending, "physical_cleanup": "pending" if pending else "done", "failed": failed}
 
 
 # -- version records --------------------------------------------------------------------------------------------------

@@ -24,7 +24,8 @@ PostgreSQL service, not inside the self-hosted Supabase. The engine speaks plain
 2. DOC_STALE and DOC_SINGLETON_EXISTS hold across processes: an advisory lock per doc / per (owner, kind) inside the save.
 3. Nothing is written to an erased case (`ProjectSourceRepository.require_case`, CASE_ERASED): the check and the erase
    take the same per-(tenant, case) lock in their own transactions (today SQLite's single writer gives this for free).
-4. A tenant's rows and blobs live only in its region. Erasure must never remove a blob while its row can still roll back; **blocked** by the fault below.
+4. A tenant's rows and blobs live only in its region. Erasure never removes a file while the decision it depends on can still roll
+   back, and a committed erasure can always be finished ("Erasure across the database and the files", built 2026-10-08).
 5. Every SQLite `BEGIN IMMEDIATE` (project_source_repository.py) is replaced by the narrowest lock that gives the same
    guarantee, named in a comment; none becomes "no lock".
 
@@ -49,7 +50,7 @@ The engine reads and writes PostgreSQL only; no SQLite path, file or fallback is
 | Piece | Where |
 |---|---|
 | Row type, jsonb and timestamptz adapters, shared and session advisory locks, tenant directory, rehearsal | `ai_lego/data/db.py` (its docstring holds the conventions, the one copy) |
-| Migrations: 0002 `tenant_directory`, 0003 `write_order` on events and workspace | `ai_lego/data/migrations/versions/` |
+| Migrations: 0002 `tenant_directory`, 0003 `write_order` on events and workspace, 0004 `erasure_jobs` + `erasure_items` (the erasure outbox) | `ai_lego/data/migrations/versions/` |
 | The SQLite schema the engine kept, frozen for the baseline comparison and the data move | `ai_lego/data/migrations/sqlite_schema_2026_10_04.sql` |
 | record_log, case_docs, project_source_repository, custom_workflow_repository, derived_artifact_cache, identity store, GOVERN's queries | ported in place, each call `Databases.for_tenant` |
 | API wiring: one process-wide `Databases` (`main.get_databases`, schema-at-head checked per region on first use); every store and repository dependency takes it | `ai_lego/apps/api/main.py` |
@@ -82,16 +83,17 @@ The engine reads and writes PostgreSQL only; no SQLite path, file or fallback is
 |---|---|---|---|
 | `events`, tenant, aggregate (`record_log.lock_aggregate`) | `record_log.append`, first; `CaseDocs.save` (a next version) and `delete` before reading the document's history | xact, exclusive | invariant 1 (MAX(sequence)+1 never races; UNIQUE is the backstop); invariant 2 DOC_STALE |
 | `doc-singleton`, tenant, owner kind, owner id, kind | `CaseDocs.save` of a new document of a one-per-owner kind, before `_live_ids` | xact, exclusive | invariant 2 DOC_SINGLETON_EXISTS |
-| `case`, tenant, case (`db.owner_lock` via `ProjectSourceRepository.lock_case`) | every case writer, first in its transaction (`require_case`, `_content_write`, rename, report CAS); a person's `from_case` record (save: after its own checks -- an events row has no foreign key to the case, so it cannot hold the row the erase deletes; delete: before it writes); `erase_project`; `CaseDocs.save_many` with a `check` | xact; writers **shared**; the erase and a checked batch **exclusive** | invariant 3: writers do not wait for each other; an exclusive holder waits for the writes in flight only; a write after the erase gets CASE_ERASED; nothing a batch's check read changes before its writes (was SQLite's file write lock) |
-| `source-blobs`, tenant | `add_source`, `supersede`, `ingest_batch` (after the case lock); `collect_unreferenced_blobs` and `erase_project` | xact; writes shared, garbage collection exclusive | the blob lifecycle rule (no blob of an uncommitted row is collected) -- was BEGIN IMMEDIATE |
+| `case`, tenant, case (`db.owner_lock` via `ProjectSourceRepository.lock_case`) | every case writer, first in its transaction (`require_case`, `_content_write`, rename, report CAS); a person's `from_case` record (save: after its own checks -- an events row has no foreign key to the case, so it cannot hold the row the erase deletes; delete: before it writes); the erasure's decision (`erase_case_rows`); `CaseDocs.save_many` with a `check` | xact; writers **shared**; the erase and a checked batch **exclusive** | invariant 3: writers do not wait for each other; an exclusive holder waits for the writes in flight only; a write after the erase gets CASE_ERASED; nothing a batch's check read changes before its writes (was SQLite's file write lock) |
+| `source-blobs`, tenant | `add_source`, `supersede`, `ingest_batch` (after the case lock); `collect_unreferenced_blobs`, the erasure's decision (`unreferenced_blobs`) and each blob item of its cleanup (`blob_referenced`) | xact; writes shared, garbage collection exclusive | the blob lifecycle rule (no blob of an uncommitted row is collected; a blob a committed row names is never removed) -- was BEGIN IMMEDIATE |
+| row locks on `erasure_items` / `erasure_jobs` | the erasure's cleanup: an item `FOR UPDATE SKIP LOCKED`, the job `FOR UPDATE` when it completes | row, until the transaction ends | two workers (a second DELETE, another process's start) never work one item at once; a job completes, and gets its tombstone, once |
 | `ai-usage`, tenant | `reserve_ai_usage` | xact, exclusive | the budget check and the reservation are one step across processes -- was BEGIN IMMEDIATE |
 | `case-hooks`, tenant, case (`CaseDocs.hooks_lock`) | `block_hooks._run_after_sources`, the whole run | session (a pooled connection held for it), exclusive | one after-sources run per case across processes -- was an in-process `threading.Lock`; its own name, so the erase never waits for a hook |
 
 Order everywhere: case, then source-blobs, then events (an aggregate); a batch locks the documents it names in sorted
 order before any write. `db.owner_lock(connection, kind, tenant, id, exclusive=)` is the scheme to reuse for a group
 (STEP34_SHARED_RULES.md: a per-(tenant, group) lock, shared for writers, exclusive for the erase): one name for both
-modes, the existence check under it. Alembic revisions 0002 and 0003 are taken here, so the groups' migration is 0004
-(`down_revision = "0003"`), not the `0002_groups.py` STEP34 names. The file run locks (`workflow/run_lock.py`: recipe
+modes, the existence check under it. Alembic revisions 0002-0004 are taken here (0004 = the erasure outbox), so the groups' migration is 0005
+(`down_revision = "0004"`), not the `0002_groups.py` STEP34 names. The file run locks (`workflow/run_lock.py`: recipe
 runs, interpretations, syntheses, and the erase's synthesis lock) stay OS file locks: they guard journals and runners on
 the API host and work across its processes; a write they let through still meets the database locks above.
 
@@ -132,13 +134,47 @@ the API host and work across its processes; a write they let through still meets
 - Text ordering (`ORDER BY name`, `ORDER BY kind`) follows the database collation. The pinned `postgres:17-alpine` (musl)
   orders by bytes, as SQLite did; D8 must use the same image, or create the database with `LC_COLLATE=C`.
 
-## Erasure and the bytes on disk (open decision)
+## Erasure and the bytes on disk
 
-### Merge blocker: erasure across DB and filesystem
+### Erasure across the database and the files
 
-The current `erase_case` deletes run artifacts/journals and AI artifacts before the DB erase (`ai_lego/apps/api/main.py:2808-2811`). The repository then unlinks Source CAS inside the DB transaction, before the tombstone append and commit (`ai_lego/data/repositories/project_source_repository.py:750-769`). Fault injection of `record_log.append` on a disposable PostgreSQL database returned `row_survives=True blob_survives=False`: the row rolled back but its content was gone. `close_collect_grants_for_project` is also a separate transaction before the erase. This violates invariant 4; W1-W3 must not merge to main or serve people as-is.
+Built 2026-10-08 (was the merge blocker: `erase_case` deleted run files and artifacts and closed grants before the
+database erase, and `erase_project` unlinked Source CAS inside its rollbackable transaction; fault injection showed
+`row_survives=True blob_survives=False`). Invariant: **nothing irreversible happens before the decision it depends on
+is durable, and a durable decision to erase can always be finished.** One workflow, `ai_lego/platform/erasure.py`, for
+`DELETE /projects/{id}`, every case of `POST /govern/account/erase`, and the account's own part.
 
-Required repair boundary: one durable, idempotent erasure workflow covering DB rows, Source CAS, AI artifacts, run journals and grants. DB commit must precede irreversible file deletion; a committed-but-unfinished cleanup must be discoverable and retryable after process crash. The tombstone/API must not claim physical completion until cleanup succeeds. Test failures before DB commit, after commit, during each unlink, and during retry; preserve shared Source blobs. Do not replace this with a post-commit best-effort call that can strand personal files.
+| Step | What | Where |
+|---|---|---|
+| 1 Decide (one transaction) | Case: case lock exclusive, every row of the case (`erase_case_rows`), its collect grants closed (`IdentityStore.close_collect_grants_on`), the tenant's unreferenced Source blobs listed under the source-blobs lock, and the outbox: one `erasure_jobs` row + one `erasure_items` row per blob / AI artifact (case rows and run sidecars) / run. Person: workflows, person records, identity marker, outbox of the runs on no case. References only (path, hash, artifact reference, run id), never content. Nothing on disk is touched; a failure leaves everything as it was. | `Erasure.decide_case`, `decide_person`; `erasure_outbox.write_job`; migration 0004 |
+| 2 Clean up (after commit) | Each item in its own transaction, `FOR UPDATE SKIP LOCKED`. A Source blob is re-checked under the source-blobs lock (`blob_referenced`): named by any committed row = `kept`. An artifact is re-checked against committed artifact rows. Already gone = `absent`. A filesystem error leaves it `pending` (attempts + 1). Malformed / another tenant's / hash mismatch = `unremovable`, reported in `failed` (a retry cannot mend it). | `Erasure.finish`, `_remove` |
+| 3 Complete | Job `FOR UPDATE`; no item pending: the ProjectErased tombstone (platform-owned; counts of what was actually removed) and the job delete commit together, then `physical_retention_hook` (empty: see below). | `Erasure._complete` |
+
+An unfinished job (its row exists exactly while files remain) is found again by a repeated `DELETE` of the case by the
+person who erased it, by that person's account deletion (`resume` narrowed to them), and at every API start
+(`main._lifespan` -> `resume_pending_erasures`; logged, never fatal). Nothing waits for a case's hooks.
+
+API: `DELETE /projects/{id}` answers 200 `{project_id, erased: {sources, blobs_unlinked, artifacts_deleted,
+events_deleted}, physical_cleanup: "done"}` or 202 `{..., physical_cleanup: "pending", pending_items}`; the account
+erase adds `physical_cleanup`, and `tombstone` is false (202) while a file remains. `GET /projects/erased` lists
+finished erasures only. The web client needs no change: `apiFetch` accepts any 2xx (`apps/cognitive-web/lib/api.ts:9`)
+and ignores the DELETE body (`components/ProjectPage.tsx:131`, `components/result/ResultPage.tsx:351`).
+
+Cost of this shape (an outbox/saga) over the rejected ones: one migration (head moves to 0004: prod is migrated before
+the code that requires it, `require_schema_at_head`), one short transaction per file, a source-blob item holding the
+tenant's source-blobs lock for one unlink (source writes of that tenant wait that long), a start-up scan of
+`erasure_jobs` per region. Rejected: a post-commit best-effort unlink (a crash strands personal files with nothing to
+find them); files first (the original fault).
+
+Gate: `tests/unit/test_erasure_workflow.py` -- fault injection at each decision step, after commit, at each file kind,
+during the resume, a fresh process, a concurrent DELETE, the account path, shared blobs (also one added after the
+decision); and `IrreversibleGateTests`, which fails when any path from an erasure entry point reaches a removal
+(`unlink`, `rmdir`, `remove`, `rmtree`, `delete_if_present`, ...) or a split-transaction write (`close_collect_grants_for_project`,
+`delete_identity`, `delete_person`) without passing through `finish` / `resume`.
+
+Not covered: an artifact's put and its row are not under one lock, so the re-check sees committed rows only (artifact
+content carries its ids; unchanged from before); encrypted-journal ciphertext in `workflow-cas` stays (named in the
+account summary, unchanged); a run started on a case after its decision is not in the outbox (it finds no case).
 
 ### Physical retention decision
 
@@ -149,7 +185,8 @@ every nightly dump (D8) until that dump expires. The tests now prove the region'
 erased (`tests/pg.py::dump`); they no longer prove the bytes on disk. Options for the operator: VACUUM the touched tables
 after an erasure (cost on large tables, still not WAL or dumps), a dump retention that bounds how long erased data lives,
 or per-tenant/per-person encryption keys destroyed on erasure. Until decided, an erasure is complete for every reader of
-the database and not for its files.
+the database and not for its files. Whatever is decided runs from one place: `erasure.physical_retention_hook`, called
+after an erasure completes (empty today).
 
 ## Data move (requirements; the script is later)
 
