@@ -91,7 +91,9 @@ def study_secret(study_id: str, environ: Mapping[str, str]) -> bytes:
     secret = environ.get(name, "")
     if not secret.strip():
         raise InvariantViolation(f"RESEARCH_STUDY_SECRET_MISSING: set {name}; nothing is exported without the study's own secret")
-    return secret.encode("utf-8")
+    # The env name is many-to-one ("s-a", "S_A" -> ..._S_A): the key is bound to the exact study id, so two studies
+    # that share a secret still never share a pseudonym (Codex GOVERN review F2: cross-study linkage).
+    return hmac.new(secret.encode("utf-8"), f"study:{study_id}".encode("utf-8"), hashlib.sha256).digest()
 
 
 def _pseudonym(secret: bytes, label: str, value: str) -> str:

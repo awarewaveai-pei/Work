@@ -106,6 +106,17 @@ class WhatLeavesTests(ExportCase):
         self.assertNotEqual(first, other)
         self.assertNotIn(self.b, first[0])
 
+    def test_two_study_ids_that_share_a_secret_name_never_share_a_pseudonym(self):
+        card = self.save(self.b, "sense.card", {"category": "事件", "text": "一"}, "SENSE")
+        self.consent(self.b, card)
+        self.consent(self.b, card, study="S_2026")   # same env name COGNITIVE_OS_STUDY_SECRET_S_2026 as "s-2026"
+        first = [line["subject"] for line in self.export()[0] if line["type"] == "item"]
+        out = self.folder / "alias.jsonl"
+        research_export.export(self.repo, self.tenant, "S_2026", out, now=db.now(), environ=SECRET)
+        alias = [json.loads(line)["subject"] for line in out.read_text(encoding="utf-8").splitlines() if json.loads(line)["type"] == "item"]
+        self.assertTrue(first and alias)
+        self.assertFalse(set(first) & set(alias))
+
     def test_the_header_says_what_was_removed_and_that_it_is_no_guarantee(self):
         lines, manifest, _ = self.export()
         self.assertEqual(lines[0]["type"], "header")
