@@ -16,7 +16,7 @@ from ai_lego.platform.erasure import Erasure
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.scripts import load_scripts
 from tests.pg import dump
-from tests.unit.facilitator_fixture import make_eligible
+from tests.unit.facilitator_fixture import make_eligible, reviewed_script_patch
 from tests.unit.test_api_main import ApiTestCase
 
 PASSWORD = "correct-horse-battery"
@@ -103,8 +103,10 @@ class WhoReadsAnAppealTests(AppealCase):
         with self.databases.for_tenant(self.tenant_id) as connection:
             ProjectSourceRepository.add_member(connection, self.tenant_id, other, self.ids["S"], "facilitator")
         make_eligible(CaseDocs(self.repo), self.tenant_id, self.ids["S"])
+        make_eligible(CaseDocs(self.repo), self.tenant_id, self.ids["F"])   # a leader who names a supervisor is a trained one
         script = load_scripts().items[0]
-        log = self.as_("S").post("/me/docs/facilitate.log", json={"content": {"group_id": other, "script": script["id"], "script_version": script["version"], "followed": "照稿"}})
+        with reviewed_script_patch():
+            log = self.as_("S").post("/me/docs/facilitate.log", json={"content": {"group_id": other, "script": script["id"], "script_version": script["version"], "followed": "照稿"}})
         self.assertEqual(log.status_code, 200, log.text)
         self.reads_nothing("S", doc_id)   # eligible, but nobody named S yet
         named = self.as_("F").post("/facilitate/supervisors", json={"email": self.store.get_identity(self.ids["S"])["email"]})

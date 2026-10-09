@@ -17,11 +17,11 @@ from ai_lego.platform.block_hooks.facilitate import drift_records
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.scripts import load_scripts
 from ai_lego.platform.visibility import Viewer
-from tests.unit.facilitator_fixture import make_eligible, run_content
+from tests.unit.facilitator_fixture import make_eligible, reviewed_script_patch, run_content
 from tests.unit.test_api_main import ApiTestCase
 
 PASSWORD = "correct-horse-battery"
-SCRIPT = load_scripts().items[0]
+SCRIPT, DRAFT = load_scripts().items[0], load_scripts().items[1]
 
 
 class FacilitateCase(ApiTestCase):
@@ -34,12 +34,18 @@ class FacilitateCase(ApiTestCase):
         self.tenant_id = self.tenant["tenant_id"]
         self._login()   # the convener C
         self.group = self.client.post("/groups", json={"name": "工作坊", "purpose": "workshop"}).json()["group_id"]
+        patcher = reviewed_script_patch()
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.ids: dict[str, str] = {}
         self.clients: dict[str, TestClient] = {}
+        self.trained: dict[str, dict[str, str]] = {}
         for name, role in (("F", "facilitator"), ("G", "facilitator"), ("P1", "participant"), ("P2", "participant"), ("S", None), ("X", None)):
             self.ids[name] = self.store.create_identity(str(uuid.uuid4()), self.tenant_id, f"{name.lower()}-{uuid.uuid4().hex[:6]}@example.com", f"名字{name}", PASSWORD)["identity_id"]
             if role:
                 self.join(self.group, name, role)
+        self.eligible("F")   # a facilitator leads only while the records say so (is_leader_of): F and G have finished the course
+        self.eligible("G")
 
     def join(self, group: str, name: str, role: str) -> None:
         with self.databases.for_tenant(self.tenant_id) as connection:
@@ -57,7 +63,10 @@ class FacilitateCase(ApiTestCase):
         return Viewer(self.tenant_id, self.ids[name])
 
     def eligible(self, name: str) -> dict[str, str]:
-        return make_eligible(self.docs, self.tenant_id, self.ids[name])
+        """The identity's teach.run ids by lesson (made once: a second set would keep them eligible after a delete)."""
+        if name not in self.trained:
+            self.trained[name] = make_eligible(self.docs, self.tenant_id, self.ids[name])
+        return self.trained[name]
 
     def log(self, by: str, group: str | None = None, **more):
         content = {"group_id": group or self.group, "script": SCRIPT["id"], "script_version": SCRIPT["version"], "followed": "照稿", **more}
@@ -120,7 +129,16 @@ class EligibilityTests(FacilitateCase):
         self.assertEqual({name: len(items) for name, items in self.consented().items()}, {"P1": 1, "P2": 0})
         self.as_("F").delete(f"/me/docs/teach.run/{runs['facilitator-how-to-lead']}")
         self.assertEqual(visibility.shared_with(self.docs, self.repo, self.viewer("F"), "facilitator", self.ids["F"]), [])
-        self.assertEqual({name: len(items) for name, items in self.consented().items()}, {"P1": 0, "P2": 0})
+
+    def test_a_leader_who_lost_the_course_leads_nothing_a_stored_role_is_not_enough(self):
+        self.shared_card("P1", "F")
+        mine = f"/groups/{self.group}"
+        asks = {"consented": lambda: self.as_("F").get(f"{mine}/facilitate/consented"), "stop": lambda: self.as_("F").post(f"{mine}/facilitate/stop", json={"participant": self.ids["P1"]}),
+                "log": lambda: self.log("F"), "invite": lambda: self.as_("F").post(f"{mine}/invites", json={"role": "participant"})}
+        self.assertEqual({name: ask().status_code for name, ask in asks.items()}, {"consented": 200, "stop": 200, "log": 200, "invite": 200})   # trained: all of it works
+        self.assertEqual(self.as_("F").delete(f"/me/docs/teach.run/{self.eligible('F')['facilitator-donts']}").status_code, 200)
+        self.assertEqual(self.repo.get_group_for(self.tenant_id, self.group, self.ids["F"])["my_role"], "facilitator")   # the stored role is still there
+        self.assertEqual({name: ask().status_code for name, ask in asks.items()}, {"consented": 403, "stop": 403, "log": 400, "invite": 403})
 
     def shared_card(self, owner: str, with_whom: str, text: str = "分享的卡") -> str:
         """The owner opens a case with two cards and consents to show only the first to ``with_whom``; returns its doc id."""
@@ -154,6 +172,13 @@ class LogTests(FacilitateCase):
         self.assertEqual(self.log("F", followed="", deviated=[]).status_code, 400)   # an empty log is no log
         self.assertEqual(self.log("F", followed="", deviated=[{"what": "跳過第二步", "why": "時間不夠"}]).status_code, 200)
         self.assertEqual(self.as_("S").post("/me/docs/facilitate.supervision_link", json={"content": {}}).status_code, 404)   # a link is not a person's record to post
+
+
+class ScriptTests(FacilitateCase):
+    def test_a_log_names_only_a_script_that_may_lead(self):
+        draft = self.log("F", script=DRAFT["id"], script_version=DRAFT["version"])   # the second seed is a draft
+        self.assertEqual((draft.status_code, draft.json()["detail"].split(":")[0]), (400, "FACILITATE_SCRIPT_NOT_REVIEWED"))
+        self.assertEqual(self.log("F").status_code, 200)
 
 
 class SupervisionTests(FacilitateCase):
@@ -237,6 +262,29 @@ class SupervisionTests(FacilitateCase):
         self.docs.save(self.tenant_id, record_log.platform(self.tenant_id), "facilitate.supervision_link", unit, record_log.user(self.ids["P1"], "FACILITATE"))
         self.assertEqual([item["supervisee"] for item in self.as_("S").get("/facilitate/supervisees").json()], [self.ids["F"]])
         self.assertEqual(self.as_("S").get(f"/facilitate/supervisees/{self.ids['G']}/logs").status_code, 404)
+
+    def test_a_link_is_taken_back_only_through_its_own_door(self):
+        unit = self.client.post(f"/groups/{self.group}/facilitate/assignments", json={"supervisee": self.ids["F"], "email": self.email("S")}).json()["doc_id"]
+        own = self.name("F").json()["doc_id"]
+        elsewhere = self.client.post("/groups", json={"name": "別的班", "purpose": "class"}).json()["group_id"]
+        self.assertEqual(self.client.delete(f"/groups/{elsewhere}/facilitate/assignments/{unit}").status_code, 404)   # another group's door
+        self.assertEqual(self.client.delete(f"/facilitate/supervisors/{unit}").status_code, 404)                     # the leaders' door is for their own links
+        self.assertEqual(self.as_("F").delete(f"/groups/{self.group}/facilitate/assignments/{own}").status_code, 404)  # a leader's own link is no unit assignment
+        self.assertEqual(sorted(item["assigned_by"] for item in self.as_("F").get("/facilitate/supervisors").json()), ["self", "unit"])   # nothing was taken
+        self.assertEqual(self.client.delete(f"/groups/{self.group}/facilitate/assignments/{unit}").status_code, 200)
+        self.assertEqual(self.as_("F").delete(f"/facilitate/supervisors/{own}").status_code, 200)
+        self.assertEqual(self.as_("F").get("/facilitate/supervisors").json(), [])
+
+    def test_only_a_leader_may_name_a_supervisor_and_every_refusal_is_the_same_404(self):
+        unfit = self.as_("F").post("/facilitate/supervisors", json={"email": "nobody@example.com"})
+        self.assertEqual(unfit.status_code, 404)
+        self.eligible("P2")   # trained, but leads no group
+        self.assertEqual(self.as_("G").delete(f"/me/docs/teach.run/{self.eligible('G')['facilitator-donts']}").status_code, 200)   # leads a group, no longer trained
+        for who in ("P1", "X", "P2", "G"):
+            with self.subTest(who=who):
+                answer = self.as_(who).post("/facilitate/supervisors", json={"email": self.email("S")})
+                self.assertEqual((answer.status_code, answer.json()), (404, unfit.json()))
+        self.assertEqual(self.name("F").status_code, 200)
 
     def test_a_link_is_one_and_only_its_writer_takes_it_back(self):
         self.assertEqual(self.name("F").status_code, 200)

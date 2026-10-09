@@ -4,10 +4,12 @@ then the system's completion), for tests that need a facilitator without going t
 from __future__ import annotations
 
 import datetime
+from unittest import mock
 
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.platform.lessons import FACILITATOR_COURSE, courses, load_lessons, load_practice_cases
+from ai_lego.platform.scripts import load_scripts
 
 
 def lesson_versions() -> dict[str, int]:
@@ -26,3 +28,9 @@ def make_eligible(docs: CaseDocs, tenant_id: str, identity_id: str) -> dict[str,
         runs[lesson_id] = docs.save(tenant_id, owner, "teach.run", run_content(lesson_id, version), record_log.user(identity_id, "TEACH"))["doc_id"]
     docs.save(tenant_id, owner, "teach.completion", {"course": FACILITATOR_COURSE, "lesson_versions": versions, "at": datetime.date.today().isoformat()}, record_log.system("TEACH"))
     return runs
+
+
+def reviewed_script_patch() -> "mock._patch":
+    """The first seed script counts as reviewed for the log check (the three seeds are drafts until the operator reviews one)."""
+    first = load_scripts().items[0]
+    return mock.patch("ai_lego.platform.block_hooks.facilitate.usable_for_leading", lambda: [{**first, "state": "reviewed"}])

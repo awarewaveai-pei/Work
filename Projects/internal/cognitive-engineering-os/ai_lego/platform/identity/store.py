@@ -582,7 +582,7 @@ class IdentityStore:
     # account-flooding hold are GOVERN's ruleset (platform/rulesets/govern.py "govern.invites"), never constants here.
     #
     # Who may invite: a convener always (a participant or a facilitator); a facilitator in a 'class' or 'workshop'
-    # group (a participant); a participant never; nobody held for review.
+    # group (a participant) while they are an eligible facilitator (card 61); a participant never; nobody held for review.
 
     INVITE_REFUSED = "INVITE_NOT_FOUND: this invitation opens nothing"   # every refusal of accept: one text, no reason
 
@@ -602,7 +602,8 @@ class IdentityStore:
             mine = conn.execute("SELECT role, review_state FROM group_members WHERE tenant_id = %s AND group_id = %s AND identity_id = %s AND left_at IS NULL",
                                 (tenant_id, group_id, inviter_identity_id)).fetchone()
             allowed = mine["review_state"] == "confirmed" and (
-                mine["role"] == "convener" or (mine["role"] == "facilitator" and group["purpose"] in ("class", "workshop") and role == "participant"))
+                mine["role"] == "convener" or (mine["role"] == "facilitator" and group["purpose"] in ("class", "workshop") and role == "participant"
+                                               and self._finished_leader_course(tenant_id, inviter_identity_id)))
             if not allowed:
                 raise InvariantViolation("GROUP_INVITE_NOT_ALLOWED: a convener invites; a facilitator invites participants to a class or a workshop")
             db.advisory_xact_lock(conn, "group-invites", tenant_id, group_id)   # the two counts below hold until this commits

@@ -28,7 +28,7 @@ const doc = (kind: string, doc_id: string, content: Record<string, unknown>, ove
   ({ doc_id, kind, version: 1, content, author: "user", block: "FACILITATE", at: "2026-10-09T08:00:00Z", created_at: "2026-10-09T08:00:00Z", ...over });
 
 async function group(routes: Record<string, unknown> = {}) {
-  const calls = serve({ "/blocks/facilitate/scripts": SCRIPTS, "/groups/G1": GROUP, "/groups/G1/facilitate/consented": CONSENTED, "/groups/G1/facilitate/assignments": [], ...routes });
+  const calls = serve({ "/blocks/facilitate/scripts": SCRIPTS, "/groups/G1": GROUP, "/facilitate/me": { facilitator: true, supervisor: false }, "/groups/G1/facilitate/consented": CONSENTED, "/groups/G1/facilitate/assignments": [], ...routes });
   const page = await mount(<FacilitatePage groupId="G1" />);
   return { ...page, calls };
 }
@@ -109,6 +109,7 @@ describe("FACILITATE: leading a group", () => {
         pointers: [{ n: 2, line: "沒照稿：我替他們總結了結論（理由：時間不夠）", dont: DONTS[0], text: `這裡可能偏離「${DONTS[0]}」：這一行說你替參與者做了總結。` }] }, { author: "ai" }) }),
     });
     expect(byText(host, "button", "請 AI 指出可能偏離的地方")?.hasAttribute("disabled")).toBe(true);   // nothing saved yet
+    expect(host.querySelector('[aria-label="這次帶的帶領稿"]')?.textContent).toBe("冰山模型");   // the draft script is not offered for a log
     await type(field(host, "log-followed"), "開場說明了步驟。");
     await click(byText(host, "button", "再加一項"));
     await type(field(host, "log-what-0"), "我替他們總結了結論");
@@ -124,6 +125,17 @@ describe("FACILITATE: leading a group", () => {
     expect(text).toContain("沒照稿：我替他們總結了結論（理由：時間不夠）");
     expect(text).toContain(HANDBACK);
     NO_FORBIDDEN_WORDS(host);
+    await done();
+  });
+
+  it("offers no leading to a facilitator who no longer meets the course, but keeps the don'ts and the way to the course", async () => {
+    const { host, done, calls } = await group({ "/facilitate/me": { facilitator: false, supervisor: false } });
+    expect(allDonts(host)).toBe(true);
+    expect(host.textContent).toContain("你現在不符合帶領者的條件");
+    expect(host.querySelector('a[href="/lead"]')).not.toBeNull();
+    expect(byText(host, "button", "參與者要停")).toBeUndefined();
+    expect(host.querySelector("#log-followed")).toBeNull();
+    expect(calls.filter((call) => call.path.includes("/facilitate/consented"))).toEqual([]);   // nothing of the participants is asked for
     await done();
   });
 

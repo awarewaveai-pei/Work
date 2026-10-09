@@ -80,6 +80,21 @@ def is_eligible_supervisor(docs: CaseDocs, viewer: Viewer) -> bool:
     return is_eligible_facilitator(docs, viewer) and bool(docs.current(viewer.tenant_id, record_log.person(viewer.identity_id), FACILITATE_LOG))
 
 
+def is_leader_of(docs: CaseDocs, viewer: Viewer, group_id: str) -> bool:
+    """A facilitator's powers over a group -- leading it, logging it, helping its members, reading what they chose to show,
+    inviting into it -- need both: a confirmed facilitator of it now AND an eligible facilitator now (§5). The role says
+    where, the records say whether still; every such power asks this one question, so none keeps working on a stored role."""
+    membership = _membership(docs, viewer, group_id)
+    return (membership is not None and membership["my_role"] == "facilitator" and membership["my_review_state"] == "confirmed"
+            and is_eligible_facilitator(docs, viewer))
+
+
+def leads_a_group(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer) -> bool:
+    """Whether the viewer is a facilitator of some group now and an eligible one: who may find a supervisor for themself."""
+    return is_eligible_facilitator(docs, viewer) and any(group["my_role"] == "facilitator" and group["my_review_state"] == "confirmed"
+                                                         for group in repo.list_groups_for(viewer.tenant_id, viewer.identity_id))
+
+
 def visible(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, *, doc_id: str | None = None) -> list[dict[str, Any]]:
     """R1: what of a group's records of ``kind`` this viewer reads now (``doc_id``: that one document, or nothing).
 
@@ -287,6 +302,13 @@ def unit_assignments(docs: CaseDocs, viewer: Viewer, group_id: str) -> list[dict
             if link["content"]["assigned_by"] == "unit" and link["content"].get("group_id") == group_id and (convener or link["content"]["supervisee"] == viewer.identity_id)]
 
 
+def writes_link(docs: CaseDocs, viewer: Viewer, doc_id: str, assigned_by: str, group_id: str = "") -> bool:
+    """Whether the viewer wrote the live link ``doc_id`` and it is of this kind: a leader's own (self), or the unit's of this
+    group. A route that takes a link back asks this first, so a link is never reached through another kind's or group's door."""
+    return any(link["doc_id"] == doc_id and link["written_by"] == viewer.identity_id and link["content"]["assigned_by"] == assigned_by
+               and link["content"].get("group_id", "") == group_id for link in docs.current_on_platform(viewer.tenant_id, SUPERVISION_LINK))
+
+
 def existing_link(docs: CaseDocs, tenant_id: str, content: dict[str, Any]) -> str | None:
     """The id of the live link with exactly these parts, if one is there (a second is not made). Ids only."""
     return next((link["doc_id"] for link in docs.current_on_platform(tenant_id, SUPERVISION_LINK)
@@ -320,11 +342,10 @@ def led_cases(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer) -> 
 
 
 def help_for_member(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer, group_id: str, member_id: str) -> dict[str, Any] | None:
-    """GOVERN's help for where one member of a group is, asked by the group's facilitator when that member wants to stop
-    (help is never held back for a leader's training). The place is read here from the member's own records and never
-    leaves: only the lines of help do. None unless the viewer leads the group now and the member is in it."""
-    leader, member = repo.get_group_for(viewer.tenant_id, group_id, viewer.identity_id), repo.get_group_for(viewer.tenant_id, group_id, member_id)
-    if leader is None or leader["my_role"] != "facilitator" or leader["my_review_state"] != "confirmed" or member is None:
+    """GOVERN's help for where one member of a group is, asked by the group's leader (``is_leader_of``) when that member
+    wants to stop. The place is read here from the member's own records and never leaves: only the lines of help do.
+    None unless the viewer leads the group now and the member is in it."""
+    if not is_leader_of(docs, viewer, group_id) or repo.get_group_for(viewer.tenant_id, group_id, member_id) is None:
         return None
     placed = [item for item in docs.current_in_group(viewer.tenant_id, group_id, "collab.place") if item["written_by"] == member_id]
     where = placed[-1]["content"]["where"] if placed else None

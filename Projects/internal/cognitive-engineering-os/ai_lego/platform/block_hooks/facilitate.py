@@ -18,7 +18,7 @@ from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import visibility
-from ai_lego.platform.scripts import load_scripts
+from ai_lego.platform.scripts import load_scripts, usable_for_leading
 from ai_lego.platform.visibility import Viewer
 
 DRIFT_KIND = "facilitate.log"
@@ -37,12 +37,13 @@ def _log_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, conten
         if str(error).startswith(("GROUP_NOT_FOUND", "GROUP_ERASED")):
             raise InvariantViolation(f"GROUP_NOT_FOUND: {group_id!r}") from None
         raise
-    membership = docs.reads.membership(tenant_id, str(group_id), owner.id)
-    if membership is None or membership["my_role"] != "facilitator":
-        raise InvariantViolation("FACILITATE_LOG_NOT_LEADER: a log is written by a facilitator of the group it is about")
+    if not visibility.is_leader_of(docs, Viewer(tenant_id, owner.id), str(group_id)):
+        raise InvariantViolation("FACILITATE_LOG_NOT_LEADER: a log is written by a facilitator of the group it is about, who has finished the leader course")
     script = next((item for item in load_scripts().items if item["id"] == content.get("script")), None)
     if script is None or script["version"] != content.get("script_version"):
         raise InvariantViolation(f"FACILITATE_SCRIPT_VERSION_UNKNOWN: {content.get('script')!r} v{content.get('script_version')!r}")
+    if not any(item["id"] == script["id"] for item in usable_for_leading()):   # only a script that may lead is one a session followed
+        raise InvariantViolation(f"FACILITATE_SCRIPT_NOT_REVIEWED: {script['id']!r} is a draft or has no stop signal")
     deviated = content.get("deviated") or []
     if (not isinstance(deviated, list) or len(deviated) > MAX_DEVIATIONS
             or any(not isinstance(item, dict) or set(item) != {"what", "why"} or not _text(item["what"]) or not _text(item["why"]) for item in deviated)):

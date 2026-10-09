@@ -339,7 +339,7 @@ function Shared({ groupId }: { groupId: string }) {
 function Log({ groupId, scripts }: { groupId: string; scripts: Script[] }) {
   const [logs, setLogs] = useState<Doc<LogContent>[]>([]);
   const [editing, setEditing] = useState<Doc<LogContent> | null>(null);
-  const [scriptId, setScriptId] = useState(scripts.find((item) => item.usable)?.id ?? scripts[0]?.id ?? "");
+  const [scriptId, setScriptId] = useState(scripts[0]?.id ?? "");
   const [followed, setFollowed] = useState("");
   const [deviated, setDeviated] = useState<Deviation[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -386,7 +386,7 @@ function Log({ groupId, scripts }: { groupId: string; scripts: Script[] }) {
         </div>
       )}
       <div className="chips" role="group" aria-label="這次帶的帶領稿">
-        {scripts.map((item) => <button key={item.id} type="button" className={`chip${item.id === scriptId ? " on" : ""}`} aria-pressed={item.id === scriptId} onClick={() => edit(setScriptId)(item.id)}>{item.subject_name}{item.state === "draft" ? "（草稿）" : ""}</button>)}
+        {scripts.map((item) => <button key={item.id} type="button" className={`chip${item.id === scriptId ? " on" : ""}`} aria-pressed={item.id === scriptId} onClick={() => edit(setScriptId)(item.id)}>{item.subject_name}</button>)}
       </div>
       <div className="field">
         <label htmlFor="log-followed">照稿做了哪些</label>
@@ -463,10 +463,12 @@ function Unit({ groupId, group }: { groupId: string; group: Group }) {
 
 function GroupLead({ groupId, scripts }: { groupId: string; scripts: Scripts }) {
   const [group, setGroup] = useState<Group | null>(null);
+  const [standing, setStanding] = useState<Standing | null>(null);
   const [error, setError] = useState("");
-  useEffect(() => { groups.get(groupId).then(setGroup).catch((reason) => setError(humanError(reason))); }, [groupId]);
-  if (!group) return <div className="card"><p>{error || "載入中…"}</p></div>;
-  const leads = group.my_role === "facilitator";
+  useEffect(() => { Promise.all([groups.get(groupId), facilitate.standing()]).then(([found, mine]) => { setGroup(found); setStanding(mine); }).catch((reason) => setError(humanError(reason))); }, [groupId]);
+  if (!group || !standing) return <div className="card"><p>{error || "載入中…"}</p></div>;
+  const leads = group.my_role === "facilitator" && standing.facilitator;
+  const usable = scripts.scripts.filter((item) => item.usable);
   return (
     <>
       <p className="sub">群組：{group.name}</p>
@@ -474,9 +476,11 @@ function GroupLead({ groupId, scripts }: { groupId: string; scripts: Scripts }) 
         <>
           <Lead groupId={groupId} scripts={scripts.scripts} participants={(group.members ?? []).filter((member) => member.role === "participant")} />
           <Shared groupId={groupId} />
-          <Log groupId={groupId} scripts={scripts.scripts} />
+          {usable.length > 0 ? <Log groupId={groupId} scripts={usable} /> : <section className="card"><h2>寫帶領紀錄</h2><p>現在還沒有審過、可以拿來帶的帶領稿，所以還不能寫帶領紀錄。</p></section>}
         </>
-      ) : <div className="card"><p>這一頁的帶領功能，只給這個群組的帶領者。</p></div>}
+      ) : <div className="card"><p>{group.my_role === "facilitator"
+        ? <>你現在不符合帶領者的條件（要上完帶領者的課），所以不能用這一頁帶領。到<Link href="/lead">「帶領」頁</Link>看課。</>
+        : "這一頁的帶領功能，只給這個群組的帶領者。"}</p></div>}
       {(leads || group.my_role === "convener") && <Unit groupId={groupId} group={group} />}
     </>
   );

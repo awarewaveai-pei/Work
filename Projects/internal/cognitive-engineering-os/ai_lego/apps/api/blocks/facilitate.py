@@ -65,12 +65,17 @@ def _missing() -> HTTPException:
     return HTTPException(status_code=404, detail="FACILITATE_SUPERVISEE_NOT_FOUND: nobody you supervise has that id")
 
 
+def _no_supervisor() -> HTTPException:
+    """The one answer for every refusal to name a supervisor (no such person, not trained, never led, or the asker may not name one)."""
+    return HTTPException(status_code=404, detail="FACILITATE_SUPERVISOR_NOT_FOUND: nobody with that address can supervise yet")
+
+
 def _supervisor_by_email(store: IdentityStore, docs: CaseDocs, session: dict[str, Any], email: str, supervisee_id: str) -> str:
-    """Whom an email names, if they are an eligible supervisor now and not the leader themself; else one 404 for every
-    other case (no such person, not trained, never led): it does not tell who has an account."""
+    """Whom an email names, if they are an eligible supervisor now and not the leader themself; else the one 404: it does
+    not tell who has an account."""
     found = store.identity_by_email(session["tenant_id"], email.strip().lower())
     if found is None or found["identity_id"] == supervisee_id or not visibility.is_eligible_supervisor(docs, Viewer(session["tenant_id"], found["identity_id"])):
-        raise HTTPException(status_code=404, detail="FACILITATE_SUPERVISOR_NOT_FOUND: nobody with that address can supervise yet")
+        raise _no_supervisor()
     return found["identity_id"]
 
 
@@ -88,12 +93,17 @@ def _link(repo: ProjectSourceRepository, session: dict[str, Any], content: dict[
     return {"doc_id": saved["doc_id"], "already": False}
 
 
-def _delete_link(repo: ProjectSourceRepository, session: dict[str, Any], doc_id: str) -> dict[str, str]:
-    """Only the person who wrote it takes a link back (CaseDocs: DOC_NOT_YOURS); one that is not there or not theirs answers alike."""
-    try:
-        CaseDocs(repo).delete(session["tenant_id"], _platform(session), LINK, doc_id, api._me(session, BLOCK))
+def _delete_link(repo: ProjectSourceRepository, session: dict[str, Any], doc_id: str, assigned_by: str, group_id: str = "") -> dict[str, str]:
+    """Only the person who wrote it takes a link back, and only through its own door: a leader's own (self) or the unit's of
+    this group. Not there, not theirs, another kind's or another group's: one 404."""
+    docs = CaseDocs(repo)
+    gone = HTTPException(status_code=404, detail="FACILITATE_LINK_NOT_FOUND: no link of yours has that id")
+    if not visibility.writes_link(docs, _viewer(session), doc_id, assigned_by, group_id):
+        raise gone
+    try:   # CaseDocs re-checks the sole writer under the lock (DOC_NOT_YOURS)
+        docs.delete(session["tenant_id"], _platform(session), LINK, doc_id, api._me(session, BLOCK))
     except InvariantViolation as error:
-        raise HTTPException(status_code=404, detail="FACILITATE_LINK_NOT_FOUND: no link of yours has that id") from error
+        raise gone from error
     return {"status": "deleted", "doc_id": doc_id}
 
 
@@ -131,14 +141,16 @@ class SupervisorBody(BaseModel):
 @router.post("/facilitate/supervisors")
 def find_supervisor(body: SupervisorBody, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository),
                     store: IdentityStore = Depends(api.get_store)) -> dict[str, Any]:
-    me_id = session["identity_id"]
-    supervisor = _supervisor_by_email(store, CaseDocs(repo), session, body.email, me_id)
+    docs, me_id = CaseDocs(repo), session["identity_id"]
+    if not visibility.leads_a_group(docs, repo, _viewer(session)):   # only a leader names a supervisor: anyone else gets the answer of an address that fits nobody
+        raise _no_supervisor()
+    supervisor = _supervisor_by_email(store, docs, session, body.email, me_id)
     return _link(repo, session, {"supervisee": me_id, "supervisor": supervisor, "assigned_by": "self"})
 
 
 @router.delete("/facilitate/supervisors/{doc_id}")
 def drop_supervisor(doc_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, str]:
-    return _delete_link(repo, session, doc_id)
+    return _delete_link(repo, session, doc_id, "self")
 
 
 # -- a supervisor's side --------------------------------------------------------------------------------------------------
@@ -175,9 +187,10 @@ def my_feedback(session: dict[str, Any] = Depends(api.require_session), repo: Pr
 # -- inside one group ----------------------------------------------------------------------------------------------------
 
 def _leader_group(repo: ProjectSourceRepository, session: dict[str, Any], group_id: str) -> dict[str, Any]:
+    """A member of the group who leads it now: a facilitator of it who is still an eligible one (visibility.is_leader_of)."""
     group = member_group(repo, session, group_id)
-    if group["my_role"] != "facilitator" or group["my_review_state"] != "confirmed":
-        raise HTTPException(status_code=403, detail="FACILITATE_LEADER_ONLY: only a facilitator of this group leads it")
+    if not visibility.is_leader_of(CaseDocs(repo), _viewer(session), group_id):
+        raise HTTPException(status_code=403, detail="FACILITATE_LEADER_ONLY: only a facilitator of this group who has finished the leader course leads it")
     return group
 
 
@@ -246,4 +259,4 @@ def assign(group_id: str, body: AssignBody, session: dict[str, Any] = Depends(ap
 @router.delete("/groups/{group_id}/facilitate/assignments/{doc_id}")
 def unassign(group_id: str, doc_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, str]:
     member_group(repo, session, group_id)
-    return _delete_link(repo, session, doc_id)
+    return _delete_link(repo, session, doc_id, "unit", group_id)
