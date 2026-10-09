@@ -4,6 +4,11 @@
 # typecheck. Run FROM THE MONOREPO ROOT on the target host (matches this repo's own
 # resolve_spec_root() layout expectation -- see ai_lego/__init__.py).
 #
+# Database (PostgreSQL, STORAGE_SWITCH.md): needs the cognitive-db service up (ops/cognitive-db/install-cognitive-db.sh) and
+# COGNITIVE_OS_DATABASE_URLS in deploy/.env. deploy/lib-db.sh does the database half: preflight, a pre-deploy dump, the one
+# explicit migration (the engine never migrates by itself), a database smoke, and the rollback that puts back the image AND,
+# when a migration ran, the dump. First deploy on PostgreSQL: docs/platform/GO_LIVE.md.
+#
 # Usage: bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh
 set -euo pipefail
 
@@ -144,11 +149,26 @@ done
 #    (short env_file syntax works on every Compose v2; the long `required: false` form needs >= 2.24). --
 touch "$PRODUCT_ROOT/deploy/.env"
 
-# -- 3. Build + up. --
+# -- 2c. Database preflight (deploy/lib-db.sh): URL in deploy/.env, cognitive-db healthy, the SQLite data already moved. --
+# shellcheck source=deploy/lib-db.sh
+source "$PRODUCT_ROOT/deploy/lib-db.sh"
+db_preflight || { notify "FAILED at database preflight (see deploy.log)"; exit 1; }
+
+# From the first container stop or start on, any failure rolls back through abort_deploy (image, and the database when a
+# migration ran). A failure before that changed nothing and just exits.
+abort_deploy() {
+  rollback_all "$1" || true
+  exit 1
+}
+
+# -- 3. Build, dump + migrate, up. --
 log "build | docker compose build ${SERVICES[*]}"
 docker compose -f "$COMPOSE_FILE" build "${SERVICES[@]}" || { log "build | FAIL"; notify "FAILED at build"; exit 1; }
+log "db | pre-deploy dump and explicit migration"
+db_prepare || abort_deploy "database prepare (dump or migration)"
 log "up | docker compose up -d"
-docker compose -f "$COMPOSE_FILE" up -d || { log "up | FAIL"; notify "FAILED at docker compose up -d"; exit 1; }
+NEW_UP=1
+docker compose -f "$COMPOSE_FILE" up -d || abort_deploy "docker compose up -d"
 
 # -- 4. Healthcheck: wait for the container's own HEALTHCHECK to report healthy. Ceiling is
 #    120s, comfortably clearing two of compose.yml's 30s healthcheck intervals (Docker's first
@@ -163,14 +183,7 @@ for index in "${!SERVICES[@]}"; do
     [[ "$status" == "healthy" ]] && break
     if [[ "$elapsed" -ge 120 ]]; then
       log "healthcheck | FAIL | service=$service last status=$status"
-      notify "FAILED healthcheck for $service -- rolling back"
-      for rollback_service in "${SERVICES[@]}"; do
-        if docker image inspect "$rollback_service:rollback" >/dev/null 2>&1; then
-          docker tag "$rollback_service:rollback" "$rollback_service:latest"
-        fi
-      done
-      docker compose -f "$COMPOSE_FILE" up -d || { log "rollback | up -d FAILED"; notify "ROLLBACK FAILED: service is down, needs human"; exit 1; }
-      exit 1
+      abort_deploy "healthcheck for $service"
     fi
     sleep 3
     elapsed=$((elapsed + 3))
@@ -182,11 +195,14 @@ done
 #    then the real public domain if it resolves (skipped, not failed, if it doesn't yet -- DNS
 #    propagation and nginx wiring are separate steps in the deploy runbook). --
 log "smoke | local: curl $HEALTH_URL"
-curl -sf "$HEALTH_URL" | grep -q '"status":"ok"' || { log "smoke | local FAIL"; notify "FAILED local smoke test"; exit 1; }
+curl -sf "$HEALTH_URL" | grep -q '"status":"ok"' || { log "smoke | local FAIL"; abort_deploy "local smoke test"; }
 log "smoke | local: PASS"
 log "smoke | local: curl ${HEALTH_URLS[1]}"
-curl -sf "${HEALTH_URLS[1]}" >/dev/null || { log "smoke | web local FAIL"; notify "FAILED web local smoke test"; exit 1; }
+curl -sf "${HEALTH_URLS[1]}" >/dev/null || { log "smoke | web local FAIL"; abort_deploy "web local smoke test"; }
 log "smoke | web local: PASS"
+log "smoke | database: migrate_db --check inside the running API container (its own URL, the network, schema at head)"
+db_smoke || { log "smoke | database FAIL"; abort_deploy "database smoke test"; }
+log "smoke | database: PASS"
 
 if getent hosts cognitive.aware-wave.com >/dev/null 2>&1; then
   log "smoke | public: curl $SMOKE_URL"
@@ -202,5 +218,7 @@ fi
 
 # -- 6. Notification (success). --
 echo "$HEAD_SHA" > "$GREEN_SHA_FILE"   # all green now: the next deploy tests only what changed after this
-notify "deployed successfully, local health OK"
+DEPLOY_NOTE=""
+if (( MIGRATED )); then DEPLOY_NOTE=", migrated to head (pre-deploy dump: $PRE_DEPLOY_DUMP)"; fi
+notify "deployed successfully, local health OK$DEPLOY_NOTE"
 log "done"

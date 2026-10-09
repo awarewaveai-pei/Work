@@ -28,10 +28,14 @@ Nothing in this folder has been applied.
 在 `/etc/cron.d/ks-stack-backup` 的既有備份行旁加入一行：
 
 ```cron
-17 2 * * * root COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_BACKUP_DIR=/root/backups/cognitive-db /root/lobster-phase1/Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh >>/var/log/cognitive-db-backup.log 2>&1
+17 2 * * * root COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_BACKUP_DIR=/root/backups/cognitive-db /opt/cognitive-os/Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh >>/var/log/cognitive-db-backup.log 2>&1
 ```
 
-這行僅供安全套用機制完成、獲核准後使用；部署目錄必須有本資料夾及可讀的 secret file。cron 只寫密碼檔路徑，不寫密碼。
+這行僅供獲核准後使用；路徑是 deploy.sh 用的 `/opt/cognitive-os` 檢出（上線前 `ls` 確認本資料夾在那裡），root 要讀得到 secret file。cron 只寫密碼檔路徑，不寫密碼。
+
+## 部署回滾用的還原
+
+`restore-live-cognitive-db.sh <dump>`（由 `deploy/lib-db.sh` 的 `rollback_all` 在「這次部署已跑過 migration」時呼叫，呼叫前 API 已停）：先把 dump 還原到暫存資料庫並檢查 `alembic_version`，通過才用改名一次換掉 `cognitive_os`；被換下的那個留成 `cognitive_os_failed_<UTC 時間>`（檢查完手動刪）。dump 還原不起來時，正式資料庫完全沒動。
 
 ## 上線前清單
 

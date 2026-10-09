@@ -18,8 +18,10 @@ services:
     image: cognitive-os-api:latest
     container_name: cognitive-os-api
     restart: unless-stopped
+    # Storage is PostgreSQL (docs/platform/STORAGE_SWITCH.md): COGNITIVE_OS_DATABASE_URLS=<region>=postgresql://user:password@cognitive-db:5432/cognitive_os
+    # carries a password, so it lives in deploy/.env on the host only (below; install-cognitive-db.sh writes the line, deploy.sh
+    # reads the region name from it and exports COGNITIVE_OS_REGION for the files volume at the bottom). Never in this file.
     environment:
-      - COGNITIVE_OS_DB_PATH=/app/Projects/internal/cognitive-engineering-os/.runtime/identity.sqlite3
       # EC §99 runtime egress allowlist (deny-by-default). Hosts here must also be listed in
       # agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/policies/ai-execution/network-egress.yaml EGRESS-EC99-2
       # (tests/unit/test_egress_allowlist_parity.py). app.aware-wave.com = the Collection Service: egress is
@@ -33,8 +35,10 @@ services:
     env_file:
       - path: ./deploy/.env
         required: false
+    # The region's file root (D7): Source/artifact/journal CAS and run journals. Rows are in PostgreSQL, files are here; the SQLite
+    # volume of before the move (cognitive-os-identity-data) is no longer mounted and is kept untouched as the rollback source.
     volumes:
-      - cognitive-os-identity-data:/app/Projects/internal/cognitive-engineering-os/.runtime
+      - cognitive-os-files:/app/Projects/internal/cognitive-engineering-os/.runtime
     ports:
       - "127.0.0.1:8420:8420" # reserved for local health-check use, matching oracle-web's own :3010 convention
     mem_limit: 512m
@@ -74,7 +78,8 @@ services:
       start_period: 10s
 
 volumes:
-  cognitive-os-identity-data:
+  cognitive-os-files:
+    name: cognitive-os-files-${COGNITIVE_OS_REGION:?COGNITIVE_OS_REGION is set by deploy.sh from deploy/.env; export it before any manual docker compose call}
 
 networks:
   lobster-net:
