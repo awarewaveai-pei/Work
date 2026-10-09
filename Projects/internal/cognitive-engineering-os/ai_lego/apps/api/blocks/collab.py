@@ -227,7 +227,7 @@ def agreement_view(group_id: str, session: dict[str, Any] = Depends(api.require_
     now = {member: {option: said for option, said in marks.items() if round_of.get(option) == latest} for member, marks in stances.items()}
     history = {member: {option: said["stance"] for option, said in marks.items() if round_of.get(option) != latest} for member, marks in stances.items()}
     answer = agreement_rule(now, history, members)
-    marked = set(stances.get(viewer.identity_id) or {})
+    marked = set(stances.get(viewer.identity_id, {}))
     names = Names(docs, repo, viewer, group_id)
     first = {key: value for key, value in answer.items() if key not in ("held", "heaviest_left_out", "without_heaviest")}
     return {**_only(first, marked), "held": [names(member) for member in answer["held"]], "heaviest_left_out": answer["heaviest_left_out"],

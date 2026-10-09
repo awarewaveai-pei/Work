@@ -74,7 +74,8 @@ def _interface(docs: CaseDocs, me: Viewer, group_id: str, content: dict[str, Any
 
 
 def _option(docs: CaseDocs, me: Viewer, group_id: str, content: dict[str, Any], doc_id: str | None, mine: list) -> None:
-    refs = content.get("evidence_refs") or []
+    refs = content.get("evidence_refs")
+    refs = [] if refs is None else refs   # only absent is none: a falsy wrong type is refused below
     if not isinstance(refs, list) or any(not isinstance(ref, dict) or set(ref) != EVIDENCE_KEYS or not all(isinstance(value, str) for value in ref.values()) for ref in refs):
         raise InvariantViolation("COLLAB_EVIDENCE_INVALID: each piece of evidence names {project_id, kind, doc_id}")
 
@@ -88,7 +89,8 @@ def _stance(docs: CaseDocs, me: Viewer, group_id: str, content: dict[str, Any], 
 
 
 def _authority(docs: CaseDocs, me: Viewer, group_id: str, content: dict[str, Any], doc_id: str | None, mine: list) -> None:
-    revoked = content.get("revoked_by") or []
+    revoked = content.get("revoked_by")
+    revoked = [] if revoked is None else revoked
     if any(who != me.identity_id for who in revoked):
         raise InvariantViolation("COLLAB_REVOKE_OWN_ONLY: each person takes back only their own share")
     if docs.reads.membership(me.tenant_id, group_id, str(content.get("to"))) is None:
