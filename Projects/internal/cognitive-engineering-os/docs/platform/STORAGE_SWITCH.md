@@ -15,7 +15,7 @@ PostgreSQL service, not inside the self-hosted Supabase. The engine speaks plain
 | D5 | JSON columns are `jsonb`; ids stay text (uuid strings) | same values the API already returns |
 | D6 | Regions: `COGNITIVE_OS_DATABASE_URLS` = `region=dsn,region=dsn`; one small directory (tenant → region, no personal data) is the only cross-region table, in the first region's database | residency per tenant |
 | D7 | Blobs (TenantScopedCas, JsonArtifactStore) on disk under a per-region root now; object storage when a second region opens | no new service yet |
-| D8 | A separate `cognitive-db` compose service, own volume, nightly host-side pg_dump, health check. Card 02's files are in isolated `refs/codex/work` (`842ab3941`), not this branch; current `safe-infra-patch.sh compose` operates the main compose and cannot install that separate project. A governed installer and operator approval are required (High-STOP). | AGENTS.md §0; `agency-os/handoffs/cos-codex-queue/cards/02-cognitive-db-ops.md` |
+| D8 | A separate `cognitive-db` compose service, own volume, nightly host-side pg_dump, health check. Built 2026-10-10 in `ops/cognitive-db/` (compose, backup, restore, `restore-live-cognitive-db.sh`, and `install-cognitive-db.sh` = the governed installer; `safe-infra-patch.sh compose` operates the main compose and cannot install a separate project). Applying it is High-STOP, operator approval: `docs/platform/GO_LIVE.md`. | AGENTS.md §0; `agency-os/handoffs/cos-codex-queue/cards/02-cognitive-db-ops.md` |
 
 ## Invariants the port keeps (each has a test that fails on a naive port)
 
