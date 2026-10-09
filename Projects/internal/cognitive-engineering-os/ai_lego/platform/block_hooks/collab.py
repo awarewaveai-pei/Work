@@ -2,7 +2,7 @@
 
 ``check_save`` runs as the save's batch check (CaseDocs.save_many under the group lock held exclusive, from
 apps/api/blocks/collab.py ``_save_group``): what it reads cannot change before the write commits. It reads only through
-platform/visibility.py, as the writer. ``after_group_save`` derives the system's records from what was saved: a dissent
+platform/visibility.py, as the writer. ``derived`` names the system's records the save brings (written in its transaction): a dissent
 from each objection, a renegotiation notice from a share of authority taken back. Both name the record they come from
 (a copy is a pointer) and carry the member's identity, so they go with that member's account erasure.
 
@@ -23,6 +23,7 @@ from ai_lego.platform.visibility import Viewer
 SHARED_WORDING = ("collab.question",)   # any member writes a new version of these (every wording stays); others: their writer only
 ONE_PER_MEMBER = ("collab.place", "collab.label")
 ONE_PER_ROUND = ("collab.position", "collab.change", "collab.interface_answers")
+OWN_LIST = (*ONE_PER_MEMBER, *ONE_PER_ROUND, "collab.stance", "collab.authority")   # kinds whose rules look at the writer's other records
 EVIDENCE_KEYS = {"project_id", "kind", "doc_id"}
 
 
@@ -36,8 +37,8 @@ def _already() -> InvariantViolation:
 
 def _answers(content: dict[str, Any]) -> None:
     answers, asked = content.get("answers"), set(INTERFACE_QUESTIONS)
-    if not isinstance(answers, list) or not answers:
-        raise InvariantViolation("COLLAB_ANSWERS_INVALID: answers is a list of {q, text} for the interface questions")
+    if not isinstance(answers, list) or len(answers) != len(asked):   # all of them: a part would open the round's blind answers
+        raise InvariantViolation("COLLAB_ANSWERS_INVALID: answers is a list of {q, text}, one for each interface question")
     seen = set()
     for answer in answers:
         if (not isinstance(answer, dict) or set(answer) != {"q", "text"} or answer["q"] not in asked or answer["q"] in seen
@@ -55,7 +56,7 @@ def check_save(docs: CaseDocs, tenant_id: str, group_id: str, identity_id: str, 
             raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")
         if found[0]["written_by"] != identity_id:
             raise InvariantViolation("COLLAB_NOT_YOURS: in a group, only the person who wrote a record writes its next version")
-    others_of_mine = [item for item in _own(docs, me, group_id, kind) if item["doc_id"] != doc_id] if kind in (*ONE_PER_MEMBER, *ONE_PER_ROUND, "collab.stance") else []
+    others_of_mine = [item for item in _own(docs, me, group_id, kind) if item["doc_id"] != doc_id] if kind in OWN_LIST else []
     if kind in ONE_PER_MEMBER and others_of_mine:
         raise _already()
     if kind in ONE_PER_ROUND and any(item["content"]["round"] == content.get("round") for item in others_of_mine):
@@ -92,6 +93,8 @@ def _authority(docs: CaseDocs, me: Viewer, group_id: str, content: dict[str, Any
         raise InvariantViolation("COLLAB_REVOKE_OWN_ONLY: each person takes back only their own share")
     if docs.reads.membership(me.tenant_id, group_id, str(content.get("to"))) is None:
         raise InvariantViolation("COLLAB_AUTHORITY_TO_NOT_MEMBER: authority is given to someone in the group")
+    if doc_id is None and any(not item["content"].get("revoked_by") for item in mine):   # one live share each: taking it back takes it all
+        raise _already()
     if doc_id is not None:
         [before] = visibility.visible(docs, me, group_id, "collab.authority", doc_id=doc_id)
         if before["content"].get("revoked_by") and not revoked:
@@ -124,22 +127,25 @@ RULES: dict[str, Callable[..., None]] = {
 }
 
 
-def _group(group_id: str) -> record_log.Owner:
-    return record_log.group(group_id)
-
-
-def after_group_save(docs: CaseDocs, tenant_id: str, group_id: str, identity_id: str, doc: dict[str, Any]) -> list[dict[str, Any]]:
-    """The system's records derived from a member's save (each written as the system on that member's behalf, so their
-    account erasure takes it): an objection is kept as a dissent -- one per version that said 異議, never deleted; a share
-    of authority taken back leaves 「範圍要重新談」. Kinds ``after_close``: a group closed right after the save still gets them."""
+def derived(docs: CaseDocs, tenant_id: str, group_id: str, identity_id: str, doc: dict[str, Any]) -> list[tuple[str, dict[str, Any], record_log.Writer]]:
+    """The system's records a member's save brings, written in the save's own transaction (CaseDocs.save_many ``derive``:
+    an objection never commits without its dissent). Each is the system's on that member's behalf, so their account
+    erasure takes it: an objection is kept as a dissent -- one per version that said 異議, never deleted; a share taken
+    back leaves 「範圍要重新談」, once."""
     writer = record_log.Writer("system", "COLLAB", identity_id)
-    me = Viewer(tenant_id, identity_id)
     if doc["kind"] == "collab.stance" and doc["content"]["stance"] == "異議":
-        docs.save(tenant_id, _group(group_id), "collab.dissent", {"option": doc["content"]["option"], "stance_id": doc["doc_id"], "stance_version": doc["version"]}, writer)
+        return [("collab.dissent", {"option": doc["content"]["option"], "stance_id": doc["doc_id"], "stance_version": doc["version"]}, writer)]
+    if doc["kind"] == "collab.authority" and doc["content"].get("revoked_by"):
+        me = Viewer(tenant_id, identity_id)
+        if not any(item["content"]["authority"] == doc["doc_id"] for item in visibility.visible(docs, me, group_id, "collab.renegotiate")):
+            return [("collab.renegotiate", {"authority": doc["doc_id"]}, writer)]
+    return []
+
+
+def notices(doc: dict[str, Any]) -> list[dict[str, Any]]:
+    if doc["kind"] == "collab.stance" and doc["content"]["stance"] == "異議":
         return [{"type": "dissent_kept", "notice": "你的異議和理由會一直留著，不會被多數蓋掉。"}]
     if doc["kind"] == "collab.authority" and doc["content"].get("revoked_by"):
-        if not any(item["content"]["authority"] == doc["doc_id"] for item in visibility.visible(docs, me, group_id, "collab.renegotiate")):
-            docs.save(tenant_id, _group(group_id), "collab.renegotiate", {"authority": doc["doc_id"]}, writer)
         return [{"type": "renegotiate", "notice": RENEGOTIATE}]
     return []
 

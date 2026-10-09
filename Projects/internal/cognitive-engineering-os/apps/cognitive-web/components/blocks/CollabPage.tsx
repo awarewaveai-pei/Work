@@ -165,13 +165,13 @@ export function CollabPage({ groupId }: { groupId: string }) {
       )}
 
       <div className="card">
-        <h2>介面問題（各自先寫）</h2>
+        <h2>介面問題（各自先寫，五題都寫完才存）</h2>
         {!data.wrote.answers && <p className="how">{WRITE_FIRST}</p>}
         {!data.wrote.answers && (
           <>
             {INTERFACE_QUESTIONS.map((q, index) => <Cell key={q} id={`answer-${index}`} label={q}><textarea id={`answer-${index}`} value={form[`answer-${index}`] ?? ""} maxLength={2000} onChange={set(`answer-${index}`)} /></Cell>)}
-            <div className="btns"><button className="btn" type="button" disabled={busy || !INTERFACE_QUESTIONS.some((_, index) => (form[`answer-${index}`] ?? "").trim())}
-              onClick={write("collab.interface_answers", { round, answers: INTERFACE_QUESTIONS.map((q, index) => ({ q, text: (form[`answer-${index}`] ?? "").trim() })).filter((answer) => answer.text) },
+            <div className="btns"><button className="btn" type="button" disabled={busy || !INTERFACE_QUESTIONS.every((_, index) => (form[`answer-${index}`] ?? "").trim())}
+              onClick={write("collab.interface_answers", { round, answers: INTERFACE_QUESTIONS.map((q, index) => ({ q, text: (form[`answer-${index}`] ?? "").trim() })) },
                 INTERFACE_QUESTIONS.map((_, index) => `answer-${index}`))}>存我的回答</button></div>
           </>
         )}

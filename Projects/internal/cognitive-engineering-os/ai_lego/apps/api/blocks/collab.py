@@ -45,7 +45,7 @@ from ai_lego.platform.collab_agreement import agreement as agreement_rule
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.rulesets.collab import AGREEMENT
 from ai_lego.platform.block_hooks import before_save
-from ai_lego.platform.block_hooks.collab import RENEGOTIATE, after_group_save, check_save
+from ai_lego.platform.block_hooks.collab import RENEGOTIATE, check_save, derived, notices
 from ai_lego.platform.visibility import Viewer
 
 router = APIRouter()
@@ -126,9 +126,10 @@ def _save_group(repo: ProjectSourceRepository, session: dict[str, Any], group_id
         check_save(docs, tenant_id, group_id, identity_id, spec.kind, body.content, doc_id)
         before_save(docs, tenant_id, owner, spec.kind, body.content, doc_id)
 
-    [saved] = _call(group_id, docs.save_many, tenant_id, owner, [item], api._me(session, BLOCK), check=check)
+    [saved] = _call(group_id, docs.save_many, tenant_id, owner, [item], api._me(session, BLOCK), check=check,
+                    derive=lambda written: derived(docs, tenant_id, group_id, identity_id, written[0]))
     result = _saved(repo, session, owner, saved)
-    result["notices"] += _call(group_id, after_group_save, docs, tenant_id, group_id, identity_id, saved)
+    result["notices"] += notices(saved)
     return {**result, "mine": True, "who": "你"}
 
 

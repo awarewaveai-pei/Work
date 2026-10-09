@@ -95,9 +95,11 @@ class BlindTests(CollabCase):
 
     def test_the_convener_is_not_exempt_and_the_interface_answers_are_blind_too(self):
         self.post(self.b, "collab.position", round=1, text="乙的立場")
-        self.post(self.b, "collab.interface_answers", round=1, answers=[{"q": INTERFACE_QUESTIONS[0], "text": "乙的回答"}])
+        self.post(self.b, "collab.interface_answers", round=1, answers=[{"q": q, "text": f"乙的回答{n}"} for n, q in enumerate(INTERFACE_QUESTIONS)])
         self.assertNotIn("乙的", self.everything(self.a))
-        self.post(self.a, "collab.interface_answers", round=1, answers=[{"q": INTERFACE_QUESTIONS[2], "text": "甲的回答"}])
+        self.post(self.a, "collab.interface_answers", 400, round=1, answers=[{"q": INTERFACE_QUESTIONS[2], "text": "只答一題"}])   # F1: a part opens nothing
+        self.assertNotIn("乙的", self.everything(self.a))
+        self.post(self.a, "collab.interface_answers", round=1, answers=[{"q": q, "text": f"甲的回答{n}"} for n, q in enumerate(INTERFACE_QUESTIONS)])
         self.assertEqual({item["who"] for item in self.get(self.a, "collab.interface_answers")}, {"你", "乙"})
 
     def test_what_changed_is_written_after_ones_own_position_and_is_blind(self):
@@ -151,6 +153,18 @@ class StanceAndDissentTests(CollabCase):
         self.put(self.b, "collab.stance", objection["doc_id"], 1, option=option, stance="同意", reason="被說服了")
         self.assertEqual([item["reason"] for item in self.get(self.a, "view/dissent")], ["這樣對新人不公平"])   # kept after a change of mind too
 
+    def test_an_objection_never_commits_without_its_dissent(self):
+        """F2 (Codex 2026-10-08): the dissent is written in the objection's own transaction -- if it cannot be, neither is."""
+        from unittest import mock
+        from ai_lego.data.events import record_log
+        option = self.option()
+        broken = lambda *args: [("collab.dissent", {"option": option}, record_log.Writer("system", "COLLAB", self.b))]   # missing fields: refused
+        with mock.patch("ai_lego.apps.api.blocks.collab.derived", broken):
+            self.assertEqual(self.as_(self.b).post(f"{self.base}/collab.stance", json={"content": {"option": option, "stance": "異議", "reason": "不行"}}).status_code, 400)
+        self.assertEqual([item for item in self.get(self.b, "collab.stance") if item["mine"]], [])
+        self.post(self.b, "collab.stance", option=option, stance="異議", reason="不行")
+        self.assertEqual(len(self.get(self.b, "collab.dissent")), 1)
+
     def test_9_no_answer_carries_a_count_a_tally_or_a_rank(self):
         option = self.option()
         for who, said in ((self.a, "同意"), (self.b, "異議"), (self.c, "同意")):
@@ -183,6 +197,15 @@ class AuthorityTests(CollabCase):
         self.assertEqual(sorted(given["grantors"]), sorted(["你", "丙"]))   # A represents two
         self.assertEqual([(notice["to"], notice["taken_back_by"], notice["notice"]) for notice in view["renegotiate"]], [("你", "乙", "範圍要重新談")])
         self.assertEqual(self.put(self.b, "collab.authority", shares[self.b]["doc_id"], 2, to=self.a, scope="代表大家談合約", revoked_by=[]).status_code, 409)
+
+    def test_one_live_share_per_grantor_so_taking_it_back_takes_it_all(self):
+        """F3 (Codex 2026-10-08): a second share while one is live is refused; after taking it back a new one may be given."""
+        share = self.post(self.b, "collab.authority", to=self.a, scope="談合約")
+        self.post(self.b, "collab.authority", 409, to=self.a, scope="談合約")
+        self.post(self.b, "collab.authority", 409, to=self.c, scope="談別的")
+        self.assertEqual(self.as_(self.b).post(f"{self.base}/collab.authority/{share['doc_id']}/revoke").status_code, 200)
+        self.assertEqual(self.get(self.a, "view/authority")["current"], [])
+        self.post(self.b, "collab.authority", to=self.c, scope="談別的")
 
 
 class ClosingTests(CollabCase):

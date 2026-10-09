@@ -82,14 +82,17 @@ class CaseDocs:
             return self._save(connection, tenant_id, owner, kind, content, writer, doc_id, base_version)
 
     def save_many(self, tenant_id: str, owner: Owner, items: list[Mapping[str, Any]], writer: Writer,
-                  check: Callable[[], None] | None = None) -> list[dict[str, Any]]:
+                  check: Callable[[], None] | None = None,
+                  derive: Callable[[list[dict[str, Any]]], list[tuple[str, Mapping[str, Any], Writer]]] | None = None) -> list[dict[str, Any]]:
         """Every item (``{"kind", "content", "doc_id"?, "base_version"?}``, each as ``save``) or none: one transaction.
         ``check()`` runs first and what it read holds until the writes commit: with a check the batch takes its owner's
         lock exclusive -- the case's, the person's (where SQLite's file write lock was) or the group's -- so no other writer of that
         owner's records commits in between; it raises to refuse. Its reads run on this batch's connection (db: one per
         thread), inside this transaction. It must only read: a write would join the batch. The platform's records have
         no owner lock: a check is refused there. The documents the items name are locked first in one order, so two
-        batches never wait on each other crosswise."""
+        batches never wait on each other crosswise. ``derive(saved)``: the records the system keeps because of these
+        writes (a group's dissent from an objection), as ``(kind, content, writer)``, written new in this same transaction:
+        both commit or neither. It may read like ``check``; it does not write."""
         if check is not None and owner.kind not in ("case", "person", "group"):
             raise InvariantViolation("DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK: a batch's check holds only under a case's, a person's or a group's lock")
         with self._repo.transaction(tenant_id) as connection:
@@ -107,7 +110,10 @@ class CaseDocs:
                 record_log.lock_aggregate(connection, tenant_id, f"doc:{doc_id}")
             if check is not None:
                 check()
-            return [self._save(connection, tenant_id, owner, item["kind"], item["content"], writer, item.get("doc_id"), item.get("base_version")) for item in items]
+            saved = [self._save(connection, tenant_id, owner, item["kind"], item["content"], writer, item.get("doc_id"), item.get("base_version")) for item in items]
+            for kind, content, by in (derive(saved) if derive is not None else []):
+                self._save(connection, tenant_id, owner, kind, content, by, None, None)
+            return saved
 
     def record_read(self, tenant_id: str, owner: Owner, kind: str, doc_id: str, version: int, writer: Writer) -> dict[str, Any]:
         """Record that the person fetched one current document version without making a content version. Under the case

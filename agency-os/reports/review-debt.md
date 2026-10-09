@@ -42,6 +42,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 | Claude | 20-collab-kinds-routes | COLLAB 的群組紀錄種類（`kinds/collab.py`）與路由（`apps/api/blocks/collab.py`）：先寫後看（立場／想法變化／介面回答依輪次，同意異議依方案）、一人一方案一個意見且每版保留、異議由系統留指標紀錄、授權一人一份可收回並重算、結束四項必填、任何人可要求重開（群組結束後也可）、同意分享的案子只經 `shared_with` 且只取 MAP/VERIFY/EXPRESS 等卡上准讀的部分、交給 DECIDE/ACT 只存指標；`CaseDocs.save_many` 對群組可帶 check（群組鎖 exclusive） | 別人的紀錄只經 visibility；回應不帶別的成員身分（who/mine）；只有寫的人改／刪自己的紀錄（召集人不是裁判）；異議與重算通知隨帳號刪除一起刪；沒有任何計數 | test_block_collab 22 PASS（真 PostgreSQL 三人群組）；affected_tests --base 5dbff71c0 --run 49 模組 1230 tests OK；突變 5/5 紅→還原綠（position 拿掉 blind、收回一份變全部收回、list 路由不查成員、異議不帶成員身分、shared 回整份） | 待審 |
 | Claude | 21-collab-agreement-ai | 「大家怎麼看」純函式（2-means、異議擋住、排除最多標記者、待確認者不算、不夠就說不夠）與規則集；AI 閘門的群組路徑（只限現任成員、只用不需授權的權限、經 visibility 讀、別人的字只以 QUOTED 圍欄進模型）；整理分歧（只給提問者）、轉述立場（本人確認說得對才給別人看，說錯了即交還）；誰還沒說話改為系統計算；integrity 危機探針支援群組 | 轉述在本人確認前任何人（含提問者）都讀不到；別人的字不出現在圍欄外；AI 寫不了 stance；有新異議／重開時在叫模型前停；沒有計數或排名 | test_collab_agreement 8、test_collab_ai 7、test_block_collab 22 PASS（真 PostgreSQL）；affected_tests --base 5dbff71c0 --run 59 模組 1325 tests OK（含 integrity 群組危機探針）；突變 3/3 紅→還原綠（轉述提早可見、AI 可寫 stance、群組讀取保留別人的字） | 待審 |
 | Claude | 22-collab-page | `/groups`（我的群組、開群組、一次性邀請連結只顯示一次可複製、收回）與 `/groups/[id]` 共同程序頁（依卡片順序：問題各版本、先寫自己的立場、想法有沒有變、介面問題、方案並排同意／異議＋理由、保留的異議與署名、授權與收回自己那一份、結束四項、要求重開、大家怎麼看、待確認成員、AI 幫忙與轉述確認、決定之後）；路由加 `?mine=true` 與收回自己那份的路由 | 寫自己的之前連請求別人的立場都不發，早到的回應也不畫；沒有票數／排名／分數／%；頁首徽章；只用 design-system、沒有 select | tsc exit 0；vitest CollabPage 4、GroupsPage 2 PASS；test_block_collab 22 PASS；affected_tests --base 5dbff71c0 --run 59 模組 1325 tests OK；突變 1/1 紅→還原綠（寫之前就請求全部立場） | 待審 |
+| Claude | collab-codex-fix-1 | Codex partialreview-25fc1536 F1-F3：介面問題五題都寫才存（只存一部分會打開整輪的盲寫）；異議與 `collab.dissent`、收回與「範圍要重新談」在同一筆交易寫（`CaseDocs.save_many` 新增 `derive`）；每位授權人同時只能有一份還有效的授權 | 先寫完自己整份才看得到別人的；異議不會沒有保留紀錄就存進去；收回自己那一份就全部收回 | test_block_collab 24、test_collab_ai 7、test_visibility 14 PASS；vitest CollabPage 4、tsc 0；affected_tests 於 rebase 到 main 後跑一次；突變 2/2 紅→還原綠（只收一部分回答、第二份有效授權） | 待審 |
 
 ## deferred, before D7 second region
 
@@ -63,5 +64,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 - 申訴（card 30）：作者刪除後留一筆 DocDeleted（無內容，信封仍有作者身分），直到帳號抹除才一併刪；若要連這筆都不留，需改 `CaseDocs.delete` 的墓碑規則。
 - 不留紀錄（card 32）：抹除工作被另一個 worker 完成時，`_completed_elsewhere` 找不到墓碑會回 pending（不留紀錄的案子本來就沒有墓碑）；只影響回應字樣，不影響刪除。
 - 求助資源（card 32）：「112 / 911 / 999（依所在地）」尚未查核；張老師等專線的語言欄只寫查得到的。
-- COLLAB（card 20）：異議／範圍要重新談由存檔後另一筆交易寫（`after_group_save`），存檔成功後行程若當掉，該次異議沒有 `collab.dissent`；立場版本仍在，可補一個重建工具。DECIDE／ACT 頁面還不顯示 `collab.handoff` 指標。
+- COLLAB（card 20）：DECIDE／ACT 頁面還不顯示 `collab.handoff` 指標。
+- COLLAB F4（Codex 2026-10-08 partialreview-25fc1536）：召集人離開群組或群組刪除後，`/projects/{id}/collab/handoffs` 仍回傳指標本身（group_id、closing id、to），只有內容變 null；在召集人自己的案子裡，不含別人的字。
+- COLLAB F5（同上）：本人最近一次說「說錯了」後，別人請 AI 轉述他新的立場也會被擋，直到他自己再請 AI 轉述；照卡片原文「交回給他本人」，是否只擋同一份立場由操作者決定。
 - COLLAB 頁（card 22）：主選單沒有「我的群組」連結；方案的證據還不能從分享的紀錄挑；1280／400 寬的頁面走查留到整波最後；邀請連結指向 `/invite#token`，接受頁仍未做（見 card 12 那一行）。
