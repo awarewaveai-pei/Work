@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-10（續1）認知主權平台第 3、4 步完成並上線（cognitive.aware-wave.com → PostgreSQL）
+
+**根本問題**: 第 3、4 步（COLLAB、GOVERN、TEACH、EXPRESS、FACILITATE、過程指標）在 worktree 分批完成後要合進 main 並上線；main 的引擎已只認 PostgreSQL，但部署路徑仍是 SQLite（`docker-compose.yml:22`）、沒有搬資料程式、沒有獨立 cognitive-db 的受控安裝 → 照原樣部署網站會起不來。
+
+**已修改**（main，2026-10-08..10）:
+- 卡 10–13、20–22、30–33、40–42、50–52、60–62、70、80 合進 main（a082fa6a9..9c5077a29），每批一次 Codex 審查，只修隱私／擦除／同意／擁有權／資料遺失／CI 類 finding，其餘進 `agency-os/reports/review-debt.md` deferred。
+- 上線工具：`ai_lego/apps/cli/move_sqlite_to_pg.py`（兩邊證明相等才 commit）、`ops/cognitive-db/install-cognitive-db.sh`、`deploy/deploy.sh`+`deploy/lib-db.sh`（dump → 明確 migration → 健康/smoke → 映像與資料庫一起回滾）、`docs/platform/GO_LIVE.md`（0b3f640fd..7310c4bae）。
+- CI 修正 a7f21c3b1：映像外檔案的測試歸 `CHECKOUT_ONLY_TEST_MODULES`、FACILITATE 五處 falsy default、pg_isready 等真正服務中、design-system.css 對齊。
+- 上線（operator「上線」2026-10-10 04:20 TW）：A2 migration 0095；A3 next-admin sg-deploy；A7 cognitive-db（region `aw01`，cron 每晚備份 KEEP_DAYS=7）；B1–B8 停站 22:23:48–22:30:59 UTC；`GO_LIVE.md` 補 B2b（活站 ebbf363c 比 a76af28da 舊，複本先用 a76 引擎開一次）與 `out/` 屬 uid 1001。
+- 監工頁 v61：14 塊建置完成、現況全部「有」、時間線加 2026-10-10 上線。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=bash cosmove.sh $WORK/src move --report /out/move-report.json | exit=0 | ms=1892
+- REALTEST_EVIDENCE: tool=SSH | cmd=bash cosmove.sh $WORK/src verify (VERIFY OK; source sha256 changed lines 0; tenant/identity/projects/events 3/4/2/60) | exit=0 | ms=1500
+- REALTEST_EVIDENCE: tool=SSH | cmd=bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh (test-gate PASS, db preflight, pre-deploy dump, health, smoke local/web/database/public PASS) | exit=0 | ms=386000
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -s https://cognitive.aware-wave.com/api/health -> {"status":"ok"}; printenv COGNITIVE_OS_DB_PATH exit=1; COGNITIVE_OS_DATABASE_URLS exit=0 | exit=0 | ms=900
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo -n /root/lobster-phase1/scripts/sg-deploy.sh next-admin (tsc, vitest, health, 5 smokes OK) | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/playwright-runner.ps1 -Mode smoke (26 passed, 0 failed, 6 skipped) | exit=0 | ms=26000
+- REALTEST_EVIDENCE: tool=Bash | cmd=gh run 37993372010 "Cognitive OS full suite" attempt 3 (all 4 jobs success; attempts 1-2 failed only on Docker Hub 504 pulls) | exit=0 | ms=2400000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=13/0m/0n -- Codex oracle per batch (913e6466 5 findings, a85baf40 3 findings, 25fc1536, 14a31033, 80c78a66); all in-scope findings fixed, rest deferred in review-debt.md
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=COGNITIVE_OS_DB_PATH | hits=3
+- ORACLE: agency-os/reports/oracle/2026-10-09-partialreview-913e6466.md, 2026-10-10-partialreview-a85baf40.md
+
+**剩餘風險**: 部署測試閘在映像內沒有 PostgreSQL（PG 測試在映像內 skip；CI checkout job 與本機有跑）；`erasure.physical_retention_hook` 仍空（決定：dump 留 7 天＋抹除後 VACUUM，程式待補）；「Perplexity Search-only guard」workflow 自 10-08 起紅（不是本批 commit，待 operator 決定）；verify-build-gates 的 AO-CLOSE archive lift gate 紅（TASKS.md 記帳，與程式無關）。
+
+**Rollback**: GO_LIVE.md C1（`git checkout --detach $(cat $WORK/prev-sha.txt)` + `:rollback` 映像 + 舊 compose 掛未改過的 SQLite 卷 `cognitive-engineering-os_cognitive-os-identity-data`）；舊卷與 `$WORK/src` 保留到 2026-10-17 後刪（High-STOP，需確認）。
 ## 2026-10-08（續10）COS Codex 線（refs/codex/work 17 + card 60 2 + 60b 1 + 52A 1）cherry-pick 到 PostgreSQL main＋移植
 - 範圍：`445f39e51..9ab233f7f` 17 commits、`4208af89b..15b7bfa97` 2 commits、`1fb5ed9de`（60b）、`3ff8fa1a1`（52A），`-x` 逐一 cherry-pick 到 main `d1540e11d`（throwaway worktree `D:/tmp/cos-cx-rb`）；成果 `refs/claude/codex-line-rebased`，不 merge／push／部署。
 - 衝突（兩邊意圖都留）：

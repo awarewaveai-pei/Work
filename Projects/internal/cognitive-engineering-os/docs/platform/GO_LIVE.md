@@ -1,6 +1,6 @@
 # GO_LIVE：Cognitive OS 從 SQLite 搬上 PostgreSQL 的上線步驟
 
-狀態：2026-10-10 寫成，**沒有在 ks-aw-01 上執行過**。本機（假網路 `gl_net`、`postgres:17-alpine`、用 a76af28da 引擎寫出的夾具）跑過的：`install-cognitive-db.sh`（含 dry-run、兩種失敗回滾、拒絕已存在的卷）、`move_sqlite_to_pg.py` 在容器內以 uid 1001 的 dry-run／move／verify（本文 `cosmove` 的同一組參數）、`lib-db.sh` 的預檢／dump／migration／回滾（含舊映像不能用的分支）、`restore-live-cognitive-db.sh`（C2 同一個腳本）。**沒跑過**：A1–A3（git、migration 0095、`sg-deploy.sh`）、完整的 `deploy.sh`（測試閘與建映像只能在主機上）、cron、nginx、真正的資料量。
+狀態：2026-10-10 寫成；**同日在 ks-aw-01 執行完 A1–B8**（停站 22:23:48–22:30:59 UTC，搬 3 租戶／4 帳號／60 事件／15 檔，證明相等；B2b 與 out/ 擁有者兩處是執行時補的）。原本寫：本機（假網路 `gl_net`、`postgres:17-alpine`、用 a76af28da 引擎寫出的夾具）跑過的：`install-cognitive-db.sh`（含 dry-run、兩種失敗回滾、拒絕已存在的卷）、`move_sqlite_to_pg.py` 在容器內以 uid 1001 的 dry-run／move／verify（本文 `cosmove` 的同一組參數）、`lib-db.sh` 的預檢／dump／migration／回滾（含舊映像不能用的分支）、`restore-live-cognitive-db.sh`（C2 同一個腳本）。**沒跑過**：A1–A3（git、migration 0095、`sg-deploy.sh`）、完整的 `deploy.sh`（測試閘與建映像只能在主機上）、cron、nginx、真正的資料量。
 上線是 High-STOP（`agency-os/AGENTS.md` §3）：**每個標「High-STOP」的步驟，操作者說 go ahead 才做**。每步格式：**做**（指令）、**預期**（看到什麼才算對）、**退回**（這步出錯怎麼回到上一步）。
 
 工具對照（都在 `Projects/internal/cognitive-engineering-os/`）：
@@ -34,7 +34,7 @@ export PRODUCT=$COS/Projects/internal/cognitive-engineering-os
 export OLDVOL=cognitive-engineering-os_cognitive-os-identity-data
 export WORK=/home/ubuntu/cos-golive-$(date -u +%Y%m%d)   # 複本與證明放這裡，不進 git
 export RT=/app/Projects/internal/cognitive-engineering-os/.runtime   # 引擎映像裡的檔案根；新卷掛在這裡
-mkdir -p $WORK/out && chmod 700 $WORK
+mkdir -p $WORK/out && chmod 700 $WORK && sudo -n chown 1001:1001 $WORK/out   # 容器以 uid 1001 寫報告；2026-10-10 第一次 B4 因 out/ 屬 ubuntu 在 commit 後寫報告失敗，走了 C2 重來
 
 cosmove() {   # cosmove <來源目錄> move [--dry-run] [--report /out/x.json]   |   cosmove <來源目錄> verify
   local src="$1"; shift
@@ -169,6 +169,8 @@ ls $WORK/src/*.sqlite3*                                    # 只該有三個 .sq
 ```
 
 預期：`identity.sqlite3 projects.sqlite3 custom_workflows.sqlite3`。退回：`sudo rm -r $WORK/src`。
+
+**B2b 活站比 a76af28da 舊時，先把複本升到那個形狀**（2026-10-10 正式站是 ebbf363c；A8 會報 `SOURCE_SHAPE`）。用 a76af28da 的引擎開一次複本（只動複本；雜湊在這之後才記）：`git archive a76af28da Projects/internal/cognitive-engineering-os agency-os/docs/AI_LEGO_Cognitive_Engineering_OS | tar -x -C $WORK/a76ctx`，`docker build --target runtime -t cognitive-os-api:a76 -f $WORK/a76ctx/Projects/internal/cognitive-engineering-os/Dockerfile $WORK/a76ctx`，再以 uid 1001 執行一個只建構 `IdentityStore`、`ProjectSourceRepository`、`CustomWorkflowRepository`（各指向複本的三個檔）的 python。之後複本旁不得有 `-wal`/`-journal`。B2 的雜湊改在這一步之後記。
 
 **B3 乾跑一次最終複本。** 做：`time cosmove $WORK/src move --dry-run`。預期：`DRY RUN OK: nothing written`。退回：無（沒寫東西）。
 
