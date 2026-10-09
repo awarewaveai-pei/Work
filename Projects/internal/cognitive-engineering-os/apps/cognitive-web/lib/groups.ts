@@ -28,8 +28,8 @@ export type Dissent = { doc_id: string; option: string; reason: string; who: str
 export type Authority = { current: Array<{ to: string; to_me: boolean; scope: string; grantors: string[]; my_share: string | null }>; renegotiate: Array<{ to: string; scope: string; taken_back_by: string; notice: string; at: string }> };
 export type AgreementTable = { insufficient: true; why: string } | { insufficient: false; options: Record<string, { agreed_across: boolean; objections: string[] }> };
 export type Agreement = AgreementTable & { held: string[]; heaviest_left_out: boolean; without_heaviest: AgreementTable; rule?: { version: string } };
-// A record another member chose to share with this group (view/shared): `content` is only the part COLLAB reads; `who` is how they are shown.
-export type Shared = { who: string; kind: string; doc_id: string; version: number; content: Record<string, unknown>; at: string };
+// What another member chose to share with this group (view/shared), as the server projects it (ai_lego/platform/collab_shared.py): their words only; `who` is how they are shown.
+export type Shared = { who: string; title: string; lines: string[] };
 export type AiTurn = { saved?: Item & { waiting?: boolean }; handback?: string; stopped?: "crisis"; notice?: string; resources?: Array<{ name: string; contact: string }> };
 
 export const groups = {

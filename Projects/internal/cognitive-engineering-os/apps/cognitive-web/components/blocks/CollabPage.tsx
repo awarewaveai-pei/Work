@@ -20,24 +20,6 @@ type Stance = { option: string; stance: "同意" | "異議"; reason: string };
 type Closing = { why_end: string; reopen_if: string; review_on: string; owner: string };
 type Proposal = { express_draft?: string; text: string };   // express_draft points into the proposer's own case: never drawn
 
-// What a reader gets of a record another member shared (view/shared): their words only. The rest of a record (ids, versions,
-// hashes) points into the sharer's own case and is never drawn; a kind not listed here is not drawn at all.
-type Words = Record<string, unknown>;
-const LAYER_NAMES: Array<[string, string]> = [["facts", "事實"], ["interpretations", "解釋"], ["interests", "利益"], ["structure", "結構"], ["core", "核心矛盾"], ["intervention", "介入"]];   // kinds/map.py LAYERS
-const words = (value: unknown): string[] => (Array.isArray(value) ? value : [value]).filter((one): one is string => typeof one === "string" && one.trim() !== "").map((one) => one.trim());
-const rows = (value: unknown): Words[] => (Array.isArray(value) ? value.filter((one): one is Words => typeof one === "object" && one !== null) : []);
-const SHARED_VIEW: Record<string, { title: string; lines: (content: Words) => string[] }> = {
-  "map.map": { title: "地圖", lines: (c) => [
-    ...LAYER_NAMES.flatMap(([key, name]) => { const texts = rows((c.layers as Words | undefined)?.[key]).flatMap((item) => words(item.text)); return texts.length ? [`${name}：${texts.join("；")}`] : []; }),
-    ...words(c.core_conflict).map((line) => `核心衝突：${line}`)] },
-  "verify.claim": { title: "主張", lines: (c) => words(c.text) },
-  "verify.verdict": { title: "查證判定", lines: (c) => words(c.reason).map((reason) => `${words(c.verdict)[0] ?? ""}：${reason}`) },
-  "verify.summary": { title: "查證摘要", lines: (c) => [...words(c.overview), ...rows(c.lines).flatMap((line) => words(line.line))] },
-  "express.draft": { title: "輸出稿", lines: (c) => rows(c.sentences).flatMap((sentence) => words(sentence.text)) },
-  "act.note": { title: "觀察紀錄", lines: (c) => [["實際狀況", "happened"], ["想法", "thoughts"], ["要調整什麼", "adjustment"], ["卡在哪", "blocker"]].flatMap(([label, key]) => words(c[key]).map((line) => `${label}：${line}`)) },
-  "assembler.intake": { title: "開案資料", lines: (c) => (words(c.affected).length ? [`會受影響的人：${words(c.affected).join("、")}`] : []) },
-};
-
 export const BADGE = "這是程序工具。它不保證公平，也不保證大家真的同意。";
 export const WRITE_FIRST = "寫完，才看得到別人的";
 const AI_TAG = <span className="tags"><span>AI 寫的</span></span>;
@@ -100,7 +82,6 @@ export function CollabPage({ groupId }: { groupId: string }) {
 
   if (!data) return <><div className="crumbs"><Link href="/groups">我的群組</Link></div><div className="card"><p>{error || "載入中…"}</p></div></>;
   const { group, round } = data;
-  const sharedShown = data.shared.flatMap((item) => { const view = SHARED_VIEW[item.kind]; const lines = view ? view.lines(item.content) : []; return lines.length ? [{ item, title: view.title, lines }] : []; });
   const convener = group.my_role === "convener";
   const thisRound = <C extends { round: number }>(items: Array<Item<C>>) => items.filter((item) => item.content.round === round);
   const seen = [...data.reopens, ...data.stances.filter((item) => item.content.stance === "異議")].map((item) => `${item.doc_id}@${item.version}`);
@@ -217,15 +198,15 @@ export function CollabPage({ groupId }: { groupId: string }) {
         </div>
       )}
 
-      {sharedShown.length > 0 && (
+      {data.shared.length > 0 && (
         <div className="card">
           <h2>分享給這個群組的紀錄</h2>
           <p className="how">成員自己同意分享的才會出現在這裡。沒分享的案子，這裡看不到。</p>
           <div className="mcards">
-            {sharedShown.map(({ item, title, lines }, index) => (
-              <div key={`${index}-${item.doc_id}`} className="mcard">
-                <b>{item.who}分享的{title}</b>
-                {lines.map((line, at) => <p key={at} className="mt0">{line}</p>)}
+            {data.shared.map((item, index) => (
+              <div key={index} className="mcard">
+                <b>{item.who}分享的{item.title}</b>
+                {item.lines.map((line, at) => <p key={at} className="mt0">{line}</p>)}
               </div>
             ))}
           </div>

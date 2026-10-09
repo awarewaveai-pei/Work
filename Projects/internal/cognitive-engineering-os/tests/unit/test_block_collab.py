@@ -288,10 +288,33 @@ class MembershipAndConsentTests(CollabCase):
         consent = self.as_(self.b).post("/me/consents", json={"purpose": "group", "target": self.group, "items": items, "follow_versions": True})
         self.assertEqual(consent.status_code, 200, consent.text)
         shared = self.get(self.a, "view/shared")
-        self.assertEqual([(item["kind"], item["who"], item["content"]["core_conflict"]) for item in shared], [("map.map", "乙", "乙的地圖：錢和信任")])
+        self.assertEqual([(item["title"], item["who"], item["lines"]) for item in shared], [("地圖", "乙", ["核心衝突：乙的地圖：錢和信任"])])
         self.assertNotIn("乙的感受", self.everything(self.a))
         self.as_(self.b).post(f"/me/consents/{consent.json()['doc_id']}/withdraw")
         self.assertEqual(self.get(self.a, "view/shared"), [])
+
+    def test_a_shared_draft_and_map_reach_the_group_as_their_words_and_nothing_that_points_into_the_case(self):
+        case = self.as_(self.b).post("/projects", json={"name": "乙的案子", "purpose": "p", "data_classification": "Confidential"}).json()["project_id"]
+
+        def save(kind: str, content: dict) -> dict:
+            response = self.as_(self.b).post(f"/projects/{case}/docs/{kind}", json={"content": content})
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        card = save("sense.card", {"category": "事件", "text": "乙看到的事"})
+        save("express.selection", {"items": [{"project_id": case, "kind": "sense.card", "doc_id": card["doc_id"]}], "format": "摘要", "reader": "只給乙的合夥人"})
+        draft = save("express.draft", {"format": "摘要", "reader": "只給乙的合夥人", "sentences": [{"text": "乙的稿：先談錢。", "refs": [{"kind": "sense.card", "doc_id": card["doc_id"]}], "unchecked": False, "author": "user"}]})
+        mapped = save("map.map", {"layers": {"interpretations": [{"id": "ITEM-7", "text": "乙的解釋：怕被利用", "by": "user", "card": card["doc_id"], "sources": 3}]}, "core_conflict": "乙的地圖：錢和信任"})
+        items = [{"project_id": case, "kind": kind, "doc_id": doc["doc_id"]} for kind, doc in (("express.draft", draft), ("map.map", mapped))]
+        consent = self.as_(self.b).post("/me/consents", json={"purpose": "group", "target": self.group, "items": items, "follow_versions": True})
+        self.assertEqual(consent.status_code, 200, consent.text)
+        shared = self.get(self.a, "view/shared")
+        self.assertEqual({(item["title"], tuple(item["lines"])) for item in shared},
+                         {("輸出稿", ("乙的稿：先談錢。",)), ("地圖", ("解釋：乙的解釋：怕被利用", "核心衝突：乙的地圖：錢和信任"))})
+        self.assertTrue(all(set(item) == {"who", "title", "lines"} for item in shared))
+        text = json.dumps(shared, ensure_ascii=False)
+        for hidden in (case, card["doc_id"], draft["doc_id"], mapped["doc_id"], "只給乙的合夥人", "ITEM-7", "refs", "reader", "sources"):
+            self.assertNotIn(hidden, text)
 
     def test_an_erased_account_takes_its_dissent_and_renegotiation_notices_with_it(self):
         option = self.option()

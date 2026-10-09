@@ -89,16 +89,15 @@ describe("COLLAB: one group's page", () => {
     await done();
   });
 
-  it("draws what the shared-records route returns (a MAP and a VERIFY item: the words, not the pointers) and nothing when it returns none", async () => {
+  it("draws what the shared-records route returns (who, a title, its lines) and nothing when it returns none", async () => {
     const shared = [
-      { who: "乙", kind: "map.map", doc_id: "M1", version: 1, at: "x", content: { layers: { facts: [{ id: "i1", text: "合約沒寫期限", by: "user", card: "CARD-7" }] }, core_conflict: "誰來負責收尾" } },
-      { who: "丙", kind: "verify.verdict", doc_id: "V1", version: 1, at: "x", content: { claim: "CLAIM-3", claim_version: 2, verdict: "存疑", reason: "只有一個出處" } },
+      { who: "乙", title: "地圖", lines: ["事實：合約沒寫期限", "核心衝突：誰來負責收尾"] },
+      { who: "丙", title: "查證判定", lines: ["存疑：只有一個出處"] },
     ];
     const withShared = await open({ [`${C}/view/shared`]: shared });
     const text = withShared.host.textContent ?? "";
     expect(byText(withShared.host, "h2", "分享給這個群組的紀錄")).toBeDefined();
     for (const line of ["乙分享的地圖", "事實：合約沒寫期限", "核心衝突：誰來負責收尾", "丙分享的查證判定", "存疑：只有一個出處"]) expect(text).toContain(line);
-    for (const pointer of ["CARD-7", "CLAIM-3", "M1", "V1"]) expect(text).not.toContain(pointer);
     await withShared.done();
     const none = await open();
     expect(byText(none.host, "h2", "分享給這個群組的紀錄")).toBeUndefined();

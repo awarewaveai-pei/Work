@@ -3,7 +3,7 @@ differences. The platform offers a procedure; nothing here says the decision was
 
     GET    /groups/{id}/collab/view/dissent        every objection kept, with its reason (an option you marked)
     GET    /groups/{id}/collab/view/authority      who represents whom now, recomputed from the shares still given
-    GET    /groups/{id}/collab/view/shared         the case records members chose to share with the group (consent)
+    GET    /groups/{id}/collab/view/shared         what members chose to share with the group (consent): {who, title, lines}, the words only
     GET    /groups/{id}/collab/view/agreement      「大家怎麼看」 (platform/collab_agreement.py), for the options you marked
     GET    /groups/{id}/collab/view/not-heard?round=  who has not written a position of that round (names only)
     POST   /groups/{id}/ai/{action}                {context}  an AI turn in the group (ai_gate's group path)
@@ -42,6 +42,7 @@ from ai_lego.errors import InvariantViolation, group_gone
 from ai_lego.platform import visibility
 from ai_lego.platform.ai_gate import AiRefused, actions, ask_ai
 from ai_lego.platform.collab_agreement import agreement as agreement_rule
+from ai_lego.platform.collab_shared import shared_words
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.rulesets.collab import AGREEMENT
 from ai_lego.platform.block_hooks import before_save
@@ -51,9 +52,6 @@ from ai_lego.platform.visibility import Viewer
 router = APIRouter()
 BLOCK = "COLLAB"
 GROUP_KINDS = {spec.kind: spec for spec in KINDS if spec.owner == "group"}
-# What of a member's shared case COLLAB reads (card 「讀什麼」): MAP, VERIFY results, EXPRESS proposals; of ACT only the
-# observations after the group's decision; of the intake only who is affected.
-SHARED_BLOCKS = ("MAP", "VERIFY", "EXPRESS")
 LEFT = "已離開的成員"
 WAITING = "轉述先給本人看。本人確認說得對之後，大家才看得到。"
 
@@ -178,23 +176,11 @@ def authority(group_id: str, session: dict[str, Any] = Depends(api.require_sessi
     return {"current": current, "renegotiate": renegotiate}
 
 
-def _shared_part(item: dict[str, Any], decided_at: str | None) -> dict[str, Any] | None:
-    spec = doc_kinds.kinds().get(item["kind"])
-    if spec is None:
-        return None
-    if spec.block in SHARED_BLOCKS:
-        return item["content"]
-    if item["kind"] == "act.note" and decided_at is not None and item["at"] > decided_at:
-        return item["content"]
-    if item["kind"] == "assembler.intake":
-        return {"affected": item["content"].get("affected", [])}
-    return None
-
-
 @router.get("/groups/{group_id}/collab/view/shared")
 def shared(group_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> list[dict[str, Any]]:
-    """Other members' case records their live consent names for this group, and only the parts COLLAB reads; nothing of a
-    case they did not share (visibility.shared_with decides it at this read)."""
+    """What other members' live consents name for this group, as the words a group may read (platform/collab_shared.py:
+    ``{who, title, lines}`` -- no doc id, version, reader or reference into the sharer's case); nothing of a case they did
+    not share, and no kind without a projection (visibility.shared_with decides consent at this read)."""
     member_group(repo, session, group_id)
     docs, viewer = CaseDocs(repo), _viewer(session)
     names = Names(docs, repo, viewer, group_id)
@@ -202,9 +188,9 @@ def shared(group_id: str, session: dict[str, Any] = Depends(api.require_session)
     decided_at = min((item["created_at"] for item in closings), default=None)
     out = []
     for item in visibility.shared_with(docs, repo, viewer, "group", group_id):
-        part = _shared_part(item, decided_at)
-        if part is not None:
-            out.append({"who": names(item["owner_identity_id"]), "kind": item["kind"], "doc_id": item["doc_id"], "version": item["version"], "content": part, "at": item["at"]})
+        words = shared_words(item["kind"], item["content"], after_decision=decided_at is not None and item["at"] > decided_at)
+        if words is not None:
+            out.append({"who": names(item["owner_identity_id"]), **words})
     return out
 
 
