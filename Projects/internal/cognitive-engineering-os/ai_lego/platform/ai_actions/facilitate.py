@@ -66,8 +66,9 @@ _LINES: ContextVar[list[str] | None] = ContextVar("facilitate_log_lines", defaul
 
 def log_lines(content: Mapping[str, Any]) -> list[str]:
     """The lines of a log a pointer may name: what followed, one per line, then each deviation as written."""
-    lines = [part.strip() for part in str(content.get("followed") or "").splitlines() if part.strip()]
-    return lines + [f"沒照稿：{item['what']}（理由：{item['why']}）" for item in content.get("deviated") or []]
+    followed, deviated = content.get("followed"), content.get("deviated")
+    lines = [part.strip() for part in (followed if isinstance(followed, str) else "").splitlines() if part.strip()]
+    return lines + [f"沒照稿：{item['what']}（理由：{item['why']}）" for item in (deviated if isinstance(deviated, list) else [])]
 
 
 def _refuse(code: str, text: str) -> InvariantViolation:
@@ -103,7 +104,7 @@ def _practice(context: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any
     say = context.get("say")
     if not isinstance(say, str) or not say.strip() or len(say) > MAX_SAY:
         raise _refuse("FACILITATE_SAY_REQUIRED", "write what you say to the participant")
-    earlier = context.get("earlier") or []
+    earlier = [] if context.get("earlier") is None else context["earlier"]
     if (not isinstance(earlier, list) or len(earlier) > MAX_EARLIER
             or any(not isinstance(turn, dict) or set(turn) != {"leader", "participant"} or not all(isinstance(text, str) and len(text) <= MAX_SAY for text in turn.values()) for turn in earlier)):
         raise _refuse("AI_CONTEXT_INVALID", "earlier is a short list of {leader, participant}")

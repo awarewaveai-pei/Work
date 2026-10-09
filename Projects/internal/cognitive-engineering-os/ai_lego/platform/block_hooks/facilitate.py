@@ -44,11 +44,12 @@ def _log_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, conten
         raise InvariantViolation(f"FACILITATE_SCRIPT_VERSION_UNKNOWN: {content.get('script')!r} v{content.get('script_version')!r}")
     if not any(item["id"] == script["id"] for item in usable_for_leading()):   # only a script that may lead is one a session followed
         raise InvariantViolation(f"FACILITATE_SCRIPT_NOT_REVIEWED: {script['id']!r} is a draft or has no stop signal")
-    deviated = content.get("deviated") or []
+    deviated = [] if content.get("deviated") is None else content["deviated"]
     if (not isinstance(deviated, list) or len(deviated) > MAX_DEVIATIONS
             or any(not isinstance(item, dict) or set(item) != {"what", "why"} or not _text(item["what"]) or not _text(item["why"]) for item in deviated)):
         raise InvariantViolation(f"FACILITATE_DEVIATION_INVALID: at most {MAX_DEVIATIONS} entries, each {{what, why}}, both written")
-    if not deviated and not str(content.get("followed") or "").strip():
+    followed = content.get("followed")
+    if not deviated and not (isinstance(followed, str) and followed.strip()):
         raise InvariantViolation("FACILITATE_LOG_EMPTY: write what followed the script, or where it did not and why")
 
 
