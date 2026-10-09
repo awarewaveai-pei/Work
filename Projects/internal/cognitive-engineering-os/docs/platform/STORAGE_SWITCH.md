@@ -40,7 +40,8 @@ PostgreSQL service, not inside the self-hosted Supabase. The engine speaks plain
 - W2 project_source_repository + custom_workflow_repository + derived_artifact_cache + blocks/govern.py queries. Built 2026-10-04.
 - W3 identity/store + the region directory (D6). Built 2026-10-04.
 - Last: the SQLite → PostgreSQL data-move script (row counts + a hash per aggregate, SQLite files kept read-only), the
-  compose service (D8), the full suite once.
+  compose service (D8), the full suite once. Script, installer and deploy path built 2026-10-10, not applied anywhere:
+  `docs/platform/GO_LIVE.md` holds the ordered steps.
 
 ## Built (W1-W3, 2026-10-04)
 
@@ -199,7 +200,22 @@ or per-tenant/per-person encryption keys destroyed on erasure. Until decided, an
 the database and not for its files. Whatever is decided runs from one place: `erasure.physical_retention_hook`, called
 after an erasure completes (empty today).
 
-## Data move (requirements; the script is later)
+## Data move
+
+Built 2026-10-10: `ai_lego/apps/cli/move_sqlite_to_pg.py` (`move`, `move --dry-run`, `verify`), tested on the files the engine
+of a76af28da wrote (`tests/fixtures/sqlite_a76af28da/`, `tests/unit/test_move_sqlite_to_pg.py`: equal proof, one corrupted
+row fails it and leaves nothing). Where it chose, beyond the requirements below:
+- `tenant.data_residency_region` is rewritten to the mapped region, the value its directory line gets (`create_tenant` keeps
+  the two equal); `--region-map SOURCE=REGION` is required and every tenant's source region must be in it.
+- One configured region only (the engine refuses more: D7). The proof also holds a digest of every row of every table, the
+  rowid order of `events`/`workspace` against `write_order`, and both sequences (past `sqlite_sequence`, so a deleted id is
+  not handed out again); files per tenant: count, bytes, digest of (path, sha256).
+- Files: the move copies the `objects/<tenant>` and `objects/<sha256(tenant)[:32]>` trees of `source-cas`, `artifact-cas`,
+  `workflow-cas` and `workflows/<sha256(tenant)[:32]>`; a directory of no tenant, or an entry the move does not know, stops it.
+- `verify` is valid until the engine writes its first row after the move.
+
+Requirements (frozen 2026-10-04):
+
 
 - Source: the three SQLite files at the a76af28da shape (the frozen schema). A file not at that shape is first opened
   once by the engine at a76af28da, whose on-open migrations bring it there (owners derived for old rows, the per-person
