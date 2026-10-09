@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -35,6 +36,15 @@ class ExpressKindTests(unittest.TestCase):
         self.assertEqual(sent.authors, frozenset({"user"}))
         self.assertTrue(all(field.human_only for field in sent.fields.values()))
         self.assertEqual(set(sent.fields), {"draft", "version", "to"})
+
+    def test_the_page_asks_only_for_case_owned_kinds(self):
+        """A person-owned kind asked through /projects/{id}/docs answers 404 and the page logs a console error on every open."""
+        source = (PRODUCT_ROOT / "apps/cognitive-web/components/blocks/ExpressPage.tsx").read_text(encoding="utf-8")
+        listed = re.findall(r'"([a-z_]+\.[a-z_]+)"', re.search(r"const CASE_RECORD_KINDS = \[(.*?)\] as const", source, re.S).group(1))
+        self.assertTrue(listed)
+        for kind in listed:
+            spec = doc_kinds.require(kind)
+            self.assertEqual((spec.owner, spec.block in express_hooks.SELECTABLE_BLOCKS), ("case", True), kind)
 
     def test_formats_are_versioned(self):
         self.assertEqual(tuple(item["name"] for item in FORMATS.items), FORMAT_NAMES)

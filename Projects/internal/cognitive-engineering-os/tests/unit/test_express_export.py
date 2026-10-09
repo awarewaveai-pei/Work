@@ -14,18 +14,17 @@ from unittest.mock import patch
 from ai_lego import PRODUCT_ROOT
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
+from ai_lego.platform.integrity import outbound_hits
 from ai_lego.platform.exports.render import _PDF_PRINTABLE_WIDTH, _pdf_text_width, _wrap_pdf_line, render_markdown, render_pdf, render_text
 import ai_lego.platform.exports.render as render_module
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
 
-FORBIDDEN_OUTBOUND_WORDS = ("smtp", "requests", "urllib", "webhook", "schedule", "cron")
 MISSING = object()
 
 
 def _assert_no_outbound_code(root: Path) -> None:
-    paths = [root / "ai_lego" / "apps" / "api" / "blocks" / "express.py", *(root / "ai_lego" / "platform" / "exports").glob("*.py")]
-    hits = [(path, word) for path in paths for word in FORBIDDEN_OUTBOUND_WORDS if word in path.read_text(encoding="utf-8").lower()]
+    hits = outbound_hits(root / "ai_lego")
     if hits:
         raise AssertionError(f"EXPRESS export/send has an outbound path: {hits}")
 

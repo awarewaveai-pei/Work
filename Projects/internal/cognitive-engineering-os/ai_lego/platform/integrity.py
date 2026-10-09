@@ -379,6 +379,139 @@ def routes_keep_the_save_path(snap: Snapshot, block: str) -> list[str]:
     return unsafe_route_modules(Path(routes.__path__[0]))
 
 
+LEGO = Path(__file__).resolve().parents[1]
+# Steps 3 and 4 (docs/platform/STEP34_SHARED_RULES.md §3, §9, §11). Each function checks what the code shows; the proof tests
+# named on its Check run the rule itself.
+BLIND_KINDS = {"collab.position": "round", "collab.change": "round", "collab.interface_answers": "round", "collab.stance": "option"}
+GROUP_READERS = ("current_in_group", "versions_in_group", "current_on_platform")
+GROUP_READ_HOMES = ("platform/visibility.py", "data/repositories/case_docs.py")
+# The modules that hold the consent kind's name, and why each may: a new one is read before it joins this list.
+CONSENT_MODULES = {
+    "apps/api/blocks/govern_group.py": "the person's own consents (/me/consents)",
+    "data/repositories/project_source_repository.py": "an erase removes the consents naming the group",
+    "platform/block_hooks/govern_group.py": "the ownership check on save",
+    "platform/research_export.py": "the operator's export reads research consents only",
+    "platform/visibility.py": "shared_with, the one reader of consents for sharing",
+}
+EXPRESS_OUTBOUND_WORDS = ("smtp", "requests", "urllib", "webhook", "schedule", "cron")
+EXPRESS_FILES = ("apps/api/blocks/express.py", "platform/ai_actions/express.py", "platform/block_hooks/express.py")
+# Dict keys of an answer that would grade or count people: the platform answers presence, who and what, never a tally.
+TALLY_KEYS = GRADING_TOKENS | frozenset({"vote", "votes", "tally", "points", "percent"})
+STEP34_ANSWER_FILES = (
+    "apps/api/blocks/collab.py", "apps/api/blocks/groups.py", "apps/api/blocks/govern_group.py", "apps/api/blocks/teach.py", "apps/api/blocks/express.py",
+    "apps/api/blocks/facilitate.py", "platform/collab_agreement.py", "platform/collab_shared.py", "platform/indicators.py", "platform/research_export.py",
+    "platform/visibility.py", "platform/ai_actions/collab.py", "platform/ai_actions/teach.py", "platform/ai_actions/express.py", "platform/ai_actions/facilitate.py",
+)
+
+
+def group_readers(root: Path) -> list[str]:
+    """Every call of CaseDocs' group and platform readers outside platform/visibility.py (``root``: the ai_lego folder)."""
+    offenders = []
+    for path in sorted(root.rglob("*.py")):
+        relative = path.relative_to(root).as_posix()
+        if relative in GROUP_READ_HOMES:
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in GROUP_READERS:
+                offenders.append(f"{relative}:{node.lineno}")
+    return offenders
+
+
+def unnamed_group_visibility(root: Path) -> list[str]:
+    """Every DocKind(..., owner="group", ...) in the kind modules that does not say who may read it."""
+    offenders = []
+    for path in sorted((root / "core" / "domain" / "kinds").glob("*.py")):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not (isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", None)) == "DocKind"):
+                continue
+            keywords = {keyword.arg: keyword.value for keyword in node.keywords}
+            owner = keywords.get("owner")
+            if isinstance(owner, ast.Constant) and owner.value == "group" and "visibility" not in keywords:
+                offenders.append(f"{path.name}: {node.args[0].value if node.args and isinstance(node.args[0], ast.Constant) else '?'}")
+    return offenders
+
+
+def consent_modules(root: Path) -> list[str]:
+    """The modules (outside the kind definitions and this one) that hold the string "govern.consent"."""
+    return sorted(relative for relative in (path.relative_to(root).as_posix() for path in root.rglob("*.py")) if not relative.startswith("core/domain/kinds/") and relative != "platform/integrity.py"
+                  and any(isinstance(node, ast.Constant) and node.value == "govern.consent" for node in ast.walk(ast.parse((root / relative).read_text(encoding="utf-8")))))
+
+
+def outbound_hits(root: Path) -> list[str]:
+    """A word that names a way out (mail, a request, a webhook, a schedule) in EXPRESS's route, hook, action and exporters."""
+    paths = [root / name for name in EXPRESS_FILES] + sorted((root / "platform" / "exports").glob("*.py"))
+    return [f"{path.relative_to(root).as_posix()}: {word}" for path in paths if path.exists() for word in EXPRESS_OUTBOUND_WORDS if word in path.read_text(encoding="utf-8").lower()]
+
+
+def tally_keys(root: Path) -> list[str]:
+    """A string key of a dict literal that grades or counts people, in the files that answer for steps 3 and 4."""
+    hits = []
+    for name in STEP34_ANSWER_FILES:
+        for node in ast.walk(ast.parse((root / name).read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Dict):
+                hits += [f"{name}:{key.lineno} {key.value!r}" for key in node.keys if isinstance(key, ast.Constant) and isinstance(key.value, str) and key.value.lower() in TALLY_KEYS]
+    return hits
+
+
+def blind_write(snap: Snapshot, block: str) -> list[str]:
+    problems = []
+    for kind, field in BLIND_KINDS.items():
+        spec = snap.kinds.get(kind)
+        if spec is None:
+            problems.append(f"{kind} does not exist")
+        elif spec.blind != field or field not in spec.fields:
+            problems.append(f"{kind} must be blind by its own field {field!r} (write before see), it is {spec.blind!r}")
+    return problems
+
+
+def consent_read_path_only(snap: Snapshot, block: str) -> list[str]:
+    problems = [f"{hit} reads group or platform records outside platform/visibility.py" for hit in group_readers(LEGO)]
+    problems += [f"{hit} is a group kind that does not say who may read it" for hit in unnamed_group_visibility(LEGO)]
+    problems += [f"{name} names the consent kind and is not on the reviewed list" for name in consent_modules(LEGO) if name not in CONSENT_MODULES]
+    return problems
+
+
+def appeals_not_read_by_subject(snap: Snapshot, block: str) -> list[str]:
+    spec = snap.kinds.get("govern.appeal")
+    if spec is None:
+        return ["govern.appeal does not exist"]
+    problems = []
+    if spec.owner != "platform":
+        problems.append("govern.appeal must belong to the platform, not to a case, a person or a group the leader is in")
+    problems += [f"govern.appeal.{name} is missing" for name in ("about_identity_id", "named", "text") if name not in spec.fields]
+    if "text" in spec.fields and not spec.fields["text"].human_only:
+        problems.append("govern.appeal.text must be the person's own")
+    problems += [f"{action.block}.{action.name} reads an appeal (an AI never rules on one)" for (_, _), action in snap.actions.items() if "govern.appeal" in action.reads]
+    return problems
+
+
+def express_has_no_outbound_send(snap: Snapshot, block: str) -> list[str]:
+    return [f"{hit}: EXPRESS has a way to send by itself" for hit in outbound_hits(LEGO)]
+
+
+def facilitator_needs_training(snap: Snapshot, block: str) -> list[str]:
+    from ai_lego.platform.lessons import FACILITATOR_COURSE, courses
+
+    problems = []
+    completion, run, link = (snap.kinds.get(kind) for kind in ("teach.completion", "teach.run", "facilitate.supervision_link"))
+    if completion is None or completion.authors != frozenset({"system"}):
+        problems.append("teach.completion must be written by the system only (a person cannot write their own training)")
+    if run is None or run.owner != "person" or not run.deletable:
+        problems.append("teach.run must be the person's own and deletable (deleting a lesson run ends eligibility)")
+    if link is None or link.owner != "platform":
+        problems.append("facilitate.supervision_link must belong to the platform, like an appeal")
+    if not courses().get(FACILITATOR_COURSE):
+        problems.append("the facilitator course has no lesson")
+    for name, word in (("platform/identity/store.py", "is_eligible_facilitator"), ("apps/api/blocks/facilitate.py", "is_leader_of")):
+        if word not in (LEGO / name).read_text(encoding="utf-8"):
+            problems.append(f"{name} no longer asks {word}")
+    return problems
+
+
+def no_scores_in_answers(snap: Snapshot, block: str) -> list[str]:
+    return [f"{hit} grades or counts people" for hit in tally_keys(LEGO)]
+
+
 @dataclass(frozen=True)
 class Check:
     id: str
@@ -389,6 +522,7 @@ class Check:
     run: Callable[[Snapshot, str], list[str]]
     blocks: tuple[str, ...] | None = None        # None: every block that has kinds or AI actions
     needs: str = "kinds"                          # generic ones: "kinds" | "actions" | "words"; a fixed one waits for "act_or_learn" to be built
+    proof: tuple[str, ...] = ()                   # the tests that run the rule itself ("tests/unit/x.py::Class::method"); test_integrity checks each exists
 
     def applies(self, snap: Snapshot, block: str) -> bool:
         if self.blocks is not None:
@@ -422,6 +556,18 @@ CHECKS = (
     Check("crisis_on_save", ("R1",), "存一張卡，出現危機訊號，會給求助資源", "真的走一次存卡的路，帶危機訊號的卡會得到求助資源。", "只試一句話，也只試外化卡。", crisis_on_save, blocks=(PLATFORM,)),
     Check("ai_inputs_are_readable", ("R1",), "AI 的輸入沒有把中文escape掉，危機詞看得到", "每個 AI 動作的檔案裡，json.dumps 都寫了 ensure_ascii=False，所以閘檢查的那段字，和送給 AI 的是同一段、讀得懂。", "只看 json.dumps；別種把字變形的寫法，這裡看不到。危機詞表漏掉的說法也看不到。", ai_inputs_are_readable, blocks=(PLATFORM,)),
     Check("routes_keep_the_save_path", ("R1",), "每個存你寫的紀錄的路由檔，都接上危機和護欄那一關", "apps/api/blocks 裡凡是可能存到你寫的字的檔，都用了存卡那條路（危機訊號給求助、高風險加護欄）。只有兩種不算：用 AI 身分存的（攤開 AI 的卡），和用系統身分存進只有系統能寫的紀錄種類（整理出的歷程）；把存的函式交給別的函式用，也算你的。", "只看檔案有沒有接上，不看每一個寫入點是不是都走那條路。", routes_keep_the_save_path, blocks=(PLATFORM,)),
+    Check("blind_write", ("R8", "R1"), "共同決定：先寫自己的，才看得到別人的", "立場、讀完之後的一句、介面問題的回答，和對方案的同意或異議，都標了「寫完才看」，而且指的是它自己的格子。", "只證明有宣告。誰在什麼時候看得到，由 platform/visibility.py 讀取時決定，有測試真的跑；召集人也不例外。", blind_write, blocks=(PLATFORM,),
+          proof=("tests/unit/test_visibility.py::BlindTests::test_the_convener_is_blind_too_and_fetching_by_id_is_refused_as_not_found", "tests/unit/test_block_collab.py::BlindTests::test_1_before_writing_their_own_position_no_route_shows_anothers_of_that_round")),
+    Check("consent_read_path_only", ("R1", "R3"), "別人的紀錄只走一條讀的路，別人的案子只在本人同意時讀", "群組和平台的紀錄，只有 platform/visibility.py 讀得到；每一種群組紀錄都寫明誰能讀；「同意」這種紀錄只有看過、列在清單上的幾個檔案提到。", "只看呼叫的地方，不看每一個讀取是不是都問了同意。同意有沒有撤回、讀到哪一版，由測試真的跑。", consent_read_path_only, blocks=(PLATFORM,),
+          proof=("tests/unit/test_visibility.py::GateTests::test_b_only_visibility_calls_the_group_readers", "tests/unit/test_consent.py::GroupConsentTests::test_withdrawing_empties_the_next_read_and_a_new_version_shares_again")),
+    Check("appeals_not_read_by_subject", ("R3", "R9"), "申訴：被申訴的帶領者讀不到，AI 不裁決", "申訴屬於平台（不屬於任何帶領者看得到的案子或群組），有「對誰」「具名與否」的格子，內容只收本人寫的，沒有任何 AI 動作會讀它。", "只證明放的位置。誰讀得到、不具名時遮不遮，由 visibility.appeals_for 決定，有測試真的跑（含被申訴者本人兼任處理人的情況）。", appeals_not_read_by_subject, blocks=(PLATFORM,),
+          proof=("tests/unit/test_appeals.py::WhoReadsAnAppealTests::test_the_facilitator_it_is_about_reads_nothing_even_as_a_handler", "tests/unit/test_appeals.py::WhoReadsAnAppealTests::test_the_handler_reads_it_with_no_trace_of_who_wrote_it")),
+    Check("express_has_no_outbound_send", ("R1",), "產出與表達：系統自己不會把稿子送出去", "EXPRESS 的路由、AI 動作、存檔檢查和匯出檔案裡，沒有寄信、發請求、webhook、排程的字眼。", "只看字眼。送出一定由本人按，那一關由測試真的跑。", express_has_no_outbound_send, blocks=(PLATFORM,),
+          proof=("tests/unit/test_express_export.py::ExpressOutboundScanTests::test_real_tree_has_no_outbound_path_and_temp_import_is_caught", "tests/unit/test_express_export.py::ExpressExportApiTests::test_send_requires_current_version_and_acknowledgement_then_records_sent")),
+    Check("facilitator_needs_training", ("R3",), "帶領：沒上完課不能帶", "課程完成紀錄只有系統能寫；上課紀錄是本人的、可以刪（刪了就不符資格）；督導連結屬於平台；帶領者那一課有內容；接受邀請和帶領的路由都問「現在符合資格嗎」。", "只看有沒有問。資格是每次重新算的，有測試真的跑，包括刪掉一堂課的紀錄之後。", facilitator_needs_training, blocks=(PLATFORM,),
+          proof=("tests/unit/test_block_facilitate.py::EligibilityTests::test_an_untrained_identity_cannot_be_set_as_facilitator_a_trained_one_can", "tests/unit/test_block_facilitate.py::EligibilityTests::test_eligibility_is_asked_again_after_a_lesson_run_is_deleted")),
+    Check("no_scores_in_answers", ("NOSCORE", "R6"), "新的路由和計算不回傳分數、排名、票數", "共同程序、團體、教學、輸出、帶領這幾塊回答裡的字典，沒有叫分數、排名、評等、票數的鍵。", "只看字面的鍵名。換個名字或放進別的結構，這裡看不到；欄位本身由 no_scores 看。", no_scores_in_answers, blocks=(PLATFORM,),
+          proof=("tests/unit/test_block_collab.py::StanceAndDissentTests::test_9_no_answer_carries_a_count_a_tally_or_a_rank", "tests/unit/test_facilitate_ai.py::GateTests::test_no_answer_has_a_score_or_rank_key_and_the_ai_never_writes_a_log")),
 )
 assert len({check.id for check in CHECKS}) == len(CHECKS) and all(rule in RULES for check in CHECKS for rule in check.rules)
 assert all(SLOTS[check.id][0] == check.blocks[0] for check in CHECKS if check.id in SLOTS)
@@ -433,6 +579,7 @@ RULES_HISTORY = (
     {"version": 1, "date": "2026-10-03", "fingerprint": "c692fa60074f", "change": "first version: 11 rules and 不打分 checked per block; 20 checks, each with what it proves and does not prove"},
     {"version": 2, "date": "2026-10-03", "fingerprint": "428dd046bfc7", "change": "integration: a conclusion is a field of words in a kind the AI may author (an int version number is not); a route must send the person's saves through the save path, a system or AI write is not the person's words"},
     {"version": 3, "date": "2026-10-03", "fingerprint": "4f70873772a8", "change": "critic: a field that points at a record (*_version, *_id) is not a conclusion, a confidence number is; a save handed to a helper or written as the system into a kind the person may author counts as the person's"},
+    {"version": 4, "date": "2026-10-10", "fingerprint": "c936b4cb101e", "change": "steps 3 and 4 (card 80): six platform rows -- blind write, one read path for others' records and consents, appeals unreadable by their subject, no outbound send from EXPRESS, a facilitator needs training, no score or tally key in the new answers; each check names the tests that run its rule"},
 )
 
 
@@ -449,7 +596,7 @@ def _plain(value: Any) -> Any:
 def rules_fingerprint() -> str:
     """What the rules say now: the checks (with their words), the card reads, the name lists, the fixed slots."""
     return digest(_plain({
-        "rules": RULES, "checks": [(check.id, check.rules, check.name, check.proves, check.does_not_prove, check.blocks, check.needs) for check in CHECKS],
+        "rules": RULES, "checks": [(check.id, check.rules, check.name, check.proves, check.does_not_prove, check.blocks, check.needs, check.proof) for check in CHECKS],
         "conclusion": [CONCLUSION_TOKENS, CONCLUSION_NAMES], "grading": GRADING_TOKENS, "preamble": PREAMBLE_MUST,
         "reads": {block: sorted(reads_from(block)) for block in DRAWER_READS}, "read_limits": {f"{a}:{b}": kinds for (a, b), kinds in KIND_READ_LIMITS.items()}, "slots": SLOTS,
     }))

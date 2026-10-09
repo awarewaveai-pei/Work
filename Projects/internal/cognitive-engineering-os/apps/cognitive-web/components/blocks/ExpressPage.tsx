@@ -50,7 +50,7 @@ const CASE_RECORD_KINDS = [
   "compute.run", "compute.adopt", "compute.request", "compute.suggestion", "compute.explanation",
   "decide.judgment", "decide.check", "decide.review", "decide.seal", "decide.pause",
   "act.task", "act.note", "act.split", "act.flag", "act.trend",
-  "learn.calibration", "learn.revisit", "learn.compare", "learn.daily", "learn.daily_mirror", "learn.practice", "learn.sprint",
+  "learn.calibration", "learn.revisit", "learn.compare",
 ] as const;
 
 const KIND_NAMES: Record<string, string> = {

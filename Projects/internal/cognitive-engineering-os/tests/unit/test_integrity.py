@@ -4,6 +4,7 @@ open block is built; until then the blocks that are open and not built are liste
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import dataclasses
 import io
@@ -344,6 +345,52 @@ class TheCardSlots(unittest.TestCase):
         record = Snapshot.live().kinds["govern.ai_call"]
         by_person = dataclasses.replace(record, authors=frozenset({"user"}), deletable=True)
         self.assertEqual(sorted(self.run_slot("version_records", with_kinds(by_person))), ["govern.ai_call must be written by ['system'] only, not ['user']", "govern.ai_call must keep every version (not deletable)"])
+
+
+class TheStep34Rows(unittest.TestCase):
+    """The rows of card 80: each fails on a copy or a made-up kind that breaks its rule, and each names proof tests that exist."""
+
+    ROWS = ("blind_write", "consent_read_path_only", "appeals_not_read_by_subject", "express_has_no_outbound_send", "facilitator_needs_training", "no_scores_in_answers")
+
+    def test_each_row_names_proof_tests_that_exist(self):
+        self.assertEqual(sorted(check.id for check in CHECKS if check.proof), sorted(self.ROWS))
+        for check in CHECKS:
+            for ref in check.proof:
+                path, klass, method = ref.split("::")
+                tree = ast.parse((PRODUCT_ROOT / path).read_text(encoding="utf-8"))
+                found = {(node.name, item.name) for node in tree.body if isinstance(node, ast.ClassDef) for item in node.body if isinstance(item, ast.FunctionDef)}
+                self.assertIn((klass, method), found, f"{check.id}: {ref}")
+
+    def test_a_scan_finds_a_copy_with_one_planted_break(self):
+        import shutil
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder) / "ai_lego"
+            for part in ("apps/api/blocks", "platform", "core/domain/kinds", "data/repositories"):
+                shutil.copytree(integrity.LEGO / part, root / part, dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__"))
+            self.assertEqual((integrity.tally_keys(root), integrity.outbound_hits(root), integrity.group_readers(root), integrity.consent_modules(root) == sorted(integrity.CONSENT_MODULES)), ([], [], [], True))
+            with (root / "apps/api/blocks/collab.py").open("a", encoding="utf-8") as file:
+                file.write("\n_PLANTED = {'votes': 3}\n")
+            with (root / "apps/api/blocks/express.py").open("a", encoding="utf-8") as file:
+                file.write("\n# import smtplib\n")
+            (root / "apps/api/blocks/peek.py").write_text("def peek(docs, t, g):\n    return docs.current_in_group(t, g, 'govern.consent'), 'govern.consent'\n", encoding="utf-8")
+            self.assertEqual([hit.split(" ", 1)[1] for hit in integrity.tally_keys(root)], ["'votes'"])
+            self.assertEqual(integrity.outbound_hits(root), ["apps/api/blocks/express.py: smtp"])
+            self.assertEqual(integrity.group_readers(root), ["apps/api/blocks/peek.py:2"])
+            self.assertEqual(set(integrity.consent_modules(root)) - set(integrity.CONSENT_MODULES), {"apps/api/blocks/peek.py"})
+
+    def test_a_kind_that_breaks_its_rule_is_found(self):
+        live = Snapshot.live()
+        position, appeal, completion, run = (live.kinds[name] for name in ("collab.position", "govern.appeal", "teach.completion", "teach.run"))
+        self.assertEqual(integrity.blind_write(live, PLATFORM) + integrity.appeals_not_read_by_subject(live, PLATFORM) + integrity.facilitator_needs_training(live, PLATFORM), [])
+        self.assertEqual(len(integrity.blind_write(with_kinds(dataclasses.replace(position, blind="")), PLATFORM)), 1)
+        self.assertEqual(len(integrity.appeals_not_read_by_subject(with_kinds(dataclasses.replace(appeal, owner="person")), PLATFORM)), 1)
+        self.assertEqual(len(integrity.facilitator_needs_training(with_kinds(dataclasses.replace(completion, authors=frozenset({"user"}))), PLATFORM)), 1)
+        self.assertEqual(len(integrity.facilitator_needs_training(with_kinds(dataclasses.replace(run, deletable=False)), PLATFORM)), 1)
+        reading = an_action("GOVERN", reads=("govern.appeal",))
+        self.assertEqual(len(integrity.appeals_not_read_by_subject(dataclasses.replace(live, actions={**live.actions, ("GOVERN", "probe"): reading}), PLATFORM)), 1)
 
 
 class TheRulesHaveVersions(unittest.TestCase):

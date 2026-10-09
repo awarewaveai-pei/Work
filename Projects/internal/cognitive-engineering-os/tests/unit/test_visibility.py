@@ -16,6 +16,7 @@ from ai_lego.data.events import record_log
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import visibility
+from ai_lego.platform.integrity import group_readers, unnamed_group_visibility
 from ai_lego.platform.visibility import Viewer
 from tests.unit.test_groups_core import GroupCase, make_people, registered
 
@@ -61,8 +62,7 @@ REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/teach.py", "record_log.person(session['identity_id'])"): 1,
     ("platform/block_hooks/facilitate.py", "record_log.person(facilitator)"): 1,
 })
-# (c) Group kinds that keep visibility="members" without saying so. Empty: every group kind names its visibility.
-DEFAULT_VISIBILITY_ON_PURPOSE: set[str] = set()
+# (b) and (c) are platform/integrity.py: group_readers, unnamed_group_visibility (the integrity rows scan with them too).
 
 
 def _is_owner_call(node: ast.AST) -> bool:
@@ -86,34 +86,6 @@ def owner_uses(root: Path) -> Counter:
                 if _is_owner_call(node):
                     found[(f"{folder}/{path.name}", ast.unparse(node))] += 1
     return found
-
-
-def group_readers(root: Path) -> list[str]:
-    """(b) Every call of CaseDocs' group and platform readers outside platform/visibility.py."""
-    offenders = []
-    for path in sorted(root.rglob("*.py")):
-        relative = path.relative_to(root).as_posix()
-        if relative in ("platform/visibility.py", "data/repositories/case_docs.py"):
-            continue
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr in ("current_in_group", "versions_in_group", "current_on_platform"):
-                offenders.append(f"{relative}:{node.lineno}")
-    return offenders
-
-
-def unnamed_group_visibility(root: Path) -> list[str]:
-    """(c) Every DocKind(..., owner="group", ...) in the kind modules that does not say its visibility."""
-    offenders = []
-    for path in sorted((root / "core" / "domain" / "kinds").glob("*.py")):
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
-            if not (isinstance(node, ast.Call) and getattr(node.func, "id", getattr(node.func, "attr", None)) == "DocKind"):
-                continue
-            keywords = {keyword.arg: keyword.value for keyword in node.keywords}
-            owner = keywords.get("owner")
-            if isinstance(owner, ast.Constant) and owner.value == "group" and "visibility" not in keywords:
-                name = node.args[0].value if node.args and isinstance(node.args[0], ast.Constant) else "?"
-                if name not in DEFAULT_VISIBILITY_ON_PURPOSE:
-                    offenders.append(f"{path.name}: {name}")
     return offenders
 
 

@@ -1,5 +1,7 @@
 # Steps 3 and 4 checklist
 
+The page walk of §16 ran at the wave's close (card 80): `scripts/page_walk_step34.mjs` + `scripts/seed_step34.py`, six pages at 1280 and 400 wide, no page error. It found one real fault: `ExpressPage.tsx` asked for four person-owned kinds as case records and logged a 404 on every open (fixed, `tests/unit/test_block_express.py` `test_the_page_asks_only_for_case_owned_kinds`). The per-line account of every card is the last section.
+
 ## TEACH
 
 - [x] Lessons and low-risk practice cases are reviewed content files under `ai_lego/platform/lessons/`, not database rows.
@@ -56,7 +58,7 @@
 - built (card 62): `ai_actions/facilitate.py` -- `play_participant` (reads no record: a reviewed script's step + a practice case + what the leader said; the reply is a participant's, tagged AI, saved as `facilitate.practice_reply`) and `point_at_deviations` (reads the leader's own `facilitate.log` only; the model names a line by number and one of the four don'ts, the SYSTEM copies the line from the log, the wording is 這裡可能偏離「…」：…, a verdict or a score word is refused as the model's failure; every answer ends with the fixed sentence, set by the system: `facilitate.pointers`). Two AI-written kinds were added to `kinds/facilitate.py` (an `AiAction` has to save into one). `tests/unit/test_facilitate_ai.py` scans the actions file: it names no kind but the leader's own and the AI's answers.
 - built (card 62): pages `/lead` (the course with 草稿 marks, the groups I lead, practice with the AI participant, my supervisors found by address, feedback about me, the leaders I supervise: their logs, the appeals about them masked -- a name only when the appeal is named -- and a form for feedback) and `/groups/[id]/lead` (the script step by step with the stop signals of the step, the four don'ts always drawn, 「參與者要停」 stops the step, lights the signals, shows the script's escalation and GOVERN's lines for that participant's place or the general lines when no one is named; what participants chose to show, by who; the log form with 「請 AI 指出可能偏離的地方」; the unit-assigned supervisor note, and for the convener the form to assign one). `lib/facilitate.ts`; sentences in `lib/errors.ts`.
 - NOT CHANGED: `lib/blocks.ts` -- the FACILITATE entry stays (FACILITATE has no case page; its pages are `/lead` and `/groups/[id]/lead`, as COLLAB's are at `/groups`).
-- NOT YET: a link to 帶領 in the main menu (`AppNav.tsx`); the page walk at 1280 and 400 wide (§16, end of the wave); practice needs a script whose `state` is `reviewed` -- the three seeds are drafts until the operator reviews them, so the page says so and offers none.
+- NOT YET: a link to 帶領 in the main menu (`AppNav.tsx`); practice needs a script whose `state` is `reviewed` -- the three seeds are drafts until the operator reviews them, so the page says so and offers none.
 
 ## GOVERN (cards 30-33)
 
@@ -73,8 +75,8 @@
     marked 尚未查核 (`resources.unchecked()`).
 - 33 pages: `/me/data` (`MyDataPage.tsx`: consents with preview and withdraw, appeals, research, export / erase) and on
   the case's GOVERN page the audit line and the 不留紀錄 switch.
-  - Not built: the switch on the intake page itself (`IntakePage.tsx` is S's); the page walk at 1280 / 400 wide (§16,
-    end of the wave).
+  - Not built: the switch on the intake page itself (`IntakePage.tsx` is S's).
+
 
 
 ## COLLAB (cards 20-22)
@@ -108,7 +110,7 @@
 - built: 「寫完，才看得到別人的」 on the page -- a blind kind is asked `?mine=true` until your own of the round is saved; the full list is not even requested before, and nothing but your own is drawn from that answer (route gained `mine`; `POST .../collab.authority/{id}/revoke` takes back the caller's own share)
 - NOT CHANGED: `lib/blocks.ts` -- COLLAB's entry already exists (step 3); groups are reached at `/groups`, not from a case's block list
 - built: the group page draws `view/shared` as 「分享給這個群組的紀錄」; the route returns `{who, title, lines}` per record -- the words only, built by `ai_lego/platform/collab_shared.py` `PROJECTIONS` (地圖, 主張 / 查證判定 / 查證摘要, 輸出稿, 觀察紀錄 after the group's decision, who is affected in 開案資料); no doc id, version, reader or ref into the sharer's case leaves the server (Codex F4); a kind with no projection is not returned; consent is decided at the read by `visibility.shared_with`; nothing is drawn when the route returns none
-- NOT YET: a link to 我的群組 in the main menu (`AppNav.tsx`); choosing an option's evidence from shared records (`evidence_refs` is stored and checked, the page has no picker); the page walk at 1280 and 400 wide (§16, end of the wave)
+- NOT YET: a link to 我的群組 in the main menu (`AppNav.tsx`); choosing an option's evidence from shared records (`evidence_refs` is stored and checked, the page has no picker)
 
 
 ## Process indicators (card 70)
@@ -120,3 +122,463 @@
 - NOT BUILT: the group-level `claims_with_source_share` and `facts_law_values_separate` (A8 lists them under 公共決策) -- they need each member's claim ledger, which a group reads only through a consent (R2) and which carries no origins to count; a member sees them on their own case
 - NOT YET: GOVERN's research export including the indicator facts of consented items (the card's "may") -- `platform/research_export.py` is card 31's file, not in this card's list; the functions take the consented documents as `records`, the export would pseudonymise the `owner` label and add a manifest line
 - NOT YET: the lists drawn on the group and case pages (the card's "may show"; no page file is in the card's list); `lib/` has no client for the two routes
+
+## Card lines (card 80)
+
+Every line of `step34-cards/<BLOCK>.card.txt`, verbatim, then `=>` and where it is built (`file:line`, relative to the product root), or `NOT YET:` and why, or `context:` for a line that states background or a heading and builds nothing. `tests/unit/test_step34_checklist.py` fails on a card line missing from here, a `built:` without a `file:line`, and `context:` outside a heading, the opening lines, `解決什麼問題` and `現在有沒有`.
+
+### COLLAB
+
+- COLLAB => context: block title, one-line summary and state words of the card
+- 共同程序有別人一起決定時 => context: block title, one-line summary and state words of the card
+- ○ 無 => context: block title, one-line summary and state words of the card
+- 合約　草稿 => context: block title, one-line summary and state words of the card
+- 解決什麼問題 => context: section heading
+- COLLAB 幫幾個人一起做決定，又保留不同的意見。例：第三位合夥人也要一起決定。它用這些做法：畫出大家在哪裡不一樣、授權和收回授權、保存少數意見、訂好什麼時候結束和什麼時候重開。 => context: what the block is for; the how is the lines below
+- 進入團隊、課堂或組織時，新問題是程序正當性，不是誰比較會思考。六個問題。 => context: background
+- 誰能參與決策？ => built: ai_lego/apps/api/blocks/groups.py:146; ai_lego/apps/api/blocks/groups.py:176
+- 何時可以合理地結束討論？ => built: ai_lego/core/domain/kinds/collab.py:83
+- 專業權威在什麼範圍內有效？ => built: ai_lego/core/domain/kinds/collab.py:75
+- 授權能否被理解、檢查與撤回？ => built: ai_lego/apps/api/blocks/collab.py:269; ai_lego/core/domain/kinds/collab.py:80
+- 少數意見如何被保存，不被多數決抹除？ => built: ai_lego/core/domain/kinds/collab.py:70; ai_lego/apps/api/blocks/collab.py:4
+- 什麼條件可以重新開啟已結束的決定？ => built: ai_lego/core/domain/kinds/collab.py:89
+- 用「授權／共同決定」，不用「核准」。保留異議、理由、責任人、重開條件，避免權威程序覆蓋使用者的判斷。 => built: apps/cognitive-web/components/blocks/CollabPage.tsx:271; ai_lego/core/domain/kinds/collab.py:75
+- 保留異議、可以重開，是為了讓大家不同意，也還信任彼此。 => context: the reason for keeping dissent; the lines below build it
+- 共同程序這一層還是之後的研究和設計領域，不假裝已經完成。 => built: apps/cognitive-web/components/blocks/CollabPage.tsx:23
+- 自主可以包含自願授權。授權要看得懂、查得到、有邊界，必要時能重新評估。 => built: ai_lego/core/domain/kinds/collab.py:75; ai_lego/apps/api/blocks/collab.py:5
+- 這一塊要讓人練出：在不同意見裡共同決定，保留異議 => context: aim, scale and capability of the block; no behaviour of its own
+- 尺度「公共決策」：藍圖的「共同程序」：不同判斷怎麼形成正當的共同決定，保留異議、可以重開 => context: aim, scale and capability of the block; no behaviour of its own
+- 要培養的能力「理解他人立場」：每個角色真正要什麼、怕什麼；分歧地圖 => context: aim, scale and capability of the block; no behaviour of its own
+- 成熟公民「尊重別人思考後得出不同結論」：看別人的解釋和利益、切換視角、保留少數意見 => context: aim, scale and capability of the block; no behaviour of its own
+- 成熟公民的意思：成熟公民不是永遠正確、永遠理性、永遠同意彼此。 => context: aim, scale and capability of the block; no behaviour of its own
+- 因果鏈「更好的公共決策」這一環怎麼量：團體層，只量過程：異議有沒有保留、重開條件有沒有寫、決定後有沒有回顧、能不能正確轉述對方立場、主張帶來源的比例。不量大家是否一致 => built: ai_lego/platform/indicators.py:77; ai_lego/apps/api/blocks/govern_group.py:253
+- 擋認知作戰「社會的信任和凝聚」：分化是對方的目標，所以要保住「不同意，但還能一起決定」 => context: why division matters; the lines below keep disagreement and joint decision together
+- 認知作戰會這樣打到這一塊：假帳號混進共同決定、帶風向。防法：參與者身分要確認；「多數意見」要防被灌 => built: ai_lego/platform/identity/store.py:688; ai_lego/platform/collab_agreement.py:77
+- 在戰爭發生之前「去人化變成正常之前」：訊息要你敵視某一群人時，VERIFY 標出來；共同決定時，每一方的立場由本人確認轉述得對不對 => context: VERIFY's marking of dehumanising messages is VERIFY's card; the restatement the subject confirms is built below
+- 在戰爭發生之前「異議被當成背叛之前」：異議和理由都存下來，不會被多數蓋掉；任何參與者都可以提出重開 => built: ai_lego/core/domain/kinds/collab.py:70; ai_lego/core/domain/kinds/collab.py:89
+- 在戰爭發生之前「制度失去自我修正能力之前」：共同決定寫明重開的條件；平台自己可以被質疑、被申訴，研究保留失敗和沒改變的結果 => context: background
+- 這裡的「政治」不是黨派，是人們共同決定公共事務怎麼運作的過程：教育制度、AI 規範、醫療資源、環境、言論自由、稅收。平台要提升的是人參與公共決策的能力，不是做政治教育。 => context: background
+- 使用者做什麼 => context: section heading
+- 你的八步循環裡，這一塊做：「反思」每個人讀完別人的立場，寫一句：自己的想法有沒有變（AI 的轉述由本人確認）；「提問」每個人先各自回答你的五個介面問題；「比較」你們對每個方案標同意或異議，寫理由。 => built: ai_lego/core/domain/kinds/collab.py:49; ai_lego/core/domain/kinds/collab.py:54; ai_lego/core/domain/kinds/collab.py:65
+- 你發起共同程序，邀請有關的人。例：第三位合夥人。 => built: ai_lego/apps/api/blocks/groups.py:82; ai_lego/apps/api/blocks/groups.py:146
+- 每個參與者加入時，寫自己在哪裡。 => built: ai_lego/core/domain/kinds/collab.py:38
+- 你們先一起寫：這次要決定的問題是什麼。寫法不同的版本都留著。 => built: ai_lego/core/domain/kinds/collab.py:34
+- 每個人先各自寫自己的立場。寫完，才看得到別人的。 => built: ai_lego/core/domain/kinds/collab.py:44
+- 每個人讀完別人的立場，寫一句：自己的想法有沒有變、哪裡變了。 => built: ai_lego/core/domain/kinds/collab.py:49
+- 你們對每個方案標同意或異議，並寫理由。 => built: ai_lego/core/domain/kinds/collab.py:65; apps/cognitive-web/components/blocks/CollabPage.tsx:217
+- 你們一起訂：什麼情況結束討論、什麼情況重新開。 => built: ai_lego/core/domain/kinds/collab.py:83
+- 做共同決定之前，每個人先各自回答這 5 個問題（你的《判斷主權教育架構 v0.1》的介面問題），寫完才看得到別人的；不同的回答都留在群組紀錄裡： => built: ai_lego/core/domain/kinds/collab.py:54; ai_lego/core/domain/kinds/context.py:48; tests/unit/test_block_collab.py:333
+- ①個體判斷權與制度決策權在哪裡相遇？ => built: ai_lego/core/domain/kinds/context.py:48; tests/unit/test_block_collab.py:333
+- ②制度何時有正當理由限制個體選擇？ => built: ai_lego/core/domain/kinds/context.py:48; tests/unit/test_block_collab.py:333
+- ③誰來判斷「共同利益」？ => built: ai_lego/core/domain/kinds/context.py:48; tests/unit/test_block_collab.py:333
+- ④如果制度必須保有權威，如何避免權威變成認知上的接管？ => built: ai_lego/core/domain/kinds/context.py:48; tests/unit/test_block_collab.py:333
+- ⑤如果個體必須保有自主，如何避免自主變成拒絕一切共同責任？ => built: ai_lego/core/domain/kinds/context.py:48; tests/unit/test_block_collab.py:333
+- 你們決定授權給誰、範圍多大。 => built: ai_lego/core/domain/kinds/collab.py:75
+- 授權可以收回。每個人收回的是自己那一份。例：三個人授權給甲，乙收回後，甲只代表兩個人；範圍要重新談。 => built: ai_lego/apps/api/blocks/collab.py:269; ai_lego/core/domain/kinds/collab.py:80; tests/unit/test_block_collab.py:185
+- 系統做什麼 => context: section heading
+- 系統畫出分歧地圖：大家在哪裡不一樣。 => NOT YET: the positions, options and stances are drawn side by side (apps/cognitive-web/components/blocks/CollabPage.tsx:217); no map of who differs from whom is drawn
+- 系統把各方案的證據、風險、價值權衡並排。 => built: ai_lego/core/domain/kinds/collab.py:58; apps/cognitive-web/components/blocks/CollabPage.tsx:217
+- 系統把異議和理由存下來。異議不會被多數蓋掉。 => built: ai_lego/core/domain/kinds/collab.py:70; ai_lego/platform/block_hooks/collab.py:132; ai_lego/apps/api/blocks/collab.py:4
+- 系統記下結束討論的理由、重開條件、檢討日期、負責的人。 => built: ai_lego/core/domain/kinds/collab.py:83; ai_lego/platform/block_hooks/collab.py:108
+- 系統確認每個參與者是受邀的那個帳號。 => NOT YET: an invitation is a one-time link taken by whoever holds it (ai_lego/platform/identity/store.py:645); it is not tied to an address
+- 一個人用多個帳號，由 GOVERN 的帳號檢查擋。平台不要求實名。 => built: ai_lego/platform/identity/store.py:688; ai_lego/platform/rulesets/govern.py:8; ai_lego/apps/api/blocks/groups.py:198
+- 各自寫完之前，系統不顯示多數意見。這樣防止有人帶風向。 => built: ai_lego/core/domain/kinds/collab.py:44; ai_lego/core/domain/kinds/collab.py:65; ai_lego/apps/api/blocks/collab.py:197
+- 任何「大家怎麼看」的顯示都不用票數決定，要看平常意見不同的人是不是都同意；並排除少數大量投票的人再算一次。這是 X 社群註解公開的做法，可以照著用。（我讀了它的官方技術文件） => built: ai_lego/platform/collab_agreement.py:84; ai_lego/platform/rulesets/collab.py:8
+- 系統之後把決定的後果寫回來，帶進下一輪。 => built: ai_lego/core/domain/kinds/collab.py:109; ai_lego/core/domain/kinds/collab.py:113; apps/cognitive-web/components/blocks/CollabPage.tsx:360
+- 治理支線：提案／報表 → 共同審議 → 授權、退回或重開 → 行動 → 回顧。 => NOT YET: collab.proposal is written by EXPRESS's button and listed on the group page (apps/cognitive-web/components/blocks/CollabPage.tsx:189); no kind returns a proposal (退回) and no step links proposal, review, authorisation and action
+- 公共決策怎麼量，只量過程、不量立場，資料來自這一塊的紀錄。 => built: ai_lego/platform/indicators.py; ai_lego/apps/api/blocks/govern_group.py:253
+- 異議有沒有被保留 => built: ai_lego/platform/indicators.py:77
+- 重開條件有沒有寫 => built: ai_lego/platform/indicators.py:86
+- 決定後有沒有回顧 => built: ai_lego/platform/indicators.py:96
+- 參與者能不能正確轉述對方的立場 => built: ai_lego/platform/indicators.py:111
+- 主張帶來源的比例 => NOT YET: not built at group level: it needs each member's claim ledger, which a group reads only through consent; a member sees it on their own case (ai_lego/platform/indicators.py:126)
+- 事實、法律、價值有沒有分開談 => NOT YET: not built at group level, same reason as the line above (ai_lego/platform/indicators.py:136)
+- 不量：大家是否一致、是否同意某個結論。 => built: ai_lego/platform/indicators.py:210; ai_lego/platform/integrity.py:511
+- AI 能做什麼 => context: section heading
+- AI 整理大家的分歧。 => built: ai_lego/platform/ai_actions/collab.py:136
+- AI 轉述每一方的立場。每一方本人確認說得對不對。 => built: ai_lego/platform/ai_actions/collab.py:139; ai_lego/core/domain/kinds/collab.py:92
+- AI 指出還沒被聽到的人。例：兩個員工還沒說話。 => built: ai_lego/apps/api/blocks/collab.py:8; computed from who wrote a position, not asked of the model
+- AI 不准做什麼 => context: section heading
+- AI 不准代表任何一方。 => built: ai_lego/platform/ai_actions/collab.py:20; ai_lego/core/domain/kinds/collab.py:65
+- AI 不准宣布大家已經有共識。 => built: ai_lego/platform/ai_actions/collab.py:20; ai_lego/core/domain/kinds/collab.py:65
+- AI 不准藏起少數意見。 => built: ai_lego/platform/ai_actions/collab.py:20; ai_lego/core/domain/kinds/collab.py:65
+- AI 不准給參與者排名。 => built: ai_lego/platform/ai_actions/collab.py:20; ai_lego/core/domain/kinds/collab.py:65
+- 交還控制：有人提出異議或要求重開時，AI 停下來，交回給當事人。 => built: ai_lego/platform/ai_actions/collab.py:55
+- 交還控制：有人說自己的立場被轉述錯了，AI 停下來，交回給他本人。 => built: ai_lego/platform/ai_actions/collab.py:74
+- 交還控制：出現自傷、暴力、急性危機的訊號時，AI 停下來。 => built: ai_lego/platform/ai_gate.py:330
+- 這時 COLLAB 叫 GOVERN，照那位參與者在哪裡給當地的求助資源。 => built: ai_lego/platform/ai_gate.py:312
+- 交還控制：碰到 GOVERN 列的高風險時，COLLAB 叫 GOVERN 加護欄。 => built: ai_lego/platform/block_hooks/govern.py:22; ai_lego/apps/api/blocks/collab.py:129
+- 讀什麼、絕不讀什麼 => context: section heading
+- 這一步讀：每個參與者同意分享的地圖（MAP）、查證結果（VERIFY）、提案（EXPRESS）。 => built: ai_lego/platform/visibility.py:175; ai_lego/apps/api/blocks/collab.py:179; ai_lego/platform/collab_shared.py:56
+- 這一步也讀：ACT 的觀察紀錄（只讀群組決定之後的觀察）、開案資料裡誰會受影響（只讀這一項）。 => built: ai_lego/platform/collab_shared.py:47; ai_lego/platform/collab_shared.py:51
+- 沒有查證或提案時，只看地圖和各人寫的立場。 => built: ai_lego/apps/api/blocks/collab.py:179
+- 絕不讀：參與者沒分享的個人案子。 => built: ai_lego/platform/visibility.py:175; tests/unit/test_block_collab.py:282
+- 寫什麼 => context: section heading
+- 「群組紀錄」：各人的立場、分歧地圖、同意和異議、授權、共同的判斷和要做的行動、介面問題的回答、結束與重開的條件、每個參與者在哪裡。 => built: ai_lego/core/domain/kinds/collab.py:34; ai_lego/core/domain/kinds/collab.py:101; ai_lego/core/domain/kinds/collab.py:118
+- 產出給誰 => context: section heading
+- 共同的判斷交給 DECIDE。要做的行動交給 ACT。 => built: ai_lego/core/domain/kinds/collab.py:118; ai_lego/apps/api/blocks/collab.py:288
+- 照架構頁，讀這一塊寫的東西的：「群組紀錄」：DECIDE（只讀共同的判斷和異議）、ACT（只讀要做的行動和授權）、GOVERN（只讀每個參與者在哪裡：給當地的求助資源）。 => NOT YET: DECIDE and ACT do not show the handoff pointer yet (agency-os/reports/review-debt.md, COLLAB card 20); the place is read by GOVERN at ai_lego/platform/ai_gate.py:312
+- 來源與不確定性 => context: section heading
+- 大家一致，不代表就是對的。 => built: apps/cognitive-web/components/blocks/CollabPage.tsx:23
+- 異議有幾個、說了什麼，都要看得到。 => built: ai_lego/apps/api/blocks/collab.py:136
+- 人怎麼控制 => context: section heading
+- 任何參與者都可以撤回授權。 => built: ai_lego/apps/api/blocks/collab.py:269
+- 任何參與者都可以提出重開。 => built: ai_lego/core/domain/kinds/collab.py:89
+- 資料與版本 => context: section heading
+- 系統把個人的原始素材，和群組的決策紀錄分開存。 => built: ai_lego/data/events/record_log.py:33; ai_lego/core/domain/kinds/collab.py:34
+- 誰看得到什麼，系統要寫明。 => built: ai_lego/platform/integrity.py:561; ai_lego/platform/visibility.py:98
+- 每個參與者在哪裡，只有他本人和 GOVERN 讀得到；別的參與者看不到。 => built: ai_lego/core/domain/kinds/collab.py:38
+- 現在有沒有 => context: section heading
+- 今天沒有這一塊。 => context: what exists today, as of 2026-10-03; the block is now built
+- 初期只提供程序工具，不宣稱已解決這些問題。排在個人層之後獨立驗證。 => context: what exists today, as of 2026-10-03; the block is now built
+- 建置由最後一步提前到第 3 步：公共決策是北極星因果鏈的第四環。 => context: what exists today, as of 2026-10-03; the block is now built
+- 不靠這些工具。今天什麼都沒有 => context: what exists today, as of 2026-10-03; the block is now built
+- 14 => context: what exists today, as of 2026-10-03; the block is now built
+
+### TEACH
+
+- TEACH => context: block title, one-line summary and state words of the card
+- 課程與演練每一塊用之前先練 => context: block title, one-line summary and state words of the card
+- ◐ 部分 => context: block title, one-line summary and state words of the card
+- 合約　草稿 => context: block title, one-line summary and state words of the card
+- 解決什麼問題 => context: section heading
+- TEACH 讓你在用一個方法或一個套件之前，先練一次。它有五分鐘的課、低風險的練習案例、輪流當不同的角色。帶領別人的事在 FACILITATE。例：你第一次用冰山模型，先上 5 分鐘的課。 => context: what the block is for and where the content comes from
+- 藍圖沒有這一塊，內容在 6.14。6.8 的三種練習用的是真的案子，由 LEARN 負責。 => context: what the block is for and where the content comes from
+- 這一塊要讓人練出：把這些動作練到沒有 AI 也會做 => context: aim and scale of the block
+- 尺度「每一個人的判斷」：藍圖的「個體判斷」。先做這一層 => context: aim and scale of the block
+- 認知作戰會這樣打到這一塊：練習案例本身被汙染。防法：案例來源先查過 => built: ai_lego/platform/lessons/__init__.py:246; ai_lego/platform/lessons/cases/taiwan-central-weather.yaml:5
+- 使用者做什麼 => context: section heading
+- 你用一個方法或套件之前，先上一堂 5 分鐘的課。 => built: ai_lego/apps/api/blocks/teach.py:24; apps/cognitive-web/components/blocks/TeachPage.tsx:33
+- 你用練習案例做一次。例：用別人的案例練一次。 => built: ai_lego/apps/api/blocks/teach.py:38; ai_lego/core/domain/kinds/teach.py:18
+- 你輪流當提出者、反方、證據稽核者、決策者、回顧者。 => built: ai_lego/core/domain/kinds/teach.py:9; ai_lego/core/domain/kinds/teach.py:18
+- 練完一個案例，你也練一次行動後回顧：原本預測、實際結果、漏看的脈絡、下次要調整的協作條件。真實案子的回顧在 LEARN。 => built: ai_lego/core/domain/kinds/teach.py:25
+- 系統做什麼 => context: section heading
+- 系統替每個方法、每個套件準備一堂課。 => NOT YET: one lesson per method is not written: 7 package courses, the independent-origins lesson and 3 generated tool lessons exist (ai_lego/platform/lessons/lessons/course-public-issue.yaml:1); the generator is ai_lego/apps/cli/generate_lessons.py:115, its output is draft until a person reviews it
+- 系統給低風險的練習案例。案例的來源先查過。 => built: ai_lego/platform/lessons/__init__.py:246; ai_lego/platform/lessons/cases/
+- 課程要教「有引註不等於是真的」，和怎麼看獨立出處。 => built: ai_lego/platform/lessons/lessons/sources-independent-origins.yaml:6
+- 系統另外給兩種練習（角色輪替、行動後回顧寫在「使用者做什麼」）： => NOT YET: neither of the two further practices is built; see the next two lines
+- 情境演練：用低風險案例練習資料不足、意見衝突、時間壓力、AI 出錯時怎麼重新定義問題和交還控制 => NOT YET: 情境演練 (insufficient data, conflicting views, time pressure, AI error) is not built
+- 共同實作空間：課堂、團隊或組織用匿名案例、同儕挑戰、少數意見保存建立共享規範，不由單一權威定義「正確使用 AI」 => NOT YET: 共同實作空間 is not built
+- 課和練習，你都可以跳過。 => built: apps/cognitive-web/components/blocks/TeachPage.tsx:263
+- 先教手法，比事後闢謠有用：研究做過的做法是用 90 秒的短片介紹常見的操弄手法，看過的人不分政治立場和教育程度，辨認能力都提高。平台的課要有一組這樣的短課。（我讀的是劍橋大學這個研究的報導，不是論文） => NOT YET: the 90-second manipulation-technique lessons are operator-reviewed content; the place for them is the lesson loader (ai_lego/platform/lessons/__init__.py:241)
+- 教查核員的讀法：不在同一個網頁裡一直往下讀，而是另開視窗查「別人怎麼說這個來源」。 => NOT YET: no lesson teaches lateral reading (opening another window to check what others say of a source) yet; content work
+- AI 能做什麼 => context: section heading
+- AI 當練習的對手。 => built: ai_lego/platform/ai_actions/teach.py:16; ai_lego/core/domain/kinds/teach.py:44
+- AI 針對你思考的動作給回饋。例：「你還沒寫反例，就下了結論。」 => built: ai_lego/platform/ai_actions/teach.py:1; ai_lego/core/domain/kinds/teach.py:48
+- AI 不准做什麼 => context: section heading
+- AI 不准給你打分數或排名。 => built: ai_lego/platform/integrity.py:129; tests/unit/test_block_teach.py:1
+- AI 不准要求你說出脆弱的事。 => built: ai_lego/platform/scripts/dont-list.yaml:3; ai_lego/platform/ai_actions/teach.py:18
+- 交還控制：出現自傷、暴力、急性危機的訊號時，AI 停下來。 => built: ai_lego/platform/ai_gate.py:330
+- 這時 TEACH 叫 GOVERN，照你在哪裡給當地的求助資源。 => built: ai_lego/platform/ai_gate.py:330
+- 交還控制：碰到 GOVERN 列的高風險時，TEACH 叫 GOVERN 加護欄。 => built: ai_lego/platform/block_hooks/govern.py:22
+- 讀什麼、絕不讀什麼 => context: section heading
+- 這一步讀：課程內容和練習案例。 => built: ai_lego/platform/ai_actions/teach.py:147
+- 絕不讀：你真實的案子，除非你同意拿來練。 => built: ai_lego/core/domain/kinds/teach.py:31; ai_lego/platform/ai_actions/teach.py:75
+- 寫什麼 => context: section heading
+- 「練習紀錄」：上過哪些課、練習案例做到哪；可以選擇不留。 => built: ai_lego/core/domain/kinds/teach.py:18; ai_lego/core/domain/kinds/teach.py:34
+- 產出給誰 => context: section heading
+- 不交給別塊。練習紀錄只有你看。練完，你回到要用的那一塊。 => built: ai_lego/platform/integrity.py:70; ai_lego/core/domain/kinds/teach.py:24
+- 照架構頁，讀這一塊寫的東西的：「練習紀錄」：沒有別的積木讀。 => built: ai_lego/platform/integrity.py:70; ai_lego/core/domain/kinds/teach.py:24
+- 來源與不確定性 => context: section heading
+- 上過課、用過一次、用得很頻繁，都不等於會了。 => built: ai_lego/core/domain/kinds/teach.py:39; a completion records that lessons were run; no field claims a person can do the act
+- 會不會，看的是你之後真的做出來的動作。 => built: ai_lego/core/domain/kinds/teach.py:39; a completion records that lessons were run; no field claims a person can do the act
+- 人怎麼控制 => context: section heading
+- 你可以跳過、重來、換案例。 => built: apps/cognitive-web/components/blocks/TeachPage.tsx:262
+- 資料與版本 => context: section heading
+- 系統把練習和真實的案子分開存。 => built: ai_lego/core/domain/kinds/teach.py:24; ai_lego/core/domain/kinds/teach.py:31
+- 在各地，練習案例要換成當地的例子。 => built: ai_lego/apps/api/blocks/teach.py:38; ai_lego/platform/lessons/cases/taiwan-central-weather.yaml:9
+- 現在有沒有 => context: what exists today, as of 2026-10-03
+- 今天只有一小部分。 => context: what exists today, as of 2026-10-03
+- 每個工具自己的頁面，都有說明和一個可以直接填入的範例。 => context: what exists today, as of 2026-10-03
+- 「開始前 5 分鐘」那種一頁一頁教的課程頁，程式裡只有兩堂。 => context: what exists today, as of 2026-10-03
+- 兩堂是：冰山模型（工具）、人生決策（工作流）。 => context: what exists today, as of 2026-10-03
+- 其餘工具沒有課程頁。 => context: what exists today, as of 2026-10-03
+- 今天沒有情境演練。 => context: what exists today, as of 2026-10-03
+- 這是 2026-10-03 查程式核對的，沒有登入正式站逐個點。 => context: what exists today, as of 2026-10-03
+- 之前這裡寫「每個方法一堂課」，不對。 => context: what exists today, as of 2026-10-03
+- 手法的教材來源之後要讀：台灣民主實驗室（沈伯洋 2019 年共同創辦）研究資訊操作的報告、黑熊學院（2021 年共同創辦）的資訊戰課程。它們是研究和教育組織，不是查核資料庫。（我只看了新聞報導） => context: what exists today, as of 2026-10-03
+- 不靠這些工具。靠的是課程頁；今天只有兩堂（冰山模型、人生決策），其餘工具只有說明和範例 => context: what exists today, as of 2026-10-03
+- 結果頁與課程頁（積木內部的畫面）：結果頁歸 MAP／COMPUTE，課程頁歸 TEACH。 => context: what exists today, as of 2026-10-03
+- 11 => context: what exists today, as of 2026-10-03
+
+### EXPRESS
+
+- EXPRESS => context: block title, one-line summary and state words of the card
+- 產出與表達任何一步都能輸出給別人 => context: block title, one-line summary and state words of the card
+- ◐ 部分 => context: block title, one-line summary and state words of the card
+- 合約　草稿 => context: block title, one-line summary and state words of the card
+- 解決什麼問題 => context: section heading
+- EXPRESS 幫你把判斷變成給別人看的東西。它可以是論文章節、提案、一封信、一次談話的稿。例：寫給合夥人的一封信。稿子裡每一句話，都追得回紀錄。 => context: what the block is for; aim and scale
+- 藍圖沒有這一塊。它寫的是：報表不是必經步驟，是任何階段都可以產生的輸出。 => context: what the block is for; aim and scale
+- 這一塊要讓人練出：能向別人說明自己的立場和理由 => context: what the block is for; aim and scale
+- 尺度「每一個人的判斷」：藍圖的「個體判斷」。先做這一層 => context: what the block is for; aim and scale
+- 擋認知作戰「公共參與」：公共議題的行動是參與的一步；能向別人說明自己的立場 => context: what the block is for; aim and scale
+- 認知作戰會這樣打到這一塊：使用者成了放大器。防法：發表前標出沒查證的句子 => built: ai_lego/platform/block_hooks/express.py:84; apps/cognitive-web/components/blocks/ExpressPage.tsx:13
+- 使用者做什麼 => context: section heading
+- 你選要給誰看、用什麼形式。 => built: ai_lego/core/domain/kinds/express.py:13; apps/cognitive-web/components/blocks/ExpressPage.tsx:319
+- 形式有：摘要、證據報告、決策理由、提案、學習紀錄、一封信、談話稿、論文段落。藍圖還列了「研究資料」：它由 GOVERN 在你同意後交出，不在這一塊；跟藍圖不同，照這樣做（2026-10-03 定）。 => built: ai_lego/platform/rulesets/express.py:8; ai_lego/platform/research_export.py:167
+- 你先寫幾句自己要說的重點。 => built: ai_lego/core/domain/kinds/express.py:14
+- 你選要帶哪些判斷和依據。 => built: ai_lego/apps/api/blocks/express.py:104; ai_lego/platform/block_hooks/express.py:62
+- 你自己改寫。 => built: apps/cognitive-web/components/blocks/ExpressPage.tsx:388
+- 你自己按送出。 => built: ai_lego/apps/api/blocks/express.py:177; ai_lego/core/domain/kinds/express.py:22
+- 系統做什麼 => context: section heading
+- 你寫完重點、選好要帶的內容之後，系統才把你選的紀錄排成大綱。 => built: ai_lego/apps/api/blocks/express.py:133
+- 大綱只用你選的紀錄。 => built: ai_lego/platform/block_hooks/express.py:62; ai_lego/platform/block_hooks/express.py:51
+- 草稿的每一句，都連得回紀錄裡的哪一筆。 => built: ai_lego/platform/block_hooks/express.py:73
+- 還沒查證、只有一個出處的句子，系統標出來。 => built: ai_lego/platform/block_hooks/express.py:84; apps/cognitive-web/components/blocks/ExpressPage.tsx:13
+- 系統匯出成你需要的格式。 => built: ai_lego/apps/api/blocks/express.py:170; ai_lego/platform/exports/render.py:183
+- AI 能做什麼 => context: section heading
+- AI 照大綱起草。 => built: ai_lego/platform/ai_actions/express.py:216
+- AI 依讀者調整說法。 => built: ai_lego/platform/ai_actions/express.py:218
+- AI 不准做什麼 => context: section heading
+- AI 不准加進紀錄裡沒有的主張。 => built: ai_lego/platform/block_hooks/express.py:88; ai_lego/platform/ai_actions/express.py:53
+- AI 不准替你送出。 => built: ai_lego/platform/integrity.py:565; ai_lego/core/domain/kinds/express.py:22
+- AI 寫的句子，不准當成你自己的立場。AI 寫的句子要標出來。 => built: apps/cognitive-web/components/blocks/ExpressPage.tsx:373; ai_lego/platform/block_hooks/express.py:84
+- 交還控制：送給別人或公開之前，一定由你看過，你自己按送出。 => built: ai_lego/apps/api/blocks/express.py:178; tests/unit/test_express_export.py:151
+- 交還控制：稿子裡有還沒查證的句子時，AI 先停下來問你。 => built: ai_lego/platform/ai_actions/express.py:138
+- 交還控制：出現自傷、暴力、急性危機的訊號時，AI 停下來。 => built: ai_lego/platform/ai_gate.py:330
+- 這時 EXPRESS 叫 GOVERN，照你在哪裡給當地的求助資源。 => built: ai_lego/platform/ai_gate.py:330
+- 交還控制：碰到 GOVERN 列的高風險時，EXPRESS 叫 GOVERN 加護欄。 => built: ai_lego/platform/block_hooks/govern.py:22
+- 讀什麼、絕不讀什麼 => context: section heading
+- 這一步讀：你選的那幾部分。 => built: ai_lego/platform/ai_actions/express.py:217
+- 你選的可以是這些抽屜裡的東西：判斷卡（DECIDE）、地圖（MAP）、主張帳本（VERIFY）、計算（COMPUTE）、來源（GATHER）、思考卡（THINK）、行動與觀察（ACT）、外化素材（SENSE）、回顧（LEARN）。 => built: ai_lego/platform/block_hooks/express.py:15
+- 還沒有判斷卡，也能輸出。你選了攤出來的卡片，也可以帶。 => built: ai_lego/platform/block_hooks/express.py:62; no judgment card is required: any selectable record can be chosen
+- 要標「還沒查證」時，這一步只讀每個主張的查證狀態和出處數。它不讀你沒選的內容。 => built: ai_lego/platform/ai_actions/express.py:89
+- 絕不讀：你攤出來、但沒選的卡片。 => built: ai_lego/platform/block_hooks/express.py:62; tests/unit/test_block_express.py:99
+- 寫什麼 => context: section heading
+- 「輸出稿」：給別人看的稿子、稿子的版本；每一句對回紀錄裡的哪一筆。 => built: ai_lego/core/domain/kinds/express.py:17
+- 產出給誰 => context: section heading
+- 稿子交給外面的讀者。多人一起決定時，稿子交給 COLLAB 當提案。 => built: apps/cognitive-web/components/blocks/ExpressPage.tsx:402; ai_lego/platform/collab_shared.py:43
+- 照架構頁，讀這一塊寫的東西的：「輸出稿」：COLLAB（只讀本人同意分享的）。LEARN 和共用紀錄讀這個案子的全部。 => built: ai_lego/platform/collab_shared.py:43; ai_lego/platform/integrity.py:69
+- 來源與不確定性 => context: section heading
+- 稿子裡保留你的信心和不確定的地方。 => built: apps/cognitive-web/components/blocks/ExpressPage.tsx:118; ai_lego/platform/exports/render.py:128
+- 這些地方不因為要說服人就拿掉。 => built: apps/cognitive-web/components/blocks/ExpressPage.tsx:118; ai_lego/platform/exports/render.py:128
+- 人怎麼控制 => context: section heading
+- 你可以改、刪稿子。 => built: ai_lego/apps/api/blocks/docs.py:153; ai_lego/apps/api/blocks/docs.py:158
+- 你可以不送。 => built: ai_lego/apps/api/blocks/express.py:177; apps/cognitive-web/components/blocks/ExpressPage.tsx:316
+- 資料與版本 => context: section heading
+- 稿子的每一版都跟著案子存。 => built: ai_lego/apps/api/blocks/express.py:164
+- 最後形成一份個人可攜、可檢查、可刪除的判斷紀錄。匯出和刪除由 GOVERN 做，這一塊做給別人看的稿子；跟藍圖不同，照這樣做（2026-10-03 定）。 => built: ai_lego/apps/api/blocks/govern.py:315; ai_lego/apps/api/blocks/express.py:170
+- 現在有沒有 => context: section heading
+- 今天只有雛形。 => context: what exists today, as of 2026-10-03
+- 今天有報表匯出。 => context: what exists today, as of 2026-10-03
+- 但報表讀的是來源和 AI 分析，不是人的判斷卡。 => context: what exists today, as of 2026-10-03
+- 不靠這些工具。今天只有結果頁匯出 PDF => context: what exists today, as of 2026-10-03
+- 12 => context: what exists today, as of 2026-10-03
+
+### FACILITATE
+
+- FACILITATE => context: block title, one-line summary and state words of the card
+- 帶領有人帶的時候 => context: block title, one-line summary and state words of the card
+- ○ 無 => context: block title, one-line summary and state words of the card
+- 合約　草稿 => context: block title, one-line summary and state words of the card
+- 解決什麼問題 => context: section heading
+- FACILITATE 管有人帶領的時候。例：老師帶一班學生做反思、工作坊帶一群人用冰山模型。這張卡裡的「你」是帶領者。帶領者也是一種影響，跟家庭、文化、制度、平台本身一樣，要能被檢查。所以這一塊讓帶領者先受訓，帶的時候守住原則，碰到危機知道交給誰，帶完留下紀錄給督導看。方法離開原開發者，別人也要帶得起來。 => context: what the block is for and why
+- 藍圖沒有這一塊。藍圖把帶領者的事寫在第 9、10、11、12 節；2026-10-03 你說「那做一塊」，拆成獨立一塊。 => context: what the block is for and why
+- 所有影響都要能被檢查：家庭、文化、制度、帶領者、研究者、框架本身、系統本身。 => context: what the block is for and why
+- 方法離開原開發者，還能不能守住核心原則；帶領者最常在哪裡偏離；訓練要清楚，但不能把帶領變成照稿念。 => context: what the block is for and why
+- 研究要主動保留失敗、沒改變、負面、退出、互相矛盾的資料，和帶領者偏離。 => built: ai_lego/platform/research_export.py:58; ai_lego/platform/research_export.py:158
+- 交付階段要看：帶領者能不能接手、訓練、忠實度、調整、常見錯誤、參與者安全、文化轉譯。原開發者不在場，它還成立嗎？ => context: delivery questions, long-term aims and scale; the lines below build the pieces
+- 長期：教師可以獨立教學；不同文化可以發展不同方法；機構不需要向原開發者請示。 => context: delivery questions, long-term aims and scale; the lines below build the pieces
+- 這一塊要讓人練出：帶別人想，但不替人想；自己的帶法也能被檢查 => context: delivery questions, long-term aims and scale; the lines below build the pieces
+- 尺度「文明的方向」：藍圖的「制度與社群」：制度怎麼維持秩序而不壓縮個人判斷；平台自己也要可被質疑 => context: delivery questions, long-term aims and scale; the lines below build the pieces
+- 認知作戰會這樣打到這一塊：帶領者被利用，在課堂或團體裡把某個立場帶成「大家的結論」。防法：帶領稿寫明不替人下結論、服從或反抗都不算錯；帶領紀錄由督導看 => built: ai_lego/platform/scripts/dont-list.yaml:2; apps/cognitive-web/components/blocks/FacilitatePage.tsx:24
+- 在戰爭發生之前「權威變成不能質疑之前」：帶領者和平台本身都能被檢查；問誰有權決定、規範從哪來、誰受益 => built: ai_lego/core/domain/kinds/facilitate.py:28; ai_lego/core/domain/kinds/facilitate.py:35
+- 使用者做什麼 => context: section heading
+- 帶之前，你上帶領者的課，用練習案例演練。 => built: ai_lego/platform/lessons/lessons/facilitator-how-to-lead.yaml:1; ai_lego/platform/lessons/__init__.py:28
+- 帶的時候，你照帶領稿走。每個工具、每個套件各有一份。 => NOT YET: only 3 seed scripts exist (ai_lego/platform/scripts/scripts/systems.iceberg_model.yaml:1), all drafts until the operator reviews them; one per tool and package is content work
+- 參與者寫的東西，你只看得到他同意給你看的部分。 => built: ai_lego/platform/visibility.py:175
+- 每帶完一次，你寫帶領紀錄：照稿做了哪些、哪裡沒照稿、為什麼。 => built: ai_lego/core/domain/kinds/facilitate.py:28
+- 你定期找督導談。督導可以你自己找，也可以由使用的單位指派（例如學校、機構），看那個單位怎麼定。督導要受過訓、帶過。督導看你的帶領紀錄，寫回饋。 => built: ai_lego/core/domain/kinds/facilitate.py:39; ai_lego/apps/api/blocks/facilitate.py:141; ai_lego/apps/api/blocks/facilitate.py:246
+- 停止訊號一出現就停：帶領稿上寫的、工具自己列的、參與者說不想再做的，都算。 => built: ai_lego/platform/scripts/__init__.py:22; ai_lego/apps/api/blocks/facilitate.py:218
+- 出現自傷、暴力、急性危機的訊號時，你停下來，照升級標準交出去。 => built: ai_lego/apps/api/blocks/facilitate.py:218; ai_lego/platform/scripts/__init__.py:21
+- 系統做什麼 => context: section heading
+- 系統給帶領稿、帶領者的課、演練用的練習案例。 => built: ai_lego/apps/api/blocks/facilitate.py:112; ai_lego/platform/lessons/__init__.py:28
+- 上完帶領者的課，系統記一筆。沒上完，不能帶。 => built: ai_lego/platform/visibility.py:63; ai_lego/platform/identity/store.py:700
+- 督導不管是你自己找的，還是單位指派的，系統都查他有沒有上完帶領者的課、有沒有帶過；只查有沒有，不看內容。沒有，不能當督導。這一句是我們加的。 => built: ai_lego/platform/visibility.py:78
+- 參與者對帶法的異議，記在 GOVERN 的申訴紀錄裡。作者是參與者自己，他可以匯出、刪除；帶領者不能改。 => built: ai_lego/apps/api/blocks/govern_group.py:110; ai_lego/platform/visibility.py:358
+- 督導一定看。GOVERN 處理申訴的人也一定看：督導是你自己找的時候，異議不會只給你選的人看。 => built: ai_lego/platform/visibility.py:358; ai_lego/platform/visibility.py:247
+- 異議預設不顯示是誰提的。參與者自己選要不要具名。例：學生對老師的帶法有意見，不具名也可以提。 => built: ai_lego/platform/visibility.py:375; ai_lego/core/domain/kinds/govern_group.py:29
+- 帶領稿寫明：這一步怎麼帶、大約多久、不能做什麼、停止訊號是什麼。 => built: ai_lego/platform/scripts/__init__.py:172; ai_lego/platform/scripts/scripts/systems.iceberg_model.yaml:13
+- 帶的時候，畫面一直列出四件不能做的事：替參與者下結論；要求參與者說出脆弱的事；停止訊號出現了還繼續；把服從或反抗當成錯。 => built: ai_lego/platform/scripts/dont-list.yaml:4; apps/cognitive-web/components/blocks/FacilitatePage.tsx:24
+- 參與者同意給你看的部分，系統跟沒同意的分開。沒同意的，你看不到。 => built: ai_lego/platform/visibility.py:175; ai_lego/apps/api/blocks/facilitate.py:197
+- 升級標準寫明：碰到危機或超出範圍，交給誰、怎麼交。求助資源由 GOVERN 照那位參與者在哪裡給。 => built: ai_lego/platform/scripts/__init__.py:21; ai_lego/apps/api/blocks/facilitate.py:218; ai_lego/platform/visibility.py:344
+- 藝術反思的工具裡，沒寫停止訊號的，不給參與者用。你補上停止訊號、寫進帶領稿之後才開放；這一句是我們加的。 => built: ai_lego/platform/scripts/__init__.py:185
+- 帶領紀錄和督導的回饋，存在你這裡，跟參與者的案子分開。 => built: ai_lego/core/domain/kinds/facilitate.py:28; ai_lego/core/domain/kinds/facilitate.py:34
+- 做研究時，你和那幾位參與者都同意了，帶領紀錄裡偏離原則的部分才交給 GOVERN，跟研究資料放在一起。研究資料也要留下沒改變、失敗、退出、負面的結果，由 GOVERN 交出。 => built: ai_lego/platform/block_hooks/facilitate.py:69; ai_lego/platform/research_export.py:158
+- 平台和研究都不拿「參與者同不同意帶領者的結論」當衡量的指標；AI 也一樣。平台那一半在 GOVERN。 => built: ai_lego/platform/integrity.py:511; ai_lego/platform/indicators.py:210
+- AI 能做什麼 => context: section heading
+- AI 扮演練習的參與者，讓你演練。 => built: ai_lego/platform/ai_actions/facilitate.py:3
+- 你寫帶領紀錄時，AI 對照帶領稿，指出可能偏離原則的地方。例：你替參與者下了結論。 => built: ai_lego/platform/ai_actions/facilitate.py:5
+- AI 不准做什麼 => context: section heading
+- AI 不准給帶領者打分數或排名。 => built: tests/unit/test_facilitate_ai.py:44
+- AI 不准代替你帶領參與者。 => built: ai_lego/platform/ai_actions/facilitate.py:3; no action writes a log or leads: tests/unit/test_facilitate_ai.py:30
+- AI 不准讀參與者沒同意給你看的內容。 => built: tests/unit/test_facilitate_ai.py:108
+- 交還控制：要不要改帶法，由你和督導決定。AI 只指出來。 => built: ai_lego/platform/ai_actions/facilitate.py:160; ai_lego/core/domain/kinds/facilitate.py:56
+- 交還控制：出現自傷、暴力、急性危機的訊號時，AI 停下來。 => built: ai_lego/platform/ai_gate.py:330
+- 這時 FACILITATE 叫 GOVERN，照那位參與者在哪裡給當地的求助資源。 => built: ai_lego/platform/ai_gate.py:330
+- 交還控制：碰到 GOVERN 列的高風險時，FACILITATE 叫 GOVERN 加護欄。 => built: ai_lego/platform/block_hooks/govern.py:22
+- 讀什麼、絕不讀什麼 => context: section heading
+- 這一步讀：帶領稿、帶領者的課和練習案例、你自己的帶領紀錄。 => built: ai_lego/apps/api/blocks/facilitate.py:112; ai_lego/core/domain/kinds/facilitate.py:28
+- 這一步也讀：參與者開案時寫的有沒有人帶、哪一位帶領者，看哪些案子是你帶的。 => NOT YET: the read side is built (ai_lego/platform/visibility.py:327) but no control on the intake page lets a participant name their leader (IntakePage.tsx belongs to the foundation), so it reads nothing in practice
+- 督導時，也讀 GOVERN 申訴紀錄裡，參與者對這位帶領者帶法的異議。只讀這一部分；參與者沒具名時，不讀是誰提的。 => built: ai_lego/platform/visibility.py:375; ai_lego/apps/api/blocks/facilitate.py:172
+- 帶的時候，也讀參與者同意給你看的部分：他攤出來的卡片、地圖、思考卡。 => built: ai_lego/apps/api/blocks/facilitate.py:197
+- 絕不讀：參與者沒同意給你看的內容、參與者的個人歷程。 => built: ai_lego/platform/visibility.py:175; tests/unit/test_block_facilitate.py:133
+- 寫什麼 => context: section heading
+- 「帶領紀錄」：上完帶領者的課的紀錄、督導是誰和怎麼來的、帶了哪個工具或套件、照帶領稿做了哪些、哪裡沒照稿和為什麼、交出去的危機（只記哪一類、交給誰、什麼時候）、督導的回饋；不寫參與者的名字和內容。 => NOT YET: the handed-off crisis (only its kind, to whom, when) has no field in the frozen log shape (ai_lego/core/domain/kinds/facilitate.py:28); every other part of the line is kept in the log, the course completion, the supervision link and the supervisor's feedback (ai_lego/core/domain/kinds/facilitate.py:35)
+- 產出給誰 => context: section heading
+- 帶領紀錄和督導的回饋，交給你本人和你的督導。做研究時，你和那幾位參與者都同意了，偏離原則的部分才交給 GOVERN。 => built: ai_lego/apps/api/blocks/facilitate.py:181; ai_lego/apps/api/blocks/facilitate.py:164
+- 照架構頁，讀這一塊寫的東西的：「帶領紀錄」：GOVERN（只讀帶領者和那幾位參與者都同意給研究的偏離紀錄）。 => built: ai_lego/platform/block_hooks/facilitate.py:69
+- 來源與不確定性 => context: section heading
+- 帶領稿是起點，不是唯一正確的帶法。 => built: ai_lego/platform/scripts/scripts/systems.iceberg_model.yaml:4
+- 沒照稿不一定是錯。寫下理由，你和督導一起看。 => built: ai_lego/platform/block_hooks/facilitate.py:5
+- 同一個方法換一個帶領者，效果可能不一樣。這要研究，不能假設：第二階段要測試不同的帶領者、不同的情境，和失敗的樣子。 => NOT YET: a step-two research question (different leaders, settings, failures); each log keeps its leader, script and script version (ai_lego/core/domain/kinds/facilitate.py:28) so a later comparison is possible
+- 人怎麼控制 => context: section heading
+- 參與者隨時可以停、不分享，也可以對你的帶法提出異議。異議記在 GOVERN 的申訴紀錄裡，督導和處理申訴的人一定看；參與者可以不具名。 => built: ai_lego/apps/api/blocks/facilitate.py:218; ai_lego/apps/api/blocks/govern_group.py:110
+- 你可以改帶法，寫下理由。 => built: ai_lego/platform/block_hooks/facilitate.py:5; ai_lego/core/domain/kinds/facilitate.py:33
+- 資料與版本 => context: section heading
+- 帶領紀錄跟著你，跟參與者的案子分開存。 => built: ai_lego/core/domain/kinds/facilitate.py:34
+- 帶領稿有版本。各地由當地的帶領者參與改寫，平台不單方面定。 => built: ai_lego/platform/scripts/HISTORY.json:1; local rewriting by local leaders is content work, not a feature
+- 研究要你和參與者都明確同意；同意了也能撤回。 => built: ai_lego/core/domain/kinds/govern_group.py:14; ai_lego/apps/api/blocks/govern_group.py:85
+- 現在有沒有 => context: section heading
+- 今天沒有這一塊，也沒有帶領稿。 => context: what exists today, as of 2026-10-03
+- 藝術反思的工具資料在 Airtable，每個工具都有「帶活動者提示用語」和「停止活動訊號」兩欄，可以當帶領稿的底稿；研究線總計畫列為還沒同步進程式。 => context: what exists today, as of 2026-10-03
+- 研究線總計畫把「停止訊號欄有好幾筆是空的」列為風險 R21；帶領者偏離原則的紀錄排在參與者模式那一步，還沒做。 => context: what exists today, as of 2026-10-03
+- 不靠這些工具。帶領稿的底稿在藝術反思的工具資料裡：每個工具的「帶活動者提示用語」和「停止活動訊號」 => context: what exists today, as of 2026-10-03
+- 13 => context: what exists today, as of 2026-10-03
+
+### GOVERN
+
+- GOVERN => context: block title, one-line summary and state words of the card
+- 安全、資料與治理全程伴隨 => context: block title, one-line summary and state words of the card
+- ◐ 部分 => context: block title, one-line summary and state words of the card
+- 合約　已確認 => context: block title, one-line summary and state words of the card
+- 解決什麼問題 => context: section heading
+- GOVERN 保護你，也讓平台自己被檢查。它管：同意、隱私、資料匯出和完整刪除、危機和高風險的轉介、申訴。它也管：AI 指令和模型的版本查得到、在地化。高風險的案子，系統自動加護欄，也就是多一層保護。高風險是指：健康、法律、金錢、人身安全、急性心理危機、要公開散布的事。這不是治療服務。 => context: what the block covers; each part is a line below
+- 評估判斷的過程，不給信念打分數，不產生「自主排名」。 => built: ai_lego/platform/integrity.py:129
+- 研究要主動保留失敗、沒改變、負面、退出、互相矛盾的資料，和帶領者偏離。 => built: ai_lego/platform/research_export.py:58; ai_lego/platform/research_export.py:167
+- 擴大不是複製，是跨文化重建：語言、例子、帶法、權威關係、社會脈絡都可能要重新建。 => context: aim, scale and capability of the block
+- 不同文化、教育者和研究者，在共同的核心原則下發展不同的方法，持續用證據修正。 => context: aim, scale and capability of the block
+- 這一塊要讓人練出：不被平台自己操控；平台可被質疑 => context: aim, scale and capability of the block
+- 尺度「文明的方向」：藍圖的「制度與社群」：制度怎麼維持秩序而不壓縮個人判斷；平台自己也要可被質疑 => context: aim, scale and capability of the block
+- 要培養的能力「不容易被操控」：辨認操弄手法；平台自己不得操控，AI 權限可撤回 => context: aim, scale and capability of the block
+- 因果鏈「認知能力、自主判斷」這一環怎麼量：個人層。藍圖第 11 節的十項過程指標（十項列在 GOVERN 合約卡的「系統做什麼」），加 6.10 的成長九項（九項列在 LEARN 合約卡的「系統做什麼」） => built: ai_lego/platform/indicators.py; ai_lego/apps/api/blocks/govern_group.py:235
+- 因果鏈「更好的世界」這一環怎麼量：量不到，平台不宣稱。只在課堂、團隊、組織的試點比較用前用後，並保留沒變、失敗、退出的結果 => context: how outcomes are measured / why the platform is a target; the lines below build the defences
+- 擋認知作戰「平台自己不被利用」：平台會是目標：假帳號、灌進來的假案例、被汙染的資料和模型 => context: how outcomes are measured / why the platform is a target; the lines below build the defences
+- 認知作戰會這樣打到這一塊：模型和資料來源被汙染；平台被利用。防法：模型與來源列清單、可換、可查；模型的記憶不算來源 => built: ai_lego/platform/rulesets/__init__.py:4; ai_lego/platform/rulesets/__init__.py:31
+- 在戰爭發生之前「權威變成不能質疑之前」：帶領者和平台本身都能被檢查；問誰有權決定、規範從哪來、誰受益 => built: ai_lego/apps/api/blocks/govern_group.py:110; ai_lego/apps/api/blocks/govern.py:426
+- 在戰爭發生之前「制度失去自我修正能力之前」：共同決定寫明重開的條件；平台自己可以被質疑、被申訴，研究保留失敗和沒改變的結果 => built: ai_lego/core/domain/kinds/collab.py:89; ai_lego/apps/api/blocks/govern_group.py:110
+- 使用者做什麼 => context: section heading
+- 你可以看、可以改自己的資料設定。 => built: apps/cognitive-web/components/blocks/MyDataPage.tsx:203; ai_lego/core/domain/kinds/govern.py:27
+- 你可以匯出自己的資料。你也可以完整刪除。 => built: ai_lego/apps/api/blocks/govern.py:315; ai_lego/apps/api/blocks/govern.py:353; apps/cognitive-web/components/blocks/MyDataPage.tsx:245
+- 你可以同意把資料用在研究上，也可以撤回。 => built: ai_lego/core/domain/kinds/govern_group.py:14; apps/cognitive-web/components/blocks/MyDataPage.tsx:236
+- 你可以對平台的做法提申訴。 => built: ai_lego/apps/api/blocks/govern_group.py:110; apps/cognitive-web/components/blocks/MyDataPage.tsx:210
+- 你可以查這個案子用了哪個模型、哪一版規則。 => built: apps/cognitive-web/components/blocks/GovernPage.tsx:72; ai_lego/apps/api/blocks/govern_group.py:220
+- 系統做什麼 => context: section heading
+- GOVERN 管理你的同意。 => built: ai_lego/apps/api/blocks/govern_group.py:77; ai_lego/apps/api/blocks/govern_group.py:72
+- GOVERN 負責匯出和完整刪除。 => built: ai_lego/apps/api/blocks/govern.py:315; ai_lego/apps/api/blocks/govern.py:353; ai_lego/platform/erasure.py:141
+- GOVERN 維護各地的求助資源清單和轉介流程。第 1 步先放台灣和國際通用的；其他地方在第 3 步在地化時加。 => NOT YET: resource files exist for 台灣 and 國際通用 only (ai_lego/platform/resources/taiwan.yaml, international.yaml; ai_lego/platform/resources/__init__.py:86); files for other places are localisation content
+- 心理與教育邊界五條。 => built: ai_lego/platform/safety/__init__.py:77; ai_lego/apps/api/blocks/govern.py:67
+- 清楚的非治療定位與安全提醒 => built: ai_lego/platform/safety/__init__.py:77
+- 隨時暫停、跳過、刪除、不分享的權利 => built: apps/cognitive-web/components/blocks/TeachPage.tsx:263; ai_lego/apps/api/blocks/govern_group.py:85; ai_lego/apps/api/blocks/govern.py:353
+- 自傷、暴力、急性危機的安全轉介流程 => built: ai_lego/platform/safety/__init__.py:95; ai_lego/apps/api/blocks/govern.py:67
+- 帶領者訓練、督導與升級標準（由 FACILITATE 負責；危機的求助資源仍由 GOVERN 給） => built: apps/cognitive-web/components/blocks/FacilitatePage.tsx:24; ai_lego/platform/scripts/__init__.py:21
+- 不以脆弱揭露作為課程或組織績效要求 => built: ai_lego/platform/scripts/dont-list.yaml:3
+- 參與者對帶領者的異議也記在申訴紀錄。作者是參與者，他可以匯出、刪除；GOVERN 給那位帶領者的督導看，處理申訴的人也看。 => built: ai_lego/apps/api/blocks/govern_group.py:110; ai_lego/apps/api/blocks/govern_group.py:130; ai_lego/apps/api/blocks/govern_group.py:138; ai_lego/platform/visibility.py:358
+- 參與者沒具名時，異議不顯示是誰提的。 => built: ai_lego/platform/visibility.py:375
+- 有人帶你的時候，你在每一張卡片、每一版地圖、每一張思考卡上，選要不要給帶領者看。GOVERN 記在同意紀錄；系統照它決定帶領者看得到什麼。 => built: ai_lego/core/domain/kinds/sense.py:27; ai_lego/core/domain/kinds/govern_group.py:18; ai_lego/platform/visibility.py:175
+- 做研究時，GOVERN 把 FACILITATE 交來的帶領者偏離紀錄，和研究資料放在一起。研究資料要留下沒改變、失敗、退出的案子，不只挑成功的。 => built: ai_lego/platform/block_hooks/facilitate.py:69; ai_lego/platform/research_export.py:158
+- 危機訊號和高風險，由看得到你內容的積木自己認出來：SENSE、GATHER、MAP、THINK、VERIFY、COMPUTE、DECIDE、ACT、LEARN、TEACH、EXPRESS、FACILITATE、COLLAB、規範與脈絡、組裝器。 => built: ai_lego/platform/block_hooks/govern.py:22
+- 那一塊認出危機，就叫 GOVERN 照你在哪裡（多人時、或有人帶的時候，照那位參與者在哪裡）給當地的求助資源；認出高風險，就叫 GOVERN 加護欄。 => built: ai_lego/platform/ai_gate.py:312; ai_lego/platform/visibility.py:344
+- GOVERN 不看你攤出來的內容和反思的內容。 => built: ai_lego/platform/block_hooks/govern.py:51; GOVERN keeps only the category: ai_lego/core/domain/kinds/govern.py:18
+- 匯出和刪除時，GOVERN 只搬動、刪掉資料，不看裡面寫了什麼。 => built: ai_lego/apps/api/blocks/govern.py:173; ai_lego/platform/erasure.py:141
+- 高風險的案子，系統自動加護欄。高風險是指：健康、法律、金錢、人身安全、急性心理危機、要公開散布的事。 => built: ai_lego/core/domain/kinds/govern.py:9; ai_lego/core/domain/kinds/govern.py:18
+- 人身安全是我們加的；藍圖 3.4 第 6 條的清單沒有它。 => built: ai_lego/core/domain/kinds/govern.py:9
+- 組裝器從你開案時寫的風險認出來；看得到內容的積木在過程中認出來。它們叫 GOVERN 加護欄。 => built: ai_lego/platform/block_hooks/assembler.py:17; ai_lego/platform/block_hooks/govern.py:51
+- 沒有案子的時候碰到高風險（例如每天校準的卡寫到健康、法律、金錢的事），系統建議你開一個案子，在案子裡處理；卡上的內容要不要帶過去，由你自己貼進開案資料（別的積木讀不到你的個人歷程）。護欄在案子裡加。 => built: ai_lego/platform/block_hooks/govern.py:28
+- GOVERN 把這個案子加了哪些護欄、是哪一類高風險、是哪一塊認出來的，寫進「護欄」抽屜。GOVERN 只收到是哪一類，不看內容。 => built: ai_lego/core/domain/kinds/govern.py:18; apps/cognitive-web/components/blocks/GovernPage.tsx:36
+- 護欄有四種，下面各寫由誰做。 => built: ai_lego/core/domain/kinds/govern.py:10
+- 要求來源：每次呼叫 AI 時，系統讀護欄；AI 說到事實時一定要附來源（哪一個網頁或哪一份文件），沒有來源就說沒有。 => built: ai_lego/platform/ai_gate.py:376
+- 建議找專業的人：每次呼叫 AI 時，系統讀護欄；AI 提醒你這件事可以找專業的人，並說明哪些事要由專業的人負責、哪些由你自己負責。GOVERN 照你在哪裡，告訴你當地可以找誰。 => built: ai_lego/platform/ai_gate.py:378
+- 先等一下或請人覆核：DECIDE 和 ACT 讀護欄；碰到不能反悔的決定或行動，請你先等一下或請人覆核。 => built: ai_lego/platform/block_hooks/act.py:4; ai_lego/platform/block_hooks/decide.py:2
+- 群組程序：有別人也有決定權時，DECIDE 提議加 COLLAB，並標明是護欄。你可以不加。藍圖寫四種護欄都自動加；群組程序這裡改成你同意才加，因為 COLLAB 是選用的積木。跟藍圖不同，照這樣做（2026-10-03 定）。 => built: ai_lego/platform/block_hooks/decide.py:1; ai_lego/core/domain/kinds/assembler.py:48
+- 模型、給 AI 的指令、來源名單、分類規則、分組規則、操弄手法清單、查核資料庫名單，版本都由 GOVERN 管。 => built: ai_lego/platform/rulesets/__init__.py:4; ai_lego/apps/api/blocks/govern.py:413
+- 這些版本你都看得到。 => built: apps/cognitive-web/components/blocks/GovernPage.tsx:185
+- 別的積木只記下自己用的是哪一版。 => built: ai_lego/platform/block_hooks/gather.py:46
+- 平台自己會成為認知作戰的目標。系統要做到： => built: ai_lego/platform/rulesets/govern.py:8
+- 防假帳號大量註冊、灌進假案例或假的「大家都這樣想」 => built: ai_lego/platform/rulesets/govern.py:8; ai_lego/platform/identity/store.py:688
+- 共同程序和任何顯示「多數人怎麼看」的地方，要防被協同帳號帶風向 => built: ai_lego/platform/collab_agreement.py:77; ai_lego/platform/identity/store.py:688
+- 平台用的 AI 模型和蒐集來的資料可能被汙染：模型和資料來源要列清單、可換、可查；你已有的規定「不用中國廠商的 AI 模型」併進這裡 => built: ai_lego/platform/net/egress.py:31; ai_lego/platform/rulesets/__init__.py:4
+- 平台不得自己做這種事：不推播情緒、不用使用者的資料做說服 => built: ai_lego/platform/ai_gate.py:51; ai_lego/platform/integrity.py:555
+- 在戰爭、內戰、高壓政權底下使用，紀錄本身可能危及使用者的人身安全。 => built: ai_lego/apps/api/blocks/govern_group.py:180; ai_lego/core/domain/kinds/assembler.py:39
+- 可以選擇不留紀錄，或只留在自己的裝置上 => NOT YET: a 不留紀錄 case is erased when closed (ai_lego/apps/api/blocks/govern_group.py:180); the device-only mode is not built (STEP34_SHARED_RULES.md §10)
+- 一鍵快速刪除整個案子 => built: ai_lego/apps/api/main.py:2821; ai_lego/platform/erasure.py:141
+- 平台本來就不要求實名，這裡不用另外開 => built: ai_lego/platform/identity/store.py:166
+- 資料放在哪個國家，要考慮你所在國家的政府會不會調閱 => built: ai_lego/data/db.py:222; docs/platform/STORAGE_SWITCH.md:1
+- 選了不留紀錄，案子結束就刪。 => built: ai_lego/apps/api/blocks/govern_group.py:180; ai_lego/platform/erasure.py:133
+- 這樣回顧會用不了。系統會先跟你講清楚。 => built: ai_lego/apps/api/blocks/govern_group.py:167
+- 成效衡量：評估判斷過程，不評分信念內容。可觀察的過程指標十項。 => built: ai_lego/platform/indicators.py:210
+- 能否區分事實、解釋、法律條件與價值選擇 => built: ai_lego/platform/indicators.py:136
+- 能否說出自身假設與影響來源 => built: ai_lego/platform/indicators.py:147
+- 能否提出會改變判斷的證據條件 => built: ai_lego/platform/indicators.py:158
+- 能否提出替代解釋與不確定性 => NOT YET: no indicator reads alternative explanations or uncertainty as such (ai_lego/platform/indicators.py:210 lists the ten built)
+- 能否回顧行動結果並更新模型 => built: ai_lego/platform/indicators.py:96
+- 能否依可觀察表現調整對 AI 的信任範圍 => built: ai_lego/platform/indicators.py:175
+- 能否說明採納、覆寫或撤回 AI 權限的理由 => built: ai_lego/platform/indicators.py:175
+- 能否依案子的目的選擇、調整或停用積木 => built: ai_lego/platform/indicators.py:190
+- 能否同時保留獨立版本與 AI 協作版本 => NOT YET: no indicator reads the independent and the AI-assisted version side by side; records carry the author but no function reads that (ai_lego/platform/indicators.py:210)
+- 能否在群體中保留異議並理解程序 => built: ai_lego/platform/indicators.py:77
+- 不應採用的指標：是否同意平台或帶領者的結論（帶領者那一半由 FACILITATE 守）、是否改變立場、是否更服從或更反抗、單一「自主分數」排名、立場是否符合平台偏好、AI 使用次數或對話長度或產出速度、是否盲目接受推薦、使用的積木數量或流程長度、把 AI 協作表現誤作純個人能力、群體一致性本身。 => built: ai_lego/platform/indicators.py:243; ai_lego/platform/integrity.py:511
+- 群體層怎麼量，寫在 COLLAB。 => built: ai_lego/apps/api/blocks/govern_group.py:253
+- AI 能做什麼 => context: section heading
+- AI 解釋設定是什麼意思。 => built: ai_lego/platform/ai_actions/govern.py:39
+- AI 不准做什麼 => context: section heading
+- AI 不准拿你的資料做說服、廣告、評分。 => built: ai_lego/platform/ai_gate.py:51; ai_lego/platform/safety/__init__.py:77
+- AI 在危機時不准自己處理。AI 要轉介。 => built: ai_lego/platform/ai_gate.py:330
+- AI 模型自己「記得」的事不算來源。有爭議的事實，AI 只能根據蒐集到、有身分卡的來源說話；沒有來源就說沒有。模型本身也是被網路內容餵出來的，同樣會被灌水影響。 => built: ai_lego/platform/ai_gate.py:53; ai_lego/platform/ai_gate.py:75
+- 交還控制：積木認出危機時，AI 停下來，交還給你；GOVERN 給當地的求助資源。 => built: ai_lego/platform/ai_gate.py:330
+- 交還控制：申訴由人處理。AI 不自己裁決。 => built: ai_lego/platform/integrity.py:563; ai_lego/apps/api/blocks/govern_group.py:110
+- 讀什麼、絕不讀什麼 => context: section heading
+- 這一塊讀：設定、同意紀錄、版本紀錄。 => built: ai_lego/apps/api/blocks/govern_group.py:72; ai_lego/apps/api/blocks/govern.py:426
+- 這一塊也讀：你在哪裡（開案時寫的）。只讀這一項，用來給當地的求助資源、照當地的規定處理資料。 => built: ai_lego/core/domain/kinds/assembler.py:36; ai_lego/platform/ai_gate.py:311
+- 沒有案子的時候（TEACH 的練習、FACILITATE 的演練和帶領紀錄、LEARN 的每天校準），讀你帳號設定裡的「你在哪裡」。只讀這一項，只用來給當地的求助資源。你可以不填；沒填時，給國際通用的求助資源。 => built: ai_lego/core/domain/kinds/govern.py:27; ai_lego/apps/api/blocks/govern.py:67
+- 多人時，也讀群組紀錄裡每個參與者在哪裡。只讀這一項。 => built: ai_lego/platform/ai_gate.py:312
+- 做研究時，也讀 FACILITATE 的帶領紀錄裡，帶領者和那幾位參與者都同意給研究的偏離紀錄。只讀這一部分。 => built: ai_lego/platform/block_hooks/facilitate.py:69; ai_lego/platform/research_export.py:158
+- 絕不讀：你攤出來的內容和反思的內容。匯出和刪除只搬動資料，不看內容。 => built: ai_lego/apps/api/blocks/govern.py:173; ai_lego/platform/erasure.py:141
+- 寫什麼 => context: section heading
+- 「護欄」：這個案子加了哪些護欄、是哪一類高風險、是哪一塊認出來的。 => built: ai_lego/core/domain/kinds/govern.py:18
+- 「平台紀錄」：同意紀錄；模型、AI 指令、來源名單、分類規則、分組規則、操弄手法清單、查核資料庫名單的版本；稽核紀錄；申訴；被抹除的案子留的一筆「已抹除」；你帳號設定裡的「你在哪裡」（選填，沒有案子時給求助資源用）。 => built: ai_lego/core/domain/kinds/govern_group.py:18; ai_lego/core/domain/kinds/govern.py:36; ai_lego/core/domain/kinds/govern.py:23; ai_lego/core/domain/kinds/govern_group.py:25; ai_lego/core/domain/kinds/govern.py:27; ai_lego/platform/erasure.py:141
+- 產出給誰 => context: section heading
+- 這些紀錄交給你本人。參與者對帶領者的異議，交給 FACILITATE，給那位帶領者的督導看；處理申訴的人也看。這個案子的護欄交給 DECIDE、ACT 讀；每次呼叫 AI 時，系統也讀。來源名單、分類規則、分組規則、操弄手法清單、查核資料庫名單的現行版本，交給 GATHER、VERIFY 讀。每次呼叫 AI 時，系統讀模型和 AI 指令的版本。研究資料要等你明確同意，才給研究用。GOVERN 拿掉帳號和三個地點（發生地、你在哪裡、當事人各在哪裡），不改內文；內文裡的人名要你自己先刪改。這樣只是拿掉帳號，不保證認不出是誰。 => built: ai_lego/platform/visibility.py:358; ai_lego/platform/block_hooks/decide.py:2; ai_lego/platform/research_export.py:167
+- 照架構頁，讀這一塊寫的東西的：「護欄」：DECIDE、ACT；每次呼叫 AI 時，系統讀它：照這個案子的護欄提醒 AI；「平台紀錄」：GATHER（只讀來源名單、分類規則、分組規則的現行版本）、VERIFY（只讀操弄手法清單和查核資料庫名單的現行版本）、FACILITATE（只讀參與者對這位帶領者帶法的異議；參與者沒具名時，不讀是誰提的）；每次呼叫 AI 之前，系統讀模型和 AI 指令的現行版本。LEARN 和共用紀錄讀這個案子的全部。 => built: ai_lego/core/domain/kinds/govern.py:35
+- 來源與不確定性 => context: section heading
+- 平台自己的分類和名單也可能錯，或被人利用。 => built: ai_lego/apps/api/blocks/govern.py:413; apps/cognitive-web/components/blocks/GovernPage.tsx:185
+- 它們要標版本。你可以質疑它們。 => built: ai_lego/apps/api/blocks/govern.py:413; apps/cognitive-web/components/blocks/GovernPage.tsx:185
+- 平台本身也可以被質疑：模型、給 AI 的指令、資料治理、評估方式，都可以被質疑、研究、修改，或部分推翻。 => built: ai_lego/apps/api/blocks/govern_group.py:110; apps/cognitive-web/components/blocks/GovernPage.tsx:185
+- 人怎麼控制 => context: section heading
+- 你的每一個同意，都可以撤回。 => built: ai_lego/apps/api/blocks/govern_group.py:85
+- 研究這類選用的用途，你都可以關掉。 => built: ai_lego/core/domain/kinds/govern_group.py:14; apps/cognitive-web/components/blocks/MyDataPage.tsx:236
+- 你看得到這個案子加了哪些護欄、是哪一類高風險。 => built: apps/cognitive-web/components/blocks/GovernPage.tsx:36
+- 資料與版本 => context: section heading
+- 系統只收最少、必要的資料，另外守這五條： => built: ai_lego/apps/api/blocks/govern.py:315; ai_lego/apps/api/blocks/govern_group.py:77
+- 使用者擁有並可匯出、刪除自己的資料 => built: ai_lego/apps/api/blocks/govern.py:315; ai_lego/apps/api/blocks/govern.py:353
+- 研究資料採明確、可撤回的知情同意 => built: ai_lego/core/domain/kinds/govern_group.py:14; ai_lego/platform/research_export.py:167
+- 個人反思資料不得用於廣告、操控式推薦或評分 => built: ai_lego/platform/ai_gate.py:51; ai_lego/platform/integrity.py:129
+- 個人原始素材、匿名研究資料、群組決策資料分開治理（研究資料只拿掉帳號和三個地點，不保證認不出是誰，所以不叫「匿名」；2026-10-03 定） => built: ai_lego/platform/research_export.py:65; ai_lego/platform/research_export.py:40
+- 對 AI 訓練、人工審閱、資料保留提供清楚選項 => NOT YET: no setting lets a person choose about AI training, human review or retention; the platform keeps what the person writes until they delete it, and sends text only to the AI provider listed in ai_lego/platform/net/egress.py:31
+- 資料存多久、存在哪裡，系統都寫明。 => NOT YET: the page lists what a case keeps (apps/cognitive-web/components/blocks/GovernPage.tsx:193) but does not say for how long or in which country
+- 跨國使用。 => NOT YET: only crisis resources are per place (ai_lego/platform/resources/__init__.py:86); the lines below list what else is not
+- 介面、課程、範例都要能換語言和在地案例，不是翻譯一份台灣版 => NOT YET: the interface is Traditional Chinese only; lessons and practice cases carry a place (ai_lego/platform/lessons/cases/taiwan-central-weather.yaml:9) but there is no other-language interface
+- 資料保護、未成年人、同意的規定各地不同，照你所在地的規定走；不確定時用較嚴的 => NOT YET: no place-specific data-protection, minors or consent rules are applied; the platform has one rule set for every place
+- 危機轉介的資源照你所在地給，不能只列一國的專線 => built: ai_lego/platform/resources/__init__.py:86; ai_lego/platform/resources/__init__.py:24
+- 在地化由當地的人參與改寫，平台不單方面定義 => NOT YET: local rewriting by local people is a process, not a feature of the engine
+- 每塊積木的產出要記下出自哪一塊、哪一版。由共用紀錄記，見那張卡。 => built: ai_lego/core/domain/kinds/govern.py:36; ai_lego/core/domain/kinds/govern.py:35
+- 現在有沒有 => context: section heading
+- 今天只有一點點。 => context: what exists today, as of 2026-10-03; steps 1 and 3 are built
+- 今天有三樣雛形：AI 指令的版本紀錄、拿同一份輸入重跑一次、照結果改進指令。 => context: what exists today, as of 2026-10-03; steps 1 and 3 are built
+- 今天專案可以抹除，也可以匯出 PDF。 => context: what exists today, as of 2026-10-03; steps 1 and 3 are built
+- 今天沒有同意、申訴、危機轉介、高風險護欄。 => context: what exists today, as of 2026-10-03; steps 1 and 3 are built
+- 分兩段建：第 1 步做基本安全（匯出、刪除、非治療聲明、危機轉介、高風險護欄）和版本紀錄；第 3 步做研究與治理（同意、申訴、在地化、衡量），和這張卡上不留紀錄的選項、防假帳號大量灌入。 => context: what exists today, as of 2026-10-03; steps 1 and 3 are built
+- 不靠這些工具。今天有 AI 指令的版本紀錄、重跑、抹除、匯出 => context: what exists today, as of 2026-10-03; steps 1 and 3 are built
+- 全程生效的五樣（不算積木） => context: what exists today, as of 2026-10-03; steps 1 and 3 are built
+- 全 => context: what exists today, as of 2026-10-03; steps 1 and 3 are built
