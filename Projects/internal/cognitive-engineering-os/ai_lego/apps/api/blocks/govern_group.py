@@ -18,6 +18,11 @@ Appeals (§9, card 30), read only through platform/visibility.py ``appeals_for``
     POST /projects/{id}/govern/close         closing a 不留紀錄 case erases it whole (the case erasure; no tombstone)
     GET  /projects/{id}/govern/used          which model and instructions each AI turn used, and every ruleset stamped on the
                                              case's records -- names, versions and fingerprints only, never what the records say
+
+The process indicators (card 70, platform/indicators.py): presence facts about how a judgment was made, never a grade:
+    GET  /projects/{id}/indicators           the case's owner only: its own records
+    GET  /groups/{id}/indicators             a current member only (the missing group's 404 otherwise): the group's records as
+                                             platform/visibility.py gives them to this member, so a round they have not unlocked is not in it
 """
 
 from __future__ import annotations
@@ -32,15 +37,17 @@ from pydantic import BaseModel
 
 from ai_lego.apps.api import main as api
 from ai_lego.apps.api.blocks.docs import DocBody, _call, _save, _saved, case_owner
+from ai_lego.apps.api.blocks.groups import member_group, not_found
 from ai_lego.core.domain import doc_kinds
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
-from ai_lego.errors import InvariantViolation
-from ai_lego.platform import visibility
+from ai_lego.errors import InvariantViolation, group_gone
+from ai_lego.platform import evidence, indicators, visibility
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.platform import resources
+from ai_lego.platform.block_hooks.assembler import proposals
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.rulesets import rulesets
 from ai_lego.platform.visibility import Viewer
@@ -221,3 +228,39 @@ def case_used(project_id: str, session: dict[str, Any] = Depends(api.require_ses
                                   (tenant_id, project_id)).fetchall()
     found = {(item["name"], item["version"], item["fingerprint"]): item for row in rows for item in stamps(row["content"])}
     return {"labels": USED_LABELS, "ai_turns": turns, "rulesets": [found[key] for key in sorted(found)], "resources": resources.version()}
+
+
+# -- the process indicators (card 70) -------------------------------------------------------------------------------------
+
+@router.get("/projects/{project_id}/indicators")
+def case_indicators(project_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
+    """The case's process facts (platform/indicators.py), from its own records, to its owner (a case that is not yours is the
+    missing case's 404). The claim ledger is the one counting rule's (evidence.checked_claims), never recounted here."""
+    owner = case_owner(project_id, session, repo)
+    docs, tenant_id = CaseDocs(repo), session["tenant_id"]
+    label = indicators.owner_label(indicators.CASE, project_id)
+    records: dict[str, list[dict[str, Any]]] = {}
+    for kind in indicators.reads(indicators.CASE):
+        if kind == indicators.LEDGER:
+            records[kind] = indicators.stamped_ledger(label, evidence.checked_claims(docs, tenant_id, owner))
+        elif kind == indicators.PROPOSALS:
+            records[kind] = indicators.stamped(label, proposals(docs, tenant_id, owner))
+        else:
+            records[kind] = indicators.stamped(label, docs.current(tenant_id, owner, kind))
+    return indicators.describe(indicators.CASE, records)
+
+
+@router.get("/groups/{group_id}/indicators")
+def group_indicators(group_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
+    """The group's process facts, to a current member only (G2). Computed from what ``visibility.visible`` gives this member:
+    another member's stance or restatement of a round or option they have not unlocked is not read, so it is not counted."""
+    member_group(repo, session, group_id)
+    docs, viewer = CaseDocs(repo), Viewer(session["tenant_id"], session["identity_id"])
+    label = indicators.owner_label(indicators.GROUP, group_id)
+    try:
+        records = {kind: indicators.stamped(label, visibility.visible(docs, viewer, group_id, kind)) for kind in indicators.reads(indicators.GROUP)}
+    except InvariantViolation as error:
+        if group_gone(error):
+            raise not_found(group_id) from None
+        raise
+    return indicators.describe(indicators.GROUP, records)
