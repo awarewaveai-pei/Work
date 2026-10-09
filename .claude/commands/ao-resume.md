@@ -278,7 +278,7 @@ Task count（所有群加總）must match `open-tasks-snapshot.md` Total open。
 
 **8. 下一步**
 
-**建議模型（每個下一步必附，操作者不記模型分工）**：每一項具體下一步行末加 `建議模型：<Fable 5.1｜Opus 5.5｜Sonnet 5.5｜Haiku 4.5>`，依 `agency-os/AGENTS.md` §5 模型路由表判（想→Fable／做→Opus 或 Sonnet／填→Haiku）；來源計畫的「下一步」行已寫建議模型就照抄。第一項的建議模型與目前 session 模型不同 → 該行前加 `⚠ 先在模型選單切 <模型>`。
+**建議模型（每個下一步必附，操作者不記模型分工）**：每一項具體下一步行末加 `建議模型：<Fable 5.1｜Opus 5.5｜Sonnet 5.5｜Haiku 5.5>`，依 `agency-os/AGENTS.md` §5 模型路由表判（想→Fable／做→Opus 或 Sonnet／填→Haiku）；來源計畫的「下一步」行已寫建議模型就照抄。第一項的建議模型與目前 session 模型不同 → 該行前加 `⚠ 先在模型選單切 <模型>`。
 
 **Pending handoff packets (check before first action)**:
 
