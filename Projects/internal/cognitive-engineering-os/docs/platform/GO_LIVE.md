@@ -120,7 +120,7 @@ RESTORE OK: cognitive-db-<date>-636f676e69746976655f6f73-<run>.dump -> restore_c
 OK. Next: ...
 ```
 
-再確認（不要印值）：`grep -c '^COGNITIVE_OS_DATABASE_URLS=' $PRODUCT/deploy/.env` 是 `1`（安裝腳本從密碼檔寫進去的；密碼不在 git、不在指令列）；然後建搬移用的網址檔：`grep '^COGNITIVE_OS_DATABASE_URLS=' $PRODUCT/deploy/.env > $WORK/url.env && chmod 600 $WORK/url.env`。**第一份 dump（空的、已 migrate 的資料庫）留著**：C2「退掉搬移」靠它。
+安裝腳本要求 `deploy/.env` 已存在時是 mode 600、擁有者與 `deploy/` 資料夾相同，否則 `REFUSED`（先 `chmod 600`／`chown`）；它新建這個檔時會自己設好。再確認（不要印值）：`grep -c '^COGNITIVE_OS_DATABASE_URLS=' $PRODUCT/deploy/.env` 是 `1`（安裝腳本從密碼檔寫進去的；密碼不在 git、不在指令列）；然後建搬移用的網址檔：`grep '^COGNITIVE_OS_DATABASE_URLS=' $PRODUCT/deploy/.env > $WORK/url.env && chmod 600 $WORK/url.env`。**第一份 dump（空的、已 migrate 的資料庫）留著**：C2「退掉搬移」靠它。
 加每晚備份：把 `ops/cognitive-db/README.md`「備份」節那行 cron 加到 `/etc/cron.d/ks-stack-backup`（路徑已是 `/opt/cognitive-os/...`）；隔天 `ls -la /root/backups/cognitive-db` 要有新檔。
 退回：安裝腳本中途失敗會自動拆掉它建的東西（容器、卷、這次寫的 dump、這次寫進 `deploy/.env` 的那一行）並通知，直接重跑。安裝成功後、搬資料之前想拆掉：
 
@@ -258,7 +258,7 @@ docker volume rm cognitive-os-files-$REGION                         # 只有這�
 | `CONVERT` | 某表某列某欄的時間或 JSON 格式不合（訊息只給表名、rowid、欄名） | 停，交給工程師看那一列 |
 | `REGION_UNMAPPED` / `REGION_MAP_UNUSED` / `REGION_NOT_CONFIGURED` | `--region-map` 沒涵蓋租戶的區域、多寫了、或不是 `deploy/.env` 設定的那個區域 | 改參數 |
 | `FILES_ORPHAN` / `FILES_UNKNOWN` | 複本裡有不屬於任何租戶的目錄或不認得的項目 | 看是什麼；是垃圾就從**複本**刪掉再跑 |
-| `TARGET_NOT_EMPTY` / `TARGET_SCHEMA_BEHIND` / `FILES_TARGET_NOT_EMPTY` | 目標不是空的或不在 head | 空資料庫才能搬；要重來走 C2 |
+| `TARGET_NOT_EMPTY` / `TARGET_SCHEMA_BEHIND` / `FILES_TARGET_NOT_EMPTY` | 目標有列、有序號被用過、或不在 head | 空資料庫才能搬；要重來走 C2。搬移自己失敗並回滾時會把序號還原，所以直接重跑不會被這條擋住；程序被殺掉才可能留下用過的序號 |
 | `PROOF_FAILED` | 兩邊不相等 | 什麼都沒提交；保留輸出重跑一次，再失敗就停，交給工程師 |
 | `INSERT` | 資料庫拒絕某列（只給 SQLSTATE 與約束名） | 停，交給工程師 |
 

@@ -358,7 +358,10 @@ def plan_target(connection: psycopg.Connection) -> Plan:
     return Plan(columns, kinds, tables)
 
 
-def require_head_and_empty(connection: psycopg.Connection, plan: Plan) -> None:
+def require_head_and_empty(connection: psycopg.Connection, plan: Plan) -> list[str]:
+    """Head, no row, and every sequence unused: a sequence that has been read from outlives its rows (a deleted or rolled
+    back insert still advanced it), and the move's setval to the source's largest id would then hand out an id already used
+    on the target. Returns every sequence of the schema (qualified), which a failed move restarts: they were all proven unused."""
     current, heads = schema_revisions(connection), head_revisions()
     if current != heads:
         raise MoveError("TARGET_SCHEMA_BEHIND", f"the target is at {sorted(current) or 'no revision'}, head is {sorted(heads)}: run ai_lego.apps.cli.migrate_db first")
@@ -366,6 +369,10 @@ def require_head_and_empty(connection: psycopg.Connection, plan: Plan) -> None:
     for table in plan.tables:
         if connection.execute(f"SELECT EXISTS (SELECT 1 FROM {q(table)})").fetchone()[0]:
             raise MoveError("TARGET_NOT_EMPTY", f"table {table} already holds rows: the move fills an empty database only")
+    used = [row[0] for row in connection.execute("SELECT sequencename FROM pg_sequences WHERE schemaname = current_schema() AND last_value IS NOT NULL ORDER BY 1")]
+    if used:
+        raise MoveError("TARGET_NOT_EMPTY", f"sequence(s) {used} were already used (rows since deleted, or a move that died): restore the empty database (GO_LIVE.md C2); setval would reuse ids")
+    return [row[0] for row in connection.execute("SELECT quote_ident(schemaname) || '.' || quote_ident(sequencename) FROM pg_sequences WHERE schemaname = current_schema() ORDER BY 1")]
 
 
 def target_proof(connection: psycopg.Connection, plan: Plan) -> Proof:
@@ -620,28 +627,38 @@ def run(command: str, source_dir: Path, urls: Mapping[str, str], region_map: Map
         source_files = {tenant: tree_digest(source_dir, relatives) for tenant, relatives in files_plan.items()}
         with psycopg.connect(url, autocommit=True) as connection:
             connection.execute("SET TIME ZONE 'UTC'")
-            with connection.transaction():
-                if command == "verify":
-                    connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
-                plan = plan_target(connection)
-                if command == "move":
-                    require_head_and_empty(connection, plan)
-                counted = copy_and_prove_source(source, plan, region_map, connection if command == "move" and not dry_run else None)
-                counted.proof.files = source_files
-                if command == "move" and dry_run:
-                    if files_root is not None:
-                        _check_files_absent(files_root, files_plan)
+            writes = command == "move" and not dry_run
+            proven_unused: list[str] = []   # set once the target is proven empty and unused; a rolled-back move restarts exactly these
+            try:
+                with connection.transaction():
+                    if command == "verify":
+                        connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+                    plan = plan_target(connection)
+                    if command == "move":
+                        sequences = require_head_and_empty(connection, plan)
+                        proven_unused = sequences if writes else []
+                    counted = copy_and_prove_source(source, plan, region_map, connection if writes else None)
+                    counted.proof.files = source_files
+                    if command == "move" and dry_run:
+                        if files_root is not None:
+                            _check_files_absent(files_root, files_plan)
+                        source.unchanged()
+                        return Result(counted.proof, None, [], False, dict(source.sha_before), counted.tenants)
+                    if copied is not None:
+                        copied.copy(source_dir, files_plan)
+                    target = target_proof(connection, plan)
+                    assert files_root is not None
+                    target.files = {tenant: tree_digest(files_root, relatives) for tenant, relatives in files_plan.items()}
+                    found = differences(counted.proof, target)
+                    if command == "move" and found:
+                        raise MoveError("PROOF_FAILED", "; ".join(found), EXIT_PROOF)
                     source.unchanged()
-                    return Result(counted.proof, None, [], False, dict(source.sha_before), counted.tenants)
-                if copied is not None:
-                    copied.copy(source_dir, files_plan)
-                target = target_proof(connection, plan)
-                assert files_root is not None
-                target.files = {tenant: tree_digest(files_root, relatives) for tenant, relatives in files_plan.items()}
-                found = differences(counted.proof, target)
-                if command == "move" and found:
-                    raise MoveError("PROOF_FAILED", "; ".join(found), EXIT_PROOF)
-                source.unchanged()
+            except BaseException:
+                # nextval and setval survive a rollback; the target was proven unused under lock, so put them back or the
+                # retry (and the next run's emptiness check) would see a used sequence.
+                for sequence in proven_unused:
+                    connection.execute(f"ALTER SEQUENCE {sequence} RESTART")
+                raise
         return Result(counted.proof, target, found, command == "move", dict(source.sha_before), counted.tenants)
     except BaseException:
         if copied is not None:

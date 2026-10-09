@@ -97,6 +97,21 @@ class DataMoveProofTests(PgTestCase):
             connection.execute("DROP TRIGGER corrupt_one ON events")
         self.assertTrue(self.run_move(url).committed)
 
+    def test_a_target_whose_sequence_was_already_used_is_not_empty(self):
+        url = self.fresh_database()
+        with psycopg.connect(url, autocommit=True) as connection:   # rows deleted, sequence left at 1000: setval(5) would reuse 6..1000
+            connection.execute("SELECT setval(pg_get_serial_sequence('ai_usage', 'id'), 1000)")
+
+        with self.assertRaises(move.MoveError) as refused:
+            self.run_move(url)
+
+        self.assertEqual(refused.exception.code, "TARGET_NOT_EMPTY")
+        self.assertIn("ai_usage_id_seq", str(refused.exception))
+        self.assertEqual(count(url, "tenant"), 0)
+        self.assertEqual(list(self.destination.iterdir()), [])
+        with psycopg.connect(url) as connection:
+            self.assertEqual(connection.execute("SELECT last_value FROM pg_sequences WHERE sequencename = 'ai_usage_id_seq'").fetchone()[0], 1000, "left as it was")
+
 
 if __name__ == "__main__":
     unittest.main()

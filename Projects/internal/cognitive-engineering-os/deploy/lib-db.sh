@@ -21,6 +21,13 @@ PRE_DEPLOY_DUMP=""
 
 compose_app() { docker compose -f "$COMPOSE_FILE" "$@"; }
 
+# True only when compose answers AND lists no running container of the services: "the stop returned" is not proof.
+services_stopped() {
+  local running
+  running="$(compose_app ps -q "${SERVICES[@]}")" || return 1
+  [[ -z "$running" ]]
+}
+
 db_container() {
   docker ps -q --filter "label=com.docker.compose.project=$DB_PROJECT" --filter "label=com.docker.compose.service=cognitive-db" | head -n 1
 }
@@ -92,8 +99,12 @@ db_prepare() {
       ;;
     1)
       log "db | migration pending: stopping ${SERVICES[*]}, dump, migrate"
+      QUIESCED=1   # set first: even a half-failed stop leaves something for rollback_all to start again
       compose_app stop "${SERVICES[@]}" >>"$LOG" 2>&1 || true
-      QUIESCED=1
+      if ! services_stopped; then
+        log "db | FAIL: ${SERVICES[*]} are not proven stopped; the database is untouched (no dump, no migration)"
+        return 1
+      fi
       db_backup || { log "db | FAIL: pre-deploy dump"; return 1; }
       db_migrate_run >>"$LOG" 2>&1 || { log "db | FAIL: migration (it runs in one transaction: the database is unchanged)"; return 1; }
       MIGRATED=1
@@ -125,6 +136,11 @@ rollback_all() {
   notify "FAILED ($reason) -- rolling back"
   compose_app stop "${SERVICES[@]}" >>"$LOG" 2>&1 || true
   if (( MIGRATED )); then
+    if ! services_stopped; then
+      log "rollback | the new containers are not proven stopped: the dump is NOT restored over live writers"
+      notify "ROLLBACK STOPPED: could not stop ${SERVICES[*]}, database left as migrated -- needs human (dump: $PRE_DEPLOY_DUMP)"
+      return 1
+    fi
     log "rollback | restoring the pre-deploy dump $PRE_DEPLOY_DUMP"
     if ! COGNITIVE_DB_CONTAINER="$DB_CONTAINER" bash "$PRODUCT_ROOT/ops/cognitive-db/restore-live-cognitive-db.sh" "$PRE_DEPLOY_DUMP" >>"$LOG" 2>&1; then
       log "rollback | database restore FAILED"

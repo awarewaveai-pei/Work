@@ -138,6 +138,14 @@ else
   ENV_LINE_PRESENT=0
   [[ "$REGION" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] || refuse "--region is required (lowercase letters, digits, '-'): $ENGINE_ENV_FILE has no $URL_VAR yet"
 fi
+# The file that holds the database URL holds its password: 0600 and owned by the deploy user (= the owner of its folder)
+# BEFORE any secret is written into it; umask only protects a file this run creates.
+env_dir="$(dirname -- "$ENGINE_ENV_FILE")"
+[ -d "$env_dir" ] || refuse "the folder of $ENGINE_ENV_FILE does not exist"
+if [ -f "$ENGINE_ENV_FILE" ]; then
+  case "$(stat -c %a -- "$ENGINE_ENV_FILE")" in 400|600) ;; *) refuse "$ENGINE_ENV_FILE holds the database password but is not mode 600: chmod 600 it first" ;; esac
+  [ "$(stat -c %u -- "$ENGINE_ENV_FILE")" = "$(stat -c %u -- "$env_dir")" ] || refuse "$ENGINE_ENV_FILE is not owned by the owner of its folder (the deploy user): chown it first"
+fi
 db_hex="$(printf %s "$DB_NAME" | od -An -tx1 | tr -d '[:space:]')"
 dump_glob="$COGNITIVE_DB_BACKUP_DIR/cognitive-db-????-??-??-*.dump"
 list_dumps() { compgen -G "$dump_glob" | sort || true; }
@@ -182,7 +190,12 @@ if (( ENV_LINE_PRESENT == 0 )); then
   if (( DRY_RUN )); then
     log "(dry-run) would append ${URL_VAR}=${REGION}=postgresql://${DB_USER}:<password>@${DB_HOST}:5432/${DB_NAME} to $ENGINE_ENV_FILE (the password file's content; never printed)"
   else
-    [ -f "$ENGINE_ENV_FILE" ] || { : >"$ENGINE_ENV_FILE"; CREATED_ENV_FILE=1; }
+    if [ ! -f "$ENGINE_ENV_FILE" ]; then
+      : >"$ENGINE_ENV_FILE"
+      CREATED_ENV_FILE=1
+      chmod 600 -- "$ENGINE_ENV_FILE"
+      chown --reference="$env_dir" -- "$ENGINE_ENV_FILE"   # created by root, read by the deploy user
+    fi
     ADDED_ENV_LINE=1
     if [ -s "$ENGINE_ENV_FILE" ] && [ -n "$(tail -c 1 "$ENGINE_ENV_FILE")" ]; then printf '\n' >>"$ENGINE_ENV_FILE"; fi
     printf '%s=%s=postgresql://%s:%s@%s:5432/%s\n' "$URL_VAR" "$REGION" "$DB_USER" "$PASSWORD" "$DB_HOST" "$DB_NAME" >>"$ENGINE_ENV_FILE"
