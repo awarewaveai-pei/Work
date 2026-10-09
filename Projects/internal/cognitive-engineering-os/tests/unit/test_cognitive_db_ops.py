@@ -52,6 +52,16 @@ def _run_docker(*args: str, timeout: int = 120) -> subprocess.CompletedProcess[s
     )
 
 
+def _wait_until_serving(container: str) -> bool:
+    """Ready = the final server answers on TCP. The image's init phase runs a socket-only server that already says yes to
+    pg_isready over the socket -- before POSTGRES_DB exists (tests/pg.py does the same)."""
+    for _ in range(90):
+        if _run_docker("exec", container, "pg_isready", "-h", "127.0.0.1", "-U", "cognitive", "-d", "cognitive_os").returncode == 0:
+            return True
+        time.sleep(1)
+    return False
+
+
 def _bash_path(path: Path) -> str:
     resolved = path.resolve().as_posix()
     if os.name == "nt":
@@ -183,14 +193,7 @@ class CognitiveDbOpsTests(unittest.TestCase):
         )
         self.assertEqual(source.returncode, 0, source.stderr)
         try:
-            ready = False
-            for _ in range(90):
-                probe = _run_docker("exec", source_name, "pg_isready", "-U", "cognitive", "-d", "cognitive_os")
-                if probe.returncode == 0:
-                    ready = True
-                    break
-                time.sleep(1)
-            self.assertTrue(ready, "throwaway PostgreSQL did not become ready")
+            self.assertTrue(_wait_until_serving(source_name), "throwaway PostgreSQL did not become ready")
             proof = _run_docker(
                 "exec", source_name, "psql", "-U", "cognitive", "-d", "cognitive_os",
                 "-c", "CREATE TABLE restore_proof (id integer); INSERT INTO restore_proof VALUES (11);",
@@ -315,14 +318,7 @@ class CognitiveDbOpsTests(unittest.TestCase):
         )
         self.assertEqual(container.returncode, 0, container.stderr)
         try:
-            ready = False
-            for _ in range(90):
-                probe = _run_docker("exec", name, "pg_isready", "-U", "cognitive", "-d", "cognitive_os")
-                if probe.returncode == 0:
-                    ready = True
-                    break
-                time.sleep(1)
-            self.assertTrue(ready, "throwaway PostgreSQL did not become ready")
+            self.assertTrue(_wait_until_serving(name), "throwaway PostgreSQL did not become ready")
             proof = _run_docker("exec", name, "psql", "-U", "cognitive", "-d", "cognitive_os", "-c", "CREATE TABLE backup_proof (id integer); INSERT INTO backup_proof VALUES (7);")
             self.assertEqual(proof.returncode, 0, proof.stderr)
             for database in ("a b", "a_b"):

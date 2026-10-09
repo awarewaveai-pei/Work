@@ -28,12 +28,13 @@ docker run -d --rm --name "$CONTAINER" --network none \
   --mount "type=bind,source=$COGNITIVE_DB_PASSWORD_FILE,target=/run/secrets/cognitive_db_password,readonly" \
   "$IMAGE" >/dev/null
 
-# A container that died never answers; fail instead of waiting forever.
+# A container that died never answers; fail instead of waiting forever. Ready = TCP (-h): the image's init phase runs a
+# socket-only server that answers pg_isready, then stops and restarts -- a restore started in that window is cut off.
 for _ in $(seq 1 90); do
-  docker exec "$CONTAINER" pg_isready -U "$USER" -d "$DATABASE" >/dev/null 2>&1 && break
+  docker exec "$CONTAINER" pg_isready -h 127.0.0.1 -U "$USER" -d "$DATABASE" >/dev/null 2>&1 && break
   sleep 1
 done
-docker exec "$CONTAINER" pg_isready -U "$USER" -d "$DATABASE" >/dev/null
+docker exec "$CONTAINER" pg_isready -h 127.0.0.1 -U "$USER" -d "$DATABASE" >/dev/null
 docker exec "$CONTAINER" createdb -U "$USER" "$TARGET_DATABASE"
 docker cp "$COGNITIVE_DB_DUMP_FILE" "$CONTAINER:/tmp/restore.dump"
 docker exec "$CONTAINER" pg_restore -U "$USER" --exit-on-error --no-owner --dbname="$TARGET_DATABASE" /tmp/restore.dump
