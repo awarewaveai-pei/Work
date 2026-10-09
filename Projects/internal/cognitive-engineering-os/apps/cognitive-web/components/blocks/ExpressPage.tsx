@@ -5,6 +5,7 @@ import { ApiError, apiFetch } from "../../lib/api";
 import { AUTHOR, ai, type AiTurn, type Doc, type Notice, type Saved } from "../../lib/blocks";
 import { docs } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
+import { collab, groups, type Group } from "../../lib/groups";
 import { BlockShell, Notices } from "./BlockShell";
 
 type Ref = { project_id: string; kind: string; doc_id: string };
@@ -163,17 +164,21 @@ export function ExpressPage({ projectId }: { projectId: string }) {
   const [openedSource, setOpenedSource] = useState<CaseRecord | null>(null);
   const [handback, setHandback] = useState("");
   const [sendConfirm, setSendConfirm] = useState(false);
+  const [openGroups, setOpenGroups] = useState<Group[]>([]);
+  const [giveConfirm, setGiveConfirm] = useState<string | null>(null);
+  const [given, setGiven] = useState("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
   const load = async () => {
-    const [formatData, savedSelection, savedDrafts, recordLists] = await Promise.all([
+    const [formatData, savedSelection, savedDrafts, recordLists, myGroups] = await Promise.all([
       apiFetch<FormatResponse>(pathFor(projectId, "/express/formats")),
       apiFetch<Selection[]>(pathFor(projectId, "/express/selection")),
       apiFetch<Draft[]>(pathFor(projectId, "/express/drafts")),
       Promise.all(CASE_RECORD_KINDS.map((kind) => docs.list<RecordContent>(projectId, kind))),
+      groups.list(),
     ]);
     const currentSelection = savedSelection.at(-1) ?? null;
     const listedDraft = savedDrafts.at(-1) ?? null;
@@ -188,6 +193,8 @@ export function ExpressPage({ projectId }: { projectId: string }) {
     setFormat(currentSelection?.content.format ?? formatData.formats?.[0]?.name ?? "");
     setKeyPoints(currentSelection?.content.key_points ?? "");
     setDraft(readDraft);
+    setOpenGroups(myGroups.filter((group) => group.status === "open"));
+    setGiveConfirm(null);
     setEdits({});
     setHandback("");
     if (currentSelection) {
@@ -207,6 +214,7 @@ export function ExpressPage({ projectId }: { projectId: string }) {
 
   const act = async (work: () => Promise<void>) => {
     setError("");
+    setGiven("");
     setBusy(true);
     try {
       await work();
@@ -223,6 +231,7 @@ export function ExpressPage({ projectId }: { projectId: string }) {
   const sentences = draft?.content.sentences ?? [];
   const disclosures = useMemo(() => disclosureLines(draft, selectedRecords), [draft, selectedRecords]);
   const hasUnchecked = sentences.some((sentence) => sentence.unchecked === true);
+  const unsaved = sentences.some((sentence, index) => edits[index] !== undefined && edits[index] !== sentence.text);
 
   const toggleRecord = (record: CaseRecord) => {
     const ref = { project_id: projectId, kind: record.kind, doc_id: record.doc_id };
@@ -282,6 +291,20 @@ export function ExpressPage({ projectId }: { projectId: string }) {
       });
       download(blob, `express-draft-v${draft.version}.md`);
       setSendConfirm(false);
+    });
+  };
+
+  // Only the saved version's sentences go, into a group the person is an open member of; no refs, reader or case record.
+  const giveToGroup = (group: Group) => {
+    if (!draft) return;
+    if (hasUnchecked && giveConfirm !== group.group_id) {
+      setGiveConfirm(group.group_id);
+      return;
+    }
+    void act(async () => {
+      const saved = await collab.create(group.group_id, "collab.proposal", { express_draft: draft.doc_id, text: sentences.map((sentence) => sentence.text).join("\n") });
+      setNotices(saved.notices);
+      setGiven(group.name);
     });
   };
 
@@ -369,6 +392,19 @@ export function ExpressPage({ projectId }: { projectId: string }) {
             </div>
             {hasUnchecked && <div className="finding warn"><b>這份稿有還沒查證的句子。</b>送出前請確認你看過這個提醒。</div>}
             <div className="btns mt8"><button className="btn primary" type="button" disabled={busy || !reader.trim()} onClick={sendDraft}>{sendConfirm && hasUnchecked ? "我知道了，仍要送出" : "送出"}</button></div>
+            {openGroups.length > 0 && (
+              <div className="station">
+                <h3>交給群組當提案</h3>
+                <p className="why">只把最後存下的第 {draft.version} 版文字交給群組。來源、信心和案子裡的其他紀錄都不會過去。</p>
+                {openGroups.map((group) => (
+                  <div className="btns mt8" key={group.group_id}>
+                    <span className="sub">{group.name}</span>
+                    <button className="btn" type="button" disabled={busy || unsaved} onClick={() => giveToGroup(group)}>{giveConfirm === group.group_id && hasUnchecked ? "我知道了，仍要交給大家" : "交給大家當提案"}</button>
+                  </div>
+                ))}
+                {given && <div className="finding ok mt8" role="status">已交給「{given}」當提案。</div>}
+              </div>
+            )}
           </div>
         )}
         {error && <p className="error" role="alert">{error}</p>}

@@ -17,17 +17,21 @@ const draft = (sentences = [{ text: "AI 先整理了一句。", refs: [{ kind: "
 
 let currentSelection: any[] = [];
 let currentDraft: any[] = [];
+let currentGroups: any[] = [];
 let writes: Array<{ path: string; method: string; body?: any }> = [];
 
-function setup(config: { selection?: any[]; drafts?: any[] } = {}) {
+function setup(config: { selection?: any[]; drafts?: any[]; groups?: any[] } = {}) {
   currentSelection = config.selection ?? [];
   currentDraft = config.drafts ?? [];
+  currentGroups = config.groups ?? [];
   writes = [];
   vi.mocked(apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     if (method !== "GET") writes.push({ path, method, body });
     if (path === `${P}`) return { project_id: "P", name: "測試案子" } as never;
+    if (path === "/groups") return currentGroups as never;
+    if (path === "/groups/G1/collab/collab.proposal" && method === "POST") return { doc_id: "PR1", kind: "collab.proposal", version: 1, content: body.content, author: "user", mine: true, who: "你", notices: [] } as never;
     if (path === `${P}/route`) return { purpose: null, package: null, blocks: [], done: [] } as never;
     if (path === `${P}/express/formats`) return { formats: [{ name: "簡短說明", sections: ["重點"], reader: "團隊" }] } as never;
     if (path === `${P}/express/selection` && method === "GET") return currentSelection as never;
@@ -63,7 +67,7 @@ function setup(config: { selection?: any[]; drafts?: any[] } = {}) {
   });
 }
 
-async function openPage(config: { selection?: any[]; drafts?: any[] } = {}) {
+async function openPage(config: { selection?: any[]; drafts?: any[]; groups?: any[] } = {}) {
   setup(config);
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -78,6 +82,7 @@ afterEach(() => {
   vi.resetAllMocks();
   currentSelection = [];
   currentDraft = [];
+  currentGroups = [];
 });
 
 describe("EXPRESS page", () => {
@@ -111,6 +116,31 @@ describe("EXPRESS page", () => {
     await act(async () => { send().click(); });
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body))).toMatchObject({ acknowledge_unchecked: true, version: 1 });
+    await done();
+  });
+
+  it("offers no proposal button to a person who is in no group", async () => {
+    const selection = { ...record("express.selection", "SEL1", { items: [{ project_id: "P", kind: "sense.card", doc_id: "S1" }], format: "簡短說明", reader: "團隊" }), notices: [] };
+    const { host, done } = await openPage({ selection: [selection], drafts: [draft()] });
+    expect(host.textContent).toContain("你的稿子");
+    expect(host.textContent).not.toContain("交給大家當提案");
+    await done();
+  });
+
+  it("gives only the saved draft text, once confirmed, into the open group and nowhere else", async () => {
+    const selection = { ...record("express.selection", "SEL1", { items: [{ project_id: "P", kind: "sense.card", doc_id: "S1" }], format: "簡短說明", reader: "團隊" }), notices: [] };
+    const groups = [{ group_id: "G1", name: "家人討論", status: "open" }, { group_id: "G2", name: "舊的群組", status: "closed" }];
+    const { host, done } = await openPage({ selection: [selection], drafts: [draft()], groups });
+    const give = () => [...host.querySelectorAll("button")].filter((button) => button.textContent === "交給大家當提案" || button.textContent === "我知道了，仍要交給大家") as HTMLButtonElement[];
+    expect(give()).toHaveLength(1);
+    expect(host.textContent).toContain("家人討論");
+    expect(host.textContent).not.toContain("舊的群組");
+    await act(async () => { give()[0].click(); });
+    expect(writes).toEqual([]);
+    await act(async () => { give()[0].click(); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(writes).toEqual([{ path: "/groups/G1/collab/collab.proposal", method: "POST", body: { content: { express_draft: "D1", text: "AI 先整理了一句。" } } }]);
+    expect(host.textContent).toContain("已交給「家人討論」當提案");
     await done();
   });
 
