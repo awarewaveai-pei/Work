@@ -15,7 +15,7 @@ const GROUP = { group_id: "G1", name: "第三位合夥人", purpose: "decision",
     { identity_id: "I3", display_name: "丁", role: "participant", review_state: "pending_review" }] };
 const NO_AUTHORITY = { current: [], renegotiate: [] };
 const INSUFFICIENT = { insufficient: true, why: "還不夠看出誰跟誰不同", held: ["丁"], heaviest_left_out: false, without_heaviest: { insufficient: true, why: "還不夠看出誰跟誰不同" } };
-const KINDS = ["question", "position", "change", "interface_answers", "option", "stance", "reopen", "closing", "restatement", "confirm", "differences", "consequence", "review", "label", "place"];
+const KINDS = ["question", "position", "change", "interface_answers", "option", "stance", "reopen", "closing", "restatement", "confirm", "differences", "consequence", "review", "label", "place", "proposal"];
 const THEIRS = item("collab.position", "P2", { round: 1, text: "乙的立場：先談錢" });
 
 async function open(routes: Record<string, unknown> = {}) {
@@ -76,6 +76,16 @@ describe("COLLAB: one group's page", () => {
     expect(calls.filter((call) => call.method === "POST" && call.path.includes("revoke")).map((call) => call.path)).toEqual([`${C}/collab.authority/A2/revoke`]);
     expect(host.textContent).toContain("甲代表 乙、丙：談合約");
     expect(host.textContent).toContain("範圍要重新談");
+    await done();
+  });
+
+  it("lists a member's proposal as the words and who brought them, never the draft pointer into their case", async () => {
+    const { host, done } = await open({ [`${C}/collab.proposal`]: [item("collab.proposal", "PR1", { express_draft: "DRAFT-9", text: "先談錢。\n再談時間。" })] });
+    expect(byText(host, "h2", "提案")).toBeDefined();
+    expect(host.textContent).toContain("先談錢。");
+    expect(host.textContent).toContain("再談時間。");
+    expect(host.textContent).toContain("乙交來的提案");
+    expect(host.textContent).not.toContain("DRAFT-9");
     await done();
   });
 

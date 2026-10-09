@@ -18,6 +18,7 @@ type Answers = { round: number; answers: Array<{ q: string; text: string }> };
 type Option = { round: number; text: string; risks?: string; values_tradeoff?: string; evidence_refs?: unknown[] };
 type Stance = { option: string; stance: "同意" | "異議"; reason: string };
 type Closing = { why_end: string; reopen_if: string; review_on: string; owner: string };
+type Proposal = { express_draft?: string; text: string };   // express_draft points into the proposer's own case: never drawn
 
 export const BADGE = "這是程序工具。它不保證公平，也不保證大家真的同意。";
 export const WRITE_FIRST = "寫完，才看得到別人的";
@@ -29,7 +30,7 @@ type Loaded = {
   options: Array<Item<Option>>; stances: Array<Item<Stance>>; dissent: Dissent[]; authority: Authority; reopens: Array<Item<{ reason: string }>>;
   closings: Array<Item<Closing>>; restatements: Array<Item<{ about: string; position: string; text: string }>>; confirms: Array<Item<{ restatement: string; verdict: string }>>;
   differences: Array<Item<{ round: number; differences: string[] }>>; agreement: Agreement; consequences: Array<Item<{ decision: string; observed: string }>>;
-  reviews: Array<Item<{ text: string }>>; labels: Array<Item<{ label: string }>>; places: Array<Item<{ where: string }>>;
+  reviews: Array<Item<{ text: string }>>; labels: Array<Item<{ label: string }>>; places: Array<Item<{ where: string }>>; proposals: Array<Item<Proposal>>;
 };
 
 /** Blind kinds: only what I wrote until I wrote mine of the round, then everything I may read. */
@@ -56,15 +57,15 @@ export function CollabPage({ groupId }: { groupId: string }) {
     const [[positions, position], [changes, change], [answers, answered]] = await Promise.all([
       blind<Position>(groupId, "collab.position", round), blind<Change>(groupId, "collab.change", round), blind<Answers>(groupId, "collab.interface_answers", round)]);
     const versions = Object.fromEntries(await Promise.all(questions.map(async (item) => [item.doc_id, await collab.versions<{ text: string }>(groupId, "collab.question", item.doc_id)] as const)));
-    const [options, stances, dissent, authority, reopens, closings, restatements, confirms, differences, agreement, consequences, reviews, labels, places] = await Promise.all([
+    const [options, stances, dissent, authority, reopens, closings, restatements, confirms, differences, agreement, consequences, reviews, labels, places, proposals] = await Promise.all([
       collab.list<Option>(groupId, "collab.option"), collab.list<Stance>(groupId, "collab.stance"), collab.dissent(groupId), collab.authority(groupId),
       collab.list<{ reason: string }>(groupId, "collab.reopen"), collab.list<Closing>(groupId, "collab.closing"),
       collab.list<{ about: string; position: string; text: string }>(groupId, "collab.restatement"), collab.list<{ restatement: string; verdict: string }>(groupId, "collab.confirm"),
       collab.list<{ round: number; differences: string[] }>(groupId, "collab.differences"), collab.agreement(groupId),
       collab.list<{ decision: string; observed: string }>(groupId, "collab.consequence"), collab.list<{ text: string }>(groupId, "collab.review"),
-      collab.list<{ label: string }>(groupId, "collab.label"), collab.list<{ where: string }>(groupId, "collab.place")]);
+      collab.list<{ label: string }>(groupId, "collab.label"), collab.list<{ where: string }>(groupId, "collab.place"), collab.list<Proposal>(groupId, "collab.proposal")]);
     setData({ group, round, questions, versions, positions, changes, answers, wrote: { position, change, answers: answered }, options, stances, dissent, authority,
-      reopens, closings, restatements, confirms, differences, agreement, consequences, reviews, labels, places });
+      reopens, closings, restatements, confirms, differences, agreement, consequences, reviews, labels, places, proposals });
   };
   useEffect(() => { load().catch((reason) => setError(humanError(reason))); }, [groupId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -181,6 +182,20 @@ export function CollabPage({ groupId }: { groupId: string }) {
           </div>
         ))}
       </div>
+
+      {data.proposals.length > 0 && (
+        <div className="card">
+          <h2>提案</h2>
+          <div className="mcards">
+            {data.proposals.map((item) => (
+              <div key={item.doc_id} className="mcard">
+                {item.content.text.split("\n").filter((line) => line.trim()).map((line, index) => <p key={index} className="mt0">{line}</p>)}
+                <p className="sub mt0">{item.who}交來的提案</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <h2>方案（並排，不排先後）</h2>
