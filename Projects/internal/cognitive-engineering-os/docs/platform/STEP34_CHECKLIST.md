@@ -41,16 +41,25 @@
 - [x] The CSV importer maps operator-selected headers, writes drafts, preserves empty stop-signal cells as empty lists, reports those rows, and never calls a network client.
 - [x] card 60b: facilitator course has three draft lessons for leading, the fixed FACIL_DONTS, and escalation to GOVERN; the TEACH loader and completion shape accept the special `facilitator` course.
 - [ ] Showing `FACIL_DONTS` on screen the whole time someone leads belongs to the later FACILITATE page card; this card supplies the list.
+- built (card 61): kinds `facilitate.log` (person, user: `group_id`, `script`, `script_version`, `followed`, `deviated [{what, why}]`), `facilitate.supervision` (person, user, the supervisor's: `supervisee`, `feedback`), `facilitate.supervision_link` (platform-owned like an appeal: `supervisee`, `supervisor`, `assigned_by` self|unit, `group_id` for unit); `assembler.intake.led_by` {facilitator_identity_id} (one field in S's `kinds/assembler.py`). `script` is a field the card's shape lacks: a version means nothing without the script it belongs to.
+- built: 「上完課才能帶、督導要受過訓也帶過」 -- eligibility is DERIVED in `visibility.py` on every call, never cached: `is_eligible_facilitator` = a `teach.completion` of the facilitator course AND a live `teach.run` for each lesson and version it names (deleting a run ends it); `is_eligible_supervisor` = that + one `facilitate.log` of their own (existence only). The `facilitator` role is set only by `IdentityStore.accept_invite` for a signed-in identity that is eligible then (`GROUP_FACILITATOR_NOT_TRAINED`, 403; a visitor's new account never is; nothing is created). `shared_with(..., "facilitator")` returns nothing for a leader who stopped being eligible.
+- built: 「督導可以自己找或單位指派；系統查有沒有上完課、有沒有帶過，不看內容」 -- the link is the leader's (`POST /facilitate/supervisors {email}`) or the unit group's convener's (`POST /groups/{id}/facilitate/assignments`); it stands only while its supervisor is an eligible supervisor AND whoever made it may (self: the leader wrote it; unit: a confirmed convener of that group, the leader still a facilitator there) -- decided again on every read (`visibility._supervised_links`). The supervisor reads the supervisee's `facilitate.log` and the appeals about them (masked, `appeals_for`; card 30's skipped test now runs) and nothing else; a leader who is not theirs, a participant and a missing id all answer the same 404. Feedback is saved only by an eligible supervisor about someone they supervise now.
+- built: 「參與者同意給你看的部分」「看哪些案子是你帶的」 -- `GET /groups/{id}/facilitate/consented` is `shared_with(..."facilitator")` only, listed by who consented (a participant who shared nothing is listed with nothing); `led_cases` reads the fact that a case's intake names the leader, for people in a group they lead, never a word of the intake.
+- built: 「參與者要停」 -- `POST /groups/{id}/facilitate/stop` gives GOVERN's lines for the named participant's place (read in `visibility.help_for_member`, never returned), or the general lines with no one named; help is never held back for a leader's training.
+- built: 「做研究時，你和那幾位參與者都同意，偏離原則的部分才交給 GOVERN」 -- `block_hooks/facilitate.py` `drift_records`: only `deviated` (+ script and version), only when the leader and every current participant of the log's group consented; the exporter calls it.
+- DECISION: 「督導的回饋存在你這裡」 -- following card 61 and §11 the feedback is the SUPERVISOR's person record (not attached to any participant's case), read by its subject through `GET /facilitate/feedback` via the links that name them; it goes with the supervisor's account, not the leader's.
+- NOT YET: 「交出去的危機（只記哪一類、交給誰、什麼時候）」 in the log -- §11's frozen log shape has no field for it; adding one is a shape decision.
+- NOT YET: the participant's control that sets `led_by` -- the case's intake route stores it (checked: exactly one identity id), `IntakePage.tsx` is S's and has no control; a facilitator learns of a case only through `led_cases`.
+- NOT YET: a supervisor cannot refuse being named; the link is the leader's or the unit's word.
 
 ## GOVERN (cards 30-33)
 
 - 30 appeals: `govern.appeal` (platform-owned, anonymous by default), `visibility.appeals_for` (author / appeal_handler /
   supervisor / nobody else), `/me/appeals` + `/govern/appeals`; account erasure removes the appeals its person wrote.
-  - Not built: the supervisor reader class (`visibility._supervisees` is empty until card 61 makes `facilitate.supervision`
-    real; its test is skipped with reason "card 61").
+  - Built in card 61: the supervisor reader class (`visibility._supervisees` from `facilitate.supervision_link`); the test that was skipped runs.
 - 31 research export: `platform/research_export.py` + CLI `apps/cli/research_export.py` + migration `0007_research_exports.py`
   (COLLAB takes 0008). No web route.
-  - Not built: FACILITATE drift records are read only once card 61 registers `facilitate.log` (tested with a stand-in).
+  - Built in card 61: `facilitate.log` is registered; the exporter takes the drift part from `drift_records` (the stand-in kind in the test is gone).
 - 32 no record, resources per place, audit line: `assembler.intake.no_record`; `POST /projects/{id}/govern/close` (no close
   action existed before; it erases a 不留紀錄 case, and every erase of such a case leaves no tombstone);
   `platform/resources/` (台灣 + 國際通用, versioned, sourced); `GET /projects/{id}/govern/used`.

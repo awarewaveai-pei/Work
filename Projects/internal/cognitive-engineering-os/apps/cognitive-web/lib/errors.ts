@@ -193,6 +193,18 @@ const CODES: Record<string, string> = {
   COLLAB_RESTATEMENT_NOT_FOUND: "找不到這段轉述，可能還在等本人確認，或已經刪掉了。",
   COLLAB_CONFIRM_SUBJECT_ONLY: "轉述說得對不對，只有被轉述的本人可以回答。",
   ACCOUNT_IS_LAST_CONVENER: "你是某個群組唯一的召集人。請先讓另一位成員也當召集人，或刪除那個群組，再刪除帳號。這次什麼都沒刪。",
+  // FACILITATE
+  GROUP_FACILITATOR_NOT_TRAINED: "要先上完帶領者的課，才能當這個群組的帶領者。上完課之後，再打開一次邀請連結。",
+  FACILITATE_LEADER_ONLY: "這一頁只給這個群組的帶領者。",
+  FACILITATE_LOG_NOT_LEADER: "只有這個群組的帶領者，可以寫這個群組的帶領紀錄。",
+  FACILITATE_LOG_EMPTY: "請寫照帶領稿做了哪些，或哪裡沒照稿、為什麼。",
+  FACILITATE_DEVIATION_INVALID: "沒照稿的地方，每一項都要寫「哪裡」和「為什麼」，最多 30 項。",
+  FACILITATE_SCRIPT_VERSION_UNKNOWN: "這份帶領稿的版本已經變了，請重新整理頁面再選一次。",
+  FACILITATE_SUPERVISOR_NOT_FOUND: "找不到這位督導。督導要上完帶領者的課，也要帶過至少一次。",
+  FACILITATE_SUPERVISOR_NOT_ELIGIBLE: "你還不能當督導：要上完帶領者的課，也要帶過至少一次。",
+  FACILITATE_SUPERVISEE_NOT_FOUND: "找不到你督導的這個人。",
+  FACILITATE_LINK_NOT_FOUND: "找不到這個督導連結，或它不是你設的。",
+  FACILITATE_LED_BY_INVALID: "「誰帶的」只能選一位帶領者，不能寫別的字。",
   // GATHER
   GATHER_ORIGIN_NOT_FOUND: "這一組現在不在了（網頁重新分過組）。請重新整理頁面，標新的組。",
   GATHER_ORIGIN_PENDING: "這一頁還在分組，分好之後再標。",

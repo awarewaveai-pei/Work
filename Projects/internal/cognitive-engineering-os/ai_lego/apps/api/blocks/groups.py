@@ -44,7 +44,7 @@ HELD_FOR_CONVENER = "這個帳號還在等你確認：同一個人在一天內�
 
 
 def _status(text: str) -> int:
-    if text.startswith(("GROUP_CONVENER_ONLY", "GROUP_INVITE_NOT_ALLOWED")):
+    if text.startswith(("GROUP_CONVENER_ONLY", "GROUP_INVITE_NOT_ALLOWED", "GROUP_FACILITATOR_NOT_TRAINED")):
         return 403
     if text.startswith(("GROUP_MEMBER_NOT_FOUND", "GROUP_INVITE_NOT_FOUND")):
         return 404

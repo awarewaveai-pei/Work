@@ -1,7 +1,9 @@
 """The only ways to read another person's record (docs/platform/STEP34_SHARED_RULES.md §3), so a leak has one place to
 be found. R1 ``visible``: a group's records. R2 ``shared_with``: documents of another person's case, through their live
 consent. R3, a person's own case and person records, stays with the routes that check the owner. ``appeals_for`` (§9):
-the platform's appeals, with who wrote them masked.
+the platform's appeals, with who wrote them masked. R4 (FACILITATE, card 61): a supervisor reads the logs of the leaders
+they supervise now, a leader reads the feedback written about them -- both through ``facilitate.supervision_link`` records
+whose standing is decided again on every read, never cached; so is eligibility (``is_eligible_*``).
 
 CaseDocs refuses to read a group's records any other way (``current`` / ``versions`` with a group owner); its
 ``current_in_group`` / ``versions_in_group`` are called from this module only (tests/unit/test_visibility.py).
@@ -18,7 +20,9 @@ from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
+from ai_lego.platform import safety
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.platform.lessons import FACILITATOR_COURSE
 
 
 # ``subject_confirmed`` (COLLAB's restatement, §7): an AI's words about one member's record are that member's first (the
@@ -52,15 +56,28 @@ def is_appeal_handler(store: IdentityStore, viewer: Viewer) -> bool:
     return store.has_role(viewer.tenant_id, viewer.identity_id, "appeal_handler")
 
 
-def is_eligible_facilitator(viewer: Viewer) -> bool:
-    """Derived from a teach.completion of the facilitator course (§5) -- built by card 60. Until then it refuses to
-    answer, so nothing passes on a guess."""
-    raise NotImplementedError("is_eligible_facilitator: derived from teach.completion records, built by card 60")
+FACILITATE_LOG = "facilitate.log"
+SUPERVISION_LINK = "facilitate.supervision_link"
 
 
-def is_eligible_supervisor(viewer: Viewer) -> bool:
-    """Facilitator + at least one facilitate.log (§5) -- built by card 60; refuses to answer until then."""
-    raise NotImplementedError("is_eligible_supervisor: derived from facilitate.log records, built by card 60")
+def is_eligible_facilitator(docs: CaseDocs, viewer: Viewer) -> bool:
+    """§5, derived from the person's records on every call, never cached: a ``teach.completion`` of the facilitator course
+    exists and a ``teach.run`` is still there for each lesson (and version) it names -- deleting a run takes it away.
+    Only the fact leaves: no run's notes do."""
+    owner = record_log.person(viewer.identity_id)
+    for completion in docs.current(viewer.tenant_id, owner, "teach.completion"):
+        named = completion["content"].get("lesson_versions") or {}
+        if completion["content"].get("course") != FACILITATOR_COURSE or not named:
+            continue
+        done = {(run["content"].get("lesson"), run["content"].get("lesson_version")) for run in docs.current(viewer.tenant_id, owner, "teach.run")}
+        if all((lesson, version) in done for lesson, version in named.items()):
+            return True
+    return False
+
+
+def is_eligible_supervisor(docs: CaseDocs, viewer: Viewer) -> bool:
+    """Facilitator + at least one ``facilitate.log`` of their own (§5): existence only, never what a log says."""
+    return is_eligible_facilitator(docs, viewer) and bool(docs.current(viewer.tenant_id, record_log.person(viewer.identity_id), FACILITATE_LOG))
 
 
 def visible(docs: CaseDocs, viewer: Viewer, group_id: str, kind: str, *, doc_id: str | None = None) -> list[dict[str, Any]]:
@@ -156,7 +173,7 @@ def shared_with(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer, g
             return []
         sharers = [member["identity_id"] for member in repo.group_members(tenant_id, grantee_id) if member["identity_id"] != viewer.identity_id]
     elif grantee_kind == "facilitator":
-        if grantee_id != viewer.identity_id:
+        if grantee_id != viewer.identity_id or not is_eligible_facilitator(docs, viewer):   # a leader who stopped being trained reads nothing more
             return []
         sharers = repo.facilitated_by(tenant_id, viewer.identity_id)
     else:
@@ -195,10 +212,126 @@ APPEAL = "govern.appeal"
 MASKED_KEYS = ("doc_id", "group_id", "about_identity_id", "text", "named", "on")
 
 
+def _authority_stands(docs: CaseDocs, tenant_id: str, link: dict[str, Any]) -> bool:
+    """Who made the link may still make it. Self: the leader themself wrote it. Unit: its writer is a confirmed convener of
+    the unit's group and the leader is a facilitator of it, both as they are now (leaving or an erased group ends it)."""
+    content, writer = link["content"], link["written_by"]
+    if content["supervisee"] == content["supervisor"]:
+        return False
+    if content["assigned_by"] == "self":
+        return writer == content["supervisee"]
+    group_id = content.get("group_id")
+    if not group_id:
+        return False
+    by = docs.reads.membership(tenant_id, group_id, writer)
+    leader = docs.reads.membership(tenant_id, group_id, content["supervisee"])
+    return (by is not None and by["my_role"] == "convener" and by["my_review_state"] == "confirmed"
+            and leader is not None and leader["my_role"] == "facilitator")
+
+
+def _supervised_links(docs: CaseDocs, viewer: Viewer) -> list[dict[str, Any]]:
+    """The links that make the viewer someone's supervisor now. Whether they are still an eligible supervisor is asked
+    again on every call (§5; the link says who, never that they still qualify)."""
+    named = [link for link in docs.current_on_platform(viewer.tenant_id, SUPERVISION_LINK) if link["content"]["supervisor"] == viewer.identity_id]
+    if not named or not is_eligible_supervisor(docs, viewer):
+        return []
+    return [link for link in named if _authority_stands(docs, viewer.tenant_id, link)]
+
+
 def _supervisees(docs: CaseDocs, viewer: Viewer) -> set[str]:
-    """Whom this viewer supervises (``facilitate.supervision``, §9) -- card 61 makes it real. Until then nobody, so a
-    supervisor reads no appeal yet: never wider than built."""
-    return set()
+    """Whom this viewer supervises right now (§9): appeals about them are the viewer's to read, masked."""
+    return {link["content"]["supervisee"] for link in _supervised_links(docs, viewer)}
+
+
+def supervises(docs: CaseDocs, viewer: Viewer, supervisee_id: str) -> bool:
+    return supervisee_id in _supervisees(docs, viewer)
+
+
+def supervisees(docs: CaseDocs, viewer: Viewer) -> list[dict[str, str]]:
+    """R4 (supervisor): the leaders the viewer supervises now and how each came (self, or the unit's group)."""
+    return [{"supervisee": link["content"]["supervisee"], "assigned_by": link["content"]["assigned_by"], "group_id": link["content"].get("group_id", "")}
+            for link in _supervised_links(docs, viewer)]
+
+
+def supervisee_logs(docs: CaseDocs, viewer: Viewer, supervisee_id: str) -> list[dict[str, Any]] | None:
+    """R4: the ``facilitate.log`` records of one leader the viewer supervises now -- nothing else of that person's. None for
+    anyone else, a person who does not exist included: the caller answers all of them alike."""
+    if not supervises(docs, viewer, supervisee_id):
+        return None
+    return docs.current(viewer.tenant_id, record_log.person(supervisee_id), FACILITATE_LOG)
+
+
+def supervisors_of(docs: CaseDocs, viewer: Viewer) -> list[dict[str, Any]]:
+    """The viewer's own links as the leader, standing or not: who, how it came, and whether it stands now (the supervisor
+    is an eligible supervisor and whoever made it may). The leader sees this about their own supervision only."""
+    found = []
+    for link in docs.current_on_platform(viewer.tenant_id, SUPERVISION_LINK):
+        content = link["content"]
+        if content["supervisee"] == viewer.identity_id:
+            stands = is_eligible_supervisor(docs, Viewer(viewer.tenant_id, content["supervisor"])) and _authority_stands(docs, viewer.tenant_id, link)
+            found.append({"doc_id": link["doc_id"], "supervisor": content["supervisor"], "assigned_by": content["assigned_by"], "group_id": content.get("group_id", ""),
+                          "stands": stands, "written_by_me": link["written_by"] == viewer.identity_id})
+    return found
+
+
+def unit_assignments(docs: CaseDocs, viewer: Viewer, group_id: str) -> list[dict[str, Any]]:
+    """The links a group's unit made: to its convener (all of them, to take back) and to the leader each names (their own).
+    Nobody else of the group reads them."""
+    membership = _membership(docs, viewer, group_id)
+    if membership is None or membership["my_review_state"] != "confirmed":
+        return []
+    convener = membership["my_role"] == "convener"
+    return [{"doc_id": link["doc_id"], "supervisee": link["content"]["supervisee"], "supervisor": link["content"]["supervisor"], "written_by_me": link["written_by"] == viewer.identity_id,
+             "stands": is_eligible_supervisor(docs, Viewer(viewer.tenant_id, link["content"]["supervisor"])) and _authority_stands(docs, viewer.tenant_id, link)}
+            for link in docs.current_on_platform(viewer.tenant_id, SUPERVISION_LINK)
+            if link["content"]["assigned_by"] == "unit" and link["content"].get("group_id") == group_id and (convener or link["content"]["supervisee"] == viewer.identity_id)]
+
+
+def existing_link(docs: CaseDocs, tenant_id: str, content: dict[str, Any]) -> str | None:
+    """The id of the live link with exactly these parts, if one is there (a second is not made). Ids only."""
+    return next((link["doc_id"] for link in docs.current_on_platform(tenant_id, SUPERVISION_LINK)
+                 if all(link["content"].get(key, "") == content.get(key, "") for key in ("supervisee", "supervisor", "assigned_by", "group_id"))), None)
+
+
+def feedback_for(docs: CaseDocs, viewer: Viewer) -> list[dict[str, Any]]:
+    """R4 (supervisee): the feedback written about the viewer -- only theirs, found through the links that name them as the
+    supervisee; a supervisor's other records, and their feedback on anyone else, stay theirs."""
+    supervisors = sorted({link["content"]["supervisor"] for link in docs.current_on_platform(viewer.tenant_id, SUPERVISION_LINK) if link["content"]["supervisee"] == viewer.identity_id})
+    return [{"doc_id": item["doc_id"], "supervisor": supervisor, "feedback": item["content"]["feedback"], "at": item["at"]}
+            for supervisor in supervisors for item in docs.current(viewer.tenant_id, record_log.person(supervisor), "facilitate.supervision")
+            if item["content"]["supervisee"] == viewer.identity_id]
+
+
+def led_cases(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer) -> list[dict[str, str]]:
+    """The fact that a case names the viewer as its leader (``assembler.intake.led_by``) -- the case and its owner, never a
+    word of the intake -- for people in a group where the viewer leads now (R2's rule), while the viewer is an eligible
+    facilitator. What those people shared is read through ``shared_with``, not here."""
+    if not is_eligible_facilitator(docs, viewer):
+        return []
+    people = set(repo.facilitated_by(viewer.tenant_id, viewer.identity_id))
+    found = []
+    for project in repo.list_projects(viewer.tenant_id):
+        if project["created_by_identity_id"] not in people:
+            continue
+        intake = docs.current(viewer.tenant_id, record_log.case(project["project_id"]), "assembler.intake")
+        if intake and (intake[-1]["content"].get("led_by") or {}).get("facilitator_identity_id") == viewer.identity_id:
+            found.append({"project_id": project["project_id"], "owner_identity_id": project["created_by_identity_id"]})
+    return found
+
+
+def help_for_member(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer, group_id: str, member_id: str) -> dict[str, Any] | None:
+    """GOVERN's help for where one member of a group is, asked by the group's facilitator when that member wants to stop
+    (help is never held back for a leader's training). The place is read here from the member's own records and never
+    leaves: only the lines of help do. None unless the viewer leads the group now and the member is in it."""
+    leader, member = repo.get_group_for(viewer.tenant_id, group_id, viewer.identity_id), repo.get_group_for(viewer.tenant_id, group_id, member_id)
+    if leader is None or leader["my_role"] != "facilitator" or leader["my_review_state"] != "confirmed" or member is None:
+        return None
+    placed = [item for item in docs.current_in_group(viewer.tenant_id, group_id, "collab.place") if item["written_by"] == member_id]
+    where = placed[-1]["content"]["where"] if placed else None
+    if where is None:
+        saved = docs.current(viewer.tenant_id, record_log.person(member_id), "govern.location")
+        where = saved[-1]["content"]["where"] if saved else None
+    return safety.help_for(where)
 
 
 def appeals_for(docs: CaseDocs, store: IdentityStore, viewer: Viewer) -> list[dict[str, Any]]:

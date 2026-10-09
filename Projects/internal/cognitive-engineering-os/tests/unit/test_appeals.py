@@ -4,7 +4,6 @@ P1 P2, an appeal handler H and an outsider X, each signed in on their own client
 from __future__ import annotations
 
 import json
-import unittest
 import uuid
 
 from fastapi.testclient import TestClient
@@ -15,7 +14,9 @@ from ai_lego.data.repositories.project_source_repository import ProjectSourceRep
 from ai_lego.platform import visibility
 from ai_lego.platform.erasure import Erasure
 from ai_lego.platform.identity.store import IdentityStore
+from ai_lego.platform.scripts import load_scripts
 from tests.pg import dump
+from tests.unit.facilitator_fixture import make_eligible
 from tests.unit.test_api_main import ApiTestCase
 
 PASSWORD = "correct-horse-battery"
@@ -32,7 +33,7 @@ class AppealCase(ApiTestCase):
         self.group = self.client.post("/groups", json={"name": "工作坊", "purpose": "workshop"}).json()["group_id"]
         self.ids: dict[str, str] = {}
         self.clients: dict[str, TestClient] = {}
-        for name, role in (("F", "facilitator"), ("P1", "participant"), ("P2", "participant"), ("H", None), ("X", None)):
+        for name, role in (("F", "facilitator"), ("P1", "participant"), ("P2", "participant"), ("H", None), ("X", None), ("S", None)):
             self.ids[name] = self.store.create_identity(str(uuid.uuid4()), self.tenant_id, f"{name.lower()}-{uuid.uuid4().hex[:6]}@example.com", f"名字{name}", PASSWORD)["identity_id"]
             if role:
                 with self.databases.for_tenant(self.tenant_id) as connection:
@@ -94,9 +95,28 @@ class WhoReadsAnAppealTests(AppealCase):
                 self.reads_nothing(name, doc_id)
         self.assertEqual(self.client.get("/govern/appeals").json(), [])   # the convener too
 
-    @unittest.skip("card 61: supervision links (facilitate.supervision) are built there; visibility._supervisees is empty until then")
     def test_the_supervisor_of_the_facilitator_reads_it_masked(self):
-        self.fail("card 61")
+        """S has finished the leader course and led once (a log); F names S as their supervisor; only then does S read it."""
+        made = self.appeal()
+        doc_id = made.json()["doc_id"]
+        other = self.client.post("/groups", json={"name": "帶領者交流", "purpose": "workshop"}).json()["group_id"]
+        with self.databases.for_tenant(self.tenant_id) as connection:
+            ProjectSourceRepository.add_member(connection, self.tenant_id, other, self.ids["S"], "facilitator")
+        make_eligible(CaseDocs(self.repo), self.tenant_id, self.ids["S"])
+        script = load_scripts().items[0]
+        log = self.as_("S").post("/me/docs/facilitate.log", json={"content": {"group_id": other, "script": script["id"], "script_version": script["version"], "followed": "照稿"}})
+        self.assertEqual(log.status_code, 200, log.text)
+        self.reads_nothing("S", doc_id)   # eligible, but nobody named S yet
+        named = self.as_("F").post("/facilitate/supervisors", json={"email": self.store.get_identity(self.ids["S"])["email"]})
+        self.assertEqual(named.status_code, 200, named.text)
+        [seen] = self.as_("S").get("/govern/appeals").json()
+        self.assertEqual(set(seen), set(visibility.MASKED_KEYS))
+        self.assertEqual((seen["doc_id"], seen["text"], seen["about_identity_id"], seen["named"]), (doc_id, "帶領的人一直打斷我", self.ids["F"], False))
+        for trace in (self.ids["P1"], self.store.get_identity(self.ids["P1"])["email"], "名字P1"):
+            self.assertNotIn(trace, json.dumps(seen, ensure_ascii=False))
+        self.assertEqual(self.as_("S").get(f"/govern/appeals/{doc_id}").status_code, 200)
+        self.assertEqual(self.as_("S").get("/me/appeals").json(), [])   # not S's own
+        self.reads_nothing("F", doc_id)   # the facilitator it is about still reads nothing, whoever supervises them
 
 
 class TheAuthorsAppealTests(AppealCase):

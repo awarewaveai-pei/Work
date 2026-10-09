@@ -34,6 +34,7 @@ REVIEWED_OWNER_USES = {
     ("apps/api/blocks/collab.py", "record_log.group(group_id)"): "_owner: called only after groups.member_group let the caller in (or, to delete, after visible() found their own record: G3)",
     ("apps/api/blocks/docs.py", "record_log.person(identity_id)"): "_where: called with the session's identity only (docs.py _save)",
     ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): "/me/docs/*: the signed-in person's own records",
+    ("apps/api/blocks/facilitate.py", "record_log.platform(session['tenant_id'])"): "_platform: a link is written (after the route's own checks) or taken back (CaseDocs: only its writer) -- never read here, visibility.py reads it",
     ("apps/api/blocks/govern.py", "record_log.person(session['identity_id'])"): "/govern/help: the signed-in person's own saved place",
     ("apps/api/blocks/govern.py", "record_log.person(me)"): "/govern/export: me = the session's identity",
     ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): "_mine: /me/consents, the signed-in person's own consents",
@@ -42,12 +43,14 @@ REVIEWED_OWNER_USES = {
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): "_history: called with the session's identity only",
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): "learn.history save: the signed-in person's own",
     ("apps/api/blocks/teach.py", "record_log.person(session['identity_id'])"): "/blocks/teach/practice-cases: the signed-in person's own saved place",
+    ("platform/block_hooks/facilitate.py", "record_log.person(facilitator)"): "drift_records: a consenting facilitator's own logs, only the deviated part, only when every participant of the log's group consented too",
 }
 REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/act.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/collab.py", "record_log.group(group_id)"): 1,
     ("apps/api/blocks/docs.py", "record_log.person(identity_id)"): 1,
     ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): 5,
+    ("apps/api/blocks/facilitate.py", "record_log.platform(session['tenant_id'])"): 1,
     ("apps/api/blocks/govern.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/govern.py", "record_log.person(me)"): 1,
     ("apps/api/blocks/govern_group.py", "record_log.person(session['identity_id'])"): 1,
@@ -56,6 +59,7 @@ REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/learn.py", "record_log.person(identity_id)"): 1,
     ("apps/api/blocks/learn.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/teach.py", "record_log.person(session['identity_id'])"): 1,
+    ("platform/block_hooks/facilitate.py", "record_log.person(facilitator)"): 1,
 })
 # (c) Group kinds that keep visibility="members" without saying so. Empty: every group kind names its visibility.
 DEFAULT_VISIBILITY_ON_PURPOSE: set[str] = set()

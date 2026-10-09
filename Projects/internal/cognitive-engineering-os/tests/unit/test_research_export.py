@@ -13,18 +13,15 @@ from pathlib import Path
 
 from ai_lego import PRODUCT_ROOT
 from ai_lego.apps.cli import research_export as cli
-from ai_lego.core.domain.doc_kinds import DocKind, Field
 from ai_lego.data import db
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import research_export
-from tests.unit.test_groups_core import GroupCase, registered
+from tests.unit.test_groups_core import GroupCase
 
 STUDY = "s-2026"
 SECRET = {"COGNITIVE_OS_STUDY_SECRET_S_2026": "a-study-secret"}
-DRIFT = DocKind("facilitate.log", "FACILITATE", "帶領紀錄", {"group_id": Field("text", 200, required=True), "followed": Field("text", 500),
-                                                               "deviated": Field("json", 4000, shape="array")}, owner="person")
 PLACES = ("台南市安平區", "高雄市前鎮區", "東京都新宿", "花蓮縣秀林鄉", "新竹市東區")
 
 
@@ -33,9 +30,6 @@ class ExportCase(GroupCase):
 
     def setUp(self):
         super().setUp()
-        patcher = registered(DRIFT)
-        patcher.__enter__()
-        self.addCleanup(patcher.__exit__, None, None, None)
         self.folder = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.folder, True)
         self.cases = {who: self.open_case(who) for who in (self.b, self.c)}
@@ -161,7 +155,8 @@ class WhatIsLeftOutTests(ExportCase):
         facilitator = self.a   # the convener leads here; the group's participants are b and c
         with self.databases.for_tenant(self.tenant) as connection:
             connection.execute("UPDATE group_members SET role='facilitator' WHERE tenant_id=%s AND group_id=%s AND identity_id=%s", (self.tenant, self.group, facilitator))
-        self.docs.save(self.tenant, record_log.person(facilitator), "facilitate.log", {"group_id": self.group, "followed": "照稿", "deviated": [{"what": "跳過第二步", "why": "時間不夠"}]},
+        self.docs.save(self.tenant, record_log.person(facilitator), "facilitate.log",
+                       {"group_id": self.group, "script": "systems.iceberg_model", "script_version": 1, "followed": "照稿", "deviated": [{"what": "跳過第二步", "why": "時間不夠"}]},
                        record_log.user(facilitator, "FACILITATE"))
         self.docs.save(self.tenant, record_log.person(facilitator), "govern.consent", {"purpose": "research", "target": STUDY, "items": [], "follow_versions": True, "withdrawn": False},
                        record_log.user(facilitator, "GOVERN"))

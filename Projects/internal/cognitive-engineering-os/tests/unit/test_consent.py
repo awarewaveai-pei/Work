@@ -15,6 +15,7 @@ from ai_lego.data.repositories.project_source_repository import ProjectSourceRep
 from ai_lego.platform import visibility
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.visibility import Viewer
+from tests.unit.facilitator_fixture import make_eligible
 from tests.unit.test_api_main import ApiTestCase
 
 
@@ -148,9 +149,12 @@ class FacilitatorConsentTests(ConsentCase):
         self.assertEqual(self.seen(self.facilitator, "facilitator", self.facilitator), [])   # not in a group with me yet
         workshop = self.client.post("/groups", json={"name": "工作坊", "purpose": "workshop"}).json()["group_id"]
         self.join(workshop, self.facilitator, "facilitator")
+        self.assertEqual(self.seen(self.facilitator, "facilitator", self.facilitator), [])   # not trained (card 61): reads nothing
+        make_eligible(self.docs, self.tenant_id, self.facilitator)
         self.assertEqual(self.seen(self.facilitator, "facilitator", self.facilitator), [(self.shared, "分享的卡")])
         self.assertEqual(self.seen(self.viewer, "facilitator", self.facilitator), [])   # someone else asking as them
         self.join(workshop, self.outsider, "facilitator")
+        make_eligible(self.docs, self.tenant_id, self.outsider)
         self.assertEqual(self.seen(self.outsider, "facilitator", self.outsider), [])     # a facilitator not named
 
 
@@ -170,8 +174,3 @@ class RoleTests(ConsentCase):
         writers = [f"{path.name}:{number}" for path in api.rglob("*.py") for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
                    if "identity_roles" in line or "grant_role(" in line or "revoke_role(" in line]
         self.assertEqual(writers, [])
-
-    def test_derived_eligibility_refuses_to_answer_until_it_is_built(self):
-        for check in (visibility.is_eligible_facilitator, visibility.is_eligible_supervisor):
-            with self.assertRaisesRegex(NotImplementedError, "card 60"):
-                check(Viewer(self.tenant_id, self.viewer))

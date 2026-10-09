@@ -222,6 +222,11 @@ class IdentityStore:
             row = conn.execute("SELECT identity_id, tenant_id, email, display_name, status, created_at FROM identity WHERE tenant_id = %s AND email = %s", (tenant_id, email.lower())).fetchone()
         return dict(row) if row else None
 
+    def identity_by_email(self, tenant_id: str, email: str) -> dict[str, Any] | None:
+        """A live person of this tenant by their address (the leader naming a supervisor): None for no one, a deleted account too."""
+        found = self._find_identity_by_email(tenant_id, email)
+        return found if found is not None and found["status"] == "active" else None
+
     # -- Authentication -------------------------------------------------------------
 
     def authenticate(self, tenant_id: str, email: str, password: str) -> str | None:
@@ -668,6 +673,8 @@ class IdentityStore:
             if invite is None or invite["used_at"] is not None or invite["revoked_at"] is not None or now >= _instant(invite["expires_at"]):
                 raise InvariantViolation(self.INVITE_REFUSED)
             inviter = invite["inviter_identity_id"]
+            if invite["role"] == "facilitator" and (visitor is not None or not self._finished_leader_course(tenant_id, identity["identity_id"])):
+                raise InvariantViolation("GROUP_FACILITATOR_NOT_TRAINED: only someone who has finished the leader course can be a facilitator")   # a new account never has
             if visitor is not None:   # a savepoint of this transaction (db: one connection per thread): it goes if anything after fails
                 joining = self.create_identity(str(uuid4()), tenant_id, visitor["email"], visitor["display_name"], visitor["password"])["identity_id"]
                 conn.execute("UPDATE identity SET invited_by = %s WHERE tenant_id = %s AND identity_id = %s", (inviter, tenant_id, joining))
@@ -683,6 +690,13 @@ class IdentityStore:
                             (now, joining, tenant_id, invite["invite_id"])).rowcount != 1:
                 raise InvariantViolation(self.INVITE_REFUSED)
         return {"group_id": invite["group_id"], "identity_id": joining, "review_state": state}
+
+    def _finished_leader_course(self, tenant_id: str, identity_id: str) -> bool:
+        """§5: the facilitator role is derived from records (platform/visibility.py), asked at the moment it would be set."""
+        from ai_lego.data.repositories.case_docs import CaseDocs   # local: both import this module
+        from ai_lego.platform import visibility
+
+        return visibility.is_eligible_facilitator(CaseDocs(ProjectSourceRepository(self._db)), visibility.Viewer(tenant_id, identity_id))
 
     def confirm_member(self, tenant_id: str, group_id: str, convener_identity_id: str, identity_id: str) -> None:
         """A convener lets a held member read the others' records and count in the group's agreement."""

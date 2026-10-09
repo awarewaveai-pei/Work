@@ -25,16 +25,16 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
 
-from ai_lego.core.domain import doc_kinds
 from ai_lego.data import db
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform import visibility
+from ai_lego.platform.block_hooks.facilitate import drift_records
 
 CONSENT = "govern.consent"
-DRIFT_KIND = "facilitate.log"   # card 61's; until it is registered no drift record exists
+DRIFT_KIND = "facilitate.log"
 SECRET_ENV_PREFIX = "COGNITIVE_OS_STUDY_SECRET_"
 
 HEADER_ZH = "這份檔案拿掉了帳號和三個地點（發生地、你在哪裡、當事人各在哪裡）；不保證認不出是誰。內文裡的人名沒有拿掉。"
@@ -156,20 +156,11 @@ def _withdrawals_since(consents: list[tuple[str, list[dict[str, Any]]]], study_i
 
 
 def _drift(docs: CaseDocs, repo: ProjectSourceRepository, tenant_id: str, consenting: set[str], secret: bytes) -> tuple[list[dict[str, Any]], list[str]]:
-    """The drift records of consenting facilitators whose groups' current participants all consent (else excluded)."""
-    if DRIFT_KIND not in doc_kinds.kinds():
-        return [], []
-    lines, excluded = [], []
-    for facilitator in sorted(consenting):
-        for record in docs.current(tenant_id, record_log.person(facilitator), DRIFT_KIND):
-            group_id = str(record["content"].get("group_id", ""))
-            members = repo.group_members(tenant_id, group_id) if group_id else []
-            participants = {member["identity_id"] for member in members if member["role"] == "participant"}
-            if not members or not participants <= consenting:
-                excluded.append("not_all_consented")
-                continue
-            lines.append({"type": "drift", "subject": _pseudonym(secret, "identity", facilitator), "group": _pseudonym(secret, "group", group_id),
-                          "kind": DRIFT_KIND, "version": record["version"], "content": scrub({key: value for key, value in record["content"].items() if key != "group_id"})})
+    """The drift records of consenting facilitators whose groups' current participants all consent (else excluded): which
+    logs, and which part of each, is FACILITATE's rule (block_hooks/facilitate.py ``drift_records``)."""
+    records, excluded = drift_records(docs, repo, tenant_id, consenting)
+    lines = [{"type": "drift", "subject": _pseudonym(secret, "identity", record["facilitator"]), "group": _pseudonym(secret, "group", record["group_id"]),
+              "kind": DRIFT_KIND, "version": record["version"], "content": scrub(record["content"])} for record in records]
     return lines, excluded
 
 
