@@ -21,8 +21,14 @@ if [[ "${1:-}" == "--all" ]]; then
   echo "== 1/2 unittest: full image suite (checkout-only list excluded explicitly) =="
   COS_FULL_SUITE=1 python scripts/image_test_modules.py --image || fail=1  # the full-suite opt-in (image_test_modules.py, tests/__init__.py)
 elif [[ $# -gt 0 ]]; then
-  echo "== 1/2 unittest: $# affected module(s) =="
-  python -m unittest "$@" -q || fail=1
+  echo "== 1/2 unittest: $# affected module(s) (checkout-only ones left out: scripts/image_test_modules.py) =="
+  selected="$(python scripts/image_test_modules.py --select "$@")" || fail=1
+  if [[ -n "$selected" ]]; then
+    # shellcheck disable=SC2086  # selected is one dotted module name per line
+    python -m unittest $selected -q || fail=1
+  else
+    echo "no affected module the image can run"
+  fi
 else
   echo "== 1/2 unittest: no affected module =="
 fi

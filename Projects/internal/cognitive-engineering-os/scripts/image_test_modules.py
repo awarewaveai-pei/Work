@@ -17,8 +17,10 @@ import sys
 CHECKOUT_ONLY_TEST_MODULES = frozenset(
     {
         "tests.unit.test_block_act",
+        "tests.unit.test_block_collab",
         "tests.unit.test_block_compute",
         "tests.unit.test_block_decide",
+        "tests.unit.test_block_express",
         "tests.unit.test_block_foundation",
         "tests.unit.test_block_gather",
         "tests.unit.test_block_govern",
@@ -30,8 +32,11 @@ CHECKOUT_ONLY_TEST_MODULES = frozenset(
         "tests.unit.test_cognitive_db_ops",
         "tests.unit.test_collect_lookups",
         "tests.unit.test_collector_wire_v2",
+        "tests.unit.test_facilitate_content",
+        "tests.unit.test_go_live_guards",
         "tests.unit.test_integrity",
         "tests.unit.test_step2_foundation",
+        "tests.unit.test_step34_checklist",
     }
 )
 
@@ -49,6 +54,12 @@ def image_test_modules(tests_root: Path) -> tuple[str, ...]:
     return tuple(module for module in all_test_modules(tests_root) if module not in CHECKOUT_ONLY_TEST_MODULES)
 
 
+def image_safe(modules: list[str]) -> tuple[list[str], list[str]]:
+    """(modules the image can run, modules left to the checkout job) of a named list -- the one filter scripts/test-gate.sh
+    applies to an affected-module run, so deploy.sh's host gate never runs a repository-file test inside the image."""
+    return [m for m in modules if m not in CHECKOUT_ONLY_TEST_MODULES], [m for m in modules if m in CHECKOUT_ONLY_TEST_MODULES]
+
+
 def checkout_test_modules(tests_root: Path) -> tuple[str, ...]:
     # This is deliberately a fixed manifest: a newly added repository-file test
     # must be reviewed into this list instead of silently moving between jobs.
@@ -59,7 +70,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", action="store_true", help="run tests whose repository reads are copied into the image")
     parser.add_argument("--checkout", action="store_true", help="run the explicit checkout-only test list")
+    parser.add_argument("--select", nargs="+", metavar="MODULE", help="print the named modules the image can run, one per line; name the rest on stderr")
     args = parser.parse_args()
+    if args.select:
+        runnable, left_out = image_safe(args.select)
+        if left_out:
+            print("checkout-only (run by the checkout job in GitHub, not in the image): " + " ".join(left_out), file=sys.stderr)
+        print("\n".join(runnable))
+        return 0
     if args.image == args.checkout:
         parser.error("choose exactly one of --image or --checkout")
 
