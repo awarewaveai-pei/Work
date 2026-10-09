@@ -38,4 +38,12 @@ docker exec "$CONTAINER" createdb -U "$USER" "$TARGET_DATABASE"
 docker cp "$COGNITIVE_DB_DUMP_FILE" "$CONTAINER:/tmp/restore.dump"
 docker exec "$CONTAINER" pg_restore -U "$USER" --exit-on-error --no-owner --dbname="$TARGET_DATABASE" /tmp/restore.dump
 docker exec "$CONTAINER" psql -U "$USER" -d "$TARGET_DATABASE" -At -c 'SELECT 1' | grep -qx '1'
+# The dump of a migrated database must bring the migration ledger back: the revision(s) the caller expects, exactly.
+if [ -n "${COGNITIVE_DB_RESTORE_EXPECT_REVISION:-}" ]; then
+  restored="$(docker exec "$CONTAINER" psql -U "$USER" -d "$TARGET_DATABASE" -At -c 'SELECT version_num FROM alembic_version ORDER BY 1' | paste -sd, -)"
+  if [ "$restored" != "$COGNITIVE_DB_RESTORE_EXPECT_REVISION" ]; then
+    printf 'RESTORE FAILED: restored revision [%s], expected [%s]\n' "$restored" "$COGNITIVE_DB_RESTORE_EXPECT_REVISION" >&2
+    exit 1
+  fi
+fi
 printf 'RESTORE OK: %s -> %s\n' "$(basename -- "$COGNITIVE_DB_DUMP_FILE")" "$TARGET_DATABASE"

@@ -49,6 +49,7 @@ from typing import Any, Iterator, Mapping, Sequence
 import psycopg
 from psycopg.types.json import Jsonb
 
+from ai_lego.apps.cli.migrate_db import describe
 from ai_lego.core.support import canonical_json
 from ai_lego.data.db import DATABASE_URLS_ENV, head_revisions, parse_database_urls, schema_revisions
 from ai_lego.errors import InvariantViolation
@@ -592,15 +593,6 @@ def read_tenants(source: Source) -> dict[str, str]:
     return {row[0]: row[1] for row in source.connections["identity"].execute("SELECT tenant_id, data_residency_region FROM tenant")}
 
 
-def file_proofs(source_dir: Path, destination: Path | None, plan: Mapping[str, Sequence[str]]) -> tuple[Proof, Proof]:
-    source, target = Proof(), Proof()
-    for tenant, relatives in plan.items():
-        source.files[tenant] = tree_digest(source_dir, relatives)
-        if destination is not None:
-            target.files[tenant] = tree_digest(destination, relatives)
-    return source, target
-
-
 def _check_files_absent(files_root: Path, plan: Mapping[str, Sequence[str]]) -> None:
     for relatives in plan.values():
         for relative in relatives:
@@ -687,8 +679,8 @@ def main(argv: list[str] | None = None) -> int:
     except (MoveError, InvariantViolation) as error:
         print(f"FAIL: {error}", file=sys.stderr)
         return error.exit_code if isinstance(error, MoveError) else EXIT_REFUSED
-    except psycopg.Error as error:   # the library's text can quote a row or the connection string: name the class only
-        print(f"FAIL: DATABASE: {type(error).__name__} (SQLSTATE {error.sqlstate})", file=sys.stderr)
+    except psycopg.Error as error:
+        print(f"FAIL: DATABASE: {describe(error)}", file=sys.stderr)
         return EXIT_REFUSED
     for line in result.summary():
         print(line)

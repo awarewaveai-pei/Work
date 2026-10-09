@@ -126,7 +126,7 @@ class CognitiveDbOpsTests(unittest.TestCase):
     def test_readme_records_unapplied_state_and_go_live_checks(self) -> None:
         self.assertIn("Nothing in this folder has been applied.", self.readme_text)
         self.assertIn("safe-infra-patch.sh compose", self.readme_text)
-        self.assertIn("沒有可執行的套用命令", self.readme_text)
+        self.assertIn("install-cognitive-db.sh", self.readme_text)   # the one governed way to apply it
         self.assertIn("docker exec", self.backup_text)
         self.assertIn("/etc/cron.d/ks-stack-backup", self.readme_text)
         for required in ("pg_isready", "EMPTY database", "migration to head", "backup", "restore", "ClaimReview"):

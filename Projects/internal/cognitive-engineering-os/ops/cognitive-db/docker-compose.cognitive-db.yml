@@ -40,7 +40,8 @@ volumes:
 networks:
   lobster-net:
     external: true
-    name: lobster-net
+    # lobster-net on the host; install-cognitive-db.sh's local rehearsal names a throwaway network instead.
+    name: ${COGNITIVE_DB_NETWORK:-lobster-net}
 
 secrets:
   cognitive_db_password:

@@ -8,7 +8,14 @@ Every container on the external `lobster-net` can reach this service by name. Th
 
 ## 套用閘
 
-本卡只有檔案，沒有套用。現有 `lobster-factory/infra/hetzner-phase1-core/scripts/safe-infra-patch.sh compose` 固定在 `/root/lobster-phase1` 對主 compose 執行，不能安全建立這份獨立 compose。上線前須先補獨立 compose 的備份、套用、健康檢查、失敗回滾與通知，再經操作者核准；此處沒有可執行的套用命令。不可直接 `docker compose up`。
+唯一的安裝路徑是 `install-cognitive-db.sh`（不可直接 `docker compose up`；`safe-infra-patch.sh compose` 只管 `/root/lobster-phase1` 的主 compose，管不到這份獨立 compose）。它做的事：預檢（密碼檔存在、權限 600、不在 git 工作樹、網路在、卷不存在）→ 建卷與服務 → 等健康 → 對**空**資料庫跑 migration 到 head（用新的引擎映像）→ 備份一次 → 還原演練一次（一次性容器，核對 `alembic_version`）→ 通知。任一步失敗只拆除這次建立的東西（容器、卷、這次寫的 dump、這次附加的 `COGNITIVE_OS_DATABASE_URLS` 行），已存在的卷一律拒絕、不碰。`--dry-run` 跑真的預檢後印出每個指令、不執行。
+
+套用屬 High-STOP：先有操作者明示 go-ahead。完整順序與每步回滾見 `../../docs/platform/GO_LIVE.md`。
+
+```bash
+COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_ENGINE_IMAGE=cognitive-os-api:golive \
+  bash Projects/internal/cognitive-engineering-os/ops/cognitive-db/install-cognitive-db.sh --region <第一個區域名> --dry-run
+```
 
 Nothing in this folder has been applied.
 
@@ -29,9 +36,7 @@ Nothing in this folder has been applied.
 ## 上線前清單
 
 - `docker compose -f Projects/internal/cognitive-engineering-os/ops/cognitive-db/docker-compose.cognitive-db.yml exec -T cognitive-db pg_isready -U cognitive -d cognitive_os` 成功。
-- 在 EMPTY database 上先跑一次真的 migration to head，確認全新資料庫能到最新版本。
-- 備份腳本真的跑一次。
-- 依照 `restore-cognitive-db.md` 真的還原一次到一次性容器。
+- 安裝腳本已把這三項做完並留下證據：EMPTY database 上的 migration to head、備份腳本真的跑一次、還原到一次性容器一次。
 - 定期用未套用的 `restore-cognitive-db.sh` 把最新 dump 還原到 scratch database；週期由維運排程決定，腳本不會自動套用 compose。
 - Run the periodic restore rehearsal with `restore-cognitive-db.sh` into a scratch database; this script is unapplied.
 - 確認引擎使用正確的區域資料庫連線，不把 ClaimReview mirror 放進這個資料庫。
