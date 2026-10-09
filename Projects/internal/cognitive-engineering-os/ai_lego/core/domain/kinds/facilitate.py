@@ -19,6 +19,11 @@ def _id(required: bool = True) -> Field:
     return Field("text", 160, required=required, human_only=True, scan=False)
 
 
+def _ref() -> Field:
+    """An id or a name the system set (a script, a log): not the person's words, not read for risk."""
+    return Field("text", 160, required=True, scan=False)
+
+
 KINDS = [
     DocKind("facilitate.log", "FACILITATE", "帶領紀錄", {
         "group_id": _id(),
@@ -37,4 +42,17 @@ KINDS = [
         "assigned_by": Field("choice", choices=ASSIGNED_BY, required=True, human_only=True),
         "group_id": _id(required=False),                        # the unit's group: required when assigned_by is "unit"
     }, owner="platform"),
+    # What the AI practice partner and the deviation pointer answer (platform/ai_actions/facilitate.py): the leader's own
+    # records, written by the AI only; neither is a log, a score or a verdict.
+    DocKind("facilitate.practice_reply", "FACILITATE", "練習參與者的回應", {
+        "script": _ref(),
+        "step": Field("int", 1000, required=True),
+        "reply": Field("text", 1200, required=True),
+    }, owner="person", authors=frozenset({"ai"})),
+    DocKind("facilitate.pointers", "FACILITATE", "AI 指出可能偏離的地方", {
+        "log": _ref(),                                          # the log read (a pointer; the lines below are copied from that version by the system)
+        "log_version": Field("int", 100000, required=True),
+        "pointers": Field("json", 24000, shape="array"),        # [{n, line, dont, text}]; none = it pointed at nothing
+        "handback": Field("text", 300, required=True),          # the fixed sentence: the way of leading is the leader's and the supervisor's
+    }, owner="person", authors=frozenset({"ai"})),
 ]

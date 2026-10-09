@@ -205,6 +205,11 @@ const CODES: Record<string, string> = {
   FACILITATE_SUPERVISEE_NOT_FOUND: "找不到你督導的這個人。",
   FACILITATE_LINK_NOT_FOUND: "找不到這個督導連結，或它不是你設的。",
   FACILITATE_LED_BY_INVALID: "「誰帶的」只能選一位帶領者，不能寫別的字。",
+  FACILITATE_SCRIPT_NOT_REVIEWED: "這份帶領稿還沒審過，現在不能拿來練習。",
+  FACILITATE_STEP_UNKNOWN: "請選帶領稿的其中一步。",
+  FACILITATE_SAY_REQUIRED: "請先寫你要對參與者說什麼。",
+  FACILITATE_AI_LOG_REQUIRED: "先存一份帶領紀錄，AI 才能指出可能偏離的地方。",
+  FACILITATE_SCRIPT_CHANGED: "這份紀錄用的帶領稿版本已經不是現在的版本，AI 沒辦法對照。請看過新版再寫一份。",
   // GATHER
   GATHER_ORIGIN_NOT_FOUND: "這一組現在不在了（網頁重新分過組）。請重新整理頁面，標新的組。",
   GATHER_ORIGIN_PENDING: "這一頁還在分組，分好之後再標。",
