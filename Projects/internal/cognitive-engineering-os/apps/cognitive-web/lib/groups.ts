@@ -28,6 +28,8 @@ export type Dissent = { doc_id: string; option: string; reason: string; who: str
 export type Authority = { current: Array<{ to: string; to_me: boolean; scope: string; grantors: string[]; my_share: string | null }>; renegotiate: Array<{ to: string; scope: string; taken_back_by: string; notice: string; at: string }> };
 export type AgreementTable = { insufficient: true; why: string } | { insufficient: false; options: Record<string, { agreed_across: boolean; objections: string[] }> };
 export type Agreement = AgreementTable & { held: string[]; heaviest_left_out: boolean; without_heaviest: AgreementTable; rule?: { version: string } };
+// A record another member chose to share with this group (view/shared): `content` is only the part COLLAB reads; `who` is how they are shown.
+export type Shared = { who: string; kind: string; doc_id: string; version: number; content: Record<string, unknown>; at: string };
 export type AiTurn = { saved?: Item & { waiting?: boolean }; handback?: string; stopped?: "crisis"; notice?: string; resources?: Array<{ name: string; contact: string }> };
 
 export const groups = {
@@ -52,6 +54,7 @@ export const collab = {
   dissent: (id: string) => apiFetch<Dissent[]>(`${base(id)}/view/dissent`),
   authority: (id: string) => apiFetch<Authority>(`${base(id)}/view/authority`),
   agreement: (id: string) => apiFetch<Agreement>(`${base(id)}/view/agreement`),
+  shared: (id: string) => apiFetch<Shared[]>(`${base(id)}/view/shared`),
   notHeard: (id: string, round: number) => apiFetch<{ round: number; not_heard: string[] }>(`${base(id)}/view/not-heard?round=${round}`),
   ai: (id: string, action: string, context: Record<string, unknown>) => apiFetch<AiTurn>(`/groups/${enc(id)}/ai/${enc(action)}`, { method: "POST", body: JSON.stringify({ context }) }),
 };

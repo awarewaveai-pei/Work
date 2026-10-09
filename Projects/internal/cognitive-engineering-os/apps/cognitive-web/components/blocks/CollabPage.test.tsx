@@ -20,7 +20,7 @@ const THEIRS = item("collab.position", "P2", { round: 1, text: "乙的立場：�
 
 async function open(routes: Record<string, unknown> = {}) {
   const lists = Object.fromEntries(KINDS.map((kind) => [`${C}/collab.${kind}`, []]));
-  const calls = serve({ ...lists, [G]: GROUP, [`${C}/view/dissent`]: [], [`${C}/view/authority`]: NO_AUTHORITY, [`${C}/view/agreement`]: INSUFFICIENT, ...routes });
+  const calls = serve({ ...lists, [G]: GROUP, [`${C}/view/dissent`]: [], [`${C}/view/authority`]: NO_AUTHORITY, [`${C}/view/agreement`]: INSUFFICIENT, [`${C}/view/shared`]: [], ...routes });
   const page = await mount(<CollabPage groupId="G1" />);
   return { ...page, calls };
 }
@@ -87,6 +87,22 @@ describe("COLLAB: one group's page", () => {
     expect(host.textContent).toContain("乙交來的提案");
     expect(host.textContent).not.toContain("DRAFT-9");
     await done();
+  });
+
+  it("draws what the shared-records route returns (a MAP and a VERIFY item: the words, not the pointers) and nothing when it returns none", async () => {
+    const shared = [
+      { who: "乙", kind: "map.map", doc_id: "M1", version: 1, at: "x", content: { layers: { facts: [{ id: "i1", text: "合約沒寫期限", by: "user", card: "CARD-7" }] }, core_conflict: "誰來負責收尾" } },
+      { who: "丙", kind: "verify.verdict", doc_id: "V1", version: 1, at: "x", content: { claim: "CLAIM-3", claim_version: 2, verdict: "存疑", reason: "只有一個出處" } },
+    ];
+    const withShared = await open({ [`${C}/view/shared`]: shared });
+    const text = withShared.host.textContent ?? "";
+    expect(byText(withShared.host, "h2", "分享給這個群組的紀錄")).toBeDefined();
+    for (const line of ["乙分享的地圖", "事實：合約沒寫期限", "核心衝突：誰來負責收尾", "丙分享的查證判定", "存疑：只有一個出處"]) expect(text).toContain(line);
+    for (const pointer of ["CARD-7", "CLAIM-3", "M1", "V1"]) expect(text).not.toContain(pointer);
+    await withShared.done();
+    const none = await open();
+    expect(byText(none.host, "h2", "分享給這個群組的紀錄")).toBeUndefined();
+    await none.done();
   });
 
   it("a restatement of me is shown to me first, tagged AI, with 說錯了; reopening is always there", async () => {
