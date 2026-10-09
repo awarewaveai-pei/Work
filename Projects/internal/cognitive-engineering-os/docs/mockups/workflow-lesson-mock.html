@@ -74,6 +74,8 @@
   .journey a:hover{text-decoration:underline}
   .journey span.done{background:var(--ok);color:var(--bg)}
   .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
+  .journey a.done{background:var(--ok);color:var(--bg)}
+  .journey a.next{outline:2px solid var(--accent);outline-offset:1px}
   .journey i{color:var(--muted);font-style:normal}
   .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
   .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:var(--fs-small);cursor:pointer}
@@ -166,6 +168,7 @@
   .mcard b{font-size:var(--fs-body)}
   .mcard .k{color:var(--muted);font-size:var(--fs-tag)}
   .mcard .need{color:var(--warn)}
+  .card .tag{display:inline-block;font-size:var(--fs-tag);padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);vertical-align:middle}
   .mcard .tag{display:inline-block;font-size:var(--fs-tag);padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
   h2 small{font-weight:400;color:var(--muted);font-size:var(--fs-small);margin-left:8px}
   .grid2{display:grid;grid-template-columns:1fr;gap:12px}

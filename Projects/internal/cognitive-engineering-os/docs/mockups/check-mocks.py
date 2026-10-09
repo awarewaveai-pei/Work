@@ -26,7 +26,7 @@ FONT = 'font:var(--fs-body)/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC
 # you glance at); a prose line stops at 80 characters of its own size on a desktop, tables and pictures keep the column
 TYPE_TOKENS = {"--fs-h1": "28px", "--fs-h2": "20px", "--fs-h3": "18px", "--fs-body": "16px", "--fs-small": "14px", "--fs-tag": "12px", "--measure": "80em"}
 TAG_OK = {".side .brand small", ".navi small", ".navi", ".btn small", ".crumbs", ".tags span", "cite", "th", ".conf", "pre", ".layer .meta",
-          ".lever", ".kpi .when", ".mcard .k", ".mcard .tag", ".filled .lab", ".fam small", ".tool b small", "details.dir summary small", ".tab small"}
+          ".lever", ".kpi .when", ".mcard .k", ".mcard .tag", ".card .tag", ".filled .lab", ".fam small", ".tool b small", "details.dir summary small", ".tab small"}
 PROSE = {"p", ".lead", ".how", ".sub", ".read", ".finding", ".station .why", ".mocknote", ".banner"}
 FS_VAR = re.compile(r"var\(\s*(--fs-[a-z0-9]+)\s*\)")
 # U20: one column by default; only "several methods side by side" may go 2-up, and only by container width
