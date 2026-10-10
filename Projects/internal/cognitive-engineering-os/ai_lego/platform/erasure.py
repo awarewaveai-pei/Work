@@ -30,19 +30,23 @@ deletion of that person (``resume`` narrowed to them), and by ``resume`` at ever
 case's hooks (the erase takes the case lock, never the hooks lock).
 
 Every irreversible call of the erase paths lives in ``Erasure._remove`` and ``Erasure._after_cleanup``;
-tests/unit/test_erasure_workflow.py fails if one is reachable from an erasure entry point any other way.
+tests/unit/test_erasure_workflow.py fails if one is reachable from an erasure entry point any other way. After each
+erasure transaction commits (a decision, the groups part, the completion), ``physical_retention_hook`` VACUUMs the tables
+it deleted or updated rows of, in the background (STORAGE_SWITCH.md "Physical retention decision").
 """
 
 from __future__ import annotations
 
 import logging
 import re
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
 import psycopg
 
 from ai_lego.data import db
+from ai_lego.data.db import Databases
 from ai_lego.data.events import record_log
 from ai_lego.data.object.json_artifact_store import JsonArtifactStore
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
@@ -88,10 +92,41 @@ def admit_run(connection: psycopg.Connection, tenant_id: str, identity_id: str, 
     record_log.require_person(connection, tenant_id, identity_id)
 
 
-def physical_retention_hook(tenant_id: str, subject_kind: str, subject_id: str) -> None:
-    """The one place a step after a finished erasure would reach the database's own files -- a VACUUM of the touched
-    tables, say. Deliberately empty: what happens to a deleted row's bytes (VACUUM, WAL, dump expiry) is the operator's
-    decision (STORAGE_SWITCH.md "Physical retention decision"), not this module's."""
+# One worker: the VACUUMs of every erasure in this process run one after another, never beside the API's request.
+_VACUUMS = ThreadPoolExecutor(max_workers=1, thread_name_prefix="erasure-vacuum")
+
+
+def touched_tables(connection: psycopg.Connection) -> tuple[str, ...]:
+    """The tables this transaction left dead rows in (deleted or updated), read just before it commits. A superset: counts
+    of earlier transactions on the same connection not yet flushed to the server's statistics are included too."""
+    return tuple(row[0] for row in connection.execute(
+        "SELECT relname FROM pg_stat_xact_user_tables WHERE schemaname = current_schema() AND n_tup_del + n_tup_upd > 0 ORDER BY relname"))
+
+
+def physical_retention_hook(databases: Databases, tenant_id: str, tables: Iterable[str]) -> Future[None] | None:
+    """The one place an erasure reaches the database's own files (decided 2026-10-10, STORAGE_SWITCH.md "Physical retention
+    decision"): after its transaction committed, VACUUM each table it touched, so the dead rows are pruned from the data
+    files. In the background (the answer never waits) and never fatal (a failure is logged; autovacuum prunes later). Not
+    the WAL, not the nightly dumps (kept 7 days), and the freed space is not zeroed."""
+    tables = tuple(tables)
+    if not tables:
+        return None
+    try:   # the region now, while the tenant's directory line is certainly there; the erasure stands whatever fails here
+        region = databases.region_of(tenant_id)
+        if region is None:
+            raise InvariantViolation("TENANT_REGION_UNKNOWN")
+        return _VACUUMS.submit(_vacuum, databases, tenant_id, region, tables)
+    except Exception as error:   # no region, or the worker is shut down (interpreter exit): autovacuum prunes later
+        _log.warning("erasure VACUUM not queued (tenant %s): %s", tenant_id, type(error).__name__)
+        return None
+
+
+def _vacuum(databases: Databases, tenant_id: str, region: str, tables: tuple[str, ...]) -> None:
+    for table in tables:
+        try:
+            databases.vacuum(region, table)
+        except Exception as error:
+            _log.warning("erasure VACUUM of %s failed (tenant %s, region %s): %s: %s; autovacuum prunes it later", table, tenant_id, region, type(error).__name__, error)
 
 
 def _unstorable(value: Any) -> bool:
@@ -168,6 +203,8 @@ class Erasure:
             grants = IdentityStore.close_collect_grants_on(connection, tenant_id, project_id)
             counts = {"sources": erased["sources"], "events_deleted": erased["events_deleted"], "grants_closed": grants, **({"no_record": True} if no_record else {})}
             outbox.write_job(connection, tenant_id, CASE, project_id, identity_id, counts, items)
+            tables = touched_tables(connection)
+        physical_retention_hook(self._repo.databases, tenant_id, tables)
 
     def decide_groups(self, tenant_id: str, identity_id: str) -> dict[str, int]:
         """The account erasure's first step, before any case is erased (Codex F3): under the person lock held exclusive,
@@ -175,7 +212,10 @@ class Erasure:
         memberships, invitations and group records go. decide_person runs the same part again for anything since."""
         with self._repo.transaction(tenant_id) as connection:
             db.owner_lock(connection, "person", tenant_id, identity_id, exclusive=True)
-            return ProjectSourceRepository.erase_person_from_groups(connection, tenant_id, identity_id)
+            erased = ProjectSourceRepository.erase_person_from_groups(connection, tenant_id, identity_id)
+            tables = touched_tables(connection)
+        physical_retention_hook(self._repo.databases, tenant_id, tables)
+        return erased
 
     def decide_person(self, tenant_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]]) -> dict[str, int]:
         """The person's own part, after their cases: the workflows and their records, their memberships and what they wrote
@@ -196,6 +236,8 @@ class Erasure:
             items = _artifact_items(reference for run in runs for reference in run["artifacts"]) + _run_items(runs)
             counts = {"records": records, "workflows": workflows, "runs": len(runs), **groups}
             outbox.write_job(connection, tenant_id, PERSON, identity_id, identity_id, counts, items)
+            tables = touched_tables(connection)
+        physical_retention_hook(self._repo.databases, tenant_id, tables)
         return counts
 
     # -- the entry points --------------------------------------------------------------------------------------------
@@ -322,7 +364,8 @@ class Erasure:
             if subject_kind == CASE and not job["counts_json"].get("no_record"):   # 不留紀錄: not even 「已抹除」
                 ProjectSourceRepository.append_tombstone(connection, tenant_id, subject_id, job["erased_by_identity_id"], summary["erased"])
             outbox.delete_job(connection, tenant_id, subject_kind, subject_id)
-        self._after_cleanup(tenant_id, subject_kind, subject_id)
+            tables = touched_tables(connection)
+        self._after_cleanup(tenant_id, subject_kind, subject_id, tables)
         return {**summary, "physical_cleanup": "done", "failed": failed}
 
     @staticmethod
@@ -339,8 +382,9 @@ class Erasure:
             return {"erased": erased, "physical_cleanup": "done" if tombstones else "pending", "failed": []}
         return {"physical_cleanup": "done", "failed": []}
 
-    def _after_cleanup(self, tenant_id: str, subject_kind: str, subject_id: str) -> None:
-        """After the completing commit: a person's run folder goes when nothing is left in it; then the retention hook."""
+    def _after_cleanup(self, tenant_id: str, subject_kind: str, subject_id: str, tables: tuple[str, ...]) -> None:
+        """After the completing commit: a person's run folder goes when nothing is left in it; then the retention hook over
+        what the completion touched (the outbox rows: references, never content)."""
         if subject_kind == PERSON:
             folder = self._journal_path(tenant_id, "x", subject_id).parent
             try:
@@ -348,7 +392,7 @@ class Erasure:
                     folder.rmdir()
             except OSError:
                 _log.warning("an emptied run folder stays (tenant %s): it holds nothing", tenant_id)
-        physical_retention_hook(tenant_id, subject_kind, subject_id)
+        physical_retention_hook(self._repo.databases, tenant_id, tables)
 
 
 def main() -> int:

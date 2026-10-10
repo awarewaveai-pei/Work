@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-10（續3）COS 抹除後的物理保留：VACUUM 掛點實作＋dump 預設 7 天（未部署）
+
+**根本問題**: PostgreSQL 沒有 `secure_delete`；`erasure.physical_retention_hook` 是空的，抹除後的列留在資料檔直到 autovacuum。決定（2026-10-10，操作者授權，GO_LIVE.md D4）：抹除後 VACUUM 碰過的表＋每晚 dump 留 7 天。
+
+**已修改**（`Projects/internal/cognitive-engineering-os/`）:
+- `ai_lego/platform/erasure.py`：`touched_tables`（commit 前讀 `pg_stat_xact_user_tables`，有刪/改列的表；不維護表清單，之後新增的抹除步驟自動涵蓋）；`decide_case`／`decide_groups`／`decide_person`／`_complete` 各自 commit 後呼叫 `physical_retention_hook`：當下查 region，丟給單一背景 worker；任何失敗只記 log，抹除不受影響。
+- `ai_lego/data/db.py`：`Databases.vacuum(region, table)` = `VACUUM (INDEX_CLEANUP ON)`，跑在 autocommit 連線、交易外，`lock_timeout` 30 s 之後 RESET；`Rehearsal.vacuum` 不做事。
+- `ops/cognitive-db/backup-cognitive-db.sh`：預設 `KEEP_DAYS` 14→7；標為 `.corrupt` 的 dump 也照同一個截止日過期（Codex F1）。`README.md` 同步（cron 行加上 `KEEP_DAYS=7`，跟正式機 `/etc/cron.d` 一致，已用 SSH 唯讀確認）。
+- `docs/platform/STORAGE_SWITCH.md`「Physical retention decision」、`GO_LIVE.md` D4／D 節：寫明已做到與還沒做到的部分。
+- `tests/unit/test_erasure_workflow.py::PhysicalRetentionTests`（一個測試）。
+
+**發現**:
+- F1 VACUUM 不會把空間清零（postgres:17 探測，CHECKPOINT 後用 `pg_read_binary_file` 讀原始檔）：中間的列 VACUUM 後不見了，但頁面上最後插入的那一列位元組還在。所以剛寫入就被抹除的案件很可能還留在檔案裡；只有 `VACUUM FULL`（重寫時鎖表）或每人金鑰才能補，未決定。WAL、dump（7 天）、go-live 複本同樣還留著。
+- F2 第一次跑 affected 時，背景 worker 太晚才查 region（別的測試已清空 directory，查到 `region None`）→ 改成 commit 後當下查。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest tests/unit/test_erasure_workflow.py -q (36 passed, 4 subtests, real PostgreSQL container) | exit=0 | ms=54555
+- REALTEST_EVIDENCE: tool=Bash | cmd=mutation physical_retention_hook=no-op -> pytest -k PhysicalRetention (1 failed: vacuumed=set()) ; restored -> 1 passed | exit=1 | ms=9920
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash snippet of backup-cognitive-db.sh quarantine expiry on temp dir (2026-09-01 .corrupt removed, 2026-10-10 kept, cutoff 2026-10-04) | exit=0 | ms=200
+- REALTEST_WAIVED: NA -- `affected_tests.py --base HEAD~1 --run` 在共用工作樹上 1500 s 逾時（exit 124；diff 含其他 session 未 commit 的 40 個模組／73 個測試模組）；commit 後在拋棄式 worktree 重跑，結果見回報
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- Codex oracle agency-os/reports/oracle/2026-10-10-partialreview-aebf8178.md；F1 .corrupt dump 不會過期、F2 VACUUM 等鎖沒有上限、F3 submit 例外造成 500、F4 測試漏 project_interpretations，四項都已修並重測
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=physical_retention_hook | hits=6
+- ORACLE_WAIVED: 共用工作樹上有其他 session 未 commit 的改動，整 repo 審查會連他們的也一起審 → 改用 -Path 部分審查（artifact 2026-10-10-partialreview-aebf8178），四項 finding 修完後重跑模組＋突變
+
+**剩餘風險**: F1 那些殘留（空間沒清零、WAL、dump）；背景 VACUUM 在行程結束前沒跑完就交給 autovacuum；帳號抹除的路徑（decide_groups／decide_person）只做了靜態閱讀，沒有專屬測試（操作者規則：不做無效益測試）。**未部署**：正式部署是 High-STOP。
+
+**Rollback**: `git revert <this commit>`；沒有 schema 或資料改動。
 ## 2026-10-10（續2）HCI-30 restore drill CI 紅 32 天 → 改成 glob migration 目錄
 
 **根本問題**: `.github/workflows/hci30-restore-drill.yml` 手列 migration 0001–0011；fixture `0001_synthetic.sql:137` 開始寫 0016 才建的 `hci.case_report_snapshots` → source job 第一步就死（run 35340652567），2026-09-08 起連 8 次紅，restore 演練等於關了 32 天。不變量：drill 套用的 migration 集合 = 目錄裡全部 `*_up.sql`，不可手抄。

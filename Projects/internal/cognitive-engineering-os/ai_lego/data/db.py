@@ -37,6 +37,7 @@ from types import MappingProxyType
 from typing import Any
 
 import psycopg
+from psycopg import sql
 from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
@@ -260,6 +261,19 @@ class Databases:
                     connection.close()   # a closed connection drops the lock; the pool throws it away
                     raise
 
+    def vacuum(self, region: str, table: str) -> None:
+        """``VACUUM (INDEX_CLEANUP ON)`` of one table, on this thread's connection outside any transaction (VACUUM refuses to
+        run inside one): the dead rows are pruned from the heap and their index entries removed. The freed space is not
+        zeroed: bytes at the page's free-space edge stay until a later write reuses them."""
+        if region in self._held.__dict__.get("connections", {}):
+            raise InvariantViolation("DB_VACUUM_IN_TRANSACTION: a VACUUM runs on a connection this thread does not already hold")
+        with self._held_connection(region) as connection:
+            connection.execute("SET lock_timeout = '30s'")   # a conflicting lock (ALTER TABLE...) fails it, never parks the caller
+            try:
+                connection.execute(sql.SQL("VACUUM (INDEX_CLEANUP ON) {}").format(sql.Identifier(table)))
+            finally:
+                connection.execute("RESET lock_timeout")   # a pooled session: the next borrower gets the server default
+
     @contextmanager
     def rehearsal(self) -> Iterator[Rehearsal]:
         """The real repository code on this database, nothing kept (see ``Rehearsal``)."""
@@ -317,6 +331,9 @@ class Rehearsal(Databases):
     @contextmanager
     def session_lock(self, region: str, *parts: str) -> Iterator[None]:
         yield
+
+    def vacuum(self, region: str, table: str) -> None:
+        pass   # nothing a rehearsal deletes is kept
 
     @contextmanager
     def rehearsal(self) -> Iterator[Rehearsal]:

@@ -21,14 +21,14 @@ Nothing in this folder has been applied.
 
 ## 備份
 
-主機上的腳本透過 `docker compose ps` 定位私有容器，再以 `docker exec` 執行 PostgreSQL 工具；dump 串流到主機目錄，密碼不離開容器。每個非 template 資料庫各有一份 custom-format dump；檔名中的資料庫名稱是 UTF-8 十六進位，避免不同名稱碰撞。每份新檔案先以 `pg_restore --exit-on-error -f /dev/null` 完整讀取；舊檔案若損壞會先改名為 `.corrupt`，新備份仍會保留，腳本最後才以非零回報。預設保留含當天在內的 14 個 UTC 日期。
+主機上的腳本透過 `docker compose ps` 定位私有容器，再以 `docker exec` 執行 PostgreSQL 工具；dump 串流到主機目錄，密碼不離開容器。每個非 template 資料庫各有一份 custom-format dump；檔名中的資料庫名稱是 UTF-8 十六進位，避免不同名稱碰撞。每份新檔案先以 `pg_restore --exit-on-error -f /dev/null` 完整讀取；舊檔案若損壞會先改名為 `.corrupt`，新備份仍會保留，腳本最後才以非零回報。預設保留含當天在內的 7 個 UTC 日期：dump 裡的資料不受抹除影響，被抹除的人最多再留 7 天（`docs/platform/STORAGE_SWITCH.md`「Physical retention decision」，2026-10-10 決定）。部署前 dump（`deploy/lib-db.sh`）用同一個腳本，也是 7 天。
 
 預設目錄是 `/root/backups/cognitive-db`。可用 `COGNITIVE_DB_BACKUP_DIR` 改變目錄。可用 `COGNITIVE_DB_BACKUP_KEEP_DAYS` 改變保留天數。腳本失敗只會回報 `BACKUP FAILED:`，不會回報密碼。
 
 在 `/etc/cron.d/ks-stack-backup` 的既有備份行旁加入一行：
 
 ```cron
-17 2 * * * root COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_BACKUP_DIR=/root/backups/cognitive-db /opt/cognitive-os/Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh >>/var/log/cognitive-db-backup.log 2>&1
+17 2 * * * root COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_BACKUP_DIR=/root/backups/cognitive-db COGNITIVE_DB_BACKUP_KEEP_DAYS=7 /opt/cognitive-os/Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh >>/var/log/cognitive-db-backup.log 2>&1
 ```
 
 這行僅供獲核准後使用；路徑是 deploy.sh 用的 `/opt/cognitive-os` 檢出（上線前 `ls` 確認本資料夾在那裡），root 要讀得到 secret file。cron 只寫密碼檔路徑，不寫密碼。
@@ -44,6 +44,6 @@ Nothing in this folder has been applied.
 - 定期用未套用的 `restore-cognitive-db.sh` 把最新 dump 還原到 scratch database；週期由維運排程決定，腳本不會自動套用 compose。
 - Run the periodic restore rehearsal with `restore-cognitive-db.sh` into a scratch database; this script is unapplied.
 - 確認引擎使用正確的區域資料庫連線，不把 ClaimReview mirror 放進這個資料庫。
-- 預估容量目前很小。今天以低於 1 GiB 的引擎資料加上 14 天備份作規劃，正式上線前再用實際 dump 大小校正。
+- 預估容量目前很小。今天以低於 1 GiB 的引擎資料加上 7 天備份作規劃，正式上線前再用實際 dump 大小校正。
 
 ClaimReview mirror is NOT in this database.

@@ -19,7 +19,7 @@
 | D1 | 第一個區域的名字 `<region>`（小寫字母、數字、`-`；例 `eu`） | 今天每個租戶的 `data_residency_region` 都是 `local-dev`；搬的時候全部對到這一個名字（`--region-map local-dev=<region>`）。名字也會出現在檔案卷 `cognitive-os-files-<region>`。之後改名 = 搬資料。 |
 | D2 | 停站窗口多長 | 窗口 = B1 到 B8，三段決定長度：複本（B2，看資料量）、搬移（B4，看列數與檔案數）、`deploy.sh`（B7，測試閘 + 建映像 + 啟動，通常最久）。前兩段在 A8 的 `time` 先量到；第三段看上一次部署的時間戳（指令在表下）。停站期間訪客看到 nginx 的 502；要不要放維護頁 = 另一個 nginx 變更（`safe-infra-patch.sh`，另行批准），本文不含。 |
 | D3 | SQLite 舊卷與各種複本留多久 | 舊卷、`$WORK/src`、部署前 dump 都含個資；留著等於讓「已抹除」的人還在複本裡。建議回滾期（例 7 天）一過就刪（D 節）。 |
-| D4 | 物理保留 | PostgreSQL 沒有 `secure_delete`：抹除後的列在資料檔、WAL、每晚 dump（保留 14 天）裡還在一陣子。先決定 dump 保留天數或要不要在抹除後 VACUUM（`STORAGE_SWITCH.md`「Physical retention decision」；程式掛點 `erasure.physical_retention_hook` 現在是空的）。上線不需要先做完，但要有決定。 |
+| D4 | 物理保留 | **已決定（2026-10-10，操作者授權）並已實作**：抹除的每個交易 commit 後，`erasure.physical_retention_hook` 在背景 VACUUM 它刪改過列的表；每晚 dump 留 7 天（正式 cron 傳 `COGNITIVE_DB_BACKUP_KEEP_DAYS=7`，腳本預設也是 7）。**還沒做到**：VACUUM 釋放空間但不清零，在頁面空閒區邊緣的舊列位元組留到之後的寫入蓋過；WAL 留到回收；dump 留到 7 天過期。細節 `STORAGE_SWITCH.md`「Physical retention decision」。 |
 
 D2 的第三段：`grep -E 'test-gate [|]|done' /opt/cognitive-os/Projects/internal/cognitive-engineering-os/deploy/deploy.log | tail -6`。
 
@@ -267,7 +267,7 @@ docker volume rm cognitive-os-files-$REGION                         # 只有這�
 ## D. 之後
 
 1. 隔天確認每晚備份有產生：`ls -la /root/backups/cognitive-db`。每週用 `ops/cognitive-db/restore-cognitive-db.sh` 把最新 dump 還原到一次性容器演練一次。
-2. 回滾期（D3）一過：`docker volume rm $OLDVOL`、`sudo rm -r $WORK`（含複本與 `url.env`）。部署前的 dump 在 `~/cos-predeploy-backups`，備份腳本自己只留 14 天。這些是刪除性操作，High-STOP。
+2. 回滾期（D3）一過：`docker volume rm $OLDVOL`、`sudo rm -r $WORK`（含複本與 `url.env`）。部署前的 dump 在 `~/cos-predeploy-backups`，備份腳本自己只留 7 天。這些是刪除性操作，High-STOP。
 3. 刪掉 `cognitive_os_failed_*` 資料庫（若有）。
 4. `scripts/dev/cos_live_counts.sh`、`cos_predeploy_trial.sh` 讀的是 SQLite 卷，上線後作廢；換成對 PostgreSQL 的版本是另一張卡。
 5. `docs/platform/STORAGE_SWITCH.md` 的 D8 與 Not built（D7 每區域檔案根：現在只有一個區域）在第二個區域開之前不用動。

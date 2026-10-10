@@ -3,7 +3,7 @@ set -euo pipefail
 umask 077
 
 BACKUP_DIR="${COGNITIVE_DB_BACKUP_DIR:-${BACKUP_DIR:-/root/backups/cognitive-db}}"
-KEEP_DAYS="${COGNITIVE_DB_BACKUP_KEEP_DAYS:-${KEEP_DAYS:-14}}"
+KEEP_DAYS="${COGNITIVE_DB_BACKUP_KEEP_DAYS:-${KEEP_DAYS:-7}}"   # 7: erased data lives at most this long in a dump (docs/platform/STORAGE_SWITCH.md "Physical retention decision")
 DB_USER="${COGNITIVE_DB_USER:-cognitive}"
 MAINTENANCE_DB="${COGNITIVE_DB_MAINTENANCE_DB:-cognitive_os}"
 COMPOSE_FILE="${COGNITIVE_DB_COMPOSE_FILE:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/docker-compose.cognitive-db.yml}"
@@ -137,6 +137,18 @@ for dump in "$BACKUP_DIR"/cognitive-db-????-??-??-*.dump; do
   if [[ "$name" =~ ^cognitive-db-([0-9]{4}-[0-9]{2}-[0-9]{2})-.*\.dump$ ]] && [[ "${BASH_REMATCH[1]}" < "$cutoff_date" ]]; then
     if ! rm -f -- "$dump" 2>"$ERROR_LOG"; then
       FAILURE_REASON="could not remove an expired dated dump"
+      exit 1
+    fi
+  fi
+done
+
+# A quarantined dump holds the same data: it expires on the same date (Codex F1, 2026-10-10).
+for quarantined in "$BACKUP_DIR"/cognitive-db-????-??-??-*.dump.corrupt; do
+  [ -f "$quarantined" ] || continue
+  name="$(basename -- "$quarantined")"
+  if [[ "$name" =~ ^cognitive-db-([0-9]{4}-[0-9]{2}-[0-9]{2})-.*\.dump\.corrupt$ ]] && [[ "${BASH_REMATCH[1]}" < "$cutoff_date" ]]; then
+    if ! rm -f -- "$quarantined" 2>"$ERROR_LOG"; then
+      FAILURE_REASON="could not remove an expired quarantined dump"
       exit 1
     fi
   fi

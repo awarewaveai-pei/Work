@@ -153,7 +153,7 @@ is durable, and a durable decision to erase can always be finished.** One workfl
 |---|---|---|
 | 1 Decide (one transaction) | Case: case lock exclusive, every row of the case (`erase_case_rows`), the person's runs on it read under that lock (a run's admission holds it shared and writes its sidecar under it: `admit_run`; a run still going refuses the erase), its collect grants closed (`IdentityStore.close_collect_grants_on`), the tenant's unreferenced Source blobs listed under the source-blobs lock, and the outbox: one `erasure_jobs` row + one `erasure_items` row per blob / AI artifact (case rows and run sidecars) / run. Person: person lock exclusive, refused while the person still has a case (`ACCOUNT_HAS_LIVE_CASES`) or is already deleted (`ACCOUNT_ALREADY_ERASED`), the runs left in the folder read under it, workflows, person records, identity marker, outbox of those runs. References only (path, hash, artifact reference, run id), never content. Nothing on disk is touched; a failure leaves everything as it was. | `Erasure.decide_case`, `decide_person`; `erasure_outbox.write_job`; migration 0004 |
 | 2 Clean up (after commit) | Each item in its own transaction, `FOR UPDATE SKIP LOCKED`. A Source blob is re-checked under the source-blobs lock (`blob_referenced`), an artifact against committed artifact rows: still named = `kept`. A run's artifact is never shared (`recipe_runtime.persist_artifact_output` gives each write its own bytes; pinned by two `test_block_govern` tests). A well-formed path of the tenant is removed by its path, even when its bytes no longer match the reference's hash. Already gone = `absent`. A filesystem error leaves it `pending` (attempts + 1; from `ATTENTION_ATTEMPTS` on, logged as an error). A reference that names no file of the tenant (malformed, another tenant's, a run id that leaves its folder) = `unresolvable`. | `Erasure.finish`, `_remove` |
-| 3 Complete | Job `FOR UPDATE`; every item `removed`/`absent`/`kept` ("done" = every target accounted for): the ProjectErased tombstone (platform-owned; counts of what was actually removed) and the job delete commit together, then `physical_retention_hook` (empty: see below). | `Erasure._complete` |
+| 3 Complete | Job `FOR UPDATE`; every item `removed`/`absent`/`kept` ("done" = every target accounted for): the ProjectErased tombstone (platform-owned; counts of what was actually removed) and the job delete commit together, then `physical_retention_hook` (see below). | `Erasure._complete` |
 
 An unfinished job (its row exists exactly while something is left) is found again by a repeated `DELETE` of the case by
 the person who erased it (nobody else: another person gets 404), by that person's account deletion (`resume` narrowed
@@ -193,12 +193,34 @@ unresolvable item cannot be acknowledged yet, so its job stays `blocked` until a
 SQLite ran with `secure_delete = ON`: an erased row was overwritten in the file (plan D10). PostgreSQL has no such
 switch. A deleted row's bytes stay in its data file until VACUUM prunes the page (probe 2026-10-04 with pageinspect on the
 pinned image: present after DELETE, gone from the page after VACUUM), and they stay in the WAL until it is recycled and in
-every nightly dump (D8) until that dump expires. The tests now prove the region's every row no longer holds what was
-erased (`tests/pg.py::dump`); they no longer prove the bytes on disk. Options for the operator: VACUUM the touched tables
-after an erasure (cost on large tables, still not WAL or dumps), a dump retention that bounds how long erased data lives,
-or per-tenant/per-person encryption keys destroyed on erasure. Until decided, an erasure is complete for every reader of
-the database and not for its files. Whatever is decided runs from one place: `erasure.physical_retention_hook`, called
-after an erasure completes (empty today).
+every nightly dump (D8) until that dump expires. The tests prove the region's every row no longer holds what was erased
+(`tests/pg.py::dump`), not the bytes on disk.
+
+Decided 2026-10-10 under the operator's delegation (GO_LIVE.md D4): VACUUM after erasure, and nightly dumps kept 7 days.
+
+Built: after each erasure transaction commits -- `decide_case`, `decide_groups`, `decide_person`, the completion --
+`physical_retention_hook` VACUUMs (`INDEX_CLEANUP ON`) every table that transaction deleted or updated rows of
+(`touched_tables`: `pg_stat_xact_user_tables`, read just before the commit, so a table a future erase step touches is
+included without a list to keep). One background worker per process runs them in order on a pooled autocommit
+connection (`Databases.vacuum`; VACUUM refuses a transaction; `lock_timeout` 30 s, so a conflicting lock fails the VACUUM
+instead of parking the worker): the API answer never waits, a failure is logged and never
+fails the erasure (autovacuum prunes later), a process that dies first leaves them to autovacuum. A dead row is
+pruned only once no open transaction that began before the erasure's commit can still see it; one that is left waits for
+the next VACUUM or autovacuum. Gate:
+`PhysicalRetentionTests` (the case's tables and the outbox's have `vacuum_count` raised; an empty hook turns it red).
+`ops/cognitive-db/backup-cognitive-db.sh` keeps 7 days by default (the production cron passes 7 as well; the pre-deploy
+dumps of `deploy/lib-db.sh` use the same default).
+
+Still not done, so an erasure is complete for every reader of the database and only partly for its files:
+- VACUUM frees a dead row's space and does not zero it. Compacting the page moves live rows over most freed bytes, but a
+  dead row at the page's free-space edge keeps its bytes until a later write reuses them (probe 2026-10-10, postgres:17,
+  raw file read after CHECKPOINT: a middle row gone after VACUUM, the page's last-inserted row still there) -- a case
+  erased soon after it was written is the likely case. Only a rewrite (`VACUUM FULL`: an exclusive lock on the table for
+  the rewrite) or per-tenant/per-person keys destroyed on erasure would close this; neither is decided.
+- The WAL keeps the rows until its segments are recycled.
+- A nightly dump keeps them until it expires (7 days; a dump quarantined as corrupt expires on the same date); the
+  pre-deploy dumps likewise; any other copy (the SQLite volume
+  and copies of the go-live, GO_LIVE.md D3) until it is deleted.
 
 ## Data move
 

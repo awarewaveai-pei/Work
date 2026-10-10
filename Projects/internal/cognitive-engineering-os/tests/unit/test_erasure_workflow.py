@@ -428,6 +428,21 @@ class ConcurrentDeleteTests(_ErasureCase):
         self.assert_finished()
 
 
+class PhysicalRetentionTests(_ErasureCase):
+    def _manual_vacuums(self) -> dict[str, int]:
+        return {row[0]: row[1] for row in self._sql("SELECT relname, vacuum_count FROM pg_stat_user_tables WHERE schemaname = current_schema()")}
+
+    def test_after_an_erasure_every_table_it_left_dead_rows_in_is_vacuumed(self):
+        """The retention decision (STORAGE_SWITCH.md "Physical retention decision"): the decision's and the completion's
+        tables are VACUUMed after their commits, so the erased rows are pruned from the data files, not only unreadable."""
+        before = self._manual_vacuums()
+        self.assertEqual(self.erase().status_code, 200)
+        erasure._VACUUMS.submit(lambda: None).result(timeout=120)   # one worker, in order: every VACUUM queued before ran
+        after = self._manual_vacuums()
+        vacuumed = {table for table, count in after.items() if count > before.get(table, 0)}
+        self.assertLessEqual({"events", "platform_projects", "prov_sources", "project_interpretations", "collect_grant", "erasure_jobs", "erasure_items"}, vacuumed)
+
+
 class AccountTests(GovernApiTestCase):
     """(h) The account deletion: each case through the same workflow, then the person's own part as one decision."""
 
