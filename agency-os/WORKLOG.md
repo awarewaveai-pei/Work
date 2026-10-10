@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-10（續2）HCI-30 restore drill CI 紅 32 天 → 改成 glob migration 目錄
+
+**根本問題**: `.github/workflows/hci30-restore-drill.yml` 手列 migration 0001–0011；fixture `0001_synthetic.sql:137` 開始寫 0016 才建的 `hci.case_report_snapshots` → source job 第一步就死（run 35340652567），2026-09-08 起連 8 次紅，restore 演練等於關了 32 天。不變量：drill 套用的 migration 集合 = 目錄裡全部 `*_up.sql`，不可手抄。
+
+**已修改**:
+- `.github/workflows/hci30-restore-drill.yml`：手列改 `migrations/[0-9][0-9][0-9][0-9]_*_up.sql` glob（4 位數前綴排序 = 號碼順序）＋ 0 個命中即 exit 1。
+- `Projects/internal/hci30/security/DR_RESTORE_DRILL_RECORD.md`：Mechanism 改述 glob；Findings 加這次紅的根因。
+- `Projects/internal/hci30/app/README.md:7`：「the 11 Wave 1 migrations」→「every Wave 1 migration」（dev-db-init 實際套 20）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scratchpad/drill.sh（兩個 postgres:15.8 拋棄式容器照 workflow 重播：20 migrations + fixture → pg_dump → 另一容器 pg_restore → 6 表 marker MATCH → negative suite 303 assertions 0 failed） | exit=0 | ms=12196
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex oracle NO FINDINGS
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/hci30,.github | grep=11 Wave 1 migrations|all 11 (Wave 1 )?migrations|hci30-restore-drill | hits=13
+- ORACLE: agency-os/reports/oracle/2026-10-10-partialreview-75c04c14.md
+
+**剩餘風險**: 同類手列仍在 `Projects/internal/hci30/scripts/test-wave1-local.ps1:9-29`、`mutation-check-wave1.ps1:30-49`、`dev-db-init.ps1:52`（`1..20`），目前都到 0020、不紅；加 0021 時要一起改。CI 真跑待 push 後 workflow_dispatch 確認。
+
+**Rollback**: `git revert <本 commit>`。
 ## 2026-10-10（續1）認知主權平台第 3、4 步完成並上線（cognitive.aware-wave.com → PostgreSQL）
 
 **根本問題**: 第 3、4 步（COLLAB、GOVERN、TEACH、EXPRESS、FACILITATE、過程指標）在 worktree 分批完成後要合進 main 並上線；main 的引擎已只認 PostgreSQL，但部署路徑仍是 SQLite（`docker-compose.yml:22`）、沒有搬資料程式、沒有獨立 cognitive-db 的受控安裝 → 照原樣部署網站會起不來。

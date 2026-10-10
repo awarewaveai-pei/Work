@@ -6,7 +6,7 @@
 
 `.github/workflows/hci30-restore-drill.yml`. Two GitHub Actions jobs on two independently-provisioned runner VMs, connected only by an uploaded artifact (no shared filesystem):
 
-1. **produce-dump** — applies all 11 Wave 1 migrations + fixtures, records a per-table row-count marker, `pg_dump -Fc`, `pg_dumpall --roles-only` (captured for a future generic-replay drill, not consumed by this one), uploads both + the marker as an artifact.
+1. **produce-dump** — applies every `migrations/NNNN_*_up.sql` in number order (globbed, so a new migration is included automatically) + fixtures, records a per-table row-count marker, `pg_dump -Fc`, `pg_dumpall --roles-only` (captured for a future generic-replay drill, not consumed by this one), uploads both + the marker as an artifact.
 2. **restore-and-verify** — downloads the artifact, recreates the two app roles (`hci_app_test_a`/`hci_app_test_b` — cluster-scoped, not inside a database-scoped dump, see Findings below), `pg_restore`, re-checks the row-count marker, then re-runs the **existing** `database/tests/wave1-negative-tests.sql` suite against the restored schema — proof that RLS/triggers/grants survive the cycle, not just that `pg_restore` exited 0.
 
 Why this satisfies "cross-box" today: the dev machine this repo is normally worked on has no second non-production box. The only other machine is `ks-aw-01` (production); putting synthetic HCI data on it would violate this product's own test/prod isolation (`README.md`). Two separate, ephemeral GitHub Actions runners are a genuine second box at zero infrastructure cost.
@@ -20,6 +20,7 @@ Restore timing/RPO/RTO at real data volume (this is the Wave 1 synthetic fixture
 ## Findings from actually running it (not assumed going in)
 
 - **Cluster-scoped roles are outside a database-scoped `pg_dump`.** `hci_app_test_a`/`hci_app_test_b` are `CREATE ROLE` (cluster-level); `pg_dump <db>` only captures database objects and the GRANTs referencing those role *names* — restoring into a cluster that never had the roles would either fail or silently drop the GRANTs, depending on `pg_restore`'s per-statement error handling. Fixed by recreating both roles (same DDL as `migrations/0001_wave1_synthetic_up.sql`) before `pg_restore`, not by discovering this during a real incident.
+- **Red 2026-09-08 → 2026-10-10 (8 runs), drill off the whole time.** The workflow listed migrations 0001–0011 by hand; the fixture began seeding tables from 0012+ (`relation "hci.case_report_snapshots" does not exist`, run `35340652567`). Fixed by globbing the migration directory instead of listing it.
 - **First real run (`34137801181`) failed, and correctly so** — not the restore, the drill's own marker-checkpoint design. The negative-test suite legitimately `INSERT`s rows as part of its own assertions (DSR lifecycle, Case lifecycle); running it *before* the row-count comparison compared "source pre-test" against "target post-test" and never had a chance to match, independent of restore correctness. Fixed (`7c9584123`) by moving the comparison to immediately after `pg_restore`, before the suite runs, on both sides.
 
 ## Drill log

@@ -4,7 +4,7 @@ Not a product, not P1/P2/P3 work. One real endpoint (`GET /api/hci/v1/cases`, pe
 
 ## Run it
 
-1. `powershell -ExecutionPolicy Bypass -File ../scripts/dev-db-init.ps1` — starts a persistent local Postgres (`127.0.0.1:5433`, gitignored generated password at `../infra/local/.env.dev`), applies the 11 Wave 1 migrations + synthetic fixtures once. Safe to re-run — skips migration if `hci.cases` already exists.
+1. `powershell -ExecutionPolicy Bypass -File ../scripts/dev-db-init.ps1` — starts a persistent local Postgres (`127.0.0.1:5433`, gitignored generated password at `../infra/local/.env.dev`), applies every Wave 1 migration + synthetic fixtures once. Safe to re-run — skips migration if `hci.cases` already exists.
 2. `npm install && npm start` (or `preview_start` with the `hci30-app` entry in `.claude/launch.json`) — serves on `:4030`.
 
 ## What it proves, not just claims

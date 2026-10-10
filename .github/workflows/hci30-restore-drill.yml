@@ -74,22 +74,18 @@ jobs:
             sudo apt-get install -y --no-install-recommends postgresql-client
           fi
 
-      - name: Apply all 11 Wave 1 migrations + synthetic fixtures
+      - name: Apply every Wave 1 migration + synthetic fixtures
+        # Globbed, not listed: a hand-kept list of 11 stayed red from 2026-09-08
+        # to 2026-10-10 once the fixture began seeding tables from 0012+.
+        # The glob sorts by the 4-digit prefix, so order = migration number.
         run: |
           set -e
+          shopt -s nullglob
           cd "$HCI_ROOT/database"
-          for f in migrations/0001_wave1_synthetic_up.sql \
-                   migrations/0002_wave1_case_aggregate_up.sql \
-                   migrations/0003_wave1_regulatory_market_scope_up.sql \
-                   migrations/0004_wave1_source_provenance_up.sql \
-                   migrations/0005_wave1_bitemporal_history_up.sql \
-                   migrations/0006_wave1_bitemporal_scope_fence_up.sql \
-                   migrations/0007_wave1_crypto_shredding_up.sql \
-                   migrations/0008_wave1_field_author_class_policy_up.sql \
-                   migrations/0009_wave1_adr0019_hardening_up.sql \
-                   migrations/0010_wave1_epistemic_label_up.sql \
-                   migrations/0011_wave1_trust_domain_scope_up.sql \
-                   fixtures/0001_synthetic.sql; do
+          migs=(migrations/[0-9][0-9][0-9][0-9]_*_up.sql)
+          [ "${#migs[@]}" -gt 0 ] || { echo "no *_up.sql migrations found"; exit 1; }
+          echo "-- ${#migs[@]} migrations"
+          for f in "${migs[@]}" fixtures/0001_synthetic.sql; do
             echo "-- applying $f"
             psql -v ON_ERROR_STOP=1 -f "$f"
           done
