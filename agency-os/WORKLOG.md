@@ -64,13 +64,13 @@
 
 **發現**:
 - F1 VACUUM 不會把空間清零（postgres:17 探測，CHECKPOINT 後用 `pg_read_binary_file` 讀原始檔）：中間的列 VACUUM 後不見了，但頁面上最後插入的那一列位元組還在。所以剛寫入就被抹除的案件很可能還留在檔案裡；只有 `VACUUM FULL`（重寫時鎖表）或每人金鑰才能補，未決定。WAL、dump（7 天）、go-live 複本同樣還留著。
-- F2 第一次跑 affected 時，背景 worker 太晚才查 region（別的測試已清空 directory，查到 `region None`）→ 改成 commit 後當下查。
+- F2 第一次跑 affected 時，背景 worker 太晚才查 region（別的測試已清空 directory，查到 `region None`）→ 改成 commit 後當下查。（第一次跑在共用工作樹上 1500 s 逾時，exit 124，沒有任何失敗；是我設的時間上限不夠，不是範圍問題。）
 
 **驗證結果**:
 - REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest tests/unit/test_erasure_workflow.py -q (36 passed, 4 subtests, real PostgreSQL container) | exit=0 | ms=54555
 - REALTEST_EVIDENCE: tool=Bash | cmd=mutation physical_retention_hook=no-op -> pytest -k PhysicalRetention (1 failed: vacuumed=set()) ; restored -> 1 passed | exit=1 | ms=9920
 - REALTEST_EVIDENCE: tool=Bash | cmd=bash snippet of backup-cognitive-db.sh quarantine expiry on temp dir (2026-09-01 .corrupt removed, 2026-10-10 kept, cutoff 2026-10-04) | exit=0 | ms=200
-- REALTEST_WAIVED: NA -- `affected_tests.py --base HEAD~1 --run` 在共用工作樹上 1500 s 逾時（exit 124；diff 含其他 session 未 commit 的 40 個模組／73 個測試模組）；commit 後在拋棄式 worktree 重跑，結果見回報
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --base HEAD~1 --run (throwaway worktree D:/tmp/cos-aff-3f49 at 3f49bf053; 40 changed modules = db.py import fan-out, 73 test modules; Ran 1541 tests OK) | exit=0 | ms=1432222
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- Codex oracle agency-os/reports/oracle/2026-10-10-partialreview-aebf8178.md；F1 .corrupt dump 不會過期、F2 VACUUM 等鎖沒有上限、F3 submit 例外造成 500、F4 測試漏 project_interpretations，四項都已修並重測
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=physical_retention_hook | hits=6
 - ORACLE_WAIVED: 共用工作樹上有其他 session 未 commit 的改動，整 repo 審查會連他們的也一起審 → 改用 -Path 部分審查（artifact 2026-10-10-partialreview-aebf8178），四項 finding 修完後重跑模組＋突變
