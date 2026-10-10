@@ -75,7 +75,7 @@
 - BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=physical_retention_hook | hits=6
 - ORACLE_WAIVED: 共用工作樹上有其他 session 未 commit 的改動，整 repo 審查會連他們的也一起審 → 改用 -Path 部分審查（artifact 2026-10-10-partialreview-aebf8178），四項 finding 修完後重跑模組＋突變
 
-**剩餘風險**: F1 那些殘留（空間沒清零、WAL、dump）；背景 VACUUM 在行程結束前沒跑完就交給 autovacuum；帳號抹除的路徑（decide_groups／decide_person）只做了靜態閱讀，沒有專屬測試（操作者規則：不做無效益測試）。**未部署**：正式部署是 High-STOP。
+**剩餘風險**: F1 那些殘留（空間沒清零、WAL、dump）；背景 VACUUM 在行程結束前沒跑完就交給 autovacuum；帳號抹除的路徑（decide_groups／decide_person）只做了靜態閱讀，沒有專屬測試（操作者規則：不做無效益測試）。**已上線**：隨主線部署 merge 3da7835cd 出去（cognitive-os-api 05:09:15 UTC 啟動、healthy；容器內 erasure.py 含 `touched_tables`；15:32 UTC 再跑一次 deploy.sh 全綠，映像相同所以沒重建；`/api/health` = ok）。
 
 **Rollback**: `git revert <this commit>`；沒有 schema 或資料改動。
 ## 2026-10-10（續2）HCI-30 restore drill CI 紅 32 天 → 改成 glob migration 目錄
