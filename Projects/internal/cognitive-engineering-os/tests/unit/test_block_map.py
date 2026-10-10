@@ -310,7 +310,7 @@ class MapAiTests(MapApiTestCase):
 class MapHookTests(MapApiTestCase):
     def test_a_gap_proposes_gather_once_and_saving_again_with_the_same_gap_proposes_nothing(self):
         first = self._save_map({"gaps": ["合約原文"]})
-        self.assertEqual([(n["propose"], n["open"], n["why"]) for n in first["notices"] if n["type"] == "proposal"], [("GATHER", False, WHY_GATHER)])   # recorded; GATHER opens in step 2
+        self.assertEqual([(n["propose"], n["open"], n["why"]) for n in first["notices"] if n["type"] == "proposal"], [("GATHER", True, WHY_GATHER)])
         again = self._save_map({"gaps": ["合約原文"], "layers": {"facts": [FACT]}}, first)
         self.assertEqual([n for n in again["notices"] if n["type"] == "proposal"], [])
         self.assertEqual(self._proposals(), ["GATHER"])

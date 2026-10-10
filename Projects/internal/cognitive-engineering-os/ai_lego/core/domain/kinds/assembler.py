@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from ai_lego.core.domain.blocks import BLOCKS
 from ai_lego.core.domain.doc_kinds import DocKind, Field
 
 # 你選目的 (the seven purposes; 公共議題判斷 is ours)
@@ -20,9 +21,10 @@ PURPOSE_PACKAGE = {"自我理解": "自我理解", "複雜決策": "個人複雜
                    "學習反思": "課堂反思", "團隊審議": "團隊審議", "公共議題判斷": "公共議題判斷"}
 # Which build step opens a package (supervisor MY_DECISIONS: 首批 = 自我理解、個人複雜決策、創意與策略衝刺)
 PACKAGE_OPENS_AT = {"自我理解": 1, "個人複雜決策": 1, "創意與策略衝刺": 1, "可疑訊息判斷": 2, "公共議題判斷": 2, "團隊審議": 3, "課堂反思": 4}
-# Blocks built so far; a proposal for any other block is recorded and shown as 「這一塊還沒開放」
-OPEN_BLOCKS = ("SENSE", "MAP", "THINK", "DECIDE", "ACT", "LEARN", "GOVERN")
-BUILD_STEP = 1
+# Blocks built so far; a proposal for any other block is recorded and shown as 「這一塊還沒開放」. Merging a step into
+# main opens its blocks (test_every_built_block_is_open): steps 2-4 merged 2026-10-08..10 but stayed shut until 2026-10-10.
+OPEN_BLOCKS = BLOCKS
+BUILD_STEP = 4
 
 KINDS = [
     DocKind("assembler.intake", "ASSEMBLER", "開案資料", {

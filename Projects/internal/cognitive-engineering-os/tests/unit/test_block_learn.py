@@ -119,7 +119,7 @@ class CalibrationTests(LearnBase):
 
     def test_the_blocks_picked_for_the_next_round_go_to_the_assembler_once_each(self):
         saved = self.save("learn.calibration", {**REVIEW, "next_blocks": ["GATHER", "COMPUTE"]})
-        self.assertEqual([(n["by"], n["propose"], n["open"]) for n in saved["notices"] if n["type"] == "proposal"], [("LEARN", "GATHER", False), ("LEARN", "COMPUTE", False)])
+        self.assertEqual([(n["by"], n["propose"], n["open"]) for n in saved["notices"] if n["type"] == "proposal"], [("LEARN", "GATHER", True), ("LEARN", "COMPUTE", True)])
         again = self.client.put(f"{self.base}/docs/learn.calibration/{saved['doc_id']}", json={"content": {**REVIEW, "next_blocks": ["GATHER", "COMPUTE", "VERIFY"]}, "base_version": 1}).json()
         self.assertEqual([n["propose"] for n in again["notices"] if n["type"] == "proposal"], ["VERIFY"])   # only what is new
         self.assertEqual(sorted(item["propose"] for item in self.client.get(f"{self.base}/proposals").json()), ["COMPUTE", "GATHER", "VERIFY"])
@@ -139,7 +139,7 @@ class CalibrationTests(LearnBase):
     def test_the_blocks_not_used_yet_are_listed_for_the_person_to_pick_from(self):
         self.save("decide.judgment", LEAN)
         unused = {item["code"]: item["open"] for item in self.client.get(f"{self.base}/learn/unused_blocks").json()["unused"]}
-        self.assertEqual((unused["GATHER"], unused["COMPUTE"], unused["ACT"]), (False, False, True))
+        self.assertEqual((unused["GATHER"], unused["COMPUTE"], unused["ACT"]), (True, True, True))
         self.assertNotIn("DECIDE", unused)
         self.assertNotIn("LEARN", unused)
 

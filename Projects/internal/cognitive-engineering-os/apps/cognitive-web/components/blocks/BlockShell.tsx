@@ -6,7 +6,7 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
-import { BLOCKS, blockOf, docs, isOpen, route, type BlockCode, type Notice, type Route, type RouteStop } from "../../lib/blocks";
+import { BLOCKS, blockHref, blockOf, docs, isOpen, route, type BlockCode, type Notice, type Route, type RouteStop } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { AskBeforeBlock, CollabPermissions } from "./CollabPermissions";
 import type { Project } from "../../lib/projects";
@@ -48,7 +48,7 @@ export function Slots({ projectId, current, route: path }: { projectId?: string;
         if (block.code === current) return <span key={block.code} className="now" aria-current="page" title={title}>{label}</span>;
         if (!isOpen(block)) return <i key={block.code} title={`第 ${block.step} 步才開放`}>{label}</i>;
         if (!projectId) return <span key={block.code}>{label}</span>;
-        return <Link key={block.code} className={state} title={title} href={`/projects/${encodeURIComponent(projectId)}/${block.path}`}>{label}</Link>;
+        return <Link key={block.code} className={state} title={title} href={blockHref(projectId, block)}>{label}</Link>;
       })}
     </nav>
   );
@@ -74,7 +74,7 @@ function GoOn({ projectId, code, path }: { projectId: string; code: BlockCode; p
   return (
     <div className="tabnext">
       {block
-        ? <Link className="btn primary" href={`/projects/${encodeURIComponent(projectId)}/${block.path}`}>下一塊：{block.name} →</Link>
+        ? <Link className="btn primary" href={blockHref(projectId, block)}>下一塊：{block.name} →</Link>
         : <Link className="btn" href={`/projects/${encodeURIComponent(projectId)}`}>回到案子</Link>}
       <span className="sub">不想寫了也可以直接往下走；這一塊隨時可以回來。</span>
     </div>
@@ -104,7 +104,7 @@ function Where({ projectId, code, path, error }: { projectId: string; code: Bloc
         ? <>你在{intake}選的「{why.package}」套件排了這一塊。</>
         : <>「{blockOf(why.by)?.name ?? why.by}」提議加，你同意了：{why.text}</>}</p>}
       <p className="mb0"><b>下一塊：</b>{next
-        ? <><Link href={`/projects/${encodeURIComponent(projectId)}/${blockOf(next.code)?.path}`}>{blockOf(next.code)?.n} {blockOf(next.code)?.name}</Link>：{blockOf(next.code)?.does}。{closed && <span className="sub">（{closed}，先跳過。）</span>}</>
+        ? <><Link href={blockHref(projectId, blockOf(next.code)!)}>{blockOf(next.code)?.n} {blockOf(next.code)?.name}</Link>：{blockOf(next.code)?.does}。{closed && <span className="sub">（{closed}，先跳過。）</span>}</>
         : none}</p>
     </div>
   );

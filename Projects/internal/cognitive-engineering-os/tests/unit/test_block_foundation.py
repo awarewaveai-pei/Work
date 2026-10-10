@@ -112,9 +112,35 @@ class WebBlockListTests(PgTestCase):
         from ai_lego.core.domain.kinds.assembler import OPEN_BLOCKS
 
         web = PRODUCT_ROOT / "apps" / "cognitive-web"
-        paths = dict(re.findall(r'\{ code: "([A-Z]+)", n: \d+,.*?path: "([a-z]+)"', (web / "lib" / "blocks.ts").read_text(encoding="utf-8")))
-        missing = [code for code in OPEN_BLOCKS if not (web / "app" / "(shell)" / "projects" / "[id]" / paths[code] / "page.tsx").is_file()]
-        self.assertEqual(missing, [])
+        rows = re.findall(r'\{ code: "([A-Z]+)", n: \d+,.*?path: "([a-z]+)"(?:, home: "(/[a-z/]+)")?', (web / "lib" / "blocks.ts").read_text(encoding="utf-8"))
+        shell = web / "app" / "(shell)"
+        page = {code: (shell.joinpath(*home.strip("/").split("/")) if home else shell / "projects" / "[id]" / path) / "page.tsx" for code, path, home in rows}
+        self.assertEqual([code for code in OPEN_BLOCKS if not page[code].is_file()], [])
+
+    def test_every_built_block_is_open(self):
+        """A step merged into main opens its blocks. Steps 2-4 merged 2026-10-08..10 with OPEN_BLOCKS still at step 1: seven
+        built blocks were greyed out on the live site and the integrity gate never looked at them (it gates open ones)."""
+        from ai_lego.core.domain.blocks import BLOCKS
+        from ai_lego.core.domain.kinds.assembler import OPEN_BLOCKS
+        from ai_lego.platform import integrity
+
+        built = [row.block for row in integrity.run() if row.block in BLOCKS and row.built]
+        self.assertGreaterEqual(len(built), 14)
+        self.assertEqual(sorted(set(built) - set(OPEN_BLOCKS)), [])
+
+    def test_every_top_level_platform_page_is_in_the_menu(self):
+        """A page a person starts from (no [id] in its path, at most two levels deep) has a main-menu item (AppNav.tsx NAV);
+        2026-10-10: 我的群組、帶領、課程、校準、我的資料 had none, so the live site looked like the old one."""
+        import re
+        from ai_lego import PRODUCT_ROOT
+
+        web = PRODUCT_ROOT / "apps" / "cognitive-web"
+        shell = web / "app" / "(shell)"
+        pages = ["/" + "/".join(page.relative_to(shell).parts[:-1]) for page in shell.rglob("page.tsx")]
+        starts = sorted({path for path in pages if "[" not in path and path.count("/") <= 2} - {"/"})
+        hrefs = set(re.findall(r'href: "([^"]+)"', (web / "components" / "AppNav.tsx").read_text(encoding="utf-8")))
+        self.assertIn("/groups", starts)
+        self.assertEqual([path for path in starts if path not in hrefs], [])
 
     def test_every_refusal_a_block_can_give_has_a_sentence(self):
         """拒收用人話: every code the blocks, the gate and the record raise is in lib/errors.ts CODES, or named here as a
@@ -276,7 +302,7 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
 
     def test_someone_elses_claim_proposes_verify(self):
         card = self._card("聽說同業都這樣改")
-        self.assertEqual([(n["type"], n["propose"], n["open"]) for n in card["notices"]], [("proposal", "VERIFY", False)])
+        self.assertEqual([(n["type"], n["propose"], n["open"]) for n in card["notices"]], [("proposal", "VERIFY", True)])
         self.assertEqual(self._card("網路上寫他們常這樣")["notices"], [])   # one open proposal at a time
 
     def test_a_crisis_word_in_a_card_brings_help(self):
@@ -388,6 +414,7 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         stored = self.client.get(f"{self.base}/docs/{proposal['kind']}").json()[0]
         self.assertEqual(stored["author"], "system")
 
+    @patch("ai_lego.platform.block_hooks.assembler.OPEN_BLOCKS", ("SENSE", "MAP", "THINK", "DECIDE", "ACT", "LEARN", "GOVERN"))   # every block is open since 2026-10-10: shut VERIFY so the guard is still exercised
     def test_the_route_is_my_order_plus_what_i_accepted_and_shows_what_i_did(self):
         self.assertEqual(self.client.get(f"{self.base}/route").json(), {"purpose": None, "package": None, "blocks": [], "done": []})
         gone = self._card()
@@ -417,6 +444,7 @@ class BlockFoundationApiTests(ProjectSourceApiTestCase):
         self.assertEqual([(item["open"], item["done"]) for item in route["blocks"]], [(True, True), (True, False), (True, False), (True, False)])
         self.assertEqual(route["done"], ["SENSE"])
 
+    @patch("ai_lego.platform.block_hooks.assembler.OPEN_BLOCKS", ("SENSE", "MAP", "THINK", "DECIDE", "ACT", "LEARN", "GOVERN"))   # every block is open since 2026-10-10: shut VERIFY so the guard is still exercised
     def test_only_made_things_mark_a_slot_and_stored_answers_for_unbuilt_blocks_stay_out(self):
         """critic 2026-10-03 m5: a failed request marked its block 做過; M1: the route took a block not built yet."""
         repo = api_main.app.dependency_overrides[api_main.get_project_source_repository]()

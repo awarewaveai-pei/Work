@@ -6,7 +6,7 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { NotTherapyNotice } from "./GovernParts";
-import { BLOCKS, OPEN_STEP, blockOf, docs, type Doc, type Notice } from "../../lib/blocks";
+import { BLOCKS, OPEN_STEP, blockHref, blockOf, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { BlockShell, Notices } from "./BlockShell";
 
@@ -115,7 +115,7 @@ export function IntakePage({ projectId }: { projectId: string }) {
         <div className="btns mt8"><button className="btn primary big" type="button" disabled={!draft.purpose || !draft.question.trim() || busy} onClick={save}>{busy ? "存檔中…" : held ? "存這一版" : "開案"}</button></div>
         {error && <p className="error">{error}</p>}
       </div>
-      {held && first && <div className="tabnext"><Link className="btn primary" href={`/projects/${encodeURIComponent(projectId)}/${first.path}`}>開始第一塊：{first.name} →</Link></div>}
+      {held && first && <div className="tabnext"><Link className="btn primary" href={blockHref(projectId, first)}>開始第一塊：{first.name} →</Link></div>}
       <p className="sub">每一版開案資料都留著。{BLOCKS.length} 塊積木都在這個案子的頁面上。</p>
     </BlockShell>
   );

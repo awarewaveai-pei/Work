@@ -1,10 +1,12 @@
 // The platform's blocks as the pages show them: the 14 blocks + the 5 always-on parts (ai_lego/core/domain/blocks.py
 // holds the codes; this adds the words a person reads). `step` = the build step a block opens in
-// (ai_lego/core/domain/kinds/assembler.py OPEN_BLOCKS = step 1); a block not open yet is shown, never hidden.
+// (ai_lego/core/domain/kinds/assembler.py BUILD_STEP; steps 1-4 all open since 2026-10-10); a block not open yet is shown, never hidden.
 import { apiFetch } from "./api";
 
 export type BlockCode = "SENSE" | "GATHER" | "MAP" | "THINK" | "VERIFY" | "COMPUTE" | "DECIDE" | "ACT" | "LEARN" | "TEACH" | "EXPRESS" | "FACILITATE" | "COLLAB" | "GOVERN";
-export type Block = { code: BlockCode; n: number; name: string; does: string; path: string; step: number };
+// `home`: a block whose page is not one case's (課程 is yours, 帶領 and 共同程序 are a group's): every link to it goes there,
+// never to /projects/{id}/<path> (a 404; test_every_open_block_has_its_page).
+export type Block = { code: BlockCode; n: number; name: string; does: string; path: string; home?: string; step: number };
 
 export const BLOCKS: Block[] = [
   { code: "SENSE", n: 1, name: "外化", does: "把腦子裡混在一起的東西，一件一張卡放到外面", path: "sense", step: 1 },
@@ -16,15 +18,17 @@ export const BLOCKS: Block[] = [
   { code: "DECIDE", n: 7, name: "判斷", does: "你自己寫結論、依據、信心、什麼會改變它", path: "decide", step: 1 },
   { code: "ACT", n: 8, name: "行動與觀察", does: "走最小、能反悔的一步，持續看結果", path: "act", step: 1 },
   { code: "LEARN", n: 9, name: "回顧校準", does: "回頭對：預測跟結果差在哪", path: "learn", step: 1 },
-  { code: "TEACH", n: 10, name: "課程與演練", does: "開始前的 5 分鐘課、情境演練", path: "teach", step: 4 },
+  { code: "TEACH", n: 10, name: "課程與演練", does: "開始前的 5 分鐘課、情境演練", path: "teach", home: "/me/teach", step: 4 },
   { code: "EXPRESS", n: 11, name: "產出與表達", does: "把判斷說給別人聽", path: "express", step: 4 },
-  { code: "FACILITATE", n: 12, name: "帶領", does: "帶領者陪著走", path: "facilitate", step: 4 },
-  { code: "COLLAB", n: 13, name: "共同程序", does: "有別人也有決定權時，一起決定", path: "collab", step: 3 },
+  { code: "FACILITATE", n: 12, name: "帶領", does: "帶領者陪著走", path: "facilitate", home: "/lead", step: 4 },
+  { code: "COLLAB", n: 13, name: "共同程序", does: "有別人也有決定權時，一起決定", path: "collab", home: "/groups", step: 3 },
   { code: "GOVERN", n: 14, name: "安全、資料與治理", does: "保護你：匯出、刪除、危機轉介、護欄", path: "govern", step: 1 },
 ];
-export const OPEN_STEP = 1;
+export const OPEN_STEP = 4;
 export const blockOf = (code: string) => BLOCKS.find((block) => block.code === code);
 export const isOpen = (block: Block) => block.step <= OPEN_STEP;
+/** Where a link to ``block`` goes from case ``projectId``: the case's own page, or the block's ``home``. */
+export const blockHref = (projectId: string, block: Block) => block.home ?? `/projects/${encodeURIComponent(projectId)}/${block.path}`;
 
 // A block's document as the API returns it (ai_lego/data/repositories/case_docs.py).
 export type Author = "user" | "ai" | "joint" | "system";

@@ -142,7 +142,8 @@ class TheLiveBlocks(unittest.TestCase):
         live = Snapshot.live()
         unbuilt = dataclasses.replace(live, kinds={name: kind for name, kind in live.kinds.items() if kind.block != "TEACH"},
                                       actions={name: action for name, action in live.actions.items() if action.block != "TEACH"},
-                                      hooks={name: hooks for name, hooks in live.hooks.items() if not name.startswith("teach.")})
+                                      hooks={name: hooks for name, hooks in live.hooks.items() if not name.startswith("teach.")},
+                                      open_blocks=tuple(block for block in live.open_blocks if block != "TEACH"))
         rows = {row.block: row for row in integrity.run(unbuilt)}
         self.assertEqual(rows["TEACH"].status, "NOT BUILT")
 

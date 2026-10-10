@@ -72,4 +72,13 @@ describe("main menu section of a path", () => {
     expect(sectionOf("/workflows")).toBe("workflows");
     expect(sectionOf("/projects")).toBe("projects");
   });
+  it("the platform pages sit under their own items, a group's 帶領 page under 帶領", () => {
+    expect(sectionOf("/groups")).toBe("groups");
+    expect(sectionOf("/groups/g1")).toBe("groups");
+    expect(sectionOf("/groups/g1/lead")).toBe("lead");
+    expect(sectionOf("/lead")).toBe("lead");
+    expect(sectionOf("/me/teach")).toBe("teach");
+    expect(sectionOf("/me/learn")).toBe("calibrate");
+    expect(sectionOf("/me/data")).toBe("data");
+  });
 });

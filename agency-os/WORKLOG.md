@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-10（續5）認知平台上線後看起來還是舊版：第 2–4 步的積木沒開、主選單沒有新頁面
+
+**根本問題**: 操作者看 cognitive.aware-wave.com「沒有新的操作模式，還是舊版」。線上確實是 a7f21c3b（新版），但兩個開關沒動：
+- C1 `ai_lego/core/domain/kinds/assembler.py` `OPEN_BLOCKS` 還是第 1 步的 7 塊、`BUILD_STEP = 1`；網頁 `apps/cognitive-web/lib/blocks.ts` `OPEN_STEP = 1`。第 2–4 步合併時沒有人照 `docs/platform/STEP2_SHARED_RULES.md:160`「合併時開放」去調，案子裡 GATHER/VERIFY/COMPUTE/TEACH/EXPRESS/FACILITATE/COLLAB 七塊是灰的，integrity 上線關卡也只看開放的積木。
+- C2 `apps/cognitive-web/components/AppNav.tsx` 只有舊的 6 項；/groups、/lead、/me/teach、/me/learn、/me/data 沒有入口（`STEP34_CHECKLIST.md` 寫著 NOT YET，監工頁卻全標「有」）。`sectionOf` 把這些頁都算成「工具」。
+
+**已修改**:
+- `OPEN_BLOCKS = BLOCKS`、`BUILD_STEP = 4`、`OPEN_STEP = 4`。
+- 主選單加 我的群組／帶領／課程／校準／我的資料，`sectionOf` 各自對應（群組的帶領頁歸「帶領」）。
+- 手機底部選單改左右滑（`docs/mockups/design-system.css` → `sync-design-system.py` 同步到網頁與 5 個 mock，check-mocks 綠）。
+- 關掉這一類：`tests/unit/test_block_foundation.py` 新增 `test_every_built_block_is_open`（integrity 認定已建的積木都要開放）、`test_every_top_level_platform_page_is_in_the_menu`（沒有 [id]、兩層內的頁面都要有選單項）。
+- `STEP34_CHECKLIST.md` 兩行 NOT YET 改 built。
+- 開放後抓到的真問題：TEACH/FACILITATE/COLLAB 的頁面不在案子底下（/me/teach、/lead、/groups），案子格子會連到 404。`lib/blocks.ts` 加 `Block.home` + `blockHref()`，BlockShell 三處連結與 IntakePage 第一塊都改用它；`test_every_open_block_has_its_page` 認 `home`。
+- 舊測試寫死第 1 步的 `open: False`（decide/foundation/learn/map 共 6 處）改成現況；兩個「未開放積木」守衛的測試改 patch `block_hooks.assembler.OPEN_BLOCKS` 關掉 VERIFY，守衛仍被執行；`test_integrity` 未建積木的測試同時把它移出 open_blocks。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run (throwaway worktree D:/tmp/cos-nav, only this change; 1656 tests, 9 failed = the stale step-1 expectations + the 404 links above) | exit=1 | ms=1529551
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_foundation tests.unit.test_block_decide tests.unit.test_block_learn tests.unit.test_block_map tests.unit.test_integrity (after the fixes; 175 tests OK) | exit=0 | ms=172683
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run (cognitive-web, 40 files 346 tests, after the blockHref fix) | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=preview cognitive-web-dev /help at 1280 and 375 wide: 11 menu items, phone bar scrollWidth 646 > 375, page no sideways scroll | exit=0 | ms=5000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex oracle agency-os/reports/oracle/2026-10-10-review-e2531b47.md: NO FINDINGS
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=OPEN_BLOCKS | hits=23
+- ORACLE: agency-os/reports/oracle/2026-10-10-review-e2531b47.md
+
+**避免再發生**: 兩個新測試；之後合併一步卻沒開放，或加了起始頁沒放進選單，測試直接紅。
+
+**Rollback**: `git revert` 這個 commit 再跑 deploy.sh（deploy.sh 失敗會自動退回映像與資料庫）。
 ## 2026-10-10（續4）Weekly workflows security audit 紅 33 天 → verdict pass
 
 **根本問題**: `lobster-factory/packages/workflows` 的 override 下限被新 advisory 追過（fast-uri／hono／brace-expansion／ip-address／engine.io），另有 4 個新 advisory 沒 override（@modelcontextprotocol/sdk、proxy-addr critical、source-map-js、qs）→ 自 2026-09-07 每週紅，最新 verdict `shipped`（engine.io 6.6.9 經 @trigger.dev/sdk→core→socket.io 進 prod 依賴圖）。Issue #23。

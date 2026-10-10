@@ -255,7 +255,7 @@ class ProposalTests(DecideBase):
 
     def test_comparing_cost_income_or_probability_proposes_compute_once(self):
         saved = self.judge({**LEAN, "criteria": "比兩條路的成本和收入"})
-        self.assertEqual([(n["by"], n["propose"], n["open"]) for n in saved["notices"] if n["type"] == "proposal"], [("DECIDE", "COMPUTE", False)])
+        self.assertEqual([(n["by"], n["propose"], n["open"]) for n in saved["notices"] if n["type"] == "proposal"], [("DECIDE", "COMPUTE", True)])
         proposal = self.client.get(f"{self.base}/proposals").json()[0]
         self.client.post(f"{self.base}/docs/assembler.answer", json={"content": {"proposal": proposal["doc_id"], "answer": "declined"}})
         again = self.judge({**LEAN, "criteria": "還是比成本", "revision_reason": "再看"}, base=saved)

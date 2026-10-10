@@ -7,7 +7,7 @@ import { formatTime } from "../lib/time";
 import { AnalysisPage } from "./AnalysisPage";
 import { ProjectList } from "./ProjectList";
 import { ProjectPage } from "./ProjectPage";
-import { BLOCKS, isOpen } from "../lib/blocks";
+import { BLOCKS, blockHref, isOpen } from "../lib/blocks";
 
 vi.mock("../lib/api", async (original) => ({ ...(await original<typeof import("../lib/api")>()), apiFetch: vi.fn() }));
 // the case list's two panels read their own endpoints and have their own tests (RemindersPanel, GovernParts)
@@ -296,7 +296,8 @@ describe("one project", () => {
     });
     const { host, done: finish } = await mount(<ProjectPage projectId="P-OLD" />);
     const links = [...host.querySelectorAll(".journey a")].map((link) => link.getAttribute("href"));
-    expect(links).toEqual(BLOCKS.filter(isOpen).map((block) => `/projects/P-OLD/${block.path}`));
+    expect(links).toEqual(BLOCKS.filter(isOpen).map((block) => blockHref("P-OLD", block)));
+    expect(links).toContain("/me/teach");   // 課程 is yours, not the case's: never /projects/P-OLD/teach (no such page)
     expect(host.querySelector('a[href="/projects/P-OLD/start"]')).not.toBeNull();
     await finish();
   });

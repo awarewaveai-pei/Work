@@ -58,7 +58,8 @@ The page walk of §16 ran at the wave's close (card 80): `scripts/page_walk_step
 - built (card 62): `ai_actions/facilitate.py` -- `play_participant` (reads no record: a reviewed script's step + a practice case + what the leader said; the reply is a participant's, tagged AI, saved as `facilitate.practice_reply`) and `point_at_deviations` (reads the leader's own `facilitate.log` only; the model names a line by number and one of the four don'ts, the SYSTEM copies the line from the log, the wording is 這裡可能偏離「…」：…, a verdict or a score word is refused as the model's failure; every answer ends with the fixed sentence, set by the system: `facilitate.pointers`). Two AI-written kinds were added to `kinds/facilitate.py` (an `AiAction` has to save into one). `tests/unit/test_facilitate_ai.py` scans the actions file: it names no kind but the leader's own and the AI's answers.
 - built (card 62): pages `/lead` (the course with 草稿 marks, the groups I lead, practice with the AI participant, my supervisors found by address, feedback about me, the leaders I supervise: their logs, the appeals about them masked -- a name only when the appeal is named -- and a form for feedback) and `/groups/[id]/lead` (the script step by step with the stop signals of the step, the four don'ts always drawn, 「參與者要停」 stops the step, lights the signals, shows the script's escalation and GOVERN's lines for that participant's place or the general lines when no one is named; what participants chose to show, by who; the log form with 「請 AI 指出可能偏離的地方」; the unit-assigned supervisor note, and for the convener the form to assign one). `lib/facilitate.ts`; sentences in `lib/errors.ts`.
 - NOT CHANGED: `lib/blocks.ts` -- the FACILITATE entry stays (FACILITATE has no case page; its pages are `/lead` and `/groups/[id]/lead`, as COLLAB's are at `/groups`).
-- NOT YET: a link to 帶領 in the main menu (`AppNav.tsx`); practice needs a script whose `state` is `reviewed` -- the three seeds are drafts until the operator reviews them, so the page says so and offers none.
+- built 2026-10-10: 帶領 in the main menu (`AppNav.tsx`; test_every_top_level_platform_page_is_in_the_menu).
+- NOT YET: practice needs a script whose `state` is `reviewed` -- the three seeds are drafts until the operator reviews them, so the page says so and offers none.
 
 ## GOVERN (cards 30-33)
 
@@ -110,7 +111,8 @@ The page walk of §16 ran at the wave's close (card 80): `scripts/page_walk_step
 - built: 「寫完，才看得到別人的」 on the page -- a blind kind is asked `?mine=true` until your own of the round is saved; the full list is not even requested before, and nothing but your own is drawn from that answer (route gained `mine`; `POST .../collab.authority/{id}/revoke` takes back the caller's own share)
 - NOT CHANGED: `lib/blocks.ts` -- COLLAB's entry already exists (step 3); groups are reached at `/groups`, not from a case's block list
 - built: the group page draws `view/shared` as 「分享給這個群組的紀錄」; the route returns `{who, title, lines}` per record -- the words only, built by `ai_lego/platform/collab_shared.py` `PROJECTIONS` (地圖, 主張 / 查證判定 / 查證摘要, 輸出稿, 觀察紀錄 after the group's decision, who is affected in 開案資料); no doc id, version, reader or ref into the sharer's case leaves the server (Codex F4); a kind with no projection is not returned; consent is decided at the read by `visibility.shared_with`; nothing is drawn when the route returns none
-- NOT YET: a link to 我的群組 in the main menu (`AppNav.tsx`); choosing an option's evidence from shared records (`evidence_refs` is stored and checked, the page has no picker)
+- built 2026-10-10: 我的群組 in the main menu (`AppNav.tsx`), and steps 2-4 opened (`BUILD_STEP = 4`; test_every_built_block_is_open).
+- NOT YET: choosing an option's evidence from shared records (`evidence_refs` is stored and checked, the page has no picker)
 
 
 ## Process indicators (card 70)
