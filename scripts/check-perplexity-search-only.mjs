@@ -37,7 +37,20 @@ const RECORD_DATA = /^agency-os\/(reports|handoffs|memory)\/.+\.(jsonl|json|txt|
 
 const HOST = /api\.perplexity\.ai/gi;
 const SDK_OR_GATEWAY = /@ai-sdk\/perplexity|@perplexity-ai\/|\bperplexityai\b|ChatPerplexity|createPerplexity|["']perplexity\/|PERPLEXITY_BASE_URL|server-perplexity|perplexity-ask|mcp\/perplexity|perplexity-mcp/i;
-const KEY_READER = /(process\.env|\benv|environ|getenv|\$env:|GetEnvironmentVariable\()[^A-Za-z0-9]{0,4}PERPLEXITY_API_KEY/;
+const KEY_READER = /(process\.env|\benv|environ|getenv|\$env:|GetEnvironmentVariable\()[^A-Za-z0-9]{0,4}PERPLEXITY_API_KEY/g;
+// A plain assignment or `delete` only sets/clears the variable (a test's fake key): no call without HOST or SDK,
+// which are checked separately. `??=`, `||=`, `===` read it, so they stay readers.
+const KEY_WRITE_AFTER = /^\s*(?:["']\s*)?(?:\]\s*)?=(?!=)/;
+const KEY_DELETE_BEFORE = /\bdelete\s+$/;
+
+export function readsKey(text) {
+  for (const m of text.matchAll(KEY_READER)) {
+    const after = text.slice(m.index + m[0].length, m.index + m[0].length + 8);
+    const before = text.slice(Math.max(0, m.index - 8), m.index);
+    if (!KEY_WRITE_AFTER.test(after) && !KEY_DELETE_BEFORE.test(before)) return true;
+  }
+  return false;
+}
 
 export function skipped(file) {
   if (file === SELF || SKIP_EXT.test(file)) return true;
@@ -62,7 +75,7 @@ export function scanText(file, text) {
   }
   const sdk = SDK_OR_GATEWAY.exec(text);
   if (sdk) out.push(`${file}: uses a Perplexity SDK / gateway / MCP package ("${sdk[0]}")`);
-  if (KEY_READER.test(text) && !KEY_READER_ALLOWED.has(file)) {
+  if (readsKey(text) && !KEY_READER_ALLOWED.has(file)) {
     out.push(`${file}: reads PERPLEXITY_API_KEY outside the guarded exits`);
   }
   if (/llm-perplexity/i.test(text) && !LLM_PLUGIN_PROSE_ALLOWED.has(file)) {
@@ -122,6 +135,14 @@ function selfTest() {
     ["agency-os/reports/agent-dispatch/d.ps1", "Invoke-RestMethod https://api.perplexity.ai/chat/completions", 1],
     ["agency-os/memory/x.mjs", "fetch('https://api.perplexity.ai/v1/agent')", 1],
     ["agency-os/config/x.json", '{"url":"https://api.perplexity.ai/chat/completions"}', 1],
+    ["app/t.test.ts", 'process.env.PERPLEXITY_API_KEY = "test-perplexity"', 0],
+    ["app/t.test.ts", "delete process.env.PERPLEXITY_API_KEY", 0],
+    ["app/t.py", 'os.environ["PERPLEXITY_API_KEY"] = "x"', 0],
+    ["app/t.ps1", '$env:PERPLEXITY_API_KEY = "x"', 0],
+    ["app/u.ts", 'process.env.PERPLEXITY_API_KEY = "x"; const k = process.env.PERPLEXITY_API_KEY', 1],
+    ["app/u.ts", 'if (process.env.PERPLEXITY_API_KEY === undefined) {}', 1],
+    ["app/u.ts", 'process.env.PERPLEXITY_API_KEY ??= "x"', 1],
+    ["app/u.py", 'k = os.environ["PERPLEXITY_API_KEY"]', 1],
   ];
   let bad = 0;
   for (const [f, t, want] of cases) {
