@@ -51,7 +51,7 @@
 **剩餘風險**: engine.io 不在已部署的 worker image 內 → 這次不需重新部署；下次正常部署自然帶新樹。braces 2027-01-08、deepmerge-ts 2026-11-23 到期會再擋。Server v4.4.4 落後 SDK 4.5.10，升 server 另案。
 
 **Rollback**: `git revert <本 commit>` 後在 packages/workflows `npm install`。
-## 2026-10-10（續3）COS 抹除後的物理保留：VACUUM 掛點實作＋dump 預設 7 天（未部署）
+## 2026-10-10（續6）COS 抹除後的物理保留：VACUUM 掛點實作＋dump 預設 7 天（未部署）
 
 **根本問題**: PostgreSQL 沒有 `secure_delete`；`erasure.physical_retention_hook` 是空的，抹除後的列留在資料檔直到 autovacuum。決定（2026-10-10，操作者授權，GO_LIVE.md D4）：抹除後 VACUUM 碰過的表＋每晚 dump 留 7 天。
 
@@ -78,7 +78,7 @@
 **剩餘風險**: F1 那些殘留（空間沒清零、WAL、dump）；背景 VACUUM 在行程結束前沒跑完就交給 autovacuum；帳號抹除的路徑（decide_groups／decide_person）只做了靜態閱讀，沒有專屬測試（操作者規則：不做無效益測試）。**未部署**：正式部署是 High-STOP。
 
 **Rollback**: `git revert <this commit>`；沒有 schema 或資料改動。
-## 2026-10-10（續2）HCI-30 restore drill CI 紅 32 天 → 改成 glob migration 目錄
+## 2026-10-10（續3）HCI-30 restore drill CI 紅 32 天 → 改成 glob migration 目錄
 
 **根本問題**: `.github/workflows/hci30-restore-drill.yml` 手列 migration 0001–0011；fixture `0001_synthetic.sql:137` 開始寫 0016 才建的 `hci.case_report_snapshots` → source job 第一步就死（run 35340652567），2026-09-08 起連 8 次紅，restore 演練等於關了 32 天。不變量：drill 套用的 migration 集合 = 目錄裡全部 `*_up.sql`，不可手抄。
 
@@ -96,6 +96,19 @@
 **剩餘風險**: 同類手列仍在 `Projects/internal/hci30/scripts/test-wave1-local.ps1:9-29`、`mutation-check-wave1.ps1:30-49`、`dev-db-init.ps1:52`（`1..20`），目前都到 0020、不紅；加 0021 時要一起改。CI 真跑待 push 後 workflow_dispatch 確認。
 
 **Rollback**: `git revert <本 commit>`。
+## 2026-10-10（續2）Perplexity Search-only guard 紅（自 10-08）：KEY_READER 把「寫入假 key」當讀取
+
+**根因**: `scripts/check-perplexity-search-only.mjs:40` KEY_READER 正則不分讀寫；`c83b557e6` 的 `next-admin/lib/collect/__tests__/collect-wire-v2.test.ts:92` 只寫假值 `process.env.PERPLEXITY_API_KEY = "test-perplexity"`（證明 claim 忽略 Perplexity）→ 誤報，CI 自 10-08 紅（smoke blockers 9/30 起）。
+**不變量**: guard 管「讀 key 的地方」（`:21`）；寫入/刪除不會產生呼叫——呼叫需 host 或 SDK，另由 `:66`/`:76` 擋。故整類關閉＝寫入不算讀，不加豁免檔、不改測試迴避偵測。
+**已修改**: `scripts/check-perplexity-search-only.mjs` +`readsKey()`（逐一 match；後接 `=`(非 `==`) 或前接 `delete` = 寫）；self-test +8 例（4 寫=0、4 讀=1，含 `===`、`??=`、讀寫同檔）。`TASKS.md` +1 已知限制（間接讀 `process.env[name]`／`environ.get` 本來就抓不到，非本次引入）。
+**驗證**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/check-perplexity-search-only.mjs --self-test (25 cases ok) && node scripts/check-perplexity-search-only.mjs (ok, 7796 files) | exit=0 | ms=936
+- 修前 base `4aa0925` 同指令 exit=1（唯一違規 collect-wire-v2.test.ts）；讀者集合修前後比對：只有該檔由 READER→write-only，其餘 5 檔不變。
+- 突變：寫=讀 → self-test 3 FAIL exit=1；全當寫 → 3 FAIL exit=1；還原 exit=0。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n -- 對抗自審：>8 空白的賦值被當讀（保守側誤報，可接受）；n1=間接讀盲點已開 TASKS
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,.github,lobster-factory | grep=KEY_READER|readsKey | hits=5
+- ORACLE_WAIVED: 遠端 container 無 codex CLI；以突變雙向證據＋讀者集合差分代替
+**Rollback**: `git revert <本 commit>`（guard 回到舊正則，CI 會再紅於同一測試檔）。
 ## 2026-10-10（續1）認知主權平台第 3、4 步完成並上線（cognitive.aware-wave.com → PostgreSQL）
 
 **根本問題**: 第 3、4 步（COLLAB、GOVERN、TEACH、EXPRESS、FACILITATE、過程指標）在 worktree 分批完成後要合進 main 並上線；main 的引擎已只認 PostgreSQL，但部署路徑仍是 SQLite（`docker-compose.yml:22`）、沒有搬資料程式、沒有獨立 cognitive-db 的受控安裝 → 照原樣部署網站會起不來。
