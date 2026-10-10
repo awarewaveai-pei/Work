@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-10（續4）Weekly workflows security audit 紅 33 天 → verdict pass
+
+**根本問題**: `lobster-factory/packages/workflows` 的 override 下限被新 advisory 追過（fast-uri／hono／brace-expansion／ip-address／engine.io），另有 4 個新 advisory 沒 override（@modelcontextprotocol/sdk、proxy-addr critical、source-map-js、qs）→ 自 2026-09-07 每週紅，最新 verdict `shipped`（engine.io 6.6.9 經 @trigger.dev/sdk→core→socket.io 進 prod 依賴圖）。Issue #23。
+
+**已修改**:
+- `packages/workflows/package.json`：stale override 下限拉過 advisory 範圍（同 major）；新增 4 個 override；vitest ^4.1.11；新增 devDependency `@types/node ^22.20.5`。
+- 為何加 `@types/node`：`tsconfig.typecheck.json` 要 `types:["node"]` 卻從未宣告，原本靠 engine.io 6.6.9 hoist；patched engine.io 不再帶 → typecheck TS2688。宣告它關掉這類「靠別人 hoist」。
+- `packages/workflows/security-acknowledgements.json`：braces GHSA-vfj7-8cjw-p6xm 加期限接受到 2027-01-08。理由：braces 3.0.3 = 最新版且 advisory 範圍 `<=3.0.3` 全包，無修法；只經 devDependency trigger.dev CLI（直接＋chokidar@3.6.0）。
+- `lobster-factory/infra/trigger/README.md:135-158`：寫死的 `npx trigger.dev@4.4.6`（自 08 月升 4.5.10 就過時；Codex finding）→ `npx trigger`（解析到鎖定版，與部署腳本同一支），不再寫版本號。
+- Trigger 三件套**刻意不升** 4.7.3：先試升過、gate 一樣 pass，但自架 server 是 v4.4.4（ks-aw-01 `docker ps`），4.5.10 已實證可部署；4.7.3 拉大版本差且無資安必要。
+- 報告：`agency-os/reports/security/workflows-npm-audit-LATEST.{md,json}` + `-2026-10-10-044737.md`。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run audit:workflows-security（Gate verdict: pass, shipped high/critical = 0；braces/deepmerge-ts 期限接受） | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test (packages/workflows: 22 files, 143 passed) | exit=0 | ms=2245
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run typecheck (0 errors；改前 TS2688) | exit=0 | ms=2333
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker create+export 部署中 worker image 20260930.1.production.6qpj6hef 列檔（206 套件；ssh2=1 證明列檔有效；braces/chokidar/trigger.dev/engine.io/socket.io-client=0） | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=sed 部署期 buildImage.js patch 對 4.5.10 試跑仍命中 1 行（localBuildImage） | exit=0 | ms=100
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex oracle F1 README CLI 4.4.6 過時，已修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=4\.5\.10|trigger.dev@4.4.6 | hits=17 (package.json 3 處 4.5.10 為現值、trigger.config.ts:11 註解仍正確、其餘為 WORKLOG/archive/oracle 歷史記錄)
+- ORACLE: agency-os/reports/oracle/2026-10-10-partialreview-22762eb9.md
+
+**剩餘風險**: engine.io 不在已部署的 worker image 內 → 這次不需重新部署；下次正常部署自然帶新樹。braces 2027-01-08、deepmerge-ts 2026-11-23 到期會再擋。Server v4.4.4 落後 SDK 4.5.10，升 server 另案。
+
+**Rollback**: `git revert <本 commit>` 後在 packages/workflows `npm install`。
 ## 2026-10-10（續3）COS 抹除後的物理保留：VACUUM 掛點實作＋dump 預設 7 天（未部署）
 
 **根本問題**: PostgreSQL 沒有 `secure_delete`；`erasure.physical_retention_hook` 是空的，抹除後的列留在資料檔直到 autovacuum。決定（2026-10-10，操作者授權，GO_LIVE.md D4）：抹除後 VACUUM 碰過的表＋每晚 dump 留 7 天。

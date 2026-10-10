@@ -132,20 +132,20 @@ docker compose --env-file .env logs -f webapp
 
 **唯一部署入口（2026-09-23 起）**：repo 根目錄 `powershell -ExecutionPolicy Bypass -File scripts/lobster-trigger-deploy.ps1`；push 到 main 且範圍動到 `packages/workflows` 時，post-push hook（`mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1`）自動跑同一支。它在 ks-aw-01 上 build，`syncEnvVars` 要的部署期 env 集中在它的步驟 3。新增 `syncEnvVars` 讀取時要同時在步驟 3 的 `$deployBash` export（或列入 `packages/workflows/src/lib/deployEnv/syncEnvVarsParity.test.ts` 的 `NOT_SYNCED_BY_DEPLOY` 並寫明理由）；腳本部署前先跑該測試，紅就中止。同步語意：送出的鍵覆寫既有值、沒送的鍵不動（CLI `deploy.js syncEnvVarsWithServer`，`override: true`）→ 輪替 token 要重跑一次部署；刪鍵要到 dashboard 手動刪。以下 §7／§7a 是 2026-05 EU 時期的手動流程，只作除錯參考：照它的 `--env-file`（只含 PostHog）部署，其他 runtime 變數都不會同步。
 
-**CLI 版本**：與 `packages/workflows/package.json` 內 **`trigger.dev`** devDependency 對齊（目前 **4.4.6**）。請使用 **`npx trigger.dev@4.4.6`**（勿隨意 `@latest`，避免與已鎖 SDK 漂移）。Server（trigger-webapp）目前為 v4.4.4；CLI 4.4.6 對 Server 4.4.4 相容，已確認（2026-05-21）。
+**CLI 版本**：一律用 `packages/workflows` 內鎖定的 **`trigger.dev`** devDependency——在該目錄跑 **`npx trigger`**（= `./node_modules/.bin/trigger`，部署腳本同一支），不寫死版本號、勿用 `@latest`。Server（trigger-webapp）目前為 v4.4.4；CLI／SDK 4.5.10 對它的部署已實證（最後一次 worker image `20260930.1.production`）。升 `@trigger.dev/*` 前先比對 server 版本。
 
 1. 在 dashboard 建立 **project**，把 **`project`** 寫進 `packages/workflows/trigger.config.ts`。  
 2. **兩種金鑰勿混用**（與 [官方 API keys](https://trigger.dev/docs/apikeys) 一致）：  
    - **Project → API keys → Production secret key（`tr_prod_*`）**：給後端／SDK 設 **`TRIGGER_SECRET_KEY`**，用於 **從你的 App 觸發已部署的 task**。**不要**把它設成 CLI 的 **`TRIGGER_ACCESS_TOKEN`**。  
    - **Account → Personal Access Tokens（`tr_pat_*`）**：在 **`{APP_ORIGIN}/account/tokens`** 建立（例：`https://trigger.aware-wave.com/account/tokens`）。用於 **`login`／`deploy`／CI** 的 **`TRIGGER_ACCESS_TOKEN`**（自架另可設 **`TRIGGER_API_URL`**，見 [CLI deploy](https://trigger.dev/docs/cli-deploy-commands#self-hosting)）。若儀表板只突出 **Secret key** 一欄，請改到 **帳號／Account** 區找 **PAT**。  
-3. **互動式登入（一次性）**：`npx trigger.dev@4.4.6 login -a <APP_ORIGIN>`（瀏覽器／magic link；無需在指令列預先貼 `tr_pat_*`）。**CI／無頭機**才需事先匯出 **`TRIGGER_ACCESS_TOKEN`（`tr_pat_*`）**。  
+3. **互動式登入（一次性）**：`npx trigger login -a <APP_ORIGIN>`（瀏覽器／magic link；無需在指令列預先貼 `tr_pat_*`）。**CI／無頭機**才需事先匯出 **`TRIGGER_ACCESS_TOKEN`（`tr_pat_*`）**。  
 4. **Deploy 機器**必須能對 **`registry:5000`** 完成 **push** — 見下方 **§7a**。
 
 ```bash
 cd lobster-factory/packages/workflows
-npx trigger.dev@4.4.6 login -a https://trigger.aware-wave.com
+npx trigger login -a https://trigger.aware-wave.com
 # 見 §7a；勿用整包 phase1 .env 當 --env-file（會污染 TRIGGER_ACCESS_TOKEN）
-npx trigger.dev@4.4.6 deploy -p "<project ref>" -a https://trigger.aware-wave.com --env-file <僅含 POSTHOG_API_KEY、POSTHOG_HOST 的檔案>
+npx trigger deploy -p "<project ref>" -a https://trigger.aware-wave.com --env-file <僅含 POSTHOG_API_KEY、POSTHOG_HOST 的檔案>
 ```
 
 **Windows 封裝 `deploy-workflows.ps1`**：2026-09-23 退役（只同步 PostHog、走公網被 Cloudflare BFM 擋、依賴已退租的 EU tunnel），現在執行只會報錯並指向上面的唯一入口。
@@ -155,7 +155,7 @@ npx trigger.dev@4.4.6 deploy -p "<project ref>" -a https://trigger.aware-wave.co
 自架 v4 會在本機 **build** 後 **push** 到 **`https://registry:5000/...`**（映像倉庫在主機名 **`registry`**）。  
 **筆電 Windows** 若未處理 DNS／網路，會出現 **`lookup registry ... no such host`** — 這與 Docker Desktop 是否正常無關。
 
-**路徑 A（首選，最簡運維）**：在 **EU 上跑 Trigger stack 的那台 VPS** SSH 進去，於 repo 內執行上面的 **`npx trigger.dev@4.4.6 deploy`**；並先在該機對 **`127.0.0.1:5000`**（或 compose 公布的 registry 位址）**`docker login`**，帳密與 **`DEPLOY_REGISTRY_USERNAME` / `DEPLOY_REGISTRY_PASSWORD`**（`registry/auth.htpasswd`）一致。
+**路徑 A（首選，最簡運維）**：在 **EU 上跑 Trigger stack 的那台 VPS** SSH 進去，於 repo 內執行上面的 **`npx trigger deploy`**；並先在該機對 **`127.0.0.1:5000`**（或 compose 公布的 registry 位址）**`docker login`**，帳密與 **`DEPLOY_REGISTRY_USERNAME` / `DEPLOY_REGISTRY_PASSWORD`**（`registry/auth.htpasswd`）一致。
 
 > **EU VPS 一次性前置設定**（已完成，2026-05-07）：registry hostname 只在 Docker 內部 DNS 可解析，從 VPS host 部署需額外三步：
 >

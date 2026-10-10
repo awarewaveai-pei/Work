@@ -44,6 +44,29 @@
         "Deployed worker image on EU (registry:5000/trigger/proj_6c4f24492a705729fc2c:20260815.1.production.niakdddd)",
         "scanned directly: deepmerge-ts=0 dirs, @prisma/config=0 dirs, esbuild=0 dirs. Measured, not inferred."
       ]
+    },
+    {
+      "id": 1240992,
+      "ghsa": "GHSA-vfj7-8cjw-p6xm",
+      "package": "braces",
+      "range": "<=3.0.3",
+      "severity": "high",
+      "scope": "dev-only",
+      "acknowledgedOn": "2026-10-10",
+      "reviewBy": "2027-01-08",
+      "reason": [
+        "Stack-exhaustion DoS (CWE-674) from deeply nested brace patterns. Reachable only through the devDependency",
+        "trigger.dev@4.5.10 (the CLI), directly and via chokidar@3.6.0, i.e. file watching during `trigger dev`/deploy",
+        "over this repo's own source paths - never untrusted input, never the deployed worker.",
+        "No upstream remediation exists: braces@3.0.3 is the latest release and the advisory covers every version",
+        "(`<=3.0.3`), so no override can fix it. Re-evaluate when braces publishes a fix or trigger.dev drops chokidar@3."
+      ],
+      "evidence": [
+        "npm audit --omit=dev --audit-level=high in lobster-factory/packages/workflows: exit 0 (2026-10-10).",
+        "npm ls braces --omit=dev: empty - not in the production dependency graph.",
+        "Deployed worker image on ks-aw-01 (registry:5000/trigger/proj_6c4f24492a705729fc2c:20260930.1.production.6qpj6hef)",
+        "listed via docker create + export: 206 node_modules packages, braces/chokidar/trigger.dev = 0. Measured, not inferred."
+      ]
     }
   ]
 }
