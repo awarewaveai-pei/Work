@@ -1,7 +1,7 @@
 // The platform's blocks as the pages show them: the 14 blocks + the 5 always-on parts (ai_lego/core/domain/blocks.py
 // holds the codes; this adds the words a person reads). `step` = the build step a block opens in
 // (ai_lego/core/domain/kinds/assembler.py BUILD_STEP; steps 1-4 all open since 2026-10-10); a block not open yet is shown, never hidden.
-import { apiFetch } from "./api";
+import { apiFetch, type Coalesce } from "./api";
 
 export type BlockCode = "SENSE" | "GATHER" | "MAP" | "THINK" | "VERIFY" | "COMPUTE" | "DECIDE" | "ACT" | "LEARN" | "TEACH" | "EXPRESS" | "FACILITATE" | "COLLAB" | "GOVERN";
 // `home`: a block whose page is not one case's (課程 is yours, 帶領 and 共同程序 are a group's): every link to it goes there,
@@ -44,8 +44,24 @@ export const AUTHOR: Record<Author, string> = { user: "你寫的", ai: "AI 寫�
 const enc = encodeURIComponent;
 const base = (projectId: string | null) => (projectId ? `/projects/${enc(projectId)}` : "/me");
 
+// Every list read in one tick for one case (or for you) is one GET {base}/docs?kinds=a,b (ai_lego/apps/api/blocks/docs.py,
+// answer {"docs": {kind: Doc[]}}); a kind the batch calls unknown (404 DOC_KIND_UNKNOWN) is asked alone, so
+// optionalDocs still sees its own 404 and the other kinds still load.
+const docsBatch = (owner: string, kind: string): Coalesce => ({
+  key: `docs:${owner}`, item: kind, max: 100,
+  url: (kinds) => `${owner}/docs?kinds=${kinds.map(enc).join(",")}`,
+  pick: (payload, item) => {
+    const found = (payload as { docs?: Record<string, unknown> } | null)?.docs?.[item];
+    return Array.isArray(found) ? found : undefined;
+  },
+  alone: (error) => {
+    const code = typeof error.detail === "string" ? error.detail : (error.detail as { code?: unknown } | null)?.code;
+    return error.status === 404 && typeof code === "string" && code.startsWith("DOC_KIND_UNKNOWN");
+  },
+});
+
 export const docs = {
-  list: <C,>(projectId: string | null, kind: string) => apiFetch<Doc<C>[]>(`${base(projectId)}/docs/${enc(kind)}`),
+  list: <C,>(projectId: string | null, kind: string) => apiFetch<Doc<C>[]>(`${base(projectId)}/docs/${enc(kind)}`, undefined, docsBatch(base(projectId), kind)),
   create: <C,>(projectId: string | null, kind: string, content: C) => apiFetch<Saved<C>>(`${base(projectId)}/docs/${enc(kind)}`, { method: "POST", body: JSON.stringify({ content }) }),
   update: <C,>(projectId: string | null, kind: string, doc: Doc<C>, content: C) =>
     apiFetch<Saved<C>>(`${base(projectId)}/docs/${enc(kind)}/${enc(doc.doc_id)}`, { method: "PUT", body: JSON.stringify({ content, base_version: doc.version }) }),

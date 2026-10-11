@@ -6,6 +6,10 @@
 // facilitator (GET /facilitate/me: the facilitator course finished, platform/visibility.py), even on /lead itself.
 // aria-current = "page" on the item whose page this is, "true" on the section a deeper page sits under: a run page and a
 // group sit under 我的案子, a tool page and a lesson under 直接分析, a group's 帶領 page under 帶領.
+// On a phone (B10) the bottom bar holds only the top-level items (each with its icon); the section's sub-pages are a
+// wrapping row of buttons above the page (.subnav), never text-only items in the bar.
+// prefetch={false} on every menu link (A1): Next prefetches each link in view, and a menu on every page is 8-10
+// requests per page counted against the site's 50-per-10-seconds limit; a click still loads the page at once.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import React, { useEffect, useState } from "react";
@@ -50,22 +54,29 @@ export function AppNav() {
   }, []);
   const shown = NAV.filter((item) => item.id !== "lead" || leads);
   const firstBottom = shown.find((item) => item.bottom)?.id;   // the account items sit at the bottom of the sidebar
+  const subs = shown.find((item) => item.id === section)?.subs ?? [];
+  const subCurrent = (sub: NonNullable<Item["subs"]>[number]) => (sub.match(path) ? (sub.href === path ? "page" : "true") : undefined);
   const link = (item: Item) => (
-    <Link key={item.id} className={`navi${item.id === firstBottom ? " navbottom" : ""}`} href={item.href}
+    <Link key={item.id} prefetch={false} className={`navi${item.id === firstBottom ? " navbottom" : ""}`} href={item.href}
       aria-current={item.id === section ? (item.href === path && !item.subs?.some((sub) => sub.href === path) ? "page" : "true") : undefined}>
       <svg className="glyph" viewBox="0 0 24 24" aria-hidden="true" dangerouslySetInnerHTML={{ __html: item.icon }} />
       <span>{item.label}</span>
     </Link>
   );
   return (
-    <nav className="side" aria-label="主選單">
-      <Link className="brand" href="/"><b>{strings.appName}</b><small>{strings.appNameEn}</small></Link>
-      {shown.map((item) => <div key={item.id} className="navgroup">
-        {link(item)}
-        {item.id === section && item.subs?.map((sub) => (
-          <Link key={sub.href} className="navi sub" href={sub.href} aria-current={sub.match(path) ? (sub.href === path ? "page" : "true") : undefined}><span>{sub.label}</span></Link>
-        ))}
-      </div>)}
-    </nav>
+    <>
+      <nav className="side" aria-label="主選單">
+        <Link className="brand" href="/" prefetch={false}><b>{strings.appName}</b><small>{strings.appNameEn}</small></Link>
+        {shown.map((item) => <div key={item.id} className="navgroup">
+          {link(item)}
+          {item.id === section && item.subs?.map((sub) => (
+            <Link key={sub.href} prefetch={false} className="navi sub" href={sub.href} aria-current={subCurrent(sub)}><span>{sub.label}</span></Link>
+          ))}
+        </div>)}
+      </nav>
+      {subs.length > 0 && <nav className="subnav" aria-label="這一區的頁面">
+        {subs.map((sub) => <Link key={sub.href} prefetch={false} className={`btn${subCurrent(sub) ? " primary" : ""}`} href={sub.href} aria-current={subCurrent(sub)}>{sub.label}</Link>)}
+      </nav>}
+    </>
   );
 }

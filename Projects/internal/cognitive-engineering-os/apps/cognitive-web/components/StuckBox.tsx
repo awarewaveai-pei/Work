@@ -6,10 +6,10 @@
 // that matches nothing says so and points to the goal cards instead of guessing.
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import type { Catalog } from "../lib/catalog";
-import { isUserTool, runHref, toolHref } from "../lib/catalog";
+import type { StuckCatalog } from "../lib/catalog";
+import { runHref, toolHref } from "../lib/catalog";
 
-type Pick = { id: string; hits: string[] };
+type Pick = { id: string; name_zh: string; blurb_zh: string; hits: string[] };
 
 /** Terms of a sentence: CJK runs split into 2-char pieces (Chinese has no spaces), latin words as they are. */
 export function termsOf(text: string): string[] {
@@ -21,18 +21,19 @@ export function termsOf(text: string): string[] {
   return [...out];
 }
 
-export function pickTools(catalog: Catalog, text: string, limit = 3): Pick[] {
+// ``catalog``: stuckCatalog() -- only the tools a person may be offered (isUserTool), so no engineering tool is picked.
+export function pickTools(catalog: StuckCatalog, text: string, limit = 3): Pick[] {
   const terms = termsOf(text);
   if (!terms.length) return [];
-  return Object.entries(catalog.methods)
-    .map(([id, m]) => ({ id, hits: terms.filter((t) => `${m.name_zh} ${m.blurb_zh} ${m.name_en}`.toLowerCase().includes(t)) }))
-    .filter((x) => x.hits.length > 0 && isUserTool(catalog, x.id))
+  return catalog.tools
+    .map((m) => ({ id: m.id, name_zh: m.name_zh, blurb_zh: m.blurb_zh, hits: terms.filter((t) => `${m.name_zh} ${m.blurb_zh} ${m.name_en}`.toLowerCase().includes(t)) }))
+    .filter((x) => x.hits.length > 0)
     .sort((a, b) => b.hits.length - a.hits.length || a.id.localeCompare(b.id))
     .slice(0, limit);
 }
 
 // initial: the sentence written on the home page (直接分析 ?q=), already asked so its picks show at once.
-export function StuckBox({ catalog, project, initial = "" }: { catalog: Catalog; project?: string; initial?: string }) {
+export function StuckBox({ catalog, project, initial = "" }: { catalog: StuckCatalog; project?: string; initial?: string }) {
   const [text, setText] = useState(initial);
   const [asked, setAsked] = useState(initial.trim());
   const picks = useMemo(() => (asked ? pickTools(catalog, asked) : []), [catalog, asked]);
@@ -48,16 +49,13 @@ export function StuckBox({ catalog, project, initial = "" }: { catalog: Catalog;
       <div className="btns mt8"><button className="btn primary" type="button" onClick={() => setAsked(text.trim())} disabled={!text.trim()}>幫我挑<small>最多三個建議；先免費比對工具資料</small></button></div>
       {asked && (picks.length ? (
         <div className="mcards mt10" aria-live="polite">
-          {picks.map((p, i) => {
-            const m = catalog.methods[p.id];
-            return (
-              <div className="mcard" key={p.id}>
-                <div><b>{i + 1} <Link href={toolHref(p.id)}>{m.name_zh}</Link></b><span className="tag">工具</span></div>
-                <div><span className="k">為什麼：</span>工具資料裡有「{p.hits.slice(0, 4).join("」「")}」；{m.blurb_zh}</div>
-                <div className="btns"><Link className="btn primary" href={runHref(p.id, project)}>開始 →</Link><Link className="btn" href={toolHref(p.id, project)}>看它做什麼</Link></div>
-              </div>
-            );
-          })}
+          {picks.map((p, i) => (
+            <div className="mcard" key={p.id}>
+              <div><b>{i + 1} <Link prefetch={false} href={toolHref(p.id)}>{p.name_zh}</Link></b><span className="tag">工具</span></div>
+              <div><span className="k">為什麼：</span>工具資料裡有「{p.hits.slice(0, 4).join("」「")}」；{p.blurb_zh}</div>
+              <div className="btns"><Link prefetch={false} className="btn primary" href={runHref(p.id, project)}>開始 →</Link><Link prefetch={false} className="btn" href={toolHref(p.id, project)}>看它做什麼</Link></div>
+            </div>
+          ))}
         </div>
       ) : (
         <p className="sub mt10" aria-live="polite">工具資料裡比不到這句話的字。請換個說法，或從下面「按你想做的事找」的問句進去；用 AI 幫你挑的功能還在做。</p>

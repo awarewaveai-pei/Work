@@ -22,6 +22,16 @@ describe("humanError", () => {
     expect(text).toContain("找不到");
   });
 
+  it("A7: a 429 is the AI budget only when it says so; the site's request limit (no code, an HTML body) asks for 10 seconds", () => {
+    expect(humanError(new ApiError(429, "AI_DAILY_TOKEN_BUDGET_EXCEEDED: 6699/200000 tokens used today (UTC)"))).toContain("AI 額度用完");
+    expect(humanError(new ApiError(429, {}))).toContain("等 10 秒");
+    expect(humanError(new ApiError(429, {}))).not.toContain("明天");
+    expect(humanError(new ApiError(422, "AI_ANSWER_TRUNCATED: stopped at max_tokens"))).toContain("截斷");
+    expect(humanError(new ApiError(424, "AI_PROVIDER_SOMETHING_NEW: x"))).toContain("AI 服務");   // a new family member still reads as a sentence
+    for (const status of [502, 504, 520]) expect(humanError(new ApiError(status, {}))).not.toMatch(/[<>]|API|狀態碼/);
+    expect(humanError(new TypeError("Failed to fetch"))).toContain("連不上系統");   // a page's own fetch(), not apiFetch
+  });
+
   it("passes a plain Error's own message through unchanged (a real ApiFetch() network failure, not a designed code)", () => {
     expect(humanError(new Error("toggle failed"))).toBe("toggle failed");
   });

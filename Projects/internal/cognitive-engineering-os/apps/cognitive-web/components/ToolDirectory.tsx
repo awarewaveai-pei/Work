@@ -36,7 +36,7 @@ export function ToolDirectory({ catalog }: { catalog: Catalog }) {
             const abbr = shownAbbr(m);
             return (
               <div className="tool" id={`m-${id}`} key={id}>
-                <b><Link href={toolHref(id)}>{m.name_zh}</Link>{abbr && <> <small>{abbr}</small></>}</b><span className="k">{m.name_en}</span>
+                <b><Link prefetch={false} href={toolHref(id)}>{m.name_zh}</Link>{abbr && <> <small>{abbr}</small></>}</b><span className="k">{m.name_en}</span>
                 <div className="sub">{m.blurb_zh}</div>
               </div>
             );

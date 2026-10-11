@@ -113,7 +113,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
         setPrefillNeeds((parsed.needs ?? []).filter((need) => validKeys.has(need)));
         if (parsed.from?.name) setPrefillNotice(`從「${parsed.from.name}分析」帶入 ${Object.keys(coerced).length} 格；紅字的要你補（引用自${parsed.from.approved ? "已核准的版本" : "尚未核准的草稿"}）`);   // N-45
       } catch { setState(base); }
-    }).catch((reason) => { if (active) setError(String(reason)); });
+    }).catch((reason) => { if (active) setError(humanError(reason)); });
     apiFetch<Estimate>(`/methods/${encodeURIComponent(methodId)}/estimate`).then((found) => { if (active) setEstimate(found); }).catch(() => undefined);
     return () => { active = false; };
   }, [methodId]);   // eslint-disable-line react-hooks/exhaustive-deps
@@ -134,7 +134,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
       if (!active) return;
       setProjects([...list].sort(byActivity));
       if (given && !list.some((item) => item.project_id === given)) { setProjectId(""); setError("網址裡的專案找不到了（可能已經刪除）；這次分析會開一個新專案。"); }
-    }).catch((reason) => { if (active) setError(String(reason)); });
+    }).catch((reason) => { if (active) setError(humanError(reason)); });
     return () => { active = false; };
   }, [given]);
 
@@ -174,7 +174,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
           if (refill.current && update.record && form) { restore(form.form.fields, update.record); refill.current = false; }
         }
         if (update.status === "FAILED") { setError(failed(update.error)); setLastFailed(true); setPendingId(""); }
-      } catch (reason) { if (active) { setError(String(reason)); setPendingId(""); } }
+      } catch (reason) { if (active) { setError(humanError(reason)); setPendingId(""); } }
     }, 2000);
     return () => { active = false; clearInterval(timer); };
   }, [pendingId, form]);

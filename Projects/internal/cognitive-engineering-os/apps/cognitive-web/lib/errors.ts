@@ -5,7 +5,8 @@
 import { ApiError } from "./api";
 
 // One sentence per detail code this app's own endpoints can return (main.py's HTTPException detail=
-// "CODE: message" or {"code"|"error": "CODE", ...}); unlisted codes fall back to STATUS_FALLBACK by status.
+// "CODE: message" or {"code"|"error": "CODE", ...}); an unlisted code falls back to its FAMILIES prefix, then to
+// STATUS_FALLBACK by status (a body with no code at all -- Cloudflare's HTML pages -- goes straight there).
 const CODES: Record<string, string> = {
   AUTH_REQUIRED: "登入已經過期，請重新整理頁面再登入一次。",
   AUTH_FAILED: "帳號或密碼不對，請再試一次。",
@@ -268,7 +269,28 @@ const CODES: Record<string, string> = {
   COMPUTE_QUESTION_REQUIRED: "先寫下你要算什麼，AI 才建議算法。",
   AI_ANSWER_HAS_NUMBER: "AI 這次的回答自己寫了數字，系統不收：數字只由系統算。再按一次即可。",
   AI_ANSWER_CALLS_IT_PREDICTION: "AI 這次把計算或模擬說成了預測或保證，系統不收。再按一次即可。",
+  // the AI's answer cut off or unusable (422 AI_ANSWER_*, 424 AI_PROVIDER_*; any other member of either family: FAMILIES)
+  AI_ANSWER_TRUNCATED: "AI 的回答太長，寫到一半被截斷了，這次沒有存。再按一次即可；一直這樣，請少勾幾張要給它看的卡。",
+  AI_PROVIDER_CUT_OFF: "AI 的回答太長，寫到一半被截斷了，這次沒有存。再按一次即可；一直這樣，請少勾幾張要給它看的卡。",
+  AI_PROVIDER_REFUSAL: "AI 這次拒絕回答，沒有存。換個說法，或少給它一些內容，再試一次。",
+  AI_PROVIDER_EMPTY_RESPONSE: "AI 這次沒有回答，沒有存。再按一次即可。",
+  AI_PROVIDER_MALFORMED_RESPONSE: "AI 這次的回答讀不出來，沒有存。再按一次即可。",
+  AI_PROVIDER_KEY_REQUIRED: "AI 功能還沒設定好，請聯絡管理員。",
+  AI_PROVIDER_MODEL_REQUIRED: "AI 功能還沒設定好，請聯絡管理員。",
+  // the login (POST /auth/login without a workspace): the page shows the workspaces as buttons, this is only the heading
+  LOGIN_CHOOSE_WORKSPACE: "這個信箱在幾個工作區都有帳號，請選一個登入。",
+  // apiFetch itself: the browser could not reach the server at all
+  NETWORK_UNREACHABLE: "連不上系統：請確認網路連線，再試一次。",
+  BATCH_ITEM_MISSING: "這一頁有一部分資料沒有讀到，請重新整理頁面。",
 };
+
+// A whole family of codes with one sentence: a new member the engine adds still reads as a sentence, never a code.
+const FAMILIES: Array<[string, string]> = [
+  ["AI_BUDGET", "今天的 AI 額度用完了，明天 UTC 午夜重置後再試。"],
+  ["AI_DAILY_TOKEN_BUDGET", "今天的 AI 額度用完了，明天 UTC 午夜重置後再試。"],
+  ["AI_ANSWER_", "AI 這次的回答不能用，沒有存。再按一次即可。"],
+  ["AI_PROVIDER_", "AI 服務這次沒有給出可用的回答，沒有存。請稍後再按一次。"],
+];
 
 const STATUS_FALLBACK: Record<number, string> = {
   400: "這個要求送錯了，請確認填的內容後再試一次。",
@@ -277,10 +299,16 @@ const STATUS_FALLBACK: Record<number, string> = {
   404: "找不到這筆資料，可能已經被刪除或搬走了。",
   409: "這個動作現在不能做：有其他事還在進行中，稍後再試。",
   422: "送出的內容不符合這個工具的要求，請檢查後再試。",
-  429: "今天用得太多了，明天再試。",
+  424: "AI 服務這次沒有給出可用的回答，沒有存。請稍後再按一次。",
+  // a 429 with no code is the site's request limit (Cloudflare: 50 requests in 10 seconds), not the AI budget
+  // (that one always carries its code, AI_DAILY_TOKEN_BUDGET_EXCEEDED, answered above); it clears by itself in 10 seconds
+  429: "一下子送出太多要求，系統請你稍等：等 10 秒再試一次。",
   500: "系統出了問題，不是你填錯；請稍後再試一次。",
   501: "這個功能還沒接上，暫時用不了。",
+  502: "系統這一刻沒有回應（不是你填錯），請等一下再試一次。",
   503: "系統暫時沒辦法回應，請稍後再試一次。",
+  // a timeout may still have finished on the server: look before pressing again, so nothing is done twice
+  504: "系統等太久沒有回應。請等一下重新整理頁面，看看剛才的動作有沒有完成，再決定要不要再按一次。",
 };
 
 /** The detail's code, however main.py shaped it: a "CODE: message" string, or {code|error: "CODE", ...}. */
@@ -313,8 +341,12 @@ export function humanError(error: unknown): string {
   if (error instanceof ApiError) {
     const code = extractCode(error.detail);
     if (code && CODES[code]) return CODES[code];
-    return STATUS_FALLBACK[error.status] ?? `系統發生錯誤（狀態碼 ${error.status}），請稍後再試。`;
+    const family = code ? FAMILIES.find(([start]) => code.startsWith(start)) : undefined;
+    if (family) return family[1];
+    return STATUS_FALLBACK[error.status] ?? (error.status >= 500 ? STATUS_FALLBACK[500] : `系統發生錯誤（狀態碼 ${error.status}），請稍後再試。`);
   }
+  // a page's own fetch() (a file download) that never reached the server: the browser's English, per browser
+  if (error instanceof TypeError && /^(Failed to fetch|NetworkError when attempting to fetch resource\.?|Load failed)$/.test(error.message)) return CODES.NETWORK_UNREACHABLE;
   if (error instanceof Error && error.message) return error.message;
   return "發生錯誤，請稍後再試。";
 }

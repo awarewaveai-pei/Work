@@ -52,17 +52,17 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
     const count = project.analysis_count ?? 0;
     const flags = [project.tasks?.overdue ? `${project.tasks.overdue} 個任務逾期` : project.tasks?.open ? `${project.tasks.open} 個任務進行中` : "", project.tasks?.due_today ? `${project.tasks.due_today} 個任務今天到期` : "", project.reruns_due ? "到期：重跑並比較" : ""].filter(Boolean);
     return <tr key={project.project_id}>
-      <td>{tickable && <><input type="checkbox" id={`tick-${project.project_id}`} aria-label={`勾選「${project.name}」`} checked={ticked.includes(project.project_id)} onChange={() => tick(project.project_id)} /> </>}<Link href={projectHref(project.project_id)}>{project.name}</Link></td>
-      <td>{project.methods?.length ? <>工具：{project.methods.map((id, index) => <span key={id}>{index ? "、" : ""}<Link href={toolHref(id)}>{names[id] ?? id}</Link></span>)}</> : "—"}</td>
+      <td>{tickable && <><input type="checkbox" id={`tick-${project.project_id}`} aria-label={`勾選「${project.name}」`} checked={ticked.includes(project.project_id)} onChange={() => tick(project.project_id)} /> </>}<Link prefetch={false} href={projectHref(project.project_id)}>{project.name}</Link></td>
+      <td>{project.methods?.length ? <>工具：{project.methods.map((id, index) => <span key={id}>{index ? "、" : ""}<Link prefetch={false} href={toolHref(id)}>{names[id] ?? id}</Link></span>)}</> : "—"}</td>
       <td>{standing(latest)}{count > 1 ? `（共 ${count} 次分析）` : ""}{flags.length ? <><br /><span className="warn">{flags.join("・")}</span></> : null}</td>
       <td>{formatTime(project.created_at)}</td>
       <td>{formatTime(project.updated_at ?? project.created_at)}</td>
       <td>{project.reruns_due
-        ? <Link className="btn primary" href={projectHref(project.project_id)}>到期了：重跑並比較 →</Link>
+        ? <Link prefetch={false} className="btn primary" href={projectHref(project.project_id)}>到期了：重跑並比較 →</Link>
         : latest?.status === "DONE"
-          ? <Link className="btn" href={analysisHref(project.project_id, latest.interpretation_id)}>{latest.approval?.decision === "approve" ? "看結果 →" : "看結果、核准 →"}</Link>
-          : <Link className="btn" href={projectHref(project.project_id)}>打開 →</Link>}
-        {tickable && <> <Link className="btn ghost" href={`${projectHref(project.project_id)}/start`}>用這份結果開案 →</Link></>}</td>
+          ? <Link prefetch={false} className="btn" href={analysisHref(project.project_id, latest.interpretation_id)}>{latest.approval?.decision === "approve" ? "看結果 →" : "看結果、核准 →"}</Link>
+          : <Link prefetch={false} className="btn" href={projectHref(project.project_id)}>打開 →</Link>}
+        {tickable && <> <Link prefetch={false} className="btn ghost" href={`${projectHref(project.project_id)}/start`}>用這份結果開案 →</Link></>}</td>
     </tr>;
   };
   return (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Catalog } from "./catalog";
-import { goalOf, isUserTool, runHref, shownAbbr, stations, toolHref, toolSearchKey, toolsOfGoal, userGoals, userToolCount } from "./catalog";
+import { goalOf, isUserTool, runHref, shownAbbr, stations, stuckCatalog, toolHref, toolSearchKey, toolsOfGoal, userGoals, userToolCount } from "./catalog";
 import { pickTools, termsOf } from "../components/StuckBox";
 import { sectionOf } from "../components/AppNav";
 
@@ -49,19 +49,20 @@ describe("catalog helpers (mirror docs/mockups/mockkit.py)", () => {
 });
 
 describe("幫我挑 first layer (free matching, never a guess)", () => {
+  const stuck = stuckCatalog(catalog);
   it("Chinese text becomes 2-character terms, latin words stay whole", () => {
     expect(termsOf("一再發生 SWOT")).toEqual(expect.arrayContaining(["一再", "再發", "發生", "swot"]));
   });
 
   it("ranks by matched terms, at most three, and names what matched", () => {
-    const picks = pickTools(catalog, "同樣的問題一再發生");
+    const picks = pickTools(stuck, "同樣的問題一再發生");
     expect(picks[0].id).toBe("systems.iceberg_model");
     expect(picks[0].hits).toEqual(expect.arrayContaining(["一再", "發生"]));
-    expect(pickTools(catalog, "分析 分析 力量 競爭 威脅 機會").length).toBeLessThanOrEqual(3);
+    expect(pickTools(stuck, "分析 分析 力量 競爭 威脅 機會").length).toBeLessThanOrEqual(3);
   });
 
   it("an engineering tool is never offered, whatever it matches (ENTRY_SLICE1_CHECKLIST.md item 5)", () => {
-    expect(pickTools(catalog, "產業競爭的威脅").map((pick) => pick.id)).not.toContain("security.stride");
+    expect(pickTools(stuck, "產業競爭的威脅").map((pick) => pick.id)).not.toContain("security.stride");
     expect(isUserTool(catalog, "security.stride")).toBe(false);
     expect(isUserTool(catalog, "strategy.swot")).toBe(true);
     expect(userGoals(catalog).map((goal) => goal.id)).toEqual(["why", "see"]);
@@ -69,8 +70,8 @@ describe("幫我挑 first layer (free matching, never a guess)", () => {
   });
 
   it("a sentence that shares no word with any tool returns nothing", () => {
-    expect(pickTools(catalog, "今天天氣很好")).toEqual([]);
-    expect(pickTools(catalog, "   ")).toEqual([]);
+    expect(pickTools(stuck, "今天天氣很好")).toEqual([]);
+    expect(pickTools(stuck, "   ")).toEqual([]);
   });
 });
 

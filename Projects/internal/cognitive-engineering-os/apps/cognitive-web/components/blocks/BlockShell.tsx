@@ -34,7 +34,8 @@ export function useRoute(projectId: string, refresh = 0) {
   return { route: found, error };
 }
 
-/** The 14 slots, one per block; with no ``projectId`` (the case list) they are names only, not links. With the case's
+/** The 14 slots, one per block; with no ``projectId`` (the case list) they are names only, not links (never prefetched:
+ *  14 prefetches on every block page counted against the site's 50-per-10-seconds limit, A1). With the case's
  *  ``route``: a slot with something written is marked 做過 (✓, not by colour alone) and the next block of the route is lit. */
 export function Slots({ projectId, current, route: path }: { projectId?: string; current?: BlockCode; route?: Route | null }) {
   const done = new Set(Array.isArray(path?.done) ? path.done : []);
@@ -48,7 +49,7 @@ export function Slots({ projectId, current, route: path }: { projectId?: string;
         if (block.code === current) return <span key={block.code} className="now" aria-current="page" title={title}>{label}</span>;
         if (!isOpen(block)) return <i key={block.code} title={`第 ${block.step} 步才開放`}>{label}</i>;
         if (!projectId) return <span key={block.code}>{label}</span>;
-        return <Link key={block.code} className={state} title={title} href={blockHref(projectId, block)}>{label}</Link>;
+        return <Link key={block.code} prefetch={false} className={state} title={title} href={blockHref(projectId, block)}>{label}</Link>;
       })}
     </nav>
   );

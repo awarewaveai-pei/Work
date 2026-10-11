@@ -6,6 +6,7 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { ApiError, apiFetch } from "../lib/api";
+import { humanError } from "../lib/errors";
 import { projectHref } from "../lib/catalog";
 import { RunPage, type InterpretationStatus } from "./RunPage";
 
@@ -19,7 +20,7 @@ export function AnalysisPage({ projectId, analysisId, names = {}, lessons = {}, 
       if (found.project_id !== projectId) setError("這次分析不在這個專案裡。");
       else if (!found.method_id) setError("找不到這次分析用的工具。");
       else setAnalysis(found);
-    }).catch((reason) => { if (active) setError(reason instanceof ApiError && reason.status === 404 ? "找不到這次分析：可能連同專案一起刪除了，或不在你的帳號裡。" : String(reason)); });
+    }).catch((reason) => { if (active) setError(reason instanceof ApiError && reason.status === 404 ? "找不到這次分析：可能連同專案一起刪除了，或不在你的帳號裡。" : humanError(reason)); });
     return () => { active = false; };
   }, [projectId, analysisId]);
   if (error) return <><div className="crumbs"><Link href="/projects">我的案子</Link> › <Link href={projectHref(projectId)}>這個專案</Link></div><div className="card"><p className="error">{error}</p></div></>;

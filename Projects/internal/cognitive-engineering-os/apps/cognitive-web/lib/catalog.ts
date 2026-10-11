@@ -33,6 +33,16 @@ export async function loadCatalog(): Promise<Catalog> {
 /** A tool a person may be offered: not an engineering one (ENTRY_SLICE1_CHECKLIST.md item 5). Every list, count and
  *  recommendation a person sees goes through this or userGoals; a tool reached by its own address still opens. */
 export const isUserTool = (catalog: Catalog, id: string): boolean => catalog.methods[id]?.block !== "INTERNAL";
+
+/** What 先說你卡在哪 (components/StuckBox) reads, and all the browser gets of the catalog there: the example situations
+ *  and each tool a person may be offered, with only the words it is matched on (B8: the whole catalog, ~384 KB, went to
+ *  the browser on every 直接分析). Built on the server; a field StuckBox starts reading is added here, not the catalog. */
+export type StuckTool = { id: string; name_zh: string; name_en: string; blurb_zh: string };
+export type StuckCatalog = { prompts: string[]; tools: StuckTool[] };
+export const stuckCatalog = (catalog: Catalog): StuckCatalog => ({
+  prompts: catalog.prompts,
+  tools: Object.entries(catalog.methods).filter(([id]) => isUserTool(catalog, id)).map(([id, m]) => ({ id, name_zh: m.name_zh, name_en: m.name_en, blurb_zh: m.blurb_zh })),
+});
 export const userGoals = (catalog: Catalog): Goal[] => catalog.goals.filter((goal) => !goal.internal);
 export const userToolCount = (catalog: Catalog): number => Object.keys(catalog.methods).filter((id) => isUserTool(catalog, id)).length;
 

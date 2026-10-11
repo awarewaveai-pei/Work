@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Glyph, Picture } from "../../../components/Svg";
 import { StuckBox } from "../../../components/StuckBox";
-import { dirHref, goalOf, loadCatalog, runHref, toolHref, toolsOfGoal, userGoals } from "../../../lib/catalog";
+import { dirHref, goalOf, loadCatalog, runHref, stuckCatalog, toolHref, toolsOfGoal, userGoals } from "../../../lib/catalog";
 import { lessonHref } from "../../../lib/lessons";
 
 // 直接分析 (ENTRY_SLICE1_CHECKLIST.md item 4): what the home page was until 2026-10-11 -- 先說你卡在哪, the goal cards,
@@ -24,7 +24,8 @@ export default async function AnalyzePage({ searchParams }: { searchParams: Prom
         </div>
       </div>
 
-      <StuckBox catalog={catalog} project={project} initial={asked} />
+      {/* only what 先說你卡在哪 reads goes to the browser (B8): the whole catalog was ~384 KB */}
+      <StuckBox catalog={stuckCatalog(catalog)} project={project} initial={asked} />
 
       <div className="card" id="goals">
         <h2>按你想做的事找<small>{goals.length} 種你可能想做的事；每一種先給三個常用工具</small></h2>
@@ -38,8 +39,8 @@ export default async function AnalyzePage({ searchParams }: { searchParams: Prom
                 <div className="gh"><Glyph paths={glyphs[goal.icon]} label={goal.short_zh} /><b>{goal.title_zh}</b></div>
                 <div>{goal.blurb_zh}</div>
                 <div className="k">{ids.length} 個工具{wfs.length ? `・${wfs.length} 條工作流` : ""}</div>
-                <div><span className="k">常用：</span>{goal.featured.map((id, i) => <span key={id}>{i ? "、" : ""}<Link href={toolHref(id, project)} title={methods[id].blurb_zh}>{methods[id].name_zh}</Link></span>)}</div>
-                <div className="btns"><Link className="btn" href={dirHref(goal.id)}>看全部 {ids.length} 個 →</Link></div>
+                <div><span className="k">常用：</span>{goal.featured.map((id, i) => <span key={id}>{i ? "、" : ""}<Link prefetch={false} href={toolHref(id, project)} title={methods[id].blurb_zh}>{methods[id].name_zh}</Link></span>)}</div>
+                <div className="btns"><Link prefetch={false} className="btn" href={dirHref(goal.id)}>看全部 {ids.length} 個 →</Link></div>
               </div>
             );
           })}
@@ -55,11 +56,11 @@ export default async function AnalyzePage({ searchParams }: { searchParams: Prom
             const lesson = lessonHref(p.id, "tool");
             return (
               <div className="mcard pop" id={`pop-${p.id}`} key={p.id}>
-                <div className="gh"><Picture paths={shapes[p.shape]} label={`${m.name_zh}的樣子`} /><div><b><Link href={toolHref(p.id, project)}>{m.name_zh}</Link></b><span className="tag">{goalOf(catalog, p.id).short_zh}</span><div className="k">{m.name_en}</div></div></div>
+                <div className="gh"><Picture paths={shapes[p.shape]} label={`${m.name_zh}的樣子`} /><div><b><Link prefetch={false} href={toolHref(p.id, project)}>{m.name_zh}</Link></b><span className="tag">{goalOf(catalog, p.id).short_zh}</span><div className="k">{m.name_en}</div></div></div>
                 <div>{p.line_zh}</div>
-                <div className="btns"><Link className="btn primary" href={runHref(p.id, project)}>開始 →</Link>{lesson
+                <div className="btns"><Link prefetch={false} className="btn primary" href={runHref(p.id, project)}>開始 →</Link>{lesson
                   ? <a className="btn" href={lesson} target="_blank" rel="noopener">第一次用？先上 5 分鐘的課 ↗</a>
-                  : <Link className="btn" href={toolHref(p.id, project)}>看它做什麼</Link>}</div>
+                  : <Link prefetch={false} className="btn" href={toolHref(p.id, project)}>看它做什麼</Link>}</div>
               </div>
             );
           })}

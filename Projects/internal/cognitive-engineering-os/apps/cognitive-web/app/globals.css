@@ -16,7 +16,7 @@ foreignObject .warn { color: var(--warn); }
 /* 匯出 PDF = the browser's print: the result cards alone, no menu, no form, no buttons; folded expert mode stays folded */
 .print-only { display: none; }
 @media print {
-  .side, .runform, .btns, button, .judge textarea, .mocknote, #input, .howto, .crumbs, details:not([open]) > *:not(summary) { display: none !important; }
+  .side, .subnav, .runform, .btns, button, .judge textarea, .mocknote, #input, .howto, .crumbs, details:not([open]) > *:not(summary) { display: none !important; }
   .print-only { display: block !important; }
   .app { display: block; }
   .wrap { max-width: none; padding: 0; }
@@ -27,4 +27,7 @@ foreignObject .warn { color: var(--warn); }
 .navgroup { display: contents; }
 .navi.sub { padding: 6px 12px 6px 44px; font-weight: 400; font-size: var(--fs-small); }
 .navi.navbottom { margin-top: auto; }
-@media (max-width: 760px) { .navi.sub { padding: 6px 4px; } .navi.navbottom { margin-top: 0; } }
+/* a phone's bottom bar holds only the top-level items, each with its icon (B10); the section's own pages are a wrapping
+   row of buttons above the page instead (.subnav), shown only there: the sidebar lists them on a desktop */
+.subnav { display: none; }
+@media (max-width: 760px) { .navi.sub { display: none; } .navi.navbottom { margin-top: 0; } .subnav { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 12px 0; } }
