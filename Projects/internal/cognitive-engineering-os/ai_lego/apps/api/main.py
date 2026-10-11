@@ -2840,8 +2840,9 @@ def erase_project(
     case's rows, closes its grants and names what is left on disk; the files go after it commits. 200 with
     ``physical_cleanup: "done"`` when every file is gone and the ProjectErased tombstone is written; 202 with
     ``"pending"`` when the case is already unreadable but a file is not gone yet -- DELETE again (the case answers 404
-    to everything else) or the server finishes it at its next start. ``?only=analysis`` (我的分析, a result page): a
-    project that became a case since the page loaded (開案資料 saved in another tab) answers 409 and is not erased."""
+    to everything else) or the server finishes it at its next start. ``?only=analysis`` (我的分析, a result page's 這份結果
+    要怎麼處理): a project that became a case since the page loaded (開案資料 saved in another tab) answers 409
+    PROJECT_IS_A_CASE and is not erased -- checked inside the erasure's decision, under the case lock."""
     tenant_id = session["tenant_id"]
     if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
@@ -2850,9 +2851,7 @@ def erase_project(
         result = _without_empty_failed({"project_id": project_id, **erasure.finish(tenant_id, ERASURE_CASE, project_id)})
     else:
         _project_or_404(repo, session, project_id)
-        if only == "analysis" and CaseDocs(repo).current(tenant_id, record_log.case(project_id), "assembler.intake"):
-            raise HTTPException(status_code=409, detail="PROJECT_IS_A_CASE: it holds 開案資料 now; delete it from the case's own page")
-        result = erase_case(store, repo, source_cas, artifact_store, tenant_id, session["identity_id"], project_id)
+        result = erase_case(store, repo, source_cas, artifact_store, tenant_id, session["identity_id"], project_id, only_if_not_case=only == "analysis")
     return result if result["physical_cleanup"] == "done" else JSONResponse(status_code=202, content=result)
 
 
@@ -2861,7 +2860,7 @@ def _without_empty_failed(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore,
-               tenant_id: str, identity_id: str, project_id: str, *, only_if_no_record: bool = False) -> dict[str, Any]:
+               tenant_id: str, identity_id: str, project_id: str, *, only_if_no_record: bool = False, only_if_not_case: bool = False) -> dict[str, Any]:
     """The case erasure itself, for a case the caller has already shown is the person's. No entitlement gate: it is also what
     the account deletion calls, and deleting what is yours is a right a suspended tenant does not take away. What cannot be
     deleted (a corrupt artifact reference) comes back in ``failed`` and does not stop the erasure. ``physical_cleanup``
@@ -2874,10 +2873,13 @@ def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: 
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a synthesis is still running; wait for it to finish, then delete")
     try:
         runs = lambda: _case_runs(tenant_id, identity_id, project_id)   # noqa: E731 -- read inside the decision, under the case lock
-        result = erasure_for(repo, source_cas, artifact_store).erase_case(tenant_id, project_id, identity_id, runs, only_if_no_record=only_if_no_record)   # later writes: CASE_ERASED
+        result = erasure_for(repo, source_cas, artifact_store).erase_case(tenant_id, project_id, identity_id, runs, only_if_no_record=only_if_no_record,
+                                                                          only_if_not_case=only_if_not_case)   # later writes: CASE_ERASED
     except InvariantViolation as error:
         if str(error).startswith("PROJECT_NOT_FOUND"):
             raise HTTPException(status_code=404, detail=f"PROJECT_NOT_FOUND: {project_id!r}") from error
+        if str(error).startswith("PROJECT_IS_A_CASE"):   # decided under the case lock (erasure.decide_case), so no intake slips past it
+            raise HTTPException(status_code=409, detail=str(error)) from error
         raise
     finally:
         synthesis_lock.release()

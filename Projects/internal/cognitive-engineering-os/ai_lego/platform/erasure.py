@@ -173,6 +173,13 @@ def _no_record(connection: psycopg.Connection, tenant_id: str, project_id: str) 
     return row is not None and row["no_record"] == "true"
 
 
+def _holds_intake(connection: Any, tenant_id: str, project_id: str) -> bool:
+    """開案資料 was saved (assembler.intake is not deletable, so one DocSaved is enough): the project is a case."""
+    return connection.execute(
+        "SELECT 1 FROM events WHERE tenant_id=%s AND owner_kind='case' AND owner_id=%s AND event_type='DocSaved' "
+        "AND payload_json->>'kind' = 'assembler.intake' LIMIT 1", (tenant_id, project_id)).fetchone() is not None
+
+
 class Erasure:
     """``journal_path``: where a run's journal lives (main.workflow_journal_path); runs are named to it by
     (run_id, identity_id), so the outbox never holds a host path."""
@@ -185,16 +192,21 @@ class Erasure:
 
     # -- 1. the decisions --------------------------------------------------------------------------------------------
 
-    def decide_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]], *, only_if_no_record: bool = False) -> None:
+    def decide_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]], *, only_if_no_record: bool = False,
+                    only_if_not_case: bool = False) -> None:
         """``runs()``: the person's recipe runs on this case ({run_id, identity_id, artifacts}); read under the case lock,
         after every admission in flight (admit_run); raises (and nothing is decided) while one still runs. A case whose
         intake says 不留紀錄 (card 32) gets no tombstone, read under the same lock; ``only_if_no_record`` (closing it)
-        refuses a case that keeps its records (CASE_KEEPS_RECORDS)."""
+        refuses a case that keeps its records (CASE_KEEPS_RECORDS). ``only_if_not_case`` (deleting from 我的分析)
+        refuses a project whose 開案資料 is saved (PROJECT_IS_A_CASE): read under the exclusive lock every doc writer
+        takes shared, so an intake saved while the delete waited is seen (Codex review 2026-10-11 round 3)."""
         with self._repo.transaction(tenant_id) as connection:
             ProjectSourceRepository.lock_case(connection, tenant_id, project_id, exclusive=True)
             no_record = _no_record(connection, tenant_id, project_id)
             if only_if_no_record and not no_record:
                 raise InvariantViolation("CASE_KEEPS_RECORDS: this case did not choose 不留紀錄; delete it instead")
+            if only_if_not_case and _holds_intake(connection, tenant_id, project_id):
+                raise InvariantViolation("PROJECT_IS_A_CASE: it holds 開案資料 now; delete it from the case's own page")
             erased = ProjectSourceRepository.erase_case_rows(connection, tenant_id, project_id)
             runs = runs()
             items = [("source_blob", {"path": path}, "pending", None) for path in ProjectSourceRepository.unreferenced_blobs(connection, tenant_id, self._source_cas)]
@@ -242,11 +254,12 @@ class Erasure:
 
     # -- the entry points --------------------------------------------------------------------------------------------
 
-    def erase_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]], *, only_if_no_record: bool = False) -> dict[str, Any]:
+    def erase_case(self, tenant_id: str, project_id: str, identity_id: str, runs: Callable[[], list[Mapping[str, Any]]], *, only_if_no_record: bool = False,
+                   only_if_not_case: bool = False) -> dict[str, Any]:
         """Decide, then clean up. A second DELETE that lost the race to the first finds no case: it finishes the first's job
         instead (same person) -- never a second decision."""
         try:
-            self.decide_case(tenant_id, project_id, identity_id, runs, only_if_no_record=only_if_no_record)
+            self.decide_case(tenant_id, project_id, identity_id, runs, only_if_no_record=only_if_no_record, only_if_not_case=only_if_not_case)
         except InvariantViolation as error:
             if not str(error).startswith("PROJECT_NOT_FOUND") or not self.pending_for(tenant_id, CASE, project_id, identity_id):
                 raise

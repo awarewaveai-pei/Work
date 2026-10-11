@@ -492,4 +492,25 @@ describe("ResultPage", () => {
     expect(errors.mock.calls.filter(([message]) => String(message).includes("same key"))).toEqual([]);
     errors.mockRestore();
   });
+
+  it("這份結果要怎麼處理's 永久刪除 asks the server for an analysis only; 刪除專案 deletes whatever it is (Codex review 2026-10-11 round 3)", async () => {
+    const deletes: string[] = [];
+    vi.mocked(apiFetch).mockImplementation(async (path, init) => {
+      if (init?.method === "DELETE") { deletes.push(String(path)); return {} as never; }
+      return (String(path) === "/projects/P1" ? { project_id: "P1", name: "示範專案", created_at: "2026-10-11T00:00:00Z", is_case: false } : []) as never;
+    });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const { host, done } = await mount(<ResultPage result={fixture} record={record} project={{ id: "P1", name: "示範專案" }} />);
+    const location = window.location;
+    Object.defineProperty(window, "location", { configurable: true, value: { ...location, assign: vi.fn() } });
+    try {
+      await act(async () => { ([...host.querySelectorAll("#choices button")].find((item) => item.textContent === "永久刪除") as HTMLButtonElement).click(); });
+      await act(async () => { ([...host.querySelectorAll("button")].find((item) => item.textContent === "刪除專案") as HTMLButtonElement).click(); });
+      expect(deletes).toEqual(["/projects/P1?only=analysis", "/projects/P1"]);
+    } finally {
+      Object.defineProperty(window, "location", { configurable: true, value: location });
+      confirm.mockRestore();
+      await done();
+    }
+  });
 });
