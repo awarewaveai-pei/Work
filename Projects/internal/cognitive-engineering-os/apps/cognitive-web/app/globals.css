@@ -23,3 +23,8 @@ foreignObject .warn { color: var(--warn); }
   .card { break-inside: avoid; border: 1px solid #999; }
   a[href]::after { content: none; }
 }
+/* main menu (components/AppNav.tsx): a section's own items under it, the account items at the bottom of the sidebar */
+.navgroup { display: contents; }
+.navi.sub { padding: 6px 12px 6px 44px; font-weight: 400; font-size: var(--fs-small); }
+.navi.navbottom { margin-top: auto; }
+@media (max-width: 760px) { .navi.sub { padding: 6px 4px; } .navi.navbottom { margin-top: 0; } }

@@ -196,11 +196,11 @@ export function TeachPage() {
     setCompletions((current) => current.filter((item) => item.doc_id !== completion.doc_id));
   });
 
-  if (!lessons || !lesson || !practiceCase) return <><div className="crumbs"><Link href="/projects">我的專案</Link> › 課程與演練</div><div className="card"><p>{error || "載入中…"}</p></div></>;
+  if (!lessons || !lesson || !practiceCase) return <><div className="crumbs"><Link href="/projects">我的案子</Link> › 課程與演練</div><div className="card"><p>{error || "載入中…"}</p></div></>;
 
   return (
     <>
-      <div className="crumbs"><Link href="/projects">我的專案</Link> › 課程與演練</div>
+      <div className="crumbs"><Link href="/projects">我的案子</Link> › 課程與演練</div>
       <h1>課程與演練</h1>
       <p className="sub">先讀一堂短課，再用低風險案例練一次。練習和真實案例分開存。</p>
       <Notices notices={notices} />

@@ -185,7 +185,7 @@ describe("run page", () => {
     const howto = host.querySelector(".top a.howto")!;
     expect([howto.getAttribute("href"), howto.getAttribute("target"), howto.textContent]).toEqual(["/learn/systems.iceberg_model", "_blank", "怎麼用？先上 5 分鐘的課 ↗"]);
     expect(host.querySelector('.how a[href="/learn/systems.iceberg_model#panel-read"]')?.getAttribute("target")).toBe("_blank");
-    expect(host.querySelector(".crumbs")?.textContent).toBe("我的專案 › 冰山模型分析");
+    expect(host.querySelector(".crumbs")?.textContent).toBe("我的案子 › 冰山模型分析");
     expect(host.querySelector(".sub")?.textContent).toBe("工具：冰山模型 Iceberg Model");
     await done();
   });

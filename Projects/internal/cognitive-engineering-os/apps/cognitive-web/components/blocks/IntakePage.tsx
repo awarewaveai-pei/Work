@@ -27,9 +27,11 @@ type Intake = {
 };
 const lines = (text: string) => text.split(/\n|、/).map((item) => item.trim()).filter(Boolean);
 
-export function IntakePage({ projectId }: { projectId: string }) {
+// question: the sentence written on the home page before 陪我思考 (?q=, ENTRY_SLICE1_CHECKLIST.md item 6); it fills
+// 你想釐清什麼 only while the case has no 開案資料 yet, never over a saved one.
+export function IntakePage({ projectId, question = "" }: { projectId: string; question?: string }) {
   const [held, setHeld] = useState<Doc<Intake> | null | undefined>(undefined);
-  const [draft, setDraft] = useState<Intake>({ purpose: "", question: "", package: "" });
+  const [draft, setDraft] = useState<Intake>({ purpose: "", question, package: "" });
   const [text, setText] = useState({ affected: "", happened_in: "", others_in: "" });
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");

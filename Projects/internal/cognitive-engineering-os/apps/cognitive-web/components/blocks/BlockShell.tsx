@@ -1,6 +1,6 @@
 "use client";
 
-// The frame every block page sits in: where you are (我的專案 › 案子 › 這一塊), the case's 14 slots (one per block; a
+// The frame every block page sits in: where you are (我的案子 › 案子 › 這一塊), the case's 14 slots (one per block; a
 // block not built yet shows the step it opens in; 做過 marked), 現在在哪一塊、為什麼在這一塊、下一塊做什麼 (the case's route), the blocks' unanswered proposals to add a block (they stay until
 // you answer: 你同意才加), and the crisis help a save can bring back (help for where you are).
 import Link from "next/link";
@@ -166,10 +166,10 @@ export function BlockShell({ projectId, code, title, refresh = 0, children }: { 
   const { route: path, error: routeError } = useRoute(projectId, refresh + answered);
   const block = code ? blockOf(code) : undefined;
   const name = block?.name ?? title ?? "";
-  if (error) return <><div className="crumbs"><Link href="/projects">我的專案</Link></div><div className="card"><p className="error">{error}</p></div></>;
+  if (error) return <><div className="crumbs"><Link href="/projects">我的案子</Link></div><div className="card"><p className="error">{error}</p></div></>;
   return (
     <>
-      <div className="crumbs"><Link href="/projects">我的專案</Link> › <Link href={`/projects/${encodeURIComponent(projectId)}`}>{project?.name ?? "…"}</Link> › {name}</div>
+      <div className="crumbs"><Link href="/projects">我的案子</Link> › <Link href={`/projects/${encodeURIComponent(projectId)}`}>{project?.name ?? "…"}</Link> › {name}</div>
       <h1>{block ? `${block.n} ${block.name}` : name}</h1>
       {block && <p className="sub">{block.does}。你隨時可以停，也可以跳過這一塊。</p>}
       <Slots projectId={projectId} current={code} route={path} />

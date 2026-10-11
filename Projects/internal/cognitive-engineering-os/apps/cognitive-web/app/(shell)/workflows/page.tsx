@@ -31,7 +31,7 @@ function WorkflowCard({ catalog, r }: { catalog: Catalog; r: Recipe }) {
 export default async function WorkflowsPage() {
   const catalog = await loadCatalog();
   const user = catalog.recipes.filter((r) => r.audience === "user");
-  const internal = catalog.recipes.filter((r) => r.audience === "internal");
+  // internal workflows (audience: internal) are not listed: they run engineering tools (ENTRY_SLICE1_CHECKLIST.md item 5)
   return (
     <section className="view" id="workflows">
       <div className="top"><div><h1>工作流</h1><div className="sub">幾個工具排好順序一次走完；上一站的結果自動變成下一站的輸入。</div></div></div>
@@ -48,12 +48,6 @@ export default async function WorkflowsPage() {
             </section>
           );
         })}
-        {internal.length > 0 && (
-          <details className="dir mt14" id="wf-internal">
-            <summary><b>平台維運用的工作流</b><small>{internal.length} 條：{internal.map((r) => r.name_zh).join("、")}；一般使用不需要</small></summary>
-            <div className="mcards">{internal.map((r) => <WorkflowCard key={r.id} catalog={catalog} r={r} />)}</div>
-          </details>
-        )}
       </div>
     </section>
   );

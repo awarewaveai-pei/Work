@@ -8,6 +8,7 @@ import re
 from pathlib import Path
 
 from ai_lego import resolve_spec_root
+from ai_lego.core.domain.blocks import INTERNAL, block_of_family
 from ai_lego.platform.ai_execution.contract_catalog import is_active
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 
@@ -207,16 +208,29 @@ def goal_of(goals, mid):
     return next(x for x in goals["goals"] if fam in x["families"])
 
 
+def internal_goals(goals):
+    """Goal ids whose tools are for internal and engineering clients only (blocks.INTERNAL). A goal is wholly one or the
+    other: a goal mixing both would put an engineering tool in a person's menu, so it is a gap (ValueError)."""
+    out = set()
+    for goal in goals["goals"]:
+        kinds = {block_of_family(f) == INTERNAL for f in goal["families"]}
+        if len(kinds) > 1: raise ValueError(f"goal {goal['id']} mixes engineering and user families: {goal['families']}")
+        if kinds == {True}: out.add(goal["id"])
+    return out
+
+
 def catalog_payload(cat):
     """The catalog as JSON for GET /catalog: everything the home page, the tool directory and the workflow list show,
-    with the glyph and picture markup they draw (both live only here)."""
+    with the glyph and picture markup they draw (both live only here). Each tool carries its block and each goal whether
+    it is internal, both from blocks.FAMILY_BLOCK -- the web filters on these and keeps no copy of the map."""
     tools, users, internals = counts(cat)
+    internal = internal_goals(cat.goals)
     return {
         "counts": {"tools": tools, "user_workflows": users, "internal_workflows": internals},
-        "methods": {mid: {**m, "family": mid.split(".")[0], "goal": goal_of(cat.goals, mid)["id"], "next": cat.nexts.get(mid, [])}
+        "methods": {mid: {**m, "family": mid.split(".")[0], "block": block_of_family(mid.split(".")[0]), "goal": goal_of(cat.goals, mid)["id"], "next": cat.nexts.get(mid, [])}
                     for mid, m in sorted(cat.methods.items())},
         "families": cat.families["families"],
-        "goals": cat.goals["goals"],
+        "goals": [{**goal, "internal": goal["id"] in internal} for goal in cat.goals["goals"]],
         "popular": cat.goals["popular"],
         "prompts": cat.goals["prompts"],
         "recipes": cat.recipes,

@@ -9,7 +9,7 @@ import unittest
 from ai_lego import resolve_spec_root
 from ai_lego.platform.ai_execution.contract_catalog import is_active
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
-from ai_lego.platform.catalog.display_catalog import catalog_payload, counts, load_catalog
+from ai_lego.platform.catalog.display_catalog import catalog_payload, counts, internal_goals, load_catalog
 
 
 class DisplayCatalogTests(unittest.TestCase):
@@ -34,6 +34,19 @@ class DisplayCatalogTests(unittest.TestCase):
         for mid, method in payload["methods"].items():
             self.assertIn(method["goal"], goal_ids, mid)
             self.assertIsInstance(method["next"], list, mid)
+
+    def test_engineering_tools_are_marked_internal_and_only_their_goal_is(self):
+        # The web hides a goal marked internal and every tool whose block is INTERNAL (ENTRY_SLICE1_CHECKLIST.md item 5).
+        payload = catalog_payload(self.catalog)
+        internal = {g["id"] for g in payload["goals"] if g["internal"]}
+        self.assertEqual(internal, {"engineering"})
+        for mid, method in payload["methods"].items():
+            self.assertEqual(method["block"] == "INTERNAL", method["goal"] in internal, mid)
+
+    def test_a_goal_mixing_engineering_and_user_families_is_a_gap(self):
+        goals = {"goals": [{"id": "mixed", "families": ["architecture", "decision"]}]}
+        with self.assertRaises(ValueError):
+            internal_goals(goals)
 
 
 if __name__ == "__main__":

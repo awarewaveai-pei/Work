@@ -406,9 +406,9 @@ describe("ResultPage", () => {
   it("card 8's actions carry the project through, and the workflow-chaining button no longer claims to run it (N-22/N-23/N-24)", () => {
     const withProject = renderToStaticMarkup(<ResultPage result={fixture} record={record} project={{ id: "P1", name: "團體反思" }} />);
     expect(withProject).toContain('href="/methods/systems.leverage_point_analysis?project=P1" target="_blank" rel="noopener">第一次用？先看它做什麼 ↗');
-    expect(withProject).toContain('href="/?project=P1#ask"');
+    expect(withProject).toContain('href="/analyze?project=P1#ask"');
     const noProject = renderToStaticMarkup(<ResultPage result={fixture} record={record} />);
-    expect(noProject).toContain('href="/#ask"');
+    expect(noProject).toContain('href="/analyze#ask"');
     expect(noProject).not.toContain("?project=");
     expect(noProject).toContain('<button type="button" class="btn">看一步的建議順序，自己一步步做<small>串成一次跑完的工作流還在做（計畫 P3）</small></button>');
     expect(noProject).not.toContain("把建議的");   // the old "把建議的N步...一次跑完" claim is gone

@@ -7,7 +7,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { Catalog } from "../lib/catalog";
-import { runHref, toolHref } from "../lib/catalog";
+import { isUserTool, runHref, toolHref } from "../lib/catalog";
 
 type Pick = { id: string; hits: string[] };
 
@@ -26,14 +26,15 @@ export function pickTools(catalog: Catalog, text: string, limit = 3): Pick[] {
   if (!terms.length) return [];
   return Object.entries(catalog.methods)
     .map(([id, m]) => ({ id, hits: terms.filter((t) => `${m.name_zh} ${m.blurb_zh} ${m.name_en}`.toLowerCase().includes(t)) }))
-    .filter((x) => x.hits.length > 0)
+    .filter((x) => x.hits.length > 0 && isUserTool(catalog, x.id))
     .sort((a, b) => b.hits.length - a.hits.length || a.id.localeCompare(b.id))
     .slice(0, limit);
 }
 
-export function StuckBox({ catalog, project }: { catalog: Catalog; project?: string }) {
-  const [text, setText] = useState("");
-  const [asked, setAsked] = useState("");
+// initial: the sentence written on the home page (直接分析 ?q=), already asked so its picks show at once.
+export function StuckBox({ catalog, project, initial = "" }: { catalog: Catalog; project?: string; initial?: string }) {
+  const [text, setText] = useState(initial);
+  const [asked, setAsked] = useState(initial.trim());
   const picks = useMemo(() => (asked ? pickTools(catalog, asked) : []), [catalog, asked]);
   return (
     <div className="card">

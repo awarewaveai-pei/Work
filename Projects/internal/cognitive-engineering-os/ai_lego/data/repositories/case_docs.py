@@ -277,6 +277,21 @@ class CaseDocs:
                     latest[item["doc_id"]]["written_by"] = before.get("written_by", row["author_identity_id"])
         return list(latest.values())
 
+    def owners_with(self, tenant_id: str, owner_kind: str, kind: str) -> set[str]:
+        """The ids of the owners of ``owner_kind`` that hold a live document of ``kind``: one scan for a whole list (我的案子
+        tells a case -- a project with 開案資料 -- from a saved analysis), never one read per owner."""
+        with self._repo.transaction(tenant_id) as connection:
+            rows = connection.execute(
+                "SELECT owner_id, event_type, payload_json->>'doc_id' AS doc_id FROM events WHERE tenant_id=%s AND owner_kind=%s "
+                "AND event_type IN ('DocSaved','DocDeleted') AND payload_json->>'kind' = %s ORDER BY write_order",
+                (tenant_id, owner_kind, kind),
+            ).fetchall()
+        live: dict[str, set[str]] = {}
+        for row in rows:
+            docs = live.setdefault(row["owner_id"], set())
+            (docs.discard if row["event_type"] == "DocDeleted" else docs.add)(row["doc_id"])
+        return {owner for owner, docs in live.items() if docs}
+
     def blocks_used(self, tenant_id: str, owner: Owner) -> set[str]:
         """The blocks something was made in by the person or the AI (你看得到哪幾格做過): event types marked ``done`` in
         record_log (a result, a document, a task -- never a request, a failure or a tombstone; deleting every card

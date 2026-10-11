@@ -1,5 +1,7 @@
 // What GET /projects, /projects/{id}, /projects/{id}/analyses, /tasks and /reruns return (ai_lego/apps/api/main.py), and
 // how the pages say it. An analysis's status is read from the project's event log (ProjectSourceRepository.analyses).
+import { ApiError, apiFetch } from "./api";
+
 export type Stance = "agree" | "partial" | "disagree";
 export type Approval = { decision: "approve" | "return"; at: string; by_name?: string | null; reason?: string | null };
 export type Analysis = {
@@ -17,8 +19,9 @@ export type Task = {
 // 任務卡的 4 個狀態，看得見的按鈕，不用下拉選單 (operator rule: no dropdowns).
 export const TASK_STATUS: Record<TaskStatus, string> = { not_started: "未開始", in_progress: "進行中", done: "完成", on_hold: "擱置" };
 export type Rerun = { rerun_id: string; interpretation_id: string; method_id: string | null; due: string; scheduled_at: string; fulfilled_by: string | null; fulfilled_at: string | null };
+// is_case: it holds 開案資料 (a case, 我的案子); false = only analyses run from 直接分析 (我的分析). POST /projects omits it.
 export type Project = {
-  project_id: string; name: string; purpose?: string; created_at: string;
+  project_id: string; name: string; purpose?: string; created_at: string; is_case?: boolean;
   updated_at?: string; analysis_count?: number; methods?: string[]; latest_analysis?: Analysis | null;
   tasks?: { open: number; overdue: number; due_today: number; next_due: string | null }; reruns_due?: number;
 };
@@ -73,3 +76,19 @@ export function daysOf(horizon: string | undefined): number | null {
 
 /** Most recently active first (a new analysis puts its project on top). */
 export const byActivity = (a: Project, b: Project) => (b.updated_at ?? b.created_at).localeCompare(a.updated_at ?? a.created_at);
+
+/** A case being opened: 陪我思考 makes the project before 開案資料 is written, so it holds nothing yet. Shown with the
+ *  cases (我的案子, 繼續上次的案子), never as an analysis -- the one place this rule is written. */
+export const unopenedCase = (project: Project): boolean => !project.is_case && !(project.analysis_count ?? 0);
+export const listedAsCase = (project: Project): boolean => Boolean(project.is_case) || unopenedCase(project);
+
+/** A new project named ``base``; names are unique per person and workspace (409), so a second one with the same name
+ *  becomes "base (2)" … The run page (a tool's analysis) and the home page's 陪我思考 (a case) both open projects here. */
+export async function createProject(base: string, purpose: string): Promise<Project> {
+  for (let attempt = 1; attempt <= 20; attempt++) {
+    try {
+      return await apiFetch<Project>("/projects", { method: "POST", body: JSON.stringify({ name: attempt === 1 ? base : `${base} (${attempt})`, purpose, data_classification: "Confidential" }) });
+    } catch (reason) { if (!(reason instanceof ApiError && reason.status === 409)) throw reason; }
+  }
+  throw new Error("同一分鐘開了太多同名的，請稍後再按一次");
+}

@@ -319,6 +319,8 @@ class InterpretApiTests(ApiTestCase):
         excluded = prompts[0].split("NOT FOR next_steps / next_methods (this page already draws them, or this project already ran them): ", 1)[1].split("\n", 1)[0]
         for method_id, why in (("systems.causal_loop_diagram", "③ 已經畫出"), ("systems.leverage_point_analysis", "③ 已經畫出"), ("systems.iceberg_model", "就是這個工具")):
             self.assertIn(f"{method_id} ({why})", excluded)
+        # a person's tool never recommends an engineering one (ENTRY_SLICE1_CHECKLIST.md item 5)
+        self.assertIn("security.stride (工程工具，只給內部)", excluded)
         prompts.clear()   # another tool in the same project: the iceberg is now a tool the project already ran
         with patch.object(self.provider, "complete", side_effect=spy), patch("ai_lego.apps.api.main._launch_interpretation") as launch:
             response = self.client.post("/methods/decision.eisenhower_matrix/interpret", json={
@@ -647,6 +649,12 @@ class InterpretApiTests(ApiTestCase):
         created_event = self.client.get(f"/projects/{empty['project_id']}/history").json()[0]
         self.assertEqual((created_event["event_type"], listed["updated_at"]), ("ProjectCreated", created_event["occurred_at"]))   # nothing since: the creation
         self.assertEqual(self.client.get(f"/projects/{uuid.uuid4()}/analyses").status_code, 404)
+        # 我的案子 vs 我的分析 (ENTRY_SLICE1_CHECKLIST.md item 7): a project is a case once it holds 開案資料, in the list and alone.
+        self.assertFalse(listed["is_case"])
+        intake = {"purpose": "複雜決策", "question": "要不要續約", "package": "個人複雜決策"}
+        self.assertEqual(self.client.post(f"/projects/{empty['project_id']}/docs/assembler.intake", json={"content": intake}).status_code, 200)
+        self.assertTrue([item for item in self.client.get("/projects").json() if item["project_id"] == empty["project_id"]][0]["is_case"])
+        self.assertTrue(self.client.get(f"/projects/{empty['project_id']}").json()["is_case"])
         self.client.cookies.clear()
         self.assertEqual(self.client.get(f"/projects/{self.project_id}/analyses").status_code, 401)
 

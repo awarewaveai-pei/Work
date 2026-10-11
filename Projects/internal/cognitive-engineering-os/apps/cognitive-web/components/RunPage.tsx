@@ -11,11 +11,11 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import React from "react";
-import { ApiError, apiFetch } from "../lib/api";
+import { apiFetch } from "../lib/api";
 import { analysisHref, ICEBERG_ID, projectHref } from "../lib/catalog";
 import { failureReason, humanError } from "../lib/errors";
 import { fieldKey, FormField, initialState } from "../lib/form-model";
-import { byActivity, costLine, type Approval, type Estimate, type Project, type Stance, runMinutes } from "../lib/projects";
+import { byActivity, costLine, createProject, type Approval, type Estimate, type Project, type Stance, runMinutes } from "../lib/projects";
 import { isOldVersion, restoreState } from "../lib/record";
 import { formatTime } from "../lib/time";
 import { LazyFill } from "./LazyFill";
@@ -204,15 +204,9 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
   // A new project for this analysis: the typed 專案名稱 (N-83), or else the tool and the minute. Names are unique
   // per workspace (409): a second one in the same minute (or the same typed name) becomes "… (2)".
   const newProject = async (): Promise<string> => {
-    const base = customName.trim() || `${name} ${formatTime(new Date().toISOString())}`;
-    for (let attempt = 1; attempt <= 20; attempt++) {
-      try {
-        const created = await apiFetch<Project>("/projects", { method: "POST", body: JSON.stringify({ name: attempt === 1 ? base : `${base} (${attempt})`, purpose: `使用 ${name} 進行分析`, data_classification: "Confidential" }) });
-        setProjects((list) => [created, ...(list ?? [])]); setProjectId(created.project_id);
-        return created.project_id;
-      } catch (reason) { if (!(reason instanceof ApiError && reason.status === 409)) throw reason; }
-    }
-    throw new Error("同一分鐘開了太多同名專案，請稍後再按一次");
+    const created = await createProject(customName.trim() || `${name} ${formatTime(new Date().toISOString())}`, `使用 ${name} 進行分析`);
+    setProjects((list) => [created, ...(list ?? [])]); setProjectId(created.project_id);
+    return created.project_id;
   };
   // The run itself, after 確認執行: a project to save in, then the analysis; the address becomes the analysis's own page.
   const launch = async (payload: Record<string, unknown>) => {
@@ -244,7 +238,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
       {projects && projects.length > 0 && !pendingId && !revision && !rerun && <details className="mb8"><summary>改存到別的專案</summary><div className="btns mt6">
         <button type="button" className={`btn${projectId ? " ghost" : " primary"}`} aria-pressed={!projectId} onClick={() => setProjectId("")}>新專案</button>
         {projects.slice(0, 8).map((item) => <button type="button" key={item.project_id} className={`btn${projectId === item.project_id ? " primary" : " ghost"}`} aria-pressed={projectId === item.project_id} onClick={() => setProjectId(item.project_id)}>{item.name}</button>)}
-      </div>{projects.length > 8 && <p className="sub mb0">更早的專案：到「我的專案」打開它，按「在這個專案再用「{name}」分析一次」。</p>}</details>}
+      </div>{projects.length > 8 && <p className="sub mb0">更早的專案：到「我的案子」打開它，按「在這個專案再用「{name}」分析一次」。</p>}</details>}
       {prefillNotice && <p className="mocknote" role="status">{prefillNotice}</p>}
       {recorded && rerun && <p className="mocknote" role="status">{recorded}</p>}
       <MethodForm fields={form.form.fields} state={state} onState={setState} example={example} onFill={fill} onClear={clear} label={`${name}的${numeral}個格子`} busy={Boolean(pendingId) || starting} layered={methodId === ICEBERG_ID} needs={prefillNeeds}
@@ -258,7 +252,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
       }} />
       {confirming && !pendingId && <div className="finding warn" role="status"><b>要花多少</b>{estimate ? `${costLine(estimate.tokens, estimate.twd)}${estimate.based_on ? `（依你最近 ${estimate.based_on} 次）` : "（第一次跑的估計）"}${estimate.tokens_max ? `，最多 ${costLine(estimate.tokens_max, estimate.twd_max).replace(/^約 /, "")}（要重試一次時）` : ""}` : "估計還沒載入"}，{runMinutes(estimate)}；按「確認執行」才開始、才花錢。
         <div className="btns mt6"><button type="button" className="btn primary big" disabled={starting} onClick={() => { const payload = confirming; setConfirming(null); void launch(payload); }}>確認執行</button><button type="button" className="btn ghost" onClick={() => setConfirming(null)}>取消</button></div></div>}
-      {pendingId && <p role="status" className="sub mt10">正在分析，{runMinutes(estimate)}（整頁結果：結論、逐層解讀、圖、方案）；完成後結果會出現在下面。關掉這頁也會繼續，之後到「我的專案」打開。</p>}{error && <p className="error">{error}</p>}
+      {pendingId && <p role="status" className="sub mt10">正在分析，{runMinutes(estimate)}（整頁結果：結論、逐層解讀、圖、方案）；完成後結果會出現在下面。關掉這頁也會繼續，之後到「我的案子」打開。</p>}{error && <p className="error">{error}</p>}
     </RunInputCard>
   );
   if (completed?.result) return resultCard(inputCard);

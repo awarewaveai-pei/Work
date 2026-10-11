@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { ResultChoices } from "./ResultChoices";
 import { apiFetch } from "../../lib/api";
 import { analysisHref, compareHref, projectHref, runHref, toolHref } from "../../lib/catalog";
 import { fieldKey, type FormField } from "../../lib/form-model";
@@ -337,13 +338,13 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     const option = chosen.length && solutions ? solutions.options.filter((item) => chosen.includes(item.name)).map(optionName).join("、") : undefined;
     const saved = await apiFetch<Task[]>(`/projects/${encodeURIComponent(project.id)}/tasks`, { method: "POST", body: JSON.stringify({ interpretation_id: result.interpretation_id, option, tasks }) });
     setSavedTasks(saved);
-    setPlanNote(`已存成 ${tasks.length} 個任務；到期會在專案頁和「我的專案」提醒你，每個任務都能寫紀錄。`);
+    setPlanNote(`已存成 ${tasks.length} 個任務；到期會在專案頁和「我的案子」提醒你，每個任務都能寫紀錄。`);
   });
   const scheduleRerun = () => plan(async () => {
     if (!rerunDue) return;
     const rerun = await apiFetch<Rerun>(`/interpretations/${encodeURIComponent(result.interpretation_id)}/rerun`, { method: "POST", body: JSON.stringify({ due: rerunDue }) });
     setSavedReruns((current) => [...(current ?? []), rerun]);
-    setRerunDue(null); setPlanNote(`已排在 ${rerun.due}：到期時專案頁和「我的專案」會提醒你更新數字重跑，跑完把兩次並排比較。`);
+    setRerunDue(null); setPlanNote(`已排在 ${rerun.due}：到期時專案頁和「我的案子」會提醒你更新數字重跑，跑完把兩次並排比較。`);
   });
   const erase = () => act(async () => {
     if (!project) return;
@@ -535,7 +536,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       {!steps.length && <p className="mb0">這次沒有建議下一步；不繼續也可以。</p>}
       <div className="btns mt12">
         {steps.length > 0 && <button type="button" className="btn" onClick={() => setNote(WORKFLOW_NOT_BUILT)}>看{NUMERAL[steps.length] ?? steps.length}步的建議順序，自己一步步做<small>串成一次跑完的工作流還在做（計畫 P3）</small></button>}
-        <a className="btn" href={project ? `/?project=${encodeURIComponent(project.id)}#ask` : "/#ask"}>不確定選哪個？描述你想知道什麼<small>系統幫你挑，最多三個建議</small></a>
+        <a className="btn" href={project ? `/analyze?project=${encodeURIComponent(project.id)}#ask` : "/analyze#ask"}>不確定選哪個？描述你想知道什麼<small>系統幫你挑，最多三個建議</small></a>
         {solutions && <a className="btn" href="#solution">分析已經夠了，直接去 ⑦ 解決方案</a>}
         <a className="btn ghost" href="#approve">都不做，先核准存檔（⑨ 下方）</a>
       </div>
@@ -577,6 +578,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         <details><summary>完整 JSON</summary><pre>{JSON.stringify({ result, gateResults, manifest }, null, 2)}</pre></details>
       </details>
     </div>
+    {project && !demo && <ResultChoices projectId={project.id} onErase={erase} />}
     {project && <p className="sub mt8"><Link href={projectHref(project.id)}>← 回專案「{project.name}」</Link></p>}
   </div>;
 }

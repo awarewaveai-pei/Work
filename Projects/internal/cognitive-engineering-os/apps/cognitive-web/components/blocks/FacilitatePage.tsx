@@ -492,7 +492,7 @@ export function FacilitatePage({ groupId }: { groupId?: string }) {
   useEffect(() => { facilitate.scripts().then(setScripts).catch((reason) => setError(humanError(reason))); }, []);
   return (
     <>
-      <div className="crumbs"><Link href="/projects">我的專案</Link> › {groupId ? <><Link href={`/groups/${encodeURIComponent(groupId)}`}>群組</Link> › </> : null}帶領</div>
+      <div className="crumbs"><Link href="/projects">我的案子</Link> › {groupId ? <><Link href={`/groups/${encodeURIComponent(groupId)}`}>群組</Link> › </> : null}帶領</div>
       <h1>帶領</h1>
       <p className="sub">帶別人想，但不替人想。帶領稿是起點，不是唯一正確的帶法。這一頁只記你怎麼帶，不評價你。</p>
       {!scripts ? <div className="card"><p>{error || "載入中…"}</p></div> : (

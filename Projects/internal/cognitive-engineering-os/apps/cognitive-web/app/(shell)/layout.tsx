@@ -1,17 +1,15 @@
 import type { ReactNode } from "react";
 import { AppNav } from "../../components/AppNav";
-import { loadCatalog } from "../../lib/catalog";
 
 // Every page after login: the main menu + one content column (docs/mockups/home-mock.html `.app` / `.side` / `.wrap`).
-// The menu does not depend on the catalog: when GET /catalog fails, the menu shows without counts and only the pages
-// that list tools fail (app/(shell)/error.tsx); the run page and 我的專案 keep working.
+// The menu does not read the catalog (no tool counts since 2026-10-11, ENTRY_SLICE1_CHECKLIST.md item 3): when GET
+// /catalog fails, only the pages that list tools fail (app/(shell)/error.tsx); the run page and 我的案子 keep working.
 export const dynamic = "force-dynamic";   // the catalog comes from the API at request time, never at build time
 
-export default async function ShellLayout({ children }: { children: ReactNode }) {
-  const catalog = await loadCatalog().catch(() => null);
+export default function ShellLayout({ children }: { children: ReactNode }) {
   return (
     <div className="app">
-      <AppNav counts={catalog ? { tools: catalog.counts.tools, workflows: catalog.counts.user_workflows } : null} />
+      <AppNav />
       <main className="wrap">{children}</main>
     </div>
   );

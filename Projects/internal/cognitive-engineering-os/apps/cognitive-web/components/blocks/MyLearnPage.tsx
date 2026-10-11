@@ -79,13 +79,13 @@ export function MyLearnPage() {
   const saveSprint = run(async () => { await docs.create(null, "learn.sprint", { project: chosen }); });
   const removeSprint = (sprint: Doc<Sprint>) => run(async () => { await docs.remove(null, "learn.sprint", sprint.doc_id); })();
 
-  if (!dailies) return <><div className="crumbs"><Link href="/projects">我的專案</Link> › 每天的校準</div><div className="card"><p>{error || "載入中…"}</p></div></>;
+  if (!dailies) return <><div className="crumbs"><Link href="/projects">我的案子</Link> › 每天的校準</div><div className="card"><p>{error || "載入中…"}</p></div></>;
   const mirrored = mirror && todays && mirror.at >= todays.at;   // a mirror made after the card's last version belongs to it
   const doneThisWeek = sprintsThisWeek(sprints.map((sprint) => day(sprint.at)), today);
 
   return (
     <>
-      <div className="crumbs"><Link href="/projects">我的專案</Link> › 每天的校準</div>
+      <div className="crumbs"><Link href="/projects">我的案子</Link> › 每天的校準</div>
       <h1>每天的校準</h1>
       <p className="sub">這裡是你自己的，不用開案子，別人看不到，也不跟任何人比。</p>
       <Notices notices={notices} />
@@ -105,7 +105,7 @@ export function MyLearnPage() {
         {open.map((item) => (
           <div key={item.categories.join()} className="card accent mt12">
             <p className="mt0">{item.notice}</p>
-            <div className="btns"><Link className="btn" href="/projects">到「我的專案」開案子</Link></div>
+            <div className="btns"><Link className="btn" href="/projects">到「我的案子」開案子</Link></div>
           </div>
         ))}
         {todays && (
@@ -127,7 +127,7 @@ export function MyLearnPage() {
           <b>每週 30 分鐘的思考衝刺，幾次</b>
           <div className="chips" role="group" aria-label="每週衝刺幾次">{SPRINTS.map((count) => <button key={count} type="button" className={`chip${(setting.weekly_sprints ?? 0) === count ? " on" : ""}`} aria-pressed={(setting.weekly_sprints ?? 0) === count} onClick={() => setSetting({ ...setting, weekly_sprints: count })}>{count === 0 ? "不設" : `${count} 次`}</button>)}</div>
         </div>
-        <p className="hint">設了，提醒會出現在「我的專案」首頁。</p>
+        <p className="hint">設了，提醒會出現在「我的案子」首頁。</p>
         <div className="btns"><button className="btn" type="button" disabled={busy} onClick={savePractice}>存這兩件</button></div>
       </div>
 
