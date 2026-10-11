@@ -30,7 +30,7 @@ export default async function ToolPage({ params, searchParams }: { params: Promi
         {m.next.length ? (
           <p className="my6">{m.next.map((x, i) => <span key={x}>{i ? "、" : ""}{catalog.methods[x] ? <Link href={toolHref(x)}>{catalog.methods[x].name_zh}</Link> : <span className="k">尚未上架的工具（{x}）</span>}</span>)}</p>
         ) : (
-          <p className="sub my6">這個工具沒有固定的下一步：看下面同一類常用的，或回<Link href="/">首頁</Link>說你卡在哪。</p>
+          <p className="sub my6">這個工具沒有固定的下一步：看下面同一類常用的，或到<Link href="/analyze">直接分析</Link>說你卡在哪。</p>
         )}
         <h3 className="fam">用到它的工作流</h3>
         {wfs.length ? (

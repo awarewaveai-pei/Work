@@ -39,22 +39,63 @@ const OLD = { project_id: "P-OLD", name: "冰山模型 2026-09-26", created_at: 
 const NEW = { project_id: "P-NEW", name: "冰山模型 2026-09-27 00:10", created_at: "2026-09-26T16:10:00Z", updated_at: "2026-09-26T16:11:00Z", analysis_count: 1, methods: ["systems.iceberg_model"], latest_analysis: done("I-3", "2026-09-26T16:11:00Z") };
 const EMPTY = { project_id: "P-EMPTY", name: "蒐集資料", created_at: "2026-09-26T14:10:06Z", updated_at: "2026-09-26T14:10:30Z", analysis_count: 0, methods: [], latest_analysis: null };
 
-describe("我的專案", () => {
+describe("我的案子", () => {
   it("every project opens; created and last moved read to the minute; the latest result is one click; most recent first", async () => {
     vi.mocked(apiFetch).mockResolvedValue([OLD, EMPTY, NEW] as never);
     const { host, done: finish } = await mount(<ProjectList names={{ "systems.iceberg_model": "冰山模型" }} />);
-    expect(host.querySelector("h2 small")?.textContent).toBe("3 個你自己的・1 個示範");
+    // none has 開案資料, so all are 我的分析 -- an empty one too (a direct analysis that failed or is still running): a case
+    // is only what the server calls one (is_case), never guessed from emptiness (ENTRY_SLICE1 item 7, Codex review F1)
+    expect(host.querySelector("#analyses h2 small")?.textContent).toBe("3 個你自己的・1 個示範");
+    expect(host.querySelector("#cases h2 small")?.textContent).toBe("0 個");
     const demoRow = host.querySelector("tr.demo");   // the free 示範專案 is always the last row (N-78)
     expect(demoRow?.querySelector("a")?.getAttribute("href")).toBe("/projects/demo/iceberg");
     expect(demoRow?.textContent).toContain("報表（示範，不花錢）");
-    const rows = [...host.querySelectorAll("tbody tr:not(.demo)")];
+    const rows = [...host.querySelectorAll("#analyses tbody tr:not(.demo)")];
     expect(rows.map((row) => row.querySelector("td a")?.getAttribute("href"))).toEqual(["/projects/P-NEW", "/projects/P-OLD", "/projects/P-EMPTY"]);
+    expect(rows[2].textContent).toContain("還沒分析");
     const cells = [...rows[1].querySelectorAll("td")].map((cell) => cell.textContent);
     expect(cells.slice(1, 5)).toEqual(["工具：冰山模型", "報表（AI 草稿・尚未核准）（共 2 次分析）", formatTime(OLD.created_at), formatTime(OLD.updated_at)]);
     expect(cells[3]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
     expect(rows[1].querySelector("td:last-child a")?.getAttribute("href")).toBe("/projects/P-OLD/analyses/I-2");
-    expect(rows[2].querySelector("td:last-child a")?.getAttribute("href")).toBe("/projects/P-EMPTY");   // nothing to show yet: the project
-    expect(rows[2].textContent).toContain("還沒分析");
+    await finish();
+  });
+
+  it("a project with 開案資料 is a case, the rest are 我的分析; only an analysis offers 用這份結果開案 (ENTRY_SLICE1 item 7)", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path) => (path === "/projects/erased" ? [] : [OLD, { ...NEW, is_case: true }]) as never);
+    const { host, done: finish } = await mount(<ProjectList names={{ "systems.iceberg_model": "冰山模型" }} />);
+    expect([...host.querySelectorAll("#cases tbody tr")].map((row) => row.querySelector("td a")?.getAttribute("href"))).toEqual(["/projects/P-NEW"]);
+    expect([...host.querySelectorAll("#analyses tbody tr:not(.demo)")].map((row) => row.querySelector("td a")?.getAttribute("href"))).toEqual(["/projects/P-OLD"]);
+    expect(host.querySelector("#cases input[type=checkbox]")).toBeNull();
+    expect([...host.querySelectorAll("#analyses a")].some((link) => link.getAttribute("href") === "/projects/P-OLD/start")).toBe(true);
+    await finish();
+  });
+
+  it("erases ticked analyses for good only after the page says what that means (ENTRY_SLICE1 item 8)", async () => {
+    const deleted: string[] = [];
+    vi.mocked(apiFetch).mockImplementation(async (path, init) => {
+      if (init?.method === "DELETE") { deleted.push(String(path)); return { project_id: "P-OLD", physical_cleanup: "pending" } as never; }   // 202
+      return (path === "/projects/erased" ? [] : [OLD, NEW].filter((item) => !deleted.includes(`/projects/${item.project_id}?only=analysis`))) as never;
+    });
+    const { host, done: finish } = await mount(<ProjectList />);
+    const button = [...host.querySelectorAll("#analyses button")].find((item) => item.textContent?.startsWith("永久刪除")) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);   // nothing ticked
+    await act(async () => { (host.querySelector("#tick-P-OLD") as HTMLInputElement).click(); });
+    await act(async () => { button.click(); });
+    expect(deleted).toEqual([]);   // asked first, nothing deleted yet
+    const confirm = host.querySelector("#erase-confirm")!;
+    expect(confirm.textContent).toContain("冰山模型 2026-09-26");
+    expect(confirm.textContent).toContain("刪了就回不來");
+    expect(confirm.textContent).toContain("7 天");
+    await act(async () => { ([...confirm.querySelectorAll("button")].find((item) => item.textContent === "確定永久刪除") as HTMLButtonElement).click(); });
+    // ?only=analysis: one that became a case in another tab since the list loaded is refused by the server (Codex review F2)
+    expect(deleted).toEqual(["/projects/P-OLD?only=analysis"]);
+    expect(host.querySelector("#analyses [role=status]")?.textContent).toContain("有 1 個的內容已經刪掉");   // never claims more than happened (Codex review F4)
+    expect([...host.querySelectorAll("#analyses tbody tr:not(.demo)")].map((row) => row.querySelector("td a")?.getAttribute("href"))).toEqual(["/projects/P-NEW"]);
+    // a second batch does not hide the first one's cleanup (Codex review 2026-10-11 F3)
+    await act(async () => { (host.querySelector("#tick-P-NEW") as HTMLInputElement).click(); });
+    await act(async () => { button.click(); });
+    await act(async () => { ([...host.querySelectorAll("#erase-confirm button")].find((item) => item.textContent === "確定永久刪除") as HTMLButtonElement).click(); });
+    expect(host.querySelector("#analyses [role=status]")?.textContent).toContain("有 2 個的內容已經刪掉");
     await finish();
   });
 
@@ -110,7 +151,7 @@ describe("one project", () => {
       throw new Error(`unexpected: ${path}`);
     });
     const { host, done: finish } = await mount(<ProjectPage projectId="P-OLD" names={{ "systems.iceberg_model": "冰山模型" }} />);
-    expect(host.querySelector(".crumbs")?.textContent).toBe("我的專案 › 冰山模型 2026-09-26");
+    expect(host.querySelector(".crumbs")?.textContent).toBe("我的案子 › 冰山模型 2026-09-26");
     expect(host.querySelector(".status")?.textContent).toContain(`建立 ${formatTime(OLD.created_at)}`);
     const rows = [...host.querySelector("table")!.querySelectorAll("tbody tr")];   // the only table on the page now: tasks render as cards
     expect(rows.map((row) => row.querySelector("td")?.textContent)).toEqual(analyses.map((item) => formatTime(item.requested_at)));

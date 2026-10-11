@@ -15,7 +15,7 @@ export function RunHeader({ methodId, name, nameEn, family, headline, lesson, pr
 }) {
   const boxes = count ? `${["", "一", "兩", "三", "四", "五", "六", "七", "八", "九"][count] ?? count}格` : "格子";
   return <>
-    <div className="crumbs"><Link href="/projects">我的專案</Link> › {project && <><Link href={projectHref(project.id)}>{project.name}</Link> › </>}{name}分析</div>
+    <div className="crumbs"><Link href="/projects">我的案子</Link> › {project && <><Link href={projectHref(project.id)}>{project.name}</Link> › </>}{name}分析</div>
     <div className="card" data-section="0">
       <div className="top"><h1>{name}分析{headline ? <span>：{headline}</span> : null}</h1>{lesson
         ? <a className="howto" href={lesson} target="_blank" rel="noopener">怎麼用？先上 5 分鐘的課 ↗</a>

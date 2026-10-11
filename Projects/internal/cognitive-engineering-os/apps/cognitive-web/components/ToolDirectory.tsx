@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Catalog } from "../lib/catalog";
-import { shownAbbr, toolHref, toolSearchKey, toolsOfGoal } from "../lib/catalog";
+import { shownAbbr, toolHref, toolSearchKey, toolsOfGoal, userGoals, userToolCount } from "../lib/catalog";
 
 export function ToolDirectory({ catalog }: { catalog: Catalog }) {
   const [query, setQuery] = useState("");
@@ -15,7 +15,7 @@ export function ToolDirectory({ catalog }: { catalog: Catalog }) {
     if (id.startsWith("dir-")) { setOpen(id.slice(4)); document.getElementById(id)?.scrollIntoView(); }
   }, []);
   const q = query.trim().toLowerCase();
-  const groups = catalog.goals.map((goal) => {
+  const groups = userGoals(catalog).map((goal) => {   // engineering tools are not listed (ENTRY_SLICE1_CHECKLIST.md item 5)
     const items = toolsOfGoal(catalog, goal)
       .sort((a, b) => (catalog.methods[a].name_zh < catalog.methods[b].name_zh ? -1 : catalog.methods[a].name_zh > catalog.methods[b].name_zh ? 1 : 0))   // code-point order, as mockkit sorted()
       .filter((id) => !q || toolSearchKey(id, catalog.methods[id]).includes(q));
@@ -24,9 +24,9 @@ export function ToolDirectory({ catalog }: { catalog: Catalog }) {
   const shown = groups.reduce((n, g) => n + g.items.length, 0);
   return (
     <>
-      <h2>全部 {catalog.counts.tools} 個工具<small>按你想做的事分 {catalog.goals.length} 類；點開一類，或直接搜名字</small></h2>
-      <div className="how"><b>怎麼讀</b>每一類摺起來，標題就是首頁問句卡上的問句；點開是這一類的全部工具，每列中文名（縮寫）、英文名、一句話。<b>你要做的</b>知道名字就在下面搜，符合的類別會自動打開；不知道名字就回首頁，從問句卡或「先說你卡在哪」進去。</div>
-      <input className="search" id="q" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="知道名字就直接搜：SWOT、冰山、五力、決策樹、STRIDE…" aria-label="搜尋工具" />
+      <h2>全部 {userToolCount(catalog)} 個工具<small>按你想做的事分 {userGoals(catalog).length} 類；點開一類，或直接搜名字</small></h2>
+      <div className="how"><b>怎麼讀</b>每一類摺起來，標題就是「直接分析」問句卡上的問句；點開是這一類的全部工具，每列中文名（縮寫）、英文名、一句話。<b>你要做的</b>知道名字就在下面搜，符合的類別會自動打開；不知道名字就到「直接分析」，從問句卡或「先說你卡在哪」進去。</div>
+      <input className="search" id="q" type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="知道名字就直接搜：SWOT、冰山、五力、決策樹…" aria-label="搜尋工具" />
       <p className="sub my6" id="hits" aria-live="polite">{q ? <>符合 <span id="mcount">{shown}</span> 個工具</> : <>共 <span id="mcount">{shown}</span> 個工具</>}</p>
       {groups.map(({ goal, items, total }) => (q && !items.length) ? null : (
         <details className="dir" id={`dir-${goal.id}`} data-dir={goal.id} key={goal.id} open={Boolean(q) || open === goal.id}>

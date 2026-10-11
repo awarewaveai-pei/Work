@@ -26,7 +26,7 @@ export function ComparePage({ projectId, a, b, names = {} }: { projectId: string
       .catch((reason) => { if (active) setError(humanError(reason)); });
     return () => { active = false; };
   }, [projectId, a, b]);
-  if (error) return <><div className="crumbs"><Link href="/projects">我的專案</Link> › <Link href={projectHref(projectId)}>這個專案</Link> › 比較</div><div className="card"><p className="error">{error}</p></div></>;
+  if (error) return <><div className="crumbs"><Link href="/projects">我的案子</Link> › <Link href={projectHref(projectId)}>這個專案</Link> › 比較</div><div className="card"><p className="error">{error}</p></div></>;
   if (!pair) return <div className="card"><p>載入中…</p></div>;
   // N-67: two independent metric lists read as two different tools' outputs; one row per metric NAME, present on
   // either side, keeps 現在/目標 for the same thing on the same row so "有沒有往目標走" is a left-to-right read.
@@ -54,7 +54,7 @@ export function ComparePage({ projectId, a, b, names = {} }: { projectId: string
     finally { setApproving(false); }
   };
   return <>
-    <div className="crumbs"><Link href="/projects">我的專案</Link> › <Link href={projectHref(projectId)}>這個專案</Link> › 比較</div>
+    <div className="crumbs"><Link href="/projects">我的案子</Link> › <Link href={projectHref(projectId)}>這個專案</Link> › 比較</div>
     <div className="card">
       <div className="top"><h1>兩次分析並排比較</h1></div>
       <div className="sub">工具：{names[pair[0].method_id ?? ""] ?? pair[0].method_id}</div>

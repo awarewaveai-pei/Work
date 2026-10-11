@@ -91,7 +91,7 @@ from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.data.events import record_log
 from ai_lego.platform import block_hooks
-from ai_lego.core.domain.blocks import block_of_family
+from ai_lego.core.domain.blocks import FAMILY_BLOCK, INTERNAL, block_of_family
 from ai_lego.core.domain.custom_workflow import custom_workflow_record
 from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowRepository
 from ai_lego.platform.workflow.ir import compile_recipe_to_workflow_ir
@@ -1705,6 +1705,10 @@ def _interpret_and_record(
         excluded = {key: "③ 已經畫出" for key in result_page_shows(spec_root, method_id)}
         excluded.update({item["method_id"]: "這個專案已經做過" for item in repo.analyses(tenant_id, project_id).get(project_id, [])
                          if item["status"] == "DONE" and item.get("method_id")})
+        # a person's tool never recommends an engineering one (ENTRY_SLICE1_CHECKLIST.md item 5); an engineering tool, run by
+        # its own address, may still point at the next engineering step
+        if FAMILY_BLOCK.get(method_id.split(".")[0]) != INTERNAL:   # .get: an unmapped family is simply not engineering here
+            excluded.update({key: "工程工具，只給內部" for key in catalog.contracts if FAMILY_BLOCK.get(key.split(".")[0]) == INTERNAL})
         excluded[method_id] = "就是這個工具"
         outcome = run_interpretation(
             method_id=method_id, contract=contract, display=display, record=record,
@@ -2254,7 +2258,7 @@ def schedule_rerun(
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> dict[str, Any]:
     """到期重跑並比較: a reminder, due on a date, to run this analysis again with new numbers and compare the two. The
-    project page and 我的專案 show it once due; the run that answers it names it (rerun_id) and fulfils it."""
+    project page and 我的案子 show it once due; the run that answers it names it (rerun_id) and fulfils it."""
     tenant_id = session["tenant_id"]
     stored = _interpretation_or_404(repo, session, interpretation_id)
     due = _iso_date_or_400(payload.due, "RERUN_DUE")
@@ -2726,18 +2730,20 @@ def list_projects(
 ) -> list[dict[str, Any]]:
     tenant_id = session["tenant_id"]
     analyses, activity, tasks, reruns = _analyses(repo, tenant_id), repo.last_activity(tenant_id), repo.tasks(tenant_id), repo.reruns(tenant_id)   # four event scans once, not per project
-    return [_project_with_activity(project, analyses, activity, tasks, reruns) for project in repo.list_projects(tenant_id, workspace_id) if project["created_by_identity_id"] == session["identity_id"]]
+    cases = CaseDocs(repo).owners_with(tenant_id, "case", "assembler.intake")
+    return [_project_with_activity(project, analyses, activity, tasks, reruns, project["project_id"] in cases) for project in repo.list_projects(tenant_id, workspace_id) if project["created_by_identity_id"] == session["identity_id"]]
 
 
-def _project_with_activity(project: dict[str, Any], analyses: dict[str, list[dict[str, Any]]], activity: dict[str, str], tasks: dict[str, list[dict[str, Any]]], reruns: dict[str, list[dict[str, Any]]]) -> dict[str, Any]:
+def _project_with_activity(project: dict[str, Any], analyses: dict[str, list[dict[str, Any]]], activity: dict[str, str], tasks: dict[str, list[dict[str, Any]]], reruns: dict[str, list[dict[str, Any]]], is_case: bool) -> dict[str, Any]:
     """A Project with what it holds (GET /projects and GET /projects/{id} alike): when it last moved, how many analyses,
-    the tools they used, the latest one, its open and overdue tasks, the rerun reminders that are due."""
+    the tools they used, the latest one, its open and overdue tasks, the rerun reminders that are due, and ``is_case``:
+    it has 開案資料 (a case), or it only holds analyses run from 直接分析 (我的分析)."""
     own = analyses.get(project["project_id"], [])
     today = datetime.datetime.now(datetime.timezone.utc).date().isoformat()
     open_tasks = [task for task in tasks.get(project["project_id"], []) if not task["done"]]
     due_dates = sorted(task["due"] for task in open_tasks if task["due"])
     return {
-        **project, "updated_at": activity.get(project["project_id"], project["created_at"]), "analysis_count": len(own),
+        **project, "is_case": is_case, "updated_at": activity.get(project["project_id"], project["created_at"]), "analysis_count": len(own),
         "methods": list(dict.fromkeys(item["method_id"] for item in own if item["method_id"])), "latest_analysis": own[-1] if own else None,
         "tasks": {"open": len(open_tasks), "overdue": sum(1 for task in open_tasks if task["due"] and _date_has_passed(task["due"])), "due_today": sum(1 for task in open_tasks if task["due"] == today), "next_due": due_dates[0] if due_dates else None},
         "reruns_due": sum(1 for item in reruns.get(project["project_id"], []) if item["fulfilled_by"] is None and item["due"] <= today),
@@ -2776,7 +2782,8 @@ def get_project(
 ) -> dict[str, Any]:
     tenant_id = session["tenant_id"]
     project = _project_or_404(repo, session, project_id)
-    return _project_with_activity(project, _analyses(repo, tenant_id, project_id), repo.last_activity(tenant_id, project_id), repo.tasks(tenant_id, project_id), repo.reruns(tenant_id, project_id))
+    return _project_with_activity(project, _analyses(repo, tenant_id, project_id), repo.last_activity(tenant_id, project_id), repo.tasks(tenant_id, project_id), repo.reruns(tenant_id, project_id),
+                                  bool(CaseDocs(repo).current(tenant_id, record_log.case(project_id), "assembler.intake")))
 
 
 class RenameProjectRequest(BaseModel):
@@ -2804,7 +2811,8 @@ def rename_project(
         raise HTTPException(status_code=_domain_error_status(error), detail=str(error)) from error
     except UniqueViolation as error:
         raise HTTPException(status_code=409, detail=f"PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE: {payload.name!r}") from error
-    return _project_with_activity(project, _analyses(repo, tenant_id, project_id), repo.last_activity(tenant_id, project_id), repo.tasks(tenant_id, project_id), repo.reruns(tenant_id, project_id))
+    return _project_with_activity(project, _analyses(repo, tenant_id, project_id), repo.last_activity(tenant_id, project_id), repo.tasks(tenant_id, project_id), repo.reruns(tenant_id, project_id),
+                                  bool(CaseDocs(repo).current(tenant_id, record_log.case(project_id), "assembler.intake")))
 
 
 @app.get("/projects/{project_id}/history")
@@ -2821,6 +2829,7 @@ def project_history(
 @app.delete("/projects/{project_id}")
 def erase_project(
     project_id: str,
+    only: Literal["analysis"] | None = None,
     session: dict[str, Any] = Depends(require_session),
     store: IdentityStore = Depends(get_store),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
@@ -2831,7 +2840,9 @@ def erase_project(
     case's rows, closes its grants and names what is left on disk; the files go after it commits. 200 with
     ``physical_cleanup: "done"`` when every file is gone and the ProjectErased tombstone is written; 202 with
     ``"pending"`` when the case is already unreadable but a file is not gone yet -- DELETE again (the case answers 404
-    to everything else) or the server finishes it at its next start."""
+    to everything else) or the server finishes it at its next start. ``?only=analysis`` (我的分析, a result page's 這份結果
+    要怎麼處理): a project that became a case since the page loaded (開案資料 saved in another tab) answers 409
+    PROJECT_IS_A_CASE and is not erased -- checked inside the erasure's decision, under the case lock."""
     tenant_id = session["tenant_id"]
     if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
@@ -2840,7 +2851,7 @@ def erase_project(
         result = _without_empty_failed({"project_id": project_id, **erasure.finish(tenant_id, ERASURE_CASE, project_id)})
     else:
         _project_or_404(repo, session, project_id)
-        result = erase_case(store, repo, source_cas, artifact_store, tenant_id, session["identity_id"], project_id)
+        result = erase_case(store, repo, source_cas, artifact_store, tenant_id, session["identity_id"], project_id, only_if_not_case=only == "analysis")
     return result if result["physical_cleanup"] == "done" else JSONResponse(status_code=202, content=result)
 
 
@@ -2849,7 +2860,7 @@ def _without_empty_failed(result: dict[str, Any]) -> dict[str, Any]:
 
 
 def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: TenantScopedCas, artifact_store: JsonArtifactStore,
-               tenant_id: str, identity_id: str, project_id: str, *, only_if_no_record: bool = False) -> dict[str, Any]:
+               tenant_id: str, identity_id: str, project_id: str, *, only_if_no_record: bool = False, only_if_not_case: bool = False) -> dict[str, Any]:
     """The case erasure itself, for a case the caller has already shown is the person's. No entitlement gate: it is also what
     the account deletion calls, and deleting what is yours is a right a suspended tenant does not take away. What cannot be
     deleted (a corrupt artifact reference) comes back in ``failed`` and does not stop the erasure. ``physical_cleanup``
@@ -2862,10 +2873,13 @@ def erase_case(store: IdentityStore, repo: ProjectSourceRepository, source_cas: 
         raise HTTPException(status_code=409, detail="PROJECT_BUSY: a synthesis is still running; wait for it to finish, then delete")
     try:
         runs = lambda: _case_runs(tenant_id, identity_id, project_id)   # noqa: E731 -- read inside the decision, under the case lock
-        result = erasure_for(repo, source_cas, artifact_store).erase_case(tenant_id, project_id, identity_id, runs, only_if_no_record=only_if_no_record)   # later writes: CASE_ERASED
+        result = erasure_for(repo, source_cas, artifact_store).erase_case(tenant_id, project_id, identity_id, runs, only_if_no_record=only_if_no_record,
+                                                                          only_if_not_case=only_if_not_case)   # later writes: CASE_ERASED
     except InvariantViolation as error:
         if str(error).startswith("PROJECT_NOT_FOUND"):
             raise HTTPException(status_code=404, detail=f"PROJECT_NOT_FOUND: {project_id!r}") from error
+        if str(error).startswith("PROJECT_IS_A_CASE"):   # decided under the case lock (erasure.decide_case), so no intake slips past it
+            raise HTTPException(status_code=409, detail=str(error)) from error
         raise
     finally:
         synthesis_lock.release()

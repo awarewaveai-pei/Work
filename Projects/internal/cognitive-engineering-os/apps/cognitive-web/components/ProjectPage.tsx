@@ -1,6 +1,6 @@
 "use client";
 
-// One project (我的專案 › name): what it is, every analysis in it newest first -- each opens its own result page -- its
+// One project (我的案子 › name): what it is, every analysis in it newest first -- each opens its own result page -- its
 // tasks (⑦ 存成任務 or added straight from a card) as cards with a status board and a journal, its rerun reminders
 // (到期重跑，或隨時「現在重跑並比較」), how many sources it holds, and its 歷程 (the project's own history, newest first).
 // While an analysis runs, the list refreshes itself.
@@ -85,7 +85,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
     return () => { active = false; };
   }, [tasks]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loadError) return <><div className="crumbs"><Link href="/projects">我的專案</Link></div><div className="card"><p className="error">{loadError}</p></div></>;
+  if (loadError) return <><div className="crumbs"><Link href="/projects">我的案子</Link></div><div className="card"><p className="error">{loadError}</p></div></>;
   if (!project || !analyses) return <div className="card"><p>載入中…</p></div>;
   const latest = analyses[0];
   const latestDone = analyses.find((item) => item.status === "DONE");
@@ -124,7 +124,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
     } catch (reason) { setRenameError(humanError(reason)); }
     finally { setRenaming(false); }
   };
-  // N-65: DELETE lived only on a DONE result's ⑨; the project page and 我的專案 had no way in at all.
+  // N-65: DELETE lived only on a DONE result's ⑨; the project page and 我的案子 had no way in at all.
   const erase = async () => {
     if (!window.confirm(`刪除專案「${project.name}」？來源與所有產出一起刪掉，留一筆「已抹除」。這不能復原。`)) return;
     setDeleteError("");
@@ -317,7 +317,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
   };
 
   return <>
-    <div className="crumbs"><Link href="/projects">我的專案</Link> › {project.name}</div>
+    <div className="crumbs"><Link href="/projects">我的案子</Link> › {project.name}</div>
     <div className="card">
       <div className="top">
         <h1>{project.name}</h1>
@@ -346,7 +346,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
       {dueReruns.map((item) => <div className="finding warn" key={item.rerun_id}><b>到期了（{item.due}）：用新資料重跑並比較</b>打開 {formatTime(item.scheduled_at).slice(0, 10)} 排的那一次分析，更新格子裡的數字，按「執行分析」；跑完兩次會並排比較。<div className="btns mt6"><Link className="btn primary" href={`${analysisHref(project.project_id, item.interpretation_id)}?rerun=${encodeURIComponent(item.rerun_id)}`}>重跑並比較 →</Link></div></div>)}
     </div>
     <div className="card">
-      <h2>這個專案的分析<small>{analyses.length ? `${analyses.length} 次，新的在上面` : "還沒有"}</small></h2>
+      <h2>這個專案的分析<small>{analyses.length ? `${analyses.length} 次，新的在上面・AI 做的，不是你的判斷` : "還沒有"}</small></h2>
       {analyses.length ? <div className="scroll-x">
         <table>
           <thead><tr><th>開始</th><th>工具</th><th>狀態</th><th>你的判斷</th><th>核准</th><th></th></tr></thead>

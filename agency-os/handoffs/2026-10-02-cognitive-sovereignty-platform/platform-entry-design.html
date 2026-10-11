@@ -1,0 +1,631 @@
+<title>認知工程系統入口設計</title>
+<style>
+/* 版面：沿用監工台——左邊選畫面，右邊一次看一件事。顏色、字級沿用 cognitive.aware-wave.com 的設計系統（design-system.css）。
+   樣稿畫面放在 .shot 框裡，代表「網站上會長這樣」；框外是說明。 */
+:root{
+  --bg:#f6f2e9; --card:#fffdf8; --ink:#232019; --muted:#6f6757; --line:#e3dbc8; --soft:#f3efe4;
+  --accent:#0e5b50; --accent-hover:#093f38; --tag:#e2eeea; --on-accent:#ffffff;
+  --ok:#1f6b47; --ok-bg:#e2eeea; --warn:#a3611c; --warn-bg:#fbf0dc; --bad:#a13328; --bad-bg:#f3ddd8;
+  --ai:#6247a8; --ai-bg:#ece7f7; --you:#2a5d9f; --you-bg:#e4ecf7;
+  --shot:#fbf8f1; --shot-bar:#ece5d5;
+  --fs-h1:28px; --fs-h2:20px; --fs-h3:18px; --fs-body:16px; --fs-small:14px; --fs-tag:12px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ color-scheme:dark;
+  --bg:#1c2b27; --card:#243530; --ink:#f3efe4; --muted:#a9beb6; --line:#3a4b45; --soft:#2a3b36;
+  --accent:#8fc7b0; --accent-hover:#b5dcc9; --tag:#22403a; --on-accent:#10201c;
+  --ok:#5fcf8f; --ok-bg:#14301f; --warn:#f0a44a; --warn-bg:#3a2a10; --bad:#e08a80; --bad-bg:#3a1c1a;
+  --ai:#c9bbf2; --ai-bg:#332c54; --you:#a9c8f0; --you-bg:#22344f;
+  --shot:#20302b; --shot-bar:#2f413b } }
+:root[data-theme="dark"]{ color-scheme:dark;
+  --bg:#1c2b27; --card:#243530; --ink:#f3efe4; --muted:#a9beb6; --line:#3a4b45; --soft:#2a3b36;
+  --accent:#8fc7b0; --accent-hover:#b5dcc9; --tag:#22403a; --on-accent:#10201c;
+  --ok:#5fcf8f; --ok-bg:#14301f; --warn:#f0a44a; --warn-bg:#3a2a10; --bad:#e08a80; --bad-bg:#3a1c1a;
+  --ai:#c9bbf2; --ai-bg:#332c54; --you:#a9c8f0; --you-bg:#22344f;
+  --shot:#20302b; --shot-bar:#2f413b }
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:var(--fs-body)/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,h4,p,ul,ol{margin:0}
+ul,ol{padding-left:1.3em}
+h1{font-size:var(--fs-h1);line-height:1.3;text-wrap:balance}
+h2{font-size:var(--fs-h2);line-height:1.4;text-wrap:balance}
+h3{font-size:var(--fs-h3);line-height:1.4}
+h4{font-size:var(--fs-body)}
+.sub,.cap{color:var(--muted);font-size:var(--fs-small)}
+.sub{max-width:46em}
+.num{font-variant-numeric:tabular-nums}
+
+.app{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;max-width:1320px;margin:0 auto;padding-inline:24px;padding-block:32px 96px}
+.side{position:sticky;top:calc(env(safe-area-inset-top,0px) + 24px);align-self:start;display:flex;flex-direction:column;gap:4px}
+.brand{padding:0 12px 16px;line-height:1.4;font-weight:700}
+.brand small{display:block;font-weight:400;font-size:var(--fs-tag);color:var(--muted)}
+.navi{border:0;background:transparent;text-align:left;padding:10px 12px;border-radius:8px;font-weight:600;cursor:pointer}
+.navi:hover{background:var(--soft)}
+.navi[aria-current="page"]{background:var(--tag);color:var(--accent)}
+.navi small{display:block;font-weight:400;font-size:var(--fs-tag);color:var(--muted)}
+main{display:grid;gap:28px;min-width:0}
+.view{display:grid;gap:24px;min-width:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;min-width:0}
+.stack{display:grid;gap:14px;min-width:0}
+.two{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:var(--fs-tag);font-weight:700;background:var(--tag);color:var(--accent);white-space:nowrap}
+.pill.ai{background:var(--ai-bg);color:var(--ai)} .pill.you{background:var(--you-bg);color:var(--you)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)} .pill.bad{background:var(--bad-bg);color:var(--bad)}
+.note{border-left:3px solid var(--warn);background:var(--warn-bg);padding:10px 14px;border-radius:0 8px 8px 0;font-size:var(--fs-small)}
+table{border-collapse:collapse;width:100%;font-size:var(--fs-small)}
+th,td{text-align:left;vertical-align:top;padding:10px 12px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:600;white-space:nowrap}
+.scroll-x{overflow-x:auto}
+
+/* 樣稿框 */
+.shot{border:1px solid var(--line);border-radius:12px;background:var(--shot);overflow:hidden;min-width:0}
+.shot-bar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--shot-bar);font-size:var(--fs-tag);color:var(--muted)}
+.shot-bar b{color:var(--ink)}
+.shot-body{padding:24px;display:grid;gap:18px;min-width:0}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 14px;font-weight:600;cursor:pointer;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.primary:hover{background:var(--accent-hover)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.field{display:grid;gap:6px;font-size:var(--fs-small);font-weight:600}
+.input{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:10px 12px;font-weight:400;font-size:var(--fs-body);min-height:44px}
+.input.tall{min-height:72px}
+.input .ph{color:var(--muted)}
+
+/* 首頁兩道門 */
+.doors{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.door{display:grid;gap:10px;align-content:start;padding:20px;border-radius:12px;border:1.5px solid var(--line);background:var(--card);text-align:left;cursor:pointer}
+.door:hover{border-color:var(--accent)}
+.door.main{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.door .k{font-size:var(--fs-tag);font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.door .t{font-size:22px;font-weight:700;line-height:1.3}
+.door ul{font-size:var(--fs-small);color:var(--muted);display:grid;gap:2px}
+.door .go{justify-self:start}
+
+/* 目的按鈕（看得見的按鈕，不用下拉） */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--line);background:var(--card);border-radius:999px;padding:6px 14px;font-size:var(--fs-small);font-weight:600;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--tag);color:var(--accent)}
+.chip.lock{border-style:dashed;color:var(--muted);cursor:default}
+
+/* 路線：一列站 */
+.route{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:var(--fs-small);font-weight:700}
+.route .st{padding:4px 10px;border-radius:8px;background:var(--tag);color:var(--accent)}
+.route .ar{color:var(--muted);font-weight:400}
+
+/* 地圖：一圈九站，中間紀錄（沿用監工台的圈） */
+.ring{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.node{display:grid;gap:2px;align-content:start;text-align:left;padding:10px 12px;border-radius:10px;border:1.5px dashed var(--line);background:var(--card);cursor:pointer;min-width:0;position:relative}
+.node:hover{border-color:var(--accent)}
+.node.on{border-style:solid;border-color:var(--accent)}
+.node.done{background:var(--tag)}
+.node[aria-pressed="true"]{box-shadow:0 0 0 3px var(--accent)}
+.node .top{display:flex;align-items:center;gap:6px;font-size:var(--fs-tag);color:var(--muted);font-weight:700}
+.node .nm{font-size:var(--fs-h3);font-weight:700;line-height:1.3}
+.node .rl{font-size:var(--fs-tag);color:var(--muted)}
+.node .here{position:absolute;top:-9px;right:8px;font-size:11px;padding:0 8px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-weight:700}
+.hub{grid-column:2 / span 2;display:grid;place-content:center;gap:2px;text-align:center;padding:14px;border-radius:10px;background:var(--soft);border:1px solid var(--line);cursor:pointer}
+.hub b{font-size:var(--fs-h3)}
+.loop{display:grid;place-content:center;text-align:center;font-size:var(--fs-tag);color:var(--muted);padding:6px;border:1px dashed var(--line);border-radius:10px}
+.outer{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.outer .node{border-style:solid;border-color:var(--line)}
+.outer .node.on{border-color:var(--accent)}
+.outer .node .nm{font-size:var(--fs-body)}
+
+/* 案子頁：地圖在左，選到的站在旁邊 */
+.case{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px;align-items:start}
+.casehead{display:grid;gap:8px}
+.meta{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:var(--fs-small);color:var(--muted);align-items:center}
+.panel{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:18px;display:grid;gap:14px;min-width:0}
+.turn{display:grid;gap:6px;padding:12px 14px;border-radius:10px;border:1px solid var(--line)}
+.turn.you{background:var(--you-bg);border-color:transparent}
+.turn.ai{background:var(--ai-bg);border-color:transparent}
+.turn .who{font-size:var(--fs-tag);font-weight:700;letter-spacing:.04em}
+.turn.you .who{color:var(--you)} .turn.ai .who{color:var(--ai)}
+.tools{display:grid;gap:6px;font-size:var(--fs-small)}
+.tools li{list-style:none}
+.tools ul{padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.tools .tl{border:1px solid var(--line);border-radius:8px;padding:4px 10px;background:var(--card)}
+.steps8{display:flex;flex-wrap:wrap;gap:6px;font-size:var(--fs-tag)}
+.steps8 span{padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.steps8 span.on{border-color:var(--you);color:var(--you);background:var(--you-bg);font-weight:700}
+
+/* 一張圖 */
+.flow{display:grid;gap:14px}
+.flow .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.box{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--card);display:grid;gap:4px;min-width:0}
+.box .k{font-size:var(--fs-tag);font-weight:700;color:var(--muted);letter-spacing:.04em}
+.box b{font-size:var(--fs-h3)}
+.box.accent{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.down{text-align:center;color:var(--muted);font-size:var(--fs-small)}
+.bridge{border:1px dashed var(--accent);border-radius:10px;padding:10px 14px;font-size:var(--fs-small);color:var(--accent);text-align:center}
+
+/* 比較 */
+.cmp{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.who-c{font-size:var(--fs-tag);font-weight:700;letter-spacing:.06em;color:var(--muted)}
+.agree li,.split li,.dec li{margin-bottom:6px}
+.split td:first-child{font-weight:700;white-space:nowrap}
+.dec{display:grid;gap:10px;padding-left:0;list-style:none;counter-reset:d}
+.dec li{display:grid;grid-template-columns:28px minmax(0,1fr);gap:10px;counter-increment:d}
+.dec li::before{content:counter(d);display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--on-accent);font-weight:700;font-size:var(--fs-tag)}
+
+@media (max-width:959px){
+  .app{grid-template-columns:minmax(0,1fr);gap:20px;padding-inline:16px;padding-block:20px 72px}
+  .side{position:static;flex-direction:row;flex-wrap:wrap;gap:8px}
+  .brand{display:none}
+  .navi{border:1px solid var(--line);background:var(--card);border-radius:999px;padding:6px 14px;font-size:var(--fs-small)}
+  .navi small{display:none}
+  .card{padding:16px}
+  .case,.two,.cmp,.flow .row{grid-template-columns:minmax(0,1fr)}
+  .outer{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:599px){
+  h1{font-size:24px}
+  .doors{grid-template-columns:minmax(0,1fr)}
+  .shot-body{padding:16px}
+  .ring{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ring>*{grid-column:auto!important;grid-row:auto!important}
+  .hub{grid-column:1 / -1!important}
+  .loop{display:none}
+  .outer{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <nav class="side" aria-label="設計稿畫面">
+    <div class="brand">認知工程系統<small>入口與地圖設計稿　2026-10-11</small></div>
+    <button class="navi" data-v="one" aria-current="page">一張圖<small>所有東西怎麼接</small></button>
+    <button class="navi" data-v="home">首頁<small>兩道門</small></button>
+    <button class="navi" data-v="intake">陪我思考：開案<small>一頁開好</small></button>
+    <button class="navi" data-v="case">案子頁：地圖<small>一圈九站</small></button>
+    <button class="navi" data-v="direct">直接分析<small>結果帶進案子</small></button>
+    <button class="navi" data-v="nav">網站選單<small>11 項變 5 項</small></button>
+    <button class="navi" data-v="cmp">Claude × Codex<small>共識與分歧</small></button>
+    <button class="navi" data-v="decide">要妳決定<small id="n-dec-side"></small></button>
+  </nav>
+
+  <main>
+    <header class="stack">
+      <h1>認知工程系統：入口與地圖</h1>
+      <p class="sub">妳說的三個問題：體驗不是妳要的平台、第一次來的人找不到起點、東西很多卻看不出關係。這份設計稿用一張「地圖」把全部接起來。灰框裡是網站上會長的樣子，可以點。</p>
+    </header>
+
+    <!-- 一張圖 -->
+    <section class="view" id="v-one">
+      <div class="card stack">
+        <h2>一句話</h2>
+        <p style="font-size:22px;font-weight:700;line-height:1.4">把一件事想清楚。結論由你下，AI 在旁邊幫你看、幫你問、幫你查。</p>
+        <p class="cap">這句放在首頁最上面。它同時說了第二版（你自己想）和第一版（AI 幫你查、幫你分析）。</p>
+      </div>
+
+      <div class="card stack">
+        <h2>所有東西怎麼接：從首頁走到地圖</h2>
+        <div class="flow">
+          <div class="box accent" style="text-align:center"><span class="k">首頁</span><b>你想把什麼事想清楚？</b><span class="cap">寫一句（可以不寫），再選一道門</span></div>
+          <div class="row">
+            <div class="box"><span class="k">門 1　趕時間、要一個答案</span><b>直接分析</b>
+              <span class="cap">做法庫：<span class="num" data-n="userTools"></span> 個做法，照 11 種問句分類（工程那一類不給一般人）；<span class="num" data-n="userFlows"></span> 條「AI 一口氣跑完」。挑一個，填格子，AI 給一份分析。</span></div>
+            <div class="box accent"><span class="k">門 2　想自己想清楚</span><b>陪我思考</b>
+              <span class="cap">開案：選目的（7 種），系統在地圖上亮出這次的路線，從第一站開始。你先寫，AI 才回。</span></div>
+          </div>
+          <div class="bridge">直接分析的結果，按一下就能帶進案子，標「AI 做的」，當材料，不會變成你的判斷。</div>
+          <div class="down">↓ 只有「陪我思考」走地圖；「直接分析」要你按「帶進案子」才進來 ↓</div>
+          <div class="box" style="gap:12px"><span class="k">案子＝一張地圖</span>
+            <div class="ring" id="one-ring"></div>
+            <div class="outer" id="one-outer"></div>
+            <p class="cap">實線框＝「做一個複雜的決定」這條路線第一輪要走的 6 站；虛線＝需要時系統提議，你同意才加。每一站裡面是那一站的做法（數字＝做法數）。外面一排 5 塊不是一站一站走的，是隨時可以叫出來或一直都在的。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card stack">
+        <h2>妳手上的每一樣東西，在地圖上是什麼</h2>
+        <p class="cap">左欄是妳和工程用的叫法，中欄是使用者在網站上看到的叫法。使用者只需要懂七個詞：案子、地圖、路線、站、做法、AI 快速跑、紀錄。</p>
+        <div class="scroll-x"><table>
+          <thead><tr><th>妳手上的</th><th>使用者看到</th><th>在地圖上的位置</th></tr></thead>
+          <tbody id="vocab"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- 首頁 -->
+    <section class="view" id="v-home" hidden>
+      <div class="stack"><h2>首頁：只問一句，下面兩道門</h2>
+        <p class="sub">今天的首頁是工具目錄（12 類卡片＋熱門工具）。它們搬到「直接分析」那一頁。首頁只留一件事：你想用哪種方式開始。</p></div>
+      <div class="shot">
+        <div class="shot-bar"><b>cognitive.aware-wave.com</b><span>首頁</span></div>
+        <div class="shot-body">
+          <div class="stack" style="gap:6px">
+            <h1>把一件事想清楚</h1>
+            <p class="sub">結論由你下。AI 在旁邊幫你看、幫你問、幫你查。</p>
+          </div>
+          <label class="field">你想把什麼事想清楚？（可以先不寫）
+            <div class="input tall">合夥人第三次改合約條件，還說「同業都這樣改」。這段合作要不要繼續？</div>
+          </label>
+          <div class="doors">
+            <button class="door main" data-go="intake">
+              <span class="k">我想自己想清楚</span>
+              <span class="t">陪我思考</span>
+              <ul><li>系統幫你排好路線，一站一站走</li><li>每一站你先寫，AI 再補充、提問、找反例</li><li>結論你自己寫；可以分幾天做完</li></ul>
+              <span class="btn primary go">開一個案子 →</span>
+            </button>
+            <button class="door" data-go="direct">
+              <span class="k">我需要一個答案</span>
+              <span class="t">直接分析</span>
+              <ul><li>挑一個做法，填幾個格子</li><li>AI 直接給你一份分析</li><li>之後想深入，可以把結果帶進案子</li></ul>
+              <span class="btn go">直接分析 →</span>
+            </button>
+          </div>
+          <div class="stack" style="gap:8px">
+            <h3>繼續上次的案子</h3>
+            <div class="box" style="grid-template-columns:minmax(0,1fr) auto;align-items:center">
+              <div><b style="font-size:var(--fs-body)">這段合作要不要繼續</b><div class="cap">做一個複雜的決定・走到第 3 站「共思考」・3 天前</div></div>
+              <span class="btn" data-go="case" role="button" tabindex="0">繼續 →</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="card stack"><h3>為什麼兩道門</h3><ul class="cap">
+          <li>藍圖 §8.1、§8.7：不能用介面擋住使用者取得直接回答。所以「直接分析」一定要有。</li>
+          <li>平台要做的是「陪我思考」，所以它是主按鈕、放左邊、有框。</li>
+          <li>上面寫的那一句會帶進妳選的那一道門，不用再打一次。</li></ul></div>
+        <div class="card stack"><h3>拿掉的東西</h3><ul class="cap">
+          <li>「<span data-n="allTools"></span> 個思考工具、17 條工作流」：使用者不用知道總數。</li>
+          <li>12 類卡片、熱門工具：搬到直接分析。</li>
+          <li>登入頁的 Tenant ID：改成自己申請帳號（2026-10-11 定），系統自動分配，使用者不用填。之後登入只要 email 和密碼。</li>
+          <li>英文站名「Cognitive OS」與選單的「認知作業系統」：統一成「認知工程系統／Cognitive Engineering OS」（2026-10-11 定）。</li></ul></div>
+      </div>
+    </section>
+
+    <!-- 開案 -->
+    <section class="view" id="v-intake" hidden>
+      <div class="stack"><h2>陪我思考：一頁開好一個案子</h2>
+        <p class="sub">今天要先跑一個工具，系統才開專案，再找「開案資料 →」。改成：首頁按「陪我思考」，直接到這一頁。按「開案」那一刻才建立案子（POST /projects 再存開案資料），離開這一頁什麼都不留；所以「是不是案子」只看有沒有開案資料。</p></div>
+      <div class="shot">
+        <div class="shot-bar"><b>cognitive.aware-wave.com</b><span>開一個案子</span></div>
+        <div class="shot-body">
+          <label class="field">1　要想清楚什麼（從首頁帶過來）
+            <div class="input">這段合作要不要繼續</div></label>
+          <div class="field">2　這件事比較像哪一種？（選一個）
+            <div class="chips" id="purposes"></div></div>
+          <div class="field">3　系統排的路線（你可以重排、跳過、隨時停）
+            <div class="route" id="intake-route"></div>
+            <span class="cap" id="intake-why" style="font-weight:400"></span></div>
+          <div class="field">4　AI 這次能做什麼（可多選，之後隨時改）
+            <div class="chips" id="perms"></div></div>
+          <div class="field">5　建議現在填（團隊一起決定、或系統看出風險高時，這三項一定要填）
+            <div class="chips"><span class="chip">風險</span><span class="chip">誰會受影響</span><span class="chip">做到什麼算告一段落</span></div></div>
+          <div class="field">6　之後再補也可以
+            <div class="chips"><span class="chip">事情發生在哪</span><span class="chip">知道的相關規定</span><span class="chip">有人帶我（邀請帶領者）</span></div></div>
+          <div class="btns"><span class="btn primary" data-go="case" role="button" tabindex="0">從第一站「外化」開始 →</span></div>
+        </div>
+      </div>
+      <p class="cap">「目的」用七顆看得見的按鈕，不用下拉。選了之後，第 3 欄的路線馬上換成那個目的的建議路線，下面寫為什麼這樣排。路線就是監工台的「套件」。必填只有 1、2 兩項，第一次來的人不會被一長串欄位擋住。</p>
+    </section>
+
+    <!-- 案子頁 -->
+    <section class="view" id="v-case" hidden>
+      <div class="stack"><h2>案子頁：一張地圖，點哪一站就在旁邊打開</h2>
+        <p class="sub">這就是監工台的【地圖】搬進網站。左邊整張圖一直在，右邊是選到的那一站；不換頁、不用分頁。每一站同一個形狀：你先寫 → AI 回 → 想換方式就挑一個做法 → 存進紀錄。今天只有「拆解」能挑做法，改成有做法的站都能挑（蒐集站用的是蒐集器）。</p></div>
+      <div class="shot">
+        <div class="shot-bar"><b>cognitive.aware-wave.com</b><span>我的案子 › 這段合作要不要繼續</span></div>
+        <div class="shot-body">
+          <div class="casehead">
+            <h2>這段合作要不要繼續</h2>
+            <div class="meta">
+              <span class="pill">做一個複雜的決定</span>
+              <span>第 1 輪：6 站走到第 3 站</span>
+              <span>AI 這次能做：整理、提出不同看法、當反方　<u>改</u></span>
+              <span class="btn" style="padding:4px 10px">拿給別人看</span>
+            </div>
+          </div>
+          <div class="case">
+            <div class="stack" style="gap:10px">
+              <div class="ring" id="case-ring"></div>
+              <div class="outer" id="case-outer"></div>
+              <details class="box" id="rules"><summary><b style="font-size:var(--fs-body)">這個案子的 5 條規則</b>　<span class="cap">一直有效，點開看</span></summary>
+                <ul class="cap" style="margin-top:8px">
+                  <li>結論只有你能寫；AI 寫的每一段都標「AI 做的」。</li>
+                  <li>AI 這次能做什麼，你隨時可以縮小或收回。</li>
+                  <li>要加哪一站，系統只能提議，你同意才加。</li>
+                  <li>每一筆都記下來：誰寫的、哪一站寫的、第幾版。</li>
+                  <li>拆解和判斷時，可以看這件事所在的世界（法律、慣例、文化）。</li></ul></details>
+            </div>
+            <div class="panel" id="case-panel" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="card stack"><h3>妳的八步循環在哪</h3><p class="cap">不做成選單。每一站上面一排小字標出「這一站你在做哪幾步」，亮的是這一站的。回顧完回到圈上＝再檢視。這樣八步一直看得見，又不用多學一套。</p></div>
+        <div class="card stack"><h3>全程生效的五樣在哪</h3><p class="cap">地圖下面固定一格「這個案子的 5 條規則」，用白話寫，點開看。五樣不是站，所以不畫進圈裡。它們也各自落在畫面上：</p><ul class="cap">
+          <li>完整性核心：「判斷」那一站只能你寫；AI 寫的每一段都標「AI 做的」。</li>
+          <li>協作合約：頁頭那一行「AI 這次能做：… 改」。</li>
+          <li>組裝器：開案那一頁，和「系統提議加一站」的提示。</li>
+          <li>共用紀錄：圈中間那一格。</li>
+          <li>規範與脈絡：拆解和判斷那兩站裡的「看這件事所在的世界」。</li></ul></div>
+      </div>
+    </section>
+
+    <!-- 直接分析 -->
+    <section class="view" id="v-direct" hidden>
+      <div class="stack"><h2>直接分析：照今天的做法，結果可以帶進案子</h2>
+        <p class="sub">就是今天的首頁內容（先說你卡在哪、12 類問句、熱門工具），搬到這一頁。改三件事：工程做法不出現；跑一次不再自動開一個專案；結果頁底下有一條路通往陪我思考。</p></div>
+      <div class="shot">
+        <div class="shot-bar"><b>cognitive.aware-wave.com</b><span>直接分析</span></div>
+        <div class="shot-body">
+          <label class="field">先說你卡在哪（從首頁帶過來）
+            <div class="input">合夥人第三次改合約條件，還說「同業都這樣改」。這段合作要不要繼續？</div></label>
+          <div class="stack" style="gap:8px"><h3>建議的做法</h3>
+            <div class="tools"><ul><li class="tl">利益導向談判</li><li class="tl">最佳替代方案（BATNA）</li><li class="tl">加權決策矩陣</li></ul></div>
+            <p class="cap">今天實測推薦的是 ZOPA、獨立裁決、變更風險矩陣，最後一個是工程工具。工程的 <span data-n="eng"></span> 個做法改成只給內部和工程客戶。</p></div>
+          <div class="stack" style="gap:8px"><h3>或照你想做的事找（11 類）</h3>
+            <div class="chips"><span class="chip">這件事為什麼一直發生</span><span class="chip">問題到底是什麼</span><span class="chip">幾個選項，選哪一個</span><span class="chip">我的說法站不站得住</span><span class="chip">做不做得起來、划不划算</span><span class="chip">…另外 6 類</span></div></div>
+        </div>
+      </div>
+      <div class="shot">
+        <div class="shot-bar"><b>cognitive.aware-wave.com</b><span>直接分析 › 加權決策矩陣 › 結果（最下面）</span></div>
+        <div class="shot-body">
+          <div class="turn ai"><span class="who">AI 做的</span><span>三個選項的加權分數：續約並改條款 3.8、續約不改 2.1、結束合作 3.2。權重是你填的。</span></div>
+          <div class="box accent">
+            <b style="font-size:var(--fs-body)">這份結果要怎麼處理？</b>
+            <span class="cap">帶進案子的話，它會放進「計算」那一站，標「AI 做的」，當材料用；你從第一站開始，自己寫判斷。</span>
+            <div class="btns"><span class="btn primary" data-go="intake" role="button" tabindex="0">開一個案子，帶這份結果進去 →</span><span class="btn">放進我已經有的案子</span><span class="btn">只存進「我的分析」</span><span class="btn">不存</span></div>
+          </div>
+          <p class="cap">跑一次不再自動開一個案子，也不自動保存；你選了才存（藍圖 §5.3 第 5 條：使用者可以選擇要不要保存過程紀錄）。</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 選單 -->
+    <section class="view" id="v-nav" hidden>
+      <div class="stack"><h2>網站選單：11 項變 5 項</h2>
+        <p class="sub">今天的選單一排 11 項，「工具」和「工作流」排在「我的專案」旁邊，看不出哪個是主、哪個是輔（AppNav.tsx:15-26）。改成照「使用者要做的事」排。</p></div>
+      <div class="two">
+        <div class="card stack"><h3>今天</h3><ol class="cap" id="nav-now"></ol></div>
+        <div class="card stack"><h3>改成</h3><ol id="nav-new" style="display:grid;gap:8px"></ol></div>
+      </div>
+    </section>
+
+    <!-- 比較 -->
+    <section class="view" id="v-cmp" hidden>
+      <div class="stack"><h2>Claude × Codex：各自的看法、共識、分歧</h2>
+        <p class="sub" id="cmp-how"></p></div>
+      <div class="cmp">
+        <div class="card stack"><span class="who-c">CLAUDE 的看法</span><ul id="cmp-claude" class="cap" style="display:grid;gap:6px"></ul></div>
+        <div class="card stack"><span class="who-c">CODEX 的看法</span><ul id="cmp-codex" class="cap" style="display:grid;gap:6px"></ul></div>
+      </div>
+      <div class="card stack"><h3>共識</h3><ul class="agree" id="agree"></ul></div>
+      <div class="card stack"><h3>分歧</h3>
+        <div class="scroll-x"><table class="split"><thead><tr><th>題目</th><th>Claude</th><th>Codex</th><th>設計稿現在照哪個</th></tr></thead><tbody id="split"></tbody></table></div></div>
+    </section>
+
+    <!-- 決定 -->
+    <section class="view" id="v-decide" hidden>
+      <div class="stack"><h2>要妳決定</h2>
+        <p class="sub">決定之後才動網站程式。每一題都附建議。</p></div>
+      <div class="card"><ol class="dec" id="decisions"></ol></div>
+    </section>
+  </main>
+</div>
+
+<script>
+/* 數字由資料算：做法數＝監工台「現有工具去哪」各列（gen-tools-data.mjs 從程式庫產生）。 */
+const STATIONS = [
+  {n:1, code:"SENSE",  name:"外化",   does:"先攤出來",           tools:16,  steps:["觀察","外化","反思"], fast:"藝術反思 3 條",
+   you:"把事件、身體反應、恐懼、別人的聲音，一件寫一張卡。", ai:"把你寫的整理回來給你看（當鏡子）；你確認、改或刪。不猜你的動機。",
+   sample:["事件：上週第三次改條件","身體：看到訊息時胃縮了一下","別人的聲音：「同業都這樣改」"], picks:["生命時間線","衝突地圖","價值澄清"]},
+  {n:2, code:"GATHER", name:"蒐集",   does:"把資料找回來",       tools:0,   steps:[], fast:"研究 2 條（和查證共用）",
+   you:"說你要找什麼、哪些來源你信得過。", ai:"上網、查文獻，每筆記清楚是誰說的、哪一天。", engine:"不靠做法清單，靠蒐集器"},
+  {n:3, code:"MAP",    name:"拆解",   does:"分開看",             tools:116, steps:["提問","比較","重構"], fast:"根本原因分析 1 條",
+   you:"把事實、解釋、利益、結構、矛盾、可以做的事分開寫。", ai:"指出你哪一句是推論寫成事實、哪裡缺資料。", picks:["冰山模型","利害關係人圖","最佳替代方案（BATNA）"], context:true},
+  {n:4, code:"THINK",  name:"共思考", does:"發散、反證",         tools:32,  steps:["反思","提問","比較","重構"], fast:"",
+   you:"先寫你自己的三個解釋。", ai:"提出機制不同的看法；當反方，找你最有把握那一個的反例。一次只問一題。",
+   sample:["我的解釋 1：他資金吃緊","我的解釋 2：他在試我的底線","我的解釋 3：同業真的都改了"], aiSample:"反方：如果「同業都這樣改」是真的，第 3 個解釋就不是藉口。你查過嗎？這一點可以送去「查證」。", picks:["魔鬼代言人","事前驗屍","六頂思考帽"]},
+  {n:5, code:"VERIFY", name:"查證",   does:"對來源",             tools:11,  steps:["觀察","外化","提問"], fast:"研究 2 條（和蒐集共用）",
+   you:"先寫你的第一反應和有多相信，再看系統查到什麼。", ai:"每個主張對來源：支持、反對、不知道、可能怎麼被操弄。不當真假裁判。", picks:["證據三角驗證","假設地圖","信心校準"]},
+  {n:6, code:"COMPUTE",name:"計算",   does:"真的算",             tools:11,  steps:[], fast:"商業計畫與可行性 6 條（和拆解、判斷共用）",
+   you:"說要比什麼：成本、收入、機率。", ai:"真的算：損益、情境模擬；數字從哪來都寫出來。", picks:["損益兩平分析","蒙地卡羅模擬","成本效益分析"]},
+  {n:7, code:"DECIDE", name:"判斷",   does:"我的結論",           tools:14,  steps:["判斷"], fast:"",
+   you:"自己寫結論、依據、有多確定、什麼證據會讓你改。", ai:"只檢查你寫得清不清楚、漏了什麼未知。不准替你寫結論。", lock:true, picks:["加權決策矩陣","決策樹","期望值"], context:true},
+  {n:8, code:"ACT",    name:"行動",   does:"做一步，持續看",     tools:22,  steps:[], fast:"",
+   you:"挑一個最小、可以收回的下一步；先寫你預測會怎樣。", ai:"幫你排停止條件和觀察的節奏（按週、按月）。", picks:["試點計畫","風險登記表","完成的定義"]},
+  {n:9, code:"LEARN",  name:"回顧",   does:"回頭對結果",         tools:11,  steps:["再檢視"], fast:"",
+   you:"拿預測對實際結果：維持判斷、出新版，或換方法再走一輪。", ai:"指出你這次的思考習慣；更新你對 AI 的信任範圍。", picks:["行動後檢討","預測追蹤","決策逆轉條件"]},
+];
+const OUTER = [
+  {code:"TEACH", name:"先練", rl:"每個做法旁邊：5 分鐘的課"},
+  {code:"EXPRESS", name:"拿給別人看", rl:"任何時候，每句追得回紀錄"},
+  {code:"COLLAB", name:"一起決定", rl:"別人也有決定權時系統提議"},
+  {code:"FACILITATE", name:"帶領", rl:"有人帶時才出現"},
+  {code:"GOVERN", name:"安全與資料", rl:"一直都在：匯出、刪除、求助"},
+];
+const EIGHT = ["觀察","外化","反思","提問","比較","重構","判斷","再檢視"];
+/* 目的 → 路線（assembler.py PURPOSES / PACKAGES）。數字＝站號，字串＝外圈那一塊。 */
+const PURPOSES = [
+  {name:"做一個複雜的決定", key:"複雜決策", route:[1,3,4,7,8,9], why:"關係、職涯、合作這種事，先攤出來再拆，才不會一開始就只看見錢。判斷之後走一小步，再回來對。"},
+  {name:"了解自己", key:"自我理解", route:[1,3,4,7,9], why:"先把感受和事件攤出來，再分開看，最後寫下你現在怎麼看自己。不排行動。"},
+  {name:"判斷一則可疑訊息", key:"訊息判斷", route:[5,4,7,8,9], why:"先停一下，寫第一反應，再對來源。詐騙、健康、投資、轉傳的訊息都走這條。"},
+  {name:"想點子、訂策略", key:"創意發散", route:[1,3,4,7,8,9], why:"研究、創作、產品問題。先攤開，再拆、再發散，最後收斂成一步試驗。"},
+  {name:"課堂反思", key:"學習反思", route:[1,4,7,9], why:"學生的思考練習。比較短，四站走完。"},
+  {name:"團隊一起決定", key:"團隊審議", route:[3,5,"COLLAB",7,8,9], why:"先把問題和主張攤在一起，再走共同程序：分歧地圖、保留異議、誰授權。"},
+  {name:"對公共議題形成立場", key:"公共議題判斷", route:[3,5,4,7,8,9], why:"一項政策或公共爭議。拆解時一定會打開「看這件事所在的世界」。"},
+];
+const PERMS = [["整理我寫的",true],["提出不同看法",true],["當反方找漏洞",true],["上網找資料",false],["直接給建議",false]];
+const VOCAB = [
+  ["兩群人（原文沒定義；這是我們的解讀，要妳確認）","個人使用者／帶領者","帶領者和系統管理員的選單多一項「帶領」；其他都一樣。工程客戶不在這個網站。"],
+  ["兩道門","陪我思考／直接分析","首頁兩顆按鈕"],
+  ["7 個套件","路線","開案時選目的，地圖上亮出這次要走的站"],
+  ["14 塊積木","9 站＋外面 5 塊","9 站排成一圈（外化到回顧），每一站用它的中文名；外面 5 塊：先練、拿給別人看、一起決定、帶領、安全與資料"],
+  ["全程生效的五樣","這個案子的 5 條規則","地圖下面固定一格，白話寫，點開看；也各自落在畫面上（只有你能寫判斷、AI 權限那一行、開案頁、圈中間的紀錄、看這件事所在的世界）"],
+  ["八步循環","每一站上方的小字","標出這一站你在做哪幾步；回顧完回到圈上＝再檢視"],
+  ["286 個工具","做法","一般 233＋法規 10＝"+"<b>243</b> 個給使用者，放在它所屬的那一站；工程 43 個只給內部"],
+  ["17 條工作流","AI 快速跑","給使用者的 13 條放在直接分析（做法庫）裡；內部 4 條不出現。案子裡不放"],
+  ["12 類問句","直接分析的分類（11 類）","工程那一類拿掉，剩 11 類；直接分析那一頁照問句找；進了案子改成照站找"],
+];
+const NAV_NOW = ["首頁","我的專案","我的群組","帶領","課程","校準","工具","工作流","我的資料","設定","求助"];
+const NAV_NEW = [
+  ["首頁","一句話＋兩道門＋繼續上次的案子"],
+  ["我的案子","上面是案子、下面是「我的分析」（直接分析跑過、還沒開案的）；底下兩項：開新案子（陪我思考進的同一個開案頁）、我的群組（團隊一起決定時用，一般人也會用到）"],
+  ["直接分析","就是直接分析那一頁；底下兩項：工具目錄、工作流"],
+  ["練習","底下兩項：課程、校準"],
+  ["帶領","只有帶領者看得到（系統管理員角色另外做）"],
+  ["（最下面）我的資料、設定、求助","帳號的事放底部，不跟要做的事排在一起"],
+];
+/* Codex 兩輪原文：scratchpad codex-r1.md（獨立設計）、codex-r2.log 末段（逐題回應 D1–D9、E、F）。 */
+const CMP = {
+  how:"怎麼談的：兩邊讀同一批檔案，各自先寫一份設計，寫完才交換（Claude 的那份寫在看 Codex 之前）。第二輪 Codex 逐題回應九個不同的地方，並挑 Claude 稿子的錯。這一頁已照第二輪談定的結果改過。",
+  claude:[
+    "一句話：把一件事想清楚。結論由你下，AI 在旁邊幫你看、幫你問、幫你查。",
+    "所有東西接成一張地圖：兩道門都走到「案子」，案子＝9 站一圈＋外面 5 塊，中間是紀錄。",
+    "使用者只學七個詞：案子、地圖、路線、站、做法、AI 快速跑、紀錄。",
+    "首頁：上面一個輸入框，下面兩道門，「陪我思考」當主按鈕。",
+    "選單 11 項併成 5 項。",
+    "開案只要目的和問題必填，其他之後補。"],
+  codex:[
+    "一句話：讓人自己形成、檢查、修正並實踐判斷的 AI 工具與紀錄平台；AI 幫忙，不代替人下結論。",
+    "平台的中心是「案子」，不是工具目錄。",
+    "兩道門是使用方式，不是把兩群人分開；兩群人都能走兩道門。",
+    "案子頁照監工台地圖：左邊整張圖、右邊選到的那一塊。",
+    "不要每一塊都放「叫 AI 直接跑」，會把第二版拉回第一版。",
+    "登入用邀請連結帶工作區；跑完工具先問要不要存。"],
+  agree:[
+    "保留兩道門，名字用「直接分析／陪我思考」。",
+    "平台的中心是案子；首頁不放工具總數、12 類卡片、熱門工具。",
+    "「陪我思考」不必先跑工具，首頁按下去就開案。",
+    "案子頁用監工台的地圖：左邊整張圖一直在，右邊是選到的那一站；第一輪最多 6 站，其他站由系統提議，你同意才加。",
+    "AI 做的東西永遠標「AI 做的」，不能寫進「判斷」那一格。",
+    "跑一次工具不再自動開一個專案。",
+    "工程的 43 個做法、內部的 4 條工作流、SENSE 這類代號，一般人都看不到。",
+    "「兩群人」原文沒定義；兩邊各自的解讀一樣：自己想事情的人／帶領別人（或代表組織）的人。",
+    "帶領的課和帶領稿還是草稿（STEP34_CHECKLIST.md:391），帶領入口要先藏起來或只給帶領者。",
+    "最該先做的一件事（Codex 第二輪 F）：先接通「首頁那一句 → 兩道門 → 一個案子／一次直接分析」這一條，確認 AI 寫的和人寫的分得開。"],
+  split:[
+    ["D1 首頁輸入框","兩道門上方一個共用框","門先，門內再問","Codex 改同意 Claude"],
+    ["D2 主按鈕","陪我思考，放左邊","直接分析在前","Codex 改同意 Claude"],
+    ["D3 名詞","路線、站、做法、AI 快速跑","沿用 14 塊中文名、目的、工具、工作流","合併：第一層用 Claude 的詞，地圖上每站用 14 塊的中文名"],
+    ["D4 五樣","不寫名稱，分散在畫面上","固定在側邊","合併：地圖下面固定一格「這個案子的 5 條規則」，可點開"],
+    ["D5 AI 一口氣跑","每一站放工作流","只放一個「跳過練習」","合併後又被妳拿掉（2026-10-11）：案子裡不放任何「讓 AI 直接跑」的按鈕；要直接答案走「直接分析」，或開案時准 AI「直接給建議」。工作流只放在直接分析"],
+    ["D6 選單","11 項併成 5 項","保留 11 個路由","Codex 改同意 Claude：5 項是主選單，11 個路由留作次層"],
+    ["D7 登入","用 email 找工作區","邀請連結帶工作區","妳定（2026-10-11）：兩個都不要，改成自己申請帳號"],
+    ["D8 開案欄位","只要目的＋問題","開案就問風險、受影響的人、完成條件","合併：目的＋問題必填；那三項建議填，團隊或高風險時必填"],
+    ["D9 直接分析的結果","預設存進「我的分析」","跑完先問：存、不存、帶進案子","Claude 改同意 Codex：藍圖 §5.3 第 5 條，存不存由使用者選"]],
+};
+/* Codex 第二輪挑出的錯，四條都核對成立，已改：email 找工作區、每站都有工作流、蒐集站沒有做法清單、未選就預設保存。 */
+const DECISIONS = [
+  ["兩群人＝「個人使用者」和「帶領者」？（2026-10-11 妳說原本的說法太爛，改用這兩個詞）","個人使用者：為自己的事來想清楚的人。帶領者：在課堂、工作坊、團體帶別人想的人，例如老師、引導員。等妳確認。"],
+  ["網站名稱（已定：認知工程系統／Cognitive Engineering OS）","登入頁、選單、瀏覽器分頁三處統一，放進第一段。"],
+  ["登入（已定：自己申請帳號）","牽涉身分和權限，屬於高風險，另外開一張卡，先出計畫再做。"],
+  ["帶領入口給誰看？（已定：帶領者和系統管理員）","帶領者今天就認得出來：系統從紀錄判斷，不用另外指定。系統管理員目前不存在，系統裡唯一能指定的角色是處理申訴的人（identity/store.py:711-716）。新增這個角色牽涉身分和權限，屬於高風險，另外開一張卡做，不放進第一段。"],
+  ["舊專案（已定：保留，而且要能永久刪除）","今天刪除一個專案就是永久刪除：內容、檔案和資料庫裡的空間都清掉，只留一筆「誰在什麼時候刪了幾筆」，不含任何內容（project_source_repository.py:800）。每晚的備份最多再留 7 天。「我的分析」清單加勾選和「永久刪除」，按下去前在頁面上講清楚刪了就回不來。"],
+  ["第一段（已定：做）","2026-10-11 開工。首頁維持兩道門：直接分析／陪我思考。"],
+];
+
+const $ = (s, r=document) => r.querySelector(s);
+const $$ = (s, r=document) => [...r.querySelectorAll(s)];
+const N = {allTools:286, eng:43, userTools:243, userFlows:13};
+$$("[data-n]").forEach(el => el.textContent = N[el.dataset.n]);
+
+function nodeHTML(s, opt){
+  const on = opt.route.includes(s.n), here = opt.here === s.n, done = opt.done && opt.done.includes(s.n);
+  const pos = [[1,1],[2,1],[3,1],[4,1],[4,2],[4,3],[3,3],[2,3],[1,3]][s.n-1];
+  return `<button class="node${on?" on":""}${done?" done":""}" style="grid-column:${pos[0]};grid-row:${pos[1]}" data-st="${s.n}" ${opt.pick?`aria-pressed="${opt.sel===s.n}"`:""}>
+    ${here?'<span class="here">在這裡</span>':""}
+    <span class="top">${String(s.n).padStart(2,"0")}<span style="margin-left:auto">${s.tools?s.tools+" 個做法":(s.engine?"蒐集器":"")}</span></span>
+    <span class="nm">${s.name}</span><span class="rl">${s.does}</span></button>`;
+}
+function ringHTML(opt){
+  return STATIONS.map(s => nodeHTML(s, opt)).join("") +
+    `<div class="loop" style="grid-column:1;grid-row:2">↑ 回顧完再走一圈</div>
+     <div class="hub" style="grid-row:2" data-st="rec"><b>紀錄</b><span class="cap">${opt.recCap||"每一站寫的都在這裡"}</span></div>`;
+}
+function outerHTML(opt){
+  return OUTER.map(o => `<button class="node${(opt.route||[]).includes(o.code)?" on":""}" data-st="${o.code}"><span class="nm">${o.name}</span><span class="rl">${o.rl}</span></button>`).join("");
+}
+
+/* 一張圖 */
+$("#one-ring").innerHTML = ringHTML({route:[1,3,4,7,8,9]});
+$("#one-outer").innerHTML = outerHTML({});
+$("#vocab").innerHTML = VOCAB.map(r => `<tr><td>${r[0]}</td><td><b>${r[1]}</b></td><td>${r[2]}</td></tr>`).join("");
+
+/* 開案 */
+let purpose = 0;
+function renderIntake(){
+  $("#purposes").innerHTML = PURPOSES.map((p,i) => `<button class="chip" aria-pressed="${i===purpose}" data-p="${i}">${p.name}</button>`).join("");
+  const p = PURPOSES[purpose];
+  $("#intake-route").innerHTML = p.route.map(r => {
+    const name = typeof r === "number" ? STATIONS[r-1].name : OUTER.find(o=>o.code===r).name;
+    return `<span class="st">${name}</span>`;
+  }).join('<span class="ar">→</span>');
+  $("#intake-why").textContent = "為什麼這樣排：" + p.why;
+}
+$("#purposes").addEventListener("click", e => { const b = e.target.closest("[data-p]"); if(!b) return; purpose = +b.dataset.p; renderIntake(); });
+renderIntake();
+$("#perms").innerHTML = PERMS.map(([t,on]) => `<button class="chip" aria-pressed="${on}">${t}</button>`).join("") + `<span class="chip lock">替你寫結論：永遠不行</span>`;
+$("#perms").addEventListener("click", e => { const b = e.target.closest(".chip:not(.lock)"); if(b) b.setAttribute("aria-pressed", b.getAttribute("aria-pressed")!=="true"); });
+
+/* 案子頁 */
+const CASE = {route:[1,3,4,7,8,9], done:[1,3], here:4};
+let sel = 4;
+function panelHTML(id){
+  if (id === "rec") return `<h3>紀錄</h3><p class="cap">這個案子每一站寫下的東西，照時間排；每一筆標誰寫的（你、AI、共同、系統）和哪一站寫的。</p>
+    <ul class="cap"><li>10/02 開案：做一個複雜的決定</li><li>10/02 外化：8 張卡 <span class="pill you">你寫的</span></li><li>10/03 拆解：冰山模型 <span class="pill you">你寫的</span> <span class="pill ai">AI 做的</span></li><li>10/03 共思考：我的三個解釋 <span class="pill you">你寫的</span></li></ul>`;
+  const o = OUTER.find(x => x.code === id);
+  if (o) return `<h3>${o.name}</h3><p class="cap">${o.rl}。這一塊不是一站一站走的，所以放在圈外面。</p>`;
+  const s = STATIONS[id-1], inRoute = CASE.route.includes(s.n);
+  const eight = `<div class="steps8">${EIGHT.map(x => `<span class="${s.steps.includes(x)?"on":""}">${x}</span>`).join("")}</div>`;
+  if (!inRoute) return `<div class="stack" style="gap:6px"><h3>${String(s.n).padStart(2,"0")}　${s.name}</h3>${eight}</div>
+    <p class="cap">這一站不在這次的路線裡。走到一半需要時（例如出現「聽說」「他說」這種別人的說法），系統會提議加進來，你同意才加。</p>
+    <div class="btns"><span class="btn">現在就加進這個案子</span></div>
+    <p class="cap">這一站的做法：${s.tools?s.tools+" 個":s.engine}</p>`;
+  return `<div class="stack" style="gap:6px"><h3>${String(s.n).padStart(2,"0")}　${s.name}　<span class="cap" style="font-weight:400">${s.does}</span></h3>${eight}</div>
+    <div class="turn you"><span class="who">① 你先寫</span><span>${s.you}</span>${s.sample?`<ul class="cap">${s.sample.map(x=>`<li>${x}</li>`).join("")}</ul>`:""}</div>
+    <div class="turn ai"><span class="who">② AI 再回（照你給的權限）</span><span>${s.aiSample||s.ai}</span></div>
+    ${s.lock?'<div class="note">這一站只有你能寫。AI 不會預先填好。</div>':""}
+    ${s.context?'<div class="btns"><span class="btn">看這件事所在的世界（法律、慣例、文化）</span></div>':""}
+    ${s.tools?`<div class="tools"><b>③ 想換個方式想：這一站的做法（${s.tools} 個）</b><ul>${(s.picks||[]).map(x=>`<li class="tl">${x}</li>`).join("")}<li class="tl">看全部 ${s.tools} 個</li></ul></div>`:`<div class="tools"><b>③ ${s.engine}</b><span class="cap">上網、查文獻、學術資料；每筆記來源。</span></div>`}
+    <div class="btns"><span class="btn primary">④ 存進紀錄，往下一站 →</span><span class="btn">先停在這裡</span></div>`;
+}
+function renderCase(){
+  $("#case-ring").innerHTML = ringHTML({...CASE, pick:true, sel, recCap:"12 筆"});
+  $("#case-outer").innerHTML = outerHTML({});
+  $("#case-panel").innerHTML = panelHTML(sel);
+}
+$("#v-case").addEventListener("click", e => {
+  const b = e.target.closest("[data-st]"); if(!b) return;
+  const v = b.dataset.st; sel = /^\d+$/.test(v) ? +v : v; renderCase();
+});
+renderCase();
+
+/* 選單 */
+$("#nav-now").innerHTML = NAV_NOW.map(x => `<li>${x}</li>`).join("");
+$("#nav-new").innerHTML = NAV_NEW.map(([a,b]) => `<li><b>${a}</b><div class="cap">${b}</div></li>`).join("");
+
+/* 比較與決定 */
+function renderCmp(){
+  $("#cmp-how").textContent = CMP.how;
+  $("#cmp-claude").innerHTML = CMP.claude.map(x => `<li>${x}</li>`).join("");
+  $("#cmp-codex").innerHTML = CMP.codex.map(x => `<li>${x}</li>`).join("");
+  $("#agree").innerHTML = CMP.agree.map(x => `<li>${x}</li>`).join("");
+  $("#split").innerHTML = CMP.split.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join("")}</tr>`).join("");
+  $("#decisions").innerHTML = DECISIONS.map(([q,a]) => `<li><div><b>${q}</b><div class="cap">${a}</div></div></li>`).join("");
+  $("#n-dec-side").textContent = DECISIONS.length ? DECISIONS.length + " 題" : "";
+}
+renderCmp();
+
+/* 換畫面 */
+function show(v){
+  $$(".view").forEach(x => x.hidden = x.id !== "v-"+v);
+  $$(".navi").forEach(b => b.getAttribute("data-v")===v ? b.setAttribute("aria-current","page") : b.removeAttribute("aria-current"));
+  try { localStorage.setItem("entry-view", v); } catch(_) {}
+  window.scrollTo({top:0});
+}
+$$(".navi").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
+document.addEventListener("click", e => { const g = e.target.closest("[data-go]"); if (g) show(g.dataset.go); });
+document.addEventListener("keydown", e => { if (e.key === "Enter") { const g = e.target.closest("[data-go]"); if (g) show(g.dataset.go); } });
+try { const v = localStorage.getItem("entry-view"); if (v && $("#v-"+v)) show(v); } catch(_) {}
+</script>

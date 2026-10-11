@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Catalog } from "./catalog";
-import { goalOf, runHref, shownAbbr, stations, toolHref, toolSearchKey, toolsOfGoal } from "./catalog";
+import { goalOf, isUserTool, runHref, shownAbbr, stations, toolHref, toolSearchKey, toolsOfGoal, userGoals, userToolCount } from "./catalog";
 import { pickTools, termsOf } from "../components/StuckBox";
 import { sectionOf } from "../components/AppNav";
 
@@ -10,10 +10,13 @@ const catalog = {
     "systems.iceberg_model": { name_zh: "冰山模型", name_en: "Iceberg Model", abbr: null, blurb_zh: "找出一再發生的事背後的結構", family: "systems", goal: "why", next: [] },
     "strategy.swot": { name_zh: "SWOT 分析", name_en: "SWOT Analysis", abbr: "SWOT", blurb_zh: "強弱機會威脅", family: "strategy", goal: "see", next: [] },
     "decision.five_forces": { name_zh: "五力分析", name_en: "Porter's Five Forces", abbr: "5F", blurb_zh: "產業競爭的五種力量", family: "decision", goal: "see", next: [] },
+    // an engineering tool: its words match a sentence about competition, and it must still never be offered
+    "security.stride": { name_zh: "STRIDE 威脅模型", name_en: "STRIDE", abbr: null, blurb_zh: "產業競爭對手的威脅", family: "security", block: "INTERNAL", goal: "eng", next: [] },
   },
   goals: [
     { id: "why", title_zh: "為什麼一直發生？", short_zh: "為什麼", blurb_zh: "", icon: "layers", families: ["systems"], featured: ["systems.iceberg_model"] },
     { id: "see", title_zh: "看清楚局勢", short_zh: "看局", blurb_zh: "", icon: "compass", families: ["strategy", "decision"], featured: ["strategy.swot"] },
+    { id: "eng", title_zh: "工程決策", short_zh: "工程", blurb_zh: "", icon: "gear", families: ["security"], featured: ["security.stride"], internal: true },
   ],
   popular: [], prompts: [], recipes: [], glyphs: {}, shapes: {},
 } as unknown as Catalog;
@@ -57,6 +60,14 @@ describe("幫我挑 first layer (free matching, never a guess)", () => {
     expect(pickTools(catalog, "分析 分析 力量 競爭 威脅 機會").length).toBeLessThanOrEqual(3);
   });
 
+  it("an engineering tool is never offered, whatever it matches (ENTRY_SLICE1_CHECKLIST.md item 5)", () => {
+    expect(pickTools(catalog, "產業競爭的威脅").map((pick) => pick.id)).not.toContain("security.stride");
+    expect(isUserTool(catalog, "security.stride")).toBe(false);
+    expect(isUserTool(catalog, "strategy.swot")).toBe(true);
+    expect(userGoals(catalog).map((goal) => goal.id)).toEqual(["why", "see"]);
+    expect(userToolCount(catalog)).toBe(3);
+  });
+
   it("a sentence that shares no word with any tool returns nothing", () => {
     expect(pickTools(catalog, "今天天氣很好")).toEqual([]);
     expect(pickTools(catalog, "   ")).toEqual([]);
@@ -64,21 +75,26 @@ describe("幫我挑 first layer (free matching, never a guess)", () => {
 });
 
 describe("main menu section of a path", () => {
-  it("top pages, a tool page under 工具, a run page under 我的專案", () => {
+  it("five things a person does: a run page and a group under 我的案子, a tool page and a lesson under 直接分析 (ENTRY_SLICE1 items 11-12)", () => {
     expect(sectionOf("/")).toBe("home");
-    expect(sectionOf("/methods")).toBe("tools");
-    expect(sectionOf("/methods/systems.iceberg_model")).toBe("tools");
-    expect(sectionOf("/methods/systems.iceberg_model/run")).toBe("projects");
-    expect(sectionOf("/workflows")).toBe("workflows");
     expect(sectionOf("/projects")).toBe("projects");
+    expect(sectionOf("/projects/P1/start")).toBe("projects");
+    expect(sectionOf("/methods/systems.iceberg_model/run")).toBe("projects");
+    expect(sectionOf("/groups")).toBe("projects");
+    expect(sectionOf("/groups/g1")).toBe("projects");
+    expect(sectionOf("/analyze")).toBe("analyze");
+    expect(sectionOf("/methods")).toBe("analyze");
+    expect(sectionOf("/methods/systems.iceberg_model")).toBe("analyze");
+    expect(sectionOf("/workflows")).toBe("analyze");
+    expect(sectionOf("/learn/workflow/w1")).toBe("analyze");
   });
-  it("the platform pages sit under their own items, a group's 帶領 page under 帶領", () => {
-    expect(sectionOf("/groups")).toBe("groups");
-    expect(sectionOf("/groups/g1")).toBe("groups");
-    expect(sectionOf("/groups/g1/lead")).toBe("lead");
+  it("練習 holds 課程 and 校準; 帶領 holds a group's 帶領 page; the account pages are their own", () => {
+    expect(sectionOf("/me/teach")).toBe("practice");
+    expect(sectionOf("/me/learn")).toBe("practice");
     expect(sectionOf("/lead")).toBe("lead");
-    expect(sectionOf("/me/teach")).toBe("teach");
-    expect(sectionOf("/me/learn")).toBe("calibrate");
+    expect(sectionOf("/groups/g1/lead")).toBe("lead");
     expect(sectionOf("/me/data")).toBe("data");
+    expect(sectionOf("/settings")).toBe("settings");
+    expect(sectionOf("/help")).toBe("help");
   });
 });
