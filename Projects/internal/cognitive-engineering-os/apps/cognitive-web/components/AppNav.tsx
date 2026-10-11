@@ -2,7 +2,7 @@
 
 // The main menu (ENTRY_SLICE1_CHECKLIST.md items 11-12): five things a person does, then the account at the bottom. A
 // left sidebar on a desktop, a bottom bar on a phone (design-system.css). Every platform page still has a place: the
-// items under a section (我的群組, 工具目錄, 工作流, 課程, 校準) show while you are in that section. 帶領 shows only to a
+// items under a section (開新案子, 我的群組, 工具目錄, 工作流, 課程, 校準) show while you are in that section. 帶領 shows only to a
 // facilitator (GET /facilitate/me: the facilitator course finished, platform/visibility.py), even on /lead itself.
 // aria-current = "page" on the item whose page this is, "true" on the section a deeper page sits under: a run page and a
 // group sit under 我的案子, a tool page and a lesson under 直接分析, a group's 帶領 page under 帶領.
@@ -17,7 +17,7 @@ type Item = { id: Section; href: string; label: string; icon: string; subs?: Arr
 const NAV: Item[] = [
   { id: "home", href: "/", label: "首頁", icon: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>' },
   { id: "projects", href: "/projects", label: "我的案子", icon: '<path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>',
-    subs: [{ href: "/groups", label: "我的群組", match: (path) => path.startsWith("/groups") }] },
+    subs: [{ href: "/projects/new", label: "開新案子", match: (path) => path === "/projects/new" }, { href: "/groups", label: "我的群組", match: (path) => path.startsWith("/groups") }] },
   { id: "analyze", href: "/analyze", label: "直接分析", icon: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
     subs: [{ href: "/methods", label: "工具目錄", match: (path) => path.startsWith("/methods") }, { href: "/workflows", label: "工作流", match: (path) => path.startsWith("/workflows") || path.startsWith("/learn/workflow/") }] },
   { id: "practice", href: "/me/teach", label: "練習", icon: '<path d="M4 5a1 1 0 0 1 1-1h5a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4z"/><path d="M20 5a1 1 0 0 0-1-1h-5a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>',

@@ -8,6 +8,7 @@ import React, { useEffect, useState } from "react";
 import { NotTherapyNotice } from "./GovernParts";
 import { BLOCKS, OPEN_STEP, blockHref, blockOf, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
+import { caseName, createProject } from "../../lib/projects";
 import { BlockShell, Notices } from "./BlockShell";
 
 // ai_lego/core/domain/kinds/assembler.py PURPOSES / PURPOSE_PACKAGE / PACKAGES / PACKAGE_OPENS_AT (test_block_foundation compares them)
@@ -28,9 +29,12 @@ type Intake = {
 const lines = (text: string) => text.split(/\n|、/).map((item) => item.trim()).filter(Boolean);
 
 // question: the sentence written on the home page before 陪我思考 (?q=, ENTRY_SLICE1_CHECKLIST.md item 6); it fills
-// 你想釐清什麼 only while the case has no 開案資料 yet, never over a saved one.
-export function IntakePage({ projectId, question = "" }: { projectId: string; question?: string }) {
-  const [held, setHeld] = useState<Doc<Intake> | null | undefined>(undefined);
+// 你想釐清什麼 only while the case has no 開案資料 yet, never over a saved one. No projectId (/projects/new): the
+// project is created only when 開案 is pressed, so a case is exactly a project with 開案資料 (GET /projects is_case);
+// leaving this page leaves nothing behind (Codex review 2026-10-11 F1).
+export function IntakePage({ projectId: given, question = "" }: { projectId?: string; question?: string }) {
+  const [projectId, setProjectId] = useState(given ?? "");
+  const [held, setHeld] = useState<Doc<Intake> | null | undefined>(given ? undefined : null);
   const [draft, setDraft] = useState<Intake>({ purpose: "", question, package: "" });
   const [text, setText] = useState({ affected: "", happened_in: "", others_in: "" });
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -39,7 +43,8 @@ export function IntakePage({ projectId, question = "" }: { projectId: string; qu
   const [refresh, setRefresh] = useState(0);
 
   useEffect(() => {
-    docs.list<Intake>(projectId, "assembler.intake").then((found) => {
+    if (!given) return;
+    docs.list<Intake>(given, "assembler.intake").then((found) => {
       const latest = found.at(-1) ?? null;
       setHeld(latest);
       if (latest) {
@@ -47,7 +52,7 @@ export function IntakePage({ projectId, question = "" }: { projectId: string; qu
         setText({ affected: (latest.content.affected ?? []).join("\n"), happened_in: (latest.content.happened_in ?? []).join("\n"), others_in: (latest.content.others_in ?? []).join("\n") });
       }
     }).catch((reason) => setError(humanError(reason)));
-  }, [projectId]);
+  }, [given]);
 
   const pick = (purpose: (typeof PURPOSES)[number]) => setDraft({ ...draft, purpose: purpose.purpose, package: purpose.package, blocks: purpose.blocks });
   const move = (index: number, by: number) => {
@@ -61,17 +66,26 @@ export function IntakePage({ projectId, question = "" }: { projectId: string; qu
     setError(""); setBusy(true);
     try {
       const content: Intake = { ...draft, question: draft.question.trim(), affected: lines(text.affected), happened_in: lines(text.happened_in), others_in: lines(text.others_in) };
-      const saved = held ? await docs.update(projectId, "assembler.intake", held, content) : await docs.create(projectId, "assembler.intake", content);
+      let id = projectId;
+      if (!id) {   // kept if 開案資料 then fails, so pressing 開案 again does not make a second project
+        id = (await createProject(caseName(content.question, new Date()), content.question)).project_id;
+        setProjectId(id);
+      }
+      const saved = held ? await docs.update(id, "assembler.intake", held, content) : await docs.create(id, "assembler.intake", content);
+      if (!given) window.history.replaceState(null, "", `/projects/${encodeURIComponent(id)}/start`);   // keeps this page (and its notices) on screen
       setHeld(saved); setNotices(saved.notices); setRefresh((count) => count + 1);
     } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
   };
   if (held === undefined) return <BlockShell projectId={projectId} title="開案"><div className="card"><p>{error || "載入中…"}</p></div></BlockShell>;
+  const shell = (children: React.ReactNode) => projectId
+    ? <BlockShell projectId={projectId} title="開案" refresh={refresh}>{children}</BlockShell>
+    : <section className="view" id="intake-new"><div className="top"><div><h1>開一個新案子</h1><div className="sub">按「開案」才會建立這個案子；離開這一頁什麼都不會留下。</div></div></div>{children}</section>;
   const chosen = PURPOSES.find((item) => item.purpose === draft.purpose);
   const first = (draft.blocks ?? []).map((code) => blockOf(code)).find((block) => block && block.step <= OPEN_STEP);
   const guarded = notices.filter((notice) => notice.type === "guardrail");
 
-  return (
-    <BlockShell projectId={projectId} title="開案" refresh={refresh}>
+  return shell(
+    <>
       <NotTherapyNotice />
       <Notices notices={notices} />
       {guarded.length > 0 && <div className="card accent"><p className="mt0">你寫的風險碰到：{guarded.map((notice) => notice.type === "guardrail" ? notice.category : "").join("、")}。這個案子加了護欄：AI 說到事實一定附來源、會提醒你可以找專業的人、不能反悔的決定會請你先等一下。</p></div>}
@@ -119,6 +133,6 @@ export function IntakePage({ projectId, question = "" }: { projectId: string; qu
       </div>
       {held && first && <div className="tabnext"><Link className="btn primary" href={blockHref(projectId, first)}>開始第一塊：{first.name} →</Link></div>}
       <p className="sub">每一版開案資料都留著。{BLOCKS.length} 塊積木都在這個案子的頁面上。</p>
-    </BlockShell>
+    </>
   );
 }

@@ -219,6 +219,14 @@ def internal_goals(goals):
     return out
 
 
+def user_popular(goals):
+    """The popular list, which every person sees on 直接分析: an engineering tool (blocks.INTERNAL) in it is a gap
+    (ValueError), the same rule as a goal mixing both (Codex review 2026-10-11 F4)."""
+    engineering = [entry["id"] for entry in goals["popular"] if block_of_family(entry["id"].split(".")[0]) == INTERNAL]
+    if engineering: raise ValueError(f"popular lists engineering tools: {engineering}")
+    return goals["popular"]
+
+
 def catalog_payload(cat):
     """The catalog as JSON for GET /catalog: everything the home page, the tool directory and the workflow list show,
     with the glyph and picture markup they draw (both live only here). Each tool carries its block and each goal whether
@@ -231,7 +239,7 @@ def catalog_payload(cat):
                     for mid, m in sorted(cat.methods.items())},
         "families": cat.families["families"],
         "goals": [{**goal, "internal": goal["id"] in internal} for goal in cat.goals["goals"]],
-        "popular": cat.goals["popular"],
+        "popular": user_popular(cat.goals),
         "prompts": cat.goals["prompts"],
         "recipes": cat.recipes,
         "glyphs": GLYPHS,

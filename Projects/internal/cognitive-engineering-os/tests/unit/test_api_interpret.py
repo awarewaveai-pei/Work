@@ -655,6 +655,10 @@ class InterpretApiTests(ApiTestCase):
         self.assertEqual(self.client.post(f"/projects/{empty['project_id']}/docs/assembler.intake", json={"content": intake}).status_code, 200)
         self.assertTrue([item for item in self.client.get("/projects").json() if item["project_id"] == empty["project_id"]][0]["is_case"])
         self.assertTrue(self.client.get(f"/projects/{empty['project_id']}").json()["is_case"])
+        # 我的分析 deletes with ?only=analysis: a list loaded before 開案資料 was saved cannot erase the case (Codex F2).
+        refused = self.client.delete(f"/projects/{empty['project_id']}?only=analysis")
+        self.assertEqual((refused.status_code, refused.json()["detail"].split(":")[0]), (409, "PROJECT_IS_A_CASE"))
+        self.assertTrue(self.client.get(f"/projects/{empty['project_id']}").json()["is_case"])
         self.client.cookies.clear()
         self.assertEqual(self.client.get(f"/projects/{self.project_id}/analyses").status_code, 401)
 

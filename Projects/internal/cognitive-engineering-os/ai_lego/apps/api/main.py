@@ -2829,6 +2829,7 @@ def project_history(
 @app.delete("/projects/{project_id}")
 def erase_project(
     project_id: str,
+    only: Literal["analysis"] | None = None,
     session: dict[str, Any] = Depends(require_session),
     store: IdentityStore = Depends(get_store),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
@@ -2839,7 +2840,8 @@ def erase_project(
     case's rows, closes its grants and names what is left on disk; the files go after it commits. 200 with
     ``physical_cleanup: "done"`` when every file is gone and the ProjectErased tombstone is written; 202 with
     ``"pending"`` when the case is already unreadable but a file is not gone yet -- DELETE again (the case answers 404
-    to everything else) or the server finishes it at its next start."""
+    to everything else) or the server finishes it at its next start. ``?only=analysis`` (我的分析, a result page): a
+    project that became a case since the page loaded (開案資料 saved in another tab) answers 409 and is not erased."""
     tenant_id = session["tenant_id"]
     if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
@@ -2848,6 +2850,8 @@ def erase_project(
         result = _without_empty_failed({"project_id": project_id, **erasure.finish(tenant_id, ERASURE_CASE, project_id)})
     else:
         _project_or_404(repo, session, project_id)
+        if only == "analysis" and CaseDocs(repo).current(tenant_id, record_log.case(project_id), "assembler.intake"):
+            raise HTTPException(status_code=409, detail="PROJECT_IS_A_CASE: it holds 開案資料 now; delete it from the case's own page")
         result = erase_case(store, repo, source_cas, artifact_store, tenant_id, session["identity_id"], project_id)
     return result if result["physical_cleanup"] == "done" else JSONResponse(status_code=202, content=result)
 

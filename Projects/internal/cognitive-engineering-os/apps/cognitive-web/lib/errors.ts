@@ -17,6 +17,7 @@ const CODES: Record<string, string> = {
   PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE: "這個名字已經有專案在用了，換一個名字再試一次。",
   PROJECT_NAME_INVALID: "專案名稱不能留白，最多 200 字。",
   PROJECT_BUSY: "有一次分析還在跑，等它跑完再刪除這個專案。",
+  PROJECT_IS_A_CASE: "它已經開成案子了（可能是在另一個分頁），這次沒有刪；要刪請到案子自己的頁面。",
   INTERPRETATION_IN_FLIGHT: "分析這一刻沒能開始，請再按一次執行。",
   WORKSPACE_NOT_FOUND: "找不到這個工作區。",
   INTERPRETATION_NOT_FOUND: "找不到這次分析，可能已經刪除。",

@@ -43,18 +43,16 @@ describe("我的案子", () => {
   it("every project opens; created and last moved read to the minute; the latest result is one click; most recent first", async () => {
     vi.mocked(apiFetch).mockResolvedValue([OLD, EMPTY, NEW] as never);
     const { host, done: finish } = await mount(<ProjectList names={{ "systems.iceberg_model": "冰山模型" }} />);
-    // none has 開案資料: the two with analyses are 我的分析; the empty one is a case still being opened (ENTRY_SLICE1 item 7)
-    expect(host.querySelector("#analyses h2 small")?.textContent).toBe("2 個你自己的・1 個示範");
-    expect(host.querySelector("#cases h2 small")?.textContent).toBe("1 個");
-    const opening = host.querySelector("#cases tbody tr")!;
-    expect(opening.querySelector("td a")?.getAttribute("href")).toBe("/projects/P-EMPTY");
-    expect(opening.querySelector("td:last-child a")?.getAttribute("href")).toBe("/projects/P-EMPTY/start");
-    expect(opening.textContent).toContain("還沒分析");
+    // none has 開案資料, so all are 我的分析 -- an empty one too (a direct analysis that failed or is still running): a case
+    // is only what the server calls one (is_case), never guessed from emptiness (ENTRY_SLICE1 item 7, Codex review F1)
+    expect(host.querySelector("#analyses h2 small")?.textContent).toBe("3 個你自己的・1 個示範");
+    expect(host.querySelector("#cases h2 small")?.textContent).toBe("0 個");
     const demoRow = host.querySelector("tr.demo");   // the free 示範專案 is always the last row (N-78)
     expect(demoRow?.querySelector("a")?.getAttribute("href")).toBe("/projects/demo/iceberg");
     expect(demoRow?.textContent).toContain("報表（示範，不花錢）");
     const rows = [...host.querySelectorAll("#analyses tbody tr:not(.demo)")];
-    expect(rows.map((row) => row.querySelector("td a")?.getAttribute("href"))).toEqual(["/projects/P-NEW", "/projects/P-OLD"]);
+    expect(rows.map((row) => row.querySelector("td a")?.getAttribute("href"))).toEqual(["/projects/P-NEW", "/projects/P-OLD", "/projects/P-EMPTY"]);
+    expect(rows[2].textContent).toContain("還沒分析");
     const cells = [...rows[1].querySelectorAll("td")].map((cell) => cell.textContent);
     expect(cells.slice(1, 5)).toEqual(["工具：冰山模型", "報表（AI 草稿・尚未核准）（共 2 次分析）", formatTime(OLD.created_at), formatTime(OLD.updated_at)]);
     expect(cells[3]).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
@@ -76,7 +74,7 @@ describe("我的案子", () => {
     const deleted: string[] = [];
     vi.mocked(apiFetch).mockImplementation(async (path, init) => {
       if (init?.method === "DELETE") { deleted.push(String(path)); return { project_id: "P-OLD", physical_cleanup: "pending" } as never; }   // 202
-      return (path === "/projects/erased" ? [] : [OLD, NEW].filter((item) => !deleted.includes(`/projects/${item.project_id}`))) as never;
+      return (path === "/projects/erased" ? [] : [OLD, NEW].filter((item) => !deleted.includes(`/projects/${item.project_id}?only=analysis`))) as never;
     });
     const { host, done: finish } = await mount(<ProjectList />);
     const button = [...host.querySelectorAll("#analyses button")].find((item) => item.textContent?.startsWith("永久刪除")) as HTMLButtonElement;
@@ -89,9 +87,15 @@ describe("我的案子", () => {
     expect(confirm.textContent).toContain("刪了就回不來");
     expect(confirm.textContent).toContain("7 天");
     await act(async () => { ([...confirm.querySelectorAll("button")].find((item) => item.textContent === "確定永久刪除") as HTMLButtonElement).click(); });
-    expect(deleted).toEqual(["/projects/P-OLD"]);
-    expect(host.querySelector("#analyses [role=status]")?.textContent).toContain("檔案還在清理");   // never claims more than happened (Codex review F4)
+    // ?only=analysis: one that became a case in another tab since the list loaded is refused by the server (Codex review F2)
+    expect(deleted).toEqual(["/projects/P-OLD?only=analysis"]);
+    expect(host.querySelector("#analyses [role=status]")?.textContent).toContain("有 1 個的內容已經刪掉");   // never claims more than happened (Codex review F4)
     expect([...host.querySelectorAll("#analyses tbody tr:not(.demo)")].map((row) => row.querySelector("td a")?.getAttribute("href"))).toEqual(["/projects/P-NEW"]);
+    // a second batch does not hide the first one's cleanup (Codex review 2026-10-11 F3)
+    await act(async () => { (host.querySelector("#tick-P-NEW") as HTMLInputElement).click(); });
+    await act(async () => { button.click(); });
+    await act(async () => { ([...host.querySelectorAll("#erase-confirm button")].find((item) => item.textContent === "確定永久刪除") as HTMLButtonElement).click(); });
+    expect(host.querySelector("#analyses [role=status]")?.textContent).toContain("有 2 個的內容已經刪掉");
     await finish();
   });
 

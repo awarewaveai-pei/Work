@@ -28,7 +28,7 @@ describe("main menu (ENTRY_SLICE1_CHECKLIST.md items 11-12)", () => {
   });
 
   it("every page the old menu had is still one click away from its own section", async () => {
-    for (const page of ["/", "/projects", "/groups", "/me/teach", "/me/learn", "/methods", "/workflows", "/me/data", "/settings", "/help"]) {
+    for (const page of ["/", "/projects", "/projects/new", "/groups", "/me/teach", "/me/learn", "/methods", "/workflows", "/me/data", "/settings", "/help"]) {
       expect(await hrefsAt(page, false), page).toContain(page);
     }
     expect(await hrefsAt("/lead", true)).toContain("/lead");

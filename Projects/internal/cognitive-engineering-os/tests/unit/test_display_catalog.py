@@ -9,7 +9,7 @@ import unittest
 from ai_lego import resolve_spec_root
 from ai_lego.platform.ai_execution.contract_catalog import is_active
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
-from ai_lego.platform.catalog.display_catalog import catalog_payload, counts, internal_goals, load_catalog
+from ai_lego.platform.catalog.display_catalog import catalog_payload, counts, internal_goals, load_catalog, user_popular
 
 
 class DisplayCatalogTests(unittest.TestCase):
@@ -47,6 +47,10 @@ class DisplayCatalogTests(unittest.TestCase):
         goals = {"goals": [{"id": "mixed", "families": ["architecture", "decision"]}]}
         with self.assertRaises(ValueError):
             internal_goals(goals)
+
+    def test_an_engineering_tool_in_the_popular_list_is_a_gap(self):
+        with self.assertRaises(ValueError):
+            user_popular({"popular": [{"id": "security.stride", "shape": "grid", "line_zh": "x"}]})
 
 
 if __name__ == "__main__":

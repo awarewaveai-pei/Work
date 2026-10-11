@@ -1,6 +1,7 @@
 // What GET /projects, /projects/{id}, /projects/{id}/analyses, /tasks and /reruns return (ai_lego/apps/api/main.py), and
 // how the pages say it. An analysis's status is read from the project's event log (ProjectSourceRepository.analyses).
 import { ApiError, apiFetch } from "./api";
+import { formatTime } from "./time";
 
 export type Stance = "agree" | "partial" | "disagree";
 export type Approval = { decision: "approve" | "return"; at: string; by_name?: string | null; reason?: string | null };
@@ -77,13 +78,14 @@ export function daysOf(horizon: string | undefined): number | null {
 /** Most recently active first (a new analysis puts its project on top). */
 export const byActivity = (a: Project, b: Project) => (b.updated_at ?? b.created_at).localeCompare(a.updated_at ?? a.created_at);
 
-/** A case being opened: 陪我思考 makes the project before 開案資料 is written, so it holds nothing yet. Shown with the
- *  cases (我的案子, 繼續上次的案子), never as an analysis -- the one place this rule is written. */
-export const unopenedCase = (project: Project): boolean => !project.is_case && !(project.analysis_count ?? 0);
-export const listedAsCase = (project: Project): boolean => Boolean(project.is_case) || unopenedCase(project);
+/** A new case's name: the question's first line, short; without one, the minute it was opened. */
+export function caseName(question: string, now: Date): string {
+  const line = question.trim().split(/\r?\n/)[0].trim();
+  return line ? (line.length > 40 ? `${line.slice(0, 40)}…` : line) : `新的案子 ${formatTime(now.toISOString())}`;
+}
 
 /** A new project named ``base``; names are unique per person and workspace (409), so a second one with the same name
- *  becomes "base (2)" … The run page (a tool's analysis) and the home page's 陪我思考 (a case) both open projects here. */
+ *  becomes "base (2)" … The run page (a tool's analysis) and 開案 (a case, only when its 開案資料 is saved) open projects here. */
 export async function createProject(base: string, purpose: string): Promise<Project> {
   for (let attempt = 1; attempt <= 20; attempt++) {
     try {

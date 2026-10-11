@@ -14,7 +14,7 @@ import React, { useEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
 import { analysisHref, projectHref, toolHref } from "../lib/catalog";
 import { humanError } from "../lib/errors";
-import { byActivity, listedAsCase, standing, unopenedCase, type ErasedProject, type Project } from "../lib/projects";
+import { byActivity, standing, type ErasedProject, type Project } from "../lib/projects";
 import { formatTime } from "../lib/time";
 
 const HEAD = <thead><tr><th>名稱</th><th>用的</th><th>走到哪</th><th>建立</th><th>最後更新</th><th>下一步</th></tr></thead>;
@@ -31,8 +31,8 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
   const [reload, setReload] = useState(0);
   useEffect(() => { apiFetch<Project[]>("/projects").then((list) => setProjects([...list].sort(byActivity))).catch((reason) => setError(humanError(reason))); }, [reload]);
   useEffect(() => { apiFetch<ErasedProject[]>("/projects/erased").then(setErased).catch(() => undefined); }, [reload]);
-  const cases = (projects ?? []).filter(listedAsCase);
-  const analyses = (projects ?? []).filter((project) => !listedAsCase(project));
+  const cases = (projects ?? []).filter((project) => project.is_case);
+  const analyses = (projects ?? []).filter((project) => !project.is_case);
   const chosen = analyses.filter((project) => ticked.includes(project.project_id));
   const tick = (id: string) => setTicked((list) => (list.includes(id) ? list.filter((item) => item !== id) : [...list, id]));
   const eraseChosen = async () => {
@@ -40,10 +40,12 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
     const failed: string[] = [];
     let pending = 0;   // 202: the records are gone, some files are still being removed (the cleanup retries on its own)
     for (const project of chosen) {
-      try { const done = await apiFetch<{ physical_cleanup?: string }>(`/projects/${encodeURIComponent(project.project_id)}`, { method: "DELETE" }); if (done?.physical_cleanup === "pending") pending += 1; }
+      // ?only=analysis: one that became a case since this list loaded (another tab) is refused, never erased (PROJECT_IS_A_CASE)
+      try { const done = await apiFetch<{ physical_cleanup?: string }>(`/projects/${encodeURIComponent(project.project_id)}?only=analysis`, { method: "DELETE" }); if (done?.physical_cleanup === "pending") pending += 1; }
       catch (reason) { failed.push(`${project.name}：${humanError(reason)}`); }
     }
-    setDeleteErrors(failed); setCleaning(pending); setTicked([]); setAsking(false); setDeleting(false); setReload((count) => count + 1);
+    // the count adds up: an earlier batch's cleanup is not over because this one is (Codex review 2026-10-11 F3)
+    setDeleteErrors(failed); setCleaning((count) => count + pending); setTicked([]); setAsking(false); setDeleting(false); setReload((count) => count + 1);
   };
   const row = (project: Project, tickable: boolean) => {
     const latest = project.latest_analysis;
@@ -55,9 +57,7 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
       <td>{standing(latest)}{count > 1 ? `（共 ${count} 次分析）` : ""}{flags.length ? <><br /><span className="warn">{flags.join("・")}</span></> : null}</td>
       <td>{formatTime(project.created_at)}</td>
       <td>{formatTime(project.updated_at ?? project.created_at)}</td>
-      <td>{unopenedCase(project)
-        ? <Link className="btn primary" href={`${projectHref(project.project_id)}/start`}>還沒填開案資料：繼續開案 →</Link>
-        : project.reruns_due
+      <td>{project.reruns_due
         ? <Link className="btn primary" href={projectHref(project.project_id)}>到期了：重跑並比較 →</Link>
         : latest?.status === "DONE"
           ? <Link className="btn" href={analysisHref(project.project_id, latest.interpretation_id)}>{latest.approval?.decision === "approve" ? "看結果 →" : "看結果、核准 →"}</Link>
@@ -67,7 +67,7 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
   };
   return (
     <section className="view" id="projects">
-      <div className="top"><div><h1>我的案子</h1><div className="sub">上面是你開的案子；下面「我的分析」是直接分析跑過、還沒開案的結果。</div></div><Link className="btn primary" href="/">開新的：回首頁選一道門 →</Link></div>
+      <div className="top"><div><h1>我的案子</h1><div className="sub">上面是你開的案子；下面「我的分析」是直接分析跑過、還沒開案的結果。</div></div><Link className="btn primary" href="/projects/new">開新案子 →</Link></div>
       <NotTherapyNotice />
       <RemindersPanel />
       {error && <div className="card"><p className="error">{error}</p></div>}
@@ -76,7 +76,7 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
         <div className="how"><b>怎麼讀</b>一列一個案子：用過哪些工具、走到哪、建立和最後更新的時間（到分鐘）、下一步；最近動過的在上面。<b>你要做的</b>按名稱打開案子，接著走下一塊。</div>
         {projects && (cases.length
           ? <div className="scroll-x"><table>{HEAD}<tbody>{cases.map((project) => row(project, false))}</tbody></table></div>
-          : <p className="sub mb0">還沒有案子。回首頁按「陪我思考」開第一個；也可以把下面任何一份分析拿來開案。</p>)}
+          : <p className="sub mb0">還沒有案子。按「開新案子」或首頁的「陪我思考」開第一個；也可以把下面任何一份分析拿來開案。</p>)}
       </div>
       <div className="card" id="analyses">
         <h2>我的分析<small>{projects ? `${analyses.length} 個你自己的・1 個示範` : "載入中"}</small></h2>
