@@ -1,4 +1,37 @@
 # Worklog
+## 2026-10-11（續1）認知平台入口第一段：一個首頁兩道門、我的案子分案子／我的分析、工程工具藏起來、選單 5 區（735e12468＋51dffee2d＋578ae0a05）
+
+**根本問題**: 操作者：體驗是 v1 不是她的 v2；第一次來的人沒有起點；兩群人、兩道門、17 工作流、286 工具、14＋5 積木、八步、7 套件看不出關係。網站首頁仍是工具目錄（總數、12 類、熱門），選單 11 項平鋪；每跑一次工具就開一個專案，「我的專案」混著案子和一次性分析；STRIDE 等工程工具對所有人推薦。
+
+**決定（操作者 2026-10-11）**: 站名「認知工程系統／Cognitive Engineering OS」；首頁兩門「陪我思考／直接分析」；帶領只給帶領者（系統管理員角色另開卡）；舊專案要能永久刪除；登入改自行申請（另開卡，高風險）；拿掉「跳過練習」；測試只跑本次＋受影響、最後改動後一次，走查／新 main 網頁測試／跨積木檢查留到後面。
+
+**已修改**: 範圍與逐項 file:line = `Projects/internal/cognitive-engineering-os/docs/platform/ENTRY_SLICE1_CHECKLIST.md`（13 項 built、10 項 LATER）。設計稿 `agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/platform-entry-design.html`。
+- C1 首頁：`components/HomeStart.tsx`（陪我思考 → `/projects/new?q=`；直接分析 → `/analyze?q=`；繼續上次的案子）。開案頁沒有專案時，按「開案」才 POST /projects＋存開案資料（`components/blocks/IntakePage.tsx`），離開什麼都不留。舊首頁內容搬到 `app/(shell)/analyze/page.tsx`。
+- C2 工程工具：`display_catalog.py` 每個工具帶 block（來自 blocks.FAMILY_BLOCK）、目標帶 internal；網頁 `lib/catalog.ts` isUserTool/userGoals/userToolCount；非工程工具的建議下一步排除工程工具 `main.py:1708-1711`。
+- C3 案子判定：`case_docs.py` owners_with（一次掃描）、GET /projects 與 /projects/{id} 帶 is_case；是不是案子只看伺服器 is_case，網頁不猜（51dffee2d 刪掉 735e12468 的 unopenedCase 猜測）。
+- C4 我的案子：`ProjectList.tsx` 分兩區；勾選＋頁面上確認（回不來、備份最多 7 天）＋DELETE ?only=analysis（已開成案子的回 409 PROJECT_IS_A_CASE 不刪；判斷在刪除交易裡、案子獨佔鎖之後 `ai_lego/platform/erasure.py:208`，寫開案資料拿同一把鎖的共用鎖，所以不會漏；結果頁的永久刪除也帶它）；202 時照實說還在清理，幾批累加。熱門工具清單混進工程工具 → `display_catalog.user_popular` 報錯。結果頁 `result/ResultChoices.tsx` 三選。
+- C5 選單：`AppNav.tsx` 5 區＋帳號 3 項，舊 11 頁都在子項，「我的案子」底下加「開新案子」（/projects/new）；帶領看 GET /facilitate/me。「我的專案」→「我的案子」全站（含 main.py:2261 docstring）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (apps/cognitive-web, after the last web edit) | exit=0 | ms=0 (duration not recorded)
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run AppNav HomeStart Projects (27 tests) + ResultChoices ResultPage AppNav HomeStart (37 tests) + vitest related on changed files | exit=0 | ms=0 (duration not recorded)
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run (78 modules; 1680 tests, 1678 OK, 2 FAIL = laptop environment, see m1) | exit=1 | ms=5193619
+- REALTEST_EVIDENCE: tool=Bash | cmd=after 51dffee2d: npx tsc --noEmit + vitest related (30 files; 2 failed then fixed: a trailing comment swallowed setTicked/setReload, a too-strict assertion) + Projects/IntakePage rerun 23/23 | exit=0 | ms=0 (duration not recorded)
+- REALTEST_EVIDENCE: tool=Bash | cmd=after 51dffee2d: python -m unittest test_api_interpret test_api_main test_api_synthesis test_block_foundation test_block_govern test_block_teach test_display_catalog test_erasure_workflow test_govern_no_record test_project_erase test_project_source_api test_record_log test_step2_foundation (496 tests OK) | exit=0 | ms=2205000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/13m/0n (7+4+2 over three rounds; all fixed except round-1 F1 LATER and F2 kept) -- Codex oracle round 1 agency-os/reports/oracle/2026-10-11-partialreview-b800c499.md (7 findings: F3-F7 fixed, F1 LATER pre-existing multi-workspace main.py:2695-2702, F2 kept = the person's own history); round 2 on 735e12468 agency-os/reports/oracle/2026-10-11-partialreview-6946be67.md (4 findings, all fixed in 51dffee2d); round 3 on 51dffee2d agency-os/reports/oracle/2026-10-11-partialreview-66b8beec.md (2 findings, both deletion of a case: result page erase without ?only=analysis, check-then-erase race; both fixed in 578ae0a05 by moving the check into erasure.decide_case under the exclusive case lock)
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=我的專案 | hits=42 (product code 0 after main.py:2261; rest = old mockups docs/mockups/*, history, reports, checklists quoting the old name)
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=owners_with | hits=3
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=unopenedCase | hits=0 (the guess removed in 51dffee2d)
+- REALTEST_EVIDENCE: tool=Bash | cmd=after 578ae0a05: npx tsc --noEmit + vitest related ResultPage.tsx (62 tests) ; python -m unittest test_api_interpret test_project_erase test_erasure_workflow test_govern_no_record test_api_main (204 tests OK) | exit=0 | ms=740000
+- ORACLE: agency-os/reports/oracle/2026-10-11-partialreview-b800c499.md, agency-os/reports/oracle/2026-10-11-partialreview-6946be67.md, agency-os/reports/oracle/2026-10-11-partialreview-66b8beec.md
+
+**剩餘風險／發現**:
+- m1 筆電上 Windows 智慧型應用程式控制從 2026-10-11 12:20 起擋 `psycopg_binary.libs/libcrypto-3-x64-*.dll`（CodeIntegrity 事件 3077，24 次）。psycopg 退回純 Python 版、借 PHP 的 libpq.dll 連線，所以大部分 DB 測試照跑；`test_ci_postgres` 的乾淨子程序載不到 → FAIL；`test_authenticate_timing` 差 0.11s > 0.06s（單獨重跑仍 FAIL）。兩者不碰本次程式（最後改動 10/08）。決定：不關智慧型應用程式控制（關了要重灌才能開）；這兩個測試由 CI full suite（Linux＋PostgreSQL，`.github/workflows/cognitive-os-full-suite.yml:23` 涵蓋 ai_lego/data/**）驗。筆電 DB 測試依賴 PHP 的 libpq 是脆弱點，壞了再改成在 Docker 裡跑。
+- m2 F1：多工作區的租戶兩道門都開不了案（這一段之前就有）；併入「自行申請帳號」卡。
+- m3 頁面走查、新 main 之後的網頁測試、跨積木檢查：操作者指定留到後面一起做，未做。
+- 未部署（高風險，等操作者 go）。
+
+**rollback**: `git revert 578ae0a05 51dffee2d 735e12468`（無 schema／資料變更；is_case 是讀出來的欄位）。
 ## 2026-10-10（續5）認知平台上線後看起來還是舊版：第 2–4 步的積木沒開、主選單沒有新頁面
 
 **根本問題**: 操作者看 cognitive.aware-wave.com「沒有新的操作模式，還是舊版」。線上確實是 a7f21c3b（新版），但兩個開關沒動：
