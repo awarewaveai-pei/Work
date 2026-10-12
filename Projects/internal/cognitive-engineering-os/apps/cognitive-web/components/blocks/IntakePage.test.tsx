@@ -2,7 +2,7 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "../../lib/api";
-import { IntakePage } from "./IntakePage";
+import { IntakePage, guardedSaid } from "./IntakePage";
 
 vi.mock("next/navigation", () => ({ usePathname: () => "/projects/new", useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
@@ -37,5 +37,15 @@ describe("開一個新案子 (/projects/new, Codex review 2026-10-11 F1)", () =>
     expect(calls.filter((call) => call.path === "/projects/P1/docs/assembler.intake" && call.method === "POST")).toHaveLength(2);
     expect(window.location.pathname).toBe("/projects/P1/start");
     await act(async () => { root.unmount(); }); host.remove();
+  });
+});
+
+describe("護欄說字在哪裡 (walk 2026-10-11 C1)", () => {
+  it("a word in the question is never called your risk", () => {
+    const notice = (category: string, found_in?: string[]) => ({ type: "guardrail" as const, category, found_by: "ASSEMBLER", found_in });
+    expect(guardedSaid([notice("法律", ["question"])])).toBe("你想釐清的事提到法律");
+    expect(guardedSaid([notice("法律", ["question"]), notice("健康", ["risk"]), notice("金錢", ["question"])])).toBe("你想釐清的事提到法律、金錢；你寫的風險提到健康");
+    expect(guardedSaid([notice("法律", ["question", "risk"])])).toBe("你想釐清的事和你寫的風險提到法律");
+    expect(guardedSaid([notice("法律")])).toBe("你寫的內容提到法律");
   });
 });

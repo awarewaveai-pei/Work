@@ -29,6 +29,18 @@ type Intake = {
 };
 const lines = (text: string) => text.split(/\n|、/).map((item) => item.trim()).filter(Boolean);
 
+// Where each guardrail's word was (the engine's found_in, 2026-10-11 walk C1): never 「你寫的風險」 for a word in the question.
+const FIELD_WORDS: Record<string, string> = { question: "你想釐清的事", risk: "你寫的風險" };
+export const guardedSaid = (guarded: Notice[]): string => {
+  const byPlace = new Map<string, string[]>();
+  for (const notice of guarded) {
+    if (notice.type !== "guardrail") continue;
+    const place = (notice.found_in ?? []).map((field) => FIELD_WORDS[field] ?? "你寫的內容").filter((word, index, all) => all.indexOf(word) === index).join("和") || "你寫的內容";
+    byPlace.set(place, [...(byPlace.get(place) ?? []), notice.category]);
+  }
+  return [...byPlace].map(([place, categories]) => `${place}提到${categories.join("、")}`).join("；");
+};
+
 // question: the sentence written on the home page before 陪我思考 (?q=, ENTRY_SLICE1_CHECKLIST.md item 6); it fills
 // 你想釐清什麼 only while the case has no 開案資料 yet, never over a saved one. No projectId (/projects/new): the
 // project is created only when 開案 is pressed, so a case is exactly a project with 開案資料 (GET /projects is_case);
@@ -89,7 +101,7 @@ export function IntakePage({ projectId: given, question = "" }: { projectId?: st
     <>
       <NotTherapyNotice />
       <Notices notices={notices} />
-      {guarded.length > 0 && <div className="card accent"><p className="mt0">你寫的風險碰到：{guarded.map((notice) => notice.type === "guardrail" ? notice.category : "").join("、")}。這個案子加了護欄：AI 說到事實一定附來源、會提醒你可以找專業的人、不能反悔的決定會請你先等一下。</p></div>}
+      {guarded.length > 0 && <div className="card accent"><p className="mt0">{guardedSaid(guarded)}。這個案子加了護欄：AI 說到事實一定附來源、會提醒你可以找專業的人、不能反悔的決定會請你先等一下。</p></div>}
       <div className="card cta">
         <h2>這次的目的</h2>
         <div className="chips" role="group" aria-label="目的">
