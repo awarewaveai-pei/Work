@@ -47,7 +47,7 @@ describe("我的案子", () => {
     // is only what the server calls one (is_case), never guessed from emptiness (ENTRY_SLICE1 item 7, Codex review F1)
     expect(host.querySelector("#analyses h2 small")?.textContent).toBe("3 個你自己的・1 個示範");
     expect(host.querySelector("#cases h2 small")?.textContent).toBe("0 個");
-    const demoRow = host.querySelector("tr.demo");   // the free 示範專案 is always the last row (N-78)
+    const demoRow = host.querySelector("tr.demo");   // the free 示範分析 is always the last row (N-78)
     expect(demoRow?.querySelector("a")?.getAttribute("href")).toBe("/projects/demo/iceberg");
     expect(demoRow?.textContent).toContain("報表（示範，不花錢）");
     const rows = [...host.querySelectorAll("#analyses tbody tr:not(.demo)")];
@@ -151,7 +151,7 @@ describe("one project", () => {
       throw new Error(`unexpected: ${path}`);
     });
     const { host, done: finish } = await mount(<ProjectPage projectId="P-OLD" names={{ "systems.iceberg_model": "冰山模型" }} />);
-    expect(host.querySelector(".crumbs")?.textContent).toBe("我的案子 › 冰山模型 2026-09-26");
+    expect(host.querySelector(".crumbs")?.textContent).toBe("我的分析 › 冰山模型 2026-09-26");   // no is_case: an analysis, not a case
     expect(host.querySelector(".status")?.textContent).toContain(`建立 ${formatTime(OLD.created_at)}`);
     const rows = [...host.querySelector("table")!.querySelectorAll("tbody tr")];   // the only table on the page now: tasks render as cards
     expect(rows.map((row) => row.querySelector("td")?.textContent)).toEqual(analyses.map((item) => formatTime(item.requested_at)));
@@ -160,7 +160,7 @@ describe("one project", () => {
     expect(rows[1].querySelector("details")?.textContent).toContain("INTERPRETATION_NOT_JSON");
     expect(rows[2].querySelector("a.btn")?.textContent).toBe("看結果 →");
     expect(rows[2].textContent).toContain("同意");
-    expect(host.querySelector('a[href="/methods/systems.iceberg_model/run?project=P-OLD"]')?.textContent).toBe("在這個專案再用「冰山模型」分析一次");
+    expect(host.querySelector('a[href="/methods/systems.iceberg_model/run?project=P-OLD"]')?.textContent).toBe("在這份分析再用「冰山模型」分析一次");
     // tasks and a due rerun reminder show on the project page (⑦ 存成任務 / 到期重跑並比較)
     expect(host.textContent).toContain("補齊三項數據");
     expect(host.textContent).toContain("（逾期）");
@@ -171,7 +171,7 @@ describe("one project", () => {
   it("a project that is not yours or is gone says so", async () => {
     vi.mocked(apiFetch).mockRejectedValue(new ApiError(404, "PROJECT_NOT_FOUND"));
     const { host, done: finish } = await mount(<ProjectPage projectId="P-X" />);
-    expect(host.querySelector(".error")?.textContent).toContain("找不到這個專案");
+    expect(host.querySelector(".error")?.textContent).toContain("找不到這個案子或分析");
     await finish();
   });
 
@@ -259,14 +259,14 @@ describe("one project", () => {
       throw new Error(`unexpected: ${path}`);
     });
     const { host, done: finish } = await mount(<ProjectPage projectId="P-OLD" />);
-    const input = host.querySelector('input[aria-label="專案名稱"]') as HTMLInputElement;
+    const input = host.querySelector('input[aria-label="分析名稱"]') as HTMLInputElement;
     const renameButton = () => [...host.querySelectorAll("button")].find((button) => button.textContent === "重新命名")!;
     await act(async () => { type(input, "New Name"); });
     await act(async () => { renameButton().click(); await Promise.resolve(); });
     expect(host.querySelector("h1")?.textContent).toBe("New Name");
     await act(async () => { type(input, "Taken"); });
     await act(async () => { renameButton().click(); await Promise.resolve(); });
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain("已經有專案在用");
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain("已經有案子或分析在用");
     expect(host.querySelector("h1")?.textContent).toBe("New Name");   // the failed rename did not overwrite the shown name
     await finish();
   });
@@ -288,7 +288,7 @@ describe("one project", () => {
       throw new Error(`unexpected: ${path}`);
     });
     const { host, done: finish } = await mount(<ProjectPage projectId="P-OLD" />);
-    await act(async () => { [...host.querySelectorAll("button")].find((button) => button.textContent === "刪除專案")!.click(); await Promise.resolve(); });
+    await act(async () => { [...host.querySelectorAll("button")].find((button) => button.textContent === "刪除分析")!.click(); await Promise.resolve(); });
     expect(window.confirm).toHaveBeenCalled();
     expect(vi.mocked(apiFetch).mock.calls.some(([path, init]) => path === "/projects/P-OLD" && init?.method === "DELETE")).toBe(true);
     expect(assign).toHaveBeenCalledWith("/projects");
@@ -512,7 +512,7 @@ describe("one project", () => {
   it("an analysis opened under the wrong project is refused, not shown", async () => {
     vi.mocked(apiFetch).mockResolvedValue({ interpretation_id: "I-1", status: "DONE", project_id: "P-OTHER", method_id: "systems.iceberg_model" } as never);
     const { host, done: finish } = await mount(<AnalysisPage projectId="P-OLD" analysisId="I-1" />);
-    expect(host.querySelector(".error")?.textContent).toBe("這次分析不在這個專案裡。");
+    expect(host.querySelector(".error")?.textContent).toBe("這次分析不在這裡。");
     await finish();
   });
 });

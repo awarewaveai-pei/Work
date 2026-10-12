@@ -46,9 +46,16 @@ export const stuckCatalog = (catalog: Catalog): StuckCatalog => ({
 export const userGoals = (catalog: Catalog): Goal[] => catalog.goals.filter((goal) => !goal.internal);
 export const userToolCount = (catalog: Catalog): number => Object.keys(catalog.methods).filter((id) => isUserTool(catalog, id)).length;
 
-/** tool id -> its name, for pages that show tools by id (next steps, 我的案子); without a catalog: none, the ids show. */
+/** tool id -> its name, for pages that show tools by id (next steps, 我的案子); without a catalog: none (toolLabel then says so). */
 export function toolNames(catalog: Catalog | null): Record<string, string> {
   return catalog ? Object.fromEntries(Object.entries(catalog.methods).map(([key, method]) => [key, method.name_zh])) : {};
+}
+
+const METHOD_ID_SHAPE = /^[a-z][a-z0-9_]*\.[a-z0-9_.]+$/;   // framing.problem_statement
+/** What a person reads for a tool id or a lesson subject: the tool's Chinese name; a subject that is not an id (a package
+ *  name) as it is; an id the catalog does not know is never shown (walk 2026-10-12 W16). */
+export function toolLabel(names: Record<string, string>, id: string): string {
+  return names[id] ?? (METHOD_ID_SHAPE.test(id) ? "（找不到名稱的工具）" : id);
 }
 
 export const ICEBERG_ID = "systems.iceberg_model";   // the one tool whose form fields are its layers (docs/mockups/iceberg-result-mock.html)

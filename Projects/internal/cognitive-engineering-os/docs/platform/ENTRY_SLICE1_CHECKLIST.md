@@ -4,7 +4,7 @@
 - 2026-10-11 操作者定：正式名稱「認知工程系統」、英文「Cognitive Engineering OS」；首頁兩道門「直接分析／陪我思考」；帶領給帶領者和系統管理員；舊專案保留、可永久刪除；登入改自己申請（另一張卡）；不要「跳過練習」按鈕。
 - 規則：每一行做完改成 `=> built: <file:line>`；這一段不做的寫 `=> LATER: <去哪一張卡>`。全部是 built 或 LATER 才算這一段做完。
 
-## 這一段要做完的（13 項）
+## 這一段要做完的（14 項）
 
 1. 站名：登入頁、選單、瀏覽器分頁三處都是「認知工程系統」，英文「Cognitive Engineering OS」。 => built: apps/cognitive-web/lib/strings.ts:3-4（唯一一處）；apps/cognitive-web/app/layout.tsx:7、apps/cognitive-web/app/login/page.tsx:15、apps/cognitive-web/components/AppNav.tsx:62 都讀它
 2. 首頁：標題「把一件事想清楚」、副標一句、一個輸入框（可以不寫）、兩道門（左「陪我思考」主按鈕，右「直接分析」）、「繼續上次的案子」（有案子才出現）。 => built: apps/cognitive-web/app/(shell)/page.tsx:11-15；apps/cognitive-web/components/HomeStart.tsx:26（輸入框）、:29（陪我思考）、:39（直接分析）、:50（繼續上次的案子，只列 is_case）；測試 apps/cognitive-web/components/HomeStart.test.tsx
@@ -19,6 +19,7 @@
 11. 選單：首頁／我的案子（底下有開新案子、我的群組）／直接分析（底下有工具目錄、工作流）／練習（底下有課程、校準）／帶領（只有帶領者看得到）；最下面：我的資料、設定、求助。 => built: apps/cognitive-web/components/AppNav.tsx:17-28（5 項＋帳號 3 項；子項目 :20,:22,:24）、:48（帶領只給帶領者，GET /facilitate/me；自己打網址進 /lead 也不會出現）；apps/cognitive-web/app/globals.css（子項目和底部樣式）；測試 apps/cognitive-web/components/AppNav.test.tsx、apps/cognitive-web/lib/catalog.test.ts
 12. 原本 11 個頁面都還找得到：每一頁在選單上都有歸屬，網址不變。 => built: apps/cognitive-web/components/AppNav.test.tsx:30（舊選單 11 頁，每一頁在自己的區塊都點得到）
 13. 「我的專案」這個名稱全站改成「我的案子」：選單、頁首、每一頁上方的路徑、提示文字。 => built: apps/cognitive-web/ 底下 14 個檔案的「我的專案」全部改成「我的案子」（grep 剩 0）；測試裡的路徑文字一起改
+14. 畫面上不再出現「專案」：有開案資料的叫「案子」，只有直接分析留下的叫「分析」（我的分析）；工具只顯示中文名，認不得的代號顯示「（找不到名稱的工具）」。 => built: apps/cognitive-web/lib/projects.ts（holderWord／thisHolder）、apps/cognitive-web/lib/catalog.ts（toolLabel）；檢查 apps/cognitive-web/lib/vocabulary.test.ts（全站原始碼掃描，新頁面帶回「專案」或工具代號會變紅）；工具頁的存到、麵包屑、「改存到別的案子或分析」apps/cognitive-web/components/RunPage.tsx、RunHeader.tsx
 
 ## 這一段不做的（各自去哪）
 

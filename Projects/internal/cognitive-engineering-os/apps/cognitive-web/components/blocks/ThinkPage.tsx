@@ -11,7 +11,7 @@ import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { NONE, caseEvidence, type Evidence } from "../../lib/evidence";
 import { BlockShell, Notices } from "./BlockShell";
-import { Missing, Refused, type Failed } from "./PageParts";
+import { Fold, Missing, Refused, type Failed } from "./PageParts";
 import { ALWAYS, GRANTABLE_WORDS } from "./CollabPermissions";
 
 export const ROLES = ["鏡子", "發散夥伴", "蘇格拉底引導者", "反方教練", "證據稽核者", "決策教練", "後設學習教練"] as const;
@@ -23,6 +23,7 @@ export const RESPONSES = ["確認", "改寫", "否定"] as const;
 export const MAX_PICKED = 3;
 export const MIN_OWN_CARDS = 2;
 export const STREAK_REMINDER = 2;
+export const FIRST_COMMANDS = 3;   // the command cards shown at once; the other four and the later two are folded
 export const ROUND_MINUTES = 25;
 
 // action -> the role and mode it is, the permission it needs (the engine refuses it without), and what its answer is called
@@ -74,7 +75,7 @@ export type Card = {
 };
 /** Your answer to one card, kept apart from the card so an AI card stays the AI's until you change its words. */
 export type Reaction = { card: string; reaction?: string; reason?: string; stance?: string; picked?: boolean };
-type Reply = { round: string; action: string; role: string; sections?: Array<{ title: string; items: string[] }>; question?: string; premise?: string; fails_when?: string; handback?: string; sourced: string };
+type Reply = { round: string; action: string; role: string; sections?: Array<{ title: string; items: string[] }>; question?: string; premise?: string; fails_when?: string; handback?: string; caution?: string; sourced: string };
 type Batch = { round: string; action: string; role: string; cards?: unknown[]; question?: string; handback?: string; sourced: string };
 type Answer = { reply: string; version?: number; response: string; note?: string };
 type Loaded = { rounds: Doc<Round>[]; cards: Doc<Card>[]; reactions: Doc<Reaction>[]; laidOut: Doc<{ batch: string }>[]; batches: Doc<Batch>[]; replies: Doc<Reply>[]; answers: Doc<Answer>[]; permissions: string[]; emotion: { emotion: string; intensity: string } | null };
@@ -121,6 +122,27 @@ export function thinkError(reason: unknown): string {
   return (code && THINK_ERRORS[code]) || humanError(reason);
 }
 
+export type Stage = "start" | "own" | "ask" | "reply" | "pick" | "own-cards" | "reflect" | "done";
+/** Where the round stands, from what is saved: the first thing still missing. The page shows its one next step and folds the rest. */
+export function thinkStage(have: { round: boolean; ownSaved: boolean; cards: number; answers: number; picked: number; ownCards: number; reflected: boolean }): Stage {
+  if (!have.round) return "start";
+  if (!have.ownSaved) return "own";
+  if (have.cards === 0) return have.answers > 0 ? "reply" : "ask";
+  if (have.picked < MAX_PICKED) return "pick";
+  if (have.ownCards < MIN_OWN_CARDS) return "own-cards";
+  return have.reflected ? "done" : "reflect";
+}
+export const NEXT_STEP: Record<Stage, string> = {
+  start: "寫下這一次的問題和你自己的版本，按「存這一輪」。",
+  own: "至少留下一項你自己的版本（看到什麼、可能的解釋、「我不知道」都算），按「存下來」。AI 要等你存了才會回。",
+  ask: "請 AI 幫忙。第一次可以按「先幫我看見我在想什麼」，或「和我一起發散」。",
+  reply: "看 AI 回給你的：對就按「對，是這樣」，不對就改寫。AI 給的一批卡，按「展開成卡」才看得到。想要更多方向，再請 AI 發散。",
+  pick: "看每張卡，標上你的反應，選三張帶走。",
+  "own-cards": "再加幾張你自己的卡（在「加一張你自己的卡」）。",
+  reflect: "在最下面寫一句「這次我是怎麼想的」。",
+  done: "這一輪都做完了。想再想一次，按「新的一輪」；也可以直接往下走。",
+};
+
 /** A reaction with nothing left in it (no reaction, reason, stance or pick) is not kept. */
 const tidy = (content: Reaction): Reaction | null => {
   const kept = Object.fromEntries(Object.entries(content).filter(([, value]) => value !== undefined && value !== "" && value !== false)) as Reaction;
@@ -163,9 +185,9 @@ function Timer({ clock, setClock }: { clock: { shown: boolean; running: boolean;
   const phase = PHASES[phaseAt(clock.seconds)];
   const mm = String(Math.floor(clock.seconds / 60)).padStart(2, "0");
   const ss = String(clock.seconds % 60).padStart(2, "0");
-  if (!clock.shown) return <div className="card"><div className="btns"><span className="sub">計時關著。</span><button className="btn ghost" type="button" onClick={() => setClock({ shown: true, running: false, seconds: 0 })}>打開計時</button></div></div>;
+  if (!clock.shown) return <div><div className="btns"><span className="sub">計時關著。</span><button className="btn ghost" type="button" onClick={() => setClock({ shown: true, running: false, seconds: 0 })}>打開計時</button></div></div>;
   return (
-    <div className="card">
+    <div>
       <div className="top"><h2>25 分鐘一輪 <small>{mm}:{ss}</small></h2>
         <div className="btns">
           <button className="btn" type="button" onClick={() => setClock((held) => ({ ...held, running: !held.running }))}>{clock.running ? "暫停" : clock.seconds ? "繼續" : "開始計時"}</button>
@@ -378,6 +400,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
         <span className="tags"><span>{ACTIONS[content.action]?.title ?? "AI 的整理"}</span><span>{AUTHOR[doc.author]}</span><span>{content.sourced}</span><span>{content.role}</span>{given && <span>你：{given.response}</span>}</span>
         {content.handback && <p className="warn">AI 這次把控制交還給你：{content.handback}</p>}
         {(content.sections ?? []).map((section) => <div key={section.title}><b>{section.title}</b><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}
+        {content.caution && <p className="warn">AI 在整理旁邊提醒你：{content.caution}</p>}
         {content.question && <p><b>一個問題：</b>{content.question}</p>}
         {content.premise && <p><b>前提和適用條件：</b>{content.premise}</p>}
         {content.fails_when && <p><b>可能怎麼失敗：</b>{content.fails_when}</p>}
@@ -402,11 +425,14 @@ export function ThinkPage({ projectId }: { projectId: string }) {
 
   const grouped = (label: string, lines: string[]) => <div className="mcard"><b>{label}</b>{lines.length ? <ul>{lines.map((line, index) => <li key={`${index}-${line}`}>{line}</li>)}</ul> : <span className="k">還沒有</span>}</div>;
   const unexpanded = roundBatches.filter((batch) => (batch.content.cards ?? []).length > 0 && !data.laidOut.some((note) => note.content.batch === batch.doc_id));
+  const clockText = `${String(Math.floor(clock.seconds / 60)).padStart(2, "0")}:${String(clock.seconds % 60).padStart(2, "0")}`;
+  const stage = thinkStage({ round: Boolean(current), ownSaved: savedOwn, cards: roundCards.length, answers: roundReplies.length + unexpanded.length, picked: picked.length, ownCards: ownCards.length, reflected: Boolean(current?.content.reflection?.trim()) });
 
   return (
     <BlockShell projectId={projectId} code="THINK" refresh={refresh}>
       <Notices notices={notices} />
-      <Timer clock={clock} setClock={setClock} />
+      <div className="card cta"><p className="mt0 mb0" role="status"><b>下一步：</b>{NEXT_STEP[stage]}{stage === "pick" ? `（現在 ${picked.length} / ${MAX_PICKED} 張）` : stage === "own-cards" ? `（現在 ${ownCards.length} / ${MIN_OWN_CARDS} 張）` : ""}</p></div>
+      <Fold card title={`25 分鐘計時（選用，不開也可以）${clock.seconds ? `　${clockText}` : ""}`}><Timer clock={clock} setClock={setClock} /></Fold>
 
       <div className="card">
         <div className="top"><h2>這一輪</h2>
@@ -418,8 +444,8 @@ export function ThinkPage({ projectId }: { projectId: string }) {
         {!current && data.rounds.length > 0 && <p className="sub">這是一輪新的。寫好問題和你的版本，存下來。</p>}
       </div>
 
-      <div className="card cta">
-        <h2>先寫你自己的</h2>
+      {(() => {
+        const ownBody = <>
         <p className="how">AI 要等你寫完這一段、存下來，才會回。先想，再看 AI 怎麼說。</p>
         <div className="field">
           <label htmlFor="problem">這一次的問題是什麼？（由你自己界定）</label>
@@ -443,10 +469,14 @@ export function ThinkPage({ projectId }: { projectId: string }) {
         </div>
         <Missing why={!problem.trim() && "先寫這一次的問題，才能存。"} />
         <Refused failed={failed} at="round" />
-      </div>
+        </>;
+        return savedOwn
+          ? <Fold card title="你的問題和你自己的版本（已存下來，要改就打開）" filled={ownItems.length}>{ownBody}</Fold>
+          : <div className="card cta"><h2>先寫你自己的</h2>{ownBody}</div>;
+      })()}
 
-      <div className="card">
-        <h2>請 AI 幫忙</h2>
+      {(() => {
+        const aiBody = <>
         <p className="how">AI 不替你決定，也不排序。它說的每一句都是「它自己說的」，目前沒有外部出處。要它做的事，要先在協作合約准了才能選。</p>
         {!current && <p className="warn">先存下這一輪的問題和你的版本。</p>}
         {current && !savedOwn && <p className="warn">先寫你自己的版本（至少一項）並存下來，AI 才會回。</p>}
@@ -456,26 +486,31 @@ export function ThinkPage({ projectId }: { projectId: string }) {
             <div className="chips" role="group" aria-label="反方的目標">{ownItems.map((item, index) => <button key={`${index}-${item.text}`} type="button" className={`chip${target === index ? " on" : ""}`} aria-pressed={target === index} onClick={() => setTarget(index)}>{item.text.slice(0, 20)}</button>)}</div>
           </div>
         )}
-        <div className="mcards">{COMMANDS.map((command) => commandCard(command.title, command.action, command.focus))}</div>
-        <h3 className="fam">之後再用</h3>
-        <div className="mcards">{LATER.map((command) => commandCard(command.title, command.action))}</div>
-        <div className="field">
-          <b>自己選角色和模式</b>
+        <div className="mcards">{COMMANDS.slice(0, FIRST_COMMANDS).map((command) => commandCard(command.title, command.action, command.focus))}</div>
+        <Fold title={`更多做法（${COMMANDS.length - FIRST_COMMANDS + LATER.length} 種）`} open={[...COMMANDS.slice(FIRST_COMMANDS), ...LATER].some((command) => command.action === suggestion)}>
+          <div className="mcards">{COMMANDS.slice(FIRST_COMMANDS).map((command) => commandCard(command.title, command.action, command.focus))}</div>
+          <h3 className="fam">之後再用</h3>
+          <div className="mcards">{LATER.map((command) => commandCard(command.title, command.action))}</div>
+        </Fold>
+        <Fold title="自己選角色和模式">
           <Chips options={ROLES} value={role as (typeof ROLES)[number]} label="AI 這一輪的角色" onPick={setRole} disabled={(name) => roleNeeds(name).every((needs) => !granted(needs))} />
           <Chips options={MODES} value={mode as (typeof MODES)[number]} label="模式" onPick={setMode} />
           {role && mode && !chosen && <p className="hint">這個角色在這個模式下沒有對應的做法，換一個。</p>}
           <div className="btns"><button className="btn" type="button" disabled={!chosen || Boolean(blocked(chosen)) || busy} onClick={() => ask(chosen, chosen === "counter" ? { target } : {})}>用這個角色和模式開始</button></div>
           {chosen && blocked(chosen) && <p className="hint">{blocked(chosen)}。</p>}
-        </div>
-        <div className="field">
-          <b>不想先寫，直接要建議</b>
+        </Fold>
+        <Fold title="不想先寫，直接要建議">
           <p className="hint">這會跳過「你先寫」。AI 給的建議會附上前提和可能怎麼失敗，決定仍然是你的。你隨時可以回來寫自己的。</p>
           <div className="btns"><button className="btn" type="button" disabled={Boolean(blocked("direct_advice")) || busy} onClick={() => ask("direct_advice")}>直接取得建議</button></div>
           {blocked("direct_advice") && <p className="hint">{blocked("direct_advice")}。<Link href={`/projects/${encodeURIComponent(projectId)}/contract`}>到協作合約改</Link></p>}
-        </div>
+        </Fold>
         <Refused failed={failed} at="ai" />
         {busy && <p className="sub" role="status">處理中，請稍等…</p>}
-      </div>
+        </>;
+        return savedOwn
+          ? <div className="card"><h2>請 AI 幫忙</h2>{aiBody}</div>
+          : <Fold card title="請 AI 幫忙（先存下你的版本，AI 才會回）">{aiBody}</Fold>;
+      })()}
 
       {roundReplies.length > 0 && <div className="card"><h2>AI 回給你的</h2>{[...roundReplies].reverse().map(replyView)}</div>}
 
@@ -492,17 +527,15 @@ export function ThinkPage({ projectId }: { projectId: string }) {
         {roundCards.length === 0 && <p className="sub">還沒有卡。</p>}
         <div className="mcards">{roundCards.map(cardView)}</div>
         {current && (
-          <div className="field">
-            <b>加一張你自己的卡</b>
+          <Fold title="加一張你自己的卡" open={stage === "own-cards"}>
             <CardForm key={adding} initial={{ claim: "", round: roundId! }} busy={busy} onSave={(card) => saveOwnCard(card)} />
             <Refused failed={failed} at="newcard" />
-          </div>
+          </Fold>
         )}
       </div>
 
       {current && (
-        <div className="card">
-          <h2>候選的判準</h2>
+        <Fold card title="候選的判準" filled={criteria.length}>
           <p className="how">你用什麼標準來選？一條一條寫。AI 提的判準，你覺得有用才自己抄進來。</p>
           <ul>{criteria.map((item, index) => <li key={`${index}-${item}`}>{item} <button className="btn ghost" type="button" onClick={() => setCriteria(criteria.filter((_, at) => at !== index))}>拿掉</button></li>)}</ul>
           <label htmlFor="criterion">新的一條</label>
@@ -512,12 +545,11 @@ export function ThinkPage({ projectId }: { projectId: string }) {
             <button className="btn primary" type="button" disabled={busy} onClick={() => saveRound({ criteria }, "criteria")}>存判準</button>
           </div>
           <Refused failed={failed} at="criteria" />
-        </div>
+        </Fold>
       )}
 
       {current && (
-        <div className="card">
-          <h2>這一輪放在一起看</h2>
+        <Fold card title="這一輪放在一起看">
           <div className="mcards">
             {grouped("問題", [current.content.problem])}
             {grouped("假設", [...ownItems.filter((item) => item.type === "假設或替代解釋").map((item) => item.text), ...roundCards.map((card) => card.content.assumption ?? "").filter(Boolean)])}
@@ -526,17 +558,16 @@ export function ThinkPage({ projectId }: { projectId: string }) {
             {grouped("選項", roundCards.map((card) => `${reactionOf(card)?.content.picked ? "（選了）" : ""}${card.content.claim}`))}
             {grouped("判準", current.content.criteria ?? [])}
           </div>
-        </div>
+        </Fold>
       )}
 
       {current && (
-        <div className="card">
-          <h2>這次我是怎麼想的</h2>
+        <Fold card title="這次我是怎麼想的" filled={reflection.trim() ? 1 : 0} open={stage === "reflect"}>
           <p className="how">最後寫一句。只有你寫得出來，AI 不會替你寫。</p>
           <textarea aria-label="這次我是怎麼想的" value={reflection} maxLength={2000} onChange={(event) => setReflection(event.target.value)} />
           <div className="btns mt8"><button className="btn primary" type="button" disabled={!reflection.trim() || busy} onClick={() => saveRound({ reflection: reflection.trim() }, "reflection")}>存</button></div>
           <Refused failed={failed} at="reflection" />
-        </div>
+        </Fold>
       )}
 
       {error && <p className="error">{error}</p>}

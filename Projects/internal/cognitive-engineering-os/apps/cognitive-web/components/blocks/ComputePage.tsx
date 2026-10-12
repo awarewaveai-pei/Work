@@ -33,7 +33,10 @@ export type Run = {
   adopt: { adopt: string; reason: string } | null; weakest: string;
   sourcing: Array<{ input: string; own: boolean; origins: number; words: string; cards: Array<{ card: string; title: string; url: string; counts: boolean }> }>;
 };
-type Origin = { origin_id: string; counts: boolean; cards: Array<{ card: string; title?: string; url?: string }> };
+type Origin = { origin_id: string; counts: boolean; aside?: boolean; cards: Array<{ card: string; title?: string; url?: string; aside?: string }> };
+/** The cards a number may come from: what the case counts or could count, never a page the person set aside (放一旁 is not a
+ *  source, walk 2026-10-12 W22). A page that only does not count (one origin, not independent) is still offered, labelled. */
+export const pickableCards = (origins: Origin[]) => origins.filter((origin) => !origin.aside).flatMap((origin) => origin.cards.filter((card) => !card.aside).map((card) => ({ ...card, counts: origin.counts })));
 /** How this page names a source card: its title, else its address, else its id. */
 const cardName = (card: { card: string; title?: string; url?: string }) => card.title || card.url || card.card;
 type Explanation = { run: string; points: Array<{ part: string; text: string }>; influential: string; rests_on: string[] };
@@ -248,7 +251,7 @@ export function ComputePage({ projectId }: { projectId: string }) {
     try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: show(reason) }); } finally { setBusy(false); }
   };
   const algorithm = useMemo(() => spec?.algorithms.find((item) => item.id === draft?.algorithm), [spec, draft?.algorithm]);
-  const cards = useMemo(() => origins.flatMap((origin) => origin.cards.map((card) => ({ ...card, counts: origin.counts }))), [origins]);
+  const cards = useMemo(() => pickableCards(origins), [origins]);
   if (!spec || !draft || !algorithm) return <BlockShell projectId={projectId} code="COMPUTE"><div className="card"><p>{error || "載入中…"}</p></div></BlockShell>;
 
   const setRow = (index: number, patch: Partial<DraftInput>) => setDraft({ ...draft, inputs: draft.inputs.map((row, at) => (at === index ? { ...row, ...patch } : row)) });
@@ -313,19 +316,21 @@ export function ComputePage({ projectId }: { projectId: string }) {
           const input = specOf(row.key);
           const kind = spec.types[input.type];
           const repeated = draft.inputs.filter((item) => item.key === row.key).length;
+          const nth = draft.inputs.slice(0, index + 1).filter((item) => item.key === row.key).length;
+          const who = input.repeat ? `${input.name} 第 ${nth} 項${row.name.trim() ? `「${row.name.trim()}」` : ""}` : input.name;   // the row's name and place, said in every box of the row
           return (
             <div key={index} className="station">
               {input.repeat
-                ? <><label htmlFor={`name-${index}`}>{input.name}：名字</label><input id={`name-${index}`} className="search" value={row.name} maxLength={60} onChange={(event) => setRow(index, { name: event.target.value })} /></>
+                ? <><label htmlFor={`name-${index}`}>{input.name}：名字</label><input id={`name-${index}`} className="search" aria-label={`${input.name} 第 ${nth} 項：名字`} value={row.name} maxLength={60} onChange={(event) => setRow(index, { name: event.target.value })} /></>
                 : <h3>{input.name}</h3>}
               {input.hint && <p className="hint">{input.hint}</p>}
               <label htmlFor={`value-${index}`}>{input.spread ? spec.base : "數字"}{kind.fixed_unit ? `（${kind.unit}）` : ""}</label>
-              <input id={`value-${index}`} className="search" type="number" inputMode="decimal" step="any" value={row.value} onChange={(event) => setRow(index, { value: event.target.value })} />
-              {!kind.fixed_unit && <><label htmlFor={`unit-${index}`}>單位</label><input id={`unit-${index}`} className="search" value={row.unit} maxLength={20} onChange={(event) => setRow(index, { unit: event.target.value })} /></>}
+              <input id={`value-${index}`} className="search" type="number" inputMode="decimal" step="any" aria-label={`${who}：${input.spread ? spec.base : "數字"}`} value={row.value} onChange={(event) => setRow(index, { value: event.target.value })} />
+              {!kind.fixed_unit && <><label htmlFor={`unit-${index}`}>單位</label><input id={`unit-${index}`} className="search" aria-label={`${who}：單位`} value={row.unit} maxLength={20} onChange={(event) => setRow(index, { unit: event.target.value })} /></>}
               {input.scenarios !== false && others(spec).map((scenario) => (
                 <React.Fragment key={scenario}>
                   <label htmlFor={`${scenario}-${index}`}>{scenario}時（不填＝跟{spec.base}一樣）</label>
-                  <input id={`${scenario}-${index}`} className="search" type="number" inputMode="decimal" step="any" value={row.scenarios[scenario] ?? ""}
+                  <input id={`${scenario}-${index}`} className="search" type="number" inputMode="decimal" step="any" aria-label={`${who}：${scenario}時`} value={row.scenarios[scenario] ?? ""}
                     onChange={(event) => setRow(index, { scenarios: { ...row.scenarios, [scenario]: event.target.value } })} />
                 </React.Fragment>
               ))}

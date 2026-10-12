@@ -1,7 +1,7 @@
 import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiFetch } from "../../lib/api";
+import { ApiError, apiFetch } from "../../lib/api";
 import type { ContextSpec, Notes } from "../../lib/context";
 import type { MapSpec } from "../../lib/map";
 import { ContextPage } from "./ContextPage";
@@ -31,7 +31,9 @@ const MAP_SPEC: MapSpec = {
 };
 
 type Stored = { doc_id: string; kind: string; version: number; content: any; author: string; block: string; at: string };
-function server(initial: Record<string, any[]>) {
+/** GET /projects/{id}/context/claims as the engine answers it (kinds/context.py case_claims, claim_counts). */
+const NO_CLAIMS = { claims: [], counts: { 事實: 0, 法律: 0, 價值: 0, 文化宗教: 0, 其他: 0 } };
+function server(initial: Record<string, any[]>, claimed: unknown = NO_CLAIMS) {
   const store: Record<string, Stored[]> = Object.fromEntries(Object.entries(initial).map(([kind, contents]) => [kind, contents.map((content, index) => ({ doc_id: `${kind}-${index + 1}`, kind, version: 1, content, author: "user", block: "CONTEXT", at: "2026-10-03T08:00:00Z" }))]));
   const writes: Array<{ method: string; path: string; body: any }> = [];
   vi.mocked(apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
@@ -41,6 +43,7 @@ function server(initial: Record<string, any[]>) {
     if (path === "/blocks/context/spec") return SPEC as never;
     if (path === "/blocks/map/spec") return MAP_SPEC as never;
     if (path.endsWith("/proposals")) return [] as never;
+    if (path.endsWith("/context/claims")) { if (claimed instanceof Error) throw claimed; return claimed as never; }
     if (/^\/projects\/[^/]+$/.test(path)) return { project_id: "P1", name: "續約", created_at: "x" } as never;
     if (path.endsWith("/ai/CONTEXT/point_facets")) {
       const doc = { doc_id: "context.pointers-1", kind: "context.pointers", version: 1, content: { facets: [{ facet: "經濟", why: "你寫到續約的錢" }] }, author: "ai", block: "CONTEXT", at: "2026-10-03T09:00:00Z" };
@@ -91,9 +94,10 @@ describe("規範與脈絡", () => {
     expect(host.querySelector("#文化-defines_normal")).not.toBeNull();
     expect(host.querySelector("#文化-is_cause")).not.toBeNull();
     expect(host.querySelector("#經濟-is_cause")).toBeNull();
-    expect(cards[0].textContent).toContain("先寫你自己怎麼理解");   // 文化: your own understanding first
-    await click(byText(cards[2] as HTMLElement, "button", "有關"));
-    expect(cards[2].textContent).not.toContain("先寫你自己怎麼理解");   // 經濟: no such note
+    const card = (name: string) => host.querySelector(`#facet-${name}`) as HTMLElement;   // a facet marked 有關 moves out of 其他面向: ask for it again
+    expect(card("文化").textContent).toContain("先寫你自己怎麼理解");   // 文化: your own understanding first
+    await click(byText(card("經濟"), "button", "有關"));
+    expect(card("經濟").textContent).not.toContain("先寫你自己怎麼理解");   // 經濟: no such note
     expect(host.querySelector("select")).toBeNull();
     await done();
   });
@@ -112,8 +116,7 @@ describe("規範與脈絡", () => {
   it("offers the places the intake wrote, picks none for you, and a law claim without its source is 未確認", async () => {
     server({
       "assembler.intake": [{ question: "q", happened_in: ["高雄"], you_are_in: "東京" }],
-      "map.map": [{ claims: [{ id: "c1", text: "他能不能自己改合約", kind: "法律", by: "user", details: { jurisdiction: "某國" } }] }],
-    });
+    }, { claims: [{ id: "c1", text: "他能不能自己改合約", kind: "法律", from: "MAP", missing: ["時效", "來源"] }], counts: { ...NO_CLAIMS.counts, 法律: 1 } });
     const { host, done } = await mount(<ContextPage projectId="P1" />);
     const chips = [...host.querySelectorAll('[aria-label="適用哪裡的法律"] button')];
     expect(chips.map((chip) => chip.textContent)).toEqual(["高雄", "東京"]);
@@ -122,6 +125,38 @@ describe("規範與脈絡", () => {
     expect(host.textContent).toContain("未確認");
     expect(host.textContent).toContain("還缺：時效、來源");
     expect(host.textContent).toContain("有法律主張，但還沒標適用哪裡的法律");
+    await done();
+  });
+
+  it("counts and lists the case's claims from the server's one set -- MAP's and VERIFY's together -- and says plainly what a law claim lacks (走查 2026-10-12 W15)", async () => {
+    server({}, {
+      claims: [
+        { id: "c1", text: "他能不能自己改合約", kind: "法律", from: "MAP", missing: [] },
+        { id: "v1", text: "公會規定要三十天前通知", kind: "法律", from: "VERIFY", missing: ["適用法域", "時效"] },
+        { id: "v2", text: "對方說同業都這樣改", kind: "事實", from: "VERIFY", missing: [] },
+        { id: "v3", text: "這樣不公平", kind: "", from: "VERIFY", missing: [] },
+      ],
+      counts: { 事實: 1, 法律: 2, 價值: 0, 文化宗教: 0, 其他: 1 },
+    });
+    const { host, done } = await mount(<ContextPage projectId="P1" />);
+    const items = [...host.querySelectorAll("ul.check > li")].map((item) => item.textContent);
+    expect(items).toHaveLength(2);   // only the 法律 ones are listed here
+    expect(items[0]).toContain("法域、時效、來源都寫了");
+    expect(items[1]).toContain("公會規定要三十天前通知");
+    expect(items[1]).toContain("未確認");
+    expect(items[1]).toContain("還缺：適用法域、時效。到查證主張補。");
+    expect(host.querySelector('ul.check li:nth-child(2) a')?.getAttribute("href")).toBe("/projects/P1/verify");
+    expect(host.textContent).toContain("目前標了：事實 1、法律 2、價值 0、文化宗教 0；還沒歸進這四種的 1 個。");
+    expect(host.textContent).toContain("有法律主張，但還沒標適用哪裡的法律");
+    await done();
+  });
+
+  it("says so when the case's claims cannot be read, instead of showing zero of everything", async () => {
+    server({}, new ApiError(500, "INTERNAL"));
+    const { host, done } = await mount(<ContextPage projectId="P1" />);
+    expect(host.textContent).toContain("這個案子的主張這次讀不到");
+    expect(host.textContent).toContain("主張的數目這次讀不到");
+    expect(host.textContent).not.toContain("事實 0");
     await done();
   });
 
@@ -147,6 +182,31 @@ describe("規範與脈絡", () => {
     await click(byText(judge as HTMLElement, "button", "無關"));
     expect(host.querySelector(".judge")).toBeNull();
     expect(byText(host.querySelector("#facet-經濟") as HTMLElement, "button", "無關")?.getAttribute("aria-pressed")).toBe("true");
+    await done();
+  });
+
+  it("shows the facets you marked 有關 and the ones you added; the rest wait in 其他面向, none removed (走查 2026-10-12 W14)", async () => {
+    server({ "context.notes": [{ facets: [{ facet: "文化", relevant: true }, { facet: "經濟", relevant: false }, { facet: "戰爭", relevant: true, custom: true, definition: "自己加的" }] }] });
+    const { host, done } = await mount(<ContextPage projectId="P1" />);
+    const fold = [...host.querySelectorAll("details")].find((item) => item.querySelector("summary")?.textContent === "其他面向（2 個）") as HTMLDetailsElement;
+    expect(fold).toBeDefined();
+    expect(fold.open).toBe(false);
+    const shown = [...host.querySelectorAll(".mcards")].filter((list) => !fold.contains(list)).flatMap((list) => [...list.querySelectorAll(":scope > .mcard")].map((card) => card.querySelector("b")?.textContent));
+    expect(shown).toEqual(["文化", "戰爭你加的"]);
+    expect([...fold.querySelectorAll(".mcard b")].map((name) => name.textContent)).toEqual(["法律", "經濟"]);   // undecided and 無關, still there
+    await click(byText(fold.querySelector("#facet-法律") as HTMLElement, "button", "有關"));
+    expect(fold.querySelector("#facet-法律")).toBeNull();
+    expect((host.querySelector("#facet-法律") as HTMLElement).closest("details")).toBeNull();   // it moved up, with its two questions
+    expect(host.querySelector("#法律-defines_normal")).not.toBeNull();
+    await done();
+  });
+
+  it("with nothing marked yet, says so and keeps every facet reachable under 其他面向", async () => {
+    server({});
+    const { host, done } = await mount(<ContextPage projectId="P1" />);
+    expect(host.textContent).toContain("還沒有標「有關」的面向");
+    const fold = [...host.querySelectorAll("details")].find((item) => item.querySelector("summary")?.textContent === "其他面向（3 個）")!;
+    expect(fold.querySelectorAll(".mcard")).toHaveLength(3);
     await done();
   });
 

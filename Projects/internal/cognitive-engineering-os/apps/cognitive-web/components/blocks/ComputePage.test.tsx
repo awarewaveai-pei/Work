@@ -249,4 +249,54 @@ describe("計算與模擬：按了就有回應，來源一次選（走查 2026-1
     expect(host.querySelector("select")).toBeNull();
     await done();
   });
+
+  it("never offers a page set aside (放一旁) as a source for a number: 14 pages = 6 counted + 8 aside offers 6 (走查 2026-10-12 W22)", async () => {
+    server([]);
+    const base = vi.mocked(apiFetch).getMockImplementation()!;
+    const counted = (n: number) => ({ origin_id: `o:${n}`, counts: true, aside: false, cards: [{ card: `K${n}`, title: `算數的 ${n}`, aside: "" }] });
+    const setAside = (n: number) => ({ origin_id: `a:${n}`, counts: false, aside: true, cards: [{ card: `A${n}`, title: `放一旁的 ${n}`, aside: "不相關" }] });
+    vi.mocked(apiFetch).mockImplementation(async (path: string, init?: RequestInit) => (path.endsWith("/evidence")
+      ? { origins: [...[1, 2, 3, 4, 5, 6].map(counted), ...[1, 2, 3, 4, 5, 6, 7, 8].map(setAside), { origin_id: "x:1", counts: false, aside: false, cards: [{ card: "N1", title: "只有一個出處的", aside: "" }] }] } as never
+      : base(path, init)));
+    const { host, done } = await mount(<ComputePage projectId="P1" />);
+    const group = host.querySelector('[aria-label="一開始投入的金額 的來源"]')!;
+    expect([...group.querySelectorAll("button")].map((node) => node.textContent)).toEqual([OWN, "從蒐集的來源選（7 張）"]);   // 6 counted + 1 that merely does not count yet
+    await click(group.querySelectorAll("button")[1]);
+    const names = [...host.querySelectorAll('.station')[0].querySelectorAll("li")].map((node) => node.textContent?.trim());
+    expect(names).toHaveLength(7);
+    expect(names.some((name) => name?.includes("放一旁"))).toBe(false);
+    expect(names[6]).toBe("只有一個出處的（不算數）");
+    await done();
+  });
+});
+
+describe("計算與模擬：每個數字的格子都說是誰的數字（走查 2026-10-12 W12）", () => {
+  it("gives every number box a label that names its row and what the box is, and no two boxes share one", async () => {
+    server([]);
+    const { host, done } = await mount(<ComputePage projectId="P1" />);
+    const boxes = [...host.querySelectorAll<HTMLInputElement>(".station input")];
+    const labels = boxes.map((box) => box.getAttribute("aria-label"));
+    expect(labels.every(Boolean)).toBe(true);
+    expect(new Set(labels).size).toBe(labels.length);
+    expect(labels).toEqual(expect.arrayContaining(["一開始投入的金額：數字", "一開始投入的金額：單位", "一開始投入的金額：樂觀時", "一開始投入的金額：悲觀時", `${YEARLY}：悲觀時`, "年數：數字", "折現率：樂觀時"]));
+    expect(boxes.filter((box) => box.type === "number")).toHaveLength(12);   // 4 numbers, and 樂觀時 and 悲觀時 beside each: 4 + 8
+    await done();
+  });
+
+  it("a repeated row is named by what the person typed, else by its place in the list; a spread row says 一般", async () => {
+    server([]);
+    const { host, done } = await mount(<ComputePage projectId="P1" />);
+    await click([...host.querySelectorAll('[aria-label="算法"] button')].find((node) => node.textContent === "蒙地卡羅"));
+    const label = (needle: string) => [...host.querySelectorAll(".station input")].map((node) => node.getAttribute("aria-label") ?? "").filter((text) => text.includes(needle));
+    expect(label("要加起來的一項")).toEqual(expect.arrayContaining(["要加起來的一項 第 1 項：名字", "要加起來的一項 第 1 項：一般", "要加起來的一項 第 1 項：樂觀時", "要加起來的一項 第 1 項：悲觀時"]));
+    await typeInto(host.querySelector<HTMLInputElement>("#name-0")!, "接案收入");
+    expect(label("接案收入")).toEqual(expect.arrayContaining(["要加起來的一項 第 1 項「接案收入」：一般", "要加起來的一項 第 1 項「接案收入」：悲觀時"]));
+    await click([...host.querySelectorAll("button")].find((node) => node.textContent === "再加一項"));
+    await typeInto(host.querySelector<HTMLInputElement>("#name-1")!, "接案收入");   // the same name typed twice
+    const all = [...host.querySelectorAll(".station input")].map((node) => node.getAttribute("aria-label"));
+    expect(new Set(all).size).toBe(all.length);
+    expect(label("接案收入")).toEqual(expect.arrayContaining(["要加起來的一項 第 1 項「接案收入」：一般", "要加起來的一項 第 2 項「接案收入」：一般"]));
+    expect(label("你要的最低結果")).toEqual(["你要的最低結果：數字", "你要的最低結果：單位"]);   // a row with no scenarios has no 樂觀時／悲觀時 box
+    await done();
+  });
 });

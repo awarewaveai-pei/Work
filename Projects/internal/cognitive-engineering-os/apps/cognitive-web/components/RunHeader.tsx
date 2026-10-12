@@ -2,25 +2,28 @@ import React from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { projectHref, toolHref } from "../lib/catalog";
+import { holderWord } from "../lib/projects";
 import { formatTime } from "../lib/time";
 
 // The run page's header (docs/mockups/iceberg-result-mock.html: crumbs, then the first card = title + lesson button,
 // tool line, status strip, 怎麼讀). One card before and after a result, so the page does not jump when the result lands.
 // With a result the title carries the analysis's headline (冰山模型分析：團體反思 session 主動分享從 6 人掉到 2 人) and the
-// tool line the project and the time (工具：冰山模型 Iceberg Model（系統思考 Systems Thinking）・專案「…」・時間). A tool with
+// tool line the case or analysis and the time (工具：冰山模型 Iceberg Model（系統思考 Systems Thinking）・案子「…」・時間). A tool with
 // a lesson points to its 看懂結果 tab; a tool without one carries the reading guide here once there is a result
 // (check-mocks.py U14: the guide lives in exactly one place).
 export function RunHeader({ methodId, name, nameEn, family, headline, lesson, project, analyzedAt, status, guide = false, count = 0 }: {
-  methodId: string; name: string; nameEn?: string; family?: string | null; headline?: string; lesson: string | null; project?: { id: string; name: string }; analyzedAt?: string; status: ReactNode; guide?: boolean; count?: number;
+  methodId: string; name: string; nameEn?: string; family?: string | null; headline?: string; lesson: string | null; project?: { id: string; name: string; isCase?: boolean }; analyzedAt?: string; status: ReactNode; guide?: boolean; count?: number;
 }) {
   const boxes = count ? `${["", "一", "兩", "三", "四", "五", "六", "七", "八", "九"][count] ?? count}格` : "格子";
   return <>
-    <div className="crumbs"><Link href="/projects">我的案子</Link> › {project && <><Link href={projectHref(project.id)}>{project.name}</Link> › </>}{name}分析</div>
+    <div className="crumbs">{project
+      ? <><Link href="/projects">{project.isCase ? "我的案子" : "我的分析"}</Link> › <Link href={projectHref(project.id)}>{project.name}</Link></>
+      : <Link href="/analyze">直接分析</Link>} › {name}分析</div>
     <div className="card" data-section="0">
       <div className="top"><h1>{name}分析{headline ? <span>：{headline}</span> : null}</h1>{lesson
         ? <a className="howto" href={lesson} target="_blank" rel="noopener">怎麼用？先上 5 分鐘的課 ↗</a>
         : <Link className="howto" href={toolHref(methodId)}>它做什麼？</Link>}</div>
-      <div className="sub">工具：{name}{nameEn ? ` ${nameEn}` : ""}{family ? `（${family}）` : ""}{project ? `・專案「${project.name}」` : ""}{analyzedAt ? `・${formatTime(analyzedAt)}` : ""}</div>
+      <div className="sub">工具：{name}{nameEn ? ` ${nameEn}` : ""}{family ? `（${family}）` : ""}{project ? `・${holderWord(project.isCase)}「${project.name}」` : ""}{analyzedAt ? `・${formatTime(analyzedAt)}` : ""}</div>
       <div className="status">{status}</div>
       {lesson
         ? <div className="how"><b>怎麼讀</b>上面填、下面看；每段的讀法在<a href={`${lesson}#panel-read`} target="_blank" rel="noopener">課程的「看懂結果」分頁 ↗</a>。<b>你要做的</b>填好或改好{boxes}，按「執行分析」。</div>

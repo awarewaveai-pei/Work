@@ -18,7 +18,7 @@ function overview(patch: Partial<Overview> = {}): Overview {
   return {
     origins: [{ origin_id: "o:1", cards: [card("a"), card("b")], how: "同一篇", pending: false, aside: false, counts: true, mark: null, wrong_in_review: [] }],
     changed_marks: [], counted: 1, min_origins: 2, aside: 0, data_classification: "Confidential", card_limit: { max: 800, cards: 2, uncarded: 0, notice: "" },
-    channels: { engines: [{ key: "serper", name: "Serper（Google 的結果）" }], languages: [{ key: "zh", name: "中文" }], blocked: [{ provider: "brave", lang: "zh", state: "no_key", why: "", says: "平台還沒有Brave的金鑰" }],
+    channels: { engines: [{ key: "serper", name: "Serper（Google 的結果）" }], languages: [{ key: "zh", name: "中文" }], blocked: [{ provider: "brave", lang: "zh", state: "no_key", why: "平台還沒有這個搜尋引擎的金鑰", says: "Brave：平台還沒有這個搜尋引擎的金鑰" }],
                 short: ["只用了 1 家搜尋引擎（Serper（Google 的結果））"], ask: [], looked: true },
     distribution: { engine: { "Serper（Google 的結果）": 2 }, language: { 查不到: 2 }, country: { 查不到: 2 } },
     rules: [{ name: "gather.grouping", title: "分組規則", version: "1", maintainer: "平台", items: { rules: ["同一篇：…"] } }],
@@ -103,7 +103,7 @@ describe("蒐集來源", () => {
     expect(writes[1].body.seeds[0].meta).toMatchObject({ kind: "claim", entityName: "公會有沒有改合約", languages: ["zh", "en"], providers: ["serper"] });
     const plan = host.querySelector('[aria-label="會怎麼找"]')?.textContent ?? "";
     expect(plan).toContain("最多 16 組查詢");
-    expect(plan).toContain("上一次真的用上：Serper（Google 的結果）。平台還沒有Brave的金鑰。");   // the channels' real state, not a fixed claim
+    expect(plan).toContain("上一次真的用上：Serper（Google 的結果）。Brave：平台還沒有這個搜尋引擎的金鑰。");   // the channels' real state, not a fixed claim
     expect(host.textContent).not.toContain("兩家搜尋引擎");
     await click(byText(host, "button", "確定去找"));
     expect(writes.at(-1)!.body.confirm).toBe(true);
@@ -134,10 +134,24 @@ describe("蒐集來源", () => {
     const stop = host.querySelector(".card.accent[role=status]")!;
     expect(stop.textContent).toContain("找到 1 個獨立出處，不到 2 個");
     expect(stop.textContent).toContain("管道不足：只用了 1 家搜尋引擎");
-    expect(host.textContent).toContain("無法檢查：平台還沒有Brave的金鑰");
+    expect(host.textContent).toContain("Brave：平台還沒有這個搜尋引擎的金鑰。");
+    expect(host.textContent).not.toContain("無法檢查：Brave");
     await click(byText(stop as HTMLElement, "button", "照樣繼續"));
     expect(host.textContent).toContain("你選了照樣繼續");
     expect(host.querySelector("select")).toBeNull();
+    await done();
+  });
+
+  it("shows a channel's sentence as the engine sent it: the engine's name once, and nothing put in front of it (走查 2026-10-12 W11)", async () => {
+    const says = "Brave：這個搜尋引擎回了錯誤（HTTP 422）";
+    server(overview({ channels: { engines: [{ key: "serper", name: "Serper（Google 的結果）" }], languages: [{ key: "zh", name: "中文" }],
+      blocked: [{ provider: "brave", lang: "zh", state: "unreachable", why: "這個搜尋引擎回了錯誤（HTTP 422）", says }], short: [], ask: [], looked: true } }));
+    const { host, done } = await mount(<GatherPage projectId="P1" />);
+    const lines = [...host.querySelectorAll("p.warn")].map((node) => node.textContent);
+    expect(lines).toContain(`${says}。`);
+    expect(host.textContent).not.toContain("無法檢查：Brave");
+    expect(host.textContent).not.toContain("Brave Brave");
+    expect((host.textContent ?? "").split("Brave：").length - 1).toBe(1);   // said once on the overview
     await done();
   });
 

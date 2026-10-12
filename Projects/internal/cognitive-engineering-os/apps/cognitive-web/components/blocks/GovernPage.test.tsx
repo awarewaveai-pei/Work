@@ -301,7 +301,7 @@ describe("GOVERN：這個案子的護欄和版本紀錄", () => {
   it("another person's case is a plain error, not a page", async () => {
     routes({ "GET /projects/P1": () => { throw new ApiError(404, "PROJECT_NOT_FOUND: 'P1'"); }, "GET /projects/P1/proposals": [], "GET /projects/P1/govern/versions": () => { throw new ApiError(404, "PROJECT_NOT_FOUND: 'P1'"); } });
     const { host, done } = await mount(<VersionsPage projectId="P1" />);
-    expect(host.textContent).toContain("找不到這個專案");
+    expect(host.textContent).toContain("找不到這個案子或分析");
     await done();
   });
 });

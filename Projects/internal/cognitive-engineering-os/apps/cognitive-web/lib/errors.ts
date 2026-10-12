@@ -11,20 +11,20 @@ const CODES: Record<string, string> = {
   AUTH_REQUIRED: "登入已經過期，請重新整理頁面再登入一次。",
   AUTH_FAILED: "帳號或密碼不對，請再試一次。",
   ENTITLEMENT_DENIED: "這個帳號沒有權限做這件事。",
-  PROJECT_NOT_FOUND: "找不到這個專案：可能已經刪除，或不在你的帳號裡。",
-  PROJECT_ID_REQUIRED: "沒有指定專案，請重新整理頁面再試一次。",
+  PROJECT_NOT_FOUND: "找不到這個案子或分析：可能已經刪除，或不在你的帳號裡。",
+  PROJECT_ID_REQUIRED: "沒有指定是哪個案子或分析，請重新整理頁面再試一次。",
   PROJECT_WORKSPACE_ID_REQUIRED: "帳號的工作區設定有問題，請聯絡管理員。",
   PROJECT_DATA_CLASSIFICATION_INVALID: "資料分類設定有問題，請聯絡管理員。",
-  PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE: "這個名字已經有專案在用了，換一個名字再試一次。",
-  PROJECT_NAME_INVALID: "專案名稱不能留白，最多 200 字。",
-  PROJECT_BUSY: "有一次分析還在跑，等它跑完再刪除這個專案。",
+  PROJECT_NAME_ALREADY_EXISTS_IN_WORKSPACE: "這個名字已經有案子或分析在用了，換一個名字再試一次。",
+  PROJECT_NAME_INVALID: "名稱不能留白，最多 200 字。",
+  PROJECT_BUSY: "有一次分析還在跑，等它跑完再刪除。",
   PROJECT_IS_A_CASE: "它已經開成案子了（可能是在另一個分頁），這次沒有刪；要刪請到案子自己的頁面。",
   INTERPRETATION_IN_FLIGHT: "分析這一刻沒能開始，請再按一次執行。",
   WORKSPACE_NOT_FOUND: "找不到這個工作區。",
   INTERPRETATION_NOT_FOUND: "找不到這次分析，可能已經刪除。",
   REVISION_INVALID: "重做需要先寫退回原因。",
   REVISION_REASON_TOO_LONG: "退回原因太長，請縮短後再送出。",
-  RERUN_NOT_OPEN: "這個重跑提醒現在不能用了（可能已經跑過，或跟這次要用的工具對不上），請回專案頁重新開始。",
+  RERUN_NOT_OPEN: "這個重跑提醒現在不能用了（可能已經跑過，或跟這次要用的工具對不上），請回那個案子或分析的頁面重新開始。",
   RERUN_DUE_INVALID: "重跑日期不對，請重新選一個還沒到的日期。",
   APPROVAL_DECISION_INVALID: "核准的動作不對，請重新整理頁面再試一次。",
   RETURN_REASON_REQUIRED: "退回要先寫原因。",
@@ -50,7 +50,7 @@ const CODES: Record<string, string> = {
   AI_DAILY_TOKEN_BUDGET_EXCEEDED: "今天的 AI 額度用完了，明天 UTC 午夜重置後再試。",
   SOURCE_NOT_FOUND: "找不到這個來源，可能已經刪除。",
   SOURCE_MEDIA_TYPE_UNSUPPORTED: "這個檔案格式現在不支援，只能貼純文字。",
-  SOURCE_PROJECT_CLASSIFICATION_MISMATCH: "這個來源的資料分類跟專案不一致，沒辦法加入。",
+  SOURCE_PROJECT_CLASSIFICATION_MISMATCH: "這個來源的資料分類跟它要放進的案子或分析不一致，沒辦法加入。",
   SOURCE_CONTENT_TOO_LARGE: "這段內容太長了，請縮短後再試一次。",
   AI_DRAFT_LABELS_REQUIRED: "一次能請 AI 起草的欄位數量超過上限，請減少後再試。",
   // the platform's blocks (ai_lego/apps/api/blocks/)
@@ -180,7 +180,7 @@ const CODES: Record<string, string> = {
   CONSENT_TARGET_NOT_FOUND: "你不在這個群組裡，不能分享給它。",
   CONSENT_NOT_FOUND: "找不到這個同意，請重新整理頁面。",
   APPEAL_NOT_FOUND: "找不到這個申訴，可能已經刪除。",
-  CASE_KEEPS_RECORDS: "這個案子沒有選「不留紀錄」，不會在結束時刪掉。要刪掉，請到案子頁按「刪除專案」。",
+  CASE_KEEPS_RECORDS: "這個案子沒有選「不留紀錄」，不會在結束時刪掉。要刪掉，請到案子頁按「刪除案子」。",
   DOC_NOT_YOURS: "在群組裡，只有寫的人可以刪掉自己寫的東西。",
   COLLAB_ALREADY_WRITTEN: "這一份你已經寫過了。要改，請改原本那一份。",
   COLLAB_NOT_YOURS: "在群組裡，只有寫的人可以改自己寫的東西。",
@@ -311,6 +311,15 @@ const STATUS_FALLBACK: Record<number, string> = {
   504: "系統等太久沒有回應。請等一下重新整理頁面，看看剛才的動作有沒有完成，再決定要不要再按一次。",
 };
 
+const BUDGET_CODE = "AI_DAILY_TOKEN_BUDGET_EXCEEDED";
+/** The AI budget refusal says whose limit it is (``scope=person`` | ``scope=tenant``, W24): your own share, or the whole space's. */
+function budgetSentence(detail: unknown): string {
+  const text = typeof detail === "string" ? detail : detail && typeof detail === "object" ? JSON.stringify(detail) : "";
+  if (/scope=person\b/.test(text)) return "你今天自己的 AI 份額用完了。明天 UTC 午夜重置後再試。";
+  if (/scope=tenant\b/.test(text)) return "整個空間今天的 AI 額度到上限了，不是你一個人用完的。請告訴管理這個空間的人。";
+  return CODES[BUDGET_CODE];
+}
+
 /** The detail's code, however main.py shaped it: a "CODE: message" string, or {code|error: "CODE", ...}. */
 function extractCode(detail: unknown): string | null {
   if (typeof detail === "string") { const match = /^[A-Z][A-Z0-9_]*/.exec(detail); return match ? match[0] : null; }
@@ -333,6 +342,7 @@ const FAILURES: Record<string, string> = {
 /** A FAILED analysis's reason as a sentence; an unknown one is not shown as a code either. */
 export function failureReason(error: string | null | undefined): string {
   const code = error ? extractCode(error) : null;
+  if (code === BUDGET_CODE) return budgetSentence(error).replace(/。$/, "");
   return (code && FAILURES[code]) || "AI 服務這次沒有給出可用的回答；再執行一次即可";
 }
 
@@ -340,6 +350,7 @@ export function failureReason(error: string | null | undefined): string {
 export function humanError(error: unknown): string {
   if (error instanceof ApiError) {
     const code = extractCode(error.detail);
+    if (code === BUDGET_CODE) return budgetSentence(error.detail);
     if (code && CODES[code]) return CODES[code];
     const family = code ? FAMILIES.find(([start]) => code.startsWith(start)) : undefined;
     if (family) return family[1];

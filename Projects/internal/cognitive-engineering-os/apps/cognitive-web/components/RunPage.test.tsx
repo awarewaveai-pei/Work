@@ -35,7 +35,7 @@ describe("run page", () => {
     const { host, done } = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} />);
     expect(host.textContent).not.toContain("Project ID");
     expect(posts("/projects")).toHaveLength(0);   // opening the page makes nothing
-    expect(host.textContent).toContain("存到：新專案");
+    expect(host.textContent).toContain("存到：我的分析裡新的一份");
     expect(host.querySelector(".top a.howto")?.getAttribute("href")).toBe("/methods/systems.iceberg_model");   // no lesson: the tool page
     await run(host);
     expect(posts("/projects")).toHaveLength(1);
@@ -152,7 +152,7 @@ describe("run page", () => {
     const { host, done } = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} projectId="P1" analysis={saved} />);
     expect(host.querySelector('[data-section="1"]')).not.toBeNull();
     expect(host.querySelector(".crumbs a[href='/projects/P1']")?.textContent).toBe("團體反思");
-    expect(host.querySelector('[data-section="0"] .sub')?.textContent).toMatch(/^工具：冰山模型 Iceberg Model・專案「團體反思」・2026-09-2\d \d{2}:52$/);
+    expect(host.querySelector('[data-section="0"] .sub')?.textContent).toMatch(/^工具：冰山模型 Iceberg Model・分析「團體反思」・2026-09-2\d \d{2}:52$/);
     expect(host.querySelector<HTMLTextAreaElement>("#f-events")?.value).toBe("第 6 次只有 2 位分享");
     expect(host.querySelector(".judgment-button[aria-pressed='true']")?.textContent).toBe("部分同意");
     expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="你的判斷"]')?.value).toBe("人數對，原因不確定");
@@ -185,8 +185,136 @@ describe("run page", () => {
     const howto = host.querySelector(".top a.howto")!;
     expect([howto.getAttribute("href"), howto.getAttribute("target"), howto.textContent]).toEqual(["/learn/systems.iceberg_model", "_blank", "怎麼用？先上 5 分鐘的課 ↗"]);
     expect(host.querySelector('.how a[href="/learn/systems.iceberg_model#panel-read"]')?.getAttribute("target")).toBe("_blank");
-    expect(host.querySelector(".crumbs")?.textContent).toBe("我的案子 › 冰山模型分析");
+    expect(host.querySelector(".crumbs")?.textContent).toBe("直接分析 › 冰山模型分析");
     expect(host.querySelector(".sub")?.textContent).toBe("工具：冰山模型 Iceberg Model");
+    await done();
+  });
+});
+
+describe("run page: a case, an analysis, or neither (走查 2026-10-12 W20, W21)", () => {
+  const CASE = { project_id: "C1", name: "要不要續約", created_at: "2026-10-10T09:00:00Z", is_case: true };
+  const ANALYSIS = { project_id: "A1", name: "冰山模型 2026-10-01 09:00", created_at: "2026-10-01T09:00:00Z", is_case: false };
+  const FORM_WITH_DEMO = { ...FORM, form: { fields: [FORM.form.fields[0], { key: "summary", kind: "text", label: "一句話", required: true }], example: { input: { events: ["藝術治療團體的示範"] } } } };
+  const stored = (kind: string, content: unknown, id = `${kind}-1`) => ({ doc_id: id, kind, version: 1, content, author: "user", block: "X", at: "2026-10-10T09:00:00Z" });
+  const serveProjects = () => vi.mocked(apiFetch).mockImplementation(async (path) => {
+    if (path === "/methods/systems.iceberg_model/form") return FORM_WITH_DEMO as never;
+    if (path === "/projects") return [CASE, ANALYSIS] as never;
+    if (path === "/projects/C1/docs/assembler.intake") return [stored("assembler.intake", { question: "要不要續約" })] as never;
+    if (path === "/projects/C1/docs/sense.card") return [stored("sense.card", { category: "事件", text: "他第三次改條件" }, "K1"), stored("sense.card", { category: "恐懼", text: "我怕他生氣" }, "K2")] as never;
+    if (path === "/projects/C1/docs/map.map") return [stored("map.map", { layers: { facts: [{ id: "f1", text: "合約下個月到期", by: "user" }], core: [{ id: "c1", text: "誰有權決定條件", by: "user" }] } })] as never;
+    return [] as never;
+  });
+  const aiDrafts = () => vi.mocked(apiFetch).mock.calls.filter(([path]) => String(path).startsWith("/ai/draft"));
+  const settle = () => act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  const hasDemo = (host: HTMLElement) => [...host.querySelectorAll("button")].some((button) => button.textContent === "用示範案例填入");
+
+  it("inside a case: saved to the 案子, the crumbs and the tool line say 案子, and the demo button is not offered", async () => {
+    serveProjects();
+    const { host, done } = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} projectId="C1" />);
+    await settle();
+    expect(host.textContent).toContain("存到：案子「要不要續約」");
+    expect(host.querySelector(".crumbs")?.textContent).toBe("我的案子 › 要不要續約 › 冰山模型分析");
+    expect(host.textContent).toContain("改存到別的案子或分析");
+    expect(host.textContent).toContain("我的分析裡新的一份");
+    expect(host.textContent).not.toContain("專案");
+    expect(hasDemo(host)).toBe(false);
+    expect([...host.querySelectorAll("button")].some((button) => button.textContent === "清空，填我自己的")).toBe(true);
+    await done();
+  });
+
+  it("inside a case: the 手邊有一段描述 box opens already holding the question, cards and layers; nothing runs or is drafted until the person presses it", async () => {
+    serveProjects();
+    const { host, done } = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} projectId="C1" />);
+    await settle();
+    const box = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="貼上一段描述"]')!;
+    expect(box.closest("details")?.open).toBe(true);
+    expect(box.value).toContain("我想釐清：要不要續約");
+    expect(box.value).toContain("- （事件）他第三次改條件");
+    expect(box.value).toContain("- （恐懼）我怕他生氣");
+    expect(box.value).toContain("事實：合約下個月到期");
+    expect(box.value).toContain("核心矛盾：誰有權決定條件");
+    expect(box.value).not.toContain("藝術治療");
+    expect(host.textContent).toContain("已經把這個案子的內容貼在下面");
+    expect(host.querySelector<HTMLTextAreaElement>("#f-events")!.value).toBe("");   // the fields wait for 比對並填入
+    expect(aiDrafts()).toHaveLength(0);
+    expect(posts("/methods/systems.iceberg_model/interpret")).toHaveLength(0);
+    // the existing path: 比對並填入 sends the pasted description as the brief
+    vi.mocked(apiFetch).mockImplementation(async (path) => (String(path).startsWith("/ai/draft/method/") ? { draft: { events: ["他第三次改條件"] } } : []) as never);
+    await act(async () => { [...host.querySelectorAll("button")].find((button) => button.textContent === "比對並填入")!.click(); });
+    expect(aiDrafts()).toHaveLength(1);
+    expect(JSON.parse(String(aiDrafts()[0][1]?.body)).brief).toContain("我想釐清：要不要續約");
+    await done();
+  });
+
+  it("going from one case to another replaces the description with the other case's, never carries the first case's words over", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path) => {
+      if (path === "/methods/systems.iceberg_model/form") return FORM_WITH_DEMO as never;
+      if (path === "/projects") return [CASE, { ...CASE, project_id: "C2", name: "要不要搬家" }, ANALYSIS] as never;
+      if (path === "/projects/C1/docs/assembler.intake") return [stored("assembler.intake", { question: "要不要續約" })] as never;
+      if (path === "/projects/C2/docs/assembler.intake") return [stored("assembler.intake", { question: "要不要搬家" })] as never;
+      return [] as never;
+    });
+    const { host, done } = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} projectId="C1" />);
+    await settle();
+    const box = () => host.querySelector<HTMLTextAreaElement>('textarea[aria-label="貼上一段描述"]')!;
+    expect(box().value).toContain("要不要續約");
+    await act(async () => { [...host.querySelectorAll("button")].find((button) => button.textContent === "要不要搬家")!.click(); });
+    await settle();
+    expect(box().value).toContain("要不要搬家");
+    expect(box().value).not.toContain("要不要續約");
+    await act(async () => { [...host.querySelectorAll("button")].find((button) => button.textContent === ANALYSIS.name)!.click(); });
+    await settle();
+    expect(box().value).toBe("");   // an analysis has no case to start from
+    expect(hasDemo(host)).toBe(true);
+    await done();
+  });
+
+  it("a case whose documents cannot be read says so beside the box; the box stays empty and nothing runs", async () => {
+    vi.mocked(apiFetch).mockImplementation(async (path) => {
+      if (path === "/methods/systems.iceberg_model/form") return FORM_WITH_DEMO as never;
+      if (path === "/projects") return [CASE] as never;
+      if (path === "/projects/C1/docs/sense.card") throw new ApiError(500, "INTERNAL");
+      return [] as never;
+    });
+    const { host, done } = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} projectId="C1" />);
+    await settle();
+    expect(host.textContent).toContain("這個案子的內容這次讀不到");
+    expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="貼上一段描述"]')!.value).toBe("");
+    expect(posts("/methods/systems.iceberg_model/interpret")).toHaveLength(0);
+    await done();
+  });
+
+  it("outside a case the demo button is there and the description box starts empty and closed; a saved analysis is 我的分析, not a case", async () => {
+    serveProjects();
+    const first = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} projectId="A1" />);
+    await settle();
+    expect(first.host.textContent).toContain("存到：我的分析「冰山模型 2026-10-01 09:00」");
+    expect(first.host.querySelector(".crumbs")?.textContent).toBe("我的分析 › 冰山模型 2026-10-01 09:00 › 冰山模型分析");
+    expect(hasDemo(first.host)).toBe(true);
+    const box = first.host.querySelector<HTMLTextAreaElement>('textarea[aria-label="貼上一段描述"]')!;
+    expect([box.value, box.closest("details")?.open]).toEqual(["", false]);
+    expect(vi.mocked(apiFetch).mock.calls.some(([path]) => String(path).includes("/docs/"))).toBe(false);   // no case documents are read for it
+    await first.done();
+    const none = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} />);
+    await settle();
+    expect(none.host.querySelector(".crumbs")?.textContent).toBe("直接分析 › 冰山模型分析");
+    expect(hasDemo(none.host)).toBe(true);
+    await none.done();
+  });
+
+  it("while it is not yet known whether the project is a case, the demo button waits; once it is a case it stays away", async () => {
+    let release: (list: unknown) => void = () => undefined;
+    vi.mocked(apiFetch).mockImplementation((async (path: string) => {
+      if (path === "/methods/systems.iceberg_model/form") return FORM_WITH_DEMO;
+      if (path === "/projects") return new Promise((resolve) => { release = resolve; });
+      return [];
+    }) as never);
+    const { host, done } = await mount(<RunPage methodId="systems.iceberg_model" lesson={null} projectId="C1" />);
+    await settle();
+    expect(hasDemo(host)).toBe(false);
+    await act(async () => { release([CASE]); });
+    await settle();
+    expect(hasDemo(host)).toBe(false);
     await done();
   });
 });

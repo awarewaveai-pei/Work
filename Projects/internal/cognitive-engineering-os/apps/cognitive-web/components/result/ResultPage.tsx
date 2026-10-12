@@ -5,9 +5,9 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ResultChoices } from "./ResultChoices";
 import { apiFetch } from "../../lib/api";
-import { analysisHref, compareHref, projectHref, runHref, toolHref } from "../../lib/catalog";
+import { analysisHref, compareHref, projectHref, runHref, toolHref, toolLabel } from "../../lib/catalog";
 import { fieldKey, type FormField } from "../../lib/form-model";
-import { costLine, daysOf, plusDays, STANCE, todayIso, type Approval, type Estimate, type Rerun, type Stance, type Task, runMinutes } from "../../lib/projects";
+import { costLine, daysOf, holderWord, plusDays, STANCE, thisHolder, todayIso, type Approval, type Estimate, type Rerun, type Stance, type Task, runMinutes } from "../../lib/projects";
 import { plain, recordValue } from "../../lib/record";
 import { formatTime } from "../../lib/time";
 import { RunHeader } from "../RunHeader";
@@ -70,7 +70,7 @@ type Props = {
   stepForms?: Record<string, FormField[]>;   // a next step's target method_id -> its own run form's fields (N-13/N-14: what
                                               // it can honestly carry and what it still needs, by the TARGET's real fields and Chinese labels)
   family?: string | null;          // the tool's family, for the tool line
-  project?: { id: string; name: string };   // the project this analysis is saved in
+  project?: { id: string; name: string; isCase?: boolean };   // the case or analysis this analysis is saved in
   analyzedAt?: string;             // when it finished (UTC ISO)
   judgment?: { stance: Stance; text: string } | null;   // the judgment saved with it, if any
   approval?: Approval | null;      // the latest 核准／退回 decision saved with it
@@ -78,7 +78,7 @@ type Props = {
   oldVersion?: boolean;            // made before the result page had its sections: offer a rerun
   compareWith?: string | null;     // the analysis this one redoes or reruns: offer the comparison
   onRedo?: (reason: string) => void;   // 退回 → 依原因重做: the run page prepares the next run
-  demo?: boolean;                  // the read-only 示範專案: nothing writes; a button that would says so (N-78)
+  demo?: boolean;                  // the read-only 示範分析: nothing writes; a button that would says so (N-78)
 };
 
 const CONFIDENCE: Record<string, [string, string]> = { high: ["high", "高"], mid: ["mid", "中"], medium: ["mid", "中"], low: ["low", "低"] };
@@ -230,7 +230,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const thicknessOf = (unit: string) => readings.find((item) => keyOf(item.path) === unit)?.thickness;
   const verdict = (unit: string) => { const count = result.data_thickness?.[unit]?.own_statements ?? 0; const own = thicknessOf(unit)?.verdict;
     return count === 0 ? "空白，列成證據缺口" : own ? VERDICT[own] : thinnest && thinnest[0] === unit && thickness.length > 1 ? "最薄" : "夠用"; };
-  const thicknessNote = (unit: string) => { const t = thicknessOf(unit); return `${t?.note ? `（${t.note}）` : ""}${t?.fill_by ? `，⑧ ${names[t.fill_by] ?? t.fill_by}可補` : ""}`; };
+  const thicknessNote = (unit: string) => { const t = thicknessOf(unit); return `${t?.note ? `（${t.note}）` : ""}${t?.fill_by ? `，⑧ ${toolLabel(names, t.fill_by)}可補` : ""}`; };
   const recommendedOption = (option: { name: string }) => solutions?.recommended === option.name;
   const conditions = findings.flatMap((finding) => finding.revision_conditions ?? []);
   const steps = (result.next_steps ?? []).filter((step) => step.method_id);
@@ -238,7 +238,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const pathSteps = steps.some((step) => step.on_path) ? steps.filter((step) => step.on_path).slice(0, 2) : steps.slice(0, 2);
   // the step whose yields names data/evidence, for "要提高" (N-34); with none of those, the most-worth-doing step (steps[0])
   const dataStep = steps.find((step) => /資料|數字|來源|證據/.test(step.yields ?? "")) ?? steps[0];
-  const name = display?.name_zh ?? result.method_id;
+  const name = display?.name_zh ?? toolLabel(names, result.method_id);
   const tokens = (result.usage?.input_tokens ?? 0) + (result.usage?.output_tokens ?? 0);
   const focusLayer = layers.find((layer) => keyOf(layer.path) === focusKey);
   const focusReading = focusLayer ? readingOf(focusLayer.path) : undefined;
@@ -338,19 +338,19 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     const option = chosen.length && solutions ? solutions.options.filter((item) => chosen.includes(item.name)).map(optionName).join("、") : undefined;
     const saved = await apiFetch<Task[]>(`/projects/${encodeURIComponent(project.id)}/tasks`, { method: "POST", body: JSON.stringify({ interpretation_id: result.interpretation_id, option, tasks }) });
     setSavedTasks(saved);
-    setPlanNote(`已存成 ${tasks.length} 個任務；到期會在專案頁和「我的案子」提醒你，每個任務都能寫紀錄。`);
+    setPlanNote(`已存成 ${tasks.length} 個任務；到期會在${thisHolder(project.isCase)}的頁面和「我的案子」提醒你，每個任務都能寫紀錄。`);
   });
   const scheduleRerun = () => plan(async () => {
     if (!rerunDue) return;
     const rerun = await apiFetch<Rerun>(`/interpretations/${encodeURIComponent(result.interpretation_id)}/rerun`, { method: "POST", body: JSON.stringify({ due: rerunDue }) });
     setSavedReruns((current) => [...(current ?? []), rerun]);
-    setRerunDue(null); setPlanNote(`已排在 ${rerun.due}：到期時專案頁和「我的案子」會提醒你更新數字重跑，跑完把兩次並排比較。`);
+    setRerunDue(null); setPlanNote(`已排在 ${rerun.due}：到期時${thisHolder(project?.isCase)}的頁面和「我的案子」會提醒你更新數字重跑，跑完把兩次並排比較。`);
   });
   // onlyAnalysis: from 這份結果要怎麼處理 (shown while not a case); the server refuses it if the project became a case since
-  // this page loaded (PROJECT_IS_A_CASE). 刪除專案 deletes this project whatever it is.
+  // this page loaded (PROJECT_IS_A_CASE). 刪除案子／刪除分析 deletes this project whatever it is.
   const erase = (onlyAnalysis: boolean) => act(async () => {
     if (!project) return;
-    if (!window.confirm(`刪除專案「${project.name}」？來源與所有產出一起刪掉，留一筆「已抹除」。這不能復原。`)) return;
+    if (!window.confirm(`刪除${holderWord(project.isCase)}「${project.name}」？來源與所有產出一起刪掉，留一筆「已抹除」。這不能復原。`)) return;
     await apiFetch(`/projects/${encodeURIComponent(project.id)}${onlyAnalysis ? "?only=analysis" : ""}`, { method: "DELETE" });
     window.location.assign("/projects");
   });
@@ -362,10 +362,10 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     const button = (event.target as HTMLElement).closest("button");
     if (!button || button.hasAttribute("data-demo-ok")) return;
     event.preventDefault(); event.stopPropagation();
-    setDemoNote("這是示範專案：不能核准、存任務、排提醒或寫判斷。用你自己的案例在「冰山模型」跑一次，這些按鈕就都能用。");
+    setDemoNote("這是示範分析：不能核准、存任務、排提醒或寫判斷。用你自己的案例在「冰山模型」跑一次，這些按鈕就都能用。");
   };
   return <div className="result-page" onClickCapture={demo ? blockInDemo : undefined}>
-    {demo && <div className="finding warn" role="status"><b>示範專案（免費，不花錢）</b>這是示範案例的一次真實分析，給你先看終點。要分析你自己的案例：<Link href={`/methods/${encodeURIComponent(result.method_id)}/run`}>到「{display?.name_zh ?? result.method_id}」填你的格子 →</Link>{demoNote && <><br />{demoNote}</>}</div>}
+    {demo && <div className="finding warn" role="status"><b>示範分析（免費，不花錢）</b>這是示範案例的一次真實分析，給你先看終點。要分析你自己的案例：<Link href={`/methods/${encodeURIComponent(result.method_id)}/run`}>到「{display?.name_zh ?? toolLabel(names, result.method_id)}」填你的格子 →</Link>{demoNote && <><br />{demoNote}</>}</div>}
     <RunHeader methodId={result.method_id} name={name} nameEn={display?.name_en} family={family} headline={result.headline} lesson={lesson} project={project} analyzedAt={analyzedAt} guide count={fields.length} status={<>
       <span className="pill">{approval?.decision === "approve" ? "已核准" : approval?.decision === "return" ? "已退回・待重做" : "AI 草稿・尚未核准"}</span>
       <span>資料：你填的 {own} 段話・外部來源 {sources} 筆</span>
@@ -375,7 +375,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     {children}
 
     <Card id="1" className="card accent" anchor="result" title="① 結論（文字分析）" read={`先看一句話，再看${findings.length ? `${NUMERAL[findings.length] ?? findings.length}個` : ""}發現各自的信心。`} act="在最下面寫你自己的判斷。">
-      {oldVersion && <div className="finding warn"><b>這次是舊版分析</b>只有結論、下一步和引註，沒有一句話、逐層解讀、圖和方案。上面的格子已帶回你填的內容；按「執行分析」用新版重跑一次，會存成同一專案的新分析。</div>}
+      {oldVersion && <div className="finding warn"><b>這次是舊版分析</b>只有結論、下一步和引註，沒有一句話、逐層解讀、圖和方案。上面的格子已帶回你填的內容；按「執行分析」用新版重跑一次，會存在同一個地方，當作新的一次分析。</div>}
       {result.summary && <p className="lead mt0"><b>一句話：</b>{result.summary}</p>}
       {findings.map((finding, index) => { const [cls, zh] = CONFIDENCE[finding.confidence?.level] ?? ["mid", finding.confidence?.level ?? "未標"]; return <div className="finding" key={finding.id}><b>發現 {index + 1}｜{finding.title}<span className={`conf ${cls}`}>信心：{zh}——{finding.confidence?.reason}</span></b>{finding.text} {cites(finding.citations)}</div>; })}
       {((result.recommendations ?? []).some((item) => item.action) || (result.gaps ?? []).length > 0) && <p className="mt6 mb0">
@@ -474,7 +474,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
                 <td>{row.proof}</td>
                 <td><input aria-label={`目標：${row.action}`} value={planValue(row, "target")} placeholder={row.target ? `建議：${row.target}` : "你填"} onChange={(event) => editPlan(row, "target", event.target.value)} /></td></tr>)}
             </React.Fragment> : null; })}
-              <tr><td>{phased ? spanLabel(1 + SPAN_MONTHS[span], span) : horizonDays ? `${Math.ceil(horizonDays / 7)} 週` : solutions.horizon ? "到期" : "之後"}</td><td>全部</td><td>用新資料重跑本分析，比較前後（同一個專案）</td><td>你＋系統提醒</td><td>—</td><td>{(solutions.metrics ?? []).length ? `上面${NUMERAL[(solutions.metrics ?? []).length] ?? (solutions.metrics ?? []).length}個指標` : "—"}</td><td>{(solutions.metrics ?? []).length ? "見 C" : "—"}</td></tr></tbody>
+              <tr><td>{phased ? spanLabel(1 + SPAN_MONTHS[span], span) : horizonDays ? `${Math.ceil(horizonDays / 7)} 週` : solutions.horizon ? "到期" : "之後"}</td><td>全部</td><td>用新資料重跑本分析，比較前後（同一個地方）</td><td>你＋系統提醒</td><td>—</td><td>{(solutions.metrics ?? []).length ? `上面${NUMERAL[(solutions.metrics ?? []).length] ?? (solutions.metrics ?? []).length}個指標` : "—"}</td><td>{(solutions.metrics ?? []).length ? "見 C" : "—"}</td></tr></tbody>
           </table></div>
         </>}
         {solutions.signoff && <p className="sub mt6 mb0">需要誰點頭：{solutions.signoff}</p>}
@@ -485,9 +485,9 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         {removedNote("solutions", "指標或對應")}
         <div className="btns mt10">
           {project && savedTaskCount > 0 ? (
-            <Link className="btn" href={projectHref(project.id)}>已存成 {savedTaskCount} 個任務，到專案頁看</Link>
+            <Link className="btn" href={projectHref(project.id)}>已存成 {savedTaskCount} 個任務，到{holderWord(project.isCase)}頁看</Link>
           ) : (
-            <button type="button" className="btn primary" title={!project ? "先把分析存進專案" : !planRows.length ? "這次沒有行動計畫" : undefined} onClick={saveTasks} disabled={!project || !tasksReady}>把行動計畫存成任務，設提醒</button>
+            <button type="button" className="btn primary" title={!project ? "先把分析存起來" : !planRows.length ? "這次沒有行動計畫" : undefined} onClick={saveTasks} disabled={!project || !tasksReady}>把行動計畫存成任務，設提醒</button>
           )}
           {openRerun ? (
             <span className="btn" aria-disabled="true">已排在 {openRerun.due} 重跑</span>
@@ -502,7 +502,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
           <div className="btns mt6"><button type="button" className="btn primary" onClick={scheduleRerun} disabled={!rerunDue}>排提醒</button><button type="button" className="btn ghost" onClick={() => setRerunDue(null)}>取消</button></div>
         </div>}
         {planNote && <p className={planNote.startsWith("案例庫") ? "mocknote" : "finding ok mt10"} role="status">{planNote}{planNote.startsWith("案例庫") && <> <a className="btn ghost" href="#solution">回到 A 重選</a></>}</p>}
-        {!project && <p className="sub mb0">先把分析存進專案，才能把行動計畫存成任務。</p>}
+        {!project && <p className="sub mb0">先把分析存起來，才能把行動計畫存成任務。</p>}
         {project && !(solutions.plan ?? []).length && <p className="sub mb0">這次沒有行動計畫，暫時沒有可存成任務的內容。</p>}
         {planError && <p className="error" role="alert">沒有成功：{planError}</p>}
         <p className="sub mt8 mb0">工具負責想清楚、排出來、盯著看；動手做事的是人。到期時系統提醒你用新資料重跑這一頁、把前後放在一起比較；目標數字由你定，AI 不替你定。</p>
@@ -510,8 +510,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     </Card>
 
     <Card id="8" title="⑧ 下一步：你在這條路的哪裡、接著做什麼" read="旅程列是你在哪；每張卡寫做了會得到什麼、要你再填什麼。" act="選一張，或都不選。">
-      <div className="journey"><span className="done">✓ {name}{position ? `：${position}` : result.headline ? `：${result.headline}` : result.summary ? `：${result.summary}` : ""}</span>{pathSteps.map((step, index) => <React.Fragment key={index}><i>→</i><span className={index === 0 ? "mcard" : undefined}>{index === 0 ? "下一步：" : "之後："}{names[step.method_id!] ?? step.method_id}{step.short ? `（${step.short}）` : step.answers && !steps.some((other) => other.short) ? `（${step.answers}）` : ""}</span></React.Fragment>)}{solutions && <><i>→</i><span>最後：⑦ 解決方案定案與追蹤</span></>}</div>
-      {steps.length > 0 && <p className="lead mt6 mb0">{position ? `你已經知道${position}。` : result.summary ? `你已經知道${result.summary}${/[。！？.!?]\s*$/.test(result.summary) ? "" : "。"}` : ""}<b>最值得的下一步是「{names[pathSteps[0].method_id!] ?? pathSteps[0].method_id}」{pathSteps[0].why ? `，因為${pathSteps[0].why.replace(/[。.]$/, "")}` : ""}</b>{pathSteps[0].deepens ? `：${pathSteps[0].deepens}` : ""}。<b>不做下一步也可以</b>：{solutions ? "⑦ 的方案已經能用。" : "① 的建議已經能用。"}</p>}
+      <div className="journey"><span className="done">✓ {name}{position ? `：${position}` : result.headline ? `：${result.headline}` : result.summary ? `：${result.summary}` : ""}</span>{pathSteps.map((step, index) => <React.Fragment key={index}><i>→</i><span className={index === 0 ? "mcard" : undefined}>{index === 0 ? "下一步：" : "之後："}{toolLabel(names, step.method_id!)}{step.short ? `（${step.short}）` : step.answers && !steps.some((other) => other.short) ? `（${step.answers}）` : ""}</span></React.Fragment>)}{solutions && <><i>→</i><span>最後：⑦ 解決方案定案與追蹤</span></>}</div>
+      {steps.length > 0 && <p className="lead mt6 mb0">{position ? `你已經知道${position}。` : result.summary ? `你已經知道${result.summary}${/[。！？.!?]\s*$/.test(result.summary) ? "" : "。"}` : ""}<b>最值得的下一步是「{toolLabel(names, pathSteps[0].method_id!)}」{pathSteps[0].why ? `，因為${pathSteps[0].why.replace(/[。.]$/, "")}` : ""}</b>{pathSteps[0].deepens ? `：${pathSteps[0].deepens}` : ""}。<b>不做下一步也可以</b>：{solutions ? "⑦ 的方案已經能用。" : "① 的建議已經能用。"}</p>}
       <div className="mcards next-steps">{steps.map((step, index) => {
         const targetKeys = stepFieldKeys(step.method_id!);   // the target's real fields, once known (N-13); unknown = trust the model
         const prefillEntries = Object.entries(step.prefill ?? {}).filter(([key]) => !targetKeys || targetKeys.has(key));
@@ -527,12 +527,12 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         const carryPrefill = () => { try { localStorage.setItem(`cos:prefill:${step.method_id}`, JSON.stringify({ values, needs, from: { name, approved: approval?.decision === "approve" }, at: Date.now() })); } catch { /* private mode: the tool opens empty */ } };
         const doneBefore = projectAnalyses.find((item) => item.method_id === step.method_id && item.status === "DONE" && item.interpretation_id !== result.interpretation_id);
         return <div className={`mcard next-step${index === 0 ? " now" : ""}`} key={index}>
-          <div><b><Link href={toolHref(step.method_id!)}>{names[step.method_id!] ?? step.method_id}</Link></b>{index === 0 && <span className="tag">本工具建議的下一步</span>}</div>
+          <div><b><Link href={toolHref(step.method_id!)}>{toolLabel(names, step.method_id!)}</Link></b>{index === 0 && <span className="tag">本工具建議的下一步</span>}</div>
           {step.answers && <div><span className="k">回答什麼：</span>{step.answers}</div>}
           <div><span className="k">帶入什麼：</span>{carried.length ? <>你填的{[...new Set(carried.map(inputName))].join("、")} {cites(carried)} → 自動填 {carried.length} 個欄位；</> : "沒有能帶入的欄位；"}<span className="need">還要你填 {needs.length} 個</span>{needs.length ? `：${needs.map((need) => stepFieldLabel(step.method_id!, need)).join("、")}` : ""}。</div>
           {step.yields && <div><span className="k">會得到：</span>{step.yields}</div>}
           <div className="k">{estimate ? `${runMinutes(estimate)}・${costLine(estimate.tokens, estimate.twd).replace(/^約 \S+ tokens・?/, "") || `約 ${Math.round(estimate.tokens / 1000)}k tokens`}` : step.est_cost ? `預估成本：${COST[step.est_cost] ?? step.est_cost}` : ""}</div>
-          {doneBefore && project && <div className="k">這個專案已經做過：<a href={analysisHref(project.id, doneBefore.interpretation_id)} target="_blank" rel="noopener">看那次結果 ↗</a></div>}
+          {doneBefore && project && <div className="k">{thisHolder(project.isCase)}已經做過：<a href={analysisHref(project.id, doneBefore.interpretation_id)} target="_blank" rel="noopener">看那次結果 ↗</a></div>}
           <div className="btns"><a className={index === 0 ? "btn primary" : "btn"} href={runHref(step.method_id!, project?.id)} target="_blank" rel="noopener" onClick={carryPrefill}>用這次的資料開始 ↗</a>{lessonHref ? <a className="btn" href={lessonHref} target="_blank" rel="noopener">第一次用？先看 5 分鐘的課 ↗</a> : <a className="btn" href={toolHref(step.method_id!, project?.id)} target="_blank" rel="noopener" onClick={carryPrefill}>第一次用？先看它做什麼 ↗</a>}</div>
         </div>; })}</div>
       {!steps.length && <p className="mb0">這次沒有建議下一步；不繼續也可以。</p>}
@@ -543,12 +543,12 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         <a className="btn ghost" href="#approve">都不做，先核准存檔（⑨ 下方）</a>
       </div>
       {note && <p className="mocknote" role="status">{note}</p>}
-      <p className="sub mt8 mb0">每一張都列出會帶入什麼、還要你填什麼；按下去在新分頁開預填好的表單，你確認才執行、才花錢。③ 已經畫出的圖（迴路、趨勢、四層槓桿）和這個專案做過的工具不再推薦。</p>
+      <p className="sub mt8 mb0">每一張都列出會帶入什麼、還要你填什麼；按下去在新分頁開預填好的表單，你確認才執行、才花錢。③ 已經畫出的圖（迴路、趨勢、四層槓桿）和{project ? thisHolder(project.isCase) : "這裡"}做過的工具不再推薦。</p>
     </Card>
 
     <Card id="9" title="⑨ 引註（每個 [n] 都指向一段可查的來源）" read="[n] 是那句話的來源。" act="引錯了，按下方「退回並說原因」。">
       <ol className="src">{citationIds.map((id) => { const source = sourceCitation(id); return <li key={id} id={`citation-${citationNumber.get(id)}`} data-source={id}>{id.startsWith("r/") ? <>你的輸入・{inputName(id)}：「{resolved(id)}」</> : source ? <>外部來源・{source}</> : <>外部來源・{id}：「{resolved(id)}」</>}</li>; })}</ol>
-      {sources === 0 && <div className="finding warn"><b>本次沒有外部來源</b>結論全部建立在你填的{layers.length ? `${NUMERAL[layers.length] ?? layers.length}段話` : "內容"}上，所以信心最高只到「中」。要提高：{project ? <Link href={`${projectHref(project.id)}#sources`}>補上真實數字或外部資料</Link> : "補上真實數字或外部資料"}{dataStep ? `，或先在 ⑧ 用「${names[dataStep.method_id!] ?? dataStep.method_id}」往下挖` : ""}。</div>}
+      {sources === 0 && <div className="finding warn"><b>本次沒有外部來源</b>結論全部建立在你填的{layers.length ? `${NUMERAL[layers.length] ?? layers.length}段話` : "內容"}上，所以信心最高只到「中」。要提高：{project ? <Link href={`${projectHref(project.id)}#sources`}>補上真實數字或外部資料</Link> : "補上真實數字或外部資料"}{dataStep ? `，或先在 ⑧ 用「${toolLabel(names, dataStep.method_id!)}」往下挖` : ""}。</div>}
     </Card>
 
     <div className="card" id="approve" data-section="approve">
@@ -559,12 +559,12 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         <span>檢查 {checks.length ? checks.map((check) => <b key={check.label} className={check.ok ? "ok" : "warn"} title={check.tip}>{check.label} {check.ok ? "✓" : "✗"} </b>) : <b>未提供</b>}{lostCount > 0 && <b className="warn" title="沒有出處或對不上你填的內容，已拿掉；各卡有說明">已拿掉 {lostCount} 項 </b>}</span>
         <span>你的判斷 <b>{judgment ? STANCE[judgment as Stance] : "尚未填"}</b>（① 下方）</span>
       </div>
-      <div className="sub mt8"><b>核准</b> = 這頁成為專案的正式紀錄，可匯出、可被下一步引用；<b>退回</b> = 寫原因後重做，這一版保留；<b>刪除專案</b> = 來源與所有產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
+      <div className="sub mt8"><b>核准</b> = 這頁成為正式紀錄，可匯出、可被下一步引用；<b>退回</b> = 寫原因後重做，這一版保留；<b>刪除{holderWord(project?.isCase)}</b> = 來源與所有產出一起刪掉，留一筆「已抹除」。這頁只有你的租戶看得到。</div>
       <div className="btns mt12">
-        <button type="button" className="btn primary" onClick={() => decide("approve")} disabled={approval?.decision === "approve"}>{approval?.decision === "approve" ? "已核准，存進專案" : "核准，存進專案"}</button>
+        <button type="button" className="btn primary" onClick={() => decide("approve")} disabled={approval?.decision === "approve"}>{approval?.decision === "approve" ? "已核准，存進紀錄" : "核准，存進紀錄"}</button>
         <button type="button" className="btn" onClick={() => { setReturning(true); setReturnReason(approval?.decision === "return" ? approval.reason ?? "" : ""); }}>退回並說原因</button>
         <button type="button" className="btn" data-demo-ok onClick={() => { const was = document.title; document.title = `${name}分析${result.headline ? `：${result.headline}` : ""}`; window.addEventListener("afterprint", () => { document.title = was; }, { once: true }); window.print(); }}>匯出 PDF</button>
-        {project && <button type="button" className="btn ghost" onClick={() => erase(false)}>刪除專案</button>}
+        {project && <button type="button" className="btn ghost" onClick={() => erase(false)}>刪除{holderWord(project.isCase)}</button>}
         <a className="btn ghost" href="#expert" onClick={() => { const fold = document.getElementById("expert") as HTMLDetailsElement | null; if (fold) fold.open = true; }}>專家模式：閘門表與 JSON</a>
         {compareWith && project && <Link className="btn" href={compareHref(project.id, compareWith, result.interpretation_id)}>和上一版並排比較 →</Link>}
       </div>
@@ -581,6 +581,6 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       </details>
     </div>
     {project && !demo && <ResultChoices projectId={project.id} onErase={() => erase(true)} />}
-    {project && <p className="sub mt8"><Link href={projectHref(project.id)}>← 回專案「{project.name}」</Link></p>}
+    {project && <p className="sub mt8"><Link href={projectHref(project.id)}>← 回{holderWord(project.isCase)}「{project.name}」</Link></p>}
   </div>;
 }

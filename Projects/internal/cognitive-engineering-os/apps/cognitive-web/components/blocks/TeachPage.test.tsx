@@ -17,7 +17,7 @@ const CASE_TWO: PracticeCase = { ...CASE, id: "notice", title: "台灣大學的�
 
 const doc = <C,>(kind: string, content: C, author: "user" | "ai" = "user") => ({ doc_id: `${kind}-1`, kind, version: 1, content, author, block: "TEACH", at: "2026-10-04T00:00:00Z" });
 
-async function openPage(config: { lessons?: Lesson[]; runs?: any[]; aars?: any[]; completions?: any[]; preferences?: any[]; opponents?: any[]; feedback?: any[] } = {}) {
+async function openPage(config: { lessons?: Lesson[]; runs?: any[]; aars?: any[]; completions?: any[]; preferences?: any[]; opponents?: any[]; feedback?: any[]; names?: Record<string, string> } = {}) {
   const writes: Array<{ path: string; method: string; body?: Record<string, unknown> }> = [];
   vi.mocked(apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
@@ -41,10 +41,33 @@ async function openPage(config: { lessons?: Lesson[]; runs?: any[]; aars?: any[]
   });
   const host = document.createElement("div"); document.body.appendChild(host);
   const root = createRoot(host);
-  await act(async () => { root.render(<TeachPage />); });
+  await act(async () => { root.render(<TeachPage names={config.names} />); });
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
   return { host, writes, done: async () => { await act(async () => { root.unmount(); }); host.remove(); } };
 }
+
+describe("TEACH page: a lesson's subject is a tool, shown by its name (走查 2026-10-12 W16)", () => {
+  const BY_TOOL: Lesson[] = [
+    { ...LESSONS[1], id: "ps", subject: "framing.problem_statement", title: "把問題寫成一句話" },
+    { ...LESSONS[1], id: "aar", subject: "learning.after_action_review", title: "事後回顧" },
+    { ...LESSONS[1], id: "ice", subject: "systems.iceberg_model", title: "冰山的四層" },
+    LESSONS[1],
+  ];
+  const chips = (host: HTMLElement) => [...host.querySelectorAll('[aria-label="課程主題"] button')].map((chip) => chip.textContent);
+
+  it("shows the tool's Chinese name on each topic chip; a package name is shown as it is", async () => {
+    const { host, done } = await openPage({ lessons: BY_TOOL, names: { "framing.problem_statement": "問題陳述", "learning.after_action_review": "事後回顧", "systems.iceberg_model": "冰山模型" } });
+    expect(chips(host)).toEqual(["問題陳述", "事後回顧", "冰山模型", "自我理解"]);
+    await done();
+  });
+
+  it("never shows a tool id the catalog does not know -- not even when there is no catalog at all", async () => {
+    const { host, done } = await openPage({ lessons: BY_TOOL, names: { "systems.iceberg_model": "冰山模型" } });
+    expect(chips(host)).toEqual(["（找不到名稱的工具）", "（找不到名稱的工具）", "冰山模型", "自我理解"]);
+    expect(host.textContent).not.toMatch(/framing\.|learning\.|systems\./);
+    await done();
+  });
+});
 
 describe("TEACH page", () => {
   it("shows draft status only for draft lessons, offers five roles, and never uses a dropdown", async () => {

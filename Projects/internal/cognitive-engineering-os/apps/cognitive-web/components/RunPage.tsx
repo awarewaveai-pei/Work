@@ -3,8 +3,9 @@
 // The run page (docs/mockups/iceberg-result-mock.html): header card, the fields you fill (they stay above the result),
 // then the result. `lesson` = the tool's lesson page or null, `names` = tool id -> name for the next steps, `family` = the
 // tool's family label, `lessons`/`families` = the same for every tool (all resolved on the server). Every analysis is
-// saved in a project: `projectId` (the address's ?project=, or a saved analysis's own) or else a new project made when
-// 執行分析 is pressed -- never whichever project happens to exist. `analysis` = a saved analysis to open
+// saved in a project (a person reads it as a 案子 or as 我的分析): `projectId` (the address's ?project=, or a saved
+// analysis's own) or else a new one made when 執行分析 is pressed -- never whichever project happens to exist. Inside a case
+// the 手邊有一段描述 box opens already holding the case (question, cards, layers) and the demo button is not offered (W21). `analysis` = a saved analysis to open
 // (app/(shell)/projects/[id]/analyses/[analysis]): its result or its progress, the fields refilled from its record.
 // `rerunId` = the rerun reminder this visit answers (from a project page's 到期 notice). Once an analysis is accepted the
 // address becomes its own page, so a reload or a bookmark comes back to it.
@@ -12,9 +13,12 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import React from "react";
 import { apiFetch } from "../lib/api";
-import { analysisHref, ICEBERG_ID, projectHref } from "../lib/catalog";
+import { docs } from "../lib/blocks";
+import { caseBrief } from "../lib/case-brief";
+import { analysisHref, ICEBERG_ID, projectHref, toolLabel } from "../lib/catalog";
 import { failureReason, humanError } from "../lib/errors";
 import { fieldKey, FormField, initialState } from "../lib/form-model";
+import type { MapContent, SenseCard } from "../lib/map";
 import { byActivity, costLine, createProject, type Approval, type Estimate, type Project, type Stance, runMinutes } from "../lib/projects";
 import { isOldVersion, restoreState } from "../lib/record";
 import { formatTime } from "../lib/time";
@@ -26,12 +30,14 @@ import { RunHeader } from "./RunHeader";
 type FormResponse = { method_id: string; display?: { name_zh?: string; name_en?: string; blurb_zh?: string }; form: { fields: FormField[]; example?: { scenario?: string; input?: Record<string, unknown>; sets?: Record<string, { scenario?: string; input?: Record<string, unknown> }> } } };
 /** The mock's 「手邊有一段描述？」 (I-15): paste a description, the fields are matched first and drafted only if needed. */
 export function DescribeFirst(props: React.ComponentProps<typeof LazyFill>) {
-  return <details className="mb8"><summary>手邊有一段描述？貼上，系統先幫你填格子</summary><LazyFill {...props} /></details>;
+  return <details className="mb8" open={props.initialText ? true : undefined}><summary>手邊有一段描述？貼上，系統先幫你填格子</summary>
+    {props.initialText && <p className="hint">已經把這個案子的內容貼在下面（你的問題、外化的卡片、拆解的六層）。按「比對並填入」，系統先幫你填格子，你再逐格看過。</p>}
+    <LazyFill {...props} /></details>;
 }
 
-/** 存到 (I-15): the project this run is saved in, or a new one named here. */
-export function SaveTo({ project, name, customName, onName }: { project?: { id: string; name: string }; name: string; customName: string; onName: (value: string) => void }) {
-  return <p className="sub mb8">存到：{project ? <>專案「<Link href={projectHref(project.id)}>{project.name}</Link>」</> : <>新專案，<label>名稱：<input type="text" aria-label="新專案名稱" value={customName} onChange={(event) => onName(event.target.value)} placeholder={`留白 = ${name}加上時間`} /></label>（按「執行分析」時建立）</>}</p>;
+/** 存到 (I-15): the case or analysis this run is saved in, or a new analysis named here. */
+export function SaveTo({ project, name, customName, onName }: { project?: { id: string; name: string; isCase?: boolean }; name: string; customName: string; onName: (value: string) => void }) {
+  return <p className="sub mb8">存到：{project ? <>{project.isCase ? "案子" : "我的分析"}「<Link href={projectHref(project.id)}>{project.name}</Link>」</> : <>我的分析裡新的一份，<label>名稱：<input type="text" aria-label="新分析的名稱" value={customName} onChange={(event) => onName(event.target.value)} placeholder={`留白 = ${name}加上時間`} /></label>（按「執行分析」時建立）</>}</p>;
 }
 
 export function RunInputCard({ numeral, children }: { numeral: string; children: React.ReactNode }) {
@@ -68,7 +74,9 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
   const [revision, setRevision] = useState<{ of: string; reason: string } | null>(null);   // 退回 → 依原因重做: the next run redoes this one
   const [rerun, setRerun] = useState(rerunId);   // the reminder the next run answers
   const [previous, setPrevious] = useState<string | null>(null);   // the analysis the shown result redoes or reruns
-  const [customName, setCustomName] = useState("");   // N-83: 專案名稱, typed before a new project exists; blank = the auto tool+time name
+  const [customName, setCustomName] = useState("");   // N-83: the new analysis's name, typed before it exists; blank = the auto tool+time name
+  const [brief, setBrief] = useState("");   // inside a case: the case written as one description (lib/case-brief.ts)
+  const [briefFailed, setBriefFailed] = useState(false);   // the case could not be read: say so, never start from nothing in silence
   const [prefillNotice, setPrefillNotice] = useState("");          // N-20: 從「X分析」帶入 N 格
   const [prefillNeeds, setPrefillNeeds] = useState<string[]>([]);  // N-20: which carried-from fields still need the user (MethodForm marks them .need)
   const [recorded, setRecorded] = useState("");   // a rerun: the numbers the project's task cards recorded last (operator 2026-09-29)
@@ -133,10 +141,21 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
     apiFetch<Project[]>("/projects").then((list) => {
       if (!active) return;
       setProjects([...list].sort(byActivity));
-      if (given && !list.some((item) => item.project_id === given)) { setProjectId(""); setError("網址裡的專案找不到了（可能已經刪除）；這次分析會開一個新專案。"); }
+      if (given && !list.some((item) => item.project_id === given)) { setProjectId(""); setError("網址裡的案子或分析找不到了（可能已經刪除）；這次分析會存成「我的分析」裡新的一份。"); }
     }).catch((reason) => { if (active) setError(humanError(reason)); });
     return () => { active = false; };
   }, [given]);
+
+  const inCase = Boolean(projectId && projects?.find((item) => item.project_id === projectId)?.is_case);
+  useEffect(() => {   // inside a case the run starts from the case, not from a demo (W21); one click on 比對並填入 fills the fields
+    setBrief(""); setBriefFailed(false);
+    if (!inCase) return;
+    let active = true;
+    Promise.all([docs.list<{ question?: string }>(projectId, "assembler.intake"), docs.list<SenseCard>(projectId, "sense.card"), docs.list<MapContent>(projectId, "map.map")])
+      .then(([intakes, cards, maps]) => { if (active) setBrief(caseBrief(intakes.at(-1)?.content, cards, maps.at(-1)?.content)); })
+      .catch(() => { if (active) setBriefFailed(true); });
+    return () => { active = false; };
+  }, [inCase, projectId]);
 
   useEffect(() => {   // a rerun compares against what actually happened: the task cards' latest 實際數字, one per name
     if (!rerunId || !given) return;
@@ -181,7 +200,8 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
 
   // Independent of `form`: N-58 needs these to show a saved result even when the tool's own form failed to load.
   const current = projects?.find((item) => item.project_id === projectId);
-  const project = projectId && current ? { id: projectId, name: current.name } : undefined;
+  const project = projectId && current ? { id: projectId, name: current.name, isCase: Boolean(current.is_case) } : undefined;
+  const showDemo = !projectId || (projects !== null && !current?.is_case);   // a case starts from itself; while that is not known yet, no demo
   const redo = (reason: string) => {
     if (!completed?.interpretation_id) return;
     setRevision({ of: completed.interpretation_id, reason });
@@ -195,13 +215,13 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
     if (completed?.result) return resultCard(<p className="sub">這個工具目前不能再執行；結果照存。</p>);
     return <div className="card"><p>{error || "載入中…"}</p></div>;
   }
-  const name = form.display?.name_zh ?? methodId;
+  const name = form.display?.name_zh ?? toolLabel(names, methodId);
   const example = form.form.example?.input;
   const fill = () => { if (example) { setState(initialState(form.form.fields, example)); setSuggested([]); setLeft([]); setError(""); } else setError("此工具沒有示範案例"); };
   const clear = () => { setState(initialState(form.form.fields)); setSuggested([]); setLeft([]); setError(""); };
   const count = form.form.fields.length;
   const numeral = ["", "一", "兩", "三", "四", "五", "六", "七", "八", "九"][count] ?? String(count);
-  // A new project for this analysis: the typed 專案名稱 (N-83), or else the tool and the minute. Names are unique
+  // A new project for this analysis: the typed name (N-83), or else the tool and the minute. Names are unique
   // per workspace (409): a second one in the same minute (or the same typed name) becomes "… (2)".
   const newProject = async (): Promise<string> => {
     const created = await createProject(customName.trim() || `${name} ${formatTime(new Date().toISOString())}`, `使用 ${name} 進行分析`);
@@ -211,7 +231,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
   // The run itself, after 確認執行: a project to save in, then the analysis; the address becomes the analysis's own page.
   const launch = async (payload: Record<string, unknown>) => {
     if (pendingId || starting) return;
-    if (!projects) { setError("專案清單還在載入，請再按一次"); return; }
+    if (!projects) { setError("清單還在載入，請再按一次"); return; }
     setStarting(true);
     try {
       const target = projectId || await newProject();
@@ -229,19 +249,20 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
   // ResultPage's own header replaces this one once there is a result.
   const inputCard = (
     <RunInputCard numeral={numeral}>
-      <DescribeFirst methodId={methodId} fields={form.form.fields} state={state} onState={setState} onSuggested={setSuggested} />
+      <DescribeFirst key={brief ? projectId : "plain"} methodId={methodId} fields={form.form.fields} state={state} onState={setState} onSuggested={setSuggested} initialText={brief} />
+      {briefFailed && <p className="warn" role="status">這個案子的內容這次讀不到，沒辦法預先貼進上面的框。重新整理再試一次，或自己貼上一段描述、直接填格子。</p>}
       {suggested.length > 0 && <div className="how"><b>AI 幫你填了</b>{suggested.join("、")}；請逐格核對。<button type="button" className="btn" onClick={() => setSuggested([])}>我已確認這些格子</button></div>}
       {left.length > 0 && <p className="sub">這次分析的「{left.join("、")}」沒辦法自動帶回格子；要再分析，請重新填這幾格。</p>}
       {revision && <p className="mocknote" role="status">依退回原因重做：「{revision.reason}」。改好格子按「執行分析」，AI 會依原因重做；退回的那一版保留。<button type="button" className="btn ghost" onClick={() => setRevision(null)}>不重做了</button></p>}
       {rerun && <p className="mocknote" role="status">到期重跑：更新格子裡的數字，按「執行分析」；跑完會和上一次並排比較。<button type="button" className="btn ghost" onClick={() => setRerun("")}>不重跑了</button></p>}
       <SaveTo project={project} name={name} customName={customName} onName={setCustomName} />
-      {projects && projects.length > 0 && !pendingId && !revision && !rerun && <details className="mb8"><summary>改存到別的專案</summary><div className="btns mt6">
-        <button type="button" className={`btn${projectId ? " ghost" : " primary"}`} aria-pressed={!projectId} onClick={() => setProjectId("")}>新專案</button>
+      {projects && projects.length > 0 && !pendingId && !revision && !rerun && <details className="mb8"><summary>改存到別的案子或分析</summary><div className="btns mt6">
+        <button type="button" className={`btn${projectId ? " ghost" : " primary"}`} aria-pressed={!projectId} onClick={() => setProjectId("")}>我的分析裡新的一份</button>
         {projects.slice(0, 8).map((item) => <button type="button" key={item.project_id} className={`btn${projectId === item.project_id ? " primary" : " ghost"}`} aria-pressed={projectId === item.project_id} onClick={() => setProjectId(item.project_id)}>{item.name}</button>)}
-      </div>{projects.length > 8 && <p className="sub mb0">更早的專案：到「我的案子」打開它，按「在這個專案再用「{name}」分析一次」。</p>}</details>}
+      </div>{projects.length > 8 && <p className="sub mb0">更早的案子或分析：到「我的案子」打開它，在那一頁再用「{name}」分析一次。</p>}</details>}
       {prefillNotice && <p className="mocknote" role="status">{prefillNotice}</p>}
       {recorded && rerun && <p className="mocknote" role="status">{recorded}</p>}
-      <MethodForm fields={form.form.fields} state={state} onState={setState} example={example} onFill={fill} onClear={clear} label={`${name}的${numeral}個格子`} busy={Boolean(pendingId) || starting} layered={methodId === ICEBERG_ID} needs={prefillNeeds}
+      <MethodForm fields={form.form.fields} state={state} onState={setState} example={example} onFill={showDemo ? fill : undefined} onClear={clear} label={`${name}的${numeral}個格子`} busy={Boolean(pendingId) || starting} layered={methodId === ICEBERG_ID} needs={prefillNeeds}
         onSubmit={async (payload) => {
         if (pendingId || starting) return;
         if (suggested.length) { setError("請先確認 AI 幫你填的格子"); return; }

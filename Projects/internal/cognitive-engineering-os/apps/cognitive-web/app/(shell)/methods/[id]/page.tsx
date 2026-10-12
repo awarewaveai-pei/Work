@@ -28,7 +28,7 @@ export default async function ToolPage({ params, searchParams }: { params: Promi
         <div className="btns"><Link className="btn primary" href={runHref(id, typeof project === "string" ? project : undefined)}>開始 →</Link>{lesson && <a className="btn" href={lesson} target="_blank" rel="noopener">第一次用？先上 5 分鐘的課 ↗</a>}</div>
         <h3 className="fam">做完常接</h3>
         {m.next.length ? (
-          <p className="my6">{m.next.map((x, i) => <span key={x}>{i ? "、" : ""}{catalog.methods[x] ? <Link href={toolHref(x)}>{catalog.methods[x].name_zh}</Link> : <span className="k">尚未上架的工具（{x}）</span>}</span>)}</p>
+          <p className="my6">{m.next.map((x, i) => <span key={x}>{i ? "、" : ""}{catalog.methods[x] ? <Link href={toolHref(x)}>{catalog.methods[x].name_zh}</Link> : <span className="k">（尚未上架的工具）</span>}</span>)}</p>
         ) : (
           <p className="sub my6">這個工具沒有固定的下一步：看下面同一類常用的，或到<Link href="/analyze">直接分析</Link>說你卡在哪。</p>
         )}

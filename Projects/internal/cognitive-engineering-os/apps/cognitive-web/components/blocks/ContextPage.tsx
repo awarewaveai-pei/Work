@@ -9,12 +9,15 @@ import { apiFetch } from "../../lib/api";
 import { AUTHOR, docs, type AiTurn, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { facetState, openPointers, placesOf, removeFacet, setFacet, toggled, type ContextSpec, type Notes } from "../../lib/context";
-import { detailsMissing, unconfirmedLaw, type MapContent, type MapSpec } from "../../lib/map";
+import type { MapSpec } from "../../lib/map";
 import { BlockShell, Notices } from "./BlockShell";
-import { Missing, Refused, type Failed } from "./PageParts";
+import { Fold, Missing, Refused, type Failed } from "./PageParts";
 
 type Intake = { question?: string; package?: string; happened_in?: string[]; you_are_in?: string; others_in?: string[] };
 type Pointers = { facets?: Array<{ facet: string; why: string }> };
+/** GET /projects/{id}/context/claims: the case's claims once, MAP's and VERIFY's together (`from` = which page it was written on); `missing` = the 法律 details no list has written. */
+type CaseClaims = { claims: Array<{ id: string; text: string; kind: string; from: string; missing: string[] }>; counts: Record<string, number> };
+const KINDS = ["事實", "法律", "價值", "文化宗教"];
 
 export function ContextPage({ projectId }: { projectId: string }) {
   const [spec, setSpec] = useState<ContextSpec | null>(null);
@@ -22,7 +25,7 @@ export function ContextPage({ projectId }: { projectId: string }) {
   const [held, setHeld] = useState<Doc<Notes> | null>(null);
   const [draft, setDraft] = useState<Notes>({});
   const [intake, setIntake] = useState<Intake>({});
-  const [map, setMap] = useState<MapContent>({});
+  const [caseClaims, setCaseClaims] = useState<CaseClaims | null>(null);   // null = could not be read
   const [pointers, setPointers] = useState<Doc<Pointers> | null>(null);
   const [custom, setCustom] = useState({ name: "", definition: "" });
   const [place, setPlace] = useState("");
@@ -35,14 +38,15 @@ export function ContextPage({ projectId }: { projectId: string }) {
   const [loaded, setLoaded] = useState(false);
 
   const load = async (resetDraft: boolean) => {
-    const [notes, intakes, maps, points] = await Promise.all([
-      docs.list<Notes>(projectId, "context.notes"), docs.list<Intake>(projectId, "assembler.intake"), docs.list<MapContent>(projectId, "map.map"), docs.list<Pointers>(projectId, "context.pointers"),
+    const [notes, intakes, claimed, points] = await Promise.all([
+      docs.list<Notes>(projectId, "context.notes"), docs.list<Intake>(projectId, "assembler.intake"),
+      apiFetch<CaseClaims>(`/projects/${encodeURIComponent(projectId)}/context/claims`).catch(() => null), docs.list<Pointers>(projectId, "context.pointers"),
     ]);
     const latest = notes.at(-1) ?? null;
     setHeld(latest);
     if (resetDraft) setDraft(latest?.content ?? {});
     setIntake(intakes.at(-1)?.content ?? {});
-    setMap(maps.at(-1)?.content ?? {});
+    setCaseClaims(claimed);
     setPointers(points.at(-1) ?? null);
   };
   useEffect(() => {
@@ -79,11 +83,35 @@ export function ContextPage({ projectId }: { projectId: string }) {
   const rows = [...spec.facets.map((item) => ({ ...item, custom: false })), ...customFacets.map((item) => ({ facet: item.facet, definition: item.definition ?? "", custom: true }))];
   const open = openPointers(pointers?.content.facets, draft);
   const places = placesOf(intake);
-  const claims = map.claims ?? [];
-  const legal = claims.filter((claim) => claim.kind === "法律");
+  const legal = (caseClaims?.claims ?? []).filter((claim) => claim.kind === "法律");
   const layerName = mapSpec.layers.find((layer) => layer.key === fromLayer)?.name;
   const mapHref = `/projects/${encodeURIComponent(projectId)}/map`;
+  const verifyHref = `/projects/${encodeURIComponent(projectId)}/verify`;
   const checkField = (key: string) => key as "rights_duties" | "norm_origin";
+  const shownRows = rows.filter((row) => row.custom || facetState(draft, row.facet) === "relevant");   // what the person marked, and what they added
+  const otherRows = rows.filter((row) => !shownRows.includes(row));
+  const facetCard = (row: (typeof rows)[number]) => {
+    const state = facetState(draft, row.facet);
+    const entry = facetEntry(row.facet);
+    return (
+      <div key={row.facet} className={`mcard${state === "relevant" ? " now" : ""}`} id={`facet-${row.facet}`}>
+        <b>{row.facet}{row.custom && <span className="tag">你加的</span>}</b>
+        <span className="k">{row.definition}</span>
+        <div className="chips" role="group" aria-label={`${row.facet}跟這件事有沒有關`}>
+          <button type="button" className={`chip${state === "relevant" ? " on" : ""}`} aria-pressed={state === "relevant"} onClick={() => setDraft((current) => setFacet(current, row.facet, { relevant: true }))}>有關</button>
+          <button type="button" className={`chip${state === "irrelevant" ? " on" : ""}`} aria-pressed={state === "irrelevant"} onClick={() => setDraft((current) => setFacet(current, row.facet, { relevant: false }))}>無關</button>
+          {row.custom && <button type="button" className="btn ghost" onClick={() => setDraft((current) => removeFacet(current, row.facet))}>刪掉這個面向</button>}
+        </div>
+        {state === "relevant" && spec.own_first.facets.includes(row.facet) && <p className="hint">{spec.own_first.note}</p>}
+        {state === "relevant" && spec.facet_questions.map((question) => (
+          <div key={question.key} className="field">
+            <label htmlFor={`${row.facet}-${question.key}`}>{question.question}</label>
+            <textarea id={`${row.facet}-${question.key}`} value={entry?.[question.key] ?? ""} maxLength={2000} onChange={(event) => setDraft((current) => setFacet(current, row.facet, { [question.key]: event.target.value }))} />
+          </div>
+        ))}
+      </div>
+    );
+  };
   const addCustom = () => {
     const name = custom.name.trim();
     if (!name || rows.some((row) => row.facet === name)) return;
@@ -121,30 +149,12 @@ export function ContextPage({ projectId }: { projectId: string }) {
           </div>
         )}
         {pointers && open.length === 0 && Object.keys(pointers.content).length === 0 && <p className="sub">AI 這次沒有看到還沒看的面向。</p>}
-        <div className="mcards">
-          {rows.map((row) => {
-            const state = facetState(draft, row.facet);
-            const entry = facetEntry(row.facet);
-            return (
-              <div key={row.facet} className={`mcard${state === "relevant" ? " now" : ""}`} id={`facet-${row.facet}`}>
-                <b>{row.facet}{row.custom && <span className="tag">你加的</span>}</b>
-                <span className="k">{row.definition}</span>
-                <div className="chips" role="group" aria-label={`${row.facet}跟這件事有沒有關`}>
-                  <button type="button" className={`chip${state === "relevant" ? " on" : ""}`} aria-pressed={state === "relevant"} onClick={() => setDraft((current) => setFacet(current, row.facet, { relevant: true }))}>有關</button>
-                  <button type="button" className={`chip${state === "irrelevant" ? " on" : ""}`} aria-pressed={state === "irrelevant"} onClick={() => setDraft((current) => setFacet(current, row.facet, { relevant: false }))}>無關</button>
-                  {row.custom && <button type="button" className="btn ghost" onClick={() => setDraft((current) => removeFacet(current, row.facet))}>刪掉這個面向</button>}
-                </div>
-                {state === "relevant" && spec.own_first.facets.includes(row.facet) && <p className="hint">{spec.own_first.note}</p>}
-                {state === "relevant" && spec.facet_questions.map((question) => (
-                  <div key={question.key} className="field">
-                    <label htmlFor={`${row.facet}-${question.key}`}>{question.question}</label>
-                    <textarea id={`${row.facet}-${question.key}`} value={entry?.[question.key] ?? ""} maxLength={2000} onChange={(event) => setDraft((current) => setFacet(current, row.facet, { [question.key]: event.target.value }))} />
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        {shownRows.length === 0 && <p className="sub">還沒有標「有關」的面向。從下面「其他面向」挑跟這件事有關的。</p>}
+        <div className="mcards">{shownRows.map(facetCard)}</div>
+        <Fold title={`其他面向（${otherRows.length} 個）`}>
+          <p className="hint">還沒標、或標了「無關」的面向收在這裡，一個都沒少。覺得有關，就按「有關」，它會移到上面。</p>
+          <div className="mcards">{otherRows.map(facetCard)}</div>
+        </Fold>
         <div className="field">
           <b>加一個你自己的面向</b>
           <input className="search" aria-label="面向的名字" placeholder="名字" value={custom.name} maxLength={60} onChange={(event) => setCustom({ ...custom, name: event.target.value })} />
@@ -166,14 +176,14 @@ export function ContextPage({ projectId }: { projectId: string }) {
           <div className="btns"><button className="btn" type="button" disabled={!place.trim() || (draft.jurisdictions ?? []).length >= 10} onClick={() => { set({ jurisdictions: toggled(draft.jurisdictions, place.trim()).slice(0, 10) }); setPlace(""); }}>加進去</button></div>
           <Missing why={(draft.jurisdictions ?? []).length >= 10 && "最多標 10 個地方。要加新的，先點掉一個。"} />
         </div>
-        <h3 className="fam">地圖裡的法律主張</h3>
-        {legal.length === 0 ? <p className="sub">地圖裡還沒有標成法律的主張。在<Link href={mapHref}>拆解</Link>的「主張」那裡標。</p> : (
+        <h3 className="fam">這個案子的法律主張</h3>
+        {caseClaims === null ? <p className="warn" role="status">這個案子的主張這次讀不到。重新整理再試一次。</p> : legal.length === 0 ? <p className="sub">這個案子還沒有標成法律的主張。在<Link href={mapHref}>拆解</Link>的「主張」或<Link href={verifyHref}>查證主張</Link>那裡標。</p> : (
           <ul className="check">{legal.map((claim) => (
             <li key={claim.id}>{claim.text}
-              {unconfirmedLaw(claim, mapSpec)
+              {claim.missing.length > 0
                 ? <span className="tags"><span>未確認</span></span>
                 : <span className="tags"><span>法域、時效、來源都寫了</span></span>}
-              {unconfirmedLaw(claim, mapSpec) && <span className="sub">還缺：{detailsMissing(claim, mapSpec).join("、")}。到<Link href={mapHref}>拆解</Link>補。</span>}
+              {claim.missing.length > 0 && <span className="sub">還缺：{claim.missing.join("、")}。到<Link href={claim.from === "VERIFY" ? verifyHref : mapHref}>{claim.from === "VERIFY" ? "查證主張" : "拆解"}</Link>補。</span>}
             </li>
           ))}</ul>
         )}
@@ -188,7 +198,7 @@ export function ContextPage({ projectId }: { projectId: string }) {
             <b>{index + 1}. {check.question}</b>
             <p className="hint">{check.how}</p>
             {check.key === "claim_kind" && (
-              <p className="sub">到<Link href={mapHref}>拆解的「主張」</Link>做。目前標了：{["事實", "法律", "價值", "文化宗教"].map((kind) => `${kind} ${claims.filter((claim) => claim.kind === kind).length}`).join("、")}。</p>
+              <p className="sub">到<Link href={mapHref}>拆解的「主張」</Link>或<Link href={verifyHref}>查證主張</Link>做。{caseClaims ? `目前標了：${KINDS.map((kind) => `${kind} ${caseClaims.counts[kind] ?? 0}`).join("、")}${caseClaims.counts["其他"] ? `；還沒歸進這四種的 ${caseClaims.counts["其他"]} 個` : ""}。` : "主張的數目這次讀不到。"}</p>
             )}
             {(check.key === "rights_duties" || check.key === "norm_origin") && (
               <textarea aria-label={check.question} value={draft[checkField(check.key)] ?? ""} maxLength={3000} onChange={(event) => set({ [check.key]: event.target.value })} />

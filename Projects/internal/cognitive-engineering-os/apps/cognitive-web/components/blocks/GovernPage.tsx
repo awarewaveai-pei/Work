@@ -65,7 +65,7 @@ export function GovernPage({ projectId }: { projectId: string }) {
         <h2>匯出這個案子</h2>
         <p className="how">每一版的卡和紀錄，都寫著是你寫的、AI 寫的、共同或系統，和哪一塊寫的。匯出只是把資料搬出來，不經過 AI。刪掉的卡只留「已刪除」。</p>
         <ExportLinks projectId={projectId} />
-        <p className="sub mt8 mb0">要刪掉整個案子，到<Link href={`/projects/${enc(projectId)}`}>案子頁</Link>按「刪除專案」。你的帳號資料在<Link href="/settings">設定</Link>。你分享給別人的東西、申訴和研究，在<Link href="/me/data">我的資料</Link>。</p>
+        <p className="sub mt8 mb0">要刪掉整個案子，到<Link href={`/projects/${enc(projectId)}`}>案子頁</Link>按「刪除案子」。你的帳號資料在<Link href="/settings">設定</Link>。你分享給別人的東西、申訴和研究，在<Link href="/me/data">我的資料</Link>。</p>
       </div>
 
       <div className="card">

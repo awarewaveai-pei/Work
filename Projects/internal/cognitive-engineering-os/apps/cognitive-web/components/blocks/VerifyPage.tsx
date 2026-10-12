@@ -7,11 +7,12 @@
 // like any other -- who judged and on what grounds -- never the platform's verdict. The pasted message is never sent to
 // /sources: it would support itself. Every record about a claim is shown for the claim's current version only. Which
 // databases a look-up sends the words to, and which cards only you read, come from the server (GET /verify/ledger).
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type AiTurn, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { BlockShell, Notices } from "./BlockShell";
+import { FINISHED, POLL_MS, runLine, type Run } from "./GatherPage";
 import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 type Cell = { state: string; value?: string; why?: string };
@@ -55,6 +56,23 @@ const enc = encodeURIComponent;
 const CONFIDENCE = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 const ANGLE_NAMES: Record<string, string> = { primary: "原始文件與官方公告", news: "別的地方怎麼報", factcheck: "查核", origin: "最早的出處", opposite: "相反的說法" };
 const MAX_READ_CARDS = 12;
+
+type ProposalDoc = { propose: string; source?: string };
+/** The cards that made SENSE propose VERIFY (the proposal names its card in ``source``): their words, to start a message from
+ *  (walk 2026-10-12 W9). One offer per card; a card since deleted is gone, and one already saved as a message is not offered again. */
+export function messageOffers(proposals: Doc<ProposalDoc>[], cards: Doc<{ category: string; text: string }>[], messages: Doc<Message>[]): Array<{ id: string; text: string }> {
+  const used = new Set(messages.map((item) => item.content.text.trim()));
+  const ids = [...new Set(proposals.filter((item) => item.content.propose === "VERIFY" && item.content.source).map((item) => item.content.source!))];
+  return ids.flatMap((id) => {
+    const card = cards.find((item) => item.doc_id === id);
+    const text = card?.content.text.trim() ?? "";
+    return text && !used.has(text) ? [{ id, text }] : [];
+  });
+}
+
+/** What the 去查 line says while a search runs: the same readout GATHER gives (how long since it was sent, when it ends at the
+ *  latest, how many pages at most); before the first read, only that it is still looking (walk 2026-10-12 W10). */
+export const lookupLine = (run: Run | undefined, now: number): string => (run ? runLine(run, now, "找完，結果會寫進這個主張的帳本。") : "還在找");
 
 /** The AI's proposed claims not confirmed yet (a confirmed one names its proposal: "<split doc>#<index>"). */
 export function pendingProposals(split: Doc<Split> | undefined, claims: Doc<Claim>[]): Array<{ index: number; text: string; sentence: string; law: boolean }> {
@@ -170,15 +188,21 @@ export function VerifyPage({ projectId }: { projectId: string }) {
   const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [offers, setOffers] = useState<Array<{ id: string; text: string }>>([]);
+  const [runs, setRuns] = useState<Record<string, Run>>({});   // the searches still running, as the server reports them
+  const [now, setNow] = useState(() => Date.now());
+  const reloaded = useRef(new Set<string>());
 
   const load = async () => {
-    const [m, f, c, s, t, sp, se, fc, r, st, v, su, n, maps, ev, ledger] = await Promise.all([
+    const [m, f, c, s, t, sp, se, fc, r, st, v, su, n, maps, ev, ledger, senseProposals, senseCards] = await Promise.all([
       docs.list<Message>(projectId, "verify.message"), docs.list<First>(projectId, "verify.first"), docs.list<Claim>(projectId, "verify.claim"),
       docs.list<Split>(projectId, "verify.split"), docs.list<Techniques>(projectId, "verify.techniques"), docs.list<Spread>(projectId, "verify.spread"),
       docs.list<Seen>(projectId, "verify.seen"), docs.list<Factcheck>(projectId, "verify.factcheck"), docs.list<Reading>(projectId, "verify.reading"),
       docs.list<Stance>(projectId, "verify.stance"), docs.list<Verdict>(projectId, "verify.verdict"), docs.list<Summary>(projectId, "verify.summary"),
       docs.list<Next>(projectId, "verify.next"), docs.list<MapDoc>(projectId, "map.map"), apiFetch<Evidence>(`${base}/evidence`), apiFetch<Ledger>(`${base}/verify/ledger`),
+      docs.list<ProposalDoc>(projectId, "assembler.proposal.sense"), docs.list<{ category: string; text: string }>(projectId, "sense.card"),
     ]);
+    setOffers(messageOffers(senseProposals, senseCards, m));
     setMessages(m); setFirsts(f); setClaims(c); setSplits(s); setTechniques(t); setSpreads(sp); setSeen(se); setFactchecks(fc); setReadings(r);
     setStances(st); setVerdicts(v); setSummaries(su); setNexts(n); setMap(maps.at(-1)?.content); setEvidence(ev); setLines(ledger.claims);
     setAsks(ledger.factcheck_asks); setPersonReads(new Set(ledger.person_reads));
@@ -199,6 +223,25 @@ export function VerifyPage({ projectId }: { projectId: string }) {
     if (answer.stopped) setNotices([{ type: "crisis", notice: answer.notice ?? "", resources: answer.resources ?? [] }]);
     return answer;
   };
+
+  // While a search runs, ask the server for it at once and then every POLL_MS (one request per open search); when one ends the
+  // page reloads once for it, so its result lands in the ledger.
+  const openRuns = [...new Set((lines ?? []).flatMap((line) => (line.lookup && !FINISHED.includes(line.lookup.status) ? [line.lookup.run] : [])))].join(",");
+  useEffect(() => {
+    if (!openRuns) return;
+    let active = true;
+    const ask = async () => {
+      setNow(Date.now());
+      const next = await Promise.all(openRuns.split(",").map(async (id) => [id, await apiFetch<Run>(`${base}/collections/${enc(id)}`).catch(() => null)] as const));
+      if (!active) return;
+      setRuns((held) => ({ ...held, ...Object.fromEntries(next.map(([id, run]) => [id, run ?? held[id] ?? { status: "" }])) }));   // a read that failed keeps the last one, or says 讀不到進度
+      const ended = next.filter(([id, run]) => run && FINISHED.includes(run.status) && !reloaded.current.has(id));
+      if (ended.length) { ended.forEach(([id]) => reloaded.current.add(id)); load().catch(() => undefined); }
+    };
+    void ask();
+    const timer = setInterval(ask, POLL_MS);
+    return () => { active = false; clearInterval(timer); };
+  }, [openRuns]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const cards = useMemo(() => evidence.origins.flatMap((origin) => origin.cards).filter((card) => card.source_id && card.snapshot?.sha256 && !card.aside), [evidence]);
   // a fact-check card's source, from the verify.factcheck records (never from the source's text): the person reads it, the AI never does
@@ -255,6 +298,14 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         {draft.form === "連結" && <input className="search" aria-label="網址" placeholder="https://" value={draft.url} maxLength={2048} onChange={(event) => setDraft({ ...draft, url: event.target.value })} />}
         <textarea aria-label="訊息原文" placeholder={draft.form === "連結" ? "連結裡看到的字（選填）" : draft.form === "截圖文字" ? "截圖裡的字" : "訊息原文"} value={draft.text} maxLength={20000}
           onChange={(event) => setDraft({ ...draft, text: event.target.value })} />
+        {offers.map((offer) => (
+          <div key={offer.id} className="judge">
+            <p className="mt0">你在「外化」寫的一張卡裡，有別人的說法。要查它，可以從這一句開始：</p>
+            <p className="tnote">{offer.text}</p>
+            <div className="btns"><button className="btn" type="button" onClick={() => setDraft({ form: "訊息", text: offer.text, url: "" })}>用這句當要查的訊息</button></div>
+            <p className="hint">按了只是把這句放進上面的框。你可以改，再按「存這則訊息」。</p>
+          </div>
+        ))}
         <div className="btns mt8"><button className="btn primary" type="button" disabled={busy || !(draft.text.trim() || (draft.form === "連結" && draft.url.trim()))} onClick={pasteMessage}>存這則訊息</button></div>
         <Missing why={!(draft.text.trim() || (draft.form === "連結" && draft.url.trim())) && (draft.form === "連結" ? "先貼上網址。" : "先貼上訊息的字。")} />
         <Refused failed={failed} at="message" />
@@ -371,7 +422,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         <p className="how">帳本由系統排：每個主張有幾個獨立出處支持、幾個反對。只有你自己確認過的讀法才算數。三件事分開看：找得到出處、出處彼此獨立、出處站得住。這三件，沒有一件等於「這是真的」。</p>
         {lines.length === 0 && <p className="sub">還沒有主張。</p>}
         {lines.map((line) => (
-          <LedgerLine key={`${line.claim_id}:${line.version}`} projectId={projectId} line={line} spec={spec} asks={asks} busy={busy} base={base} claims={claims} cards={cards} hitOf={hitOf} cardTitle={cardTitle} lines={lines}
+          <LedgerLine key={`${line.claim_id}:${line.version}`} projectId={projectId} line={line} spec={spec} asks={asks} busy={busy} base={base} claims={claims} cards={cards} hitOf={hitOf} cardTitle={cardTitle} lines={lines} runs={runs} now={now}
             readings={readingsFor(readings, line.claim_id, line.version)} stances={liveOf(stances, line.claim_id)}
             verdict={liveOf(verdicts, line.claim_id).at(-1)} editing={editing === line.claim_id} setEditing={setEditing}
             factcheck={ofVersion(factchecks, line.claim_id, line.version).at(-1)} act={act} saveClaim={saveClaim} lookUp={lookUp} setNotices={setNotices} failed={failed} />
@@ -452,8 +503,8 @@ function FactcheckResult({ result, spec }: { result: Factcheck; spec: Spec }) {
   );
 }
 
-function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hitOf, cardTitle, lines, readings, stances, verdict, editing, setEditing, factcheck, act, saveClaim, lookUp, setNotices, failed }: {
-  projectId: string; line: Line; spec: Spec; asks: string[]; busy: boolean; base: string; claims: Doc<Claim>[]; cards: EvidenceCard[]; hitOf: Map<string, HeldHit>; cardTitle: (id: string) => string; lines: Line[];
+function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hitOf, cardTitle, lines, runs, now, readings, stances, verdict, editing, setEditing, factcheck, act, saveClaim, lookUp, setNotices, failed }: {
+  projectId: string; line: Line; spec: Spec; asks: string[]; busy: boolean; base: string; claims: Doc<Claim>[]; cards: EvidenceCard[]; hitOf: Map<string, HeldHit>; cardTitle: (id: string) => string; lines: Line[]; runs: Record<string, Run>; now: number;
   // stances / verdict: the live ones of this claim, any version -- to edit them; shown only for this line's version and page
   readings: Array<ReadingEntry & { reading: string }>; stances: Doc<Stance>[]; verdict?: Doc<Verdict>; editing: boolean; setEditing: (value: string | null) => void;
   factcheck?: Doc<Factcheck>; act: (at: string, work: () => Promise<void>) => Promise<void>; saveClaim: (claim: Claim, doc: Doc<Claim> | undefined, at: string) => Promise<void>;
@@ -517,7 +568,9 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
         </li>
       </ul>}
       {checkable && <div className="field">
-        <b>去查</b>{line.lookup && <span className="sub">　上次：{line.lookup.status === "completed" ? "跑完了" : line.lookup.status === "failed" ? "沒有跑完" : "還在找"}</span>}
+        <b>去查</b>{line.lookup && (FINISHED.includes(line.lookup.status)
+          ? <span className="sub">　上次：{line.lookup.status === "completed" ? "跑完了" : "沒有跑完"}</span>
+          : <span className="sub" role="status">　上次：{lookupLine(runs[line.lookup.run], now)}</span>)}
         {line.search && <span className="sub">　結果：{line.search.state}{line.search.why ? `（${line.search.why}）` : ""}</span>}
         <div className="chips" role="group" aria-label="要找的方向">{spec.angles.map((angle) => (
           <button key={angle} type="button" className={`chip${angles.includes(angle) ? " on" : ""}`} aria-pressed={angles.includes(angle)} onClick={() => setAngles(angles.includes(angle) ? angles.filter((item) => item !== angle) : [...angles, angle])}>{ANGLE_NAMES[angle] ?? angle}</button>

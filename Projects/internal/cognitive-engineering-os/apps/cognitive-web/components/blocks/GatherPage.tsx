@@ -46,19 +46,19 @@ export type Seed = { uri: string; meta: Record<string, unknown> };
 type Plan = { seeds: number; max_queries: number; max_fetches: number };
 type Pending = { ask: Doc<Ask>; seeds: Seed[]; plan: Plan };
 // GET /projects/{id}/collections/{run} (project_source_repository._run_from_row): what the server knows while it runs
-type Run = { status: string; requested_at?: string; deadline_at?: string; max_fetches?: number };
+export type Run = { status: string; requested_at?: string; deadline_at?: string; max_fetches?: number };
 
 const DEFAULT_ANGLES = ["primary", "news", "factcheck", "precedent", "field"];
 export const SEARCH_LANGUAGES = ["zh", "en"];
 const MAX_AI_CARDS = 12;
 const RUN_WORDS: Record<string, string> = { requested: "已經送出，等找資料的服務接手", running: "系統正在找", completed: "找完了", failed: "沒找成" };
-const FINISHED = ["completed", "failed"];
-const POLL_MS = 15000;   // a running search is asked again this often: one request per open search
+export const FINISHED = ["completed", "failed"];
+export const POLL_MS = 15000;   // a running search is asked again this often: one request per open search
 
 const minutes = (ms: number) => { const count = Math.floor(ms / 60000); return count < 1 ? "不到 1 分鐘" : ` ${count} 分鐘`; };   // "已經過了 7 分鐘"、"已經過了不到 1 分鐘"
 /** A search while it runs, in what the server reports: how long since it was sent, when it ends at the latest, how many
  *  pages at most. Nothing about how far it got: the server does not say that until it is done. */
-export function runLine(run: Run | undefined, now: number): string {
+export function runLine(run: Run | undefined, now: number, landing = "找完，來源會出現在下面的「來源總覽」。"): string {
   if (!run || !run.status) return "讀不到進度";
   const words = RUN_WORDS[run.status] ?? "讀不到進度";
   if (FINISHED.includes(run.status)) return words;
@@ -69,7 +69,7 @@ export function runLine(run: Run | undefined, now: number): string {
     Number.isFinite(sent) ? `已經過了${minutes(now - sent)}。` : "",
     Number.isFinite(deadline) && deadline > now ? `最晚再${minutes(deadline - now + 59999)}會結束。` : "",
     run.max_fetches ? `最多抓 ${run.max_fetches} 頁。` : "",
-    "找完，來源會出現在下面的「來源總覽」。",
+    landing,
   ].join("");
 }
 const enc = encodeURIComponent;
@@ -417,7 +417,7 @@ export function GatherPage({ projectId }: { projectId: string }) {
       <div className="card">
         <h2>來源總覽 <small>{view.counted} 個獨立出處・{view.aside} 頁放一旁（不算）</small></h2>
         {view.channels.looked && <p className="sub">這次用了：{view.channels.engines.map((item) => item.name).join("、") || "沒有搜尋引擎"}；語言：{view.channels.languages.map((item) => item.name).join("、") || "沒有"}。</p>}
-        {view.channels.blocked.map((item) => <p key={`${item.provider}-${item.state}`} className="warn">無法檢查：{item.says}。</p>)}
+        {view.channels.blocked.map((item) => <p key={`${item.provider}-${item.state}`} className="warn">{item.says}。</p>)}
         {cards.length > 0 && <div className="kpis">{(["engine", "language", "country"] as const).map((key) => (
           <div key={key} className="kpi"><b>{{ engine: "從哪裡找到", language: "語言", country: "國家或地區" }[key]}</b>
             {Object.entries(view.distribution[key]).map(([name, count]) => <span key={name}>{name}：{count} 頁</span>)}</div>

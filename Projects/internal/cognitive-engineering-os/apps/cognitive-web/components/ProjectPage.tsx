@@ -7,9 +7,9 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { ApiError, apiFetch } from "../lib/api";
-import { analysisHref, compareHref, runHref, toolHref } from "../lib/catalog";
+import { analysisHref, compareHref, runHref, toolHref, toolLabel } from "../lib/catalog";
 import { failureReason, humanError } from "../lib/errors";
-import { STANCE, STATUS, TASK_STATUS, standing, todayIso, type Analysis, type Project, type Rerun, type Source, type Task, type TaskNumber, type TaskStatus } from "../lib/projects";
+import { STANCE, STATUS, TASK_STATUS, holderWord, standing, thisHolder, todayIso, type Analysis, type Project, type Rerun, type Source, type Task, type TaskNumber, type TaskStatus } from "../lib/projects";
 import { formatTime } from "../lib/time";
 import { TrendChart, type TrendSeries } from "./result/Charts";
 import { CaseSlots } from "./blocks/BlockShell";
@@ -58,7 +58,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
   useEffect(() => {
     let active = true;
     Promise.all([load(), apiFetch<Source[]>(`${base}/sources`).then((held) => { if (active) setSources(held); })])
-      .catch((reason) => { if (active) setLoadError(reason instanceof ApiError && reason.status === 404 ? "找不到這個專案：可能已經刪除，或不在你的帳號裡。" : humanError(reason)); });
+      .catch((reason) => { if (active) setLoadError(reason instanceof ApiError && reason.status === 404 ? "找不到這個案子或分析：可能已經刪除，或不在你的帳號裡。" : humanError(reason)); });
     return () => { active = false; };
   }, [base]);   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -87,6 +87,8 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
 
   if (loadError) return <><div className="crumbs"><Link href="/projects">我的案子</Link></div><div className="card"><p className="error">{loadError}</p></div></>;
   if (!project || !analyses) return <div className="card"><p>載入中…</p></div>;
+  const word = holderWord(project.is_case);   // 案子 or 分析 (ENTRY_SLICE1 item 7)
+  const here = thisHolder(project.is_case);
   const latest = analyses[0];
   const latestDone = analyses.find((item) => item.status === "DONE");
   const methods = project.methods ?? [];
@@ -113,7 +115,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
       setActionError(humanError(reason));
     }
   };
-  // N-83: 專案名稱 stays editable after creation (create_project's tool+time default is not a dead end).
+  // N-83: the name stays editable after creation (create_project's tool+time default is not a dead end).
   const rename = async () => {
     const name = projectName.trim();
     if (!name || name === project.name) return;
@@ -126,7 +128,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
   };
   // N-65: DELETE lived only on a DONE result's ⑨; the project page and 我的案子 had no way in at all.
   const erase = async () => {
-    if (!window.confirm(`刪除專案「${project.name}」？來源與所有產出一起刪掉，留一筆「已抹除」。這不能復原。`)) return;
+    if (!window.confirm(`刪除${word}「${project.name}」？來源與所有產出一起刪掉，留一筆「已抹除」。這不能復原。`)) return;
     setDeleteError("");
     try { await apiFetch(base, { method: "DELETE" }); window.location.assign("/projects"); }
     catch (reason) { setDeleteError(humanError(reason)); }
@@ -213,7 +215,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
     const at = event.occurred_at;
     const push = (node: React.ReactNode) => historyLines.push({ key: event.event_id, at, node });
     switch (event.event_type) {
-      case "InterpretationRequested": push(<>開始分析：{names[payload.method_id] ?? payload.method_id ?? "工具"}</>); break;
+      case "InterpretationRequested": push(<>開始分析：{payload.method_id ? toolLabel(names, payload.method_id) : "工具"}</>); break;
       case "InterpretationCreated": push(<>分析完成：<Link href={analysisHref(project.project_id, payload.interpretation_id)}>看結果 →</Link></>); break;
       case "InterpretationFailed": push(<>分析沒有完成：{failureReason(payload.error)}</>); break;
       case "InterpretationApproved": push(<>核准{payload.by_name ? `：${payload.by_name}` : ""}</>); break;
@@ -317,14 +319,14 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
   };
 
   return <>
-    <div className="crumbs"><Link href="/projects">我的案子</Link> › {project.name}</div>
+    <div className="crumbs"><Link href="/projects">{project.is_case ? "我的案子" : "我的分析"}</Link> › {project.name}</div>
     <div className="card">
       <div className="top">
         <h1>{project.name}</h1>
         <div className="btns">
-          <input type="text" aria-label="專案名稱" value={projectName} onChange={(event) => setProjectName(event.target.value)} />
+          <input type="text" aria-label={`${word}名稱`} value={projectName} onChange={(event) => setProjectName(event.target.value)} />
           <button type="button" className="btn ghost" disabled={renaming || !projectName.trim() || projectName.trim() === project.name} onClick={rename}>重新命名</button>
-          <button type="button" className="btn ghost" onClick={erase}>刪除專案</button>
+          <button type="button" className="btn ghost" onClick={erase}>刪除{word}</button>
         </div>
       </div>
       {renameError && <p className="error" role="alert">改名沒有成功：{renameError}</p>}
@@ -342,34 +344,34 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
           says a personal case does not end in 核准. */}
       <CaseSlots projectId={project.project_id} />
       <div className="btns"><Link className="btn" href={`/projects/${encodeURIComponent(project.project_id)}/start`}>開案資料：目的、風險、誰會受影響、這次走哪幾塊 →</Link></div>
-      <div className="how"><b>怎麼讀</b>這個專案走到哪：每一次分析（新的在上面）、存下來的任務、到期要重跑的提醒；時間是你這裡的時間，到分鐘。<b>你要做的</b>按「看結果」打開那一次的完整結果；到期的提醒按「重跑並比較」；任務卡上按狀態按鈕更新進度。</div>
+      <div className="how"><b>怎麼讀</b>{here}走到哪：每一次分析（新的在上面）、存下來的任務、到期要重跑的提醒；時間是你這裡的時間，到分鐘。<b>你要做的</b>按「看結果」打開那一次的完整結果；到期的提醒按「重跑並比較」；任務卡上按狀態按鈕更新進度。</div>
       {dueReruns.map((item) => <div className="finding warn" key={item.rerun_id}><b>到期了（{item.due}）：用新資料重跑並比較</b>打開 {formatTime(item.scheduled_at).slice(0, 10)} 排的那一次分析，更新格子裡的數字，按「執行分析」；跑完兩次會並排比較。<div className="btns mt6"><Link className="btn primary" href={`${analysisHref(project.project_id, item.interpretation_id)}?rerun=${encodeURIComponent(item.rerun_id)}`}>重跑並比較 →</Link></div></div>)}
     </div>
     <div className="card">
-      <h2>這個專案的分析<small>{analyses.length ? `${analyses.length} 次，新的在上面・AI 做的，不是你的判斷` : "還沒有"}</small></h2>
+      <h2>{project.is_case ? "這個案子的分析" : "分析紀錄"}<small>{analyses.length ? `${analyses.length} 次，新的在上面・AI 做的，不是你的判斷` : "還沒有"}</small></h2>
       {analyses.length ? <div className="scroll-x">
         <table>
           <thead><tr><th>開始</th><th>工具</th><th>狀態</th><th>你的判斷</th><th>核准</th><th></th></tr></thead>
           <tbody>{analyses.map((item) => { const redoes = item.revision_of ?? reruns.find((rerun) => rerun.fulfilled_by === item.interpretation_id)?.interpretation_id;
             return <tr key={item.interpretation_id}>
               <td>{formatTime(item.requested_at)}</td>
-              <td>{item.method_id ? <Link href={toolHref(item.method_id)}>{names[item.method_id] ?? item.method_id}</Link> : "—"}{redoes ? <><br /><span className="sub">{item.revision_of ? "依退回原因重做" : "到期重跑"}</span></> : null}</td>
+              <td>{item.method_id ? <Link href={toolHref(item.method_id)}>{toolLabel(names, item.method_id)}</Link> : "—"}{redoes ? <><br /><span className="sub">{item.revision_of ? "依退回原因重做" : "到期重跑"}</span></> : null}</td>
               <td>{STATUS[item.status]}{item.status === "DONE" && item.finished_at ? `（${formatTime(item.finished_at).slice(11)} 完成）` : ""}{item.status === "FAILED" && item.error ? <details><summary>原因</summary>{item.error}</details> : null}</td>
               <td>{item.judgment ? STANCE[item.judgment] : "尚未填"}</td>
               <td>{item.approval?.decision === "approve" ? `已核准（${item.approval.by_name ?? ""}）` : item.approval?.decision === "return" ? "已退回" : item.status === "DONE" ? "尚未核准" : "—"}</td>
               <td><Link className={`btn${item === latest && item.status === "DONE" ? " primary" : ""}`} href={analysisHref(project.project_id, item.interpretation_id)}>{OPEN[item.status]}</Link>{redoes && item.status === "DONE" && <> <Link className="btn ghost" href={compareHref(project.project_id, redoes, item.interpretation_id)}>和上一版比較</Link></>}</td>
             </tr>; })}</tbody>
         </table>
-      </div> : <p className="sub">這個專案還沒有分析。</p>}
+      </div> : <p className="sub">這裡還沒有分析。</p>}
       <div className="btns mt10">
-        {methods.map((id) => <Link key={id} className="btn" href={runHref(id, project.project_id)}>在這個專案再用「{names[id] ?? id}」分析一次</Link>)}
-        {!methods.length && <Link className="btn" href="/methods">到「工具」挑一個開始（會開一個新專案）</Link>}
+        {methods.map((id) => <Link key={id} className="btn" href={runHref(id, project.project_id)}>在{here}再用「{toolLabel(names, id)}」分析一次</Link>)}
+        {!methods.length && <Link className="btn" href="/methods">到「工具」挑一個開始（結果會另存在「我的分析」）</Link>}
       </div>
     </div>
     <div className="card" id="sources">
       <h2>來源<small>{sources ? `${sources.length} 筆` : "載入中"}</small></h2>
-      <div className="how"><b>怎麼讀</b>這個專案存的外部來源：標題、存入時間；分析會引用這裡的內容。<b>你要做的</b>要新增就貼上文字和標題；要看內容按「看內容」。</div>
-      {sources && sources.length > 0 ? <ul>{sources.map((item) => <li key={item.source_id}>{item.title}（{formatTime(item.created_at)}）<a href={`/api/projects/${encodeURIComponent(project.project_id)}/sources/${encodeURIComponent(item.source_id)}/content`} target="_blank" rel="noreferrer">看內容 →</a></li>)}</ul> : <p className="sub">這個專案還沒有來源。</p>}
+      <div className="how"><b>怎麼讀</b>{here}存的外部來源：標題、存入時間；分析會引用這裡的內容。<b>你要做的</b>要新增就貼上文字和標題；要看內容按「看內容」。</div>
+      {sources && sources.length > 0 ? <ul>{sources.map((item) => <li key={item.source_id}>{item.title}（{formatTime(item.created_at)}）<a href={`/api/projects/${encodeURIComponent(project.project_id)}/sources/${encodeURIComponent(item.source_id)}/content`} target="_blank" rel="noreferrer">看內容 →</a></li>)}</ul> : <p className="sub">這裡還沒有來源。</p>}
       <details className="mb8"><summary>貼上文字，新增一筆來源</summary>
         <div className="mt6"><input type="text" aria-label="來源標題" placeholder="標題" value={sourceTitle} onChange={(event) => setSourceTitle(event.target.value)} /></div>
         <div className="mt6"><textarea aria-label="來源內容" placeholder="貼上內容" value={sourceContent} onChange={(event) => setSourceContent(event.target.value)} /></div>
@@ -385,14 +387,14 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
     </div>
     {(latestDone || reruns.length > 0) && <div className="card">
       <h2>到期重跑<small>{reruns.filter((item) => !item.fulfilled_by).length} 個等著</small></h2>
-      <div className="how"><b>怎麼讀</b>⑦ 排的提醒：到期日、答覆它的那一次分析。<b>你要做的</b>到期時按「重跑並比較」；也可以隨時按「現在重跑並比較」——重跑留在同一個專案裡，跟這次並排比較，不會多開一個專案。</div>
+      <div className="how"><b>怎麼讀</b>⑦ 排的提醒：到期日、答覆它的那一次分析。<b>你要做的</b>到期時按「重跑並比較」；也可以隨時按「現在重跑並比較」——重跑留在同一個地方，跟這次並排比較，不會另外多開一份。</div>
       {latestDone && <div className="btns mt6"><button type="button" className="btn" disabled={rerunNowBusy} onClick={rerunNow}>現在重跑並比較 →</button></div>}
       {rerunNowError && <p className="error" role="alert">{rerunNowError}</p>}
       {reruns.length > 0 && <ul>{reruns.map((item) => <li key={item.rerun_id}>{item.due}：{item.fulfilled_by ? <>已重跑，<Link href={compareHref(project.project_id, item.interpretation_id, item.fulfilled_by)}>並排比較 →</Link></> : item.due <= today ? <Link href={`${analysisHref(project.project_id, item.interpretation_id)}?rerun=${encodeURIComponent(item.rerun_id)}`}>到期了，重跑並比較 →</Link> : "還沒到期"}</li>)}</ul>}
     </div>}
     <div className="card">
       <h2>歷程<small>{historyLines.length ? `${historyLines.length} 筆，新的在上面` : "還沒有"}</small></h2>
-      <div className="how"><b>怎麼讀</b>這個專案從建立到現在的每一步，新的在上面。<b>你要做的</b>不用做；想看細節就點連結。</div>
+      <div className="how"><b>怎麼讀</b>{here}從建立到現在的每一步，新的在上面。<b>你要做的</b>不用做；想看細節就點連結。</div>
       {historyLines.length ? <ul>{historyLines.map((line) => <li key={line.key}>{formatTime(line.at)}：{line.node}</li>)}</ul> : <p className="sub mb0">還沒有記錄。</p>}
       {metricSeries.length > 0 && <div className="charts mt10">{metricSeries.map((series) => <figure key={series.name}><figcaption><b>{series.name}</b> 隨時間的變化</figcaption><TrendChart series={[series]} cite={() => ""} /></figure>)}</div>}
     </div>

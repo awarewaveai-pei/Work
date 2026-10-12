@@ -189,7 +189,7 @@ function Supervise({ people, scripts }: { people: Supervisee[]; scripts: Script[
     try { const saved = await docs.create(null, "facilitate.supervision", { supervisee: chosen.supervisee, feedback: text.trim() }); setMine([...mine, saved]); setText(""); }
     catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
   };
-  const nameOf = (id: string) => scripts.find((item) => item.id === id)?.subject_name ?? id;
+  const nameOf = (id: string) => scripts.find((item) => item.id === id)?.subject_name ?? "（找不到這份帶領腳本）";
   return (
     <section className="card">
       <h2>我督導的人</h2>

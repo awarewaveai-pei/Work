@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
+import { toolLabel } from "../../lib/catalog";
 import { humanError } from "../../lib/errors";
 import { Notices } from "./BlockShell";
 import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
@@ -80,7 +81,8 @@ function CasePanel({ practiceCase }: { practiceCase: PracticeCase }) {
   );
 }
 
-export function TeachPage() {
+/** `names`: tool id -> its Chinese name (a lesson's subject is a tool id or a package name; an id is never shown). */
+export function TeachPage({ names = {} }: { names?: Record<string, string> }) {
   const [lessons, setLessons] = useState<Lesson[] | null>(null);
   const [practiceCases, setPracticeCases] = useState<PracticeCase[]>([]);
   const [caseMessage, setCaseMessage] = useState("");
@@ -212,7 +214,7 @@ export function TeachPage() {
       <div className="card">
         <h2>先選主題</h2>
         <div className="chips" role="group" aria-label="課程主題">
-          {subjects.map((item) => <button key={item} type="button" className={`chip${item === subject ? " on" : ""}`} aria-pressed={item === subject} onClick={() => chooseSubject(item)}>{item}</button>)}
+          {subjects.map((item) => <button key={item} type="button" className={`chip${item === subject ? " on" : ""}`} aria-pressed={item === subject} onClick={() => chooseSubject(item)}>{toolLabel(names, item)}</button>)}
         </div>
         <div className="chips" role="group" aria-label="課程">
           {visibleLessons.map((item) => <button key={item.id} type="button" className={`chip${item.id === lessonId ? " on" : ""}`} aria-pressed={item.id === lessonId} onClick={() => chooseLesson(item.id)}>{item.title}{item.state === "draft" && "（草稿）"}</button>)}

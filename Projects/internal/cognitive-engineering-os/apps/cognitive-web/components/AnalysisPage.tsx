@@ -17,13 +17,13 @@ export function AnalysisPage({ projectId, analysisId, names = {}, lessons = {}, 
     let active = true;
     apiFetch<InterpretationStatus>(`/interpretations/${encodeURIComponent(analysisId)}`).then((found) => {
       if (!active) return;
-      if (found.project_id !== projectId) setError("這次分析不在這個專案裡。");
+      if (found.project_id !== projectId) setError("這次分析不在這裡。");
       else if (!found.method_id) setError("找不到這次分析用的工具。");
       else setAnalysis(found);
-    }).catch((reason) => { if (active) setError(reason instanceof ApiError && reason.status === 404 ? "找不到這次分析：可能連同專案一起刪除了，或不在你的帳號裡。" : humanError(reason)); });
+    }).catch((reason) => { if (active) setError(reason instanceof ApiError && reason.status === 404 ? "找不到這次分析：可能連同它所在的案子或分析一起刪除了，或不在你的帳號裡。" : humanError(reason)); });
     return () => { active = false; };
   }, [projectId, analysisId]);
-  if (error) return <><div className="crumbs"><Link href="/projects">我的案子</Link> › <Link href={projectHref(projectId)}>這個專案</Link></div><div className="card"><p className="error">{error}</p></div></>;
+  if (error) return <><div className="crumbs"><Link href="/projects">我的案子</Link> › <Link href={projectHref(projectId)}>上一層</Link></div><div className="card"><p className="error">{error}</p></div></>;
   if (!analysis) return <div className="card"><p>載入中…</p></div>;
   return <RunPage key={analysisId} methodId={analysis.method_id!} lesson={lessons[analysis.method_id!] ?? null} lessons={lessons} names={names} family={families[analysis.method_id!] ?? null} projectId={projectId} analysis={analysis} rerunId={rerunId} />;
 }

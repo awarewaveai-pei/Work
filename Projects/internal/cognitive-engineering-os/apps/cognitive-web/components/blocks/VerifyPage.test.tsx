@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import React from "react";
+import React, { act } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { VerifyPage, claimFromMap, liveOf, mapClaimsToBring, ofVersion, pendingProposals, readingsFor, sentTo, type Claim, type Split } from "./VerifyPage";
+import { ApiError } from "../../lib/api";
+import { VerifyPage, claimFromMap, liveOf, lookupLine, mapClaimsToBring, messageOffers, ofVersion, pendingProposals, readingsFor, sentTo, type Claim, type Message, type Split } from "./VerifyPage";
 import { byText, click, doc, field, labelled, mount, saved, serve, shell, type, type Call } from "./JudgmentTestKit";
 
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
@@ -98,6 +99,133 @@ describe("VERIFY 查證主張", () => {
     expect(text).toContain("由它去問：Cofacts 真的假的、全球查核結果公開資料檔。");
     expect(text).not.toContain("蒐集器");   // one term for the service on every page
     await done();
+  });
+});
+
+describe("VERIFY starts from the card that made SENSE propose it (走查 2026-10-12 W9)", () => {
+  const CARD = doc("sense.card", "K1", { category: "事件", text: "他還說「同業都這樣改」" });
+  const PROPOSAL = (propose: string, source?: string) => doc("assembler.proposal.sense", "PR1", { propose, why: "w", ...(source ? { source } : {}) }, { author: "system" });
+
+  it("offers the card a VERIFY proposal names, once per card; a deleted card, another block's proposal, or a card already saved as a message is not offered", () => {
+    expect(messageOffers([PROPOSAL("VERIFY", "K1")], [CARD], [])).toEqual([{ id: "K1", text: "他還說「同業都這樣改」" }]);
+    expect(messageOffers([PROPOSAL("VERIFY", "K1"), { ...PROPOSAL("VERIFY", "K1"), doc_id: "PR2" }], [CARD], [])).toHaveLength(1);
+    expect(messageOffers([PROPOSAL("VERIFY", "K9")], [CARD], [])).toEqual([]);
+    expect(messageOffers([PROPOSAL("THINK", "K1")], [CARD], [])).toEqual([]);
+    expect(messageOffers([PROPOSAL("VERIFY")], [CARD], [])).toEqual([]);
+    expect(messageOffers([PROPOSAL("VERIFY", "K1")], [CARD], [MSG, doc<Message>("verify.message", "M2", { text: " 他還說「同業都這樣改」 ", form: "訊息", sha256: "b".repeat(64) })])).toEqual([]);
+  });
+
+  it("shows the card's words with one button that only puts them in the message box; the person edits and saves", async () => {
+    const { host, done, calls } = await open({ [`GET ${P}/docs/assembler.proposal.sense`]: [PROPOSAL("VERIFY", "K1")], [`GET ${P}/docs/sense.card`]: [CARD], [`POST ${P}/verify/messages`]: (call: Call) => saved("verify.message", "M1", { ...call.body, sha256: "a".repeat(64) }) });
+    expect(host.textContent).toContain("你在「外化」寫的一張卡裡，有別人的說法");
+    expect(host.querySelector(".judge .tnote")?.textContent).toBe("他還說「同業都這樣改」");
+    expect(labelled(host, "訊息原文").value).toBe("");
+    expect(posts(calls, `${P}/verify/messages`)).toHaveLength(0);
+    await click(byText(host, "button", "用這句當要查的訊息"));
+    expect(labelled(host, "訊息原文").value).toBe("他還說「同業都這樣改」");
+    expect(posts(calls, `${P}/verify/messages`)).toHaveLength(0);   // nothing is saved by the offer itself
+    await type(labelled(host, "訊息原文"), "他還說「同業都這樣改」（我改過）");
+    await click(byText(host, "button", "存這則訊息"));
+    expect(posts(calls, `${P}/verify/messages`)[0].body).toEqual({ text: "他還說「同業都這樣改」（我改過）", form: "訊息" });
+    await done();
+  });
+
+  it("offers nothing when no proposal names a card", async () => {
+    const { host, done } = await open({ [`GET ${P}/docs/sense.card`]: [CARD] });
+    expect(byText(host, "button", "用這句當要查的訊息")).toBeUndefined();
+    await done();
+  });
+});
+
+describe("VERIFY 去查 shows how far the search is (走查 2026-10-12 W10)", () => {
+  const RUN = "RUN1";
+  const LINE_RUNNING = { ...LINE, lookup: { run: RUN, status: "running", angles: ["primary"] } };
+  const claimDoc = doc<Claim>("verify.claim", "C1", { text: LINE.text, sentence: LINE.sentence, from: "訊息", message: "M1" });
+  const minutesAgo = (n: number) => new Date(Date.now() - n * 60000).toISOString();
+  const later = (n: number) => new Date(Date.now() + n * 60000).toISOString();
+
+  it("reads the run at once and says how long it has run, when it ends at the latest and how many pages at most -- the words GATHER uses", async () => {
+    const { host, done, calls } = await open({
+      [`GET ${P}/docs/verify.claim`]: [claimDoc], [`${P}/verify/ledger`]: { claims: [LINE_RUNNING], factcheck_asks: [], person_reads: [] },
+      [`GET ${P}/collections/${RUN}`]: { status: "running", requested_at: minutesAgo(7), deadline_at: later(8), max_fetches: 200 },
+    });
+    const line = [...host.querySelectorAll("span.sub")].find((node) => node.textContent?.includes("上次："))!.textContent!;
+    expect(line).toContain("系統正在找");
+    expect(line).toContain("已經過了 7 分鐘");
+    expect(line).toContain("最晚再 8 分鐘會結束");
+    expect(line).toContain("最多抓 200 頁");
+    expect(line).toContain("找完，結果會寫進這個主張的帳本");
+    expect(line).not.toContain("來源總覽");   // that is GATHER's page, not this one
+    expect(calls.filter((call) => call.path === `${P}/collections/${RUN}`)).toHaveLength(1);
+    await done();
+  });
+
+  it("when the progress cannot be read it says so, and keeps the last reading it had", async () => {
+    let answer: () => unknown = () => { throw new ApiError(503, "COLLECT_DOWN"); };
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      const { host, done } = await open({
+        [`GET ${P}/docs/verify.claim`]: [claimDoc], [`${P}/verify/ledger`]: { claims: [LINE_RUNNING], factcheck_asks: [], person_reads: [] },
+        [`GET ${P}/collections/${RUN}`]: () => answer(),
+      });
+      const line = () => [...host.querySelectorAll("span.sub")].find((node) => node.textContent?.includes("上次："))!.textContent!;
+      expect(line()).toContain("讀不到進度");
+      expect(line()).not.toContain("還在找");
+      answer = () => ({ status: "running", requested_at: minutesAgo(2), deadline_at: later(10), max_fetches: 100 });
+      await act(async () => { vi.advanceTimersByTime(15000); });
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(line()).toContain("最多抓 100 頁");
+      answer = () => { throw new ApiError(503, "COLLECT_DOWN"); };
+      await act(async () => { vi.advanceTimersByTime(15000); });
+      await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+      expect(line()).toContain("最多抓 100 頁");   // one failed read does not wipe what was known
+      await done();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("shows the search result's why as the engine sent it: the engine's name once, no name or 無法檢查 added in front of it (走查 2026-10-12 W11)", async () => {
+    const why = "Brave：這個搜尋引擎回了錯誤（HTTP 422）；Serper：找過沒有找到";
+    const { host, done } = await open({
+      [`GET ${P}/docs/verify.claim`]: [claimDoc],
+      [`${P}/verify/ledger`]: { claims: [{ ...LINE, lookup: { run: RUN, status: "completed", angles: [] }, search: { state: "無法檢查", why } }], factcheck_asks: [], person_reads: [] },
+    });
+    const line = [...host.querySelectorAll("span.sub")].find((node) => node.textContent?.includes("結果："))!.textContent!;
+    expect(line).toBe(`　結果：無法檢查（${why}）`);
+    expect(line).not.toMatch(/Brave Brave|Brave：Brave|無法檢查：/);
+    await done();
+  });
+
+  it("before the first read it says only 還在找; a finished or failed search is not asked about", async () => {
+    expect(lookupLine(undefined, Date.now())).toBe("還在找");
+    const { host, done, calls } = await open({
+      [`GET ${P}/docs/verify.claim`]: [claimDoc], [`${P}/verify/ledger`]: { claims: [{ ...LINE, lookup: { run: RUN, status: "completed", angles: [] } }], factcheck_asks: [], person_reads: [] },
+    });
+    expect(host.textContent).toContain("上次：跑完了");
+    expect(calls.some((call) => call.path.includes("/collections/"))).toBe(false);
+    await done();
+  });
+
+  it("asks again every 15 seconds while it runs, and when it ends the page reloads once -- not on every later poll", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    try {
+      let status = "running";
+      const { host, done, calls } = await open({
+        [`GET ${P}/docs/verify.claim`]: [claimDoc], [`${P}/verify/ledger`]: { claims: [LINE_RUNNING], factcheck_asks: [], person_reads: [] },
+        [`GET ${P}/collections/${RUN}`]: () => ({ status, requested_at: minutesAgo(1), deadline_at: later(14), max_fetches: 200 }),
+      });
+      const tick = async () => { await act(async () => { vi.advanceTimersByTime(15000); }); await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); }); };
+      const asked = () => calls.filter((call) => call.path === `${P}/collections/${RUN}`).length;
+      const ledgers = () => calls.filter((call) => call.path === `${P}/verify/ledger`).length;
+      expect([asked(), ledgers()]).toEqual([1, 1]);
+      await tick();
+      expect([asked(), ledgers()]).toEqual([2, 1]);   // still running: a read, no reload
+      status = "completed";
+      await tick();
+      expect([asked(), ledgers()]).toEqual([3, 2]);   // ended: one reload
+      await tick();
+      expect(ledgers()).toBe(2);   // the ledger here still says running; the page does not reload every 15 seconds for it
+      await done();
+    } finally { vi.useRealTimers(); }
   });
 });
 

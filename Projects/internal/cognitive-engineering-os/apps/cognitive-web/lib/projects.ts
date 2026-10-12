@@ -26,6 +26,10 @@ export type Project = {
   updated_at?: string; analysis_count?: number; methods?: string[]; latest_analysis?: Analysis | null;
   tasks?: { open: number; overdue: number; due_today: number; next_due: string | null }; reruns_due?: number;
 };
+/** What a person calls a project (ENTRY_SLICE1 items 7 and 13): 案子 when the server says it is a case, else 分析 (it holds
+ *  only what 直接分析 left, 我的分析). The old word for both is not shown. `this` = 這個案子／這份分析. */
+export const holderWord = (isCase?: boolean) => (isCase ? "案子" : "分析");
+export const thisHolder = (isCase?: boolean) => (isCase ? "這個案子" : "這份分析");
 // N-85: a project's sources, for ProjectPage's own Sources card (GET/POST /projects/{id}/sources).
 export type Source = { source_id: string; title: string; created_at: string };
 // N-66: what stays after DELETE /projects/{id} -- the row itself is gone (GET /projects/erased).

@@ -143,6 +143,20 @@ describe("拆解", () => {
     await done();
   });
 
+  it("after a method is picked, says in a sentence what that does and what to do next, with no tool version on screen (走查 2026-10-12 W8)", async () => {
+    server({});
+    const { host, done } = await mount(<MapPage projectId="P1" />);
+    await click(byText(host, '[aria-label="可以選的拆法"] button', "冰山模型"));
+    const picked = host.querySelector(".card.cta")!.textContent ?? "";
+    expect(picked).toContain("冰山模型（系統思考）");
+    expect(picked).toContain("看這個工具怎麼用");
+    expect(picked).toContain("選了「冰山模型」，這一版地圖就記下你是用它來拆的");
+    expect(picked).toContain("它不會自動填格子");
+    expect(picked).toContain("再把結果寫進下面六層");
+    expect(picked).not.toMatch(/工具 \d|版本|1\.0\.0/);
+    await done();
+  });
+
   it("brings each ticked facet's two answers to the structure and the core-conflict layers, and no unticked one", async () => {
     server({ "context.notes": [{ facets: [{ facet: "文化", relevant: true, defines_normal: "重人情", is_cause: "可能是" }, { facet: "宗教", relevant: false }] }] });
     const { host, done } = await mount(<MapPage projectId="P1" />);

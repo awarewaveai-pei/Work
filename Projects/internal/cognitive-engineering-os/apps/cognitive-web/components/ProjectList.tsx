@@ -12,7 +12,7 @@ import { BLOCKS } from "../lib/blocks";
 import { Slots } from "./blocks/BlockShell";
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../lib/api";
-import { analysisHref, projectHref, toolHref } from "../lib/catalog";
+import { analysisHref, projectHref, toolHref, toolLabel } from "../lib/catalog";
 import { humanError } from "../lib/errors";
 import { byActivity, standing, type ErasedProject, type Project } from "../lib/projects";
 import { formatTime } from "../lib/time";
@@ -53,7 +53,7 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
     const flags = [project.tasks?.overdue ? `${project.tasks.overdue} 個任務逾期` : project.tasks?.open ? `${project.tasks.open} 個任務進行中` : "", project.tasks?.due_today ? `${project.tasks.due_today} 個任務今天到期` : "", project.reruns_due ? "到期：重跑並比較" : ""].filter(Boolean);
     return <tr key={project.project_id}>
       <td>{tickable && <><input type="checkbox" id={`tick-${project.project_id}`} aria-label={`勾選「${project.name}」`} checked={ticked.includes(project.project_id)} onChange={() => tick(project.project_id)} /> </>}<Link prefetch={false} href={projectHref(project.project_id)}>{project.name}</Link></td>
-      <td>{project.methods?.length ? <>工具：{project.methods.map((id, index) => <span key={id}>{index ? "、" : ""}<Link prefetch={false} href={toolHref(id)}>{names[id] ?? id}</Link></span>)}</> : "—"}</td>
+      <td>{project.methods?.length ? <>工具：{project.methods.map((id, index) => <span key={id}>{index ? "、" : ""}<Link prefetch={false} href={toolHref(id)}>{toolLabel(names, id)}</Link></span>)}</> : "—"}</td>
       <td>{standing(latest)}{count > 1 ? `（共 ${count} 次分析）` : ""}{flags.length ? <><br /><span className="warn">{flags.join("・")}</span></> : null}</td>
       <td>{formatTime(project.created_at)}</td>
       <td>{formatTime(project.updated_at ?? project.created_at)}</td>
@@ -80,7 +80,7 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
       </div>
       <div className="card" id="analyses">
         <h2>我的分析<small>{projects ? `${analyses.length} 個你自己的・1 個示範` : "載入中"}</small></h2>
-        <div className="how"><b>怎麼讀</b>直接分析每跑一次就留一份在這裡，是 AI 做的，不是你的判斷；2026-10-11 以前的專案也都在這裡。<b>你要做的</b>想把一件事想清楚，按「用這份結果開案」；不要的，勾起來按「永久刪除」。</div>
+        <div className="how"><b>怎麼讀</b>直接分析每跑一次就留一份在這裡，是 AI 做的，不是你的判斷；2026-10-11 以前跑的分析也都在這裡。<b>你要做的</b>想把一件事想清楚，按「用這份結果開案」；不要的，勾起來按「永久刪除」。</div>
         {projects && (
           <div className="scroll-x">
             <table>

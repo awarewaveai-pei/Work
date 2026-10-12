@@ -8,7 +8,7 @@ import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
-import { toolHref } from "../../lib/catalog";
+import { toolHref, toolLabel } from "../../lib/catalog";
 import { humanError } from "../../lib/errors";
 import {
   allItems, compareRows, confirmClaim, detailsMissing, editedBy, interestGroups, itemsOf, layerFlags, newId, pendingKeys, placeCard, sourceLine, takeAlternative,
@@ -89,6 +89,10 @@ function ItemRow({ layer, item, claimed, kinds, origins, onSave, onDelete, onCla
     </div>
   );
 }
+
+/** What picking a 拆法 does, in one sentence: it is written down on this version of the map; it fills nothing by itself. */
+export const methodMeaning = (name: string | undefined) =>
+  `選了「${name ?? "這個拆法"}」，這一版地圖就記下你是用它來拆的（之後兩版並排看得出來）。它不會自動填格子：想用它，就按「看這個工具怎麼用」做一遍，再把結果寫進下面六層，每層一句。`;
 
 export function MapPage({ projectId }: { projectId: string }) {
   const [spec, setSpec] = useState<MapSpec | null>(null);
@@ -191,7 +195,7 @@ export function MapPage({ projectId }: { projectId: string }) {
   const layerName = Object.fromEntries(spec.layers.map((layer) => [layer.key, layer.name]));
   const flags = layerFlags(draft, layerKeys);
   const thin = thinFacts(draft, evidence);
-  const toolName = (id: string) => tools.find((tool) => tool.method_id === id)?.name ?? id;
+  const toolName = (id: string) => toolLabel(Object.fromEntries(tools.map((tool) => [tool.method_id, tool.name])), id);
   const unplaced = unplacedCards(cards, draft);
   const placements = usablePlacements(placeDoc?.content.placements, cards, draft, layerKeys);
   const pendingPlacements = placeDoc ? pendingKeys(placements.map((item) => item.card), placeDoc, reviews, decided) : [];
@@ -272,8 +276,11 @@ export function MapPage({ projectId }: { projectId: string }) {
         <h2>選一個拆法（選填）</h2>
         <p className="how">一個拆法就是一個工具。不管用哪一個，結果都放進下面同一張六層地圖。一個拆法沒看清楚，就換一個再拆一次。</p>
         {draft.method_id
-          ? <p><b>{draft.method}</b>{picked ? `（${picked.family_zh}）` : ""}・<Link href={toolHref(draft.method_id, projectId)}>看這個工具怎麼用</Link>{draft.method_version ? `・工具 ${draft.method_version} 版` : ""}
-            <button className="btn ghost" type="button" onClick={() => set({ method: undefined, method_id: undefined, method_version: undefined })}>不用這個</button></p>
+          ? <>
+            <p><b>{draft.method}</b>{picked ? `（${picked.family_zh}）` : ""}・<Link href={toolHref(draft.method_id, projectId)}>看這個工具怎麼用</Link>
+              <button className="btn ghost" type="button" onClick={() => set({ method: undefined, method_id: undefined, method_version: undefined })}>不用這個</button></p>
+            <p className="hint">{methodMeaning(draft.method)}</p>
+          </>
           : <p className="sub">還沒選。不選也可以直接寫下面的六層。</p>}
         <Fold title={`看可以選的拆法（${matches.length} 個）`}>
           <p className="hint">{intake.purpose ? `先列適合「${intake.purpose}」的。` : ""}研究用的方法要資料和統計，排在最後。用找的，每一個都找得到。</p>

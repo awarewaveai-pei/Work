@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiFetch } from "../../lib/api";
 import type { Author, Doc } from "../../lib/blocks";
-import { PHASES, ThinkPage, hasOwn, ownItem, phaseAt, pickHistory, splitOwn, thinkError, unchangedStreak, type Card, type PickHistory, type Reaction } from "./ThinkPage";
+import { NEXT_STEP, PHASES, ThinkPage, hasOwn, ownItem, phaseAt, pickHistory, splitOwn, thinkError, thinkStage, unchangedStreak, type Card, type PickHistory, type Reaction } from "./ThinkPage";
 
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -81,6 +81,67 @@ describe("refusals read as sentences", () => {
     expect(thinkError(new ApiError(400, "THINK_OWN_VERSION_REQUIRED: 先寫下你自己的版本"))).toContain("先寫下你自己的版本");
     expect(thinkError(new ApiError(502, "AI_ANSWER_INVALID: x"))).toContain("再按一次");
     expect(thinkError(new ApiError(403, "AI_PERMISSION_DENIED: counter"))).toContain("協作合約");
+  });
+});
+
+describe("what the round asks for next (走查 2026-10-12 W7)", () => {
+  const have = { round: true, ownSaved: true, cards: 0, answers: 0, picked: 0, ownCards: 0, reflected: false };
+  it("names the first thing still missing, from what is saved, and every stage has a sentence", () => {
+    expect(thinkStage({ ...have, round: false, ownSaved: false })).toBe("start");
+    expect(thinkStage({ ...have, ownSaved: false })).toBe("own");
+    expect(thinkStage(have)).toBe("ask");
+    expect(thinkStage({ ...have, answers: 1 })).toBe("reply");
+    expect(thinkStage({ ...have, cards: 4, picked: 2 })).toBe("pick");
+    expect(thinkStage({ ...have, cards: 4, picked: 3, ownCards: 1 })).toBe("own-cards");
+    expect(thinkStage({ ...have, cards: 6, picked: 3, ownCards: 2 })).toBe("reflect");
+    expect(thinkStage({ ...have, cards: 6, picked: 3, ownCards: 2, reflected: true })).toBe("done");
+    expect(Object.keys(NEXT_STEP).sort()).toEqual(["ask", "done", "own", "own-cards", "pick", "reflect", "reply", "start"]);
+    expect(Object.values(NEXT_STEP).join("")).not.toMatch(/[A-Za-z_]{4,}/);   // plain Chinese, no ids
+  });
+});
+
+describe("共思考 page：先看到下一步，其餘收起來", () => {
+  const round = doc("think.round", "R1", { problem: "要不要接這個案子", own: ["觀察：他第三次改條件"] });
+  const grants = { "collab_contract.terms": [doc("collab_contract.terms", "C", { permissions: ["counter", "propose_options", "direct_advice"] })] };
+  const foldOf = (host: HTMLElement, title: string) => [...host.querySelectorAll("details")].find((item) => item.querySelector("summary")?.textContent?.startsWith(title)) as HTMLDetailsElement | undefined;
+
+  it("once your version is saved: the next step, three commands in sight; the timer, the other commands, the role-and-mode picker and the direct advice folded, all still on the page", async () => {
+    serve({ "think.round": [round], ...grants });
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    expect(host.querySelector(".card.cta")?.textContent).toBe(`下一步：${NEXT_STEP.ask}`);
+    const outside = (selector: string) => [...host.querySelectorAll(selector)].filter((node) => !node.closest("details"));
+    expect(outside(".mcards .mcard").map((card) => card.querySelector("b")?.textContent)).toEqual(["先幫我看見我在想什麼", "和我一起發散，但不要替我決定", "請當最強的反方"]);
+    for (const title of ["25 分鐘計時", "更多做法（6 種）", "自己選角色和模式", "不想先寫，直接要建議"]) {
+      const fold = foldOf(host, title);
+      expect(fold, title).toBeDefined();
+      expect(fold!.open, title).toBe(false);
+    }
+    expect([...host.querySelectorAll(".mcards .mcard")].filter((card) => card.textContent?.includes("模式：")).length).toBe(9);   // nothing removed: the nine start cards are all in the page
+    expect(button(host, "用這個角色和模式開始")).toBeDefined();
+    expect(button(host, "直接取得建議")).toBeDefined();
+    expect(button(host, "開始計時")).toBeDefined();
+    await done();
+  });
+
+  it("before your version is saved: the page asks for it, and the whole AI part is one folded line saying why it waits", async () => {
+    serve({ "think.round": [doc("think.round", "R0", { problem: "要不要接這個案子" })], ...grants });
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    expect(host.querySelector(".card.cta")?.textContent).toContain(NEXT_STEP.own);
+    expect(host.querySelector("#problem")!.closest("details")).toBeNull();   // the writing is in sight
+    const ai = foldOf(host, "請 AI 幫忙（先存下你的版本")!;
+    expect(ai.open).toBe(false);
+    expect(ai.contains(button(host, "直接取得建議"))).toBe(true);
+    await done();
+  });
+
+  it("with cards on the page the next step counts the picks, and the later cards (criteria, together, how I thought) wait folded", async () => {
+    const card = (id: string) => doc<Card>("think.card", id, { claim: `方向${id}`, mechanism: "m", round: "R1", sourced: "它自己說的" }, "ai");
+    serve({ "think.round": [round], "think.card": [card("a"), card("b")], "think.reaction": [doc<Reaction>("think.reaction", "x-a", { card: "a", picked: true })], ...grants });
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    expect(host.querySelector(".card.cta")?.textContent).toBe(`下一步：${NEXT_STEP.pick}（現在 1 / 3 張）`);
+    for (const title of ["候選的判準", "這一輪放在一起看", "這次我是怎麼想的", "加一張你自己的卡", "你的問題和你自己的版本"]) expect(foldOf(host, title), title).toBeDefined();
+    expect(foldOf(host, "你的問題和你自己的版本")!.open).toBe(false);
+    await done();
   });
 });
 
@@ -206,6 +267,19 @@ describe("共思考 page", () => {
     const laid = await mount(<ThinkPage projectId="P" />);
     expect(button(laid.host, "展開成卡")).toBeUndefined();
     await laid.done();
+  });
+
+  it("shows the AI's caution beside its reflection, in the warn style, with the sections kept and no hand-back (走查 2026-10-12 W5)", async () => {
+    const reply = doc("think.reply", "Y2", { round: "R1", action: "mirror", role: "鏡子", sections: [{ title: "事實", items: ["他改了條件"] }], caution: "合約條款這要請律師看。", sourced: "它自己說的" }, "ai");
+    serve({ "think.round": [round], "think.reply": [reply] });
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    const shown = host.querySelector(".judge")!;
+    expect(shown.textContent).toContain("他改了條件");
+    const caution = [...shown.querySelectorAll("p.warn")].map((node) => node.textContent);
+    expect(caution).toEqual(["AI 在整理旁邊提醒你：合約條款這要請律師看。"]);
+    expect(shown.textContent).not.toContain("把控制交還給你");
+    expect(button(host, "對，是這樣")).toBeDefined();   // the reflection is still the one to confirm or rewrite
+    await done();
   });
 
   it("answers a reply with the version of it that is on the screen", async () => {

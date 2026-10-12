@@ -188,7 +188,7 @@ describe("ResultPage", () => {
   });
   it("shows a visible reason when saving tasks is unavailable and renders the gate table", () => {
     const noProject = renderToStaticMarkup(<ResultPage result={{ ...fixture, solutions: { options: [], first_step: "x", plan: [] } } as any} />);
-    expect(noProject).toContain("先把分析存進專案，才能把行動計畫存成任務。");
+    expect(noProject).toContain("先把分析存起來，才能把行動計畫存成任務。");
     const withGate = renderToStaticMarkup(<ResultPage result={fixture} gateResults={[{ gate_id: "citation_integrity", status: "PASS", evidence: { cited: 1 } }]} />);
     expect(withGate).toContain("<th>閘門</th>");
     expect(withGate).toContain("引註完整");
@@ -246,17 +246,17 @@ describe("ResultPage", () => {
     expect(html).toContain("紀錄表只問洞察");
   });
 
-  it("the 示範專案 is the real result page, read-only: a writing button says it is a demo and calls nothing (N-78)", async () => {
+  it("the 示範分析 is the real result page, read-only: a writing button says it is a demo and calls nothing (N-78)", async () => {
     const demo = (await import("../../fixtures/demo-iceberg.json")).default as unknown as { result: React.ComponentProps<typeof ResultPage>["result"]; record: Record<string, unknown>; manifest: never[]; gateResults: never[]; fields: never[] };
     vi.mocked(apiFetch).mockResolvedValue({} as never);   // reads (the next steps' estimates) may happen; writes may not
     const host = document.createElement("div"); document.body.append(host);
     const root = createRoot(host);
     await act(async () => { root.render(<ResultPage demo result={demo.result} record={demo.record} manifest={demo.manifest} gateResults={demo.gateResults} fields={demo.fields} />); });
-    expect(host.textContent).toContain("示範專案（免費，不花錢）");
-    const approve = [...host.querySelectorAll("button")].find((b) => b.textContent === "核准，存進專案")!;
+    expect(host.textContent).toContain("示範分析（免費，不花錢）");
+    const approve = [...host.querySelectorAll("button")].find((b) => b.textContent === "核准，存進紀錄")!;
     await act(async () => { approve.click(); });
     expect(vi.mocked(apiFetch).mock.calls.some(([, init]) => init?.method === "POST" || init?.method === "DELETE")).toBe(false);
-    expect(host.textContent).toContain("這是示範專案：不能核准");
+    expect(host.textContent).toContain("這是示範分析：不能核准");
     await act(async () => { root.unmount(); }); host.remove();
   });
 
@@ -299,7 +299,7 @@ describe("ResultPage", () => {
       return [] as never;
     });
     const { host, done: finish } = await mount(<ResultPage result={fixture} project={{ id: "P1", name: "P" }} />);
-    expect(host.textContent).toContain("已存成 1 個任務，到專案頁看");
+    expect(host.textContent).toContain("已存成 1 個任務，到分析頁看");
     expect(host.textContent).not.toContain("把行動計畫存成任務，設提醒");
     expect(host.textContent).toContain("已排在 2030-02-01 重跑");
     await finish();
@@ -362,7 +362,7 @@ describe("ResultPage", () => {
     await act(async () => { textarea.blur(); });
     expect(host.querySelector('[role="status"]')?.textContent).toContain("先選同意／部分同意／不同意");
     expect(vi.mocked(apiFetch).mock.calls.some(([p]) => String(p).includes("/judgment"))).toBe(false);   // the words stayed unsaved rather than being silently dropped
-    const approveButton = [...host.querySelectorAll("button")].find((b) => b.textContent === "核准，存進專案") as HTMLButtonElement;
+    const approveButton = [...host.querySelectorAll("button")].find((b) => b.textContent === "核准，存進紀錄") as HTMLButtonElement;
     await act(async () => { approveButton.click(); });
     expect(host.querySelector('[role="alert"]')?.textContent).toContain("先選同意／部分同意／不同意");
     expect(vi.mocked(apiFetch).mock.calls.some(([p]) => String(p).includes("/approval"))).toBe(false);
@@ -394,14 +394,14 @@ describe("ResultPage", () => {
   it("states where the problem sits (第 N 層) in the journey pill and the ⑧ lead, instead of repeating the headline/summary, once there is a focus (N-03/N-07)", () => {
     const fields = ["events", "patterns", "structures", "mental_models"].map((key, index) => ({ key, kind: "list", label: `${"①②③④"[index]} ${["事件", "模式", "結構", "心智模型"][index]}：問題 ${index + 1}？` }));
     const positioned = { ...fixture, focus: { path: "r/structures", why: "切斷迴路" }, data_thickness: { events: { own_statements: 1 }, mental_models: { own_statements: 1 } } };
-    const html = renderToStaticMarkup(<ResultPage result={positioned} record={record} fields={fields} />);
-    expect(html).toContain('<span class="done">✓ systems.iceberg_model：問題在第 3 層、根在第 4 層</span>');
+    const html = renderToStaticMarkup(<ResultPage result={positioned} record={record} fields={fields} names={{ "systems.iceberg_model": "冰山模型" }} />);
+    expect(html).toContain('<span class="done">✓ 冰山模型：問題在第 3 層、根在第 4 層</span>');
     const lead = html.match(/<p class="lead mt6 mb0">([\s\S]*?)<\/p>/)![1];
     expect(lead.startsWith("你已經知道問題在第 3 層、根在第 4 層。")).toBe(true);
     expect(lead).not.toContain(positioned.summary);
     // no focus: falls back to the headline, as before
-    const noFocus = renderToStaticMarkup(<ResultPage result={{ ...fixture, focus: undefined }} record={record} fields={fields} />);
-    expect(noFocus).toContain(`<span class="done">✓ systems.iceberg_model：${fixture.headline}</span>`);
+    const noFocus = renderToStaticMarkup(<ResultPage result={{ ...fixture, focus: undefined }} record={record} fields={fields} names={{ "systems.iceberg_model": "冰山模型" }} />);
+    expect(noFocus).toContain(`<span class="done">✓ 冰山模型：${fixture.headline}</span>`);
   });
   it("card 8's actions carry the project through, and the workflow-chaining button no longer claims to run it (N-22/N-23/N-24)", () => {
     const withProject = renderToStaticMarkup(<ResultPage result={fixture} record={record} project={{ id: "P1", name: "團體反思" }} />);
@@ -426,7 +426,7 @@ describe("ResultPage", () => {
     vi.mocked(apiFetch).mockImplementation(async (path) => (path === "/projects/P1/analyses" ? [{ interpretation_id: "INTERP-OLD", method_id: "systems.leverage_point_analysis", status: "DONE" }] : []) as never);
     const { host, done: finish } = await mount(<ResultPage result={fixture} record={record} project={{ id: "P1", name: "P" }} />);
     const card = host.querySelector(".next-step")!;
-    expect(card.textContent).toContain("這個專案已經做過");
+    expect(card.textContent).toContain("這份分析已經做過");
     expect(card.querySelector('a[href="/projects/P1/analyses/INTERP-OLD"]')?.getAttribute("target")).toBe("_blank");
     await finish();
   });
@@ -437,12 +437,12 @@ describe("ResultPage", () => {
     const host = document.createElement("div");
     document.body.appendChild(host);
     const root = createRoot(host);
-    await act(async () => { root.render(<ResultPage result={next} record={record} approval={{ decision: "approve", at: "2026-01-01T00:00:00Z" }} />); });
+    await act(async () => { root.render(<ResultPage result={next} record={record} names={{ "systems.iceberg_model": "冰山模型" }} approval={{ decision: "approve", at: "2026-01-01T00:00:00Z" }} />); });
     const link = host.querySelector<HTMLAnchorElement>(".next-step a.btn.primary")!;
     link.addEventListener("click", (event) => event.preventDefault());   // jsdom would otherwise try (and fail) to follow the real href
     await act(async () => { link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true })); });
     const stored = JSON.parse(localStorage.getItem("cos:prefill:systems.leverage_point_analysis")!);
-    expect(stored.from).toEqual({ name: "systems.iceberg_model", approved: true });
+    expect(stored.from).toEqual({ name: "冰山模型", approved: true });
     expect(stored.values).toEqual({ events: ["Release incidents increased"] });
     expect(typeof stored.at).toBe("number");   // the run page ignores a hand-over older than 10 minutes
     await act(async () => { root.unmount(); });
@@ -450,8 +450,8 @@ describe("ResultPage", () => {
     localStorage.clear();
   });
   it("with a lesson, the header opens it in a new tab; without one it opens the tool page", () => {
-    const withLesson = renderToStaticMarkup(<ResultPage result={fixture} lesson="/learn/systems.iceberg_model" />);
-    expect(withLesson).toContain('<div class="top"><h1>systems.iceberg_model分析<span>：Release incidents recur</span></h1><a class="howto" href="/learn/systems.iceberg_model" target="_blank" rel="noopener">怎麼用？先上 5 分鐘的課 ↗</a></div>');
+    const withLesson = renderToStaticMarkup(<ResultPage result={fixture} lesson="/learn/systems.iceberg_model" names={{ "systems.iceberg_model": "冰山模型" }} />);
+    expect(withLesson).toContain('<div class="top"><h1>冰山模型分析<span>：Release incidents recur</span></h1><a class="howto" href="/learn/systems.iceberg_model" target="_blank" rel="noopener">怎麼用？先上 5 分鐘的課 ↗</a></div>');
     expect(renderToStaticMarkup(<ResultPage result={fixture} />)).toContain('<a class="howto" href="/methods/systems.iceberg_model">它做什麼？</a>');
   });
   it("renders finding-level revision conditions from the typed contract", () => {
@@ -493,7 +493,7 @@ describe("ResultPage", () => {
     errors.mockRestore();
   });
 
-  it("這份結果要怎麼處理's 永久刪除 asks the server for an analysis only; 刪除專案 deletes whatever it is (Codex review 2026-10-11 round 3)", async () => {
+  it("這份結果要怎麼處理's 永久刪除 asks the server for an analysis only; 刪除分析 deletes whatever it is (Codex review 2026-10-11 round 3)", async () => {
     const deletes: string[] = [];
     vi.mocked(apiFetch).mockImplementation(async (path, init) => {
       if (init?.method === "DELETE") { deletes.push(String(path)); return {} as never; }
@@ -505,7 +505,7 @@ describe("ResultPage", () => {
     Object.defineProperty(window, "location", { configurable: true, value: { ...location, assign: vi.fn() } });
     try {
       await act(async () => { ([...host.querySelectorAll("#choices button")].find((item) => item.textContent === "永久刪除") as HTMLButtonElement).click(); });
-      await act(async () => { ([...host.querySelectorAll("button")].find((item) => item.textContent === "刪除專案") as HTMLButtonElement).click(); });
+      await act(async () => { ([...host.querySelectorAll("button")].find((item) => item.textContent === "刪除分析") as HTMLButtonElement).click(); });
       expect(deletes).toEqual(["/projects/P1?only=analysis", "/projects/P1"]);
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: location });
