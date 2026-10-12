@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import datetime
 import threading
+from time import monotonic as _monotonic
 import hashlib
 import hmac
 import json
@@ -79,7 +80,7 @@ from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHA
 from ai_lego.platform.ai_gateway.pricing import cost_twd
 from ai_lego.platform.ai_gateway.provider import (DEFAULT_MODEL, SCOPE_PERSON, SCOPE_TENANT, AiProvider, AnthropicProvider, ProviderCallError, budget_exceeded, daily_person_budget,
                                                   daily_token_budget, fits_budget, provider_from_env)
-from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_paths
+from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_fingerprint
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net.collection_service import CollectionServiceClient, collection_service_from_env
 from ai_lego.core.domain._intake_validation import require_text, require_uuid
@@ -115,6 +116,25 @@ SESSION_COOKIE = "cognitive_os_session"
 
 
 
+def _warm_reads() -> None:
+    """What a read route would parse on its first request in this worker, parsed at start instead (pure-Python YAML, measured
+    2026-10-12 on the capacity rig): the method catalog (3 s), the TEACH and FACILITATE content with the catalog behind their
+    subject check (7 s), and one method form, which builds the contracts and schema index every form shares (9 s cold)."""
+    from ai_lego.platform.lessons import load_lessons, load_practice_cases
+    from ai_lego.platform.scripts import load_scripts
+
+    catalog = get_catalog()
+    load_lessons()
+    load_practice_cases()
+    load_scripts()
+    for method_id in sorted(catalog.contracts)[:5]:
+        try:
+            method_form(method_id, catalog)
+            return
+        except HTTPException:   # this one has no builder or is not resolvable: the next one warms the same shared tables
+            continue
+
+
 @asynccontextmanager
 async def _lifespan(started: FastAPI) -> AsyncIterator[None]:
     """At start, in every worker process: finish every erasure a crash or a filesystem error left with files still on
@@ -126,6 +146,10 @@ async def _lifespan(started: FastAPI) -> AsyncIterator[None]:
         _display_catalog_payload()
     except Exception:
         logging.getLogger(__name__).exception("display catalog not built at start; the first GET /catalog tries again")
+    try:
+        _warm_reads()
+    except Exception:
+        logging.getLogger(__name__).exception("read routes not warmed at start; the first request of each kind in this worker parses its files")
     overrides = started.dependency_overrides
     try:
         repo = overrides[get_project_source_repository]() if get_project_source_repository in overrides else ProjectSourceRepository(overrides.get(get_databases, get_databases)())
@@ -493,8 +517,14 @@ def _process_databases() -> Databases:
     """The process's pools, one per region of COGNITIVE_OS_DATABASE_URLS, built on first use. A region whose schema is not
     at head stops it here (the engine never migrates by itself: docs/platform/STORAGE_SWITCH.md D2)."""
     databases = Databases.from_env()
-    for region in databases.regions():
-        databases.require_schema_at_head(region)
+    workers = os.environ.get("COGNITIVE_OS_API_WORKERS", "").strip()
+    try:
+        for region in databases.regions():
+            databases.require_schema_at_head(region)
+            databases.require_connection_budget(region, int(workers) if workers.isdecimal() else 1)
+    except BaseException:
+        databases.close()   # a refused start must not leave its pools (and their threads) behind for the next request to repeat
+        raise
     return databases
 
 
@@ -676,22 +706,30 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+_DISPLAY_METADATA_CACHE: dict[str, Any] = {}
+
+
 def _method_display_metadata() -> dict[str, dict[str, str]]:
-    """``method_id -> {name_en, name_zh, blurb_en, blurb_zh}``, read fresh per call -- same
-    no-cache convention as ``list_recipes`` below, so dashboard copy edits don't need a restart.
+    """``method_id -> {name_en, name_zh, blurb_en, blurb_zh}``, re-read when the file changes (mtime and size) -- so dashboard copy
+    edits don't need a restart, and a request does not parse the file.
     Deliberately a separate file from each contract's own ``description`` (AI/engineer-facing
     per AGENTS.md §9, not end-user copy) -- see the file's own header for why. Fails open to
     ``{}`` if the file is missing OR fails to parse (critic finding 2026-09-18: a malformed-but-
     present file must not 500 /methods and /methods/{id}/form, the two basic discovery routes)."""
     path = resolve_spec_root() / "methods" / "registry" / "method-display-metadata.yaml"
-    if not path.exists():
-        return {}
     try:
-        document = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError:
+        stat = path.stat()
+    except OSError:
         return {}
-    entries = document.get("entries") if isinstance(document, dict) else None
-    return entries if isinstance(entries, dict) else {}
+    stamp = (str(path), stat.st_mtime_ns, stat.st_size)   # the parse is 0.4 s of pure-Python YAML: once per file change, not per request
+    if _DISPLAY_METADATA_CACHE.get("stamp") != stamp:
+        try:
+            document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            document = None
+        entries = document.get("entries") if isinstance(document, dict) else None
+        _DISPLAY_METADATA_CACHE.update(stamp=stamp, entries=entries if isinstance(entries, dict) else {})
+    return _DISPLAY_METADATA_CACHE["entries"]
 
 
 @app.get("/methods")
@@ -707,32 +745,38 @@ _CATALOG_CACHE: dict[str, Any] = {}
 
 
 def _catalog_fingerprint() -> tuple[int, int]:
-    """(file count, newest mtime) of every file the display catalog reads -- a registry edit changes it, so the cached
+    """(file count, hash of names, mtimes and sizes) of every file the display catalog reads -- a registry edit changes it, so the cached
     payload is rebuilt without a restart (same freshness as /methods), while an unchanged tree costs a few stat calls
     instead of a 1.3 s parse of every contract."""
-    paths = registry_paths()
-    files = [paths[key] for key in ("METHODS_FILE", "FAMILIES_FILE", "GOALS_FILE", "RECIPE_DISPLAY_FILE")]
-    files += list(paths["CONTRACTS_DIR"].glob("*.contract.yaml")) + list(paths["RECIPES_DIR"].glob("*.recipe.yaml"))
-    return len(files), max((path.stat().st_mtime_ns for path in files if path.exists()), default=0)
+    return registry_fingerprint()
+
+
+_CATALOG_RECHECK_SECONDS = 2.0   # the fingerprint is a glob and 280 stats (7 ms): looked at most this often, so a registry edit shows within it
 
 
 def _display_catalog_payload() -> dict[str, Any]:
-    """The cached payload, rebuilt when the registry's files changed (_catalog_fingerprint). Per process: each worker
-    builds its own copy at start (_lifespan); it is read-only, so N copies never disagree for longer than an edit."""
+    """The cached payload (and its JSON bytes, 390 KB: serialized once, not per request), rebuilt when the registry's files changed
+    (_catalog_fingerprint). Per process: each worker builds its own copy at start (_lifespan); it is read-only, so N copies never
+    disagree for longer than an edit."""
+    now = _monotonic()
+    if "payload" in _CATALOG_CACHE and now - _CATALOG_CACHE.get("checked", float("-inf")) < _CATALOG_RECHECK_SECONDS:
+        return _CATALOG_CACHE["payload"]
     fingerprint = _catalog_fingerprint()
     if _CATALOG_CACHE.get("fingerprint") != fingerprint:
         payload = catalog_payload(load_catalog())
-        _CATALOG_CACHE.update(fingerprint=fingerprint, payload=payload)
+        _CATALOG_CACHE.update(fingerprint=fingerprint, payload=payload, body=JSONResponse(payload).body)
+    _CATALOG_CACHE["checked"] = now
     return _CATALOG_CACHE["payload"]
 
 
 @app.get("/catalog")
-def display_catalog() -> dict[str, Any]:
+def display_catalog() -> Response:
     """Everything the web app's home page, tool directory and workflow list show, from the loader the mocks are checked
     with (ai_lego/platform/catalog/display_catalog.py). Public like /methods. A registry gap is a 503 that names it --
     never a half-labelled page."""
     try:
-        return _display_catalog_payload()
+        _display_catalog_payload()
+        return Response(content=_CATALOG_CACHE["body"], media_type="application/json")
     except (ValueError, OSError, yaml.YAMLError, InvariantViolation) as error:   # a gap, a missing or unparsable file
         raise HTTPException(status_code=503, detail=f"CATALOG_INVALID: {type(error).__name__}: {error}") from error
 
@@ -1832,13 +1876,17 @@ def _interpretation_running(tenant_id: str, interpretation_id: str) -> bool:
     return run_lock_state(path) == "held" and run_lock_tag(path) == interpretation_id
 
 
-def _analyses(repo: ProjectSourceRepository, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+def _analyses(repo: ProjectSourceRepository, tenant_id: str, project_id: str | None = None, *, project_ids: list[str] | None = None) -> dict[str, list[dict[str, Any]]]:
     """``repo.analyses`` with each PENDING whose runner is gone read as FAILED / RUNNER_LOST (N-64: a restart mid-run
     left it PENDING forever and the Project undeletable). Probes first, then re-reads: a runner writes its outcome
-    before it lets go of the lock, so one that finished between the reads shows its real outcome."""
-    read = (lambda: repo.analyses(tenant_id, project_id)) if project_id else (lambda: repo.analyses(tenant_id))
-    lost = {item["interpretation_id"] for items in read().values() for item in items
+    before it lets go of the lock, so one that finished between the reads shows its real outcome. Nothing PENDING and
+    gone: the first read is the answer (no second scan). ``project_ids``: only these cases."""
+    read = (lambda: repo.analyses(tenant_id, project_id)) if project_id else (lambda: repo.analyses(tenant_id, project_ids=project_ids))
+    first = read()
+    lost = {item["interpretation_id"] for items in first.values() for item in items
             if item["status"] == "PENDING" and not _interpretation_running(tenant_id, item["interpretation_id"])}
+    if not lost:
+        return first
     analyses = read()
     for items in analyses.values():
         for item in items:
@@ -2793,9 +2841,11 @@ def list_projects(
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> list[dict[str, Any]]:
     tenant_id = session["tenant_id"]
-    analyses, activity, tasks, reruns = _analyses(repo, tenant_id), repo.last_activity(tenant_id), repo.tasks(tenant_id), repo.reruns(tenant_id)   # four event scans once, not per project
-    cases = CaseDocs(repo).owners_with(tenant_id, "case", "assembler.intake")
-    return [_project_with_activity(project, analyses, activity, tasks, reruns, project["project_id"] in cases) for project in repo.list_projects(tenant_id, workspace_id) if project["created_by_identity_id"] == session["identity_id"]]
+    mine = repo.list_projects(tenant_id, workspace_id, created_by=session["identity_id"])   # this person only: every read below is bounded by their cases, not the tenant
+    ids = [project["project_id"] for project in mine]
+    analyses, activity, tasks, reruns = _analyses(repo, tenant_id, project_ids=ids), repo.last_activity(tenant_id, project_ids=ids), repo.tasks(tenant_id, project_ids=ids), repo.reruns(tenant_id, project_ids=ids)   # four event scans once, not per project
+    cases = CaseDocs(repo).owners_with(tenant_id, "case", "assembler.intake", owner_ids=ids)
+    return [_project_with_activity(project, analyses, activity, tasks, reruns, project["project_id"] in cases) for project in mine if project["created_by_identity_id"] == session["identity_id"]]
 
 
 def _project_with_activity(project: dict[str, Any], analyses: dict[str, list[dict[str, Any]]], activity: dict[str, str], tasks: dict[str, list[dict[str, Any]]], reruns: dict[str, list[dict[str, Any]]], is_case: bool) -> dict[str, Any]:

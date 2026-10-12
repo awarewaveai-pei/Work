@@ -38,12 +38,15 @@ EXPOSE 8420
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8420/health', timeout=3).status == 200 else 1)"
 
-# N worker processes (COGNITIVE_OS_API_WORKERS, default 4): one process queued every request of a class behind the
+# N worker processes (COGNITIVE_OS_API_WORKERS, default 8): one process queued every request of a class behind the
 # others (2026-10-11 walk). Nothing a request depends on lives in one process's memory -- locks, budgets, sessions and
 # erasure claims are in PostgreSQL or kernel file locks; caches are read-only (tests/unit/test_no_process_local_run_registry.py).
-# Each worker holds its own DB pool (Databases max_size 10 x N <= cognitive-db max_connections 100) and ~150-250 MB:
-# docker-compose.yml's mem_limit is sized for 4. exec: uvicorn is PID 1 and gets the stop signal.
-ENV COGNITIVE_OS_API_WORKERS=4
+# Capacity rig 2026-10-12 (ops/load-test): one worker serves ~100 requests/s, and the Python in it holds the GIL, so a worker is
+# one core. 1000 people at think time 4-10 s = ~390 requests/s: 4 workers sit at their ceiling, 8 hold 1000 people at twice
+# the activity (770 requests/s, p95 < 250 ms). Each worker holds its own DB pool (COGNITIVE_OS_DB_POOL_MAX, default 10: 8 x 10 reached
+# 82 backends of cognitive-db max_connections 100 -- raise that before raising N) and ~150 MB (1.2 GB at 8 under load):
+# docker-compose.yml's mem_limit is sized for 8. exec: uvicorn is PID 1 and gets the stop signal.
+ENV COGNITIVE_OS_API_WORKERS=8
 CMD ["sh", "-c", "exec uvicorn ai_lego.apps.api.main:app --host 0.0.0.0 --port 8420 --workers \"$COGNITIVE_OS_API_WORKERS\""]
 
 

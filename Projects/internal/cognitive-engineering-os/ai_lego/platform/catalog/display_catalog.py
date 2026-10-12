@@ -92,8 +92,39 @@ def registry_paths(spec_root=None):
 
 Catalog = collections.namedtuple("Catalog", "methods families recipes goals nexts")
 
+_MEMO = {}   # the default-root Catalog by registry_fingerprint(): the cold parse is 3-7 s of pure-Python YAML (capacity rig, 2026-10-12)
+
+
+def registry_fingerprint(spec_root=None):
+    """(file count, hash of every file name, mtime and size) of what load_catalog reads: any registry edit changes it, even one that keeps
+    an old timestamp; an unchanged tree costs a few stat calls. Compared inside one process only (the hash is salted per process)."""
+    p = registry_paths(spec_root)
+    files = [p[key] for key in ("METHODS_FILE", "FAMILIES_FILE", "GOALS_FILE", "RECIPE_DISPLAY_FILE")]
+    files += list(p["CONTRACTS_DIR"].glob("*.contract.yaml")) + list(p["RECIPES_DIR"].glob("*.recipe.yaml"))
+    stamps = []
+    for path in files:
+        try:
+            info = path.stat()
+        except OSError:
+            continue
+        stamps.append((str(path), info.st_mtime_ns, info.st_size))
+    return len(files), hash(tuple(sorted(stamps)))
+
 
 def load_catalog(spec_root=None):
+    """Load the catalog (see _load_catalog_uncached). Without an explicit root the result is kept until a registry file changes, so the
+    API, the TEACH and FACILITATE loaders and the facilitate script list share one parse per process, not one each per request.
+    Read-only: callers never edit the returned tables. An explicit root is always read fresh (the mock tooling and the tests)."""
+    if spec_root is not None:
+        return _load_catalog_uncached(spec_root)
+    fingerprint = registry_fingerprint()
+    kept = _MEMO.get("catalog")
+    if kept is None or kept[0] != fingerprint:
+        kept = _MEMO["catalog"] = (fingerprint, _load_catalog_uncached(None))
+    return kept[1]
+
+
+def _load_catalog_uncached(spec_root=None):
     """-> Catalog(methods, families, recipes, goals, nexts) from the SPEC registries, fully validated (nexts = each
     ACTIVE contract's recommended_next; an id that is not an ACTIVE tool is a tool the Atlas names but nobody has built
     yet, shown as such, never linked). ValueError on any gap — a

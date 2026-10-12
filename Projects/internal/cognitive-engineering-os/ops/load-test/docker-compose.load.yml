@@ -1,0 +1,89 @@
+# Throwaway capacity rig (2026-10-12): the API image against its own PostgreSQL, nothing shared with production.
+#   - own compose project (`-p cos-load`), own network, own volumes; nothing published except 127.0.0.1:18420
+#   - no AI key, no collection service, no egress: /ai/* answers 503 AI_PROVIDER_UNCONFIGURED and the scenario never calls it
+#   - the DB runs prod's flags (ops/cognitive-db/docker-compose.cognitive-db.yml) so the numbers carry over
+# Run (on the host; COS_LOAD_DB_PASSWORD from a 0600 file, never typed):
+#   export COS_LOAD_DB_PASSWORD=$(cat .pw); docker compose -p cos-load -f docker-compose.load.yml up -d db migrate api
+#   docker compose -p cos-load -f docker-compose.load.yml run --rm loadgen /work/load_test.py seed-db --users 1000
+# Tear down (this project only): docker compose -p cos-load -f docker-compose.load.yml down -v
+name: cos-load
+
+x-engine-env: &engine-env
+  COGNITIVE_OS_DATABASE_URLS: cos-load=postgresql://cognitive:${COS_LOAD_DB_PASSWORD:?set from the 0600 password file}@db:5432/cognitive_os
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: cognitive
+      POSTGRES_DB: cognitive_os
+      POSTGRES_PASSWORD: ${COS_LOAD_DB_PASSWORD:?}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    command: ["postgres", "-c", "max_connections=${COS_LOAD_PG_MAX_CONNECTIONS:-100}", "-c", "shared_buffers=${COS_LOAD_PG_SHARED_BUFFERS:-128MB}", "-c", "log_min_duration_statement=${COS_LOAD_PG_SLOW_MS:-1000}"]
+    cpus: 4
+    mem_limit: 512m
+    shm_size: 128m
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cognitive -d cognitive_os"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    image: cognitive-os-api:latest
+    environment: *engine-env
+    command: ["python", "-m", "ai_lego.apps.cli.migrate_db"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    image: ${COS_LOAD_API_IMAGE:-cognitive-os-api:latest}
+    environment:
+      <<: *engine-env
+      COGNITIVE_OS_API_WORKERS: ${COS_LOAD_WORKERS:-4}
+      COGNITIVE_OS_DB_POOL_MAX: ${COS_LOAD_POOL_MAX:-10}
+    ports:
+      - "127.0.0.1:18420:8420"
+    networks:
+      default:
+        aliases: [cognitive-os-api]   # the web image was built with its rewrite pointing at this name
+    cpus: ${COS_LOAD_API_CPUS:-8}
+    mem_limit: ${COS_LOAD_API_MEM:-1536m}
+    volumes:
+      - files:/app/Projects/internal/cognitive-engineering-os/.runtime
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # The production web image (Next.js, rewrites /api/* to the API): `up -d web`, then load_test.py run --base http://web:3000 --prefix /api
+  web:
+    image: cognitive-os-web:latest
+    profiles: ["web"]
+    cpus: 4
+    mem_limit: 256m
+    depends_on:
+      - api
+
+  # One-shot client in the API image (python 3.12 + psycopg, no extra packages): `run --rm loadgen /work/load_test.py ...`
+  loadgen:
+    image: cognitive-os-api:latest
+    profiles: ["tools"]
+    user: "0:0"
+    entrypoint: ["python"]
+    environment:
+      <<: *engine-env
+      PYTHONPATH: /app/Projects/internal/cognitive-engineering-os   # the API runs from this tree (uvicorn puts cwd first); the installed wheel lacks the data files
+    cpus: 8
+    ulimits:
+      nofile: 65536
+    volumes:
+      - ./:/work
+    working_dir: /work
+
+volumes:
+  db-data:
+  files:

@@ -52,6 +52,10 @@ from ai_lego.errors import InvariantViolation
 __all__ = ["Databases", "Jsonb", "Rehearsal", "Row", "advisory_xact_lock", "iso", "now", "owner_lock"]
 
 DATABASE_URLS_ENV = "COGNITIVE_OS_DATABASE_URLS"
+# Connections one process may hold per region. Workers x this must stay under the server max_connections (100) with room for
+# the migration, backup and operator sessions: 8 workers x 10 reached 82 backends on the capacity rig (2026-10-12).
+POOL_MAX_ENV = "COGNITIVE_OS_DB_POOL_MAX"
+DEFAULT_POOL_MAX = 10
 MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 REGION_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 _URL_SCHEMES = ("postgresql://", "postgres://")
@@ -164,7 +168,12 @@ class Databases:
         }
 
     @classmethod
-    def from_env(cls, environ: Mapping[str, str] = os.environ, *, min_size: int = 1, max_size: int = 10) -> Databases:
+    def from_env(cls, environ: Mapping[str, str] = os.environ, *, min_size: int = 1, max_size: int | None = None) -> Databases:
+        if max_size is None:
+            raw = environ.get(POOL_MAX_ENV, "").strip()
+            if raw and not (raw.isdecimal() and int(raw) >= 1):
+                raise InvariantViolation(f"DB_POOL_MAX_INVALID: {POOL_MAX_ENV} is a whole number of at least 1")
+            max_size = int(raw) if raw else DEFAULT_POOL_MAX
         value = environ.get(DATABASE_URLS_ENV, "").strip()
         if not value:
             raise InvariantViolation(f"DB_URLS_MISSING: {DATABASE_URLS_ENV} is not set (region=postgresql://...,region=postgresql://...)")
@@ -221,9 +230,18 @@ class Databases:
     # -- the tenant directory: tenant -> region, nothing else (no personal data) -----------------------------------
 
     def region_of(self, tenant_id: str) -> str | None:
-        """The one place a tenant is mapped to its region; None for a tenant the directory does not hold."""
-        row = self._read_one(self.directory_region, "SELECT region FROM tenant_directory WHERE tenant_id = %s", (tenant_id,))
-        return None if row is None else self.require_region(row[0])
+        """The one place a tenant is mapped to its region; None for a tenant the directory does not hold. A tenant row is written
+        once and never changed or deleted (add_to_directory is the only writer), so a found region is kept for the life of this
+        object: every unit of work asked the database first, which doubled the pool borrows of a request (the capacity rig,
+        2026-10-12). A tenant not found is asked again. If tenants ever move region, this cache is what to invalidate."""
+        known = self.__dict__.setdefault("_regions_by_tenant", {})   # Rehearsal does not run __init__
+        region = known.get(tenant_id)
+        if region is None:
+            row = self._read_one(self.directory_region, "SELECT region FROM tenant_directory WHERE tenant_id = %s", (tenant_id,))
+            if row is None:
+                return None
+            region = known[tenant_id] = self.require_region(row[0])
+        return region
 
     @staticmethod
     def add_to_directory(connection: psycopg.Connection, tenant_id: str, region: str) -> None:
@@ -289,6 +307,16 @@ class Databases:
                 f"DB_SCHEMA_BEHIND: region {region!r} is at {sorted(current) or 'no revision'}, head is {sorted(heads)} -- "
                 "run the migration (ai_lego.data.db.migrate) first; the engine never migrates by itself"
             )
+
+    def require_connection_budget(self, region: str, workers: int) -> None:
+        """Every worker process may hold up to the pool maximum: together they must fit the connections the server leaves to ordinary
+        sessions (max_connections less superuser_reserved_connections), or a busy hour fails requests with the health check still
+        green (COGNITIVE_OS_DB_POOL_MAX, COGNITIVE_OS_API_WORKERS)."""
+        with self.transaction(region) as connection:
+            slots = connection.execute("SELECT current_setting(%s)::int - current_setting(%s)::int", ("max_connections", "superuser_reserved_connections")).fetchone()[0]
+        need = workers * self._pool(region).max_size
+        if need > slots:
+            raise InvariantViolation(f"DB_POOL_EXCEEDS_SERVER: {workers} workers x {self._pool(region).max_size} connections = {need}, the server allows {slots}; lower {POOL_MAX_ENV} or the worker count, or raise max_connections")
 
     def close(self) -> None:
         for pool in self._pools.values():

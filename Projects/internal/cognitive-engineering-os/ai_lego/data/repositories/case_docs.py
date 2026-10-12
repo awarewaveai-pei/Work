@@ -258,34 +258,51 @@ class CaseDocs:
         (tests/unit/test_visibility.py's gate): it masks the writer."""
         return self._current(tenant_id, record_log.platform(tenant_id), kind)
 
+    def current_many(self, tenant_id: str, owner: Owner, kinds: list[str]) -> dict[str, list[dict[str, Any]]]:
+        """{kind: what ``current`` answers for it} for several kinds of one owner in ONE statement and one snapshot (a page
+        shows about 60 kinds: 60 reads were 244 statements and 43 ms of CPU a page, the capacity rig, 2026-10-12). Not for a
+        group (as ``current``)."""
+        _not_a_group(owner)
+        return self._current_many(tenant_id, owner, kinds)
+
     def _current(self, tenant_id: str, owner: Owner, kind: str) -> list[dict[str, Any]]:
+        return self._current_many(tenant_id, owner, [kind])[kind]
+
+    def _current_many(self, tenant_id: str, owner: Owner, kinds: list[str]) -> dict[str, list[dict[str, Any]]]:
+        wanted = list(dict.fromkeys(kinds))
         with self._repo.transaction(tenant_id) as connection:
             rows = connection.execute(
                 "SELECT event_type, occurred_at, payload_json, author, block, aggregate_id, author_identity_id FROM events WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s "
-                "AND event_type IN ('DocSaved','DocDeleted') AND payload_json->>'kind' = %s ORDER BY write_order",
-                (tenant_id, owner.kind, owner.id, kind),
+                "AND event_type IN ('DocSaved','DocDeleted') AND payload_json->>'kind' = ANY(%s) ORDER BY write_order",
+                (tenant_id, owner.kind, owner.id, wanted),
             ).fetchall()
-        latest: dict[str, dict[str, Any]] = {}
+        latest: dict[str, dict[str, dict[str, Any]]] = {kind: {} for kind in wanted}
         for row in rows:
             item = _row(row)
+            docs = latest[item["kind"]]
             if item["deleted"]:
-                latest.pop(item["doc_id"], None)
+                docs.pop(item["doc_id"], None)
             else:
-                before = latest.get(item["doc_id"], {})
-                latest[item["doc_id"]] = {**item, "created_at": before.get("created_at", item["at"])}
+                before = docs.get(item["doc_id"], {})
+                docs[item["doc_id"]] = {**item, "created_at": before.get("created_at", item["at"])}
                 if owner.kind in ("group", "platform"):
-                    latest[item["doc_id"]]["written_by"] = before.get("written_by", row["author_identity_id"])
-        return list(latest.values())
+                    docs[item["doc_id"]]["written_by"] = before.get("written_by", row["author_identity_id"])
+        return {kind: list(docs.values()) for kind, docs in latest.items()}
 
-    def owners_with(self, tenant_id: str, owner_kind: str, kind: str) -> set[str]:
+    def owners_with(self, tenant_id: str, owner_kind: str, kind: str, *, owner_ids: list[str] | None = None) -> set[str]:
         """The ids of the owners of ``owner_kind`` that hold a live document of ``kind``: one scan for a whole list (我的案子
-        tells a case -- a project with 開案資料 -- from a saved analysis), never one read per owner."""
+        tells a case -- a project with 開案資料 -- from a saved analysis), never one read per owner. ``owner_ids``: only
+        among these (a person list asks for their own cases, not the tenant)."""
+        if owner_ids is not None and not owner_ids:
+            return set()
+        query = ("SELECT owner_id, event_type, payload_json->>'doc_id' AS doc_id FROM events WHERE tenant_id=%s AND owner_kind=%s "
+                 "AND event_type IN ('DocSaved','DocDeleted') AND payload_json->>'kind' = %s")
+        parameters: tuple[Any, ...] = (tenant_id, owner_kind, kind)
+        if owner_ids is not None:
+            query += " AND owner_id = ANY(%s)"
+            parameters += (owner_ids,)
         with self._repo.transaction(tenant_id) as connection:
-            rows = connection.execute(
-                "SELECT owner_id, event_type, payload_json->>'doc_id' AS doc_id FROM events WHERE tenant_id=%s AND owner_kind=%s "
-                "AND event_type IN ('DocSaved','DocDeleted') AND payload_json->>'kind' = %s ORDER BY write_order",
-                (tenant_id, owner_kind, kind),
-            ).fetchall()
+            rows = connection.execute(query + " ORDER BY write_order", parameters).fetchall()
         live: dict[str, set[str]] = {}
         for row in rows:
             docs = live.setdefault(row["owner_id"], set())

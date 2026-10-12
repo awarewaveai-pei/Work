@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import importlib
 import pkgutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from ai_lego.errors import InvariantViolation
@@ -52,6 +54,21 @@ def rulesets() -> dict[str, Ruleset]:
             check(ruleset, history)
             found[ruleset.name] = ruleset
     return found
+
+
+_KEPT: dict[tuple[str, str], tuple[Any, Ruleset]] = {}
+
+
+def kept_load(name: str, root: Path, load: Callable[[], Ruleset]) -> Ruleset:
+    """The ruleset ``load`` builds from the content files under ``root``, kept until one of those files changes (path, mtime, size): a
+    content route re-parsed and re-hashed its YAML on every request (21 ms of CPU for the lessons, a 3-7 s first request), the
+    capacity rig, 2026-10-12. Callers use the default content root only (an explicit root, the tests and tooling, always reads
+    fresh) and treat the result as read-only."""
+    stamp = tuple(sorted((str(path), path.stat().st_mtime_ns, path.stat().st_size) for path in root.rglob("*") if path.is_file()))
+    kept = _KEPT.get((name, str(root)))
+    if kept is None or kept[0] != stamp:
+        kept = _KEPT[(name, str(root))] = (stamp, load())
+    return kept[1]
 
 
 def check(ruleset: Ruleset, history: dict[str, dict[str, str]]) -> None:

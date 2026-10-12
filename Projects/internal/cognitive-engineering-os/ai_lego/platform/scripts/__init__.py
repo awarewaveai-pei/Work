@@ -13,7 +13,7 @@ import yaml
 from ai_lego.core.domain.kinds.assembler import PACKAGES
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.catalog.display_catalog import load_catalog
-from ai_lego.platform.rulesets import Ruleset, check
+from ai_lego.platform.rulesets import Ruleset, check, kept_load
 
 
 ROOT = Path(__file__).resolve().parent
@@ -171,7 +171,8 @@ def _ruleset(root: Path, items: list[dict[str, Any]]) -> Ruleset:
 
 def load_scripts(root: Path | str | None = None) -> Ruleset:
     content_root = _content_root(root)
-    return _ruleset(content_root, _load_scripts(content_root))
+    build = lambda: _ruleset(content_root, _load_scripts(content_root))
+    return build() if root is not None else kept_load("facilitate.scripts", content_root, build)
 
 
 def available_subjects(root: Path | str | None = None) -> list[str]:

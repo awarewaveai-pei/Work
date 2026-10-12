@@ -20,6 +20,7 @@ for each other; the erase waits only for the transactions in flight, and one tha
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Callable, Mapping
 from uuid import uuid4
@@ -184,12 +185,17 @@ class ProjectSourceRepository:
             row = connection.execute(f"SELECT {_PROJECT_SELECT} FROM platform_projects WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id)).fetchone()
         return None if row is None else dict(row)
 
-    def list_projects(self, tenant_id: str, workspace_id: str | None = None) -> list[dict[str, Any]]:
+    def list_projects(self, tenant_id: str, workspace_id: str | None = None, *, created_by: str | None = None) -> list[dict[str, Any]]:
+        """created_by: one person only. A route that serves one person asks for their cases here, so it reads those and
+        not the whole tenant (the capacity rig, 2026-10-12: 2000 rows parsed per GET /projects)."""
         query = f"SELECT {_PROJECT_SELECT} FROM platform_projects WHERE tenant_id=%s"
         parameters: tuple[Any, ...] = (tenant_id,)
         if workspace_id is not None:
             query += " AND workspace_id=%s"
             parameters += (workspace_id,)
+        if created_by is not None:
+            query += " AND created_by_identity_id=%s"
+            parameters += (created_by,)
         query += " ORDER BY created_at, project_id"
         with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(query, parameters).fetchall()
@@ -554,24 +560,30 @@ class ProjectSourceRepository:
             ).fetchall()
         return [{**dict(row), "payload": row["payload_json"]} for row in rows]
 
-    def _project_events(self, tenant_id: str, event_types: tuple[str, ...], project_id: str | None) -> list[Row]:
+    def _project_events(self, tenant_id: str, event_types: tuple[str, ...], project_id: str | None, project_ids: Sequence[str] | None = None) -> list[Row]:
+        """project_id: one case; project_ids: these cases (a person list); neither: every case of the tenant."""
+        if project_ids is not None and not project_ids:
+            return []
         placeholders = ",".join("%s" for _ in event_types)
         query = f"SELECT aggregate_id, event_type, occurred_at, payload_json FROM events WHERE tenant_id=%s AND event_type IN ({placeholders})"
         parameters: tuple[Any, ...] = (tenant_id, *event_types)
         if project_id is not None:
             query += " AND aggregate_id=%s"
             parameters += (f"project:{project_id}",)
+        if project_ids is not None:
+            query += " AND aggregate_id = ANY(%s)"
+            parameters += ([f"project:{pid}" for pid in project_ids],)
         with self._db.for_tenant(tenant_id) as connection:
             return connection.execute(query + " ORDER BY write_order", parameters).fetchall()
 
-    def analyses(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    def analyses(self, tenant_id: str, project_id: str | None = None, *, project_ids: Sequence[str] | None = None) -> dict[str, list[dict[str, Any]]]:
         """project_id -> its analyses, oldest first, read from the event stream (their one record): the tool, when it was
         asked for and when it finished, PENDING / DONE / FAILED (GET /interpretations/{id} reads the same events), the
         user's latest judgment, the latest approval decision, and the version it redoes (退回 → 依原因重做).
-        ``project_id`` limits it to one Project."""
+        project_id limits it to one Project, project_ids to these."""
         projects: dict[str, list[dict[str, Any]]] = {}
         by_id: dict[str, dict[str, Any]] = {}
-        for row in self._project_events(tenant_id, self.INTERPRETATION_EVENTS, project_id):
+        for row in self._project_events(tenant_id, self.INTERPRETATION_EVENTS, project_id, project_ids):
             payload = row["payload_json"]
             key = payload.get("interpretation_id")
             kind = row["event_type"]
@@ -596,7 +608,7 @@ class ProjectSourceRepository:
     TASK_EVENTS = ("TaskCreated", "TaskDone", "TaskUpdated", "TaskNoted")
     RERUN_EVENTS = ("RerunScheduled", "RerunFulfilled")
 
-    def tasks(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    def tasks(self, tenant_id: str, project_id: str | None = None, *, project_ids: Sequence[str] | None = None) -> dict[str, list[dict[str, Any]]]:
         """project_id -> its tasks, oldest first: title, owner, due (YYYY-MM-DD), proof, target, the option it was
         saved under, the analysis it came from, its parent_task_id/kind (a card-created task or plan_change; None/
         "task" for a ⑦-saved plan row), its 4-state status (not_started/in_progress/done/on_hold -- done mirrors
@@ -605,7 +617,7 @@ class ProjectSourceRepository:
         already had a journal entry, else not_started."""
         projects: dict[str, list[dict[str, Any]]] = {}
         by_id: dict[str, dict[str, Any]] = {}
-        for row in self._project_events(tenant_id, self.TASK_EVENTS, project_id):
+        for row in self._project_events(tenant_id, self.TASK_EVENTS, project_id, project_ids):
             payload = row["payload_json"]
             key = payload.get("task_id")
             event_type = row["event_type"]
@@ -637,12 +649,12 @@ class ProjectSourceRepository:
             by_id[key]["done"] = by_id[key]["status"] == "done"
         return projects
 
-    def reruns(self, tenant_id: str, project_id: str | None = None) -> dict[str, list[dict[str, Any]]]:
+    def reruns(self, tenant_id: str, project_id: str | None = None, *, project_ids: Sequence[str] | None = None) -> dict[str, list[dict[str, Any]]]:
         """project_id -> its rerun reminders, oldest first: the analysis to redo, when it is due, and the analysis that
         fulfilled it (None while open)."""
         projects: dict[str, list[dict[str, Any]]] = {}
         by_id: dict[str, dict[str, Any]] = {}
-        for row in self._project_events(tenant_id, self.RERUN_EVENTS, project_id):
+        for row in self._project_events(tenant_id, self.RERUN_EVENTS, project_id, project_ids):
             payload = row["payload_json"]
             key = payload.get("rerun_id")
             if row["event_type"] == "RerunScheduled":
@@ -652,13 +664,18 @@ class ProjectSourceRepository:
                 by_id[key].update(fulfilled_by=payload.get("interpretation_id"), fulfilled_at=row["occurred_at"])
         return projects
 
-    def last_activity(self, tenant_id: str, project_id: str | None = None) -> dict[str, str]:
+    def last_activity(self, tenant_id: str, project_id: str | None = None, *, project_ids: Sequence[str] | None = None) -> dict[str, str]:
         """project_id -> when its own event stream last moved (created, collections, analyses, judgments)."""
+        if project_ids is not None and not project_ids:
+            return {}
         query = "SELECT aggregate_id, MAX(occurred_at) AS at FROM events WHERE tenant_id=%s AND aggregate_id LIKE 'project:%%'"
         parameters: tuple[Any, ...] = (tenant_id,)
         if project_id is not None:
             query += " AND aggregate_id=%s"
             parameters += (f"project:{project_id}",)
+        if project_ids is not None:
+            query += " AND aggregate_id = ANY(%s)"
+            parameters += ([f"project:{pid}" for pid in project_ids],)
         with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(query + " GROUP BY aggregate_id", parameters).fetchall()
         return {row["aggregate_id"].removeprefix("project:"): row["at"] for row in rows}

@@ -50,7 +50,7 @@ def case_reminder_list(project_id: str, today: str | None = None, utc_offset: in
 def my_reminders(today: str | None = None, utc_offset: int = Query(0, ge=-840, le=840), session: dict[str, Any] = Depends(api.require_session),
                  repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> list[dict[str, Any]]:
     day, docs, tenant_id = _today(today, utc_offset), CaseDocs(repo), session["tenant_id"]
-    found = [item for project in repo.list_projects(tenant_id) if project["created_by_identity_id"] == session["identity_id"] for item in _case(docs, tenant_id, project, day, utc_offset)]
+    found = [item for project in repo.list_projects(tenant_id, created_by=session["identity_id"]) if project["created_by_identity_id"] == session["identity_id"] for item in _case(docs, tenant_id, project, day, utc_offset)]
     me = record_log.person(session["identity_id"])
     practice = docs.current(tenant_id, me, "learn.practice")
     found += [{**item, "scope": "person", "path": "/me/learn"}

@@ -20,7 +20,7 @@ import yaml
 from ai_lego.core.domain.kinds.assembler import PACKAGES
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.catalog.display_catalog import load_catalog
-from ai_lego.platform.rulesets import Ruleset, check
+from ai_lego.platform.rulesets import Ruleset, check, kept_load
 
 
 ROOT = Path(__file__).resolve().parent
@@ -240,12 +240,14 @@ def _ruleset(root: Path, name: str, title: str, items: list[dict[str, Any]]) -> 
 
 def load_lessons(root: Path | str | None = None) -> Ruleset:
     content_root = _content_root(root)
-    return _ruleset(content_root, "teach.lessons", "課", _load_lessons(content_root))
+    build = lambda: _ruleset(content_root, "teach.lessons", "課", _load_lessons(content_root))
+    return build() if root is not None else kept_load("teach.lessons", content_root, build)
 
 
 def load_practice_cases(root: Path | str | None = None) -> Ruleset:
     content_root = _content_root(root)
-    return _ruleset(content_root, "teach.practice_cases", "練習案例", _load_cases(content_root))
+    build = lambda: _ruleset(content_root, "teach.practice_cases", "練習案例", _load_cases(content_root))
+    return build() if root is not None else kept_load("teach.practice_cases", content_root, build)
 
 
 def courses(root: Path | str | None = None) -> dict[str, list[str]]:

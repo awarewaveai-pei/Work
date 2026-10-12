@@ -1,0 +1,8 @@
+# Overlay: run the API from the worktree source (shipped to ./patched/ai_lego) instead of the source baked into the image.
+# uvicorn imports ai_lego from its working directory first (the same tree the image copies), so this tests the exact change.
+#   docker compose -p cos-load -f docker-compose.load.yml -f docker-compose.patched.yml up -d api
+services:
+  api:
+    volumes:
+      - files:/app/Projects/internal/cognitive-engineering-os/.runtime
+      - ./patched/ai_lego:/app/Projects/internal/cognitive-engineering-os/ai_lego:ro

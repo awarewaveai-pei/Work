@@ -308,7 +308,7 @@ def export_case(project_id: str, fmt: Format = Query(default="json", alias="form
 
 
 def _my_cases(repo: ProjectSourceRepository, session: dict[str, Any]) -> list[dict[str, Any]]:
-    mine = [project for project in repo.list_projects(session["tenant_id"]) if project["created_by_identity_id"] == session["identity_id"]]
+    mine = [project for project in repo.list_projects(session["tenant_id"], created_by=session["identity_id"]) if project["created_by_identity_id"] == session["identity_id"]]
     return sorted(mine, key=lambda project: (project["created_at"], project["name"]))   # the repository breaks a tie inside one second by random id
 
 

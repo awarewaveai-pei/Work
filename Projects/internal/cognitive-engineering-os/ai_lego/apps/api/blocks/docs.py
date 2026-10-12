@@ -10,7 +10,7 @@ version is written by the AI gate (ai_gate.py), never posted here.
     the same under /me/docs/{kind}... (and /me/docs?kinds=...) for a kind the person owns across cases (每天的校準卡、你在哪裡)
 
 A page reads every kind it shows in one request (?kinds=): one request per kind tripped the site's 50-per-10-seconds limit.
-Each list is the per-kind route's own answer (_listed), never a second reader.
+Each list is the per-kind route's own answer (CaseDocs._current_many serves both), read in one statement.
 
 A save answers the document plus ``notices``: a crisis signal in what the person wrote (help for where they are --
 every block that sees content recognises it; GOVERN gives the resources) and the blocks the saving block proposes.
@@ -172,8 +172,7 @@ def list_case_docs(project_id: str, kind: str, session: dict[str, Any] = Depends
 @router.get("/projects/{project_id}/docs")
 def list_case_docs_of_kinds(project_id: str, kinds: str = Query(""), session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, dict[str, list[dict[str, Any]]]]:
     owner = case_owner(project_id, session, repo)
-    docs = CaseDocs(repo)
-    return {"docs": {kind: _listed(docs, session["tenant_id"], owner, kind, "case") for kind in _kinds(kinds, "case")}}
+    return {"docs": CaseDocs(repo).current_many(session["tenant_id"], owner, _kinds(kinds, "case"))}
 
 
 @router.post("/projects/{project_id}/docs/{kind}")
@@ -209,8 +208,8 @@ def list_my_docs(kind: str, session: dict[str, Any] = Depends(api.require_sessio
 
 @router.get("/me/docs")
 def list_my_docs_of_kinds(kinds: str = Query(""), session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, dict[str, list[dict[str, Any]]]]:
-    docs, owner = CaseDocs(repo), record_log.person(session["identity_id"])
-    return {"docs": {kind: _listed(docs, session["tenant_id"], owner, kind, "person") for kind in _kinds(kinds, "person")}}
+    owner = record_log.person(session["identity_id"])
+    return {"docs": CaseDocs(repo).current_many(session["tenant_id"], owner, _kinds(kinds, "person"))}
 
 
 @router.post("/me/docs/{kind}")
