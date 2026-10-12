@@ -181,7 +181,7 @@ def _pointers_shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="FACILITATE", name="play_participant", needs="organize", instructions=PARTICIPANT, output_kind="facilitate.practice_reply",
-             output_schema=PARTICIPANT_SCHEMA, reads=(), build_input=_practice_input, shape=_reply_shape, fill=_practice_fill, outside_case=True, max_tokens=700),
+             output_schema=PARTICIPANT_SCHEMA, reads=(), build_input=_practice_input, shape=_reply_shape, fill=_practice_fill, outside_case=True),
     AiAction(block="FACILITATE", name="point_at_deviations", needs="point_gaps", instructions=POINTER, output_kind="facilitate.pointers",
-             output_schema=POINTER_SCHEMA, reads=("facilitate.log",), build_input=_pointers_input, shape=_pointers_shape, fill=_pointers_fill, outside_case=True, max_tokens=1100),
+             output_schema=POINTER_SCHEMA, reads=("facilitate.log",), build_input=_pointers_input, shape=_pointers_shape, fill=_pointers_fill, outside_case=True),
 ]

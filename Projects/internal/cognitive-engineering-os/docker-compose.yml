@@ -41,8 +41,9 @@ services:
       - cognitive-os-files:/app/Projects/internal/cognitive-engineering-os/.runtime
     ports:
       - "127.0.0.1:8420:8420" # reserved for local health-check use, matching oracle-web's own :3010 convention
-    mem_limit: 512m
-    mem_reservation: 128m
+    # 4 API worker processes (Dockerfile COGNITIVE_OS_API_WORKERS) at ~150-250 MB each; 512m held one.
+    mem_limit: 1536m
+    mem_reservation: 512m
     networks:
       - lobster-net
     healthcheck:

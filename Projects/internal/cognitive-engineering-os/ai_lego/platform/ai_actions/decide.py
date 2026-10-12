@@ -119,5 +119,5 @@ def _shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="DECIDE", name="check", needs="organize", instructions=CHECK, output_kind="decide.check", output_schema=CHECK_SCHEMA,
-             reads=("decide.judgment", "decide.seal", "context.notes", "verify.claim"), build_input=_check_input, shape=_shape, max_tokens=1800),
+             reads=("decide.judgment", "decide.seal", "context.notes", "verify.claim"), build_input=_check_input, shape=_shape),
 ]

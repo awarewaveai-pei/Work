@@ -437,7 +437,7 @@ class ApiRouteTests(ApiTestCase):
 
         self._use(Broken())
         response = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"})
-        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.status_code, 424)
         self.assertIn("AI_PROVIDER_UNAVAILABLE", response.json()["detail"])
         self.assertEqual(self.client.get("/ai/status").json()["usage"]["calls"], 1, "a failed call is still metered")
 
@@ -501,7 +501,7 @@ class CompleteJsonTests(unittest.TestCase):
 
     def test_a_call_cut_off_by_max_tokens_is_not_trusted_and_says_what_it_cost(self):
         provider, _ = self._provider({"content": [{"type": "tool_use", "name": "answer", "input": {"partial": True}}], "stop_reason": "max_tokens", "usage": {"input_tokens": 1, "output_tokens": 10}})
-        with self.assertRaisesRegex(ProviderCallError, "AI_PROVIDER_CUT_OFF") as caught:
+        with self.assertRaisesRegex(ProviderCallError, "AI_ANSWER_TRUNCATED") as caught:
             provider.complete_json("s", "u", max_tokens=10)
         self.assertEqual((caught.exception.reason, caught.exception.input_tokens, caught.exception.output_tokens), ("cut_off", 1, 10))
 
@@ -565,7 +565,7 @@ class RequestShapeTests(unittest.TestCase):
             provider.complete("s", "u", max_tokens=10)
         self.assertEqual((caught.exception.reason, caught.exception.output_tokens), ("refusal", 2))
         provider, _ = self._call(DEFAULT_MODEL, {"content": [{"type": "text", "text": "half an ans"}], "stop_reason": "max_tokens", "usage": {"input_tokens": 4, "output_tokens": 10}})
-        with self.assertRaisesRegex(ProviderCallError, "AI_PROVIDER_CUT_OFF"):
+        with self.assertRaisesRegex(ProviderCallError, "AI_ANSWER_TRUNCATED"):
             provider.complete("s", "u", max_tokens=10)
 
 

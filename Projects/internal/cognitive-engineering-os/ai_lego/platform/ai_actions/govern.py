@@ -37,5 +37,5 @@ def _input(context: Mapping[str, Any], read: Callable[[str], list[dict[str, Any]
 
 ACTIONS = [
     AiAction(block="GOVERN", name="explain", needs="organize", instructions=EXPLAIN, output_kind="govern.explanation", output_schema=SCHEMA,
-             reads=(), build_input=_input, outside_case=True, max_tokens=600),
+             reads=(), build_input=_input, outside_case=True),
 ]

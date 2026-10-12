@@ -95,7 +95,7 @@ class CollectionRequestTests(CollectionApiTestCase):
         self._collector()
         self.service.fail = True
         response = self._confirm()
-        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.status_code, 424)
         grant_ref = self.service.calls[0]["grant_ref"]
         self.assertEqual(self.client.get(f"/projects/{self.project['project_id']}/collections/{self.service.calls[0]['run_id']}").json()["status"], "failed")
         self.assertEqual(self._exchange(grant_ref).status_code, 410)

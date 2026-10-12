@@ -54,6 +54,9 @@ COLLECTOR_EMAIL = "research-collector@cognitive-os.local"
 # "wrong password" path -- closes the timing side-channel a critic pass found 2026-09-12 (see
 # authenticate()'s own docstring). Never used to hash or verify a real stored credential.
 _DUMMY_SALT = hashlib.sha256(b"cognitive-os-phase1-timing-equalization-dummy-salt-not-secret").digest()[:16]
+# A login without a tenant pays as many hashes as the most tenants any one address is in (authenticate_anywhere), at most
+# this many: the bound on what one such request can cost the server. Tenants are created by the operator only.
+LOGIN_HASHES_CAP = 8
 
 
 def _now_iso() -> str:
@@ -62,6 +65,17 @@ def _now_iso() -> str:
 
 def _hash_password(password: str, salt: bytes, iterations: int = PBKDF2_ITERATIONS) -> bytes:
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations)
+
+
+def _password_matches(password: str, credential: Any | None) -> bool:
+    """Exactly one PBKDF2 hash whatever the outcome: against the stored credential, or -- with no credential to check
+    (no such account, not active, no credential row) -- against the dummy salt, then False. The equal cost of every
+    failure is what keeps an address from being enumerated by timing (authenticate's docstring)."""
+    if credential is None:
+        _hash_password(password, _DUMMY_SALT, PBKDF2_ITERATIONS)
+        return False
+    candidate = _hash_password(password, bytes(credential["password_salt"]), credential["iterations"])
+    return hmac.compare_digest(candidate, bytes(credential["password_hash"]))
 
 
 def _instant(value: str) -> datetime:
@@ -245,17 +259,53 @@ class IdentityStore:
         """
         identity = self._find_identity_by_email(tenant_id, email)
         if identity is None or identity["status"] != "active":
-            _hash_password(password, _DUMMY_SALT, PBKDF2_ITERATIONS)
+            _password_matches(password, None)
             return None
         with self._db.for_tenant(tenant_id) as conn:
             cred = conn.execute("SELECT password_hash, password_salt, iterations FROM identity_credential WHERE identity_id = %s", (identity["identity_id"],)).fetchone()
-        if cred is None:
-            _hash_password(password, _DUMMY_SALT, PBKDF2_ITERATIONS)
-            return None
-        candidate = _hash_password(password, bytes(cred["password_salt"]), cred["iterations"])
-        if not hmac.compare_digest(candidate, bytes(cred["password_hash"])):
+        if not _password_matches(password, cred):
             return None
         return self._issue_session(identity["identity_id"], identity["tenant_id"])
+
+    def authenticate_anywhere(self, email: str, password: str) -> dict[str, Any] | None:
+        """Login without naming the tenant (an address is unique only within one: identity UNIQUE (tenant_id, email)).
+        ``{"session": token}`` when the password matches the address in exactly one tenant; ``{"choose": [{"tenant_id",
+        "name"}, ...]}`` when it matches in several -- named only after the password matched each of them, and no session
+        is issued; ``None`` otherwise, like ``authenticate``.
+
+        Timing: one PBKDF2 hash per active account with this address in a tenant the directory routes to that region (a
+        dummy one for an account with no credential), padded with dummy hashes to the most tenants any one address is in
+        (_most_accounts_per_address, at most LOGIN_HASHES_CAP) -- so an unknown address, an address in one tenant and an
+        address in several cost the same, and the cost says nothing about this address (Codex review 2026-10-11 F1). Only
+        an address in more than LOGIN_HASHES_CAP tenants costs more."""
+        address = email.lower()
+        pad = min(max(1, self._most_accounts_per_address()), LOGIN_HASHES_CAP)
+        accounts = []
+        for region in self._each_region():
+            with self._db.transaction(region) as conn:
+                rows = conn.execute(
+                    "SELECT i.identity_id, i.tenant_id, t.legal_name, c.password_hash, c.password_salt, c.iterations FROM identity i "
+                    "JOIN tenant t ON t.tenant_id = i.tenant_id LEFT JOIN identity_credential c ON c.identity_id = i.identity_id "
+                    "WHERE i.email = %s AND i.status = 'active' ORDER BY t.legal_name, i.tenant_id", (address,)).fetchall()
+            accounts += [row for row in rows if self._db.region_of(row["tenant_id"]) == region]   # the directory routes the tenant here
+        matched = [row for row in accounts if _password_matches(password, row if row["password_hash"] is not None else None)]
+        for _ in range(pad - len(accounts)):
+            _password_matches(password, None)
+        if not matched:
+            return None
+        if len(matched) == 1:
+            return {"session": self._issue_session(matched[0]["identity_id"], matched[0]["tenant_id"])}
+        return {"choose": [{"tenant_id": row["tenant_id"], "name": row["legal_name"]} for row in matched]}
+
+    def _most_accounts_per_address(self) -> int:
+        """The most active accounts any one address has, over every region (the sum of each region's most: an upper bound).
+        Read per login, so it follows a new tenant without a restart."""
+        most = 0
+        for region in self._each_region():
+            with self._db.transaction(region) as conn:
+                row = conn.execute("SELECT count(*) AS n FROM identity WHERE status = 'active' GROUP BY email ORDER BY n DESC LIMIT 1").fetchone()
+            most += row["n"] if row else 0
+        return most
 
     def _issue_session(self, identity_id: str, tenant_id: str) -> str:
         token = secrets.token_urlsafe(32)

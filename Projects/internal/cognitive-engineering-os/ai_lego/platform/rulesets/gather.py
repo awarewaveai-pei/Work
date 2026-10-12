@@ -109,7 +109,8 @@ GROUPING = Ruleset("gather.grouping", "GATHER", "分組規則", "5", "平台（�
     ],
 })
 
-# 系統至少用兩種語言找：事情發生地的語言，加上另一方或國際通用的語言。The collector searches 中文 and English only.
+# 事情發生地的語言要找到（管道不足 when the platform cannot search it). Fewer languages than planned is said, never a stop
+# (block_hooks/gather.channel_state). The collector searches 中文 and English only.
 PLACE_LANGUAGES = Ruleset("gather.place_languages", "GATHER", "發生地的語言", "1", "平台（第 2 步）", {
     "searched": ["zh", "en"],
     "names": {"zh": "中文", "en": "英文", "ja": "日文", "ko": "韓文", "ms": "馬來文", "id": "印尼文", "vi": "越南文", "th": "泰文",

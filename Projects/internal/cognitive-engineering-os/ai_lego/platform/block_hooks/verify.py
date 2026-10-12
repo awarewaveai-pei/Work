@@ -226,12 +226,12 @@ def _first_saved(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: d
     return []
 
 
-def _channels_said(states: Mapping[tuple[Any, Any], Any]) -> str:
+def _channels_said(states: Mapping[tuple[Any, Any], Any], languages: tuple[str, ...]) -> str:
     """What each planned engine said, the ones that did not look first: 「Brave 沒有回應；Serper 找過沒有找到」 (a language
-    is named only when an engine's two languages differ)."""
+    is named only when an engine's languages differ)."""
     failed, looked = [], []
     for provider, name in SEARCH_PROVIDERS.items():
-        said = {lang: CHANNEL_SAID.get(states.get((provider, lang)), NOT_REPORTED) for lang in SEARCH_LANGUAGES}
+        said = {lang: CHANNEL_SAID.get(states.get((provider, lang)), NOT_REPORTED) for lang in languages}
         same = set(said.values())
         parts = [(f"{name} {words}", words) for words in same] if len(same) == 1 else [(f"{name}（{SEARCH_LANGUAGES[lang]}）{words}", words) for lang, words in said.items()]
         for text, words in parts:
@@ -255,16 +255,17 @@ def channel_states(channels: list[Any]) -> dict[tuple[Any, Any], Any]:
     return states
 
 
-def search_result(run: Mapping[str, Any], channels: list[Any]) -> tuple[str, str]:
+def search_result(run: Mapping[str, Any], channels: list[Any], languages: tuple[str, ...] = tuple(SEARCH_LANGUAGES)) -> tuple[str, str]:
     """What a finished 「去查」 run says for its claim: 查到 (pages came back), 查不到 (every channel the run planned --
-    SEARCH_PROVIDERS x SEARCH_LANGUAGES -- answered and none had a page), 無法檢查 (it could not look everywhere it
-    planned, or did not say where it looked: zero pages is then not 「找過，沒有」; the why says what each engine did)."""
+    SEARCH_PROVIDERS x the ``languages`` it searched in (its verify.lookup's) -- answered and none had a page), 無法檢查 (it
+    could not look everywhere it planned, or did not say where it looked: zero pages is then not 「找過，沒有」; the why
+    says what each engine did)."""
     if run.get("status") != "completed":
         return UNCHECKABLE, DEAD_RUN
     states = channel_states(channels)
     tried = bool(states)
     if tried and not any(state == "ok" for state in states.values()):
-        return UNCHECKABLE, _channels_said(states)
+        return UNCHECKABLE, _channels_said(states, languages)
     report = run.get("report")
     if not isinstance(report, Mapping):
         return UNCHECKABLE, NO_REPORT
@@ -273,9 +274,9 @@ def search_result(run: Mapping[str, Any], channels: list[Any]) -> tuple[str, str
         return FOUND, f"找回 {pages} 頁"
     if not tried:
         return UNCHECKABLE, NO_CHANNELS
-    if all(states.get((provider, lang)) == "ok" for provider in SEARCH_PROVIDERS for lang in SEARCH_LANGUAGES):
+    if all(states.get((provider, lang)) == "ok" for provider in SEARCH_PROVIDERS for lang in languages):
         return NOT_FOUND, "找過，沒有找到相關的網頁"
-    return UNCHECKABLE, _channels_said(states)
+    return UNCHECKABLE, _channels_said(states, languages)
 
 
 def _run_of(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, run_id: str) -> dict[str, Any] | None:
@@ -336,10 +337,10 @@ def _after_sources(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, arri
     if run is None or run["status"] in ("requested", "running"):
         return   # a batch arrived; the run's end says what was found
     written = _searched(docs, tenant_id, owner)
-    state, why = search_result(run, list(arrived.get("channels") or []))
     for lookup in lookups:
         content = lookup["content"]
         if (content["claim"], content["claim_version"], run_id) not in written:
+            state, why = search_result(run, list(arrived.get("channels") or []), tuple(content.get("languages") or SEARCH_LANGUAGES))
             _write_search(docs, tenant_id, owner, lookup, state, why)
     if usable_cards(docs, tenant_id, owner) > MAX_SOURCES_PER_TURN:
         propose(docs, tenant_id, owner, "VERIFY", "GATHER", WHY_GATHER, source=lookups[0]["doc_id"])

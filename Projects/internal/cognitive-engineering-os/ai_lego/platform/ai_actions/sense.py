@@ -69,5 +69,5 @@ def _shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="SENSE", name="mirror", needs="organize", instructions=MIRROR, output_kind="sense.mirror", output_schema=MIRROR_SCHEMA,
-             reads=("sense.card", "sense.state"), build_input=_mirror_input, shape=_shape, max_tokens=1800),
+             reads=("sense.card", "sense.state"), build_input=_mirror_input, shape=_shape),
 ]

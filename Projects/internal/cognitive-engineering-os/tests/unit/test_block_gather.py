@@ -390,7 +390,7 @@ class ChannelTests(GatherCase):
     CHANNELS = [{"provider": "serper", "lang": "zh", "state": "ok"}, {"provider": "serper", "lang": "en", "state": "ok"},
                 {"provider": "brave", "lang": "zh", "state": "no_key", "why": "BRAVE_API_KEY unset"}]
 
-    def test_one_engine_is_too_few_and_a_channel_with_no_key_is_said(self):
+    def test_one_engine_is_said_plainly_never_too_few_and_a_channel_with_no_key_is_said(self):
         self.collected("https://a.example.com/1", zh(1))
         self.arrive(channels=self.CHANNELS, run="r1")
         self.arrive(channels=self.CHANNELS, run="r1")
@@ -398,7 +398,8 @@ class ChannelTests(GatherCase):
         self.assertEqual((doc["content"]["run"], doc["version"], len(doc["content"]["channels"])), ("r1", 1, 3))
         state = self.client.get(f"{self.base}/gather").json()["channels"]
         self.assertEqual([language["key"] for language in state["languages"]], ["en", "zh"])
-        self.assertEqual(state["short"], ["只用了 1 家搜尋引擎（Serper（Google 的結果））"])
+        self.assertEqual(state["short"], [])   # operator 2026-10-11: one engine is enough
+        self.assertEqual(state["used"], "這次用了 1 家搜尋引擎（Serper（Google 的結果）），2 種語言（英文、中文）")
         self.assertEqual([item["says"] for item in state["blocked"]], ["平台還沒有Brave的金鑰"])
 
     def test_the_places_language_not_searched_is_too_few_and_none_found_in_it_is_asked(self):
@@ -412,7 +413,7 @@ class ChannelTests(GatherCase):
     def test_nothing_searched_is_not_too_few(self):
         self.pasted(ZH_SAYS)
         state = self.client.get(f"{self.base}/gather").json()["channels"]
-        self.assertEqual((state["looked"], state["short"]), (False, []))
+        self.assertEqual((state["looked"], state["short"], state["used"]), (False, [], None))
 
 
 class PersonSaveTests(GatherCase):
@@ -513,12 +514,12 @@ class AiTests(GatherCase):
         for action in ("queries", "summarise", "compare"):
             self.assertEqual(self.turn(action, {"go_on": True}).status_code, 403, action)
 
-    def test_under_two_origins_or_too_few_channels_the_summary_hands_back_before_any_model_call(self):
+    def test_under_two_origins_the_summary_hands_back_before_any_model_call_but_one_engine_does_not(self):
         sid, card = self.one_source()
         self.grant("search_external")
         result = self.turn("summarise").json()
         self.assertIn("獨立出處只有 1 個，不到 2 個", result["handback"])
-        self.assertIn("管道不足：只用了 1 家搜尋引擎", result["handback"])
+        self.assertNotIn("搜尋引擎", result["handback"])   # operator 2026-10-11: fewer engines or languages never stops the run
         self.assertEqual(self.provider.calls, [])
         saved = self.turn("summarise", {"go_on": True}, {"items": [{"card": card, "says": "公會把第七條改成按月結算。", "quote": "合約範本第七條改為按月結算", "citations": [f"source:{sid}"]}]})
         self.assertEqual(saved.status_code, 200, saved.text)
@@ -530,7 +531,7 @@ class AiTests(GatherCase):
         self.grant("search_external")
         for item in ({"card": card, "says": "公會改了合約。", "quote": "公會說同業都這樣改", "citations": [f"source:{sid}"]}, {"says": "公會改了合約。"}):
             response = self.turn("summarise", {"go_on": True}, {"items": [item]})
-            self.assertEqual((response.status_code, response.json()["detail"].split(":")[0]), (502, "AI_ANSWER_UNCITED"))
+            self.assertEqual((response.status_code, response.json()["detail"].split(":")[0]), (422, "AI_ANSWER_UNCITED"))
         self.assertEqual(self.docs.current(self.tenant_id, self.owner, "gather.ai_says"), [])
 
     def test_two_sources_that_contradict_stand_side_by_side(self):

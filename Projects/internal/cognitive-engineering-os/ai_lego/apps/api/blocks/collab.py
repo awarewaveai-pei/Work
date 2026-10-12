@@ -257,7 +257,7 @@ def group_ai_turn(group_id: str, action_name: str, body: AiBody, session: dict[s
         if group_gone(error):
             raise not_found(group_id) from None
         text = str(error)
-        status = 403 if isinstance(error, AiRefused) else 429 if "budget" in text.lower() else 502 if text.startswith(("AI_ANSWER", "AI_PROVIDER")) else _status(text)
+        status = 403 if isinstance(error, AiRefused) else api.ai_failure_status(error) or _status(text)
         raise HTTPException(status_code=status, detail=text) from error
     if "saved" in result:
         saved = result["saved"]

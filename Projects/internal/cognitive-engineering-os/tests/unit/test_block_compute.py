@@ -458,7 +458,7 @@ class AiTests(ComputeCase):
                            ("報酬大概 15%。", "AI_ANSWER_HAS_NUMBER"), ("依這個結果預測你會賺。", "AI_ANSWER_CALLS_IT_PREDICTION"), ("這樣一定會賺。", "AI_ANSWER_CALLS_IT_PREDICTION")):
             self.provider.answer = {**EXPLAINED, "points": [{"part": "推論", "text": text}]}
             response = self.ask("explain", run=run)
-            self.assertEqual(response.status_code, 502, text)
+            self.assertEqual(response.status_code, 422, text)
             self.assertTrue(response.json()["detail"].startswith(code), text)
         self.assertEqual(self.docs.current(self.tenant_id, self.owner, "compute.explanation"), [])
         self.provider.answer = {**EXPLAINED, "points": [{"part": "推論", "text": "模擬不是預測，悲觀情境不一定會發生；千萬不要只看一個數。"}]}

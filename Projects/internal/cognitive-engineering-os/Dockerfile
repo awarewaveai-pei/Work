@@ -38,7 +38,13 @@ EXPOSE 8420
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8420/health', timeout=3).status == 200 else 1)"
 
-CMD ["uvicorn", "ai_lego.apps.api.main:app", "--host", "0.0.0.0", "--port", "8420"]
+# N worker processes (COGNITIVE_OS_API_WORKERS, default 4): one process queued every request of a class behind the
+# others (2026-10-11 walk). Nothing a request depends on lives in one process's memory -- locks, budgets, sessions and
+# erasure claims are in PostgreSQL or kernel file locks; caches are read-only (tests/unit/test_no_process_local_run_registry.py).
+# Each worker holds its own DB pool (Databases max_size 10 x N <= cognitive-db max_connections 100) and ~150-250 MB:
+# docker-compose.yml's mem_limit is sized for 4. exec: uvicorn is PID 1 and gets the stop signal.
+ENV COGNITIVE_OS_API_WORKERS=4
+CMD ["sh", "-c", "exec uvicorn ai_lego.apps.api.main:app --host 0.0.0.0 --port 8420 --workers \"$COGNITIVE_OS_API_WORKERS\""]
 
 
 FROM runtime AS test

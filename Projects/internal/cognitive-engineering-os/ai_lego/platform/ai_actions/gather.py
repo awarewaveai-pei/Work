@@ -167,13 +167,11 @@ def _organize_input(context: Mapping[str, Any], read: Read) -> str:
 
 ACTIONS = [
     AiAction(block="GATHER", name="queries", needs="search_external", instructions=QUERIES, output_kind="gather.ai_queries", output_schema=QUERIES_SCHEMA,
-             reads=("gather.ask", "map.map"), build_input=_queries_input, shape=_queries_shape, max_tokens=1500),
+             reads=("gather.ask", "map.map"), build_input=_queries_input, shape=_queries_shape),
     AiAction(block="GATHER", name="summarise", needs="search_external", instructions=SUMMARY, output_kind="gather.ai_says", output_schema=SAYS_SCHEMA,
-             reads=("gather.ask", "gather.source", "gather.channels", "assembler.intake"), build_input=_sources_input, shape=_says_shape,
-             max_tokens=2500, cites=True, handback=_handback),
+             reads=("gather.ask", "gather.source", "gather.channels", "assembler.intake"), build_input=_sources_input, shape=_says_shape, max_tokens=6000, cites=True, handback=_handback),
     AiAction(block="GATHER", name="compare", needs="search_external", instructions=COMPARE, output_kind="gather.ai_compare", output_schema=COMPARE_SCHEMA,
-             reads=("gather.ask", "gather.source", "gather.channels", "assembler.intake"), build_input=_sources_input, shape=_compare_shape,
-             max_tokens=2500, cites=True, handback=_handback),
+             reads=("gather.ask", "gather.source", "gather.channels", "assembler.intake"), build_input=_sources_input, shape=_compare_shape, max_tokens=6000, cites=True, handback=_handback),
     AiAction(block="GATHER", name="organize", needs="organize", instructions=ORGANIZE, output_kind="gather.ai_says", output_schema=SAYS_SCHEMA,
-             reads=("gather.ask", "gather.own", "gather.source", "map.map"), build_input=_organize_input, shape=_says_shape, max_tokens=2000, cites=True),
+             reads=("gather.ask", "gather.own", "gather.source", "map.map"), build_input=_organize_input, shape=_says_shape, max_tokens=6000, cites=True),
 ]

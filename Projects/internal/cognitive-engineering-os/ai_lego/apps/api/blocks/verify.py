@@ -247,8 +247,10 @@ def search_claim(project_id: str, claim_id: str, body: SearchBody, response: Res
     angles = body.angles if body.angles is not None else list(SEARCH_ANGLES)
     if not angles or any(angle not in SEARCH_ANGLES for angle in angles) or len(set(angles)) != len(angles):
         raise HTTPException(status_code=400, detail=f"VERIFY_SEARCH_ANGLES_INVALID: a non-empty choice of {list(SEARCH_ANGLES)}")
+    text = claim["content"]["text"][:200]
+    languages = [api.query_language(text)]   # the claim's own language only: no translation of a claim exists, and a mixed query finds noise
     seed = api.CollectionSeed(uri=f"entity://claim/{claim_id.replace('-', '')[:12]}", meta={
-        "kind": "claim", "entityName": claim["content"]["text"][:200], "angles": angles, "languages": list(SEARCH_LANGUAGES), "providers": list(SEARCH_PROVIDERS)})
+        "kind": "claim", "entityName": text, "angles": angles, "languages": languages, "providers": list(SEARCH_PROVIDERS)})
     version = claim["version"]
     if body.confirm:
         _call(refuse_open_search, docs, tenant_id, owner, claim_id, version)
@@ -258,7 +260,7 @@ def search_claim(project_id: str, claim_id: str, body: SearchBody, response: Res
         refuse_open_search(docs, tenant_id, owner, claim_id, version)
 
     def reserve(run_id: str) -> None:
-        lookup = {"kind": "verify.lookup", "content": {"claim": claim_id, "claim_version": version, "run": run_id, "angles": angles}}
+        lookup = {"kind": "verify.lookup", "content": {"claim": claim_id, "claim_version": version, "run": run_id, "angles": angles, "languages": languages}}
         _call(docs.save_many, tenant_id, owner, [lookup], record_log.system("VERIFY"), check=still_this_version)
 
     return api.start_collection(project_id, api.CollectionRequest(seeds=[seed], confirm=body.confirm), response, session, store, repo, service, reserve=reserve)

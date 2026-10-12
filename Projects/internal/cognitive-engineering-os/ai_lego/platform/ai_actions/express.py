@@ -214,7 +214,7 @@ INSTRUCTIONS = (
 
 ACTIONS = [
     AiAction(block="EXPRESS", name="draft_from_outline", needs="organize", instructions=INSTRUCTIONS, output_kind="express.draft", output_schema=DRAFT_SCHEMA,
-             reads=DRAFT_READS, build_input=_draft_input, shape=_shape, max_tokens=3000, cites=True, handback=_handback, quoted=_quoted),
+             reads=DRAFT_READS, build_input=_draft_input, shape=_shape, max_tokens=8000, cites=True, handback=_handback, quoted=_quoted),
     AiAction(block="EXPRESS", name="adjust_for_reader", needs="organize", instructions=INSTRUCTIONS + " Rewrite wording for the reader without adding a new claim or changing refs.",
-             output_kind="express.draft", output_schema=DRAFT_SCHEMA, reads=ADJUST_READS, build_input=_adjust_input, shape=_shape, max_tokens=3000, cites=True, handback=_handback, quoted=_quoted),
+             output_kind="express.draft", output_schema=DRAFT_SCHEMA, reads=ADJUST_READS, build_input=_adjust_input, shape=_shape, max_tokens=8000, cites=True, handback=_handback, quoted=_quoted),
 ]

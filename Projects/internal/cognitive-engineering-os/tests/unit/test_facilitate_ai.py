@@ -102,7 +102,7 @@ class PointerTests(AiCase):
             with self.subTest(pointer=pointer):
                 self.provider.answer = {"pointers": [pointer]}
                 refused = self.point()
-                self.assertEqual(refused.status_code, 502, refused.text)
+                self.assertEqual(refused.status_code, 422, refused.text)
         self.assertEqual(self.as_("F").get("/me/docs/facilitate.pointers").json(), [])
 
     def test_it_reads_only_my_own_log_and_nothing_a_participant_shared_with_me(self):
@@ -150,7 +150,7 @@ class PracticeTests(AiCase):
             self.assertEqual(self.say(step=99).status_code, 400)
             self.assertEqual(self.say(say="").status_code, 400)
             self.provider.answer = {"reply": "你的排名是第二。"}
-            self.assertEqual(self.say().status_code, 502)   # it does not rank the leader
+            self.assertEqual(self.say().status_code, 422)   # it does not rank the leader
             self.provider.answer = {"reply": "我看到時間。"}
             calls = len(self.provider.calls)
             crisis = self.say(say="我想結束自己")

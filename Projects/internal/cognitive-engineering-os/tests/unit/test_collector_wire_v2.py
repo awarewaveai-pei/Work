@@ -59,8 +59,8 @@ class WireV2Case(CollectionApiTestCase):
 class SpecExamplesTests(WireV2Case):
     def test_the_spec_seeds_are_planned_and_reach_the_collector_unchanged(self):
         plan = self._request(SPEC["seeds"]).json()["plan"]
-        # one claim seed; the pasted URL makes no query
-        self.assertEqual((plan["seeds"], plan["max_queries"]), (2, api_main.RESEARCH_MAX_QUERIES_PER_ENTITY))
+        # two claim seeds, one per language (the English one a translation); the pasted URL makes no query
+        self.assertEqual((plan["seeds"], plan["max_queries"]), (3, 2 * api_main.RESEARCH_MAX_QUERIES_PER_ENTITY))
         self._start()
         self.assertEqual(self.service.calls[-1]["seeds"], SPEC["seeds"])
 
@@ -244,8 +244,10 @@ class ClaimSeedTests(WireV2Case):
         self.assert_refused(self.claim(providers=["serper", "perplexity"]))
 
     def test_every_claim_angle_language_and_engine_in_the_spec_is_accepted(self):
-        seed = self.claim(angles=SPEC["claim_angles"], languages=SPEC["languages"], providers=SPEC["providers"])
-        self.assertEqual(self._request([seed]).status_code, 200)
+        words = {"zh": SPEC["seeds"][0]["meta"]["entityName"], "en": SPEC["seeds"][2]["meta"]["entityName"]}
+        for language in SPEC["languages"]:
+            seed = self.claim(angles=SPEC["claim_angles"], languages=[language], providers=SPEC["providers"], entityName=words[language])
+            self.assertEqual(self._request([seed]).status_code, 200, language)
 
     def test_a_malformed_claim_is_refused_before_anything_is_written(self):
         cases = {
@@ -253,6 +255,10 @@ class ClaimSeedTests(WireV2Case):
             "no angle": self.claim(angles=[]),
             "a repeated angle": self.claim(angles=["news", "news"]),
             "a language outside zh and en": self.claim(languages=["fr"]),
+            # 2026-10-11: 「…修改條件嗎？ official statement document」 -- one seed's words searched in a language they are not in
+            "two languages in one seed": self.claim(languages=["zh", "en"]),
+            "Chinese words searched in English": self.claim(languages=["en"]),
+            "English words searched in Chinese": self.claim(entityName=SPEC["seeds"][2]["meta"]["entityName"]),
             "angles as a string": self.claim(angles="news,factcheck"),
             "an empty claim": self.claim(entityName="   "),
             "a claim over the limit": self.claim(entityName="查" * (SPEC["claim_max_chars"] + 1)),

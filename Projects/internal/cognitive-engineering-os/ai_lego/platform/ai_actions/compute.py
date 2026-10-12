@@ -267,7 +267,7 @@ def _explain_shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="COMPUTE", name="suggest", needs="propose_options", instructions=SUGGEST, output_kind="compute.suggestion", output_schema=SUGGEST_SCHEMA,
-             reads=(), build_input=_suggest_input, shape=_suggest_shape, max_tokens=900),
+             reads=(), build_input=_suggest_input, shape=_suggest_shape),
     AiAction(block="COMPUTE", name="explain", needs="organize", instructions=EXPLAIN, output_kind="compute.explanation", output_schema=EXPLAIN_SCHEMA,
-             reads=READS, build_input=_explain_input, shape=_explain_shape, handback=_explain_handback, max_tokens=1400),
+             reads=READS, build_input=_explain_input, shape=_explain_shape, handback=_explain_handback),
 ]

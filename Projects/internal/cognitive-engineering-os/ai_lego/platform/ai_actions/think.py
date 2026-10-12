@@ -15,7 +15,7 @@ from typing import Any, Callable, Mapping
 from ai_lego.core.domain.evidence_words import CHECKABLE, CLAIM_STATES
 from ai_lego.core.domain.kinds.think import ACTION_FACETS, COUNTER_ANGLES, DIVERGE_METHODS, OWN_TYPES, SOURCED
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform.ai_gate import AiAction
+from ai_lego.platform.ai_gate import MIN_MAX_TOKENS, AiAction
 from ai_lego.platform.evidence import not_usable_because
 
 Read = Callable[[str], list[dict[str, Any]]]
@@ -362,7 +362,7 @@ TASKS = {
 }
 
 
-def _action(name: str, needs: str, build_input: Callable[[Mapping[str, Any], Read], str], max_tokens: int) -> AiAction:
+def _action(name: str, needs: str, build_input: Callable[[Mapping[str, Any], Read], str], max_tokens: int = MIN_MAX_TOKENS) -> AiAction:
     if name in BATCHES:
         kind, schema, shape = "think.batch", _batch_schema(BATCHES[name][0], advice=name == "direct_advice"), _batch_shape(name)
     else:
@@ -372,14 +372,14 @@ def _action(name: str, needs: str, build_input: Callable[[Mapping[str, Any], Rea
 
 
 ACTIONS = [
-    _action("mirror", "organize", lambda context, read: _message(context, read), 1500),
-    _action("diverge", "propose_options", lambda context, read: _message(context, read), 6000),
-    _action("counter", "counter", lambda context, read: _message(context, read, target=True), 2500),
-    _action("audit", "organize", _audit_input, 2000),
-    _action("socratic", "ask", lambda context, read: _message(context, read), 400),
-    _action("ask_conclusion", "ask", lambda context, read: _message(context, read), 400),
-    _action("criteria", "propose_options", lambda context, read: _message(context, read, cards="picked"), 2000),
-    _action("look_back", "organize", lambda context, read: _message(context, read, cards="picked"), 1500),
+    _action("mirror", "organize", lambda context, read: _message(context, read)),
+    _action("diverge", "propose_options", lambda context, read: _message(context, read), 6000),   # a batch of cards
+    _action("counter", "counter", lambda context, read: _message(context, read, target=True), 6000),
+    _action("audit", "organize", _audit_input),
+    _action("socratic", "ask", lambda context, read: _message(context, read)),
+    _action("ask_conclusion", "ask", lambda context, read: _message(context, read)),
+    _action("criteria", "propose_options", lambda context, read: _message(context, read, cards="picked")),
+    _action("look_back", "organize", lambda context, read: _message(context, read, cards="picked")),
     # 除非你明確選「直接給建議」: the one turn that does not wait for the person's own version -- the problem is still theirs
-    _action("direct_advice", "direct_advice", lambda context, read: _message(context, read, need_own=False), 2500),
+    _action("direct_advice", "direct_advice", lambda context, read: _message(context, read, need_own=False), 6000),
 ]

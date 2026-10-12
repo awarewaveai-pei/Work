@@ -29,6 +29,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
+import logging
 import pkgutil
 from dataclasses import dataclass
 from functools import lru_cache
@@ -43,6 +44,7 @@ from ai_lego.core.domain.evidence_words import MIN_QUOTE, quote_in
 from ai_lego.modules.research.source_manifest import build_source_manifest, new_fence_nonce, render_source_block
 from ai_lego.platform import safety, visibility
 from ai_lego.platform.evidence import CaseEvidence
+from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS
 from ai_lego.platform.ai_gateway.structured import ask_object, parse_object
 
 # Every model call inside the platform starts with these (完整性核心 and the AI rules shared by every card).
@@ -58,6 +60,15 @@ PREAMBLE = (
 )
 
 
+# The smallest output cap an action may set (AiAction refuses less). claude-opus-5-5 always thinks and its thinking is
+# billed against max_tokens (ai_gateway/provider.py DEFAULT_EFFORT), and a Chinese answer costs about 1.5-2x the tokens of
+# the same answer in English. 2026-10-11: THINK.mirror at 1500 was cut at exactly 1500 and refused. 4000 = the shortest
+# card's answer (one question, ~200 tokens in Chinese) with room for medium-effort thinking, over twice the cap that was
+# cut; a long-form or cited answer (drafts, source readings, card batches) sets more. A cut answer still raises
+# AI_ANSWER_TRUNCATED (provider.py), never a silent half answer.
+MIN_MAX_TOKENS = 4000
+
+
 @dataclass(frozen=True)
 class AiAction:
     block: str
@@ -71,7 +82,7 @@ class AiAction:
     shape: Callable[[dict[str, Any]], dict[str, Any]] = lambda answer: answer   # holds the answer to the card (e.g. fixed questions) before it is validated
     outside_case: bool = False      # may run with no case (permission fixed by the card: only ALWAYS actions)
     places: tuple[str, ...] = ("happened_in", "you_are_in")   # 系統把發生地和你在哪裡交給 AI; a card that reads more (規範與脈絡: 當事人各在哪裡) names it
-    max_tokens: int = 2000
+    max_tokens: int = MIN_MAX_TOKENS
     cites: bool = False             # reads the case's source cards' text and may cite only them (STEP2_SHARED_RULES §5)
     handback: Callable[[Mapping[str, Any], Callable[..., list[dict[str, Any]]]], "str | None"] | None = None   # (context, read) -> why the system stops, before the model is paid
     # (context, read) -> doc ids of stored records whose kind declares others_words (a pasted message). The gate reads
@@ -87,6 +98,8 @@ class AiAction:
     subject_field: str = ""         # in a group: the filled field naming the member the answer is about -- the record's identity (theirs to delete, erased with them); empty = the caller
 
     def __post_init__(self) -> None:
+        if not MIN_MAX_TOKENS <= self.max_tokens <= MAX_OUTPUT_TOKENS:
+            raise InvariantViolation(f"AI_ACTION_INVALID: {self.block}.{self.name} max_tokens {self.max_tokens} is outside {MIN_MAX_TOKENS}..{MAX_OUTPUT_TOKENS}")
         if self.needs not in ALWAYS and self.needs not in GRANTABLE:
             raise InvariantViolation(f"AI_ACTION_INVALID: {self.block}.{self.name} needs {self.needs!r}")
         if self.cites and "gather.source" not in self.reads:
@@ -129,6 +142,19 @@ def _quoted_kinds(action: AiAction) -> list[str]:
 
 class AiRefused(InvariantViolation):
     """The gate refused before any model call: AI_PERMISSION_DENIED (the contract does not grant it)."""
+
+
+_log = logging.getLogger(__name__)
+REFUSAL_REASON_CHARS = 300
+
+
+def _log_refusal(action: AiAction, error: InvariantViolation, provider: Any) -> None:
+    """Every turn that ends without an answer, at WARNING: the action, the code, the rule's reason and what the model
+    call cost. Never the person's words or the model's: a reason is the gate's or a validator's own sentence (code:
+    reason), cut to REFUSAL_REASON_CHARS. 2026-10-11: a VERIFY split refused after 315 output tokens and nothing said why."""
+    code, _, reason = str(error).partition(":")
+    _log.warning("AI turn refused: action=%s.%s code=%s output_tokens=%s reason=%s", action.block, action.name, code.strip()[:80],
+                 getattr(provider, "output_tokens", "?"), reason.strip()[:REFUSAL_REASON_CHARS])
 
 
 MAX_SOURCES_PER_TURN = 12   # a turn about more cards picks them (context["cards"]); every source is paid for as input
@@ -285,7 +311,19 @@ def ask_ai(action: AiAction, *, tenant_id: str, identity_id: str, project_id: st
     {"stopped": "crisis", "resources": [...], "notice": ...}. ``provider`` is already metered by the caller
     (main._MeteredProvider); ``source_text(source_id) -> (row, text) | None`` reads a stored source (``cites`` turns).
     ``group_id``: the group an ``in_group`` action runs in (the caller must be a current member); ``shown``: how a
-    member is named to people (a hand-back says whose turn it is)."""
+    member is named to people (a hand-back says whose turn it is). A refusal is logged (_log_refusal), then raised."""
+    try:
+        return _turn(action, tenant_id=tenant_id, identity_id=identity_id, project_id=project_id, context=context, docs=docs, provider=provider,
+                     doc_id=doc_id, base_version=base_version, source_text=source_text, group_id=group_id, shown=shown)
+    except InvariantViolation as error:
+        _log_refusal(action, error, provider)
+        raise
+
+
+def _turn(action: AiAction, *, tenant_id: str, identity_id: str, project_id: str | None, context: Mapping[str, Any],
+          docs: CaseDocs, provider: Any, doc_id: str | None, base_version: int | None,
+          source_text: Callable[[str], "tuple[dict[str, Any], str] | None"] | None, group_id: str | None,
+          shown: Callable[[str | None], str] | None) -> dict[str, Any]:
     viewer = None
     if action.in_group:
         if group_id is None or project_id is not None:

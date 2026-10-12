@@ -179,7 +179,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         self._grant("direct_advice")
         round_ = self._round(own=())
         self.provider.answer = {"cards": [{**card, "fails_when": ""} for card in ANSWERS["direct_advice"]["cards"]]}
-        self.assertEqual(self._ask("direct_advice", round_["doc_id"]).status_code, 502)
+        self.assertEqual(self._ask("direct_advice", round_["doc_id"]).status_code, 422)
         self.assertEqual(self._cards(), [])
 
     # -- 協作合約 --------------------------------------------------------------------------------------------------------------
@@ -251,7 +251,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         round_ = self._round()
         for answer in ({"cards": cards(7)}, {"cards": cards(10, kinds.DIVERGE_METHODS[:3])}, {"cards": cards(12, ())}, {"cards": [{**card, "claim": "同一個"} for card in cards(10)]}):
             self.provider.answer = answer
-            self.assertEqual(self._ask("diverge", round_["doc_id"]).status_code, 502, answer)
+            self.assertEqual(self._ask("diverge", round_["doc_id"]).status_code, 422, answer)
         self.assertEqual(self.client.get(f"{self.base}/docs/think.batch").json(), [])
         many = self._answer("diverge", round_["doc_id"], {"cards": cards(20) + [{"claim": "沒有發散法", "mechanism": "m", "benefit": "b", "risk": "r", "assumption": "a"}]})
         self.assertEqual(len(many["content"]["cards"]), 15)
@@ -268,7 +268,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         saved = self._answer("counter", round_["doc_id"], {"cards": short + cards(1, kinds.COUNTER_ANGLES)})
         self.assertEqual(len(saved["content"]["cards"]), 1)
         self.provider.answer = {"cards": short}
-        self.assertEqual(self._ask("counter", round_["doc_id"]).status_code, 502)
+        self.assertEqual(self._ask("counter", round_["doc_id"]).status_code, 422)
 
     def test_the_counter_aims_at_the_item_i_marked(self):
         self._grant("counter")
@@ -510,14 +510,14 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         junk = self._answer("mirror", round_["doc_id"], {"sections": [{"title": ["事實"], "items": ["x"]}, {"title": {"a": 1}, "items": ["y"]}, {"title": "情緒", "items": ["生氣"]}]})   # a title that is not even text
         self.assertEqual(junk["content"]["sections"], [{"title": "情緒", "items": ["生氣"]}])
         self.provider.answer = {"sections": [{"title": "你的動機", "items": ["x"]}]}
-        self.assertEqual(self._ask("mirror", round_["doc_id"]).status_code, 502)
+        self.assertEqual(self._ask("mirror", round_["doc_id"]).status_code, 422)
 
     def test_a_question_only_role_gives_one_question_and_nothing_else(self):
         round_ = self._round()
         saved = self._answer("socratic", round_["doc_id"], {"question": "你要先弄清楚什麼？", "sections": [{"title": "事實", "items": ["x"]}], "premise": "p"})
         self.assertEqual(set(saved["content"]), {"round", "action", "role", "question", "sourced"})
         self.provider.answer = {"sections": [{"title": "事實", "items": ["x"]}]}
-        self.assertEqual(self._ask("ask_conclusion", round_["doc_id"]).status_code, 502)
+        self.assertEqual(self._ask("ask_conclusion", round_["doc_id"]).status_code, 422)
 
     def test_the_ai_asks_one_question_at_a_time(self):
         self.assertEqual(actions._one_question("你要先弄清楚什麼？還是先看他的條件？", 300), "你要先弄清楚什麼？")
@@ -552,7 +552,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         self._grant("propose_options")
         round_ = self._round()
         self.provider.answer = {**ANSWERS["criteria"], "fails_when": ""}
-        self.assertEqual(self._ask("criteria", round_["doc_id"]).status_code, 502)
+        self.assertEqual(self._ask("criteria", round_["doc_id"]).status_code, 422)
         saved = self._answer("criteria", round_["doc_id"])
         self.assertEqual((saved["content"]["premise"], saved["content"]["fails_when"]), ("你有兩個以上的選項", "選項其實只有一個"))
 
@@ -574,7 +574,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         reply = self._answer("mirror", round_["doc_id"], {"sections": [{"title": "事實", "items": ["x"]}], "handback": "資料不足", "question": "你想先弄清楚哪一點？"})
         self.assertNotIn("sections", reply["content"])
         self.provider.answer = {"cards": cards(10), "handback": "資料不足"}
-        self.assertEqual(self._ask("diverge", round_["doc_id"]).status_code, 502)
+        self.assertEqual(self._ask("diverge", round_["doc_id"]).status_code, 422)
 
     def test_i_answer_a_reply_and_the_ai_cannot_answer_for_me(self):
         reply = self._answer("mirror", self._round()["doc_id"])

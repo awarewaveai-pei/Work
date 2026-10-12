@@ -58,26 +58,26 @@ class AuthenticateTimingTests(PgTestCase):
         )
         self.store.create_identity(str(uuid.uuid4()), self.tenant_id, "real@example.com", "Real User", "correct-horse-battery")
 
-    def _time_one(self, email: str, password: str) -> float:
+    def _time_one(self, email: str, password: str, anywhere: bool = False) -> float:
         start = time.perf_counter()
-        result = self.store.authenticate(self.tenant_id, email, password)
+        result = self.store.authenticate_anywhere(email, password) if anywhere else self.store.authenticate(self.tenant_id, email, password)
         elapsed = time.perf_counter() - start
         self.assertIsNone(result)  # every call in this test is a deliberate failure case
         return elapsed
 
-    def _interleaved(self, left: tuple[str, str], right: tuple[str, str]) -> tuple[list[float], list[float]]:
+    def _interleaved(self, left: tuple[str, str], right: tuple[str, str], anywhere: bool = False) -> tuple[list[float], list[float]]:
         """Alternating samples of the two failure paths, swapping which goes first each pair."""
-        self._time_one(*left)
-        self._time_one(*right)
+        self._time_one(*left, anywhere=anywhere)
+        self._time_one(*right, anywhere=anywhere)
         left_durations: list[float] = []
         right_durations: list[float] = []
         for index in range(PAIRS):
             if index % 2 == 0:
-                left_durations.append(self._time_one(*left))
-                right_durations.append(self._time_one(*right))
+                left_durations.append(self._time_one(*left, anywhere=anywhere))
+                right_durations.append(self._time_one(*right, anywhere=anywhere))
             else:
-                right_durations.append(self._time_one(*right))
-                left_durations.append(self._time_one(*left))
+                right_durations.append(self._time_one(*right, anywhere=anywhere))
+                left_durations.append(self._time_one(*left, anywhere=anywhere))
         return left_durations, right_durations
 
     def _assert_comparable(self, label: str, first: list[float], second: list[float], check_absolute: bool) -> None:
@@ -104,6 +104,33 @@ class AuthenticateTimingTests(PgTestCase):
             ("real@example.com", "wrong-password-here-2"),
         )
         self._assert_comparable("nonexistent-email", nonexistent, wrong_password, check_absolute=True)
+
+    def test_without_a_tenant_an_unknown_address_and_a_wrong_password_take_comparable_time(self):
+        """POST /auth/login without tenant_id (IdentityStore.authenticate_anywhere): an address of one tenant costs one hash on a
+        wrong password, and an unknown address one dummy hash."""
+        address = f"{uuid.uuid4().hex}@example.com"   # in this tenant only (the database is shared across tests)
+        self.store.create_identity(str(uuid.uuid4()), self.tenant_id, address, "Real User", "correct-horse-battery")
+        nonexistent, wrong_password = self._interleaved(
+            (f"{uuid.uuid4().hex}@example.com", "irrelevant-password-5"),
+            (address, "wrong-password-here-6"),
+            anywhere=True,
+        )
+        self._assert_comparable("anywhere nonexistent-email", nonexistent, wrong_password, check_absolute=True)
+
+    def test_without_a_tenant_an_address_in_several_tenants_costs_what_an_unknown_one_does(self):
+        """Codex review 2026-10-11 F1: k accounts used to cost k hashes, so a wrong password told how many tenants hold an
+        address. Every login without a tenant pays the same padded count."""
+        address = f"{uuid.uuid4().hex}@example.com"
+        self.store.create_identity(str(uuid.uuid4()), self.tenant_id, address, "Real User", "correct-horse-battery")
+        other = self.store.create_tenant(tenant_id=str(uuid.uuid4()), legal_name="Second Tenant", home_jurisdiction="jurisdiction-pack.tw.v1",
+                                         data_residency_region="local-dev", encryption_root_key_ref="test-kek-ref")
+        self.store.create_identity(str(uuid.uuid4()), other["tenant_id"], address, "Real User", "correct-horse-battery")
+        nonexistent, in_two = self._interleaved(
+            (f"{uuid.uuid4().hex}@example.com", "irrelevant-password-7"),
+            (address, "wrong-password-here-8"),
+            anywhere=True,
+        )
+        self._assert_comparable("anywhere nonexistent-email vs address-in-two-tenants", nonexistent, in_two, check_absolute=True)
 
     def test_suspended_identity_and_wrong_password_take_comparable_time(self):
         with self.databases.for_tenant(self.tenant_id) as conn:

@@ -131,6 +131,7 @@ KINDS = [
         "claim_version": Field("int", 100000, required=True),
         "run": Field("text", 64, required=True, scan=False),
         "angles": Field("list", 7, scan=False),
+        "languages": Field("list", 2, scan=False),   # what the run searched in (collection_run.query_language); absent = every SEARCH_LANGUAGES
     }, authors=frozenset({"system"}), deletable=False),
     # 系統查別人是不是已經查過這一則: each fact-check database of the place's list, what it said; every hit is a source
     # (GATHER cards it) -- 誰判的、依據什麼, never the platform's verdict

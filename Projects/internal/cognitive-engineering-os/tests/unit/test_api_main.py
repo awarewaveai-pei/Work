@@ -13,7 +13,7 @@ import yaml
 import uuid
 import json
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 from PIL import Image
@@ -353,6 +353,15 @@ class CatalogTests(ApiTestCase):
             self.assertIn(goal["icon"], body["glyphs"])
             self.assertTrue(all(body["methods"][mid]["goal"] == goal["id"] for mid in goal["featured"]))
         self.assertTrue(all(p["shape"] in body["shapes"] for p in body["popular"]))
+
+    def test_the_catalog_is_built_at_start_so_the_first_visitor_does_not_pay(self):
+        attention = MagicMock()
+        attention.return_value.needs_attention.return_value = []
+        with patch.object(api_main, "resume_pending_erasures", return_value=[]), patch.object(api_main, "erasure_for", attention), \
+                TestClient(api_main.app, base_url="https://testserver"):   # runs the lifespan
+            self.assertIn("payload", api_main._CATALOG_CACHE)
+            with patch.object(api_main, "load_catalog", side_effect=AssertionError("built on the first request")):
+                self.assertEqual(self.client.get("/catalog").status_code, 200)
 
     def test_an_unchanged_registry_is_served_from_the_cache(self):
         self.client.get("/catalog")

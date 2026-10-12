@@ -149,7 +149,7 @@ class ExpressApiTests(ProjectSourceApiTestCase):
         ):
             self.provider.answer = {"sentences": [sentence]}
             response = self.client.post(f"{self.base}/ai/EXPRESS/draft_from_outline", json={"context": {}})
-            self.assertEqual(response.status_code, 502, response.text)
+            self.assertEqual(response.status_code, 422, response.text)
             self.assertIn("AI_ANSWER_INVALID", response.text)
         self.assertEqual(self.client.get(f"{self.base}/express/drafts").json(), [])
 
@@ -220,11 +220,11 @@ class ExpressApiTests(ProjectSourceApiTestCase):
         self.selection([{"project_id": self.project["project_id"], "kind": "decide.judgment", "doc_id": judgment["doc_id"]}])
         self.provider.answer = {"sentences": [{"text": "信心：60；我還不確定合作方是否會改變條件。", "refs": [{"kind": "decide.judgment", "doc_id": judgment["doc_id"]}], "unchecked": False, "author": "joint"}]}
         joint = self.client.post(f"{self.base}/ai/EXPRESS/draft_from_outline", json={"context": {}})
-        self.assertEqual(joint.status_code, 502, joint.text)
+        self.assertEqual(joint.status_code, 422, joint.text)
         self.assertIn("invalid author", joint.text)
         self.provider.answer = {"sentences": [{"text": "只寫一般摘要", "refs": [{"kind": "decide.judgment", "doc_id": judgment["doc_id"]}], "unchecked": False, "author": "ai"}]}
         missing_person_line = self.client.post(f"{self.base}/ai/EXPRESS/draft_from_outline", json={"context": {}})
-        self.assertEqual(missing_person_line.status_code, 502, missing_person_line.text)
+        self.assertEqual(missing_person_line.status_code, 422, missing_person_line.text)
         self.assertIn("person's confidence or uncertainty", missing_person_line.text)
         self.provider.answer = {"sentences": [{"text": "信心：60；我還不確定合作方是否會改變條件。", "refs": [{"kind": "decide.judgment", "doc_id": judgment["doc_id"]}], "unchecked": False, "author": "ai"}]}
         response = self.client.post(f"{self.base}/ai/EXPRESS/draft_from_outline", json={"context": {}})
@@ -235,7 +235,7 @@ class ExpressApiTests(ProjectSourceApiTestCase):
         self.assertIn("我還不確定合作方是否會改變條件。", self.provider.calls[0][1])
         self.provider.answer = {"sentences": [{"text": "冒充本人", "refs": [{"kind": "decide.judgment", "doc_id": judgment["doc_id"]}], "unchecked": False, "author": "user"}]}
         refused = self.client.post(f"{self.base}/ai/EXPRESS/adjust_for_reader", json={"context": {"draft": draft["doc_id"]}})
-        self.assertEqual(refused.status_code, 502, refused.text)
+        self.assertEqual(refused.status_code, 422, refused.text)
         self.assertIn("cannot label", refused.text)
 
     def test_sent_can_only_be_written_by_the_person(self):

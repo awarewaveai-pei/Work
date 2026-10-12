@@ -322,14 +322,14 @@ def _next_shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="VERIFY", name="split", needs="organize", instructions=SPLIT, output_kind="verify.split", output_schema=SPLIT_SCHEMA,
-             reads=("verify.message", "verify.first"), build_input=_split_input, shape=_split_shape, max_tokens=2500, quoted=_the_message),
+             reads=("verify.message", "verify.first"), build_input=_split_input, shape=_split_shape, max_tokens=6000, quoted=_the_message),
     AiAction(block="VERIFY", name="techniques", needs="organize", instructions=TECHNIQUES_TEXT, output_kind="verify.techniques", output_schema=TECHNIQUES_SCHEMA,
-             reads=("verify.message", "verify.first"), build_input=_techniques_input, shape=_techniques_shape, max_tokens=2500, quoted=_the_message),
+             reads=("verify.message", "verify.first"), build_input=_techniques_input, shape=_techniques_shape, max_tokens=6000, quoted=_the_message),
     # reading the case's source cards and citing them is what 「找外部資料（只引用有來源卡的）」 grants (as GATHER's summaries)
     AiAction(block="VERIFY", name="read", needs="search_external", instructions=READ, output_kind="verify.reading", output_schema=READ_SCHEMA,
              reads=("verify.claim", "verify.first", "gather.source"), build_input=_read_input, shape=_read_shape, max_tokens=6000, cites=True),
     AiAction(block="VERIFY", name="summary", needs="organize", instructions=SUMMARY, output_kind="verify.summary", output_schema=SUMMARY_SCHEMA,
-             reads=("verify.claim", "verify.first"), build_input=_summary_input, shape=_summary_shape, max_tokens=2000, handback=_summary_handback),
+             reads=("verify.claim", "verify.first"), build_input=_summary_input, shape=_summary_shape, handback=_summary_handback),
     AiAction(block="VERIFY", name="next", needs="point_gaps", instructions=NEXT, output_kind="verify.next", output_schema=NEXT_SCHEMA,
-             reads=("verify.claim", "verify.first"), build_input=_next_input, shape=_next_shape, max_tokens=1200),
+             reads=("verify.claim", "verify.first"), build_input=_next_input, shape=_next_shape),
 ]

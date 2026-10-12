@@ -2,11 +2,15 @@
 version is written by the AI gate (ai_gate.py), never posted here.
 
     GET    /projects/{project_id}/docs/{kind}                       current version of each document
+    GET    /projects/{project_id}/docs?kinds=a,b,c                  the same for several kinds in one request: {"docs": {kind: [...]}}
     POST   /projects/{project_id}/docs/{kind}            {content}  a new document
     PUT    /projects/{project_id}/docs/{kind}/{doc_id}   {content, base_version}
     DELETE /projects/{project_id}/docs/{kind}/{doc_id}
     GET    /projects/{project_id}/docs/{kind}/{doc_id}/versions
-    the same under /me/docs/{kind}... for a kind the person owns across cases (每天的校準卡、你在哪裡)
+    the same under /me/docs/{kind}... (and /me/docs?kinds=...) for a kind the person owns across cases (每天的校準卡、你在哪裡)
+
+A page reads every kind it shows in one request (?kinds=): one request per kind tripped the site's 50-per-10-seconds limit.
+Each list is the per-kind route's own answer (_listed), never a second reader.
 
 A save answers the document plus ``notices``: a crisis signal in what the person wrote (help for where they are --
 every block that sees content recognises it; GOVERN gives the resources) and the blocks the saving block proposes.
@@ -16,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from ai_lego.apps.api import main as api
@@ -30,6 +34,7 @@ from ai_lego.platform.block_hooks import after_save, before_save, on_delete
 from ai_lego.platform.block_hooks.govern import strings
 
 router = APIRouter()
+MAX_KINDS_PER_READ = 100   # a page shows about 60 kinds; the cap bounds what one request can make the server read
 
 
 class DocBody(BaseModel):
@@ -138,11 +143,37 @@ def case_owner(project_id: str, session: dict[str, Any], repo: ProjectSourceRepo
     return record_log.case(project_id)
 
 
+def _kinds(kinds: str, owner_kind: str) -> list[str]:
+    """``?kinds=a,b,c``: each named once, every one checked as its own route checks it (404 DOC_KIND_UNKNOWN) before
+    anything is read."""
+    named = [kind.strip() for kind in kinds.split(",") if kind.strip()]
+    if not named:
+        raise HTTPException(status_code=400, detail="DOC_KINDS_REQUIRED: name the kinds to read (?kinds=a,b,c)")
+    if len(named) > MAX_KINDS_PER_READ:
+        raise HTTPException(status_code=400, detail=f"DOC_KINDS_TOO_MANY: {len(named)} kinds; at most {MAX_KINDS_PER_READ} per request")
+    named = list(dict.fromkeys(named))
+    for kind in named:
+        _kind(kind, owner_kind)
+    return named
+
+
+def _listed(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, kind: str, owner_kind: str) -> list[dict[str, Any]]:
+    """What GET .../docs/{kind} answers, after the owner check: the one reader of a block's list."""
+    _kind(kind, owner_kind)
+    return docs.current(tenant_id, owner, kind)
+
+
 @router.get("/projects/{project_id}/docs/{kind}")
 def list_case_docs(project_id: str, kind: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> list[dict[str, Any]]:
     owner = case_owner(project_id, session, repo)
-    _kind(kind, "case")
-    return CaseDocs(repo).current(session["tenant_id"], owner, kind)
+    return _listed(CaseDocs(repo), session["tenant_id"], owner, kind, "case")
+
+
+@router.get("/projects/{project_id}/docs")
+def list_case_docs_of_kinds(project_id: str, kinds: str = Query(""), session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    owner = case_owner(project_id, session, repo)
+    docs = CaseDocs(repo)
+    return {"docs": {kind: _listed(docs, session["tenant_id"], owner, kind, "case") for kind in _kinds(kinds, "case")}}
 
 
 @router.post("/projects/{project_id}/docs/{kind}")
@@ -173,8 +204,13 @@ def case_doc_versions(project_id: str, kind: str, doc_id: str, session: dict[str
 
 @router.get("/me/docs/{kind}")
 def list_my_docs(kind: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> list[dict[str, Any]]:
-    _kind(kind, "person")
-    return CaseDocs(repo).current(session["tenant_id"], record_log.person(session["identity_id"]), kind)
+    return _listed(CaseDocs(repo), session["tenant_id"], record_log.person(session["identity_id"]), kind, "person")
+
+
+@router.get("/me/docs")
+def list_my_docs_of_kinds(kinds: str = Query(""), session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    docs, owner = CaseDocs(repo), record_log.person(session["identity_id"])
+    return {"docs": {kind: _listed(docs, session["tenant_id"], owner, kind, "person") for kind in _kinds(kinds, "person")}}
 
 
 @router.post("/me/docs/{kind}")

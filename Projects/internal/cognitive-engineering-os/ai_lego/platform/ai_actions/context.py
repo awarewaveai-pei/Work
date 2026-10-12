@@ -61,6 +61,6 @@ def _point_shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="CONTEXT", name="point_facets", needs="point_gaps", instructions=POINT, output_kind="context.pointers", output_schema=POINT_SCHEMA,
-             reads=("assembler.intake", "map.map", "context.notes"), build_input=_point_input, shape=_point_shape, max_tokens=900,
+             reads=("assembler.intake", "map.map", "context.notes"), build_input=_point_input, shape=_point_shape,
              places=("happened_in", "you_are_in", "others_in")),
 ]

@@ -19,6 +19,15 @@ REPORT_COUNTERS = ("fetched", "written", "unchanged", "refused")
 # same instant, so "the grant is dead" and "the run is over" can never disagree. Long enough for Trigger to queue the run
 # and for the crawl (capped at 240 s in next-admin) to finish; a leaked grant token dies within the hour.
 RUN_TTL = timedelta(minutes=30)
+_HAN = re.compile(r"[\u3400-\u9fff\uf900-\ufaff]")
+
+
+def query_language(text: str) -> str:
+    """The language a claim seed's words are written in: zh when they hold any Chinese character, else en. A claim seed
+    searches in exactly this language (main._research_seeds): 2026-10-11 a Chinese question with English words appended
+    (「…修改條件嗎？ official statement document」) found a dictionary entry for 嗎. A second language is a second seed
+    whose words are a translation (GATHER's AI queries), or no second seed."""
+    return "zh" if _HAN.search(text) else "en"
 
 
 def _instant(value: str) -> datetime:

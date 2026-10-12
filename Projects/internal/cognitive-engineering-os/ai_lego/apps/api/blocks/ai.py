@@ -6,7 +6,8 @@
 200 {"saved": doc} -- the AI's answer, saved as an AI-authored document;
 200 {"handback": why} -- the card's 交還控制 (e.g. under two independent origins): no model call;
 200 {"stopped": "crisis", "notice", "resources"} -- a crisis signal: no model call;
-403 AI_PERMISSION_DENIED -- the 協作合約 does not grant what the action needs.
+403 AI_PERMISSION_DENIED -- the 協作合約 does not grant what the action needs;
+422 AI_ANSWER_* / 424 AI_PROVIDER_* / 429 budget -- main.ai_failure_status (never 502: the reason must reach the page).
 """
 
 from __future__ import annotations
@@ -50,7 +51,7 @@ def _turn(block: str, action_name: str, project_id: str | None, body: AiBody, se
         raise HTTPException(status_code=403, detail=str(refusal)) from refusal
     except InvariantViolation as error:
         text = str(error)
-        status = 429 if text.startswith("AI_BUDGET") or "budget" in text.lower() else 409 if "STALE" in text or "SINGLETON" in text else 502 if text.startswith(("AI_ANSWER", "AI_PROVIDER")) else 400
+        status = api.ai_failure_status(error) or (409 if "STALE" in text or "SINGLETON" in text else 400)
         raise HTTPException(status_code=status, detail=text) from error
 
 

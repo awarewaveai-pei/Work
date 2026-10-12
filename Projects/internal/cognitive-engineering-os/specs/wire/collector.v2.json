@@ -2,7 +2,7 @@
   "about": "Collector wire v2 (docs/platform/STEP2_SHARED_RULES.md 4.1). One set of examples for both sides: the engine posts them (tests/unit/test_collector_wire_v2.py), next-admin builds them from the seeds below (lib/collect/__tests__/collect-wire-v2.test.ts). Change both sides and this file in one commit.",
   "schema_version": "2",
   "wire_versions": "The engine lists the versions it accepts in its grant-exchange answer (wire_versions); next-admin sends v2 (this file's shapes, aside, channels, keepAside) only when \"2\" is listed, else the v1 shape. An engine that answers without the key accepts v1 only.",
-  "seed_shapes": "Exactly two: a claim (entity://claim/<id>, meta exactly kind, entityName, angles, languages, providers) or an https:// URL with no meta or meta exactly {\"pasted\": bool}. Every seed uri once. Never Perplexity: providers and every channel and searchProvider are serper or brave.",
+  "seed_shapes": "Exactly two: a claim (entity://claim/<id>, meta exactly kind, entityName, angles, languages, providers) or an https:// URL with no meta or meta exactly {\"pasted\": bool}. A claim seed searches in exactly one language, the one its entityName is written in (engine collection_run.query_language: zh when it holds a Chinese character, else en): never a Chinese question with English words appended; a second language is a second seed whose entityName is a translation. Every seed uri once. Never Perplexity: providers and every channel and searchProvider are serper or brave.",
   "claim_angles": [
     "primary",
     "news",
@@ -105,8 +105,7 @@
           "primary"
         ],
         "languages": [
-          "zh",
-          "en"
+          "zh"
         ],
         "providers": [
           "serper",
@@ -118,6 +117,24 @@
       "uri": "https://www.example.gov.tw/news/2027-fee",
       "meta": {
         "pasted": true
+      }
+    },
+    {
+      "uri": "entity://claim/c7f3a1-en",
+      "meta": {
+        "kind": "claim",
+        "entityName": "Taipei household garbage fee doubles from 2027",
+        "angles": [
+          "factcheck",
+          "primary"
+        ],
+        "languages": [
+          "en"
+        ],
+        "providers": [
+          "serper",
+          "brave"
+        ]
       }
     }
   ],
@@ -205,7 +222,7 @@
           "searchProvider": "serper",
           "searchLang": "en",
           "searchAngle": "factcheck",
-          "searchQuery": "台北市從 2027 年起家戶垃圾費加倍 fact check",
+          "searchQuery": "Taipei household garbage fee doubles from 2027 fact check",
           "pasted": false,
           "aside": "系統只抓到很少的字，可能讀不到這種網頁",
           "outlinks": []

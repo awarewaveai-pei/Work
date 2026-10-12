@@ -15,8 +15,7 @@ from typing import Any
 from ai_lego.core.domain import doc_kinds
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
-from ai_lego.platform.block_hooks.assembler import add_guardrails
-from ai_lego.platform.safety.risk import high_risk_categories
+from ai_lego.platform.block_hooks.assembler import add_guardrails, found_in
 
 # The blocks whose documents carry the person's words (GOVERN 卡: SENSE、GATHER、MAP … 規範與脈絡、組裝器). GOVERN itself and 協作合約 do not.
 WATCHED_BLOCKS = ("SENSE", "GATHER", "MAP", "THINK", "VERIFY", "COMPUTE", "DECIDE", "ACT", "LEARN", "TEACH", "EXPRESS", "FACILITATE", "COLLAB", "CONTEXT", "ASSEMBLER")
@@ -40,22 +39,28 @@ def strings(value: Any, skip: tuple[str, ...] = (), keys: bool = False) -> list[
     return []
 
 
-def written(doc: dict[str, Any]) -> list[str]:
-    """The person's own words in a document: its text, list and json fields that are read for risk -- not the choices the
-    system offers, and not a value that is one of the field's labels."""
+def written_by_field(doc: dict[str, Any]) -> dict[str, list[str]]:
+    """The person's own words in a document, field by field: its text, list and json fields that are read for risk -- not
+    the choices the system offers, and not a value that is one of the field's labels."""
     fields = doc_kinds.require(doc["kind"]).fields
-    return [text for name, spec in fields.items() if spec.type in ("text", "list", "json") and spec.scan
-            for text in strings(doc["content"].get(name), spec.unread_keys) if text not in spec.labels]
+    return {name: [text for text in strings(doc["content"].get(name), spec.unread_keys) if text not in spec.labels]
+            for name, spec in fields.items() if spec.type in ("text", "list", "json") and spec.scan}
+
+
+def written(doc: dict[str, Any]) -> list[str]:
+    """written_by_field's words, together."""
+    return [text for texts in written_by_field(doc).values() for text in texts]
 
 
 def _recognise(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dict[str, Any]) -> list[dict[str, Any]]:
     if doc["author"] not in ("user", "joint"):
         return []
-    categories = high_risk_categories(*written(doc))
+    found = found_in(written_by_field(doc))
+    categories = list(found)
     if not categories:
         return []
     if owner.kind == "case":
-        return add_guardrails(docs, tenant_id, owner, categories, doc["block"])
+        return add_guardrails(docs, tenant_id, owner, found, doc["block"])
     if "急性心理危機" in categories:   # the save already brings crisis help; 「開一個案子」 beside it would be the wrong next step
         return []
     return [{"type": "suggest_case", "categories": categories, "notice": OPEN_A_CASE}]

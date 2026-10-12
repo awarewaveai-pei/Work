@@ -93,9 +93,9 @@ def _trend_shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="ACT", name="split", needs="propose_options", instructions=SPLIT, output_kind="act.split", output_schema=SPLIT_SCHEMA,
-             reads=("decide.judgment", "act.task"), build_input=_split_input, shape=_split_shape, max_tokens=1200),
+             reads=("decide.judgment", "act.task"), build_input=_split_input, shape=_split_shape),
     AiAction(block="ACT", name="flag", needs="organize", instructions=FLAG, output_kind="act.flag", output_schema=FLAG_SCHEMA,
-             reads=("act.task", "assembler.intake"), build_input=_flag_input, shape=_flag_shape, max_tokens=900),
+             reads=("act.task", "assembler.intake"), build_input=_flag_input, shape=_flag_shape),
     AiAction(block="ACT", name="trend", needs="organize", instructions=TREND, output_kind="act.trend", output_schema=TREND_SCHEMA,
-             reads=("act.task", "act.note"), build_input=_trend_input, shape=_trend_shape, max_tokens=900),
+             reads=("act.task", "act.note"), build_input=_trend_input, shape=_trend_shape),
 ]

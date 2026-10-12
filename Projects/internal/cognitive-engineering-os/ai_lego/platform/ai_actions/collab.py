@@ -135,9 +135,9 @@ def _differences_shape(answer: dict[str, Any]) -> dict[str, Any]:
 ACTIONS = [
     AiAction(block="COLLAB", name="organise_differences", needs="organize", instructions=DIFFERENCES, output_kind="collab.differences", output_schema=DIFFERENCES_SCHEMA,
              reads=("collab.position", "collab.option", "collab.stance", "collab.reopen"), build_input=_differences_input, shape=_differences_shape,
-             handback=_newer_objection, quoted=_differences_quoted, fill=lambda context, read: {"round": _round(context)}, in_group=True, max_tokens=2000),
+             handback=_newer_objection, quoted=_differences_quoted, fill=lambda context, read: {"round": _round(context)}, in_group=True),
     AiAction(block="COLLAB", name="restate_positions", needs="organize", instructions=RESTATE, output_kind="collab.restatement", output_schema=RESTATE_SCHEMA,
              reads=("collab.position", "collab.confirm", "collab.stance", "collab.reopen"), build_input=_restate_input,
              shape=lambda answer: {"text": answer["text"]} if isinstance(answer.get("text"), str) else {}, handback=_restate_handback, quoted=_restate_quoted,
-             fill=_restate_fill, subject_field="about", in_group=True, max_tokens=1200),
+             fill=_restate_fill, subject_field="about", in_group=True),
 ]

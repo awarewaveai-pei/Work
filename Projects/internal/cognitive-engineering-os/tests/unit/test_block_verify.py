@@ -303,7 +303,7 @@ class TechniquesTests(VerifyCase):
         self.assertEqual((saved["content"]["asks"][0]["what"], saved["content"]["rules"]), ("轉傳", TECHNIQUES.stamp()))
         self.provider.answer = {"techniques": [{"name": "冒充來源", "quote": "央行總裁親口說的", "why": "x"}], "asks": []}
         response = self.client.post(f"{self.base}/ai/VERIFY/techniques", json={"context": {"message": mid}})
-        self.assertEqual(response.status_code, 502)
+        self.assertEqual(response.status_code, 422)
         self.assertIn("AI_ANSWER_INVALID", response.text)
         self.assertEqual(len(self.current("verify.techniques")), 1)   # a made-up quote saves nothing
         self.provider.answer = {"techniques": [], "asks": [{"what": "捐款", "quote": "請大家捐款給央行"}]}
@@ -333,10 +333,10 @@ class ReadingTests(VerifyCase):
         [entry] = saved["content"]["readings"]
         self.assertEqual((entry["claim_version"], entry["snapshot"], saved["author"]), (1, self.sha(self.cardid), "ai"))
         self.assertEqual(self.ledger()[self.cid]["oppose"], [])   # a reading never counts by itself
-        self.assertEqual(self.ai("read", {}, {"readings": [self.reading(claim="made-up")]}, 502)["detail"].split(":")[0], "AI_ANSWER_INVALID")
-        self.assertEqual(self.ai("read", {}, {"readings": [self.reading(quote="央行說可以領兩萬元")]}, 502)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
+        self.assertEqual(self.ai("read", {}, {"readings": [self.reading(claim="made-up")]}, 422)["detail"].split(":")[0], "AI_ANSWER_INVALID")
+        self.assertEqual(self.ai("read", {}, {"readings": [self.reading(quote="央行說可以領兩萬元")]}, 422)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
         unquoted = {key: value for key, value in self.reading().items() if key != "quote"}
-        self.assertEqual(self.ai("read", {}, {"readings": [unquoted]}, 502)["detail"].split(":")[0], "AI_ANSWER_INVALID")   # an unquoted 反對 cannot be checked
+        self.assertEqual(self.ai("read", {}, {"readings": [unquoted]}, 422)["detail"].split(":")[0], "AI_ANSWER_INVALID")   # an unquoted 反對 cannot be checked
         self.assertIn("saved", self.ai("read", {}, {"readings": [{**unquoted, "reads_as": "無關"}]}))
 
     def edit_claim(self):
@@ -400,7 +400,7 @@ class ReadingTests(VerifyCase):
         other = self.source("財經週刊：央行宣布下週起每天只能領一萬元，民眾一早排隊。", "財經週刊")
         self.grant("search_external")
         borrowed = self.reading(reads_as="支持", quote="央行宣布下週起每天只能領一萬元，民眾一早排隊", citations=[f"source:{self.sid}", f"source:{other}"])
-        self.assertEqual(self.ai("read", {}, {"readings": [borrowed]}, 502)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
+        self.assertEqual(self.ai("read", {}, {"readings": [borrowed]}, 422)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
         self.assertEqual(self.current("verify.reading"), [])
 
     def test_confirming_all_of_a_claims_readings_saves_every_stance_or_none(self):
@@ -444,7 +444,7 @@ class ReadingTests(VerifyCase):
         「全部照這樣記」 would then count the one the model may not have meant. Two different readings refuse the answer."""
         self.grant("search_external")
         unrelated = {key: value for key, value in self.reading(reads_as="無關").items() if key != "quote"}
-        self.assertEqual(self.ai("read", {}, {"readings": [self.reading(), unrelated]}, 502)["detail"].split(":")[0], "AI_ANSWER_INVALID")
+        self.assertEqual(self.ai("read", {}, {"readings": [self.reading(), unrelated]}, 422)["detail"].split(":")[0], "AI_ANSWER_INVALID")
         same = self.ai("read", {}, {"readings": [self.reading(), self.reading(quote="本行從未宣布每日提款上限 ")]})["saved"]
         self.assertEqual(len(same["content"]["readings"]), 1)
 
@@ -705,7 +705,7 @@ class FactcheckTests(VerifyCase):
             self.assertIn("VERIFY_FACTCHECK_CARD_NOT_FOR_AI", self.ai("read", context, {"readings": [oppose]}, 400)["detail"], context)
         self.assertEqual(self.provider.calls, [])
         for reading in (oppose, {**oppose, "card": page}):
-            self.assertEqual(self.ai("read", {"cards": [page]}, {"readings": [reading]}, 502)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
+            self.assertEqual(self.ai("read", {"cards": [page]}, {"readings": [reading]}, 422)["detail"].split(":")[0], "AI_ANSWER_UNCITED")
         self.assertNotIn("他們的判定", self.provider.calls[0][1])   # the hit's text was never sent
         self.assertEqual(self.current("verify.reading"), [])
         mine = self.post("/verify/stances", {"content": {"claim": cid, "claim_version": 1, "card": hit, "snapshot": self.sha(hit), "stance": "反對"}})
@@ -883,7 +883,7 @@ class SearchTests(CollectionApiTestCase):
         run_id, _ = self.start_run(claim)
         [seed] = self.service.calls[0]["seeds"]
         self.assertTrue(seed["uri"].startswith("entity://claim/"))
-        self.assertEqual(seed["meta"], {"kind": "claim", "entityName": CLAIM, "angles": list(SEARCH_ANGLES), "languages": ["zh", "en"], "providers": ["serper", "brave"]})
+        self.assertEqual(seed["meta"], {"kind": "claim", "entityName": CLAIM, "angles": list(SEARCH_ANGLES), "languages": ["zh"], "providers": ["serper", "brave"]})   # the claim's own language only
         [lookup] = self.docs.current(self.tenant_id, self.owner, "verify.lookup")
         self.assertEqual((lookup["content"]["claim"], lookup["content"]["run"], lookup["author"]), (claim, run_id, "system"))
 

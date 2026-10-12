@@ -109,7 +109,7 @@ def _mirror_shape(answer: dict[str, Any]) -> dict[str, Any]:
 ACTIONS = [
     AiAction(block="LEARN", name="compare", needs="organize", instructions=COMPARE, output_kind="learn.compare", output_schema=COMPARE_SCHEMA,
              reads=("decide.judgment", "decide.check", "decide.review", "act.task", "act.note", "learn.calibration", "sense.mirror", "sense.review", "think.card", "think.reaction"),
-             build_input=_compare_input, shape=_compare_shape, max_tokens=1600),
+             build_input=_compare_input, shape=_compare_shape),
     AiAction(block="LEARN", name="mirror", needs="organize", instructions=MIRROR, output_kind="learn.daily_mirror", output_schema=MIRROR_SCHEMA,
-             reads=("learn.daily",), build_input=_mirror_input, shape=_mirror_shape, outside_case=True, max_tokens=700),
+             reads=("learn.daily",), build_input=_mirror_input, shape=_mirror_shape, outside_case=True),
 ]

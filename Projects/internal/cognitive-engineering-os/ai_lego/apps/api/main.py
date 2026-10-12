@@ -84,7 +84,7 @@ from ai_lego.platform.net.collection_service import CollectionServiceClient, col
 from ai_lego.core.domain._intake_validation import require_text, require_uuid
 from ai_lego.core.domain.project import project_record
 from ai_lego.core.domain.source import OUTLINK_CHARS, OUTLINKS_ITEMS, TEXT_MEDIA_TYPES, source_record
-from ai_lego.core.domain.collection_run import MAX_FETCHES, MAX_SEEDS, collection_run_record
+from ai_lego.core.domain.collection_run import MAX_FETCHES, MAX_SEEDS, collection_run_record, query_language
 from ai_lego.data.db import Databases
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
 from ai_lego.data.repositories.case_docs import CaseDocs
@@ -116,8 +116,15 @@ SESSION_COOKIE = "cognitive_os_session"
 
 @asynccontextmanager
 async def _lifespan(started: FastAPI) -> AsyncIterator[None]:
-    """At start: finish every erasure a crash or a filesystem error left with files still on disk (ai_lego/platform/
-    erasure.py). Logged, never fatal: an unfinished job stays for the next start or a repeated DELETE."""
+    """At start, in every worker process: finish every erasure a crash or a filesystem error left with files still on
+    disk (ai_lego/platform/erasure.py; two workers never work one item: outbox.claim), and build the display catalog, so
+    the first visitor after a deploy never pays its parse (8.9 s cold, measured 2026-10-11). Logged, never fatal: an
+    unfinished job stays for the next start or a repeated DELETE; a catalog that cannot be built is built, or refused
+    with its 503, by the first GET /catalog."""
+    try:
+        _display_catalog_payload()
+    except Exception:
+        logging.getLogger(__name__).exception("display catalog not built at start; the first GET /catalog tries again")
     overrides = started.dependency_overrides
     try:
         repo = overrides[get_project_source_repository]() if get_project_source_repository in overrides else ProjectSourceRepository(overrides.get(get_databases, get_databases)())
@@ -635,7 +642,7 @@ def require_session(cognitive_os_session: str | None = Cookie(default=None), sto
 
 
 class LoginRequest(BaseModel):
-    tenant_id: str
+    tenant_id: str | None = None   # optional: without it the address is looked up in every tenant (authenticate_anywhere)
     email: str
     password: str
 
@@ -708,18 +715,25 @@ def _catalog_fingerprint() -> tuple[int, int]:
     return len(files), max((path.stat().st_mtime_ns for path in files if path.exists()), default=0)
 
 
+def _display_catalog_payload() -> dict[str, Any]:
+    """The cached payload, rebuilt when the registry's files changed (_catalog_fingerprint). Per process: each worker
+    builds its own copy at start (_lifespan); it is read-only, so N copies never disagree for longer than an edit."""
+    fingerprint = _catalog_fingerprint()
+    if _CATALOG_CACHE.get("fingerprint") != fingerprint:
+        payload = catalog_payload(load_catalog())
+        _CATALOG_CACHE.update(fingerprint=fingerprint, payload=payload)
+    return _CATALOG_CACHE["payload"]
+
+
 @app.get("/catalog")
 def display_catalog() -> dict[str, Any]:
     """Everything the web app's home page, tool directory and workflow list show, from the loader the mocks are checked
     with (ai_lego/platform/catalog/display_catalog.py). Public like /methods. A registry gap is a 503 that names it --
     never a half-labelled page."""
     try:
-        fingerprint = _catalog_fingerprint()
-        if _CATALOG_CACHE.get("fingerprint") != fingerprint:
-            _CATALOG_CACHE.update(fingerprint=fingerprint, payload=catalog_payload(load_catalog()))
+        return _display_catalog_payload()
     except (ValueError, OSError, yaml.YAMLError, InvariantViolation) as error:   # a gap, a missing or unparsable file
         raise HTTPException(status_code=503, detail=f"CATALOG_INVALID: {type(error).__name__}: {error}") from error
-    return _CATALOG_CACHE["payload"]
 
 
 @app.get("/recipes")
@@ -1267,7 +1281,16 @@ def method_form(method_id: str, catalog: MethodCatalog = Depends(get_catalog)) -
 
 @app.post("/auth/login")
 def login(payload: LoginRequest, response: Response, store: IdentityStore = Depends(get_store)) -> dict[str, str]:
-    token = store.authenticate(payload.tenant_id, payload.email, payload.password)
+    """{email, password} and, optionally, tenant_id. Without it: one tenant whose account the password opens -> the
+    session; several -> 409 LOGIN_CHOOSE_WORKSPACE naming only those (send again with the chosen tenant_id); none -> the
+    same 401, at the same cost, as a wrong password."""
+    if payload.tenant_id:
+        token = store.authenticate(payload.tenant_id, payload.email, payload.password)
+    else:
+        found = store.authenticate_anywhere(payload.email, payload.password)
+        if found is not None and "choose" in found:
+            raise HTTPException(status_code=409, detail={"code": "LOGIN_CHOOSE_WORKSPACE", "workspaces": found["choose"]})
+        token = found["session"] if found is not None else None
     if token is None:
         raise HTTPException(status_code=401, detail="AUTH_FAILED: invalid credentials")
     response.set_cookie(SESSION_COOKIE, token, httponly=True, samesite="strict", secure=True, max_age=12 * 3600)
@@ -1410,6 +1433,26 @@ def _budget_refused(error: BaseException | None) -> bool:
     return False
 
 
+def ai_failure_status(error: BaseException) -> int | None:
+    """The status of a request the AI could not answer, or None when the error is not the AI's (the route decides).
+    Never 502/504: Cloudflare puts its own page in place of those and the person never sees why (2026-10-11 walk).
+    Today's budget 429; an answer that broke a rule, or that our own cap cut off (AI_ANSWER_*), 422; the provider
+    unreachable, refusing or malformed (AI_PROVIDER_*), 424. Read through every wrapper (a recipe draft's AI_DRAFT_FAILED
+    wraps the method's AI_ANSWER_TRUNCATED: Codex review 2026-10-11 F2). tests/unit/test_ai_failure_status.py holds every route to it."""
+    if _budget_refused(error):
+        return 429
+    while error is not None:
+        text = str(error)
+        if text.startswith("AI_DAILY_TOKEN_BUDGET_EXCEEDED"):
+            return 429
+        if text.startswith("AI_ANSWER"):
+            return 422
+        if text.startswith("AI_PROVIDER"):
+            return 424
+        error = error.__cause__
+    return None
+
+
 def _interpretation_schema_version() -> str:
     try:
         return str((yaml.safe_load((resolve_spec_root() / "specs" / "cognitive" / "typed-objects" / "method-interpretation.schema.yaml").read_text(encoding="utf-8")) or {}).get("version") or "")
@@ -1508,7 +1551,7 @@ def ai_draft_method(
     try:
         result = draft_method_kwargs(method_id, payload.brief, provider=metered, spec_root=resolve_spec_root(), catalog=catalog)
     except AiDraftProviderError as error:
-        raise HTTPException(status_code=429 if _budget_refused(error) else 502, detail=str(error)) from error
+        raise HTTPException(status_code=ai_failure_status(error) or 424, detail=str(error)) from error
     except InvariantViolation as error:
         raise HTTPException(status_code=400, detail=str(error)) from error
     return result.as_dict()
@@ -1530,7 +1573,7 @@ def ai_draft_recipe(
     try:
         result = draft_recipe_source(recipe_id, payload.brief, provider=metered, spec_root=resolve_spec_root(), catalog=catalog, labels=payload.labels, source=payload.source)
     except AiDraftProviderError as error:
-        raise HTTPException(status_code=429 if _budget_refused(error) else 502, detail=str(error)) from error
+        raise HTTPException(status_code=ai_failure_status(error) or 424, detail=str(error)) from error
     except InvariantViolation as error:
         code = str(error)
         if "RECIPE_NOT_FOUND" in code or "RECIPE_ID_MISMATCH" in code:
@@ -3270,6 +3313,9 @@ def _research_seeds(payload: CollectionRequest) -> list[dict[str, Any]]:
             values = meta[key]
             if not isinstance(values, list) or not values or len(set(map(str, values))) != len(values) or not all(isinstance(v, str) and v in allowed for v in values):
                 raise refuse(f"{key} is a non-empty list without repeats from {', '.join(allowed)}")
+        if meta["languages"] != [query_language(meta["entityName"])]:   # never words of one language searched as another
+            raise refuse(f"a claim seed searches in one language, the one its words are written in ({query_language(meta['entityName'])}); "
+                         "another language is another seed with the words translated")
         seeds.append({"uri": seed.uri, "meta": meta})
     return seeds
 
@@ -3330,7 +3376,7 @@ def start_collection(project_id: str, payload: CollectionRequest, response: Resp
         # A known refusal: the run fails now instead of waiting out its deadline.
         repo.finish_collection_run(tenant_id, run_id, "failed", None)
         store.close_collect_grant(grant_ref)
-        raise HTTPException(status_code=502, detail=f"COLLECTION_SERVICE_UNAVAILABLE: {error}") from error
+        raise HTTPException(status_code=424, detail=f"COLLECTION_SERVICE_UNAVAILABLE: {error}") from error   # never 502 (ai_failure_status)
     response.status_code = 202
     return {"run_id": run_id, "status": "requested", "plan": plan}
 

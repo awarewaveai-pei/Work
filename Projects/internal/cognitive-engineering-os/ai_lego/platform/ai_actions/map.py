@@ -224,11 +224,11 @@ def _claims_shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="MAP", name="place", needs="organize", instructions=PLACE, output_kind="map.placement", output_schema=PLACE_SCHEMA,
-             reads=("sense.card", "map.map"), build_input=_place_input, shape=_place_shape, max_tokens=1500),
+             reads=("sense.card", "map.map"), build_input=_place_input, shape=_place_shape),
     AiAction(block="MAP", name="alternatives", needs="propose_options", instructions=ALTERNATIVES, output_kind="map.alternatives", output_schema=ALTERNATIVES_SCHEMA,
-             reads=("map.map", "context.notes", "gather.source"), build_input=_facts_and_readings, shape=_alternatives_shape, max_tokens=1800),
+             reads=("map.map", "context.notes", "gather.source"), build_input=_facts_and_readings, shape=_alternatives_shape),
     AiAction(block="MAP", name="method", needs="organize", instructions=METHOD, output_kind="map.method_pick", output_schema=METHOD_SCHEMA,
-             reads=("assembler.intake", "map.map"), build_input=_method_input, shape=_method_shape, max_tokens=900),
+             reads=("assembler.intake", "map.map"), build_input=_method_input, shape=_method_shape),
     AiAction(block="MAP", name="claims", needs="organize", instructions=CLAIMS, output_kind="map.claim_proposal", output_schema=CLAIMS_SCHEMA,
-             reads=("map.map", "context.notes", "gather.source"), build_input=_claims_input, shape=_claims_shape, max_tokens=1500),
+             reads=("map.map", "context.notes", "gather.source"), build_input=_claims_input, shape=_claims_shape),
 ]

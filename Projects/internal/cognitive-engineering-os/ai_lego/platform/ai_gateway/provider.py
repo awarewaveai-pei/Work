@@ -46,7 +46,8 @@ class AiCompletion:
 
 
 class ProviderCallError(InvariantViolation):
-    """A call the API answered -- and billed -- without a usable answer: cut off at max_tokens (``AI_PROVIDER_CUT_OFF``),
+    """A call the API answered -- and billed -- without a usable answer: cut off by the caller's own max_tokens
+    (``AI_ANSWER_TRUNCATED``, reason ``cut_off``: never read as a schema error -- the cap is ours, not the model's fault),
     refused (``AI_PROVIDER_REFUSAL``), empty (``AI_PROVIDER_EMPTY_RESPONSE``) or malformed (``AI_PROVIDER_MALFORMED_RESPONSE``; reason ``usage_unreadable``
     when a usable answer's cost cannot be read); ``usage_known`` is False whenever the tokens are not the real ones. ``input_tokens``/``output_tokens`` are
     what it cost, so a caller can count it and decide whether one more try is worth it (only a cut-off is)."""
@@ -100,7 +101,7 @@ class AnthropicProvider:
         stop = payload.get("stop_reason")
         if stop == "max_tokens":   # a tool input or text cut off mid-way is never a whole answer
             usage = self._usage(payload)
-            raise self._refused(payload, f"AI_PROVIDER_CUT_OFF: output_tokens={usage[1] if usage else '?'} reached max_tokens={max_tokens}", "cut_off")
+            raise self._refused(payload, f"AI_ANSWER_TRUNCATED: the answer reached our cap (max_tokens={max_tokens}, output_tokens={usage[1] if usage else '?'}) before it was whole", "cut_off")
         if stop == "refusal":
             category = (payload.get("stop_details") or {}).get("category") if isinstance(payload.get("stop_details"), dict) else None
             raise self._refused(payload, f"AI_PROVIDER_REFUSAL: the model declined to answer (category={category!r})", "refusal")

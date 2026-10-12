@@ -108,13 +108,13 @@ class RecognitionHookTests(PgTestCase):
         return sorted((doc["content"]["category"], doc["content"]["guardrail"], doc["content"]["found_by"]) for doc in self.docs.current("t", self.owner, "govern.guardrail"))
 
     def test_words_in_a_card_add_the_guardrails_and_name_the_block_that_found_them(self):
-        notices = self._card("醫生說要手術，我也怕公司的合約")
+        notices = [notice for notice in self._card("醫生說要手術，我也怕公司的合約") if notice["type"] == "guardrail"]   # 醫生說 is also SENSE's VERIFY proposal
         self.assertEqual([(notice["type"], notice["category"], notice["found_by"]) for notice in notices], [("guardrail", "健康", "SENSE"), ("guardrail", "法律", "SENSE")])
         self.assertEqual(self._guardrails(), [(category, guardrail, "SENSE") for category in ("健康", "法律") for guardrail in ("professional", "require_sources", "wait_or_review")])
 
     def test_a_category_already_guarded_is_not_added_again(self):
         self._card("要手術")
-        self.assertEqual(self._card("又要檢查，醫生說的"), [])
+        self.assertEqual([notice for notice in self._card("又要檢查，醫生說的") if notice["type"] == "guardrail"], [])
         self.assertEqual(len(self._guardrails()), 3)
 
     def test_the_guardrail_keeps_the_category_never_the_words(self):

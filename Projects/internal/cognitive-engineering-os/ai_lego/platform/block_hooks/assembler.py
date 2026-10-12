@@ -4,11 +4,12 @@ And the case's route: which blocks, in what order, why each is there (畫面上�
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.blocks import BLOCKS
 from ai_lego.core.domain.kinds.assembler import OPEN_BLOCKS, PACKAGES
+from ai_lego.core.domain.kinds.govern import HIGH_RISK
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
@@ -45,18 +46,28 @@ def case_route(docs: CaseDocs, tenant_id: str, owner: record_log.Owner) -> dict[
     return {"purpose": content.get("purpose"), "package": package, "blocks": route, "done": [code for code in BLOCKS if code in used]}
 
 
-def add_guardrails(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, categories: list[str], found_by: str) -> list[dict[str, Any]]:
-    """One guardrail of each automatic kind per category not guarded yet; returns a notice per new category."""
-    if owner.kind != "case" or not categories:
+def found_in(texts_by_field: Mapping[str, list[str]]) -> dict[str, list[str]]:
+    """Each high-risk category the texts touch -> the fields its words were in (categories in HIGH_RISK order). Field names
+    only: what was written goes no further than here."""
+    by_field = {field: high_risk_categories(*texts) for field, texts in texts_by_field.items()}
+    return {category: [field for field, found in by_field.items() if category in found] for category in HIGH_RISK
+            if any(category in found for found in by_field.values())}
+
+
+def add_guardrails(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, found: dict[str, list[str]], found_by: str) -> list[dict[str, Any]]:
+    """One guardrail of each automatic kind per category not guarded yet; returns a notice per new category, with the
+    fields of the saved record its words were in (``found_in``: ``found``'s value) -- so the page says where the word came
+    from, never 「你寫的風險」 for a word that was in the question (2026-10-11 walk)."""
+    if owner.kind != "case" or not found:
         return []
     held = {(doc["content"]["guardrail"], doc["content"]["category"]) for doc in docs.current(tenant_id, owner, "govern.guardrail")}
     notices = []
-    for category in categories:
+    for category, fields in found.items():
         added = [kind for kind in AUTOMATIC if (kind, category) not in held]
         for kind in added:
             docs.save(tenant_id, owner, "govern.guardrail", {"guardrail": kind, "category": category, "found_by": found_by}, record_log.system("GOVERN"))
         if added:
-            notices.append({"type": "guardrail", "category": category, "found_by": found_by})
+            notices.append({"type": "guardrail", "category": category, "found_by": found_by, "found_in": fields})
     return notices
 
 
@@ -74,7 +85,7 @@ def _answer_checked(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, con
 
 def _intake_saved(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: dict[str, Any]) -> list[dict[str, Any]]:
     content = doc["content"]
-    return add_guardrails(docs, tenant_id, owner, high_risk_categories(content.get("risk"), content.get("question")), "ASSEMBLER")
+    return add_guardrails(docs, tenant_id, owner, found_in({field: [content[field]] for field in ("question", "risk") if isinstance(content.get(field), str)}), "ASSEMBLER")
 
 
 AFTER_SAVE = {"assembler.intake": _intake_saved}

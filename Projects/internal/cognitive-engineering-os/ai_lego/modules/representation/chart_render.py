@@ -34,9 +34,9 @@ from ai_lego.errors import InvariantViolation
 # thread-safe (matplotlib's own FAQ documents known race conditions and explicitly calls out a
 # threaded web-server dispatch as the risk scenario). FastAPI/Starlette runs a plain `def` path
 # operation (this one, via artifact.generate_chart) in a worker thread pool, not the event loop,
-# and this repo's own Dockerfile starts uvicorn with no --workers (one process, many threads) --
-# so two concurrent chart requests really can interleave plt.subplots()/plt.close() calls against
-# the same global registry. Serializing the whole render+encode+close lifecycle behind one lock
+# and each of the Dockerfile's uvicorn worker processes runs many threads -- so two concurrent chart
+# requests in one process really can interleave plt.subplots()/plt.close() calls against the same
+# global registry (the registry is per process, so this per-process lock is all it needs). Serializing the whole render+encode+close lifecycle behind one lock
 # is the smallest fix that doesn't require rewriting all 3 renderers off the pyplot global API
 # (critic finding 2026-09-18 -- pre-existing since forest_plot/bubble_chart, newly load-bearing
 # now that a chart renders on every decision.impact_effort/decision.eisenhower_matrix run, not

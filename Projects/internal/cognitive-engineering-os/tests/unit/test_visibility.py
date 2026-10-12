@@ -50,7 +50,7 @@ REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/act.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/collab.py", "record_log.group(group_id)"): 1,
     ("apps/api/blocks/docs.py", "record_log.person(identity_id)"): 1,
-    ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): 5,
+    ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): 6,
     ("apps/api/blocks/facilitate.py", "record_log.platform(session['tenant_id'])"): 1,
     ("apps/api/blocks/govern.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/govern.py", "record_log.person(me)"): 1,

@@ -145,8 +145,8 @@ def _feedback_shape(answer: dict[str, Any]) -> dict[str, Any]:
 ACTIONS = [
     AiAction(block="TEACH", name="opponent", needs="organize", instructions=OPPONENT, output_kind="teach.opponent",
              output_schema=OPPONENT_SCHEMA, reads=("teach.run", "teach.practice_consent"), build_input=_opponent_input,
-             shape=_opponent_shape, outside_case=True, max_tokens=900),
+             shape=_opponent_shape, outside_case=True),
     AiAction(block="TEACH", name="feedback_on_moves", needs="organize", instructions=FEEDBACK, output_kind="teach.feedback",
              output_schema=FEEDBACK_SCHEMA, reads=("teach.run", "teach.practice_consent"), build_input=_feedback_input,
-             shape=_feedback_shape, outside_case=True, max_tokens=1100),
+             shape=_feedback_shape, outside_case=True),
 ]

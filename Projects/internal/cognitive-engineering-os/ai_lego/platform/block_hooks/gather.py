@@ -5,7 +5,8 @@
   「原始的還是轉貼的」, then what each channel of the run did. Idempotent: a second run over the same arrival adds nothing.
 - BEFORE_SAVE (the person's saves): one mark per origin, on exactly that group's pages; one change per card and cell;
   a split takes part of one group; a take-back is for a page set aside, once.
-- ``channel_state`` / ``distribution``: 管道不足, the place's language, where the pages came from -- read by the page
+- ``channel_state`` / ``distribution``: which engines and languages were used, 管道不足 for the place's language, where
+  the pages came from -- read by the page
   (apps/api/blocks/gather.py) and by the AI's hand-back (ai_actions/gather.py).
 Every cell says only what a list or the page itself states, or what collect learnt from a registry or the web archive:
 the platform reaches nothing outside itself (specs/wire/lookup.v1.json; STEP2_SHARED_RULES §2).
@@ -50,7 +51,6 @@ _log = logging.getLogger(__name__)
 SYSTEM = record_log.system("GATHER")
 SEARCHED, PASTED = FOUND_BY
 CARD_RULES = ("gather.source_lists", "gather.outlets", "gather.grouping")
-MIN_ENGINES = MIN_LANGUAGES = 2   # 系統至少用兩家搜尋引擎、兩種語言找
 CHANNEL_STATES = ("ok", "unreachable", "no_key")
 PROVIDER_NAMES = {"serper": "Serper（Google 的結果）", "brave": "Brave"}
 _DATE = re.compile(r"^\d{4}-\d{2}-\d{2}")
@@ -932,8 +932,10 @@ def _place_langs(place: str) -> list[str] | None:
 
 
 def channel_state(cards: list[Mapping[str, Any]], channel_docs: list[Mapping[str, Any]], happened_in: list[str]) -> dict[str, Any]:
-    """Which engines and languages were used, what could not be reached, and why the channels fall short (管道不足) or
-    the system must ask (事情發生地的語言一筆都找不到). ``cards``: as evidence.origins gives them."""
+    """Which engines and languages were used (``used``: said plainly), what could not be reached, and why the channels
+    fall short of the place (管道不足: its language unknown or not searched) or the system must ask (事情發生地的語言一筆都找不到).
+    Fewer engines or languages than planned is said, never a stop (operator 2026-10-11: one engine is enough; an engine
+    with no key or down is a ``blocked`` row). ``cards``: as evidence.origins gives them."""
     rules = require("gather.place_languages").items
     names, searched = rules["names"], set(rules["searched"])
     used = {(found["provider"], found["lang"]) for card in cards if (found := card.get("found_by") or {}).get("by") == SEARCHED and found.get("provider") and found.get("lang")}
@@ -950,10 +952,8 @@ def channel_state(cards: list[Mapping[str, Any]], channel_docs: list[Mapping[str
     languages = sorted({lang for _, lang in used})
     looked = bool(used or blocked)
     short = []
-    if looked and len(engines) < MIN_ENGINES:
-        short.append(f"只用了 {len(engines)} 家搜尋引擎" + (f"（{'、'.join(PROVIDER_NAMES.get(e, e) for e in engines)}）" if engines else ""))
-    if looked and len(languages) < MIN_LANGUAGES:
-        short.append(f"只用了 {len(languages)} 種語言" + (f"（{'、'.join(names.get(lang, lang) for lang in languages)}）" if languages else ""))
+    used_said = (f"這次用了 {len(engines)} 家搜尋引擎（{'、'.join(PROVIDER_NAMES.get(e, e) for e in engines) or '沒有'}），"
+                 f"{len(languages)} 種語言（{'、'.join(names.get(lang, lang) for lang in languages) or '沒有'}）") if looked else None
     code_of = {word: code for code, word in names.items()}
     found_langs = {code_of.get(((card.get("mine") or {}).get("language") or (card.get("cells") or {}).get("language") or {}).get("value"))
                    for card in cards if not card.get("aside")}   # the person's correction of a page's language first
@@ -968,7 +968,7 @@ def channel_state(cards: list[Mapping[str, Any]], channel_docs: list[Mapping[str
         elif looked and not set(langs) & found_langs:
             ask.append(f"「{place}」的語言（{words}）一筆都沒找到")
     return {"engines": [{"key": e, "name": PROVIDER_NAMES.get(e, e)} for e in engines], "languages": [{"key": lang, "name": names.get(lang, lang)} for lang in languages],
-            "blocked": list(blocked.values()), "short": short, "ask": ask, "looked": looked}
+            "blocked": list(blocked.values()), "short": short, "ask": ask, "looked": looked, "used": used_said}
 
 
 def distribution(cards: list[Mapping[str, Any]]) -> dict[str, dict[str, int]]:
