@@ -260,16 +260,16 @@
         "why": ""
       },
       {
-        "provider": "serper",
-        "lang": "en",
-        "state": "ok",
-        "why": ""
-      },
-      {
         "provider": "brave",
         "lang": "zh",
         "state": "no_key",
         "why": "平台還沒有這個搜尋引擎的金鑰"
+      },
+      {
+        "provider": "serper",
+        "lang": "en",
+        "state": "ok",
+        "why": ""
       },
       {
         "provider": "brave",

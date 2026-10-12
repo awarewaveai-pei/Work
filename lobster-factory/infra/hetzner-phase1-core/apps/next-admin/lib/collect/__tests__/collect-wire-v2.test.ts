@@ -28,6 +28,8 @@ const { parseResearchRunRequest } = await import("@/app/api/internal/collect/run
 const SPEC_PATH = path.resolve(__dirname, "../../../../../../../..", "Projects/internal/cognitive-engineering-os/specs/wire/collector.v2.json");
 const spec = JSON.parse(fs.readFileSync(SPEC_PATH, "utf8"));
 const CLAIM: string = spec.seeds[0].meta.entityName;
+// a claim seed searches only its own words' language; the English search is a second seed with translated words (spec seed_shapes)
+const CLAIM_EN: string = spec.seeds[2].meta.entityName;
 
 type Result = { title: string; link: string };
 type Call = { provider: string; q: string };
@@ -76,7 +78,7 @@ const RESULTS: Record<string, Result[]> = {
     { title: "查核：垃圾費沒有加倍", link: "https://factcheck.example.tw/report/1" },
     { title: "臉書貼文", link: "https://www.facebook.com/somepage/posts/1" },
   ],
-  [`${CLAIM} fact check`]: [{ title: "Fact check: Taipei fee", link: "https://news.example.com/taipei-fee" }],
+  [`${CLAIM_EN} fact check`]: [{ title: "Fact check: Taipei fee", link: "https://news.example.com/taipei-fee" }],
   [`${CLAIM} 官方 公告 原文`]: [{ title: "環保局公告", link: "https://dep.example.gov.tw/notice/88" }],
 };
 
@@ -442,9 +444,7 @@ describe("round 2: what the critic found, each closed for the whole class", () =
     ]);
     expect(result.report.channels).toEqual([
       { provider: "serper", lang: "zh", state: "unreachable", why: "budget" },
-      { provider: "serper", lang: "en", state: "unreachable", why: "budget" },
       { provider: "brave", lang: "zh", state: "no_key", why: "no_key" },
-      { provider: "brave", lang: "en", state: "no_key", why: "no_key" },
     ]);
     expect(sinkMod.completionOf(result.report).aside[0].reason).toBe("這次的抓取額度或時間用完了，這一頁沒有抓");
   });
