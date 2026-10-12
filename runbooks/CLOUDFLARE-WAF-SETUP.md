@@ -151,6 +151,8 @@ curl -s -o /dev/null -w "/api/ops/summary: %{http_code}\n" https://app.aware-wav
 
 **修復**：排除清單追加 `studio.aware-wave.com`、`trigger.aware-wave.com`、`n8n.aware-wave.com`、`uptime.aware-wave.com`、`mainwp.aware-wave.com`、`postiz.aware-wave.com`（`oracle.aware-wave.com` 是公開消費者 app，**刻意不排除**，保留掃描器防護）。已用 PATCH 同一顆 rule 完成，8 連發 curl 打 studio 編輯器全部 200 驗證。
 
+**2026-10-12 追加 `cognitive.aware-wave.com`**（操作者同意）：它是公開產品，但一整班共用一個 Wi-Fi 位址，一頁約 10 個請求 × 30 人就超過 50/10s。免費方案只能有一條限速規則，無法替它單獨設門檻，所以排除；保護改由 lobster-nginx 照登入的人（session cookie）限速，見 `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 的 `zone=cognitive`。改前規則存檔在該次 session 的 scratchpad，退回 = 從 expression 拿掉 `and http.host ne "cognitive.aware-wave.com"`。
+
 **日後新增內部管理後台子網域時，務必同步檢查這條規則的排除清單**（本次事故的可複製教訓：新子網域 = 新的 SPA = 新的併發請求來源，忘記排除就會在操作者正常使用時無預警鎖 10 秒-timeout 循環）。
 
 ```bash
