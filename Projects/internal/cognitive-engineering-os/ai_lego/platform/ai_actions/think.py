@@ -9,6 +9,7 @@ What the AI saves is its own kind: ``think.reply`` (sections, one question) or `
 from __future__ import annotations
 
 import json
+import unicodedata
 from contextvars import ContextVar
 from typing import Any, Callable, Mapping
 
@@ -28,6 +29,22 @@ CARD_CHARS = 160    # 15 cards x 7 fields x 160 characters stays under the 64KB 
 _ROUND: ContextVar[str | None] = ContextVar("think_round", default=None)
 # the checked claims this turn was shown, numbered from 1 (shape reads which ones a card may rest on); set with _ROUND
 _CLAIMS: ContextVar[list[dict[str, Any]]] = ContextVar("think_claims", default=[])
+# what the person wrote that this turn was shown (the problem, their own version, criteria, reflection, their cards and reasons): the one question must not be these words again
+_SAID: ContextVar[list[str]] = ContextVar("think_said", default=[])
+
+
+def _strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    return [text for item in value for text in _strings(item)] if isinstance(value, list) else []
+
+
+def own_text(item: str) -> str:
+    """What the person wrote after the type label (「觀察：」 is the label, not their words)."""
+    for label in OWN_TYPES:
+        if item.startswith(f"{label}："):
+            return item[len(label) + 1:].strip()
+    return item
 
 
 def own_texts(content: Mapping[str, Any]) -> list[str]:
@@ -119,6 +136,8 @@ def _message(context: Mapping[str, Any], read: Read, *, need_own: bool = True, c
     if cards == "picked" and content.get("reflection"):
         payload["their_reflection"] = content["reflection"]
     payload.update(extra or {})
+    _SAID.set([content["problem"], *[own_text(item) for item in own], *_strings(payload.get("criteria_so_far")), *_strings(payload.get("their_reflection")),
+               *[words for row in rows for name, value in row.items() if name != "by" for words in _strings(value)]])
     return "This round, in the person's own words:\n" + json.dumps(payload, ensure_ascii=False)
 
 
@@ -145,6 +164,28 @@ def _one_question(value: Any, limit: int) -> str:
     return _cut(value, limit, "？?")
 
 
+def _flat(text: str) -> str:
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    return "".join(char for char in folded if not unicodedata.category(char).startswith(("P", "Z", "S")))
+
+
+def echoes(question: str, said: list[str]) -> bool:
+    """The question is the person's own words again: what they wrote (or a part of it), or what they wrote with a few words
+    around it. Width, case, spaces and punctuation do not make it another question."""
+    asked = _flat(question)
+    for text in map(_flat, said):
+        if len(asked) >= 4 and len(text) >= 4 and (asked in text or (text in asked and len(asked) - len(text) <= 6)):
+            return True
+    return False
+
+
+def _asked(value: Any, limit: int) -> tuple[str, bool]:
+    """(the one question, whether it was cut for repeating the person's own words): a question that only gives the person's
+    words back asks nothing new, so it is not kept."""
+    question = _one_question(value, limit)
+    return ("", True) if question and echoes(question, _SAID.get()) else (question, False)
+
+
 def _one_sentence(value: Any, limit: int) -> str:
     """A hand-back is one plain sentence saying why (交還控制), not a second place to put questions or advice."""
     return _cut(value, limit, "。！？!?", dot=True)
@@ -168,9 +209,18 @@ COMMON = (
     "Your only sources are the checked_claims the message lists, if any (the person checked them); everything else you say is your own, "
     "so never cite a study, a statistic, a law or an expert. A card resting on a checked claim gives its number as rests_on (leave rests_on out otherwise); never "
     "present a claim the person did not trust as fact. "
-    "If you lack the information, the question is outside what you can responsibly help with, or the risk is high (health, law, money, "
-    "safety), do not advise: set handback to one plain sentence saying why, and ask one question instead. Never ask more than one question."
+    "Never ask more than one question, and never ask the person's own question or any sentence they wrote again: a question says something new."
 )
+# a role that gives advice stops when it cannot responsibly advise; a role that only reflects or points out has no advice to hold back
+HANDBACK = (
+    "If you lack the information, the question is outside what you can responsibly help with, or the risk is high (health, law, money, "
+    "safety), do not advise: set handback to one plain sentence saying why, and ask one question instead."
+)
+REFLECT = (
+    "You give no advice, so there is nothing to hand back: always give your reflection, whatever the matter is (law, health, money and safety included). "
+    "If the matter needs a professional, say that in caution, one plain sentence beside the reflection and never instead of it."
+)
+REFLECTS = ("mirror", "audit", "look_back")   # they add a caution; they never hand control back
 
 SECTION_TITLES = {
     "mirror": ("事實", "情緒", "推論", "沒說出的假設", "空白"),
@@ -197,18 +247,21 @@ def _reply_shape(action: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
 
     def shape(answer: dict[str, Any]) -> dict[str, Any]:
         round_id = _round_id()
-        sections, question, handback = _sections(answer.get("sections"), titles), _one_question(answer.get("question"), 300), _one_sentence(answer.get("handback"), 200)
+        sections, (question, echoed) = _sections(answer.get("sections"), titles), _asked(answer.get("question"), 300)
+        handback = "" if action in REFLECTS else _one_sentence(answer.get("handback"), 200)
         _CLAIMS.set([])   # a reply rests on no claim; what this turn was shown ends with it
         shaped = {"round": round_id, "action": action, "role": role, "sections": sections, "question": question, "handback": handback, "sourced": SOURCED[1]}
+        if action in REFLECTS:
+            shaped["caution"] = _one_sentence(answer.get("caution"), 300)
         if action == "criteria":
             shaped.update(premise=_text(answer.get("premise"), 1000), fails_when=_text(answer.get("fails_when"), 1000))
         if handback:
             shaped.update(sections=[], premise="", fails_when="")   # 交還控制: no advice, one question instead
             if not question:
-                raise _invalid("a hand-back comes with the one question that replaces the advice")
+                raise _invalid("a hand-back comes with the one question that replaces the advice" + (" (the question repeated the person's own words)" if echoed else ""))
         elif not titles:
             if not question:
-                raise _invalid("this role only asks: one question")
+                raise _invalid("this role only asks: one question" + (" (the question repeated the person's own words)" if echoed else ""))
         elif not sections:
             raise _invalid("the answer has none of this role's sections")
         elif action == "criteria" and not (shaped["premise"] and shaped["fails_when"]):
@@ -265,11 +318,11 @@ def _batch_shape(action: str) -> Callable[[dict[str, Any]], dict[str, Any]]:
 
     def shape(answer: dict[str, Any]) -> dict[str, Any]:
         round_id = _round_id()
-        question, handback = _one_question(answer.get("question"), 300), _one_sentence(answer.get("handback"), 200)
+        (question, echoed), handback = _asked(answer.get("question"), 300), _one_sentence(answer.get("handback"), 200)
         cards = [] if handback else [_sourced(card, raw) for card, raw in _card_list(answer.get("cards"), methods=methods, required=required)[:most]]
         _CLAIMS.set([])   # what this turn was shown ends with it
         if handback and not question:
-            raise _invalid("a hand-back comes with the one question that replaces the advice")
+            raise _invalid("a hand-back comes with the one question that replaces the advice" + (" (the question repeated the person's own words)" if echoed else ""))
         if not handback and (len(cards) < least or len({card.get("method") for card in cards}) < least_methods):
             raise _invalid(f"{action} needs at least {least} cards using at least {least_methods} different methods; got {len(cards)}")
         every = cards and all(card.get("sourced") == SOURCED[0] for card in cards)
@@ -289,8 +342,8 @@ def _sourced(card: dict[str, Any], raw: Mapping[str, Any]) -> dict[str, Any]:
     return {**card, "sourced": SOURCED[1]}
 
 
-def _reply_schema(titles: tuple[str, ...], *, advice: bool = False) -> dict[str, Any]:
-    properties: dict[str, Any] = {"question": {"type": "string"}, "handback": {"type": "string"}}
+def _reply_schema(titles: tuple[str, ...], *, advice: bool = False, reflect: bool = False) -> dict[str, Any]:
+    properties: dict[str, Any] = {"question": {"type": "string"}, **({"caution": {"type": "string"}} if reflect else {"handback": {"type": "string"}})}
     if titles:
         properties["sections"] = {"type": "array", "items": {"type": "object", "properties": {"title": {"type": "string", "enum": list(titles)}, "items": {"type": "array", "items": {"type": "string"}}}, "required": ["title", "items"]}}
     if advice:
@@ -366,8 +419,8 @@ def _action(name: str, needs: str, build_input: Callable[[Mapping[str, Any], Rea
     if name in BATCHES:
         kind, schema, shape = "think.batch", _batch_schema(BATCHES[name][0], advice=name == "direct_advice"), _batch_shape(name)
     else:
-        kind, schema, shape = "think.reply", _reply_schema(SECTION_TITLES.get(name, ()), advice=name == "criteria"), _reply_shape(name)
-    return AiAction(block="THINK", name=name, needs=needs, instructions=f"{ROLE_TEXT[name]}\n{COMMON}\n{TASKS[name]}", output_kind=kind, output_schema=schema,
+        kind, schema, shape = "think.reply", _reply_schema(SECTION_TITLES.get(name, ()), advice=name == "criteria", reflect=name in REFLECTS), _reply_shape(name)
+    return AiAction(block="THINK", name=name, needs=needs, instructions=f"{ROLE_TEXT[name]}\n{COMMON} {REFLECT if name in REFLECTS else HANDBACK}\n{TASKS[name]}", output_kind=kind, output_schema=schema,
                     reads=READS, build_input=build_input, shape=shape, max_tokens=max_tokens)
 
 

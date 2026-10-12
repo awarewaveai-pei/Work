@@ -5,10 +5,12 @@ claim without its 法域、時效、來源 is shown as 未確認."""
 
 from __future__ import annotations
 
+from typing import Any, Mapping
+
 from ai_lego.core.domain.doc_kinds import DocKind, Field
 
 # The list grows (card 「清單會再增加」): bump the version with any change; a note records the version it was written with.
-FACETS_VERSION = "2026-10-03.1"
+FACETS_VERSION = "2026-10-12.1"
 FACETS = (
     ("地理／地形／地域", "距離、交通、氣候、災害、資源和邊界在哪裡；城鄉、區域落差、地方的歷史"),
     ("歷史與集體記憶", "以前在這裡發生過什麼、當地人記得什麼；口耳相傳的事，外人常常不知道"),
@@ -16,7 +18,7 @@ FACETS = (
     ("戰爭與武裝衝突", "國與國的戰爭、內戰、軍閥割據、佔領、停火之後的局面"),
     ("國內政治情勢", "政黨與派系、政權穩不穩、選舉、各方對外國政權的立場、對國家前途的根本分歧"),
     ("經濟", "就業、物價、貧富、債務、產業、誰掌握資源"),
-    ("教育狀況", "誰能受教育、教什麼、誰被排除在外（例：阿富汗禁止女性受教育）"),
+    ("教育狀況", "誰能受教育、教什麼、誰被排除在外（例：學費誰付得起、哪些人進不了某所學校）"),
     ("資訊環境", "媒體、審查、演算法、宣傳：這裡的人看得到什麼、看不到什麼"),
     ("認知作戰與資訊戰", "有沒有人在有組織地影響這裡的人怎麼想：假帳號、機器人帳號、偽造的新聞網站、內容農場、在地協力者；用大量內容把網路上看得到的東西換掉"),
     ("群體處境", "性別、族群、世代、少數：同一件事對不同的人是不是不同的事"),
@@ -82,3 +84,53 @@ def spec() -> dict:
         "own_first": {"facets": list(OWN_FIRST), "note": OWN_FIRST_NOTE},
         "public_issue": {"package": PUBLIC_ISSUE_PACKAGE, "questions": list(INTERFACE_QUESTIONS)},
     }
+
+
+# 一個案子只有一組主張: MAP 的主張和 VERIFY 的主張是同一組（VERIFY 的主張從 MAP 帶過去時，記著 map_claim），不分兩邊各數各的。
+KIND_OF_SENTENCE = {"可以查的事實": "事實", "價值判斷": "價值"}   # a VERIFY sentence kind with a MAP kind; the other two (解釋、叫你去做的事) have none
+
+
+def case_claims(map_claims: list[Mapping[str, Any]], verify_claims: list[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Every claim of the case once, whichever list it was written in. A MAP claim keeps its kind; a VERIFY claim made from it
+    (``map_claim``) is the same claim -- 法律 if either list says so, a detail written in either counts. A VERIFY claim of its own
+    is 法律 when it is marked law, else 事實 / 價值 by its sentence kind, else no kind (``kind`` empty). ``missing``: the 法律
+    details no list has written (法域、時效、來源)."""
+    from ai_lego.core.domain.kinds.map import CLAIM_KINDS
+
+    law_details = {"jurisdiction": ("jurisdiction", "jurisdiction"), "limitation": ("limitation", "limitation"), "source": ("source", "law_source")}   # label key -> (MAP detail, VERIFY field)
+    labels = dict(CLAIM_KINDS["法律"][1])
+    made_from: dict[Any, list[Mapping[str, Any]]] = {}
+    for content in verify_claims:
+        if content.get("map_claim"):
+            made_from.setdefault(content["map_claim"], []).append(content)
+    found: list[dict[str, Any]] = []
+
+    def row(claim_id: str, text: str, kind: str, source: str, legal: bool, written: Mapping[str, str]) -> dict[str, Any]:
+        missing = [labels[key] for key in law_details if not str(written.get(key) or "").strip()] if legal else []
+        return {"id": claim_id, "text": text, "kind": "法律" if legal else kind, "from": source, "missing": missing}
+
+    for claim in map_claims:
+        theirs = made_from.get(claim.get("id"), [])   # more than one VERIFY claim can name one MAP claim: any of them marking it law, any of them writing a detail, counts
+        legal = claim.get("kind") == "法律" or any(content.get("law") for content in theirs)
+        details = claim.get("details") if isinstance(claim.get("details"), Mapping) else {}
+        written = {key: details.get(map_key) or next((content[verify_key] for content in theirs if str(content.get(verify_key) or "").strip()), None)
+                   for key, (map_key, verify_key) in law_details.items()}
+        found.append(row(str(claim.get("id")), str(claim.get("text", "")), str(claim.get("kind") or ""), "MAP", legal, written))
+    mapped = {claim.get("id") for claim in map_claims}
+    for content in verify_claims:
+        if content.get("map_claim") in mapped:
+            continue
+        written = {key: content.get(verify_key) for key, (_, verify_key) in law_details.items()}
+        found.append(row(str(content.get("doc_id", "")), str(content.get("text", "")), KIND_OF_SENTENCE.get(content.get("sentence"), ""), "VERIFY", bool(content.get("law")), written))
+    return found
+
+
+def claim_counts(claims: list[Mapping[str, Any]]) -> dict[str, int]:
+    """How many claims of each MAP kind (事實、法律、價值、文化宗教) the case has, from ``case_claims``; ``其他`` = no kind of the four."""
+    from ai_lego.core.domain.kinds.map import CLAIM_KINDS
+
+    counts = {kind: 0 for kind in CLAIM_KINDS}
+    counts["其他"] = 0
+    for claim in claims:
+        counts[claim["kind"] if claim["kind"] in CLAIM_KINDS else "其他"] += 1
+    return counts

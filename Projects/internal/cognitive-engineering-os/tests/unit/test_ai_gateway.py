@@ -8,6 +8,7 @@ import inspect
 import json
 import threading
 import unittest
+import uuid
 from unittest.mock import patch
 
 from ai_lego import resolve_spec_root
@@ -18,7 +19,7 @@ from ai_lego.errors import InvariantViolation
 from tests.unit.method_testkit import shared_method_catalog
 from ai_lego.platform.ai_gateway import draft as draft_mod
 from ai_lego.platform.ai_gateway.draft import build_prompt, draft_method_kwargs, draft_recipe_source, extract_json_object, method_input_spec, recipe_draft_plan
-from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, DEFAULT_EFFORT, DEFAULT_MODEL, MAX_OUTPUT_TOKENS, MODEL_ENV, AiCompletion, AnthropicProvider, ProviderCallError, provider_from_env
+from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, PERSON_TOKEN_BUDGET_ENV, DEFAULT_EFFORT, DEFAULT_MODEL, MAX_OUTPUT_TOKENS, MODEL_ENV, AiCompletion, AnthropicProvider, ProviderCallError, provider_from_env
 from ai_lego.platform.net import egress
 from tests.unit.test_api_main import ApiTestCase
 from tests.unit.thread_testkit import HANG_GUARD_S, join_all
@@ -357,7 +358,7 @@ class ApiRouteTests(ApiTestCase):
         self._login()
         self._use(ScriptedProvider(json.dumps(flowchart_kwargs(), ensure_ascii=False)))
         worst = 1_000_000 + draft_mod.DRAFT_MAX_TOKENS   # every call's worst case (a call starts only if it fits)
-        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 100)}):
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 100), PERSON_TOKEN_BUDGET_ENV: str(10**12)}):
             response = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"})
             self.assertEqual(response.status_code, 200, response.text)  # 0 used + worst fits -> allowed
             status = self.client.get("/ai/status").json()
@@ -365,6 +366,73 @@ class ApiRouteTests(ApiTestCase):
             blocked = self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"})
             self.assertEqual(blocked.status_code, 429, blocked.text)
             self.assertIn("AI_DAILY_TOKEN_BUDGET_EXCEEDED", blocked.json()["detail"])
+
+    def _second_person(self) -> None:
+        """Another person of the same tenant (self-registered people share one), signed in in place of the first."""
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        store.create_identity(str(uuid.uuid4()), self.tenant["tenant_id"], "second@example.com", "Second", "correct-horse-battery")
+        response = self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "second@example.com", "password": "correct-horse-battery"})
+        self.assertEqual(response.status_code, 200, response.text)
+
+    def _draft(self):
+        return self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"})
+
+    def test_one_person_spends_only_their_own_share_and_the_refusal_says_it_is_theirs(self):
+        """2026-10-12: the budget was per tenant, so one class would spend everyone's day within minutes. Each person has a share
+        (COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET_PER_PERSON); the tenant's number is the ceiling over all of them."""
+        self._login()
+        self._use(ScriptedProvider(*[json.dumps(flowchart_kwargs(), ensure_ascii=False)] * 6))
+        worst = 1_000_000 + draft_mod.DRAFT_MAX_TOKENS
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {PERSON_TOKEN_BUDGET_ENV: str(worst + 100), DAILY_TOKEN_BUDGET_ENV: str(10 * worst)}):
+            self.assertEqual(self._draft().status_code, 200)   # 0 used + its worst case fits the share
+            mine = self._draft()   # 150 used: the next call's worst case no longer fits
+            self.assertEqual(mine.status_code, 429, mine.text)
+            self.assertIn("AI_DAILY_TOKEN_BUDGET_EXCEEDED: scope=person", mine.json()["detail"])
+            self.assertIn("your own", mine.json()["detail"])
+            self.assertEqual(self.client.get("/ai/status").json()["your_budget"], {"daily_limit": worst + 100, "used_today": 150, "reserved_in_flight": 0, "remaining_today": worst - 50})
+            self._second_person()
+            self.assertEqual(self._draft().status_code, 200)   # the same tenant, another person: their share is untouched
+            self.assertEqual(self.client.get("/ai/status").json()["your_budget"]["used_today"], 150)   # only their own calls
+            self.assertEqual(self.client.get("/ai/status").json()["budget"]["used_today"], 300)   # the space's number is everyone's
+
+    def test_the_spaces_ceiling_stops_everyone_and_the_refusal_says_it_is_the_spaces(self):
+        self._login()
+        self._use(ScriptedProvider(*[json.dumps(flowchart_kwargs(), ensure_ascii=False)] * 6))
+        worst = 1_000_000 + draft_mod.DRAFT_MAX_TOKENS
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {PERSON_TOKEN_BUDGET_ENV: str(10 * worst), DAILY_TOKEN_BUDGET_ENV: str(worst + 200)}):
+            self.assertEqual(self._draft().status_code, 200)
+            self._second_person()
+            self.assertEqual(self._draft().status_code, 200)   # 150 + worst still fits the ceiling
+            blocked = self._draft()   # 300 used in the space; this person has used 150 of their share
+            self.assertEqual(blocked.status_code, 429, blocked.text)
+            self.assertIn("AI_DAILY_TOKEN_BUDGET_EXCEEDED: scope=tenant", blocked.json()["detail"])
+            self.assertIn("whole space", blocked.json()["detail"])
+
+    def test_a_person_already_over_their_share_is_stopped_before_any_work(self):
+        self._login()
+        self._use(ScriptedProvider("{}"))
+        store = api_main.app.dependency_overrides[api_main.get_store]()
+        usage_id, _ = store.reserve_ai_usage(self.tenant["tenant_id"], self.identity["identity_id"], "draft:x", "m", 300, 300, since="1970-01-01T00:00:00Z", fits=lambda used: True)
+        store.settle_ai_usage(self.tenant["tenant_id"], usage_id, "m", 300, 300)
+        with patch.dict("os.environ", {PERSON_TOKEN_BUDGET_ENV: "500", DAILY_TOKEN_BUDGET_ENV: "1000000"}):
+            stopped = self._draft()
+            self.assertEqual(stopped.status_code, 429, stopped.text)
+            self.assertIn("scope=person", stopped.json()["detail"])
+            self.assertEqual(self.client.get("/ai/status").json()["your_budget"]["remaining_today"], 0)
+
+    def test_the_default_shares_and_a_misconfigured_share_fails_closed(self):
+        from ai_lego.platform.ai_gateway.provider import DEFAULT_PERSON_TOKEN_BUDGET, daily_person_budget, daily_token_budget
+
+        self.assertEqual((daily_person_budget({}), daily_token_budget({})), (DEFAULT_PERSON_TOKEN_BUDGET, DEFAULT_DAILY_TOKEN_BUDGET))
+        self.assertEqual(daily_person_budget({PERSON_TOKEN_BUDGET_ENV: " 1234 "}), 1234)
+        self._login()
+        self._use(ScriptedProvider("{}"))
+        for bad in ("not-a-number", "0", "-5"):
+            with patch.dict("os.environ", {PERSON_TOKEN_BUDGET_ENV: bad}):
+                response = self._draft()
+                self.assertEqual(response.status_code, 503, (bad, response.text))
+                self.assertIn("AI_DAILY_TOKEN_BUDGET_INVALID", response.json()["detail"])
+                self.assertIn(PERSON_TOKEN_BUDGET_ENV, response.json()["detail"])
 
     def test_daily_token_budget_only_counts_todays_usage(self):
         self._login()
@@ -404,7 +472,7 @@ class ApiRouteTests(ApiTestCase):
         worst = 1_000_000 + draft_mod.DRAFT_MAX_TOKENS
         results: dict[str, int] = {}
         first = threading.Thread(target=lambda: results.__setitem__("first", self.client.post("/ai/draft/method/systems.flowchart", json={"brief": "x"}).status_code), name="reserve-first")
-        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + worst // 2)}):
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + worst // 2), PERSON_TOKEN_BUDGET_ENV: str(10**12)}):
             try:
                 first.start()
                 self.assertTrue(first_in_provider.wait(HANG_GUARD_S), "first request never reached the provider")
@@ -446,7 +514,7 @@ class ApiRouteTests(ApiTestCase):
         self._login()
         self._use(ScriptedProvider())
         worst = 1_000_000 + draft_mod.DRAFT_MAX_TOKENS
-        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 100)}):
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 100), PERSON_TOKEN_BUDGET_ENV: str(10**12)}):
             response = self.client.post("/ai/draft/recipe/art-therapy-unstick-v1", json={"brief": "x", "labels": ["visual_metaphor", "metaphor_dialogue"]})
         self.assertEqual(response.status_code, 429, response.text)   # the first call (150 tokens) fits; the next one's worst does not
         self.assertIn("AI_DAILY_TOKEN_BUDGET_EXCEEDED", response.json()["detail"])

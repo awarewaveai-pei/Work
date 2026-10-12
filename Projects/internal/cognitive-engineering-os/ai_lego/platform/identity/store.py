@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Callable
 from uuid import uuid4
@@ -80,6 +81,17 @@ def _password_matches(password: str, credential: Any | None) -> bool:
 
 def _instant(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+@dataclass(frozen=True)
+class AiReservation:
+    """The outcome of one reservation: its row (None when refused), what the whole tenant and this person had used today before it,
+    and which limit refused it (``"person"`` first, else ``"tenant"``)."""
+
+    usage_id: int | None
+    tenant_used: int
+    person_used: int
+    refused_by: str | None
 
 
 class IdentityStore:
@@ -578,17 +590,32 @@ class IdentityStore:
 
     def reserve_ai_usage(self, tenant_id: str, identity_id: str, purpose: str, model: str, input_tokens: int, output_tokens: int,
                          *, since: str, fits: Callable[[int], bool], run_id: str | None = None) -> tuple[int | None, int]:
-        """(row id, tokens used since ``since`` before it) -- id None when ``fits(used)`` refuses; nothing is written then."""
+        """(row id, tokens used since ``since`` before it) -- id None when ``fits(used)`` refuses; nothing is written then.
+        The tenant's limit alone; a call that also holds one person to a share is ``reserve_ai_usage_for``."""
+        reservation = self.reserve_ai_usage_for(tenant_id, identity_id, purpose, model, input_tokens, output_tokens, since=since,
+                                                person_fits=lambda used: True, tenant_fits=fits, run_id=run_id)
+        return reservation.usage_id, reservation.tenant_used
+
+    def reserve_ai_usage_for(self, tenant_id: str, identity_id: str, purpose: str, model: str, input_tokens: int, output_tokens: int,
+                             *, since: str, person_fits: Callable[[int], bool], tenant_fits: Callable[[int], bool], run_id: str | None = None) -> AiReservation:
+        """The one reservation: this person's use since ``since`` and the whole tenant's are read, both limits are asked
+        (the person's first, so a person over their own share is told it is theirs) and the row is written, in one transaction
+        under the tenant's ai-usage lock. Nothing is written when either refuses."""
         with self._db.for_tenant(tenant_id) as conn:
             db.advisory_xact_lock(conn, "ai-usage", tenant_id)
-            used = int(conn.execute("SELECT COALESCE(SUM(input_tokens + output_tokens), 0) FROM ai_usage WHERE tenant_id = %s AND used_at >= %s", (tenant_id, since)).fetchone()[0])
-            if not fits(used):
-                return None, used
             row = conn.execute(
+                "SELECT COALESCE(SUM(input_tokens + output_tokens), 0), COALESCE(SUM(CASE WHEN identity_id = %s THEN input_tokens + output_tokens ELSE 0 END), 0) "
+                "FROM ai_usage WHERE tenant_id = %s AND used_at >= %s", (identity_id, tenant_id, since)).fetchone()
+            tenant_used, person_used = int(row[0]), int(row[1])
+            if not person_fits(person_used):
+                return AiReservation(None, tenant_used, person_used, "person")
+            if not tenant_fits(tenant_used):
+                return AiReservation(None, tenant_used, person_used, "tenant")
+            inserted = conn.execute(
                 "INSERT INTO ai_usage (tenant_id, identity_id, purpose, model, input_tokens, output_tokens, used_at, status, run_id) VALUES (%s,%s,%s,%s,%s,%s,%s,'reserved',%s) RETURNING id",
                 (tenant_id, identity_id, purpose, model, int(input_tokens), int(output_tokens), db.now(), run_id),
             ).fetchone()
-            return int(row[0]), used
+            return AiReservation(int(inserted[0]), tenant_used, person_used, None)
 
     def settle_ai_usage(self, tenant_id: str, usage_id: int, model: str, input_tokens: int, output_tokens: int) -> None:
         """What the reserved call cost (a failed call: 0, or its worst case when its cost could not be read)."""
@@ -613,15 +640,18 @@ class IdentityStore:
             ).fetchall()
         return [{"input_tokens": int(row["input_tokens"]), "output_tokens": int(row["output_tokens"]), "model": str(row["model"])} for row in rows]
 
-    def ai_usage_totals(self, tenant_id: str, since: str | None = None) -> dict[str, int]:
+    def ai_usage_totals(self, tenant_id: str, since: str | None = None, identity_id: str | None = None) -> dict[str, int]:
         """Every row (reserved ones at their worst case) and, apart, what is still reserved. ``since``: an ISO-8601
-        lower bound with its offset (inclusive), compared as a time by the database."""
+        lower bound with its offset (inclusive), compared as a time by the database. ``identity_id``: one person's rows only."""
         query = ("SELECT COUNT(*) AS calls, COALESCE(SUM(input_tokens),0) AS input_tokens, COALESCE(SUM(output_tokens),0) AS output_tokens, "
                  "COALESCE(SUM(CASE WHEN status = 'reserved' THEN input_tokens + output_tokens ELSE 0 END),0) AS reserved FROM ai_usage WHERE tenant_id = %s")
         params: list[str] = [tenant_id]
         if since is not None:
             query += " AND used_at >= %s"
             params.append(since)
+        if identity_id is not None:
+            query += " AND identity_id = %s"
+            params.append(identity_id)
         with self._db.for_tenant(tenant_id) as conn:
             row = conn.execute(query, params).fetchone()
         return {"calls": int(row["calls"]), "input_tokens": int(row["input_tokens"]), "output_tokens": int(row["output_tokens"]), "reserved": int(row["reserved"])}

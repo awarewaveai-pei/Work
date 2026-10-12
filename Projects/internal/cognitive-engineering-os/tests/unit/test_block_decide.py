@@ -175,6 +175,34 @@ class CheckTests(DecideBase):
         self.assertIn("各自的界線", user)
         self.assertEqual({"decide.judgment", "decide.seal", "context.notes", "verify.claim"}, set(ai_gate.actions()[("DECIDE", "check")].reads))
 
+    def test_the_check_names_a_cell_by_the_label_the_person_sees_never_by_its_key(self):
+        """2026-10-12 walk: 「中」（intensity_now）, 「uncertainty 欄位」 reached the person. The model is given the Chinese label of every
+        cell and the gate replaces a key it still writes (any AI action: ai_gate -> ai_words)."""
+        self.judge(FULL)
+        self.provider.answer = {"gaps": ["uncertainty 欄位寫得太少"], "clarity": ["「中」（intensity_now）是指什麼？"], "question": "你最怕哪一點？"}
+        saved = self.check().json()["saved"]["content"]
+        self.assertEqual((saved["gaps"], saved["clarity"]), (["仍然不確定的地方 欄位寫得太少"], ["「中」（下判斷前的情緒強度）是指什麼？"]))
+        system, user = self.provider.calls[-1]
+        labels = json.loads(user.split("\n", 1)[1])["cell_labels"]
+        self.assertEqual((labels["uncertainty"], labels["intensity_now"], "influences_listed" in labels), ("仍然不確定的地方", "下判斷前的情緒強度", False))
+        self.assertIn("never by its key", system)
+        self.provider.answer = {"gaps": ["請補上 map_claim"], "clarity": ["檔名 report_final.pdf 要改"]}   # a field of ours with no label; a file name is no key
+        refused = self.check()
+        self.assertEqual(refused.status_code, 422, refused.text)
+        self.assertIn("AI_ANSWER_INVALID", refused.json()["detail"])
+        self.provider.answer = {"clarity": ["檔名 report_final.pdf 要改"], "gaps": ["uncertainty", "change_condition"]}
+        kept = self.check().json()["saved"]["content"]
+        self.assertEqual((kept["clarity"], kept["gaps"]), (["檔名 report_final.pdf 要改"], ["仍然不確定的地方", "什麼會改變這個結論"]))   # a list of cells named by key reads by label
+        self.provider.answer = {"revisitable": "The uncertainty is large, and the options are few"}
+        self.assertEqual(self.check().json()["saved"]["content"]["revisitable"], "The uncertainty is large, and the options are few")   # English prose is not a key leak
+
+    def test_the_check_writes_chinese_with_full_width_punctuation(self):
+        self.judge(FULL)
+        self.provider.answer = {"clarity": ["條件,並說明", "他說「條件,好」,然後", "見 https://a.example.com/x,y 與 3,000 元"], "question": "事件卡:是什麼?"}
+        saved = self.check().json()["saved"]["content"]
+        self.assertEqual(saved["clarity"], ["條件，並說明", "他說「條件,好」，然後", "見 https://a.example.com/x,y 與 3,000 元"])
+        self.assertEqual(saved["question"], "事件卡：是什麼？")
+
     def test_the_check_sends_each_fact_as_it_stands_now_never_its_stored_count(self):
         """critic 2026-10-04 round 3 A: the card's stored counts went to the model as if they were current."""
         docs, owner, me = CaseDocs(self._repo), record_log.case(self.pid), record_log.user(self.identity["identity_id"], "VERIFY")

@@ -65,8 +65,23 @@ _CJK = "⺀-〿぀-鿿가-힯豈-﫿"
 _SPACE_IN_CJK = re.compile(rf"(?<=[{_CJK}])\s+(?=[{_CJK}])")
 
 
+# A search channel (wire v2: one engine in one language) as the person reads it. ``why`` is the collector's own sentence for what
+# happened (「這個搜尋引擎回了錯誤（HTTP 422）」, 「連不上這個搜尋引擎」): the state alone cannot tell an engine that answered with
+# an error from one that never answered, so 「連不上」 is said only when the collector said it (2026-10-12: 「這裡連不上Brave」 for an HTTP 422).
+CHANNEL_SAID = {"ok": "找過沒有找到", "unreachable": "沒有回應", "no_key": "平台還沒有這個搜尋引擎的金鑰"}
+CHANNEL_NOT_REPORTED = "沒有回報"
+
+
+def channel_words(state: Any, why: Any = None) -> str:
+    """What one channel did, without its name: the collector's sentence for a channel that did not look (a why in machine
+    code, with no Chinese in it, is not shown), else the state's plain words, else 沒有回報."""
+    if state in ("unreachable", "no_key") and isinstance(why, str) and re.search(f"[{_CJK}]", why):
+        return why.strip()
+    return CHANNEL_SAID.get(state, CHANNEL_NOT_REPORTED)
+
+
 def cell(state: str, value: str | None = None, why: str | None = None) -> dict[str, str]:
-    """One cell: 查到 carries a value; 查不到 and 無法檢查 carry why (「這裡連不上 X」, 「平台還沒有這個金鑰」) and no value --
+    """One cell: 查到 carries a value; 查不到 and 無法檢查 carry why (「Brave：這個搜尋引擎回了錯誤（HTTP 422）」, 「平台還沒有這個金鑰」) and no value --
     a value beside 查不到 would be shown as if something were found."""
     if state not in STATES:
         raise InvariantViolation(f"EVIDENCE_CELL_INVALID: state is one of {list(STATES)}")

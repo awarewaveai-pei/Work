@@ -77,7 +77,8 @@ from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog,
 from ai_lego.platform.entitlement.check import check_entitlement
 from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHARS, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
 from ai_lego.platform.ai_gateway.pricing import cost_twd
-from ai_lego.platform.ai_gateway.provider import DEFAULT_MODEL, AiProvider, AnthropicProvider, ProviderCallError, budget_exceeded, daily_token_budget, fits_budget, provider_from_env
+from ai_lego.platform.ai_gateway.provider import (DEFAULT_MODEL, SCOPE_PERSON, SCOPE_TENANT, AiProvider, AnthropicProvider, ProviderCallError, budget_exceeded, daily_person_budget,
+                                                  daily_token_budget, fits_budget, provider_from_env)
 from ai_lego.platform.catalog.display_catalog import catalog_payload, load_catalog, registry_paths
 from ai_lego.platform.identity.store import IdentityStore
 from ai_lego.platform.net.collection_service import CollectionServiceClient, collection_service_from_env
@@ -1465,14 +1466,15 @@ def _today_utc_start_iso() -> str:
     return now.strftime("%Y-%m-%dT00:00:00Z")
 
 
-def _ai_budget(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any]) -> int:
-    """The tenant's daily budget, once the provider is configured and the tenant may use AI (503 / 403 otherwise)."""
+def _ai_budgets(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any]) -> tuple[int, int]:
+    """(this person's daily share, the tenant's daily ceiling), once the provider is configured and the tenant may use AI
+    (503 / 403 otherwise). Either value misconfigured is a 503, never unlimited."""
     if provider is None:
         raise HTTPException(status_code=503, detail="AI_PROVIDER_UNCONFIGURED: set COGNITIVE_OS_ANTHROPIC_API_KEY (deploy/.env) to enable AI drafting")
     if not check_entitlement(store, session["tenant_id"], AI_DRAFT_CAPABILITY):
         raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {AI_DRAFT_CAPABILITY!r}")
     try:
-        return daily_token_budget()
+        return daily_person_budget(), daily_token_budget()
     except InvariantViolation as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
@@ -1480,11 +1482,12 @@ def _ai_budget(provider: AiProvider | None, store: IdentityStore, session: dict[
 def _require_ai(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any]) -> AiProvider:
     """Refuse a request before any work when AI is off, not allowed, or today's budget is spent (429). Each paid call
     is then checked again, atomically with its reservation, by _MeteredProvider."""
-    budget = _ai_budget(provider, store, session)
-    totals = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
-    used = totals["input_tokens"] + totals["output_tokens"]   # reserved rows (calls in flight) at their worst case
-    if not fits_budget(used, 0, budget):
-        raise HTTPException(status_code=429, detail=budget_exceeded(used, budget))
+    person_budget, tenant_budget = _ai_budgets(provider, store, session)
+    for scope, budget, who in ((SCOPE_PERSON, person_budget, session["identity_id"]), (SCOPE_TENANT, tenant_budget, None)):
+        totals = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso(), identity_id=who)
+        used = totals["input_tokens"] + totals["output_tokens"]   # reserved rows (calls in flight) at their worst case
+        if not fits_budget(used, 0, budget):
+            raise HTTPException(status_code=429, detail=budget_exceeded(used, budget, scope=scope))
     return provider
 
 
@@ -1509,10 +1512,23 @@ def ai_status(session: dict[str, Any] = Depends(require_session), provider: AiPr
         budget = daily_token_budget()
     except InvariantViolation:
         budget = None
+    try:
+        person_budget = daily_person_budget()
+    except InvariantViolation:
+        person_budget = None
     today = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso())
     reserved = today["reserved"]   # calls in flight (or whose process died) at their worst case, as the check counts them
     used = today["input_tokens"] + today["output_tokens"] - reserved
+    mine = store.ai_usage_totals(session["tenant_id"], since=_today_utc_start_iso(), identity_id=session["identity_id"])
+    my_reserved = mine["reserved"]
+    my_used = mine["input_tokens"] + mine["output_tokens"] - my_reserved
     return {
+        "your_budget": {   # this person's own daily share: the number that runs out first for one person
+            "daily_limit": person_budget,
+            "used_today": my_used,
+            "reserved_in_flight": my_reserved,
+            "remaining_today": None if person_budget is None else max(0, person_budget - my_used - my_reserved),
+        },
         "configured": provider is not None,
         "model": provider.model if provider else None,
         "usage": store.ai_usage_totals(session["tenant_id"]),
@@ -2373,15 +2389,20 @@ class _MeteredProvider:
     def _metered(self, sent: tuple[str, ...], max_tokens: int, call: Callable[[], Any]) -> Any:
         worst_input = worst_input_tokens(*sent)   # all this call can bill: output (thinking included) <= max_tokens
         try:
-            budget = _ai_budget(self._inner, self._store, self._session)
+            person_budget, tenant_budget = _ai_budgets(self._inner, self._store, self._session)
         except HTTPException as refusal:
             raise InvariantViolation(str(refusal.detail)) from refusal
-        usage_id, used = self._store.reserve_ai_usage(
+        worst = worst_input + max_tokens
+        reservation = self._store.reserve_ai_usage_for(
             self._session["tenant_id"], self._session["identity_id"], self._purpose, self.model, worst_input, max_tokens,
-            since=_today_utc_start_iso(), fits=lambda used: fits_budget(used, worst_input + max_tokens, budget), run_id=self._run_id,
+            since=_today_utc_start_iso(), person_fits=lambda used: fits_budget(used, worst, person_budget),
+            tenant_fits=lambda used: fits_budget(used, worst, tenant_budget), run_id=self._run_id,
         )
+        usage_id = reservation.usage_id
         if usage_id is None:
-            raise AiBudgetRefused(budget_exceeded(used, budget, worst_input + max_tokens))
+            mine = reservation.refused_by == SCOPE_PERSON
+            raise AiBudgetRefused(budget_exceeded(reservation.person_used if mine else reservation.tenant_used, person_budget if mine else tenant_budget, worst,
+                                                  scope=SCOPE_PERSON if mine else SCOPE_TENANT))
         try:
             completion = call()
         except ProviderCallError as billed:

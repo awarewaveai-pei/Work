@@ -10,11 +10,25 @@ from ai_lego.apps.api import main as api
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
+from ai_lego.platform import resources, safety
 from ai_lego.platform.lessons import load_lessons, load_practice_cases
 
 
 router = APIRouter()
 FALLBACK_MESSAGE = "你所在的地方沒有這類練習案例，先顯示其他地方的案例。"
+UNKNOWN_PLACE_MESSAGE = "還不知道你在哪裡，先顯示所有地方的案例。在「你在哪裡」填了，你那裡的案例會排在前面。"
+
+
+def in_place(where: str | None, case_place: str) -> bool:
+    """Whether a practice case's place is where the person is. The person writes a city, a spelling or a sentence (「台北」, 「臺灣」,
+    「我在台灣」); a place the platform knows (platform/resources) is matched by what it lists for itself, any other by the
+    case's place named in what they wrote."""
+    if not where or not where.strip():
+        return False
+    mine, theirs = resources.place_of(where), resources.place_of(case_place)
+    if mine is not None or theirs is not None:
+        return mine == theirs
+    return safety.normalise(case_place).lower() in safety.normalise(where).lower()
 
 
 def _lesson_view(lesson: dict[str, Any]) -> dict[str, Any]:
@@ -42,7 +56,7 @@ def list_practice_cases(session: dict[str, Any] = Depends(api.require_session), 
     location = docs.current(session["tenant_id"], record_log.person(session["identity_id"]), "govern.location")
     place = location[-1]["content"].get("where") if location else None
     cases = list(load_practice_cases().items)
-    local = [case for case in cases if place and case["place"] == place]
+    local = [case for case in cases if in_place(place, case["place"])]
     other = [case for case in cases if case not in local]
     fallback = not local
-    return {"cases": local + other, "place": place, "fallback": fallback, "message": FALLBACK_MESSAGE if fallback else ""}
+    return {"cases": local + other, "place": place, "fallback": fallback, "message": ("" if not fallback else FALLBACK_MESSAGE if place and place.strip() else UNKNOWN_PLACE_MESSAGE)}

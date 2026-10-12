@@ -25,7 +25,7 @@ from contextvars import ContextVar
 from typing import Any, Iterator, Mapping
 
 from ai_lego.core.domain.collection_run import OPEN_STATUSES
-from ai_lego.core.domain.evidence_words import FOUND, NOT_FOUND, UNCHECKABLE, cell, normalise_quote
+from ai_lego.core.domain.evidence_words import CHANNEL_SAID, FOUND, NOT_FOUND, UNCHECKABLE, cell, channel_words, normalise_quote
 from ai_lego.core.domain.kinds.map import CHECKABLE as MAP_CHECKABLE
 from ai_lego.core.domain.kinds.verify import FACTCHECK_ANGLE, SEARCH_LANGUAGES, SEARCH_PROVIDERS, SPREAD
 from ai_lego.data.events import record_log
@@ -37,8 +37,6 @@ WHY_GATHER = "這個案子找回來的來源，比 AI 一次能讀的還多。�
 DEAD_RUN = "這次查詢沒有跑完"
 NO_CHANNELS = "找資料的服務沒有回報搜尋管道"
 NO_REPORT = "找資料的服務沒有回報找到幾頁"
-CHANNEL_SAID = {"ok": "找過沒有找到", "unreachable": "沒有回應", "no_key": "還沒有設定金鑰"}   # wire v2 channel states
-NOT_REPORTED = "沒有回報"
 SEARCH_OPEN = "VERIFY_SEARCH_ALREADY_RUNNING: 這個主張的這一版已經在找了；等它跑完，或過了期限，再查一次"
 FIRST_REQUIRED = "VERIFY_FIRST_REACTION_REQUIRED: write your first reaction and confidence for this message first; nothing about it is shown or asked of the AI before that"
 
@@ -226,14 +224,14 @@ def _first_saved(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, doc: d
     return []
 
 
-def _channels_said(states: Mapping[tuple[Any, Any], Any], languages: tuple[str, ...]) -> str:
-    """What each planned engine said, the ones that did not look first: 「Brave 沒有回應；Serper 找過沒有找到」 (a language
-    is named only when an engine's languages differ)."""
+def _channels_said(reports: Mapping[tuple[Any, Any], tuple[Any, Any]], languages: tuple[str, ...]) -> str:
+    """What each planned engine said, the ones that did not look first: 「Brave：這個搜尋引擎回了錯誤（HTTP 422）；Serper：找過沒有找到」
+    (a language is named only when an engine's languages differ)."""
     failed, looked = [], []
     for provider, name in SEARCH_PROVIDERS.items():
-        said = {lang: CHANNEL_SAID.get(states.get((provider, lang)), NOT_REPORTED) for lang in languages}
+        said = {lang: channel_words(*reports.get((provider, lang), (None, None))) for lang in languages}
         same = set(said.values())
-        parts = [(f"{name} {words}", words) for words in same] if len(same) == 1 else [(f"{name}（{SEARCH_LANGUAGES[lang]}）{words}", words) for lang, words in said.items()]
+        parts = [(f"{name}：{words}", words) for words in same] if len(same) == 1 else [(f"{name}（{SEARCH_LANGUAGES[lang]}）：{words}", words) for lang, words in said.items()]
         for text, words in parts:
             (looked if words == CHANNEL_SAID["ok"] else failed).append(text)
     return "；".join(failed + looked)[:300]
@@ -242,17 +240,21 @@ def _channels_said(states: Mapping[tuple[Any, Any], Any], languages: tuple[str, 
 CHANNEL_RANK = {"no_key": 0, "unreachable": 1, "ok": 2}   # = next-admin lib/collect/orchestrator.ts CHANNEL_RANK; lower is worse
 
 
-def channel_states(channels: list[Any]) -> dict[tuple[Any, Any], Any]:
-    """(provider, lang) -> what that channel said, from every row: a pair reported twice reads as its worse report (an
+def channel_reports(channels: list[Any]) -> dict[tuple[Any, Any], tuple[Any, Any]]:
+    """(provider, lang) -> (state, why) of that channel, from every row: a pair reported twice reads as its worse report (an
     unknown state is the worst), never the last row -- a duplicate 「ok」 must not erase an 「unreachable」 into 查不到.
     The completion route already refuses a repeated pair (main.CollectionCompleteRequest.wire_error); this holds without it."""
-    states: dict[tuple[Any, Any], Any] = {}
+    reports: dict[tuple[Any, Any], tuple[Any, Any]] = {}
     for item in channels:
         if isinstance(item, Mapping):
             key, state = (item.get("provider"), item.get("lang")), item.get("state")
-            if key not in states or CHANNEL_RANK.get(state, -1) < CHANNEL_RANK.get(states[key], -1):
-                states[key] = state
-    return states
+            if key not in reports or CHANNEL_RANK.get(state, -1) < CHANNEL_RANK.get(reports[key][0], -1):
+                reports[key] = (state, item.get("why"))
+    return reports
+
+
+def channel_states(channels: list[Any]) -> dict[tuple[Any, Any], Any]:
+    return {key: state for key, (state, _) in channel_reports(channels).items()}
 
 
 def search_result(run: Mapping[str, Any], channels: list[Any], languages: tuple[str, ...] = tuple(SEARCH_LANGUAGES)) -> tuple[str, str]:
@@ -262,10 +264,11 @@ def search_result(run: Mapping[str, Any], channels: list[Any], languages: tuple[
     says what each engine did)."""
     if run.get("status") != "completed":
         return UNCHECKABLE, DEAD_RUN
-    states = channel_states(channels)
+    reports = channel_reports(channels)
+    states = {key: state for key, (state, _) in reports.items()}
     tried = bool(states)
     if tried and not any(state == "ok" for state in states.values()):
-        return UNCHECKABLE, _channels_said(states, languages)
+        return UNCHECKABLE, _channels_said(reports, languages)
     report = run.get("report")
     if not isinstance(report, Mapping):
         return UNCHECKABLE, NO_REPORT
@@ -276,7 +279,7 @@ def search_result(run: Mapping[str, Any], channels: list[Any], languages: tuple[
         return UNCHECKABLE, NO_CHANNELS
     if all(states.get((provider, lang)) == "ok" for provider in SEARCH_PROVIDERS for lang in languages):
         return NOT_FOUND, "找過，沒有找到相關的網頁"
-    return UNCHECKABLE, _channels_said(states, languages)
+    return UNCHECKABLE, _channels_said(reports, languages)
 
 
 def _run_of(docs: CaseDocs, tenant_id: str, owner: record_log.Owner, run_id: str) -> dict[str, Any] | None:

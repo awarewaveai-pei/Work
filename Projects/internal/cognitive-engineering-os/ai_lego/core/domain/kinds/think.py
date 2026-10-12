@@ -87,6 +87,7 @@ KINDS = [
         "premise": Field("text", 1000),
         "fails_when": Field("text", 1000),
         "handback": Field("text", 500),
+        "caution": Field("text", 500),                                     # 鏡子／稽核者／回顧：不交還控制，只在整理旁邊加一句提醒（例：這要請律師看）
         "sourced": Field("choice", choices=SOURCED, required=True),
     }, authors=frozenset({"ai"})),
     DocKind("think.response", "THINK", "你對 AI 整理的回應", {

@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 
 from ai_lego.apps.api import main as api_main
+from ai_lego.apps.api.blocks import teach as teach_blocks
 from ai_lego.core.domain import doc_kinds
 from ai_lego.data.events import record_log
 from ai_lego.errors import InvariantViolation
@@ -94,6 +95,33 @@ class TeachApiTests(ProjectSourceApiTestCase):
         fallback = self.client.get("/blocks/teach/practice-cases").json()
         self.assertTrue(fallback["fallback"])
         self.assertIn("其他地方", fallback["message"])
+
+    def test_a_person_in_taiwan_gets_the_taiwan_cases_however_they_wrote_the_place(self):
+        """2026-10-12 walk: 「你所在的地方沒有這類練習案例」 above a list with taiwan cases in it. The place is matched the way the platform
+        matches a place everywhere else (platform/resources), not by the exact string."""
+        for where in ("台灣", "臺灣", "台北", "我住在台北市", "Taiwan", "taipei"):
+            self.save("govern.location", {"where": where})
+            shown = self.client.get("/blocks/teach/practice-cases").json()
+            self.assertFalse(shown["fallback"], where)
+            self.assertEqual(shown["message"], "", where)
+            self.assertEqual([case["place"] for case in shown["cases"][:3]], ["台灣"] * 3, where)
+        self.assertEqual({case["id"] for case in shown["cases"]}, {case["id"] for case in teach_lessons.load_practice_cases().items})   # the others stay listed after the local ones
+
+    def test_a_person_who_has_not_said_where_is_not_told_there_are_no_cases_for_their_place(self):
+        shown = self.client.get("/blocks/teach/practice-cases").json()
+        self.assertEqual((shown["fallback"], shown["place"], len(shown["cases"])), (True, None, len(teach_lessons.load_practice_cases().items)))
+        self.assertIn("還不知道你在哪裡", shown["message"])
+        self.assertNotIn("沒有這類練習案例", shown["message"])
+
+    def test_a_place_with_no_case_falls_back_and_says_so_and_a_named_place_still_matches(self):
+        self.assertEqual(teach_blocks.in_place("英國倫敦", "英國"), True)
+        self.assertEqual(teach_blocks.in_place("台北", "英國"), False)
+        self.assertEqual(teach_blocks.in_place("火星", "台灣"), False)
+        self.assertEqual(teach_blocks.in_place(None, "台灣"), False)
+        self.assertEqual(teach_blocks.in_place("  ", "台灣"), False)
+        self.save("govern.location", {"where": "英國倫敦"})
+        shown = self.client.get("/blocks/teach/practice-cases").json()
+        self.assertEqual((shown["fallback"], [case["place"] for case in shown["cases"][:1]]), (False, ["英國"]))
 
     def test_unknown_lesson_version_is_refused(self):
         response = self.client.post("/me/docs/teach.run", json={"content": {**RUN, "lesson_version": 99}})

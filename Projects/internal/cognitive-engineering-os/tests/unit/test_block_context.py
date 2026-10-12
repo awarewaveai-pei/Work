@@ -9,7 +9,7 @@ import unittest
 from ai_lego.apps.api import main as api_main
 from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.evidence_words import CARD_CELL_KEYS, NOT_FOUND, cell
-from ai_lego.core.domain.kinds.context import FACET_NAMES, FACETS_VERSION
+from ai_lego.core.domain.kinds.context import FACET_NAMES, FACETS, FACETS_VERSION, case_claims, claim_counts
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
@@ -74,6 +74,12 @@ class ContextKindTests(ContextTestCase):
         self.assertIn("先寫你自己怎麼理解", spec["own_first"]["note"])
         self.assertEqual(spec["public_issue"]["package"], "公共議題判斷")
 
+    def test_no_facet_example_is_a_war_or_a_foreign_case_and_every_facet_is_kept(self):
+        """2026-10-12 walk: 「例：阿富汗禁止女性受教育」 was shown on a personal contract case. The examples are everyday ones; the list is whole."""
+        self.assertEqual(len(FACETS), 15)
+        self.assertNotIn("阿富汗", " ".join(definition for _, definition in FACETS))
+        self.assertTrue(FACETS_VERSION >= "2026-10-12")   # a changed list is a new version (a note records the one it was written with)
+
     def test_every_save_is_a_new_version_and_the_notes_cannot_be_deleted(self):
         first = self._notes({"facets_version": FACETS_VERSION, "facets": [{"facet": "文化", "relevant": True, "defines_normal": "重人情", "is_cause": "可能"}], "jurisdictions": ["台灣"]})
         self.assertEqual((first["author"], first["block"], first["version"]), ("user", "CONTEXT", 1))
@@ -103,6 +109,63 @@ class ContextKindTests(ContextTestCase):
         self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "colleague@example.com", "password": "correct-horse-battery"})
         self.assertEqual(self.client.get(f"{self.base}/docs/context.notes").status_code, 404)
         self.assertEqual(self._point().status_code, 404)
+
+
+class CaseClaimsTests(ContextTestCase):
+    """2026-10-12 walk: 「目前標了：事實 0、法律 0」 while VERIFY held a claim tagged 法律. One case = one set of claims, whichever list it was
+    written in; a claim carried from MAP to VERIFY is one claim."""
+
+    def _map(self, claims):
+        response = self.client.post(f"{self.base}/docs/map.map", json={"content": {"claims": claims}})
+        self.assertEqual(response.status_code, 200, response.text)
+
+    def _claim(self, **content):
+        response = self.client.post(f"{self.base}/docs/verify.claim", json={"content": content})
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def _read(self):
+        response = self.client.get(f"{self.base}/context/claims")
+        self.assertEqual(response.status_code, 200, response.text)
+        return response.json()
+
+    def test_a_law_claim_written_only_in_verify_is_counted(self):
+        self._claim(text="民法允許合夥一方自行調整分潤比例", sentence="可以查的事實", law=True, **{"from": "我加的"})
+        shown = self._read()
+        self.assertEqual(shown["counts"], {"事實": 0, "法律": 1, "價值": 0, "文化宗教": 0, "其他": 0})
+        self.assertEqual([(item["from"], item["kind"], item["missing"]) for item in shown["claims"]], [("VERIFY", "法律", ["適用法域", "時效", "來源"])])
+
+    def test_the_two_lists_are_one_set_and_a_claim_carried_over_counts_once(self):
+        self._map([{"id": "m1", "text": "他三次改價", "kind": "事實", "by": "user"},
+                   {"id": "m2", "text": "合約須用書面", "kind": "法律", "by": "user", "details": {"jurisdiction": "台灣"}},
+                   {"id": "m3", "text": "守約比賺錢重要", "kind": "價值", "by": "user"}])
+        self._claim(text="他三次改價", sentence="可以查的事實", law=True, jurisdiction="台灣", limitation="十五年", law_source="民法第125條", map_claim="m1", **{"from": "MAP"})
+        self._claim(text="快轉給家人", sentence="叫你去做的事", **{"from": "我加的"})
+        shown = self._read()
+        self.assertEqual(shown["counts"], {"事實": 0, "法律": 2, "價值": 1, "文化宗教": 0, "其他": 1})   # m1 is 法律 now (VERIFY says so), counted once
+        by_id = {item["id"]: item for item in shown["claims"]}
+        self.assertEqual((by_id["m1"]["kind"], by_id["m1"]["missing"], by_id["m1"]["from"]), ("法律", [], "MAP"))   # the details written in VERIFY count for it
+        self.assertEqual(by_id["m2"]["missing"], ["時效", "來源"])
+        self.assertEqual(sum(shown["counts"].values()), len(shown["claims"]))
+
+    def test_the_count_is_the_cases_own_and_needs_a_session_of_its_owner(self):
+        self.assertEqual(self._read(), {"claims": [], "counts": {"事實": 0, "法律": 0, "價值": 0, "文化宗教": 0, "其他": 0}})
+        self.assertEqual(self.client.get("/projects/not-a-case/context/claims").status_code, 404)
+
+    def test_the_rules_without_a_database(self):
+        map_claims = [{"id": "a", "text": "A", "kind": "法律", "details": {"jurisdiction": "台灣", "limitation": "x", "source": "y"}}, {"id": "b", "text": "B", "kind": "文化宗教"}]
+        verified = [{"doc_id": "v1", "text": "A", "sentence": "可以查的事實", "map_claim": "a"}, {"doc_id": "v2", "text": "C", "sentence": "對事實的解釋"},
+                    {"doc_id": "v3", "text": "D", "sentence": "價值判斷"}, {"doc_id": "v4", "text": "E", "sentence": "可以查的事實", "law": True, "jurisdiction": "日本", "limitation": "1年", "law_source": "民法"}]
+        claims = case_claims(map_claims, verified)
+        self.assertEqual([(item["id"], item["kind"], item["missing"]) for item in claims], [("a", "法律", []), ("b", "文化宗教", []), ("v2", "", []), ("v3", "價值", []), ("v4", "法律", [])])
+        self.assertEqual(claim_counts(claims), {"事實": 0, "法律": 2, "價值": 1, "文化宗教": 1, "其他": 1})
+
+    def test_two_verify_claims_made_from_one_map_claim_share_their_details(self):
+        both = [{"doc_id": "v1", "text": "A", "sentence": "可以查的事實", "map_claim": "a", "law": True, "jurisdiction": "台灣", "limitation": "十五年", "law_source": "民法"},
+                {"doc_id": "v2", "text": "A", "sentence": "可以查的事實", "map_claim": "a"}]
+        for order in (both, both[::-1]):
+            [claim] = case_claims([{"id": "a", "text": "A", "kind": "事實"}], order)
+            self.assertEqual((claim["kind"], claim["missing"]), ("法律", []), order)
 
 
 class ContextAiTests(ContextTestCase):

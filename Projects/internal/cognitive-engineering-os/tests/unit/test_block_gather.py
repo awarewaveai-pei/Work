@@ -400,7 +400,24 @@ class ChannelTests(GatherCase):
         self.assertEqual([language["key"] for language in state["languages"]], ["en", "zh"])
         self.assertEqual(state["short"], [])   # operator 2026-10-11: one engine is enough
         self.assertEqual(state["used"], "這次用了 1 家搜尋引擎（Serper（Google 的結果）），2 種語言（英文、中文）")
-        self.assertEqual([item["says"] for item in state["blocked"]], ["平台還沒有Brave的金鑰"])
+        self.assertEqual([item["says"] for item in state["blocked"]], ["Brave：平台還沒有這個搜尋引擎的金鑰"])
+
+    def says_for(self, why: str) -> str:
+        self.collected("https://a.example.com/1", zh(1))
+        self.arrive(channels=[{"provider": "serper", "lang": "zh", "state": "ok"}, {"provider": "brave", "lang": "zh", "state": "unreachable", "why": why}], run="r1")
+        [blocked] = self.client.get(f"{self.base}/gather").json()["channels"]["blocked"]
+        return blocked["says"]
+
+    def test_an_engine_that_answered_with_an_error_is_never_said_to_be_unreachable(self):
+        """2026-10-12 walk: 「這裡連不上Brave」 for a channel whose why was 「這個搜尋引擎回了錯誤（HTTP 422）」. The collector's sentence says
+        what happened; a code with no Chinese in it is not shown; no sentence at all reads 沒有回應, not 連不上."""
+        self.assertEqual(self.says_for("這個搜尋引擎回了錯誤（HTTP 422）"), "Brave：這個搜尋引擎回了錯誤（HTTP 422）")
+
+    def test_an_engine_the_collector_could_not_reach_is_said_so(self):
+        self.assertEqual(self.says_for("連不上這個搜尋引擎"), "Brave：連不上這個搜尋引擎")
+
+    def test_an_unreachable_channel_with_no_sentence_reads_no_answer_not_cannot_connect(self):
+        self.assertEqual(self.says_for("http_422"), "Brave：沒有回應")
 
     def test_the_places_language_not_searched_is_too_few_and_none_found_in_it_is_asked(self):
         self.collected("https://a.example.com/1", EN, searchLang="en")

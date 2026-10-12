@@ -35,7 +35,7 @@ from collections import Counter
 from typing import Any, Callable, Iterable, Iterator, Mapping
 
 from ai_lego.core.domain import doc_kinds
-from ai_lego.core.domain.evidence_words import FOUND, FOUND_BY, MIN_ORIGINS, NOT_FOUND, UNCHECKABLE, cell
+from ai_lego.core.domain.evidence_words import FOUND, FOUND_BY, MIN_ORIGINS, NOT_FOUND, UNCHECKABLE, cell, channel_words
 from ai_lego.core.domain.kinds.gather import MAX_CASE_CARDS
 from ai_lego.core.domain.source import outlinks_whole
 from ai_lego.data.events import record_log
@@ -946,7 +946,7 @@ def channel_state(cards: list[Mapping[str, Any]], channel_docs: list[Mapping[str
                 used.add((channel["provider"], channel["lang"]))
             else:
                 name = PROVIDER_NAMES.get(channel["provider"], channel["provider"])
-                says = f"平台還沒有{name}的金鑰" if channel["state"] == "no_key" else f"這裡連不上{name}"
+                says = f"{name}：{channel_words(channel['state'], channel.get('why'))}"
                 blocked[(channel["provider"], channel["state"])] = {**channel, "says": says}
     engines = sorted({provider for provider, _ in used})
     languages = sorted({lang for _, lang in used})

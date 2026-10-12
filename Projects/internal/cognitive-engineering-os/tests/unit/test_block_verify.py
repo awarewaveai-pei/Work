@@ -26,7 +26,7 @@ from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform import block_hooks, integrity
+from ai_lego.platform import ai_gate, block_hooks, integrity
 from ai_lego.platform.block_hooks import verify as hooks
 from ai_lego.apps.api.blocks.verify import NO_ATTRIBUTION
 from ai_lego.platform.block_hooks.verify import hit_address
@@ -251,6 +251,25 @@ class MessageTests(VerifyCase):
 
 
 class SplitAndClaimTests(VerifyCase):
+    def test_a_claim_is_the_messages_own_words_the_ais_remark_never_enters_its_text(self):
+        """2026-10-12 walk: claims came back as 「…（未註明出處，無可查來源，法律內容需由律師確認）」 and every web query carried the note. A bracketed
+        group the message does not contain is the AI's remark: cut from the text (a note field is where it may go, and it is not kept)."""
+        mid = self.opened()
+        remark = "（未註明出處，無可查來源，法律內容需由律師確認）"
+        split = self.ai("split", {"message": mid}, {"claims": [
+            {"text": CLAIM + remark, "sentence": CHECKABLE, "law": True, "note": "法律內容需由律師確認"},
+            {"text": "【緊急】央行宣布下週起每天只能領一萬元", "sentence": CHECKABLE},   # brackets the message itself has stay
+            {"text": "快轉給家人 [註: 無來源] (AI 提醒)", "sentence": "叫你去做的事"},
+            {"text": "央行宣布,下週起每天只能領一萬元", "sentence": CHECKABLE},   # the message's own punctuation is not re-typeset
+            {"text": remark, "sentence": CHECKABLE},   # nothing left once the remark is cut: no claim
+            {"text": "此訊息聲稱" + CLAIM, "sentence": CHECKABLE},   # no bracket, but words of the AI's own: not the message's claim
+            {"text": "央行下週起每天限領一萬元", "sentence": CHECKABLE}]})["saved"]   # reworded: not as the message states it
+        self.assertEqual([item["text"] for item in split["content"]["claims"]], [CLAIM, "【緊急】央行宣布下週起每天只能領一萬元", "快轉給家人", "央行宣布,下週起每天只能領一萬元"])
+        self.assertTrue(all(set(item) == {"text", "sentence", "law"} for item in split["content"]["claims"]))
+        action = ai_gate.actions()[("VERIFY", "split")]
+        self.assertIn("note", action.output_schema["properties"]["claims"]["items"]["properties"])
+        self.assertIn("text is copied from the message", action.instructions)
+
     def test_the_ai_proposes_a_split_and_only_my_confirmation_makes_a_claim(self):
         mid = self.opened()
         split = self.ai("split", {"message": mid}, {"message": "someone-else", "claims": [
@@ -913,10 +932,27 @@ class SearchTests(CollectionApiTestCase):
         """Codex round 4 F5 (decision S): Serper answered, Brave did not, no page -- that is not 「找過，沒有」. 查不到 only
         when every channel the run planned (engines x languages) reported ok; else 無法檢查 naming what each engine said."""
         empty = {"status": "completed", "report": {**REPORT, "written": 0}}
-        self.assertEqual(hooks.search_result(empty, channels(brave="unreachable")), ("無法檢查", "Brave 沒有回應；Serper 找過沒有找到"))
-        self.assertEqual(hooks.search_result(empty, channels(brave="no_key")), ("無法檢查", "Brave 還沒有設定金鑰；Serper 找過沒有找到"))
-        self.assertEqual(hooks.search_result(empty, channels()[:1]), ("無法檢查", "Serper（英文）沒有回報；Brave 沒有回報；Serper（中文）找過沒有找到"))
+        self.assertEqual(hooks.search_result(empty, channels(brave="unreachable")), ("無法檢查", "Brave：沒有回應；Serper：找過沒有找到"))
+        self.assertEqual(hooks.search_result(empty, channels(brave="no_key")), ("無法檢查", "Brave：平台還沒有這個搜尋引擎的金鑰；Serper：找過沒有找到"))
+        self.assertEqual(hooks.search_result(empty, channels()[:1]), ("無法檢查", "Serper（英文）：沒有回報；Brave：沒有回報；Serper（中文）：找過沒有找到"))
         self.assertEqual(hooks.search_result({**empty, "report": REPORT}, channels(brave="unreachable")), ("查到", "找回 3 頁"))   # pages came back: found
+
+    def test_a_channel_says_what_happened_not_only_that_it_failed(self):
+        """2026-10-12 walk: 「這裡連不上Brave」 for an engine that answered HTTP 422. The collector's own sentence is what the person reads;
+        a code is not shown; with no sentence the state's plain words stand."""
+        empty = {"status": "completed", "report": {**REPORT, "written": 0}}
+
+        def brave(state, why):
+            return [{"provider": provider, "lang": lang, "state": state if provider == "brave" else "ok", "why": why if provider == "brave" else ""}
+                    for provider in ("serper", "brave") for lang in ("zh", "en")]
+
+        self.assertEqual(hooks.search_result(empty, brave("unreachable", "這個搜尋引擎回了錯誤（HTTP 422）")), ("無法檢查", "Brave：這個搜尋引擎回了錯誤（HTTP 422）；Serper：找過沒有找到"))
+        self.assertEqual(hooks.search_result(empty, brave("unreachable", "連不上這個搜尋引擎"))[1], "Brave：連不上這個搜尋引擎；Serper：找過沒有找到")
+        self.assertEqual(hooks.search_result(empty, brave("unreachable", "http_422"))[1], "Brave：沒有回應；Serper：找過沒有找到")
+        self.assertEqual(hooks.search_result(empty, brave("no_key", "平台還沒有這個搜尋引擎的金鑰"))[1], "Brave：平台還沒有這個搜尋引擎的金鑰；Serper：找過沒有找到")
+        self.assertEqual(hooks.search_result(empty, brave("ok", "每個問題最多查 3 次，這些角度沒有查：新聞"))[1], "找過，沒有找到相關的網頁")   # an engine that looked says nothing of its why
+        worse = [{"provider": "brave", "lang": "zh", "state": "ok", "why": ""}, {"provider": "brave", "lang": "zh", "state": "unreachable", "why": "這個搜尋引擎回了錯誤（HTTP 503）"}]
+        self.assertEqual(hooks.channel_reports(worse), {("brave", "zh"): ("unreachable", "這個搜尋引擎回了錯誤（HTTP 503）")})   # the worse report brings its own why
 
     def test_a_channel_reported_twice_reads_as_its_worse_report_never_the_last(self):
         """Codex VERIFY r5 F1: serper/zh 「unreachable」 then a duplicate serper/zh 「ok」, zero pages: the dict kept the last
@@ -924,7 +960,7 @@ class SearchTests(CollectionApiTestCase):
         empty = {"status": "completed", "report": {**REPORT, "written": 0}}
         unreachable = {"provider": "serper", "lang": "zh", "state": "unreachable", "why": ""}
         for rows in ([unreachable, *channels()], [*channels(), unreachable]):
-            self.assertEqual(hooks.search_result(empty, rows), ("無法檢查", "Serper（中文）沒有回應；Serper（英文）找過沒有找到；Brave 找過沒有找到"))
+            self.assertEqual(hooks.search_result(empty, rows), ("無法檢查", "Serper（中文）：沒有回應；Serper（英文）：找過沒有找到；Brave：找過沒有找到"))
         self.assertEqual(hooks.channel_states([{"provider": "brave", "lang": "en", "state": "no_key"}, {"provider": "brave", "lang": "en", "state": "unreachable"}]),
                          {("brave", "en"): "no_key"})
         self.assertEqual(hooks.channel_states([{"provider": "brave", "lang": "en", "state": "ok"}, {"provider": "brave", "lang": "en", "state": "?"}]), {("brave", "en"): "?"})

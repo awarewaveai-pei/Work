@@ -14,11 +14,12 @@ source's country or the person's verdict -- it cannot conclude from what it is n
 from __future__ import annotations
 
 import json
+import re
 from contextvars import ContextVar
 from typing import Any, Callable, Mapping
 
 from ai_lego.core.domain.evidence_words import CHECKABLE, MIN_ORIGINS, MIN_QUOTE, NOT_CHECKABLE, SENTENCE_KINDS, STANCES, normalise_quote, quote_in
-from ai_lego.core.domain.kinds.verify import ASKS, LAW_UNCONFIRMED_LINE, law_unconfirmed, weak_line
+from ai_lego.core.domain.kinds.verify import ASKS, LAW_UNCONFIRMED_LINE, claim_key, law_unconfirmed, weak_line
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gate import AiAction
 from ai_lego.platform.block_hooks.verify import FIRST_REQUIRED, card_sha, first_written, person_reads
@@ -96,28 +97,44 @@ SPLIT = (
     "is exactly one of four kinds: 可以查的事實 (something said to have happened or to exist, that a record could confirm or not), 對事實的解釋 "
     "(what a fact is taken to mean), 價值判斷 (good or bad, should or should not), 叫你去做的事 (forward, donate, vote or not, stay away from someone). "
     "Example: 「下週起每天只能領一萬元」 is 可以查的事實; 「快去領」 is 叫你去做的事. Set law to true for a sentence about what a law, rule or court says. "
-    "Do not say whether any claim is true; the person confirms each claim, rewrites it or drops it."
+    "Do not say whether any claim is true; the person confirms each claim, rewrites it or drops it. "
+    "text is copied from the message -- a sentence of it, or a part of one -- with no bracket, remark, warning or word of your own: the platform adds its own "
+    "caution to a 法律 claim, so do not. A claim whose words are not in the message is thrown away. If you must say something about a claim, put it in note, "
+    "which the person never sees as part of the claim."
 )
 SPLIT_SCHEMA = {"type": "object", "properties": {"claims": {"type": "array", "maxItems": MAX_CLAIMS, "items": {"type": "object", "properties": {
-    "text": {"type": "string"}, "sentence": {"type": "string", "enum": list(SENTENCE_KINDS)}, "law": {"type": "boolean"}}, "required": ["text", "sentence"]}}}, "required": ["claims"]}
+    "text": {"type": "string"}, "sentence": {"type": "string", "enum": list(SENTENCE_KINDS)}, "law": {"type": "boolean"}, "note": {"type": "string"}}, "required": ["text", "sentence"]}}}, "required": ["claims"]}
+_REMARK = re.compile(r"[（(【\[]([^）)】\]]*)[）)】\]]")
 
 
 def _split_input(context: Mapping[str, Any], read: Read) -> str:
     message = _message(context, read)
-    _TURN.set({"message": message["doc_id"]})
+    _TURN.set({"message": message["doc_id"], "text": message["content"]["text"]})
     return "Split the message given below between the QUOTED markers."
+
+
+def _own_words(text: str, message: str) -> str:
+    """A claim's text is the message's own words, or it is nothing (``""``: the claim is dropped). A bracketed group that is
+    not in the message is the AI's own remark (「…（未註明出處，需由律師確認）」, 2026-10-12: it went into every web search of the
+    claim): cut out first, so the claim survives without it. What is left must still be in the message, width, case, spaces and
+    punctuation aside (claim_key) -- a prefix or suffix of the AI's own is not a bracket, but it is not the message's either.
+    The note field is where a remark may go, and it is not kept."""
+    folded = normalise_quote(message)
+    kept = _REMARK.sub(lambda found: found.group() if normalise_quote(found.group(1)) in folded else "", text)
+    kept = " ".join(kept.split())
+    return kept if claim_key(kept) and claim_key(kept) in claim_key(message) else ""
 
 
 def _split_shape(answer: dict[str, Any]) -> dict[str, Any]:
     turn = _turn()
     claims, seen = [], set()
     for item in answer.get("claims") if isinstance(answer.get("claims"), list) else []:
-        text = _text(item.get("text"), 2000) if isinstance(item, dict) else ""
+        text = _own_words(_text(item.get("text"), 2000), turn["text"]) if isinstance(item, dict) else ""
         if text and item.get("sentence") in SENTENCE_KINDS and text not in seen:
             seen.add(text)
             claims.append({"text": text, "sentence": item["sentence"], "law": item.get("law") is True})
     if not claims:
-        raise _invalid("the split has no claim of the four kinds")
+        raise _invalid("the split has no claim of the four kinds in the message's own words")
     return {"message": turn["message"], "claims": claims[:MAX_CLAIMS]}
 
 
@@ -322,7 +339,7 @@ def _next_shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="VERIFY", name="split", needs="organize", instructions=SPLIT, output_kind="verify.split", output_schema=SPLIT_SCHEMA,
-             reads=("verify.message", "verify.first"), build_input=_split_input, shape=_split_shape, max_tokens=6000, quoted=_the_message),
+             reads=("verify.message", "verify.first"), build_input=_split_input, shape=_split_shape, max_tokens=6000, quoted=_the_message, verbatim=("text",)),
     AiAction(block="VERIFY", name="techniques", needs="organize", instructions=TECHNIQUES_TEXT, output_kind="verify.techniques", output_schema=TECHNIQUES_SCHEMA,
              reads=("verify.message", "verify.first"), build_input=_techniques_input, shape=_techniques_shape, max_tokens=6000, quoted=_the_message),
     # reading the case's source cards and citing them is what 「找外部資料（只引用有來源卡的）」 grants (as GATHER's summaries)

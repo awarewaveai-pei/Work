@@ -18,8 +18,10 @@ Before the model is called, in this order:
 ``build_input(context, read)`` and ``handback(context, read)``: ``read(kind)`` reads the listed kinds; ``read.evidence``
 reads the counts (ai_lego.platform.evidence) of the listed kinds -- never a recount.
 Then the call is metered (main._MeteredProvider, the API's one paid-call path; the object is asked for through
-ai_gateway.structured like every other object answer) and the answer -- validated by the
-action's output kind -- is saved as an AI-authored document. The AI never writes anywhere else.
+ai_gateway.structured like every other object answer) and the answer -- shaped by the action, then set right for the person
+(text/ai_words.polish: full-width punctuation in Chinese, no field name shown; a source's ``quote`` and an action's
+``verbatim`` keys untouched) and validated by the action's output kind -- is saved as an AI-authored document. The AI never
+writes anywhere else.
 
 A block declares its actions in its own module: ``ACTIONS = [AiAction(...)]`` in ai_lego/platform/ai_actions/<block>.py.
 """
@@ -46,6 +48,7 @@ from ai_lego.platform import safety, visibility
 from ai_lego.platform.evidence import CaseEvidence
 from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS
 from ai_lego.platform.ai_gateway.structured import ask_object, parse_object
+from ai_lego.platform.text.ai_words import keys_shown, polish
 
 # Every model call inside the platform starts with these (完整性核心 and the AI rules shared by every card).
 PREAMBLE = (
@@ -56,7 +59,8 @@ PREAMBLE = (
     "- Do not present any political, cultural, religious, legal or moral position as the neutral or mature one.\n"
     "- Never state what a law says from common knowledge; say a lawyer or the source must confirm it.\n"
     "- Ask at most one question at a time.\n"
-    "- Write in the language the person writes in (Traditional Chinese by default).\n"
+    "- Write in the language the person writes in (Traditional Chinese by default). In Chinese use full-width punctuation (，：；？！（）).\n"
+    "- Name a thing on the person's card by the label the person sees (the Chinese label given with it), never by a field name or an id such as intensity_now or weighted_sum.\n"
 )
 
 
@@ -95,6 +99,7 @@ class AiAction:
     # the model, ``who`` = the name people see, ``mine``); ``quoted`` names other members' records the gate adds fenced.
     in_group: bool = False
     fill: Callable[[Mapping[str, Any], Callable[..., list[dict[str, Any]]]], dict[str, Any]] | None = None   # (context, read) -> fields the system sets, never the model
+    verbatim: tuple[str, ...] = ()  # answer keys whose strings are someone else's words (a message's sentence): the gate leaves them as they are (``quote`` always is)
     subject_field: str = ""         # in a group: the filled field naming the member the answer is about -- the record's identity (theirs to delete, erased with them); empty = the caller
 
     def __post_init__(self) -> None:
@@ -362,6 +367,7 @@ def _turn(action: AiAction, *, tenant_id: str, identity_id: str, project_id: str
     places = {key: intake[key] for key in told if intake.get(key)}
     if places:
         user += "\n\nWhere: " + json.dumps(places, ensure_ascii=False)
+    shown_keys = keys_shown(user)   # the keys of what the gate built, before any fenced words of a source or someone else are added
     if safety.crisis_signal(user):
         if project_id:
             docs.save(tenant_id, owner, "govern.stop", {"reason": "crisis", "block": action.block}, record_log.system("GOVERN"))
@@ -414,7 +420,8 @@ def _turn(action: AiAction, *, tenant_id: str, identity_id: str, project_id: str
     if "require_sources" in guardrails:
         instructions.append("This case has a guardrail: every factual statement names its source (which page or document); with no source, say there is none.")
     if "professional" in guardrails:
-        instructions.append("This case has a guardrail: remind the person this can be taken to a professional, and say which parts a professional answers for and which are theirs.")
+        instructions.append("This case has a guardrail: remind the person this can be taken to a professional, and say which parts a professional answers for and which are theirs. "
+                            "Still do the work you were asked for: the reminder goes beside it, never in its place.")
     if agreed:
         instructions.append("The message ends with the person's 協作合約: stay inside its scope, leave the parts they keep for themselves to them, "
                             "and when its hand-back condition is met, stop and say so instead of going on.")
@@ -430,7 +437,8 @@ def _turn(action: AiAction, *, tenant_id: str, identity_id: str, project_id: str
     except InvariantViolation as error:
         raise InvariantViolation("AI_ANSWER_NOT_JSON: the model did not answer with the object asked for") from error
     fields = doc_kinds.require(action.output_kind).fields
-    answer = {**action.shape({key: value for key, value in answer.items() if key in fields}), **filled}   # extra keys the model added are dropped
+    shaped = polish(action.shape({key: value for key, value in answer.items() if key in fields}), verbatim=("quote", *action.verbatim), shown=shown_keys)   # what the person reads: full-width punctuation, no field names
+    answer = {**shaped, **filled}   # extra keys the model added are dropped
     if action.cites:
         problems = uncited(answer, texts, card_of)
         if problems:

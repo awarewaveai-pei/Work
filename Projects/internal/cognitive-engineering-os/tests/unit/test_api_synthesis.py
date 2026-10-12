@@ -15,7 +15,7 @@ from ai_lego.apps.api import main as api_main
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog
-from ai_lego.platform.ai_gateway.provider import DAILY_TOKEN_BUDGET_ENV, AiCompletion
+from ai_lego.platform.ai_gateway.provider import DAILY_TOKEN_BUDGET_ENV, PERSON_TOKEN_BUDGET_ENV, AiCompletion
 from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "eval"))
@@ -231,7 +231,7 @@ class SynthesisApiTests(ProjectSourceApiTestCase):
         self.provider.answers = ["not json", _dossier_answer()]
         from ai_lego.modules.research.synthesis import MAX_OUTPUT_TOKENS
         worst = 1_000_000 + MAX_OUTPUT_TOKENS   # every call's reservation (a call starts only if its worst case fits)
-        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 33)}):   # the first call spends 34
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 33), PERSON_TOKEN_BUDGET_ENV: str(10**12)}):   # the first call spends 34
             response, launch = self._post()
             api_main._run_synthesis(**launch.call_args.kwargs)
         failed = self._get(response.json()["synthesis_id"]).json()

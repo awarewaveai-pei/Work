@@ -60,7 +60,7 @@ KINDS = [
         "layers": Field("json", 60000, unread_keys=("place",), shape="object"),   # {layer key: [{id, text, by, card?, group?, place?, sources?, self_said?, cards?}]}; a fact's cards = GATHER source cards
         "skipped": Field("choices", len(LAYER_KEYS), choices=LAYER_KEYS),
         "core_conflict": Field("text", 2000, human_only=True),
-        "claims": Field("json", 20000, labels=tuple(CLAIM_KINDS), shape="array"),   # [{id, text, kind, by, item?, + the kind's detail fields}]
+        "claims": Field("json", 20000, labels=tuple(CLAIM_KINDS), shape="array"),   # [{id, text, kind, by, item?, details?: {the kind's detail keys: text}}]
         "gaps": Field("list", 30),                          # 資訊缺口
         "assumptions": Field("json", 8000, shape="array"),  # [{text, by}] 假設，誰提的
         "unwinnable": Field("bool"),                        # you judged this a game that cannot be won

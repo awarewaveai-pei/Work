@@ -540,7 +540,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         self._grant("propose_options")
         handed_back = self._answer("diverge", round_["doc_id"], {"handback": "資料不足", "question": "這件事會影響誰？誰會反對？"})
         self.assertEqual(handed_back["content"]["question"], "這件事會影響誰？")
-        wordy = self._answer("mirror", round_["doc_id"], {"handback": "資料不足，先不給建議。你可以這樣做：先談條件，再談期限。", "question": "你想先弄清楚哪一點？"})
+        wordy = self._answer("socratic", round_["doc_id"], {"handback": "資料不足，先不給建議。你可以這樣做：先談條件，再談期限。", "question": "你想先弄清楚哪一點？"})
         self.assertEqual(wordy["content"]["handback"], "資料不足，先不給建議。")
 
     def test_the_look_back_names_two_strengths_and_one_practice(self):
@@ -571,10 +571,49 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         batch = self._answer("diverge", round_["doc_id"], {"cards": cards(10), "handback": "你還沒說清楚誰會受影響", "question": "這件事會影響誰？"})
         self.assertEqual((batch["content"].get("cards"), batch["content"]["handback"], batch["content"]["question"]), (None, "你還沒說清楚誰會受影響", "這件事會影響誰？"))
         self.assertEqual(self.client.post(f"{self.base}/think/expand", json={"batch": batch["doc_id"]}).json(), {"created": 0})
-        reply = self._answer("mirror", round_["doc_id"], {"sections": [{"title": "事實", "items": ["x"]}], "handback": "資料不足", "question": "你想先弄清楚哪一點？"})
-        self.assertNotIn("sections", reply["content"])
+        reply = self._answer("criteria", round_["doc_id"], {"sections": [{"title": "判準", "items": ["x"]}], "premise": "p", "fails_when": "f", "handback": "資料不足", "question": "你想先弄清楚哪一點？"})
+        self.assertNotIn("sections", reply["content"])   # an advising role that hands back gives no advice
         self.provider.answer = {"cards": cards(10), "handback": "資料不足"}
         self.assertEqual(self._ask("diverge", round_["doc_id"]).status_code, 422)
+
+    def test_a_mirror_reflects_and_adds_a_caution_it_never_hands_back(self):
+        """2026-10-12 walk: a mirror on a case with a 法律 guardrail came back as only 「需要律師…我無法代為判斷」. A role that gives no advice has no advice
+        to hold back: the reflection is always given, the caution sits beside it."""
+        self._grant("propose_options")
+        round_ = self._round(problem="合約裡寫了違約金，我要不要簽")
+        for action in ("mirror", "audit", "look_back"):
+            saved = self._answer(action, round_["doc_id"], {**ANSWERS[action], "handback": "需要律師，我無法代為判斷。", "caution": "這部分要請律師確認。你可以先把條款拿給他看。"})
+            self.assertEqual((saved["content"].get("handback"), saved["content"]["caution"], bool(saved["content"]["sections"])), (None, "這部分要請律師確認。", True), action)
+            system = self.provider.calls[-1][0]
+            self.assertIn("caution", system, action)
+            self.assertNotIn("set handback", system, action)
+        self._answer("criteria", round_["doc_id"])
+        self.assertIn("set handback", self.provider.calls[-1][0])   # an advising role still can
+        self.provider.answer = {"handback": "需要律師，我無法代為判斷。", "caution": "請律師看", "question": "你最擔心哪一條？"}
+        refused = self._ask("mirror", round_["doc_id"])
+        self.assertEqual(refused.status_code, 422, refused.text)   # nothing to reflect = not an answer
+        self.assertIn("AI_ANSWER_INVALID", refused.json()["detail"])
+
+    def test_the_one_question_is_never_the_persons_own_words_again(self):
+        round_ = self._round(problem="要不要接這個案子", own=("觀察：他第三次改條件", "假設或替代解釋：他想壓低價格"))
+        said = ["要不要接這個案子？", "要不要接這個案子", "他第三次改條件?", "他想壓低價格嗎？", "要不要接這個案子，你怎麼想？"]
+        for question in said:
+            self.assertNotIn("question", self._answer("mirror", round_["doc_id"], {**ANSWERS["mirror"], "question": question})["content"], question)
+            self.provider.answer = {"question": question}
+            refused = self._ask("socratic", round_["doc_id"])   # a role that only asks has nothing left once its question is dropped
+            self.assertEqual(refused.status_code, 422, (question, refused.text))
+            self.assertIn("AI_ANSWER_INVALID", refused.json()["detail"])
+        for fresh in ("如果他再改一次條件，你會怎麼做？", "要不要接這個案子，取決於他願意讓步到哪裡？你設的底線是什麼？", "哪一點最讓你在意？"):
+            self.assertEqual(self._answer("mirror", round_["doc_id"], {**ANSWERS["mirror"], "question": fresh})["content"]["question"], fresh.split("？")[0] + "？")
+        reflective = self._round(problem="要不要接這個案子", own=("觀察：他第三次改條件",), reflection="我太快相信第一個想法", criteria=["不要賠錢"])
+        looked_back = self._answer("look_back", reflective["doc_id"], {**ANSWERS["look_back"], "question": "我太快相信第一個想法嗎？"})
+        self.assertNotIn("question", looked_back["content"])   # the look-back shows the reflection to the model, so it is theirs again too
+        self.provider.answer = {"question": "不要賠錢，對你來說是多少錢？"}
+        self.assertEqual(self._ask("socratic", reflective["doc_id"]).status_code, 200)   # a new question that uses their words is not their words again
+        self.provider.answer = {"question": "不要賠錢?"}
+        self.assertEqual(self._ask("socratic", reflective["doc_id"]).status_code, 422)   # the criteria they listed
+        self.assertTrue(actions.echoes("要不要接這個案子？", ["要不要接這個案子"]))
+        self.assertFalse(actions.echoes("要不要？", ["要不要接這個案子"]))   # too short to be anyone's sentence
 
     def test_i_answer_a_reply_and_the_ai_cannot_answer_for_me(self):
         reply = self._answer("mirror", self._round()["doc_id"])

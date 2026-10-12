@@ -174,6 +174,23 @@ class AnthropicProvider:
 
 DAILY_TOKEN_BUDGET_ENV = "COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET"
 DEFAULT_DAILY_TOKEN_BUDGET = 200_000
+PERSON_TOKEN_BUDGET_ENV = "COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET_PER_PERSON"
+DEFAULT_PERSON_TOKEN_BUDGET = 100_000
+SCOPE_PERSON, SCOPE_TENANT = "person", "tenant"
+
+
+def _budget_from_env(name: str, default: int, environ: dict[str, str] | None) -> int:
+    env = os.environ if environ is None else environ
+    raw = env.get(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        raise InvariantViolation(f"AI_DAILY_TOKEN_BUDGET_INVALID: {name}={raw!r} is not an integer") from None
+    if value <= 0:
+        raise InvariantViolation(f"AI_DAILY_TOKEN_BUDGET_INVALID: {name} must be a positive integer, got {value}")
+    return value
 
 
 def daily_token_budget(environ: dict[str, str] | None = None) -> int:
@@ -181,18 +198,16 @@ def daily_token_budget(environ: dict[str, str] | None = None) -> int:
     combined), checked against ``ai_usage`` before every draft call -- Phase 1 has no billing/credits system,
     so this is the only thing standing between a runaway loop (or a malicious/confused caller hammering
     ``/ai/draft/*``) and an unbounded Anthropic bill. A misconfigured value fails closed (raises) rather than
-    silently falling back to unlimited."""
-    env = os.environ if environ is None else environ
-    raw = env.get(DAILY_TOKEN_BUDGET_ENV, "").strip()
-    if not raw:
-        return DEFAULT_DAILY_TOKEN_BUDGET
-    try:
-        value = int(raw)
-    except ValueError:
-        raise InvariantViolation(f"AI_DAILY_TOKEN_BUDGET_INVALID: {raw!r} is not an integer") from None
-    if value <= 0:
-        raise InvariantViolation(f"AI_DAILY_TOKEN_BUDGET_INVALID: must be a positive integer, got {value}")
-    return value
+    silently falling back to unlimited. With self-registered people in one tenant this is the space's ceiling
+    (the cost brake); what one person may use is ``daily_person_budget``."""
+    return _budget_from_env(DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, environ)
+
+
+def daily_person_budget(environ: dict[str, str] | None = None) -> int:
+    """What one person (identity) may use per UTC day, so that one class cannot spend everyone's share (2026-10-12: the
+    tenant's 200k was one workshop's). Checked beside the space's ceiling in the same reservation; same fail-closed rule.
+    A per-person credit wallet (ADR 015) replaces this number with a balance, at this one place."""
+    return _budget_from_env(PERSON_TOKEN_BUDGET_ENV, DEFAULT_PERSON_TOKEN_BUDGET, environ)
 
 
 def fits_budget(used: int, reserve: int, budget: int) -> bool:
@@ -201,9 +216,12 @@ def fits_budget(used: int, reserve: int, budget: int) -> bool:
     return used < budget and used + reserve <= budget
 
 
-def budget_exceeded(used: int, budget: int, reserve: int = 0) -> str:
+def budget_exceeded(used: int, budget: int, reserve: int = 0, scope: str = SCOPE_TENANT) -> str:
+    """The 429 text. One code for both limits (the page, the runners and the logs already know it); ``scope=`` says whose:
+    ``person`` = this person's own daily share, ``tenant`` = the space everyone shares."""
     needs = f"; this call may use up to {reserve}" if reserve else ""
-    return f"AI_DAILY_TOKEN_BUDGET_EXCEEDED: {used}/{budget} tokens used today (UTC){needs}; resets at midnight UTC"
+    whose = "your own daily share" if scope == SCOPE_PERSON else "the whole space's daily limit (everyone in it together)"
+    return f"AI_DAILY_TOKEN_BUDGET_EXCEEDED: scope={scope}; {whose}: {used}/{budget} tokens used today (UTC){needs}; resets at midnight UTC"
 
 
 def provider_from_env(environ: dict[str, str] | None = None) -> AnthropicProvider | None:

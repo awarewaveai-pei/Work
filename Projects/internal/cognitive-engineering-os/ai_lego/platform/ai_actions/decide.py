@@ -9,9 +9,11 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Mapping
 
+from ai_lego.core.domain import doc_kinds
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gate import AiAction, AiRefused
 from ai_lego.platform.evidence import not_usable_because
+from ai_lego.platform.text.ai_words import FIELD_LABELS
 
 CHECK = (
     "Check what the person wrote on their judgment card. You do not write, complete or improve their conclusion, you "
@@ -25,7 +27,8 @@ CHECK = (
     "Never say what a law says.\n"
     "- gaps: which cells of the card are still empty, by the cell's name.\n"
     "- contradictions: statements on the card that contradict each other; quote both.\n"
-    "- question: at most one question that helps the person say it more clearly. Never a leading question."
+    "- question: at most one question that helps the person say it more clearly. Never a leading question.\n"
+    "Name a cell only by its Chinese label in cell_labels (what the person sees on the page), never by its key; never write a key such as uncertainty or intensity_now."
 )
 
 CHECK_SCHEMA = {
@@ -98,7 +101,7 @@ def _check_input(context: Mapping[str, Any], read: Callable[[str], list[dict[str
     card = {key: value for key, value in saved[-1]["content"].items() if key not in SYSTEM_MADE}
     if "facts" in card:
         card["facts"] = _facts_now(card["facts"], read.evidence.claims())   # never the stored count
-    payload: dict[str, Any] = {"judgment_card": card}
+    payload: dict[str, Any] = {"judgment_card": card, "cell_labels": {key: FIELD_LABELS[key] for key in doc_kinds.require("decide.judgment").fields if key in FIELD_LABELS and key not in SYSTEM_MADE}}
     notes = read("context.notes")
     if notes:
         held = notes[-1]["content"]
@@ -108,6 +111,7 @@ def _check_input(context: Mapping[str, Any], read: Callable[[str], list[dict[str
             found["relevant_facets"] = mattering
         if found:
             payload["norm_notes"] = found
+            payload["cell_labels"].update({key: FIELD_LABELS[key] for key in (*found, "relevant_facets") if key in FIELD_LABELS})
     return "The person's judgment card:\n" + json.dumps(payload, ensure_ascii=False)
 
 

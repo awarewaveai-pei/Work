@@ -334,10 +334,10 @@ class InterpretApiTests(ApiTestCase):
 
     def test_a_retry_is_checked_against_the_budget_like_the_first_call(self):
         """Codex 2026-09-28 [high]: the run reserved one call and the retry went unchecked past the daily budget."""
-        from ai_lego.platform.ai_gateway.provider import DAILY_TOKEN_BUDGET_ENV
+        from ai_lego.platform.ai_gateway.provider import DAILY_TOKEN_BUDGET_ENV, PERSON_TOKEN_BUDGET_ENV
         bad = AiCompletion(text="bad JSON", model=self.provider.model, input_tokens=20, output_tokens=20)
         worst = 1_000_000 + api_main.INTERPRET_MAX_TOKENS   # every call's reservation (any prompt here is shorter)
-        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 30)}), \
+        with patch.object(api_main, "PROMPT_RESERVE_TOKENS", 1_000_000), patch.dict("os.environ", {DAILY_TOKEN_BUDGET_ENV: str(worst + 30), PERSON_TOKEN_BUDGET_ENV: str(10**12)}), \
                 patch.object(self.provider, "complete", return_value=bad) as calls, patch("ai_lego.apps.api.main._launch_interpretation") as launch:
             response = self.client.post("/methods/systems.iceberg_model/interpret", json={"project_id": self.project_id, "events": ["x"], "patterns": [], "structures": [], "mental_models": []})
             self.assertEqual(response.status_code, 202, response.text)
