@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-12（續1）認知平台實走問題整批修（4ee6a8c81＋b8c719890＋efc0530be＋0963971c0＋9e34f3e78＋8c99c7d0e）
+
+**根本問題**: 2026-10-11 操作者登入正式站，Claude 從「陪我思考」一塊一塊走，清單 `agency-os/handoffs/2026-10-11-cognitive-platform-walk-issues.md`（A1–A8、B1–B10、C1–C4）。主因：一頁約 60 個請求＋預載觸發 Cloudflare 全站限速（50/10s）；API 單一程序；AI 出錯回 502 被 Cloudflare 蓋掉；AI 回答上限太小被截斷；被擋的 AI 回答沒紀錄；蒐集器把全國法規資料庫頁面丟掉；登入要 Tenant ID；頁面欄位太多、例子不合。操作者：「整批修完 再重走」。
+
+**已修改**（四個平行 worker 在 D:/tmp/fix-*，合併在 D:/tmp/fix-merge；逐項根因在各 commit 訊息）:
+- 4ee6a8c81 網頁核心：一頁一次讀文件（`GET …/docs?kinds=`）、關預載、429 說等 10 秒、登入只填 email（多工作區給按鈕）、載入提示、StuckBox 384KB→68KB、手機選單。A1 A7 B1 B8 B10。
+- b8c719890 積木頁：拒收原因顯示在按鈕下、拆解／判斷／回顧折疊、例子改「看例子」、拆法排序、蒐集每 15 秒更新、來源卡折疊、產出清單只列案子的。A8 B2–B7 B9。
+- efc0530be 蒐集器：保留 `<form>`（法規資料庫是 WebForms）、單一 `<article>`、防火牆頁是 blocked_page、IPv6→IPv4、WordPress 文章只讀本文、進度 API。A6 B5。
+- 9e34f3e78 平台主機：批次讀文件、API 4 個 worker（mem 1536m）、AI 失敗 422/424/429 不再 502、AI_ANSWER_TRUNCATED＋上限下限 4000、拒答寫 WARNING、免 tenant 登入、啟動時建目錄、護欄帶 found_in、聽說偵測、蒐集「少於兩家引擎／兩種語言」不再停（操作者：一家就夠）、一則說法只用它自己的語言搜（C3）。A1–A5 B1 B8 C1 C2 C3。worker 被斷電打斷，Claude 接手補 Codex F2（包一層的 AI 錯誤）與 5 個過時測試。
+- 0963971c0 開案頁說護欄的字在哪一欄（C1 網頁半）。8c99c7d0e 蒐集器 wire 測試跟上新範例。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run (fix-engine; 416 modules, 15789 tests; 4 FAIL + 1 ERROR = stale tests, fixed in 9e34f3e78) | exit=1 | ms=4687834
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_govern tests.unit.test_block_foundation.WebBlockListTests tests.unit.test_visibility.GateTests (after the fixes, 79 tests) | exit=0 | ms=54352
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_block_foundation tests.unit.test_collector_wire_v2 (merged tree, 62 tests) | exit=0 | ms=45346
+- REALTEST_EVIDENCE: tool=Bash | cmd=apps/cognitive-web npx tsc --noEmit && npx vitest run (merged tree, 374 tests) | exit=0 | ms=9520
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin npx vitest run lib/collect app/api/internal/collect (merged tree, 442 passed 15 skipped) && npx tsc --noEmit | exit=0 | ms=0 (duration not recorded)
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/2n -- Codex per worker: agency-os/reports/oracle/2026-10-11-review-a57394bc.md (web core), 2026-10-11-review-88cd4392.md (pages), 2026-10-11-review-b6167d6d.md (collect, 2 non-blocking), 2026-10-11-review-6f8bff1b.md (engine, F1 timing / F2 wrapped status / F3 own speech, all fixed). Claude's own follow-ups (F2 fix, C1 page, stale tests, wire test) self-reviewed: small, each with a named test.
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory | grep=MIN_ENGINES | hits=0
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory | grep=query_language | hits=7
+- ORACLE: agency-os/reports/oracle/2026-10-11-review-a57394bc.md, 2026-10-11-review-88cd4392.md, 2026-10-11-review-b6167d6d.md, 2026-10-11-review-6f8bff1b.md
+
+**剩餘風險／發現**:
+- m1 未部署（高風險，等操作者說「部署」）。平台主機和網頁要一起部署：網頁依賴 `GET …/docs?kinds=` 和免 tenant 登入。
+- m2 C4 Brave 金鑰已在 `mcp/user-env.ps1`，還沒放進 next-admin 容器（部署時一起做，printenv 只看長度）。
+- m3 法務部網站防火牆仍擋爬蟲、robots.txt 不准 LawSingle.aspx：現在會照實說原因，不是讀不到卻算進來。
+- m4 頁面走查、多帳號共同程序、一整班壓力測試：部署後重走時做。
+- m5 帶領的課程和帶領稿仍是草稿，等操作者審。
+
+**rollback**: `git revert 8c99c7d0e 9e34f3e78 0963971c0 efc0530be b8c719890 4ee6a8c81`（無 schema 變更；API worker 數用 COGNITIVE_OS_API_WORKERS=1 可退回單程序）。
 ## 2026-10-11（續1）認知平台入口第一段：一個首頁兩道門、我的案子分案子／我的分析、工程工具藏起來、選單 5 區（735e12468＋51dffee2d＋578ae0a05）
 
 **根本問題**: 操作者：體驗是 v1 不是她的 v2；第一次來的人沒有起點；兩群人、兩道門、17 工作流、286 工具、14＋5 積木、八步、7 套件看不出關係。網站首頁仍是工具目錄（總數、12 類、熱門），選單 11 項平鋪；每跑一次工具就開一個專案，「我的專案」混著案子和一次性分析；STRIDE 等工程工具對所有人推薦。
