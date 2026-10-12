@@ -15,6 +15,7 @@ import { formatTime } from "../../lib/time";
 import { Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips } from "./JudgmentParts";
 import { RemindersPanel } from "./RemindersPanel";
+import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 type Daily = { about: string; text: string; counterexample?: string; change_condition?: string };
 type Practice = { daily?: boolean; weekly_sprints?: number };
@@ -36,6 +37,7 @@ export function MyLearnPage() {
   const [open, setOpen] = useState<OpenCase[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
@@ -56,28 +58,29 @@ export function MyLearnPage() {
     }).catch((reason) => setError(humanError(reason)));
   }, []);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const run = (work: () => Promise<void>) => async () => {
-    setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const run = (at: string, work: () => Promise<void>) => async () => {
+    setFailed(null); setBusy(true);
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
   const todays = dailies?.filter((card) => day(card.at) === today).at(-1) ?? null;
-  const save = run(async () => {
+  const save = run("today", async () => {
     const content = Object.fromEntries(Object.entries({ ...form, text: form.text.trim() }).filter(([, value]) => value !== undefined && value !== "")) as Daily;
     const saved = todays ? await docs.update(null, "learn.daily", todays, content) : await docs.create(null, "learn.daily", content);
     setNotices(saved.notices);
     setOpen((saved.notices as unknown as OpenCase[]).filter((notice) => notice.type === "suggest_case"));
   });
-  const askMirror = run(async () => {
+  const askMirror = run("mirror", async () => {
     if (!todays) return;
     const turn = await ai<{ summary: string }>(null, "LEARN", "mirror", { card: todays.doc_id }, mirror);
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
   });
-  const savePractice = run(async () => {
+  const savePractice = run("practice", async () => {
     const content = { daily: setting.daily === true, weekly_sprints: setting.weekly_sprints ?? 0 };
     if (practice) await docs.update(null, "learn.practice", practice, content); else await docs.create(null, "learn.practice", content);
   });
-  const saveSprint = run(async () => { await docs.create(null, "learn.sprint", { project: chosen }); });
-  const removeSprint = (sprint: Doc<Sprint>) => run(async () => { await docs.remove(null, "learn.sprint", sprint.doc_id); })();
+  const saveSprint = run("sprint", async () => { await docs.create(null, "learn.sprint", { project: chosen }); });
+  const removeSprint = (sprint: Doc<Sprint>) => run("sprint", async () => { await docs.remove(null, "learn.sprint", sprint.doc_id); })();
 
   if (!dailies) return <><div className="crumbs"><Link href="/projects">我的案子</Link> › 每天的校準</div><div className="card"><p>{error || "載入中…"}</p></div></>;
   const mirrored = mirror && todays && mirror.at >= todays.at;   // a mirror made after the card's last version belongs to it
@@ -102,6 +105,8 @@ export function MyLearnPage() {
         <Cell id="daily-counter" label="你補一個反例" hint="有沒有哪一次，不是這樣？"><textarea id="daily-counter" value={form.counterexample ?? ""} maxLength={1000} onChange={(event) => setForm({ ...form, counterexample: event.target.value })} /></Cell>
         <Cell id="daily-change" label="什麼會改變它"><textarea id="daily-change" value={form.change_condition ?? ""} maxLength={1000} onChange={(event) => setForm({ ...form, change_condition: event.target.value })} /></Cell>
         <div className="btns mt8"><button className="btn primary big" type="button" disabled={busy || !form.about || !form.text.trim()} onClick={save}>{busy ? "存檔中…" : todays ? "存修改" : "存今天這張"}</button></div>
+        <Missing why={firstMissing([!form.about, "先選這是一個信念、情緒，還是決定。"], [!form.text.trim(), "寫下來，才能存。"])} />
+        <Refused failed={failed} at="today" />
         {open.map((item) => (
           <div key={item.categories.join()} className="card accent mt12">
             <p className="mt0">{item.notice}</p>
@@ -111,6 +116,7 @@ export function MyLearnPage() {
         {todays && (
           <div className="judge">
             <div className="btns"><button className="btn" type="button" disabled={busy} onClick={askMirror}>{busy ? "整理中…" : mirror ? "請 AI 再當一次鏡子" : "請 AI 當鏡子"}</button></div>
+            <Refused failed={failed} at="mirror" />
             {mirror && mirrored && <><AuthorTag author={mirror.author} /><p>{mirror.content.summary}</p></>}
             {mirror && !mirrored && <p className="sub">你改過這張卡，這是之前的整理。再請 AI 整理一次，就是新的。</p>}
           </div>
@@ -129,6 +135,7 @@ export function MyLearnPage() {
         </div>
         <p className="hint">設了，提醒會出現在「我的案子」首頁。</p>
         <div className="btns"><button className="btn" type="button" disabled={busy} onClick={savePractice}>存這兩件</button></div>
+        <Refused failed={failed} at="practice" />
       </div>
 
       <div className="card">
@@ -141,6 +148,8 @@ export function MyLearnPage() {
           {chosen && <Link className="btn" href={`/projects/${encodeURIComponent(chosen)}/think`}>去共思考</Link>}
           <button className="btn primary" type="button" disabled={!chosen || busy} onClick={saveSprint}>記下這次衝刺</button>
         </div>
+        <Missing why={projects.length > 0 && !chosen && "先挑一個案子。"} />
+        <Refused failed={failed} at="sprint" />
         {sprints.slice(-5).map((sprint) => (
           <p key={sprint.doc_id} className="sub mb0">{formatTime(sprint.at)}　{projects.find((project) => project.project_id === sprint.content.project)?.name ?? "（案子已刪除）"}　<button className="btn ghost" type="button" disabled={busy} onClick={() => removeSprint(sprint)}>刪掉這筆</button></p>
         ))}
@@ -158,7 +167,6 @@ export function MyLearnPage() {
           {dailies.slice(-7).reverse().map((card) => <details key={card.doc_id}><summary>{formatTime(card.at)}・{card.content.about}</summary><p>{card.content.text}</p>{card.content.counterexample && <p className="sub">反例：{card.content.counterexample}</p>}{card.content.change_condition && <p className="sub">什麼會改變它：{card.content.change_condition}</p>}</details>)}
         </div>
       )}
-      {error && <p className="error">{error}</p>}
     </>
   );
 }

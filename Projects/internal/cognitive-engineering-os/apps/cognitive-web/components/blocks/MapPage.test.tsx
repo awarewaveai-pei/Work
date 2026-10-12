@@ -267,3 +267,48 @@ describe("拆解", () => {
     await done();
   });
 });
+
+describe("拆解：第一次來的人先看到六句，拆法照目的排（走查 2026-10-11 B2、B3、B4）", () => {
+  const tool = (method_id: string, name: string, family: string) => ({ method_id, name, family, family_zh: family, version: "1.0.0", used: false });
+  const RESEARCH_FIRST = [   // the server sends them sorted by id: causal.* came first
+    tool("causal.regression_discontinuity", "斷點迴歸設計", "causal"), tool("causal.instrumental_variables", "工具變數法", "causal"),
+    tool("framing.problem_statement", "問題陳述", "framing"), tool("research.qualitative_coding", "質性編碼", "research"),
+    tool("stakeholders.batna", "最佳替代方案（BATNA）", "stakeholders"), tool("strategy.swot", "SWOT 分析", "strategy"), tool("systems.iceberg_model", "冰山模型", "systems"),
+  ];
+  function withTools(initial: Record<string, any[]>) {
+    const made = server(initial);
+    const base = vi.mocked(apiFetch).getMockImplementation()!;
+    vi.mocked(apiFetch).mockImplementation(async (path: string, init?: RequestInit) => (path.endsWith("/map/methods") ? RESEARCH_FIRST as never : base(path, init)));
+    return made;
+  }
+  const chips = (host: HTMLElement) => [...host.querySelectorAll('[aria-label="可以選的拆法"] button')].map((chip) => chip.textContent);
+
+  it("lists the methods that fit the case's purpose first and research methods last; the search still finds every one", async () => {
+    withTools({ "assembler.intake": [{ purpose: "複雜決策", question: "要不要拆夥" }] });
+    const { host, done } = await mount(<MapPage projectId="P1" />);
+    expect(chips(host)).toEqual(["問題陳述", "最佳替代方案（BATNA）", "冰山模型", "SWOT 分析", "斷點迴歸設計", "工具變數法", "質性編碼"]);
+    expect(host.querySelector('[aria-label="可以選的拆法"]')?.textContent).toContain("研究用的方法（要資料和統計）");
+    await act(async () => { type(host.querySelector<HTMLInputElement>('[aria-label="找拆法"]')!, "斷點"); });
+    expect(chips(host)).toEqual(["斷點迴歸設計"]);
+    await done();
+  });
+
+  it("shows each layer's one line first and folds the rest under a named line; the war examples open only on 看例子", async () => {
+    server({ "map.map": [{ layers: { facts: [FACT] } }] });
+    const { host, done } = await mount(<MapPage projectId="P1" />);
+    for (const station of host.querySelectorAll(".station")) {
+      expect(station.querySelector(`#one-${station.id.replace("layer-", "")}`)?.closest("details")).toBeNull();   // the one line is never folded
+      const fold = station.querySelector("details.dir")!;
+      expect(fold.querySelector("summary")?.textContent).toMatch(/的細項：/);
+      expect(fold.querySelector(`#add-${station.id.replace("layer-", "")}`)).not.toBeNull();
+    }
+    expect(host.querySelector("#layer-facts details.dir summary")?.textContent).toContain("已寫的 1 條");
+    expect(host.querySelector("#layer-core details.dir #core-conflict")).not.toBeNull();
+    const unwinnable = host.querySelector("#unwinnable details.dir")!;
+    expect(unwinnable.querySelector("summary")?.textContent).toContain("解不了的局？1 個檢查題");
+    const example = [...unwinnable.querySelectorAll("details")].find((item) => item.querySelector("summary")?.textContent === "看例子")!;
+    expect(example.textContent).toContain("英國的例子");
+    expect(example.open).toBe(false);
+    await done();
+  });
+});

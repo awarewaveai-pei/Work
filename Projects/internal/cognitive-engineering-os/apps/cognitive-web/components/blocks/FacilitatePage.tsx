@@ -16,6 +16,7 @@ import {
 import { groups, type Group, type Member } from "../../lib/groups";
 import { Notices } from "./BlockShell";
 import type { Lesson, PracticeCase } from "./TeachPage";
+import { Missing, firstMissing } from "./PageParts";
 
 const AI_TAG = <span className="tags"><span>{AUTHOR.ai}</span></span>;
 const day = (at?: string) => (at ?? "").slice(0, 10);
@@ -110,6 +111,7 @@ function Practice({ scripts }: { scripts: Script[] }) {
             <label htmlFor="practice-say">你要對參與者說什麼</label>
             <textarea id="practice-say" value={say} maxLength={2000} onChange={(event) => setSay(event.target.value)} />
             <div className="btns"><button className="btn primary" type="button" disabled={busy || !say.trim() || !practiceCase} onClick={send}>{busy ? "等它回答…" : "說說看"}</button></div>
+            <Missing why={say.trim() !== "" && !practiceCase && "先選一個練習案例。"} />
           </div>
         </>
       )}
@@ -410,6 +412,7 @@ function Log({ groupId, scripts }: { groupId: string; scripts: Script[] }) {
         <button className="btn primary" type="button" disabled={busy || !script || (!followed.trim() && !deviated.some((item) => item.what.trim()))} onClick={save}>{busy ? "存檔中…" : "存紀錄"}</button>
         <button className="btn" type="button" disabled={busy || !editing || dirty} onClick={point}>請 AI 指出可能偏離的地方</button>
       </div>
+      <Missing why={firstMissing([!script, "先選這次照哪一份帶領稿。"], [!followed.trim() && !deviated.some((item) => item.what.trim()), "寫照稿做了哪些，或哪裡沒照稿，才能存。"], [!editing, "先存一份帶領紀錄，AI 才能指出可能偏離的地方。"], [dirty, "改過的地方還沒存：先存紀錄，AI 才能對照。"])} />
       {pointers && (
         <div className="finding">
           {AI_TAG}
@@ -454,6 +457,7 @@ function Unit({ groupId, group }: { groupId: string; group: Group }) {
           <label htmlFor="assign-email">督導的信箱</label>
           <input id="assign-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} />
           <div className="btns"><button className="btn" type="button" disabled={busy || !leader || !email.trim()} onClick={act(async () => { await facilitate.assign(groupId, leader, email.trim()); setEmail(""); })}>指派</button></div>
+          <Missing why={(leader || email.trim()) && firstMissing([!leader, "先選指派給哪位帶領者。"], [!email.trim(), "寫督導的信箱。"])} />
         </div>
       )}
       {error && <p className="error" role="alert">{error}</p>}

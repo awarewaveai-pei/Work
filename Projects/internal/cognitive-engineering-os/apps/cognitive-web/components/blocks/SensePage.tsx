@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { BlockShell, Notices } from "./BlockShell";
+import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 export const CATEGORIES = ["事件", "感受", "身體反應", "恐懼", "期待", "人物關係與權力", "直覺", "你現在跟自己講的故事", "別人的聲音"] as const;
 const INTENSITY = ["弱", "中", "強"] as const;
@@ -64,6 +65,7 @@ function CardForm({ initial, onSave, onCancel, busy }: { initial: Card; onSave: 
         <button className="btn primary" type="button" disabled={!ready || busy} onClick={() => onSave({ ...card, text: card.text.trim() })}>{busy ? "存檔中…" : "存這張卡"}</button>
         {onCancel && <button className="btn ghost" type="button" onClick={onCancel}>取消</button>}
       </div>
+      <Missing why={firstMissing([!card.category, "先選這張卡是哪一類。"], [!card.text.trim(), "寫下這張卡的內容。"])} />
     </div>
   );
 }
@@ -75,6 +77,7 @@ export function SensePage({ projectId }: { projectId: string }) {
   const [reviewed, setReviewed] = useState<string>("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
   const [view, setView] = useState<(typeof VIEWS)[number]>("分類");
@@ -101,33 +104,34 @@ export function SensePage({ projectId }: { projectId: string }) {
   // never wipe what you are typing there.
   useEffect(() => { load().then((saved) => { if (saved) setDraftState(saved.content); }).catch((reason) => setError(humanError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const act = async (work: () => Promise<void>) => {
-    setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const act = async (at: string, work: () => Promise<void>) => {
+    setFailed(null); setBusy(true);
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
-  const saveCard = (card: Card, doc?: Doc<Card>) => act(async () => {
+  const saveCard = (card: Card, doc?: Doc<Card>) => act(doc ? `card-${doc.doc_id}` : "new", async () => {
     const saved = doc ? await docs.update(projectId, "sense.card", doc, { ...doc.content, ...card }) : await docs.create(projectId, "sense.card", card);
     setNotices(saved.notices); setEditing(null);
     if (!doc) setWritten((count) => count + 1);
   });
-  const patchCard = (doc: Doc<Card>, patch: Partial<Card>) => act(async () => { setNotices((await docs.update(projectId, "sense.card", doc, { ...doc.content, ...patch })).notices); });
+  const patchCard = (doc: Doc<Card>, patch: Partial<Card>) => act(`card-${doc.doc_id}`, async () => { setNotices((await docs.update(projectId, "sense.card", doc, { ...doc.content, ...patch })).notices); });
   // Deleting a card also takes out every link that pointed at it.
-  const removeCard = (doc: Doc<Card>) => act(async () => {
+  const removeCard = (doc: Doc<Card>) => act(`card-${doc.doc_id}`, async () => {
     for (const other of cards ?? []) {
       if ((other.content.links ?? []).some((link) => link.to === doc.doc_id)) await docs.update(projectId, "sense.card", other, { ...other.content, links: (other.content.links ?? []).filter((link) => link.to !== doc.doc_id) });
     }
     await docs.remove(projectId, "sense.card", doc.doc_id);
   });
-  const saveState = () => act(async () => {
+  const saveState = () => act("state", async () => {
     const content = { ...draftState, defer_irreversible: (draftState.regulation ?? []).includes("延後") };
     const saved = state ? await docs.update(projectId, "sense.state", state, content) : await docs.create(projectId, "sense.state", content);
     setNotices(saved.notices); setDraftState(saved.content);
   });
-  const askMirror = () => act(async () => {
+  const askMirror = () => act("mirror", async () => {
     const turn = await ai<Mirror>(projectId, "SENSE", "mirror", {}, mirror);
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
   });
-  const review = (decision: "確認" | "改寫" | "刪掉", note = "") => act(async () => {
+  const review = (decision: "確認" | "改寫" | "刪掉", note = "") => act("mirror", async () => {
     if (!mirror) return;
     const version = decision === "改寫" && rewrite !== null ? (await docs.update(projectId, "sense.mirror", mirror, { ...mirror.content, summary: rewrite })).version : mirror.version;
     await docs.create(projectId, "sense.review", { mirror: mirror.doc_id, version, decision, note });
@@ -140,7 +144,7 @@ export function SensePage({ projectId }: { projectId: string }) {
   if (!cards) return <BlockShell projectId={projectId} code="SENSE"><div className="card"><p>{error || "載入中…"}</p></div></BlockShell>;
 
   const cardView = (doc: Doc<Card>) => editing === doc.doc_id ? (
-    <div key={doc.doc_id} className="mcard now"><CardForm initial={doc.content} busy={busy} onSave={(card) => saveCard(card, doc)} onCancel={() => setEditing(null)} /></div>
+    <div key={doc.doc_id} className="mcard now"><CardForm initial={doc.content} busy={busy} onSave={(card) => saveCard(card, doc)} onCancel={() => setEditing(null)} /><Refused failed={failed} at={`card-${doc.doc_id}`} /></div>
   ) : (
     <div key={doc.doc_id} className="mcard" draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", doc.doc_id)}>
       <span className="k">{doc.content.category}{doc.content.when ? ` · ${doc.content.when}` : ""}</span>
@@ -153,6 +157,7 @@ export function SensePage({ projectId }: { projectId: string }) {
         <button className="btn ghost" type="button" onClick={() => setLinking({ from: doc.doc_id, to: "", relation: "" })}>連到別張卡</button>
         <button className="btn ghost" type="button" onClick={() => removeCard(doc)}>刪掉</button>
       </div>
+      <Refused failed={failed} at={`card-${doc.doc_id}`} />
     </div>
   );
   const dropInto = (group: string) => ({
@@ -167,6 +172,7 @@ export function SensePage({ projectId }: { projectId: string }) {
         <h2>寫一張卡</h2>
         <p className="how">一件事一張卡。實際看見、感覺、在意什麼，都可以寫。這一步不分析，也不下結論。卡片是你當下的感受和記憶，不是查證過的事實。</p>
         <CardForm key={written} initial={EMPTY} busy={busy} onSave={(card) => saveCard(card)} />
+        <Refused failed={failed} at="new" />
       </div>
 
       <div className="card">
@@ -209,6 +215,7 @@ export function SensePage({ projectId }: { projectId: string }) {
                 onClick={() => { const doc = byId[linking.from]; patchCard(doc, { links: [...(doc.content.links ?? []).filter((link) => link.to !== linking.to), { to: linking.to, relation: linking.relation.trim() }] }); setLinking(null); }}>連起來</button>
               <button className="btn ghost" type="button" onClick={() => setLinking(null)}>取消</button>
             </div>
+            <Missing why={!busy && firstMissing([!linking.to, "先點要連到哪一張。"], [!linking.relation.trim(), "寫是什麼關係。"])} />
           </div>
         )}
       </div>
@@ -229,12 +236,16 @@ export function SensePage({ projectId }: { projectId: string }) {
         )}
         {draftState.intensity === "強" && <p className="warn">情緒很強時，建議把不能反悔的決定延後。要等多久，由你定。</p>}
         <div className="btns mt8"><button className="btn primary" type="button" disabled={!draftState.emotion.trim() || !draftState.intensity || busy} onClick={saveState}>存</button></div>
+        <Missing why={firstMissing([!draftState.emotion.trim(), "先寫一個詞。"], [!draftState.intensity, "先選強度。"])} />
+        <Refused failed={failed} at="state" />
       </div>
 
       <div className="card">
         <h2>請 AI 當鏡子</h2>
         <p className="how">AI 只把你放的東西整理回給你看，指出哪裡是空的，最多問你一題。它不解釋你的動機、不診斷、不下結論。整理回來的版本，你確認了才算數。</p>
         <div className="btns"><button className="btn" type="button" disabled={!cards.length || busy} onClick={askMirror}>{busy ? "整理中…" : mirror ? "再整理一次" : "整理給我看"}</button></div>
+        <Missing why={!cards.length && "先寫至少一張卡，AI 才有東西可以整理。"} />
+        <Refused failed={failed} at="mirror" />
         {mirror && (
           <div className="judge">
             <span className="tags"><span>{AUTHOR[mirror.author]}</span>{reviewed && <span>你{reviewed === "改寫" ? "改寫過" : `${reviewed}了`}</span>}</span>
@@ -258,7 +269,6 @@ export function SensePage({ projectId }: { projectId: string }) {
         )}
       </div>
 
-      {error && <p className="error">{error}</p>}
     </BlockShell>
   );
 }

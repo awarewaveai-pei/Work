@@ -14,6 +14,7 @@ import {
 } from "../../lib/govern";
 import { apiFetch } from "../../lib/api";
 import { formatTime } from "../../lib/time";
+import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 type CaseRow = { project_id: string; name: string };
 type Pick = { project_id: string; case_name: string; kind: string; kind_name: string; doc_id: string; label: string };
@@ -102,6 +103,7 @@ function NewConsent({ cases, groups, onSaved }: { cases: CaseRow[]; groups: MyGr
       )}
       {purpose && <ItemPicker cases={cases} chosen={chosen} onChange={setChosen} />}
       <div className="btns"><button type="button" className="btn" disabled={!who || chosen.length === 0} onClick={() => setAsking(true)}>看一下要分享什麼</button></div>
+      <Missing why={firstMissing([!purpose, "先選給誰看。"], [!who, purpose === "research" ? "寫研究的代號。" : "先選要給哪一個。"], [chosen.length === 0, "至少勾一份要分享的東西。"])} />
       {asking && who && (
         <div className="judge" role="dialog" aria-label="確認要分享的東西">
           <p><b>{who.name}</b> 會看得到這 {chosen.length} 份：</p>
@@ -188,13 +190,14 @@ export function MyDataPage() {
   const [toHandle, setToHandle] = useState<Appeal[]>([]);
   const [account, setAccount] = useState<AccountSummary | null>(null);
   const [error, setError] = useState("");
+  const [appealFailed, setAppealFailed] = useState<Failed>(null);
   const load = () => Promise.all([apiFetch<CaseRow[]>("/projects"), myGroups(), consents(), myAppeals(), appealsToHandle(), accountSummary()])
     .then(([projects, joined, given, written, handled, summary]) => { setCases(projects); setGroups(joined); setMine(given); setAppeals(written); setToHandle(handled); setAccount(summary); })
     .catch((reason) => setError(humanError(reason)));
   useEffect(() => { load(); }, []);   // eslint-disable-line react-hooks/exhaustive-deps
   if (!mine) return <div className="card"><p>{error || "載入中…"}</p></div>;
   const groupName = (id: string) => groups.find((group) => group.group_id === id)?.name ?? "一個群組";
-  const removeAppeal = async (appeal: Appeal) => { try { await deleteAppeal(appeal.doc_id); load(); } catch (reason) { setError(humanError(reason)); } };
+  const removeAppeal = async (appeal: Appeal) => { setAppealFailed(null); try { await deleteAppeal(appeal.doc_id); load(); } catch (reason) { setAppealFailed({ at: appeal.doc_id, text: humanError(reason) }); } };
   const research = mine.filter((consent) => consent.content.purpose === "research" && !consent.content.withdrawn);
 
   return (
@@ -215,7 +218,8 @@ export function MyDataPage() {
           <div key={appeal.doc_id} className="row">
             <b>{groupName(appeal.group_id)}</b>
             <span>{appeal.text}<br /><span className="sub">{appeal.named ? "有寫你的名字" : "沒有寫名字"}</span>
-              <button type="button" className="btn ghost" onClick={() => removeAppeal(appeal)}>刪除</button></span>
+              <button type="button" className="btn ghost" onClick={() => removeAppeal(appeal)}>刪除</button>
+              <Refused failed={appealFailed} at={appeal.doc_id} /></span>
           </div>
         ))}
         {appeals.length > 0 && <p className="sub"><a href={appealsExportHref()} download>匯出你的申訴</a></p>}

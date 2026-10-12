@@ -11,6 +11,7 @@ import { humanError } from "../../lib/errors";
 import { facetState, openPointers, placesOf, removeFacet, setFacet, toggled, type ContextSpec, type Notes } from "../../lib/context";
 import { detailsMissing, unconfirmedLaw, type MapContent, type MapSpec } from "../../lib/map";
 import { BlockShell, Notices } from "./BlockShell";
+import { Missing, Refused, type Failed } from "./PageParts";
 
 type Intake = { question?: string; package?: string; happened_in?: string[]; you_are_in?: string; others_in?: string[] };
 type Pointers = { facets?: Array<{ facet: string; why: string }> };
@@ -28,6 +29,7 @@ export function ContextPage({ projectId }: { projectId: string }) {
   const [fromLayer, setFromLayer] = useState("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -57,11 +59,12 @@ export function ContextPage({ projectId }: { projectId: string }) {
     setNotices(saved.notices);
     await load(true);
   };
-  const act = async (work: () => Promise<void>) => {
-    setError(""); setBusy(true);
-    try { await work(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const act = async (at: string, work: () => Promise<void>) => {
+    setFailed(null); setBusy(true);
+    try { await work(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
-  const point = () => act(async () => {
+  const point = () => act("point", async () => {
     if (dirty) await persist();
     const turn = await apiFetch<AiTurn<Pointers>>(`/projects/${encodeURIComponent(projectId)}/ai/CONTEXT/point_facets`, { method: "POST", body: JSON.stringify({ context: {}, ...(pointers ? { doc_id: pointers.doc_id, base_version: pointers.version } : {}) }) });
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
@@ -103,6 +106,7 @@ export function ContextPage({ projectId }: { projectId: string }) {
         <h2>哪些面向跟這件事有關</h2>
         <p className="how">勾出有關的，回答兩題。跟這件事無關的，標「無關」。面向清單版本：{spec.version}；清單會再增加，你也可以加自己的。</p>
         <div className="btns"><button className="btn" type="button" disabled={busy} onClick={point}>{busy ? "想一想…" : "請 AI 提醒還沒看的面向"}</button></div>
+        <Refused failed={failed} at="point" />
         <p className="sub">AI 只提醒哪些面向可能有關，不說那裡的規定是什麼。AI 能做什麼，在<Link href={`/projects/${encodeURIComponent(projectId)}/contract`}>協作合約</Link>決定。請 AI 之前，系統會先把你現在寫的存成一版。</p>
         {open.length > 0 && (
           <div className="judge">
@@ -146,6 +150,7 @@ export function ContextPage({ projectId }: { projectId: string }) {
           <input className="search" aria-label="面向的名字" placeholder="名字" value={custom.name} maxLength={60} onChange={(event) => setCustom({ ...custom, name: event.target.value })} />
           <input className="search" aria-label="這個面向是什麼意思" placeholder="一句話說它是什麼（選填）" value={custom.definition} maxLength={300} onChange={(event) => setCustom({ ...custom, definition: event.target.value })} />
           <div className="btns"><button className="btn" type="button" disabled={!custom.name.trim() || rows.some((row) => row.facet === custom.name.trim())} onClick={addCustom}>加進清單</button></div>
+          <Missing why={rows.some((row) => row.facet === custom.name.trim()) && "這個面向已經在清單裡了。"} />
         </div>
       </div>
 
@@ -159,6 +164,7 @@ export function ContextPage({ projectId }: { projectId: string }) {
         <div className="field">
           <input className="search" aria-label="加一個法域" placeholder="例如：某國、某州、某個行業的規定" value={place} maxLength={200} onChange={(event) => setPlace(event.target.value)} />
           <div className="btns"><button className="btn" type="button" disabled={!place.trim() || (draft.jurisdictions ?? []).length >= 10} onClick={() => { set({ jurisdictions: toggled(draft.jurisdictions, place.trim()).slice(0, 10) }); setPlace(""); }}>加進去</button></div>
+          <Missing why={(draft.jurisdictions ?? []).length >= 10 && "最多標 10 個地方。要加新的，先點掉一個。"} />
         </div>
         <h3 className="fam">地圖裡的法律主張</h3>
         {legal.length === 0 ? <p className="sub">地圖裡還沒有標成法律的主張。在<Link href={mapHref}>拆解</Link>的「主張」那裡標。</p> : (
@@ -220,10 +226,11 @@ export function ContextPage({ projectId }: { projectId: string }) {
         <h2>存成新的一版</h2>
         <p className="how">每存一次就是一版，舊的不會被蓋掉。{held ? `現在是第 ${held.version} 版。` : "還沒存過。"}註記會交給拆解的每一層，也會交給判斷。</p>
         <div className="btns">
-          <button className="btn primary big" type="button" disabled={busy || !dirty} onClick={() => act(persist)}>{busy ? "存檔中…" : held ? "存成新的一版" : "存第一版"}</button>
+          <button className="btn primary big" type="button" disabled={busy || !dirty} onClick={() => act("save", persist)}>{busy ? "存檔中…" : held ? "存成新的一版" : "存第一版"}</button>
           {dirty && <span className="warn">有還沒存的改動</span>}
         </div>
-        {error && <p className="error">{error}</p>}
+        <Missing why={!busy && !dirty && "還沒有改動。改了任何一格，才能存成新的一版。"} />
+        <Refused failed={failed} at="save" />
       </div>
 
       <p className="sub">這個鏡頭橫切六層，不是最後才補的一層。隨時可以回來。</p>

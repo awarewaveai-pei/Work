@@ -1,6 +1,7 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../lib/api";
+import { REVIEW_CHECKS } from "../../lib/learn";
 import { LearnPage } from "./LearnPage";
 import { byText, click, doc, field, labelled, mount, saved, serve, shell, type, type Call } from "./JudgmentTestKit";
 
@@ -207,6 +208,27 @@ describe("LEARN 回顧校準", () => {
     const { host, done } = await open();
     expect(host.querySelector("select")).toBeNull();
     expect(host.querySelector('a[href="/me/learn"]')).not.toBeNull();
+    await done();
+  });
+});
+
+describe("LEARN 回顧校準：第一次來的人先看到三樣（走查 2026-10-11 B2、B3）", () => {
+  it("keeps what happened, whether the prediction held and your decision out of any fold; folds the rest under named lines", async () => {
+    const { host, done } = await open();
+    expect(field(host, "outcome").closest("details")).toBeNull();
+    for (const group of ["預測對上了嗎", "維持、出新版，還是換方法"]) expect(host.querySelector(`[aria-label="${group}"]`)?.closest("details"), group).toBeNull();
+    const review = [...host.querySelectorAll(".card.cta details.dir > summary")].map((summary) => summary.textContent);
+    expect(review).toEqual([expect.stringContaining("回頭看細一點"), expect.stringContaining("還信不信 AI？五個面向"), expect.stringContaining("當時哪個出處錯了"), expect.stringContaining("下一輪要加哪一塊")]);
+    for (const id of ["missed", "step", "direction", "process", "luck", "delegate"]) expect(field(host, id).closest("details.dir"), id).not.toBeNull();
+    await done();
+  });
+
+  it("puts each review check's war example behind 看例子 and names where the questions come from", async () => {
+    const { host, done } = await open();
+    const examples = [...host.querySelectorAll("details")].filter((item) => item.querySelector("summary")?.textContent === "看例子");
+    expect(examples.map((item) => item.querySelector(".hint")?.textContent)).toEqual(REVIEW_CHECKS.map((item) => item.example));
+    expect(examples.every((item) => !item.open)).toBe(true);
+    expect(host.textContent).toContain("這四題來自 Theo Farrell 談英國在阿富汗作戰的講稿");
     await done();
   });
 });

@@ -18,8 +18,10 @@ import {
 import { formatTime } from "../../lib/time";
 import { NONE, caseEvidence, originName, type Evidence, type Origin } from "../../lib/evidence";
 import { BlockShell, Notices } from "./BlockShell";
+import { rankTools } from "./mapMethods";
+import { Example, Fold, Missing, Refused, type Failed } from "./PageParts";
 
-type Intake = { question?: string; affected?: string[] };
+type Intake = { question?: string; affected?: string[]; purpose?: string };
 type Notes = { facets?: Array<{ facet: string; relevant?: boolean; defines_normal?: string; is_cause?: string }> };
 type Alternatives = { items?: Array<{ about: string; view: string; check?: string }> };
 type Picks = { picks?: Array<{ method_id: string; reason: string }> };
@@ -113,6 +115,8 @@ export function MapPage({ projectId }: { projectId: string }) {
   const [assumptionText, setAssumptionText] = useState("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
+  const [allTools, setAllTools] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -167,13 +171,14 @@ export function MapPage({ projectId }: { projectId: string }) {
     await load(true);
     return saved;
   };
-  const act = async (work: () => Promise<void>) => {
-    setError(""); setBusy(true);
-    try { await work(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const act = async (at: string, work: () => Promise<void>) => {
+    setFailed(null); setBusy(true);
+    try { await work(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
-  const save = () => act(async () => { await persist(); });
+  const save = () => act("save", async () => { await persist(); });
   // The AI reads the saved map, not the page: so what you wrote is saved as a version first.
-  const askAi = (name: string, over: Doc<any> | null, context: Record<string, unknown> = {}) => act(async () => {
+  const askAi = (name: string, over: Doc<any> | null, context: Record<string, unknown> = {}) => act(name, async () => {
     if (dirty || decided.length) await persist();
     const turn = await ai<any>(projectId, "MAP", name, context, over);
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
@@ -197,6 +202,11 @@ export function MapPage({ projectId }: { projectId: string }) {
   const proposals = (claimDoc?.content.proposals ?? []).filter((entry) => allItems(draft).some((item) => item.id === entry.item) && !(draft.claims ?? []).some((claim) => claim.item === entry.item && claim.kind === entry.kind));
   const pendingProposals = pendingKeys(proposals.map((entry) => entry.item), claimDoc, reviews, decided);
   const matches = tools.filter((tool) => !tool.used && tool.method_id !== draft.method_id && (!search.trim() || `${tool.name} ${tool.family_zh} ${tool.method_id}`.toLowerCase().includes(search.trim().toLowerCase())));
+  const ranked = rankTools(matches, intake.purpose);
+  const runs: Array<[string, typeof matches]> = [[intake.purpose ? `適合「${intake.purpose}」的` : "常用的", ranked.fit], ["其他拆法", ranked.rest], ["研究用的方法（要資料和統計）", ranked.research]];
+  let budget = allTools || search.trim() ? matches.length : SHOWN_TOOLS;
+  const shownRuns = runs.map(([name, list]) => { const taken = list.slice(0, Math.max(budget, 0)); budget -= taken.length; return [name, taken] as const; }).filter(([, list]) => list.length > 0);
+  const hiddenTools = matches.length - shownRuns.reduce((sum, [, list]) => sum + list.length, 0);
   const relevantFacets = (notes.facets ?? []).filter((facet) => facet.relevant);
   const claimedItems = new Set((draft.claims ?? []).map((claim) => claim.item));
   const affected = intake.affected ?? [];
@@ -235,15 +245,14 @@ export function MapPage({ projectId }: { projectId: string }) {
 
   const aiNote = <p className="sub">請 AI 之前，系統會先把你現在寫的存成一版。AI 能做什麼，在<Link href={`/projects/${encodeURIComponent(projectId)}/contract`}>協作合約</Link>決定。</p>;
   const unwinnable = (
-    <div className="card" id="unwinnable">
-      <h2>解不了的局？</h2>
+    <Fold card id="unwinnable" title={`解不了的局？${spec.unwinnable.questions.length} 個檢查題`} filled={(draft.unwinnable_answers ?? []).length}>
       <p className="how">這個局在現有條件下，解得了嗎？有些局是結構決定的，再怎麼加碼都贏不了。先辨認出來，才不會把結構問題當成自己不夠努力。這些題要和「結構」「核心矛盾」兩層一起看。{spec.unwinnable.source}</p>
       {spec.unwinnable.questions.map((entry) => {
         const current = (draft.unwinnable_answers ?? []).find((item) => item.q === entry.q);
         return (
           <div key={entry.q} className="field">
             <label htmlFor={`uw-${entry.q}`}>{entry.q + 1}. {entry.question}</label>
-            <details><summary>他的例子</summary><p className="hint">{entry.example}</p></details>
+            <Example text={entry.example} />
             <Chips options={spec.unwinnable.answers} value={current?.answer} onPick={(value) => answer(entry.q, { answer: value })} label={`第 ${entry.q + 1} 題的回答`} />
             <input id={`uw-${entry.q}`} className="search" placeholder="想補一句（選填）" value={current?.note ?? ""} maxLength={500} onChange={(event) => answer(entry.q, { note: event.target.value })} />
           </div>
@@ -251,7 +260,7 @@ export function MapPage({ projectId }: { projectId: string }) {
       })}
       <p className="sub">Farrell 直接講的兩個「注定失敗」的原因：{spec.unwinnable.reasons.join("；")}。{spec.unwinnable.reasons_reading}</p>
       <label><input type="checkbox" checked={Boolean(draft.unwinnable)} onChange={(event) => set({ unwinnable: event.target.checked })} /> 我判斷這是解不了的局（只有你能標）</label>
-    </div>
+    </Fold>
   );
 
   return (
@@ -260,21 +269,30 @@ export function MapPage({ projectId }: { projectId: string }) {
       {guarded.length > 0 && <div className="card accent"><p className="mt0">你寫的碰到：{guarded.map((notice) => notice.category).join("、")}。這個案子加了護欄：AI 說到事實一定附來源、會提醒你可以找專業的人、不能反悔的決定會請你先等一下。</p></div>}
 
       <div className="card cta">
-        <h2>選一個拆法</h2>
+        <h2>選一個拆法（選填）</h2>
         <p className="how">一個拆法就是一個工具。不管用哪一個，結果都放進下面同一張六層地圖。一個拆法沒看清楚，就換一個再拆一次。</p>
         {draft.method_id
           ? <p><b>{draft.method}</b>{picked ? `（${picked.family_zh}）` : ""}・<Link href={toolHref(draft.method_id, projectId)}>看這個工具怎麼用</Link>{draft.method_version ? `・工具 ${draft.method_version} 版` : ""}
             <button className="btn ghost" type="button" onClick={() => set({ method: undefined, method_id: undefined, method_version: undefined })}>不用這個</button></p>
           : <p className="sub">還沒選。不選也可以直接寫下面的六層。</p>}
-        <input className="search" aria-label="找拆法" placeholder="找拆法：寫一個字，例如「冰山」「利害」" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <div className="chips mt8" role="group" aria-label="可以選的拆法">
-          {matches.slice(0, SHOWN_TOOLS).map((tool) => <button key={tool.method_id} type="button" className="chip" onClick={() => chooseMethod(tool.method_id, tool.name)}>{tool.name}</button>)}
-          {matches.length > SHOWN_TOOLS && <span className="sub">還有 {matches.length - SHOWN_TOOLS} 個，寫幾個字縮小範圍。</span>}
-          {matches.length === 0 && <span className="sub">沒有符合的。</span>}
-        </div>
-        {tools.some((tool) => tool.used) && <p className="sub">這個案子已經用過：{tools.filter((tool) => tool.used).map((tool) => tool.name).join("、")}。系統只推還沒用過的。</p>}
-        <div className="btns mt8"><button className="btn" type="button" disabled={busy} onClick={() => askAi("method", pickDoc, { used: tools.filter((tool) => tool.used).map((tool) => tool.method_id) })}>{busy ? "想一想…" : "請 AI 推薦拆法"}</button></div>
-        {aiNote}
+        <Fold title={`看可以選的拆法（${matches.length} 個）`}>
+          <p className="hint">{intake.purpose ? `先列適合「${intake.purpose}」的。` : ""}研究用的方法要資料和統計，排在最後。用找的，每一個都找得到。</p>
+          <input className="search" aria-label="找拆法" placeholder="找拆法：寫一個字，例如「冰山」「利害」" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <div className="chips mt8" role="group" aria-label="可以選的拆法">
+            {shownRuns.map(([name, list]) => (
+              <React.Fragment key={name}>
+                <span className="sub">{name}：</span>
+                {list.map((tool) => <button key={tool.method_id} type="button" className="chip" onClick={() => chooseMethod(tool.method_id, tool.name)}>{tool.name}</button>)}
+              </React.Fragment>
+            ))}
+            {matches.length === 0 && <span className="sub">沒有符合的。</span>}
+          </div>
+          {hiddenTools > 0 && <div className="btns"><button className="btn ghost" type="button" onClick={() => setAllTools(true)}>還有 {hiddenTools} 個，全部列出來</button></div>}
+          {tools.some((tool) => tool.used) && <p className="sub">這個案子已經用過：{tools.filter((tool) => tool.used).map((tool) => tool.name).join("、")}。系統只推還沒用過的。</p>}
+          <div className="btns mt8"><button className="btn" type="button" disabled={busy} onClick={() => askAi("method", pickDoc, { used: tools.filter((tool) => tool.used).map((tool) => tool.method_id) })}>{busy ? "想一想…" : "請 AI 推薦拆法"}</button></div>
+          {aiNote}
+        </Fold>
+        <Refused failed={failed} at="method" />
         {pendingPicks.length > 0 && (
           <div className="judge">
             <span className="tags"><span>{AUTHOR.ai}</span></span>
@@ -288,10 +306,11 @@ export function MapPage({ projectId }: { projectId: string }) {
       </div>
 
       {cards.length > 0 && (
-        <div className="card">
-          <h2>把你外化的卡放進六層 <small>{unplaced.length} 張還沒放</small></h2>
+        <Fold card title={`把你外化的卡放進六層（${unplaced.length} 張還沒放）`} open={pendingPlacements.length > 0}>
           <p className="how">放進來就是複製一份：之後在「外化」改或刪這張卡，地圖裡的不會跟著變。AI 可以建議每張卡放哪一層，你確認了才算。</p>
           <div className="btns"><button className="btn" type="button" disabled={busy || unplaced.length === 0} onClick={() => askAi("place", placeDoc)}>{busy ? "整理中…" : "請 AI 建議每張卡放哪一層"}</button></div>
+          <Missing why={unplaced.length === 0 && "每張卡都已經放進某一層了。"} />
+          <Refused failed={failed} at="place" />
           {aiNote}
           <div className="mcards">
             {unplaced.map((doc) => {
@@ -309,7 +328,7 @@ export function MapPage({ projectId }: { projectId: string }) {
               );
             })}
           </div>
-        </div>
+        </Fold>
       )}
 
       {spec.layers.map((layer, index) => {
@@ -337,14 +356,6 @@ export function MapPage({ projectId }: { projectId: string }) {
               <p className="sub"><Link href={contextHref(layer.key)}>打開規範與脈絡看這一層 →</Link></p>
               {skipped ? <div className="btns"><button className="btn ghost" type="button" onClick={() => set({ skipped: (draft.skipped ?? []).filter((key) => key !== layer.key) })}>回來寫這一層</button></div> : (
                 <>
-                  {(layer.key === "structure" || layer.key === "core") && (
-                    <div className="filled">
-                      <span className="lab">拿每個有關的脈絡面向對一次：地理、地域、制度、文化本身可能就是原因，不只是背景</span>
-                      {relevantFacets.length === 0
-                        ? <p className="sub">還沒勾有關的面向。<Link href={contextHref(layer.key)}>去規範與脈絡勾</Link></p>
-                        : relevantFacets.map((facet) => <p key={facet.facet} className="mt4"><b>{facet.facet}</b>：界定了什麼算正常：{facet.defines_normal || "還沒寫"}；是不是原因：{facet.is_cause || "還沒寫"}</p>)}
-                    </div>
-                  )}
                   <div className="field">
                     <label htmlFor={`one-${layer.key}`}>這一層，你先寫一句</label>
                     <input id={`one-${layer.key}`} className="search" value={draft.one_lines?.[layer.key] ?? ""} maxLength={500} onChange={(event) => set({ one_lines: { ...draft.one_lines, [layer.key]: event.target.value } })} />
@@ -355,6 +366,15 @@ export function MapPage({ projectId }: { projectId: string }) {
                       <ul>{thin.map((item) => <li key={item.id}>{item.text}（{sourceLine(item).text}）{useThin.includes(item.id)
                         ? <button className="btn ghost" type="button" onClick={() => setUseThin(useThin.filter((id) => id !== item.id))}>不讓 AI 看</button>
                         : <button className="btn ghost" type="button" onClick={() => setUseThin([...useThin, item.id])}>讓 AI 也看這一條</button>}</li>)}</ul>
+                    </div>
+                  )}
+                  <Fold title={`${layer.name}的細項：${[items.length ? `已寫的 ${items.length} 條` : "", "加一條", layer.key === "structure" || layer.key === "core" ? "脈絡面向" : "", layer.key === "core" ? "你認為的核心矛盾" : ""].filter(Boolean).join("、")}`}>
+                  {(layer.key === "structure" || layer.key === "core") && (
+                    <div className="filled">
+                      <span className="lab">拿每個有關的脈絡面向對一次：地理、地域、制度、文化本身可能就是原因，不只是背景</span>
+                      {relevantFacets.length === 0
+                        ? <p className="sub">還沒勾有關的面向。<Link href={contextHref(layer.key)}>去規範與脈絡勾</Link></p>
+                        : relevantFacets.map((facet) => <p key={facet.facet} className="mt4"><b>{facet.facet}</b>：界定了什麼算正常：{facet.defines_normal || "還沒寫"}；是不是原因：{facet.is_cause || "還沒寫"}</p>)}
                     </div>
                   )}
                   {layer.key === "interests" ? (
@@ -385,6 +405,7 @@ export function MapPage({ projectId }: { projectId: string }) {
                       <textarea id="core-conflict" value={draft.core_conflict ?? ""} maxLength={2000} onChange={(event) => set({ core_conflict: event.target.value })} />
                     </div>
                   )}
+                  </Fold>
                 </>
               )}
             </div>
@@ -392,10 +413,10 @@ export function MapPage({ projectId }: { projectId: string }) {
         );
       })}
 
-      <div className="card">
-        <h2>別的解釋</h2>
+      <Fold card title="別的解釋：同一件事的其他理解" open={pendingAlternatives.length > 0}>
         <p className="how">同一件事，可以有別的理解。AI 可以提，放進「解釋」那一層是你決定。</p>
         <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => askAi("alternatives", altDoc, { use_thin: useThin })}>{busy ? "想一想…" : "請 AI 提別的解釋"}</button></div>
+        <Refused failed={failed} at="alternatives" />
         {aiNote}
         {pendingAlternatives.map((key) => {
           const entry = alternatives[Number(key.slice(1))];
@@ -411,12 +432,13 @@ export function MapPage({ projectId }: { projectId: string }) {
             </div>
           );
         })}
-      </div>
+      </Fold>
 
-      <div className="card">
-        <h2>主張</h2>
+      <Fold card title="主張：事實、法律、價值、文化宗教分開" filled={(draft.claims ?? []).length} open={pendingProposals.length > 0}>
         <p className="how">一條一條看，哪些是主張、各是哪一種。四種要分開：事實要查證，法律要寫法域、時效、來源，價值要寫怎麼權衡，文化和宗教先寫你自己怎麼理解。你確認了才算。也可以在上面每一條按「標成主張」。</p>
         <div className="btns"><button className="btn" type="button" disabled={busy || allItems(draft).length === 0} onClick={() => askAi("claims", claimDoc, { use_thin: useThin })}>{busy ? "想一想…" : "請 AI 看哪些是主張"}</button></div>
+        <Missing why={allItems(draft).length === 0 && "地圖上還沒有任何一條。先在六層裡加一條，AI 才有東西可以看。"} />
+        <Refused failed={failed} at="claims" />
         {aiNote}
         {proposals.filter((entry) => pendingProposals.includes(entry.item)).map((entry) => {
           const item = allItems(draft).find((found) => found.id === entry.item)!;
@@ -468,10 +490,9 @@ export function MapPage({ projectId }: { projectId: string }) {
           ))}
         </div>
         <p className="sub">這四種分欄只是把主張分開。每一條在哪個脈絡下成立，到<Link href={contextHref()}>規範與脈絡</Link>看。</p>
-      </div>
+      </Fold>
 
-      <div className="card">
-        <h2>還缺什麼、你在假設什麼</h2>
+      <Fold card title="還缺什麼、你在假設什麼" filled={(draft.gaps ?? []).length + (draft.assumptions ?? []).length}>
         <div className="field">
           <b>資訊缺口</b>
           <p className="hint">還缺的資料。寫下來之後，系統會提議去蒐集來源。</p>
@@ -486,7 +507,7 @@ export function MapPage({ projectId }: { projectId: string }) {
           <input className="search" aria-label="加一個假設" placeholder="例如：他不是故意拖延" value={assumptionText} maxLength={500} onChange={(event) => setAssumptionText(event.target.value)} />
           <div className="btns"><button className="btn" type="button" disabled={!assumptionText.trim()} onClick={() => { set({ assumptions: [...(draft.assumptions ?? []), { text: assumptionText.trim(), by: "user" }] }); setAssumptionText(""); }}>加進假設</button></div>
         </div>
-      </div>
+      </Fold>
 
       <div className="card cta">
         <h2>存成新的一版</h2>
@@ -495,7 +516,8 @@ export function MapPage({ projectId }: { projectId: string }) {
           <button className="btn primary big" type="button" disabled={busy || (!dirty && decided.length === 0)} onClick={save}>{busy ? "存檔中…" : held ? "存成新的一版" : "存第一版"}</button>
           {dirty && <span className="warn">有還沒存的改動</span>}
         </div>
-        {error && <p className="error">{error}</p>}
+        <Missing why={!busy && !dirty && decided.length === 0 && "還沒有改動。改了任何一格，才能存成新的一版。"} />
+        <Refused failed={failed} at="save" />
       </div>
 
       {versions.length > 1 && (

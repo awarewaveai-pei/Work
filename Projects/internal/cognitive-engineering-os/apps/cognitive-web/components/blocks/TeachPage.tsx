@@ -6,6 +6,7 @@ import { apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { Notices } from "./BlockShell";
+import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 export type Lesson = {
   id: string;
@@ -100,6 +101,7 @@ export function TeachPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [completionNotice, setCompletionNotice] = useState("");
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -140,9 +142,10 @@ export function TeachPage() {
   const runReady = sameRun(run, lesson, practiceCase, role) && !dirty;
   const subjects = useMemo(() => [...new Set((lessons ?? []).map((item) => item.subject))], [lessons]);
 
-  const act = async (work: () => Promise<void>) => {
-    setError(""); setBusy(true);
-    try { await work(); await load(); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const act = async (at: string, work: () => Promise<void>) => {
+    setFailed(null); setBusy(true);
+    try { await work(); await load(); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
 
   const chooseSubject = (next: string) => {
@@ -151,7 +154,7 @@ export function TeachPage() {
   };
   const chooseLesson = (next: string) => { setLessonId(next); setSkippedLessonId(""); setDirty(true); setOpponent(null); setFeedback(null); };
   const chooseCase = (next: string) => { setPracticeCaseId(next); setDirty(true); setOpponent(null); setFeedback(null); };
-  const saveRun = () => act(async () => {
+  const saveRun = () => act("run", async () => {
     if (!lesson || !practiceCase) return;
     const content: TeachRun = { lesson: lesson.id, lesson_version: lesson.version, practice_case: practiceCase.id, role, notes: notes.trim() };
     const sameLesson = run?.content.lesson === lesson.id && run.content.lesson_version === lesson.version;
@@ -161,18 +164,18 @@ export function TeachPage() {
     setCompletionNotice(found?.type === "teach_completion" ? found.notice : "");
     setNotices(saved.notices);
   });
-  const saveAar = () => act(async () => {
+  const saveAar = () => act("aar", async () => {
     const content = { predicted: aarForm.predicted.trim(), happened: aarForm.happened.trim(), missed_context: aarForm.missed_context?.trim(), change_next_time: aarForm.change_next_time?.trim() };
     const saved = aarDoc ? await docs.update(null, "teach.aar", aarDoc, content) : await docs.create(null, "teach.aar", content);
     setAarDoc(saved); setAarForm(saved.content); setNotices(saved.notices);
   });
-  const askOpponent = () => act(async () => {
+  const askOpponent = () => act("ai", async () => {
     if (!run) return;
     const turn = await ai<Opponent>(null, "TEACH", "opponent", { run: run.doc_id });
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
     else if (turn.saved) setOpponent(turn.saved);
   });
-  const askFeedback = () => act(async () => {
+  const askFeedback = () => act("ai", async () => {
     if (!run) return;
     const turn = await ai<Feedback>(null, "TEACH", "feedback_on_moves", { run: run.doc_id });
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
@@ -184,14 +187,14 @@ export function TeachPage() {
     const index = practiceCases.findIndex((item) => item.id === practiceCaseId);
     chooseCase(practiceCases[(index + 1) % practiceCases.length].id);
   };
-  const toggleCompletionKeeping = () => act(async () => {
+  const toggleCompletionKeeping = () => act("completion", async () => {
     const content = { ...completionPreference?.content, keep: !(completionPreference?.content.keep ?? true) };
     const saved = completionPreference
       ? await docs.update(null, "teach.completion_preference", completionPreference, content)
       : await docs.create(null, "teach.completion_preference", content);
     setCompletionPreference(saved);
   });
-  const removeCompletion = (completion: Doc<Completion>) => act(async () => {
+  const removeCompletion = (completion: Doc<Completion>) => act("completion", async () => {
     await docs.remove(null, "teach.completion", completion.doc_id);
     setCompletions((current) => current.filter((item) => item.doc_id !== completion.doc_id));
   });
@@ -233,8 +236,11 @@ export function TeachPage() {
             <label htmlFor="teach-notes">寫下你的想法</label>
             <textarea id="teach-notes" value={notes} maxLength={4000} onChange={(event) => { setNotes(event.target.value); setDirty(true); }} />
             <div className="btns"><button className="btn primary" type="button" disabled={busy || !lesson || !practiceCase} onClick={saveRun}>{busy ? "存檔中…" : "存這次練習"}</button></div>
+            <Refused failed={failed} at="run" />
           </div>
           <div className="btns mt8"><button className="btn" type="button" disabled={busy || !runReady} onClick={askOpponent}>請 AI 當練習對手</button><button className="btn" type="button" disabled={busy || !runReady} onClick={askFeedback}>請 AI 看思考動作</button></div>
+          <Missing why={!runReady && (run && !dirty ? "這次練習跟上面選的課、案例或角色不一樣：先存這次練習，AI 才能回應。" : "先存這次練習，AI 才能回應。")} />
+          <Refused failed={failed} at="ai" />
           <div className="grid mt8">
             <div className="filled"><span className="lab">你寫的</span>{notes.trim() || "還沒有寫下想法。"}</div>
             {(opponent || feedback) && <div className="finding">
@@ -254,7 +260,8 @@ export function TeachPage() {
         <label htmlFor="teach-missed">漏看的脈絡</label><textarea id="teach-missed" value={aarForm.missed_context ?? ""} onChange={(event) => setAarForm({ ...aarForm, missed_context: event.target.value })} />
         <label htmlFor="teach-change">下次要改什麼</label><textarea id="teach-change" value={aarForm.change_next_time ?? ""} onChange={(event) => setAarForm({ ...aarForm, change_next_time: event.target.value })} />
         <div className="btns mt8"><button className="btn primary" type="button" disabled={busy || !aarForm.predicted.trim() || !aarForm.happened.trim()} onClick={saveAar}>{busy ? "存檔中…" : "存這次回顧"}</button></div>
-        {error && <p className="error" role="alert">{error}</p>}
+        <Missing why={firstMissing([!aarForm.predicted.trim(), "先寫原本預測什麼。"], [!aarForm.happened.trim(), "先寫實際發生什麼。"])} />
+        <Refused failed={failed} at="aar" />
       </div>
 
       <div className="card">
@@ -270,6 +277,7 @@ export function TeachPage() {
         <p className="sub">刪除一門課的紀錄後，那門課不會再自動記下。</p>
         {(completionPreference?.content.declined ?? []).length > 0 && <p className="sub">不再記下的課：{completionPreference?.content.declined?.join("、")}</p>}
         <button className="btn" type="button" onClick={toggleCompletionKeeping}>{completionPreference?.content.keep === false ? "保留完成紀錄" : "不保留完成紀錄"}</button>
+        <Refused failed={failed} at="completion" />
         {completions.length === 0 ? <p className="sub mb0">還沒有完成紀錄。</p> : <ul>{completions.map((item) => <li key={item.doc_id}>{item.content.course}：{item.content.at} <button className="btn ghost" type="button" onClick={() => removeCompletion(item)}>刪除這筆紀錄</button></li>)}</ul>}
       </div>
     </>

@@ -9,7 +9,7 @@ vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import
 
 const P = "/projects/P";
 const record = (kind: string, id: string, content: Record<string, unknown>) => ({ doc_id: id, kind, version: 1, content, author: "user" as const, block: kind.split(".")[0].toUpperCase(), at: "2026-10-08T00:00:00Z" });
-const selected = record("sense.card", "S1", { text: "我看到團隊需要先說清楚。", confidence_text: "我有七成把握", uncertainty_text: "還沒問過另一方。" });
+const selected = record("sense.card", "S1", { category: "事件", text: "我看到團隊需要先說清楚。", confidence_text: "我有七成把握", uncertainty_text: "還沒問過另一方。" });
 const claim = record("verify.claim", "C1", { text: "這是還沒查證的主張。" });
 const draft = (sentences = [{ text: "AI 先整理了一句。", refs: [{ kind: "sense.card", doc_id: "S1" }], unchecked: true, author: "ai" as const }]) => record("express.draft", "D1", {
   format: "簡短說明", reader: "團隊", sentences, confidence_text: "我有七成把握", uncertainty_text: "還沒問過另一方。",
@@ -19,8 +19,10 @@ let currentSelection: any[] = [];
 let currentDraft: any[] = [];
 let currentGroups: any[] = [];
 let writes: Array<{ path: string; method: string; body?: any }> = [];
+let extraRecords: any[] = [];
 
-function setup(config: { selection?: any[]; drafts?: any[]; groups?: any[] } = {}) {
+function setup(config: { selection?: any[]; drafts?: any[]; groups?: any[]; records?: any[] } = {}) {
+  extraRecords = config.records ?? [];
   currentSelection = config.selection ?? [];
   currentDraft = config.drafts ?? [];
   currentGroups = config.groups ?? [];
@@ -50,7 +52,7 @@ function setup(config: { selection?: any[]; drafts?: any[]; groups?: any[] } = {
     if (path === `${P}/express/outline`) return { nodes: [{ refs: [{ kind: "sense.card", doc_id: "S1" }], record: { kind: "sense.card", title: "感受", content: { text: "我看到團隊需要先說清楚。" } } }] } as never;
     if (path.includes("/docs/") && method === "GET") {
       const kind = decodeURIComponent(path.split("/docs/")[1].split("/")[0]);
-      return [selected, claim].filter((item) => item.kind === kind) as never;
+      return [selected, claim, ...extraRecords].filter((item) => item.kind === kind) as never;
     }
     if (path.includes("/docs/express.draft/D1") && method === "PUT") {
       const saved = { ...draft(body.content.sentences), version: 2, content: body.content };
@@ -67,7 +69,7 @@ function setup(config: { selection?: any[]; drafts?: any[]; groups?: any[] } = {
   });
 }
 
-async function openPage(config: { selection?: any[]; drafts?: any[]; groups?: any[] } = {}) {
+async function openPage(config: { selection?: any[]; drafts?: any[]; groups?: any[]; records?: any[] } = {}) {
   setup(config);
   const host = document.createElement("div");
   document.body.appendChild(host);
@@ -148,11 +150,33 @@ describe("EXPRESS page", () => {
     const { host, done } = await openPage();
     await act(async () => { (host.querySelector('[aria-label="給誰看"] .chip') as HTMLButtonElement).click(); });
     await act(async () => { (host.querySelector('[aria-label="輸出格式"] .chip') as HTMLButtonElement).click(); });
-    const checkbox = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((item) => item.parentElement?.textContent?.includes("感受"))!;
+    const checkbox = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((item) => item.parentElement?.textContent?.includes("事件：我看到團隊"))!;
     await act(async () => { checkbox.click(); });
     await act(async () => { [...host.querySelectorAll("button")].find((button) => button.textContent === "存下選擇")!.click(); });
     const save = writes.find((write) => write.path === `${P}/express/selection` && write.method === "POST");
     expect(save?.body.content.items).toEqual([{ project_id: "P", kind: "sense.card", doc_id: "S1" }]);
+    await done();
+  });
+});
+
+describe("EXPRESS 選紀錄：只列一個人會想帶的，每筆說得出是什麼（走查 2026-10-11 B7）", () => {
+  it("names a SENSE card by its own category, folds set-aside sources, leaves bookkeeping out and never shows an id", async () => {
+    const aside = record("gather.source", "G2", { title: "米蘭冬奧閉幕", url: "https://example.com/olympics", aside: "跟這件事無關", cells: {}, found_by: { by: "系統找的" } });
+    const kept = record("gather.source", "G1", { title: "", url: "https://www.moj.gov.tw/law/670", aside: "", cells: {}, found_by: { by: "系統找的" } });
+    const review = record("map.review", "R1", { suggestion: "0c2f6a1e-4b1d-4c55-9f1a-6d2b8e4c7a10", version: 1, key: "a0", decision: "採用" });
+    const { host, done } = await openPage({ records: [aside, kept, review] });
+    const picker = [...host.querySelectorAll(".station")].find((node) => node.textContent?.includes("選要帶上的紀錄"))!;
+    const visible = (node: Element) => !node.closest("details");
+    const rows = [...picker.querySelectorAll("label.todo")].filter(visible).map((node) => node.textContent?.trim());
+    expect(rows).toContain("事件：我看到團隊需要先說清楚。");
+    expect(rows).toContain("來源卡：moj.gov.tw");
+    expect(rows.join("")).not.toContain("米蘭冬奧閉幕");
+    expect(picker.textContent).not.toMatch(/其他紀錄|[0-9a-f]{8}-[0-9a-f]{4}-/);
+    expect(picker.textContent).not.toContain("採用");   // an answer to an AI offer is not a record to carry
+    const fold = picker.querySelector("details.dir")!;
+    expect(fold.querySelector("summary")?.textContent).toBe("放一旁的來源（1 筆，不算進出處）");
+    expect(fold.textContent).toContain("來源卡：米蘭冬奧閉幕");
+    expect([...picker.querySelectorAll("h3")].map((node) => node.textContent)).toEqual(["主張帳本", "來源", "外化素材"]);
     await done();
   });
 });

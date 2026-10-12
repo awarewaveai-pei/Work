@@ -18,6 +18,7 @@ import { NONE, calcLine, caseEvidence, claimLine, somethingChecked, type Evidenc
 import { formatTime } from "../../lib/time";
 import { BlockShell, Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips, optionalDocs } from "./JudgmentParts";
+import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 type Any = Record<string, any>;
 const EMPTY: Task = { title: "", prediction: "" };
@@ -57,6 +58,7 @@ function TaskForm({ initial, guardrails, onSave, onCancel, busy, label }: { init
         <button className="btn primary" type="button" disabled={!ready || busy} onClick={() => onSave(compact({ ...task, title: task.title.trim(), prediction: task.prediction.trim() }))}>{busy ? "存檔中…" : label}</button>
         {onCancel && <button className="btn ghost" type="button" onClick={onCancel}>取消</button>}
       </div>
+      <Missing why={firstMissing([!task.title.trim(), "先寫這一步要做什麼。"], [!task.prediction.trim(), "先寫你的預測。"], [holding, "這一步不能反悔：先在「做了以後，能反悔嗎？」下面選一個。"])} />
     </div>
   );
 }
@@ -89,6 +91,7 @@ function NoteForm({ onSave, busy }: { onSave: (note: Omit<Note, "task">) => void
       ))}
       {rows.length < 5 && <div className="btns"><button className="btn ghost" type="button" onClick={() => setRows([...rows, { name: "", value: "", unit: "" }])}>再加一個數字</button></div>}
       <div className="btns mt8"><button className="btn primary" type="button" disabled={!ready || busy} onClick={save}>存這一筆</button></div>
+      <Missing why={!ready && "至少寫一格，或記一個數字。"} />
     </div>
   );
 }
@@ -129,6 +132,7 @@ export function ActPage({ projectId }: { projectId: string }) {
   const [person, setPerson] = useState("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
@@ -146,11 +150,12 @@ export function ActPage({ projectId }: { projectId: string }) {
   };
   useEffect(() => { load().catch((reason) => setError(humanError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const run = (work: () => Promise<void>) => async () => {
-    setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const run = (at: string, work: () => Promise<void>) => async () => {
+    setFailed(null); setBusy(true);
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
-  const doing = async (work: () => Promise<void>) => run(work)();
+  const doing = async (at: string, work: () => Promise<void>) => run(at, work)();
   const crisis = (turn: { stopped?: string; notice?: string; resources?: Array<{ name: string; contact: string }> }) => { if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]); };
 
   const nextStep = judgment?.content.next_step?.trim() ?? "";
@@ -158,20 +163,20 @@ export function ActPage({ projectId }: { projectId: string }) {
   const affected: string[] = intake?.content.affected ?? [];
   const start = (patch: Partial<Task>) => { setDraft({ ...EMPTY, ...patch }); setFormKey((count) => count + 1); };
 
-  const createTask = (task: Task) => doing(async () => { setNotices((await docs.create(projectId, "act.task", { ...task, status: "未開始" })).notices); setDraft(EMPTY); setFormKey((count) => count + 1); });
-  const updateTask = (doc: Doc<Task>, content: Task) => doing(async () => { setNotices((await docs.update(projectId, "act.task", doc, content)).notices); setEditing(null); setHistory((held) => { const { [doc.doc_id]: _gone, ...rest } = held; return rest; }); });
-  const saveNote = (task: Doc<Task>, note: Omit<Note, "task">) => doing(async () => { setNotices((await docs.create(projectId, "act.note", { task: task.doc_id, ...note })).notices); });
-  const addPerson = () => doing(async () => {
+  const createTask = (task: Task) => doing("task", async () => { setNotices((await docs.create(projectId, "act.task", { ...task, status: "未開始" })).notices); setDraft(EMPTY); setFormKey((count) => count + 1); });
+  const updateTask = (doc: Doc<Task>, content: Task) => doing(`task-${doc.doc_id}`, async () => { setNotices((await docs.update(projectId, "act.task", doc, content)).notices); setEditing(null); setHistory((held) => { const { [doc.doc_id]: _gone, ...rest } = held; return rest; }); });
+  const saveNote = (task: Doc<Task>, note: Omit<Note, "task">) => doing(`note-${task.doc_id}`, async () => { setNotices((await docs.create(projectId, "act.note", { task: task.doc_id, ...note })).notices); });
+  const addPerson = () => doing("person", async () => {
     const added = newPeople(affected, [person]);
     if (added.length && intake) await docs.update(projectId, "assembler.intake", intake, { ...intake.content, affected: [...affected, ...added] });
     setPerson("");
   });
-  const askSplit = run(async () => { const turn = await ai<Split>(projectId, "ACT", "split", {}, split); crisis(turn); });
-  const askFlag = run(async () => { const turn = await ai<Flag>(projectId, "ACT", "flag", {}, flag); crisis(turn); });
-  const askTrend = run(async () => { const turn = await ai<{ summary: string }>(projectId, "ACT", "trend", {}, trend); crisis(turn); });
+  const askSplit = run("split", async () => { const turn = await ai<Split>(projectId, "ACT", "split", {}, split); crisis(turn); });
+  const askFlag = run("ai", async () => { const turn = await ai<Flag>(projectId, "ACT", "flag", {}, flag); crisis(turn); });
+  const askTrend = run("ai", async () => { const turn = await ai<{ summary: string }>(projectId, "ACT", "trend", {}, trend); crisis(turn); });
   const openHistory = async (doc: Doc<Task>) => {
     if (history[doc.doc_id]) return;
-    try { const found = await docs.versions<Task>(projectId, "act.task", doc.doc_id); setHistory((held) => ({ ...held, [doc.doc_id]: found })); } catch (reason) { setError(humanError(reason)); }
+    try { const found = await docs.versions<Task>(projectId, "act.task", doc.doc_id); setHistory((held) => ({ ...held, [doc.doc_id]: found })); } catch (reason) { setFailed({ at: `history-${doc.doc_id}`, text: humanError(reason) }); }
   };
 
   if (!tasks) return <BlockShell projectId={projectId} code="ACT"><div className="card"><p>{error || "載入中…"}</p></div></BlockShell>;
@@ -201,6 +206,7 @@ export function ActPage({ projectId }: { projectId: string }) {
               <button className="btn primary" type="button" onClick={() => start(taskFromNextStep(nextStep))}>用這一句開任務卡</button>
               <button className="btn" type="button" disabled={busy} onClick={askSplit}>{busy ? "拆解中…" : split ? "再拆一次" : "請 AI 拆成更小、能反悔的步驟"}</button>
             </div>
+            <Refused failed={failed} at="split" />
             <p className="hint">拆小步需要協作合約准 AI「提出選項」。</p>
           </div>
         ) : <p className="sub">判斷卡上還沒有「下一步」。你也可以直接在下面寫任務卡。</p>}
@@ -232,10 +238,13 @@ export function ActPage({ projectId }: { projectId: string }) {
           </div>
         )}
         <TaskForm key={formKey} initial={draft} guardrails={guardrails} busy={busy} label="存這張任務卡" onSave={createTask} />
+        <Refused failed={failed} at="task" />
         <div className="field">
           <label htmlFor="more-person">這一步多出來的受影響的人（選填）</label>
           <input id="more-person" className="search" value={person} maxLength={200} onChange={(event) => setPerson(event.target.value)} />
           <div className="btns"><button className="btn" type="button" disabled={!person.trim() || !intake || busy} onClick={addPerson}>補進開案資料</button></div>
+          <Missing why={person.trim() !== "" && !intake && "這個案子還沒有開案資料，沒有地方補。"} />
+          <Refused failed={failed} at="person" />
         </div>
       </div>
 
@@ -246,7 +255,8 @@ export function ActPage({ projectId }: { projectId: string }) {
         return (
           <div key={task.doc_id} className="card">
             {editing === task.doc_id ? (
-              <TaskForm initial={task.content} guardrails={guardrails} busy={busy} label="存修改" onSave={(content) => updateTask(task, content)} onCancel={() => setEditing(null)} />
+              <><TaskForm initial={task.content} guardrails={guardrails} busy={busy} label="存修改" onSave={(content) => updateTask(task, content)} onCancel={() => setEditing(null)} />
+                <Refused failed={failed} at={`task-${task.doc_id}`} /></>
             ) : (
               <div className="tcard">
                 <div className="head"><h3>{task.content.title}</h3><span className="tags"><span>{task.content.status ?? "未開始"}</span></span></div>
@@ -262,9 +272,11 @@ export function ActPage({ projectId }: { projectId: string }) {
                   <button key={status} type="button" className={`chip${(task.content.status ?? "未開始") === status ? " on" : ""}`} aria-pressed={(task.content.status ?? "未開始") === status} disabled={busy}
                     onClick={() => updateTask(task, { ...task.content, status })}>{status}</button>
                 ))}</div>
+                <Refused failed={failed} at={`task-${task.doc_id}`} />
                 <div className="btns"><button className="btn ghost" type="button" onClick={() => setEditing(task.doc_id)}>改期限、內容或換做法</button></div>
                 <details onToggle={(event) => { if ((event.currentTarget as HTMLDetailsElement).open) openHistory(task); }}>
                   <summary>這張卡的歷程（每一版都留著）</summary>
+                  <Refused failed={failed} at={`history-${task.doc_id}`} />
                   {folded.map((run) => (
                     <div key={run.shown.version} className="tnote">
                       <b>第 {run.shown.version} 版</b>{formatTime(run.shown.at)}・狀態：{run.shown.content.status ?? "未開始"}・期限：{run.shown.content.due ?? "沒定"}
@@ -291,6 +303,7 @@ export function ActPage({ projectId }: { projectId: string }) {
             ))}</div>
             <Trend notes={mine} />
             <NoteForm busy={busy} onSave={(note) => saveNote(task, note)} />
+            <Refused failed={failed} at={`note-${task.doc_id}`} />
           </div>
         );
       })}
@@ -304,6 +317,7 @@ export function ActPage({ projectId }: { projectId: string }) {
             <button className="btn" type="button" disabled={busy || !numbered} onClick={askTrend}>{trend ? "再整理一次趨勢" : "整理數字的趨勢"}</button>
           </div>
           {!numbered && <p className="hint">要有紀錄記了數字，才能整理趨勢。</p>}
+          <Refused failed={failed} at="ai" />
           {flag && (
             <div className="judge">
               <AuthorTag author={flag.author} />
@@ -322,7 +336,6 @@ export function ActPage({ projectId }: { projectId: string }) {
         </div>
       )}
 
-      {error && <p className="error">{error}</p>}
       <p className="sub">到期的時候，會提醒你回「回顧校準」，把當初的預測和實際發生的並排看。</p>
     </BlockShell>
   );

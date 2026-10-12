@@ -11,6 +11,7 @@ import { humanError } from "../../lib/errors";
 import { collab, groups, INTERFACE_QUESTIONS, type Agreement, type AgreementTable, type Authority, type Dissent, type Group, type Item, type Shared } from "../../lib/groups";
 import { Notices } from "./BlockShell";
 import { Cell } from "./JudgmentParts";
+import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 type Position = { round: number; text: string; confidence?: string };
 type Change = { round: number; after_reading: "no change" | "changed"; what?: string };
@@ -44,6 +45,7 @@ async function blind<C extends { round: number }>(id: string, kind: string, roun
 export function CollabPage({ groupId }: { groupId: string }) {
   const [data, setData] = useState<Loaded | null>(null);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [said, setSaid] = useState("");   // the last hand-back or a plain answer from the AI turn
@@ -70,11 +72,12 @@ export function CollabPage({ groupId }: { groupId: string }) {
   };
   useEffect(() => { load().catch((reason) => setError(humanError(reason))); }, [groupId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const run = (work: () => Promise<unknown>) => async () => {
-    setError(""); setBusy(true);
-    try { await work(); await load(); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the card that sent it; its refusal is shown there (PageParts.Refused)
+  const run = (at: string, work: () => Promise<unknown>) => async () => {
+    setFailed(null); setBusy(true);
+    try { await work(); await load(); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
-  const write = <C,>(kind: string, content: C, keys: string[] = []) => run(async () => {
+  const write = <C,>(at: string, kind: string, content: C, keys: string[] = []) => run(at, async () => {
     const saved = await collab.create(groupId, kind, content);
     setNotices(saved.notices);
     setForm(Object.fromEntries(Object.entries(form).filter(([key]) => !keys.includes(key))));
@@ -90,12 +93,12 @@ export function CollabPage({ groupId }: { groupId: string }) {
   const myStance = (option: string) => data.stances.find((item) => item.mine && item.content.option === option);
   const optionText = (option: string) => data.options.find((item) => item.doc_id === option)?.content.text ?? "（方案已刪除）";
 
-  const ask = (action: string, context: Record<string, unknown>) => run(async () => {
+  const ask = (action: string, context: Record<string, unknown>) => run("ai", async () => {
     const turn = await collab.ai(groupId, action, { seen, ...context });
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
     setSaid(turn.handback ?? (turn.saved?.waiting ? "轉述先給本人看。本人確認說得對之後，大家才看得到。" : ""));
   });
-  const restateAll = run(async () => {
+  const restateAll = run("ai", async () => {
     for (const item of thisRound(data.positions)) {
       const turn = await collab.ai(groupId, "restate_positions", { seen, position: item.doc_id });
       if (turn.handback || turn.stopped) { setSaid(turn.handback ?? turn.notice ?? ""); return; }
@@ -124,10 +127,11 @@ export function CollabPage({ groupId }: { groupId: string }) {
         <Cell id="question-text" label={question ? "寫另一種問法" : "寫下這次要決定的問題"}><textarea id="question-text" value={form.question ?? ""} maxLength={2000} onChange={set("question")} /></Cell>
         <div className="btns">
           <button className="btn" type="button" disabled={busy || !(form.question ?? "").trim()}
-            onClick={question ? run(async () => { await collab.update(groupId, "collab.question", question, { text: form.question.trim(), round }); setForm({ ...form, question: "" }); })
-              : write("collab.question", { text: (form.question ?? "").trim(), round }, ["question"])}>存這個問法</button>
-          {question && <button className="btn ghost" type="button" disabled={busy || !(form.question ?? "").trim()} onClick={write("collab.question", { text: (form.question ?? "").trim(), round: round + 1 }, ["question"])}>用這個問法開新的一輪</button>}
+            onClick={question ? run("question", async () => { await collab.update(groupId, "collab.question", question, { text: form.question.trim(), round }); setForm({ ...form, question: "" }); })
+              : write("question", "collab.question", { text: (form.question ?? "").trim(), round }, ["question"])}>存這個問法</button>
+          {question && <button className="btn ghost" type="button" disabled={busy || !(form.question ?? "").trim()} onClick={write("question", "collab.question", { text: (form.question ?? "").trim(), round: round + 1 }, ["question"])}>用這個問法開新的一輪</button>}
         </div>
+        <Refused failed={failed} at="question" />
       </div>
 
       <div className="card">
@@ -138,7 +142,8 @@ export function CollabPage({ groupId }: { groupId: string }) {
             <Cell id="position-text" label="你的立場"><textarea id="position-text" value={form.position ?? ""} maxLength={4000} onChange={set("position")} /></Cell>
             <Cell id="position-confidence" label="你有多確定" hint="用你自己的話寫。"><input id="position-confidence" value={form.confidence ?? ""} maxLength={200} onChange={set("confidence")} /></Cell>
             <div className="btns"><button className="btn primary" type="button" disabled={busy || !(form.position ?? "").trim()}
-              onClick={write("collab.position", { round, text: (form.position ?? "").trim(), ...(form.confidence?.trim() ? { confidence: form.confidence.trim() } : {}) }, ["position", "confidence"])}>存我的立場</button></div>
+              onClick={write("position", "collab.position", { round, text: (form.position ?? "").trim(), ...(form.confidence?.trim() ? { confidence: form.confidence.trim() } : {}) }, ["position", "confidence"])}>存我的立場</button></div>
+            <Refused failed={failed} at="position" />
           </>
         )}
         {data.wrote.position && (
@@ -159,7 +164,9 @@ export function CollabPage({ groupId }: { groupId: string }) {
               </div>
               <Cell id="change-what" label="寫一句：哪裡變了，或為什麼沒變"><input id="change-what" value={form.what ?? ""} maxLength={500} onChange={set("what")} /></Cell>
               <div className="btns"><button className="btn" type="button" disabled={busy || !form.change}
-                onClick={write("collab.change", { round, after_reading: form.change, ...(form.what?.trim() ? { what: form.what.trim() } : {}) }, ["change", "what"])}>存這一句</button></div>
+                onClick={write("change", "collab.change", { round, after_reading: form.change, ...(form.what?.trim() ? { what: form.what.trim() } : {}) }, ["change", "what"])}>存這一句</button></div>
+              <Missing why={!form.change && "先選想法沒變，還是有變。"} />
+              <Refused failed={failed} at="change" />
             </>
           )}
           {data.wrote.change && thisRound(data.changes).map((item) => <p key={item.doc_id}><b>{item.who}</b>：{item.content.after_reading === "changed" ? "有變" : "沒變"}{item.content.what ? `。${item.content.what}` : ""}</p>)}
@@ -173,8 +180,10 @@ export function CollabPage({ groupId }: { groupId: string }) {
           <>
             {INTERFACE_QUESTIONS.map((q, index) => <Cell key={q} id={`answer-${index}`} label={q}><textarea id={`answer-${index}`} value={form[`answer-${index}`] ?? ""} maxLength={2000} onChange={set(`answer-${index}`)} /></Cell>)}
             <div className="btns"><button className="btn" type="button" disabled={busy || !INTERFACE_QUESTIONS.every((_, index) => (form[`answer-${index}`] ?? "").trim())}
-              onClick={write("collab.interface_answers", { round, answers: INTERFACE_QUESTIONS.map((q, index) => ({ q, text: (form[`answer-${index}`] ?? "").trim() })) },
+              onClick={write("answers", "collab.interface_answers", { round, answers: INTERFACE_QUESTIONS.map((q, index) => ({ q, text: (form[`answer-${index}`] ?? "").trim() })) },
                 INTERFACE_QUESTIONS.map((_, index) => `answer-${index}`))}>存我的回答</button></div>
+            <Missing why={!INTERFACE_QUESTIONS.every((_, index) => (form[`answer-${index}`] ?? "").trim()) && `五題都要寫才能存：還有 ${INTERFACE_QUESTIONS.filter((_, index) => !(form[`answer-${index}`] ?? "").trim()).length} 題沒寫。`} />
+            <Refused failed={failed} at="answers" />
           </>
         )}
         {data.wrote.answers && INTERFACE_QUESTIONS.map((q) => (
@@ -232,11 +241,13 @@ export function CollabPage({ groupId }: { groupId: string }) {
                 </div>
                 <Cell id={`reason-${item.doc_id}`} label="理由"><textarea id={`reason-${item.doc_id}`} value={form[`reason-${item.doc_id}`] ?? ""} maxLength={2000} onChange={set(`reason-${item.doc_id}`)} /></Cell>
                 <div className="btns"><button className="btn" type="button" disabled={busy || !form[`stance-${item.doc_id}`] || !(form[`reason-${item.doc_id}`] ?? "").trim()}
-                  onClick={run(async () => {
+                  onClick={run(`option-${item.doc_id}`, async () => {
                     const content = { option: item.doc_id, stance: form[`stance-${item.doc_id}`] as Stance["stance"], reason: form[`reason-${item.doc_id}`].trim() };
                     const saved = mine ? await collab.update(groupId, "collab.stance", mine, content) : await collab.create(groupId, "collab.stance", content);
                     setNotices(saved.notices);
                   })}>{mine ? "改我的意見" : "存我的意見"}</button></div>
+                <Missing why={(form[`stance-${item.doc_id}`] || (form[`reason-${item.doc_id}`] ?? "").trim()) && firstMissing([!form[`stance-${item.doc_id}`], "先選同意或異議。"], [!(form[`reason-${item.doc_id}`] ?? "").trim(), "寫理由。"])} />
+                <Refused failed={failed} at={`option-${item.doc_id}`} />
                 {!mine && <p className="sub mt0">標了你的意見，才看得到別人對這個方案的意見。</p>}
                 {others.map((stance) => <p key={stance.doc_id} className="mt0">{stance.who}：{stance.content.stance}。{stance.content.reason}</p>)}
               </div>
@@ -247,7 +258,8 @@ export function CollabPage({ groupId }: { groupId: string }) {
         <Cell id="option-risks" label="風險"><textarea id="option-risks" value={form.risks ?? ""} maxLength={2000} onChange={set("risks")} /></Cell>
         <Cell id="option-values" label="要在哪些價值之間取捨"><textarea id="option-values" value={form.values ?? ""} maxLength={2000} onChange={set("values")} /></Cell>
         <div className="btns"><button className="btn" type="button" disabled={busy || !(form.option ?? "").trim()}
-          onClick={write("collab.option", { round, text: (form.option ?? "").trim(), ...(form.risks?.trim() ? { risks: form.risks.trim() } : {}), ...(form.values?.trim() ? { values_tradeoff: form.values.trim() } : {}) }, ["option", "risks", "values"])}>存這個方案</button></div>
+          onClick={write("option", "collab.option", { round, text: (form.option ?? "").trim(), ...(form.risks?.trim() ? { risks: form.risks.trim() } : {}), ...(form.values?.trim() ? { values_tradeoff: form.values.trim() } : {}) }, ["option", "risks", "values"])}>存這個方案</button></div>
+        <Refused failed={failed} at="option" />
       </div>
 
       <div className="card">
@@ -256,15 +268,16 @@ export function CollabPage({ groupId }: { groupId: string }) {
         {data.dissent.map((item) => <p key={item.doc_id}>{item.who}對「{optionText(item.option)}」：{item.reason}</p>)}
         <Cell id="label" label="你的異議要怎麼署名" hint="寫一個名字，或按「用匿名」。"><input id="label" value={form.label ?? data.labels.find((item) => item.mine)?.content.label ?? ""} maxLength={40} onChange={set("label")} /></Cell>
         <div className="btns">
-          <button className="btn" type="button" disabled={busy || !(form.label ?? "").trim()} onClick={run(async () => {
+          <button className="btn" type="button" disabled={busy || !(form.label ?? "").trim()} onClick={run("label", async () => {
             const mine = data.labels.find((item) => item.mine);
             if (mine) await collab.update(groupId, "collab.label", mine, { label: form.label.trim() }); else await collab.create(groupId, "collab.label", { label: form.label.trim() });
           })}>存署名</button>
-          <button className="btn ghost" type="button" disabled={busy} onClick={run(async () => {
+          <button className="btn ghost" type="button" disabled={busy} onClick={run("label", async () => {
             const mine = data.labels.find((item) => item.mine);
             if (mine) await collab.update(groupId, "collab.label", mine, { label: "匿名" }); else await collab.create(groupId, "collab.label", { label: "匿名" });
           })}>用匿名</button>
         </div>
+        <Refused failed={failed} at="label" />
       </div>
 
       <div className="card">
@@ -273,7 +286,7 @@ export function CollabPage({ groupId }: { groupId: string }) {
         {data.authority.current.map((item) => (
           <div key={`${item.to}-${item.scope}`}>
             <p>{item.to}代表 {item.grantors.join("、")}：{item.scope}</p>
-            {item.my_share && <div className="btns"><button className="btn ghost" type="button" disabled={busy} onClick={run(() => collab.revoke(groupId, item.my_share as string))}>收回我那一份</button></div>}
+            {item.my_share && <div className="btns"><button className="btn ghost" type="button" disabled={busy} onClick={run("authority", () => collab.revoke(groupId, item.my_share as string))}>收回我那一份</button></div>}
           </div>
         ))}
         {data.authority.renegotiate.map((item) => <p key={`${item.at}-${item.to}`} className="warn">{item.taken_back_by}收回了給{item.to}的那一份（{item.scope}）：{item.notice}。</p>)}
@@ -282,7 +295,9 @@ export function CollabPage({ groupId }: { groupId: string }) {
             onClick={() => setForm({ ...form, to: member.identity_id })}>{member.display_name}</button>)}
         </div>
         <Cell id="scope" label="範圍"><textarea id="scope" value={form.scope ?? ""} maxLength={1000} onChange={set("scope")} /></Cell>
-        <div className="btns"><button className="btn" type="button" disabled={busy || !form.to || !(form.scope ?? "").trim()} onClick={write("collab.authority", { to: form.to, scope: (form.scope ?? "").trim() }, ["to", "scope"])}>給這份授權</button></div>
+        <div className="btns"><button className="btn" type="button" disabled={busy || !form.to || !(form.scope ?? "").trim()} onClick={write("authority", "collab.authority", { to: form.to, scope: (form.scope ?? "").trim() }, ["to", "scope"])}>給這份授權</button></div>
+        <Missing why={(form.to || (form.scope ?? "").trim()) && firstMissing([!form.to, "先選授權給誰。"], [!(form.scope ?? "").trim(), "寫授權的範圍。"])} />
+        <Refused failed={failed} at="authority" />
       </div>
 
       <div className="card">
@@ -295,7 +310,9 @@ export function CollabPage({ groupId }: { groupId: string }) {
             <Cell id="review-on" label="哪一天回頭檢討"><input id="review-on" type="date" value={form.review_on ?? ""} onChange={set("review_on")} /></Cell>
             <Cell id="owner" label="負責的人"><input id="owner" value={form.owner ?? ""} maxLength={200} onChange={set("owner")} /></Cell>
             <div className="btns"><button className="btn" type="button" disabled={busy || !["why_end", "reopen_if", "review_on", "owner"].every((key) => (form[key] ?? "").trim())}
-              onClick={write("collab.closing", { why_end: (form.why_end ?? "").trim(), reopen_if: (form.reopen_if ?? "").trim(), review_on: form.review_on ?? "", owner: (form.owner ?? "").trim() }, ["why_end", "reopen_if", "review_on", "owner"])}>存結束的條件</button></div>
+              onClick={write("closing", "collab.closing", { why_end: (form.why_end ?? "").trim(), reopen_if: (form.reopen_if ?? "").trim(), review_on: form.review_on ?? "", owner: (form.owner ?? "").trim() }, ["why_end", "reopen_if", "review_on", "owner"])}>存結束的條件</button></div>
+            <Missing why={!["why_end", "reopen_if", "review_on", "owner"].every((key) => (form[key] ?? "").trim()) && "四項都要寫：為什麼結束、什麼情況重新開、哪一天回頭檢討、負責的人。"} />
+            <Refused failed={failed} at="closing" />
           </>
         )}
         {!convener && !data.closings.length && <p className="sub">召集人寫結束的條件。四項都要寫：為什麼結束、什麼情況重新開、哪一天回頭檢討、負責的人。</p>}
@@ -306,7 +323,8 @@ export function CollabPage({ groupId }: { groupId: string }) {
         <p className="how">任何人都可以要求重開，召集人不能拒絕。</p>
         {data.reopens.map((item) => <p key={item.doc_id}>{item.who}：{item.content.reason}</p>)}
         <Cell id="reopen" label="為什麼要重開"><textarea id="reopen" value={form.reopen ?? ""} maxLength={2000} onChange={set("reopen")} /></Cell>
-        <div className="btns"><button className="btn" type="button" disabled={busy || !(form.reopen ?? "").trim()} onClick={write("collab.reopen", { reason: (form.reopen ?? "").trim() }, ["reopen"])}>要求重開</button></div>
+        <div className="btns"><button className="btn" type="button" disabled={busy || !(form.reopen ?? "").trim()} onClick={write("reopen", "collab.reopen", { reason: (form.reopen ?? "").trim() }, ["reopen"])}>要求重開</button></div>
+        <Refused failed={failed} at="reopen" />
       </div>
 
       <div className="card">
@@ -323,7 +341,8 @@ export function CollabPage({ groupId }: { groupId: string }) {
           {held.map((member) => (
             <div key={member.identity_id}>
               <p>{member.display_name}：{member.notice ?? "還在等召集人確認。確認之前，他看不到別人寫的東西，意見也不算進大家的看法。"}</p>
-              {convener && <div className="btns"><button className="btn" type="button" disabled={busy} onClick={run(() => groups.confirm(groupId, member.identity_id))}>確認是本人</button></div>}
+              {convener && <div className="btns"><button className="btn" type="button" disabled={busy} onClick={run(`member-${member.identity_id}`, () => groups.confirm(groupId, member.identity_id))}>確認是本人</button></div>}
+              <Refused failed={failed} at={`member-${member.identity_id}`} />
             </div>
           ))}
         </div>
@@ -335,8 +354,10 @@ export function CollabPage({ groupId }: { groupId: string }) {
         <div className="btns">
           <button className="btn" type="button" disabled={busy || !data.wrote.position} onClick={ask("organise_differences", { round })}>整理大家的分歧</button>
           <button className="btn" type="button" disabled={busy || !data.wrote.position} onClick={restateAll}>轉述每個人的立場</button>
-          <button className="btn" type="button" disabled={busy} onClick={run(async () => setNotHeard((await collab.notHeard(groupId, round)).not_heard))}>誰還沒說話</button>
+          <button className="btn" type="button" disabled={busy} onClick={run("ai", async () => setNotHeard((await collab.notHeard(groupId, round)).not_heard))}>誰還沒說話</button>
         </div>
+        <Missing why={!data.wrote.position && "先寫你自己的立場，才能請 AI 整理分歧或轉述立場。"} />
+        <Refused failed={failed} at="ai" />
         {said && <p className="warn">{said}</p>}
         {notHeard && <p><span className="tags"><span>系統</span></span>{notHeard.length ? `這一輪還沒寫立場的：${notHeard.join("、")}。` : "這一輪每個人都寫了立場。"}</p>}
         {data.differences.filter((item) => item.content.round === round).slice(-1).map((item) => <div key={item.doc_id}>{AI_TAG}{item.content.differences.map((line) => <p key={line} className="mt0">{line}</p>)}</div>)}
@@ -347,10 +368,11 @@ export function CollabPage({ groupId }: { groupId: string }) {
               {AI_TAG}<p className="mt0">{item.mine ? "AI 轉述你的立場：" : "AI 轉述的立場："}{item.content.text}</p>
               {item.mine && (answer ? <p className="sub mt0">你說：{answer.content.verdict}</p> : (
                 <div className="btns">
-                  <button className="btn" type="button" disabled={busy} onClick={write("collab.confirm", { restatement: item.doc_id, verdict: "說得對" })}>說得對</button>
-                  <button className="btn ghost" type="button" disabled={busy} onClick={write("collab.confirm", { restatement: item.doc_id, verdict: "說錯了" })}>說錯了</button>
+                  <button className="btn" type="button" disabled={busy} onClick={write(`restate-${item.doc_id}`, "collab.confirm", { restatement: item.doc_id, verdict: "說得對" })}>說得對</button>
+                  <button className="btn ghost" type="button" disabled={busy} onClick={write(`restate-${item.doc_id}`, "collab.confirm", { restatement: item.doc_id, verdict: "說錯了" })}>說錯了</button>
                 </div>
               ))}
+              <Refused failed={failed} at={`restate-${item.doc_id}`} />
             </div>
           );
         })}
@@ -364,9 +386,11 @@ export function CollabPage({ groupId }: { groupId: string }) {
         <Cell id="decision" label="當時決定了什麼"><input id="decision" value={form.decision ?? ""} maxLength={2000} onChange={set("decision")} /></Cell>
         <Cell id="observed" label="之後看到什麼"><textarea id="observed" value={form.observed ?? ""} maxLength={4000} onChange={set("observed")} /></Cell>
         <div className="btns"><button className="btn" type="button" disabled={busy || !(form.decision ?? "").trim() || !(form.observed ?? "").trim()}
-          onClick={write("collab.consequence", { decision: (form.decision ?? "").trim(), observed: (form.observed ?? "").trim() }, ["decision", "observed"])}>存後果</button></div>
+          onClick={write("after", "collab.consequence", { decision: (form.decision ?? "").trim(), observed: (form.observed ?? "").trim() }, ["decision", "observed"])}>存後果</button></div>
+        <Refused failed={failed} at="after" />
         <Cell id="review" label="回頭看，寫一段回顧"><textarea id="review" value={form.review ?? ""} maxLength={4000} onChange={set("review")} /></Cell>
-        <div className="btns"><button className="btn" type="button" disabled={busy || !(form.review ?? "").trim()} onClick={write("collab.review", { text: (form.review ?? "").trim() }, ["review"])}>存回顧</button></div>
+        <div className="btns"><button className="btn" type="button" disabled={busy || !(form.review ?? "").trim()} onClick={write("review", "collab.review", { text: (form.review ?? "").trim() }, ["review"])}>存回顧</button></div>
+        <Refused failed={failed} at="review" />
       </div>
 
       <div className="card">
@@ -376,7 +400,8 @@ export function CollabPage({ groupId }: { groupId: string }) {
         {!data.places.some((item) => item.mine) && (
           <>
             <Cell id="where" label="你在哪裡"><input id="where" value={form.where ?? ""} maxLength={200} onChange={set("where")} /></Cell>
-            <div className="btns"><button className="btn" type="button" disabled={busy || !(form.where ?? "").trim()} onClick={write("collab.place", { where: (form.where ?? "").trim() }, ["where"])}>存</button></div>
+            <div className="btns"><button className="btn" type="button" disabled={busy || !(form.where ?? "").trim()} onClick={write("place", "collab.place", { where: (form.where ?? "").trim() }, ["where"])}>存</button></div>
+            <Refused failed={failed} at="place" />
           </>
         )}
       </div>

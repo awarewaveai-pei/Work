@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiFetch } from "../../lib/api";
 import { ComputePage, draftFor, flipWords, fmt, fromRun, refusal, toRequest, type Run, type Spec } from "./ComputePage";
+import { type as typeInto } from "./JudgmentTestKit";
 
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -197,6 +198,55 @@ describe("計算與模擬：頁面", () => {
     const asked = writes.filter((write) => write.path.endsWith("/ai/COMPUTE/explain")).map((write) => write.body.context);
     expect(asked).toEqual([{ run: "R1" }, { run: "R1", go_on: true }]);
     expect(host.textContent).not.toContain("仍然繼續");
+    await done();
+  });
+});
+
+describe("計算與模擬：按了就有回應，來源一次選（走查 2026-10-11 A8、B9）", () => {
+  const REFUSED = "至少一個參與計算的數字要寫樂觀或悲觀時的值。";
+  /** server() plus three cards (one does not count) and a refused 算. */
+  function refusing() {
+    const { writes } = server([]);
+    const base = vi.mocked(apiFetch).getMockImplementation()!;
+    vi.mocked(apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path.endsWith("/evidence")) return { origins: [
+        { origin_id: "o:1", counts: true, cards: [{ card: "C1", title: "公會公告" }, { card: "C2", title: "勞動部統計" }] },
+        { origin_id: "o:2", counts: false, cards: [{ card: "C3", title: "米蘭冬奧閉幕" }] }] } as never;
+      if (path.endsWith("/docs/compute.request") && init?.method === "POST") { writes.push({ method: "POST", path, body: JSON.parse(String(init.body)) }); throw new ApiError(400, `COMPUTE_INPUT_REFUSED: ${REFUSED}`); }
+      return base(path, init);
+    });
+    return { writes };
+  }
+
+  it("says what is missing beside a disabled 算, and puts the server's refusal sentence right under 算", async () => {
+    refusing();
+    const { host, done } = await mount(<ComputePage projectId="P1" />);
+    const form = host.querySelector(".card.cta")!;
+    const go = () => [...form.querySelectorAll("button")].find((node) => node.textContent === "算") as HTMLButtonElement;
+    expect(go().disabled).toBe(true);
+    expect(go().closest(".btns")!.nextElementSibling?.textContent).toBe("先在上面寫你要算什麼。");
+    await typeInto(host.querySelector("#compute-question") as HTMLTextAreaElement, "拆夥後六個月的收入夠不夠");
+    await click(go());
+    const alert = go().closest(".btns")!.nextElementSibling;
+    expect(alert?.getAttribute("role")).toBe("alert");
+    expect(alert?.textContent).toBe(REFUSED);
+    await done();
+  });
+
+  it("offers 我自己說的 and one button that opens a searchable list -- never a button per source card", async () => {
+    refusing();
+    const { host, done } = await mount(<ComputePage projectId="P1" />);
+    const group = host.querySelector('[aria-label="一開始投入的金額 的來源"]')!;
+    expect([...group.querySelectorAll("button")].map((node) => node.textContent)).toEqual([OWN, "從蒐集的來源選（3 張）"]);
+    await click(group.querySelectorAll("button")[1]);
+    const list = () => [...host.querySelectorAll('.station')[0].querySelectorAll("li")].map((node) => node.textContent?.trim());
+    expect(list()).toEqual(["公會公告", "勞動部統計", "米蘭冬奧閉幕（不算數）"]);   // counted first; the one that does not count says so
+    await typeInto(host.querySelector('[aria-label="找一開始投入的金額 的來源"]') as HTMLInputElement, "勞動");
+    expect(list()).toEqual(["勞動部統計"]);
+    await click(host.querySelectorAll('.station')[0].querySelector('input[type="checkbox"]'));
+    expect(host.querySelectorAll('.station')[0].textContent).toContain("選了：「勞動部統計」");
+    expect(group.querySelector("button")?.getAttribute("aria-pressed")).toBe("false");   // no longer 我自己說的
+    expect(host.querySelector("select")).toBeNull();
     await done();
   });
 });

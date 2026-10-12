@@ -68,7 +68,7 @@ export function ContractPage({ projectId }: { projectId: string }) {
         </div>
         <div className="btns mt8">
           <button className="btn primary" type="button" disabled={busy || unchanged} onClick={() => save(draft)}>{busy ? "存檔中…" : doc ? "存成新的一版" : "存下來"}</button>
-          {unchanged && doc && <span className="sub">還沒改任何東西。</span>}
+          {unchanged && <span className="sub">{doc ? "還沒改任何東西。" : "還沒選任何一項。選了，才能存。"}</span>}
         </div>
         {error && <p className="error">{error}</p>}
       </div>

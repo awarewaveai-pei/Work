@@ -108,6 +108,7 @@ export function SettingsPage() {
           <button className="btn primary" type="button" disabled={!where.trim() || where.trim() === location?.content.where || busy} onClick={saveWhere}>存起來</button>
           {location && <button className="btn ghost" type="button" disabled={busy} onClick={clearWhere}>刪掉，不留這一項</button>}
         </div>
+        {error && <p className="error" role="alert">{error}</p>}
         {help && (
           <>
             <p className="sub mt8">{help.where ? `現在給你的是「${help.where}」的求助電話。` : "現在給你的是世界各地都能用的求助電話。"}{help.where && !help.covered ? "這個地方系統還沒有專屬的電話。" : ""}</p>
@@ -155,7 +156,6 @@ export function SettingsPage() {
         {eraseError && <p className="error" role="alert">{eraseError}</p>}
         <Explain topic="erase" />
       </div>
-      {error && <p className="error">{error}</p>}
     </>
   );
 }

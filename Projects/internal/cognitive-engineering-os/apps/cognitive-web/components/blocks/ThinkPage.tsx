@@ -11,6 +11,7 @@ import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { NONE, caseEvidence, type Evidence } from "../../lib/evidence";
 import { BlockShell, Notices } from "./BlockShell";
+import { Missing, Refused, type Failed } from "./PageParts";
 import { ALWAYS, GRANTABLE_WORDS } from "./CollabPermissions";
 
 export const ROLES = ["鏡子", "發散夥伴", "蘇格拉底引導者", "反方教練", "證據稽核者", "決策教練", "後設學習教練"] as const;
@@ -199,6 +200,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const [clock, setClock] = useState({ shown: true, running: false, seconds: 0 });
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
   const [evidence, setEvidence] = useState<Evidence>(NONE);
@@ -237,9 +239,10 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   }, [pickedKey]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // ``work`` may return something to run once the reload has landed (e.g. switch to the round it just made)
-  const act = async (work: () => Promise<(() => void) | void>) => {
-    setError(""); setBusy(true);
-    try { const after = await work(); await load(); setRefresh((count) => count + 1); after?.(); } catch (reason) { setError(thinkError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const act = async (at: string, work: () => Promise<(() => void) | void>) => {
+    setFailed(null); setBusy(true);
+    try { const after = await work(); await load(); setRefresh((count) => count + 1); after?.(); } catch (reason) { setFailed({ at, text: thinkError(reason) }); } finally { setBusy(false); }
   };
 
   if (!data) return <BlockShell projectId={projectId} code="THINK"><div className="card"><p>{error || "載入中…"}</p></div></BlockShell>;
@@ -264,13 +267,13 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     if (!granted(needs)) return `協作合約沒有准「${GRANTABLE_WORDS[needs]}」`;
     return "";
   };
-  const saveRound = (patch: Partial<Round>) => act(async () => {
+  const saveRound = (patch: Partial<Round>, at = "round") => act(at, async () => {
     const content = { ...current?.content, ...patch } as Round;
     const saved = current ? await docs.update(projectId, "think.round", current, content) : await docs.create(projectId, "think.round", content);
     setNotices(saved.notices);
     return current ? undefined : () => setPick(saved.doc_id);
   });
-  const ask = (action: string, context: Record<string, unknown> = {}) => act(async () => {
+  const ask = (action: string, context: Record<string, unknown> = {}, at = "ai") => act(at, async () => {
     const facets = ACTIONS[action];
     if (current && (current.content.role !== facets.role || current.content.mode !== facets.mode)) await docs.update(projectId, "think.round", current, { ...current.content, role: facets.role, mode: facets.mode });
     const turn = await ai(projectId, "THINK", action, { round: roundId, ...context });
@@ -278,7 +281,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     if (turn.saved?.kind === "think.batch") await apiFetch(`/projects/${encodeURIComponent(projectId)}/think/expand`, { method: "POST", body: JSON.stringify({ batch: turn.saved.doc_id }) });
   });
   // ``patch`` goes onto the card's one reaction; clearing the last thing in it removes the reaction
-  const react = (card: Doc<Card>, patch: Partial<Reaction>) => act(async () => {
+  const react = (card: Doc<Card>, patch: Partial<Reaction>) => act(`card-${card.doc_id}`, async () => {
     const held = reactionOf(card);
     const content = tidy({ ...(held?.content ?? { card: card.doc_id }), ...patch });
     if (!content) { if (held) await docs.remove(projectId, "think.reaction", held.doc_id); return; }
@@ -290,7 +293,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     if (held) await docs.remove(projectId, "think.reaction", held.doc_id);
     await docs.remove(projectId, "think.card", card.doc_id);
   };
-  const saveOwnCard = (card: Card, doc?: Doc<Card>) => act(async () => {
+  const saveOwnCard = (card: Card, doc?: Doc<Card>) => act(doc ? `card-${doc.doc_id}` : "newcard", async () => {
     // a card you rewrite no longer rests on the checked claim: 「有來源」 and its claim go with the old words (the server insists)
     const reworded = doc && CARD_TEXT.some((field) => (card[field] ?? "") !== (doc.content[field] ?? ""));
     const { rests_on: _claim, ...rest } = doc?.content ?? ({} as Card);
@@ -299,11 +302,11 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     setNotices(saved.notices); setEditing(null);
     if (!doc) setAdding((count) => count + 1);
   });
-  const answer = (reply: Doc<Reply>, response: (typeof RESPONSES)[number], note = "") => act(async () => {
+  const answer = (reply: Doc<Reply>, response: (typeof RESPONSES)[number], note = "") => act(`reply-${reply.doc_id}`, async () => {
     await docs.create(projectId, "think.response", { reply: reply.doc_id, version: reply.version, response, ...(note.trim() ? { note: note.trim() } : {}) });
     setRewrite(null);
   });
-  const removeRound = () => act(async () => {
+  const removeRound = () => act("round", async () => {
     if (!current) return;
     const replyIds = new Set(roundReplies.map((reply) => reply.doc_id));
     for (const item of data.answers.filter((entry) => replyIds.has(entry.content.reply))) await docs.remove(projectId, "think.response", item.doc_id);
@@ -337,7 +340,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     const mine = reactionOf(doc);
     const given = mine?.content ?? ({ card: doc.doc_id } as Reaction);
     return editing === doc.doc_id ? (
-      <div key={doc.doc_id} className="mcard now"><CardForm initial={doc.content} busy={busy} onSave={(card) => saveOwnCard(card, doc)} onCancel={() => setEditing(null)} /></div>
+      <div key={doc.doc_id} className="mcard now"><CardForm initial={doc.content} busy={busy} onSave={(card) => saveOwnCard(card, doc)} onCancel={() => setEditing(null)} /><Refused failed={failed} at={`card-${doc.doc_id}`} /></div>
     ) : (
       <div key={doc.doc_id} className="mcard">
         <span className="tags"><span>{AUTHOR[doc.author]}</span>{doc.content.sourced && <span>{doc.content.rests_on && !restsOn(doc)?.usable ? "它自己說的" : doc.content.sourced}</span>}{doc.content.role && <span>{doc.content.role}</span>}{doc.content.method && <span>{doc.content.method}</span>}{given.picked && <span>你選了這張</span>}</span>
@@ -360,8 +363,9 @@ export function ThinkPage({ projectId }: { projectId: string }) {
           <button className={`btn${given.picked ? " primary" : ""}`} type="button" aria-pressed={Boolean(given.picked)} disabled={busy || (!given.picked && unpickedFull)}
             onClick={() => react(doc, { picked: given.picked ? undefined : true })}>{given.picked ? "取消選這張" : "選這張帶走"}</button>
           <button className="btn ghost" type="button" onClick={() => setEditing(doc.doc_id)}>改寫</button>
-          <button className="btn ghost" type="button" disabled={busy} onClick={() => act(async () => { await removeCard(doc); })}>刪掉</button>
+          <button className="btn ghost" type="button" disabled={busy} onClick={() => act(`card-${doc.doc_id}`, async () => { await removeCard(doc); })}>刪掉</button>
         </div>
+        <Refused failed={failed} at={`card-${doc.doc_id}`} />
       </div>
     );
   };
@@ -390,6 +394,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
             <button className="btn ghost" type="button" disabled={busy} onClick={() => answer(doc, "否定")}>不對</button>
           </div>
         ))}
+        <Refused failed={failed} at={`reply-${doc.doc_id}`} />
         {given?.note && <p><b>你的版本：</b>{given.note}</p>}
       </div>
     );
@@ -436,6 +441,8 @@ export function ThinkPage({ projectId }: { projectId: string }) {
           <button className="btn primary" type="button" disabled={!problem.trim() || busy} onClick={() => saveRound({ problem: problem.trim(), own })}>{busy ? "存檔中…" : current ? "存下來" : "存這一輪"}</button>
           {current && <button className="btn ghost" type="button" disabled={busy} onClick={() => (armed ? removeRound() : setArmed(true))}>{armed ? "再按一次，整輪完整刪除" : "刪掉這一輪"}</button>}
         </div>
+        <Missing why={!problem.trim() && "先寫這一次的問題，才能存。"} />
+        <Refused failed={failed} at="round" />
       </div>
 
       <div className="card">
@@ -466,6 +473,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
           <div className="btns"><button className="btn" type="button" disabled={Boolean(blocked("direct_advice")) || busy} onClick={() => ask("direct_advice")}>直接取得建議</button></div>
           {blocked("direct_advice") && <p className="hint">{blocked("direct_advice")}。<Link href={`/projects/${encodeURIComponent(projectId)}/contract`}>到協作合約改</Link></p>}
         </div>
+        <Refused failed={failed} at="ai" />
         {busy && <p className="sub" role="status">處理中，請稍等…</p>}
       </div>
 
@@ -473,11 +481,13 @@ export function ThinkPage({ projectId }: { projectId: string }) {
 
       <div className="card">
         <div className="top"><h2>思考卡 <small>{roundCards.length} 張</small></h2>
-          <button className="btn" type="button" disabled={Boolean(blocked("counter")) || busy} onClick={() => ask("counter", { target })}>請當最強的反方</button>
+          <button className="btn" type="button" disabled={Boolean(blocked("counter")) || busy} onClick={() => ask("counter", { target }, "cards")}>請當最強的反方</button>
         </div>
+        {blocked("counter") && <p className="hint">{blocked("counter")}。</p>}
+        <Refused failed={failed} at="cards" />
         <p className="how">每張卡標上你的反應和原因。你自己選三張帶到下一步；AI 的卡也可以改寫、不選。你自己至少再加兩張：{ownCards.length} / {MIN_OWN_CARDS}。這一輪你選了 {picked.length} / {MAX_PICKED} 張。</p>
         {streak >= STREAK_REMINDER && <p className="warn" role="status">你連續 {streak} 次，把 AI 的卡一個字沒改就選下來。先寫一張你自己的卡，再決定要不要選它。（這是系統的提醒，不是 AI 說的。）</p>}
-        {unexpanded.map((batch) => <div key={batch.doc_id} className="btns"><span className="sub">AI 給的一批卡還沒展開。</span><button className="btn" type="button" disabled={busy} onClick={() => act(async () => { await apiFetch(`/projects/${encodeURIComponent(projectId)}/think/expand`, { method: "POST", body: JSON.stringify({ batch: batch.doc_id }) }); })}>展開成卡</button></div>)}
+        {unexpanded.map((batch) => <div key={batch.doc_id} className="btns"><span className="sub">AI 給的一批卡還沒展開。</span><button className="btn" type="button" disabled={busy} onClick={() => act("cards", async () => { await apiFetch(`/projects/${encodeURIComponent(projectId)}/think/expand`, { method: "POST", body: JSON.stringify({ batch: batch.doc_id }) }); })}>展開成卡</button></div>)}
         {roundBatches.filter((batch) => batch.content.handback).map((batch) => <p key={batch.doc_id} className="warn">AI 這次把控制交還給你：{batch.content.handback}{batch.content.question ? ` 它問：${batch.content.question}` : ""}</p>)}
         {roundCards.length === 0 && <p className="sub">還沒有卡。</p>}
         <div className="mcards">{roundCards.map(cardView)}</div>
@@ -485,6 +495,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
           <div className="field">
             <b>加一張你自己的卡</b>
             <CardForm key={adding} initial={{ claim: "", round: roundId! }} busy={busy} onSave={(card) => saveOwnCard(card)} />
+            <Refused failed={failed} at="newcard" />
           </div>
         )}
       </div>
@@ -498,8 +509,9 @@ export function ThinkPage({ projectId }: { projectId: string }) {
           <input id="criterion" className="search" value={criterion} maxLength={1900} onChange={(event) => setCriterion(event.target.value)} />
           <div className="btns mt8">
             <button className="btn" type="button" disabled={!criterion.trim()} onClick={() => { setCriteria([...criteria, criterion.trim()]); setCriterion(""); }}>加一條</button>
-            <button className="btn primary" type="button" disabled={busy} onClick={() => saveRound({ criteria })}>存判準</button>
+            <button className="btn primary" type="button" disabled={busy} onClick={() => saveRound({ criteria }, "criteria")}>存判準</button>
           </div>
+          <Refused failed={failed} at="criteria" />
         </div>
       )}
 
@@ -522,7 +534,8 @@ export function ThinkPage({ projectId }: { projectId: string }) {
           <h2>這次我是怎麼想的</h2>
           <p className="how">最後寫一句。只有你寫得出來，AI 不會替你寫。</p>
           <textarea aria-label="這次我是怎麼想的" value={reflection} maxLength={2000} onChange={(event) => setReflection(event.target.value)} />
-          <div className="btns mt8"><button className="btn primary" type="button" disabled={!reflection.trim() || busy} onClick={() => saveRound({ reflection: reflection.trim() })}>存</button></div>
+          <div className="btns mt8"><button className="btn primary" type="button" disabled={!reflection.trim() || busy} onClick={() => saveRound({ reflection: reflection.trim() }, "reflection")}>存</button></div>
+          <Refused failed={failed} at="reflection" />
         </div>
       )}
 

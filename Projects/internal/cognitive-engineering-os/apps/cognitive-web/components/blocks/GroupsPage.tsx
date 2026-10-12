@@ -7,6 +7,7 @@ import React, { useEffect, useState } from "react";
 import { humanError } from "../../lib/errors";
 import { groups, PURPOSES, type Group, type Invite, type Purpose } from "../../lib/groups";
 import { Cell, Chips } from "./JudgmentParts";
+import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 export const ONCE = "這個連結只出現這一次";
 const purposeLabel = (purpose: Purpose) => PURPOSES.find((item) => item.value === purpose)?.label ?? purpose;
@@ -19,6 +20,7 @@ export function GroupsPage() {
   const [invites, setInvites] = useState<Record<string, Invite[]>>({});
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
@@ -28,19 +30,20 @@ export function GroupsPage() {
     setInvites(Object.fromEntries(open));
   };
   useEffect(() => { load().catch((reason) => setError(humanError(reason))); }, []);
-  const run = (work: () => Promise<unknown>) => async () => {
-    setError(""); setBusy(true);
-    try { await work(); await load(); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const run = (at: string, work: () => Promise<unknown>) => async () => {
+    setFailed(null); setBusy(true);
+    try { await work(); await load(); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
-  const create = run(async () => { await groups.create(name.trim(), purpose as Purpose); setName(""); setPurpose(""); });
-  const invite = (group: Group) => run(async () => {
+  const create = run("create", async () => { await groups.create(name.trim(), purpose as Purpose); setName(""); setPurpose(""); });
+  const invite = (group: Group) => run(`group-${group.group_id}`, async () => {
     const made = await groups.invite(group.group_id);
     setCopied(false);
     setLink({ group: group.group_id, url: `${window.location.origin}/invite#${made.token}` });
   });
   const copy = async () => {
     if (!link) return;
-    try { await navigator.clipboard.writeText(link.url); setCopied(true); } catch { setError("沒辦法自動複製，請自己選取連結複製。"); }
+    try { await navigator.clipboard.writeText(link.url); setCopied(true); } catch { setFailed({ at: `group-${link.group}`, text: "沒辦法自動複製，請自己選取連結複製。" }); }
   };
 
   if (!list) return <><div className="crumbs">我的群組</div><div className="card"><p>{error || "載入中…"}</p></div></>;
@@ -69,8 +72,9 @@ export function GroupsPage() {
             )}
             {(invites[group.group_id] ?? []).map((item) => (
               <p key={item.invite_id} className="sub mt0">一個還沒用的邀請（到 {item.expires_at.slice(0, 10)}）
-                <button className="btn ghost" type="button" disabled={busy} onClick={run(() => groups.revoke(group.group_id, item.invite_id))}>收回</button></p>
+                <button className="btn ghost" type="button" disabled={busy} onClick={run(`group-${group.group_id}`, () => groups.revoke(group.group_id, item.invite_id))}>收回</button></p>
             ))}
+            <Refused failed={failed} at={`group-${group.group_id}`} />
           </div>
         ))}
       </div>
@@ -83,6 +87,8 @@ export function GroupsPage() {
             onPick={(label) => setPurpose(PURPOSES.find((item) => item.label === label)?.value ?? "")} />
         </div>
         <div className="btns"><button className="btn primary" type="button" disabled={busy || !name.trim() || !purpose} onClick={create}>開這個群組</button></div>
+        <Missing why={(name.trim() || purpose) && firstMissing([!name.trim(), "寫群組的名字。"], [!purpose, "先選這個群組要做什麼。"])} />
+        <Refused failed={failed} at="create" />
       </div>
     </>
   );

@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { apiFetch } from "../../lib/api";
+import { ApiError, apiFetch } from "../../lib/api";
 import { ASKED, PRE_CHECKS, STOP_QUESTIONS } from "../../lib/decide";
 import { DecidePage } from "./DecidePage";
 import { byText, click, doc, field, mount, saved, serve, shell, type, type Call } from "./JudgmentTestKit";
@@ -272,6 +272,44 @@ describe("DECIDE 判斷", () => {
     await click(byText(host, "button", "撤回，繼續寫"));
     expect(host.textContent).not.toContain("你選了「現在先不決定」");
     expect(apiFetch).toHaveBeenCalled();
+    await done();
+  });
+});
+
+describe("DECIDE 判斷：第一次來的人先看到六樣（走查 2026-10-11 B2、B3、A8）", () => {
+  it("keeps the intensity, the conclusion, the three required cells and the next step out of any fold; folds the rest under named lines", async () => {
+    const { host, done } = await open();
+    for (const id of ["conclusion", "uncertainty", "change", "confidence", "next"]) expect(field(host, id).closest("details"), id).toBeNull();
+    expect(host.querySelector('[aria-label="現在的強度"]')?.closest("details")).toBeNull();
+    const folds = [...host.querySelectorAll("details.dir > summary")].map((summary) => summary.textContent);
+    expect(folds).toEqual([
+      expect.stringContaining("這次可能在影響你的"), expect.stringContaining("依據：問題怎麼定義"), expect.stringContaining("選項"),
+      expect.stringContaining("什麼時候停止分析？四題（4 格"), expect.stringContaining("下決定前，先問自己四題（4 格"), expect.stringContaining("誰有決定權、誰會受影響"),
+    ]);
+    for (const id of ["problem", "assumptions", "alt", "criteria", "options", "deciders"]) expect(field(host, id).closest("details.dir"), id).not.toBeNull();
+    await done();
+  });
+
+  it("puts each of the four checks' war example behind 看例子 and names where the questions come from", async () => {
+    const { host, done } = await open();
+    const examples = [...host.querySelectorAll("details")].filter((item) => item.querySelector("summary")?.textContent === "看例子");
+    expect(examples.map((item) => item.querySelector(".hint")?.textContent)).toEqual(PRE_CHECKS.map((item) => item.example));
+    expect(examples.every((item) => !item.open)).toBe(true);
+    expect(host.textContent).toContain("這四題來自 Theo Farrell 談英國在阿富汗作戰的講稿");
+    await done();
+  });
+
+  it("shows the server's refusal under the save button, not at the end of the page", async () => {
+    const { host, done } = await open({ [`POST ${P}/docs/decide.judgment`]: () => { throw new ApiError(400, "DOC_FIELD_REQUIRED: uncertainty"); } });
+    await click(chip(host, "現在的強度", "中"));
+    await type(field(host, "uncertainty"), "不知道");
+    await type(field(host, "change"), "沒有");
+    await type(field(host, "confidence"), "50");
+    const save = byText(host, "button", "存這一版")!;
+    await click(save);
+    const alert = save.closest(".btns")!.nextElementSibling;
+    expect(alert?.getAttribute("role")).toBe("alert");
+    expect(alert?.textContent).toBe("還有必填的格子沒填。");
     await done();
   });
 });

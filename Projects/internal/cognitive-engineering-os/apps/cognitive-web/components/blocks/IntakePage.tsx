@@ -10,6 +10,7 @@ import { BLOCKS, OPEN_STEP, blockHref, blockOf, docs, type Doc, type Notice } fr
 import { humanError } from "../../lib/errors";
 import { caseName, createProject } from "../../lib/projects";
 import { BlockShell, Notices } from "./BlockShell";
+import { Missing, firstMissing } from "./PageParts";
 
 // ai_lego/core/domain/kinds/assembler.py PURPOSES / PURPOSE_PACKAGE / PACKAGES / PACKAGE_OPENS_AT (test_block_foundation compares them)
 export const PURPOSES: Array<{ purpose: string; package: string; blocks: string[]; opens: number; why: string }> = [
@@ -129,6 +130,7 @@ export function IntakePage({ projectId: given, question = "" }: { projectId?: st
           </div>
         )}
         <div className="btns mt8"><button className="btn primary big" type="button" disabled={!draft.purpose || !draft.question.trim() || busy} onClick={save}>{busy ? "存檔中…" : held ? "存這一版" : "開案"}</button></div>
+        <Missing why={firstMissing([!draft.purpose, "先選這次的目的。"], [!draft.question.trim(), "先寫要釐清什麼。"])} />
         {error && <p className="error">{error}</p>}
       </div>
       {held && first && <div className="tabnext"><Link className="btn primary" href={blockHref(projectId, first)}>開始第一塊：{first.name} →</Link></div>}

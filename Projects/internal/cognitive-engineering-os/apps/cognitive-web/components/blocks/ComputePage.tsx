@@ -11,6 +11,7 @@ import { ApiError, apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type AiTurn, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { BlockShell, Notices } from "./BlockShell";
+import { Missing, Refused, type Failed } from "./PageParts";
 
 type InputSpec = { key: string; name: string; type: string; min?: number; max?: number; hint?: string; repeat?: [number, number]; spread?: boolean; scenarios?: boolean; sweep?: string };
 type TypeSpec = { unit: string; fixed_unit: boolean; same_unit?: boolean; integer?: boolean };
@@ -162,6 +163,41 @@ function RunSummary({ run, spec, projectId }: { run: Run; spec: Spec; projectId:
   );
 }
 
+type PickCard = { card: string; title?: string; url?: string; counts: boolean };
+
+/** 這個數字從哪裡來: 「我自己說的」, or cards from a list that opens on demand -- a search box and checkboxes, counted
+ *  sources first, then the ones that do not count (labelled). Never one button per card in the form (walk B9). */
+function SourcePicker({ own, ownWords, cards, picked, label, onOwn, onCards }: {
+  own: boolean; ownWords: string; cards: PickCard[]; picked: string[]; label: string; onOwn: () => void; onCards: (cards: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const chosen = own ? [] : picked;
+  const named = (id: string) => { const card = cards.find((item) => item.card === id); return card ? cardName(card) : id; };
+  const words = query.trim().toLowerCase();
+  const ordered = [...cards.filter((card) => card.counts), ...cards.filter((card) => !card.counts)];
+  const shown = ordered.filter((card) => chosen.includes(card.card) || !words || `${card.title ?? ""} ${card.url ?? ""}`.toLowerCase().includes(words));
+  return (
+    <div className="field">
+      <div className="chips" role="group" aria-label={label}>
+        <button type="button" className={`chip${own ? " on" : ""}`} aria-pressed={own} onClick={onOwn}>{ownWords}</button>
+        {cards.length > 0 && <button type="button" className={`chip${!own ? " on" : ""}`} aria-expanded={open} onClick={() => setOpen(!open)}>{open ? "收起來源清單" : `從蒐集的來源選（${cards.length} 張）`}</button>}
+      </div>
+      {chosen.length > 0 && <p className="sub mb0">選了：{chosen.map((id) => `「${named(id).slice(0, 40)}」`).join("")}</p>}
+      {open && (
+        <div className="filled">
+          <input className="search" aria-label={`找${label}`} placeholder="寫幾個字找來源" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <ul className="check">{shown.map((card) => (
+            <li key={card.card}><label><input type="checkbox" checked={chosen.includes(card.card)}
+              onChange={() => onCards(chosen.includes(card.card) ? chosen.filter((item) => item !== card.card) : [...chosen, card.card])} /> {cardName(card).slice(0, 80)}{card.counts ? "" : "（不算數）"}</label></li>
+          ))}</ul>
+          {shown.length === 0 && <p className="sub">沒有符合的來源。</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** The one place an AI explanation is drawn. No word filter stops every forecast, so the system's own line always sits
  *  beside the AI's words -- the guarantee the AI guard only backs up. */
 function ExplanationBox({ doc, spec }: { doc: Doc<Explanation>; spec: Spec }) {
@@ -191,6 +227,7 @@ export function ComputePage({ projectId }: { projectId: string }) {
   const [picked, setPicked] = useState<string[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
@@ -205,9 +242,10 @@ export function ComputePage({ projectId }: { projectId: string }) {
   };
   useEffect(() => { load().catch((reason) => setError(humanError(reason))); }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const act = async (work: () => Promise<void>, show: (reason: unknown) => string = humanError) => {
-    setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(show(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const act = async (at: string, work: () => Promise<void>, show: (reason: unknown) => string = humanError) => {
+    setFailed(null); setBusy(true);
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: show(reason) }); } finally { setBusy(false); }
   };
   const algorithm = useMemo(() => spec?.algorithms.find((item) => item.id === draft?.algorithm), [spec, draft?.algorithm]);
   const cards = useMemo(() => origins.flatMap((origin) => origin.cards.map((card) => ({ ...card, counts: origin.counts }))), [origins]);
@@ -215,26 +253,26 @@ export function ComputePage({ projectId }: { projectId: string }) {
 
   const setRow = (index: number, patch: Partial<DraftInput>) => setDraft({ ...draft, inputs: draft.inputs.map((row, at) => (at === index ? { ...row, ...patch } : row)) });
   const specOf = (key: string) => algorithm.inputs.find((input) => input.key === key)!;
-  const save = () => act(async () => {
+  const save = () => act("save", async () => {
     const content = toRequest(spec, draft);
     const saved = editing ? await docs.update(projectId, "compute.request", editing, content) : await docs.create(projectId, "compute.request", content);
     setNotices(saved.notices); setEditing(null); setDraft(draftFor(spec, algorithm));
   }, refusal);
   // 用同樣的數字再算一次: the run's own numbers, saved as the request's next version
-  const again = (run: Run) => act(async () => {
+  const again = (run: Run) => act(`run-${run.run_id}`, async () => {
     const request = requests.find((doc) => doc.doc_id === run.request);
     if (request) setNotices((await docs.update(projectId, "compute.request", request, toRequest(spec, fromRun(run)))).notices);
   }, refusal);
-  const suggest = () => act(async () => {
+  const suggest = () => act("suggest", async () => {
     const turn = await ai<Suggestion>(projectId, "COMPUTE", "suggest", { question: draft.question });
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
   });
-  const explain = (run: Run, goOn = false) => act(async () => {
+  const explain = (run: Run, goOn = false) => act(`run-${run.run_id}`, async () => {
     const turn = await ai<Explanation>(projectId, "COMPUTE", "explain", { run: run.run_id, ...(goOn ? { go_on: true } : {}) }) as AiTurn<Explanation> & { handback?: string };
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
     setHandback((held) => ({ ...held, [run.run_id]: turn.handback ?? "" }));
   });
-  const decide = (run: Run) => act(async () => {
+  const decide = (run: Run) => act(`run-${run.run_id}`, async () => {
     const choice = adopting[run.run_id];
     const earlier = adopts.find((doc) => doc.content.run === run.run_id);
     const content = { run: run.run_id, adopt: choice.adopt, reason: choice.reason.trim() };
@@ -254,6 +292,8 @@ export function ComputePage({ projectId }: { projectId: string }) {
         <label htmlFor="compute-question">例：拆夥後六個月的收入夠不夠</label>
         <textarea id="compute-question" value={draft.question} maxLength={1000} onChange={(event) => setDraft({ ...draft, question: event.target.value })} />
         <div className="btns mt8"><button className="btn" type="button" disabled={!draft.question.trim() || busy} onClick={suggest}>請 AI 建議算法</button></div>
+        <Missing why={!draft.question.trim() && "先寫你要算什麼，才能請 AI 建議算法，也才能算。"} />
+        <Refused failed={failed} at="suggest" />
         {suggestion && (
           <div className="judge">
             <span className="tags"><span>{AUTHOR[suggestion.author]}</span><span>只是建議，不是唯一正確的算法</span></span>
@@ -290,15 +330,8 @@ export function ComputePage({ projectId }: { projectId: string }) {
                 </React.Fragment>
               ))}
               <b>這個數字從哪裡來</b>
-              <div className="chips" role="group" aria-label={`${input.name} 的來源`}>
-                <button type="button" className={`chip${row.own ? " on" : ""}`} aria-pressed={row.own} onClick={() => setRow(index, { own: true, cards: [] })}>{spec.own_words}</button>
-                {cards.map((card) => {
-                  const on = !row.own && row.cards.includes(card.card);
-                  return <button key={card.card} type="button" className={`chip${on ? " on" : ""}`} aria-pressed={on}
-                    onClick={() => setRow(index, { own: false, cards: on ? row.cards.filter((item) => item !== card.card) : [...(row.own ? [] : row.cards), card.card] })}>
-                    {cardName(card).slice(0, 30)}{card.counts ? "" : "・不算數"}</button>;
-                })}
-              </div>
+              <SourcePicker own={row.own} ownWords={spec.own_words} cards={cards} picked={row.cards} label={`${input.name} 的來源`}
+                onOwn={() => setRow(index, { own: true, cards: [] })} onCards={(picked) => setRow(index, picked.length ? { own: false, cards: picked } : { own: true, cards: [] })} />
               {cards.length === 0 && <p className="hint">這個案子還沒有來源卡。到「蒐集來源」找回資料，或先標「{spec.own_words}」。</p>}
               {input.repeat && repeated > input.repeat[0] && <button className="btn ghost" type="button" onClick={() => setDraft({ ...draft, inputs: draft.inputs.filter((_, at) => at !== index) })}>拿掉這一項</button>}
               {input.repeat && index === draft.inputs.map((item) => item.key).lastIndexOf(row.key) && repeated < input.repeat[1] && (
@@ -329,6 +362,8 @@ export function ComputePage({ projectId }: { projectId: string }) {
           <button className="btn primary" type="button" disabled={!draft.question.trim() || busy} onClick={save}>{busy ? "計算中…" : editing ? "改好了，再算一次" : "算"}</button>
           {editing && <button className="btn ghost" type="button" onClick={() => { setEditing(null); setDraft(draftFor(spec, algorithm)); }}>取消</button>}
         </div>
+        <Missing why={!draft.question.trim() && "先在上面寫你要算什麼。"} />
+        <Refused failed={failed} at="save" />
         {error && <p className="error" role="alert">{error}</p>}
       </div>
 
@@ -355,6 +390,7 @@ export function ComputePage({ projectId }: { projectId: string }) {
                 <button className={`chip${picked.includes(run.run_id) ? " on" : ""}`} type="button" aria-pressed={picked.includes(run.run_id)} onClick={() => pick(run.run_id)}>選來比較</button>
                 <button className="btn" type="button" disabled={busy} onClick={() => explain(run)}>請 AI 用白話解釋</button>
               </div>
+              <Refused failed={failed} at={`run-${run.run_id}`} />
               {handback[run.run_id] && (
                 <div className="finding warn" role="status"><b>AI 先停下來</b>{handback[run.run_id]}
                   <div className="btns mt8"><button className="btn" type="button" disabled={busy} onClick={() => explain(run, true)}>仍然繼續</button></div></div>

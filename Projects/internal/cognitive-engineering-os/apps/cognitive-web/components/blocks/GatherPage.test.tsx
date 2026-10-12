@@ -2,7 +2,7 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiFetch } from "../../lib/api";
-import { GatherPage, pastedSeed, searchSeed, type Overview } from "./GatherPage";
+import { GatherPage, pastedSeed, runLine, searchSeed, type Overview } from "./GatherPage";
 
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -182,6 +182,33 @@ describe("蒐集來源", () => {
     server(overview({ card_limit: { max: 800, cards: 800, uncarded: 3, notice: "這個案子的來源卡已經到上限 800 張，之後存進來的網頁沒有做卡" } }));
     const { host, done } = await mount(<GatherPage projectId="P1" />);
     expect(host.querySelector(".warn[role=status]")?.textContent).toBe("這個案子的來源卡已經到上限 800 張，之後存進來的網頁沒有做卡；現在有 3 頁沒有做卡，不算進出處。");
+    await done();
+  });
+});
+
+describe("蒐集來源：找的時候說得出知道的，來源卡先給找到的（走查 2026-10-11 B5、B6）", () => {
+  it("while a search runs, says only what the server reports: how long since it was sent, when it ends at the latest, how many pages at most", () => {
+    const now = Date.parse("2026-10-11T08:07:30Z");
+    const run = { status: "running", requested_at: "2026-10-11T08:00:00+00:00", deadline_at: "2026-10-11T08:15:00+00:00", max_fetches: 200 };
+    expect(runLine(run, now)).toBe("系統正在找。已經過了 7 分鐘。最晚再 8 分鐘會結束。最多抓 200 頁。找完，來源會出現在下面的「來源總覽」。");
+    expect(runLine({ ...run, status: "requested" }, Date.parse("2026-10-11T08:00:20Z"))).toMatch(/^已經送出，等找資料的服務接手。已經過了不到 1 分鐘。/);
+    expect(runLine({ ...run, status: "completed" }, now)).toBe("找完了");
+    expect(runLine({ status: "" }, now)).toBe("讀不到進度");
+    expect(runLine(undefined, now)).toBe("讀不到進度");
+    expect(runLine({ status: "running" }, now)).toBe("系統正在找。找完，來源會出現在下面的「來源總覽」。");   // nothing invented when the server says nothing
+  });
+
+  it("shows a card's found cells first and folds every 查不到／無法檢查 cell into one line that opens to all of them", async () => {
+    const found = card("a", { cells: { operator: { state: "查到", value: "某產業公會" }, registered: CELL } });
+    server(overview({ origins: [{ origin_id: "o:1", cards: [found], how: "單獨", pending: false, aside: false, counts: true, mark: null, wrong_in_review: [] }] }));
+    const { host, done } = await mount(<GatherPage projectId="P1" />);
+    const box = host.querySelector(".mcard")!;
+    const table = box.querySelector(":scope > table.plan")!;
+    expect(table.textContent).toContain("誰辦的查到：某產業公會");
+    expect(table.textContent).not.toContain("何時開始存在");
+    const fold = box.querySelector("details.dir")!;
+    expect(fold.querySelector("summary")?.textContent).toBe("另有 1 項查不到或無法檢查");
+    expect(fold.textContent).toContain("何時開始存在查不到：這一頁沒寫");   // nothing left out, only folded
     await done();
   });
 });

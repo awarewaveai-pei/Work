@@ -7,6 +7,8 @@ import { docs } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { collab, groups, type Group } from "../../lib/groups";
 import { BlockShell, Notices } from "./BlockShell";
+import { DRAWERS, offered, recordName, setAside } from "./expressRecords";
+import { Fold, Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 type Ref = { project_id: string; kind: string; doc_id: string };
 type SentenceRef = { kind: string; doc_id: string };
@@ -53,49 +55,24 @@ const CASE_RECORD_KINDS = [
   "learn.calibration", "learn.revisit", "learn.compare",
 ] as const;
 
-const KIND_NAMES: Record<string, string> = {
-  "sense.card": "感受",
-  "sense.state": "現在的感受",
-  "sense.mirror": "整理後的感受",
-  "sense.review": "對整理的回應",
-  "gather.source": "來源",
-  "gather.own": "我寫的來源",
-  "gather.ask": "查找問題",
-  "map.map": "地圖",
-  "think.card": "思考卡",
-  "think.response": "對整理的回應",
-  "verify.message": "要查的訊息",
-  "verify.claim": "主張",
-  "verify.seen": "我看到的",
-  "verify.verdict": "查證判定",
-  "verify.summary": "查證摘要",
-  "compute.run": "計算",
-  "compute.request": "計算問題",
-  "decide.judgment": "判斷",
-  "act.task": "任務",
-  "act.note": "觀察",
-  "learn.calibration": "回顧",
-};
-
 const pathFor = (projectId: string, suffix: string) => `/projects/${encodeURIComponent(projectId)}${suffix}`;
 const keyOf = (ref: { kind: string; doc_id: string }) => `${ref.kind}:${ref.doc_id}`;
 
+// an id is never shown as what a record says (walk B7)
+const ID_LIKE = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{24,}|[a-z]+:[0-9a-f-]{8,})$/i;
+
 function contentText(content: RecordContent | undefined): string {
   if (!content) return "";
-  const preferred = ["title", "text", "conclusion", "summary", "question", "sentence", "note", "what", "reason"];
+  const preferred = ["title", "text", "conclusion", "summary", "question", "sentence", "note", "what", "reason", "outcome", "claim", "problem", "happened"];
+  const said = (value: unknown) => typeof value === "string" && value.trim() !== "" && !ID_LIKE.test(value.trim());
   for (const key of preferred) {
     const value = content[key];
-    if (typeof value === "string" && value.trim()) return value.trim();
+    if (said(value)) return (value as string).trim();
   }
   for (const value of Object.values(content)) {
-    if (typeof value === "string" && value.trim()) return value.trim();
+    if (said(value)) return (value as string).trim();
   }
-  return "這筆紀錄沒有可顯示的短句。";
-}
-
-function recordLabel(record: CaseRecord): string {
-  const label = KIND_NAMES[record.kind] ?? "其他紀錄";
-  return `${label}：${contentText(record.content).slice(0, 70)}`;
+  return "這筆紀錄沒有一句可以顯示的話。";
 }
 
 function valuesFor(content: Record<string, unknown> | undefined, keys: string[]): string[] {
@@ -169,6 +146,8 @@ export function ExpressPage({ projectId }: { projectId: string }) {
   const [given, setGiven] = useState("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
+  const [outlineError, setOutlineError] = useState("");
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
@@ -197,8 +176,9 @@ export function ExpressPage({ projectId }: { projectId: string }) {
     setGiveConfirm(null);
     setEdits({});
     setHandback("");
+    setOutlineError("");
     if (currentSelection) {
-      setOutline(await apiFetch<Outline>(pathFor(projectId, "/express/outline")).catch(() => null));
+      setOutline(await apiFetch<Outline>(pathFor(projectId, "/express/outline")).catch((reason) => { setOutlineError(humanError(reason)); return null; }));
     } else {
       setOutline(null);
     }
@@ -212,15 +192,16 @@ export function ExpressPage({ projectId }: { projectId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, refresh]);
 
-  const act = async (work: () => Promise<void>) => {
-    setError("");
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const act = async (at: string, work: () => Promise<void>) => {
+    setFailed(null);
     setGiven("");
     setBusy(true);
     try {
       await work();
       setRefresh((value) => value + 1);
     } catch (reason) {
-      setError(humanError(reason));
+      setFailed({ at, text: humanError(reason) });
     } finally {
       setBusy(false);
     }
@@ -233,6 +214,12 @@ export function ExpressPage({ projectId }: { projectId: string }) {
   const hasUnchecked = sentences.some((sentence) => sentence.unchecked === true);
   const unsaved = sentences.some((sentence, index) => edits[index] !== undefined && edits[index] !== sentence.text);
 
+  const isPicked = (record: CaseRecord) => selectedRefs.some((ref) => keyOf(ref) === keyOf(record));
+  const offeredRecords = records.filter(offered);
+  const asideRecords = offeredRecords.filter(setAside);
+  const pickedElsewhere = records.filter((record) => !offered(record) && isPicked(record));
+  const pickRow = (record: CaseRecord) => <label className="todo" key={keyOf(record)}><input type="checkbox" checked={isPicked(record)} onChange={() => toggleRecord(record)} /> {recordName(record)}</label>;
+
   const toggleRecord = (record: CaseRecord) => {
     const ref = { project_id: projectId, kind: record.kind, doc_id: record.doc_id };
     setSelectedRefs((current) => current.some((item) => keyOf(item) === keyOf(ref))
@@ -240,7 +227,7 @@ export function ExpressPage({ projectId }: { projectId: string }) {
       : [...current, ref]);
   };
 
-  const saveSelection = () => act(async () => {
+  const saveSelection = () => act("selection", async () => {
     const content: SelectionContent = { items: selectedRefs, format, reader, key_points: keyPoints };
     const saved = selection
       ? await apiFetch<Saved<SelectionContent>>(pathFor(projectId, `/express/selection/${encodeURIComponent(selection.doc_id)}`), { method: "PUT", body: JSON.stringify({ content, base_version: selection.version }) })
@@ -248,21 +235,21 @@ export function ExpressPage({ projectId }: { projectId: string }) {
     setNotices(saved.notices ?? []);
   });
 
-  const draftFromAi = () => act(async () => {
+  const draftFromAi = () => act("outline", async () => {
     if (!selection) return;
     const turn = await ai<DraftContent>(projectId, "EXPRESS", "draft_from_outline", { selection: selection.doc_id, format, reader }) as ExpressTurn;
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
     setHandback(turn.handback ?? "");
   });
 
-  const adjustForReader = () => act(async () => {
+  const adjustForReader = () => act("rewrite", async () => {
     if (!selection || !draft) return;
     const turn = await ai<DraftContent>(projectId, "EXPRESS", "adjust_for_reader", { selection: selection.doc_id, draft: draft.doc_id, format, reader }, draft) as ExpressTurn;
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
     setHandback(turn.handback ?? "");
   });
 
-  const saveEdits = () => act(async () => {
+  const saveEdits = () => act("rewrite", async () => {
     if (!draft) return;
     const changed = sentences.map((sentence, index) => {
       const text = edits[index] ?? sentence.text;
@@ -271,7 +258,7 @@ export function ExpressPage({ projectId }: { projectId: string }) {
     await docs.update(projectId, "express.draft", draft, { ...draft.content, sentences: changed });
   });
 
-  const exportDraft = (exportFormat: string) => act(async () => {
+  const exportDraft = (exportFormat: string) => act("export", async () => {
     if (!draft) return;
     const blob = await postFile(pathFor(projectId, `/express/drafts/${encodeURIComponent(draft.doc_id)}/export?format=${encodeURIComponent(exportFormat)}`));
     download(blob, `express-draft-v${draft.version}.${exportFormat}`);
@@ -283,7 +270,7 @@ export function ExpressPage({ projectId }: { projectId: string }) {
       setSendConfirm(true);
       return;
     }
-    void act(async () => {
+    void act("send", async () => {
       const blob = await postFile(pathFor(projectId, `/express/drafts/${encodeURIComponent(draft.doc_id)}/send`), {
         version: draft.version,
         to: reader,
@@ -301,7 +288,7 @@ export function ExpressPage({ projectId }: { projectId: string }) {
       setGiveConfirm(group.group_id);
       return;
     }
-    void act(async () => {
+    void act(`group-${group.group_id}`, async () => {
       const saved = await collab.create(group.group_id, "collab.proposal", { express_draft: draft.doc_id, text: sentences.map((sentence) => sentence.text).join("\n") });
       setNotices(saved.notices);
       setGiven(group.name);
@@ -314,6 +301,7 @@ export function ExpressPage({ projectId }: { projectId: string }) {
       <div className="card cta">
         <div className="top"><h1>產出與表達</h1><span className="tag">EXPRESS</span></div>
         <p className="how">這一頁把你的判斷整理成一份可以給別人看的稿子。你會自己決定內容，也會自己按送出。</p>
+        {error && <p className="error" role="alert">{error}</p>}
 
         <div className="station">
           <h2>給誰看</h2>
@@ -339,23 +327,27 @@ export function ExpressPage({ projectId }: { projectId: string }) {
         <div className="station">
           <h2>選要帶上的紀錄</h2>
           <p className="hint">只會把打勾的紀錄放進這份稿子。</p>
-          {records.length === 0 && <p className="sub">這個案子還沒有可選的紀錄。</p>}
-          <div className="todos">
-            {records.map((record) => {
-              const checked = selectedRefs.some((ref) => keyOf(ref) === keyOf(record));
-              return <label className="todo" key={keyOf(record)}><input type="checkbox" checked={checked} onChange={() => toggleRecord(record)} /> {recordLabel(record)}</label>;
-            })}
-          </div>
+          {offeredRecords.length === 0 && <p className="sub">這個案子還沒有可選的紀錄。</p>}
+          {DRAWERS.map((drawer) => {
+            const list = offeredRecords.filter((record) => record.kind in drawer.kinds && !setAside(record));
+            return list.length > 0 && <div key={drawer.name}><h3 className="fam">{drawer.name}</h3><div className="todos">{list.map(pickRow)}</div></div>;
+          })}
+          {asideRecords.length > 0 && <Fold title={`放一旁的來源（${asideRecords.length} 筆，不算進出處）`} filled={asideRecords.filter(isPicked).length}><div className="todos">{asideRecords.map(pickRow)}</div></Fold>}
+          {pickedElsewhere.length > 0 && <><p className="hint">之前選過、不在上面清單裡的：</p><div className="todos">{pickedElsewhere.map(pickRow)}</div></>}
           <div className="btns mt8"><button className="btn primary" type="button" disabled={busy || selectedRefs.length === 0 || !reader.trim() || !format} onClick={saveSelection}>存下選擇</button></div>
+          <Missing why={firstMissing([!reader.trim(), "先選或寫這份稿子給誰看。"], [!format, "先選格式。"], [selectedRefs.length === 0, "至少勾一筆紀錄。"])} />
+          <Refused failed={failed} at="selection" />
         </div>
 
         {outline && (
           <div className="card">
             <h2>大綱</h2>
-            <ol>{outline.nodes.map((node, index) => <li key={`${index}-${node.refs.map(keyOf).join(",")}`}>{node.record ? (node.record.title || contentText(node.record.content)) : node.refs.map((ref) => recordsByKey.get(keyOf(ref)) ? recordLabel(recordsByKey.get(keyOf(ref))!) : "選取的紀錄").join("、")}</li>)}</ol>
+            <ol>{outline.nodes.map((node, index) => <li key={`${index}-${node.refs.map(keyOf).join(",")}`}>{node.record ? (node.record.title || recordName({ kind: node.record.kind, content: node.record.content })) : node.refs.map((ref) => recordsByKey.get(keyOf(ref)) ? recordName(recordsByKey.get(keyOf(ref))!) : "選取的紀錄").join("、")}</li>)}</ol>
             <div className="btns"><button className="btn primary" type="button" disabled={busy || !selection} onClick={draftFromAi}>請 AI 起草</button></div>
+            <Refused failed={failed} at="outline" />
           </div>
         )}
+        {outlineError && <p className="error">讀不到大綱：{outlineError}</p>}
 
         {handback && <div className="finding warn" role="status"><b>先確認一件事</b>{handback}</div>}
         {draft && (
@@ -375,23 +367,27 @@ export function ExpressPage({ projectId }: { projectId: string }) {
                   <div className="chips" aria-label={`第 ${index + 1} 句的來源`}>
                     {sentence.refs.map((ref) => {
                       const source = recordsByKey.get(keyOf(ref));
-                      return <button key={keyOf(ref)} type="button" className="chip" onClick={() => source && setOpenedSource(source)}>來源：{source ? recordLabel(source) : "來源紀錄"}</button>;
+                      return <button key={keyOf(ref)} type="button" className="chip" onClick={() => source && setOpenedSource(source)}>來源：{source ? recordName(source) : "來源紀錄"}</button>;
                     })}
                   </div>
                 </div>
               );
             })}
-            {openedSource && <div className="finding" role="status"><b>{recordLabel(openedSource)}</b><p>{contentText(openedSource.content)}</p><button className="btn ghost" type="button" onClick={() => setOpenedSource(null)}>關閉來源</button></div>}
+            {openedSource && <div className="finding" role="status"><b>{recordName(openedSource)}</b><p>{contentText(openedSource.content)}</p><button className="btn ghost" type="button" onClick={() => setOpenedSource(null)}>關閉來源</button></div>}
             <div className="card okline"><h3>我的信心</h3>{disclosures.confidence.length ? <ul>{disclosures.confidence.map((line) => <li key={line}>{line}</li>)}</ul> : <p className="sub">尚未寫下信心。</p>}<h3>我還不確定</h3>{disclosures.uncertainty.length ? <ul>{disclosures.uncertainty.map((line) => <li key={line}>{line}</li>)}</ul> : <p className="sub">尚未另外寫下來。</p>}</div>
             <div className="btns">
               <button className="btn" type="button" disabled={busy || !selection} onClick={adjustForReader}>請 AI 依讀者改寫</button>
               <button className="btn primary" type="button" disabled={busy} onClick={saveEdits}>存下逐句改寫</button>
             </div>
+            <Refused failed={failed} at="rewrite" />
             <div className="btns mt8">
               {EXPORTS.map((item) => <button key={item.format} className="btn ghost" type="button" disabled={busy} onClick={() => exportDraft(item.format)}>{item.label}</button>)}
             </div>
+            <Refused failed={failed} at="export" />
             {hasUnchecked && <div className="finding warn"><b>這份稿有還沒查證的句子。</b>送出前請確認你看過這個提醒。</div>}
             <div className="btns mt8"><button className="btn primary" type="button" disabled={busy || !reader.trim()} onClick={sendDraft}>{sendConfirm && hasUnchecked ? "我知道了，仍要送出" : "送出"}</button></div>
+            <Missing why={!reader.trim() && "先在上面寫這份稿子給誰看，才能送出。"} />
+            <Refused failed={failed} at="send" />
             {openGroups.length > 0 && (
               <div className="station">
                 <h3>交給群組當提案</h3>
@@ -400,14 +396,15 @@ export function ExpressPage({ projectId }: { projectId: string }) {
                   <div className="btns mt8" key={group.group_id}>
                     <span className="sub">{group.name}</span>
                     <button className="btn" type="button" disabled={busy || unsaved} onClick={() => giveToGroup(group)}>{giveConfirm === group.group_id && hasUnchecked ? "我知道了，仍要交給大家" : "交給大家當提案"}</button>
+                    <Refused failed={failed} at={`group-${group.group_id}`} />
                   </div>
                 ))}
+                <Missing why={unsaved && "逐句改寫還沒存。先按「存下逐句改寫」，才能交給群組。"} />
                 {given && <div className="finding ok mt8" role="status">已交給「{given}」當提案。</div>}
               </div>
             )}
           </div>
         )}
-        {error && <p className="error" role="alert">{error}</p>}
       </div>
     </BlockShell>
   );

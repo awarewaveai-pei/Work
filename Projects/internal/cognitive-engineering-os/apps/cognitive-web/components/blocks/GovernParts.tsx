@@ -11,11 +11,13 @@ import { exportHref, helpFor, type Help, type HelpLine, type Topic } from "../..
 /** 非治療聲明: the system's own sentence (GET /govern/help carries it, so there is one copy), for the places a person starts. */
 export function NotTherapyNotice({ link = true }: { link?: boolean }) {
   const [help, setHelp] = useState<Help | null>(null);
+  const [error, setError] = useState("");
   useEffect(() => {
     let active = true;
-    helpFor().then((found) => { if (active) setHelp(found); }).catch(() => undefined);
+    helpFor().then((found) => { if (active) setHelp(found); }).catch((reason) => { if (active) setError(humanError(reason)); });
     return () => { active = false; };
   }, []);
+  if (error) return <div className="card accent" role="note"><p className="mt0">讀不到平台的說明：{error}</p>{link && <p className="sub mb0"><Link href="/help">需要協助：看求助電話和你的權利</Link></p>}</div>;
   if (!help) return null;
   return (
     <div className="card accent" role="note">

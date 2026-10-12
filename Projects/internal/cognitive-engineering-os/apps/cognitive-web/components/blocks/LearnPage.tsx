@@ -19,6 +19,7 @@ import { formatTime } from "../../lib/time";
 import { caseEvidence, originName, type Origin } from "../../lib/evidence";
 import { BlockShell, Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips, optionalDocs } from "./JudgmentParts";
+import { Example, Fold, Missing, Refused, filledCount, type Failed } from "./PageParts";
 
 type Any = Record<string, any>;
 type Held = {
@@ -42,6 +43,7 @@ export function LearnPage({ projectId }: { projectId: string }) {
   const [day, setDay] = useState("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
@@ -83,30 +85,31 @@ export function LearnPage({ projectId }: { projectId: string }) {
     }).catch((reason) => setError(humanError(reason)));
   }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const run = (work: () => Promise<void>) => async () => {
-    setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const run = (at: string, work: () => Promise<void>) => async () => {
+    setFailed(null); setBusy(true);
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
   const set = (patch: Partial<Calibration>) => setForm((current) => ({ ...current, ...patch }));
   const pick = (next: Held, chosen: number) => { setVersion(chosen); fill(next.calibrations.filter((doc) => doc.content.judgment_version === chosen).at(-1) ?? null); };
 
   const mine = held?.calibrations.filter((doc) => doc.content.judgment_version === version).at(-1) ?? null;
-  const save = run(async () => {
+  const save = run("save", async () => {
     const content = compact({ ...form, judgment_version: version, outcome: (form.outcome ?? "").trim(), review_checks: clean(form.review_checks), trust: clean(form.trust), wrong_sources: wrong.filter((item) => item.source.trim()).map((item) => compact({ source: item.source.trim(), why: item.why?.trim(), cards: item.cards })) }) as Calibration;
     const saved = mine ? await docs.update(projectId, "learn.calibration", mine, content) : await docs.create(projectId, "learn.calibration", content);
     setNotices(saved.notices);
     await apiFetch(`/projects/${encodeURIComponent(projectId)}/learn/history`, { method: "POST" });   // this case's line in your own history, written by the platform
   });
-  const writeHistory = run(async () => { await apiFetch(`/projects/${encodeURIComponent(projectId)}/learn/history`, { method: "POST" }); });
-  const askCompare = run(async () => {
+  const writeHistory = run("history", async () => { await apiFetch(`/projects/${encodeURIComponent(projectId)}/learn/history`, { method: "POST" }); });
+  const askCompare = run("compare", async () => {
     const turn = await ai<Compare>(projectId, "LEARN", "compare", version ? { judgment_version: version } : {}, held?.compare);
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
   });
-  const saveDay = run(async () => {
+  const saveDay = run("revisit", async () => {
     if (held?.revisit) await docs.update(projectId, "learn.revisit", held.revisit, { on: day });
     else await docs.create(projectId, "learn.revisit", { on: day });
   });
-  const saveHabit = run(async () => { await docs.create(null, "learn.habit", compact({ keep: habit.keep.trim(), change: habit.change.trim(), project: projectId })); setHabit({ keep: "", change: "" }); });
+  const saveHabit = run("habit", async () => { await docs.create(null, "learn.habit", compact({ keep: habit.keep.trim(), change: habit.change.trim(), project: projectId })); setHabit({ keep: "", change: "" }); });
 
   if (!held) return <BlockShell projectId={projectId} code="LEARN"><div className="card"><p>{error || "載入中…"}</p></div></BlockShell>;
   const judgment = held.judgments.find((item) => item.version === version) ?? null;
@@ -133,6 +136,8 @@ export function LearnPage({ projectId }: { projectId: string }) {
             <label htmlFor="revisit">這次的組合沒有「行動與觀察」。你選一天，再回來重看，系統照那一天提醒你。</label>
             <input id="revisit" className="search" type="date" value={day} onChange={(event) => setDay(event.target.value)} />
             <div className="btns"><button className="btn" type="button" disabled={!day || busy} onClick={saveDay}>{held.revisit ? "改這一天" : "記下這一天"}</button></div>
+            <Missing why={!day && "先選一天。"} />
+            <Refused failed={failed} at="revisit" />
           </div>
         )}
         {!noAct && <p className="sub">要延後回顧，到「行動與觀察」改任務的期限。</p>}
@@ -162,7 +167,7 @@ export function LearnPage({ projectId }: { projectId: string }) {
         </div>
         {!judgment && held.thinkCards.length > 0 && <p className="sub">沒有判斷卡時，對照你的思考卡：{held.thinkCards.slice(0, 5).map((card) => card.content.claim).filter(Boolean).join("；")}</p>}
 
-        <h3 className="mt12">AI 當時給了什麼，你採納了嗎</h3>
+        <Fold title={`AI 當時給了什麼，你採納了嗎（${said.length} 筆）`}>
         {said.length === 0 ? <p className="sub">這個案子裡，還沒有 AI 給過的東西。</p> : (
           <div className="scroll-x">
             <table>
@@ -171,7 +176,10 @@ export function LearnPage({ projectId }: { projectId: string }) {
             </table>
           </div>
         )}
+        </Fold>
         <div className="btns mt8"><button className="btn" type="button" disabled={busy || (!held.judgments.length && !held.tasks.length)} onClick={askCompare}>{busy ? "整理中…" : held.compare ? "請 AI 再整理一次前後比較" : "請 AI 整理前後比較"}</button></div>
+        <Missing why={!held.judgments.length && !held.tasks.length && "這個案子還沒有判斷卡或任務卡，沒有東西可以對照。"} />
+        <Refused failed={failed} at="compare" />
         <p className="hint">AI 只把前後擺出來，不給分數、不排名、不改寫當初的紀錄，也不替你決定要不要修正。</p>
         {held.compare && (
           <div className="judge">
@@ -191,11 +199,19 @@ export function LearnPage({ projectId }: { projectId: string }) {
           <Chips options={PREDICTION_RESULT} value={form.prediction_result as (typeof PREDICTION_RESULT)[number] | undefined} label="預測對上了嗎" onPick={(prediction_result) => set({ prediction_result })} />
           <input className="search" aria-label="預測和結果差在哪" placeholder="差在哪（選填）" value={form.prediction_note ?? ""} maxLength={1000} onChange={(event) => set({ prediction_note: event.target.value })} />
         </div>
+        <h3 className="mt14">你決定</h3>
+        <Chips options={DECISIONS} value={form.decision as (typeof DECISIONS)[number] | undefined} label="維持、出新版，還是換方法" onPick={(decision) => set({ decision })} />
+        {form.decision === "出新版判斷" && <Cell id="updated" label="更新後的判斷條件" hint="存好之後，到「判斷」出新的一版，會看到這一句。"><textarea id="updated" value={form.updated_conditions ?? ""} maxLength={2000} onChange={(event) => set({ updated_conditions: event.target.value })} /></Cell>}
+        {form.decision === "換方法再做一輪" && <Cell id="other" label="換什麼方法" hint="「拆解」會讀到這一句。"><input id="other" className="search" value={form.other_method ?? ""} maxLength={500} onChange={(event) => set({ other_method: event.target.value })} /></Cell>}
+        <p className="hint">要不要修正，由你決定。AI 不替你決定。</p>
+        <Fold title="回頭看細一點：漏看了什麼、四個檢查題、這一步和整件事、過程和運氣" cells={9 + (held.intake?.content.done_when ? 1 : 0)} filled={filledCount(form.missed, form.step_done, form.direction, form.process, form.luck, form.done_when_met) + Object.keys(clean(form.review_checks)).length}>
         <Cell id="missed" label="當時漏看了什麼"><textarea id="missed" value={form.missed ?? ""} maxLength={2000} onChange={(event) => set({ missed: event.target.value })} /></Cell>
 
         <h3 className="mt14">回顧的四個檢查題</h3>
+        <p className="hint">這四題來自 Theo Farrell 談英國在阿富汗作戰的講稿。題目用得到你的事上；例子是那場戰爭的事，按「看例子」才會打開。</p>
         {REVIEW_CHECKS.map((item) => (
-          <Cell key={item.key} id={`check-${item.key}`} label={item.question} hint={item.example}>
+          <Cell key={item.key} id={`check-${item.key}`} label={item.question}>
+            <Example text={item.example} />
             <textarea id={`check-${item.key}`} value={form.review_checks?.[item.key] ?? ""} maxLength={1000} onChange={(event) => set({ review_checks: { ...form.review_checks, [item.key]: event.target.value } })} />
           </Cell>
         ))}
@@ -213,8 +229,8 @@ export function LearnPage({ projectId }: { projectId: string }) {
             <Chips options={DONE_WHEN} value={form.done_when_met as (typeof DONE_WHEN)[number] | undefined} label="做到了沒有" onPick={(done_when_met) => set({ done_when_met })} />
           </div>
         )}
-
-        <h3 className="mt14">還信不信 AI？五個面向</h3>
+        </Fold>
+        <Fold title="還信不信 AI？五個面向" cells={TRUST.length + 1} filled={Object.keys(clean(form.trust)).length + filledCount(form.delegate_note)}>
         <p className="how">信任不是喜歡系統，也不是因為它講得流暢。每一格只寫你看到的。</p>
         {TRUST.map((item) => (
           <Cell key={item.key} id={`trust-${item.key}`} label={item.name} hint={item.question}>
@@ -222,7 +238,8 @@ export function LearnPage({ projectId }: { projectId: string }) {
           </Cell>
         ))}
         <Cell id="delegate" label="哪些事還交給 AI，哪些不交" hint="要改，回「協作合約」改。例：你已經會自己找反例，下一輪就讓 AI 等你寫完再挑戰。"><textarea id="delegate" value={form.delegate_note ?? ""} maxLength={1000} onChange={(event) => set({ delegate_note: event.target.value })} /></Cell>
-
+        </Fold>
+        <Fold title="當時哪個出處錯了（選填）" filled={wrong.filter((item) => item.source.trim()).length}>
         <div className="field">
           <b>當時哪個出處錯了（選填）</b>
           <p className="hint">標出來，以後同一個出處再出現時，會提醒你。系統不會自動降低它的分量。{held && held.origins.length > 0 ? "這個案子找回來的出處，直接點；不在裡面的，寫它的名字。" : ""}</p>
@@ -243,13 +260,8 @@ export function LearnPage({ projectId }: { projectId: string }) {
           ))}
           <div className="btns"><button className="btn ghost" type="button" onClick={() => setWrong([...wrong, { source: "", why: "" }])}>再加一個</button></div>
         </div>
-
-        <h3 className="mt14">你決定</h3>
-        <Chips options={DECISIONS} value={form.decision as (typeof DECISIONS)[number] | undefined} label="維持、出新版，還是換方法" onPick={(decision) => set({ decision })} />
-        {form.decision === "出新版判斷" && <Cell id="updated" label="更新後的判斷條件" hint="存好之後，到「判斷」出新的一版，會看到這一句。"><textarea id="updated" value={form.updated_conditions ?? ""} maxLength={2000} onChange={(event) => set({ updated_conditions: event.target.value })} /></Cell>}
-        {form.decision === "換方法再做一輪" && <Cell id="other" label="換什麼方法" hint="「拆解」會讀到這一句。"><input id="other" className="search" value={form.other_method ?? ""} maxLength={500} onChange={(event) => set({ other_method: event.target.value })} /></Cell>}
-        <p className="hint">要不要修正，由你決定。AI 不替你決定。</p>
-
+        </Fold>
+        <Fold title="下一輪要加哪一塊（選填）" filled={(form.next_blocks ?? []).length}>
         <div className="field">
           <b>還沒用過的積木：哪一塊，可能改變結果？</b>
           <p className="hint">挑下一輪想加的；你同意，才會加。</p>
@@ -262,8 +274,11 @@ export function LearnPage({ projectId }: { projectId: string }) {
           </div>
         </div>
 
+        </Fold>
+
         <div className="btns mt8"><button className="btn primary big" type="button" disabled={!ready || busy} onClick={save}>{busy ? "存檔中…" : mine ? "存修改" : "存這次回顧"}</button></div>
-        {!ready && <p className="hint">先寫「實際發生了什麼」，才能存。</p>}
+        <Missing why={!ready && "先寫「實際發生了什麼」，才能存。"} />
+        <Refused failed={failed} at="save" />
       </div>
 
       <div className="card">
@@ -272,6 +287,7 @@ export function LearnPage({ projectId }: { projectId: string }) {
         {held.moves.length === 0 ? <p className="sub">這個案子裡，還看不到你不靠 AI 做到的動作。</p> : <ul>{held.moves.map((item) => <li key={item.item}><b>{item.item}</b>　{item.seen}</li>)}</ul>}
         {held.hints.map((hint) => <p key={hint} className="warn">{hint}</p>)}
         <div className="btns"><button className="btn" type="button" disabled={busy} onClick={writeHistory}>把這個案子記進我的歷程</button></div>
+        <Refused failed={failed} at="history" />
       </div>
 
       <div className="card">
@@ -281,9 +297,9 @@ export function LearnPage({ projectId }: { projectId: string }) {
         <Cell id="keep" label="要保留的"><input id="keep" className="search" value={habit.keep} maxLength={1000} onChange={(event) => setHabit({ ...habit, keep: event.target.value })} /></Cell>
         <Cell id="change" label="要改變的"><input id="change" className="search" value={habit.change} maxLength={1000} onChange={(event) => setHabit({ ...habit, change: event.target.value })} /></Cell>
         <div className="btns"><button className="btn" type="button" disabled={busy || !(habit.keep.trim() || habit.change.trim())} onClick={saveHabit}>記下來</button></div>
+        <Refused failed={failed} at="habit" />
       </div>
 
-      {error && <p className="error">{error}</p>}
       <p className="sub">每天 10 分鐘的校準卡、每週的思考衝刺，在 <Link href="/me/learn">我的校準</Link>，不用開案子。</p>
     </BlockShell>
   );

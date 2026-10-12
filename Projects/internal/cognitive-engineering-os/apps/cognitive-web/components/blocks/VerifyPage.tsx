@@ -12,6 +12,7 @@ import { apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type AiTurn, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { BlockShell, Notices } from "./BlockShell";
+import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
 
 type Cell = { state: string; value?: string; why?: string };
 export type Message = { text: string; form: string; url?: string; sha256: string };
@@ -131,6 +132,7 @@ function ClaimForm({ initial, spec, busy, onSave, onCancel, needReason }: { init
         <button className="btn primary" type="button" disabled={!ready || busy} onClick={() => onSave({ ...claim, text: claim.text.trim() })}>存這個主張</button>
         {onCancel && <button className="btn ghost" type="button" onClick={onCancel}>取消</button>}
       </div>
+      <Missing why={firstMissing([!claim.text.trim(), "先寫主張。"], [!claim.sentence, "先選這是哪一種句子。"], [Boolean(needReason && !(claim.reason ?? "").trim()), "寫為什麼改。"])} />
     </div>
   );
 }
@@ -165,6 +167,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
   const [handback, setHandback] = useState("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
+  const [failed, setFailed] = useState<Failed>(null);
   const [busy, setBusy] = useState(false);
   const [refresh, setRefresh] = useState(0);
 
@@ -186,9 +189,10 @@ export function VerifyPage({ projectId }: { projectId: string }) {
     load().catch((reason) => setError(humanError(reason)));
   }, [projectId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const act = async (work: () => Promise<void>) => {
-    setError(""); setBusy(true);
-    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setError(humanError(reason)); } finally { setBusy(false); }
+  // `at`: the button group that sent it; its refusal is shown there (PageParts.Refused)
+  const act = async (at: string, work: () => Promise<void>) => {
+    setFailed(null); setBusy(true);
+    try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
   const turn = async <C,>(action: string, context: Record<string, unknown>) => {
     const answer = await ai<C>(projectId, "VERIFY", action, context) as Turn<C>;
@@ -215,28 +219,28 @@ export function VerifyPage({ projectId }: { projectId: string }) {
   const summary = summaries.at(-1);
   const next = nexts.at(-1);
 
-  const pasteMessage = () => act(async () => {
+  const pasteMessage = () => act("message", async () => {
     const text = draft.text.trim() || (draft.form === "連結" ? draft.url.trim() : "");
     const saved = await apiFetch<Doc<Message> & { notices: Notice[] }>(`${base}/verify/messages`, { method: "POST", body: JSON.stringify({ text, form: draft.form, ...(draft.form === "連結" ? { url: draft.url.trim() } : {}) }) });
     setNotices(saved.notices); setPicked(saved.doc_id); setDraft({ form: draft.form, text: "", url: "" });
   });
-  const saveFirst = () => act(async () => {
+  const saveFirst = () => act("first", async () => {
     if (!message || first.confidence === null) return;
     setNotices((await docs.create(projectId, "verify.first", { message: message.doc_id, reaction: first.reaction.trim(), confidence: first.confidence })).notices);
     setFirst({ reaction: "", confidence: null });
   });
-  const lookUp = (body: Record<string, string>) => act(async () => { await apiFetch(`${base}/verify/factcheck`, { method: "POST", body: JSON.stringify(body) }); });
-  const saveClaim = (claim: Claim, doc?: Doc<Claim>) => act(async () => {
+  const lookUp = (body: Record<string, string>, at: string) => act(at, async () => { await apiFetch(`${base}/verify/factcheck`, { method: "POST", body: JSON.stringify(body) }); });
+  const saveClaim = (claim: Claim, doc: Doc<Claim> | undefined, at: string) => act(at, async () => {
     const clean = Object.fromEntries(Object.entries(claim).filter(([, value]) => value !== "" && value !== undefined)) as Claim;
     setNotices((doc ? await docs.update(projectId, "verify.claim", doc, clean) : await docs.create(projectId, "verify.claim", clean)).notices);
     setEditing(null);
   });
-  const saveSeen = () => act(async () => {
+  const saveSeen = () => act("seen", async () => {
     if (!message) return;
     setNotices((await docs.create(projectId, "verify.seen", { message: message.doc_id, about: seenDraft.about, text: seenDraft.text.trim() })).notices);
     setSeenDraft({ about: "", text: "" });
   });
-  const summarise = (goOn: boolean) => act(async () => {
+  const summarise = (goOn: boolean) => act("summary", async () => {
     const answer = await turn<Summary>("summary", goOn ? { go_on: true } : {});
     setHandback(answer.handback ?? "");
   });
@@ -252,6 +256,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         <textarea aria-label="訊息原文" placeholder={draft.form === "連結" ? "連結裡看到的字（選填）" : draft.form === "截圖文字" ? "截圖裡的字" : "訊息原文"} value={draft.text} maxLength={20000}
           onChange={(event) => setDraft({ ...draft, text: event.target.value })} />
         <div className="btns mt8"><button className="btn primary" type="button" disabled={busy || !(draft.text.trim() || (draft.form === "連結" && draft.url.trim()))} onClick={pasteMessage}>存這則訊息</button></div>
+        <Missing why={!(draft.text.trim() || (draft.form === "連結" && draft.url.trim())) && (draft.form === "連結" ? "先貼上網址。" : "先貼上訊息的字。")} />
+        <Refused failed={failed} at="message" />
       </div>
 
       {messages.length > 0 && (
@@ -270,6 +276,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
                 <Chips options={CONFIDENCE.map(String)} value={first.confidence === null ? "" : String(first.confidence)} onPick={(value) => setFirst({ ...first, confidence: Number(value) })} label="信心有多少"
                   names={Object.fromEntries(CONFIDENCE.map((value) => [String(value), `${value}%`]))} />
                 <div className="btns mt8"><button className="btn primary" type="button" disabled={busy || !first.reaction.trim() || first.confidence === null} onClick={saveFirst}>存我的第一反應</button></div>
+                <Missing why={firstMissing([!first.reaction.trim(), "先寫你的第一反應。"], [first.confidence === null, "先選你有多相信它。"])} />
+                <Refused failed={failed} at="first" />
               </div>
             ) : <p className="sub">你的第一反應：{reaction.content.reaction}（信心 {reaction.content.confidence}%）</p>}
           </>}
@@ -281,7 +289,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
           <h2>別人查過嗎</h2>
           <p className="how">系統拿這則訊息去比對查核資料庫。查到的，是查核組織的結論，不是平台的結論。它跟別的來源一樣，由你判斷。</p>
           <p className="hint">{sentTo(spec, asks)}</p>
-          <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => lookUp({ message: message.doc_id })}>{checks ? "再查一次" : "查查核資料庫"}</button></div>
+          <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => lookUp({ message: message.doc_id }, "factcheck")}>{checks ? "再查一次" : "查查核資料庫"}</button></div>
+          <Refused failed={failed} at="factcheck" />
           {checks && <FactcheckResult result={checks.content} spec={spec} />}
         </div>
 
@@ -289,29 +298,37 @@ export function VerifyPage({ projectId }: { projectId: string }) {
           <h2>拆成主張</h2>
           <p className="how">AI 先提出怎麼拆。每一個，你確認了才算。你也可以自己加。</p>
           <div className="btns">
-            <button className="btn" type="button" disabled={busy} onClick={() => act(async () => { await turn("split", { message: message.doc_id }); })}>{split ? "請 AI 再拆一次" : "請 AI 提拆法"}</button>
+            <button className="btn" type="button" disabled={busy} onClick={() => act("split", async () => { await turn("split", { message: message.doc_id }); })}>{split ? "請 AI 再拆一次" : "請 AI 提拆法"}</button>
             <button className="btn ghost" type="button" onClick={() => setEditing("new")}>自己加一個主張</button>
           </div>
+          <Refused failed={failed} at="split" />
           {split && proposals.length > 0 && <span className="tags"><span>{AUTHOR[split.author]}</span></span>}
-          {proposals.map((item) => editing === `proposal:${item.index}` ? (
-            <ClaimForm key={item.index} spec={spec} busy={busy} initial={{ text: item.text, sentence: item.sentence, law: item.law, from: "訊息", message: message.doc_id, proposal: `${split!.doc_id}#${item.index}` }}
-              onSave={(claim) => saveClaim(claim)} onCancel={() => setEditing(null)} />
-          ) : (
-            <div key={item.index} className="mcard">
-              <span>{item.text}</span><span className="k">{item.sentence}{item.law ? "・法律" : ""}</span>
-              <div className="btns">
-                <button className="btn primary" type="button" disabled={busy} onClick={() => saveClaim({ text: item.text, sentence: item.sentence, ...(item.law ? { law: true } : {}), from: "訊息", message: message.doc_id, proposal: `${split!.doc_id}#${item.index}` })}>確認</button>
-                <button className="btn ghost" type="button" onClick={() => setEditing(`proposal:${item.index}`)}>改了再確認</button>
-              </div>
-            </div>
+          {proposals.map((item) => (
+            <React.Fragment key={item.index}>
+              {editing === `proposal:${item.index}` ? (
+                <ClaimForm spec={spec} busy={busy} initial={{ text: item.text, sentence: item.sentence, law: item.law, from: "訊息", message: message.doc_id, proposal: `${split!.doc_id}#${item.index}` }}
+                  onSave={(claim) => saveClaim(claim, undefined, `proposal-${item.index}`)} onCancel={() => setEditing(null)} />
+              ) : (
+                <div className="mcard">
+                  <span>{item.text}</span><span className="k">{item.sentence}{item.law ? "・法律" : ""}</span>
+                  <div className="btns">
+                    <button className="btn primary" type="button" disabled={busy} onClick={() => saveClaim({ text: item.text, sentence: item.sentence, ...(item.law ? { law: true } : {}), from: "訊息", message: message.doc_id, proposal: `${split!.doc_id}#${item.index}` }, undefined, `proposal-${item.index}`)}>確認</button>
+                    <button className="btn ghost" type="button" onClick={() => setEditing(`proposal:${item.index}`)}>改了再確認</button>
+                  </div>
+                </div>
+              )}
+              <Refused failed={failed} at={`proposal-${item.index}`} />
+            </React.Fragment>
           ))}
-          {editing === "new" && <ClaimForm spec={spec} busy={busy} initial={{ text: "", sentence: "", from: "訊息", message: message.doc_id }} onSave={(claim) => saveClaim(claim)} onCancel={() => setEditing(null)} />}
+          {editing === "new" && <ClaimForm spec={spec} busy={busy} initial={{ text: "", sentence: "", from: "訊息", message: message.doc_id }} onSave={(claim) => saveClaim(claim, undefined, "newclaim")} onCancel={() => setEditing(null)} />}
+          <Refused failed={failed} at="newclaim" />
         </div>
 
         <div className="card">
           <h2>用了什麼手法、要你做什麼</h2>
           <p className="how">對照「{spec.techniques.title}」第 {spec.techniques.version} 版（{spec.techniques.maintainer}）。每找到一個，都附上原文的哪一段。手法不等於假：真的事也會被拿來操弄。</p>
-          <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => act(async () => { await turn("techniques", { message: message.doc_id }); })}>請 AI 找手法</button></div>
+          <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => act("techniques", async () => { await turn("techniques", { message: message.doc_id }); })}>請 AI 找手法</button></div>
+          <Refused failed={failed} at="techniques" />
           {found && <div className="judge">
             <span className="tags"><span>{AUTHOR[found.author]}</span></span>
             {(found.content.techniques ?? []).length === 0 && <p className="sub">AI 沒有在這則訊息裡找到清單上的手法。</p>}
@@ -329,6 +346,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
             names={Object.fromEntries(spec.spread.map((item) => [item.key, item.question]))} />
           <textarea aria-label="你看到的" value={seenDraft.text} maxLength={2000} onChange={(event) => setSeenDraft({ ...seenDraft, text: event.target.value })} />
           <div className="btns mt8"><button className="btn" type="button" disabled={busy || !seenDraft.about || !seenDraft.text.trim()} onClick={saveSeen}>存我看到的</button></div>
+          <Missing why={firstMissing([!seenDraft.about, "先選你看到的是哪一件。"], [!seenDraft.text.trim(), "寫下你看到的。"])} />
+          <Refused failed={failed} at="seen" />
           <ul>{seen.filter((doc) => doc.content.message === message.doc_id).map((doc) => <li key={doc.doc_id}>{spec.spread.find((item) => item.key === doc.content.about)?.question}：{doc.content.text}<span className="tags"><span>{AUTHOR[doc.author]}</span><span>不算出處</span></span></li>)}</ul>
           <details><summary>有組織的假訊息怎麼認（檢查題，可以跳過）</summary><ul>{spec.check_questions.map((question) => <li key={question}>{question}</li>)}</ul></details>
         </div>
@@ -340,7 +359,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
           <p className="how">你在「拆解」標成事實或法律的句子，可以帶進來查。</p>
           {toBring.map((item) => (
             <div key={item.id} className="mcard"><span>{item.text}</span><span className="k">{item.kind}</span>
-              <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => saveClaim(claimFromMap(item, spec.checkable))}>帶進來</button></div>
+              <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => saveClaim(claimFromMap(item, spec.checkable), undefined, `bring-${item.id}`)}>帶進來</button></div>
+              <Refused failed={failed} at={`bring-${item.id}`} />
             </div>
           ))}
         </div>
@@ -354,7 +374,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
           <LedgerLine key={`${line.claim_id}:${line.version}`} projectId={projectId} line={line} spec={spec} asks={asks} busy={busy} base={base} claims={claims} cards={cards} hitOf={hitOf} cardTitle={cardTitle} lines={lines}
             readings={readingsFor(readings, line.claim_id, line.version)} stances={liveOf(stances, line.claim_id)}
             verdict={liveOf(verdicts, line.claim_id).at(-1)} editing={editing === line.claim_id} setEditing={setEditing}
-            factcheck={ofVersion(factchecks, line.claim_id, line.version).at(-1)} act={act} saveClaim={saveClaim} lookUp={lookUp} setNotices={setNotices} />
+            factcheck={ofVersion(factchecks, line.claim_id, line.version).at(-1)} act={act} saveClaim={saveClaim} lookUp={lookUp} setNotices={setNotices} failed={failed} />
         ))}
       </div>
 
@@ -369,13 +389,16 @@ export function VerifyPage({ projectId }: { projectId: string }) {
               onClick={() => setReadCards(readCards.includes(card.card) ? readCards.filter((item) => item !== card.card) : [...readCards, card.card])}>{(card.title || card.url || "來源卡").slice(0, 24)}</button>
           ))}</div>
           {forAi.length === 0 && <p className="sub">還沒有可以給 AI 讀的來源卡。先「去查」。</p>}
-          <div className="btns mt8"><button className="btn" type="button" disabled={busy || readCards.length === 0} onClick={() => act(async () => { await turn("read", { cards: readCards }); })}>請 AI 讀這些來源</button></div>
+          <div className="btns mt8"><button className="btn" type="button" disabled={busy || readCards.length === 0} onClick={() => act("read", async () => { await turn("read", { cards: readCards }); })}>請 AI 讀這些來源</button></div>
+          <Missing why={forAi.length > 0 && readCards.length === 0 && "先點要給 AI 讀的來源卡。"} />
+          <Refused failed={failed} at="read" />
         </div>
 
         <div className="card">
           <h2>AI 白話摘要帳本</h2>
           <p className="how">帳本本身由系統排，AI 只用白話說一次。一個主張的獨立出處不到 {spec.min_origins} 個時，AI 先停下來，由你決定。</p>
           <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => summarise(false)}>請 AI 摘要</button></div>
+          <Refused failed={failed} at="summary" />
           {handback && <div className="judge"><p className="warn">{handback}</p><div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => summarise(true)}>照樣請 AI 摘要</button></div></div>}
           {summary && <div className="judge">
             <span className="tags"><span>{AUTHOR[summary.author]}</span></span>
@@ -387,7 +410,8 @@ export function VerifyPage({ projectId }: { projectId: string }) {
 
         <div className="card">
           <h2>還該查什麼</h2>
-          <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => act(async () => { await turn("next", {}); })}>請 AI 提還該查什麼</button></div>
+          <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => act("next", async () => { await turn("next", {}); })}>請 AI 提還該查什麼</button></div>
+          <Refused failed={failed} at="next" />
           {next && <div className="judge"><span className="tags"><span>{AUTHOR[next.author]}</span></span><ul>{next.content.items.map((item) => <li key={item}>{item}</li>)}</ul>{next.content.question && <p><b>一個問題：</b>{next.content.question}</p>}</div>}
         </div>
       </>}
@@ -428,13 +452,14 @@ function FactcheckResult({ result, spec }: { result: Factcheck; spec: Spec }) {
   );
 }
 
-function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hitOf, cardTitle, lines, readings, stances, verdict, editing, setEditing, factcheck, act, saveClaim, lookUp, setNotices }: {
+function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hitOf, cardTitle, lines, readings, stances, verdict, editing, setEditing, factcheck, act, saveClaim, lookUp, setNotices, failed }: {
   projectId: string; line: Line; spec: Spec; asks: string[]; busy: boolean; base: string; claims: Doc<Claim>[]; cards: EvidenceCard[]; hitOf: Map<string, HeldHit>; cardTitle: (id: string) => string; lines: Line[];
   // stances / verdict: the live ones of this claim, any version -- to edit them; shown only for this line's version and page
   readings: Array<ReadingEntry & { reading: string }>; stances: Doc<Stance>[]; verdict?: Doc<Verdict>; editing: boolean; setEditing: (value: string | null) => void;
-  factcheck?: Doc<Factcheck>; act: (work: () => Promise<void>) => Promise<void>; saveClaim: (claim: Claim, doc?: Doc<Claim>) => Promise<void>;
-  lookUp: (body: Record<string, string>) => Promise<void>; setNotices: (notices: Notice[]) => void;
+  factcheck?: Doc<Factcheck>; act: (at: string, work: () => Promise<void>) => Promise<void>; saveClaim: (claim: Claim, doc: Doc<Claim> | undefined, at: string) => Promise<void>;
+  lookUp: (body: Record<string, string>, at: string) => Promise<void>; setNotices: (notices: Notice[]) => void; failed: Failed;
 }) {
+  const at = `line-${line.claim_id}`;   // every action on this line answers on this line
   const doc = claims.find((item) => item.doc_id === line.claim_id)!;
   const [angles, setAngles] = useState<string[]>(spec.angles);
   const [plan, setPlan] = useState<{ seeds: number; max_queries: number; max_fetches: number } | null>(null);
@@ -450,7 +475,7 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
   const mine = (card: string) => ofVersion(stances, line.claim_id, line.version).find((item) => item.content.card === card && item.content.snapshot === sha(card));
   const shown = stances.filter((item) => mine(item.content.card) === item);
   const post = (path: string, body: unknown) => apiFetch<Record<string, any>>(`${base}${path}`, { method: "POST", body: JSON.stringify(body) });
-  const saveStance = (content: Stance, held?: Doc<Stance>) => act(async () => {
+  const saveStance = (content: Stance, held?: Doc<Stance>) => act(`${at}:read`, async () => {
     const saved = await post("/verify/stances", { content, ...(held ? { doc_id: held.doc_id, base_version: held.version } : {}) });
     setNotices(saved.notices ?? []); setOwn({ card: "", stance: "", quote: "", reason: "" });
   });
@@ -461,11 +486,11 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
       ...(own.quote.trim() ? { quote: own.quote.trim() } : {}), ...(own.reading ? { reading: own.reading.reading } : {}), ...(own.reason.trim() ? { reason: own.reason.trim() } : {}) };
     return saveStance(content, held(own.card));
   };
-  const goCheck = (confirm: boolean) => act(async () => {
+  const goCheck = (confirm: boolean) => act(`${at}:check`, async () => {
     const answer = await post(`/verify/claims/${enc(line.claim_id)}/search`, { angles, confirm });
     setPlan(confirm ? null : answer.plan);
   });
-  const saveVerdict = () => act(async () => {
+  const saveVerdict = () => act(`${at}:verdict`, async () => {
     const content = { claim: line.claim_id, claim_version: line.version, verdict: judge.verdict, reason: judge.reason.trim() };
     setNotices((verdict ? await docs.update(projectId, "verify.verdict", verdict, content) : await docs.create(projectId, "verify.verdict", content)).notices);
   });
@@ -473,7 +498,7 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
   const ownHit = hitOf.get(cards.find((item) => item.card === own.card)?.source_id ?? "");
   return (
     <div className="judge">
-      {editing ? <ClaimForm spec={spec} busy={busy} initial={{ ...doc.content, reason: "" }} needReason onSave={(claim) => saveClaim(claim, doc)} onCancel={() => setEditing(null)} /> : <>
+      {editing ? <><ClaimForm spec={spec} busy={busy} initial={{ ...doc.content, reason: "" }} needReason onSave={(claim) => saveClaim(claim, doc, `${at}:claim`)} onCancel={() => setEditing(null)} /><Refused failed={failed} at={`${at}:claim`} /></> : <>
         <p className="mt0"><b>{line.text}</b></p>
         <span className="tags">
           <span>{line.sentence}</span>{line.law && <span>法律{line.law_state ? `：${line.law_state}` : ""}</span>}<span>{doc.content.from === "MAP" ? "從地圖帶來的" : doc.content.proposal ? "AI 提的，你確認了" : "你寫的"}</span>
@@ -501,8 +526,10 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
         <div className="btns">
           {plan ? <button className="btn primary" type="button" disabled={busy || angles.length === 0} onClick={() => goCheck(true)}>確認去查</button>
             : <button className="btn" type="button" disabled={busy || angles.length === 0} onClick={() => goCheck(false)}>去查（先看計畫）</button>}
-          <button className="btn ghost" type="button" disabled={busy} onClick={() => lookUp({ claim: line.claim_id })}>查查核資料庫</button>
+          <button className="btn ghost" type="button" disabled={busy} onClick={() => lookUp({ claim: line.claim_id }, `${at}:check`)}>查查核資料庫</button>
         </div>
+        <Missing why={angles.length === 0 && "至少選一個要找的方向。"} />
+        <Refused failed={failed} at={`${at}:check`} />
         <p className="hint">「查查核資料庫」：{sentTo(spec, asks)}</p>
         {factcheck && <FactcheckResult result={factcheck.content} spec={spec} />}
       </div>}
@@ -518,7 +545,7 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
           </div>
         ))}
         {readings.some((entry) => !mine(entry.card)) && <div className="btns"><button className="btn" type="button" disabled={busy}
-          onClick={() => act(async () => { for (const reading of [...new Set(readings.filter((entry) => !mine(entry.card)).map((entry) => entry.reading))]) setNotices((await post("/verify/stances/confirm", { reading, claim: line.claim_id })).notices ?? []); })}>這個主張的全部照這樣記</button></div>}
+          onClick={() => act(`${at}:read`, async () => { for (const reading of [...new Set(readings.filter((entry) => !mine(entry.card)).map((entry) => entry.reading))]) setNotices((await post("/verify/stances/confirm", { reading, claim: line.claim_id })).notices ?? []); })}>這個主張的全部照這樣記</button></div>}
       </div>}
       {shown.length > 0 && <ul>{shown.map((item) => <li key={item.doc_id}>{cardTitle(item.content.card)}：{item.content.stance}{item.content.quote ? `「${item.content.quote}」` : ""}<span className="tags"><span>{AUTHOR[item.author]}</span></span></li>)}</ul>}
       <div className="field">
@@ -530,6 +557,8 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
         <input className="search" aria-label="原文的哪一段（選填，要照抄）" placeholder="原文的哪一段（選填，要照抄）" value={own.quote} maxLength={2000} onChange={(event) => setOwn({ ...own, quote: event.target.value })} />
         {own.reading && own.stance && own.stance !== own.reading.reads_as && <input className="search" aria-label="為什麼跟 AI 讀的不一樣" placeholder="為什麼跟 AI 讀的不一樣（必填）" value={own.reason} maxLength={1000} onChange={(event) => setOwn({ ...own, reason: event.target.value })} />}
         <div className="btns"><button className="btn" type="button" disabled={busy || !own.card || !own.stance || Boolean(own.reading && own.stance !== own.reading.reads_as && !own.reason.trim())} onClick={writeOwn}>存我的讀法</button></div>
+        <Missing why={(own.card || own.stance) && firstMissing([!own.card, "先選讀哪一張。"], [!own.stance, "先選它怎麼說這個主張。"], [Boolean(own.reading && own.stance !== own.reading.reads_as && !own.reason.trim()), "寫為什麼跟 AI 讀的不一樣。"])} />
+        <Refused failed={failed} at={`${at}:read`} />
       </div>
       <div className="field">
         <b>你的判定</b>
@@ -540,6 +569,8 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
           <button className="btn primary" type="button" disabled={busy || !judge.verdict || !judge.reason.trim()} onClick={saveVerdict}>存判定</button>
           {!editing && <button className="btn ghost" type="button" onClick={() => setEditing(line.claim_id)}>改主張</button>}
         </div>
+        <Missing why={(judge.verdict || judge.reason.trim()) && firstMissing([!judge.verdict, "先選採信、存疑或不採信。"], [!judge.reason.trim(), "寫一句理由。"])} />
+        <Refused failed={failed} at={`${at}:verdict`} />
       </div>
     </div>
   );
