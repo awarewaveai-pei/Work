@@ -1,8 +1,8 @@
 """VERIFY's AI turns (contract card 「AI 能做什麼」): propose how a message splits into claims (``split``), name the
 manipulation patterns with the message's own words (``techniques``), read what each source card says about each claim
-(``read``: cites the case's cards only, never one only the person reads -- a fact-check hit or report), summarise the
-ledger in plain words (``summary``: hands back under two independent origins), and say what is still worth checking
-(``next``). The pasted message reaches split and techniques only through the gate's ``quoted``: after the crisis check,
+(``read``: cites the case's cards only, never one only the person reads -- a fact-check hit or report). The ledger in plain
+words and what is still worth checking are the system's own sentences, not AI turns (kinds/verify.py ledger_sentence,
+what_next; docs/platform/AI_TO_CODE_AUDIT.md §1). The pasted message reaches split and techniques only through the gate's ``quoted``: after the crisis check,
 fenced as someone else's words (a rumour that mentions 自殺 is not the person's crisis signal).
 
 Every turn about a message waits for the person's first reaction to it (先寫第一反應，才看結果). The AI never rules a claim
@@ -18,8 +18,8 @@ import re
 from contextvars import ContextVar
 from typing import Any, Callable, Mapping
 
-from ai_lego.core.domain.evidence_words import CHECKABLE, MIN_ORIGINS, MIN_QUOTE, NOT_CHECKABLE, SENTENCE_KINDS, STANCES, normalise_quote, quote_in
-from ai_lego.core.domain.kinds.verify import ASKS, LAW_UNCONFIRMED_LINE, claim_key, law_unconfirmed, weak_line
+from ai_lego.core.domain.evidence_words import CHECKABLE, MIN_QUOTE, SENTENCE_KINDS, STANCES, normalise_quote, quote_in
+from ai_lego.core.domain.kinds.verify import ASKS, claim_key
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gate import AiAction
 from ai_lego.platform.block_hooks.verify import FIRST_REQUIRED, card_sha, first_written, person_reads
@@ -252,91 +252,6 @@ def _read_shape(answer: dict[str, Any]) -> dict[str, Any]:
     return {"readings": readings}
 
 
-# -- summary of the ledger ---------------------------------------------------------------------------------------------
-
-SUMMARY = (
-    "Summarise the claim ledger for the person in plain words: lines, one per claim (claim: its id; line: one sentence), then overview, at most "
-    "three sentences. Say only what the ledger holds: a claim's state and how many independent origins support or oppose it. Never say whether "
-    "a claim is true or false, what to believe, or whether to forward anything; add nothing the ledger does not hold. A 法律 claim marked "
-    "law_unconfirmed: say its jurisdiction, time limit or source is not written yet, so it is not a settled conclusion."
-)
-SUMMARY_SCHEMA = {"type": "object", "properties": {"lines": {"type": "array", "items": {"type": "object", "properties": {"claim": {"type": "string"}, "line": {"type": "string"}},
-                                                                                      "required": ["claim", "line"]}}, "overview": {"type": "string"}}, "required": ["lines"]}
-
-
-def _ledger(context: Mapping[str, Any], read: Read) -> list[dict[str, Any]]:
-    mine = {doc["doc_id"]: doc for doc in _claims(context, read)}
-    return [line for line in read.evidence.claims() if line["claim_id"] in mine]   # type: ignore[attr-defined]
-
-
-def _summary_handback(context: Mapping[str, Any], read: Read) -> str | None:
-    """交還控制：一個主張的獨立出處不到兩個時，AI 停下來 -- unless the person chose to go on (context["go_on"])."""
-    if context.get("go_on") is True:
-        return None
-    few = [line for line in _ledger(context, read) if line["few"]]
-    if not few:
-        return None
-    counts = "、".join(f"{len(set(line['support']) | set(line['oppose']))} 個" for line in few)
-    return f"有 {len(few)} 個主張的獨立出處不到 {MIN_ORIGINS} 個（各是 {counts}）。AI 先停下來，由你決定要不要照樣請它摘要。"
-
-
-def _summary_input(context: Mapping[str, Any], read: Read) -> str:
-    ledger = _ledger(context, read)
-    claims = {doc["doc_id"]: doc["content"] for doc in read("verify.claim")}
-    fixed = {}
-    rows = []
-    for line in ledger:
-        support, oppose = len(line["support"]), len(line["oppose"])
-        unconfirmed = law_unconfirmed(claims.get(line["claim_id"], {}))
-        said = [NOT_CHECKABLE if line["state"] == NOT_CHECKABLE else weak_line(support, oppose) if line["few"] else "", LAW_UNCONFIRMED_LINE if unconfirmed else ""]
-        if any(said):
-            fixed[line["claim_id"]] = "；".join(part for part in said if part)
-        rows.append({"claim": line["claim_id"], "text": line["text"], "kind": line["sentence"], "state": line["state"], "support": support, "oppose": oppose,
-                     **({"law_unconfirmed": True} if unconfirmed else {})})
-    _TURN.set({"versions": {line["claim_id"]: line["version"] for line in ledger}, "fixed": fixed, "states": {line["claim_id"]: line["state"] for line in ledger}})
-    return "The claim ledger (counts of independent origins, made by the system):\n" + json.dumps(rows, ensure_ascii=False)
-
-
-def _summary_shape(answer: dict[str, Any]) -> dict[str, Any]:
-    """A claim under two origins, one that cannot be checked, or a 法律 claim without its 法域、時效、來源 gets fixed words
-    whatever the model wrote. A claim given two different lines gets the ledger's own words: which one it meant is unknown."""
-    turn = _turn()
-    given = [(item["claim"], _text(item.get("line"), 300)) for item in answer.get("lines") or [] if isinstance(item, dict) and isinstance(item.get("claim"), str)]
-    said = {claim: line for claim, line in given if len({other for named, other in given if named == claim}) == 1}
-    lines = [{"claim": claim, "claim_version": version, "line": turn["fixed"].get(claim) or said.get(claim) or f"帳本上是「{turn['states'][claim]}」"}
-             for claim, version in turn["versions"].items()]
-    shaped = {"lines": lines, "overview": _text(answer.get("overview"), 1000)}
-    return {key: value for key, value in shaped.items() if value not in ("", [])}
-
-
-# -- what is still worth checking --------------------------------------------------------------------------------------
-
-NEXT = (
-    "Point out what is still worth checking about these claims, as at most 5 short items, and at most one question. Follow a fact-checker's "
-    "order: who said it first, how others report it, the earliest original. Name kinds of records or places to look (an official notice, the "
-    "original document, a local fact-checker, someone who was there) -- never a conclusion, never whether to believe or forward it, and never "
-    "a source you remember."
-)
-NEXT_SCHEMA = {"type": "object", "properties": {"items": {"type": "array", "maxItems": 5, "items": {"type": "string"}}, "question": {"type": "string"}}, "required": ["items"]}
-
-
-def _next_input(context: Mapping[str, Any], read: Read) -> str:
-    claims = _claims(context, read)
-    ledger = {line["claim_id"]: line for line in read.evidence.claims()}   # type: ignore[attr-defined]
-    rows = [{"text": doc["content"]["text"], "kind": doc["content"]["sentence"], "state": ledger.get(doc["doc_id"], {}).get("state"),
-             **({"law_unconfirmed": True} if law_unconfirmed(doc["content"]) else {})} for doc in claims]
-    return "The claims and where they stand:\n" + json.dumps(rows, ensure_ascii=False)
-
-
-def _next_shape(answer: dict[str, Any]) -> dict[str, Any]:
-    items = [_text(item, 200) for item in answer.get("items") or [] if _text(item, 200)][:5]
-    if not items:
-        raise _invalid("nothing named to check")
-    question = _text(answer.get("question"), 300)
-    question = question[:question.find("？") + 1] if "？" in question else question
-    return {"items": items, **({"question": question} if question else {})}
-
-
 ACTIONS = [
     AiAction(block="VERIFY", name="split", needs="organize", instructions=SPLIT, output_kind="verify.split", output_schema=SPLIT_SCHEMA,
              reads=("verify.message", "verify.first"), build_input=_split_input, shape=_split_shape, max_tokens=6000, quoted=_the_message, verbatim=("text",)),
@@ -345,8 +260,4 @@ ACTIONS = [
     # reading the case's source cards and citing them is what 「找外部資料（只引用有來源卡的）」 grants (as GATHER's summaries)
     AiAction(block="VERIFY", name="read", needs="search_external", instructions=READ, output_kind="verify.reading", output_schema=READ_SCHEMA,
              reads=("verify.claim", "verify.first", "gather.source"), build_input=_read_input, shape=_read_shape, max_tokens=6000, cites=True),
-    AiAction(block="VERIFY", name="summary", needs="organize", instructions=SUMMARY, output_kind="verify.summary", output_schema=SUMMARY_SCHEMA,
-             reads=("verify.claim", "verify.first"), build_input=_summary_input, shape=_summary_shape, handback=_summary_handback),
-    AiAction(block="VERIFY", name="next", needs="point_gaps", instructions=NEXT, output_kind="verify.next", output_schema=NEXT_SCHEMA,
-             reads=("verify.claim", "verify.first"), build_input=_next_input, shape=_next_shape),
 ]

@@ -147,6 +147,25 @@ describe("ACT 行動與觀察", () => {
     await done();
   });
 
+  it("lists what I ticked on each task, who is affected and where my numbers went, made by the system with no AI button; an AI record saved before still shows", async () => {
+    const task = { ...TASK, content: { ...TASK.content, irreversible: true, hold: "請人覆核" } };
+    const notes = [doc("act.note", "N1", { task: "T1", numbers: [{ name: "價格", value: 90, unit: "萬" }, { name: "訂單", value: 3 }] }, { at: "2026-10-08T08:00:00Z" }),
+      doc("act.note", "N2", { task: "T1", numbers: [{ name: "價格", value: 80, unit: "萬" }] }, { at: "2026-10-15T08:00:00Z" })];
+    const oldFlag = doc("act.flag", "F1", { irreversible: ["跟他談一次條件：話說出口收不回"] }, { author: "ai", block: "ACT" });
+    const { host, done, calls } = await open({ [`GET ${P}/docs/act.task`]: [task], [`GET ${P}/docs/act.note`]: notes, [`GET ${P}/docs/act.flag`]: [oldFlag] });
+    const text = host.textContent ?? "";
+    expect(text).toContain("系統整理的，不是 AI 寫的，不扣點");
+    expect(text).toContain("跟他談一次條件：不能反悔；你選了「請人覆核」");
+    expect(text).toContain("合夥人");
+    expect(text).toContain("「跟他談一次條件」的「價格」：從 90萬 到 80萬，少了 10萬；2026-10-08 到 2026-10-15 記了 2 次。");
+    expect(text).toContain("「跟他談一次條件」的「訂單」：只記了一次");
+    expect(text).toContain("以前 AI 整理的");
+    expect(text).toContain("話說出口收不回");
+    expect([...host.querySelectorAll("button")].map((button) => button.textContent).filter((label) => /哪裡不能反悔|整理數字|趨勢/.test(label ?? ""))).toEqual([]);
+    expect(calls.filter((call) => call.method !== "GET" && call.path.includes("/ai/"))).toEqual([]);
+    await done();
+  });
+
   it("shows what the engine says is due, and the rhythm of each task in words", async () => {
     const { host, done } = await open({
       [`GET ${P}/docs/act.task`]: [{ ...TASK, content: { ...TASK.content, long_rhythm: "年" } }],

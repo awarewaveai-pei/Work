@@ -22,6 +22,16 @@ LAYERS = (
 )
 LAYER_KEYS = tuple(key for key, *_ in LAYERS)
 BY = ("user", "ai", "joint")   # who wrote an item (我、AI，或共同)
+# Which layer a SENSE card's category belongs in (the system suggests it, no AI): the person moves any card. 感受, 身體反應 and 直覺 are not
+# here on purpose -- what a feeling, a body reaction or a hunch is, is for the person to place.
+CATEGORY_LAYER = {
+    "事件": "facts",
+    "你現在跟自己講的故事": "interpretations",
+    "別人的聲音": "interpretations",
+    "恐懼": "interests",
+    "期待": "interests",
+    "人物關係與權力": "structure",
+}
 
 # 四種主張要分開: kind -> (what it needs, the fields that carry it)
 CLAIM_KINDS = {
@@ -113,6 +123,7 @@ def spec() -> dict:
     """What the page shows, from the one place that holds it."""
     return {
         "layers": [{"key": key, "name": name, "question": question, "output": output} for key, name, question, output in LAYERS],
+        "category_layer": dict(CATEGORY_LAYER),
         "claim_kinds": [{"kind": kind, "needs": needs, "details": [{"key": key, "label": label} for key, label in details]} for kind, (needs, details) in CLAIM_KINDS.items()],
         "unwinnable": {
             "questions": [{"q": number, "question": question, "example": example} for number, (question, example) in enumerate(UNWINNABLE_QUESTIONS)],

@@ -2,8 +2,9 @@
 
 // MAP 拆解 (contract card): one matter in six layers -- 事實、解釋、利益、結構、核心矛盾、介入. You pick a 拆法, write one line
 // per layer first, put your cards in the layers, and keep claims of four kinds apart. The map is yours: the core conflict
-// only you write, every save is a new version, two versions can be read side by side. What the AI offers (where a card
-// goes, other readings, a method, which lines are claims) is its own and counts only when you take it.
+// only you write, every save is a new version, two versions can be read side by side. What the AI offers (other readings, which
+// lines are claims) is its own and counts only when you take it. Where a card goes and which 拆法 fits the sentences you wrote are
+// suggested by the system itself (lib/map.ts systemPlacements, mapMethods.ts suggestTools), not by the AI; you take them or not.
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../../lib/api";
@@ -12,14 +13,14 @@ import { toolHref, toolLabel } from "../../lib/catalog";
 import { humanError } from "../../lib/errors";
 import {
   allItems, compareRows, confirmClaim, detailsMissing, editedBy, interestGroups, itemsOf, layerFlags, newId, pendingKeys, placeCard, sourceLine, takeAlternative,
-  linkSources, thinFacts, unconfirmedLaw, unplacedCards, usablePlacements, withItems, withLiveSources,
+  linkSources, systemPlacements, thinFacts, unconfirmedLaw, unplacedCards, usablePlacements, withItems, withLiveSources,
   type Decision, type Item, type MapContent, type MapSpec, type Placement, type SenseCard, type Tool,
 } from "../../lib/map";
 import { formatTime } from "../../lib/time";
 import { NONE, caseEvidence, originName, type Evidence, type Origin } from "../../lib/evidence";
 import { BlockShell, Notices } from "./BlockShell";
-import { rankTools } from "./mapMethods";
-import { Example, Fold, Missing, Refused, type Failed } from "./PageParts";
+import { rankTools, suggestTools } from "./mapMethods";
+import { Example, Fold, Missing, Refused, SystemMade, type Failed } from "./PageParts";
 
 type Intake = { question?: string; affected?: string[]; purpose?: string };
 type Notes = { facets?: Array<{ facet: string; relevant?: boolean; defines_normal?: string; is_cause?: string }> };
@@ -198,6 +199,7 @@ export function MapPage({ projectId }: { projectId: string }) {
   const toolName = (id: string) => toolLabel(Object.fromEntries(tools.map((tool) => [tool.method_id, tool.name])), id);
   const unplaced = unplacedCards(cards, draft);
   const placements = usablePlacements(placeDoc?.content.placements, cards, draft, layerKeys);
+  const bySystem = new Map(systemPlacements(cards, draft, spec.category_layer, layerKeys).map((item) => [item.card, item.layer]));
   const pendingPlacements = placeDoc ? pendingKeys(placements.map((item) => item.card), placeDoc, reviews, decided) : [];
   const alternatives = altDoc?.content.items ?? [];
   const pendingAlternatives = pendingKeys(alternatives.map((_, index) => `a${index}`), altDoc, reviews, decided);
@@ -206,6 +208,8 @@ export function MapPage({ projectId }: { projectId: string }) {
   const proposals = (claimDoc?.content.proposals ?? []).filter((entry) => allItems(draft).some((item) => item.id === entry.item) && !(draft.claims ?? []).some((claim) => claim.item === entry.item && claim.kind === entry.kind));
   const pendingProposals = pendingKeys(proposals.map((entry) => entry.item), claimDoc, reviews, decided);
   const matches = tools.filter((tool) => !tool.used && tool.method_id !== draft.method_id && (!search.trim() || `${tool.name} ${tool.family_zh} ${tool.method_id}`.toLowerCase().includes(search.trim().toLowerCase())));
+  const methodWords = [intake.question ?? "", ...Object.values(draft.one_lines ?? {})].join(" ");
+  const suggested = suggestTools(tools.filter((tool) => !tool.used && tool.method_id !== draft.method_id), intake.purpose, methodWords);
   const ranked = rankTools(matches, intake.purpose);
   const runs: Array<[string, typeof matches]> = [[intake.purpose ? `適合「${intake.purpose}」的` : "常用的", ranked.fit], ["其他拆法", ranked.rest], ["研究用的方法（要資料和統計）", ranked.research]];
   let budget = allTools || search.trim() ? matches.length : SHOWN_TOOLS;
@@ -296,10 +300,18 @@ export function MapPage({ projectId }: { projectId: string }) {
           </div>
           {hiddenTools > 0 && <div className="btns"><button className="btn ghost" type="button" onClick={() => setAllTools(true)}>還有 {hiddenTools} 個，全部列出來</button></div>}
           {tools.some((tool) => tool.used) && <p className="sub">這個案子已經用過：{tools.filter((tool) => tool.used).map((tool) => tool.name).join("、")}。系統只推還沒用過的。</p>}
-          <div className="btns mt8"><button className="btn" type="button" disabled={busy} onClick={() => askAi("method", pickDoc, { used: tools.filter((tool) => tool.used).map((tool) => tool.method_id) })}>{busy ? "想一想…" : "請 AI 推薦拆法"}</button></div>
-          {aiNote}
         </Fold>
-        <Refused failed={failed} at="method" />
+        <div className="judge">
+          <SystemMade />
+          <p className="mt4"><b>照你寫的字，系統幫你比對的拆法</b></p>
+          {methodWords.trim() === "" ? <p className="hint">先在下面六層各寫一句，或開案時寫下問題，系統才比對得出來。</p>
+            : suggested.length === 0 ? <p className="hint">工具資料裡比不到你寫的字。從上面「看可以選的拆法」找，或換個說法再寫。</p>
+            : suggested.map(({ tool, hits }) => (
+              <div key={tool.method_id} className="mt8"><b>{tool.name}</b>：工具資料裡有「{hits.slice(0, 4).join("」「")}」；{tool.blurb_zh}
+                <div className="btns"><button className="btn primary" type="button" onClick={() => chooseMethod(tool.method_id, tool.name)}>用這個</button></div></div>
+            ))}
+          <p className="hint">用字比對，不是 AI 讀懂了你的事。比到的只是參考，不排名；選不選由你。</p>
+        </div>
         {pendingPicks.length > 0 && (
           <div className="judge">
             <span className="tags"><span>{AUTHOR.ai}</span></span>
@@ -314,21 +326,21 @@ export function MapPage({ projectId }: { projectId: string }) {
 
       {cards.length > 0 && (
         <Fold card title={`把你外化的卡放進六層（${unplaced.length} 張還沒放）`} open={pendingPlacements.length > 0}>
-          <p className="how">放進來就是複製一份：之後在「外化」改或刪這張卡，地圖裡的不會跟著變。AI 可以建議每張卡放哪一層，你確認了才算。</p>
-          <div className="btns"><button className="btn" type="button" disabled={busy || unplaced.length === 0} onClick={() => askAi("place", placeDoc)}>{busy ? "整理中…" : "請 AI 建議每張卡放哪一層"}</button></div>
+          <p className="how">放進來就是複製一份：之後在「外化」改或刪這張卡，地圖裡的不會跟著變。系統會照每張卡的分類建議放哪一層（不是 AI）；感受、身體反應、直覺由你自己放。建議不算數，你按了那一層才算；放錯了，刪掉那一條，卡就回到這裡，可以再放。</p>
           <Missing why={unplaced.length === 0 && "每張卡都已經放進某一層了。"} />
-          <Refused failed={failed} at="place" />
-          {aiNote}
           <div className="mcards">
             {unplaced.map((doc) => {
-              const suggestion = placeDoc && pendingPlacements.includes(doc.doc_id) ? placements.find((item) => item.card === doc.doc_id) : undefined;
+              const suggestion = placeDoc && pendingPlacements.includes(doc.doc_id) ? placements.find((item) => item.card === doc.doc_id) : undefined;   // an AI suggestion saved before
+              const systemLayer = suggestion ? undefined : bySystem.get(doc.doc_id);
               return (
                 <div key={doc.doc_id} className="mcard">
                   <span className="k">{doc.content.category}</span>
                   <span>{doc.content.text}</span>
                   {suggestion && <span className="tags"><span>{AUTHOR.ai}建議：{layerName[suggestion.layer]}層</span></span>}
+                  {systemLayer && <span className="tags"><span>系統建議：{layerName[systemLayer]}層（不是 AI）</span></span>}
+                  {!suggestion && !systemLayer && <span className="hint">這一類由你自己放。</span>}
                   <div className="chips" role="group" aria-label="放進哪一層">
-                    {spec.layers.map((layer) => <button key={layer.key} type="button" className={`chip${suggestion?.layer === layer.key ? " on" : ""}`} onClick={() => putCard(doc, layer.key)}>{layer.name}</button>)}
+                    {spec.layers.map((layer) => <button key={layer.key} type="button" className={`chip${(suggestion?.layer ?? systemLayer) === layer.key ? " on" : ""}`} onClick={() => putCard(doc, layer.key)}>{layer.name}</button>)}
                   </div>
                   {suggestion && <button className="btn ghost" type="button" onClick={() => decide(placeDoc!, doc.doc_id, "不採用")}>不照 AI 的建議</button>}
                 </div>

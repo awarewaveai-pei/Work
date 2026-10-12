@@ -6,6 +6,7 @@
 // - a section a first-time person does not need yet is folded under its name, never hidden without a label;
 // - an example of a question opens on 「看例子」, the same on every page.
 import React from "react";
+import { SYSTEM_MADE } from "../../lib/blocks";
 
 /** The one failed action on a page: which button group sent it (`at`) and the sentence to show there. */
 export type Failed = { at: string; text: string } | null;
@@ -40,3 +41,6 @@ export const filledCount = (...values: unknown[]): number => values.filter((valu
 export function Example({ text }: { text: string }) {
   return <details><summary>看例子</summary><p className="hint">{text}</p></details>;
 }
+
+/** The tag on a result the system made by code where an AI answer used to appear: made by the system, not by the AI, and costs nothing. */
+export const SystemMade = () => <span className="tags"><span>{SYSTEM_MADE}</span></span>;

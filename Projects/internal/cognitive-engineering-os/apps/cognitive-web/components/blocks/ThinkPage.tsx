@@ -3,15 +3,18 @@
 // THINK 共思考 (contract card): you write the problem and your own version first; only then can the AI help, in the role you
 // pick. Its answers are cards and short replies, each marked as the AI's and as 「它自己說的」 (no outside source yet). You react to
 // every card, pick three, add at least two of your own, and end with one line on how you thought. The constants below copy
-// ai_lego/core/domain/kinds/think.py and ai_lego/platform/ai_actions/think.py (test_block_think compares them).
+// ai_lego/core/domain/kinds/think.py and ai_lego/platform/ai_actions/think.py (test_block_think compares them). Two of the
+// command cards are not the AI's: asking you for your own conclusion and the look back at how you thought are the system's
+// fixed questions (lib/think.ts), shown at once and free.
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { ApiError, apiFetch } from "../../lib/api";
 import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { NONE, caseEvidence, type Evidence } from "../../lib/evidence";
+import { LOOK_BACK_NOTE, askConclusionCard, lookBackCard } from "../../lib/think";
 import { BlockShell, Notices } from "./BlockShell";
-import { Fold, Missing, Refused, type Failed } from "./PageParts";
+import { Fold, Missing, Refused, SystemMade, type Failed } from "./PageParts";
 import { ALWAYS, GRANTABLE_WORDS } from "./CollabPermissions";
 
 export const ROLES = ["鏡子", "發散夥伴", "蘇格拉底引導者", "反方教練", "證據稽核者", "決策教練", "後設學習教練"] as const;
@@ -29,14 +32,17 @@ export const ROUND_MINUTES = 25;
 // action -> the role and mode it is, the permission it needs (the engine refuses it without), and what its answer is called
 export const ACTIONS: Record<string, { role: string; mode: string; needs: string; title: string }> = {
   mirror: { role: "鏡子", mode: "鏡像", needs: "organize", title: "AI 當鏡子整理回來的" },
-  look_back: { role: "後設學習教練", mode: "鏡像", needs: "organize", title: "回看你怎麼想" },
   diverge: { role: "發散夥伴", mode: "發散", needs: "propose_options", title: "不同的方向" },
   counter: { role: "反方教練", mode: "挑戰", needs: "counter", title: "最強的反方" },
   audit: { role: "證據稽核者", mode: "查證", needs: "organize", title: "拆開來看" },
   criteria: { role: "決策教練", mode: "收斂", needs: "propose_options", title: "判準和檢查你的選擇" },
   direct_advice: { role: "決策教練", mode: "收斂", needs: "direct_advice", title: "直接給的建議" },
   socratic: { role: "蘇格拉底引導者", mode: "只問問題", needs: "ask", title: "一個問題" },
-  ask_conclusion: { role: "決策教練", mode: "只問問題", needs: "ask", title: "請你自己下結論" },
+};
+// the two cards the system answers itself with fixed questions (lib/think.ts): no AI, no permission, no credits
+export const SYSTEM_CARDS: Record<string, { role: string; mode: string; title: string }> = {
+  ask_conclusion: { role: "決策教練", mode: "只問問題", title: "請你自己下結論" },
+  look_back: { role: "後設學習教練", mode: "鏡像", title: "回看你怎麼想" },
 };
 // 七張指令卡: one click picks the mode and the role
 export const COMMANDS: Array<{ title: string; action: string; focus?: string }> = [
@@ -65,7 +71,7 @@ export const PHASES = [
   { from: 11, to: 15, name: "挑戰", hint: "請 AI 針對你最有把握的說法，提出最強的反例。", action: "counter" },
   { from: 15, to: 20, name: "建立判準", hint: "把選項放進判準、風險、證據和時間尺度。", action: "criteria" },
   { from: 20, to: 23, name: "人做選擇", hint: "你自己選三張卡。AI 只檢查你的選擇清不清楚、能不能反悔、之後能不能回頭看。", action: "criteria" },
-  { from: 23, to: 25, name: "回看自己怎麼想", hint: "寫下這次我是怎麼想的。AI 可以指出兩個強項和一個下次練習點。", action: "look_back" },
+  { from: 23, to: 25, name: "回看自己怎麼想", hint: "寫下這次我是怎麼想的。系統有幾個固定的回看題，把你這一輪做過的列給你看。", action: "look_back" },
 ] as const;
 
 export type Round = { problem: string; own?: string[]; role?: string; mode?: string; criteria?: string[]; reflection?: string };
@@ -218,6 +224,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const [adding, setAdding] = useState(0);
   const [rewrite, setRewrite] = useState<{ reply: string; note: string } | null>(null);
   const [armed, setArmed] = useState(false);
+  const [shown, setShown] = useState<string[]>([]);   // the system's fixed cards opened for this round
   const [streak, setStreak] = useState(0);
   const [clock, setClock] = useState({ shown: true, running: false, seconds: 0 });
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -243,7 +250,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const roundId = current?.doc_id;
   useEffect(() => {
     setProblem(current?.content.problem ?? ""); setOwn(current?.content.own ?? []); setCriteria(current?.content.criteria ?? []); setReflection(current?.content.reflection ?? "");
-    setRole(current?.content.role ?? ""); setMode(current?.content.mode ?? ""); setTarget(0); setRewrite(null); setArmed(false);
+    setRole(current?.content.role ?? ""); setMode(current?.content.mode ?? ""); setTarget(0); setRewrite(null); setArmed(false); setShown([]);
   }, [roundId]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   // every pick still on a card of the case, with the card it points at; the streak reads the AI's cards among them
@@ -273,6 +280,7 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const roundCards = data.cards.filter((card) => card.content.round === roundId);
   const roundReplies = data.replies.filter((reply) => reply.content.round === roundId);
   const roundBatches = data.batches.filter((batch) => batch.content.round === roundId);
+  const answersOfRound = data.answers.filter((item) => roundReplies.some((reply) => reply.doc_id === item.content.reply));
   const savedOwn = hasOwn(current?.content.own);
   const frozen = savedOwn && roundReplies.length + roundBatches.length > 0;   // once the AI has answered your version, it stays as you wrote it
   const reactionOf = (card: Doc<Card>) => data.reactions.find((item) => item.content.card === card.doc_id);
@@ -283,9 +291,10 @@ export function ThinkPage({ projectId }: { projectId: string }) {
   const ownItems = (current?.content.own ?? []).map(splitOwn).filter((item) => item.text);
 
   const blocked = (action: string): string => {
-    const needs = ACTIONS[action].needs;
     if (!current) return "先存下這一輪的問題和你的版本";
-    if (action !== "direct_advice" && !savedOwn) return "先寫並存下你自己的版本";
+    if (action !== "direct_advice" && !savedOwn) return "先寫並存下你自己的版本";   // the system's cards quote your version, so they wait for it too
+    if (action in SYSTEM_CARDS) return "";
+    const needs = ACTIONS[action].needs;
     if (!granted(needs)) return `協作合約沒有准「${GRANTABLE_WORDS[needs]}」`;
     return "";
   };
@@ -339,18 +348,40 @@ export function ThinkPage({ projectId }: { projectId: string }) {
     return () => setPick("");
   });
 
-  const facetsFor = (chosenRole: string, chosenMode: string) => Object.entries(ACTIONS).find(([, facets]) => facets.role === chosenRole && facets.mode === chosenMode)?.[0] ?? "";
+  const facetsFor = (chosenRole: string, chosenMode: string) => Object.entries({ ...ACTIONS, ...SYSTEM_CARDS }).find(([, facets]) => facets.role === chosenRole && facets.mode === chosenMode)?.[0] ?? "";
   const chosen = role && mode ? facetsFor(role, mode) : "";
-  const roleNeeds = (name: string) => Object.values(ACTIONS).filter((facets) => facets.role === name).map((facets) => facets.needs);
+  const roleOpen = (name: string) => Object.values(SYSTEM_CARDS).some((facets) => facets.role === name) || Object.values(ACTIONS).some((facets) => facets.role === name && granted(facets.needs));
+  const begin = (action: string, context: Record<string, unknown> = {}) => {
+    if (action in SYSTEM_CARDS) { setShown((held) => (held.includes(action) ? held : [...held, action])); return; }
+    void ask(action, context);
+  };
   const commandCard = (title: string, action: string, focus?: string) => {
-    const facets = ACTIONS[action];
+    const facets = ACTIONS[action] ?? SYSTEM_CARDS[action];
+    const system = action in SYSTEM_CARDS;
     const reason = blocked(action);
     return (
       <div key={title} className={`mcard${suggestion === action ? " now" : ""}`}>
         <b>{title}</b>
         <span className="k">模式：{facets.mode}・角色：{facets.role}</span>
+        {system && <span className="k">系統的固定題目，不是 AI，不扣點</span>}
         {reason && <span className="need">{reason}</span>}
-        <div className="btns"><button className="btn" type="button" disabled={Boolean(reason) || busy} onClick={() => ask(action, { ...(focus ? { focus } : {}), ...(action === "counter" ? { target } : {}) })}>開始</button></div>
+        <div className="btns"><button className="btn" type="button" disabled={Boolean(reason) || (busy && !system)} onClick={() => begin(action, { ...(focus ? { focus } : {}), ...(action === "counter" ? { target } : {}) })}>{system ? "看這張題目卡" : "開始"}</button></div>
+      </div>
+    );
+  };
+  const systemCard = (action: string) => {
+    const facts = {
+      own: current?.content.own ?? [], rewrittenCards: roundCards.filter((card) => card.author === "joint").length,
+      confirmed: answersOfRound.filter((item) => item.content.response === "確認").length, rewrote: answersOfRound.filter((item) => item.content.response === "改寫").length,
+      denied: answersOfRound.filter((item) => item.content.response === "否定").length, picked: picked.length, pickedAsIs: picked.filter((card) => card.author === "ai").length, reflection: current?.content.reflection,
+    };
+    const questions = action === "ask_conclusion" ? askConclusionCard(facts.own) : lookBackCard(facts);
+    return (
+      <div key={action} className="judge">
+        <div className="top"><b>{SYSTEM_CARDS[action].title}</b><button className="btn ghost" type="button" onClick={() => setShown((held) => held.filter((item) => item !== action))}>收起來</button></div>
+        <SystemMade />
+        <ol>{questions.map((item) => <li key={item.ask}><b>{item.ask}</b>{item.said.length > 0 && <ul>{item.said.map((line) => <li key={line}>{line}</li>)}</ul>}</li>)}</ol>
+        {action === "look_back" && <p className="sub">{LOOK_BACK_NOTE}</p>}
       </div>
     );
   };
@@ -493,10 +524,10 @@ export function ThinkPage({ projectId }: { projectId: string }) {
           <div className="mcards">{LATER.map((command) => commandCard(command.title, command.action))}</div>
         </Fold>
         <Fold title="自己選角色和模式">
-          <Chips options={ROLES} value={role as (typeof ROLES)[number]} label="AI 這一輪的角色" onPick={setRole} disabled={(name) => roleNeeds(name).every((needs) => !granted(needs))} />
+          <Chips options={ROLES} value={role as (typeof ROLES)[number]} label="AI 這一輪的角色" onPick={setRole} disabled={(name) => !roleOpen(name)} />
           <Chips options={MODES} value={mode as (typeof MODES)[number]} label="模式" onPick={setMode} />
           {role && mode && !chosen && <p className="hint">這個角色在這個模式下沒有對應的做法，換一個。</p>}
-          <div className="btns"><button className="btn" type="button" disabled={!chosen || Boolean(blocked(chosen)) || busy} onClick={() => ask(chosen, chosen === "counter" ? { target } : {})}>用這個角色和模式開始</button></div>
+          <div className="btns"><button className="btn" type="button" disabled={!chosen || Boolean(blocked(chosen)) || busy} onClick={() => begin(chosen, chosen === "counter" ? { target } : {})}>用這個角色和模式開始</button></div>
           {chosen && blocked(chosen) && <p className="hint">{blocked(chosen)}。</p>}
         </Fold>
         <Fold title="不想先寫，直接要建議">
@@ -511,6 +542,8 @@ export function ThinkPage({ projectId }: { projectId: string }) {
           ? <div className="card"><h2>請 AI 幫忙</h2>{aiBody}</div>
           : <Fold card title="請 AI 幫忙（先存下你的版本，AI 才會回）">{aiBody}</Fold>;
       })()}
+
+      {shown.length > 0 && <div className="card"><h2>系統給你的題目</h2>{shown.map(systemCard)}</div>}
 
       {roundReplies.length > 0 && <div className="card"><h2>AI 回給你的</h2>{[...roundReplies].reverse().map(replyView)}</div>}
 

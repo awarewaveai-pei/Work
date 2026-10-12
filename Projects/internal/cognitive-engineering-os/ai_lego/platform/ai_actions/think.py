@@ -1,6 +1,8 @@
-"""THINK's AI turns (contract card 「AI 能做什麼」). Nine actions, one per role-and-mode the card names; every one asks for the
-round first, and every one but ``direct_advice`` refuses a round with no version of the person's own (先想再看). It reads
+"""THINK's AI turns (contract card 「AI 能做什麼」). Seven actions, one per role-and-mode the card names that needs an AI; every one asks for
+the round first, and every one but ``direct_advice`` refuses a round with no version of the person's own (先想再看). It reads
 only the round, the cards of the round and your reactions to them, the MAP's map (else SENSE's cards): never another case, never a judgment.
+Asking the person for their own conclusion (ask_conclusion) and the look back at how they thought (look_back) are fixed questions
+(apps/cognitive-web/lib/think.ts), not AI turns (docs/platform/AI_TO_CODE_AUDIT.md §1).
 
 What the AI saves is its own kind: ``think.reply`` (sections, one question) or ``think.batch`` (cards). A reply is always
 「它自己說的」. A card is 「有來源」 only when it names (``rests_on``) a claim from VERIFY's ledger that counted origins support:
@@ -220,15 +222,14 @@ REFLECT = (
     "You give no advice, so there is nothing to hand back: always give your reflection, whatever the matter is (law, health, money and safety included). "
     "If the matter needs a professional, say that in caution, one plain sentence beside the reflection and never instead of it."
 )
-REFLECTS = ("mirror", "audit", "look_back")   # they add a caution; they never hand control back
+REFLECTS = ("mirror", "audit")   # they add a caution; they never hand control back
 
 SECTION_TITLES = {
     "mirror": ("事實", "情緒", "推論", "沒說出的假設", "空白"),
     "audit": ("已知", "推論", "猜測", "價值偏好", "缺口", "事實", "法律", "價值", "文化宗教"),
     "criteria": ("判準", "權衡", "可逆的小試驗", "停止條件", "檢查你的選擇"),
-    "look_back": ("思考強項", "下次練習點", "過早閉合", "信心偏差"),
 }
-SECTION_LIMITS = {"思考強項": 2, "下次練習點": 1, "過早閉合": 2, "信心偏差": 2, "檢查你的選擇": 3, "判準": 6}
+SECTION_LIMITS = {"檢查你的選擇": 3, "判準": 6}
 
 
 def _sections(raw: Any, titles: tuple[str, ...]) -> list[dict[str, Any]]:
@@ -378,9 +379,7 @@ ROLE_TEXT = {
     "counter": "You are the Red Team: give the strongest counter. The person answers: revise, maintain, or pause their conclusion.",
     "audit": "You are the Evidence Auditor: tell what is known from what is inferred, guessed, valued or missing. The person decides which unknowns are worth checking.",
     "socratic": "You are the Socratic Guide: ask. The person defines the problem themselves.",
-    "ask_conclusion": "You are the Decision Coach and you only ask. The person has asked to reach their own conclusion now.",
     "criteria": "You are the Decision Coach: help build the criteria and check the choice. The person chooses and carries it.",
-    "look_back": "You are the Meta-Learning Coach: look at how the person thought. The person writes down which habit to keep or change.",
     "direct_advice": "You are the Decision Coach. The person explicitly asked for direct advice; the decision stays theirs.",
 }
 TASKS = {
@@ -399,16 +398,11 @@ TASKS = {
         "第二序後果 / 失敗模式 / 邊界條件 / 最強反論). Do not say who is right and never tell them to change their mind."),
     "audit": "Use only the sections named by the focus below, with exactly those titles. List unknowns that matter under 缺口 without saying which is most worth checking; the person decides.",
     "socratic": "Ask the one question that would most change how the person defines the problem. Only the question: no preface, no answer, no advice, no list.",
-    "ask_conclusion": "Ask the one question that makes them state, in their own words, what they conclude and what would change it. Do not suggest a conclusion.",
     "criteria": (
         "Help them build criteria for choosing among what is on the table (the cards they picked, if any). Sections, exactly these titles: 判準 (3 to 6 candidate criteria, each as a "
         "question they can ask of any option), 權衡 (what pulls against what), 可逆的小試驗 (cheap ways to test, each one reversible), 停止條件 (signs to stop or hand back), 檢查你的選擇 "
         "(only if they picked cards: at most three observations on whether their choice is clear, reversible and can be revisited). premise: when this help applies; fails_when: how it "
         "may fail. Do not apply the criteria to the options, do not rank, do not choose."),
-    "look_back": (
-        "Look at how they thought in this round: their own version, what they marked on cards and why, what they picked and why, their reflection. Sections, exactly these titles: "
-        "思考強項 (two, each citing what they did), 下次練習點 (one), and only if clearly visible in their own words 過早閉合 and 信心偏差. Not a score, not a diagnosis, never a "
-        "comparison with other people."),
     "direct_advice": (
         "Give 1 to 3 pieces of advice, each a card: claim (the advice), mechanism (why it should work), benefit, risk, assumption (what must be true), premise (the conditions under which "
         "it applies), fails_when (how it may fail). Never present it as the answer."),
@@ -430,9 +424,7 @@ ACTIONS = [
     _action("counter", "counter", lambda context, read: _message(context, read, target=True), 6000),
     _action("audit", "organize", _audit_input),
     _action("socratic", "ask", lambda context, read: _message(context, read)),
-    _action("ask_conclusion", "ask", lambda context, read: _message(context, read)),
     _action("criteria", "propose_options", lambda context, read: _message(context, read, cards="picked")),
-    _action("look_back", "organize", lambda context, read: _message(context, read, cards="picked")),
     # 除非你明確選「直接給建議」: the one turn that does not wait for the person's own version -- the problem is still theirs
     _action("direct_advice", "direct_advice", lambda context, read: _message(context, read, need_own=False), 6000),
 ]

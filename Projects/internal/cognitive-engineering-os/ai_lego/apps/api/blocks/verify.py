@@ -5,8 +5,10 @@
     POST /projects/{project_id}/verify/factcheck           {message | claim}   ask collect the place's fact-check databases
     POST /projects/{project_id}/verify/claims/{claim}/search {angles?, confirm}  「去查」: a collection run for one claim
                                                            version, one open at a time (409 VERIFY_SEARCH_ALREADY_RUNNING)
-    GET  /projects/{project_id}/verify/ledger              the ledger with what VERIFY adds to evidence.checked_claims, the
-                                                           databases a look-up sends the words to here, the cards only you read
+    GET  /projects/{project_id}/verify/ledger              the ledger with what VERIFY adds to evidence.checked_claims (each line's
+                                                           plain-words sentence and what is still worth checking, and an overview:
+                                                           the system's, kinds/verify.py), the databases a look-up sends the words
+                                                           to here, the cards only you read
     POST /projects/{project_id}/verify/stances             {content, doc_id?, base_version?}  your stance, its quote checked
     POST /projects/{project_id}/verify/stances/confirm     {reading, claim}  confirm every AI reading of one claim at once
                                                            (every stance or none)
@@ -29,7 +31,7 @@ from ai_lego.apps.api import main as api
 from ai_lego.apps.api.blocks.docs import DocBody, _call, _kind, _save, _saved, _where, case_owner
 from ai_lego.core.domain.evidence_words import CHECKABLE, FOUND, MIN_ORIGINS, NOT_FOUND, SENTENCE_KINDS, STANCES, UNCHECKABLE, VERDICTS, quote_in
 from ai_lego.core.domain.kinds.verify import (ASKS, CHECK_QUESTIONS, FACTCHECK_ANGLE, LAW_UNCONFIRMED, MESSAGE_FORMS, SEARCH_ANGLES, SEARCH_LANGUAGES, SEARCH_PROVIDERS,
-                                               SPREAD, claim_key, law_unconfirmed, weak_line)
+                                               SPREAD, claim_key, law_unconfirmed, ledger_overview, ledger_sentence, weak_line, what_next)
 from ai_lego.core.domain.source import COLLECTED_PROVENANCE, source_record
 from ai_lego.data.events import record_log
 from ai_lego.data.object.tenant_scoped_cas import TenantScopedCas
@@ -292,7 +294,7 @@ def ledger(project_id: str, session: dict[str, Any] = Depends(api.require_sessio
         run = repo.get_collection_run(tenant_id, project_id, lookup["content"]["run"]) if lookup else None
         search = searches.get((line["claim_id"], line["version"]))
         key = claim_key(claim["content"].get("text"))
-        lines.append({
+        entry = {
             **line, "message": claim["content"].get("message"), "from": claim["content"].get("from"),
             "law_state": LAW_UNCONFIRMED if law_unconfirmed(claim["content"]) else ("寫了法域、時效、來源" if claim["content"].get("law") else None),
             "needs_alternative": claim["content"].get("sentence") == SENTENCE_KINDS[1] and not (claim["content"].get("alternative") or "").strip(),
@@ -301,9 +303,10 @@ def ledger(project_id: str, session: dict[str, Any] = Depends(api.require_sessio
             "three": {"found": bool(read_origins), "independent": len(read_origins), "independent_enough": len(read_origins) >= MIN_ORIGINS, "stands": stands},
             "search": {key_: search["content"].get(key_) for key_ in ("state", "why")} if search else None,
             "lookup": {"run": lookup["content"]["run"], "status": run["status"] if run else "failed", "angles": lookup["content"].get("angles") or []} if lookup else None,
-        })
+        }
+        lines.append({**entry, "said": ledger_sentence(entry), "next": what_next(entry)})   # the summary and the 還該查什麼 list: the system's words, no AI
     _, plan = _factcheck_plan(docs, session, owner)
-    return {"claims": lines, "min_origins": MIN_ORIGINS, "factcheck_asks": collect_asks(plan),
+    return {"claims": lines, "overview": ledger_overview(lines), "min_origins": MIN_ORIGINS, "factcheck_asks": collect_asks(plan),
             "person_reads": [doc["doc_id"] for doc in docs.current(tenant_id, owner, "gather.source") if person_reads(doc["content"])]}
 
 

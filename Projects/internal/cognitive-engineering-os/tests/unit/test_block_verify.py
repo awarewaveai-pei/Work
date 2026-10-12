@@ -18,7 +18,7 @@ from ai_lego import PRODUCT_ROOT
 from ai_lego.apps.api import main as api_main
 from ai_lego.apps.api.blocks import docs as docs_route
 from ai_lego.apps.api.blocks import verify as verify_route
-from ai_lego.core.domain import evidence_words as words
+from ai_lego.core.domain import doc_kinds, evidence_words as words
 from ai_lego.core.domain.kinds import verify as kinds_verify
 from ai_lego.core.domain.kinds.verify import SEARCH_ANGLES, SPREAD_KEYS, claim_key
 from ai_lego.data import db
@@ -180,7 +180,7 @@ class FirstReactionTests(VerifyCase):
         mid = self.message()["doc_id"]
         self.docs.save(self.tenant_id, self.owner, "verify.claim", {"text": CLAIM, "sentence": CHECKABLE, "from": "訊息", "message": mid}, record_log.user(self.identity["identity_id"], "VERIFY"))
         self.grant("search_external")
-        for action in ("read", "summary", "next"):
+        for action in ("read",):
             response = self.client.post(f"{self.base}/ai/VERIFY/{action}", json={"context": {}})
             self.assertIn("VERIFY_FIRST_REACTION_REQUIRED", response.text, action)
         self.assertEqual(self.provider.calls, [])
@@ -545,6 +545,9 @@ class VerdictAndLedgerTests(VerifyCase):
 
 
 class SummaryAndNextTests(VerifyCase):
+    """VERIFY.summary and VERIFY.next are the system's own sentences now, not AI turns (docs/platform/AI_TO_CODE_AUDIT.md §1): the ledger route
+    carries each line's sentence and what is still worth checking, and an overview."""
+
     def setUp(self):
         super().setUp()
         self.cid = self.claim()["doc_id"]
@@ -552,49 +555,95 @@ class SummaryAndNextTests(VerifyCase):
         self.group([self.cardid])
         self.save("verify.stance", {"claim": self.cid, "claim_version": 1, "card": self.cardid, "snapshot": self.sha(self.cardid), "stance": "支持"}, record_log.user(self.identity["identity_id"], "VERIFY"))
 
-    def test_under_two_independent_origins_the_ai_stops_before_any_call_and_says_how_many(self):
-        stopped = self.ai("summary", {})
-        self.assertEqual((sorted(stopped), self.provider.calls), (["handback"], []))
-        self.assertIn("1 個", stopped["handback"])
-        saved = self.ai("summary", {"go_on": True}, {"lines": [{"claim": self.cid, "line": "這是真的，大家可以放心轉傳"}], "overview": "帳本上有一個主張。"})["saved"]
-        self.assertEqual(saved["content"]["lines"], [{"claim": self.cid, "claim_version": 1, "line": "只有一個出處這樣說"}])
-
-    def test_the_summary_is_given_counts_never_a_sources_country_or_my_verdict(self):
-        self.save("verify.verdict", {"claim": self.cid, "claim_version": 1, "verdict": "不採信", "reason": "我覺得發訊的人是對岸的"}, record_log.user(self.identity["identity_id"], "VERIFY"))
-        self.ai("summary", {"go_on": True}, {"lines": [], "overview": "x"})
-        sent = self.provider.calls[0][1]
-        self.assertNotIn("對岸", sent)
-        self.assertNotIn("country", sent)
-        self.assertIn('"support": 1', sent)
-
-    def test_a_law_claim_without_its_details_gets_fixed_words_whatever_the_ai_writes(self):
-        """Codex round 4 F10: 未確認 was only a hint in the prompt; like 無法檢查 and under two origins, the system writes
-        that claim's line -- the AI never writes a conclusion for it."""
-        law = self.claim("提款上限依銀行法第 45 條", law=True, jurisdiction="台灣")["doc_id"]
-        a, b = self.card(url="https://law-a"), self.card(url="https://law-b")
+    def two_origins(self, claim, stance):
+        a, b = self.card(url=f"https://{claim[:6]}-a"), self.card(url=f"https://{claim[:6]}-b")
         self.group([self.cardid], [a], [b])
         for card in (a, b):
-            self.save("verify.stance", {"claim": law, "claim_version": 1, "card": card, "snapshot": self.sha(card), "stance": "支持"}, record_log.user(self.identity["identity_id"], "VERIFY"))
-        saved = self.ai("summary", {"claims": [law]}, {"lines": [{"claim": law, "line": "法律已確定：銀行法第 45 條規定了提款上限"}]})["saved"]
-        self.assertEqual(saved["content"]["lines"], [{"claim": law, "claim_version": 1, "line": kinds_verify.LAW_UNCONFIRMED_LINE}])
+            self.save("verify.stance", {"claim": claim, "claim_version": 1, "card": card, "snapshot": self.sha(card), "stance": stance}, record_log.user(self.identity["identity_id"], "VERIFY"))
 
-    def test_a_claim_given_two_different_lines_gets_the_ledgers_own_words(self):
-        """Codex VERIFY r5 (class of F1): the model's lines were read into a dict, the last line for a claim winning."""
+    def test_the_two_turns_are_gone_and_nothing_is_asked_of_the_ai(self):
+        self.assertEqual({name for (block, name) in ai_gate.actions() if block == "VERIFY"}, {"split", "techniques", "read"})
+        for action in ("summary", "next"):
+            self.assertEqual(self.client.post(f"{self.base}/ai/VERIFY/{action}", json={"context": {}}).status_code, 404, action)
+            self.assertIn("ai", doc_kinds.require(f"verify.{action}").authors)   # a record saved before is still a kind the case holds
+        self.ledger()
+        self.assertEqual(self.provider.calls, [])
+
+    def test_a_claim_under_two_independent_origins_says_how_few_by_the_ledgers_one_rule(self):
+        line = self.ledger()[self.cid]
+        self.assertEqual(line["said"], "只有一個出處這樣說；獨立出處要 2 個以上才算數")
+        self.assertEqual(line["said"].split("；")[0], line["weak_line"])
+
+    def test_a_claim_with_two_origins_says_the_counts_and_a_state_with_none_says_what_was_done(self):
         other = self.claim("銀行下週停止營業")["doc_id"]
-        a, b = self.card(url="https://two-a"), self.card(url="https://two-b")
-        self.group([self.cardid], [a], [b])
-        for card in (a, b):
-            self.save("verify.stance", {"claim": other, "claim_version": 1, "card": card, "snapshot": self.sha(card), "stance": "反對"}, record_log.user(self.identity["identity_id"], "VERIFY"))
-        answer = {"lines": [{"claim": other, "line": "兩個出處都說不是這樣"}, {"claim": other, "line": "沒有出處說到它"}]}
-        saved = self.ai("summary", {"go_on": True}, answer)["saved"]
-        state = self.ledger()[other]["state"]
-        self.assertEqual([line["line"] for line in saved["content"]["lines"] if line["claim"] == other], [f"帳本上是「{state}」"])
-        same = self.ai("summary", {"go_on": True}, {"lines": [answer["lines"][0], answer["lines"][0]]})["saved"]
-        self.assertEqual([line["line"] for line in same["content"]["lines"] if line["claim"] == other], ["兩個出處都說不是這樣"])
+        self.two_origins(other, "反對")
+        untouched = self.claim("銀行下週不開門")["doc_id"]
+        lines = self.ledger()
+        self.assertEqual(lines[other]["said"], "有 2 個獨立出處反對它")
+        self.assertEqual(lines[untouched]["said"], kinds_verify.LEDGER_SENTENCES[lines[untouched]["state"]])
+        self.assertEqual(lines[untouched]["state"], words.NOT_SEARCHED)
+        self.assertEqual(lines[untouched]["said"], "系統還沒去找出處")
 
-    def test_what_is_still_worth_checking_needs_no_grant(self):
-        saved = self.ai("next", {}, {"items": ["央行官網的新聞稿", ""], "question": "最早是誰傳的？還有別的嗎？"})["saved"]
-        self.assertEqual((saved["content"]["items"], saved["content"]["question"]), (["央行官網的新聞稿"], "最早是誰傳的？"))
+    def test_a_sentence_that_cannot_be_checked_and_a_law_claim_without_its_details_get_fixed_words(self):
+        value = self.claim("提款上限太低了", sentence="價值判斷")["doc_id"]
+        law = self.claim("提款上限依銀行法第 45 條", law=True, jurisdiction="台灣")["doc_id"]
+        self.two_origins(law, "支持")
+        lines = self.ledger()
+        self.assertEqual((lines[value]["said"], lines[value]["next"]), ("這是價值判斷，不是查得了的句子，帳本不算它的出處", []))
+        self.assertEqual(lines[law]["said"], f"有 2 個獨立出處支持它；{kinds_verify.LAW_UNCONFIRMED_LINE}")
+        self.assertEqual(lines[law]["next"][-1], "寫上這句法律的法域、時效、來源")
+
+    def test_what_is_still_worth_checking_lists_the_angles_not_searched_in_the_fixed_order(self):
+        self.assertEqual(self.ledger()[self.cid]["next"], [kinds_verify.ANGLE_ASKS[angle] for angle in SEARCH_ANGLES])   # nothing searched yet: all, who said it first before the earliest original
+        self.save("verify.lookup", {"claim": self.cid, "claim_version": 1, "run": "run-1", "angles": ["primary", "origin"]}, record_log.system("VERIFY"))
+        searched = self.ledger()[self.cid]["next"]
+        self.assertEqual(searched, [kinds_verify.ANGLE_ASKS[angle] for angle in ("news", "factcheck", "opposite")])
+        self.save("verify.lookup", {"claim": self.cid, "claim_version": 1, "run": "run-2", "angles": list(SEARCH_ANGLES)}, record_log.system("VERIFY"))
+        self.assertEqual(self.ledger()[self.cid]["next"], [])
+
+    def test_the_overview_counts_claims_and_says_the_ledger_never_rules_true_or_false(self):
+        self.claim("提款上限太低了", sentence="價值判斷")
+        overview = self.client.get(f"{self.base}/verify/ledger").json()["overview"]
+        self.assertEqual(overview, "帳本上共有 2 個主張，其中 1 個是查得了的事實。這 1 個裡，0 個有 2 個以上的獨立出處，1 個不到。帳本只數出處，不說哪個主張是真的或假的。")
+
+
+class LedgerWordsTests(unittest.TestCase):
+    """kinds/verify.py ledger_sentence, ledger_overview, what_next: pure functions of one ledger line."""
+
+    def line(self, **more):
+        return {"sentence": words.CHECKABLE, "state": "有獨立出處支持", "support": ["o:1", "o:2"], "oppose": [], "few": False, "law_state": None, "lookup": None, **more}
+
+    def test_every_state_the_ledger_can_hold_has_its_sentence_and_the_angles_are_the_search_angles(self):
+        self.assertEqual(set(kinds_verify.LEDGER_SENTENCES), {*words.CLAIM_STATES, words.NOT_SEARCHED, words.NOT_READ, words.NOT_CHECKABLE})
+        self.assertEqual(tuple(kinds_verify.ANGLE_ASKS), SEARCH_ANGLES)
+
+    def test_the_sentence_is_the_states_pattern_with_the_counts(self):
+        say = kinds_verify.ledger_sentence
+        self.assertEqual(say(self.line()), "有 2 個獨立出處支持它")
+        self.assertEqual(say(self.line(state="兩邊都有", support=["o:1", "o:2"], oppose=["o:3", "o:4"])), "有 2 個獨立出處支持它，2 個反對它")
+        self.assertEqual(say(self.line(state="查不到", support=[], few=True)), "系統去找過，沒有找到可以算的出處")
+        self.assertEqual(say(self.line(state=words.NOT_READ, support=[], few=True)), "找到了來源，還沒有全部讀完")
+        self.assertEqual(say(self.line(state="無法檢查", support=[], few=True)), "沒有辦法檢查它")
+        self.assertEqual(say(self.line(state=words.NOT_CHECKABLE, sentence="叫你去做的事", support=[])), "這是叫你去做的事，不是查得了的句子，帳本不算它的出處")
+
+    def test_one_origin_gets_the_weak_line_and_never_a_word_on_true_or_false(self):
+        say = kinds_verify.ledger_sentence
+        self.assertEqual(say(self.line(support=["o:1"], few=True)), "只有一個出處這樣說；獨立出處要 2 個以上才算數")
+        self.assertEqual(say(self.line(state="有獨立出處反對", support=[], oppose=["o:1"], few=True)), "只有一個出處說不是這樣；獨立出處要 2 個以上才算數")
+        for state in kinds_verify.LEDGER_SENTENCES:
+            sentence = say(self.line(state=state, few=state != words.NOT_CHECKABLE))
+            self.assertNotRegex(sentence, "是真的|是假的|不要轉|可以轉|相信")
+
+    def test_an_unknown_state_is_said_as_the_ledger_has_it(self):
+        self.assertEqual(kinds_verify.ledger_sentence(self.line(state="新的狀態")), "帳本上是「新的狀態」")
+
+    def test_what_next_is_empty_for_a_sentence_that_cannot_be_checked_and_keeps_the_order(self):
+        self.assertEqual(kinds_verify.what_next(self.line(sentence="價值判斷")), [])
+        self.assertEqual(kinds_verify.what_next(self.line(lookup={"angles": ["news"]})), [kinds_verify.ANGLE_ASKS[a] for a in ("primary", "factcheck", "origin", "opposite")])
+
+    def test_the_overview_of_no_claims_and_of_none_checkable(self):
+        self.assertEqual(kinds_verify.ledger_overview([]), "帳本上共有 0 個主張，其中 0 個是查得了的事實。帳本只數出處，不說哪個主張是真的或假的。")
+        self.assertEqual(kinds_verify.ledger_overview([self.line(sentence="價值判斷")]), "帳本上共有 1 個主張，其中 0 個是查得了的事實。帳本只數出處，不說哪個主張是真的或假的。")
 
 
 class FactcheckTests(VerifyCase):

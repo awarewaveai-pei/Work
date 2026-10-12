@@ -9,7 +9,7 @@ import unicodedata
 from typing import Any, Mapping
 
 from ai_lego.core.domain.doc_kinds import DocKind, Field
-from ai_lego.core.domain.evidence_words import SENTENCE_KINDS, STANCES, STATES, VERDICTS, normalise_quote
+from ai_lego.core.domain.evidence_words import CHECKABLE, MIN_ORIGINS, NOT_CHECKABLE, NOT_READ, NOT_SEARCHED, SENTENCE_KINDS, STANCES, STATES, VERDICTS, normalise_quote
 
 CLAIM_FROM = ("訊息", "MAP", "我加的")
 MESSAGE_FORMS = ("訊息", "截圖文字", "連結")   # 你貼上訊息、截圖或連結
@@ -143,12 +143,12 @@ KINDS = [
         "dbs": Field("json", 30000, required=True, scan=False, shape="array"),  # [{"db", "state", "why"?, "hits": [{"source_id", "publisher", "judged_as", "date", "url"}]}]
         "rules": Field("json", 2000, scan=False, shape="object"),
     }, authors=frozenset({"system"}), deletable=False),
-    # AI 用白話摘要主張帳本 (the ledger itself is the system's: evidence.checked_claims)
+    # AI 用白話摘要主張帳本: kept for a summary saved before 2026-10-12; the summary is now the system's own sentences (ledger_sentence)
     DocKind("verify.summary", "VERIFY", "AI 白話摘要帳本", {
         "lines": Field("json", 20000, required=True, shape="array"),  # [{"claim", "claim_version", "line"}]
         "overview": Field("text", 1000),
     }, authors=frozenset({"ai"})),
-    # AI 提出還該查什麼
+    # AI 提出還該查什麼: kept for one saved before 2026-10-12; the list is now the system's own (what_next)
     DocKind("verify.next", "VERIFY", "還該查什麼", {
         "items": Field("list", 6, required=True),
         "question": Field("text", 300),
@@ -191,3 +191,64 @@ def weak_line(support: int, oppose: int) -> str:
     if oppose:
         return "只有一個出處說不是這樣"
     return "還沒有獨立出處說到它"
+
+
+# -- the ledger in plain words, by the system (VERIFY.summary and VERIFY.next were AI turns until 2026-10-12; docs/platform/AI_TO_CODE_AUDIT.md §1) --
+
+# state -> the sentence about it; {support}/{oppose}: counted independent origins, {sentence}: the kind of sentence the claim is
+LEDGER_SENTENCES = {
+    "有獨立出處支持": "有 {support} 個獨立出處支持它",
+    "有獨立出處反對": "有 {oppose} 個獨立出處反對它",
+    "兩邊都有": "有 {support} 個獨立出處支持它，{oppose} 個反對它",
+    "查不到": "系統去找過，沒有找到可以算的出處",
+    NOT_SEARCHED: "系統還沒去找出處",
+    NOT_READ: "找到了來源，還沒有全部讀完",
+    "無法檢查": "沒有辦法檢查它",
+    NOT_CHECKABLE: "這是{sentence}，不是查得了的句子，帳本不算它的出處",
+}
+
+
+def ledger_sentence(line: Mapping[str, Any]) -> str:
+    """One claim's line of the ledger in plain words, from its state and the counts of independent origins only (no AI): never
+    whether the claim is true. A checkable claim under MIN_ORIGINS origins says what may be said of so few (weak_line); a
+    法律 claim without its 法域、時效、來源 says it is not settled."""
+    support, oppose = len(line["support"]), len(line["oppose"])
+    pattern = LEDGER_SENTENCES.get(line["state"])
+    said = pattern.format(support=support, oppose=oppose, sentence=line["sentence"]) if pattern else f"帳本上是「{line['state']}」"
+    if line["few"] and (support or oppose):
+        said = f"{weak_line(support, oppose)}；獨立出處要 {MIN_ORIGINS} 個以上才算數"
+    return f"{said}；{LAW_UNCONFIRMED_LINE}" if line.get("law_state") == LAW_UNCONFIRMED else said
+
+
+def ledger_overview(lines: list[Mapping[str, Any]]) -> str:
+    """The ledger as a whole in up to three fixed sentences: how many claims, how many are checkable facts and how many of those have
+    enough independent origins, and that the ledger counts origins and never says which claim is true."""
+    checkable = [line for line in lines if line["sentence"] == CHECKABLE]
+    said = [f"帳本上共有 {len(lines)} 個主張，其中 {len(checkable)} 個是查得了的事實。"]
+    if checkable:
+        few = sum(1 for line in checkable if line["few"])
+        said.append(f"這 {len(checkable)} 個裡，{len(checkable) - few} 個有 {MIN_ORIGINS} 個以上的獨立出處，{few} 個不到。")
+    said.append("帳本只數出處，不說哪個主張是真的或假的。")
+    return "".join(said)
+
+
+# 「去查」's angles, each as the question it answers, in a fact-checker's order: who said it first, how others report it, whether
+# someone checked it, the earliest original, the opposite claim
+ANGLE_ASKS = {
+    "primary": "誰先說的：找原始文件和官方公告",
+    "news": "別的地方怎麼報：找別家的報導",
+    FACTCHECK_ANGLE: "別人查過嗎：找查核報告",
+    "origin": "最早的原文在哪裡：找最早的出處",
+    "opposite": "有沒有相反的說法：找反對的說法",
+}
+
+
+def what_next(line: Mapping[str, Any]) -> list[str]:
+    """What is still worth checking about a claim, in the fixed order of SEARCH_ANGLES: each angle its 「去查」 has not searched
+    for this version of the claim (all of them before the first search), then the 法律 parts not written yet. A claim that
+    cannot be checked has none."""
+    if line["sentence"] != CHECKABLE:
+        return []
+    searched = set((line.get("lookup") or {}).get("angles") or [])
+    items = [ANGLE_ASKS[angle] for angle in SEARCH_ANGLES if angle not in searched]
+    return [*items, "寫上這句法律的法域、時效、來源"] if line.get("law_state") == LAW_UNCONFIRMED else items

@@ -14,12 +14,13 @@ export type MapContent = {
 };
 export type MapSpec = {
   layers: Array<{ key: string; name: string; question: string; output: string }>;
+  category_layer: Record<string, string>;   // a card's category -> the layer it belongs in (kinds/map.py CATEGORY_LAYER); a category not here is left for the person
   claim_kinds: Array<{ kind: string; needs: string; details: Array<{ key: string; label: string }> }>;
   unwinnable: { questions: Array<{ q: number; question: string; example: string }>; answers: string[]; reasons: string[]; reasons_reading: string; source: string };
 };
 export type SenseCard = { category: string; text: string };
 export type Placement = { card: string; layer: string };
-export type Tool = { method_id: string; name: string; family: string; family_zh: string; version: string; used: boolean };
+export type Tool = { method_id: string; name: string; name_en: string; blurb_zh: string; family: string; family_zh: string; version: string; used: boolean };
 
 export const FACT_CATEGORY = "事件";   // only a card that says what happened may be offered as a fact by the AI
 
@@ -44,6 +45,15 @@ export const unplacedCards = <D extends { doc_id: string }>(cards: D[], content:
 export function usablePlacements(placements: Placement[] | undefined, cards: Array<{ doc_id: string; content: SenseCard }>, content: MapContent, layers: string[]): Placement[] {
   const open = new Map(unplacedCards(cards, content).map((card) => [card.doc_id, card.content.category]));
   return (placements ?? []).filter((item) => open.has(item.card) && layers.includes(item.layer) && (item.layer !== "facts" || open.get(item.card) === FACT_CATEGORY));
+}
+
+/** MAP.place as code (no AI): for each card not in a layer yet, the layer its category belongs in. A card whose category the spec does not
+ *  place (感受, 身體反應, 直覺) gets none: where it goes is the person's to say. The person can always put a card in any other layer. */
+export function systemPlacements(cards: Array<{ doc_id: string; content: SenseCard }>, content: MapContent, categoryLayer: Record<string, string>, layers: string[]): Placement[] {
+  return unplacedCards(cards, content).flatMap((card) => {
+    const layer = categoryLayer[card.content.category];
+    return layer && layers.includes(layer) ? [{ card: card.doc_id, layer }] : [];
+  });
 }
 
 /** Layers with nothing in them, and the layer(s) with the least among those that have something; a skipped layer is neither. */

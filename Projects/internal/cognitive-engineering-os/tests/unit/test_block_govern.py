@@ -25,8 +25,8 @@ from ai_lego.data.repositories.custom_workflow_repository import CustomWorkflowR
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from tests.unit.case_fixture import a_case
 from ai_lego.errors import InvariantViolation
-from ai_lego.platform import safety
-from ai_lego.platform.ai_actions.govern import TOPICS
+from ai_lego.platform import ai_gate, safety
+from ai_lego.core.domain.kinds.govern import SETTINGS
 from ai_lego.platform.block_hooks import after_save
 from ai_lego.platform.block_hooks.govern import _recognise, written
 from ai_lego.platform.identity.store import IdentityStore
@@ -171,19 +171,6 @@ class RecognitionHookTests(PgTestCase):
         self.assertEqual(after_save(self.docs, "t", record_log.person("me"), saved), [])
 
 
-class TwoAnswerProvider(MirrorProvider):
-    """Answers a SENSE mirror turn and a GOVERN explain turn each with what it asks for."""
-    EXPLAIN = {"explanation": "你在哪裡：這一項可以不填。"}
-
-    def __init__(self):
-        super().__init__()
-        self.mirror = dict(self.answer)
-
-    def complete_json(self, system, user, *, max_tokens, **options):
-        self.answer = self.EXPLAIN if "Explain one setting" in system else self.mirror
-        return super().complete_json(system, user, max_tokens=max_tokens, **options)
-
-
 class GovernApiTestCase(ProjectSourceApiTestCase):
     def setUp(self):
         super().setUp()
@@ -192,7 +179,7 @@ class GovernApiTestCase(ProjectSourceApiTestCase):
         patcher = mock.patch.object(api_main, "PRODUCT_ROOT", Path(self._proj_tmpdir.name))   # recipe-run files go to this test's folder
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.provider = TwoAnswerProvider()
+        self.provider = MirrorProvider()
         api_main.app.dependency_overrides[api_main.get_ai_provider] = lambda: self.provider
         self._login()
         self.pid = self._create_project()["project_id"]
@@ -736,33 +723,26 @@ class VersionRecordTests(GovernApiTestCase):
 
 
 class ExplainSettingTests(GovernApiTestCase):
-    def test_the_ai_explains_from_the_systems_own_description_and_reads_nothing_the_person_wrote(self):
-        self.client.post("/me/docs/govern.location", json={"content": {"where": "PRIVATE-PLACE"}})
-        turn = self.client.post("/me/ai/GOVERN/explain", json={"context": {"topic": "where"}})
-        self.assertEqual(turn.status_code, 200, turn.text)
-        saved = turn.json()["saved"]
-        self.assertEqual((saved["kind"], saved["author"], saved["block"]), ("govern.explanation", "ai", "GOVERN"))
-        system, user = self.provider.calls[0]
-        self.assertIn(TOPICS["where"][1], user)
-        self.assertNotIn("PRIVATE-PLACE", user + system)
-        self.assertEqual(len(self.client.get("/me/docs/govern.explanation").json()), 1)
-        calls = self.client.get("/me/docs/govern.ai_call_personal").json()
-        self.assertEqual([(call["content"]["block"], call["content"]["action"]) for call in calls], [("GOVERN", "explain")])
+    """GOVERN.explain is not an AI turn any more (docs/platform/AI_TO_CODE_AUDIT.md §1): one fixed explanation per setting, in
+    kinds/govern.py SETTINGS, handed to the page by the spec."""
 
-    def test_only_a_listed_setting_can_be_asked_about(self):
-        self.assertEqual(self.client.post("/me/ai/GOVERN/explain", json={"context": {"topic": "anything"}}).status_code, 400)
-        self.assertEqual(self.client.post("/me/ai/GOVERN/explain", json={"context": {}}).status_code, 400)
+    def test_each_setting_has_its_one_explanation_in_the_spec(self):
+        spec = self.client.get("/blocks/govern/spec").json()
+        self.assertEqual(set(spec["settings"]), {"where", "guardrails", "export", "erase", "versions"})
+        for key, (name, explanation) in SETTINGS.items():
+            self.assertEqual(spec["settings"][key], {"name": name, "explanation": explanation}, key)
+            self.assertTrue(explanation.strip() and name.strip(), key)
         self.assertEqual(self.provider.calls, [])
 
-    def test_no_description_carries_a_crisis_word_or_the_gate_would_stop_every_explanation(self):
-        for topic, (name, description) in TOPICS.items():
-            self.assertFalse(safety.crisis_signal(name, description), topic)
-            self.assertTrue(self.client.post("/me/ai/GOVERN/explain", json={"context": {"topic": topic}}).json().get("saved"), topic)
-
-    def test_it_runs_with_no_case_only(self):
-        """Its answer is kept for the person, not in a case: the gate refuses before any model call is paid for."""
-        self.assertEqual(self.client.post(f"{self.base}/ai/GOVERN/explain", json={"context": {"topic": "where"}}).status_code, 403)
+    def test_the_ai_turn_is_gone_and_a_saved_explanation_is_still_a_record_of_the_person(self):
+        self.assertNotIn(("GOVERN", "explain"), ai_gate.actions())
+        self.assertEqual(self.client.post("/me/ai/GOVERN/explain", json={"context": {"topic": "where"}}).status_code, 404)
         self.assertEqual(self.provider.calls, [])
+        self.assertEqual(self.client.get("/me/docs/govern.explanation").json(), [])   # the kind is still held: a record saved before is listed
+
+    def test_no_explanation_carries_a_crisis_word_or_a_page_showing_it_beside_a_person_in_crisis_would_read_as_the_systems_alarm(self):
+        for topic, (name, explanation) in SETTINGS.items():
+            self.assertFalse(safety.crisis_signal(name, explanation), topic)
 
 
 class NeverReadsIntoAnAiTests(unittest.TestCase):
@@ -815,9 +795,9 @@ class WebCopiesTests(unittest.TestCase):
         from ai_lego.core.domain.kinds.govern import HIGH_RISK
         self.assertEqual(self._list("HIGH_RISK"), list(HIGH_RISK))
 
-    def test_the_topics_the_ai_can_explain(self):
+    def test_the_settings_the_page_explains(self):
         declared = re.search(r"export type Topic = (.*?);", self.web).group(1)
-        self.assertEqual(set(re.findall(r'"(\w+)"', declared)), set(TOPICS))
+        self.assertEqual(set(re.findall(r'"(\w+)"', declared)), set(SETTINGS))
 
     def test_the_reasons_the_ai_stopped(self):
         reasons = re.search(r"export const STOP_REASON: Record<string, string> = \{(.*?)\};", self.web, re.S).group(1)

@@ -24,6 +24,7 @@ const SPLIT = doc<Split>("verify.split", "S1", { message: "M1", claims: [{ text:
 const LINE = {
   claim_id: "C1", version: 1, text: "央行宣布下週起每天只能領一萬元", sentence: "可以查的事實", law: false, state: "有獨立出處支持", support: ["o:1"], oppose: [], stale: 0, few: true, verdict: null,
   message: "M1", from: "訊息", law_state: null, needs_alternative: false, earlier: [], three: { found: true, independent: 1, independent_enough: false, stands: [] }, search: null, lookup: null, weak_line: "只有一個出處這樣說",
+  said: "只有一個出處這樣說；獨立出處要 2 個以上才算數", next: [],
 };
 const posts = (calls: Call[], path: string) => calls.filter((call) => call.method !== "GET" && call.path === path);
 
@@ -69,17 +70,28 @@ describe("VERIFY 查證主張", () => {
     await done();
   });
 
-  it("under two origins the summary hands back with the count, and going on is my choice", async () => {
-    let asked = 0;
+  it("the summary of the ledger and what to check next are the system's own sentences with no AI button; a summary and a list the AI saved before still show", async () => {
+    const line = { ...LINE, next: ["別的地方怎麼報：找別家的報導", "最早的原文在哪裡：找最早的出處"] };
+    const oldSummary = doc("verify.summary", "U1", { lines: [{ claim: "C1", claim_version: 1, line: "帳本上有一個出處支持它" }], overview: "AI 以前的總覽" }, { author: "ai" });
+    const oldNext = doc("verify.next", "N1", { items: ["去問當事人"], question: "誰先說的？" }, { author: "ai" });
     const { host, done, calls } = await open({
-      [`GET ${P}/docs/verify.claim`]: [doc<Claim>("verify.claim", "C1", { text: LINE.text, sentence: LINE.sentence, from: "訊息", message: "M1" })], [`${P}/verify/ledger`]: { claims: [LINE], factcheck_asks: ["cofacts", "claimreview"], person_reads: [] },
-      [`POST ${P}/ai/VERIFY/summary`]: () => (asked++ === 0 ? { handback: "有 1 個主張的獨立出處不到 2 個（各是 1 個）。AI 先停下來，由你決定要不要照樣請它摘要。" } : { saved: {} }),
+      [`GET ${P}/docs/verify.claim`]: [doc<Claim>("verify.claim", "C1", { text: LINE.text, sentence: LINE.sentence, from: "訊息", message: "M1" }), doc<Claim>("verify.claim", "C2", { text: "快轉給家人", sentence: "叫你去做的事", from: "訊息", message: "M1" })],
+      [`${P}/verify/ledger`]: { claims: [line, { ...LINE, claim_id: "C2", text: "快轉給家人", sentence: "叫你去做的事", state: "不是查得了的句子", few: false, said: "這是叫你去做的事，不是查得了的句子，帳本不算它的出處", next: [] }],
+        overview: "帳本上共有 2 個主張，其中 1 個是查得了的事實。這 1 個裡，0 個有 2 個以上的獨立出處，1 個不到。帳本只數出處，不說哪個主張是真的或假的。", factcheck_asks: [], person_reads: [] },
+      [`GET ${P}/docs/verify.summary`]: [oldSummary], [`GET ${P}/docs/verify.next`]: [oldNext],
     });
-    expect(host.textContent).toContain("只有一個出處這樣說");
-    await click(byText(host, "button", "請 AI 摘要"));
-    expect(host.textContent).toContain("各是 1 個");
-    await click(byText(host, "button", "照樣請 AI 摘要"));
-    expect(posts(calls, `${P}/ai/VERIFY/summary`).map((call) => call.body.context)).toEqual([{}, { go_on: true }]);
+    const text = host.textContent ?? "";
+    expect(text).toContain("系統整理的，不是 AI 寫的，不扣點");
+    expect(text).toContain("央行宣布下週起每天只能領一萬元：只有一個出處這樣說；獨立出處要 2 個以上才算數");
+    expect(text).toContain("快轉給家人：這是叫你去做的事，不是查得了的句子，帳本不算它的出處");
+    expect(text).toContain("帳本上共有 2 個主張，其中 1 個是查得了的事實。");
+    expect(text).toContain("別的地方怎麼報：找別家的報導");
+    expect(text).toContain("最早的原文在哪裡：找最早的出處");
+    expect(text).toContain("以前 AI 摘要的");
+    expect(text).toContain("AI 以前的總覽");
+    expect(text).toContain("去問當事人");
+    expect([...host.querySelectorAll("button")].map((button) => button.textContent).filter((label) => /請 AI 摘要|請 AI 提還該查什麼/.test(label ?? ""))).toEqual([]);
+    expect(calls.filter((call) => call.method !== "GET" && call.path.includes("/ai/"))).toEqual([]);
     await done();
   });
 
@@ -237,7 +249,7 @@ describe("VERIFY ledger lines", () => {
   });
 
   it("says what one origin says with the server's one rule, never a support line for an opposing origin", async () => {
-    const { host, done } = await ledger({ support: [], oppose: ["o:1"], weak_line: "只有一個出處說不是這樣" });
+    const { host, done } = await ledger({ support: [], oppose: ["o:1"], weak_line: "只有一個出處說不是這樣", said: "只有一個出處說不是這樣；獨立出處要 2 個以上才算數" });
     expect(host.textContent).toContain("獨立出處不到 2 個：只有一個出處說不是這樣。");
     expect(host.textContent).not.toContain("只有一個出處這樣說");
     await done();

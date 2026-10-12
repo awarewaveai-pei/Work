@@ -40,6 +40,8 @@ export type Notice =
   | { type: "suggest_case"; categories: string[]; notice: string };   // outside a case: a high-risk word -> open a case (GOVERN's sentence)
 export type Saved<C = Record<string, any>> = Doc<C> & { notices: Notice[] };
 export const AUTHOR: Record<Author, string> = { user: "你寫的", ai: "AI 寫的", joint: "AI 起草、你改過", system: "系統" };
+/** The label on what the system made by code in the place an AI answer used to be (docs/platform/AI_TO_CODE_AUDIT.md §1): not the AI, and no credits. */
+export const SYSTEM_MADE = "系統整理的，不是 AI 寫的，不扣點";
 
 const enc = encodeURIComponent;
 const base = (projectId: string | null) => (projectId ? `/projects/${enc(projectId)}` : "/me");

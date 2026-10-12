@@ -25,8 +25,17 @@ function type(element: HTMLInputElement | HTMLTextAreaElement, value: string) {
 const click = async (element: Element | null | undefined) => { await act(async () => { (element as HTMLElement).click(); }); };
 const button = (host: HTMLElement, text: string) => [...host.querySelectorAll("button")].find((item) => item.textContent?.includes(text));
 
+// what GET /blocks/govern/spec says about each setting (kinds/govern.py SETTINGS): the fixed sentences the pages show beside a setting
+const SETTINGS = {
+  where: { name: "你在哪裡", explanation: "你可以寫下你在哪個地方，也可以不寫。" }, guardrails: { name: "護欄", explanation: "案子碰到健康、法律、金錢的事，系統會加護欄。" },
+  export: { name: "匯出", explanation: "你可以把一個案子，或你所有的資料，下載成檔案。" }, erase: { name: "刪除", explanation: "你可以刪掉一個案子，或刪掉整個帳號。刪掉就回不來。" },
+  versions: { name: "版本紀錄", explanation: "每次 AI 回答，系統都記下用了哪個模型。" },
+};
+const SPEC = { no_record: { label: "不留紀錄", warning: "關掉之後整個案子會刪掉，不能匯出" }, resources: {}, settings: SETTINGS };
+
 // "METHOD path" -> the answer (a function gets the init); any other call fails the test loudly
-function routes(table: Record<string, unknown | ((init?: RequestInit) => unknown)>) {
+function routes(given: Record<string, unknown | ((init?: RequestInit) => unknown)>) {
+  const table: Record<string, unknown> = { "GET /blocks/govern/spec": SPEC, "GET /me/docs/govern.explanation": [], ...given };
   vi.mocked(apiFetch).mockImplementation((async (path: string, init?: RequestInit) => {
     const key = `${init?.method ?? "GET"} ${path}`;
     if (!(key in table)) throw new Error(`unexpected call: ${key}`);
@@ -193,24 +202,41 @@ describe("設定：你在哪裡、匯出、AI 解釋", () => {
     await done();
   });
 
-  it("an AI explanation shows who wrote it, is not the person's record, and can be dropped", async () => {
-    const explanation = { ...doc("govern.explanation", { explanation: "你在哪裡：這一項可以不填。" }, { author: "ai" }) };
+  it("each setting is explained by one fixed sentence of the system, with no AI turn and no button", async () => {
+    routes({ "GET /govern/help": { notice: NOTICE, where: null, covered: false, resources: WORLD }, "GET /me/docs/govern.location": [] });
+    const { host, done } = await mount(<SettingsPage />);
+    const shown = [...host.querySelectorAll(".judge")].map((item) => item.textContent);
+    expect(shown).toContain("系統整理的，不是 AI 寫的，不扣點你在哪裡：你可以寫下你在哪個地方，也可以不寫。");
+    expect(shown.some((text) => text?.includes("匯出：你可以把一個案子"))).toBe(true);
+    expect(shown.some((text) => text?.includes("刪除：你可以刪掉一個案子"))).toBe(true);
+    expect([...host.querySelectorAll("button")].some((item) => item.textContent?.includes("請 AI"))).toBe(false);
+    expect(vi.mocked(apiFetch).mock.calls.some(([called]) => String(called).includes("/ai/"))).toBe(false);
+    await done();
+  });
+});
+
+describe("設定：以前 AI 寫的說明還在", () => {
+  it("shows an explanation the AI saved before with its author, says it is not the person's record, and lets them drop it", async () => {
+    const old = doc("govern.explanation", { explanation: "你在哪裡：這一項可以不填。" }, { author: "ai" });
     routes({
-      "GET /govern/help": { notice: NOTICE, where: null, covered: false, resources: WORLD }, "GET /me/docs/govern.location": [],
-      "POST /me/ai/GOVERN/explain": () => ({ saved: explanation, model: "m" }),
+      "GET /govern/help": { notice: NOTICE, where: null, covered: false, resources: WORLD }, "GET /me/docs/govern.location": [], "GET /me/docs/govern.explanation": [old],
       "DELETE /me/docs/govern.explanation/govern.explanation-1": { status: "deleted" },
     });
     const { host, done } = await mount(<SettingsPage />);
-    const ask = [...host.querySelectorAll("button")].find((item) => item.textContent === "請 AI 用白話說明這一項");
-    await click(ask);
-    expect(JSON.parse(calls("POST", "/me/ai/GOVERN/explain")[0][1]!.body as string)).toEqual({ context: { topic: "where" } });
-    const shown = host.querySelector(".judge");
-    expect(shown?.textContent).toContain("AI 寫的");
-    expect(shown?.textContent).toContain("你在哪裡：這一項可以不填。");
-    expect(shown?.textContent).toContain("不是你的紀錄");
-    await click(button(host, "刪掉這段說明"));
+    const card = [...host.querySelectorAll(".card")].find((node) => node.querySelector("h2")?.textContent?.startsWith("以前 AI 寫的設定說明"))!;
+    expect(card.textContent).toContain("AI 寫的");
+    expect(card.textContent).toContain("你在哪裡：這一項可以不填。");
+    expect(card.textContent).toContain("不是你的紀錄");
+    await click(button(card as HTMLElement, "刪掉這段說明"));
     expect(calls("DELETE", "/me/docs/govern.explanation/govern.explanation-1")).toHaveLength(1);
-    expect(host.querySelector(".judge")).toBeNull();
+    expect([...host.querySelectorAll("h2")].some((node) => node.textContent?.startsWith("以前 AI 寫的設定說明"))).toBe(false);
+    await done();
+  });
+
+  it("shows nothing about old explanations when there are none", async () => {
+    routes({ "GET /govern/help": { notice: NOTICE, where: null, covered: false, resources: WORLD }, "GET /me/docs/govern.location": [] });
+    const { host, done } = await mount(<SettingsPage />);
+    expect(host.textContent).not.toContain("以前 AI 寫的設定說明");
     await done();
   });
 });

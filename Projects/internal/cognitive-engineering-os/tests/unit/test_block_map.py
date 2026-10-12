@@ -1,6 +1,6 @@
-"""MAP 拆解: the map is the person's (every version stays, the core conflict is theirs alone), the AI offers placements,
-other readings, a method and claim kinds as kinds of its own, and the hooks propose GATHER / VERIFY / TEACH only for what is
-new. Each guard below has a test that goes red when the guard is taken out."""
+"""MAP 拆解: the map is the person's (every version stays, the core conflict is theirs alone), the AI offers other readings and
+claim kinds as kinds of its own (where a card goes and which method fits are plain code, not AI), and the hooks propose GATHER /
+VERIFY / TEACH only for what is new. Each guard below has a test that goes red when the guard is taken out."""
 
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ import unittest
 from ai_lego.apps.api import main as api_main
 from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.evidence_words import CARD_CELL_KEYS, NOT_FOUND, cell
-from ai_lego.core.domain.kinds.map import LAYER_KEYS, thin_facts
+from ai_lego.core.domain.kinds.map import CATEGORY_LAYER, LAYER_KEYS, thin_facts
+from ai_lego.core.domain.kinds.sense import CATEGORIES
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.errors import InvariantViolation
@@ -138,6 +139,8 @@ class MapKindTests(MapApiTestCase):
         tools = map_tools()
         self.assertGreater(len(tools), 100)
         self.assertEqual(tools["systems.iceberg_model"]["name"], "冰山模型")
+        self.assertEqual(tools["systems.iceberg_model"]["name_en"], "Iceberg Model")
+        self.assertTrue(all(tool["blurb_zh"].strip() for tool in tools.values()))   # the words the page's free matching compares a sentence with (MAP.method as code)
         self.assertEqual(self.client.get(f"{self.base}/map/methods").json()[0]["version"], next(iter(tools.values()))["version"])
         self.assertTrue(all(tool["version"] for tool in tools.values()))   # the version the map records when a tool is picked
         self.assertNotIn("decision.eisenhower_matrix", tools)   # DECIDE's, not a way to split a matter
@@ -158,6 +161,7 @@ class MapKindTests(MapApiTestCase):
         self.assertEqual(spec["layers"][0]["question"], "到底發生了什麼？")
         self.assertEqual([item["kind"] for item in spec["claim_kinds"]], ["事實", "法律", "價值", "文化宗教"])
         self.assertEqual([detail["key"] for detail in spec["claim_kinds"][1]["details"]], ["jurisdiction", "limitation", "source"])
+        self.assertEqual(spec["category_layer"], CATEGORY_LAYER)
         self.assertEqual(len(spec["unwinnable"]["questions"]), 8)
         self.assertEqual(len(spec["unwinnable"]["reasons"]), 2)
         self.assertIn("不是 Farrell 說的", spec["unwinnable"]["reasons_reading"])   # the two reasons are his, the reading after them is ours
@@ -168,36 +172,37 @@ class MapKindTests(MapApiTestCase):
         store.create_identity(str(uuid.uuid4()), self.tenant["tenant_id"], "colleague@example.com", "Colleague", "correct-horse-battery")
         self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "colleague@example.com", "password": "correct-horse-battery"})
         self.assertEqual(self.client.get(f"{self.base}/map/methods").status_code, 404)
-        self.assertEqual(self._ask("place").status_code, 404)
+        self.assertEqual(self._ask("claims").status_code, 404)
+
+
+class CategoryLayerTests(unittest.TestCase):
+    """MAP.place as code: which layer a card's category belongs in (kinds/map.py CATEGORY_LAYER), served by the spec."""
+
+    def test_the_cards_table_event_to_facts_stories_and_voices_to_interpretations_fear_and_hope_to_interests_power_to_structure(self):
+        self.assertEqual(CATEGORY_LAYER, {"事件": "facts", "你現在跟自己講的故事": "interpretations", "別人的聲音": "interpretations", "恐懼": "interests", "期待": "interests", "人物關係與權力": "structure"})
+
+    def test_every_key_is_a_card_category_and_every_value_a_layer_and_a_feeling_a_body_reaction_and_a_hunch_are_left_to_the_person(self):
+        self.assertTrue(set(CATEGORY_LAYER) <= set(CATEGORIES))
+        self.assertTrue(set(CATEGORY_LAYER.values()) <= set(LAYER_KEYS))
+        self.assertEqual(set(CATEGORIES) - set(CATEGORY_LAYER), {"感受", "身體反應", "直覺"})
+        self.assertEqual([category for category, layer in CATEGORY_LAYER.items() if layer == "facts"], ["事件"])   # only a card that says what happened is a fact
 
 
 class MapAiTests(MapApiTestCase):
     def test_each_action_reads_and_needs_what_the_card_says(self):
         found = {name: action for (block, name), action in ai_gate.actions().items() if block == "MAP"}
         self.assertEqual({name: action.reads for name, action in found.items()}, {
-            "place": ("sense.card", "map.map"), "alternatives": ("map.map", "context.notes", "gather.source"), "method": ("assembler.intake", "map.map"),
-            "claims": ("map.map", "context.notes", "gather.source")})   # gather.source: a fact linked to source cards is counted live
-        self.assertEqual({name: action.needs for name, action in found.items()}, {"place": "organize", "alternatives": "propose_options", "method": "organize", "claims": "organize"})
+            "alternatives": ("map.map", "context.notes", "gather.source"), "claims": ("map.map", "context.notes", "gather.source")})   # gather.source: a fact linked to source cards is counted live
+        self.assertEqual({name: action.needs for name, action in found.items()}, {"alternatives": "propose_options", "claims": "organize"})
 
-    def test_placing_cards_offers_only_cards_not_in_a_layer_and_the_answer_is_held_to_the_six_layers(self):
-        placed, free = self._card("合夥人第三次改條件"), self._card("我很怕他生氣", "恐懼")
-        self._save_map({"layers": {"facts": [{**FACT, "card": placed["doc_id"]}]}})
-        self.provider.answer = {"placements": [{"card": free["doc_id"], "layer": "interests"}, {"card": free["doc_id"], "layer": "facts"}, {"card": "x", "layer": "nowhere"}, {"card": "y", "layer": "core", "extra": 1}], "note": "dropped"}
-        turn = self._ask("place")
-        self.assertEqual(turn.status_code, 200, turn.text)
-        system, user = self.provider.calls[0]
-        self.assertIn("我很怕他生氣", user)
-        self.assertNotIn("合夥人第三次改條件", user)   # already placed: not sent again
-        self.assertIn("a feeling, a fear", system)
-        saved = turn.json()["saved"]
-        self.assertEqual((saved["author"], saved["kind"], saved["block"]), ("ai", "map.placement", "MAP"))
-        self.assertEqual(saved["content"]["placements"], [{"card": free["doc_id"], "layer": "interests"}, {"card": "y", "layer": "core"}])   # one per card, only the six layers
-
-    def test_with_every_card_placed_the_model_is_not_called(self):
-        card = self._card("合夥人第三次改條件")
-        self._save_map({"layers": {"facts": [{**FACT, "card": card["doc_id"]}]}})
-        self.assertEqual(self._ask("place").status_code, 400)
+    def test_place_and_method_are_code_now_not_ai_turns_and_what_they_saved_before_stays_a_kind_the_case_holds(self):
+        self.assertEqual({name for (block, name) in ai_gate.actions() if block == "MAP"}, {"alternatives", "claims"})
+        for name in ("place", "method"):
+            self.assertEqual(self._ask(name).status_code, 404, name)
         self.assertEqual(self.provider.calls, [])
+        for kind in ("map.placement", "map.method_pick"):
+            self.assertEqual(doc_kinds.require(kind).authors, frozenset({"ai"}), kind)
+            self.assertEqual(self.client.get(f"{self.base}/docs/{kind}").json(), [], kind)
 
     def test_another_reading_needs_the_contract_to_grant_propose_options(self):
         self._save_map({"layers": {"facts": [FACT], "interpretations": [READING]}})
@@ -263,17 +268,6 @@ class MapAiTests(MapApiTestCase):
         for private in ("我站在甲方這一邊", "仍有保留", "合約沒寫的我沒有義務"):
             self.assertNotIn(private, user)
 
-    def test_the_method_offered_is_one_not_used_in_this_case_and_only_a_real_tool(self):
-        self._save_map({"method": "冰山模型", "method_id": "systems.iceberg_model"})
-        self.provider.answer = {"picks": [{"method_id": "systems.iceberg_model", "reason": "已經用過"}, {"method_id": "made.up", "reason": "不存在"}, {"method_id": "systems.causal_loop_diagram", "reason": "你的問題有來回的影響"}]}
-        turn = self._ask("method", {"used": ["systems.causal_loop_diagram"]})
-        self.assertEqual(turn.status_code, 200, turn.text)
-        user = self.provider.calls[0][1]
-        self.assertNotIn("systems.iceberg_model —", user)    # the one in the map
-        self.assertNotIn("systems.causal_loop_diagram —", user)   # the one the page says was used
-        self.assertIn("root_cause.fishbone —", user)
-        self.assertEqual([pick["method_id"] for pick in turn.json()["saved"]["content"]["picks"]], ["systems.iceberg_model", "systems.causal_loop_diagram"])   # unknown id dropped; the page filters the used
-
     def test_claims_are_marked_never_defined_and_a_culture_line_carries_no_meaning_from_the_model(self):
         self._save_map({"layers": {"facts": [FACT], "interpretations": [{"id": "i2", "text": "他們的傳統不准這樣", "by": "user"}]}})
         self.provider.answer = {"proposals": [{"item": "i2", "kind": "文化宗教", "meaning": "在該宗教裡這是禁忌"}, {"item": "i2", "kind": "法律"}, {"item": "f1", "kind": "意見"}, {"item": "f1", "kind": "事實"}]}
@@ -294,11 +288,11 @@ class MapAiTests(MapApiTestCase):
         self.assertEqual(saved["content"]["method_version"], "1.0.0")
 
     def test_a_rerun_is_the_next_version_of_the_same_offer(self):
-        self._card("合夥人第三次改條件")
-        self.provider.answer = {"placements": []}
-        first = self._ask("place").json()["saved"]
-        self.assertEqual(self._ask("place").status_code, 409)   # a second offer beside the first is refused; the page passes the earlier one
-        again = self._ask("place", over=first).json()["saved"]
+        self._save_map({"layers": {"facts": [FACT]}})
+        self.provider.answer = {"proposals": []}
+        first = self._ask("claims").json()["saved"]
+        self.assertEqual(self._ask("claims").status_code, 409)   # a second offer beside the first is refused; the page passes the earlier one
+        again = self._ask("claims", over=first).json()["saved"]
         self.assertEqual((again["doc_id"], again["version"]), (first["doc_id"], 2))
 
     def test_what_i_took_or_dropped_is_kept_and_stays(self):

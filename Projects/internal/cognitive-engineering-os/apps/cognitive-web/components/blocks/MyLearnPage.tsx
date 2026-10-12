@@ -1,21 +1,21 @@
 "use client";
 
-// 每天的校準 (LEARN card, yours across cases, outside any case): once a day you write one belief, emotion or decision, the AI
-// gives it back as a mirror -- no advice, and it never writes your counterexample -- and you add a counterexample and what
+// 每天的校準 (LEARN card, yours across cases, outside any case): once a day you write one belief, emotion or decision, the page
+// gives it back as you wrote it -- the system's own copy, no AI, no advice -- and you add a counterexample and what
 // would change it. You also set the two practices (10 minutes a day, 2 to 3 thinking sprints a week) and keep your own
 // habits. Nothing here is copied into a case, and nothing here is scored or compared with anyone.
 import Link from "next/link";
 import { humanError } from "../../lib/errors";
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
-import { ai, docs, type Doc, type Notice } from "../../lib/blocks";
+import { docs, type Doc, type Notice } from "../../lib/blocks";
 import { DAILY_ABOUT, SPRINTS, sprintsThisWeek, type OpenCase } from "../../lib/learn";
 import type { Project } from "../../lib/projects";
 import { formatTime } from "../../lib/time";
 import { Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips } from "./JudgmentParts";
 import { RemindersPanel } from "./RemindersPanel";
-import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
+import { Missing, Refused, SystemMade, firstMissing, type Failed } from "./PageParts";
 
 type Daily = { about: string; text: string; counterexample?: string; change_condition?: string };
 type Practice = { daily?: boolean; weekly_sprints?: number };
@@ -70,11 +70,6 @@ export function MyLearnPage() {
     setNotices(saved.notices);
     setOpen((saved.notices as unknown as OpenCase[]).filter((notice) => notice.type === "suggest_case"));
   });
-  const askMirror = run("mirror", async () => {
-    if (!todays) return;
-    const turn = await ai<{ summary: string }>(null, "LEARN", "mirror", { card: todays.doc_id }, mirror);
-    if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
-  });
   const savePractice = run("practice", async () => {
     const content = { daily: setting.daily === true, weekly_sprints: setting.weekly_sprints ?? 0 };
     if (practice) await docs.update(null, "learn.practice", practice, content); else await docs.create(null, "learn.practice", content);
@@ -96,7 +91,7 @@ export function MyLearnPage() {
 
       <div className="card cta">
         <h2>今天的 10 分鐘</h2>
-        <p className="how">寫一個你相信的事、一種情緒，或一個決定。AI 當鏡子，把你寫的整理回來給你看；它不給建議，也不替你寫反例。反例和「什麼會改變它」，由你寫。</p>
+        <p className="how">寫一個你相信的事、一種情緒，或一個決定。存了以後，系統把你寫的照原話放回來給你看，不加任何話，不給建議，也不替你寫反例。反例和「什麼會改變它」，由你寫。</p>
         <div className="field">
           <b>這是一個</b>
           <Chips options={DAILY_ABOUT} value={form.about as (typeof DAILY_ABOUT)[number] | undefined} label="信念、情緒或決定" onPick={(about) => setForm({ ...form, about })} />
@@ -115,10 +110,13 @@ export function MyLearnPage() {
         ))}
         {todays && (
           <div className="judge">
-            <div className="btns"><button className="btn" type="button" disabled={busy} onClick={askMirror}>{busy ? "整理中…" : mirror ? "請 AI 再當一次鏡子" : "請 AI 當鏡子"}</button></div>
-            <Refused failed={failed} at="mirror" />
-            {mirror && mirrored && <><AuthorTag author={mirror.author} /><p>{mirror.content.summary}</p></>}
-            {mirror && !mirrored && <p className="sub">你改過這張卡，這是之前的整理。再請 AI 整理一次，就是新的。</p>}
+            <SystemMade />
+            <b>你今天寫的，照原話放在這裡</b>
+            <p>{todays.content.about}：{todays.content.text}</p>
+            {todays.content.counterexample && <p className="sub">你補的反例：{todays.content.counterexample}</p>}
+            {todays.content.change_condition && <p className="sub">什麼會改變它：{todays.content.change_condition}</p>}
+            {mirror && mirrored && <><b>以前 AI 當鏡子整理的（舊的紀錄，留著）</b><AuthorTag author={mirror.author} /><p>{mirror.content.summary}</p></>}
+            {mirror && !mirrored && <p className="sub">你改過這張卡，之前 AI 整理的那一份不放在這裡了。</p>}
           </div>
         )}
       </div>

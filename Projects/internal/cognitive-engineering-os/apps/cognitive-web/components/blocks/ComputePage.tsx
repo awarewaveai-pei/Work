@@ -3,15 +3,15 @@
 // COMPUTE 計算與模擬 (contract card): you say what to calculate, pick the numbers, say where each comes from (source
 // cards, or 我自己說的) and set 樂觀／悲觀 beside 一般; saving runs it on the server (block_hooks/compute.py), which keeps
 // every run: formula, inputs with sources, a range, the one number that flips it, the label. Every rule and every
-// refusal lives on the server (GET /blocks/compute/spec); this page only shows them. The AI suggests an algorithm and
-// explains a run in words; it never writes a number.
+// refusal lives on the server (GET /blocks/compute/spec); this page only shows them. The AI suggests an algorithm; it never
+// writes a number. What a run shows and which input moves it most is said by the system in fixed sentences (explainRun).
 import Link from "next/link";
 import React, { useEffect, useMemo, useState } from "react";
 import { ApiError, apiFetch } from "../../lib/api";
-import { AUTHOR, ai, docs, type AiTurn, type Doc, type Notice } from "../../lib/blocks";
+import { AUTHOR, ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { BlockShell, Notices } from "./BlockShell";
-import { Missing, Refused, type Failed } from "./PageParts";
+import { Missing, Refused, SystemMade, type Failed } from "./PageParts";
 
 type InputSpec = { key: string; name: string; type: string; min?: number; max?: number; hint?: string; repeat?: [number, number]; spread?: boolean; scenarios?: boolean; sweep?: string };
 type TypeSpec = { unit: string; fixed_unit: boolean; same_unit?: boolean; integer?: boolean };
@@ -117,6 +117,21 @@ export function flipWords(run: Run, spec: Spec): string {
   return `只改「${flip.input}」${whole}：從 ${fmt(flip.base)} ${unit} 變成大約 ${fmt(flip.at)} ${unit}${change}，結果就從「${flip.from}」變成「${flip.to}」。其他數字都不動。`;
 }
 
+/** COMPUTE.explain as code (no AI): what the run shows in fixed sentences, only from what the system computed -- the result's range, the one
+ *  input that flips it (flipWords), which numbers have no outside source or too few -- and never a number of its own: every number is the run's. */
+export function explainRun(run: Run, spec: Spec): string[] {
+  const range = run.result.range.low === null ? "每個情境都落在線的同一邊" : `範圍是 ${fmt(run.result.range.low)} 到 ${fmt(run.result.range.high)} ${run.result.range.unit}`;
+  const own = run.inputs.filter((row) => row.own).map((row) => `「${row.name}」`);
+  const thin = run.thin_inputs.map((name) => `「${name}」`);
+  return [
+    `這是系統算出來的${run.label}（${run.algorithm.name}）：${run.result.what}，${range}。`,
+    run.flip.input ? `最影響結果的數字是「${run.flip.input}」。${flipWords(run, spec)}` : `沒有哪一個數字單獨一動，就讓結果翻過來。${run.flip.why ?? ""}`,
+    ...(own.length ? [`${own.join("")}是你自己說的，沒有外部出處。`] : []),
+    ...(thin.length ? [`${thin.join("")}的獨立出處不到 ${spec.min_origins} 個。`] : []),
+    `${spec.not_prediction}，計算也不是：算出來的不等於會發生。`,
+  ];
+}
+
 function Chips({ options, value, onPick, label }: { options: string[]; value: string; onPick: (value: string) => void; label: string }) {
   return <div className="chips" role="group" aria-label={label}>{options.map((option) => <button key={option} type="button" className={`chip${value === option ? " on" : ""}`} aria-pressed={value === option} onClick={() => onPick(option)}>{option}</button>)}</div>;
 }
@@ -201,11 +216,12 @@ function SourcePicker({ own, ownWords, cards, picked, label, onOwn, onCards }: {
   );
 }
 
-/** The one place an AI explanation is drawn. No word filter stops every forecast, so the system's own line always sits
+/** An explanation the AI wrote before 2026-10-12, still kept. No word filter stops every forecast, so the system's own line always sits
  *  beside the AI's words -- the guarantee the AI guard only backs up. */
 function ExplanationBox({ doc, spec }: { doc: Doc<Explanation>; spec: Spec }) {
   return (
     <div className="finding">
+      <b>以前 AI 寫的說明（舊的紀錄，留著）</b>
       <span className="tags"><span>{AUTHOR[doc.author]}</span></span>
       <ul>{doc.content.points.map((point, index) => <li key={index}><span className="tag">{point.part}</span> {point.text}</li>)}</ul>
       <p><b>AI 認為最影響結果的：</b>「{doc.content.influential}」</p>
@@ -225,7 +241,6 @@ export function ComputePage({ projectId }: { projectId: string }) {
   const [adopts, setAdopts] = useState<Doc<Adopt>[]>([]);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [editing, setEditing] = useState<Doc<Request> | null>(null);
-  const [handback, setHandback] = useState<Record<string, string>>({});
   const [adopting, setAdopting] = useState<Record<string, { adopt: string; reason: string }>>({});
   const [picked, setPicked] = useState<string[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -269,11 +284,6 @@ export function ComputePage({ projectId }: { projectId: string }) {
   const suggest = () => act("suggest", async () => {
     const turn = await ai<Suggestion>(projectId, "COMPUTE", "suggest", { question: draft.question });
     if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
-  });
-  const explain = (run: Run, goOn = false) => act(`run-${run.run_id}`, async () => {
-    const turn = await ai<Explanation>(projectId, "COMPUTE", "explain", { run: run.run_id, ...(goOn ? { go_on: true } : {}) }) as AiTurn<Explanation> & { handback?: string };
-    if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
-    setHandback((held) => ({ ...held, [run.run_id]: turn.handback ?? "" }));
   });
   const decide = (run: Run) => act(`run-${run.run_id}`, async () => {
     const choice = adopting[run.run_id];
@@ -393,13 +403,13 @@ export function ComputePage({ projectId }: { projectId: string }) {
                 <button className="btn ghost" type="button" disabled={busy} onClick={() => again(run)}>用同樣的數字再算一次</button>
                 {run.rerun_of && <button className="btn ghost" type="button" onClick={() => setPicked([run.rerun_of!, run.run_id])}>跟上一次並排比</button>}
                 <button className={`chip${picked.includes(run.run_id) ? " on" : ""}`} type="button" aria-pressed={picked.includes(run.run_id)} onClick={() => pick(run.run_id)}>選來比較</button>
-                <button className="btn" type="button" disabled={busy} onClick={() => explain(run)}>請 AI 用白話解釋</button>
               </div>
               <Refused failed={failed} at={`run-${run.run_id}`} />
-              {handback[run.run_id] && (
-                <div className="finding warn" role="status"><b>AI 先停下來</b>{handback[run.run_id]}
-                  <div className="btns mt8"><button className="btn" type="button" disabled={busy} onClick={() => explain(run, true)}>仍然繼續</button></div></div>
-              )}
+              <div className="finding">
+                <SystemMade />
+                <b>用白話說這次算出來的</b>
+                <ul>{explainRun(run, spec).map((line) => <li key={line}>{line}</li>)}</ul>
+              </div>
               {explained && <ExplanationBox doc={explained} spec={spec} />}
               {run.adopt && !choice
                 ? <p><b>你{run.adopt.adopt}：</b>{run.adopt.reason} <button className="btn ghost" type="button" onClick={() => setAdopting({ ...adopting, [run.run_id]: { ...run.adopt! } })}>改</button></p>

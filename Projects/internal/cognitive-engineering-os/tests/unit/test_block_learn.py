@@ -1,10 +1,9 @@
 """LEARN 回顧校準: the person's review kept as written (process apart from luck, a wrong source flagged, trust in five
 aspects), what they did unaided listed without a score, habits across their own cases, the next blocks proposed, and the
-daily calibration card outside any case with the AI as a mirror only."""
+daily calibration card outside any case, given back as written (LEARN has no AI turn since 2026-10-12)."""
 
 from __future__ import annotations
 
-import json
 import re
 import unittest
 
@@ -206,25 +205,19 @@ class DailyCardTests(LearnBase):
         self.assertEqual(self.client.get(f"{self.base}/docs/govern.guardrail").json(), [])   # the guardrails are added inside a case, not by the card
         self.assertEqual([n for n in self.mine("learn.daily", {"about": "情緒", "text": "今天有點累"})["notices"] if n["type"] == "suggest_case"], [])
 
-    def test_the_ai_is_a_mirror_outside_a_case_and_needs_no_contract(self):
+    def test_the_mirror_is_the_card_as_written_not_an_ai_turn_and_a_mirror_saved_before_stays_readable(self):
+        """LEARN.mirror is the page showing the daily card as written (MyLearnPage.tsx); the gate has no such turn and the card is all it needs."""
         card = self.mine("learn.daily", {"about": "信念", "text": "我一定要先講話才安全"})
-        self.provider.answer = {"summary": "你相信要先講話才安全。", "advice": "你可以試試先聽", "counterexample": "也許不用"}
-        turn = self.client.post("/me/ai/LEARN/mirror", json={"context": {"card": card["doc_id"]}})
-        self.assertEqual(turn.status_code, 200, turn.text)
-        mirror = turn.json()["saved"]
-        self.assertEqual((mirror["author"], mirror["kind"], mirror["content"]), ("ai", "learn.daily_mirror", {"summary": "你相信要先講話才安全。"}))
-        system, user = self.provider.calls[0]
-        self.assertIn("do not advise", system)
-        self.assertIn("我一定要先講話才安全", user)
-        self.assertEqual(self.client.post("/me/ai/LEARN/mirror", json={"context": {}}).status_code, 409)   # again = its next version
-        over = self.client.post("/me/ai/LEARN/mirror", json={"context": {}, "doc_id": mirror["doc_id"], "base_version": 1})
-        self.assertEqual(over.json()["saved"]["version"], 2)
+        self.assertEqual(self.client.post("/me/ai/LEARN/mirror", json={"context": {"card": card["doc_id"]}}).status_code, 404)
+        self.assertEqual(self.provider.calls, [])
+        self.assertEqual(doc_kinds.require("learn.daily_mirror").authors, frozenset({"ai"}))
+        self.assertEqual(self.client.post("/me/docs/learn.daily_mirror", json={"content": {"summary": "x"}}).status_code, 403)   # only the AI wrote it, and no AI does now
+        self.assertEqual(self.client.get("/me/docs/learn.daily_mirror").json(), [])
+        self.assertEqual(self.client.get("/me/docs/learn.daily").json()[0]["content"], {"about": "信念", "text": "我一定要先講話才安全"})   # as written, nothing added
 
-    def test_no_card_no_mirror_and_a_crisis_stops_it(self):
-        self.assertEqual(self.client.post("/me/ai/LEARN/mirror", json={"context": {}}).status_code, 400)
-        self.mine("learn.daily", {"about": "情緒", "text": "我不想活了"})
-        turn = self.client.post("/me/ai/LEARN/mirror", json={"context": {}}).json()
-        self.assertEqual(turn["stopped"], "crisis")
+    def test_a_crisis_word_in_the_card_still_brings_help_without_any_model(self):
+        saved = self.mine("learn.daily", {"about": "情緒", "text": "我不想活了"})
+        self.assertEqual([notice["type"] for notice in saved["notices"] if notice["type"] == "crisis"], ["crisis"])
         self.assertEqual(self.provider.calls, [])
 
     def test_the_two_practices_and_a_sprint_are_the_persons_own_records(self):
@@ -243,94 +236,17 @@ class DailyCardTests(LearnBase):
 
 
 class CompareTests(LearnBase):
-    def test_the_ai_sets_earlier_and_later_side_by_side_scores_no_one_and_never_rewrites_the_record(self):
-        judgment = self.save("decide.judgment", {**LEAN, "conclusion": "先談一次", "confidence": 60})
-        task = self.save("act.task", {"title": "跟他談", "prediction": "我猜他會讓步一半"})
-        self.save("act.note", {"task": task["doc_id"], "happened": "他下個月又改條件"})
-        self.provider.answer = {"side_by_side": "你預測他讓步一半；結果他又改了條件。", "done_well": ["你先寫了預測", "你寫了什麼會改變結論", "第三個"], "practice": "下次先寫反例",
-                                "score": 7, "ranking": ["a"], "verdict": "你錯了"}
-        turn = self.client.post(f"{self.base}/ai/LEARN/compare", json={"context": {}})
-        self.assertEqual(turn.status_code, 200, turn.text)
-        saved = turn.json()["saved"]
-        self.assertEqual((saved["author"], saved["kind"]), ("ai", "learn.compare"))
-        self.assertEqual(saved["content"], {"side_by_side": "你預測他讓步一半；結果他又改了條件。", "done_well": ["你先寫了預測", "你寫了什麼會改變結論"], "practice": "下次先寫反例"})
-        system, user = self.provider.calls[0]
-        self.assertIn("Never give a score, a grade or a ranking", system)
-        self.assertIn("never rewrite what was written earlier", system)
-        self.assertIn("never say whether the person should revise", system)
-        for seen in ("先談一次", "我猜他會讓步一半", "他下個月又改條件"):
-            self.assertIn(seen, user)
-        self.assertEqual(self.client.get(f"{self.base}/docs/decide.judgment").json()[0]["content"]["conclusion"], judgment["content"]["conclusion"])
+    """LEARN.compare is the review page's own side-by-side table and 「你自己做到的」 (LearnPage.tsx, own_moves), not an AI turn."""
 
-    def compare(self, **context):
-        held = self.client.get(f"{self.base}/docs/learn.compare").json()   # asking again = its next version
-        over = {"doc_id": held[0]["doc_id"], "base_version": held[0]["version"]} if held else {}
-        return self.client.post(f"{self.base}/ai/LEARN/compare", json={"context": context, **over})
-
-    def asked_about(self):
-        user = self.provider.calls[-1][1]
-        return json.loads(user.split("\n", 1)[1].split("\n\n", 1)[0])
-
-    def test_the_earlier_judgment_is_the_version_the_review_is_about_never_one_written_after_the_outcome(self):
-        """AI 不准改寫當初的紀錄: v2 written after the outcome must not be labelled the earlier judgment."""
-        v1 = self.save("decide.judgment", {**LEAN, "conclusion": "先談一次", "confidence": 60})
-        task = self.save("act.task", {"title": "跟他談", "prediction": "我猜他會讓步一半"})
-        self.client.put(f"{self.base}/docs/decide.judgment/{v1['doc_id']}", json={"content": {**LEAN, "conclusion": "改成直接退出", "confidence": 30, "revision_reason": "結果出來後我改了"}, "base_version": 1})
-        self.provider.answer = {"side_by_side": "x"}
-        self.assertEqual(self.compare(judgment_version=1).status_code, 200)
-        earlier = self.asked_about()["earlier_judgment"]
-        self.assertEqual((earlier["version"], earlier["conclusion"], earlier["confidence"]), (1, "先談一次", 60))
-        self.assertNotIn("改成直接退出", self.provider.calls[-1][1])
-        self.assertEqual(self.compare(judgment_version=2).status_code, 200)
-        self.assertEqual((self.asked_about()["earlier_judgment"]["version"], self.asked_about()["earlier_judgment"]["conclusion"]), (2, "改成直接退出"))
-        self.assertEqual(self.compare().status_code, 200)   # nothing named, no review yet: the latest
-        self.assertEqual(self.asked_about()["earlier_judgment"]["version"], 2)
-        self.save("learn.calibration", {**REVIEW, "judgment_version": 1})
-        self.assertEqual(self.compare().status_code, 200)   # a review names the version it is about
-        self.assertEqual(self.asked_about()["earlier_judgment"]["version"], 1)
-        calls = len(self.provider.calls)
-        for wrong in (9, 0):
-            refused = self.compare(judgment_version=wrong)
-            self.assertEqual((refused.status_code, "DOC_NOT_FOUND" in refused.text), (400, True), wrong)
-        self.assertEqual(len(self.provider.calls), calls)   # refused before any model call
-        self.assertEqual(task["version"], 1)
-
-    def test_the_prediction_is_sent_as_first_written_and_a_later_change_is_said(self):
-        task = self.save("act.task", {"title": "跟他談", "prediction": "我猜他會讓步一半"})
-        other = self.save("act.task", {"title": "寫信", "prediction": "他會回信"})
-        self.provider.answer = {"side_by_side": "x"}
-        self.assertEqual(self.compare().status_code, 200)
-        by_title = {item["title"]: item for item in self.asked_about()["predictions"]}
-        self.assertEqual(by_title["跟他談"], {"title": "跟他談", "prediction": "我猜他會讓步一半"})
-        self.client.put(f"{self.base}/docs/act.task/{task['doc_id']}", json={"content": {"title": "跟他談", "prediction": "我猜他會讓步七成", "status": "完成"}, "base_version": 1})
-        self.assertEqual(self.compare().status_code, 200)
-        by_title = {item["title"]: item for item in self.asked_about()["predictions"]}
-        self.assertEqual(by_title["跟他談"], {"title": "跟他談", "status": "完成", "prediction": "我猜他會讓步一半", "prediction_changed_later": True, "prediction_now": "我猜他會讓步七成"})
-        self.assertEqual(by_title["寫信"], {"title": "寫信", "prediction": "他會回信"})   # a task never changed says nothing extra
-        self.assertEqual(other["version"], 1)
-
-    def test_it_reads_what_the_ai_said_and_what_the_person_answered(self):
-        self.save("decide.judgment", LEAN)
-        self.provider.answer = {"reversibility": ["退出：簽了就退不回"]}
-        check = self.client.post(f"{self.base}/ai/DECIDE/check", json={"context": {}}).json()["saved"]
-        self.save("decide.review", {"check": check["doc_id"], "version": 1, "irreversible": ["退出：簽了就退不回"], "hold": "先等一下"})
-        self.provider.answer = {"side_by_side": "x"}
-        self.client.post(f"{self.base}/ai/LEARN/compare", json={"context": {}})
-        user = self.provider.calls[-1][1]
-        self.assertIn("退出：簽了就退不回", user)
-        self.assertIn("先等一下", user)
-
-    def test_there_must_be_something_to_compare(self):
-        self.assertEqual(self.client.post(f"{self.base}/ai/LEARN/compare", json={"context": {}}).status_code, 400)
+    def test_the_turn_is_gone_and_a_comparison_the_ai_saved_before_stays_a_kind_the_case_holds(self):
+        self.save("decide.judgment", {**LEAN, "conclusion": "先談一次", "confidence": 60})
+        self.save("act.task", {"title": "跟他談", "prediction": "我猜他會讓步一半"})
+        self.assertEqual({name for (block, name) in ai_gate.actions() if block == "LEARN"}, set())
+        self.assertEqual(self.client.post(f"{self.base}/ai/LEARN/compare", json={"context": {}}).status_code, 404)
         self.assertEqual(self.provider.calls, [])
-
-    def test_the_ai_owns_only_its_two_kinds_here_and_reads_only_the_cards_kinds(self):
-        mine = {key: action for key, action in ai_gate.actions().items() if key[0] == "LEARN"}
-        self.assertEqual({(name, action.output_kind, action.needs, action.outside_case) for (_, name), action in mine.items()},
-                         {("compare", "learn.compare", "organize", False), ("mirror", "learn.daily_mirror", "organize", True)})
-        self.assertTrue(all(doc_kinds.require(action.output_kind).authors == frozenset({"ai"}) for action in mine.values()))
-        self.assertEqual(set(mine[("LEARN", "mirror")].reads), {"learn.daily"})
+        self.assertEqual(doc_kinds.require("learn.compare").authors, frozenset({"ai"}))
         self.assertEqual(self.client.post(f"{self.base}/docs/learn.compare", json={"content": {"side_by_side": "x"}}).status_code, 403)
+        self.assertEqual(self.client.get(f"{self.base}/docs/learn.compare").json(), [])
 
 
 class WebParityTests(unittest.TestCase):

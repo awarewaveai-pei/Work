@@ -45,19 +45,21 @@ export function collapseFlips(versions: Array<Doc<Task>>, windowMs = FLIP_WINDOW
 
 export type Series = { name: string; unit: string; points: Array<{ on: string; value: number }>; trend: boolean };
 
-/** The numbers recorded in a task's notes, one series per name. A number recorded twice or more is a trend (同一個數字記到兩筆，系統就畫成趨勢);
- *  one recorded once stays a single point. Notes in the order they were written. */
+/** The numbers recorded in a task's notes, one series per name in one unit (100 元 and 1 萬元 are never one line: a change across units would be
+ *  a made-up number). A number recorded twice or more is a trend (同一個數字記到兩筆，系統就畫成趨勢); one recorded once stays a single point.
+ *  Notes in the order they were written. */
 export function seriesOf(notes: Array<Doc<Note>>): Series[] {
   const found = new Map<string, Series>();
   for (const note of [...notes].sort((a, b) => a.at.localeCompare(b.at))) {
     for (const item of note.content.numbers ?? []) {
       const name = item.name.trim();
       if (!name || typeof item.value !== "number" || !Number.isFinite(item.value)) continue;
-      const series = found.get(name) ?? { name, unit: item.unit ?? "", points: [], trend: false };
+      const unit = item.unit ?? "";
+      const key = JSON.stringify([name, unit]);
+      const series = found.get(key) ?? { name, unit, points: [], trend: false };
       series.points.push({ on: note.at.slice(0, 10), value: item.value });
       series.trend = series.points.length >= 2;
-      if (item.unit) series.unit = item.unit;
-      found.set(name, series);
+      found.set(key, series);
     }
   }
   return [...found.values()];
@@ -77,3 +79,48 @@ export function parseNumber(name: string, value: string, unit: string): Num | nu
   const parsed = trimmed === "" ? NaN : Number(trimmed);
   return name.trim() && Number.isFinite(parsed) ? { name: name.trim(), value: parsed, ...(unit.trim() ? { unit: unit.trim() } : {}) } : null;
 }
+
+// ACT.flag and ACT.trend were AI turns until 2026-10-12; they are plain code now (docs/platform/AI_TO_CODE_AUDIT.md §1). Nothing here
+// judges: it lists what the person marked and what they recorded, in the order they wrote it.
+
+/** What the person marked on one task about undoing it, in their words: 不能反悔 (and the wait or review they chose), 能反悔, or not marked yet. */
+export function undoMark(task: Task): string {
+  if (task.irreversible === true) return `不能反悔${task.hold ? `；你選了「${task.hold}」` : ""}`;
+  return task.irreversible === false ? "能反悔" : "你還沒勾能不能反悔";
+}
+
+/** Every task with its own mark, and who is affected (the intake's ``affected``): the lines under 「哪裡不能反悔、會影響到誰」. */
+export function flagLines(tasks: Array<Doc<Task>>, affected: string[]): { tasks: Array<{ title: string; mark: string; irreversible: boolean }>; affected: string[] } {
+  return { tasks: tasks.map((task) => ({ title: task.content.title, mark: undoMark(task.content), irreversible: task.content.irreversible === true })), affected };
+}
+
+export type Moved = { task: string; name: string; unit: string; first: number; last: number; change: number; from: string; to: string; count: number };
+export type Once = { task: string; name: string; unit: string; value: number; on: string };
+
+/** The number a difference of two recorded numbers is: no float tail (0.1 + 0.2 stays 0.3). */
+const diff = (last: number, first: number): number => Number((last - first).toPrecision(12));
+
+/** The recorded numbers of every task: each number recorded twice or more from its first value to its last, the change and the two days;
+ *  a number recorded once is listed as recorded once. Per task, so two tasks that record 「價格」 stay two lines. */
+export function trendLines(tasks: Array<Doc<Task>>, notes: Array<Doc<Note>>): { moved: Moved[]; once: Once[] } {
+  const moved: Moved[] = [];
+  const once: Once[] = [];
+  for (const task of tasks) {
+    for (const series of seriesOf(notes.filter((note) => note.content.task === task.doc_id))) {
+      const first = series.points[0];
+      const last = series.points[series.points.length - 1];
+      if (series.trend) moved.push({ task: task.content.title, name: series.name, unit: series.unit, first: first.value, last: last.value, change: diff(last.value, first.value), from: first.on, to: last.on, count: series.points.length });
+      else once.push({ task: task.content.title, name: series.name, unit: series.unit, value: first.value, on: first.on });
+    }
+  }
+  return { moved, once };
+}
+
+/** One moved number in one sentence. */
+export function movedSentence(line: Moved): string {
+  const how = line.change === 0 ? "一樣" : `${line.change > 0 ? "多了" : "少了"} ${Math.abs(line.change)}${line.unit}`;
+  return `「${line.task}」的「${line.name}」：從 ${line.first}${line.unit} 到 ${line.last}${line.unit}，${how}；${line.from === line.to ? `${line.from} 記了 ${line.count} 次` : `${line.from} 到 ${line.to} 記了 ${line.count} 次`}。`;
+}
+
+/** One number recorded once, in one sentence. */
+export const onceSentence = (line: Once): string => `「${line.task}」的「${line.name}」：只記了一次（${line.value}${line.unit}，${line.on}），還看不出趨勢。`;

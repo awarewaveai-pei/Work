@@ -26,6 +26,7 @@ const SPEC: ContextSpec = {
 };
 const MAP_SPEC: MapSpec = {
   layers: [{ key: "facts", name: "事實", question: "q", output: "o" }, { key: "structure", name: "結構", question: "q", output: "o" }],
+  category_layer: {},
   claim_kinds: [{ kind: "法律", needs: "", details: [{ key: "jurisdiction", label: "適用法域" }, { key: "limitation", label: "時效" }, { key: "source", label: "來源" }] }],
   unwinnable: { questions: [], answers: [], reasons: [], reasons_reading: "", source: "" },
 };

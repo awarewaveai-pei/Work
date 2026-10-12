@@ -166,23 +166,19 @@ describe("LEARN 回顧校準", () => {
     await withAct.done();
   });
 
-  it("the AI's comparison carries its author, two things done well and one to practise, and no verdict", async () => {
+  it("the side-by-side is the system's own table with no AI button; a comparison the AI saved before still shows with its author, two things done well and one to practise, and no verdict", async () => {
     const compare = doc("learn.compare", "P1", { side_by_side: "你預測他讓步一半；結果他又改了條件。", done_well: ["你先寫了預測", "你寫了什麼會改變結論"], practice: "下次先寫反例" }, { author: "ai", block: "LEARN" });
-    let made = false;
-    const { host, done, calls } = await open({ [`POST ${P}/ai/LEARN/compare`]: () => { made = true; return { saved: compare }; }, [`GET ${P}/docs/learn.compare`]: () => (made ? [compare] : []) });
-    await click(chip(host, "回顧哪一版", "第 1 版"));
-    await click(byText(host, "button", "請 AI 整理前後比較"));
-    expect(posts(calls, `${P}/ai/LEARN/compare`)[0].body.context).toEqual({ judgment_version: 1 });   // the version the review is about, not whatever is newest
-    expect(host.textContent).toContain("AI 寫的");
-    expect(host.textContent).toContain("你先寫了預測");
-    expect(host.textContent).toContain("下次可以練的一處：下次先寫反例");
-    expect(host.textContent).toContain("不給分數、不排名、不改寫當初的紀錄，也不替你決定要不要修正");
-    await done();
-  });
-
-  it("says in plain words when there is nothing to compare", async () => {
-    const { host, done } = await open({ [`GET ${P}/docs/decide.judgment`]: [], [`GET ${P}/docs/decide.judgment/J1/versions`]: [], [`POST ${P}/ai/LEARN/compare`]: () => { throw new ApiError(400, "LEARN_NOTHING_TO_COMPARE: x"); } });
-    expect((byText(host, "button", "請 AI 整理前後比較") as HTMLButtonElement).disabled).toBe(true);
+    const { host, done, calls } = await open({ [`GET ${P}/docs/learn.compare`]: [compare] });
+    const text = host.textContent ?? "";
+    expect(text).toContain("系統整理的，不是 AI 寫的，不扣點");
+    expect(text).toContain("這張表是系統照你的紀錄排的");
+    expect(text).toContain("以前 AI 整理的前後比較");
+    expect(text).toContain("AI 寫的");
+    expect(text).toContain("你先寫了預測");
+    expect(text).toContain("下次可以練的一處：下次先寫反例");
+    expect(text).toContain("不給分數、不排名、不改寫當初的紀錄，也不替你決定要不要修正");
+    expect([...host.querySelectorAll("button")].some((node) => /請 AI/.test(node.textContent ?? ""))).toBe(false);
+    expect(calls.filter((call) => call.method !== "GET" && call.path.includes("/ai/"))).toEqual([]);
     await done();
   });
 

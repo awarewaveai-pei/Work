@@ -34,14 +34,12 @@ ANSWERS = {
     "mirror": {"sections": [{"title": "事實", "items": ["他第三次改條件"]}, {"title": "情緒", "items": ["生氣"]}], "question": "哪一點最讓你在意？"},
     "audit": {"sections": [{"title": "已知", "items": ["他改了三次"]}, {"title": "猜測", "items": ["他想逼我退出"]}]},
     "socratic": {"question": "這件事你真正想弄清楚的是什麼？"},
-    "ask_conclusion": {"question": "現在你的結論是什麼？什麼會改變它？"},
-    "look_back": {"sections": [{"title": "思考強項", "items": ["你先寫了假設", "你找了反例"]}, {"title": "下次練習點", "items": ["多寫一個我不知道"]}]},
     "criteria": {"sections": [{"title": "判準", "items": ["能不能反悔？"]}], "premise": "你有兩個以上的選項", "fails_when": "選項其實只有一個"},
     "diverge": {"cards": cards(10)},
     "counter": {"cards": cards(3, kinds.COUNTER_ANGLES)},
     "direct_advice": {"cards": cards(2, (), premise="他還願意談", fails_when="他已經決定退出")},
 }
-ALWAYS_ACTIONS = ("mirror", "audit", "socratic", "ask_conclusion", "look_back")
+ALWAYS_ACTIONS = ("mirror", "audit", "socratic")
 GRANT_NEEDED = {"diverge": "propose_options", "counter": "counter", "criteria": "propose_options", "direct_advice": "direct_advice"}
 
 
@@ -186,7 +184,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
     def test_the_contract_decides_which_turns_run(self):
         round_ = self._round()
         self.assertEqual({action: ai_gate.actions()[("THINK", action)].needs for action in kinds.ACTION_FACETS},
-                         {**{action: "organize" for action in ("mirror", "audit", "look_back")}, **{action: "ask" for action in ("socratic", "ask_conclusion")}, **GRANT_NEEDED})
+                         {**{action: "organize" for action in ("mirror", "audit")}, "socratic": "ask", **GRANT_NEEDED})
         for action in GRANT_NEEDED:
             self.provider.answer = ANSWERS[action]
             refused = self._ask(action, round_["doc_id"])
@@ -517,7 +515,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         saved = self._answer("socratic", round_["doc_id"], {"question": "你要先弄清楚什麼？", "sections": [{"title": "事實", "items": ["x"]}], "premise": "p"})
         self.assertEqual(set(saved["content"]), {"round", "action", "role", "question", "sourced"})
         self.provider.answer = {"sections": [{"title": "事實", "items": ["x"]}]}
-        self.assertEqual(self._ask("ask_conclusion", round_["doc_id"]).status_code, 422)
+        self.assertEqual(self._ask("socratic", round_["doc_id"]).status_code, 422)
 
     def test_the_ai_asks_one_question_at_a_time(self):
         self.assertEqual(actions._one_question("你要先弄清楚什麼？還是先看他的條件？", 300), "你要先弄清楚什麼？")
@@ -543,10 +541,16 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         wordy = self._answer("socratic", round_["doc_id"], {"handback": "資料不足，先不給建議。你可以這樣做：先談條件，再談期限。", "question": "你想先弄清楚哪一點？"})
         self.assertEqual(wordy["content"]["handback"], "資料不足，先不給建議。")
 
-    def test_the_look_back_names_two_strengths_and_one_practice(self):
+    def test_asking_for_my_conclusion_and_the_look_back_are_fixed_questions_now_not_ai_turns(self):
+        """THINK.ask_conclusion and THINK.look_back are the page's fixed question cards (lib/think.ts); the gate lists seven turns and a reply they saved before stays a kind."""
         round_ = self._round()
-        saved = self._answer("look_back", round_["doc_id"], {"sections": [{"title": "思考強項", "items": ["a", "b", "c"]}, {"title": "下次練習點", "items": ["x", "y"]}]})
-        self.assertEqual([(section["title"], len(section["items"])) for section in saved["content"]["sections"]], [("思考強項", 2), ("下次練習點", 1)])
+        self.assertEqual({name for (block, name) in ai_gate.actions() if block == "THINK"}, {"mirror", "diverge", "counter", "audit", "socratic", "criteria", "direct_advice"})
+        self.assertEqual(set(kinds.ACTION_FACETS), {"mirror", "diverge", "counter", "audit", "socratic", "criteria", "direct_advice"})
+        for action in ("ask_conclusion", "look_back"):
+            self.assertEqual(self._ask(action, round_["doc_id"]).status_code, 404, action)
+        self.assertEqual(self.provider.calls, [])
+        self.assertIn("後設學習教練", kinds.ROLES)   # a reply a round kept from either card still names its role
+        self.assertEqual(doc_kinds.require("think.reply").authors, frozenset({"ai"}))
 
     def test_criteria_come_with_their_premise_and_how_they_fail(self):
         self._grant("propose_options")
@@ -581,7 +585,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         to hold back: the reflection is always given, the caution sits beside it."""
         self._grant("propose_options")
         round_ = self._round(problem="合約裡寫了違約金，我要不要簽")
-        for action in ("mirror", "audit", "look_back"):
+        for action in ("mirror", "audit"):
             saved = self._answer(action, round_["doc_id"], {**ANSWERS[action], "handback": "需要律師，我無法代為判斷。", "caution": "這部分要請律師確認。你可以先把條款拿給他看。"})
             self.assertEqual((saved["content"].get("handback"), saved["content"]["caution"], bool(saved["content"]["sections"])), (None, "這部分要請律師確認。", True), action)
             system = self.provider.calls[-1][0]
@@ -606,8 +610,9 @@ class ThinkApiTests(ProjectSourceApiTestCase):
         for fresh in ("如果他再改一次條件，你會怎麼做？", "要不要接這個案子，取決於他願意讓步到哪裡？你設的底線是什麼？", "哪一點最讓你在意？"):
             self.assertEqual(self._answer("mirror", round_["doc_id"], {**ANSWERS["mirror"], "question": fresh})["content"]["question"], fresh.split("？")[0] + "？")
         reflective = self._round(problem="要不要接這個案子", own=("觀察：他第三次改條件",), reflection="我太快相信第一個想法", criteria=["不要賠錢"])
-        looked_back = self._answer("look_back", reflective["doc_id"], {**ANSWERS["look_back"], "question": "我太快相信第一個想法嗎？"})
-        self.assertNotIn("question", looked_back["content"])   # the look-back shows the reflection to the model, so it is theirs again too
+        self._grant("propose_options")
+        advised = self._answer("criteria", reflective["doc_id"], {**ANSWERS["criteria"], "question": "我太快相信第一個想法嗎？"})
+        self.assertNotIn("question", advised["content"])   # the criteria turn shows the reflection to the model, so it is theirs again too
         self.provider.answer = {"question": "不要賠錢，對你來說是多少錢？"}
         self.assertEqual(self._ask("socratic", reflective["doc_id"]).status_code, 200)   # a new question that uses their words is not their words again
         self.provider.answer = {"question": "不要賠錢?"}
@@ -659,7 +664,7 @@ class ThinkApiTests(ProjectSourceApiTestCase):
     # -- 讀什麼 -----------------------------------------------------------------------------------------------------------------
     def test_every_turn_reads_only_what_the_card_allows(self):
         thinks = {key: action for key, action in ai_gate.actions().items() if key[0] == "THINK"}
-        self.assertEqual(len(thinks), 9)
+        self.assertEqual(len(thinks), 7)
         allowed = {"think.round", "think.card", "think.reaction", "map.map", "sense.card", "verify.claim"}   # verify.claim: 有查證時讀主張帳本
         for key, action in thinks.items():
             self.assertEqual(set(action.reads), allowed, key)
@@ -696,13 +701,14 @@ class ThinkApiTests(ProjectSourceApiTestCase):
             self.assertIn("怕被騙", message([{"doc_id": "M", "author": "user", "content": broken}]))
         self.assertIn("怕被騙", message([]))
 
-    def test_only_my_picks_and_my_reflection_go_to_the_look_back(self):
+    def test_only_my_picks_and_my_reflection_go_to_the_criteria(self):
+        self._grant("propose_options")
         round_ = self._round()
         mine = self._card(round_["doc_id"], "我選這個")
         self._card(round_["doc_id"], "我沒選的")
         self._react(mine, reaction="共鳴", reason="因為便宜", picked=True)
         self._set_round(round_, reflection="我太快相信第一個想法")
-        self._answer("look_back", round_["doc_id"])
+        self._answer("criteria", round_["doc_id"])
         sent = self.provider.calls[-1][1]
         self.assertIn("我選這個", sent)
         self.assertIn("因為便宜", sent)
@@ -748,18 +754,32 @@ class ThinkWebTests(unittest.TestCase):
             self.assertEqual((role, mode), kinds.ACTION_FACETS[name], name)
             self.assertEqual(needs, engine[name].needs, name)
 
+    def system_cards(self) -> dict[str, tuple[str, str]]:
+        block = re.search(r"export const SYSTEM_CARDS.*?\n\};", self.think, re.S).group(0)
+        return {name: (role, mode) for name, role, mode in re.findall(r'^  (\w+): \{ role: "([^"]+)", mode: "([^"]+)", title: "[^"]*" \},$', block, re.M)}
+
+    def test_the_two_system_cards_are_roles_and_modes_the_engine_knows_and_no_ai_action(self):
+        cards = self.system_cards()
+        self.assertEqual(cards, {"ask_conclusion": ("決策教練", "只問問題"), "look_back": ("後設學習教練", "鏡像")})
+        for name, (role, mode) in cards.items():
+            self.assertIn(role, kinds.ROLES, name)
+            self.assertIn(mode, kinds.MODES, name)
+            self.assertNotIn(name, kinds.ACTION_FACETS)
+            self.assertNotIn(("THINK", name), ai_gate.actions())
+
     def test_the_seven_command_cards_are_the_specs_modes_and_roles(self):
         block = re.search(r"export const COMMANDS.*?\n\];", self.think, re.S).group(0)
         found = re.findall(r'\{ title: "[^"]+", action: "(\w+)"(?:, focus: "(\w+)")? \}', block)
         self.assertEqual(found, [("mirror", ""), ("diverge", ""), ("counter", ""), ("audit", "checkable"), ("socratic", ""), ("audit", "separate"), ("ask_conclusion", "")])
-        self.assertEqual([kinds.ACTION_FACETS[action][::-1] for action, _ in found],
+        facets = {**{name: kinds.ACTION_FACETS[name][::-1] for name in kinds.ACTION_FACETS}, **{name: (mode, role) for name, (role, mode) in self.system_cards().items()}}
+        self.assertEqual([facets[action] for action, _ in found],
                          [("鏡像", "鏡子"), ("發散", "發散夥伴"), ("挑戰", "反方教練"), ("查證", "證據稽核者"), ("只問問題", "蘇格拉底引導者"), ("查證", "證據稽核者"), ("只問問題", "決策教練")])
 
     def test_the_phases_are_the_specs_seven_in_twenty_five_minutes(self):
         rows = re.findall(r'\{ from: (\d+), to: (\d+), name: "([^"]+)", hint: "[^"]+", action: "(\w*)" \}', self.think)
         self.assertEqual([(int(a), int(b), name) for a, b, name, _ in rows],
                          [(0, 3, "先有自己的版本"), (3, 6, "鏡像"), (6, 11, "發散"), (11, 15, "挑戰"), (15, 20, "建立判準"), (20, 23, "人做選擇"), (23, 25, "回看自己怎麼想")])
-        self.assertTrue(all(action in kinds.ACTION_FACETS for *_, action in rows if action))
+        self.assertTrue(all(action in kinds.ACTION_FACETS or action in self.system_cards() for *_, action in rows if action))
 
     def test_the_contract_page_words_are_the_engines(self):
         words = dict(re.findall(r'^  (\w+): "([^"]+)",$', re.search(r"export const GRANTABLE_WORDS.*?\n\};", self.contract, re.S).group(0), re.M))

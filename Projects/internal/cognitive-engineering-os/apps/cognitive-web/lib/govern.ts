@@ -27,7 +27,7 @@ export const GUARDRAIL_LABEL: Record<string, string> = {
 export const GUARDRAIL_ORDER = ["require_sources", "professional", "wait_or_review", "group_procedure"];
 // ai_lego/core/domain/kinds/govern.py HIGH_RISK
 export const HIGH_RISK = ["健康", "法律", "金錢", "人身安全", "急性心理危機", "要公開散布"];
-// ai_lego/platform/ai_actions/govern.py TOPICS
+// ai_lego/core/domain/kinds/govern.py SETTINGS (test_block_govern compares the names); the sentences come from GET /blocks/govern/spec
 export type Topic = "where" | "guardrails" | "export" | "erase" | "versions";
 
 // A record names the part that wrote it by code (ai_lego/core/domain/blocks.py): the 14 blocks are named in lib/blocks.ts, these are the always-on parts.
@@ -54,7 +54,7 @@ export type Appeal = { doc_id: string; group_id: string; about_identity_id: stri
   mine?: boolean; at?: string; on?: string; author_identity_id?: string; author_name?: string };
 export type GroupMember = { identity_id: string; display_name: string; role: "convener" | "participant" | "facilitator" };
 export type MyGroup = { group_id: string; name: string; purpose: string; my_role: GroupMember["role"] };
-export type GovernSpec = { no_record: { label: string; warning: string }; resources: Record<string, string> };
+export type GovernSpec = { no_record: { label: string; warning: string }; resources: Record<string, string>; settings: Record<Topic, { name: string; explanation: string }> };
 export type Stamp = { name: string; version: string; fingerprint: string; title: string };
 export type CaseUsed = { labels: Record<string, string>; ai_turns: Array<{ block: string; action: string; model: string; instructions: string; at: string }>;
   rulesets: Stamp[]; resources: Record<string, string> };

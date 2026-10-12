@@ -1,5 +1,5 @@
 """ACT 行動與觀察: a task card the person writes (prediction first), observation notes, the weekly-then-monthly/quarterly/
-yearly rhythm and the reminders it makes, and the AI's three turns (split, flag, trend) that never promise or set a number."""
+yearly rhythm and the reminders it makes, and the AI's one turn (split) that never promises or sets a number."""
 
 from __future__ import annotations
 
@@ -206,7 +206,7 @@ class TaskAndNoteTests(ActBase):
         self.client.post("/auth/login", json={"tenant_id": self.tenant["tenant_id"], "email": "colleague@example.com", "password": "correct-horse-battery"})
         self.assertEqual(self.client.get(f"{self.base}/docs/act.task").status_code, 404)
         self.assertEqual(self.client.get(f"{self.base}/act/reminders").status_code, 404)
-        self.assertEqual(self.ask("flag").status_code, 404)
+        self.assertEqual(self.ask("split").status_code, 404)
 
 
 class ReminderRouteTests(ActBase):
@@ -259,33 +259,22 @@ class AiTurnTests(ActBase):
         self.assertEqual(self.ask("split").status_code, 400)
         self.assertEqual(self.provider.calls, [])
 
-    def test_flagging_what_cannot_be_undone_needs_no_permission_and_decides_nothing(self):
-        saved_task = self.task({**TASK, "irreversible": False})
-        self.provider.answer = {"irreversible": ["跟他談一次條件：話說出口收不回"], "affects_others": ["合夥人會知道你想退出"], "decision": "不要做"}
-        saved = self.ask("flag").json()["saved"]
-        self.assertEqual(saved["content"], {"irreversible": ["跟他談一次條件：話說出口收不回"], "affects_others": ["合夥人會知道你想退出"]})
-        self.assertIn(saved_task["doc_id"], self.provider.calls[0][1])
-        self.assertEqual(self.client.get(f"{self.base}/docs/act.task").json()[0]["content"]["irreversible"], False)   # the AI flagged; the task card is still the person's to tick
-
-    def test_the_trend_is_from_the_recorded_numbers_only(self):
-        self.assertEqual(self.ask("trend").status_code, 400)
+    def test_flag_and_trend_are_code_now_not_ai_turns_and_their_saved_ai_records_stay_readable(self):
+        """ACT.flag and ACT.trend are plain code (apps/cognitive-web/lib/act.ts); the gate no longer lists them, and an AI record saved before is still a kind the case holds."""
+        self.assertEqual({name for (block, name) in ai_gate.actions() if block == "ACT"}, {"split"})
         task = self.task()
-        for value in (90, 80):
-            self.client.post(f"{self.base}/docs/act.note", json={"content": {"task": task["doc_id"], "numbers": [{"name": "價格", "value": value, "unit": "萬"}]}})
-        self.provider.answer = {"summary": "價格從 90 降到 80。", "unclear": ["訂單：只記了一次"], "target": "目標 70"}
-        saved = self.ask("trend").json()["saved"]
-        self.assertEqual(saved["content"], {"summary": "價格從 90 降到 80。", "unclear": ["訂單：只記了一次"]})
-        user = self.provider.calls[0][1]
-        self.assertIn("價格", user)
-        self.assertIn("90", user)
-        self.assertIn("Do not set a target", self.provider.calls[0][0])
+        for name in ("flag", "trend"):
+            self.assertEqual(self.ask(name).status_code, 404, name)
+            self.assertIn("ai", doc_kinds.require(f"act.{name}").authors, name)
+        self.assertEqual(self.provider.calls, [])
+        self.assertEqual(self.client.get(f"{self.base}/docs/act.flag").json(), [])
+        self.assertEqual(self.client.get(f"{self.base}/docs/act.task").json()[0]["doc_id"], task["doc_id"])
 
     def test_the_ai_cannot_write_the_persons_task_or_note_and_reads_only_the_cards_kinds(self):
         for kind, content in (("act.split", {"options": [{"step": "x"}]}), ("act.flag", {"irreversible": ["x"]}), ("act.trend", {"summary": "x"})):
             self.assertEqual(self.client.post(f"{self.base}/docs/{kind}", json={"content": content}).status_code, 403, kind)
-        reads = {name: set(ai_gate.actions()[("ACT", name)].reads) for name in ("split", "flag", "trend")}
-        self.assertEqual(reads, {"split": {"decide.judgment", "act.task"}, "flag": {"act.task", "assembler.intake"}, "trend": {"act.task", "act.note"}})
-        self.assertEqual({name: ai_gate.actions()[("ACT", name)].needs for name in reads}, {"split": "propose_options", "flag": "organize", "trend": "organize"})
+        self.assertEqual(set(ai_gate.actions()[("ACT", "split")].reads), {"decide.judgment", "act.task"})
+        self.assertEqual(ai_gate.actions()[("ACT", "split")].needs, "propose_options")
 
 
 class WebParityTests(unittest.TestCase):

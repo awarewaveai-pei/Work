@@ -8,7 +8,7 @@ import Link from "next/link";
 import { humanError } from "../../lib/errors";
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
-import { ai, blockOf, docs, type Doc, type Notice } from "../../lib/blocks";
+import { blockOf, docs, type Doc, type Notice } from "../../lib/blocks";
 import { GUARDRAIL_NAME, wontChange, type Check, type Judgment, type Review } from "../../lib/decide";
 import {
   DECISIONS, DONE_WHEN, NEXT_BLOCKS, PREDICTION_RESULT, REVIEW_CHECKS, TRUST, whatTheAiSaid,
@@ -19,7 +19,7 @@ import { formatTime } from "../../lib/time";
 import { caseEvidence, originName, type Origin } from "../../lib/evidence";
 import { BlockShell, Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips, optionalDocs } from "./JudgmentParts";
-import { Example, Fold, Missing, Refused, filledCount, type Failed } from "./PageParts";
+import { Example, Fold, Missing, Refused, SystemMade, filledCount, type Failed } from "./PageParts";
 
 type Any = Record<string, any>;
 type Held = {
@@ -101,10 +101,6 @@ export function LearnPage({ projectId }: { projectId: string }) {
     await apiFetch(`/projects/${encodeURIComponent(projectId)}/learn/history`, { method: "POST" });   // this case's line in your own history, written by the platform
   });
   const writeHistory = run("history", async () => { await apiFetch(`/projects/${encodeURIComponent(projectId)}/learn/history`, { method: "POST" }); });
-  const askCompare = run("compare", async () => {
-    const turn = await ai<Compare>(projectId, "LEARN", "compare", version ? { judgment_version: version } : {}, held?.compare);
-    if (turn.stopped) setNotices([{ type: "crisis", notice: turn.notice ?? "", resources: turn.resources ?? [] }]);
-  });
   const saveDay = run("revisit", async () => {
     if (held?.revisit) await docs.update(projectId, "learn.revisit", held.revisit, { on: day });
     else await docs.create(projectId, "learn.revisit", { on: day });
@@ -151,6 +147,8 @@ export function LearnPage({ projectId }: { projectId: string }) {
 
       <div className="card">
         <h2>並排看</h2>
+        <SystemMade />
+        <p className="how">這張表是系統照你的紀錄排的：當初和後來並排，不給分數、不排名、不改寫當初的紀錄，也不替你決定要不要修正。</p>
         <div className="scroll-x">
           <table>
             <thead><tr><th>項目</th><th>當初</th><th>後來</th></tr></thead>
@@ -177,12 +175,9 @@ export function LearnPage({ projectId }: { projectId: string }) {
           </div>
         )}
         </Fold>
-        <div className="btns mt8"><button className="btn" type="button" disabled={busy || (!held.judgments.length && !held.tasks.length)} onClick={askCompare}>{busy ? "整理中…" : held.compare ? "請 AI 再整理一次前後比較" : "請 AI 整理前後比較"}</button></div>
-        <Missing why={!held.judgments.length && !held.tasks.length && "這個案子還沒有判斷卡或任務卡，沒有東西可以對照。"} />
-        <Refused failed={failed} at="compare" />
-        <p className="hint">AI 只把前後擺出來，不給分數、不排名、不改寫當初的紀錄，也不替你決定要不要修正。</p>
         {held.compare && (
           <div className="judge">
+            <b>以前 AI 整理的前後比較（舊的紀錄，留著）</b>
             <AuthorTag author={held.compare.author} />
             <p>{held.compare.content.side_by_side}</p>
             {(held.compare.content.done_well ?? []).length > 0 && <><b>這次你想得好的地方</b><ul>{held.compare.content.done_well!.map((item) => <li key={item}>{item}</li>)}</ul></>}
@@ -283,6 +278,7 @@ export function LearnPage({ projectId }: { projectId: string }) {
 
       <div className="card">
         <h2>你自己做到的</h2>
+        <SystemMade />
         <p className="how">下面是這個案子裡，你不靠 AI、自己做到的思考動作。只給你看，不打分數、不排名、不跟別人比。</p>
         {held.moves.length === 0 ? <p className="sub">這個案子裡，還看不到你不靠 AI 做到的動作。</p> : <ul>{held.moves.map((item) => <li key={item.item}><b>{item.item}</b>　{item.seen}</li>)}</ul>}
         {held.hints.map((hint) => <p key={hint} className="warn">{hint}</p>)}

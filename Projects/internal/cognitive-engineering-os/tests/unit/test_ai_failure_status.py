@@ -16,7 +16,7 @@ from ai_lego.platform import ai_gate
 from ai_lego.platform.ai_gate import MIN_MAX_TOKENS, AiAction
 from ai_lego.platform.ai_gateway.draft import AiDraftProviderError
 from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS, AiCompletion, AnthropicProvider
-from tests.unit.test_api_main import ApiTestCase
+from tests.unit.test_project_source_api import ProjectSourceApiTestCase
 
 AI_LEGO = PRODUCT_ROOT / "ai_lego"
 
@@ -97,22 +97,23 @@ class RefusalLogTests(unittest.TestCase):
         self.assertNotIn("合夥", line)
 
 
-class RouteTests(ApiTestCase):
+class RouteTests(ProjectSourceApiTestCase):
     """The block route answers each failure with its status and its reason (main.ai_failure_status)."""
 
     def setUp(self):
         super().setUp()
         self._login()
+        self.pid = self._create_project()["project_id"]
 
     def _ask(self, provider):
         api_main.app.dependency_overrides[api_main.get_ai_provider] = lambda: provider
-        return self.client.post("/me/ai/GOVERN/explain", json={"context": {"topic": "where"}})
+        return self.client.post(f"/projects/{self.pid}/ai/SENSE/mirror", json={"context": {}})
 
     def _anthropic(self, payload):
         return AnthropicProvider("test-key", fetch=lambda *args, **kwargs: payload)
 
     def test_each_failure_reaches_the_page_with_its_reason(self):
-        cut = self._anthropic({"content": [{"type": "tool_use", "name": "answer", "input": {"explanation": "你可以寫"}}], "stop_reason": "max_tokens",
+        cut = self._anthropic({"content": [{"type": "tool_use", "name": "answer", "input": {"summary": "你可以寫"}}], "stop_reason": "max_tokens",
                                "usage": {"input_tokens": 5, "output_tokens": MIN_MAX_TOKENS}, "model": "claude-opus-5-5"})
         refused = self._ask(cut)
         self.assertEqual(refused.status_code, 422, refused.text)
@@ -126,7 +127,7 @@ class RouteTests(ApiTestCase):
 
         down = self._ask(Down())
         self.assertEqual((down.status_code, down.json()["detail"]), (424, "AI_PROVIDER_UNAVAILABLE: HTTP 529 from api.anthropic.com"))
-        invalid = self._ask(self._anthropic({"content": [{"type": "tool_use", "name": "answer", "input": {"explanation": ["not text"]}}], "stop_reason": "tool_use",
+        invalid = self._ask(self._anthropic({"content": [{"type": "tool_use", "name": "answer", "input": {"summary": ["not text"]}}], "stop_reason": "tool_use",
                                              "usage": {"input_tokens": 5, "output_tokens": 9}, "model": "claude-opus-5-5"}))
         self.assertEqual(invalid.status_code, 422, invalid.text)
         self.assertTrue(invalid.json()["detail"].startswith("AI_ANSWER_INVALID"))

@@ -18,6 +18,7 @@ const SPEC: MapSpec = {
     { key: "core", name: "核心矛盾", question: "哪個上游問題不解，其他都只是症狀？", output: "核心衝突假設" },
     { key: "intervention", name: "介入", question: "最小且槓桿最高的改變是什麼？", output: "可逆試驗、介入方案、風險" },
   ],
+  category_layer: { 事件: "facts", 你現在跟自己講的故事: "interpretations", 別人的聲音: "interpretations", 恐懼: "interests", 期待: "interests", 人物關係與權力: "structure" },
   claim_kinds: [
     { kind: "事實", needs: "要可追溯的證據與查證", details: [{ key: "evidence", label: "證據，或怎麼查證" }] },
     { kind: "法律", needs: "要標適用法域、時效、來源", details: [{ key: "jurisdiction", label: "適用法域" }, { key: "limitation", label: "時效" }, { key: "source", label: "來源" }] },
@@ -27,8 +28,8 @@ const SPEC: MapSpec = {
   unwinnable: { questions: [{ q: 0, question: "目標是不是大到到過現場的人都不敢這樣寫？", example: "英國的例子" }], answers: ["是", "否", "不確定"], reasons: ["我支持的政府貪腐到失去正當性", "鄰國支持我的對手"], reasons_reading: "我們的解讀，不是 Farrell 說的：兩個都不是多投入就能解決的。", source: "題目出自 Theo Farrell 談英國在阿富汗作戰的講稿。" },
 };
 const TOOLS = [
-  { method_id: "systems.iceberg_model", name: "冰山模型", family: "systems", family_zh: "系統思考", version: "1.0.0", used: false },
-  { method_id: "root_cause.fishbone", name: "魚骨圖", family: "root_cause", family_zh: "根因分析", version: "1.2.0", used: true },
+  { method_id: "systems.iceberg_model", name: "冰山模型", name_en: "Iceberg Model", blurb_zh: "把看得見的事件往下看，找出一再發生的模式", family: "systems", family_zh: "系統思考", version: "1.0.0", used: false },
+  { method_id: "root_cause.fishbone", name: "魚骨圖", name_en: "Fishbone", blurb_zh: "把一個問題的可能原因分類畫出來", family: "root_cause", family_zh: "根因分析", version: "1.2.0", used: true },
 ];
 
 type Stored = { doc_id: string; kind: string; version: number; content: any; author: string; block: string; at: string };
@@ -283,7 +284,7 @@ describe("拆解", () => {
 });
 
 describe("拆解：第一次來的人先看到六句，拆法照目的排（走查 2026-10-11 B2、B3、B4）", () => {
-  const tool = (method_id: string, name: string, family: string) => ({ method_id, name, family, family_zh: family, version: "1.0.0", used: false });
+  const tool = (method_id: string, name: string, family: string, blurb_zh = "") => ({ method_id, name, name_en: "", blurb_zh, family, family_zh: family, version: "1.0.0", used: false });
   const RESEARCH_FIRST = [   // the server sends them sorted by id: causal.* came first
     tool("causal.regression_discontinuity", "斷點迴歸設計", "causal"), tool("causal.instrumental_variables", "工具變數法", "causal"),
     tool("framing.problem_statement", "問題陳述", "framing"), tool("research.qualitative_coding", "質性編碼", "research"),
@@ -324,5 +325,55 @@ describe("拆解：第一次來的人先看到六句，拆法照目的排（走�
     expect(example.textContent).toContain("英國的例子");
     expect(example.open).toBe(false);
     await done();
+  });
+
+  it("suggests where each card goes by its category, in the system's name and not the AI's; a feeling is left for me, and I can put any card in any layer", async () => {
+    const { writes } = server({ "sense.card": [{ category: "事件", text: "他第三次改條件" }, { category: "恐懼", text: "我怕他生氣" }, { category: "感受", text: "我很煩" }] });
+    const { host, done } = await mount(<MapPage projectId="P1" />);
+    const cards = [...host.querySelectorAll(".mcards .mcard")].filter((card) => card.querySelector('[aria-label="放進哪一層"]'));
+    expect(cards.map((card) => card.textContent)).toEqual([
+      expect.stringContaining("系統建議：事實層（不是 AI）"), expect.stringContaining("系統建議：利益層（不是 AI）"), expect.stringContaining("這一類由你自己放。"),
+    ]);
+    expect(cards.map((card) => [...card.querySelectorAll(".chip.on")].map((chip) => chip.textContent))).toEqual([["事實"], ["利益"], []]);
+    expect([...host.querySelectorAll("button")].some((button) => /請 AI 建議|請 AI 推薦/.test(button.textContent ?? ""))).toBe(false);
+    await click(byText(cards[0] as HTMLElement, "button", "結構"));   // the suggestion is not binding
+    await click(byText(host, "button", "存第一版"));
+    const saved = writes.find((write) => write.method === "POST" && write.path.endsWith("/docs/map.map"))!.body.content as MapContent;
+    expect(saved.layers?.structure).toEqual([expect.objectContaining({ text: "他第三次改條件", card: "sense.card-1" })]);
+    expect(writes.some((write) => write.path.includes("/ai/"))).toBe(false);
+    await done();
+  });
+
+  it("matches the words I wrote with the tools' names and blurbs -- the same free matching as 先說你卡在哪 -- shows why, and takes none until I press 用這個", async () => {
+    const tools = [tool("framing.problem_statement", "問題陳述", "framing", "把問題寫成一句別人也看得懂的話"), tool("stakeholders.map", "利害關係人分析", "stakeholders", "列出每個相關的人想要什麼、怕什麼"),
+      tool("systems.iceberg_model", "冰山模型", "systems", "把看得見的事件往下看")];
+    const made = server({ "assembler.intake": [{ purpose: "複雜決策", question: "他們每個人想要什麼" }] });
+    const base = vi.mocked(apiFetch).getMockImplementation()!;
+    vi.mocked(apiFetch).mockImplementation(async (path: string, init?: RequestInit) => (path.endsWith("/map/methods") ? tools as never : base(path, init)));
+    const { host, done } = await mount(<MapPage projectId="P1" />);
+    const box = [...host.querySelectorAll(".judge")].find((node) => node.textContent?.includes("系統幫你比對的拆法"))!;
+    expect(box.textContent).toContain("系統整理的，不是 AI 寫的，不扣點");
+    expect(box.textContent).toContain("利害關係人分析：工具資料裡有「");
+    expect(box.textContent).toContain("列出每個相關的人想要什麼、怕什麼");
+    expect(box.textContent).not.toContain("冰山模型");
+    expect([...host.querySelectorAll("button")].some((button) => button.textContent?.includes("請 AI 推薦拆法"))).toBe(false);
+    expect(made.writes).toEqual([]);   // nothing is taken for me
+    await click(byText(box as HTMLElement, "button", "用這個"));
+    await click(byText(host, "button", "存第一版"));
+    const saved = made.writes.find((write) => write.method === "POST" && write.path.endsWith("/docs/map.map"))!.body.content as MapContent;
+    expect([saved.method, saved.method_id]).toEqual(["利害關係人分析", "stakeholders.map"]);
+    expect(made.writes.some((write) => write.path.includes("/ai/"))).toBe(false);
+    await done();
+  });
+
+  it("with nothing written to match, says what to write instead of listing tools at random; words no tool holds are said plainly", async () => {
+    server({});
+    const first = await mount(<MapPage projectId="P1" />);
+    expect(first.host.textContent).toContain("先在下面六層各寫一句，或開案時寫下問題，系統才比對得出來。");
+    await first.done();
+    server({ "assembler.intake": [{ purpose: "複雜決策", question: "今天天氣很好" }] });
+    const second = await mount(<MapPage projectId="P1" />);
+    expect(second.host.textContent).toContain("工具資料裡比不到你寫的字。");
+    await second.done();
   });
 });

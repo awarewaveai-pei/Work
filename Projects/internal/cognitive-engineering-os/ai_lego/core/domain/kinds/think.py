@@ -23,17 +23,16 @@ SOURCED = ("有來源", "它自己說的")           # in step 1 there are no so
 MAX_PICKED = 3                              # 你自己選三張卡，帶到下一步: per round, refused by block_hooks/think.py BEFORE_SAVE
 MIN_OWN_CARDS = 2                           # 你自己至少加兩張思考卡
 
-# Which role and mode an AI action is (the page's role/mode chips and the seven command cards pick one of these).
+# Which role and mode an AI action is (the page's role/mode chips and the command cards pick one of these). ask_conclusion and look_back are
+# not here: they are the system's fixed questions now (docs/platform/AI_TO_CODE_AUDIT.md §1); a reply saved by either keeps its role.
 ACTION_FACETS = {
     "mirror": ("鏡子", "鏡像"),
-    "look_back": ("後設學習教練", "鏡像"),
     "diverge": ("發散夥伴", "發散"),
     "counter": ("反方教練", "挑戰"),
     "audit": ("證據稽核者", "查證"),
     "criteria": ("決策教練", "收斂"),
     "direct_advice": ("決策教練", "收斂"),
     "socratic": ("蘇格拉底引導者", "只問問題"),
-    "ask_conclusion": ("決策教練", "只問問題"),
 }
 
 KINDS = [

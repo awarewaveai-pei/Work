@@ -429,47 +429,31 @@ class AiTests(ComputeCase):
         self.request(content or self.npv())
         return self.runs()[-1]["run_id"]
 
-    def test_explain_hands_back_under_two_origins_before_any_model_call(self):
-        run = self.run_id(self.npv(yearly_cards=self.counted(1)))
-        back = self.ask("explain", run=run)
-        self.assertEqual(back.status_code, 200, back.text)
-        self.assertEqual(back.json(), {"handback": f"「{YEARLY}」只有 1 個算數的獨立出處（要 2 個）。AI 先停下來，由你決定：可以先去找出處，或按「仍然繼續」。"})
-        self.assertEqual(self.provider.calls, [])
-        went_on = self.ask("explain", run=run, go_on=True)
-        self.assertEqual((went_on.status_code, len(self.provider.calls)), (200, 1), went_on.text)
-        self.assertIn("只有 1 個算數的獨立出處（要 2 個）", self.provider.calls[0][1])   # the AI is told each number's source, from calc_results
-
-    def test_own_numbers_never_hand_back(self):
-        self.assertIn("saved", self.ask("explain", run=self.run_id()).json())
-
-    def test_the_explanation_rests_on_every_input_whatever_the_model_says(self):
+    def test_explain_is_code_now_not_an_ai_turn_and_an_explanation_saved_before_is_still_a_kind_the_case_holds(self):
+        """COMPUTE.explain is the page's fixed sentences from what the run computed (ComputePage.tsx explainRun); the gate no longer lists it."""
         run = self.run_id()
-        self.provider.answer = {**EXPLAINED, "rests_on": ["運氣"], "run": "another-run"}
-        saved = self.ask("explain", run=run).json()["saved"]
-        self.assertEqual((saved["author"], saved["content"]["run"], saved["content"]["rests_on"]), ("ai", run, ["一開始投入的金額", YEARLY, "年數", "折現率"]))
-        self.assertEqual(saved["content"]["points"], EXPLAINED["points"])
-        self.assertIn("模擬不是預測", self.provider.calls[0][0])
-        self.provider.answer = {**EXPLAINED, "influential": "運氣"}
-        self.assertIn("AI_ANSWER_INVALID", self.ask("explain", run=run).text)
+        self.assertEqual({name for (block, name) in ai_gate.actions() if block == "COMPUTE"}, {"suggest"})
+        self.assertEqual(self.ask("explain", run=run).status_code, 404)
+        self.assertEqual(self.provider.calls, [])
+        self.assertIn("ai", doc_kinds.require("compute.explanation").authors)
+        self.assertEqual(self.client.get(f"{self.base}/docs/compute.explanation").json(), [])
 
     def test_a_number_or_a_forecast_from_the_ai_is_not_saved(self):
-        run = self.run_id()
+        self.client.post(f"{self.base}/docs/collab_contract.terms", json={"content": {"permissions": ["propose_options"]}})
         for text, code in (("淨現值大約是 3 萬，還不錯。", "AI_ANSWER_HAS_NUMBER"), ("悲觀時會少五萬元。", "AI_ANSWER_HAS_NUMBER"), ("折現率高兩成就不划算。", "AI_ANSWER_HAS_NUMBER"),
                            ("報酬大概 15%。", "AI_ANSWER_HAS_NUMBER"), ("依這個結果預測你會賺。", "AI_ANSWER_CALLS_IT_PREDICTION"), ("這樣一定會賺。", "AI_ANSWER_CALLS_IT_PREDICTION")):
-            self.provider.answer = {**EXPLAINED, "points": [{"part": "推論", "text": text}]}
-            response = self.ask("explain", run=run)
+            self.provider.answer = {"algorithms": [{"id": "npv", "why": text}]}
+            response = self.ask("suggest", question="開工作室划不划算")
             self.assertEqual(response.status_code, 422, text)
             self.assertTrue(response.json()["detail"].startswith(code), text)
-        self.assertEqual(self.docs.current(self.tenant_id, self.owner, "compute.explanation"), [])
-        self.provider.answer = {**EXPLAINED, "points": [{"part": "推論", "text": "模擬不是預測，悲觀情境不一定會發生；千萬不要只看一個數。"}]}
-        self.assertIn("saved", self.ask("explain", run=run).json())
+        self.assertEqual(self.docs.current(self.tenant_id, self.owner, "compute.suggestion"), [])
+        self.provider.answer = {"algorithms": [{"id": "npv", "why": "模擬不是預測，悲觀情境不一定會發生；千萬不要只看一個數。"}]}
+        self.assertIn("saved", self.ask("suggest", question="開工作室划不划算").json())
 
     def test_a_name_the_person_gave_may_be_quoted_even_with_digits(self):
-        run = self.run_id({"question": "2027 年撐不撐得住", "algorithm": "monte_carlo", "inputs": [
-            item("item", "2027 年房租", -120000), item("item", "接案收入", 300000), item("threshold", "你要的最低結果", 100000)],
-            "scenarios": {"樂觀": {"接案收入": 400000}, "悲觀": {"接案收入": 200000, "2027 年房租": -150000}}})
-        self.provider.answer = {"points": [{"part": "創意假設", "text": "「2027 年房租」漲多少，是你自己估的。"}], "influential": "接案收入"}
-        self.assertIn("saved", self.ask("explain", run=run).json())
+        self.client.post(f"{self.base}/docs/collab_contract.terms", json={"content": {"permissions": ["propose_options"]}})
+        self.provider.answer = {"algorithms": [{"id": "monte_carlo", "why": "「2027 年房租撐不撐得住」是每個月不一樣的事。"}]}
+        self.assertIn("saved", self.ask("suggest", question="2027 年房租撐不撐得住").json())
 
     def test_suggest_needs_propose_options_and_names_only_listed_algorithms(self):
         self.assertEqual(self.ask("suggest", question="拆夥後六個月的收入").status_code, 403)
@@ -482,16 +466,16 @@ class AiTests(ComputeCase):
         self.provider.answer = {"algorithms": [{"id": "npv", "why": "每年大概 30 萬，五年。"}]}
         self.assertIn("AI_ANSWER_HAS_NUMBER", self.ask("suggest", question="拆夥後六個月的收入").text)
 
-    def test_the_ai_reads_only_this_calculation_and_the_source_cards(self):
-        """讀什麼：GATHER 的來源卡、你給的數字；絕不讀跟這次計算無關的個人資料."""
-        actions = [action for (block, _), action in ai_gate.actions().items() if block == "COMPUTE"]
-        self.assertEqual(sorted(action.name for action in actions), ["explain", "suggest"])
-        for action in actions:
-            self.assertLessEqual(set(action.reads), {"compute.run", "compute.request", "gather.source"}, action.name)
-            with self.assertRaisesRegex(InvariantViolation, "AI_READ_REFUSED"):
-                ai_gate._Reader(action, self.docs, self.tenant_id, self.owner)("sense.card")
+    def test_the_ai_reads_only_the_question_it_is_given_and_nothing_else_the_person_keeps(self):
+        """讀什麼：你給的問題；絕不讀跟這次計算無關的個人資料."""
+        [action] = [action for (block, _), action in ai_gate.actions().items() if block == "COMPUTE"]
+        self.assertEqual((action.name, action.reads), ("suggest", ()))
+        with self.assertRaisesRegex(InvariantViolation, "AI_READ_REFUSED"):
+            ai_gate._Reader(action, self.docs, self.tenant_id, self.owner)("sense.card")
         self.docs.save(self.tenant_id, self.owner, "sense.card", {"category": "感受", "text": "我其實很怕跟他談"}, record_log.user(self.identity["identity_id"], "SENSE"))
-        self.ask("explain", run=self.run_id())
+        self.client.post(f"{self.base}/docs/collab_contract.terms", json={"content": {"permissions": ["propose_options"]}})
+        self.provider.answer = {"algorithms": [{"id": "npv", "why": "每年都有收入的事。"}]}
+        self.ask("suggest", question="開工作室划不划算")
         self.assertNotIn("很怕跟他談", self.provider.calls[0][1])
 
 

@@ -14,7 +14,7 @@ Appeals (§9, card 30), read only through platform/visibility.py ``appeals_for``
     GET    /govern/appeals[/{doc_id}]      what appeals_for gives a handler or supervisor; anyone else gets [] / the 404
 
 不留紀錄 and the case's audit line (card 32):
-    GET  /blocks/govern/spec                 the words the page shows before the person chooses 不留紀錄
+    GET  /blocks/govern/spec                 the words the page shows before the person chooses 不留紀錄, and what each setting means (kinds/govern.py SETTINGS)
     POST /projects/{id}/govern/close         closing a 不留紀錄 case erases it whole (the case erasure; no tombstone)
     GET  /projects/{id}/govern/used          which model and instructions each AI turn used, and every ruleset stamped on the
                                              case's records -- names, versions and fingerprints only, never what the records say
@@ -39,6 +39,7 @@ from ai_lego.apps.api import main as api
 from ai_lego.apps.api.blocks.docs import DocBody, _call, _save, _saved, case_owner
 from ai_lego.apps.api.blocks.groups import member_group, not_found
 from ai_lego.core.domain import doc_kinds
+from ai_lego.core.domain.kinds.govern import SETTINGS
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
 from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
@@ -174,7 +175,8 @@ _VERSION = re.compile(r"^[0-9][0-9A-Za-z.-]{0,19}$")
 
 @router.get("/blocks/govern/spec")
 def govern_spec() -> dict[str, Any]:
-    return {"no_record": {"label": "不留紀錄", "warning": NO_RECORD_WARNING}, "resources": resources.version()}
+    return {"no_record": {"label": "不留紀錄", "warning": NO_RECORD_WARNING}, "resources": resources.version(),
+            "settings": {key: {"name": name, "explanation": explanation} for key, (name, explanation) in SETTINGS.items()}}
 
 
 @router.post("/projects/{project_id}/govern/close")

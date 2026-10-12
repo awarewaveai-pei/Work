@@ -1,5 +1,6 @@
-"""GOVERN's records beyond govern.py (build step 1): what the AI said when asked to explain a setting (card 「AI 能做什麼」:
-AI 解釋設定是什麼意思). The AI's words only; it is not a record of the person's choice and the person can delete it."""
+"""GOVERN's records beyond govern.py (build step 1): what the AI said when asked to explain a setting. The AI is no longer asked
+(each setting has one fixed explanation, kinds/govern.py SETTINGS); a record saved before is kept and shown. The AI's words only;
+it is not a record of the person's choice and the person can delete it."""
 
 from __future__ import annotations
 

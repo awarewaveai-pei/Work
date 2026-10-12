@@ -1,12 +1,7 @@
-"""COMPUTE's AI turns (contract card 「AI 能做什麼」): suggest an algorithm (``propose_options``: STEP2_SHARED_RULES §11)
-and explain a run in plain words, naming the assumption that moves it most (``organize``). The system runs every
-calculation; the AI never writes a number, never calls a calculation or a simulation a prediction, and never hides an
-assumption: ``rests_on`` is every input of the run, filled from the record, not by the model.
-
-They read only the case's runs through ``read.evidence.calcs()`` -- each number with its counted origins, counted in
-``evidence.calc_results`` from GATHER's cards, never here -- and nothing else the person keeps (讀什麼：GATHER 的來源卡、
-你給的數字；絕不讀跟這次計算無關的個人資料). ``explain`` hands back (交還控制) while an outside number has under two
-independent origins, unless the person chose to go on."""
+"""COMPUTE's AI turn (contract card 「AI 能做什麼」): suggest an algorithm (``propose_options``: STEP2_SHARED_RULES §11). The
+system runs every calculation; the AI never writes a number and never calls a calculation or a simulation a prediction.
+Saying what a run shows and which input moves it most is the system's own fixed sentences, not an AI turn
+(apps/cognitive-web/components/blocks/ComputePage.tsx explainRun; docs/platform/AI_TO_CODE_AUDIT.md §1); a ``compute.explanation`` saved before is kept and shown."""
 
 from __future__ import annotations
 
@@ -16,15 +11,13 @@ import unicodedata
 from contextvars import ContextVar
 from typing import Any, Callable, Mapping
 
-from ai_lego.core.domain.evidence_words import MIN_ORIGINS
 from ai_lego.core.domain.evidence_words import LABELS, OWN_WORDS
 from ai_lego.core.domain.kinds.compute import AI_PARTS, NOT_PREDICTION, SCENARIOS
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gate import AiAction
-from ai_lego.platform.block_hooks.compute import algorithms, sourcing, weakest
+from ai_lego.platform.block_hooks.compute import algorithms
 
 Read = Callable[..., list[dict[str, Any]]]
-READS = ("compute.run",)
 
 # AI 不准自己編數字 is an allow list: any digit, percent sign, Roman numeral, CJK numeral or English number word is a
 # number the AI wrote, unless it sits inside one of these fixed words with no unit right after it (「一個」 is a word,
@@ -186,88 +179,7 @@ def _suggest_shape(answer: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in {"algorithms": picked[:3], "ideas": ideas, "question": question}.items() if value}
 
 
-# -- explain: what a run shows, in plain words (整理) --------------------------------------------------------------------
-
-EXPLAIN = (
-    "The system ran the calculation below; you did not, and you never restate, round or invent any number. Explain in "
-    "plain words what it shows, as a few short points. Label each point with exactly one of these kinds: "
-    + "、".join(AI_PARTS) + " (資料支持 = what a number with outside sources says; 推論 = what follows from the formula; "
-    "法律／程序條件 = a rule or procedure it depends on; 價值選擇 = what depends on what the person values; 創意假設 = a "
-    "guess). Put in `influential` the one input, named exactly as given, whose change moves the result most.\n"
-    "- Never write a number, an amount, a percentage or a ratio: refer to inputs and results by name; the page shows "
-    "every number beside your words.\n"
-    f"- A calculation or a simulation is not a prediction ({NOT_PREDICTION}): a pessimistic scenario that loses money "
-    "does not mean the person will lose money. Never say what will happen, how sure or how likely it is: do not use "
-    f"{MARKER_WORDS} about any outcome; say what the calculation shows (「悲觀情境下的計算結果低於打平」).\n"
-    "- Say which numbers are the person's own (no outside source) and which have few independent origins; the result "
-    "is no surer than its least-sourced number. Never present the result as objective truth or as a recommendation."
-)
-EXPLAIN_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "points": {"type": "array", "minItems": 1, "maxItems": 8, "items": {"type": "object", "properties": {"part": {"type": "string", "enum": list(AI_PARTS)}, "text": {"type": "string"}}, "required": ["part", "text"]}},
-        "influential": {"type": "string"},
-    },
-    "required": ["points", "influential"],
-}
-
-
-def _run(context: Mapping[str, Any], read: Read) -> dict[str, Any]:
-    wanted = context.get("run")
-    found = next((run for run in read.evidence.calcs() if run["run_id"] == wanted), None) if isinstance(wanted, str) else None
-    if found is None:
-        raise InvariantViolation("COMPUTE_RUN_NOT_FOUND: 找不到這次計算。")
-    return found
-
-
-def _explain_input(context: Mapping[str, Any], read: Read) -> str:
-    run = _run(context, read)
-    inputs = [item for item in run.get("inputs") or [] if isinstance(item, Mapping)]
-    rows = sourcing(inputs, run["input_origins"])
-    names = [item["name"] for item in inputs]
-    result = run.get("result") or {}
-    persons = [run.get("question") or "", result.get("who_bears") or "", *(row.get("what", "") for row in result.get("not_priced") or [])]
-    _TURN.set({"run": run["run_id"], "inputs": names, "persons": [*names, *persons]})
-    source = {row["input"]: row["words"] for row in rows}
-    payload = {
-        "question (the person's)": run.get("question"), "label": run.get("label"), "algorithm": (run.get("algorithm") or {}).get("name"),
-        "formula": run.get("formula"), "inputs": [{"name": item["name"], "value": item.get("value"), "unit": item.get("unit"), "source": source.get(item["name"])} for item in inputs],
-        "scenarios": run.get("scenarios"), "result": run.get("result"), "flip (the system's one-at-a-time sweep)": run.get("flip"),
-        "how sure (the system's rule)": weakest(rows),
-    }
-    return "The calculation:\n" + json.dumps(payload, ensure_ascii=False)
-
-
-def _explain_handback(context: Mapping[str, Any], read: Read) -> str | None:
-    """交還控制：某個外部數字的獨立出處不到兩個時，AI 停下來。畫面顯示有幾個出處，由你決定。你自己給的數字不算。"""
-    if context.get("go_on") is True:
-        return None
-    run = _run(context, read)
-    thin = run.get("thin_inputs") or []
-    if not thin:
-        return None
-    named = "、".join(f"「{name}」只有 {run['input_origins'].get(name, 0)} 個" for name in thin)
-    return f"{named}算數的獨立出處（要 {MIN_ORIGINS} 個）。AI 先停下來，由你決定：可以先去找出處，或按「仍然繼續」。"
-
-
-def _explain_shape(answer: dict[str, Any]) -> dict[str, Any]:
-    turn = _TURN.get()
-    _TURN.set(None)
-    if turn is None or "run" not in turn:
-        raise InvariantViolation("AI_ANSWER_INVALID: the turn's run was not read before the answer")
-    points = [{"part": item["part"], "text": item["text"].strip()} for item in answer.get("points") or []
-              if isinstance(item, dict) and item.get("part") in AI_PARTS and isinstance(item.get("text"), str) and item["text"].strip()][:8] \
-        if isinstance(answer.get("points"), list) else []
-    influential = answer.get("influential").strip() if isinstance(answer.get("influential"), str) else ""
-    if influential not in turn["inputs"]:
-        raise InvariantViolation("AI_ANSWER_INVALID: the most influential assumption is not one of the run's inputs")
-    _guard_words([item["text"] for item in points], turn["persons"])
-    return {"run": turn["run"], "points": points, "influential": influential, "rests_on": turn["inputs"]}
-
-
 ACTIONS = [
     AiAction(block="COMPUTE", name="suggest", needs="propose_options", instructions=SUGGEST, output_kind="compute.suggestion", output_schema=SUGGEST_SCHEMA,
              reads=(), build_input=_suggest_input, shape=_suggest_shape),
-    AiAction(block="COMPUTE", name="explain", needs="organize", instructions=EXPLAIN, output_kind="compute.explanation", output_schema=EXPLAIN_SCHEMA,
-             reads=READS, build_input=_explain_input, shape=_explain_shape, handback=_explain_handback),
 ]

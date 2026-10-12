@@ -2,7 +2,7 @@
 
 // 設定 (GOVERN contract card): the notice that this is not therapy; where you are (optional: only used to give you help
 // for that place); export everything you own; delete the account, confirmed twice. GOVERN moves and removes data and never
-// reads it; the AI only explains what a setting means.
+// reads it; each setting is explained by one fixed sentence of the system's, not the AI's.
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { ApiError } from "../../lib/api";
@@ -10,7 +10,7 @@ import { docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { accountSummary, eraseAccount, helpFor, type AccountSummary, type ErasedAccount, type Help } from "../../lib/govern";
 import { Notices } from "./BlockShell";
-import { Explain, ExportLinks, HelpLines } from "./GovernParts";
+import { Explain, ExportLinks, HelpLines, OldExplanations } from "./GovernParts";
 
 type Where = { where: string };
 
@@ -156,6 +156,8 @@ export function SettingsPage() {
         {eraseError && <p className="error" role="alert">{eraseError}</p>}
         <Explain topic="erase" />
       </div>
+
+      <OldExplanations />
     </>
   );
 }

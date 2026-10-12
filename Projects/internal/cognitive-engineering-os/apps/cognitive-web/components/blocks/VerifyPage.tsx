@@ -13,7 +13,7 @@ import { AUTHOR, ai, docs, type AiTurn, type Doc, type Notice } from "../../lib/
 import { humanError } from "../../lib/errors";
 import { BlockShell, Notices } from "./BlockShell";
 import { FINISHED, POLL_MS, runLine, type Run } from "./GatherPage";
-import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
+import { Missing, Refused, SystemMade, firstMissing, type Failed } from "./PageParts";
 
 type Cell = { state: string; value?: string; why?: string };
 export type Message = { text: string; form: string; url?: string; sha256: string };
@@ -42,6 +42,7 @@ type Line = {
   verdict: { verdict: string; reason: string; earlier: boolean } | null; message?: string; from?: string; law_state: string | null; needs_alternative: boolean; earlier: string[];
   three: { found: boolean; independent: number; independent_enough: boolean; stands: Stand[] }; search: { state: string; why?: string } | null;
   lookup: { run: string; status: string; angles: string[] } | null; weak_line: string | null;
+  said: string; next: string[];   // the system's own sentence about the claim, and the angles of 「去查」 not searched yet for it (kinds/verify.py ledger_sentence, what_next)
 };
 type Spec = {
   forms: string[]; sentence_kinds: string[]; checkable: string; stances: string[]; verdicts: string[]; asks: string[]; spread: Array<{ key: string; question: string }>;
@@ -49,8 +50,7 @@ type Spec = {
   techniques: { title: string; version: string; maintainer: string; items: Array<{ name: string; looks_like: string }> };
   factcheck_dbs: { title: string; version: string; maintainer: string; dbs: Record<string, { name: string; by: string }> };
 };
-type Turn<C> = AiTurn<C> & { handback?: string };
-type Ledger = { claims: Line[]; factcheck_asks: string[]; person_reads: string[] };
+type Ledger = { claims: Line[]; overview: string; factcheck_asks: string[]; person_reads: string[] };
 
 const enc = encodeURIComponent;
 const CONFIDENCE = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
@@ -174,6 +174,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
   const [map, setMap] = useState<MapDoc | undefined>(undefined);
   const [evidence, setEvidence] = useState<Evidence>({ origins: [] });
   const [lines, setLines] = useState<Line[] | null>(null);
+  const [overview, setOverview] = useState("");
   const [asks, setAsks] = useState<string[]>([]);
   const [personReads, setPersonReads] = useState<Set<string>>(new Set());
   const [picked, setPicked] = useState("");
@@ -182,7 +183,6 @@ export function VerifyPage({ projectId }: { projectId: string }) {
   const [seenDraft, setSeenDraft] = useState({ about: "", text: "" });
   const [editing, setEditing] = useState<string | null>(null);   // "proposal:<n>" | "new" | a claim id
   const [readCards, setReadCards] = useState<string[]>([]);
-  const [handback, setHandback] = useState("");
   const [notices, setNotices] = useState<Notice[]>([]);
   const [error, setError] = useState("");
   const [failed, setFailed] = useState<Failed>(null);
@@ -204,7 +204,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
     ]);
     setOffers(messageOffers(senseProposals, senseCards, m));
     setMessages(m); setFirsts(f); setClaims(c); setSplits(s); setTechniques(t); setSpreads(sp); setSeen(se); setFactchecks(fc); setReadings(r);
-    setStances(st); setVerdicts(v); setSummaries(su); setNexts(n); setMap(maps.at(-1)?.content); setEvidence(ev); setLines(ledger.claims);
+    setStances(st); setVerdicts(v); setSummaries(su); setNexts(n); setMap(maps.at(-1)?.content); setEvidence(ev); setLines(ledger.claims); setOverview(ledger.overview);
     setAsks(ledger.factcheck_asks); setPersonReads(new Set(ledger.person_reads));
     setPicked((held) => held || m.at(-1)?.doc_id || "");
   };
@@ -219,7 +219,7 @@ export function VerifyPage({ projectId }: { projectId: string }) {
     try { await work(); await load(); setRefresh((count) => count + 1); } catch (reason) { setFailed({ at, text: humanError(reason) }); } finally { setBusy(false); }
   };
   const turn = async <C,>(action: string, context: Record<string, unknown>) => {
-    const answer = await ai<C>(projectId, "VERIFY", action, context) as Turn<C>;
+    const answer = await ai<C>(projectId, "VERIFY", action, context);
     if (answer.stopped) setNotices([{ type: "crisis", notice: answer.notice ?? "", resources: answer.resources ?? [] }]);
     return answer;
   };
@@ -282,10 +282,6 @@ export function VerifyPage({ projectId }: { projectId: string }) {
     if (!message) return;
     setNotices((await docs.create(projectId, "verify.seen", { message: message.doc_id, about: seenDraft.about, text: seenDraft.text.trim() })).notices);
     setSeenDraft({ about: "", text: "" });
-  });
-  const summarise = (goOn: boolean) => act("summary", async () => {
-    const answer = await turn<Summary>("summary", goOn ? { go_on: true } : {});
-    setHandback(answer.handback ?? "");
   });
 
   return (
@@ -446,24 +442,32 @@ export function VerifyPage({ projectId }: { projectId: string }) {
         </div>
 
         <div className="card">
-          <h2>AI 白話摘要帳本</h2>
-          <p className="how">帳本本身由系統排，AI 只用白話說一次。一個主張的獨立出處不到 {spec.min_origins} 個時，AI 先停下來，由你決定。</p>
-          <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => summarise(false)}>請 AI 摘要</button></div>
-          <Refused failed={failed} at="summary" />
-          {handback && <div className="judge"><p className="warn">{handback}</p><div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => summarise(true)}>照樣請 AI 摘要</button></div></div>}
+          <h2>白話摘要帳本</h2>
+          <SystemMade />
+          <p className="how">帳本由系統排，這裡用固定的句子說一次：每個主張是什麼狀態、有幾個獨立出處。它不說哪個主張是真的或假的。</p>
+          <ul>{lines.map((line) => <li key={line.claim_id}>{line.text.slice(0, 30)}：{line.said}</li>)}</ul>
+          <p>{overview}</p>
           {summary && <div className="judge">
+            <b>以前 AI 摘要的（舊的紀錄，留著）</b>
             <span className="tags"><span>{AUTHOR[summary.author]}</span></span>
             <ul>{summary.content.lines.filter((item) => current(item.claim, item.claim_version)).map((item) => <li key={item.claim}>{claims.find((doc) => doc.doc_id === item.claim)?.content.text.slice(0, 30)}：{item.line}</li>)}</ul>
-            {summary.content.lines.some((item) => !current(item.claim, item.claim_version)) && <p className="hint">有主張在摘要之後改過；它們的那一行說的是舊版，沒有列出來。要的話，請 AI 再摘要一次。</p>}
+            {summary.content.lines.some((item) => !current(item.claim, item.claim_version)) && <p className="hint">有主張在摘要之後改過；它們的那一行說的是舊版，沒有列出來。上面是照現在的帳本寫的。</p>}
             {summary.content.overview && <p>{summary.content.overview}</p>}
           </div>}
         </div>
 
         <div className="card">
           <h2>還該查什麼</h2>
-          <div className="btns"><button className="btn" type="button" disabled={busy} onClick={() => act("next", async () => { await turn("next", {}); })}>請 AI 提還該查什麼</button></div>
-          <Refused failed={failed} at="next" />
-          {next && <div className="judge"><span className="tags"><span>{AUTHOR[next.author]}</span></span><ul>{next.content.items.map((item) => <li key={item}>{item}</li>)}</ul>{next.content.question && <p><b>一個問題：</b>{next.content.question}</p>}</div>}
+          <SystemMade />
+          <p className="how">照查證的順序：誰先說的、別的地方怎麼報、有沒有人查過、最早的原文、有沒有相反的說法。下面列出每個查得了的主張，「去查」還沒找過的方向。</p>
+          {lines.filter((line) => line.sentence === spec.checkable).map((line) => (
+            <div key={line.claim_id}>
+              <p className="mb0"><b>{line.text.slice(0, 30)}</b></p>
+              {line.next.length > 0 ? <ul>{line.next.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="sub">每個方向都找過了。</p>}
+            </div>
+          ))}
+          {lines.every((line) => line.sentence !== spec.checkable) && <p className="sub">還沒有查得了的主張。</p>}
+          {next && <div className="judge"><b>以前 AI 提的（舊的紀錄，留著）</b><span className="tags"><span>{AUTHOR[next.author]}</span></span><ul>{next.content.items.map((item) => <li key={item}>{item}</li>)}</ul>{next.content.question && <p><b>一個問題：</b>{next.content.question}</p>}</div>}
         </div>
       </>}
       <p className="sub">要不要轉傳、照不照它說的做，在「判斷」和「行動」那兩步決定。</p>
@@ -558,7 +562,7 @@ function LedgerLine({ projectId, line, spec, asks, busy, base, claims, cards, hi
         {earlier.map((item) => <p key={item.claim_id} className="hint">你查過：這個案子裡同一個說法寫過一次。{item.verdict ? `當時你標「${item.verdict.verdict}」：${item.verdict.reason}` : "當時還沒有判定。"}</p>)}
       </>}
       <p><b>帳本：</b>{line.state}{checkable && <>　支持的獨立出處 {line.support.length} 個、反對的 {line.oppose.length} 個</>}{line.stale > 0 && <span className="sub">（{line.stale} 筆讀法是舊版的，不算）</span>}</p>
-      {line.few && <p className="warn">獨立出處不到 {spec.min_origins} 個：{line.weak_line}。AI 摘要時會先停下來，由你決定。</p>}
+      {line.few && <p className="warn">獨立出處不到 {spec.min_origins} 個：{line.weak_line}。</p>}
       {line.needs_alternative && <p className="hint">這是對事實的解釋，不查真假。請你至少寫一個別的解釋（按「改」）。</p>}
       {checkable && <ul className="check">
         <li>{line.three.found ? "✓" : "・"} 找得到出處</li>

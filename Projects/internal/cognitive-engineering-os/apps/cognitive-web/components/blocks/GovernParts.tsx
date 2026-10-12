@@ -1,12 +1,13 @@
 "use client";
 
 // Pieces GOVERN's pages share: the notice that this is not therapy, the lines of help for a place, the export links, and
-// the button that has the AI explain a setting in plain words (from the system's own description; it reads nothing you wrote).
+// the plain-words explanation of a setting (the system's own fixed sentence from the spec; no AI, nothing you wrote is read).
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
-import { AUTHOR, ai, docs, type Doc } from "../../lib/blocks";
+import { AUTHOR, docs, type Doc } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
-import { exportHref, helpFor, type Help, type HelpLine, type Topic } from "../../lib/govern";
+import { exportHref, governSpec, helpFor, type Help, type HelpLine, type Topic } from "../../lib/govern";
+import { SystemMade } from "./PageParts";
 
 /** 非治療聲明: the system's own sentence (GET /govern/help carries it, so there is one copy), for the places a person starts. */
 export function NotTherapyNotice({ link = true }: { link?: boolean }) {
@@ -50,44 +51,57 @@ export function ExportLinks({ projectId }: { projectId: string | null }) {
   );
 }
 
-type Explanation = { explanation: string };
-
-/** 請 AI 解釋這一項設定. Asking again writes the next version of the same explanation; you can drop it. */
+/** 這一項設定的白話說明: one fixed explanation per setting, the system's own sentences from the spec (no AI, no credits). */
 export function Explain({ topic }: { topic: Topic }) {
-  const [saved, setSaved] = useState<Doc<Explanation> | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [setting, setSetting] = useState<{ name: string; explanation: string } | null>(null);
   const [error, setError] = useState("");
-  const ask = async () => {
-    setBusy(true); setError("");
-    try {
-      const turn = await ai<Explanation>(null, "GOVERN", "explain", { topic }, saved);
-      if (turn.saved) setSaved(turn.saved);
-    } catch (reason) {
-      setError(humanError(reason));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const drop = async () => {
-    if (!saved) return;
-    setError("");
-    try {
-      await docs.remove(null, "govern.explanation", saved.doc_id);
-      setSaved(null);
-    } catch (reason) {
-      setError(humanError(reason));
-    }
-  };
+  useEffect(() => {
+    let active = true;
+    governSpec().then((spec) => { if (active) setSetting(spec.settings[topic] ?? null); }).catch((reason) => { if (active) setError(humanError(reason)); });
+    return () => { active = false; };
+  }, [topic]);
   return (
     <div className="my6">
-      <button className="btn ghost" type="button" disabled={busy} onClick={ask}>{busy ? "AI 在寫…" : saved ? "再說一次" : "請 AI 用白話說明這一項"}</button>
-      {saved && (
+      {setting && (
         <div className="judge">
-          <span className="tags"><span>{AUTHOR[saved.author]}</span></span>
-          <p>{saved.content.explanation}</p>
-          <p className="sub mb0">這是 AI 照系統自己的說明改寫的，不是你的紀錄。<button className="btn ghost" type="button" onClick={drop}>刪掉這段說明</button></p>
+          <SystemMade />
+          <p><b>{setting.name}</b>：{setting.explanation}</p>
         </div>
       )}
+      {error && <p className="error">{error}</p>}
+    </div>
+  );
+}
+
+/** Explanations the AI wrote before 2026-10-12 (the AI turn is gone): the person's own records, kept and shown, and theirs to drop as before. */
+export function OldExplanations() {
+  const [found, setFound] = useState<Array<Doc<{ explanation: string }>>>([]);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let active = true;
+    docs.list<{ explanation: string }>(null, "govern.explanation").then((list) => { if (active) setFound(list); }).catch((reason) => { if (active) setError(humanError(reason)); });
+    return () => { active = false; };
+  }, []);
+  const drop = async (doc: Doc<{ explanation: string }>) => {
+    setError("");
+    try {
+      await docs.remove(null, "govern.explanation", doc.doc_id);
+      setFound((held) => held.filter((item) => item.doc_id !== doc.doc_id));
+    } catch (reason) {
+      setError(humanError(reason));
+    }
+  };
+  if (found.length === 0 && !error) return null;
+  return (
+    <div className="card">
+      <h2>以前 AI 寫的設定說明（舊的紀錄，留著）</h2>
+      {found.map((doc) => (
+        <div key={doc.doc_id} className="judge">
+          <span className="tags"><span>{AUTHOR[doc.author]}</span></span>
+          <p>{doc.content.explanation}</p>
+          <p className="sub mb0">這是 AI 照系統的說明改寫過的，不是你的紀錄。<button className="btn ghost" type="button" onClick={() => drop(doc)}>刪掉這段說明</button></p>
+        </div>
+      ))}
       {error && <p className="error">{error}</p>}
     </div>
   );

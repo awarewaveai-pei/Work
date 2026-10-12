@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import { NONE } from "./evidence";
 
 import {
-  compareRows, confirmClaim, detailsMissing, editedBy, interestGroups, layerFlags, pendingKeys, placeCard, sourceLine, takeAlternative, thinFacts, unconfirmedLaw, unplacedCards, usablePlacements,
+  compareRows, confirmClaim, detailsMissing, editedBy, interestGroups, layerFlags, pendingKeys, placeCard, sourceLine, systemPlacements, takeAlternative, thinFacts, unconfirmedLaw, unplacedCards, usablePlacements,
   type Item, type MapContent, type MapSpec,
 } from "./map";
 
 const LAYERS = ["facts", "interpretations", "interests", "structure", "core", "intervention"];
 const SPEC: MapSpec = {
   layers: LAYERS.map((key) => ({ key, name: key, question: "q", output: "o" })),
+  category_layer: {},
   claim_kinds: [
     { kind: "事實", needs: "", details: [{ key: "evidence", label: "證據" }] },
     { kind: "法律", needs: "", details: [{ key: "jurisdiction", label: "適用法域" }, { key: "limitation", label: "時效" }, { key: "source", label: "來源" }] },
@@ -146,5 +147,24 @@ describe("two versions side by side", () => {
       const row = rows.find((item) => item.label === label)!;
       expect(row.a.join("|"), label).not.toEqual(row.b.join("|"));
     }
+  });
+});
+
+describe("MAP.place as code: the layer a card's category belongs in", () => {
+  const CATEGORY_LAYER = { 事件: "facts", 你現在跟自己講的故事: "interpretations", 別人的聲音: "interpretations", 恐懼: "interests", 期待: "interests", 人物關係與權力: "structure" };
+  const categories = ["事件", "你現在跟自己講的故事", "別人的聲音", "恐懼", "期待", "人物關係與權力", "感受", "身體反應", "直覺"];
+
+  it("places 事件 in the facts; 故事 and 別人的聲音 in the interpretations; 恐懼 and 期待 in the interests; 人物關係與權力 in the structure", () => {
+    const cards = categories.map((category, index) => card(`c${index}`, category));
+    expect(systemPlacements(cards, {}, CATEGORY_LAYER, LAYERS).map((item) => [item.card, item.layer])).toEqual([
+      ["c0", "facts"], ["c1", "interpretations"], ["c2", "interpretations"], ["c3", "interests"], ["c4", "interests"], ["c5", "structure"],
+    ]);
+  });
+
+  it("leaves 感受, 身體反應 and 直覺 for the person, skips a card already in a layer, and never names a layer the map does not have", () => {
+    const cards = [card("c1", "感受"), card("c2", "身體反應"), card("c3", "直覺"), card("c4", "事件"), card("c5", "恐懼")];
+    const content: MapContent = { layers: { facts: [item("a", { card: "c4" })] } };
+    expect(systemPlacements(cards, content, CATEGORY_LAYER, LAYERS)).toEqual([{ card: "c5", layer: "interests" }]);
+    expect(systemPlacements(cards, {}, { 事件: "nowhere" }, LAYERS)).toEqual([]);
   });
 });

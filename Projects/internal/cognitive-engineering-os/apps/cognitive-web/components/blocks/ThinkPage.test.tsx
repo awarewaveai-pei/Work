@@ -145,6 +145,65 @@ describe("共思考 page：先看到下一步，其餘收起來", () => {
   });
 });
 
+describe("共思考 page：兩張題目卡是系統的固定題目（不是 AI）", () => {
+  const round = doc("think.round", "R1", { problem: "要不要接這個案子", own: ["觀察：他第三次改條件"], reflection: "我太快相信第一個想法" });
+  const commandCard = (host: HTMLElement, title: string) => [...host.querySelectorAll(".mcard")].find((card) => card.querySelector("b")?.textContent === title) as HTMLElement;
+  const asked = () => vi.mocked(apiFetch).mock.calls.filter(([path, init]) => String(path).includes("/ai/") || (init as RequestInit | undefined)?.method === "POST");
+
+  it("shows the conclusion, grounds and what-would-change-it questions at once with the person's own version under the grounds, with no contract permission and no call to the AI", async () => {
+    serve({ "think.round": [round] });   // no contract terms at all
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    const card = commandCard(host, "現在要求我自己下結論");
+    expect(card.textContent).toContain("系統的固定題目，不是 AI，不扣點");
+    const open = card.querySelector("button") as HTMLButtonElement;
+    expect([open.textContent, open.disabled]).toEqual(["看這張題目卡", false]);
+    await act(async () => { open.click(); });
+    const shown = [...host.querySelectorAll(".card")].find((node) => node.querySelector("h2")?.textContent === "系統給你的題目")!;
+    expect(shown.textContent).toContain("系統整理的，不是 AI 寫的，不扣點");
+    for (const ask of ["你現在的結論是什麼？用你自己的話寫一句。", "你的依據是什麼？是你這一輪寫的哪幾條？", "什麼會改變它？看到什麼，你就會改變這個結論？"]) expect(shown.textContent).toContain(ask);
+    expect(shown.textContent).toContain("觀察：他第三次改條件");
+    await act(async () => { (shown.querySelector(".top button") as HTMLButtonElement).click(); });
+    expect(host.textContent).not.toContain("系統給你的題目");
+    expect(asked()).toEqual([]);
+    await done();
+  });
+
+  it("lists what the round holds under the look-back questions: your first version, the cards you rewrote, your answers to the AI, what you picked, your reflection -- no grade", async () => {
+    const cards = [doc<Card>("think.card", "a", { claim: "A", round: "R1" }, "ai"), doc<Card>("think.card", "b", { claim: "B", round: "R1" }, "joint"), doc<Card>("think.card", "c", { claim: "C", round: "R1" }, "user")];
+    const reply = doc("think.reply", "RP1", { round: "R1", action: "mirror", role: "鏡子", sections: [], sourced: "它自己說的" }, "ai");
+    serve({ "think.round": [round], "think.card": cards, "think.reaction": [doc<Reaction>("think.reaction", "x-a", { card: "a", picked: true })], "think.reply": [reply],
+      "think.response": [doc("think.response", "rs", { reply: "RP1", version: 1, response: "改寫", note: "我的版本" })] });
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    await act(async () => { (commandCard(host, "回看我怎麼想").querySelector("button") as HTMLButtonElement).click(); });
+    const shown = [...host.querySelectorAll(".judge")].find((node) => node.textContent?.includes("回看你怎麼想"))!.textContent ?? "";
+    expect(shown).toContain("這一輪，你一開始先寫了什麼？");
+    expect(shown).toContain("觀察：他第三次改條件");
+    expect(shown).toContain("你改寫了 1 張 AI 給的卡。");
+    expect(shown).toContain("AI 回給你的整理，你確認了 0 次、改寫了 1 次、說「不對」0 次。");
+    expect(shown).toContain("你選了 1 張卡帶走，其中 1 張是 AI 的卡，你一個字沒改。");
+    expect(shown).toContain("你寫的「這次我是怎麼想的」：我太快相信第一個想法");
+    expect(shown).toContain("不是分數，也不跟任何人比");
+    expect(asked()).toEqual([]);
+    await done();
+  });
+
+  it("the role-and-mode picker reaches them too: 決策教練 with 只問問題 opens the conclusion card, and 後設學習教練 stays choosable with nothing granted", async () => {
+    serve({ "think.round": [round] });
+    const { host, done } = await mount(<ThinkPage projectId="P" />);
+    const roles = host.querySelector('[aria-label="AI 這一輪的角色"]')!;
+    const mode = host.querySelector('[aria-label="模式"]')!;
+    expect(([...roles.querySelectorAll("button")].find((item) => item.textContent === "後設學習教練") as HTMLButtonElement).disabled).toBe(false);
+    await act(async () => { ([...roles.querySelectorAll("button")].find((item) => item.textContent === "後設學習教練") as HTMLButtonElement).click(); });
+    await act(async () => { ([...mode.querySelectorAll("button")].find((item) => item.textContent === "鏡像") as HTMLButtonElement).click(); });
+    await act(async () => { button(host, "用這個角色和模式開始").click(); });
+    expect(host.textContent).toContain("系統給你的題目");
+    expect(host.textContent).toContain("這一輪，你換過幾次想法？");
+    expect(vi.mocked(apiFetch).mock.calls.some(([path]) => String(path).includes("/ai/"))).toBe(false);
+    await done();
+  });
+});
+
+
 describe("共思考 page", () => {
   const round = doc("think.round", "R1", { problem: "要不要接這個案子", own: ["觀察：他第三次改條件"] });
 

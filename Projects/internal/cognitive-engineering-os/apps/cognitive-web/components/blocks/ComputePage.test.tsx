@@ -2,7 +2,7 @@ import React, { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiFetch } from "../../lib/api";
-import { ComputePage, draftFor, flipWords, fmt, fromRun, refusal, toRequest, type Run, type Spec } from "./ComputePage";
+import { ComputePage, draftFor, explainRun, flipWords, fmt, fromRun, refusal, toRequest, type Run, type Spec } from "./ComputePage";
 import { type as typeInto } from "./JudgmentTestKit";
 
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
@@ -49,9 +49,8 @@ const npvRun = (runId: string, yearly: number, extra: Partial<Run> = {}): Run =>
   rules: { version: "2" }, request: "Q1", thin_inputs: [], adopt: null, sourcing: [], weakest: "", ...extra,
 });
 
-function server(runs: Run[], answers: { explain?: Array<Record<string, unknown>> } = {}, docs: Record<string, any[]> = {}) {
+function server(runs: Run[], docs: Record<string, any[]> = {}) {
   const writes: Array<{ method: string; path: string; body: any }> = [];
-  const explain = [...(answers.explain ?? [])];
   vi.mocked(apiFetch).mockImplementation(async (path: string, init?: RequestInit) => {
     const method = init?.method ?? "GET";
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
@@ -65,7 +64,6 @@ function server(runs: Run[], answers: { explain?: Array<Record<string, unknown>>
     const kind = /\/docs\/([^/]+)/.exec(path)?.[1];
     if (kind && method === "GET") return (docs[kind] ?? []) as never;
     if (kind && method === "PUT") return { doc_id: "Q1", kind, version: 3, content: body.content, author: "user", block: "COMPUTE", at: "", notices: [] } as never;
-    if (path.endsWith("/ai/COMPUTE/explain")) return (explain.shift() ?? {}) as never;
     return [] as never;
   });
   return { writes };
@@ -159,7 +157,7 @@ describe("計算與模擬：頁面", () => {
 
   it("reruns an old run with that run's numbers, not the request's latest ones", async () => {
     const request = { doc_id: "Q1", kind: "compute.request", version: 2, content: toRequest(SPEC, fromRun(npvRun("R2", 20000))), author: "user", block: "COMPUTE", at: "" };
-    const { writes } = server([npvRun("R1", 30000), npvRun("R2", 20000, { rerun_of: "R1" })], {}, { "compute.request": [request] });
+    const { writes } = server([npvRun("R1", 30000), npvRun("R2", 20000, { rerun_of: "R1" })], { "compute.request": [request] });
     const { host, done } = await mount(<ComputePage projectId="P1" />);
     await click([...runCard(host, "開工作室", "30,000").querySelectorAll("button")].find((node) => node.textContent === "用同樣的數字再算一次"));
     const put = writes.find((write) => write.method === "PUT")!;
@@ -177,7 +175,7 @@ describe("計算與模擬：頁面", () => {
     const explanation = (run: string) => ({ doc_id: `E-${run}`, kind: "compute.explanation", version: 1, author: "ai", block: "COMPUTE", at: "",
       content: { run, points: [{ part: "推論", text: "悲觀情境下淨現值是負的。" }], influential: YEARLY, rests_on: [YEARLY] } });
     const runs = [npvRun("R1", 30000), npvRun("R2", 20000, { rerun_of: "R1" }), npvRun("R3", 25000, { adopt: { adopt: "採用", reason: "數字有出處" } })];
-    server(runs, {}, { "compute.explanation": runs.map((run) => explanation(run.run_id)) });
+    server(runs, { "compute.explanation": runs.map((run) => explanation(run.run_id)) });
     const { host, done } = await mount(<ComputePage projectId="P1" />);
     const boxes = [...host.querySelectorAll(".finding")].filter((node) => node.textContent?.includes("AI 認為最影響結果的"));
     expect(boxes).toHaveLength(3);
@@ -185,20 +183,46 @@ describe("計算與模擬：頁面", () => {
     await done();
   });
 
-  it("shows the AI's hand-back, goes on only when you press 仍然繼續, and says 模擬不是預測 beside every explanation", async () => {
+  it("says what each run shows in fixed sentences made by the system, with no AI button; an explanation the AI wrote before stays beside it", async () => {
     const explained = { doc_id: "E1", kind: "compute.explanation", version: 1, author: "ai", block: "COMPUTE", at: "",
       content: { run: "R9", points: [{ part: "推論", text: "悲觀情境下淨現值是負的。" }], influential: YEARLY, rests_on: [YEARLY] } };
-    const { writes } = server([SIMULATION, npvRun("R9", 30000)], { explain: [{ handback: "「接案收入」只有 1 個算數的獨立出處（要 2 個）。AI 先停下來，由你決定。" }, { saved: { doc_id: "E2" } }] },
-      { "compute.explanation": [explained] });
+    const { writes } = server([SIMULATION, npvRun("R9", 30000)], { "compute.explanation": [explained] });
     const { host, done } = await mount(<ComputePage projectId="P1" />);
-    expect(runCard(host, "開工作室", "30,000").textContent).toContain("模擬不是預測，計算也不是：算出來的不等於會發生。");
-    await click([...runCard(host, "拆夥後", "300,000").querySelectorAll("button")].find((node) => node.textContent === "請 AI 用白話解釋"));
-    expect(host.textContent).toContain("AI 先停下來");
-    await click([...host.querySelectorAll("button")].find((node) => node.textContent === "仍然繼續"));
-    const asked = writes.filter((write) => write.path.endsWith("/ai/COMPUTE/explain")).map((write) => write.body.context);
-    expect(asked).toEqual([{ run: "R1" }, { run: "R1", go_on: true }]);
-    expect(host.textContent).not.toContain("仍然繼續");
+    const simulation = runCard(host, "拆夥後", "300,000");
+    const said = simulation.querySelector(".finding")!.textContent ?? "";
+    expect(said).toContain("系統整理的，不是 AI 寫的，不扣點");
+    expect(said).toContain("這是系統算出來的模擬結果（蒙地卡羅）：加起來的結果，範圍是 180,000 到 380,000 元。");
+    expect(said).toContain("最影響結果的數字是「接案收入」。只改「接案收入」");
+    expect(said).toContain("「你要的最低結果」是你自己說的，沒有外部出處。");
+    expect(said).toContain("「接案收入」的獨立出處不到 2 個。");
+    expect(said).toContain("模擬不是預測，計算也不是：算出來的不等於會發生。");
+    const older = runCard(host, "開工作室", "30,000");
+    expect(older.textContent).toContain("以前 AI 寫的說明（舊的紀錄，留著）");
+    expect(older.textContent).toContain("悲觀情境下淨現值是負的。");
+    expect([...host.querySelectorAll("button")].some((node) => node.textContent?.includes("請 AI 用白話解釋") || node.textContent === "仍然繼續")).toBe(false);
+    expect(writes.some((write) => write.path.includes("/ai/COMPUTE/explain"))).toBe(false);
     await done();
+  });
+});
+
+describe("COMPUTE.explain as code: fixed sentences from what the system computed", () => {
+  it("says the result and the one input that moves it most, only with the run's own numbers", () => {
+    const lines = explainRun(npvRun("R1", 30000), SPEC);
+    expect(lines[0]).toBe("這是系統算出來的計算結果（淨現值）：淨現值，範圍是 -35,057 到 29,884 元。");
+    expect(lines[1]).toBe(`最影響結果的數字是「${YEARLY}」。${flipWords(npvRun("R1", 30000), SPEC)}`);
+    expect(lines.slice(2)).toEqual([`「一開始投入的金額」「${YEARLY}」「年數」「折現率」是你自己說的，沒有外部出處。`, "模擬不是預測，計算也不是：算出來的不等於會發生。"]);
+    const digits = lines.join("").match(/\d[\d,]*(?:\.\d+)?/g) ?? [];
+    const given = JSON.stringify(npvRun("R1", 30000)).replace(/,/g, "") + [fmt(-35057), fmt(29884), fmt(30000), fmt(23097), "23.0%", "2"].join(" ");
+    for (const found of digits) expect(given, found).toContain(found.replace(/,/g, "").replace(/\.0+$/, ""));   // not one number the run did not hold
+  });
+
+  it("says no input flips the result when none does, and that every scenario sits on one side when there is no range", () => {
+    const run: Run = { ...npvRun("R1", 30000), inputs: [{ key: "a", name: "甲", value: 1, unit: "元", cards: ["C1"], own: false }], thin_inputs: [],
+      result: { what: "淨現值", unit: "元", range: { low: null, high: null, unit: "元" } }, flip: { input: null, from: "淨現值大於 0", each: [], why: "每個數字單獨改，結果都不會翻過來。" } };
+    expect(explainRun(run, SPEC)).toEqual([
+      "這是系統算出來的計算結果（淨現值）：淨現值，每個情境都落在線的同一邊。", "沒有哪一個數字單獨一動，就讓結果翻過來。每個數字單獨改，結果都不會翻過來。",
+      "模擬不是預測，計算也不是：算出來的不等於會發生。",
+    ]);
   });
 });
 

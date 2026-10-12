@@ -43,21 +43,25 @@ describe("每天的校準 (outside any case)", () => {
     await done();
   });
 
-  it("the AI is a mirror only once there is a card today, and its words carry the AI's tag", async () => {
-    const card = doc("learn.daily", "D1", { about: "信念", text: "我一定要先講話才安全" }, { at: NOW() });
-    const mirrors: unknown[] = [];
+  it("gives today's card back as it was written, once there is one, by the system and with no AI call; a mirror the AI made before still shows with its tag", async () => {
+    const card = doc("learn.daily", "D1", { about: "信念", text: "我一定要先講話才安全", counterexample: "上次先聽也沒事", change_condition: "有人先聽完我說" }, { at: NOW() });
     const none = await open();
-    expect(byText(none.host, "button", "請 AI 當鏡子")).toBeUndefined();   // no card yet: no button
+    expect(none.host.textContent).not.toContain("照原話放在這裡");   // no card yet: nothing to give back
     await none.done();
     vi.resetAllMocks();
-    const { host, done, calls } = await open({
-      "GET /me/docs/learn.daily": [card], "GET /me/docs/learn.daily_mirror": () => mirrors,
-      "POST /me/ai/LEARN/mirror": () => { const made = doc("learn.daily_mirror", "M1", { summary: "你相信要先講話才安全。" }, { author: "ai", block: "LEARN", at: new Date(Date.now() + 1000).toISOString() }); mirrors.push(made); return { saved: made }; },
-    });
-    await click(byText(host, "button", "請 AI 當鏡子"));
-    expect(posts(calls, "/me/ai/LEARN/mirror")[0].body).toEqual({ context: { card: "D1" } });
-    expect(host.textContent).toContain("AI 寫的");
-    expect(host.textContent).toContain("你相信要先講話才安全。");
+    const made = doc("learn.daily_mirror", "M1", { summary: "你相信要先講話才安全。" }, { author: "ai", block: "LEARN", at: new Date(Date.now() + 1000).toISOString() });
+    const { host, done, calls } = await open({ "GET /me/docs/learn.daily": [card], "GET /me/docs/learn.daily_mirror": [made] });
+    const text = host.textContent ?? "";
+    expect(text).toContain("系統整理的，不是 AI 寫的，不扣點");
+    expect(text).toContain("你今天寫的，照原話放在這裡");
+    expect(text).toContain("信念：我一定要先講話才安全");
+    expect(text).toContain("你補的反例：上次先聽也沒事");
+    expect(text).toContain("什麼會改變它：有人先聽完我說");
+    expect(text).toContain("以前 AI 當鏡子整理的");
+    expect(text).toContain("AI 寫的");
+    expect(text).toContain("你相信要先講話才安全。");
+    expect([...host.querySelectorAll("button")].some((node) => /請 AI/.test(node.textContent ?? ""))).toBe(false);
+    expect(calls.filter((call) => call.method !== "GET" && call.path.includes("/ai/"))).toEqual([]);
     await done();
   });
 
@@ -66,7 +70,7 @@ describe("每天的校準 (outside any case)", () => {
     const old = doc("learn.daily_mirror", "M1", { summary: "舊的整理" }, { author: "ai", at: "2026-10-01T08:00:00Z" });
     const { host, done } = await open({ "GET /me/docs/learn.daily": [card], "GET /me/docs/learn.daily_mirror": [old] });
     expect(host.textContent).not.toContain("舊的整理");
-    expect(host.textContent).toContain("你改過這張卡，這是之前的整理");
+    expect(host.textContent).toContain("你改過這張卡，之前 AI 整理的那一份不放在這裡了");
     await done();
   });
 

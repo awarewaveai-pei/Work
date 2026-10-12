@@ -3,14 +3,15 @@
 // ACT 行動與觀察 (contract card): the judgment's one-sentence next step becomes a task card -- your prediction first, then
 // the due date, risk, stop and escalate conditions, who owns it. After the task you come back to write what happened:
 // weekly for the first month, then monthly, quarterly or yearly. The AI may split the step into smaller undoable ones (you
-// pick), point at what cannot be undone and summarise the numbers; it never promises, sets a target or does the step for you.
+// pick); it never promises, sets a target or does the step for you. What you ticked as undoable or not, who is affected and
+// where the numbers you recorded went are listed by the system itself (lib/act.ts flagLines, trendLines), not by the AI.
 import Link from "next/link";
 import { humanError } from "../../lib/errors";
 import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { ai, docs, type Doc, type Notice } from "../../lib/blocks";
 import {
-  LONG_RHYTHM, STATUS, collapseFlips, holdAsked, parseNumber, rhythmLine, seriesOf, sparkPoints, taskFromNextStep,
+  LONG_RHYTHM, STATUS, collapseFlips, flagLines, holdAsked, movedSentence, onceSentence, parseNumber, rhythmLine, seriesOf, sparkPoints, taskFromNextStep, trendLines,
   type Flag, type Note, type Num, type Reminder, type Split, type Task,
 } from "../../lib/act";
 import { GUARDRAIL_NAME, HOLD, newPeople, type Judgment } from "../../lib/decide";
@@ -18,7 +19,7 @@ import { NONE, calcLine, caseEvidence, claimLine, somethingChecked, type Evidenc
 import { formatTime } from "../../lib/time";
 import { BlockShell, Notices } from "./BlockShell";
 import { AuthorTag, Cell, Chips, optionalDocs } from "./JudgmentParts";
-import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
+import { Missing, Refused, SystemMade, firstMissing, type Failed } from "./PageParts";
 
 type Any = Record<string, any>;
 const EMPTY: Task = { title: "", prediction: "" };
@@ -102,7 +103,7 @@ function Trend({ notes }: { notes: Array<Doc<Note>> }) {
   return (
     <div className="charts">
       {found.map((series) => (
-        <figure key={series.name}>
+        <figure key={JSON.stringify([series.name, series.unit])}>
           <figcaption><b>{series.name}</b>：{series.points.map((point) => `${point.value}${series.unit}`).join(" → ")}</figcaption>
           {series.trend
             ? <svg viewBox="0 0 240 60" role="img" aria-label={`${series.name}的趨勢，從 ${series.points[0].value} 到 ${series.points.at(-1)!.value}`}><polyline className="axis" fill="none" strokeWidth="2" points={sparkPoints(series.points.map((point) => point.value))} /></svg>
@@ -172,8 +173,6 @@ export function ActPage({ projectId }: { projectId: string }) {
     setPerson("");
   });
   const askSplit = run("split", async () => { const turn = await ai<Split>(projectId, "ACT", "split", {}, split); crisis(turn); });
-  const askFlag = run("ai", async () => { const turn = await ai<Flag>(projectId, "ACT", "flag", {}, flag); crisis(turn); });
-  const askTrend = run("ai", async () => { const turn = await ai<{ summary: string }>(projectId, "ACT", "trend", {}, trend); crisis(turn); });
   const openHistory = async (doc: Doc<Task>) => {
     if (history[doc.doc_id]) return;
     try { const found = await docs.versions<Task>(projectId, "act.task", doc.doc_id); setHistory((held) => ({ ...held, [doc.doc_id]: found })); } catch (reason) { setFailed({ at: `history-${doc.doc_id}`, text: humanError(reason) }); }
@@ -197,7 +196,7 @@ export function ActPage({ projectId }: { projectId: string }) {
 
       <div className="card">
         <h2>走一小步，然後看結果</h2>
-        <p className="how">這一步要最小、能反悔、你自己負得起責任。AI 可以幫你拆小、提醒哪裡不能反悔、整理數字；它不替你承諾、不替你定目標數字、不替你去做。判斷權是你的，後果也是你的。</p>
+        <p className="how">這一步要最小、能反悔、你自己負得起責任。AI 可以幫你拆小；系統會把你勾的「能不能反悔」和你記的數字整理給你看（不是 AI 做的）。它們都不替你承諾、不替你定目標數字、不替你去做。判斷權是你的，後果也是你的。</p>
         {publicIssue && <p className="sub">公共議題的行動，是參與的一步：{PUBLIC_STEPS}。行動前先問：這正好是誰希望我做的？</p>}
         {nextStep ? (
           <div className="judge">
@@ -308,33 +307,41 @@ export function ActPage({ projectId }: { projectId: string }) {
         );
       })}
 
-      {tasks.length > 0 && (
-        <div className="card">
-          <h2>請 AI 幫忙看</h2>
-          <p className="how">AI 只指出哪裡不能反悔、會影響到誰，和你記的數字怎麼走；它不決定你做不做，也不給你定目標。</p>
-          <div className="btns">
-            <button className="btn" type="button" disabled={busy} onClick={askFlag}>{flag ? "再看一次哪裡不能反悔" : "看哪裡不能反悔"}</button>
-            <button className="btn" type="button" disabled={busy || !numbered} onClick={askTrend}>{trend ? "再整理一次趨勢" : "整理數字的趨勢"}</button>
+      {tasks.length > 0 && (() => {
+        const flagged = flagLines(tasks, affected);
+        const found = trendLines(tasks, notes);
+        return (
+          <div className="card">
+            <h2>哪裡不能反悔、會影響到誰、數字怎麼走</h2>
+            <SystemMade />
+            <p className="how">下面照你自己寫的整理：每張任務卡你勾的「能不能反悔」、開案時寫的受影響的人，和你記的數字。它不決定你做不做，也不給你定目標。</p>
+            <b>每張任務卡，你自己勾的</b>
+            <ul>{flagged.tasks.map((item, index) => <li key={`${index}-${item.title}`}>{item.title}：{item.irreversible ? <span className="warn">{item.mark}</span> : item.mark}</li>)}</ul>
+            <p className="sub">要不要照做，由你決定；任務卡上「能不能反悔」也由你勾。</p>
+            <b>會影響到誰（開案時寫的）</b>
+            <p>{flagged.affected.length ? flagged.affected.join("、") : "還沒寫。"}</p>
+            <b>你記的數字</b>
+            {!numbered && <p className="hint">要有紀錄記了數字，才看得到數字怎麼走。</p>}
+            {found.moved.length > 0 && <ul>{found.moved.map((line) => <li key={`${line.task}-${line.name}-${line.unit}`}>{movedSentence(line)}</li>)}</ul>}
+            {found.once.length > 0 && <ul>{found.once.map((line) => <li key={`${line.task}-${line.name}-${line.unit}`}>{onceSentence(line)}</li>)}</ul>}
+            {(flag || trend) && <b>以前 AI 整理的（舊的紀錄，留著）</b>}
+            {flag && (
+              <div className="judge">
+                <AuthorTag author={flag.author} />
+                {(flag.content.irreversible ?? []).length > 0 ? <><b>做了不能反悔</b><ul>{flag.content.irreversible!.map((item) => <li key={item}>{item}</li>)}</ul></> : <p className="sub">AI 沒有指出不能反悔的地方。</p>}
+                {(flag.content.affects_others ?? []).length > 0 && <><b>會影響到誰</b><ul>{flag.content.affects_others!.map((item) => <li key={item}>{item}</li>)}</ul></>}
+              </div>
+            )}
+            {trend && (
+              <div className="judge">
+                <AuthorTag author={trend.author} />
+                <p>{trend.content.summary}</p>
+                {(trend.content.unclear ?? []).length > 0 && <><b>只記了一次、看不出趨勢</b><ul>{trend.content.unclear!.map((item) => <li key={item}>{item}</li>)}</ul></>}
+              </div>
+            )}
           </div>
-          {!numbered && <p className="hint">要有紀錄記了數字，才能整理趨勢。</p>}
-          <Refused failed={failed} at="ai" />
-          {flag && (
-            <div className="judge">
-              <AuthorTag author={flag.author} />
-              {(flag.content.irreversible ?? []).length > 0 ? <><b>做了不能反悔</b><ul>{flag.content.irreversible!.map((item) => <li key={item}>{item}</li>)}</ul></> : <p className="sub">AI 沒有指出不能反悔的地方。</p>}
-              {(flag.content.affects_others ?? []).length > 0 && <><b>會影響到誰</b><ul>{flag.content.affects_others!.map((item) => <li key={item}>{item}</li>)}</ul></>}
-              <p className="sub mb0">要不要照做，由你決定；任務卡上「能不能反悔」也由你勾。</p>
-            </div>
-          )}
-          {trend && (
-            <div className="judge">
-              <AuthorTag author={trend.author} />
-              <p>{trend.content.summary}</p>
-              {(trend.content.unclear ?? []).length > 0 && <><b>只記了一次、看不出趨勢</b><ul>{trend.content.unclear!.map((item) => <li key={item}>{item}</li>)}</ul></>}
-            </div>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       <p className="sub">到期的時候，會提醒你回「回顧校準」，把當初的預測和實際發生的並排看。</p>
     </BlockShell>
