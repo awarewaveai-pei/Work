@@ -68,6 +68,22 @@ export interface CrawlOptions {
    * not reach it with text is listed in `report.aside`. Off for the knowledge base, which must never store them.
    */
   keepAside?: boolean;
+  /**
+   * Called after every target and every flush with the run's counts so far (lib/collect/research-progress.ts). A
+   * throwing listener is ignored: watching a crawl must never stop it.
+   */
+  onProgress?: (p: CrawlProgress) => void;
+}
+
+/** A crawl's counts so far. Pages are http(s) targets; `ingested` = what the sink has accepted (new or unchanged). */
+export interface CrawlProgress {
+  /** Distinct pages queued so far (seeds and every page a search or a page named). */
+  pagesFound: number;
+  /** Pages that got a final answer this run: read, refused, gone, disallowed or failed. */
+  pagesChecked: number;
+  ingested: number;
+  /** Pages not counted as sources: listed without text, or delivered labelled with why. */
+  setAside: number;
 }
 
 export interface CrawlResult {
@@ -249,6 +265,11 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
   ];
   if (saved) log(`resumed run ${opts.runId}: ${frontier.length} queued, ${seen.size} already seen`);
 
+  const isPage = (uri: string) => /^https?:\/\//i.test(uri);
+  const pagesFound = new Set(frontier.filter((t) => isPage(t.uri)).map((t) => t.canonicalUri));
+  let pagesChecked = 0;
+  let deliveredAside = 0;
+
   const ctx: CollectCtx = {
     fetch: opts.fetch,
     callProvider: opts.callProvider,
@@ -271,7 +292,21 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
     const batch = pending;
     pending = [];
     sinkTotals = mergeSink(sinkTotals, await opts.sink.run(batch, sinkCtx));
+    progress();
   };
+  function progress(): void {
+    if (!opts.onProgress) return;
+    try {
+      opts.onProgress({
+        pagesFound: pagesFound.size,
+        pagesChecked,
+        ingested: sinkTotals.written + sinkTotals.skipped,
+        setAside: report.aside.length + deliveredAside,
+      });
+    } catch {
+      // see CrawlOptions.onProgress
+    }
+  }
 
   while (frontier.length) {
     if (!opts.budget.ok()) {
@@ -303,11 +338,15 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
     // page 37 is skipped forever, every test still green. That is the exact failure the plan's
     // resume requirement names.
     seen.add(target.canonicalUri);
+    // Put back (retry, budget) = not answered yet; it is counted as checked when it is.
+    let requeued = false;
     const requeueFront = (t: Target) => {
+      requeued = true;
       seen.delete(target.canonicalUri);
       frontier.unshift(t);
     };
     const requeueBack = (t: Target) => {
+      requeued = true;
       seen.delete(target.canonicalUri);
       frontier.push(t);
     };
@@ -326,6 +365,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
 
     if (!candidates.length) {
       report.unhandled.push(target.uri);
+      if (isPage(target.uri)) pagesChecked++;
       setAside(target.uri, null, "unhandled");
       continue;
     }
@@ -363,6 +403,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         // The child's own meta wins: a block that deliberately stamped something (web-search's
         // per-result searchQuery, its own scope) knows more about that target than its parent does.
         frontier.push({ ...d, canonicalUri, scope, tier: 0, depth, meta: { ...carried, ...d.meta } });
+        if (isPage(d.uri)) pagesFound.add(canonicalUri);
       }
     };
 
@@ -430,6 +471,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
       }
 
       if (opts.keepAside) report.aside.push(...(result.aside ?? []));
+      for (const a of result.aside ?? []) if (isPage(a.url)) pagesFound.add(canonicalize(a.url)); // found, then skipped unread
       for (const channel of result.channels ?? []) mergeChannel(report.channels, channel);
 
       if (result.notModified) {
@@ -487,6 +529,7 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
         // report is a row nobody opens, and "it names her and mentions La Trobe" is what makes the
         // collection auditable rather than a pile of URLs somebody has to re-read.
         const added = { ...carried, ...extra };
+        if (typeof added.aside === "string") deliveredAside++;
         pending.push(stampProvenance(Object.keys(added).length ? { ...doc, meta: { ...doc.meta, ...added } } : doc));
         delivered.add(doc.canonicalUrl);
         return true;
@@ -507,6 +550,13 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
           // would have to be configured.
           const thin = verdict.reason === "too_short" || verdict.reason === "low_text_density";
           const reason = thin && !hasNextTier ? `${verdict.reason}_no_heavier_tier` : (verdict.reason ?? "unknown");
+          // A firewall's refusal is the site's text, not the page's: nothing of the page to keep, and its title
+          // ("Error") is not the page's either, so it is listed with the title the search gave it.
+          if (verdict.reason === "blocked_page") {
+            report.dirty.push({ uri: doc.uri, reason, checks: verdict.checks });
+            setAside(doc.uri, null, reason);
+            continue;
+          }
           // A research run keeps a refused page that has text, labelled with why; it is not admitted, so its
           // links are not followed (below). Still counted as refused: the gate did refuse it.
           if (opts.keepAside && doc.text.trim()) {
@@ -552,6 +602,8 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
       setAside(target.uri, null, "fetch_failed");
     }
     if (budgetStopped) break;
+    if (isPage(target.uri) && !requeued) pagesChecked++;
+    progress();
 
     if (pending.length >= flushEvery) {
       await flush();

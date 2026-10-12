@@ -8,7 +8,7 @@
 // are the same code path. Three call sites building their own budget and their own fetch is three
 // different crawlers wearing one name.
 
-import { crawl, type CrawlResult, type SeedInput } from "@/lib/collect/orchestrator";
+import { crawl, type CrawlProgress, type CrawlResult, type SeedInput } from "@/lib/collect/orchestrator";
 import { createBudget, type BudgetLimits } from "@/lib/collect/budget";
 import { createCollectFetch } from "@/lib/collect/net/fetcher";
 import { createProviderCall } from "@/lib/collect/net/providers";
@@ -103,6 +103,7 @@ interface CrawlWithOptions {
   keepAside: boolean;
   /** Search calls draw from this one when given (a research run), page fetches from `budget`. */
   queryBudget?: ReturnType<typeof createBudget>;
+  onProgress?: (p: CrawlProgress) => void;
   log: (msg: string) => void;
 }
 
@@ -123,6 +124,7 @@ function crawlWith(o: CrawlWithOptions): Promise<CrawlResult> {
     blocks: collectors(),
     log: o.log,
     keepAside: o.keepAside,
+    onProgress: o.onProgress,
     // Off ⇒ the orchestrator's own NO_URL_STATE default: every page is fetched and delivered in full.
     urlState: o.urlState ? createSupabaseUrlStateStore() : undefined,
     fetch: createCollectFetch({ budget: o.budget, log: o.log, rateLimiter }),
@@ -152,6 +154,8 @@ export interface ResearchCollectionOptions {
   budget?: BudgetLimits;
   /** What the engine listed at the grant exchange: "2" keeps refused pages (keepAside), "1" drops them as before. */
   wire: WireVersion;
+  /** The run's counts as it goes (runs/execute keeps them for GET runs/progress). */
+  onProgress?: (p: CrawlProgress) => void;
   log?: (msg: string) => void;
 }
 
@@ -180,6 +184,7 @@ export async function runResearchCollection(opts: ResearchCollectionOptions): Pr
     urlState: false,
     keepAside: opts.wire === "2",
     queryBudget,
+    onProgress: opts.onProgress,
     log: opts.log ?? (() => {}),
   });
   return { report: result.report, sink: result.sink };

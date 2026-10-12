@@ -17,10 +17,14 @@ import { COLLECTED_PROVENANCE } from "@/lib/collect/provenance";
 /**
  * Elements whose text is never the document. So `text` is a page's body, not the page: who runs the site, usually said
  * in the footer, is not in it, and the engine says so instead of 「沒寫」 (collector.v2.json `reading`).
+ *
+ * Never a CONTAINER: `form` is not here because an ASP.NET WebForms page wraps its whole body in one
+ * `<form id="form1">` (law.moj.gov.tw, mojlaw.moj.gov.tw and most .gov.tw sites); dropping it read 民法第 670 條
+ * and 有限合夥法 as 0 bytes and set them aside as 「抓到的字太少」 (2026-10-11). A form's controls are dropped instead.
  */
 const DROP_TAGS = [
-  "script", "style", "noscript", "template", "svg", "nav", "header", "footer", "aside", "form",
-  "iframe", "button", "select",
+  "script", "style", "noscript", "template", "svg", "nav", "header", "footer", "aside",
+  "iframe", "button", "select", "textarea",
 ];
 
 /**
@@ -113,11 +117,19 @@ function metaContent(html: string, matcher: RegExp): string | null {
   return null;
 }
 
-/** The main content region if the page marks one, otherwise the body. */
+/**
+ * The main content region if the page marks one, otherwise the body.
+ *
+ * `<article>` only when the page has exactly one: several are a list (a WordPress/Elementor 「相關文章」 grid of
+ * `<article role="listitem">` cards), and the first card was read as the page — legaldoctor.tw's post came out as
+ * 36 bytes (2026-10-11). The body, with the chrome above dropped, never loses the content.
+ */
 function contentRegion(html: string): string {
-  for (const re of [/<main\b[^>]*>([\s\S]*?)<\/main\s*>/i, /<article\b[^>]*>([\s\S]*?)<\/article\s*>/i]) {
-    const m = re.exec(html);
-    if (m && m[1].length > 200) return m[1];
+  const main = /<main\b[^>]*>([\s\S]*?)<\/main\s*>/i.exec(html);
+  if (main && main[1].length > 200) return main[1];
+  if ((html.match(/<article\b/gi) ?? []).length === 1) {
+    const article = /<article\b[^>]*>([\s\S]*?)<\/article\s*>/i.exec(html);
+    if (article && article[1].length > 200) return article[1];
   }
   const body = /<body\b[^>]*>([\s\S]*?)<\/body\s*>/i.exec(html);
   return body ? body[1] : html;

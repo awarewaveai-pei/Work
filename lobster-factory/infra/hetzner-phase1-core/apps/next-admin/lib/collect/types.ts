@@ -278,6 +278,8 @@ export interface QualityVerdict {
     minDensity: number;
     script: "cjk" | "latin";
     softNotFound: boolean;
+    /** The page is a firewall's refusal answered with 200 (quality.ts BLOCKED_PAGE). */
+    blockedPage: boolean;
   };
 }
 

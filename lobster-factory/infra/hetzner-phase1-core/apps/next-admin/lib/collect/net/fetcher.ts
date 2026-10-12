@@ -108,6 +108,24 @@ export class CollectFetchError extends Error {
   }
 }
 
+/**
+ * The addresses one request may try: the validated first, then the first validated address of the OTHER family.
+ * At most two, so a dead host costs one extra connect attempt, not one per DNS record. Exported for tests.
+ */
+export function pinnedCandidates(first: string, validated: readonly string[]): string[] {
+  const v6 = (a: string) => a.includes(":");
+  const other = validated.find((a) => v6(a) !== v6(first));
+  return other ? [first, other] : [first];
+}
+
+/** The connection was never made: no route for that family, refused, or the connect itself timed out. */
+const CONNECT_FAILURES = new Set(["UND_ERR_CONNECT_TIMEOUT", "ENETUNREACH", "EHOSTUNREACH", "ECONNREFUSED", "EADDRNOTAVAIL"]);
+export function connectFailed(e: unknown): boolean {
+  const cause = e && typeof e === "object" ? (e as { cause?: unknown }).cause : undefined;
+  const code = cause && typeof cause === "object" ? (cause as { code?: unknown }).code : undefined;
+  return typeof code === "string" && CONNECT_FAILURES.has(code);
+}
+
 /** Statuses whose body must stay empty, per the Response constructor. */
 const NULL_BODY_STATUS = new Set([101, 204, 205, 304]);
 
@@ -207,8 +225,8 @@ export function createCollectFetch(opts: CollectFetchOptions) {
       const gate = await checkUrl(current, resolver);
       if (!gate.ok) throw new CollectFetchError(`ssrf_blocked_${gate.reason}`, "blocked");
       // gate.ok guarantees `address` is set (checkUrl's contract) — pin the connection to exactly
-      // the address just validated, so the platform's own re-resolution at connect time never runs.
-      const dispatcher = pinnedDispatcher(gate.address!);
+      // the addresses just validated, so the platform's own re-resolution at connect time never runs.
+      const pinned = pinnedCandidates(gate.address!, gate.addresses ?? []);
       const host = new URL(current).hostname.toLowerCase();
 
       let crawlDelayMs: number | undefined;
@@ -225,9 +243,13 @@ export function createCollectFetch(opts: CollectFetchOptions) {
       const waited = await limiter.take(host, { minIntervalMs: crawlDelayMs });
       if (waited) log(`rate-limited ${host} for ${waited}ms`);
 
-      const startedAt = Date.now();
-      let res: Response;
-      try {
+      let startedAt = Date.now();
+      let res: Response | undefined;
+      // The other address family only when the first could not even be CONNECTED to (connectFailed): an answer,
+      // whatever its status, is the site's, and a request that timed out after connecting is not retried here.
+      for (let a = 0; a < pinned.length && !res; a++) {
+        const dispatcher = pinnedDispatcher(pinned[a]);
+        startedAt = Date.now();
         try {
           res = await transport(current, {
             method,
@@ -248,13 +270,17 @@ export function createCollectFetch(opts: CollectFetchOptions) {
           } as RequestInit & { dispatcher: Dispatcher });
         } catch (e) {
           opts.budget.spend({ fetches: 1, ms: Date.now() - startedAt });
-          throw new CollectFetchError(`network_${String(e)}`, "network");
+          const last =
+            a + 1 >= pinned.length || !connectFailed(e) || Date.now() - startedWholeCall > deadlineMs || !opts.budget.ok();
+          if (last) throw new CollectFetchError(`network_${String(e)}`, "network");
+          log(`no answer from ${host} at ${pinned[a]}; trying ${pinned[a + 1]}`);
+        } finally {
+          // One request per Agent (see pinnedDispatcher's own comment) — close it either way so a
+          // crawl of thousands of pages does not leak thousands of idle connection pools.
+          void dispatcher.close().catch(() => {});
         }
-      } finally {
-        // One request per Agent (see pinnedDispatcher's own comment) — close it either way so a
-        // crawl of thousands of pages does not leak thousands of idle connection pools.
-        void dispatcher.close().catch(() => {});
       }
+      if (!res) throw new CollectFetchError("network_no_address_answered", "network");
 
       // Only the statuses that actually mean "go here instead". 304 lives in the 3xx range but is
       // the answer to a conditional request — treating it as a redirect turns "nothing changed,

@@ -70,6 +70,24 @@ const SOFT_404_WEAK = [
   /找不到(這個|該|此)?(頁面|網頁|商品|產品)/,
 ];
 
+/**
+ * A site's firewall refusing the crawler while answering 200 OK: the page is the firewall's message, not the
+ * document. law.moj.gov.tw / mojlaw.moj.gov.tw answer every request from this crawler with a 781-byte
+ * 「Error — This page can't be displayed. Contact MOJ support」 page (verified 2026-10-11, from ks-aw-01 too), which
+ * was set aside as 「抓到的字太少」 — a reason the collector made up for a refusal the site made. Counted only in
+ * the title or the opening AND on a short page, like a weak soft-404 marker: an article ABOUT access denial is long.
+ */
+const BLOCKED_PAGE = [
+  /this page can['’]?t be displayed/i,
+  /the requested url was rejected/i,
+  /\brequest (?:was )?rejected\b/i,
+  /\baccess denied\b/i,
+  /you have been blocked/i,
+  /attention required!? \| cloudflare/i,
+  /incapsula incident id/i,
+  /(?:拒絕存取|存取被拒|請求已被(?:拒絕|封鎖)|您的(?:請求|連線)已被(?:拒絕|封鎖))/,
+];
+
 const encoder = new TextEncoder();
 export function utf8Bytes(s: string): number {
   return encoder.encode(s).byteLength;
@@ -115,6 +133,7 @@ export function grade(doc: RawDoc, opts: GradeOptions = {}): QualityVerdict {
   const weakMarker = SOFT_404_WEAK.some((re) => re.test(title) || re.test(opening));
   const softNotFound =
     strongMarker || (weakMarker && (textBytes < minTextBytes * 1.5 || !!opts.canonicalMismatch));
+  const blockedPage = textBytes < minTextBytes * 1.5 && BLOCKED_PAGE.some((re) => re.test(title) || re.test(opening));
 
   const checks: QualityVerdict["checks"] = {
     textBytes,
@@ -123,9 +142,11 @@ export function grade(doc: RawDoc, opts: GradeOptions = {}): QualityVerdict {
     minDensity: MIN_DENSITY,
     script,
     softNotFound,
+    blockedPage,
   };
 
   if (softNotFound) return { ok: false, reason: "soft_404", checks };
+  if (blockedPage) return { ok: false, reason: "blocked_page", checks };
   if (textBytes < minTextBytes) return { ok: false, reason: "too_short", checks };
   if (density !== null && density < MIN_DENSITY) return { ok: false, reason: "low_text_density", checks };
   return { ok: true, reason: null, checks };

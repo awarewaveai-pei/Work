@@ -50,6 +50,13 @@ const AGGREGATOR_PATTERNS = [
   /\/page\/\d+/i,
 ];
 
+/**
+ * WordPress's numeric permalink (`/archives/443`) is ONE post, not an archive listing: chenyinlaw.com.tw's
+ * 「簽訂契約應注意事項」 was set aside unread as 「列表／標籤頁」 (2026-10-11). Ambiguous with a bare year archive
+ * (`/archives/2020`), and resolved toward admitting, as everything in this file is.
+ */
+const SINGLE_POST_PERMALINK = /\/archives?\/\d+\/?$/i;
+
 const RETAIL_PATH_PATTERNS = [
   /\/dp\//i, /\/gp\/product\//i, /\/product\//i, /\/products\//i,
   /\/shop\//i, /\/store\//i, /\/cart\b/i, /\/buy\b/i, /\/isbn\b/i,
@@ -79,7 +86,7 @@ export function classifySource(url: string): SourceClass {
   if (hostMatches(host, RETAIL_HOSTS) || RETAIL_PATH_PATTERNS.some((re) => re.test(path))) return "retail";
   if (hostMatches(host, SOCIAL_HOSTS)) return "social";
   if (hostMatches(host, REFERENCE_HOSTS)) return "reference";
-  if (AGGREGATOR_PATTERNS.some((re) => re.test(path))) return "aggregator";
+  if (!SINGLE_POST_PERMALINK.test(path) && AGGREGATOR_PATTERNS.some((re) => re.test(path))) return "aggregator";
   return "unknown";
 }
 

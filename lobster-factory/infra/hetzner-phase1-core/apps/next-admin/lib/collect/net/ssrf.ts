@@ -98,6 +98,12 @@ export interface UrlGateResult {
    * to the first of its validated resolved addresses. Absent when !ok.
    */
   address?: string;
+  /**
+   * Every validated address, `address` first. A host with an AAAA record reached from a network without an IPv6
+   * route (a container, this laptop) fails on its first address only; trying the next validated one is the same
+   * gate's answer, not a new one. Without it law.moj.gov.tw read as 「這個網站一直沒有回應」 (2026-10-11).
+   */
+  addresses?: string[];
 }
 
 /**
@@ -124,7 +130,7 @@ export async function checkUrl(rawUrl: string, resolver: Resolver = defaultResol
 
   // A literal IP has nothing to resolve — and nothing to rebind either, so it pins to itself.
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host) || host.includes(":")) {
-    return { ok: true, reason: null, address: host };
+    return { ok: true, reason: null, address: host, addresses: [host] };
   }
 
   let addresses: string[];
@@ -140,5 +146,5 @@ export async function checkUrl(rawUrl: string, resolver: Resolver = defaultResol
   // First of the validated set — deterministic given what the resolver returned, and the same
   // address the pinned connection below will actually use, so "what we checked" and "what we
   // connect to" can never diverge.
-  return { ok: true, reason: null, address: addresses[0] };
+  return { ok: true, reason: null, address: addresses[0], addresses };
 }

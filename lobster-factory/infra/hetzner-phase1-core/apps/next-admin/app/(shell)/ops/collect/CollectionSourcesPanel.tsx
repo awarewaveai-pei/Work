@@ -910,6 +910,7 @@ export function explainReason(reason: string): string | null {
   if (reason.includes("provider_call_unavailable")) return "這個來源需要外部供應商，但這次執行沒有帶供應商設定。";
   if (reason.includes("too_short")) return "這頁抽不到足夠的內文。多半是 JavaScript 才長出內容的網站——勾「JS 渲染網頁」那個來源可以讀，但它按次計費。";
   if (reason.includes("low_text_density")) return "這頁大部分是版面與程式碼，沒什麼可讀的內文，所以沒有收進來。";
+  if (reason.includes("blocked_page")) return "對方網站的防火牆擋下了爬蟲，回的是一頁錯誤訊息（狀態仍是 200），不是內文。";
   if (reason.includes("soft_404")) return "這頁其實是「找不到頁面」，只是網站回了 200。網址可能過期了。";
   if (reason.includes("injection_")) return "這頁裡藏著像是要指揮 AI 的句子，已經擋下不入庫。這是刻意的防線，不是誤判。";
   if (reason.includes("query_missing")) return "這筆來源沒有查詢字串。";

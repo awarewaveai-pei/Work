@@ -88,6 +88,7 @@ const ASIDE_WHY: Record<string, string> = {
   low_text_density: "抓到的大多是網頁框架，不是內文",
   low_text_density_no_heavier_tier: "系統只抓到很少的字，可能讀不到這種網頁",
   soft_404: "這一頁寫著找不到內容",
+  blocked_page: "這個網站擋下了系統，回的是一頁錯誤訊息，不是內文；要看原文請自己開這個網址",
   entity_absent: "這一頁沒有提到要查的對象",
   entity_anchor_missing: "這一頁沒有出現分辨同名的字",
   off_entity: "這一頁講的可能不是要查的對象",

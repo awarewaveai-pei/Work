@@ -15,6 +15,8 @@ import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { runResearchCollection } from "@/lib/collect/run";
 import { completionOf, createCognitiveSink } from "@/lib/collect/sinks/cognitive";
 import { completeRun, exchangeGrant, wireVersionOf, type RunReportSummary } from "@/lib/cognitive-os/research";
+import { finishProgress, startProgress, updateProgress } from "@/lib/collect/research-progress";
+import type { CrawlProgress } from "@/lib/collect/orchestrator";
 import { parseResearchRunRequest } from "../research-run-request";
 import "@/lib/collect/blocks";
 
@@ -65,6 +67,10 @@ export async function POST(request: Request) {
   const summary: RunReportSummary = { fetched: 0, written: 0, unchanged: 0, refused: 0, stopped_by: "not_started" };
   // Wire v2: what the person sees set aside, and which search channels worked. Empty when the crawl threw.
   let found: ReturnType<typeof completionOf> = { aside: [], channels: [] };
+  const startedAt = Date.now();
+  // Written by the crawl's callback; `as` keeps TypeScript from narrowing it to null at the finally below.
+  let last = null as CrawlProgress | null;
+  startProgress(run.project_id, run.run_id, startedAt);
   try {
     const result = await runResearchCollection({
       projectId: run.project_id,
@@ -73,6 +79,10 @@ export async function POST(request: Request) {
       sink: createCognitiveSink({ projectId: run.project_id, runId: run.run_id, grantToken, wire }),
       budget: { fetches: run.budget.fetches },
       wire,
+      onProgress: (p) => {
+        last = p;
+        updateProgress(run.project_id, run.run_id, p);
+      },
     });
     const r = result.report;
     summary.fetched = r.fetched;
@@ -86,6 +96,14 @@ export async function POST(request: Request) {
   } catch (e) {
     failure = String(e).slice(0, 200);
   } finally {
+    finishProgress(run.project_id, run.run_id, last);
+    // Counts only (no URL, query or title: the case's contents stay in the engine). The crawl itself logs nothing.
+    const p = last;
+    console.info(
+      `[collect/run ${run.project_id}/${run.run_id}] ${status} in ${Math.round((Date.now() - startedAt) / 1000)}s: ` +
+        `found=${p?.pagesFound ?? 0} checked=${p?.pagesChecked ?? 0} fetched=${summary.fetched} written=${summary.written} ` +
+        `unchanged=${summary.unchanged} refused=${summary.refused} aside=${found.aside.length} stopped_by=${summary.stopped_by}`,
+    );
     const done = await completeRun(run.project_id, run.run_id, grantToken, status, summary, failure, wire === "2" ? found : undefined);
     if (done.ok === false) failure = `${failure ?? ""} complete_${done.status}:${done.error}`.trim().slice(0, 200);
   }
