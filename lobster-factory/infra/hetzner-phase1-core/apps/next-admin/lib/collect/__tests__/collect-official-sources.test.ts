@@ -5,13 +5,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { CollectCtx, RawDoc, SinkBlock } from "@/lib/collect/types";
+import type { CollectBlock, CollectCtx, RawDoc, SinkBlock } from "@/lib/collect/types";
 import { crawl, type CrawlProgress } from "@/lib/collect/orchestrator";
 import { createBudget } from "@/lib/collect/budget";
 import { httpHtmlCollector, extractText } from "@/lib/collect/collectors/http-html";
 import { classifySource } from "@/lib/collect/source-class";
-import { createCollectFetch, connectFailed, pinnedCandidates } from "@/lib/collect/net/fetcher";
-import { asideWhy } from "@/lib/collect/sinks/cognitive";
+import { createCollectFetch, connectFailed, pinnedCandidates, CollectFetchError } from "@/lib/collect/net/fetcher";
+import { asideWhy, completionOf } from "@/lib/collect/sinks/cognitive";
 
 const fixture = (name: string) => fs.readFileSync(path.join(__dirname, "fixtures", name), "utf8");
 const LAW_670 = "https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=B0000001&flno=670";
@@ -109,5 +109,72 @@ describe("a research crawl reports its counts as it goes (B5)", () => {
     );
     expect(seen.length).toBeGreaterThanOrEqual(2);
     expect(seen.at(-1)).toEqual({ pagesFound: 2, pagesChecked: 2, ingested: 1, setAside: 1 });
+  });
+});
+
+// 2026-10-12 walk: a 全國法規資料庫 page was set aside as 「系統讀不到這一頁」. The first strategy HAD read it and said why (the
+// site firewall page); a heavier strategy was then tried, threw, and its error replaced the answer. The answer for a page
+// is the most specific thing known about it, whichever strategy said it.
+describe("every page that is not read says its own reason, end to end", () => {
+  const LAW = "https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=B0000001&flno=667";
+  const FIREWALL = fixture("moj-firewall-refusal.html");
+  const THIN = "<html><head><title>某頁</title></head><body><main><p>很短的字。</p></main></body></html>";
+
+  /** A strategy ranked below http-html (match 1) that fails the way the test says. */
+  const heavier = (fail: () => unknown): CollectBlock => ({ id: "test/heavier", title: "heavier", match: () => 0.5, async run() { throw fail(); } });
+  const only = (fail: () => unknown): CollectBlock => ({ id: "test/only", title: "only", match: () => 1, async run() { throw fail(); } });
+  const status = (n: number) => () => Object.assign(new Error(`HTTP ${n} ${LAW} (rendered)`), { status: n });
+
+  async function run(pages: Record<string, string>, blocks: CollectBlock[]) {
+    const { sink, docs } = capture();
+    const result = await crawl([{ uri: LAW, meta: { maxDepth: 0, searchTitle: "民法第667條" } }], {
+      sink, budget: createBudget(), tenantRef: "t", runId: "r", fetch: web(pages), blocks, keepAside: true, maxAttemptsPerTarget: 1,
+    });
+    return { docs, report: result.report, said: completionOf(result.report).aside };
+  }
+
+  it("keeps the firewall verdict when the heavier strategy then fails with 403", async () => {
+    const { report, said } = await run({ [LAW]: FIREWALL }, [httpHtmlCollector, heavier(status(403))]);
+    expect(report.aside).toEqual([{ url: LAW, title: "民法第667條", reason: "blocked_page" }]);
+    expect(report.dirty.map((d) => d.reason)).toEqual(["blocked_page"]);
+    expect(said[0].reason).toContain("擋下了系統");
+  });
+
+  it("keeps it when the heavier strategy keeps timing out until its attempts run out", async () => {
+    const { report } = await run({ [LAW]: FIREWALL }, [httpHtmlCollector, heavier(status(502))]);
+    expect(report.aside.map((a) => a.reason)).toEqual(["blocked_page"]);
+  });
+
+  it("keeps a thin page as a set-aside page with its text when the heavier strategy fails", async () => {
+    const { docs, report } = await run({ [LAW]: THIN }, [httpHtmlCollector, heavier(status(403))]);
+    expect(report.dirty.map((d) => d.reason)).toEqual(["too_short_no_heavier_tier"]);
+    expect(docs.map((d) => d.meta.aside)).toEqual(["too_short_no_heavier_tier"]);
+  });
+
+  it("names the HTTP status when no strategy could read the page", async () => {
+    const { report, said } = await run({}, [only(status(403))]);
+    expect(report.aside.map((a) => a.reason)).toEqual(["fetch_failed:http_403"]);
+    expect(said[0].reason).toBe("這個網站拒絕了系統（HTTP 403）；要看原文請自己開這個網址");
+  });
+
+  it("names a file type that is not a web page, and an error with no status stays plain", async () => {
+    const zip = Object.assign(new Error("unsupported_content_type_application/zip"), { status: 415 });
+    expect((await run({}, [only(() => zip)])).report.aside.map((a) => a.reason)).toEqual(["fetch_failed:content_type_application/zip"]);
+    expect((await run({}, [only(() => new TypeError("x is not a function"))])).report.aside.map((a) => a.reason)).toEqual(["fetch_failed"]);
+    const first = { ...only(() => zip), match: () => 1 };
+    const unstructured = heavier(() => new TypeError("renderer sent malformed JSON"));
+    expect((await run({}, [first, unstructured])).report.aside.map((a) => a.reason)).toEqual(["fetch_failed:content_type_application/zip"]); // a later bare error keeps the earlier named one
+    expect(asideWhy("fetch_failed:content_type_application/zip")).toBe("這個網址不是網頁（application/zip），系統只讀網頁文字");
+    expect(asideWhy("fetch_failed:http_451")).toBe("這個網站回了錯誤（HTTP 451），系統讀不到內文");
+    expect(asideWhy("fetch_failed")).toBe("系統讀這一頁時出錯，沒有拿到內文");
+  });
+
+  it("tells a name that does not resolve and our own safety check apart from robots.txt", async () => {
+    const gated = (message: string) => only(() => new CollectFetchError(message, "blocked"));
+    expect((await run({}, [gated("ssrf_blocked_dns_failed")])).report.aside.map((a) => a.reason)).toEqual(["dns_failed"]);
+    expect((await run({}, [gated("ssrf_blocked_private_host_literal")])).report.aside.map((a) => a.reason)).toEqual(["blocked_by_gate"]);
+    expect((await run({}, [only(() => new CollectFetchError("robots_robots_disallow", "disallowed"))])).report.aside.map((a) => a.reason)).toEqual(["disallowed"]);
+    expect(asideWhy("dns_failed")).toContain("找不到這個網址的網站");
+    expect(asideWhy("blocked_by_gate")).toContain("安全檢查");
   });
 });

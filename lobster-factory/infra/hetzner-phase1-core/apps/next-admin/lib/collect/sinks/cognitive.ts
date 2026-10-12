@@ -94,8 +94,10 @@ const ASIDE_WHY: Record<string, string> = {
   off_entity: "這一頁講的可能不是要查的對象",
   injection: "這一頁藏有給 AI 的指令，系統沒有收內文",
   retry_exhausted: "這個網站一直沒有回應",
-  fetch_failed: "系統讀不到這一頁",
+  fetch_failed: "系統讀這一頁時出錯，沒有拿到內文",
   disallowed: "這個網站不讓系統抓這一頁",
+  dns_failed: "找不到這個網址的網站（網址打錯，或網站已經不存在）",
+  blocked_by_gate: "這個網址沒有通過系統的安全檢查，沒有抓",
   gone: "這一頁已經不在了",
   unhandled: "系統還不能讀這種檔案",
   budget: "這次的抓取額度或時間用完了，這一頁沒有抓",
@@ -104,6 +106,14 @@ const ASIDE_WHY: Record<string, string> = {
 export function asideWhy(code: string): string {
   if (code.startsWith("source_class:")) return `系統沒有去抓這類網頁：${sourceClassLabel(code.slice("source_class:".length) as SourceClass)}`;
   if (code.startsWith("injection_")) return ASIDE_WHY.injection;
+  if (code.startsWith("fetch_failed:")) {
+    const detail = code.slice("fetch_failed:".length);
+    const http = /^http_(\d{3})$/.exec(detail)?.[1];
+    if (http === "401" || http === "403") return `這個網站拒絕了系統（HTTP ${http}）；要看原文請自己開這個網址`;
+    if (http) return `這個網站回了錯誤（HTTP ${http}），系統讀不到內文`;
+    const type = /^content_type_(\S{1,60})$/.exec(detail)?.[1];
+    if (type) return `這個網址不是網頁（${type}），系統只讀網頁文字`;
+  }
   return ASIDE_WHY[code] ?? "系統沒有收這一頁";
 }
 

@@ -85,7 +85,7 @@ export const webSearchCollector: CollectBlock = {
         key: "language",
         label: "語言",
         type: "string",
-        help: "ISO 639-1，逗號分隔，例如 zh,en。留空 = 不限。",
+        help: "目前支援 zh（繁體中文）與 en，逗號分隔，例如 zh,en。留空 = 不限。",
       },
     ],
   },

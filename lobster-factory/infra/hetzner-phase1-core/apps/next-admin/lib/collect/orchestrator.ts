@@ -171,6 +171,9 @@ function errorLabel(e: unknown): string {
   return String(e).slice(0, 100);
 }
 
+type StrategyResult = Awaited<ReturnType<CollectBlock["run"]>>;
+type GradedDoc = { doc: RawDoc; verdict: ReturnType<typeof grade> };
+
 type Outcome = "retry" | "gone" | "budget" | "disallowed" | "extraction";
 
 /**
@@ -190,6 +193,27 @@ function classify(e: unknown): Outcome {
   if (status !== undefined && status >= 400) return "extraction"; // 401/403: this strategy cannot read it
   // Only with no structured signal at all, fall back to the shape of a transport failure.
   return /timeout|aborted|econnreset|etimedout|fetch failed/i.test(String(e)) ? "retry" : "extraction";
+}
+
+/**
+ * The aside code for a page no strategy could read, from the error's own fields. `fetch_failed:<detail>` is
+ * worded by sinks/cognitive.ts asideWhy; a bare `fetch_failed` is an error with no HTTP status to name.
+ */
+function fetchFailedCode(e: unknown): string {
+  const status = statusOf(e);
+  if (status === 415) {
+    const type = /^unsupported_content_type_(\S{1,60})$/.exec(e instanceof Error ? e.message : "")?.[1];
+    return type ? `fetch_failed:content_type_${type}` : "fetch_failed";
+  }
+  return status !== undefined ? `fetch_failed:http_${status}` : "fetch_failed";
+}
+
+/** Why the fetch gate refused (outcome "disallowed"): the site's robots.txt, or our own address checks. */
+function disallowedCode(e: unknown): string {
+  const message = e instanceof CollectFetchError ? e.message : "";
+  if (message === "ssrf_blocked_dns_failed" || message === "ssrf_blocked_dns_empty") return "dns_failed";
+  if (message.startsWith("ssrf_blocked_") || message.startsWith("method_not_allowed_")) return "blocked_by_gate";
+  return "disallowed";
 }
 
 /**
@@ -407,110 +431,9 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
       }
     };
 
-    let handled = false;
-    let lastError: string | null = null;
-    for (let i = 0; i < candidates.length; i++) {
-      const { block } = candidates[i];
-      let result: Awaited<ReturnType<CollectBlock["run"]>>;
-      try {
-        result = await block.run(target, ctx);
-      } catch (e) {
-        const outcome = classify(e);
-
-        if (outcome === "budget") {
-          // The run ends here and this target goes back to the FRONT of the queue. It was never
-          // attempted successfully, so recording it as seen would lose the page permanently.
-          // `tier: i` means the resumed run skips the strategies already ruled out for it.
-          requeueFront({ ...target, tier: i });
-          report.stoppedBy = "budget";
-          budgetStopped = true;
-          handled = true;
-          break;
-        }
-
-        if (outcome === "retry") {
-          const attempts = Number(target.meta?.[ATTEMPTS_KEY] ?? 0) + 1;
-          if (attempts <= maxAttempts) {
-            // Back of the queue, not a sleep: a crawl that blocks on one slow host does no work at
-            // all, and on a large frontier the next attempt is naturally minutes later.
-            requeueBack({ ...target, meta: { ...target.meta, [ATTEMPTS_KEY]: attempts } });
-            report.retried++;
-          } else {
-            // Out of attempts for THIS run — not forever. The mark is dropped so a later run, after
-            // the site recovers, starts clean instead of skipping the page for good.
-            seen.delete(target.canonicalUri);
-            report.dirty.push({ uri: target.uri, reason: `retry_exhausted:${errorLabel(e)}` });
-            setAside(target.uri, null, "retry_exhausted");
-          }
-          handled = true;
-          break;
-        }
-
-        if (outcome === "disallowed") {
-          // robots said no, or the gate refused. A settled answer, and its own bucket: mixed into
-          // `dirty` it would make C2's alert fire on correct behaviour until somebody turned the
-          // alert down — and then the alert is gone for the case that mattered.
-          report.disallowed.push({ uri: target.uri, reason: errorLabel(e) });
-          setAside(target.uri, null, "disallowed");
-          handled = true;
-          break;
-        }
-
-        if (outcome === "gone") {
-          // Not an error to fix — the page is gone, and a tombstone pass turns that into an archive
-          // so the knowledge base stops answering with a product that no longer exists.
-          report.gone.push(target.uri);
-          setAside(target.uri, null, "gone");
-          handled = true;
-          break;
-        }
-
-        lastError = errorLabel(e);
-        log(`block ${block.id} failed on ${target.uri}: ${String(e).slice(0, 160)}`);
-        continue; // extraction problem: fall through to the next strategy
-      }
-
-      if (opts.keepAside) report.aside.push(...(result.aside ?? []));
-      for (const a of result.aside ?? []) if (isPage(a.url)) pagesFound.add(canonicalize(a.url)); // found, then skipped unread
-      for (const channel of result.channels ?? []) mergeChannel(report.channels, channel);
-
-      if (result.notModified) {
-        // Confirmed unchanged: nothing new to grade or store, but the LINKS this page had are not
-        // "gone" — a 304 simply cannot report them. Replay whatever the last successful fetch of
-        // this URL found, at THIS target's depth (not the depth they were originally discovered at,
-        // which may have been a different, now-irrelevant crawl run).
-        const cached = await urlState.get(opts.tenantRef, target.canonicalUri);
-        enqueueDiscovered((cached?.discoveredLinks ?? []).map((uri) => ({ uri, depth: target.depth + 1 })));
-        handled = true;
-        break;
-      }
-
-      // A genuine fetch happened (200, regardless of what the quality gate decides below) — cache
-      // what it learned so the NEXT run of this exact URL can send a conditional GET. Overwritten by
-      // whichever strategy ultimately succeeds if an earlier one degrades to a heavier one below;
-      // that is correct, the earlier strategy's etag belongs to a response nobody is keeping.
-      const firstDoc = result.docs[0];
-      await urlState.set(opts.tenantRef, target.canonicalUri, {
-        etag: typeof firstDoc?.meta.etag === "string" ? firstDoc.meta.etag : null,
-        lastModified: typeof firstDoc?.meta.lastModified === "string" ? firstDoc.meta.lastModified : null,
-        discoveredLinks: result.discovered.map((d) => d.uri),
-      });
-
-      report.fetched++;
-      const graded = result.docs.map((d) => ({
-        doc: d,
-        // The block reports when a page pointed its canonical somewhere else; the gate uses it as
-        // the second signal for a soft-404 (a templated error page canonicalises to the home page).
-        // Without passing it the option existed but nothing ever set it — a check that never ran.
-        verdict: grade(d, { canonicalMismatch: typeof d.meta.declaredCanonicalRejected === "string" }),
-      }));
-      const hasNextTier = i + 1 < candidates.length;
-      if (graded.length > 0 && graded.every((g) => !g.verdict.ok) && hasNextTier) {
-        // Everything this strategy produced is chrome or a soft-404 — try a heavier strategy before
-        // recording a failure.
-        continue;
-      }
-
+    // Settles one strategy's graded documents as the page's final answer: delivered, set aside with the gate's reason,
+    // or refused. `hasNextTier` only words the reason of a thin extraction (nothing heavier could read it).
+    const settle = (result: StrategyResult, graded: GradedDoc[], hasNextTier: boolean): void => {
       // Screens, stamps and queues one document for the sink; false = quarantined, never stored automatically
       // (a human decides).
       const deliver = (doc: RawDoc, extra: Record<string, unknown>): boolean => {
@@ -592,14 +515,135 @@ export async function crawl(seeds: SeedInput[], opts: CrawlOptions): Promise<Cra
       // (a search, a sitemap, a feed index) is unaffected: discovery is its entire job.
       if (graded.length === 0 || admitted > 0) enqueueDiscovered(result.discovered);
       else log(`not expanding ${target.uri}: every extracted document was refused`);
+    };
 
+    let handled = false;
+    let lastError: string | null = null;
+    let failedCode = ""; // the most specific fetchFailedCode any strategy gave: a later bare error does not erase it
+    let refused: { result: StrategyResult; graded: GradedDoc[] } | null = null;
+    for (let i = 0; i < candidates.length; i++) {
+      const { block } = candidates[i];
+      let result: Awaited<ReturnType<CollectBlock["run"]>>;
+      try {
+        result = await block.run(target, ctx);
+      } catch (e) {
+        const outcome = classify(e);
+
+        if (outcome === "budget") {
+          // The run ends here and this target goes back to the FRONT of the queue. It was never
+          // attempted successfully, so recording it as seen would lose the page permanently.
+          // `tier: i` means the resumed run skips the strategies already ruled out for it.
+          requeueFront({ ...target, tier: i });
+          report.stoppedBy = "budget";
+          budgetStopped = true;
+          handled = true;
+          break;
+        }
+
+        if (outcome === "retry") {
+          const attempts = Number(target.meta?.[ATTEMPTS_KEY] ?? 0) + 1;
+          if (attempts <= maxAttempts) {
+            // Back of the queue, not a sleep: a crawl that blocks on one slow host does no work at
+            // all, and on a large frontier the next attempt is naturally minutes later.
+            requeueBack({ ...target, meta: { ...target.meta, [ATTEMPTS_KEY]: attempts } });
+            report.retried++;
+          } else {
+            // Out of attempts for THIS run — not forever. The mark is dropped so a later run, after
+            // the site recovers, starts clean instead of skipping the page for good.
+            seen.delete(target.canonicalUri);
+            if (refused) {
+              settle(refused.result, refused.graded, false);
+            } else {
+              report.dirty.push({ uri: target.uri, reason: `retry_exhausted:${errorLabel(e)}` });
+              setAside(target.uri, null, "retry_exhausted");
+            }
+          }
+          handled = true;
+          break;
+        }
+
+        if (outcome === "disallowed") {
+          // robots said no, or the gate refused. A settled answer, and its own bucket: mixed into
+          // `dirty` it would make C2's alert fire on correct behaviour until somebody turned the
+          // alert down — and then the alert is gone for the case that mattered.
+          report.disallowed.push({ uri: target.uri, reason: errorLabel(e) });
+          setAside(target.uri, null, disallowedCode(e));
+          handled = true;
+          break;
+        }
+
+        if (outcome === "gone") {
+          // Not an error to fix — the page is gone, and a tombstone pass turns that into an archive
+          // so the knowledge base stops answering with a product that no longer exists.
+          report.gone.push(target.uri);
+          setAside(target.uri, null, "gone");
+          handled = true;
+          break;
+        }
+
+        lastError = errorLabel(e);
+        const code = fetchFailedCode(e);
+        if (code !== "fetch_failed" || !failedCode) failedCode = code;
+        log(`block ${block.id} failed on ${target.uri}: ${String(e).slice(0, 160)}`);
+        continue; // extraction problem: fall through to the next strategy
+      }
+
+      if (opts.keepAside) report.aside.push(...(result.aside ?? []));
+      for (const a of result.aside ?? []) if (isPage(a.url)) pagesFound.add(canonicalize(a.url)); // found, then skipped unread
+      for (const channel of result.channels ?? []) mergeChannel(report.channels, channel);
+
+      if (result.notModified) {
+        // Confirmed unchanged: nothing new to grade or store, but the LINKS this page had are not
+        // "gone" — a 304 simply cannot report them. Replay whatever the last successful fetch of
+        // this URL found, at THIS target's depth (not the depth they were originally discovered at,
+        // which may have been a different, now-irrelevant crawl run).
+        const cached = await urlState.get(opts.tenantRef, target.canonicalUri);
+        enqueueDiscovered((cached?.discoveredLinks ?? []).map((uri) => ({ uri, depth: target.depth + 1 })));
+        handled = true;
+        break;
+      }
+
+      // A genuine fetch happened (200, regardless of what the quality gate decides below) — cache
+      // what it learned so the NEXT run of this exact URL can send a conditional GET. Overwritten by
+      // whichever strategy ultimately succeeds if an earlier one degrades to a heavier one below;
+      // that is correct, the earlier strategy's etag belongs to a response nobody is keeping.
+      const firstDoc = result.docs[0];
+      await urlState.set(opts.tenantRef, target.canonicalUri, {
+        etag: typeof firstDoc?.meta.etag === "string" ? firstDoc.meta.etag : null,
+        lastModified: typeof firstDoc?.meta.lastModified === "string" ? firstDoc.meta.lastModified : null,
+        discoveredLinks: result.discovered.map((d) => d.uri),
+      });
+
+      report.fetched++;
+      const graded = result.docs.map((d) => ({
+        doc: d,
+        // The block reports when a page pointed its canonical somewhere else; the gate uses it as
+        // the second signal for a soft-404 (a templated error page canonicalises to the home page).
+        // Without passing it the option existed but nothing ever set it — a check that never ran.
+        verdict: grade(d, { canonicalMismatch: typeof d.meta.declaredCanonicalRejected === "string" }),
+      }));
+      const hasNextTier = i + 1 < candidates.length;
+      if (graded.length > 0 && graded.every((g) => !g.verdict.ok) && hasNextTier) {
+        // Everything this strategy produced is chrome or a soft-404 — try a heavier strategy before
+        // recording a failure. Kept: if every heavier one then fails, this is the page's answer.
+        refused = { result, graded };
+        continue;
+      }
+
+      settle(result, graded, hasNextTier);
       handled = true;
       break;
     }
 
+    // Every heavier strategy failed after one had read the page and refused it: what the site said about the page is
+    // the answer, not the heavier strategy's transport error.
+    if (!handled && refused) {
+      settle(refused.result, refused.graded, false);
+      handled = true;
+    }
     if (!handled) {
       report.dirty.push({ uri: target.uri, reason: `all_strategies_failed:${lastError ?? "unknown"}` });
-      setAside(target.uri, null, "fetch_failed");
+      setAside(target.uri, null, failedCode || "fetch_failed");
     }
     if (budgetStopped) break;
     if (isPage(target.uri) && !requeued) pagesChecked++;

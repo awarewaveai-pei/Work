@@ -44,6 +44,28 @@ export const SEARCH_KEYS = ["SERPER_API_KEY", "BRAVE_SEARCH_API_KEY"] as const;
  */
 export const CLAIM_PROVIDERS = ["serper", "brave"] as const;
 
+/**
+ * The language and region each vendor documents, per OUR internal language code. The single place a
+ * language reaches a vendor: a code that is not in a vendor's row is never sent raw — it throws
+ * (a 422 from the vendor is a source that silently never answers, as Brave did with `zh`, 2026-10-12).
+ * Values probed live against each API on that date: Brave `zh-hant`+`TW` -> 200, bare `zh` -> 422;
+ * Serper proxies Google, whose documented interface languages are `zh-CN` / `zh-TW` (no bare `zh`).
+ * Taiwan is the platform's audience, so `zh` is Traditional / TW everywhere it can be said.
+ */
+export type SearchLocale = { lang: string; region?: string };
+export const SEARCH_LOCALES: Record<string, Record<string, SearchLocale>> = {
+  perplexity: { zh: { lang: "zh" }, en: { lang: "en" } }, // search_language_filter: ISO 639-1
+  brave: { zh: { lang: "zh-hant", region: "TW" }, en: { lang: "en", region: "US" } }, // search_lang, country
+  serper: { zh: { lang: "zh-tw", region: "tw" }, en: { lang: "en", region: "us" } }, // hl, gl
+};
+
+/** Our code -> what `provider` documents; throws for a code the vendor row does not name. */
+export function searchLocale(provider: string, code: string): SearchLocale {
+  const hit = SEARCH_LOCALES[provider]?.[code.trim().toLowerCase()];
+  if (!hit) throw Object.assign(new Error(`unsupported_search_language_${provider}_${code}`), { status: 400 });
+  return hit;
+}
+
 /** One result, after each vendor's own shape has been flattened by `parseResults`. */
 interface SearchResult {
   title?: string;
@@ -79,7 +101,7 @@ export const SEARCH_DRIVERS: Record<
         max_results: q.maxResults,
         ...(q.domains ? { search_domain_filter: q.domains } : {}),
         ...(q.recency ? { search_recency_filter: q.recency } : {}),
-        ...(q.languages ? { search_language_filter: q.languages } : {}),
+        ...(q.languages?.length ? { search_language_filter: q.languages.map((l) => searchLocale("perplexity", l).lang) } : {}),
       },
     }),
     parse: (json) => ((json as { results?: SearchResult[] }).results ?? []),
@@ -97,7 +119,11 @@ export const SEARCH_DRIVERS: Record<
         const freshness: Record<string, string> = { day: "pd", week: "pw", month: "pm", year: "py" };
         if (freshness[q.recency]) params.set("freshness", freshness[q.recency]);
       }
-      if (q.languages?.length) params.set("search_lang", q.languages[0]);
+      if (q.languages?.length) {
+        const loc = searchLocale("brave", q.languages[0]);
+        params.set("search_lang", loc.lang);
+        if (loc.region) params.set("country", loc.region);
+      }
       return { path: `/res/v1/web/search?${params.toString()}`, method: "GET" };
     },
     parse: (json) => {
@@ -117,7 +143,11 @@ export const SEARCH_DRIVERS: Record<
         const tbs: Record<string, string> = { day: "qdr:d", week: "qdr:w", month: "qdr:m", year: "qdr:y" };
         if (tbs[q.recency]) body.tbs = tbs[q.recency];
       }
-      if (q.languages?.length) body.hl = q.languages[0];
+      if (q.languages?.length) {
+        const loc = searchLocale("serper", q.languages[0]);
+        body.hl = loc.lang;
+        if (loc.region) body.gl = loc.region;
+      }
       return { path: "/search", method: "POST", body };
     },
     parse: (json) => {
