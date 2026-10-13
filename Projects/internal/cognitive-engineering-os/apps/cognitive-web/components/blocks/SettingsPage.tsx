@@ -1,6 +1,6 @@
 "use client";
 
-// 設定 (GOVERN contract card): the notice that this is not therapy; where you are (optional: only used to give you help
+// 設定 (GOVERN contract card): the notice that this is not therapy; the colours (淺色／深色／預設, lib/theme.ts); where you are (optional: only used to give you help
 // for that place); export everything you own; delete the account, confirmed twice. GOVERN moves and removes data and never
 // reads it; each setting is explained by one fixed sentence of the system's, not the AI's.
 import Link from "next/link";
@@ -9,12 +9,28 @@ import { ApiError } from "../../lib/api";
 import { docs, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
 import { accountSummary, eraseAccount, helpFor, type AccountSummary, type ErasedAccount, type Help } from "../../lib/govern";
+import { THEMES, chooseTheme, type Theme } from "../../lib/theme";
 import { Notices } from "./BlockShell";
 import { Explain, ExportLinks, HelpLines, OldExplanations } from "./GovernParts";
 
 type Where = { where: string };
 
-export function SettingsPage() {
+/** 顏色: works on this browser alone, so it is drawn whatever the rest of the page could load. `initial` = the server's reading of the cookie. */
+function Colours({ initial }: { initial: Theme | null }) {
+  const [theme, setTheme] = useState<Theme | null>(initial);
+  const pick = (value: Theme | null) => { chooseTheme(value); setTheme(value); };
+  return (
+    <div className="card">
+      <h2>顏色</h2>
+      <p className="how">預設：跟著電腦的深色或淺色設定。選了只記在這個瀏覽器。</p>
+      <div className="btns" role="group" aria-label="顏色">
+        {THEMES.map((item) => <button key={item.label} type="button" className={`chip${theme === item.value ? " on" : ""}`} aria-pressed={theme === item.value} onClick={() => pick(item.value)}>{item.label}</button>)}
+      </div>
+    </div>
+  );
+}
+
+export function SettingsPage({ theme = null }: { theme?: Theme | null }) {
   const [help, setHelp] = useState<Help | null>(null);
   const [location, setLocation] = useState<Doc<Where> | null | undefined>(undefined);
   const [where, setWhere] = useState("");
@@ -89,7 +105,7 @@ export function SettingsPage() {
       </>
     );
   }
-  if (location === undefined) return <><div className="crumbs"><Link href="/">首頁</Link> › 設定</div><h1>設定</h1><div className="card"><p>{error || "載入中…"}</p></div></>;
+  if (location === undefined) return <><div className="crumbs"><Link href="/">首頁</Link> › 設定</div><h1>設定</h1><Colours initial={theme} /><div className="card"><p>{error || "載入中…"}</p></div></>;
   const typedRight = !!summary && typed.trim() === summary.phrase;
 
   return (
@@ -98,6 +114,8 @@ export function SettingsPage() {
       <h1>設定</h1>
       {help && <div className="card accent" role="note"><p className="mt0">{help.notice}</p><p className="sub mb0"><Link href="/help">需要協助：看求助電話和你的權利</Link></p></div>}
       <Notices notices={notices} />
+
+      <Colours initial={theme} />
 
       <div className="card">
         <h2>你在哪裡</h2>

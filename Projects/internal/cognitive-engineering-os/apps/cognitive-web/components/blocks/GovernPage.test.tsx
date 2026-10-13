@@ -167,6 +167,37 @@ describe("設定：刪除帳號要確認兩次", () => {
   });
 });
 
+describe("設定：顏色 (2026-10-13: the site only followed the computer)", () => {
+  const pressed = (host: HTMLElement) => [...host.querySelectorAll('[aria-label="顏色"] button[aria-pressed="true"]')].map((item) => item.textContent);
+  afterEach(() => { delete document.documentElement.dataset.theme; document.cookie = "cognitive_os_theme=; path=/; max-age=0"; });
+
+  it("three buttons; a choice shows at once and is kept in this browser; 預設 goes back to the computer's", async () => {
+    routes({ "GET /govern/help": { notice: NOTICE, where: null, covered: false, resources: WORLD }, "GET /me/docs/govern.location": [] });
+    const { host, done } = await mount(<SettingsPage />);
+    expect([...host.querySelectorAll('[aria-label="顏色"] button')].map((item) => item.textContent)).toEqual(["淺色", "深色", "預設"]);
+    expect(pressed(host)).toEqual(["預設"]);
+    await click(button(host, "深色"));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    expect(document.cookie).toContain("cognitive_os_theme=dark");
+    expect(pressed(host)).toEqual(["深色"]);
+    await click(button(host, "預設"));
+    expect(document.documentElement.dataset.theme).toBeUndefined();
+    expect(document.cookie).not.toContain("cognitive_os_theme");
+    expect(pressed(host)).toEqual(["預設"]);
+    expect(host.querySelector("select")).toBeNull();
+    await done();
+  });
+
+  it("opens on the choice the server read, and is there even when the rest of the page cannot load", async () => {
+    routes({ "GET /govern/help": () => { throw new ApiError(500, "down"); }, "GET /me/docs/govern.location": [] });
+    const { host, done } = await mount(<SettingsPage theme="light" />);
+    expect(pressed(host)).toEqual(["淺色"]);
+    await click(button(host, "深色"));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    await done();
+  });
+});
+
 describe("設定：你在哪裡、匯出、AI 解釋", () => {
   it("saves the place as the person's own document and shows the help for it", async () => {
     let held: unknown[] = [];
