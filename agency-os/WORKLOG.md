@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-13（續5）認知平台：五個介面問題改回原題在上、白話在下（5491ef84b，已上線）
+
+**根本問題**: e367571dc 把白話當題目、原題用「原題：」放在下面；操作者要的是相反：原題是題目，白話只是附加說明，不加「原題」字樣。
+
+**已修改**: `lib/groups.ts` `plainNote` 取代 `plainQuestion`／`originalLine`；群組頁和案子的「公共議題的五個問題」都是 label = 原題、hint = 白話。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run CollabPage.test.tsx ContextPage.test.tsx（16 passed）| exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy/deploy.sh（/tmp/cos-deploy-20261013f.out：smoke local/web/database/public 全 PASS，05:35:13Z done）| exit=0 | ms=300000
+- REVIEW_WAIVED: NA -- 只改顯示的上下順序，讀回 diff
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=originalLine | hits=0
+
+**rollback**: `git revert 5491ef84b` 後重跑 `deploy/deploy.sh`。
 ## 2026-10-13（續4）認知平台：設定加顏色、五個介面問題改用操作者的白話（c960b8af0、e367571dc、9d17e6cb5，已上線）
 
 **根本問題**:
