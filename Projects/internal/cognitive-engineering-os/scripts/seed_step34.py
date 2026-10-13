@@ -147,8 +147,8 @@ def main() -> int:
                       {"text": "我願意先試用三個月。", "refs": [{"kind": "sense.card", "doc_id": cards[1]["doc_id"]}], "unchecked": False, "author": "ai"},
                       {"text": "試用前先講好誰負責簽約。", "refs": [{"kind": "sense.card", "doc_id": cards[0]["doc_id"]}], "unchecked": False, "author": "user"}]},
                   record_log.Writer("ai", "EXPRESS"))
-        restated = "AI 轉述：乙擔心共同決定會變慢。"
-        restatement = docs.save(tenant_id, record_log.group(g1), "collab.restatement", {"about": bob.identity_id, "position": bob_position["doc_id"], "text": restated},
+        restated = "AI 轉述：擔心共同決定會變慢。"   # no 成員N in it: the walk looks for these exact words on every reader's page
+        restatement = docs.save(tenant_id, record_log.group(g1), "collab.restatement", {"about": bob.identity_id, "position": bob_position["doc_id"], "text": restated, "members": {"成員1": bob.identity_id}},
                                 record_log.Writer("ai", "COLLAB", bob.identity_id))
         bob.call("POST", f"/groups/{g1}/collab/collab.confirm", {"content": {"restatement": restatement["doc_id"], "verdict": "說得對"}})
 
