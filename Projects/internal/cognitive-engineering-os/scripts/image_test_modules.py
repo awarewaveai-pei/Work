@@ -16,6 +16,7 @@ import sys
 
 CHECKOUT_ONLY_TEST_MODULES = frozenset(
     {
+        "tests.unit.test_ai_to_code",   # scans the web app's pages (apps/cognitive-web), which the image does not hold
         "tests.unit.test_block_act",
         "tests.unit.test_block_collab",
         "tests.unit.test_block_compute",
