@@ -1,16 +1,21 @@
 """Two go-live guards that decide whether a secret leaks or production data is overwritten, run as the real bash they guard
 (no Docker, no PostgreSQL: `docker` and compose are stubs):
 - deploy/lib-db.sh: a migration (and a rollback's dump restore) only starts once the API and web are PROVEN stopped;
-- ops/cognitive-db/install-cognitive-db.sh: the file that will hold the database URL must already be mode 600."""
+- ops/cognitive-db/install-cognitive-db.sh: the file that will hold the database URL must already be mode 600.
+And the proxy in front of the API outwaits its AI timeout (reads lobster-factory's nginx: checkout-only)."""
 
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+
+from ai_lego import REPO_ROOT
+from ai_lego.platform.ai_gateway.provider import DEFAULT_TIMEOUT_SECONDS
 
 COS = Path(__file__).resolve().parents[2]
 LIB = COS / "deploy" / "lib-db.sh"
@@ -124,3 +129,15 @@ exit 0
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProxyTimeoutTests(unittest.TestCase):
+    def test_the_page_gets_the_apis_answer_before_a_proxy_gives_up(self):
+        """2026-10-13: the AI timeout and nginx's were both 60 s, so a turn ending near 60 s reached the page as nginx's 504.
+        The API answers inside nginx's limit; nginx waits less than Cloudflare's 100 s."""
+        conf = (REPO_ROOT / "lobster-factory/infra/hetzner-phase1-core/nginx/default.conf").read_text(encoding="utf-8")
+        server = re.search(r"server_name cognitive\.aware-wave\.com;(.*?)\n}", conf, re.S)
+        self.assertIsNotNone(server, "default.conf: the cognitive server block is not found")
+        for setting in ("proxy_read_timeout", "proxy_send_timeout"):
+            [seconds] = [int(value) for value in re.findall(setting + r" (\d+)s;", server.group(1))]
+            self.assertTrue(DEFAULT_TIMEOUT_SECONDS + 5 <= seconds < 100, f"{setting} {seconds}s vs the AI timeout {DEFAULT_TIMEOUT_SECONDS}s")
