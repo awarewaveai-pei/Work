@@ -175,8 +175,8 @@ export function CollabPage({ groupId }: { groupId: string }) {
       )}
 
       <div className="card">
-        <h2>介面問題（各自先寫，五題都寫完才存）</h2>
-        {!data.wrote.answers && <p className="how">{WRITE_FIRST}</p>}
+        <h2>從個人的判斷，走向共同的理解</h2>
+        {!data.wrote.answers && <p className="how">請獨立回答五個問題，完成並儲存後，再看看其他人有哪些不同的觀點。</p>}
         {!data.wrote.answers && (
           <>
             {INTERFACE_QUESTIONS.map((q, index) => <Cell key={q} id={`answer-${index}`} label={plainQuestion(q)} hint={originalLine(q)}><textarea id={`answer-${index}`} value={form[`answer-${index}`] ?? ""} maxLength={2000} onChange={set(`answer-${index}`)} /></Cell>)}
