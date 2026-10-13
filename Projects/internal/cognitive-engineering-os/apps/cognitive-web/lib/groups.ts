@@ -42,6 +42,10 @@ export type Agreement = AgreementTable & { held: string[]; heaviest_left_out: bo
 // What another member chose to share with this group (view/shared), as the server projects it (ai_lego/platform/collab_shared.py): their words only; `who` is how they are shown.
 export type Shared = { who: string; title: string; lines: string[] };
 export type AiTurn = { saved?: Item & { waiting?: boolean }; handback?: string; stopped?: "crisis"; notice?: string; resources?: Array<{ name: string; contact: string }> };
+// GET /groups/{id}/collab/page (ai_lego/apps/api/blocks/collab.py `page`): the whole group page in one answer. A kind written
+// before seen by round (`wrote` names them) holds only the viewer's own until they wrote theirs of `round`.
+export type GroupPage = { group: Group; round: number; records: Record<string, Item[]>; wrote: Record<string, boolean>; versions: Record<string, Item[]>;
+  dissent: Dissent[]; authority: Authority; agreement: Agreement; shared: Shared[] };
 
 export const groups = {
   list: () => apiFetch<Group[]>("/groups"),
@@ -55,6 +59,7 @@ export const groups = {
 
 const base = (id: string) => `/groups/${enc(id)}/collab`;
 export const collab = {
+  page: (id: string) => apiFetch<GroupPage>(`${base(id)}/page`),
   // `mine`: only what I wrote -- what a page asks before I wrote mine of a round (write before see)
   list: <C,>(id: string, kind: string, mine = false) => apiFetch<Array<Item<C>>>(`${base(id)}/${enc(kind)}${mine ? "?mine=true" : ""}`),
   create: <C,>(id: string, kind: string, content: C) => apiFetch<SavedItem<C>>(`${base(id)}/${enc(kind)}`, { method: "POST", body: JSON.stringify({ content }) }),

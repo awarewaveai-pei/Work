@@ -8,7 +8,7 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import type { Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
-import { collab, groups, INTERFACE_QUESTIONS, plainNote, type Agreement, type AgreementTable, type Authority, type Dissent, type Group, type Item, type Shared } from "../../lib/groups";
+import { collab, groups, INTERFACE_QUESTIONS, plainNote, type Agreement, type AgreementTable, type Authority, type Dissent, type Group, type GroupPage, type Item, type Shared } from "../../lib/groups";
 import { Notices } from "./BlockShell";
 import { Cell } from "./JudgmentParts";
 import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
@@ -36,12 +36,13 @@ type Loaded = {
   shared: Shared[];
 };
 
-/** Blind kinds: only what I wrote until I wrote mine of the round, then everything I may read. */
-async function blind<C extends { round: number }>(id: string, kind: string, round: number): Promise<[Array<Item<C>>, boolean]> {
-  const mine = (await collab.list<C>(id, kind, true)).filter((item) => item.mine);
-  const wrote = mine.some((item) => item.content.round === round);
-  return [wrote ? await collab.list<C>(id, kind) : mine, wrote];
-}
+/** A kind written before seen: only my own until I wrote mine of this round -- the server sends no more, and the page draws no
+ *  more even if it did. */
+const blind = <C,>(found: GroupPage, kind: string): [Array<Item<C>>, boolean] => {
+  const wrote = Boolean(found.wrote[kind]);
+  const items = (found.records[kind] ?? []) as Array<Item<C>>;
+  return [wrote ? items : items.filter((item) => item.mine), wrote];
+};
 
 export function CollabPage({ groupId }: { groupId: string }) {
   const [data, setData] = useState<Loaded | null>(null);
@@ -54,22 +55,18 @@ export function CollabPage({ groupId }: { groupId: string }) {
   const [form, setForm] = useState<Record<string, string>>({});
   const set = (key: string) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm({ ...form, [key]: event.target.value });
 
+  // One request for the whole page (2026-10-13: ~24 requests in four waves took 9 s over a slow link), again after every action.
   const load = async () => {
-    const group = await groups.get(groupId);
-    const questions = await collab.list<{ text: string; round: number }>(groupId, "collab.question");
-    const round = Math.max(1, ...questions.map((item) => item.content.round));
-    const [[positions, position], [changes, change], [answers, answered]] = await Promise.all([
-      blind<Position>(groupId, "collab.position", round), blind<Change>(groupId, "collab.change", round), blind<Answers>(groupId, "collab.interface_answers", round)]);
-    const versions = Object.fromEntries(await Promise.all(questions.map(async (item) => [item.doc_id, await collab.versions<{ text: string }>(groupId, "collab.question", item.doc_id)] as const)));
-    const [options, stances, dissent, authority, reopens, closings, restatements, confirms, differences, agreement, consequences, reviews, labels, places, proposals, shared] = await Promise.all([
-      collab.list<Option>(groupId, "collab.option"), collab.list<Stance>(groupId, "collab.stance"), collab.dissent(groupId), collab.authority(groupId),
-      collab.list<{ reason: string }>(groupId, "collab.reopen"), collab.list<Closing>(groupId, "collab.closing"),
-      collab.list<{ about: string; position: string; text: string }>(groupId, "collab.restatement"), collab.list<{ restatement: string; verdict: string }>(groupId, "collab.confirm"),
-      collab.list<{ round: number; differences: string[] }>(groupId, "collab.differences"), collab.agreement(groupId),
-      collab.list<{ decision: string; observed: string }>(groupId, "collab.consequence"), collab.list<{ text: string }>(groupId, "collab.review"),
-      collab.list<{ label: string }>(groupId, "collab.label"), collab.list<{ where: string }>(groupId, "collab.place"), collab.list<Proposal>(groupId, "collab.proposal"), collab.shared(groupId)]);
-    setData({ group, round, questions, versions, positions, changes, answers, wrote: { position, change, answers: answered }, options, stances, dissent, authority,
-      reopens, closings, restatements, confirms, differences, agreement, consequences, reviews, labels, places, proposals, shared });
+    const found = await collab.page(groupId);
+    const of = <C,>(kind: string) => (found.records[kind] ?? []) as Array<Item<C>>;
+    const [positions, position] = blind<Position>(found, "collab.position");
+    const [changes, change] = blind<Change>(found, "collab.change");
+    const [answers, answered] = blind<Answers>(found, "collab.interface_answers");
+    setData({ group: found.group, round: found.round, questions: of("collab.question"), versions: found.versions as Loaded["versions"], positions, changes, answers,
+      wrote: { position, change, answers: answered }, options: of("collab.option"), stances: of("collab.stance"), dissent: found.dissent, authority: found.authority,
+      reopens: of("collab.reopen"), closings: of("collab.closing"), restatements: of("collab.restatement"), confirms: of("collab.confirm"), differences: of("collab.differences"),
+      agreement: found.agreement, consequences: of("collab.consequence"), reviews: of("collab.review"), labels: of("collab.label"), places: of("collab.place"),
+      proposals: of("collab.proposal"), shared: found.shared });
   };
   useEffect(() => { load().catch((reason) => setError(humanError(reason))); }, [groupId]);   // eslint-disable-line react-hooks/exhaustive-deps
 

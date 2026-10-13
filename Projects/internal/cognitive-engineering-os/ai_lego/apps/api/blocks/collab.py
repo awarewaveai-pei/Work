@@ -6,6 +6,7 @@ differences. The platform offers a procedure; nothing here says the decision was
     GET    /groups/{id}/collab/view/shared         what members chose to share with the group (consent): {who, title, lines}, the words only
     GET    /groups/{id}/collab/view/agreement      「大家怎麼看」 (platform/collab_agreement.py), for the options you marked
     GET    /groups/{id}/collab/view/not-heard?round=  who has not written a position of that round (names only)
+    GET    /groups/{id}/collab/page                everything the group page draws, in one answer (below)
     POST   /groups/{id}/ai/{action}                {context}  an AI turn in the group (ai_gate's group path)
     POST   /groups/{id}/collab/handoff             {project_id, closing, to}  convener: a pointer in their own case
     GET    /projects/{project_id}/collab/handoffs  those pointers, each read through the group as it is now
@@ -32,7 +33,7 @@ from pydantic import BaseModel
 from ai_lego.apps.api import main as api
 from ai_lego.apps.api.main import _MeteredProvider
 from ai_lego.apps.api.blocks.docs import DocBody, _save, _saved
-from ai_lego.apps.api.blocks.groups import HELD_YOU, member_group, not_found
+from ai_lego.apps.api.blocks.groups import HELD_YOU, get_group, member_group, not_found
 from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.kinds.collab import KINDS
 from ai_lego.data.events import record_log
@@ -312,6 +313,39 @@ def handoffs(project_id: str, session: dict[str, Any] = Depends(api.require_sess
             found = visibility.visible(docs, viewer, pointer["content"]["group_id"], "collab.closing", doc_id=pointer["content"]["closing"])
         out.append({**pointer, "closing": found[0]["content"] if found else None})
     return out
+
+
+# -- the page --------------------------------------------------------------------------------------------------------------
+
+# What the group page (apps/cognitive-web CollabPage.tsx) draws, in its order.
+PAGE_KINDS = ("collab.question", "collab.position", "collab.change", "collab.interface_answers", "collab.option", "collab.stance",
+              "collab.reopen", "collab.closing", "collab.restatement", "collab.confirm", "collab.differences", "collab.consequence",
+              "collab.review", "collab.label", "collab.place", "collab.proposal")
+
+
+@router.get("/groups/{group_id}/collab/page")
+def page(group_id: str, session: dict[str, Any] = Depends(api.require_session), repo: ProjectSourceRepository = Depends(api.get_project_source_repository)) -> dict[str, Any]:
+    """The whole group page in one answer (2026-10-13: the page asked ~24 routes in four waves; 9 s over a slow link). Each part
+    is what its own route answers -- the same ``visibility.visible``, ``Names`` and views -- so no rule lives here twice. A kind
+    written before seen by round: until the viewer wrote theirs of the current round, only their own is sent, not even the
+    others' of earlier rounds (``wrote`` says which kinds they wrote this round)."""
+    group = get_group(group_id, session, repo)
+    docs, viewer = CaseDocs(repo), _viewer(session)
+    names = Names(docs, repo, viewer, group_id)
+    records = {kind: _call(group_id, visibility.visible, docs, viewer, group_id, kind) for kind in PAGE_KINDS}
+    round_ = max([1, *(item["content"]["round"] for item in records["collab.question"])])
+    wrote: dict[str, bool] = {}
+    for kind in PAGE_KINDS:
+        if GROUP_KINDS[kind].blind == "round":
+            mine = [item for item in records[kind] if item["written_by"] == viewer.identity_id]
+            wrote[kind] = any(item["content"]["round"] == round_ for item in mine)
+            records[kind] = records[kind] if wrote[kind] else mine
+    versions = {item["doc_id"]: _shown([{**version, "written_by": item["written_by"]} for version in
+                                        _call(group_id, visibility.versions, docs, viewer, group_id, "collab.question", item["doc_id"])], names)
+                for item in records["collab.question"]}
+    return {"group": group, "round": round_, "records": {kind: _shown(items, names) for kind, items in records.items()}, "wrote": wrote,
+            "versions": versions, "dissent": dissent(group_id, session, repo), "authority": authority(group_id, session, repo),
+            "agreement": agreement_view(group_id, session, repo), "shared": shared(group_id, session, repo)}
 
 
 # -- every kind -----------------------------------------------------------------------------------------------------------

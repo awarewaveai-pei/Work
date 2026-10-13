@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiFetch } from "../../lib/api";
 import type { Doc } from "../../lib/blocks";
-import { AskBeforeBlock, CollabPermissions, GRANTABLE_WORDS, HIDE_PLACES_WORDS, PlacesToggle, describeChange, type Terms } from "./CollabPermissions";
+import { CaseContract, GRANTABLE_WORDS, HIDE_PLACES_WORDS, PlacesToggle, describeChange, type Terms } from "./CollabPermissions";
 
 vi.mock("../../lib/api", async (original) => ({ ...(await original<typeof import("../../lib/api")>()), apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -59,17 +59,17 @@ describe("PlacesToggle", () => {
 describe("CollabPermissions", () => {
   it("shows what the AI may do in one line, and says so when nothing extra was granted", async () => {
     vi.mocked(apiFetch).mockResolvedValue([doc({ permissions: ["counter", "propose_options"] })] as never);
-    const first = await mount(<CollabPermissions projectId="P" />);
+    const first = await mount(<CaseContract projectId="P" block="SENSE" />);
     expect(first.host.textContent).toContain("AI 現在能做：整理、提問、指出還缺什麼；你另外准了：提出選項、當反方");   // in the card's order, not the order they were granted
     expect(first.host.querySelector("a")?.getAttribute("href")).toBe("/projects/P/contract");
     await first.done();
     vi.mocked(apiFetch).mockResolvedValue([] as never);
-    const none = await mount(<CollabPermissions projectId="P" />);
+    const none = await mount(<CaseContract projectId="P" block="SENSE" />);
     expect(none.host.textContent).toContain("其他的你還沒准");
     expect(none.host.textContent).not.toContain("不讓它知道發生地");
     await none.done();
     vi.mocked(apiFetch).mockResolvedValue([doc({ permissions: ["counter"], hide_places: true })] as never);
-    const hidden = await mount(<CollabPermissions projectId="P" />);
+    const hidden = await mount(<CaseContract projectId="P" block="SENSE" />);
     expect(hidden.host.textContent).toContain("你不讓它知道發生地和你在哪裡。");
     await hidden.done();
   });
@@ -78,29 +78,30 @@ describe("CollabPermissions", () => {
 describe("AskBeforeBlock", () => {
   it("asks once per block for a case, then stays out of the way", async () => {
     vi.mocked(apiFetch).mockResolvedValue([] as never);
-    const first = await mount(<AskBeforeBlock projectId="ASK-1" block="THINK" />);
+    const first = await mount(<CaseContract projectId="ASK-1" block="THINK" />);
     expect(first.host.textContent).toContain("進「共思考」之前，要改 AI 能做什麼嗎？");
     expect([...first.host.querySelectorAll(".chip")].map((chip) => chip.textContent)).toEqual(["沒准：提出選項", "沒准：當反方", "沒准：給直接建議"]);   // only what THINK's turns ask for
     await act(async () => { button(first.host, "不改，繼續").click(); });
-    expect(first.host.textContent).toBe("");
+    expect(first.host.querySelector("[role=region]")).toBeNull();
     await first.done();
-    const again = await mount(<AskBeforeBlock projectId="ASK-1" block="THINK" />);
-    expect(again.host.textContent).toBe("");
+    const again = await mount(<CaseContract projectId="ASK-1" block="THINK" />);
+    expect(again.host.querySelector("[role=region]")).toBeNull();
     await again.done();
-    const other = await mount(<AskBeforeBlock projectId="ASK-1" block="DECIDE" />);
+    const other = await mount(<CaseContract projectId="ASK-1" block="DECIDE" />);
     expect(other.host.textContent).toContain("進「判斷」之前");
     await other.done();
   });
 
-  it("saves a changed permission as the contract's next version, then continues", async () => {
+  it("saves a changed permission as the contract's next version, then continues; the line says so at once", async () => {
     vi.mocked(apiFetch).mockImplementation(async (_path: string, init?: RequestInit) => (init?.method === "POST" ? { ...doc({ permissions: ["counter"] }), notices: [] } : []) as never);
-    const { host, done } = await mount(<AskBeforeBlock projectId="ASK-2" block="THINK" />);
+    const { host, done } = await mount(<CaseContract projectId="ASK-2" block="THINK" />);
     await act(async () => { button(host, "當反方").click(); });
     await act(async () => { button(host, "存下來，繼續").click(); });
     const post = vi.mocked(apiFetch).mock.calls.find(([, init]) => init?.method === "POST")!;
     expect(post[0]).toBe("/projects/ASK-2/docs/collab_contract.terms");
     expect(JSON.parse(post[1]!.body as string)).toEqual({ content: { permissions: ["counter"] } });
-    expect(host.textContent).toBe("");
+    expect(host.querySelector("[role=region]")).toBeNull();
+    expect(host.textContent).toContain("你另外准了：當反方");   // 2026-10-13: the line kept 「其他的你還沒准」 until a reload
     await done();
   });
 });

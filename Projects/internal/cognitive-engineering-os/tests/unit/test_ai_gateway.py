@@ -563,6 +563,22 @@ class CompleteJsonTests(unittest.TestCase):
         self.assertIn("Answer by calling the tool `answer`", seen["body"]["messages"][0]["content"])
         self.assertEqual(seen["body"]["max_tokens"], 99)
 
+    def test_an_argument_written_inside_another_is_put_back_as_its_own_field(self):
+        """2026-10-13: the SENSE mirror showed 「…</summary> <parameter name="gaps">[…]」 on the page and had no gaps."""
+        leaked = {"summary": "卡片上的事：分潤改成六四。</summary>\n<parameter name=\"gaps\">[\"合約簽了沒有？\", \"他的理由是什麼？\"]", "question": "先看清楚哪一件？"}
+        provider, _ = self._provider({"content": [{"type": "tool_use", "name": "answer", "input": leaked}], "stop_reason": "tool_use", "usage": {"input_tokens": 1, "output_tokens": 1}})
+        self.assertEqual(json.loads(provider.complete_json("s", "u", max_tokens=10).text),
+                         {"summary": "卡片上的事：分潤改成六四。", "gaps": ["合約簽了沒有？", "他的理由是什麼？"], "question": "先看清楚哪一件？"})
+
+    def test_call_markup_that_cannot_be_put_back_is_refused_with_its_cost(self):
+        for broken in ({"summary": "a", "gaps": "x</summary>\n<parameter name=\"summary\">b"},   # named twice
+                       {"items": ["ok", "x<parameter name=\"y\">z"]},                             # inside a list
+                       {"summary": "a<parameter name=\"gaps\">", "question": "q"}):                # a name with nothing after it (Codex 2026-10-13)
+            provider, _ = self._provider({"content": [{"type": "tool_use", "name": "answer", "input": broken}], "stop_reason": "tool_use", "usage": {"input_tokens": 4, "output_tokens": 5}})
+            with self.assertRaisesRegex(ProviderCallError, "AI_PROVIDER_MALFORMED_RESPONSE") as caught:
+                provider.complete_json("s", "u", max_tokens=10)
+            self.assertEqual((caught.exception.reason, caught.exception.input_tokens, caught.exception.output_tokens), ("malformed", 4, 5))
+
     def test_a_text_answer_is_passed_through_for_the_callers_parser(self):
         provider, _ = self._provider({"content": [{"type": "text", "text": "{\"ok\": true}"}], "stop_reason": "end_turn", "usage": {"input_tokens": 1, "output_tokens": 1}})
         self.assertEqual(provider.complete_json("s", "u", max_tokens=10).text, "{\"ok\": true}")

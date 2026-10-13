@@ -8,7 +8,7 @@ import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { BLOCKS, blockHref, blockOf, docs, isOpen, route, type BlockCode, type Notice, type Route, type RouteStop } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
-import { AskBeforeBlock, CollabPermissions } from "./CollabPermissions";
+import { CaseContract } from "./CollabPermissions";
 import type { Project } from "../../lib/projects";
 
 export function useProject(projectId: string) {
@@ -175,8 +175,7 @@ export function BlockShell({ projectId, code, title, refresh = 0, children }: { 
       {block && <p className="sub">{block.does}。你隨時可以停，也可以跳過這一塊。</p>}
       <Slots projectId={projectId} current={code} route={path} />
       {code && <Where projectId={projectId} code={code} path={path} error={routeError} />}
-      {code && <CollabPermissions projectId={projectId} />}
-      {code && <AskBeforeBlock projectId={projectId} block={code} />}
+      {code && <CaseContract projectId={projectId} block={code} />}
       <Proposals projectId={projectId} refresh={refresh} onAnswered={() => setAnswered((count) => count + 1)} />
       {children}
       {code && path && <GoOn projectId={projectId} code={code} path={path} />}

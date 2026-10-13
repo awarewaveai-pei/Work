@@ -18,27 +18,38 @@ const INSUFFICIENT = { insufficient: true, why: "還不夠看出誰跟誰不同"
 const KINDS = ["question", "position", "change", "interface_answers", "option", "stance", "reopen", "closing", "restatement", "confirm", "differences", "consequence", "review", "label", "place", "proposal"];
 const THEIRS = item("collab.position", "P2", { round: 1, text: "乙的立場：先談錢" });
 
+const BLIND = ["position", "change", "interface_answers"];
+// The page asks one route (collab.py `page`); the test still writes each part as the route of its own name, and the page
+// answer is built from them -- unfiltered, so what the page itself draws before I wrote mine is what is tested.
 async function open(routes: Record<string, unknown> = {}) {
-  const lists = Object.fromEntries(KINDS.map((kind) => [`${C}/collab.${kind}`, []]));
-  const calls = serve({ ...lists, [G]: GROUP, [`${C}/view/dissent`]: [], [`${C}/view/authority`]: NO_AUTHORITY, [`${C}/view/agreement`]: INSUFFICIENT, [`${C}/view/shared`]: [], ...routes });
-  const page = await mount(<CollabPage groupId="G1" />);
-  return { ...page, calls };
+  const parts: Record<string, unknown> = { ...Object.fromEntries(KINDS.map((kind) => [`${C}/collab.${kind}`, []])), [G]: GROUP, [`${C}/view/dissent`]: [],
+    [`${C}/view/authority`]: NO_AUTHORITY, [`${C}/view/agreement`]: INSUFFICIENT, [`${C}/view/shared`]: [], ...routes };
+  const answer = (path: string) => { const hit = parts[path]; return typeof hit === "function" ? hit({ path, method: "GET" }) : hit; };
+  const page = () => {
+    const records = Object.fromEntries(KINDS.map((kind) => [`collab.${kind}`, answer(`${C}/collab.${kind}`) as Array<{ mine: boolean; content: { round?: number } }>]));
+    const round = Math.max(1, ...records["collab.question"].map((item) => item.content.round ?? 1));
+    const wrote = Object.fromEntries(BLIND.map((kind) => [`collab.${kind}`, records[`collab.${kind}`].some((item) => item.mine && item.content.round === round)]));
+    return { group: answer(G), round, records, wrote, versions: {}, dissent: answer(`${C}/view/dissent`), authority: answer(`${C}/view/authority`),
+      agreement: answer(`${C}/view/agreement`), shared: answer(`${C}/view/shared`) };
+  };
+  const calls = serve({ ...Object.fromEntries(Object.entries(parts).filter(([key]) => key.includes(" "))), [`${C}/page`]: page });
+  const mounted = await mount(<CollabPage groupId="G1" />);
+  return { ...mounted, calls };
 }
-const allPositions = (calls: Call[]) => calls.filter((call) => call.method === "GET" && call.path === `${C}/collab.position`);
 
 describe("COLLAB: one group's page", () => {
-  it("before saving my position: no request for the others' and nothing of theirs drawn, even from an early answer", async () => {
-    let mine: unknown[] = [THEIRS];   // a wrong server answer to "mine only": the page still draws nothing of it
+  it("before saving my position nothing of theirs is drawn, even from a wrong answer; the whole page is one request", async () => {
+    let positions: unknown[] = [THEIRS];   // a wrong server answer before I wrote mine: the page still draws nothing of it
     const { host, done, calls } = await open({
-      [`${C}/collab.position`]: (call: Call) => (call.path.includes("mine=true") ? mine : [THEIRS, item("collab.position", "P1", { round: 1, text: "我的立場" }, { mine: true, who: "你" })]),
-      [`POST ${C}/collab.position`]: (call: Call) => { mine = [item("collab.position", "P1", call.body.content, { mine: true, who: "你" })]; return { ...(mine[0] as object), notices: [] }; },
+      [`${C}/collab.position`]: () => positions,
+      [`POST ${C}/collab.position`]: (call: Call) => { positions = [THEIRS, item("collab.position", "P1", call.body.content, { mine: true, who: "你" })]; return { ...(positions[1] as object), notices: [] }; },
     });
     expect(host.textContent).toContain(WRITE_FIRST);
     expect(host.textContent).not.toContain("乙的立場");
-    expect(allPositions(calls)).toEqual([]);
+    expect(calls.map((call) => call.path)).toEqual([`${C}/page`]);
     await type(field(host, "position-text"), "我的立場");
     await click(byText(host, "button", "存我的立場"));
-    expect(allPositions(calls).length).toBeGreaterThan(0);
+    expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([`GET ${C}/page`, `POST ${C}/collab.position`, `GET ${C}/page`]);
     expect(host.textContent).toContain("乙的立場：先談錢");
     expect(host.querySelector("#position-text")).toBeNull();   // written: the others' are shown in its place
     await done();

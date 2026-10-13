@@ -3,6 +3,8 @@
 // 協作合約 (contract card): what the AI may do in this case. The words and the always-allowed list copy
 // ai_lego/core/domain/kinds/collab_contract.py (test_block_think compares them). Two pieces every block page can show:
 // CollabPermissions = the AI's permissions in one line, always visible; AskBeforeBlock = asks once per block whether to change them.
+// CaseContract reads the contract once for both, so a change saved in the question shows in the line at once (2026-10-13: the
+// line kept 「其他的你還沒准」 after 准「當反方」 was saved, until a reload).
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { blockOf, docs, type Doc } from "../../lib/blocks";
@@ -98,9 +100,16 @@ export function PlacesToggle({ value, onChange }: { value: boolean; onChange: (n
   );
 }
 
+type Contract = ReturnType<typeof useContract>;
+
+/** A block page's contract pieces: the line and the question, over one reading of the contract. */
+export function CaseContract({ projectId, block }: { projectId: string; block: string }) {
+  const contract = useContract(projectId);
+  return <><CollabPermissions projectId={projectId} contract={contract} /><AskBeforeBlock projectId={projectId} block={block} contract={contract} /></>;
+}
+
 /** The AI's permissions in one line (「畫面上一直看得到 AI 現在的權限」). */
-export function CollabPermissions({ projectId }: { projectId: string }) {
-  const { doc, error } = useContract(projectId);
+export function CollabPermissions({ projectId, contract: { doc, error } }: { projectId: string; contract: Contract }) {
   if (error) return <p className="error">{error}</p>;
   if (doc === undefined) return null;
   const { granted } = allowedNow(doc?.content);
@@ -124,8 +133,7 @@ function markAsked(key: string) {
 }
 
 /** Asks once the first time this case enters ``block``: should the AI's permissions change before it starts? */
-export function AskBeforeBlock({ projectId, block }: { projectId: string; block: string }) {
-  const { doc, error, busy, save } = useContract(projectId);
+export function AskBeforeBlock({ projectId, block, contract: { doc, error, busy, save } }: { projectId: string; block: string; contract: Contract }) {
   const key = seenKey(projectId, block);
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[] | null>(null);

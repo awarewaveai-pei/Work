@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
@@ -34,6 +35,10 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 DEFAULT_TIMEOUT_SECONDS = 60.0
 MAX_OUTPUT_TOKENS = 16384   # the gateway's ceiling per call; a caller picks its own limit under it (drafts 6000, interpretations 12288)
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+# A tool call can come back with its next argument written inside a string argument, in the model's own call syntax:
+# {"summary": "…</summary>\n<parameter name=\"gaps\">[\"…\"]"} and no "gaps" (2026-10-13, SENSE mirror on the page).
+LEAKED_ARGUMENT = re.compile(r'\s*(?:</[A-Za-z_][\w-]*>\s*)?<parameter name="([A-Za-z_][\w-]*)">')
+CALL_MARKUP = re.compile(r'</?parameter\b|</?invoke\b|</?antml:')
 
 
 @dataclass(frozen=True)
@@ -133,11 +138,33 @@ class AnthropicProvider:
         content, stop = payload["content"], payload.get("stop_reason")
         call = next((block for block in content if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == name), None)
         if call is not None and isinstance(call.get("input"), dict):
-            return self._completion(payload, json.dumps(call["input"], ensure_ascii=False))
+            return self._completion(payload, json.dumps(self._unfolded(payload, call["input"]), ensure_ascii=False))
         text = "".join(str(block.get("text", "")) for block in content if isinstance(block, dict) and block.get("type") == "text")
         if not text.strip():
             raise self._refused(payload, f"AI_PROVIDER_EMPTY_RESPONSE: stop_reason={stop!r}", "empty")
         return self._completion(payload, text)
+
+    def _unfolded(self, payload: dict[str, Any], arguments: dict[str, Any]) -> dict[str, Any]:
+        """The arguments with every argument written inside another's string put back as its own field (LEAKED_ARGUMENT);
+        a value that is JSON is read as JSON. Call markup still anywhere after that, or an argument named twice, is not an
+        answer: AI_PROVIDER_MALFORMED_RESPONSE, with what it cost -- nothing of it reaches a page."""
+        out = dict(arguments)
+        for key, value in arguments.items():
+            if not isinstance(value, str) or not LEAKED_ARGUMENT.search(value):
+                continue
+            head, *rest = LEAKED_ARGUMENT.split(value)
+            out[key] = head.rstrip()
+            for name, raw in zip(rest[::2], rest[1::2]):
+                raw = re.sub(r"\s*</parameter>\s*$", "", raw).strip()
+                if name in out or not raw:
+                    raise self._refused(payload, f"AI_PROVIDER_MALFORMED_RESPONSE: argument {name!r} given twice or empty", "malformed")
+                try:
+                    out[name] = json.loads(raw)
+                except ValueError:
+                    out[name] = raw
+        if CALL_MARKUP.search(json.dumps(out, ensure_ascii=False)):
+            raise self._refused(payload, "AI_PROVIDER_MALFORMED_RESPONSE: call markup inside an argument", "malformed")
+        return out
 
     def _content(self, payload: dict[str, Any]) -> list[Any]:
         """The answer's content blocks; an answer without them is still billed, so the refusal carries its usage."""

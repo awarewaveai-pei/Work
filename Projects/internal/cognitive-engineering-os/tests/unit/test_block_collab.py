@@ -71,6 +71,9 @@ class CollabCase(ApiTestCase):
         """Every read route of the block, as one text: what this member could ever be shown."""
         bodies = [self.as_(who).get(f"{self.base}/{kind}").json() for kind in GROUP_KINDS]
         bodies += [self.as_(who).get(f"{self.base}/view/{view}").json() for view in ("dissent", "authority", "shared", "agreement", "not-heard?round=1")]
+        # the whole page in one answer, under every rule its parts are; its "group" is GET /groups/{id} (the member list, which
+        # names members and ties no record to them), left out as the routes above leave that route out
+        bodies.append({key: value for key, value in self.as_(who).get(f"{self.base}/page").json().items() if key != "group"})
         return json.dumps(bodies, ensure_ascii=False)
 
     def option(self, who: str = None, text: str = "先試做三個月") -> str:
@@ -101,6 +104,28 @@ class BlindTests(CollabCase):
         self.assertNotIn("乙的", self.everything(self.a))
         self.post(self.a, "collab.interface_answers", round=1, answers=[{"q": q, "text": f"甲的回答{n}"} for n, q in enumerate(INTERFACE_QUESTIONS)])
         self.assertEqual({item["who"] for item in self.get(self.a, "collab.interface_answers")}, {"你", "乙"})
+
+    def test_the_page_answer_is_the_parts_and_holds_earlier_rounds_back_until_this_ones_is_written(self):
+        """2026-10-13: the group page asked ~24 routes in four waves (9 s); now one. Before writing this round's position the
+        page gets only its own, not even the others' of a round already written (what the page did with ?mine=true)."""
+        self.post(self.a, "collab.question", round=1, text="要不要接受六四？")
+        self.post(self.a, "collab.position", round=1, text="甲一")
+        self.post(self.b, "collab.position", round=1, text="乙一")
+        self.post(self.a, "collab.question", round=2, text="那七三呢？")
+        self.post(self.a, "collab.position", round=2, text="甲二")
+        page = self.get(self.b, "page")
+        self.assertEqual((page["round"], page["wrote"]["collab.position"]), (2, False))
+        self.assertEqual([item["content"]["text"] for item in page["records"]["collab.position"]], ["乙一"])
+        self.assertEqual(page["group"]["group_id"], self.group)
+        self.post(self.b, "collab.position", round=2, text="乙二")
+        page = self.get(self.b, "page")
+        self.assertTrue(page["wrote"]["collab.position"])
+        self.assertEqual(page["records"]["collab.position"], self.get(self.b, "collab.position"))
+        for view in ("dissent", "authority", "agreement", "shared"):
+            self.assertEqual(page[view], self.get(self.b, f"view/{view}"))
+        question = page["records"]["collab.question"][0]["doc_id"]
+        self.assertEqual(page["versions"][question], self.get(self.b, f"collab.question/{question}/versions"))
+        self.assertEqual(self.as_(self.person("外人")).get(f"{self.base}/page").status_code, 404)
 
     def test_what_changed_is_written_after_ones_own_position_and_is_blind(self):
         self.assertEqual(self.as_(self.b).post(f"{self.base}/collab.change", json={"content": {"round": 1, "after_reading": "changed", "what": "x"}}).status_code, 409)
