@@ -2,6 +2,7 @@
 
 - **狀態**：已接受（承接既有 C5 選型；本檔把 **邊界** 寫死以利審計）
 - **日期**：2026-04-02
+- **部分取代**：AwareWave 自己賣給客人的產品，客人帳號改用 aware-wave.com 的 WordPress 會員 → [ADR 015](015-awarewave-account-and-shared-wallet.md)（2026-10-12）
 
 ## 脈絡
 

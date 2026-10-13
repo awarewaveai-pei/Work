@@ -41,6 +41,7 @@
 | [012-shared-platform-layer.md](012-shared-platform-layer.md) | 共用平台層：QUOTA/RATE_LIMIT/SAFETY_GATE 三類上限、帳本泛化、上架機械閘、跨產品版本相容（已接受） | 2026-09-10 |
 | [013-open-web-discovery-into-corpus.md](013-open-web-discovery-into-corpus.md) | 開放式 discovery 可進 Corpus，但只產生「候選來源」，經人核准才成為 seed；核准單位是來源不是文件（已接受） | 2026-09-11 |
 | [014-entity-dossier-relevance-axis.md](014-entity-dossier-relevance-axis.md) | 背景調查的單位是實體不是查詢；相關性是與抽取品質並列的第二條軸，由 orchestrator 擁有；`off_entity` 獨立 bucket（已接受） | 2026-09-20 |
+| [015-awarewave-account-and-shared-wallet.md](015-awarewave-account-and-shared-wallet.md) | AwareWave 一個帳號一個錢包：WordPress 管會員和收費（WooCommerce＝012 的金流），點數記在 012 的共用帳本，照用量扣、不退；認知平台第一個接（已接受，未實作） | 2026-10-12 |
 
 ## 本機檢查（可選）
 
@@ -66,5 +67,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-adr-index.ps1
 ## Related Documents (Auto-Synced)
 - `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
 
-_Last synced: 2026-09-23 03:45:07 UTC_
+_Last synced: 2026-10-13 00:02:31 UTC_
 
