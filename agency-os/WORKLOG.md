@@ -1,4 +1,35 @@
 # Worklog
+## 2026-10-13（續6）認知平台：開新案、我的群組實測（真瀏覽器、真 AI、兩個帳號），找到 5 個問題並修好（ea47c6a4e、c27f293f8，已上線）
+
+**做法**: ks-aw-01 上開一次性的測試站（compose project `cos-e2e`、`cos-e2e2`，自己的資料庫、只開 127.0.0.1，用正式站當下的 image；修正版另建 `cos-e2e-*:new`），筆電 ssh tunnel，Playwright 腳本（scratchpad `e2e/walk.js`、`e2e/group2.js`）。開新案：14 個積木頁每個欄位填、每個不刪資料的按鈕按一次，記錄 4xx/5xx、頁面錯誤、拒絕訊息、標記外洩。我的群組：召集人建群組、做邀請連結，新的人用連結建帳號加入，兩人輪流走完 39 個步驟。
+
+**找到的問題**:
+- F1 准了 AI 權限後，頁面上方「AI 現在能做」那一行不更新：`CollabPermissions` 和 `AskBeforeBlock` 各自讀一次合約。
+- F2 AI 鏡子把 `</summary> <parameter name="gaps">[…]` 顯示給使用者，缺口不見了：模型把下一個參數寫進字串，`provider.complete_json` 沒檢查。所有回 JSON 的 AI 按鈕都可能發生。
+- F3 群組頁每次載入和每個動作都要約 24 個請求、分四批（經 tunnel 9 秒；伺服器每個 6–28 ms，時間花在來回）。
+- F5 蒐集來源「去找」每次都被拒：頁面送 `["zh","en"]`，伺服器從 1a7eef30c（10/12）起只收文字本身的語言。頁面自己的測試寫的就是錯的值，所以沒被抓到。正式站 10/12 起就壞了。
+- 已解釋、不是錯：計算的拒絕是腳本填同一個值；群組頁「整理分歧」在別人剛要求重開時停下來，是設計好的交還控制；EXPRESS 起草經 Next 代理 30 秒逾時，但正式站 /api 由 nginx 直接送 API（`default.conf:40`，60 秒），直接呼叫 200、38.6 秒。
+
+**已修改**:
+- ea47c6a4e：`provider._unfolded`（放回原欄位；剩標記、重複、空值 = MALFORMED）；`CaseContract` 只讀一次合約；`GET /groups/{id}/collab/page` 一次給整頁，沿用 visibility／Names／views，依輪次的盲寫在寫之前只給自己的。
+- c27f293f8：`searchSeed` 只送文字本身的語言（`queryLanguage`，同伺服器 `_HAN`），新增一致性測試。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=node e2e/group2.js（cos-e2e2 跑 ea47c6a4e 的 image）：39 步 38 過，1 個是設計好的交還控制；群組頁 1.5–2.3 秒、2 個請求（原本 9 秒、約 24 個）| exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl POST /projects/{id}/collections：languages ["zh","en"] → COLLECTION_SEEDS_INVALID；["zh"] → plan | exit=0 | ms=200
+- REALTEST_EVIDENCE: tool=Bash | cmd=pytest test_ai_gateway CompleteJson（8）、test_block_collab（26，`everything` 納入 page）、SearchLanguageParityTests；vitest CollabPermissions、CollabPage、GatherPage；tsc | exit=0 | ms=150000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/0n
+  - Codex agency-os/reports/oracle/2026-10-13-review-5890438f.md：空的外洩參數被收下，已修並加測試。c27f293f8 讀回 diff，有一致性測試。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=SEARCH_LANGUAGES | hits=8
+  - 剩下的全在 VERIFY：那是語言的顯示名稱（kinds/verify.py:35）。VERIFY 的搜尋由伺服器組，已經只用文字本身的語言（blocks/verify.py:253），沒有同一個錯。
+
+**還沒修（小問題，列給操作者排）**:
+- 情緒調節四個勾選框的無障礙名稱是 "on"。
+- 情緒「存」之後畫面沒有「已存」。
+- 群組 AI 文字把別人寫成「成員1」，被轉述的本人看到的也是「成員1」。
+- EXPRESS 起草要 38 秒，正式站上限 60 秒，餘裕不大。
+
+**rollback**: `git revert c27f293f8 ea47c6a4e` 後重跑 `deploy/deploy.sh`。
 ## 2026-10-13（續5）認知平台：五個介面問題改回原題在上、白話在下（5491ef84b，已上線）
 
 **根本問題**: e367571dc 把白話當題目、原題用「原題：」放在下面；操作者要的是相反：原題是題目，白話只是附加說明，不加「原題」字樣。
