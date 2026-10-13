@@ -5,6 +5,7 @@ their own client; the convener C is the default user."""
 from __future__ import annotations
 
 import uuid
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
@@ -331,6 +332,10 @@ class LedByTests(FacilitateCase):
             self.assertEqual(saved.status_code, 200, saved.text)
         self.assertEqual([item["owner_identity_id"] for item in visibility.led_cases(self.docs, self.repo, self.viewer("F"))], [self.ids["P1"]])   # X is in no group F leads
         self.assertEqual(visibility.led_cases(self.docs, self.repo, self.viewer("G")), [])   # G was not named
+        with mock.patch.object(self.repo, "list_projects", wraps=self.repo.list_projects) as listed:   # capacity rig 2026-10-12: never the tenant's whole list
+            visibility.led_cases(self.docs, self.repo, self.viewer("F"))
+        [call] = listed.call_args_list
+        self.assertEqual(sorted(call.kwargs["created_by_any"]), sorted(self.repo.facilitated_by(self.tenant_id, self.ids["F"])))
         bad = self.as_("P2").post("/projects", json={"name": "案", "purpose": "p", "data_classification": "Confidential"}).json()["project_id"]
         for led_by in ({"facilitator_identity_id": self.ids["F"], "note": "自由寫的字"}, {"facilitator_identity_id": ""}, "F"):
             refused = self.as_("P2").post(f"/projects/{bad}/docs/assembler.intake", json={"content": {"purpose": "複雜決策", "question": "q", "package": "個人複雜決策", "led_by": led_by}})

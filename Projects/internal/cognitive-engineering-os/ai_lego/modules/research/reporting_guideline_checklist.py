@@ -32,7 +32,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
-import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego import resolve_spec_root
 from ai_lego.core.domain.record_kit import (
@@ -82,7 +82,7 @@ def _catalog() -> dict[str, dict[str, Any]]:
     """``guideline_id -> {citation, items: {item_id: requirement_text}}``, read once per process from
     the spec root's own reference-data file."""
     path = resolve_spec_root() / _CATALOG_RELATIVE_PATH
-    document = yaml.safe_load(path.read_text(encoding="utf-8"))
+    document = safe_load_yaml(path.read_text(encoding="utf-8"))
     catalog: dict[str, dict[str, Any]] = {}
     for guideline_id, entry in document["guidelines"].items():
         catalog[guideline_id] = {

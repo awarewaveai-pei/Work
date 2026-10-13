@@ -21,14 +21,46 @@ export type Catalog = {
   shapes: Record<string, string>;
 };
 
-/** Server-side only: the web container reaches the API directly (COS_API_ORIGIN), not through nginx. */
-export async function loadCatalog(): Promise<Catalog> {
-  const origin = process.env.COS_API_ORIGIN ?? "http://127.0.0.1:8420";
-  // no Next data cache: the API caches the catalog and rebuilds it the moment a registry changes (mtime fingerprint)
-  const response = await fetch(`${origin}/catalog`, { cache: "no-store" });
-  if (!response.ok) throw new Error(`GET /catalog ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  return (await response.json()) as Catalog;
+/** The kept copy: the parsed catalog, the API's ETag for it, when it was last confirmed current. One per web process. */
+type Kept = { etag: string; catalog: Catalog; checkedAt: number };
+export const CATALOG_RECHECK_MS = 2000;   // same rhythm as the API's own fingerprint recheck (main.py _CATALOG_RECHECK_SECONDS): a registry edit shows within it
+
+/** A loader that parses the 392 KB catalog once and then asks the API only "still this one?" (If-None-Match -> 304), at most
+ *  every CATALOG_RECHECK_MS and with one question in flight at a time -- a page render used to download and parse it every time
+ *  (1000 people's navigations = ~390 MB/s of JSON). A failed recheck serves the kept copy and waits out one window before asking again: the registry is static content,
+ *  a blip must not blank every page, and a down API must not be asked once per render; with nothing kept the error still reaches the page. fetchImpl/now are injected for the test. */
+export function makeCatalogLoader(fetchImpl: typeof fetch = fetch, now: () => number = Date.now) {
+  let kept: Kept | null = null;
+  let asking: Promise<Catalog> | null = null;
+  async function ask(): Promise<Catalog> {
+    const origin = process.env.COS_API_ORIGIN ?? "http://127.0.0.1:8420";
+    // cache: "no-store" keeps Next's data cache out; the freshness check is the ETag above
+    const response = await fetchImpl(`${origin}/catalog`, { cache: "no-store", headers: kept ? { "If-None-Match": kept.etag } : {} });
+    if (response.status === 304 && kept) {
+      kept = { ...kept, checkedAt: now() };
+      return kept.catalog;
+    }
+    if (!response.ok) throw new Error(`GET /catalog ${response.status}: ${(await response.text()).slice(0, 300)}`);
+    const catalog = (await response.json()) as Catalog;
+    const etag = response.headers.get("etag");
+    kept = etag ? { etag, catalog, checkedAt: now() } : null;   // no ETag (an older API): nothing to revalidate with, fetch every time
+    return catalog;
+  }
+  return async function load(): Promise<Catalog> {
+    if (kept && now() - kept.checkedAt < CATALOG_RECHECK_MS) return kept.catalog;
+    if (!asking) {
+      const held = kept;
+      asking = ask().catch((error) => {
+        if (held && kept === held) { kept = { ...held, checkedAt: now() }; return held.catalog; }   // serve it, and do not ask again for one window
+        throw error;
+      }).finally(() => { asking = null; });
+    }
+    return asking;
+  };
 }
+
+/** Server-side only: the web container reaches the API directly (COS_API_ORIGIN), not through nginx. */
+export const loadCatalog: () => Promise<Catalog> = makeCatalogLoader();
 
 /** A tool a person may be offered: not an engineering one (ENTRY_SLICE1_CHECKLIST.md item 5). Every list, count and
  *  recommendation a person sees goes through this or userGoals; a tool reached by its own address still opens. */

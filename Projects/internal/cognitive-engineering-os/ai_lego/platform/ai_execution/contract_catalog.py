@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any, Callable, ClassVar, TypeVar
 
 import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego.core.support import sha256_bytes, sha256_json
 from ai_lego.errors import InvariantViolation
@@ -59,7 +60,7 @@ def scan_contract_files(spec_root: Path, relative_dir: str, glob_pattern: str) -
         relative = str(path.relative_to(spec_root)).replace("\\", "/")
         try:
             raw = path.read_bytes()
-            document = yaml.safe_load(raw.decode("utf-8"))
+            document = safe_load_yaml(raw.decode("utf-8"))
         except (OSError, UnicodeDecodeError, yaml.YAMLError) as error:
             raise InvariantViolation(f"CONTRACT_CATALOG_UNREADABLE: {relative}: {error}") from error
         if not isinstance(document, dict) or not document.get("id"):

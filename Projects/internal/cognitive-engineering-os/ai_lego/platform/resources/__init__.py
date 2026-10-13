@@ -16,7 +16,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego.errors import InvariantViolation
 
@@ -54,7 +54,7 @@ def load(folder: Path = FOLDER) -> dict[str, dict[str, Any]]:
     history = json.loads((folder / "HISTORY.json").read_text(encoding="utf-8"))
     found: dict[str, dict[str, Any]] = {}
     for path in sorted(folder.glob("*.yaml")):
-        content = yaml.safe_load(path.read_text(encoding="utf-8"))
+        content = safe_load_yaml(path.read_text(encoding="utf-8"))
         place = content.get("place") if isinstance(content, dict) else None
         if not place or place in found or not isinstance(content.get("entries"), list) or not isinstance(content.get("matches"), list):
             raise InvariantViolation(f"RESOURCE_FILE_INVALID: {path.name}")

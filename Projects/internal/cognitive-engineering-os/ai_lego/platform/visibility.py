@@ -330,11 +330,9 @@ def led_cases(docs: CaseDocs, repo: ProjectSourceRepository, viewer: Viewer) -> 
     facilitator. What those people shared is read through ``shared_with``, not here."""
     if not is_eligible_facilitator(docs, viewer):
         return []
-    people = set(repo.facilitated_by(viewer.tenant_id, viewer.identity_id))
+    people = repo.facilitated_by(viewer.tenant_id, viewer.identity_id)
     found = []
-    for project in repo.list_projects(viewer.tenant_id):
-        if project["created_by_identity_id"] not in people:
-            continue
+    for project in repo.list_projects(viewer.tenant_id, created_by_any=people):   # these people's cases, not the tenant's (capacity rig 2026-10-12)
         intake = docs.current(viewer.tenant_id, record_log.case(project["project_id"]), "assembler.intake")
         if intake and (intake[-1]["content"].get("led_by") or {}).get("facilitator_identity_id") == viewer.identity_id:
             found.append({"project_id": project["project_id"], "owner_identity_id": project["created_by_identity_id"]})

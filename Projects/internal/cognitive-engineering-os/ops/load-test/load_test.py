@@ -16,6 +16,7 @@ import asyncio
 import json
 import os
 import random
+import re
 import sys
 import time
 from collections import Counter, defaultdict
@@ -24,7 +25,8 @@ from concurrent.futures import ThreadPoolExecutor
 PASSWORD = "LoadTest-Pw-2026!"
 CRLF = bytes((13, 10))
 HEAD_END = CRLF + CRLF
-ALLOWED_HOSTS = ("api", "web", "127.0.0.1", "localhost")
+ASSET = re.compile(b"/_next/static/[^" + bytes([34, 39]) + b" <>)]+[.](?:js|css)")   # a script or style path inside an attribute, either quote
+ALLOWED_HOSTS = ("api", "web", "nginx", "127.0.0.1", "localhost")
 ACTIONS = {"home": 20, "case_open": 25, "save_sense": 20, "save_decide": 8, "catalog": 7, "method_run": 5, "lead": 8, "teach": 7}
 WHEN = ("in the meeting", "on the commute", "after work", "at lunch")
 FEEL = ("a bit tense", "quite calm", "stuck on tomorrow", "interrupted")
@@ -86,7 +88,13 @@ class Run:
         self.samples = []        # first few non-expected answers
         self.reconnects = 0
         self.stop = False
-        self.prefix = ""         # "/api" when the target is the web container, which proxies /api/* to the API
+        self.prefix = ""         # "/api" when the target is the web container (rewrite) or nginx (location /api/), which proxy /api/* to the API
+        self.host_header = None  # the public name nginx routes on (server_name cognitive.aware-wave.com); None = the connection host
+        self.pages = False       # every action starts with the page navigation a browser does (HTML + the assets it has not cached)
+        self.assets = False      # also fetch the scripts and styles a page names, once per person. Off by default: Cloudflare serves /_next/static from its
+                                 # cache (cf-cache-status: HIT, immutable, 2026-10-12), so the origin sees them once per file, not once per person
+        self.pages_only = False  # diagnostic: skip every API call, so the web tier alone carries the load
+        self.class_size = 50     # people per client address (CF-Connecting-IP, which the rig nginx trusts); 0 = every request from the loadgen address
 
 
 class Person:
@@ -94,8 +102,10 @@ class Person:
         self.run, self.index = run, index
         self.idle = []
         self.cookie = None
+        self.ip = None            # the address nginx keys its per-address zones on
+        self.assets = set()       # the browser cache: static files this person already has
 
-    async def _roundtrip(self, method, path, body, fresh=False):
+    async def _roundtrip(self, method, path, body, fresh=False, accept="application/json"):
         run = self.run
         if fresh:   # the server closed the idle ones (uvicorn keep-alive is 5 s): drop them all, open a new one
             for _, old in self.idle:
@@ -108,7 +118,9 @@ class Person:
             reader, writer = await asyncio.open_connection(run.host, run.port)
         try:
             payload = b"" if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
-            head = [f"{method} {path} HTTP/1.1", f"Host: {run.host}", "Accept: application/json"]
+            head = [f"{method} {path} HTTP/1.1", f"Host: {run.host_header or run.host}", f"Accept: {accept}"]
+            if self.ip:
+                head.append(f"CF-Connecting-IP: {self.ip}")
             if self.cookie:
                 head.append(f"Cookie: {self.cookie}")
             if body is not None:
@@ -131,18 +143,30 @@ class Person:
         return status, headers, data, not reused
 
     async def call(self, label, method, path, body=None, expect=(200,)):
+        if self.run.pages_only and not label.endswith("/auth/login"):
+            return 200, None, {}
+        status, data, headers = await self.fetch(label, method, self.run.prefix + path, body, expect)
+        parsed = None
+        if status == 200 and data[:1] in (b"{", b"["):
+            try:
+                parsed = json.loads(data)
+            except ValueError:
+                parsed = None
+        return status, parsed, headers
+
+    async def fetch(self, label, method, path, body=None, expect=(200,), accept="application/json"):
+        """One timed request, path as sent. (status, body bytes, headers); status None = no answer."""
         run = self.run
-        path = run.prefix + path
         t0 = time.monotonic()
         bucket = run.steady if t0 >= run.measure_from else run.ramp
         run.inflight += 1
         outcome, status, data, headers, fresh = None, None, b"", {}, False
         try:
             try:
-                status, headers, data, fresh = await asyncio.wait_for(self._roundtrip(method, path, body), run.timeout)
+                status, headers, data, fresh = await asyncio.wait_for(self._roundtrip(method, path, body, accept=accept), run.timeout)
             except Stale:
                 run.reconnects += 1
-                status, headers, data, fresh = await asyncio.wait_for(self._roundtrip(method, path, body, fresh=True), run.timeout)
+                status, headers, data, fresh = await asyncio.wait_for(self._roundtrip(method, path, body, fresh=True, accept=accept), run.timeout)
             outcome = status
         except asyncio.TimeoutError:
             outcome = "timeout"
@@ -156,16 +180,20 @@ class Person:
             run.by_conn.add(label + (" [new conn]" if fresh else " [reused conn]"), ms, outcome)
         if not (isinstance(outcome, int) and outcome in expect) and len(run.samples) < 12:
             run.samples.append({"label": label, "outcome": outcome, "body": data[:300].decode("utf-8", "replace")})
-        parsed = None
-        if status == 200 and data[:1] in (b"{", b"["):
-            try:
-                parsed = json.loads(data)
-            except ValueError:
-                parsed = None
-        return status, parsed, headers
+        return status, data, headers
 
-    async def login(self, email):
-        status, _, headers = await self.call("POST /auth/login", "POST", "/auth/login", {"email": email, "password": PASSWORD})
+    async def page(self, label, path):
+        """A browser navigation: the page's HTML, then (first sight only) the scripts and styles it names, in parallel. The API calls the
+        page then makes from the browser are the action's own calls."""
+        status, data, _ = await self.fetch(label, "GET", path, accept="text/html")
+        if status == 200 and self.run.assets:
+            wanted = sorted(set(ASSET.findall(data)) - self.assets)
+            self.assets.update(wanted)
+            await asyncio.gather(*(self.fetch("GET /_next/static (first sight)", "GET", item.decode("ascii", "replace"), accept="*/*") for item in wanted))
+        return status
+
+    async def login(self, email, label="POST /auth/login"):
+        status, _, headers = await self.call(label, "POST", "/auth/login", {"email": email, "password": PASSWORD})
         if status != 200:
             return False
         cookie = headers.get(b"set-cookie", b"").decode("utf-8", "replace")
@@ -268,16 +296,45 @@ def endpoint(base):
 
 # -- the scenario -------------------------------------------------------------------------------------------------------
 
+def class_address(run, index):
+    """The address of the person's class: run.class_size people share one (a Wi-Fi), as nginx sees it."""
+    if run.class_size <= 0:
+        return None
+    group = index // run.class_size
+    return f"10.{1 + (group >> 8)}.{group & 255}.1"
+
+
+async def login_burst(run, users, count, delay, within, rng):
+    """`count` logins spread over `within` seconds, all from ONE address (a class signing in together), `delay` seconds from now."""
+    await asyncio.sleep(delay)
+
+    async def one(u, at):
+        await asyncio.sleep(at)
+        person = Person(run, -2)
+        person.ip = "10.250.0.1"
+        await person.login(u["email"], "POST /auth/login (burst, one address)")
+
+    await asyncio.gather(*(one(users[k % len(users)], rng.uniform(0, within)) for k in range(count)))
+
+
 def get(person, label, path):
     return person.call(label, "GET", path)
 
 
+async def nav(person, label, path):
+    """The browser navigation that starts an action (HTML through nginx and the web tier), when the run goes through them."""
+    if person.run.pages:
+        await person.page("PAGE " + label, path)
+
+
 async def act_home(person, u, rng, ctx):
+    await nav(person, "/", "/")
     await asyncio.gather(get(person, "GET /projects", "/projects"), get(person, "GET /facilitate/me", "/facilitate/me"))
 
 
 async def act_case_open(person, u, rng, ctx):
     pid = rng.choice(u["projects"])["project_id"]
+    await nav(person, "/projects/:id", f"/projects/{pid}")
     await asyncio.gather(get(person, "GET /facilitate/me", "/facilitate/me"), get(person, "GET /projects/:id", f"/projects/{pid}"),
                          get(person, "GET /projects/:id/route", f"/projects/{pid}/route"),
                          get(person, "GET /projects/:id/docs?kinds=(60 kinds)", f"/projects/{pid}/docs?kinds={ctx['case_kinds']}"))
@@ -295,12 +352,14 @@ async def save(person, run, label, method, path, content, base_version=None):
 
 async def act_save_sense(person, u, rng, ctx):
     pid = rng.choice(u["projects"])["project_id"]
+    await nav(person, "/projects/:id/sense", f"/projects/{pid}/sense")
     await save(person, ctx["run"], "POST docs/sense.card", "POST", f"/projects/{pid}/docs/sense.card", sense_content(rng))
     await get(person, "GET /projects/:id/docs?kinds=(4 sense kinds)", f"/projects/{pid}/docs?kinds=sense.card,sense.state,sense.mirror,sense.review")
 
 
 async def act_save_decide(person, u, rng, ctx):
     mine = rng.choice(u["projects"])
+    await nav(person, "/projects/:id/decide", f"/projects/{mine['project_id']}/decide")
     if not mine.get("synced"):   # a page open reads the card first: another level may have moved its version
         _, listed, _ = await get(person, "GET /projects/:id/docs?kinds=decide.judgment (sync)", f"/projects/{mine['project_id']}/docs?kinds=decide.judgment")
         current = (listed or {}).get("docs", {}).get("decide.judgment") or []
@@ -316,19 +375,23 @@ async def act_save_decide(person, u, rng, ctx):
 
 
 async def act_catalog(person, u, rng, ctx):
+    await nav(person, "/methods", "/methods")
     await asyncio.gather(get(person, "GET /facilitate/me", "/facilitate/me"), get(person, "GET /catalog", "/catalog"))
 
 
 async def act_method_run(person, u, rng, ctx):
     method = rng.choice(ctx["methods"])
+    await nav(person, "/methods/:id/run", f"/methods/{method}/run")
     await asyncio.gather(get(person, "GET /catalog", "/catalog"), get(person, "GET /methods/:id/form", f"/methods/{method}/form"))
 
 
 async def act_lead(person, u, rng, ctx):
+    await nav(person, "/lead", "/lead")
     await asyncio.gather(*[get(person, "GET /facilitate/me", "/facilitate/me") for _ in range(4)], get(person, "GET /blocks/teach/lessons", "/blocks/teach/lessons"))
 
 
 async def act_teach(person, u, rng, ctx):
+    await nav(person, "/me/teach", "/me/teach")
     await asyncio.gather(get(person, "GET /facilitate/me", "/facilitate/me"), get(person, "GET /me/docs?kinds=(teach kinds)", f"/me/docs?kinds={ctx['teach_kinds']}"),
                          get(person, "GET /blocks/teach/practice-cases", "/blocks/teach/practice-cases"))
 
@@ -341,6 +404,7 @@ async def living(run, u, seed, start_delay, end_ts, think, ctx):
     rng = random.Random(seed)
     await asyncio.sleep(start_delay)
     person = Person(run, u["i"])
+    person.ip = class_address(run, u["i"])
     if not await person.login(u["email"]) or not u.get("projects"):
         return
     names = list(ACTIONS)
@@ -411,6 +475,11 @@ async def run_level(args):
         raise SystemExit(f"only {len(users)} seeded people with a case; asked for {args.users}")
     run = Run(*endpoint(args.base), timeout=args.timeout)
     run.prefix = args.prefix
+    run.host_header = args.host_header or None
+    run.pages = args.pages or args.pages_only
+    run.pages_only = args.pages_only
+    run.assets = args.assets
+    run.class_size = args.class_size
     ctx = {"run": run, "case_kinds": ",".join(case_kinds()), "teach_kinds": ",".join(person_kinds("teach.")) or "teach.run"}
     probe = Person(run, -1)
     await probe.login(users[0]["email"])
@@ -424,8 +493,12 @@ async def run_level(args):
         end_ts = run.measure_from + args.duration
         run.ramp, run.steady, run.by_conn = Stats(), Stats(), Stats()
         watcher = asyncio.create_task(watch(run, args))
+        if args.login_burst:
+            burst = asyncio.create_task(login_burst(run, users, args.login_burst, args.ramp + args.burst_at, args.burst_within, random.Random(args.seed)))
         tasks = [asyncio.create_task(living(run, u, args.seed + u["i"], args.ramp * n / max(1, len(users)), end_ts, think, ctx)) for n, u in enumerate(users)]
         await asyncio.wait(tasks, timeout=args.ramp + args.duration + 90)
+        if args.login_burst:
+            await asyncio.wait([burst], timeout=30)
         run.stop = True
         await asyncio.sleep(1)
         watcher.cancel()
@@ -439,6 +512,7 @@ async def run_level(args):
     summary = {"label": args.label, "users": len(users), "think": think, "ramp_s": args.ramp, "duration_s": args.duration,
                "requests_steady": sum(r["n"] for r in steady_rows), "rps_steady": round(sum(r["n"] for r in steady_rows) / args.duration, 1),
                "inflight_mean": round(sum(samples) / max(1, len(samples)), 1), "inflight_max": max(samples or [0]), "reconnects": run.reconnects,
+               "status_429": sum(count for stats in (run.ramp, run.steady) for outcomes in stats.outcome.values() for o, count in outcomes.items() if o == 429),
                "saves_acked": len(run.acked), "saves_unknown_outcome": run.unacked, "db_docsaved_delta": after - before, "lost_acked_writes": len(lost),
                "lost_examples": lost[:5], "error_samples": run.samples}
     print(json.dumps({k: v for k, v in summary.items() if k != "error_samples"}))
@@ -473,7 +547,15 @@ def main():
             p.add_argument("--seed", type=int, default=1000)
             p.add_argument("--out", default="")
             p.add_argument("--split-conn", action="store_true")
-            p.add_argument("--prefix", default="", help="/api to go through the web container")
+            p.add_argument("--prefix", default="", help="/api to go through the web container or nginx")
+            p.add_argument("--pages", action="store_true", help="start every action with the browser page navigation (HTML + first-sight assets); needs the web tier behind --base")
+            p.add_argument("--assets", action="store_true", help="with --pages: also fetch each page's scripts and styles once per person (a CDN normally absorbs them)")
+            p.add_argument("--pages-only", action="store_true", help="diagnostic: page navigations only, no API calls (isolates the web tier)")
+            p.add_argument("--host-header", default="", help="Host to send, e.g. cognitive.aware-wave.com for the rig nginx")
+            p.add_argument("--class-size", type=int, default=50, help="people per client address (CF-Connecting-IP); 0 = one address for the loadgen")
+            p.add_argument("--login-burst", type=int, default=0, help="extra logins from ONE address during the steady phase")
+            p.add_argument("--burst-at", type=float, default=30, help="seconds into the steady phase")
+            p.add_argument("--burst-within", type=float, default=30, help="seconds the burst is spread over")
             p.add_argument("--abort-file", default="/work/state/ABORT")
     args = parser.parse_args()
     os.makedirs(os.path.dirname(args.state), exist_ok=True)

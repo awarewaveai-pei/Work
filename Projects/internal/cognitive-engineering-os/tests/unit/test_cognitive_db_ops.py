@@ -110,7 +110,7 @@ class CognitiveDbOpsTests(unittest.TestCase):
 
     def test_postgres_flags_have_reasons(self) -> None:
         for flag, reason in (
-            ("max_connections=100", "connection"),
+            ("max_connections=150", "connection"),
             ("shared_buffers=128MB", "cache"),
             ("log_min_duration_statement=1000", "slow"),
         ):

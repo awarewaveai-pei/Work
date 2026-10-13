@@ -368,6 +368,21 @@ class CatalogTests(ApiTestCase):
         with patch.object(api_main, "load_catalog", side_effect=AssertionError("reloaded")):
             self.assertEqual(self.client.get("/catalog").status_code, 200)
 
+    def test_a_caller_holding_the_current_copy_gets_a_304_and_a_changed_registry_a_new_etag(self):
+        first = self.client.get("/catalog")
+        etag = first.headers["etag"]
+        again = self.client.get("/catalog", headers={"If-None-Match": etag})
+        self.assertEqual((again.status_code, again.content, again.headers["etag"]), (304, b"", etag))
+        self.assertEqual(self.client.get("/catalog", headers={"If-None-Match": '"stale"'}).status_code, 200)
+        for held in (f"W/{etag}", f'"other", {etag}', "*"):
+            self.assertEqual(self.client.get("/catalog", headers={"If-None-Match": held}).status_code, 304, held)
+        changed = {**api_main._CATALOG_CACHE["payload"], "prompts": ["a registry edit"]}
+        with patch.object(api_main, "catalog_payload", return_value=changed), patch.object(api_main, "_catalog_fingerprint", return_value=(0, 1)):
+            api_main._CATALOG_CACHE["checked"] = float("-inf")
+            refreshed = self.client.get("/catalog", headers={"If-None-Match": etag})
+        self.assertEqual(refreshed.status_code, 200)
+        self.assertNotEqual(refreshed.headers["etag"], etag)
+
     def test_a_registry_gap_is_a_503_that_names_it(self):
         with patch.object(api_main, "load_catalog", side_effect=ValueError("method-goal-groups.yaml: families in no goal: ['x']")):
             response = self.client.get("/catalog")

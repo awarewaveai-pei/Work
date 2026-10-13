@@ -185,9 +185,12 @@ class ProjectSourceRepository:
             row = connection.execute(f"SELECT {_PROJECT_SELECT} FROM platform_projects WHERE tenant_id=%s AND project_id=%s", (tenant_id, project_id)).fetchone()
         return None if row is None else dict(row)
 
-    def list_projects(self, tenant_id: str, workspace_id: str | None = None, *, created_by: str | None = None) -> list[dict[str, Any]]:
-        """created_by: one person only. A route that serves one person asks for their cases here, so it reads those and
-        not the whole tenant (the capacity rig, 2026-10-12: 2000 rows parsed per GET /projects)."""
+    def list_projects(self, tenant_id: str, workspace_id: str | None = None, *, created_by: str | None = None, created_by_any: Sequence[str] | None = None) -> list[dict[str, Any]]:
+        """created_by: one person only; created_by_any: these people only ([] = no one). A route that serves one person (or
+        the people of their group) asks for those cases here, so it reads those and not the whole tenant (the capacity rig,
+        2026-10-12: 2000 rows parsed per GET /projects)."""
+        if created_by_any is not None and not created_by_any:
+            return []
         query = f"SELECT {_PROJECT_SELECT} FROM platform_projects WHERE tenant_id=%s"
         parameters: tuple[Any, ...] = (tenant_id,)
         if workspace_id is not None:
@@ -196,6 +199,9 @@ class ProjectSourceRepository:
         if created_by is not None:
             query += " AND created_by_identity_id=%s"
             parameters += (created_by,)
+        if created_by_any is not None:
+            query += " AND created_by_identity_id = ANY(%s)"
+            parameters += (list(created_by_any),)
         query += " ORDER BY created_at, project_id"
         with self._db.for_tenant(tenant_id) as connection:
             rows = connection.execute(query, parameters).fetchall()

@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Catalog } from "./catalog";
-import { goalOf, isUserTool, runHref, shownAbbr, stations, stuckCatalog, toolHref, toolSearchKey, toolsOfGoal, userGoals, userToolCount } from "./catalog";
+import { CATALOG_RECHECK_MS, goalOf, isUserTool, makeCatalogLoader, runHref, shownAbbr, stations, stuckCatalog, toolHref, toolSearchKey, toolsOfGoal, userGoals, userToolCount } from "./catalog";
 import { pickTools, termsOf } from "../components/StuckBox";
 import { sectionOf } from "../components/AppNav";
 
@@ -97,5 +97,57 @@ describe("main menu section of a path", () => {
     expect(sectionOf("/me/data")).toBe("data");
     expect(sectionOf("/settings")).toBe("settings");
     expect(sectionOf("/help")).toBe("help");
+  });
+});
+
+describe("loadCatalog keeps one parsed copy and revalidates it with the API's ETag", () => {
+  const reply = (status: number, etag: string | null, body: unknown = catalog) =>
+    new Response(status === 304 ? null : JSON.stringify(body), { status, headers: etag ? { etag } : {} });
+
+  it("fetches once, then serves the kept copy inside the recheck window and asks If-None-Match after it (304 keeps the same object)", async () => {
+    let clock = 0;
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(reply(200, '"a"'))
+      .mockResolvedValueOnce(reply(304, '"a"'));
+    const load = makeCatalogLoader(fetchImpl as unknown as typeof fetch, () => clock);
+    const first = await load();
+    expect(await load()).toBe(first);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    clock = CATALOG_RECHECK_MS + 1;
+    expect(await load()).toBe(first);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect((fetchImpl.mock.calls[1][1] as RequestInit).headers).toEqual({ "If-None-Match": '"a"' });
+  });
+
+  it("a changed registry (200 with a new ETag) replaces the kept copy; concurrent renders share one question", async () => {
+    let clock = 0;
+    const changed = { ...catalog, prompts: ["new"] };
+    const fetchImpl = vi.fn().mockResolvedValueOnce(reply(200, '"a"')).mockResolvedValueOnce(reply(200, '"b"', changed));
+    const load = makeCatalogLoader(fetchImpl as unknown as typeof fetch, () => clock);
+    await load();
+    clock = CATALOG_RECHECK_MS + 1;
+    const [x, y, z] = await Promise.all([load(), load(), load()]);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(x.prompts).toEqual(["new"]);
+    expect(y).toBe(x);
+    expect(z).toBe(x);
+  });
+
+  it("a failed recheck serves the kept copy; with nothing kept the error reaches the page; no ETag = no keeping", async () => {
+    let clock = 0;
+    const fetchImpl = vi.fn().mockResolvedValueOnce(reply(200, '"a"')).mockRejectedValueOnce(new Error("api down"));
+    const load = makeCatalogLoader(fetchImpl as unknown as typeof fetch, () => clock);
+    const first = await load();
+    clock = CATALOG_RECHECK_MS + 1;
+    expect(await load()).toBe(first);
+    expect(await load()).toBe(first);   // the failed recheck is not repeated by every render
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    const empty = makeCatalogLoader(vi.fn().mockResolvedValue(new Response("CATALOG_INVALID", { status: 503 })) as unknown as typeof fetch, () => clock);
+    await expect(empty()).rejects.toThrow(/GET \/catalog 503/);
+    const noEtag = vi.fn().mockImplementation(async () => reply(200, null));
+    const old = makeCatalogLoader(noEtag as unknown as typeof fetch, () => clock);
+    await old();
+    await old();
+    expect(noEtag).toHaveBeenCalledTimes(2);
   });
 });

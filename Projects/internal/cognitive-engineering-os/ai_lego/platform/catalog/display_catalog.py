@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ai_lego import resolve_spec_root
 from ai_lego.core.domain.blocks import INTERNAL, block_of_family
+from ai_lego.core.yaml_safe import SafeLoader
 from ai_lego.platform.ai_execution.contract_catalog import is_active
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 
@@ -33,7 +34,7 @@ def _yaml(path):
         loader.flatten_mapping(node)
         return {loader.construct_object(k, deep=deep): loader.construct_object(v, deep=deep) for k, v in node.value}
 
-    class Strict(yaml.SafeLoader): pass
+    class Strict(SafeLoader): pass   # the C loader where there is one (ai_lego/core/yaml_safe.py); the constructor below is the same on both
     Strict.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
     return yaml.load(path.read_text(encoding="utf-8"), Loader=Strict)
 

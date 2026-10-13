@@ -6,6 +6,7 @@ set -eu
 label=${1:?label}; users=${2:?users}; ramp=${3:?ramp}; duration=${4:?duration}; shift 4
 here=$(cd "$(dirname "$0")" && pwd)
 cd "$here"
+start=$(date +%s)
 mkdir -p "out/$label"
 rm -f "out/$label"/*.csv
 ./sampler.sh "$label" $((ramp + duration + 90)) &
@@ -16,6 +17,10 @@ kill "$watcher" 2>/dev/null || true
 wait 2>/dev/null || true
 echo "peak API/DB CPU and memory:"
 awk -F, '{gsub("%","",$3); if ($3+0 > m[$2]) m[$2]=$3+0; u[$2]=$4} END {for (n in m) print n, "max_cpu%", m[n], "last_mem", u[n]}' "out/$label/stats.csv"
+if docker inspect cos-load-nginx-1 >/dev/null 2>&1; then
+  echo "nginx: requests answered 429 by the limit zones / 'limiting requests' log lines / 5xx:"
+  docker logs --since "$start" cos-load-nginx-1 2>&1 | awk '{ if ($0 ~ /" 429 /) a++; if ($0 ~ /limiting requests/) b++; if ($0 ~ /" 5[0-9][0-9] /) c++ } END {print a+0, b+0, c+0}'
+fi
 echo "max backends by state:"
 awk -F, '{if ($3+0 > m[$2]) m[$2]=$3+0} END {for (s in m) print s, m[s]}' "out/$label/pgconn.csv"
 echo "prod health (PROD_HEALTH_URL, opt-in): max seconds / non-200:"

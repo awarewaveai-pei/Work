@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
 from ai_lego.core.support import canonical_json
@@ -77,7 +78,7 @@ def build_prompt_manifest(record: Mapping[str, Any], sources: list[Mapping[str, 
 
 
 def _load_visual_registry(spec_root: Path) -> dict[str, Any]:
-    value = yaml.safe_load((spec_root / "methods" / "registry" / "method-visual-kinds.yaml").read_text(encoding="utf-8"))
+    value = safe_load_yaml((spec_root / "methods" / "registry" / "method-visual-kinds.yaml").read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise InvariantViolation("VISUAL_REGISTRY_INVALID")
     return value
@@ -95,7 +96,7 @@ def visual_kind(spec_root: Path, method_id: str, contract: Mapping[str, Any]) ->
 def result_page_shows(spec_root: Path, method_id: str) -> set[str]:
     """The tools whose picture ③ of this method's result page already draws (methods/registry/result-page-shows.yaml)."""
     try:
-        document = yaml.safe_load((spec_root / "methods" / "registry" / "result-page-shows.yaml").read_text(encoding="utf-8")) or {}
+        document = safe_load_yaml((spec_root / "methods" / "registry" / "result-page-shows.yaml").read_text(encoding="utf-8")) or {}
     except (OSError, yaml.YAMLError):
         return set()
     return {str(item) for item in [*(document.get("every_method") or []), *((document.get("by_method") or {}).get(method_id) or [])]}
@@ -479,7 +480,7 @@ CONFORM_KEYS = ("findings", "recommendations", "gaps", "next_steps", "headline",
 
 
 def load_interpretation_schema(spec_root: Path) -> dict[str, Any]:
-    value = yaml.safe_load((spec_root / INTERPRETATION_SCHEMA_FILE).read_text(encoding="utf-8"))
+    value = safe_load_yaml((spec_root / INTERPRETATION_SCHEMA_FILE).read_text(encoding="utf-8"))
     if not isinstance(value, dict): raise InvariantViolation("INTERPRETATION_SCHEMA_INVALID")
     return value
 

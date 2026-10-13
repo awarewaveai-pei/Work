@@ -1,7 +1,9 @@
 # Throwaway capacity rig (2026-10-12): the API image against its own PostgreSQL, nothing shared with production.
 #   - own compose project (`-p cos-load`), own network, own volumes; nothing published except 127.0.0.1:18420
 #   - no AI key, no collection service, no egress: /ai/* answers 503 AI_PROVIDER_UNCONFIGURED and the scenario never calls it
-#   - the DB runs prod's flags (ops/cognitive-db/docker-compose.cognitive-db.yml) so the numbers carry over
+#   - the DB runs prod's flags (ops/cognitive-db/docker-compose.cognitive-db.yml) so the numbers carry over, plus pg_stat_statements
+#     (instrumentation only: which statements cost the most, which tables are scanned)
+#   - profile "edge": the browser path -- nginx with prod's cognitive server block (make_nginx_conf.py) in front of the API and the web tier
 # Run (on the host; COS_LOAD_DB_PASSWORD from a 0600 file, never typed):
 #   export COS_LOAD_DB_PASSWORD=$(cat .pw); docker compose -p cos-load -f docker-compose.load.yml up -d db migrate api
 #   docker compose -p cos-load -f docker-compose.load.yml run --rm loadgen /work/load_test.py seed-db --users 1000
@@ -19,9 +21,10 @@ services:
       POSTGRES_DB: cognitive_os
       POSTGRES_PASSWORD: ${COS_LOAD_DB_PASSWORD:?}
       POSTGRES_INITDB_ARGS: "--data-checksums"
-    command: ["postgres", "-c", "max_connections=${COS_LOAD_PG_MAX_CONNECTIONS:-100}", "-c", "shared_buffers=${COS_LOAD_PG_SHARED_BUFFERS:-128MB}", "-c", "log_min_duration_statement=${COS_LOAD_PG_SLOW_MS:-1000}"]
+    command: ["postgres", "-c", "max_connections=${COS_LOAD_PG_MAX_CONNECTIONS:-150}", "-c", "shared_buffers=${COS_LOAD_PG_SHARED_BUFFERS:-128MB}", "-c", "log_min_duration_statement=${COS_LOAD_PG_SLOW_MS:-1000}",
+             "-c", "shared_preload_libraries=pg_stat_statements", "-c", "pg_stat_statements.track=all"]
     cpus: 4
-    mem_limit: 512m
+    mem_limit: ${COS_LOAD_PG_MEM:-1g}
     shm_size: 128m
     volumes:
       - db-data:/var/lib/postgresql/data
@@ -44,7 +47,7 @@ services:
     image: ${COS_LOAD_API_IMAGE:-cognitive-os-api:latest}
     environment:
       <<: *engine-env
-      COGNITIVE_OS_API_WORKERS: ${COS_LOAD_WORKERS:-4}
+      COGNITIVE_OS_API_WORKERS: ${COS_LOAD_WORKERS:-8}
       COGNITIVE_OS_DB_POOL_MAX: ${COS_LOAD_POOL_MAX:-10}
     ports:
       - "127.0.0.1:18420:8420"
@@ -59,14 +62,55 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # The production web image (Next.js, rewrites /api/* to the API): `up -d web`, then load_test.py run --base http://web:3000 --prefix /api
+  # The web image (Next.js, rewrites /api/* to the API): `--profile web up -d web`, then load_test.py run --base http://web:3000 --prefix /api.
+  # Every replica answers to cognitive-os-web-pool, the name prod's nginx sends page requests to; web carries the old name too.
   web:
-    image: cognitive-os-web:latest
-    profiles: ["web"]
-    cpus: 4
+    image: ${COS_LOAD_WEB_IMAGE:-cognitive-os-web:latest}
+    profiles: ["web", "edge"]
+    environment:
+      COS_API_ORIGIN: http://cognitive-os-api:8420
+    cpus: ${COS_LOAD_WEB_CPUS:-2}
     mem_limit: 256m
+    networks:
+      default:
+        aliases: [cognitive-os-web, cognitive-os-web-pool]
     depends_on:
       - api
+
+  web2: &web-replica
+    image: ${COS_LOAD_WEB_IMAGE:-cognitive-os-web:latest}
+    profiles: ["web2"]
+    environment:
+      COS_API_ORIGIN: http://cognitive-os-api:8420
+    cpus: ${COS_LOAD_WEB_CPUS:-2}
+    mem_limit: 256m
+    networks:
+      default:
+        aliases: [cognitive-os-web-pool]
+    depends_on:
+      - api
+
+  web3:
+    <<: *web-replica
+    profiles: ["web3"]
+  web4:
+    <<: *web-replica
+    profiles: ["web4"]
+  web5:
+    <<: *web-replica
+    profiles: ["web5"]
+  web6:
+    <<: *web-replica
+    profiles: ["web6"]
+
+  # prod's lobster-nginx limits (0.5 CPU, 128 MB; COS_LOAD_NGINX_CPUS to try more) and its cognitive server block, so the per-person zones are the real ones.
+  nginx:
+    image: nginx:stable
+    profiles: ["edge"]
+    volumes:
+      - ${COS_LOAD_NGINX_CONF:-./nginx.rig.conf}:/etc/nginx/nginx.conf:ro
+    cpus: ${COS_LOAD_NGINX_CPUS:-0.5}   # prod's value today (/root/lobster-phase1/docker-compose.yml, lobster-nginx limits)
+    mem_limit: 128m
 
   # One-shot client in the API image (python 3.12 + psycopg, no extra packages): `run --rm loadgen /work/load_test.py ...`
   loadgen:
@@ -77,7 +121,7 @@ services:
     environment:
       <<: *engine-env
       PYTHONPATH: /app/Projects/internal/cognitive-engineering-os   # the API runs from this tree (uvicorn puts cwd first); the installed wheel lacks the data files
-    cpus: 8
+    cpus: ${COS_LOAD_GEN_CPUS:-6}
     ulimits:
       nofile: 65536
     volumes:

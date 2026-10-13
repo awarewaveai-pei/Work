@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego.core.domain.kinds.assembler import PACKAGES
 from ai_lego.errors import InvariantViolation
@@ -37,7 +38,7 @@ def _content_root(root: Path | str | None) -> Path:
 
 def _read_yaml(path: Path) -> dict[str, Any]:
     try:
-        value = yaml.safe_load(path.read_text(encoding="utf-8"))
+        value = safe_load_yaml(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as exc:
         raise InvariantViolation(f"FACILITATE_YAML_INVALID: {path.name}: {exc}") from exc
     if not isinstance(value, dict):

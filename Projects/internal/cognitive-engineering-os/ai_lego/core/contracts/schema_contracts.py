@@ -12,7 +12,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
@@ -26,7 +26,7 @@ class SchemaContracts:
             raise InvariantViolation(f"SPEC_ROOT_INVALID: {specs_dir} is not a directory")
         resources: list[tuple[str, Resource[Any]]] = []
         for schema_path in sorted(specs_dir.rglob("*.yaml")):
-            schema = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
+            schema = safe_load_yaml(schema_path.read_text(encoding="utf-8"))
             if isinstance(schema, dict) and schema.get("$id"):
                 resources.append((schema["$id"], Resource.from_contents(schema)))
         if not resources:

@@ -44,7 +44,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 # Capacity rig 2026-10-12 (ops/load-test): one worker serves ~100 requests/s, and the Python in it holds the GIL, so a worker is
 # one core. 1000 people at think time 4-10 s = ~390 requests/s: 4 workers sit at their ceiling, 8 hold 1000 people at twice
 # the activity (770 requests/s, p95 < 250 ms). Each worker holds its own DB pool (COGNITIVE_OS_DB_POOL_MAX, default 10: 8 x 10 reached
-# 82 backends of cognitive-db max_connections 100 -- raise that before raising N) and ~150 MB (1.2 GB at 8 under load):
+# 82 backends of cognitive-db max_connections (150 now) -- raise that before raising N) and ~150 MB (1.2 GB at 8 under load):
 # docker-compose.yml's mem_limit is sized for 8. exec: uvicorn is PID 1 and gets the stop signal.
 ENV COGNITIVE_OS_API_WORKERS=8
 CMD ["sh", "-c", "exec uvicorn ai_lego.apps.api.main:app --host 0.0.0.0 --port 8420 --workers \"$COGNITIVE_OS_API_WORKERS\""]

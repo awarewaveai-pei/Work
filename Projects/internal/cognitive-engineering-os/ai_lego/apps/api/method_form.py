@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego.apps.api.dispatch import self_id_param
 
@@ -48,7 +49,7 @@ _MAX_DEPTH = 8
 
 
 def _load_yaml(path: Path) -> Any:
-    return yaml.safe_load(path.read_text(encoding="utf-8"))
+    return safe_load_yaml(path.read_text(encoding="utf-8"))
 
 
 @lru_cache(maxsize=4)
@@ -628,7 +629,7 @@ def _contracts(spec_root: str, paths: tuple[tuple[str, str], ...]) -> dict[str, 
     for method_id, relative in paths:
         path = Path(relative) if Path(relative).is_absolute() else Path(spec_root) / relative
         text = path.read_text(encoding="utf-8")
-        parsed = yaml.safe_load(text)
+        parsed = safe_load_yaml(text)
         loaded[method_id] = (parsed if isinstance(parsed, dict) else {}, text)
     return loaded
 

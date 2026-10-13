@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego.apps.api.dispatch import MethodDispatchError, invoke_builder, record_id_prefix, resolve_builder, resolve_gate_runner, run_gate_runner
 from ai_lego.apps.api.method_form import SERVER_INJECTED_PARAMS, TYPED_OBJECTS, record_schema_name
@@ -91,7 +92,7 @@ def draft_tool_schema(spec: dict[str, Any], exclude_params: tuple[str, ...] = ()
     """The draft's shape for the tool call: exactly the builder parameters asked for, each with its property in the
     output-record schema when it has one (the builder's kwargs become that record's top-level properties)."""
     try:
-        record = yaml.safe_load(spec.get("schema_yaml_full") or "") or {}
+        record = safe_load_yaml(spec.get("schema_yaml_full") or "") or {}
     except yaml.YAMLError:
         record = {}
     properties = record.get("properties") if isinstance(record, dict) and isinstance(record.get("properties"), dict) else {}
@@ -109,7 +110,7 @@ def method_input_spec(spec_root: Path, catalog: MethodCatalog, method_id: str) -
     entry = catalog.require(method_id)
     contract_path = spec_root / entry["path"] if not Path(entry["path"]).is_absolute() else Path(entry["path"])
     contract_text = contract_path.read_text(encoding="utf-8") if contract_path.is_file() else ""
-    contract = yaml.safe_load(contract_text) if contract_text else {}
+    contract = safe_load_yaml(contract_text) if contract_text else {}
     contract = contract if isinstance(contract, dict) else {}
     builder = resolve_builder(method_id)
     parameters = []

@@ -63,6 +63,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Red
 from psycopg.errors import UniqueViolation
 from pydantic import BaseModel, ConfigDict, Field
 import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego import PRODUCT_ROOT, resolve_spec_root
 from ai_lego.apps.api.dispatch import MethodDispatchError, builder_takes_record_id, invoke_builder, invoke_gate_runner, method_binding_issues, record_id_prefix, resolve_builder, resolve_gate_runner, run_gate_runner
@@ -117,9 +118,9 @@ SESSION_COOKIE = "cognitive_os_session"
 
 
 def _warm_reads() -> None:
-    """What a read route would parse on its first request in this worker, parsed at start instead (pure-Python YAML, measured
-    2026-10-12 on the capacity rig): the method catalog (3 s), the TEACH and FACILITATE content with the catalog behind their
-    subject check (7 s), and one method form, which builds the contracts and schema index every form shares (9 s cold)."""
+    """What a read route would parse on its first request in this worker, parsed at start instead (capacity rig, 2026-10-12: the
+    catalog, the TEACH and FACILITATE content with the catalog behind their subject check, and one method form, which builds the
+    contracts and schema index every form shares -- 22 s with the pure-Python YAML loader, 4.8 s with libyaml's, imports included)."""
     from ai_lego.platform.lessons import load_lessons, load_practice_cases
     from ai_lego.platform.scripts import load_scripts
 
@@ -724,7 +725,7 @@ def _method_display_metadata() -> dict[str, dict[str, str]]:
     stamp = (str(path), stat.st_mtime_ns, stat.st_size)   # the parse is 0.4 s of pure-Python YAML: once per file change, not per request
     if _DISPLAY_METADATA_CACHE.get("stamp") != stamp:
         try:
-            document = yaml.safe_load(path.read_text(encoding="utf-8"))
+            document = safe_load_yaml(path.read_text(encoding="utf-8"))
         except (OSError, yaml.YAMLError):
             document = None
         entries = document.get("entries") if isinstance(document, dict) else None
@@ -764,19 +765,25 @@ def _display_catalog_payload() -> dict[str, Any]:
     fingerprint = _catalog_fingerprint()
     if _CATALOG_CACHE.get("fingerprint") != fingerprint:
         payload = catalog_payload(load_catalog())
-        _CATALOG_CACHE.update(fingerprint=fingerprint, payload=payload, body=JSONResponse(payload).body)
+        body = JSONResponse(payload).body
+        _CATALOG_CACHE.update(fingerprint=fingerprint, payload=payload, body=body, etag='"' + hashlib.sha256(body).hexdigest()[:32] + '"')
     _CATALOG_CACHE["checked"] = now
     return _CATALOG_CACHE["payload"]
 
 
 @app.get("/catalog")
-def display_catalog() -> Response:
+def display_catalog(request: Request) -> Response:
     """Everything the web app's home page, tool directory and workflow list show, from the loader the mocks are checked
     with (ai_lego/platform/catalog/display_catalog.py). Public like /methods. A registry gap is a 503 that names it --
-    never a half-labelled page."""
+    never a half-labelled page. ETag = hash of the body (same in every worker): the web tier keeps its parsed copy and asks
+    `If-None-Match`, so a render costs a 304 instead of 390 KB over the wire and a JSON parse (apps/cognitive-web/lib/catalog.ts)."""
     try:
         _display_catalog_payload()
-        return Response(content=_CATALOG_CACHE["body"], media_type="application/json")
+        etag = _CATALOG_CACHE["etag"]
+        tags = [part.strip().removeprefix("W/") for part in request.headers.get("if-none-match", "").split(",")]   # RFC 9110 13.1.2: a list, `*`, weak validators
+        if "*" in tags or etag in tags:
+            return Response(status_code=304, headers={"ETag": etag})
+        return Response(content=_CATALOG_CACHE["body"], media_type="application/json", headers={"ETag": etag})
     except (ValueError, OSError, yaml.YAMLError, InvariantViolation) as error:   # a gap, a missing or unparsable file
         raise HTTPException(status_code=503, detail=f"CATALOG_INVALID: {type(error).__name__}: {error}") from error
 
@@ -787,7 +794,7 @@ def list_recipes() -> list[dict[str, Any]]:
     recipe_dir = resolve_spec_root() / "recipes" / "validated"
     recipes = []
     for path in sorted(recipe_dir.glob("*.recipe.yaml")):
-        recipe = yaml.safe_load(path.read_text(encoding="utf-8"))
+        recipe = safe_load_yaml(path.read_text(encoding="utf-8"))
         if not isinstance(recipe, dict) or recipe.get("status") != "ACTIVE":
             continue
         recipes.append({"recipe_id": recipe.get("id"), "version": str(recipe.get("version")), "status": recipe.get("status"), "step_count": len(recipe.get("steps", []))})
@@ -1500,7 +1507,7 @@ def ai_failure_status(error: BaseException) -> int | None:
 
 def _interpretation_schema_version() -> str:
     try:
-        return str((yaml.safe_load((resolve_spec_root() / "specs" / "cognitive" / "typed-objects" / "method-interpretation.schema.yaml").read_text(encoding="utf-8")) or {}).get("version") or "")
+        return str((safe_load_yaml((resolve_spec_root() / "specs" / "cognitive" / "typed-objects" / "method-interpretation.schema.yaml").read_text(encoding="utf-8")) or {}).get("version") or "")
     except (OSError, yaml.YAMLError):
         return ""
 
@@ -1756,7 +1763,7 @@ def _record_schema_properties(spec_root: Path, catalog: MethodCatalog, method_id
     if not schema_path or not schema_path.is_file():
         return None
     try:
-        doc = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
+        doc = safe_load_yaml(schema_path.read_text(encoding="utf-8"))
     except yaml.YAMLError:
         return None
     properties = (doc or {}).get("properties") if isinstance(doc, dict) else None
@@ -1848,7 +1855,7 @@ def _interpret_and_record(
         })
         repo.save_interpretation(
             tenant_id, project_id, interpretation_id, reference,
-            datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z"), block=block,
+            datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"), block=block,   # microseconds, like the request's event: whole seconds could put finished_at before requested_at
         )
         saved = True
         if rerun_id:
@@ -1940,7 +1947,7 @@ def interpret_method(
 
     entry = catalog.require(method_id)
     contract_path = resolve_spec_root() / entry["path"]
-    contract = yaml.safe_load(contract_path.read_text(encoding="utf-8"))
+    contract = safe_load_yaml(contract_path.read_text(encoding="utf-8"))
     if not isinstance(contract, dict):
         raise HTTPException(status_code=500, detail="METHOD_CONTRACT_INVALID")
     interpretation_id = f"INTERP-{uuid.uuid4().hex.upper()}"
@@ -2555,7 +2562,7 @@ def create_synthesis(
     capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
     if not capability_catalog.is_resolvable(capability_id):
         raise HTTPException(status_code=404, detail=f"CAPABILITY_RESOLUTION_BLOCKED: no ACTIVE contract for {capability_id!r}")
-    contract = yaml.safe_load((resolve_spec_root() / capability_catalog.require(capability_id)["path"]).read_text(encoding="utf-8"))
+    contract = safe_load_yaml((resolve_spec_root() / capability_catalog.require(capability_id)["path"]).read_text(encoding="utf-8"))
     artifact_type = contract["output"]["type"][0]   # DossierBrief / DecisionEvidenceBrief / LiteratureMatrix
     # Only active rows are read (a superseded blob is never cited), and only the part a manifest entry can span
     # (DEFAULT_MAX_CHARS) is kept for the background run; the runner still decides what enters the manifest.

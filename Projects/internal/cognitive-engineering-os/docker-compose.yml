@@ -53,30 +53,49 @@ services:
       retries: 3
       start_period: 10s
 
+  # Three web replicas behind one name: the Next.js server renders ~66 pages/s per process (capacity rig, ops/load-test, 2026-10-12);
+  # 1000 people navigating every ~7 s are ~140 pages/s -- 1 replica: p50 7.9 s, 2: p95 2.6 s, 3: p50 40 ms / p95 230 ms, 0 errors.
+  # All three carry the network alias cognitive-os-web-pool, which lobster-nginx's cognitive server block sends page requests to
+  # (nginx/default.conf `set $web`): Docker DNS answers with every replica, nginx takes them round-robin. More replicas = copy
+  # the cognitive-os-web-3 block with a new name and add it to deploy/deploy.sh SERVICES. cognitive-os-web builds the image,
+  # the others run it.
   cognitive-os-web:
     build:
       context: ./apps/cognitive-web
       dockerfile: Dockerfile
     image: cognitive-os-web:latest
     container_name: cognitive-os-web
-    restart: unless-stopped
-    environment:
-      - COS_API_ORIGIN=http://cognitive-os-api:8420
     ports:
       - "127.0.0.1:8421:3000"
-    mem_limit: 256m
-    mem_reservation: 64m
-    networks:
-      - lobster-net
-    depends_on:
-      cognitive-os-api:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:3000/login"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    <<: &cognitive-web
+      restart: unless-stopped
+      environment:
+        - COS_API_ORIGIN=http://cognitive-os-api:8420
+      mem_limit: 256m
+      mem_reservation: 64m
+      networks:
+        lobster-net:
+          aliases:
+            - cognitive-os-web-pool
+      depends_on:
+        cognitive-os-api:
+          condition: service_healthy
+      healthcheck:
+        test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:3000/login"]
+        interval: 30s
+        timeout: 5s
+        retries: 3
+        start_period: 10s
+
+  cognitive-os-web-2:
+    image: cognitive-os-web:latest
+    container_name: cognitive-os-web-2
+    <<: *cognitive-web
+
+  cognitive-os-web-3:
+    image: cognitive-os-web:latest
+    container_name: cognitive-os-web-3
+    <<: *cognitive-web
 
 volumes:
   cognitive-os-files:

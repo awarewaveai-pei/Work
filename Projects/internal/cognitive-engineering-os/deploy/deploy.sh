@@ -15,7 +15,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
 PRODUCT_ROOT="$REPO_ROOT/Projects/internal/cognitive-engineering-os"
 COMPOSE_FILE="$PRODUCT_ROOT/docker-compose.yml"
-SERVICES=(cognitive-os-api cognitive-os-web)
+SERVICES=(cognitive-os-api cognitive-os-web cognitive-os-web-2 cognitive-os-web-3)   # web-2/-3 run the image web builds (docker-compose.yml): stopped, health-waited and rolled back with it
 HEALTH_URLS=("http://127.0.0.1:8420/health" "http://127.0.0.1:8421/login")
 HEALTH_URL="${HEALTH_URLS[0]}"
 SMOKE_URL="https://cognitive.aware-wave.com/api/health"  # nginx: /api/ -> api, / -> web (PI-b)

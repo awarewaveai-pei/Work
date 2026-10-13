@@ -14,7 +14,7 @@ from pathlib import Path
 from functools import lru_cache
 from typing import Any, Mapping
 
-import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego.errors import InvariantViolation
 from ai_lego.core.contracts.schema_contracts import SchemaContracts
@@ -34,7 +34,7 @@ def load_recipe(spec_root: Path, recipe_id: str) -> dict[str, Any]:
     path = spec_root / "recipes" / "validated" / f"{recipe_id}.recipe.yaml"
     if not path.is_file():
         raise InvariantViolation(f"RECIPE_NOT_FOUND: {path}")
-    recipe = yaml.safe_load(path.read_text(encoding="utf-8"))
+    recipe = safe_load_yaml(path.read_text(encoding="utf-8"))
     if not isinstance(recipe, dict) or recipe.get("id") != recipe_id:
         raise InvariantViolation(f"RECIPE_ID_MISMATCH: {path} does not declare id {recipe_id}")
     if recipe.get("status") != "ACTIVE":

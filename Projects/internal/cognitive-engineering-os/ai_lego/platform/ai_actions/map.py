@@ -15,7 +15,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-import yaml
+from ai_lego.core.yaml_safe import safe_load as safe_load_yaml
 
 from ai_lego import resolve_spec_root
 from ai_lego.core.domain.blocks import FAMILY_BLOCK
@@ -33,8 +33,8 @@ LAYER_NAME = {key: name for key, name, *_ in LAYERS}
 @lru_cache(maxsize=4)
 def _tools(spec_root: str) -> dict[str, dict[str, str]]:
     root = Path(spec_root)
-    names = yaml.safe_load((root / "methods" / "registry" / "method-display-metadata.yaml").read_text(encoding="utf-8")).get("entries") or {}
-    families = yaml.safe_load((root / "methods" / "registry" / "method-family-display.yaml").read_text(encoding="utf-8")).get("families") or {}
+    names = safe_load_yaml((root / "methods" / "registry" / "method-display-metadata.yaml").read_text(encoding="utf-8")).get("entries") or {}
+    families = safe_load_yaml((root / "methods" / "registry" / "method-family-display.yaml").read_text(encoding="utf-8")).get("families") or {}
     found = {}
     for method_id, entry in sorted(MethodCatalog.from_spec_root(root).contracts.items()):
         family = entry.get("family")

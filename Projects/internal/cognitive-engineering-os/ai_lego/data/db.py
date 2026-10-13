@@ -52,7 +52,7 @@ from ai_lego.errors import InvariantViolation
 __all__ = ["Databases", "Jsonb", "Rehearsal", "Row", "advisory_xact_lock", "iso", "now", "owner_lock"]
 
 DATABASE_URLS_ENV = "COGNITIVE_OS_DATABASE_URLS"
-# Connections one process may hold per region. Workers x this must stay under the server max_connections (100) with room for
+# Connections one process may hold per region. Workers x this must stay under the server max_connections (150 since 2026-10-12; 100 before) with room for
 # the migration, backup and operator sessions: 8 workers x 10 reached 82 backends on the capacity rig (2026-10-12).
 POOL_MAX_ENV = "COGNITIVE_OS_DB_POOL_MAX"
 DEFAULT_POOL_MAX = 10

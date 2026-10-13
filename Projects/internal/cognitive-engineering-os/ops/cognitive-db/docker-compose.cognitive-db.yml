@@ -9,19 +9,22 @@ services:
       POSTGRES_INITDB_ARGS: "--data-checksums"
     secrets:
       - cognitive_db_password
-    # Bound connection slots keep memory use predictable for the small first region.
+    # Bound connection slots keep memory use predictable. 150: the API holds 8 workers x pool 10 = up to 80 (82 backends measured at 1000
+    # simultaneous people on ops/load-test) plus migration, backup and operator sessions; the API refuses to start when workers x pool
+    # exceed what the server leaves (DB_POOL_EXCEEDS_SERVER, ai_lego/data/db.py), so this value is read live, not copied.
+    # Applying it restarts the database: deploy step, see ops/cognitive-db/README.md.
     command:
       - postgres
       # Keep the number of backend connections within the memory budget.
       - -c
-      - max_connections=100
+      - max_connections=150
       # Reserve a useful shared cache without crowding out connections and maintenance.
       - -c
       - shared_buffers=128MB
       # Make statements slower than one second visible during operations review.
       - -c
       - log_min_duration_statement=1000
-    mem_limit: 512m
+    mem_limit: 1g   # 150 backends at ~5-10 MB each + shared_buffers + the 1000-person working set; 512m was sized for 100
     shm_size: 128m
     volumes:
       - cognitive-db-data:/var/lib/postgresql/data

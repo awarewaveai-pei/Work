@@ -15,6 +15,7 @@ from ai_lego.apps.api import main as api_main
 from ai_lego.data import db
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
+from ai_lego.data.repositories.project_source_repository import ProjectSourceRepository
 from ai_lego.errors import InvariantViolation
 from ai_lego.platform.rulesets import kept_load
 from tests import pg
@@ -129,7 +130,7 @@ class DisplayMetadataCacheTests(unittest.TestCase):
             registry.mkdir(parents=True)
             path = registry / "method-display-metadata.yaml"
             path.write_text(NL.join(["entries:", "  a.b:", "    name_zh: x", ""]), encoding="utf-8")
-            with mock.patch.object(api_main, "resolve_spec_root", return_value=Path(folder)), mock.patch.object(api_main.yaml, "safe_load", wraps=api_main.yaml.safe_load) as parsed:
+            with mock.patch.object(api_main, "resolve_spec_root", return_value=Path(folder)), mock.patch.object(api_main, "safe_load_yaml", wraps=api_main.safe_load_yaml) as parsed:
                 self.assertEqual(api_main._method_display_metadata(), {"a.b": {"name_zh": "x"}})
                 api_main._method_display_metadata()
                 self.assertEqual(parsed.call_count, 1)
@@ -155,6 +156,33 @@ class CatalogBytesTests(ProjectSourceApiTestCase):
         with mock.patch.object(api_main, "_catalog_fingerprint", return_value=(0, 0)), mock.patch.object(api_main, "_monotonic", return_value=time.monotonic() + 3600):
             self.assertEqual(self.client.get("/catalog").status_code, 200)
         self.assertIsNot(api_main._CATALOG_CACHE["payload"], built)
+
+
+class HotPathIndexTests(pg.PgTestCase):
+    """Migration 0008: the planner can use each index for the statement the code runs (the WHERE clauses are copied from
+    IdentityStore.reserve_ai_usage_for / ai_usage_totals / authenticate_anywhere and ProjectSourceRepository.interpretation_events).
+    seqscan is turned off so a tiny test table still shows whether the index is *eligible*; the partial ones are the risk."""
+    REGION = "local-dev"
+
+    def _plan(self, statement: str, params: tuple) -> str:
+        with self.databases.transaction(self.REGION) as conn:
+            conn.execute("SET LOCAL enable_seqscan = off")
+            return NL.join(row[0] for row in conn.execute("EXPLAIN " + statement, params).fetchall())
+
+    def test_each_statement_has_an_index_it_can_use(self):
+        events = ProjectSourceRepository.INTERPRETATION_EVENTS
+        cases = (
+            ("ix_ai_usage_tenant_used", "SELECT sum(input_tokens) FROM ai_usage WHERE tenant_id = %s AND used_at >= %s", ("t", "2026-01-01T00:00:00+00:00")),
+            ("ix_ai_usage_person_used", "SELECT count(*) FROM ai_usage WHERE tenant_id = %s AND used_at >= %s AND identity_id = %s", ("t", "2026-01-01T00:00:00+00:00", "p")),
+            ("ix_identity_email_active", "SELECT identity_id FROM identity WHERE email = %s AND status = 'active'", ("a@example.com",)),
+            ("ix_identity_email_active", "SELECT count(*) AS n FROM identity WHERE status = 'active' GROUP BY email ORDER BY n DESC LIMIT 1", ()),   # _most_accounts_per_address, every login
+            ("ix_platform_projects_creator", "SELECT project_id FROM platform_projects WHERE tenant_id=%s AND created_by_identity_id=%s ORDER BY created_at, project_id", ("t", "p")),
+            ("ix_events_interpretation", "SELECT sequence FROM events WHERE tenant_id=%s AND event_type IN (" + ",".join("%s" for _ in events) + ") AND payload_json->>'interpretation_id' = %s ORDER BY write_order",
+             ("t", *events, "i")),
+        )
+        for index, statement, params in cases:
+            with self.subTest(index=index):
+                self.assertIn(index, self._plan(statement, params))
 
 
 if __name__ == "__main__":

@@ -19,6 +19,18 @@ COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_ENGINE_IMAGE
 
 Nothing in this folder has been applied.
 
+## 改 PostgreSQL 旗標或記憶體上限（已上線的卷）
+
+`install-cognitive-db.sh` 只管第一次安裝（卷已存在即拒絕）。已上線後改 `max_connections`／`mem_limit` 這類 compose 值：改完檔案，在主機上對**同一個 compose 專案**重建容器；卷不動，資料庫會重啟（約 10 秒，API 這段時間的請求會 5xx，先排在低峰或與 API 部署同一次維護窗口）：
+
+```bash
+docker compose -p cognitive-db -f Projects/internal/cognitive-engineering-os/ops/cognitive-db/docker-compose.cognitive-db.yml config -q   # 驗 YAML
+COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password docker compose -p cognitive-db -f Projects/internal/cognitive-engineering-os/ops/cognitive-db/docker-compose.cognitive-db.yml up -d cognitive-db
+docker exec cognitive-db-cognitive-db-1 psql -U cognitive -d cognitive_os -Atc "show max_connections"   # 150
+```
+
+2026-10-12 起 `max_connections=150`、`mem_limit: 1g`：API 8 個 worker × 連線池 10 = 最多 80 條（1000 人容量測試實測 82 條），其餘留給 migration、備份與維運連線。API 啟動時讀伺服器實際的 `max_connections`，worker × 連線池超過就拒絕啟動（`DB_POOL_EXCEEDS_SERVER`），所以新舊順序都安全：先升 API（80 ≤ 100 − 3）或先升資料庫皆可。
+
 ## 備份
 
 主機上的腳本透過 `docker compose ps` 定位私有容器，再以 `docker exec` 執行 PostgreSQL 工具；dump 串流到主機目錄，密碼不離開容器。每個非 template 資料庫各有一份 custom-format dump；檔名中的資料庫名稱是 UTF-8 十六進位，避免不同名稱碰撞。每份新檔案先以 `pg_restore --exit-on-error -f /dev/null` 完整讀取；舊檔案若損壞會先改名為 `.corrupt`，新備份仍會保留，腳本最後才以非零回報。預設保留含當天在內的 7 個 UTC 日期：dump 裡的資料不受抹除影響，被抹除的人最多再留 7 天（`docs/platform/STORAGE_SWITCH.md`「Physical retention decision」，2026-10-10 決定）。部署前 dump（`deploy/lib-db.sh`）用同一個腳本，也是 7 天。
