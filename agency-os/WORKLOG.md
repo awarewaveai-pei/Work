@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-13（續4）認知平台：設定加顏色、五個介面問題改用操作者的白話（c960b8af0、e367571dc、9d17e6cb5，已上線）
+
+**根本問題**:
+- 網站的顏色只跟著電腦的深色／淺色設定：`design-system.css` 已有 `data-theme` 兩組顏色，但沒有任何地方設它。操作者在 Chrome 看到淺色、在 App 的瀏覽器看到深色，以為 CSS 被改了。
+- 群組頁的五個介面問題照藍圖原文出現，卡片標題是內部名稱「介面問題（各自先寫，五題都寫完才存）」。剛加入的人看不懂。
+
+**已修改**:
+- c960b8af0 設定頁「顏色」卡：淺色、深色、預設（跟著電腦）。選擇存在這個瀏覽器的 cookie；root layout 在伺服器端直接輸出 `<html data-theme>`，頁面不會先閃另一種顏色。
+- e367571dc 五題改用操作者的白話，原題用小字放在下面。答案仍存在原題底下（API 的 key），舊紀錄不動。群組頁和案子的「公共議題的五個問題」都改。
+- 9d17e6cb5 卡片標題和說明改成操作者原文：「從個人的判斷，走向共同的理解」、「請獨立回答五個問題，完成並儲存後，再看看其他人有哪些不同的觀點。」
+- 「五題改選填」沒有做（操作者選 1）：選填會讓只寫一題的人看到別人五題的回答，等於破壞「先寫才看」的規則（`ai_lego/platform/block_hooks/collab.py:40`）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx next build; npx vitest run GovernPage.test.tsx CollabPage.test.tsx ContextPage.test.tsx | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy/deploy.sh 兩次（/tmp/cos-deploy-20261013d.out 05:08:47Z、/tmp/cos-deploy-20261013e.out 05:15:46Z：smoke local/web/database/public 全 PASS）| exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -b cognitive_os_theme=dark https://cognitive.aware-wave.com/login → `<html lang="zh-Hant" data-theme="dark">`；不帶 cookie → 沒有 data-theme | exit=0 | ms=600
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/0n
+  - Codex agency-os/reports/oracle/2026-10-13-review-73594128.md（顏色）。兩項都確認並修好：設定頁其他部分載入失敗時顏色卡不出現；已選深色的人打開設定頁時「預設」先亮。e367571dc、9d17e6cb5 只改文字，讀回 diff。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=currentTheme | hits=0
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=介面問題（各自先寫 | hits=0
+
+**避免再發生**: 頁面中文要寫成完整、自然的句子，不用口語或電報式短句；操作者的三段改寫存成 memory `chinese-page-copy-register`。
+
+**rollback**: `git revert 9d17e6cb5 e367571dc c960b8af0` 後重跑 `deploy/deploy.sh`。
 ## 2026-10-13（續3）關掉 chatgpt／gemini／grok 六個 MCP wrapper（省每 session 的工具定義開銷）
 
 **根本問題**: 操作者覺得 Claude Code 燒 token。每個 session 都載入 6 個 LLM wrapper（`chatgpt-fast/latest`、`gemini-fast/latest`、`grok-fast/latest`）的工具定義，各 6 個工具，但 `.claude/` 下沒有任何 command／agent／skill 呼叫它們，AGENTS.md §4 也禁止拿它們當 oracle。
