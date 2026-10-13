@@ -8,7 +8,7 @@ import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import type { Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
-import { collab, groups, INTERFACE_QUESTIONS, originalLine, plainQuestion, type Agreement, type AgreementTable, type Authority, type Dissent, type Group, type Item, type Shared } from "../../lib/groups";
+import { collab, groups, INTERFACE_QUESTIONS, plainNote, type Agreement, type AgreementTable, type Authority, type Dissent, type Group, type Item, type Shared } from "../../lib/groups";
 import { Notices } from "./BlockShell";
 import { Cell } from "./JudgmentParts";
 import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
@@ -179,7 +179,7 @@ export function CollabPage({ groupId }: { groupId: string }) {
         {!data.wrote.answers && <p className="how">請獨立回答五個問題，完成並儲存後，再看看其他人有哪些不同的觀點。</p>}
         {!data.wrote.answers && (
           <>
-            {INTERFACE_QUESTIONS.map((q, index) => <Cell key={q} id={`answer-${index}`} label={plainQuestion(q)} hint={originalLine(q)}><textarea id={`answer-${index}`} value={form[`answer-${index}`] ?? ""} maxLength={2000} onChange={set(`answer-${index}`)} /></Cell>)}
+            {INTERFACE_QUESTIONS.map((q, index) => <Cell key={q} id={`answer-${index}`} label={q} hint={plainNote(q)}><textarea id={`answer-${index}`} value={form[`answer-${index}`] ?? ""} maxLength={2000} onChange={set(`answer-${index}`)} /></Cell>)}
             <div className="btns"><button className="btn" type="button" disabled={busy || !INTERFACE_QUESTIONS.every((_, index) => (form[`answer-${index}`] ?? "").trim())}
               onClick={write("answers", "collab.interface_answers", { round, answers: INTERFACE_QUESTIONS.map((q, index) => ({ q, text: (form[`answer-${index}`] ?? "").trim() })) },
                 INTERFACE_QUESTIONS.map((_, index) => `answer-${index}`))}>存我的回答</button></div>
@@ -188,7 +188,7 @@ export function CollabPage({ groupId }: { groupId: string }) {
           </>
         )}
         {data.wrote.answers && INTERFACE_QUESTIONS.map((q) => (
-          <div key={q}><p className="mt8"><b>{plainQuestion(q)}</b></p>
+          <div key={q}><p className="mt8 mb0"><b>{q}</b></p><p className="hint">{plainNote(q)}</p>
             {thisRound(data.answers).flatMap((item) => item.content.answers.filter((answer) => answer.q === q).map((answer) => <p key={item.doc_id} className="mt0">{item.who}：{answer.text}</p>))}
           </div>
         ))}

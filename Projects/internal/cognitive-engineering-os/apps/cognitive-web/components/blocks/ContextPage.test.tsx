@@ -169,10 +169,10 @@ describe("規範與脈絡", () => {
     server({ "assembler.intake": [{ question: "q", package: "公共議題判斷" }] });
     const second = await mount(<ContextPage projectId="P1" />);
     expect(second.host.querySelectorAll("[id^='pub-']")).toHaveLength(5);
-    // 2026-10-13: the operator's plain wording is what is asked, the original under it
+    // 2026-10-13: the original is the question, the operator's plain wording a note under it
     const field = second.host.querySelector("#pub-1")!.closest(".field")!;
-    expect(field.querySelector("label")?.textContent).toBe("1. 個人的判斷與共同的規則，該如何取得平衡？");
-    expect(field.querySelector(".hint")?.textContent).toBe("原題：個體判斷權與制度決策權在哪裡相遇？");
+    expect(field.querySelector("label")?.textContent).toBe("1. 個體判斷權與制度決策權在哪裡相遇？");
+    expect(field.querySelector(".hint")?.textContent).toBe("個人的判斷與共同的規則，該如何取得平衡？");
     await second.done();
   });
 

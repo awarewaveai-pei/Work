@@ -13,8 +13,8 @@ export const INTERFACE_QUESTIONS = [
   "如果制度必須保有權威，如何避免權威變成認知上的接管？",
   "如果個體必須保有自主，如何避免自主變成拒絕一切共同責任？",
 ] as const;
-// What the pages ask: the operator's plain wording of each (2026-10-13); the original stays beside it, and an answer is
-// still stored under the original (the API's key).
+// The operator's plain wording of each (2026-10-13): a note under the original question, which stays the question asked
+// and the key an answer is stored under.
 const INTERFACE_PLAIN: Record<string, string> = {
   "個體判斷權與制度決策權在哪裡相遇？": "個人的判斷與共同的規則，該如何取得平衡？",
   "制度何時有正當理由限制個體選擇？": "什麼情況下，限制個人的選擇是合理的？",
@@ -22,10 +22,8 @@ const INTERFACE_PLAIN: Record<string, string> = {
   "如果制度必須保有權威，如何避免權威變成認知上的接管？": "制度有權要求人遵守規則，但能不能要求人接受它的想法？",
   "如果個體必須保有自主，如何避免自主變成拒絕一切共同責任？": "如何保有自己的選擇權，同時不忽略對他人的責任？",
 };
-/** The plain wording of an interface question; a question it does not know is shown as it is. */
-export const plainQuestion = (question: string): string => INTERFACE_PLAIN[question] ?? question;
-/** The line under the plain wording: the original, when there is a plain one. */
-export const originalLine = (question: string): string | undefined => (question in INTERFACE_PLAIN ? `原題：${question}` : undefined);
+/** The note under an interface question: its plain wording, or nothing for a question it does not know. */
+export const plainNote = (question: string): string | undefined => INTERFACE_PLAIN[question];
 
 export type Purpose = "decision" | "class" | "workshop" | "research";
 export const PURPOSES: Array<{ value: Purpose; label: string }> = [
