@@ -25,6 +25,7 @@ never carry another member's identity: each item says ``who`` (你, the label th
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -107,10 +108,28 @@ class Names:
         return self.labels.get(identity_id) or self.names.get(identity_id) or LEFT
 
 
+# An AI record keeps member ids for the system: whom it restates (``about``) and which member each 成員N in its words is
+# (``members``, ai_gate._GroupReader.label). The viewer gets the words with each label read as the name they know.
+MEMBER_IDS = ("about", "members")
+LABEL = re.compile(r"成員\s*(\d+)")
+
+
+def _named(content: dict[str, Any], names: Names) -> dict[str, Any]:
+    members = content.get("members") if isinstance(content.get("members"), dict) else {}
+
+    def words(value: Any) -> Any:
+        if isinstance(value, str):
+            return LABEL.sub(lambda found: names(members[label]) if (label := f"成員{found.group(1)}") in members else found.group(0), value)
+        return [words(item) for item in value] if isinstance(value, list) else value
+
+    return {key: words(value) for key, value in content.items() if key not in MEMBER_IDS}
+
+
 def _shown(items: list[dict[str, Any]], names: Names) -> list[dict[str, Any]]:
     """The items as the viewer gets them: no identity of another member, ``who`` and ``mine`` instead."""
     return [{key: value for key, value in item.items() if key != "written_by"} | {"mine": item["written_by"] == names.viewer.identity_id,
-            "who": "AI" if item["author"] == "ai" else names(item["written_by"])} for item in items]
+            "who": "AI" if item["author"] == "ai" else names(item["written_by"])} | ({"content": _named(item["content"], names)} if item["author"] == "ai" else {})
+            for item in items]
 
 
 def _save_group(repo: ProjectSourceRepository, session: dict[str, Any], group_id: str, spec: doc_kinds.DocKind, body: DocBody, doc_id: str | None = None) -> dict[str, Any]:

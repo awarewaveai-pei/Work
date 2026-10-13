@@ -270,13 +270,19 @@ class _GroupReader:
 
     def __init__(self, action: AiAction, docs: CaseDocs, viewer: visibility.Viewer, group_id: str, shown: Callable[[str | None], str] | None) -> None:
         self._action, self._docs, self._viewer, self._group_id = action, docs, viewer, group_id
-        self._labels: dict[str | None, str] = {viewer.identity_id: "你"}
+        self._labels: dict[str | None, str] = {viewer.identity_id: "成員1"}
         self._shown = shown
 
     def label(self, identity_id: str | None) -> str:
+        """How the model names a member: 成員1 is the caller. Never 你: an AI record in a group is read by more people than
+        the one who asked, each shown the labels as the names they know (api/blocks/collab._shown, through ``members``)."""
         if identity_id not in self._labels:
-            self._labels[identity_id] = f"成員{len(self._labels)}"
+            self._labels[identity_id] = f"成員{len(self._labels) + 1}"
         return self._labels[identity_id]
+
+    def members(self) -> dict[str, str]:
+        """Which member each label given to the model stands for, kept with the AI's record."""
+        return {label: identity_id for identity_id, label in self._labels.items() if identity_id}
 
     def whole(self, kind: str) -> list[dict[str, Any]]:
         if kind not in self._action.reads:

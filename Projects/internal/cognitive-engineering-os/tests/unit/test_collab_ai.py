@@ -24,7 +24,7 @@ FENCE = re.compile(r"<<<QUOTED (\d+) BEGIN (\w+)>>>.*?<<<QUOTED \1 END \2>>>", r
 class CollabAiCase(CollabCase):
     def setUp(self):
         super().setUp()
-        self.provider = MirrorProvider({"text": "乙要的是先把錢談清楚，怕之後吵架。", "differences": ["要不要先談錢：一方要先談，一方要先做。"]})
+        self.provider = MirrorProvider({"text": "成員2要的是先把錢談清楚，怕之後吵架。", "differences": ["要不要先談錢：成員1要先做，成員2要先談。"]})
         api_main.app.dependency_overrides[api_main.get_ai_provider] = lambda: self.provider
 
     def turn(self, who: str, action: str, **context):
@@ -43,10 +43,15 @@ class RestatementTests(CollabAiCase):
         self.assertNotIn("先把錢談清楚", turn.text)            # not even to the one who asked
         [mine] = self.get(self.b, "collab.restatement")
         self.assertEqual((mine["who"], mine["mine"], mine["author"]), ("AI", True, "ai"))
+        self.assertEqual(mine["content"]["text"], "你要的是先把錢談清楚，怕之後吵架。")   # the model's 成員2, read by 成員2
         for viewer in (self.a, self.c):
             self.assertEqual(self.get(viewer, "collab.restatement"), [])
         self.post(self.b, "collab.confirm", restatement=mine["doc_id"], verdict="說得對")
-        self.assertEqual([item["content"]["text"] for item in self.get(self.a, "collab.restatement")], ["乙要的是先把錢談清楚，怕之後吵架。"])
+        [theirs] = self.get(self.a, "collab.restatement")
+        self.assertEqual(theirs["content"], {"position": ids[self.b], "text": "乙要的是先把錢談清楚，怕之後吵架。"})   # no member id: who it is about is 乙's to show
+        self.assertNotIn(self.b, self.everything(self.a))
+        self.post(self.b, "collab.label", label="匿名")
+        self.assertEqual(self.get(self.a, "collab.restatement")[0]["content"]["text"], "匿名要的是先把錢談清楚，怕之後吵架。")   # read as the name of now
         self.assertEqual(self.get(self.c, "collab.restatement"), [])   # c has not written a position of round 1: write before see holds through it
 
     def test_only_the_subject_answers_a_restatement(self):
@@ -100,7 +105,7 @@ class GroupGateTests(CollabAiCase):
         seen = [f"{item['doc_id']}@{item['version']}" for item in self.get(self.a, "collab.stance") if item["content"]["stance"] == "異議"]
         turn = self.turn(self.a, "organise_differences", round=1, seen=seen)
         self.assertEqual(turn.status_code, 200, turn.text)
-        self.assertEqual(turn.json()["saved"]["content"]["differences"], ["要不要先談錢：一方要先談，一方要先做。"])
+        self.assertEqual(turn.json()["saved"]["content"], {"round": 1, "differences": ["要不要先談錢：你要先做，乙要先談。"]})
         _, user = self.provider.calls[-1]
         fenced = "".join(match.group(0) for match in FENCE.finditer(user))
         outside = FENCE.sub("", user)

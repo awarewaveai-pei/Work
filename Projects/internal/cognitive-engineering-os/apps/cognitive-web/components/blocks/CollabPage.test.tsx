@@ -117,7 +117,7 @@ describe("COLLAB: one group's page", () => {
 
   it("a restatement of me is shown to me first, tagged AI, with 說錯了; reopening is always there", async () => {
     const { host, done, calls } = await open({
-      [`${C}/collab.restatement`]: [item("collab.restatement", "R1", { about: "I2", position: "P2", text: "你要先把錢談清楚。" }, { author: "ai", who: "AI", mine: true })],
+      [`${C}/collab.restatement`]: [item("collab.restatement", "R1", { position: "P2", text: "你要先把錢談清楚。" }, { author: "ai", who: "AI", mine: true })],
       [`POST ${C}/collab.confirm`]: (call: Call) => ({ ...item("collab.confirm", "K1", call.body.content, { mine: true }), notices: [] }),
     });
     expect(host.textContent).toContain("AI 寫的");

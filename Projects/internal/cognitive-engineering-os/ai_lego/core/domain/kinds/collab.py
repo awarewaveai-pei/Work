@@ -30,6 +30,11 @@ def _id(required: bool = True) -> Field:
     return Field("text", 64, required=required, scan=False)
 
 
+def _members() -> Field:
+    """An AI record's {成員N: member id}: which member each label in its words is. A reader is shown names, never this."""
+    return Field("json", 30000, required=True, scan=False, shape="object")   # ~50 bytes a member
+
+
 KINDS = [
     DocKind("collab.question", "COLLAB", "這次要決定的問題", {
         "text": Field("text", 2000, required=True),
@@ -93,6 +98,7 @@ KINDS = [
         "about": _id(),                                             # the member restated (the record's writer identity too)
         "position": _id(),                                          # the collab.position it restates
         "text": Field("text", 2000, required=True),
+        "members": _members(),
     }, owner="group", authors=frozenset({"ai"}), visibility="subject_confirmed"),
     DocKind("collab.confirm", "COLLAB", "轉述對不對", {
         "restatement": _id(),
@@ -101,6 +107,7 @@ KINDS = [
     DocKind("collab.differences", "COLLAB", "AI 整理的分歧", {
         "round": _round(),
         "differences": Field("list", 10, required=True),
+        "members": _members(),
     }, owner="group", authors=frozenset({"ai"}), visibility="author_only"),   # for the one who asked: written with their identity
     DocKind("collab.proposal", "COLLAB", "提案", {
         "express_draft": _id(required=False),

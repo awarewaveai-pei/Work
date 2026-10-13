@@ -122,6 +122,8 @@ export function SensePage({ projectId }: { projectId: string }) {
     }
     await docs.remove(projectId, "sense.card", doc.doc_id);
   });
+  const flat = (content: object) => JSON.stringify(content, Object.keys(content).sort());   // the list's order of keys is not the save's
+  const stateDirty = flat(draftState) !== flat(state?.content ?? {});
   const saveState = () => act("state", async () => {
     const content = { ...draftState, defer_irreversible: (draftState.regulation ?? []).includes("延後") };
     const saved = state ? await docs.update(projectId, "sense.state", state, content) : await docs.create(projectId, "sense.state", content);
@@ -235,7 +237,10 @@ export function SensePage({ projectId }: { projectId: string }) {
           <><label htmlFor="distance">拉開距離之後，你怎麼看</label><textarea id="distance" value={draftState.distance_note ?? ""} maxLength={1000} onChange={(event) => setDraftState({ ...draftState, distance_note: event.target.value })} /></>
         )}
         {draftState.intensity === "強" && <p className="warn">情緒很強時，建議把不能反悔的決定延後。要等多久，由你定。</p>}
-        <div className="btns mt8"><button className="btn primary" type="button" disabled={!draftState.emotion.trim() || !draftState.intensity || busy} onClick={saveState}>存</button></div>
+        <div className="btns mt8">
+          <button className="btn primary" type="button" disabled={!draftState.emotion.trim() || !draftState.intensity || busy} onClick={saveState}>存</button>
+          {state && (stateDirty ? <span className="warn">有還沒存的改動</span> : <span className="sub" role="status">已存</span>)}
+        </div>
         <Missing why={firstMissing([!draftState.emotion.trim(), "先寫一個詞。"], [!draftState.intensity, "先選強度。"])} />
         <Refused failed={failed} at="state" />
       </div>

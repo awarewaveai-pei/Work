@@ -91,7 +91,7 @@ def cases(say: str) -> dict[str, tuple[list[dict], list[dict]]]:
     calibration = doc("learn.calibration", {"judgment_version": 1, "outcome": say})
     old_calibration = doc("learn.calibration", {"judgment_version": 1, "outcome": say})
     late_judgment = doc("decide.judgment", {"uncertainty": say, "change_condition": say, "confidence": 50, "intensity_now": "中"})
-    restatement = doc("collab.restatement", {"about": "b", "position": "p1", "text": say}, author="ai", written_by="b", **g)
+    restatement = doc("collab.restatement", {"about": "b", "position": "p1", "text": say, "members": {"成員1": "b"}}, author="ai", written_by="b", **g)
     right = doc("collab.confirm", {"restatement": restatement["doc_id"], "verdict": "說得對"}, written_by="b", **g)
     wrong = doc("collab.confirm", {"restatement": restatement["doc_id"], "verdict": "說錯了"}, written_by="b", **g)
     by_other = doc("collab.confirm", {"restatement": restatement["doc_id"], "verdict": "說得對"}, written_by="a", **g)

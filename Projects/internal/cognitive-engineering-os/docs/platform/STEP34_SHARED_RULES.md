@@ -117,7 +117,7 @@ All `owner="group"`, writers as stated, none carries a score, rank or rating key
 | `collab.authority` | user | `to`, `scope`, `revoked_by: [identity_id]` | revoking removes only the revoker's share; the scope shown is recomputed from the members still granting |
 | `collab.closing` | user (convener) | `why_end`, `reopen_if`, `review_on`, `owner` | all four required |
 | `collab.reopen` | user | `reason` | any member; reopening is never refused by the convener |
-| `collab.restatement` | ai | `about`, `text` | visible to others only after `about` confirmed it; "說錯了" stops the AI turn and hands control back |
+| `collab.restatement` | ai | `about`, `text`, `members` | visible to others only after `about` confirmed it; "說錯了" stops the AI turn and hands control back; the text names members 成員N, each reader is shown the name they know (`members`; no id is served) |
 | `collab.proposal` | user (from EXPRESS) | `express_draft`, `text` | the proposal a draft becomes inside a group |
 | `collab.consequence` | user | `decision`, `observed` | written back, read by the next round |
 

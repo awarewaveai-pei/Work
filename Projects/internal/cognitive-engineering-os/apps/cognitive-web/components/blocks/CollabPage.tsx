@@ -30,7 +30,7 @@ type Loaded = {
   group: Group; round: number; questions: Array<Item<{ text: string; round: number }>>; versions: Record<string, Array<Item<{ text: string }>>>;
   positions: Array<Item<Position>>; changes: Array<Item<Change>>; answers: Array<Item<Answers>>; wrote: { position: boolean; change: boolean; answers: boolean };
   options: Array<Item<Option>>; stances: Array<Item<Stance>>; dissent: Dissent[]; authority: Authority; reopens: Array<Item<{ reason: string }>>;
-  closings: Array<Item<Closing>>; restatements: Array<Item<{ about: string; position: string; text: string }>>; confirms: Array<Item<{ restatement: string; verdict: string }>>;
+  closings: Array<Item<Closing>>; restatements: Array<Item<{ position: string; text: string }>>; confirms: Array<Item<{ restatement: string; verdict: string }>>;
   differences: Array<Item<{ round: number; differences: string[] }>>; agreement: Agreement; consequences: Array<Item<{ decision: string; observed: string }>>;
   reviews: Array<Item<{ text: string }>>; labels: Array<Item<{ label: string }>>; places: Array<Item<{ where: string }>>; proposals: Array<Item<Proposal>>;
   shared: Shared[];
