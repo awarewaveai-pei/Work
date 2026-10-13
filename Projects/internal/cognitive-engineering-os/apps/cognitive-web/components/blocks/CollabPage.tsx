@@ -12,6 +12,7 @@ import { collab, groups, INTERFACE_QUESTIONS, type Agreement, type AgreementTabl
 import { Notices } from "./BlockShell";
 import { Cell } from "./JudgmentParts";
 import { Missing, Refused, firstMissing, type Failed } from "./PageParts";
+import { ProcessFacts } from "./ProcessFacts";
 
 type Position = { round: number; text: string; confidence?: string };
 type Change = { round: number; after_reading: "no change" | "changed"; what?: string };
@@ -392,6 +393,8 @@ export function CollabPage({ groupId }: { groupId: string }) {
         <div className="btns"><button className="btn" type="button" disabled={busy || !(form.review ?? "").trim()} onClick={write("review", "collab.review", { text: (form.review ?? "").trim() }, ["review"])}>存回顧</button></div>
         <Refused failed={failed} at="review" />
       </div>
+
+      <ProcessFacts path={`/groups/${encodeURIComponent(groupId)}`} stamp={data} />
 
       <div className="card">
         <h2>我在哪裡</h2>

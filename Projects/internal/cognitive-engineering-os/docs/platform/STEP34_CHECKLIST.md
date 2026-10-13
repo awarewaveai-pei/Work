@@ -123,7 +123,7 @@ The page walk of §16 ran at the wave's close (card 80): `scripts/page_walk_step
 - DEPARTURE: `ai_trust_calibrated` reads the two kinds that carry a reason of the person's own beside an answer to an AI record: `verify.stance.reason` (with `reading`) and `think.reaction.reason` (on an AI card). `sense.review.note`, `decide.review.note`, `think.response.note` are notes or the rewritten version, not reasons, so they are not read
 - NOT BUILT: the group-level `claims_with_source_share` and `facts_law_values_separate` (A8 lists them under 公共決策) -- they need each member's claim ledger, which a group reads only through a consent (R2) and which carries no origins to count; a member sees them on their own case
 - NOT YET: GOVERN's research export including the indicator facts of consented items (the card's "may") -- `platform/research_export.py` is card 31's file, not in this card's list; the functions take the consented documents as `records`, the export would pseudonymise the `owner` label and add a manifest line
-- NOT YET: the lists drawn on the group and case pages (the card's "may show"; no page file is in the card's list); `lib/` has no client for the two routes
+- built 2026-10-13: the lists drawn on the case page (`components/ProjectPage.tsx:396`, a case only) and the group page (`components/blocks/CollabPage.tsx:397`) by `components/blocks/ProcessFacts.tsx:25` -- folded, read only when opened; on a case each sentence links to the block page holding its records
 
 ## Card lines (card 80)
 

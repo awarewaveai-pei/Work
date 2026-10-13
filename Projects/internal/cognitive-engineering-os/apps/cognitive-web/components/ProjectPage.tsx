@@ -13,6 +13,7 @@ import { STANCE, STATUS, TASK_STATUS, holderWord, standing, thisHolder, todayIso
 import { formatTime } from "../lib/time";
 import { TrendChart, type TrendSeries } from "./result/Charts";
 import { CaseSlots } from "./blocks/BlockShell";
+import { ProcessFacts } from "./blocks/ProcessFacts";
 
 const OPEN: Record<Analysis["status"], string> = { DONE: "看結果 →", PENDING: "看進度 →", FAILED: "看原因 →" };
 const TASK_STATUS_LIST = Object.keys(TASK_STATUS) as TaskStatus[];
@@ -392,6 +393,7 @@ export function ProjectPage({ projectId, names = {} }: { projectId: string; name
       {rerunNowError && <p className="error" role="alert">{rerunNowError}</p>}
       {reruns.length > 0 && <ul>{reruns.map((item) => <li key={item.rerun_id}>{item.due}：{item.fulfilled_by ? <>已重跑，<Link href={compareHref(project.project_id, item.interpretation_id, item.fulfilled_by)}>並排比較 →</Link></> : item.due <= today ? <Link href={`${analysisHref(project.project_id, item.interpretation_id)}?rerun=${encodeURIComponent(item.rerun_id)}`}>到期了，重跑並比較 →</Link> : "還沒到期"}</li>)}</ul>}
     </div>}
+    {project.is_case && <ProcessFacts path={base} projectId={project.project_id} />}
     <div className="card">
       <h2>歷程<small>{historyLines.length ? `${historyLines.length} 筆，新的在上面` : "還沒有"}</small></h2>
       <div className="how"><b>怎麼讀</b>{here}從建立到現在的每一步，新的在上面。<b>你要做的</b>不用做；想看細節就點連結。</div>
