@@ -56,6 +56,18 @@ class InviteCase(ApiTestCase):
 
 
 class OneTimeLinkTests(InviteCase):
+    def test_a_visitors_new_account_is_signed_in_by_the_accept_answer(self):
+        """2026-10-13: the web page used to log in by password after accepting; an address held in another workspace
+        then met LOGIN_CHOOSE_WORKSPACE with the one-time invitation already used. The answer itself signs the new
+        account in, and says nothing of the workspace."""
+        joined = self.as_visitor(self.invite()["token"], "fresh@example.com")
+        self.assertEqual(joined.status_code, 200, joined.text)
+        self.assertNotIn("tenant_id", joined.json())
+        self.assertIn("cognitive_os_session", joined.cookies)
+        mine = self.client.get("/groups")
+        self.assertEqual(mine.status_code, 200, mine.text)
+        self.assertEqual([group["group_id"] for group in mine.json()], [self.group])
+
     def test_a_visitor_joins_once_and_the_second_accept_is_refused(self):
         made = self.invite()
         joined = self.as_visitor(made["token"], "new@example.com")

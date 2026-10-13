@@ -5,19 +5,10 @@
 // workspaces: [{tenant_id, name}]}; each one is a visible button (no dropdown), and pressing it logs in there.
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, apiFetch } from "../../lib/api";
+import { apiFetch } from "../../lib/api";
+import { type Workspace, workspacesOf } from "../../lib/login";
 import { humanError } from "../../lib/errors";
 import { strings } from "../../lib/strings";
-
-type Workspace = { tenant_id: string; name: string };
-
-/** The workspaces a 409 LOGIN_CHOOSE_WORKSPACE offers; anything else is not a choice. */
-function workspacesOf(reason: unknown): Workspace[] | null {
-  if (!(reason instanceof ApiError) || reason.status !== 409) return null;
-  const detail = reason.detail as { code?: unknown; workspaces?: unknown } | null;
-  if (!detail || detail.code !== "LOGIN_CHOOSE_WORKSPACE" || !Array.isArray(detail.workspaces)) return null;
-  return detail.workspaces.filter((item): item is Workspace => typeof item?.tenant_id === "string" && typeof item?.name === "string");
-}
 
 export default function LoginPage() {
   const router = useRouter();

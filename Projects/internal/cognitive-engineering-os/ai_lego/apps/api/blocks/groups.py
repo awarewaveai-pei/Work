@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from psycopg.errors import UniqueViolation
 from pydantic import BaseModel
 
@@ -174,9 +174,11 @@ class AcceptBody(BaseModel):
 
 
 @router.post("/invites/accept")
-def accept_invite(body: AcceptBody, cognitive_os_session: str | None = Cookie(default=None), store: IdentityStore = Depends(api.get_store)) -> dict[str, Any]:
+def accept_invite(body: AcceptBody, response: Response, cognitive_os_session: str | None = Cookie(default=None), store: IdentityStore = Depends(api.get_store)) -> dict[str, Any]:
     """Signed in: that person joins (same tenant only). Otherwise a visitor: a new account in the invitation's tenant.
-    Every refusal of the invitation itself is one 404 with one body (IdentityStore.INVITE_REFUSED)."""
+    Every refusal of the invitation itself is one 404 with one body (IdentityStore.INVITE_REFUSED). A visitor's new account
+    is signed in by this answer (the session cookie /auth/login sets): a password login afterwards could meet the same
+    address in another workspace (LOGIN_CHOOSE_WORKSPACE) after the one-time invitation was already used (2026-10-13)."""
     session = store.resolve_session(cognitive_os_session) if cognitive_os_session else None
     visitor = None
     if session is None:
@@ -184,7 +186,11 @@ def accept_invite(body: AcceptBody, cognitive_os_session: str | None = Cookie(de
             raise HTTPException(status_code=400, detail="INVITE_VISITOR_FIELDS_REQUIRED: email, display name and password make the new account")
         visitor = {"email": body.email.strip().lower(), "display_name": body.display_name.strip(), "password": body.password}
     try:
-        return store.accept_invite(body.token, identity=session, visitor=visitor)
+        joined = store.accept_invite(body.token, identity=session, visitor=visitor)
+        tenant_id = joined.pop("tenant_id")
+        if visitor is not None:
+            response.set_cookie(api.SESSION_COOKIE, store.issue_session_for_identity(joined["identity_id"], tenant_id), httponly=True, samesite="strict", secure=True, max_age=12 * 3600)
+        return joined
     except InvariantViolation as error:
         text = str(error)
         if text == IdentityStore.INVITE_REFUSED:

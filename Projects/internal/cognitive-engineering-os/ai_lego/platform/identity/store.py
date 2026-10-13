@@ -770,7 +770,7 @@ class IdentityStore:
             if conn.execute("UPDATE group_invites SET used_at = %s, used_by_identity_id = %s WHERE tenant_id = %s AND invite_id = %s AND used_at IS NULL AND revoked_at IS NULL",
                             (now, joining, tenant_id, invite["invite_id"])).rowcount != 1:
                 raise InvariantViolation(self.INVITE_REFUSED)
-        return {"group_id": invite["group_id"], "identity_id": joining, "review_state": state}
+        return {"group_id": invite["group_id"], "identity_id": joining, "review_state": state, "tenant_id": tenant_id}
 
     def _finished_leader_course(self, tenant_id: str, identity_id: str) -> bool:
         """§5: the facilitator role is derived from records (platform/visibility.py), asked at the moment it would be set."""
