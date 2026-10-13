@@ -8,6 +8,7 @@ import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { AUTHOR, docs, type AiTurn, type Doc, type Notice } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
+import { originalLine, plainQuestion } from "../../lib/groups";
 import { facetState, openPointers, placesOf, removeFacet, setFacet, toggled, type ContextSpec, type Notes } from "../../lib/context";
 import type { MapSpec } from "../../lib/map";
 import { BlockShell, Notices } from "./BlockShell";
@@ -225,7 +226,8 @@ export function ContextPage({ projectId }: { projectId: string }) {
           <p className="how">走公共議題判斷時，你也回答這五題。想不出來的可以空著。</p>
           {spec.public_issue.questions.map((question, index) => (
             <div key={question} className="field">
-              <label htmlFor={`pub-${index + 1}`}>{index + 1}. {question}</label>
+              <label htmlFor={`pub-${index + 1}`}>{index + 1}. {plainQuestion(question)}</label>
+              {originalLine(question) && <p className="hint">{originalLine(question)}</p>}
               <textarea id={`pub-${index + 1}`} value={draft.interface?.[String(index + 1)] ?? ""} maxLength={1500} onChange={(event) => set({ interface: { ...draft.interface, [String(index + 1)]: event.target.value } })} />
             </div>
           ))}
