@@ -32,7 +32,10 @@ NO_EFFORT_MODEL_PREFIXES = ("claude-haiku-",)   # effort is a 400 there (COGNITI
 # model's rates; payload["model"] names who answered, which is what the meter prices).
 FALLBACK_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-fable-5-1")
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
-DEFAULT_TIMEOUT_SECONDS = 60.0
+# A turn the page waits for: under the proxies in front of the API (lobster-factory/.../nginx/default.conf, the cognitive
+# server's proxy_read_timeout 90s; Cloudflare stops at 100 s), so the API's own answer -- a draft at 59 s, or AI_PROVIDER
+# timed out -- reaches the page instead of a gateway's 504 (2026-10-13: both were 60 s). tests/unit/test_ai_gateway.py checks.
+DEFAULT_TIMEOUT_SECONDS = 85.0
 MAX_OUTPUT_TOKENS = 16384   # the gateway's ceiling per call; a caller picks its own limit under it (drafts 6000, interpretations 12288)
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 # A tool call can come back with its next argument written inside a string argument, in the model's own call syntax:

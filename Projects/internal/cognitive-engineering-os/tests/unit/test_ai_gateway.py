@@ -6,12 +6,13 @@ from __future__ import annotations
 
 import inspect
 import json
+import re
 import threading
 import unittest
 import uuid
 from unittest.mock import patch
 
-from ai_lego import resolve_spec_root
+from ai_lego import REPO_ROOT, resolve_spec_root
 from ai_lego.apps.api import main as api_main
 from ai_lego.apps.api.dispatch import resolve_builder
 from ai_lego.apps.cli.run_flowchart_slice import fixture_args
@@ -19,7 +20,7 @@ from ai_lego.errors import InvariantViolation
 from tests.unit.method_testkit import shared_method_catalog
 from ai_lego.platform.ai_gateway import draft as draft_mod
 from ai_lego.platform.ai_gateway.draft import build_prompt, draft_method_kwargs, draft_recipe_source, extract_json_object, method_input_spec, recipe_draft_plan
-from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, PERSON_TOKEN_BUDGET_ENV, DEFAULT_EFFORT, DEFAULT_MODEL, MAX_OUTPUT_TOKENS, MODEL_ENV, AiCompletion, AnthropicProvider, ProviderCallError, provider_from_env
+from ai_lego.platform.ai_gateway.provider import API_KEY_ENV, DAILY_TOKEN_BUDGET_ENV, DEFAULT_DAILY_TOKEN_BUDGET, PERSON_TOKEN_BUDGET_ENV, DEFAULT_EFFORT, DEFAULT_MODEL, DEFAULT_TIMEOUT_SECONDS, MAX_OUTPUT_TOKENS, MODEL_ENV, AiCompletion, AnthropicProvider, ProviderCallError, provider_from_env
 from ai_lego.platform.net import egress
 from tests.unit.test_api_main import ApiTestCase
 from tests.unit.thread_testkit import HANG_GUARD_S, join_all
@@ -541,6 +542,18 @@ class ApiRouteTests(ApiTestCase):
         self.assertEqual(self.client.post("/ai/draft/recipe/nope", json={"brief": "x", "labels": ["a"]}).status_code, 404)
 
 
+
+
+class ProxyTimeoutTests(unittest.TestCase):
+    def test_the_page_gets_the_apis_answer_before_a_proxy_gives_up(self):
+        """2026-10-13: the AI timeout and nginx's were both 60 s, so a turn ending near 60 s reached the page as nginx's 504.
+        The API answers inside nginx's limit; nginx waits less than Cloudflare's 100 s."""
+        conf = (REPO_ROOT / "lobster-factory/infra/hetzner-phase1-core/nginx/default.conf").read_text(encoding="utf-8")
+        server = re.search(r"server_name cognitive\.aware-wave\.com;(.*?)\n}", conf, re.S)
+        self.assertIsNotNone(server, "default.conf: the cognitive server block is not found")
+        for setting in ("proxy_read_timeout", "proxy_send_timeout"):
+            [seconds] = [int(value) for value in re.findall(setting + r" (\d+)s;", server.group(1))]
+            self.assertTrue(DEFAULT_TIMEOUT_SECONDS + 5 <= seconds < 100, f"{setting} {seconds}s vs the AI timeout {DEFAULT_TIMEOUT_SECONDS}s")
 
 
 class CompleteJsonTests(unittest.TestCase):

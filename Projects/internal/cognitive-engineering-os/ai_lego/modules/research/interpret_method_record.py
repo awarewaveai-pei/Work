@@ -28,7 +28,7 @@ _VISUAL_KINDS = {"layered", "quadrant", "table", "matrix", "graph", "tree", "tim
 # record, and INTERPRET_EFFORT keeps the thinking share bounded. A cut-off answer is asked once more (run_interpretation).
 INTERPRET_MAX_TOKENS = min(16000, MAX_OUTPUT_TOKENS)
 INTERPRET_EFFORT = "medium"
-INTERPRET_TIMEOUT_SECONDS = 300.0                    # 16k tokens take up to ~4 minutes; the interactive 60 s default would cut it off (the job runs in the background)
+INTERPRET_TIMEOUT_SECONDS = 300.0                    # 16k tokens take up to ~4 minutes; the interactive 85 s default would cut it off (the job runs in the background)
 # keys the server writes after the model answers: never asked of the model
 SERVER_KEYS = ("interpretation_id", "method_id", "record_sha256", "data_thickness", "provenance", "model", "usage", "judgment")
 MAX_SCHEMA_CHARS = 12000
