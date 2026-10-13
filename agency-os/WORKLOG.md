@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-13（續7）認知平台：實測剩下的小問題處理完（6bd12be9c、6bce0eb9a、f3ef8af8d、f898e7341，已上線）
+
+**操作者**：「去處理好所有的事」（續6 列的 4 個小問題）。
+
+**逐項**:
+- m1 情緒調節勾選框名稱是 "on"：**不是錯**。`SensePage.tsx` 的 input 包在 label 裡；Chromium 算出的名稱是「放慢：先停十秒」（scratchpad `a11y.js`，ariaSnapshot）。"on" 是爬蟲讀到 checkbox 的 value。
+- m2 外化存情緒後沒有「已存」：照 ContextPage／MapPage 既有做法，存後顯示「已存」，改了之後顯示「有還沒存的改動」。比較時不管 key 順序（list 回的是 jsonb 順序，存檔回的不是）。新增 `SensePage.test.tsx`。
+- m3 群組 AI 寫「成員1」：比回報的更大。`ai_gate._GroupReader` 給模型的稱呼是「問的人＝你、其他人＝成員N」，AI 的字原樣存、原樣給人看。轉述先給本人看、再給大家看，所以本人看到自己被叫「成員1」；問的人轉述自己的立場，之後別人看到的「你」指的是問的人。另外 `collab.restatement.content.about`（本人的 identity id）會送給每個讀得到的成員，署名「匿名」的人也會被對回來，違反 `api/blocks/collab.py` 開頭的「答案不帶別人的 identity」。
+  - 修法：模型一律用「成員N」（問的人是成員1），不准用你／我／他／她。AI 紀錄另存 `members {成員N: id}`。`_shown` 讀出時把每個成員N換成這位讀者認得的名字（你、自訂署名含匿名、名字、已離開的成員），並拿掉 `about`、`members`。換名字在讀的時候做，之後才改成匿名也算數。之前存的紀錄沒有 `members`，照原樣顯示。
+- m4 EXPRESS 起草 38 秒、上限 60 秒：AI 的時限和 nginx 的時限都是 60 秒，AI 在 59 秒回來或 API 自己在 60 秒報 AI 逾時，頁面都可能先收到 nginx 的 504。改成 AI 85 秒、nginx cognitive server 90 秒，前面 Cloudflare 100 秒（host nginx 300 秒）。`ProxyTimeoutTests` 讀 `default.conf` 檢查。
+  - 沒修、要另做：回答接近 max_tokens 時（EXPRESS 起草 8000，約 68 token/秒，見 `interpret_method_record.py:31`）要兩分鐘左右，只有改成背景執行才裝得下（分析已經是背景執行）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run（921 個，4 個 test_indicators 錯：假資料少了 members；補上後 test_indicators + test_collab_ai 22 passed、109 subtests）| exit=0 | ms=778000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 `MEMBER_IDS = ()` → test_collab_ai 轉述測試變紅；還原後 grep 確認 | exit=0 | ms=7000
+- REALTEST_EVIDENCE: tool=Bash | cmd=vitest SensePage（新）、CollabPage 7 passed；npx tsc --noEmit；pytest ProxyTimeoutTests、CompleteJsonTests 9 passed | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh nginx（改前 live md5 = repo 1108d4ef…；改後 e21cce46… 兩邊相同，nginx -T 看到 proxy_read_timeout 90s，/api/health 200）| exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy/deploy.sh 第一次（/tmp/cos-deploy-20261013h.out）在測試閘門 FAIL、沒有上線：`ProxyTimeoutTests` 放在 test image 裡跑，image 沒有 lobster-factory，讀不到 default.conf。移到已在 `CHECKOUT_ONLY_TEST_MODULES` 的 `test_go_live_guards`（f898e7341）| exit=1 | ms=513000
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy/deploy.sh 第二次（/tmp/cos-deploy-20261013i.out：419 模組測試閘門 PASS、healthcheck、smoke local/web/database/public 全 PASS，07:52:15Z done；容器內 DEFAULT_TIMEOUT_SECONDS=85.0、MEMBER_IDS=('about','members')）| exit=0 | ms=616000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+  - Codex agency-os/reports/oracle/2026-10-13-review-5309fa78.md：NO FINDINGS。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts,lobster-factory/infra | grep=collab.restatement|collab.differences|DEFAULT_TIMEOUT_SECONDS|interactive 60 | hits=19
+  - `scripts/seed_step34.py:151` 寫轉述沒有 members，會被拒：補上（f3ef8af8d，文字不放成員N，走查要逐字比對）。`STEP34_SHARED_RULES.md` 轉述那一列補上 members；`interpret_method_record.py:31` 的「60 s」改 85。其餘是讀取端或已改的檔；`net/egress.py` 是另一個同名常數；codex-queue 卡片 21、70 是歷史卡，不改。
+
+**rollback**: `git revert f898e7341 f3ef8af8d 6bce0eb9a 6bd12be9c` 後重跑 `deploy/deploy.sh`；nginx 用 `/root/lobster-phase1/nginx/default.conf.bak.safe-patch-20261013-073103`。
+
+**下一步（另開）**: 長的 AI 回答改背景執行（EXPRESS 起草 8000 tokens 約兩分鐘，Cloudflare 100 秒裝不下）。
 ## 2026-10-13（續6）認知平台：開新案、我的群組實測（真瀏覽器、真 AI、兩個帳號），找到 5 個問題並修好（ea47c6a4e、c27f293f8，已上線）
 
 **做法**: ks-aw-01 上開一次性的測試站（compose project `cos-e2e`、`cos-e2e2`，自己的資料庫、只開 127.0.0.1，用正式站當下的 image；修正版另建 `cos-e2e-*:new`），筆電 ssh tunnel，Playwright 腳本（scratchpad `e2e/walk.js`、`e2e/group2.js`）。開新案：14 個積木頁每個欄位填、每個不刪資料的按鈕按一次，記錄 4xx/5xx、頁面錯誤、拒絕訊息、標記外洩。我的群組：召集人建群組、做邀請連結，新的人用連結建帳號加入，兩人輪流走完 39 個步驟。
