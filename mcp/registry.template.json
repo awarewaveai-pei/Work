@@ -310,7 +310,8 @@
                                            }
                                },
                     "chatgpt-fast":  {
-                                         "enabled":  true,
+                                         "enabled":  false,
+                                         "note":  "DISABLED 2026-10-13: operator turned off the chatgpt/gemini/grok wrappers to cut per-session tool-definition overhead; nothing in .claude/ calls them and AGENTS.md section 4 forbids them as oracle. Re-enable by setting enabled true and re-running scripts/sync-mcp-config.ps1.",
                                          "transport":  "stdio",
                                          "command":  "powershell",
                                          "args":  [
@@ -328,7 +329,8 @@
                                                  }
                                      },
                     "chatgpt-latest":  {
-                                           "enabled":  true,
+                                           "enabled":  false,
+                                           "note":  "DISABLED 2026-10-13: operator turned off the chatgpt/gemini/grok wrappers to cut per-session tool-definition overhead; nothing in .claude/ calls them and AGENTS.md section 4 forbids them as oracle. Re-enable by setting enabled true and re-running scripts/sync-mcp-config.ps1.",
                                            "transport":  "stdio",
                                            "command":  "powershell",
                                            "args":  [
@@ -346,7 +348,8 @@
                                                    }
                                        },
                     "gemini-fast":  {
-                                        "enabled":  true,
+                                        "enabled":  false,
+                                        "note":  "DISABLED 2026-10-13: operator turned off the chatgpt/gemini/grok wrappers to cut per-session tool-definition overhead; nothing in .claude/ calls them and AGENTS.md section 4 forbids them as oracle. Re-enable by setting enabled true and re-running scripts/sync-mcp-config.ps1.",
                                         "transport":  "stdio",
                                         "command":  "powershell",
                                         "args":  [
@@ -364,7 +367,8 @@
                                                 }
                                     },
                     "gemini-latest":  {
-                                          "enabled":  true,
+                                          "enabled":  false,
+                                          "note":  "DISABLED 2026-10-13: operator turned off the chatgpt/gemini/grok wrappers to cut per-session tool-definition overhead; nothing in .claude/ calls them and AGENTS.md section 4 forbids them as oracle. Re-enable by setting enabled true and re-running scripts/sync-mcp-config.ps1.",
                                           "transport":  "stdio",
                                           "command":  "powershell",
                                           "args":  [
@@ -382,7 +386,8 @@
                                                   }
                                       },
                     "grok-fast":  {
-                                      "enabled":  true,
+                                      "enabled":  false,
+                                      "note":  "DISABLED 2026-10-13: operator turned off the chatgpt/gemini/grok wrappers to cut per-session tool-definition overhead; nothing in .claude/ calls them and AGENTS.md section 4 forbids them as oracle. Re-enable by setting enabled true and re-running scripts/sync-mcp-config.ps1.",
                                       "transport":  "stdio",
                                       "command":  "powershell",
                                       "args":  [
@@ -400,7 +405,8 @@
                                               }
                                   },
                     "grok-latest":  {
-                                        "enabled":  true,
+                                        "enabled":  false,
+                                        "note":  "DISABLED 2026-10-13: operator turned off the chatgpt/gemini/grok wrappers to cut per-session tool-definition overhead; nothing in .claude/ calls them and AGENTS.md section 4 forbids them as oracle. Re-enable by setting enabled true and re-running scripts/sync-mcp-config.ps1.",
                                         "transport":  "stdio",
                                         "command":  "powershell",
                                         "args":  [

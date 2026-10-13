@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-13（續3）關掉 chatgpt／gemini／grok 六個 MCP wrapper（省每 session 的工具定義開銷）
+
+**根本問題**: 操作者覺得 Claude Code 燒 token。每個 session 都載入 6 個 LLM wrapper（`chatgpt-fast/latest`、`gemini-fast/latest`、`grok-fast/latest`）的工具定義，各 6 個工具，但 `.claude/` 下沒有任何 command／agent／skill 呼叫它們，AGENTS.md §4 也禁止拿它們當 oracle。
+
+**已修改**:
+- `mcp/registry.template.json`：六個 server `enabled: false` + `note`（沿用 canva 的停用寫法，保留條目，名單不變 → `check-governance-docs-drift.ps1` 的 mcp_set_consistency 不受影響）。
+- 跑 `scripts/sync-mcp-config.ps1` → 重產 `.mcp.json`（gitignored）、`~/.codex/config.toml`、`~/.copilot/mcp-config.json`、`~/.gemini/settings.json`。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/sync-mcp-config.ps1; grep -c -E '"(chatgpt|gemini|grok)-(fast|latest)"' .mcp.json | exit=0 | ms=9000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=.claude/commands,.claude/agents,.claude/skills,scripts,agency-os/docs,mcp,lobster-factory/docs | grep=(chatgpt|gemini|grok)-(fast|latest) | hits=7
+- ORACLE_WAIVED: config-only flag flip, no source logic changed
+
+**還原**: registry 六處改回 `"enabled":  true` → 重跑 `scripts/sync-mcp-config.ps1` → 重開 session。
+
+**避免再發生**: 新增 MCP server 前先問「哪個 command／agent 會呼叫它」；沒有呼叫者就以 `enabled: false` 登記。
 ## 2026-10-13（續2）認知平台：邀請連結有頁面、過程指標畫上頁面（16996c0c7、f2c3890bd，已上線）
 
 **根本問題**:
