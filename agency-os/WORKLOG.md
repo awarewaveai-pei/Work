@@ -1,4 +1,66 @@
 # Worklog
+## 2026-10-13（續1）認知平台第二批：重走找到的 22 項、12 個 AI 按鈕改程式、1000 人同時使用（622f7b342..662030700，已上線）
+
+**根本問題**: 2026-10-12 在正式站重走（筆記 W1–W22），找到：
+- Brave 一次都沒用上：送了 `search_lang=zh`，Brave 回 422。
+- 搜尋字混進了 AI 的註記。
+- AI 中文用半形標點，還露出欄位名。
+- 共思考太長；在案子裡跑工具，給的卻是示範案例。
+- AI 額度整個空間共用一份。
+
+操作者另外要求「300～1000 人同時用沒問題」和「能用程式就不用 AI」。容量問題實測找到四個：
+- nginx 認不出真實 IP，所有網站所有訪客共用一個限速桶。
+- Cloudflare 每個 IP 10 秒 50 次，一整班會被鎖。
+- API 讀整個租戶、一頁 244 次查詢、每次重讀檔案。
+- nginx 每個請求都開新連線，約 300 req/s 就到頂。
+
+**已修改**（逐項根因在各 commit 訊息）:
+- 622f7b342 nginx：`set_real_ip_from 172.18.0.1`；cognitive 依 session cookie 限速；登入依 IP 限速；live 的 hci 區塊補進 repo。
+- d9e161e17 runbook：Cloudflare 規則排除 cognitive（2026-10-12 操作者同意，已用 API 在正式站改好）。
+- c2f540682 蒐集器：每家搜尋引擎用自己文件寫的語言代碼；讀不到的頁面帶自己的原因。
+- 25de48273 平台主機：主張只放訊息原文；AI 文字的標點和欄位名統一在一處處理；鏡子不再交還；AI 額度每人一份、空間另有上限。
+- fa1b40c81 網頁：W7–W22 各項；全站拿掉「專案」；工具在案子裡從案子內容開始。
+- bca5ad2b0 12 個 AI 動作改成程式（41→29），`docs/platform/AI_TO_CODE_AUDIT.md`。
+- 04cbbd7c5、c8ca1541e 容量：
+  - 只讀本人的資料；批次一次查完。
+  - 快取內容和 catalog（ETag）。
+  - API 8 個 worker、web 3 份。
+  - nginx keepalive upstream。
+  - migration 0008（5 個索引）。
+  - libyaml。
+  - cognitive-db max_connections 150、記憶體 1g。
+- 662030700 test_ai_to_code 改在 checkout 上跑：第一次部署的測試閘門在 API image 裡找不到網頁。
+- 37d4f4ee8 文件：ADR 015（一個帳號、一個錢包；點數照用量扣、不退；註冊送 NT$30；先寫程式再用 AI）。
+
+**部署**（2026-10-13 操作者「部署」）:
+1. cognitive-db 重啟：max_connections 100→150，記憶體 1g。
+2. `deploy.sh`：第一次在測試閘門失敗，正式站維持舊版；修好後第二次 PASS。部署前 dump，migration 到 head，4 個容器 healthy。
+3. next-admin `sg-deploy`。
+4. nginx 用 `safe-infra-patch`，備份是 `default.conf.bak.safe-patch-20261013-020950`。
+5. `deploy/.env` 加上 AI 額度：每人 50000、空間 2000000（操作者同意）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh (2nd run: test gate PASS, dump, migrate head, smoke local/web/database/public PASS) | exit=0 | ms=0 (duration not recorded)
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy.sh 1st run: test gate 14225 tests, 1 FAIL test_ai_to_code (image lacks apps/cognitive-web) -> fixed in 662030700 | exit=1 | ms=396609
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo -n /root/lobster-phase1/scripts/sg-deploy.sh next-admin (tests, healthy 9s, 5 smokes OK) | exit=0 | ms=0 (duration not recorded)
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch.sh nginx default.conf; curl cognitive/app/aware-wave.com/hci 200; 120 concurrent /api/health from one address 120x200; access.log shows the visitor's own address | exit=0 | ms=0 (duration not recorded)
+- REALTEST_EVIDENCE: tool=Bash | cmd=throwaway cos-load rig on ks-aw-01 through prod's nginx block: 1000 people 529 req/s API p95 96 ms, pages p95 <=323 ms, logins p95 342 ms; 300 behind one address 0 errors 0 429; prod /api/health max 0.50 s; rig torn down | exit=0 | ms=0 (duration not recorded)
+- REALTEST_EVIDENCE: tool=Bash | cmd=per worker once after last edit: engine affected 1838 OK; web vitest 412/438 OK; collect vitest 177 OK; 12-to-code affected 1459 OK; capacity affected 15291 + 15572 OK | exit=0 | ms=0 (duration not recorded)
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/19m/0n -- Codex per worker, all fixed or answered: agency-os/reports/oracle/2026-10-12-partialreview-421e20c9.md, 2026-10-12-review-1f81e3dd.md, 2026-10-12-review-f1f3b45e.md, 2026-10-12-review-8fbe51a5.md, 2026-10-12-partialreview-f7c17c43.md, 2026-10-12-review-211a6f9e.md, 2026-10-12-review-87405def.md, 2026-10-13-review-7245cca2.md
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory | grep=registry_paths | hits=3
+- ORACLE: the eight artifacts above
+
+**剩餘風險／發現**:
+- m1 操作者要自己做：刪兩個測試案子（「我的案子」裡標「測試用，稍後刪除」那兩個）；開第二個帳號，才能測多人共同程序。
+- m2 1000 人、活動量加倍時，要 12 個 worker、6 份 web。現在是 8 和 3：照常用量 1000 人夠，再多就要加。
+- m3 Cloudflare 對 cognitive 不再限速，改由 lobster-nginx 照人限速。退回方法是從規則拿掉 cognitive 那一條。
+- m4 下一輪還沒做：AI_TO_CODE_AUDIT 的 B 類 10 個；工具結果頁加提示快取（最省錢）；ADR 015 錢包三段。
+
+**rollback**:
+- 平台：`git revert` 後重跑 `deploy.sh`；migration 0008 有 downgrade。
+- nginx：還原 `/root/lobster-phase1/nginx/default.conf.bak.safe-patch-20261013-020950`。
+- cognitive-db：compose 改回 100 後 `up -d`。
+- AI 額度：刪掉 `deploy/.env` 那兩行。
 ## 2026-10-12（續1）認知平台實走問題整批修（91f36fada＋3b5b4b396＋cf45d0685＋5f055db49＋1a7eef30c＋4bf9c8b42）
 
 **根本問題**: 2026-10-11 操作者登入正式站，Claude 從「陪我思考」一塊一塊走，清單 `agency-os/handoffs/2026-10-11-cognitive-platform-walk-issues.md`（A1–A8、B1–B10、C1–C4）。主因：一頁約 60 個請求＋預載觸發 Cloudflare 全站限速（50/10s）；API 單一程序；AI 出錯回 502 被 Cloudflare 蓋掉；AI 回答上限太小被截斷；被擋的 AI 回答沒紀錄；蒐集器把全國法規資料庫頁面丟掉；登入要 Tenant ID；頁面欄位太多、例子不合。操作者：「整批修完 再重走」。
