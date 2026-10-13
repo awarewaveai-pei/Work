@@ -1223,3 +1223,14 @@ if __name__ == "__main__":
     import unittest
 
     unittest.main()
+
+
+class SearchLanguageParityTests(unittest.TestCase):
+    def test_the_page_picks_a_searchs_language_by_the_servers_characters(self):
+        """2026-10-13: GatherPage sent ["zh", "en"] on every search and the server refused all of them (one language per
+        search, collection_run.query_language). The page keeps its own copy of the rule; the two must name the same characters."""
+        from ai_lego.core.domain import collection_run
+        page = (PRODUCT_ROOT / "apps/cognitive-web/components/blocks/GatherPage.tsx").read_text(encoding="utf-8")
+        found = re.search(r"const HAN = /\[(.+?)\]/;", page)
+        self.assertIsNotNone(found, "GatherPage.tsx: const HAN = /[...]/; not found")
+        self.assertEqual(found.group(1), collection_run._HAN.pattern.strip("[]"))

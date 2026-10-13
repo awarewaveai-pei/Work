@@ -88,7 +88,10 @@ async function type(element: Element | null, value: string) {
 describe("蒐集來源", () => {
   it("sends a search and a pasted URL in the collector's shape (wire v2)", () => {
     expect(searchSeed("1234567890", " 公會有沒有改合約 ", ["primary", "news"], ["serper", "brave"])).toEqual({
-      uri: "entity://claim/12345678", meta: { kind: "claim", entityName: "公會有沒有改合約", angles: ["primary", "news"], languages: ["zh", "en"], providers: ["serper", "brave"] } });
+      uri: "entity://claim/12345678", meta: { kind: "claim", entityName: "公會有沒有改合約", angles: ["primary", "news"], languages: ["zh"], providers: ["serper", "brave"] } });
+    // one language, the words' own (2026-10-13: ["zh", "en"] was sent and the server refused every search)
+    expect(searchSeed("x", "guild contract change 2026", ["news"], ["brave"]).meta.languages).toEqual(["en"]);
+    expect(searchSeed("x", "公會 contract", ["news"], ["brave"]).meta.languages).toEqual(["zh"]);
     expect(searchSeed("x", "a".repeat(300), ["origin"], ["serper"]).meta.entityName).toHaveLength(200);
     expect(pastedSeed(" https://a.example.com/x ")).toEqual({ uri: "https://a.example.com/x", meta: { pasted: true } });
   });
@@ -100,7 +103,7 @@ describe("蒐集來源", () => {
     await click(byText(host, '[aria-label="用哪些搜尋引擎"] button', "Brave"));   // 你可以關掉某個搜尋管道
     await click(byText(host, "button", "去找"));
     expect(writes.map((write) => [write.method, write.path, write.body?.confirm])).toEqual([["POST", "/projects/P1/docs/gather.ask", undefined], ["POST", "/projects/P1/collections", undefined]]);
-    expect(writes[1].body.seeds[0].meta).toMatchObject({ kind: "claim", entityName: "公會有沒有改合約", languages: ["zh", "en"], providers: ["serper"] });
+    expect(writes[1].body.seeds[0].meta).toMatchObject({ kind: "claim", entityName: "公會有沒有改合約", languages: ["zh"], providers: ["serper"] });
     const plan = host.querySelector('[aria-label="會怎麼找"]')?.textContent ?? "";
     expect(plan).toContain("最多 16 組查詢");
     expect(plan).toContain("上一次真的用上：Serper（Google 的結果）。Brave：平台還沒有這個搜尋引擎的金鑰。");   // the channels' real state, not a fixed claim

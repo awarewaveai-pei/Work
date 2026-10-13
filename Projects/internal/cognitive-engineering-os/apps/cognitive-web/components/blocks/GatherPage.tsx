@@ -49,7 +49,11 @@ type Pending = { ask: Doc<Ask>; seeds: Seed[]; plan: Plan };
 export type Run = { status: string; requested_at?: string; deadline_at?: string; max_fetches?: number };
 
 const DEFAULT_ANGLES = ["primary", "news", "factcheck", "precedent", "field"];
-export const SEARCH_LANGUAGES = ["zh", "en"];
+// The language a search's words are written in, the server's rule (ai_lego/core/domain/collection_run.py query_language,
+// same characters: tests/unit/test_block_gather.py compares them). 2026-10-13: every 去找 sent ["zh", "en"] and the server
+// refused all of them (one language per search since 2026-10-12); a second language is a second search, translated.
+const HAN = /[\u3400-\u9fff\uf900-\ufaff]/;
+export const queryLanguage = (text: string): "zh" | "en" => (HAN.test(text) ? "zh" : "en");
 const MAX_AI_CARDS = 12;
 const RUN_WORDS: Record<string, string> = { requested: "已經送出，等找資料的服務接手", running: "系統正在找", completed: "找完了", failed: "沒找成" };
 export const FINISHED = ["completed", "failed"];
@@ -74,9 +78,11 @@ export function runLine(run: Run | undefined, now: number, landing = "找完，�
 }
 const enc = encodeURIComponent;
 
-/** One search as the collector takes it (STEP2_SHARED_RULES §4.1): each (angle × language × provider) is its own query. */
-export function searchSeed(askId: string, text: string, angles: string[], providers: string[], languages: string[] = SEARCH_LANGUAGES): Seed {
-  return { uri: `entity://claim/${askId.slice(0, 8)}`, meta: { kind: "claim", entityName: text.trim().slice(0, 200), angles, languages, providers } };
+/** One search as the collector takes it (STEP2_SHARED_RULES §4.1): each (angle × provider) is its own query, in the one
+ *  language its words are written in. */
+export function searchSeed(askId: string, text: string, angles: string[], providers: string[]): Seed {
+  const words = text.trim().slice(0, 200);
+  return { uri: `entity://claim/${askId.slice(0, 8)}`, meta: { kind: "claim", entityName: words, angles, languages: [queryLanguage(words)], providers } };
 }
 export function pastedSeed(url: string): Seed {
   return { uri: url.trim(), meta: { pasted: true } };
@@ -287,10 +293,10 @@ export function GatherPage({ projectId }: { projectId: string }) {
     const answer = await apiFetch<{ plan: Plan }>(`${base}/collections`, { method: "POST", body: JSON.stringify({ seeds }) });
     setPending({ ask, seeds, plan: answer.plan });
   };
-  const search = (content: Ask, languages?: string[], at = "search") => act(at, async () => {
+  const search = (content: Ask, at = "search") => act(at, async () => {
     const saved = await docs.create<Ask>(projectId, "gather.ask", content);
     setNotices(saved.notices);
-    await plan(saved, [content.url ? pastedSeed(content.url) : searchSeed(saved.doc_id, content.text, content.angles ?? DEFAULT_ANGLES, engines, languages)]);
+    await plan(saved, [content.url ? pastedSeed(content.url) : searchSeed(saved.doc_id, content.text, content.angles ?? DEFAULT_ANGLES, engines)]);
   });
   const searchAgain = (ask: Doc<Ask>) => act("asks", async () => { await plan(ask, [ask.content.url ? pastedSeed(ask.content.url) : searchSeed(ask.doc_id, ask.content.text, ask.content.angles ?? DEFAULT_ANGLES, engines)]); });
   const confirm = () => act("search", async () => {
@@ -318,7 +324,7 @@ export function GatherPage({ projectId }: { projectId: string }) {
     const content = { card, key, value, reason };
     setNotices((held ? await docs.update(projectId, "gather.override", held, content) : await docs.create(projectId, "gather.override", content)).notices);
   });
-  const fromCard = (card: CardView, angle: string) => search({ text: card.title || card.url || "", angles: [angle], card: card.card }, undefined, `card-${card.card}`);
+  const fromCard = (card: CardView, angle: string) => search({ text: card.title || card.url || "", angles: [angle], card: card.card }, `card-${card.card}`);
   const turn = (action: string, context: Record<string, unknown>, over?: Doc<any> | null) => act("ai", async () => {
     const result = await ai<any>(projectId, "GATHER", action, context, over) as Turn<any>;
     if (result.stopped) setNotices([{ type: "crisis", notice: result.notice ?? "", resources: result.resources ?? [] }]);
@@ -377,7 +383,7 @@ export function GatherPage({ projectId }: { projectId: string }) {
         <p className="how">你貼的網址和檔案標「{view.words.found_by[1]}」，系統一樣查它是誰辦的。截圖請先把上面的字打成文字再貼。</p>
         <label htmlFor="gather-url">網址</label>
         <input id="gather-url" className="search" value={url} maxLength={2048} placeholder="https://" onChange={(event) => setUrl(event.target.value)} />
-        <div className="btns mt8"><button className="btn" type="button" disabled={!/^https:\/\/\S+$/.test(url.trim()) || busy} onClick={() => { search({ text: url.trim(), url: url.trim() }, undefined, "url"); setUrl(""); }}>抓這個網址</button></div>
+        <div className="btns mt8"><button className="btn" type="button" disabled={!/^https:\/\/\S+$/.test(url.trim()) || busy} onClick={() => { search({ text: url.trim(), url: url.trim() }, "url"); setUrl(""); }}>抓這個網址</button></div>
         <Missing why={url.trim() !== "" && !/^https:\/\/\S+$/.test(url.trim()) && "網址要用 https:// 開頭，中間不能有空格。"} />
         <Refused failed={failed} at="url" />
         <h3>貼一份檔案的文字</h3>
@@ -474,7 +480,7 @@ export function GatherPage({ projectId }: { projectId: string }) {
             <span className="tags"><span>{AUTHOR[queries.author]}</span></span>
             <ul>{queries.content.queries.map((query) => (
               <li key={`${query.lang}-${query.text}`}>{query.text}（{query.lang === "zh" ? "中文" : "英文"}・{angleName(query.angle)}）
-                <button className="btn ghost" type="button" disabled={busy} onClick={() => search({ text: query.text, angles: [query.angle] }, [query.lang])}>用這句去找</button></li>
+                <button className="btn ghost" type="button" disabled={busy} onClick={() => search({ text: query.text, angles: [query.angle] })}>用這句去找</button></li>
             ))}</ul>
             {queries.content.note && <p className="sub">{queries.content.note}</p>}
           </div>
