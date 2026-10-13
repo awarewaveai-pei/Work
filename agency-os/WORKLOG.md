@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-13（續2）認知平台：邀請連結有頁面、過程指標畫上頁面（16996c0c7、f2c3890bd，已上線）
+
+**根本問題**:
+- 邀請連結只開到登入頁：網頁沒有 `/invite`，middleware 也把它擋去登入。
+- 卡 70 的十項過程指標算得出來（`GET /projects|groups/{id}/indicators`），但沒有頁面讀它們。2026-10-13 的路由比對找到這兩條路由沒有呼叫者；STEP34_CHECKLIST 也寫著 NOT YET。
+
+**已修改**:
+- 16996c0c7 `/invite` 頁有兩個入口。「第一次來」：建帳號並加入，accept 的回應直接登入。「已經有帳號」：先登入再加入，遇到多工作區就給按鈕選。
+- f2c3890bd `components/blocks/ProcessFacts.tsx`：一張摺起來的卡，放在案子頁和群組頁。打開才讀；在案子頁，每句連到放那筆紀錄的積木頁；群組頁存檔後，已打開的清單會重讀。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit; npx vitest run ProcessFacts.test.tsx CollabPage.test.tsx Projects.test.tsx; pytest tests/unit/test_step34_checklist.py | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy/deploy.sh（/tmp/cos-deploy-20261013c.out：測試閘門、healthcheck 4 個容器、smoke local/web/database/public 全 PASS，03:10:17Z done）| exit=0 | ms=295000
+- REALTEST_EVIDENCE: tool=curl | cmd=curl https://cognitive.aware-wave.com/invite → 200（未登入）；/projects → 307 /login；/api/groups/x/indicators 未登入 → 401；瀏覽器 read_page /invite#token 兩個表單都在 | exit=0 | ms=900
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/0n
+  - Codex agency-os/reports/oracle/2026-10-13-review-29926e61.md。兩項都確認並修好：打開的清單在群組頁存檔後沒更新；已回答的提議連到開案資料，但那頁只列還沒回答的。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=ProcessFacts | hits=6
+- 路由比對：網頁的連結都有頁面（`/analyze` + query 是誤報）。
+
+**剩餘風險**:
+- 頁面走查（設定、我的資料、求助、直接分析、練習、群組、帶領）要操作者登入後一起做，這次沒走。
+- 藍圖的 NOT YET 約 106 項，在四份檢查表上，沒有動。
+
+**rollback**: `git revert f2c3890bd 16996c0c7` 後重跑 `deploy/deploy.sh`。
 ## 2026-10-13（續1）認知平台第二批：重走找到的 22 項、12 個 AI 按鈕改程式、1000 人同時使用（622f7b342..662030700，已上線）
 
 **根本問題**: 2026-10-12 在正式站重走（筆記 W1–W22），找到：
