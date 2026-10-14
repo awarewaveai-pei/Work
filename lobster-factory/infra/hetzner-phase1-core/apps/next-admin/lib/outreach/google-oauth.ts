@@ -57,9 +57,12 @@ export function verifyState(signed: string, secret: string): OAuthState | null {
  *  allowlist server-side), but deriving a security-relevant URL from request-controlled input is
  *  a smell worth avoiding when it's free to (critic suggestion, 2026-09-11). Matches the existing
  *  `NEXT_PUBLIC_APP_URL` fallback convention already used in lib/repair-center/github.ts. */
+export function appBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.aware-wave.com";
+}
+
 export function gmailOAuthRedirectUri(): string {
-  const base = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.aware-wave.com";
-  return new URL("/api/outreach/connectors/gmail/oauth/callback", base).toString();
+  return new URL("/api/outreach/connectors/gmail/oauth/callback", appBaseUrl()).toString();
 }
 
 export function buildAuthorizeUrl(opts: { clientId: string; redirectUri: string; state: string }): string {

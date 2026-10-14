@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-14（續27）T10 Gmail OAuth callback 成功後導向 `https://0.0.0.0:3000/...`（ERR_ADDRESS_INVALID）
+
+**根因**：`oauth/callback/route.ts` 的 `redirectToConnectors(url.origin, …)` 用 `new URL(req.url).origin` 組導回網址；standalone 容器內 `req.url` 是綁定位址 `0.0.0.0:3000`，不是公開 host。連接本身成功（DB 實查：connector `616e063a…` `credentials_ref` 已設、`settings.email=awarewaveai@gmail.com`、scope 僅 `gmail.compose`；`co_sender_accounts` 新增 org=NULL、daily_limit 20），只有最後導回壞掉。
+**修法**：`lib/outreach/google-oauth.ts` 抽 `appBaseUrl()`（`NEXT_PUBLIC_APP_URL` → `https://app.aware-wave.com`），`gmailOAuthRedirectUri()` 與 callback 的 14 處導回共用；`redirectToConnectors` 不再收 origin。
+**同類掃描**：next-admin `app/ lib/` 全部 `NextResponse.redirect` 共 3 處，只有此 callback 從 req.url 組網址（`cognitive-os/open` 用固定常數、`gmail/authorize` 導去 Google）。
+**避免再發生**：回歸測試 `app/api/outreach/connectors/gmail/oauth/callback/route.test.ts` 以 `http://0.0.0.0:3000/...` 發請求，斷言 Location 以 `https://app.aware-wave.com/outreach/connectors?` 開頭。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run app/api/outreach lib/outreach lib/security | exit=0 | ms=868
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 單一 helper 抽出 + 呼叫點機械替換（斷言 14 處）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=NextResponse.redirect | hits=3（見同類掃描，僅 1 處有缺陷且已修）
+- ORACLE_WAIVED: 導回網址來源替換，無授權/資料邏輯改動；回歸測試鎖住症狀
 ## 2026-10-14（續26）T10 Gmail OAuth `redirect_uri_mismatch`：callback 路由移到 `/gmail/oauth/callback` 對齊 Console 登記值
 
 **根因**：我給操作者的 Google Cloud Console 設定清單寫 `https://app.aware-wave.com/api/outreach/connectors/gmail/oauth/callback`（`C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md` §36 同值），但實作路由建在 `app/api/outreach/connectors/gmail/callback/`，`gmailOAuthRedirectUri()` 也送 `/gmail/callback` → Google 拒絕（400 redirect_uri_mismatch）。操作者貼 Console 設定確認登記值帶 `/oauth`。
