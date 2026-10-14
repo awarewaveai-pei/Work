@@ -75,6 +75,15 @@
         "cd Projects/internal/cognitive-engineering-os/apps/cognitive-web && npx next dev -p 3930"
       ],
       "port": 3930
+    },
+    {
+      "name": "social-mocks",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "lobster-factory/docs/social/mockups/preview-server.py",
+        "8766"
+      ],
+      "port": 8766
     }
   ]
 }

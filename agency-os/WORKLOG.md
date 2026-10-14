@@ -1,4 +1,39 @@
 # Worklog
+## 2026-10-14（續5）社群管理平台：樣稿、功能總表、ADR 016、執行計畫——Metricool 等級的統一發文＋行事曆，Postiz 只當送信員
+
+**根因**:
+- 社群發文藏在內容工作室底部的摺疊區，要先生成文章才能用（`ContentStudio.tsx:3681`）；只有建草稿／立即發佈，不能選時間（`:3838`）；內容行事曆只讀 WordPress（`calendar/ContentCalendar.tsx:261`）；一個文字框，看不到各平台成品（`:3820`）。操作者：「我們的很爛」「我要功能完善的平台」「可能管理多個客戶，或像 Metricool 給人訂閱」「css style 直接掛 app.aware-wave.com 的，統一管理」。
+- `morluto/rea`（逆向工程 MCP）：拆得到前端，拆不到平台 API 權限、歷史與競品數據，且有 ToS／著作權風險；不採用。
+- Postiz 公開 API：沒有改發文時間（change-status「keeps its stored date」）；30 次／小時（runbook §4）；整台一把 key；connect 不回報 integration 歸屬——所以排程真相必須在我們的資料庫（ADR 016 §2–§4）。
+- 模型標註錯：把「寫 ADR＋計畫」標成 Opus 5.5，操作者抓到（「不是讓 fable 寫?」）；規則＝看下一步工作性質，不看目前 session 模型（記憶已改）。
+
+**做了**:
+- 樣稿 `lobster-factory/docs/social/mockups/social-manager-mock.html`（預覽頁 https://claude.ai/artifact/VpkMvRbzr7ThaAxv2obppW，第 12 版；repo 檔＝發布檔）：品牌切換（Soulful／Aware Wave）；左欄七個檢視：週／月／清單／輪播／媒體／紀錄／設定；拖拉改時間、點空格新增、平台與狀態多選篩選、搜尋、批次送審／刪除／還原；右欄編輯：帳號（已連接／待審核／連線失效）、共用文字＋各平台另寫、各平台字數上限、媒體（＋媒體庫）、第一則留言、連結＋UTM、替代文字、常用文字、格式、預覽手機／電腦、固定時間／加入輪播、存草稿／送審／排程／立即發佈（二次確認）、已發佈唯讀＋複製＋平台連結；審核人核准／退回＋理由；通知 N；WordPress 文章→用摘要（免費）／AI 改寫（標費用）。
+- 設計閘 `mockups/check-social-mocks.py`：無 `<select>`、無 tab role、顏色只能來自 app（標記區與 `next-admin/app/globals.css` 一字不差）、無第二套配色、自有 token 只准固定清單（版面、字級、7 個平台色）且只在 :root、字級 token 一律 px 且本文／標題 ≥14、標籤 ≥12、font-size 只准 token、無 inline 字級與顏色、hex／色彩函式／具名色都算、頁面可見文字標示樣稿、四個動作是真按鈕（註解不算）、標記只在 <style> 內且各一個；CSS 用 sync-app-theme.py 的大括號深度解析器、markup 用 html.parser；`--selftest` 38 個突變各自要觸發自己那條規則碼。`mockups/sync-app-theme.py` 把 `:root`／`body`／`.btn-primary`／`.btn-secondary` 貼進標記區，閘 import 同一支程式比對。`mockups/preview-server.py`＋`.claude/launch.json` 的 `social-mocks`：本機 8766 加發布器骨架，瀏覽器量尺寸。
+- 樣式依操作者指示改用 app 的 token（`--accent`／`--card-bg`／`--text-muted`…）與 `.btn-primary`／`.btn-secondary`；狀態色對應 `--status-ignored`／`--yellow`／`--green`／`--red`／`--severity-low`／`--accent`；深色區塊整段刪除（配色由 `/tools/theme` 管）。
+- 自查（互動腳本 50+ 斷言）修 5 項：已發佈可改回草稿、清單檢視搜尋無效、輪播貼文在清單日期 NaN＋複製壞掉、排給未連接帳號無提醒（卡片與編輯器標 ⚠）、「已刪除」篩選在週檢視無意義。
+- `lobster-factory/docs/social/SOCIAL_MANAGER_FEATURE_MATRIX.md`：70 項對照 Metricool／Buffer／Postiz，分 V1／V2／V3，列出樣稿缺的六塊（本批已補進樣稿）。
+- ADR 016 `agency-os/docs/architecture/decisions/016-social-manager-third-product.md`（提案；`ADR_INDEX.md` 已登記）：第三個產品 `social`、跑在 next-admin、排程真相在我們 DB、Postiz 送信員、單一 key 不出伺服器、連接歸屬靠時間配對、收件匣＝Chatwoot、不做廣告／手機 app／X、AGPL 不改 Postiz。
+- `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md`：G1–G4 動工 gate、C1–C12 卡（六項契約＋建議模型）、V2 清單、依賴順序。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -I -B lobster-factory/docs/social/mockups/check-social-mocks.py（1 page 0 findings＋2 條 note：app .btn-primary／.btn-secondary 13px）；--selftest（38/38 各中自己的規則碼；pipe 輸出 UTF-8；-O 同結果）；sync-app-theme.py --check（up to date） | exit=0 | ms=2500
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad guard_kill.py：27 個 out.append 逐一換成 no-op，各跑一次 --selftest → 27/27 變紅（拿掉任何一條規則都有突變抓到） | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad tools_realtest.py 20/20：sync 解析改寫後 render 一字不差；globals.css 多一個 :root → SystemExit；單行 rule 不吞下一條；註解／字串裡的大括號略過；少 selector → SystemExit；HTML 註解引用標記不被當目標；兩組標記拒絕；--check 漂移紅、sync 修回、無 .tmp 殘留；preview-server：/../、/D:/、%2e%2e、非 mock 檔、大小寫變體全 404，外來 Host 403，HEAD 長度＝GET，同 port 第二個 server 以 WinError 10048 退出 | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=瀏覽器對 http://localhost:8766/social-manager-mock.html 1280×660：documentElement.scrollHeight=660、編輯欄溢出 0、預覽卡溢出 0、標題列 49px 單行；設定／媒體／紀錄／輪播／審核人狀態同；1536×660 同；375 寬無橫向捲動；console 0 錯誤；互動腳本 50+ 斷言 PASS（品牌切換、週導航、篩選、搜尋、拖拉、字數上限擋排程、四動作、二次確認、文章摘要／AI、月檢視、批次、還原、清單 CRUD、輪播加入、連接流程、邀請、角色、媒體附加、第一則留言預覽、UTM 縮網址、常用文字、核准／退回、紀錄、通知、平台連結） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=SSH | cmd=ks-aw-01 curl 127.0.0.1:4007/api/public/v1/posts?startDate=2026-06-01&endDate=2026-10-31 → 200 {"posts":[]}；/integrations → facebook「Aware Wave」＋bluesky soulfulexpression.bsky.social，disabled:false（image ghcr.io/gitroomhq/postiz-app:v2.11.3） | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/verify-adr-index.ps1（登記 016 後）→ PASS | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/7n
+  - M1 app 區塊不受字級規則（按鈕 13px）→ 改印 note、開 TASKS 由操作者決定改 globals.css；M2 字級可繞過（連字號 token、rem、:root 外覆寫、inline、rem shorthand）→ 全 CSS＋inline 單一掃描；M3 顏色只擋 hex／--p- 前綴可藏配色／:root 外重指 app token／rgb、具名色、大寫 token → 固定白名單＋全色值偵測；M4 selftest 任何 finding 都算中（6 條 guard 拿掉仍 13/13）→ 每突變綁規則碼＋補 25 個突變；M5 sync 抽取取第一個 match 且 lazy 到欄首 } → 大括號深度解析、每 selector 恰一條。
+  - m1 pipe 時 CJK 走 cp950 → reconfigure UTF-8；m2 assert 被 -O 拿掉 → if/return；m3 regex 判 HTML（單引號、SVG fill、<span/>、註解裡的按鈕、script createElement）→ html.parser；m4 sync 在整頁找標記 → 只在 <style> 且各一個；m5 非 atomic 寫入 → tmp＋os.replace；m6 preview 路徑穿越（實測讀到別資料夾的 mock）→ 只服務資料夾清單內的檔名＋Host 檢查；m7 Windows 同 port 雙綁 → allow_reuse_address=False。n1–n5（大小寫 quirks mode、HEAD 長度、accent 寫死、#fff 豁免全頁、pyc）一併修；.pf／.pill 的 #fff 改 --p-ink／--btn-primary-text。
+  - 新閘抓到樣稿 2 處：連接頁標題 inline 字級 → class；@media 內 :root 改 --rail 屬合法響應式 → 規則認得「@media » :root」但仍驗字級下限與平台色不得改。
+- ORACLE_WAIVED: staged 的 .py 是樣稿開發工具（不部署、不碰資料／權限／金流）；critic Deep 12 項全修＋38 突變＋27 guard 移除＋20 項實測已覆蓋；next-admin 程式從計畫 C1 起每卡 /codex-review
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=social-manager-mock|check-social-mocks|sync-app-theme|SOCIAL_MANAGER_(PLAN|FEATURE_MATRIX)|016-social-manager | hits=7
+  - 7 個都是本批新檔互相引用（ADR↔計畫↔總表↔樣稿↔閘）；`.claude/` 命中只有 session 紀錄與檔案歷史。舊計畫 `POSTIZ_SOCIAL_PUBLISHING_PLAN.md` 由 ADR 016 標「部分取代」，正文未改（Task 3–6 的程式碼保留）。
+
+**剩餘風險**: app 的 .btn-primary／.btn-secondary 是 13px，樣稿照抄所以「排程」等按鈕比 14px 規則小 1px（閘印 note，TASKS 待操作者決定）；樣稿四個選填列全開時文字欄內部捲動 242px（預覽與按鈕不動）；設計閘只驗樣稿，產品實作的同款規則排在計畫 C6；Postiz v2.11.3 的端點可能不同於最新文件（G1 gate 逐一 curl）；Meta 審核狀態未查（G3）；ADR 016 是提案，操作者看樣稿後才定案。
+
+**rollback**: `git revert <本 commit>`；預覽頁同 URL 重新發布舊版；`.claude/launch.json` 的 `social-mocks` 區塊可直接刪。
 ## 2026-10-14（續4）只剩一套 scripts/：agency-os/scripts 移除，排程改跑 scripts/，doc-sync 不再刪別人的字
 
 **根因**:
