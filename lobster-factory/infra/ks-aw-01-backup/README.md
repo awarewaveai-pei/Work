@@ -30,8 +30,8 @@ container name:
 ```sh
 SOULFUL_DB_CONTAINER=soulful-db
 SOULFUL_WP_VOLUME=soulful_wordpress_data
-CHATWOOT_DB_CONTAINER=chatwoot-db-1
-CHATWOOT_STORAGE_VOLUME=chatwoot_storage
+CHATWOOT_DB_CONTAINER=chatwoot-postgres
+CHATWOOT_STORAGE_VOLUME=chatwoot_chatwoot_storage
 ```
 
 Verify the wiring with a mutation test — declare a service that is not deployed and confirm

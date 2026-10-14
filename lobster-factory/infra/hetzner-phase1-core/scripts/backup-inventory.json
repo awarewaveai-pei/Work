@@ -1,0 +1,57 @@
+{
+  "_doc": "Every writable mount of every running container on ks-aw-01 is listed under a store or under not_backed_up. backup-coverage-check.py reads this file; plan lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md. A mount key is <container>:<destination>; a trailing * matches a prefix.",
+  "version": 1,
+  "max_age_hours": 26,
+  "split_threshold_bytes": 209715200,
+  "r2": {
+    "bucket": "lobster-backup",
+    "credentials_file": "/etc/default/eu-backup",
+    "lifecycle_max_age_seconds": {
+      "eu/": 2592000,
+      "sg-stack/": 2592000,
+      "ks-aw-01/": 2592000,
+      "cognitive/": 432000,
+      "hci/": 2592000
+    },
+    "unlocked_prefixes": ["cognitive/"]
+  },
+  "pipelines": {
+    "stack":     {"script": "/root/scripts/backup-eu-stack.sh", "local_root": "/root/backups-stack", "r2_prefix": "eu", "r2_dir": "date"},
+    "lobster":   {"script": "/root/lobster-phase1/scripts/backup-phase1.sh", "local_root": "/root/lobster-phase1/backups", "r2_prefix": "sg-stack", "r2_dir": "date"},
+    "ks-aw-01":  {"script": "/root/scripts/backup-ks-aw-01.sh", "local_root": "/root/backups", "r2_prefix": "ks-aw-01", "r2_dir": "stamp"},
+    "cognitive": {"script": "Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh, then backup-offsite-cognitive-hci.sh", "local_root": "/root/backups-cognitive", "r2_prefix": "cognitive", "r2_dir": "date", "complete_marker": ".complete"},
+    "hci":       {"script": "Projects/internal/hci30/scripts/backup-hci-postgres-prod.sh, then backup-offsite-cognitive-hci.sh", "local_root": "/root/backups-hci-postgres", "r2_prefix": "hci", "r2_dir": "date", "complete_marker": ".complete"}
+  },
+  "stores": [
+    {"id": "supabase-db", "pipeline": "stack", "mounts": ["supabase-db:/var/lib/postgresql/data"], "artifacts": ["supabase-all.sql.gz"], "note": "pg_dumpall: main, n8n and postiz databases"},
+    {"id": "stack-secrets", "pipeline": "stack", "mounts": ["supabase-db:/etc/postgresql-custom"], "plan": "B4", "sources": {"supabase-db:/etc/postgresql-custom": "supabase_db-config"},
+     "artifacts": [{"name": "env.tar.gz.enc", "members_file": "env.tar.gz.enc.members", "members": ["root/supabase/.env", "root/trigger/.env", "root/mainwp/.env", "root/postiz/.env", "var/lib/docker/volumes/supabase_db-config/_data/pgsodium_root.key"]}],
+     "note": "pgsodium_root.key decrypts vault.secrets; it may leave the host only inside the encrypted bundle"},
+    {"id": "supabase-files", "pipeline": "stack", "plan": "B4", "mounts": ["supabase-storage:/var/lib/storage", "supabase-imgproxy:/var/lib/storage", "supabase-edge-functions:/home/deno/functions", "supabase-studio:/app/edge-functions", "supabase-studio:/app/snippets"], "artifacts": ["supabase-files.tgz"], "sources": {"supabase-storage:/var/lib/storage": "/root/supabase/volumes/storage", "supabase-edge-functions:/home/deno/functions": "/root/supabase/volumes/functions", "supabase-studio:/app/snippets": "/root/supabase/volumes/snippets"}, "note": "/root/supabase/volumes/{storage,functions,snippets}"},
+    {"id": "trigger-db", "pipeline": "stack", "mounts": ["trigger-postgres:/var/lib/postgresql/data"], "artifacts": ["trigger.sql.gz"]},
+    {"id": "trigger-minio", "pipeline": "stack", "mounts": ["trigger-minio:/bitnami/minio/data"], "artifacts": ["trigger-minio.tgz"], "sources": {"trigger-minio:/bitnami/minio/data": "trigger_trigger_minio_data"}},
+    {"id": "mainwp-db", "pipeline": "stack", "mounts": ["mainwp-db:/var/lib/mysql"], "artifacts": ["mainwp.sql.gz"]},
+    {"id": "mainwp-files", "pipeline": "stack", "mounts": ["mainwp-web:/var/www/html"], "artifacts": ["mainwp-files.tgz"], "sources": {"mainwp-web:/var/www/html": "mainwp_mainwp_files"}},
+    {"id": "n8n", "pipeline": "stack", "mounts": ["n8n:/home/node/.n8n"], "artifacts": ["n8n.tgz"], "sources": {"n8n:/home/node/.n8n": "n8n_n8n_data"}},
+    {"id": "postiz-uploads", "pipeline": "stack", "mounts": ["postiz:/uploads"], "artifacts": ["postiz-uploads.tgz"], "sources": {"postiz:/uploads": "postiz_postiz_uploads"}},
+    {"id": "uptime-kuma", "pipeline": "stack", "mounts": ["uptime-kuma:/app/data"], "artifacts": ["uptime-kuma.tgz"], "sources": {"uptime-kuma:/app/data": "uptime-kuma"}},
+    {"id": "lobster-wordpress-db", "pipeline": "lobster", "mounts": ["lobster-wordpress-db:/var/lib/mysql"], "artifacts": ["wordpress-db.sql.gz"]},
+    {"id": "lobster-wordpress", "pipeline": "lobster", "mounts": ["lobster-wordpress:/var/www/html"], "artifacts": ["wp-html.tgz"]},
+    {"id": "soulful-db", "pipeline": "ks-aw-01", "mounts": ["soulful-db:/var/lib/mysql"], "artifacts": ["soulful-db.sql.gz"]},
+    {"id": "soulful-wp", "pipeline": "ks-aw-01", "mounts": ["soulful-wp:/var/www/html"], "artifacts": ["soulful-wordpress.tgz"], "sources": {"soulful-wp:/var/www/html": "soulful_wordpress_data"}},
+    {"id": "ks-secrets", "pipeline": "ks-aw-01", "mounts": [], "plan": "B4",
+     "artifacts": [{"name": "env.tar.gz.enc", "members_file": "env.tar.gz.enc.members", "members": ["root/soulful/.env", "root/chatwoot/.env"]}]},
+    {"id": "chatwoot", "pipeline": "ks-aw-01", "plan": "B4", "mounts": ["chatwoot-postgres:/var/lib/postgresql/data", "chatwoot-rails:/app/storage", "chatwoot-sidekiq:/app/storage"], "artifacts": ["chatwoot.sql.gz", "chatwoot-storage.tgz"], "sources": {"chatwoot-rails:/app/storage": "chatwoot_chatwoot_storage"}},
+    {"id": "cognitive", "pipeline": "cognitive", "plan": "B3", "mounts": ["cognitive-db-cognitive-db-1:/var/lib/postgresql/data", "cognitive-os-api:/app/Projects/internal/cognitive-engineering-os/.runtime"], "artifacts": ["cognitive_os.dump", "postgres.dump", "runtime.tgz"], "note": "database rows name blobs in .runtime source-cas/artifact-cas; both in one snapshot. local and R2 kept 5 days: erased data may live at most 7 days in a backup (backup-cognitive-db.sh:6), R2 deletes up to a day late"},
+    {"id": "hci", "pipeline": "hci", "plan": "B3", "mounts": ["hci-postgres:/var/lib/postgresql/data"], "artifacts": ["hci-postgres.sql.gz"]}
+  ],
+  "not_backed_up": [
+    {"mounts": ["chatwoot-redis:/data", "lobster-redis:/data", "postiz-redis:/data", "soulful-redis:/data", "trigger-redis:/data"], "reason": "cache and job queues, rebuilt on start; jobs in flight are lost"},
+    {"mounts": ["trigger-clickhouse:/bitnami/clickhouse"], "reason": "Trigger.dev run history and logs; task code is in the repo"},
+    {"mounts": ["temporal-postgresql:/var/lib/postgresql/data"], "reason": "Postiz's Temporal send queue; the schedule's system of record is social_posts in supabase-db (ADR 016 §2)"},
+    {"mounts": ["trigger-registry:/var/lib/registry", "buildx_buildkit_trigger0:/var/lib/buildkit"], "reason": "images and build cache, rebuilt by deploy"},
+    {"mounts": ["trigger-minio:/certs", "trigger-supervisor:/home/node/shared", "trigger-webapp:/home/node/shared", "supabase-edge-functions:/root/.cache/deno"], "reason": "generated certs, scratch space, cache"},
+    {"mounts": ["lobster-grafana-obs:/var/lib/grafana", "lobster-loki:/loki", "lobster-nginx:/var/log/nginx"], "reason": "monitoring data and logs"},
+    {"mounts": ["supabase-db:/docker-entrypoint-initdb.d/*"], "reason": "init SQL, in the repo at lobster-factory/infra/supabase/volumes/db/"}
+  ]
+}

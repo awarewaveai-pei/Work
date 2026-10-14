@@ -122,9 +122,9 @@ fi
 
 # --- 3. Chatwoot PG ---
 if expects chatwoot; then
-  if require_container "${CHATWOOT_DB_CONTAINER:-chatwoot-db}" "Chatwoot DB"; then
+  if require_container "${CHATWOOT_DB_CONTAINER:-chatwoot-postgres}" "Chatwoot DB"; then
     log "Dumping Chatwoot Postgres..."
-    if docker exec "${CHATWOOT_DB_CONTAINER:-chatwoot-db}" pg_dump -U chatwoot chatwoot 2>/dev/null | gzip > "${OUT}/chatwoot.sql.gz"; then
+    if docker exec "${CHATWOOT_DB_CONTAINER:-chatwoot-postgres}" pg_dump -U chatwoot chatwoot_production 2>/dev/null | gzip > "${OUT}/chatwoot.sql.gz"; then
       if gzip -t "${OUT}/chatwoot.sql.gz" 2>/dev/null && [[ -s "${OUT}/chatwoot.sql.gz" ]]; then
         SIZE=$(du -h "${OUT}/chatwoot.sql.gz" | cut -f1); log "  chatwoot.sql.gz OK (${SIZE})"
       else
@@ -138,9 +138,9 @@ fi
 
 # --- 4. Chatwoot uploads volume ---
 if expects chatwoot; then
-  if require_volume "${CHATWOOT_STORAGE_VOLUME:-chatwoot_storage}" "Chatwoot storage"; then
+  if require_volume "${CHATWOOT_STORAGE_VOLUME:-chatwoot_chatwoot_storage}" "Chatwoot storage"; then
     log "Archiving Chatwoot storage volume..."
-    if docker run --rm -v "${CHATWOOT_STORAGE_VOLUME:-chatwoot_storage}":/data:ro -v "$(realpath "${OUT}")":/backup \
+    if docker run --rm -v "${CHATWOOT_STORAGE_VOLUME:-chatwoot_chatwoot_storage}":/data:ro -v "$(realpath "${OUT}")":/backup \
          alpine tar czf /backup/chatwoot-storage.tgz -C /data . 2>/dev/null && [[ -s "${OUT}/chatwoot-storage.tgz" ]]; then
       SIZE=$(du -h "${OUT}/chatwoot-storage.tgz" | cut -f1); log "  chatwoot-storage.tgz OK (${SIZE})"
     else
@@ -158,7 +158,9 @@ if [[ ${#ENV_FILES[@]} -gt 0 ]]; then
   if [[ -n "${BACKUP_ENC_KEY:-}" ]]; then
     log "Archiving + encrypting ${#ENV_FILES[@]} .env file(s) (AES-256)..."
     export BACKUP_ENC_KEY
-    if tar czf - "${ENV_FILES[@]}" 2>/dev/null \
+    # tar -v lists members on stderr -> env.tar.gz.enc.members (checked by backup-coverage-check.py; "tar: " lines
+    # there are notices or errors, not members).
+    if tar czvf - "${ENV_FILES[@]}" 2>"${OUT}/env.tar.gz.enc.members" \
          | openssl enc -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -out "${OUT}/env.tar.gz.enc" 2>/dev/null \
          && [[ -s "${OUT}/env.tar.gz.enc" ]]; then
       SIZE=$(du -h "${OUT}/env.tar.gz.enc" | cut -f1); log "  env.tar.gz.enc OK (${SIZE})"

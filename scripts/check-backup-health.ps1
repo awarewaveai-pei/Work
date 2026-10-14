@@ -170,6 +170,30 @@ function Get-HostBackupHealth {
     }
 }
 
+# Coverage = every store in backup-inventory.json has a fresh, offsite backup (backup-coverage-check.py on the
+# host, cron after the verify jobs). The pipeline checks above say whether each pipeline ran and verified; only
+# this one says whether everything that holds data is in some pipeline. Missing or >26h old status = WARN:
+# a silent checker must not read as green.
+function Get-CoverageStatus {
+    # base64 on one line: Invoke-Ssh merges stderr, and an ssh/sudo notice in front of raw JSON breaks ConvertFrom-Json.
+    $res = Invoke-Ssh -ServerHost $KsAw01Host -User $KsAw01SshUser -Key $KsAw01PrivateKey -Port $KsAw01SshPort `
+        -Command "sudo base64 -w0 /var/lib/awarewave/backup-coverage.json 2>/dev/null || echo MISSING"
+    if ($res.ExitCode -ne 0) { return [ordered]@{ ok = $false; problem = "ssh failed: " + $res.Output; fails = @() } }
+    $lines = @($res.Output -split "`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if ($lines.Count -eq 0) { return [ordered]@{ ok = $false; problem = "status file unreadable: empty answer"; fails = @() } }
+    $last = $lines[$lines.Count - 1]   # StrictMode Latest throws on [-1] of an empty array
+    if ($last -eq "MISSING") { return [ordered]@{ ok = $false; problem = "status file missing: backup-coverage-check.py has not run"; fails = @() } }
+    try { $s = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($last)) | ConvertFrom-Json }
+    catch { return [ordered]@{ ok = $false; problem = "status file unreadable"; fails = @() } }
+    $ageH = ((Get-Date).ToUniversalTime() - [datetime]::Parse($s.generated_at).ToUniversalTime()).TotalHours
+    $fails = @($s.rows | Where-Object { $_.status -eq "FAIL" } | ForEach-Object {
+        $_.id + ": " + $_.detail + $(if ($_.PSObject.Properties["plan"]) { " (plan " + $_.plan + ")" } else { "" }) })
+    $problem = if ($ageH -gt 26) { ("status is {0:N0}h old: the check stopped running" -f $ageH) }
+               elseif ($s.overall -ne "PASS") { "overall " + $s.overall + $(if ($s.PSObject.Properties["error"]) { ": " + $s.error } else { "" }) }
+               else { "" }
+    return [ordered]@{ ok = ($problem -eq ""); problem = $problem; generated_at = $s.generated_at; overall = $s.overall; fails = $fails }
+}
+
 $root = Resolve-Root -InputRoot $WorkRoot
 $statusDir = Join-Path $root "agency-os\reports\status"
 $null = New-Item -ItemType Directory -Force -Path $statusDir
@@ -180,6 +204,7 @@ $sshOk = [bool](Get-Command ssh.exe -ErrorAction SilentlyContinue)
 $sg = $null
 $eu = $null
 $ks = $null
+$coverage = $null
 $fatal = $false
 $fatalReason = ""
 
@@ -245,7 +270,11 @@ if (-not $sshOk) {
         BackupDir = "/root/backups"; VerifyLog = "/var/log/ks-aw-01-backup.log"
         User = $KsAw01SshUser; Key = $KsAw01PrivateKey; Port = $KsAw01SshPort; UseSudo = $true
     }
+    $coverage = if (Test-Path -LiteralPath $KsAw01PrivateKey) {
+        try { Get-CoverageStatus } catch { [ordered]@{ ok = $false; problem = "check threw: " + $_.Exception.Message; fails = @() } }
+    } else { [ordered]@{ ok = $false; problem = "SSH private key not found: $KsAw01PrivateKey"; fails = @() } }
 }
+$coverageWarn = ($coverage -ne $null) -and (-not $coverage.ok)
 
 $sgStale = ($sg -ne $null) -and $sg.ok -and ($sg.backup_age_days -match '^\d+$') -and ([int]$sg.backup_age_days -gt 3)
 $euStale = ($eu -ne $null) -and $eu.ok -and ($eu.backup_age_days -match '^\d+$') -and ([int]$eu.backup_age_days -gt 3)
@@ -273,7 +302,7 @@ $ksUnverified = ($ks -ne $null) -and $ks.ok -and ($ks.unverified_latest -eq "yes
 $sgCronGone = ($sg -ne $null) -and $sg.ok -and ($sg.cron_status -ne "present")
 $euCronGone = ($eu -ne $null) -and $eu.ok -and ($eu.cron_status -ne "present")
 $ksCronGone = ($ks -ne $null) -and $ks.ok -and ($ks.cron_status -ne "present")
-$overall = if ($fatal) { "ERROR" } elseif (((($sg -ne $null) -and (-not $sg.ok))) -or ((($eu -ne $null) -and (-not $eu.ok))) -or ((($ks -ne $null) -and (-not $ks.ok)))) { "WARN" } elseif ($sgStale -or $euStale -or $ksStale -or $sgVerifyFail -or $euVerifyFail -or $ksVerifyFail -or $sgCronGone -or $euCronGone -or $ksCronGone -or $sgVerifyDead -or $euVerifyDead -or $ksVerifyDead -or $sgUnverified -or $euUnverified -or $ksUnverified) { "WARN" } else { "PASS" }
+$overall = if ($fatal) { "ERROR" } elseif (((($sg -ne $null) -and (-not $sg.ok))) -or ((($eu -ne $null) -and (-not $eu.ok))) -or ((($ks -ne $null) -and (-not $ks.ok)))) { "WARN" } elseif ($sgStale -or $euStale -or $ksStale -or $sgVerifyFail -or $euVerifyFail -or $ksVerifyFail -or $sgCronGone -or $euCronGone -or $ksCronGone -or $sgVerifyDead -or $euVerifyDead -or $ksVerifyDead -or $sgUnverified -or $euUnverified -or $ksUnverified -or $coverageWarn) { "WARN" } else { "PASS" }
 
 $markdown = New-Object System.Text.StringBuilder
 [void]$markdown.AppendLine("# Backup health report")
@@ -312,6 +341,14 @@ if ($fatal) {
         [void]$markdown.AppendLine("- Verify result: " + $node.data.verify_result + " (" + $node.data.verify_time + ")" + $verifyTag)
         [void]$markdown.AppendLine("")
     }
+    [void]$markdown.AppendLine("## Coverage (backup-inventory.json)")
+    if ($coverage.ok) {
+        [void]$markdown.AppendLine("- PASS (" + $coverage.generated_at + ")")
+    } else {
+        [void]$markdown.AppendLine("- **WARN**: " + $coverage.problem)
+        foreach ($f in $coverage.fails) { [void]$markdown.AppendLine("  - FAIL " + $f) }
+    }
+    [void]$markdown.AppendLine("")
 }
 
 $latestPath = Join-Path $statusDir "backup-health-LATEST.md"
@@ -335,6 +372,7 @@ $payload = [ordered]@{
     sg          = $sg
     eu          = $eu
     ks_aw_01    = $ks
+    coverage    = $coverage
     reportPath  = "agency-os/reports/status/backup-health-LATEST.md"
 }
 [System.IO.File]::WriteAllText($jsonPath, ($payload | ConvertTo-Json -Depth 6), $utf8NoBom)
@@ -366,6 +404,12 @@ if ($Json) {
             } else {
                 Write-Host ("- " + $x.name + ": WARN (" + $x.data.error + ")") -ForegroundColor Yellow
             }
+        }
+        if ($coverage.ok) {
+            Write-Host ("- coverage: PASS (" + $coverage.generated_at + ")")
+        } else {
+            Write-Host ("- coverage: WARN (" + $coverage.problem + ")") -ForegroundColor Yellow
+            foreach ($f in $coverage.fails) { Write-Host ("    FAIL " + $f) -ForegroundColor Yellow }
         }
     }
 }

@@ -64,4 +64,7 @@ if [[ "${BACKUP_RETAIN_DAYS}" -gt 0 ]]; then
 fi
 
 log "Done. Errors: ${ERRORS}"
+# .complete = this snapshot finished cleanly; the offsite leg and backup-coverage-check.py ship and count only those
+# (a failed pg_dump still leaves a 20-byte gzip that passes gzip -t).
+if [[ ${ERRORS} -eq 0 ]]; then touch "${OUT}/.complete"; fi
 exit "$([[ ${ERRORS} -eq 0 ]] && echo 0 || echo 1)"

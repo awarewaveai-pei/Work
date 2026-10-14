@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-14（續21）備份涵蓋 B1–B6 程式完成（未部署）：清單、每日檢查、cognitive／HCI 離機、Chatwoot、pgsodium key、/ops/backup
+
+**根因**（計畫 `lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md` 現況表）:
+- 沒有「主機上有哪些資料」的清單，檢查只看三條管線（`scripts/check-backup-health.ps1:233-245`）。實查 46 個寫入型 mount：Chatwoot 零備份；cognitive DB 與 `.runtime`（blob）、hci 只在本機；`pgsodium_root.key`（`vault.secrets` 60 筆靠它解）從沒備份；`supabase-storage.tgz` 打包的是沒人用的 volume。
+
+**做了**:
+- `hetzner-phase1-core/scripts/backup-inventory.json`＋`backup-coverage-check.py`（cron `backup-coverage.cron` 03:30）：每個 mount 屬於 store 或 not_backed_up；store 驗完成標記、檔、26h、R2 大小與上傳時間（大檔驗 parts 加總）、加密包成員、打包來源；R2 lifecycle 與 bucket lock（cognitive/ 不得被鎖）。PASS 才更新 dead-man 戳記（`/etc/awarewave-alert/fresh.d/backup-coverage`，endpoint-alert.sh 發 Telegram），否則戳記設 0。
+- `backup-offsite-cognitive-hci.sh`（02:50）：cognitive 最新一次 dump＋`.runtime`（volume 名從 docker inspect 取）→ `cognitive/`，同一次 dump 只送一次、本機與 R2 都 5 天（刪除承諾 7 天）；hci 只送有 `.complete` 的快照 → `hci/`。`backup-hci-postgres-prod.sh` 成功才寫 `.complete`。
+- `eu-backup/backup-eu-stack.sh`：`pgsodium_root.key` 進加密包並寫 `.members`；`supabase-files.tgz`＝`/root/supabase/volumes/{storage,functions,snippets}`（tar rc 1 可接受）。`ks-aw-01-backup/backup-ks-aw-01.sh`：Chatwoot 預設容器／庫／volume 改成實際名；加密包寫 `.members`。
+- `check-backup-health.ps1`：加讀覆蓋狀態（base64 傳回，SSH 雜訊不會壞 JSON；不存在／>26h＝WARN）。
+- next-admin `/ops/backup`（`lib/backup/coverage.ts`＋頁面＋側欄），compose 加 `/var/lib/awarewave:/host-status:ro`。資料夾用單數：根目錄 `.gitignore` 的 `Backups/` 在 Windows 不分大小寫會吃掉 `backups/`。
+- R2：lifecycle 新增 `cognitive/` 5 天、`hci/` 30 天（原 6 條保留，改前存 `/root/r2-lifecycle-backup-20261014{,b}.json`）。
+- DR runbook：鑰匙先還原進 volume 再起 supabase-db（經 docker 複製，不寫死 data-root）；驗收加 `vault.decrypted_secrets` 筆數。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tests/host-scripts/backup-coverage-check.test.py → 21/21；守衛突變（lock、source、marker、old part、lifecycle、listing-fail）各自變紅 | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker ubuntu:24.04 tests/host-scripts/backup-offsite-cognitive-hci.test.sh → 13/13；突變 ship-once、cleanup-first 變紅 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機試跑 backup-coverage-check.py（狀態與戳記導到 /tmp）→ 46 mounts 全登記、sources 全對；FAIL 只剩已知缺口 7 項 | exit=1 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit → 0；vitest lib/backup app/(shell)/ops/backup → 8/8；check-backup-health.ps1 讀主機狀態列出 FAIL | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=SSH | cmd=vault.decrypted_secrets 非空 60 筆；/root/supabase/volumes/{functions,snippets} 無明文密鑰（只有 env 讀取與 shell 變數引用）| exit=0 | ms=5000
+- REVIEW_DONE: critic=Standard | verdict=fail | findings=0c/5m/9n
+  - M1 hci 半成品照送且判綠 → `.complete`。M2 volume 名寫死可能打包空 volume → docker inspect＋inventory `sources` 比對。M3 清理只在成功時跑 → 開頭就清。M4 前一天 dump 重送讓 R2 計時歸零 → `.shipped-<run>`。M5 沒看 bucket lock → 讀 `/lock`。m1 只驗 key → 驗大小與上傳時間。m2 0 mount 判綠 → FAIL。m3 SSH 雜訊壞 JSON → base64。m4 supabase-files 失敗擋整個 stack → tar rc≤1。m5 6 天無餘裕 → 5 天。m6 ks 加密包無成員檢查 → `.members`。m7 runbook 寫死路徑、驗收缺 vault → 修。m8 計畫與實作不一致 → 修。m9 cron 不在 repo → `backup-coverage.cron`。
+- ORACLE_WAIVED: critic 審過且 14 項全修，每個守衛有指名測試＋突變；主機變更另經操作者「15 項一直做到完成」授權
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=supabase-storage\.tgz|supabase_storage-data|chatwoot-db|ops/backups | hits=3
+  - `runbooks/KS-AW-01-HOST-SWITCH-RUNBOOK.md:62`（列出存在的 volume，正確，不改）；計畫現況表兩處（描述舊狀況，正確）。
+
+**剩餘風險**: 未部署（下一條：上線、手動跑一輪備份）；B7 還原演練、B8 跨產品對帳、B9–B11 未做；Kuma 與主機同機，主機整台掛時通知也會沉默。
+
+**rollback**: `git revert`；主機上 `.bak-20261014b`；R2 lifecycle 用 `/root/r2-lifecycle-backup-20261014.json` PUT 回去。
 ## 2026-10-14（續20）Postiz Soulful FB：Soulful 粉專（Pei Huang 帳號）連上 Postiz，兩個 FB 頻道寫進客戶 Hub
 
 **操作者**：Aware Wave 管 Postiz Meta App 和自家粉專；Pei Huang 管 Soulful 粉專；Chatwoot 只能接一個 Meta App，所以把 Pei Huang 加成同一個 App 的管理員。

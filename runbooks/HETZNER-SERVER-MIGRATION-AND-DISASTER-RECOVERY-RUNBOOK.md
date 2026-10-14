@@ -110,13 +110,14 @@
 | Supabase Postgres（客戶/業務主資料） | container `supabase-db`（data 在 `/root/supabase/volumes/`） | `pg_dumpall` 邏輯 dump |
 | Trigger Postgres（run 紀錄/排程/狀態） | container `trigger-postgres` | `pg_dump -U trigger trigger`（**單庫**；還原需先 `CREATE DATABASE trigger`）|
 | 全部 `.env`（密鑰 SSOT） | `/root/{supabase,trigger,mainwp,postiz}/.env` | 加密複製（含在 §2 備份集）|
+| Supabase vault 解密鑰匙 `pgsodium_root.key`（`vault.secrets` 靠它解；2026-10-14 有 60 筆） | vol `supabase_db-config` | 同一個加密包 `env.tar.gz.enc`（2026-10-14 起） |
 | MainWP DB（child site 連線/token） | container `mainwp-db` | `mysqldump --single-transaction mainwp` |
 | n8n（workflow + 憑證） | **workflow/憑證在 supabase-db 的 `n8n` DB**（隨 Supabase `pg_dumpall`）；加密金鑰在 n8n `.env`；vol `n8n_n8n_data` 僅 binary/config（**無 SQLite**）| workflow 隨 supabase dump + `.env` 加密 + volume 快照 |
 
 ### 🟡 IMPORTANT — 丟了會痛但可重建
 | 項目 | 位置 | 備份方式 |
 |------|------|---------|
-| Supabase Storage（上傳檔） | vol `supabase_storage-data` | volume 快照 |
+| Supabase Storage（上傳檔）＋edge functions＋Studio snippets | bind `/root/supabase/volumes/{storage,functions,snippets}`（vol `supabase_storage-data` 沒有服務在用） | `supabase-files.tgz`（2026-10-14 起） |
 | Trigger MinIO（packets/物件） | vol `trigger_trigger_minio_data` | volume 快照 |
 | Trigger ClickHouse（run analytics） | vol `trigger_trigger_clickhouse_data` | `clickhouse-backup` 或可接受重建 |
 | Postiz（排程貼文/上傳） | **DB 在 supabase-db 的 `postiz` DB**（隨 Supabase dump，已確認 2026-06-26）+ vol `postiz_postiz_uploads`（上傳檔）| DB 隨 supabase dump + volume 快照 |
@@ -241,7 +242,7 @@
 # 從本機（筆電/桌機）救援。secrets-vault.ps1 run 把兩把鑰匙注入 env，不落地。
 & scripts\secrets-vault.ps1 -Action run -Names @("R2_API_TOKEN","BACKUP_ENC_KEY") -Command @'
   $acct="aea1a836e6f8b8d7f18206dc8e848bd6"; $date="<YYYY-MM-DD>"
-  $files="supabase-all.sql.gz","trigger.sql.gz","mainwp.sql.gz","env.tar.gz.enc","n8n.tgz","supabase-storage.tgz","trigger-minio.tgz","postiz-uploads.tgz","mainwp-files.tgz","uptime-kuma.tgz"
+  $files="supabase-all.sql.gz","trigger.sql.gz","mainwp.sql.gz","env.tar.gz.enc","n8n.tgz","supabase-files.tgz","trigger-minio.tgz","postiz-uploads.tgz","mainwp-files.tgz","uptime-kuma.tgz"
   foreach($f in $files){ curl.exe -s -H "Authorization: Bearer $env:R2_API_TOKEN" -o "D:\tmp\restore\$f" "https://api.cloudflare.com/client/v4/accounts/$acct/r2/buckets/lobster-backup/objects/eu/$date/$f" }
 '@
 # 或 SG 還在：scp -i ~/.ssh/backup_to_sg -r root@5.223.93.113:/root/lobster-phase1/backups/from-eu/<YYYY-MM-DD>/ ./restore/
@@ -253,7 +254,12 @@
 
 **3. 還原密鑰**（`BACKUP_ENC_KEY` 從 vault；新機 `/etc/default/eu-backup` 也要重建此值 + R2/OFFSITE 設定）：
 ```bash
-openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in /root/restore/env.tar.gz.enc | tar xzf - -C /   # 還原 /root/{supabase,trigger,mainwp,postiz}/.env
+mkdir -p /root/restore/secrets && openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in /root/restore/env.tar.gz.enc | tar xzf - -C /root/restore/secrets
+cp -a /root/restore/secrets/root/. /root/   # /root/{supabase,trigger,mainwp,postiz}/.env
+# pgsodium_root.key 必須在 supabase-db 第一次啟動前放進 volume：空的 volume 會讓它產生新鑰匙，舊 vault 就永遠解不開。
+# 經 docker 複製進 volume，不寫死 /var/lib/docker 路徑（新機的 docker data-root 可能不同）。
+docker volume create supabase_db-config
+docker run --rm -v supabase_db-config:/d -v /root/restore/secrets/var/lib/docker/volumes/supabase_db-config/_data:/s:ro alpine \n  sh -c 'cp -a /s/pgsodium_root.key /d/ && ls -l /d/pgsodium_root.key'
 ```
 **4. 還原 DB**（先 `docker compose up -d` 起 DB 容器，再灌）：
 ```bash
@@ -264,13 +270,14 @@ gunzip -c /root/restore/mainwp.sql.gz       | docker exec -i mainwp-db sh -c 'my
 ```
 **5. 還原 volumes**（每個 tgz 灌回對應 volume）：
 ```bash
-for pair in "n8n.tgz:n8n_n8n_data" "supabase-storage.tgz:supabase_storage-data" "trigger-minio.tgz:trigger_trigger_minio_data" "postiz-uploads.tgz:postiz_postiz_uploads" "mainwp-files.tgz:mainwp_mainwp_files" "uptime-kuma.tgz:uptime-kuma"; do
+tar xzf /root/restore/supabase-files.tgz -C /root/supabase/volumes   # storage、functions、snippets
+for pair in "n8n.tgz:n8n_n8n_data" "trigger-minio.tgz:trigger_trigger_minio_data" "postiz-uploads.tgz:postiz_postiz_uploads" "mainwp-files.tgz:mainwp_mainwp_files" "uptime-kuma.tgz:uptime-kuma"; do
   f="${pair%%:*}"; v="${pair##*:}"; docker volume create "$v" >/dev/null
   docker run --rm -v "$v":/d -v /root/restore:/b alpine sh -c "tar xzf /b/$f -C /d"
 done
 ```
 **6.** `docker compose up -d`（各 stack：supabase / trigger / 各服務）→ 等 healthy。
-**7. 驗證**：`docker exec supabase-db psql -U supabase_admin -d postgres -c "SELECT count(*) FROM organizations"`（客戶資料）；Trigger `SELECT * FROM "TaskSchedule"`（排程在）；MainWP 連得到 child；app.aware-wave 能建站。
+**7. 驗證**：`docker exec supabase-db psql -U supabase_admin -d postgres -c "SELECT count(*) FROM organizations"`（客戶資料）；`docker exec supabase-db psql -U supabase_admin -d postgres -c "SELECT count(*) FROM vault.decrypted_secrets WHERE decrypted_secret IS NOT NULL"` 等於備份當時的筆數（2026-10-14 是 60；0 = 鑰匙沒還原到）；Trigger `SELECT * FROM "TaskSchedule"`（排程在）；MainWP 連得到 child；app.aware-wave 能建站。
 **8. DNS**：换 IP → 更新指向 EU 的 **9 個 record**（清單 + 指令見 §5 step 5）。
 **9.** 新機重建備份：`scp lobster-factory/infra/eu-backup/*.sh root@$NEW:/root/scripts/` + 重設 `/etc/default/eu-backup`（`BACKUP_ENC_KEY` 從 vault、R2_* 設定）+ 裝 cron。
 

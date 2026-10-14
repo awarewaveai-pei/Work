@@ -56,6 +56,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link', href: '/ops/repairs',      icon: '🛠', label: 'Repair Center', badge: 'ops-inbox', title: 'AI 維修主控台' },
       { type: 'link', href: '/ops/approvals',    icon: '✓', label: 'Approvals',     title: '高風險指令簽核佇列' },
       { type: 'link', href: '/ops/system-modes', icon: '◐', label: 'System Modes',  title: '全域 Kill Switch / 維護模式' },
+      { type: 'link', href: '/ops/backup',       icon: '⛁', label: 'Backups',       title: '每個資料庫的備份與 R2 離機狀態' },
     ],
   },
   {

@@ -249,6 +249,9 @@ services:
     restart: unless-stopped
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      # Host status files for /ops pages, read-only (backup-coverage.json: BACKUP_COVERAGE_PLAN.md B6).
+      - /var/lib/awarewave:/host-status:ro
     environment:
       PORT: "3000"
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}

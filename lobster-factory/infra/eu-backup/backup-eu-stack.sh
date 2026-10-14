@@ -105,11 +105,16 @@ else
   log "  SKIP: mainwp-db not running"
 fi
 
-# --- 3c. Secrets: .env x4, ENCRYPTED before leaving host (key NOT in backup) ---
+# --- 3c. Secrets: .env x4 + pgsodium_root.key, ENCRYPTED before leaving host (BACKUP_ENC_KEY NOT in backup) ---
+# pgsodium_root.key decrypts vault.secrets inside supabase-all.sql.gz; a restore without it cannot read them.
+# tar -v lists members on stderr (stdout is the archive) -> env.tar.gz.enc.members, checked by
+# backup-coverage-check.py; "tar: " lines there are errors, not members.
+SECRET_FILES=(root/supabase/.env root/trigger/.env root/mainwp/.env root/postiz/.env
+              var/lib/docker/volumes/supabase_db-config/_data/pgsodium_root.key)
 if [[ -n "${BACKUP_ENC_KEY:-}" ]]; then
-  log "Archiving + encrypting .env files (AES-256)..."
+  log "Archiving + encrypting .env files and pgsodium_root.key (AES-256)..."
   export BACKUP_ENC_KEY   # openssl -pass env: reads the process environment, not a sourced shell var
-  if tar czf - -C / root/supabase/.env root/trigger/.env root/mainwp/.env root/postiz/.env 2>/dev/null \
+  if tar czvf - -C / "${SECRET_FILES[@]}" 2>"${OUT}/env.tar.gz.enc.members" \
        | openssl enc -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -out "${OUT}/env.tar.gz.enc" 2>/dev/null; then
     if [[ -s "${OUT}/env.tar.gz.enc" ]]; then
       SIZE=$(du -h "${OUT}/env.tar.gz.enc" | cut -f1); log "  env.tar.gz.enc OK (${SIZE})"
@@ -124,7 +129,7 @@ else
   ERRORS=$((ERRORS + 1))
 fi
 
-# --- 3d. Volumes: n8n (critical) + storage/minio/postiz/mainwp-files (non-fatal) ---
+# --- 3d. Volumes: n8n (critical) + minio/postiz/mainwp-files (non-fatal) ---
 _archive_vol() {  # $1=volume  $2=outfile  $3=critical(1=ERRORS++,0=WARN)
   local vol="$1" out="$2" crit="$3"
   if docker volume inspect "$vol" >/dev/null 2>&1; then
@@ -142,10 +147,21 @@ _archive_vol() {  # $1=volume  $2=outfile  $3=critical(1=ERRORS++,0=WARN)
   fi
 }
 _archive_vol n8n_n8n_data            n8n.tgz             1
-_archive_vol supabase_storage-data   supabase-storage.tgz 0
 _archive_vol trigger_trigger_minio_data trigger-minio.tgz 0
 _archive_vol postiz_postiz_uploads   postiz-uploads.tgz  0
 _archive_vol mainwp_mainwp_files     mainwp-files.tgz    0
+
+# --- 3e. Supabase files: storage objects, edge functions, Studio snippets ---
+# Binds under /root/supabase/volumes (lobster-factory/infra/supabase/docker-compose.yml). The named volume
+# supabase_storage-data archived here before 2026-10-14 is not what supabase-storage mounts.
+# GNU tar exits 1 for "file changed as we read it" (a live upload): the archive is still usable; 2+ is a real failure.
+log "Archiving Supabase files (storage, functions, snippets)..."
+_rc=0; tar czf "${OUT}/supabase-files.tgz" -C /root/supabase/volumes storage functions snippets 2>/dev/null || _rc=$?
+if [[ "$_rc" -le 1 && -s "${OUT}/supabase-files.tgz" ]]; then
+  SIZE=$(du -h "${OUT}/supabase-files.tgz" | cut -f1); log "  supabase-files.tgz OK (${SIZE})$([[ $_rc -eq 1 ]] && echo ', a file changed while it was read')"
+else
+  log "  ERROR: supabase-files.tgz failed (tar exit ${_rc})"; ERRORS=$((ERRORS + 1))
+fi
 
 # --- 4. Abort if critical errors ---
 if [[ $ERRORS -gt 0 ]]; then

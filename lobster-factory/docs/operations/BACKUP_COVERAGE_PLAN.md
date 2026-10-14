@@ -16,33 +16,40 @@
 | cognitive-db | `Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh`（cron `ks-stack-backup` 02:17） | ❌ 只在主機 `/root/backups/cognitive-db` |
 | hci-postgres | `Projects/internal/hci30/scripts/backup-hci-postgres-prod.sh`（cron `hci-postgres-backup`） | ❌ 只在主機 `/root/backups-hci-postgres` |
 | chatwoot-postgres | 腳本支援（`backup-ks-aw-01.sh:124-125`），但主機 `EXPECT_SERVICES=soulful`，且預設容器名 `chatwoot-db` ≠ 實際 `chatwoot-postgres` | ❌ **完全沒備份**（目前 3 則測試對話，最後 2026-09-11） |
-| trigger-clickhouse、各 redis | 無 | B1 判定要不要 |
+| cognitive-os-api 的 `.runtime`（volume `cognitive-os-files-aw01`：source-cas、artifact-cas、workflow journal；資料庫列指向這些檔，`ai_lego/apps/api/main.py:544,571`） | 無 | ❌ 沒備份 |
+| supabase-db 的 `pgsodium_root.key`（volume `supabase_db-config`；`vault.secrets` 60 筆靠它解密，compose `infra/supabase/docker-compose.yml:603`） | 無（只有 runbook 手動範例 `SUPABASE_SELF_HOSTED_RUNBOOK.md:420`） | ❌ 沒備份：還原後 60 筆密鑰解不開 |
+| supabase-storage 的檔（bind `/root/supabase/volumes/storage`，目前 0 檔） | `backup-eu-stack.sh:145` 打包的是 volume `supabase_storage-data`（空的，不是服務在用的路徑） | ❌ 來源錯 |
+| trigger-clickhouse、各 redis、loki／grafana、buildkit、registry | 無 | 不備份，理由寫在清單 |
+
+R2 保存規則（2026-10-14 讀 `GET /r2/buckets/lobster-backup/lifecycle`）：`eu/`、`ks-aw-01/`、`sg/`、`sg-stack/` 30 天刪；`ks-aw-01/` 另有 14 天防刪鎖。
 
 檢查：`scripts/check-backup-health.ps1:233-245` 寫死三條管線，只讀 verify 結論行；只在 AO-RESUME 跑。
 
 ## 卡片
 
 ### B1 資料庫總清單（Opus 5.5）
-- 一個機器可讀的檔（`lobster-factory/infra/backup-inventory.json`）：每個有狀態的容器／卷一列：負責的腳本、排程、本機目錄、R2 前綴、每天應有的檔名、保留天數；不備份的（快取類 redis）寫明理由。
+- `lobster-factory/infra/hetzner-phase1-core/scripts/backup-inventory.json`（隨 sync-host-scripts.sh 到主機）：每個寫入型 mount 屬於一個 store（管線、每天應有的檔、打包來源 `sources`）或列在 `not_backed_up` 並寫理由。
 - 驗收：主機 `docker ps`＋`docker volume ls` 的每個有資料的容器都在清單上（B2 會機械比對）。
 
 ### B2 每日檢查讀清單（Opus 5.5）
-- 檢查改在主機上跑（cron，03:30 UTC，全部 verify 之後），對清單每一項查：今天的檔在本機、R2 上有（大檔看 `.parts.json`）、不超過 26 小時；寫一份狀態 JSON。`check-backup-health.ps1` 改讀這份 JSON（不再寫死三條管線），AO-RESUME 照舊顯示；B6 也讀同一份。
+- `backup-coverage-check.py` 在主機上跑（`backup-coverage.cron`，03:30 UTC，全部 verify 之後），寫 `/var/lib/awarewave/backup-coverage.json`。`check-backup-health.ps1` 在三條管線的 verify 檢查之外加讀這份（管線有沒有跑 vs. 有資料的東西是不是都在某條管線裡），AO-RESUME 照舊顯示；B6 也讀同一份。
 - 正在跑的有狀態容器不在清單上 → FAIL。
 - 驗收：上線當天 cognitive、hci、chatwoot 三項顯示 FAIL（真實狀態）；拿掉某一項的 R2 檔 → 該項 FAIL。
 
-### B3 cognitive、hci 接 R2（Opus 5.5；High）
-- 用同一支 `upload-to-r2.sh`，各自一個前綴。cognitive 的保留期 R2 也不得超過 7 天（`backup-cognitive-db.sh:6`：刪除的資料在備份裡最多留 7 天），不可用 14 天防刪鎖。
-- 驗收：B2 這兩項 PASS。
+### B3 cognitive（資料庫＋`.runtime` 檔）、hci 接 R2（Opus 5.5；High）
+- 用同一支 `upload-to-r2.sh`，前綴 `cognitive/`、`hci/`。cognitive 本機與 R2 都保存 5 天（`backup-cognitive-db.sh:6`：刪除的資料在備份裡最多留 7 天；R2 到期後可能晚一天才刪），同一次 dump 只送一次，不可加防刪鎖（B2 讀 `/lock` 檢查）。資料庫和 `.runtime` 同一次快照；hci 只送有 `.complete` 的快照。
+- R2 lifecycle 規則寫進清單，B2 每天比對（被改掉＝FAIL）。
+- 驗收：B2 這幾項 PASS。
 
-### B4 Chatwoot 開始備份（Sonnet 5.5；High）
+### B4 Chatwoot、pgsodium key、supabase-files（Sonnet 5.5；High）
+- `pgsodium_root.key` 放進 `backup-eu-stack.sh` 的加密包 `env.tar.gz.enc`（不能明文出主機，`.members` 列出成員）；`supabase-storage.tgz` 改為 `supabase-files.tgz`，打包 `/root/supabase/volumes/{storage,functions,snippets}`（2026-10-14 查過裡面沒有明文密鑰）。ks-aw-01 的加密包同樣寫 `.members`。
 - 主機 `/etc/default/ks-aw-01-backup`：`EXPECT_SERVICES=soulful chatwoot`、`CHATWOOT_DB_CONTAINER=chatwoot-postgres`。repo 三處一起改對：預設容器名（`backup-ks-aw-01.sh:125,127`、`README.md:33`）與資料庫名（`:127` dump `chatwoot`，實際是 `chatwoot_production`，使用者 `chatwoot`）。
 - 驗收：隔天 R2 `ks-aw-01/<STAMP>/` 有 chatwoot 的 dump；B2 PASS。
 
 ### B5 成功才回報，沒回報就通知（Opus 5.5；High）
-- B2 全部 PASS 時打一次 Uptime Kuma push；Kuma 的 push 監控 26 小時沒收到 → Telegram。
+- 用既有的 dead-man 機制（`hetzner-phase1-core/scripts/endpoint-alert.sh` 的 `/etc/awarewave-alert/fresh.d/`，wp-cron-runner 已在用）：B2 全部 PASS 才 touch 戳記；FAIL 把戳記時間設回 0 → endpoint-alert 下一分鐘照它既有的防抖與 Telegram／Slack 發出；endpoint-alert 本身由 Uptime Kuma heartbeat 盯著。不另開 Kuma 監控。
 - 邊界：Kuma 在同一台主機，主機整台掛掉時這條也會沉默；那由外部可達性監控負責，不在本卡。
-- 驗收：停一天回報 → 收到 Telegram。
+- 驗收：戳記設回 0 → 收到 Telegram。
 
 ### B6 `/ops` 資料庫與備份頁（Sonnet 5.5；High＝sg-deploy）
 - 讀 B2 的狀態 JSON：每個庫一列，最近備份時間、大小、R2 有沒有、PASS／FAIL。只讀，不在頁面上觸發備份。
