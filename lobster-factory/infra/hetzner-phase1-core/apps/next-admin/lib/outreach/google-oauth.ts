@@ -59,7 +59,7 @@ export function verifyState(signed: string, secret: string): OAuthState | null {
  *  `NEXT_PUBLIC_APP_URL` fallback convention already used in lib/repair-center/github.ts. */
 export function gmailOAuthRedirectUri(): string {
   const base = process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.aware-wave.com";
-  return new URL("/api/outreach/connectors/gmail/callback", base).toString();
+  return new URL("/api/outreach/connectors/gmail/oauth/callback", base).toString();
 }
 
 export function buildAuthorizeUrl(opts: { clientId: string; redirectUri: string; state: string }): string {

@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-14（續26）T10 Gmail OAuth `redirect_uri_mismatch`：callback 路由移到 `/gmail/oauth/callback` 對齊 Console 登記值
+
+**根因**：我給操作者的 Google Cloud Console 設定清單寫 `https://app.aware-wave.com/api/outreach/connectors/gmail/oauth/callback`（`C:\Users\user1115\AWARE_WAVE_CREDENTIALS.md` §36 同值），但實作路由建在 `app/api/outreach/connectors/gmail/callback/`，`gmailOAuthRedirectUri()` 也送 `/gmail/callback` → Google 拒絕（400 redirect_uri_mismatch）。操作者貼 Console 設定確認登記值帶 `/oauth`。
+**修法**：程式對齊已登記值（不再要操作者改 Console、免 propagation 等待）：`git mv` callback 目錄到 `gmail/oauth/callback/`；`lib/outreach/google-oauth.ts:62` redirect path 加 `/oauth`；`lib/security/__tests__/get-no-side-effects.test.ts:48` GET-寫入白名單路徑同步；callback 註解相對路徑 `../authorize` → `../../authorize`。
+**避免再發生**：設定清單與路由路徑同一 commit 寫；redirect URI 只由 `gmailOAuthRedirectUri()` 一處產生，文件引用它。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run lib/outreach lib/security app/api/outreach | exit=0 | ms=928
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 純路徑搬移，grep 確認 `gmail/callback` 舊路徑零殘留
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=gmail/callback | hits=1（僅 agency-os/WORKLOG.md 歷史/本條目敘述，程式與 docs 零殘留；.next 建置產物不計）
+- ORACLE_WAIVED: 純路由路徑搬移 + 兩處字串同步，無邏輯改動
 ## 2026-10-14（續25）備份涵蓋上線：首次正式檢查 PASS 20 列；Chatwoot、vault key、cognitive／HCI 都已離機；B9–B11 收尾
 
 **做了**（主機 ks-aw-01，操作者「15 項一直做到完成」授權）:

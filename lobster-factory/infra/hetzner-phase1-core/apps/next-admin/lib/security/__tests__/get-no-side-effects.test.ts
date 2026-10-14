@@ -45,7 +45,7 @@ const PRIMITIVES: Record<string, "*" | Set<string>> = {
 
 // Relative path (forward-slash, from ROOT) -> one-line reason this GET is exempt.
 const ALLOWLIST: Record<string, string> = {
-  "app/api/outreach/connectors/gmail/callback/route.ts":
+  "app/api/outreach/connectors/gmail/oauth/callback/route.ts":
     "OAuth2 authorization-code callback -- Google's redirect here is always a browser GET (outside our control, spec-mandated), and the write is gated by verifyState()'s HMAC-signed state token minted only by ../authorize, not by the session cookie -- immune to the SameSite=Lax img/script forgery this test otherwise guards against.",
 };
 

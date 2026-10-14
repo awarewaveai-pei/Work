@@ -5,7 +5,7 @@ import { exchangeCodeForTokens, getGmailProfile, gmailOAuthRedirectUri, verifySt
 
 // Cold Outreach — Gmail OAuth step 2 (task T10). Google redirects here after consent; no ops-role
 // session cookie is guaranteed to be present on this hop (Google's redirect is a fresh top-level
-// navigation), so this route trusts ONLY the HMAC-signed `state` param minted by ../authorize,
+// navigation), so this route trusts ONLY the HMAC-signed `state` param minted by ../../authorize,
 // never a client-supplied identity header. Redirect target on both success and failure is the
 // connectors page — this is a full-page browser navigation, not a fetch(), so there is no JSON
 // response to display to a caller.
