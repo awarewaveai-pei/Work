@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-14（續9）認知平台：直接分析的修正上線（e6182b960；群組 AI 問題背景 136ae32f0 已於 06:39Z 上線）
+
+**操作者**：「要」（部署）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy/deploy.sh（/tmp/cos-deploy-20261014c.out：測試閘門 PASS 07:39:01Z；smoke local/web/database/public 全 PASS，07:41:21Z done）| exit=0 | ms=212000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec cognitive-os-web grep 「示範案例已經附上這一步的結果」 /app/.next/static → chunks/541-…js（新版網頁在跑）| exit=0 | ms=500
+- REVIEW_WAIVED: NA -- 部署本身；程式的審查在 e6182b960 的條目（續8）
+- BUGHUNT_WAIVED: NA -- 部署本身，沒有改檔
+
+**rollback**: `git revert e6182b960` 後重跑 `deploy/deploy.sh`。
 ## 2026-10-14（續8）認知平台：直接分析實測（真瀏覽器、真 AI），找到 4 個問題並修好（e6182b960，未部署）
 
 **做法**: 測試站 cos-e2e3（正式站同版映像、獨立資料庫），Playwright：首頁問題 → 直接分析 → 5 個常用工具（冰山、SWOT、加權決策矩陣、問題陳述、5 Whys；示範案例與「貼上描述＋AI 起草」各半）→ 執行分析 → 等背景分析完成 → 結果頁每個按鈕。測試瀏覽器的 /api 直連 API（跟正式站 nginx 一樣；測試站的 Next 代理 30 秒會斷）。
