@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-14（續11）備份上傳 R2 偶發失敗沒有重試（調查完成，未修；操作者電量不足先存）
+
+**根因**:
+- `lobster-factory/infra/eu-backup/upload-to-r2.sh:34-43` `put_object` 只 PUT 一次，遇暫時性錯誤（HTTP 502／000）直接放棄該物件。三條管線（ks-stack／lobster-phase1／ks-aw-01）共用這支（`backup-phase1.sh:136`、`backup-ks-aw-01.sh:231`、`backup-eu-stack.sh:202`）。
+- 實際發生 4 天：09-08 lobster `wp-html.tgz.part-001` [000]；09-09 eu `mainwp.sql.gz` [000]；10-13 ks-aw-01 `soulful-wordpress.tgz.part-003` [502]（verify-backup-ks-aw-01 FAILED）；10-14 eu `uptime-kuma.tgz.part-002` [502]（verify-backup-eu FAILED，缺 `eu/2026-10-14/uptime-kuma.tgz.parts.json`）。主庫 supabase-all.sql.gz 每天都有上傳成功。
+- 正式機 `/root/scripts/*.sh` md5 與 repo 相同（未漂移）。
+- `backup-eu-stack.sh:220` 訊息「NO R2 offsite copy was made」在部分上傳時不實（今天 14 個物件已上傳）。
+
+**計畫（未做）**:
+- `put_object` 對 000／408／429／5xx 重試（預設 4 次、遞增等待），其他 4xx（401/403/413）不重試；PUT 同 key 可重複。改 FATAL 文字為「不完整或沒有」。
+- 本機用假 curl（先 502 後 200）測，拔掉重試要變紅。
+- 部署（High，需 go-ahead）：照 `lobster-factory/infra/eu-backup/README.md:17-20` scp + install + sha256 比對；補傳 `/root/backups-stack/20261014-023001`（R2_PREFIX=eu，DATE 2026-10-14）與 `/root/backups/20261013-021501`（R2_PREFIX=ks-aw-01）後跑 verify。
+
+**另發現（待查證）**:
+- 正式機資料庫：supabase-db（主庫＋n8n＋postiz 三個 database）、cognitive-db（pg17）、hci-postgres、chatwoot-postgres、trigger-postgres、mainwp-db、soulful-db、lobster-wordpress-db。
+- cognitive-db（`backup-cognitive-db.sh`，`/root/backups/cognitive-db` 留 7 天）與 hci-postgres（`backup-hci-postgres-prod.sh`，`/root/backups-hci-postgres`）的備份腳本裡沒找到任何 R2 上傳 → 疑似只有本機副本，主機壞了會一起沒。chatwoot 出現在 `backup-ks-aw-01.sh`，覆蓋範圍待讀。`/var/log/cognitive-db-backup.log` 是 0 bytes（10-10 起），但備份檔每天有產生。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ks-aw-01 讀 /var/log/{eu,lobster,ks-aw-01}-backup.log、md5sum /root/scripts/*.sh、docker ps、ls 備份目錄 | exit=0 | ms=20000
+- REVIEW_WAIVED: NA -- 只有調查，尚無改動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=upload-to-r2 | hits=5
+- ORACLE_WAIVED: 無程式改動
+
+**rollback**: 無改動。
 ## 2026-10-14（續10）社群管理平台 C1＋C2：0096 資料表（未套正式庫）、產品登記改成唯一清單
 
 **根因**:
