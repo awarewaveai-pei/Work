@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-14（續14）認知平台：背景 AI 起草正式 image 實測（一次性測試站，真 AI）
+
+**做法**：ks-aw-01 開一次性 `cos-e2e3`（正式 API 容器正在跑的 image `dd29501…`、web `ada703f…`，自己的資料庫，只開 127.0.0.1），bootstrap 一個測試帳號，容器內腳本走真 HTTP：登入 → 開案 → 寫卡 → 選起來 → `POST /ai/EXPRESS/draft_from_outline`。跑完 `docker compose -p cos-e2e3 down -v`、拆掉 tag、刪檔；正式站 4 容器 healthy、`/api/health` ok。
+
+**結果**:
+- 14 張卡、證據報告：200，39.7 秒，14 句、author ai、model claude-sonnet-5，草稿列得出來。60 秒內寫完 → 走同步那條，跟改之前一樣。
+- 30 張卡、論文段落：422 `AI_ANSWER_INVALID: sentence 30 needs at least one selected record ref`，50.8 秒。模型漏給來源，原本就有的檢查擋下，代碼照常到頁面。
+- 超過 60 秒的背景那條（202 → 輪詢 → 200）兩次都沒碰到：正式站模型（claude-sonnet-5）寫 14–30 句要 40–51 秒。那條只由 `test_ai_turn_background.py` 用慢的假模型證明過。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=cos-e2e3 內 live_draft.py（scratchpad）兩次：200 39.7s；422 50.8s | exit=0 | ms=91000
+- REVIEW_WAIVED: NA -- 沒有改程式，只是實測
+- BUGHUNT_WAIVED: NA -- 沒有改程式
+
+**觀察**：以 sonnet-5 的速度，8000 的上限大約要寫到 50 句以上才會超過 60 秒，一般草稿用不到背景；背景是給長稿或模型變慢時的保險。
 ## 2026-10-14（續13）R2 上傳加重試（repo 已改，未部署）
 
 **根因**: 見 2026-10-14（續11）：`upload-to-r2.sh` 每個物件只 PUT 一次，一次 502／000 就讓當天異地備份缺一塊（09-08、09-09、10-13、10-14）。三條管線共用這支。
