@@ -1,5 +1,5 @@
 # Worklog
-## 2026-10-14（續12）R2 上傳加重試（repo 已改，未部署）
+## 2026-10-14（續13）R2 上傳加重試（repo 已改，未部署）
 
 **根因**: 見 2026-10-14（續11）：`upload-to-r2.sh` 每個物件只 PUT 一次，一次 502／000 就讓當天異地備份缺一塊（09-08、09-09、10-13、10-14）。三條管線共用這支。
 
@@ -21,6 +21,19 @@
 **剩餘風險**: 正式機還是舊版（等 go-ahead）；10-13（ks-aw-01）與 10-14（eu）缺的物件還沒補；verify 腳本自己的列表請求也沒重試（只會誤報，不會掉資料）；cognitive／HCI 備份離機與否未處理（續11）。
 
 **rollback**: `git revert`；部署後用 `/root/scripts/upload-to-r2.sh.bak-20261014` 還原。
+## 2026-10-14（續12）認知平台：長的 AI 回答改背景執行，已上線（c118157c5，隨 e6182b960 的部署一起上）
+
+**操作者**：「上線」。查證時發現已經上線，沒有重新部署：另一個 session 07:41:21Z 部署 e6182b960 時，主機檢出 `b5c8a628` 已包含 c118157c5（`git merge-base --is-ancestor` 成立），之後 main 上沒有新的 COS 改動。續1 寫的「未上線」以此為準。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy.log `test-gate | PASS` 07:39:01Z、`done` 07:41:21Z；`docker exec cognitive-os-api` 讀到 SYNC_WAIT_SECONDS=60.0 與 11 個背景動作；`cognitive-os-web` 的 .next/static 含 `ai/turns` | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=curl | cmd=https://cognitive.aware-wave.com/api/me/ai/turns/x → 401 AUTH_REQUIRED（不存在的路由 → 404：新路由有上）| exit=0 | ms=2000
+- REVIEW_WAIVED: NA -- 沒有改程式，只查上線狀態
+- BUGHUNT_WAIVED: NA -- 沒有改程式
+
+**還沒做**：正式站用真帳號、真 AI 跑一次超過 60 秒的 EXPRESS 起草（會花一次 8000 token 的 AI 額度）。
+
+**rollback**：主機 `cd /opt/cognitive-os && git checkout --detach <前一版>` 後 `bash Projects/internal/cognitive-engineering-os/deploy/deploy.sh`；e6182b960 之前的版本見 0efeb14f5 的 WORKLOG。
 ## 2026-10-14（續11）備份上傳 R2 偶發失敗沒有重試（調查完成，未修；操作者電量不足先存）
 
 **根因**:
