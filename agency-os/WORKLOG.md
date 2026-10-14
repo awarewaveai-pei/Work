@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-14（續8）認知平台：直接分析實測（真瀏覽器、真 AI），找到 4 個問題並修好（e6182b960，未部署）
+
+**做法**: 測試站 cos-e2e3（正式站同版映像、獨立資料庫），Playwright：首頁問題 → 直接分析 → 5 個常用工具（冰山、SWOT、加權決策矩陣、問題陳述、5 Whys；示範案例與「貼上描述＋AI 起草」各半）→ 執行分析 → 等背景分析完成 → 結果頁每個按鈕。測試瀏覽器的 /api 直連 API（跟正式站 nginx 一樣；測試站的 Next 代理 30 秒會斷）。
+
+**找到**:
+- F1 5 Whys 完全跑不起來：它的原因假設集是魚骨圖的結果，魚骨圖又要問題陳述；送出只處理一層上游（MethodForm），魚骨圖永遠缺問題陳述；示範案例附的現成結果也被當成「需要先填上游方法」。
+- F2 SWOT 結果頁引註整列輸入時印出 JSON（含 provenance）：`lib/record.ts` plain 用 JSON.stringify。
+- F3 加權決策矩陣沒填分數、市場准入的示範案例（可空的人工簽核送成 ""）都只回「送出的內容不符合這個工具的要求」，沒說哪一格。
+- 不是錯：問題陳述的示範案例一次「AI 兩次的回答都沒有通過檢查」（citation_integrity），重跑 117 秒成功，頁面已提示再跑；React #418 出現一次，17 頁直接載入重現不出來。
+
+**改了**: 上游逐層解析、現成結果直接用（除非它說是別的方法做的）；引註讀成「標籤：值」，選項用中文名稱，系統欄位改顯示所在那一列；送出前點名頂層缺的必填格；伺服器拒絕時點名它提到的格子；可空的格子空白送 null。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=vitest 54 檔 459 passed；npx tsc --noEmit | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=全部 284 個示範案例經頁面的 payload 打 builder /invoke（不用 AI）：全部 200，missingRequired 0 誤擋（放進列內的版本誤擋 6 個，例如 critical_path_method 的最早開始是算出來的，所以只檢查頂層）| exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=測試站換上這版網頁映像，瀏覽器：5 Whys、市場准入示範案例送出 202；空矩陣顯示「要再看的格子：選項」；SWOT 4 條引註都是文字 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n
+  - Codex agency-os/reports/oracle/2026-10-14-review-f7dd5b8d.md：F2 select_by 換來源後沿用舊結果、F4 拒絕訊息不點名內層格子 → 修；F1 內層上游（7 個上游格 0 個在內層）、F3 內層必填檢查（誤擋 6 個）→ 依掃描拒絕。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=plain\(|missingRequired|toPayload | hits=8
+
+**部署**: 未部署，等操作者同意。
+**rollback**: `git revert e6182b960`。
 ## 2026-10-14（續7）社群管理平台：ADR 016 接受、app 按鈕改 14px、G1／G2 實測——我們的 Postiz v2.11.3 缺大半 API，要升 v2.25.1
 
 **根因**:
