@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-14（續3）D:\Work 落後 16 個 commit、108 個路徑未提交：整理完（e97d9b966）
+
+**根因**: 排程（AgencyOS-SystemGuard-Daily、Weekly、Monthly）跑的是 `agency-os/scripts/*`，那是一套 40 支的舊副本；`Resolve-WorkspaceRoot` 也把根導向 agency-os。舊的 `agency-os/scripts/doc-sync-automation.ps1:107` 用 `Set-Content` 寫 CRLF＋BOM（c20ad99cf 只修了 `scripts/`），還刪掉 `CHANGE_IMPACT_MATRIX.md` 一段 2026-09-30 的註記。產生的報告兩週沒提交，D:\Work 一直髒、拉不動。今天 08:19 健康 99.4%：TASKS／CONVERSATION_MEMORY 有 CRLF、封存待辦 3 條沒進 TASKS。
+
+**做了**:
+- 備份全部髒狀態到 `D:\tmp\work-dirty-backup-20261014`（staged／unstaged patch＋原檔）。
+- TASKS.md、WORKLOG.md 還原後 `merge --ff-only`（0/0），WORKLOG 的 monthly 機器附錄補回。
+- 其餘報告、doc-sync 頁尾、oracle 報告、dispatch log、session 摘要、會議服務主計畫：LF、BOM 照 repo 原狀，提交。`CHANGE_IMPACT_MATRIX.md` 留 HEAD 版。
+- `.gitignore`：`.claude/state|agent-dispatch|scheduled-tasks|SUBAGENT_CHARTER.md`、`agency-os/ALERT_REQUIRED.txt`。
+- 雜檔搬到 `D:\tmp\work-stray-20261014`（body.txt、.scratch_my_section2.txt、誤打的 `tash push …` 輸出、Temp/p208_*、.tmp-generate-authority-v2.mjs），每個都先確認已在 WORKLOG 或 commit 裡。
+
+**沒做（另開）**: 合併兩套腳本、讓排程只跑 `scripts/`；在那之前每天的 doc-sync 還會寫出 CRLF。封存待辦 3 條沒進 TASKS 的檢查也還沒處理。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=git rev-list --left-right --count HEAD...origin/main → 0 0；git status 只剩 WORKLOG | exit=0 | ms=200
+- REVIEW_WAIVED: DOC_ONLY -- 只提交產生的報告、時間戳、文件與 .gitignore，沒有改程式
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude | grep=doc-sync-automation|SUBAGENT_CHARTER|ALERT_REQUIRED | hits=151
+  - 檔數（不含 reports、WORKLOG）。兩套腳本互相引用是主因，留給合併任務；本次只改 .gitignore，沒有改到任何引用。
+
+**rollback**: `git revert e97d9b966`；原狀在備份資料夾。
 ## 2026-10-14（續2）認知平台：長的 AI 回答改背景執行，已上線（c118157c5）
 
 **操作者**：「如果是 趕快做」（部署）。沒有資料庫結構改動。
@@ -17589,3 +17609,8 @@ WORKLOG 先前的 `REALTEST_WAIVED: Docker Desktop 未啟動` 是誠實的，但
 **Rollback**: `git revert <this commit>` 可移除本輪 specification 與 ADR links；因未建立 schema/data/migration，不需要資料回滾。
 ## 2026-10-12
 - 01:15 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-10-12.md
+
+## 2026-10-13
+
+### Machine appendix (monthly-system-review)
+- 2026-10-13 11:31:39 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 33.26% (< 85%))
