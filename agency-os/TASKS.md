@@ -111,7 +111,8 @@
 - [ ] **【產品｜規劃】app.aware-wave.com 排程頁：一個地方管理所有例行工作**
   - `🟠 未開始` · `2026-10-14` · `無`
   - **一句話**：客戶例行工作改在 app 裡設定（筆電 tenant 自動化已退役）。一張通用排程表（工作 × 客戶 × 時間 × 開關），ops 總表頁＋每個客戶控制台一區，共用同一個元件；工作只能從程式寫好的菜單選，不能輸入指令；主機 cron、GitHub Actions、雲端 routine、筆電 guard 在總表只顯示。
-  - **下一步**：寫規劃卡（延伸 `collection_schedules`／migration 0081 與 `/api/internal/collect/run-due-schedules`），附可點的頁面草圖給操作者確認。建議模型：Fable 5.1
+  - **現在到哪**：規劃卡寫好 `docs/operations/SCHEDULES_PAGE_PLAN.md`（2026-10-14）：`collection_schedules` 一般化成 `client_schedules(org, job_key)`＋程式內 registry；網站巡檢用 adapter 不併表；筆電／雲端／GHA 排程不進 app。
+  - **下一步**：操作者看卡 §3.4 草圖後，照 §5 步 1 開工（步 2、5 High 等 go）。建議模型：Opus 5.5（照卡施工）
   - **證據**：WORKLOG 2026-10-14（續22）
 - [ ] **【治理｜小】連 ssh 的檢查腳本沒有存活檢查：連線中途斷掉就無限期卡住，每晚 guard 會被卡死**
   - `🟠 未開始` · `2026-10-14` · `無`

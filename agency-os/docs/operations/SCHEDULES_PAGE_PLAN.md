@@ -1,0 +1,165 @@
+# app.aware-wave.com 排程頁 — 規劃卡
+
+> 讀者：執行這張卡的 agent。路徑縮寫：`NA` = `lobster-factory/infra/hetzner-phase1-core/apps/next-admin`、`WF` = `lobster-factory/packages/workflows`、`DB` = `lobster-factory/packages/db`。所有 `file:line` 以 2026-10-14 `f8ffaf4b1` 為準。
+
+## 0. 現況（每次改動更新此段）
+
+| 項 | 狀態（2026-10-14） |
+|---|---|
+| 卡 | 寫好，等操作者看 §3 的草圖決定 |
+| Slice 1 | 未開始 |
+| 前置 | 筆電 tenant 自動化已退役（`f8ffaf4b1`，WORKLOG 2026-10-14 續22） |
+
+## 1. 目標
+
+一頁看完所有客戶的例行工作並能改；客戶頁同一份資料；工作只能從程式寫好的菜單選。不再有第二套排程機制。
+
+## 2. 操作者已拍板（勿重問）
+
+- 放 app.aware-wave.com，不是 api.aware-wave.com（2026-10-14）。
+- 總表＋客戶頁兩邊都能改，資料只存一份（2026-10-14）。
+- UI：核取方格／按鈕 chips，禁 `<select>`，預設多選；一頁一張圖、細節放旁邊（memory `feedback_no_dropdowns_multiselect`、`user_working_memory_one_thing_at_a_time`）。
+- 不讓人輸入指令（退役的 tenant runner 用 `Invoke-Expression` 跑清單裡的字串，那是這次要關掉的整類）。
+- 自動化預設 OFF（AGENTS.md §0）。
+
+## 3. 決策（含「這是最好的做法嗎」的答案）
+
+### 3.1 現有兩套「每客戶排程」已經是同一個形狀，差在資料表名
+
+| | 自動爬取 | 網站巡檢 |
+|---|---|---|
+| 表 | `collection_schedules`（`DB/migrations/0081_collection_schedules.sql`）：org PK、enabled、frequency daily/weekly、hour_utc、day_of_week_utc、last_run_at、last_run_key | `site_watch_targets`（`0091_site_watch.sql`）：org UNIQUE、enabled、frequency hourly/every_6h/daily/update_only、hour_utc、lease_*、last_completed_* |
+| 到時判斷 | `NA/lib/collect/schedule.ts:35-48` `isDueNow`（純函式） | `NA/lib/site-watch/runner.ts` `isDue`（桶＋租約） |
+| 心跳 | Trigger `collect-scheduled-crawl` cron `0 * * * *` → `POST /api/internal/collect/run-due-schedules`（`WF/src/lib/collection/postRunDueSchedules.ts:20`） | Trigger `site-watch-heartbeat` → `POST /api/internal/site-watch/due` |
+| 每客戶設定 API | `NA/app/api/ops/clients/[slug]/collection-schedule/route.ts`（GET :39、PATCH :53；`canWriteTenantConfig` `lib/ops-role.ts:64`；audit `ops_audit_events` :27-37） | `/api/ops/clients/[slug]/site-watch`（`lib/site-watch/console.ts`；同 audit :25-44） |
+| 設定 UI | `NA/app/(shell)/ops/collect/CollectionSourcesPanel.tsx:733-828` `ScheduleControls`（:497 使用；客戶頁「資料蒐集」分頁 `ClientHubTabs.tsx:1973` 共用同一面板） | `NA/app/(shell)/ops/clients/[slug]/SiteWatchCard.tsx`（:204 開關、:211 頻率 chips、:216-232 小時；在「維護」分頁 `ClientHubTabs.tsx:701`） |
+| 新客戶預設 | 無列＝關（route.ts:49） | `store.ts:124-129` 每個 active 且有 site_url 的 org 自動建列、預設開 |
+
+0081 檔頭已經寫明為什麼用表不用 Trigger.dev 自己的動態排程（第二份真相、無法察覺不一致）。同一個理由反對再開第三種機制。
+
+### 3.2 決定
+
+1. **把 `collection_schedules` 一般化成 `client_schedules`，主鍵 (organization_id, job_key)**。`isDueNow` 不動（它本來就不知道自己在排什麼）；`schedule-store` 多一個 `jobKey`；心跳 route 改成「對每個 due 的 (org, job) 呼叫 registry 裡該 job 的 `run`」。新工作 = registry 加一筆 + 一個 `run(orgId, runKey)` 函式；不加表、不加 route、不加 Trigger task。
+2. **網站巡檢不併表**。它不是「到點跑一次」的工作，是帶租約、桶、每頁狀態、告警狀態機的監控（0091 四張表）。併進去只會把 `isDueNow` 弄髒。頁面上用一個 adapter 讀 `site_watch_targets`、寫走它現有的 PATCH route，顯示在同一張表裡。
+3. **兩個畫面、一個元件、一份資料**：總表 `/ops/schedules` 和客戶頁「維護」分頁頂端同一個 `ScheduleTable`，差別只有 org 過濾。回答操作者的問題：是，兩邊都放是對的，因為兩種問法（「今天誰失敗」、「這家有誰在跑」）都真實存在；資料只在 `client_schedules`／`site_watch_targets` 各一份，所以不會對不上。
+4. **一列 = 一種工作，格子 = 一個客戶**。格子的核取方格 = 該 (job, org) 的 enabled；點格子，右側欄顯示那一格的細節：頻率 chips（每天／每週＋星期）、UTC 小時（旁邊換算台北）、上次執行時間、上次結果、audit 最近一筆。總表上方一行摘要：幾個排程、今天跑了幾個、幾個失敗。
+5. **新客戶的預設來自 registry，不靠開站流程**：registry 每筆宣告 `defaultEnabled`（client_schedules 一律 false；site-watch 沿用它自己的 true＋自動建列）。GET 在無列時回 registry 預設（同 route.ts:49 現行做法），sweep 只讀 enabled 列。沒有列就沒有東西要維護；一鍵架站不必多做任何事。這比「開站時插入預設列」乾淨，也不會在 registry 改預設時留下一堆舊列。
+6. **失敗走現有的事件路**：sweep 裡一個 job 丟錯 → `upsertIncidentAtomic`（`NA/lib/ops-inbox/upsertIncidentAtomic.ts:22`，fingerprint `schedule:<job_key>:<org>`）→ Ops Inbox → Slack/Telegram（`lib/ops-inbox/notify/dispatcher.ts`）。不寫新的通知器。成功時零聲音。
+7. **系統排程只顯示「主機看得到的」**：目前 app 能讀到的只有備份覆蓋（`NA/lib/backup/coverage.ts` 讀 `/host-status/backup-coverage.json`，compose :254 `/var/lib/awarewave:/host-status:ro`；主機上該目錄 2026-10-14 只有這一個檔）和網站巡檢心跳（`site_watch_maintenance.last_heartbeat_at`，`store.ts:118`）。筆電的每晚檢查、雲端 Claude routine、GitHub Actions **不放進 app**：沒有誠實的資料路徑（要新建推送管線＝範圍外），它們已在 AO-RESUME 開工報告裡。之前草圖裡把它們畫進總表是錯的，以此卡為準。
+8. **不做**：monthly 頻率（現在沒有任何每月工作；有了再加 `day_of_month` 和測試）、「立即執行」按鈕（爬取已有自己的「正式抓取」）、新工作（Slice 1 只搬現有兩個；第一個真的新工作出現時走 §9）。
+
+### 3.3 為什麼不是其他做法
+
+- **只放客戶頁**：「今天誰失敗」要一家家點。**只放總表**：處理某家時要跳出去。
+- **用 `ops_action_runs` 當排程**（0011＋`WF/src/trigger/dispatch-action-run.ts` cron */10）：那是一次性動作的佇列（action_key → Trigger task），沒有「下次幾點」的概念；拿來當排程要再長出 cadence 欄＝第三套。保留它做一次性動作。
+- **每個 job 各一張表**（照 0081／0091 現狀再複製）：新工作要 migration＋route＋task 三件，正是這次要關掉的重工。
+
+### 3.4 草圖
+
+總表：
+
+```
+排程                                            7 個排程 · 今天跑了 4 · 1 失敗
+──────────────────────────────────────────────────────────────────────────
+客戶例行工作（在這裡設定）
+ 工作          Soulful   Mongolia   P1試點   │ 右側欄（點了格子才有內容）
+ 自動爬取      [x] ●     [ ]        [ ]      │ 自動爬取 · Soulful
+ 網站巡檢      [x] ●     [x] ●      [ ]      │ 每天 / 每週 一二三四五六日
+                                            │ UTC 03 時（台北 11 時）
+在主機跑（只顯示）                             │ 上次 10/14 03:00 · 正常 · 寫入 12 筆
+ 備份覆蓋      每天 03:30   10/14 正常         │ 最近改動 owner:claims 10/01
+ 巡檢心跳      每小時       10/14 19:05 活著   │
+```
+
+● = 上次失敗時改紅。客戶頁「維護」分頁頂端 = 同一張表只留這家那一欄（右側欄相同）。
+
+## 4. 架構（Slice 1 實作即 SSOT；改程式時同步本段）
+
+### 4.1 資料
+
+`DB/migrations/0092_client_schedules.sql`（additive + 搬資料 + 刪舊表；down：`DB/scripts/0092_client_schedules_down.sql` 還原 0081 形狀）：
+
+```
+client_schedules(
+  organization_id uuid REFERENCES organizations(id) ON DELETE CASCADE,
+  job_key         text CHECK (job_key ~ '^[a-z][a-z0-9_]{2,40}$'),
+  enabled boolean NOT NULL DEFAULT false,
+  frequency text NOT NULL DEFAULT 'weekly' CHECK (frequency IN ('daily','weekly')),
+  hour_utc int NOT NULL DEFAULT 3 CHECK (0..23), day_of_week_utc int NOT NULL DEFAULT 1 CHECK (0..6),
+  last_run_at timestamptz, last_run_key text, last_error text,
+  updated_by text, created_at, updated_at,
+  PRIMARY KEY (organization_id, job_key))
+INSERT ... SELECT organization_id, 'collect_crawl', ... FROM collection_schedules;  DROP TABLE collection_schedules;
+RLS service_role only、REVOKE anon/authenticated、NOTIFY pgrst（照 0081 :40-47）
+```
+
+`last_error`：sweep 失敗時存前 200 字（現在 route 只回在 JSON 裡，頁面看不到）；成功時清空。job_key 不做 FK 到任何表：registry 在程式裡（§4.2），表只存設定。
+
+### 4.2 程式（`NA`）
+
+| 檔 | 內容 | 來源 |
+|---|---|---|
+| `lib/schedules/schedule.ts` | `isDueNow`、`scheduledRunKey(org, jobKey, now)` | `git mv lib/collect/schedule.ts`；runKey 多帶 job（`scheduled-<job>-<org8>-<date>`） |
+| `lib/schedules/store.ts` | `getSchedule(org, job)`、`listForOrg(org)`、`listAll()`、`listEnabled()`、`upsertSchedule`、`recordRun(org, job, runKey, error?)` | `git mv lib/collect/schedule-store.ts` + jobKey |
+| `lib/schedules/jobs.ts` | registry：`{ key, label, scope:'client', defaults:{frequency,hourUtc,dayOfWeekUtc}, run(orgId, runKey) }[]`。Slice 1 只有 `collect_crawl`（`run` = `runCollection` `lib/collect/run.ts`） | 新 |
+| `lib/schedules/adapters/site-watch.ts` | 讀 `site_watch_targets` → 同一個 row shape（enabled、frequency、hour、last、error）；寫走 `/api/ops/clients/[slug]/site-watch` 既有邏輯（`lib/site-watch/console.ts`） | 新 |
+| `lib/schedules/adapters/host-status.ts` | 備份覆蓋（`lib/backup/coverage.ts` `readBackupCoverage`）、巡檢心跳（`site_watch_maintenance`）→ 唯讀 row | 新；不複製 coverage 解析 |
+| `app/api/internal/schedules/run-due/route.ts` | generic sweep：`listEnabled()` → `isDueNow` → `jobs[key].run` → `recordRun`；錯誤 → `upsertIncidentAtomic` | `git mv` 自 `collect/run-due-schedules`；token 改名 `SCHEDULE_INGEST_TOKEN`（compose＋`.env.example`＋WF `trigger.config.ts` syncEnvVars 同步） |
+| `app/api/internal/collect/run-due-schedules/route.ts` | **過渡**：re-export 上一列的 POST；Trigger 換 URL 部署完後刪（§5 步 7） | 改 |
+| `app/api/ops/schedules/route.ts` | GET：所有 org × 所有 job（含 adapter）＋摘要 | 新 |
+| `app/api/ops/clients/[slug]/schedules/[job]/route.ts` | GET／PATCH 一格；job=`site_watch` 轉 adapter | `git mv` 自 `collection-schedule/route.ts`；舊路徑刪 |
+| `app/(shell)/ops/schedules/page.tsx` + `ScheduleTable.tsx` | 總表＋右側欄；org 清單照 `ops/collect/page.tsx:21`（`organizations` select slug,name） | 新 |
+| `app/SidebarNav.tsx:56-59` | 營運區加 `/ops/schedules` 「排程」 | 改 |
+| `ClientHubTabs.tsx:689` MaintenanceTab 頂端 | `<ScheduleTable only={org.slug} />` | 改 |
+| `CollectionSourcesPanel.tsx:733-828` | **刪** `ScheduleControls`（:497 使用處一起刪） | 刪 |
+| `SiteWatchCard.tsx:204-232` | **刪**開關／頻率／小時那一段；保留 baseline 接受、證據圖 | 刪一段 |
+| `WF/src/trigger/collect-scheduled-crawl.ts` → `schedules-heartbeat.ts` | id `schedules-heartbeat`，cron 不變；`postRunDueSchedules.ts:20` URL 改 `/api/internal/schedules/run-due` | 改名 |
+
+測試：`schedule.test.ts`（現有純函式測試搬過去＋runKey 含 job）、`run-due/route.test.ts`（照 `collect/run-due-schedules/route.test.ts` 的 hoisted-mock 寫法，加「一個 job 丟錯 → incident 一筆、其他 org 照跑」）、`adapters/site-watch.test.ts`（row shape 往返）。只寫這三支。
+
+### 4.3 權限與安全
+
+- 讀：viewer+（同 `collection-schedule` GET）。寫：`canWriteTenantConfig`（`lib/ops-role.ts:64`）。每次寫 `ops_audit_events`（照 route.ts:27-37）。
+- internal route：專屬 bearer，fail-closed（照現行 :30-35）。
+- 頁面不接受任何命令字串；job_key 只能是 registry 裡有的（PATCH 時驗）。
+
+## 5. Slice 1 步驟（順序 = 先不改行為地換引擎 → 再換 UI → 最後切 Trigger）
+
+Low/Medium 直接做；標 **High** 的逐項等操作者 go-ahead。每步完成更新 §0。主機 cron `auto-deploy-next-admin.sh` 每 4 小時從 main 自動部署 next-admin（crontab 2026-10-14），所以**每個 commit 都要能獨立上線**。
+
+1. 0092 migration + down；`lib/schedules/*`（搬＋jobKey）；generic sweep route；舊 collect route 變 re-export；`collection-schedule` route 改讀新 store（路徑先不動）。測試三支綠、`npx tsc --noEmit` 綠、`npm test` 綠。**行為不變**：Trigger 仍打舊 URL，舊 URL 轉到新 sweep。
+2. **High**：`node scripts/apply-db-migration.mjs --check 0092` → 操作者 go → apply。驗：`client_schedules` 列數 = 原 `collection_schedules` 列數；`collection_schedules` 不存在。
+3. `ScheduleTable` + `/ops/schedules` + sidebar + 客戶頁維護分頁；刪 `ScheduleControls`、SiteWatchCard 的設定段；`collection-schedule` route 改名 `schedules/[job]`。
+4. 部署隨 auto-deploy 上線後 smoke：`/ops/schedules` 200、改一格 → `ops_audit_events` 多一筆、`client_schedules` 該列 updated_by 正確；客戶頁同一格同步。
+5. **High**：Trigger task 改名＋URL（`scripts/lobster-trigger-deploy.ps1`）；env `SCHEDULE_INGEST_TOKEN` 先用 `safe-infra-patch.sh compose` 加到 next-admin（舊 token 保留到步 7）。驗：Trigger 下一個整點 run 綠；`docker exec lobster-next-admin printenv SCHEDULE_INGEST_TOKEN` exit 0。
+6. 等一個整點：`client_schedules.last_run_at` 更新、`collection_runs` 多一列 run_key `scheduled-collect_crawl-…`。
+7. 刪過渡 route、舊 token（compose 走 safe-infra-patch）、`WF` 舊檔。健康檢查／`/check-drift` 綠。
+8. 更新本卡 §0、`SITE_WATCH_MASTER_PLAN.md` §3.2（設定入口改到排程表）、`CollectionSourcesPanel.tsx:666-732` 的註解、WORKLOG。
+
+## 6. 驗收（缺一不算）
+
+| # | 證據 |
+|---|---|
+| 1 | `npm test`（NA）綠；三支新測試在列 |
+| 2 | 步 4 smoke：改總表一格 → 客戶頁同格相同；反向亦然（同一份資料） |
+| 3 | 步 6：真實心跳跑出一筆 `collection_runs`，`last_run_at` 更新 |
+| 4 | 故意讓一個 job 丟錯（測試或 dry）→ `ops_incidents` 一筆、Telegram 一則；其他 org 的 job 照跑 |
+| 5 | 主機上只剩 `schedules-heartbeat`、`site-watch-heartbeat` 兩個 app 心跳 task（Trigger dashboard） |
+| 6 | grep `collection_schedules|collection-schedule|run-due-schedules|ScheduleControls` 在 NA／WF／DB／agency-os docs = 0 程式命中 |
+| 7 | WORKLOG 四行證據（REALTEST／REVIEW／BUGHUNT／本段） |
+
+## 7. 邊界（不在本卡）
+
+- 筆電每晚檢查、雲端 routine、GHA 的狀態進 app：需要主機側接收端，另開卡。
+- `update_only` 巡檢頻率、多頁巡檢：`SITE_WATCH_MASTER_PLAN.md` §8。
+- 每月頻率、立即執行、新工作：§9。
+
+## 8. 回滾
+
+- 步 1–4（app）：`git revert`；auto-deploy 下一輪帶回舊版。DB 已套 0092 時先跑 down（還原 0081 表與列），再 revert。
+- 步 5：Trigger 重新部署上一版（`lobster-trigger-deploy.ps1` 指舊 commit）；過渡 route 還在，舊 URL 仍通。
+
+## 9. 之後（動工時展開成 §5 同格式）
+
+- 第一個新工作候選：WP 外掛更新檢查（`NA/app/api/ops/clients/[slug]/wp-update/` 既有邏輯包成 `run`）、客戶月報（先定內容與收件人，否則不做）。每個新工作 = registry 一筆 + `run` + 一支測試。
+- monthly：`frequency` CHECK 加 'monthly'、`day_of_month` 1–28、`isDueNow` 加一個分支＋測試。

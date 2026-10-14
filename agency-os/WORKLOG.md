@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-14（續24）排程頁規劃卡：`docs/operations/SCHEDULES_PAGE_PLAN.md`
+
+**操作者**：「這是最好的做法嗎」→「要」（寫卡）。
+
+**查到的（卡 §3.1 有 file:line）**：app 裡已有兩套同形狀的每客戶排程——自動爬取 `collection_schedules`（0081，`isDueNow` 純函式，Trigger 整點心跳打 `run-due-schedules`）與網站巡檢 `site_watch_targets`（0091，桶＋租約＋每頁狀態機）。0081 檔頭已論證「用表、不用 Trigger 動態排程」。主機 `/var/lib/awarewave` 只有 `backup-coverage.json`（app 讀得到的系統排程只有這個＋巡檢心跳）。`auto-deploy-next-admin.sh` 每 4 小時自動從 main 部署（crontab 2026-10-14）→ 每個 commit 必須可獨立上線。
+
+**決定（卡 §3.2）**：`collection_schedules` → `client_schedules(org, job_key)`＋程式內 registry（新工作＝一筆＋一個 `run`，不加表／route／task）；網站巡檢不併表、用 adapter 進同一張表；總表 `/ops/schedules` 與客戶頁「維護」分頁同一個 `ScheduleTable`；預設來自 registry 不靠開站流程；失敗走 `upsertIncidentAtomic` 既有路；筆電／雲端／GHA 排程不進 app（無資料路徑，留 AO-RESUME；更正先前草圖）；不做 monthly／立即執行／新工作。刪除清單：`ScheduleControls`、SiteWatchCard 設定段、`collection-schedule` route、`collect-scheduled-crawl` task、過渡 route。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad check_card_paths.py：卡內每個已存在路徑逐一 os.path.exists | exit=0 | ms=300
+- REVIEW_WAIVED: DOC_ONLY -- 規劃卡；施工時每步照 §5 走 /codex-review
+- BUGHUNT_WAIVED: DOC_ONLY -- 新檔，無 call site；repo 內 .md 免 BOM
+- 無 subagent。
+
+**rollback**: `git revert <本 commit>`。
 ## 2026-10-14（續22）客戶 tenant 自動化退役；查清每日 guard 的 0xC000013A 與 ssh 卡住
 
 **操作者**：「你去查是怎麼回事」→ 刪不刪「你決定，你才是專家」。
