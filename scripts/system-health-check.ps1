@@ -5,25 +5,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Resolve-WorkspaceRoot {
-    param([string]$InputRoot)
-    $resolved = $null
-    if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
-    } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } else {
-        $resolved = (Get-Location).Path
-    }
-
-    # Monorepo guardrail: if this path is the monorepo parent of agency-os, use agency-os as workspace root.
-    $agencyCandidate = Join-Path $resolved "agency-os"
-    if (Test-Path (Join-Path $agencyCandidate "scripts\system-health-check.ps1")) {
-        return (Resolve-Path -LiteralPath $agencyCandidate).Path
-    }
-
-    return $resolved
-}
+. (Join-Path $PSScriptRoot 'lib\repo-roots.ps1')
 
 function Read-Json {
     param([string]$Path)
@@ -35,7 +17,7 @@ function Ensure-Dir {
     if (-not (Test-Path $Path)) { New-Item -ItemType Directory -Path $Path -Force | Out-Null }
 }
 
-$root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
+$root = Resolve-AgencyRoot -InputRoot $WorkspaceRoot
 $checks = @()
 $criticalFailures = @()
 
@@ -80,10 +62,10 @@ $coreFiles = @(
     "AGENTS.md",
     "TASKS.md",
     "WORKLOG.md",
-    "scripts/doc-sync-automation.ps1",
-    "scripts/system-health-check.ps1",
-    "scripts/system-guard.ps1",
-    "scripts/build-product-bundle.ps1",
+    "../scripts/doc-sync-automation.ps1",
+    "../scripts/system-health-check.ps1",
+    "../scripts/system-guard.ps1",
+    "../scripts/build-product-bundle.ps1",
     "docs/CHANGE_IMPACT_MATRIX.md",
     "docs/change-impact-map.json",
     "automation/TENANT_AUTOMATION_RUNNER.ps1",
@@ -110,48 +92,31 @@ if (Test-Path -LiteralPath $ltPath) {
     Add-CriticalFailure -Reason "Missing docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md"
 }
 
-# 1a2) agency-os health entrypoint must stay a thin wrapper (canonical body is monorepo scripts\).
-# Validate only the agency-os copy, never the monorepo canonical file (it does not contain ..\..\scripts).
-# Covers both layouts: $root at agency-os package, or $root at monorepo parent when wrapper resolution falls back.
-$canonicalHealth = $null
-$wrapPath = $null
-if (Test-Path -LiteralPath (Join-Path $root "agency-os\AGENTS.md")) {
-    $canonicalHealth = Join-Path $root "scripts\system-health-check.ps1"
-    $wrapPath = Join-Path $root "agency-os\scripts\system-health-check.ps1"
-} elseif (Test-Path -LiteralPath (Join-Path $root "AGENTS.md")) {
-    $monoParent = Split-Path -Path $root -Parent
-    if ($monoParent) {
-        $canonicalHealth = Join-Path $monoParent "scripts\system-health-check.ps1"
-    }
-    $wrapPath = Join-Path $root "scripts\system-health-check.ps1"
+# 1a2) One scripts tree. Every script lives in monorepo scripts\ (this file's folder). A parallel
+# agency-os\scripts copy ran on schedule for months, rewrote AO files with CRLF+BOM and dropped
+# content (WORKLOG 2026-10-14). Fail if the folder comes back, or if any script again reaches
+# code through it -- that path is how callers ended up on the copy.
+$parallelTree = Join-Path $root "scripts"
+$parallelFiles = @(if (Test-Path -LiteralPath $parallelTree) { Get-ChildItem -LiteralPath $parallelTree -Recurse -File })
+$parallelNeedle = 'agency-os' + '[\\/]+scripts\b'
+$parallelRefs = @(Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -File -Include *.ps1, *.mjs, *.js, *.py, *.sh |
+    Select-String -Pattern $parallelNeedle |
+    Where-Object { $_.Line -notmatch '^\s*(#|//)' } |
+    ForEach-Object { "{0}:{1}" -f $_.Path.Substring($PSScriptRoot.Length + 1), $_.LineNumber })
+$singleTreeOk = ($parallelFiles.Count -eq 0) -and ($parallelRefs.Count -eq 0)
+$singleTreeDetail = if ($singleTreeOk) { "OK (no scripts folder under agency-os; no script reaches code through one)" } else {
+    "files in the agency-os scripts folder=$($parallelFiles.Count); code refs=$($parallelRefs.Count) $(($parallelRefs | Select-Object -First 5) -join ', ') -- move code to scripts/ and locate it from `$PSScriptRoot"
 }
-$distinctWrapper = $false
-if ($canonicalHealth -and $wrapPath -and (Test-Path -LiteralPath $canonicalHealth) -and (Test-Path -LiteralPath $wrapPath)) {
-    try {
-        $distinctWrapper = ((Resolve-Path -LiteralPath $canonicalHealth).Path -ne (Resolve-Path -LiteralPath $wrapPath).Path)
-    } catch {
-        $distinctWrapper = $false
-    }
-}
-if ($distinctWrapper) {
-    $wrapRaw = Get-Content -LiteralPath $wrapPath -Raw -Encoding UTF8
-    $wrapThin = ($wrapRaw.Length -lt 4000) -and ($wrapRaw -match '(?i)single-owner|canonical implementation') -and ($wrapRaw -match '\.\.[\\/]\.\.[\\/]scripts[\\/]system-health-check\.ps1')
-    $wrapDetail = if ($wrapThin) { "OK (thin wrapper -> monorepo scripts)" } else { "Looks like a full duplicate or missing forwarder; use monorepo scripts/system-health-check.ps1 only" }
-    Add-Check -Name "Script sanity: agency-os scripts/system-health-check.ps1 (thin wrapper)" -Pass $wrapThin -Detail $wrapDetail
-    if (-not $wrapThin) { Add-CriticalFailure -Reason "agency-os system-health-check.ps1 must remain a thin wrapper to monorepo scripts" }
-} elseif ($wrapPath -and (Test-Path -LiteralPath $wrapPath)) {
-    Add-Check -Name "Script sanity: agency-os scripts/system-health-check.ps1 (thin wrapper)" -Pass $true -Detail "Skipped: same file as monorepo canonical or layout has no split copy (wrapper rule N/A)"
-}
+Add-Check -Name "Single scripts tree: no scripts folder under agency-os, no code path into one" -Pass $singleTreeOk -Detail $singleTreeDetail
+if (-not $singleTreeOk) { Add-CriticalFailure -Reason "A parallel scripts tree under agency-os (or a code path into it) exists" }
 
 # 1b) Critical script bodies (detect accidental wrapper-only overwrite)
-$genPath = Join-Path $root "scripts\generate-integrated-status-report.ps1"
+$genPath = Join-Path $PSScriptRoot "generate-integrated-status-report.ps1"
 if (Test-Path $genPath) {
     $genRaw = Get-Content -LiteralPath $genPath -Raw -Encoding UTF8
-    $isFullGenerator = ($genRaw.Length -ge 2500) -and ($genRaw -match "Get-UncheckedInSection")
-    $isIntentionalWrapper = ($genRaw -match "Single-owner design") -and ($genRaw -match "owner script")
-    $genOk = $isFullGenerator -or $isIntentionalWrapper
-    $genDetail = if ($isFullGenerator) { "OK (full generator)" } elseif ($isIntentionalWrapper) { "OK (intentional wrapper)" } else { "Too small or missing expected symbols (wrapper overwrite?)" }
-    Add-Check -Name "Script sanity: generate-integrated-status-report.ps1 (full/wrapper)" -Pass $genOk -Detail $genDetail
+    $genOk = ($genRaw.Length -ge 2500) -and ($genRaw -match "Get-UncheckedInSection")
+    $genDetail = if ($genOk) { "OK (full generator)" } else { "Too small or missing expected symbols (wrapper overwrite?)" }
+    Add-Check -Name "Script sanity: generate-integrated-status-report.ps1 (full generator)" -Pass $genOk -Detail $genDetail
     if (-not $genOk) { Add-CriticalFailure -Reason "generate-integrated-status-report.ps1 failed sanity check" }
 }
 # weekly-system-review.ps1 retired 2026-05-30 (machine-local scheduled task → GitHub Actions
@@ -286,7 +251,7 @@ if (Test-Path $tenantsRoot) {
 }
 
 # 3b) Tenant staging URL SSOT (SITES_INDEX vs ENVIRONMENT_REGISTRY)
-$ssotGate = Join-Path $root "scripts\verify-tenant-staging-sites-index-ssot.ps1"
+$ssotGate = Join-Path $PSScriptRoot "verify-tenant-staging-sites-index-ssot.ps1"
 if (Test-Path -LiteralPath $ssotGate) {
     $prevEapSsot = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
@@ -302,7 +267,7 @@ if (Test-Path -LiteralPath $ssotGate) {
         }
         Add-Check -Name "Tenant SSOT: staging URLs (SITES_INDEX + SITE_PROFILE) vs ENVIRONMENT_REGISTRY" -Pass $ssotPass -Detail $ssotDetail
         if (-not $ssotPass) {
-            Add-CriticalFailure -Reason "Tenant staging URL drift vs core/ENVIRONMENT_REGISTRY (run agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1 from repo root)"
+            Add-CriticalFailure -Reason "Tenant staging URL drift vs core/ENVIRONMENT_REGISTRY (run scripts/verify-tenant-staging-sites-index-ssot.ps1)"
         }
     } catch {
         Add-Check -Name "Tenant SSOT: SITES_INDEX staging URL vs ENVIRONMENT_REGISTRY" -Pass $false -Detail $_.Exception.Message
@@ -312,7 +277,7 @@ if (Test-Path -LiteralPath $ssotGate) {
     }
 } else {
     Add-Check -Name "Tenant SSOT: staging URLs (SITES_INDEX + SITE_PROFILE) vs ENVIRONMENT_REGISTRY" -Pass $false -Detail "Missing script at scripts/verify-tenant-staging-sites-index-ssot.ps1"
-    Add-CriticalFailure -Reason "Missing verify-tenant-staging-sites-index-ssot.ps1 under agency-os/scripts"
+    Add-CriticalFailure -Reason "Missing scripts/verify-tenant-staging-sites-index-ssot.ps1"
 }
 
 # 4) Encoding spot check

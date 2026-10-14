@@ -54,10 +54,7 @@ switch ($Mode) {
             exit $LASTEXITCODE
         }
 
-        $guard = Join-Path $script:Root "agency-os\scripts\system-guard.ps1"
-        if (-not (Test-Path -LiteralPath $guard)) {
-            $guard = Join-Path $script:Root "scripts\system-guard.ps1"
-        }
+        $guard = Join-Path $script:Root "scripts\system-guard.ps1"
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $guard -WorkspaceRoot (Join-Path $script:Root "agency-os") -Mode manual
         if ($LASTEXITCODE -ne 0) {
             Invoke-Notify -Title "AO Alert Auto-Repair FAIL" -Message ("system-guard manual failed with exit code " + $LASTEXITCODE) -Level "error"

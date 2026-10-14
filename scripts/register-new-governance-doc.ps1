@@ -12,22 +12,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Resolve-AgencyRoot {
-    param([string]$InputRoot)
-    $resolved = $null
-    if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
-    } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } else {
-        $resolved = (Get-Location).Path
-    }
-    $agencyCandidate = Join-Path $resolved "agency-os"
-    if (Test-Path (Join-Path $agencyCandidate "scripts\doc-sync-automation.ps1")) {
-        return (Resolve-Path -LiteralPath $agencyCandidate).Path
-    }
-    return $resolved
-}
+. (Join-Path $PSScriptRoot 'lib\repo-roots.ps1')
 
 function Normalize-RelPath {
     param([string]$Value)

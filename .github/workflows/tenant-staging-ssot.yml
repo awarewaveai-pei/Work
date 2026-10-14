@@ -6,7 +6,8 @@ on:
       - main
     paths:
       - "agency-os/tenants/**"
-      - "agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1"
+      - "scripts/verify-tenant-staging-sites-index-ssot.ps1"
+      - "scripts/lib/repo-roots.ps1"
       - "scripts/system-health-check.ps1"
   workflow_dispatch:
 
@@ -21,4 +22,4 @@ jobs:
 
       - name: Verify staging URLs vs ENVIRONMENT_REGISTRY (SITES_INDEX + SITE_PROFILE)
         shell: pwsh
-        run: ./agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1 -WorkspaceRoot "${{ github.workspace }}/agency-os"
+        run: ./scripts/verify-tenant-staging-sites-index-ssot.ps1 -WorkspaceRoot "${{ github.workspace }}/agency-os"

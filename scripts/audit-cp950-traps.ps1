@@ -75,7 +75,6 @@
 
   Default scan paths (kept explicit to avoid scanning node_modules / Backups):
     scripts/
-    agency-os/scripts/
     lobster-factory/infra/**/scripts/
     lobster-factory/infra/trigger/
     mcp/claude-userlevel/hooks/ (PS hooks only)
@@ -118,7 +117,6 @@ $script:CaptureCmds = @('ssh', 'docker', 'wp', 'scp', 'git', 'kubectl', 'helm', 
 # Default scan paths if -Path not given.
 $script:DefaultScanPaths = @(
     'scripts',
-    'agency-os\scripts',
     'lobster-factory\infra\hetzner-phase1-core\scripts',
     'lobster-factory\infra\trigger',
     'mcp\claude-userlevel\hooks'

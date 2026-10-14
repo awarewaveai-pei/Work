@@ -53,13 +53,8 @@ if ($_regSecretsRoot) { $env:AO_SYNC_SECRETS_ROOT = $_regSecretsRoot }
 
 # ── 1. Resolve WorkRoot ───────────────────────────────────────────────────────
 if (-not $WorkRoot) {
-    $fromWorkScripts   = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
-    $fromAgencyScripts = Join-Path $PSScriptRoot "system-guard.ps1"
-    if (Test-Path -LiteralPath $fromWorkScripts) {
-        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } elseif (Test-Path -LiteralPath $fromAgencyScripts) {
-        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
-    }
+    # scripts\ sits directly under the monorepo root (the only scripts tree).
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 # Normalise WorkRoot to Windows-style backslash before deriving project key.
 # Same reason as the export script: Join-Path normalises '/' to '\' which would

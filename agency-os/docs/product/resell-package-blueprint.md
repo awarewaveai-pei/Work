@@ -30,12 +30,12 @@
 - 不承諾「零風險」，承諾「可觀測、可回滾、可復原」
 
 ## Related Documents (Auto-Synced)
+- `../scripts/build-product-bundle.ps1`
 - `docs/product/buyer-handover-checklist.md`
 - `docs/product/templates/monthly-report-template-en.md`
 - `docs/product/templates/proposal-template-en.md`
 - `docs/product/templates/sow-template-en.md`
 - `README.md`
-- `scripts/build-product-bundle.ps1`
 
-_Last synced: 2026-03-20 04:57:15 UTC_
+_Last synced: 2026-10-14 02:10:48 UTC_
 

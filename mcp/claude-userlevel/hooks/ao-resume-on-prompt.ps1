@@ -39,10 +39,10 @@ function Resolve-MonorepoRootWithAoResume {
         if (-not [System.IO.Path]::IsPathRooted($start)) { continue }
         $cur = $start
         for ($i = 0; $i -lt 16; $i++) {
-            # Sentinel must be paired with .git: scripts\ao-resume.ps1 also exists as a thin
-            # wrapper at agency-os\scripts\ao-resume.ps1 (owner script lives at monorepo
+            # Sentinel must be paired with .git: until 2026-10-14 scripts\ao-resume.ps1 also
+            # existed as a thin wrapper under agency-os\ (the owner script lives at monorepo
             # root scripts\ao-resume.ps1). Without the .git co-condition, a walk starting
-            # under agency-os\ stops at that inner wrapper and resolves the wrong root,
+            # under agency-os\ stopped at that inner wrapper and resolved the wrong root,
             # writing hook state into a nested agency-os\agency-os\.agency-state\ (found
             # 2026-09-05: 4 orphan debris trees from exactly this).
             $scriptPath = Join-Path $cur "scripts\ao-resume.ps1"

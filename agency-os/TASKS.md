@@ -108,6 +108,21 @@
 
 ### 未完成
 
+- [ ] **【治理｜小】automation/ 與 agency-os/automation/ 兩套排程腳本：留一套**
+  - `🟠 未開始` · `2026-10-14` · `無`
+  - **一句話**：和 agency-os/scripts 同一類雙頭馬車。TENANT_AUTOMATION_RUNNER／ENQUEUE／REGISTER_TENANT／REGISTER_AUTOPILOT 兩邊內容不同；兩個 tenant 月排程跑 agency-os 那份；agency-os 那份的 REGISTER_SYSTEM_GUARD_TASKS／REGISTER_AUTOPILOT_PHASE1_TASKS 以 agency-os 為根找 scripts，現在會直接報 Missing。
+  - **完成定義**：只剩一套、排程指向它、健康檢查擋第二套回來（同 system-health-check 1a2）。
+  - **證據**：WORKLOG 2026-10-14（續4）
+- [ ] **【治理｜待決】M3 客戶交付報告（generate-customer-delivery-status.ps1）要不要恢復收工自動跑**
+  - `🟡 潛伏` · `2026-10-14` · `操作者決定`
+  - **一句話**：generate-integrated-status-report 從 2026-05-13 起去 agency-os/scripts 找它，那裡從沒有，所以從來沒跑過；2026-10-14 拿掉這個呼叫。恢復的話：沒 Supabase 金鑰時是空報告，且每次收工多一個未追蹤的時間戳檔。
+  - **下一步**：決定恢復（要定報告放哪、是否進 git）或刪腳本與 DEPARTMENT_COVERAGE_MATRIX 的說明。
+  - **證據**：scripts/generate-integrated-status-report.ps1（REMOVED 2026-10-14 註解）；WORKLOG 2026-10-14（續4）
+- [ ] **【治理｜小】tests/smoke-status-digest.test.ps1 Case1 在 HEAD 就紅：doc_integrity_commits 報告不在時給 PASS 不給 BLIND**
+  - `🟠 未開始` · `2026-10-14` · `無`
+  - **一句話**：乾淨 worktree（HEAD 9a79dd136）重跑仍是 1 個 assertion 失敗，和本次改動無關；偵測器在沒資料時說 PASS 是盲點。
+  - **證據**：WORKLOG 2026-10-14（續4）
+
 - [ ] **【Cognitive OS｜小】`.runtime` 的 run lock 檔只增不刪：分析和背景 AI 動作每次各留一個檔**
   - `🟢 小` · `2026-10-14` · `無`
   - **一句話**：`run_lock.py` 規定 lock 檔不刪；分析（`main.py` `_interpretation_lock_path`）和背景 AI 動作（`api/blocks/ai.py` `_lock_path`）每次開新檔，放在持久 volume（`docker-compose.yml:41`），只會累積。
@@ -476,7 +491,7 @@
   - **【未完成｜範圍已縮 2026-08-25】** **DoD：**Scenery：`https://staging.scenery-travel.mn/` 後台可登入 + 關鍵頁可開（Pilot A §2 同等驗收；若網域變更須先更新 registry）。
   - **卡點**：****須選定主機商操作與 DNS／SSL；代理無法代登入第三方面板，且蒙古案本身卡在客戶刷卡開 Cloudways（見該條）。 **⛔ Soulful 半邊已作廢，不要再排**：~~Soulful：`https://staging.soulfulexpression.org/` 後台可登入 + 關鍵頁可開~~2026-08-16 決議 **abandon staging**，理由是 Hostinger hosting 2026-11-12 到期不續約，不在即將退場的主機上建 staging（WORKLOG 2026-08-16「補上搬站執行手冊 + 清掉 5 份文件的過期 staging 主張」，`ENVIRONMENT_REGISTRY.md` 與 `02_EXECUTION_PLAN.md` Day 2 兩行均已加刪除線並註「⛔ 不再執行」）。Soulful 的等價驗收改由**搬站後在新主機上做**，見「Soulful 網站搬離 Hostinger」條。
   - 證據鏈：`core/ENVIRONMENT_REGISTRY.md`（**URL／lifecycle SSOT**）、`SITES_INDEX.md`（須與 registry 對齊）、各案 `02_EXECUTION_PLAN.md` Day 2、`SITE_PROFILE.md`；Runbook §2 對齊框：`PRODUCTION_RUNBOOK_PILOT_*`；藍圖 §6：`docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`
-  - **自動漂移閘道**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
+  - **自動漂移閘道**：`scripts/verify-tenant-staging-sites-index-ssot.ps1`（比對 **`SITES_INDEX`**、含 HTTPS 之 **`sites/*/SITE_PROFILE`**、以及 `projects/*/02_EXECUTION_PLAN.md` 的 staging URL；`scripts/system-health-check.ps1` → **`verify-build-gates`**；PR `.github/workflows/tenant-staging-ssot.yml`）。
 
 - [x] `tenants/templates/` v2
   - **【未開始】** **進度：**依試點回填後再開；見 Pilot 條目。
@@ -1756,7 +1771,7 @@
   - **未宣稱完成**：****雲端 staging **實機**（DNS／SSL／WP 可登入）——見 **`### 未完成`**「**Next-Gen 試點 — Day 2 雲端 staging 實機驗收**」。
   - **SSOT 收斂（避免矛盾）**：****`SITES_INDEX`、兩份 **Pilot Runbook §2（Repo 對齊框）**、`RELEASE_GATES_CHECKLIST`、`CROSS_BORDER_GOVERNANCE`、`BACKUP_RESTORE_PROOF`、`ACCESS_REGISTER`、`30_YEAR_AI_CODING_EXEC_CHARTER` §4.1／§4.3、`TASKS` 證據鏈——均以 **`core/ENVIRONMENT_REGISTRY.md`** 為 URL／lifecycle 先決；**未新增**獨立長文檔。
 - [x] **Staging URL SSOT 漂移閘道擴充（`SITES_INDEX` + `SITE_PROFILE` + `02_EXECUTION_PLAN`）**
-  - **機械檢查**：`agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1` 單一腳本擴充；本機與 CI 共用，不開平行實作。
+  - **機械檢查**：`scripts/verify-tenant-staging-sites-index-ssot.ps1` 單一腳本擴充；本機與 CI 共用，不開平行實作。
   - **閘道接入**：`scripts/system-health-check.ps1` Critical Gate + `.github/workflows/tenant-staging-ssot.yml`（PR 路徑觸發）；
   - **驗證**：`system-health-check` 100% PASS（354/354）。
 

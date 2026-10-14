@@ -97,7 +97,7 @@
 3. 做完後寫 `WORKLOG.md` **3 行**（事實，不要寫心情小說）。  
 4. 若今天動到治理／docs：跑 doc-sync；收工前跑 health（Critical Gate 要 PASS）。
 
-**每週一次（與每日分開）**：執行 `scripts/weekly-system-review.ps1`——一次跑滿工程＋治理閘道、刷新綜合報告，並把證據附錄到 `WORKLOG`（見 `EXECUTION_DASHBOARD.md`「每週」一節）。若要自動化： `automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1`。
+**每週一次**：本機週檢排程已於 2026-05-30 退役，改由 GitHub Actions `weekly-workflows-security-audit.yml` 執行（見 `docs/operations/weekly-automation-framework.md`）；建置閘道在每次 PR／push 與收工時跑。
 
 ---
 

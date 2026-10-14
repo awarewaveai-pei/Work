@@ -8,13 +8,8 @@ param([string]$WorkRoot = "")
 $ErrorActionPreference = "SilentlyContinue"
 
 if (-not $WorkRoot) {
-    $fromWork   = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
-    $fromAgency = Join-Path $PSScriptRoot "system-guard.ps1"
-    if (Test-Path -LiteralPath $fromWork) {
-        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } elseif (Test-Path -LiteralPath $fromAgency) {
-        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
-    }
+    # scripts\ sits directly under the monorepo root (the only scripts tree).
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 if (-not $WorkRoot) { exit 0 }
 

@@ -15,13 +15,8 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "SilentlyContinue"
 
 if (-not $WorkRoot) {
-    $fromWorkScripts   = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
-    $fromAgencyScripts = Join-Path $PSScriptRoot "system-guard.ps1"
-    if (Test-Path -LiteralPath $fromWorkScripts) {
-        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } elseif (Test-Path -LiteralPath $fromAgencyScripts) {
-        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
-    }
+    # scripts\ sits directly under the monorepo root (the only scripts tree).
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 if (-not $WorkRoot) {
     Write-Host "validate-memory-index: WorkRoot not resolved — skip." -ForegroundColor Yellow

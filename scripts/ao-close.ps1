@@ -7,7 +7,7 @@
 # CONVERSATION_MEMORY: agent must edit agency-os/memory/CONVERSATION_MEMORY.md before this script (10-memory + 40-closeout); merge script may add inbox pointer only.
 # apply-closeout-task-checkmarks: WORKLOG today "- AUTO_TASK_DONE: <substring>" + optional
 # agency-os/.agency-state/pending-task-completions.txt (gitignored).
-# Primary: monorepo root scripts\ao-close.ps1. agency-os\scripts\ao-close.ps1 is a thin wrapper (same flags).
+# Lives in monorepo scripts\ (the only scripts tree; agency-os\scripts was removed 2026-10-14).
 # -SkipPush: no git commit/push (still runs gates and reports).
 # -SkipVerify: skip verify-build-gates (faster; not recommended before company pull).
 # -AllowAheadCommits: required override when local branch is already ahead of origin before AO-CLOSE starts.
@@ -55,16 +55,8 @@ $ErrorActionPreference = "Stop"
 if ($WorkRoot) {
     $WorkRoot = (Resolve-Path -LiteralPath $WorkRoot).Path
 } else {
-    $fromWorkScripts = Join-Path $PSScriptRoot "..\agency-os\scripts\system-guard.ps1"
-    $fromAgencyScripts = Join-Path $PSScriptRoot "system-guard.ps1"
-    if (Test-Path -LiteralPath $fromWorkScripts) {
-        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } elseif (Test-Path -LiteralPath $fromAgencyScripts) {
-        $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\..")).Path
-    } else {
-        Write-Error "ao-close: cannot locate system-guard.ps1 (expected under monorepo). PSScriptRoot=$PSScriptRoot"
-        exit 1
-    }
+    # scripts\ sits directly under the monorepo root (the only scripts tree).
+    $WorkRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 }
 
 $agencyRoot = Join-Path $WorkRoot "agency-os"
@@ -114,7 +106,7 @@ function Invoke-CloseoutGateDecision {
     return $false       # clean
 }
 
-$guardScript = Join-Path $agencyRoot "scripts\system-guard.ps1"
+$guardScript = Join-Path $PSScriptRoot "system-guard.ps1"
 if (-not (Test-Path -LiteralPath $guardScript)) {
     Write-Error "ao-close: missing system-guard at $guardScript"
     exit 1
@@ -915,7 +907,7 @@ if ($guardExit -ne 0) {
     Add-CloseoutGateResult -Gate $gate -Name "system-guard (health/doc-sync/closeout)" -Failed $true -Detail "system-guard exited $guardExit" -Fix "fix the failing health/closeout items in LAST_SYSTEM_STATUS.md (doc-sync already ran)"
 }
 
-$genScript = Join-Path $agencyRoot "scripts\generate-integrated-status-report.ps1"
+$genScript = Join-Path $PSScriptRoot "generate-integrated-status-report.ps1"
 if (Test-Path -LiteralPath $genScript) {
     Write-Host "== AO-CLOSE: generate integrated-status report ==" -ForegroundColor Cyan
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $genScript -WorkspaceRoot $agencyRoot

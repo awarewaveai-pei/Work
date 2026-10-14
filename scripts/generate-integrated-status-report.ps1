@@ -8,25 +8,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Resolve-AgencyRoot {
-    param([string]$InputRoot)
-    $resolved = $null
-    if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
-    } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } else {
-        $resolved = (Get-Location).Path
-    }
-
-    # Monorepo guardrail: if invoked from D:\Work, force canonical agency root.
-    $agencyCandidate = Join-Path $resolved "agency-os"
-    if (Test-Path (Join-Path $agencyCandidate "scripts\generate-integrated-status-report.ps1")) {
-        return (Resolve-Path -LiteralPath $agencyCandidate).Path
-    }
-
-    return $resolved
-}
+. (Join-Path $PSScriptRoot 'lib\repo-roots.ps1')
 
 function Ensure-Dir {
     param([string]$Path)
@@ -306,7 +288,7 @@ $utf8NoBom = [System.Text.UTF8Encoding]::new($false)
 Write-Output ("Integrated status report: reports/status/" + [System.IO.Path]::GetFileName($outFile))
 Write-Output ("Also written to: reports/status/integrated-status-LATEST.md")
 
-$renderTimeline = Join-Path $root "scripts\render-program-timeline-from-schedule.ps1"
+$renderTimeline = Join-Path $PSScriptRoot "render-program-timeline-from-schedule.ps1"
 if (Test-Path -LiteralPath $renderTimeline) {
     Write-Host "== generate-integrated-status-report: render PROGRAM_TIMELINE from PROGRAM_SCHEDULE.json ==" -ForegroundColor Cyan
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $renderTimeline -WorkspaceRoot $root
@@ -316,12 +298,7 @@ if (Test-Path -LiteralPath $renderTimeline) {
     }
 }
 
-# M3: generate customer delivery status (20-department coverage snapshot)
-$customerDeliveryScript = Join-Path $root "scripts\generate-customer-delivery-status.ps1"
-if (Test-Path -LiteralPath $customerDeliveryScript) {
-    Write-Host "== generate-integrated-status-report: M3 customer delivery status (20-dept) ==" -ForegroundColor Cyan
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $customerDeliveryScript -WorkspaceRoot $root
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "generate-integrated-status-report: generate-customer-delivery-status exited $LASTEXITCODE (non-fatal)"
-    }
-}
+# REMOVED 2026-10-14: the M3 customer-delivery step looked for its script under agency-os\scripts,
+# where it never existed, so it was a silent no-op from 2026-05-13 on. Pointing it at scripts\ would
+# switch on a report nobody has seen (empty without Supabase keys, a new untracked file every
+# close-out); whether to revive it is an open TASKS.md item. Run scripts\generate-customer-delivery-status.ps1 by hand.

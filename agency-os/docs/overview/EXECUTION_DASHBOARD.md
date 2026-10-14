@@ -53,7 +53,7 @@
 
 ### 一鍵跑滿「工程 + 治理」閘道（monorepo 根）
 - `powershell -ExecutionPolicy Bypass -File .\scripts\verify-build-gates.ps1`
-  - 先跑 `lobster-factory` 的 `bootstrap-validate.mjs`（含 doc integrity），再跑 `agency-os\scripts\system-health-check.ps1`
+  - 先跑 `lobster-factory` 的 `bootstrap-validate.mjs`（含 doc integrity），再跑 `scripts\system-health-check.ps1`
 
 ### 治理 Gate（agency-os）
 - `scripts/doc-sync-automation.ps1 -AutoDetect`（closeout 報告）

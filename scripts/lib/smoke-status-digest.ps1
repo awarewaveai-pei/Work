@@ -228,9 +228,8 @@ function Get-CiHealthEntry {
 # --- 2. Nightly system-guard health gate (reports/health/health-*.json, dated, gitignored) ---
 function Get-NightlyHealthEntry {
     param([string]$WorkRoot, [double]$MaxAgeHours = 30)
-    # system-health-check.ps1's own Resolve-WorkspaceRoot canonicalizes D:\Work to
-    # D:\Work\agency-os (the monorepo guardrail: it re-roots to agency-os whenever
-    # agency-os\scripts\system-health-check.ps1 exists there), so the nightly gate's
+    # system-health-check.ps1 canonicalizes D:\Work to D:\Work\agency-os (Resolve-AgencyRoot in
+    # scripts\lib\repo-roots.ps1 re-roots to agency-os whenever agency-os\AGENTS.md exists), so the nightly gate's
     # reports land at agency-os\reports\health, not <WorkRoot>\reports\health. $WorkRoot
     # here is D:\Work (matching every other Get-*Entry in this file), so the agency-os
     # segment must be added explicitly -- verified against a real run 2026-09-23.

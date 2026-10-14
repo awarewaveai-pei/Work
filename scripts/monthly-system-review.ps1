@@ -12,46 +12,13 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
-function Resolve-AgencyRoot {
-    param([string]$InputRoot)
-    if ($InputRoot -and (Test-Path $InputRoot)) { return (Resolve-Path -LiteralPath $InputRoot).Path }
-    if ($PSScriptRoot) { return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path }
-    return (Get-Location).Path
-}
-
-function Resolve-PhysicalDirectory {
-    param([string]$Path)
-    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Stop
-    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
-        $tgt = $item.Target
-        if ($tgt) {
-            $first = if ($tgt -is [string]) { $tgt } else { $tgt[0] }
-            return (Resolve-Path -LiteralPath $first).Path
-        }
-    }
-    return (Resolve-Path -LiteralPath $Path).Path
-}
-
-function Resolve-MonorepoRoot {
-    param([string]$AgencyPhysicalPath)
-    $cursor = $AgencyPhysicalPath
-    for ($i = 0; $i -lt 10; $i++) {
-        $gate = Join-Path $cursor "scripts\verify-build-gates.ps1"
-        $boot = Join-Path $cursor "lobster-factory\scripts\bootstrap-validate.mjs"
-        if ((Test-Path -LiteralPath $gate) -and (Test-Path -LiteralPath $boot)) { return $cursor }
-        $parent = Split-Path -Parent $cursor
-        if (-not $parent -or $parent -eq $cursor) { break }
-        $cursor = $parent
-    }
-    return (Split-Path -Parent $AgencyPhysicalPath)
-}
+. (Join-Path $PSScriptRoot 'lib\repo-roots.ps1')
 
 $agencyRoot = Resolve-AgencyRoot -InputRoot $AgencyOsRoot
-$agencyPhysical = Resolve-PhysicalDirectory -Path $agencyRoot
-$workRoot = Resolve-MonorepoRoot -AgencyPhysicalPath $agencyPhysical
-$verifyScript = Join-Path $workRoot "scripts\verify-build-gates.ps1"
-$genScript = Join-Path $agencyRoot "scripts\generate-integrated-status-report.ps1"
-$memScript = Join-Path $agencyRoot "scripts\check-supabase-memory-monthly.ps1"
+$workRoot = Get-MonorepoRoot
+$verifyScript = Join-Path $PSScriptRoot "verify-build-gates.ps1"
+$genScript = Join-Path $PSScriptRoot "generate-integrated-status-report.ps1"
+$memScript = Join-Path $PSScriptRoot "check-supabase-memory-monthly.ps1"
 $worklogPath = Join-Path $agencyRoot "WORKLOG.md"
 $alertFile = Join-Path $agencyRoot "ALERT_REQUIRED.txt"
 

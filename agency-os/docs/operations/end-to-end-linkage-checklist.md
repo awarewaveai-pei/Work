@@ -39,14 +39,14 @@
 - [ ] `LAST_SYSTEM_STATUS.md` current and readable
 
 ## Related Documents (Auto-Synced)
+- `../scripts/doc-sync-automation.ps1`
+- `../scripts/system-guard.ps1`
+- `../scripts/system-health-check.ps1`
 - `docs/architecture/multi-platform-delivery-architecture.md`
 - `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 - `docs/operations/system-operation-sop.md`
 - `README.md`
-- `scripts/doc-sync-automation.ps1`
-- `scripts/system-guard.ps1`
-- `scripts/system-health-check.ps1`
 
-_Last synced: 2026-10-14 00:16:07 UTC_
+_Last synced: 2026-10-14 02:10:48 UTC_
 

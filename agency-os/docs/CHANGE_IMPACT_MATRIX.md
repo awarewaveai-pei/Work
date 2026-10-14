@@ -24,18 +24,18 @@
 | `docs/architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md` | `docs/architecture/decisions/ADR_INDEX.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `docs/operations/security-secrets-policy.md`, `tenants/templates/core/ENVIRONMENT_REGISTRY.md`, `docs/architecture/decisions/006-supabase-tenant-isolation-and-clerk-mapping.md`, `WORKLOG.md` |
 | `docs/architecture/decisions/006-supabase-tenant-isolation-and-clerk-mapping.md` | `docs/architecture/decisions/ADR_INDEX.md`, `docs/architecture/decisions/002-clerk-identity-boundary.md`, `docs/architecture/decisions/005-supabase-sor-vs-wordpress-runtime-db.md`, `../lobster-factory/packages/db/migrations/0010_clerk_org_mapping_and_rls_expansion.sql`, `docs/operations/security-secrets-policy.md`, `WORKLOG.md` |
 | `docs/overview/REMOTE_WORKSTATION_STARTUP.md` | `docs/overview/EXECUTION_DASHBOARD.md`, `docs/overview/INTEGRATED_STATUS_REPORT.md`, `RESUME_AFTER_REBOOT.md`, `docs/operations/end-of-day-checklist.md`, `AGENTS.md`, `memory/CONVERSATION_MEMORY.md`, `TASKS.md`, `../README.md`（monorepo 根；§1.5／§2／雙機敘述變更時必查）, `.cursor/rules/00-session-bootstrap.mdc`, `.cursor/rules/30-resume-keyword.mdc`, `.cursor/rules/40-shutdown-closeout.mdc`（**改 REMOTE 的開收工順序／§ 分工時必查**）, `../.cursor/rules/00-session-bootstrap.mdc`, `../.cursor/rules/30-resume-keyword.mdc`, `../.cursor/rules/40-shutdown-closeout.mdc`（monorepo 根鏡像；**同名檔須與上面 agency-os 版本保持一致**，避免根與 agency-os 載入規則分叉） |
-| `docs/overview/INTEGRATED_STATUS_REPORT.md` | `docs/overview/EXECUTION_DASHBOARD.md`, `docs/overview/REMOTE_WORKSTATION_STARTUP.md`, `scripts/generate-integrated-status-report.ps1`, `reports/status/integrated-status-LATEST.md` |
+| `docs/overview/INTEGRATED_STATUS_REPORT.md` | `docs/overview/EXECUTION_DASHBOARD.md`, `docs/overview/REMOTE_WORKSTATION_STARTUP.md`, `../scripts/generate-integrated-status-report.ps1`, `reports/status/integrated-status-LATEST.md` |
 | `docs/operations/system-operation-sop.md` | `README.md`, `AGENTS.md`, `TASKS.md`, `WORKLOG.md` |
 | `docs/operations/client-risk-scoring-model.md` | `docs/metrics/kpi-margin-dashboard-spec.md`, `docs/product/templates/monthly-report-template-en.md`, `README.md`, `TASKS.md` |
 | `docs/operations/outsourcing-vendor-scorecard.md` | `docs/operations/outsourcing-playbook.md`, `README.md`, `TASKS.md` |
 | `docs/operations/tenant-scheduling.md` | `README.md`, `tenants/README.md`, `tenants/NEW_TENANT_ONBOARDING_SOP.md`, `automation/README.md` |
 | `docs/wordpress_mainwp_plan.md`（monorepo root `docs/`） | `agency-os/TASKS.md`、`agency-os/WORKLOG.md`、`C:\Users\USER\Desktop\AWARE_WAVE_CREDENTIALS.md`（§二十六）、`agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md`（§MainWP）、`agency-os/docs/operations/WP_MANAGED_UPDATES.md` |
 | `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` | `lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`, `lobster-factory/infra/hetzner-phase1-core/scripts/rollback-phase1.sh`, `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml`, `docs/governance-plans/PLAN_30Y_STABILITY_HARDENING.md`, `docs/operations/hetzner-stack-rollout-index.md`, `docs/operations/OPS_DOCS_INDEX.md`, `TASKS.md`, `WORKLOG.md` |
-| `docs/operations/system-guard-and-notification.md` | `README.md`, `AGENTS.md`, `RESUME_AFTER_REBOOT.md`, `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`, `scripts/system-guard.ps1` |
-| `docs/operations/end-to-end-linkage-checklist.md` | `docs/operations/new-doc-linkage-checklist.md`, `scripts/system-guard.ps1`, `scripts/system-health-check.ps1`, `scripts/doc-sync-automation.ps1`, `README.md` |
-| `docs/operations/new-doc-linkage-checklist.md` | `docs/operations/end-to-end-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/DOCS_INDEX.md`, `scripts/register-new-governance-doc.ps1`, `scripts/doc-sync-automation.ps1`, `scripts/system-health-check.ps1`, `scripts/verify-tenant-staging-sites-index-ssot.ps1` |
-| `AGENTS.md` | `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `scripts/register-new-governance-doc.ps1`, `README.md`, `docs/operations/TOOL_TRIGGER_MAP.md` |
-| `scripts/register-new-governance-doc.ps1` | `docs/operations/new-doc-linkage-checklist.md`, `docs/change-impact-map.json`, `docs/CHANGE_IMPACT_MATRIX.md`, `AGENTS.md` |
+| `docs/operations/system-guard-and-notification.md` | `README.md`, `AGENTS.md`, `RESUME_AFTER_REBOOT.md`, `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`, `../scripts/system-guard.ps1` |
+| `docs/operations/end-to-end-linkage-checklist.md` | `docs/operations/new-doc-linkage-checklist.md`, `../scripts/system-guard.ps1`, `../scripts/system-health-check.ps1`, `../scripts/doc-sync-automation.ps1`, `README.md` |
+| `docs/operations/new-doc-linkage-checklist.md` | `docs/operations/end-to-end-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/DOCS_INDEX.md`, `../scripts/register-new-governance-doc.ps1`, `../scripts/doc-sync-automation.ps1`, `../scripts/system-health-check.ps1`, `../scripts/verify-tenant-staging-sites-index-ssot.ps1` |
+| `AGENTS.md` | `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `../scripts/register-new-governance-doc.ps1`, `README.md`, `docs/operations/TOOL_TRIGGER_MAP.md` |
+| `../scripts/register-new-governance-doc.ps1` | `docs/operations/new-doc-linkage-checklist.md`, `docs/change-impact-map.json`, `docs/CHANGE_IMPACT_MATRIX.md`, `AGENTS.md` |
 | `docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md` | `CLAUDE.md`, `AGENTS.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/dual-ide-coexistence-strategy.md`, `docs/operations/OPS_DOCS_INDEX.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `docs/operations/dual-ide-coexistence-strategy.md` | `CLAUDE.md`, `AGENTS.md`, `docs/operations/cursor-enterprise-rules-index.md`, `docs/operations/CLAUDE_EXECUTION_BLUEPRINT_30Y.md`, `docs/operations/OPS_DOCS_INDEX.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `docs/operations/cursor-enterprise-rules-index.md` | `AGENTS.md`, `docs/operations/cursor-mcp-and-plugin-inventory.md`, `docs/operations/new-doc-linkage-checklist.md`, `docs/operations/security-secrets-policy.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md`, `.cursor/rules/63-cursor-core-identity-risk.mdc`, `.cursor/rules/64-architecture-mcp-routing.mdc`, `.cursor/rules/65-build-standards-data-state.mdc`, `.cursor/rules/66-skills-observability-protocol.mdc`, `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md`, `docs/CHANGE_IMPACT_MATRIX.md`, `docs/change-impact-map.json`, `docs/DOCS_INDEX.md`, `../README.md` |
@@ -55,9 +55,9 @@
 | `docs/sales/cr-pricing-rules.md` | `docs/operations/scope-change-policy.md`, `docs/templates/cr-template.md`, 專案 `01_SCOPE_AND_CR.md` |
 | `docs/quality/delivery-qa-gate.md` | `project-kit/20_BUILD_AND_CUSTOM_SYSTEM.md`, `project-kit/30_LAUNCH_AND_HANDOVER.md`, `README.md` |
 | `docs/compliance/leads-and-scraping-checklist.md` | `docs/international/global-compliance-baseline.md`, `README.md`, `TASKS.md` |
-| `docs/product/resell-package-blueprint.md` | `docs/product/buyer-handover-checklist.md`, `README.md`, `scripts/build-product-bundle.ps1` |
+| `docs/product/resell-package-blueprint.md` | `docs/product/buyer-handover-checklist.md`, `README.md`, `../scripts/build-product-bundle.ps1` |
 | `docs/releases/release-notes.md` | `docs/releases/upgrade-path.md`, `docs/releases/migration-checklist.md`, `README.md`, `WORKLOG.md` |
-| `docs/releases/upgrade-path.md` | `docs/releases/migration-checklist.md`, `scripts/system-health-check.ps1`, `scripts/system-guard.ps1`, `README.md` |
+| `docs/releases/upgrade-path.md` | `docs/releases/migration-checklist.md`, `../scripts/system-health-check.ps1`, `../scripts/system-guard.ps1`, `README.md` |
 | `docs/templates/msa-template.md` | `docs/templates/sow-template.md`, `docs/templates/cr-template.md`, `README.md` |
 | `docs/standards/wordpress-custom-dev-guidelines.md` | 專案 `02_EXECUTION_PLAN.md`, `03_HANDOVER_CRITERIA.md` |
 | `docs/standards/n8n-workflow-architecture.md` | `docs/operations/tools-and-integrations.md`, 專案自動化文件、`README.md` |
@@ -72,15 +72,15 @@
 | `tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md` | `tenants/company-p1-pilot/04_OPERATIONS_AUTOMATION_GUIDE.md`, `tenants/README.md`, `README.md`, `docs/operations/tenant-scheduling.md`, `automation/README.md` |
 | `.cursor/rules/00-session-bootstrap.mdc` | `AGENTS.md`, `README.md`, `memory/CONVERSATION_MEMORY.md`, `TASKS.md`, `WORKLOG.md` |
 | `.cursor/rules/10-memory-maintenance.mdc` | `AGENTS.md`, `memory/CONVERSATION_MEMORY.md`, `README.md` |
-| `.cursor/rules/20-doc-sync-closeout.mdc` | `AGENTS.md`, `README.md`, `scripts/doc-sync-automation.ps1`, `TASKS.md`, `WORKLOG.md` |
+| `.cursor/rules/20-doc-sync-closeout.mdc` | `AGENTS.md`, `README.md`, `../scripts/doc-sync-automation.ps1`, `TASKS.md`, `WORKLOG.md` |
 | `.cursor/rules/30-resume-keyword.mdc` | `AGENTS.md`, `README.md`, `memory/CONVERSATION_MEMORY.md`, `TASKS.md`, `WORKLOG.md`, `LAST_SYSTEM_STATUS.md` |
-| `.cursor/rules/40-shutdown-closeout.mdc` | `AGENTS.md`, `README.md`, `TASKS.md`, `WORKLOG.md`, `memory/CONVERSATION_MEMORY.md`, `scripts/doc-sync-automation.ps1`, `scripts/system-health-check.ps1`, `scripts/system-guard.ps1` |
+| `.cursor/rules/40-shutdown-closeout.mdc` | `AGENTS.md`, `README.md`, `TASKS.md`, `WORKLOG.md`, `memory/CONVERSATION_MEMORY.md`, `../scripts/doc-sync-automation.ps1`, `../scripts/system-health-check.ps1`, `../scripts/system-guard.ps1` |
 | `docs/edge-and-domains/EDGE_DOMAINS_INDEX.md` | `docs/DOCS_INDEX.md`, `AGENTS.md`, `docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`, `docs/operations/OPS_DOCS_INDEX.md`, `../lobster-factory/infra/hetzner-phase1-core/README.md`, `docs/overview/OVERVIEW_INDEX.md`, `../README.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `docs/edge-and-domains/PLAN_PHASE1_API_AWARE_WAVE_NODE_EDGE.md` | `docs/edge-and-domains/EDGE_DOMAINS_INDEX.md`, `docs/DOCS_INDEX.md`, `AGENTS.md`, `docs/operations/CLOUDFLARE_HETZNER_PHASE1.md`, `../lobster-factory/infra/hetzner-phase1-core/README.md`, `TASKS.md`, `WORKLOG.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `docs/governance-plans/GOVERNANCE_PLANS_INDEX.md` | `docs/DOCS_INDEX.md`, `docs/operations/OPS_DOCS_INDEX.md`, `docs/edge-and-domains/EDGE_DOMAINS_INDEX.md`, `AGENTS.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `docs/governance-plans/PLAN_30Y_STABILITY_HARDENING.md` | `docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`, `docs/operations/SENTRY_ALERT_POLICY.md`, `docs/operations/security-secrets-policy.md`, `../lobster-factory/infra/hetzner-phase1-core/LONG_TERM_OPS.md`, `TASKS.md`, `WORKLOG.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `docs/governance-plans/PLAN_30_YEAR_RULE_CONSOLIDATION.md` | `docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`, `docs/governance-plans/PLAN_RULES_STABILITY_CONSOLIDATION.md`, `docs/operations/rules-version-and-enforcement.md`, `AGENTS.md`, `TASKS.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
-| `docs/governance-plans/PLAN_RULES_STABILITY_CONSOLIDATION.md` | `docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`, `docs/governance-plans/PLAN_30_YEAR_RULE_CONSOLIDATION.md`, `docs/operations/rules-version-and-enforcement.md`, `AGENTS.md`, `scripts/ao-resume.ps1`, `docs/CHANGE_IMPACT_MATRIX.md` |
+| `docs/governance-plans/PLAN_RULES_STABILITY_CONSOLIDATION.md` | `docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`, `docs/governance-plans/PLAN_30_YEAR_RULE_CONSOLIDATION.md`, `docs/operations/rules-version-and-enforcement.md`, `AGENTS.md`, `../scripts/ao-resume.ps1`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` | `docs/operations/cursor-mcp-and-plugin-inventory.md`, `../lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md`, `../lobster-factory/docs/ROUTING_MATRIX.md`, `TASKS.md`, `WORKLOG.md`, `docs/operations/tools-and-integrations.md`, `docs/operations/security-secrets-policy.md`, `docs/operations/NEXT_GEN_DELIVERY_BLUEPRINT_V1.md`, `docs/DOCS_INDEX.md`, `docs/operations/OPS_DOCS_INDEX.md`, `docs/edge-and-domains/EDGE_DOMAINS_INDEX.md`, `docs/governance-plans/GOVERNANCE_PLANS_INDEX.md`, `AGENTS.md`, `README.md`, `../README.md`, `docs/CHANGE_IMPACT_MATRIX.md` |
 | `../lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md` | `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md` §41, `../lobster-factory/docs/ARCHITECTURE_CANONICAL_MAP.md`, `docs/overview/ao-lobster-operating-model.md`, `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md` §0, `docs/CHANGE_IMPACT_MATRIX.md` |
 
@@ -103,16 +103,15 @@
 - `.agency-state/doc-sync-state.json`：記錄上次同步時間與受影響文件
 
 ## Related Documents (Auto-Synced)
+- `../scripts/register-new-governance-doc.ps1`
 - `AGENTS.md`
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/new-doc-linkage-checklist.md`
-- `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-09-29 14:30:03 UTC_
+_Last synced: 2026-10-14 02:11:47 UTC_
 
 # Maintenance note (2026-09-30): Cursor was retired on 2026-08-26. Historical
 # `.cursor/` and `Cursor  Rules for AI` paths remain below for traceability, but
 # `scripts/check-change-impact-matrix-drift.ps1` excludes them from live drift
 # verdicts and records each exclusion in the skipped section of its report. The
 # current workflow SSOT is `CLAUDE.md` + `agency-os/AGENTS.md`.
-

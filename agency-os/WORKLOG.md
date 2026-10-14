@@ -1,4 +1,40 @@
 # Worklog
+## 2026-10-14（續4）只剩一套 scripts/：agency-os/scripts 移除，排程改跑 scripts/，doc-sync 不再刪別人的字
+
+**根因**:
+- 排程跑 `agency-os/scripts/*`：Daily guard 的 `-WorkspaceRoot agency-os` 讓 `scripts/system-guard.ps1` 去呼叫 `$root/scripts/doc-sync-automation.ps1`＝舊副本（`Set-Content`→CRLF＋BOM）。8 支腳本的 `Resolve-WorkspaceRoot` 以「agency-os/scripts/X.ps1 存在」判斷 agency 根；5 支（ao-close、append-agent-dispatch、export/import-cross-machine-memory、validate-memory-index）以「agency-os/scripts/system-guard.ps1 存在」判斷 monorepo 根——只刪副本會讓它們靜默落到 `D:\`。
+- 週檢 2026-05-30 已退役（6f1ff70e9），但副本 `weekly-system-review.ps1` 和排程一直在跑，用 `Add-Content` 寫 CRLF 機器附錄進 WORKLOG。
+- 月檢 registrar（schtasks）先刪任務再建，launcher 指令超過 /TR 261 字元上限必失敗；留下的是直接呼叫 agency-os 副本的舊任務（StartWhenAvailable=false、電池不跑，10-01 結果 0x800710E0）。
+- 刪內容：根版 `Upsert-RelatedBlock` 也一樣——從標記取代到下一個 `## `，`CHANGE_IMPACT_MATRIX.md` 尾端的 H1 註記被吞（舊副本與根版都會）。Codex F2：標記用 `IndexOf`，WORKLOG.md:1366 散文裡引用標記，會被當成區塊起點，刪到下一個標題。
+- 封存待辦 3 條：RLS（0094，bf83aa19b）與 CRLF（c20ad99cf）兩項在 10-03 封存後才完成，`tasks-ref` 指到已勾 [x] 的行。
+
+**做了**:
+- 新 `scripts/lib/repo-roots.ps1`：`Get-MonorepoRoot`、`Resolve-AgencyRoot`（以 `agency-os/AGENTS.md` 判斷）。8 份 resolver 換成它；所有找程式的地方改 `$PSScriptRoot`（system-guard、ao-close、monthly-system-review、generate-integrated、verify-build-gates、autopilot-phase1、system-health-check）。
+- 刪 `agency-os/scripts/` 30 檔：17 個轉發、9 個與 scripts/ 相同的副本、check-three-way-sync 轉發、doc-sync 舊副本、weekly-system-review（已退役）、sync-enterprise-cursor 轉發（目標已刪）。10 檔 `git mv` 到 scripts/（verify-adr-index、verify-tenant-staging-sites-index-ssot、airtable-*、art-therapy-*、load-art-therapy-source-archive、verify-art-therapy-dry-run），兩支 .ps1 改用 Resolve-AgencyRoot；CI `tenant-staging-ssot.yml` 路徑跟著改。
+- 刪 `agency-os/automation/REGISTER_MONTHLY_SYSTEM_REVIEW_TASK.ps1`（副本）、`automation/REGISTER_WEEKLY_SYSTEM_REVIEW_TASK.ps1`（已退役，且 -RemoveOnly 前就 throw）。`scripts/register-monthly-system-review-task.ps1` 改 Task Scheduler COM（月觸發、CREATE_OR_UPDATE、電池可跑、補跑）。
+- 排程：Daily 用 `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1` 重註冊、Monthly 用新 registrar 重註冊，兩者都指 `D:\Work\scripts\`；Weekly `Unregister-ScheduledTask`。舊 XML 存 `D:\tmp\agencyos-task-rollback-20261014\`。
+- doc-sync：區塊＝最後一個整行標記到自己的 `_Last synced:` 行；外面的字一律保留。CHANGE_IMPACT_MATRIX 註記從 HEAD 補回。
+- `change-impact-map.json` 20 處、MATRIX 表格 19 處 `scripts/` → `../scripts/`（原本指副本，doc-sync 從沒監看到真腳本）；跑 doc-sync 更新相關區塊。live 文件 12 處路徑改正（tenants/README 連結、LONG_TERM_OPERATING_DISCIPLINE、local-secrets-vault-dpapi、EXECUTION_DASHBOARD、LEARNING_PATH 等）；audit-cp950 掃描清單拿掉 agency-os/scripts。
+- 健康檢查 1a2 改成「Single scripts tree」：agency-os 底下出現 scripts 資料夾，或 scripts/ 內有程式行指向它，就 Critical。核心檔 4 支改查 `../scripts/`；generate-integrated 不再接受 wrapper。
+- `generate-integrated-status-report` 的 M3 customer-delivery 呼叫拿掉（一直指 agency-os/scripts，從沒跑過；恢復與否開 TASKS 待決）；DEPARTMENT_COVERAGE_MATRIX 說明改正。
+- 封存 `reports/ao-close/2026-10-03-1457.md` 3 條改 `archive-only: 已完成…`。hook 註解改後跑 `sync-claude-userlevel.ps1 -Mode merge`（PASS）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=Start-ScheduledTask AgencyOS-SystemGuard-Daily（新註冊）→ guard-20261014-101818.md：Health 100%、Result PASS；TASKS.md／CONVERSATION_MEMORY.md sha1 前後相同（0cee8344a71c／3e05cbdf324f，crlf=0，BOM False／True）| exit=0 | ms=92000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/system-health-check.ps1 → 100%（328/328），含 Single scripts tree、Task file path ×4、archive-lift（5 lifted／3 archive-only）、AO pipeline LF | exit=0 | ms=38000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad writer_test.py：同一份 TASKS／CONVERSATION_MEMORY／MATRIX 副本，新 doc-sync → crlf=0、BOM 不變、註記在；HEAD 舊副本 → TASKS crlf=19＋多出 BOM、MATRIX 註記被刪 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad marker_test.py：散文內引用標記＋真區塊＋尾端 H1；新版 KEEP-1/2/3 全在、舊區塊換掉；HEAD scripts/ 版刪掉 KEEP-1、舊區塊沒換 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=verify-adr-index（15 ADR OK）、verify-tenant-staging（無參數／-WorkspaceRoot agency-os 皆 PASS）、node --test airtable/art-therapy（9/9）、monthly-system-review -ReportOnly -SkipWorklog（done）、bash scripts/test-hooks.sh（PASS）、validate-doc-integrity（exit 0） | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=tests/smoke-status-digest.test.ps1 → 1 assertion 紅（Case1 doc_integrity_commits）；乾淨 HEAD worktree 同樣紅＝既有問題，已開 TASKS | exit=0 | ms=30000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex（agency-os/reports/oracle/2026-10-14-partialreview-efaee35b.md）4 條：F2 成立已修（上面 marker_test）；F1（-NoInteractive＝S4U）是既有選項、本次用預設互動式，不改；F3（doc-sync 寫 BOM）不成立——Upsert 走 Write-RepoTextFile，writer_test 證 TASKS 維持無 BOM，Set-Content 只剩 gitignore 的 state json（.gitignore:90）與新產生的 closeout 報告；F4（M3 不再產生）是刻意決定，已開 TASKS 待決。
+- ORACLE_WAIVED: F2 的修正在 Codex 審查之後；以 marker_test 新舊對照為證，不再跑第二輪（操作者規則：一次 Codex review）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,.github,automation,lobster-factory | grep=agency-os[\\/]+scripts | hits=17
+  - 17 處全是註解、已結案紀錄（AUDIT_REGISTRY、secrets closeout、TASKS [x]）或 BUGHUNT 範圍散文；程式行 0（健康檢查 1a2 守住）。
+
+**剩餘風險**: 健康檢查只擋字面 `agency-os\scripts`；`Join-Path $agencyRoot "scripts\x"` 這種寫法擋不到（資料夾不存在，會在 Test-Path 失敗）。automation/ 與 agency-os/automation/ 兩套另開 TASKS。
+
+**rollback**: `git revert <本 commit>`；排程用 `D:\tmp\agencyos-task-rollback-20261014\rollback-AgencyOS-*.xml` 以 `Register-ScheduledTask -Xml` 還原（Weekly 也在內）。
 ## 2026-10-14（續3）D:\Work 落後 16 個 commit、108 個路徑未提交：整理完（e97d9b966）
 
 **根因**: 排程（AgencyOS-SystemGuard-Daily、Weekly、Monthly）跑的是 `agency-os/scripts/*`，那是一套 40 支的舊副本；`Resolve-WorkspaceRoot` 也把根導向 agency-os。舊的 `agency-os/scripts/doc-sync-automation.ps1:107` 用 `Set-Content` 寫 CRLF＋BOM（c20ad99cf 只修了 `scripts/`），還刪掉 `CHANGE_IMPACT_MATRIX.md` 一段 2026-09-30 的註記。產生的報告兩週沒提交，D:\Work 一直髒、拉不動。今天 08:19 健康 99.4%：TASKS／CONVERSATION_MEMORY 有 CRLF、封存待辦 3 條沒進 TASKS。

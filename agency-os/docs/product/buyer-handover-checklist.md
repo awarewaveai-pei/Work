@@ -27,5 +27,5 @@
 ## Related Documents (Auto-Synced)
 - `docs/product/resell-package-blueprint.md`
 
-_Last synced: 2026-03-28 11:27:29 UTC_
+_Last synced: 2026-10-14 02:10:48 UTC_
 

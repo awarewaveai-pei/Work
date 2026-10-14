@@ -2,7 +2,7 @@
   "schema_version": 1,
   "meta": {
     "title": "Example schedule (copy per project)",
-    "description": "Duplicate this file into agency-os/docs/overview/, a lobster-factory folder, or tenants/.../projects/.../ then expand streams.tasks. Run agency-os/scripts/render-program-timeline-from-schedule.ps1 with -SchedulePath and -TimelinePath pointing at your copy.",
+    "description": "Duplicate this file into agency-os/docs/overview/, a lobster-factory folder, or tenants/.../projects/.../ then expand streams.tasks. Run scripts/render-program-timeline-from-schedule.ps1 with -SchedulePath and -TimelinePath pointing at your copy.",
     "reuse": "Three streams keys: AO (ops), LF (platform), PJ (client). Add rows; use null start/end for TBD (omits bar from Mermaid)."
   },
   "render_hints": {

@@ -55,7 +55,7 @@
 - **預設不新增檔**：見 `docs/operations/new-doc-linkage-checklist.md` 開頭「**預設：不要新增檔案**」——先 append Owner，禁止為偏好開平行長文檔。
 - **隊列**：`TASKS` 只保留 **一行**責任敘述 + **進度／下一步** + **連結到 Owner**；長細項不得堆在 `TASKS` 重複貼全文。
 - **細項與案例**：只在對應 **Owner 檔** 維護正文；他處 **一句摘要 + 連結**（見 `CLAUDE.md` / `agency-os/AGENTS.md` 的 Single Owner 原則）。
-- **租戶／試點**：事實以 `tenants/<company>/...` 該案檔為準（**環境 URL**：`core/ENVIRONMENT_REGISTRY.md`；**站點索引**：`SITES_INDEX.md`；若在 `sites/*/SITE_PROFILE.md` 的 **Staging URL** 列出 HTTPS，須與 registry 對齊——機械檢查見 `agency-os/scripts/verify-tenant-staging-sites-index-ssot.ps1`）；與全局政策衝突時，先對照 ADR／Routing Spec／營運 SSOT，**禁止**在 tenant 內複製第二套長篇政策正文。
+- **租戶／試點**：事實以 `tenants/<company>/...` 該案檔為準（**環境 URL**：`core/ENVIRONMENT_REGISTRY.md`；**站點索引**：`SITES_INDEX.md`；若在 `sites/*/SITE_PROFILE.md` 的 **Staging URL** 列出 HTTPS，須與 registry 對齊——機械檢查見 `scripts/verify-tenant-staging-sites-index-ssot.ps1`）；與全局政策衝突時，先對照 ADR／Routing Spec／營運 SSOT，**禁止**在 tenant 內複製第二套長篇政策正文。
 
 ### 4.4 「三十年」的誠實範圍（安全、可演進）
 - **在此承諾**：本檔所述 **治理原則**、**證據鏈**（閘道、health、`AO-CLOSE`）可長期作為組織紀律；**缺失即不可宣稱完成**。

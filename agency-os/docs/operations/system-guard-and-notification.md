@@ -35,11 +35,11 @@
 - 低於門檻時建立 `ALERT_REQUIRED.txt`；但若允許 auto-repair，會先做一次保守重跑（仍 FAIL 才產生 ALERT）
 
 ## Related Documents (Auto-Synced)
+- `../scripts/system-guard.ps1`
 - `AGENTS.md`
 - `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`
 - `README.md`
 - `RESUME_AFTER_REBOOT.md`
-- `scripts/system-guard.ps1`
 
-_Last synced: 2026-06-16 14:30:02 UTC_
+_Last synced: 2026-10-14 02:10:48 UTC_
 

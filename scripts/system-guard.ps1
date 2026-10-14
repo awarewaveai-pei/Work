@@ -12,25 +12,7 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Resolve-WorkspaceRoot {
-    param([string]$InputRoot)
-    $resolved = $null
-    if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
-    } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } else {
-        $resolved = (Get-Location).Path
-    }
-
-    # Monorepo guardrail: if invoked from D:\Work, force canonical agency root.
-    $agencyCandidate = Join-Path $resolved "agency-os"
-    if (Test-Path (Join-Path $agencyCandidate "scripts\system-guard.ps1")) {
-        return (Resolve-Path -LiteralPath $agencyCandidate).Path
-    }
-
-    return $resolved
-}
+. (Join-Path $PSScriptRoot 'lib\repo-roots.ps1')
 
 function Ensure-Dir {
     param([string]$Path)
@@ -80,15 +62,15 @@ function Show-DesktopPopup {
     }
 }
 
-$root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
-$healthUtils = Join-Path (Split-Path $root -Parent) "scripts\health-report-utils.ps1"
+$root = Resolve-AgencyRoot -InputRoot $WorkspaceRoot
+$healthUtils = Join-Path $PSScriptRoot "health-report-utils.ps1"
 if (Test-Path -LiteralPath $healthUtils) {
     . (Resolve-Path -LiteralPath $healthUtils).Path
 }
 $noUi = $HideUi -or ($env:AGENCYOS_SCHEDULED_QUIET -eq "1")
 
 # 1) Sync relationships
-Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/doc-sync-automation.ps1") -ScriptArgs @("-AutoDetect")
+Invoke-GuardChildPwsh -ScriptPath (Join-Path $PSScriptRoot "doc-sync-automation.ps1") -ScriptArgs @("-AutoDetect")
 
 # 2) Health check — skip if a fresh 100% report exists from this session (< 10 min)
 $healthDir = Join-Path $root "reports/health"
@@ -106,7 +88,7 @@ if ($existingHealth -and $existingHealth.LastWriteTimeUtc -gt $freshCutoff) {
     }
 }
 if (-not $usedFreshReport) {
-    Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/system-health-check.ps1") -ScriptArgs @("-WorkspaceRoot", $root)
+    Invoke-GuardChildPwsh -ScriptPath (Join-Path $PSScriptRoot "system-health-check.ps1") -ScriptArgs @("-WorkspaceRoot", $root)
     $healthExitCode = $LASTEXITCODE
 }
 $guardDir = Join-Path $root "reports/guard"
@@ -135,8 +117,8 @@ if (-not $ok -and -not $DisableAutoRepair) {
     try {
         Write-Host "System guard auto-repair: retry doc-sync + system-health-check once..." -ForegroundColor Yellow
 
-        Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/doc-sync-automation.ps1") -ScriptArgs @("-AutoDetect")
-        Invoke-GuardChildPwsh -ScriptPath (Join-Path $root "scripts/system-health-check.ps1") -ScriptArgs @("-WorkspaceRoot", $root)
+        Invoke-GuardChildPwsh -ScriptPath (Join-Path $PSScriptRoot "doc-sync-automation.ps1") -ScriptArgs @("-AutoDetect")
+        Invoke-GuardChildPwsh -ScriptPath (Join-Path $PSScriptRoot "system-health-check.ps1") -ScriptArgs @("-WorkspaceRoot", $root)
         $healthExitCode = $LASTEXITCODE
 
         $latestHealth = Get-LatestFile -Dir $healthDir -Filter "health-*.md"

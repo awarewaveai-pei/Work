@@ -21,7 +21,7 @@
 ## 架構與建置說明（你怕掛掉時先看這段）
 - Vault 引擎：`scripts/secrets-vault.ps1`
 - Root 入口：`D:\Work\scripts\secrets-vault.ps1`
-- 實作入口：`D:\Work\agency-os\scripts\secrets-vault.ps1`
+- 實作入口：`D:\Work\scripts\secrets-vault.ps1`
 - 儲存檔：`%LOCALAPPDATA%\AgencyOS\secrets\vault.json`
 - 加密機制：Windows DPAPI（綁「同一台機器 + 同一個 Windows 使用者」）
 - 結論：檔案就算被看到也不是明文，但換機/換帳號不能直接解密
@@ -69,7 +69,7 @@
 
 ### C) 腳本壞掉或不見（Repo 破損）
 1. 先 `git pull` 還原 repo
-2. 若 `scripts/secrets-vault.ps1` 仍缺失，從 `agency-os/scripts/secrets-vault.ps1` 複本確認
+2. 若 `scripts/secrets-vault.ps1` 仍缺失，先 `git pull` 再確認（只有這一份，agency-os 底下沒有副本）
 3. 必要時重建：
    - `.\scripts\secrets-vault.ps1 -Action init`
 

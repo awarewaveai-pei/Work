@@ -57,7 +57,7 @@ if (-not (Test-Path -LiteralPath $healthScript)) {
     exit 1
 }
 
-$adrIdx = Join-Path $agencyRoot "scripts\verify-adr-index.ps1"
+$adrIdx = Join-Path $PSScriptRoot "verify-adr-index.ps1"
 if (Test-Path -LiteralPath $adrIdx) {
     Write-Host "== Agency OS: verify-adr-index ==" -ForegroundColor Cyan
     & powershell -ExecutionPolicy Bypass -NoProfile -File $adrIdx

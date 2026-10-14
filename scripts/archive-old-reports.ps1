@@ -7,32 +7,14 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Resolve-WorkspaceRoot {
-    param([string]$InputRoot)
-    $resolved = $null
-    if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
-    } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } else {
-        $resolved = (Get-Location).Path
-    }
-
-    # Monorepo guardrail: if invoked from D:\Work, force canonical agency root.
-    $agencyCandidate = Join-Path $resolved "agency-os"
-    if (Test-Path (Join-Path $agencyCandidate "scripts\archive-old-reports.ps1")) {
-        return (Resolve-Path -LiteralPath $agencyCandidate).Path
-    }
-
-    return $resolved
-}
+. (Join-Path $PSScriptRoot 'lib\repo-roots.ps1')
 
 function Ensure-Dir {
     param([string]$Path)
     if (-not (Test-Path $Path)) { New-Item -ItemType Directory -Path $Path -Force | Out-Null }
 }
 
-$root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
+$root = Resolve-AgencyRoot -InputRoot $WorkspaceRoot
 $reportsRoot = Join-Path $root "reports"
 if (-not (Test-Path $reportsRoot)) {
     Write-Output "No reports directory found. Nothing to archive."

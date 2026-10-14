@@ -11,14 +11,14 @@
                         "AGENTS.md",
                         "TASKS.md",
                         "WORKLOG.md",
-                        "scripts/system-guard.ps1",
-                        "scripts/build-product-bundle.ps1",
-                        "scripts/system-health-check.ps1",
-                        "scripts/verify-tenant-staging-sites-index-ssot.ps1",
-                        "scripts/doc-sync-automation.ps1",
-                        "scripts/register-new-governance-doc.ps1",
-                        "scripts/generate-integrated-status-report.ps1",
-                        "scripts/render-program-timeline-from-schedule.ps1",
+                        "../scripts/system-guard.ps1",
+                        "../scripts/build-product-bundle.ps1",
+                        "../scripts/system-health-check.ps1",
+                        "../scripts/verify-tenant-staging-sites-index-ssot.ps1",
+                        "../scripts/doc-sync-automation.ps1",
+                        "../scripts/register-new-governance-doc.ps1",
+                        "../scripts/generate-integrated-status-report.ps1",
+                        "../scripts/render-program-timeline-from-schedule.ps1",
                         "docs/overview/PROGRAM_SCHEDULE.json",
                         "docs/operations/finance-operations.md",
                         "docs/operations/scope-change-policy.md",
@@ -105,16 +105,16 @@
                                       "AGENTS.md",
                                       "RESUME_AFTER_REBOOT.md",
                                       "automation/REGISTER_SYSTEM_GUARD_TASKS.ps1",
-                                      "scripts/system-guard.ps1"
+                                      "../scripts/system-guard.ps1"
                                   ]
                   },
                   {
                       "source":  "docs/operations/end-to-end-linkage-checklist.md",
                       "targets":  [
                                       "docs/operations/new-doc-linkage-checklist.md",
-                                      "scripts/system-guard.ps1",
-                                      "scripts/system-health-check.ps1",
-                                      "scripts/doc-sync-automation.ps1",
+                                      "../scripts/system-guard.ps1",
+                                      "../scripts/system-health-check.ps1",
+                                      "../scripts/doc-sync-automation.ps1",
                                       "README.md"
                                   ]
                   },
@@ -126,9 +126,9 @@
                                       "docs/CHANGE_IMPACT_MATRIX.md",
                                       "docs/change-impact-map.json",
                                       "docs/DOCS_INDEX.md",
-                                      "scripts/register-new-governance-doc.ps1",
-                                      "scripts/doc-sync-automation.ps1",
-                                      "scripts/system-health-check.ps1"
+                                      "../scripts/register-new-governance-doc.ps1",
+                                      "../scripts/doc-sync-automation.ps1",
+                                      "../scripts/system-health-check.ps1"
                                   ]
                   },
                   {
@@ -137,12 +137,12 @@
                                       "docs/operations/new-doc-linkage-checklist.md",
                                       "docs/operations/cursor-enterprise-rules-index.md",
                                       "docs/CHANGE_IMPACT_MATRIX.md",
-                                      "scripts/register-new-governance-doc.ps1",
+                                      "../scripts/register-new-governance-doc.ps1",
                                       "README.md"
                                   ]
                   },
                   {
-                      "source":  "scripts/register-new-governance-doc.ps1",
+                      "source":  "../scripts/register-new-governance-doc.ps1",
                       "targets":  [
                                       "docs/operations/new-doc-linkage-checklist.md",
                                       "docs/change-impact-map.json",
@@ -199,7 +199,7 @@
                                       "docs/product/templates/sow-template-en.md",
                                       "docs/product/templates/monthly-report-template-en.md",
                                       "README.md",
-                                      "scripts/build-product-bundle.ps1"
+                                      "../scripts/build-product-bundle.ps1"
                                   ]
                   },
                   {
@@ -215,8 +215,8 @@
                       "source":  "docs/releases/upgrade-path.md",
                       "targets":  [
                                       "docs/releases/migration-checklist.md",
-                                      "scripts/system-health-check.ps1",
-                                      "scripts/system-guard.ps1",
+                                      "../scripts/system-health-check.ps1",
+                                      "../scripts/system-guard.ps1",
                                       "README.md"
                                   ]
                   },

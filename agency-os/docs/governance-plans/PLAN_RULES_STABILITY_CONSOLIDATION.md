@@ -33,7 +33,7 @@
   - Owner 檔版本標記存在
   - 規則鏡像一致性 `sync-enterprise-cursor-rules-to-monorepo-root.ps1`（Cursor 已於 2026-08-26 退場，檔案已刪除） `-VerifyOnly`
   - 失敗即中止 + 單行 quick-fix
-- 保持 `agency-os/scripts/ao-resume.ps1` 為 wrapper（單一程式 Owner 在 root）
+- `scripts/ao-resume.ps1` 是唯一一份（agency-os 底下的 scripts 副本樹已於 2026-10-14 移除，健康檢查擋它回來）
 
 **驗收**：任一規則分叉時，AO-RESUME 必定 fail-fast；不會出現「表面 PASS 但實際沿用舊規則」。
 

@@ -75,6 +75,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -Chan
 - 發布／遷移時也常要動地圖：`docs/releases/migration-checklist.md`
 
 ## Related Documents (Auto-Synced)
+- `../scripts/doc-sync-automation.ps1`
+- `../scripts/register-new-governance-doc.ps1`
+- `../scripts/system-health-check.ps1`
 - `AGENTS.md`
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/change-impact-map.json`
@@ -82,9 +85,6 @@ powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -Chan
 - `docs/operations/cursor-enterprise-rules-index.md`
 - `docs/operations/end-to-end-linkage-checklist.md`
 - `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
-- `scripts/doc-sync-automation.ps1`
-- `scripts/register-new-governance-doc.ps1`
-- `scripts/system-health-check.ps1`
 
-_Last synced: 2026-10-14 00:16:07 UTC_
+_Last synced: 2026-10-14 02:10:48 UTC_
 

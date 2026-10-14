@@ -190,6 +190,7 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - **`file:line` 查證不可砍**：它是驗證機制（成本 = 一個 grep），可砍的只有查證之後描述過程的敘事。
 
 ## Related Documents (Auto-Synced)
+- `../scripts/register-new-governance-doc.ps1`
 - `docs/CHANGE_IMPACT_MATRIX.md`
 - `docs/operations/AGENTS_APPENDIX.md`
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
@@ -201,7 +202,6 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `docs/operations/system-operation-sop.md`
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
-- `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-10-14 00:16:07 UTC_
+_Last synced: 2026-10-14 02:10:48 UTC_
 

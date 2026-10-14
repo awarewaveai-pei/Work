@@ -1,6 +1,6 @@
 # Project Kit Master Checklist
 
-**Schedule / Gantt (optional):** Copy [`PROGRAM_SCHEDULE.example.json`](PROGRAM_SCHEDULE.example.json) into the project folder, rename, add tasks and dates, then run `agency-os/scripts/render-program-timeline-from-schedule.ps1` with `-SchedulePath` and `-TimelinePath` to emit markdown tables + Mermaid (or rely on **AO-CLOSE** when using the main `docs/overview/PROGRAM_SCHEDULE.json` in agency-os).
+**Schedule / Gantt (optional):** Copy [`PROGRAM_SCHEDULE.example.json`](PROGRAM_SCHEDULE.example.json) into the project folder, rename, add tasks and dates, then run `scripts/render-program-timeline-from-schedule.ps1` with `-SchedulePath` and `-TimelinePath` to emit markdown tables + Mermaid (or rely on **AO-CLOSE** when using the main `docs/overview/PROGRAM_SCHEDULE.json` in agency-os).
 
 ## A. Pre-sales
 - [ ] 完成需求訪談

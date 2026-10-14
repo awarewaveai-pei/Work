@@ -11,25 +11,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot 'lib\repo-text.ps1')
 
-function Resolve-WorkspaceRoot {
-    param([string]$InputRoot)
-    $resolved = $null
-    if ($InputRoot -and (Test-Path $InputRoot)) {
-        $resolved = (Resolve-Path -LiteralPath $InputRoot).Path
-    } elseif ($PSScriptRoot) {
-        $resolved = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-    } else {
-        $resolved = (Get-Location).Path
-    }
-
-    # Monorepo guardrail: if invoked from D:\Work, force canonical agency root.
-    $agencyCandidate = Join-Path $resolved "agency-os"
-    if (Test-Path (Join-Path $agencyCandidate "scripts\doc-sync-automation.ps1")) {
-        return (Resolve-Path -LiteralPath $agencyCandidate).Path
-    }
-
-    return $resolved
-}
+. (Join-Path $PSScriptRoot 'lib\repo-roots.ps1')
 
 function To-RelPath {
     param([string]$Root, [string]$PathValue)
@@ -96,15 +78,28 @@ function Upsert-RelatedBlock {
     $lines += "_Last synced: ${timestamp}_"
     $block = ($lines -join "`r`n")
 
-    $startMarker = "## Related Documents (Auto-Synced)"
-    $startIdx = $content.IndexOf($startMarker)
+    # The block is the LAST line that is exactly the marker: prose that mentions the marker inline
+    # (WORKLOG.md quotes it) must never be taken as the block start.
+    $markers = [regex]::Matches($content, '(?m)^## Related Documents \(Auto-Synced\)[ \t]*\r?$')
+    $startIdx = if ($markers.Count -gt 0) { $markers[$markers.Count - 1].Index } else { -1 }
     if ($startIdx -ge 0) {
-        $nextHeadingIdx = $content.IndexOf("`n## ", $startIdx + 1)
-        if ($nextHeadingIdx -gt $startIdx) {
-            $newContent = $content.Substring(0, $startIdx).TrimEnd("`r", "`n") + "`r`n`r`n" + $block + "`r`n`r`n" + $content.Substring($nextHeadingIdx + 1).TrimStart("`r", "`n")
-        } else {
-            $newContent = $content.Substring(0, $startIdx).TrimEnd("`r", "`n") + "`r`n`r`n" + $block + "`r`n"
+        # Replace only this block: marker through its own "_Last synced:" line. Ending at the next
+        # "## " heading instead deleted any other text below the block -- the H1 maintenance note
+        # at the end of CHANGE_IMPACT_MATRIX.md (2026-10-14). Without the stamp line, stop at the
+        # next heading of any level.
+        $headingIdx = $content.IndexOf("`n#", $startIdx + 1)
+        $stamp = [regex]::Match($content.Substring($startIdx), '(?m)^_Last synced:')
+        $stampIdx = if ($stamp.Success) { $startIdx + $stamp.Index } else { -1 }
+        $tail = ""
+        if ($stampIdx -ge 0 -and ($headingIdx -lt 0 -or $stampIdx -lt $headingIdx)) {
+            $stampEnd = $content.IndexOf("`n", $stampIdx)
+            if ($stampEnd -ge 0) { $tail = $content.Substring($stampEnd + 1) }
+        } elseif ($headingIdx -ge 0) {
+            $tail = $content.Substring($headingIdx + 1)
         }
+        $tail = $tail.TrimStart("`r", "`n")
+        $newContent = $content.Substring(0, $startIdx).TrimEnd("`r", "`n") + "`r`n`r`n" + $block + "`r`n"
+        if ($tail) { $newContent += "`r`n" + $tail.TrimEnd("`r", "`n") }
     } else {
         $newContent = $content.TrimEnd("`r", "`n") + "`r`n`r`n" + $block + "`r`n"
     }
@@ -386,7 +381,7 @@ function Invoke-Once {
     Write-Output ("Auto-updated metadata blocks: " + ($autoUpdated -join ", "))
 }
 
-$root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
+$root = Resolve-AgencyRoot -InputRoot $WorkspaceRoot
 $apply = -not $SkipApply
 $report = -not $SkipReport
 
