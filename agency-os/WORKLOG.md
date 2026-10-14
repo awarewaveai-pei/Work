@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-15（續4）Messenger 雙粉專：Soulful 接 Chatwoot Account#2＋Chatwoot 4.6.0→4.18.0（Meta 停用 ACCOUNT_UPDATE 標籤，所有回覆失敗）
+
+**Meta 端**：Soulful 粉專管理員＝FB 帳號 Pei Huang（`61584455006990`），加為 App `AwareWave Postiz`（`2998470257172880`）管理員（Chatwoot 全域只認一個 `FB_APP_SECRET`，不能用 Pei Huang 自己的 App）。Page token 永久、13 scope（含 `pages_manage_metadata`、IG 兩項）；webhook 11 欄。值在 `AWARE_WAVE_CREDENTIALS.md` §38。
+**Chatwoot 端**（rails runner 單一 transaction）：Account#2「Soulful Expression Art Therapy」＋`Channel::FacebookPage` id=2＋Inbox 3＋AgentBot 2（`outgoing_url ?token=`）。portal：org `2bf60452-…` `client_config.chatwoot={accountId:2,…}`（jsonb_set 合併）＋vault `cs:chatwoot:2bf60452-…:{api_token,webhook_secret}`（`secret_get` 比對相等）。
+- C1 **Aware Wave Messenger inbox 2 從未掛 AgentBot**（9/12 建 inbox 時漏）→ 該粉專訊息從沒進 AI。已補 `AgentBotInbox(2→bot 1)`。
+- C2 `Channel::FacebookPage#subscribe`（after_create_commit）把訂閱覆寫回內建 6 欄 → 已用 Graph `POST /{page}/subscribed_apps` 補回 11 欄；日後重建 inbox 要再補。
+- C3 **根因：Chatwoot v4.6.0 `send_on_facebook_service.rb#fb_text_message_params` 寫死 `messaging_type: MESSAGE_TAG, tag: ACCOUNT_UPDATE`；Meta 2026-04-27 起停用該標籤**（Graph 實測 code 100 / subcode 1893061「不允許已停用的訊息標籤」）→ 兩粉專所有 Chatwoot 回覆 `Failed to send`。上游修正 PR chatwoot#14329，首個含修正 tag v4.14.2；升到最新穩定 v4.18.0（`ENABLE_MESSENGER_CHANNEL_HUMAN_AGENT`=false → `RESPONSE`）。
+**升級步驟**（`safe-infra-patch.sh compose` 寫死 `cd /root/lobster-phase1`，套不到 `/root/chatwoot` → 手動等價）：備份 `/root/backups/chatwoot-pre-4.18-20261014-164239/`（pg_dump -Fc 84 表、storage、compose、env）→ pull → compose tag 改 → `docker compose config` → stop rails/sidekiq → `rails db:chatwoot_prepare`（exit 0，最後一支 20260831000000）→ `up -d` → 40s healthy。repo 正本 `lobster-factory/infra/chatwoot/docker-compose.yml` 同步並加註版本下限；server 複本與 repo 一致（diff 僅註解後覆蓋）。
+**驗證**：`/api` → `version 4.18.0, queue_services ok, data_services ok`；資料筆數升級前後一致（messages 12／conversations 5／accounts 2／inboxes 3／fb pages 2／bot inboxes 3）；`/bot` verify challenge 回傳；真實訊息「請問課程時間？」×2 → `cs_ai_replies` 2 列 `action=handoff, retrieval_score=0`（Soulful KB 0 筆，設計上轉真人）；操作者先前失敗的兩則回覆 retry 後 `status=sent` 且有 FB `source_id`。
+**rollback**：compose 改回 `v4.6.0` + `pg_restore` 上述 dump（但 4.6.0 回覆仍會被 Meta 拒，回滾只用於 4.18.0 本身壞掉）。
+**剩**：Soulful KB 空；>24h 回覆需 HUMAN_AGENT（App Review + 上游 #15932）；safe-infra-patch 不支援獨立 compose 專案（TASKS 同條）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl https://chatwoot.aware-wave.com/api（4.18.0 ok）；POST .../accounts/2/conversations/{2,1}/messages/{10,11}/retry → 200；psql messages 10/11 status=0 source_id 非空；Graph debug_token/subscribed_apps | exit=0 | ms=7600
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- repo 改動僅 compose image tag + 3 行註解；其餘為 prod 設定（已逐項實測）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=chatwoot/chatwoot:v4.6.0 | hits=0
+- ORACLE_WAIVED: 無 source 邏輯改動（image tag 升級＋設定）；行為以 prod 真實發送驗證
 ## 2026-10-15（續3）排程頁步 2 已套＋步 5 程式：Trigger `collect-scheduled-crawl` → `schedules-heartbeat`
 
 **步 2（High，操作者 go）**：`node scripts/apply-db-migration.mjs 0097` → `APPLY_OK 1/1`。prod 驗：`client_schedules` 1 列（`39ad4149…`，collect_crawl，enabled=f，weekly 3 1）＝原表列數；`collection_schedules` absent；`relrowsecurity=t`；`ops_incidents_source_check` 含 `schedule`；ledger 有 `0097_client_schedules.sql`。

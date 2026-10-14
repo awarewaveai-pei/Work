@@ -32,7 +32,10 @@ name: chatwoot
 
 services:
   base: &base
-    image: chatwoot/chatwoot:v4.6.0
+    # >= v4.14.2 required: older tags send every Messenger reply with tag ACCOUNT_UPDATE, which Meta
+    # rejects since 2026-04-27 (code 100 / subcode 1893061) -- all replies fail. Upgrade = pull, then
+    # `docker compose run --rm chatwoot-rails bundle exec rails db:chatwoot_prepare` before `up -d`.
+    image: chatwoot/chatwoot:v4.18.0
     env_file: .env
     volumes:
       - chatwoot_storage:/app/storage
