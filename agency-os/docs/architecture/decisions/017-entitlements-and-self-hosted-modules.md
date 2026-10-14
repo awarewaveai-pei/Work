@@ -1,10 +1,10 @@
 # ADR 017: 客戶怎麼買 — 線上用「權利」（合約、贈送＋點數），買斷＝一鍵架站到客戶主機、用客戶自己的 API、模組選購
 
-- **狀態**：提議（等操作者看完「要操作者決定的事」）
+- **狀態**：已接受（操作者 2026-10-14「你決定」：8 題照建議定案，第 3 題是上線前要查的事）
 - **日期**：2026-10-14
 - **承接**：[ADR 012](012-shared-platform-layer.md)（產品登記表、共用帳本、簽章許可 `entitlement_ref`）、[ADR 015](015-awarewave-account-and-shared-wallet.md)（一個帳號、一個錢包、WordPress 收費）、[ADR 016](016-social-manager-third-product.md)（社群管理）。
-- **部分取代**（接受時生效）：
-  - HCI [ADR-0031](../../HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0031-ai-lego-usage-metering-attribution.md)：`:33` 不授權「Product/Plan/Feature/Entitlement/Limit engine」→ 由本 ADR 授權。gate 1／2／4（`:39-42`）的許可欄位與簽發條件改照 §3（簽發依據改為 `organization_entitlements`；`subscription_ref` 改為 `entitlement_id`＋`source_ref`）。驗章方式、不得直讀對方資料表不變。接受時在 HCI `governance/ADR_INDEX.md` 註記。
+- **部分取代**（2026-10-14 接受起生效）：
+  - HCI [ADR-0031](../../HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0031-ai-lego-usage-metering-attribution.md)：`:33` 不授權「Product/Plan/Feature/Entitlement/Limit engine」→ 由本 ADR 授權。gate 1／2／4（`:39-42`）的許可欄位與簽發條件改照 §3（簽發依據改為 `organization_entitlements`；`subscription_ref` 改為 `entitlement_id`＋`source_ref`）。驗章方式、不得直讀對方資料表不變。HCI `governance/ADR_INDEX.md` 已註記。
   - ADR 016 §7（`016:55`）「`organizations` 預留方案與上限欄位」→ 方案與上限改放 §2 的 `plans`，`organizations` 不加欄位。
 - **來源**：操作者 2026-09-10「全部要能獨立串接、自用、開放訂閱或點數、賣人」（012:43）；2026-10-14「如果有客戶想訂閱或買斷某些服務、功能平台?」「買斷>>他們就要用自己的API了, 是一鍵架站,但可以選購, 所以我才一直說要用LEGO積木形式」「選購如果是 他本身就有網站 要怎麼辦?」。
 
@@ -71,13 +71,13 @@
 - 買斷通常另租一台主機：一般共享虛擬主機跑不動 Docker 和資料庫；分開放，功能主機出事時網站照常。
 - 客戶網站是 WordPress 時，可選擇讓它當買斷安裝的登入入口（ADR 015 §2 同一套簽章開門）；預設用安裝自己的登入。
 
-## 要操作者決定的事（每題附建議）
+## 產品決定（2026-10-14 定案）
 
-| # | 問題 | 建議 |
+| # | 問題 | 決定 |
 |---|---|---|
 | 1 | 功能切多細？ | 先「產品＋幾個加購＋上限」（例：社群＝品牌數、每月貼文數、審核流程）。不要每個按鈕都賣 |
 | 2 | 試用？ | 每個產品 14 天、每個帳戶一次 |
-| 3 | 訂閱怎麼每月扣款？ | WooCommerce 要加定期扣款外掛；選哪個、台灣金流能不能定期扣款，上線前查 |
+| 3 | 訂閱怎麼每月扣款？ | WooCommerce 加定期扣款外掛；選哪個、台灣金流能不能定期扣款，在「順序」第 3 步前查定 |
 | 4 | 買斷含多久更新？ | 含 1 年；之後選購年費繼續拿新版，不續也能一直用目前版本 |
 | 5 | 大改版（例：2.0）買斷客戶有沒有？ | 更新期內有；過期要續 |
 | 6 | 買斷的主機誰管？ | 我們一鍵裝好；選購維運月費（備份、更新、監控）；主機在客戶名下 |
@@ -104,4 +104,4 @@
 
 - 正面：新產品、新功能、新方案、改價格都是資料；產品程式只問一次 `can()`；買斷不增加我們的 API 成本，客戶資料也不在我們手上。
 - 代價：控制面多兩張表、許可簽發與靜態檢查；每個產品維護模組清單；買斷要有建置變體、更新管道和版本支援期，是持續成本。
-- 需跟進：`lib/portal/products.ts`＋`__tests__/products.test.ts`、`lobster-factory/packages/db/migrations/`（plans、entitlements、0062 擴充）、`ai_lego/platform/entitlement/check.py`、wp-bridge 外掛（付款通知）、一鍵架站總藍圖（加買斷安裝階段）、HCI `governance/ADR_INDEX.md`（接受時）、`ADR_INDEX.md`。
+- 需跟進：`lib/portal/products.ts`＋`__tests__/products.test.ts`、`lobster-factory/packages/db/migrations/`（plans、entitlements、0062 擴充）、`ai_lego/platform/entitlement/check.py`、wp-bridge 外掛（付款通知）、一鍵架站總藍圖（加買斷安裝階段）、`ADR_INDEX.md`。

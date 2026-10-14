@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-14（續17）ADR 017 接受；備份涵蓋計畫 B1–B11；查到 Chatwoot 沒有任何備份
+
+**操作者**：「你決定」（ADR 017 的 8 題）；「還沒做的 15 項你要怎麼確認沒有漏做?」
+
+**根因（漏項）**:
+- 備份的 8 件事擠在 TASKS 一個勾選框（`TASKS.md:111` 舊版）：勾一次就全部消失；3 個小尾巴沒有任何出處。
+- Chatwoot：`backup-ks-aw-01.sh:124-125` 支援，但主機 `/etc/default/ks-aw-01-backup` `EXPECT_SERVICES=soulful`，且預設容器名 `chatwoot-db` ≠ 實際 `chatwoot-postgres`；其他管線也沒有 → 零備份（現有 3 對話／5 訊息，最後 2026-09-11）。
+
+**做了**:
+- ADR 017 → 已接受（8 題照建議；第 3 題排在順序第 3 步前查定）；HCI `governance/ADR_INDEX.md` ADR-0031 列註記部分取代。agency-os `ADR_INDEX.md` 那列仍寫「提議」：檔案被 session 82559534 佔用（doc-sync 頁尾），下次改。
+- 新 `lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md`：現況表（每個庫的腳本與離機狀態）＋B1–B11 卡（每張有驗收），不變量「新增服務沒進清單＝檢查變紅」。
+- TASKS：備份一條改指向計畫；ADR 017 一條改已接受、指向「順序」。社群項目本來就在 `SOCIAL_MANAGER_PLAN.md` 有卡（G3、G5、C3–C12、0096 在 C4）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=`grep EXPECT_SERVICES /etc/default/ks-aw-01-backup` → soulful；`grep -rl chatwoot /etc/cron.d` → 無；chatwoot-postgres psql 計數 1|3|5|3|2026-09-11 | exit=0 | ms=5000
+- REVIEW_WAIVED: DOC_ONLY -- 計畫與 ADR 狀態；每個 file:line 已 grep
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=chatwoot-db|CHATWOOT_DB_CONTAINER | hits=3
+  - `backup-ks-aw-01.sh:125,127`、`ks-aw-01-backup/README.md:33`；另 `:127` dump 的庫名 `chatwoot` 應為 `chatwoot_production`。B4 一起改。
+- ORACLE_WAIVED: 無程式改動
 ## 2026-10-14（續16）R2 上傳重試上線（93605c263），補傳 10-13／10-14 缺的備份
 
 **操作者**：「上線」。
