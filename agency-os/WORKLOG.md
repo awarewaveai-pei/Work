@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-15（續1）agency Gemini key 換發：三處同步換新（本機 env／prod .env／冷信 vault connector）
+
+**VBC 發現**：冷信 AI 實際讀的是 Supabase Vault `co_connector:bdee2903…`（org=NULL `gemini` connector），不是 `GEMINI_API_KEY` env。實測三把舊 key：本機 `AIzaSyCzc7…` 400、prod `.env` `AIzaSyCs-tcov…` 400、vault 內 peijingartstudio `AQ.Ab8RN6IL…` 402「prepayment credits depleted」→ 冷信 AI 與 Ops Inbox Gemini 分類（`OPS_INBOX_GEMINI_ENABLED=true`）當時都不能用。
+**換新**：操作者在專案 AwareWave-ColdEmail（749365809116）產生新 key。已寫入：vault `secret_put`（讀回前綴確認）；prod `.env` 經 `safe-infra-patch.sh file`（備份 `.env.bak.safe-patch-20261014-155908`）＋ `docker compose up -d --no-build next-admin`，healthy，`docker exec … printenv GEMINI_API_KEY` 前綴正確；本機 `mcp/user-env.ps1` 並同步 User env；`AWARE_WAVE_CREDENTIALS.md` §十九／§三十二／§三十六。
+**實測**：新 key 經 Google 認證（回模型層訊息而非 400/402）；`gemini-flash-latest`、`gemini-3.5-flash`、`gemini-3.8-flash` 當下皆 503 high demand（Google 端暫時性），`/api/outreach/messages` 依設計降級 `manual_prompt`（3 筆測試 message 已刪）。`gemini-flash-lite-latest` 帶 `thinkingConfig.thinkingBudget=0` 回 400（不支援此參數）——若日後要以 lite 當 503 備援需拿掉該參數。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl generateContent 三把舊 key + 新 key；POST /api/outreach/messages ×3 | exit=0 | ms=2012
+- REVIEW_WAIVED: NA -- 無程式改動（金鑰輪替 + 設定）
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-10-14（續28）Cold Outreach T10 prod REALTEST 通過 → Phase 1 全完成
 
 **連接**：操作者在 prod 走完 OAuth（awarewaveai@gmail.com）。DB 實查：connector `616e063a…`（org=NULL，agency 自用）`is_enabled=t`、`credentials_ref` 已設、scope 僅 `https://www.googleapis.com/auth/gmail.compose`；`co_sender_accounts` `1e04842d…` daily_limit 20。
