@@ -43,6 +43,7 @@
 | [014-entity-dossier-relevance-axis.md](014-entity-dossier-relevance-axis.md) | 背景調查的單位是實體不是查詢；相關性是與抽取品質並列的第二條軸，由 orchestrator 擁有；`off_entity` 獨立 bucket（已接受） | 2026-09-20 |
 | [015-awarewave-account-and-shared-wallet.md](015-awarewave-account-and-shared-wallet.md) | AwareWave 一個帳號一個錢包：WordPress 管會員和收費（WooCommerce＝012 的金流），點數記在 012 的共用帳本，照用量扣、不退；認知平台第一個接（已接受，未實作） | 2026-10-12 |
 | [016-social-manager-third-product.md](016-social-manager-third-product.md) | 社群管理是第三個產品：排程資料在我們的資料庫、Postiz 只負責送出、所有品牌共用一台 Postiz 但 key 不出伺服器；先自己管多品牌再開放訂閱；樣稿＝規格、樣式只來自 app globals.css；收件匣＝Chatwoot（提案，等樣稿定案） | 2026-10-14 |
+| [017-entitlements-and-self-hosted-modules.md](017-entitlements-and-self-hosted-modules.md) | 客戶怎麼買：線上用權利表（訂閱／試用／贈送＋點數，功能級簽章許可，方案是資料、價格在 Woo）；買斷＝一鍵架站到客戶主機、用客戶自己的 API、模組選購、離線授權檔；客戶既有網站是接進來的來源（提議） | 2026-10-14 |
 
 ## 本機檢查（可選）
 

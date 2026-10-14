@@ -1,4 +1,35 @@
 # Worklog
+## 2026-10-14（續15）ADR 017 提議：線上權利表＋買斷走一鍵架站選購模組
+
+**操作者**：「如果有客戶想訂閱或買斷某些服務、功能平台?」「買斷>>他們就要用自己的API了, 是一鍵架站,但可以選購, 所以我才一直說要用LEGO積木形式」「選購如果是 他本身就有網站 要怎麼辦?」
+
+**做了**: `agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md`（提議）＋`ADR_INDEX.md`。重點：主體＝計費帳戶 `coalesce(parent_organization_id,id)`；0062＝合約、新 `plans`／`organization_entitlements`；`can()` 回 grant；買斷＝另開安裝階段、授權檔離線驗章、建置時排除 SAFETY_GATE；客戶網站＝接進來的來源。部分取代 HCI ADR-0031 gate 1/2/4 與 016 §7（接受時生效）。8 題待操作者決定。
+
+**驗證結果**:
+- REALTEST_WAIVED: DOC_ONLY -- 設計文件；引用的 file:line 逐一 grep，正式庫 0062／media_credit_ledger 0 筆以 SSH psql 查
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=1c/7m/6n
+  - C1 買斷版執行時開關讓 SAFETY_GATE 可被打開 → 建置時排除＋機械閘。M1 改了 ADR-0031 未寫取代 → 標部分取代。M2 0062 唯一索引擋付款建合約 → 試用就地轉 active、索引改（org,product,plan_key）。M3 CHECK 缺 social → 放寬。M4 主體未定義 → 計費帳戶。M5 布林 can() 表達不了上限 → 回 grant。M6 Stage 4/5 是用我們的 token → 另開買斷安裝階段＋交接撤 key。M7 同 app 擋不住直讀 → 三表靜態檢查。m1–m6 全修。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=organization_product_subscriptions | hits=4
+  - 程式只有 `app/portal/launcher/page.tsx` 與 `lib/portal/products.ts` 引用（都在 §3 允許範圍）；migration 0062／0063。
+- ORACLE_WAIVED: 設計文件無程式；critic 審過並逐條修正
+
+**下一步**: 操作者回 8 題 → 狀態改已接受 → 依「順序」第 1 步開卡。
+## 2026-10-14（續14）R2 上傳重試上線（93605c263），補傳 10-13／10-14 缺的備份
+
+**操作者**：「上線」。
+
+**做了**:
+- ks-aw-01 `/root/scripts/{upload-to-r2,backup-eu-stack}.sh` 換新版，舊版存 `.bak-20261014`。三條管線共用 upload-to-r2.sh，一起生效。
+- 補傳：`eu/2026-10-14/uptime-kuma.tgz`（4 段＋parts.json）；`ks-aw-01/20261013-021501/soulful-wordpress.tgz`（part-000～002 回 409，比對大小相同後接受；part-003＋parts.json 新傳）。用暫存目錄硬連結單一檔案上傳，傳完刪除連結和目錄。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=sha256sum /root/scripts/upload-to-r2.sh backup-eu-stack.sh = repo（357f93f0…、4d570c46…）| exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=upload-to-r2.sh 補傳 eu 10-14 → 4 段 [200]＋parts.json [200]，R2 upload: OK；BACKUP_DIR=/root/backups-stack verify-backup-eu.sh → PASSED（16 objects）| exit=0 | ms=110000
+- REALTEST_EVIDENCE: tool=SSH | cmd=upload-to-r2.sh 補傳 ks-aw-01 20261013-021501 → part-000～002 [409 already stored, same size]、part-003 [200]、parts.json [200]；列 R2 對本機 20261013-021501 每個檔 → missing=0 | exit=0 | ms=40000
+- REVIEW_WAIVED: NA -- 部署已審過的 93605c263（續13），無新程式
+- BUGHUNT_WAIVED: NA -- 無新程式
+
+**rollback**: `sudo cp -p /root/scripts/upload-to-r2.sh.bak-20261014 /root/scripts/upload-to-r2.sh`（backup-eu-stack.sh 同）。
 ## 2026-10-14（續13）R2 上傳加重試（repo 已改，未部署）
 
 **根因**: 見 2026-10-14（續11）：`upload-to-r2.sh` 每個物件只 PUT 一次，一次 502／000 就讓當天異地備份缺一塊（09-08、09-09、10-13、10-14）。三條管線共用這支。
