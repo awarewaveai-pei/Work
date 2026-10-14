@@ -26,7 +26,7 @@
 
 ## 2. 操作者已拍板（產品決策，勿重問；2026-09-21）
 - 設定入口 = 客戶頁 `/ops/clients/[slug]` 一張「網站巡檢」卡；按鈕／核取方格／chips，**禁 `<select>`**；選取預設多選。
-- 新客戶預設開、每天 1 次；電商與 app.aware-wave.com 每小時（Slice 1 由操作者在卡片改 hourly）。頻率 chips：每小時／每 6 小時／每天／只在更新時（後者 Slice 2）。
+- 新客戶預設開、每天 1 次；電商與 app.aware-wave.com 每小時（Slice 1 由操作者在排程表改 hourly）。頻率 chips：每小時／每 6 小時／每天／只在更新時（後者 Slice 2）。
 - 正常不出聲、不產日報；失敗才 Telegram：同一問題一次、恢復一次、連續 2 次失敗才報。週摘要預設關。
 - 不留垃圾：基準圖每頁只留最新 1 張；正常結果只記一行、30 天自動刪；失敗證據 30 天自動刪。
 - 總覽表列全部網站狀態，未開巡檢者標黃（Slice 2）。
@@ -49,7 +49,7 @@ Trigger.dev 每小時 heartbeat（`WF/src/trigger/site-watch.ts` `site-watch-hea
 | 核心 lib | `NA/lib/site-watch/`：`config`／`runKey`／`pages`／`diff`／`storage`／`rendererClient`／`store`（只呼叫 RPC）／`messages`／`notify`／`runner`／`objects`／`cleanup`／`console`／`wiring` | 純函式 + 編排；DB 只經 `store.ts` |
 | Routes | `NA/app/api/internal/site-watch/{due,run/[targetId],cleanup}/route.ts`；`NA/app/api/ops/clients/[slug]/site-watch/{route,accept-baseline/route,image/route}.ts` | 內部 = bearer；操作者 = `resolveOpsRole`，寫入需 owner/admin |
 | 排程 | `WF/src/trigger/site-watch.ts`（`site-watch-heartbeat` + `site-watch-run`）、`WF/src/lib/siteWatch/post.ts`（+ `post.test.ts`）；跨套件狀態字串守在 `NA/lib/site-watch/__tests__/trigger-contract.test.ts` | heartbeat → batchTrigger per-target child（`concurrencyLimit: 2`）→ cleanup；兩者 `maxAttempts: 1`；token 未設 → heartbeat 安靜略過（watchdog a 抓） |
-| UI | `NA/app/(shell)/ops/clients/[slug]/SiteWatchCard.tsx`（維護分頁最上方）；共用 `hub-ui.tsx`（`Card/ChipBtn/NoData/SubLabel/relativeTime` 自 ClientHubTabs 原樣搬出）；文案 `NA/lib/site-watch/labels.ts`（server 訊息與卡片共用，無 import） | 設定卡 + 狀態 + 最近 10 次 + 證據圖 + 接受新基準；測試 `__tests__/SiteWatchCard.render.test.tsx` |
+| UI | `NA/app/(shell)/ops/clients/[slug]/SiteWatchCard.tsx`（維護分頁最上方）；共用 `hub-ui.tsx`（`Card/ChipBtn/NoData/SubLabel/relativeTime` 自 ClientHubTabs 原樣搬出）；文案 `NA/lib/site-watch/labels.ts`（server 訊息與卡片共用，無 import） | 狀態 + 最近 10 次 + 證據圖 + 接受新基準；測試 `__tests__/SiteWatchCard.render.test.tsx`。開關／頻率／小時 2026-10-14 移到排程表（`SCHEDULES_PAGE_PLAN.md` §4.2，`lib/schedules/adapters/site-watch.ts`；PATCH `/api/ops/clients/[slug]/schedules/site_watch`） |
 | Watchdog | `scripts/check-site-watch-health.ps1` → `agency-os/reports/status/site-watch-LATEST.{md,json}`；`scripts/ao-resume.ps1` capacity 區塊之後呼叫；`TOOL_TRIGGER_MAP.md` 一列 | 監控者的監控（§7 步 3 探針 a–d）；prod 走 SSH ks-aw-01 → `supabase-db` psql（SQL base64 進容器解碼）；`-LocalDbContainer` = 同 SQL 對本機容器（判定實證用） |
 
 ### 3.3 重用（已查證，不建新輪子）

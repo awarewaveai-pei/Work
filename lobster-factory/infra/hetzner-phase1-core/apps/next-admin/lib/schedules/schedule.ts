@@ -1,12 +1,10 @@
-// Pure "is this tenant's crawl due right now?" logic (migration 0081 collection_schedules).
+// Pure "is this (client, job) due right now?" logic for client_schedules (migration 0097).
 //
-// Kept separate from schedule-store.ts (which reads the DB) and the API route that calls this
-// (which does the actual fan-out): a scheduling bug is a date-arithmetic bug, and date arithmetic
-// deserves tests that run in milliseconds against a fixed clock, not tests that need a database.
+// Kept separate from store.ts (which reads the DB) and the sweep route that calls this: a scheduling
+// bug is a date-arithmetic bug, and date arithmetic deserves tests against a fixed clock, not a database.
 //
-// day encoding: JS Date#getUTCDay() (0=Sunday..6=Saturday) everywhere in this module and in the
-// collection_schedules table — the same encoding in both places means never translating between
-// them, which is exactly the class of bug ("off by one weekday") that a translation table invites.
+// day encoding: JS Date#getUTCDay() (0=Sunday..6=Saturday) here and in the table -- one encoding, no
+// translation table to get off by one.
 
 export interface Schedule {
   enabled: boolean;
@@ -47,8 +45,8 @@ export function isDueNow(schedule: Schedule, now: Date): boolean {
   return now.getTime() - last.getTime() >= 6 * DAY_MS;
 }
 
-/** A stable, sortable run key for one scheduled firing — `scheduled-<org 8 chars>-<UTC date>`. */
-export function scheduledRunKey(organizationId: string, now: Date): string {
+/** A stable run key for one scheduled firing — `scheduled-<job>-<org 8 chars>-<UTC date>`. */
+export function scheduledRunKey(organizationId: string, jobKey: string, now: Date): string {
   const date = now.toISOString().slice(0, 10).replace(/-/g, "");
-  return `scheduled-${organizationId.slice(0, 8)}-${date}`;
+  return `scheduled-${jobKey}-${organizationId.slice(0, 8)}-${date}`;
 }

@@ -68,6 +68,14 @@ const REPAIR_SOURCE_POLICY_BY_SOURCE = {
     rationale: "客戶網站打不開或畫面大幅變動，原因多在客戶主機、外掛或內容，不是本 repo 的程式；由操作者判斷。",
     can_escalate_to_pr: false,
   },
+  schedule: {
+    source: "schedule",
+    label: "排程工作",
+    policy: "human_only",
+    family: "manual",
+    rationale: "客戶例行工作（如自動爬取）在排程執行時丟錯；原因可能在客戶網站、來源或工作本身，由操作者在排程頁與事件內容判斷。",
+    can_escalate_to_pr: false,
+  },
   manual: {
     source: "manual",
     label: "手動",

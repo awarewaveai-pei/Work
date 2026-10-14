@@ -3,7 +3,7 @@
 // Trigger task collect-research-run (I-b), which calls back runs/execute. The body carries a grant REFERENCE only;
 // the token is exchanged later inside runs/execute, so it never lands in Trigger's run history (plan K3).
 //
-// Its own bearer (COLLECT_RESEARCH_RUNS_TOKEN), never a shared one — same rule as run-due-schedules.
+// Its own bearer (COLLECT_RESEARCH_RUNS_TOKEN), never a shared one — same rule as schedules/run-due.
 
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";

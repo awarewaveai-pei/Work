@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 //
 // 網站巡檢 card, mounted for real (same convention as KnowledgeDetailModal.test.tsx: react-dom, no
-// @testing-library). Covers what tsc cannot: the banners the operator relies on, the optimistic-
-// version PATCH and its 409 path, the two-click baseline accept, and plan R8 — strings written by a
-// client's website must render as text, never as markup.
+// @testing-library). Covers what tsc cannot: the banners the operator relies on, the two-click
+// baseline accept, and plan R8 — strings written by a client's website must render as text, never as
+// markup. The config write (version, 409) moved to the schedules table: lib/schedules/__tests__/site-watch-adapter.test.ts.
 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -92,42 +92,6 @@ describe("SiteWatchCard", () => {
     await mount();
     expect(container.textContent).toContain("R2_SITE_WATCH_BUCKET");
     expect(container.textContent).toContain("沒有可巡檢的網址");
-  });
-
-  it("save is disabled until something changes; PATCH carries the row version; hourly hides the hour input", async () => {
-    stubFetch((c) =>
-      c.method === "PATCH"
-        ? { status: 200, body: { ok: true, overview: overview({ target: { ...overview().target!, frequency: "hourly", version: 4 } }) } }
-        : { status: 200, body: { ok: true, overview: overview() } },
-    );
-    await mount();
-    expect(button("儲存").disabled).toBe(true);
-    expect(container.querySelector('input[type="number"]')).not.toBeNull();
-    await click(button("每小時"));
-    expect(container.querySelector('input[type="number"]')).toBeNull();
-    expect(button("儲存").disabled).toBe(false);
-    await click(button("儲存"));
-    const patch = calls.find((c) => c.method === "PATCH")!;
-    expect(patch.url).toBe("/api/ops/clients/shop-a/site-watch");
-    expect(patch.body).toEqual({ expectedVersion: 3, enabled: true, frequency: "hourly", hourUtc: 22 });
-    expect(container.textContent).toContain("已儲存");
-  });
-
-  it("a target that does not exist yet is created with expectedVersion 0", async () => {
-    stubFetch(() => ({ status: 200, body: { ok: true, overview: overview({ target: null }) } }));
-    await mount();
-    await click(button("每 6 小時"));
-    await click(button("儲存"));
-    expect(calls.find((c) => c.method === "PATCH")!.body).toMatchObject({ expectedVersion: 0, frequency: "every_6h" });
-  });
-
-  it("409 reloads the card and tells the operator someone else just changed it", async () => {
-    stubFetch((c) => (c.method === "PATCH" ? { status: 409, body: { ok: false, error: "version_conflict" } } : { status: 200, body: { ok: true, overview: overview() } }));
-    await mount();
-    await click(button("每小時"));
-    await click(button("儲存"));
-    expect(calls.filter((c) => c.method === "GET")).toHaveLength(2);
-    expect(container.textContent).toContain("別人剛改過");
   });
 
   it("accepting a new baseline takes two clicks; only the second one calls the API", async () => {

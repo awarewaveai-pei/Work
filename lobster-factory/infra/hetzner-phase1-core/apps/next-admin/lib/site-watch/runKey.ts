@@ -1,6 +1,6 @@
 // C2 run buckets. Each bucket runs at most once; only the CURRENT bucket runs (a monitor checks now —
 // re-running yesterday is meaningless); a stall across buckets is reported as skipped_buckets.
-// Why not lib/collect/schedule.ts: it only knows daily|weekly (:13) and its run key is date-only.
+// Why not lib/schedules/schedule.ts: it only knows daily|weekly (:11) and its run key is date-only.
 
 export type SiteWatchFrequency = "hourly" | "every_6h" | "daily" | "update_only";
 

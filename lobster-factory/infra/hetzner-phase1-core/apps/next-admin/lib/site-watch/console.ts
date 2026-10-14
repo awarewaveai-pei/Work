@@ -45,6 +45,13 @@ export async function auditSiteWatch(
 /** Slice 1 exposes the clock-driven frequencies; update_only needs the wp-update hook (slice 2). */
 export const CONFIGURABLE_FREQUENCIES: SiteWatchFrequency[] = ["hourly", "every_6h", "daily"];
 
+/** What site_watch_sync_targets (0091) creates for an active client with a site URL. */
+export const SITE_WATCH_DEFAULTS: { enabled: boolean; frequency: SiteWatchFrequency; hour_utc: number } = {
+  enabled: true,
+  frequency: "daily",
+  hour_utc: 22,
+};
+
 export interface ResultRow {
   id: string;
   run_key: string;
@@ -107,7 +114,7 @@ export async function loadOverview(sb: SupabaseClient, org: { id: string; siteUr
           last_completed_run_key: target.last_completed_run_key,
         }
       : null,
-    defaults: { enabled: true, frequency: "daily", hour_utc: 22 },
+    defaults: SITE_WATCH_DEFAULTS,
     watchedPages: pagesForSiteUrl(org.siteUrl).map((p) => ({ pageId: p.pageId, url: p.url })),
     pageStates,
     recent,

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase-server";
 import { verifyIngestToken } from "@/lib/ops-inbox/verifyIngestToken";
+import { REPAIR_SOURCE_POLICIES } from "@/lib/repair-center/policy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,7 +44,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
   }
 
-  const ALLOWED_SOURCES = new Set(["sentry", "uptime_kuma", "grafana", "netdata", "posthog", "manual", "deploy", "site_watch"]);
+  // Every IncidentSource (policy.ts `satisfies Record<IncidentSource, …>`), not a second hand-typed list.
+  const ALLOWED_SOURCES = new Set<string>(REPAIR_SOURCE_POLICIES.map((p) => p.source));
   if (sourceParam && !ALLOWED_SOURCES.has(sourceParam)) {
     return NextResponse.json({ ok: false, error: "invalid source param" }, { status: 400 });
   }

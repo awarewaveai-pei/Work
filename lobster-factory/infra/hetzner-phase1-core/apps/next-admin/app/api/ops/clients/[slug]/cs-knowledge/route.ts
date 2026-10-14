@@ -6,7 +6,7 @@
 //          ?sourceId=<id> returns one document's full detail (K2g: body text, provenance, citation)
 //          plus every version in its document family — the content-viewer the ops console lacked.
 //          Same read level as the list (viewer+), matching every other route in this console
-//          (cs-config, collection-sources, collection-schedule all use the identical "viewer+ read,
+//          (cs-config, collection-sources, schedules/[job] all use the identical "viewer+ read,
 //          owner/admin write" split). Critic finding (2026-09-17): for an `isSensitive` document this
 //          IS a real increase over the list, which discloses zero body bytes regardless of the flag —
 //          `is_sensitive` was designed to gate the customer-facing AI's retrieval (migration 0083),

@@ -271,11 +271,11 @@ services:
       OPS_INBOX_NETDATA_TOKEN: ${OPS_INBOX_NETDATA_TOKEN:-}
       OPS_INBOX_UPTIME_KUMA_TOKEN: ${OPS_INBOX_UPTIME_KUMA_TOKEN:-}
       OPS_INBOX_POSTHOG_TOKEN: ${OPS_INBOX_POSTHOG_TOKEN:-}
-      # Collection scheduling heartbeat (migration 0081). Own dedicated token, never
-      # OPS_INBOX_INGEST_TOKEN — see verifyIngestToken.ts's M2 history for why a shared
+      # Client schedules heartbeat -> /api/internal/schedules/run-due (migration 0097). Own dedicated
+      # token, never OPS_INBOX_INGEST_TOKEN — see verifyIngestToken.ts's M2 history for why a shared
       # token across unrelated callers is a blast-radius mistake already paid for once.
       # Empty = the endpoint fails closed (401 to every caller) until set.
-      COLLECT_SCHEDULE_INGEST_TOKEN: ${COLLECT_SCHEDULE_INGEST_TOKEN:-}
+      SCHEDULE_INGEST_TOKEN: ${SCHEDULE_INGEST_TOKEN:-}
       # Cognitive OS research runs (RESEARCH_LINES_MASTER_PLAN §12.7): RUNS = COS -> /api/internal/collect/runs and
       # this app -> COS grant exchange (same value in COS deploy/.env); EXECUTE = Trigger worker -> runs/execute.
       # Empty = both endpoints 401 (fail closed).

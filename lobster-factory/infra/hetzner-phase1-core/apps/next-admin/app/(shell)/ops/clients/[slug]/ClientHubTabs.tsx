@@ -6,6 +6,7 @@ import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
 import { SiteWatchCard } from "./SiteWatchCard";
+import { ScheduleTable } from "@/app/(shell)/ops/schedules/ScheduleTable";
 import { CollectionSourcesPanel } from "@/app/(shell)/ops/collect/CollectionSourcesPanel";
 import { KnowledgeDetailModal } from "./KnowledgeDetailModal";
 import type { ClientConfig, WpUpdateLatest } from "@/app/api/ops/clients/route";
@@ -698,6 +699,10 @@ function MaintenanceTab({ org, cfg, wp, runs, installRuns }: Pick<ClientHubTabsP
 
   return (
     <>
+      <Card title="排程">
+        <ScheduleTable only={org.slug} />
+      </Card>
+
       <SiteWatchCard slug={org.slug} />
 
       {cfg.platform === "wordpress" && cfg.ssh_host && (

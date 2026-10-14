@@ -44,6 +44,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     items: [
       { type: 'link', href: '/ops/clients',      icon: '👥', label: 'Clients',      title: '全客戶健康狀態 + WP 外掛更新' },
       { type: 'link', href: '/ops/integrations', icon: '⇄', label: 'Integrations', title: '客戶工具串接狀態' },
+      { type: 'link', href: '/ops/schedules',    icon: '⏱', label: '排程',          title: '所有客戶的例行工作：自動爬取、網站巡檢' },
       { type: 'link', href: '/api-check',        icon: '⬡', label: 'API Health',    title: 'Node API 健康（server-side）' },
     ],
   },

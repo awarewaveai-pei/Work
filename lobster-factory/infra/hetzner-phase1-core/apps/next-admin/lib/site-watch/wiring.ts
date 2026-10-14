@@ -10,7 +10,7 @@ import { createSupabaseStore } from "./store";
 
 /**
  * Dedicated bearer token for /api/internal/site-watch/* (the Trigger.dev heartbeat) — never shared
- * with COLLECT_SCHEDULE_INGEST_TOKEN or OPS_INBOX_INGEST_TOKEN (same blast-radius rule as those).
+ * with SCHEDULE_INGEST_TOKEN or OPS_INBOX_INGEST_TOKEN (same blast-radius rule as those).
  * Unset = nobody is authorized.
  */
 export function verifySiteWatchToken(request: Request): boolean {

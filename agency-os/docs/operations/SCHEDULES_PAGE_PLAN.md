@@ -6,8 +6,8 @@
 
 | 項 | 狀態（2026-10-14） |
 |---|---|
-| 卡 | 寫好，等操作者看 §3 的草圖決定 |
-| Slice 1 | 未開始 |
+| 卡 | 操作者 2026-10-14 看過 §3.4，步 2、5 給 go |
+| Slice 1 | 步 1+3 同一 commit（引擎＋UI）；主機 env `SCHEDULE_INGEST_TOKEN` 已加（舊名保留到步 7）；步 2 migration 編號改 **0097**（0092 已被 ledger 佔用） |
 | 前置 | 筆電 tenant 自動化已退役（`f8ffaf4b1`，WORKLOG 2026-10-14 續22） |
 
 ## 1. 目標
@@ -77,7 +77,7 @@
 
 ### 4.1 資料
 
-`DB/migrations/0092_client_schedules.sql`（additive + 搬資料 + 刪舊表；down：`DB/scripts/0092_client_schedules_down.sql` 還原 0081 形狀）：
+`DB/migrations/0097_client_schedules.sql`（建表＋搬資料＋刪舊表＋`ops_incidents.source` 加 `'schedule'`；down：`DB/scripts/0097_client_schedules_down.sql` 還原 0081 表與列）：
 
 ```
 client_schedules(
@@ -86,7 +86,7 @@ client_schedules(
   enabled boolean NOT NULL DEFAULT false,
   frequency text NOT NULL DEFAULT 'weekly' CHECK (frequency IN ('daily','weekly')),
   hour_utc int NOT NULL DEFAULT 3 CHECK (0..23), day_of_week_utc int NOT NULL DEFAULT 1 CHECK (0..6),
-  last_run_at timestamptz, last_run_key text, last_error text,
+  last_run_at timestamptz, last_run_key text, last_error text, last_error_at timestamptz,
   updated_by text, created_at, updated_at,
   PRIMARY KEY (organization_id, job_key))
 INSERT ... SELECT organization_id, 'collect_crawl', ... FROM collection_schedules;  DROP TABLE collection_schedules;
@@ -99,27 +99,31 @@ RLS service_role only、REVOKE anon/authenticated、NOTIFY pgrst（照 0081 :40-
 
 | 檔 | 內容 | 來源 |
 |---|---|---|
-| `lib/schedules/schedule.ts` | `isDueNow`、`scheduledRunKey(org, jobKey, now)` | `git mv lib/collect/schedule.ts`；runKey 多帶 job（`scheduled-<job>-<org8>-<date>`） |
-| `lib/schedules/store.ts` | `getSchedule(org, job)`、`listForOrg(org)`、`listAll()`、`listEnabled()`、`upsertSchedule`、`recordRun(org, job, runKey, error?)` | `git mv lib/collect/schedule-store.ts` + jobKey |
-| `lib/schedules/jobs.ts` | registry：`{ key, label, scope:'client', defaults:{frequency,hourUtc,dayOfWeekUtc}, run(orgId, runKey) }[]`。Slice 1 只有 `collect_crawl`（`run` = `runCollection` `lib/collect/run.ts`） | 新 |
-| `lib/schedules/adapters/site-watch.ts` | 讀 `site_watch_targets` → 同一個 row shape（enabled、frequency、hour、last、error）；寫走 `/api/ops/clients/[slug]/site-watch` 既有邏輯（`lib/site-watch/console.ts`） | 新 |
-| `lib/schedules/adapters/host-status.ts` | 備份覆蓋（`lib/backup/coverage.ts` `readBackupCoverage`）、巡檢心跳（`site_watch_maintenance`）→ 唯讀 row | 新；不複製 coverage 解析 |
-| `app/api/internal/schedules/run-due/route.ts` | generic sweep：`listEnabled()` → `isDueNow` → `jobs[key].run` → `recordRun`；錯誤 → `upsertIncidentAtomic` | `git mv` 自 `collect/run-due-schedules`；token 改名 `SCHEDULE_INGEST_TOKEN`（compose＋`.env.example`＋WF `trigger.config.ts` syncEnvVars 同步） |
-| `app/api/internal/collect/run-due-schedules/route.ts` | **過渡**：re-export 上一列的 POST；Trigger 換 URL 部署完後刪（§5 步 7） | 改 |
-| `app/api/ops/schedules/route.ts` | GET：所有 org × 所有 job（含 adapter）＋摘要 | 新 |
-| `app/api/ops/clients/[slug]/schedules/[job]/route.ts` | GET／PATCH 一格；job=`site_watch` 轉 adapter | `git mv` 自 `collection-schedule/route.ts`；舊路徑刪 |
-| `app/(shell)/ops/schedules/page.tsx` + `ScheduleTable.tsx` | 總表＋右側欄；org 清單照 `ops/collect/page.tsx:21`（`organizations` select slug,name） | 新 |
-| `app/SidebarNav.tsx:56-59` | 營運區加 `/ops/schedules` 「排程」 | 改 |
-| `ClientHubTabs.tsx:689` MaintenanceTab 頂端 | `<ScheduleTable only={org.slug} />` | 改 |
-| `CollectionSourcesPanel.tsx:733-828` | **刪** `ScheduleControls`（:497 使用處一起刪） | 刪 |
-| `SiteWatchCard.tsx:204-232` | **刪**開關／頻率／小時那一段；保留 baseline 接受、證據圖 | 刪一段 |
-| `WF/src/trigger/collect-scheduled-crawl.ts` → `schedules-heartbeat.ts` | id `schedules-heartbeat`，cron 不變；`postRunDueSchedules.ts:20` URL 改 `/api/internal/schedules/run-due` | 改名 |
+| `lib/schedules/schedule.ts` | `isDueNow`（不變）、`scheduledRunKey(org, jobKey, now)` → `scheduled-<job>-<org8>-<date>` | `git mv lib/collect/schedule.ts` |
+| `lib/schedules/store.ts` | `listSchedules(org?)`、`listEnabledSchedules()`、`upsertSchedule`、`claimScheduleRun`（一個 run key 只有一個贏家）、`recordScheduleRun`（清 error）、`recordScheduleError`（不動 last_run_at）；讀與記錄失敗一律 throw（「沒列」不能代替「讀不到」） | `git mv lib/collect/schedule-store.ts` |
+| `lib/schedules/types.ts` | `JobMeta`／`ScheduleCell`／`SystemRow`／`SchedulesView`（client 元件也 import，無 server 依賴） | 新 |
+| `lib/schedules/jobs.ts` | registry `CLIENT_JOBS`：`{ key, label, frequencies, defaults, run(orgId, runKey) }`；Slice 1 只有 `collect_crawl`（`runCollection`） | 新 |
+| `lib/schedules/adapters/site-watch.ts` | `siteWatchCells`（`site_watch_targets`＋`site_watch_page_state` → cell；無列＝`SITE_WATCH_DEFAULTS`）、`writeSiteWatchCell`（`console.ts` `parseConfigInput`＋`updateConfig`＋`auditSiteWatch`） | 新 |
+| `lib/schedules/adapters/host-status.ts` | 備份覆蓋（`readBackupCoverage`）、巡檢心跳（`site_watch_maintenance`）→ 唯讀 row | 新 |
+| `lib/schedules/view.ts` | `loadSchedulesView(sb, {slug?})`：org × job cells＋系統列＋摘要 | 新 |
+| `lib/ops-inbox/ingest.ts` | `ingestIncident`：snapshot → transition → `upsertIncidentAtomic` → `dispatchNotifications` | 新 |
+| `app/api/internal/schedules/run-due/route.ts` | sweep：due → claim（回應前）→ `after()` 裡 `run` → `recordScheduleRun`；丟錯 → `recordScheduleError`＋`ingestIncident`（fingerprint `schedule:<job>:<org>`）；讀不到 store = 500；token `SCHEDULE_INGEST_TOKEN`。為何 after：爬取預算 10 分（`lib/collect/run.ts` DEFAULT_BUDGET），Trigger task 300 s 就重試（`WF/trigger.config.ts` maxDuration/retries） | `git mv` 自 `collect/run-due-schedules` |
+| `app/api/internal/collect/run-due-schedules/route.ts` | **過渡** re-export POST；步 7 刪 | 新 |
+| `app/api/ops/schedules/route.ts` | GET `?slug=` 選填 → `SchedulesView` | 新 |
+| `app/api/ops/clients/[slug]/schedules/[job]/route.ts` | PATCH 一格（不做 GET，表格只讀上一列）；registry 外的 job → 404；`site_watch` → adapter（409 照舊） | `git mv` 自 `collection-schedule/route.ts` |
+| `app/api/ops/clients/[slug]/site-watch/route.ts` | 只剩 GET（卡片狀態）；PATCH 刪 | 改 |
+| `app/(shell)/ops/schedules/page.tsx`＋`ScheduleTable.tsx` | 總表＋右側欄；客戶頁 `only={slug}` | 新 |
+| `SidebarNav.tsx`（Clients & Ops）、`ClientHubTabs.tsx` MaintenanceTab 頂端 | 連結「排程」、`<ScheduleTable only>` | 改 |
+| `CollectionSourcesPanel.tsx` | 刪 `ScheduleControls`＋其型別；留一行指向排程頁 | 刪 |
+| `SiteWatchCard.tsx` | 刪開關／頻率／小時／儲存；留狀態、證據圖、接受基準 | 刪一段 |
+| `ops-inbox/types.ts`、`repair-center/policy.ts`、`IncidentCard.tsx`、`inbox/incidents/route.ts` | incident source `schedule`；incidents route 的允許清單改由 policy 表導出 | 改 |
+| `WF/src/trigger/collect-scheduled-crawl.ts` → `schedules-heartbeat.ts` | id `schedules-heartbeat`，cron 不變；URL `/api/internal/schedules/run-due`；token 名 | 改名（步 5，單獨 commit） |
 
-測試：`schedule.test.ts`（現有純函式測試搬過去＋runKey 含 job）、`run-due/route.test.ts`（照 `collect/run-due-schedules/route.test.ts` 的 hoisted-mock 寫法，加「一個 job 丟錯 → incident 一筆、其他 org 照跑」）、`adapters/site-watch.test.ts`（row shape 往返）。只寫這三支。
+測試：`lib/schedules/__tests__/schedule.test.ts`（runKey 含 job）、`app/api/internal/schedules/run-due/route.test.ts`（一個 job 丟錯 → incident 一筆、其他照跑；registry 外的列算失敗）、`lib/schedules/__tests__/site-watch-adapter.test.ts`（cell 映射、400／409／audit）。搬過去照改：`store.test.ts`、`schedules/[job]/route.test.ts`。`SiteWatchCard.render.test.tsx` 刪 3 支設定段測試。
 
 ### 4.3 權限與安全
 
-- 讀：viewer+（同 `collection-schedule` GET）。寫：`canWriteTenantConfig`（`lib/ops-role.ts:64`）。每次寫 `ops_audit_events`（照 route.ts:27-37）。
+- 讀：viewer+。寫：`canWriteTenantConfig`（`lib/ops-role.ts:64`）。每次寫 `ops_audit_events`（照 route.ts:27-37）。
 - internal route：專屬 bearer，fail-closed（照現行 :30-35）。
 - 頁面不接受任何命令字串；job_key 只能是 registry 裡有的（PATCH 時驗）。
 
@@ -127,8 +131,8 @@ RLS service_role only、REVOKE anon/authenticated、NOTIFY pgrst（照 0081 :40-
 
 Low/Medium 直接做；標 **High** 的逐項等操作者 go-ahead。每步完成更新 §0。主機 cron `auto-deploy-next-admin.sh` 每 4 小時從 main 自動部署 next-admin（crontab 2026-10-14），所以**每個 commit 都要能獨立上線**。
 
-1. 0092 migration + down；`lib/schedules/*`（搬＋jobKey）；generic sweep route；舊 collect route 變 re-export；`collection-schedule` route 改讀新 store（路徑先不動）。測試三支綠、`npx tsc --noEmit` 綠、`npm test` 綠。**行為不變**：Trigger 仍打舊 URL，舊 URL 轉到新 sweep。
-2. **High**：`node scripts/apply-db-migration.mjs --check 0092` → 操作者 go → apply。驗：`client_schedules` 列數 = 原 `collection_schedules` 列數；`collection_schedules` 不存在。
+1. 0097 migration + down；`lib/schedules/*`（搬＋jobKey）；generic sweep route；舊 collect route 變 re-export；`collection-schedule` route 改讀新 store（路徑先不動）。測試三支綠、`npx tsc --noEmit` 綠、`npm test` 綠。**行為不變**：Trigger 仍打舊 URL，舊 URL 轉到新 sweep。
+2. **High**：`node scripts/apply-db-migration.mjs --check 0097` → 操作者 go → apply。驗：`client_schedules` 列數 = 原 `collection_schedules` 列數；`collection_schedules` 不存在。
 3. `ScheduleTable` + `/ops/schedules` + sidebar + 客戶頁維護分頁；刪 `ScheduleControls`、SiteWatchCard 的設定段；`collection-schedule` route 改名 `schedules/[job]`。
 4. 部署隨 auto-deploy 上線後 smoke：`/ops/schedules` 200、改一格 → `ops_audit_events` 多一筆、`client_schedules` 該列 updated_by 正確；客戶頁同一格同步。
 5. **High**：Trigger task 改名＋URL（`scripts/lobster-trigger-deploy.ps1`）；env `SCHEDULE_INGEST_TOKEN` 先用 `safe-infra-patch.sh compose` 加到 next-admin（舊 token 保留到步 7）。驗：Trigger 下一個整點 run 綠；`docker exec lobster-next-admin printenv SCHEDULE_INGEST_TOKEN` exit 0。
@@ -156,7 +160,7 @@ Low/Medium 直接做；標 **High** 的逐項等操作者 go-ahead。每步完�
 
 ## 8. 回滾
 
-- 步 1–4（app）：`git revert`；auto-deploy 下一輪帶回舊版。DB 已套 0092 時先跑 down（還原 0081 表與列），再 revert。
+- 步 1–4（app）：`git revert`；auto-deploy 下一輪帶回舊版。DB 已套 0097 時先跑 down（還原 0081 表與列），再 revert。
 - 步 5：Trigger 重新部署上一版（`lobster-trigger-deploy.ps1` 指舊 commit）；過渡 route 還在，舊 URL 仍通。
 
 ## 9. 之後（動工時展開成 §5 同格式）

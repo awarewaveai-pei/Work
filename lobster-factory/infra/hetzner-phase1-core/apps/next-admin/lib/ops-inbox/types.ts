@@ -1,4 +1,4 @@
-export type IncidentSource = "sentry" | "uptime_kuma" | "grafana" | "netdata" | "posthog" | "manual" | "deploy" | "site_watch";
+export type IncidentSource = "sentry" | "uptime_kuma" | "grafana" | "netdata" | "posthog" | "manual" | "deploy" | "site_watch" | "schedule";
 
 export type IncidentSignalType = "error" | "uptime" | "latency" | "resource" | "business" | "deployment";
 

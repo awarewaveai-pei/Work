@@ -8,7 +8,7 @@
 
 ## 現在去哪裡排
 
-- 客戶例行工作：app.aware-wave.com 的排程頁（規劃中，見 TASKS.md）；現有範例是自動爬取（`collection_schedules`，Trigger.dev 每小時呼叫 `/api/internal/collect/run-due-schedules`）。
+- 客戶例行工作：app.aware-wave.com `/ops/schedules`（表 `client_schedules`，Trigger.dev 每小時呼叫 `/api/internal/schedules/run-due`；新工作加在 next-admin `lib/schedules/jobs.ts`，見 `SCHEDULES_PAGE_PLAN.md`）。
 - 其他排程的分類規則：`automation/claude-routines/README.md` 的 Decision rubric。
 
 ## Related Documents (Auto-Synced)
@@ -20,5 +20,5 @@
 - `tenants/README.md`
 - `tenants/templates/tenant-template/04_OPERATIONS_AUTOMATION_GUIDE.md`
 
-_Last synced: 2026-05-18 06:50:32 UTC_
+_Last synced: 2026-10-14 14:39:21 UTC_
 

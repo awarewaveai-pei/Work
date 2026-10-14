@@ -8,7 +8,7 @@
 // there is no token to send it with; the COS grant expires on its own.
 //
 // Its own bearer (COLLECT_RESEARCH_EXECUTE_TOKEN): the Trigger worker is a different caller from Cognitive OS, and
-// one token per caller is the rule (run-due-schedules/route.ts header).
+// one token per caller is the rule (schedules/run-due/route.ts header).
 
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";

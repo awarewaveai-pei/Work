@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-15（續2）排程頁 Slice 1 步 1+3：`client_schedules`＋registry＋一張表兩個畫面
+
+**操作者**：「看卡 §3.4 沒意見照 §5 開工；步 2、步 5 go」（2026-10-14）。卡 `docs/operations/SCHEDULES_PAGE_PLAN.md` §0／§4.2 已同步為實作 SSOT。
+
+**根因（為何要動）**：每客戶例行工作有兩套各自的表／route／UI（`collection_schedules` 0081、`site_watch_targets` 0091），新工作＝再複製一套；設定散在兩張卡片，沒有一頁看全部。
+
+**做了什麼**
+- DB `0097_client_schedules.sql`：表 `(organization_id, job_key)`，搬 0081 唯一一列（prod：1 列、disabled），刪 `collection_schedules`，`ops_incidents.source` 加 `schedule`。down `packages/db/scripts/0097_client_schedules_down.sql`。卡寫 0092 錯（已被 ledger 佔用），改 0097。
+- next-admin `lib/schedules/`：`schedule.ts`／`store.ts`（git mv 自 lib/collect）、`jobs.ts` registry（`collect_crawl`）、`adapters/site-watch.ts`（巡檢不併表，寫走 0091 locked RPC）、`adapters/host-status.ts`（備份覆蓋＋巡檢心跳唯讀）、`view.ts`；`lib/ops-inbox/ingest.ts`（snapshot→transition→upsert→dispatch）。
+- sweep `app/api/internal/schedules/run-due`：回應前 claim（`claimScheduleRun`，一個 run key 一個贏家），`after()` 裡跑；丟錯 → `last_error`＋一筆 incident `schedule:<job>:<org>`；讀不到 store＝500。舊 URL `collect/run-due-schedules` 過渡 re-export（步 7 刪）。
+- UI：`/ops/schedules`（sidebar Clients & Ops）＋客戶頁維護分頁同一個 `ScheduleTable`；PATCH `/api/ops/clients/[slug]/schedules/[job]`（registry 外 404，site_watch 走 adapter，409 照舊）。刪 `ScheduleControls`、SiteWatchCard 設定段、site-watch PATCH、3 支設定段 render 測試。incident source 清單：`inbox/incidents/route.ts` 改由 `policy.ts` 導出（不再手抄）。
+- 主機（步 5 env 部分，safe-infra-patch file＋compose）：`/root/lobster-phase1/.env` 加 `SCHEDULE_INGEST_TOKEN`（值＝舊 `COLLECT_SCHEDULE_INGEST_TOKEN`），compose next-admin 加映射；舊名保留到步 7。備份 `.env.bak.safe-patch-20261014-155100`、`docker-compose.yml.bak.safe-patch-20261014-155100`。repo compose／`.env.example` 已是終態（只剩新名）→ `/check-drift` 到步 7 前會 WARN 一個多出的 `COLLECT_SCHEDULE_INGEST_TOKEN`。
+
+**Codex（`reports/oracle/2026-10-15-partialreview-6bd06ee9.md`，6 項）**
+- F2 收：`runCollection` 的 `errors[]`（如 `no_approved_sources`）不丟錯 → 排程頁會顯示正常。`jobs.ts` 改為 errors 非空即丟。
+- F3 收：store 讀失敗回 `[]` → sweep 200 `checked:0`＝自動化靜默停擺。store 讀／記錄一律 throw，sweep 500。
+- F4＋F5 收（真）：Trigger task `maxDuration 300`＋`maxAttempts 3`（`WF/trigger.config.ts:171-175`）而爬取預算 10 分（`lib/collect/run.ts:76`）→ 長爬取被重試＝跑兩次。claim＋after() 關掉整類。
+- F1 拒：route 讀容器內 `SCHEDULE_INGEST_TOKEN`，主機已設且與舊值相等（`printenv` 比對 equal），舊 Trigger task 送的 bearer 照過。
+- F6 拒：audit fire-and-forget 是本 console 全部 tenant-config route 的既有寫法（原 `collection-schedule/route.ts:27` 同），單改一支＝不一致。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit && npm test（231 files／2160 tests） | exit=0 | ms=13000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv SCHEDULE_INGEST_TOKEN（且與 COLLECT_ 值相等） | exit=0 | ms=12000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（6 報 4 收 2 拒，見上）
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os,.claude | grep=collection_schedules|collection-schedule|run-due-schedules|ScheduleControls|lib/collect/schedule | hits=0（程式；WF 5 處留給步 5 commit，0081 歷史檔與 DATA_COLLECTION_PLAN C3 歷史列不改）
+- 無 subagent。
+
+**下一步**：commit 推上後套 0097（High，已 go）→ 19:00 UTC auto-deploy → 步 4 smoke → 步 5 Trigger rename deploy → 步 7 清過渡 route 與舊 token。建議模型：Opus 5.5。
+
+**rollback**：DB 先跑 `0097_client_schedules_down.sql` 再 `git revert`；主機 env 用上列備份還原（safe-infra-patch）。
 ## 2026-10-15（續1）agency Gemini key 換發：三處同步換新（本機 env／prod .env／冷信 vault connector）
 
 **VBC 發現**：冷信 AI 實際讀的是 Supabase Vault `co_connector:bdee2903…`（org=NULL `gemini` connector），不是 `GEMINI_API_KEY` env。實測三把舊 key：本機 `AIzaSyCzc7…` 400、prod `.env` `AIzaSyCs-tcov…` 400、vault 內 peijingartstudio `AQ.Ab8RN6IL…` 402「prepayment credits depleted」→ 冷信 AI 與 Ops Inbox Gemini 分類（`OPS_INBOX_GEMINI_ENABLED=true`）當時都不能用。

@@ -1,22 +1,20 @@
 "use client";
 
-// 網站巡檢 card (agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md §2, §7 step 5). Every string
-// shown here that came from the DB — URLs, JS error samples, notes — was produced by the client's
-// website, i.e. is attacker-controlled (plan R8): React text only, never dangerouslySetInnerHTML.
+// 網站巡檢 card (agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md §2, §7 step 5): status, evidence,
+// baseline acceptance. On/off and frequency live in the schedules table (ScheduleTable, same tab).
+// Every string shown here that came from the DB — URLs, JS error samples, notes — was produced by the
+// client's website, i.e. is attacker-controlled (plan R8): React text only, never dangerouslySetInnerHTML.
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { roleHeader } from "@/lib/ops-role";
 import type { ResultRow, SiteWatchOverview } from "@/lib/site-watch/console";
 import type { PageStateRow } from "@/lib/site-watch/store";
 import {
   ALERT_STATE_LABEL,
-  FREQUENCY_LABEL,
   RECOVERY_STATE_LABEL,
   VISUAL_STATUS_LABEL,
   failureLabel,
 } from "@/lib/site-watch/labels";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
-
-const FREQUENCIES = ["hourly", "every_6h", "daily"] as const;
 
 const ACCEPT_ERROR: Record<string, string> = {
   storage_unconfigured: "未設定私有截圖儲存",
@@ -28,7 +26,6 @@ const ACCEPT_ERROR: Record<string, string> = {
   forbidden_role: "需要 owner／admin 權限",
 };
 
-type Draft = { enabled: boolean; frequency: string; hourUtc: number };
 type Notice = { tone: "ok" | "warn" | "error"; text: string };
 
 function Banner({ tone, children }: { tone: "ok" | "warn" | "error" | "info"; children: ReactNode }) {
@@ -64,19 +61,11 @@ function StateLine({ label, s, extra }: { label: string; s: PageStateRow | undef
 
 export function SiteWatchCard({ slug }: { slug: string }) {
   const [ov, setOv] = useState<SiteWatchOverview | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [openImage, setOpenImage] = useState<{ key: string; src: string; label: string } | null>(null);
   const [armedPage, setArmedPage] = useState<string | null>(null);
   const [acceptingPage, setAcceptingPage] = useState<string | null>(null);
-
-  const apply = useCallback((o: SiteWatchOverview) => {
-    setOv(o);
-    const t = o.target ?? { enabled: o.defaults.enabled, frequency: o.defaults.frequency, hour_utc: o.defaults.hour_utc };
-    setDraft({ enabled: t.enabled, frequency: t.frequency, hourUtc: t.hour_utc });
-  }, []);
 
   const load = useCallback(async () => {
     setLoadError(null);
@@ -90,49 +79,15 @@ export function SiteWatchCard({ slug }: { slug: string }) {
         setLoadError(body?.error ?? `HTTP ${res.status}`);
         return;
       }
-      apply(body.overview as SiteWatchOverview);
+      setOv(body.overview as SiteWatchOverview);
     } catch (e) {
       setLoadError(String(e));
     }
-  }, [slug, apply]);
+  }, [slug]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  async function save() {
-    if (!ov || !draft) return;
-    setSaving(true);
-    setNotice(null);
-    try {
-      const res = await fetch(`/api/ops/clients/${encodeURIComponent(slug)}/site-watch`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
-        body: JSON.stringify({
-          expectedVersion: ov.target?.version ?? 0,
-          enabled: draft.enabled,
-          frequency: draft.frequency,
-          hourUtc: draft.hourUtc,
-        }),
-      });
-      const body = await res.json().catch(() => null);
-      if (res.status === 409) {
-        await load();
-        setNotice({ tone: "warn", text: "別人剛改過這張卡，已重新載入最新設定；確認後再存一次。" });
-      } else if (res.status === 403) {
-        setNotice({ tone: "error", text: "需要 owner／admin 權限才能修改。" });
-      } else if (!res.ok || !body?.ok) {
-        setNotice({ tone: "error", text: `儲存失敗：${body?.error ?? `HTTP ${res.status}`}` });
-      } else {
-        apply(body.overview as SiteWatchOverview);
-        setNotice({ tone: "ok", text: "已儲存。" });
-      }
-    } catch (e) {
-      setNotice({ tone: "error", text: `儲存失敗：${String(e)}` });
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function acceptBaseline(pageId: string) {
     // Two clicks, no modal: the old baseline image is overwritten in place and cannot be recovered.
@@ -171,7 +126,7 @@ export function SiteWatchCard({ slug }: { slug: string }) {
       </Card>
     );
   }
-  if (!ov || !draft) {
+  if (!ov) {
     return (
       <Card title="網站巡檢">
         <NoData>載入中…</NoData>
@@ -179,8 +134,6 @@ export function SiteWatchCard({ slug }: { slug: string }) {
     );
   }
 
-  const current = ov.target ?? { enabled: ov.defaults.enabled, frequency: ov.defaults.frequency, hour_utc: ov.defaults.hour_utc };
-  const dirty = draft.enabled !== current.enabled || draft.frequency !== current.frequency || draft.hourUtc !== current.hour_utc;
   const newestWithErrors = ov.recent.find((r) => r.errors_sample.length > 0);
 
   function toggleImage(key: string, src: string, label: string) {
@@ -190,7 +143,7 @@ export function SiteWatchCard({ slug }: { slug: string }) {
   return (
     <Card title="網站巡檢" badge={ov.recent[0] ? `上次巡檢 ${relativeTime(ov.recent[0].created_at)}` : "尚無紀錄"}>
       {!ov.globallyEnabled && (
-        <Banner tone="warn">SITE_WATCH_ENABLED 未開，目前不會巡檢（設定可以先存，全域開關打開後生效）。</Banner>
+        <Banner tone="warn">SITE_WATCH_ENABLED 未開，目前不會巡檢（排程表的設定可以先改，全域開關打開後生效）。</Banner>
       )}
       {!ov.storageConfigured && (
         <Banner tone="info">未設定私有截圖儲存（R2_SITE_WATCH_BUCKET）：只檢查網站能不能打開，不比對畫面、不存截圖。</Banner>
@@ -199,54 +152,6 @@ export function SiteWatchCard({ slug }: { slug: string }) {
         <Banner tone="warn">這個客戶沒有可巡檢的網址（客戶設定的網站網址空白或不是 http(s)），巡檢不會執行。</Banner>
       )}
       {notice && <Banner tone={notice.tone}>{notice.text}</Banner>}
-
-      <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--text-primary)", cursor: "pointer" }}>
-        <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft({ ...draft, enabled: e.target.checked })} />
-        巡檢這個客戶的網站
-      </label>
-
-      <SubLabel>頻率</SubLabel>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-        {FREQUENCIES.map((f) => (
-          <ChipBtn key={f} label={FREQUENCY_LABEL[f]} active={draft.frequency === f} onClick={() => setDraft({ ...draft, frequency: f })} />
-        ))}
-        <span style={{ fontSize: 11, color: "var(--text-muted)" }}>「只在更新時」之後開放</span>
-      </div>
-
-      {draft.frequency === "daily" && (
-        <>
-          <SubLabel>每天幾點（UTC）</SubLabel>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--text-secondary)" }}>
-            <input
-              type="number"
-              min={0}
-              max={23}
-              value={draft.hourUtc}
-              aria-label="每天巡檢時間（UTC 小時）"
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                if (e.target.value !== "" && Number.isInteger(n) && n >= 0 && n <= 23) setDraft({ ...draft, hourUtc: n });
-              }}
-              style={{ width: 56, fontSize: 12, padding: "3px 6px", borderRadius: 5, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }}
-            />
-            <span>點 UTC ＝ 台北 {(draft.hourUtc + 8) % 24} 點</span>
-          </div>
-        </>
-      )}
-
-      <div style={{ marginTop: 12 }}>
-        <button
-          onClick={save}
-          disabled={!dirty || saving}
-          style={{
-            fontSize: 11, padding: "3px 10px", borderRadius: 5, border: "none",
-            cursor: !dirty || saving ? "default" : "pointer", opacity: !dirty || saving ? 0.5 : 1,
-            background: "var(--accent)", color: "var(--btn-primary-text)",
-          }}
-        >
-          {saving ? "儲存中…" : "儲存"}
-        </button>
-      </div>
 
       <SubLabel>目前狀態</SubLabel>
       {ov.watchedPages.length === 0 ? (

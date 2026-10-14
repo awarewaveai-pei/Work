@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDueNow, scheduledRunKey, type Schedule } from "@/lib/collect/schedule";
+import { isDueNow, scheduledRunKey, type Schedule } from "@/lib/schedules/schedule";
 
 const base: Schedule = { enabled: true, frequency: "daily", hourUtc: 3, dayOfWeekUtc: 1, lastRunAt: null };
 
@@ -44,12 +44,14 @@ describe("isDueNow", () => {
     expect(isDueNow({ ...base, lastRunAt: "not-a-date" }, new Date("2026-09-14T03:05:00Z"))).toBe(true);
   });
 
-  it("scheduledRunKey is stable for the same org+day and differs by day", () => {
+  it("scheduledRunKey is stable for the same org+job+day and differs by day and by job", () => {
     const org = "11111111-1111-4111-8111-111111111111";
-    const a = scheduledRunKey(org, new Date("2026-09-14T03:05:00Z"));
-    const b = scheduledRunKey(org, new Date("2026-09-14T23:59:00Z"));
-    const c = scheduledRunKey(org, new Date("2026-09-15T00:01:00Z"));
+    const a = scheduledRunKey(org, "collect_crawl", new Date("2026-09-14T03:05:00Z"));
+    const b = scheduledRunKey(org, "collect_crawl", new Date("2026-09-14T23:59:00Z"));
+    const c = scheduledRunKey(org, "collect_crawl", new Date("2026-09-15T00:01:00Z"));
+    expect(a).toBe("scheduled-collect_crawl-11111111-20260914");
     expect(a).toBe(b);
     expect(a).not.toBe(c);
+    expect(scheduledRunKey(org, "other_job", new Date("2026-09-14T03:05:00Z"))).not.toBe(a);
   });
 });

@@ -45,19 +45,6 @@ interface Source {
   lastStatus: string | null;
 }
 
-interface Schedule {
-  organizationId: string;
-  enabled: boolean;
-  frequency: "daily" | "weekly";
-  hourUtc: number;
-  dayOfWeekUtc: number;
-  lastRunAt: string | null;
-  lastRunKey: string | null;
-  updatedBy: string | null;
-}
-
-const DAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
-
 interface RunResult {
   runKey: string;
   sources: number;
@@ -494,7 +481,9 @@ export function CollectionSourcesPanel({ slug, researchBridgesEnabled = false }:
             ) : null}
           </h2>
 
-          <ScheduleControls slug={slug} />
+          <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 14 }}>
+            要讓它定期自動抓，到 <a href="/ops/schedules">排程</a> 頁勾選「自動爬取」。
+          </div>
 
           {candidates.length ? (
             <div style={{ marginBottom: 14 }}>
@@ -662,9 +651,8 @@ export function CollectionSourcesPanel({ slug, researchBridgesEnabled = false }:
 }
 
 /**
- * Choices as visible buttons, never a native <select> — the house convention on this screen (see
- * ScheduleControls below, and the catalogue's own comment on why a dropdown was rejected for source
- * types). A dropdown hides how many options exist and how many are currently on, which for
+ * Choices as visible buttons, never a native <select> — the house convention on this screen (see the
+ * catalogue's own comment on why a dropdown was rejected for source types; the schedules page follows it too). A dropdown hides how many options exist and how many are currently on, which for
  * something like "which angles should this search cover" is exactly the information being chosen.
  *
  * One value shape for both modes: a comma-separated string, matching SourceOption's contract, so
@@ -719,110 +707,6 @@ function ChoiceChips({
           </button>
         );
       })}
-    </div>
-  );
-}
-
-/**
- * The switch for "someone has to remember to click 正式抓取" (TASKS.md 2026-09-12). Talks to
- * PATCH /api/ops/clients/[slug]/collection-schedule directly — collection-sources' own PATCH is
- * per-source approve/disable, a different axis entirely. Buttons, not a native <select>, for
- * frequency and day-of-week: every option visible at once is the house convention here (see the
- * catalogue's own comment above on why a dropdown was rejected for source types).
- */
-function ScheduleControls({ slug }: { slug: string }) {
-  const [schedule, setSchedule] = useState<Schedule | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const headers = { "Content-Type": "application/json" };
-
-  const load = useCallback(async () => {
-    const res = await fetch(`/api/ops/clients/${slug}/collection-schedule`, { headers: { "Content-Type": "application/json" } });
-    const data = (await res.json()) as { ok?: boolean; schedule?: Schedule };
-    if (data.ok && data.schedule) setSchedule(data.schedule);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function save(patch: Partial<Pick<Schedule, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc">>) {
-    if (!schedule) return;
-    const next = { ...schedule, ...patch };
-    setSchedule(next); // optimistic — a slow PATCH must not make a checkbox feel unresponsive
-    setSaving(true);
-    setMsg(null);
-    try {
-      const res = await fetch(`/api/ops/clients/${slug}/collection-schedule`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ enabled: next.enabled, frequency: next.frequency, hourUtc: next.hourUtc, dayOfWeekUtc: next.dayOfWeekUtc }),
-      });
-      const data = (await res.json()) as { ok?: boolean; schedule?: Schedule; errors?: string[] };
-      if (data.ok && data.schedule) setSchedule(data.schedule);
-      else setMsg(`⚠ ${(data.errors ?? ["save_failed"]).join("、")}`);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (!schedule) return null;
-
-  return (
-    <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: "10px 12px", marginBottom: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-          <input type="checkbox" checked={schedule.enabled} disabled={saving} onChange={(e) => save({ enabled: e.target.checked })} />
-          自動排程抓取
-        </label>
-        {schedule.enabled ? (
-          <>
-            <div style={{ display: "flex", gap: 4 }}>
-              <button disabled={saving} onClick={() => save({ frequency: "daily" })} style={{ ...buttonStyle(schedule.frequency === "daily"), fontSize: 11, padding: "4px 10px" }}>
-                每天
-              </button>
-              <button disabled={saving} onClick={() => save({ frequency: "weekly" })} style={{ ...buttonStyle(schedule.frequency === "weekly"), fontSize: 11, padding: "4px 10px" }}>
-                每週
-              </button>
-            </div>
-            {schedule.frequency === "weekly" ? (
-              <div style={{ display: "flex", gap: 4 }}>
-                {DAY_LABELS.map((label, day) => (
-                  <button key={day} disabled={saving} onClick={() => save({ dayOfWeekUtc: day })}
-                    style={{ ...buttonStyle(schedule.dayOfWeekUtc === day), fontSize: 11, padding: "4px 8px", minWidth: 28 }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#6b7280" }}>
-              時間（UTC）
-              <input
-                type="number"
-                min={0}
-                max={23}
-                value={schedule.hourUtc}
-                disabled={saving}
-                onChange={(e) => {
-                  const h = Number(e.target.value);
-                  if (Number.isInteger(h) && h >= 0 && h <= 23) void save({ hourUtc: h });
-                }}
-                style={{ ...inputStyle, width: 56, padding: "4px 6px" }}
-              />
-              點
-            </label>
-          </>
-        ) : (
-          <span style={{ fontSize: 11, color: "#9ca3af" }}>關閉時完全不會自動跑，仍可手動按「正式抓取」</span>
-        )}
-      </div>
-      {schedule.enabled && schedule.lastRunAt ? (
-        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 6 }}>
-          上次排程執行：{schedule.lastRunAt.slice(0, 16).replace("T", " ")}
-        </div>
-      ) : null}
-      {msg ? <div style={{ fontSize: 11, color: "#b91c1c", marginTop: 6 }}>{msg}</div> : null}
     </div>
   );
 }
