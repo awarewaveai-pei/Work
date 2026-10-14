@@ -4,14 +4,15 @@
 > 每張卡六項：目標／範圍／輸入／輸出／驗收／邊界。驗收照 AGENTS.md §1 四動作（實測、Review、抓蟲、WORKLOG）。`.ts/.tsx` 改動完成前 `npx tsc --noEmit` 必綠；只寫卡片點名的測試。
 > 路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`，除非另寫。
 
-## 0. 動工前 gate（全部 CLOSED 才開 C1）
+## 0. 動工前 gate（G1–G4 CLOSED 才開 C1；G5 在 C3 之前 CLOSED——C1／C2 不碰 Postiz，可先做）
 
 | Gate | 做法 | 證據 |
 |---|---|---|
-| G1 Postiz 端點實測 | 從 ks-aw-01 用 `POSTIZ_API_KEY` 對 `127.0.0.1:4007/api/public/v1/` 逐一 curl：`posts?startDate&endDate`、`posts/{id}/status`（PUT）、`social/bluesky`、`groups`、`integrations/find-slot`、analytics；回應存 `__tests__/fixtures/postiz/*.json`（Gate B 做法） | fixture 檔＋WORKLOG REALTEST 行 |
-| G2 `API_LIMIT` | `docker exec postiz printenv API_LIMIT`；沒有就是預設 30 | WORKLOG |
+| G1 Postiz 端點實測 | ✅ 2026-10-14：v2.11.3 只有 integrations／posts 列表／find-slot／is-connected／upload-from-url／刪單則；連接帳號、改狀態、分組、通知、媒體、分析、刪整組全 404（表在 ADR 016「實測」）。回應存 `next-admin/lib/content/__tests__/fixtures/postiz-v2.11.3/*.json` | WORKLOG 2026-10-14 |
+| G2 `API_LIMIT` | ✅ 未設＝預設 30／小時；`GET posts` 也扣額度 | 同上 |
 | G3 Meta app 狀態 | 操作者登入 Meta 開發者後台確認 IG 權限與審核進度 | TASKS.md 371 更新 |
-| G4 ADR 016 已接受、樣稿定案 | 操作者看過樣稿說 OK | ADR 狀態改「已接受」 |
+| G4 ADR 016 已接受、樣稿定案 | ✅ 2026-10-14 操作者「同意」 | ADR 狀態 |
+| **G5 Postiz 升級到 v2.25.1**（High-STOP，先 go-ahead） | 備份 Postiz DB（`pg_dump`）＋ `/root/postiz/.env`、`docker-compose.yml` → image tag 改 `v2.25.1`、加 `API_LIMIT=<值>` → 照 `safe-infra-patch.sh` 同款流程（備份 → apply → `docker compose config` → `up -d` → 等 healthy → 失敗還原）→ 重跑 G1 那組 curl，所有 404 消失、現有兩個 integration 仍 `disabled:false`、Bluesky 草稿可建可刪。跨 14 個小版本，先讀 v2.12–v2.25 release notes 的 breaking changes 與 migration | WORKLOG＋runbook `POSTIZ-OPS-RUNBOOK.md` 版本號 |
 
 ## 1. V1 卡片（自己管多品牌就能用）
 

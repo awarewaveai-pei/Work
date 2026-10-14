@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-14（續7）社群管理平台：ADR 016 接受、app 按鈕改 14px、G1／G2 實測——我們的 Postiz v2.11.3 缺大半 API，要升 v2.25.1
+
+**根因**:
+- 操作者「同意」：ADR 016 定案；app 按鈕 13px 違反「字不小於 14px」，改 globals.css 一處全站生效。
+- ADR 016 的 API 清單是照 Postiz 最新文件寫的；我們跑 v2.11.3（2026-06）。實測前不知道缺什麼。
+
+**做了**:
+- `next-admin/app/globals.css` `.btn-primary`、`.btn-secondary` `font-size: 13px` → `14px`；`sync-app-theme.py` 同步樣稿，預覽頁第 14 版。
+- ks-aw-01 對 `127.0.0.1:4007/api/public/v1` 逐一 curl（只讀；改狀態用不存在的 id）：有 integrations、posts 列表、find-slot、is-connected、upload-from-url、DELETE posts/{id}（不存在的 id 回 500）；404：social/{platform}（連接帳號）、PUT posts/{id}/status、DELETE posts/group、groups、notifications、media、analytics。`API_LIMIT` 未設＝30／小時，`GET posts` 也扣（remaining 29）。最新版 v2.25.1（2026-10-11）。
+- fixture：`next-admin/lib/content/__tests__/fixtures/postiz-v2.11.3/{integrations,posts,findslot}.json`；主機暫存檔已刪。
+- ADR 016 狀態「已接受」，加「實測」表與結論（V1 前升 v2.25.1；升級前連帳號照 runbook §8 在 Postiz 介面做）。計畫 G1／G2／G4 打勾，新增 G5 升級 Postiz（High-STOP），C1／C2 不碰 Postiz 可先做。TASKS：按鈕項 [x]，V1 項更新下一步。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=ks-aw-01 curl 12 個 public API 端點＋5 個補測（上列結果）；docker exec postiz printenv API_LIMIT → 未設 | exit=0 | ms=6000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -I -B lobster-factory/docs/social/mockups/sync-app-theme.py（block updated）；check-social-mocks.py（0 findings，13px note 消失）；--selftest 38/38；verify-adr-index OK（16） | exit=0 | ms=3000
+- REVIEW_WAIVED: DOC_ONLY -- CSS 兩個數值與文件；樣稿閘與 selftest 已驗
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=v2\.11\.3 | hits=4
+  - `POSTIZ_SOCIAL_PUBLISHING_PLAN.md` 3 處是 2026-06 的歷史敘述（正確）；ADR 016 實測表 1 處。runbook 版本號在 G5 升級時改。
+
+**剩餘風險**: 按鈕 14px 只在 repo，正式站跟下一次 next-admin sg-deploy；按鈕變寬 1px 字，未逐頁看 app 其他頁面排版（下次 deploy 後 `/playwright smoke` 截圖看）。Postiz 跨 14 個小版本升級的風險在 G5 處理。
+
+**rollback**: `git revert <本 commit>`（globals.css 兩行回 13px、文件回前一版）。
 ## 2026-10-14（續6）社群管理平台：樣稿、功能總表、ADR 016、執行計畫——Metricool 等級的統一發文＋行事曆，Postiz 只當送信員
 
 **根因**:

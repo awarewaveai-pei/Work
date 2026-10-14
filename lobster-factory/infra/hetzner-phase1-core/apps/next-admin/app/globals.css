@@ -789,7 +789,7 @@ pre {
   border: 0;
   border-radius: 8px;
   padding: 9px 20px;
-  font-size: 13px;
+  font-size: 14px; /* text you read is never under 14px (operator 2026-10-14) */
   font-weight: 700;
   color: var(--btn-primary-text);
   background: var(--accent);
@@ -1578,7 +1578,7 @@ pre {
   background: var(--btn-secondary-bg);
   border: 1px solid var(--btn-secondary-border);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 14px; /* text you read is never under 14px (operator 2026-10-14) */
   font-weight: 600;
   color: var(--btn-secondary-text);
   cursor: pointer;

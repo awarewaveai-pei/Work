@@ -1,6 +1,6 @@
 # ADR 016: 社群管理是 AwareWave 第三個產品 — 排程資料放我們的資料庫，Postiz 只負責送出；先自己管多品牌，再開放訂閱
 
-- **狀態**：提案。產品方向由操作者 2026-10-14 口頭定下（「我可能管理多個客戶，或是像 Metricool 給人訂閱使用」「我要功能完善的平台」「css style 都直接先掛 app.aware-wave.com 的，要統一管理」）；工程做法由 Claude 決定。樣稿（`lobster-factory/docs/social/mockups/social-manager-mock.html`）定案後改「已接受」。
+- **狀態**：已接受（操作者 2026-10-14「同意」，看過樣稿第 13 版）。產品方向由操作者定（「我可能管理多個客戶，或是像 Metricool 給人訂閱使用」「我要功能完善的平台」「css style 都直接先掛 app.aware-wave.com 的，要統一管理」）；工程做法由 Claude 決定。
 - **日期**：2026-10-14
 - **承接**：[ADR 012](012-shared-platform-layer.md)（產品登記表、共用帳本）、[ADR 015](015-awarewave-account-and-shared-wallet.md)（一個帳號、一個錢包、每產品一個子網域）。
 - **部分取代**：`agency-os/docs/operations/POSTIZ_SOCIAL_PUBLISHING_PLAN.md` 的「社群發文放在內容工作室底部面板」做法（Task 3–6，2026-06-22 上線）。那批程式碼（`lib/content/postiz.ts`、`/api/content/social-*`、`social_postiz_connections`）保留並擴充，面板本身退場。
@@ -68,9 +68,20 @@
 - 代價：我們多維護一套排程與對帳（Trigger.dev 任務＋狀態回寫）；Postiz 與我們之間的狀態會有最多 5 分鐘延遲；連接帳號的歸屬靠時間配對，要有「同品牌一次一個連接」的鎖。
 - 需跟進：`lib/portal/products.ts`、`lobster-factory/packages/db/migrations/`、`middleware.ts`（host 判斷）、nginx vhost、`lobster-factory/packages/workflows/`（Trigger.dev 任務）、`runbooks/POSTIZ-OPS-RUNBOOK.md`（§9 v2 監控改為已落地）、`agency-os/TASKS.md`。執行計畫：`lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md`。
 
-## 待查（動工前的 gate）
+## 實測（2026-10-14，ks-aw-01 `127.0.0.1:4007/api/public/v1`，v2.11.3）
 
-- 我們這台 Postiz v2.11.3 實際有哪些端點：`GET /posts`（2026-10-14 已驗 200）、`PUT /posts/{id}/status`、`GET /social/{platform}`、`GET /groups`、`GET /integrations/find-slot`、analytics。文件寫的是最新版，動工前逐一 curl。
-- `API_LIMIT` 目前值（`/root/postiz/.env`）。
-- Meta app 審核狀態（Facebook 已連上但 IG 未連，是否同一個 app）。
+| 端點 | 結果 | 對本 ADR 的影響 |
+|---|---|---|
+| `GET integrations`、`GET posts?startDate&endDate`、`GET find-slot/{id}`、`GET is-connected`、`POST upload-from-url` | 有 | §2 送出與對帳可做 |
+| `DELETE posts/{id}` | 有（不存在的 id 回 500，不是 404） | §2「改時間＝刪掉重建」可做；client 要把 500 當「可能已不存在」處理 |
+| `GET social/{platform}`（連接帳號） | **404** | §4 從我們的畫面連帳號做不到 |
+| `PUT posts/{id}/status`、`DELETE posts/group/{g}`、`GET groups`、`GET notifications`、`GET media`、`GET analytics/*` | **404** | 狀態切換、分組、通知、媒體清單、數據分析都沒有 |
+| `GET posts` 也扣 rate limit | `x-ratelimit-remaining: 29`；`API_LIMIT` 未設（預設 30／小時） | 對帳輪詢會吃掉發文額度 |
+
+**結論**：V1 前必須把 Postiz 升到 v2.25.1（2026-10-11，最新）。升級前，§4 的帳號連接只能由操作者在 Postiz 介面做，再在我們這邊把 integration 指給品牌（現行 runbook §8 做法）。升級時一併設 `API_LIMIT`。計畫 G5。
+
+## 待查
+
+- 升級到 v2.25.1 之後重跑同一組 curl，確認上表 404 都消失（計畫 G5 驗收）。
+- Meta app 審核狀態（Facebook 已連上但 IG 未連，是否同一個 app）（G3，操作者）。
 - Postiz 的 customer 分組要怎麼指定到 integration（文件沒寫，可能只能在 UI 做）。

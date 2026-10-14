@@ -108,19 +108,17 @@
 
 ### 未完成
 
-- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：先過 G1–G4 gate，再從 C1 資料表起逐卡**
-  - `🟠 未開始` · `2026-10-14` · `G3 Meta 審核狀態、G4 樣稿定案都等操作者`
+- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C1 資料表起逐卡**
+  - `🟠 未開始` · `2026-10-14` · `G3 Meta 審核狀態（操作者）；G5 要 go-ahead`
   - **一句話**：Metricool 等級的統一發文＋行事曆，Postiz 只當送信員；先自己管多品牌，再開放訂閱
-  - **現在到哪**：樣稿（預覽頁第 12 版，七個檢視、審核、輪播、媒體庫、紀錄、設定都有）、功能總表 70 項、ADR 016（提案）、計畫 C1–C12 寫好；程式 0 行
-  - **下一步**：操作者看樣稿定案 → ADR 016 改「已接受」→ G1 從 ks-aw-01 curl Postiz v2.11.3 端點存 fixture → C1 migration（建議模型：Opus 5.5）
+  - **現在到哪**：ADR 016 已接受；樣稿第 14 版；G1／G2 實測完：v2.11.3 缺連接帳號、改狀態、分組、通知、媒體、分析等 API，API_LIMIT 預設 30／小時且 GET posts 也扣
+  - **下一步**：C1 migration 與 C2 產品登記可先做（不碰 Postiz，建議模型：Opus 5.5）；G5 把 Postiz 升 v2.25.1（High-STOP，先讀 release notes、備份、go-ahead）
   - **完成定義**：V1 12 張卡各有 REALTEST／REVIEW／BUGHUNT 行；sg-deploy 上線 `social.aware-wave.com`；ContentStudio 舊 Postiz 面板退場
-  - **證據**：WORKLOG 2026-10-14（續6）；`lobster-factory/docs/social/`；`agency-os/docs/architecture/decisions/016-social-manager-third-product.md`
+  - **證據**：WORKLOG 2026-10-14（續6）＋本日 G1 條目；`lobster-factory/docs/social/`；`agency-os/docs/architecture/decisions/016-social-manager-third-product.md`「實測」表
 
-- [ ] **【外觀｜操作者決定】app 按鈕字級 13px → 14px：`.btn-primary`／`.btn-secondary` 比「字不小於 14px」小 1px**
-  - `🟢 小` · `2026-10-14` · `操作者`
-  - **一句話**：社群樣稿照抄 app 樣式，所以「排程」「核准並排程」等按鈕是 13px；改 `globals.css` 一處，全站按鈕一起變 14px
-  - **下一步**：操作者說改 → `next-admin/app/globals.css` 的 `.btn-primary`、`.btn-secondary` `font-size: 13px` 改 14px → `python lobster-factory/docs/social/mockups/sync-app-theme.py` → 閘的 note 消失
-  - **證據**：`check-social-mocks.py` 印出的兩條 note；critic M1（WORKLOG 2026-10-14 續6）
+- [x] **【外觀｜操作者決定】app 按鈕字級 13px → 14px：`.btn-primary`／`.btn-secondary` 比「字不小於 14px」小 1px**
+  - `✅ 2026-10-14 操作者「同意」` · repo 已改，跟下次 next-admin sg-deploy 上線
+  - **證據**：`next-admin/app/globals.css` `.btn-primary`／`.btn-secondary` `font-size: 14px`；樣稿 sync 後閘的 note 消失
 
 - [ ] **【治理｜小】automation/ 與 agency-os/automation/ 兩套排程腳本：留一套**
   - `🟠 未開始` · `2026-10-14` · `無`
