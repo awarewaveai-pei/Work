@@ -1,33 +1,15 @@
-﻿# Tenant Scheduling and Automation
+﻿# Tenant Scheduling and Automation — RETIRED (2026-10-14)
 
-## Goal
-- Let each company define daily/weekly/monthly tasks and run them automatically.
-- Support irregular tasks through an adhoc queue.
+> 每個客戶一份 `OPERATIONS_SCHEDULE.json`，由筆電的 Windows 工作排程器定時執行。2026-10-14 退役，原因：
+> - `REGISTER_TENANT_TASKS.ps1` 的參數名 `$Args` 在 PowerShell 5.1 收不到值，從 4/5 第一版起什麼都沒註冊（實測 count=0）。
+> - 三個客戶的清單裡沒有任何客戶工作；機器上只有 4/30 手動建的兩個「每月」任務，而每月清單是空的。
+> - 筆電睡眠或用電池時任務會被拒（2026-10-01 0x800710E0）；5/30 已定原則：不再用單機 Windows 排程做 repo 層級的自動化（`weekly-automation-framework.md`）。
+> 詳細：WORKLOG 2026-10-14。
 
-## Configuration
-- `tenants/<company>/OPERATIONS_SCHEDULE.json`
-  - `scheduler.daily_time`
-  - `scheduler.weekly_day`, `scheduler.weekly_time`
-  - `scheduler.monthly_day`, `scheduler.monthly_time`
-  - `scheduler.adhoc_interval_minutes`
-- `tenants/<company>/OPS_QUEUE.json`
+## 現在去哪裡排
 
-## Runtime
-- Runner: `automation/TENANT_AUTOMATION_RUNNER.ps1`
-- Register Windows tasks: `automation/REGISTER_TENANT_TASKS.ps1`
-- Enqueue irregular tasks: `automation/ENQUEUE_TENANT_TASK.ps1`
-
-## Commands
-- Register:
-  - `powershell -ExecutionPolicy Bypass -File .\automation\REGISTER_TENANT_TASKS.ps1 -TenantSlug company-a`
-- Run once manually:
-  - `powershell -ExecutionPolicy Bypass -File .\automation\TENANT_AUTOMATION_RUNNER.ps1 -TenantSlug company-a -Frequency daily`
-- Enqueue adhoc:
-- `powershell -ExecutionPolicy Bypass -File .\automation\ENQUEUE_TENANT_TASK.ps1 -TenantSlug company-a -Title "Hotfix" -Command "powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -AutoDetect"`
-
-## Output
-- Reports: `reports/automation/<company>/run-*.md`
-- JSON logs: `reports/automation/<company>/run-*.json`
+- 客戶例行工作：app.aware-wave.com 的排程頁（規劃中，見 TASKS.md）；現有範例是自動爬取（`collection_schedules`，Trigger.dev 每小時呼叫 `/api/internal/collect/run-due-schedules`）。
+- 其他排程的分類規則：`automation/claude-routines/README.md` 的 Decision rubric。
 
 ## Related Documents (Auto-Synced)
 - `automation/README.md`

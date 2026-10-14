@@ -1,29 +1,16 @@
-﻿# Tenant Automation
+﻿# Automation (this machine)
 
 ## Purpose
-- Run daily/weekly/monthly/adhoc tasks per tenant automatically.
-- Keep operations simple, precise, and repeatable.
+- Windows Task Scheduler registrars for the system's own jobs on this laptop. Per-client routine work does NOT live here (tenant automation retired 2026-10-14, see `docs/operations/tenant-scheduling.md`).
 
 ## Files
-- `automation/TENANT_AUTOMATION_RUNNER.ps1`: executes tenant tasks
-- `automation/REGISTER_TENANT_TASKS.ps1`: creates/removes Windows Scheduled Tasks
-- `automation/ENQUEUE_TENANT_TASK.ps1`: enqueue irregular (adhoc) tasks
-- `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`: register global guard tasks
+- `automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`: registers the nightly system guard (`AgencyOS-SystemGuard-Daily`)
+- `automation/REGISTER_AUTOPILOT_PHASE1_TASKS.ps1`: autopilot registrar (known `$Args` bug, see TASKS.md)
 - `automation/claude-routines/`: SSOT for Anthropic cloud Claude routines (different scheduling primitive — see subdir README for rubric)
-- `tenants/<tenant>/OPERATIONS_SCHEDULE.json`: tenant task plan
-- `tenants/<tenant>/OPS_QUEUE.json`: adhoc queue
-
-## Quick Start
-1. Copy schedule templates into a tenant folder.
-2. Edit `OPERATIONS_SCHEDULE.json` for that tenant.
-3. Register schedule:
-   - `powershell -ExecutionPolicy Bypass -File .\automation\REGISTER_TENANT_TASKS.ps1 -TenantSlug company-a`
-4. For irregular tasks:
-   - `powershell -ExecutionPolicy Bypass -File .\automation\ENQUEUE_TENANT_TASK.ps1 -TenantSlug company-a -Title "Hotfix deploy" -Command "powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -AutoDetect"`
+- Monthly review registrar: `../scripts/register-monthly-system-review-task.ps1`
 
 ## Output
-- Run logs: `reports/automation/<tenant>/`
-- Guard logs: `reports/guard/`
+- Guard logs: `reports/guard/`; launcher transcripts: `%LOCALAPPDATA%\AgencyOS\scheduled-logs\`
 
 ## Related Documents (Auto-Synced)
 - `docs/operations/tenant-scheduling.md`

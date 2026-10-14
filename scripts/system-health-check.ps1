@@ -67,10 +67,7 @@ $coreFiles = @(
     "../scripts/system-guard.ps1",
     "../scripts/build-product-bundle.ps1",
     "docs/CHANGE_IMPACT_MATRIX.md",
-    "docs/change-impact-map.json",
-    "automation/TENANT_AUTOMATION_RUNNER.ps1",
-    "automation/REGISTER_TENANT_TASKS.ps1",
-    "automation/ENQUEUE_TENANT_TASK.ps1"
+    "docs/change-impact-map.json"
 )
 
 foreach ($f in $coreFiles) {
@@ -242,9 +239,7 @@ if (Test-Path $tenantsRoot) {
             "01_COMMANDER_SYSTEM_GUIDE.md",
             "02_CLIENT_WORKSPACE_GUIDE.md",
             "03_TOOLS_CONFIGURATION_GUIDE.md",
-            "04_OPERATIONS_AUTOMATION_GUIDE.md",
-            "OPERATIONS_SCHEDULE.json",
-            "OPS_QUEUE.json"
+            "04_OPERATIONS_AUTOMATION_GUIDE.md"
         )
         foreach ($rf in $required) {
             $full = Join-Path $tenant.FullName $rf

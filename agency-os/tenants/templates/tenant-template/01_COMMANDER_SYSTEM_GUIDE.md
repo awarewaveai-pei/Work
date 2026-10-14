@@ -16,10 +16,6 @@
 - 針對高風險客戶執行風險降級動作（CR、排程、資源）
 
 ## 你可一鍵做的事
-- 重新註冊此客戶自動排程：
-  - `powershell -ExecutionPolicy Bypass -File .\automation\REGISTER_TENANT_TASKS.ps1 -TenantSlug <company-slug>`
-- 手動執行每日任務：
-  - `powershell -ExecutionPolicy Bypass -File .\automation\TENANT_AUTOMATION_RUNNER.ps1 -TenantSlug <company-slug> -Frequency daily`
 - 全局守護檢查：
   - `powershell -ExecutionPolicy Bypass -File .\scripts\system-guard.ps1 -Mode manual`
 

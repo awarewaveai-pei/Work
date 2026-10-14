@@ -40,8 +40,6 @@
 | `02_CLIENT_WORKSPACE_GUIDE.md` | 客戶工作區 |
 | `03_TOOLS_CONFIGURATION_GUIDE.md` | 工具設定 |
 | `04_OPERATIONS_AUTOMATION_GUIDE.md` | 營運自動化 |
-| `OPERATIONS_SCHEDULE.json` | 排程 |
-| `OPS_QUEUE.json` | 佇列 |
 
 ---
 
@@ -55,7 +53,7 @@
 
 **完整 SOP**：[NEW_TENANT_ONBOARDING_SOP.md](NEW_TENANT_ONBOARDING_SOP.md)
 
-**排程註冊**：在 `agency-os/` 根執行 `automation/REGISTER_TENANT_TASKS.ps1`（見 [automation/README.md](../automation/README.md)）。
+**例行工作排程**：客戶例行工作的筆電排程（tenant 自動化）已於 2026-10-14 退役：它從沒真的運作過，見 `docs/operations/tenant-scheduling.md`。之後改在 app.aware-wave.com 的排程頁設定（規劃中，見 TASKS.md）。
 
 ### Staging URL（單一真相＋機械閘道）
 

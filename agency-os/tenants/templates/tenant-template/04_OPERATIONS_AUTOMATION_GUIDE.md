@@ -1,28 +1,12 @@
 ﻿# Operations and Automation Guide
 
 ## 目的
-- 定義這家公司每日/每週/每月/臨時任務如何自動執行。
+- 記錄這家公司有哪些自動化（監控、備份、通知），以及由哪個系統負責。
 
-## 設定檔
-- `OPERATIONS_SCHEDULE.json`：固定排程
-- `OPS_QUEUE.json`：臨時任務佇列
-
-## 排程頻率
-- Daily：固定時間執行每日例行
-- Weekly：固定星期與時間
-- Monthly：每月固定日期與時間
-- Adhoc：固定分鐘輪詢佇列
-
-## 常用操作
-- 註冊排程：
-  - `powershell -ExecutionPolicy Bypass -File .\automation\REGISTER_TENANT_TASKS.ps1 -TenantSlug <company-slug>`
-- 加入臨時任務：
-  - `powershell -ExecutionPolicy Bypass -File .\automation\ENQUEUE_TENANT_TASK.ps1 -TenantSlug <company-slug> -Title "<task>" -Command "<command>"`
-- 手動跑一次：
-  - `powershell -ExecutionPolicy Bypass -File .\automation\TENANT_AUTOMATION_RUNNER.ps1 -TenantSlug <company-slug> -Frequency daily`
+## 例行工作排程
+- 客戶例行工作的筆電排程（tenant 自動化）已於 2026-10-14 退役：它從沒真的運作過，見 `docs/operations/tenant-scheduling.md`。之後改在 app.aware-wave.com 的排程頁設定（規劃中，見 TASKS.md）。
 
 ## 觀測與排錯
-- 執行報告：`reports/automation/<company-slug>/`
 - 系統總狀態：`LAST_SYSTEM_STATUS.md`
 - 若 FAIL：先看 `ALERT_REQUIRED.txt` 與最新 health report
 

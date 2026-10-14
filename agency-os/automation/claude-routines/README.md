@@ -10,7 +10,7 @@ This directory is the **SSOT (Single Source of Truth)** for all Anthropic-hosted
 
 | Directory | Scheduling mechanism | Owner |
 |---|---|---|
-| `agency-os/automation/` (existing) | Windows Task Scheduler (local machine) | Per tenant / per machine |
+| `agency-os/automation/` (existing) | Windows Task Scheduler (local machine) | This machine's system jobs only (per-tenant scheduling retired 2026-10-14) |
 | `agency-os/automation/claude-routines/` (this dir) | Anthropic cloud cron (always-on) | Whole agency |
 | `lobster-factory/packages/workflows/` | Trigger.dev (EU VPS) | Lobster Factory |
 | `/root/lobster-phase1/scripts/*.sh` cron | SG VPS local cron (needs SSH) | SG infra |

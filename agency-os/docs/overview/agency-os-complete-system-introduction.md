@@ -28,8 +28,7 @@ Agency OS 是一套給接案公司使用的營運系統，核心目標是把「�
 - 讓總司令與客戶使用流程分離，減少溝通誤差
 
 ### C. 自動化執行
-- Daily/Weekly/Monthly/Adhoc 任務排程
-- 任務執行有報告輸出到 `reports/automation/<company>/`
+- 系統自己的排程（每晚檢查、每月檢查）在筆電；客戶例行工作改在 app.aware-wave.com 排程頁（規劃中，見 `docs/operations/tenant-scheduling.md`）
 
 ### D. 自動連動與結案檢查
 - 依 `docs/change-impact-map.json` 自動推導受影響文件
@@ -60,7 +59,7 @@ Agency OS 是一套給接案公司使用的營運系統，核心目標是把「�
 - `tenants/<company-*/>`（客戶資料、排程、專案、指南；試點如 `company-p1-pilot`、`company-soulful-expression`）
 
 ### Layer 4: Evidence (證據層)
-- `reports/closeout/`, `reports/health/`, `reports/guard/`, `reports/automation/`
+- `reports/closeout/`, `reports/health/`, `reports/guard/`
 
 ## 5) 你每天怎麼用（總司令）
 1. 看 `LAST_SYSTEM_STATUS.md`

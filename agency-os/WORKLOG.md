@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-14（續22）客戶 tenant 自動化退役；查清每日 guard 的 0xC000013A 與 ssh 卡住
+
+**操作者**：「你去查是怎麼回事」→ 刪不刪「你決定，你才是專家」。
+
+**查到的**:
+- C1 tenant registrar 從沒成功過：`REGISTER_TENANT_TASKS.ps1:23` `param([string[]]$Args)`，PS 5.1 下 `-Args @(...)` 收到 0 個值（scratchpad args_test.ps1 實測 count=0），實際執行的是不帶參數的 `schtasks.exe`（只列清單，exit 0），最後印「Registered」。4/5 首版起每個版本都是（git show 逐版 grep）。現存兩個月排程是 4/30 02:27 以舊格式手動建的。即使修好參數名，它會先刪四個任務再用 375／397 字元的 /TR 建（上限 261），結果全刪光。`REGISTER_AUTOPILOT_PHASE1_TASKS.ps1:20` 同 bug。grok-cli／perplexity-cli 是腳本層級 ValueFromRemainingArguments＋位置參數，實測可用。
+- C2 tenant 任務不做事：三個客戶清單沒有任何客戶工作（p1 每日 1 條 A10-2 預檢、soulful 每日 1 條 doc-sync、mongolia 全空，monthly 全空）；日命令用 `.\scripts\...` 相對路徑；唯一一次執行 9/1「No tasks executed」。一鍵架站（Trigger.dev `orchestrate-tenant-provisioning`）不讀這些檔。
+- C3 10/1 0x800710E0：筆電 14:24:14 從睡眠醒、14:25:23 電源來源改變（Kernel-Power 105）、14:30:11 補跑；允許電池的 guard 14:30:13 正常，月檢＋兩個 tenant（DisallowStartIfOnBatteries=true）同一秒被拒。
+- C4 guard 第一次 0xC000013A：不是失敗。內層程序 19:00:39 寫出 guard 報告（健康 100%、PASS），被中止的只有外層 launcher（18:59 左右）；中止來源未查到（任務檔 18:58:10 後沒被改、其他 session 紀錄無 taskkill／Stop-ScheduledTask、System／Application 事件無紀錄），重現未再發生。
+- C5 guard 重現時卡 16 分鐘：健康檢查 → `check-deploy-drift.ps1:270` 的 ssh（只有 ConnectTimeout=8，無 ServerAliveInterval）卡住；同指令重跑 5.6 秒回來（主機 load 0.96）。中止那個 ssh（pid 56912）後 guard 19:42:48 PASS。任務 IgnoreNew → 卡住會讓之後的排程都被跳過。10 支連 ssh 的檢查只有 check-capacity-health.ps1 有存活檢查。另：ssh 被中止時 drift 被記成 WARN＋Pass=true，說明寫「0 commit behind」。開 TASKS。
+
+**做了**:
+- 刪 `agency-os/automation/{TENANT_AUTOMATION_RUNNER,REGISTER_TENANT_TASKS,ENQUEUE_TENANT_TASK}.ps1`、三個客戶與範本的 `OPERATIONS_SCHEDULE.json`／`OPS_QUEUE.json`（8 檔）、`agency-os/reports/automation/`（3 檔）；移除兩個 Windows 任務（XML 存 `D:\tmp\agencyos-task-rollback-20261014\`）。
+- `tenant-scheduling.md` 改寫成退役說明（照 5/30 週檢前例，連結不斷）；automation/README、agency-os/README、tenants/README、NEW_TENANT_ONBOARDING_SOP（第 6 步、Step 6 第 5 項）、範本 01／04 指南、soulful 04 指南、系統介紹、程式地圖 :36（兩份）、claude-routines README 改寫。
+- `system-health-check.ps1`：核心檔清單拿掉 3 支、客戶必備檔拿掉 2 個。
+- TASKS 開 3 條：app.aware-wave.com 排程頁規劃、ssh 存活檢查、autopilot registrar `$Args`。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/system-health-check.ps1 → 100%（318；少的 11 項＝3 腳本＋6 客戶檔＋2 任務路徑） | exit=0 | ms=72000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/scripts/validate-doc-integrity.mjs（無 broken_link）；Get-ScheduledTask AgencyOS-* → 只剩 MonthlySystemReview、SystemGuard-Daily | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad trace_guard.ps1（逐秒追 launcher／inner／health 程序）→ 卡在 check-deploy-drift ssh；同 ssh 指令加 ServerAliveInterval 重跑 5.6 s exit 0 | exit=0 | ms=1000000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+  - Codex（agency-os/reports/oracle/2026-10-14-partialreview-6a1fdb11.md）3 條全駁回：F1/F2「刪掉 p1 預檢、soulful doc-sync 每日工作」——兩條每日工作從沒被排進 Windows（registrar 收不到參數，機器上只有手動建的兩個 monthly 任務），刪前就沒在跑；doc-sync 另由每晚 guard 執行（system-guard.ps1:73）。F3「舊任務指向被刪腳本、健康仍通過」——健康檢查本就逐一驗 AgencyOS-* 任務的 -File 與 -TargetScript（今早月檢指向被刪腳本即報 Missing file、99.7%）。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,tests,runbooks,.github,lobster-factory,docs | grep=OPERATIONS_SCHEDULE|OPS_QUEUE|TENANT_AUTOMATION_RUNNER|REGISTER_TENANT_TASKS|ENQUEUE_TENANT_TASK|reports/automation | hits=4
+  - 4 處：AUDIT_REGISTRY.md:194（歷史稽核）、tenant-scheduling.md:3-4（退役說明本身）、TASKS.md:1841（已結案）。程式行 0。
+
+**剩餘風險**: 排程頁做出來前，客戶例行工作沒有設定處（現在本來就沒有任何客戶工作排在裡面）；guard ssh 卡住未修（TASKS）；第一次 launcher 被中止的來源未明。
+
+**rollback**: `git revert <本 commit>`；任務用 `D:\tmp\agencyos-task-rollback-20261014\rollback-AgencyOS-company-*-monthly.xml` 以 `Register-ScheduledTask -Xml` 還原。
 ## 2026-10-14（續21）備份涵蓋 B1–B6 程式完成（未部署）：清單、每日檢查、cognitive／HCI 離機、Chatwoot、pgsodium key、/ops/backup
 
 **根因**（計畫 `lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md` 現況表）:

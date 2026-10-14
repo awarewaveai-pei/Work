@@ -277,9 +277,7 @@
 
 ## 每公司自動排程
 
-- 設定：`tenants/<company>/OPERATIONS_SCHEDULE.json`、`OPS_QUEUE.json`
-- 引擎：`automation/TENANT_AUTOMATION_RUNNER.ps1`；註冊：`automation/REGISTER_TENANT_TASKS.ps1`；加單：`automation/ENQUEUE_TENANT_TASK.ps1`
-- 紀錄：`reports/automation/<company>/`
+- 客戶例行工作的筆電排程（tenant 自動化）已於 2026-10-14 退役：它從沒真的運作過，見 `docs/operations/tenant-scheduling.md`。之後改在 app.aware-wave.com 的排程頁設定（規劃中，見 TASKS.md）。
 
 ## 記憶與規則（其餘 .mdc）
 

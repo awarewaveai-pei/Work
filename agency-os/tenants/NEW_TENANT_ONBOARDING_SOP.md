@@ -39,7 +39,7 @@
 3. 更新 `SITES_INDEX.md`：至少新增 1 個站點規劃，補上 staging/prod URL 與備份日期欄位
 4. 初始化 `FINANCIAL_LEDGER.md`：付款節點與條件
 5. 初始化 `ACCESS_REGISTER.md`：補齊 MFA、Secret Location、Rotation Due、Approver、Audit Evidence
-6. 建立 `OPERATIONS_SCHEDULE.json` 與 `OPS_QUEUE.json`（含 owner/retry/timeout/evidence_output）
+6. 例行工作排程：客戶例行工作的筆電排程（tenant 自動化）已於 2026-10-14 退役：它從沒真的運作過，見 `docs/operations/tenant-scheduling.md`。之後改在 app.aware-wave.com 的排程頁設定（規劃中，見 TASKS.md）。
 7. 填寫 1-4 使用指南，對齊該客戶的角色、流程、工具與排程
 8. 填寫 `core/ENVIRONMENT_REGISTRY.md`（staging/prod 必填）
 9. 預先建立 `core/RELEASE_GATES_CHECKLIST.md` 與 `core/BACKUP_RESTORE_PROOF.md` 第一版
@@ -74,9 +74,7 @@
 2. 在 `WORKLOG.md` 記錄 tenant 建立完成
 3. 在 `memory/daily/YYYY-MM-DD.md` 記錄當日導入脈絡
 4. 若為重大里程碑，更新 `memory/CONVERSATION_MEMORY.md`
-5. 註冊自動排程：
-   - `powershell -ExecutionPolicy Bypass -File .\automation\REGISTER_TENANT_TASKS.ps1 -TenantSlug <company-slug>`
-6. 跑系統健康檢查：
+5. 跑系統健康檢查：
    - `powershell -ExecutionPolicy Bypass -File .\scripts\system-health-check.ps1`
 
 ## Step 7：WordPress Factory（Lobster）銜接 — A10-2 前置
