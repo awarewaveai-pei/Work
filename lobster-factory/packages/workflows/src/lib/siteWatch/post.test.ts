@@ -26,13 +26,13 @@ describe("site-watch posts", () => {
     process.env.SITE_WATCH_INGEST_TOKEN = "   ";
     expect(siteWatchConfigured()).toBe(false);
     delete process.env.SITE_WATCH_INGEST_TOKEN;
-    process.env.COLLECT_SCHEDULE_INGEST_TOKEN = "collect-token";
+    process.env.SCHEDULE_INGEST_TOKEN = "schedule-token";
     expect(siteWatchConfigured()).toBe(false);
   });
 
   it("throws before calling fetch when the token is missing — never falls back to another token", async () => {
     delete process.env.SITE_WATCH_INGEST_TOKEN;
-    process.env.COLLECT_SCHEDULE_INGEST_TOKEN = "collect-token";
+    process.env.SCHEDULE_INGEST_TOKEN = "schedule-token";
     process.env.OPS_INBOX_INGEST_TOKEN = "ops-token";
     const spy = vi.fn();
     global.fetch = spy as unknown as typeof fetch;

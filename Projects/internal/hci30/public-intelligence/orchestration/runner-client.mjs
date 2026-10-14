@@ -5,7 +5,7 @@
 // orchestration layer lives HERE and nowhere else -- scripts/check-trigger-
 // no-direct-fetch.ps1 (test id wave6-trigger-no-direct-fetch) enforces that
 // by filename allowlist ("*runner-client*"), matching the exact pattern
-// lobster-factory's own collect-scheduled-crawl.ts already uses (a thin
+// lobster-factory's own schedules-heartbeat.ts already uses (a thin
 // Trigger.dev task delegating to a separate function, never fetching
 // inline) rather than inventing a new one.
 //

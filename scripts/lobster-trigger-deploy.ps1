@@ -67,13 +67,13 @@ if (-not $srk -or $srk.StartsWith("ssh:") -or $srk.Length -lt 20) {
 }
 Write-Host "[deploy] SERVICE_ROLE_KEY obtained (length=$($srk.Length))." -ForegroundColor Green
 
-Write-Host "[deploy] Reading COLLECT_SCHEDULE_INGEST_TOKEN from VPS..." -ForegroundColor Cyan
+Write-Host "[deploy] Reading SCHEDULE_INGEST_TOKEN from VPS..." -ForegroundColor Cyan
 $cst = (& ssh -o StrictHostKeyChecking=no -p 58122 -i $SshKey ubuntu@$VpsHost `
-    "sudo grep '^COLLECT_SCHEDULE_INGEST_TOKEN=' /root/lobster-phase1/.env | cut -d= -f2-" 2>&1).Trim()
+    "sudo grep '^SCHEDULE_INGEST_TOKEN=' /root/lobster-phase1/.env | cut -d= -f2-" 2>&1).Trim()
 if (-not $cst -or $cst.StartsWith("ssh:") -or $cst.Length -lt 10) {
-    throw "Could not read COLLECT_SCHEDULE_INGEST_TOKEN from VPS /root/lobster-phase1/.env"
+    throw "Could not read SCHEDULE_INGEST_TOKEN from VPS /root/lobster-phase1/.env"
 }
-Write-Host "[deploy] COLLECT_SCHEDULE_INGEST_TOKEN obtained (length=$($cst.Length))." -ForegroundColor Green
+Write-Host "[deploy] SCHEDULE_INGEST_TOKEN obtained (length=$($cst.Length))." -ForegroundColor Green
 
 # ── 3. Build bash deploy script ────────────────────────────────────────────
 # PowerShell here-string: $pat/$srk/$phk/$oit/$AoOrgId are expanded by PS.
@@ -145,7 +145,7 @@ export POSTHOG_HOST=https://us.i.posthog.com
 # Webhooks
 export OPS_INBOX_INGEST_TOKEN='$oit'
 export AWAREWAVE_WEBHOOK_BASE_URL=https://app.aware-wave.com
-export COLLECT_SCHEDULE_INGEST_TOKEN='$cstTok'
+export SCHEDULE_INGEST_TOKEN='$cstTok'
 
 # wp-install-plugins: SSH execution gate + global SSH key
 export LOBSTER_EXECUTE_MANIFEST_STEPS='$execSteps'

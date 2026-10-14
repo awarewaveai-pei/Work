@@ -26,7 +26,7 @@ Synced on each deploy by `scripts/lobster-trigger-deploy.ps1` through `syncEnvVa
 | `OPS_INBOX_INGEST_TOKEN` | `record-tenant-integration`, `orchestrate-tenant-provisioning` | Bearer token for AW webhook ingest |
 | `AWAREWAVE_WEBHOOK_BASE_URL` | `record-tenant-integration`, `orchestrate-tenant-provisioning` | `https://app.aware-wave.com` |
 | `MAINWP_DASHBOARD_URL` / `MAINWP_CONSUMER_KEY` / `MAINWP_CONSUMER_SECRET` | `create-wp-site`, `adopt-client-os` (addSiteToMainWp) | read_write MainWP REST v2 key; source = ks-aw-01 `/root/lobster-phase1/.env`, synced by `scripts/lobster-trigger-deploy.ps1`. Never in the run payload. |
-| `COLLECT_SCHEDULE_INGEST_TOKEN` | `collect-scheduled-crawl` | Dedicated bearer token (never `OPS_INBOX_INGEST_TOKEN`) for `/api/internal/collect/run-due-schedules` |
+| `SCHEDULE_INGEST_TOKEN` | `schedules-heartbeat` | Dedicated bearer token (never `OPS_INBOX_INGEST_TOKEN`) for `/api/internal/schedules/run-due`; source = ks-aw-01 `/root/lobster-phase1/.env`, synced by `scripts/lobster-trigger-deploy.ps1` |
 | `SITE_WATCH_INGEST_TOKEN` | `site-watch-heartbeat`, `site-watch-run` | Dedicated bearer token (never shared with the collect/ops-inbox tokens) for `/api/internal/site-watch/*`; source = the RUNNING `lobster-next-admin` container (`docker exec … printenv`, i.e. the value next-admin actually accepts; set via `/root/lobster-phase1/.env` + compose in SITE_WATCH_MASTER_PLAN step 10d), synced by `scripts/lobster-trigger-deploy.ps1` |
 | `SENTRY_AUTH_TOKEN` | `orchestrate-tenant-provisioning` | Sentry provisioning auth token |
 | `SENTRY_ORG_SLUG` | `orchestrate-tenant-provisioning` | e.g. `aware-wave` |
@@ -224,18 +224,19 @@ every-minute poll spawned ~1,440 no-op runner containers/day; queue is usually e
 
 ---
 
-### `collect-scheduled-crawl`
+### `schedules-heartbeat`
 
 **What it does**: Hourly cron (`0 * * * *`, declarative schedule) that pokes next-admin's
-`/api/internal/collect/run-due-schedules`. Owns no scheduling logic itself -- next-admin's
-`lib/collect/schedule.ts` (`isDueNow`) decides which tenants are actually due. Every tenant
-defaults to `collection_schedules.enabled = false`, so this firing hourly does nothing until an
-operator enables a tenant via `PATCH /api/ops/clients/[slug]/collection-schedule`.
+`/api/internal/schedules/run-due`. Owns no scheduling logic itself -- next-admin decides which
+(client, job) rows of `client_schedules` are due (`lib/schedules/schedule.ts` `isDueNow`), claims
+them and runs them after answering (`lib/schedules/jobs.ts`). Every job defaults to off, so this
+firing hourly does nothing until an operator ticks a cell on `/ops/schedules`
+(agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md). Replaced `collect-scheduled-crawl` (2026-10-15).
 
-**Requires**: `COLLECT_SCHEDULE_INGEST_TOKEN` + `AWAREWAVE_WEBHOOK_BASE_URL`
+**Requires**: `SCHEDULE_INGEST_TOKEN` + `AWAREWAVE_WEBHOOK_BASE_URL`
 
 **Test payload**: none (scheduled task, no input). Safe to test-run any time --
-0 schedules enabled returns `{"ok":true,"checked":0,"due":0,"results":[]}` with no side effects.
+nothing due returns `{"ok":true,"checked":N,"due":0,"started":[],"claimErrors":[]}` with no side effects.
 
 ---
 

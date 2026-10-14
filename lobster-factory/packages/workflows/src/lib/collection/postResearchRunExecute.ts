@@ -1,5 +1,5 @@
 // Hands one Cognitive OS research run to next-admin's /api/internal/collect/runs/execute, where the crawler lives
-// (RESEARCH_LINES_MASTER_PLAN §12.7 I-c). Mirrors postRunDueSchedules.ts: its own bearer
+// (RESEARCH_LINES_MASTER_PLAN §12.7 I-c). Mirrors ../schedules/postRunDue.ts: its own bearer
 // (COLLECT_RESEARCH_EXECUTE_TOKEN), never a shared one. The payload carries a grant REFERENCE only; next-admin
 // exchanges it for the token, so no token passes through Trigger.
 

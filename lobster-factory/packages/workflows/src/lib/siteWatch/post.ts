@@ -1,6 +1,6 @@
 // Calls next-admin's site-watch routes (all monitoring logic lives there; agency-os/docs/operations/
-// SITE_WATCH_MASTER_PLAN.md §3.1). Same shape as ../collection/postRunDueSchedules.ts: a dedicated
-// bearer token — never OPS_INBOX_INGEST_TOKEN or COLLECT_SCHEDULE_INGEST_TOKEN — so a leak of one
+// SITE_WATCH_MASTER_PLAN.md §3.1). Same shape as ../schedules/postRunDue.ts: a dedicated
+// bearer token — never OPS_INBOX_INGEST_TOKEN or SCHEDULE_INGEST_TOKEN — so a leak of one
 // cannot forge calls on the endpoints the others guard.
 
 export type SiteWatchDueResult = {

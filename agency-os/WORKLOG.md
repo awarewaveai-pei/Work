@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-15（續3）排程頁步 2 已套＋步 5 程式：Trigger `collect-scheduled-crawl` → `schedules-heartbeat`
+
+**步 2（High，操作者 go）**：`node scripts/apply-db-migration.mjs 0097` → `APPLY_OK 1/1`。prod 驗：`client_schedules` 1 列（`39ad4149…`，collect_crawl，enabled=f，weekly 3 1）＝原表列數；`collection_schedules` absent；`relrowsecurity=t`；`ops_incidents_source_check` 含 `schedule`；ledger 有 `0097_client_schedules.sql`。
+
+**步 5 程式**：`WF/src/trigger/schedules-heartbeat.ts`（id 改名，cron 不變）、`WF/src/lib/schedules/postRunDue.ts`（URL `/api/internal/schedules/run-due`、token `SCHEDULE_INGEST_TOKEN`、結果型別 `started`／`claimErrors`）、`trigger.config.ts` syncEnvVars、`scripts/lobster-trigger-deploy.ps1` 從主機 `.env` 讀新名、`infra/trigger/TASK_REFERENCE.md`；指向舊檔名的註解（siteWatch/post、site-watch.ts、postResearchRunExecute、HCI orchestration 兩檔）同步。部署等 19:00 UTC next-admin 上線後（新 URL 先存在）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd WF && npm run typecheck && npm test（22 files／143 tests，含 syncEnvVarsParity） | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql client_schedules／to_regclass／pg_get_constraintdef／schema_migrations（見上） | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 機械改名（task id、URL、env 名）；同一條 token 路徑已在 2026-10-15-partialreview-6bd06ee9 F1 審過
+- ORACLE_WAIVED: 機械改名，型別＋143 測試（含 env parity gate）覆蓋；token 路徑已由 6bd06ee9 F1 審過
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os,.claude,Projects | grep=collect-scheduled-crawl|COLLECT_SCHEDULE_INGEST_TOKEN|postRunDueSchedules | hits=0（程式；歷史文件與 0081 檔不改；過渡 route 註解步 7 刪）
+
+**rollback**：`git revert`；Trigger 未部署前無影響。
 ## 2026-10-15（續2）排程頁 Slice 1 步 1+3：`client_schedules`＋registry＋一張表兩個畫面
 
 **操作者**：「看卡 §3.4 沒意見照 §5 開工；步 2、步 5 go」（2026-10-14）。卡 `docs/operations/SCHEDULES_PAGE_PLAN.md` §0／§4.2 已同步為實作 SSOT。

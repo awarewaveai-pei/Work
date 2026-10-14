@@ -1,7 +1,7 @@
 /**
  * site-watch: client-site monitoring heartbeat (agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md).
  *
- * Deliberately thin, same as collect-scheduled-crawl.ts: no scheduling logic here. next-admin's
+ * Deliberately thin, same as schedules-heartbeat.ts: no scheduling logic here. next-admin's
  * /api/internal/site-watch/due stamps the watchdog heartbeat, decides which targets are due or owe
  * a notification, and each target then runs in its own child (C4: no route call loops over clients).
  * next-admin has to do the work anyway — the renderer is only reachable on its docker network.

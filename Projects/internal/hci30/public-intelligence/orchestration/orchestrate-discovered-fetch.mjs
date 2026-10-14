@@ -6,8 +6,8 @@
 // with its `{outcome, retryable, ...}` result (throw to trigger Trigger.dev's
 // own retry policy, or return for a terminal outcome) -- exactly the
 // "thin task, real logic lives in an importable function" pattern
-// lobster-factory's own collect-scheduled-crawl.ts already uses (it delegates
-// to postRunDueSchedules() rather than containing its own logic inline).
+// lobster-factory's own schedules-heartbeat.ts already uses (it delegates
+// to postRunDue() rather than containing its own logic inline).
 //
 // ADR-0029 gate 6: this file imports ONLY ./runner-client.mjs for network
 // calls -- never a raw fetch()/http client. scripts/check-trigger-no-direct-

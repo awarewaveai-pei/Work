@@ -52,11 +52,11 @@ export default defineConfig({
         const awBase = process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "";
         if (awBase.trim()) out.AWAREWAVE_WEBHOOK_BASE_URL = awBase.trim().replace(/\/$/, "");
 
-        // collect-scheduled-crawl heartbeat -> next-admin /api/internal/collect/run-due-schedules.
+        // schedules-heartbeat -> next-admin /api/internal/schedules/run-due.
         // Dedicated token (never OPS_INBOX_INGEST_TOKEN) so a leak here cannot forge the other
         // OPS_INBOX_INGEST_TOKEN-guarded endpoints, and vice versa.
-        const collectToken = process.env.COLLECT_SCHEDULE_INGEST_TOKEN ?? "";
-        if (collectToken.trim()) out.COLLECT_SCHEDULE_INGEST_TOKEN = collectToken.trim();
+        const scheduleToken = process.env.SCHEDULE_INGEST_TOKEN ?? "";
+        if (scheduleToken.trim()) out.SCHEDULE_INGEST_TOKEN = scheduleToken.trim();
 
         // site-watch-heartbeat / site-watch-run -> next-admin /api/internal/site-watch/*. Own token,
         // same blast-radius rule as the collect one above.
