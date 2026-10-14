@@ -397,6 +397,7 @@
 
 - [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交** — Meta IG+FB（一個 Meta app，App Review，最高價值）/ Reddit / LinkedIn。callback = `https://postiz.aware-wave.com/integrations/social/<slug>`；client_id/secret 加進 EU `/root/postiz/.env`（`<PLATFORM>_CLIENT_ID/SECRET`）+ restart。
   - **X 跳過**（API $100/月）。非 Claude 可做，等各平台審核通過再接線。
+  - **現況 2026-10-14**：Meta ✅ app `2998470257172880` 建好、全權限、redirect、隱私／條款頁；FB 粉專 Aware Wave + Soulful Expression Art Therapy 已連 Postiz 並寫入 `social_postiz_connections`（WORKLOG 2026-10-14 續20）。剩：App icon（人工拖檔）、App Review + 商家驗證（正式發文權限）、IG（需專業帳號綁粉專）。Reddit ⛔ 要開支援單；LinkedIn ⛔ 人脈不足無法建公司頁。
 
 - [x] **【✅ VBC 2026-09-11 查證：早已完成，非本次動作｜Postiz 測試草稿清理】** DB 查證 `Post.deletedAt = 2026-06-23 16:43:20`，draft `cmqo1wijz0005p58ncl1mtssr` 三個月前即已軟刪除；本檔待辦未同步更新。今日重試 DELETE API 才發現 Postiz backend 掛了（見下方新增事故記錄），與草稿清理本身無關。
 

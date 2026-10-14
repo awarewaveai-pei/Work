@@ -211,6 +211,13 @@ curl -X DELETE "https://postiz.aware-wave.com/api/public/v1/posts/cmqo1wijz0005p
 
 4. **Bluesky 特別**：使用 App Password（非 OAuth），在 Bluesky 設定 → App Passwords 產生，填入 Postiz Bluesky 連接表單。
 
+5. **Facebook 粉專屬於另一個 FB 帳號**（例：Soulful 粉專在 Pei Huang 帳號，Postiz 只在另一個瀏覽器登入）：
+   - 前提：該 FB 帳號是 Meta App `2998470257172880` 的管理員（`developers.facebook.com/apps/2998470257172880/roles/roles/` 狀態不能是「待確認」）。development mode 下非 app 角色的帳號授權不了。
+   - 只要 state 存在 Redis 就能連，跟哪個瀏覽器發起無關：`connectSocialMedia` 只查 `login:<state>`（TTL 300 秒），code 換 token 不驗 state。
+   - 做法：已登入 Postiz 的瀏覽器 `fetch('/api/integrations/social/facebook')` 產生 state → 主機 `redis-cli --scan --pattern 'login:*'` 找最新的 → 在粉專擁有者的瀏覽器開 `https://www.facebook.com/v20.0/dialog/oauth?client_id=…&redirect_uri=<encoded …/integrations/social/facebook>&state=<state>&scope=<facebook.provider.js 的 scopes>` → 一路繼續。callback 會被導到 `/auth`（未登入，不會消耗 code）→ 從主機 `/var/log/nginx/` grep `integrations/social/facebook?code` 取 code → 在已登入 Postiz 的瀏覽器開 `/integrations/social/facebook?code=<code>&state=<state>` → 選粉專 → Save。
+   - state 過期就重新 fetch 一個，code 用新 state 帶過去即可（code 約 10 分鐘內有效、只能用一次）。
+   - 驗證：`GET /public/v1/integrations` 出現該粉專且 `disabled:false`，再寫 `social_postiz_connections`。
+
 ---
 
 ## 9. 監控（現況與 v2 計畫）

@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-14（續20）Postiz Soulful FB：Soulful 粉專（Pei Huang 帳號）連上 Postiz，兩個 FB 頻道寫進客戶 Hub
+
+**操作者**：Aware Wave 管 Postiz Meta App 和自家粉專；Pei Huang 管 Soulful 粉專；Chatwoot 只能接一個 Meta App，所以把 Pei Huang 加成同一個 App 的管理員。
+
+**做了**:
+- Meta App `2998470257172880` 角色：Pei Huang 管理員，已接受（roles 頁不再顯示「待確認」）。
+- Soulful Expression Art Therapy 粉專（Page ID 808838245657038）連上 Postiz → integration `cmv82i4950001s58fu8hudew3`。
+- Pei Huang 的瀏覽器沒登入 Postiz（不能代輸密碼），改用跨瀏覽器帶 code：已登入的瀏覽器產生 state → 主機 Redis 讀 `login:<state>` → Pei Huang 的瀏覽器開 FB 授權 → 主機 nginx log 取 code → 已登入的瀏覽器開 callback 選粉專存檔。做法寫進 `runbooks/POSTIZ-OPS-RUNBOOK.md` §8 第 5 點。
+- `social_postiz_connections` 新增兩列：Soulful 組織 ↔ `cmv82i4950001s58fu8hudew3`、AwareWave Ops 組織 ↔ `cmtx829l70001s589j2eg0xb9`（Aware Wave 粉專）。
+- `AWARE_WAVE_CREDENTIALS.md` Meta 段補權限、App 角色、已連粉專（page token 不另存，Postiz DB 自己存）。
+- 清掉主機 `/tmp` 的 check/delete 暫存腳本。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql postiz `select … from "Integration" where "deletedAt" is null` → 3 列：bluesky、Aware Wave(facebook)、Soulful Expression Art Therapy(facebook)，disabled=f、inBetweenSteps=f | exit=0 | ms=1504
+- REALTEST_EVIDENCE: tool=curl | cmd=GET https://postiz.aware-wave.com/api/public/v1/integrations → 3 個 integration 全部 disabled=False | exit=0 | ms=1565
+- REALTEST_EVIDENCE: tool=SSH | cmd=insert into social_postiz_connections … returning → INSERT 0 2 | exit=0 | ms=1565
+- REVIEW_WAIVED: NA -- 無程式改動；runbook 新段已讀回
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：App icon（人工拖檔）、App Review＋商家驗證（正式發文權限，dev mode 只有 app 角色帳號能用）、IG 需專業帳號綁粉專。
+
+**rollback**: Postiz 軟刪 integration（`update "Integration" set "deletedAt"=now() where id='cmv82i4950001s58fu8hudew3'`）；`delete from social_postiz_connections where postiz_integration_id in ('cmv82i4950001s58fu8hudew3','cmtx829l70001s589j2eg0xb9')`。
 ## 2026-10-14（續19）認知平台：工具課程改由資料產生（lessonkit）；lessons v1 晉升；結果頁 ④⑥ 讀資料、頂端顯示「知識不足」（未部署）
 
 **根因**: 冰山課是手寫示意稿匯出到網站；其他 33 個工具要「跟冰山一樣完整」就得各手寫一頁＝不可能且會分岔。結果頁 ④⑥ 的層資料寫死在 `MethodVisual.tsx` 的 `ICEBERG_LAYERS`，別的工具永遠拿不到。冰山課狀態列「工具齊備 M1–M10 ✓」是手打的字，沒人檢查——資料一接檢查就紅：三個來源都沒網址（M8 要 ≥2 個）。
