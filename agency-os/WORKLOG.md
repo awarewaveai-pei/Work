@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-15（續8）排程頁上線：步 5 部署、心跳首跑綠、步 7 清過渡；步 4 寫入／步 6 真跑待操作者登入
+
+**上線經過**
+- next-admin：另一 session 17:02 UTC 部署 `5634769`（含 `4ff292b38`）。主機實測：`/api/internal/schedules/run-due` 無 token 401、帶 token `{"ok":true,"checked":0,"due":0,"started":[],"claimErrors":[]}`；`/ops/schedules` 未登入 307→/login。
+- 讀取 smoke（伺服器金鑰 `x-ops-sync-key`）：`/api/ops/schedules` 6 客戶／12 格／jobs `collect_crawl`,`site_watch`；系統列 backup_coverage ok「20 項正常」、site_watch_heartbeat ok。寫入以金鑰＋自填 `x-ops-claims-role: admin` 一律 403（role 解成 operator）＝角色只能來自真 session，權限閘有效；寫入 smoke 因此需操作者登入。
+- Trigger：另一 session 16:31 UTC 已部署 v20261014.1（含 `d6e537717`）→ 17:00 心跳打新 URL 時 next-admin 尚未上線 → 404（`COMPLETED_WITH_ERRORS`）。當時無 enabled 排程，無漏跑。我 17:04 部署 v20261014.2（16 tasks）。Trigger DB：`schedules-heartbeat` `0 * * * *` active，`collect-scheduled-crawl` 已無排程。**18:00 UTC 首跑 `COMPLETED_SUCCESSFULLY`**。
+- 步 7：主機 compose／.env 刪 `COLLECT_SCHEDULE_INGEST_TOKEN`（safe-infra-patch；備份 `docker-compose.yml.bak.safe-patch-20261014-222231`、`.env.bak.safe-patch-20261014-222243`），next-admin healthy；刪過渡 route `app/api/internal/collect/run-due-schedules/route.ts`（隨下次 auto-deploy）。
+
+**教訓**：Trigger 部署腳本從主機 checkout `git pull` 後部署 → 推上 main 的 WF 改動可能被別的 session 先部署。跨 next-admin／Trigger 的改名，WF commit 應等 next-admin 上線後再推。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=trigger-postgres TaskRun schedules-heartbeat createdAt 18:00 → COMPLETED_SUCCESSFULLY | exit=0 | ms=4452
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv COLLECT_SCHEDULE_INGEST_TOKEN → exit 1；printenv SCHEDULE_INGEST_TOKEN → exit 0；POST run-due 帶 token → ok | exit=0 | ms=12000
+- REVIEW_WAIVED: NA -- 部署與刪除過渡檔；程式審查見續2
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os,.claude | grep=run-due-schedules|COLLECT_SCHEDULE_INGEST_TOKEN | hits=0（程式；歷史文件不改）
+- 無 subagent。
+
+**剩（操作者）**：登入 app.aware-wave.com/ops/schedules 改一格（步 4：`ops_audit_events` 多一筆、客戶頁同格同步）；要看真跑就勾 AwareWave Ops「自動爬取」每天、下一整點（步 6：`collection_runs` 一列 `scheduled-collect_crawl-…`），看完關掉。
+
+**rollback**：主機 env 用上列備份還原（safe-infra-patch）；Trigger 重新部署上一版；程式 `git revert`。
 ## 2026-10-15（續7）G5 Postiz v2.11.3 → v2.25.1（Temporal）：重寫升級腳本、拋棄式副本演練升級＋強制回滾都過，再上正式機
 
 **根因／發現**:

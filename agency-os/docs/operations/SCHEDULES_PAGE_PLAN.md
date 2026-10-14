@@ -7,7 +7,7 @@
 | 項 | 狀態（2026-10-14） |
 |---|---|
 | 卡 | 操作者 2026-10-14 看過 §3.4，步 2、5 給 go |
-| Slice 1 | 步 1+3 同一 commit（引擎＋UI）；主機 env `SCHEDULE_INGEST_TOKEN` 已加（舊名保留到步 7）；步 2 migration 編號改 **0097**（0092 已被 ledger 佔用） |
+| Slice 1 | 步 1–3、5、7 完成（`4ff292b38`、`d6e537717`、0097 已套、`schedules-heartbeat` 18:00 UTC 首跑綠、過渡 route 與舊 token 已刪）。**剩**：步 4 寫入 smoke 與步 6 真實一跑需操作者登入（改一格 → `ops_audit_events`；勾一格到下一個整點 → `collection_runs`） |
 | 前置 | 筆電 tenant 自動化已退役（`f8ffaf4b1`，WORKLOG 2026-10-14 續22） |
 
 ## 1. 目標
