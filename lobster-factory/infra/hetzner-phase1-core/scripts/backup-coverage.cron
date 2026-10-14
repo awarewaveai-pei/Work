@@ -2,8 +2,10 @@
 # sync-host-scripts.sh; install or refresh: sudo install -m 0644 /root/lobster-phase1/scripts/backup-coverage.cron /etc/cron.d/backup-coverage
 # 02:50 = after backup-cognitive-db.sh (02:17) and backup-hci-postgres-prod.sh (02:45).
 # 03:30 = after the verify jobs (02:30, 02:45, 03:00) and the stack upload's 20-minute retry budget (starts ~02:33).
-# Both are called through their interpreter: sync-host-scripts.sh marks only *.sh executable.
+# 04:15 on the 1st = restore drill (B7), after that day's uploads; the next 03:30 check reads its result.
+# All are called through their interpreter: sync-host-scripts.sh marks only *.sh executable.
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 50 2 * * * root bash /root/lobster-phase1/scripts/backup-offsite-cognitive-hci.sh >> /var/log/backup-offsite.log 2>&1
 30 3 * * * root python3 /root/lobster-phase1/scripts/backup-coverage-check.py >> /var/log/backup-coverage.log 2>&1
+15 4 1 * * root python3 /root/lobster-phase1/scripts/backup-restore-drill.py >> /var/log/restore-drill.log 2>&1

@@ -1,5 +1,5 @@
 {
-  "_doc": "Every writable mount of every running container on ks-aw-01 is listed under a store or under not_backed_up. backup-coverage-check.py reads this file; plan lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md. A mount key is <container>:<destination>; a trailing * matches a prefix.",
+  "_doc": "Every writable mount of every running container on ks-aw-01 is listed under a store or under not_backed_up. backup-coverage-check.py and backup-restore-drill.py (a store's \"drill\" entry) read this file; plan lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md. A mount key is <container>:<destination>; a trailing * matches a prefix.",
   "version": 1,
   "max_age_hours": 26,
   "split_threshold_bytes": 209715200,
@@ -15,6 +15,8 @@
     },
     "unlocked_prefixes": ["cognitive/"]
   },
+  "restore_drill": {"status_file": "/var/lib/awarewave/restore-drill.json", "max_age_days": 35, "label": "awarewave.restore-drill", "work_root": "/var/tmp/restore-drill"},
+  "reconcile": {"url": "http://127.0.0.1:3002/api/internal/reconcile", "token_file": "/etc/default/awarewave-reconcile", "checks": {"postiz-integrations": "Postiz", "cognitive-os-projects": "Cognitive OS"}},
   "pipelines": {
     "stack":     {"script": "/root/scripts/backup-eu-stack.sh", "local_root": "/root/backups-stack", "r2_prefix": "eu", "r2_dir": "date"},
     "lobster":   {"script": "/root/lobster-phase1/scripts/backup-phase1.sh", "local_root": "/root/lobster-phase1/backups", "r2_prefix": "sg-stack", "r2_dir": "date"},
@@ -23,27 +25,28 @@
     "hci":       {"script": "Projects/internal/hci30/scripts/backup-hci-postgres-prod.sh, then backup-offsite-cognitive-hci.sh", "local_root": "/root/backups-hci-postgres", "r2_prefix": "hci", "r2_dir": "date", "complete_marker": ".complete"}
   },
   "stores": [
-    {"id": "supabase-db", "pipeline": "stack", "mounts": ["supabase-db:/var/lib/postgresql/data"], "artifacts": ["supabase-all.sql.gz"], "note": "pg_dumpall: main, n8n and postiz databases"},
+    {"id": "supabase-db", "pipeline": "stack", "mounts": ["supabase-db:/var/lib/postgresql/data"], "artifacts": ["supabase-all.sql.gz"],
+     "drill": {"engine": "supabase", "container": "supabase-db", "secrets": {"artifact": "env.tar.gz.enc", "key": "var/lib/docker/volumes/supabase_db-config/_data/pgsodium_root.key", "env": "root/supabase/.env"}, "expect": [["postgres", "public.organizations"], ["postgres", "auth.users"], ["postgres", "vault.secrets"], ["n8n", "public.workflow_entity"], ["postiz", "public.\"Integration\""]]}, "note": "pg_dumpall: main, n8n and postiz databases"},
     {"id": "stack-secrets", "pipeline": "stack", "mounts": ["supabase-db:/etc/postgresql-custom"], "plan": "B4", "sources": {"supabase-db:/etc/postgresql-custom": "supabase_db-config"},
      "artifacts": [{"name": "env.tar.gz.enc", "members_file": "env.tar.gz.enc.members", "members": ["root/supabase/.env", "root/trigger/.env", "root/mainwp/.env", "root/postiz/.env", "var/lib/docker/volumes/supabase_db-config/_data/pgsodium_root.key"]}],
      "note": "pgsodium_root.key decrypts vault.secrets; it may leave the host only inside the encrypted bundle"},
     {"id": "supabase-files", "pipeline": "stack", "plan": "B4", "mounts": ["supabase-storage:/var/lib/storage", "supabase-imgproxy:/var/lib/storage", "supabase-edge-functions:/home/deno/functions", "supabase-studio:/app/edge-functions", "supabase-studio:/app/snippets"], "artifacts": ["supabase-files.tgz"], "sources": {"supabase-storage:/var/lib/storage": "/root/supabase/volumes/storage", "supabase-edge-functions:/home/deno/functions": "/root/supabase/volumes/functions", "supabase-studio:/app/snippets": "/root/supabase/volumes/snippets"}, "note": "/root/supabase/volumes/{storage,functions,snippets}"},
-    {"id": "trigger-db", "pipeline": "stack", "mounts": ["trigger-postgres:/var/lib/postgresql/data"], "artifacts": ["trigger.sql.gz"]},
+    {"id": "trigger-db", "pipeline": "stack", "mounts": ["trigger-postgres:/var/lib/postgresql/data"], "artifacts": ["trigger.sql.gz"], "drill": {"engine": "postgres", "container": "trigger-postgres", "expect": [["trigger", "public.\"TaskSchedule\""], ["trigger", "public.\"Project\""]]}},
     {"id": "trigger-minio", "pipeline": "stack", "mounts": ["trigger-minio:/bitnami/minio/data"], "artifacts": ["trigger-minio.tgz"], "sources": {"trigger-minio:/bitnami/minio/data": "trigger_trigger_minio_data"}},
-    {"id": "mainwp-db", "pipeline": "stack", "mounts": ["mainwp-db:/var/lib/mysql"], "artifacts": ["mainwp.sql.gz"]},
+    {"id": "mainwp-db", "pipeline": "stack", "mounts": ["mainwp-db:/var/lib/mysql"], "artifacts": ["mainwp.sql.gz"], "drill": {"engine": "mysql", "container": "mainwp-db", "expect": [["mainwp", "mwp_options"], ["mainwp", "mwp_users"]]}},
     {"id": "mainwp-files", "pipeline": "stack", "mounts": ["mainwp-web:/var/www/html"], "artifacts": ["mainwp-files.tgz"], "sources": {"mainwp-web:/var/www/html": "mainwp_mainwp_files"}},
     {"id": "n8n", "pipeline": "stack", "mounts": ["n8n:/home/node/.n8n"], "artifacts": ["n8n.tgz"], "sources": {"n8n:/home/node/.n8n": "n8n_n8n_data"}},
     {"id": "postiz-uploads", "pipeline": "stack", "mounts": ["postiz:/uploads"], "artifacts": ["postiz-uploads.tgz"], "sources": {"postiz:/uploads": "postiz_postiz_uploads"}},
     {"id": "uptime-kuma", "pipeline": "stack", "mounts": ["uptime-kuma:/app/data"], "artifacts": ["uptime-kuma.tgz"], "sources": {"uptime-kuma:/app/data": "uptime-kuma"}},
-    {"id": "lobster-wordpress-db", "pipeline": "lobster", "mounts": ["lobster-wordpress-db:/var/lib/mysql"], "artifacts": ["wordpress-db.sql.gz"]},
+    {"id": "lobster-wordpress-db", "pipeline": "lobster", "mounts": ["lobster-wordpress-db:/var/lib/mysql"], "artifacts": ["wordpress-db.sql.gz"], "drill": {"engine": "mysql", "container": "lobster-wordpress-db", "expect": [["wordpress", "wp_options"], ["wordpress", "wp_users"]]}, "note": "--databases: the site and every staging site (wp_s_<site id>)"},
     {"id": "lobster-wordpress", "pipeline": "lobster", "mounts": ["lobster-wordpress:/var/www/html"], "artifacts": ["wp-html.tgz"]},
-    {"id": "soulful-db", "pipeline": "ks-aw-01", "mounts": ["soulful-db:/var/lib/mysql"], "artifacts": ["soulful-db.sql.gz"]},
+    {"id": "soulful-db", "pipeline": "ks-aw-01", "mounts": ["soulful-db:/var/lib/mysql"], "artifacts": ["soulful-db.sql.gz"], "drill": {"engine": "mysql", "container": "soulful-db", "expect": [["soulful", "wp_options"], ["soulful", "wp_users"]]}},
     {"id": "soulful-wp", "pipeline": "ks-aw-01", "mounts": ["soulful-wp:/var/www/html"], "artifacts": ["soulful-wordpress.tgz"], "sources": {"soulful-wp:/var/www/html": "soulful_wordpress_data"}},
     {"id": "ks-secrets", "pipeline": "ks-aw-01", "mounts": [], "plan": "B4",
      "artifacts": [{"name": "env.tar.gz.enc", "members_file": "env.tar.gz.enc.members", "members": ["root/soulful/.env", "root/chatwoot/.env"]}]},
-    {"id": "chatwoot", "pipeline": "ks-aw-01", "plan": "B4", "mounts": ["chatwoot-postgres:/var/lib/postgresql/data", "chatwoot-rails:/app/storage", "chatwoot-sidekiq:/app/storage"], "artifacts": ["chatwoot.sql.gz", "chatwoot-storage.tgz"], "sources": {"chatwoot-rails:/app/storage": "chatwoot_chatwoot_storage"}},
-    {"id": "cognitive", "pipeline": "cognitive", "plan": "B3", "mounts": ["cognitive-db-cognitive-db-1:/var/lib/postgresql/data", "cognitive-os-api:/app/Projects/internal/cognitive-engineering-os/.runtime"], "artifacts": ["cognitive_os.dump", "postgres.dump", "runtime.tgz"], "note": "database rows name blobs in .runtime source-cas/artifact-cas; both in one snapshot. local and R2 kept 5 days: erased data may live at most 7 days in a backup (backup-cognitive-db.sh:6), R2 deletes up to a day late"},
-    {"id": "hci", "pipeline": "hci", "plan": "B3", "mounts": ["hci-postgres:/var/lib/postgresql/data"], "artifacts": ["hci-postgres.sql.gz"]}
+    {"id": "chatwoot", "pipeline": "ks-aw-01", "plan": "B4", "mounts": ["chatwoot-postgres:/var/lib/postgresql/data", "chatwoot-rails:/app/storage", "chatwoot-sidekiq:/app/storage"], "artifacts": ["chatwoot.sql.gz", "chatwoot-storage.tgz"], "drill": {"engine": "postgres", "container": "chatwoot-postgres", "artifacts": ["chatwoot.sql.gz"], "expect": [["chatwoot_production", "public.accounts"], ["chatwoot_production", "public.users"]]}, "sources": {"chatwoot-rails:/app/storage": "chatwoot_chatwoot_storage"}},
+    {"id": "cognitive", "pipeline": "cognitive", "plan": "B3", "mounts": ["cognitive-db-cognitive-db-1:/var/lib/postgresql/data", "cognitive-os-api:/app/Projects/internal/cognitive-engineering-os/.runtime"], "artifacts": ["cognitive_os.dump", "postgres.dump", "runtime.tgz"], "drill": {"engine": "postgres", "container": "cognitive-db-cognitive-db-1", "artifacts": ["*.dump"], "expect": [["cognitive_os", "public.events"]]}, "note": "database rows name blobs in .runtime source-cas/artifact-cas; both in one snapshot. local and R2 kept 5 days: erased data may live at most 7 days in a backup (backup-cognitive-db.sh:6), R2 deletes up to a day late"},
+    {"id": "hci", "pipeline": "hci", "plan": "B3", "mounts": ["hci-postgres:/var/lib/postgresql/data"], "artifacts": ["hci-postgres.sql.gz", "hci-roles.sql.gz"], "drill": {"engine": "postgres", "container": "hci-postgres", "roles": "hci-roles.sql.gz", "expect": [["hci_wave1_synthetic", "hci.tenants"]]}, "note": "the dump GRANTs to hci_app_test_a/b: hci-roles.sql.gz carries the cluster roles"}
   ],
   "not_backed_up": [
     {"mounts": ["chatwoot-redis:/data", "lobster-redis:/data", "postiz-redis:/data", "soulful-redis:/data", "trigger-redis:/data"], "reason": "cache and job queues, rebuilt on start; jobs in flight are lost"},

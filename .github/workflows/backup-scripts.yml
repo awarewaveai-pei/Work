@@ -37,3 +37,5 @@ jobs:
         run: python3 lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-coverage-check.test.py
       - name: Cognitive/HCI offsite leg
         run: bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-offsite-cognitive-hci.test.sh
+      - name: Restore drill guards and its coverage row
+        run: python3 lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-restore-drill.test.py

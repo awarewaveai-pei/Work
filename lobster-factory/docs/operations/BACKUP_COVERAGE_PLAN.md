@@ -51,17 +51,24 @@ R2 保存規則（2026-10-14 讀 `GET /r2/buckets/lobster-backup/lifecycle`）�
 - 邊界：Kuma 在同一台主機，主機整台掛掉時這條也會沉默；那由外部可達性監控負責，不在本卡。
 - 驗收：戳記設回 0 → 收到 Telegram。
 
-### B6 `/ops` 資料庫與備份頁（Sonnet 5.5；High＝sg-deploy）
+### B6 `/ops` 資料庫與備份頁 ✅ 2026-10-14（auto-deploy 15:05 上線，`/ops/backup` 未登入 307→login；容器內 `/host-status` 讀得到；登入後畫面由 vitest renderToStaticMarkup 驗，未人工看過）
 - 讀 B2 的狀態 JSON：每個庫一列，最近備份時間、大小、R2 有沒有、PASS／FAIL。只讀，不在頁面上觸發備份。
 - 驗收：頁面列數＝清單列數；B2 的 FAIL 在頁面上是紅的。
 
-### B7 每月還原演練（Opus 5.5）
-- 每月從 R2 取每個庫最新的備份，還原到一次性容器（不碰正式容器），跑幾個關鍵表的筆數查詢，結果寫進 B2 的狀態 JSON。參考既有 `.github/workflows/hci30-restore-drill.yml` 的做法。
+### B7 每月還原演練（程式完成、主機暫存目錄實跑；上線後 8 庫首跑 PASS 才打勾）
+- `hetzner-phase1-core/scripts/backup-restore-drill.py`（每月 1 日 04:15，`backup-coverage.cron`）：清單裡有 `drill` 的庫，從 R2 下載最新備份（分割檔重組後比對 sha256），灌進與 prod 同 image 的一次性容器（不接網路、限記憶體），判定規則在檔頭。結果 `/var/lib/awarewave/restore-drill.json`；B2 加 `restore-drill` 列（>35 天、任一庫 FAIL、漏庫 → FAIL）。
+- 比「關鍵表筆數」更嚴：dump 裡每個 COPY 區塊的筆數＝還原後筆數（筆數來自 dump 本身，不用另存標記；做法來自 `hci30-restore-drill.yml`）。
+- 首跑抓到 5 個還原會失敗或資料沒備到的地方（都已修，runbook §4/§6 同步）：Supabase 設定 volume 只放鑰匙 → DB 起不來；先跑 image 初始化再灌 → 6 張 auth/cron 表 0 筆；`postgres` 庫的 owner／grant 沒進 dump（fixup 補、演練比對 prod）；HCI dump GRANT 給 dump 外的角色（加 `hci-roles.sql.gz`）；一鍵架站的 staging 庫（`wp_s_*`）沒備份（`backup-phase1.sh` 改 `--databases`）。
 - 驗收：演練報告每個庫一列；故意給一份壞檔 → 該列 FAIL。
 
-### B8 跨產品客戶編號對帳（Opus 5.5）
+### B8 跨產品客戶編號對帳（程式完成；上線＝next-admin 部署＋`RECONCILE_TOKEN`）
 - 先列出各產品存了哪些「指向主庫客戶」的編號。對帳走各產品的 API 或匯出，不得跨庫直讀（HCI ADR-0002）。
 - 驗收：每天一次；故意放一個不存在的編號 → 報警。
+- 做法：next-admin `lib/reconcile/pointers.ts` 每種指標一塊（我們存的 id ↔ 對方 API 列出的 id），`GET /api/internal/reconcile`（自己的 `RECONCILE_TOKEN`）；B2 每天呼叫，每塊一列，掛不到對方或有懸空 id ＝ FAIL。
+- 2026-10-15 盤點 30 種跨產品指標（主庫→他產品 23、他產品→主庫 7），第一版查有寫入程式又有列表 API 的兩塊：
+  - `postiz-integrations`：`social_postiz_connections.postiz_integration_id`（prod 3 筆）↔ Postiz `GET /public/v1/integrations`。C4 上 0096 後加 `social_accounts`。
+  - `cognitive-os-projects`：`organizations.metadata.cognitive_os_import_project_id`（1）、`cs_knowledge_sources`（18）、`cs_knowledge_folders`（0）的 `cognitive_os_project_id` ↔ Cognitive OS `GET /projects`。還原後兩邊 dump 時間不同（02:17／02:30），中間建的專案會懸空。
+- 不查，理由：Chatwoot `accountId`（2 筆；vault 只有 AgentBot token，Chatwoot 只准它呼叫對話端點，讀不到帳號；要管理員 token 才能查）；HCI `hci_source_id`（HCI 沒有列表 API，`/seeds` 只回 DISCOVERED）；`external_tenant_id`、Clerk、FluentCRM、`postiz_workspace_id`、`cs_customer_memory.contact_ref`（沒有程式寫入）；Sentry／PostHog／GitHub／Supabase Cloud／Stripe／Woo／Trigger run id（外部 SaaS 或事件紀錄，不是會被我們還原的資料）；MainWP site id 只在 repo 檔，不在主庫。
 
 ### B9 verify 腳本查 R2 清單也要重試 ✅ 2026-10-14（改為刪掉重複，R2 只由 B2 查）
 - `eu-backup/verify-backup-eu.sh:91`、`hetzner-phase1-core/scripts/verify-backup.sh:130` 查 R2 清單只試一次，Cloudflare 一次失敗＝誤報 FAILED（`ks-aw-01-backup/verify-backup-ks-aw-01.sh` 不查 R2）。若 B2 已涵蓋 R2 檢查，這張卡改為刪掉 verify 裡重複的 R2 檢查，只留一處。
@@ -74,4 +81,4 @@ R2 保存規則（2026-10-14 讀 `GET /r2/buckets/lobster-backup/lifecycle`）�
 
 ## 順序
 
-B1 → B2（先讓缺口全部看得見）→ B4、B3（補洞）→ B5 → B6 → B7 → B8。B9–B11 隨時可做。
+B1 → B2（先讓缺口全部看得見）→ B4、B3（補洞）→ B5 → B6 → B7 → B8。B9–B11 隨時可做。剩 B8。

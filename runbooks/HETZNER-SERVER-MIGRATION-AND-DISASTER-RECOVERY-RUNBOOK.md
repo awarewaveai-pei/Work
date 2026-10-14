@@ -257,16 +257,42 @@
 mkdir -p /root/restore/secrets && openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in /root/restore/env.tar.gz.enc | tar xzf - -C /root/restore/secrets
 cp -a /root/restore/secrets/root/. /root/   # /root/{supabase,trigger,mainwp,postiz}/.env
 # pgsodium_root.key 必須在 supabase-db 第一次啟動前放進 volume：空的 volume 會讓它產生新鑰匙，舊 vault 就永遠解不開。
-# 經 docker 複製進 volume，不寫死 /var/lib/docker 路徑（新機的 docker data-root 可能不同）。
+# 由 image 自己填滿這個空 volume（postgresql.conf include 裡面的 supautils.conf 等檔；只放鑰匙 = DB 起不來），
+# 再以 image 的 postgres 身分裝鑰匙。不寫死 /var/lib/docker（新機 data-root 可能不同）。backup-restore-drill.py 每月照做。
+IMG=$(grep -A2 '^  db:' /root/Work/lobster-factory/infra/supabase/docker-compose.yml | sed -n 's/.*image: //p')
 docker volume create supabase_db-config
-docker run --rm -v supabase_db-config:/d -v /root/restore/secrets/var/lib/docker/volumes/supabase_db-config/_data:/s:ro alpine \n  sh -c 'cp -a /s/pgsodium_root.key /d/ && ls -l /d/pgsodium_root.key'
+docker run --rm -v supabase_db-config:/etc/postgresql-custom -v /root/restore/secrets/var/lib/docker/volumes/supabase_db-config/_data:/s:ro \
+  --entrypoint sh "$IMG" -c 'install -o postgres -g postgres -m 600 /s/pgsodium_root.key /etc/postgresql-custom/ && ls -ln /etc/postgresql-custom'
 ```
-**4. 還原 DB**（先 `docker compose up -d` 起 DB 容器，再灌）：
+**4. 還原 DB**。Supabase 灌進**空的** cluster，不經 compose 第一次啟動：compose 首次啟動會跑 image 的 init SQL，把 auth/storage/cron 建成 image 的舊版欄位，dump 的資料灌不進去（2026-10-14 演練：`auth.users`、`refresh_tokens`、`audit_log_entries`、`schema_migrations`、`cron.job`、`job_run_details` 變 0 筆）：
 ```bash
-gunzip -c /root/restore/supabase-all.sql.gz | docker exec -i supabase-db psql -U supabase_admin   # 含 postgres + n8n + postiz DB（pg_dumpall 全抓）
-gunzip -c /root/restore/trigger.sql.gz      | docker exec -i trigger-postgres psql -U trigger -d trigger
-docker exec mainwp-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "CREATE DATABASE IF NOT EXISTS mainwp"'
-gunzip -c /root/restore/mainwp.sql.gz       | docker exec -i mainwp-db sh -c 'mysql -u root -p"$MYSQL_ROOT_PASSWORD" mainwp'
+set -a; . /root/supabase/.env; set +a; export PGPASSWORD="$POSTGRES_PASSWORD"   # dump 會還原 prod 的角色密碼，之後的 \connect 靠它
+mkdir -p /root/supabase/volumes/db/data /root/restore/empty-initdb
+# 不接網路、pg_cron 不跑：prod 的排程與 pg_net 呼叫不能在還原中觸發（只靠 docker exec 操作它）
+docker run -d --name supabase-restore --network none -e POSTGRES_PASSWORD -e PGPASSWORD -v /root/supabase/volumes/db/data:/var/lib/postgresql/data \
+  -v supabase_db-config:/etc/postgresql-custom -v /root/restore/empty-initdb:/docker-entrypoint-initdb.d:ro \
+  "$IMG" postgres -c config_file=/etc/postgresql/postgresql.conf -c cron.launch_active_jobs=off
+for i in $(seq 150); do docker exec supabase-restore pg_isready -q -U postgres -h localhost && break; sleep 2; done
+docker exec supabase-restore pg_isready -U postgres -h localhost || docker logs --tail 20 supabase-restore   # 沒 ready 就停，看 log
+# 含 postgres + n8n + postiz DB（pg_dumpall 全抓）。錯誤寫檔；下一行應該沒有輸出（容忍的 3 種見 backup-restore-drill.py 的 TOLERATED）
+gunzip -c /root/restore/supabase-all.sql.gz | docker exec -i supabase-restore psql -U supabase_admin -d postgres -q 2>/root/restore/supabase-restore.err
+grep -iE '(error|fatal):' /root/restore/supabase-restore.err | grep -vE 'role "supabase_admin" already exists|Superuser owned event trigger must|event trigger "[^"]+" does not exist'
+docker exec -i supabase-restore psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 < /root/Work/lobster-factory/infra/hetzner-phase1-core/scripts/supabase-restore-fixup.sql
+docker stop -t 300 supabase-restore && docker rm supabase-restore   # 大量載入後的 checkpoint 要時間；step 6 compose up 時資料目錄已有資料，init SQL 不再跑
+```
+其他庫：先 `docker compose up -d <只有 db 服務>` 起空容器（app 先別起）再灌；檔案取自各自的 R2 前綴（`backup-inventory.json` 的 `pipelines`）。每月演練照同樣的方式灌（`backup-restore-drill.py`）：
+```bash
+P() { gunzip -c "/root/restore/$1" | docker exec -i "$2" psql -v ON_ERROR_STOP=1 -q "${@:3}"; }   # 遇錯即停，不會只灌一半
+M() { gunzip -c "/root/restore/$1" | docker exec -i "$2" sh -c 'MYSQL_PWD="${MARIADB_ROOT_PASSWORD:-$MYSQL_ROOT_PASSWORD}" "$(command -v mariadb || command -v mysql)" -uroot "$0"' "$3"; }
+P trigger.sql.gz trigger-postgres -U trigger -d trigger
+P chatwoot.sql.gz chatwoot-postgres -U chatwoot -d chatwoot_production
+gunzip -c /root/restore/hci-roles.sql.gz | docker exec -i hci-postgres psql -q -U hci_owner -d postgres   # 先角色；只會報 hci_owner already exists
+P hci-postgres.sql.gz hci-postgres -U hci_owner -d hci_wave1_synthetic
+for f in /root/restore/cognitive/*.dump; do d=$(basename "$f" .dump); docker exec cognitive-db-cognitive-db-1 createdb -U cognitive "$d" 2>/dev/null
+  docker exec -i cognitive-db-cognitive-db-1 pg_restore -U cognitive -d "$d" --exit-on-error < "$f"; done
+M mainwp.sql.gz mainwp-db mainwp
+M wordpress-db.sql.gz lobster-wordpress-db wordpress
+M soulful-db.sql.gz soulful-db soulful
 ```
 **5. 還原 volumes**（每個 tgz 灌回對應 volume）：
 ```bash
@@ -320,52 +346,13 @@ done
 
 ## §6 還原演練（沒演練過的備份 = 沒有備份）— **確切指令**
 
-> 現有 `verify-backup-eu.sh` 只驗 gzip/tar 完整性 = **「檔案沒爛」≠「還原得回來」**。真演練必須把 dump **灌進臨時 DB** 確認資料活著。
-> **頻率**：每季一次（+ 每次補漏覆蓋後一次）。**目標**：RTO ≤ 數小時、RPO ≤ 24h。**全程在臨時容器，不碰 prod。**
+> `verify-backup-*.sh` 只驗 gzip/tar 完整性 = **「檔案沒爛」≠「還原得回來」**。
 >
-> **✅ 演練 2026-06-26 通過**：
-> - **A Supabase**：`supabase-all.sql.gz` → 拋棄式 postgres:15 → `organizations=5`、`ops_action_runs=6`、73 表（pg_dumpall 還原有 ~315 role/extension-exists 雜訊，以 count>0 判定）。
-> - **C `.env` 解密**：`openssl enc -d -pass env:BACKUP_ENC_KEY` → 列出 4 個 .env（密鑰救得回）。
-> - **MainWP**：`mainwp.sql.gz` 內容 44 表（含客戶連線）；**n8n**：`n8n.tgz` 解開 OK，workflow 本體在 supabase dump 的 `n8n` DB（`workflow_entity` 已驗）。
-> - （拋棄式 mariadb live-load 因 root pw env 不合 1045，改以 dump 內容驗證；非備份問題。）
+> **每月自動演練**（2026-10-14 起）：`lobster-factory/infra/hetzner-phase1-core/scripts/backup-restore-drill.py`，每月 1 日 04:15 UTC（`backup-coverage.cron`）。從 R2 下載 `backup-inventory.json` 裡每個有 `drill` 的資料庫最新備份，灌進與 prod 同 image 的拋棄式容器（不接網路、不碰 prod），判定規則在該檔開頭（dump 結尾標記、每個 COPY 區塊筆數 = 還原後筆數、vault 全部解得開、event trigger 齊全）。結果 `/var/lib/awarewave/restore-drill.json`；每日 coverage check 的 `restore-drill` 列在 >35 天沒跑或任一庫 FAIL 時變紅 → 既有告警與 `/ops/backup`。手動重跑：`sudo python3 /root/lobster-phase1/scripts/backup-restore-drill.py [<store id> ...]`（指定 store 時不寫狀態檔）。
+>
+> 首次演練（2026-10-14）抓到 3 個還原會失敗的地方，都已修：§4 step 3 只放鑰匙 → DB 起不來；§4 step 4 經 compose 起 DB 再灌 → 6 張 auth/cron 表 0 筆；HCI dump GRANT 給 dump 外的角色。2026-06-26 手動演練用「count>0」判定，看不出第二項。
 
-### 演練 A — Supabase / Trigger PG dump 真的還原得回來
-
-```bash
-# 在 EU（或任何有 docker 的機）跑，全程拋棄式，不碰 prod
-OUT=$(ls -dt /root/backups/*/ | head -1)          # 取最新備份
-echo "drill from: $OUT"
-
-# 1) 起一個拋棄式 postgres
-docker run -d --name drill-pg -e POSTGRES_PASSWORD=drill postgres:15
-sleep 8
-
-# 2) 灌 Supabase dump（pg_dumpall 含 CREATE ROLE/DB）
-gunzip -c "$OUT/supabase-all.sql.gz" | docker exec -i drill-pg psql -U postgres 2>&1 | tail -5
-
-# 3) 驗資料真的在（改成你的關鍵表，如 organizations / ops_action_runs）
-docker exec drill-pg psql -U postgres -d postgres -c \
-  "SELECT count(*) FROM organizations;" 2>&1     # 期望 > 0 = 客戶資料還活著
-
-# 4) Trigger dump 同法（trigger.sql.gz 是單庫 pg_dump）
-docker exec drill-pg psql -U postgres -c "CREATE DATABASE trigger;" 
-gunzip -c "$OUT/trigger.sql.gz" | docker exec -i drill-pg psql -U postgres -d trigger 2>&1 | tail -3
-docker exec drill-pg psql -U postgres -d trigger -c "SELECT count(*) FROM \"TaskSchedule\";"
-
-# 5) 拆台
-docker rm -f drill-pg
-```
-**判定**：步驟 3/4 的 count > 0 = ✅ 還原可行。count=0 或報錯 = 🔴 備份有問題，當天修。
-
-### 演練 B — MainWP / n8n / volume 還原（補漏項上線後加驗）
-```bash
-# MainWP DB（補漏後）：灌進拋棄式 mariadb 驗 wp_options/連線表筆數
-# n8n volume：docker run --rm -v drill-n8n:/d -v $OUT:/b alpine tar xzf /b/n8n.tgz -C /d
-#   → 起拋棄式 n8n 掛 drill-n8n 確認 workflow 清單回得來
-# 註：補漏項已上線並內容驗過（2026-06-26：mainwp dump 44 表、n8n 解開 OK）；上面 live-restore 指令待下次正式演練跑通定稿（拋棄式 mariadb root pw env 待調）。
-```
-
-### 演練 C — `.env` 解密驗證
+### 手動 — `.env` 解密驗證
 ```bash
 # 確認加密的 .env 備份解得開。金鑰來源二選一：
 #   EU 機上：source /etc/default/eu-backup; export BACKUP_ENC_KEY
@@ -392,7 +379,7 @@ openssl enc -d -aes-256-cbc -pbkdf2 -pass env:BACKUP_ENC_KEY -in "$OUT/env.tar.g
 - [x] ~~下單前逐項確認（KS-6 路線）~~ —— **已由實機取代**：SYS-GAME-2 實裝 Ubuntu 24.04 + soft RAID1（md2/md3 `[2/2] [UU]`）驗證通過。**Backup Agent 容量已移除依賴**（改走 R2）
 - [x] **P2.2** NVMe 磨耗檢查（2026-08-27 實測）：`nvme smart-log` 兩顆碟 **`percentage_used=5%`**，遠低於 40% 換碟線 → 不需換碟
 - [ ] **P2.8** rescue mode 平時實按一次驗證可用（無 IPMI/KVM，這是唯一救援路徑）
-- [ ] **P4.1** Drill #2：從 R2 完整還原到拋棄式機器，計時，目標 < 4 小時
+- [ ] **P4.1** Drill #2：從 R2 完整還原到拋棄式機器，計時，目標 < 4 小時（資料庫部分 2026-10-14 起由 §6 每月演練自動做，在同機拋棄式容器；整機計時仍未做）
 - [ ] **W4（EU/SG 整併）明確排 2026-11-20 之後**，六個服務各一具名任務，兩週一台 —— 操作者已確認 9–11 月與 2027 Q1 無出國行程，排程無阻礙
 - [x] 🔴 **P2.4 防火牆 UFW + DOCKER-USER chain 雙層已裝並驗證**（2026-08-27：`ufw` active、`DOCKER-USER` 4 條規則、`docker-user-chain.service` enabled 開機重建）。**裝的過程真的踩到了**：`iptables-persistent` 安裝時**靜默移除了 ufw**（INPUT policy DROP→ACCEPT），只被 P2.8 重開機驗證抓到——而這個衝突 repo 早就記錄在 `SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md:630-633`，當時只 grep 指令沒讀旁邊的說明。原文保留如下（2026-08-18 追加，修正 2026-04-20 SG 挖礦入侵同款漏洞——Docker 寫 iptables `DOCKER` chain，執行順序在 UFW `INPUT` chain 之前，單純 UFW 攔不住）。事故記錄與根治法：[`SECURITY-INCIDENT-CRYPTO-MINER.md`](HETZNER-SERVER-SECURITY-INCIDENT-CRYPTO-MINER.md) / [`SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md`](SERVER-SECURITY-BREACH-RESPONSE-PLAYBOOK.md)
 - [x] **P2.4b** 所有非對外服務 port（Postgres/Redis/ClickHouse/MinIO/n8n/Chatwoot）一律 compose 層綁 `127.0.0.1:`，不依賴防火牆當唯一防線——2026-08-30 `ss -tlnp` 全機掃描確認，對外只有 80/443/58122，其餘全綁 `127.0.0.1`

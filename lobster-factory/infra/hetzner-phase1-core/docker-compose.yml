@@ -276,6 +276,9 @@ services:
       # token across unrelated callers is a blast-radius mistake already paid for once.
       # Empty = the endpoint fails closed (401 to every caller) until set.
       SCHEDULE_INGEST_TOKEN: ${SCHEDULE_INGEST_TOKEN:-}
+      # Cross-product id reconciliation -> GET /api/internal/reconcile (BACKUP_COVERAGE_PLAN.md B8). The same value
+      # sits in /etc/default/awarewave-reconcile for backup-coverage-check.py on the host. Empty = 401 (fail closed).
+      RECONCILE_TOKEN: ${RECONCILE_TOKEN:-}
       # Cognitive OS research runs (RESEARCH_LINES_MASTER_PLAN §12.7): RUNS = COS -> /api/internal/collect/runs and
       # this app -> COS grant exchange (same value in COS deploy/.env); EXECUTE = Trigger worker -> runs/execute.
       # Empty = both endpoints 401 (fail closed).

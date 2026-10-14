@@ -51,13 +51,17 @@ log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
 mkdir -p "$OUT"
 ERRORS=0
 
-# --- 1. WordPress DB ---
-log "Dumping MariaDB (${WORDPRESS_DB_NAME})..."
-if docker exec lobster-wordpress-db mariadb-dump \
+# --- 1. WordPress DBs: the site's own plus every staging site's (provision-staging creates wp_s_<site id>) ---
+# --databases: one dump carries every database on this server with its CREATE DATABASE, so a staging site added later
+# is backed up without a change here; backup-restore-drill.py fails a database prod has and this dump lacks.
+DBS="$(docker exec lobster-wordpress-db mariadb -u root -p"${WORDPRESS_DB_ROOT_PASSWORD}" -N -B -e "SHOW DATABASES" \
+  | grep -vxE 'information_schema|mysql|performance_schema|sys' | tr '\n' ' ' || true)"
+log "Dumping MariaDB (${DBS:-none found})..."
+if [[ " ${DBS} " == *" ${WORDPRESS_DB_NAME} "* ]] && docker exec lobster-wordpress-db mariadb-dump \
   -u root -p"${WORDPRESS_DB_ROOT_PASSWORD}" \
   --single-transaction \
   --quick \
-  "${WORDPRESS_DB_NAME}" | gzip > "${OUT}/wordpress-db.sql.gz"; then
+  --databases ${DBS} | gzip > "${OUT}/wordpress-db.sql.gz"; then
   # integrity check
   if gzip -t "${OUT}/wordpress-db.sql.gz" 2>/dev/null; then
     SIZE=$(du -h "${OUT}/wordpress-db.sql.gz" | cut -f1)

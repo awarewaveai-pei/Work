@@ -50,6 +50,19 @@ else
   ERRORS=$((ERRORS + 1))
 fi
 
+# Cluster roles: pg_dump has none, and the dump GRANTs to hci_app_test_a/b, so a fresh cluster cannot load it without
+# this file (lobster-factory/infra/hetzner-phase1-core/scripts/backup-restore-drill.py loads it first). No password
+# hashes: R2 hci/ is not encrypted, the app roles are NOLOGIN and hci_owner gets its password from the container env.
+# tail -10: pg_dump 16.10+ writes a line after its trailer.
+log "Dumping hci-postgres roles (pg_dumpall --roles-only)..."
+if docker exec hci-postgres pg_dumpall -U hci_owner --roles-only --no-role-passwords 2>/dev/null | gzip > "${OUT}/hci-roles.sql.gz" \
+   && gunzip -c "${OUT}/hci-roles.sql.gz" | tail -10 | grep -q "PostgreSQL database cluster dump complete"; then
+  log "  hci-roles.sql.gz OK"
+else
+  log "  ERROR: hci-postgres roles dump failed or incomplete"
+  ERRORS=$((ERRORS + 1))
+fi
+
 # Retention cleanup -- see file header: this glob can only match snapshot dirs THIS script
 # creates, never any other directory that happens to live under BACKUP_DIR.
 if [[ "${BACKUP_RETAIN_DAYS}" -gt 0 ]]; then

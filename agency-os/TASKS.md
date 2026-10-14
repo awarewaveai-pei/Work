@@ -125,8 +125,8 @@
   - **證據**：WORKLOG 2026-10-14（續22）
 
 - [ ] **【備份｜照 `lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md` 做 B1–B11】每個庫都有離機備份、每天被檢查、能還原**
-  - `🟡 進行中` · `2026-10-14` · B1–B5、B9–B11 上線，首次正式檢查 PASS 20 列（WORKLOG 續21、續25）；B6 頁面隨下次 next-admin 部署
-  - **下一步**：B7 每月還原演練 → B8 跨產品對帳（建議模型：Opus 5.5）
+  - `🟡 進行中` · `2026-10-15` · B1–B6、B9–B11 上線（WORKLOG 2026-10-14 續21、續25）；B7 還原演練＋B8 id 對帳程式完成（WORKLOG 2026-10-15 續5）
+  - **下一步**：B7/B8 上主機（sync、cron、RECONCILE_TOKEN、next-admin 部署、HCI／lobster 備份各跑一輪、全 8 庫首跑）（建議模型：Opus 5.5）
 
 - [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–5 開卡做**
   - `🟠 未開始` · `2026-10-14` · WORKLOG 續15、續17；第 3 步前查定期扣款外掛；`ADR_INDEX.md` 那列還寫「提議」（檔案被另一個 session 佔用，下次改）

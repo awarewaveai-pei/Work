@@ -10,7 +10,12 @@ Reads backup-inventory.json next to this file and fails when:
     its <name>.parts.json plus parts that add up to its size, see eu-backup/upload-to-r2.sh);
   - an encrypted bundle's members list lacks a required member;
   - an R2 lifecycle rule differs from the inventory, or a bucket lock covers an unlocked prefix
-    (cognitive/ must disappear within 7 days: erasure).
+    (cognitive/ must disappear within 7 days: erasure);
+  - the monthly restore drill (backup-restore-drill.py, B7) is missing, RUNNING for hours, older than
+    restore_drill.max_age_days, not PASS, did not cover every store with a "drill" entry, or left labelled
+    containers/volumes or files behind;
+  - an id this platform stores for another product's object is gone from that product (B8: next-admin's
+    /api/internal/reconcile, one row per inventory reconcile check), or the check could not run.
 Writes STATUS_FILE (read by scripts/check-backup-health.ps1 and /ops/backup) and one verdict line. On PASS it touches
 OK_STAMP, otherwise sets its mtime to 0, so endpoint-alert.sh (fresh.d registration below) alerts within minutes.
 Exit 0 = all PASS, 1 = a FAIL, 2 = the check itself could not run. Cron: backup-coverage.cron.
@@ -61,13 +66,16 @@ def r2_problems(keys, base, size, mtime, threshold):
     return [f"R2 {k} predates the local file" for k in old]
 
 
-def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now):
+def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now, drill=None, leftovers=(), reconcile=None):
     """Pure: inventory + observed state -> result rows.
 
     mounts: {"container:destination": source} for running containers' writable mounts (volume name or bind path).
     snapshots: {pipeline: None | {"stamp": dir name, "files": {name: (size, mtime)}, "members": {file: [lines]}}}.
     r2_keys: {pipeline: None (listing failed) | {key: (size, last_modified epoch)} under <prefix>/<dir>/}.
     lifecycle: None (read failed) | {prefix: maxAge seconds}.  locks: None (read failed) | [lock prefix, ...].
+    drill: None (no status file) | {"unreadable": why} | backup-restore-drill.py's status JSON.
+    leftovers: what the drill left (labelled containers/volumes, files under its work root).
+    reconcile: None | {"error": why} | /api/internal/reconcile's answer (B8, one row per inventory check).
     """
     rows = []
 
@@ -131,6 +139,45 @@ def evaluate(inv, mounts, snapshots, r2_keys, lifecycle, locks, now):
         problems += [f"bucket lock on '{lp}' keeps {p} longer than its lifecycle"
                      for p in inv["r2"]["unlocked_prefixes"] for lp in locks if p.startswith(lp)]
     row("r2-retention", problems, f"{len(expected)} lifecycle rules match, no lock on {', '.join(inv['r2']['unlocked_prefixes'])}")
+
+    if "restore_drill" in inv:
+        spec = inv["restore_drill"]
+        want = sorted(s["id"] for s in inv["stores"] if "drill" in s)
+        ok = f"{drill and drill.get('generated_at', '')[:10]}: {len(want)} databases restored from R2 and checked"
+        running = bool(drill) and drill.get("overall") == "RUNNING"
+        if drill is None:
+            problems = [f"no {spec['status_file']}: the restore drill never ran"]
+        elif "unreadable" in drill:
+            problems = [f"{spec['status_file']} unreadable: {drill['unreadable']}"]
+        else:
+            when = datetime.strptime(drill["generated_at"], "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc).timestamp()
+            if running:  # a drill takes minutes; one RUNNING for hours was killed
+                problems = [f"drill started {drill['generated_at']} and never finished"] if now - when > 6 * 3600 else []
+                ok = f"drill running since {drill['generated_at']}"
+            else:
+                age_d = (now - when) / 86400
+                problems = [f"last drill {drill['generated_at'][:10]} is {age_d:.0f} days old"] if age_d > spec["max_age_days"] else []
+                if drill["overall"] == "ERROR":
+                    problems.append(f"the drill did not run: {drill.get('error')}")
+                problems += [f"{r['id']}: {r['detail']}" for r in drill["rows"] if r["status"] != "PASS"]
+                missed = sorted(set(want) - {r["id"] for r in drill["rows"]})
+                problems += [f"drill skipped {', '.join(missed)}"] if missed and drill["overall"] != "ERROR" else []
+        if not running:
+            problems += [f"the drill left {x} behind: restored client data on this host" for x in leftovers]
+        row("restore-drill", problems, ok)
+
+    for cid, owner in inv.get("reconcile", {}).get("checks", {}).items():
+        got = next((c for c in (reconcile or {}).get("checks", []) if c.get("id") == cid), None)
+        if reconcile is None or "error" in reconcile:
+            problems = [f"/api/internal/reconcile: {(reconcile or {}).get('error', 'not called')}"]
+        elif got is None:
+            problems = ["not reported by /api/internal/reconcile"]
+        elif got.get("error"):
+            problems = [got["error"]]
+        else:
+            problems = [f"{len(got['dangling'])} id(s) {owner} does not have: "
+                        + ", ".join(f"{p['where']} -> {p['id']}" for p in got["dangling"][:3])] if got["dangling"] else []
+        row(f"ids:{cid}", problems, f"{got and got.get('checked')} stored ids all exist in {owner}", "B8")
     return rows
 
 
@@ -165,14 +212,18 @@ def newest_snapshot(root):
     return {"stamp": stamps[-1], "files": files, "members": members}
 
 
-def read_env(path):
+def parse_env(text):
     env = {}
-    with open(path, encoding="utf-8") as fh:
-        for line in fh:
-            m = re.match(r"^\s*(?:export\s+)?([A-Z0-9_]+)=(.*)$", line)
-            if m:
-                env[m.group(1)] = m.group(2).strip().strip("'\"")
+    for line in text.splitlines():
+        m = re.match(r"^\s*(?:export\s+)?([A-Z0-9_]+)=(.*)$", line)
+        if m:
+            env[m.group(1)] = m.group(2).strip().strip("'\"")
     return env
+
+
+def read_env(path):
+    with open(path, encoding="utf-8") as fh:
+        return parse_env(fh.read())
 
 
 def cf_get(url, token):
@@ -234,13 +285,71 @@ def signal(ok):
     os.utime(OK_STAMP, None if ok else (0, 0))
 
 
+def r2_base(inv, env):
+    return (f"https://api.cloudflare.com/client/v4/accounts/{env.get('R2_ACCOUNT_ID') or 'aea1a836e6f8b8d7f18206dc8e848bd6'}"
+            f"/r2/buckets/{inv['r2']['bucket']}")
+
+
+def read_drill(inv):
+    """A broken status file fails the restore-drill row only, never the whole check."""
+    path = inv.get("restore_drill", {}).get("status_file")
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            drill = json.load(fh)
+        datetime.strptime(drill["generated_at"], "%Y-%m-%dT%H:%M:%SZ")
+        if drill["overall"] not in ("PASS", "FAIL", "ERROR", "RUNNING") or not isinstance(drill["rows"], list):
+            raise ValueError(f"overall={drill['overall']!r}")
+        return drill
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        return {"unreadable": f"{type(exc).__name__}: {exc}"}
+
+
+def drill_leftovers(inv):
+    spec = inv.get("restore_drill")
+    if not spec:
+        return []
+    out = []
+    for kind, ls in (("container", ["ps", "-aq"]), ("volume", ["volume", "ls", "-q"])):
+        ids = subprocess.run(["docker", *ls, "--filter", f"label={spec['label']}"], check=True, capture_output=True, text=True).stdout.split()
+        out += [f"{len(ids)} {kind}(s) labelled {spec['label']}"] if ids else []
+    if os.path.isdir(spec["work_root"]) and os.listdir(spec["work_root"]):
+        out.append(f"{len(os.listdir(spec['work_root']))} item(s) in {spec['work_root']}")
+    return out
+
+
+def read_reconcile(inv):
+    """GET next-admin's /api/internal/reconcile (B8). Three tries: the 03:00 auto-deploy may still be restarting it."""
+    spec = inv.get("reconcile")
+    if not spec:
+        return None
+    try:
+        token = read_env(spec["token_file"])["RECONCILE_TOKEN"]
+    except (OSError, KeyError) as exc:
+        return {"error": f"no RECONCILE_TOKEN in {spec['token_file']} ({type(exc).__name__})"}
+    last = "unknown"
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(spec["url"], headers={"Authorization": f"Bearer {token}"})
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as e:
+            last = f"HTTP {e.code}"
+            if e.code < 500:
+                break
+        except (urllib.error.URLError, TimeoutError, ValueError) as e:
+            last = f"{type(e).__name__}: {e}"
+        time.sleep(30 * (attempt + 1))
+    return {"error": last}
+
+
 def main():
     with open(INVENTORY, encoding="utf-8") as fh:
         inv = json.load(fh)
     env = read_env(inv["r2"]["credentials_file"])
     token = env["R2_API_TOKEN"]
-    base = (f"https://api.cloudflare.com/client/v4/accounts/{env.get('R2_ACCOUNT_ID') or 'aea1a836e6f8b8d7f18206dc8e848bd6'}"
-            f"/r2/buckets/{inv['r2']['bucket']}")
+    base = r2_base(inv, env)
     snapshots, r2_keys = {}, {}
     for pid, pipe in inv["pipelines"].items():
         snapshots[pid] = snap = newest_snapshot(pipe["local_root"])
@@ -254,7 +363,8 @@ def main():
         locks = r2_locks(base, token)
     except Exception:  # noqa: BLE001 -- reported in the r2-retention row
         pass
-    rows = evaluate(inv, running_mounts(), snapshots, r2_keys, lifecycle, locks, time.time())
+    rows = evaluate(inv, running_mounts(), snapshots, r2_keys, lifecycle, locks, time.time(), read_drill(inv),
+                    drill_leftovers(inv), read_reconcile(inv))
     fails = [r for r in rows if r["status"] == "FAIL"]
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     write_atomic(STATUS_FILE, json.dumps({"generated_at": stamp, "overall": "FAIL" if fails else "PASS", "rows": rows},

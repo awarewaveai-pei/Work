@@ -1,4 +1,40 @@
 # Worklog
+## 2026-10-15（續5）B7 每月還原演練＋B8 跨產品 id 對帳：從 R2 灌回拋棄式容器、每列筆數對得上才算過；首跑抓到 5 個還原會失敗或沒備到的地方
+
+**根因／發現**（主機實跑 2026-10-14 15:28 UTC 起）:
+- F1 runbook §4 step 3 只把 `pgsodium_root.key` 放進新 volume：Docker 只在 volume 為空時用 image 內容填，supabase image 的 `postgresql.conf` 硬 include `/etc/postgresql-custom/{supautils,wal-g,read-replica}.conf`（prod 三檔＝image 預設，md5 同）→ DB 起不來。image postgres uid=105。
+- F2 runbook §4 step 4「compose 起 DB 再灌 pg_dumpall」：image init SQL 先建 image 基線的 auth/storage/cron，COPY 欄位對不上 → `auth.users` 1→0、`refresh_tokens` 126→0、`audit_log_entries` 9620→0、`schema_migrations` 74→7、`cron.job` 1→0、`job_run_details` 146→0。改灌空 cluster → 324 表全對，剩 bootstrap 角色已存在＋2 個 event trigger（dump 先把函式交給非 superuser 再建 trigger，PG 拒絕）。
+- F3 HCI dump GRANT 給 `hci_app_test_a/b`（cluster 角色，pg_dump 不含）；四個 pg cluster 只有 HCI 有額外角色（實查）。
+- F4 pg_dumpall 不帶 `--clean` 時不寫 postgres／template1 的庫層屬性（PG commit b3f8401）：實測設定 8/8 相同，差在 `postgres` 庫 owner（prod `postgres`）與 `dashboard_user` 的 CTc。
+- F6 lobster-wordpress-db 上有一鍵架站的 staging 庫 `wp_s_6e2b917e2efc46b89cdbcb`（E2E-Verify-0704，draft），`backup-phase1.sh` 只 dump 主庫 → 客戶 staging 站沒有備份（M2 的「prod 多出的庫」檢查抓到）。改 `--databases` 全部非系統庫。
+- F5（自己的）壞 gzip 丟 `EOFError`（非 OSError）→ 整個演練 ERROR；改為該庫 FAIL。
+- critic（Standard）fix-first 0C/5M/9m，全修：M1 有空格的表名／零欄表沒比對、`pg_restore --data-only` 沒看 rc；M2 dump 空的或少了重要表仍 PASS → `expect` 清單＋空即 FAIL＋prod 多出的庫 FAIL；M3 快照目錄沒過濾格式與新舊（`eu/manual-*` 會被選中）；M4＝F4；M5 匿名 volume 沒 label、被殺會留客戶資料 → 具名 labelled volume＋B2 查殘留。m1 psql 小寫 error／not connected；m2 trigger 比定義不只名字；m3 pg_cron 關閉＋runbook 容器不接網路；m4 錯誤字串去掉資料值；m5 用 image id；m6 runbook 指令可直接貼；m7 RUNNING 狀態、鎖忙不覆寫、路徑讀清單；m8 狀態檔壞只壞那一列；m9 roles 檔檢查結尾、`tail -10`、`--no-role-passwords`。
+- B8 盤點 30 種跨產品指標（主庫→他產品 23、他產品→主庫 7；7 種沒有寫入程式）。Chatwoot 只有 AgentBot token，Chatwoot 只准它呼叫對話端點，讀不到帳號 → 列為不查並寫理由。
+
+**做了**:
+- `hetzner-phase1-core/scripts/backup-restore-drill.py`（新）：R2 最新正規快照（太舊 FAIL）→ prod 同 image id 的拋棄式容器（`--network none`、4g、2 cpu、pids 512、no-new-privileges、labelled volume）→ 判定見檔頭。`supabase-restore-fixup.sql`（新，runbook 與演練共用）：2 個 event trigger＋`postgres` 庫 owner／grant。
+- `backup-coverage-check.py`：`r2_base()`、`parse_env()`；`restore-drill` 列（無檔／壞檔／RUNNING>6h／>35 天／ERROR／任一庫 FAIL／漏庫／殘留）；`ids:<check>` 列（B8，呼叫 `/api/internal/reconcile`，3 次重試）。
+- `backup-inventory.json`：`restore_drill`（狀態檔、label、work_root）、`reconcile`、8 個 `drill`（含 `expect`；cognitive `*.dump`）；hci 加 `hci-roles.sql.gz`。`backup-coverage.cron`：每月 1 日 04:15。
+- `Projects/internal/hci30/scripts/backup-hci-postgres-prod.sh`：`pg_dumpall --roles-only --no-role-passwords` → `hci-roles.sql.gz`（補上 `DR_RESTORE_DRILL_RECORD.md:35` 的通用 role-replay）。
+- next-admin：`lib/reconcile/pointers.ts`（每種指標一塊；分頁讀過 1000 列）、`app/api/internal/reconcile/route.ts`（`RECONCILE_TOKEN`，未設即 401）；compose 加 `RECONCILE_TOKEN`。
+- runbook：§4 step 3–4 換成演練驗過的指令；§6 改指每月演練（舊「count>0」看不出 F2）；P4.1 註記。`BACKUP_COVERAGE_PLAN.md` B6／B7／B8。CI 第 4 組測試。
+- `backup-phase1.sh`：dump 改 `--databases`（主庫＋每個 staging 庫，主庫不在清單即 ERROR）；drill 的 mysql 掃描依 `USE` 分庫。
+- 沒合併 `scripts/phase4-checks.py` 3A：那是各 tenant 客戶站（WPvivid）的還原紀錄，不是本機資料庫。
+- 沒重用 `Projects/internal/cognitive-engineering-os/ops/cognitive-db/restore-cognitive-db.sh`：它只驗 `SELECT 1`／alembic 版本、吃本機檔、`--no-owner`。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=backup-restore-drill.py（7 庫，暫存目錄，修 critic 前）→ supabase 324 表 175327 列＋vault 60/60；trigger 82 表 3178957 列（分割檔）；mainwp 44、lobster-wp 48、soulful 290 表；chatwoot 84 表；cognitive 28 表；PASSED | exit=0 | ms=242000
+- REALTEST_EVIDENCE: tool=SSH | cmd=dbprops.py → 庫層設定 prod 8＝還原 8；ACL 只差 `postgres` 庫（→ fixup） | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=SSH | cmd=backup-restore-drill.py（修 critic 後，7 庫）→ 6 PASS（supabase 加「database owners, grants, settings as prod」）；lobster-wordpress-db FAIL「prod has database wp_s_6e2b917e2efc46b89cdbcb, the backup lacks it」＝F6 | exit=1 | ms=210000
+- REALTEST_EVIDENCE: tool=SSH | cmd=multidb_probe.py（新 --databases dump → drill_mysql）→ PASS 2 database(s), 81 tables, 36 with rows；bad_files.py 4 種壞檔全 FAIL；殘留 0/0/0 | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=backup-restore-drill.test.py 20 OK；backup-coverage-check.test.py 24 OK；vitest lib/reconcile＋route 5 OK；npx tsc --noEmit exit 0 | exit=0 | ms=30000
+- REVIEW_DONE: critic=Standard | verdict=fail→fixed | findings=0c/5m/9n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks,Projects,.github | grep=restore-drill|supabase-restore-fixup|hci-roles|r2_base|parse_env|RECONCILE_TOKEN|演練 A|drill-pg | hits=supabase-restore-fixup 2, hci-roles 4, RECONCILE_TOKEN 5, api/internal/reconcile 7, parse_env 2, r2_base 2（全在本次改動的檔）
+- ORACLE_WAIVED: critic（Claude 子代理）＝本 commit 的獨立審查，findings 全修並重跑主機實測；codex 未跑
+
+**避免再發生**: 還原步驟只有被定期真跑才可信 → 演練跑的就是 runbook 的步驟，fixup 只有一份；比對集合不准悄悄變小（空、少表、少庫都 FAIL）；新角色、新庫、image 升級使還原失敗時，下一次演練變紅，B2 隔天告警。
+
+**rollback**: `git revert`；主機：舊 cron 檔、`rm /var/lib/awarewave/restore-drill.json /etc/default/awarewave-reconcile`，`.env` 拿掉 `RECONCILE_TOKEN`（端點即 401）；HCI 多出的 roles 檔不影響還原。
 ## 2026-10-15（續4）Messenger 雙粉專：Soulful 接 Chatwoot Account#2＋Chatwoot 4.6.0→4.18.0（Meta 停用 ACCOUNT_UPDATE 標籤，所有回覆失敗）
 
 **Meta 端**：Soulful 粉專管理員＝FB 帳號 Pei Huang（`61584455006990`），加為 App `AwareWave Postiz`（`2998470257172880`）管理員（Chatwoot 全域只認一個 `FB_APP_SECRET`，不能用 Pei Huang 自己的 App）。Page token 永久、13 scope（含 `pages_manage_metadata`、IG 兩項）；webhook 11 欄。值在 `AWARE_WAVE_CREDENTIALS.md` §38。
