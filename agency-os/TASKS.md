@@ -108,11 +108,11 @@
 
 ### 未完成
 
-- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C1 資料表起逐卡**
+- [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**
   - `🟠 未開始` · `2026-10-14` · `G3 Meta 審核狀態（操作者）；G5 要 go-ahead`
   - **一句話**：Metricool 等級的統一發文＋行事曆，Postiz 只當送信員；先自己管多品牌，再開放訂閱
-  - **現在到哪**：ADR 016 已接受；樣稿第 14 版；G1／G2 實測完：v2.11.3 缺連接帳號、改狀態、分組、通知、媒體、分析等 API，API_LIMIT 預設 30／小時且 GET posts 也扣
-  - **下一步**：C1 migration 與 C2 產品登記可先做（不碰 Postiz，建議模型：Opus 5.5）；G5 把 Postiz 升 v2.25.1（High-STOP，先讀 release notes、備份、go-ahead）
+  - **現在到哪**：ADR 016 已接受；樣稿第 14 版；G1／G2 實測完（v2.11.3 缺大半 API）；C1 0096 資料表寫好、本機 15.8 驗過、未套正式庫；C2 產品登記完成
+  - **下一步**：G5 把 Postiz 升 v2.25.1（High-STOP，先讀 release notes、備份、go-ahead）→ C3 Postiz client（建議模型：Opus 5.5）；C4 API 可先用 0096 寫（不碰 Postiz 的部分）
   - **完成定義**：V1 12 張卡各有 REALTEST／REVIEW／BUGHUNT 行；sg-deploy 上線 `social.aware-wave.com`；ContentStudio 舊 Postiz 面板退場
   - **證據**：WORKLOG 2026-10-14（續6）＋本日 G1 條目；`lobster-factory/docs/social/`；`agency-os/docs/architecture/decisions/016-social-manager-third-product.md`「實測」表
 

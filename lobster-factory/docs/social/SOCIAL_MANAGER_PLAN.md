@@ -16,7 +16,7 @@
 
 ## 1. V1 卡片（自己管多品牌就能用）
 
-### C1 資料表（建議模型：Opus 5.5）
+### C1 資料表 ✅ 2026-10-14（`packages/db/migrations/0096_social_manager.sql`；證據 WORKLOG 2026-10-14；未套正式庫，跟 C4 同一次部署）
 - 目標：ADR 016 §2 的表。
 - 範圍：`lobster-factory/packages/db/migrations/00NN_social_manager.sql`（編號接現有最大）；`social_postiz_connections` 的列搬進 `social_accounts`，舊表保留一版再刪。
 - 輸入：ADR 016 §2–§3；0094 的 RLS 寫法；`organizations` 現有欄位。
@@ -24,7 +24,7 @@
 - 驗收：拋棄式 DB 套用（`feedback_never_test_against_prod_container`）；`db-expert` 審 migration；`npm test` 綠。
 - 邊界：不碰 `media_credit_ledger`；不改 0094。
 
-### C2 產品登記（Sonnet 5.5）
+### C2 產品登記 ✅ 2026-10-14（`lib/portal/products.ts` 是唯一產品清單：signup 表單與 `/api/signup` 都讀它，`selfSignup` 旗標＋`products.test.ts` 對 0062 的資料庫 check）
 - `lib/portal/products.ts` 加 `{ key:"social", name:"社群發文", domain:"social.aware-wave.com", status:"coming_soon" }`；`ProductKey` 型別加 `"social"`。
 - 驗收：`npx tsc --noEmit`；`app/portal/launcher` 顯示 coming soon。
 
@@ -34,6 +34,7 @@
 - 邊界：不在 client 裡做重試迴圈；rate limit 的退讓在 C5。
 
 ### C4 API（Opus 5.5）
+- 0096 交代的：改 target／media 的同一個 transaction 要碰父貼文（讓 version 涵蓋子列）；0096 與 C4 同一次部署，部署後重跑一次 0011→social_accounts 的同步（冪等）補上中間新連的帳號。
 - 路由：`app/api/social/brands`、`accounts`（`POST connect` 回授權網址並記「進行中」、`POST reconnect`、`DELETE`、`GET` 含狀態）、`posts`（CRUD、`PUT state`、`POST bulk`、`GET ?start&end` 合併 WordPress 文章）、`lists`、`media`（沿用 `uploadMedia`）、`log`。
 - 授權：每個 handler 先 `requireBrandRole(brandId, ["owner","editor"])`；審核相關要 `reviewer`；客戶唯讀只有 GET。
 - 狀態轉換只在一處：`lib/social/state.ts`（`transition(post, action, role)`，非法轉換丟錯）。已發佈不可改。
@@ -41,6 +42,7 @@
 - 邊界：不呼叫 Postiz 建貼文（C5）。
 
 ### C5 送出與對帳（Opus 5.5）
+- 0096 交代的：先以 `UPDATE … SET state='queued' WHERE state='scheduled' AND scheduled_at <= … RETURNING`（`FOR UPDATE SKIP LOCKED`，走 `social_posts_due_idx`）認領，再呼叫 Postiz，兩個重疊的排程不會重發。
 - 範圍：`lobster-factory/packages/workflows/` Trigger.dev 任務 `social-dispatch`（每 5 分鐘）：`scheduled` 且 `scheduled_at <= now + 10min` → `createSocialPost`（批次，429 → 退讓到 reset）→ 記 Postiz ids → `queued`；`queued` → `listPosts` 對帳 → `published`（含 `releaseURL`）或 `error`（含訊息）→ 失敗寫 ops inbox＋Telegram。改時間：`queued` 的先 `deletePost` 再重建。
 - 驗收：dry-run 模式（`LOBSTER_EXECUTE_MANIFEST_STEPS` 同款開關）先跑一輪只記錄不送；真送一則 Bluesky 草稿（`type:"draft"`）驗 id 回寫；對帳把 fixture 的 ERROR 轉成 `error`。
 - 邊界：部署用 `tr_pat_*`（CLI），runtime 用 `tr_prod_*`；不碰其他 workflow。
@@ -52,6 +54,7 @@
 - 邊界：不碰 ContentStudio；舊面板在 C12 退場。
 
 ### C7 輪播清單（Opus 5.5）
+- 0096 交代的：具體化出來的貼文帶 `list_id`＋`scheduled_at`，`social_posts_list_slot_idx` 讓同一格不會生兩次；刪清單前先刪它 `state='rotation'` 的項目（資料庫會擋）。
 - 範圍：清單 CRUD（C4 `lists`）＋ Trigger.dev 任務 `social-rotation`（每日 00:05 把未來 7 天的輪播發文具體化成 `scheduled` 貼文並前推 cursor；清單暫停時撤回尚未 `queued` 的）。畫面：左「輪播」檢視＋右清單編輯（照樣稿）。
 - 驗收：具體化冪等（同一天跑兩次不重複）；暫停撤回測試。
 
@@ -77,7 +80,7 @@
 - 邊界：先 go-ahead 才 deploy。
 
 ## 2. V2（開放訂閱前）
-WordPress 會員一鍵進入（ADR 015 §2）；方案與用量上限＋WooCommerce；Postiz analytics（審核後）；Chatwoot 入口與未讀數；最佳時段；重複貼文；find-slot 佇列；對外 API／MCP；服務條款、隱私政策、資料刪除；第二台 Postiz 的 instance 對應。
+`social_audit_log` 保留期限或按月分割（每則貼文約 2 列，768 MB 主機）；WordPress 會員一鍵進入（ADR 015 §2）；方案與用量上限＋WooCommerce；Postiz analytics（審核後）；Chatwoot 入口與未讀數；最佳時段；重複貼文；find-slot 佇列；對外 API／MCP；服務條款、隱私政策、資料刪除；第二台 Postiz 的 instance 對應。
 
 ## 3. 順序與依賴
 C1 → C2、C3（並行）→ C4 → C5、C6（並行；C6 可先用 C4 的 mock 資料）→ C7、C8、C9、C10、C11（並行，互不碰檔）→ C12。

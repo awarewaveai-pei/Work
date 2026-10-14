@@ -3,7 +3,7 @@
 // how the launcher becomes aware of it. This file carries NO product-specific business logic —
 // entitlement, provisioning, and per-product UI all live elsewhere, keyed by `key`.
 
-export type ProductKey = "cognitive" | "hci";
+export type ProductKey = "cognitive" | "hci" | "social";
 
 export interface PortalProduct {
   key: ProductKey;
@@ -24,9 +24,26 @@ export interface PortalProduct {
    * launch can actually flip this value and the launcher's branch becomes reachable.
    */
   status: "coming_soon" | "available";
+  /**
+   * Offered on the portal signup form and accepted by /api/signup. Every self-signup key must also be
+   * allowed by the organization_product_subscriptions.product_key check (0062) — the registry test
+   * compares the two. Social is false until V2 opens subscriptions (ADR 016 §7).
+   */
+  selfSignup: boolean;
 }
 
 export const PRODUCTS: readonly PortalProduct[] = [
-  { key: "cognitive", name: "AI LEGO Cognitive Engineering OS", domain: "cognitive.aware-wave.com", status: "coming_soon" },
-  { key: "hci", name: "HCI-30", domain: "hci.aware-wave.com", status: "coming_soon" },
+  { key: "cognitive", name: "AI LEGO Cognitive Engineering OS", domain: "cognitive.aware-wave.com", status: "coming_soon", selfSignup: true },
+  { key: "hci", name: "HCI-30", domain: "hci.aware-wave.com", status: "coming_soon", selfSignup: true },
+  { key: "social", name: "社群發文", domain: "social.aware-wave.com", status: "coming_soon", selfSignup: false }, // ADR 016
 ];
+
+/** The products a visitor may pick at signup — the only list the signup form and /api/signup use. */
+export const SELF_SIGNUP_PRODUCTS: readonly PortalProduct[] = PRODUCTS.filter((p) => p.selfSignup);
+
+/** What signup gives a visitor who did not pick one — the form's initial value and /api/signup's fallback. */
+export const DEFAULT_SIGNUP_PRODUCT: ProductKey = SELF_SIGNUP_PRODUCTS[0].key;
+
+export function isSelfSignupProductKey(value: unknown): value is ProductKey {
+  return typeof value === "string" && SELF_SIGNUP_PRODUCTS.some((p) => p.key === value);
+}

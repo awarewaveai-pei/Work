@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID, createHash } from "node:crypto";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { verifyTurnstileToken } from "@/lib/turnstile";
+import { DEFAULT_SIGNUP_PRODUCT, isSelfSignupProductKey, type ProductKey } from "@/lib/portal/products";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,7 +42,6 @@ const MAX_EMAIL_LEN = 254;
 const MAX_ORG_NAME_LEN = 120;
 const MAX_PASSWORD_LEN = 128;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PRODUCT_KEYS = new Set(["cognitive", "hci"]);
 
 type SignupBody = {
   email?: string;
@@ -134,10 +134,10 @@ export async function POST(request: Request) {
   const orgName = (body.org_name ?? "").trim();
   // Explicit whitelist -- an unrecognised value is a 422, not silently coerced to a default
   // (a typo'd product_key used to give the customer the wrong product with no error).
-  if (body.product_key !== undefined && !PRODUCT_KEYS.has(body.product_key)) {
+  if (body.product_key !== undefined && !isSelfSignupProductKey(body.product_key)) {
     return NextResponse.json({ ok: false, error: "invalid_product_key" }, { status: 422 });
   }
-  const productKey = (body.product_key as "cognitive" | "hci" | undefined) ?? "cognitive";
+  const productKey: ProductKey = isSelfSignupProductKey(body.product_key) ? body.product_key : DEFAULT_SIGNUP_PRODUCT;
 
   if (
     !EMAIL_RE.test(email) || email.length > MAX_EMAIL_LEN ||

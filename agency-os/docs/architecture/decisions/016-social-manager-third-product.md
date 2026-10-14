@@ -23,7 +23,7 @@
 
 ### 2. 排程資料的真相在我們的資料庫，Postiz 是送信員
 
-- 新表（都用 0094 的 default-deny RLS；表名以 migration 為準）：`social_accounts`（品牌 ↔ Postiz integration id、狀態 connected／review／expired、instance id）、`social_posts`（共用文字、各平台另寫的文字、媒體、第一則留言、連結＋UTM、替代文字、格式、狀態、排定時間、Postiz post ids、發佈後連結、錯誤訊息）、`social_lists`＋`social_list_items`（輪播清單）、`social_media`（媒體庫）、`social_audit_log`（誰、何時、做了什麼、結果）、品牌設定（時區、成員角色）掛在既有 `organizations`。既有 `social_postiz_connections` 的列搬進 `social_accounts`，舊表退場。
+- 新表：`lobster-factory/packages/db/migrations/0096_social_manager.sql`（10 張 `social_*` 表與它守住的不變量寫在檔頭，該檔為準）。帳號狀態 connected／expired／disabled；「平台還在審核」是平台層的事實，不存在帳號列上。輪播項目就是 `state='rotation'` 的貼文。時區用 `organizations.default_timezone`；外部成員角色 `social_brand_members`。既有 `social_postiz_connections` 的列複製進 `social_accounts`，舊表在 C4 換完程式後退場。
 - 貼文只在「排定且到了送出窗口」才進 Postiz：Trigger.dev 任務每 5 分鐘把 `scheduled_at` 落在窗口內的貼文建進 Postiz（批次、照 rate limit 退讓），記下 Postiz id；改時間 = 若已進 Postiz 就刪掉重建；狀態回寫用 `GET /posts?startDate&endDate` 對帳（`PUBLISHED`／`ERROR`＋`releaseURL`＋`error`）。這樣拖拉改時間、審核、備註、輪播都不依賴 Postiz 沒有的 API，30 次／小時也只在送出時才消耗。
 - 狀態機：`draft → review → scheduled → queued（已進 Postiz）→ published | error`；`deleted`（軟刪，可還原）；`rotation`（在輪播清單裡，沒有固定時間）。已發佈的不可改，只能複製。
 

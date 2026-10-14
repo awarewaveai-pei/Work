@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { ProductKey } from "@/lib/portal/products";
+import { DEFAULT_SIGNUP_PRODUCT, SELF_SIGNUP_PRODUCTS, type ProductKey } from "@/lib/portal/products";
 
 // Browser-visible paths here are unprefixed ("/api/signup", not "/portal/api/signup") --
 // nginx's idempotent rewrite (PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md §7) adds the /portal/
@@ -47,7 +47,7 @@ export function PortalSignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [orgName, setOrgName] = useState("");
-  const [productKey, setProductKey] = useState<ProductKey>("cognitive");
+  const [productKey, setProductKey] = useState<ProductKey>(DEFAULT_SIGNUP_PRODUCT);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,8 +156,9 @@ export function PortalSignupForm() {
           onChange={(e) => setProductKey(e.target.value as ProductKey)}
           disabled={busy}
         >
-          <option value="cognitive">AI LEGO Cognitive Engineering OS</option>
-          <option value="hci">HCI-30</option>
+          {SELF_SIGNUP_PRODUCTS.map((p) => (
+            <option key={p.key} value={p.key}>{p.name}</option>
+          ))}
         </select>
       </div>
 

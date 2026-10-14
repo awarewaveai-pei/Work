@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-14（續10）社群管理平台 C1＋C2：0096 資料表（未套正式庫）、產品登記改成唯一清單
+
+**根因**:
+- C1：ADR 016 要求排程真相在我們的資料庫；舊 0011 只有「org ↔ integration」一張表，而且同一個 integration 可以掛兩個 org（隔離漏洞）。
+- C2：產品清單有四份：`lib/portal/products.ts`、`/api/signup` 的 `PRODUCT_KEYS`（route.ts:44）、signup 表單寫死的兩個 option、0062 的資料庫 check。只加一處就會漂移。
+
+**做了**:
+- `packages/db/migrations/0096_social_manager.sql`：10 張 `social_*` 表。資料庫守住：品牌隔離（子列以 (id, organization_id) 指父列）、一個 integration 只屬一個品牌、狀態形狀、published_at 一設就凍結內容與 targets／media（只能 published↔deleted，只放行送出端回寫欄位）、audit 只增不改（trigger＋對 service_role 收回 update/delete/truncate）、version 遞增、可刪品牌（限制型子 FK 改 deferrable）、尺寸上限、輪播同一格只具體化一次；RLS 只給 service_role。0011 的列複製過去，同一 integration 對兩個 org 時整批中止。
+- `scripts/0096_social_manager_down.sql`、`scripts/0096_social_manager-local-verify.{sh,sql}`（Postgres 15.8＝正式版本；`PG_IMAGE` 可換）。
+- db-expert（1C/3M/7m/2s）全修：X 的 platform 是一個字母 `x`（原 pattern 要兩字，0011 有 X 列時整個 migration 會中止）；刪除後還原會變成可編輯草稿再發一次；targets／media 插入、刪除未凍結；品牌刪不掉（restrict FK＋audit trigger 擋 cascade）；缺 5 個 FK／查詢索引；audit 可被 truncate；published 可沒有 scheduled_at；下架腳本 lock_timeout 1s。
+- C2：`products.ts` 加 `social`（`selfSignup:false`，V2 才開放）、`SELF_SIGNUP_PRODUCTS`、`DEFAULT_SIGNUP_PRODUCT`、`isSelfSignupProductKey`；`/api/signup` 與表單只讀它；`lib/portal/__tests__/products.test.ts` 比對 0062 的資料庫 check（只看 organization_product_subscriptions、兩種寫法、無替代的 drop 會丟錯）。
+- 同類修正：四個本機驗證腳本（0095、collection、site-watch、0096）改用 TCP 判斷 Postgres 就緒（kb-local-verify.sh 的做法；socket 判斷會在首次啟動的暫時伺服器時誤報就緒）。
+- ADR 016 的表清單改指 0096 檔頭；計畫 C1／C2 打勾，C4／C5／C7／V2 加上 0096 交代的事。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/packages/db/scripts/0096_social_manager-local-verify.sh（postgres:15.8 與 PG_IMAGE=postgres:16）→ BEHAVIOUR／DEFERRED／AUDIT／BRAND_DELETE／ACCESS 全 OK、DOWN_OK、兩 org 對同一 integration 拒絕、重套、重複套用不重複 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=4 個守衛突變（隔離 FK 去掉 organization_id、凍結改回看 state、children 觸發器只留 update、拿掉 audit revoke）→ 4/4 指名案例變紅 | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（0）；npx vitest run lib/portal lib/__tests__/middleware-csrf.test.ts lib/__tests__/middleware-portal-guards.test.ts → 50/50；把 social 改 selfSignup:true → 資料庫比對測試變紅 | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=site-watch／collection／0095 三個舊驗證腳本改 TCP 後重跑 → 全 exit 0 | exit=0 | ms=300000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/3m/7n
+  - db-expert 審 0096：上列全修；建議的 audit 保留期限寫進計畫 V2。
+  - critic（Standard）審 C2＋驗證腳本：0c/0m/3n 全修（測試的 migration 解析限定表＋兩種寫法＋drop；預設產品單一來源；四個腳本 TCP 就緒）。
+- ORACLE_WAIVED: 0096 由 db-expert 逐條實測審過並以 4 個守衛突變驗證；C2 改動有 critic 與資料庫比對突變；0096 尚未套正式庫，套用前（C4 同一次部署）另審
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands | grep=\bPRODUCT_KEYS\b|"cognitive" \| "hci" | hits=1
+  - 唯一命中是 `products.ts:6` 新的型別定義；`.next/cache` 二進位檔不算。`social_list_items`、`connected／review／expired` 舊說法 0 命中。
+
+**剩餘風險**: 0096 未套正式庫，要與 C4 同一次部署（中間經舊路由新連的帳號要再同步一次，計畫 C4 已寫）；`social_audit_log` 沒有保留期限（V2）；子列修改要碰父貼文 version 是 C4 的責任，資料庫不強制。另：上一個 commit 3fc9b0d4b 用 `GIT_INDEX_FILE="$idx"`，scope guard 讀不到路徑、沒把共用 index 同步回 HEAD（任何人裸 commit 會把它改回 13px）；已 `git reset -q HEAD -- <9 個路徑>` 修正並記進記憶。
+
+**rollback**: `git revert <本 commit>`；0096 沒套正式庫，無資料要還原。
 ## 2026-10-14（續9）認知平台：直接分析的修正上線（e6182b960；群組 AI 問題背景 136ae32f0 已於 06:39Z 上線）
 
 **操作者**：「要」（部署）。

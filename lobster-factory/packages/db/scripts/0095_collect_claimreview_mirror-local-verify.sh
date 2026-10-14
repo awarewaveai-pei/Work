@@ -23,14 +23,17 @@ trap cleanup EXIT
 
 echo "▶ starting $IMAGE as $CONTAINER"
 docker run -d --name "$CONTAINER" -e POSTGRES_PASSWORD=verify -e POSTGRES_DB=postgres "$IMAGE" -c shared_buffers=128MB >/dev/null
+# Over TCP (kb-local-verify.sh pattern): the image's first-boot server listens on the socket only, then
+# restarts, so a socket check can pass before the real server is up.
 for _ in $(seq 1 60); do
-  if docker exec "$CONTAINER" pg_isready -U postgres >/dev/null 2>&1; then break; fi
+  if docker exec "$CONTAINER" psql -h 127.0.0.1 -U postgres -d postgres -c 'SELECT 1' >/dev/null 2>&1; then break; fi
   sleep 1
 done
 sleep 2
-docker exec "$CONTAINER" pg_isready -U postgres >/dev/null
+docker exec "$CONTAINER" psql -h 127.0.0.1 -U postgres -d postgres -c 'SELECT 1' >/dev/null 2>&1 \
+  || { echo "✗ postgres never became reachable in the container"; exit 1; }
 
-psql_run() { docker exec -i "$CONTAINER" psql -v ON_ERROR_STOP=1 -q -U postgres -d postgres "$@"; }
+psql_run() { docker exec -i "$CONTAINER" psql -h 127.0.0.1 -v ON_ERROR_STOP=1 -q -U postgres -d postgres "$@"; }
 psql_file() { psql_run -f - < "$1"; }
 
 psql_run <<'SQL' >/dev/null
