@@ -124,9 +124,12 @@
   - **一句話**：與已退役的 tenant registrar 同一 bug（agency-os/automation/REGISTER_AUTOPILOT_PHASE1_TASKS.ps1:20）；目前機器上沒有 autopilot 任務，先決定 autopilot 要留還是退役，再修或刪。
   - **證據**：WORKLOG 2026-10-14（續22）
 
-- [ ] **【備份｜照 `lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md` 做 B1–B11】每個庫都有離機備份、每天被檢查、能還原**
-  - `🟡 進行中` · `2026-10-15` · B1–B6、B9–B11 上線（WORKLOG 2026-10-14 續21、續25）；B7 還原演練＋B8 id 對帳程式完成（WORKLOG 2026-10-15 續5）
-  - **下一步**：B7/B8 上主機（sync、cron、RECONCILE_TOKEN、next-admin 部署、HCI／lobster 備份各跑一輪、全 8 庫首跑）（建議模型：Opus 5.5）
+- [x] **【備份｜照 `lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md` 做 B1–B11】每個庫都有離機備份、每天被檢查、能還原**
+  - `✅ 完成` · `2026-10-15` · B1–B11 全上線；全 8 庫從 R2 演練 PASS（WORKLOG 2026-10-14 續21、續25；2026-10-15 續5、續6）
+
+- [ ] **【資料｜Cognitive OS 專案指標 19／19 懸空】主庫存的專案 id 在 Cognitive OS 都不存在，B2 `ids:cognitive-os-projects` 每天照實 FAIL**
+  - `🔴 待決` · `2026-10-15` · `import-sources.ts:178` 存過的 id 不驗就用；Cognitive `platform_projects` 只剩 2 列（WORKLOG 2026-10-15 續6 F8）
+  - **待操作者定**：18 筆知識來源清成「未匯入」讓人重送，或自動重送到新專案；程式自癒（用前先查 id 在不在）兩案都要（建議模型：Opus 5.5）
 
 - [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–5 開卡做**
   - `🟠 未開始` · `2026-10-14` · WORKLOG 續15、續17；第 3 步前查定期扣款外掛；`ADR_INDEX.md` 那列還寫「提議」（檔案被另一個 session 佔用，下次改）

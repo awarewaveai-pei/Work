@@ -279,6 +279,10 @@ services:
       # Cross-product id reconciliation -> GET /api/internal/reconcile (BACKUP_COVERAGE_PLAN.md B8). The same value
       # sits in /etc/default/awarewave-reconcile for backup-coverage-check.py on the host. Empty = 401 (fail closed).
       RECONCILE_TOKEN: ${RECONCILE_TOKEN:-}
+      # Postiz public API (lib/content/postiz.ts). In .env but never passed through, so every next-admin Postiz
+      # call threw "POSTIZ_API_BASE_URL env var not set" (found by the B8 reconcile check, 2026-10-15).
+      POSTIZ_API_BASE_URL: ${POSTIZ_API_BASE_URL:-}
+      POSTIZ_API_KEY: ${POSTIZ_API_KEY:-}
       # Cognitive OS research runs (RESEARCH_LINES_MASTER_PLAN §12.7): RUNS = COS -> /api/internal/collect/runs and
       # this app -> COS grant exchange (same value in COS deploy/.env); EXECUTE = Trigger worker -> runs/execute.
       # Empty = both endpoints 401 (fail closed).

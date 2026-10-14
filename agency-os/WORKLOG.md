@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-15（續6）B7／B8 上線：全 8 庫從 R2 演練 PASS；對帳首跑抓到 next-admin 從沒拿到 Postiz 設定、Cognitive 19 個專案指標全懸空
+
+**做了**（主機 ks-aw-01，操作者「15 項一直做到完成」授權）:
+- `/root/Work` ff 到 563476919；`sync-host-scripts.sh` 裝 6 檔（drill、fixup、coverage check、inventory、cron、backup-phase1.sh）；`/etc/cron.d/backup-coverage` 換新（舊的 `/root/backup-coverage.cron.bak-20261015`）。
+- `RECONCILE_TOKEN`：`/root/lobster-phase1/.env`（備份 `.env.bak-20261015-reconcile`）＋`/etc/default/awarewave-reconcile`（600）；compose 經 `safe-infra-patch.sh compose`（healthy 9s，備份 `docker-compose.yml.bak.safe-patch-20261014-165534`）。
+- `sg-deploy.sh next-admin` → deployed 563476919，healthy 9s，smoke 全 OK。
+- 各跑一輪：HCI 備份（`hci-roles.sql.gz` OK）＋offsite（hci/2026-10-14 兩檔 200；cognitive「already shipped」＝設計上拒絕重送）；lobster 備份 `--databases wordpress wp_s_6e2b917e2efc46b89cdbcb`（604K，R2 200）。
+- F7 對帳首跑：next-admin 容器沒有任何 `POSTIZ_*`（`.env` 有，compose 沒傳）→ `lib/content/postiz.ts:39` 每次丟「POSTIZ_API_BASE_URL env var not set」；compose 補 `POSTIZ_API_BASE_URL`／`POSTIZ_API_KEY`（repo＋prod，safe-infra-patch 備份 `…-170418`）。
+- F8 `cognitive-os-projects` 19／19 懸空：Cognitive OS `platform_projects` 只有 2 列（1 個 identity），主庫指到的 `3e7b8539…`、`8e323c1c…` 都不在；`import-sources.ts:178` 存過的 id 直接用、不驗。不改資料（18 筆來源要清成「未匯入」還是自動重送＝產品取捨），開 TASKS 項。B2 這列會照實 FAIL 到修好為止。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=python3 /root/lobster-phase1/scripts/backup-restore-drill.py → 8 PASS（supabase 324 表＋vault 60/60＋owners/grants/settings as prod；trigger 3178957 列；lobster-wp 2 庫 81 表；hci 24 表 86 列）；`restore-drill.json` overall PASS 8 rows | exit=0 | ms=213000
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl /api/internal/reconcile → 無 token 401、錯 token 401、正確 token：postiz-integrations 3 筆 0 懸空（補 env 後）、cognitive-os-projects 19 筆 19 懸空 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=SSH | cmd=backup-coverage-check.py（狀態與戳記指向 /tmp，不觸發告警）→ 23 列，只有 `ids:cognitive-os-projects` FAIL，`restore-drill`、`ids:postiz-integrations` PASS | exit=1 | ms=20000
+- REVIEW_WAIVED: NA -- 部署已審過的 563476919；compose 兩行 env 傳遞，以 printenv＋reconcile 實測驗證
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=POSTIZ_API_BASE_URL | hits=5（POSTIZ_SOCIAL_PUBLISHING_PLAN、.env.example 早有此名；只差 compose 沒傳）
+- ORACLE_WAIVED: 同續5 critic；本條為部署與 env 傳遞
+
+**剩餘風險**: 03:30 UTC 起 B2 每天照實 FAIL（Cognitive 指標）→ endpoint-alert 告警，直到 F8 修好。
+
+**rollback**: compose 用 safe-patch 備份；`.env.bak-20261015-reconcile`；`/root/backup-coverage.cron.bak-20261015`；next-admin 用 sg-deploy 的 rollback 映像。
 ## 2026-10-15（續5）B7 每月還原演練＋B8 跨產品 id 對帳：從 R2 灌回拋棄式容器、每列筆數對得上才算過；首跑抓到 5 個還原會失敗或沒備到的地方
 
 **根因／發現**（主機實跑 2026-10-14 15:28 UTC 起）:

@@ -55,13 +55,14 @@ R2 保存規則（2026-10-14 讀 `GET /r2/buckets/lobster-backup/lifecycle`）�
 - 讀 B2 的狀態 JSON：每個庫一列，最近備份時間、大小、R2 有沒有、PASS／FAIL。只讀，不在頁面上觸發備份。
 - 驗收：頁面列數＝清單列數；B2 的 FAIL 在頁面上是紅的。
 
-### B7 每月還原演練（程式完成、主機暫存目錄實跑；上線後 8 庫首跑 PASS 才打勾）
+### B7 每月還原演練 ✅ 2026-10-15（上線；首次全 8 庫從 R2 演練 PASS，狀態檔＋B2 `restore-drill` 列 PASS）
 - `hetzner-phase1-core/scripts/backup-restore-drill.py`（每月 1 日 04:15，`backup-coverage.cron`）：清單裡有 `drill` 的庫，從 R2 下載最新備份（分割檔重組後比對 sha256），灌進與 prod 同 image 的一次性容器（不接網路、限記憶體），判定規則在檔頭。結果 `/var/lib/awarewave/restore-drill.json`；B2 加 `restore-drill` 列（>35 天、任一庫 FAIL、漏庫 → FAIL）。
 - 比「關鍵表筆數」更嚴：dump 裡每個 COPY 區塊的筆數＝還原後筆數（筆數來自 dump 本身，不用另存標記；做法來自 `hci30-restore-drill.yml`）。
 - 首跑抓到 5 個還原會失敗或資料沒備到的地方（都已修，runbook §4/§6 同步）：Supabase 設定 volume 只放鑰匙 → DB 起不來；先跑 image 初始化再灌 → 6 張 auth/cron 表 0 筆；`postgres` 庫的 owner／grant 沒進 dump（fixup 補、演練比對 prod）；HCI dump GRANT 給 dump 外的角色（加 `hci-roles.sql.gz`）；一鍵架站的 staging 庫（`wp_s_*`）沒備份（`backup-phase1.sh` 改 `--databases`）。
 - 驗收：演練報告每個庫一列；故意給一份壞檔 → 該列 FAIL。
 
-### B8 跨產品客戶編號對帳（程式完成；上線＝next-admin 部署＋`RECONCILE_TOKEN`）
+### B8 跨產品客戶編號對帳 ✅ 2026-10-15（上線；首跑抓到兩個真問題，見下）
+- 首跑結果：`ids:postiz-integrations` 原本 FAIL「POSTIZ_API_BASE_URL env var not set」＝ next-admin compose 從沒把 `.env` 的 `POSTIZ_API_*` 傳進容器（所有 next-admin 的 Postiz 呼叫都會丟錯），已補，3／3 PASS。`ids:cognitive-os-projects` FAIL 19／19：Cognitive OS 只剩 2 個專案，主庫指到的專案都不在 `platform_projects`；`lib/cognitive-os/import-sources.ts:178` 存過的 id 永遠直接用、不查還在不在。修法（程式自癒＋18 筆來源怎麼處理）待決，見 TASKS。
 - 先列出各產品存了哪些「指向主庫客戶」的編號。對帳走各產品的 API 或匯出，不得跨庫直讀（HCI ADR-0002）。
 - 驗收：每天一次；故意放一個不存在的編號 → 報警。
 - 做法：next-admin `lib/reconcile/pointers.ts` 每種指標一塊（我們存的 id ↔ 對方 API 列出的 id），`GET /api/internal/reconcile`（自己的 `RECONCILE_TOKEN`）；B2 每天呼叫，每塊一列，掛不到對方或有懸空 id ＝ FAIL。
