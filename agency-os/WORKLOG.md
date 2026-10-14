@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-15（續9）G5 正式機升 v2.25.1 成功（停機約 74s）、重開機也穩；C3 Postiz client 五個函式＋修 v2.25.1 兩個相容問題
+
+**做了**（主機 ks-aw-01，操作者「15 項一直做到完成」授權）:
+- `/root/Work` ff 到 9374a2468；開機檢查 `/usr/local/bin/ks-aw-01-boot-health-notify.sh` 換新（舊的 `/root/ks-aw-01-boot-health-notify.sh.bak-20261015`）。
+- `systemd-run --unit=postiz-upgrade --collect bash …/upgrade-postiz.sh …/infra/postiz`（排隊貼文 0）：preflight 產生 `TEMPORAL_DB_PASSWORD` → 備份 `/root/postiz-upgrade-backups/20261014-175559/`（dump 116K、3 頻道）→ schema 只有 `drop the column marketplace on User` 並接受 → 17:56:32 套用 → 17:57:16 health PASS。
+- 20:00 UTC 例行自動重開（20:04 開機）：postiz、temporal、temporal-postgresql 全 healthy，missing-post workflow RUNNING、main queue 2 個 poller、`is-connected` 401——`wait-for-temporal.js` 在真重開下有效。
+- G5 驗收：G1 那組 12 條全在（連接帳號、改狀態、刪整組、分組、通知、媒體、分析、me…）；Bluesky 草稿（type draft，不會送）建 201 → 列出 DRAFT → 刪 200 → 再刪 404 → 剩 0。
+- 驗收抓到 next-admin 現有發文的兩個 v2.25.1 相容問題（`lib/content/postiz.ts` `createSocialPost`）：純文字貼文沒帶 `image` 被 400（「posts.0.value.0.image must be an array」）；建立回應改成 `[{postId, integration}]`，舊程式讀 `json.id ?? json.posts[0].id` 永遠拿不到 id。兩個都修。
+- C3：`listPosts({start,end,customer})`、`deletePost`（404＝已不在）、`changeStatus('draft'|'schedule')`、`connectUrl(platform, refreshId?)`、`listGroups`，共用 `postizRequest`＋`PostizApiError`（429 帶 `retryAfterSeconds`，沒 header 不當成「馬上重試」；client 不重試，退讓在 C5）。fixture `lib/content/__tests__/fixtures/postiz-v2.25.1/`（真回應，無 token）。
+- 文件：SOCIAL_MANAGER_PLAN G5、C3 ✅；ADR 016「待查」第一條結案。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=systemd-run … upgrade-postiz.sh → `health | PASS | temporal ready, worker polling, missing-post workflow running, pm2 online, keyed API 200, frontend up, channels unchanged`；`docker ps` postiz v2.25.1 healthy | exit=0 | ms=77000
+- REALTEST_EVIDENCE: tool=SSH | cmd=重開後 `temporal workflow describe --workflow-id missing-post-workflow -o json` → WORKFLOW_EXECUTION_STATUS_RUNNING；task-queue main pollers 2；curl is-connected 401 | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=SSH | cmd=g1_recheck.sh → 12 OK 0 MISSING；g5_draft.sh → create 201、listed DRAFT、delete 200、again 404、left 0 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/__tests__/postiz-client.test.ts（7）＋social-channels／social-publish（9）→ 16 passed；npx tsc --noEmit exit 0（先刪掉另一個 session 移走的 run-due-schedules 留下的 .next/types 殘檔） | exit=0 | ms=30000
+- REVIEW_WAIVED: NA -- G5 腳本兩輪 critic（續7）；C3 為 client 小改，以真回應 fixture 逐函式測＋書面自審（抓到 retry-after 缺 header 會讀成 0，已修並加測）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=createSocialPost|postizPostId | hits=程式 3 檔（postiz.ts、social-publish/route.ts:275-292 用 postizPostId 寫交付收據→現在拿得到 id、mode-gate.test.ts）＋POSTIZ_SOCIAL_PUBLISHING_PLAN 歷史說明
+- ORACLE_WAIVED: 同上
+
+**rollback**: Postiz：`/root/postiz-upgrade-backups/20261014-175559/`（compose、.env、`postiz.dump --create`）照 runbook §6.1 手動回滾；C3：`git revert`。
 ## 2026-10-15（續8）排程頁上線：步 5 部署、心跳首跑綠、步 7 清過渡；步 4 寫入／步 6 真跑待操作者登入
 
 **上線經過**

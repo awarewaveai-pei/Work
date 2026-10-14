@@ -309,9 +309,12 @@ export async function createSocialPost(opts: {
   const results: PostizPostResult[] = [];
 
   for (const post of posts) {
-    const value: Record<string, unknown> = { content: post.content };
+    // v2.25.1 rejects a value without an image array ("posts.0.value.0.image must be an array"), text-only included.
     const platformMedia = mediaPerPlatform?.[post.platform] ?? media;
-    if (platformMedia) value.image = [{ id: platformMedia.id, path: platformMedia.path }];
+    const value: Record<string, unknown> = {
+      content: post.content,
+      image: platformMedia ? [{ id: platformMedia.id, path: platformMedia.path }] : [],
+    };
 
     const body = {
       type: mode,
@@ -351,8 +354,9 @@ export async function createSocialPost(opts: {
         continue;
       }
 
-      const json = (await res.json()) as { id?: string; posts?: Array<{ id: string }> };
-      const postizPostId = json.id ?? json.posts?.[0]?.id;
+      // v2.25.1 answers [{ postId, integration }] (fixtures/postiz-v2.25.1/post-create.json); v2.11.3 { id } / { posts }.
+      const json = (await res.json()) as Array<{ postId?: string }> | { id?: string; posts?: Array<{ id: string }> };
+      const postizPostId = Array.isArray(json) ? json[0]?.postId : (json.id ?? json.posts?.[0]?.id);
       results.push({
         platform: post.platform,
         integrationId: post.integrationId,
@@ -371,6 +375,85 @@ export async function createSocialPost(opts: {
   }
 
   return results;
+}
+
+// ---- v2.25.1 public API (SOCIAL_MANAGER_PLAN.md C3). Shapes from lib/content/__tests__/fixtures/postiz-v2.25.1/.
+// No retry loop here: a 429 carries retryAfter and the caller (C5's dispatch task) decides when to come back.
+
+export class PostizApiError extends Error {
+  constructor(readonly status: number, message: string, readonly retryAfterSeconds?: number) {
+    super(message);
+    this.name = "PostizApiError";
+  }
+}
+
+async function postizRequest<T>(method: "GET" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
+  const cfg = getPostizConfig();
+  const res = await fetch(`${cfg.baseUrl}/public/v1${path}`, {
+    method,
+    headers: { Authorization: cfg.apiKey, ...(body !== undefined ? { "Content-Type": "application/json" } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) {
+    const text = (await res.text()).slice(0, 200);
+    // Seconds only; an absent header must not read as "retry now" (Number(null) is 0).
+    const header = res.status === 429 ? res.headers.get("retry-after") : null;
+    const retry = header && /^\d+$/.test(header.trim()) ? Number(header) : undefined;
+    throw new PostizApiError(res.status, `Postiz ${method} ${path.split("?")[0]} returned ${res.status}: ${text}`, retry);
+  }
+  return (await res.json()) as T;
+}
+
+export type PostizPostState = "QUEUE" | "PUBLISHED" | "ERROR" | "DRAFT";
+
+export type PostizPost = {
+  id: string;
+  content: string;
+  publishDate: string;
+  releaseURL: string | null;
+  releaseId: string | null;
+  state: PostizPostState;
+  error: string | null;
+  intervalInDays: number | null;
+  group: string;
+  creationMethod: string;
+  settings: string; // JSON text, e.g. {"__type":"bluesky"}
+  tags: unknown[];
+  integration: { id: string; name: string; providerIdentifier: string; picture: string | null };
+};
+
+/** Posts whose publish date falls in [start, end]; `customer` = a Postiz group (our brand). */
+export async function listPosts(opts: { start: Date; end: Date; customer?: string }): Promise<PostizPost[]> {
+  const q = new URLSearchParams({ startDate: opts.start.toISOString(), endDate: opts.end.toISOString() });
+  if (opts.customer) q.set("customer", opts.customer);
+  return (await postizRequest<{ posts: PostizPost[] }>("GET", `/posts?${q}`)).posts;
+}
+
+/** Deletes the post's whole group (Postiz deletes by group). A post already gone is not an error: v2.25.1 answers 404. */
+export async function deletePost(id: string): Promise<{ existed: boolean }> {
+  try {
+    await postizRequest("DELETE", `/posts/${encodeURIComponent(id)}`);
+    return { existed: true };
+  } catch (e) {
+    if (e instanceof PostizApiError && e.status === 404) return { existed: false };
+    throw e;
+  }
+}
+
+export async function changeStatus(id: string, status: "draft" | "schedule"): Promise<void> {
+  await postizRequest("PUT", `/posts/${encodeURIComponent(id)}/status`, { status });
+}
+
+/** OAuth URL to connect a channel (`refreshId` = an existing integration to reconnect). The user opens it. */
+export async function connectUrl(platform: string, refreshId?: string): Promise<string> {
+  const q = refreshId ? `?${new URLSearchParams({ refresh: refreshId })}` : "";
+  return (await postizRequest<{ url: string }>("GET", `/social/${encodeURIComponent(platform)}${q}`)).url;
+}
+
+export async function listGroups(): Promise<Array<{ id: string; name: string }>> {
+  return postizRequest("GET", "/groups");
 }
 
 export function assertCanPublishNow(role: OpsRole, confirmPublishNow: boolean): void {

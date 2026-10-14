@@ -12,7 +12,7 @@
 | G2 `API_LIMIT` | ✅ 未設＝預設 30／小時；`GET posts` 也扣額度 | 同上 |
 | G3 Meta app 狀態 | 操作者登入 Meta 開發者後台確認 IG 權限與審核進度 | TASKS.md 371 更新 |
 | G4 ADR 016 已接受、樣稿定案 | ✅ 2026-10-14 操作者「同意」 | ADR 狀態 |
-| **G5 Postiz 升級到 v2.25.1**（High-STOP，先 go-ahead） | 備份 Postiz DB（`pg_dump`）＋ `/root/postiz/.env`、`docker-compose.yml` → image tag 改 `v2.25.1`、加 `API_LIMIT=<值>` → 照 `safe-infra-patch.sh` 同款流程（備份 → apply → `docker compose config` → `up -d` → 等 healthy → 失敗還原）→ 重跑 G1 那組 curl，所有 404 消失、現有兩個 integration 仍 `disabled:false`、Bluesky 草稿可建可刪。跨 14 個小版本，先讀 v2.12–v2.25 release notes 的 breaking changes 與 migration | WORKLOG＋runbook `POSTIZ-OPS-RUNBOOK.md` 版本號 |
+| **G5 Postiz 升級到 v2.25.1** ✅ 2026-10-15（`lobster-factory/infra/postiz/upgrade-postiz.sh`，演練 `rehearse-postiz-upgrade.sh` 三輪後上正式機；G1 那組 12 條全在、Bluesky 草稿建／列／刪過、20:00 自動重開後 Temporal worker 與 missing-post workflow 照常；WORKLOG 2026-10-15 續7、續9） | 備份 Postiz DB（`pg_dump`）＋ `/root/postiz/.env`、`docker-compose.yml` → image tag 改 `v2.25.1`、加 `API_LIMIT=<值>` → 照 `safe-infra-patch.sh` 同款流程（備份 → apply → `docker compose config` → `up -d` → 等 healthy → 失敗還原）→ 重跑 G1 那組 curl，所有 404 消失、現有兩個 integration 仍 `disabled:false`、Bluesky 草稿可建可刪。跨 14 個小版本，先讀 v2.12–v2.25 release notes 的 breaking changes 與 migration | WORKLOG＋runbook `POSTIZ-OPS-RUNBOOK.md` 版本號 |
 
 ## 1. V1 卡片（自己管多品牌就能用）
 
@@ -28,7 +28,7 @@
 - `lib/portal/products.ts` 加 `{ key:"social", name:"社群發文", domain:"social.aware-wave.com", status:"coming_soon" }`；`ProductKey` 型別加 `"social"`。
 - 驗收：`npx tsc --noEmit`；`app/portal/launcher` 顯示 coming soon。
 
-### C3 Postiz client 擴充（Opus 5.5）
+### C3 Postiz client 擴充 ✅ 2026-10-15（`lib/content/postiz.ts`：`listPosts`／`deletePost`／`changeStatus`／`connectUrl`／`listGroups`＋`PostizApiError`；fixture `__tests__/fixtures/postiz-v2.25.1/`；順手修 v2.25.1 兩個相容問題：純文字貼文要帶 `image: []`、建立回應是 `[{postId}]`）
 - 範圍：`lib/content/postiz.ts` 加 `listPosts({start,end,customer})`、`deletePost(id)`、`changeStatus(id, "draft"|"schedule")`、`connectUrl(platform, refreshId?)`、`listGroups()`；回應型別照 G1 fixture。
 - 驗收：每個函式一個測試，用 fixture（`lib/content/__tests__/postiz-*.test.ts`）；錯誤路徑：429 回傳 `retryAfter`。
 - 邊界：不在 client 裡做重試迴圈；rate limit 的退讓在 C5。
