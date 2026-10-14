@@ -13,12 +13,12 @@
                                                   "capped":  false
                                               },
                    "client_mail":  "ok:no_failures_7d_last_send_2d",
-                   "nightly_health":  "ok",
-                   "codex_parity":  "ok:parity",
+                   "nightly_health":  "warn:fail_[FAIL]_Nightly_health:_AO-CLOSE_archive_items_not_lifted_to_TASKS.md_(see_archive-lift-last.json)",
+                   "codex_parity":  "warn:Codex_session_rollout-2026-10-11T13-17-59-01a12965-7d8a-7e31-bb83-f94c0aa5be3b.jsonl_ran_after_the_hook_file_was_written_but_no_hook_heartbe",
                    "n8n_failures":  "ok:none_24h",
                    "pod_order_inbox":  "ok",
                    "repair_center":  "ok",
-                   "ci_health":  "warn:fail_[FAIL]_CI:_\u0027HCI-30_—_Wave_1_cross-box_restore_drill_(P0-10)\u0027_has_been_failing_for_8_consecutive_run(",
+                   "ci_health":  "warn:warn_[WARN]_CI:_\u0027Cognitive_OS_full_suite\u0027_latest_run_on_main_is_failure:_https://github.com/awarewaveai-p",
                    "client_sites":  "ok:6_active",
                    "repair_detail":  {
                                          "github_app_status":  "unverified",
@@ -48,12 +48,11 @@
                },
     "overall":  "WARN",
     "blockers":  [
-                     "[FAIL] CI: \u0027HCI-30 — Wave 1 cross-box restore drill (P0-10)\u0027 has been failing for 8 consecutive run(s) over 22 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/35340652567",
-                     "[FAIL] CI: \u0027Perplexity Search-only guard\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/36659841748",
-                     "[FAIL] CI: \u0027Weekly workflows security audit\u0027 has been failing for 4 consecutive run(s) over 23 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/36390406303",
-                     "[WARN] Routine freshness: Monthly review: 48d old (max 35d) -- routine AgencyOS-MonthlyReview may have stopped firing or its source drifted; check https://claude.ai/code/routines"
+                     "[WARN] CI: \u0027Cognitive OS full suite\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/38333666520",
+                     "[FAIL] Nightly health: AO-CLOSE archive items not lifted to TASKS.md (see archive-lift-last.json)",
+                     "[WARN] Backup: WARN -- see reports/status/backup-health-LATEST.md for per-host detail"
                  ],
-    "generated":  "2026-09-30 10:30:14",
+    "generated":  "2026-10-14 08:30:54",
     "blind_spots":  [
 
                     ]

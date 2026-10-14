@@ -1,6 +1,6 @@
 # VPS auto-reboot health
 
-- Generated: 2026-09-30 02:28:21 UTC
+- Generated: 2026-10-14 00:28:56 UTC
 - **Overall: 🟢 PASS**
 - SSOT: `lobster-factory/infra/hetzner-phase1-core/auto-reboot/`
 - Runbook: `runbooks/VPS-AUTO-REBOOT-RUNBOOK.md`
@@ -10,11 +10,11 @@
 
 | VPS | Verdict | Auto-Reboot | Time | SSOT 52 | daemon | boot-notify | pending | kernel |
 |-----|---------|-------------|------|---------|--------|-------------|---------|--------|
-| ks-aw-01 (145.239.195.47) | 🟢 healthy | true | 20:00 | ✓ | active/enabled | enabled/present/present/present | no | 6.8.0-142-generic |
+| ks-aw-01 (145.239.195.47) | 🟢 healthy | true | 20:00 | ✓ | active/enabled | enabled/present/present/present | no | 6.8.0-146-generic |
 
 ## Last reboot
 
-- ks-aw-01: Thu Sep 24 20:03 still
+- ks-aw-01: Fri Oct 9 20:03 still
 
 ---
 

@@ -1,25 +1,24 @@
-﻿# Change Impact Matrix Drift - 2026-09
+﻿# Change Impact Matrix Drift - 2026-10
 
-- Generated: 2026-09-30 13:27:58 +08:00
+- Generated: 2026-10-13 11:31:58 +08:00
 - Overall: **WARN**
 - Rows parsed: 80 | Pairs checked: 349 | Pairs skipped (unresolved path): 31
 - Thresholds: WARN > 90 days, FAIL > 180 days (one-directional: main doc newer than impacted file)
 
-## Flagged pairs (12 WARN, 0 FAIL)
+## Flagged pairs (11 WARN, 0 FAIL)
 
 | Severity | 主文件 | Impacted | 主文件 mtime (UTC) | Impacted mtime (UTC) | Drift (days) |
 |----------|--------|----------|---------------------|------------------------|---------------|
 | WARN | `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md` | `docs/overview/repo-template-locations.md` | 2026-09-30 | 2026-04-05 | 178 |
+| WARN | `docs/edge-and-domains/EDGE_DOMAINS_INDEX.md` | `docs/overview/OVERVIEW_INDEX.md` | 2026-09-30 | 2026-04-29 | 153.7 |
+| WARN | `../lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md` | `../lobster-factory/docs/ARCHITECTURE_CANONICAL_MAP.md` | 2026-09-30 | 2026-05-03 | 149.7 |
 | WARN | `docs/overview/LONG_TERM_OPERATING_DISCIPLINE.md` | `tenants/templates/core/RELEASE_GATES_CHECKLIST.md` | 2026-09-30 | 2026-05-07 | 145.7 |
 | WARN | `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` | `lobster-factory/infra/hetzner-phase1-core/docker-compose.staging.yml` | 2026-09-28 | 2026-05-06 | 145.3 |
 | WARN | `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` | `docs/governance-plans/PLAN_30Y_STABILITY_HARDENING.md` | 2026-09-28 | 2026-05-06 | 145.3 |
-| WARN | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md` | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER_CLIENT_SHORT.md` | 2026-09-30 | 2026-05-20 | 132.8 |
-| WARN | `docs/overview/30_YEAR_AI_CODING_EXEC_CHARTER.md` | `docs/operations/neuroinclusive-document-layout.md` | 2026-09-30 | 2026-05-20 | 132.8 |
-| WARN | `docs/edge-and-domains/EDGE_DOMAINS_INDEX.md` | `docs/overview/OVERVIEW_INDEX.md` | 2026-08-29 | 2026-04-29 | 121.7 |
-| WARN | `docs/edge-and-domains/EDGE_DOMAINS_INDEX.md` | `docs/operations/CLOUDFLARE_HETZNER_PHASE1.md` | 2026-08-29 | 2026-05-03 | 117.9 |
-| WARN | `AGENTS.md` | `scripts/register-new-governance-doc.ps1` | 2026-09-29 | 2026-06-05 | 116.5 |
-| WARN | `docs/operations/new-doc-linkage-checklist.md` | `scripts/register-new-governance-doc.ps1` | 2026-09-29 | 2026-06-05 | 116.5 |
-| WARN | `docs/operations/end-to-end-linkage-checklist.md` | `scripts/system-guard.ps1` | 2026-09-23 | 2026-06-05 | 110.1 |
+| WARN | `docs/operations/end-to-end-linkage-checklist.md` | `scripts/system-guard.ps1` | 2026-10-13 | 2026-06-05 | 130 |
+| WARN | `AGENTS.md` | `scripts/register-new-governance-doc.ps1` | 2026-10-13 | 2026-06-05 | 130 |
+| WARN | `docs/operations/new-doc-linkage-checklist.md` | `scripts/register-new-governance-doc.ps1` | 2026-10-13 | 2026-06-05 | 130 |
+| WARN | `../lobster-factory/docs/ONE_CLICK_BUILD_SYSTEM.md` | `../lobster-factory/docs/LOBSTER_FACTORY_MASTER_DEPLOYMENT_SYSTEM_v1.3.md` | 2026-09-30 | 2026-05-23 | 129.6 |
 | WARN | `docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` | `docs/operations/hetzner-stack-rollout-index.md` | 2026-09-28 | 2026-06-26 | 94.5 |
 
 ## Skipped (31 entries -- path did not resolve to an existing file)

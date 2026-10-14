@@ -1,5 +1,5 @@
 ﻿{
-    "generated_utc":  "2026-09-30T02:20:48Z",
+    "generated_utc":  "2026-10-14T00:29:59Z",
     "overall":  "OK",
     "blind_spots":  [
 
@@ -19,7 +19,7 @@
                          "slug":  "e2e-verify-0704-6e2b91",
                          "class":  "complete",
                          "dir":  true,
-                         "sizeKb":  256400,
+                         "sizeKb":  256404,
                          "db":  "wp_s_6e2b917e2efc46b89cdbcb",
                          "dbPresent":  true,
                          "row":  true,

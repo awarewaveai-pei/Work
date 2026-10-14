@@ -28,6 +28,12 @@ _paid-plugins/
 .claude/ide/
 .claude/paste-cache/
 .claude/plugins/
+.claude/state/
+# machine-local: the agent-dispatch hook's fallback outside the repo (agent-dispatch-log.js), the app's own
+# scheduled reminders, and the charter deployed from mcp/claude-userlevel/SUBAGENT_CHARTER.md (as .claude/hooks/ is)
+.claude/agent-dispatch/
+.claude/scheduled-tasks/
+.claude/SUBAGENT_CHARTER.md
 # memory 不進 git（CLAUDE.md R1）— 可能含敏感資料；跨機同步走 Google Drive vault
 # (export-cross-machine-memory.ps1 / import-cross-machine-memory.ps1)，非 git。
 # 還原 70fb8e51（2026-06-04 誤把 memory 納入 git，違反 R1，造成 ao-close guard 卡死）。
@@ -62,6 +68,8 @@ _paid-plugins/
 # .claude/commands/ and ALL .claude/agents/*.md ARE tracked in git
 
 # AO-RESUME local stamp (see scripts/git-audit-tracked-remote.ps1 / check-three-way-sync knownNoise)
+# System Guard's alert flag (autopilot-phase1.ps1 reads it to start auto-repair); a state, not a record
+agency-os/ALERT_REQUIRED.txt
 agency-os/.agency-state/ao-resume-last.txt
 agency-os/.agency-state/pending-task-completions.txt
 agency-os/.agency-state/open-tasks-snapshot.md

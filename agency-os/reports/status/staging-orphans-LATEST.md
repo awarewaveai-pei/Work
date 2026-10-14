@@ -1,6 +1,6 @@
 ﻿# staging 站三層對帳（SG 檔案 / MariaDB / Supabase wp_sites）
 
-- generated: 2026-09-30T02:20:48Z
+- generated: 2026-10-14T00:29:59Z
 - verdict: **OK**
 - staging 磁碟用量: 250.4 MB
 - 孤兒總數: 0（complete: 1）

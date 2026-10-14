@@ -203,5 +203,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `README.md`
 - `scripts/register-new-governance-doc.ps1`
 
-_Last synced: 2026-10-01 09:07:42 UTC_
+_Last synced: 2026-10-14 00:16:07 UTC_
 

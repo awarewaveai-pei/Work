@@ -1,6 +1,6 @@
 {
-    "generatedAt":  "2026-09-30T02:28:03.1836796Z",
-    "overall":  "PASS",
+    "generatedAt":  "2026-10-14T00:28:39.3103986Z",
+    "overall":  "WARN",
     "fatal":  false,
     "fatalReason":  "",
     "sg":  {
@@ -12,12 +12,12 @@
                "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|0 2 * * * root /root/lobster-phase1/scripts/backup-phase1.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261|30 2 * * * root /root/lobster-phase1/scripts/verify-backup.sh \u003e\u003e /var/log/lobster-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "2.6G",
-               "latest_time":  "2026-09-30 02:00:01",
-               "oldest_time":  "2026-09-23 02:00:02",
+               "backup_size":  "1.6G",
+               "latest_time":  "2026-10-13 02:00:01",
+               "oldest_time":  "2026-10-06 02:00:01",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-09-29T02:30:05Z"
+               "verify_time":  "2026-10-13T02:30:04Z"
            },
     "eu":  {
                "host":  "145.239.195.47",
@@ -25,15 +25,15 @@
                "error":  "",
                "cron_status":  "present",
                "unverified_latest":  "no",
-               "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261",
+               "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin|30 2 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/backup-eu-stack.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|0 3 * * * root BACKUP_DIR=/root/backups-stack /root/scripts/verify-backup-eu.sh \u003e\u003e /var/log/eu-backup.log 2\u003e\u00261|17 2 * * * root COGNITIVE_DB_PASSWORD_FILE=/root/cognitive-db-password COGNITIVE_DB_BACKUP_DIR=/root/backups/cognitive-db COGNITIVE_DB_BACKUP_KEEP_DAYS=7 /opt/cognitive-os/Projects/internal/cognitive-engineering-os/ops/cognitive-db/backup-cognitive-db.sh \u003e\u003e/var/log/cognitive-db-backup.log 2\u003e\u00261",
                "retention_days":  "7",
                "retention_source":  "static",
-               "backup_size":  "8.4G",
-               "latest_time":  "2026-09-29 02:33:40",
-               "oldest_time":  "2026-09-22 02:33:43",
+               "backup_size":  "8.7G",
+               "latest_time":  "2026-10-13 02:33:42",
+               "oldest_time":  "2026-10-06 02:33:47",
                "backup_age_days":  "0",
                "verify_result":  "PASSED",
-               "verify_time":  "2026-09-29T03:00:37Z"
+               "verify_time":  "2026-10-13T03:00:37Z"
            },
     "ks_aw_01":  {
                      "host":  "145.239.195.47",
@@ -44,12 +44,12 @@
                      "cron_lines":  "SHELL=/bin/bash|PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin|15 2 * * * root /root/scripts/backup-ks-aw-01.sh \u003e\u003e /var/log/ks-aw-01-backup.log 2\u003e\u00261|45 2 * * * root /root/scripts/verify-backup-ks-aw-01.sh \u003e\u003e /var/log/ks-aw-01-backup.log 2\u003e\u00261",
                      "retention_days":  "7",
                      "retention_source":  "static",
-                     "backup_size":  "6.9G",
-                     "latest_time":  "2026-09-30 02:18:07",
-                     "oldest_time":  "2026-09-22 02:17:44",
+                     "backup_size":  "6.8G",
+                     "latest_time":  "2026-10-13 02:16:00",
+                     "oldest_time":  "2026-10-05 02:17:34",
                      "backup_age_days":  "0",
-                     "verify_result":  "PASSED",
-                     "verify_time":  "2026-09-29T02:45:22Z"
+                     "verify_result":  "FAILED",
+                     "verify_time":  "2026-10-13T02:45:20Z"
                  },
     "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"
 }

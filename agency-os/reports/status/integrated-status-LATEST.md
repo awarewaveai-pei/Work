@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-09-30 01:42:05
+- Generated: 2026-10-13 11:31:26
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -15,20 +15,19 @@
 - `LAST_SYSTEM_STATUS.md`, `WORKLOG.md`
 
 ## 1) TASKS.md - Next (unchecked)
-- [ ] **【研究線｜P1 01–14 上線；P2 WC-01–09 程式與部署前置完成；WC-15 ⑤ prod 抹除未驗】三條線（合作風險／決策利弊／EdD）做成 Cognitive OS 上的 Project 工作流** — 現況與下一步只看計畫正本 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` §0／§12.8／§12.9；P1 紀錄 WORKLOG 續37／41／52／54／55／59；P2 09b 目前只剩付費 DOD-2／DOD-3 與操作者門檻裁定；⑤ 見計畫 §7 R29（操作者）。
+- [ ] **【研究線｜P1 全部完成（WC-15 ⑤ 2026-10-02 驗過）；P2 DOD 8/8 完成（2026-10-02）；剩操作者定門檻】三條線（合作風險／決策利弊／EdD）做成 Cognitive OS 上的 Project 工作流** — 現況與下一步只看計畫正本 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` §0／§12.8／§12.9；P1 紀錄 WORKLOG 續37／41／52／54／55／59；P2 09b 剩：操作者門檻裁定（DOD-2 已用新專案 `857b6f41…`「勿刪」通過，WORKLOG 2026-10-02 續2）；「舊專案刪不掉」後端已排除、待操作者描述畫面（WORKLOG 2026-10-02 續1）。
+- [ ] **【Cognitive OS P4｜待操作者決定】報告核准角色與來源搜尋規模** — ① `POST /projects/{id}/reports/{rid}/approval` 任何有效 session 都能核准，是否限角色；② `GET /sources/search` 無分頁／全文索引／限流（現為上限 100 筆＋每請求讀 200 份 artifact，超出標 `truncated`／`incomplete`），租戶或資料量變大時再做；③ 報告 `run_results` 要等 project-level run binding 才開放。WORKLOG 2026-10-01（續7）。
 - [ ] **【基礎設施｜小】主機 nginx 有 repo 沒有的 `hci.aware-wave.com` server 區塊（漂移）** — `/root/lobster-phase1/nginx/default.conf` 含 hci 區塊，repo `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 沒有；任何人以 repo 檔覆蓋主機檔會讓 hci 站下線。修：把該區塊收進 repo（先比對主機現值）。2026-09-26 PI-b 分流時發現，詳 WORKLOG 2026-09-26（續34）。
-- [ ] **【Cognitive OS web】結果頁已照示意稿（已上線）；剩各頁渲染閘與示意稿裡還沒做的動作** — 已上正式站：外框／首頁／工具／工作流／專案（WORKLOG 續36）、填寫頁（續38）、兩堂課＋課程連結（續39），`79bf7cc5`（續40）。結果頁＝卡片①–⑨＋核准卡、解讀契約 1.1.0 與 detail_integrity 閘（續61），已上正式站 `1fbb021f`（續62）。我的專案：專案名點得進專案頁、每次分析一列且打得開、每次「執行分析」開自己的專案、建立／最後更新到分鐘（2026-09-27 續1），已上正式站 `b6936ecc`（續3）。剩：① `check-mocks.py --page` 只有 result，首頁／工具目錄／工具頁／工作流頁沒有渲染 HTML 閘；② 工作流逐站頁（P3）；③ 結果頁對示意稿 310 筆已全修（2026-09-28 續11＋續15，已 push，未上線），見 `Projects/internal/cognitive-engineering-os/docs/RESULT_PAGE_GAP_REPORT.md`；④ 上線 High-STOP（報告 §9），先定每租戶每日 token 額度（一次分析約 1.8–4.3 萬）。
+- [ ] **【Cognitive OS web】結果頁已照示意稿（已上線）；剩各頁渲染閘與示意稿裡還沒做的動作** — 已上正式站：外框／首頁／工具／工作流／專案（WORKLOG 續36）、填寫頁（續38）、兩堂課＋課程連結（續39），`79bf7cc5`（續40）。結果頁＝卡片①–⑨＋核准卡、解讀契約 1.1.0 與 detail_integrity 閘（續61），已上正式站 `1fbb021f`（續62）。我的專案：專案名點得進專案頁、每次分析一列且打得開、每次「執行分析」開自己的專案、建立／最後更新到分鐘（2026-09-27 續1），已上正式站 `b6936ecc`（續3）。剩：① `check-mocks.py --page` 只有 result，首頁／工具目錄／工具頁／工作流頁沒有渲染 HTML 閘；② 工作流逐站頁（P3）；③ 結果頁對示意稿 310 筆已全修（2026-09-28 續11＋續15），已隨 `73b9ac8f8` 上線（2026-09-29 續8；登入後畫面待正式站測試身分），見 `Projects/internal/cognitive-engineering-os/docs/RESULT_PAGE_GAP_REPORT.md`；④ 上線 High-STOP（報告 §9），先定每租戶每日 token 額度（一次分析約 1.8–4.3 萬）。
 - [ ] **【蒐集｜設計問題，需判斷】density 是不是該有單獨否決權** — 同一批實測裡 `rusi.org/people/farrell`、`royalsoc.org.au/...`被 `low_text_density` 擋下，但那些頁面的抽取其實是對的：正文短、站本身 HTML 很重（605KB）。`MIN_DENSITY` 的用意是「抽到的是導覽列而不是正文」，可是對「短但完整的個人檔案頁」它會誤判，而個人檔案頁正是背景調查最需要的東西。可能的治本方向：density 改成第二訊號（只在 textBytes 貼近下限時才否決），與 soft-404 的 weak-marker 邏輯同構——但這會放寬所有來源的入庫條件，影響客戶 KB，**不是可以順手改的東西**。需要先蒐集實際 textBytes/density 分布再決定。
 - [ ] **【MainWP】建站自動接上 MainWP：bridge 已修好（2026-09-24），剩 next-admin 部署（DEPLOY_HOLD）＋真建站 E2E**
 - [ ] **【資安｜待操作者】staging WP admin 密碼曾明文進 Trigger.dev run output：輪換 2 站 + redact 9 run + deploy**
-- [ ] **Codex `/hooks` trust 未執行，Codex 側等同零機械閘** — `check-claude-codex-parity.ps1` 444/446，唯二失敗就是這條（`0/8 hook handlers trusted` + 無 heartbeat）。2026-09-20 的共用資產成果（41 個 command wrapper、25 個 agent bridge、相對路徑、model 分層）在 Codex session 內全都沒有機械強制。**需操作者在 Codex 開 `D:\Work` 跑 `/hooks` 並 trust AwareWave hooks**，之後 `check-claude-codex-parity.ps1` 應轉 446/446。
 - [ ] **【2026-09-11 開出｜蒐集 C1 × KB】`provenance` 與 `author` 到 sink 就斷** — 蒐集端每份文件都蓋 `EVIDENCE`/`SOURCE_QUOTATION`（`lib/collect/provenance.ts`）並抓 byline，但 `KnowledgeInput`（`lib/kb/types.ts`）沒有這兩個欄位，`sink/kb` 只能丟掉。後果：客服 AI 從 KB 撈到爬來的廠商行銷文案時，沒有任何標記可據以包裝成 untrusted quote——正是 `DATA_COLLECTION_PLAN.md` §1.3b「傳遞」列要防的整條路徑。KB 側屬 K2e（三軸 + locked），本項在那之前不得宣稱 §1.3b 完成。
 - [ ] **【2026-09-11 開出｜KB K1】per-model partial HNSW 是否真的被用到，未經 EXPLAIN 證實** — 0072 加了 `idx_cs_chunks_hnsw_te3s`（`WHERE embed_model = 'text-embedding-3-small'`），0051 的全表 `idx_cs_chunks_embedding` 仍在，兩個 HNSW 同時維護 = 雙倍寫入成本；而 `p_model` 是 bind parameter，partial index 未必會被選中。塞 ~2000 列跑 `EXPLAIN (ANALYZE)` 確認後再決定刪哪一個。順帶：0051 的 `bm25_tsv` 欄與 `idx_cs_chunks_bm25` 至今無人寫也無人讀（死欄位＋死索引），一併處置。
 - [ ] **【2026-09-12 開出｜KB migration 0076】critic 覆審找到的五個延後項（皆非阻擋，已個別記在程式註解裡）**
 - [ ] **【2026-09-11 開出｜影片｜待查】`/api/video/regenerate-image` 502，與 remotion-render 502 不同根因，未修**
 - [ ] **【⚠️ 逾期 69 天｜原排 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**
 - [ ] **【未開始｜2026-08-25 開｜到期日 2026-08-31】重新啟用 Codex stop-time review gate** — 2026-08-25 05:08 UTC **暫時停用**（`node ~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/codex-companion.mjs setup --disable-review-gate`，走官方開關非改檔；已驗證 `stopReviewGate: True → False`）。
-- [ ] **🔴【資安】2026-08-27 `HF_TOKEN` 明文進入對話紀錄 — 待輪換** —— 驗證 WSL2 環境變數轉送時讀取 `/proc/<pid>/environ`，遮罩用的 `sed` 比對條件寫錯未生效，HuggingFace token 完整值印進 transcript。**與 2026-08-15 三項外洩同根因**（遮罩「輸出後才套用」而非「不讀取值」），第三次發生。
 - [ ] **⏭️ Soulful 搬站：機器買到後的接手點（硬死線 2026-11-12，買機死線 9/30）**
 - [ ] **【🔴 硬死線 2026-11-12｜②主體搬遷已完成 2026-08-28，③④收尾未做｜2026-08-30 稽核】Soulful 網站搬離 Hostinger（hosting 不續約，操作者 2026-08-15 決定）** — **狀態更新（不要照下方 KS-6/買機日期等舊細節行動，那是原計畫，實際發生的不一樣）**：④步驟執行順序中的②「網站搬新購二手 dedicated 機」**已完成**——實際買的是 OVH SYS-GAME-2（不是原計畫的 KS-6/auction 機），2026-08-28 完成真流量切換到 `ks-aw-01`（見 WORKLOG「🎉 Soulful 正式切換完成」+ `AUTO_TASK_DONE: soulful-cutover-executed`）。**還沒做的只剩**：③ 網域轉 CF Registrar（原文自己就寫「建議搬站穩定後再做」，尚未執行）④ 讓 Hostinger hosting 自然到期於 2026-11-12（未到期，不用管）。舊站維持凍結當回滾路徑，觀察期滿（2026-09-04 起）才進入收尾，見本檔「⏭️ Soulful 搬站」大項 §157。
       - [ ] EU①Supabase（**High-risk，需操作者本人在線**，六服務中風險最高、放最後搬）
@@ -45,7 +44,7 @@
       - [ ] SG⑪Redis（共用快取層，隨最後一個依賴它的服務一起搬，不單獨排波；**檢查現況是否有密碼，新機多服務共用建議補上**）
       - [ ] SG⑫觀測堆疊（Loki/Grafana/Promtail；**✅ 2026-08-19 SSH 查證用途：SG 主機自己的日誌監控**，loopback-only + SSH tunnel 存取，有正式文件 [`OBSERVABILITY_P1_P2_ROLLOUT.md`](docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md)，為防過去 502 事故而建——**要搬，不是退役項**；搬遷後 SSH tunnel 指令要改指新機 IP）
       - [ ] 兩台雲端主機確認已無流量 → 安全關閉 → 帳單確認只剩一台在計費（呼應 Pre-mortem「切換 +120 天仍 &gt;1 台在跑」的預警指標）
-- [ ] **【2026-09-28 觸發】aware-wave.com DMARC 升級第一階段（p=none → p=quarantine;pct=25）** — 決策正本 [`reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`](reports/decisions/2026-09-10-dmarc-enforcement-timeline.md)：機械分階段（pct=25→100→reject，各 14 天），前提是操作者查看 `peijingartstudio@gmail.com` 收到的 DMARC rua 聚合報表，確認 Cloudflare Email Routing／Amazon SES／Resend 三個已知寄件來源皆對齊、零未解釋失敗。任一階段出現未解釋失敗 → 凍結，不得跳過原因逕自往下推進。（2026-09-28：排程提醒已觸發，已推播通知操作者查信；本項尚未執行，等待操作者確認 rua 報表結果後續行動）
+- [ ] **【2026-10-15 觸發】aware-wave.com DMARC 升級第二階段（pct=25 → pct=100）** — 同上決策正本的機械時程，重複同款報表檢查（這次要確認 Gmail 搜尋沒有限制在單一寄件者，不只看 google.com）。**提醒已排**：操作者 2026-10-03 表示已自行設定 10-15 提醒（不需再建 routine）。
 - [ ] **【人工｜Postiz Task 2 OAuth app 審核】各平台 dev app 提交** — Meta IG+FB（一個 Meta app，App Review，最高價值）/ Reddit / LinkedIn。callback = `https://postiz.aware-wave.com/integrations/social/<slug>`；client_id/secret 加進 EU `/root/postiz/.env`（`<PLATFORM>_CLIENT_ID/SECRET`）+ restart。
 - [ ] **【診斷】Mockup Studio 功能異常 — server-side 已排除（2026-06-16），卡操作者症狀**：操作者回報 mockup 有問題未提供細節（2026-06-13）。MockupStudio.tsx 實走 `/api/tools/studio/generate`（nano-banana-2 + referenceImages）。
 - [ ] **【驗證債】Canvas 編輯器 `/tools/canvas` 整輪瀏覽器實測** — 整個 PS 功能目錄已全部 build+deploy（HEAD 含 `09b81ee4`/`5b73b77d`，tsc 0+build 0+critic 過），但**使用者尚未瀏覽器實測**（Claude 無登入 session 無法測）。主檔 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/tools/canvas/CanvasEditor.tsx`。待驗清單：
@@ -62,12 +61,12 @@
 - [ ] **【2026-08-26 開出｜中】現存 10 個 staging 孤兒 / 1969.7 MB 待清理（拆除路徑已就緒，清理是決策）** — 見 `agency-os/reports/status/staging-orphans-LATEST.md`。**4 個 unregistered**（`fresh-brew-coffee-f2a3b4` 93MB、`green-valley-farm-28ba09` 217MB、`ssasd-8ebcd4` 306MB、`test-pilot` 93MB）有目錄有 DB 但從未進過 `wp_sites` —— 佈建 wiring 是 best-effort，失敗只回 WARN 不擋佈建。**3 個 complete 但已停用**（`e2e-verify-0704` 357MB、`mongolia-03` 549MB、`test-wp-webhook-co` 355MB），WP REST 實測 404。**6 個 db_only** 只剩資料庫沒有目錄，`deprovision-staging.sh` **刻意拆不動**（要求目錄存在且含 wp-config.php，否則無法證明要 DROP 哪一個），需人工確認後手動處理。SG 根磁碟 67%（48G/75G）。**注意 `test-pilot` 的 DB 叫 `wp_staging_testpilot`，命名規則與自動佈建不同，可能是更早的手工產物，不該和自動佈建的混在一起判斷。**
 - [ ] **【2026-08-26 開出｜中】手動新增的站拿不到租戶歸屬
 - [ ] **【2026-08-26 開出｜小｜跟著
-- [ ] **【2026-09-26 開出｜DB｜Medium】正式庫從未套用 4 個 migration** — ledger 補登時逐檔實測發現（WORKLOG 續48）：0022 build console 7 表＋`sites.apply_mode`（adopt-client-os／wp-install-plugins 會寫這些表，Profile C 目前在正式庫必失敗）；0037 派送 index（檔內 CONCURRENTLY，需非交易手動套）；0024 `tenant_integration_bindings_ws_idx`；0057 wp-update 目錄列（`lib/ops-actions/record.ts` 首次使用會自動 upsert，可只補帳）。0022 無自身 BEGIN/COMMIT、runner 會拒絕 → 需先補交易包裹（新號或原檔修正需決定）。套完以 `apply-db-migration.mjs --record-only` 補帳。
-- [ ] **【2026-09-26 開出｜小】workflows 套件沒有 typecheck 步驟** — `lobster-factory/packages/workflows` 無 tsconfig／typescript；Trigger build（esbuild）不做型別檢查。ad-hoc strict tsc 找到 3 個既有錯：`dispatch-action-run.ts:198`（captureWorkflowEvent 參數缺 workflowId）、`:213`（SentryContext 無 runId）、`hosting/providers/httpJsonStagingAdapter.ts:51`。WORKLOG 續43。
+- [ ] **【2026-10-01 開出｜小】verify-governance-pointers 未接進 commit 當下的 hook** — `scripts/verify-governance-pointers.mjs` 現在在 CI（push 後）、健康閘（AO-CLOSE）、`scripts/test-hooks.sh` 跑；`validate-doc-integrity.mjs --commit` 模式不跑它，破壞段落指標的 commit 要到 push／收工才紅。做法：`mcp/claude-userlevel/hooks/rules/doc-link-commit-check.js` 在 commit 動到規則檔或引用面時加跑一次（約 0.4 秒）。延後原因：開出當日另一 session 正在改 hooks。來源：Codex 第三輪 finding 6，`agency-os/reports/oracle/2026-10-01-partialreview-c8ad097d.md`；WORKLOG 2026-10-01「規則檔指標完整性」條。
 - [ ] **【2026-09-26 開出｜POD｜Medium】Woo 端對帳：webhook 是否仍啟用、有無投遞失敗** — pod_order_inbox 只看得到「有送到」的訂單；WooCommerce 停用 webhook（>5 次失敗）或部署重啟時的單筆失敗，收件匣看不到。偵測：讀 soulful `wp_wc_webhooks`（delivery_url 含 `/api/webhooks/woo-order`）的 status＝active 且 failure_count＝0，沿用 `scripts/check-smoke-tests.ps1` client_mail 的 SOULFUL_DB_PROFILE 傳輸（Hostinger／ks-aw-01 切換期）。critic M2 延伸，WORKLOG 續51。
 - [ ] **【2026-09-26 開出｜小｜設定】env 設定的 WP 站與 bridge 站綁 org** — env 站（`lib/content/wp-sites.ts:42` organizationId null）只受 global 模式管、社群發文回 422；bridge 站以網址 host 對應 active wp_sites 列取 org（`lib/studio/wp-bridge-client.ts` bridgeSiteOrg），無列 = 只看 global。修：把這些站建成 wp_sites 列並填 organization_id。T18 critic M2＋m5，詳 WORKLOG 續26。
-- [ ] **【2026-09-26 開出｜資安｜小】app origin 的前端供應鏈與傳輸加固** — `public/vector-editor.html:7-13` 7 支 cdnjs／jsdelivr script 無 SRI（跑在 app origin、不受登入保護，session cookie httpOnly:false 可被讀）；live 無 HSTS header、cookie 無 Secure。修：加 `integrity`＋`crossorigin` 或自架；nginx 加 HSTS。 → SRI ✅ 2026-09-26 續47（T23，7 支 hash 與 CDN 官方值比對一致）；HSTS（host nginx）＋cookie Secure 仍待做。
 - [ ] **【2026-09-12 開出｜中優先】`git-align-main-aoresume-feature-*` 自動對齊腳本會吃掉未提交的編輯**
+- [ ] **【2026-10-01 開出｜Cognitive OS｜低優先】渲染後的字級／行寬檢查（U22）還不是任何閘：`render-mocks.cjs` exit 4 只在手動跑時擋**
+- [ ] **【2026-10-01 開出｜Cognitive OS｜低優先】結果頁快照 fixture 過期：`check-mocks-selftest.py` 的 page 突變 2/2 漏抓**
 - [ ] **【2026-09-28 開出｜Cognitive OS｜低優先】run_recipe_async 終態 FAILED flake：`test_async_run_reaches_a_terminal_state_via_the_existing_status_endpoint` 高負載下 async run 以 FAILED 收尾**
 - [ ] **【2026-09-11 開出｜HCI30｜低優先】mutation-check-wave1.ps1 的 `drop-all-subject-records-referencing-fks` 疑似 flaky**
 - [ ] **【2026-09-19 開出｜HCI30｜中】快照未存抓取時的 HTTP header charset** — 「採用為證據」從已存 bytes 重新擷取文字時只剩 BOM/`<meta>` 可判斷編碼；只在 header 宣告 Big5/GBK/Shift_JIS 的頁面會變亂碼證據（人工預覽看得到，append-only 無法事後改）。治本＝`hci.source_snapshots` 加 `content_charset`（migration，High）+ sink 寫入 + `/snapshot-text` 帶入 `detectHtmlEncoding`。來源：critic m2，WORKLOG 2026-09-19「HCI 採用為證據」。
@@ -80,7 +79,6 @@
 - [ ] **Bash 工具 wrapper 疑似壞掉，需獨立調查（間歇性，非持續）** — 2026-09-17 某 session 三種方式（裸指令、`.sh` 檔、`cmd.exe //c` .bat 檔）全部同樣失敗，錯誤與內容無關；同日兩個獨立 `fullstack-engineer` agent（做 Task 4/5，見上）也各自整個 session 100% 中招、從未找到解法。過去偶發同款症狀曾用「寫 script 檔另外呼叫」繞過，那次繞不過。**同日稍後另一個 session（本次，接手真跑 Task 4/5 驗證）Bash 全程正常**——`echo hi`、`node --test`、`powershell -File`（含 real-Docker/MinIO 跑約 5 分鐘）、`git`、`grep` 皆無異常，跨約 20 分鐘、數十次呼叫零故障。懷疑是特定 subagent 沙箱/session 才會中招，不是這台機器或這個 wrapper 全域持續壞掉；根因仍未定位，過去猜測（`bash -c` 呼叫前後被注入東西）未驗證。優先權降為中——不再擋住每個 session，但下次再中招時應保留完整錯誤輸出供比對。
 - [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
 - [ ] **【2026-09-19 開出｜bughunt-oracle 驗證缺口｜根因：為什麼 6/21 的修復沒擋住 9/19 的 sonar-pro 預設值】**`bughunt-oracle.ps1` 只驗 `hits=0` 的零命中宣告是否造假，不驗 `hits=N`（N>0）的清單是否完整。2026-06-21 那次 Perplexity 修復（WORKLOG-archive/2026-06.md:2777）宣告 `BUGHUNT_DONE: grep=PERPLEXITY_API_KEY | hits=3`，但同一個 scope（agency-os,scripts,lobster-factory）、同一個 pattern，2026-09-19 重跑立刻多出 `scripts/perplexity-cli.ps1:10,12,15` 三處命中——該檔案 2026-04-23 就存在，早於那次修復兩個月，理當被同一次 grep 掃到。這行記錄沒提到它，也沒有像 `trending-sources.ts`/`generate-core.ts` 那樣寫「不動理由」，代表不是刻意排除，是漏掉。這正是 `scripts/perplexity-cli.ps1` 的 sonar-pro 預設值沒被那次修復一併抓到、缺口留到今天的直接原因。詳見 WORKLOG 2026-09-19（續76）。**修法方向**：bughunt-oracle 對非零 hits 也該獨立重跑 grep 比對清單是否完整，不能只驗證「宣告的每一條是否真實存在」。
-- [ ] **Cursor 散文殘留：10 份文件仍叫操作者「用 Cursor 開 monorepo 根」**
 - [ ] **【2026-08-26 開出｜偵測器說謊｜第三顆】Phase 4 Check 1／Check 2 至少 12 週在回報假綠燈 —— 雲端容器沒有 `gh`** — 2026-08-26 把檢查邏輯換成 `scripts/phase4-checks.py` 後第一次雲端實跑，Check 1／2 回 `SKIP — gh not installed`（`RemoteTrigger get_run_log cse_01BAKre3odz4KUbP1jUDxaFS`，容器內 `python3` 有、`gh` 沒有）。但 `agency-os/reports/repair-center/phase4-2026-06-08.md` 到 `phase4-2026-08-21.md` **連續 12 份全部是 `Check 1: PASS`**（逐檔 grep 確認）。舊 prompt 明文寫 `If gh exit != 0: CHECK1_STATUS = "SKIP"`，所以要嘛容器映像近期拿掉 `gh`，要嘛散文規格被執行成了 PASS —— 兩者結論相同：**那兩項檢查有 12 週沒有真的在量任何東西**。**現況不是退步**：SKIP 是誠實的「我沒量到」，比假 PASS 好；且 SKIP 會進 `整體` 顯示（今天是「⚠️ 1 項需注意, 2 項 SKIP」），不會被當健康。**要決定的是取捨不是 bug**：① 給 routine 配 setup script 裝 `gh`（目前 `No setup script configured`）② 改走 GitHub REST API + token —— 但 routine 刻意無 env vars（與另外三支 routine 同 pattern），加 token 會讓四支分叉 ③ 接受 SKIP，把 auto-repair PR 重複偵測改由本機 `/health` 或 `.ps1` fallback 負責（本機有 `gh`，今天實測 Check 1 正常回 PASS）。**建議③**：這兩項本來就不是時效性檢查，而雲端加 secret 的代價高於收益。
 - [ ] **建立 `detector-contract` audit class：偵測器必須申報「這輪量到什麼」**
 - [ ] **【🟡 邏輯已修，僅剩字面措辭未達完成定義｜2026-08-30 稽核確認】`check-backup-health.ps1` 把「無法證明可還原」當成健康** — 平行 session 已完成邏輯修正：`:264-269` 新增 `$sgVerifyDead/$euVerifyDead/$ksVerifyDead`（UNKNOWN 且 backup_age_days≥1 才判定），`:277` 折入 `$overall` 計算，UNKNOWN 已能正確升級 WARN（新鮮的 UNKNOWN 仍安靜，不會 false-alarm）。**未達成的只剩完成定義字面要求**：WARN 訊息目前只標 `(unknown)`，未寫出「無法證明可還原」這句話本身（`:312-313`）。不打勾，留給補一行文字。
@@ -89,10 +87,8 @@
 - [ ] **【2026-08-26 開出｜治理｜✅ 根因已定位 2026-08-26】廣域 `git add -A` 把別的 session 未驗證的工作掃進不相干的 commit**
 - [ ] **【2026-08-26 開出｜治理｜具名 add 也擋不住】兩個 session 編輯同一檔案時，`git add -- <file>` 一樣會帶走對方未提交的編輯**
 - [ ] **【2026-08-26 開出｜小｜人體工學，非安全機制】`record-restore-drill` 一鍵記錄還原演練** — 目前記錄一次演練要手寫兩處（frontmatter `restore_drills` + 敘述段落）。
-- [ ] **【2026-08-25 開出｜小｜文件一致性】Soulful staging「abandon」決策未傳播到 3 份仍在宣告它的文件** — 2026-08-16 已決議不在即將退場的 Hostinger 上建 staging，`ENVIRONMENT_REGISTRY.md` / `02_EXECUTION_PLAN.md` 均已加刪除線，但下列**仍以肯定語氣宣告要建 staging**，冷啟動的代理或操作者照著做就會白工：
 - [ ] **【2026-08-25 開出】`ao-resume-last.txt` 錨點卡在 2026-06-12，AO-CLOSE 視窗計算長期失真** — `agency-os/.agency-state/ao-resume-last.txt` 實測值 `2026-06-12T05:27:33.6508893Z`，距今 2.5 個月未推進；`ao-close-prev.txt`=`2026-08-24T12:13:10Z`、`ao-close-last.txt`=`2026-08-24T12:14:06Z` 兩者只差 56 秒（同日兩次 close 嘗試）。
-- [ ] **【2026-08-24 開出】CHANGE_IMPACT_MATRIX 漂移偵測腳本首輪 7 個 WARN 待人工確認** — `scripts/check-change-impact-matrix-drift.ps1` 2026-08-24 首次接進月度巡檢（`ao-resume.ps1` monthly check #5），真實跑出 7 對 WARN（全部是 `docs/operations/cursor-enterprise-rules-index.md` / `docs/operations/cursor-mcp-and-plugin-inventory.md` / `../docs/spec/raw/Cursor  Rules for AI/README-部署說明.md` 宣告的 impacted，vs `.cursor/rules/64-architecture-mcp-routing.mdc` / `65-build-standards-data-state.mdc` / `66-skills-observability-protocol.mdc` 三個 `.mdc` 檔案，4 月未更新但主文件近期持續改動，drift 127-141 天）。
-- [ ] **【2026-08-29 開出｜中】`system-health-check.ps1` 7)deploy-drift(:520) 與 9)cloudflare(:~610) 兩個 check 從未真正執行過** — 同一 session 修 CP950 第三 class 時發現：`$root` 恆等於 `agency-os`（`Resolve-WorkspaceRoot` 的 monorepo guardrail），但 `check-deploy-drift.ps1` / `check-cloudflare-security.ps1` 只存在於 monorepo-root `scripts/`，從未存在於 `agency-os/scripts/`，故這兩個 `Join-Path $root "scripts/..."` 恆指向不存在路徑，`Test-Path` 恆 false，兩個 check 永遠走 `Pass=$true "Skipped: ... not present"` 分支——跟 7b（CP950 parse-break）2026-05-30 上線後從未真正跑過是同一款缺陷，本次已修 7b/7c（改用 `$monoRoot`），這兩個刻意未動（不同 check，需各自驗證改用 `$monoRoot` 後的實際輸出是否正確，不能照搬 7b/7c 的 fail-closed 處理，因為這兩個目前是 informational/warn-only 不是 hard gate）。
+- [ ] **【2026-10-01 開出】git-log-injector 描述過期：仍寫「上一完整 session（全部）commits」** — 實際行為見 WORKLOG 2026-10-01 續5（窗 >3d 退 `-10`、20 行封頂）。待改：`agency-os/AGENTS.md:23`、`agency-os/docs/operations/AGENTS_APPENDIX.md:122,155,581,699`、`agency-os/docs/operations/TOOL_TRIGGER_MAP.md:377`、`mcp/claude-userlevel/hooks/README.md:61`、`README.zh-TW.md:61`。當日皆被他 session 認領／未 commit，等其 commit 後改；另 live hooks 的 settings.json 與 template 漂移（`model` 等 key）待操作者決定是否 `sync-claude-userlevel.ps1 -Mode merge`。
 - [ ] **【2026-08-25 開出｜小｜非阻塞】CP950 backlog 其餘 84 個 site：套用 ao-close 那套分類法** — 2026-08-25 關掉 27 個（`ao-resume.ps1` 17／`lib/git-safe-ops.ps1` 4／`ao-close.ps1` 6），repo-wide drift 111→84。
 - [ ] TASKS [x] 自動歸檔 + 重複行偵測閘（archive-completed-tasks.ps1，**R0 已批方案A**，照 packet 直接動工免重提案）→ handoffs/2026-06-11-1738-tomo-173818.md
 - [ ] **【未開始｜先預留】Composable AI Commerce OS** — 藍圖已吸收為參考素材（`agency-os/docs/Composable AI Commerce OS/`，含 Master Plan / Implementation Roadmap / LEGO Documentation Pack；absorbed via commit `97cdea3ed`）。操作者 2026-09-05 明示「之後要做，先預留」，**目前不動工**，勿主動排入排程；待操作者明示啟動再展開任務拆解。
@@ -131,7 +127,9 @@
 - [ ] **【2026-08-29 開出｜未開始】`status.aware-wave.com` = 現有 `uptime.aware-wave.com`（Uptime Kuma）對外開放 view** — 不重建，SSOT：`docs/edge-and-domains/PRODUCT_DOMAIN_IA_PLAN.md` §2。做法二選一：(a) Kuma 內建 public status page 功能開一個 group，另建 CNAME `status`→同一 Kuma；(b) 直接讓 `uptime.aware-wave.com` 兼公開用（需確認現有 dashboard 沒有機敏資訊外露）。
 - [ ] **【已知風險｜操作者已決定不輪換｜2026-08-17】`~/.codex/config.toml` 明文憑證** — 該檔以明文存約 30 組正式憑證（Supabase `service_role`、Hetzner API token、Cloudflare API token、Resend、Slack、Sentry、n8n、Grafana 密碼、Trigger prod token 等）。2026-08-17 稽核 Codex 設定時另被印入 session transcript（transcript 保留期已於 `75512998` 改為 365 天）。
 - [ ] **【已知缺陷｜第三方 plugin，不在本 repo｜2026-08-25 開】`stop-review-gate-hook.mjs` 的失敗訊息會遮住真正原因** — `~/.claude/plugins/cache/openai-codex/codex/1.0.6/scripts/stop-review-gate-hook.mjs:121` 寫 `String(result.stderr || result.stdout || "")`。
+- [ ] **認知主權平台：步驟 2 已併進 main（未 push）；接下來儲存切換 W1–W3（PostgreSQL 每區域一台）→ 步驟 3+4 → 才問上線；Codex 可照接手包接手** → handoffs/2026-10-04-1400-cos-step2-merged-storage-next.md
 - [ ] **`decision.eisenhower_matrix` 內聯 provenance 正規化改呼叫共用函式**
+- [ ] **COS Codex→Claude 接手（未完成；主線勿合併）**：隔離樹 `D:/tmp/cos-codex` 的卡 51 已暫存未提交，`D:/tmp/cos-pg` 的 W1–W3 被實測擦除資料遺失擋住；全情見 `agency-os/handoffs/2026-10-08-cos-codex-to-claude.md`。根因/卡點：`ai_lego/platform/exports/render.py:153` 的固定字數換行裁切 PDF 中文；PG `ai_lego/data/repositories/project_source_repository.py:765` 先 unlink CAS 再 commit，故障注入得 `row_survives=True blob_survives=False`。已試：卡 51 局部測試 8+14+43+20+109 綠，5 突變紅；真 PG 重現資料遺失。**下一步**：① 讀交接包，核對兩樹 `git status` 與 queue 過期 `running` ② 修卡 51 排版/已讀/並發並完成私有索引提交、Claude review ③ 以可重試擦除流程修 PG P0 並做故障回歸，雙重審查和真 PG 過閘前不 merge／push／部署。
 
 ## 2) TASKS.md - Backlog (unchecked)
 - [ ] **Cloudflare MCP 連線失敗（`insufficient scope: account:read`）待操作者在 Cloudflare dashboard 修 token permission** — 根因已診斷完成（`CLOUDFLARE_AUTH_BEARER_TOKEN` 缺 `Account Settings: Read`），修復動作屬修改外部帳號安全設定，非 Claude 可代做。步驟見 WORKLOG 2026-09-12（續13）。同條目另揭露：診斷過程誤將 6 把憑證明文印進 session transcript，建議操作者輪替。
@@ -371,94 +369,87 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-09-30.md
-# Daily Note - 2026-09-30
-
-## AO-CLOSE
-
-- Completed: Cognitive OS report API lifecycle and Markdown export were committed and pushed as `53dc77535`; local research-line status and remaining work were documented.
-- Verification: report API tests and the isolated cross-project source-search slice were run; the latter remains uncommitted in its managed worktree pending its own closeout.
-- Safety: shared dirty/staged files belonging to other work were preserved; no reset, clean, production write, or Airtable import was performed.
-- Open: P2-09 paid/operator gates, P1 WC-15 production verification, PI-b05/P-ARF-data, and remaining P4 exports/approval/recipe-binding work.
+## 5) memory/daily/2026-10-13.md
+_no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
-- Mode: `manual`
-- Time: `2026-09-30 01:40:40`
-- Health score: **100%**
+- Mode: `daily`
+- Time: `2026-10-09 20:20:55`
+- Health score: **99.4%**
 - Threshold: **100%**
-- Health gate exit code: **0**
+- Health gate exit code: **1**
 - Closeout report exists: **YES**
-- Result: **PASS**
-- Auto-repair attempted: **NO**
-- Auto-repair result: **N/A**
+- Result: **FAIL**
+- Auto-repair attempted: **YES**
+- Auto-repair result: **FAIL**
 
 ## Latest Reports
-- Health: `reports/health/health-20260930-014040.md`
-- Closeout: `reports/closeout/closeout-20260930-014019.md`
+- Health: `reports/health/health-20261009-202054.md`
+- Closeout: `reports/closeout/closeout-20261009-201705.md`
 
 ## Action
-- No blocking issue detected.
+- Blocking issues detected. Review latest health/closeout reports immediately.
 
 ## 7) WORKLOG.md tail (~60 lines)
-[rollback] `git revert` 本 commit 即還原兩份舊檔與註解。
+- `reports/decisions/INDEX.md`：登錄決策報告。
+- `C:\Users\user1115\.claude\projects\d--Work\memory\` 下 21 份檔案：`audit-cross-machine-bom.ps1 -Fix` 以保留 backup 的方式補上 BOM；備份位於 `.bom-backfill-backup-20260901-021636`（檔案不在 Git repo）。
 
-（續）操作者問「動工用哪份、還能優化嗎」→ packet §5 依風險重排：① renderer 真實測試移到第 1 步（最大未知先殺）② 新增 RPC 契約靜態測試（`p_*` key vs 0091 簽名；今日 scratch 比對 16/16 一致；守 PGRST202 類）③ Trigger+env 合併為第 3 步、UI 卡拆 4a 最小／4b 證據 ④ 8b 註明 migration 必先於部署（`cleanup` route 不受 kill switch 保護）⑤ 8f 註明首次開啟全 target 立即跑一次 ⑥ 待決 D1：slice 1 visual 告警現況會進 Telegram（medium ≥ 預設 min medium），建議降 low 待遮罩 selector。
-WORKLOG_DONE: site-watch 交接包重擬為單一合規 packet（TASKS 已登記）、設計 glossary 進 0091 檔頭、程式註解不再依賴會被 prune 的 handoff
+[驗證結果]
+- REALTEST_WAIVED: DOC_ONLY — 決策包沒有 runtime/schema/部署變更；文件完整性檢查確認 Wave 1 為 11 項、延後為 13 項、HCI ADR index 零 `ACCEPTED` 項、報告索引存在且 `git diff --check` 通過。
+- REVIEW_DONE: decision-intelligence architecture review（Topic Analyzer、3×Advocate、Security／DevOps／Cost／Product／Customer Voice／Legal／Compliance／AI-ML／Scalability、Skeptic、Judge、Pre-mortem、Implementation／Rollout Planner）| verdict=C2 Wave 1 tranche | confidence=0.70；pre-mortem 新增「批准與 machine-enforced control 脫鉤」風險及對應 gate。
+- BUGHUNT_DONE: `audit-cross-machine-bom.ps1` 修復後重跑：80/80 `.md` 有 UTF-8 BOM、missing=0；HCI decision packet 檢查確認沒有將任何 `PLANNED` ADR 誤標為 `ACCEPTED`。
 
-## 2026-09-23（續）site-watch 計畫改為單一 MASTER PLAN（操作者：「我要完整的，沒頭沒尾」）
-**根因**：計畫被我拆成三處——handoff packet（只講 slice 1 進度）、0091 檔頭（C1–C12 glossary）、被刪的 09-21 plan（唯一寫了 Slice 2／P2／P3 路線圖）。接手者拿到的是碎片，不是計畫。
-**修法**：新建 `agency-os/docs/operations/SITE_WATCH_MASTER_PLAN.md`（沿用 `APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md`／`CONTENT_PIPELINE_BLOCKS_MASTER_PLAN.md` 慣例；兩者皆未登記 DOCS_INDEX／CHANGE_IMPACT_MATRIX，本檔同）：§0 現況、§1 分期總表（Slice 1／2／P2／P3）、§2 操作者拍板、§3 架構（file:line）、§4 完整合約 I1–I3 + C1–C12（as implemented，含 Slice 2 的 C11）、§5 驗收矩陣 14 條各標驗於何處、§6 風險與待決 D1、§7 下一步 8 步、§8 Slice 2／P2／P3 設計備忘（含 `addSiteToMainWp` 正確位置 `packages/workflows/src/integrations/integration-steps.ts:371`，舊 plan 寫的 next-admin 路徑不存在）、§9 回滾、§10 文件關係。
-- 0091 檔頭：C1–C12 glossary 移出，改一行指回 MASTER PLAN §4；I1–I3 保留（schema 自述）。程式 4 處註解「glossary in 0091」經檔頭轉指，不再改。
-- `git rm handoffs/2026-09-23-1116-site-watch-slice1.md`（併入 §7；可自 `76a0a2e3f` 取回）；TASKS.md §I 列改指 MASTER PLAN §7，移除 `→ handoffs/` pointer（packet 已無）。
-- REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/site-watch-local-verify.sh`（0091 檔頭改後 apply/down/re-apply） | exit=0 | ms=40000
-- REALTEST_EVIDENCE: tool=Bash | cmd=for-loop `[ -e ]` 對 MASTER PLAN 引用的 20 個路徑 | exit=0 | ms=50（0 MISSING）
-- REVIEW_WAIVED: DOC_ONLY -- 新文件 + migration 註解 + TASKS 指針，無邏輯改動
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`site-watch-slice1.md|SITE_WATCH_MASTER_PLAN` | hits=3 files（MASTER PLAN 自身、TASKS.md、0091 檔頭；舊 packet 名僅存於本 WORKLOG）
-[剩餘風險] MASTER PLAN §3/§4 的 `:line` 以 2026-09-23 為準，程式改動後需同步；D1 仍待操作者。
-[rollback] `git revert` 本 commit。
+[剩餘風險]
+- HD-00～23 的最終選項仍需操作者明示；在 HD-01／02 未批准前不得 freeze Wave 1 domain schema，在資料主體權利／identity／RLS 相關 HD 未批准前不得處理 RESTRICTED HCI 資料。
+- BOM 修復的備份留在 Claude memory 目錄、未受 Git 保護；若需要回復，應使用該 backup 而非手改編碼。
 
-WORKLOG_DONE: site-watch 計畫正本 = docs/operations/SITE_WATCH_MASTER_PLAN.md，一份到底（範圍／分期／合約／驗收／下一步／回滾）；handoff 與 0091 檔頭皆退為指針
+[rollback]
+- `git revert <本次 commit>` 還原決策報告與 index；不改變任何 HCI pending decision。BOM 回復以 `C:\Users\user1115\.claude\projects\d--Work\memory\.bom-backfill-backup-20260901-021636` 的原始副本為準。
 
-## 2026-09-23（續）SITE_WATCH_MASTER_PLAN v2 — 操作者問「完整嗎、有優化空間嗎」→ 稽核出 9 個缺口，補齊
-**稽核方法**：對照 AGENTS.md §0/§7 DoD、`runbooks/ADD-PERIODIC-HEALTH-CHECK.md`、`sg-deploy.sh` smoke 段、既有兩份 MASTER_PLAN 結構。**缺口（v1 皆無）**：
-- G1 監控者無人監控：heartbeat 停／renderer 死／通知卡住都不會浮現 → 新 §7 步 3：`site_watch_maintenance` 加 heartbeat 兩欄 + `site_watch_touch_heartbeat`（prod 未套 0091，直接改 0091）、`scripts/check-site-watch-health.ps1` 四探針（量機制不量事故，runbook addendum）掛 AO-RESUME、§5 #15、§6.1 故障模式表。
-- G2 部署 smoke 只打 `/render`（`sg-deploy.sh:476-491`），`/snapshot` 退化不會擋部署 → §7 步 4 加 `/snapshot` smoke（sg-deploy.sh 由 `:152` rsync 同步）。
-- G3 缺 RUNNABLE_DEMOS（AGENTS §7 Product DoD）與 MONITORING_SYSTEMS_INVENTORY 登記（新監控系統、與 Uptime Kuma 分工）→ §7 步 8。
-- G4 env 變數散落 → §3.4 表（誰讀／哪設／預設／缺了會怎樣）。
-- G5 無威脅模型 → §3.5 安全邊界。
-- G6 無操作手冊 → §11（每種 Telegram 訊息／watchdog 顏色 → 動作）。
-- G7 無決策紀錄 → §4.3（12 條決策／理由／放棄的替代）。
-- G8 分期無完成定義 → §1 表加欄。
-- G9 容量未估：snapshot 併發 1 ≈ 90 頁/小時上限 → R6 + §8 容量閘（Slice 2 hourly 多頁必備）。
-另：§7 Trigger fan-out 改 `batchTrigger`；§10 加維護規則（改程式必同步 §3/§4；`:line` 只在 §3.2／§3.4／§7）。TASKS §I 列步數同步（1–9 本機 → 10 prod）。
-- REALTEST_EVIDENCE: tool=Bash | cmd=for-loop `[ -e ]` 對 v2 新增引用的 10 個路徑（runbook、check-*.ps1、ao-resume.ps1、entrypoint.sh、.env.example、RUNNABLE_DEMOS、MONITORING inventory、providers.ts、wiring.ts、secret-vault.ts） | exit=0 | ms=50（0 MISSING）
-- REALTEST_EVIDENCE: tool=Bash | cmd=`grep -n "check-backup-health\|check-ci-health" scripts/ao-resume.ps1`（:565／:653 = watchdog 掛點確存） | exit=0 | ms=20
-- REVIEW_WAIVED: DOC_ONLY -- 純計畫文件；程式未動
-- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`SITE_WATCH_MASTER_PLAN` | hits=2 files（TASKS.md、0091 檔頭；本檔以「本檔」自稱不含檔名；TASKS 步數已同步）
-[剩餘風險] G1/G2 是新增的實作工作（步 3、步 4），會讓 Slice 1 多約半天；D1 仍待操作者。
-[rollback] `git revert` 本 commit（回 v1 `67e4db98d`）。
+## 2026-09-01
 
-（續 v2.1）操作者再問「只有這些嗎」→ 設計層對抗審查（fan-out→renderer→UI 走一遍）再抓 6 項：① Trigger child 無限流：N>20 同時打 renderer（`server.mjs:34 MAX_QUEUE=20`、`rendererClient.ts:29` client 150s）→ 503／client 先斷而 renderer 仍截沒人等的圖 → 步 4 加 `queue: { concurrencyLimit: 2 }`，R6 補機制、P3 候選 abort-on-disconnect；② 首次開啟無金絲雀 → 步 10f 改：先手動 `site_watch_sync_targets()`、卡片只留 1 個 target 開、全域開、驗 1 列後再放量（10h）；③ 備份邊界未寫 → R7；④ 客戶站可控字串（errors_sample／final_url）XSS 面未寫 → R8 + 步 5a 純文字；⑤ ops-inbox `ignored` 會被下一 episode 重開（`0056:67`）→ §11 說明永久靜音 = 卡片關掉；⑥ env 開關要重建容器 → §8 軟開關候選。migration 編號無碰撞（`ls migrations | grep -c ^0091_` = 1）。
-WORKLOG_DONE: SITE_WATCH_MASTER_PLAN v2：補 watchdog／deploy smoke／登記／env 表／安全邊界／故障模式／決策紀錄／操作手冊／分期 DoD／容量
+### docs(hci): record explicit HD-00/01/02 approvals without unlocking implementation
 
-## 2026-09-25（續）Cognitive OS PI-a WC-PIa-01～14 完成（僅本機，未部署）
-**任務**：在 Claude 額度耗盡後，完成 `RESEARCH_LINES_MASTER_PLAN.md` 的 PI-a 解讀層與新殼全部工作卡；PI-b nginx／正式部署保持 High-STOP，未執行。
+- AUTO_TASK_DONE: docs(hci) — recorded HD-00=C, HD-01=A, and HD-02=C as accepted ADRs with implementation gates left open.
 
-- `e28b630ba`：新增 `MethodInterpretation` typed object、fixtures、`interpret.method_record` capability contract；解讀模組從 validated record 生成 manifest／prompt、強制 schema + citation／visual binding／next method gates，修復回合後才儲存。
-- API：`POST /methods/{id}/interpret` 重新執行 builder + method gates、記錄 `InterpretationRequested`／`InterpretationCreated`／`InterpretationJudged` events、artifact CAS 與 `ai_usage`；`GET /interpretations/{id}` 與 judgment endpoint 均為 tenant/project scoped。
-- Web：新增 Next 15 standalone shell（login、method discovery、middleware）、受控表單與 LazyFill、demo、固定九段 result page + method-native layered/quadrant/table visual + judgment；無 `<select>`。
-- Runtime：compose 加 web service、web Dockerfile／`.dockerignore`、deploy multi-service rollback/health loop、Playwright `cognitive` project。Docker image build 成功；完整 local compose 啟動未能取得既有程序佔用的 `127.0.0.1:8420`，已 `docker compose down` 清除本次建立的 containers，未動既有 listener。
-- REALTEST_EVIDENCE: `python agency-os/docs/AI_LEGO_Cognitive_Engineering_OS/tests/run_golden_tests.py` → `PASSED: 4158`；final `python -m unittest discover -s tests -t . -q` → `Ran 14186 tests in 991.668s / OK`；`python -m unittest tests.unit.test_interpret_method_record tests.unit.test_api_interpret -q` → `Ran 16 tests / OK`；web `npm test -- --run && npm run typecheck && npm run build` → 3 tests / typecheck / production build OK；`docker compose build cognitive-os-web` → image built；`docker compose config --quiet && bash -n deploy/deploy.sh` → OK；Playwright cognitive listed and correctly skipped without required test credentials/project.
-- REVIEW_WAIVED: `/claude-review` attempted under `claude-oracle.ps1`; Claude returned invalid/incomplete review schema (exit 1), so no valid oracle artifact exists. Manual adversarial review + mutation evidence used instead.
-- BUGHUNT_DONE: schema mutation made an invalid `findings_empty` fixture unexpectedly valid → golden red; citation / visual bindings / next-method gates each temporarily removed → their named unit test red; family→kind override changed → visual-kind test red; endpoint pre-gate check removed → `test_gate_fail_returns_422_without_provider_call` red. Each mutation was restored and the relevant test re-green.
-[剩餘風險] Playwright full E2E needs `COS_TEST_TENANT_ID`／`COS_TEST_EMAIL`／`COS_TEST_PASSWORD`／`COS_TEST_PROJECT_ID`; PI-b is intentionally not started. Next 15.2.4 reports its upstream security advisory during npm install; version remains the plan-specified baseline and production must take a patched version decision during PI-b.
-[rollback] `git revert e28b630ba` removes PI-a implementation; `git revert` this documentation commit restores the pointer. No production state changed.
+**根本問題**: HCI V2 已有 24 項人類決策與 ADR planning register；其中 `HD-00`、`HD-01`、`HD-02` 已收到操作者明示選項，但若只保留在對話裡，文件仍會錯誤顯示為 pending，並且批准與 schema/policy/test gate 脫鉤。
 
-WORKLOG_DONE: PI-a 14/14 local implementation and period gate complete; waiting only for explicit per-card PI-b deployment go-ahead.
-## 2026-09-28
-- 01:07 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-09-28.md
-- Cognitive OS result-page gap batch C1-10/C3-03/C3-26/M-74/M-86/N-49/P-32/P-33/P-35/P-36/P-37/P-38/P-39/P-40/P-41：修正可見文案、輸入卡元件共用、專家 gate 表、mock/page parity checker、1.2.0 fixture/schema/e2e mock routes；web typecheck + 51 tests、fixture schema、golden 4247、mock selftest 194+2 mutations 全通過；未部署，Playwright 因 registry EACCES/network 未執行。
-- REVIEW_WAIVED: Claude oracle quota available，但 `claude-oracle.ps1` 於 2026-09-28 連續兩次 exit 1／無有效 schema；操作者明確授權人工對抗審查取代。
-- BUGHUNT_DONE: scope=RunPage/ResultPage/check-mocks/fixture/e2e；確認 e2e 核准 POST 僅在 `mockApi`、fixture 由 SchemaContracts 驗證、parity 的 baseline／文字 drift／卡片數 drift 均可偵測；無新增 finding。
+**已修改**:
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0009-tenant-organization-model-reconciliation.md` — 記錄 `HD-01=A`；Tenant 模型、portal adapter 邊界及 mapping/migration/negative-test open gate。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0010-consent-entity-scope.md` — 記錄 `HD-02=C`；明定 tenant authorization、data-subject consent/lawful basis、source terms 三分語意及 open gate。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0011-hci-subject-type-scope.md` — 記錄 `HD-00=C`；V1 Person-only 與 nullable forward-compatible subject stub 的 open gate。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/{00_README.md,02_PRODUCT_BOUNDARIES.md,07_HCI30_DOMAIN_MODEL_AND_DATA_OWNERSHIP.md,14_ROADMAP_AND_DEFINITION_OF_DONE.md,16_OPEN_DECISIONS_AND_NEXT_ARTIFACTS.md,17_REPOSITORY_LAYOUT_AND_PATHS.md,22_HCI_TOP_TIER_IMPLEMENTATION_MASTER_PLAN.md,governance/ADR_INDEX.md}` — 將這三項改為 resolved/accepted，且明示所有 implementation gates 仍為 `OPEN`；其餘 21 項不變。
+- `agency-os/reports/decisions/2026-09-01-hci-wave-1-decision-tranche.md` — 加入操作者批准紀錄與下個未決三項（HD-03/04/05）。
+
+**驗證結果**:
+- REALTEST_WAIVED: DOC_ONLY -- only architecture records and cross-document decision state changed; no runnable HCI implementation or schema exists. Static document-gate check passed: 3 accepted ADRs, 10 remaining planned ADRs, 0 stale pending/unresolved HD-00/01/02 references, and 16 changed V2 Markdown files with paired code fences. `audit-cross-machine-bom.ps1 -WorkRoot D:\Work` also passed: 80/80 cross-Drive memory Markdown files have UTF-8 BOM.
+- REVIEW_DONE: critic=Adversarial self-review | verdict=pass | findings=0c/0m/0n — read back the ADR metadata, decision authority, required gate lists, index state, owner-document cross-links, report approval table, and tenancy hierarchy. Every accepted ADR says `OPEN` for implementation gates and no document claims schema/policy/test implementation.
+- BUGHUNT_DONE: scope=agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2,agency-os/reports/decisions,scripts | grep=`(pending|unresolved).{0,80}HD-0[012]|HD-0[012].{0,80}(pending|unresolved)` | hits=0; approval trace search (`HD-00=C|HD-01=A|HD-02=C|ADR-0009|ADR-0010|ADR-0011`) returned 40 reviewed current-state references. No scripts call site was introduced.
+- WORKLOG: 本條目
+
+**剩餘風險**: ADR acceptance is not Wave-1 readiness. The mapping/migration, lawful-basis policy, ERD constraints, and negative tests are deliberately not invented here; all three gates remain `OPEN`. HD-03 through HD-23 remain human decisions.
+
+**Rollback**: before implementation, supersede the individual ADR with a new explicit human approval and restore the affected inline state; after implementation, use the ADR-specific reviewed migration plan rather than relabeling historical data in place.
+
+### docs(hci): specify approved Wave 1 gates without asserting runtime completion
+
+- AUTO_TASK_DONE: docs(hci) — created the approved ADR-0009/0010/0011 Wave 1 adapter, permission-policy, ERD-addendum, and negative-test specifications; runtime gates remain open.
+
+**根本問題**: 已批准的三項 ADR 只有 gate 名稱，尚無可交接的 mapping、policy、constraint 或 test contract；同時 HCI runtime/schema/test directory 尚不存在，不能把文件決定誤報為 schema/migration/test 已完成。
+
+**已修改**:
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/wave1/{HCI_TENANT_ORGANIZATION_ADAPTER_CONTRACT,HCI_PERMISSION_AND_LAWFUL_BASIS_POLICY,HCI_WAVE1_DOMAIN_ERD,HCI_WAVE1_NEGATIVE_TEST_SPEC}.md` — 建立四份 doc-only implementation contracts，涵蓋 portal adapter seam、三分 permission records、Person-only subject stub、12 個 negative-test IDs；明示無 HCI runtime 實作與無 test pass 結果。
+- `agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2/governance/{ADR_INDEX,ADR-0009-tenant-organization-model-reconciliation,ADR-0010-consent-entity-scope,ADR-0011-hci-subject-type-scope}.md` — gate 狀態改為 `SPECIFIED — RUNTIME OPEN`，並指向每個可交接 artifact；HD-03/10/20/21 仍是 blocker，不被本次決定。
+- `agency-os/reports/decisions/2026-09-01-hci-wave-1-decision-tranche.md` — 區分已具體化的 design spec 與仍未建立的 executable HCI adapter/schema/test suite。
+
+**驗證結果**:
+- REALTEST_WAIVED: DOC_ONLY -- no HCI implementation directory, API, database, role, migration, or test runner exists; four design artifacts are not executable tests.
+- REVIEW_DONE: critic=Adversarial self-review | verdict=pass | findings=0c/0m/0n — read all four artifacts, source portal migrations, ADR state, and decision report; verified that the policy makes no jurisdiction/controller determination and every runtime gate says OPEN.
+- BUGHUNT_DONE: scope=agency-os/docs/HCI/HCI_AI_LEGO_Blueprint_v2,agency-os/reports/decisions,scripts | grep=`SPECIFIED — RUNTIME OPEN|HCI_WAVE1_|HD-03|HD-10|HD-20|HD-21` | hits=48, all reviewed: three accepted ADRs are `SPECIFIED — RUNTIME OPEN`; HD-03/10/20/21 remain explicit blockers; scripts has no HCI runtime call site.
+- WORKLOG: 本條目
+
+**剩餘風險**: HD-03～HD-23 未獲人類選項批准；尤其 HD-03/10/20/21 會阻擋資料主體 rights、Case aggregate、法域/市場與 DPA 角色的 production implementation。所有 four artifacts 都是 design input，不能作為任何處理 real-person data 的許可。
+
+**Rollback**: `git revert <this commit>` 可移除本輪 specification 與 ADR links；因未建立 schema/data/migration，不需要資料回滾。

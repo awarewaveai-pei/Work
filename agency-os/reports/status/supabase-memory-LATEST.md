@@ -1,17 +1,14 @@
 ﻿# Supabase Monthly Memory Check
 
-- Time: 2026-08-28 16:49:42
-- Host: root@149.202.64.114
+- Time: 2026-10-13 11:31:40
+- Host: ubuntu@145.239.195.47
 - Container: supabase-studio
-- Status: **ERROR**
-- Summary: supabase memory check failed: docker inspect failed: root@149.202.64.114: Permission denied (publickey).
+- Status: **PASS**
+- Summary: supabase-studio memory at 33.26% (< 85%)
 
 ## Metrics
-- MemUsage (docker): N/A
-- Usage parsed: N/A
-- Limit parsed: N/A
-- Limit bytes (inspect): N/A
-- Usage percent: N/A
-
-## Error
-- docker inspect failed: root@149.202.64.114: Permission denied (publickey).
+- MemUsage (docker): 170.3MiB / 512MiB
+- Usage parsed: 170.3MiB
+- Limit parsed: 512MiB
+- Limit bytes (inspect): 536870912
+- Usage percent: 33.26%

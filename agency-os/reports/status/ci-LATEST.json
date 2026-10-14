@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-09-30T02:28:53.0238005Z",
+    "generatedAtUtc":  "2026-10-14T00:29:25.4241701Z",
     "branch":  "main",
     "runsPerWorkflow":  20,
     "probeOk":  true,
@@ -11,7 +11,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/34500145253"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38059255248"
                       },
                       {
                           "name":  "Auto-Repair - PR Notification",
@@ -27,23 +27,23 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36602776909"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38363135329"
                       },
                       {
                           "name":  "Cognitive OS full suite",
+                          "latest":  "failure",
+                          "consecutiveFailures":  2,
+                          "failingSinceUtc":  "2026-10-13T00:13:37Z",
+                          "failingDays":  1,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38333666520"
+                      },
+                      {
+                          "name":  "HCI-30 — Wave 1 cross-box restore drill (P0-10)",
                           "latest":  "success",
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36463307131"
-                      },
-                      {
-                          "name":  "HCI-30 — Wave 1 cross-box restore drill (P0-10)",
-                          "latest":  "failure",
-                          "consecutiveFailures":  8,
-                          "failingSinceUtc":  "2026-09-08T05:39:09Z",
-                          "failingDays":  22,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/35340652567"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38024680051"
                       },
                       {
                           "name":  "Lobster workflows package — validate (main)",
@@ -51,7 +51,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36246710848"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38025804219"
                       },
                       {
                           "name":  "next-admin — TypeScript typecheck",
@@ -59,15 +59,15 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36659447018"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38326184497"
                       },
                       {
                           "name":  "Perplexity Search-only guard",
-                          "latest":  "failure",
-                          "consecutiveFailures":  1,
-                          "failingSinceUtc":  "2026-09-30T02:26:18Z",
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36659841748"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38365538366"
                       },
                       {
                           "name":  "Release Gate (main)",
@@ -91,7 +91,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36659841767"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38365538531"
                       },
                       {
                           "name":  "Tenant staging SSOT",
@@ -107,15 +107,15 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/33858143879"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38025804218"
                       },
                       {
                           "name":  "Weekly workflows security audit",
-                          "latest":  "failure",
-                          "consecutiveFailures":  4,
-                          "failingSinceUtc":  "2026-09-07T06:20:20Z",
-                          "failingDays":  23,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/36390406303"
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38218906388"
                       },
                       {
                           "name":  "ziwei — typecheck · test · build",
@@ -126,11 +126,9 @@
                           "url":  ""
                       }
                   ],
-    "verdict":  "broken",
-    "verdictLabel":  "FAIL",
+    "verdict":  "drift",
+    "verdictLabel":  "WARN",
     "findings":  [
-                     "\u0027HCI-30 — Wave 1 cross-box restore drill (P0-10)\u0027 has been failing for 8 consecutive run(s) over 22 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/35340652567",
-                     "\u0027Perplexity Search-only guard\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/36659841748",
-                     "\u0027Weekly workflows security audit\u0027 has been failing for 4 consecutive run(s) over 23 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/36390406303"
+                     "\u0027Cognitive OS full suite\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/38333666520"
                  ]
 }

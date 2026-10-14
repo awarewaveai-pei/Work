@@ -1,6 +1,6 @@
-﻿# Governance Docs Drift - 2026-08
+﻿# Governance Docs Drift - 2026-10
 
-- Generated: 2026-08-15 17:36:21 +08:00
+- Generated: 2026-10-13 11:31:52 +08:00
 - Overall: **PASS**
 - Scope: 4 long-term governance documents
 
@@ -18,19 +18,19 @@
 
 | Doc | Path | Last modified (UTC) |
 |-----|------|----------------------|
-| Inventory | agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md | 2026-08-15 09:35 |
-| RoutingSpec | lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md | 2026-08-15 09:33 |
-| RoutingMatrix | lobster-factory/docs/ROUTING_MATRIX.md | 2026-08-15 09:36 |
-| Traceability | agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md | 2026-05-20 10:55 |
+| Inventory | agency-os/docs/operations/cursor-mcp-and-plugin-inventory.md | 2026-10-13 01:55 |
+| RoutingSpec | lobster-factory/docs/MCP_TOOL_ROUTING_SPEC.md | 2026-10-01 08:45 |
+| RoutingMatrix | lobster-factory/docs/ROUTING_MATRIX.md | 2026-09-24 08:06 |
+| Traceability | agency-os/docs/operations/TOOLS_DELIVERY_TRACEABILITY.md | 2026-10-13 01:55 |
 
 ## Findings
 
 - mcp_set_consistency: shared=20 ; only_in_inventory=0 ; only_in_spec=0
-- mtime_drift: span=87 days (youngest=2026-08-15; oldest=2026-05-20)
-  - Inventory: 2026-08-15 (age 0 days)
-  - RoutingSpec: 2026-08-15 (age 0 days)
-  - RoutingMatrix: 2026-08-15 (age 0 days)
-  - Traceability: 2026-05-20 (age 87 days)
+- mtime_drift: span=19 days (youngest=2026-10-13; oldest=2026-09-24)
+  - Inventory: 2026-10-13 (age 0 days)
+  - RoutingSpec: 2026-10-01 (age 12 days)
+  - RoutingMatrix: 2026-09-24 (age 19 days)
+  - Traceability: 2026-10-13 (age 0 days)
 
 ## Notes
 

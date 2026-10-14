@@ -1,7 +1,7 @@
 # CI health (GitHub Actions, branch main)
 
-- Generated: 2026-09-30 10:28:53
-- Overall: **🔴 FAIL**
+- Generated: 2026-10-14 08:29:25
+- Overall: **🟡 WARN**
 - Method: every workflow enumerated; last 20 run(s) of each inspected on `main`
 
 ## Workflows
@@ -11,24 +11,22 @@
 | Auto-Repair - Claude Code | skipped | - | - |
 | Auto-Repair - PR Notification | none | - | - |
 | Cognitive OS eval harness | success | - | - |
-| Cognitive OS full suite | success | - | - |
-| HCI-30 — Wave 1 cross-box restore drill (P0-10) | failure | 8 | 22d |
+| Cognitive OS full suite | failure | 2 | 1d |
+| HCI-30 — Wave 1 cross-box restore drill (P0-10) | success | - | - |
 | Lobster workflows package — validate (main) | success | - | - |
 | next-admin — TypeScript typecheck | success | - | - |
-| Perplexity Search-only guard | failure | 1 | 0d |
+| Perplexity Search-only guard | success | - | - |
 | Release Gate (main) | none | - | - |
 | SG Deploy (self-hosted runner) | success | - | - |
 | Shared asset gates (Claude + Codex) | success | - | - |
 | Tenant staging SSOT | none | - | - |
 | Trigger infra config guard | success | - | - |
-| Weekly workflows security audit | failure | 4 | 23d |
+| Weekly workflows security audit | success | - | - |
 | ziwei — typecheck · test · build | none | - | - |
 
 ## Findings
 
-- 'HCI-30 — Wave 1 cross-box restore drill (P0-10)' has been failing for 8 consecutive run(s) over 22 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/35340652567
-- 'Perplexity Search-only guard' latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/36659841748
-- 'Weekly workflows security audit' has been failing for 4 consecutive run(s) over 23 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/36390406303
+- 'Cognitive OS full suite' latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/38333666520
 
 ## Why this check exists
 
