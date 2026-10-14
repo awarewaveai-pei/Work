@@ -25,21 +25,52 @@ R2_PREFIX="${R2_PREFIX:-unknown}"
 R2_SPLIT_THRESHOLD_BYTES="${R2_SPLIT_THRESHOLD_BYTES:-209715200}"   # 200 MiB
 R2_SPLIT_PART_BYTES="${R2_SPLIT_PART_BYTES:-209715200}"             # 200 MiB
 
+# Transient answers are retried: 000 (connection dropped/timed out), 408, 429, 5xx. One 502 or 000
+# with no retry lost a day's offsite set on 2026-09-08, 09-09, 10-13 and 10-14. Any other 4xx
+# (401/403 token, 413 too big) is final. eu/ and sg-stack/ keys can be overwritten; ks-aw-01/ is
+# WORM-locked (ks-aw-01-backup/README.md "R2 bucket lock"), so a key already stored there answers
+# 409 — accepted only when the stored size equals the local file (a lost reply, or a rerun).
+# Retries stop once the script has run R2_RETRY_BUDGET_SECONDS, so the verify cron 23+ minutes
+# later never reads a set that is still uploading.
+R2_PUT_ATTEMPTS="${R2_PUT_ATTEMPTS:-4}"
+R2_RETRY_BASE_SECONDS="${R2_RETRY_BASE_SECONDS:-15}"     # waits 15s, 30s, 45s
+R2_RETRY_BUDGET_SECONDS="${R2_RETRY_BUDGET_SECONDS:-1200}"
+
 API_BASE="https://api.cloudflare.com/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_BUCKET}/objects"
 ERRORS=0
 
 log() { echo "[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] $1"; }
 
-# put_object <local-file> <object-key> -> echoes HTTP code, returns 0 on 2xx
+# remote_size <object-key> -> echoes the stored size of exactly that key, or nothing
+remote_size() {
+  curl -s --max-time 60 -H "Authorization: Bearer ${R2_API_TOKEN}" "${API_BASE}?prefix=$1" 2>/dev/null \
+    | sed 's/{"key":/\n{"key":/g' | grep -F "{\"key\":\"$1\"," | grep -oE '"size":[0-9]+' | head -1 | cut -d: -f2 || true
+}
+
+# put_object <local-file> <object-key> -> echoes the last HTTP code, returns 0 on 2xx.
+# Retry lines go to stderr: stdout is the caller's $(...) capture.
 put_object() {
-  local src="$1" key="$2" code
-  code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3600 \
-    -X PUT \
-    -H "Authorization: Bearer ${R2_API_TOKEN}" \
-    --data-binary "@${src}" \
-    "${API_BASE}/${key}")
-  echo "$code"
-  [[ "$code" =~ ^2[0-9]{2}$ ]]
+  local src="$1" key="$2" code attempt=1 wait
+  while :; do
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3600 \
+      -X PUT \
+      -H "Authorization: Bearer ${R2_API_TOKEN}" \
+      --data-binary "@${src}" \
+      "${API_BASE}/${key}") || true
+    [[ -n "$code" ]] || code=000
+    if [[ "$code" =~ ^2[0-9]{2}$ ]]; then echo "$code"; return 0; fi
+    if [[ "$code" == 409 && "$(remote_size "$key")" == "$(stat -c %s "$src")" ]]; then
+      echo "409 already stored, same size"; return 0
+    fi
+    wait=$(( R2_RETRY_BASE_SECONDS * attempt ))
+    if [[ ! "$code" =~ ^(000|408|429|5[0-9]{2})$ ]] || (( attempt >= R2_PUT_ATTEMPTS )) \
+       || (( SECONDS + wait >= R2_RETRY_BUDGET_SECONDS )); then
+      echo "$code"; return 1
+    fi
+    log "    retry ${key} after HTTP ${code} (attempt ${attempt}/${R2_PUT_ATTEMPTS}, waiting ${wait}s)" >&2
+    sleep "$wait"
+    attempt=$((attempt + 1))
+  done
 }
 
 log "Uploading to R2: ${R2_BUCKET}/${R2_PREFIX}/${DATE_PREFIX}/"

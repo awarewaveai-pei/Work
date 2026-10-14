@@ -217,7 +217,7 @@ TOTAL_SIZE=$(du -sh "${OUT}" | cut -f1)
 log "=== Backup complete: ${OUT} (${TOTAL_SIZE}) ==="
 
 if [[ "$R2_OK" == "false" ]]; then
-  log "FATAL: local snapshot exists but NO R2 offsite copy was made."
+  log "FATAL: local snapshot exists but the R2 offsite copy is incomplete or missing (see upload errors above)."
   log "       (peer-VPS leg: OFFSITE_OK=${OFFSITE_OK} - optional since the 2026-08-28 consolidation)"
   exit 2
 fi

@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-14（續12）R2 上傳加重試（repo 已改，未部署）
+
+**根因**: 見 2026-10-14（續11）：`upload-to-r2.sh` 每個物件只 PUT 一次，一次 502／000 就讓當天異地備份缺一塊（09-08、09-09、10-13、10-14）。三條管線共用這支。
+
+**做了**:
+- `lobster-factory/infra/eu-backup/upload-to-r2.sh`：`put_object` 對 000／408／429／5xx 重試，最多 4 次，等 15／30／45 秒；其他 4xx 不重試。腳本跑超過 `R2_RETRY_BUDGET_SECONDS`（1200）就不再重試，避免 03:00 的 verify 讀到上傳中的半套。`ks-aw-01/` 有 14 天 WORM 鎖（`ks-aw-01-backup/README.md` "R2 bucket lock"），已存在的 key 回 409：遠端大小等於本機就算成功（回覆遺失或重跑），否則失敗。重試訊息走 stderr（呼叫端用 `$(...)` 收 stdout 的 code）。
+- `backup-eu-stack.sh`：FATAL 文字改為「不完整或沒有」（部分上傳時原文不實）。
+- 新 `upload-to-r2.test.sh`：假 curl（含列表回應），ubuntu:24.04（正式機 bash 5.2）跑。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker run ubuntu:24.04 bash /src/upload-to-r2.test.sh → pass=18 failed=0 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=3 個突變（拿掉重試上限判斷、拿掉 409 同大小接受、拿掉時間預算）→ 各自 11／1／2 項變紅 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=SSH | cmd=正式機讀 R2 列表回應格式（`"size":149046` = 本機 stat）、確認 /root/scripts 三支 md5 = repo 改前 | exit=0 | ms=5000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n
+  - m1 重試無總時限可能壓到 verify cron → 加 `R2_RETRY_BUDGET_SECONDS`。m2 註解說「同 key 覆寫」對 `ks-aw-01/` 不成立（WORM 409）→ 改註解＋409 同大小接受。建議（未做）：測試進 CI。
+- ORACLE_WAIVED: critic 審過＋3 個守衛突變；改動只在備份上傳腳本，部署前另經操作者 go-ahead
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=upload-to-r2|NO R2 offsite | hits=6
+  - 呼叫端 `backup-eu-stack.sh:202`、`backup-phase1.sh:136`、`backup-ks-aw-01.sh:231` 只看 exit code；`check-backup-health.ps1` 只讀 verify 結論行；舊 FATAL 文字無人解析。
+
+**剩餘風險**: 正式機還是舊版（等 go-ahead）；10-13（ks-aw-01）與 10-14（eu）缺的物件還沒補；verify 腳本自己的列表請求也沒重試（只會誤報，不會掉資料）；cognitive／HCI 備份離機與否未處理（續11）。
+
+**rollback**: `git revert`；部署後用 `/root/scripts/upload-to-r2.sh.bak-20261014` 還原。
 ## 2026-10-14（續11）備份上傳 R2 偶發失敗沒有重試（調查完成，未修；操作者電量不足先存）
 
 **根因**:
