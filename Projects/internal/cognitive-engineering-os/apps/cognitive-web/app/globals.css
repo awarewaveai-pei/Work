@@ -31,3 +31,6 @@ foreignObject .warn { color: var(--warn); }
    row of buttons above the page instead (.subnav), shown only there: the sidebar lists them on a desktop */
 .subnav { display: none; }
 @media (max-width: 760px) { .navi.sub { display: none; } .navi.navbottom { margin-top: 0; } .subnav { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 12px 0; } }
+/* an AI turn this page waits for (AiWaiting): kept in view at the bottom, above a phone's bottom bar (.side, ~76px) */
+.aiwait { position: sticky; bottom: 12px; z-index: 5; border-color: var(--accent); }
+@media (max-width: 760px) { .aiwait { bottom: 84px; } }

@@ -151,7 +151,7 @@ class WebBlockListTests(PgTestCase):
         internal = {"AI_ACTION_DUPLICATE", "AI_ACTION_INVALID", "AI_READ_REFUSED", "DOC_BATCH_CHECK_NEEDS_AN_OWNER_LOCK", "DOC_GROUP_READ_NEEDS_VISIBILITY", "DOC_PLATFORM_READ_NEEDS_VISIBILITY", "DOC_CONTENT_NOT_NORMALISED", "DOC_FIELD_SHAPE_INVALID", "DOC_KIND_DUPLICATE", "DOC_KIND_INVALID", "DOC_KINDS_REQUIRED", "DOC_KINDS_TOO_MANY",
                     "DOC_KIND_NOT_SINGLETON", "DOC_SINGLETON_BROKEN", "RECORD_AUTHOR_IDENTITY_REQUIRED", "RECORD_AUTHOR_INVALID", "RECORD_BLOCK_NOT_ALLOWED",
                     "RECORD_OWNER_INVALID", "RECORD_OWNER_NOT_ALLOWED", "RECORD_TYPE_UNREGISTERED", "RECORD_WRITER_AND_OWNER_REQUIRED",
-                    "AI_SOURCES_UNAVAILABLE", "EVIDENCE_CELL_INVALID", "RULESET_DUPLICATE", "RULESET_INVALID", "RULESET_CHANGED_WITHOUT_VERSION", "RULESET_UNKNOWN"}
+                    "AI_SOURCES_UNAVAILABLE", "AI_TURN_RECORD_INVALID", "EVIDENCE_CELL_INVALID", "RULESET_DUPLICATE", "RULESET_INVALID", "RULESET_CHANGED_WITHOUT_VERSION", "RULESET_UNKNOWN"}
         lego = PRODUCT_ROOT / "ai_lego"
         sources = [*(lego / "platform" / "block_hooks").glob("*.py"), *(lego / "platform" / "ai_actions").glob("*.py"), *(lego / "apps" / "api" / "blocks").glob("*.py"),
                    lego / "platform" / "ai_gate.py", lego / "platform" / "evidence.py", lego / "core" / "domain" / "evidence_words.py", *(lego / "platform" / "rulesets").glob("*.py"),

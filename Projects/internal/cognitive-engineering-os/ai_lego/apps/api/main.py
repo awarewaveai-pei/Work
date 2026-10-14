@@ -2405,19 +2405,20 @@ def list_reruns(
 _ERROR_CODES = re.compile(r"([A-Z][A-Z0-9_]{2,})(?=:|$)(?:: ([A-Z][A-Z0-9_]{2,})(?=:|$))?")
 
 
-def _error_code(message: str) -> str:
-    """``"SYNTHESIS_REJECTED_AFTER_REPAIR: SYNTHESIS_GATE_FAILED: {...}"`` -> the first two codes; no code -> SYNTHESIS_FAILED."""
+def _error_code(message: str, fallback: str = "SYNTHESIS_FAILED") -> str:
+    """``"SYNTHESIS_REJECTED_AFTER_REPAIR: SYNTHESIS_GATE_FAILED: {...}"`` -> the first two codes; no code -> ``fallback``."""
     match = _ERROR_CODES.match(message or "")
-    return ": ".join(code for code in match.groups() if code) if match else "SYNTHESIS_FAILED"
+    return ": ".join(code for code in match.groups() if code) if match else fallback
 
 
-def _failure_code(failure: BaseException) -> str:
+def _failure_code(failure: BaseException, fallback: str = "SYNTHESIS_FAILED") -> str:
     """A domain error keeps its codes; anything else (the provider raises urllib's HTTPError/URLError as they come)
-    keeps its class name and HTTP status -- neither carries request or model text."""
+    keeps its class name and HTTP status -- neither carries request or model text. ``fallback``: the runner's own code
+    (a background AI turn: api/blocks/ai.py)."""
     if isinstance(failure, InvariantViolation):
-        return _error_code(str(failure))
+        return _error_code(str(failure), fallback)
     status = getattr(failure, "code", None)
-    return f"SYNTHESIS_FAILED: {type(failure).__name__}" + (f" {status}" if isinstance(status, int) else "")
+    return f"{fallback}: {type(failure).__name__}" + (f" {status}" if isinstance(status, int) else "")
 
 
 class _MeteredProvider:

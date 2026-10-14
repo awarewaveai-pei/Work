@@ -28,6 +28,7 @@ A block declares its actions in its own module: ``ACTIONS = [AiAction(...)]`` in
 
 from __future__ import annotations
 
+import contextvars
 import hashlib
 import importlib
 import json
@@ -46,7 +47,7 @@ from ai_lego.core.domain.evidence_words import MIN_QUOTE, quote_in
 from ai_lego.modules.research.source_manifest import build_source_manifest, new_fence_nonce, render_source_block
 from ai_lego.platform import safety, visibility
 from ai_lego.platform.evidence import CaseEvidence
-from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS
+from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS, SYNC_OUTPUT_TOKENS
 from ai_lego.platform.ai_gateway.structured import ask_object, parse_object
 from ai_lego.platform.text.ai_words import keys_shown, polish
 
@@ -102,7 +103,15 @@ class AiAction:
     verbatim: tuple[str, ...] = ()  # answer keys whose strings are someone else's words (a message's sentence): the gate leaves them as they are (``quote`` always is)
     subject_field: str = ""         # in a group: the filled field naming the member the answer is about -- the record's identity (theirs to delete, erased with them); empty = the caller
 
+    @property
+    def background(self) -> bool:
+        """Its longest answer can outrun a request the page waits for (provider.SYNC_OUTPUT_TOKENS): the API runs it as a
+        background turn the page polls (apps/api/blocks/ai.py)."""
+        return self.max_tokens > SYNC_OUTPUT_TOKENS
+
     def __post_init__(self) -> None:
+        if self.in_group and self.background:   # the group route answers only what the member may read now: it waits for the turn
+            raise InvariantViolation(f"AI_ACTION_INVALID: {self.block}.{self.name} runs in a group, so its max_tokens stays at most {SYNC_OUTPUT_TOKENS}")
         if not MIN_MAX_TOKENS <= self.max_tokens <= MAX_OUTPUT_TOKENS:
             raise InvariantViolation(f"AI_ACTION_INVALID: {self.block}.{self.name} max_tokens {self.max_tokens} is outside {MIN_MAX_TOKENS}..{MAX_OUTPUT_TOKENS}")
         if self.needs not in ALWAYS and self.needs not in GRANTABLE:
@@ -324,17 +333,65 @@ def ask_ai(action: AiAction, *, tenant_id: str, identity_id: str, project_id: st
     ``group_id``: the group an ``in_group`` action runs in (the caller must be a current member); ``shown``: how a
     member is named to people (a hand-back says whose turn it is). A refusal is logged (_log_refusal), then raised."""
     try:
-        return _turn(action, tenant_id=tenant_id, identity_id=identity_id, project_id=project_id, context=context, docs=docs, provider=provider,
-                     doc_id=doc_id, base_version=base_version, source_text=source_text, group_id=group_id, shown=shown)
+        prepared = _prepare(action, tenant_id=tenant_id, identity_id=identity_id, project_id=project_id, context=context, docs=docs,
+                            doc_id=doc_id, base_version=base_version, source_text=source_text, group_id=group_id, shown=shown)
+        return prepared if isinstance(prepared, dict) else _answer(prepared, provider, None)
     except InvariantViolation as error:
         _log_refusal(action, error, provider)
         raise
 
 
-def _turn(action: AiAction, *, tenant_id: str, identity_id: str, project_id: str | None, context: Mapping[str, Any],
-          docs: CaseDocs, provider: Any, doc_id: str | None, base_version: int | None,
-          source_text: Callable[[str], "tuple[dict[str, Any], str] | None"] | None, group_id: str | None,
-          shown: Callable[[str | None], str] | None) -> dict[str, Any]:
+def prepare_ai(action: AiAction, *, tenant_id: str, identity_id: str, project_id: str | None, context: Mapping[str, Any], docs: CaseDocs,
+               doc_id: str | None = None, base_version: int | None = None,
+               source_text: Callable[[str], "tuple[dict[str, Any], str] | None"] | None = None) -> "dict[str, Any] | Prepared":
+    """``ask_ai`` up to the model call -- the permission, the crisis check, the hand-back, the sources; nothing is paid for:
+    the answer that needs no model ({"stopped": "crisis", ...} or {"handback": why}), else the turn ready to send
+    (``Prepared.answer``), which a background turn (AiAction.background) sends from another thread. A case's or the
+    person's turn (a group's is answered while the member waits: AiAction refuses a group action that is background)."""
+    try:
+        return _prepare(action, tenant_id=tenant_id, identity_id=identity_id, project_id=project_id, context=context, docs=docs,
+                        doc_id=doc_id, base_version=base_version, source_text=source_text, group_id=None, shown=None)
+    except InvariantViolation as error:
+        _log_refusal(action, error, None)
+        raise
+
+
+@dataclass(frozen=True)
+class Prepared:
+    """A turn that passed every check and is not paid for yet: the message, and what its answer is checked against and
+    saved as. Built only by ``_prepare``. ``turn_context``: the context ``build_input`` left (an action hands its turn to its
+    ``shape`` in a ContextVar: express, verify, think, compute, facilitate) -- ``answer`` runs in it on any thread."""
+    action: AiAction
+    docs: CaseDocs
+    tenant_id: str
+    identity_id: str
+    project_id: str | None
+    owner: record_log.Owner
+    in_group: bool
+    system: str
+    user: str
+    shown_keys: frozenset[str]
+    filled: Mapping[str, Any]
+    texts: Mapping[str, str]
+    card_of: Mapping[str, str]
+    doc_id: str | None
+    base_version: int | None
+    turn_context: contextvars.Context
+
+    def answer(self, provider: Any, *, turn_id: str | None = None) -> dict[str, Any]:
+        """The model call and the save: {"saved": doc, "model"}. ``turn_id``: the background turn this answers -- its answer
+        is recorded in the save's own transaction (CaseDocs.save ``answers_turn``). A refusal is logged, then raised."""
+        try:
+            return self.turn_context.run(_answer, self, provider, turn_id)
+        except InvariantViolation as error:
+            _log_refusal(self.action, error, provider)
+            raise
+
+
+def _prepare(action: AiAction, *, tenant_id: str, identity_id: str, project_id: str | None, context: Mapping[str, Any],
+             docs: CaseDocs, doc_id: str | None, base_version: int | None,
+             source_text: Callable[[str], "tuple[dict[str, Any], str] | None"] | None, group_id: str | None,
+             shown: Callable[[str | None], str] | None) -> "dict[str, Any] | Prepared":
     viewer = None
     if action.in_group:
         if group_id is None or project_id is not None:
@@ -433,20 +490,26 @@ def _turn(action: AiAction, *, tenant_id: str, identity_id: str, project_id: str
                             "and when its hand-back condition is met, stop and say so instead of going on.")
     if project_id and not places:
         instructions.append("You were not told where this happens or where the person is: for anything that depends on the place, say you do not know.")
-    system = "\n".join(instructions)
-    completion = ask_object(provider, system, user, max_tokens=action.max_tokens, schema=action.output_schema)
-    docs.save(tenant_id, owner if viewer is None else record_log.person(identity_id), "govern.ai_call" if project_id else "govern.ai_call_personal",
+    return Prepared(action=action, docs=docs, tenant_id=tenant_id, identity_id=identity_id, project_id=project_id, owner=owner, in_group=viewer is not None,
+                    system="\n".join(instructions), user=user, shown_keys=shown_keys, filled=filled, texts=texts, card_of=card_of,
+                    doc_id=doc_id, base_version=base_version, turn_context=contextvars.copy_context())
+
+
+def _answer(turn: Prepared, provider: Any, turn_id: str | None) -> dict[str, Any]:
+    action, docs, tenant_id, identity_id = turn.action, turn.docs, turn.tenant_id, turn.identity_id
+    completion = ask_object(provider, turn.system, turn.user, max_tokens=action.max_tokens, schema=action.output_schema)
+    docs.save(tenant_id, record_log.person(identity_id) if turn.in_group else turn.owner, "govern.ai_call" if turn.project_id else "govern.ai_call_personal",
               {"block": action.block, "action": action.name, "model": str(getattr(completion, "model", "") or "unknown")[:120],
-               "instructions_sha256": hashlib.sha256(system.encode("utf-8")).hexdigest()}, record_log.system("GOVERN"))
+               "instructions_sha256": hashlib.sha256(turn.system.encode("utf-8")).hexdigest()}, record_log.system("GOVERN"))
     try:
         answer = parse_object(completion)
     except InvariantViolation as error:
         raise InvariantViolation("AI_ANSWER_NOT_JSON: the model did not answer with the object asked for") from error
     fields = doc_kinds.require(action.output_kind).fields
-    shaped = polish(action.shape({key: value for key, value in answer.items() if key in fields}), verbatim=("quote", *action.verbatim), shown=shown_keys)   # what the person reads: full-width punctuation, no field names
-    answer = {**shaped, **filled}   # extra keys the model added are dropped
+    shaped = polish(action.shape({key: value for key, value in answer.items() if key in fields}), verbatim=("quote", *action.verbatim), shown=turn.shown_keys)   # what the person reads: full-width punctuation, no field names
+    answer = {**shaped, **turn.filled}   # extra keys the model added are dropped
     if action.cites:
-        problems = uncited(answer, texts, card_of)
+        problems = uncited(answer, turn.texts, turn.card_of)
         if problems:
             raise InvariantViolation(f"AI_ANSWER_UNCITED: {problems[0]}")
     try:
@@ -454,7 +517,9 @@ def _turn(action: AiAction, *, tenant_id: str, identity_id: str, project_id: str
     except InvariantViolation as error:   # the model's answer broke the card's shape: the model's failure, not the request's
         raise InvariantViolation(f"AI_ANSWER_INVALID: {error}") from error
     writer = record_log.ai(action.block)
-    if viewer is not None:   # in a group the AI's record names a member: the one it is about, else the one who asked
-        writer = record_log.Writer("ai", action.block, filled[action.subject_field] if action.subject_field else identity_id)
-    saved = docs.save(tenant_id, owner, action.output_kind, answer, writer, doc_id=doc_id, base_version=base_version)
-    return {"saved": saved, "model": getattr(completion, "model", None)}
+    if turn.in_group:   # in a group the AI's record names a member: the one it is about, else the one who asked
+        writer = record_log.Writer("ai", action.block, turn.filled[action.subject_field] if action.subject_field else identity_id)
+    model = getattr(completion, "model", None)
+    saved = docs.save(tenant_id, turn.owner, action.output_kind, answer, writer, doc_id=turn.doc_id, base_version=turn.base_version,
+                      answers_turn=None if turn_id is None else (turn_id, str(model or "")[:120]))
+    return {"saved": saved, "model": model}

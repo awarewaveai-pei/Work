@@ -38,6 +38,15 @@ FALLBACK_BETA = "server-side-fallback-2026-07-01"
 DEFAULT_TIMEOUT_SECONDS = 85.0
 MAX_OUTPUT_TOKENS = 16384   # the gateway's ceiling per call; a caller picks its own limit under it (drafts 6000, interpretations 12288)
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+# How long an answer can take: ~68 output tokens/s (16k tokens took ~4 minutes: interpret_method_record.py
+# INTERPRET_TIMEOUT_SECONDS). A turn whose max_tokens can outrun DEFAULT_TIMEOUT_SECONDS less FIRST_TOKEN_SECONDS (reading the
+# input before the first token, and the save -- headroom, not measured) is not waited for: it runs in the background with
+# BACKGROUND_TIMEOUT_SECONDS (ai_gate.AiAction.background; apps/api/blocks/ai.py). 2026-10-13: the 8000-token EXPRESS draft
+# needs ~118 s and the 6000-token actions ~88 s, past the 85 s a request may wait.
+OUTPUT_TOKENS_PER_SECOND = 68
+FIRST_TOKEN_SECONDS = 15.0
+SYNC_OUTPUT_TOKENS = int((DEFAULT_TIMEOUT_SECONDS - FIRST_TOKEN_SECONDS) * OUTPUT_TOKENS_PER_SECOND)
+BACKGROUND_TIMEOUT_SECONDS = 300.0   # MAX_OUTPUT_TOKENS at OUTPUT_TOKENS_PER_SECOND is ~241 s
 # A tool call can come back with its next argument written inside a string argument, in the model's own call syntax:
 # {"summary": "…</summary>\n<parameter name=\"gaps\">[\"…\"]"} and no "gaps" (2026-10-13, SENSE mirror on the page).
 LEAKED_ARGUMENT = re.compile(r'\s*(?:</[A-Za-z_][\w-]*>\s*)?<parameter name="([A-Za-z_][\w-]*)">')

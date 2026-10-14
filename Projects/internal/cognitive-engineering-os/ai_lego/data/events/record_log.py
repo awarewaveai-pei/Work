@@ -93,6 +93,11 @@ EVENT_TYPES: dict[str, EventType] = {
     "DocSaved": _t("1.0.0", "user ai joint system", frozenset(ALL_CODES), "case person group platform", done=True),
     "DocDeleted": _t("1.0.0", "user", frozenset(ALL_CODES), "case person group platform", done=False),
     "DocRead": _t("1.0.0", "user", "EXPRESS", "case", done=False),
+    # A block's AI turn that runs in the background (ai_gate.AiAction.background; CaseDocs.record_turn): asked for, then
+    # answered (a pointer to the document saved in the same transaction) or failed (error codes only, never words)
+    "AiTurnStarted": _t("1.0.0", "user", frozenset(ALL_CODES), "case person", done=False),
+    "AiTurnAnswered": _t("1.0.0", "system", frozenset(ALL_CODES), "case person", done=False),
+    "AiTurnFailed": _t("1.0.0", "system", frozenset(ALL_CODES), "case person", done=False),
 }
 DOC_EVENTS = ("DocSaved", "DocDeleted")
 

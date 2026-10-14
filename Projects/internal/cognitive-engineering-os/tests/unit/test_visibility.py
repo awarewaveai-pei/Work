@@ -32,6 +32,7 @@ SCANNED = ("apps/api/blocks", "platform/ai_actions", "platform/block_hooks")
 # read and added here.
 REVIEWED_OWNER_USES = {
     ("apps/api/blocks/act.py", "record_log.person(session['identity_id'])"): "/me/reminders: the signed-in person's own practice records",
+    ("apps/api/blocks/ai.py", "record_log.person(session['identity_id'])"): "GET /me/ai/turns/{id}: the signed-in person's own background AI turn (and _turn_state checks they started it)",
     ("apps/api/blocks/collab.py", "record_log.group(group_id)"): "_owner: called only after groups.member_group let the caller in (or, to delete, after visible() found their own record: G3)",
     ("apps/api/blocks/docs.py", "record_log.person(identity_id)"): "_where: called with the session's identity only (docs.py _save)",
     ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): "/me/docs/*: the signed-in person's own records",
@@ -48,6 +49,7 @@ REVIEWED_OWNER_USES = {
 }
 REVIEWED_COUNTS = Counter({
     ("apps/api/blocks/act.py", "record_log.person(session['identity_id'])"): 1,
+    ("apps/api/blocks/ai.py", "record_log.person(session['identity_id'])"): 1,
     ("apps/api/blocks/collab.py", "record_log.group(group_id)"): 1,
     ("apps/api/blocks/docs.py", "record_log.person(identity_id)"): 1,
     ("apps/api/blocks/docs.py", "record_log.person(session['identity_id'])"): 6,

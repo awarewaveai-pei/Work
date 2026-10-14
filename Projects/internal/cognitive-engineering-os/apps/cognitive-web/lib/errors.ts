@@ -75,6 +75,13 @@ const CODES: Record<string, string> = {
   AI_NOTHING_TO_PLACE: "每張卡都已經放進某一層了。",
   AI_NOTHING_TO_POINT: "每個面向你都看過了。",
   AI_NOTHING_TO_READ: "還沒有可以給 AI 讀的內容：先在開案資料選目的，或在地圖寫一行。",
+  // a background AI turn (ai_lego/apps/api/blocks/ai.py)
+  AI_TURN_RUNNER_LOST: "AI 這次停下來了，沒有留下結果（可能是系統重新啟動）。再按一次即可。",
+  AI_TURN_IN_FLIGHT: "AI 剛才沒能開始，再按一次即可。",
+  AI_TURN_FAILED: "AI 這次沒有寫完，沒有存。再按一次即可。",
+  AI_TURN_NOT_FOUND: "找不到這次請 AI 寫的紀錄。請重新整理這一頁。",
+  AI_TURN_ANSWER_GONE: "AI 寫好的那一份已經被刪掉了。",
+  AI_TURN_WAIT_TOO_LONG: "AI 寫了很久還沒寫完。請等一下再重新整理這一頁；寫好的會出現在這一塊，不用再按一次。",
   AI_SEALED: "你按了「現在我要自己下結論」，這一版 AI 不再給新答案。存下一版之後，才能再請它檢查。",
   ANSWER_ALREADY_GIVEN: "這個提議你已經回答過了；要改，改那一次的回答。",
   ANSWER_BLOCK_NOT_OPEN: "這一塊還沒開放，現在不能加；提議會先記著。",

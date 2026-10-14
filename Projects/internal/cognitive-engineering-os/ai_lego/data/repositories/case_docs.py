@@ -70,16 +70,47 @@ class CaseDocs:
         return [_row(row) for row in rows]
 
     def save(self, tenant_id: str, owner: Owner, kind: str, content: Mapping[str, Any], writer: Writer,
-             doc_id: str | None = None, base_version: int | None = None) -> dict[str, Any]:
+             doc_id: str | None = None, base_version: int | None = None, answers_turn: tuple[str, str] | None = None) -> dict[str, Any]:
         """A new document (``doc_id`` None) or its next version. ``base_version``: the version the writer edited -- a
-        newer one in between is a conflict (DOC_STALE), never a silent overwrite.
+        newer one in between is a conflict (DOC_STALE), never a silent overwrite. ``answers_turn``: (turn id, model) of the
+        background AI turn this saves -- its AiTurnAnswered is written in this transaction: both commit or neither.
 
         The person saving over an AI or joint version: unchanged = the AI's (一字沒改照收的算「AI」), changed = joint
         (AI 起草、你改過的算「共同」)."""
         with self._repo.transaction(tenant_id) as connection:
             if owner.kind == "person":   # first, as a case writer takes the case lock (record_log.require_person)
                 record_log.require_person(connection, tenant_id, owner.id)
-            return self._save(connection, tenant_id, owner, kind, content, writer, doc_id, base_version)
+            saved = self._save(connection, tenant_id, owner, kind, content, writer, doc_id, base_version)
+            if answers_turn is not None:
+                turn_id, model = answers_turn
+                record_log.append(connection, tenant_id, f"aiturn:{turn_id}", "AiTurnAnswered",
+                                  {"turn_id": turn_id, "kind": kind, "doc_id": saved["doc_id"], "version": saved["version"], "model": model},
+                                  writer=record_log.system(writer.block), owner=owner)
+            return saved
+
+    # A background AI turn's records (api/blocks/ai.py), on its own aggregate ``aiturn:<turn_id>`` of the case or the person
+    # it answers into, so erasing either erases them: AiTurnStarted (the person asked), then AiTurnAnswered (``save``'s
+    # ``answers_turn``) or AiTurnFailed.
+    TURN_EVENTS = ("AiTurnStarted", "AiTurnAnswered", "AiTurnFailed")
+
+    def record_turn(self, tenant_id: str, owner: Owner, turn_id: str, event_type: str, payload: Mapping[str, Any], writer: Writer) -> None:
+        """One of a turn's records, under its owner's lock and only while the owner is there (CASE_ERASED / IDENTITY_ERASED)."""
+        if event_type not in self.TURN_EVENTS or owner.kind not in ("case", "person"):
+            raise InvariantViolation(f"AI_TURN_RECORD_INVALID: {event_type!r} for a {owner.kind}")
+        with self._repo.transaction(tenant_id) as connection:
+            if owner.kind == "case":
+                self._repo.require_case(connection, tenant_id, owner.id)
+            record_log.append(connection, tenant_id, f"aiturn:{turn_id}", event_type, {**payload, "turn_id": turn_id}, writer=writer, owner=owner)
+
+    def turn_records(self, tenant_id: str, owner: Owner, turn_id: str) -> list[dict[str, Any]]:
+        """The turn's records in the order written: {event_type, at, payload, by} (``by``: the person behind a user record)."""
+        with self._repo.transaction(tenant_id) as connection:
+            rows = connection.execute(
+                "SELECT event_type, occurred_at, payload_json, author_identity_id FROM events WHERE tenant_id=%s AND owner_kind=%s AND owner_id=%s "
+                "AND aggregate_id=%s ORDER BY sequence",
+                (tenant_id, owner.kind, owner.id, f"aiturn:{turn_id}"),
+            ).fetchall()
+        return [{"event_type": row["event_type"], "at": row["occurred_at"], "payload": row["payload_json"], "by": row["author_identity_id"]} for row in rows]
 
     def save_many(self, tenant_id: str, owner: Owner, items: list[Mapping[str, Any]], writer: Writer,
                   check: Callable[[], None] | None = None,

@@ -1,4 +1,45 @@
 # Worklog
+## 2026-10-14（續1）認知平台：長的 AI 回答改在背景跑完（本 commit，未上線）
+
+**根因**：每個積木的 AI 按鈕都在一個 HTTP 請求裡等 `ai_gate.ask_ai` 跑完。AI 最多等 85 秒（`provider.py` DEFAULT_TIMEOUT_SECONDS），nginx 90 秒，Cloudflare 100 秒。輸出約 68 token/秒（`interpret_method_record.py:31`：16k 約 4 分鐘），所以 max_tokens 8000 的 EXPRESS 起草最長要約 118 秒，6000 的動作約 88 秒，回答一長就一定逾時。
+
+**哪些動作**：`AiAction.background` = max_tokens > `SYNC_OUTPUT_TOKENS`（(85−15)×68 = 4760）。現在 11 個：EXPRESS 起草／依讀者改寫（8000）；GATHER summarise/compare/organize、THINK diverge/counter/direct_advice、VERIFY split/techniques/read（6000）。4000 的動作（約 59 秒）照舊同步。以後新增的動作 max_tokens 一超過就自動走背景，不用另列。
+
+**做法（方案 A，不加新表、不加 migration）**:
+- `ai_gate`：`ask_ai` 拆成 `_prepare`（權限、危機停止、交還控制、來源；不花錢）和 `Prepared.answer`（呼叫模型＋存檔）。拒絕、危機、交還仍在請求裡馬上回答。
+- C1（實作時抓到）：express／verify／think／compute／facilitate 用 ContextVar 把 build_input 的資料交給 shape，新 thread 拿不到，草稿被拒 AI_ANSWER_INVALID。`Prepared` 帶著 build_input 之後的 context，`answer` 在裡面跑，哪個 thread 都一樣。
+- `api/blocks/ai.py`：背景動作先寫 AiTurnStarted，拿 run lock（plan P-k，同分析），開 thread 跑；請求最多等 60 秒，跑完就照原樣回答，沒跑完回 202 {turn}。`GET /projects/{id}/ai/turns/{turn}`、`/me/ai/turns/{turn}`：跑中 202；跑完 200 {saved}（AiTurnAnswered 指標和存檔同一個 transaction）；失敗回原本的狀態碼，只留錯誤碼（K8）；伺服器重啟 503 AI_TURN_RUNNER_LOST。
+- 狀態全在 events（aggregate `aiturn:<id>`，owner＝案子或本人），刪案子、刪帳號一起刪。計費照舊走 `_MeteredProvider`；背景的 provider 時限 300 秒（`BACKGROUND_TIMEOUT_SECONDS`）。
+- 群組的 AI 動作不能走背景（`AiAction` 直接拒）：群組路由要等答案才知道誰看得到。
+- 網頁：`lib/blocks.ts ai()` 收到 202 就每 3 秒問一次，沒帶代碼的 429／5xx（Cloudflare、nginx 自己的頁）跳過，10 分鐘上限；`AiWaiting` 在每個積木頁底部顯示「AI 正在寫……已經過了 1 分 05 秒」。頁面本身不用改。
+- 同一個請求在跑的時候再按（離開又回來的頁面），接上同一個 turn，不再付一次錢（`lib/ai-wait.ts`）；別的積木頁寫「『產出與表達』的 AI 還在寫，寫好會留在那一塊」；回來的頁面在寫好時提示重新整理。
+
+**critic（Deep）1 major、5 minor**:
+- M1 等待那一行沒綁頁面：在別頁也說「會出現在這一頁」；回到原頁看不到結果、可以再按一次（再付一次 8000 tokens、多一份草稿）。修：等待綁（案子、積木），同一請求接上同一個 turn，別頁說答案去哪，回來的頁面提示重新整理（`ai-turn.test.tsx` 第 2 個測試）。
+- m1 60 秒內出非預期錯誤回沒有代碼的 500：改回和紀錄同樣的代碼。m2 輪詢遇到沒代碼的 500 就放棄：改成跳過。m5 文案：「已經過了」、「AI 剛才沒能開始」、這一頁／這一塊統一。
+- m3 lock 檔只增不刪：分析也一樣，兩邊一起修，另列 TASKS（不在這次）。m4 4000 的動作只剩約 11 秒餘裕、全靠一個速度估計：照任務要的「用最壞時間決定」保留門檻，列剩餘風險。
+
+**Codex review**:
+- 第 2 輪：F1 再報一次（同上，先寫不變量：本人紀錄一律經 `record_log.append` 的 require_person；identity 列從不硬刪，只刪 `identity_roles`，`store.py:241`），加測試 `test_an_erased_account_gets_no_more_turn_records` 釘住；F2' 失敗紀錄本身寫不進去時 GET 說「伺服器重新啟動」不實：RUNNER_LOST 改成「停下來了，沒有留下結果（可能是系統重新啟動）」。
+- F1 刪帳號後還能寫入本人的 turn 紀錄：不成立。刪帳號保留 identity 列、status='deleted'（`identity/store.py:238`），`record_log.append` 對每筆本人紀錄跑 require_person（`record_log.py:220`），會拒絕。
+- F2 60 秒內失敗回完整訊息、GET 只回代碼：屬實但不是外洩。完整訊息只回給問的人，跟每個同步動作一樣；存下來的只有代碼（K8）。頁面顯示的句子一樣（`lib/errors.ts` 只讀代碼）。EXPRESS 三個守衛測試要讀原因（`test_block_express.py:224,228,239`）。已寫進 `ai.py` 開頭說明。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run（86 模組、1823 tests；3 個失敗都是審查登記：`test_visibility` 新的 `/me/ai/turns` 本人讀取、`test_block_foundation` 新代碼 AI_TURN_RECORD_INVALID 屬程式錯誤；登記後 test_visibility + test_block_foundation + test_ai_turn_background 68 passed、76 subtests）| exit=0 | ms=1545570
+- REALTEST_EVIDENCE: tool=Bash | cmd=審查修正後 pytest test_ai_turn_background + test_block_express 29 passed；vitest 全部 54 files（ai-turn.test.tsx 3 passed，0 個 act 警告）；npx tsc --noEmit | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=pytest tests/unit/test_ai_turn_background.py（8000-token EXPRESS 起草用慢的假模型跑完：202 → GET 202 → 200 saved、max_tokens=[8000]、計費 20 output tokens；失敗只留代碼；危機和交還不開 turn；runner 死掉 503；別的租戶 404；刪案子 turn 紀錄歸零）8 passed | exit=0 | ms=10850
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 `_kept` 回完整訊息 → 失敗測試變紅；AiTurnStarted 改存本人名下 → 刪案子測試變紅；還原後都綠（scratchpad mutate.py）| exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=vitest 全部 54 files（新 lib/ai-turn.test.tsx 2 passed：202 → 跳過 502 → 拿到答案、頁面顯示「AI 還在寫」和秒數；424 帶代碼直接丟出）；npx tsc --noEmit | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/5n
+  - Codex agency-os/reports/oracle/2026-10-14-partialreview-4468cca8.md、2026-10-14-partialreview-ae3be5e6.md：2 項，皆不改（上列）。全 diff 第一次 900 秒逾時（63.8KB），改成只送伺服器端 6 檔。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts,lobster-factory,.claude | grep=ask_ai\(|prepare_ai|_failure_code\(|_error_code\(|SYNC_OUTPUT_TOKENS|AiTurnStarted|ai/turns|waitFor\( | hits=62
+  - `ask_ai` 簽名沒變：`integrity.py:220`、`collab.py` 群組路由、測試照舊。`_error_code`/`_failure_code` 預設仍是 SYNTHESIS_FAILED（`test_api_synthesis.py:274-279`）。`STEP1_CHECKLIST.md:10` 說命令列走 `ask_ai`，仍成立。沒有文件寫 AI 動作是同步的。
+
+**剩餘風險**: 每個背景 turn 在 `.runtime/ai-turn/` 留一個 lock 檔（同分析；TASKS 已列）；多主機時 run lock 要換成 DB lock（`run_lock.py` 開頭）；60 秒內回答的失敗給完整原因、之後的只給代碼（F2）；4000 的動作在模型慢於約 61 token/秒時仍可能 85 秒逾時（m4）；接上同一個 turn 只在同一個分頁內，換分頁或裝置再按仍是新的一次。
+
+**rollback**: `git revert` 本 commit（沒有 migration；events 裡的 AiTurn* 紀錄沒人讀就沒有作用）。
+
+**下一步**: 上線要操作者明確同意（High-STOP）：`deploy/deploy.sh`，上線後實測一次 EXPRESS 起草超過 60 秒的情形。
 ## 2026-10-13（續7）認知平台：實測剩下的小問題處理完（6bd12be9c、6bce0eb9a、f3ef8af8d、f898e7341，已上線）
 
 **操作者**：「去處理好所有的事」（續6 列的 4 個小問題）。

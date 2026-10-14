@@ -8,6 +8,7 @@ import React, { useEffect, useState } from "react";
 import { apiFetch } from "../../lib/api";
 import { BLOCKS, blockHref, blockOf, docs, isOpen, route, type BlockCode, type Notice, type Route, type RouteStop } from "../../lib/blocks";
 import { humanError } from "../../lib/errors";
+import { AiWaiting } from "./AiWaiting";
 import { CaseContract } from "./CollabPermissions";
 import type { Project } from "../../lib/projects";
 
@@ -178,6 +179,7 @@ export function BlockShell({ projectId, code, title, refresh = 0, children }: { 
       {code && <CaseContract projectId={projectId} block={code} />}
       <Proposals projectId={projectId} refresh={refresh} onAnswered={() => setAnswered((count) => count + 1)} />
       {children}
+      <AiWaiting projectId={projectId} block={code} />
       {code && path && <GoOn projectId={projectId} code={code} path={path} />}
     </>
   );

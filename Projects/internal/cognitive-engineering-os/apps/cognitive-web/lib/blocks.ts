@@ -1,7 +1,8 @@
 // The platform's blocks as the pages show them: the 14 blocks + the 5 always-on parts (ai_lego/core/domain/blocks.py
 // holds the codes; this adds the words a person reads). `step` = the build step a block opens in
 // (ai_lego/core/domain/kinds/assembler.py BUILD_STEP; steps 1-4 all open since 2026-10-10); a block not open yet is shown, never hidden.
-import { apiFetch, type Coalesce } from "./api";
+import { ApiError, apiFetch, type Coalesce } from "./api";
+import { waitFor } from "./ai-wait";
 
 export type BlockCode = "SENSE" | "GATHER" | "MAP" | "THINK" | "VERIFY" | "COMPUTE" | "DECIDE" | "ACT" | "LEARN" | "TEACH" | "EXPRESS" | "FACILITATE" | "COLLAB" | "GOVERN";
 // `home`: a block whose page is not one case's (課程 is yours, 帶領 and 共同程序 are a group's): every link to it goes there,
@@ -78,6 +79,41 @@ export type Route = { purpose: string | null; package: string | null; blocks: Ro
 export const route = (projectId: string) => apiFetch<Route>(`/projects/${enc(projectId)}/route`);
 
 export type AiTurn<C = Record<string, any>> = { saved?: Doc<C>; stopped?: "crisis"; notice?: string; resources?: Array<{ name: string; contact: string }> };
+// A turn the API took into the background (ai_lego/apps/api/blocks/ai.py: its longest answer outruns a request): 202 with
+// its id; GET {base}/ai/turns/{turn} answers 202 while it runs, then what the POST would have -- the answer, or the error.
+export type AiPending = { turn: string; status: "PENDING"; since?: string };
+export const AI_POLL_MS = 3000;   // ~20 asks a minute: far under the site's 50 requests in 10 seconds (A1)
+export const AI_WAIT_LIMIT_MS = 10 * 60 * 1000;   // the server ends every turn within 5 minutes (provider BACKGROUND_TIMEOUT_SECONDS)
+const isPending = (value: unknown): value is AiPending =>
+  typeof value === "object" && value !== null && (value as AiPending).status === "PENDING" && typeof (value as AiPending).turn === "string";
+// No answer this time (offline, Cloudflare's own 429/502/504 page, a 500 with no code): ask again. Every outcome of the turn
+// itself carries its code (api/blocks/ai.py), so an answer with a code is the turn's.
+const passing = (error: unknown) => error instanceof ApiError && (error.status === 0 || ((error.status === 429 || error.status >= 500) && typeof error.detail !== "string"));
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function turnResult<C>(path: string): Promise<AiTurn<C>> {
+  for (const until = Date.now() + AI_WAIT_LIMIT_MS; Date.now() < until;) {
+    await pause(AI_POLL_MS);
+    try {
+      const answer = await apiFetch<AiTurn<C> | AiPending>(path);
+      if (!isPending(answer)) return answer;
+    } catch (error) {
+      if (!passing(error)) throw error;
+    }
+  }
+  throw new ApiError(0, "AI_TURN_WAIT_TOO_LONG");
+}
+
 // ``over``: the AI's earlier version of a one-per-case document (再整理一次 = its next version, not a second document).
-export const ai = <C,>(projectId: string | null, block: BlockCode, action: string, context: Record<string, unknown> = {}, over?: Doc<C> | null) =>
-  apiFetch<AiTurn<C>>(`${base(projectId)}/ai/${block}/${enc(action)}`, { method: "POST", body: JSON.stringify({ context, ...(over ? { doc_id: over.doc_id, base_version: over.version } : {}) }) });
+// A background turn is waited for here, so a page gets the answer as from any turn (and lib/ai-wait.ts shows the wait). The
+// same request asked again while it runs (the page was left and opened again) joins it: one turn, one bill.
+export const ai = <C,>(projectId: string | null, block: BlockCode, action: string, context: Record<string, unknown> = {}, over?: Doc<C> | null) => {
+  const path = `${base(projectId)}/ai/${block}/${enc(action)}`;
+  const body = JSON.stringify({ context, ...(over ? { doc_id: over.doc_id, base_version: over.version } : {}) });
+  return waitFor({ projectId, block }, `${path} ${body}`, async (toBackground): Promise<AiTurn<C>> => {
+    const answer = await apiFetch<AiTurn<C> | AiPending>(path, { method: "POST", body });
+    if (!isPending(answer)) return answer;
+    toBackground();
+    return turnResult<C>(`${base(projectId)}/ai/turns/${enc(answer.turn)}`);
+  });
+};

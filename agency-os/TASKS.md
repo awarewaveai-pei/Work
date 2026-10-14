@@ -108,6 +108,11 @@
 
 ### 未完成
 
+- [ ] **【Cognitive OS｜小】`.runtime` 的 run lock 檔只增不刪：分析和背景 AI 動作每次各留一個檔**
+  - `🟢 小` · `2026-10-14` · `無`
+  - **一句話**：`run_lock.py` 規定 lock 檔不刪；分析（`main.py` `_interpretation_lock_path`）和背景 AI 動作（`api/blocks/ai.py` `_lock_path`）每次開新檔，放在持久 volume（`docker-compose.yml:41`），只會累積。
+  - **下一步**：同一處清理兩邊：id 不會再被取的 lock，已 free 且超過 2×`BACKGROUND_TIMEOUT_SECONDS` 才刪。
+  - **證據**：WORKLOG 2026-10-14（續1）critic m3。
 - [x] **【2026-09-23 事故收尾｜已完成 2026-09-23】6 個 prod／遠端動作全部落地（操作者「全部去處理好…都你決定」授權）**
   - `✅ 完成` · `2026-09-23` · `收尾 session`
   - ① CF 3 條 whitelist 刪（備份 `reports/security/cf-access-rules-deleted-2026-09-23.json`，check clean）② fail2ban ignoreip 乾淨 ③ nginx 最小 patch（safe-infra-patch，bak `default.conf.bak.safe-patch-20260923-184411`）④ Auto-Repair SSH 指 ks-aw-01:58122 + pinned host key + forced-command gate（dogfood 10/10）⑤ `sync-host-scripts.sh` → `scripts == origin/main ce8109acf` ⑥ push 完成。
