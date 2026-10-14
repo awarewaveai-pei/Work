@@ -1,0 +1,5 @@
+# Data loss upgrade-postiz.sh may accept from the new image's `prisma db push` (one Prisma warning per line, counts
+# stripped). Anything else aborts the upgrade before the schema changes. Reviewed for v2.11.3 -> v2.25.1 (critic
+# 2026-10-15 C1: v2.12.0 removed User.marketplace; v2.12.0-v2.25.0 pushed with --accept-data-loss, v2.25.1 does not).
+# Replace this list, after review, for every later version jump; rehearse-postiz-upgrade.sh prints what it found.
+You are about to drop the column `marketplace` on the `User` table

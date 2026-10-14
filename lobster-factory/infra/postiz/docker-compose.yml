@@ -1,11 +1,14 @@
 # Postiz (self-hosted social publishing) — KS-AW-01 single-host deployment.
 # DEPLOYED COPY lives at /root/postiz/docker-compose.yml (with a sibling .env holding
-# POSTIZ_DB_PASSWORD / POSTIZ_JWT_SECRET — never committed). This repo copy is the SSOT;
-# keep the two in sync. Lightweight v2.11.3 (pre-Temporal/Elasticsearch); hard mem_limit caps
-# blast radius so Postiz can never OOM the host's Supabase/n8n/Trigger workloads.
+# POSTIZ_DB_PASSWORD / POSTIZ_JWT_SECRET / REDIS_PASSWORD / TEMPORAL_DB_PASSWORD / FACEBOOK_APP_* — never
+# committed). This repo copy is the SSOT; change the running install only with ./upgrade-postiz.sh (preflight, backup,
+# schema gate, health, database-aware rollback). Hard mem_limits cap blast radius so Postiz can never OOM the host.
 # Reuses the existing supabase-db Postgres (dedicated `postiz` DB+role). Public via nginx vhost
 # postiz.aware-wave.com → 127.0.0.1:4007. Internal layout: nginx:5000 → backend:3000 (/api) +
 # frontend:4200 (/) — hence NEXT_PUBLIC_BACKEND_URL ends in /api and BACKEND_INTERNAL_URL=:3000.
+# Since v2.12 the post queue is Temporal (was BullMQ + in-container cron). Temporal runs on its own Postgres
+# with SQL visibility (no Elasticsearch); its state is Postiz's send queue only — the schedule's system of
+# record is our social_posts table (ADR 016 §2), so temporal-postgresql is not backed up (backup-inventory.json).
 name: postiz
 
 services:
@@ -24,8 +27,69 @@ services:
     networks:
       - postiz_internal
 
+  temporal-postgresql:
+    image: postgres:16
+    container_name: temporal-postgresql
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 512m
+    cpus: "0.5"
+    environment:
+      - POSTGRES_USER=temporal
+      - POSTGRES_PASSWORD=${TEMPORAL_DB_PASSWORD:?set TEMPORAL_DB_PASSWORD in /root/postiz/.env}
+    volumes:
+      - temporal_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - temporal_internal
+
+  temporal:
+    image: temporalio/auto-setup:1.28.1
+    container_name: temporal
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    mem_limit: 1g
+    cpus: "1.0"
+    environment:
+      - DB=postgres12
+      - DB_PORT=5432
+      - POSTGRES_USER=temporal
+      - POSTGRES_PWD=${TEMPORAL_DB_PASSWORD:?set TEMPORAL_DB_PASSWORD in /root/postiz/.env}
+      - POSTGRES_SEEDS=temporal-postgresql
+      - DYNAMIC_CONFIG_FILE_PATH=config/dynamicconfig/production-sql.yaml
+      # SQL visibility has 3 Text search-attribute slots; auto-setup's two demo attributes would leave too few for
+      # Postiz's organizationId + postId, and the backend then never listens (critic C2, 2026-10-15).
+      - SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true
+    volumes:
+      - ./dynamicconfig:/etc/temporal/config/dynamicconfig:ro
+    healthcheck:
+      # Healthy = the default namespace exists. Cluster health goes SERVING before auto-setup registers it, and a
+      # Postiz backend started in that window stays dead (its search-attribute call fails once and is swallowed).
+      test: ["CMD-SHELL", "temporal operator namespace describe --namespace default --address temporal:7233 >/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    depends_on:
+      temporal-postgresql:
+        condition: service_healthy
+    networks:
+      - temporal_internal
+
   postiz:
-    image: ghcr.io/gitroomhq/postiz-app:v2.11.3
+    image: ghcr.io/gitroomhq/postiz-app:v2.25.1
     container_name: postiz
     restart: unless-stopped
     logging:
@@ -33,22 +97,26 @@ services:
       options:
         max-size: "25m"
         max-file: "5"
-    # Postiz runs backend + cron + workers + Next in one container. KS-AW-01 observed a stable
-    # ~1.27 GiB working set at the prior 1.4 GiB cap; 2 GiB restores headroom while retaining
-    # cgroup isolation and Netdata's per-container warning/critical protection.
-    mem_limit: 2g
-    cpus: "1.0"
+    # One container runs backend + frontend + the Temporal worker (orchestrator). v2.11.3 held ~1.3 GiB;
+    # 3 GiB leaves room for the worker while keeping cgroup isolation and Netdata's per-container alerts.
+    mem_limit: 3g
+    cpus: "1.5"
     ports:
       - '127.0.0.1:4007:5000'
     environment:
       - DATABASE_URL=postgresql://postiz:${POSTIZ_DB_PASSWORD}@supabase-db:5432/postiz
       - REDIS_URL=redis://:${REDIS_PASSWORD}@postiz-redis:6379
+      - TEMPORAL_ADDRESS=temporal:7233
       - JWT_SECRET=${POSTIZ_JWT_SECRET}
       - FRONTEND_URL=https://postiz.aware-wave.com
       - NEXT_PUBLIC_BACKEND_URL=https://postiz.aware-wave.com/api
       - BACKEND_INTERNAL_URL=http://localhost:3000
       - MAIN_URL=https://postiz.aware-wave.com
       - IS_GENERAL=true
+      # Hourly cap on public-API post creation (v2.25.1 default 90; only POST /public/v1/posts counts, GETs do not).
+      - API_LIMIT=300
+      # Starts the hourly missing-post workflow: it re-drives QUEUE posts that lost their Temporal workflow (e.g.
+      # BullMQ jobs from before the upgrade, or an orchestrator crash). Not a BullMQ-only switch.
       - RUN_CRON=true
       # NOT_SECURED skips email-activation (no SMTP/Resend wired yet) so local email+password
       # registration completes without a confirmation mail.
@@ -58,19 +126,42 @@ services:
       - STORAGE_PROVIDER=local
       - UPLOAD_DIRECTORY=/uploads
       - NEXT_PUBLIC_UPLOAD_DIRECTORY=/uploads
+      - FACEBOOK_APP_ID=${FACEBOOK_APP_ID}
+      - FACEBOOK_APP_SECRET=${FACEBOOK_APP_SECRET}
+    # The image's own command, after Temporal's namespace answers (postiz-boot/wait-for-temporal.js says why).
+    command: ["sh", "-c", "node /opt/postiz-boot/wait-for-temporal.js && nginx && pnpm run pm2"]
+    # docker stop's default 10 s would kill a publish mid-call; Temporal retries it, the platform may see it twice.
+    stop_grace_period: 60s
     volumes:
       - postiz_uploads:/uploads
+      - ./postiz-boot:/opt/postiz-boot:ro
     networks:
       - supabase_default
       - postiz_internal
+      - temporal_internal
+    # The backend answers 401 without an API key once it listens; the frontend alone answering is not up.
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/public/v1/is-connected').then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+    # Compose order holds only for `up`; after a host reboot Docker starts all at once: the command above waits for
+    # Temporal, the boot check (ks-aw-01-boot-health-notify.sh) and the daily ids:postiz-integrations row call the backend.
     depends_on:
-      - postiz-redis
+      postiz-redis:
+        condition: service_started
+      temporal:
+        condition: service_healthy
 
 volumes:
   postiz_uploads:
+  temporal_pgdata:
 
 networks:
   supabase_default:
     external: true
   postiz_internal:
+    driver: bridge
+  temporal_internal:
     driver: bridge

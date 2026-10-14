@@ -1,0 +1,6 @@
+# Temporal dynamic config for Postiz (mounted read-only at /etc/temporal/config/dynamicconfig).
+# Lowers the id length limit from Temporal's default 1000 to 255 so ids fit SQL visibility's workflow_id VARCHAR(255);
+# same value as upstream dynamicconfig/development-sql.yaml (v2.25.1), without its dev-only search-attribute cache refresh.
+limit.maxIDLength:
+  - value: 255
+    constraints: {}

@@ -58,6 +58,12 @@ send_telegram() {
 # checking immediately after boot would report false failures for slow-starting
 # services (Supabase, ClickHouse) and defeat the point of this script.
 sleep 90
+# A container still inside its healthcheck start_period reports "starting", which is neither healthy nor unhealthy:
+# judging then passes a service that is about to fail (postiz has start_period 300s). Wait up to 5 more minutes.
+for _ in $(seq 30); do
+  [ -z "$(docker ps --filter health=starting --format '{{.Names}}' 2>/dev/null)" ] && break
+  sleep 10
+done
 
 FAILURES=""
 check() {
@@ -82,7 +88,7 @@ check "supabase-kong" "http://127.0.0.1:8000/" "supabase.aware-wave.com"
 check "trigger"       "http://127.0.0.1/" "trigger.aware-wave.com"
 check "n8n"           "http://127.0.0.1/n8n/" "n8n.aware-wave.com"
 check "uptime-kuma"   "http://127.0.0.1:3005/dashboard"
-check "postiz"        "http://127.0.0.1:4007/"
+check "postiz"        "http://127.0.0.1:4007/api/public/v1/is-connected"   # the backend (401 = up); / is only the frontend
 check "soulful"       "http://127.0.0.1/" "soulfulexpression.org"
 
 UNHEALTHY=$(docker ps --filter health=unhealthy --format '{{.Names}}' 2>/dev/null | tr '\n' ' ')

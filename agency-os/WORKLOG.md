@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-15（續7）G5 Postiz v2.11.3 → v2.25.1（Temporal）：重寫升級腳本、拋棄式副本演練升級＋強制回滾都過，再上正式機
+
+**根因／發現**:
+- critic（第一版，fix-first 3C/4M）：C1 v2.25.1 的 `prisma db push` 拿掉 `--accept-data-loss`，從 v2.11.3 直跳會因 `User.marketplace` 拒絕 → 容器起不來；C2 Temporal SQL 可見性只有 3 個 Text 搜尋屬性，auto-setup 預設佔 2 個，Postiz 的 `organizationId`／`postId` 註冊失敗 → 後端不聽；C3 schema 推前後舊版起不來、`pg_restore --clean` 也失敗；M1 拿掉 `RUN_CRON` 會關掉補送遺失 workflow 的排程；M2 健康檢查會假 PASS；M3 Temporal 註冊 namespace 前後端先起就永遠死；M4 主機 compose 手加的變數會被蓋掉。
+- critic 第二輪（fix-first 1C/6M/10m）：C 演練副本帶了 prod 的 `POSTIZ_JWT_SECRET`，Bluesky 的 app password（`customInstanceDetails`，prod 1 筆）解得開，egress 開著＝副本可以用客戶真帳號發文（prod 0 篇貼文、兩次演練 0 篇排隊，沒有發生）；M1 回滾中被訊號打斷；M2 `set -E` 讓 `$()` 裡也跑回滾（兩次或子殼回滾）；M3 有排隊貼文時升級／回滾會晚發或重發；M4 演練 PASS 會刪掉 prod 的告警；M5 開機後端可能比 Temporal 早起而死、開機檢查只打前端；M6 沒有鎖。
+- 第三輪修正前的不變量（同一 reviewer 連報兩次，AGENTS.md §4）：①副本裡每把憑證都不能用、啟動前用 SQL 斷言；②回滾只在主殼跑一次、不能被訊號打斷；③有排隊貼文就不升級；④推過 schema 就還原（不靠指紋猜），還原後用 `pg_dump -s` 全 schema 指紋驗；⑤「活著」＝後端回應，開機與每日都打後端；⑥一次一個升級。
+- 演練抓到我自己的：`temporal task-queue describe` 沒有 worker 也印 `Pollers:` 表頭 → 原本 grep 永遠 PASS；改成數表頭下的列。`pm2 jlist` 啟動中先印 banner。
+
+**做了**:
+- `lobster-factory/infra/postiz/docker-compose.yml`：`SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true`；Temporal healthcheck＝namespace 存在；postiz healthcheck＝後端 401；`depends_on: service_healthy`；保留 `RUN_CRON=true`；`${TEMPORAL_DB_PASSWORD:?}`；註解改正（API_LIMIT、maxIDLength）。
+- `upgrade-postiz.sh`（重寫）：preflight（env 鍵不准少、TEMPORAL 密碼格式、新 image）→ 備份（compose、.env、`pg_dump -Fc --create`、schema 指紋、頻道快照）→ schema gate（新 image 自己的 Prisma，資料遺失只准 `expected-data-loss.txt`）→ 套用 → 健康（Temporal、搜尋屬性、worker 真的在 poll、pm2 全 online、帶 key API 200、前端、頻道不變）→ 回滾（schema 動過就 DROP＋`pg_restore --create`，再跑同一組健康；不健康 exit 3＋fresh.d 告警）；`set -E`＋ERR/HUP trap；保留最近 5 份備份。
+- 第三輪：flock；QUEUE>0 中止；compose postiz 設定（env 值、port、volume）不准少或被改；preflight 先拉齊所有 image；push 有 900s timeout、兩次輸出分檔；`PUSHED` 決定還原；`trap '' HUP INT TERM`＋`BASHPID`＋重入保護；`$()` 內關 ERR；頻道比 DB 的 disabled／refreshNeeded／inBetweenSteps；missing-post workflow 要 RUNNING；告警路徑可覆寫、stamp 不放 fresh.d 讀的位置；`umask 077`。`postiz-boot/wait-for-temporal.js`（新）＋compose `command` 先等 namespace、`stop_grace_period: 60s`。開機檢查（`ks-aw-01-boot-health-notify.sh`）等 healthcheck 的 starting 結束、postiz 打 `is-connected`。
+- `rehearse-postiz-upgrade.sh`（新）：同一支腳本對拋棄式副本（`-rehearsal` 名稱、無 port、自有網路、prod postiz dump 還原到 prod 同款 supabase/postgres、`*_SECRET` 全換、頻道 token／登入資料清空且停用、排隊貼文刪除，啟動前 SQL 斷言）跑升級一次＋強制回滾一次。`expected-data-loss.txt`（新）。runbook §6 服務名改 `postiz`、加 §6.1；§5 key 輪替加 printenv 驗證。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=rehearse-postiz-upgrade.sh（第 3 次，兩輪 critic 全修後）→ 副本斷言 0 個可用頻道／排隊貼文才啟動；schema 只找到 `drop the column marketplace on User` 並接受；升級 health PASS（apply 後 44s，含 missing-post workflow RUNNING、worker poller 列）；強制回滾（HEALTH_TIMEOUT=20）→ schema push attempted → DROP＋`pg_restore --create`（supabase_admin，prod 同款 image）→ v2.11.3 healthy；殘留 0/0/0 | exit=0 | ms=540000
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash -n upgrade-postiz.sh rehearse-postiz-upgrade.sh ks-aw-01-boot-health-notify.sh；awk poller 檢查：空表頭 rc=1、一列 rc=0 | exit=0 | ms=1000
+- REVIEW_DONE: critic=Standard | verdict=fail | findings=1c/6m/10n（第二輪；第一輪 3c/4m；兩輪全修，演練第 3 次驗）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=postiz-app|RUN_CRON|upgrade-postiz|wait-for-temporal|expected-data-loss | hits=postiz-app 1（image 名）、upgrade-postiz 2、wait-for-temporal 2、expected-data-loss 1、RUN_CRON 1；v2.11.3 只剩有日期的歷史紀錄
+- ORACLE_WAIVED: critic（Claude 子代理）兩輪＋主機演練三輪；codex 未跑
+
+**正式機**：本條只到演練；正式升級與 G1 重跑見下一條。
+
+**rollback**: 腳本自己的回滾（備份在 `/root/postiz-upgrade-backups/<STAMP>/`）；手動：停 postiz → `DROP DATABASE postiz WITH (FORCE)` → `pg_restore --create -d postgres <dump>` → 還原 compose → `docker compose up -d --remove-orphans`。
 ## 2026-10-15（續6）B7／B8 上線：全 8 庫從 R2 演練 PASS；對帳首跑抓到 next-admin 從沒拿到 Postiz 設定、Cognitive 19 個專案指標全懸空
 
 **做了**（主機 ks-aw-01，操作者「15 項一直做到完成」授權）:

@@ -111,7 +111,7 @@ x-ratelimit-reset: 3600 (秒)
 ## 5. POSTIZ_API_KEY 輪替
 
 **API Key 位置**：
-- SG：`/root/lobster-phase1/.env` → `POSTIZ_API_KEY`
+- ks-aw-01：`/root/lobster-phase1/.env` → `POSTIZ_API_KEY`（next-admin compose 傳進容器；2026-10-15 前沒傳，next-admin 其實拿不到）
 - Vault：`scripts/secrets-vault.ps1 -Action get -Name POSTIZ_API_KEY`（僅確認存在，輸出為遮罩；真值在本機 `mcp\user-env.ps1`）
 
 **輪替步驟**：
@@ -127,8 +127,10 @@ sudo -i
 nano /root/lobster-phase1/.env
 # 找 POSTIZ_API_KEY= → 貼新 key → 存檔
 
-# 3. 重 build next-admin（讓新 key 進 container env）
+# 3. 重 build next-admin（讓新 key 進 container env），再確認容器裡真的是新 key 的開頭
 /root/lobster-phase1/scripts/sg-deploy.sh next-admin
+docker exec lobster-next-admin printenv POSTIZ_API_KEY | cut -c1-6
+# 每日 backup-coverage 的 ids:postiz-integrations 列也會因 key 錯而 FAIL
 
 # 4. 更新本機 vault
 .\scripts\secrets-vault.ps1 -Action set -Name POSTIZ_API_KEY -Value '<新 key>'
@@ -150,22 +152,31 @@ curl -si "https://postiz.aware-wave.com/api/public/v1/integrations" \
 ssh -i ~/.ssh/id_ed25519 -p 58122 ubuntu@145.239.195.47
 sudo -i
 
-# 查容器狀態
+# 查容器狀態（postiz、temporal 有 healthcheck；healthy = 後端在聽、Temporal 的 namespace 已建）
 cd /root/postiz
 docker compose ps
 
 # 查 log
-docker compose logs --tail=50 postiz-app
+docker compose logs --tail=50 postiz
+docker compose logs --tail=50 temporal
 
 # 重啟
-docker compose restart postiz-app
+docker compose restart postiz
 ```
 
-**Postiz docker-compose 位置**：EU `/root/postiz/docker-compose.yml`（或 `infra/postiz/docker-compose.yml` 在 repo）
+**Postiz docker-compose 位置**：ks-aw-01 `/root/postiz/docker-compose.yml`；正本 repo `lobster-factory/infra/postiz/docker-compose.yml`。
 
 **若重啟後仍 500**：
-- 查 DB 連線（Postiz 使用獨立 `postiz` DB user）：`docker compose logs postiz-app | grep -i 'database\|connect\|error'`
-- 查 EU Postgres 是否正常：`docker compose ps` at Supabase stack
+- 查 DB 連線（Postiz 使用獨立 `postiz` DB user，庫在 `supabase-db`）：`docker compose logs postiz | grep -i 'database\|connect\|error'`
+- 後端起來但不送文：`docker exec postiz pm2 jlist`（backend／frontend／orchestrator 都要 online）；`docker exec temporal temporal task-queue describe --task-queue main --namespace default --address temporal:7233`（Pollers 下要有列）。
+
+### 6.1 版本與升級（v2.25.1 起佇列是 Temporal）
+
+- 只用 `lobster-factory/infra/postiz/upgrade-postiz.sh <repo 的 infra/postiz>` 改正在跑的 Postiz；先跑 `rehearse-postiz-upgrade.sh`（拋棄式副本：升級一次、強制回滾一次，兩次都要過；副本的 secret 全換、頻道停用、排隊貼文刪除，碰不到真帳號）。
+- 正式機脫離 SSH 跑：`systemd-run --unit=postiz-upgrade --collect bash /root/Work/lobster-factory/infra/postiz/upgrade-postiz.sh /root/Work/lobster-factory/infra/postiz`，看 `/var/log/postiz-upgrade.log`。
+- 腳本：一次只跑一個（flock）→ 有排隊中的貼文就不升（兩個方向都可能晚發或重發）→ compose 的 postiz 設定不准少或被改 → 先拉齊所有 image → 備份（compose、.env、dump `--create`、schema、頻道）→ 用新 image 的 Prisma 推 schema，資料遺失只准 `expected-data-loss.txt` 列的 → 套用 → 健康（Temporal＋搜尋屬性、worker 真的在 poll、missing-post workflow、pm2、帶 key 的 API、前端、頻道不變）→ 失敗就回滾（推過 schema 就還原資料庫；回滾中不理會中斷訊號），回滾也不健康 → exit 3＋endpoint-alert 告警。
+- 開機：postiz 的 command 先等 Temporal 的 namespace（`postiz-boot/wait-for-temporal.js`）再啟動；開機檢查打 `/api/public/v1/is-connected`（401＝後端活著）。
+- 換版本：先更新 `expected-data-loss.txt`（rehearsal 會印出新版本找到的清單），審過再跑。
 
 **不可執行**：直接改 Postiz DB schema / 清空 posts table / 改 `.env` secrets（需 R0 審核）
 
