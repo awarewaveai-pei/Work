@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-10-13 11:31:26
+- Generated: 2026-10-14 10:19:52
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -15,6 +15,7 @@
 - `LAST_SYSTEM_STATUS.md`, `WORKLOG.md`
 
 ## 1) TASKS.md - Next (unchecked)
+- [ ] **【Cognitive OS｜小】`.runtime` 的 run lock 檔只增不刪：分析和背景 AI 動作每次各留一個檔**
 - [ ] **【研究線｜P1 全部完成（WC-15 ⑤ 2026-10-02 驗過）；P2 DOD 8/8 完成（2026-10-02）；剩操作者定門檻】三條線（合作風險／決策利弊／EdD）做成 Cognitive OS 上的 Project 工作流** — 現況與下一步只看計畫正本 `Projects/internal/cognitive-engineering-os/docs/RESEARCH_LINES_MASTER_PLAN.md` §0／§12.8／§12.9；P1 紀錄 WORKLOG 續37／41／52／54／55／59；P2 09b 剩：操作者門檻裁定（DOD-2 已用新專案 `857b6f41…`「勿刪」通過，WORKLOG 2026-10-02 續2）；「舊專案刪不掉」後端已排除、待操作者描述畫面（WORKLOG 2026-10-02 續1）。
 - [ ] **【Cognitive OS P4｜待操作者決定】報告核准角色與來源搜尋規模** — ① `POST /projects/{id}/reports/{rid}/approval` 任何有效 session 都能核准，是否限角色；② `GET /sources/search` 無分頁／全文索引／限流（現為上限 100 筆＋每請求讀 200 份 artifact，超出標 `truncated`／`incomplete`），租戶或資料量變大時再做；③ 報告 `run_results` 要等 project-level run binding 才開放。WORKLOG 2026-10-01（續7）。
 - [ ] **【基礎設施｜小】主機 nginx 有 repo 沒有的 `hci.aware-wave.com` server 區塊（漂移）** — `/root/lobster-phase1/nginx/default.conf` 含 hci 區塊，repo `lobster-factory/infra/hetzner-phase1-core/nginx/default.conf` 沒有；任何人以 repo 檔覆蓋主機檔會讓 hci 站下線。修：把該區塊收進 repo（先比對主機現值）。2026-09-26 PI-b 分流時發現，詳 WORKLOG 2026-09-26（續34）。
@@ -75,6 +76,7 @@
 - [ ] **已知模式債務：`dev-db-init.ps1` 的「hardcode 最新 migration marker + loop bound」模式會在下個 migration 忘記同步時重演** — Task 8（2026-09-18）critic 覆審發現：這次的根因類型本身沒根治，只修了症狀（0019→0020）。根治需 migration 帳本表（記錄哪些 id 已套用，逐檔比對現有 migrations 目錄），非本次範圍。
 - [ ] **已知限制：`check-trigger-no-direct-fetch.ps1` 抓不到動態字串組出屬性名稱的 fetch 呼叫** — Task 9（2026-09-18）critic 覆審真實 PoC 證實：`globalThis['fe'+'tch'](...)` 這類手法因為原始碼裡從未出現完整的 "fetch" 字面 token，regex 掃描原理上抓不到，需要真正的 AST + scope resolution 或直譯器才能根治。這是 ADR-0029 gate 6 目前**唯一**的執行機制，非形式化證明過的完整方案。
 - [ ] **已知限制：`check-trigger-no-direct-fetch.ps1` 的 `$forbiddenImportPattern`／`$xhrPattern` 有 3 個真實繞過，未修**（Task 10 follow-up app/ 擴大掃描，2026-09-18，critic 覆審真跑 PoC 證實，皆為修改前既有文字，非當次改動引入）：(1) backtick 分隔的 module specifier `` require(`undici`) `` — 字元類別只認 `['"]`；(2) 字串串接 `require('und'+'ici')`；(3) `require` 本身取別名再呼叫 `const req=require; req('undici')` — 與今天已修的 `fetch` 別名繞過同一類手法，尚未同步套到 `require`。`$xhrPattern`（`\bnew\s+XMLHttpRequest\b`）也有同款別名繞過（`const XHR=XMLHttpRequest; new XHR()`），同樣尚未套用 `fetch` 那次已驗證的「裸識別符」修法。三者皆已用真實執行證實（非推論），列為獨立後續任務，不在本次 app/ 擴大掃描範圍內（該範圍只覆蓋 node_modules 排除／字串常值誤報／零容忍模式三項）。詳見 WORKLOG 2026-09-18。
+- [ ] **已知限制：`check-perplexity-search-only.mjs:40` KEY_READER 抓不到間接讀 key（`process.env[name]`、`os.environ.get("…")`）** — 2026-10-10 續2 發現；HOST／SDK 檢查（`:66`、`:76`）仍兜底，不會靜默變成呼叫。修法方向：key 名改由單一常數匯出，guard 掃常數的使用處。詳 WORKLOG 2026-10-10（續2）。
 - [ ] **已知債務：runner 端寫入 MinIO 但 DB 列因輪詢階段失敗而遺失時的孤兒物件** — Task 9（2026-09-18）critic 覆審指出架構層級取捨：若失敗發生在輪詢階段（例如 runner 重啟導致 job 狀態遺失），runner 可能已把內容寫進 MinIO，但呼叫端重新 enqueue 後找不到對應 DB 列可參照，形成孤兒物件；`object-storage-client.mjs` 沒有 TTL/GC。與既有「`jobs` Map 無 TTL」債務同源，Task 9 真實流量接上前應一併處理。
 - [ ] **Bash 工具 wrapper 疑似壞掉，需獨立調查（間歇性，非持續）** — 2026-09-17 某 session 三種方式（裸指令、`.sh` 檔、`cmd.exe //c` .bat 檔）全部同樣失敗，錯誤與內容無關；同日兩個獨立 `fullstack-engineer` agent（做 Task 4/5，見上）也各自整個 session 100% 中招、從未找到解法。過去偶發同款症狀曾用「寫 script 檔另外呼叫」繞過，那次繞不過。**同日稍後另一個 session（本次，接手真跑 Task 4/5 驗證）Bash 全程正常**——`echo hi`、`node --test`、`powershell -File`（含 real-Docker/MinIO 跑約 5 分鐘）、`git`、`grep` 皆無異常，跨約 20 分鐘、數十次呼叫零故障。懷疑是特定 subagent 沙箱/session 才會中招，不是這台機器或這個 wrapper 全域持續壞掉；根因仍未定位，過去猜測（`bash -c` 呼叫前後被注入東西）未驗證。優先權降為中——不再擋住每個 session，但下次再中招時應保留完整錯誤輸出供比對。
 - [ ] **MCP 執行期可用性偵測器：讀實際 connected/failed 計數，不再只驗設定檔語法**
@@ -369,37 +371,30 @@
 
 > Full runbook: see `## Runbook Commands` in the source file.
 
-## 5) memory/daily/2026-10-13.md
+## 5) memory/daily/2026-10-14.md
 _no file for today yet._
 
 ## 6) LAST_SYSTEM_STATUS.md (appendix)
 # System Guard Status
 
 - Mode: `daily`
-- Time: `2026-10-09 20:20:55`
-- Health score: **99.4%**
+- Time: `2026-10-14 10:18:18`
+- Health score: **100%**
 - Threshold: **100%**
-- Health gate exit code: **1**
+- Health gate exit code: **0**
 - Closeout report exists: **YES**
-- Result: **FAIL**
-- Auto-repair attempted: **YES**
-- Auto-repair result: **FAIL**
+- Result: **PASS**
+- Auto-repair attempted: **NO**
+- Auto-repair result: **N/A**
 
 ## Latest Reports
-- Health: `reports/health/health-20261009-202054.md`
-- Closeout: `reports/closeout/closeout-20261009-201705.md`
+- Health: `reports/health/health-20261014-101817.md`
+- Closeout: `reports/closeout/closeout-20261014-101654.md`
 
 ## Action
-- Blocking issues detected. Review latest health/closeout reports immediately.
+- No blocking issue detected.
 
 ## 7) WORKLOG.md tail (~60 lines)
-- `reports/decisions/INDEX.md`：登錄決策報告。
-- `C:\Users\user1115\.claude\projects\d--Work\memory\` 下 21 份檔案：`audit-cross-machine-bom.ps1 -Fix` 以保留 backup 的方式補上 BOM；備份位於 `.bom-backfill-backup-20260901-021636`（檔案不在 Git repo）。
-
-[驗證結果]
-- REALTEST_WAIVED: DOC_ONLY — 決策包沒有 runtime/schema/部署變更；文件完整性檢查確認 Wave 1 為 11 項、延後為 13 項、HCI ADR index 零 `ACCEPTED` 項、報告索引存在且 `git diff --check` 通過。
-- REVIEW_DONE: decision-intelligence architecture review（Topic Analyzer、3×Advocate、Security／DevOps／Cost／Product／Customer Voice／Legal／Compliance／AI-ML／Scalability、Skeptic、Judge、Pre-mortem、Implementation／Rollout Planner）| verdict=C2 Wave 1 tranche | confidence=0.70；pre-mortem 新增「批准與 machine-enforced control 脫鉤」風險及對應 gate。
-- BUGHUNT_DONE: `audit-cross-machine-bom.ps1` 修復後重跑：80/80 `.md` 有 UTF-8 BOM、missing=0；HCI decision packet 檢查確認沒有將任何 `PLANNED` ADR 誤標為 `ACCEPTED`。
 
 [剩餘風險]
 - HD-00～23 的最終選項仍需操作者明示；在 HD-01／02 未批准前不得 freeze Wave 1 domain schema，在資料主體權利／identity／RLS 相關 HD 未批准前不得處理 RESTRICTED HCI 資料。
@@ -453,3 +448,10 @@ _no file for today yet._
 **剩餘風險**: HD-03～HD-23 未獲人類選項批准；尤其 HD-03/10/20/21 會阻擋資料主體 rights、Case aggregate、法域/市場與 DPA 角色的 production implementation。所有 four artifacts 都是 design input，不能作為任何處理 real-person data 的許可。
 
 **Rollback**: `git revert <this commit>` 可移除本輪 specification 與 ADR links；因未建立 schema/data/migration，不需要資料回滾。
+## 2026-10-12
+- 01:15 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-10-12.md
+
+## 2026-10-13
+
+### Machine appendix (monthly-system-review)
+- 2026-10-13 11:31:39 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 33.26% (< 85%))

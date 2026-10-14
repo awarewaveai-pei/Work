@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-10-14T00:29:25.4241701Z",
+    "generatedAtUtc":  "2026-10-14T01:53:56.3356455Z",
     "branch":  "main",
     "runsPerWorkflow":  20,
     "probeOk":  true,
@@ -32,10 +32,10 @@
                       {
                           "name":  "Cognitive OS full suite",
                           "latest":  "failure",
-                          "consecutiveFailures":  2,
+                          "consecutiveFailures":  3,
                           "failingSinceUtc":  "2026-10-13T00:13:37Z",
                           "failingDays":  1,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38333666520"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38493906498"
                       },
                       {
                           "name":  "HCI-30 — Wave 1 cross-box restore drill (P0-10)",
@@ -67,7 +67,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38365538366"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38497359996"
                       },
                       {
                           "name":  "Release Gate (main)",
@@ -91,7 +91,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38365538531"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38497360055"
                       },
                       {
                           "name":  "Tenant staging SSOT",
@@ -126,9 +126,9 @@
                           "url":  ""
                       }
                   ],
-    "verdict":  "drift",
-    "verdictLabel":  "WARN",
+    "verdict":  "broken",
+    "verdictLabel":  "FAIL",
     "findings":  [
-                     "\u0027Cognitive OS full suite\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/38333666520"
+                     "\u0027Cognitive OS full suite\u0027 has been failing for 3 consecutive run(s) over 1 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/38493906498"
                  ]
 }

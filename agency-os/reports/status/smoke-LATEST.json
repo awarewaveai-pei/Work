@@ -18,7 +18,7 @@
                    "n8n_failures":  "ok:none_24h",
                    "pod_order_inbox":  "ok",
                    "repair_center":  "ok",
-                   "ci_health":  "warn:warn_[WARN]_CI:_\u0027Cognitive_OS_full_suite\u0027_latest_run_on_main_is_failure:_https://github.com/awarewaveai-p",
+                   "ci_health":  "warn:fail_[FAIL]_CI:_\u0027Cognitive_OS_full_suite\u0027_has_been_failing_for_3_consecutive_run(s)_over_1_day(s)_-_this_",
                    "client_sites":  "ok:6_active",
                    "repair_detail":  {
                                          "github_app_status":  "unverified",
@@ -48,11 +48,11 @@
                },
     "overall":  "WARN",
     "blockers":  [
-                     "[WARN] CI: \u0027Cognitive OS full suite\u0027 latest run on main is failure: https://github.com/awarewaveai-pei/Work/actions/runs/38333666520",
+                     "[FAIL] CI: \u0027Cognitive OS full suite\u0027 has been failing for 3 consecutive run(s) over 1 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/38493906498",
                      "[FAIL] Nightly health: AO-CLOSE archive items not lifted to TASKS.md (see archive-lift-last.json)",
                      "[WARN] Backup: WARN -- see reports/status/backup-health-LATEST.md for per-host detail"
                  ],
-    "generated":  "2026-10-14 08:30:54",
+    "generated":  "2026-10-14 09:55:16",
     "blind_spots":  [
 
                     ]
