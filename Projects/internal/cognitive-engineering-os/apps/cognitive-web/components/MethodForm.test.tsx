@@ -4,6 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { MethodForm } from "./MethodForm";
 import { toPayload } from "../lib/form-model";
+import { ApiError, apiFetch } from "../lib/api";
+
+vi.mock("../lib/api", async (original) => ({ ...(await original<typeof import("../lib/api")>()), apiFetch: vi.fn() }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -61,5 +64,67 @@ describe("MethodForm", () => {
     expect(empty).toContain('<label class="field need">');
     const filled = renderToStaticMarkup(<MethodForm fields={fields} state={{ events: ["x"], objective: "y" }} onState={() => undefined} onSubmit={() => undefined} needs={["events", "objective"]} />);
     expect(filled).not.toContain("need");
+  });
+});
+
+describe("MethodForm upstream steps (2026-10-14 walk: 5 Whys <- 魚骨圖 <- 問題陳述 could never run)", () => {
+  const statement = [{ key: "text", kind: "text", label: "陳述", required: true }];
+  const fishbone = [{ key: "problem_statement", kind: "upstream", label: "問題陳述", method_id: "framing.problem_statement", required: true },
+                    { key: "hypotheses", kind: "rows", label: "原因假設", required: true, item: { kind: "group", fields: [{ key: "statement", kind: "text" }] } }];
+  const whys = [{ key: "cause_hypothesis_set", kind: "upstream", label: "原因假設集（魚骨圖結果）", method_id: "root_cause.fishbone", required: true },
+                { key: "target", kind: "text", label: "要追問的原因假設", required: true }];
+  async function submit(state: Record<string, unknown>, fields = whys) {
+    const host = document.createElement("div"); document.body.appendChild(host);
+    const root = createRoot(host);
+    const onSubmit = vi.fn();
+    await act(async () => { root.render(<MethodForm fields={fields} state={state} onState={() => undefined} onSubmit={onSubmit} />); });
+    await act(async () => { host.querySelector<HTMLButtonElement>("button[type=submit]")!.click(); });
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    const alert = host.querySelector("[role=alert]")?.textContent ?? "";
+    await act(async () => { root.unmount(); }); host.remove();
+    return { onSubmit, alert };
+  }
+  const calls = () => vi.mocked(apiFetch).mock.calls.map(([path, init]) => `${init?.method ?? "GET"} ${path}`);
+
+  it("invokes every depth, the inner step first, each record passed up", async () => {
+    vi.mocked(apiFetch).mockReset().mockImplementation(async (path: string, init?: RequestInit) => {
+      if (path === "/methods/root_cause.fishbone/form") return { form: { fields: fishbone } } as never;
+      if (path === "/methods/framing.problem_statement/form") return { form: { fields: statement } } as never;
+      if (path === "/methods/framing.problem_statement/invoke") return { record: { statement_id: "PS-1" } } as never;
+      if (path === "/methods/root_cause.fishbone/invoke") { expect(JSON.parse(String(init!.body)).problem_statement).toEqual({ statement_id: "PS-1" }); return { record: { set: "CHS-1" } } as never; }
+      throw new Error(`unexpected ${path}`);
+    });
+    const { onSubmit, alert } = await submit({ target: "H1", cause_hypothesis_set: { methodId: "root_cause.fishbone", data: { hypotheses: [{ statement: "慢" }],
+      problem_statement: { methodId: "framing.problem_statement", data: { text: "結帳慢" } } } } });
+    expect(alert).toBe("");
+    expect(calls().filter((call) => call.startsWith("POST"))).toEqual(["POST /methods/framing.problem_statement/invoke", "POST /methods/root_cause.fishbone/invoke"]);
+    expect(onSubmit).toHaveBeenCalledWith({ target: "H1", cause_hypothesis_set: { set: "CHS-1" } });
+  });
+
+  it("uses a demo case's finished upstream record as it is, invoking nothing", async () => {
+    vi.mocked(apiFetch).mockReset();
+    const record = { generated_by_method: "root_cause.fishbone", hypotheses: [{ id: "H1", statement: "結帳頁面載入過慢" }] };
+    const { onSubmit } = await submit({ target: "H1", cause_hypothesis_set: record });
+    expect(calls()).toEqual([]);
+    expect(onSubmit).toHaveBeenCalledWith({ target: "H1", cause_hypothesis_set: record });
+    vi.mocked(apiFetch).mockImplementation(async (path: string) => ({ form: { fields: path.includes("fishbone") ? fishbone : statement } }) as never);   // not ready: its form loads
+    const other = await submit({ target: "H1", cause_hypothesis_set: { ...record, generated_by_method: "security.stride" } });   // another method's record
+    expect(other.onSubmit).not.toHaveBeenCalled();
+    expect(other.alert).toContain("需要先填上游方法");
+  });
+
+  it("names a required box left out, and a step the builder refused with the box it named", async () => {
+    vi.mocked(apiFetch).mockReset();
+    const left = await submit({ cause_hypothesis_set: { generated_by_method: "root_cause.fishbone" } });
+    expect(left.alert).toBe("還沒填：要追問的原因假設");
+    expect(left.onSubmit).not.toHaveBeenCalled();
+    vi.mocked(apiFetch).mockReset().mockImplementation(async (path: string) => {
+      if (path === "/methods/root_cause.fishbone/form") return { form: { fields: [fishbone[1]] } } as never;
+      throw new ApiError(422, "FISHBONE_INVALID: hypotheses must name at least one cause");
+    });
+    const refused = await submit({ target: "H1", cause_hypothesis_set: { methodId: "root_cause.fishbone", data: { hypotheses: [] } } });
+    expect(refused.alert).toContain("「原因假設集（魚骨圖結果）」這一步沒有通過");
+    expect(refused.alert).toContain("要再看的格子：原因假設。");
+    expect(refused.onSubmit).not.toHaveBeenCalled();
   });
 });

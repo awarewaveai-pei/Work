@@ -2,13 +2,50 @@
 
 import { useEffect, useRef, useState } from "react";
 import React from "react";
-import { apiFetch } from "../lib/api";
+import { ApiError, apiFetch } from "../lib/api";
 import { humanError } from "../lib/errors";
 
-import { FormField, FormOption, collectDefs, fieldKey, setField, toPayload } from "../lib/form-model";
+import { FormField, FormOption, collectDefs, fieldKey, fieldsNamedIn, missingRequired, setField, toCheck, toPayload } from "../lib/form-model";
 
 type Change = (value: unknown) => void;
 const asObject = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+// An upstream field holds what the person fills for that method ({methodId, data}) or, from a demo case, that method's
+// finished record (5 Whys' 原因假設集 is the 魚骨圖's record): used as it is, never invoked again -- unless it says another
+// method made it (security_control_mapping picks its source by select_by: a STRIDE record is not a LINDDUN one).
+const isWorksheet = (value: unknown) => "methodId" in asObject(value);
+const isRecord = (value: unknown, methodId: string | undefined) => {
+  const record = asObject(value);
+  return !isWorksheet(value) && Object.keys(record).length > 0 && (record.generated_by_method === undefined || record.generated_by_method === methodId);
+};
+const upstreamMethod = (field: FormField, state: Record<string, unknown>) => field.method_id ?? field.methods?.[String(state[field.select_by ?? ""] ?? "")];
+
+/** The payload for ``fields``, each upstream field replaced by its method's record -- invoked first, at every depth (5 Whys
+ *  <- 魚骨圖 <- 問題陳述: only one level was invoked, so 魚骨圖 always lacked its 問題陳述, 2026-10-14). A required field
+ *  left empty is named before anything is sent (``named``: the method it belongs to; ``check`` false: the iceberg, where a
+ *  blank layer is a listed gap). */
+async function withUpstream(fields: FormField[], state: Record<string, unknown>, named = "", check = true): Promise<Record<string, unknown>> {
+  const payload = toPayload(fields, state);
+  for (const field of fields.filter((candidate) => candidate.kind === "upstream")) {
+    const key = fieldKey(field);
+    const methodId = upstreamMethod(field, state);
+    const source = asObject(state[key]);
+    if (isRecord(source, methodId)) { payload[key] = source; continue; }
+    if (!methodId || source.methodId !== methodId) { if (field.required) throw new Error(`${field.label ?? key} 需要先填上游方法`); continue; }
+    const step = (field.label ?? key).split("：")[0];
+    const form = await apiFetch<{ form: { fields: FormField[] } }>(`/methods/${encodeURIComponent(methodId)}/form`);
+    const data = await withUpstream(form.form.fields, asObject(source.data), step);
+    try {
+      payload[key] = (await apiFetch<{ record: Record<string, unknown> }>(`/methods/${encodeURIComponent(methodId)}/invoke`, { method: "POST", body: JSON.stringify(data) })).record;
+    } catch (reason) {
+      if (reason instanceof ApiError) throw new Error(`「${step}」這一步沒有通過：${humanError(reason)}${toCheck(fieldsNamedIn(form.form.fields, reason.detail))}`);
+      throw reason;
+    }
+  }
+  const missing = check ? missingRequired(fields, payload) : [];
+  if (missing.length) throw new Error(`${named ? `「${named}」` : ""}還沒填：${missing.join("、")}`);
+  return payload;
+}
+
 const optionsOf = (field: FormField): FormOption[] => field.options ?? (field.choices ?? []).map((choice) => ({ value: choice, label: choice }));
 function childList(fields: FormField[], state: Record<string, unknown>, onChange: (state: Record<string, unknown>) => void, defs: Record<string, FormField>, conditions?: FormField["conditions"], depth = 0) {
   return fields.filter((field) => !["const", "provenance"].includes(field.kind ?? "")).map((field) => {
@@ -19,12 +56,14 @@ function childList(fields: FormField[], state: Record<string, unknown>, onChange
 }
 
 function UpstreamEditor({ field, value, onChange, siblings }: { field: FormField; value: unknown; onChange: Change; siblings: Record<string, unknown> }) {
-  const methodId = field.method_id ?? field.methods?.[String(siblings[field.select_by ?? ""] ?? "")];
+  const methodId = upstreamMethod(field, siblings);
   const [formFields, setFormFields] = useState<FormField[]>([]);
   const [error, setError] = useState("");
-  useEffect(() => { if (!methodId) return; let active = true; apiFetch<{ form: { fields: FormField[] } }>(`/methods/${encodeURIComponent(methodId)}/form`).then((response) => { if (active) setFormFields(response.form.fields); }).catch((reason) => { if (active) setError(humanError(reason)); }); return () => { active = false; }; }, [methodId]);
+  const ready = isRecord(value, methodId);   // a demo's finished record: no form to fill, nothing to load
+  useEffect(() => { if (!methodId || ready) return; let active = true; apiFetch<{ form: { fields: FormField[] } }>(`/methods/${encodeURIComponent(methodId)}/form`).then((response) => { if (active) setFormFields(response.form.fields); }).catch((reason) => { if (active) setError(humanError(reason)); }); return () => { active = false; }; }, [methodId, ready]);
   const source = asObject(value);
   const data = source.methodId === methodId ? asObject(source.data) : {};
+  if (ready) return <fieldset className="field"><legend>{field.label ?? fieldKey(field)}（上游方法）</legend><p className="hint mt0 mb0">示範案例已經附上這一步的結果，執行時直接用。要自己填，按下面的「清空，填我自己的」。</p></fieldset>;
   return <fieldset className="field"><legend>{field.label ?? fieldKey(field)}（上游方法）</legend>{!methodId && <p>先選擇來源類型。</p>}{error && <p role="alert">{error}</p>}{methodId && formFields.length > 0 && childList(formFields, data, (next) => onChange({ methodId, data: next }), collectDefs(formFields))}</fieldset>;
 }
 
@@ -95,5 +134,5 @@ export function MethodForm({ fields, state, onState, onSubmit, example, onFill, 
   // one analysis per click: a second submit while this one (or the page's pending run, `busy`) is in flight is ignored
   const inFlight = useRef(false);
   const [submitting, setSubmitting] = useState(false);
-  return <form onSubmit={async (event) => { event.preventDefault(); if (inFlight.current || busy) return; inFlight.current = true; setSubmitting(true); setSubmitError(""); try { const payload = toPayload(fields, state); for (const field of fields.filter((candidate) => candidate.kind === "upstream")) { const key = fieldKey(field); const source = asObject(state[key]); const methodId = field.method_id ?? field.methods?.[String(state[field.select_by ?? ""] ?? "")]; if (!methodId || source.methodId !== methodId) { if (field.required) throw new Error(`${field.label ?? key} 需要先填上游方法`); continue; } const form = await apiFetch<{ form: { fields: FormField[] } }>(`/methods/${encodeURIComponent(methodId)}/form`); const upstream = await apiFetch<{ record: Record<string, unknown> }>(`/methods/${encodeURIComponent(methodId)}/invoke`, { method: "POST", body: JSON.stringify(toPayload(form.form.fields, asObject(source.data))) }); payload[key] = upstream.record; } await onSubmit(payload); } catch (error) { setSubmitError(humanError(error)); } finally { inFlight.current = false; setSubmitting(false); } }} className="runform" aria-label={label}>{fields.map((field, index) => { const key = fieldKey(field); const classes = [layered ? `layer l${Math.min(index + 1, 4)}` : "", needSet.has(key) && !isFilled(state[key]) ? "need" : ""].filter(Boolean).join(" "); return <FieldEditor key={key} field={field} value={state[key]} onChange={(value) => onState(setField(state, key, value))} defs={defs} siblings={state} placeholder={examplePlaceholder(example?.[key])} extra={classes || undefined} />; })}{submitError && <p role="alert">{submitError}</p>}<div className="btns mt12"><button type="submit" className="btn primary big" disabled={submitting || busy}>{submitting || busy ? "分析中…" : "執行分析"}</button>{onFill && <button type="button" className="btn" onClick={onFill}>用示範案例填入</button>}{onClear && <button type="button" className="btn ghost" onClick={onClear}>清空，填我自己的</button>}</div></form>;
+  return <form onSubmit={async (event) => { event.preventDefault(); if (inFlight.current || busy) return; inFlight.current = true; setSubmitting(true); setSubmitError(""); try { await onSubmit(await withUpstream(fields, state, "", !layered)); } catch (error) { setSubmitError(humanError(error)); } finally { inFlight.current = false; setSubmitting(false); } }} className="runform" aria-label={label}>{fields.map((field, index) => { const key = fieldKey(field); const classes = [layered ? `layer l${Math.min(index + 1, 4)}` : "", needSet.has(key) && !isFilled(state[key]) ? "need" : ""].filter(Boolean).join(" "); return <FieldEditor key={key} field={field} value={state[key]} onChange={(value) => onState(setField(state, key, value))} defs={defs} siblings={state} placeholder={examplePlaceholder(example?.[key])} extra={classes || undefined} />; })}{submitError && <p role="alert">{submitError}</p>}<div className="btns mt12"><button type="submit" className="btn primary big" disabled={submitting || busy}>{submitting || busy ? "分析中…" : "執行分析"}</button>{onFill && <button type="button" className="btn" onClick={onFill}>用示範案例填入</button>}{onClear && <button type="button" className="btn ghost" onClick={onClear}>清空，填我自己的</button>}</div></form>;
 }

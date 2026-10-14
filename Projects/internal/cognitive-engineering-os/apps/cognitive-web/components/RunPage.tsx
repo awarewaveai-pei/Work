@@ -12,12 +12,12 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import React from "react";
-import { apiFetch } from "../lib/api";
+import { ApiError, apiFetch } from "../lib/api";
 import { docs } from "../lib/blocks";
 import { caseBrief } from "../lib/case-brief";
 import { analysisHref, ICEBERG_ID, projectHref, toolLabel } from "../lib/catalog";
 import { failureReason, humanError } from "../lib/errors";
-import { fieldKey, FormField, initialState } from "../lib/form-model";
+import { fieldKey, fieldsNamedIn, FormField, initialState, toCheck } from "../lib/form-model";
 import type { MapContent, SenseCard } from "../lib/map";
 import { byActivity, costLine, createProject, type Approval, type Estimate, type Project, type Stance, runMinutes } from "../lib/projects";
 import { isOldVersion, restoreState } from "../lib/record";
@@ -243,7 +243,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
       setPrevious(revision?.of ?? (rerun ? completed?.interpretation_id ?? analysis?.interpretation_id ?? null : null));
       setError(""); setCompleted(null); setLeft([]); setLastFailed(false); setRevision(null); setRerun(""); refill.current = false; setPendingId(accepted.interpretation_id);
       window.history.replaceState(null, "", analysisHref(target, accepted.interpretation_id));
-    } catch (reason) { setError(humanError(reason)); }
+    } catch (reason) { setError(humanError(reason) + (reason instanceof ApiError ? toCheck(fieldsNamedIn(form.form.fields, reason.detail)) : "")); }
     finally { setStarting(false); }
   };
   // ResultPage's own header replaces this one once there is a result.

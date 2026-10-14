@@ -103,7 +103,7 @@ function serializeFields(fields: FormField[], state: Record<string, unknown>, de
     const key = fieldKey(field); if (!key) continue;
     const raw = state[key] === undefined ? field.default : state[key];
     if (raw === undefined && !["provenance", "const", "fixed_rows", "variant"].includes(field.kind ?? "")) continue;
-    if (raw === null && field.nullable) { if (field.required) output[key] = null; continue; }
+    if (field.nullable && (raw === null || (typeof raw === "string" && !raw.trim()))) { if (field.required) output[key] = null; continue; }
     const serialized = serializeValue(field, raw, defs, depth);
     if (empty(serialized) && !field.required) continue;
     output[key] = serialized;
@@ -112,6 +112,31 @@ function serializeFields(fields: FormField[], state: Record<string, unknown>, de
   return output;
 }
 export function toPayload(fields: FormField[], state: Record<string, unknown>): Record<string, unknown> { return serializeFields(fields, state, collectDefs(fields)); }
+
+// Parts the system fills (or that are resolved before this check): never the person's to fill.
+const FILLED_BY_SYSTEM = ["upstream", "provenance", "const", "fixed_rows", "variant"];
+const shownName = (field: FormField) => (field.label ?? fieldKey(field)).split("：")[0];
+const partsOf = (field: FormField): FormField[] => field.fields ?? field.children ?? (field.item ? partsOf(field.item) : []);
+
+/** The required fields a payload leaves out, by the name the form shows: the page names them instead of sending (the
+ *  builder refuses a missing argument every time). Top level only, and not an empty one: the 2026-10-14 sweep of every
+ *  demo against the builder found 7 tools whose required lists may be empty and 6 whose required parts inside a row
+ *  are computed (critical_path_method's 最早開始) -- what a part needs is the builder's to say. */
+export function missingRequired(fields: FormField[], payload: Record<string, unknown>): string[] {
+  return fields.filter((field) => field.required && fieldKey(field) && !FILLED_BY_SYSTEM.includes(field.kind ?? "") && payload[fieldKey(field)] === undefined).map(shownName);
+}
+
+const keyIn = (text: string, key: string) => key.length > 2 && new RegExp(`(?<![A-Za-z0-9_])${key}(?![A-Za-z0-9_])`).test(text);
+/** The fields a builder's refusal names by key ("WDM_INVALID_SCORES: scores must be ..."), as the form names them: said
+ *  beside the refusal (2026-10-14: 「送出的內容不符合這個工具的要求」 named no box). A top-level box it names is enough;
+ *  only when it names none, the parts inside the boxes (「因素・陳述」). */
+export function fieldsNamedIn(fields: FormField[], detail: unknown): string[] {
+  const text = typeof detail === "string" ? detail : JSON.stringify(detail ?? "");
+  const top = fields.filter((field) => keyIn(text, fieldKey(field))).map(shownName);
+  if (top.length) return top;
+  return [...new Set(fields.flatMap((field) => partsOf(field).filter((part) => keyIn(text, fieldKey(part))).map((part) => `${shownName(field)}・${shownName(part)}`)))];
+}
+export const toCheck = (names: string[]) => (names.length ? `要再看的格子：${names.join("、")}。` : "");
 
 export function applyLazyLines(text: string, fields: FormField[], state: Record<string, unknown>): { state: Record<string, unknown>; missing: string[] } {
   const next = { ...state };

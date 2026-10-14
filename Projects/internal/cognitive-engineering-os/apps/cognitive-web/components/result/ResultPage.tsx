@@ -8,7 +8,7 @@ import { apiFetch } from "../../lib/api";
 import { analysisHref, compareHref, projectHref, runHref, toolHref, toolLabel } from "../../lib/catalog";
 import { fieldKey, type FormField } from "../../lib/form-model";
 import { costLine, daysOf, holderWord, plusDays, STANCE, thisHolder, todayIso, type Approval, type Estimate, type Rerun, type Stance, type Task, runMinutes } from "../../lib/projects";
-import { plain, recordValue } from "../../lib/record";
+import { fieldAt, plain, recordValue, shownPath } from "../../lib/record";
 import { formatTime } from "../../lib/time";
 import { RunHeader } from "../RunHeader";
 import { LeverageChart, LoopChart, TrendChart, type Loop, type TrendSeries } from "./Charts";
@@ -177,7 +177,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   ])];
   const citationNumber = new Map(citationIds.map((id, index) => [id, index + 1]));
   const manifestById = new Map(manifest.map((item) => [item.id, item]));
-  const resolved = (id: string) => { const fromRecord = recordValue(record, id); const item = manifestById.get(id); return fromRecord === undefined ? item?.value ?? item?.sha256 ?? "來源尚未載入" : plain(fromRecord); };
+  const resolved = (cited: string) => { const id = shownPath(fields, cited); const fromRecord = recordValue(record, id); const item = manifestById.get(cited); return fromRecord === undefined ? item?.value ?? item?.sha256 ?? "來源尚未載入" : plain(fromRecord, fieldAt(fields, id)); };
   // N-32/P-29: an external source cites by title, linking to its actual content -- not its id and a sha256, which
   // told the reader nothing. A source the model never returned a title for (older data) still shows its id, honestly.
   const sourceCitation = (id: string) => {
