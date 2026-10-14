@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-14（續18）續4 的三條待辦做完：只剩 agency-os/automation、M3 報告腳本刪除、digest 測試改正
+
+**操作者**：「第 1 和第 3 條做掉，第 2 條『刪』」。
+
+**根因**:
+- C1 兩套 automation：內容只差 `-LiteralPath`（agency-os 版 8/15 改過）。每支腳本都從「自己的資料夾往上一層」算根，同一份放兩個深度只有一半能用：根目錄那套的 tenant 三支找 `D:\Work\tenants`（不存在）、autopilot registrar 算到 `D:\`；agency-os 那套的 REGISTER_SYSTEM_GUARD_TASKS 找 `agency-os\scripts\system-guard.ps1`（續4 已刪，:42）。呼叫者（tenant 排程、system-health-check.ps1:71-73、register-autopilot-phase1.ps1:20、runner-parity.test.mjs:57、全部文件）都指 agency-os/automation。根目錄另有 4/5 初始快照留下、4/28 後沒人動的 `docs/CHANGE_IMPACT_MATRIX.md`、`docs/change-impact-map.json`、`.agency-state/doc-sync-state.json`，沒有程式讀（所有讀者經 Resolve-AgencyRoot 或 agency-os 路徑）。
+- C2 M3：`generate-customer-delivery-status.ps1` 讀 `SUPABASE_URL`／`SUPABASE_SERVICE_ROLE_KEY`（:41-42），`mcp/user-env.ps1` 只有 `SUPABASE_AWAREWAVE_*` 等名稱，永遠是空報告；沒有程式讀它的報告；控制台 `ops/clients/[slug]/DepartmentCoveragePanel.tsx` 與 `department-summary` API 已顯示同一份資料。
+- C3 digest 測試：test 寫於 9/23（58a5ba578），第 11 個來源 `doc_integrity_commits` 9/25 才加（40366864a），其規則「無報告＝PASS」（smoke-status-digest.ps1:520-533，事件驅動）；Case1 仍要求全部來源 BLIND。錯的是測試。
+
+**做了**:
+- 刪根目錄 `automation/`（6 檔）、`docs/CHANGE_IMPACT_MATRIX.md`、`docs/change-impact-map.json`、`.agency-state/doc-sync-state.json`。根目錄 `reports/status/README.md` 是刻意的指路牌，保留。
+- `agency-os/automation/REGISTER_SYSTEM_GUARD_TASKS.ps1`：改用 `scripts/lib/repo-roots.ps1`（agency 根給 -WorkspaceRoot，guard 與 launcher 取 monorepo `scripts\`），拿掉「兩個深度都能用」的猜測查找。用它重新註冊 Daily guard。
+- `system-health-check.ps1` 1a2 加「Single automation tree」：monorepo 根出現 automation/ 即 Critical（跟 -WorkspaceRoot 走）。排程檢查另驗 launcher 的 `-TargetScript`（原本只驗 launcher 本身）。
+- 刪 `scripts/generate-customer-delivery-status.ps1`；DEPARTMENT_COVERAGE_MATRIX.md:66、NEXT_GEN_DELIVERY_BLUEPRINT_V1.md:95-96、AUDIT_REGISTRY.md:129、generate-integrated-status-report.ps1 註解改正。
+- `tests/smoke-status-digest.test.ps1` Case1：跳過 doc_integrity_commits，另加斷言「無報告＝PASS」。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell tests/smoke-status-digest.test.ps1 → ALL PASS (19 cases, 1 mutation proof)；改前同一檔在乾淨 HEAD 紅 1 條（續4） | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/system-health-check.ps1 → 100%（329/329，含 Single automation tree） | exit=0 | ms=72600
+- REALTEST_EVIDENCE: tool=Bash | cmd=agency-os/automation/REGISTER_SYSTEM_GUARD_TASKS.ps1 → 任務 action：launcher D:\Work\scripts\scheduled-task-launcher.ps1、target D:\Work\scripts\system-guard.ps1、extra "-WorkspaceRoot 'D:\Work\agency-os' -Mode daily -HideUi"、next 22:30 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=Start-ScheduledTask AgencyOS-SystemGuard-Daily：第 1 次 18:58 doc-sync 跑完（closeout-20261014-185835.md）後在健康檢查段被外部中止 0xC000013A，原因未查到（同時間另一 session 在跑 Bash）；直接跑健康檢查 100%；第 2 次 19:01 result=0x0、guard-20261014-190139.md PASS（沿用 10 分鐘內的 100% 報告） | exit=0 | ms=70000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - Codex（agency-os/reports/oracle/2026-10-14-partialreview-801ec62e.md）2 條都修：F1 排程經 launcher 包一層時健康檢查只驗 launcher（system-health-check.ps1:369），沒驗 -TargetScript → 加「Task target script exists」（目前沒有排程指根目錄 automation，兩個 tenant 排程指 agency-os 那份）；F2 新的 automation 檢查用 Get-MonorepoRoot、不跟 -WorkspaceRoot → 改 Split-Path $root -Parent。改後健康檢查 100%，target 檢查 2 項 PASS。
+- ORACLE_WAIVED: F1/F2 的修正在 Codex 審查之後；改動是兩行檢查，以重跑健康檢查為證，不跑第二輪（操作者規則：一次 Codex review）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,tests,runbooks,.github | grep=generate-customer-delivery-status | hits=8
+  - 8 處全是歷史註解（audit-cp950-traps.ps1:276、system-health-check.ps1 2026-05-30 註解）、AUDIT_REGISTRY 已標刪除、TASKS 已結案行、改正後的文件說明。根目錄 automation 路徑（WorkRoot／D:\Work／.\automation\）程式行 0：register-autopilot-phase1.ps1:20、runner-parity.test.mjs:57 都指 agency-os/automation。
+
+**剩餘風險**: 第 1 次排程中止原因未明；兩個 tenant 月排程 monthly 清單是空的、且電池模式不跑（10-01 0x800710E0），目前不做事，沒動。
+
+**rollback**: `git revert <本 commit>`；Daily guard 用 `D:\tmp\agencyos-task-rollback-20261014\rollback-AgencyOS-SystemGuard-Daily.xml` 還原。
 ## 2026-10-14（續17）ADR 017 接受；備份涵蓋計畫 B1–B11；查到 Chatwoot 沒有任何備份
 
 **操作者**：「你決定」（ADR 017 的 8 題）；「還沒做的 15 項你要怎麼確認沒有漏做?」

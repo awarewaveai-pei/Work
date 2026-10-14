@@ -127,21 +127,9 @@
   - `✅ 2026-10-14 操作者「同意」` · repo 已改，跟下次 next-admin sg-deploy 上線
   - **證據**：`next-admin/app/globals.css` `.btn-primary`／`.btn-secondary` `font-size: 14px`；樣稿 sync 後閘的 note 消失
 
-- [ ] **【治理｜小】automation/ 與 agency-os/automation/ 兩套排程腳本：留一套**
-  - `🟠 未開始` · `2026-10-14` · `無`
-  - **一句話**：和 agency-os/scripts 同一類雙頭馬車。TENANT_AUTOMATION_RUNNER／ENQUEUE／REGISTER_TENANT／REGISTER_AUTOPILOT 兩邊內容不同；兩個 tenant 月排程跑 agency-os 那份；agency-os 那份的 REGISTER_SYSTEM_GUARD_TASKS／REGISTER_AUTOPILOT_PHASE1_TASKS 以 agency-os 為根找 scripts，現在會直接報 Missing。
-  - **完成定義**：只剩一套、排程指向它、健康檢查擋第二套回來（同 system-health-check 1a2）。
-  - **證據**：WORKLOG 2026-10-14（續4）
-- [ ] **【治理｜待決】M3 客戶交付報告（generate-customer-delivery-status.ps1）要不要恢復收工自動跑**
-  - `🟡 潛伏` · `2026-10-14` · `操作者決定`
-  - **一句話**：generate-integrated-status-report 從 2026-05-13 起去 agency-os/scripts 找它，那裡從沒有，所以從來沒跑過；2026-10-14 拿掉這個呼叫。恢復的話：沒 Supabase 金鑰時是空報告，且每次收工多一個未追蹤的時間戳檔。
-  - **下一步**：決定恢復（要定報告放哪、是否進 git）或刪腳本與 DEPARTMENT_COVERAGE_MATRIX 的說明。
-  - **證據**：scripts/generate-integrated-status-report.ps1（REMOVED 2026-10-14 註解）；WORKLOG 2026-10-14（續4）
-- [ ] **【治理｜小】tests/smoke-status-digest.test.ps1 Case1 在 HEAD 就紅：doc_integrity_commits 報告不在時給 PASS 不給 BLIND**
-  - `🟠 未開始` · `2026-10-14` · `無`
-  - **一句話**：乾淨 worktree（HEAD 9a79dd136）重跑仍是 1 個 assertion 失敗，和本次改動無關；偵測器在沒資料時說 PASS 是盲點。
-  - **證據**：WORKLOG 2026-10-14（續4）
-
+- [x] **【治理｜小】automation/ 與 agency-os/automation/ 兩套排程腳本：留一套** → ✅ 2026-10-14 續18：刪根目錄 automation/（＋根目錄舊的 docs/CHANGE_IMPACT_MATRIX.md、docs/change-impact-map.json、.agency-state/），REGISTER_SYSTEM_GUARD_TASKS 改用 repo-roots.ps1，健康檢查擋根目錄 automation/ 回來。WORKLOG 2026-10-14（續18）
+- [x] **【治理｜待決】M3 客戶交付報告（generate-customer-delivery-status.ps1）要不要恢復收工自動跑** → ✅ 2026-10-14 操作者「刪」：腳本已刪，文件改指控制台部門覆蓋面板。WORKLOG 2026-10-14（續18）
+- [x] **【治理｜小】tests/smoke-status-digest.test.ps1 Case1 在 HEAD 就紅：doc_integrity_commits 報告不在時給 PASS 不給 BLIND** → ✅ 2026-10-14：錯的是測試（比第 11 個來源早兩天寫），Case1 改成固定「無報告＝PASS」，19 case 全過。WORKLOG 2026-10-14（續18）
 - [ ] **【Cognitive OS｜小】`.runtime` 的 run lock 檔只增不刪：分析和背景 AI 動作每次各留一個檔**
   - `🟢 小` · `2026-10-14` · `無`
   - **一句話**：`run_lock.py` 規定 lock 檔不刪；分析（`main.py` `_interpretation_lock_path`）和背景 AI 動作（`api/blocks/ai.py` `_lock_path`）每次開新檔，放在持久 volume（`docker-compose.yml:41`），只會累積。
@@ -1975,5 +1963,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-10-02 14:30:03 UTC_
+_Last synced: 2026-10-14 10:58:34 UTC_
 

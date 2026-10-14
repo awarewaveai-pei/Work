@@ -126,7 +126,7 @@ Tool reports **85 remaining unprotected sites** across these files (was 117; 202
 | `mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1` | 1 | Low |
 | `mcp/claude-userlevel/hooks/post-push-trigger-deploy.ps1` | 2 | Low |
 | `scripts/playwright-runner.ps1` | parse-error | 🔴 FIXED 2026-05-30: root cause **WAS** encoding (BOM-less non-ASCII decorative glyphs `╔═╗ ► ✔ ⚠ ✘ → —` mis-decoded by PS5.1 under CP950 → broken string terminator at L340). Fixed by converting all decorative chars to ASCII (`[OK]`/`[!]`/`[X]`/`->`/`--`). Verified: `Parser::ParseFile` OK + smoke 26/0/4 + `audit-cp950-traps` clean. Original "unrelated to encoding" diagnosis was incorrect. |
-| `scripts/generate-customer-delivery-status.ps1` | parse-error (79) | 🔴 TRACKED: same encoding root cause (41 non-ASCII, PARSE FAIL under CP950) but **distinct subclass** — non-ASCII is CJK **data** (department cluster labels e.g. `倉儲/履約`), NOT strippable to ASCII. Fix = add UTF-8 BOM **or** externalize catalog to UTF-8 JSON read with `-Encoding UTF8` (preferred, matches DEPARTMENT_CLUSTER_CATALOG pattern). Not yet fixed — separate task. |
+| `scripts/generate-customer-delivery-status.ps1` | parse-error (79) | 🔴 TRACKED: same encoding root cause (41 non-ASCII, PARSE FAIL under CP950) but **distinct subclass** — non-ASCII is CJK **data** (department cluster labels e.g. `倉儲/履約`), NOT strippable to ASCII. Fix = add UTF-8 BOM **or** externalize catalog to UTF-8 JSON read with `-Encoding UTF8` (preferred, matches DEPARTMENT_CLUSTER_CATALOG pattern). Not yet fixed — separate task. ⛔ 2026-10-14：腳本已刪除（沒有程式讀它的報告），不再追蹤。 |
 | `scripts/rebuild-content-studio-4cards.ps1` | parse-error (46) | 🔴 FIXED 2026-08-29: same subclass as `generate-customer-delivery-status.ps1` above — non-ASCII is real CJK **data** (React/JSX UI strings, e.g. `電子報導讀（FluentCRM 草稿）`), not decorative. Fixed by adding a UTF-8 BOM (byte-level prepend, content bytes unchanged, verified valid-UTF-8 before and after). Never previously listed in this registry (only tracked in TASKS.md) — surfaced for real fixing because this was `-ParseBreakOnly`'s first-ever live run (see the `system-health-check.ps1 $root` fix, `unencoded-raw-read` section below): the gate had silently skipped since 2026-05-30 due to an unrelated path-resolution bug, so this known drift was never actually blocking AO-CLOSE until today. Verified: `Parser::ParseFile` OK + `audit-cp950-traps.ps1 -ParseBreakOnly -Quiet` scanned=167 clean=167 drift=0. |
 
 **Hardening strategy** (per AGENTS.md auto-trigger): when any of these scripts gets an `Edit`/`Write`, Claude must:
@@ -467,5 +467,5 @@ Minor/suggestion findings also fixed in the same pass: m1 (`@()`-wrap `.Count` a
 ## Related Documents (Auto-Synced)
 - `docs/operations/BUG_HUNT_PROTOCOL.md`
 
-_Last synced: 2026-09-24 14:30:03 UTC_
+_Last synced: 2026-10-14 10:58:34 UTC_
 

@@ -92,8 +92,7 @@
 - **M3 擴充（Next-Gen 對齊）**：控制台輸出映射到「20 部門」責任矩陣，避免試點與跨國企業目標脫鉤。
 
 ### 已交付（2026-05-13）
-- `reports/status/customer-delivery-status-LATEST.md` — 每次 AO-CLOSE 自動生成
-- `scripts/generate-customer-delivery-status.ps1` — 查 Supabase → 輸出 20 部門覆蓋率 + 健康狀態表
+- ~~`scripts/generate-customer-delivery-status.ps1` → `reports/status/customer-delivery-status-LATEST.md`~~ — 已刪（2026-10-14）：沒有任何程式讀這份報告，控制台客戶頁的部門覆蓋面板讀同一份 Supabase 資料（`ops/clients/[slug]` DepartmentCoveragePanel）
 - `GET /api/ops/clients/:slug/department-summary` — 機器可讀部門摘要 API（回傳 tier / byGroup / matrixRows）
 - `DepartmentCoveragePanel` — 客戶詳情頁 20 部門覆蓋率面板（按 group 分組、進度條、必填模板清單）
 - `ClientCard` — 列表頁顯示 `X/20 部門` badge（綠≥8，黃<8，無設定黃警示）
@@ -175,5 +174,5 @@
 ## Related Documents (Auto-Synced)
 - `docs/operations/TOOLS_DELIVERY_TRACEABILITY.md`
 
-_Last synced: 2026-10-14 00:16:07 UTC_
+_Last synced: 2026-10-14 10:58:34 UTC_
 

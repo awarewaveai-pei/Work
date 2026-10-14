@@ -109,6 +109,14 @@ $singleTreeDetail = if ($singleTreeOk) { "OK (no scripts folder under agency-os;
 }
 Add-Check -Name "Single scripts tree: no scripts folder under agency-os, no code path into one" -Pass $singleTreeOk -Detail $singleTreeDetail
 if (-not $singleTreeOk) { Add-CriticalFailure -Reason "A parallel scripts tree under agency-os (or a code path into it) exists" }
+# Same class for the automation tree: it lives in agency-os\automation (tenant data is under
+# agency-os). A monorepo-root copy computed its root one level too high and half its scripts
+# resolved to D:\ or D:\Work\tenants (removed 2026-10-14).
+$rootAutomation = Join-Path (Split-Path -Path $root -Parent) "automation"   # follows -WorkspaceRoot
+$rootAutomationFiles = @(if (Test-Path -LiteralPath $rootAutomation) { Get-ChildItem -LiteralPath $rootAutomation -Recurse -File })
+$singleAutomationOk = ($rootAutomationFiles.Count -eq 0)
+Add-Check -Name "Single automation tree: no automation folder at the monorepo root" -Pass $singleAutomationOk -Detail $(if ($singleAutomationOk) { "OK (agency-os/automation only)" } else { "monorepo-root automation files=$($rootAutomationFiles.Count) -- keep agency-os/automation only" })
+if (-not $singleAutomationOk) { Add-CriticalFailure -Reason "A parallel automation tree exists at the monorepo root" }
 
 # 1b) Critical script bodies (detect accidental wrapper-only overwrite)
 $genPath = Join-Path $PSScriptRoot "generate-integrated-status-report.ps1"
@@ -364,6 +372,12 @@ try {
                     Add-Check -Name ("Task file path exists: " + $task.TaskName) -Pass $fileOk -Detail ($(if ($fileOk) { $filePath } else { "Missing file: " + $filePath }))
                 } else {
                     Add-Check -Name ("Task file path parseable: " + $task.TaskName) -Pass $false -Detail "Could not parse -File argument"
+                }
+                # Launcher-wrapped tasks: -File is scheduled-task-launcher.ps1, the real script is -TargetScript.
+                $targetPath = Parse-TaskArgPath -Arguments $args -SwitchName "-TargetScript"
+                if ($targetPath) {
+                    $targetOk = Test-Path -LiteralPath $targetPath
+                    Add-Check -Name ("Task target script exists: " + $task.TaskName) -Pass $targetOk -Detail ($(if ($targetOk) { $targetPath } else { "Missing target script: " + $targetPath }))
                 }
 
                 $workspacePath = Parse-TaskArgPath -Arguments $args -SwitchName "-WorkspaceRoot"

@@ -63,7 +63,7 @@
   - **API**：`GET /api/ops/clients/:slug/department-summary` → 回傳 `activeCount`、`byGroup`、`matrixRowsCovered`、`enterpriseTier`
   - **UI**：`DepartmentCoveragePanel`（`app/ops/clients/[slug]/DepartmentCoveragePanel.tsx`）— 客戶詳情頁 20 部門覆蓋率視圖
   - **Card badge**：`ClientCard` 顯示 `X/20 部門` 綠色（≥8）/ 黃色（<8）badge
-  - **狀態報表**：`scripts/generate-customer-delivery-status.ps1` → `reports/status/customer-delivery-status-LATEST.md`（手動執行；收工不會自動跑——2026-10-14 起是否恢復待決，見 TASKS.md）
+  - **狀態報表**：看控制台客戶頁 `ops/clients/[slug]` 的部門覆蓋面板，或 `GET /api/ops/clients/:slug/department-summary`。原本的 `generate-customer-delivery-status.ps1` Markdown 報告已於 2026-10-14 刪除（沒有任何程式讀它）。
   - **資料欄位**：`organizations.metadata.client_config.department_selection: ClusterId[]`（JSONB 擴充，無 migration）
 
 ## Related (repo SSOT, do not duplicate body here)

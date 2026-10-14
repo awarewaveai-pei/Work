@@ -26,34 +26,22 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Resolve-WorkspaceRoot {
-    param([string]$InputRoot)
-    if ($InputRoot -and (Test-Path -LiteralPath $InputRoot)) { return (Resolve-Path -LiteralPath $InputRoot).Path }
-    if ($PSScriptRoot) { return (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path }
-    return (Get-Location).Path
-}
+# This file lives in <monorepo>\agency-os\automation; code is in <monorepo>\scripts (the only
+# scripts tree), found through the shared root helper -- never relative to the agency root.
+. (Join-Path $PSScriptRoot '..\..\scripts\lib\repo-roots.ps1')
 
 function Encode-ExtraArgsB64 {
     param([string]$Plain)
     return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Plain))
 }
 
-$root = Resolve-WorkspaceRoot -InputRoot $WorkspaceRoot
-$guardPath = Join-Path $root "scripts\system-guard.ps1"
-if (-not (Test-Path -LiteralPath $guardPath)) {
-    throw "Missing system-guard.ps1 at $guardPath"
+$root = Resolve-AgencyRoot -InputRoot $WorkspaceRoot
+$scriptsDir = Join-Path (Get-MonorepoRoot) "scripts"
+$guardPath = Join-Path $scriptsDir "system-guard.ps1"
+$launcher = Join-Path $scriptsDir "scheduled-task-launcher.ps1"
+foreach ($p in @($guardPath, $launcher)) {
+    if (-not (Test-Path -LiteralPath $p)) { throw "Missing $p" }
 }
-# Location-robust launcher lookup so this file is byte-identical at BOTH installed depths:
-#   agency-os/automation/  -> launcher is at <root>/../scripts  (monorepo root)
-#   automation/ (repo root) -> launcher is at <root>/scripts
-$launcher = @(
-    (Join-Path $root "scripts\scheduled-task-launcher.ps1"),
-    (Join-Path (Join-Path $root "..") "scripts\scheduled-task-launcher.ps1")
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $launcher) {
-    throw "Missing scheduled-task-launcher.ps1 (looked under '$root\scripts' and '$root\..\scripts')."
-}
-$launcher = (Resolve-Path -LiteralPath $launcher).Path
 
 $nameDaily   = "AgencyOS-SystemGuard-Daily"
 $nameStartup = "AgencyOS-SystemGuard-OnStartup"

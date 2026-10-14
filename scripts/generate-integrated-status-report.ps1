@@ -299,6 +299,5 @@ if (Test-Path -LiteralPath $renderTimeline) {
 }
 
 # REMOVED 2026-10-14: the M3 customer-delivery step looked for its script under agency-os\scripts,
-# where it never existed, so it was a silent no-op from 2026-05-13 on. Pointing it at scripts\ would
-# switch on a report nobody has seen (empty without Supabase keys, a new untracked file every
-# close-out); whether to revive it is an open TASKS.md item. Run scripts\generate-customer-delivery-status.ps1 by hand.
+# where it never existed, so it never ran. The script was deleted the same day (operator decision):
+# nothing read its report, and the console's department-coverage panel shows the same Supabase data.

@@ -69,5 +69,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\verify-adr-index.ps1
 ## Related Documents (Auto-Synced)
 - `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
 
-_Last synced: 2026-10-13 00:02:31 UTC_
+_Last synced: 2026-10-14 10:58:34 UTC_
 

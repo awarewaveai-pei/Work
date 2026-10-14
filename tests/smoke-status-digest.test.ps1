@@ -27,8 +27,12 @@ try {
     # ---------- Case 1: everything missing -> every source BLIND, blockers non-empty ----------
     $d1 = Get-StatusDigest -WorkRoot $root
     foreach ($k in $d1.entries.Keys) {
+        # doc_integrity_commits is event-driven: no file = no script commit yet = PASS
+        # (smoke-status-digest.ps1, source 11). Every periodic source must read BLIND.
+        if ($k -eq 'doc_integrity_commits') { continue }
         Assert-Eq "BLIND" $d1.entries[$k].verdict "Case1: $k should be BLIND when its report is missing"
     }
+    Assert-Eq "PASS" $d1.entries.doc_integrity_commits.verdict "Case1: doc_integrity_commits with no report (no script commit yet) is PASS, not BLIND"
     Assert-True ($d1.blockers.Count -ge 10) "Case1: blockers should have at least one line per missing source"
 
     # ---------- Case 2: all-healthy fixtures -> PASS, no blockers ----------
