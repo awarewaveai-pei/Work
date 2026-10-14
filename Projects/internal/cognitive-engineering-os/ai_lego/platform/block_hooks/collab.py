@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from ai_lego.core.domain import doc_kinds
 from ai_lego.core.domain.kinds.collab import INTERFACE_QUESTIONS
 from ai_lego.data.events import record_log
 from ai_lego.data.repositories.case_docs import CaseDocs
@@ -20,7 +21,6 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform import visibility
 from ai_lego.platform.visibility import Viewer
 
-SHARED_WORDING = ("collab.question",)   # any member writes a new version of these (every wording stays); others: their writer only
 ONE_PER_MEMBER = ("collab.place", "collab.label")
 ONE_PER_ROUND = ("collab.position", "collab.change", "collab.interface_answers")
 OWN_LIST = (*ONE_PER_MEMBER, *ONE_PER_ROUND, "collab.stance", "collab.authority")   # kinds whose rules look at the writer's other records
@@ -50,7 +50,7 @@ def _answers(content: dict[str, Any]) -> None:
 def check_save(docs: CaseDocs, tenant_id: str, group_id: str, identity_id: str, kind: str, content: dict[str, Any], doc_id: str | None) -> None:
     """Refuses what a kind's own fields cannot see. Raises InvariantViolation."""
     me = Viewer(tenant_id, identity_id)
-    if doc_id is not None and kind not in SHARED_WORDING:   # the convener is not a judge: nobody versions another's record
+    if doc_id is not None and not doc_kinds.require(kind).shared_wording:   # the convener is not a judge: nobody versions another's record
         found = visibility.visible(docs, me, group_id, kind, doc_id=doc_id)
         if not found:
             raise InvariantViolation(f"DOC_NOT_FOUND: {doc_id!r}")

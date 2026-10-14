@@ -62,6 +62,8 @@ class DocKind:
     after_close: bool = False   # a group's kind that may still be written once the group is closed (a review); never for others
     blind: str = ""             # a group's kind written before seen: the field keying a round (visibility.visible)
     visibility: str = "members" # a group's kind: who reads another member's record (VISIBILITIES)
+    shared_wording: bool = False  # a group's kind any member writes the next version of (the question): its words are
+                                  # nobody's own, so the AI gate always fences them (ai_gate._GroupReader)
 
     def __post_init__(self) -> None:
         if self.block not in ALL_CODES or self.owner not in OWNERS or not self.fields or (self.after_close and self.owner != "group"):
@@ -79,6 +81,8 @@ class DocKind:
             raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} visibility {self.visibility!r} (a group's kind only)")
         if self.blind and (self.owner != "group" or self.blind not in self.fields or not self.fields[self.blind].required or self.authors != frozenset({"user"})):
             raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} blind names no field of a group's kind only the person writes")
+        if self.shared_wording and self.owner != "group":
+            raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} shared_wording is a group's kind only")
         if self.others_words and (self.others_words not in self.fields or self.fields[self.others_words].type != "text" or self.authors != frozenset({"user"})):
             raise InvariantViolation(f"DOC_KIND_INVALID: {self.kind} others_words names no text field the person saved")
 

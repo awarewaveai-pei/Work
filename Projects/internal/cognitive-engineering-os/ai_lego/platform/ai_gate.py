@@ -301,9 +301,9 @@ class _GroupReader:
     def __call__(self, kind: str, every_version: bool = False) -> list[dict[str, Any]]:
         if every_version:
             raise InvariantViolation(f"AI_READ_REFUSED: {self._action.block}.{self._action.name} reads a group's records as they are now")
-        words, out = _words(kind), []
+        words, shared, out = _words(kind), doc_kinds.require(kind).shared_wording, []
         for item in self.whole(kind):
-            mine = item["written_by"] == self._viewer.identity_id
+            mine = item["written_by"] == self._viewer.identity_id and not shared   # its first writer may not have written this wording
             content = item["content"] if mine else {name: value for name, value in item["content"].items() if name not in words}
             out.append({**{key: value for key, value in item.items() if key != "written_by"}, "content": content, "mine": mine,
                         "member": self.label(item["written_by"]), "who": self._shown(item["written_by"]) if self._shown else self.label(item["written_by"])})
@@ -443,9 +443,10 @@ def _prepare(action: AiAction, *, tenant_id: str, identity_id: str, project_id: 
     if action.quoted is not None:   # after the crisis check: someone else's words are not the person's
         wanted = {doc_id for doc_id in action.quoted(context, read) or [] if isinstance(doc_id, str)}
         if viewer is not None:   # in a group: every other member's record named, whole -- their words, not the caller's
-            given = [(f"{doc_kinds.require(kind).title}（{read.label(doc['written_by'])}，{doc['doc_id']}）",
+            given = [(f"{spec.title}（{'' if spec.shared_wording else read.label(doc['written_by']) + '，'}{doc['doc_id']}）",
                       "\n".join(f"{name}: {value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)}" for name in _words(kind) if (value := doc["content"].get(name))))
-                     for kind in action.reads for doc in read.whole(kind) if doc["doc_id"] in wanted and doc["written_by"] != identity_id]
+                     for kind in action.reads for spec in [doc_kinds.require(kind)] for doc in read.whole(kind)
+                     if doc["doc_id"] in wanted and (doc["written_by"] != identity_id or spec.shared_wording)]
         else:
             given = [(doc_kinds.require(kind).title, doc["content"].get(doc_kinds.require(kind).others_words)) for kind in _quoted_kinds(action)
                      for doc in read(kind) if doc["doc_id"] in wanted]   # the stored text, read here through the action's own reads

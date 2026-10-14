@@ -39,7 +39,7 @@ KINDS = [
     DocKind("collab.question", "COLLAB", "這次要決定的問題", {
         "text": Field("text", 2000, required=True),
         "round": _round(),
-    }, owner="group", deletable=False, visibility="members"),        # any member writes a new wording; every version stays
+    }, owner="group", deletable=False, visibility="members", shared_wording=True),   # any member writes a new wording; every version stays
     DocKind("collab.place", "COLLAB", "我在哪裡", {
         "where": Field("text", 200, required=True, scan=False),
     }, owner="group", visibility="self_and_govern"),
