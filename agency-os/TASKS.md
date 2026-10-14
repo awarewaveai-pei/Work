@@ -125,8 +125,8 @@
   - **證據**：WORKLOG 2026-10-14（續22）
 
 - [ ] **【備份｜照 `lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md` 做 B1–B11】每個庫都有離機備份、每天被檢查、能還原**
-  - `🔴 現行` · `2026-10-14` · Chatwoot 完全沒備份、cognitive／HCI 只在主機上；R2 重試已上線（WORKLOG 續16）；主機變更要 go-ahead
-  - **下一步**：B1 清單 → B2 每日檢查（建議模型：Opus 5.5）
+  - `🟡 進行中` · `2026-10-14` · B1–B5、B9–B11 上線，首次正式檢查 PASS 20 列（WORKLOG 續21、續25）；B6 頁面隨下次 next-admin 部署
+  - **下一步**：B7 每月還原演練 → B8 跨產品對帳（建議模型：Opus 5.5）
 
 - [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–5 開卡做**
   - `🟠 未開始` · `2026-10-14` · WORKLOG 續15、續17；第 3 步前查定期扣款外掛；`ADR_INDEX.md` 那列還寫「提議」（檔案被另一個 session 佔用，下次改）

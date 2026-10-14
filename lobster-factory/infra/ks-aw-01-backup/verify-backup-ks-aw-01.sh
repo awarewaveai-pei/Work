@@ -39,9 +39,11 @@ expects() {
 # gzip of an error backtrace, and the first-generation check called it OK. Every
 # threshold below therefore asserts CONTENT, not format.
 
-# require_gzip <file> <label> <min-bytes> <min-create-table>
+# require_gzip <file> <label> <min-bytes> <min-create-table> [<completion trailer>]
+# The trailer is the dumper's own last line: mariadb-dump "Dump completed", pg_dump "PostgreSQL database dump
+# complete" (pg_dump 16.10+/17.6+ writes an unrestrict line after it, hence tail -10).
 require_gzip() {
-  local f="${TODAY_DIR}/$1" label="$2" minb="${3:-1000000}" mintbl="${4:-50}"
+  local f="${TODAY_DIR}/$1" label="$2" minb="${3:-1000000}" mintbl="${4:-50}" want="${5:-Dump completed}"
   if [[ ! -f "$f" ]]; then fail "$1 missing (${label} declared in EXPECT_SERVICES)"; return; fi
   if ! gunzip -t "$f" 2>/dev/null; then fail "$1 corrupt gzip (${label})"; return; fi
   local bytes tbl trailer
@@ -55,10 +57,10 @@ require_gzip() {
     fail "$1 has ${tbl} CREATE TABLE, below ${mintbl} (${label})"
     return
   fi
-  # mariadb-dump writes this last; its absence means the dump was cut off mid-stream
-  trailer=$(zcat "$f" | tail -3 | grep -c "Dump completed" || true)
+  # absence means the dump was cut off mid-stream
+  trailer=$(zcat "$f" | tail -10 | grep -c "$want" || true)
   if [[ "$trailer" -lt 1 ]]; then
-    fail "$1 has no MariaDB dump completion trailer — truncated (${label})"
+    fail "$1 has no '${want}' trailer — truncated (${label})"
     return
   fi
   ok "$1 ($(du -h "$f" | cut -f1), ${tbl} tables, trailer present)"
@@ -123,8 +125,11 @@ if expects soulful; then
 fi
 
 if expects chatwoot; then
-  require_gzip "chatwoot.sql.gz" "chatwoot" 100000 10
-  require_tgz  "chatwoot-storage.tgz" "chatwoot" 1000 1
+  # Floors measured 2026-10-14 (84 tables, 27.9 KB with 3 conversations); an error message is < 1 KB.
+  require_gzip "chatwoot.sql.gz" "chatwoot" 10000 50 "PostgreSQL database dump complete"
+  # Attachments may legitimately be none yet: a readable archive is the floor. Archiving the wrong volume is
+  # caught by backup-coverage-check.py's sources check (hetzner-phase1-core/scripts/backup-inventory.json).
+  require_tgz  "chatwoot-storage.tgz" "chatwoot" 0 1
 fi
 
 # Encrypted .env bundle — required whenever any target .env exists on the host

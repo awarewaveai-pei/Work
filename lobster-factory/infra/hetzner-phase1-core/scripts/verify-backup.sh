@@ -117,44 +117,8 @@ else
   log "  SKIP: n8n-data.tgz not present (n8n may not have been running)"
 fi
 
-# --- 3. Offsite verification = Cloudflare R2 REST (2026-08-28, matches backup-phase1) ---
-if [[ -z "${R2_API_TOKEN:-}" && -r /etc/default/eu-backup ]]; then
-  set -a; source /etc/default/eu-backup; set +a
-fi
-R2_ACCOUNT_ID="${R2_ACCOUNT_ID:-aea1a836e6f8b8d7f18206dc8e848bd6}"
-R2_VERIFY_BUCKET="${R2_VERIFY_BUCKET:-lobster-backup}"
-R2_VERIFY_PREFIX="${R2_VERIFY_PREFIX:-sg-stack}"
-if [[ -z "${R2_API_TOKEN:-}" ]]; then
-  fail "R2 offsite: R2_API_TOKEN not set - cannot verify the only offsite copy"
-else
-  R2_LIST=$(curl -s --max-time 30 -H "Authorization: Bearer ${R2_API_TOKEN}"     "https://api.cloudflare.com/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_VERIFY_BUCKET}/objects?prefix=${R2_VERIFY_PREFIX}/${DATE_DASH}" 2>/dev/null || true)
-  R2_COUNT=$(printf '%s' "$R2_LIST" | { grep -o '"key"' || true; } | wc -l)
-  if [[ "$R2_COUNT" -gt 0 ]]; then
-    ok "R2 offsite: ${R2_COUNT} object(s) under ${R2_VERIFY_PREFIX}/${DATE_DASH}"
-  else
-    fail "R2 offsite: no objects under ${R2_VERIFY_PREFIX}/${DATE_DASH} (offsite copy MISSING)"
-  fi
-  # F2-1 (round-2 review): counting keys is not enough. A split upload whose later
-  # part failed leaves earlier .part-* keys in the listing - countable, PASSing,
-  # and NOT reassemblable. upload-to-r2.sh's contract: the .parts.json manifest is
-  # written ONLY after every part succeeded. So the per-file invariant is:
-  #   size <= split threshold -> the exact key must exist
-  #   size >  split threshold -> the .parts.json manifest key must exist
-  R2_KEYS=$(printf '%s' "$R2_LIST" | { grep -oE '"key":"[^"]+"' || true; } | sed 's/"key":"//; s/"$//')
-  _THRESH="${R2_SPLIT_THRESHOLD_BYTES:-209715200}"
-  if [[ -n "${TODAY_DIR:-}" && -d "${TODAY_DIR}" ]]; then
-    for _f in "${TODAY_DIR}"/*; do
-      [[ -f "$_f" ]] || continue
-      _n=$(basename "$_f"); _sz=$(stat -c %s "$_f")
-      if [[ "$_sz" -gt "$_THRESH" ]]; then _want="${R2_VERIFY_PREFIX}/${DATE_DASH}/${_n}.parts.json"; else _want="${R2_VERIFY_PREFIX}/${DATE_DASH}/${_n}"; fi
-      if ! printf '%s
-' "$R2_KEYS" | grep -qxF "$_want"; then
-        fail "R2 offsite: expected object missing: ${_want} (upload incomplete or split set broken)"
-      fi
-    done
-  fi
-
-fi
+# --- Offsite (R2) is checked once, for every store, by backup-coverage-check.py: size and upload time per
+# artifact, split sets by their parts (BACKUP_COVERAGE_PLAN.md B9). This script checks the local snapshot only.
 
 # --- 4. Result ---
 if [[ $ERRORS -gt 0 ]]; then

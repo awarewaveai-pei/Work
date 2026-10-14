@@ -1,0 +1,39 @@
+name: Backup scripts tests
+
+# Guards of the backup pipeline (lobster-factory/docs/operations/BACKUP_COVERAGE_PLAN.md B10): the R2 upload retry,
+# the daily coverage check and its inventory, the cognitive/HCI offsite leg. Bash and python against stubs only:
+# no network, no containers, no secrets. ubuntu-24.04 = ks-aw-01's bash 5.2 and GNU coreutils.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/eu-backup/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/backup-*'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-*'
+      - '.github/workflows/backup-scripts.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lobster-factory/infra/eu-backup/**'
+      - 'lobster-factory/infra/hetzner-phase1-core/scripts/backup-*'
+      - 'lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-*'
+      - '.github/workflows/backup-scripts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: R2 upload retries transient errors
+        run: bash lobster-factory/infra/eu-backup/upload-to-r2.test.sh
+      - name: Coverage check guards and the shipped inventory
+        run: python3 lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-coverage-check.test.py
+      - name: Cognitive/HCI offsite leg
+        run: bash lobster-factory/infra/hetzner-phase1-core/tests/host-scripts/backup-offsite-cognitive-hci.test.sh

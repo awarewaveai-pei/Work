@@ -27,26 +27,26 @@ R2 保存規則（2026-10-14 讀 `GET /r2/buckets/lobster-backup/lifecycle`）�
 
 ## 卡片
 
-### B1 資料庫總清單（Opus 5.5）
+### B1 資料庫總清單 ✅ 2026-10-14
 - `lobster-factory/infra/hetzner-phase1-core/scripts/backup-inventory.json`（隨 sync-host-scripts.sh 到主機）：每個寫入型 mount 屬於一個 store（管線、每天應有的檔、打包來源 `sources`）或列在 `not_backed_up` 並寫理由。
 - 驗收：主機 `docker ps`＋`docker volume ls` 的每個有資料的容器都在清單上（B2 會機械比對）。
 
-### B2 每日檢查讀清單（Opus 5.5）
+### B2 每日檢查讀清單 ✅ 2026-10-14（主機首次正式跑 PASS 20 列）
 - `backup-coverage-check.py` 在主機上跑（`backup-coverage.cron`，03:30 UTC，全部 verify 之後），寫 `/var/lib/awarewave/backup-coverage.json`。`check-backup-health.ps1` 在三條管線的 verify 檢查之外加讀這份（管線有沒有跑 vs. 有資料的東西是不是都在某條管線裡），AO-RESUME 照舊顯示；B6 也讀同一份。
 - 正在跑的有狀態容器不在清單上 → FAIL。
 - 驗收：上線當天 cognitive、hci、chatwoot 三項顯示 FAIL（真實狀態）；拿掉某一項的 R2 檔 → 該項 FAIL。
 
-### B3 cognitive（資料庫＋`.runtime` 檔）、hci 接 R2（Opus 5.5；High）
+### B3 cognitive（資料庫＋`.runtime` 檔）、hci 接 R2 ✅ 2026-10-14
 - 用同一支 `upload-to-r2.sh`，前綴 `cognitive/`、`hci/`。cognitive 本機與 R2 都保存 5 天（`backup-cognitive-db.sh:6`：刪除的資料在備份裡最多留 7 天；R2 到期後可能晚一天才刪），同一次 dump 只送一次，不可加防刪鎖（B2 讀 `/lock` 檢查）。資料庫和 `.runtime` 同一次快照；hci 只送有 `.complete` 的快照。
 - R2 lifecycle 規則寫進清單，B2 每天比對（被改掉＝FAIL）。
 - 驗收：B2 這幾項 PASS。
 
-### B4 Chatwoot、pgsodium key、supabase-files（Sonnet 5.5；High）
+### B4 Chatwoot、pgsodium key、supabase-files ✅ 2026-10-14
 - `pgsodium_root.key` 放進 `backup-eu-stack.sh` 的加密包 `env.tar.gz.enc`（不能明文出主機，`.members` 列出成員）；`supabase-storage.tgz` 改為 `supabase-files.tgz`，打包 `/root/supabase/volumes/{storage,functions,snippets}`（2026-10-14 查過裡面沒有明文密鑰）。ks-aw-01 的加密包同樣寫 `.members`。
 - 主機 `/etc/default/ks-aw-01-backup`：`EXPECT_SERVICES=soulful chatwoot`、`CHATWOOT_DB_CONTAINER=chatwoot-postgres`。repo 三處一起改對：預設容器名（`backup-ks-aw-01.sh:125,127`、`README.md:33`）與資料庫名（`:127` dump `chatwoot`，實際是 `chatwoot_production`，使用者 `chatwoot`）。
 - 驗收：隔天 R2 `ks-aw-01/<STAMP>/` 有 chatwoot 的 dump；B2 PASS。
 
-### B5 成功才回報，沒回報就通知（Opus 5.5；High）
+### B5 成功才回報，沒回報就通知 ✅ 2026-10-14（endpoint-alert 乾跑抓到過期戳記）
 - 用既有的 dead-man 機制（`hetzner-phase1-core/scripts/endpoint-alert.sh` 的 `/etc/awarewave-alert/fresh.d/`，wp-cron-runner 已在用）：B2 全部 PASS 才 touch 戳記；FAIL 把戳記時間設回 0 → endpoint-alert 下一分鐘照它既有的防抖與 Telegram／Slack 發出；endpoint-alert 本身由 Uptime Kuma heartbeat 盯著。不另開 Kuma 監控。
 - 邊界：Kuma 在同一台主機，主機整台掛掉時這條也會沉默；那由外部可達性監控負責，不在本卡。
 - 驗收：戳記設回 0 → 收到 Telegram。
@@ -63,13 +63,13 @@ R2 保存規則（2026-10-14 讀 `GET /r2/buckets/lobster-backup/lifecycle`）�
 - 先列出各產品存了哪些「指向主庫客戶」的編號。對帳走各產品的 API 或匯出，不得跨庫直讀（HCI ADR-0002）。
 - 驗收：每天一次；故意放一個不存在的編號 → 報警。
 
-### B9 verify 腳本查 R2 清單也要重試（Sonnet 5.5）
+### B9 verify 腳本查 R2 清單也要重試 ✅ 2026-10-14（改為刪掉重複，R2 只由 B2 查）
 - `eu-backup/verify-backup-eu.sh:91`、`hetzner-phase1-core/scripts/verify-backup.sh:130` 查 R2 清單只試一次，Cloudflare 一次失敗＝誤報 FAILED（`ks-aw-01-backup/verify-backup-ks-aw-01.sh` 不查 R2）。若 B2 已涵蓋 R2 檢查，這張卡改為刪掉 verify 裡重複的 R2 檢查，只留一處。
 
-### B10 上傳測試進 CI（Sonnet 5.5）
+### B10 上傳測試進 CI ✅ 2026-10-14（`.github/workflows/backup-scripts.yml`，含真實清單的一致性測試）
 - `lobster-factory/infra/eu-backup/upload-to-r2.test.sh` 放進 `.github/workflows/shared-asset-gates.yml`（ubuntu runner，不需要 docker）。
 
-### B11 cognitive 備份 log 是空的（Sonnet 5.5）
+### B11 cognitive 備份 log 是空的 ✅ 2026-10-14（不用改：`backup-cognitive-db.sh:21-23,133` 只在失敗與警告時寫 stderr，空 log＝沒失敗；新鮮度由 B2 管）
 - `/var/log/cognitive-db-backup.log` 從 2026-10-10 起 0 bytes，但備份檔每天有產生。查原因，讓失敗時看得到。
 
 ## 順序

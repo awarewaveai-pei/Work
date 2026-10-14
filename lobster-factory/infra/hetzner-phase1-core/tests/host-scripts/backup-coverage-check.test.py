@@ -148,5 +148,33 @@ class Coverage(unittest.TestCase):
         self.assertIn("no snapshot", self.run_eval(mutate=m)["site"])
 
 
+class RealInventory(unittest.TestCase):
+    """The shipped backup-inventory.json is internally consistent (a typo there silently drops a store)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import json
+        with open(os.path.join(os.path.dirname(SRC), "backup-inventory.json"), encoding="utf-8") as fh:
+            cls.inv = json.load(fh)
+
+    def test_store_ids_unique_and_pipelines_exist(self):
+        ids = [s["id"] for s in self.inv["stores"]]
+        self.assertEqual(len(ids), len(set(ids)))
+        for s in self.inv["stores"]:
+            self.assertIn(s["pipeline"], self.inv["pipelines"], s["id"])
+            for key in s.get("sources", {}):
+                self.assertIn(key, s["mounts"], f"{s['id']}: source for an unlisted mount {key}")
+
+    def test_every_r2_prefix_has_a_lifecycle_rule(self):
+        rules = self.inv["r2"]["lifecycle_max_age_seconds"]
+        for name, p in self.inv["pipelines"].items():
+            self.assertIn(p["r2_prefix"] + "/", rules, name)
+
+    def test_cognitive_expires_within_the_erasure_promise(self):
+        # backup-cognitive-db.sh:6 -- erased data lives at most 7 days in a dump; R2 may delete up to a day late
+        self.assertLessEqual(self.inv["r2"]["lifecycle_max_age_seconds"]["cognitive/"], 6 * 86400)
+        self.assertIn("cognitive/", self.inv["r2"]["unlocked_prefixes"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

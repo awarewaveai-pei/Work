@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-14（續25）備份涵蓋上線：首次正式檢查 PASS 20 列；Chatwoot、vault key、cognitive／HCI 都已離機；B9–B11 收尾
+
+**做了**（主機 ks-aw-01，操作者「15 項一直做到完成」授權）:
+- `/root/Work` ff 到 22ccdd176，`sync-host-scripts.sh` 裝上 inventory／check／offsite／cron；`/root/scripts/{backup-eu-stack,backup-ks-aw-01}.sh` 換新（`.bak-20261014b`）；`/etc/default/ks-aw-01-backup` `EXPECT_SERVICES="soulful chatwoot"`（`.bak-20261014`）；`/etc/cron.d/backup-coverage` 裝上。
+- next-admin compose 加 `/var/lib/awarewave:/host-status:ro`，經 `safe-infra-patch.sh compose`（healthy 9s，備份 `docker-compose.yml.bak.safe-patch-20261014-125232`）。
+- 手動各跑一輪：hci（`.complete`）、ks-aw-01（Chatwoot 首次 dump 28K、84 表）、offsite（cognitive 2 dump＋runtime.tgz、hci → R2）、stack（加密包成員含 `pgsodium_root.key`，supabase-files 16K）。
+- `verify-backup-ks-aw-01.sh`：完成標記改成看各自 dumper 的結尾（pg_dump 16.10+ 結尾後多一行 unrestrict，看 tail -10）；Chatwoot 下限照實測（84 表／27.9 KB）改 10 KB＋50 表＋pg 結尾，storage 只要求可讀（可能本來就空；打包錯 volume 由 B2 sources 擋）。不是調門檻讓警報閉嘴：舊函式只認 MariaDB 結尾，Chatwoot 這支從沒跑過。
+- B9：刪掉 `eu-backup/verify-backup-eu.sh`、`hetzner-phase1-core/scripts/verify-backup.sh` 裡只試一次的 R2 檢查（約 80 行），R2 只由 B2 查。B10：`.github/workflows/backup-scripts.yml` 跑三組測試；測試加真實清單一致性。B11：不用改（`backup-cognitive-db.sh:21-23,133` 只在失敗寫 stderr）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=python3 /root/lobster-phase1/scripts/backup-coverage-check.py → `=== backup-coverage PASSED ===`，20 列；`/etc/awarewave-alert/fresh.d/backup-coverage` 已登記、戳記 14:54:12 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=SSH | cmd=env -i endpoint-alert.sh（臨時 STATE_DIR／FRESH_DIR、戳記 epoch 0、無通道）→ `job backup-coverage stale 1791989679s > 93600s` | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=verify-backup-ks-aw-01.sh → PASSED（chatwoot.sql.gz 84 tables trailer present、chatwoot-storage.tgz 可讀）；stack 備份 stack_exit=0、members 5 項 | exit=0 | ms=400000
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker ubuntu:24.04 截斷的 pg dump → FAIL「no 'PostgreSQL database dump complete' trailer」，完整的 → OK；CI 方式跑三組測試 18/18、24/24、13/13 | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 部署已審過的 22ccdd176；verify 修正與 B9 刪除為已審設計的直接後果，以指名測試驗證
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.github | grep=R2 offsite|R2_VERIFY|_pre_token|chatwoot" 100000 | hits=3
+  - 只剩 `verify-backup-ks-aw-01.sh:145-149`（`.verify` 標記，非 R2 列表）與 `backup-eu-stack.sh:236`、`backup-ks-aw-01.sh:3` 的說明文字。
+- ORACLE_WAIVED: 同續21的 critic 結論；本條為部署與已審設計的收尾
+
+**剩餘風險**: `/ops/backup` 等 next-admin 下一次部署（auto-deploy 每 4 小時）；`verify-backup-eu.sh`、`verify-backup-ks-aw-01.sh` 為手動安裝，下一條提交後裝；B7 還原演練、B8 跨產品對帳未做。
+
+**rollback**: 主機各檔 `.bak-20261014b`；`/etc/default/ks-aw-01-backup.bak-20261014`；compose 用 safe-patch 備份；`rm /etc/cron.d/backup-coverage /etc/awarewave-alert/fresh.d/backup-coverage`。
 ## 2026-10-14（續24）排程頁規劃卡：`docs/operations/SCHEDULES_PAGE_PLAN.md`
 
 **操作者**：「這是最好的做法嗎」→「要」（寫卡）。
