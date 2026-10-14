@@ -68,11 +68,13 @@ describe("ResultPage", () => {
     expect(other).not.toContain("冰山模型四層圖");
     expect(other).toContain('aria-label="因果回饋圖分層圖"');
     expect(other).toContain(">增強迴路</text>");
+    expect(other).toContain("知識不足：缺 M1、M2、M4–M8（這個工具還沒有課）");   // I11: a tool without a lesson says so at the top
     const fields = [{ key: "events", kind: "list", label: "① 事件：發生了什麼？" }, { key: "patterns", kind: "list", label: "② 模式：以前發生過嗎？" }];
     const berg = renderToStaticMarkup(<ResultPage result={fixture} record={{ ...record, patterns: ["每期第 4 次起下降", "線上更低"] }} fields={fields} />);
     expect(berg).toContain("① 事件｜現在發生了什麼？");   // the layer's own question (the mock), wrapped text, never cut
     expect(berg).toContain("每期第 4 次起下降；線上更低");   // an unbound layer still shows what you filled in
     expect(berg).not.toMatch(/…/);
+    expect(berg).not.toContain("知識不足");   // the iceberg's knowledge is complete
     const whole = renderToStaticMarkup(<ResultPage result={{ ...fixture, visual: { kind: "layered", bindings: { levels: [{ label: "事件", path: "r/events" }] } } }} record={{ events: ["第一件", "第二件"] }} fields={fields} />);
     expect(whole).toContain("第一件；第二件");   // a binding to a whole list reads as its items, never as JSON
     expect(whole).not.toContain('["第一件"');

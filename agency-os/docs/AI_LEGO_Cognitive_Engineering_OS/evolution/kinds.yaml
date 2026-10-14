@@ -85,6 +85,6 @@ kinds:
     risk_tier: R1
     owner: operator
     description: >
-      Per-method/per-workflow six-step lesson content (I11 M4). Placeholder kind:
-      no version file exists yet under evolution/lessons/ as of this card; listed
-      here so its eventual first version needs no new ADR to add the kind itself.
+      Per-method lesson content and the per-unit facts its result page shows
+      (I11 M1-M12, D17/D23/D25). Rendered by COS/docs/mockups/lessonkit.py into the
+      web app's lessons and the tool lesson mock; text only, the gates stay code.

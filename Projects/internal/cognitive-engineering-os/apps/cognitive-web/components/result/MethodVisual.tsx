@@ -1,21 +1,17 @@
 import React from "react";
+import { UNIT_FACTS } from "../../lib/toolsheets.generated";
 import { lineHeight, useLines, Wrap } from "./svgtext";
 import { RiskMatrix, riskCount, risksOf } from "./RiskMatrix";
 
 type Bindings = Record<string, unknown>;
-// One unit of a layered picture: its name, what you filled in (and its short form, when the analysis wrote one), its [n],
-// the short form of how to act there (the analysis's `step`).
-export type Unit = { label: string; question: string; text: string; brief?: string; step?: string; cite?: number; focus?: boolean };
+// One unit of a layered picture: its form field key, its name, what you filled in (and its short form, when the analysis
+// wrote one), its [n], the short form of how to act there (the analysis's `step`).
+export type Unit = { key: string; label: string; question: string; text: string; brief?: string; step?: string; cite?: number; focus?: boolean };
 
-// The iceberg model's own content (Anderson & Johnson), the same for every case: what each layer is, the question it
-// asks (the mock's ②), whether it shows, its time frame, how you act there and how long that lasts. One table for the
-// picture, the layer cards (④) and the comparison table (⑥).
-export const ICEBERG_LAYERS = [
-  { key: "events", name: "事件 Events", title: "事件 Events", short: "事件", question: "現在發生了什麼？", ask4: "現在發生了什麼？", asks: "最快的因應是什麼？", seen: "看得見", time: "現在", when: "現在", mode: "回應 React", effect: "當下的因應", lasting: "短期" },
-  { key: "patterns", name: "模式 Patterns", title: "模式與趨勢 Patterns & Trends", short: "模式", question: "這段時間的趨勢？事件之間有什麼關聯？", ask4: "這段時間有什麼趨勢？哪些事件互相關聯？", asks: "什麼趨勢在反覆出現？", seen: "看不見", time: "過去到現在", when: "過去→現在", mode: "預測 Anticipate", effect: "看出趨勢", lasting: "提早看到" },
-  { key: "structures", name: "結構 Structures", title: "結構與流程 Structures & Processes", short: "結構", question: "什麼流程、制度在製造這個模式？", ask4: "什麼流程、制度、權力安排在製造上面的模式？", asks: "什麼制度在製造這些模式？", seen: "看不見", time: "現在到未來", when: "現在→未來", mode: "設計 Design", effect: "改流程、改制度", lasting: "持久" },
-  { key: "mental_models", name: "心智模型 Mental Models", title: "心智模型 Mental Models", short: "心智模型", question: "什麼沒說出口的假設造成這些結構？", ask4: "什麼沒說出口的假設、信念、價值觀，造就了上面的結構？", asks: "這些制度背後的假設是什麼？", seen: "最深、最看不見", time: "未來", when: "未來", mode: "轉化 Transform", effect: "改信念", lasting: "根本" },
-];
+// The iceberg's four layers, top to bottom (lessons data): exactly the four units the bands below draw, in band order --
+// docs/mockups/lessonkit.py DRAWN holds every lessons version to that before it is generated. Each band shows the case's
+// unit of the same key.
+const ICEBERG_LAYERS = UNIT_FACTS["systems.iceberg_model"] ?? [];
 
 // The mock's iceberg (docs/mockups/iceberg-result-mock.html ②) as a polygon whose four bands can grow: the water line
 // at 150, dashed band lines at 290 and 420, the bottom at 575. When a band's text needs more room, every y inside the
@@ -27,7 +23,7 @@ const LEFT_X = 30, LEFT_W = 370, RIGHT_X = 830, RIGHT_W = 220, Q_SIZE = 14.5, T_
 function Iceberg({ units }: { units: Unit[] }) {
   const linesFor = useLines();
   const rows = ICEBERG_LAYERS.map((layer, index) => {
-    const unit = units[index];
+    const unit = units.find((candidate) => candidate.key === layer.key);
     const question = `${"①②③④"[index]} ${layer.short}｜${layer.question}`, tail = unit?.focus ? " ★ 建議先出手" : undefined;   // drawn as one inline-block
     const filled = unit ? `${unit.brief ?? unit.text}${unit.cite ? ` ［${unit.cite}］` : ""}` : "（沒填）";
     const act = `${unit?.step ?? layer.effect} → ${layer.lasting}`;

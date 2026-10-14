@@ -7,7 +7,6 @@ kind: lessons
 version: v1
 methods:
   systems.iceberg_model:
-    name: 冰山模型
     minutes: 5
     outcomes: 分清四層、把一件事填成四段、看懂結果頁、知道什麼時候不該用
     start:
@@ -319,6 +318,8 @@ methods:
       handout: 列印版講義 = 第 2 步四層表（學員領域版）＋第 4 步好壞例＋一張空白四格工作單；投影片大綱 = 六步各一頁＋冰山圖一頁。兩者都從這一頁匯出（匯出功能還在做）。
       note: 教材版和學員版由同一份工具資料生成（來源 [1]–[3]），改課文就同時改兩版。藝術反思工具的帶領腳本（Airtable 的「帶活動者提示用語」「時間分段」「停止活動訊號」）會直接進這一段。
     sources:
-      - The Systems Thinking，「Iceberg Model」教學（定義 → 四層 → 例子 → 步驟 → 常見錯誤的課程結構；本課改寫，非轉載）
-      - untools.co，「Iceberg Model」（定義與四層名稱；工具資料裡的權威網址）
-      - NPC 冰山工作單（每層要回答的問題與介入動詞：回應／預測／設計／轉化）
+      - text: The Systems Thinking，「Iceberg Model」教學（定義 → 四層 → 例子 → 步驟 → 常見錯誤的課程結構；本課改寫，非轉載）
+      - text: untools.co，「Iceberg Model」（定義與四層名稱；工具資料裡的權威網址）
+        url: https://untools.co/iceberg-model/
+      - text: NPC 冰山工作單（每層要回答的問題與介入動詞：回應／預測／設計／轉化）
+        url: https://www.thinknpc.org/resource-hub/systems-practice-toolkit/the-iceberg-model/

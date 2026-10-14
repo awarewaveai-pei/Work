@@ -1,6 +1,6 @@
 "use client";
 
-// A lesson (docs/mockups/*-lesson-mock.html, exported by sync-design-system.py into lib/lessons.generated.ts) with the
+// A lesson (lib/lessons.generated.ts: the lessons data, or a workflow's docs/mockups lesson mock) with the
 // mock's behaviours, scoped to this container and removed on unmount (client-side navigation mounts it more than once):
 //   tabs  -- partials/tabs-script.html: click, ←/→/Home/End on the focused tab (roving tabindex), a [data-tab-go]
 //            button, an in-page link or the address (#panel-<id> or any id inside a panel, on load and on hashchange)

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Sync the shared pieces into every mock, verbatim: design-system.css into each <style> (between the shared markers,
-page section left empty) and every partials/<name>.html into its marked fragment; then export the lessons to the web app
-(mockkit.WEB_LESSONS). Generated partials (domain-chips,
-from SPEC/methods/examples/domains.yaml) are re-rendered first. Idempotent; a CRLF page is rewritten as LF. Edit the
-.css / .yaml / partial, run this, run check-mocks.py. Exit 1 with one line on bad input (never a traceback).
+page section left empty), every partials/<name>.html into its marked fragment and, on a tool lesson mock, its lesson
+data into <main> (lessonkit); then export the lessons and the tools' unit facts to the web app (mockkit.WEB_LESSONS,
+lessonkit.WEB_UNITS). Generated partials
+(domain-chips, from SPEC/methods/examples/domains.yaml) are re-rendered first. Idempotent; a CRLF page is rewritten as LF.
+Edit the .css / .yaml / partial, run this, run check-mocks.py. Exit 1 with one line on bad input (never a traceback).
 Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/sync-design-system.py"""
 import re, sys
+import lessonkit as lk
 import mockkit as mk
 
 
@@ -32,6 +34,13 @@ def main():
         if not m: print(f"{f}: no <style>"); return 1
         block = "<style>\n" + mk.CSS_START + "\n" + css + "\n" + mk.CSS_END + "\n" + mk.CSS_PAGE + "\n</style>"
         new = new[:m.start()] + block + new[m.end():]
+        if f in lk.TOOL_MOCKS:                              # a tool lesson's <main> is its lesson data
+            try:
+                main = lk.mock_main(f)
+            except (OSError, ValueError) as e:
+                print(f"{f}: lesson cannot be rendered: {e}"); return 1
+            new, n = lk.MAIN.subn(lambda x: x.group(1) + main + x.group(3), new, count=1)
+            if n != 1: print(f'{f}: no <main class="wrap">'); return 1
         try:
             names = set(mk.fragments(new))
         except ValueError as e:
@@ -53,12 +62,13 @@ def main():
         out = new.encode("utf-8")
         if out == raw: print(f"{f}: already in sync"); continue
         p.write_bytes(out); print(f"{f}: synced")
-    try:                                                     # the web app's lessons = the synced lesson pages
-        lessons = mk.render_web_lessons().encode("utf-8")
+    try:                                                     # the web app's lessons (tool lessons from data, workflow lessons from their pages) and unit facts
+        exports = {mk.WEB_LESSONS: lk.render_web_lessons().encode("utf-8"), lk.WEB_UNITS: lk.render_web_units().encode("utf-8")}
     except (OSError, ValueError) as e:
         print(f"lessons cannot be exported to the web app: {e}"); return 1
-    if not mk.WEB_LESSONS.exists() or mk.WEB_LESSONS.read_bytes() != lessons:
-        mk.WEB_LESSONS.write_bytes(lessons); print(f"{mk.WEB_LESSONS}: exported")
+    for path, body in exports.items():
+        if not path.exists() or path.read_bytes() != body:
+            path.write_bytes(body); print(f"{path}: exported")
     return 0
 
 

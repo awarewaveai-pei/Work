@@ -1,0 +1,16 @@
+run A (urls stripped) mock: 2 changed lines
+  -  <div class="status"><span class="pill ok">工具齊備 M1–M10 ✓</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、看懂結果頁、知道什麼時候不該用</span><span>教材版在「教材版」分頁（給老師／帶領者）</span></div>
+  +  <div class="status"><span class="pill">知識不足：缺 M8（來源網址少於 2 個）</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、看懂結果頁、知道什麼時候不該用</span><span>教材版在「教材版」分頁（給老師／帶領者）</span></div>
+run A (urls stripped) web: 2 changed lines
+  -  <div class="status"><span class="pill ok">工具齊備 M1–M10 ✓</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、看懂結果頁、知道什麼時候不該用</span><span>教材版在「教材版」分頁（給老師／帶領者）</span></div>
+  +  <div class="status"><span class="pill">知識不足：缺 M8（來源網址少於 2 個）</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：分清四層、把一件事填成四段、看懂結果頁、知道什麼時候不該用</span><span>教材版在「教材版」分頁（給老師／帶領者）</span></div>
+run B (v1) mock: 4 changed lines
+  -      <li>untools.co，「Iceberg Model」（定義與四層名稱；工具資料裡的權威網址）</li>
+  -      <li>NPC 冰山工作單（每層要回答的問題與介入動詞：回應／預測／設計／轉化）</li>
+  +      <li>untools.co，「Iceberg Model」（定義與四層名稱；工具資料裡的權威網址） <a href="https://untools.co/iceberg-model/" target="_blank" rel="noopener">untools.co ↗</a></li>
+  +      <li>NPC 冰山工作單（每層要回答的問題與介入動詞：回應／預測／設計／轉化） <a href="https://www.thinknpc.org/resource-hub/systems-practice-toolkit/the-iceberg-model/" target="_blank" rel="noopener">www.thinknpc.org ↗</a></li>
+run B (v1) web: 4 changed lines
+  -      <li>untools.co，「Iceberg Model」（定義與四層名稱；工具資料裡的權威網址）</li>
+  -      <li>NPC 冰山工作單（每層要回答的問題與介入動詞：回應／預測／設計／轉化）</li>
+  +      <li>untools.co，「Iceberg Model」（定義與四層名稱；工具資料裡的權威網址） <a href="https://untools.co/iceberg-model/" target="_blank" rel="noopener">untools.co ↗</a></li>
+  +      <li>NPC 冰山工作單（每層要回答的問題與介入動詞：回應／預測／設計／轉化） <a href="https://www.thinknpc.org/resource-hub/systems-practice-toolkit/the-iceberg-model/" target="_blank" rel="noopener">www.thinknpc.org ↗</a></li>

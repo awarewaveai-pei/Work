@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { LessonView } from "../../../../components/LessonView";
 import { lessonOf } from "../../../../lib/lessons";
 
-// A tool's lesson, exactly as docs/mockups/iceberg-lesson-mock.html (lib/lessons.generated.ts). A tool without a
+// A tool's lesson, rendered from the lessons data like docs/mockups/iceberg-lesson-mock.html (lib/lessons.generated.ts). A tool without a
 // lesson yet is a 404; its pages link here only when the lesson exists.
 type Props = { params: Promise<{ id: string }> };
 

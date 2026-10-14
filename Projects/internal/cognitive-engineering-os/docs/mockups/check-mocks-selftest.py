@@ -8,7 +8,8 @@ Coverage: the checker runs traced (CHECK_MOCKS_TRACE), so each expected line nam
 raised it; every call site must be proven by some case, except the rules in NO_CASE_YET (a list that may only shrink:
 a listed rule that gains a case, or no longer exists, fails the run until it is removed from the list).
 Run:  python Projects/internal/cognitive-engineering-os/docs/mockups/check-mocks-selftest.py"""
-import ast, os, pathlib, re, shutil, subprocess, sys, tempfile
+import ast, hashlib, os, pathlib, re, shutil, subprocess, sys, tempfile
+import lessonkit as lk
 import mockkit as mk
 
 HERE = mk.HERE
@@ -120,7 +121,7 @@ CASES = [
     ("the all-tools card loses its id, so the search is no longer inside it (U1)", "U1|inside the #directory card", "home-mock.html", "str", '<div class="card" id="directory">', '<div class="card" id="all-tools">'),
     ("the project table becomes a div (U8)", "U8|project table", "home-mock.html", "re", r"<table>(.*?)</table>", r"<div>\1</div>"),
     ("hero states a stale tool count (numbers pinned to the registries)", "catalog|hero sentence", "home-mock.html", "re", r"\d+ 個思考工具、(\d+) 條工作流", r"9999 個思考工具、\1 條工作流"),   # count-independent: a literal anchor went dead the day a tool was added
-    ("the invented word 路線 comes back on the home page (FORBID)", "continuity|superseded text", "home-mock.html", "str", '要開新的，按上面「開新專案」', '要開新的，挑一條路線'),
+    ("the invented word 路線 comes back on the home page (FORBID)", "continuity|superseded text", "home-mock.html", "str", '要開新的，按上面「開新的分析', '要開新的，挑一條路線「開新的分析'),
     ("six-step strip loses its .journey class (the workflow cards' own strips must not satisfy the rule)", "U2|six-step", "home-mock.html", "str", '<div class="journey">\n      <span>建立</span>', '<div class="steps">\n      <span>建立</span>'),
     ("the worked example of three suggestions removed from the 說你卡在哪 card (U16)", "U16|worked example", "home-mock.html", "re", r'\s*<div class="mcards">\s*<div class="mcard now">\s*<div><b>1 <a href="#t-systems\.iceberg_model">冰山模型</a></b>.*?\n      </div>\n(?=      <div class="btns mt10">)', ""),
     ("a view waits visible instead of hidden (U1 views)", "U1|views must be", "home-mock.html", "str", '<section class="view" id="tools" data-view="tools" hidden>', '<section class="view" id="tools" data-view="tools">'),
@@ -223,12 +224,16 @@ CASES = [
     ("one field of the saved-run form shows only before a run (nested data-when)", "U14|fields must be visible in both states", "workflow-result-mock.html", "re", r'<div class="field">(\s*<label for="s2-s">)', r'<div class="field" data-when="empty" hidden>\1'),
     ("a second primary link elsewhere in the start card", "U15|start step needs exactly three buttons", "iceberg-lesson-mock.html", "re", r'(之後補：</p>\s*)<ul class="check">', r'\1<p><a class="btn primary" href="#panel-fill">先看怎麼填</a></p><ul class="check">'),
     ("the web app's stylesheet drifts from the design system", "U19|web copy of design-system.css", "web-design-system.css", "str", "[hidden]{display:none!important}", "[hidden]{display:none}"),
-    ("a lesson is edited without exporting it to the web app", "I11|differ from the lesson mocks", "iceberg-lesson-mock.html", "str", "<h1>冰山模型：開始前 5 分鐘</h1>", "<h1>冰山模型：開始前五分鐘</h1>"),
+    ("a lesson is edited without exporting it to the web app", "I11|differ from the lesson data and pages", "workflow-lesson-mock.html", "str", "<h1>做一個決定（3 站）：開始前 3 分鐘</h1>", "<h1>做一個決定（3 站）：開始前三分鐘</h1>"),
+    ("a tool lesson mock is edited by hand (its <main> is the lesson data)", "lessons|<main> differs from its lesson data", "iceberg-lesson-mock.html", "str", "<h1>冰山模型：開始前 5 分鐘</h1>", "<h1>冰山模型：開始前五分鐘</h1>"),
+    ("the web app's unit facts are edited by hand", "lessons|web unit facts", "web-toolsheets.generated.ts", "str", '"mode": "回應 React"', '"mode": "回應"'),
+    ("a drawn tool's lesson loses a unit its result picture draws", "lessons|its result picture draws exactly these", "spec:evolution/lessons/v1.yaml", "str", "        - key: mental_models", "        - key: beliefs"),
+    ("lesson text carries markup that runs", "lessons|text may carry only", "spec:evolution/lessons/v1.yaml", "str", "      lead: 冰山浮在水面上的只有一小角。", "      lead: <img src=x onerror=alert(1)>冰山浮在水面上的只有一小角。"),
     ("a lesson links to a home anchor the web app has no route for", "I11|no web route", "workflow-lesson-mock.html", "str", 'href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask"', 'href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#goals"'),
-    ("mock-only wording in a lesson would reach the web app", "I11|mock-only wording", "iceberg-lesson-mock.html", "str", "<h1>冰山模型：開始前 5 分鐘</h1>", "<h1>冰山模型：開始前 5 分鐘（示意稿）</h1>"),
+    ("mock-only wording in a lesson would reach the web app", "I11|mock-only wording", "workflow-lesson-mock.html", "str", "<h1>做一個決定（3 站）：開始前 3 分鐘</h1>", "<h1>做一個決定（3 站）：開始前 3 分鐘（示意稿）</h1>"),
     ("a mock-only control in a lesson would reach the web app", "I11|a mock-only control", "workflow-lesson-mock.html", "re", r'<a class="btn ghost" href="https://claude\.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">', '<button type="button" class="btn ghost" data-mock="x">x</button><a class="btn ghost" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">'),
     # continuity: the expected message names the loop each case proves (a mutation may trip more than one loop)
-    ("page fact removed (PAGE_FACTS)", "continuity|fact missing", "iceberg-result-mock.html", "str", "主動分享人數（8 人團體）", "主動分享人數（8 人團隊）"),
+    ("page fact removed (PAGE_FACTS)", "continuity|fact missing", "iceberg-result-mock.html", "strall", "主動分享人數（8 人團體）", "主動分享人數（8 人團隊）"),
     ("start step loses its preparation intro (PAGE_FACTS)", "continuity|fact missing", "workflow-lesson-mock.html", "str", "<p>手邊有這些會走得比較快，沒有也可以先走、之後補：</p>\n", ""),
     ("an approved plain-language layer line is dropped (PAGE_FACTS)", "continuity|fact missing", "iceberg-lesson-mock.html", "str", '<text x="30" y="62" font-size="15" font-weight="700">看得見：發生了什麼</text>', '<text x="30" y="62" font-size="12" class="m">看得見 Visible</text>'),
     ("one copy of a pinned number drifts (NUMBER_PINS)", "continuity|number drifted", "iceberg-lesson-mock.html", "re", r"第 1 次是 6 人", "第 1 次是 7 人"),
@@ -292,6 +297,7 @@ def reset(tmp):
     for f in FILES + [CSS]: shutil.copyfile(HERE / f, tmp / f)
     shutil.copyfile(mk.WEB_DESIGN_SYSTEM, tmp / "web-design-system.css")   # the web app's copy (check-mocks.py --dir reads it here)
     shutil.copyfile(mk.WEB_LESSONS, tmp / "web-lessons.generated.ts")       # the web app's lessons (same)
+    shutil.copyfile(lk.WEB_UNITS, tmp / "web-toolsheets.generated.ts")      # the web app's unit facts (same)
     if (tmp / "partials").exists(): shutil.rmtree(tmp / "partials")
     shutil.copytree(mk.PARTIALS, tmp / "partials")
 
@@ -303,7 +309,7 @@ def mutate(tmp, label, target, kind, old, new):
     if target.startswith("spec:"):   # registry mutation: a copy of the registries the mocks read
         spec = tmp / "spec"
         if spec.exists(): shutil.rmtree(spec)
-        for sub in ("methods", "recipes"): shutil.copytree(mk.SPEC / sub, spec / sub)
+        for sub in ("methods", "recipes", "evolution"): shutil.copytree(mk.SPEC / sub, spec / sub)
         target = "spec/" + target[len("spec:"):]
     targets = FILES + [CSS, "web-design-system.css"] if target == ALL_CSS else FILES if target == ALL else [target]
     for f in targets:
@@ -327,6 +333,13 @@ def mutate(tmp, label, target, kind, old, new):
             s, n = re.subn(old, new, s, count=1, flags=re.S)
             if n != 1: print(f"SETUP  {label}: regex matched nothing in {f}"); return spec, False
         p.write_text(s, encoding="utf-8", newline="\n")
+    m = re.fullmatch(r"spec/evolution/([a-z0-9-]+)/(v\d+)\.yaml", target)
+    if m:   # an edited version file: its champion records the new bytes, so the case reaches the data's own checks
+        champ = tmp / "spec/evolution" / m.group(1) / "champion.yaml"
+        c = champ.read_text(encoding="utf-8")
+        if f'version: "{m.group(2)}"' not in c: print(f"SETUP  {label}: {m.group(2)} is not the {m.group(1)} champion"); return spec, False
+        sha = hashlib.sha256((tmp / target).read_bytes()).hexdigest()
+        champ.write_text(re.sub(r'version_sha256: "[0-9a-f]{64}"', f'version_sha256: "{sha}"', c), encoding="utf-8", newline="\n")
     return spec, True
 
 

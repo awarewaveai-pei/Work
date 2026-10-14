@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-14（續19）認知平台：工具課程改由資料產生（lessonkit）；lessons v1 晉升；結果頁 ④⑥ 讀資料、頂端顯示「知識不足」（未部署）
+
+**根因**: 冰山課是手寫示意稿匯出到網站；其他 33 個工具要「跟冰山一樣完整」就得各手寫一頁＝不可能且會分岔。結果頁 ④⑥ 的層資料寫死在 `MethodVisual.tsx` 的 `ICEBERG_LAYERS`，別的工具永遠拿不到。冰山課狀態列「工具齊備 M1–M10 ✓」是手打的字，沒人檢查——資料一接檢查就紅：三個來源都沒網址（M8 要 ≥2 個）。
+
+**做了**:
+- 新 `COS/docs/mockups/lessonkit.py`：`SHAPE`（課程形狀，缺件＝載入失敗）＋`validate`（五領域齊、teach 分鐘連續、[n] 都有來源、課文只准 `<b>/<cite>/<dfn title>`、圖只准繪圖元素）＋`gaps`（M8）＋`render`（一份資料兩種輸出：示意稿 `<main>`／網站課程）＋`render_web_lessons`（從 mockkit 搬來）＋`render_web_units` → 新 `apps/cognitive-web/lib/toolsheets.generated.ts`（`UNIT_FACTS`、`KNOWLEDGE_GAPS`、`NO_LESSON`）。資料經 registry `load_champion` 讀。
+- `evolution/lessons/v1.yaml`：拿掉 `name`（與 display-metadata 重複）、sources 改 `{text, url?}`，[2] untools、[3] NPC 補網址（curl 200）。promote v1（LEDGER 2026-10-14T10:29:14Z，證據 `agency-os/reports/evolution/lessons-v1-golden.txt`）。`kinds.yaml` lessons 說明改為現況。
+- `sync-design-system.py`：冰山課示意稿的 `<main>` 由資料寫入；輸出兩個 web 檔。`check-mocks.py`：新規則 `lessons`（示意稿 `<main>` ≠ 資料、資料壞、unit facts 檔不同）。`mockkit.py`：`render_tabs(kind)`、`web_run`。
+- 結果頁：`ResultPage.tsx` 改用 `UNIT_FACTS`（任何有資料的工具，key 對 key）；狀態列加「知識不足：缺 …」（沒課的工具＝`NO_LESSON`）。`MethodVisual.tsx` 冰山圖照資料的四個單位畫、案例文字按 key 配；`lessonkit.DRAWN` 規定「程式畫死單位的工具」（冰山）課程單位必須正好是 events／patterns／structures／mental_models 且照順序，資料進來時就擋。
+- selftest：2 個舊案改指工作流課、新 4 案（手改示意稿、課文帶 `<img onerror>`、手改 unit facts 檔、…）；spec 副本含 `evolution/` 且改版本檔時同步 champion sha；2 個錨點已漂移的舊案（fa1b40c81 改了首頁「開新專案」、結果頁事實重複出現）重新對準。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=scratchpad golden.py：v1（去網址）render vs HEAD 6cfb8e2fc 的 `iceberg-lesson-mock.html` 與 `lessons.generated.ts` 冰山段 → 各只差 1 行（狀態列：✓ → 知識不足 M8）；補網址後 → 只差 2 行（兩筆來源加連結）| exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python docs/mockups/sync-design-system.py && python docs/mockups/check-mocks.py → all rules green | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python docs/mockups/check-mocks-selftest.py → 215 mutations 215 caught, 3 ACCEPT, coverage 157/157；page 段 2/2 漏抓 = TASKS「結果頁快照 fixture 過期」（HEAD 已同樣紅，非本次）| exit=1 | ms=420000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run components/result components/LessonView.test.tsx lib/lessons.test.ts → 54 passed | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（D:/tmp 拋棄式 worktree，round 1 修法時）：資料把 structures 排到 events 前 → 按位置畫「① 事件｜現在發生了什麼？」紅、按 key 綠；拿掉「知識不足」那行 → 指名斷言紅 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=lessonkit.validate 記憶體內對 champion 做三種壞資料（換序、加第 5 單位、拿掉 mental_models）→ 三個都被 DRAWN 擋下、champion 原樣通過；selftest 新案「a drawn tool's lesson loses a unit」 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/1n
+  - Codex round 1 `agency-os/reports/oracle/2026-10-14-review-ef7199bc.md`：F1 資料換序 → 冰山圖把一層的字畫在另一層名下；F2 第 5 單位 → `bands[4]` 崩。兩個都成立。round 2 `2026-10-14-review-123a2e6f.md`：F1 我把檢查放在頁面載入時（丟錯）→ 資料少一層就讓所有結果頁壞掉，成立。
+  - 不變量分析（同一 reviewer 連報 2 次）：冰山圖的四帶是程式幾何，課程資料只供字；兩者必須對「哪些單位、什麼順序」一致。這個一致要在**資料進來的地方**擋（validate：sync、check-mocks、promote 都經過它），不能在頁面執行時擋。→ `lessonkit.DRAWN` + validate；圖不再丟錯。
+  - round 3（全量 900 s 逾時：別的 session 的檔把封包撐到 299 KB → 改用 `-Path` 只審本次路徑）`2026-10-14-partialreview-c2a0bde7.md`：F1 SVG 大小寫 `ONLOAD` 可過 → 不成立（`lessonkit.py:76` 先 `.lower()`；實測 ONLOAD／OnClick／SCRIPT／xlink:HREF 四種都被擋）；F2 `Unit.key` 選填 → 沒 key 的呼叫端整張圖空白，成立 → 改必填（tsc 強制）。
+- ORACLE_WAIVED: round 3 之後唯一改動 = `MethodVisual.tsx:9` `Unit.key` 選填→必填（round 3 F2 的修法），由 tsc 強制，tsc 綠＋vitest 54 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=mk.render_web_lessons|mockkit.render_web_lessons|ICEBERG_LAYERS|differ from the lesson mocks|from the lesson mocks | hits=7
+  - 呼叫端只剩 lessonkit；`ICEBERG_LAYERS` 只在 `MethodVisual.tsx`；3 個過時註解（`lib/lessons.ts:3`、`learn/[id]/page.tsx:6`、`LessonView.tsx:3`）已改；`RESULT_PAGE_GAP_REPORT.md:289,365` 是歷史報告不改。
+
+**剩餘風險**: 未部署（網站上冰山課會多兩個來源連結；其他 285 個工具的結果頁頂端會出現「知識不足：缺 M1、M2、M4–M8（這個工具還沒有課）」——計畫 I11 的明文要求）。冰山來源 [1] 查不到出處、沒網址。下一步卡（根本原因分析 4 工具 = lessons v2）在 `agency-os/handoffs/2026-10-14-cos-tool-lessons.md`。
+
+**rollback**: `git revert`；lessons champion 是第一版，回滾＝revert 這個 commit（LEDGER 會留一列 promote 紀錄，正常）。
 ## 2026-10-14（續18）續4 的三條待辦做完：只剩 agency-os/automation、M3 報告腳本刪除、digest 測試改正
 
 **操作者**：「第 1 和第 3 條做掉，第 2 條『刪』」。

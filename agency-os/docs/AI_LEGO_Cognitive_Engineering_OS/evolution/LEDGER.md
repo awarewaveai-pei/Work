@@ -11,3 +11,4 @@ no harness run yet -- see WC-P2-04/WC-P2-09) and no approver (R2 needs none).
 | utc_time | kind | action | version_before | version_after | version_sha256 | evidence_sha256 | approved_by |
 |---|---|---|---|---|---|---|---|
 | 2026-09-26T00:00:00Z | synthesis-prompts | promote | - | v1 | cefadc8c69b78464481d1f36e2123e95b5f90394bbdc3c943bf382a47605e869 | - | - |
+| 2026-10-14T10:29:14Z | lessons | promote | - | v1 | 479e41b4a0c7bc468303d31f74de2e7275dd946fb671e481e3c2d5183a0207b4 | 7672ebde56e2f7f7fa25e4b126c337e9adb500e74e432335ddd7abeebd010b82 | - |

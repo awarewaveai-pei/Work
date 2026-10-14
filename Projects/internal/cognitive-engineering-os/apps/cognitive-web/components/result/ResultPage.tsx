@@ -13,7 +13,8 @@ import { formatTime } from "../../lib/time";
 import { RunHeader } from "../RunHeader";
 import { LeverageChart, LoopChart, TrendChart, type Loop, type TrendSeries } from "./Charts";
 import { HowTo } from "./HowTo";
-import { ICEBERG_LAYERS, MethodVisual, recordPictureCaption, type Unit } from "./MethodVisual";
+import { MethodVisual, recordPictureCaption, type Unit } from "./MethodVisual";
+import { KNOWLEDGE_GAPS, NO_LESSON, UNIT_FACTS } from "../../lib/toolsheets.generated";
 
 // The result, card by card as docs/mockups/iceberg-result-mock.html (① conclusion … ⑨ citations, then the approve
 // card), filled only from what the interpretation returns (schema method-interpretation 1.2.0). A section the
@@ -162,9 +163,14 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const missing = (section: string, what: string) => (dropped[section] && DROPPED[section]) || (oldVersion ? `舊版分析沒有${what}；重跑一次就會有。` : `這次的分析沒有產出${what}。`);
   const checks = approveChecks(gateResults, recordGates);
   const lostCount = Object.keys(dropped).length + Object.values(removed).reduce((sum, notes) => sum + notes.length, 0);
+  // the tool's own units (lessons data, units.items[].result: what each asks, shows, when, how you act there), as form fields
+  const unitFacts = UNIT_FACTS[result.method_id];
+  const knowledgeGaps = KNOWLEDGE_GAPS[result.method_id] ?? NO_LESSON;   // I11: a tool whose knowledge is incomplete says what it lacks
+  const factsOf = (path: string) => unitFacts?.find((unit) => unit.key === keyOf(path));
+  const unitFields = unitFacts ? fields.filter((field) => factsOf(`r/${field.key}`)) : [];
   // every [n] on the page, in reading order: findings, recommendations, the per-layer readings, the loop, the trend, the metrics,
-  // and the iceberg's four layers themselves (the mock numbers every layer, cited or not)
-  const layerPaths = result.method_id === "systems.iceberg_model" ? fields.map((field) => `r/${field.key}`) : [];
+  // and the tool's units themselves (the mock numbers every layer, cited or not)
+  const layerPaths = unitFields.map((field) => `r/${field.key}`);
   const citationIds = [...new Set([
     ...findings.flatMap((item) => item.citations), ...(result.recommendations ?? []).flatMap((item) => item.citations ?? []),
     ...readings.flatMap((item) => item.citations), ...(result.loop?.nodes ?? []).flatMap((node) => node.citations),
@@ -203,20 +209,20 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const optionLabel = (option: { name: string }) => OPTION_MARKS[(solutions?.options ?? []).indexOf(option as never)] ?? "";
   const optionTag = (option: { name: string }) => `${optionLabel(option)}「${optionName(option)}」`;
   const iceberg = result.method_id === "systems.iceberg_model";
-  const icebergFacts = (path: string) => ICEBERG_LAYERS.find((layer) => layer.key === keyOf(path));
   const externalSourceCount = (reading?: UnitReading) => new Set(
     (reading?.citations ?? []).filter((id) => manifestById.get(id)?.kind === "project_source"),
   ).size;
   const levels = Array.isArray(result.visual?.bindings?.levels) ? result.visual.bindings.levels as Array<{ label?: string; path?: string }> : [];
-  // the layers, top to bottom: the iceberg's are its four form fields in order (a layer the model did not bind still shows
-  // what you filled in); any other layered tool's are the layers the model bound
-  const layers: Array<{ path: string; label: string }> = iceberg && fields.length
-    ? fields.map((field) => ({ path: String(levels.find((item) => keyOf(String(item.path ?? "")) === field.key)?.path ?? `r/${field.key}`), label: icebergFacts(`r/${field.key}`)?.title ?? String(field.label ?? field.key) }))
+  // the layers, top to bottom: a tool with unit facts has its units' form fields in order (a layer the model did not bind
+  // still shows what you filled in); any other layered tool's are the layers the model bound
+  const layers: Array<{ path: string; label: string }> = unitFields.length
+    ? unitFields.map((field) => ({ path: String(levels.find((item) => keyOf(String(item.path ?? "")) === field.key)?.path ?? `r/${field.key}`), label: factsOf(`r/${field.key}`)?.title ?? String(field.label ?? field.key) }))
     : levels.map((level) => ({ path: String(level.path ?? ""), label: level.label ?? inputName(String(level.path ?? "")) }));
   const layerIndex = (id: string) => layers.findIndex((layer) => keyOf(layer.path) === keyOf(id));
+  const factTable = layers.length > 0 && layers.every((layer) => factsOf(layer.path));   // ⑥ gets its 出手方式／時間取向 columns
   const layerNumbers = (ids: string[]) => [...new Set(ids.map(layerIndex).filter((index) => index >= 0))].sort().map((index) => index + 1);
   const layerNote = (ids: string[]) => { const numbers = layerNumbers(ids); return numbers.length ? `（第 ${numbers.join("、")} 層）` : ""; };
-  const units: Unit[] = layers.map((layer) => { const reading = readingOf(layer.path); return { label: layer.label, question: fieldOf(layer.path)?.label ?? inputName(layer.path), text: resolved(layer.path), brief: reading?.brief, step: reading?.step, cite: citationNumber.get(citedUnder(layer.path)[0] ?? ""), focus: focusKey === keyOf(layer.path) }; });
+  const units: Unit[] = layers.map((layer) => { const reading = readingOf(layer.path); return { key: keyOf(layer.path), label: layer.label, question: fieldOf(layer.path)?.label ?? inputName(layer.path), text: resolved(layer.path), brief: reading?.brief, step: reading?.step, cite: citationNumber.get(citedUnder(layer.path)[0] ?? ""), focus: focusKey === keyOf(layer.path) }; });
   const order = (unit: string) => { const at = fields.findIndex((field) => field.key === unit); return at < 0 ? fields.length : at; };
   const thickness = Object.entries(result.data_thickness ?? {}).sort(([a], [b]) => order(a) - order(b));
   const own = thickness.reduce((sum, [, v]) => sum + (v.own_statements ?? 0), 0);
@@ -368,6 +374,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     {demo && <div className="finding warn" role="status"><b>示範分析（免費，不花錢）</b>這是示範案例的一次真實分析，給你先看終點。要分析你自己的案例：<Link href={`/methods/${encodeURIComponent(result.method_id)}/run`}>到「{display?.name_zh ?? toolLabel(names, result.method_id)}」填你的格子 →</Link>{demoNote && <><br />{demoNote}</>}</div>}
     <RunHeader methodId={result.method_id} name={name} nameEn={display?.name_en} family={family} headline={result.headline} lesson={lesson} project={project} analyzedAt={analyzedAt} guide count={fields.length} status={<>
       <span className="pill">{approval?.decision === "approve" ? "已核准" : approval?.decision === "return" ? "已退回・待重做" : "AI 草稿・尚未核准"}</span>
+      {knowledgeGaps.length > 0 && <span className="pill">知識不足：缺 {knowledgeGaps.join("、")}</span>}
       <span>資料：你填的 {own} 段話・外部來源 {sources} 筆</span>
       {thickness.length > 1 && <span>{layerCount}完整度 {filled}/{thickness.length}{thinnest ? `（${layerNo(thinnest[0])}最薄：只有 ${thinnest[1].own_statements ?? 0} 句）` : ""}</span>}
       <span>{costLine(tokens, costTwd)}</span>
@@ -415,7 +422,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         {iceberg && <figure>
           <figcaption><b>圖 C｜槓桿對比：在哪一層出手最值得？</b>（四層）</figcaption>
           <LeverageChart />
-          <div className="read"><b>怎麼看：</b>灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。<b>看到：</b>第 3 層是「做得到、也撐得久」的交會點。{focusLayer ? `這次建議先出手的是「${icebergFacts(focusLayer.path)?.short ?? focusLayer.label}」：${result.focus?.why}` : ""}<b>來源：</b>冰山模型本身的介入模式，不是你的資料。</div>
+          <div className="read"><b>怎麼看：</b>灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。<b>看到：</b>第 3 層是「做得到、也撐得久」的交會點。{focusLayer ? `這次建議先出手的是「${factsOf(focusLayer.path)?.short ?? focusLayer.label}」：${result.focus?.why}` : ""}<b>來源：</b>冰山模型本身的介入模式，不是你的資料。</div>
         </figure>}
       </div>
       {!result.trend && <p className="sub mt8 mb0">圖 A 趨勢：{dropped.trend ? DROPPED.trend : "這次沒有畫：分析沒有從你填的內容裡挑出同一件事在兩個時間點的數字；有的話，回上面把它們寫在同一格再執行。"}{removed.trend?.length ? "（有數字對不上你填的內容，已拿掉）" : ""}</p>}
@@ -424,7 +431,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     </Card>
 
     <Card id="4" title={`④ 由上往下${layerCount}解讀（每張卡同一格式）`} read={`${layers.length ? `${NUMERAL[layers.length] ?? layers.length}張` : "每張"}卡同一格式，由上往下。`} act="找出資料最薄的一層，之後補。">
-      {layers.length ? layers.map((layer, index) => { const reading = readingOf(layer.path); const unit = keyOf(layer.path); const facts = iceberg ? icebergFacts(layer.path) : undefined; const opts = optionsFor(layer.path);
+      {layers.length ? layers.map((layer, index) => { const reading = readingOf(layer.path); const unit = keyOf(layer.path); const facts = factsOf(layer.path); const opts = optionsFor(layer.path);
         return <div className={`layer l${Math.min(index + 1, 4)} card ${index === layers.length - 1 ? "mb0" : "mb12"}`} key={index}>
           <div className="head"><h3>第 {index + 1} 層／{layers.length}：{layer.label}</h3>{facts && <span className="meta">{facts.seen} ・ 時間：{facts.time} ・ 出手方式：{facts.mode}</span>}</div>
           <div className="row"><b>這層問</b><span className="q">{facts?.ask4 ?? question(layer.path)}</span></div>
@@ -445,8 +452,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
 
     <Card id="6" title={iceberg ? "⑥ 理解層次對照表（改編自 Anderson & Johnson）" : "⑥ 對照表"} read={focusLayer ? "一列一層，★ 是建議先出手的列。" : "一列一個你填的欄位。"} act={solutions ? "四列都要有人負責，填在 ⑦ B 表。" : "看哪一列最薄，就先補那一列。"}>
       <div className="scroll-x"><table>
-        <thead><tr>{iceberg ? <><th>層</th><th>出手方式</th><th>時間取向</th></> : <th>欄位</th>}<th>這一層問的問題</th><th>你的案例</th><th>建議動作</th></tr></thead>
-        <tbody>{layers.map((layer, index) => { const facts = iceberg ? icebergFacts(layer.path) : undefined; const star = focusKey === keyOf(layer.path) ? " ★" : ""; const reading = readingOf(layer.path);
+        <thead><tr>{factTable ? <><th>層</th><th>出手方式</th><th>時間取向</th></> : <th>欄位</th>}<th>這一層問的問題</th><th>你的案例</th><th>建議動作</th></tr></thead>
+        <tbody>{layers.map((layer, index) => { const facts = factTable ? factsOf(layer.path) : undefined; const star = focusKey === keyOf(layer.path) ? " ★" : ""; const reading = readingOf(layer.path);
           return <tr key={index}>{facts ? <><td>{facts.short}{star}</td><td>{facts.mode}</td><td>{facts.when}</td></> : <td>{inputName(layer.path)}{star}</td>}<td>{facts?.asks ?? question(layer.path)}</td><td>{reading?.brief ?? resolved(layer.path)} {cites(citedUnder(layer.path))}</td><td>{reading?.step ?? reading?.action ?? "—"}</td></tr>; })}</tbody>
       </table></div>
       {iceberg && <p className="sub mt8 mb0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>}
