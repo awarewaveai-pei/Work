@@ -114,13 +114,13 @@
   - **現在到哪**：樣稿（預覽頁第 12 版，七個檢視、審核、輪播、媒體庫、紀錄、設定都有）、功能總表 70 項、ADR 016（提案）、計畫 C1–C12 寫好；程式 0 行
   - **下一步**：操作者看樣稿定案 → ADR 016 改「已接受」→ G1 從 ks-aw-01 curl Postiz v2.11.3 端點存 fixture → C1 migration（建議模型：Opus 5.5）
   - **完成定義**：V1 12 張卡各有 REALTEST／REVIEW／BUGHUNT 行；sg-deploy 上線 `social.aware-wave.com`；ContentStudio 舊 Postiz 面板退場
-  - **證據**：WORKLOG 2026-10-14（續5）；`lobster-factory/docs/social/`；`agency-os/docs/architecture/decisions/016-social-manager-third-product.md`
+  - **證據**：WORKLOG 2026-10-14（續6）；`lobster-factory/docs/social/`；`agency-os/docs/architecture/decisions/016-social-manager-third-product.md`
 
 - [ ] **【外觀｜操作者決定】app 按鈕字級 13px → 14px：`.btn-primary`／`.btn-secondary` 比「字不小於 14px」小 1px**
   - `🟢 小` · `2026-10-14` · `操作者`
   - **一句話**：社群樣稿照抄 app 樣式，所以「排程」「核准並排程」等按鈕是 13px；改 `globals.css` 一處，全站按鈕一起變 14px
   - **下一步**：操作者說改 → `next-admin/app/globals.css` 的 `.btn-primary`、`.btn-secondary` `font-size: 13px` 改 14px → `python lobster-factory/docs/social/mockups/sync-app-theme.py` → 閘的 note 消失
-  - **證據**：`check-social-mocks.py` 印出的兩條 note；critic M1（WORKLOG 2026-10-14 續5）
+  - **證據**：`check-social-mocks.py` 印出的兩條 note；critic M1（WORKLOG 2026-10-14 續6）
 
 - [ ] **【治理｜小】automation/ 與 agency-os/automation/ 兩套排程腳本：留一套**
   - `🟠 未開始` · `2026-10-14` · `無`
