@@ -963,7 +963,7 @@
 
 - [ ] **【未開始｜先預留】Composable AI Commerce OS** — 藍圖已吸收為參考素材（`agency-os/docs/Composable AI Commerce OS/`，含 Master Plan / Implementation Roadmap / LEGO Documentation Pack；absorbed via commit `97cdea3ed`）。操作者 2026-09-05 明示「之後要做，先預留」，**目前不動工**，勿主動排入排程；待操作者明示啟動再展開任務拆解。
 
-- [ ] **【進行中｜Phase 1 ungated 全完成，剩 T10 gated】Cold Outreach Workbench — 冷開發完整鏈** — SSOT：[`agency-os/docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（三份草稿已整合並 superseded）；實作排程：[`COLD_OUTREACH_PHASE1_BUILD_PLAN.md`](docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md)（T1–T12 依賴排序）。
+- [ ] **【Phase 1 全完成 2026-10-14｜剩 ops：agency GEMINI_API_KEY 換發】Cold Outreach Workbench — 冷開發完整鏈** — SSOT：[`agency-os/docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（三份草稿已整合並 superseded）；實作排程：[`COLD_OUTREACH_PHASE1_BUILD_PLAN.md`](docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md)（T1–T12 依賴排序）。
   - **已拍板決策**：代操冷信用客戶 Gmail / 名單你幫找 / 訂閱制 / 不用 SES / schema prefix `co_`。
   - **架構對齊**：org-tenant + **service-role RLS + ops-role RBAC**（已驗證現況 §B0.1，runtime 非 Clerk；賣的 per-login 隔離留 Phase 5）；暖層走既有 wp-bridge（+小擴充 FluentCRM contact/tag endpoint，非新建 connector）；暖信走客戶 FluentSMTP 或 Brevo free；self-host Supabase/Trigger.dev/n8n = $0；**Free-Plan Router + 客戶 BYO-key 乘數**為第一級設計（PART H）。
   - **關鍵路徑**：T1 schema → T2 module 殼 → T4 Connector/Router/BYO-key → T5 Inbox → T6 AI scoring → T8 Message gen(Cold Gate) → T9 Review → T10 Gmail draft(⚠High，等 go-ahead)。
@@ -977,7 +977,7 @@
   - **Phase 1 ungated 全完成**。
   - **唯一剩 T10 Gmail per-org OAuth = gated High-risk（另案，會重用 0049 vault）**。ops 待辦：續期 agency `GEMINI_API_KEY`（2026-09-11 REALTEST 確認 `API_KEY_INVALID`，需操作者登入 Google AI Studio 換發，或靠 BYO client key）。 **【狀態訂正 2026-08-25｜原標【未開始】為過期】實際進度**：T1 schema 已落（`lobster-factory/packages/db/migrations/0048_co_outreach_core.sql`）、T2–T9/T11/T12 已實作
   - `apps/next-admin/lib/outreach/`（`connectors/`、`scoring.ts`、`cold-gate.ts`、`normalize.ts`、`db.ts`、`ai-claude/ai-gemini/ai-openai.ts`）+ 7 條 API route（`app/api/outreach/{leads,inbox,messages,followups,suppression,connectors,service-profiles}`）+ UI `app/(shell)/outreach`。
-  - **唯一剩餘＝T10 Gmail per-org OAuth + 建草稿(n8n) + sender daily limit**（⚠️High auth/憑證，gated）。`memory/daily/` 自 2026-07-05 起即持續註記「Phase 1 ungated 全完成」，僅 TASKS 標籤未同步。
+  - **✅ T10 完成（2026-10-14）**：Gmail per-org OAuth 連接 awarewaveai@gmail.com（scope 僅 gmail.compose）＋ prod REALTEST 真建 1 封繁中草稿（未寄出）＋ daily limit 實測回 429；改走 next-admin route 不經 n8n。詳 WORKLOG 2026-10-14 續28。原文：~~唯一剩餘＝T10 Gmail per-org OAuth + 建草稿(n8n) + sender daily limit~~。`memory/daily/` 自 2026-07-05 起即持續註記「Phase 1 ungated 全完成」，僅 TASKS 標籤未同步。
   - **2026-09-11**：`leads/route.ts` uuid-into-column 小修完成，過程中發現同一 bug class（client-supplied 字串未驗證格式就進 `.eq(<uuid 欄位>, ...)`，觸發 PG `22P02` 洩漏成 raw 500）遍布整個 `co_outreach` API family——全 8 個 route.ts（含未被單段 glob 蓋到的 `connectors/secret/route.ts`）皆已補上 `UUID_RE` guard；順帶補上 `connectors/secret/route.ts` DELETE 原本完全缺失的 ownership check（critic Standard 抓到：wipe 別人 org 的 vault key 無需驗證，Phase 5 client 自助開放前即為漏洞）。詳見 WORKLOG 2026-09-11。
 
 - [ ] **【進行中｜軟體先行·U0–U5 + widget U4 完成並 prod live，剩 U6 gated】全自動客服系統**

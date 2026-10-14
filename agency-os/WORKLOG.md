@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-14（續28）Cold Outreach T10 prod REALTEST 通過 → Phase 1 全完成
+
+**連接**：操作者在 prod 走完 OAuth（awarewaveai@gmail.com）。DB 實查：connector `616e063a…`（org=NULL，agency 自用）`is_enabled=t`、`credentials_ref` 已設、scope 僅 `https://www.googleapis.com/auth/gmail.compose`；`co_sender_accounts` `1e04842d…` daily_limit 20。
+**建草稿**：測試 lead `31259903…`「[T10 REALTEST] 自我測試」，收件者 = awarewaveai@gmail.com 自己；approved message `2dad5486…`（繁中 body）。經操作者已登入的瀏覽器 session 呼叫 `POST /api/outreach/messages/gmail-draft` → 200 `ok:true`、`warning:null`。Gmail 草稿匣實看：1 封草稿、繁中內文正確顯示（base64 CTE 修正有效）、無主旨（設計如此）、未寄出。DB：`co_messages.status=drafted`、`drafted_at` 有值、`sent_at` 空；`co_sending_events` 1 筆 `draft_created/gmail/cold`，`provider_event_id` 有值。
+**daily limit**：sender 暫設 `daily_limit=1`（當日已 1 封）＋第二則 approved message → 同一路由回 429 `daily Gmail draft limit reached (1/1)`；之後 daily_limit 改回 20、刪掉第二則測試 message。第一組測試 lead/message/event 留作證據。
+**剩**：agency `GEMINI_API_KEY` 仍 `API_KEY_INVALID`（需操作者到 Google AI Studio 換發）；OAuth App 仍 Testing 模式（100 人上限），開放客戶自助連接前要送 Google 驗證。
+
+- REALTEST_EVIDENCE: tool=curl | cmd=POST https://app.aware-wave.com/api/outreach/messages/gmail-draft {messageId:2dad5486…} → 200；同路由 limit=1 → 429；Gmail drafts 頁實看草稿 | exit=0 | ms=1500
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=1c/2m/4m -- 程式審查見 2026-09-11 T10 條目（全修）；本條為實測無新程式
+- BUGHUNT_WAIVED: NA -- 本條無程式改動（實測＋TASKS 狀態更新）
 ## 2026-10-14（續27）T10 Gmail OAuth callback 成功後導向 `https://0.0.0.0:3000/...`（ERR_ADDRESS_INVALID）
 
 **根因**：`oauth/callback/route.ts` 的 `redirectToConnectors(url.origin, …)` 用 `new URL(req.url).origin` 組導回網址；standalone 容器內 `req.url` 是綁定位址 `0.0.0.0:3000`，不是公開 host。連接本身成功（DB 實查：connector `616e063a…` `credentials_ref` 已設、`settings.email=awarewaveai@gmail.com`、scope 僅 `gmail.compose`；`co_sender_accounts` 新增 org=NULL、daily_limit 20），只有最後導回壞掉。
