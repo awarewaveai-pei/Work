@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-14（續2）認知平台：長的 AI 回答改背景執行，已上線（c118157c5）
+
+**操作者**：「如果是 趕快做」（部署）。沒有資料庫結構改動。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=deploy/deploy.sh（/tmp/cos-deploy-20261014a.out：f898e7341..c118157c5 86 模組測試閘門 PASS 01:31:43Z；smoke local/web/database/public 全 PASS，01:34:15Z done）| exit=0 | ms=375000
+- REALTEST_EVIDENCE: tool=curl | cmd=curl https://cognitive.aware-wave.com/api/me/ai/turns/x → 401（新路由在、要登入）| exit=0 | ms=300
+- REVIEW_WAIVED: NA -- 部署本身；程式的審查在 c118157c5 的 WORKLOG 條目
+- BUGHUNT_WAIVED: NA -- 部署本身，沒有改檔
+
+**rollback**: `git revert c118157c5` 後重跑 `deploy/deploy.sh`。
 ## 2026-10-14（續1）認知平台：長的 AI 回答改在背景跑完（本 commit，未上線）
 
 **根因**：每個積木的 AI 按鈕都在一個 HTTP 請求裡等 `ai_gate.ask_ai` 跑完。AI 最多等 85 秒（`provider.py` DEFAULT_TIMEOUT_SECONDS），nginx 90 秒，Cloudflare 100 秒。輸出約 68 token/秒（`interpret_method_record.py:31`：16k 約 4 分鐘），所以 max_tokens 8000 的 EXPRESS 起草最長要約 118 秒，6000 的動作約 88 秒，回答一長就一定逾時。
