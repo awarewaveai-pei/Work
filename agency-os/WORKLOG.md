@@ -1,5 +1,5 @@
 # Worklog
-## 2026-10-14（續5）社群管理平台：樣稿、功能總表、ADR 016、執行計畫——Metricool 等級的統一發文＋行事曆，Postiz 只當送信員
+## 2026-10-14（續6）社群管理平台：樣稿、功能總表、ADR 016、執行計畫——Metricool 等級的統一發文＋行事曆，Postiz 只當送信員
 
 **根因**:
 - 社群發文藏在內容工作室底部的摺疊區，要先生成文章才能用（`ContentStudio.tsx:3681`）；只有建草稿／立即發佈，不能選時間（`:3838`）；內容行事曆只讀 WordPress（`calendar/ContentCalendar.tsx:261`）；一個文字框，看不到各平台成品（`:3820`）。操作者：「我們的很爛」「我要功能完善的平台」「可能管理多個客戶，或像 Metricool 給人訂閱」「css style 直接掛 app.aware-wave.com 的，統一管理」。
@@ -34,6 +34,25 @@
 **剩餘風險**: app 的 .btn-primary／.btn-secondary 是 13px，樣稿照抄所以「排程」等按鈕比 14px 規則小 1px（閘印 note，TASKS 待操作者決定）；樣稿四個選填列全開時文字欄內部捲動 242px（預覽與按鈕不動）；設計閘只驗樣稿，產品實作的同款規則排在計畫 C6；Postiz v2.11.3 的端點可能不同於最新文件（G1 gate 逐一 curl）；Meta 審核狀態未查（G3）；ADR 016 是提案，操作者看樣稿後才定案。
 
 **rollback**: `git revert <本 commit>`；預覽頁同 URL 重新發布舊版；`.claude/launch.json` 的 `social-mocks` 區塊可直接刪。
+## 2026-10-14（續5）認知平台：群組 AI 拿到這一輪的問題當背景、一律隔離（136ae32f0，未部署）
+
+**根因**: 轉述與整理分歧只給模型成員的紀錄，沒有給群組在決定的問題（`ai_actions/collab.py` `_restate_input`、`_differences_input`）。今天的走查：乙只寫「六四是因為我負責業務，業務量多了一倍」，轉述變成「六四（應是指某次出缺勤或狀況）」，是猜的。同類：問題任何成員都能改寫，閘門卻用第一版作者（written_by）判斷是誰的字，召集人寫第一版、別人改寫後，會被當成召集人自己的字、不經隔離送進模型。
+
+**做了**:
+- `DocKind.shared_wording`（`doc_kinds.py`），`collab.question` 設為 True；`block_hooks/collab.py` 改讀它，刪掉 `SHARED_WORDING`。
+- `ai_gate`：這類紀錄永遠不算呼叫者自己的字，一律隔離，標題不寫成員代號。
+- 兩個群組 AI 動作讀 `collab.question`，拿這一輪的問題（寫入順序最後一筆，跟 `CollabPage.tsx` 顯示的同一筆）；規則加「問題只是背景，不解釋、不猜成員沒說明的詞或數字」。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=pytest tests/unit/test_collab_ai.py（8 passed，新增 QuestionContextTests）| exit=0 | ms=28000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：拿掉閘門的 `or spec.shared_wording` → QuestionContextTests 變紅；還原變綠 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run（78 模組 1583 個 OK）| exit=0 | ms=1177000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex agency-os/reports/oracle/2026-10-14-review-473862ed.md：用時間挑問題可能挑到舊的措辭，改成寫入順序，跟頁面同一規則。
+- BUGHUNT_DONE: scope=Projects/internal/cognitive-engineering-os,agency-os,scripts | grep=SHARED_WORDING | hits=0
+
+**部署**: 未部署，等操作者同意。
+**rollback**: `git revert 136ae32f0`。
 ## 2026-10-14（續4）只剩一套 scripts/：agency-os/scripts 移除，排程改跑 scripts/，doc-sync 不再刪別人的字
 
 **根因**:

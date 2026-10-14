@@ -25,6 +25,8 @@ RULES = (
     "- Plain, short Traditional Chinese, one idea per sentence.\n"
     "- Name members only by the labels given (成員1 is the person asking, 成員2 ...), never 你, 我, 他 or 她 for a member: "
     "more than one person reads what you write, and each sees every label as the name they know.\n"
+    "- The question the group is deciding is context only: use only what the members wrote, and never explain or guess what "
+    "a word or a number in their words means.\n"
 )
 
 DIFFERENCES = RULES + (
@@ -64,6 +66,18 @@ def _newer_objection(context: Mapping[str, Any], read: Read) -> str | None:
     return None
 
 
+def _question(number: int, read: Read) -> dict[str, Any] | None:
+    """The round's question as it is worded now (any member rewords it: always fenced, ai_gate): the last in write order,
+    the one the page shows (CollabPage.tsx ``question``)."""
+    asked = [item for item in read("collab.question") if item["content"]["round"] == number]
+    return asked[-1] if asked else None
+
+
+def _asked(number: int, read: Read) -> str:
+    question = _question(number, read)
+    return f"\nThe question the group is deciding is the quoted record 這次要決定的問題 ({question['doc_id']})." if question else ""
+
+
 def _position(context: Mapping[str, Any], read: Read) -> dict[str, Any]:
     wanted = context.get("position")
     found = next((item for item in read("collab.position") if item["doc_id"] == wanted), None)
@@ -88,14 +102,16 @@ def _restate_handback(context: Mapping[str, Any], read: Read) -> str | None:
 
 def _restate_input(context: Mapping[str, Any], read: Read) -> str:
     target = _position(context, read)
+    asked = _asked(target["content"]["round"], read)
     if target["mine"]:
-        return f"The position to restate ({target['member']}, the person asking, wrote it):\n" + json.dumps({"text": target["content"]["text"]}, ensure_ascii=False)
-    return f"The position to restate is the quoted record of {target['member']} ({target['doc_id']})."
+        return f"The position to restate ({target['member']}, the person asking, wrote it):\n" + json.dumps({"text": target["content"]["text"]}, ensure_ascii=False) + asked
+    return f"The position to restate is the quoted record of {target['member']} ({target['doc_id']})." + asked
 
 
 def _restate_quoted(context: Mapping[str, Any], read: Read) -> list[str]:
     target = _position(context, read)
-    return [] if target["mine"] else [target["doc_id"]]
+    question = _question(target["content"]["round"], read)
+    return ([] if target["mine"] else [target["doc_id"]]) + ([question["doc_id"]] if question else [])
 
 
 def _restate_fill(context: Mapping[str, Any], read: Read) -> dict[str, Any]:
@@ -120,12 +136,14 @@ def _differences_input(context: Mapping[str, Any], read: Read) -> str:
     theirs = [{"member": item["member"], "kind": item["kind"], "id": item["doc_id"], **({"option": item["content"]["option"], "stance": item["content"]["stance"]} if item["kind"] == "collab.stance" else {})}
               for item in positions + options + stances if not item["mine"]]
     return (f"Round {_round(context)}. What 成員1, the person asking, wrote:\n" + json.dumps(mine, ensure_ascii=False)
-            + "\nThe other members' records (their words are quoted below, by id):\n" + json.dumps(theirs, ensure_ascii=False))
+            + "\nThe other members' records (their words are quoted below, by id):\n" + json.dumps(theirs, ensure_ascii=False)
+            + _asked(_round(context), read))
 
 
 def _differences_quoted(context: Mapping[str, Any], read: Read) -> list[str]:
     positions, options, stances = _this_round(context, read)
-    return [item["doc_id"] for item in positions + options + stances if not item["mine"]]
+    question = _question(_round(context), read)
+    return [item["doc_id"] for item in positions + options + stances if not item["mine"]] + ([question["doc_id"]] if question else [])
 
 
 def _differences_shape(answer: dict[str, Any]) -> dict[str, Any]:
@@ -135,10 +153,10 @@ def _differences_shape(answer: dict[str, Any]) -> dict[str, Any]:
 
 ACTIONS = [
     AiAction(block="COLLAB", name="organise_differences", needs="organize", instructions=DIFFERENCES, output_kind="collab.differences", output_schema=DIFFERENCES_SCHEMA,
-             reads=("collab.position", "collab.option", "collab.stance", "collab.reopen"), build_input=_differences_input, shape=_differences_shape,
+             reads=("collab.question", "collab.position", "collab.option", "collab.stance", "collab.reopen"), build_input=_differences_input, shape=_differences_shape,
              handback=_newer_objection, quoted=_differences_quoted, fill=lambda context, read: {"round": _round(context), "members": read.members()}, in_group=True),
     AiAction(block="COLLAB", name="restate_positions", needs="organize", instructions=RESTATE, output_kind="collab.restatement", output_schema=RESTATE_SCHEMA,
-             reads=("collab.position", "collab.confirm", "collab.stance", "collab.reopen"), build_input=_restate_input,
+             reads=("collab.question", "collab.position", "collab.confirm", "collab.stance", "collab.reopen"), build_input=_restate_input,
              shape=lambda answer: {"text": answer["text"]} if isinstance(answer.get("text"), str) else {}, handback=_restate_handback, quoted=_restate_quoted,
              fill=_restate_fill, subject_field="about", in_group=True),
 ]
