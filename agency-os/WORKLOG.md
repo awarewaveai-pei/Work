@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-15（續19）CS 轉真人時客人立刻收到確認句＋讀不到名字時同句問名字，回答寫進 Chatwoot 聯絡人（程式；未部署）
+
+**根因**：`route.ts` runPipeline 三條轉真人路徑（handoff／draft／額度用完）只呼叫 `handoffToHuman`（翻 open），客人端收不到任何字（Pei-Jing 實測「為什麼不回答我?」）。Messenger 非角色用戶的 profile 讀不到（Advanced Access 需商家驗證，操作者不辦），Chatwoot v4.18 `app/builders/messages/facebook/message_builder.rb:137` 寫死「John Doe」。
+**不變量**：
+- 每次轉真人（系統模式擋下除外）客人收到一則確認句；同一則客人訊息之後已有公開回覆就不再送（多則訊息各跑一條 pipeline 時只送一次）。
+- 名字只在「本對話中，客人這則訊息的前一則公開訊息正是我們送出的問句（同文字，由 csVoice 重算）」且「寫入前重讀聯絡人仍是 John Doe」時寫入。無狀態：不在聯絡人存標記。
+- 系統模式擋下：不送確認句、不寫名字（T27 決策 `reports/decisions/2026-09-26-system-mode-inbound-events.md:13`「不自動回覆」）。
+**改動**（next-admin）：
+- `lib/cs/handoff-ack.ts`（新）：`handoffAckText`（`csVoice.escalationTone` 覆寫確認句、`csVoice.askName` 覆寫問句；預設依敬語／emoji 政策）、`isPlaceholderContactName`、`parseNameReply`（純程式：去開頭「我叫／我是／my name is」、結尾語助詞；問句／數字／「好的」「謝謝」等附和一律不算名字）。
+- `lib/cs/chatwoot-client.ts`：`listMessages`（after／before）、`getContactName`、`updateContactName`（PUT）。
+- `app/api/webhooks/chatwoot/route.ts`：三條轉真人路徑在 handoff 之後 `acknowledgeHandoff`（best-effort＋Sentry；sweep 從不重送確認句 `lib/cs/sweep.ts:31-32`）；open 對話＋John Doe 的客人訊息 → `after(captureName)`，不 claim、不跑 AI。
+- csVoice 原有欄位 `escalationTone`（表單「轉真人語氣」，執行期從未使用）改為「轉真人時回客人」的實際文字；新增 `askName`（型別、`cis/route.ts` sanitizer＋表單 keys、`ClientHubTabs.tsx` 表單）。正式兩個粉專 csVoice 皆為 null → 用預設句「已收到您的訊息，我們會盡快回覆您 🙏／請問怎麼稱呼您呢？」。
+- `docs/Customer_service/Customer_service_uiux_design.md:156` escalationTone 說明同步。
+**Codex 三輪**（`agency-os/reports/oracle/2026-10-15-partialreview-0deaa36b.md`、`-480253c0`、`-9eef373a`）：
+- R1 5：修 4（標記晚於送出→秒回漏抓；用 webhook 舊名字→改重讀；template 沒算說話；「好的」被當名字）；駁 F5（completeClaim 失敗 sweep 會重送確認句——sweep 只轉真人＋私人筆記）。
+- R2 4：同段第二次被報 → 依 AGENTS §4 先寫不變量（見上）→ 拿掉聯絡人標記，改無狀態比對前一則訊息；R2 F1/F2/F3（問句沒送出也算、多 pipeline 標記互蓋、跨對話互蓋）整類消失；F4（重讀與寫入之間幾十毫秒專員剛好改名）Chatwoot 無條件式更新，記殘留。
+- R3 5：修 F3（公開 template 也算已回覆）；駁 F1（真同毫秒並發才雙發，後果是多一句客氣話，記殘留）、F2/F4（需 7 秒內出現 100／20 則訊息）、F5（只會多問一次名字，寫入前仍重讀）。
+**未做**：部署（High-STOP，等操作者）；真 Messenger 端到端驗收在部署後。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run app/api/webhooks/chatwoot lib/cs app/api/ops/clients lib/system-modes/__tests__/production-change-coverage.test.ts（184 pass）；突變：拔「寫入前重讀名字」→ 2 紅、拔「前一則必須是我們的問句」→ 2 紅，還原皆綠 | exit=0 | ms=2500
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/14m/0n -- Codex 三輪（修 7、整類消失 3、駁 3、殘留 1＋R3F1）
+- ORACLE_WAIVED: R3 之後只改 R3 F3 一行（template 算已回覆），由指名測試「a public template already followed this message」鎖住；不開第四輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands | grep=escalationTone|askName|updateContactName|getContactName|handoffAckText|listMessages( | hits=68（含測試檔；設計文件 1 處過時已改；其餘為本次改動檔、TASKS、歷史 archive／oracle 報告、triggerWorkflow `taskName` 誤中）
+
+**rollback**：程式未部署。部署後回滾：sg-deploy 回前一個 commit；無 migration、無資料寫入（只寫 Chatwoot 聯絡人名字，John Doe → 客人回答）。
 ## 2026-10-15（續18）認知平台：結果頁不再寫死冰山——工具之間的差別只來自登記（工具模板 §15.1 第 1 項，未部署）
 
 **根因**: 套用模板到第二個工具前，`ResultPage.tsx` 有 10 處 `const iceberg = method_id === "systems.iceberg_model"` 分岔（② 標題、③ 圖 A/B 的層註、圖 C、圖張數、結尾句、④ 追蹤指標列、⑥ 標題與表下句），另有示範提示寫死「冰山模型」、⑥ 動作句寫死「四列」、`RunPage` 用 `ICEBERG_ID` 決定分層顏色。每加一個工具就得再改一次 `ResultPage`。

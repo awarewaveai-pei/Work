@@ -53,6 +53,7 @@ function sanitizeCsVoice(raw: unknown): ClientConfig["csVoice"] | undefined {
     signoff: str(v.signoff),
     refusalStyle: str(v.refusalStyle),
     escalationTone: str(v.escalationTone),
+    askName: str(v.askName),
     servicePrinciples: strArray(v.servicePrinciples),
     mission: str(v.mission),
   };
@@ -107,7 +108,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
   // from the content engine, apologyStyle/slogan) so an admin save can't silently clobber them.
   if ("csVoice" in body) {
     const CS_FORM_KEYS = ["personaName", "languages", "formality", "honorifics", "emojiPolicy",
-      "greeting", "signoff", "refusalStyle", "escalationTone", "servicePrinciples", "mission"];
+      "greeting", "signoff", "refusalStyle", "escalationTone", "askName", "servicePrinciples", "mission"];
     const existing = (clientConfig.csVoice && typeof clientConfig.csVoice === "object"
       ? { ...(clientConfig.csVoice as Record<string, unknown>) }
       : {}) as Record<string, unknown>;

@@ -71,6 +71,7 @@ export interface ClientConfig {
     signoff?: string;
     refusalStyle?: string;
     escalationTone?: string;
+    askName?: string;
     servicePrinciples?: string[];
     mission?: string;
   };

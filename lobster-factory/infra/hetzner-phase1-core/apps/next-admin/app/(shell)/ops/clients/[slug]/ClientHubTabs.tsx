@@ -1032,6 +1032,7 @@ function CsVoiceCard({ slug, initial }: { slug: string; initial?: ClientConfig["
   const [signoff, setSignoff] = useState(initial?.signoff ?? "");
   const [refusalStyle, setRefusalStyle] = useState(initial?.refusalStyle ?? "");
   const [escalationTone, setEscalationTone] = useState(initial?.escalationTone ?? "");
+  const [askName, setAskName] = useState(initial?.askName ?? "");
   const [servicePrinciples, setServicePrinciples] = useState((initial?.servicePrinciples ?? []).join("\n"));
   const [mission, setMission] = useState(initial?.mission ?? "");
   const [saving, setSaving] = useState(false);
@@ -1041,7 +1042,7 @@ function CsVoiceCard({ slug, initial }: { slug: string; initial?: ClientConfig["
     setSaving(true); setMsg(null);
     try {
       await patchCis(slug, { csVoice: {
-        personaName, formality, honorifics, emojiPolicy, greeting, signoff, refusalStyle, escalationTone, mission,
+        personaName, formality, honorifics, emojiPolicy, greeting, signoff, refusalStyle, escalationTone, askName, mission,
         languages: languages.split(",").map((s) => s.trim()).filter(Boolean),
         servicePrinciples: servicePrinciples.split("\n").map((s) => s.trim()).filter(Boolean),
       } });
@@ -1064,7 +1065,8 @@ function CsVoiceCard({ slug, initial }: { slug: string; initial?: ClientConfig["
       <CisText label="招呼語" value={greeting} onChange={setGreeting} placeholder="嗨，我是小柔…" />
       <CisText label="結尾語" value={signoff} onChange={setSignoff} placeholder="還有需要再找我喔" />
       <CisText label="拒絕用語" value={refusalStyle} onChange={setRefusalStyle} placeholder="做不到時的說法" />
-      <CisText label="轉真人語氣" value={escalationTone} onChange={setEscalationTone} placeholder="轉接時的說法" />
+      <CisText label="轉真人時回客人" value={escalationTone} onChange={setEscalationTone} placeholder="已收到您的訊息，我們會盡快回覆您 🙏" />
+      <CisText label="問名字" value={askName} onChange={setAskName} placeholder="請問怎麼稱呼您呢？（只在讀不到客人名字時接在上一句後面）" />
       <CisText label="品牌使命" value={mission} onChange={setMission} placeholder="MI（選填）" />
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "4px 0", fontSize: 12 }}>
         <span style={{ color: "var(--text-muted)", width: 88, flexShrink: 0, paddingTop: 5 }}>服務準則</span>

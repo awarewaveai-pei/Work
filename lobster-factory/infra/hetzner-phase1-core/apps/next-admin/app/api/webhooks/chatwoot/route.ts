@@ -3,12 +3,13 @@ import * as Sentry from "@sentry/nextjs";
 import { handleInbound } from "@/lib/cs/orchestrator";
 import { loadCis } from "@/lib/cs/cis";
 import { claimMessage, completeClaim, findOrganizationIdByChatwootAccountId, recordReply } from "@/lib/cs/db";
-import { handoffToHuman, sendPrivateDraft, sendReply, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
+import { getContactName, handoffToHuman, listMessages, sendPrivateDraft, sendReply, updateContactName, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
+import { handoffAckText, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
 import { reserveCsCredit } from "@/lib/cs/billing";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import type { InboundMessage } from "@/lib/cs/types";
+import type { ChatwootConfig, CisProfile, InboundMessage } from "@/lib/cs/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,7 +35,8 @@ interface ChatwootMessageCreatedPayload {
   id?: number | string;
   content?: string;
   message_type?: "incoming" | "outgoing" | number;
-  sender?: { type?: string };
+  // For an incoming message the sender is the contact (Contact#webhook_data).
+  sender?: { type?: string; id?: number; name?: string };
   account?: { id?: number };
   conversation?: {
     id?: number | string;
@@ -88,6 +90,12 @@ export async function POST(req: Request): Promise<Response> {
   const isFromAgent = payload.sender?.type === "agent_bot" || payload.sender?.type === "user";
   const conversationStatus = payload.conversation?.status ?? "pending";
   if (isFromAgent || conversationStatus === "open") {
+    // The one exception: a nameless contact may be answering the handoff acknowledgement's name question.
+    const contactId = payload.sender?.id;
+    if (!isFromAgent && typeof contactId === "number" && isPlaceholderContactName(payload.sender?.name)) {
+      const reply = { organizationId, conversationId, messageId: Number(messageId), contactId, text: payload.content ?? "" };
+      after(() => captureName(reply).catch((err) => Sentry.captureException(err, { extra: { organizationId, conversationId, messageId } })));
+    }
     return NextResponse.json({ ok: true, ignored: true, reason: "human_owns_thread" });
   }
 
@@ -117,11 +125,17 @@ export async function POST(req: Request): Promise<Response> {
     withinBusinessHours: true,
   };
   // A throw (failed delivery included) leaves the claim unfinished (completed_at NULL) for the sweep.
-  after(() => runPipeline(inbound).catch((err) => Sentry.captureException(err, { extra: { organizationId, conversationId, messageId } })));
+  const contact: ContactRef = { id: payload.sender?.id, name: payload.sender?.name };
+  after(() => runPipeline(inbound, contact, Number(messageId)).catch((err) => Sentry.captureException(err, { extra: { organizationId, conversationId, messageId } })));
   return NextResponse.json({ ok: true, accepted: true });
 }
 
-async function runPipeline(inbound: InboundMessage): Promise<void> {
+interface ContactRef {
+  id?: number;
+  name?: string;
+}
+
+async function runPipeline(inbound: InboundMessage, contact: ContactRef, customerMessageId: number): Promise<void> {
   const { organizationId, conversationId, messageId } = inbound;
   const claim = { organizationId, conversationId, messageId };
   const cis = await loadCis(organizationId);
@@ -147,7 +161,10 @@ async function runPipeline(inbound: InboundMessage): Promise<void> {
   const credit = await reserveCsCredit(organizationId, messageId);
   if (credit.metered && !credit.allowed) {
     await recordReply({ ...claim, action: "handoff", retrievedChunkIds: [] });
-    if (cis.chatwoot) await handoffToHuman(organizationId, cis.chatwoot, conversationId);
+    if (cis.chatwoot) {
+      await handoffToHuman(organizationId, cis.chatwoot, conversationId);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId);
+    }
     await completeClaim(claim);
     return;
   }
@@ -163,8 +180,10 @@ async function runPipeline(inbound: InboundMessage): Promise<void> {
     } else if (decision.action === "draft" && decision.replyText) {
       await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, decision.replyText);
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId);
     } else if (decision.action === "handoff") {
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId);
     } else if (decision.action !== "suppressed") {
       // "suppressed" = the engine intentionally stayed silent (agent owns the thread). Anything else
       // is an upstream invariant break, e.g. auto_sent with an empty replyText: leave it to the sweep.
@@ -172,4 +191,54 @@ async function runPipeline(inbound: InboundMessage): Promise<void> {
     }
   }
   await completeClaim(claim);
+}
+
+/**
+ * Tells the customer a human will answer, asking their name when Chatwoot only has a placeholder.
+ * Not on the system-mode-blocked path (T27: no automatic reply while blocked). Skipped when a public
+ * reply already followed the customer's message (several messages sent before the handoff each run
+ * a pipeline; the first to get here answers). Best-effort: the handoff already reached Chatwoot, and
+ * failing the claim would only make the sweep add a misleading "AI 處理中斷" note without sending
+ * this either (the sweep never re-sends it).
+ */
+async function acknowledgeHandoff(
+  cis: CisProfile,
+  chatwoot: ChatwootConfig,
+  conversationId: string,
+  contact: ContactRef,
+  customerMessageId: number,
+): Promise<void> {
+  const { organizationId } = cis;
+  try {
+    const later = await listMessages(organizationId, chatwoot, conversationId, { after: customerMessageId });
+    if (later.some((m) => !m.private && (m.messageType === 1 || m.messageType === 3))) return;
+    const askName = typeof contact.id === "number" && isPlaceholderContactName(contact.name);
+    await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName));
+  } catch (err) {
+    Sentry.captureException(err, { extra: { organizationId, conversationId, step: "handoff_ack" } });
+  }
+}
+
+/**
+ * The reply counts only when the public message right before it is the name question we send
+ * (same text), so an agent or template speaking in between, or a second customer message, never
+ * counts. Only a placeholder name is overwritten, read fresh because an agent may have renamed the
+ * contact after this webhook was sent. Residual: a rename landing between that read and the write
+ * (Chatwoot has no conditional update) is overwritten.
+ */
+async function captureName(reply: { organizationId: string; conversationId: string; messageId: number; contactId: number; text: string }): Promise<void> {
+  const { organizationId, conversationId } = reply;
+  const name = parseNameReply(reply.text);
+  if (!name) return;
+  const cis = await loadCis(organizationId);
+  if (!cis.chatwoot) return;
+  // T27: a blocking mode makes no automated writes.
+  const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
+  if (!gate.allowed) return;
+  const previous = (await listMessages(organizationId, cis.chatwoot, conversationId, { before: reply.messageId }))
+    .filter((m) => !m.private && m.messageType !== 2)
+    .at(-1);
+  if (previous?.messageType !== 1 || previous.content !== handoffAckText(cis, true)) return;
+  if (!isPlaceholderContactName(await getContactName(organizationId, cis.chatwoot, reply.contactId))) return;
+  await updateContactName(organizationId, cis.chatwoot, reply.contactId, name);
 }

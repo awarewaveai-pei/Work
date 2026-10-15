@@ -122,7 +122,10 @@ export interface CsVoice {
   signoff?: string;
   apologyStyle?: string;
   refusalStyle?: string;
+  /** Sent to the customer verbatim when the AI hands over to a human (lib/cs/handoff-ack.ts). */
   escalationTone?: string;
+  /** Name question appended to that sentence when Chatwoot has no real name (lib/cs/handoff-ack.ts). */
+  askName?: string;
   servicePrinciples?: string[];
   mission?: string;
   slogan?: string;

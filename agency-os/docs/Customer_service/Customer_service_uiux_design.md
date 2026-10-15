@@ -153,7 +153,8 @@ interface CsVoice {
   signoff?:     Record<string,string>;  // 結尾/簽名
   apologyStyle?:   string;     // 道歉用語基調
   refusalStyle?:   string;     // 做不到/拒絕時的用語
-  escalationTone?: string;     // 轉真人時語氣
+  escalationTone?: string;     // 轉真人時直接送給客人的確認句（不進 prompt；lib/cs/handoff-ack.ts）
+  askName?:        string;     // 讀不到客人名字時接在確認句後的問句；回答寫進 Chatwoot 聯絡人
   servicePrinciples?: string[];// 服務準則（能否開玩笑/同理優先/不過度承諾…）
   // MI 脈絡（選填，給 persona + 罐頭回覆基調）
   mission?: string; slogan?: string; values?: string[];
@@ -166,7 +167,7 @@ system = [ 客服護欄與安全(§5)
          + BrandVoiceProfile.promptInjection (內容引擎同源)
          + preferWords / avoidWords
          + csVoice: personaName / formality / honorifics / emojiPolicy
-                    / greeting / signoff / refusalStyle / escalationTone
+                    / greeting / signoff / refusalStyle
          + MI: mission / values (脈絡)
          + RAG 檢索塊 + 客戶記憶 ]
 ```

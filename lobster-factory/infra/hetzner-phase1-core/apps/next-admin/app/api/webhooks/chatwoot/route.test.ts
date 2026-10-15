@@ -31,13 +31,20 @@ vi.mock("@/lib/cs/db", () => ({ claimMessage, completeClaim, findOrganizationIdB
 
 const handoffToHuman = vi.hoisted(() => vi.fn(async () => undefined));
 const sendPrivateDraft = vi.hoisted(() => vi.fn(async () => undefined));
-const sendReply = vi.hoisted(() => vi.fn(async () => undefined));
+const sendReply = vi.hoisted(() => vi.fn(async (..._args: unknown[]): Promise<void> => undefined));
+const updateContactName = vi.hoisted(() => vi.fn(async () => undefined));
+const getContactName = vi.hoisted(() => vi.fn(async (): Promise<string | undefined> => "John Doe"));
+type Msg = { id: number; messageType: number; private: boolean; content: string };
+const listMessages = vi.hoisted(() => vi.fn(async (..._args: unknown[]): Promise<Msg[]> => []));
 const verifyWebhookToken = vi.hoisted(() => vi.fn(() => true));
 const loadWebhookSecret = vi.hoisted(() => vi.fn(async () => "secret"));
 vi.mock("@/lib/cs/chatwoot-client", () => ({
   handoffToHuman,
   sendPrivateDraft,
   sendReply,
+  updateContactName,
+  getContactName,
+  listMessages,
   verifyWebhookToken,
   loadWebhookSecret,
 }));
@@ -97,6 +104,12 @@ beforeEach(() => {
   sendPrivateDraft.mockResolvedValue(undefined);
   sendReply.mockClear();
   sendReply.mockResolvedValue(undefined);
+  updateContactName.mockClear();
+  updateContactName.mockResolvedValue(undefined);
+  getContactName.mockClear();
+  getContactName.mockResolvedValue("John Doe");
+  listMessages.mockReset();
+  listMessages.mockResolvedValue([]);
   verifyWebhookToken.mockClear();
   verifyWebhookToken.mockReturnValue(true);
   loadWebhookSecret.mockClear();
@@ -254,5 +267,150 @@ describe("POST /api/webhooks/chatwoot -- system-mode gate (T27)", () => {
     await post(makePayload());
     await runAfter();
     expect(checkProductionChangeAllowed).toHaveBeenCalledWith(fakeDb, ORG_ID);
+  });
+});
+
+describe("POST /api/webhooks/chatwoot -- handoff acknowledgement + name question", () => {
+  const HANDOFF = { ...DEFAULT_DECISION, action: "handoff" as const, replyText: undefined };
+  const JOHN = { type: "contact", id: 77, name: "John Doe" };
+  const QUESTION = "已收到您的訊息，我們會盡快回覆您 🙏\n請問怎麼稱呼您呢？";
+
+  it("handoff, placeholder name: after the handoff, one message carrying the name question", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    await post(makePayload({ sender: JOHN }));
+    await runAfter();
+    expect(listMessages).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", { after: 123 });
+    expect(sendReply).toHaveBeenCalledTimes(1);
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", QUESTION);
+    expect(handoffToHuman.mock.invocationCallOrder[0]).toBeLessThan(sendReply.mock.invocationCallOrder[0]);
+    expect(completeClaim).toHaveBeenCalledWith(CLAIM);
+  });
+
+  it("handoff, real name: acknowledgement only", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    await post(makePayload({ sender: { type: "contact", id: 77, name: "林小美" } }));
+    await runAfter();
+    expect(sendReply.mock.calls[0][3]).not.toContain("稱呼");
+  });
+
+  it("a public reply already followed this message (another pipeline acknowledged): not sent twice", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    listMessages.mockResolvedValueOnce([{ id: 130, messageType: 1, private: false, content: QUESTION }]);
+    await post(makePayload({ sender: JOHN }));
+    await runAfter();
+    expect(sendReply).not.toHaveBeenCalled();
+    expect(completeClaim).toHaveBeenCalledWith(CLAIM);
+  });
+
+  it("a public template already followed this message: not acknowledged again", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    listMessages.mockResolvedValueOnce([{ id: 130, messageType: 3, private: false, content: "template" }]);
+    await post(makePayload({ sender: JOHN }));
+    await runAfter();
+    expect(sendReply).not.toHaveBeenCalled();
+  });
+
+  it("draft: the private draft before it does not suppress the acknowledgement", async () => {
+    handleInbound.mockResolvedValueOnce({ ...DEFAULT_DECISION, action: "draft", replyText: "draft text" });
+    listMessages.mockResolvedValueOnce([{ id: 130, messageType: 1, private: true, content: "draft text" }]);
+    await post(makePayload({ sender: JOHN }));
+    await runAfter();
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", QUESTION);
+  });
+
+  it("credit-exhausted handoff acknowledges too", async () => {
+    reserveCsCredit.mockResolvedValueOnce({ metered: true, allowed: false });
+    await post(makePayload({ sender: JOHN }));
+    await runAfter();
+    expect(sendReply).toHaveBeenCalledTimes(1);
+  });
+
+  it("system mode blocked: no acknowledgement (T27: no automatic reply)", async () => {
+    checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "emergency_stop" });
+    await post(makePayload({ sender: JOHN }));
+    await runAfter();
+    expect(handoffToHuman).toHaveBeenCalledTimes(1);
+    expect(sendReply).not.toHaveBeenCalled();
+  });
+
+  it("acknowledgement fails: reported, the handoff still completes the claim", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    sendReply.mockRejectedValueOnce(new Error("chatwoot_api_500"));
+    await post(makePayload({ sender: JOHN }));
+    await runAfter();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(completeClaim).toHaveBeenCalledWith(CLAIM);
+  });
+
+  const answer = (content: string, sender: Record<string, unknown> = JOHN) =>
+    makePayload({ id: 510, content, sender, conversation: { id: 999, status: "open", contact_inbox: { source_id: "c1" } } });
+  const asked = (...extra: Msg[]) => listMessages.mockResolvedValueOnce([
+    { id: 500, messageType: 0, private: false, content: "課程問題" },
+    { id: 501, messageType: 1, private: false, content: QUESTION },
+    ...extra,
+  ]);
+
+  it("reply right after the question: name written, no claim, no AI", async () => {
+    asked({ id: 502, messageType: 2, private: false, content: "Conversation was marked open" });
+    expect(await (await post(answer("我叫小美"))).json()).toMatchObject({ ignored: true, reason: "human_owns_thread" });
+    await runAfter();
+    expect(listMessages).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", { before: 510 });
+    expect(getContactName).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, 77);
+    expect(updateContactName).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, 77, "小美");
+    expect(claimMessage).not.toHaveBeenCalled();
+    expect(handleInbound).not.toHaveBeenCalled();
+  });
+
+  it("a private note after the question does not count as someone speaking", async () => {
+    asked({ id: 505, messageType: 1, private: true, content: "內部備註" });
+    await post(answer("小美"));
+    await runAfter();
+    expect(updateContactName).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, 77, "小美");
+  });
+
+  it.each([
+    ["an agent spoke after the question", { id: 505, messageType: 1, private: false, content: "請問您想問哪一堂課？" }],
+    ["a public template after the question", { id: 505, messageType: 3, private: false, content: "template" }],
+    ["the customer already replied once", { id: 505, messageType: 0, private: false, content: "等一下" }],
+  ])("%s: name untouched", async (_label, extra) => {
+    asked(extra as Msg);
+    await post(answer("小美"));
+    await runAfter();
+    expect(updateContactName).not.toHaveBeenCalled();
+  });
+
+  it("the previous message is a different outgoing text (not our question): name untouched", async () => {
+    listMessages.mockResolvedValueOnce([{ id: 501, messageType: 1, private: false, content: "已收到您的訊息，我們會盡快回覆您 🙏" }]);
+    await post(answer("小美"));
+    await runAfter();
+    expect(updateContactName).not.toHaveBeenCalled();
+  });
+
+  it("a reply that is not a name: no Chatwoot calls at all", async () => {
+    await post(answer("請問課程什麼時候開始？"));
+    await runAfter();
+    expect(listMessages).not.toHaveBeenCalled();
+    expect(updateContactName).not.toHaveBeenCalled();
+  });
+
+  it("an agent renamed the contact after the webhook was sent: the real name is never overwritten", async () => {
+    asked();
+    getContactName.mockResolvedValueOnce("林小美");
+    await post(answer("小美"));
+    await runAfter();
+    expect(updateContactName).not.toHaveBeenCalled();
+  });
+
+  it("contact already has a real name: nothing queued", async () => {
+    await post(answer("小美", { type: "contact", id: 77, name: "林小美" }));
+    expect(afterQueue).toHaveLength(0);
+  });
+
+  it("system mode blocked: no contact write", async () => {
+    asked();
+    checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "read_only" });
+    await post(answer("小美"));
+    await runAfter();
+    expect(updateContactName).not.toHaveBeenCalled();
   });
 });

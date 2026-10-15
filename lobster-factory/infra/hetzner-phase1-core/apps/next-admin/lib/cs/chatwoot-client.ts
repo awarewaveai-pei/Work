@@ -59,7 +59,7 @@ interface ChatwootRequestOpts {
   config: ChatwootConfig;
   apiToken: string;
   path: string; // e.g. `/conversations/123/messages`
-  method?: "GET" | "POST" | "PATCH";
+  method?: "GET" | "POST" | "PATCH" | "PUT";
   body?: unknown;
 }
 
@@ -78,11 +78,60 @@ async function chatwootRequest<T>({ config, apiToken, path, method = "POST", bod
   return (await res.json()) as T;
 }
 
-/** Send the engine's reply as an outgoing message (answerLevel L2 / auto_sent path). */
+/** Send a customer-visible message (auto_sent reply, handoff acknowledgement). */
 export async function sendReply(organizationId: string, config: ChatwootConfig, conversationId: string, text: string): Promise<void> {
   const apiToken = await loadApiToken(organizationId);
   if (!apiToken) throw new Error("chatwoot_api_token_missing");
   await chatwootRequest({ config, apiToken, path: `/conversations/${conversationId}/messages`, body: { content: text, message_type: "outgoing" } });
+}
+
+/** Rename a contact (PUT /contacts/:id; other fields are left as stored). */
+export async function updateContactName(organizationId: string, config: ChatwootConfig, contactId: number, name: string): Promise<void> {
+  const apiToken = await loadApiToken(organizationId);
+  if (!apiToken) throw new Error("chatwoot_api_token_missing");
+  await chatwootRequest({ config, apiToken, method: "PUT", path: `/contacts/${contactId}`, body: { name } });
+}
+
+/** The contact's current name (contacts/show.json.jbuilder wraps it in payload). */
+export async function getContactName(organizationId: string, config: ChatwootConfig, contactId: number): Promise<string | undefined> {
+  const apiToken = await loadApiToken(organizationId);
+  if (!apiToken) throw new Error("chatwoot_api_token_missing");
+  const res = await chatwootRequest<{ payload?: { name?: unknown } }>({ config, apiToken, method: "GET", path: `/contacts/${contactId}` });
+  return typeof res.payload?.name === "string" ? res.payload.name : undefined;
+}
+
+export interface ChatwootMessageSummary {
+  id: number;
+  /** 0 incoming, 1 outgoing, 2 activity, 3 template (message_type_before_type_cast). */
+  messageType: number;
+  private: boolean;
+  content: string;
+}
+
+/**
+ * Chatwoot MessageFinder: `after` = up to 100 messages with id > after; `before` = the 20 latest with
+ * id < before. Both oldest first.
+ */
+export async function listMessages(
+  organizationId: string,
+  config: ChatwootConfig,
+  conversationId: string,
+  window: { after: number } | { before: number },
+): Promise<ChatwootMessageSummary[]> {
+  const apiToken = await loadApiToken(organizationId);
+  if (!apiToken) throw new Error("chatwoot_api_token_missing");
+  const query = "after" in window ? `after=${window.after}` : `before=${window.before}`;
+  const res = await chatwootRequest<{ payload?: Array<{ id?: unknown; message_type?: unknown; private?: unknown; content?: unknown }> }>({
+    config, apiToken, method: "GET", path: `/conversations/${conversationId}/messages?${query}`,
+  });
+  return (res.payload ?? [])
+    .filter((m) => typeof m.id === "number" && typeof m.message_type === "number")
+    .map((m) => ({
+      id: m.id as number,
+      messageType: m.message_type as number,
+      private: m.private === true,
+      content: typeof m.content === "string" ? m.content : "",
+    }));
 }
 
 /** Draft path (answerLevel L1): a PRIVATE note, visible only to the agent, never sent to the customer. */
