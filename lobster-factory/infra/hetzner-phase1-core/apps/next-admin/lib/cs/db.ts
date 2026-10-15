@@ -170,6 +170,53 @@ export async function recordReply(input: RecordReplyInput): Promise<void> {
   );
 }
 
+export interface ClaimRef {
+  organizationId: string;
+  conversationId: string;
+  messageId: string;
+}
+
+/**
+ * Claims older than `olderThanMs` whose outcome never reached Chatwoot (migration 0099). Throws on a
+ * query error: an empty answer would read as "nothing to hand off" and hide every lost message.
+ */
+export async function listUnfinishedClaims(olderThanMs: number, limit = 50): Promise<ClaimRef[]> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) throw new Error("cs_unfinished_claims: no supabase client");
+  const { data, error } = await sb
+    .from("cs_ai_replies")
+    .select("organization_id,chatwoot_conversation_id,chatwoot_message_id")
+    .is("completed_at", null)
+    .lt("created_at", new Date(Date.now() - olderThanMs).toISOString())
+    .order("created_at")
+    .limit(limit);
+  if (error) throw new Error(`cs_unfinished_claims: ${error.message}`);
+  return (data ?? []).map((r) => ({
+    organizationId: r.organization_id as string,
+    conversationId: r.chatwoot_conversation_id as string,
+    messageId: r.chatwoot_message_id as string,
+  }));
+}
+
+/**
+ * Mark a claim's outcome as delivered (reply sent / handed to a human / nothing to send). Only a row
+ * still unfinished is touched, so the webhook and the sweep never both close one. Returns false when
+ * the row was already closed; throws when the write failed (never reported as "already closed").
+ */
+export async function completeClaim(c: ClaimRef): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) throw new Error("cs_complete_claim: no supabase client");
+  const { data, error } = await sb
+    .from("cs_ai_replies")
+    .update({ completed_at: new Date().toISOString() })
+    .eq("organization_id", c.organizationId)
+    .eq("chatwoot_message_id", c.messageId)
+    .is("completed_at", null)
+    .select("chatwoot_message_id");
+  if (error) throw new Error(`cs_complete_claim ${c.organizationId}/${c.messageId}: ${error.message}`);
+  return Array.isArray(data) && data.length > 0;
+}
+
 export interface RecordActionInput {
   organizationId: string;
   conversationId: string;
@@ -231,6 +278,8 @@ export async function findOrganizationIdByChatwootAccountId(accountId: number): 
  * so a row that's claimed-but-never-overwritten (process crash between claim and persist) still
  * reads as "needs a human," never as a false "auto_sent". `recordReply` (above) OVERWRITES this row
  * once the true decision is known — that upsert must stay non-ignoreDuplicates for that to work.
+ * The claim leaves `completed_at` NULL until the outcome reaches Chatwoot (completeClaim);
+ * lib/cs/sweep.ts hands rows that stay NULL to a human.
  */
 export type ClaimResult = "claimed" | "duplicate" | "error";
 

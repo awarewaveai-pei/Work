@@ -67,6 +67,10 @@ export default defineConfig({
         const podSweepToken = process.env.POD_INBOX_SWEEP_TOKEN ?? "";
         if (podSweepToken.trim()) out.POD_INBOX_SWEEP_TOKEN = podSweepToken.trim();
 
+        // cs-inbound-sweep -> next-admin /api/internal/cs/sweep. Own token, same rule.
+        const csSweepToken = process.env.CS_SWEEP_TOKEN ?? "";
+        if (csSweepToken.trim()) out.CS_SWEEP_TOKEN = csSweepToken.trim();
+
         // collect-research-run -> next-admin /api/internal/collect/runs/execute (RESEARCH_LINES_MASTER_PLAN
         // WC-P1-13). Own token, same rule.
         const researchExecuteToken = process.env.COLLECT_RESEARCH_EXECUTE_TOKEN ?? "";

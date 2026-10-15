@@ -380,6 +380,8 @@ services:
       WC_WEBHOOK_SECRET: ${WC_WEBHOOK_SECRET:-}
       # Own bearer for /api/internal/pod-orders/sweep (the 10-minute pod_order_inbox replay); empty = 401.
       POD_INBOX_SWEEP_TOKEN: ${POD_INBOX_SWEEP_TOKEN:-}
+      # Own bearer for /api/internal/cs/sweep (the 5-minute unfinished-Chatwoot-claim handoff); empty = 401.
+      CS_SWEEP_TOKEN: ${CS_SWEEP_TOKEN:-}
       # wp-bridge signing client (one-click publish; lib/studio/wp-bridge-client.ts). Was live on the
       # server since before this file tracked it (2026-09-20 compose-drift audit) -- added here so a
       # fresh deploy of this file no longer silently omits it.

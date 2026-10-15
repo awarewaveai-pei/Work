@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { handleInbound } from "@/lib/cs/orchestrator";
 import { loadCis } from "@/lib/cs/cis";
-import { claimMessage, findOrganizationIdByChatwootAccountId } from "@/lib/cs/db";
+import { claimMessage, completeClaim, findOrganizationIdByChatwootAccountId, recordReply } from "@/lib/cs/db";
 import { handoffToHuman, sendPrivateDraft, sendReply, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
 import { reserveCsCredit } from "@/lib/cs/billing";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
@@ -16,12 +16,12 @@ export const dynamic = "force-dynamic";
 // Chatwoot AgentBot webhook (Pattern A, plan §3/§16). Verifies a shared `?token=` query-string secret
 // (see chatwoot-client.ts's verifyWebhookToken doc comment for why it's a query token and not a
 // signature header — Chatwoot's inbox-webhook/AgentBot delivery path sends no signature, confirmed
-// against its actual source), maps the payload to InboundMessage, runs the engine, and turns its
-// decision into the matching Chatwoot API call.
-// NEVER surfaces a 5xx for a processing failure — handleInbound already degrades to `handoff` inside
-// itself (plan §8.4: "no component failure may answer the customer with a guess"); this route's own
-// job is only to not let a webhook exception cause Chatwoot to retry-storm a message that was in fact
-// received and safely handed to a human.
+// against its actual source), claims the message, ANSWERS, and only then runs the engine and turns its
+// decision into the matching Chatwoot API call (after()). Chatwoot v4.18 gives an AgentBot 5 s
+// (WEBHOOK_TIMEOUT, lib/webhooks/trigger.rb) and on timeout opens the conversation itself; the
+// pipeline takes far longer (CS_TIMEOUTS). completed_at is set only once the outcome reached Chatwoot;
+// a claim whose after() work is cut off (container restart) or whose delivery failed stays NULL and
+// lib/cs/sweep.ts hands it to a human — the claim row, not after(), guarantees no message is lost.
 //
 // Body reading uses readWebhookBody (agency-os/reports/audit/auto-repair-2026-05-23.md §C3) — every
 // webhook route in this app shares the same 256KB cap; a bespoke req.text()/req.json() here would be
@@ -103,34 +103,6 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: "claim_failed" }, { status: 502 });
   }
 
-  const cis = await loadCis(organizationId);
-
-  // T27 (agency-os/reports/decisions/2026-09-26-system-mode-inbound-events.md): a blocking system
-  // mode pauses the AI and hands the conversation to a human -- no AI call, no credit reserved while
-  // paused. Placed AFTER claimMessage (above) so a Chatwoot retry of the SAME message hits "duplicate"
-  // and never re-runs this — i.e. never posts the pause note twice. blockedChangeMessage
-  // (lib/system-modes/blocked-change.ts) reads as an operator-facing 423 body ("this change was
-  // blocked; go to /ops/system-modes and retry"), which doesn't fit a private note read by a human
-  // agent taking over a conversation — a purpose-written message instead. Failed delivery of the note
-  // or the handoff itself must not turn into a 5xx (same .catch(() => undefined) shape the
-  // credit_exhausted branch below already uses) — the claim already committed above, so a 5xx here
-  // would just make Chatwoot retry into the same claimed row forever.
-  const modeGate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
-  if (!modeGate.allowed) {
-    if (cis.chatwoot) {
-      await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, `AI 暫停：系統處於 ${modeGate.mode} 模式，已轉真人`).catch(() => undefined);
-      await handoffToHuman(organizationId, cis.chatwoot, conversationId).catch(() => undefined);
-    }
-    return NextResponse.json({ ok: true, action: "handoff", reason: "system_mode_blocked", mode: modeGate.mode });
-  }
-
-  // Opt-in metering (lib/cs/billing.ts) — unmetered orgs (no billing account row) always proceed.
-  const credit = await reserveCsCredit(organizationId, messageId);
-  if (credit.metered && !credit.allowed) {
-    if (cis.chatwoot) await handoffToHuman(organizationId, cis.chatwoot, conversationId).catch(() => undefined);
-    return NextResponse.json({ ok: true, action: "handoff", reason: "credit_exhausted" });
-  }
-
   const inbound: InboundMessage = {
     organizationId,
     conversationId,
@@ -144,51 +116,60 @@ export async function POST(req: Request): Promise<Response> {
     // "AI 24h 回，非決策") — always true until a per-tenant schedule exists.
     withinBusinessHours: true,
   };
+  // A throw (failed delivery included) leaves the claim unfinished (completed_at NULL) for the sweep.
+  after(() => runPipeline(inbound).catch((err) => Sentry.captureException(err, { extra: { organizationId, conversationId, messageId } })));
+  return NextResponse.json({ ok: true, accepted: true });
+}
 
-  const decision = await handleInbound(inbound);
+async function runPipeline(inbound: InboundMessage): Promise<void> {
+  const { organizationId, conversationId, messageId } = inbound;
+  const claim = { organizationId, conversationId, messageId };
+  const cis = await loadCis(organizationId);
 
-  if (!cis.chatwoot) {
-    // Engine ran and was persisted (orchestrator.persist), but there's no Account API config yet to
-    // act on the decision — this happens during Chatwoot bring-up before client_config.chatwoot is
-    // set. Report success (the webhook itself was handled); nothing was sent to the customer.
-    return NextResponse.json({ ok: true, action: decision.action, sent: false, reason: "chatwoot_config_missing" });
+  // T27 (agency-os/reports/decisions/2026-09-26-system-mode-inbound-events.md): a blocking system
+  // mode pauses the AI and hands the conversation to a human -- no AI call, no credit reserved while
+  // paused. Runs after claimMessage, so a Chatwoot retry of the SAME message hits "duplicate" and never
+  // posts the pause note twice. A purpose-written note: blockedChangeMessage is an operator-facing 423
+  // body, not something for an agent taking over a conversation. The note is best-effort; the handoff
+  // is what completes the claim.
+  const modeGate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
+  if (!modeGate.allowed) {
+    await recordReply({ ...claim, action: "handoff", retrievedChunkIds: [] });
+    if (cis.chatwoot) {
+      await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, `AI 暫停：系統處於 ${modeGate.mode} 模式，已轉真人`).catch(() => undefined);
+      await handoffToHuman(organizationId, cis.chatwoot, conversationId);
+    }
+    await completeClaim(claim);
+    return;
   }
 
-  let sent = false;
-  try {
+  // Opt-in metering (lib/cs/billing.ts) — unmetered orgs (no billing account row) always proceed.
+  const credit = await reserveCsCredit(organizationId, messageId);
+  if (credit.metered && !credit.allowed) {
+    await recordReply({ ...claim, action: "handoff", retrievedChunkIds: [] });
+    if (cis.chatwoot) await handoffToHuman(organizationId, cis.chatwoot, conversationId);
+    await completeClaim(claim);
+    return;
+  }
+
+  // handleInbound records its decision (recordReply) on every path, failures included.
+  const decision = await handleInbound(inbound);
+
+  // No Account API config yet (Chatwoot bring-up before client_config.chatwoot is set): the decision
+  // is recorded, nothing can be sent.
+  if (cis.chatwoot) {
     if (decision.action === "auto_sent" && decision.replyText) {
       await sendReply(organizationId, cis.chatwoot, conversationId, decision.replyText);
-      sent = true;
     } else if (decision.action === "draft" && decision.replyText) {
       await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, decision.replyText);
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      sent = true;
     } else if (decision.action === "handoff") {
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      sent = true;
+    } else if (decision.action !== "suppressed") {
+      // "suppressed" = the engine intentionally stayed silent (agent owns the thread). Anything else
+      // is an upstream invariant break, e.g. auto_sent with an empty replyText: leave it to the sweep.
+      throw new Error(`cs webhook: no delivery branch matched for action=${decision.action}`);
     }
-    // "suppressed" — engine intentionally stayed silent (agent already owns the thread); no API call,
-    // sent stays false (correct: nothing was meant to be sent).
-    if (!sent && decision.action !== "suppressed") {
-      // Invariant violation, not a delivery failure — e.g. action==='auto_sent' but replyText was
-      // empty (orchestrator.ts is supposed to prevent this, but this route has no fallback of its
-      // own if that invariant is ever broken upstream). Visible in Sentry; response stays 200 because
-      // the claim already committed this message — a 5xx here would just make Chatwoot retry into
-      // the same claimed row forever.
-      Sentry.captureException(new Error(`cs webhook: no delivery branch matched for action=${decision.action}`), {
-        extra: { organizationId, conversationId, messageId },
-      });
-    }
-  } catch (err) {
-    // The DECISION was made and persisted (claimMessage + recordReply already committed it); only the
-    // Chatwoot-side delivery failed (network/API/expired token). This is exactly the failure mode the
-    // system's whole safety story ("when in doubt, hand off to a human," plan §8.4) is supposed to
-    // prevent — a silently-undelivered handoff is a customer who gets nothing. Chatwoot's own webhook
-    // retry will redeliver, but claimMessage above will correctly dedupe it (the row already exists),
-    // so a retry can NEVER recover this — Sentry is the only signal that this happened.
-    Sentry.captureException(err, { extra: { organizationId, conversationId, messageId, action: decision.action } });
-    return NextResponse.json({ ok: false, action: decision.action, error: err instanceof Error ? err.message : String(err) }, { status: 502 });
   }
-
-  return NextResponse.json({ ok: true, action: decision.action, sent });
+  await completeClaim(claim);
 }

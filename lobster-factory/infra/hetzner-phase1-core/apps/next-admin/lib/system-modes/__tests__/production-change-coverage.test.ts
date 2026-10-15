@@ -47,7 +47,9 @@ const ALLOWLIST: Record<string, string> = {
   "app/api/tools/studio/mockup/route.ts":
     "imports print-provider only for getCatalogVariants() (a read, used to resolve a mockup image variant) -- never calls a write function (createSyncProductOnNative / createDraftOrderOnNative / linkSyncVariant).",
   "lib/cs/chatwoot-client.ts":
-    "primitive Chatwoot HTTP transport -- not a call site; its one caller (app/api/webhooks/chatwoot/route.ts) gates before the AI pipeline, and the same functions are also called after an allowed gate, so the gate cannot live inside them.",
+    "primitive Chatwoot HTTP transport -- not a call site; app/api/webhooks/chatwoot/route.ts gates before the AI pipeline and also calls the same functions after an allowed gate, so the gate cannot live inside them.",
+  "lib/cs/sweep.ts":
+    "only posts a private note + hands the conversation to a human -- the exact action a blocking mode itself takes (webhooks/chatwoot/route.ts T27), never AI output.",
 };
 
 function walk(dir: string, out: string[]): void {

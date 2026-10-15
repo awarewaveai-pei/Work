@@ -10,3 +10,4 @@ export { tarotBatchGenerate } from "./tarot-batch-generate";
 export { siteWatchHeartbeat, siteWatchRun } from "./site-watch";
 export { collectResearchRun } from "./collect-research-run";
 export { podOrderInboxSweep } from "./pod-order-inbox-sweep";
+export { csInboundSweep } from "./cs-inbound-sweep";

@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-15（續14）Chatwoot webhook 先回應再處理：v4.18 AgentBot 5 秒逾時＋claim 完成標記＋5 分鐘 sweep（程式；部署見後續條目）
+
+**根因**：Chatwoot v4.18 `lib/webhooks/trigger.rb` `WEBHOOK_TIMEOUT` 預設 5 s，`handle_error` 逾時即 `conversation.open!`＋活動訊息「marked open by system due to an error with the agent bot」。`route.ts` 同步跑完整 pipeline 才回（CS_TIMEOUTS 最壞約 176 s，`lib/cs/config.ts:21-39`）→ 實測 Soulful conv 6：sidekiq `Net::ReadTimeout`（5.76 s）。
+**不變量**：claim 過的訊息只有兩種終局——結果已到 Chatwoot（回覆送出／轉真人／suppressed／無 Chatwoot 設定）或被 sweep 轉真人；絕不無聲遺失。舊 claim 佔位 `action='handoff'`（`lib/cs/db.ts` claimMessage）與真轉交無法分辨，`after()` 被切／送出失敗＝客人無人回、無人知（`after()` 2026-06-17 實測被切 `WORKLOG-archive/2026-06.md:4209`；prod 從未驗證跑完，`pod_order_inbox` 0 列）。
+**改動**：
+- migration 0099：`cs_ai_replies.completed_at`（NULL＝結果未送達）＋回填＋partial index（prod 表 4 列/64 kB）。
+- `route.ts`：claim → `after(runPipeline)` → 立即 200 `{accepted}`；`completeClaim` 只在送達後；送出／轉交失敗、無匹配分支 → throw → Sentry、留 NULL。mode-block／credit 路徑補 `recordReply`（舊版殘留佔位列）。
+- `lib/cs/db.ts`：`recordReply` 不再代表完成；`listUnfinishedClaims`／`completeClaim` 錯誤一律 throw（不偽裝成「無事」或「已關」）。
+- `lib/cs/sweep.ts`＋`POST /api/internal/cs/sweep`（`CS_SWEEP_TOKEN`）：>10 分未完成 → handoff（冪等）→ 私人筆記 → 條件式 complete；不重跑 AI；任何失敗 → 502／500 → Trigger run 失敗。
+- Trigger `cs-inbound-sweep`（*/5）；token 管線同 `POD_INBOX_SWEEP_TOKEN`（`trigger.config.ts`／`lobster-trigger-deploy.ps1`／repo compose）。
+- production-change-coverage ALLOWLIST 加 `lib/cs/sweep.ts`（只做筆記＋轉真人＝blocking mode 自身動作）。
+**Codex 兩輪**：R1 9 項 → 修 F9（送出失敗被標完成）、F4（recordReply 吞錯）、F2（重試重複筆記）、F5（查詢錯誤＝無事）；駁 F3（最壞 176 s ≪ 10 分）、F6/F7（prod 4 列、0 未覆寫佔位）、F1（claim 存在⇒當時有 config `route.ts:67`）、F8（部署步驟）。R2 1 項 → 修（completeClaim 寫失敗 vs 已關閉混用 false）。
+**不做**：調 `WEBHOOK_TIMEOUT`（補丁）；retrieval 0 時跳過 Opus（另一關注點）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin, workflows typecheck) && npx vitest run app/api/webhooks/chatwoot app/api/internal/cs lib/cs lib/system-modes/__tests__/production-change-coverage.test.ts（85 pass）+ workflows cs-inbound-sweep/syncEnvVarsParity/pod-order-inbox-sweep（12 pass） | exit=0 | ms=2000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/10m/0n -- Codex R1 `agency-os/reports/oracle/2026-10-15-partialreview-40d906e2.md`（9：修 4 駁 5）、R2 `2026-10-15-partialreview-509ba921.md`（1：修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=closeUnfinishedClaim | hits=0
+- ORACLE_WAIVED: R2 之後僅改 completeClaim 錯誤改 throw＋sweep 路由 failed→502（R2 那一項的窄修），由 3 個新測試鎖住；第三輪審查同段無新增範圍
 ## 2026-10-15（續13）C4＋懸空指標修正上正式：0096／0098 已套，next-admin `474fdb9ee` 已部署；頻道搬進 social_accounts，對帳全綠
 
 **做了**（操作者「15 項一直做到完成」授權，含「C4 時 0096 上正式」）:
