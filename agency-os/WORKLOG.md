@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-15（續35）認知平台：頁面載入的存在檢查改打輕量端點 `GET /exists/<kind>/{id}`（critic m3 from 續24；未部署）
+
+**根因**: 續24 的 middleware 為了回真 404，每次整頁載入專案／分析／群組／run 頁先 GET 完整讀取端點（`/projects/{id}` 連帶 analyses／tasks／reruns，`/interpretations/{id}` 讀整份 artifact），頁面在瀏覽器又讀一次；API 工作量加倍，上限 3 s。
+
+**做了**:
+- `ai_lego/apps/api/blocks/exists.py`（新）：四條路由，各自只依賴它的讀取路由依賴的東西、用同一個守衛、回同一個 404 body：`/exists/project/{id}`（`main._project_or_404`）、`/exists/interpretation/{id}`（新 `main._asked_interpretation_or_404`，任何狀態）、`/exists/group/{id}`（`groups.member_group`）、`/exists/method/{id}`（`catalog.is_resolvable`，不需登入，同 `/methods/{id}/form`）。204 = 在。
+- `main.py`：`GET /interpretations/{id}` 的擁有者檢查抽成 `_asked_interpretation_or_404`，讀取路由與 /exists 共用（不再兩份）。既有 `_interpretation_or_404` 只認已完成的分析，分析頁也顯示進行中／失敗的，所以不能用它。
+- web `lib/known-address.ts`：API 規則改打 `/exists/<kind>/<id>`；上限 3000 → 800 ms。
+- `tests/unit/test_exists_api.py`（新）：本人 204；同一組織的另一個人拿到的 404 與讀取路由逐字相同；未知 id 404；method 不登入也答、body 同 form；method catalog 壞掉時專案檢查照答。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_exists_api → Ran 2 OK | exit=0 | ms=10000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（拋棄式 git worktree D:/tmp/mut-exists*，已移除）：專案路由拿掉擁有者檢查 → 紅（errors=1；第一版測試用「別的組織」登入，突變仍綠＝租戶隔離擋掉、擁有者檢查沒被測到 → 改成同組織同事，才紅）；method 路由加 session 依賴 → 紅；專案路由加 catalog 依賴 → 紅；還原 → 綠 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=curl | cmd=本機 :3930（dev API 重啟後）：自己的專案／分析 200、未知分析／專案 404、`/projects/new` 200、`/projects/new/act` 404、暫時群組 200（之後 DELETE 抹除）、未知群組 404、run 200／404；`/exists/method/nope` 不帶 cookie 404 | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=e2e not-found-status.spec＋demos.spec（mock mode，:3930）→ 3 passed；web tsc 0、vitest 56 files / 468 passed | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run（最終版程式）→ Ran 1471 tests OK | exit=0 | ms=1520676
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - Codex `agency-os/reports/oracle/2026-10-15-partialreview-aee2c44a.md`：F1 `/exists/method` 要登入而 form 不用；F2 非 method 的檢查也先載入 method catalog，catalog 壞時專案檢查失敗（web 會放行成 200）。同一個根因：一條路由服務所有 kind，依賴取聯集。不變量：每個檢查只依賴它的讀取路由依賴的東西 → 拆成一個 kind 一條路由（上面），各一條測試，突變紅綠。
+- ORACLE_WAIVED: Codex 之後的改動只是把一條路由拆成四條（同樣的守衛）＋兩條測試；突變紅綠、e2e、affected 皆重跑
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory/infra/hetzner-phase1-core/tests | grep=_asked_interpretation_or_404|/exists/|DECIDE_TIMEOUT_MS|輕量端點 | hits=29
+  - 全是本筆新程式／測試；`TASKS.md` 那一行本筆移除。web 打 API 走 `COS_API_ORIGIN` 直連（同 `/catalog`），不經 nginx，不必改設定。
+
+**剩餘風險**: 未部署（High）。部署時 web 與 API 同一次 `deploy.sh`；若新 web 比新 API 早起，舊 API 對 `/exists` 回裸 404 `Not Found` → web 照 m2 規則放行（不是誤報 404）。800 ms：middleware 第一次載入 catalog（392 KB）若較慢，那一次工具頁不判定、照舊 200。
+
+**rollback**: `git revert`；已部署則主機 checkout 前一版重跑 `deploy/deploy.sh`。
 ## 2026-10-15（續34）Soulful 客服三層上線：next-admin `427d89e10` 部署、14 題問答＋AI 開啟、真 Messenger 驗收；轉真人確認句被 bot token 401 擋下（已修、待部署）
 
 **部署**（操作者「部署」；社群 C12 已先上 `4c4e153a7`，無 DEPLOY_HOLD）：`sg-deploy.sh next-admin` → build 239s、healthy 10s、smoke 5/5、`.deployed-commit=427d89e10`（10:46Z）；`playwright-runner -Mode smoke` 26 pass／0 fail。

@@ -627,6 +627,16 @@ def _interpretation_or_404(repo: ProjectSourceRepository, session: dict[str, Any
     return stored
 
 
+def _asked_interpretation_or_404(repo: ProjectSourceRepository, session: dict[str, Any], interpretation_id: str) -> tuple[list[dict[str, Any]], str]:
+    """An analysis in any state (asked, running, finished, failed) of one of the person's own cases: its events and its
+    case id. GET /interpretations/{id} and GET /exists/interpretation/{id} ask this one check."""
+    events = repo.interpretation_events(session["tenant_id"], interpretation_id)
+    project_id = events[-1]["aggregate_id"].removeprefix("project:") if events else None
+    if project_id is None or _owned_project(repo, session, project_id) is None:
+        raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {interpretation_id!r}")
+    return events, project_id
+
+
 def get_ai_provider() -> AiProvider | None:
     """``None`` = no key configured; /ai/* answers 503 AI_PROVIDER_UNCONFIGURED. Tests override this dependency."""
     return provider_from_env()
@@ -1983,10 +1993,7 @@ def get_interpretation(
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
     artifact_store: JsonArtifactStore = Depends(get_artifact_store),
 ) -> dict[str, Any]:
-    events = repo.interpretation_events(session["tenant_id"], interpretation_id)
-    project_id = events[-1]["aggregate_id"].removeprefix("project:") if events else None
-    if project_id is None or _owned_project(repo, session, project_id) is None:
-        raise HTTPException(status_code=404, detail=f"INTERPRETATION_NOT_FOUND: {interpretation_id!r}")
+    events, project_id = _asked_interpretation_or_404(repo, session, interpretation_id)
     requested = next((event["payload"] for event in events if event["event_type"] == "InterpretationRequested"), {})
     outcome = next((event for event in reversed(events) if event["event_type"] in ("InterpretationCreated", "InterpretationFailed")), None)
     shared = {"interpretation_id": interpretation_id, "project_id": project_id, "method_id": requested.get("method_id"), "revision": requested.get("revision"), "rerun_id": requested.get("rerun_id")}

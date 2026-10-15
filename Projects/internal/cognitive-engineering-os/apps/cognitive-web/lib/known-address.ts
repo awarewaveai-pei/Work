@@ -5,7 +5,8 @@ import { DEMO_FIXTURES, DEMOS, type DemoEntry } from "./toolsheets.generated";
 // Whether an address under app/(shell) names something that exists, asked by middleware.ts BEFORE the page renders:
 // (shell)/loading.tsx starts the response streaming, so a page's own notFound() still shows the not-found content but can
 // no longer change the status from 200 (crawlers, caches and monitors then keep it as a real page). Each rule asks exactly
-// what its page reads -- the same function, or the same API path with the visitor's cookie. true = it exists; false = it
+// what its page reads -- the same function, or the API's existence check for the same thing with the visitor's cookie
+// (GET /exists/<kind>/<id>, blocks/exists.py: the read route's own guard, without reading the case). true = it exists; false = it
 // does not (the middleware answers 404 and the page still renders its own not-found content); null = cannot tell here (API
 // down or slow, the session not accepted, an address with no rule): the page decides, status as before.
 // known-address.test.ts fails while a dynamic page under (shell) has no rule, or a rule would claim a static page.
@@ -13,7 +14,7 @@ export type Known = boolean | null;
 type Params = Record<string, string[]>;
 type Rule = { route: string; below?: boolean; except?: Record<string, string[]>; known: (params: Params, cookie: string) => Promise<Known> };
 
-const DECIDE_TIMEOUT_MS = 3000;   // every page load waits on this; past it the page answers as before
+const DECIDE_TIMEOUT_MS = 800;   // every page load waits on this (the /exists check is one indexed lookup); past it the page answers as before
 
 /** The demo a /projects/demo/<method>[/<domain>] address shows (the page and the rule ask this one function): no domain =
  *  the default domain's page, one domain = that domain's page; anything else, or a DEMOS entry without its fixture, = none. */
@@ -54,13 +55,13 @@ const one = (params: Params, name: string) => encodeURIComponent(params[name][0]
 // the rule's exact address).
 export const RULES: Rule[] = [
   { route: "/methods/[id]", known: async ({ id }) => { const catalog = await loadCatalog().catch(() => null); return catalog ? toolOf(catalog, id[0]) !== null : null; } },
-  { route: "/methods/[id]/run", known: (params, cookie) => probe(`/methods/${one(params, "id")}/form`, cookie, "METHOD_RESOLUTION_BLOCKED") },   // RunPage reads the tool's form
+  { route: "/methods/[id]/run", known: (params, cookie) => probe(`/exists/method/${one(params, "id")}`, cookie, "METHOD_RESOLUTION_BLOCKED") },   // RunPage reads the tool's form
   { route: "/learn/workflow/[id]", known: async ({ id }) => lessonOf(id[0], "workflow") !== null },
   { route: "/learn/[id]", known: async ({ id }) => lessonOf(id[0], "tool") !== null },
   { route: "/projects/demo/[method]/[[...domain]]", known: async ({ method, domain }) => demoOf(method[0], domain) !== null },
-  { route: "/projects/[id]/analyses/[analysis]", known: (params, cookie) => probe(`/interpretations/${one(params, "analysis")}`, cookie, "INTERPRETATION_NOT_FOUND") },   // AnalysisPage reads the analysis alone
-  { route: "/projects/[id]", below: true, except: { id: ["new"] }, known: (params, cookie) => probe(`/projects/${one(params, "id")}`, cookie, "PROJECT_NOT_FOUND") },
-  { route: "/groups/[id]", below: true, known: (params, cookie) => probe(`/groups/${one(params, "id")}`, cookie, "GROUP_NOT_FOUND") },
+  { route: "/projects/[id]/analyses/[analysis]", known: (params, cookie) => probe(`/exists/interpretation/${one(params, "analysis")}`, cookie, "INTERPRETATION_NOT_FOUND") },   // AnalysisPage reads the analysis alone
+  { route: "/projects/[id]", below: true, except: { id: ["new"] }, known: (params, cookie) => probe(`/exists/project/${one(params, "id")}`, cookie, "PROJECT_NOT_FOUND") },
+  { route: "/groups/[id]", below: true, known: (params, cookie) => probe(`/exists/group/${one(params, "id")}`, cookie, "GROUP_NOT_FOUND") },
 ];
 
 /** The parameters `route` takes from the decoded path segments `parts`, or null when it is not this route's address. */
