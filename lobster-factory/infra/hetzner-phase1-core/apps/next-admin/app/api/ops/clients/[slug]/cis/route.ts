@@ -8,6 +8,7 @@ import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { ClientConfig } from "@/app/api/ops/clients/route";
+import { sanitizeFaq } from "@/lib/cs/faq";
 
 // Length caps: these free-text fields get injected verbatim into the AI system prompt (lib/cs/cis.ts),
 // so bound them to avoid an admin bloating the prompt / JSONB row.
@@ -117,6 +118,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     if (Object.keys(merged).length) clientConfig.csVoice = merged;
     else delete clientConfig.csVoice;
   }
+  // csFaq: the editor always sends the whole list, so the list replaces what is stored ([] clears it).
+  const csFaq = "csFaq" in body ? sanitizeFaq(body.csFaq) : undefined;
+  if (csFaq) {
+    if (csFaq.length) clientConfig.csFaq = csFaq;
+    else delete clientConfig.csFaq;
+  }
 
   const nextMetadata = { ...metadata, client_config: clientConfig };
   const { error: writeErr } = await supabase.from("organizations").update({ metadata: nextMetadata }).eq("id", org.id);
@@ -131,8 +138,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     target_type: "organizations",
     target_id: org.id,
     trace_id: crypto.randomUUID(),
-    payload: { hasBrandKit: !!brandKit, hasCsVoice: !!csVoice, role_source: resolved.source },
+    payload: { hasBrandKit: !!brandKit, hasCsVoice: !!csVoice, csFaqEntries: csFaq?.length ?? null, role_source: resolved.source },
   });
 
-  return NextResponse.json({ ok: true, brandKit: brandKit ?? null, csVoice: csVoice ?? null });
+  return NextResponse.json({ ok: true, brandKit: brandKit ?? null, csVoice: csVoice ?? null, csFaq: csFaq ?? null });
 }

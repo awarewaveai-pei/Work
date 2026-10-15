@@ -414,3 +414,58 @@ describe("POST /api/webhooks/chatwoot -- handoff acknowledgement + name question
     expect(updateContactName).not.toHaveBeenCalled();
   });
 });
+
+describe("POST /api/webhooks/chatwoot -- free FAQ answers (no AI, no credit)", () => {
+  const FAQ = [{ id: "courses", keywords: ["課程"], answer: "我們有四個療癒模組" }];
+  const withFaq = () => loadCis.mockResolvedValue({ organizationId: ORG_ID, chatwoot: CHATWOOT_CONFIG, csEnabled: false, csFaq: FAQ });
+
+  it("a matching message gets the written answer; no credit, no AI, no handoff", async () => {
+    withFaq();
+    await post(makePayload({ content: "請問有哪些課程？" }));
+    await runAfter();
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", "我們有四個療癒模組");
+    expect(recordReply).toHaveBeenCalledWith({ ...CLAIM, action: "auto_sent", intentKey: "faq:courses", retrievedChunkIds: [] });
+    expect(completeClaim).toHaveBeenCalledWith(CLAIM);
+    expect(reserveCsCredit).not.toHaveBeenCalled();
+    expect(handleInbound).not.toHaveBeenCalled();
+    expect(handoffToHuman).not.toHaveBeenCalled();
+  });
+
+  it("an entry marked handoff answers and then hands over", async () => {
+    loadCis.mockResolvedValue({ organizationId: ORG_ID, chatwoot: CHATWOOT_CONFIG, csEnabled: false, csFaq: [{ ...FAQ[0], handoff: true }] });
+    await post(makePayload({ content: "請問有哪些課程？" }));
+    await runAfter();
+    expect(sendReply.mock.invocationCallOrder[0]).toBeLessThan(handoffToHuman.mock.invocationCallOrder[0]);
+    expect(recordReply).toHaveBeenCalledWith({ ...CLAIM, action: "handoff", intentKey: "faq:courses", retrievedChunkIds: [] });
+    expect(handleInbound).not.toHaveBeenCalled();
+    expect(completeClaim).toHaveBeenCalledWith(CLAIM);
+  });
+
+  it("no match: the normal path runs (here AI off -> handoff)", async () => {
+    withFaq();
+    handleInbound.mockResolvedValueOnce({ ...DEFAULT_DECISION, action: "handoff", replyText: undefined });
+    await post(makePayload({ content: "你好" }));
+    await runAfter();
+    expect(reserveCsCredit).toHaveBeenCalledTimes(1);
+    expect(handleInbound).toHaveBeenCalledTimes(1);
+    expect(handoffToHuman).toHaveBeenCalledTimes(1);
+  });
+
+  it("system mode blocked: no automatic answer (T27)", async () => {
+    withFaq();
+    checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "emergency_stop" });
+    await post(makePayload({ content: "請問有哪些課程？" }));
+    await runAfter();
+    expect(sendReply).not.toHaveBeenCalled();
+    expect(handoffToHuman).toHaveBeenCalledTimes(1);
+  });
+
+  it("the answer could not be sent: reported, claim left for the sweep", async () => {
+    withFaq();
+    sendReply.mockRejectedValueOnce(new Error("chatwoot_api_500"));
+    await post(makePayload({ content: "請問有哪些課程？" }));
+    await runAfter();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(completeClaim).not.toHaveBeenCalled();
+  });
+});

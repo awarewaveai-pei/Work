@@ -77,6 +77,8 @@ export interface ClientConfig {
   };
   // Per-tenant CS kill-switch (default ON). false = AI must not auto-reply; enforced in lib/cs/orchestrator.ts.
   csEnabled?: boolean;
+  // Free keyword answers (lib/cs/faq.ts), edited on the client page's 客服 tab.
+  csFaq?: { id: string; keywords: string[]; answer: string; handoff?: boolean }[];
 }
 
 export interface WpUpdateLatest {

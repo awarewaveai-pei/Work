@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-15（續26）Soulful 客服：知識庫重建、AI 關閉（零花費）、新增免費關鍵字問答自動回覆（問答程式未部署）
+
+**操作者決定**：「我要自動回覆 又不花錢」。AI 回答每則約 US$0.02（`ai_call_logs` 實測：Haiku 分類 0.0003＋Opus 生成 0.0181＋Haiku 監督 0.0020），操作者不接受 → AI 關、改純程式問答。
+**正式機已做（經操作者登入的 ops API，留稽核）**：
+- 知識庫：KB 0 筆的原因＝2026-09-17 操作者下令清空（`WORKLOG.md` 續8「清空兩客戶知識庫」），非故障。依操作者選「服務相關頁」加 21 個 `collect/http-html` 來源（`maxDepth:0`＝只讀該頁，`orchestrator.ts:122`；原首頁來源 maxDepth 1 上次跟連結抓 45 頁）→ 試跑 20 過（聯絡頁 too_short）→ 正式寫入 19 筆／568 塊。
+- 網站假內容封存 4 筆並停用其來源：`/support-faq/`（Lorem ipsum）、`/book-a-session/`（公開的頁面規劃稿，價格 NT$ xxx）、`/assessments/`（施工中）、首頁（後半是「首頁內容區塊建議」規劃稿）。有效 15 筆。**網站本身公開顯示這些草稿，操作者需自行處理**。
+- 意圖：Soulful 原本 0 個意圖 → 分類固定 general/0.5 < 預設門檻 0.8（`lib/cs/intent.ts:14`、`lib/cs/config.ts:37`）→ 有 KB 也必轉真人。設 courses_services／booking／products（L1 草稿、門檻 0.7）。真訊息實測：意圖 courses_services 0.95、檢索到 4 段皆正確（services、療癒模組），但最高分 0.458 < `minRetrievalScore` 0.5 → knowledge_gap 轉真人。根因＝中文問、英文網站，跨語言 cosine 天生偏低（`text-embedding-3-small`）；未調門檻。且 pipeline 先花 Opus 生成才檢查知識（續14 已記），該次 $0.018 白花。
+- `csEnabled=false`（`orchestrator.ts:81-86` 在任何 LLM 前轉真人）→ Soulful AI 零花費。
+- 測試對話 conv 4 已轉真人（open）→ 第一次測試被 `route.ts:90` human_owns_thread 正確忽略；我用 rails runner 結案（`message.rb:424-428`：有 bot 的 inbox 結案後再收訊息→pending）。
+**程式（next-admin，未部署，與社群 C12 同批）**：
+- `lib/cs/faq.ts`（新）：`matchFaq`＝含最多該題關鍵字的題目（NFKC＋小寫子字串），同分／無命中／`hitsSensitive` → null；`sanitizeFaq`（50 題、20 關鍵字、答案 1000 字、id 去重）。
+- `route.ts` runPipeline：系統模式閘之後、計點與 AI 之前；命中 → 送出答案、`recordReply(auto_sent|handoff, intentKey faq:<id>)`、complete；`handoff:true` 的題目答完再 `handoffToHuman`；送出失敗 throw → sweep。AI kill-switch 不擋問答（不是 AI）。
+- `cis.ts` 載入時 sanitize；`cis/route.ts` PATCH 收 `csFaq`（整份取代，[] 清空）；`ClientHubTabs.tsx` 客服分頁「常見問答自動回覆」編輯卡（關鍵字、答案、「答完也轉真人」勾選）；kill-switch 文案改為「停用後不呼叫 AI（不花錢）；常見問答照常」。
+- `lib/cs/autonomy.ts` `hitsAny` 改 NFKC：全形「ｒｅｆｕｎｄ」原可繞過紅線，AI 路徑（guardrails、tools）同一函式一併關閉。
+- 草稿 `agency-os/tenants/company-soulful-expression/core/cs-faq.json`（7 題，只寫網站有的事實；費用／時間／地點／退換貨＝handoff:true）。以真比對程式跑 13 句：課程→courses、費用多少→booking+轉真人、課程多少錢→同分轉真人、退款→紅線轉真人、你好→轉真人。
+**Codex**：`agency-os/reports/oracle/2026-10-15-partialreview-eb4e82c1.md` 1 項（全形繞過紅線）→ 修在共用 `hitsAny`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run app/api/webhooks/chatwoot lib/cs app/api/ops/clients lib/system-modes/__tests__/production-change-coverage.test.ts（198 pass）；突變：拔 hitsSensitive→1 紅、拔 NFKC→1 紅，還原綠；草稿 13 句真比對 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql cs_knowledge_sources（19 寫入、4 封存、15 有效）＋cs_ai_replies conv 5（courses_services 0.95、score 0.458、handoff）＋ai_call_logs 費用 | exit=0 | ms=2000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex eb4e82c1（1 修）
+- ORACLE_WAIVED: Codex 之後只加 R1 修正（hitsAny NFKC）與 `handoff` 旗標（送出後一個 handoffToHuman 呼叫），各有指名測試（faq.test full-width、route.test「an entry marked handoff」）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands | grep=csFaq|matchFaq|sanitizeFaq|hitsSensitive|hitsRedLine | hits=62（紅線比對全經 `hitsAny`：guardrails.ts:38、tools.ts:50、faq.ts，皆受 NFKC 修正）
+
+**rollback**：程式未部署。正式機：`csEnabled` 開回（客戶頁「啟用 AI 客服」）；封存的 4 筆在知識庫「封存」檢視可還原；來源停用為軟停用；意圖可在客服分頁刪除。
 ## 2026-10-15（續25）產品三扇門寫成 ADR 018＋SOP §18＋登記表欄位與測試；社群 C12 ⑥（使用者 id＋品牌成員表）、⑤ 程式面（social 這扇門）完成，未部署
 
 **做了**（操作者「先寫 ADR 017（三扇門＋買斷）、SOP 清單、products.ts 欄位＋測試，再做 ⑥、⑤」；017 號已是〈客戶怎麼買〉，改用 018）：

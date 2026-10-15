@@ -500,7 +500,7 @@
   - [x] Meta App 開發模式擋真客人訊息 → 隱私權政策改寫＋操作者按發佈切上線（免審，實測非角色帳號訊息送達）。見 WORKLOG 2026-10-15「Meta App 切上線模式」。
   - [x] Chatwoot v4.18 AgentBot 5 秒逾時 → webhook 先回應再處理＋claim 完成標記＋5 分鐘 sweep（a2adf459c／43ee9ad37）。見 WORKLOG 2026-10-15「CS webhook 先回應再處理」兩條。
   - [ ] **下一步（操作者 2026-10-15 同意順序）** ① 轉真人確認句＋問名字：程式在 main（`c3ef11ba9`），**未部署**。操作者 2026-10-15 決定：不單獨部署（sg-deploy 只能部署 main HEAD，會連帶上線還沒套 0100–0102 的社群 C5–C11），**跟社群 C12 同一次 sg-deploy 上線**（見本檔「社群發文 C12 上線」③）。部署後驗收：非角色帳號（John Doe）傳訊 → AI 轉真人 → 客人收到確認句＋問名字 → 回名字 → Chatwoot 聯絡人改名；`cs_ai_replies` 有 completed_at。見 WORKLOG 2026-10-15（續19）。② 再做下一項 KB。
-  - [ ] Soulful 知識庫 0 筆 → AI 一律轉真人；匯入 soulfulexpression.org 內容（操作者決定）。
+  - [ ] Soulful 自動回覆（零花費）：AI 已關（`csEnabled=false`，操作者「我要自動回覆 又不花錢」）；知識庫已重建 15 筆（AI 關閉時不使用）。免費關鍵字問答程式在 main 未部署 → **跟社群 C12 同一次部署**；部署後把 `agency-os/tenants/company-soulful-expression/core/cs-faq.json` 7 題貼進客戶頁「客服」→「常見問答自動回覆」（操作者先改答案），再用非角色帳號傳「請問你們有哪些療癒課程？」驗收自動回答。網站 `/book-a-session/`、`/support-faq/`、`/assessments/`、首頁後半公開顯示規劃稿／假字（操作者處理）。見 WORKLOG 2026-10-15「Soulful 客服：知識庫重建、AI 關閉」。
   - [ ] 客人最後訊息 >24h 後無法回覆（`ENABLE_MESSENGER_CHANNEL_HUMAN_AGENT`=false）；要開需 Meta App Review `HUMAN_AGENT`＋等上游 PR #15932 釋出（現版開了會連 bot 回覆都標 tag）。
   - [ ] `safe-infra-patch.sh compose` 寫死 `cd /root/lobster-phase1`（server 版第 85 行），`/root/chatwoot`、`postiz` 等獨立 compose 專案無法走此閘；本次手動等價（備份→套用→健康→回滾路徑）。
 

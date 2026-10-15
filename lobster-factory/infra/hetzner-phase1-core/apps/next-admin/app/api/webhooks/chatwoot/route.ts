@@ -5,6 +5,7 @@ import { loadCis } from "@/lib/cs/cis";
 import { claimMessage, completeClaim, findOrganizationIdByChatwootAccountId, recordReply } from "@/lib/cs/db";
 import { getContactName, handoffToHuman, listMessages, sendPrivateDraft, sendReply, updateContactName, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
 import { handoffAckText, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
+import { matchFaq } from "@/lib/cs/faq";
 import { reserveCsCredit } from "@/lib/cs/billing";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
@@ -153,6 +154,17 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
       await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, `AI 暫停：系統處於 ${modeGate.mode} 模式，已轉真人`).catch(() => undefined);
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
     }
+    await completeClaim(claim);
+    return;
+  }
+
+  // Operator-written answers: plain keyword matching, no model call, so no credit either (lib/cs/faq.ts).
+  // A failed send throws and leaves the claim to the sweep, like every other delivery here.
+  const faq = cis.chatwoot ? matchFaq(cis.csFaq ?? [], inbound.text) : null;
+  if (faq && cis.chatwoot) {
+    await sendReply(organizationId, cis.chatwoot, conversationId, faq.answer);
+    if (faq.handoff) await handoffToHuman(organizationId, cis.chatwoot, conversationId);
+    await recordReply({ ...claim, action: faq.handoff ? "handoff" : "auto_sent", intentKey: `faq:${faq.id}`, retrievedChunkIds: [] });
     await completeClaim(claim);
     return;
   }

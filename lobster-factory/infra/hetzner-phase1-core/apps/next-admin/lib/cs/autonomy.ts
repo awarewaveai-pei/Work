@@ -10,9 +10,10 @@ import type {
   Intent,
 } from "@/lib/cs/types";
 
+// NFKC first: full-width "ｒｅｆｕｎｄ" must hit "refund" (Codex 2026-10-15, partialreview-eb4e82c1).
 function hitsAny(text: string, keywords: readonly string[]): boolean {
-  const t = text.toLowerCase();
-  return keywords.some((k) => t.includes(k.toLowerCase()));
+  const t = text.normalize("NFKC").toLowerCase();
+  return keywords.some((k) => t.includes(k.normalize("NFKC").toLowerCase()));
 }
 
 /** A3 red-line: money / identity / legal / medical. Matched anywhere ⇒ hard handoff. */

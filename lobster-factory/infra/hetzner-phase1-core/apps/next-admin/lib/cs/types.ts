@@ -139,6 +139,15 @@ export interface ChatwootConfig {
   baseUrl: string;
 }
 
+/** One operator-written automatic answer (client_config.csFaq; matched by lib/cs/faq.ts, no AI). */
+export interface CsFaqEntry {
+  id: string;
+  keywords: string[];
+  answer: string;
+  /** Also hand the conversation to a human after answering (booking, prices: a person must follow up). */
+  handoff?: boolean;
+}
+
 /** Resolved CIS for one tenant (VI colours + BI/MI voice), loaded from org metadata. */
 export interface CisProfile {
   organizationId: string;
@@ -147,6 +156,8 @@ export interface CisProfile {
   /** Per-tenant kill-switch (client_config.csEnabled). Default ON; false = AI must not auto-reply. */
   csEnabled?: boolean;
   chatwoot?: ChatwootConfig;
+  /** Free keyword answers, checked before any AI work (lib/cs/faq.ts). */
+  csFaq?: CsFaqEntry[];
 }
 
 // ── Offline eval (golden set → graduation gate, plan §5.2) ────────────────────

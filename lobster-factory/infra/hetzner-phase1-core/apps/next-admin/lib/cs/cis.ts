@@ -6,6 +6,7 @@
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { RetrievedChunk } from "@/lib/kb/types";
 import type { ChatwootConfig, CisProfile, CsVoice } from "@/lib/cs/types";
+import { sanitizeFaq } from "@/lib/cs/faq";
 
 /** Load CIS for one tenant. Degrades to an empty profile (defaults applied downstream). */
 export async function loadCis(organizationId: string): Promise<CisProfile> {
@@ -28,7 +29,8 @@ export async function loadCis(organizationId: string): Promise<CisProfile> {
     cw && typeof cw.accountId === "number" && typeof cw.baseUrl === "string"
       ? { accountId: cw.accountId, baseUrl: cw.baseUrl }
       : undefined;
-  return { organizationId, brandColors, csVoice, csEnabled, chatwoot };
+  const csFaq = sanitizeFaq(cc.csFaq);
+  return { organizationId, brandColors, csVoice, csEnabled, chatwoot, csFaq };
 }
 
 const SAFETY_PREAMBLE = [

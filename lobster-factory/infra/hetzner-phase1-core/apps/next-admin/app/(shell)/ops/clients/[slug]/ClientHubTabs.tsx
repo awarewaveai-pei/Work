@@ -1101,6 +1101,69 @@ const badge = (bg: string, fg: string, text: string) => (
   <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 5, background: bg, color: fg, whiteSpace: "nowrap" }}>{text}</span>
 );
 
+type FaqDraft = { id: string; keywords: string; answer: string; handoff: boolean };
+
+/** Free automatic answers (lib/cs/faq.ts): keyword match, sent as written, no AI and no credit. */
+function CsFaqCard({ slug, initial }: { slug: string; initial?: ClientConfig["csFaq"] }) {
+  const [rows, setRows] = useState<FaqDraft[]>(
+    (initial ?? []).map((e) => ({ id: e.id, keywords: e.keywords.join("、"), answer: e.answer, handoff: e.handoff === true })),
+  );
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const update = (i: number, patch: Partial<FaqDraft>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
+
+  async function save() {
+    setSaving(true); setMsg(null);
+    try {
+      await patchCis(slug, { csFaq: rows.map((r) => ({
+        id: r.id,
+        keywords: r.keywords.split(/[,，、\n]/).map((k) => k.trim()).filter(Boolean),
+        answer: r.answer,
+        handoff: r.handoff,
+      })) });
+      setMsg("✓ 已儲存。少了關鍵字或答案的題目不會存。");
+    } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
+  }
+
+  const field = { fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)",
+    background: "var(--bg-canvas)", color: "var(--text-primary)", fontFamily: "inherit" } as const;
+
+  return (
+    <Card title={`常見問答自動回覆（${rows.length}）`}>
+      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px", lineHeight: 1.6 }}>
+        客人的訊息含有某一題的關鍵字，就直接送出那一題的答案。不經過 AI，不花錢。
+        兩題一樣符合、或訊息提到退款／投訴／法律等，會轉真人。關鍵字用頓號或逗號分開。
+      </p>
+      {rows.map((r, i) => (
+        <div key={r.id || i} style={{ borderTop: "1px solid var(--card-border)", padding: "8px 0", display: "grid", gap: 6 }}>
+          <input value={r.keywords} onChange={(e) => update(i, { keywords: e.target.value })}
+            placeholder="關鍵字，例如：課程、療癒模組、上課" style={field} />
+          <textarea value={r.answer} onChange={(e) => update(i, { answer: e.target.value })} rows={3}
+            placeholder="送給客人的答案" style={{ ...field, resize: "vertical" }} />
+          <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)" }}>
+            <input type="checkbox" checked={r.handoff} onChange={(e) => update(i, { handoff: e.target.checked })} />
+            答完也轉真人（預約、費用這類要有人接手的問題）
+          </label>
+          <button onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
+            style={{ ...cisBtnStyle, marginTop: 0, justifySelf: "start", background: "transparent", color: "var(--red)", border: "1px solid var(--red)" }}>
+            刪除這題
+          </button>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button onClick={() => setRows((rs) => [...rs, { id: "", keywords: "", answer: "", handoff: false }])}
+          style={{ ...cisBtnStyle, background: "transparent", color: "var(--accent)", border: "1px solid var(--accent)" }}>
+          ＋ 新增一題
+        </button>
+        <button onClick={save} disabled={saving} style={{ ...cisBtnStyle, opacity: saving ? 0.6 : 1 }}>
+          {saving ? "儲存中…" : "儲存問答"}
+        </button>
+      </div>
+      {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
+    </Card>
+  );
+}
+
 // ── Customer service tab ──────────────────────────────────────────────────────
 
 type CsIntentRow = {
@@ -1144,7 +1207,7 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
       const data = (await res.json()) as { ok?: boolean; error?: string; csEnabled?: boolean };
       if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
       setCsEnabled(data.csEnabled ?? next);
-      setMsg(next ? "✓ 已啟用此客戶 AI 客服" : "✓ 已停用（kill-switch）— AI 不再自動回覆此客戶");
+      setMsg(next ? "✓ 已啟用此客戶 AI 客服" : "✓ 已停用 AI（不花錢）— 常見問答仍會自動回覆，其他訊息轉真人");
     } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
   }
 
@@ -1179,7 +1242,7 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
     <>
       <Card title={csEnabled ? "🟢 AI 客服：啟用中" : "🔴 AI 客服：已停用 (kill-switch)"}>
         <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-          每租戶 kill-switch（停用後此客戶的對話一律轉真人，不自動回覆）。意圖層級與全域開關另在「客服營運中心」。
+          每租戶 kill-switch：停用後不呼叫 AI（不花錢），沒有命中常見問答的訊息一律轉真人；常見問答自動回覆照常。意圖層級與全域開關另在「客服營運中心」。
         </p>
         <button onClick={toggleKill} disabled={saving}
           style={{ ...cisBtnStyle, background: csEnabled ? "var(--red)" : "var(--accent)", opacity: saving ? 0.6 : 1 }}>
@@ -2840,7 +2903,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "品牌識別" && <BrandIdentityTab org={org} cfg={cfg} />}
         {activeTab === "知識庫" && <KnowledgeTab org={org} researchBridgesEnabled={props.researchBridgesEnabled} />}
         {activeTab === "資料蒐集" && <CollectionTab org={org} />}
-        {activeTab === "客服" && <CustomerServiceTab org={org} />}
+        {activeTab === "客服" && <><CsFaqCard slug={org.slug} initial={cfg.csFaq} /><CustomerServiceTab org={org} /></>}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
         {activeTab === "憑證庫" && <CredentialsTab org={org} />}
         {activeTab === "冷開發" && <OutreachTab org={org} />}
