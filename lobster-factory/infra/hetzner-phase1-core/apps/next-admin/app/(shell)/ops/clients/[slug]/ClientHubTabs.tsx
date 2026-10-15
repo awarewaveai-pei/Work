@@ -2075,7 +2075,7 @@ function SocialChannelsTab({ org }: Pick<ClientHubTabsProps, "org">) {
         }),
       });
       if (!res.ok) {
-        if (res.status === 409) throw new Error("已連結");
+        if (res.status === 409) throw new Error("這個頻道已經連結到一個品牌了，可能是這位客戶，也可能是其他客戶。");
         if (res.status === 403) throw new Error("權限不足");
         if (res.status === 404) throw new Error("找不到帳號或客戶");
         throw new Error(`連結失敗 (${res.status})`);

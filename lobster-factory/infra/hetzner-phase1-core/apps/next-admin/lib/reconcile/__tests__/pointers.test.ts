@@ -30,15 +30,15 @@ describe("cross-product pointers", () => {
 
   it("a check that cannot reach its owner is an error, never a clean pass", async () => {
     vi.mocked(postiz.listAllIntegrations).mockRejectedValueOnce(new Error("Postiz /integrations returned 502"));
-    const [r] = await runChecks(stubDb({ social_postiz_connections: [{ id: "r1", postiz_integration_id: "i1" }] }), [CHECKS[0]]);
+    const [r] = await runChecks(stubDb({ social_accounts: [{ id: "r1", postiz_integration_id: "i1" }] }), [CHECKS[0]]);
     expect(r).toMatchObject({ id: "postiz-integrations", error: "Postiz /integrations returned 502" });
   });
 
   it("reads every row past PostgREST's 1000-row cap", async () => {
     const many = Array.from({ length: 1001 }, (_, i) => ({ id: `r${i}`, postiz_integration_id: `i${i}` }));
     vi.mocked(postiz.listAllIntegrations).mockResolvedValueOnce(many.slice(0, 1000).map((r) => ({ id: r.postiz_integration_id })) as never);
-    const [r] = await runChecks(stubDb({ social_postiz_connections: many }), [CHECKS[0]]);
+    const [r] = await runChecks(stubDb({ social_accounts: many }), [CHECKS[0]]);
     expect(r.checked).toBe(1001);
-    expect(r.dangling).toEqual([{ where: "social_postiz_connections r1000", id: "i1000" }]);
+    expect(r.dangling).toEqual([{ where: "social_accounts r1000", id: "i1000" }]);
   });
 });

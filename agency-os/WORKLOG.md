@@ -1,4 +1,58 @@
 # Worklog
+## 2026-10-15（續12）C4 社群 API：品牌層授權、唯一一處狀態規則、原子寫入（0098）、連接帳號配對；兩份審查加複查（2C／11M）全修；舊表讀寫搬到 social_accounts
+
+**做了**:
+- `packages/db/migrations/0098_social_writes.sql`（新）：
+  - `social_save_post`：貼文、targets、media 一次寫，version compare-and-set，加 audit。子列用 upsert。
+  - 不變量（三輪審查後寫成檔頭）：送出時帶著的內容是既成事實。任一 target 進入 queued／published 後，已送的 target 列，以及貼文的 body、第一則留言、連結、媒體集合（含順序和替代文字）都不能改。帶 Postiz id 的 target 不能被存檔移除。失敗的 target 可以改。同一帳號或媒體在輸入裡出現兩次 → 22023。
+  - `social_set_state`：改狀態加 audit。
+  - `social_save_list`：清單連同帳號一個 transaction 存。
+  - `social_connect_attempts`：每個品牌同時只能有一個進行中的連接；新頻道的連接整台 Postiz 同時只能一個。
+  - SC404／SC409；只給 service_role。另有 down 腳本和本機驗證。
+- `0096_social_manager.sql`（已 commit、未套正式）：
+  - `list_position` 只存在於 rotation 狀態。
+  - 已發佈的貼文在清單刪除時，`list_id` 可以變成 null。
+  - 本機驗證加 q4／q5。
+- next-admin `lib/social/`：
+  - `state.ts`：10 個動作 × 8 個狀態 × 4 個角色的唯一規則表。除了 to_rotation，所有動作都清掉清單欄位；approve／schedule／publish_now 要至少一個頻道，而且有內容。
+  - `authz.ts`：V1 規則。沒有 `x-ops-user-kind` 一律不准。
+  - `store.ts`：
+    - `getPostAt`：版本不符回 409。
+    - `pickFreshIntegration`：配對新頻道時，排除已經屬於任何品牌的 integration。
+    - 每一筆寫入都檢查錯誤。
+    - 新增 `cancelConnect`；`listPosts` 分頁讀完。
+  - 其餘：`limits.ts`、`posts.ts`（targets 上限 100、media 上限 20、media 去重）、`lists.ts`、`http.ts`。
+- 路由 `app/api/social/`：brands、accounts（GET 配對；POST 回 OAuth 網址；DELETE 是解除綁定或 `?attempt` 取消）、posts（`wp=1` 要 editor 以上）、posts/[id]、posts/[id]/state、posts/bulk、lists、lists/[id]、media、log。
+- `lib/collect/net/remote-file.ts`（新）：`postiz.ts` 的 uploadMedia／uploadVideo 改走 collect 的 fetcher。每一跳都檢查位址、連線綁定 IP、串流讀取並限制位元組。原本的 regex 防護已刪除；它擋不了 IPv6、`100.64/10`、DNS 指向內網和 redirect。
+- `lib/supabase-paging.ts`（新）：`selectAll`，`lib/reconcile` 和 social 共用。
+- `lib/content/wp-calendar.ts`：從 calendar route 抽出來共用。
+- 舊表退場前一步：`social-admin/connections`、`listIntegrations`、`lib/reconcile` 改讀寫 `social_accounts`。另修兩處：label 遇到 `''` 會退回顯示名稱；409 的文字改成「已連結到一個品牌」。
+- 文件：
+  - ADR 016 §4 補上配對規則和重新連接的限制。
+  - POSTIZ-OPS-RUNBOOK §8 加一條：有品牌正在連接時，不要在 Postiz 介面加頻道。
+  - SOCIAL_MANAGER_PLAN：C5 交代部分已送與鎖順序；C6 要做垃圾桶的 API；C7 的冪等靠 cursor；C8 先決定審核是否必經；C12 對外前要固定錯誤文字並處理 GET 寫入。
+
+**審查**:
+- critic 第一輪：C1 錯品牌綁頻道；M1 驗證的版本和寫入的版本不同；M2 SSRF；M3 清單不是原子操作；M4 清單欄位殘留；M5 存檔抹掉回寫，會造成重發；M6 帳號頁被鎖死；另有 11 項 minor。
+- critic 複查：上述全關。新增 N1（M）：M5 的修法讓失敗的 target 永遠不能重試；N2：沒排時間的貼文沒有上限。兩項都已修。
+- db-expert 第一輪：C1 同上；M1 子列先刪後插；M2／M3 清單刪不掉；M4 down 腳本缺 lock_timeout 和 ledger；另有 5 項 minor。
+- db-expert 複查兩輪：全關。新增三項，各自處理：
+  - 重複帳號可以繞過檢查 → 已修。
+  - 送出後還能換媒體、帶 Postiz id 的失敗 target 可以被移除 → 寫成上面的不變量後一次關掉。
+  - 主張保留 C7 副本的 `list_id` → 不採用。人動過的副本就是手動貼文，C7 卡片已寫明暫停時不撤回；撤回會悄悄蓋掉人的修改。
+- 延後並寫進對應卡片：n1／n2 → C12、n5 → C8、n7 → C5、n11 → C6。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash packages/db/scripts/0096_social_manager-local-verify.sh ＋ 0098_social_writes-local-verify.sh → 兩個 ✅（含 commit 時的 deferred FK、函式預設權限、down、re-apply、idempotent） | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/social lib/social lib/collect/__tests__/remote-file.test.ts lib/collect/__tests__/collect-block-hygiene.test.ts lib/reconcile lib/content app/api/content lib/cognitive-os → 全綠；npx tsc --noEmit 無輸出 | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=拋棄式 worktree 突變：拔掉 pickFreshIntegration 的 `!owned.has` → store.test 2/2 紅、還原後 2/2 綠；拔掉 `social_connect_attempts_new_channel_idx` → 0098 驗證「two brands connecting a new channel at once was accepted」紅、還原後 ✅ | exit=0 | ms=150000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=2c/11m/21n（critic 1c/7m/12n；db-expert 1c/4m/9n），複查後全關或寫進對應卡片
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,runbooks | grep=social_postiz_connections | hits=77
+- ORACLE_WAIVED: critic＋db-expert（Claude 子代理）兩份獨立審查＋複查
+
+- 正式套用 0096＋0098、部署 next-admin：另寫一筆紀錄（commit 之後）。
+
+**rollback**: next-admin `git revert`＋sg-deploy；資料庫先撤 app，再 `scripts/0098_social_writes_down.sql`，再 `0096_social_manager_down.sql`（0011 舊表沒動過）。
 ## 2026-10-15（續11）Cognitive 19 個懸空專案指標：根因＝10/02 操作者核准抹除；匯入改成重用前先向 Cognitive OS 確認；19 筆依操作者決定改回「未匯入」
 
 **根因**:

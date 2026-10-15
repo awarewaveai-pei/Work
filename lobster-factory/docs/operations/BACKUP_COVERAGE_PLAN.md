@@ -67,7 +67,7 @@ R2 保存規則（2026-10-14 讀 `GET /r2/buckets/lobster-backup/lifecycle`）�
 - 驗收：每天一次；故意放一個不存在的編號 → 報警。
 - 做法：next-admin `lib/reconcile/pointers.ts` 每種指標一塊（我們存的 id ↔ 對方 API 列出的 id），`GET /api/internal/reconcile`（自己的 `RECONCILE_TOKEN`）；B2 每天呼叫，每塊一列，掛不到對方或有懸空 id ＝ FAIL。
 - 2026-10-15 盤點 30 種跨產品指標（主庫→他產品 23、他產品→主庫 7），第一版查有寫入程式又有列表 API 的兩塊：
-  - `postiz-integrations`：`social_postiz_connections.postiz_integration_id`（prod 3 筆）↔ Postiz `GET /public/v1/integrations`。C4 上 0096 後加 `social_accounts`。
+  - `postiz-integrations`：`social_accounts.postiz_integration_id`（social manager C4 起；之前是 0011 的 `social_postiz_connections`，prod 3 筆）↔ Postiz `GET /public/v1/integrations`。
   - `cognitive-os-projects`：`organizations.metadata.cognitive_os_import_project_id`（1）、`cs_knowledge_sources`（18）、`cs_knowledge_folders`（0）的 `cognitive_os_project_id` ↔ Cognitive OS `GET /projects`。還原後兩邊 dump 時間不同（02:17／02:30），中間建的專案會懸空。
 - 不查，理由：Chatwoot `accountId`（2 筆；vault 只有 AgentBot token，Chatwoot 只准它呼叫對話端點，讀不到帳號；要管理員 token 才能查）；HCI `hci_source_id`（HCI 沒有列表 API，`/seeds` 只回 DISCOVERED）；`external_tenant_id`、Clerk、FluentCRM、`postiz_workspace_id`、`cs_customer_memory.contact_ref`（沒有程式寫入）；Sentry／PostHog／GitHub／Supabase Cloud／Stripe／Woo／Trigger run id（外部 SaaS 或事件紀錄，不是會被我們還原的資料）；MainWP site id 只在 repo 檔，不在主庫。
 

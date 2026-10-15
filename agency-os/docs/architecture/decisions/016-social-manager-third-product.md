@@ -36,6 +36,8 @@
 ### 4. 帳號連接
 
 - 我們的設定頁 → `GET /social/{platform}`（Postiz connect API）拿授權網址 → 使用者跳去授權 → 回到 Postiz → 我們輪詢 `GET /integrations` 把新出現的 integration 歸到發起連接的品牌（Postiz 不回報歸屬，所以由我們記「誰在幾分幾秒按了連接哪個平台」來配對；同一品牌同時只允許一個連接進行中）。重新連接走 `?refresh=`。
+- 配對規則（2026-10-15 審查後，`0098_social_writes.sql` 檔頭為準）：所有品牌共用一個 Postiz workspace，所以「新頻道」的連接整台 Postiz 同時只能一個（兩個同時進行分不出誰是誰）；已屬於任何品牌的 integration 不參與配對。連接進行中時，如果有人直接在 Postiz 介面加同平台的頻道，也會被配給發起的品牌，所以頻道一律從我們的畫面連（runbook §8）。
+- 重新連接：Postiz 公開 API 只給 `disabled`，看不出授權有沒有真的換新；帳號狀態以 C5 的發送結果為準。
 - 帳號狀態每天對帳一次（`disabled:true` → `expired`）＋發 Telegram（runbook §3 的 v2 項目在此落地）。
 
 ### 5. 介面

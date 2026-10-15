@@ -115,10 +115,16 @@ BEGIN
   INSERT INTO public.social_posts (organization_id, body, state, list_id, scheduled_at, created_by) VALUES (a, 'q1', 'scheduled', list_a, '2026-10-19 10:00+08', 'rotation');
   PERFORM pg_temp.must_fail(format($q$INSERT INTO public.social_posts (organization_id, body, state, list_id, scheduled_at, created_by)
     VALUES (%L, 'q1', 'scheduled', %L, '2026-10-19 10:00+08', 'rotation')$q$, a, list_a), '23505', 'the same list slot materialised twice');
+  PERFORM pg_temp.must_fail(format($q$INSERT INTO public.social_posts (organization_id, body, state, list_id, list_position, created_by)
+    VALUES (%L, 'q5', 'draft', %L, 2, 'test')$q$, a, list_a), '23514', 'a list position outside rotation');
+  -- a materialised post that was then published: the list can still be deleted (review 2026-10-15 M3)
+  INSERT INTO public.social_posts (organization_id, body, state, list_id, scheduled_at, published_at, created_by)
+    VALUES (a, 'q4', 'published', list_a, '2026-10-21 10:00+08', '2026-10-21 10:00+08', 'rotation');
   PERFORM pg_temp.must_fail(format($q$DELETE FROM public.social_lists WHERE id = %L$q$, list_a), '23514', 'deleting a list that still holds items');
   DELETE FROM public.social_posts WHERE list_id = list_a AND state = 'rotation';
   DELETE FROM public.social_lists WHERE id = list_a;
   ASSERT (SELECT list_id FROM public.social_posts WHERE body = 'q1' AND state = 'scheduled') IS NULL, 'materialised post outlives its list';
+  ASSERT (SELECT list_id FROM public.social_posts WHERE body = 'q4') IS NULL, 'a published materialised post outlives its list';
 
   -- audit log is append-only even for the owner role
   INSERT INTO public.social_audit_log (organization_id, actor, action, post_id) VALUES (a, 'test', 'schedule', post_b);

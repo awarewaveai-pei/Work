@@ -6,7 +6,8 @@
 --     by (id, organization_id), so a post can never target another brand's account or use another brand's media.
 --   * One Postiz integration belongs to exactly one brand: unique (postiz_instance, postiz_integration_id).
 --     (0011 allowed the same integration under two orgs.) postiz_instance lets a second Postiz host join later.
---   * State shape: scheduled/queued/published need scheduled_at; rotation needs list_id+list_position and no time;
+--   * State shape: scheduled/queued/published need scheduled_at; rotation needs list_id+list_position and no time, and
+--     list_position exists only in rotation (leaving rotation clears it, so a list can always be deleted once empty);
 --     published needs published_at and published_at implies published or deleted; deleted needs deleted_at.
 --     Transitions themselves live in one place in the app (lib/social/state.ts, plan C4).
 --   * Once published_at is set the post's content and its targets/media are frozen (platforms cannot be edited from
@@ -110,7 +111,7 @@ create table if not exists public.social_posts (
   foreign key (list_id, organization_id) references public.social_lists (id, organization_id) on delete set null (list_id),
   check (state not in ('scheduled', 'queued', 'published') or scheduled_at is not null),
   check (state <> 'rotation' or (list_id is not null and list_position is not null and scheduled_at is null)),
-  check (list_position is null or list_id is not null),
+  check ((list_position is not null) = (state = 'rotation')),
   check (state <> 'published' or published_at is not null),
   check (published_at is null or state in ('published', 'deleted')),
   check ((state = 'deleted') = (deleted_at is not null)),
@@ -221,7 +222,8 @@ begin
     or new.published_at is distinct from old.published_at
     or new.body is distinct from old.body or new.scheduled_at is distinct from old.scheduled_at
     or new.first_comment is distinct from old.first_comment or new.link_url is distinct from old.link_url
-    or new.link_utm is distinct from old.link_utm or new.list_id is distinct from old.list_id) then
+    or new.link_utm is distinct from old.link_utm
+    or (new.list_id is distinct from old.list_id and new.list_id is not null)) then   -- deleting its list may null it
     raise exception 'social post % was published; copy it instead of editing', old.id using errcode = 'check_violation';
   end if;
   return new;

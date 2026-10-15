@@ -45,7 +45,7 @@ curl -s "https://postiz.aware-wave.com/api/public/v1/integrations" \
 
 ```bash
 # 從 SG SSH 進去，用 Supabase REST 查
-curl -s "https://supabase.aware-wave.com/rest/v1/social_postiz_connections?select=*" \
+curl -s "https://supabase.aware-wave.com/rest/v1/social_accounts?select=*" \
   -H "apikey: <SERVICE_ROLE_KEY>" \
   -H "Authorization: Bearer <SERVICE_ROLE_KEY>"
 ```
@@ -205,6 +205,8 @@ curl -X DELETE "https://postiz.aware-wave.com/api/public/v1/posts/cmqo1wijz0005p
 
 **前提**：平台 OAuth app 審核通過（Meta/LinkedIn/Reddit 需提交 → 見 Task 2，並行中）。
 
+**社群管理 C4 上線後**：有品牌正在連接新頻道時（最長 15 分鐘），不要在 Postiz 介面加新頻道，否則它會被配給發起連接的那個品牌（ADR 016 §4）。先確認 `GET /api/social/accounts?brand=<id>` 回的 `connecting` 是 null，或用 `DELETE /api/social/accounts?brand=<id>&attempt=<id>` 取消那個連接。
+
 **步驟**：
 
 1. **Postiz UI 連接新整合**：
@@ -227,7 +229,7 @@ curl -X DELETE "https://postiz.aware-wave.com/api/public/v1/posts/cmqo1wijz0005p
    - 只要 state 存在 Redis 就能連，跟哪個瀏覽器發起無關：`connectSocialMedia` 只查 `login:<state>`（TTL 300 秒），code 換 token 不驗 state。
    - 做法：已登入 Postiz 的瀏覽器 `fetch('/api/integrations/social/facebook')` 產生 state → 主機 `redis-cli --scan --pattern 'login:*'` 找最新的 → 在粉專擁有者的瀏覽器開 `https://www.facebook.com/v20.0/dialog/oauth?client_id=…&redirect_uri=<encoded …/integrations/social/facebook>&state=<state>&scope=<facebook.provider.js 的 scopes>` → 一路繼續。callback 會被導到 `/auth`（未登入，不會消耗 code）→ 從主機 `/var/log/nginx/` grep `integrations/social/facebook?code` 取 code → 在已登入 Postiz 的瀏覽器開 `/integrations/social/facebook?code=<code>&state=<state>` → 選粉專 → Save。
    - state 過期就重新 fetch 一個，code 用新 state 帶過去即可（code 約 10 分鐘內有效、只能用一次）。
-   - 驗證：`GET /public/v1/integrations` 出現該粉專且 `disabled:false`，再寫 `social_postiz_connections`。
+   - 驗證：`GET /public/v1/integrations` 出現該粉專且 `disabled:false`，再到社群頻道 tab 把它連給客戶（寫入 `social_accounts`）。
 
 ---
 
@@ -240,7 +242,7 @@ curl -X DELETE "https://postiz.aware-wave.com/api/public/v1/posts/cmqo1wijz0005p
 ### v2 計畫（待實作）
 - Trigger.dev 每週跑整合健康 check → Telegram 告警
 - `x-ratelimit-remaining` 低於 5 時 server log warning
-- 連線狀態寫入 `social_postiz_connections.status`（改為動態，目前固定 `'connected'`）
+- 連線狀態寫入 `social_accounts.status`（social manager C5：以送出結果為準）
 
 ---
 
@@ -251,7 +253,7 @@ curl -X DELETE "https://postiz.aware-wave.com/api/public/v1/posts/cmqo1wijz0005p
 curl -s "https://postiz.aware-wave.com/api/public/v1/integrations" -H "Authorization: $POSTIZ_API_KEY"
 
 # 查客戶連線（本機 Supabase）
-curl -s "https://supabase.aware-wave.com/rest/v1/social_postiz_connections" \
+curl -s "https://supabase.aware-wave.com/rest/v1/social_accounts" \
   -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" | python3 -m json.tool
 
 # SSH ks-aw-01 查 Postiz container

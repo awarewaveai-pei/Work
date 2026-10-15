@@ -179,7 +179,7 @@ class CoverageRows(unittest.TestCase):
     def test_ids_row_fails_on_dangling_error_or_silence(self):
         ok = {"checks": [{"id": "postiz-integrations", "checked": 3, "dangling": []}]}
         self.assertEqual(rows_for(reconcile=ok)["ids:postiz-integrations"]["status"], "PASS")
-        bad = {"checks": [{"id": "postiz-integrations", "checked": 3, "dangling": [{"where": "social_postiz_connections r1", "id": "gone"}]}]}
+        bad = {"checks": [{"id": "postiz-integrations", "checked": 3, "dangling": [{"where": "social_accounts r1", "id": "gone"}]}]}
         self.assertIn("r1 -> gone", rows_for(reconcile=bad)["ids:postiz-integrations"]["detail"])
         self.assertIn("502", rows_for(reconcile={"checks": [{"id": "postiz-integrations", "error": "Postiz 502", "dangling": []}]})["ids:postiz-integrations"]["detail"])
         self.assertIn("not reported", rows_for(reconcile={"checks": []})["ids:postiz-integrations"]["detail"])

@@ -44,6 +44,7 @@
 ### C5 送出與對帳（Opus 5.5）
 - 0096 交代的：先以 `UPDATE … SET state='queued' WHERE state='scheduled' AND scheduled_at <= … RETURNING`（`FOR UPDATE SKIP LOCKED`，走 `social_posts_due_idx`）認領，再呼叫 Postiz，兩個重疊的排程不會重發。
 - 範圍：`lobster-factory/packages/workflows/` Trigger.dev 任務 `social-dispatch`（每 5 分鐘）：`scheduled` 且 `scheduled_at <= now + 10min` → `createSocialPost`（批次，429 → 退讓到 reset）→ 記 Postiz ids → `queued`；`queued` → `listPosts` 對帳 → `published`（含 `releaseURL`）或 `error`（含訊息）→ 失敗寫 ops inbox＋Telegram。改時間：`queued` 的先 `deletePost` 再重建。
+- C4 交代的（2026-10-15 審查）：部分已送的貼文只重送 state 是 pending／error 的 target；error 的先 `deletePost` 掉它的 Postiz ERROR 貼文、清空 `postiz_post_id` 再送。0098 不讓存檔改掉或移除 queued／published 的 target，任一 target 送出後，貼文層的文字（body、第一則留言、連結）也不能改（要改就給其他頻道各自的文字）。先鎖 post 列再鎖 target（0098 檔頭的鎖順序）。帳號 connected／expired 以送出結果為準（重新連接時 C4 輪詢到 `disabled:false` 就標 connected，Postiz 公開 API 看不出授權有沒有換新）。
 - 驗收：dry-run 模式（`LOBSTER_EXECUTE_MANIFEST_STEPS` 同款開關）先跑一輪只記錄不送；真送一則 Bluesky 草稿（`type:"draft"`）驗 id 回寫；對帳把 fixture 的 ERROR 轉成 `error`。
 - 邊界：部署用 `tr_pat_*`（CLI），runtime 用 `tr_prod_*`；不碰其他 workflow。
 
@@ -51,15 +52,18 @@
 - 範圍：`app/(shell)/tools/social/page.tsx`＋`SocialManager.tsx`（行事曆：週／月／清單；編輯：帳號、文字、各平台另寫、字數、媒體、第一則留言、連結＋UTM、替代文字、常用文字、格式、預覽手機／電腦；時間列：固定時間／加入輪播；四個動作；立即發佈二次確認）。資料全走 C4 的 API。
 - 規則：用 `globals.css` 的 token 與 `.btn-primary`／`.btn-secondary`；不用 `<select>`；一屏（1280×660 不捲動）；狀態色對應 ADR 016 §5。
 - 驗收：`npx tsc --noEmit`；Playwright（`/playwright`）：建立→排程→拖拉→清單批次→還原；`scripts/`（或 `__tests__/`）加「頁面原始碼無 `<select>`、無 hex 顏色」檢查，和 `check-social-mocks.py` 同規則。
+- 垃圾桶需要一個列出 `deleted` 貼文的 API（C4 的 `GET posts` 不含 deleted），在這張卡加。
 - 邊界：不碰 ContentStudio；舊面板在 C12 退場。
 
 ### C7 輪播清單（Opus 5.5）
-- 0096 交代的：具體化出來的貼文帶 `list_id`＋`scheduled_at`，`social_posts_list_slot_idx` 讓同一格不會生兩次；刪清單前先刪它 `state='rotation'` 的項目（資料庫會擋）。
+- 0096 交代的：具體化出來的貼文帶 `list_id`＋`scheduled_at`，`social_posts_list_slot_idx` 讓同一格不會生兩次；刪清單前先刪它 `state='rotation'` 的項目（資料庫會擋，API 回 409）。
+- C4 交代的：`list_position` 只存在 rotation 狀態；人對具體化貼文做任何動作（改時間、取消排程、刪除）都會清掉 `list_id`，它就變成手動貼文。所以「這一格做過沒」要記在清單的 cursor，不能靠找帶 `list_id` 的列；暫停撤回只撤還帶 `list_id` 的貼文（人動過的已是手動貼文，不撤）。
 - 範圍：清單 CRUD（C4 `lists`）＋ Trigger.dev 任務 `social-rotation`（每日 00:05 把未來 7 天的輪播發文具體化成 `scheduled` 貼文並前推 cursor；清單暫停時撤回尚未 `queued` 的）。畫面：左「輪播」檢視＋右清單編輯（照樣稿）。
 - 驗收：具體化冪等（同一天跑兩次不重複）；暫停撤回測試。
 
 ### C8 審核與角色與通知（Opus 5.5）
 - 範圍：品牌成員表＋角色（C1 已建表）；`reviewer` 核准／退回＋理由進備註與紀錄；通知：`error`、`expired`、等待審核 → `needs()` 同款查詢供「通知 N」；Telegram 用既有 ops 通知管道。
+- 先決定：審核是不是必經。現在 editor 可以從 draft 直接排程，owner 核准後 editor 也還能改內容（`lib/social/state.ts` RULES）。
 - 驗收：角色矩陣測試（4 角色 × 6 動作）。
 
 ### C9 媒體庫（Sonnet 5.5）
@@ -77,6 +81,7 @@
 ### C12 上線（Opus 5.5；High-STOP）
 - 範圍：nginx vhost `social.aware-wave.com`（`safe-infra-patch.sh host-nginx`）；`middleware.ts` 以 host 選產品；`sg-deploy.sh next-admin`；`/playwright smoke`；ContentStudio 的 Postiz 面板改成「到社群發文」連結。
 - 驗收：`/check-drift` → `/verify` → deploy → smoke；runbook §9 更新；WORKLOG。
+- 對外開放前（C4 審查 2026-10-15 留下的）：API 錯誤訊息改成固定文字（現在 `lib/social/store.ts` fail()／addImage 會帶資料庫與 Postiz 的原文，只限員工時可接受）；`GET /api/social/accounts` 會寫入（配對連接），而 GET 不經過 CSRF 檢查。
 - 邊界：先 go-ahead 才 deploy。
 
 ## 2. V2（開放訂閱前）

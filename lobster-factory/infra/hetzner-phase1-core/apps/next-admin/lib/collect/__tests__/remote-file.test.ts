@@ -1,0 +1,40 @@
+// A pasted media URL (lib/content/postiz.ts uploadMedia/uploadVideo): collect's address gate on every redirect hop,
+// the byte cap, and nothing internal in the error (review 2026-10-15 M2).
+import { describe, expect, it } from "vitest";
+import { fetchRemoteFile, RemoteFileError } from "@/lib/collect/net/remote-file";
+
+const IMAGE = { maxBytes: 10, timeoutMs: 5_000, accept: (ct: string) => ct.startsWith("image/") };
+const publicDns = async () => ["93.184.216.34"];
+
+function transport(...answers: Response[]): typeof fetch {
+  return (async () => answers.shift() ?? new Response(null, { status: 500 })) as unknown as typeof fetch;
+}
+const reason = (p: Promise<unknown>) => p.then(() => "ok", (e) => (e instanceof RemoteFileError ? e.reason : String(e)));
+
+describe("fetchRemoteFile", () => {
+  it("a host that resolves to a private address is refused before any request", async () => {
+    let asked = 0;
+    const t = (async () => { asked++; return new Response("x"); }) as unknown as typeof fetch;
+    expect(await reason(fetchRemoteFile("https://rebind.example/a.png", IMAGE, { resolver: async () => ["10.0.0.5"], transport: t }))).toBe("refused");
+    expect(asked).toBe(0);
+  });
+
+  it("a redirect to an internal address is refused at that hop", async () => {
+    const hop = new Response(null, { status: 302, headers: { location: "https://169.254.169.254/latest/meta-data" } });
+    expect(await reason(fetchRemoteFile("https://cdn.example/a.png", IMAGE, { resolver: publicDns, transport: transport(hop) }))).toBe("refused");
+  });
+
+  it("over the byte cap, the wrong type, or not https: refused with a reason safe to show", async () => {
+    const big = new Response("12345678901", { headers: { "content-type": "image/png" } });
+    expect(await reason(fetchRemoteFile("https://cdn.example/a.png", IMAGE, { resolver: publicDns, transport: transport(big) }))).toBe("too_large");
+    const html = new Response("<html>", { headers: { "content-type": "text/html" } });
+    expect(await reason(fetchRemoteFile("https://cdn.example/a.png", IMAGE, { resolver: publicDns, transport: transport(html) }))).toBe("wrong_type");
+    expect(await reason(fetchRemoteFile("http://cdn.example/a.png", IMAGE, { resolver: publicDns }))).toBe("refused");
+  });
+
+  it("a public image within the cap comes back with its type", async () => {
+    const ok = new Response("1234567890", { headers: { "content-type": "image/png; charset=binary" } });
+    const file = await fetchRemoteFile("https://cdn.example/a.png", IMAGE, { resolver: publicDns, transport: transport(ok) });
+    expect([file.contentType, file.bytes.byteLength]).toEqual(["image/png", 10]);
+  });
+});

@@ -1,5 +1,6 @@
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { OpsRole } from "@/lib/ops-contracts";
+import { fetchRemoteFile } from "@/lib/collect/net/remote-file";
 
 export type SocialPlatform =
   | "instagram"
@@ -41,24 +42,8 @@ export function getPostizConfig(): PostizConfig {
   return { baseUrl, apiKey };
 }
 
-// SSRF guard: private / link-local / loopback ranges that must never be fetched
-const PRIVATE_HOST_RE =
-  /^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.|::1|0\.0\.0\.0)/i;
-
-function assertSafeImageUrl(url: string): void {
-  if (!url.startsWith("https://")) {
-    throw new Error(`imageUrl must use https:// scheme, got: ${url.slice(0, 30)}`);
-  }
-  let hostname: string;
-  try {
-    hostname = new URL(url).hostname;
-  } catch {
-    throw new Error("imageUrl is not a valid URL");
-  }
-  if (PRIVATE_HOST_RE.test(hostname)) {
-    throw new Error(`imageUrl hostname is private/internal: ${hostname}`);
-  }
-}
+// A remote image or video is fetched through collect (lib/collect/net/remote-file.ts): the address gate on every
+// redirect hop, the connection pinned to the checked address, the byte cap read as a stream.
 
 // Max image bytes accepted for upload (10 MB)
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -120,11 +105,11 @@ export async function listIntegrations(clientId: string): Promise<SocialChannel[
   if (!db) throw new Error("Supabase client not configured");
 
   const { data: rows, error } = await db
-    .from("social_postiz_connections")
+    .from("social_accounts")
     .select("postiz_integration_id, platform, label, status")
-    .eq("client_id", clientId);
+    .eq("organization_id", clientId);
 
-  if (error) throw new Error(`social_postiz_connections query failed: ${error.message}`);
+  if (error) throw new Error(`social_accounts query failed: ${error.message}`);
   if (!rows || rows.length === 0) return [];
 
   const cfg = getPostizConfig();
@@ -139,7 +124,7 @@ export async function listIntegrations(clientId: string): Promise<SocialChannel[
       clientId,
       postizIntegrationId: row.postiz_integration_id,
       platform: row.platform as SocialPlatform,
-      label: row.label ?? liveEntry?.name ?? row.platform,
+      label: row.label || liveEntry?.name || row.platform,   // 0096 copied a missing label as ''
       status,
     };
   });
@@ -168,36 +153,11 @@ export async function uploadMedia(opts: {
       throw new Error(`Image too large: ${buffer.length} bytes (max ${MAX_IMAGE_BYTES})`);
     }
   } else {
-    // SSRF guard: https-only + private IP block
-    assertSafeImageUrl(imageUrl);
-
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), IMAGE_FETCH_TIMEOUT_MS);
-    let fetchRes: Response;
-    try {
-      fetchRes = await fetch(imageUrl, { signal: ctrl.signal });
-    } catch (err) {
-      clearTimeout(timer);
-      throw new Error(
-        `Failed to fetch image: ${ctrl.signal.aborted ? "timeout" : err instanceof Error ? err.message : String(err)}`
-      );
-    }
-    clearTimeout(timer);
-
-    if (!fetchRes.ok) {
-      throw new Error(`Failed to fetch image: HTTP ${fetchRes.status}`);
-    }
-    const ct = fetchRes.headers.get("content-type") ?? "";
-    if (!ct.startsWith("image/")) {
-      throw new Error(`Expected image/* content-type, got: ${ct}`);
-    }
-    mimeType = ct.split(";")[0].trim();
-
-    const ab = await fetchRes.arrayBuffer();
-    if (ab.byteLength > MAX_IMAGE_BYTES) {
-      throw new Error(`Image too large: ${ab.byteLength} bytes (max ${MAX_IMAGE_BYTES})`);
-    }
-    buffer = Buffer.from(ab);
+    const file = await fetchRemoteFile(imageUrl, {
+      maxBytes: MAX_IMAGE_BYTES, timeoutMs: IMAGE_FETCH_TIMEOUT_MS, accept: (ct) => ct.startsWith("image/"),
+    });
+    mimeType = file.contentType;
+    buffer = Buffer.from(file.bytes);
   }
 
   const form = new FormData();
@@ -229,48 +189,16 @@ export async function uploadVideo(opts: {
   filename?: string;
 }): Promise<PostizMediaRef> {
   const { videoUrl, filename = "video.mp4" } = opts;
-  assertSafeImageUrl(videoUrl); // reuse SSRF guard
   const cfg = getPostizConfig();
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), VIDEO_FETCH_TIMEOUT_MS);
-  let buffer: Buffer;
-  let mimeType: string;
-  try {
-    const r = await fetch(videoUrl, { signal: controller.signal });
-    if (!r.ok) throw new Error(`video fetch failed: HTTP ${r.status}`);
-
-    // Pre-flight size check via Content-Length to avoid buffering oversized payloads.
-    const clHeader = r.headers.get("content-length");
-    if (clHeader) {
-      const cl = parseInt(clHeader, 10);
-      if (!isNaN(cl) && cl > MAX_VIDEO_BYTES) {
-        throw new Error(`video too large: server reports ${(cl / 1024 / 1024).toFixed(1)} MB > ${MAX_VIDEO_BYTES / 1024 / 1024} MB limit`);
-      }
-    }
-
-    // Validate content-type is actually a video (parity with uploadMedia image check).
-    const ct = r.headers.get("content-type") ?? "";
-    if (!ct.startsWith("video/")) {
-      const ext2 = filename.split(".").pop()?.toLowerCase() ?? "mp4";
-      // Accept streams with no content-type (R2 presigned URLs sometimes omit it); use filename extension.
-      if (ct && ct !== "application/octet-stream" && ct !== "binary/octet-stream") {
-        throw new Error(`Expected video/* content-type, got: ${ct}`);
-      }
-      mimeType = ext2 === "webm" ? "video/webm" : ext2 === "mov" ? "video/quicktime" : "video/mp4";
-    } else {
-      mimeType = ct.split(";")[0].trim();
-    }
-
-    const arr = await r.arrayBuffer();
-    buffer = Buffer.from(arr);
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (buffer.length > MAX_VIDEO_BYTES) {
-    throw new Error(`video too large: ${(buffer.length / 1024 / 1024).toFixed(1)} MB > ${MAX_VIDEO_BYTES / 1024 / 1024} MB limit`);
-  }
+  const file = await fetchRemoteFile(videoUrl, {
+    maxBytes: MAX_VIDEO_BYTES, timeoutMs: VIDEO_FETCH_TIMEOUT_MS,
+    // R2 presigned URLs sometimes omit the type: the file name says it then
+    accept: (ct) => ct.startsWith("video/") || ct === "" || ct === "application/octet-stream" || ct === "binary/octet-stream",
+  });
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "mp4";
+  const mimeType = file.contentType.startsWith("video/") ? file.contentType
+    : ext === "webm" ? "video/webm" : ext === "mov" ? "video/quicktime" : "video/mp4";
+  const buffer = Buffer.from(file.bytes);
 
   const ab = new ArrayBuffer(buffer.length);
   new Uint8Array(ab).set(buffer);

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback } from "react";
-import type { CalendarPost } from "@/app/api/content/calendar/route";
+import type { CalendarPost } from "@/lib/content/wp-calendar";
 import type { WpSite } from "@/lib/content/wp-sites";
 
 type ViewMode = "week" | "month";

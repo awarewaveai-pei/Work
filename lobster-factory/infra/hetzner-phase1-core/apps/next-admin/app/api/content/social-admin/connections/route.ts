@@ -7,10 +7,9 @@ import { listAllIntegrations, getPostizConfig } from "@/lib/content/postiz";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const VALID_PLATFORMS = [
-  "instagram", "facebook", "reddit", "linkedin", "x",
-  "threads", "tiktok", "pinterest", "bluesky",
-] as const;
+// A channel belongs to one brand: social_accounts (0096; the old social_postiz_connections table is no longer
+// written). The platform is Postiz's providerIdentifier, taken from Postiz, never from the caller.
+const PLATFORM_RE = /^[a-z][a-z0-9-]{0,30}$/;
 
 export async function POST(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
@@ -73,7 +72,7 @@ export async function POST(req: Request): Promise<Response> {
   if (!integration) {
     return new NextResponse("postizIntegrationId not found in Postiz", { status: 404 });
   }
-  if (!(VALID_PLATFORMS as readonly string[]).includes(integration.identifier)) {
+  if (!PLATFORM_RE.test(integration.identifier)) {
     return new NextResponse(
       `platform '${integration.identifier}' is not supported`,
       { status: 400 }
@@ -84,16 +83,17 @@ export async function POST(req: Request): Promise<Response> {
   const derivedLabel =
     typeof label === "string" && label ? label.slice(0, 200) : integration.name.slice(0, 200);
 
-  const { error } = await db.from("social_postiz_connections").insert({
-    client_id: clientId,
+  const { error } = await db.from("social_accounts").insert({
+    organization_id: clientId,
     postiz_integration_id: postizIntegrationId,
     platform: derivedPlatform,
     label: derivedLabel,
+    status: integration.disabled ? "expired" : "connected",
   });
 
   if (error) {
     if (error.code === "23505") {
-      return new NextResponse("connection already exists", { status: 409 });
+      return new NextResponse("this channel already belongs to a brand", { status: 409 });
     }
     console.error("[social-admin/connections POST] db insert failed:", error.code);
     return NextResponse.json({ ok: false, error: "failed to create connection" }, { status: 500 });
@@ -122,12 +122,15 @@ export async function DELETE(req: Request): Promise<Response> {
   if (!db) return new NextResponse("database not configured", { status: 503 });
 
   const { error } = await db
-    .from("social_postiz_connections")
+    .from("social_accounts")
     .delete()
-    .eq("client_id", clientId)
+    .eq("organization_id", clientId)
     .eq("postiz_integration_id", integrationId);
 
   if (error) {
+    if (error.code === "23503") {
+      return new NextResponse("posts still target this channel", { status: 409 });
+    }
     console.error("[social-admin/connections DELETE] db delete failed:", error.code);
     return NextResponse.json({ ok: false, error: "failed to remove connection" }, { status: 500 });
   }

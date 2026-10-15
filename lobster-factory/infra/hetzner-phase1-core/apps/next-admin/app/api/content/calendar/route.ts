@@ -1,70 +1,10 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { listAccessibleWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
+import { listAccessibleWpSites } from "@/lib/content/wp-sites";
+import { fetchSitePosts } from "@/lib/content/wp-calendar";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-export interface CalendarPost {
-  siteId: string;
-  siteName: string;
-  siteColor: string;
-  siteUrl: string;
-  id: number;
-  title: string;
-  status: "draft" | "future" | "publish";
-  date: string;     // ISO string
-  editUrl: string;
-  viewUrl?: string;
-}
-
-async function fetchSitePosts(
-  siteId: string,
-  siteName: string,
-  siteColor: string,
-  siteUrl: string,
-  token: string,
-  username: string,
-  statuses: string[],
-  after?: string,
-): Promise<CalendarPost[]> {
-  const params = new URLSearchParams({
-    per_page: "50",
-    orderby: "date",
-    order: "asc",
-    status: statuses.join(","),
-    _fields: "id,title,status,date,link",
-  });
-  if (after) params.set("after", after);
-
-  try {
-    const res = await fetch(`${siteUrl}/wp-json/wp/v2/posts?${params}`, {
-      headers: { Authorization: wpAuthHeader(username, token) },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return [];
-    const posts = await res.json() as Array<{
-      id: number;
-      title: { rendered: string };
-      status: string;
-      date: string;
-      link: string;
-    }>;
-
-    return posts.map(p => ({
-      siteId,
-      siteName,
-      siteColor,
-      siteUrl,
-      id: p.id,
-      title: p.title.rendered.replace(/&amp;/g, "&").replace(/&#[0-9]+;/g, "").slice(0, 120),
-      status: (["draft", "future", "publish"].includes(p.status) ? p.status : "draft") as CalendarPost["status"],
-      date: p.date,
-      editUrl: `${siteUrl}/wp-admin/post.php?post=${p.id}&action=edit`,
-      viewUrl: p.link || undefined,
-    }));
-  } catch { return []; }
-}
 
 export async function GET(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
@@ -86,7 +26,7 @@ export async function GET(req: Request): Promise<Response> {
   const allPosts = await Promise.all(
     sites.map(site =>
       fetchSitePosts(
-        site.id, site.name, site.color, site.url,
+        site,
         tokens[site.id] ?? "",
         usernames[site.id] ?? "",
         ["draft", "future", "publish"],

@@ -10,6 +10,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { listAllIntegrations } from "@/lib/content/postiz";
 import { isCognitiveOsConfigured, listCognitiveOsProjects } from "@/lib/cognitive-os/client";
+import { selectAll } from "@/lib/supabase-paging";
 
 export interface HeldPointer {
   where: string; // "<table> <row id>": where a person goes to fix it
@@ -34,25 +35,17 @@ export function findDangling(held: HeldPointer[], live: Iterable<string>): HeldP
   return held.filter((p) => !ids.has(p.id));
 }
 
-const PAGE = 1000; // PostgREST's default row cap: a single select would silently stop there
-
-async function rows<T>(label: string, page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
-  const out: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await page(from, from + PAGE - 1);
-    if (error) throw new Error(`${label}: ${error.message}`);
-    out.push(...(data ?? []));
-    if (!data || data.length < PAGE) return out;
-  }
+function rows<T>(label: string, page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
+  return selectAll(page, (e) => { throw new Error(`${label}: ${e.message}`); });
 }
 
 export const CHECKS: PointerCheck[] = [
   {
     id: "postiz-integrations",
     async held(sb) {
-      const list = await rows<{ id: string; postiz_integration_id: string }>("social_postiz_connections", (f, t) =>
-        sb.from("social_postiz_connections").select("id, postiz_integration_id").order("id").range(f, t));
-      return list.map((r) => ({ where: `social_postiz_connections ${r.id}`, id: r.postiz_integration_id }));
+      const list = await rows<{ id: string; postiz_integration_id: string }>("social_accounts", (f, t) =>
+        sb.from("social_accounts").select("id, postiz_integration_id").order("id").range(f, t));
+      return list.map((r) => ({ where: `social_accounts ${r.id}`, id: r.postiz_integration_id }));
     },
     async live() {
       return (await listAllIntegrations()).map((i) => i.id);
