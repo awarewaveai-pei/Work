@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-15（續22）社群 C12 上線 1→4：0100–0102 已套、next-admin `df4f87eba` 已部署、Trigger 20261015.4、Bluesky 草稿驗收通過、送出改 apply
+
+**做了**（操作者「go」1→4）：
+- `node scripts/apply-db-migration.mjs 0100 0101 0102` → APPLY_OK 3/3。正式庫：12 個函式在、`social_save_list` 只剩 8 參數版、ledger 3 列、`send_started_at`／`send_key`／`origin_list_id`／`origin_slot` 4 欄、anon 不能執行、`social_postiz_orphans` RLS 開。
+- 主機 `.env` 加 `SOCIAL_DISPATCH_TOKEN`（主機 openssl 產生、未顯示；備份 `.env.bak-*-social-dispatch`）、`SOCIAL_DISPATCH_ENABLED=true`、`SOCIAL_DISPATCH_MODE=draft` → `safe-infra-patch.sh compose … next-admin`（備份 `docker-compose.yml.bak.safe-patch-20261015-043917`，healthy 9s）。
+- **只部署到 `df4f87eba`**：主機 `/root/Work` 快轉到 `df4f87eba` 再 `sg-deploy.sh --skip-pull next-admin`。理由：origin/main 上另一個 session 的 CS 變更 `c3ef11ba9` 寫著「Not deployed (High-STOP)」，這次的 go 沒有涵蓋它（它的 TASKS 條目說「跟 C12 同一次上線」是那個 session 寫的，不是本 session 收到的指示）。smoke 5/5、`.deployed-commit=df4f87eba`。
+- `scripts/lobster-trigger-deploy.ps1` → version 20261015.4、19 tasks（新增 social-dispatch、social-rotation），`SOCIAL_DISPATCH_TOKEN set: yes`。df4f87eba 之後沒有 workflows 變更。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機內 POST /api/internal/social/dispatch：無 token → 401；有 token → draft 模式空跑 ok（claimed 0、errors []） | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=C5 驗收：Soulful 建一則只發 Bluesky 的貼文排 04:52 → 04:50 的 Trigger social-dispatch 認領並送出 → `social_post_targets.postiz_post_id=cmv928c2o0001rk8z4rhmo2ka`、Postiz `GET /posts` 該則 state=DRAFT、settings `{"__type":"bluesky","awarewave_send_key":"f5f9f553-…"}`；紀錄 create,schedule,queue,send | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=SSH | cmd=清理：Postiz DELETE → 200、清單已無該則；`social_release_post(…,'deleted')` → 貼文 deleted、target pending 無 id、紀錄加 delete | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`.env` MODE=apply（備份 `.env.bak-*-social-apply`）→ safe-infra-patch compose（healthy 9s）→ 容器 printenv=apply；POST dispatch → mode apply ok、POST rotation → lists 0 posts 0 expiredAccounts 0 ok；當時 scheduled/queued/rotation 貼文 0 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/check-deploy-drift.ps1 → composeVarDrift 空；落後 6＝之後其他 session 的 commit，碰 next-admin 的只有 c3ef11ba9（未授權部署） | exit=1 | ms=8000
+- REVIEW_WAIVED: NA -- 部署紀錄；程式審查見續15、續17
+- BUGHUNT_WAIVED: NA -- 無新程式改動
+
+**踩到的坑**：容器裡的 busybox `wget` 不支援 `--method=DELETE`，第一次清理沒刪到 Postiz 草稿（指令沒報錯、DB 端已放回）；改用容器內 `node -e fetch(…, {method:"DELETE"})`，再用列表確認已不見。之後在主機刪 Postiz 貼文一律用 node fetch。
+
+**剩**：C12 ⑤ 子網域＋ContentStudio 換連結、⑥ middleware 帶使用者 id（都未授權）；`c3ef11ba9` 是否部署待操作者在本 session 確認。
+
+**rollback**：`.env` 改 `SOCIAL_DISPATCH_ENABLED=false`＋safe-infra-patch compose（立即停送）；程式 `sg-deploy` 回 `a2adf459c`（快照 `lobster-phase1-next-admin:rollback-20261015-044040`）；資料庫 0102 → 0101 → 0100 down（0100 先確認 `social_postiz_orphans` 為空）。
 ## 2026-10-15（續21）認知平台：魚骨／五個為什麼／柏拉圖／問題陳述的結果頁 ④⑥ 一個單位一張卡（工具模板 §15.1 第 2 項，未部署）
 
 **根因**: 結果頁的單位只認「表單欄位是課的單位」（冰山）或 AI 綁的層；四個找原因工具的單位是圖上的骨頭、每一步、每一項、三段，不是表單欄位，所以 ④ 只印「這個工具的結果是一張圖，不分層」、⑥ 沒有列。單位又只能比對第一段路徑（`r/hypotheses`），一張魚骨的所有骨頭會擠成同一個單位。
