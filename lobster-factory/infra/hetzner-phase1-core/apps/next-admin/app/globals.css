@@ -220,6 +220,17 @@
   --surface-bg:               var(--surface);
   --chip-bg:                  var(--build-chip-bg);
   --chip-surface:             var(--bg-subtle);
+
+  /* Social platform marks (/tools/social, lobster-factory/docs/social/mockups): each platform's own brand colour, not
+   * theme colours -- the theme editor does not list them. --p-ink = the letter on the mark. */
+  --p-fb: #1b5fc4;
+  --p-ig: #c2337a;
+  --p-th: #222a35;
+  --p-li: #0f6aa8;
+  --p-bs: #1083fe;
+  --p-wp: #2b6a9e;
+  --p-x: #14171a;
+  --p-ink: #ffffff;
 }
 
 body {

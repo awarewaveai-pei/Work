@@ -30,13 +30,10 @@ export async function requiresReview(brandId: string): Promise<boolean> {
   return data?.require_review === true;
 }
 
+/** The setting and its log row together (0102 social_set_review). */
 export async function setRequiresReview(brandId: string, on: boolean, actor: string): Promise<void> {
-  const sb = db();
-  const { error } = await sb.from("social_brand_settings")
-    .upsert({ organization_id: brandId, require_review: on, updated_by: actor, updated_at: new Date().toISOString() });
+  const { error } = await db().rpc("social_set_review", { p_org: brandId, p_on: on, p_actor: actor });
   if (error) fail(error, "brand settings");
-  const { error: logErr } = await sb.from("social_audit_log").insert({ organization_id: brandId, actor, action: "review_setting", detail: { require_review: on } });
-  if (logErr) fail(logErr, "log");
 }
 
 /** With review required, an editor changes an approved post's content only after unscheduling it. */

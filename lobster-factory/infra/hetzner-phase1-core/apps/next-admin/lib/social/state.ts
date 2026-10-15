@@ -27,6 +27,8 @@ export interface TransitionInput {
   listPosition?: number;
   reason?: string;
   confirmPublishNow?: boolean;
+  /** the brand's require_review (0102, lib/social/review.ts): an editor submits instead of scheduling a draft */
+  requireReview?: boolean;
 }
 
 export interface Transition {
@@ -81,6 +83,12 @@ export function transition(post: PostSnapshot, action: PostAction, role: BrandRo
   now: Date = new Date()): Transition {
   const rule = RULES[action];
   if (!rule.roles.includes(role)) throw new TransitionError("forbidden", `${role} may not ${action}`);
+  // C8: with review required an editor never puts an unapproved post on a schedule -- a fixed time or a rotation list
+  // (review 2026-10-15: a list materialises scheduled posts with no approval of its own); moving an approved one is fine
+  if (input.requireReview && role === "editor"
+    && ((action === "schedule" && (post.state === "draft" || post.state === "error")) || action === "to_rotation")) {
+    throw new TransitionError("forbidden", "this brand needs review: submit the post, an owner approves it");
+  }
   if (!rule.from.includes(post.state)) throw new TransitionError("illegal", `cannot ${action} a ${post.state} post`);
   const keep = { scheduledAt: post.scheduledAt, listId: null, listPosition: null };
   if (SENDS.includes(action)) {

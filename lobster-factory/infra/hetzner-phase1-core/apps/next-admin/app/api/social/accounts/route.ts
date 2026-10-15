@@ -36,8 +36,8 @@ export async function DELETE(req: Request): Promise<Response> {
     const q = new URL(req.url).searchParams;
     const brand = uuid(q.get("brand"), "brand");
     requireBrandRole(req, brand, WRITE_ROLES);
-    if (q.has("attempt")) await cancelConnect(brand, uuid(q.get("attempt"), "attempt"));
-    else await unlinkAccount(brand, uuid(q.get("id"), "id"));
+    if (q.has("attempt")) await cancelConnect(brand, uuid(q.get("attempt"), "attempt"), actorOf(req));
+    else await unlinkAccount(brand, uuid(q.get("id"), "id"), actorOf(req));
     return {};
   });
 }

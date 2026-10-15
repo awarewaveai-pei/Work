@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-15（續17）C6–C11 社群發文畫面、輪播、審核、媒體庫、WordPress 文章、紀錄（程式；0101／0102 未套正式、未部署）
+
+**做了**（照 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md`，樣稿 `mockups/social-manager-mock.html` 為規格）：
+- C6 `/tools/social`（`app/(shell)/tools/social/`）：週／月／清單（含已刪除＋批次送審/刪除）、拖拉改時間（scheduled／error／queued 才能拖；queued 走 C5 的撤回）、編輯器（帳號、共用文字＋各平台另寫、字數表用 `lib/social/limits.ts`、第一則留言、連結＋UTM、替代文字、常用文字、格式、手機／電腦預覽、四個動作、立即發佈二次確認）、設定（連接／重新連接／移除帳號，新分頁授權＋輪詢）。時間一律用品牌時區（`lib/social/time.ts`，伺服器與頁面共用）。側欄加「社群發文」。
+  - 平台品牌色搬進 `globals.css`（`--p-*`），頁面與樣稿共用；`check-social-mocks.py` 改為平台色屬 app token（自測 39/39）；`__tests__/page-rules.test.ts` 鎖「無 `<select>`、無色碼」。
+  - UI 驗證用的 dev server 碰不到任何 Supabase：`tests/e2e/social/dev-server-no-supabase.mjs`（同一行程把 Supabase 變數設成空字串；cmd／WSL 會丟掉空值環境變數，這是踩過才知道的）。
+- C7 輪播（`0101_social_rotation.sql`）：每天 00:05 具體化未來 7 天；一格只做一次（`materialized_until`＋slot 唯一索引）；**清單存檔＝撤回未送出的具體化貼文並還回 cursor，再重新具體化**（暫停也是存檔）；排序只接受現有項目的排列；有項目不能刪；人改了具體化貼文的內容就變手動貼文（`social_save_post` 清 list_id）。存檔與刪除都寫紀錄。`lib/social/rotation.ts`、`POST /api/internal/social/rotation`（同 dispatch 的 token 與開關）、Trigger `social-rotation`。編輯器的「加入輪播」。
+- C8 審核：`0102_social_review.sql` 每品牌「發文前要先審核」開關（預設關＝維持現況）。開啟時編輯者不能直接排程草稿（state.ts）、已核准的貼文要先取消排程才能改內容；擁有者核准（給時間）／退回（理由進備註＋紀錄）；送審與帳號失效走 ops inbox → Telegram；`GET /api/social/needs` 給「通知 N」。**每品牌指定成員／審核人沒做**：要在 middleware 的身分標頭帶出使用者 id（身分層，High-STOP），列進上線清單；V1 角色仍照 ops_role。
+- C9 媒體庫：用過次數（PostgREST embedded count）、上傳、點一張附到右邊貼文。
+- C10 WordPress 文章 → 貼文：行事曆上的文章卡；「用文章摘要」（WP REST 摘要＋主圖＋連結，免費）；「AI 改寫（約 NT$x）」走既有 `/api/content/syndicate`，費用由 `lib/ai/cost-model.ts` 的 syndicate 算。
+- C11 紀錄：「全部紀錄」＝`social_audit_log`；「需處理」＝needs()。連接開始／完成／取消、移除帳號、上傳媒體、清單存檔／刪除補寫紀錄。
+
+**Codex 兩輪**：
+- R1 7：送審沒通知 → 接上；暫停只撤未來的 → 撤所有未被認領的；人改過的格重排會再生 → 加不可變的來源；每日任務沒對帳帳號 → 接上；清單紀錄寫死 `ops`、審核設定與紀錄非原子 → SQL 帶 actor、同一 transaction；切換文章時舊請求覆蓋新文章 → 預填帶文章身分。
+- R2 5：審核開啟時編輯可用「加入輪播」繞過 → 一併擋；審核開啟時編輯按存草稿／送審會先被拒 → 先取消排程再存；拖動過的格會被重生 → 格身分改 `(origin_list_id, origin_slot)` 涵蓋所有狀態（刪除也算）；清單明細藏了已到時間未送出的 → 不再只看未來；紀錄寫失敗不擋請求 → **駁回**：動作已成功時回錯，前端重試會變成重複動作，維持記錯誤。
+- 審核規則是權限類：同段兩輪都由 Codex 看過，本機另有 4 角色 × 6 動作 × 開/關的矩陣測試。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/packages/db/scripts/0101_social_rotation-local-verify.sh（一格一次、順序與循環、各平台文字與媒體複製、冪等、過去的格不做、改內容變手動、存檔／暫停撤回並還回 cursor、排序只接受排列、有項目不能刪、存檔與刪除各一筆紀錄、down 還原 0098、re-apply）→ ✅ | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=PLAYWRIGHT_SOCIAL_URL=http://127.0.0.1:3902 npx playwright test --project social（一屏 1280×660 無捲動＋無 select；建立→排程→拖到隔天→清單批次刪除→還原；立即發佈要二次確認；新清單＋從草稿加入；文章摘要預填且不花錢）→ 5 passed | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/packages/db/scripts/0102_social_review-local-verify.sh（設定與紀錄同一次、最後一次為準、只給 service_role、down、re-apply）→ ✅ | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（next-admin、workflows）&& npx vitest run lib/social app/api/social app/api/internal/social "app/(shell)/tools/social" lib/content lib/system-modes lib/repair-center lib/ops-inbox（587 pass）＋ workflows social-*（6 pass）＋ check-social-mocks.py（0 finding、自測 39/39） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/12m/0n -- Codex 兩輪（`agency-os/reports/oracle/2026-10-15-partialreview-40a78cbd.md` 7 項全修；`-c920df23.md` 5 項修 4、駁 1）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=social_save_list | hits=36
+- ORACLE_WAIVED: 第二輪之後只改那 4 項的窄修，各有指名斷言（state.test 的 to_rotation、0101 驗證的移動／刪除格、清單明細查詢、Editor 先取消排程再存）；依「不做無效益工作」不開第三輪
+
+**剩**：C12（上線，High-STOP）＋ 0100／0101／0102 套正式、Trigger deploy、`SOCIAL_DISPATCH_MODE=draft` 真送 Bluesky 草稿。
+
+**rollback**：未部署。之後回滾：關 `SOCIAL_DISPATCH_ENABLED` → 0102 down → 0101 down（還原 0098 的兩個函式）。
 ## 2026-10-15（續16）CS webhook 先回應再處理：部署＋實測；apply-db-migration 自動 reload PostgREST schema
 
 **部署（a2adf459c）**：0099 apply（4/4 回填、partial index）→ 主機 `/root/lobster-phase1/.env` 加 `CS_SWEEP_TOKEN`（主機 openssl 產生、未顯示，備份 `.bak-*-cs-sweep`）→ safe-infra-patch compose next-admin（備份 `docker-compose.yml.bak.safe-patch-20261015-013835`，healthy 9s）→ sg-deploy next-admin（01:44:04Z，smoke 全 OK）→ 時間窗回填 UPDATE 0 → lobster-trigger-deploy 20261015.2（17 tasks，`CS_SWEEP_TOKEN set: yes`）。

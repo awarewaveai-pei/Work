@@ -8,7 +8,8 @@ Rules (operator, 2026-09-24 .. 2026-10-14), each finding starts with its [code]:
   [palette] no second palette (dark block / data-theme): the app's theme editor owns colours
   [token-name]/[token-scope] the mock may declare only LOCAL_TOKENS, only on :root; app tokens are never redefined
   [fs-unit]/[fs-min]/[font-size]/[font] type sizes are --fs-* tokens in px; body and headings >= 14px, labels >= 12px
-  [colour]/[inline-colour]/[svg-colour] no colour of the mock's own (hex, functions, named) outside the platform tokens
+  [colour]/[inline-colour]/[svg-colour] no colour of the mock's own (hex, functions, named); platform marks are app tokens
+    (--p-* in globals.css since 2026-10-15, so the product page and the mock read the same ones)
   [inline-font] no font sizes in style="" attributes    [sample] the page says it is a 樣稿
   [action] the four post actions are real buttons        [tags]/[unclosed]/[self-close] markup balances
 Notes (printed, not findings): font sizes under 14px inside the copied app block — the app's own values, changed in globals.css.
@@ -26,8 +27,7 @@ SVG_SELF = {"path", "rect", "circle", "ellipse", "line", "polyline", "polygon", 
 ACTIONS = ["存草稿", "送審", "排程", "立即發佈"]
 TYPE_TOKENS = {"--fs-h1": 14, "--fs-h2": 14, "--fs-body": 14, "--fs-tag": 12}       # name -> minimum px
 LAYOUT_TOKENS = {"--rail", "--hour"}
-PLATFORM_TOKENS = {"--p-fb", "--p-ig", "--p-th", "--p-li", "--p-bs", "--p-wp", "--p-ink"}  # brand constants, not theme
-LOCAL_TOKENS = set(TYPE_TOKENS) | LAYOUT_TOKENS | PLATFORM_TOKENS
+LOCAL_TOKENS = set(TYPE_TOKENS) | LAYOUT_TOKENS
 COLOUR_FN = re.compile(r"\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color-mix|color)\s*\(", re.I)
 HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
 NAMED = set("""aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood
@@ -91,9 +91,9 @@ def token_findings(rules_: list, out: list) -> dict:
             if not prop.startswith("--"):
                 continue
             if prop not in LOCAL_TOKENS:
-                out.append(f"[token-name] {sel}: {prop} is not a mock-local token (layout, type, platform); app tokens live in globals.css")
+                out.append(f"[token-name] {sel}: {prop} is not a mock-local token (layout, type); app tokens live in globals.css")
                 continue
-            if not root or (sel != ":root" and prop in PLATFORM_TOKENS):
+            if not root:
                 out.append(f"[token-scope] {sel}: {prop} redefined outside :root")
                 continue
             if prop in TYPE_TOKENS:
@@ -271,13 +271,14 @@ def selftest() -> int:
         "fs-hyphen": (src.replace("--fs-tag:12px;", "--fs-tag:12px; --fs-tag-sm:10px;", 1), "[token-name]"),
         "fs-outside-root": (src.replace("button:hover{", "button:hover{--fs-body:10px;", 1), "[token-scope]"),
         "fs-small-at-breakpoint": (src.replace("--rail:34px", "--rail:34px;--fs-body:11px", 1), "[fs-min]"),
-        "platform-at-breakpoint": (src.replace("--rail:34px", "--rail:34px;--p-fb:#000000", 1), "[token-scope]"),
+        "platform-at-breakpoint": (src.replace("--rail:34px", "--rail:34px;--p-fb:#000000", 1), "[token-name]"),
         "px-font-size": (src.replace("button:hover{", "button:hover{font-size:11px;", 1), "[font-size]"),
         "undeclared-fs": (src.replace("button:hover{", "button:hover{font-size:var(--fs-xs);", 1), "[font-size]"),
         "px-font-shorthand": (src.replace("button:hover{", "button:hover{font:600 11px x;", 1), "[font]"),
         "rem-font-shorthand": (src.replace("button:hover{", "button:hover{font:600 .6rem Inter;", 1), "[font]"),
         "own-token": (src.replace("--rail:46px;", "--rail:46px; --brand:#123456;", 1), "[token-name]"),
-        "p-palette": (src.replace("--p-fb:", "--p-page-bg:#fdf2f8; --p-fb:", 1), "[token-name]"),
+        "p-palette": (src.replace("--rail:46px;", "--rail:46px; --p-page-bg:#fdf2f8;", 1), "[token-name]"),
+        "platform-redefined": (src.replace("--rail:46px;", "--rail:46px; --p-fb:#000000;", 1), "[token-name]"),
         "repoint-app-token": (src.replace(".app{", ".app{--accent:var(--p-ig);", 1), "[token-name]"),
         "upper-token": (src[:style_end] + ":root{--Brand:#123456}\n" + src[style_end:], "[token-name]"),
         "second-palette": (src.replace("html,body{height:100%}", "@media (prefers-color-scheme: dark){html{opacity:1}}\nhtml,body{height:100%}", 1), "[palette]"),

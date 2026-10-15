@@ -8,6 +8,7 @@ import { handle, jsonBody, postVersion, uuid } from "@/lib/social/http";
 import { assertWithinLimits, parsePostPayload } from "@/lib/social/posts";
 import { applyAction } from "@/lib/social/actions";
 import { getPost, getPostAt, savePost } from "@/lib/social/store";
+import { assertCanEditContent, requiresReview } from "@/lib/social/review";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,9 +28,11 @@ export async function PUT(req: Request, { params }: Ctx): Promise<Response> {
     const id = uuid((await params).id, "id");
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    const role = requireBrandRole(req, brand, WRITE_ROLES);
     const payload = parsePostPayload(body);
     const version = postVersion(body.version);
+    const contentChange = Object.keys(payload.fields).some((k) => k !== "notes") || payload.targets !== null || payload.media !== null;
+    if (contentChange && (await requiresReview(brand))) assertCanEditContent(true, role, (await getPostAt(brand, id, version)).state);
     const linkChanged = payload.fields.link_url !== undefined || payload.fields.link_utm !== undefined;
     if (payload.fields.body !== undefined || payload.targets || linkChanged) {
       const current = await getPostAt(brand, id, version);   // the limits are checked against the version being saved

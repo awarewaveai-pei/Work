@@ -23,6 +23,12 @@ function db(): SupabaseClient {
 }
 
 /** Database refusals the caller can act on, by SQLSTATE (0098: SC404/SC409; 0096: checks and keys; malformed input). */
+/** One row in the brand's log for an action that is not a post's state change (C11). Never undoes the action. */
+async function logAction(sb: SupabaseClient, brandId: string, actor: string, action: string, detail: Record<string, unknown>): Promise<void> {
+  const { error } = await sb.from("social_audit_log").insert({ organization_id: brandId, actor, action, detail });
+  if (error) console.error(`[social] log ${action} for ${brandId}: ${error.message}`);
+}
+
 function fail(error: { code?: string; message: string }, what: string): never {
   const byCode: Record<string, 400 | 404 | 409> = {
     SC404: 404, SC409: 409, "23505": 409, "23503": 409,
@@ -123,6 +129,7 @@ export async function resolveConnectAttempt(brandId: string): Promise<{ open: Op
   }
   if (!accountId) return { open: { id: open.id, platform: open.platform, started_at: open.started_at } };
   await closeAttempt(sb, open.id, "connected", accountId);
+  await logAction(sb, brandId, "system:social-connect", "connected", { account_id: accountId, platform: open.platform });
   return { open: null, connected: accountId };
 }
 
@@ -158,22 +165,27 @@ export async function startConnect(brandId: string, platform: string, refreshAcc
     await closeAttempt(sb, attempt.id, "cancelled");
     throw new SocialStoreError(502, `Postiz did not give a connect URL: ${e instanceof Error ? e.message : String(e)}`);
   }
+  await logAction(sb, brandId, actor, "connect_start", { platform, attempt_id: attempt.id, reconnect: refreshAccountId });
   return { attemptId: attempt.id, url };
 }
 
 /** The person gave up on a connection: frees the brand (and the instance's new-channel slot) now, not after the TTL. */
-export async function cancelConnect(brandId: string, attemptId: string): Promise<void> {
-  const { data, error } = await db().from("social_connect_attempts").update({ outcome: "cancelled", resolved_at: new Date().toISOString() })
-    .eq("id", attemptId).eq("organization_id", brandId).is("outcome", null).select("id");
+export async function cancelConnect(brandId: string, attemptId: string, actor: string): Promise<void> {
+  const sb = db();
+  const { data, error } = await sb.from("social_connect_attempts").update({ outcome: "cancelled", resolved_at: new Date().toISOString() })
+    .eq("id", attemptId).eq("organization_id", brandId).is("outcome", null).select("id, platform");
   if (error) fail(error, "cancel connect");
   if (!data?.length) throw new SocialStoreError(404, "no open connection with that id in this brand");
+  await logAction(sb, brandId, actor, "connect_cancel", { attempt_id: attemptId, platform: data[0].platform });
 }
 
 /** Unlinks the channel from the brand (the Postiz integration itself stays). Refused while posts target it. */
-export async function unlinkAccount(brandId: string, accountId: string): Promise<void> {
-  const { data, error } = await db().from("social_accounts").delete().eq("id", accountId).eq("organization_id", brandId).select("id");
+export async function unlinkAccount(brandId: string, accountId: string, actor: string): Promise<void> {
+  const sb = db();
+  const { data, error } = await sb.from("social_accounts").delete().eq("id", accountId).eq("organization_id", brandId).select("id, platform, label");
   if (error) fail(error, "unlink account (posts still target it?)");
   if (!data?.length) throw new SocialStoreError(404, "no such account in this brand");
+  await logAction(sb, brandId, actor, "unlink", { account_id: accountId, platform: data[0].platform, label: data[0].label });
 }
 
 // ---- posts ----------------------------------------------------------------------------------------------------
@@ -319,26 +331,15 @@ export async function listLists(brandId: string) {
   return data ?? [];
 }
 
-/** The list and its account set in one transaction (0098 social_save_list): a refused account leaves both as they were. */
-export async function saveList(brandId: string, id: string | null, input: ListInput): Promise<string> {
+/** The list and its account set in one transaction (0101 social_save_list): a refused account leaves both as they
+ *  were; the save also withdraws what the list had materialised and not sent (the caller materialises again). */
+export async function saveList(brandId: string, id: string | null, input: ListInput, actor: string): Promise<string> {
   const { data, error } = await db().rpc("social_save_list", {
     p_org: brandId, p_list_id: id, p_name: input.name, p_weekdays: input.weekdays, p_send_time: input.send_time ?? "10:00",
-    p_active: input.active ?? false, p_account_ids: input.account_ids,
+    p_active: input.active ?? false, p_account_ids: input.account_ids, p_actor: actor,
   });
   if (error) fail(error, "save list");
   return data as string;
-}
-
-/** Refused (409) while the list still holds rotation posts: they move out first (C7 or a person); 0096 refuses it too. */
-export async function deleteList(brandId: string, id: string): Promise<void> {
-  const sb = db();
-  const { count, error: countErr } = await sb.from("social_posts").select("id", { count: "exact", head: true })
-    .eq("organization_id", brandId).eq("list_id", id).eq("state", "rotation");
-  if (countErr) fail(countErr, "list items");
-  if (count) throw new SocialStoreError(409, `the list still holds ${count} rotation post(s); move them out first`);
-  const { data, error } = await sb.from("social_lists").delete().eq("id", id).eq("organization_id", brandId).select("id");
-  if (error) fail(error, "delete list");
-  if (!data?.length) throw new SocialStoreError(404, "no such list in this brand");
 }
 
 // ---- media and log ---------------------------------------------------------------------------------------------
@@ -360,11 +361,13 @@ export async function addImage(brandId: string, imageUrl: string, fileName: stri
   } catch (e) {
     throw new SocialStoreError(400, `upload refused: ${e instanceof Error ? e.message : String(e)}`);
   }
-  const { data, error } = await db().from("social_media")
+  const sb = db();
+  const { data, error } = await sb.from("social_media")
     .insert({ organization_id: brandId, kind: "image", file_name: fileName, storage_path: up.path, postiz_media_id: up.id, postiz_path: up.path, created_by: actor })
     .select("id, kind, file_name, postiz_path, created_at").single();
   if (error) fail(error, "media");
-  return data;
+  await logAction(sb, brandId, actor, "media_upload", { media_id: data.id, file_name: fileName });
+  return { ...data, used: 0 };
 }
 
 export async function listLog(brandId: string, beforeId: number | null, limit: number) {

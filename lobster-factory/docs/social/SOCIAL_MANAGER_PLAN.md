@@ -48,33 +48,33 @@
 - 驗收：dry-run 模式（`LOBSTER_EXECUTE_MANIFEST_STEPS` 同款開關）先跑一輪只記錄不送；真送一則 Bluesky 草稿（`type:"draft"`）驗 id 回寫；對帳把 fixture 的 ERROR 轉成 `error`。
 - 邊界：部署用 `tr_pat_*`（CLI），runtime 用 `tr_prod_*`；不碰其他 workflow。
 
-### C6 畫面（Opus 5.5；照樣稿，每個元件對應樣稿的一塊）
+### C6 畫面 ✅ 程式 2026-10-15（`app/(shell)/tools/social/`；UI 流程 `infra/hetzner-phase1-core/tests/e2e/social/social-manager.spec.ts`，跑在碰不到 Supabase 的 dev server `tests/e2e/social/dev-server-no-supabase.mjs`；平台色改為 `globals.css` 的 `--p-*`）
 - 範圍：`app/(shell)/tools/social/page.tsx`＋`SocialManager.tsx`（行事曆：週／月／清單；編輯：帳號、文字、各平台另寫、字數、媒體、第一則留言、連結＋UTM、替代文字、常用文字、格式、預覽手機／電腦；時間列：固定時間／加入輪播；四個動作；立即發佈二次確認）。資料全走 C4 的 API。
 - 規則：用 `globals.css` 的 token 與 `.btn-primary`／`.btn-secondary`；不用 `<select>`；一屏（1280×660 不捲動）；狀態色對應 ADR 016 §5。
 - 驗收：`npx tsc --noEmit`；Playwright（`/playwright`）：建立→排程→拖拉→清單批次→還原；`scripts/`（或 `__tests__/`）加「頁面原始碼無 `<select>`、無 hex 顏色」檢查，和 `check-social-mocks.py` 同規則。
 - 垃圾桶需要一個列出 `deleted` 貼文的 API（C4 的 `GET posts` 不含 deleted），在這張卡加。
 - 邊界：不碰 ContentStudio；舊面板在 C12 退場。
 
-### C7 輪播清單（Opus 5.5）
+### C7 輪播清單 ✅ 程式 2026-10-15（`0101_social_rotation.sql`＋`lib/social/rotation.ts`；清單存檔＝撤回未送出的具體化貼文再重排；同一格唯一靠不會被清掉的 `origin_list_id`）
 - 0096 交代的：具體化出來的貼文帶 `list_id`＋`scheduled_at`，`social_posts_list_slot_idx` 讓同一格不會生兩次；刪清單前先刪它 `state='rotation'` 的項目（資料庫會擋，API 回 409）。
 - C4 交代的：`list_position` 只存在 rotation 狀態；人對具體化貼文做任何動作（改時間、取消排程、刪除）都會清掉 `list_id`，它就變成手動貼文。所以「這一格做過沒」要記在清單的 cursor，不能靠找帶 `list_id` 的列；暫停撤回只撤還帶 `list_id` 的貼文（人動過的已是手動貼文，不撤）。
 - 範圍：清單 CRUD（C4 `lists`）＋ Trigger.dev 任務 `social-rotation`（每日 00:05 把未來 7 天的輪播發文具體化成 `scheduled` 貼文並前推 cursor；清單暫停時撤回尚未 `queued` 的）。畫面：左「輪播」檢視＋右清單編輯（照樣稿）。
 - 驗收：具體化冪等（同一天跑兩次不重複）；暫停撤回測試。
 
-### C8 審核與角色與通知（Opus 5.5）
+### C8 審核與角色與通知 ✅ 程式 2026-10-15（決定：審核預設不必經，每品牌「發文前要先審核」開關，`0102_social_review.sql`＋`lib/social/review.ts`；每品牌指定成員／審核人要等 middleware 帶出使用者 id——身分層，併 C12 的 go-ahead）
 - 範圍：品牌成員表＋角色（C1 已建表）；`reviewer` 核准／退回＋理由進備註與紀錄；通知：`error`、`expired`、等待審核 → `needs()` 同款查詢供「通知 N」；Telegram 用既有 ops 通知管道。
 - 先決定：審核是不是必經。現在 editor 可以從 draft 直接排程，owner 核准後 editor 也還能改內容（`lib/social/state.ts` RULES）。
 - 驗收：角色矩陣測試（4 角色 × 6 動作）。
 
-### C9 媒體庫（Sonnet 5.5）
+### C9 媒體庫 ✅ 程式 2026-10-15（`MediaView.tsx`；用過次數＝PostgREST embedded count）
 - 範圍：`social_media` 列表＋上傳（沿用 `uploadMedia` 與現有 storage）；用過次數；貼文附圖從庫選。
 - 邊界：R2 搬遷另開卡（runbook 的 R2 項目）。
 
-### C10 WordPress 文章 → 貼文（Sonnet 5.5）
+### C10 WordPress 文章 → 貼文 ✅ 程式 2026-10-15（`lib/social/wp-article.ts`、`GET /api/social/wp-article`、`ArticleSource.tsx`）
 - 範圍：行事曆上的文章卡 → 「用文章摘要」（WP REST `excerpt`＋主圖＋連結，免費）／「AI 改寫」（既有 `/api/content/syndicate`，按鈕標費用）→ 開編輯器預填。
 - 驗收：兩條路徑各一測試；費用顯示來自 `lib/ai/cost-model.ts`。
 
-### C11 紀錄（Sonnet 5.5）
+### C11 紀錄 ✅ 程式 2026-10-15（`LogView.tsx`；連接／取消／移除帳號、上傳媒體、清單存檔與刪除補寫紀錄）
 - 範圍：所有狀態轉換、改時間、連接、刪除、還原寫 `social_audit_log`（C4 的 `transition` 內統一寫）；「紀錄」檢視＋「需處理」篩選。
 - 驗收：每個動作一筆紀錄的測試。
 
@@ -83,6 +83,13 @@
 - 驗收：`/check-drift` → `/verify` → deploy → smoke；runbook §9 更新；WORKLOG。
 - 對外開放前（C4 審查 2026-10-15 留下的）：API 錯誤訊息改成固定文字（現在 `lib/social/store.ts` fail()／addImage 會帶資料庫與 Postiz 的原文，只限員工時可接受）；`GET /api/social/accounts` 會寫入（配對連接），而 GET 不經過 CSRF 檢查。
 - 邊界：先 go-ahead 才 deploy。
+- 2026-10-15 C5–C11 程式完成後，這張卡要一次 go-ahead 的項目（照順序）：
+  1. 套 0100 → 0101 → 0102（`node scripts/apply-db-migration.mjs 0100 0101 0102`；純新增，0101 換掉 0098 的兩個函式，先部署前套，舊程式呼叫 `social_save_list` 的 7 參數版會 PGRST202 → 0101 與 next-admin 部署要同一個窗口）。
+  2. compose 加 `SOCIAL_DISPATCH_TOKEN`（`safe-infra-patch.sh compose`），`SOCIAL_DISPATCH_ENABLED=true`、`SOCIAL_DISPATCH_MODE=draft` → `sg-deploy.sh next-admin` → `/playwright smoke`。
+  3. Trigger deploy（`trigger-deploy-agent`，`tr_pat_*`）：`social-dispatch`、`social-rotation`。
+  4. C5 驗收：排一則 Bluesky 貼文 → draft 模式送出 → Postiz 出現 DRAFT 且 `postiz_post_id` 回寫 → 刪掉 → 改 `SOCIAL_DISPATCH_MODE=apply`。
+  5. 子網域：nginx vhost `social.aware-wave.com`（`safe-infra-patch.sh host-nginx`）＋ middleware 以 host 導到 `/tools/social`（要確認 Supabase 登入 cookie 的網域涵蓋子網域）；ContentStudio 的 Postiz 面板換成「到社群發文」連結。
+  6. 每品牌成員／審核人：middleware 身分標頭帶出使用者 id（身分層）→ `authz.ts` 讀 `social_brand_members`。
 
 ## 2. V2（開放訂閱前）
 `social_audit_log` 保留期限或按月分割（每則貼文約 2 列，768 MB 主機）；WordPress 會員一鍵進入（ADR 015 §2）；方案與用量上限＋WooCommerce；Postiz analytics（審核後）；Chatwoot 入口與未讀數；最佳時段；重複貼文；find-slot 佇列；對外 API／MCP；服務條款、隱私政策、資料刪除；第二台 Postiz 的 instance 對應。

@@ -228,6 +228,17 @@
   --surface-bg:               var(--surface);
   --chip-bg:                  var(--build-chip-bg);
   --chip-surface:             var(--bg-subtle);
+
+  /* Social platform marks (/tools/social, lobster-factory/docs/social/mockups): each platform's own brand colour, not
+   * theme colours -- the theme editor does not list them. --p-ink = the letter on the mark. */
+  --p-fb: #1b5fc4;
+  --p-ig: #c2337a;
+  --p-th: #222a35;
+  --p-li: #0f6aa8;
+  --p-bs: #1083fe;
+  --p-wp: #2b6a9e;
+  --p-x: #14171a;
+  --p-ink: #ffffff;
 }
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -285,8 +296,7 @@ body {
 /* app-theme:end */
 /* mock-local: layout + type scale (the app has no type tokens yet; U22: text you read is never under 14px) */
 :root{ --fs-h1:18px; --fs-h2:15px; --fs-body:14px; --fs-tag:12px; --rail:46px; --hour:28px; }
-/* platform brand colours: component constants in the app, not theme tokens */
-:root{ --p-fb:#1b5fc4; --p-ig:#c2337a; --p-th:#222a35; --p-li:#0f6aa8; --p-bs:#1083fe; --p-wp:#2b6a9e; --p-ink:#ffffff; }
+/* platform brand colours (--p-*): app tokens in globals.css, copied above with the rest */
 
 html,body{height:100%}
 body{margin:0;font-size:var(--fs-body);font-variant-numeric:tabular-nums} /* font family, colours: the app's body rule above */

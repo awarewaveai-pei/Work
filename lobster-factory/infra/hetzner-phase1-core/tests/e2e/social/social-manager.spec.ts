@@ -1,0 +1,201 @@
+/**
+ * /tools/social UI flows (lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md C6 acceptance): create -> schedule ->
+ * drag -> list bulk -> restore, and the one-screen rule (1280x660, no page scroll); C7 a rotation list takes a draft;
+ * C10 a WordPress article starts a post from its own excerpt.
+ * Every /api/social call is answered by an in-memory fake below (page.route), so this tests the page, never a
+ * database or Postiz; the API itself is covered by next-admin app/api/social/__tests__. Run against a dev server
+ * with no Supabase configured (.claude/launch.json "next-admin-social-ui", port 3902):
+ *   cd lobster-factory/infra/hetzner-phase1-core/tests && PLAYWRIGHT_SOCIAL_URL=http://127.0.0.1:3902 npx playwright test --project social
+ */
+import { expect, test, type Page, type Route } from '@playwright/test';
+
+const BRAND = { id: '0b0b0b0b-0000-4000-8000-000000000001', slug: 'soulful', name: 'Soulful Expression', default_timezone: 'Asia/Taipei', role: 'owner' };
+const ACCOUNTS = [
+  { id: 'acc00000-0000-4000-8000-000000000001', platform: 'bluesky', label: 'soulful.bsky.social', status: 'connected', postiz_integration_id: 'i1' },
+  { id: 'acc00000-0000-4000-8000-000000000002', platform: 'facebook', label: 'Soulful 粉專', status: 'connected', postiz_integration_id: 'i2' },
+];
+
+type Post = Record<string, any>;
+
+const ARTICLE = { siteId: 'site-1', siteName: 'Soulful', id: 42, title: '藝術治療和畫畫課有什麼不同', status: 'publish', date: '', viewUrl: 'https://soulful.example/a' };
+
+function fakeServer() {
+  const posts = new Map<string, Post>();
+  const lists = new Map<string, Post>();
+  const calls: string[] = [];
+  let n = 0;
+  const json = (route: Route, body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+  const ok = (route: Route, body: object = {}) => json(route, { ok: true, ...body });
+  const write = (p: Post, input: any) => {
+    Object.assign(p, input.fields ?? {});
+    if (input.targets) p.targets = input.targets.map((t: any, i: number) => ({ id: `${p.id}-t${i}`, state: 'pending', postiz_post_id: null, release_url: null, error: null, ...t }));
+    if (input.media) p.media = input.media.map((m: any, i: number) => ({ ...m, position: i }));
+  };
+  async function handle(route: Route) {
+    const req = route.request();
+    const url = new URL(req.url());
+    const path = url.pathname;
+    const body = req.postDataJSON?.() ?? null;
+    calls.push(`${req.method()} ${path}${body?.action ? ` ${body.action}` : ''}`);
+    if (path === '/api/social/brands') return ok(route, { brands: [BRAND] });
+    if (path === '/api/social/accounts') return ok(route, { accounts: ACCOUNTS, connecting: null, justConnected: null, connectFailed: null });
+    if (path === '/api/social/media') return ok(route, { media: [] });
+    if (path === '/api/social/texts') return ok(route, { texts: [] });
+    if (path === '/api/social/needs') return ok(route, { failed: [], expired: [], review: [], n: 0 });
+    if (path === '/api/social/settings') return ok(route, { requireReview: false });
+    if (path === '/api/social/log') return ok(route, { log: [] });
+    if (path === '/api/social/wp-article') return ok(route, { article: { title: ARTICLE.title, excerpt: '畫畫課教技巧；藝術治療看的是過程。', content: '', link: ARTICLE.viewUrl, image: null } });
+    if (path === '/api/social/lists' && req.method() === 'GET') return ok(route, { lists: [...lists.values()] });
+    if (path === '/api/social/lists' && req.method() === 'POST') {
+      const id = `11111111-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+      lists.set(id, { id, name: body.name, weekdays: body.weekdays, send_time: body.send_time, active: body.active, cursor: 0, accounts: body.account_ids.map((a: string) => ({ account_id: a })) });
+      return ok(route, { id, materialized: 0 });
+    }
+    const lm = path.match(/^\/api\/social\/lists\/([^/]+)$/);
+    if (lm && req.method() === 'GET') {
+      const items = [...posts.values()].filter((p) => p.state === 'rotation' && p.list_id === lm[1]).sort((a, b) => a.list_position - b.list_position);
+      return ok(route, { list: lists.get(lm[1]), items, upcoming: [] });
+    }
+    if (path === '/api/social/posts' && req.method() === 'GET') {
+      if (url.searchParams.get('trash') === '1') return ok(route, { posts: [...posts.values()].filter((p) => p.state === 'deleted') });
+      const start = Date.parse(url.searchParams.get('start')!), end = Date.parse(url.searchParams.get('end')!);
+      // the article sits on the second day of the window, 08:00 site time
+      const day = new Date(start + 36 * 3600_000).toISOString().slice(0, 10);
+      return ok(route, { undatedTruncated: false, wordpress: [{ ...ARTICLE, date: `${day}T08:00:00` }], posts: [...posts.values()].filter((p) => p.state !== 'deleted'
+        && (p.scheduled_at === null || (Date.parse(p.scheduled_at) >= start && Date.parse(p.scheduled_at) < end))) });
+    }
+    if (path === '/api/social/posts' && req.method() === 'POST') {
+      const id = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+      const p: Post = { id, state: 'draft', body: '', scheduled_at: null, list_id: null, list_position: null, first_comment: null, link_url: null, link_utm: false,
+        notes: null, source_url: null, published_at: null, deleted_at: null, created_by: 'ops:owner', version: 1, targets: [], media: [] };
+      write(p, body);
+      posts.set(id, p);
+      return ok(route, { post: { id, version: 1 } });
+    }
+    if (path === '/api/social/posts/bulk') {
+      const results = body.items.map((it: any) => {
+        const p = posts.get(it.id)!;
+        p.state = it.action === 'delete' ? 'deleted' : 'review';
+        p.version++;
+        return { id: it.id, ok: true, version: p.version, state: p.state };
+      });
+      return ok(route, { results });
+    }
+    const m = path.match(/^\/api\/social\/posts\/([^/]+)(\/state)?$/);
+    if (m) {
+      const p = posts.get(m[1]);
+      if (!p) return json(route, { ok: false, error: 'no such post' }, 404);
+      if (req.method() === 'GET') return ok(route, { post: p });
+      if (body.version !== p.version) return json(route, { ok: false, error: 'changed' }, 409);
+      if (!m[2]) write(p, body);
+      else if (body.action === 'schedule') Object.assign(p, { state: 'scheduled', scheduled_at: body.scheduledAt });
+      else if (body.action === 'unschedule') p.state = 'draft';
+      else if (body.action === 'submit') p.state = 'review';
+      else if (body.action === 'delete') Object.assign(p, { state: 'deleted', deleted_at: new Date().toISOString() });
+      else if (body.action === 'restore') Object.assign(p, { state: 'draft', deleted_at: null });
+      else if (body.action === 'publish_now') Object.assign(p, { state: 'scheduled', scheduled_at: new Date().toISOString() });
+      else if (body.action === 'to_rotation') Object.assign(p, { state: 'rotation', scheduled_at: null, list_id: body.listId, list_position: body.listPosition });
+      p.version++;
+      return ok(route, { post: { id: p.id, version: p.version } });
+    }
+    return json(route, { ok: false, error: `fake: ${path} not handled` }, 501);
+  }
+  return { posts, calls, handle };
+}
+
+async function open(page: Page) {
+  const server = fakeServer();
+  await page.route('**/api/social/**', (r) => server.handle(r));
+  await page.setViewportSize({ width: 1280, height: 660 });
+  await page.goto(`/tools/social?brand=${BRAND.id}`);
+  await expect(page.getByRole('heading', { name: '社群發文' })).toBeVisible();
+  await expect(page.getByRole('button', { name: BRAND.name })).toBeVisible();
+  return server;
+}
+
+test.describe('social manager', () => {
+  test('fits one 1280x660 screen with no page scroll', async ({ page }) => {
+    await open(page);
+    const size = await page.evaluate(() => ({ h: document.scrollingElement!.scrollHeight, w: document.scrollingElement!.scrollWidth }));
+    expect(size.h).toBeLessThanOrEqual(660);
+    expect(size.w).toBeLessThanOrEqual(1280);
+    expect(await page.locator('select').count()).toBe(0);
+  });
+
+  test('create -> schedule -> drag to another day -> list bulk delete -> restore', async ({ page }) => {
+    const server = await open(page);
+
+    // create and schedule: tomorrow 09:00 is the new post's default
+    await page.getByLabel('貼文內容').fill('週六親子藝術時光還有三個名額。');
+    await page.getByRole('button', { name: '排程', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('已排在');
+    const [post] = [...server.posts.values()];
+    expect(post.state).toBe('scheduled');
+    expect(post.targets.map((t: any) => t.account_id).sort()).toEqual(ACCOUNTS.map((a) => a.id).sort());
+
+    // the week shows it; drag it one day later
+    const before = post.scheduled_at as string;
+    const card = page.locator('.sm-post', { hasText: '週六親子藝術時光' });
+    await expect(card).toBeVisible();
+    const from = await card.boundingBox();
+    const cols = page.locator('.sm-col');
+    const fromDay = await card.evaluate((el) => (el.parentElement as HTMLElement).dataset.date);
+    const fromIndex = await cols.evaluateAll((els, d) => els.findIndex((e) => (e as HTMLElement).dataset.date === d), fromDay);
+    const target = cols.nth(fromIndex === 6 ? 5 : fromIndex + 1);
+    const box = await target.boundingBox();
+    await card.dragTo(target, { targetPosition: { x: box!.width / 2, y: from!.y - box!.y + 4 } });
+    await expect(page.getByRole('status')).toContainText('已改到');
+    expect(server.calls.filter((c) => c.endsWith('/state schedule')).length).toBe(2);
+    const after = server.posts.get(post.id)!.scheduled_at as string;
+    expect(Math.abs(Date.parse(after) - Date.parse(before) - 24 * 3600_000)).toBeLessThan(3600_000);   // a day later, about the same time
+
+    // list: tick it, bulk delete; then the bin restores it
+    await page.getByRole('button', { name: '清單', exact: true }).click();
+    await page.getByLabel('選取').first().check();
+    await page.getByRole('button', { name: '刪除所選' }).click();
+    await expect(page.getByRole('status')).toContainText('已刪除');
+    expect(server.posts.get(post.id)!.state).toBe('deleted');
+    await page.getByRole('button', { name: '已刪除', exact: true }).click();
+    await page.getByRole('button', { name: '還原' }).click();
+    await expect(page.getByRole('status')).toContainText('已還原');
+    expect(server.posts.get(post.id)!.state).toBe('draft');
+  });
+
+  test('publishing now asks once more before it sends', async ({ page }) => {
+    const server = await open(page);
+    await page.getByLabel('貼文內容').fill('現在就發。');
+    await page.getByRole('button', { name: '立即發佈' }).click();
+    await expect(page.getByText('發出去之後，這裡收不回來')).toBeVisible();
+    expect(server.calls.some((c) => c.includes('publish_now'))).toBe(false);
+    await page.getByRole('button', { name: '確定發佈' }).click();
+    await expect(page.getByRole('status')).toContainText('已交出去');
+    expect(server.calls.some((c) => c.endsWith('/state publish_now'))).toBe(true);
+  });
+
+  test('C7: a rotation list is created and takes a draft', async ({ page }) => {
+    const server = await open(page);
+    await page.getByLabel('貼文內容').fill('藝術治療需要會畫畫嗎？不用。');
+    await page.getByRole('button', { name: '存草稿' }).click();
+    await expect(page.getByRole('status')).toContainText('已存起來');
+    await page.getByRole('button', { name: '輪播', exact: true }).click();
+    await page.getByRole('button', { name: '＋ 新清單' }).click();
+    await page.getByLabel('清單名稱').fill('常見問題');
+    await page.getByRole('button', { name: '一', exact: true }).click();
+    await page.getByRole('button', { name: '儲存清單' }).click();
+    await expect(page.getByRole('status')).toContainText('清單已儲存');
+    await page.getByRole('button', { name: '從草稿加入' }).click();
+    await page.getByRole('button', { name: /藝術治療需要會畫畫嗎/ }).click();
+    await expect(page.getByText('已加到清單最後。')).toBeVisible();
+    const [draft] = [...server.posts.values()];
+    expect([draft.state, draft.list_position]).toEqual(['rotation', 0]);
+  });
+
+  test('C10: a WordPress article starts a post from its own excerpt, at no cost', async ({ page }) => {
+    await open(page);
+    await page.locator('.sm-post.sm-article').first().click();
+    await expect(page.getByRole('button', { name: /AI 改寫（約 NT\$/ })).toBeVisible();
+    await page.getByRole('button', { name: '用文章摘要' }).click();
+    await expect(page.getByLabel('貼文內容')).toHaveValue(/藝術治療看的是過程。\n\n全文：https:\/\/soulful.example\/a/);
+    await expect(page.getByText('沒有花錢')).toBeVisible();
+  });
+});

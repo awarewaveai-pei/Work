@@ -11,6 +11,9 @@ const store = vi.hoisted(() => ({
 const postiz = vi.hoisted(() => ({ listPosts: vi.fn(), deletePost: vi.fn() }));
 const rotation = vi.hoisted(() => ({ materializeList: vi.fn(), listQueue: vi.fn(), reorderList: vi.fn(), deleteList: vi.fn(), nextPosition: vi.fn() }));
 vi.mock("@/lib/social/rotation", () => rotation);
+// C8: the brand's review setting (off unless a test turns it on); notifications are not this file's subject
+const review = vi.hoisted(() => ({ requiresReview: vi.fn(async () => false), notifyReview: vi.fn(async () => undefined) }));
+vi.mock("@/lib/social/review", async (orig) => ({ ...(await orig<typeof import("@/lib/social/review")>()), ...review }));
 vi.mock("@/lib/content/postiz", async (orig) => ({ ...(await orig<typeof import("@/lib/content/postiz")>()), ...postiz }));
 vi.mock("@/lib/social/store", async (orig) => ({ ...(await orig<typeof import("@/lib/social/store")>()), ...store }));
 const wp = vi.hoisted(() => ({ listAccessibleWpSites: vi.fn(async () => ({ sites: [] as unknown[], tokens: {} as Record<string, string>, usernames: {} as Record<string, string> })) }));
@@ -152,7 +155,7 @@ describe("/api/social routes", () => {
   it("accounts DELETE ?attempt gives up the open connection", async () => {
     const { DELETE } = await import("../accounts/route");
     expect((await DELETE(req("DELETE", `/api/social/accounts?brand=${A}&attempt=${P}`, { role: "operator" }))).status).toBe(200);
-    expect(store.cancelConnect).toHaveBeenCalledWith(A, P);
+    expect(store.cancelConnect).toHaveBeenCalledWith(A, P, "ops:operator");
     expect(store.unlinkAccount).not.toHaveBeenCalled();
   });
 
@@ -179,7 +182,7 @@ describe("/api/social routes", () => {
     expect((await POST(req("POST", "/api/social/lists", { role: "owner" }, { brand: A, name: "L", active: true }))).status).toBe(400);
     store.saveList.mockResolvedValue("l1");
     expect((await POST(req("POST", "/api/social/lists", { role: "owner" }, { brand: A, name: "L", weekdays: [3, 1, 3], account_ids: [ACC] }))).status).toBe(200);
-    expect(store.saveList).toHaveBeenCalledWith(A, null, { name: "L", weekdays: [1, 3], send_time: "10:00", active: false, account_ids: [ACC] });
+    expect(store.saveList).toHaveBeenCalledWith(A, null, { name: "L", weekdays: [1, 3], send_time: "10:00", active: false, account_ids: [ACC] }, expect.stringMatching(/^ops:/));
   });
 
   it("lists/[id] DELETE: a viewer is refused", async () => {
@@ -238,7 +241,7 @@ describe("/api/social routes", () => {
     expect((await order.PUT(req("PUT", `/api/social/lists/${L}/order`, { role: "operator" }, { brand: A, postIds: [P] }), ctx(L))).status).toBe(200);
     expect(rotation.reorderList).toHaveBeenCalledWith(A, L, [P], "ops:operator");
     expect((await one.DELETE(req("DELETE", `/api/social/lists/${L}?brand=${A}`, { role: "operator" }), ctx(L))).status).toBe(200);
-    expect(rotation.deleteList).toHaveBeenCalledWith(A, L);
+    expect(rotation.deleteList).toHaveBeenCalledWith(A, L, "ops:operator");
   });
 
   // C10: an article of this brand's site, read with the site's own password; another brand's site is a 404
@@ -273,5 +276,15 @@ describe("/api/social routes", () => {
     expect((await over.json()).detail.overLimit[0]).toMatchObject({ platform: "x", limit: 280 });
     const bare = await POST(req("POST", "/api/social/posts", { role: "operator" }, { brand: A, fields: { body: "x", link_url: "https://" }, targets: [{ account_id: ACC }] }));
     expect(bare.status).toBe(400);
+  });
+
+  // C8: with review on, an editor may not change an approved post's content (unschedule first); notes are fine
+  it("posts/[id] PUT with review on: an approved post's content is refused for an editor, not for an owner", async () => {
+    const { PUT } = await import("../posts/[id]/route");
+    review.requiresReview.mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValueOnce(true);
+    store.getPost.mockResolvedValue(draft({ state: "scheduled", scheduled_at: "2099-01-01T00:00:00Z" }));
+    expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "operator" }, { brand: A, version: 3, fields: { body: "x" } }), ctx(P))).status).toBe(409);
+    expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "operator" }, { brand: A, version: 3, fields: { notes: "n" } }), ctx(P))).status).toBe(200);
+    expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "owner" }, { brand: A, version: 3, fields: { body: "x" } }), ctx(P))).status).toBe(200);
   });
 });

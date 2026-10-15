@@ -9,6 +9,8 @@ const API_URL   = process.env.PLAYWRIGHT_API_URL   || 'https://api.aware-wave.co
 const N8N_URL   = process.env.PLAYWRIGHT_N8N_URL   || 'https://n8n.aware-wave.com';
 const CLIENT_URL = process.env.PLAYWRIGHT_CLIENT_URL || '';
 const COGNITIVE_URL = process.env.PLAYWRIGHT_COS_URL || 'http://127.0.0.1:8421';
+// /tools/social UI flows: a next-admin dev server with no Supabase (.claude/launch.json "next-admin-social-ui")
+const SOCIAL_URL = process.env.PLAYWRIGHT_SOCIAL_URL || 'http://127.0.0.1:3902';
 
 // Screenshot output dir — runner passes this; tests import from env.ts helper
 const SCREENSHOTS_DIR = process.env.PLAYWRIGHT_SCREENSHOTS_DIR ||
@@ -99,6 +101,15 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         baseURL: COGNITIVE_URL,
+      },
+    },
+    {
+      name: 'social',
+      testMatch: '**/social/**/*.spec.ts',
+      timeout: 120_000,   // the dev server compiles the page on first hit
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: SOCIAL_URL,
       },
     },
     // ── Mobile smoke: same smoke suite on a Pixel 5 viewport ─────────────

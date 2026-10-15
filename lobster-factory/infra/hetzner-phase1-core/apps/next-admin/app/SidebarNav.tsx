@@ -65,6 +65,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     label: 'Content Tools',
     items: [
       { type: 'link',     href: '/tools/content',      icon: '✍', label: 'SEO Content',   title: 'SEO/GEO 文章產出' },
+      { type: 'link',     href: '/tools/social',       icon: '📣', label: '社群發文',       title: '多品牌社群排程（ADR 016）' },
       { type: 'link',     href: '/tools/video',         icon: '🎬', label: 'Video',          title: '影片生成工具' },
       { type: 'link',     href: '/tools/tarot',         icon: '🔮', label: 'Tarot',           title: '塔羅牌印刷檔生成工具' },
       { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'Studio',          title: 'POD 設計生成器' },

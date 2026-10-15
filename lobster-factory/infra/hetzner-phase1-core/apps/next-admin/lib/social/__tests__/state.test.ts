@@ -84,3 +84,26 @@ describe("social post transitions", () => {
     expect(transition(post("draft", { targetCount: 0 }), "to_rotation", "owner", INPUT, NOW).state).toBe("rotation");   // the list's accounts send it
   });
 });
+
+// C8: the role matrix with the brand's review setting. Six actions a person does on a post, four roles, review off/on.
+describe("review required (C8, migration 0102)", () => {
+  const SIX: PostAction[] = ["submit", "approve", "reject", "schedule", "publish_now", "delete"];
+  const FROM: Record<string, PostState> = { submit: "draft", approve: "review", reject: "review", schedule: "draft", publish_now: "draft", delete: "draft" };
+  // with review on, the only change: an editor cannot put a draft on the schedule (submit instead)
+  const allowed = (action: PostAction, role: BrandRole, review: boolean) =>
+    LEGAL[action].roles.includes(role) && !(review && role === "editor" && action === "schedule");
+  it("4 roles x 6 actions, review off and on", () => {
+    for (const review of [false, true]) for (const action of SIX) for (const role of ROLES) {
+      const run = () => transition(post(FROM[action]), action, role, { ...INPUT, requireReview: review }, NOW);
+      if (allowed(action, role, review)) expect(run, `${review} ${role} ${action}`).not.toThrow();
+      else expect(run, `${review} ${role} ${action}`).toThrow(TransitionError);
+    }
+  });
+  it("with review on an editor may still move an approved post, and an owner may still schedule a draft", () => {
+    expect(() => transition(post("scheduled"), "schedule", "editor", { ...INPUT, requireReview: true }, NOW)).not.toThrow();
+    expect(() => transition(post("draft"), "schedule", "owner", { ...INPUT, requireReview: true }, NOW)).not.toThrow();
+    expect(() => transition(post("error"), "schedule", "editor", { ...INPUT, requireReview: true }, NOW)).toThrow(/needs review/);
+    expect(() => transition(post("draft"), "to_rotation", "editor", { ...INPUT, requireReview: true }, NOW)).toThrow(/needs review/);
+    expect(() => transition(post("draft"), "to_rotation", "owner", { ...INPUT, requireReview: true }, NOW)).not.toThrow();
+  });
+});
