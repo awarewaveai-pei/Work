@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-15（續28）認知平台上線 b5c8a628→2e7d70c46（6 個 commit）：第一次部署被測試閘門擋下，修兩個舊缺陷後重跑
+
+**操作者**：「要」（部署 75b013d14／04e56476c／c65e2ec97／7566beea7／c76fde717／2e7d70c46 一起上）。範圍內沒有 migration、compose、Dockerfile 改動。
+
+**根因**（第一次 `deploy.sh`，`/tmp/cos-deploy-20261015a.out`，07:58:28Z TEST GATE: FAIL；容器沒動，仍 Up 12 小時）:
+- `blocks/ai.py:178` `return waiter.result or {}`（c118157c5 引入）違反「只有不存在才是空」（`tests/unit/test_absent_is_none.py`）。閘門只跑「上次綠燈以來受影響的測試」，這次範圍才碰到它；本機也紅。
+- `tests/unit/test_tool_page_template.py`（c65e2ec97）讀 `docs/TOOL_PAGE_TEMPLATE.md` 與 web 檔，API image 不含 `docs/` → 在 image 裡 FileNotFound。與 662030700 同一類。
+
+**做了**:
+- `ai.py:178` → `{} if waiter.result is None else waiter.result`（`waiter.result: dict | None`，`ai.py:108`）。
+- `scripts/image_test_modules.py` `CHECKOUT_ONLY_TEST_MODULES` 加 `test_tool_page_template`（理由寫在同一行）。
+- 沒加「image 測試不得讀 image 外路徑」的靜態檢查：試算後 49 個 image 測試的字串會誤中（`specs`／`apps`／`docs` 各有他義），要豁免一長串＝讓偵測器閉嘴；這一類的偵測器就是部署閘門本身，它 fail-closed、沒有上線任何東西。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m unittest tests.unit.test_absent_is_none tests.unit.test_ci_postgres tests.unit.test_tool_page_template → Ran 13 OK（改前 test_absent_is_none FAIL：`blocks/ai.py:_background found 1 listed 0`） | exit=0 | ms=11531
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run → Ran 1482 tests OK | exit=0 | ms=1182395
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+  - 讀回兩處 diff：`ai.py` 只改 178 行、型別註記 `ai.py:108` 為 `dict | None`；checkout-only 清單由 `test_ci_postgres.py:104-110` 驗集合一致（OK）。
+- ORACLE_WAIVED: 兩行修正，各由一個既有指名測試由紅轉綠；部署閘門在主機上再跑一次 image 測試
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=or \{\}$|waiter.result | hits=54
+  - `waiter.result` 只有 `ai.py:137`（賦值）與 `ai.py:178`。其餘 52 個行尾 `or {}`：在 test_absent_is_none 掃的範圍（block hooks／block routes／AI actions）內的都已列在 `HARMLESS`（測試綠）；範圍外（`main.py`、`method_form.py`、`scripts/phase4-checks.py` 等）不屬這條規則，這次不動。
+
+**rollback**: `git revert` 本 commit；主機 `cd /opt/cognitive-os && git checkout b5c8a628f` 後重跑 `deploy/deploy.sh`（或 deploy.sh 失敗時自動還原 image）。
 ## 2026-10-15（續27）Soulful：網站草稿／假字清掉（正式站）、CS 改成「問答→AI→真人」且 AI 先查知識再花錢、中文問英文庫翻譯重查（程式未部署）、Zoho Desk 評估
 
 **操作者決定**：AI 留著當第二層（「不花錢的自動回覆無法回，再用 AI，AI 無法回，再轉真人」）；網站 4 頁「我不會 你去處理」；「聽說 Zoho Desk 功能很棒，你去研究」；網站是英文站（還沒加語言外掛）。

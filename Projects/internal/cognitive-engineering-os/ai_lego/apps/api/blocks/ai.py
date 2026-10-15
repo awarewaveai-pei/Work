@@ -175,7 +175,7 @@ def _background(prepared: Prepared, provider: Any, response: Response) -> dict[s
         response.status_code = 202
         return {"turn": turn_id, "status": "PENDING"}
     if waiter.error is None:
-        return waiter.result or {}
+        return {} if waiter.result is None else waiter.result   # only an absent result is none (test_absent_is_none)
     if isinstance(waiter.error, InvariantViolation):
         raise _refused(waiter.error) from waiter.error
     raise HTTPException(status_code=500, detail=_kept(waiter.error)) from waiter.error   # the code the record keeps (_run_turn logged it)
