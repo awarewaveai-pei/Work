@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { requireClientOrg, PortalAccessError } from "@/lib/tenant-guard";
 import { createSupabaseUserClient } from "@/lib/supabase/route-client";
 import { PRODUCTS } from "@/lib/portal/products";
+import { productHost } from "@/lib/portal/doors";
 
 export const dynamic = "force-dynamic";
 
@@ -90,7 +91,7 @@ export default async function PortalLauncherPage() {
                 {isReady ? "已開通" : "即將推出"}
               </p>
               {isReady ? (
-                <a href={`https://${product.domain}`} className="btn-primary">開啟</a>
+                <a href={`https://${productHost(product)}`} className="btn-primary">開啟</a>
               ) : (
                 <button className="btn-primary" disabled style={{ opacity: 0.5, cursor: "not-allowed" }}>
                   即將推出

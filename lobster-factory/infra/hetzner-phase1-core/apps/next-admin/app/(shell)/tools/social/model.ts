@@ -10,7 +10,7 @@ export interface MediaLink { media_id: string; position: number; alt_text: strin
 export interface Post {
   id: string; state: PostState; body: string; scheduled_at: string | null; list_id: string | null; list_position: number | null;
   first_comment: string | null; link_url: string | null; link_utm: boolean; notes: string | null; source_url: string | null;
-  published_at: string | null; deleted_at: string | null; created_by: string; version: number;
+  published_at: string | null; deleted_at: string | null; version: number;
   targets: Target[]; media: MediaLink[];
 }
 

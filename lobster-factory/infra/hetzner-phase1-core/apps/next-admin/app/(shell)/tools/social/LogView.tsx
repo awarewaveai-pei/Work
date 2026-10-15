@@ -17,7 +17,9 @@ export const ACTION_NAMES: Record<string, string> = {
   list_save: "儲存輪播清單", list_delete: "刪除輪播清單", media_upload: "上傳媒體",
 };
 
-const who = (actor: string) => actor.startsWith("system:") ? "系統" : actor.startsWith("client:") ? "客戶" : actor.replace(/^ops:/, "團隊・");
+// actor = "ops:<role>[:<user id>]" | "client:<org>[:<user id>]" | "system:..." (lib/social/authz.ts actorOf)
+const who = (actor: string) => actor.startsWith("system:") ? "系統" : actor.startsWith("client:") ? "客戶"
+  : actor === "ops" ? "AwareWave 團隊" : actor.startsWith("ops:") ? `團隊・${actor.split(":")[1]}` : actor;
 
 function summary(row: LogRow, tz: string): string {
   const d = row.detail ?? {};

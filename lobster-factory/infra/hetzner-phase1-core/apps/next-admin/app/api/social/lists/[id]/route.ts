@@ -18,7 +18,7 @@ export async function GET(req: Request, { params }: Ctx): Promise<Response> {
   return handle(async () => {
     const id = uuid((await params).id, "id");
     const brand = uuid(new URL(req.url).searchParams.get("brand"), "brand");
-    requireBrandRole(req, brand, ANY_ROLE);
+    await requireBrandRole(req, brand, ANY_ROLE);
     const list = (await listLists(brand)).find((l) => l.id === id);
     if (!list) throw new SocialStoreError(404, "no such list in this brand");
     return { list, ...(await listQueue(brand, id)) };
@@ -30,7 +30,7 @@ export async function PUT(req: Request, { params }: Ctx): Promise<Response> {
     const id = uuid((await params).id, "id");
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    await requireBrandRole(req, brand, WRITE_ROLES);
     await saveList(brand, id, parseListInput(body), actorOf(req));
     return { id, materialized: await materializeList(brand, id) };
   });
@@ -40,7 +40,7 @@ export async function DELETE(req: Request, { params }: Ctx): Promise<Response> {
   return handle(async () => {
     const id = uuid((await params).id, "id");
     const brand = uuid(new URL(req.url).searchParams.get("brand"), "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    await requireBrandRole(req, brand, WRITE_ROLES);
     await deleteList(brand, id, actorOf(req));
     return {};
   });

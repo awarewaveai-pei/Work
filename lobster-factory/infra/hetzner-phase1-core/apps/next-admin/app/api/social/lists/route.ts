@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request): Promise<Response> {
   return handle(async () => {
     const brand = uuid(new URL(req.url).searchParams.get("brand"), "brand");
-    requireBrandRole(req, brand, ANY_ROLE);
+    await requireBrandRole(req, brand, ANY_ROLE);
     return { lists: await listLists(brand) };
   });
 }
@@ -22,7 +22,7 @@ export async function POST(req: Request): Promise<Response> {
   return handle(async () => {
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    await requireBrandRole(req, brand, WRITE_ROLES);
     const id = await saveList(brand, null, parseListInput(body), actorOf(req));
     return { id, materialized: await materializeList(brand, id) };
   });

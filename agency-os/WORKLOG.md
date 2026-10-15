@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-15（續25）產品三扇門寫成 ADR 018＋SOP §18＋登記表欄位與測試；社群 C12 ⑥（使用者 id＋品牌成員表）、⑤ 程式面（social 這扇門）完成，未部署
+
+**做了**（操作者「先寫 ADR 017（三扇門＋買斷）、SOP 清單、products.ts 欄位＋測試，再做 ⑥、⑤」；017 號已是〈客戶怎麼買〉，改用 018）：
+- C1 `agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md`：公開門 aware-wave.com（WP 收錢）／產品門 `<子網域>.<基底網域>`／員工門 app；網址由 `products.ts`＋`PUBLIC_BASE_DOMAIN`／`PORTAL_HOST`／`PRODUCT_HOST_<KEY>` 決定；登入來源 `local`／`awarewave-wp`／`customer-wp`，每產品必含 `local`；買斷＝同一份程式換設定（017 §5–6）。ADR_INDEX 加列、017 改「已接受」；015 §2、016 §3 各一行指向 018；AGENTS.md §0 一行指標；`GOVERNED_SYSTEM_BUILD_SOP.md` §18 五題清單。
+- C2 next-admin `lib/portal/products.ts`：`domain` 換成 `subdomain`、`door`（next-admin 頁面／API 前綴或 external）、`loginSources`、`standalone`；`__tests__/products.test.ts` 擋漏填、保留子網域、前綴蓋到員工路由、門的 `page.tsx` 不存在。
+- C3 新 `lib/portal/doors.ts`：host→門唯一判斷處（`doorForHost`、`routeOnProductDoor`、`productHost`）。launcher 連結改 `productHost()`。
+- C4 ⑥：middleware 注入 `x-ops-user-id`（`data.user.id`，`CLAIM_HEADERS` 先剝除客戶端送的），session 快取多存 userId；`lib/social/authz.ts` 改 async：成員列＝明示授權優先，員工 owner/admin 仍全品牌 owner，客戶只見自己的組織＋成員品牌（`/api/social/brands`）；actor 帶 `:<user id>`，LogView 只顯示角色。27 處 `requireBrandRole` 加 await。
+- C5 ⑤ 程式：middleware 讀門——產品門上不在產品前綴的頁面改寫到 `/social`、其他 API 404；`/social` 在別的網址 404；客戶身分只能用所在門的路徑（`isClientOutsideDoor`）。新 `app/social/{layout,page}.tsx`：不套員工側欄，共用 `SocialApp`；`globals.css` 加 `.door-main`／`.door-foot`。
+- C6 審查後修（critic 1M/3L、Codex 四輪 2+逾時+2+1）：M1 客戶不能開「新頻道」連接（`store.ts` 只靠時間把新頻道配給品牌，一個開著的嘗試擋全部品牌、無主頻道會被搶走；`requireStaffForNewChannel`，客戶仍可重連自己的頻道）；L2 紀錄對客戶只顯示 `ops`／`client:<org>`（`actorForViewer`），同類的貼文 `created_by` 從 `POST_COLUMNS` 拿掉（UI 從未讀它）；L1＋Codex F1 social vhost 擋編碼 `.`／`/` 與 matcher 跳過的全部路徑（`/intake`、`/api/internal`、`/api/webhooks`…），測試用 nginx 自己的 pattern 比對每條被跳過路徑的實際子路徑。Codex 第四輪：編碼路徑規則用 `$request_uri` 連查詢字串一起比，`/login?next=%2F` 會 400（未登入到不了登入頁）→ 改成只比 `?` 之前；同一段第二次被報，不變量＝「門的 nginx 過濾只看路徑；測試直接跑 nginx 兩條 pattern，對該擋與該留（含查詢字串）兩組都驗」。
+- Codex F2（兩輪重複報）不變量：「一個網址只有一組設定值，app、nginx、DNS 都讀同一組」；擁有者＝ADR 017 第 5 步的買斷安裝程式（寫進 ADR 018 §4）。線上只用預設值，現在沒有實際缺陷，所以不在本次改 compose。L3（設定成重複網址會讓員工 404，fail-closed）未做。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx vitest run`（全套） | exit=0 | ms=13940 → 253 files／2357 passed／17 skipped
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit -p .` | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（拋棄式 worktree D:/tmp/mut-doors，6 個守衛各一次）：客戶限門內、成員列授權客戶、產品門其他 API 404、登記表必含 local、新頻道限員工、門的 vhost 擋 matcher 跳過路徑 → 6/6 拔掉變紅、還原變綠；第 7 個（nginx pattern 加 `$`）用 node 跑同一判斷：live 擋 `/api/internal/social/dispatch`=true、突變=false | exit=0 | ms=180000
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker nginx:alpine 掛 repo `nginx/default.conf`：`nginx -t` ok；Host social.aware-wave.com 打 `/api/video/%2e%2e/social/brands`、`/api/x/../social`、`/a%2Fb` → 400，`/`、`/social/x`、`/api/social/brands` → 502（沒有上游＝放行） | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sudo openssl x509 -in /etc/letsencrypt/live/aware-wave.com/fullchain.pem -noout -ext subjectAltName` → 10 個 SAN 無 social（上線要先 expand） | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/3n -- critic agent（0C/0H/1M/3L）＋Codex 第一輪 `agency-os/reports/oracle/2026-10-15-partialreview-199d9a92.md`（2）、第三輪 `2026-10-15-partialreview-5fd1fb1f.md`（2，其一與第一輪重複）、第四輪 `2026-10-15-partialreview-21abdb9b.md`（1，已修）；第二輪逾時 900s 無結果
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker nginx 第二次（修第四輪後）：social Host `/a%2Fb`、`/x/../social` → 400；`/api/internal/social/dispatch`、`/intake` → 404；`/login?next=%2F`、`/_next/image?url=%2Fa.png`、`/social` → 轉上游；舊 pattern 對 `/login?next=%2F`=true、新=false | exit=0 | ms=30000
+- ORACLE_WAIVED: 第四輪 artifact 之後只改了它報的那一條（nginx 編碼路徑規則只看路徑＋測試加查詢字串探針），已由指名測試、舊/新 pattern 對照與實際 nginx 驗證；不再開第五輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`isClientOutsidePortal`、`listBrands(tenant`、`created_by: string`、`no per-person id until`、`"portal.aware-wave.com"` | hits=9（現行程式只有 `tenant-guard.test.ts:5` 註解，已改；其餘是設計提案、archive、oracle 報告等歷史紀錄，不回改）
+
+**剩**（都要操作者 go，High-STOP）：⑤ 上線＝Cloudflare DNS `social` 記錄、憑證 expand 加 social、主機 nginx `sg-stack.aware-wave.com.conf` server_name 加 social（repo 已改）、lobster-nginx `default.conf` social 區塊（repo 已寫）→ `sg-deploy.sh next-admin` → smoke；ContentStudio 舊 Postiz 面板換連結。產品門的 `/login` 仍是員工版登入頁、產品門上 AI 改寫按鈕（`/api/content/syndicate`）404（付費 AI 等 ADR 017 權利表）。social 網址上 matcher 跳過的路徑已由 vhost 擋（只在 vhost 套上後生效）。成員管理畫面（成員列目前只能 SQL 加）＝下一張卡。另一個 session 的 gmail OAuth callback 改動不在本 commit。
+
+**rollback**：`git revert <commit>`；本次無 migration、無環境變數、未部署。
 ## 2026-10-15（續23）認知平台：示範結果頁通用化（每個工具、每個領域一份）；本機開發環境改用本機 PostgreSQL（工具模板 §15.1 第 3 項，未部署）
 
 **根因**: 示範結果頁寫死冰山（`projects/demo/iceberg` 讀 `fixtures/demo-iceberg.json`），說明書「看一個完整分析頁」是佔位按鈕，「我的案子」只列冰山一列；第二個工具起每加一份示範就得改程式。另：本機開發啟動器 `launch_cos_dev.ps1` 停在 SQLite 時代，換 PostgreSQL 後本機 API 一啟動就 `DB_URLS_MISSING`，本機無法真跑任何分析。

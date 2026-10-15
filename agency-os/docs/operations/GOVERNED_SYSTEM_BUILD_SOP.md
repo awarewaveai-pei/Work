@@ -121,6 +121,16 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 
 第 3 階段：對第一個跨文件決策建立 ADR；對第一個權威文件編輯建立 proposal，但不要自行批准；捕捉 diff 後做一次獨立覆審並將 artifact 連同結果落庫。首次有 committed contract change 時，同時執行 §11 的實測、review、跨檔抓蟲與工作紀錄四項驗證；完成後以「同檔全文＋全庫 claim 搜尋」檢查 stale state。**實證出處：** `ADR-006` L107-118；`.claude/commands/codex-review.md` L15-55；`WORKLOG.md`〈2026-08-30（續30）〉的 stale-claim 修正與 artifact 驗證記錄；`agency-os/AGENTS.md`〈R0〉的四動作驗證計畫。
 
+## 18. 對外販售的產品：開工前填完交付清單
+
+AwareWave 的產品或系統工具只要會給客戶用（訂閱、點數或買斷），規劃時就逐條回答下面五題，答案寫進 `lib/portal/products.ts` 那一列；少填一欄，`products.test.ts` 就紅燈。規則本體是 ADR 018，這裡只列要回答的題目。**實證出處：** `018-product-doors-and-buyout-delivery.md` §1–5；`017-entitlements-and-self-hosted-modules.md` §5。
+
+1. **子網域**（`subdomain`）：線上叫什麼？不能是 app、portal、www。網址由基底網域組出來，程式裡不寫網域。
+2. **門**（`door`）：頁面和 API 在 next-admin 的哪個前綴？前綴不能碰到員工路由；不在 next-admin 就填 external。
+3. **登入來源**（`loginSources`）：`local`、`awarewave-wp`、`customer-wp` 裡開哪些？一定要有 `local`。
+4. **能不能單獨安裝**（`standalone`）：買斷客戶只買這一個時裝不裝得起來？依賴的模組列進 ADR 017 §5 的模組清單。
+5. **買斷要換的設定**：基底網域、登入來源、客戶自己的 API key 各在哪個環境變數？寫進該產品的模組清單（ADR 017 §5），不寫進程式。
+
 ## Evidence boundary
 
 新系統若缺少相同的風險、寫入控制或多人接手情境，應縮小採用範圍，而不是假稱全套流程已被需要。**實證出處：** `CODEX_HANDOFF_UNIVERSAL_SYSTEM_SOP_2026-08-30.md` §0、§4；`ADR-018` L24-42 的「治理控制面」條件式選擇。
@@ -130,5 +140,5 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 - `docs/operations/end-to-end-linkage-checklist.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 
-_Last synced: 2026-08-31 02:02:23 UTC_
+_Last synced: 2026-10-15 06:19:20 UTC_
 

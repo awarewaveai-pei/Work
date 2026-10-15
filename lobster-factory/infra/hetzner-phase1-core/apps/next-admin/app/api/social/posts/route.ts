@@ -25,7 +25,7 @@ export async function GET(req: Request): Promise<Response> {
   return handle(async () => {
     const q = new URL(req.url).searchParams;
     const brand = uuid(q.get("brand"), "brand");
-    requireBrandRole(req, brand, ANY_ROLE);
+    await requireBrandRole(req, brand, ANY_ROLE);
     if (q.get("trash") === "1") return { posts: await listTrash(brand) };
     const start = iso(q.get("start"), "start");
     const end = iso(q.get("end"), "end");
@@ -34,7 +34,7 @@ export async function GET(req: Request): Promise<Response> {
     }
     const { posts, undatedTruncated } = await listPosts(brand, start, end);
     if (q.get("wp") !== "1") return { posts, undatedTruncated };
-    requireBrandRole(req, brand, WRITE_ROLES);   // WordPress drafts: the content calendar's rule (operator and up)
+    await requireBrandRole(req, brand, WRITE_ROLES);   // WordPress drafts: the content calendar's rule (operator and up)
     // the caller's sites (same rule as the content calendar), narrowed to this brand's
     const { sites, tokens, usernames } = await listAccessibleWpSites(req);
     const brandSites = sites.filter((s) => s.organizationId === brand);
@@ -48,7 +48,7 @@ export async function POST(req: Request): Promise<Response> {
   return handle(async () => {
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    await requireBrandRole(req, brand, WRITE_ROLES);
     const payload = parsePostPayload(body);
     if (payload.targets?.length) {
       await assertWithinLimits(brand, payload.fields.body ?? "", payload.targets, { url: payload.fields.link_url ?? null, utm: payload.fields.link_utm ?? false });

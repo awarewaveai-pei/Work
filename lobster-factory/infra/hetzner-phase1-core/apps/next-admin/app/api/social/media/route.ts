@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request): Promise<Response> {
   return handle(async () => {
     const brand = uuid(new URL(req.url).searchParams.get("brand"), "brand");
-    requireBrandRole(req, brand, ANY_ROLE);
+    await requireBrandRole(req, brand, ANY_ROLE);
     return { media: await listMedia(brand) };
   });
 }
@@ -21,7 +21,7 @@ export async function POST(req: Request): Promise<Response> {
   return handle(async () => {
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    await requireBrandRole(req, brand, WRITE_ROLES);
     if (typeof body.imageUrl !== "string" || !/^(https:\/\/|data:image\/)/.test(body.imageUrl)) throw new BadRequest("imageUrl must be an https URL or a data:image URL");
     const fileName = typeof body.fileName === "string" && /^[\w.\- ]{1,255}$/.test(body.fileName) ? body.fileName : "image.webp";
     return { media: await addImage(brand, body.imageUrl, fileName, actorOf(req)) };

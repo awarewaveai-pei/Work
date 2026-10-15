@@ -14,7 +14,7 @@ export async function GET(req: Request): Promise<Response> {
   return handle(async () => {
     const q = new URL(req.url).searchParams;
     const brand = uuid(q.get("brand"), "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    await requireBrandRole(req, brand, WRITE_ROLES);
     const siteId = q.get("site") ?? "";
     const postId = q.get("post") ?? "";
     if (!/^\d{1,12}$/.test(postId)) throw new BadRequest("post must be a WordPress post id");

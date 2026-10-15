@@ -31,7 +31,7 @@
 
 - 所有品牌共用一台 Postiz、一把 key；key 只在伺服器端；每個 API 請求在我們這層以「品牌成員資格」授權，客戶永遠看不到 Postiz 介面。Postiz 的 `customer` 分組鏡射品牌 id，只為對帳。
 - `social_accounts.instance` 第一天就有：品牌多到一台 Postiz 吃不下時，加第二台，品牌對應到 instance，程式不改。
-- 角色：擁有者／編輯／審核人／客戶唯讀，掛在品牌層。內部先用既有 `ops_role`；對外客戶用 WordPress 會員一鍵進入（ADR 015 §2），V2。
+- 角色：擁有者／編輯／審核人／客戶唯讀，掛在品牌層。內部先用既有 `ops_role`；對外客戶用 WordPress 會員一鍵進入（ADR 015 §2），V2。每品牌成員表與 social.aware-wave.com 這扇門照 [ADR 018](018-product-doors-and-buyout-delivery.md) §1–3。
 
 ### 4. 帳號連接
 

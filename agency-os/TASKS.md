@@ -131,7 +131,7 @@
   - `✅ 完成` · `2026-10-15` · 根因＝10/02 操作者核准抹除的專案；匯入改成重用前先向 Cognitive OS 確認（`5f38b4a06`，已部署）；19 筆依操作者決定改回「未匯入」，對帳 0 懸空（WORKLOG 2026-10-15 續11、續13）
 
 - [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–5 開卡做**
-  - `🟠 未開始` · `2026-10-14` · WORKLOG 續15、續17；第 3 步前查定期扣款外掛；`ADR_INDEX.md` 那列還寫「提議」（檔案被另一個 session 佔用，下次改）
+  - `🟠 未開始` · `2026-10-14` · WORKLOG 續15、續17；第 3 步前查定期扣款外掛；`ADR_INDEX.md` 那列已改「已接受」（2026-10-15）
 
 - [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**
   - `🟠 未開始` · `2026-10-14` · `G3 Meta 審核狀態（操作者）；G5 要 go-ahead`
@@ -1440,8 +1440,9 @@
 - [ ] **社群發文 C12 上線（操作者 2026-10-15「go」1→4）**：C5–C11 程式已在 main（`50ca7df4d` C5、`df4f87eba` C6–C11），正式站未動。卡點：全部是 High-STOP 正式機動作，已授權的只有 1→4；5（子網域 social.aware-wave.com＋middleware host 導向＋ContentStudio 換連結）、6（middleware 身分標頭帶 user id→`authz.ts` 讀 `social_brand_members`）未授權。**下一步**：① `node scripts/apply-db-migration.mjs 0100 0101 0102`（0101 換掉 0098 的 `social_save_list` 7 參數版，必須和 next-admin 部署同一窗口） ② `scripts/safe-infra-patch.sh compose` 在 next-admin 加 `SOCIAL_DISPATCH_TOKEN`（新隨機值）、`SOCIAL_DISPATCH_ENABLED=true`、`SOCIAL_DISPATCH_MODE=draft`，`docker exec lobster-next-admin printenv` 驗 ③ `sg-deploy.sh next-admin` → `/playwright smoke`（這次部署同時帶上 CS 轉真人確認句 `c3ef11ba9`，部署後照「轉真人確認句＋問名字」那行做 Messenger 驗收） ④ Trigger deploy（`trigger-deploy-agent`，`tr_pat_*`；`scripts/lobster-trigger-deploy.ps1` 從 running next-admin 帶 token）：`social-dispatch`、`social-rotation` ⑤ 驗收：soulful 品牌排一則 Bluesky 貼文到 15 分鐘內 → 等 dispatch → `social_post_targets.postiz_post_id` 有值、Postiz `GET /posts` 該則 DRAFT 且 settings 有 `awarewave_send_key` → 刪該草稿 → compose 改 `SOCIAL_DISPATCH_MODE=apply` ⑥ WORKLOG 記證據、計畫 C5 標上線。步驟正本 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md` C12 段；回滾見 WORKLOG 2026-10-15 續15／續17。
   - ✅ 1→4 已上線 2026-10-15（WORKLOG 續22）；CS `c3ef11ba9` 經操作者在本 session 同意，05:12Z 隨 `e571187a2` 上線（smoke 5/5）。
   - **待驗收（CS）**：操作者用非粉專角色 FB 帳號傳訊 Soulful 粉專要求真人 → 應收到確認句＋問名字 → 回名字。起點 05:12:21Z（cs_ai_replies 6 列）。驗：`cs_ai_replies` 新列 completed_at 非 NULL；Chatwoot 該對話有公開確認句；聯絡人名字從 John Doe 變成回答。
-  - **架構定案待寫進 ADR 016／015（新 session 第一步）**：一套程式三種門——aware-wave.com（WordPress：介紹、訂閱、付款、會員）／<產品>.aware-wave.com（訂閱客戶，只見該產品＋自己的品牌，WP 會員一鍵進）／app.aware-wave.com（員工後台，不變）；host→產品照 portal 樣板（`middleware.ts:218-220`）。**買斷客戶**＝裝在客戶自己的主機與網域（一鍵架站、自己的 API key、模組選購，memory project_buyout_is_self_hosted_lego），不登入我們的子網域；所以 ⑥ 的「使用者 id＋品牌成員」與 host→產品對應都必須是設定驅動、登入來源可插拔（我們的 WP／客戶自己的 WP〔wp-bridge〕／本機帳號），不可寫死 aware-wave.com。順序：⑥ → ⑤ →（V2）WP 一鍵進入 → Woo 訂閱開權限；全部待操作者 go。
-  - `▶️ 可動工` · `2026-10-15 開` · `5、6 待問（操作者在問：之後掛 aware-wave.com WordPress 會員是否適合——答：⑥ 是前提）`
+  - ✅ 2026-10-15 三扇門＋買斷＝[ADR 018](docs/architecture/decisions/018-product-doors-and-buyout-delivery.md)（SOP §18、AGENTS §0 指標、`products.ts` 欄位＋測試擋）；⑥ 程式完成、⑤ 程式完成（未部署）。WORKLOG 2026-10-15「產品三扇門」條目。
+  - **下一步（High-STOP，等操作者 go）**：⑤ 上線——DNS `social` → 憑證 expand 加 social（現在 SAN 沒有）→ 主機 nginx → lobster-nginx → `sg-deploy.sh next-admin`（同時帶上 ⑥）→ smoke＋social 網址實測。步驟正本 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md` C12 第 5 點。建議模型：Opus 5.5
+  - `▶️ 待 go` · `2026-10-15` · 之後：品牌成員管理畫面（成員列目前只能 SQL 加）；V2 WP 會員一鍵進入
 
 ### 2026-09-20 — Claude+Codex 共用資產稽核（結案）
 

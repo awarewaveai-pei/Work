@@ -13,7 +13,7 @@ import type { PostRow } from "../store";
 
 const post = (extra: Partial<PostRow> = {}): PostRow => ({
   id: "p1", state: "review", body: "hi", scheduled_at: "2026-10-20T01:00:00Z", list_id: null, list_position: null, first_comment: null,
-  link_url: null, link_utm: false, notes: "keep this", source_url: null, published_at: null, deleted_at: null, created_by: "x", version: 3,
+  link_url: null, link_utm: false, notes: "keep this", source_url: null, published_at: null, deleted_at: null, version: 3,
   targets: [{ id: "t", account_id: "a", custom_body: null, format: "post", state: "pending", postiz_post_id: null, release_url: null, error: null }],
   media: [], ...extra,
 });

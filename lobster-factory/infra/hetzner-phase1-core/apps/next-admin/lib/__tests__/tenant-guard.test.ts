@@ -2,7 +2,7 @@
  * requireClientOrg() table-driven tests.
  *
  * Critic finding M8 (2026-08-29): this is the fail-closed gate portal.aware-wave.com's ~120
- * would-be-exposed admin-console routes depend on (see middleware.ts's isClientOutsidePortal),
+ * would-be-exposed admin-console routes depend on (see middleware.ts's isClientOutsideDoor),
  * and it shipped with zero coverage. Every row here must throw PortalAccessError EXCEPT the
  * one valid case -- a regression that silently makes any of these pass through would be a
  * privilege-escalation hole, not a cosmetic bug.

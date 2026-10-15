@@ -1,10 +1,13 @@
-// Brand-level authorization for /api/social (ADR 016 §3; SOCIAL_MANAGER_PLAN.md C4). V1: staff get a brand role from
-// their ops_role (owner/admin -> owner, operator -> editor, viewer -> client), a client account is read-only on its own
-// brand only. Per-person brand members (social_brand_members, incl. reviewers) need a user id from middleware: C8.
+// Brand-level authorization for /api/social (ADR 016 §3, ADR 018 §3; SOCIAL_MANAGER_PLAN.md C4, C12 step 6).
+// A per-brand member row (social_brand_members, keyed by the auth user id middleware injects as x-ops-user-id) is an
+// explicit grant and wins; staff owner/admin are owner everywhere. Without a row: staff map from ops_role
+// (operator -> editor, viewer -> client), a client account is read-only on its own organization only.
 
 import { resolveOpsRole } from "@/lib/ops-role";
+import type { OpsRole } from "@/lib/ops-contracts";
 import { resolveTenant } from "@/lib/tenant-guard";
 import type { BrandRole } from "./state";
+import { memberRoles } from "./store";
 
 export class BrandAccessError extends Error {
   readonly status = 403;
@@ -14,31 +17,66 @@ export class BrandAccessError extends Error {
   }
 }
 
-/** null = this caller may not see the brand at all. */
-export function brandRole(req: Request, brandId: string): BrandRole | null {
-  // no session identity (the sync-key passthrough, or a path outside the middleware matcher): resolveTenant would read
-  // that as staff with access to every brand
-  if (!req.headers.get("x-ops-user-kind")) return null;
-  const tenant = resolveTenant(req);
-  if (tenant.userKind === "client") return tenant.orgId === brandId ? "client" : null;
-  const { role } = resolveOpsRole(req);
-  if (role === "owner" || role === "admin") return "owner";
-  return role === "operator" ? "editor" : "client";
+export interface Caller {
+  kind: "staff" | "client";
+  orgId: string | null;
+  opsRole: OpsRole;
+  userId: string | null;
+  members: ReadonlyMap<string, BrandRole>;
 }
 
-export function requireBrandRole(req: Request, brandId: string, allowed: readonly BrandRole[]): BrandRole {
-  const role = brandRole(req, brandId);
+/** The role a caller holds on a brand; null = may not see it. */
+export function roleOn(caller: Caller, brandId: string): BrandRole | null {
+  if (caller.kind === "client") return caller.members.get(brandId) ?? (caller.orgId === brandId ? "client" : null);
+  if (caller.opsRole === "owner" || caller.opsRole === "admin") return "owner";
+  return caller.members.get(brandId) ?? (caller.opsRole === "operator" ? "editor" : "client");
+}
+
+/** null = no session identity (the sync-key passthrough, or a path outside the middleware matcher): resolveTenant
+ *  would read that as staff with access to every brand. */
+export async function callerOf(req: Request): Promise<Caller | null> {
+  if (!req.headers.get("x-ops-user-kind")) return null;
+  const tenant = resolveTenant(req);
+  const userId = req.headers.get("x-ops-user-id")?.trim() || null;
+  return {
+    kind: tenant.userKind,
+    orgId: tenant.orgId,
+    opsRole: resolveOpsRole(req).role,
+    userId,
+    members: userId ? await memberRoles(userId) : new Map(),
+  };
+}
+
+export async function requireBrandRole(req: Request, brandId: string, allowed: readonly BrandRole[]): Promise<BrandRole> {
+  const caller = await callerOf(req);
+  const role = caller ? roleOn(caller, brandId) : null;
   if (!role) throw new BrandAccessError("forbidden: not your brand");
   if (!allowed.includes(role)) throw new BrandAccessError(`forbidden: ${role} may not do this`);
   return role;
 }
 
+/** A new channel is matched to the brand that asked only by timing (store.ts startConnect / resolveConnectAttempt): one
+ *  open attempt blocks every brand, and an unowned channel goes to whoever's attempt is open. Safe only while the
+ *  people who can open one are AwareWave staff, so a customer may reconnect its own channels but not add new ones. */
+export function requireStaffForNewChannel(req: Request): void {
+  if (resolveTenant(req).userKind !== "staff") throw new BrandAccessError("forbidden: new channels are connected by AwareWave staff");
+}
+
+/** What the audit log shows a viewer: customers never see staff roles or anyone's auth user id. */
+export function actorForViewer(actor: string, viewer: "staff" | "client"): string {
+  if (viewer === "staff") return actor;
+  if (actor.startsWith("ops:")) return "ops";
+  return actor.startsWith("client:") ? actor.split(":").slice(0, 2).join(":") : actor;
+}
+
 export const ANY_ROLE: readonly BrandRole[] = ["owner", "editor", "reviewer", "client"];
 export const WRITE_ROLES: readonly BrandRole[] = ["owner", "editor"];
 
-/** Who did it, for created_by and the audit log. Only headers middleware sets: no per-person id until C8 injects
- *  one (a caller-supplied header such as an email would let anyone write someone else's name into the log). */
+/** Who did it, for created_by and the audit log: `ops:<role>` or `client:<org>`, then `:<user id>`. Only headers
+ *  middleware sets (a caller-supplied header such as an email would let anyone write someone else's name into the log). */
 export function actorOf(req: Request): string {
   const tenant = resolveTenant(req);
-  return tenant.userKind === "client" ? `client:${tenant.orgId}` : `ops:${resolveOpsRole(req).role}`;
+  const who = tenant.userKind === "client" ? `client:${tenant.orgId}` : `ops:${resolveOpsRole(req).role}`;
+  const userId = req.headers.get("x-ops-user-id")?.trim();
+  return userId ? `${who}:${userId}` : who;
 }

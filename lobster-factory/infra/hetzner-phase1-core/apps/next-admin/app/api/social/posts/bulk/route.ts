@@ -16,7 +16,7 @@ export async function POST(req: Request): Promise<Response> {
   return handle(async () => {
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    const role = requireBrandRole(req, brand, ANY_ROLE);
+    const role = await requireBrandRole(req, brand, ANY_ROLE);
     if (!Array.isArray(body.items) || body.items.length === 0 || body.items.length > 100) throw new BadRequest("items must be 1..100 entries");
     const actor = actorOf(req);
     const results = [];

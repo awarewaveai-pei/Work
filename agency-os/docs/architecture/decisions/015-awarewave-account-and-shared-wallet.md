@@ -45,6 +45,7 @@
 - 進產品的方式：WordPress 伺服器簽名說「這是會員 N」，產品回一次性碼，瀏覽器拿碼換登入狀態。簽名照 wp-bridge 的 Ed25519＋防重送（[ADR 007](007-wp-bridge-ed25519-and-reversibility-gating.md)）。
 - 產品用 WordPress 會員編號對應自己的身分，不用 email，因為 email 會改。
 - 子網域都屬於 aware-wave.com，換手時瀏覽器不會擋登入狀態。不用 iframe：登入狀態會被瀏覽器擋，手機也難用。
+- 哪個網址是哪扇門、登入來源怎麼換（含買斷裝在客戶網域）：[ADR 018](018-product-doors-and-buyout-delivery.md)。
 
 ### 3. 認知平台這一側（要改的地方）
 

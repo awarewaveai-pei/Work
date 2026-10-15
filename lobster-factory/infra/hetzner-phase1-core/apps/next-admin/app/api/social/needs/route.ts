@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request): Promise<Response> {
   return handle(async () => {
     const brand = uuid(new URL(req.url).searchParams.get("brand"), "brand");
-    const role = requireBrandRole(req, brand, ANY_ROLE);
+    const role = await requireBrandRole(req, brand, ANY_ROLE);
     return await needs(brand, role);
   });
 }

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseMiddlewareClient, isSupabaseAuthConfigured, type RefreshedCookie } from "@/lib/supabase/ssr";
 import { getFreshCachedRole, consumeStaleCachedRole, cacheValidatedRole, type CachedIdentity } from "@/lib/supabase/session-cache";
 import type { OpsRole } from "@/lib/ops-contracts";
+import { doorForHost, isProductPath, portalHost, productPageOwner, routeOnProductDoor, type Door } from "@/lib/portal/doors";
 
 // Identity layer for the admin console (Supabase Auth, email+password).
 // Browser flow: validate the Supabase session cookie → resolve role from the user's
@@ -18,7 +19,7 @@ import type { OpsRole } from "@/lib/ops-contracts";
 const CLAIM_HEADERS = [
   "x-ops-claims-role", "x-user-role", "x-clerk-role",
   // Tenant identity — set only by this middleware; strip client-supplied values.
-  "x-ops-user-kind", "x-ops-org-id",
+  "x-ops-user-kind", "x-ops-org-id", "x-ops-user-id",
 ] as const;
 const SIMULATED_HEADER = "x-ops-simulated-role";
 const SYNC_KEY_HEADER = "x-ops-sync-key";
@@ -119,6 +120,8 @@ function applyIdentityHeaders(headers: Headers, identity: CachedIdentity): void 
   headers.set("x-ops-claims-role", identity.role);
   headers.set("x-ops-user-kind", identity.userKind);
   if (identity.orgId) headers.set("x-ops-org-id", identity.orgId);
+  // the auth user id (ADR 018 §3): per-person grants such as social_brand_members key on it
+  if (identity.userId) headers.set("x-ops-user-id", identity.userId);
 }
 
 // Exported (alongside the other pure helpers below) so verify-recent's tests can exercise
@@ -167,7 +170,8 @@ export function blockedResponse(request: NextRequest): NextResponse {
 // escalation hole: a portal customer's session would otherwise sail straight through every
 // /ops/* page and API as an authenticated-but-roleless "viewer". Fixing this at the ~120
 // individual routes is the patch-shaped answer; this is the one choke-point fix instead —
-// a client identity may only reach /portal/* (and /login, matcher-excluded). Applied to BOTH
+// a client identity may only reach /portal/* (and /login, matcher-excluded) -- or, on a product
+// door (ADR 018), that product's own paths: isClientOutsideDoor. Applied to BOTH
 // paths this middleware can return success from (the fast cache path and the slow
 // verify-then-cache path) so neither can skip it.
 // Critic finding (2026-08-29, minor, mirrors M-A's nginx-side boundary bug): a bare "/portal"
@@ -177,8 +181,15 @@ export function isPortalPath(pathname: string): boolean {
   return pathname === "/portal" || pathname.startsWith("/portal/");
 }
 
-export function isClientOutsidePortal(pathname: string, userKind: string): boolean {
-  return userKind === "client" && !isPortalPath(pathname);
+/** Which door the request came through (ADR 018); hosts come from config in lib/portal/doors.ts. */
+export function doorOf(request: NextRequest): Door {
+  return doorForHost(request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "");
+}
+
+/** A client identity may use only the paths of the door it is on: a product door's own paths, else /portal/*. */
+export function isClientOutsideDoor(pathname: string, userKind: string, door: Door): boolean {
+  if (userKind !== "client") return false;
+  return door.kind === "product" ? !isProductPath(pathname, door.product) : !isPortalPath(pathname);
 }
 
 function clientForbiddenResponse(request: NextRequest, cookiesToCopy: RefreshedCookie[] = []): NextResponse {
@@ -194,7 +205,7 @@ function clientForbiddenResponse(request: NextRequest, cookiesToCopy: RefreshedC
   // URL on the correct host instead, and use the browser-visible unprefixed path ("/launcher",
   // not "/portal/launcher") -- nginx's idempotent rewrite adds that prefix transparently, same
   // as every other browser-facing portal link in this codebase.
-  const forbidden = NextResponse.redirect(new URL("/launcher", "https://portal.aware-wave.com"));
+  const forbidden = NextResponse.redirect(new URL("/launcher", `https://${portalHost()}`));
   // Critic finding (2026-08-29, minor): the success path below applies any rotated session
   // cookies from Supabase's refresh onto its response; this early return didn't, so a client
   // identity blocked here right when their token happened to rotate could keep a stale
@@ -216,8 +227,16 @@ const PORTAL_PUBLIC_PATHS = new Set<string>(["/portal/login", "/portal/signup", 
 
 export function isWrongHostForPortal(request: NextRequest): boolean {
   if (!isPortalPath(request.nextUrl.pathname)) return false;
-  const host = (request.headers.get("x-forwarded-host") ?? request.headers.get("host") ?? "").toLowerCase();
-  return host !== "portal.aware-wave.com" && !isDevelopment();
+  return doorOf(request).kind !== "portal" && !isDevelopment();
+}
+
+/** Same rule for a product's page prefix (e.g. /social): it answers only on that product's own door. Staff use the
+ *  product at /tools/<product> on the staff door. */
+export function isWrongHostForProductPage(request: NextRequest): boolean {
+  const owner = productPageOwner(request.nextUrl.pathname);
+  if (!owner || isDevelopment()) return false;
+  const door = doorOf(request);
+  return !(door.kind === "product" && door.product.key === owner.key);
 }
 
 // CSRF: a cookie-authenticated write must come from this app's own pages. Staging sites live on aware-wave.com,
@@ -253,18 +272,31 @@ export function isCrossSiteWrite(request: NextRequest): boolean {
 }
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const door = doorOf(request);
 
-  if (isWrongHostForPortal(request)) {
+  if (isWrongHostForPortal(request) || isWrongHostForProductPage(request)) {
     return new NextResponse(null, { status: 404 });
   }
+
+  // A product door serves only its own paths (ADR 018 §2): other APIs 404, every other page path is served under the
+  // product's page prefix. Every check below reads the path that will actually be served.
+  let rewriteTo: string | null = null;
+  if (door.kind === "product") {
+    const route = routeOnProductDoor(request.nextUrl.pathname, door.product);
+    if (route.action === "not_found") return new NextResponse(null, { status: 404 });
+    if (route.action === "rewrite") rewriteTo = route.pathname;
+  }
+  const pathname = rewriteTo ?? request.nextUrl.pathname;
 
   // Anti-spoof: strip ALL client-supplied identity headers up-front, before any pass-through
   // decision. No path (public, sync-key, dev, or gated) may carry a spoofed role.
   const baseHeaders = new Headers(request.headers);
   for (const header of CLAIM_HEADERS) baseHeaders.delete(header);
   baseHeaders.delete(SIMULATED_HEADER);
-  const passthrough = () => NextResponse.next({ request: { headers: baseHeaders } });
+  const forward = (headers: Headers) => rewriteTo
+    ? NextResponse.rewrite(new URL(rewriteTo + request.nextUrl.search, request.url), { request: { headers } })
+    : NextResponse.next({ request: { headers } });
+  const passthrough = () => forward(baseHeaders);
 
   // Portal's own pre-auth pages (no session exists yet by definition, same reasoning as the
   // admin console's own /login exclusion). Handled HERE inside the middleware body — NOT via a
@@ -306,9 +338,9 @@ export async function middleware(request: NextRequest) {
   if (sessionKey) {
     const fresh = getFreshCachedRole(sessionKey);
     if (fresh !== null) {
-      if (isClientOutsidePortal(pathname, fresh.userKind)) return clientForbiddenResponse(request);
+      if (isClientOutsideDoor(pathname, fresh.userKind, door)) return clientForbiddenResponse(request);
       applyIdentityHeaders(baseHeaders, fresh);
-      return NextResponse.next({ request: { headers: baseHeaders } });
+      return forward(baseHeaders);
     }
   }
 
@@ -321,7 +353,7 @@ export async function middleware(request: NextRequest) {
       const meta = data.user.app_metadata as Record<string, unknown> | undefined;
       const role = resolveRoleFromUser(meta);
       const { userKind, orgId } = resolveTenantFromMeta(meta);
-      identity = { role, userKind, orgId };
+      identity = { role, userKind, orgId, userId: data.user.id };
       if (sessionKey) cacheValidatedRole(sessionKey, identity);
     } else if (error && sessionKey && isTransientAuthError(error)) {
       // Auth server unreachable / throttled — don't punish a logged-in user. Trust the last
@@ -338,13 +370,13 @@ export async function middleware(request: NextRequest) {
   if (identity === null) {
     return blockedResponse(request);
   }
-  if (isClientOutsidePortal(pathname, identity.userKind)) {
+  if (isClientOutsideDoor(pathname, identity.userKind, door)) {
     return clientForbiddenResponse(request, refreshedCookies);
   }
 
   applyIdentityHeaders(baseHeaders, identity);
 
-  const finalResponse = NextResponse.next({ request: { headers: baseHeaders } });
+  const finalResponse = forward(baseHeaders);
   // Apply any refreshed-session cookies (see M-1 fix in lib/supabase/ssr.ts for why this is a
   // plain array, not a captured NextResponse reference).
   for (const cookie of refreshedCookies) finalResponse.cookies.set(cookie.name, cookie.value, cookie.options);

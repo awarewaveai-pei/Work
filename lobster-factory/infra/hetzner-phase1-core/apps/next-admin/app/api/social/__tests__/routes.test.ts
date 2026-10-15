@@ -56,7 +56,7 @@ describe("/api/social routes", () => {
     const { GET } = await import("../brands/route");
     store.listBrands.mockResolvedValue([{ id: A, slug: "a", name: "A", default_timezone: "UTC" }]);
     const res = await (await GET(req("GET", "/api/social/brands", { client: A }))).json();
-    expect(store.listBrands).toHaveBeenCalledWith(A);
+    expect(store.listBrands).toHaveBeenCalledWith([A]);
     expect(res.brands).toEqual([expect.objectContaining({ id: A, role: "client" })]);
   });
 

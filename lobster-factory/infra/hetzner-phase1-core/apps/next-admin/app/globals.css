@@ -439,6 +439,19 @@ body {
   min-height: 100vh;
 }
 
+/* A product's own door (ADR 018, app/<product>/layout.tsx): .main without the staff sidebar. */
+.door-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.door-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 32px 16px;
+}
+
 .topbar {
   background: var(--topbar-bg);
   border-bottom: 1px solid var(--card-border);

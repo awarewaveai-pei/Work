@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { selectAll } from "@/lib/supabase-paging";
 import { connectUrl, listAllIntegrations, uploadMedia, type RawIntegration } from "@/lib/content/postiz";
-import type { PostSnapshot, PostState, Transition } from "./state";
+import type { BrandRole, PostSnapshot, PostState, Transition } from "./state";
 
 export class SocialStoreError extends Error {
   constructor(readonly status: 400 | 404 | 409 | 500 | 502, message: string) {
@@ -41,12 +41,21 @@ function fail(error: { code?: string; message: string }, what: string): never {
 
 export interface Brand { id: string; slug: string; name: string; default_timezone: string }
 
-export async function listBrands(onlyId: string | null): Promise<Brand[]> {
+/** null = every brand (staff); otherwise only these ids (a client: its own organization and its member brands). */
+export async function listBrands(onlyIds: readonly string[] | null): Promise<Brand[]> {
+  if (onlyIds && onlyIds.length === 0) return [];
   let q = db().from("organizations").select("id, slug, name, default_timezone").order("name");
-  if (onlyId) q = q.eq("id", onlyId);
+  if (onlyIds) q = q.in("id", [...onlyIds]);
   const { data, error } = await q;
   if (error) fail(error, "brands");
   return (data ?? []) as Brand[];
+}
+
+/** This person's per-brand roles (social_brand_members, 0096). user_id = the auth user id middleware injects. */
+export async function memberRoles(userId: string): Promise<Map<string, BrandRole>> {
+  const { data, error } = await db().from("social_brand_members").select("organization_id, role").eq("user_id", userId);
+  if (error) fail(error, "brand members");
+  return new Map((data ?? []).map((r: { organization_id: string; role: BrandRole }) => [r.organization_id, r.role]));
 }
 
 // ---- accounts -------------------------------------------------------------------------------------------------
@@ -190,15 +199,17 @@ export async function unlinkAccount(brandId: string, accountId: string, actor: s
 
 // ---- posts ----------------------------------------------------------------------------------------------------
 
+// No created_by: it holds actorOf() (staff role + auth user id) and posts go to customers too; the audit log, which
+// filters it per viewer (authz.ts actorForViewer), is where "who" is shown.
 export const POST_COLUMNS = "id, state, body, scheduled_at, list_id, list_position, first_comment, link_url, link_utm, notes, source_url, " +
-  "published_at, deleted_at, created_by, version, created_at, updated_at, " +
+  "published_at, deleted_at, version, created_at, updated_at, " +
   "targets:social_post_targets(id, account_id, custom_body, format, state, postiz_post_id, release_url, error), " +
   "media:social_post_media(media_id, position, alt_text)";
 
 export interface PostRow {
   id: string; state: PostState; body: string; scheduled_at: string | null; list_id: string | null; list_position: number | null;
   first_comment: string | null; link_url: string | null; link_utm: boolean; notes: string | null; source_url: string | null;
-  published_at: string | null; deleted_at: string | null; created_by: string; version: number;
+  published_at: string | null; deleted_at: string | null; version: number;
   targets: Array<{ id: string; account_id: string; custom_body: string | null; format: string; state: string; postiz_post_id: string | null; release_url: string | null; error: string | null }>;
   media: Array<{ media_id: string; position: number; alt_text: string | null }>;
 }

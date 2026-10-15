@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request): Promise<Response> {
   return handle(async () => {
     const brand = uuid(new URL(req.url).searchParams.get("brand"), "brand");
-    requireBrandRole(req, brand, ANY_ROLE);
+    await requireBrandRole(req, brand, ANY_ROLE);
     return { requireReview: await requiresReview(brand) };
   });
 }
@@ -20,7 +20,7 @@ export async function PUT(req: Request): Promise<Response> {
   return handle(async () => {
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    requireBrandRole(req, brand, ["owner"]);
+    await requireBrandRole(req, brand, ["owner"]);
     if (typeof body.requireReview !== "boolean") throw new BadRequest("requireReview must be a boolean");
     await setRequiresReview(brand, body.requireReview, actorOf(req));
     return { requireReview: body.requireReview };

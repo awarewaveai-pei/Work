@@ -15,7 +15,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const id = uuid((await params).id, "id");
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    const role = requireBrandRole(req, brand, ANY_ROLE);
+    const role = await requireBrandRole(req, brand, ANY_ROLE);
     const action = body.action as PostAction;
     if (typeof body.action !== "string" || !Object.hasOwn(RULES, body.action)) throw new BadRequest(`action must be one of ${Object.keys(RULES).join(", ")}`);
     const post = await getPostAt(brand, id, postVersion(body.version));

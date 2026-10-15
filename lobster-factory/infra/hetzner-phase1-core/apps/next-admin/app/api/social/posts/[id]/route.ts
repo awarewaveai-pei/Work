@@ -18,7 +18,7 @@ type Ctx = { params: Promise<{ id: string }> };
 export async function GET(req: Request, { params }: Ctx): Promise<Response> {
   return handle(async () => {
     const brand = uuid(new URL(req.url).searchParams.get("brand"), "brand");
-    requireBrandRole(req, brand, ANY_ROLE);
+    await requireBrandRole(req, brand, ANY_ROLE);
     return { post: await getPost(brand, uuid((await params).id, "id")) };
   });
 }
@@ -28,7 +28,7 @@ export async function PUT(req: Request, { params }: Ctx): Promise<Response> {
     const id = uuid((await params).id, "id");
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    const role = requireBrandRole(req, brand, WRITE_ROLES);
+    const role = await requireBrandRole(req, brand, WRITE_ROLES);
     const payload = parsePostPayload(body);
     const version = postVersion(body.version);
     const contentChange = Object.keys(payload.fields).some((k) => k !== "notes") || payload.targets !== null || payload.media !== null;
@@ -49,7 +49,7 @@ export async function DELETE(req: Request, { params }: Ctx): Promise<Response> {
     const id = uuid((await params).id, "id");
     const q = new URL(req.url).searchParams;
     const brand = uuid(q.get("brand"), "brand");
-    const role = requireBrandRole(req, brand, ANY_ROLE);
+    const role = await requireBrandRole(req, brand, ANY_ROLE);
     const post = await getPostAt(brand, id, postVersion(q.get("version")));
     const saved = await applyAction(brand, post, "delete", role, {}, actorOf(req), {});
     return { post: { id: saved.id, version: saved.version } };

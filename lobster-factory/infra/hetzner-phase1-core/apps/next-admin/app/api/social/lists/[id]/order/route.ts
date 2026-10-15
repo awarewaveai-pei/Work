@@ -12,7 +12,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const id = uuid((await params).id, "id");
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    await requireBrandRole(req, brand, WRITE_ROLES);
     if (!Array.isArray(body.postIds) || body.postIds.length > 500) throw new BadRequest("postIds must be an array of at most 500");
     const ids = body.postIds.map((x, i) => uuid(x, `postIds[${i}]`));
     if (new Set(ids).size !== ids.length) throw new BadRequest("a post appears twice in postIds");

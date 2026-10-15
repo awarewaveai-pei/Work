@@ -78,7 +78,7 @@
 - 範圍：所有狀態轉換、改時間、連接、刪除、還原寫 `social_audit_log`（C4 的 `transition` 內統一寫）；「紀錄」檢視＋「需處理」篩選。
 - 驗收：每個動作一筆紀錄的測試。
 
-### C12 上線（Opus 5.5；High-STOP）——1→4 ✅ 2026-10-15；5、6 待 go-ahead
+### C12 上線（Opus 5.5；High-STOP）——1→4 ✅ 2026-10-15；6 ✅ 程式、5 ✅ 程式 2026-10-15（ADR 018），5 上線待 go-ahead
 - 範圍：nginx vhost `social.aware-wave.com`（`safe-infra-patch.sh host-nginx`）；`middleware.ts` 以 host 選產品；`sg-deploy.sh next-admin`；`/playwright smoke`；ContentStudio 的 Postiz 面板改成「到社群發文」連結。
 - 驗收：`/check-drift` → `/verify` → deploy → smoke；runbook §9 更新；WORKLOG。
 - 對外開放前（C4 審查 2026-10-15 留下的）：API 錯誤訊息改成固定文字（現在 `lib/social/store.ts` fail()／addImage 會帶資料庫與 Postiz 的原文，只限員工時可接受）；`GET /api/social/accounts` 會寫入（配對連接），而 GET 不經過 CSRF 檢查。
@@ -88,8 +88,8 @@
   2. compose 加 `SOCIAL_DISPATCH_TOKEN`（`safe-infra-patch.sh compose`），`SOCIAL_DISPATCH_ENABLED=true`、`SOCIAL_DISPATCH_MODE=draft` → `sg-deploy.sh next-admin` → `/playwright smoke`。
   3. Trigger deploy（`trigger-deploy-agent`，`tr_pat_*`）：`social-dispatch`、`social-rotation`。
   4. C5 驗收：排一則 Bluesky 貼文 → draft 模式送出 → Postiz 出現 DRAFT 且 `postiz_post_id` 回寫 → 刪掉 → 改 `SOCIAL_DISPATCH_MODE=apply`。
-  5. 子網域：nginx vhost `social.aware-wave.com`（`safe-infra-patch.sh host-nginx`）＋ middleware 以 host 導到 `/tools/social`（要確認 Supabase 登入 cookie 的網域涵蓋子網域）；ContentStudio 的 Postiz 面板換成「到社群發文」連結。
-  6. 每品牌成員／審核人：middleware 身分標頭帶出使用者 id（身分層）→ `authz.ts` 讀 `social_brand_members`。
+  5. 子網域（規則＝ADR 018 三扇門）。程式已完成：`lib/portal/doors.ts`、middleware 把 social 網址的頁面改寫到 `/social`（`app/social/`，不套員工側欄）、其他 API 404；登入 cookie 不跨子網域，social 網址自己登入。repo 已寫好 lobster-nginx `nginx/default.conf` social 區塊（擋 matcher 跳過的路徑與編碼路徑）與主機 `sg-stack.aware-wave.com.conf` server_name。**上線待 go**：Cloudflare DNS `social`（proxied）→ 憑證加 social（`/etc/letsencrypt/live/aware-wave.com` 2026-10-15 查：SAN 10 個網址，沒有 social；用該憑證原本的簽發方式 expand）→ 主機 nginx（`safe-infra-patch.sh host-nginx`）→ lobster-nginx（`safe-infra-patch.sh nginx`）→ `sg-deploy.sh next-admin` → `/playwright smoke`＋social 網址實測（未登入轉 /login、/api/ops 404、員工登入看得到社群）；ContentStudio 的 Postiz 面板換成「到社群發文」連結。
+  6. ✅ 程式 2026-10-15：middleware 帶 `x-ops-user-id`；`authz.ts` 讀 `social_brand_members`（成員列優先，員工 owner/admin 全品牌 owner）；客戶不能開新頻道連接（時間配對只對員工安全）、看不到員工角色與 user id。成員管理畫面未做（目前只能 SQL 加成員）。隨 5 一起部署。
 
 ## 2. V2（開放訂閱前）
 `social_audit_log` 保留期限或按月分割（每則貼文約 2 列，768 MB 主機）；WordPress 會員一鍵進入（ADR 015 §2）；方案與用量上限＋WooCommerce；Postiz analytics（審核後）；Chatwoot 入口與未讀數；最佳時段；重複貼文；find-slot 佇列；對外 API／MCP；服務條款、隱私政策、資料刪除；第二台 Postiz 的 instance 對應。

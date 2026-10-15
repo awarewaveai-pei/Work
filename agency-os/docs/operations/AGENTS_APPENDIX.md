@@ -302,5 +302,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `AGENTS.md`
 - `docs/operations/TOOL_TRIGGER_MAP.md`
 
-_Last synced: 2026-10-15 04:09:33 UTC_
+_Last synced: 2026-10-15 06:19:20 UTC_
 

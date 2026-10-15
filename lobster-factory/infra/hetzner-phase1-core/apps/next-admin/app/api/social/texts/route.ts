@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request): Promise<Response> {
   return handle(async () => {
     const brand = uuid(new URL(req.url).searchParams.get("brand"), "brand");
-    requireBrandRole(req, brand, ANY_ROLE);
+    await requireBrandRole(req, brand, ANY_ROLE);
     return { texts: await listTexts(brand) };
   });
 }
@@ -21,7 +21,7 @@ export async function POST(req: Request): Promise<Response> {
   return handle(async () => {
     const body = await jsonBody(req);
     const brand = uuid(body.brand, "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    await requireBrandRole(req, brand, WRITE_ROLES);
     if (typeof body.body !== "string" || !body.body.trim() || body.body.length > 10000) throw new BadRequest("body must be 1..10000 characters");
     return { text: await addText(brand, body.body.trim()) };
   });
@@ -31,7 +31,7 @@ export async function DELETE(req: Request): Promise<Response> {
   return handle(async () => {
     const q = new URL(req.url).searchParams;
     const brand = uuid(q.get("brand"), "brand");
-    requireBrandRole(req, brand, WRITE_ROLES);
+    await requireBrandRole(req, brand, WRITE_ROLES);
     await deleteText(brand, uuid(q.get("id"), "id"));
     return {};
   });
