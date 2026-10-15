@@ -166,6 +166,8 @@ export "SITE_WATCH_INGEST_TOKEN=`$(docker exec lobster-next-admin printenv SITE_
 export "POD_INBOX_SWEEP_TOKEN=`$(docker exec lobster-next-admin printenv POD_INBOX_SWEEP_TOKEN 2>/dev/null)"
 # cs-inbound-sweep token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
 export "CS_SWEEP_TOKEN=`$(docker exec lobster-next-admin printenv CS_SWEEP_TOKEN 2>/dev/null)"
+# social-dispatch token: same rule -- optional, from the RUNNING next-admin, empty = the schedule skips.
+export "SOCIAL_DISPATCH_TOKEN=`$(docker exec lobster-next-admin printenv SOCIAL_DISPATCH_TOKEN 2>/dev/null)"
 # collect-research-run token: same rule -- optional, from the RUNNING next-admin; empty = the relay task fails and
 # Cognitive OS reads the run as failed at its deadline.
 export "COLLECT_RESEARCH_EXECUTE_TOKEN=`$(docker exec lobster-next-admin printenv COLLECT_RESEARCH_EXECUTE_TOKEN 2>/dev/null)"
@@ -185,6 +187,7 @@ if [ -n "`$MAINWP_CONSUMER_SECRET" ]; then echo "  MAINWP_* set: yes (`$MAINWP_D
 if [ -n "`$SITE_WATCH_INGEST_TOKEN" ]; then echo "  SITE_WATCH_INGEST_TOKEN set: yes (from running next-admin)"; else echo "  SITE_WATCH_INGEST_TOKEN set: no (next-admin has none; site-watch-heartbeat will skip)"; fi
 if [ -n "`$POD_INBOX_SWEEP_TOKEN" ]; then echo "  POD_INBOX_SWEEP_TOKEN set: yes (from running next-admin)"; else echo "  POD_INBOX_SWEEP_TOKEN set: no (next-admin has none; pod-order-inbox-sweep will skip)"; fi
 if [ -n "`$CS_SWEEP_TOKEN" ]; then echo "  CS_SWEEP_TOKEN set: yes (from running next-admin)"; else echo "  CS_SWEEP_TOKEN set: no (next-admin has none; cs-inbound-sweep will skip)"; fi
+if [ -n "`$SOCIAL_DISPATCH_TOKEN" ]; then echo "  SOCIAL_DISPATCH_TOKEN set: yes (from running next-admin)"; else echo "  SOCIAL_DISPATCH_TOKEN set: no (next-admin has none; social-dispatch will skip)"; fi
 if [ -n "`$COLLECT_RESEARCH_EXECUTE_TOKEN" ]; then echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: yes (from running next-admin)"; else echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: no (next-admin has none; collect-research-run will fail at the relay)"; fi
 
 cd /root/Work/lobster-factory/packages/workflows

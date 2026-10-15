@@ -2,6 +2,7 @@
 import { BadRequest, uuid } from "./http";
 import { overLimit } from "./limits";
 import { accountPlatforms, type MediaInput, type PostFields, type TargetInput } from "./store";
+import { composeText, ComposeError } from "./compose";
 
 const TEXT_FIELDS = ["first_comment", "link_url", "notes", "source_url"] as const;
 const MAX_TARGETS = 100;   // more channels than one brand has
@@ -22,6 +23,13 @@ export function parsePostPayload(body: Record<string, unknown>): PostPayload {
     if (!(k in raw)) continue;
     if (raw[k] !== null && typeof raw[k] !== "string") throw new BadRequest(`fields.${k} must be a string or null`);
     fields[k] = raw[k] as string | null;
+  }
+  for (const k of ["link_url", "source_url"] as const) {
+    const v = fields[k];
+    if (!v) continue;
+    let ok = false;
+    try { ok = /^https?:$/.test(new URL(v).protocol) && new URL(v).hostname.includes("."); } catch { ok = false; }
+    if (!ok) throw new BadRequest(`fields.${k} must be a full web address (https://…)`);
   }
   if ("link_utm" in raw) {
     if (typeof raw.link_utm !== "boolean") throw new BadRequest("fields.link_utm must be a boolean");
@@ -51,11 +59,20 @@ export function parsePostPayload(body: Record<string, unknown>): PostPayload {
   return { fields, targets, media };
 }
 
-/** 400 when a target's text is longer than its platform takes, or the account is not this brand's. */
-export async function assertWithinLimits(brandId: string, body: string, targets: TargetInput[]): Promise<void> {
+/** 400 when a target's text -- as the sender composes it, link and UTM included -- is longer than its platform takes,
+ *  or the account is not this brand's. */
+export async function assertWithinLimits(brandId: string, body: string, targets: TargetInput[], link: { url: string | null; utm: boolean } = { url: null, utm: false }): Promise<void> {
   const platforms = await accountPlatforms(brandId, targets.map((t) => t.account_id));
   const missing = targets.filter((t) => !platforms.has(t.account_id)).map((t) => t.account_id);
   if (missing.length) throw new BadRequest("an account in targets is not this brand's", { accounts: missing });
-  const problems = overLimit(body, targets.map((t) => ({ accountId: t.account_id, platform: platforms.get(t.account_id) as string, customBody: t.custom_body })));
+  const textOf = (t: TargetInput, platform: string) => {
+    try {
+      return composeText({ body, customBody: t.custom_body ?? null, linkUrl: link.url, linkUtm: link.utm, platform });
+    } catch (e) {
+      if (e instanceof ComposeError) throw new BadRequest(e.message);
+      throw e;
+    }
+  };
+  const problems = overLimit(body, targets.map((t) => { const platform = platforms.get(t.account_id) as string; return { accountId: t.account_id, platform, customBody: textOf(t, platform) }; }));
   if (problems.length) throw new BadRequest("text longer than the platform allows", { overLimit: problems });
 }

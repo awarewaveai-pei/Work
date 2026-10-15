@@ -382,6 +382,12 @@ services:
       POD_INBOX_SWEEP_TOKEN: ${POD_INBOX_SWEEP_TOKEN:-}
       # Own bearer for /api/internal/cs/sweep (the 5-minute unfinished-Chatwoot-claim handoff); empty = 401.
       CS_SWEEP_TOKEN: ${CS_SWEEP_TOKEN:-}
+      # Social sender (SOCIAL_MANAGER_PLAN.md C5): own bearer for /api/internal/social/dispatch (empty = 401); off unless
+      # SOCIAL_DISPATCH_ENABLED=true; SOCIAL_DISPATCH_MODE=apply sends, =draft makes Postiz drafts only (rehearsal),
+      # anything else is a dry run.
+      SOCIAL_DISPATCH_TOKEN: ${SOCIAL_DISPATCH_TOKEN:-}
+      SOCIAL_DISPATCH_ENABLED: ${SOCIAL_DISPATCH_ENABLED:-}
+      SOCIAL_DISPATCH_MODE: ${SOCIAL_DISPATCH_MODE:-}
       # wp-bridge signing client (one-click publish; lib/studio/wp-bridge-client.ts). Was live on the
       # server since before this file tracked it (2026-09-20 compose-drift audit) -- added here so a
       # fresh deploy of this file no longer silently omits it.

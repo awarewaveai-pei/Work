@@ -1,13 +1,14 @@
 // /api/social/posts
 //   GET  ?brand&start&end[&wp=1] -> posts timed in [start, end) plus the newest 500 undated ones (undatedTruncated
 //        says when there were more); wp=1 adds the brand's WordPress posts
+//   GET  ?brand&trash=1 -> the bin: deleted posts, most recently deleted first (C6; restore = PUT .../state restore)
 //   POST { brand, fields, targets?, media? } -> a new draft (lib/social/posts.ts says what may be sent)
 import { listAccessibleWpSites } from "@/lib/content/wp-sites";
 import { fetchSitePosts } from "@/lib/content/wp-calendar";
 import { ANY_ROLE, WRITE_ROLES, actorOf, requireBrandRole } from "@/lib/social/authz";
 import { BadRequest, handle, jsonBody, uuid } from "@/lib/social/http";
 import { assertWithinLimits, parsePostPayload } from "@/lib/social/posts";
-import { listPosts, savePost } from "@/lib/social/store";
+import { listPosts, listTrash, savePost } from "@/lib/social/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export async function GET(req: Request): Promise<Response> {
     const q = new URL(req.url).searchParams;
     const brand = uuid(q.get("brand"), "brand");
     requireBrandRole(req, brand, ANY_ROLE);
+    if (q.get("trash") === "1") return { posts: await listTrash(brand) };
     const start = iso(q.get("start"), "start");
     const end = iso(q.get("end"), "end");
     if (Date.parse(end) <= Date.parse(start) || Date.parse(end) - Date.parse(start) > MAX_WINDOW_MS) {
@@ -48,7 +50,9 @@ export async function POST(req: Request): Promise<Response> {
     const brand = uuid(body.brand, "brand");
     requireBrandRole(req, brand, WRITE_ROLES);
     const payload = parsePostPayload(body);
-    if (payload.targets?.length) await assertWithinLimits(brand, payload.fields.body ?? "", payload.targets);
+    if (payload.targets?.length) {
+      await assertWithinLimits(brand, payload.fields.body ?? "", payload.targets, { url: payload.fields.link_url ?? null, utm: payload.fields.link_utm ?? false });
+    }
     return { post: await savePost(brand, null, null, payload.fields, payload.targets, payload.media, actorOf(req)) };
   });
 }

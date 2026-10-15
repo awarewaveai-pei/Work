@@ -6,7 +6,7 @@ import { join } from "path";
 
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => null }));
 
-const { listPosts, deletePost, changeStatus, connectUrl, listGroups, createSocialPost, PostizApiError } = await import("../postiz");
+const { listPosts, deletePost, changeStatus, connectUrl, listGroups, createSocialPost, createPost, sendKeyOf, PostizApiError } = await import("../postiz");
 
 const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", "postiz-v2.25.1", name), "utf8");
 const fetchMock = vi.fn();
@@ -30,6 +30,29 @@ afterEach(() => {
 });
 
 describe("Postiz v2.25.1 client", () => {
+  // C5: the send key rides in the post's settings (Postiz keeps unknown keys and returns them), so an uncertain send is
+  // found again by it; Postiz assigns the post id itself
+  it("createPost stores the send key in settings, sendKeyOf reads it back; a 429 carries retryAfter", async () => {
+    answer(200, fixture("post-create.json"));
+    const id = await createPost({ sendKey: "k-1", integrationId: "int-1", type: "schedule", date: "2026-10-16T01:00:00.000Z",
+      values: [{ content: "<p>hi</p>", image: [] }, { content: "<p>first comment</p>", image: [] }], settings: { __type: "bluesky" } });
+    expect(id).toBe("cmv8oh9kq0000rk8znfwq2ll1");
+    const { url, init } = lastCall();
+    expect([init.method, url.pathname]).toEqual(["POST", "/api/public/v1/posts"]);
+    const sent = JSON.parse(init.body as string);
+    expect(sent).toMatchObject({ type: "schedule", date: "2026-10-16T01:00:00.000Z", shortLink: false, tags: [] });
+    expect(sent.posts[0].settings).toEqual({ __type: "bluesky", awarewave_send_key: "k-1" });
+    expect(sent.posts[0].value).toHaveLength(2);
+    expect(sendKeyOf({ settings: JSON.stringify(sent.posts[0].settings) })).toBe("k-1");
+    expect(sendKeyOf({ settings: "{\"__type\":\"bluesky\"}" })).toBeNull();
+    expect(sendKeyOf({ settings: "not json" })).toBeNull();
+    expect(sent.posts[0].integration).toEqual({ id: "int-1" });
+    answer(429, "slow down", { "retry-after": "120" });
+    const err = await createPost({ sendKey: "k-2", integrationId: "int-1", type: "now", date: "2026-10-16T01:00:00.000Z", values: [{ content: "x", image: [] }], settings: { __type: "x" } }).catch((e) => e);
+    expect(err).toBeInstanceOf(PostizApiError);
+    expect([err.status, err.retryAfterSeconds]).toEqual([429, 120]);
+  });
+
   it("listPosts sends the window and the group, returns the posts as Postiz shapes them", async () => {
     answer(200, fixture("posts-with-draft.json"));
     const posts = await listPosts({ start: new Date("2026-10-13T00:00:00Z"), end: new Date("2026-10-16T00:00:00Z"), customer: "brand-1" });

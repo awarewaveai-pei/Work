@@ -1,7 +1,8 @@
 // The one place post state changes are decided (SOCIAL_MANAGER_PLAN.md C4; ADR 016 §2). Routes call transition();
 // the database (0096 checks + 0098 social_set_state) keeps the shape, this table keeps who may do what from where.
-// queued / published / error are the sender's (C5): no user action produces them except publish_now (scheduled at
-// now) and restore of a published post. A post in queued is already in Postiz: changing it waits for C5's delete+recreate.
+// queued / published / error are the sender's (C5, lib/social/dispatch.ts + migration 0100): no user action produces
+// them except restore of a published post. A queued post is already in Postiz: schedule / unschedule / delete /
+// publish_now on it go through lib/social/withdraw.ts (delete its Postiz posts, then 0100 social_release_post).
 // A list slot (listId + listPosition) is set only by to_rotation; every other action clears it (0096: list_position
 // exists only in rotation), so a post that left rotation never looks like a C7 slot or blocks deleting its list.
 
@@ -54,13 +55,13 @@ export const RULES: Record<PostAction, Rule> = {
   submit: { from: ["draft"], roles: EDIT },
   approve: { from: ["review"], roles: REVIEW },
   reject: { from: ["review"], roles: REVIEW },
-  schedule: { from: ["draft", "scheduled", "error"], roles: EDIT },
-  unschedule: { from: ["scheduled"], roles: EDIT },
+  schedule: { from: ["draft", "scheduled", "queued", "error"], roles: EDIT },
+  unschedule: { from: ["scheduled", "queued"], roles: EDIT },
   to_rotation: { from: ["draft"], roles: EDIT },
   from_rotation: { from: ["rotation"], roles: EDIT },
-  delete: { from: ["draft", "review", "scheduled", "error", "rotation", "published"], roles: EDIT },
+  delete: { from: ["draft", "review", "scheduled", "queued", "error", "rotation", "published"], roles: EDIT },
   restore: { from: ["deleted"], roles: EDIT },
-  publish_now: { from: ["draft", "scheduled", "error"], roles: ["owner"] },
+  publish_now: { from: ["draft", "scheduled", "queued", "error"], roles: ["owner"] },
 };
 
 /** The actions after which C5 sends the post to its targets. */

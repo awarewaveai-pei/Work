@@ -71,6 +71,10 @@ export default defineConfig({
         const csSweepToken = process.env.CS_SWEEP_TOKEN ?? "";
         if (csSweepToken.trim()) out.CS_SWEEP_TOKEN = csSweepToken.trim();
 
+        // social-dispatch -> next-admin /api/internal/social/dispatch. Own token, same rule.
+        const socialDispatchToken = process.env.SOCIAL_DISPATCH_TOKEN ?? "";
+        if (socialDispatchToken.trim()) out.SOCIAL_DISPATCH_TOKEN = socialDispatchToken.trim();
+
         // collect-research-run -> next-admin /api/internal/collect/runs/execute (RESEARCH_LINES_MASTER_PLAN
         // WC-P1-13). Own token, same rule.
         const researchExecuteToken = process.env.COLLECT_RESEARCH_EXECUTE_TOKEN ?? "";

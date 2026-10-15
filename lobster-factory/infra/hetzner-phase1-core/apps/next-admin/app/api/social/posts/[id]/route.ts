@@ -6,8 +6,8 @@
 import { ANY_ROLE, WRITE_ROLES, actorOf, requireBrandRole } from "@/lib/social/authz";
 import { handle, jsonBody, postVersion, uuid } from "@/lib/social/http";
 import { assertWithinLimits, parsePostPayload } from "@/lib/social/posts";
-import { transition } from "@/lib/social/state";
-import { getPost, getPostAt, savePost, setState, snapshotOf } from "@/lib/social/store";
+import { applyAction } from "@/lib/social/actions";
+import { getPost, getPostAt, savePost } from "@/lib/social/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,10 +30,12 @@ export async function PUT(req: Request, { params }: Ctx): Promise<Response> {
     requireBrandRole(req, brand, WRITE_ROLES);
     const payload = parsePostPayload(body);
     const version = postVersion(body.version);
-    if (payload.fields.body !== undefined || payload.targets) {
+    const linkChanged = payload.fields.link_url !== undefined || payload.fields.link_utm !== undefined;
+    if (payload.fields.body !== undefined || payload.targets || linkChanged) {
       const current = await getPostAt(brand, id, version);   // the limits are checked against the version being saved
       const targets = payload.targets ?? current.targets.map((t) => ({ account_id: t.account_id, custom_body: t.custom_body, format: t.format }));
-      if (targets.length) await assertWithinLimits(brand, payload.fields.body ?? current.body, targets);
+      const link = { url: payload.fields.link_url !== undefined ? payload.fields.link_url : current.link_url, utm: payload.fields.link_utm ?? current.link_utm };
+      if (targets.length) await assertWithinLimits(brand, payload.fields.body ?? current.body, targets, link);
     }
     return { post: await savePost(brand, id, version, payload.fields, payload.targets, payload.media, actorOf(req)) };
   });
@@ -46,7 +48,7 @@ export async function DELETE(req: Request, { params }: Ctx): Promise<Response> {
     const brand = uuid(q.get("brand"), "brand");
     const role = requireBrandRole(req, brand, ANY_ROLE);
     const post = await getPostAt(brand, id, postVersion(q.get("version")));
-    const next = transition(snapshotOf(post), "delete", role);
-    return { post: await setState(brand, id, post.version, next, actorOf(req), "delete") };
+    const saved = await applyAction(brand, post, "delete", role, {}, actorOf(req), {});
+    return { post: { id: saved.id, version: saved.version } };
   });
 }

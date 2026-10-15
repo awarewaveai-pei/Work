@@ -21,7 +21,7 @@ export const BODY_LIMITS: Record<string, number> = {
 const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 export function bodyLength(platform: string, body: string): number {
-  if (platform === "threads") return Buffer.byteLength(body, "utf8");
+  if (platform === "threads") return new TextEncoder().encode(body).length;   // TextEncoder: the editor counts in the browser too
   let n = 0;
   for (const _ of segmenter.segment(body)) n++;
   return n;

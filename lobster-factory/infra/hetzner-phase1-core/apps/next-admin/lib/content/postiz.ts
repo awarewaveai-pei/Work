@@ -87,6 +87,7 @@ async function fetchPostizIntegrations(cfg: PostizConfig): Promise<RawIntegratio
   const res = await fetch(`${cfg.baseUrl}/public/v1/integrations`, {
     headers: { Authorization: cfg.apiKey },
     cache: "no-store",
+    signal: AbortSignal.timeout(20_000),   // the sender holds a send lease while it waits (review 2026-10-15 R5)
   });
   if (!res.ok) {
     const body = (await res.text()).slice(0, 200);
@@ -315,7 +316,7 @@ export class PostizApiError extends Error {
   }
 }
 
-async function postizRequest<T>(method: "GET" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
+async function postizRequest<T>(method: "GET" | "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T> {
   const cfg = getPostizConfig();
   const res = await fetch(`${cfg.baseUrl}/public/v1${path}`, {
     method,
@@ -368,6 +369,41 @@ export async function deletePost(id: string): Promise<{ existed: boolean }> {
     if (e instanceof PostizApiError && e.status === 404) return { existed: false };
     throw e;
   }
+}
+
+/** One Postiz post: one channel, `values` = the post then its comments (Postiz `value[]`), `settings` = the provider's
+ *  DTO incl. `__type`. Throws PostizApiError (429 with retryAfter): unlike createSocialPost, the caller (C5 dispatch)
+ *  must tell "refused" from "maybe created". One request per channel keeps each its own Postiz group, so deletePost
+ *  removes only that channel's post. `sendKey` is stored as settings.awarewave_send_key: the public create keeps unknown
+ *  settings keys (validatePosts runs class-validator without whitelist) and GET /posts returns `settings`, so the
+ *  sender finds its own post again by that exact key (sendKeyOf). Postiz assigns the post id itself. */
+export const SEND_KEY_SETTING = "awarewave_send_key";
+
+export function sendKeyOf(post: { settings: string }): string | null {
+  try {
+    const v = (JSON.parse(post.settings) as Record<string, unknown>)[SEND_KEY_SETTING];
+    return typeof v === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function createPost(opts: {
+  sendKey: string;
+  integrationId: string;
+  type: "schedule" | "now" | "draft";
+  date: string;
+  values: Array<{ content: string; image: Array<{ id: string; path: string; alt?: string }> }>;
+  settings: Record<string, unknown> & { __type: string };
+}): Promise<string> {
+  const res = await postizRequest<Array<{ postId?: string }>>("POST", "/posts", {
+    type: opts.type, date: opts.date, shortLink: false, tags: [],
+    posts: [{ integration: { id: opts.integrationId }, value: opts.values, settings: { ...opts.settings, [SEND_KEY_SETTING]: opts.sendKey } }],
+  });
+  const id = Array.isArray(res) ? res[0]?.postId : undefined;
+  // a 2xx without an id: Postiz may hold the post; the caller treats it as an uncertain send, never as refused
+  if (!id) throw new Error(`Postiz POST /posts answered without a post id: ${JSON.stringify(res).slice(0, 200)}`);
+  return id;
 }
 
 export async function changeStatus(id: string, status: "draft" | "schedule"): Promise<void> {

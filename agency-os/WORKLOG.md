@@ -1,4 +1,36 @@
 # Worklog
+## 2026-10-15（續15）C5 社群送出與對帳：認領一次、每次送出一把冪等鍵、寫回只落在自己的認領、孤兒必刪、系統模式擋發送（程式；未套正式、未部署）
+
+**根因／要關的類**：排程的真相在我們的資料庫（ADR 016 §2），Postiz 只送信。送信員跟 Postiz 之間任何一步斷掉（逾時、重疊的兩輪、人在中途改時間）都不能變成「發兩次」或「該撤的照發」。
+**不變量**（`packages/db/migrations/0100_social_dispatch.sql` 檔頭為準）：
+- 一則貼文只被認領一次（`social_claim_due` FOR UPDATE SKIP LOCKED）。
+- 一次送出最多一則 Postiz 貼文：`social_begin_send` 先發租約與 `send_key` 才呼叫 Postiz；key 放在 Postiz 貼文的 `settings.awarewave_send_key`（v2.25.1 公開建立收 `rawBody:any`、validatePosts 無 whitelist、`GET /posts` 回傳 settings）。不明的送出（逾時／5xx）租約過期後拿回同一把 key，先用 key 精確找，找不到才用同一把 key 再送。
+- 寫回只落在自己的認領（post 仍 queued 且 version 相同）；被拒的寫回在同一個 transaction 把 Postiz id 記進 `social_postiz_orphans`，之後每輪刪到 Postiz 確認為止。
+- 已發佈的 target 永遠不會被重設成 pending；貼文狀態跟著 targets（全發＝published；還有 pending/queued＝queued；否則 error）。
+- 人改 queued 貼文（改時間／取消／刪除／立即發）：先查 Postiz 是否已發 → 刪 Postiz 貼文 → `social_release_post` 一次 transaction 放回；送出中或有沒刪的 id 一律 SC409。只有「有 Postiz 貼文且在送出時間前 2 分到後 10 分」才擋。
+**改動**：
+- `0100_social_dispatch.sql`（新）＋ down ＋ 本機驗證（postgres 15.8）：`send_started_at`、`send_key`、`social_dispatch_state`（429 退讓）、`social_postiz_orphans`、六個函式、ops_incidents.source 加 `social`。
+- next-admin：`lib/social/dispatch.ts`（決策）、`dispatch-store.ts`（ports）、`compose.ts`（HTML 段落、連結＋UTM、第一則留言＝value[1]、各平台必填 settings；Pinterest／YouTube／Reddit／TikTok 需要的欄位還沒收 → 送前就標 error）、`withdraw.ts`、`actions.ts`（state／bulk／DELETE 共用）；`state.ts` 放行 queued 的 schedule／unschedule／delete／publish_now；`lib/content/postiz.ts` 加 `createPost`／`sendKeyOf`；`POST /api/internal/social/dispatch`（`SOCIAL_DISPATCH_TOKEN`；`SOCIAL_DISPATCH_ENABLED=true` 才動；`SOCIAL_DISPATCH_MODE=apply|draft`，其他＝dry run；draft＝整條跑但 Postiz 只存草稿＝正式機演練）。
+- 系統模式：發送是正式機改動 → 每品牌 `checkProductionChangeAllowed`，被擋就留在 queued；`production-change-coverage` 把 `lib/content/postiz` 列為目標模組，11 個只讀/型別匯入的檔加 allowlist 理由。
+- Trigger `social-dispatch`（*/5）；token 管線同 CS_SWEEP_TOKEN（`trigger.config.ts`、`scripts/lobster-trigger-deploy.ps1`、repo compose 三個 env）。
+- 額度：每輪 20 次 Postiz 呼叫（12 輪/時＝240，API_LIMIT=300 留 60 給人），外加本輪新孤兒最多一刪。
+- 同 commit 帶了 C6 的兩個後端缺口：`GET posts?trash=1`（垃圾桶）、`/api/social/texts`（常用文字）；`limits.ts` 改 TextEncoder（瀏覽器也能數）。
+**Codex 五輪**（`agency-os/reports/oracle/2026-10-15-partialreview-810d82b9.md`、`-4104e700`、`-cd1ed6dc`、`-e96bb7bd`、`-73a35552`）：
+- R1 3：每輪額度 40×12＞300 → 改 20；孤兒刪除被額度擋 → 清理不受擋；不明送出用文字認領會認到別人的 → 加條件。
+- R2 3：同段（文字認領）第二次被報 → 先寫不變量（見上），改成冪等鍵；清理仍計數＝刻意（Postiz 也計）；斷線頻道擋住認領 → 先查再判斷頻道。
+- R3 5：7 天逾時用 scheduled_at → 改成按 id 在 7 天窗內查；時間預算只在貼文間檢查 → 每個 target 前；孤兒刪除失敗會被遺忘 → `social_postiz_orphans`；incident 建不起來只記 log → 讓這輪失敗；批次立即發佈不帶確認＝刻意（駁回）。
+- R4 4：**我原本以為 Postiz 會用我們給的 value.id 當貼文 id——錯，create 分支不帶 id**（R4 F1，查 `posts.repository.ts` createOrUpdatePost 證實）→ 冪等鍵改放 settings；過時 queued 貼文永遠撤不回 → 改時間窗；送前再查時間；開頭重刪孤兒計入額度。
+- R5 5：演練草稿切 apply 會卡 → 非 draft 模式下 DRAFT 結算成 error；連結沒算進字數上限 → 存檔用送出同一個 `composeText` 檢查；壞網址讓租約永遠掛 → 組不出來就是該 target 失敗＋存檔驗網址；讀頻道清單無逾時 → 20 秒；本次認領內被拒的 target 每輪重送 → 只重送認領之前失敗的（target.updated_at < post.updated_at）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/packages/db/scripts/0100_social_dispatch-local-verify.sh（拋棄式 postgres 15.8：認領一次、租約 go/busy/uncertain/stale 且 uncertain 拿回同 key、429 後新 key、寫回只落在自己的認領且被拒者成孤兒、outcome 跟 targets、published 不重設、release 三種拒絕、down、re-apply、冪等）→ ✅ | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（next-admin、workflows）&& npx vitest run lib/social app/api/social app/api/internal/social lib/content lib/system-modes lib/repair-center（488 pass）+ workflows social-dispatch（3 pass） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/20m/0n -- Codex 五輪（20 項：修 18、駁 2——R2 清理計數是刻意、R3 批次不收立即發佈是刻意）
+- ORACLE_WAIVED: R5 之後只改 R5 五項的窄修，每項有指名測試（dispatch.test 3 個新案例、compose 壞網址、routes 連結計入上限）；依「不做無效益工作」不再開第六輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=social_begin_send | hits=10
+- 未做：真送一則 Bluesky 草稿驗 id 回寫（卡片驗收）要 0100 上正式＋部署（High-STOP，見下一步）；`SOCIAL_DISPATCH_MODE=draft` 就是為這一步做的。
+
+**rollback**：程式未部署；0100 未套。之後回滾：先關 `SOCIAL_DISPATCH_ENABLED`，再跑 `packages/db/scripts/0100_social_dispatch_down.sql`（先確認 `social_postiz_orphans` 為空）。
 ## 2026-10-15（續14）Chatwoot webhook 先回應再處理：v4.18 AgentBot 5 秒逾時＋claim 完成標記＋5 分鐘 sweep（程式；部署見後續條目）
 
 **根因**：Chatwoot v4.18 `lib/webhooks/trigger.rb` `WEBHOOK_TIMEOUT` 預設 5 s，`handle_error` 逾時即 `conversation.open!`＋活動訊息「marked open by system due to an error with the agent bot」。`route.ts` 同步跑完整 pipeline 才回（CS_TIMEOUTS 最壞約 176 s，`lib/cs/config.ts:21-39`）→ 實測 Soulful conv 6：sidekiq `Net::ReadTimeout`（5.76 s）。

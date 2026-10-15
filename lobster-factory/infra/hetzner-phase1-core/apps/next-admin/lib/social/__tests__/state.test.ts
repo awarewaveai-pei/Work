@@ -10,13 +10,13 @@ const LEGAL: Record<PostAction, { from: PostState[]; roles: BrandRole[] }> = {
   submit: { from: ["draft"], roles: ["owner", "editor"] },
   approve: { from: ["review"], roles: ["owner", "reviewer"] },
   reject: { from: ["review"], roles: ["owner", "reviewer"] },
-  schedule: { from: ["draft", "scheduled", "error"], roles: ["owner", "editor"] },
-  unschedule: { from: ["scheduled"], roles: ["owner", "editor"] },
+  schedule: { from: ["draft", "scheduled", "queued", "error"], roles: ["owner", "editor"] },
+  unschedule: { from: ["scheduled", "queued"], roles: ["owner", "editor"] },
   to_rotation: { from: ["draft"], roles: ["owner", "editor"] },
   from_rotation: { from: ["rotation"], roles: ["owner", "editor"] },
-  delete: { from: ["draft", "review", "scheduled", "error", "rotation", "published"], roles: ["owner", "editor"] },
+  delete: { from: ["draft", "review", "scheduled", "queued", "error", "rotation", "published"], roles: ["owner", "editor"] },
   restore: { from: ["deleted"], roles: ["owner", "editor"] },
-  publish_now: { from: ["draft", "scheduled", "error"], roles: ["owner"] },
+  publish_now: { from: ["draft", "scheduled", "queued", "error"], roles: ["owner"] },
 };
 
 const NOW = new Date("2026-10-15T00:00:00Z");
@@ -34,10 +34,12 @@ describe("social post transitions", () => {
     }
   });
 
-  it("a client (read-only) can do nothing; a queued post (already in Postiz) cannot be changed here", () => {
+  it("a client (read-only) can do nothing; a queued post (already in Postiz) can only be moved, unscheduled or deleted", () => {
     for (const action of ACTIONS) {
       expect(() => transition(post("draft"), action, "client", INPUT, NOW)).toThrow(/client may not/);
-      expect(() => transition(post("queued"), action, "owner", INPUT, NOW)).toThrow(TransitionError);
+      const fromQueued = () => transition(post("queued"), action, "owner", INPUT, NOW);
+      if (["schedule", "unschedule", "delete", "publish_now"].includes(action)) expect(fromQueued, action).not.toThrow();
+      else expect(fromQueued, action).toThrow(TransitionError);
     }
   });
 

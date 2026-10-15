@@ -41,7 +41,7 @@
 - 驗收：每條路由一個測試；`state.ts` 的轉換表測試（全部合法／非法組合）；超出字數上限 400。
 - 邊界：不呼叫 Postiz 建貼文（C5）。
 
-### C5 送出與對帳（Opus 5.5）
+### C5 送出與對帳 ✅ 程式 2026-10-15（`packages/db/migrations/0100_social_dispatch.sql`＋`lib/social/dispatch.ts`；不變量在 0100 檔頭；Codex 五輪見 WORKLOG 2026-10-15。**未套正式、未部署**：0100 套用＋next-admin 部署＋Trigger deploy＋`SOCIAL_DISPATCH_MODE=draft` 真送 Bluesky 草稿驗 id 回寫，併 C12 的 go-ahead）
 - 0096 交代的：先以 `UPDATE … SET state='queued' WHERE state='scheduled' AND scheduled_at <= … RETURNING`（`FOR UPDATE SKIP LOCKED`，走 `social_posts_due_idx`）認領，再呼叫 Postiz，兩個重疊的排程不會重發。
 - 範圍：`lobster-factory/packages/workflows/` Trigger.dev 任務 `social-dispatch`（每 5 分鐘）：`scheduled` 且 `scheduled_at <= now + 10min` → `createSocialPost`（批次，429 → 退讓到 reset）→ 記 Postiz ids → `queued`；`queued` → `listPosts` 對帳 → `published`（含 `releaseURL`）或 `error`（含訊息）→ 失敗寫 ops inbox＋Telegram。改時間：`queued` 的先 `deletePost` 再重建。
 - C4 交代的（2026-10-15 審查）：部分已送的貼文只重送 state 是 pending／error 的 target；error 的先 `deletePost` 掉它的 Postiz ERROR 貼文、清空 `postiz_post_id` 再送。0098 不讓存檔改掉或移除 queued／published 的 target，任一 target 送出後，貼文層的文字（body、第一則留言、連結）也不能改（要改就給其他頻道各自的文字）。先鎖 post 列再鎖 target（0098 檔頭的鎖順序）。帳號 connected／expired 以送出結果為準（重新連接時 C4 輪詢到 `disabled:false` 就標 connected，Postiz 公開 API 看不出授權有沒有換新）。

@@ -178,7 +178,7 @@ export async function unlinkAccount(brandId: string, accountId: string): Promise
 
 // ---- posts ----------------------------------------------------------------------------------------------------
 
-const POST_COLUMNS = "id, state, body, scheduled_at, list_id, list_position, first_comment, link_url, link_utm, notes, source_url, " +
+export const POST_COLUMNS = "id, state, body, scheduled_at, list_id, list_position, first_comment, link_url, link_utm, notes, source_url, " +
   "published_at, deleted_at, created_by, version, created_at, updated_at, " +
   "targets:social_post_targets(id, account_id, custom_body, format, state, postiz_post_id, release_url, error), " +
   "media:social_post_media(media_id, position, alt_text)";
@@ -218,6 +218,36 @@ export async function listPosts(brandId: string, start: string, end: string): Pr
   return { posts: [...timed, ...rows.slice(0, UNDATED_CAP)] as unknown as PostRow[], undatedTruncated: rows.length > UNDATED_CAP };
 }
 
+const TRASH_CAP = 200;
+
+/** The bin (C6): deleted posts, most recently deleted first (social_posts_trash_idx). */
+export async function listTrash(brandId: string): Promise<PostRow[]> {
+  const { data, error } = await db().from("social_posts").select(POST_COLUMNS).eq("organization_id", brandId).eq("state", "deleted")
+    .order("deleted_at", { ascending: false }).order("id").limit(TRASH_CAP);
+  if (error) fail(error, "deleted posts");
+  return (data ?? []) as unknown as PostRow[];
+}
+
+// ---- saved texts (C6 editor 常用文字) ------------------------------------------------------------------------------
+
+export async function listTexts(brandId: string): Promise<Array<{ id: string; body: string }>> {
+  const { data, error } = await db().from("social_saved_texts").select("id, body").eq("organization_id", brandId).order("created_at").limit(200);
+  if (error) fail(error, "saved texts");
+  return (data ?? []) as Array<{ id: string; body: string }>;
+}
+
+export async function addText(brandId: string, body: string): Promise<{ id: string; body: string }> {
+  const { data, error } = await db().from("social_saved_texts").insert({ organization_id: brandId, body }).select("id, body").single();
+  if (error) fail(error, "save text");
+  return data as { id: string; body: string };
+}
+
+export async function deleteText(brandId: string, id: string): Promise<void> {
+  const { data, error } = await db().from("social_saved_texts").delete().eq("id", id).eq("organization_id", brandId).select("id");
+  if (error) fail(error, "delete text");
+  if (!data?.length) throw new SocialStoreError(404, "no such saved text in this brand");
+}
+
 export async function getPost(brandId: string, id: string): Promise<PostRow> {
   const { data, error } = await db().from("social_posts").select(POST_COLUMNS).eq("organization_id", brandId).eq("id", id).maybeSingle();
   if (error) fail(error, "post");
@@ -252,6 +282,18 @@ export async function setState(brandId: string, id: string, expectedVersion: num
   const { data, error } = await db().rpc("social_set_state", {
     p_org: brandId, p_post_id: id, p_expected_version: expectedVersion, p_state: next.state, p_scheduled_at: next.scheduledAt,
     p_list_id: next.listId, p_list_position: next.listPosition, p_actor: actor, p_action: action, p_detail: detail,
+  });
+  if (error) fail(error, `${action} post`);
+  const row = (data as Array<{ saved_post_id: string; saved_version: number }>)[0];
+  return { id: row.saved_post_id, version: row.saved_version };
+}
+
+/** A queued post changed by a person, after withdraw.ts deleted its Postiz posts (0100 social_release_post). */
+export async function releasePost(brandId: string, id: string, expectedVersion: number, deletedPostizIds: string[], next: Transition,
+  actor: string, action: string, detail: Record<string, unknown> = {}): Promise<{ id: string; version: number }> {
+  const { data, error } = await db().rpc("social_release_post", {
+    p_org: brandId, p_post_id: id, p_expected_version: expectedVersion, p_deleted_postiz_ids: deletedPostizIds, p_state: next.state,
+    p_scheduled_at: next.scheduledAt, p_actor: actor, p_action: action, p_detail: detail,
   });
   if (error) fail(error, `${action} post`);
   const row = (data as Array<{ saved_post_id: string; saved_version: number }>)[0];
@@ -302,10 +344,12 @@ export async function deleteList(brandId: string, id: string): Promise<void> {
 // ---- media and log ---------------------------------------------------------------------------------------------
 
 export async function listMedia(brandId: string) {
-  const { data, error } = await db().from("social_media").select("id, kind, file_name, postiz_path, bytes, created_at")
+  const { data, error } = await db().from("social_media").select("id, kind, file_name, postiz_path, bytes, created_at, uses:social_post_media(count)")
     .eq("organization_id", brandId).order("created_at", { ascending: false }).limit(200);
   if (error) fail(error, "media");
-  return data ?? [];
+  // C9: how many posts use each item (the library's 「用過 N 次」); PostgREST answers the embed as [{ count }]
+  return ((data ?? []) as Array<Record<string, unknown> & { uses?: Array<{ count: number }> }>)
+    .map(({ uses, ...m }) => ({ ...m, used: uses?.[0]?.count ?? 0 }));
 }
 
 /** Uploads through Postiz (its storage holds the file until the media library card moves storage, C9). */
