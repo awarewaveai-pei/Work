@@ -11,6 +11,7 @@ import type { JobMeta, ScheduleCell } from "../types";
 export const SITE_WATCH_JOB: JobMeta = {
   key: "site_watch",
   label: "網站巡檢",
+  description: "定期檢查客戶網站是否正常，並比對畫面變化。",
   frequencies: CONFIGURABLE_FREQUENCIES.map((f) => ({ value: f, label: FREQUENCY_LABEL[f] ?? f, usesHour: f === "daily", usesDay: false })),
 };
 
@@ -81,7 +82,7 @@ export async function siteWatchCells(sb: SupabaseClient, orgs: WatchOrg[]): Prom
       updatedBy: target?.updated_by ?? null,
       updatedAt: target?.updated_at ?? null,
       version: target?.version ?? 0,
-      unavailable: !globallyOn ? "SITE_WATCH_ENABLED 未開" : !hasPages ? "客戶設定沒有網站網址" : !active ? "客戶不是 active" : null,
+      unavailable: !globallyOn ? "網站巡檢已在全系統關閉" : !hasPages ? "此客戶尚未設定網站網址" : !active ? "此客戶目前未啟用" : null,
     };
   });
 }

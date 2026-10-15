@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-15（續36）排程頁重做：每項說明、GPT 寫文案、主題 token、台北時間、表格轉置
+
+**操作者**：「應該在那個網頁說明那些東西是做什麼的；中文很爛，問 gpt 怎麼寫，原則清楚易懂不冗長不要冗詞；UI/UX 太爛，要注意 css 主題設定 /tools/theme」。
+
+**做了什麼**
+- 文案：事實＋她的原則寫成 prompt → `codex-oracle -Mode inspect`（`reports/oracle/2026-10-15-inspect-edc129b3.md`），37 條照用；只改一條沒有名詞的標題（「伺服器唯讀」→「伺服器排程（唯讀）」）。
+- 每項說明：`JobMeta.description`（registry／site-watch adapter）、`SystemRow.description`（host-status），表頭與伺服器列各顯示一句。
+- 版面：統計 `.card-grid`；表格**轉置**＝列是客戶、欄是工作（客戶會越來越多、工作少；舊版 6 客戶就要橫捲）；格子直接寫排程「每週一 11:00」＋ `.dot-green/.dot-red` 上次結果；右欄用 `panel-primitives` `chipStyle`；伺服器列 `.ops-row`＋`.badge-*`。只用主題變數。
+- 時間：顯示與編輯都用台北時間，存 UTC（`taipeiFromUtc`／`utcFromTaipei`，跨日換星期；測試含 7×24 往返）。
+- 資料蒐集頁提示改 GPT 版。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit && npm test（257 files／2392 tests） | exit=0 | ms=14000
+- REALTEST_EVIDENCE: tool=Bash | cmd=jsdom 渲染真元件＋globals.css＋prod app_theme token → 瀏覽器 1470px 截圖：無橫捲、點格右欄出現、狀態色正確 | exit=0 | ms=2000
+- REVIEW_WAIVED: NA -- 版面與文案；唯一邏輯（台北↔UTC）由 7×24 往返測試覆蓋
+- ORACLE_WAIVED: 版面與文案改動，邏輯僅時區換算且有窮舉測試；本日同檔已審 6bd06ee9、a71005f8
+- BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=SITE_WATCH_ENABLED 未開|客戶設定沒有網站網址|還沒有心跳紀錄|每天 03:30 UTC | hits=2（SiteWatchCard 自己的全域開關橫幅＋其測試，非排程頁，保留）
+- 無 subagent。
+
+**rollback**：`git revert`。隨今晚台灣 03:00 自動部署上線。
 ## 2026-10-15（續35）認知平台：頁面載入的存在檢查改打輕量端點 `GET /exists/<kind>/{id}`（critic m3 from 續24；未部署）
 
 **根因**: 續24 的 middleware 為了回真 404，每次整頁載入專案／分析／群組／run 頁先 GET 完整讀取端點（`/projects/{id}` 連帶 analyses／tasks／reruns，`/interpretations/{id}` 讀整份 artifact），頁面在瀏覽器又讀一次；API 工作量加倍，上限 3 s。

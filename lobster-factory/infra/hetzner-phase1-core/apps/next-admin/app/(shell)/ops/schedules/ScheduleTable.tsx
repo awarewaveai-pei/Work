@@ -2,37 +2,72 @@
 
 // The schedules table (agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md §3.2-3/4). One component for
 // /ops/schedules (every client) and the client page's 維護 tab (`only` = that client's slug): one data
-// source, so the two views cannot disagree. Rows = jobs, columns = clients, the clicked cell's details beside.
-// Every choice is a visible button or checkbox, never a <select> (operator rule).
-import { useCallback, useEffect, useState } from "react";
+// source, so the two views cannot disagree. Rows = clients (they grow), columns = jobs (few), the clicked cell's settings beside.
+// Styling = theme tokens (/tools/theme, lib/theme/tokens.ts) + the shared chips (components/tools/panel-primitives.ts);
+// every choice is a visible chip, never a <select>. Times are shown and edited in Taipei time; rows store UTC.
+// Copy: written by GPT to the operator's rule 清楚易懂、不冗長 (WORKLOG 2026-10-15).
+import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { roleHeader } from "@/lib/ops-role";
-import type { ScheduleCell, SchedulesView } from "@/lib/schedules/types";
-import { ChipBtn, NoData, SubLabel, relativeTime } from "@/app/(shell)/ops/clients/[slug]/hub-ui";
+import { taipeiFromUtc, utcFromTaipei } from "@/lib/schedules/schedule";
+import type { JobMeta, ScheduleCell, SchedulesView, SystemRow } from "@/lib/schedules/types";
+import { chipStyle } from "@/components/tools/panel-primitives";
 
-const DAY_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
-
-const SYSTEM_STATE: Record<string, { text: string; color: string }> = {
-  ok: { text: "正常", color: "var(--green)" },
-  stale: { text: "過期", color: "var(--severity-medium)" },
-  missing: { text: "沒有資料", color: "var(--severity-medium)" },
-  failed: { text: "失敗", color: "var(--red)" },
+const T = {
+  statEnabled: "可執行排程",
+  statRanToday: "今日已執行",
+  statFailing: "失敗排程",
+  sectionClient: "客戶排程",
+  sectionServer: "伺服器排程（唯讀）",
+  cellOff: "未啟用",
+  cellBlocked: "已啟用，無法執行：",
+  panelEmpty: "請先點選一個排程。",
+  panelOn: "啟用排程",
+  panelFrequency: "執行頻率",
+  panelWeekday: "執行星期",
+  panelHour: "台北時間",
+  panelLastRun: "上次執行",
+  panelLastResult: "上次結果",
+  resultOk: "成功",
+  resultNever: "尚未執行",
+  resultFailed: "失敗：",
+  panelChangedBy: "最後修改者",
+  changedNever: "尚未修改，使用預設值",
+  errForbidden: "只有擁有者或管理員可以修改",
+  errConflict: "其他人剛修改此排程，頁面已重新載入，請再試一次",
+  errSave: "儲存失敗，錯誤代碼：",
+  errLoad: "頁面載入失敗，錯誤代碼：",
+  server: { ok: "正常", stale: "長時間未回報", missing: "尚無資料", failed: "執行失敗" } as Record<SystemRow["state"], string>,
 };
 
-const ERROR_TEXT: Record<string, string> = {
-  forbidden_role: "需要 owner／admin 權限才能修改。",
-  version_conflict: "別人剛改過這一格，已重新載入；確認後再改一次。",
+const DAYS = ["日", "一", "二", "三", "四", "五", "六"];
+const SERVER_BADGE: Record<SystemRow["state"], string> = { ok: "badge-green", stale: "badge-yellow", missing: "badge-gray", failed: "badge-red" };
+
+const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
+
+function taipeiTime(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("zh-TW", { timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/** "每週一 11:00" / "每天 06:00" / "每小時" — the cell's actual schedule, in Taipei time. */
+function cadence(job: JobMeta, c: ScheduleCell): string {
+  const f = job.frequencies.find((x) => x.value === c.frequency);
+  if (!f) return c.frequency;
+  const tp = taipeiFromUtc(c.dayOfWeekUtc, c.hourUtc);
+  if (f.usesDay) return `${f.label}${DAYS[tp.day]} ${hh(tp.hour)}`;
+  return f.usesHour ? `${f.label} ${hh(tp.hour)}` : f.label;
+}
+
+const card: CSSProperties = {
+  background: "var(--card-bg)", border: "1px solid var(--card-border)", borderRadius: "var(--radius)", boxShadow: "var(--shadow)",
 };
-
-// Three states, three looks: a theme colour for "never ran" would read as one of the other two.
-function dot(c: ScheduleCell): { glyph: string; color: string; label: string } {
-  if (c.lastError) return { glyph: "●", color: "var(--red)", label: "上次失敗" };
-  if (c.lastRunAt) return { glyph: "●", color: "var(--green)", label: "上次正常" };
-  return { glyph: "○", color: "var(--text-muted)", label: "還沒跑過" };
-}
-
-function fmt(iso: string | null): string {
-  return iso ? `${relativeTime(iso)}（${iso.slice(0, 16).replace("T", " ")} UTC）` : "—";
-}
+const th: CSSProperties = {
+  textAlign: "left", padding: "10px 14px", fontSize: "var(--font-size-xs)", fontWeight: "var(--font-weight-semibold)" as CSSProperties["fontWeight"],
+  color: "var(--text-muted)", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap",
+};
+const td: CSSProperties = { padding: "12px 14px", borderBottom: "1px solid var(--border-subtle)", verticalAlign: "top", fontSize: "var(--font-size-sm)" };
+const label: CSSProperties = { fontSize: "var(--font-size-xs)", color: "var(--text-muted)", margin: "14px 0 6px" };
 
 export function ScheduleTable({ only }: { only?: string }) {
   const [view, setView] = useState<SchedulesView | null>(null);
@@ -43,15 +78,9 @@ export function ScheduleTable({ only }: { only?: string }) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/ops/schedules${only ? `?slug=${encodeURIComponent(only)}` : ""}`, {
-        headers: { ...roleHeader("admin") },
-        cache: "no-store",
-      });
+      const res = await fetch(`/api/ops/schedules${only ? `?slug=${encodeURIComponent(only)}` : ""}`, { headers: { ...roleHeader("admin") }, cache: "no-store" });
       const body = await res.json().catch(() => null);
-      if (!res.ok || !body?.ok) {
-        setLoadError(body?.error ?? `HTTP ${res.status}`);
-        return;
-      }
+      if (!res.ok || !body?.ok) return setLoadError(String(body?.error ?? `HTTP ${res.status}`));
       setLoadError(null);
       setView(body.view as SchedulesView);
     } catch (e) {
@@ -64,8 +93,7 @@ export function ScheduleTable({ only }: { only?: string }) {
   }, [load]);
 
   async function save(cell: ScheduleCell, patch: Partial<Pick<ScheduleCell, "enabled" | "frequency" | "hourUtc" | "dayOfWeekUtc">>) {
-    if (!view) return;
-    const slug = view.orgs.find((o) => o.id === cell.organizationId)?.slug;
+    const slug = view?.orgs.find((o) => o.id === cell.organizationId)?.slug;
     if (!slug) return;
     const next = { ...cell, ...patch };
     setSaving(true);
@@ -75,84 +103,94 @@ export function ScheduleTable({ only }: { only?: string }) {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...roleHeader("admin") },
         body: JSON.stringify({
-          enabled: next.enabled,
-          frequency: next.frequency,
-          hourUtc: next.hourUtc,
-          dayOfWeekUtc: next.dayOfWeekUtc,
+          enabled: next.enabled, frequency: next.frequency, hourUtc: next.hourUtc, dayOfWeekUtc: next.dayOfWeekUtc,
           ...(cell.version !== null ? { expectedVersion: cell.version } : {}),
         }),
       });
       const body = await res.json().catch(() => null);
       if (!res.ok || !body?.ok) {
         const code = String(body?.error ?? `HTTP ${res.status}`);
-        setNotice(ERROR_TEXT[code] ?? `儲存失敗：${code}`);
+        setNotice(code === "forbidden_role" ? T.errForbidden : code === "version_conflict" ? T.errConflict : `${T.errSave}${code}`);
       }
     } catch (e) {
-      setNotice(`儲存失敗：${String(e)}`);
+      setNotice(`${T.errSave}${String(e)}`);
     } finally {
       await load();
       setSaving(false);
     }
   }
 
-  if (loadError) return <NoData>排程讀取失敗：{loadError}</NoData>;
-  if (!view) return <NoData>載入中…</NoData>;
+  if (loadError) return <p style={{ color: "var(--red)", fontSize: "var(--font-size-sm)" }}>{T.errLoad}{loadError}</p>;
+  if (!view) return <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-sm)" }}>…</p>;
 
-  const cellOf = (jobKey: string, organizationId: string) =>
-    view.cells.find((c) => c.jobKey === jobKey && c.organizationId === organizationId);
+  const cellOf = (jobKey: string, orgId: string) => view.cells.find((c) => c.jobKey === jobKey && c.organizationId === orgId);
   const sel = selected ? cellOf(selected.jobKey, selected.organizationId) : undefined;
   const selJob = sel ? view.jobs.find((j) => j.key === sel.jobKey) : undefined;
   const selOrg = sel ? view.orgs.find((o) => o.id === sel.organizationId) : undefined;
   const selFreq = selJob?.frequencies.find((f) => f.value === sel?.frequency);
-
-  const th = { padding: "4px 8px", fontWeight: 500, color: "var(--text-muted)", textAlign: "left" as const, whiteSpace: "nowrap" as const };
-  const td = { padding: "4px 8px", borderTop: "1px solid var(--border-subtle)" };
+  const selTp = sel ? taipeiFromUtc(sel.dayOfWeekUtc, sel.hourUtc) : null;
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 8 }}>
-        {view.summary.enabled} 個排程開著 · 今天跑了 {view.summary.ranToday} · {view.summary.failing} 個失敗
-        {saving ? " · 儲存中…" : ""}
-      </div>
-      {notice && <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 8 }}>{notice}</div>}
+      {!only && (
+        <div className="card-grid" style={{ marginBottom: 24 }}>
+          {[
+            [T.statEnabled, view.summary.enabled, "var(--text-primary)"],
+            [T.statRanToday, view.summary.ranToday, "var(--text-primary)"],
+            [T.statFailing, view.summary.failing, view.summary.failing ? "var(--red)" : "var(--text-primary)"],
+          ].map(([k, v, color]) => (
+            <div key={String(k)} className="card">
+              <div className="card-label">{k}</div>
+              <div className="card-value" style={{ color: String(color), marginTop: 8 }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 420px", minWidth: 0, overflowX: "auto" }}>
-          <SubLabel>客戶例行工作（在這裡設定）</SubLabel>
-          <table style={{ fontSize: 12, borderCollapse: "collapse", color: "var(--text-primary)" }}>
+      {notice && <p style={{ color: "var(--red)", fontSize: "var(--font-size-sm)", margin: "0 0 12px" }}>{notice}</p>}
+
+      <div className="section-title">{T.sectionClient}</div>
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 28 }}>
+        <div style={{ ...card, flex: "1 1 520px", minWidth: 0, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", color: "var(--text-primary)" }}>
             <thead>
               <tr>
-                <th style={th}>工作</th>
-                {view.orgs.map((o) => (
-                  <th key={o.id} style={th}>{o.name}</th>
+                <th style={{ ...th, width: 180 }} />
+                {view.jobs.map((job) => (
+                  <th key={job.key} style={{ ...th, whiteSpace: "normal", minWidth: 200 }}>
+                    <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--text-primary)" }}>{job.label}</div>
+                    <div style={{ fontWeight: 400, marginTop: 4, lineHeight: "var(--line-height-base)" }}>{job.description}</div>
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {view.jobs.map((job) => (
-                <tr key={job.key}>
-                  <td style={{ ...td, whiteSpace: "nowrap" }}>{job.label}</td>
-                  {view.orgs.map((o) => {
+              {view.orgs.map((o) => (
+                <tr key={o.id}>
+                  <td style={{ ...td, fontWeight: 600 }}>{o.name}</td>
+                  {view.jobs.map((job) => {
                     const c = cellOf(job.key, o.id);
-                    if (!c) return <td key={o.id} style={td} />;
+                    if (!c) return <td key={job.key} style={td} />;
                     const isSel = selected?.jobKey === job.key && selected.organizationId === o.id;
                     return (
                       <td
-                        key={o.id}
-                        style={{ ...td, cursor: "pointer", background: isSel ? "var(--ai-bg)" : undefined, whiteSpace: "nowrap" }}
+                        key={job.key}
                         onClick={() => setSelected({ jobKey: job.key, organizationId: o.id })}
-                        title={c.unavailable ?? undefined}
+                        style={{ ...td, cursor: "pointer", background: isSel ? "var(--bg-hover)" : undefined, boxShadow: isSel ? "inset 3px 0 0 var(--accent)" : undefined }}
                       >
-                        <input
-                          type="checkbox"
-                          checked={c.enabled}
-                          disabled={saving}
-                          aria-label={`${job.label} · ${o.name}`}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => void save(c, { enabled: e.target.checked })}
-                        />{" "}
-                        <span style={{ color: dot(c).color }} title={dot(c).label}>{dot(c).glyph}</span>
-                        {c.unavailable ? <span style={{ color: "var(--text-muted)" }}> 不會執行</span> : null}
+                        <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={(e) => e.stopPropagation()}>
+                          <input type="checkbox" checked={c.enabled} disabled={saving} onChange={(e) => void save(c, { enabled: e.target.checked })} aria-label={`${job.label} · ${o.name}`} />
+                          <span style={{ color: c.enabled ? "var(--text-primary)" : "var(--text-muted)" }}>{c.enabled ? cadence(job, c) : T.cellOff}</span>
+                        </label>
+                        {c.enabled && c.unavailable && (
+                          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--yellow)", marginTop: 4 }}>{T.cellBlocked}{c.unavailable}</div>
+                        )}
+                        {c.enabled && !c.unavailable && (c.lastError || c.lastRunAt) && (
+                          <div style={{ fontSize: "var(--font-size-xs)", color: "var(--text-muted)", marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                            <span className={`dot ${c.lastError ? "dot-red" : "dot-green"}`} />
+                            {c.lastError ? `${T.resultFailed}${taipeiTime(c.lastErrorAt)}` : `${T.panelLastRun} ${taipeiTime(c.lastRunAt)}`}
+                          </div>
+                        )}
                       </td>
                     );
                   })}
@@ -160,56 +198,35 @@ export function ScheduleTable({ only }: { only?: string }) {
               ))}
             </tbody>
           </table>
-
-          {view.system.length > 0 && (
-            <>
-              <SubLabel>在主機跑（只顯示）</SubLabel>
-              <table style={{ fontSize: 12, borderCollapse: "collapse", color: "var(--text-primary)" }}>
-                <tbody>
-                  {view.system.map((r) => (
-                    <tr key={r.key}>
-                      <td style={{ ...td, whiteSpace: "nowrap" }}>{r.label}</td>
-                      <td style={{ ...td, whiteSpace: "nowrap", color: "var(--text-secondary)" }}>{r.cadence}</td>
-                      <td style={{ ...td, whiteSpace: "nowrap" }}>{relativeTime(r.lastAt)}</td>
-                      <td style={{ ...td, whiteSpace: "nowrap", color: SYSTEM_STATE[r.state].color }}>{SYSTEM_STATE[r.state].text}</td>
-                      <td style={{ ...td, color: "var(--text-secondary)" }}>{r.detail}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </>
-          )}
         </div>
 
-        <div style={{ flex: "0 1 300px", minWidth: 240, border: "1px solid var(--border-subtle)", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "var(--text-primary)" }}>
-          {!sel || !selJob || !selOrg ? (
-            <NoData>點表格裡的一格，這裡會顯示那一格的設定和上次執行結果。</NoData>
+        <aside style={{ ...card, flex: "0 1 320px", minWidth: 280, padding: "16px 18px", fontSize: "var(--font-size-sm)", color: "var(--text-primary)", position: "sticky", top: 16 }}>
+          {!sel || !selJob || !selOrg || !selTp ? (
+            <p style={{ color: "var(--text-muted)", margin: 0 }}>{T.panelEmpty}</p>
           ) : (
             <>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                {selJob.label} · {selOrg.name}
-              </div>
-              {sel.unavailable && (
-                <div style={{ color: "var(--severity-medium)", marginBottom: 6 }}>勾了也不會執行：{sel.unavailable}</div>
-              )}
-              <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer" }}>
+              <div style={{ fontWeight: 700, fontSize: "var(--font-size-md)" }}>{selJob.label}</div>
+              <div style={{ color: "var(--text-muted)", marginTop: 2 }}>{selOrg.name}</div>
+              {sel.enabled && sel.unavailable && <div style={{ color: "var(--yellow)", marginTop: 8 }}>{T.cellBlocked}{sel.unavailable}</div>}
+
+              <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", marginTop: 14 }}>
                 <input type="checkbox" checked={sel.enabled} disabled={saving} onChange={(e) => void save(sel, { enabled: e.target.checked })} />
-                開啟
+                {T.panelOn}
               </label>
 
-              <SubLabel>頻率</SubLabel>
+              <div style={label}>{T.panelFrequency}</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {selJob.frequencies.map((f) => (
-                  <ChipBtn key={f.value} label={f.label} active={sel.frequency === f.value} onClick={() => void save(sel, { frequency: f.value })} />
+                  <button key={f.value} type="button" disabled={saving} style={chipStyle(sel.frequency === f.value)} onClick={() => void save(sel, { frequency: f.value })}>{f.label}</button>
                 ))}
               </div>
 
               {selFreq?.usesDay && (
                 <>
-                  <SubLabel>星期（UTC）</SubLabel>
+                  <div style={label}>{T.panelWeekday}</div>
                   <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                    {DAY_LABELS.map((label, day) => (
-                      <ChipBtn key={day} label={label} active={sel.dayOfWeekUtc === day} onClick={() => void save(sel, { dayOfWeekUtc: day })} />
+                    {DAYS.map((d, day) => (
+                      <button key={day} type="button" disabled={saving} style={chipStyle(selTp.day === day)} onClick={() => void save(sel, utcFromTaipei(day, selTp.hour))}>{d}</button>
                     ))}
                   </div>
                 </>
@@ -217,43 +234,54 @@ export function ScheduleTable({ only }: { only?: string }) {
 
               {selFreq?.usesHour && (
                 <>
-                  <SubLabel>幾點（UTC）</SubLabel>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center", color: "var(--text-secondary)" }}>
+                  <div style={label}>{T.panelHour}</div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <input
-                      key={`${sel.jobKey}:${sel.organizationId}:${sel.hourUtc}`}
-                      type="number"
-                      min={0}
-                      max={23}
-                      defaultValue={sel.hourUtc}
-                      disabled={saving}
-                      aria-label="UTC 小時"
+                      key={`${sel.jobKey}:${sel.organizationId}:${selTp.hour}`}
+                      type="number" min={0} max={23} defaultValue={selTp.hour} disabled={saving} aria-label={T.panelHour}
                       onBlur={(e) => {
                         const h = Number(e.target.value);
-                        if (Number.isInteger(h) && h >= 0 && h <= 23 && h !== sel.hourUtc) void save(sel, { hourUtc: h });
+                        if (Number.isInteger(h) && h >= 0 && h <= 23 && h !== selTp.hour) void save(sel, utcFromTaipei(selTp.day, h));
                       }}
-                      style={{ width: 56, fontSize: 12, padding: "3px 6px", borderRadius: 5, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }}
+                      style={{ width: 64, padding: "4px 8px", fontSize: "var(--font-size-sm)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--card-bg)", color: "var(--text-primary)" }}
                     />
-                    <span>點 UTC ＝ 台北 {(sel.hourUtc + 8) % 24} 點</span>
+                    <span style={{ color: "var(--text-muted)" }}>:00</span>
                   </div>
                 </>
               )}
 
-              <SubLabel>上次執行</SubLabel>
-              <div>{fmt(sel.lastRunAt)}</div>
-              <SubLabel>上次結果</SubLabel>
+              <div style={label}>{T.panelLastRun}</div>
+              <div>{sel.lastRunAt ? taipeiTime(sel.lastRunAt) : T.resultNever}</div>
+              <div style={label}>{T.panelLastResult}</div>
               {sel.lastError ? (
-                <div style={{ color: "var(--red)", wordBreak: "break-all" }}>
-                  失敗（{relativeTime(sel.lastErrorAt)}）：{sel.lastError}
-                </div>
+                <div style={{ color: "var(--red)", wordBreak: "break-all" }}>{T.resultFailed}{taipeiTime(sel.lastErrorAt)} · {sel.lastError}</div>
               ) : (
-                <div>{sel.lastRunAt ? "正常" : "還沒跑過"}</div>
+                <div>{sel.lastRunAt ? T.resultOk : T.resultNever}</div>
               )}
-              <SubLabel>最近改動</SubLabel>
-              <div style={{ color: "var(--text-secondary)" }}>{sel.updatedBy ? `${sel.updatedBy} · ${relativeTime(sel.updatedAt)}` : "沒改過（用預設值）"}</div>
+              <div style={label}>{T.panelChangedBy}</div>
+              <div style={{ color: "var(--text-secondary)" }}>{sel.updatedBy ? `${sel.updatedBy} · ${taipeiTime(sel.updatedAt)}` : T.changedNever}</div>
             </>
           )}
-        </div>
+        </aside>
       </div>
+
+      {view.system.length > 0 && (
+        <>
+          <div className="section-title">{T.sectionServer}</div>
+          <div className="ops-table">
+            {view.system.map((r) => (
+              <div key={r.key} className="ops-row" style={{ gridTemplateColumns: "minmax(140px, max-content) 1fr auto" }}>
+                <div className="ops-row-key">{r.label}</div>
+                <div className="ops-row-val">
+                  {r.description}
+                  <div>{r.cadence} · {taipeiTime(r.lastAt)}{r.detail ? ` · ${r.detail}` : ""}</div>
+                </div>
+                <span className={`card-badge ${SERVER_BADGE[r.state]}`}>{T.server[r.state]}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

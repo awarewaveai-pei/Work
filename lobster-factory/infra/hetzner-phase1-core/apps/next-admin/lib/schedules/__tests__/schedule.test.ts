@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDueNow, scheduledRunKey, type Schedule } from "@/lib/schedules/schedule";
+import { isDueNow, scheduledRunKey, taipeiFromUtc, utcFromTaipei, type Schedule } from "@/lib/schedules/schedule";
 
 const base: Schedule = { enabled: true, frequency: "daily", hourUtc: 3, dayOfWeekUtc: 1, lastRunAt: null };
 
@@ -53,5 +53,22 @@ describe("isDueNow", () => {
     expect(a).toBe(b);
     expect(a).not.toBe(c);
     expect(scheduledRunKey(org, "other_job", new Date("2026-09-14T03:05:00Z"))).not.toBe(a);
+  });
+});
+
+describe("Taipei <-> UTC (the table edits Taipei time, the row stores UTC)", () => {
+  it("Monday 03 UTC is Monday 11 Taipei; Sunday 20 UTC is Monday 04 Taipei", () => {
+    expect(taipeiFromUtc(1, 3)).toEqual({ day: 1, hour: 11 });
+    expect(taipeiFromUtc(0, 20)).toEqual({ day: 1, hour: 4 });
+    expect(taipeiFromUtc(6, 16)).toEqual({ day: 0, hour: 0 });
+  });
+
+  it("round-trips every weekday and hour", () => {
+    for (let d = 0; d < 7; d++) {
+      for (let h = 0; h < 24; h++) {
+        const u = utcFromTaipei(d, h);
+        expect(taipeiFromUtc(u.dayOfWeekUtc, u.hourUtc)).toEqual({ day: d, hour: h });
+      }
+    }
   });
 });

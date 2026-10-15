@@ -482,7 +482,7 @@ export function CollectionSourcesPanel({ slug, researchBridgesEnabled = false }:
           </h2>
 
           <div style={{ fontSize: 11, color: "#6b7280", marginBottom: 14 }}>
-            要讓它定期自動抓，到 <a href="/ops/schedules">排程</a> 頁勾選「自動爬取」。
+            資料更新時間請在<a href="/ops/schedules">排程</a>頁面設定。
           </div>
 
           {candidates.length ? (

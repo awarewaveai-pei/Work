@@ -50,3 +50,16 @@ export function scheduledRunKey(organizationId: string, jobKey: string, now: Dat
   const date = now.toISOString().slice(0, 10).replace(/-/g, "");
   return `scheduled-${jobKey}-${organizationId.slice(0, 8)}-${date}`;
 }
+
+/** Taipei is UTC+8 all year (no DST). The table shows and edits Taipei time; the row stores UTC. */
+const TAIPEI_OFFSET_H = 8;
+
+export function taipeiFromUtc(dayOfWeekUtc: number, hourUtc: number): { day: number; hour: number } {
+  const h = hourUtc + TAIPEI_OFFSET_H;
+  return { day: h >= 24 ? (dayOfWeekUtc + 1) % 7 : dayOfWeekUtc, hour: h % 24 };
+}
+
+export function utcFromTaipei(dayTaipei: number, hourTaipei: number): { dayOfWeekUtc: number; hourUtc: number } {
+  const h = hourTaipei - TAIPEI_OFFSET_H;
+  return { dayOfWeekUtc: h < 0 ? (dayTaipei + 6) % 7 : dayTaipei, hourUtc: (h + 24) % 24 };
+}

@@ -23,6 +23,7 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
   {
     key: "collect_crawl",
     label: "自動爬取",
+    description: "定期整理客戶核准的網頁內容，更新客服知識庫。",
     frequencies: DAILY_WEEKLY,
     defaults: { frequency: "weekly", hourUtc: 3, dayOfWeekUtc: 1 },
     async run(organizationId, runKey) {

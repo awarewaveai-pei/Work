@@ -12,6 +12,8 @@ export interface FrequencyOption {
 export interface JobMeta {
   key: string;
   label: string;
+  /** One sentence shown under the job's name: what it does. */
+  description: string;
   frequencies: FrequencyOption[];
 }
 
@@ -40,6 +42,9 @@ export interface ScheduleCell {
 export interface SystemRow {
   key: string;
   label: string;
+  /** What it does (static). `detail` is what it last reported. */
+  description: string;
+  /** In Taipei time, like the rest of the page. */
   cadence: string;
   lastAt: string | null;
   state: "ok" | "stale" | "missing" | "failed";

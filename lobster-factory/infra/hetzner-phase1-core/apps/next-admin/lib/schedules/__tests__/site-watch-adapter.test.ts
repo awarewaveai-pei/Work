@@ -59,14 +59,14 @@ describe("siteWatchCells", () => {
     });
     // what site_watch_sync_targets will create: on, daily 22 UTC, version 0 for the first write
     expect(b).toMatchObject({ stored: false, enabled: true, frequency: "daily", hourUtc: 22, version: 0, lastError: null, unavailable: null });
-    expect(c).toMatchObject({ stored: false, enabled: false, unavailable: "客戶設定沒有網站網址" });
+    expect(c).toMatchObject({ stored: false, enabled: false, unavailable: "此客戶尚未設定網站網址" });
   });
 
   it("the global switch off marks every cell as not running", async () => {
     delete process.env.SITE_WATCH_ENABLED;
     const { sb } = fakeSb();
     const cells = await siteWatchCells(sb, orgs);
-    expect(cells.every((x) => x.unavailable === "SITE_WATCH_ENABLED 未開")).toBe(true);
+    expect(cells.every((x) => x.unavailable === "網站巡檢已在全系統關閉")).toBe(true);
   });
 });
 
