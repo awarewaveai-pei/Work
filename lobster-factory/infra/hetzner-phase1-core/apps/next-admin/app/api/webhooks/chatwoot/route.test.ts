@@ -310,6 +310,15 @@ describe("POST /api/webhooks/chatwoot -- handoff acknowledgement + name question
     expect(sendReply).not.toHaveBeenCalled();
   });
 
+  it("the dedupe read fails (bot token refused on GET): the acknowledgement is still sent", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    listMessages.mockRejectedValueOnce(new Error("chatwoot_api_401"));
+    await post(makePayload({ sender: JOHN }));
+    await runAfter();
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", QUESTION);
+    expect(completeClaim).toHaveBeenCalledWith(CLAIM);
+  });
+
   it("draft: the private draft before it does not suppress the acknowledgement", async () => {
     handleInbound.mockResolvedValueOnce({ ...DEFAULT_DECISION, action: "draft", replyText: "draft text" });
     listMessages.mockResolvedValueOnce([{ id: 130, messageType: 1, private: true, content: "draft text" }]);
@@ -398,6 +407,14 @@ describe("POST /api/webhooks/chatwoot -- handoff acknowledgement + name question
     getContactName.mockResolvedValueOnce("林小美");
     await post(answer("小美"));
     await runAfter();
+    expect(updateContactName).not.toHaveBeenCalled();
+  });
+
+  it("bot token refused on GET: name capture stops without raising", async () => {
+    listMessages.mockRejectedValueOnce(new Error("chatwoot_api_401"));
+    await post(answer("小美"));
+    await runAfter();
+    expect(captureException).not.toHaveBeenCalled();
     expect(updateContactName).not.toHaveBeenCalled();
   });
 

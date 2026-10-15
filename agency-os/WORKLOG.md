@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-15（續34）Soulful 客服三層上線：next-admin `427d89e10` 部署、14 題問答＋AI 開啟、真 Messenger 驗收；轉真人確認句被 bot token 401 擋下（已修、待部署）
+
+**部署**（操作者「部署」；社群 C12 已先上 `4c4e153a7`，無 DEPLOY_HOLD）：`sg-deploy.sh next-admin` → build 239s、healthy 10s、smoke 5/5、`.deployed-commit=427d89e10`（10:46Z）；`playwright-runner -Mode smoke` 26 pass／0 fail。
+**設定**：ops API 需登入 claims；操作者在內建瀏覽器登入三次都停在 `/login`（表單空白，pane 曾被關閉）→ 改直接寫 DB：`organizations.metadata.client_config` `jsonb_set` 寫 `csFaq`（14 題）＋`csEnabled=true`（psql `-v` 變數經 stdin；`pg_read_file` 無權限），其他 15 個 key 原樣。未留 `ops_audit_events`（API 才寫），本條為紀錄。
+**真測（Chatwoot 對話 6，非角色帳號）**：
+- 「請問你們有哪些療癒課程？」→ 1 秒內收到 `faq:courses` 答案（`cs_ai_replies` auto_sent、`ai_call_logs` 0 筆）✅ 零花費。
+- 「我最近壓力很大，適合來嗎？」→ 分類 courses_services 0.85 → 翻譯（Haiku $0.00017）→ 檢索最高 0.410 < 0.5 → knowledge_gap 轉真人；**未花 Opus**（總 $0.0005）✅。但客人**沒收到確認句** ❌：`acknowledgeHandoff` 先 `GET /conversations/6/messages?after=34` 去重 → Chatwoot **401**（AgentBot token 只允許 `access_token_auth_helper.rb` `BOT_ACCESSIBLE_ENDPOINTS`：conversations show/toggle_status/…、messages create、labels、assignments）→ catch 整段，確認句沒送。
+- 「開課時間或費用」→ 對話已 open → `human_owns_thread` 靜默（設計）。
+**修**（未部署）：`route.ts` `acknowledgeHandoff` 去重讀取改獨立 try（失敗記 Sentry、照送）；`captureName` 遇 `chatwoot_api_401` 只 warn 不丟（bot token 永遠讀不到訊息／聯絡人，每則都丟 Sentry 是噪音）。指名測試 2 個。
+**結構性缺口（操作者動作）**：問名字的「寫回聯絡人」需要 Chatwoot **User** access token（個人檔案→Access Token）存進 vault `cs:chatwoot:2bf60452…:api_token`；bot token 無 contacts#update。在那之前問句照問，答案只在對話裡給專員看。
+**校準觀察（不改）**：英文翻譯後「stressed, suitable for me」對壓力模組頁只得 0.410；`minRetrievalScore` 0.5 對 `text-embedding-3-small` 可能偏嚴，需用真問題集校準再動，不在此調。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin（healthy 10s、smoke 5/5、.deployed-commit 427d89e10）；playwright smoke 26/0；psql update organizations（faq=14、csEnabled=true、15 keys kept）；對話 6 三則訊息 cs_ai_replies／ai_call_logs／chatwoot messages＋rails log 401 | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run app/api/webhooks/chatwoot lib/cs（139 pass；新測試「the dedupe read fails…still sent」「bot token refused on GET…without raising」） | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 兩處窄修（try 範圍、401 早退）各有指名測試；Codex 本日已三輪審同檔
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=handoff_ack_dedupe|chatwoot_api_401 | hits=3（本次改動）
+- ORACLE_WAIVED: 同上，窄修由指名測試鎖住
+
+**rollback**：sg-deploy 回 `4c4e153a7`；DB：`csEnabled` 改 false／刪 `csFaq` key。
 ## 2026-10-15（續33）認知平台本機只留一個網址：移除三週舊的本機 compose 容器、刪掉死掉的啟動項、規則寫進 README
 
 **根因**: 本機同時有 `:3930`（開發網頁，現在的程式）和 `:8421`（主機 compose 映像在本機跑，映像 2026-09-25 建、今天被另一 session 手動重啟），看頁面會看錯一套（操作者：「用不到應該處理掉以避免發生錯誤」）。`.claude/launch.json` 另有死項 `cognitive-os-api`（指向已不存在的舊 scratchpad 腳本，與 `cognitive-api-dev` 同 port 8420）。

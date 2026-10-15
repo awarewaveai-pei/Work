@@ -221,9 +221,18 @@ async function acknowledgeHandoff(
   customerMessageId: number,
 ): Promise<void> {
   const { organizationId } = cis;
+  // The dedupe read is best-effort on its own: an AgentBot token may send messages yet be refused
+  // on GET (2026-10-15, Soulful: 401 on messages?after= skipped the whole acknowledgement). A read
+  // that fails must never cost the customer the reply; the worst case is one duplicate sentence.
+  let alreadyAnswered = false;
   try {
     const later = await listMessages(organizationId, chatwoot, conversationId, { after: customerMessageId });
-    if (later.some((m) => !m.private && (m.messageType === 1 || m.messageType === 3))) return;
+    alreadyAnswered = later.some((m) => !m.private && (m.messageType === 1 || m.messageType === 3));
+  } catch (err) {
+    Sentry.captureException(err, { extra: { organizationId, conversationId, step: "handoff_ack_dedupe" } });
+  }
+  if (alreadyAnswered) return;
+  try {
     const askName = typeof contact.id === "number" && isPlaceholderContactName(contact.name);
     await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName));
   } catch (err) {
@@ -247,9 +256,21 @@ async function captureName(reply: { organizationId: string; conversationId: stri
   // T27: a blocking mode makes no automated writes.
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
   if (!gate.allowed) return;
-  const previous = (await listMessages(organizationId, cis.chatwoot, conversationId, { before: reply.messageId }))
-    .filter((m) => !m.private && m.messageType !== 2)
-    .at(-1);
+  let previous;
+  try {
+    previous = (await listMessages(organizationId, cis.chatwoot, conversationId, { before: reply.messageId }))
+      .filter((m) => !m.private && m.messageType !== 2)
+      .at(-1);
+  } catch (err) {
+    // An AgentBot access token may only create messages and toggle status (Chatwoot
+    // access_token_auth_helper.rb BOT_ACCESSIBLE_ENDPOINTS); reading messages or renaming a contact
+    // needs a User token in the vault (cs:chatwoot:<org>:api_token). Not an incident per reply.
+    if (String(err).includes("chatwoot_api_401")) {
+      console.warn(`[cs] ${organizationId}: name capture needs a User access token (bot token refused on GET)`);
+      return;
+    }
+    throw err;
+  }
   if (previous?.messageType !== 1 || previous.content !== handoffAckText(cis, true)) return;
   if (!isPlaceholderContactName(await getContactName(organizationId, cis.chatwoot, reply.contactId))) return;
   await updateContactName(organizationId, cis.chatwoot, reply.contactId, name);
