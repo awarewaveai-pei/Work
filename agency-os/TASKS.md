@@ -1437,7 +1437,9 @@
 ## Next — 已完成歷程（查詢用）
 
 - [ ] **社群發文 C12 上線（操作者 2026-10-15「go」1→4）**：C5–C11 程式已在 main（`50ca7df4d` C5、`df4f87eba` C6–C11），正式站未動。卡點：全部是 High-STOP 正式機動作，已授權的只有 1→4；5（子網域 social.aware-wave.com＋middleware host 導向＋ContentStudio 換連結）、6（middleware 身分標頭帶 user id→`authz.ts` 讀 `social_brand_members`）未授權。**下一步**：① `node scripts/apply-db-migration.mjs 0100 0101 0102`（0101 換掉 0098 的 `social_save_list` 7 參數版，必須和 next-admin 部署同一窗口） ② `scripts/safe-infra-patch.sh compose` 在 next-admin 加 `SOCIAL_DISPATCH_TOKEN`（新隨機值）、`SOCIAL_DISPATCH_ENABLED=true`、`SOCIAL_DISPATCH_MODE=draft`，`docker exec lobster-next-admin printenv` 驗 ③ `sg-deploy.sh next-admin` → `/playwright smoke`（這次部署同時帶上 CS 轉真人確認句 `c3ef11ba9`，部署後照「轉真人確認句＋問名字」那行做 Messenger 驗收） ④ Trigger deploy（`trigger-deploy-agent`，`tr_pat_*`；`scripts/lobster-trigger-deploy.ps1` 從 running next-admin 帶 token）：`social-dispatch`、`social-rotation` ⑤ 驗收：soulful 品牌排一則 Bluesky 貼文到 15 分鐘內 → 等 dispatch → `social_post_targets.postiz_post_id` 有值、Postiz `GET /posts` 該則 DRAFT 且 settings 有 `awarewave_send_key` → 刪該草稿 → compose 改 `SOCIAL_DISPATCH_MODE=apply` ⑥ WORKLOG 記證據、計畫 C5 標上線。步驟正本 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md` C12 段；回滾見 WORKLOG 2026-10-15 續15／續17。
-  - `▶️ 可動工` · `2026-10-15 開` · `1→4 已授權；5、6 待問`
+  - ✅ 1→4 已上線 2026-10-15（WORKLOG 續22）；CS `c3ef11ba9` 經操作者在本 session 同意，05:12Z 隨 `e571187a2` 上線（smoke 5/5）。
+  - **待驗收（CS）**：操作者用非粉專角色 FB 帳號傳訊 Soulful 粉專要求真人 → 應收到確認句＋問名字 → 回名字。起點 05:12:21Z（cs_ai_replies 6 列）。驗：`cs_ai_replies` 新列 completed_at 非 NULL；Chatwoot 該對話有公開確認句；聯絡人名字從 John Doe 變成回答。
+  - `▶️ 可動工` · `2026-10-15 開` · `5、6 待問（操作者在問：之後掛 aware-wave.com WordPress 會員是否適合——答：⑥ 是前提）`
 
 ### 2026-09-20 — Claude+Codex 共用資產稽核（結案）
 
