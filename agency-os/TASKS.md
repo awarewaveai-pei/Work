@@ -497,6 +497,8 @@
   - **子待辦收尾 2026-09-11**：①`accountId` 唯一性——migration 0079（partial unique index）已套 prod，mutation-test 驗證重複值真的被拒。②rate limit——**這條原記錄是錯的**：VBC 檢查發現 nginx `default.conf:254-256` 早在同日 `3a7d53ee6`（access_log 洩漏修復同批）就已對這條路由加了 `limit_req zone=webhook burst=20 nodelay`，並非零保護；曾誤寫一份 app 層 RateLimiter 重用，critic 覆審抓到會躲在更嚴的 nginx bucket 後面變死碼、且完全無 429 可觀測性，已整段撤回（0 net diff，見 WORKLOG）。③SMTP——已接 Resend SMTP（`smtp.resend.com:587`，`RESEND_API_KEY` 當密碼），容器重啟 healthy，Rails `deliver_now` 真送一封測試信，Resend 自己的 send log 回報 `delivered` 獨立佐證。三項子待辦全部收尾，U6 無剩餘 code 缺口（僅上面人工 Sentry Data Scrubber 待操作者自行點）。
 - [x] **【✅ 2026-10-15】Messenger 雙粉專接通 + Chatwoot 4.6.0→4.18.0**：Soulful 獨立 Account#2／inbox 3／AgentBot 2 → org `2bf60452`；Aware Wave inbox 2 補掛 AgentBot；4.6.0 寫死 `ACCOUNT_UPDATE` 標籤被 Meta 拒（subcode 1893061）→ 升 4.18.0 後兩則重送皆送達。見 WORKLOG 2026-10-15「Messenger 雙粉專」條目。
   - [x] Meta App 開發模式擋真客人訊息 → 隱私權政策改寫＋操作者按發佈切上線（免審，實測非角色帳號訊息送達）。見 WORKLOG 2026-10-15「Meta App 切上線模式」。
+  - [x] Chatwoot v4.18 AgentBot 5 秒逾時 → webhook 先回應再處理＋claim 完成標記＋5 分鐘 sweep（a2adf459c／43ee9ad37）。見 WORKLOG 2026-10-15「CS webhook 先回應再處理」兩條。
+  - [ ] **下一步（操作者 2026-10-15 同意順序）** ① 轉真人時客人立刻收到確認句（現在客人什麼都收不到，Pei-Jing 實測問「為什麼不回答我?」）＋同句問名字，回答寫進 Chatwoot 聯絡人（非角色用戶名字讀不到＝John Doe，profile 進階存取需商家驗證，操作者不辦登記）；語氣走 csVoice；改點 `app/api/webhooks/chatwoot/route.ts` runPipeline 的 handoff 分支 ② 再做下一項 KB。
   - [ ] Soulful 知識庫 0 筆 → AI 一律轉真人；匯入 soulfulexpression.org 內容（操作者決定）。
   - [ ] 客人最後訊息 >24h 後無法回覆（`ENABLE_MESSENGER_CHANNEL_HUMAN_AGENT`=false）；要開需 Meta App Review `HUMAN_AGENT`＋等上游 PR #15932 釋出（現版開了會連 bot 回覆都標 tag）。
   - [ ] `safe-infra-patch.sh compose` 寫死 `cd /root/lobster-phase1`（server 版第 85 行），`/root/chatwoot`、`postiz` 等獨立 compose 專案無法走此閘；本次手動等價（備份→套用→健康→回滾路徑）。
