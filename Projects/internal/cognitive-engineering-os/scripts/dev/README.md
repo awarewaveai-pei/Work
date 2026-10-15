@@ -6,6 +6,12 @@ Local stack: API on :8420 (this repo; rows in the local PostgreSQL `cos-dev-db`,
 `D:/Work/lobster-factory/infra/hetzner-phase1-core/tests/node_modules` → run the `.cjs` scripts with
 `NODE_PATH=<that path>` from that `hetzner-phase1-core` folder.
 
+**One local address** (operator 2026-10-15: two local copies invite mistakes): to look at the app, use the dev web on :3930
+only. The compose pair of docker-compose.yml (`cognitive-os-web` on :8421, `cognitive-os-api` on :8422) is the host's image
+run locally, for one purpose -- trying a built image before a deploy -- and is removed right after (`docker compose -f
+docker-compose.yml down`); never left running, never used to look at pages (its image is whatever was last built, days old).
+`docker ps --format '{{.Names}}' | grep cognitive` should print nothing when no image trial is in progress.
+
 **Local database** (since the PostgreSQL switch the engine has no SQLite mode): `launch_cos_dev.ps1` creates or starts the Docker
 container `cos-dev-db` (postgres 17, the image `tests/pg.py` pins; 127.0.0.1:55432 only; trust auth, local only; volume
 `cos-dev-db-data`) and runs `migrate_db` before uvicorn. Its rows came once (2026-10-15) from the old local SQLite with

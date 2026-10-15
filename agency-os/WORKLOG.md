@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-15（續33）認知平台本機只留一個網址：移除三週舊的本機 compose 容器、刪掉死掉的啟動項、規則寫進 README
+
+**根因**: 本機同時有 `:3930`（開發網頁，現在的程式）和 `:8421`（主機 compose 映像在本機跑，映像 2026-09-25 建、今天被另一 session 手動重啟），看頁面會看錯一套（操作者：「用不到應該處理掉以避免發生錯誤」）。`.claude/launch.json` 另有死項 `cognitive-os-api`（指向已不存在的舊 scratchpad 腳本，與 `cognitive-api-dev` 同 port 8420）。
+
+**做了**: `docker rm -f cognitive-os-web cognitive-os-api`（本機 Docker Desktop，context `desktop-linux`；映像保留，下次試映像重建；repo 內沒有任何腳本會在本機開這一對）；launch.json 刪死項；`scripts/dev/README.md` 寫入「看程式只用 :3930；compose 那對只在試映像時開、試完即 down；`docker ps | grep cognitive` 平時應為空」。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=docker ps --format '{{.Names}}' | grep -c cognitive → 0；netstat :8421/:8422 LISTENING → 0；python json.loads(launch.json) → ok | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 刪容器／刪設定項／README 一段，無程式邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=cognitive-os-api | hits=18
+  - 命中皆為主機 compose 服務名（`docker-compose.yml`、`deploy/*.sh`、GO_LIVE）與 README 新段；launch.json 已無。
+
+**剩餘風險**: 無（本機）。
+
+**rollback**: `git revert`；容器用 `docker compose -f Projects/internal/cognitive-engineering-os/docker-compose.yml up -d` 可重建（試映像時才該這樣做）。
 ## 2026-10-15（續31）next-admin 改每天台灣 03:00 自動部署＋部署前 migration 閘；ContentStudio 舊 Postiz 面板換成「到社群發文」連結；CS 待上線兩筆一起部署
 
 **做了**（操作者：「每天凌晨 3 點台灣時間自動部署一次」「檢查哪些還沒部署，都處理好吧」）：
