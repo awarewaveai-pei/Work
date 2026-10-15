@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, apiFetch } from "../lib/api";
 import { todayIso } from "../lib/projects";
 import { formatTime } from "../lib/time";
+import { DEMOS } from "../lib/toolsheets.generated";
 import { AnalysisPage } from "./AnalysisPage";
 import { ProjectList } from "./ProjectList";
 import { ProjectPage } from "./ProjectPage";
@@ -45,10 +46,10 @@ describe("我的案子", () => {
     const { host, done: finish } = await mount(<ProjectList names={{ "systems.iceberg_model": "冰山模型" }} />);
     // none has 開案資料, so all are 我的分析 -- an empty one too (a direct analysis that failed or is still running): a case
     // is only what the server calls one (is_case), never guessed from emptiness (ENTRY_SLICE1 item 7, Codex review F1)
-    expect(host.querySelector("#analyses h2 small")?.textContent).toBe("3 個你自己的・1 個示範");
+    expect(host.querySelector("#analyses h2 small")?.textContent).toBe(`3 個你自己的・${Object.keys(DEMOS).length} 個示範`);   // one row per tool with a demo (DEMOS)
     expect(host.querySelector("#cases h2 small")?.textContent).toBe("0 個");
     const demoRow = host.querySelector("tr.demo");   // the free 示範分析 is always the last row (N-78)
-    expect(demoRow?.querySelector("a")?.getAttribute("href")).toBe("/projects/demo/iceberg");
+    expect([...host.querySelectorAll("tr.demo")].map((row) => row.querySelector("a")?.getAttribute("href"))).toEqual(Object.keys(DEMOS).map((method) => `/projects/demo/${method}`));   // each tool's default-domain demo
     expect(demoRow?.textContent).toContain("報表（示範，不花錢）");
     const rows = [...host.querySelectorAll("#analyses tbody tr:not(.demo)")];
     expect(rows.map((row) => row.querySelector("td a")?.getAttribute("href"))).toEqual(["/projects/P-NEW", "/projects/P-OLD", "/projects/P-EMPTY"]);

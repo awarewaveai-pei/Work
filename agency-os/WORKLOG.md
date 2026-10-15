@@ -1,4 +1,32 @@
 # Worklog
+## 2026-10-15（續23）認知平台：示範結果頁通用化（每個工具、每個領域一份）；本機開發環境改用本機 PostgreSQL（工具模板 §15.1 第 3 項，未部署）
+
+**根因**: 示範結果頁寫死冰山（`projects/demo/iceberg` 讀 `fixtures/demo-iceberg.json`），說明書「看一個完整分析頁」是佔位按鈕，「我的案子」只列冰山一列；第二個工具起每加一份示範就得改程式。另：本機開發啟動器 `launch_cos_dev.ps1` 停在 SQLite 時代，換 PostgreSQL 後本機 API 一啟動就 `DB_URLS_MISSING`，本機無法真跑任何分析。
+
+**做了**:
+- 路由 `app/(shell)/projects/demo/[method]/[[...domain]]/page.tsx`：`/projects/demo/<工具>` = 預設領域、`/<領域>` = 其他；沒有那一份 = not-found。舊網址 `/projects/demo/iceberg` 由 `next.config.ts` redirects 轉過去。
+- 資料 `fixtures/demo/<工具>.<領域>.json`（冰山那份原封搬過來）；`scripts/dev/demo_fixture.cjs <工具> <領域>…` 在本機真跑填寫頁（`#demo[=領域]` → 執行分析 → 確認執行），存 API 回的結果；失敗時印出有字的錯誤並存截圖。
+- `lessonkit`（sync）掃 `fixtures/demo` 產生 `toolsheets.generated.ts` `DEMOS`（領域、網址、案例名＝示範案例 scenario 的「：」之前）與 `DEMO_FIXTURES`（每份 lazy import，只在那一頁載入）；說明書按鈕改成每個領域一顆（跟領域晶片換），有那一份就連、沒有就說「這個領域的完整結果頁還在做」；「我的案子」每個有示範的工具一列。
+- 真跑兩份：冰山 edd（既有）、魚骨 edd（INTERP-4F0DCDCA…，claude-opus-5-5，20355+7182 tokens，NT$7.2；五道閘全 PASS；五根骨各一張卡，解讀一骨一段）。
+- 本機資料庫：`launch_cos_dev.ps1` 建立／啟動 Docker `cos-dev-db`（postgres 17，與 `tests/pg.py` 同一映像；只聽 127.0.0.1:55432；trust；volume `cos-dev-db-data`）＋ `migrate_db` 後才啟 uvicorn。舊本機 SQLite 經 `move_sqlite_to_pg` 一次搬入（副本；先刪掉 3132 個已刪測試租戶的孤兒資料夾；MOVE OK，兩邊列數與摘要相同）。`scripts/dev/README.md` 記重來的指令。
+- Codex F1（不存在的示範網址回 200）：查證是全站同一類（`(shell)/loading.tsx` 先串流，`/methods/<不存在>` 等也都是 200），不在這裡逐頁補；`TASKS.md` 開一項。試過 `generateStaticParams`＋`dynamicParams=false`：巢狀段在 dev 不生效、且會在建置時預先產生頁面（當時 API 不在），撤回。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=COS_TEST_MOCK_API=1 npx playwright test --project=cognitive demos.spec.ts → 1 passed（DEMOS 兩頁各九段＋核准卡、示範條、② 是該工具的圖、無 page error；未知領域是 not-found；舊網址轉址） | exit=0 | ms=5700
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/dev/demo_fixture.cjs root_cause.fishbone edd（本機真跑，真模型） → ok，fixture 寫出，gates 5/5 PASS | exit=0 | ms=180000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run components lib → 54 files / 463 passed；check-mocks all green；check-mocks-selftest 215/215；test_tool_page_template 4 passed | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=瀏覽器開 /projects/demo/root_cause.fishbone（手機寬）→ ④「第 1 根骨／5：人」…五張卡、⑥ 對照表，scrollWidth−innerWidth = −16（無橫向捲動） | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m ai_lego.apps.cli.move_sqlite_to_pg move（副本 → cos-dev-db） → MOVE OK: committed, proof equal on both sides | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/7m/0n
+  - Codex `agency-os/reports/oracle/2026-10-15-partialreview-0faf718d.md` F1（不存在的示範網址回 200）→ 成立但屬全站一類，開 TASKS（上面）。
+  - Codex 第二輪 `agency-os/reports/oracle/2026-10-15-partialreview-e65bf4b7.md`（啟動器與之後的改動）六項全成立、全修：F1 容器內 pg_isready 太早說好 → 改成從本機實際登入才算好（同 `tests/pg.py`）；F2 同名容器不驗身分 → 驗映像與 127.0.0.1:55432，不符就停；F3 trust 讓本機任何程式免密碼進資料庫 → 改密碼（`.runtime/cos-dev-db.password`，gitignored，第一次啟動產生），資料庫重建再搬一次（MOVE OK），從本機用錯／空密碼登入都被拒；F4 示範 fixture 沒存工具自己的閘（層序）→ 存 `recordGates`、`DemoResult` 傳給核准卡；F5 一個領域逾時就中斷其餘 → 每個領域各自 try，失敗存截圖、繼續下一個；F6 `DemoResult` 用家族前綴查 `familyLabels`（它以工具 id 為鍵，冰山示範一直沒顯示家族）→ 改用工具 id，頁首現在是「工具：冰山模型 Iceberg Model（系統思考 Systems Thinking）」。
+- ORACLE_WAIVED: 第二輪之後只改了 F1–F6 的修法；vitest 463、demos.spec 綠、啟動器實跑（建容器→登入等待→migrate 0008→uvicorn）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory/infra/hetzner-phase1-core/tests | grep=demo-iceberg|projects/demo/iceberg | hits=18
+  - 程式只剩 `next.config.ts` 的轉址與 `demos.spec.ts` 測它（3）；`RESULT_PAGE_GAP_REPORT.md` 11 處是歷史報告；模板 4 處＝v5 版本說明、§0 正式站網址（部署前仍是它）、§6 新路徑說明、§12「原本寫死」欄；模板 T1 的「現況」已改寫。
+
+**剩餘風險**: 未部署。其餘 23 份示範每份約 NT$7（預設模型 claude-opus-5-5，比交接估的 NT$3 高一倍多），待操作者定花費。冰山說明書 v1 的 partner／decision／ecom／daily 那四句寫著「這個領域的完整結果頁還在做」：那四份真跑後，按鈕會連到頁面但小字仍說還在做，要 lessons v2（操作者 promote）改。
+
+**rollback**: `git revert`；本機資料庫 `docker rm -f cos-dev-db`＋`docker volume rm cos-dev-db-data`（本機 SQLite 沒動）。
 ## 2026-10-15（續22）社群 C12 上線 1→4：0100–0102 已套、next-admin `df4f87eba` 已部署、Trigger 20261015.4、Bluesky 草稿驗收通過、送出改 apply
 
 **做了**（操作者「go」1→4）：

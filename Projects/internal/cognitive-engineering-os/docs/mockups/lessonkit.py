@@ -140,14 +140,46 @@ def mock_links(mid):
     home = mk.HOME[0]
     to = {"tools": mk.artifact_href(home, "tools"), "tool": mk.artifact_href(home, f"t-{mid}"), "ask": mk.artifact_href(home, "ask"),
           "new": mk.artifact_href(result, "new"), "demo": mk.artifact_href(result, "demo"), "result": mk.artifact_href(result)}
-    return lambda target: ("href", to[target])
+    return lambda target, domain=None: ("href", to[target])
 
 
 def web_links(mid):
-    """Web routes; the finished demo result page the web does not have yet says so instead (mockkit.WEB_PENDING)."""
+    """Web routes. 看一個完整分析頁 opens that domain's 示範分析 (demo_href) when its fixture exists, else says it is still
+    being made (DEMO_PENDING)."""
     to = {"tools": ("href", mk.WEB_HOME["tools"]), "tool": ("href", mk.WEB_HOME_PREFIX["t-"].format(mid)), "ask": ("href", mk.WEB_HOME["ask"]),
-          "new": ("href", mk.web_run(mid)), "demo": ("href", mk.web_run(mid, "demo")), "result": ("note", mk.WEB_PENDING["tool"])}
-    return lambda target: to[target]
+          "new": ("href", mk.web_run(mid)), "demo": ("href", mk.web_run(mid, "demo"))}
+    have = demos().get(mid, [])
+    return lambda target, domain=None: (("href", demo_href(mid, domain)) if domain in have else ("note", DEMO_PENDING)) if target == "result" else to[target]
+
+
+# The free 示範分析 pages (template §6): one real run per tool and domain, apps/cognitive-web/fixtures/demo/<method>.<domain>.json,
+# written by scripts/dev/demo_fixture.cjs. Which exist decides the lessons' 看一個完整分析頁 links and the web's DEMOS list.
+DEMO_DIR = mk.HERE.parents[1] / "apps/cognitive-web/fixtures/demo"
+DEMO_PENDING = "這個領域的完整結果頁還在做：先按「用示範案例試一次」，再按「執行分析」，就會看到同一個案例做完的結果。"
+EXAMPLES_FILE = mk.SPEC / "methods/registry/method-form-examples.yaml"
+
+
+def demos():
+    """-> {method id: [domains with a demo fixture, in domains.yaml order]}; a file for a retired domain is ignored."""
+    ids = mk.active_ids(mk.load_domains())
+    found = {}
+    for f in sorted(DEMO_DIR.glob("*.json")):
+        mid, _, domain = f.stem.rpartition(".")
+        if domain in ids: found.setdefault(mid, set()).add(domain)
+    return {mid: [x for x in ids if x in got] for mid, got in found.items()}
+
+
+def demo_href(mid, domain):
+    """/projects/demo/<method> for the default domain, /projects/demo/<method>/<domain> for the others."""
+    return f"/projects/demo/{mid}" + ("" if domain == mk.load_domains()["default"] else f"/{domain}")
+
+
+def demo_title(mid, domain):
+    """The demo case's name: its example scenario (method-form-examples.yaml; `input` = the default domain, `sets` the others)
+    up to the first 「：」."""
+    example = (mk._yaml(EXAMPLES_FILE).get("examples") or {}).get(mid) or {}
+    entry = example if domain == mk.load_domains()["default"] else (example.get("sets") or {}).get(domain) or {}
+    return str(entry.get("scenario") or mid).split("：", 1)[0]
 
 
 def render(mid, lesson, go, mock):
@@ -158,8 +190,8 @@ def render(mid, lesson, go, mock):
     name = mk._esc(mk._catalog().methods[mid]["name_zh"])
     tabs = mk.LESSON_TABS["tool"]
 
-    def a(target, inner, cls=None):
-        kind, value = go(target)
+    def a(target, inner, cls=None, domain=None):
+        kind, value = go(target, domain)
         if kind == "note": return f'<button type="button" class="{cls or "btn"}" data-note="{mk._esc(value)}">{inner}</button>'
         return (f'<a class="{cls}" ' if cls else "<a ") + f'href="{mk._esc(value)}">{inner}</a>'
 
@@ -222,7 +254,7 @@ def render(mid, lesson, go, mock):
         out += ["        <tr>" + "".join(f"<td>{v}</td>" for v in row) + "</tr>" for row in c["rows"]]
         out += ["      </table>", "    </div>"]
     out += ["    </div>", f'    <p class="sub mt8 mb0">{F["after"]}</p>',
-            '    <div class="btns mt8">' + a("result", "看一個完整分析頁 →<small>" + "".join(ex("span", F["result_link"])) + "</small>", "btn primary") + "</div>",
+            '    <div class="btns mt8">' + "".join(f'<span class="ex" data-set="{x}"{hide(x)}>' + a("result", f'看一個完整分析頁 →<small>{F["result_link"][x]}</small>', "btn primary", x) + "</span>" for x in ids) + "</div>",
             "  </div>", tabnext(1), "  </section>", ""]
     # 怎麼填 (M6) + 常見錯誤 (M7) + 自我檢查
     out += [panel(2), '  <div class="card">', f'    <h2>{fill["title"]}<small>1 分鐘</small></h2>', f'    <div class="how">{fill["how"]}</div>']
@@ -308,6 +340,14 @@ def render_web_units():
     out += [f"  {j(mid)}: {j(gaps(lesson))}," for mid, lesson in lessons.items()]
     out += ["};", f"export const NO_LESSON: string[] = {j(NO_LESSON)};", "export const RESULT_PAGE_SHOWS: Record<string, string[]> = {"]
     out += [f"  {j(mid)}: {j([str(x) for x in ids])}," for mid, ids in (mk._yaml(SHOWS_FILE).get("by_method") or {}).items()]
+    out += ["};", "// the 示範分析 pages that exist (fixtures/demo, DEMO_DIR): per tool, its domains in domains.yaml order; a fixture loads only",
+            "// when its page asks for it (one chunk each, never in another page's bundle).",
+            "export type DemoEntry = { domain: string; href: string; title: string };",
+            "export const DEMOS: Record<string, DemoEntry[]> = {"]
+    have = demos()
+    out += [f"  {j(mid)}: [" + ", ".join(j({"domain": x, "href": demo_href(mid, x), "title": demo_title(mid, x)}) for x in got) + "]," for mid, got in have.items()]
+    out += ["};", "export const DEMO_FIXTURES: Record<string, () => Promise<{ default: unknown }>> = {"]
+    out += [f"  {j(f'{mid}.{x}')}: () => import({j(f'../fixtures/demo/{mid}.{x}.json')})," for mid, got in have.items() for x in got]
     out += ["};"]
     return "\n".join(out) + "\n"
 

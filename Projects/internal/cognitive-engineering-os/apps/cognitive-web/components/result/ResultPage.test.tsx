@@ -91,7 +91,7 @@ describe("ResultPage", () => {
     expect([wrong.status, wrong.stdout.includes("layered iceberg SVG missing")]).toEqual([1, true]);
   });
   it("a tool without the iceberg's registration gets all nine sections and no iceberg words; ③'s own charts match result-page-shows.yaml (template §12)", async () => {
-    const demo = (await import("../../fixtures/demo-iceberg.json")).default as unknown as { result: React.ComponentProps<typeof ResultPage>["result"] };
+    const demo = (await import("../../fixtures/demo/systems.iceberg_model.edd.json")).default as unknown as { result: React.ComponentProps<typeof ResultPage>["result"] };
     const fields = [{ key: "problem_summary", kind: "text", label: "問題一句" }, { key: "hypotheses", kind: "list", label: "可能的原因" }];
     // the demo's AI text names the iceberg once; renamed, so any iceberg word left on the page is one the code wrote
     const fish = JSON.parse(JSON.stringify({ ...demo.result, method_id: "root_cause.fishbone", visual: { kind: "tree", bindings: {} } }).replaceAll("冰山", "魚骨")) as typeof demo.result;
@@ -119,7 +119,7 @@ describe("ResultPage", () => {
     await done();
   });
   it("a tool whose picture has its own units gets one ④ card and one ⑥ row per unit; a reading or citation of any member belongs to its unit (template §15.1 item 2)", async () => {
-    const demo = (await import("../../fixtures/demo-iceberg.json")).default as unknown as { result: React.ComponentProps<typeof ResultPage>["result"] };
+    const demo = (await import("../../fixtures/demo/systems.iceberg_model.edd.json")).default as unknown as { result: React.ComponentProps<typeof ResultPage>["result"] };
     // the record and units of tests/unit/test_picture_units.py (the server's picture_units for this record)
     const rec = { problem_summary: "分享從 6 人掉到 2 人", hypotheses: [{ id: "H1", statement: "帶領者先講意義", category: "人" }, { id: "H2", statement: "", category: "人" },
       { id: "H3", statement: "線上場關鏡頭", category: "環境" }, { id: "H4", statement: "分享時間不夠", category: "人" }] };
@@ -303,7 +303,7 @@ describe("ResultPage", () => {
   });
 
   it("the 示範分析 is the real result page, read-only: a writing button says it is a demo and calls nothing (N-78)", async () => {
-    const demo = (await import("../../fixtures/demo-iceberg.json")).default as unknown as { result: React.ComponentProps<typeof ResultPage>["result"]; record: Record<string, unknown>; manifest: never[]; gateResults: never[]; fields: never[] };
+    const demo = (await import("../../fixtures/demo/systems.iceberg_model.edd.json")).default as unknown as { result: React.ComponentProps<typeof ResultPage>["result"]; record: Record<string, unknown>; manifest: never[]; gateResults: never[]; fields: never[] };
     vi.mocked(apiFetch).mockResolvedValue({} as never);   // reads (the next steps' estimates) may happen; writes may not
     const host = document.createElement("div"); document.body.append(host);
     const root = createRoot(host);

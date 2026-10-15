@@ -65,8 +65,6 @@ ANCHORS: dict[str, str] = {
     "ResultPage.tsx:475": "<th>出手方式</th>",
     "ResultPage.tsx:479": "drawn.table.note",
     "ResultPage.tsx:566-594": 'id="approve"',
-    "components/ProjectList.tsx:89": 'className="demo"',
-    "projects/demo/iceberg/page.tsx:6-7": "示範分析",
 }
 
 

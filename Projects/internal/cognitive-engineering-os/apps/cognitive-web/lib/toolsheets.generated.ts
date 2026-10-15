@@ -18,3 +18,14 @@ export const NO_LESSON: string[] = ["M1、M2、M4–M8（這個工具還沒有�
 export const RESULT_PAGE_SHOWS: Record<string, string[]> = {
   "systems.iceberg_model": ["systems.leverage_point_analysis"],
 };
+// the 示範分析 pages that exist (fixtures/demo, DEMO_DIR): per tool, its domains in domains.yaml order; a fixture loads only
+// when its page asks for it (one chunk each, never in another page's bundle).
+export type DemoEntry = { domain: string; href: string; title: string };
+export const DEMOS: Record<string, DemoEntry[]> = {
+  "root_cause.fishbone": [{"domain": "edd", "href": "/projects/demo/root_cause.fishbone", "title": "主動分享從 6 人掉到 2 人"}],
+  "systems.iceberg_model": [{"domain": "edd", "href": "/projects/demo/systems.iceberg_model", "title": "團體反思 session 的主動分享從 6 人掉到 2 人，換了帶領者也一樣"}],
+};
+export const DEMO_FIXTURES: Record<string, () => Promise<{ default: unknown }>> = {
+  "root_cause.fishbone.edd": () => import("../fixtures/demo/root_cause.fishbone.edd.json"),
+  "systems.iceberg_model.edd": () => import("../fixtures/demo/systems.iceberg_model.edd.json"),
+};

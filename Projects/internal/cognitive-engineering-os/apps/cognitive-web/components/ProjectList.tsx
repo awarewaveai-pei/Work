@@ -16,7 +16,10 @@ import { analysisHref, projectHref, toolHref, toolLabel } from "../lib/catalog";
 import { humanError } from "../lib/errors";
 import { byActivity, standing, type ErasedProject, type Project } from "../lib/projects";
 import { formatTime } from "../lib/time";
+import { DEMOS } from "../lib/toolsheets.generated";
 
+// the free 示範分析 rows (N-78): one per tool that has one, its default domain's page (another domain's when that is all it has)
+const demos = Object.entries(DEMOS).flatMap(([method, list]) => { const demo = list.find((item) => item.href === `/projects/demo/${method}`) ?? list[0]; return demo ? [[method, demo] as const] : []; });
 const HEAD = <thead><tr><th>名稱</th><th>用的</th><th>走到哪</th><th>建立</th><th>最後更新</th><th>下一步</th></tr></thead>;
 
 export function ProjectList({ names = {} }: { names?: Record<string, string> }) {
@@ -79,19 +82,19 @@ export function ProjectList({ names = {} }: { names?: Record<string, string> }) 
           : <p className="sub mb0">還沒有案子。按「開新案子」或首頁的「陪我思考」開第一個；也可以把下面任何一份分析拿來開案。</p>)}
       </div>
       <div className="card" id="analyses">
-        <h2>我的分析<small>{projects ? `${analyses.length} 個你自己的・1 個示範` : "載入中"}</small></h2>
+        <h2>我的分析<small>{projects ? `${analyses.length} 個你自己的・${demos.length} 個示範` : "載入中"}</small></h2>
         <div className="how"><b>怎麼讀</b>直接分析每跑一次就留一份在這裡，是 AI 做的，不是你的判斷；2026-10-11 以前跑的分析也都在這裡。<b>你要做的</b>想把一件事想清楚，按「用這份結果開案」；不要的，勾起來按「永久刪除」。</div>
         {projects && (
           <div className="scroll-x">
             <table>
               {HEAD}
               <tbody>{analyses.map((project) => row(project, true))}
-              <tr className="demo">
-                <td><Link href="/projects/demo/iceberg">WuSheng 團體反思・第三期（示範）</Link></td>
-                <td>工具：<Link href={toolHref("systems.iceberg_model")}>{names["systems.iceberg_model"] ?? "冰山模型"}</Link></td>
+              {demos.map(([method, demo]) => <tr className="demo" key={method}>
+                <td><Link href={demo.href}>{demo.title}（示範）</Link></td>
+                <td>工具：<Link href={toolHref(method)}>{toolLabel(names, method)}</Link></td>
                 <td>報表（示範，不花錢）</td><td>—</td><td>—</td>
-                <td><Link className="btn" href="/projects/demo/iceberg">看示範結果 →</Link></td>
-              </tr></tbody>
+                <td><Link className="btn" href={demo.href}>看示範結果 →</Link></td>
+              </tr>)}</tbody>
             </table>
             {!analyses.length && <p className="sub mt8 mb0">還沒有你自己的分析。</p>}
           </div>

@@ -21,7 +21,7 @@
 
 | # | 規則 | 為什麼 |
 |---|---|---|
-| T1 | 每個工具都有：工具頁、填寫頁、說明書（操作者說的三頁），加上填寫頁產生的結果頁，加上一份不花錢的示範結果頁。 | 操作者 2026-10-14「冰山正式站有 3 頁，你不要給我少一頁」。示範結果頁應該是說明書「看一個完整分析頁」按下去的那一頁。現況：只有冰山有示範結果頁（`app/(shell)/projects/demo/iceberg/page.tsx` 寫死讀 `fixtures/demo-iceberg.json`），而且說明書那顆按鈕連冰山都還是佔位（按鈕的 `data-note`：「做完的示範結果頁還在做：先按『用示範案例試一次』，再按『執行分析』」）。 |
+| T1 | 每個工具都有：工具頁、填寫頁、說明書（操作者說的三頁），加上填寫頁產生的結果頁，加上一份不花錢的示範結果頁。 | 操作者 2026-10-14「冰山正式站有 3 頁，你不要給我少一頁」。示範結果頁應該是說明書「看一個完整分析頁」按下去的那一頁。現況（2026-10-15）：通用路徑 `/projects/demo/<method_id>[/<domain>]`＋`DEMOS`（§6），真跑的有冰山 edd、魚骨 edd；說明書的按鈕每個領域一顆，有那一份就連過去。 |
 | T2 | **單獨就能用（M14）**：表單只問這個工具自己的欄位，不能要求先填一整份別的工具的紀錄。上游紀錄最多是選填的參照。工作流裡由 recipe `bindings` 把上一站的結果帶進同一批欄位。 | 五個為什麼和柏拉圖現在只收整份魚骨紀錄（`five_whys.py:54`、`pareto.py:39`），魚骨只收整份問題陳述（`fishbone.py:75`）。 |
 | T3 | **每一格都完整（M13）**：每個看得見的欄位都有 `label`（一句問題）、`hint`（要寫什麼）、`placeholder`（一個例子）。 | 冰山有（`method-input-forms.yaml:27`），四個找原因工具一格都沒有。 |
 | T4 | 頁面上的字都來自資料檔，程式不寫方法專屬的字（D14）。 | 一份資料產生示意稿、網站、教材版三種輸出。 |
@@ -102,11 +102,13 @@
 
 ## 6. 示範結果頁 `/projects/demo/<id>`（不花錢）
 
-- 「我的案子」列出一列「〈示範案例名〉（示範）・工具：〈名稱〉・報表（示範，不花錢）・看示範結果 →」（`components/ProjectList.tsx:89`）。
+- 路徑：`/projects/demo/<method_id>` = 預設領域，`/projects/demo/<method_id>/<domain>` = 其他四個（`app/(shell)/projects/demo/[method]/[[...domain]]/page.tsx`）；沒有那一份就是 404。舊網址 `/projects/demo/iceberg` 轉到冰山的頁（`next.config.ts` `redirects`）。
+- 資料 = 一次真實執行存下來的輸出（display、fields、record、result、gateResults、manifest），檔案 `fixtures/demo/<method_id>.<domain>.json`，由 `scripts/dev/demo_fixture.cjs <method_id> <domain>…` 真跑產生，**不能手寫**；`_about` 記工具、領域、模型、時間、schema 版本。
+- 哪些存在：`sync-design-system.py` 掃 `fixtures/demo` 產生 `lib/toolsheets.generated.ts` `DEMOS`（每個工具的領域、網址、案例名＝示範案例 `scenario` 的「：」之前）和 `DEMO_FIXTURES`（每份一個 lazy import，只在那一頁載入）。
+- 說明書「看一個完整分析頁」：每個領域一顆（跟著領域晶片換），有那一份就連過去，沒有就說「這個領域的完整結果頁還在做」（`lessonkit.web_links`）。
+- 「我的案子」每個有示範的工具一列「〈案例名〉（示範）・工具・報表（示範，不花錢）・看示範結果 →」，連預設領域那一份（`components/ProjectList.tsx`）。
 - 頁面 = §4 的九段，同一支 `ResultPage` 加 `demo` 旗標：頂端一條「示範分析（免費，不花錢）…到〈工具〉填你的格子 →」，會寫入的按鈕按了只出一句說明（`ResultPage.tsx:385-394`）。
-- 資料 = 一次真實執行存下來的輸出（display、fields、record、result、gateResults、manifest），從真實執行重產，**不能手寫**（`projects/demo/iceberg/page.tsx:6-7`、fixture 的 `_about`）。所以五個領域各一份 = 每個工具真跑五次。
-- 現況：只有冰山，路徑寫死 `projects/demo/iceberg`，資料 `fixtures/demo-iceberg.json`；說明書的「看一個完整分析頁」按鈕現在是佔位，沒有連過去（T1）。**要改成一個通用路徑 `projects/demo/<method_id>`，每個工具一個 fixture，說明書那顆按鈕連到它。**
-- 示範結果要跟示範案例是同一個故事，**五個領域各一份**（T9）：預設領域對 `method-form-examples.yaml` 的 `input`，其他四個對 `sets`。說明書切到哪個領域，「看一個完整分析頁」就連到那個領域的示範結果頁。
+- 檢查：`e2e/cognitive/demos.spec.ts` 打開 `DEMOS` 每一頁（九段＋核准卡、示範條、② 是這個工具的圖、無 page error）、未知領域是 404、舊網址會轉。
 
 ## 7. 目錄與入口（工具要出現在哪裡）
 
@@ -133,7 +135,7 @@
 | `methods/registry/method-human-required.yaml` | 哪些欄位 AI 不能代填 |
 | `evolution/lessons/vN.yaml` | 說明書六分頁＋每單位的 `result` 資料（④⑥） |
 | `apps/cognitive-web/components/result/MethodVisual.tsx` `RECORD_PICTURES`＋一個 `<Tool>.tsx` | 結果頁 ② 的原生圖 |
-| `apps/cognitive-web/fixtures/demo-<id>.json` | 示範結果頁資料（§6，待做通用路徑） |
+| `apps/cognitive-web/fixtures/demo/<id>.<domain>.json` | 示範結果頁資料，五個領域各一份，`scripts/dev/demo_fixture.cjs` 真跑產生（§6） |
 | `recipes/validated/<workflow>.recipe.yaml` | 工作流才有：每站 `bindings` |
 | `docs/mockups/*.html` | 示意稿 = 規格；新工具先出示意稿 |
 
@@ -185,7 +187,7 @@
 | ⑥ 標題、表下那句；動作句的「四列」 | 同一筆的 `table`；列數照單位數 |
 | 示範分析的提示寫死「冰山模型」 | 工具名稱 |
 | `docs/mockups/lessonkit.py` `DRAWN` | 不是寫死：它是「圖由程式畫、單位固定」的工具登記表，冰山是目前唯一一筆；新工具的圖若固定單位就加一筆 |
-| `app/(shell)/projects/demo/iceberg/page.tsx` 示範結果頁 | 還沒改：§15.1 第 3 項 |
+| 示範結果頁寫死 `projects/demo/iceberg`、`fixtures/demo-iceberg.json` | 通用路徑＋`DEMOS`（§6） |
 
 這些字放在登記裡（程式檔），不放課的資料：它們描述的是程式畫的那張圖，和圖放在一起才不會兩邊不同步；課的資料（`evolution/lessons`）要升版才能改，promote 要操作者同意。
 
@@ -216,7 +218,7 @@
 |---|---|---|---|---|
 | 1 | §12 的冰山分支改成登記／單位資料 | 同 §12 | 已做（2026-10-15）：`ResultPage.test.tsx` 魚骨跑九段、無冰山字、`check-mocks.py --page result` 綠 | — |
 | 2 | ④⑥ 的單位可以來自圖的單位（單位不是表單欄位的工具） | `picture_units.py`、schema 1.5.0、`ResultPage.tsx` | 已做（2026-10-15）：`ResultPage.test.tsx` 魚骨兩根骨 → 兩張卡、⑥ 兩列、★、`check-mocks.py --page result` 綠；`test_picture_units.py` 四工具 | — |
-| 3 | 示範結果頁通用路徑 `projects/demo/<method_id>`，fixture 一個工具一個領域一份 | `app/(shell)/projects/demo/`、`fixtures/demo-<id>.json`、`components/ProjectList.tsx:89` | e2e 開五個領域的示範頁 | Opus 5.5 |
+| 3 | 示範結果頁通用路徑 `projects/demo/<method_id>[/<domain>]`，fixture 一個工具一個領域一份 | §6 | 程式已做（2026-10-15）：`demos.spec.ts` 綠；真跑兩份（冰山 edd、魚骨 edd）；本機開發環境改用本機 PostgreSQL（`launch_cos_dev.ps1`）。其餘 23 份每份約 NT$7（預設模型 claude-opus-5-5），待操作者定花費 | Opus 5.5 |
 | 4 | M13／M14 進 `test_method_form.py`（範圍 = lessons champion） | `tests/unit/test_method_form.py` | 冰山綠；故意拿掉一格 hint 變紅 | Sonnet 5.5／Codex（步驟已寫死） |
 | 5 | lessons v2 格式（T9：看懂結果、教材版 五個領域各一份）＋ `SHAPE` | `evolution/kinds.yaml`、`evolution/lessons/v2.yaml`、`lessonkit.py` | `lessonkit.validate`；冰山先補齊再 promote | Fable 5.1（格式）→ Haiku 5.5（填字） |
 | 6 | 本模板的引用檢查 | `tests/unit/test_tool_page_template.py` | 已做（v6） | — |

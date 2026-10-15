@@ -1,0 +1,1291 @@
+{
+  "_about": {
+    "what": "A real analysis of this tool's demo case in this domain: the free read-only 示範分析 (template §6). Regenerate with scripts/dev/demo_fixture.cjs; never hand-edit.",
+    "method": "root_cause.fishbone",
+    "domain": "edd",
+    "model": "claude-opus-5-5",
+    "ran_at": "2026-10-15T05:06:03.888320Z",
+    "schema_version": "1.5.0"
+  },
+  "display": {
+    "name_en": "Fishbone / Ishikawa Diagram",
+    "abbr": "",
+    "name_zh": "魚骨圖（石川圖）",
+    "blurb_en": "Organizes candidate causes of one problem into standard categories (people, process, equipment, materials, environment) branching off a central spine. Use it to brainstorm and categorize causes broadly before narrowing down with Five Whys or Pareto.",
+    "blurb_zh": "把一個問題的候選原因，依標準類別（人、流程、設備、物料、環境）分支排列在一條主幹上。想先廣泛腦力激盪、分類原因，再用 Five Whys 或 Pareto 收斂時用。",
+    "why_en": "Fishbone can only ever produce a set of HYPOTHESES about the cause, never a confirmed root cause -- the system enforces this structurally: there is no code path that lets a fishbone hypothesis jump straight to a confirmed RootCauseFact, that promotion is refused unless the hypothesis set has actually been run through a real validation method (Five Whys, Pareto, or a causal DAG) first. This stops a good-looking brainstorm from being mistaken for proof.",
+    "why_zh": "魚骨圖永遠只能產出一組「假設」，不能直接產出已確認的根因——系統在結構上強制這件事：沒有任何程式路徑能讓魚骨圖的假設直接升級成已確認的 RootCauseFact，除非這組假設真的先跑過一個真正的驗證工具（Five Whys、Pareto，或因果圖），否則升級會被拒絕。這能避免一場好看的腦力激盪被誤認為是證明。",
+    "url": "https://asq.org/quality-resources/fishbone"
+  },
+  "fields": [
+    {
+      "key": "problem_statement",
+      "label": "問題陳述",
+      "hint": null,
+      "required": true,
+      "kind": "upstream",
+      "method_id": "framing.problem_statement"
+    },
+    {
+      "key": "hypotheses",
+      "label": "原因假設",
+      "hint": null,
+      "required": true,
+      "kind": "rows",
+      "item": {
+        "kind": "group",
+        "fields": [
+          {
+            "key": "id",
+            "label": "編號",
+            "hint": null,
+            "required": true,
+            "kind": "text"
+          },
+          {
+            "key": "statement",
+            "label": "陳述",
+            "hint": null,
+            "required": true,
+            "kind": "text"
+          },
+          {
+            "key": "category",
+            "label": "類別",
+            "hint": null,
+            "required": false,
+            "kind": "text"
+          },
+          {
+            "key": "provenance",
+            "kind": "provenance",
+            "required": true
+          },
+          {
+            "key": "supporting_evidence_refs",
+            "label": "佐證資料編號（E-…）",
+            "hint": null,
+            "required": false,
+            "advanced": true,
+            "kind": "list",
+            "item_kind": "text",
+            "integer": false
+          }
+        ],
+        "conditions": {}
+      },
+      "minItems": 1
+    },
+    {
+      "key": "suggested_categories",
+      "label": "建議分類",
+      "hint": null,
+      "required": false,
+      "kind": "list",
+      "item_kind": "text",
+      "integer": false
+    }
+  ],
+  "record": {
+    "generated_by_method": "root_cause.fishbone",
+    "hypotheses": [
+      {
+        "category": "人",
+        "id": "H1",
+        "provenance": {
+          "authorship_state": "HUMAN_ORIGINAL",
+          "epistemic_type": "HUMAN_OPINION",
+          "locked": null
+        },
+        "statement": "帶領者先講作品的意義，參與者習慣等著被解讀"
+      },
+      {
+        "category": "方法",
+        "id": "H2",
+        "provenance": {
+          "authorship_state": "HUMAN_ORIGINAL",
+          "epistemic_type": "HUMAN_OPINION",
+          "locked": null
+        },
+        "statement": "90 分鐘裡帶領者說明佔 35 分鐘，輪到分享時時間已經不夠"
+      },
+      {
+        "category": "量測",
+        "id": "H3",
+        "provenance": {
+          "authorship_state": "HUMAN_ORIGINAL",
+          "epistemic_type": "HUMAN_OPINION",
+          "locked": null
+        },
+        "statement": "紀錄表只問「是否達到本次目標洞察」，沒有記誰開口"
+      },
+      {
+        "category": "環境",
+        "id": "H4",
+        "provenance": {
+          "authorship_state": "HUMAN_ORIGINAL",
+          "epistemic_type": "HUMAN_OPINION",
+          "locked": null
+        },
+        "statement": "線上場大家關著鏡頭，看不到彼此的作品"
+      },
+      {
+        "category": "材料",
+        "id": "H5",
+        "provenance": {
+          "authorship_state": "HUMAN_ORIGINAL",
+          "epistemic_type": "HUMAN_OPINION",
+          "locked": null
+        },
+        "statement": "第 4 次起換成比較難掌握的媒材，作品比較不敢拿出來"
+      },
+      {
+        "category": "人",
+        "id": "H6",
+        "provenance": {
+          "authorship_state": "HUMAN_ORIGINAL",
+          "epistemic_type": "HUMAN_OPINION",
+          "locked": null
+        },
+        "statement": "參與者彼此還不熟，怕說錯話"
+      }
+    ],
+    "id": "C93FA9B0CC34E01D",
+    "problem_statement_ref": "PROB-EDD1",
+    "problem_summary": "這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次有 6 位。三期都是從第 4 次開始往下掉。",
+    "promotion": {
+      "ready_for_promotion": false,
+      "validation_methods_applied": []
+    },
+    "suggested_categories": [
+      "人",
+      "方法",
+      "量測",
+      "環境",
+      "材料"
+    ],
+    "version": "1.0.0"
+  },
+  "result": {
+    "data_thickness": {
+      "hypotheses": {
+        "external_sources": 0,
+        "own_statements": 36
+      },
+      "problem_statement_ref": {
+        "external_sources": 0,
+        "own_statements": 1
+      },
+      "problem_summary": {
+        "external_sources": 0,
+        "own_statements": 1
+      },
+      "promotion": {
+        "external_sources": 0,
+        "own_statements": 1
+      },
+      "suggested_categories": {
+        "external_sources": 0,
+        "own_statements": 5
+      }
+    },
+    "diagnosis": {
+      "citations": [
+        "r/problem_summary",
+        "r/hypotheses/4",
+        "r/hypotheses/0",
+        "r/hypotheses/1"
+      ],
+      "text": "下降固定從第 4 次開始，和第 4 次起換成較難的媒材時間點吻合；帶領者先解讀、說明佔 35 分鐘，會讓參與者習慣等著聽。",
+      "title": "問題在分享時段，根可能在第4次的變化"
+    },
+    "findings": [
+      {
+        "citations": [
+          "r/problem_summary",
+          "r/hypotheses/4",
+          "r/hypotheses/5"
+        ],
+        "confidence": {
+          "level": "mid",
+          "reason": "時間點吻合只靠紀錄本身推論，沒有逐次數據或外部來源。"
+        },
+        "id": "F1",
+        "revision_conditions": [
+          {
+            "text": "若某一期第 4 次沒換媒材，分享人數一樣下降",
+            "would_change": "媒材就不是主因，重點改看帶領方式"
+          }
+        ],
+        "text": "三期都是從第 4 次開始往下掉，H5 正好說第 4 次起換成較難掌握的媒材。H6 說彼此不熟，但這應該隨次數變好，跟越來越少人分享的走向相反。",
+        "title": "只有媒材這條和第 4 次起下降的時間點對得上"
+      },
+      {
+        "citations": [
+          "r/hypotheses/0",
+          "r/hypotheses/1"
+        ],
+        "confidence": {
+          "level": "mid",
+          "reason": "兩條都是帶領者的看法，沒有逐次的時間紀錄。"
+        },
+        "id": "F2",
+        "revision_conditions": [
+          {
+            "text": "縮短說明、改成先讓參與者說之後分享人數沒有變",
+            "would_change": "排除帶領方式，原因改往媒材或環境找"
+          }
+        ],
+        "text": "帶領者先講作品意義，參與者習慣等著被解讀；90 分鐘裡說明佔 35 分鐘，輪到分享時時間不夠。兩者可能形成「越少人說、帶領者越多講」的循環。",
+        "title": "帶領者先解讀與說明太長可能互相加強"
+      },
+      {
+        "citations": [
+          "r/hypotheses/2",
+          "r/promotion/validation_methods_applied",
+          "r/promotion/ready_for_promotion"
+        ],
+        "confidence": {
+          "level": "mid",
+          "reason": "直接根據紀錄的欄位內容判斷。"
+        },
+        "id": "F3",
+        "text": "六條原因都被標成人的看法，促進驗證的欄位是空的。紀錄表只問有沒有達到本次的目標洞察，沒有記誰開口，所以現有紀錄無法驗證任何一條。",
+        "title": "六個原因都還沒驗證，紀錄表也記不到分享人數"
+      }
+    ],
+    "focus": {
+      "path": "r/hypotheses/2",
+      "why": "紀錄表沒有記誰開口，其他原因怎麼改都看不出效果，所以要先補上這個量測。"
+    },
+    "gaps": [
+      {
+        "citations": [
+          "r/problem_summary"
+        ],
+        "needed_evidence": "三期每次的主動分享人數",
+        "path": "r/hypotheses/2",
+        "text": "只知道第 1 次 6 位、第 6 次 2 位，缺第 2 到 5 次的人數"
+      },
+      {
+        "citations": [
+          "r/hypotheses/3"
+        ],
+        "needed_evidence": "三期每次的形式（線上或實體）",
+        "path": "r/hypotheses/3",
+        "text": "不知道哪幾次是線上場，也不知道是否從第 4 次開始"
+      },
+      {
+        "citations": [
+          "r/hypotheses/0",
+          "r/hypotheses/5"
+        ],
+        "needed_evidence": "參與者訪談或逐次觀察紀錄",
+        "path": "r/hypotheses/0",
+        "text": "六條原因都是人的看法，沒有任何證據"
+      }
+    ],
+    "headline": "第4次起分享變少，媒材與帶領方式待驗",
+    "interpretation_id": "INTERP-4F0DCDCA63A149BC9C627042D7D91F50",
+    "loop": {
+      "edges": [
+        {
+          "from": "n1",
+          "to": "n2"
+        },
+        {
+          "from": "n2",
+          "to": "n3"
+        },
+        {
+          "from": "n3",
+          "to": "n4"
+        },
+        {
+          "from": "n4",
+          "to": "n1"
+        }
+      ],
+      "feeders": [
+        {
+          "citations": [
+            "r/hypotheses/2"
+          ],
+          "id": "f1",
+          "text": "紀錄表只問是否達到本次目標洞察",
+          "to": "n1"
+        },
+        {
+          "citations": [
+            "r/hypotheses/4"
+          ],
+          "id": "f2",
+          "text": "第 4 次起換成較難掌握的媒材",
+          "to": "n4"
+        }
+      ],
+      "kind": "reinforcing",
+      "name": "越少人說，帶領者越多講",
+      "nodes": [
+        {
+          "citations": [
+            "r/hypotheses/0"
+          ],
+          "id": "n1",
+          "text": "帶領者先講作品的意義"
+        },
+        {
+          "citations": [
+            "r/hypotheses/0"
+          ],
+          "id": "n2",
+          "text": "參與者習慣等著被解讀"
+        },
+        {
+          "citations": [
+            "r/hypotheses/1"
+          ],
+          "id": "n3",
+          "text": "說明佔 35 分鐘，分享時間不夠"
+        },
+        {
+          "citations": [
+            "r/problem_summary"
+          ],
+          "id": "n4",
+          "text": "主動說自己作品的人變少"
+        }
+      ],
+      "reading": "帶領者先解讀作品，參與者就等著聽，說明時間也越拉越長，分享時間不夠，主動說的人變少，帶領者又更傾向自己先講。"
+    },
+    "method_id": "root_cause.fishbone",
+    "model": "claude-opus-5-5",
+    "next_methods": [
+      "root_cause.change_analysis",
+      "experiment.pilot",
+      "epistemic.evidence_matrix",
+      "insight.interview"
+    ],
+    "next_steps": [
+      {
+        "answers": "第 4 次和前 3 次相比到底改了什麼",
+        "deepens": "r/hypotheses/4",
+        "est_cost": "M",
+        "method_id": "root_cause.change_analysis",
+        "needs_input": [
+          "三期每次的媒材、形式、說明時間"
+        ],
+        "on_path": true,
+        "prefill": {},
+        "short": "比對第4次變化",
+        "why": "下降固定從第 4 次開始，最該先查那次改了什麼。",
+        "yields": "第 4 次前後的差異清單"
+      },
+      {
+        "answers": "媒材過渡和先說後解能不能止住下降",
+        "deepens": "r/hypotheses/0",
+        "est_cost": "L",
+        "method_id": "experiment.pilot",
+        "needs_input": [
+          "下一期的課程表"
+        ],
+        "on_path": true,
+        "prefill": {},
+        "short": "下一期試行",
+        "why": "有了量測之後，就能用一期的試行驗證主因。",
+        "yields": "一期的試行結果"
+      },
+      {
+        "answers": "每條原因各有多少證據支持或反駁",
+        "deepens": "r/hypotheses",
+        "est_cost": "M",
+        "method_id": "epistemic.evidence_matrix",
+        "needs_input": [
+          "現有的紀錄表和觀察筆記"
+        ],
+        "on_path": false,
+        "prefill": {},
+        "short": "原因證據對照",
+        "why": "六條原因都只是看法，需要先整理證據。",
+        "yields": "原因與證據對照表"
+      },
+      {
+        "answers": "參與者自己為什麼不想分享",
+        "deepens": "r/hypotheses/5",
+        "est_cost": "M",
+        "method_id": "insight.interview",
+        "needs_input": [
+          "2 到 3 位願意受訪的參與者"
+        ],
+        "on_path": false,
+        "prefill": {},
+        "short": "訪談參與者",
+        "why": "目前只有帶領者的觀點，缺參與者的說法。",
+        "yields": "參與者的說法"
+      }
+    ],
+    "picture_units": [
+      {
+        "label": "人",
+        "members": [
+          "r/hypotheses/0",
+          "r/hypotheses/5"
+        ],
+        "own_statements": 2,
+        "path": "r/hypotheses/0"
+      },
+      {
+        "label": "方法",
+        "members": [
+          "r/hypotheses/1"
+        ],
+        "own_statements": 1,
+        "path": "r/hypotheses/1"
+      },
+      {
+        "label": "量測",
+        "members": [
+          "r/hypotheses/2"
+        ],
+        "own_statements": 1,
+        "path": "r/hypotheses/2"
+      },
+      {
+        "label": "環境",
+        "members": [
+          "r/hypotheses/3"
+        ],
+        "own_statements": 1,
+        "path": "r/hypotheses/3"
+      },
+      {
+        "label": "材料",
+        "members": [
+          "r/hypotheses/4"
+        ],
+        "own_statements": 1,
+        "path": "r/hypotheses/4"
+      }
+    ],
+    "priority": "先在紀錄表加上每次誰主動分享；接著用變更分析比對第 4 次改了什麼，下一期再分別試媒材過渡和先說後解。",
+    "priority_short": "先記錄，再試媒材與帶領",
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
+    },
+    "recommendations": [
+      {
+        "action": "紀錄表加記每次主動分享的人，並計時帶領者的說明",
+        "citations": [
+          "r/hypotheses/2",
+          "r/hypotheses/1"
+        ],
+        "expected": "有逐次數據，可以檢驗媒材和帶領方式哪個是主因",
+        "level": "now"
+      },
+      {
+        "action": "下一期在第 4 次試行媒材過渡，同時改成先說後解",
+        "citations": [
+          "r/hypotheses/4",
+          "r/hypotheses/0",
+          "r/problem_summary"
+        ],
+        "expected": "看第 4 次後分享人數是否不再下降",
+        "level": "next"
+      }
+    ],
+    "record_sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+    "solutions": {
+      "first_step": "明天就在紀錄表加一欄「本次主動分享的人」，下次 session 開始填。",
+      "horizon": "12 週",
+      "long_horizon": "quarter",
+      "metrics": [
+        {
+          "name": "第 6 次主動分享作品人數",
+          "now": "2 位",
+          "now_citation": "r/problem_summary",
+          "target": "5 位",
+          "when": "下一期第 6 次"
+        },
+        {
+          "name": "帶領者說明時間",
+          "now": "35 分鐘",
+          "now_citation": "r/hypotheses/1",
+          "target": "20 分鐘以內",
+          "when": "第 4 週"
+        },
+        {
+          "name": "逐次主動分享名單完整度",
+          "now": "還沒有記錄",
+          "target": "每次都有",
+          "when": "第 1 週起"
+        }
+      ],
+      "options": [
+        {
+          "advice": "一定要先做",
+          "cost": "很低，每次多記幾分鐘",
+          "durability": "長期有效，是其他改變的量尺",
+          "name": "記錄誰開口",
+          "paths": [
+            "r/hypotheses/2"
+          ],
+          "risk": "只記數字，看不出原因",
+          "takes": "下一次就開始",
+          "what": "紀錄表每次加記主動分享的人數和名單"
+        },
+        {
+          "advice": "可以馬上試",
+          "cost": "低",
+          "durability": "要持續計時才維持得住",
+          "name": "縮短說明",
+          "paths": [
+            "r/hypotheses/1"
+          ],
+          "risk": "內容講不完",
+          "takes": "1 次就看得出來",
+          "what": "說明時間設上限，固定留下分享時段"
+        },
+        {
+          "advice": "和縮短說明一起做",
+          "cost": "帶領者要改習慣",
+          "durability": "打斷循環後可以持久",
+          "name": "先說後解",
+          "paths": [
+            "r/hypotheses/0"
+          ],
+          "risk": "一開始容易冷場",
+          "takes": "2 到 3 次",
+          "what": "參與者先說自己的作品，帶領者最後才補充意義"
+        },
+        {
+          "advice": "下一期當作試點",
+          "cost": "要調整課程設計",
+          "durability": "如果是主因，效果最根本",
+          "name": "媒材過渡",
+          "paths": [
+            "r/hypotheses/4"
+          ],
+          "risk": "會擠掉原本的課程內容",
+          "takes": "一整期",
+          "what": "第 4 次換媒材前加一次熟悉練習，或延後換媒材"
+        },
+        {
+          "advice": "確認有線上場再做",
+          "cost": "低",
+          "durability": "只對線上場有效",
+          "name": "開鏡分享",
+          "paths": [
+            "r/hypotheses/3"
+          ],
+          "risk": "參與者會有隱私上的不安",
+          "takes": "1 次",
+          "what": "線上場請大家開鏡頭或上傳作品照片"
+        }
+      ],
+      "plan": [
+        {
+          "action": "紀錄表加上主動分享名單欄",
+          "options": [
+            "記錄誰開口"
+          ],
+          "owner": "帶領者",
+          "phase": "short",
+          "proof": "每次紀錄表都有名單",
+          "target": "每次都填",
+          "when": "第 1 週"
+        },
+        {
+          "action": "說明時間設 20 分鐘上限並計時",
+          "options": [
+            "縮短說明"
+          ],
+          "owner": "帶領者",
+          "phase": "short",
+          "proof": "每次的計時紀錄",
+          "target": "說明不超過 20 分鐘",
+          "when": "第 1 週"
+        },
+        {
+          "action": "改成先請參與者說，帶領者最後補充",
+          "options": [
+            "先說後解"
+          ],
+          "owner": "帶領者",
+          "phase": "short",
+          "proof": "紀錄表上的分享人數",
+          "target": "每次至少 4 位主動分享",
+          "when": "第 2 到 4 週"
+        },
+        {
+          "action": "整理哪幾次是線上場，線上場請大家開鏡頭",
+          "options": [
+            "開鏡分享"
+          ],
+          "owner": "行政助理",
+          "phase": "short",
+          "proof": "線上與實體場的對照表",
+          "target": "確認線上場和下降有沒有關係",
+          "when": "第 2 到 4 週"
+        },
+        {
+          "action": "設計第 4 次的媒材過渡活動",
+          "options": [
+            "媒材過渡"
+          ],
+          "owner": "課程設計者",
+          "phase": "short",
+          "proof": "活動草案",
+          "target": "下一期可以用",
+          "when": "第 2 到 4 週"
+        },
+        {
+          "action": "下一期第 4 次起試行媒材過渡，比較分享人數",
+          "options": [
+            "媒材過渡",
+            "記錄誰開口"
+          ],
+          "owner": "課程設計者",
+          "phase": "long",
+          "proof": "逐次分享人數曲線",
+          "target": "第 4 次後不再明顯下降",
+          "when": "第 2 季"
+        },
+        {
+          "action": "整期維持先說後解和說明上限，並重跑魚骨圖",
+          "options": [
+            "先說後解",
+            "縮短說明",
+            "開鏡分享"
+          ],
+          "owner": "帶領者",
+          "phase": "long",
+          "proof": "逐次紀錄和新的魚骨圖",
+          "target": "第 6 次至少 5 位主動分享",
+          "when": "第 2 季"
+        }
+      ],
+      "recommended": "記錄誰開口",
+      "signoff": "媒材過渡要課程設計者或機構負責人［同意調整課程內容］才能進行。其他選項只要帶領者同意就可以做。"
+    },
+    "summary": "三期都是從第 4 次開始主動分享變少。六個候選原因目前都只是帶領者的看法。最該先查的是第 4 次起換了媒材，以及帶領者先解讀、說明時間太長這兩點；但紀錄表沒有記誰開口，所以要先把它改成能記下分享人數。",
+    "trend": {
+      "question": "主動說自己作品的人數，從第 1 次到第 6 次怎麼變？",
+      "reading": "第 1 次有 6 位，第 6 次剩 2 位（共 8 位參與者），而且三期都是從第 4 次開始往下掉。中間幾次沒有紀錄數字。",
+      "series": [
+        {
+          "name": "主動分享作品人數",
+          "points": [
+            {
+              "citation": "r/problem_summary",
+              "label": "第 1 次",
+              "value": 6
+            },
+            {
+              "citation": "r/problem_summary",
+              "label": "第 6 次",
+              "value": 2
+            }
+          ],
+          "unit": "位"
+        }
+      ]
+    },
+    "units": [
+      {
+        "action": "改成先讓參與者說，帶領者最後才補充",
+        "brief": "帶領者先講意義、彼此不熟",
+        "citations": [
+          "r/hypotheses/0",
+          "r/hypotheses/5"
+        ],
+        "effect": "可以打斷等著被解讀的習慣，持續到帶領方式變回去為止",
+        "leverage": "high",
+        "meaning": "人這一類有兩條：帶領者先解讀作品，以及參與者彼此不熟、怕說錯話。前一條和下降的走向吻合；後一條應該隨次數變好，和越來越少人分享不一致。",
+        "path": "r/hypotheses/0",
+        "step": "先說後解",
+        "thickness": {
+          "fill_by": "experiment.pilot",
+          "note": "只有看法，沒有觀察紀錄",
+          "verdict": "thin"
+        }
+      },
+      {
+        "action": "把說明時間設上限，並固定分享時段",
+        "brief": "說明佔 35 分鐘",
+        "citations": [
+          "r/hypotheses/1"
+        ],
+        "effect": "馬上多出分享時間，要靠每次計時才維持得住",
+        "leverage": "mid",
+        "meaning": "90 分鐘裡說明佔 35 分鐘，分享時段被壓縮。這是唯一有具體數字的原因，但不知道每次是不是都這樣。",
+        "path": "r/hypotheses/1",
+        "step": "縮短說明",
+        "thickness": {
+          "fill_by": "root_cause.change_analysis",
+          "note": "沒有逐次計時",
+          "verdict": "thin"
+        }
+      },
+      {
+        "action": "紀錄表加一欄：每次誰主動分享",
+        "brief": "只問是否達到目標洞察",
+        "citations": [
+          "r/hypotheses/2"
+        ],
+        "effect": "讓每條原因都能被檢驗，長期有效",
+        "leverage": "max",
+        "meaning": "紀錄表只看有沒有達到洞察，沒有記誰開口。分享變少既沒被看見，也無法驗證其他任何一條原因。",
+        "path": "r/hypotheses/2",
+        "step": "記錄誰開口",
+        "thickness": {
+          "fill_by": "epistemic.evidence_matrix",
+          "note": "欄位缺口清楚，沒有歷史資料",
+          "verdict": "thin"
+        }
+      },
+      {
+        "action": "確認每次是線上還是實體，線上場請大家分享作品畫面",
+        "brief": "線上關鏡頭看不到作品",
+        "citations": [
+          "r/hypotheses/3"
+        ],
+        "effect": "只影響線上場，效果有限",
+        "leverage": "low",
+        "meaning": "線上場關著鏡頭，看不到彼此的作品。不知道哪幾次是線上、是不是從第 4 次開始。",
+        "path": "r/hypotheses/3",
+        "step": "開鏡分享",
+        "thickness": {
+          "fill_by": "root_cause.change_analysis",
+          "note": "不知道哪幾次是線上",
+          "verdict": "thinnest"
+        }
+      },
+      {
+        "action": "下一期在第 4 次加一個媒材過渡，或延後換媒材",
+        "brief": "第4次起換難掌握媒材",
+        "citations": [
+          "r/hypotheses/4",
+          "r/problem_summary"
+        ],
+        "effect": "如果是主因，第 4 次後的下降會變緩；需要一整期才看得出來",
+        "leverage": "high",
+        "meaning": "第 4 次起換成較難掌握的媒材，作品比較不敢拿出來。和三期都從第 4 次下降的時間點最吻合。",
+        "path": "r/hypotheses/4",
+        "step": "媒材過渡",
+        "thickness": {
+          "fill_by": "experiment.pilot",
+          "note": "只有時間點吻合",
+          "verdict": "thin"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 20355,
+      "output_tokens": 7182
+    },
+    "visual": {
+      "bindings": {
+        "columns": "r/suggested_categories",
+        "rows": "r/hypotheses"
+      },
+      "kind": "table"
+    }
+  },
+  "gateResults": [
+    {
+      "evidence": {
+        "citations": [
+          "r/problem_summary",
+          "r/hypotheses/4",
+          "r/hypotheses/5",
+          "r/hypotheses/0",
+          "r/hypotheses/1",
+          "r/hypotheses/2",
+          "r/promotion/validation_methods_applied",
+          "r/promotion/ready_for_promotion",
+          "r/hypotheses/2",
+          "r/hypotheses/1",
+          "r/hypotheses/4",
+          "r/hypotheses/0",
+          "r/problem_summary"
+        ],
+        "cited": 5,
+        "claims": 5,
+        "claims_total": 20,
+        "conflicts_under_two": [],
+        "manifest_count": 60,
+        "out_of_manifest": [],
+        "uncited_sections": [],
+        "unstated_numbers": {},
+        "unsupported": 0,
+        "zero_citation": []
+      },
+      "gate_id": "citation_integrity",
+      "status": "PASS"
+    },
+    {
+      "evidence": {
+        "paths": [
+          "r/hypotheses",
+          "r/suggested_categories"
+        ]
+      },
+      "gate_id": "visual_bindings_resolvable",
+      "status": "PASS"
+    },
+    {
+      "evidence": {
+        "next_methods": [
+          "root_cause.change_analysis",
+          "experiment.pilot",
+          "epistemic.evidence_matrix",
+          "insight.interview"
+        ]
+      },
+      "gate_id": "next_methods_resolvable",
+      "status": "PASS"
+    },
+    {
+      "evidence": {
+        "dropped": {},
+        "problems": {},
+        "removed": {},
+        "repaired": {}
+      },
+      "gate_id": "detail_integrity",
+      "status": "PASS"
+    },
+    {
+      "evidence": {
+        "ai_labelled": true,
+        "judgment_left_to_user": true
+      },
+      "gate_id": "no_preset_conclusion",
+      "status": "PASS"
+    }
+  ],
+  "manifest": [
+    {
+      "id": "r/hypotheses",
+      "kind": "record",
+      "path": "r/hypotheses",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "[{\"category\":\"人\",\"id\":\"H1\",\"provenance\":{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null},\"statement\":\"帶領者先講作品的意義，參與者習慣等著被解讀\"},{\"category\":\"方法\",\"id\":\"H2\",\"provenance\":{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null},\"statement\":\"90 分鐘裡帶領者說明佔 35 分鐘，輪到分享時時間已經不夠\"},{\"category\":\"量測\",\"id\":\"H3\",\"provenance\":{\"authorship_state\":\"HUMAN_"
+    },
+    {
+      "id": "r/hypotheses/0",
+      "kind": "record",
+      "path": "r/hypotheses/0",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"category\":\"人\",\"id\":\"H1\",\"provenance\":{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null},\"statement\":\"帶領者先講作品的意義，參與者習慣等著被解讀\"}"
+    },
+    {
+      "id": "r/hypotheses/0/category",
+      "kind": "record",
+      "path": "r/hypotheses/0/category",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"人\""
+    },
+    {
+      "id": "r/hypotheses/0/id",
+      "kind": "record",
+      "path": "r/hypotheses/0/id",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"H1\""
+    },
+    {
+      "id": "r/hypotheses/0/provenance",
+      "kind": "record",
+      "path": "r/hypotheses/0/provenance",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null}"
+    },
+    {
+      "id": "r/hypotheses/0/provenance/authorship_state",
+      "kind": "record",
+      "path": "r/hypotheses/0/provenance/authorship_state",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_ORIGINAL\""
+    },
+    {
+      "id": "r/hypotheses/0/provenance/epistemic_type",
+      "kind": "record",
+      "path": "r/hypotheses/0/provenance/epistemic_type",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_OPINION\""
+    },
+    {
+      "id": "r/hypotheses/0/provenance/locked",
+      "kind": "record",
+      "path": "r/hypotheses/0/provenance/locked",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "null"
+    },
+    {
+      "id": "r/hypotheses/0/statement",
+      "kind": "record",
+      "path": "r/hypotheses/0/statement",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"帶領者先講作品的意義，參與者習慣等著被解讀\""
+    },
+    {
+      "id": "r/hypotheses/1",
+      "kind": "record",
+      "path": "r/hypotheses/1",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"category\":\"方法\",\"id\":\"H2\",\"provenance\":{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null},\"statement\":\"90 分鐘裡帶領者說明佔 35 分鐘，輪到分享時時間已經不夠\"}"
+    },
+    {
+      "id": "r/hypotheses/1/category",
+      "kind": "record",
+      "path": "r/hypotheses/1/category",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"方法\""
+    },
+    {
+      "id": "r/hypotheses/1/id",
+      "kind": "record",
+      "path": "r/hypotheses/1/id",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"H2\""
+    },
+    {
+      "id": "r/hypotheses/1/provenance",
+      "kind": "record",
+      "path": "r/hypotheses/1/provenance",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null}"
+    },
+    {
+      "id": "r/hypotheses/1/provenance/authorship_state",
+      "kind": "record",
+      "path": "r/hypotheses/1/provenance/authorship_state",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_ORIGINAL\""
+    },
+    {
+      "id": "r/hypotheses/1/provenance/epistemic_type",
+      "kind": "record",
+      "path": "r/hypotheses/1/provenance/epistemic_type",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_OPINION\""
+    },
+    {
+      "id": "r/hypotheses/1/provenance/locked",
+      "kind": "record",
+      "path": "r/hypotheses/1/provenance/locked",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "null"
+    },
+    {
+      "id": "r/hypotheses/1/statement",
+      "kind": "record",
+      "path": "r/hypotheses/1/statement",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"90 分鐘裡帶領者說明佔 35 分鐘，輪到分享時時間已經不夠\""
+    },
+    {
+      "id": "r/hypotheses/2",
+      "kind": "record",
+      "path": "r/hypotheses/2",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"category\":\"量測\",\"id\":\"H3\",\"provenance\":{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null},\"statement\":\"紀錄表只問「是否達到本次目標洞察」，沒有記誰開口\"}"
+    },
+    {
+      "id": "r/hypotheses/2/category",
+      "kind": "record",
+      "path": "r/hypotheses/2/category",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"量測\""
+    },
+    {
+      "id": "r/hypotheses/2/id",
+      "kind": "record",
+      "path": "r/hypotheses/2/id",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"H3\""
+    },
+    {
+      "id": "r/hypotheses/2/provenance",
+      "kind": "record",
+      "path": "r/hypotheses/2/provenance",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null}"
+    },
+    {
+      "id": "r/hypotheses/2/provenance/authorship_state",
+      "kind": "record",
+      "path": "r/hypotheses/2/provenance/authorship_state",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_ORIGINAL\""
+    },
+    {
+      "id": "r/hypotheses/2/provenance/epistemic_type",
+      "kind": "record",
+      "path": "r/hypotheses/2/provenance/epistemic_type",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_OPINION\""
+    },
+    {
+      "id": "r/hypotheses/2/provenance/locked",
+      "kind": "record",
+      "path": "r/hypotheses/2/provenance/locked",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "null"
+    },
+    {
+      "id": "r/hypotheses/2/statement",
+      "kind": "record",
+      "path": "r/hypotheses/2/statement",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"紀錄表只問「是否達到本次目標洞察」，沒有記誰開口\""
+    },
+    {
+      "id": "r/hypotheses/3",
+      "kind": "record",
+      "path": "r/hypotheses/3",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"category\":\"環境\",\"id\":\"H4\",\"provenance\":{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null},\"statement\":\"線上場大家關著鏡頭，看不到彼此的作品\"}"
+    },
+    {
+      "id": "r/hypotheses/3/category",
+      "kind": "record",
+      "path": "r/hypotheses/3/category",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"環境\""
+    },
+    {
+      "id": "r/hypotheses/3/id",
+      "kind": "record",
+      "path": "r/hypotheses/3/id",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"H4\""
+    },
+    {
+      "id": "r/hypotheses/3/provenance",
+      "kind": "record",
+      "path": "r/hypotheses/3/provenance",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null}"
+    },
+    {
+      "id": "r/hypotheses/3/provenance/authorship_state",
+      "kind": "record",
+      "path": "r/hypotheses/3/provenance/authorship_state",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_ORIGINAL\""
+    },
+    {
+      "id": "r/hypotheses/3/provenance/epistemic_type",
+      "kind": "record",
+      "path": "r/hypotheses/3/provenance/epistemic_type",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_OPINION\""
+    },
+    {
+      "id": "r/hypotheses/3/provenance/locked",
+      "kind": "record",
+      "path": "r/hypotheses/3/provenance/locked",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "null"
+    },
+    {
+      "id": "r/hypotheses/3/statement",
+      "kind": "record",
+      "path": "r/hypotheses/3/statement",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"線上場大家關著鏡頭，看不到彼此的作品\""
+    },
+    {
+      "id": "r/hypotheses/4",
+      "kind": "record",
+      "path": "r/hypotheses/4",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"category\":\"材料\",\"id\":\"H5\",\"provenance\":{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null},\"statement\":\"第 4 次起換成比較難掌握的媒材，作品比較不敢拿出來\"}"
+    },
+    {
+      "id": "r/hypotheses/4/category",
+      "kind": "record",
+      "path": "r/hypotheses/4/category",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"材料\""
+    },
+    {
+      "id": "r/hypotheses/4/id",
+      "kind": "record",
+      "path": "r/hypotheses/4/id",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"H5\""
+    },
+    {
+      "id": "r/hypotheses/4/provenance",
+      "kind": "record",
+      "path": "r/hypotheses/4/provenance",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null}"
+    },
+    {
+      "id": "r/hypotheses/4/provenance/authorship_state",
+      "kind": "record",
+      "path": "r/hypotheses/4/provenance/authorship_state",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_ORIGINAL\""
+    },
+    {
+      "id": "r/hypotheses/4/provenance/epistemic_type",
+      "kind": "record",
+      "path": "r/hypotheses/4/provenance/epistemic_type",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_OPINION\""
+    },
+    {
+      "id": "r/hypotheses/4/provenance/locked",
+      "kind": "record",
+      "path": "r/hypotheses/4/provenance/locked",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "null"
+    },
+    {
+      "id": "r/hypotheses/4/statement",
+      "kind": "record",
+      "path": "r/hypotheses/4/statement",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"第 4 次起換成比較難掌握的媒材，作品比較不敢拿出來\""
+    },
+    {
+      "id": "r/hypotheses/5",
+      "kind": "record",
+      "path": "r/hypotheses/5",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"category\":\"人\",\"id\":\"H6\",\"provenance\":{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null},\"statement\":\"參與者彼此還不熟，怕說錯話\"}"
+    },
+    {
+      "id": "r/hypotheses/5/category",
+      "kind": "record",
+      "path": "r/hypotheses/5/category",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"人\""
+    },
+    {
+      "id": "r/hypotheses/5/id",
+      "kind": "record",
+      "path": "r/hypotheses/5/id",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"H6\""
+    },
+    {
+      "id": "r/hypotheses/5/provenance",
+      "kind": "record",
+      "path": "r/hypotheses/5/provenance",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"authorship_state\":\"HUMAN_ORIGINAL\",\"epistemic_type\":\"HUMAN_OPINION\",\"locked\":null}"
+    },
+    {
+      "id": "r/hypotheses/5/provenance/authorship_state",
+      "kind": "record",
+      "path": "r/hypotheses/5/provenance/authorship_state",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_ORIGINAL\""
+    },
+    {
+      "id": "r/hypotheses/5/provenance/epistemic_type",
+      "kind": "record",
+      "path": "r/hypotheses/5/provenance/epistemic_type",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"HUMAN_OPINION\""
+    },
+    {
+      "id": "r/hypotheses/5/provenance/locked",
+      "kind": "record",
+      "path": "r/hypotheses/5/provenance/locked",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "null"
+    },
+    {
+      "id": "r/hypotheses/5/statement",
+      "kind": "record",
+      "path": "r/hypotheses/5/statement",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"參與者彼此還不熟，怕說錯話\""
+    },
+    {
+      "id": "r/problem_statement_ref",
+      "kind": "record",
+      "path": "r/problem_statement_ref",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"PROB-EDD1\""
+    },
+    {
+      "id": "r/problem_summary",
+      "kind": "record",
+      "path": "r/problem_summary",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次有 6 位。三期都是從第 4 次開始往下掉。\""
+    },
+    {
+      "id": "r/promotion",
+      "kind": "record",
+      "path": "r/promotion",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "{\"ready_for_promotion\":false,\"validation_methods_applied\":[]}"
+    },
+    {
+      "id": "r/promotion/ready_for_promotion",
+      "kind": "record",
+      "path": "r/promotion/ready_for_promotion",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "false"
+    },
+    {
+      "id": "r/promotion/validation_methods_applied",
+      "kind": "record",
+      "path": "r/promotion/validation_methods_applied",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "[]"
+    },
+    {
+      "id": "r/suggested_categories",
+      "kind": "record",
+      "path": "r/suggested_categories",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "[\"人\",\"方法\",\"量測\",\"環境\",\"材料\"]"
+    },
+    {
+      "id": "r/suggested_categories/0",
+      "kind": "record",
+      "path": "r/suggested_categories/0",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"人\""
+    },
+    {
+      "id": "r/suggested_categories/1",
+      "kind": "record",
+      "path": "r/suggested_categories/1",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"方法\""
+    },
+    {
+      "id": "r/suggested_categories/2",
+      "kind": "record",
+      "path": "r/suggested_categories/2",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"量測\""
+    },
+    {
+      "id": "r/suggested_categories/3",
+      "kind": "record",
+      "path": "r/suggested_categories/3",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"環境\""
+    },
+    {
+      "id": "r/suggested_categories/4",
+      "kind": "record",
+      "path": "r/suggested_categories/4",
+      "sha256": "a5b5e34f2339eb7aed7c1b65a9697e52f50a544d6a10a42e9aadc322d063f8c0",
+      "value": "\"材料\""
+    }
+  ]
+}
