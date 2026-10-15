@@ -1441,7 +1441,10 @@
   - **待驗收（CS）**：操作者用非粉專角色 FB 帳號傳訊 Soulful 粉專要求真人 → 應收到確認句＋問名字 → 回名字。起點 05:12:21Z（cs_ai_replies 6 列）。驗：`cs_ai_replies` 新列 completed_at 非 NULL；Chatwoot 該對話有公開確認句；聯絡人名字從 John Doe 變成回答。
   - ✅ 2026-10-15 三扇門＋買斷＝[ADR 018](docs/architecture/decisions/018-product-doors-and-buyout-delivery.md)（SOP §18、AGENTS §0 指標、`products.ts` 欄位＋測試擋）；⑥ 程式完成、⑤ 程式完成（未部署）。WORKLOG 2026-10-15「產品三扇門」條目。
   - ✅ 2026-10-15 ⑤⑥ 上線：social.aware-wave.com 開門（DNS、憑證、兩層 nginx、next-admin `4c4e153a7`），WORKLOG 續30；ContentStudio 舊面板換成帶品牌的連結、next-admin 改每天台灣 03:00 自動部署＋部署前 migration 閘，WORKLOG 續31。
-  - **剩**：操作者在 social 網址用員工帳號登入看一次（未驗）；品牌成員管理畫面（成員列目前只能 SQL 加）。建議模型：Opus 5.5
+  - ✅ 2026-10-15 品牌成員管理：0103（email 找帳號、改角色、移除、最後一位擁有者留下）＋ `/api/social/members`（只限擁有者）＋設定頁「成員」，WORKLOG「社群品牌成員管理」條目。
+  - **剩**：操作者在 social 網址用員工帳號登入看一次（未驗）。
+  - **前置條件（db-expert 2026-10-15 M1）**：portal 註冊開放（`PORTAL_SIGNUP_ENABLED`）之前，註冊要真的驗證 email（現在 `email_confirm:true` 不驗）——否則有人搶註別人的 email、被加成員就拿到該品牌；或成員改成邀請制。見 `app/portal/api/signup/route.ts` KNOWN V1 GAP。
+  - **後續（db-expert m1）**：既有 migration 裡 `SECURITY DEFINER` 函式的 `search_path = public, pg_temp` 改成 `''`（superuser 擁有、public 可被 postgres 建函式，2026-10-15 查 `postgres` 對 public 有 CREATE）；0103 已改。建議模型：Opus 5.5
   - `▶️ 收尾中` · `2026-10-15`
 
 ### 2026-09-20 — Claude+Codex 共用資產稽核（結案）

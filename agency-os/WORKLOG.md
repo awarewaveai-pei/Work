@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-15（續38）社群品牌成員管理：0103 RPC（email 找帳號、改角色、移除、最後一位擁有者留下）＋ /api/social/members（只限擁有者）＋設定頁「成員」區塊；暫停：0103 未套、未推送
+
+**做了**（操作者「在這裡執行此任務：社群品牌成員管理畫面」→「0103 套到正式庫 部署 commit push」）：
+- `lobster-factory/packages/db/migrations/0103_social_brand_members.sql`：`social_list_members`（security definer 讀 auth.users 的 email）、`social_add_member`（lower(email)、未刪除、非匿名；對到兩個帳號＝22023 拒絕；重複＝SC409）、`social_lock_members_for_change`（鎖該品牌成員列，最後一個 owner 列不能降級或移除＝SC409）、`social_set_member_role`、`social_remove_member`；每個動作同一交易寫 `social_audit_log`（只記 user id 與角色，不記 email）；只給 service_role。down 檔＋本機 Postgres 15.8 驗證腳本（`packages/db/scripts/0103_social_brand_members{_down.sql,-local-verify.sh,-local-verify.sql}`）。
+- next-admin：`lib/social/store.ts` listMembers／addMember／setMemberRole／removeMember，`MEMBER_REFUSALS` 把資料庫錯誤換成固定中文＋狀態碼（其他錯誤仍 500）；`app/api/social/members/route.ts`（GET／POST／PATCH／DELETE，全部 `requireBrandRole(["owner"])`，清單有 email）；`Members.tsx`（設定頁「成員」：角色用按鈕、移除要確認、email 加入）；LogView 加三個動作名稱與角色摘要；Review.tsx、review.ts 過期說明改掉。
+- 審查後修（db-expert 1M/4m、Codex 第一輪 1，與 M1 同一件）：不變量＝「帳號只能透過本人證明過的 email 拿到品牌角色」——0103 加 `email_confirmed_at is not null`；portal 註冊用 `email_confirm:true` 不驗證就確認，所以 `app/portal/api/signup/route.ts` 加 `SIGNUP_VERIFIES_EMAIL = false`，環境變數全開也不開（測試 `closed-until-email-verified.test.ts`），要等確認信流程做好才改；兩個 security definer 函式 `search_path = ''`（definer＝superuser，正式庫 `postgres` 對 public 有 CREATE）；加成員改 `on conflict do nothing`＋SC409（併發不漏出 23505 原文）；本機驗證加未確認帳號＋兩個連線同時降級兩位擁有者（一個被拒）。authz.ts 註解講準確（擁有者會拿到成員 user id 當操作把手）。擁有者能試探 email 有沒有帳號（m3）：只限品牌擁有者，接受。TASKS 開兩項：portal 註冊前先做 email 驗證、其他舊 definer 函式改 search_path。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash packages/db/scripts/0103_social_brand_members-local-verify.sh`（postgres:15.8-alpine）→ `SOCIAL_0103_{BEHAVIOUR,ACCESS}_OK`、down 留表、重套、冪等 | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit -p .`＋`npx vitest run`（257 files／2390 passed；新增 routes.test.ts 成員兩則、members-store.test.ts 5 則） | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（拋棄式 worktree D:/tmp/mut-members）：members 路由 OWNER 放寬成四種角色 → routes.test 紅、還原綠；0103 最後一位 owner 檢查改 `if false` → 本機驗證腳本紅、還原綠 | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機驗證（修正後）加併發段：兩個連線同時降級兩位擁有者 → 一個 SC409、剩一位擁有者；scratch 複本拿掉 `for update` → 腳本報「concurrent demotions both passed」紅、還原綠 | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin tsc＋`npx vitest run`（258 files／2396 passed）；註冊門測試把常數改 true → 紅、還原綠（就地改後立即還原，grep 確認 `= false` 1 筆） | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/4n -- db-expert（0C/1M/4m，M1、m1、m2、m4 已修，m3 接受）＋Codex `agency-os/reports/oracle/2026-10-15-partialreview-9a3d08d3.md`（1，＝M1，已修）
+- ORACLE_WAIVED: 修正後的 Codex 第二輪在存檔時還在跑（scratchpad oracle-members2.log）；本 commit 是暫停存檔、不推送，續做時先讀第二輪結果再套 0103
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`social_brand_members`、`要等登入帶出個人身分`、`need the user id in the`、`member_add` | hits=22（`social_brand_members` 19 檔、`member_add` 3 檔，皆現行定義與本次文件；過期說法 `要等登入帶出個人身分`、`need the user id in the` 0 筆；`social_brand_members` 命中皆為現行定義與本次文件；SOCIAL_MANAGER_PLAN C8／C12-6、ADR 018 需跟進同步改）
+
+**剩（續做順序）**：① 讀 Codex 第二輪結果（`agency-os/reports/oracle/` 最新 partialreview）② 操作者已同意：`node scripts/apply-db-migration.mjs 0103` ③ push ④ 部署（當晚 03:00 自動，或手動 sg-deploy，migration 閘會先檢查）⑤ 在 social 設定頁實際加一位成員驗收。另：成員只能加「已有帳號」的人，帳號目前由 AwareWave 開（客戶自助註冊屬 V2 的 WordPress 會員一鍵進入）；email 加入時回「沒有帳號」會讓擁有者知道某 email 有沒有帳號（只限品牌擁有者，接受）。
+
+**rollback**：程式 `git revert`（下一晚自動部署或手動 sg-deploy）；資料庫 `packages/db/scripts/0103_social_brand_members_down.sql`（只刪函式，成員列保留；先撤程式再撤函式）。
 ## 2026-10-15（續37）Soulful AI 層知識門檻校準：0.5 擋掉 6 題可答的 5 題 → 每客戶可設 `kbMinRetrievalScore`，Soulful 0.40（程式未部署；確認句修正 `1c316c638` 已部署並真測送達）
 
 **操作者問**：「資料庫有對應→自動回覆；沒有→AI 找答案；AI 無法回→真人，不是這樣嗎？」真測「我最近壓力很大，適合來嗎？」直接轉真人（收到確認句＋問名字 ✅ `1c316c638` 部署後），但網站明明有壓力模組頁。

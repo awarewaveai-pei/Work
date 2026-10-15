@@ -46,6 +46,8 @@ export interface NeedsResult {
   review: Array<{ id: string; body: string; scheduled_at: string | null }>;
   n: number;
 }
+/** /api/social/members (0103); owners only */
+export interface Member { user_id: string; email: string | null; role: import("@/lib/social/state").BrandRole; created_at: string }
 export interface MediaItem { id: string; kind: string; file_name: string; postiz_path: string | null; bytes: number | null; created_at: string; used?: number }
 
 export const api = {
@@ -77,6 +79,10 @@ export const api = {
   needs: (brand: string) => call<NeedsResult>("GET", `/api/social/needs?${q({ brand })}`),
   settings: (brand: string) => call<{ requireReview: boolean }>("GET", `/api/social/settings?${q({ brand })}`),
   setRequireReview: (brand: string, requireReview: boolean) => call<{ requireReview: boolean }>("PUT", "/api/social/settings", { brand, requireReview }),
+  members: (brand: string) => call<{ members: Member[] }>("GET", `/api/social/members?${q({ brand })}`),
+  addMember: (brand: string, email: string, role: string) => call<{ userId: string }>("POST", "/api/social/members", { brand, email, role }),
+  setMemberRole: (brand: string, userId: string, role: string) => call<object>("PATCH", "/api/social/members", { brand, userId, role }),
+  removeMember: (brand: string, userId: string) => call<object>("DELETE", `/api/social/members?${q({ brand, userId })}`),
   texts: (brand: string) => call<{ texts: Array<{ id: string; body: string }> }>("GET", `/api/social/texts?${q({ brand })}`),
   addText: (brand: string, body: string) => call<{ text: { id: string; body: string } }>("POST", "/api/social/texts", { brand, body }),
   deleteText: (brand: string, id: string) => call<object>("DELETE", `/api/social/texts?${q({ brand, id })}`),

@@ -5,8 +5,7 @@
 //     waiting for review. One query set, used by the header count and the log's 「需處理」 filter (C11).
 //   * Telegram goes through the ops inbox (ingestIncident -> the operator Telegram notifier): a failed post (raised by
 //     the sender, dispatch.ts), a channel that expired (reconcileAccounts, daily), a post submitted for review.
-// V1 roles come from ops_role (authz.ts); per-person brand members (social_brand_members) need the user id in the
-// middleware's identity headers -- an auth change, listed for go-ahead with C12.
+// Who is owner / reviewer on a brand: authz.ts roleOn (member rows, managed in the social manager, 0103; else ops_role).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { ingestIncident } from "@/lib/ops-inbox/ingest";

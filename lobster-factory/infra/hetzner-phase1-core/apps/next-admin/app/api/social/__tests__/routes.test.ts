@@ -7,6 +7,7 @@ const store = vi.hoisted(() => ({
   listPosts: vi.fn(), getPost: vi.fn(), getPostAt: vi.fn(), savePost: vi.fn(), setState: vi.fn(), accountPlatforms: vi.fn(),
   listLists: vi.fn(), saveList: vi.fn(), deleteList: vi.fn(), listMedia: vi.fn(), addImage: vi.fn(), listLog: vi.fn(), releasePost: vi.fn(),
   listTrash: vi.fn(), listTexts: vi.fn(), addText: vi.fn(), deleteText: vi.fn(),
+  listMembers: vi.fn(), addMember: vi.fn(), setMemberRole: vi.fn(), removeMember: vi.fn(),
 }));
 const postiz = vi.hoisted(() => ({ listPosts: vi.fn(), deletePost: vi.fn() }));
 const rotation = vi.hoisted(() => ({ materializeList: vi.fn(), listQueue: vi.fn(), reorderList: vi.fn(), deleteList: vi.fn(), nextPosition: vi.fn() }));
@@ -286,5 +287,38 @@ describe("/api/social routes", () => {
     expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "operator" }, { brand: A, version: 3, fields: { body: "x" } }), ctx(P))).status).toBe(409);
     expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "operator" }, { brand: A, version: 3, fields: { notes: "n" } }), ctx(P))).status).toBe(200);
     expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "owner" }, { brand: A, version: 3, fields: { body: "x" } }), ctx(P))).status).toBe(200);
+  });
+});
+
+// ADR 018 §3, migration 0103: only a brand's owner sees and changes its members (the list carries emails)
+describe("/api/social/members", () => {
+  it("owners only: an editor, a viewer and the brand's own client are refused on every method", async () => {
+    const { GET, POST, PATCH, DELETE } = await import("../members/route");
+    for (const who of [{ role: "operator" }, { role: "viewer" }, { client: A }] as const) {
+      expect((await GET(req("GET", `/api/social/members?brand=${A}`, who))).status).toBe(403);
+      expect((await POST(req("POST", "/api/social/members", who, { brand: A, email: "ann@example.com", role: "editor" }))).status).toBe(403);
+      expect((await PATCH(req("PATCH", "/api/social/members", who, { brand: A, userId: P, role: "owner" }))).status).toBe(403);
+      expect((await DELETE(req("DELETE", `/api/social/members?brand=${A}&userId=${P}`, who))).status).toBe(403);
+    }
+    expect(store.listMembers).not.toHaveBeenCalled();
+    expect(store.addMember).not.toHaveBeenCalled();
+    expect(store.setMemberRole).not.toHaveBeenCalled();
+    expect(store.removeMember).not.toHaveBeenCalled();
+  });
+
+  it("an owner lists, adds by email, changes a role and removes; bad input never reaches the store", async () => {
+    const { GET, POST, PATCH, DELETE } = await import("../members/route");
+    store.listMembers.mockResolvedValue([{ user_id: P, email: "ann@example.com", role: "editor", created_at: "2026-10-15T00:00:00Z" }]);
+    expect((await (await GET(req("GET", `/api/social/members?brand=${A}`))).json()).members).toHaveLength(1);
+    expect((await POST(req("POST", "/api/social/members", { role: "owner" }, { brand: A, email: "not-an-email", role: "editor" }))).status).toBe(400);
+    expect((await POST(req("POST", "/api/social/members", { role: "owner" }, { brand: A, email: "ann@example.com", role: "boss" }))).status).toBe(400);
+    expect(store.addMember).not.toHaveBeenCalled();
+    store.addMember.mockResolvedValue(P);
+    expect((await POST(req("POST", "/api/social/members", { role: "owner" }, { brand: A, email: " ann@example.com ", role: "reviewer" }))).status).toBe(200);
+    expect(store.addMember).toHaveBeenCalledWith(A, "ann@example.com", "reviewer", "ops:owner");
+    expect((await PATCH(req("PATCH", "/api/social/members", { role: "admin" }, { brand: A, userId: P, role: "owner" }))).status).toBe(200);
+    expect(store.setMemberRole).toHaveBeenCalledWith(A, P, "owner", "ops:admin");
+    expect((await DELETE(req("DELETE", `/api/social/members?brand=${A}&userId=${P}`))).status).toBe(200);
+    expect(store.removeMember).toHaveBeenCalledWith(A, P, "ops:owner");
   });
 });

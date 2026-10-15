@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type LogRow, type NeedsResult } from "./api";
 import { platformOf, shortDate, STATE_NAMES, zoned } from "./model";
 import type { SlotContext } from "./SocialManager";
+import { ROLE_NAMES } from "./Members";
 import type { PostState } from "@/lib/social/state";
 
 export const ACTION_NAMES: Record<string, string> = {
@@ -15,6 +16,7 @@ export const ACTION_NAMES: Record<string, string> = {
   rotation_post: "輪播排入", rotation_withdraw: "輪播撤回", rotation_reorder: "輪播排序", review_setting: "審核設定",
   connect_start: "開始連接帳號", connected: "帳號已連接", connect_cancel: "取消連接", unlink: "移除帳號",
   list_save: "儲存輪播清單", list_delete: "刪除輪播清單", media_upload: "上傳媒體",
+  member_add: "加入成員", member_role: "改成員角色", member_remove: "移除成員",
 };
 
 // actor = "ops:<role>[:<user id>]" | "client:<org>[:<user id>]" | "system:..." (lib/social/authz.ts actorOf)
@@ -24,6 +26,12 @@ const who = (actor: string) => actor.startsWith("system:") ? "系統" : actor.st
 function summary(row: LogRow, tz: string): string {
   const d = row.detail ?? {};
   const parts: string[] = [];
+  // member_* rows carry roles (0103), not post states; no email is logged
+  if (row.action.startsWith("member_")) {
+    const name = (r: unknown) => (typeof r === "string" && r in ROLE_NAMES ? ROLE_NAMES[r as keyof typeof ROLE_NAMES] : String(r));
+    if (typeof d.from === "string" && typeof d.to === "string") return `${name(d.from)} → ${name(d.to)}`;
+    return typeof d.role === "string" ? name(d.role) : "";
+  }
   if (typeof d.from === "string" && typeof d.to === "string") parts.push(`${STATE_NAMES[d.from as PostState] ?? d.from} → ${STATE_NAMES[d.to as PostState] ?? d.to}`);
   if (typeof d.scheduled_at === "string") { const z = zoned(d.scheduled_at, tz); parts.push(`${shortDate(z.date)} ${z.time}`); }
   if (typeof d.reason === "string") parts.push(`理由：${d.reason}`);

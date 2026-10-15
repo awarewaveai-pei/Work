@@ -61,7 +61,7 @@
 - 範圍：清單 CRUD（C4 `lists`）＋ Trigger.dev 任務 `social-rotation`（每日 00:05 把未來 7 天的輪播發文具體化成 `scheduled` 貼文並前推 cursor；清單暫停時撤回尚未 `queued` 的）。畫面：左「輪播」檢視＋右清單編輯（照樣稿）。
 - 驗收：具體化冪等（同一天跑兩次不重複）；暫停撤回測試。
 
-### C8 審核與角色與通知 ✅ 程式 2026-10-15（決定：審核預設不必經，每品牌「發文前要先審核」開關，`0102_social_review.sql`＋`lib/social/review.ts`；每品牌指定成員／審核人要等 middleware 帶出使用者 id——身分層，併 C12 的 go-ahead）
+### C8 審核與角色與通知 ✅ 程式 2026-10-15（決定：審核預設不必經，每品牌「發文前要先審核」開關，`0102_social_review.sql`＋`lib/social/review.ts`；每品牌成員／審核人：C12 第 6 點帶出使用者 id，2026-10-15 設定頁「成員」可管理，0103）
 - 範圍：品牌成員表＋角色（C1 已建表）；`reviewer` 核准／退回＋理由進備註與紀錄；通知：`error`、`expired`、等待審核 → `needs()` 同款查詢供「通知 N」；Telegram 用既有 ops 通知管道。
 - 先決定：審核是不是必經。現在 editor 可以從 draft 直接排程，owner 核准後 editor 也還能改內容（`lib/social/state.ts` RULES）。
 - 驗收：角色矩陣測試（4 角色 × 6 動作）。
@@ -89,7 +89,7 @@
   3. Trigger deploy（`trigger-deploy-agent`，`tr_pat_*`）：`social-dispatch`、`social-rotation`。
   4. C5 驗收：排一則 Bluesky 貼文 → draft 模式送出 → Postiz 出現 DRAFT 且 `postiz_post_id` 回寫 → 刪掉 → 改 `SOCIAL_DISPATCH_MODE=apply`。
   5. ✅ 2026-10-15 上線（DNS、憑證 11 SAN、主機 nginx、lobster-nginx、sg-deploy `4c4e153a7`；證據 WORKLOG 2026-10-15 C12 ⑤⑥ 上線條目）。未做：ContentStudio 的 Postiz 面板換連結。以下為當時的步驟：子網域（規則＝ADR 018 三扇門）。程式已完成：`lib/portal/doors.ts`、middleware 把 social 網址的頁面改寫到 `/social`（`app/social/`，不套員工側欄）、其他 API 404；登入 cookie 不跨子網域，social 網址自己登入。repo 已寫好 lobster-nginx `nginx/default.conf` social 區塊（擋 matcher 跳過的路徑與編碼路徑）與主機 `sg-stack.aware-wave.com.conf` server_name。**上線待 go**：Cloudflare DNS `social`（proxied）→ 憑證加 social（`/etc/letsencrypt/live/aware-wave.com` 2026-10-15 查：SAN 10 個網址，沒有 social；用該憑證原本的簽發方式 expand）→ 主機 nginx（`safe-infra-patch.sh host-nginx`）→ lobster-nginx（`safe-infra-patch.sh nginx`）→ `sg-deploy.sh next-admin` → `/playwright smoke`＋social 網址實測（未登入轉 /login、/api/ops 404、員工登入看得到社群）；ContentStudio 的 Postiz 面板換成「到社群發文」連結。
-  6. ✅ 程式 2026-10-15：middleware 帶 `x-ops-user-id`；`authz.ts` 讀 `social_brand_members`（成員列優先，員工 owner/admin 全品牌 owner）；客戶不能開新頻道連接（時間配對只對員工安全）、看不到員工角色與 user id。成員管理畫面未做（目前只能 SQL 加成員）。隨 5 一起部署。
+  6. ✅ 程式 2026-10-15：middleware 帶 `x-ops-user-id`；`authz.ts` 讀 `social_brand_members`（成員列優先，員工 owner/admin 全品牌 owner）；客戶不能開新頻道連接（時間配對只對員工安全）、看不到員工角色與 user id。2026-10-15 成員管理也完成：0103 RPC＋`/api/social/members`（只限擁有者）＋設定頁「成員」。
 
 ## 2. V2（開放訂閱前）
 `social_audit_log` 保留期限或按月分割（每則貼文約 2 列，768 MB 主機）；WordPress 會員一鍵進入（ADR 015 §2）；方案與用量上限＋WooCommerce；Postiz analytics（審核後）；Chatwoot 入口與未讀數；最佳時段；重複貼文；find-slot 佇列；對外 API／MCP；服務條款、隱私政策、資料刪除；第二台 Postiz 的 instance 對應。

@@ -62,7 +62,8 @@ export function requireStaffForNewChannel(req: Request): void {
   if (resolveTenant(req).userKind !== "staff") throw new BrandAccessError("forbidden: new channels are connected by AwareWave staff");
 }
 
-/** What the audit log shows a viewer: customers never see staff roles or anyone's auth user id. */
+/** What the audit log shows a viewer: customers never see staff roles or auth user ids there. (A brand's owners do get
+ *  their members' user ids from /api/social/members: the handle for changing or removing one.) */
 export function actorForViewer(actor: string, viewer: "staff" | "client"): string {
   if (viewer === "staff") return actor;
   if (actor.startsWith("ops:")) return "ops";

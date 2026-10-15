@@ -1,7 +1,7 @@
 "use client";
 // 審核與通知 (SOCIAL_MANAGER_PLAN.md C8). The header's 「通知 N」 (lib/social/review.ts needs), the reviewer's approve /
 // reject bar in the editor, and the brand's 「要先審核」 setting (owner only; migration 0102).
-// V1 roles come from ops_role (lib/social/authz.ts): owner/admin = 擁有者 (approves), operator = 編輯, viewer = 唯讀.
+// Roles: a member row on the brand (Members.tsx, 0103), else ops_role (lib/social/authz.ts roleOn): owner/admin = 擁有者, operator = 編輯, viewer = 唯讀.
 import { useEffect, useState } from "react";
 import { api, ApiError } from "./api";
 import { instantAt, zoned, type Brand, type Post } from "./model";
@@ -29,7 +29,7 @@ export function ReviewSetting({ ctx }: { ctx: SlotContext }) {
         ))}
       </div>
       <span className="sm-muted">要審核時：編輯只能送審，擁有者核准或退回；已核准的貼文，編輯要先取消排程才能改內容。</span>
-      <span className="sm-muted">角色目前跟著後台帳號：擁有者／管理員＝擁有者（可核准），操作員＝編輯，檢視者＝唯讀。每個品牌各自指定成員與審核人，要等登入帶出個人身分後才開（上線清單）。</span>
+      <span className="sm-muted">沒有加成員的後台帳號照後台角色：擁有者／管理員＝擁有者（可核准），操作員＝編輯，檢視者＝唯讀。每個品牌的成員與審核人在下面「成員」指定。</span>
     </div>
   );
 }

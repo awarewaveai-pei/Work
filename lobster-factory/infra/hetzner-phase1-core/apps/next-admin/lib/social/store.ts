@@ -58,6 +58,49 @@ export async function memberRoles(userId: string): Promise<Map<string, BrandRole
   return new Map((data ?? []).map((r: { organization_id: string; role: BrandRole }) => [r.organization_id, r.role]));
 }
 
+// ---- members (0103) -------------------------------------------------------------------------------------------
+
+export interface Member { user_id: string; email: string | null; role: BrandRole; created_at: string }
+
+/** The member functions' refusals in words a brand owner can act on (customers see these; the database text is not). */
+const MEMBER_REFUSALS: Array<[string, RegExp, 400 | 404 | 409, string]> = [
+  ["SC404", /no account/, 404, "這個 email 還沒有帳號：請對方先註冊，或請 AwareWave 開帳號"],
+  ["SC404", /not a member/, 404, "這個人已經不是此品牌的成員"],
+  ["SC409", /already a member/, 409, "這個人已經是此品牌的成員"],
+  ["SC409", /last owner/, 409, "品牌至少要留一位擁有者：先把另一位成員設成擁有者"],
+  ["22023", /more than one account/, 409, "這個 email 對到不只一個帳號，請聯絡 AwareWave 處理"],
+  ["22023", /role must be/, 400, "角色只能是擁有者、編輯、審核人或唯讀"],
+];
+function memberFail(error: { code?: string; message: string }, what: string): never {
+  const hit = MEMBER_REFUSALS.find(([code, re]) => error.code === code && re.test(error.message));
+  if (hit) throw new SocialStoreError(hit[2], hit[3]);
+  fail(error, what);
+}
+
+export async function listMembers(brandId: string): Promise<Member[]> {
+  const { data, error } = await db().rpc("social_list_members", { p_org: brandId });
+  if (error) memberFail(error, "members");
+  return (data ?? []) as Member[];
+}
+
+/** By email; the account must exist (0103 social_add_member). Returns the member's user id. */
+export async function addMember(brandId: string, email: string, role: BrandRole, actor: string): Promise<string> {
+  const { data, error } = await db().rpc("social_add_member", { p_org: brandId, p_email: email, p_role: role, p_actor: actor });
+  if (error) memberFail(error, "add member");
+  return data as string;
+}
+
+/** The last owner row stays (0103 social_lock_members_for_change). */
+export async function setMemberRole(brandId: string, userId: string, role: BrandRole, actor: string): Promise<void> {
+  const { error } = await db().rpc("social_set_member_role", { p_org: brandId, p_user: userId, p_role: role, p_actor: actor });
+  if (error) memberFail(error, "member role");
+}
+
+export async function removeMember(brandId: string, userId: string, actor: string): Promise<void> {
+  const { error } = await db().rpc("social_remove_member", { p_org: brandId, p_user: userId, p_actor: actor });
+  if (error) memberFail(error, "remove member");
+}
+
 // ---- accounts -------------------------------------------------------------------------------------------------
 
 export interface Account { id: string; platform: string; label: string; status: "connected" | "expired" | "disabled"; postiz_integration_id: string }

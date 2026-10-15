@@ -4,6 +4,10 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { verifyTurnstileToken } from "@/lib/turnstile";
 import { DEFAULT_SIGNUP_PRODUCT, isSelfSignupProductKey, type ProductKey } from "@/lib/portal/products";
 
+/** false while createUser below pre-confirms the email without proof (KNOWN V1 GAP): the route stays closed. Flip only
+ *  together with a confirmation-email flow -- an unproven email can be added to a brand (0103, /api/social/members). */
+const SIGNUP_VERIFIES_EMAIL = false;
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -33,7 +37,12 @@ export const dynamic = "force-dynamic";
 //   flow yet. Bounded by: (a) middleware.ts denies any user_kind=client session outside
 //   /portal/* (critic finding C2 fix), so a signed-up-but-unverified email cannot reach the
 //   admin console; (b) email-enumeration is not observable (see M5 fix below). Must still be
-//   revisited before opening signup beyond a small invite list.
+//   revisited before opening signup beyond a small invite list. Since 0103 (2026-10-15) (a) no longer
+//   bounds it: a brand owner adds members by email (/api/social/members) and the member gets a role on
+//   that brand, so an unverified signup for someone else's address would be handed their brand. Verify
+//   email ownership here before PORTAL_SIGNUP_ENABLED opens (TASKS), or make members invitations.
+//   Enforced, not just written: SIGNUP_VERIFIES_EMAIL (top of file) keeps this route closed whatever the env says
+//   until a confirmation-email flow replaces email_confirm:true and flips it (with its own review).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const SIGNUP_WINDOW_MIN = 10;
@@ -87,7 +96,7 @@ export async function POST(request: Request) {
   // vars with no dependency enforced between them) would open a service-role-backed,
   // unauthenticated account-creation endpoint to bots with ZERO captcha protection. Both are
   // now required together -- there is no partially-open state.
-  if (process.env.PORTAL_SIGNUP_ENABLED !== "true" || !process.env.TURNSTILE_SECRET_KEY) {
+  if (!SIGNUP_VERIFIES_EMAIL || process.env.PORTAL_SIGNUP_ENABLED !== "true" || !process.env.TURNSTILE_SECRET_KEY) {
     return NextResponse.json(
       { ok: false, error: "coming_soon", message: "Portal signup is coming soon." },
       { status: 503 },
