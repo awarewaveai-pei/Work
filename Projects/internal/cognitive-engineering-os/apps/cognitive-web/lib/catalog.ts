@@ -64,6 +64,8 @@ export const loadCatalog: () => Promise<Catalog> = makeCatalogLoader();
 
 /** A tool a person may be offered: not an engineering one (ENTRY_SLICE1_CHECKLIST.md item 5). Every list, count and
  *  recommendation a person sees goes through this or userGoals; a tool reached by its own address still opens. */
+/** A tool by id: its own key only (an id like "constructor" is not a tool). The tool page and middleware.ts ask this one. */
+export const toolOf = (catalog: Catalog, id: string): Method | null => (Object.hasOwn(catalog.methods, id) ? catalog.methods[id] : null);
 export const isUserTool = (catalog: Catalog, id: string): boolean => catalog.methods[id]?.block !== "INTERNAL";
 
 /** What 先說你卡在哪 (components/StuckBox) reads, and all the browser gets of the catalog there: the example situations

@@ -24,6 +24,34 @@
 **剩**（都要操作者 go，High-STOP）：⑤ 上線＝Cloudflare DNS `social` 記錄、憑證 expand 加 social、主機 nginx `sg-stack.aware-wave.com.conf` server_name 加 social（repo 已改）、lobster-nginx `default.conf` social 區塊（repo 已寫）→ `sg-deploy.sh next-admin` → smoke；ContentStudio 舊 Postiz 面板換連結。產品門的 `/login` 仍是員工版登入頁、產品門上 AI 改寫按鈕（`/api/content/syndicate`）404（付費 AI 等 ADR 017 權利表）。social 網址上 matcher 跳過的路徑已由 vhost 擋（只在 vhost 套上後生效）。成員管理畫面（成員列目前只能 SQL 加）＝下一張卡。另一個 session 的 gmail OAuth callback 改動不在本 commit。
 
 **rollback**：`git revert <commit>`；本次無 migration、無環境變數、未部署。
+## 2026-10-15（續24）認知平台：不存在的網址真的回 404——middleware 在串流前先判斷（`(shell)` 整類；未部署）
+
+**根因**: `app/(shell)/loading.tsx`（與各層 re-export）讓回應在頁面跑完前就開始串流；頁面之後才呼叫 `notFound()`，畫面是 not-found，狀態碼已經送出 200。`/methods/<不存在>`、`/learn/<不存在>`、`/learn/workflow/<不存在>`、`/projects/demo/<工具>/<不存在的領域>` 都是 200；`/projects/<不存在>`、`/projects/<id>/analyses/<不存在>`、`/groups/<不存在>`、`/methods/<不存在>/run` 是用戶端頁，連 not-found 都不是，也是 200（2026-10-15 本機 curl 全 200）。
+
+**做了**:
+- `apps/cognitive-web/lib/known-address.ts`：每個 `(shell)` 動態頁一條規則，各自問「那一頁讀的同一個東西」——工具 `toolOf(catalog)`、課 `lessonOf`、示範 `demoOf`（`DEMOS`＋`DEMO_FIXTURES`），或帶訪客 cookie 打同一條 API（`/methods/<id>/form`、`/projects/<id>`、`/interpretations/<id>`、`/groups/<id>`）。只有 API 回 404 才算不存在；401／5xx／3 秒逾時／連不上 = 不知道 → 照舊放行（頁面自己決定，狀態同以前）。
+- `middleware.ts`：登入檢查後，GET/HEAD 且非 RSC（連結點擊、prefetch 的資料請求，非 200 會讓用戶端整頁重載）時問 `knownAddress`；`false` → `NextResponse.rewrite(同網址, { status: 404 })`：狀態 404、頁面照常畫自己的 not-found（loading 畫面對慢但存在的頁不變）。
+- 頁面與 middleware 共用同一函式：工具頁改用 `toolOf`（`Object.hasOwn`，`/methods/constructor` 以前會拿到原型上的函式）、示範頁改用 `demoOf`（`/projects/demo/constructor` 以前 `DEMOS["constructor"].find` 直接 500）。
+- 機械閘 `lib/known-address.test.ts`：走 `app/(shell)` 每個 `page.tsx`——有 `[id]` 的頁沒有自己的規則、或規則認領了靜態頁（如 `/projects/new`）→ 紅；API 只有 404 才算不存在（401 不會變 404）。
+- 順手：`projects/demo/[method]/loading.tsx` re-export（`c76fde717` 起 `loading.test.ts` 就紅）；`invite.test.ts` 因 middleware 變 async 改成 await。
+- e2e `tests/e2e/cognitive/not-found-status.spec.ts`（新）；`demos.spec.ts` 未知領域改斷言 404。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=COS_TEST_MOCK_API=1 PLAYWRIGHT_COS_URL=http://localhost:3930 npx playwright test --project=cognitive not-found-status.spec.ts demos.spec.ts → 3 passed（工具／課／工作流課／示範 200 vs 404、`/methods/constructor` 404、真瀏覽器開未知領域 404 且畫 not-found；測試帳號自己的專案與 `/govern` 200、未知專案／其子頁／未知分析 404、`/projects/new` 200） | exit=0 | ms=8200
+- REALTEST_EVIDENCE: tool=curl | cmd=改前 8 個網址（有效與未知）全 200；改後未知工具／課／示範／專案／分析／群組／run 404、有效 200、`HEAD /learn/nope` 404、`/help` 200；404 頁內容仍是 "This page could not be found" | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=curl | cmd=本機 dev DB 建暫時群組 → `/groups/<id>` 與 `/lead` 200、`/groups/no-such-group` 404 → DELETE 抹除 → 同一網址 404 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run → tsc 0；56 files / 468 passed | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（拋棄式副本 scratchpad/mut1，非共享樹）：拿掉 `except new`／刪 groups 規則／401 當不存在 → known-address.test 各自變紅，還原變綠 | exit=0 | ms=9000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex `agency-os/reports/oracle/2026-10-15-partialreview-e3f288b2.md` F1（工具網址的判斷等 `loadCatalog()`，它沒有逾時；API 收了連線不回 → middleware 卡到平台逾時）→ 成立。不變量：middleware 等的每個判斷都有上限 → 上限搬到 `knownAddress` 本身（`Promise.race`，3 秒後 null），蓋住所有規則，不是只補 catalog；新測試「永不回答的規則到期是 null」，拿掉 race → 紅、還原 → 綠；e2e 重跑 3 passed。
+  - critic（Deep，opus）：0 Critical／0 Major；登入閘與改前等價、轉送 cookie 無 SSRF／外洩。3 Minor：m1 `except new` 連 `/projects/new/<x>`（Next 給 projects/[id]）也排除 → 改成只在規則本身的網址生效（本機 `/projects/new/act` 200→404、`/projects/new` 仍 200）；m2 API「沒這條路由」的 404（`{"detail":"Not Found"}`：COS_API_ORIGIN 或版本不對）會讓每個專案頁變 404 → 每條 probe 只認自己的代碼（`PROJECT_NOT_FOUND`／`INTERPRETATION_NOT_FOUND`／`GROUP_NOT_FOUND`／`METHOD_RESOLUTION_BLOCKED`，本機 curl 確認原文），其餘 null；兩個各一條測試、突變拿掉 → 紅、還原 → 綠；m3 probe 打的是完整讀取端點（API 工作量加倍、最壞延後 loading 3 s）→ 要 API 加輕量存在端點，開 TASKS（不在本筆改 API）。
+- ORACLE_WAIVED: Codex 之後只改了 F1 的上限與 critic m1／m2；vitest 468、tsc 0、e2e 3 passed（重跑兩次）、每個新守衛突變紅綠
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory/infra/hetzner-phase1-core/tests | grep=middleware\(|DEMO_FIXTURES\[|DEMOS\[|404 狀態|its HTTP status is | hits=11
+  - 不計 `.next/` 建置輸出。`middleware(` 呼叫只有 `invite.test.ts`（已改 await）＋定義本身；`main.py` 2 處是 FastAPI `add_middleware`、`lessonkit.py` 的 `mk.DEMOS` 是 Python 端，皆無關；`DEMOS[`／`DEMO_FIXTURES[` 在 web 只剩 `known-address.ts`；`404 狀態` 在 `TASKS.md`（本筆移除）、`.agency-state/open-tasks-snapshot.md`、`.agency-state/ao-resume-hook-last.log`（AO-RESUME 產生，下次重生）、`handoffs/2026-10-15-cos-tool-template-apply.md`（歷史交接，不改）。
+
+**剩餘風險**: 未部署（High，需操作者 go）。專案／分析／群組／run 頁的第一次整頁載入多一次 API GET（本機約 0.1 s；任一規則 3 s 沒答就放行），串流要等它；分析頁的 probe 讀整份分析（同頁面讀的）。RSC 請求（站內點連結）不經判斷，狀態由 Next 自己給。正式機 edge middleware 讀 `COS_API_ORIGIN`（Dockerfile ENV；edge sandbox 複製整個 `process.env`，`next/dist/server/web/sandbox/context.js:101`），部署後要再 curl 一次正式站。
+
+**rollback**: `git revert`（純 web 程式與測試，無資料、無設定）。
 ## 2026-10-15（續23）認知平台：示範結果頁通用化（每個工具、每個領域一份）；本機開發環境改用本機 PostgreSQL（工具模板 §15.1 第 3 項，未部署）
 
 **根因**: 示範結果頁寫死冰山（`projects/demo/iceberg` 讀 `fixtures/demo-iceberg.json`），說明書「看一個完整分析頁」是佔位按鈕，「我的案子」只列冰山一列；第二個工具起每加一份示範就得改程式。另：本機開發啟動器 `launch_cos_dev.ps1` 停在 SQLite 時代，換 PostgreSQL 後本機 API 一啟動就 `DB_URLS_MISSING`，本機無法真跑任何分析。

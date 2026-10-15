@@ -27,8 +27,8 @@ test('every demo result page opens with its nine sections, read-only', async ({ 
     await expect(page.getByText('示範分析（免費，不花錢）'), entry.href).toBeVisible();
     await expect(page.locator(`[data-method="${entry.method}"]`).first(), entry.href).toBeAttached();   // card ② is this tool's picture
   }
-  // an unknown domain is the not-found page; its HTTP status is 200 like every not-found under (shell) (TASKS.md follow-up)
-  await page.goto(`/projects/demo/${entries[0].method}/no-such-domain`);
+  // an unknown domain is the not-found page, status 404 (cognitive-web middleware.ts; not-found-status.spec.ts covers the rest)
+  expect((await page.goto(`/projects/demo/${entries[0].method}/no-such-domain`))?.status()).toBe(404);
   await expect(page.getByRole('heading', { name: 'This page could not be found.' })).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('[data-section]')).toHaveCount(0);
   await page.goto('/projects/demo/iceberg');

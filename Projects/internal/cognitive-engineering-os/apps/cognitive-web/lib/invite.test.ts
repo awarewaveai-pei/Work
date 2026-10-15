@@ -50,9 +50,9 @@ describe("邀請連結 (2026-10-13: the link sent a visitor to the login page)",
     expect(calls).toEqual([["/auth/login", { email: "b@example.com", password: "pw" }], ["/invites/accept", { token: "T" }]]);
   });
 
-  it("the invite page opens without a session; other pages still go to login", () => {
+  it("the invite page opens without a session; other pages still go to login", async () => {
     const at = (path: string) => middleware(new NextRequest(new URL(`https://cognitive.aware-wave.com${path}`)));
-    expect(at("/invite").headers.get("location")).toBeNull();
-    expect(at("/projects").headers.get("location")).toBe("https://cognitive.aware-wave.com/login");
+    expect((await at("/invite")).headers.get("location")).toBeNull();
+    expect((await at("/projects")).headers.get("location")).toBe("https://cognitive.aware-wave.com/login");
   });
 });

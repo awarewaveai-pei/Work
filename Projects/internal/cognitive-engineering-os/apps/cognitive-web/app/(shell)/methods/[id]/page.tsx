@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { dirHref, goalOf, loadCatalog, runHref, shownAbbr, toolHref, toolsOfGoal, workflowHref } from "../../../../lib/catalog";
+import { dirHref, goalOf, loadCatalog, runHref, shownAbbr, toolHref, toolOf, toolsOfGoal, workflowHref } from "../../../../lib/catalog";
 import { lessonHref } from "../../../../lib/lessons";
 
 // A tool's own page (mockkit render_tool_pages, docs/mockups/home-mock.html article.tpage): what it does, how to start,
@@ -10,8 +10,8 @@ export default async function ToolPage({ params, searchParams }: { params: Promi
   const id = decodeURIComponent((await params).id);
   const project = (await searchParams).project;
   const catalog = await loadCatalog();
-  const m = catalog.methods[id];
-  if (!m) notFound();
+  const m = toolOf(catalog, id);
+  if (!m) notFound();   // middleware.ts has already set the 404 status (lib/known-address.ts)
   const goal = goalOf(catalog, id);
   const abbr = shownAbbr(m);
   const wfs = catalog.recipes.filter((r) => r.steps.includes(id));
