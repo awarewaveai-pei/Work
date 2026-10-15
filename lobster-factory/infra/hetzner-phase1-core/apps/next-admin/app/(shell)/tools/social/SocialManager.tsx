@@ -66,11 +66,22 @@ export default function SocialManager({ slots = {} }: { slots?: Slots }) {
   const [attachRequest, setAttachRequest] = useState<{ id: string; n: number } | null>(null);
   const [logFilter, setLogFilter] = useState<"all" | "needs">("all");
 
+  // the URL names the brand on screen, so a reload or a shared link reopens this brand (the ?brand= rule above)
+  const pickBrand = useCallback((id: string) => {
+    setBrandId(id); setAnchor(null);
+    const url = new URL(window.location.href);
+    url.searchParams.set("brand", id);
+    window.history.replaceState(null, "", url);
+  }, []);
+
   useEffect(() => {
     api.brands().then((r) => {
       setBrands(r.brands);
-      const fromUrl = new URLSearchParams(window.location.search).get("brand");
-      setBrandId(r.brands.find((b) => b.id === fromUrl)?.id ?? r.brands[0]?.id ?? null);
+      // a link that names a brand opens that brand or none: falling back to the first one would put the work in someone else's
+      const wanted = new URLSearchParams(window.location.search).get("brand");
+      const hit = wanted ? r.brands.find((b) => b.id === wanted) : undefined;
+      if (wanted && !hit) say("連結指定的品牌不存在，或你沒有這個品牌的權限。請選一個品牌。", true);
+      setBrandId(wanted ? hit?.id ?? null : r.brands[0]?.id ?? null);
     }).catch((e) => say(e instanceof Error ? e.message : String(e), true));
   }, [say]);
 
@@ -187,7 +198,14 @@ export default function SocialManager({ slots = {} }: { slots?: Slots }) {
   }
 
   if (brands && !brands.length) return <div className="sm-app"><div className="sm-head"><h1>社群發文</h1><span className="sm-muted">你還沒有可以管理的品牌。</span></div></div>;
-  if (!brand || !ctx) return <div className="sm-app"><div className="sm-head"><h1>社群發文</h1>{note && <span className="sm-err">{note.text}</span>}</div></div>;
+  if (!brand || !ctx) return (
+    <div className="sm-app"><div className="sm-head"><h1>社群發文</h1>
+      {!!brands?.length && <span className="sm-chips"><span className="sm-lab">品牌</span>
+        {brands.map((b) => <button type="button" key={b.id} onClick={() => { pickBrand(b.id); setNote(null); }}>{b.name}</button>)}
+      </span>}
+      {note && <span className="sm-err">{note.text}</span>}
+    </div></div>
+  );
 
   const calendarView = view === "week" || view === "month";
   const rangeLabel = view === "week"
@@ -207,7 +225,7 @@ export default function SocialManager({ slots = {} }: { slots?: Slots }) {
       <header className="sm-head">
         <h1>社群發文</h1>
         <span className="sm-chips"><span className="sm-lab">品牌</span>
-          {brands?.map((b) => <button type="button" key={b.id} className={b.id === brand.id ? "sm-on" : ""} onClick={() => { setBrandId(b.id); setAnchor(null); }}>{b.name}</button>)}
+          {brands?.map((b) => <button type="button" key={b.id} className={b.id === brand.id ? "sm-on" : ""} onClick={() => pickBrand(b.id)}>{b.name}</button>)}
         </span>
         <span className="sm-muted">時區 {tz}</span>
         {slots.headerExtra?.(ctx)}

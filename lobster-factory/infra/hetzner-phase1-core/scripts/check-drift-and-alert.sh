@@ -7,7 +7,8 @@
 # Dedupe: only alerts once per (deployed_commit, origin_head) pair — avoids
 # spamming the channel every day if the user simply hasn't deployed yet.
 #
-# Schedule: cron daily 01:00 UTC (09:00 Asia/Taipei).
+# Schedule: cron daily 20:00 UTC (04:00 Asia/Taipei), an hour after the nightly auto-deploy (19:00 UTC): drift
+# here means tonight's deploy did not happen (DEPLOY_HOLD, a failed gate, or a failed deploy).
 # Logs: /var/log/sg-deploy-drift.log
 #
 # Manual:

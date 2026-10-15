@@ -52,7 +52,8 @@
 | 面向 | 位置 |
 |---|---|
 | 強制 | `sg-deploy.sh` 步驟 1.85（讀 `origin/main:DEPLOY_HOLD`，refuse 並印 `reason=`） |
-| 自動路徑 | `auto-deploy-next-admin.sh`（cron `0 3,7,11,15,19,23` UTC）有 hold 就跳過，**不發 Slack／Telegram**；`check-drift-and-alert.sh`（cron `0 1` UTC 每日 drift 提醒）同樣靜音 — 否則兩支都在叫人部署 hold 正要擋的東西 |
+| 自動路徑 | `auto-deploy-next-admin.sh`（cron `0 19` UTC＝台灣 03:00，每天一次，操作者 2026-10-15）有 hold 就跳過，**不發 Slack／Telegram**；`check-drift-and-alert.sh`（cron `0 20` UTC＝台灣 04:00，部署後一小時；還有落差＝當晚沒部署成）同樣靜音 — 否則兩支都在叫人部署 hold 正要擋的東西 |
+| migration 閘 | `sg-deploy.sh` 步驟 1.86 跑 `check-migrations-applied.sh`：repo 有、正式庫帳本（`schema_migrations`）沒有的 migration 存在 → 拒絕部署並發警報（exit 1，不是 75）。先 `node scripts/apply-db-migration.mjs <號碼>`；程式確定不需要那些 migration 才用 `MIGRATION_GATE_OVERRIDE=1`。讀不到帳本（exit 2）一律擋、不可 override。只檢查 next-admin／node-api 的部署；`--dry-run` 只報告。**套完 migration 立刻手動部署**，別等當晚：會取代或改簽名的函式（如 0101）一套上，線上舊程式就可能壞——這種改動先「擴充」（新舊並存）、程式上線後再「收斂」（刪舊）。auto-deploy 失敗警報會寫出是 migration 閘擋下（`.migration-gate-failed` 第一行＝exit code） |
 | 腳本新鮮度 | 上面兩支 cron 腳本決策前先跑 `sync-host-scripts.sh`（主機 `scripts/` = `origin/main`），自身被換掉就 re-exec 新版 → 改它們的邏輯下一個 tick 就生效。2026-09-23 07:00Z 的「auto-deploy FAILED」誤報就是舊版 caller（無 hold 檢查）先決策造成 |
 | 浮出 | `check-smoke-tests.ps1` 的 `deploy_hold` → AO-RESUME §1 每次開工都看得到；> 14 天升 `warn:hold_stale_<N>d` |
 | 也會提醒 | `check-deploy-drift.ps1`／`/check-drift`／AO-CLOSE 的 deploy hint：有 hold 時改印「不要跑 sg-deploy」 |

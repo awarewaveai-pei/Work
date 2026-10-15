@@ -742,34 +742,11 @@ export default function ContentStudio() {
   const [synContent,  setSynContent]  = useState<Record<string, string>>({});
   const [synCopied,   setSynCopied]   = useState<Record<string, boolean>>({});
 
-  // Postiz social publish panel
-  type PostizChannel = { postizIntegrationId: string; platform: string; label: string; status: string };
-  const [postizChannels,     setPostizChannels]     = useState<PostizChannel[]>([]);
-  const [postizChLoading,    setPostizChLoading]    = useState(false);
-  const [postizChError,      setPostizChError]      = useState("");
-  const [postizSelected,     setPostizSelected]     = useState<Set<string>>(new Set());
-  const [postizCustomText,   setPostizCustomText]   = useState<Record<string, string>>({});
-  const [postizMode,         setPostizMode]         = useState<"draft" | "now">("draft");
   // "none" = text-only | "image" = attach hero/social image | "video" = attach generated video (per-platform format routing)
-  // Document-level property — controls both copy generation style AND Postiz attachment. Positioned before generate button.
+  // Document-level property — controls the copy generation style. Positioned before generate button.
   const [distMediaType,      setDistMediaType]      = useState<"none" | "image" | "video">("none");
   // true when distMediaType changed after copy was generated → prompt user to re-generate
   const [synStale,           setSynStale]           = useState(false);
-  const [postizPushStatus,   setPostizPushStatus]   = useState<"idle" | "pushing" | "done" | "error">("idle");
-  const [postizPushResults,  setPostizPushResults]  = useState<Array<{ platform: string; status: "ok" | "error"; error?: string }>>([]);
-  const [postizShowConfirm,  setPostizShowConfirm]  = useState(false);
-  const [postizPushError,    setPostizPushError]    = useState("");
-
-  // Channels belong to the selected site's org: another site = another org's accounts, so a loaded
-  // list, the selection and the last push result are all stale.
-  // A push still in flight when the site changes resolves into the new site's panel -- it compares
-  // the site it started for against this ref and drops its result.
-  const postizSiteRef = useRef(selectedSiteId);
-  useEffect(() => {
-    postizSiteRef.current = selectedSiteId;
-    setPostizChannels([]); setPostizSelected(new Set()); setPostizChError("");
-    setPostizPushStatus("idle"); setPostizPushResults([]); setPostizShowConfirm(false); setPostizPushError("");
-  }, [selectedSiteId]);
 
   // Mark copy stale when distribution media type changes after copy already generated
   useEffect(() => {
@@ -1800,7 +1777,7 @@ export default function ContentStudio() {
               clearInterval(videoPollRef.current!); videoPollRef.current = null;
               setVideoStatus("error"); setVideoError("影片輸出 URL 不存在"); return;
             }
-            // Save all output URLs so the Postiz social-publish flow can send per-platform formats.
+            // Save all output URLs: the distribution section offers video only once one exists.
             setVideoOutputUrls(sj.video.outputs as Record<string, string>);
             clearInterval(videoPollRef.current!); videoPollRef.current = null;
             // 同 handlePublish：embed-to-wp 會**改寫**客戶站上的文章內容，沒選定客戶時
@@ -1843,87 +1820,6 @@ export default function ContentStudio() {
       else                       { setSynStatus("error"); }
       if (json._cost) addCostLine({ route: "content/syndicate", model: json._cost.model, vendor: json._cost.vendor, usd: json._cost.usd, kind: "text" });
     } catch { setSynStatus("error"); }
-  }
-
-  // ─── Postiz social publish ────────────────────────────────────────────────
-
-  function getSynContentForPlatform(platform: string): string {
-    if (platform === "x") return synContent["twitter_single"] ?? synContent["twitter_thread"] ?? "";
-    return synContent[platform] ?? "";
-  }
-
-  async function loadPostizChannels() {
-    if (!selectedSiteId) { setPostizChError("請先選擇目標客戶"); return; }
-    if (postizChLoading) return;
-    setPostizChLoading(true); setPostizChError("");
-    try {
-      const res = await fetch(`/api/content/social-channels?siteId=${encodeURIComponent(selectedSiteId)}`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => null) as { error?: string } | null;
-        setPostizChError(res.status === 422 ? "此網站尚未綁定客戶組織，無法使用社群發文" : `載入社群帳號失敗${err?.error ? `：${err.error}` : ""}`);
-        return;
-      }
-      const json = await res.json() as { ok: boolean; channels?: PostizChannel[] };
-      setPostizChannels(json.channels ?? []);
-      if ((json.channels ?? []).length === 0) setPostizChError("此客戶尚無連結的 Postiz 帳號，請至客戶 Hub「社群頻道」設定");
-    } catch { setPostizChError("載入失敗，請重試"); }
-    finally { setPostizChLoading(false); }
-  }
-
-  async function handlePostizPublish(confirmed: boolean) {
-    const posts = [...postizSelected].map(platform => ({
-      platform,
-      content: postizCustomText[platform] ?? getSynContentForPlatform(platform),
-    })).filter(p => p.content.trim());
-
-    if (posts.length === 0) { setPostizChError("所選頻道內容皆為空，請填入貼文內容"); return; }
-
-    if (postizMode === "now" && !confirmed) {
-      setPostizShowConfirm(true);
-      return;
-    }
-
-    setPostizPushStatus("pushing");
-    setPostizShowConfirm(false);
-    const pushSite = selectedSiteId;
-    try {
-      const res = await fetch("/api/content/social-publish", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          siteId: selectedSiteId,
-          mode: postizMode,
-          platforms: posts,
-          imageUrl: distMediaType === "image" && imgResult ? imgResult.imageUrl : undefined,
-          videoUrls: distMediaType === "video" && Object.keys(videoOutputUrls).length > 0
-            ? videoOutputUrls as Partial<Record<"16x9" | "9x16" | "4x5", string>>
-            : undefined,
-          confirmPublishNow: postizMode === "now" && confirmed ? true : undefined,
-        }),
-      });
-      // Text first: some refusals are plain text (publish-now denied, Postiz not configured).
-      const text = await res.text();
-      let json: {
-        ok: boolean;
-        error?: string;
-        results?: Array<{ platform: string; status: "ok" | "error"; error?: string }>;
-        skipped?: Array<{ platform: string; status: string; error: string }>;
-      };
-      try { json = JSON.parse(text); } catch { json = { ok: false, error: text.trim().slice(0, 200) }; }
-      if (postizSiteRef.current !== pushSite) return;
-      if (json.ok) {
-        setPostizPushStatus("done");
-        const skippedAsResults = (json.skipped ?? []).map(s => ({ platform: s.platform, status: "error" as const, error: s.error }));
-        setPostizPushResults([...(json.results ?? []), ...skippedAsResults]);
-      } else {
-        setPostizPushStatus("error");
-        setPostizPushError(json.error || `HTTP ${res.status}`);
-      }
-    } catch {
-      if (postizSiteRef.current !== pushSite) return;
-      setPostizPushStatus("error");
-      setPostizPushError("");
-    }
   }
 
   // ─── Newsletter (FluentCRM draft, never sends) ─────────────────────────────
@@ -3682,7 +3578,7 @@ export default function ContentStudio() {
               <div style={{ fontSize: "12px", color: "var(--text-muted)", padding: "8px 0", textAlign: "center" }}>⏳ 請先生成文章後才能使用</div>
             ) : (
               <>
-                {/* Distribution media type — must be set BEFORE generating copy (affects copy style + Postiz attachment) */}
+                {/* Distribution media type — must be set BEFORE generating copy (affects copy style) */}
                 <div style={{ marginBottom: 10 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6, color: "var(--text-secondary)" }}>
                     附加媒體（影響文案風格與發佈附件）
@@ -3780,101 +3676,13 @@ export default function ContentStudio() {
                       );
                     })}
 
-                    {/* ── 推送到 Postiz ── */}
-                    <div style={{ borderTop: "1px solid var(--card-border)", paddingTop: 14, marginTop: 4 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-                        <span style={{ fontSize: 13, fontWeight: 600 }}>📤 推送到 Postiz</span>
-                        <button className="btn-secondary" style={{ fontSize: 11, padding: "3px 10px" }}
-                          onClick={() => void loadPostizChannels()} disabled={postizChLoading}>
-                          {postizChLoading ? "載入中…" : postizChannels.length > 0 ? "重新載入" : "載入帳號"}
-                        </button>
-                      </div>
-                      {postizChError && (
-                        <div style={{ fontSize: 12, color: "var(--red)", marginBottom: 8 }}>{postizChError}</div>
-                      )}
-                      {postizChannels.filter(c => c.status === "connected").length > 0 && (
-                        <>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
-                            {postizChannels.filter(c => c.status === "connected").map(ch => {
-                              const synText = getSynContentForPlatform(ch.platform);
-                              const isSelected = postizSelected.has(ch.platform);
-                              const displayContent = postizCustomText[ch.platform] ?? synText;
-                              return (
-                                <div key={ch.platform} style={{
-                                  border: `1px solid ${isSelected ? "var(--accent)" : "var(--card-border)"}`,
-                                  borderRadius: 6, padding: "8px 10px",
-                                  background: isSelected ? "#f0fdf4" : "var(--bg-canvas)",
-                                }}>
-                                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                                    <input type="checkbox" checked={isSelected}
-                                      onChange={e => setPostizSelected(prev => {
-                                        const next = new Set(prev);
-                                        if (e.target.checked) next.add(ch.platform); else next.delete(ch.platform);
-                                        return next;
-                                      })} />
-                                    <span style={{ fontSize: 12, fontWeight: 600 }}>{ch.label}</span>
-                                    <span style={{ fontSize: 11, color: "var(--text-muted)" }}>({ch.platform})</span>
-                                    {!synText && <span style={{ fontSize: 11, color: "var(--yellow)" }}>需手動填入內容</span>}
-                                  </label>
-                                  {isSelected && (
-                                    <textarea
-                                      value={displayContent}
-                                      onChange={e => setPostizCustomText(prev => ({ ...prev, [ch.platform]: e.target.value }))}
-                                      style={{
-                                        width: "100%", minHeight: 64, marginTop: 6, fontSize: 11,
-                                        fontFamily: "inherit", padding: 6, borderRadius: 4,
-                                        border: "1px solid var(--card-border)", boxSizing: "border-box",
-                                        background: "var(--bg-page)", resize: "vertical",
-                                      }}
-                                      placeholder={synText ? "" : `${ch.platform} 貼文內容`}
-                                    />
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10 }}>
-                            {(["draft", "now"] as const).map(m => (
-                              <button key={m} onClick={() => setPostizMode(m)}
-                                style={{
-                                  padding: "5px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
-                                  border: "1px solid", cursor: "pointer",
-                                  background: postizMode === m ? "var(--accent)" : "transparent",
-                                  color: postizMode === m ? "#fff" : "var(--text-secondary)",
-                                  borderColor: postizMode === m ? "var(--accent)" : "var(--card-border)",
-                                }}>
-                                {m === "draft" ? "建草稿" : "立即發佈"}
-                              </button>
-                            ))}
-                            {postizMode === "now" && (
-                              <span style={{ fontSize: 11, color: "#f59e0b" }}>⚠ 立即推送，無法撤回</span>
-                            )}
-                          </div>
-
-                          <button className="btn-primary" style={{ fontSize: 12, padding: "6px 18px" }}
-                            onClick={() => void handlePostizPublish(false)}
-                            disabled={postizPushStatus === "pushing" || postizSelected.size === 0}>
-                            {postizPushStatus === "pushing"
-                              ? "推送中…"
-                              : postizMode === "draft" ? "建立 Postiz 草稿" : "立即發佈到社群"}
-                          </button>
-
-                          {postizPushStatus === "done" && postizPushResults.length > 0 && (
-                            <div style={{ marginTop: 10 }}>
-                              {postizPushResults.map(r => (
-                                <div key={r.platform} style={{ fontSize: 12, color: r.status === "ok" ? "var(--green)" : "var(--red)" }}>
-                                  {r.status === "ok" ? "✓" : "✗"} {r.platform}
-                                  {r.status === "error" && r.error && <span style={{ marginLeft: 4, color: "var(--red)" }}>{r.error}</span>}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {postizPushStatus === "error" && (
-                            <div style={{ fontSize: 12, color: "var(--red)", marginTop: 6 }}>推送失敗：{postizPushError || "連線失敗，請重試"}</div>
-                          )}
-                        </>
-                      )}
+                    {/* Sending moved to the social manager (ADR 016; SOCIAL_MANAGER_PLAN C12): schedule, review and send there. */}
+                    <div style={{ borderTop: "1px solid var(--card-border)", paddingTop: 14, marginTop: 4, display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>排程、審核、送出都在社群發文。上面的貼文可以複製過去。</span>
+                      {/* the brand = this site's organization; never a link without it (the social manager would open another brand). New tab: the generated copy above lives only in this page's state */}
+                      {currentSite?.organization_id
+                        ? <a href={`/tools/social?brand=${encodeURIComponent(currentSite.organization_id)}`} target="_blank" rel="noopener noreferrer" className="btn-secondary" style={{ fontSize: 13 }}>到社群發文</a>
+                        : <span style={{ fontSize: 13, color: "var(--text-muted)" }}>{currentSite ? "這個網站還沒綁定客戶組織，無法直接開它的社群發文" : "先選客戶"}</span>}
                     </div>
                   </div>
                 )}
@@ -4576,49 +4384,6 @@ export default function ContentStudio() {
         </div>
       )}
 
-      {/* ── Postiz 立即發佈二次確認 modal ── */}
-      {postizShowConfirm && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-          display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999,
-        }}>
-          <div style={{
-            background: "var(--bg-canvas, #fff)", borderRadius: 10, padding: "24px 28px",
-            maxWidth: 440, width: "90%", boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
-          }}>
-            <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>確認立即發佈？</div>
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 14 }}>
-              以下頻道將立即推送，發佈後無法撤回：
-            </div>
-            <ul style={{ margin: "0 0 16px 0", paddingLeft: 20 }}>
-              {[...postizSelected].map(p => (
-                <li key={p} style={{ fontSize: 13, marginBottom: 4 }}>{p}</li>
-              ))}
-            </ul>
-            {distMediaType === "image" && imgResult && (
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-                附帶圖片：{imgResult.spec.label}
-              </div>
-            )}
-            {distMediaType === "video" && Object.keys(videoOutputUrls).length > 0 && (
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 16 }}>
-                附帶影片（{Object.keys(videoOutputUrls).join("、")} 比例，依各平台自動路由）
-              </div>
-            )}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button className="btn-secondary" style={{ fontSize: 13 }}
-                onClick={() => setPostizShowConfirm(false)}>
-                取消
-              </button>
-              <button className="btn-primary" style={{ fontSize: 13, background: "#dc2626", borderColor: "#dc2626" }}
-                onClick={() => void handlePostizPublish(true)}
-                disabled={postizPushStatus === "pushing"}>
-                {postizPushStatus === "pushing" ? "推送中…" : "確認發佈"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

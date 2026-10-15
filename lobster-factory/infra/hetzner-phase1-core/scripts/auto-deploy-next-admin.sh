@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # auto-deploy-next-admin.sh -- auto-deploys next-admin when drift vs origin/main is detected.
-# Runs via cron every 4 hours. Logs to /root/lobster-phase1/logs/auto-deploy.log
+# Runs nightly at 19:00 UTC = 03:00 Asia/Taipei (operator 2026-10-15: once a day, at the quietest hour). Logs to /root/lobster-phase1/logs/auto-deploy.log
 # Safe to run manually: bash /root/lobster-phase1/scripts/auto-deploy-next-admin.sh
 # Notification: mirrors check-drift-and-alert.sh -- Slack + Telegram, sourced from .env.
 #
@@ -8,7 +8,7 @@
 # (this script runs it before deciding; on a fresh host sg-deploy.sh step 1.8 installs everything).
 #
 # Crontab (add via crontab -e):
-#   0 3,7,11,15,19,23 * * * /root/lobster-phase1/scripts/auto-deploy-next-admin.sh >> /root/lobster-phase1/logs/auto-deploy.log 2>&1
+#   0 19 * * * /root/lobster-phase1/scripts/auto-deploy-next-admin.sh >> /root/lobster-phase1/logs/auto-deploy.log 2>&1
 
 set -euo pipefail
 
@@ -193,6 +193,17 @@ else
             ROLLBACK_SUFFIX="\n\n🔴 AUTO-ROLLBACK FIRED BUT RESTORE FAILED: ${_rb}\n(URGENT: prod may be running the failed build -- manual check)"
         fi
         log "ROLLBACK flag detected: $_rb"
+    fi
+    # sg-deploy step 1.86 refused; deploying by hand fails the same way. Line 1 of the flag = the gate's exit code.
+    if [[ -f "$DEPLOY_DIR/.migration-gate-failed" ]]; then
+        _mg_rc=$(head -n1 "$DEPLOY_DIR/.migration-gate-failed" 2>/dev/null || echo "rc=?")
+        _mg=$(tail -n +2 "$DEPLOY_DIR/.migration-gate-failed" 2>/dev/null | head -c 800 || echo "?")
+        if [[ "$_mg_rc" == "rc=1" ]]; then
+            ROLLBACK_SUFFIX="${ROLLBACK_SUFFIX}\n\n🟠 被 migration 閘擋下（程式需要的資料庫變更還沒套），手動部署也會一樣失敗：\n${_mg}\n處理：先在筆電跑 node scripts/apply-db-migration.mjs <號碼>，再部署；確定這版程式不需要它們才用 MIGRATION_GATE_OVERRIDE=1。"
+        else
+            ROLLBACK_SUFFIX="${ROLLBACK_SUFFIX}\n\n🟠 migration 閘讀不到正式庫的 migration 帳本（${_mg_rc}），為了安全沒有部署：\n${_mg}\n處理：先查 supabase-db 容器是否正常，再部署。"
+        fi
+        log "MIGRATION GATE flag detected ($_mg_rc)"
     fi
     post_to_ops_inbox "deploy_failed"
 fi

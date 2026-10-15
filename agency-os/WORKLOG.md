@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-15（續31）next-admin 改每天台灣 03:00 自動部署＋部署前 migration 閘；ContentStudio 舊 Postiz 面板換成「到社群發文」連結；CS 待上線兩筆一起部署
+
+**做了**（操作者：「每天凌晨 3 點台灣時間自動部署一次」「檢查哪些還沒部署，都處理好吧」）：
+- 主機 root crontab：`auto-deploy-next-admin.sh` `0 3,7,11,15,19,23` → `0 19`（UTC＝台灣 03:00）；`check-drift-and-alert.sh` `0 1` → `0 20`（部署後一小時；還有落差＝當晚沒部署成）。備份 `/root/lobster-phase1/crontab.bak-20261015T082045Z-nightly-deploy`；主機時區 Etc/UTC。腳本表頭、`DEPLOY_ROLLBACK_RUNBOOK.md`、`SCHEDULES_PAGE_PLAN.md` 同步；AGENTS.md §0 一行：推上 main＝當晚上線，不能上的放 `DEPLOY_HOLD`，手動提前部署仍是 High。
+- 新 `lobster-factory/infra/hetzner-phase1-core/scripts/check-migrations-applied.sh`（唯讀；檔案集合同 `apply-db-migration.mjs --status`）＋ `sg-deploy.sh` 步驟 1.86：repo 有、`schema_migrations` 沒有 → 拒絕部署（exit 1 會發警報；`MIGRATION_GATE_OVERRIDE=1` 例外）。理由：每晚自動部署 main，需要未套 migration 的程式會在部署當下壞掉（C12 0101 的情形）。
+- `ContentStudio.tsx`：「推送到 Postiz」面板、它的 state、`loadPostizChannels`／`handlePostizPublish`／`getSynContentForPlatform`、立即發佈確認視窗刪除，換成「到社群發文」連結（ADR 016：面板退場；`/api/content/social-*` 保留，影片交付面板與客戶頁還在用）。AI 生成各平台貼文那段保留。
+- 審查後修（Codex 兩輪 4+2、critic 1M/6m）：閘門比對內容雜湊（CRLF→LF，同 `migrationSha256`），套過又改過的檔也擋；`find`／帳本讀取失敗＝exit 2，override 只能放行 exit 1；帳本用 tab 分隔（檔名可含空白）、psql 加 `timeout 60`；只對 next-admin／node-api 部署檢查，`--dry-run` 只報告；閘門路徑從 `SELF_PATH` 推；`.migration-gate-failed` 第一行記 exit code，auto-deploy 警報依它寫「migration 沒套」或「讀不到帳本」。ContentStudio 連結帶 `?brand=<網站的組織>`（`/api/content/sites` 多回 `organization_id`，清單本來就照租戶過濾）、開新分頁（AI 文案只在頁面 state）；沒網站／沒組織顯示文字不給連結。社群頁 `?brand=` 指到看不到的品牌時不再默默換成第一個，改顯示提示＋品牌按鈕；切品牌同步改網址。`DEPLOY_ROLLBACK_RUNBOOK.md` 寫明：套 migration 後立刻部署；取代函式的 migration 先擴充後收斂。
+- 不變量（Codex 對閘門第二次報）：閘門的三種結果（通過／repo 超前／查不到）在「部署是否放行」與「警報怎麼寫」各自只有一種表示，exit code 一路帶到通知，不在中途壓成「失敗」一個布林。
+- 盤點未部署：next-admin＝CS `c8e57a18d`、`a21321d4b`（無 migration、無新環境變數）＋本條；Trigger workflows、migrations（103/103 已套）、compose 無落差；認知平台 `2e7d70c46` 主機已檢出但 07:58Z 測試閘失敗，另一個 session（COS web 404）正在修，本條不碰。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機跑 `check-migrations-applied.sh`（最終版）：/root/Work → `OK -- 103 … unchanged` exit 0；複製目錄＋改 0100 內容＋`9999_a b.sql` → 兩類各列一個 exit 1；只差 CRLF → exit 0；假 docker 失敗 → `cannot read public.schema_migrations` exit 2 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 harness 執行 sg-deploy 1.86 區塊（假閘門）：rc0→繼續；rc1→FAIL＋flag；rc1+override→繼續；rc2+override→FAIL＋flag；rc1+dry-run→只報告繼續；rc1+hci-app→不檢查 | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit -p .`＋`npx vitest run`（全套 256 files／2381 passed）；`bash -n` sg-deploy.sh、check-migrations-applied.sh、auto-deploy-next-admin.sh | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`crontab -l` 改後兩行 `0 19 … auto-deploy-next-admin.sh`、`0 20 … check-drift-and-alert.sh`；`timedatectl` Etc/UTC | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/6n -- critic（1 Major 新分頁、6 Minor 全修）＋Codex `agency-os/reports/oracle/2026-10-15-partialreview-57f20163.md`（4，全修）、`2026-10-15-partialreview-ac1c9154.md`（2：空白檔名＝審到中途版本已修；exit 2 誤報＝已修）
+- ORACLE_WAIVED: 第二輪 artifact 之後只改了它報的 flag exit code 與 critic 的 6 個 Minor（新分頁、replaceState、路徑、timeout、tab、dry-run），各由 harness／主機實測／tsc／全套測試驗過
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`3,7,11,15,19,23`、`every 4 hours`、`每 4 小時`、`auto-deploy.log`、`loadPostizChannels`、`postizShowConfirm` | hits=5 檔（`auto-repair-A-deploy-status.md`、`CONVERSATION_MEMORY.md`、`POSTIZ_SOCIAL_PUBLISHING_PLAN.md` 是歷史紀錄不改；`SCHEDULES_PAGE_PLAN.md` 是本次改寫的「之前每 4 小時」；另 1 個是 video-service .venv 套件檔不相干；現行說法 0）
+
+**剩**：認知平台部署由 COS session 處理；Soulful CS 部署後三步（貼 14 題問答、開回「啟用 AI 客服」、非角色帳號實測）照 TASKS「Soulful 客服三層」那條，要操作者先改答案。
+
+**rollback**：crontab 用上面的備份 `crontab <file>`；migration 閘 `git revert`（或部署時 `MIGRATION_GATE_OVERRIDE=1`）；ContentStudio `git revert`。
 ## 2026-10-15（續29）認知平台：冰山示範結果頁換成操作者認可的那份分析；課 v2 的設計定案（未部署）
 
 **根因**: 操作者看了冰山五分鐘課和自己的分析（INTERP-E4B3565C…，2026-09-29，claude-sonnet-5）：「五分鐘教學的內容其實不好」「我做的案例目前的內容是我要的」。查下來：(a) 正式站示範 fixture（2026-09-28）比她那份還薄——沒有 ⑧ 下一步、① 改判條件、⑤ 診斷、④ 厚度判定、圖 B 信念層、⑦ ★；(b) 課的「看懂結果」是手寫的另一份字，跟結果頁程式 6 處對不上（三條路／90 天／三個指標／自動重跑／示意圖／串工作流）；(c) 同一層的問題在填寫頁、課、結果頁 ②④⑥ 有 5 種問法。

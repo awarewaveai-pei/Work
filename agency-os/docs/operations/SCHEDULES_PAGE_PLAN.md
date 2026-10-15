@@ -129,7 +129,7 @@ RLS service_role only、REVOKE anon/authenticated、NOTIFY pgrst（照 0081 :40-
 
 ## 5. Slice 1 步驟（順序 = 先不改行為地換引擎 → 再換 UI → 最後切 Trigger）
 
-Low/Medium 直接做；標 **High** 的逐項等操作者 go-ahead。每步完成更新 §0。主機 cron `auto-deploy-next-admin.sh` 每 4 小時從 main 自動部署 next-admin（crontab 2026-10-14），所以**每個 commit 都要能獨立上線**。
+Low/Medium 直接做；標 **High** 的逐項等操作者 go-ahead。每步完成更新 §0。主機 cron `auto-deploy-next-admin.sh` 每天 19:00 UTC（台灣 03:00）從 main 自動部署 next-admin（2026-10-15 起；之前每 4 小時），所以**每個 commit 都要能獨立上線**。
 
 1. 0097 migration + down；`lib/schedules/*`（搬＋jobKey）；generic sweep route；舊 collect route 變 re-export；`collection-schedule` route 改讀新 store（路徑先不動）。測試三支綠、`npx tsc --noEmit` 綠、`npm test` 綠。**行為不變**：Trigger 仍打舊 URL，舊 URL 轉到新 sweep。
 2. **High**：`node scripts/apply-db-migration.mjs --check 0097` → 操作者 go → apply。驗：`client_schedules` 列數 = 原 `collection_schedules` 列數；`collection_schedules` 不存在。

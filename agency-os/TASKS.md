@@ -1441,8 +1441,9 @@
   - ✅ 1→4 已上線 2026-10-15（WORKLOG 續22）；CS `c3ef11ba9` 經操作者在本 session 同意，05:12Z 隨 `e571187a2` 上線（smoke 5/5）。
   - **待驗收（CS）**：操作者用非粉專角色 FB 帳號傳訊 Soulful 粉專要求真人 → 應收到確認句＋問名字 → 回名字。起點 05:12:21Z（cs_ai_replies 6 列）。驗：`cs_ai_replies` 新列 completed_at 非 NULL；Chatwoot 該對話有公開確認句；聯絡人名字從 John Doe 變成回答。
   - ✅ 2026-10-15 三扇門＋買斷＝[ADR 018](docs/architecture/decisions/018-product-doors-and-buyout-delivery.md)（SOP §18、AGENTS §0 指標、`products.ts` 欄位＋測試擋）；⑥ 程式完成、⑤ 程式完成（未部署）。WORKLOG 2026-10-15「產品三扇門」條目。
-  - **下一步（High-STOP，等操作者 go）**：⑤ 上線——DNS `social` → 憑證 expand 加 social（現在 SAN 沒有）→ 主機 nginx → lobster-nginx → `sg-deploy.sh next-admin`（同時帶上 ⑥）→ smoke＋social 網址實測。步驟正本 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md` C12 第 5 點。建議模型：Opus 5.5
-  - `▶️ 待 go` · `2026-10-15` · 之後：品牌成員管理畫面（成員列目前只能 SQL 加）；V2 WP 會員一鍵進入
+  - ✅ 2026-10-15 ⑤⑥ 上線：social.aware-wave.com 開門（DNS、憑證、兩層 nginx、next-admin `4c4e153a7`），WORKLOG 續30；ContentStudio 舊面板換成帶品牌的連結、next-admin 改每天台灣 03:00 自動部署＋部署前 migration 閘，WORKLOG 續31。
+  - **剩**：操作者在 social 網址用員工帳號登入看一次（未驗）；品牌成員管理畫面（成員列目前只能 SQL 加）。建議模型：Opus 5.5
+  - `▶️ 收尾中` · `2026-10-15`
 
 ### 2026-09-20 — Claude+Codex 共用資產稽核（結案）
 

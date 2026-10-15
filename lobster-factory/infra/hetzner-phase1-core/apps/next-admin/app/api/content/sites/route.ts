@@ -57,6 +57,8 @@ export interface ManagedSite {
   createdAt?: string;
   contentDefaults?: SiteContentDefaults;
   org_slug?: string | null;
+  /** The owning organization (0061); the social manager's brand id. Env sites have none. */
+  organization_id?: string | null;
 }
 
 // GET /api/content/sites — list sites (no tokens in response)
@@ -127,6 +129,7 @@ export async function GET(req: Request): Promise<Response> {
           createdAt: r.created_at,
           contentDefaults: r.content_defaults ?? {},
           org_slug,
+          organization_id: r.organization_id,
         };
       });
       return NextResponse.json({ ok: true, sites });

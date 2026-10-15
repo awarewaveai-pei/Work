@@ -182,6 +182,34 @@ if git -C "$REPO_DIR" cat-file -e "origin/main:$HOLD_PATH" 2>/dev/null; then
   fi
 fi
 
+# 1.86. migration gate. Code that needs a migration not yet applied breaks prod at the deploy (C12 0101, 2026-10-15),
+# and the nightly auto-deploy ships whatever main holds. Only apps that read the Supabase database are gated (hci-app
+# has its own). Exit 1 = repo ahead (MIGRATION_GATE_OVERRIDE=1 may continue); exit 2 = could not check (never). The flag
+# file lets auto-deploy-next-admin.sh say why it failed. --dry-run reports and goes on.
+MIG_FLAG="$STAGING_DIR/.migration-gate-failed"
+rm -f "$MIG_FLAG"
+_mig_needed=0
+for _a in "${APPS[@]}"; do case "$_a" in next-admin|node-api) _mig_needed=1 ;; esac; done
+if [[ $_mig_needed -eq 1 ]]; then
+  log "--- migration gate ---"
+  set +e
+  _mig_out="$(bash "$(dirname "$SELF_PATH")/check-migrations-applied.sh" "$REPO_DIR" 2>&1)"
+  _mig_rc=$?
+  set -e
+  printf '%s\n' "$_mig_out" | tee -a "$LOG_FILE"
+  if [[ $_mig_rc -ne 0 && $DRY_RUN -eq 1 ]]; then
+    log "dry-run: the migration gate would refuse this deploy (exit $_mig_rc)"
+  elif [[ $_mig_rc -eq 1 && "${MIGRATION_GATE_OVERRIDE:-0}" == "1" ]]; then
+    log "migration gate: repo ahead of the ledger, MIGRATION_GATE_OVERRIDE=1 set -- continuing (the code must not need those migrations)"
+  elif [[ $_mig_rc -ne 0 ]]; then
+    printf 'rc=%s\n%s\n' "$_mig_rc" "$_mig_out" > "$MIG_FLAG"   # line 1 = exit code: 1 repo ahead, 2 could not check
+    if [[ $_mig_rc -eq 1 ]]; then
+      fail "repo has migrations not applied (or edited after applying) in production -- apply them (scripts/apply-db-migration.mjs), or re-run with MIGRATION_GATE_OVERRIDE=1 when this code does not need them"
+    fi
+    fail "migration gate could not check the ledger (exit $_mig_rc) -- refusing to deploy unverified"
+  fi
+fi
+
 # 2. rsync each app
 # 1.5. pre-build gate — typecheck then tests, only for next-admin, before rsync/snapshot.
 #      Order: tsc first (fast, clean diagnostics) then vitest.
