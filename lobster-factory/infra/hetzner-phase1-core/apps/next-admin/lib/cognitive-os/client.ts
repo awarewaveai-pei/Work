@@ -149,6 +149,11 @@ export function listCognitiveOsProjects(): Promise<CognitiveOsResult<CognitiveOs
   return cognitiveOsFetch<CognitiveOsProject[]>("/projects");
 }
 
+/** 404 with detail `PROJECT_NOT_FOUND: ...` = no such project for this identity (main.py _project_or_404). */
+export function getCognitiveOsProject(projectId: string): Promise<CognitiveOsResult<CognitiveOsProject>> {
+  return cognitiveOsFetch<CognitiveOsProject>(`/projects/${encodeURIComponent(projectId)}`);
+}
+
 export function createCognitiveOsProject(payload: {
   name: string;
   purpose: string;

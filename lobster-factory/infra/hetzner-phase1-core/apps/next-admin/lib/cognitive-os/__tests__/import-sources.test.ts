@@ -19,6 +19,7 @@ vi.mock("@/lib/kb", () => ({
 
 const client = vi.hoisted(() => ({
   listCognitiveOsProjects: vi.fn(),
+  getCognitiveOsProject: vi.fn(),
   createCognitiveOsProject: vi.fn(),
   listCognitiveOsSources: vi.fn(),
   createCognitiveOsSource: vi.fn(),
@@ -160,6 +161,7 @@ describe("importOrganizationSources", () => {
     // the failure path override this explicitly, per markSourceSentToCognitiveOs's real signature
     // (Promise<boolean>, critic finding 2026-09-18: it used to be untyped/unchecked Promise<void>).
     kb.markSourceSentToCognitiveOs.mockResolvedValue(true);
+    client.getCognitiveOsProject.mockResolvedValue({ ok: true, value: {} });
   });
 
   it("creates a Project on first run, imports every eligible source, and reports rejects", async () => {
@@ -255,6 +257,43 @@ describe("importOrganizationSources", () => {
     expect(client.listCognitiveOsProjects).not.toHaveBeenCalled();
     expect(client.createCognitiveOsProject).not.toHaveBeenCalled();
     expect(summary.projectId).toBe("proj-cached");
+  });
+
+  // 2026-10-02: Cognitive OS erased the project a stored id named; every later import was sent into nothing.
+  it("a stored Project that Cognitive OS erased is replaced by a fresh one, the pointer overwritten and the sources re-sent", async () => {
+    orgMeta.byOrgId.set(ORG_ID, { cognitive_os_import_project_id: "proj-erased", some_other_key: "preserved" });
+    client.getCognitiveOsProject.mockResolvedValue({ ok: false, status: 404, error: "PROJECT_NOT_FOUND: 'proj-erased'" });
+    client.listCognitiveOsProjects.mockResolvedValue({ ok: true, value: [] });
+    client.createCognitiveOsProject.mockResolvedValue({ ok: true, value: { project_id: "proj-new" } });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    client.createCognitiveOsSource.mockResolvedValue({ ok: true, value: { source_id: "cos-1" } });
+    // two KB rows with one title, as edd-research really holds: one Cognitive OS source, both rows marked
+    kb.listKnowledgeSources.mockResolvedValue({ items: [{ id: "src-1" }, { id: "src-2" }], total: 2, page: 1, pageSize: 200 });
+    kb.getSourceDetail.mockImplementation((_org: string, id: string) => Promise.resolve(detail({ id, cognitiveOsProjectId: "proj-erased" })));
+
+    const summary = await importOrganizationSources(ORG_ID);
+
+    expect(summary.projectId).toBe("proj-new");
+    expect(orgMeta.byOrgId.get(ORG_ID)).toEqual({ cognitive_os_import_project_id: "proj-new", some_other_key: "preserved" });
+    expect(summary.errors).toEqual(["stored_project_gone:proj-erased"]); // said, never silent: a re-bootstrapped identity reads every project as gone
+    expect(client.createCognitiveOsSource).toHaveBeenCalledTimes(1);
+    expect([summary.imported, summary.alreadyImported]).toEqual([1, 1]);
+    expect(kb.markSourceSentToCognitiveOs).toHaveBeenCalledWith(ORG_ID, "src-1", "proj-new");
+    expect(kb.markSourceSentToCognitiveOs).toHaveBeenCalledWith(ORG_ID, "src-2", "proj-new");
+  });
+
+  it.each([
+    [502, "cognitive_os_error_502"],
+    [404, "Not Found"], // a 404 that is not Cognitive OS saying PROJECT_NOT_FOUND: wrong base URL or route
+  ])("a %i that is not PROJECT_NOT_FOUND is an error, never a reason to fork a second Project", async (status, error) => {
+    orgMeta.byOrgId.set(ORG_ID, { cognitive_os_import_project_id: "proj-cached" });
+    client.getCognitiveOsProject.mockResolvedValue({ ok: false, status, error });
+
+    const summary = await importOrganizationSources(ORG_ID);
+
+    expect(summary.errors).toEqual([`ensure_project_failed:${error}`]);
+    expect(client.createCognitiveOsProject).not.toHaveBeenCalled();
+    expect(orgMeta.updateCalls).toEqual([]);
   });
 
   // The actual vulnerability the critic caught: an earlier version of this fix matched Projects by
@@ -415,6 +454,22 @@ describe("importFolderSources", () => {
     vi.clearAllMocks();
     folders.setFolderCognitiveOsProjectId.mockResolvedValue(true);
     kb.markSourceSentToCognitiveOs.mockResolvedValue(true);
+    client.getCognitiveOsProject.mockResolvedValue({ ok: true, value: {} });
+  });
+
+  it("a folder whose stored Project Cognitive OS erased gets a fresh one linked back", async () => {
+    folders.getFolder.mockResolvedValue({ id: FOLDER_ID, name: "Research", parentId: null });
+    folders.getFolderCognitiveOsProjectId.mockResolvedValue("proj-erased");
+    client.getCognitiveOsProject.mockResolvedValue({ ok: false, status: 404, error: "PROJECT_NOT_FOUND: 'proj-erased'" });
+    client.createCognitiveOsProject.mockResolvedValue({ ok: true, value: { project_id: "proj-new" } });
+    client.listCognitiveOsSources.mockResolvedValue({ ok: true, value: [] });
+    kb.listKnowledgeSources.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 200 });
+
+    const summary = await importFolderSources(ORG_ID, FOLDER_ID);
+
+    expect(summary.projectId).toBe("proj-new");
+    expect(folders.setFolderCognitiveOsProjectId).toHaveBeenCalledWith(ORG_ID, FOLDER_ID, "proj-new");
+    expect(summary.errors).toEqual(["stored_project_gone:proj-erased"]);
   });
 
   it("reports a typed error instead of throwing when the folder does not exist (or belongs to another organization)", async () => {

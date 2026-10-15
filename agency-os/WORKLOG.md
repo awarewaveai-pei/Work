@@ -1,4 +1,40 @@
 # Worklog
+## 2026-10-15（續11）Cognitive 19 個懸空專案指標：根因＝10/02 操作者核准抹除；匯入改成重用前先向 Cognitive OS 確認；19 筆依操作者決定改回「未匯入」
+
+**根因**:
+- 對帳（續6）報 19 個指標懸空，指向的 `3e7b8539`、`8e323c1c` 是 2026-10-02（續1）操作者核准抹除的 7 個專案之二。Cognitive OS 抹除不會通知 next-admin。
+- `lib/cognitive-os/import-sources.ts` 原本盲目重用存下來的 id（org metadata：舊 L182-183；folder：舊 L350-359）。被抹除後，這兩個 org 每次匯入都失敗在 `listCognitiveOsSources` 404，而且永遠修不回來。
+
+**做了**:
+- `client.ts` 新增 `getCognitiveOsProject`（GET /projects/{id}）。
+- `import-sources.ts` 新增 `confirmStoredProject`，org 和 folder 兩條路徑共用：
+  - 只有 Cognitive OS 自己回 `PROJECT_NOT_FOUND` 才算「不存在」，這時開新專案、覆寫指標，並在 errors 留 `stored_project_gone:<id>`。服務帳號重建時所有專案都會讀成不存在，不能悄悄換掉。
+  - 其他失敗（連不上、502、別的 404）都回 error，不會分叉出重複專案。
+- 同一次匯入裡同標題的第二筆，原本會在 Cognitive OS 建重複來源（edd-research 正是 4 個標題 × 2 筆）。現在 `existingTitles.add` 後改算 alreadyImported，並寫回指標。
+- 資料（操作者選「全部改回未匯入」）：18 筆 `cs_knowledge_sources` 的 `cognitive_os_project_id`／`cognitive_os_imported_at` 設成 null；org `9e6e0993` 的 metadata 移除 `cognitive_os_import_project_id`。
+
+**改前舊值**（還原用）:
+- org `9e6e0993-d535-438b-a252-64cecdd91cca`（e2e-verify-0704-5c1356）：metadata.cognitive_os_import_project_id=`3e7b8539-4c66-4b24-b481-98804543f018`
+- e2e-verify-0704，project `3e7b8539-4c66-4b24-b481-98804543f018`：
+  - imported_at 2026-09-18 15:30:16.35–.704+00：fea797d9-7ad5-4500-af55-42a7e990a5c0、6ff823ec-2401-4d9c-8d70-3e1f0b57e723、d49a5d89-dee4-4b1b-8223-262e330dc665、7e7f4b95-e121-409c-9b86-1fcc2fb58a5e、2b49802b-9725-4aee-8e30-41a3c84707c0、aa74a611-2383-4864-8132-39c4b32d81f7、c65957d0-edee-4584-ba5c-fc74a6dfd2b2、aac3aab0-087c-456e-beff-228b8d6b0a0d
+  - imported_at 2026-09-20 05:24:37.271／.294+00：e6cc2905-2c86-43f5-9af3-bc5470ab9b03、63be20cd-c066-4f34-a464-91309c65999f
+- edd-research（EdD 論文研究），project `8e323c1c-f02f-4837-96cd-f87b933142c2`：
+  - imported_at 2026-09-18 09:50:00+00：0a44e2cc-0402-4ba4-bfd8-93bc8c5dae7b、76812f43-1418-4a92-a589-3fbbdea71de1、63e1f883-d62c-49de-b10f-18528655a3fa、255d43ac-540c-4860-9955-7da6b33d8a6f
+  - imported_at 2026-09-18 11:23:01.979–02.078+00：4938845e-6acf-46a8-bdb0-1352bb38337c、b7438a43-0d01-4843-a0b0-5c4503589585、f2dafdc2-20db-460f-a0a0-c2af5c5c82cd、41bc3519-7fea-4482-8aae-a520a7d52d69
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql -v ON_ERROR_STOP=1 < clear-cos-pointers.sql（單一 transaction，筆數 ≠18／≠1 就 raise）→ BEGIN/DO/COMMIT，sources_left 0，org_key_left 0 | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl /api/internal/reconcile → cognitive-os-projects checked 0 dangling 0；backup-coverage-check.py → 23 列 PASS，ids:cognitive-os-projects PASS | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/cognitive-os lib/reconcile → 3 files 43 passed；npx tsc --noEmit 無輸出 | exit=0 | ms=30000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/3n（n1 悄悄換專案 → 加 stored_project_gone；n2 補 404 非 PROJECT_NOT_FOUND 測試；n3 見剩餘風險）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=getFolderCognitiveOsProjectId | hits=19
+- ORACLE_WAIVED: critic 子代理（Claude）獨立審查；改動小、無 auth／金流
+
+**剩餘風險**:
+- 程式碼這次沒部署：next-admin 工作區有未 commit 的 C4，C4 依賴 0096／0098 尚未上正式，所以跟 C4 一起上線。上線前，舊程式碼對已清空的指標走 legacy／新建路徑，不會出錯。
+- n3：同標題但被標敏感的 KB 列，因為標題比對在 gate 之前，會被標成已送（內容不會送出）。這是改動前就有的行為，未改。
+
+**rollback**: 程式碼 `git revert`；資料依上面的舊值 UPDATE 回去（但指向的專案已不存在，還原只會讓懸空回來）。
 ## 2026-10-15（續10）Meta App `AwareWave Postiz` 切上線模式（未送審）＋aware-wave.com 隱私權政策改寫涵蓋客服訊息
 
 **問題**：開發模式下只有 App 角色成員（Aware Wave／Pei Huang）的訊息會送到 webhook，真客人的訊息進不來。

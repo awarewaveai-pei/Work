@@ -16,6 +16,7 @@ import { getFolder, getFolderCognitiveOsProjectId, setFolderCognitiveOsProjectId
 import {
   createCognitiveOsProject,
   createCognitiveOsSource,
+  getCognitiveOsProject,
   listCognitiveOsProjects,
   listCognitiveOsSources,
 } from "@/lib/cognitive-os/client";
@@ -146,6 +147,18 @@ async function getStoredProjectId(organizationId: string): Promise<string | null
   return typeof id === "string" && id ? id : null;
 }
 
+/** A stored project id is a copy of a fact Cognitive OS owns, and Cognitive OS erases projects without telling
+ *  this database (2026-10-02: 7 erased, 19 pointers left dangling -- lib/reconcile). Reuse it only once Cognitive
+ *  OS confirms it; only its own PROJECT_NOT_FOUND means gone (the caller then creates a fresh Project, overwrites
+ *  the pointer and reports `stored_project_gone:<id>`: a re-bootstrapped service identity reads EVERY project as
+ *  gone, and that must not pass silently). Unreachable is an error, never "gone": that would fork a duplicate. */
+async function confirmStoredProject(stored: string | null): Promise<{ projectId: string | null; gone?: string } | { error: string }> {
+  if (!stored) return { projectId: null };
+  const found = await getCognitiveOsProject(stored);
+  if (found.ok === true) return { projectId: stored };
+  return found.status === 404 && found.error.startsWith("PROJECT_NOT_FOUND") ? { projectId: null, gone: stored } : { error: found.error };
+}
+
 /** Read-merge-write, same convention as every other organizations.metadata writer in this app (e.g.
  *  app/api/ops/clients/[slug]/cis/route.ts) -- metadata is a shared JSONB bag, so a blind
  *  `update({metadata: {cognitive_os_import_project_id: ...}})` would silently drop every other key already
@@ -169,8 +182,8 @@ async function storeProjectId(organizationId: string, projectId: string): Promis
  * to share a display name would have silently merged into the same Project (every subsequent import
  * for either one landing in the other's knowledge base, permanently, with no error). Resolution
  * order, every step keyed on organizationId, never on what a human named anything:
- *   1. organizations.metadata.cognitive_os_import_project_id -- the fast path once set, no Cognitive OS
- *      API call needed at all to resolve identity.
+ *   1. organizations.metadata.cognitive_os_import_project_id -- the fast path once set, as long as
+ *      Cognitive OS still has that Project (confirmStoredProject; gone = fall through to 2-3).
  *   2. The legacy `Knowledge Import: <organizationId>` name (itself id-derived, so still collision-
  *      safe) -- for an organization whose Project predates this metadata tracking. Found once, then
  *      backfilled into metadata so this branch is never taken again for that organization.
@@ -178,9 +191,11 @@ async function storeProjectId(organizationId: string, projectId: string): Promis
  *      immediately, so name collisions with some OTHER organization's Project can never cause a
  *      match on a later run.
  */
-async function ensureProjectForOrganization(organizationId: string, preferredName: string): Promise<{ projectId: string } | { error: string }> {
-  const stored = await getStoredProjectId(organizationId);
-  if (stored) return { projectId: stored };
+async function ensureProjectForOrganization(organizationId: string, preferredName: string): Promise<{ projectId: string; replaced?: string } | { error: string }> {
+  const stored = await confirmStoredProject(await getStoredProjectId(organizationId));
+  if ("error" in stored) return stored;
+  if (stored.projectId) return { projectId: stored.projectId };
+  const replaced = stored.gone;
 
   const existing = await listCognitiveOsProjects();
   if (existing.ok === false) return { error: existing.error };
@@ -188,13 +203,13 @@ async function ensureProjectForOrganization(organizationId: string, preferredNam
   const legacyMatch = existing.value.find((p) => p.name === legacyName);
   if (legacyMatch) {
     await storeProjectId(organizationId, legacyMatch.project_id);
-    return { projectId: legacyMatch.project_id };
+    return { projectId: legacyMatch.project_id, replaced };
   }
 
   const created = await createCognitiveOsProject({ name: preferredName, purpose: PROJECT_PURPOSE, data_classification: DATA_CLASSIFICATION });
   if (created.ok === false) return { error: created.error };
   await storeProjectId(organizationId, created.value.project_id);
-  return { projectId: created.value.project_id };
+  return { projectId: created.value.project_id, replaced };
 }
 
 /**
@@ -277,6 +292,7 @@ async function importSourcesIntoProject(
       errors.push(`${source.id}:${result.error}`);
       continue;
     }
+    existingTitles.add(source.title); // a second KB row with this title in the same run is already imported, not a duplicate
     // The Cognitive OS create already succeeded at this point -- a failed write-back is this app's
     // own bookkeeping falling behind reality, not an import failure, so it's a soft warning
     // (surfaced in the UI's error list) rather than un-counting an import that genuinely happened.
@@ -323,7 +339,8 @@ export async function importOrganizationSources(
   }
   const sources = await fetchAllSourceDetails(organizationId);
   const result = await importSourcesIntoProject(organizationId, project.projectId, sources);
-  return { organizationId, ...result };
+  const gone = "replaced" in project && project.replaced ? [`stored_project_gone:${project.replaced}`] : [];
+  return { organizationId, ...result, errors: [...gone, ...result.errors] };
 }
 
 /**
@@ -347,7 +364,8 @@ export async function importFolderSources(organizationId: string, folderId: stri
   const folder = await getFolder(organizationId, folderId);
   if (!folder) return { organizationId, ...FAILED_SUMMARY, errors: ["folder_not_found"] };
 
-  const stored = await getFolderCognitiveOsProjectId(organizationId, folderId);
+  const stored = await confirmStoredProject(await getFolderCognitiveOsProjectId(organizationId, folderId));
+  if ("error" in stored) return { organizationId, ...FAILED_SUMMARY, errors: [`ensure_project_failed:${stored.error}`] };
   let projectId: string;
   // Only non-empty when the backfill write below fails -- the Cognitive OS Project itself still got
   // created successfully at that point, so this is a soft warning threaded into the final result,
@@ -355,9 +373,10 @@ export async function importFolderSources(organizationId: string, folderId: stri
   // this UPDATE match zero rows must be surfaced, not swallowed -- see setFolderCognitiveOsProjectId's
   // own header for the bug class this closes).
   const backfillErrors: string[] = [];
-  if (stored) {
-    projectId = stored;
+  if (stored.projectId) {
+    projectId = stored.projectId;
   } else {
+    if (stored.gone) backfillErrors.push(`stored_project_gone:${stored.gone}`);
     const preferredName = `Knowledge Import: ${folder.name} (${folderId.slice(0, 8)})`;
     const created = await createCognitiveOsProject({ name: preferredName, purpose: PROJECT_PURPOSE, data_classification: DATA_CLASSIFICATION });
     if (created.ok === false) return { organizationId, ...FAILED_SUMMARY, errors: [`ensure_project_failed:${created.error}`] };
