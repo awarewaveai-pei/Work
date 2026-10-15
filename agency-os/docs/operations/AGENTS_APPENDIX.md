@@ -132,7 +132,7 @@
 
 **每一輪對話都會把整段歷史重送一次**，所以早期塞進 context 的東西之後每輪都在重複付費。這比 oracle 分工更大的槓桿，順序不可顛倒：
 
-1. **一個任務一個 session**。任務完成 → AO-CLOSE（狀態落進 `WORKLOG.md`／`TASKS.md`／memory）→ `/clear`。本 repo 的狀態不在對話裡而在檔案裡，所以 clear 幾乎零損失——這是 AO 生命週期設計的直接紅利。任務**進行中**不要 clear（重讀檔案比留著貴）；只是變長變鈍用 `/compact`。
+1. **一個任務一個 session**。任務完成 → AO-CLOSE（狀態落進 `WORKLOG.md`／`TASKS.md`／memory）→ `/clear`。本 repo 的狀態不在對話裡而在檔案裡，所以 clear 幾乎零損失——這是 AO 生命週期設計的直接紅利。任務**進行中**不要 clear（重讀檔案比留著貴）；只是變長變鈍用 `/compact`。「變長變鈍」有量測：閘 `suggest-compact.js`（UserPromptSubmit）每輪讀 transcript 最後一則 assistant `usage`（input＋cache_creation＋cache_read＋output）注入 `[Hook][CTX] <N>k tokens ≈ <P>%`；視窗大小 transcript 不記，依 model id 查表（Claude 5 家族與 `[1m]` = 1M：2026-10-15 app `get_usage` 量得 Fable 5.1 = 1,000,000、Opus 5.5 transcript 量到 823k；其餘假定 200k，量到超過即升 1M 並標示；`CLAUDE_CONTEXT_WINDOW` 覆蓋），注入行標明來源。分級 ≥50% `/compact`、≥80% `/tomo` → `/clear`。前身「每 50 次 tool call WARN」2026-10-15 退場：計數不是 context，且 PreToolUse 的 stderr 操作者看不到。
 2. **不讓大輸出進 context —— 但省的是「不需要的」，不是「該讀的」**。分級，不可一律片段化：
 
    | 情境 | 怎麼讀 |
@@ -148,7 +148,7 @@
    **同理，Codex 摘要的邊界 = 問題的邊界**：整檔讀會看到你沒在找的東西，摘要不會。實例：`log_saved_interval_days=14`（使 21 天門檻成為死碼的關鍵耦合）兩輪覆審都沒出現，因為沒人問——是自行追線索查設定才發現。
    外部 CLI 輸出一律導向檔案再取需要的部分。反例：2026-08-20 三次裸 `codex exec` 各噴 ~120KB，合計 ~366KB 永久佔用該 session 每一輪。
 3. **設計討論每三輪自問「這該落地成文件了嗎」**。討論留在對話裡 = 每輪重付且 session 結束即蒸發；寫進 repo = 付一次。
-4. **任務結束時主動提醒操作者 `/clear`**，不等對方想到。
+4. **任務結束時主動提醒操作者 `/clear`，並附開場句**（格式 AGENTS.md §5 Session 切換），不等對方想到。開場句是給新 session 的指令不是摘要：零記憶也能直接開工（2026-10-15 操作者：「clear 要告知開新 session 應該要說什麼」）。與 §5 模型提醒同一理由：操作者不記，規則不落成首行提醒等於不存在。
 
 ## Agent 扇出治理
 
@@ -282,6 +282,7 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 
 - Workflow tool：見 §Agent 扇出治理 路徑 B。
 - 多機同步：單機運作中，機制休眠保留（`CLAUDE.md` R1）。
+- `suggest-compact.js` tool-call 計數版（每 50 次 WARN）：2026-10-15 由 transcript 量測版取代，見 §Session 衛生 1。
 
 ## 歷史版本
 
@@ -301,5 +302,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `AGENTS.md`
 - `docs/operations/TOOL_TRIGGER_MAP.md`
 
-_Last synced: 2026-10-14 00:16:07 UTC_
+_Last synced: 2026-10-15 04:09:33 UTC_
 

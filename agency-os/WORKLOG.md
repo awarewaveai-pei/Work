@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-15（續20）Session 切換提醒：首行提 /compact／/clear、/clear 附新 session 開場句；suggest-compact 改成量 transcript（已安裝）
+
+**根因**：§5 只有「模型不匹配 → 首行提醒」有機制；`/compact`／`/clear` 沒觸發條件、沒首行格式，`/clear` 不附「新 session 第一句」（操作者：「clear 要告知開新 session 應該要說什麼」）。唯一訊號 `rules/suggest-compact.js` 數 Write/Edit 次數（每 50 次 PreToolUse stderr WARN）：計數 ≠ context，而且操作者看不到。
+
+**做了**：
+- `agency-os/AGENTS.md:82-92` §5「一任務一 session」一句 → 「Session 切換」表（收尾或換題 → `⚠ 建議 /clear → 新 session 第一句貼：「<開場句>」`；未完且 CTX ≥50% → `⚠ 建議 /compact：保留 <焦點>`；≥80% → 先 `/tomo` 再 `/clear`）＋開場句格式 `續做 <任務名>：讀 <SSOT 路徑>，從 <第一個具體動作> 開始；完成 = <條件>。建議模型：<模型>`；與模型提醒同時命中併一行。
+- `mcp/claude-userlevel/hooks/rules/suggest-compact.js` 重寫：UserPromptSubmit 讀 `payload.transcript_path` 最後一則非 sidechain assistant `usage`（input＋cache_creation＋cache_read＋output），每輪注入 `[Hook][CTX] <N>k tokens ≈ <P>%（視窗 <W>，<來源>）→ <分級>`。視窗查表 `KNOWN_WINDOWS`（Claude 5 家族、`[1m]` = 1M），其餘假定 200k、量到超過即升 1M 並標示；`CLAUDE_CONTEXT_WINDOW` 覆蓋；Codex host／transcript 尚未落地／無 assistant 紀錄 → 靜默 null；讀檔例外 → fail-open log。尾端讀 1 MiB 找不到就 ×4 擴大到 64 MiB 再放棄（Codex finding：最後一則 assistant 後面跟 >1 MiB 紀錄時原本會靜默）。`rules.manifest.json:141` 從 PreToolUse Write|Edit 改接 UserPromptSubmit。
+- 視窗證據：app `get_usage`（self）`contextWindow=1000000`、`tokensUsed=249220`（25%）、`autoCompactsAtPercent=97`；同日其他 session transcript：opus-5-5 量到 823k、sonnet-5 477k → 200k 預設對 Claude 5 家族是錯的（第一版真跑印出 119%，當場抓到）。
+- `tests/hooks/suggest-compact-rule.test.mjs`（9 條：最後非 sidechain 紀錄、50/80 分級、查表、升級、env、靜默 null、1 MiB 尾端截斷、assistant 之後 >1 MiB 紀錄不得靜默、真 runner stdout）＋ `scripts/test-hooks.sh:26,45` 掛載。
+- `AGENTS_APPENDIX.md` §Session 衛生 1（量測機制＋視窗來源）、4（開場句理由）、§已退場機制（計數版）；`TOOL_TRIGGER_MAP.md:414`（PreToolUse 表的列移到 UserPromptSubmit 表）；`handoffs/SCHEMA.md` 加「續接語」必填行；memory `feedback_session_switch_reminder.md`；`/doc-sync` 跑過（只動 metadata 戳）。
+- 安裝：`scripts/sync-claude-userlevel.ps1 -Mode merge` PASS 兩次（第二次在 Codex 修正後，`~/.claude/hooks/rules/suggest-compact.js` 與 repo cmp 相同）。本 session 之後每輪 prompt 都實收注入行（286k → 293k → 301k ≈ 29–30%）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh（Codex 修正前最後一次全套：364/364，含本規則 8 條、governance-pointers、trigger-index、manifest↔rules 完整性） | exit=0 | ms=69169
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test tests/hooks/suggest-compact-rule.test.mjs（Codex 修正後 9/9；新增那條在修正前的固定尾端版會因 `lastAssistantUsage` 回 null 而紅） | exit=0 | ms=1200
+- REALTEST_EVIDENCE: tool=Bash | cmd=node ~/.claude/hooks/runner.js UserPromptSubmit < ctx-payload.json（安裝後、本 session 真 transcript → `[Hook][CTX] 301k tokens ≈ 30%（視窗 1M，model）→ OK`；app get_usage 同時段回報 25–30%） | exit=0 | ms=90
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-15-partialreview-0ffea0ad.md`（8 檔；FINDING 1 尾端固定 1 MiB 會靜默 → 已修＋指名測試）
+- ORACLE_WAIVED: 修正只動 `lastAssistantUsage` 的讀取迴圈並有指名測試覆蓋，依「不做無效益工作」不開第二輪
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=claude-tool-count | hits=0
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=suggest-compact | hits=22（規則本身、manifest、測試、test-hooks.sh、AGENTS/APPENDIX/TRIGGER_MAP 新文字、hooks README「不擋」清單仍正確；無舊計數版殘留）
+
+**避免再發生**：規則要落成「首行格式＋機械量測」才算存在（與模型提醒同構）；閘不量的東西 agent 不得宣稱；量測行每輪必出，靜默 = 閘壞。視窗大小 transcript 不記 → 查表＋自我修正，不再寫死一個數字。
+
+**rollback**：`git revert <本 commit>` → `scripts/sync-claude-userlevel.ps1 -Mode merge`。
 ## 2026-10-15（續19）CS 轉真人時客人立刻收到確認句＋讀不到名字時同句問名字，回答寫進 Chatwoot 聯絡人（程式；未部署）
 
 **根因**：`route.ts` runPipeline 三條轉真人路徑（handoff／draft／額度用完）只呼叫 `handoffToHuman`（翻 open），客人端收不到任何字（Pei-Jing 實測「為什麼不回答我?」）。Messenger 非角色用戶的 profile 讀不到（Advanced Access 需商家驗證，操作者不辦），Chatwoot v4.18 `app/builders/messages/facebook/message_builder.rb:137` 寫死「John Doe」。

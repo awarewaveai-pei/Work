@@ -44,7 +44,6 @@
           "worklog-entry-number-guard",
           "auto-repair-guard",
           "config-protection",
-          "suggest-compact",
           "file-path-router"
         ]
       },
@@ -138,7 +137,8 @@
     "UserPromptSubmit": [
       {
         "rules": [
-          "vbc-reminder"
+          "vbc-reminder",
+          "suggest-compact"
         ]
       }
     ],

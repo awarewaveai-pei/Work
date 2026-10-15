@@ -23,6 +23,7 @@
 #   tests/hooks/shared-file-guard.test.mjs — shared-file commit guard + private-index commits + WORKLOG 續N guard (real helper, scratch repo)
 #   tests/hooks/linked-worktree-root.test.mjs — root walk accepts only a .git DIRECTORY (linked worktree = not the root)
 #   tests/hooks/file-claim-guard.test.mjs — one writing session per dirty file (claim, release by commit/TTL, Codex apply_patch)
+#   tests/hooks/suggest-compact-rule.test.mjs — context measured from the transcript on UserPromptSubmit (bands, window inference, tail read, silent nulls)
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -41,4 +42,4 @@ fi
 # is not the place every new gate has to edit.
 "$NODE_BIN" --test tests/hooks/governance-pointers.test.mjs tests/hooks/trigger-index.test.mjs
 
-"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs tests/hooks/codex-adapter.test.mjs tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/shared-file-guard.test.mjs tests/hooks/linked-worktree-root.test.mjs tests/hooks/file-claim-guard.test.mjs
+"$NODE_BIN" --test tests/hooks/runner-core.test.mjs tests/hooks/runner-parity.test.mjs tests/hooks/maintenance-scripts.test.mjs tests/hooks/subagent-budget.test.mjs tests/hooks/normalize-claude-settings.test.mjs tests/hooks/subagent-charter-rule.test.mjs tests/hooks/settings-deny-parity.test.mjs tests/hooks/codex-adapter.test.mjs tests/hooks/asset-mcp-refs.test.mjs tests/hooks/asset-parity.test.mjs tests/hooks/shared-file-guard.test.mjs tests/hooks/linked-worktree-root.test.mjs tests/hooks/file-claim-guard.test.mjs tests/hooks/suggest-compact-rule.test.mjs

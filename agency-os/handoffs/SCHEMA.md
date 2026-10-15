@@ -18,6 +18,10 @@ source_session_summary: "<one sentence: what the session was doing>"
 
 Pending/consumed state is determined by the TASKS.md `- [ ]` / `- [x]` row (the only SSOT). See `agency-os/handoffs/README.md`.
 
+## 續接語（required，body 第一行）
+
+`**續接語**：「<開場句>」` — 開場句格式見 `agency-os/AGENTS.md` §5 Session 切換（`續做 <任務名>：讀 <SSOT 路徑>，從 <第一個具體動作> 開始；完成 = <條件>。建議模型：<模型>`）。`/clear` 提醒直接印這一行，操作者貼進新 session 即開工。
+
 ## 6-Segment Body
 
 ### 1. 任務目標

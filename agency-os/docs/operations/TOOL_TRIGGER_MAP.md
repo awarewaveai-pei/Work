@@ -377,7 +377,6 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 | `rules/git-log-injector.js` | Write\|Edit（首次）| BLOCK：顯示上一完整 session 全部 commits（fallback -10），防並行 session 重工 |
 | `rules/auto-repair-guard.js` | Write\|Edit | BLOCK（首次/分類）：編輯 Auto-Repair 邏輯路徑前強制 4 pre-checks |
 | `rules/config-protection.js` | Write\|Edit | BLOCK：禁止修改 linter/formatter config |
-| `rules/suggest-compact.js` | Write\|Edit | WARN：每 ~50 次 tool call 建議 /compact |
 | `rules/file-path-router.js` | Write\|Edit | BLOCK（首次/分類）：路由到正確 agent（auth/db/supabase/n8n/nginx/wp/trigger）|
 | `rules/mcp-health.js` | mcp__.\* | 執行前檢查 MCP server 健康（backoff 斷路器）|
 | `rules/large-file-warner.js` | Read | WARN 500KB / BLOCK 2MB：保護 context window |
@@ -412,6 +411,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 |------|------|
 | `rules/session-banner.js` | SessionStart：報告治理狀態（規則/事件數由 manifest 推導，不手寫）|
 | `rules/vbc-reminder.js` | UserPromptSubmit：偵測「他方已完成」語境 → 注入 VBC 協議提醒（2026-07-02 Phase 4，非阻擋）|
+| `rules/suggest-compact.js` | UserPromptSubmit：讀 transcript 最後一則 assistant usage → 注入 `[Hook][CTX] <N>k tokens ≈ <P>%`＋分級（≥50% `/compact`、≥80% `/tomo`→`/clear`）；agent 依 AGENTS.md §5 Session 切換 在回覆首行提醒（2026-10-15，取代每 50 次 tool call 的 WARN）|
 | `ao-resume-on-prompt.ps1` | UserPromptSubmit（僅工作站）：偵測開工關鍵字 → 觸發 AO-RESUME（每 session 一次，seen-sessions ledger）|
 | `post-push-trigger-deploy.ps1` | git push 後（僅工作站）：自動觸發 Trigger.dev deploy（若設定）|
 
@@ -437,5 +437,5 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 ## Related Documents (Auto-Synced)
 - `docs/operations/AGENTS_APPENDIX.md`
 
-_Last synced: 2026-10-14 00:16:07 UTC_
+_Last synced: 2026-10-15 04:09:33 UTC_
 
