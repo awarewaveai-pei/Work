@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-15（續10）Meta App `AwareWave Postiz` 切上線模式（未送審）＋aware-wave.com 隱私權政策改寫涵蓋客服訊息
+
+**問題**：開發模式下只有 App 角色成員（Aware Wave／Pei Huang）的訊息會送到 webhook，真客人的訊息進不來。
+**查證**：Meta 文件自相矛盾——Messenger overview／changelog 2024-01-10「只收發自己粉專訊息不需 App Review」vs webhooks 頁「非角色用戶需 Advanced Access」。決定先走免審路徑實測。App 未連任何 Business Portfolio；發佈頁「所有必要設定皆已完成」；所有 Messenger 權限＝「可供測試」（標準存取）。
+- C1 **隱私權政策與事實不符**：WP page id 3 第 2 節寫「不讀取私訊內容」，但客服已收存 Messenger 訊息並送 Anthropic（`lib/cs/llm.ts:5`）／Gemini 備援（`llm.ts:72`）／OpenAI embeddings（`lib/kb/config.ts:13`）。改寫為如實描述（收集項、用途、AI 處理商、保存、傳訊者刪除請求 30 天內處理）。`wp post update 3`；舊版備份 `/root/backups/wp-pages/aware-wave-privacy-policy-20261014-165540.html`；公開頁實查新字串在、舊錯誤句不在。
+- 切上線：classifier 擋 AI 按「發佈」→ 操作者親按。`/apps/` 列表 `模式：上線`。
+**驗證**：非角色帳號（顯示名 John Doe）傳「最新課程有什麼呢?」→ Chatwoot conversation 6（account 2/inbox 3）→ `cs_ai_replies` 新列 `handoff/L1/retrieval 0` → 對話 status open。**結論：自己粉專＋標準存取＋上線模式即可收真客人訊息，不需 App Review。**
+**rollback**：App 主控板切回開發模式；WP 政策 `wp post update 3 <備份檔>`。
+**剩**：IG 私訊同理應免審（粉專需綁 IG 商業帳號）；>24h 回覆仍需 HUMAN_AGENT（需審）；Soulful KB 空。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql chatwoot messages（conv 6 John Doe incoming）+ psql cs_ai_replies（3 列）+ /apps/ 頁「模式：上線」 | exit=0 | ms=1500
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 政策逐項對照 lib/cs/llm.ts、lib/kb/config.ts 實際資料流
+- BUGHUNT_WAIVED: NA -- 無 repo 程式改動（WP 頁面內容＋Meta App 設定）
 ## 2026-10-15（續9）G5 正式機升 v2.25.1 成功（停機約 74s）、重開機也穩；C3 Postiz client 五個函式＋修 v2.25.1 兩個相容問題
 
 **做了**（主機 ks-aw-01，操作者「15 項一直做到完成」授權）:
