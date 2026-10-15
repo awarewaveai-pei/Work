@@ -21,6 +21,27 @@
 **剩**：認知平台部署由 COS session 處理；Soulful CS 部署後三步（貼 14 題問答、開回「啟用 AI 客服」、非角色帳號實測）照 TASKS「Soulful 客服三層」那條，要操作者先改答案。
 
 **rollback**：crontab 用上面的備份 `crontab <file>`；migration 閘 `git revert`（或部署時 `MIGRATION_GATE_OVERRIDE=1`）；ContentStudio `git revert`。
+## 2026-10-15（續30）社群 C12 ⑤⑥ 上線：social.aware-wave.com 開門（DNS、憑證 11 SAN、主機 nginx、lobster-nginx），next-admin `4c4e153a7` 已部署
+
+**做了**（操作者「go」）：
+- Cloudflare DNS：`social` A → 145.239.195.47、proxied（record `193f499e997b33438c9edd57d4f5a329`；CF API token，MCP 缺權限）。照 portal 那筆的設定。
+- 主機 nginx：`safe-infra-patch.sh host-nginx` 套 repo `nginx/system-sites/sg-stack.aware-wave.com.conf`（套前比對：主機檔＝repo 前一版，無漂移；備份 `/root/lobster-phase1/safe-patch-backups/_etc_nginx_sites-available_sg-stack.aware-wave.com.safe-patch-20261015-074323`）。
+- 憑證：`certbot certonly --cert-name aware-wave.com --nginx --expand`（11 網域）→ SAN 含 social，到期 2027-01-13；`00-default-placeholder` md5 前後相同（未被 certbot 污染）；`nginx -t`＋reload。
+- lobster-nginx：`safe-infra-patch.sh nginx` 套 repo `nginx/default.conf`（主機檔＝repo 前一版；備份 `default.conf.bak.safe-patch-20261015-074416`）。
+- next-admin：主機 `/root/Work` 快轉到 `4c4e153a7`（不含之後別的 session 的 CS `c8e57a18d`，那筆沒在本 session 得到核准）→ `sg-deploy.sh --skip-pull next-admin`：test gate 過、healthy 10s、smoke 5/5、`.deployed-commit=4c4e153a7`。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=curl | cmd=公網 social.aware-wave.com：`/`→307 `/login?next=%2F`；`/calendar`→307；`/api/ops/summary`、`/api/content/syndicate`、`/portal/launcher`→404；`/api/social/brands`→401；`/api/internal/social/dispatch`、`/intake`→404；`/a%2Fb`、`/x/../social`→400；`/login?next=%2F`→200 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=curl | cmd=回歸：app.aware-wave.com `/social`→404、`/tools/social`→307 login、`/`→307 login；portal `/launcher`→307；hci `/health`→200 JSON；aware-wave.com、docs→200「Aware Wave」 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`openssl x509 … -ext subjectAltName` → 11 SAN 含 `DNS:social.aware-wave.com`，notAfter 2027-01-13 | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 上線紀錄；程式審查見續25
+- BUGHUNT_WAIVED: NA -- 本條無新程式改動
+
+**發現**：主機 cron `auto-deploy-next-admin.sh`（UTC 3/7/11/15/19/23）在 origin/main 的 next-admin 有新程式時自動 sg-deploy——推上 main＝4 小時內上線，和 AGENTS.md「prod deploy＝High-STOP 要 go」不一致；commit 裡寫的「Not deployed」不成立。處理見續31（改每天台灣 03:00＋migration 閘）。
+
+**剩**：登入後畫面（員工帳號在 social 網址看得到社群、無側欄）待操作者在瀏覽器登入確認，未驗；品牌成員管理畫面；產品門的登入頁仍是員工版樣式。ContentStudio 換連結見續31。
+
+**rollback**：程式 `sg-deploy` 回 `e571187a2`（`.deployed-commit` 前值）；lobster-nginx 用 `default.conf.bak.safe-patch-20261015-074416`＋`safe-infra-patch.sh nginx`；主機 nginx 用上面的 safe-patch 備份＋`safe-infra-patch.sh host-nginx`；DNS 刪 record `193f499e…`；憑證不必回（多一個 SAN 無害）。
 ## 2026-10-15（續29）認知平台：冰山示範結果頁換成操作者認可的那份分析；課 v2 的設計定案（未部署）
 
 **根因**: 操作者看了冰山五分鐘課和自己的分析（INTERP-E4B3565C…，2026-09-29，claude-sonnet-5）：「五分鐘教學的內容其實不好」「我做的案例目前的內容是我要的」。查下來：(a) 正式站示範 fixture（2026-09-28）比她那份還薄——沒有 ⑧ 下一步、① 改判條件、⑤ 診斷、④ 厚度判定、圖 B 信念層、⑦ ★；(b) 課的「看懂結果」是手寫的另一份字，跟結果頁程式 6 處對不上（三條路／90 天／三個指標／自動重跑／示意圖／串工作流）；(c) 同一層的問題在填寫頁、課、結果頁 ②④⑥ 有 5 種問法。
