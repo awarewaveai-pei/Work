@@ -127,7 +127,7 @@ describe("ResultPage", () => {
     const unitReading = (path: string, meaning: string, citations: string[]) => ({ path, brief: meaning.slice(0, 6), meaning, action: "先驗證", step: "先驗證", effect: "知道是不是它", leverage: "mid" as const, citations });
     const fish = JSON.parse(JSON.stringify({ ...demo.result, method_id: "root_cause.fishbone", visual: { kind: "table", bindings: {} }, picture_units: pictureUnits,
       units: [unitReading("r/hypotheses/0", "人這根骨有兩個原因。", ["r/hypotheses/3/statement"]), unitReading("r/hypotheses/2", "環境只有一個原因。", ["r/hypotheses/2/statement"])],
-      focus: { path: "r/hypotheses/3", why: "兩個原因都在這裡" }, solutions: undefined }).replaceAll("冰山", "魚骨")) as typeof demo.result;
+      focus: { path: "r/hypotheses/3", why: "兩個原因都在這裡" }, solutions: undefined, diagnosis: undefined, priority_short: undefined }).replaceAll("冰山", "魚骨")) as typeof demo.result;   // the AI's own words (問題在第3層…根在第4層) are not the page's
     const html = renderToStaticMarkup(<ResultPage result={fish} record={rec} display={{ name_zh: "魚骨圖" }} />);
     expect(html).not.toContain("不分層");
     for (const text of ["<h3>第 1 根骨／2：人</h3>", "<h3>第 2 根骨／2：環境</h3>", "<b>這根骨問</b>", "<b>在這根骨出手</b>", "人這根骨有兩個原因。", "環境只有一個原因。", "你填 2 句", "你填 1 句", "<td>人 ★</td>", "<td>環境</td>", "⑤ 總結：在哪一根骨出手"]) expect(html, text).toContain(text);

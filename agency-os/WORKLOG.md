@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-15（續29）認知平台：冰山示範結果頁換成操作者認可的那份分析；課 v2 的設計定案（未部署）
+
+**根因**: 操作者看了冰山五分鐘課和自己的分析（INTERP-E4B3565C…，2026-09-29，claude-sonnet-5）：「五分鐘教學的內容其實不好」「我做的案例目前的內容是我要的」。查下來：(a) 正式站示範 fixture（2026-09-28）比她那份還薄——沒有 ⑧ 下一步、① 改判條件、⑤ 診斷、④ 厚度判定、圖 B 信念層、⑦ ★；(b) 課的「看懂結果」是手寫的另一份字，跟結果頁程式 6 處對不上（三條路／90 天／三個指標／自動重跑／示意圖／串工作流）；(c) 同一層的問題在填寫頁、課、結果頁 ②④⑥ 有 5 種問法。
+
+**做了**:
+- 示範 fixture `fixtures/demo/systems.iceberg_model.edd.json` 換成她那份分析（經瀏覽器 GET `/api/interpretations/<id>`＋`/form` 存下，`_about.source_interpretation` 記來源）；先核對 record 四段文字與 `method-form-examples.yaml` 示範 input 一字不差（= 示範案例，不是私人資料），不含 judgment／approval／project_id。不花 AI 錢。
+- `ResultPage.test.tsx` 魚骨測試的 fixture 拿掉 AI 自己寫的 `diagnosis`／`priority_short`（新 fixture 的診斷標題含「根在第4層」，測試驗的是頁面程式不印「根在第」）。
+- 對她那份逐條查「看懂結果」承諾卻沒出現的：③「注意」（程式只在兩條線時印，`ResultPage.tsx:420`）、⑦「三個指標」（AI 給 1）、「自動重跑」（要按鈕排提醒）、⑧「還要你填幾格」（AI 寫了 behavior_over_time 需要「三期逐次人數」，頁面照目標欄位重算印 0——**程式缺陷**，待修）、「串成工作流」（未做）；① 缺口 2 條被 detail_integrity 刪 1 條只在頁尾「已拿掉 1 項」。
+- 課 v2 設計（Fable 定案）寫在 `agency-os/handoffs/2026-10-15-cos-tool-template-apply.md`「課 v2 設計」D1–D5：每層一個問題為 SSOT；看例子／看懂結果從示範 fixture 產生；九段說明與結果頁同一份資料；「對照一個做完的結果頁」按鈕修成每領域一顆（今天第 3 項漏改）；齊備勾只在檢查綠時打。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run components lib → 55 files / 467 passed；npx tsc --noEmit 乾淨 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=COS_TEST_MOCK_API=1 npx playwright test --project=cognitive demos.spec.ts → 1 passed（兩頁示範各九段、未知領域 404、舊網址轉址） | exit=0 | ms=22700
+- REALTEST_EVIDENCE: tool=Bash | cmd=python docs/mockups/check-mocks.py → all rules green | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=WebFetch | cmd=正式站讀 INTERP-E4B3565C… 結果頁與 /learn/systems.iceberg_model 全文＋專家模式 JSON；比對 fixture 欄位（舊示範缺 diagnosis、priority_short、next_steps 等） | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 資料檔替換（內容 = 正式站已核准的分析原樣）＋測試 fixture 一欄；無程式邏輯改動
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os,lobster-factory/infra/hetzner-phase1-core/tests | grep=demo-iceberg|projects/demo/iceberg | hits=18
+  - 同續23：程式只剩轉址與其測試；其餘為歷史文件與模板說明。
+
+**剩餘風險**: 未部署（示範要下次部署才上線）。⑧「還要你填 N 格」吃掉 AI 的 needs_input 是程式缺陷，列入課 v2 那批；⑦ 舊分析顯示無作用的「一月／一季／一年」鈕、⑨ 同一句兩個 [n] 亦同批。
+
+**rollback**: `git revert`。
 ## 2026-10-15（續28）認知平台已上線 b5c8a628→fcc494eb4（6 個 commit＋閘門兩個舊缺陷的修正）：不存在的網址正式站回 404
 
 **操作者**：「要」（部署 75b013d14／04e56476c／c65e2ec97／7566beea7／c76fde717／2e7d70c46 一起上）。範圍內沒有 migration、compose、Dockerfile 改動。

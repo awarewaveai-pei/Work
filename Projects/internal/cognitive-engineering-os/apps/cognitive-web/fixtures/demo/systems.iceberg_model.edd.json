@@ -1,512 +1,676 @@
 {
- "_about": "A real analysis of the demo case (claude-sonnet-5, 2026-09-28, local run result_shots12): the free read-only 示範專案 (gap report N-78). Regenerate from a real run, never hand-edit the result. 2026-09-29: ⑧ passed through repair_next_steps with result_page_shows() (③ draws the leverage chart), as the pipeline now does; no other change.",
- "display": {
-  "name_en": "Iceberg Model",
-  "abbr": "",
-  "name_zh": "冰山模型",
-  "blurb_en": "Digs a surface event down through recurring patterns and systemic structures to the mental models sustaining them, one level at a time. Use it to avoid reacting to a single event in isolation and instead find the deeper structure producing a whole class of similar events.",
-  "blurb_zh": "把一個表面事件逐層往下挖——重複發生的型態、系統性結構、支撐這一切的心智模式，一次一層。想避免只針對單一事件反應，而是找出產生一整類類似事件的深層結構時用。",
-  "why_en": "You dig down one layer at a time: patterns before structures, structures before mental models. Skipping straight to this is a mental-model problem is refused -- and that jump is exactly what the iceberg exists to prevent.",
-  "why_zh": "必須由上往下一層一層挖：有型態才能寫結構，有結構才能寫心智模式。跳過中間直接寫「這是心智模式問題」會被擋下——那個跳躍正是冰山模型要避免的事。",
-  "url": "https://untools.co/iceberg-model/"
- },
- "fields": [
-  {
-   "key": "events",
-   "label": "① 事件：發生了什麼？",
-   "hint": "一件具體的事，有時間、有數字；跟上次比多少。",
-   "required": true,
-   "kind": "list",
-   "item_kind": "text",
-   "integer": false,
-   "minItems": 1
+  "_about": {
+    "what": "A real analysis of this tool's demo case in this domain: the free read-only 示範分析 (template §6). Taken from the operator's own run of the demo example (record text identical to method-form-examples input), never hand-edited; regenerate with scripts/dev/demo_fixture.cjs.",
+    "method": "systems.iceberg_model",
+    "domain": "edd",
+    "model": "claude-sonnet-5",
+    "ran_at": "2026-09-29T01:15:23.000000Z",
+    "schema_version": "1.3.0",
+    "source_interpretation": "INTERP-E4B3565C580D48908AB276ACEA078174"
   },
-  {
-   "key": "patterns",
-   "label": "② 模式：以前發生過嗎？多常？跟什麼一起出現？",
-   "hint": "一再發生的型態：多久一次、什麼時候特別多。這是線索，不是原因。",
-   "required": false,
-   "kind": "list",
-   "item_kind": "text",
-   "integer": false
+  "display": {
+    "name_en": "Iceberg Model",
+    "abbr": "",
+    "name_zh": "冰山模型",
+    "blurb_en": "Digs a surface event down through recurring patterns and systemic structures to the mental models sustaining them, one level at a time. Use it to avoid reacting to a single event in isolation and instead find the deeper structure producing a whole class of similar events.",
+    "blurb_zh": "把一個表面事件逐層往下挖——重複發生的型態、系統性結構、支撐這一切的心智模式，一次一層。想避免只針對單一事件反應，而是找出產生一整類類似事件的深層結構時用。",
+    "why_en": "You dig down one layer at a time: patterns before structures, structures before mental models. Skipping straight to this is a mental-model problem is refused -- and that jump is exactly what the iceberg exists to prevent.",
+    "why_zh": "必須由上往下一層一層挖：有型態才能寫結構，有結構才能寫心智模式。跳過中間直接寫「這是心智模式問題」會被擋下——那個跳躍正是冰山模型要避免的事。",
+    "url": "https://untools.co/iceberg-model/"
   },
-  {
-   "key": "structures",
-   "label": "③ 結構：什麼流程、規則、人力安排在製造它？",
-   "hint": "寫制度，不寫某個人：順序、時間分配、表單、權責。",
-   "required": false,
-   "kind": "list",
-   "item_kind": "text",
-   "integer": false
-  },
-  {
-   "key": "mental_models",
-   "label": "④ 心智模型：哪個沒說出口的假設撐住這些結構？",
-   "hint": "常藏在口頭禪裡；用引號寫一句話，自己的假設也要寫。",
-   "required": false,
-   "kind": "list",
-   "item_kind": "text",
-   "integer": false
-  }
- ],
- "record": {
-  "events": [
-   "這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位"
-  ],
-  "mental_models": [
-   "帶領者團隊默認「參與者需要專家幫他們看見意義」；訓練教的是「怎麼解讀作品」，不是「怎麼讓人自己看見」"
-  ],
-  "patterns": [
-   "三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低"
-  ],
-  "structures": [
-   "流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄「參與者是否達到本次目標洞察」"
-  ]
- },
- "result": {
-  "data_thickness": {
-   "events": {
-    "external_sources": 0,
-    "own_statements": 1
-   },
-   "mental_models": {
-    "external_sources": 0,
-    "own_statements": 1
-   },
-   "patterns": {
-    "external_sources": 0,
-    "own_statements": 1
-   },
-   "structures": {
-    "external_sources": 0,
-    "own_statements": 1
-   }
-  },
-  "findings": [
-   {
-    "citations": [
-     "r/events",
-     "r/patterns"
-    ],
-    "confidence": {
-     "level": "mid",
-     "reason": "基於單一團隊三期的觀察，尚未跨團隊或跨場域驗證"
-    },
-    "id": "F1",
-    "text": "本期第 6 次僅 2 位主動分享，第 1 次是 6 位；這與三期以來每期第 4 次起下降、帶領者先解讀作品時掉得最多、線上場更低的型態一致，顯示不是單一意外。",
-    "title": "事件符合三期已知型態"
-   },
-   {
-    "citations": [
-     "r/structures"
-    ],
-    "confidence": {
-     "level": "mid",
-     "reason": "結構描述來自記錄表與流程安排的陳述，尚無參與者訪談佐證感受"
-    },
-    "id": "F2",
-    "text": "90 分鐘中帶領者說明佔 35 分鐘，且流程是先講作品意義再請參與者回應；紀錄表只有一欄記錄是否達到「本次目標洞察」，沒有留給參與者自主發現的空間與追蹤指標。",
-    "title": "流程結構放大了下降"
-   },
-   {
-    "citations": [
-     "r/mental_models"
-    ],
-    "confidence": {
-     "level": "mid",
-     "reason": "信念描述來自對訓練內容與團隊默認的推論，未見團隊成員直接自陳"
-    },
-    "id": "F3",
-    "text": "帶領者團隊默認參與者需要專家幫他們看見意義，訓練內容教的是怎麼解讀作品而非怎麼讓人自己看見，這個信念直接支撐了上述流程與記錄設計。",
-    "title": "深層信念是先解讀的根源"
-   }
-  ],
-  "focus": {
-   "path": "r/mental_models",
-   "why": "其他三層都是這個默認信念的具體表現，若只改流程時間分配而不處理「參與者需要專家幫他們看見意義」這個默認，型態很可能在下一期重複出現"
-  },
-  "gaps": [
-   {
-    "needed_evidence": "參與者訪談或問卷",
-    "text": "缺少參與者本身對分享意願下降的直接說法"
-   },
-   {
-    "needed_evidence": "分場域的分享人數統計",
-    "text": "缺少線上場與實體場在人數上的具體對照數字"
-   },
-   {
-    "needed_evidence": "逐位帶領者的流程記錄與人數變化",
-    "text": "缺少不同帶領者之間先解讀比例與下降幅度的對照數據"
-   }
-  ],
-  "headline": "分享意願逐次下降",
-  "interpretation_id": "INTERP-D84EF31803E24CD69FAE31408DA99DB7",
-  "loop": {
-   "edges": [
+  "fields": [
     {
-     "from": "n1",
-     "to": "n2"
+      "key": "events",
+      "label": "① 事件：發生了什麼？",
+      "hint": "一件具體的事，有時間、有數字；跟上次比多少。",
+      "required": true,
+      "placeholder": "例：第 6 次 session，8 人只有 2 人主動分享；第 1 次是 6 人。",
+      "kind": "list",
+      "item_kind": "text",
+      "integer": false,
+      "minItems": 1
     },
     {
-     "from": "n2",
-     "to": "n3"
+      "key": "patterns",
+      "label": "② 模式：以前發生過嗎？多常？跟什麼一起出現？",
+      "hint": "一再發生的型態：多久一次、什麼時候特別多。這是線索，不是原因。",
+      "required": false,
+      "placeholder": "例：三期都從第 4 次開始掉；帶領者先解讀作品的場次最低。",
+      "kind": "list",
+      "item_kind": "text",
+      "integer": false
     },
     {
-     "from": "n3",
-     "to": "n1"
+      "key": "structures",
+      "label": "③ 結構：什麼流程、規則、人力安排在製造它？",
+      "hint": "寫制度，不寫某個人：順序、時間分配、表單、權責。",
+      "required": false,
+      "placeholder": "例：帶領者先講作品的意義，說明佔 35 分；紀錄表只問「達到洞察？」。",
+      "kind": "list",
+      "item_kind": "text",
+      "integer": false
+    },
+    {
+      "key": "mental_models",
+      "label": "④ 心智模型：哪個沒說出口的假設撐住這些結構？",
+      "hint": "常藏在口頭禪裡；用引號寫一句話，自己的假設也要寫。",
+      "required": false,
+      "placeholder": "例：「參與者需要專家幫他們看見意義。」",
+      "kind": "list",
+      "item_kind": "text",
+      "integer": false
     }
-   ],
-   "kind": "reinforcing",
-   "name": "先解讀強化下降循環",
-   "nodes": [
-    {
-     "citations": [
-      "r/structures"
-     ],
-     "id": "n1",
-     "text": "流程是帶領者先講作品意義"
-    },
-    {
-     "citations": [
-      "r/patterns"
-     ],
-     "id": "n2",
-     "text": "主動分享人數逐次下降"
-    },
-    {
-     "citations": [
-      "r/mental_models"
-     ],
-     "id": "n3",
-     "text": "團隊默認參與者需要專家幫忙看見意義"
-    }
-   ],
-   "reading": "流程先讓帶領者解讀作品，導致參與者主動分享下降；分享下降又讓團隊更相信參與者需要專家幫忙看見意義，進一步強化先解讀的流程安排，形成自我強化的循環。"
-  },
-  "method_id": "systems.iceberg_model",
-  "model": "claude-sonnet-5",
-  "next_methods": [],
-  "next_steps": [],
-  "priority": "先從結構層（流程時間與記錄表）著手做立即可行的調整，同時啟動對心智模式層默認信念的檢視與訓練調整，兩者並行但心智模式層的改變才是持久解方。",
-  "provenance": {
-   "authorship_state": "AI_GENERATED",
-   "epistemic_type": "AI_INFERENCE",
-   "locked": null
-  },
-  "recommendations": [
-   {
-    "action": "縮短帶領者說明時間，增加記錄表欄位以追蹤參與者自主發現的過程",
-    "citations": [
-     "r/structures"
-    ],
-    "expected": "降低結構層面對先解讀的依賴，讓分享空間變大",
-    "level": "結構層"
-   },
-   {
-    "action": "與帶領者團隊一起檢視「參與者需要專家幫他們看見意義」這個默認，調整訓練內容加入引導自我看見的技巧",
-    "citations": [
-     "r/mental_models"
-    ],
-    "expected": "改變支撐流程設計的根本信念，帶來較持久的改善",
-    "level": "心智模式層"
-   }
   ],
-  "record_sha256": "be50d591d16cc6ec649db22a56d31ba9f5f235d70cc0ca10d51083588b0cd8fd",
-  "solutions": {
-   "first_step": "下一次session前，帶領者先不解讀作品，改用開放提問開場",
-   "horizon": "12 週",
-   "metrics": [
-    {
-     "name": "主動分享人數",
-     "now": "2 位（第6次）",
-     "now_citation": "r/events",
-     "target": "回升至6位以上",
-     "when": "下一期第6次session"
+  "record": {
+    "events": [
+      "這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位"
+    ],
+    "generated_by_method": "systems.iceberg_model",
+    "id": "ICEBERG-D7E4EB345DA6D369",
+    "mental_models": [
+      "帶領者團隊默認「參與者需要專家幫他們看見意義」；訓練教的是「怎麼解讀作品」，不是「怎麼讓人自己看見」"
+    ],
+    "patterns": [
+      "三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低"
+    ],
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
     },
-    {
-     "name": "帶領者說明時間",
-     "now": "35 分鐘",
-     "now_citation": "r/structures",
-     "target": "縮短至15分鐘以內",
-     "when": "2 到 3 週後"
-    }
-   ],
-   "options": [
-    {
-     "advice": "最快可做，但若默認信念不變，效果可能不持久",
-     "cost": "低",
-     "durability": "中",
-     "name": "調整流程時間",
-     "paths": [
-      "r/structures"
-     ],
-     "risk": "低",
-     "takes": "1-2 次session內可見變化",
-     "what": "縮短帶領者說明時間，增加參與者自主回應的時段"
-    },
-    {
-     "advice": "能提供更好的證據來檢視型態是否改善",
-     "cost": "低",
-     "durability": "中",
-     "name": "擴充記錄追蹤",
-     "paths": [
-      "r/structures",
-      "r/patterns"
-     ],
-     "risk": "低",
-     "takes": "下次session即可開始收集",
-     "what": "記錄表加入分享意願、自主發現過程等欄位，不只看是否達到洞察"
-    },
-    {
-     "advice": "最根本但最耗時，需要團隊共識與訓練資源",
-     "cost": "中",
-     "durability": "高",
-     "name": "重塑帶領信念",
-     "paths": [
-      "r/mental_models"
-     ],
-     "risk": "中，需團隊願意檢視自身默認",
-     "takes": "數期session後才見穩定變化",
-     "what": "與帶領者團隊共同檢視「參與者需要專家解讀」的默認，調整訓練內容"
-    }
-   ],
-   "plan": [
-    {
-     "action": "與帶領者團隊討論本次冰山分析結果",
-     "owner": "帶領者團隊",
-     "proof": "討論紀錄",
-     "target": "team共識形成",
-     "when": "1"
-    },
-    {
-     "action": "調整流程時間分配與記錄表欄位",
-     "owner": "帶領者團隊",
-     "proof": "新版流程表與記錄表",
-     "target": "新流程上線",
-     "when": "2 到 3"
-    },
-    {
-     "action": "在接下來三場session試行新流程並記錄分享人數",
-     "owner": "帶領者團隊",
-     "proof": "逐場分享人數紀錄",
-     "target": "分享人數不再持續下降",
-     "when": "4 到 6"
-    },
-    {
-     "action": "檢視訓練內容並加入引導自我看見的技巧",
-     "owner": "訓練負責人",
-     "proof": "更新後的訓練教材",
-     "target": "訓練內容納入新技巧",
-     "when": "7 到 12"
-    }
-   ],
-   "signoff": "需要帶領者團隊同意調整流程與檢視自身默認信念，否則「重塑帶領信念」這個選項無法進行"
+    "structures": [
+      "流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄「參與者是否達到本次目標洞察」"
+    ],
+    "version": "1.0.0"
   },
-  "summary": "表面事件是本期第 6 次主動分享人數降到 2 位，但這其實是三期以來重複出現的下降型態，根源在流程安排讓帶領者先解讀作品、記錄表只看「是否達到洞察」，而這背後是團隊默認參與者需要專家幫他們看見意義。要改變的不是這一次的人數，而是這個默認信念與隨之而來的流程設計。",
-  "trend": {
-   "question": "主動分享人數從第1次到第6次如何變化？",
-   "reading": "從第1次的6位降到第6次的2位，與三期以來從第4次開始下降的型態一致。",
-   "series": [
-    {
-     "name": "主動分享人數",
-     "points": [
+  "result": {
+    "data_thickness": {
+      "events": {
+        "external_sources": 0,
+        "own_statements": 1
+      },
+      "mental_models": {
+        "external_sources": 0,
+        "own_statements": 1
+      },
+      "patterns": {
+        "external_sources": 0,
+        "own_statements": 1
+      },
+      "structures": {
+        "external_sources": 0,
+        "own_statements": 1
+      }
+    },
+    "diagnosis": {
+      "citations": [
+        "r/structures/0",
+        "r/mental_models/0"
+      ],
+      "text": "表面的分享人數下降由第3層的流程結構（帶領者先講解35分鐘、紀錄表只問洞察達成）持續產生，而這套結構又由第4層「參與者需要專家幫忙看見意義」的團隊信念所支撐。",
+      "title": "問題在第3層結構，根在第4層信念"
+    },
+    "findings": [
       {
-       "citation": "r/events",
-       "label": "第1次",
-       "value": 6
+        "citations": [
+          "r/events",
+          "r/events/0"
+        ],
+        "confidence": {
+          "level": "mid",
+          "reason": "僅有單一期的事件描述，缺乏跨期比對佐證"
+        },
+        "id": "F1",
+        "revision_conditions": [
+          {
+            "text": "若其他期的第 1、6 次數字也被記錄",
+            "would_change": "可確認此下降是否為固定型態而非單期波動"
+          }
+        ],
+        "text": "第 6 次 session 只有 2 位主動分享作品，相較第 1 次的 6 位明顯減少，這是冰山最上層可見的事件。",
+        "title": "表面事件：主動分享人數下降"
       },
       {
-       "citation": "r/events",
-       "label": "第6次",
-       "value": 2
+        "citations": [
+          "r/patterns",
+          "r/patterns/0"
+        ],
+        "confidence": {
+          "level": "mid",
+          "reason": "型態描述來自記錄本身，尚無外部來源交叉驗證"
+        },
+        "id": "F2",
+        "revision_conditions": [
+          {
+            "text": "若能取得每次 session 的逐次分享人數",
+            "would_change": "可量化下降幅度與各條件（帶領者先講、線上/實體）的關聯強度"
+          }
+        ],
+        "text": "三期資料顯示每期都從第 4 次 session 起主動分享人數下降，帶領者先解讀作品時掉最多，線上場更低，顯示這是重複發生的型態而非單一事件。",
+        "title": "型態：從第 4 次起系統性下滑"
+      },
+      {
+        "citations": [
+          "r/structures",
+          "r/structures/0",
+          "r/mental_models",
+          "r/mental_models/0"
+        ],
+        "confidence": {
+          "level": "mid",
+          "reason": "結構與心智模式為記錄內部推論，未經外部驗證來源支持"
+        },
+        "id": "F3",
+        "revision_conditions": [
+          {
+            "text": "若訪談帶領者確認其真實信念",
+            "would_change": "可確認心智模式描述是否準確反映團隊實際假設"
+          }
+        ],
+        "text": "流程設計讓帶領者先講解意義（90 分鐘中佔 35 分鐘），紀錄表只問是否達成目標洞察；這背後是團隊默認參與者需要專家詮釋，訓練教的是解讀而非引導自我發現。",
+        "title": "結構與心智模式支撐型態"
       }
-     ],
-     "unit": "位"
-    }
-   ]
-  },
-  "units": [
-   {
-    "action": "先記錄下這次現象，不急著單次補救",
-    "brief": "第6次2位、第1次6位主動分享",
-    "citations": [
-     "r/events"
     ],
-    "effect": "確認問題確實存在，作為後續比對基準",
-    "leverage": "low",
-    "meaning": "這是本期最新的表面事件，顯示主動分享人數從第1次到第6次明顯減少，是整個分析的起點。",
-    "path": "r/events",
-    "step": "記錄本次現象"
-   },
-   {
-    "action": "整理三期資料確認型態邊界，找出哪些場次條件影響最大",
-    "brief": "三期皆第4次起下降",
-    "citations": [
-     "r/patterns"
+    "focus": {
+      "path": "r/structures",
+      "why": "結構層已有具體、可操作的數字（35分鐘、紀錄表欄位），是最快能動手且效果會傳導到型態層的切入點"
+    },
+    "gaps": [
+      {
+        "citations": [
+          "r/mental_models/0"
+        ],
+        "needed_evidence": "帶領者訪談或訓練教材內容",
+        "path": "r/mental_models",
+        "text": "心智模式僅有單一團隊默認的描述，未說明此信念的來源或形成過程"
+      }
     ],
-    "effect": "確認問題的規模與範圍，避免誤判為單次意外",
-    "leverage": "mid",
-    "meaning": "三期以來都從第4次session開始下降，且帶領者先解讀作品的場次掉得最多，線上場更低，這是重複出現的型態而非單一事件。",
-    "path": "r/patterns",
-    "step": "比對三期型態"
-   },
-   {
-    "action": "調整流程順序與時間分配，擴充記錄表追蹤參與過程",
-    "brief": "帶領者說明佔35分鐘",
-    "citations": [
-     "r/structures"
-    ],
-    "effect": "改善會反映在數次session內，效果較中期可見",
-    "leverage": "high",
-    "meaning": "流程設計是帶領者先講解意義、參與者才回應，帶領者說明就佔了90分鐘中的35分鐘，記錄表也只看是否達到目標洞察，這個結構持續產生型態中觀察到的下降。",
-    "path": "r/structures",
-    "step": "重新設計流程"
-   },
-   {
-    "action": "與團隊共同檢視並挑戰這個默認，調整訓練方向",
-    "brief": "默認參與者需專家解讀",
-    "citations": [
-     "r/mental_models"
-    ],
-    "effect": "改變最難但最持久，會逐步改變往後所有場次的流程設計",
-    "leverage": "max",
-    "meaning": "團隊默認參與者需要專家幫他們看見意義，訓練教的是怎麼解讀作品而非怎麼讓人自己看見，這個信念是支撐前面所有結構與型態的最深層原因。",
-    "path": "r/mental_models",
-    "step": "挑戰核心默認"
-   }
-  ],
-  "usage": {
-   "input_tokens": 11113,
-   "output_tokens": 5751
-  },
-  "visual": {
-   "bindings": {
-    "levels": [
-     {
-      "label": "事件",
-      "path": "r/events"
-     },
-     {
-      "label": "型態",
-      "path": "r/patterns"
-     },
-     {
-      "label": "結構",
-      "path": "r/structures"
-     },
-     {
-      "label": "心智模式",
-      "path": "r/mental_models"
-     }
-    ]
-   },
-   "kind": "layered"
-  }
- },
- "gateResults": [
-  {
-   "evidence": {
-    "citations": [
-     "r/events",
-     "r/patterns",
-     "r/structures",
-     "r/mental_models",
-     "r/structures",
-     "r/mental_models"
-    ],
-    "manifest_count": 8,
-    "unstated_numbers": {}
-   },
-   "gate_id": "citation_integrity",
-   "status": "PASS"
-  },
-  {
-   "evidence": {
-    "paths": [
-     "r/events",
-     "r/patterns",
-     "r/structures",
-     "r/mental_models"
-    ]
-   },
-   "gate_id": "visual_bindings_resolvable",
-   "status": "PASS"
-  },
-  {
-   "evidence": {
+    "headline": "分享率逐期下滑非偶然",
+    "interpretation_id": "INTERP-E4B3565C580D48908AB276ACEA078174",
+    "loop": {
+      "edges": [
+        {
+          "from": "n1",
+          "to": "n2"
+        },
+        {
+          "from": "n2",
+          "to": "n3"
+        },
+        {
+          "from": "n3",
+          "to": "n1"
+        }
+      ],
+      "feeders": [
+        {
+          "citations": [
+            "r/mental_models/0"
+          ],
+          "id": "f1",
+          "text": "訓練教的是怎麼解讀作品，不是怎麼讓人自己看見",
+          "to": "n1"
+        }
+      ],
+      "kind": "reinforcing",
+      "name": "專家詮釋循環",
+      "nodes": [
+        {
+          "citations": [
+            "r/mental_models/0"
+          ],
+          "id": "n1",
+          "text": "團隊默認參與者需要專家幫他們看見意義"
+        },
+        {
+          "citations": [
+            "r/structures/0"
+          ],
+          "id": "n2",
+          "text": "流程設計帶領者先講解意義（佔35分鐘）"
+        },
+        {
+          "citations": [
+            "r/patterns/0"
+          ],
+          "id": "n3",
+          "text": "主動分享人數持續下滑"
+        }
+      ],
+      "reading": "團隊相信參與者需要專家幫忙看見意義，因此設計出帶領者先講解的流程，這流程又讓參與者更少主動分享，進一步強化「參與者需要專家詮釋」的信念。"
+    },
+    "method_id": "systems.iceberg_model",
+    "model": "claude-sonnet-5",
     "next_methods": [
-     "systems.leverage_point_analysis"
-    ]
-   },
-   "gate_id": "next_methods_resolvable",
-   "status": "PASS"
+      "systems.leverage_point_analysis",
+      "systems.behavior_over_time",
+      "systems.causal_loop_diagram"
+    ],
+    "next_steps": [
+      {
+        "answers": "哪一層的介入最能持久改變參與者分享行為",
+        "deepens": "F3",
+        "est_cost": "M",
+        "method_id": "systems.leverage_point_analysis",
+        "needs_input": [],
+        "on_path": true,
+        "prefill": {},
+        "short": "找槓桿點",
+        "why": "已挖到心智模式層，下一步該找最省力的介入點",
+        "yields": "找出高槓桿的具體介入點"
+      },
+      {
+        "answers": "三期的分享人數是否呈現相同的下降曲線",
+        "deepens": "F2",
+        "est_cost": "M",
+        "method_id": "systems.behavior_over_time",
+        "needs_input": [
+          "三期每次session的逐次分享人數"
+        ],
+        "on_path": true,
+        "prefill": {},
+        "short": "畫行為曲線",
+        "why": "目前只有片段數字，逐次曲線能確認型態真實性",
+        "yields": "可視化的行為隨時間變化圖"
+      },
+      {
+        "answers": "結構與心智模式如何互相強化形成循環",
+        "deepens": "F3",
+        "est_cost": "M",
+        "method_id": "systems.causal_loop_diagram",
+        "needs_input": [],
+        "on_path": false,
+        "prefill": {},
+        "short": "畫因果回饋圖",
+        "why": "可補充循環動態視角，但非必要下一步",
+        "yields": "因果回饋圖，標出強化迴路"
+      }
+    ],
+    "priority": "先從第3層結構下手，調整流程順序與紀錄表，因為這是可立即操作且有具體數字支持的層次；隨後再處理第4層的團隊信念，才能讓改變持久。",
+    "priority_short": "先改流程結構，再挑戰深層信念",
+    "provenance": {
+      "authorship_state": "AI_GENERATED",
+      "epistemic_type": "AI_INFERENCE",
+      "locked": null
+    },
+    "recommendations": [
+      {
+        "action": "調整流程：縮短帶領者先講解的時間，改為先讓參與者自己回應再補充",
+        "citations": [
+          "r/structures/0",
+          "r/patterns/0"
+        ],
+        "expected": "降低帶領者先解讀作品造成的分享意願下滑",
+        "level": "now"
+      },
+      {
+        "action": "修改紀錄表，增加「參與者主動分享」欄位而非只記錄是否達成目標洞察",
+        "citations": [
+          "r/structures/0"
+        ],
+        "expected": "讓團隊看見分享率變化，而非只看洞察達成與否",
+        "level": "next"
+      }
+    ],
+    "record_sha256": "3f0878662ec4b95290b01e83f4c7a0a01a4a01cf58b554386aa25a3e8660196b",
+    "solutions": {
+      "first_step": "下週試辦一場session，把帶領者說明時間從35分鐘縮短，先讓參與者回應",
+      "horizon": "12 週",
+      "metrics": [
+        {
+          "name": "主動分享人數",
+          "now": "2",
+          "now_citation": "r/events/0",
+          "target": "6",
+          "when": "12週後"
+        }
+      ],
+      "options": [
+        {
+          "advice": "先在一場試行，觀察分享人數變化",
+          "cost": "低",
+          "durability": "中，若信念不變可能回退",
+          "name": "調整流程順序",
+          "paths": [
+            "r/structures/0"
+          ],
+          "risk": "帶領者不熟悉新順序，執行不一致",
+          "takes": "1-2週可見初步變化",
+          "what": "讓參與者先回應、帶領者後補充，縮短帶領者先講解的35分鐘"
+        },
+        {
+          "advice": "搭配團隊會議說明為何新增此欄位",
+          "cost": "低",
+          "durability": "中，取決於是否持續使用",
+          "name": "重設紀錄表",
+          "paths": [
+            "r/structures/0"
+          ],
+          "risk": "欄位增加但團隊未真正重視",
+          "takes": "下次session即可用",
+          "what": "增加主動分享人數欄位，不只記錄是否達成目標洞察"
+        },
+        {
+          "advice": "用系統.leverage_point_analysis找出最小可行的訓練調整點",
+          "cost": "中高",
+          "durability": "高，改變信念後效果持久",
+          "name": "重新設計帶領訓練",
+          "paths": [
+            "r/mental_models/0"
+          ],
+          "risk": "帶領者團隊可能抗拒改變既有專業角色認知",
+          "takes": "數月，需教材與陪伴修正",
+          "what": "訓練內容從「怎麼解讀作品」轉為「怎麼讓人自己看見」"
+        }
+      ],
+      "plan": [
+        {
+          "action": "試行新流程順序（參與者先回應）",
+          "owner": "帶領者團隊",
+          "proof": "該次session紀錄與觀察筆記",
+          "target": "分享人數不低於上次",
+          "when": "1"
+        },
+        {
+          "action": "在紀錄表加入主動分享人數欄位並持續記錄",
+          "owner": "帶領者團隊",
+          "proof": "更新後的紀錄表",
+          "target": "每次都有分享人數數字",
+          "when": "2 到 4"
+        },
+        {
+          "action": "檢視三次試行後的分享人數趨勢",
+          "owner": "專案負責人",
+          "proof": "逐次分享人數比較表",
+          "target": "下滑趨勢趨緩或回升",
+          "when": "5 到 8"
+        },
+        {
+          "action": "啟動帶領者訓練內容調整討論",
+          "owner": "訓練負責人",
+          "proof": "訓練教材修訂草案",
+          "target": "教材加入引導自我發現的方法",
+          "when": "9 到 12"
+        }
+      ],
+      "recommended": "調整流程順序",
+      "signoff": "帶領者團隊需同意調整流程順序與紀錄表內容，訓練負責人需同意教材修訂方向，否則第三個選項（重設訓練）無法推進。"
+    },
+    "summary": "分享人數下降不是單次事件，而是三期都重複出現的型態，根源在於流程設計讓帶領者先詮釋作品、紀錄表只看目標洞察，背後是團隊認為參與者需要專家幫忙看見意義的信念。要真正改變，需從流程與信念兩層一起著手。",
+    "trend": {
+      "question": "每期session次數增加時，主動分享人數如何變化？",
+      "reading": "從第1次到第6次session，主動分享人數從6位降到2位，顯示明顯下滑。",
+      "series": [
+        {
+          "name": "主動分享人數",
+          "points": [
+            {
+              "citation": "r/events/0",
+              "label": "第1次",
+              "value": 6
+            },
+            {
+              "citation": "r/events/0",
+              "label": "第6次",
+              "value": 2
+            }
+          ],
+          "unit": "人"
+        }
+      ]
+    },
+    "units": [
+      {
+        "action": "記錄後續每次session的分享人數",
+        "brief": "第6次僅2位分享，第1次6位",
+        "citations": [
+          "r/events/0"
+        ],
+        "effect": "建立可追蹤的基準線，短期即可看到變化",
+        "leverage": "low",
+        "meaning": "這是最表面可見的單一數據點，顯示本期分享人數比開始時少。單看此點無法判斷是否為長期趨勢。",
+        "path": "r/events",
+        "step": "逐次記錄分享數",
+        "thickness": {
+          "fill_by": "systems.behavior_over_time",
+          "note": "只有兩個時間點的數字",
+          "verdict": "thin"
+        }
+      },
+      {
+        "action": "比對三期中「先解讀」與「線上/實體」條件下的下滑幅度",
+        "brief": "三期皆從第4次起下滑",
+        "citations": [
+          "r/patterns/0"
+        ],
+        "effect": "找出型態成因的關鍵變因，效果可持續數期",
+        "leverage": "mid",
+        "meaning": "型態顯示下滑並非偶然，且與帶領者先解讀、線上場等條件相關，這是跨期重複出現的規律。",
+        "path": "r/patterns",
+        "step": "比對條件差異",
+        "thickness": {
+          "fill_by": "systems.behavior_over_time",
+          "note": "缺逐次數字佐證型態",
+          "verdict": "thin"
+        }
+      },
+      {
+        "action": "重新設計流程順序與紀錄表欄位",
+        "brief": "帶領者先講佔35分鐘",
+        "citations": [
+          "r/structures/0"
+        ],
+        "effect": "改變結構可讓型態長期翻轉，非一次性效果",
+        "leverage": "high",
+        "meaning": "流程結構本身讓帶領者主導詮釋，紀錄表也只追蹤是否達成目標洞察，這套結構持續產生型態中的下滑。",
+        "path": "r/structures",
+        "step": "改流程與紀錄表",
+        "thickness": {
+          "note": "結構描述具體有數字",
+          "verdict": "enough"
+        }
+      },
+      {
+        "action": "與帶領者團隊共同檢視並挑戰此信念，調整訓練內容",
+        "brief": "默認參與者需要專家詮釋",
+        "citations": [
+          "r/mental_models/0"
+        ],
+        "effect": "若成功轉變，能從根本改變所有相關結構與型態，效果最持久",
+        "leverage": "max",
+        "meaning": "這是支撐結構背後的深層信念：帶領者訓練教的是解讀作品而非引導自我發現，是整個現象最根本的來源。",
+        "path": "r/mental_models",
+        "step": "挑戰核心信念",
+        "thickness": {
+          "fill_by": "systems.leverage_point_analysis",
+          "note": "只有一句團隊默認描述",
+          "verdict": "thinnest"
+        }
+      }
+    ],
+    "usage": {
+      "input_tokens": 30608,
+      "output_tokens": 10397
+    },
+    "visual": {
+      "bindings": {
+        "levels": [
+          {
+            "label": "事件",
+            "path": "r/events"
+          },
+          {
+            "label": "型態",
+            "path": "r/patterns"
+          },
+          {
+            "label": "結構",
+            "path": "r/structures"
+          },
+          {
+            "label": "心智模式",
+            "path": "r/mental_models"
+          }
+        ]
+      },
+      "kind": "layered"
+    }
   },
-  {
-   "evidence": {
-    "dropped": {},
-    "problems": {},
-    "removed": {}
-   },
-   "gate_id": "detail_integrity",
-   "status": "PASS"
-  }
- ],
- "manifest": [
-  {
-   "id": "r/events",
-   "kind": "record",
-   "path": "r/events",
-   "sha256": "be50d591d16cc6ec649db22a56d31ba9f5f235d70cc0ca10d51083588b0cd8fd",
-   "value": "[\"這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位\"]"
-  },
-  {
-   "id": "r/events/0",
-   "kind": "record",
-   "path": "r/events/0",
-   "sha256": "be50d591d16cc6ec649db22a56d31ba9f5f235d70cc0ca10d51083588b0cd8fd",
-   "value": "\"這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位\""
-  },
-  {
-   "id": "r/mental_models",
-   "kind": "record",
-   "path": "r/mental_models",
-   "sha256": "be50d591d16cc6ec649db22a56d31ba9f5f235d70cc0ca10d51083588b0cd8fd",
-   "value": "[\"帶領者團隊默認「參與者需要專家幫他們看見意義」；訓練教的是「怎麼解讀作品」，不是「怎麼讓人自己看見」\"]"
-  },
-  {
-   "id": "r/mental_models/0",
-   "kind": "record",
-   "path": "r/mental_models/0",
-   "sha256": "be50d591d16cc6ec649db22a56d31ba9f5f235d70cc0ca10d51083588b0cd8fd",
-   "value": "\"帶領者團隊默認「參與者需要專家幫他們看見意義」；訓練教的是「怎麼解讀作品」，不是「怎麼讓人自己看見」\""
-  },
-  {
-   "id": "r/patterns",
-   "kind": "record",
-   "path": "r/patterns",
-   "sha256": "be50d591d16cc6ec649db22a56d31ba9f5f235d70cc0ca10d51083588b0cd8fd",
-   "value": "[\"三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低\"]"
-  },
-  {
-   "id": "r/patterns/0",
-   "kind": "record",
-   "path": "r/patterns/0",
-   "sha256": "be50d591d16cc6ec649db22a56d31ba9f5f235d70cc0ca10d51083588b0cd8fd",
-   "value": "\"三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低\""
-  },
-  {
-   "id": "r/structures",
-   "kind": "record",
-   "path": "r/structures",
-   "sha256": "be50d591d16cc6ec649db22a56d31ba9f5f235d70cc0ca10d51083588b0cd8fd",
-   "value": "[\"流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄「參與者是否達到本次目標洞察」\"]"
-  },
-  {
-   "id": "r/structures/0",
-   "kind": "record",
-   "path": "r/structures/0",
-   "sha256": "be50d591d16cc6ec649db22a56d31ba9f5f235d70cc0ca10d51083588b0cd8fd",
-   "value": "\"流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄「參與者是否達到本次目標洞察」\""
-  }
- ]
+  "gateResults": [
+    {
+      "evidence": {
+        "citations": [
+          "r/events",
+          "r/events/0",
+          "r/patterns",
+          "r/patterns/0",
+          "r/structures",
+          "r/structures/0",
+          "r/mental_models",
+          "r/mental_models/0",
+          "r/structures/0",
+          "r/patterns/0",
+          "r/structures/0"
+        ],
+        "cited": 5,
+        "claims": 5,
+        "manifest_count": 8,
+        "unstated_numbers": {},
+        "unsupported": 0
+      },
+      "gate_id": "citation_integrity",
+      "status": "PASS"
+    },
+    {
+      "evidence": {
+        "paths": [
+          "r/events",
+          "r/patterns",
+          "r/structures",
+          "r/mental_models"
+        ]
+      },
+      "gate_id": "visual_bindings_resolvable",
+      "status": "PASS"
+    },
+    {
+      "evidence": {
+        "next_methods": [
+          "systems.leverage_point_analysis",
+          "systems.behavior_over_time",
+          "systems.causal_loop_diagram"
+        ]
+      },
+      "gate_id": "next_methods_resolvable",
+      "status": "PASS"
+    },
+    {
+      "evidence": {
+        "dropped": {},
+        "problems": {},
+        "removed": {
+          "gaps": [
+            "gaps[0].text states ['5'], which the record does not; removed"
+          ]
+        },
+        "repaired": {
+          "units": [
+            "units[2].thickness.fill_by names no next step; left out"
+          ]
+        }
+      },
+      "gate_id": "detail_integrity",
+      "status": "PASS"
+    },
+    {
+      "evidence": {
+        "ai_labelled": true,
+        "judgment_left_to_user": true
+      },
+      "gate_id": "no_preset_conclusion",
+      "status": "PASS"
+    }
+  ],
+  "recordGates": [
+    {
+      "evidence": [
+        {
+          "provenance_valid": true
+        }
+      ],
+      "gate_id": "provenance_required",
+      "status": "PASS",
+      "timestamp": "2026-09-29T01:13:13.026566+00:00",
+      "validator": "api.interpret"
+    },
+    {
+      "evidence": [
+        {
+          "problems": []
+        }
+      ],
+      "gate_id": "top_down_completeness",
+      "status": "PASS",
+      "timestamp": "2026-09-29T01:13:13.026566+00:00",
+      "validator": "api.interpret"
+    }
+  ],
+  "manifest": [
+    {
+      "id": "r/events",
+      "kind": "record",
+      "path": "r/events",
+      "sha256": "3f0878662ec4b95290b01e83f4c7a0a01a4a01cf58b554386aa25a3e8660196b",
+      "value": "[\"這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位\"]"
+    },
+    {
+      "id": "r/events/0",
+      "kind": "record",
+      "path": "r/events/0",
+      "sha256": "3f0878662ec4b95290b01e83f4c7a0a01a4a01cf58b554386aa25a3e8660196b",
+      "value": "\"這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次是 6 位\""
+    },
+    {
+      "id": "r/mental_models",
+      "kind": "record",
+      "path": "r/mental_models",
+      "sha256": "3f0878662ec4b95290b01e83f4c7a0a01a4a01cf58b554386aa25a3e8660196b",
+      "value": "[\"帶領者團隊默認「參與者需要專家幫他們看見意義」；訓練教的是「怎麼解讀作品」，不是「怎麼讓人自己看見」\"]"
+    },
+    {
+      "id": "r/mental_models/0",
+      "kind": "record",
+      "path": "r/mental_models/0",
+      "sha256": "3f0878662ec4b95290b01e83f4c7a0a01a4a01cf58b554386aa25a3e8660196b",
+      "value": "\"帶領者團隊默認「參與者需要專家幫他們看見意義」；訓練教的是「怎麼解讀作品」，不是「怎麼讓人自己看見」\""
+    },
+    {
+      "id": "r/patterns",
+      "kind": "record",
+      "path": "r/patterns",
+      "sha256": "3f0878662ec4b95290b01e83f4c7a0a01a4a01cf58b554386aa25a3e8660196b",
+      "value": "[\"三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低\"]"
+    },
+    {
+      "id": "r/patterns/0",
+      "kind": "record",
+      "path": "r/patterns/0",
+      "sha256": "3f0878662ec4b95290b01e83f4c7a0a01a4a01cf58b554386aa25a3e8660196b",
+      "value": "\"三期以來，每期都從第 4 次 session 開始主動分享人數下降；帶領者先解讀作品的那幾次掉得最多；線上場更低\""
+    },
+    {
+      "id": "r/structures",
+      "kind": "record",
+      "path": "r/structures",
+      "sha256": "3f0878662ec4b95290b01e83f4c7a0a01a4a01cf58b554386aa25a3e8660196b",
+      "value": "[\"流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄「參與者是否達到本次目標洞察」\"]"
+    },
+    {
+      "id": "r/structures/0",
+      "kind": "record",
+      "path": "r/structures/0",
+      "sha256": "3f0878662ec4b95290b01e83f4c7a0a01a4a01cf58b554386aa25a3e8660196b",
+      "value": "\"流程是帶領者先講這件作品的意義，再請參與者回應；90 分鐘裡帶領者說明佔 35 分鐘；紀錄表只有一欄「參與者是否達到本次目標洞察」\""
+    }
+  ]
 }
