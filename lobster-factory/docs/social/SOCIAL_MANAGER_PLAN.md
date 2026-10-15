@@ -33,7 +33,7 @@
 - 驗收：每個函式一個測試，用 fixture（`lib/content/__tests__/postiz-*.test.ts`）；錯誤路徑：429 回傳 `retryAfter`。
 - 邊界：不在 client 裡做重試迴圈；rate limit 的退讓在 C5。
 
-### C4 API（Opus 5.5）
+### C4 API ✅ 2026-10-15（`d55ec7686`，0096＋0098 已套正式、next-admin 已部署；兩份審查加複查見 WORKLOG 2026-10-15 續12）
 - 0096 交代的：改 target／media 的同一個 transaction 要碰父貼文（讓 version 涵蓋子列）；0096 與 C4 同一次部署，部署後重跑一次 0011→social_accounts 的同步（冪等）補上中間新連的帳號。
 - 路由：`app/api/social/brands`、`accounts`（`POST connect` 回授權網址並記「進行中」、`POST reconnect`、`DELETE`、`GET` 含狀態）、`posts`（CRUD、`PUT state`、`POST bulk`、`GET ?start&end` 合併 WordPress 文章）、`lists`、`media`（沿用 `uploadMedia`）、`log`。
 - 授權：每個 handler 先 `requireBrandRole(brandId, ["owner","editor"])`；審核相關要 `reviewer`；客戶唯讀只有 GET。

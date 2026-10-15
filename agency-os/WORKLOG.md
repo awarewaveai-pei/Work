@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-15（續13）C4＋懸空指標修正上正式：0096／0098 已套，next-admin `474fdb9ee` 已部署；頻道搬進 social_accounts，對帳全綠
+
+**做了**（操作者「15 項一直做到完成」授權，含「C4 時 0096 上正式」）:
+- 順序：commit `5f38b4a06`（懸空指標）＋`d55ec7686`（C4）→ 套 0096＋0098（純新增，舊程式不讀新表）→ push → sg-deploy。
+- 合併 `origin/main`：遠端多一個 daily scaffold 的 commit。共用 index 裡有別的 session 已 stage 的 gmail callback，`git merge` 拒絕，所以改用 plumbing：`merge-tree --write-tree` → `commit-tree` → `update-ref`（帶舊值檢查）→ index 只補 daily 一筆，內容和 HEAD 相同。merge commit `474fdb9ee`。別人 stage 的檔原樣保留。本機的 daily 筆記（verify-ack 那段）接在 scaffold 後面，沒有刪任何行。
+- `/check-drift`：沒有 DEPLOY_HOLD，compose 環境變數沒有 drift，正式站落後 5 個 commit，正好是這次要上的內容。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0096 0098 → APPLY_OK 2/2；ledger 有兩列；social_accounts 3 筆 = social_postiz_connections 3 筆（soulful bluesky／facebook、awarewave-ops facebook）；三個函式 ACL 只有 supabase_admin、postgres、service_role；social_connect_attempts 已開 RLS | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → healthy 9s，smoke 5/5 OK，.deployed-commit=474fdb9ee | exit=0 | ms=240000
+- REALTEST_EVIDENCE: tool=SSH | cmd=部署後檢查：舊表有、新表沒有的連接 = 0（中間空窗期沒有漏）；/api/internal/reconcile → postiz-integrations checked 3 dangling 0（現在從 social_accounts 讀）、cognitive-os-projects 0/0；未登入 GET /api/social/brands → 401 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall → Passed 26 Failed 0 Skipped 6（證據 agency-os/reports/e2e/2026-10-15/smoke） | exit=0 | ms=35000
+- REVIEW_WAIVED: NA -- 部署紀錄；程式審查見續11、續12
+- BUGHUNT_WAIVED: NA -- 無新程式改動（續12 已跑 social_postiz_connections）
+
+**剩**:
+- `social_postiz_connections`（0011）還在，程式已經不讀它；下一版刪掉（計畫 C1：舊表保留一版）。
+- C5：送出與對帳。
+
+**rollback**: `sg-deploy` 回 `d84b4843a`（`/root/lobster-phase1/.deployed-commit` 記上一版）；資料庫照續12 的順序跑 down。
 ## 2026-10-15（續12）C4 社群 API：品牌層授權、唯一一處狀態規則、原子寫入（0098）、連接帳號配對；兩份審查加複查（2C／11M）全修；舊表讀寫搬到 social_accounts
 
 **做了**:
