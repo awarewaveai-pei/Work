@@ -1,5 +1,5 @@
 # Worklog
-## 2026-10-15（續28）認知平台上線 b5c8a628→2e7d70c46（6 個 commit）：第一次部署被測試閘門擋下，修兩個舊缺陷後重跑
+## 2026-10-15（續28）認知平台已上線 b5c8a628→fcc494eb4（6 個 commit＋閘門兩個舊缺陷的修正）：不存在的網址正式站回 404
 
 **操作者**：「要」（部署 75b013d14／04e56476c／c65e2ec97／7566beea7／c76fde717／2e7d70c46 一起上）。範圍內沒有 migration、compose、Dockerfile 改動。
 
@@ -18,6 +18,8 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
   - 讀回兩處 diff：`ai.py` 只改 178 行、型別註記 `ai.py:108` 為 `dict | None`；checkout-only 清單由 `test_ci_postgres.py:104-110` 驗集合一致（OK）。
 - ORACLE_WAIVED: 兩行修正，各由一個既有指名測試由紅轉綠；部署閘門在主機上再跑一次 image 測試
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 /opt/cognitive-os ff-only → fcc494eb4；deploy/deploy.sh（/tmp/cos-deploy-20261015b.out：測試閘門 PASS、build web/api、smoke local／web local／database／public 全 PASS，08:32:43Z done；`.green-sha`=fcc494eb4；cognitive-os-api／web×3 healthy） | exit=0 | ms=1800000
+- REALTEST_EVIDENCE: tool=curl | cmd=正式站 cognitive.aware-wave.com（帶假 cookie）：/methods/systems.iceberg_model 200、/methods/no-such-tool 404、/methods/constructor 404、/learn/systems.iceberg_model 200、/learn/no-such-lesson 404、/learn/workflow/life-decision-v1 200、/learn/workflow/no-such-lesson 404、兩份示範 200、未知領域 404、/help 200；無 cookie → 307 /login（登入閘不變）；/projects/no-such-project 200＝假 session 被 API 401，照設計放行 | exit=0 | ms=12000
 - BUGHUNT_DONE: scope=agency-os,scripts,Projects/internal/cognitive-engineering-os | grep=or \{\}$|waiter.result | hits=54
   - `waiter.result` 只有 `ai.py:137`（賦值）與 `ai.py:178`。其餘 52 個行尾 `or {}`：在 test_absent_is_none 掃的範圍（block hooks／block routes／AI actions）內的都已列在 `HARMLESS`（測試綠）；範圍外（`main.py`、`method_form.py`、`scripts/phase4-checks.py` 等）不屬這條規則，這次不動。
 
