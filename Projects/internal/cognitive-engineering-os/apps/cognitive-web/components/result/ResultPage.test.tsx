@@ -118,6 +118,29 @@ describe("ResultPage", () => {
     expect(host.textContent).toContain("用你自己的案例在「魚骨圖」跑一次");
     await done();
   });
+  it("a tool whose picture has its own units gets one ④ card and one ⑥ row per unit; a reading or citation of any member belongs to its unit (template §15.1 item 2)", async () => {
+    const demo = (await import("../../fixtures/demo-iceberg.json")).default as unknown as { result: React.ComponentProps<typeof ResultPage>["result"] };
+    // the record and units of tests/unit/test_picture_units.py (the server's picture_units for this record)
+    const rec = { problem_summary: "分享從 6 人掉到 2 人", hypotheses: [{ id: "H1", statement: "帶領者先講意義", category: "人" }, { id: "H2", statement: "", category: "人" },
+      { id: "H3", statement: "線上場關鏡頭", category: "環境" }, { id: "H4", statement: "分享時間不夠", category: "人" }] };
+    const pictureUnits = [{ path: "r/hypotheses/0", label: "人", members: ["r/hypotheses/0", "r/hypotheses/3"], own_statements: 2 }, { path: "r/hypotheses/2", label: "環境", members: ["r/hypotheses/2"], own_statements: 1 }];
+    const unitReading = (path: string, meaning: string, citations: string[]) => ({ path, brief: meaning.slice(0, 6), meaning, action: "先驗證", step: "先驗證", effect: "知道是不是它", leverage: "mid" as const, citations });
+    const fish = JSON.parse(JSON.stringify({ ...demo.result, method_id: "root_cause.fishbone", visual: { kind: "table", bindings: {} }, picture_units: pictureUnits,
+      units: [unitReading("r/hypotheses/0", "人這根骨有兩個原因。", ["r/hypotheses/3/statement"]), unitReading("r/hypotheses/2", "環境只有一個原因。", ["r/hypotheses/2/statement"])],
+      focus: { path: "r/hypotheses/3", why: "兩個原因都在這裡" }, solutions: undefined }).replaceAll("冰山", "魚骨")) as typeof demo.result;
+    const html = renderToStaticMarkup(<ResultPage result={fish} record={rec} display={{ name_zh: "魚骨圖" }} />);
+    expect(html).not.toContain("不分層");
+    for (const text of ["<h3>第 1 根骨／2：人</h3>", "<h3>第 2 根骨／2：環境</h3>", "<b>這根骨問</b>", "<b>在這根骨出手</b>", "人這根骨有兩個原因。", "環境只有一個原因。", "你填 2 句", "你填 1 句", "<td>人 ★</td>", "<td>環境</td>", "⑤ 總結：在哪一根骨出手"]) expect(html, text).toContain(text);
+    expect(html.match(/<h3>第 \d 根骨／2/g)).toHaveLength(2);
+    expect(html).toMatch(/帶領者先講意義[^<]*分享時間不夠/);   // the bone's 你填的 reads both of its causes
+    for (const text of ["第 1 層", "第 2 層", "這層問", "在這層出手", "由上往下", "根在第", "<th>欄位</th>"]) expect(html, text).not.toContain(text);   // the unit word is the tool's own; bones have no depth
+    expect(html).toContain("<th>根骨</th>");
+    const artifact = path.resolve(process.cwd(), ".artifacts/fishbone-units.html");
+    mkdirSync(path.dirname(artifact), { recursive: true });
+    writeFileSync(artifact, html);
+    const checked = spawnSync("python", [path.resolve(process.cwd(), "../../docs/mockups/check-mocks.py"), "--page", "result", artifact], { encoding: "utf8" }).stdout;
+    expect(checked, checked).toContain("green");
+  });
   it("uses layer keys for iceberg facts, counts only that layer's external citations, and makes no unbuilt-form promise", () => {
     const sparse = {
       ...fixture,

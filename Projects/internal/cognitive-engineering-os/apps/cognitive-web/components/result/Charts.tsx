@@ -127,11 +127,11 @@ export function LoopChart({ loop, dashed = new Set<string>() }: { loop: Loop; da
 }
 
 // A tool's own charts in ③, after A and B, lettered C, D… in this order: method knowledge, never your data (the reading
-// names the source). `shows` = the tool whose view it draws; methods/registry/result-page-shows.yaml by_method lists the
+// names the source). `shows` = the tool whose view it draws (`short`: its name in ⑧'s closing line); methods/registry/result-page-shows.yaml by_method lists the
 // same ids (⑧ stops recommending them), and ResultPage.test fails while the two differ.
-export type OwnChart = { shows: string; title: string; scope: string; draw: () => React.ReactNode; how: string; saw: string; source: string };
+export type OwnChart = { shows: string; short: string; title: string; scope: string; draw: () => React.ReactNode; how: string; saw: string; source: string };
 export const OWN_CHARTS: Record<string, OwnChart[]> = {
-  "systems.iceberg_model": [{ shows: "systems.leverage_point_analysis", title: "槓桿對比：在哪一層出手最值得？", scope: "（四層）", draw: () => <LeverageChart />,
+  "systems.iceberg_model": [{ shows: "systems.leverage_point_analysis", short: "四層槓桿", title: "槓桿對比：在哪一層出手最值得？", scope: "（四層）", draw: () => <LeverageChart />,
     how: "灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。", saw: "第 3 層是「做得到、也撐得久」的交會點。", source: "冰山模型本身的介入模式" }],
 };
 

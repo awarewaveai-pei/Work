@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-15（續21）認知平台：魚骨／五個為什麼／柏拉圖／問題陳述的結果頁 ④⑥ 一個單位一張卡（工具模板 §15.1 第 2 項，未部署）
+
+**根因**: 結果頁的單位只認「表單欄位是課的單位」（冰山）或 AI 綁的層；四個找原因工具的單位是圖上的骨頭、每一步、每一項、三段，不是表單欄位，所以 ④ 只印「這個工具的結果是一張圖，不分層」、⑥ 沒有列。單位又只能比對第一段路徑（`r/hypotheses`），一張魚骨的所有骨頭會擠成同一個單位。
+
+**做了**:
+- 伺服器 `ai_lego/modules/research/picture_units.py`：從紀錄算出圖的單位（問題陳述三段、魚骨每個類別一根骨＝其假設 `r/hypotheses/<i>`、五個為什麼每一步依 step 排、柏拉圖每一列），條件與網頁四張圖的篩選相同；標籤一定不空（空問題／空 id 用「第 n 項」）。
+- `interpret_method_record`：提示列出 PICTURE UNITS（解讀一個單位一段、路徑用單位路徑）；結果存 `picture_units`（SERVER_KEYS，不收模型給的；空就不存）；`place_readings`：寫在成員上的解讀移到單位路徑，同一單位第二段解讀拿掉並記在 removed（頁面會說），不默默丟。
+- schema `method-interpretation` 1.5.0（選填 `picture_units`）；SPEC_QUICKREF 重產。
+- 網頁 `ResultPage`：單位三種來源（表單單位／`picture_units`／AI 綁的層），圖的單位用「成員」比對（等於或在成員底下），厚度用伺服器算的句數；單位稱呼由圖的登記 `unit`（層／段／根骨／步／項）；圖的單位沒有深淺：不說「由上往下」「根在第幾」、不畫信念層虛框；⑥ 首欄寫單位名。⑧ 結尾「四層槓桿」改由 `OWN_CHARTS.short`（上一筆漏掉的冰山字）。
+- 舊分析（1.4.0，沒有 `picture_units`）照舊顯示；`isOldVersion` 只把 1.1 以前算舊，不受影響。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest tests/unit/test_picture_units.py tests/unit/test_interpret_method_record.py → 79 passed（四工具單位、成員都是 manifest id、空標籤、解讀歸位與重複拿掉、提示列出單位、伺服器存的蓋過模型的、冰山不存） | exit=0 | ms=14500
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run components lib → 54 files / 463 passed（魚骨兩根骨 → 兩張卡「第 1 根骨／2：人」、⑥ 兩列含 ★、你填的含該骨兩個原因、無「第 n 層／由上往下／根在第」、`check-mocks.py --page result` 綠；冰山 `--parity` 仍綠） | exit=0 | ms=12000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python tests/run_golden_tests.py；gen_spec_index.py --check → 4273 passed、index 已重產 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run → Ran 1682 tests, OK（跑在 Codex 修正之前；修正只動 picture_units.py／interpret 一處，其兩個測試檔 79 passed） | exit=0 | ms=1139036
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+  - Codex `agency-os/reports/oracle/2026-10-15-partialreview-7ec570f9.md`：F1 五個為什麼空問題、F2 柏拉圖空 id → 空標籤使整個解讀被 schema 擋下 → 成立，所有工具共用一道「標籤不空」；F3 同一單位兩段解讀默默只留第一段 → 成立，伺服器 `place_readings` 歸位並把多的列進 removed。三項各一個測試。
+- ORACLE_WAIVED: Codex 之後只改了 F1–F3 的修法＋測試，pytest 79 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=focusKey|四層槓桿 | hits=4
+  - `focusKey`：程式已無引用，只剩歷史文件 `WORKLOG-archive/2026-06.md`、`RESULT_PAGE_GAP_REPORT.md`（不改）；「四層槓桿」：`Charts.tsx` 冰山那筆的 short ＋ 冰山示意稿（規格本身，正確）。
+
+**剩餘風險**: 未部署。四工具還沒有表單條目（M13），「這根骨問」目前印 schema 欄位名；第 4 項補表單與課後才有中文問題與出手方式。
+
+**rollback**: `git revert`；schema 欄位選填，舊分析不受影響。
 ## 2026-10-15（續20）Session 切換提醒：首行提 /compact／/clear、/clear 附新 session 開場句；suggest-compact 改成量 transcript（已安裝）
 
 **根因**：§5 只有「模型不匹配 → 首行提醒」有機制；`/compact`／`/clear` 沒觸發條件、沒首行格式，`/clear` 不附「新 session 第一句」（操作者：「clear 要告知開新 session 應該要說什麼」）。唯一訊號 `rules/suggest-compact.js` 數 Write/Edit 次數（每 50 次 PreToolUse stderr WARN）：計數 ≠ context，而且操作者看不到。

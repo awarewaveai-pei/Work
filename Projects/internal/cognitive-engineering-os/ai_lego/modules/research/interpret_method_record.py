@@ -19,6 +19,7 @@ from ai_lego.errors import InvariantViolation
 from ai_lego.platform.ai_gateway.structured import ask_object, offers_schema, parse_object, tool_schema
 from ai_lego.platform.ai_gateway.provider import MAX_OUTPUT_TOKENS, ProviderCallError
 from ai_lego.modules.research.gates import evaluate_citation_integrity
+from ai_lego.modules.research.picture_units import picture_units, place_readings
 
 INTERPRETATION_SCHEMA = "ai-lego://specs/cognitive/typed-objects/method-interpretation.schema.yaml"
 INTERPRETATION_SCHEMA_FILE = Path("specs") / "cognitive" / "typed-objects" / "method-interpretation.schema.yaml"
@@ -30,7 +31,7 @@ INTERPRET_MAX_TOKENS = min(16000, MAX_OUTPUT_TOKENS)
 INTERPRET_EFFORT = "medium"
 INTERPRET_TIMEOUT_SECONDS = 300.0                    # 16k tokens take up to ~4 minutes; the interactive 85 s default would cut it off (the job runs in the background)
 # keys the server writes after the model answers: never asked of the model
-SERVER_KEYS = ("interpretation_id", "method_id", "record_sha256", "data_thickness", "provenance", "model", "usage", "judgment")
+SERVER_KEYS = ("interpretation_id", "method_id", "record_sha256", "data_thickness", "picture_units", "provenance", "model", "usage", "judgment")
 MAX_SCHEMA_CHARS = 12000
 MAX_FEEDBACK_CHARS = 2000
 
@@ -118,12 +119,15 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         "quadrant": {"items": example_path, "x": example_path, "y": example_path, "x_threshold": example_path, "y_threshold": example_path},
         "table": {"rows": example_path, "columns": example_path},
     }
+    drawn = picture_units(method_id, record, language)
     lines = [
         f"METHOD: {method_id} — {(display or {}).get('name_zh', '')} / {(display or {}).get('name_en', '')}",
         f"BLURB / WHY: {(display or {}).get('blurb_zh', '')} / {(display or {}).get('why', '')}",
         "CONTRACT: " + json.dumps({key: contract.get(key) for key in ("purpose", "inputs", "outputs", "preconditions", "recommended_next")}, ensure_ascii=False),
         "RECORD SCHEMA: " + record_schema_text[:MAX_SCHEMA_CHARS],
         "MANIFEST:\n" + "\n".join(f"[{item['id']}] {item.get('value', '')}" for item in manifest if item.get("kind") == "record"),
+        *(["PICTURE UNITS (what this tool's own picture draws; write one units[] entry per unit with path = its path, and use these paths in focus.path and solutions.options[].paths):\n"
+           + "\n".join(f"[{unit['path']}] {unit['label']} (covers {', '.join(unit['members'])})" for unit in drawn)] if drawn else []),
         "SOURCES:\n" + "\n".join(str(item["id"]) for item in manifest if item.get("kind") == "project_source"),
         "AVAILABLE ACTIVE METHODS:\n" + "\n".join(catalog_lines or []),
         "NOT FOR next_steps / next_methods (this page already draws them, or this project already ran them): " + ", ".join(f"{key} ({why})" for key, why in sorted(excluded.items())),
@@ -149,7 +153,7 @@ def build_interpretation_prompt(method_id: str, contract: Mapping[str, Any], dis
         f"RULES: Write all narrative in {language}. The JSON shape is illustrative: omit optional arrays rather than emit empty-string examples. revision_conditions belongs inside each finding, never at the root. recommendations must contain objects, never bare strings, each citing the manifest; level = now|next|later (when to do it). next_steps objects require every shown key; est_cost = S|M|L (S = minutes of the user's time, M = an hour or two, L = days). Every finding and recommendation cites at least one manifest id; citations and every visual binding string must be a manifest id. confidence.level = high only when a SOURCE supports the finding; with the record alone it is at most mid. next_methods may only use exact AVAILABLE ACTIVE METHODS ids; every next_steps.method_id must also appear in next_methods (a step naming any other method is dropped), and every next_steps.prefill value must be a MANIFEST id. Never invent numbers or sources.",
         "RESULT PAGE SECTIONS (each optional; omit a section you cannot support from the record): headline = what happened in this case, at most 20 Chinese characters, like a newspaper headline (the page title). "
         "summary = one or two sentences saying what is really going on and what to change. "
-        "units = one entry per unit of the picture (layered: one per level, path = that level's binding path): brief = what the user filled in for that unit, at most 16 Chinese characters, only words and numbers from the record; meaning = what the unit tells (two or three sentences); "
+        "units = one entry per unit of the picture (layered: one per level, path = that level's binding path; with PICTURE UNITS: one per listed unit, path = its path): brief = what the user filled in for that unit, at most 16 Chinese characters, only words and numbers from the record; meaning = what the unit tells (two or three sentences); "
         "action = how to act at that unit; step = that action in at most 12 Chinese characters; effect = what the action achieves and how long it lasts; leverage = low|mid|high|max (max = the deepest unit, hardest but most lasting); citations = manifest ids. "
         "focus = the units path to act on first, and why. priority = the order of action in one or two sentences. "
         "solutions: 5 options (distinct paths, from quick relief to the deepest change; the user may pick several), name = a short name of at most 8 Chinese characters with no numbering or 甲乙丙 prefix (the page numbers them), paths = the units each acts on, compared by what, takes (time to effect), cost, durability, risk, advice; first_step = one thing doable tomorrow with no budget and no approval; "
@@ -971,7 +975,8 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
         try:
             interpretation = parse_object(completion)
             supplied_visual = interpretation.get("visual") if isinstance(interpretation.get("visual"), Mapping) else {}
-            interpretation.update({"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record), "visual": {**supplied_visual, "kind": kind}, "data_thickness": data_thickness_from_manifest(manifest), "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None}, "model": completion.model, "usage": {"input_tokens": completion.input_tokens, "output_tokens": completion.output_tokens}})
+            interpretation.update({"interpretation_id": interpretation_id, "method_id": method_id, "record_sha256": record_sha256(record), "visual": {**supplied_visual, "kind": kind}, "data_thickness": data_thickness_from_manifest(manifest), "picture_units": picture_units(method_id, record, language), "provenance": {"epistemic_type": "AI_INFERENCE", "authorship_state": "AI_GENERATED", "locked": None}, "model": completion.model, "usage": {"input_tokens": completion.input_tokens, "output_tokens": completion.output_tokens}})
+            if not interpretation["picture_units"]: del interpretation["picture_units"]   # a tool without picture units stores none
             for key in DETAIL_KEYS:   # "trend": null means omitted, not a malformed section
                 if key in interpretation and interpretation[key] is None: del interpretation[key]
             model_judgment = interpretation.pop("judgment", None)   # the user's own field: never filled in their name (無預設結論)
@@ -984,8 +989,9 @@ def run_interpretation(*, method_id: str, contract: Mapping[str, Any], display: 
             claims_removed, claims_repaired = repair_claims(interpretation, record, manifest)
             gaps_repaired = merge(add_blank_unit_gaps(interpretation, manifest, language), add_missing_source_gap(interpretation, manifest, language))
             interpretation, detail_removed, detail_repaired = repair_details(interpretation, record, manifest)
-            removed = merge(steps_removed, schema_removed, claims_removed, detail_removed)
-            repaired = merge(ids_repaired, steps_repaired, schema_repaired, claims_repaired, gaps_repaired, detail_repaired,
+            placed_removed, placed_repaired = place_readings(interpretation)
+            removed = merge(steps_removed, schema_removed, claims_removed, detail_removed, placed_removed)
+            repaired = merge(ids_repaired, steps_repaired, schema_repaired, claims_repaired, gaps_repaired, detail_repaired, placed_repaired,
                              {"judgment": ["the model wrote a judgment; the judgment is the user's, left out"]} if model_judgment is not None else {})
             gates = evaluate_interpretation_gates(interpretation, record, manifest, active_method_ids)
             core_failed = [g["gate_id"] for g in gates[:3] if g["status"] != "PASS"]

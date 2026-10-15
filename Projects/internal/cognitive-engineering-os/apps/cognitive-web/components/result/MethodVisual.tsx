@@ -91,9 +91,11 @@ function Layers({ units, name }: { units: Unit[]; name: string }) {
 // picture cannot use falls back to the generic picture of the tool's visual kind. A tool whose units are its form fields
 // (lessons units.items) may also name, by unit key, the units ③'s charts sit on (`homes`: A trend -- ⑦ C's metrics track
 // it -- and B loop; without, a chart names the units it cites), what ③'s charts map to (`parts`), and ⑥'s title and
-// closing line (`table`). ResultPage reads these and has no branch of its own on a method id (template §12).
+// closing line (`table`). `unit` = what one of its units is called on the page (default 層): the units themselves are the
+// form fields, or the server's picture_units (ai_lego/modules/research/picture_units.py). ResultPage reads these and has no
+// branch of its own on a method id (template §12).
 type RecordPicture = { visual: string; heading?: string; caption: string; usable: (record?: Record<string, unknown>) => boolean; draw: (record: Record<string, unknown>, fields: FormField[], units: Unit[]) => React.ReactNode;
-  homes?: { trend: string[]; loop: string[] }; parts?: string; table?: { title: string; note: string } };
+  homes?: { trend: string[]; loop: string[] }; parts?: string; table?: { title: string; note: string }; unit?: string };
 const optionLabel = (fields: FormField[], key: string) => (value: string) => fields.find((field) => field.key === key)?.options?.find((option) => option.value === value)?.label ?? value;
 const RECORD_PICTURES: Record<string, RecordPicture> = {
   "systems.iceberg_model": { visual: "layered", heading: "冰山圖", caption: "你的問題在四層各是什麼", usable: () => true, draw: (_record, _fields, units) => <Iceberg units={units} />,
@@ -101,20 +103,20 @@ const RECORD_PICTURES: Record<string, RecordPicture> = {
     table: { title: "理解層次對照表（改編自 Anderson & Johnson）", note: "越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。" } },
   "delivery.risk_register": { visual: "risk-matrix", caption: "每個風險落在機率×衝擊的哪一格", usable: (record) => risksOf(record).length > 0,
     draw: (record) => <RiskMatrix risks={risksOf(record)} total={riskCount(record)} /> },
-  "framing.problem_statement": { visual: "problem-gap", heading: "問題陳述", caption: "現況和期望差在哪裡", usable: (record) => problemOf(record) !== null,
+  "framing.problem_statement": { visual: "problem-gap", heading: "問題陳述", unit: "段", caption: "現況和期望差在哪裡", usable: (record) => problemOf(record) !== null,
     draw: (record) => <ProblemGap content={problemOf(record)!} /> },
-  "root_cause.fishbone": { visual: "fishbone", heading: "魚骨圖", caption: "可能的原因，分在哪幾根骨頭上", usable: (record) => bonesOf(record).length > 0,
+  "root_cause.fishbone": { visual: "fishbone", heading: "魚骨圖", unit: "根骨", caption: "可能的原因，分在哪幾根骨頭上", usable: (record) => bonesOf(record).length > 0,
     draw: (record) => <Fishbone bones={bonesOf(record)} problem={typeof record.problem_summary === "string" ? record.problem_summary : undefined} /> },
-  "root_cause.five_whys": { visual: "why-chain", heading: "為什麼鏈", caption: "從一個原因一路問到流程", usable: (record) => chainOf(record) !== null,
+  "root_cause.five_whys": { visual: "why-chain", heading: "為什麼鏈", unit: "步", caption: "從一個原因一路問到流程", usable: (record) => chainOf(record) !== null,
     draw: (record, fields) => <WhyChain chain={chainOf(record)!} stopLabel={optionLabel(fields, "stop_conditions_met")} /> },
-  "root_cause.pareto": { visual: "pareto", heading: "柏拉圖", caption: "哪幾個原因佔了大部分", usable: (record) => paretoOf(record) !== null,
+  "root_cause.pareto": { visual: "pareto", heading: "柏拉圖", unit: "項", caption: "哪幾個原因佔了大部分", usable: (record) => paretoOf(record) !== null,
     draw: (record) => <ParetoChart pareto={paretoOf(record)!} /> },
 };
 /** Card ②'s heading and caption, and what the tool's registration says about ③④⑥, for a picture drawn from the record,
  *  or undefined when that picture is not drawn (same test as the body). */
 export function recordPicture(methodId: string, record?: Record<string, unknown>): Omit<RecordPicture, "visual" | "usable" | "draw"> | undefined {
   const picture = RECORD_PICTURES[methodId];
-  return picture?.usable(record) ? { heading: picture.heading, caption: picture.caption, homes: picture.homes, parts: picture.parts, table: picture.table } : undefined;
+  return picture?.usable(record) ? { heading: picture.heading, caption: picture.caption, homes: picture.homes, parts: picture.parts, table: picture.table, unit: picture.unit } : undefined;
 }
 
 export function MethodVisual({ kind, bindings, methodId, name = "", units = [], record, fields = [] }: { kind: string; bindings: Bindings; methodId?: string; name?: string; units?: Unit[]; record?: Record<string, unknown>; fields?: FormField[] }) {

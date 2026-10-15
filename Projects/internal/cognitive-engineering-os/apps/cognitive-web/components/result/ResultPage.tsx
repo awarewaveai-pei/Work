@@ -53,6 +53,7 @@ type Interpretation = {
   interpretation_id: string; method_id: string; findings: Finding[]; visual: { kind: string; bindings: Record<string, unknown> };
   next_methods?: string[]; next_steps?: Step[]; recommendations?: Array<{ action?: string; expected?: string; citations?: string[] }>;
   gaps?: Array<{ text?: string; needed_evidence?: string; path?: string; citations?: string[] }>; data_thickness?: Record<string, { own_statements?: number; external_sources?: number }>;
+  picture_units?: Array<{ path: string; label: string; members: string[]; own_statements: number }>;   // 1.5.0, server-written
   headline?: string; summary?: string; units?: UnitReading[]; focus?: { path: string; why: string }; priority?: string; solutions?: Solutions;
   diagnosis?: { title: string; text: string; citations: string[] }; priority_short?: string;
   loop?: Loop; trend?: { question?: string; reading: string; series: TrendSeries[] };
@@ -172,7 +173,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const unitFields = unitFieldsOf(result.method_id, fields);
   // every [n] on the page, in reading order: findings, recommendations, the per-layer readings, the loop, the trend, the metrics,
   // and the tool's units themselves (the mock numbers every layer, cited or not)
-  const layerPaths = unitFields.map((field) => `r/${field.key}`);
+  const pictureUnits = unitFields.length ? [] : result.picture_units ?? [];   // a tool whose picture has its own units (bones, whys, bars)
+  const layerPaths = [...unitFields.map((field) => `r/${field.key}`), ...pictureUnits.map((unit) => unit.path)];
   const citationIds = [...new Set([
     ...findings.flatMap((item) => item.citations), ...(result.recommendations ?? []).flatMap((item) => item.citations ?? []),
     ...readings.flatMap((item) => item.citations), ...(result.loop?.nodes ?? []).flatMap((node) => node.citations),
@@ -202,8 +204,6 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const fieldOf = (path: string) => fields.find((field) => field.key === keyOf(path));
   const inputName = (path: string) => (fieldOf(path)?.label ?? keyOf(path)).split("：")[0].replace(/^[①-⑳]\s*/, "");
   const question = (path: string) => { const label = fieldOf(path)?.label; return label?.includes("：") ? label.split("：").slice(1).join("：") : label ?? keyOf(path); };
-  const readingOf = (path: string) => readings.find((item) => keyOf(item.path) === keyOf(path));
-  const focusKey = result.focus ? keyOf(result.focus.path) : null;
   // an option belongs to the deepest layer it acts on (the mock names 丙 on layer 4, not on 3 and 4); options are labelled 甲乙丙 in order
   const optionHome = (option: { paths: string[] }) => Math.max(-1, ...option.paths.map(layerIndex));
   const optionsFor = (path: string) => (solutions?.options ?? []).filter((option) => optionHome(option) === layerIndex(path));
@@ -216,28 +216,43 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     (reading?.citations ?? []).filter((id) => manifestById.get(id)?.kind === "project_source"),
   ).size;
   const levels = Array.isArray(result.visual?.bindings?.levels) ? result.visual.bindings.levels as Array<{ label?: string; path?: string }> : [];
-  // the layers, top to bottom: a tool with unit facts has its units' form fields in order (a layer the model did not bind
-  // still shows what you filled in); any other layered tool's are the layers the model bound
-  const layers: Array<{ path: string; label: string }> = unitFields.length
-    ? unitFields.map((field) => ({ path: String(levels.find((item) => keyOf(String(item.path ?? "")) === field.key)?.path ?? `r/${field.key}`), label: factsOf(`r/${field.key}`)?.title ?? String(field.label ?? field.key) }))
-    : levels.map((level) => ({ path: String(level.path ?? ""), label: level.label ?? inputName(String(level.path ?? "")) }));
-  const layerIndex = (id: string) => layers.findIndex((layer) => keyOf(layer.path) === keyOf(id));
+  // the units, top to bottom: a tool whose form fields are its units has them in form order (a layer the model did not
+  // bind still shows what you filled in); a tool whose picture has its own units has the server's list (picture_units:
+  // each covers its member ids, so a reading or a citation of any member belongs to it); any other layered tool's are the
+  // layers the model bound. `key` names a unit in data_thickness and the thickness lines.
+  type Layer = { key: string; path: string; label: string; members?: string[]; own?: number };
+  const layers: Layer[] = unitFields.length
+    ? unitFields.map((field) => ({ key: String(field.key), path: String(levels.find((item) => keyOf(String(item.path ?? "")) === field.key)?.path ?? `r/${field.key}`), label: factsOf(`r/${field.key}`)?.title ?? String(field.label ?? field.key) }))
+    : pictureUnits.length ? pictureUnits.map((unit) => ({ key: unit.path, path: unit.path, label: unit.label, members: unit.members, own: unit.own_statements }))
+    : levels.map((level) => ({ key: keyOf(String(level.path ?? "")), path: String(level.path ?? ""), label: level.label ?? inputName(String(level.path ?? "")) }));
+  const owns = (layer: Layer, id: string) => (layer.members ? layer.members.some((member) => id === member || id.startsWith(`${member}/`)) : keyOf(id) === layer.key);
+  const layerIndex = (id: string) => layers.findIndex((layer) => owns(layer, id));
+  const readingAt = (index: number) => (index < 0 ? undefined : readings.find((item) => layerIndex(item.path) === index));
+  const readingOf = (path: string) => readingAt(layerIndex(path));
+  const focusAt = result.focus ? layerIndex(result.focus.path) : -1;
+  const U = drawn?.unit ?? "層";   // what one unit is called: 層, 根骨, 步, 項, 段
+  const layered = !pictureUnits.length;   // units ordered by depth (layers): the deepest is the root; a picture's units (bones, bars…) are not
+  const citedIn = (layer: Layer) => (layer.members ? citationIds.filter((id) => layer.members!.some((member) => id === member || id.startsWith(`${member}/`))) : citedUnder(layer.path));
+  const filledIn = (layer: Layer) => (layer.members ? layer.members.map(resolved).join("；") : resolved(layer.path));
+  const layerName = (layer: Layer) => (layer.members ? layer.label : inputName(layer.path));
   const factTable = layers.length > 0 && layers.every((layer) => factsOf(layer.path));   // ⑥ gets its 出手方式／時間取向 columns
   const layerNumbers = (ids: string[]) => [...new Set(ids.map(layerIndex).filter((index) => index >= 0))].sort().map((index) => index + 1);
-  const layerNote = (ids: string[]) => { const numbers = layerNumbers(ids); return numbers.length ? `（第 ${numbers.join("、")} 層）` : ""; };
-  const units: Unit[] = layers.map((layer) => { const reading = readingOf(layer.path); return { key: keyOf(layer.path), label: layer.label, question: fieldOf(layer.path)?.label ?? inputName(layer.path), text: resolved(layer.path), brief: reading?.brief, step: reading?.step, cite: citationNumber.get(citedUnder(layer.path)[0] ?? ""), focus: focusKey === keyOf(layer.path) }; });
+  const layerNote = (ids: string[]) => { const numbers = layerNumbers(ids); return numbers.length ? `（第 ${numbers.join("、")} ${U}）` : ""; };
+  const units: Unit[] = layers.map((layer, index) => { const reading = readingAt(index); return { key: layer.key, label: layer.label, question: fieldOf(layer.path)?.label ?? inputName(layer.path), text: filledIn(layer), brief: reading?.brief, step: reading?.step, cite: citationNumber.get(citedIn(layer)[0] ?? ""), focus: focusAt === index }; });
   const order = (unit: string) => { const at = fields.findIndex((field) => field.key === unit); return at < 0 ? fields.length : at; };
-  const thickness = Object.entries(result.data_thickness ?? {}).sort(([a], [b]) => order(a) - order(b));
+  const thickness: Array<[string, { own_statements?: number }]> = pictureUnits.length ? layers.map((layer) => [layer.key, { own_statements: layer.own ?? 0 }])
+    : Object.entries(result.data_thickness ?? {}).sort(([a], [b]) => order(a) - order(b));
+  const countOf = (unit: string) => thickness.find(([key]) => key === unit)?.[1].own_statements ?? 0;
   const own = thickness.reduce((sum, [, v]) => sum + (v.own_statements ?? 0), 0);
   const sources = manifest.filter((item) => item.kind === "project_source").length;
   const counts = thickness.map(([, value]) => value.own_statements ?? 0);
   const least = counts.length ? Math.min(...counts) : 0;
   const thinnest = thickness.length > 1 && counts.filter((count) => count === least).length === 1 ? thickness[counts.indexOf(least)] : null;   // a tie names no thinnest layer
   const filled = thickness.filter(([, v]) => (v.own_statements ?? 0) > 0).length;
-  const layerNo = (unit: string) => { const index = layers.findIndex((layer) => keyOf(layer.path) === unit); return index >= 0 ? `第 ${index + 1} 層` : inputName(`r/${unit}`); };
+  const layerNo = (unit: string) => { const index = layers.findIndex((layer) => layer.key === unit); return index >= 0 ? `第 ${index + 1} ${U}` : inputName(`r/${unit}`); };
   const VERDICT: Record<Thickness["verdict"], string> = { enough: "夠用", thin: "薄", thinnest: "最薄", empty: "空白，列成證據缺口" };
-  const thicknessOf = (unit: string) => readings.find((item) => keyOf(item.path) === unit)?.thickness;
-  const verdict = (unit: string) => { const count = result.data_thickness?.[unit]?.own_statements ?? 0; const own = thicknessOf(unit)?.verdict;
+  const thicknessOf = (unit: string) => { const index = layers.findIndex((layer) => layer.key === unit); return (index >= 0 ? readingAt(index) : readings.find((item) => keyOf(item.path) === unit))?.thickness; };
+  const verdict = (unit: string) => { const count = countOf(unit); const own = thicknessOf(unit)?.verdict;
     return count === 0 ? "空白，列成證據缺口" : own ? VERDICT[own] : thinnest && thinnest[0] === unit && thickness.length > 1 ? "最薄" : "夠用"; };
   const thicknessNote = (unit: string) => { const t = thicknessOf(unit); return `${t?.note ? `（${t.note}）` : ""}${t?.fill_by ? `，⑧ ${toolLabel(names, t.fill_by)}可補` : ""}`; };
   const recommendedOption = (option: { name: string }) => solutions?.recommended === option.name;
@@ -249,13 +264,13 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const dataStep = steps.find((step) => /資料|數字|來源|證據/.test(step.yields ?? "")) ?? steps[0];
   const name = display?.name_zh ?? toolLabel(names, result.method_id);
   const tokens = (result.usage?.input_tokens ?? 0) + (result.usage?.output_tokens ?? 0);
-  const focusLayer = layers.find((layer) => keyOf(layer.path) === focusKey);
-  const focusReading = focusLayer ? readingOf(focusLayer.path) : undefined;
-  const focusIndex = focusLayer ? layers.indexOf(focusLayer) : -1;
+  const focusLayer = focusAt >= 0 ? layers[focusAt] : undefined;
+  const focusReading = readingAt(focusAt);
+  const focusIndex = focusAt;
   // the deepest layer you actually wrote something in (own_statements > 0), for "根在第 M 層"; -1 when every layer is blank
-  const rootLayerIndex = (() => { for (let index = layers.length - 1; index >= 0; index -= 1) { if ((result.data_thickness?.[keyOf(layers[index].path)]?.own_statements ?? 0) > 0) return index; } return -1; })();
+  const rootLayerIndex = !layered ? -1 : (() => { for (let index = layers.length - 1; index >= 0; index -= 1) { if (countOf(layers[index].key) > 0) return index; } return -1; })();
   // where the problem sits (N-03/N-07): the journey pill and the ⑧ lead state a position, not the headline/summary, once there is a focus
-  const position = focusIndex >= 0 ? `問題在第 ${focusIndex + 1} 層${rootLayerIndex >= 0 && rootLayerIndex !== focusIndex ? `、根在第 ${rootLayerIndex + 1} 層` : ""}` : null;
+  const position = focusIndex >= 0 ? `問題在第 ${focusIndex + 1} ${U}${rootLayerIndex >= 0 && rootLayerIndex !== focusIndex ? `、根在第 ${rootLayerIndex + 1} ${U}` : ""}` : null;
   // a next step's target form (N-13/N-14): known only once RunPage has fetched it; unknown target = trust the model's data as before
   const stepFieldsOf = (methodId: string) => stepForms[methodId];
   const stepFieldKeys = (methodId: string) => { const target = stepFieldsOf(methodId); return target ? new Set(target.map(fieldKey)) : null; };
@@ -263,8 +278,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const horizonDays = daysOf(solutions?.horizon);
   const weekRow = (when: string) => /^\s*\d+(\s*(到|[–~-])\s*\d+)?\s*$/.test(when) || /週|周/.test(when);   // 1 到 2, 3 到 4, 5, 第 1 週
   const planInWeeks = (solutions?.plan ?? []).length > 0 && (solutions?.plan ?? []).every((row) => weekRow(row.when));   // the mock's plan is laid out in weeks; a plan in other units keeps its own column name
-  const layerCount = layers.length ? `${NUMERAL[layers.length] ?? layers.length}層` : "逐層";
-  const deepest = layers.length - 1;
+  const layerCount = layers.length ? `${NUMERAL[layers.length] ?? layers.length}${U}` : `逐${U}`;
+  const deepest = layered ? layers.length - 1 : -1;
   const beliefNodes = new Set((result.loop?.feeders ?? []).length ? [] : (result.loop?.nodes ?? []).filter((node) => node.citations.length > 0 && node.citations.every((id) => layerIndex(id) === deepest) && deepest >= 2).map((node) => node.id));
   const chartCount = [result.trend, result.loop].filter(Boolean).length + ownCharts.length;
   // a chart's units: where the tool's registration homes it, else the units it cites
@@ -283,7 +298,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     await saveJudgment(judgment as Stance, judgmentText);
   };
   const removedNote = (section: string, what: string) => (removed[section]?.length ? <p className="sub mt6 mb0">{removed[section].length} 個{what}沒有出處，已拿掉（專家模式有細節）。</p> : null);
-  const missingLayerReading = removed.units?.length ? "這一層的解讀沒有出處，已拿掉" : "這次的分析沒有寫這一層";
+  const missingLayerReading = removed.units?.length ? `這一${U}的解讀沒有出處，已拿掉` : `這次的分析沒有寫這一${U}`;
   const gapNeed = (needed?: string) => needed && !UNSPECIFIED_EVIDENCE.has(needed) ? `（需要：${needed}）` : "";
   const gapSeparator = (previous?: string) => previous && !/[。！？；.!?;]\s*$/.test(previous) ? "；" : "";
   const gapText = (result.gaps ?? []).map((gap, index) => `${index ? gapSeparator(result.gaps?.[index - 1]?.text) : ""}${gap.text ?? ""}`).join("");
@@ -406,10 +421,10 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       </div>
     </Card>
 
-    <Card id="2" title={`② ${drawn?.heading ?? `${name}圖`}：${drawn?.caption ?? PICTURE[result.visual.kind] ?? "你的資料放在圖上的哪裡"}`} read={focusLayer ? "從上往下；★ 是建議先出手的層。" : "圖上每一個位置都對應你填的一段。"} act={layers.length ? `看你填的${NUMERAL[layers.length] ?? ""}段話有沒有放錯層。` : "看你填的內容有沒有放錯位置。"}>
+    <Card id="2" title={`② ${drawn?.heading ?? `${name}圖`}：${drawn?.caption ?? PICTURE[result.visual.kind] ?? "你的資料放在圖上的哪裡"}`} read={focusLayer ? `${layered ? "從上往下；" : ""}★ 是建議先出手的${U}。` : "圖上每一個位置都對應你填的一段。"} act={layers.length ? `看你填的${NUMERAL[layers.length] ?? ""}段話有沒有放錯${U}。` : "看你填的內容有沒有放錯位置。"}>
       <MethodVisual kind={result.visual.kind} bindings={result.visual.bindings} methodId={result.method_id} name={name} units={units} record={record} fields={fields} />
-      {thickness.length > 0 && <div className="thick"><b>資料厚度</b>（你填了多少）：{thickness.map(([unit, value]) => `${layerNo(unit)} ${dots(value.own_statements ?? 0)}${thicknessOf(unit)?.note ? `（${thicknessOf(unit)!.note}）` : thinnest && thinnest[0] === unit && thickness.length > 1 ? `（最薄：只有 ${value.own_statements ?? 0} 句）` : ""}`).join("　")}。薄的層，結論的信心就低。</div>}
-      {removedNote("units", "層的解讀")}
+      {thickness.length > 0 && <div className="thick"><b>資料厚度</b>（你填了多少）：{thickness.map(([unit, value]) => `${layerNo(unit)} ${dots(value.own_statements ?? 0)}${thicknessOf(unit)?.note ? `（${thicknessOf(unit)!.note}）` : thinnest && thinnest[0] === unit && thickness.length > 1 ? `（最薄：只有 ${value.own_statements ?? 0} 句）` : ""}`).join("　")}。薄的{U}，結論的信心就低。</div>}
+      {removedNote("units", `${U}的解讀`)}
     </Card>
 
     <Card id="3" title={`③ 圖表分析（${NUMERAL[chartCount] ?? chartCount}張圖各回答一個問題）`} read="每張圖回答一個問題，讀法寫在圖下。" act="不用做；圖 A 沒畫出來時，是你填的內容裡同一件事的數字不到兩個。">
@@ -435,31 +450,31 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       <p className="sub mt8 mb0">{NUMERAL[chartCount] ?? chartCount}張圖各自對應{drawn?.parts ?? "圖上的一格或幾格"}；圖 A 用你的數字，圖 B 由分析結果生成{ownCharts.map((chart, index) => `，圖 ${ownLetter(index)} 是${chart.source}`).join("")}。</p>
     </Card>
 
-    <Card id="4" title={`④ 由上往下${layerCount}解讀（每張卡同一格式）`} read={`${layers.length ? `${NUMERAL[layers.length] ?? layers.length}張` : "每張"}卡同一格式，由上往下。`} act="找出資料最薄的一層，之後補。">
-      {layers.length ? layers.map((layer, index) => { const reading = readingOf(layer.path); const unit = keyOf(layer.path); const facts = factsOf(layer.path); const opts = optionsFor(layer.path);
+    <Card id="4" title={layered ? `④ 由上往下${layerCount}解讀（每張卡同一格式）` : `④ ${layerCount}逐一解讀（每張卡同一格式）`} read={`${layers.length ? `${NUMERAL[layers.length] ?? layers.length}張` : "每張"}卡同一格式，${layered ? "由上往下" : "照圖上的順序"}。`} act={`找出資料最薄的一${U}，之後補。`}>
+      {layers.length ? layers.map((layer, index) => { const reading = readingAt(index); const unit = layer.key; const facts = factsOf(layer.path); const opts = optionsFor(layer.path);
         return <div className={`layer l${Math.min(index + 1, 4)} card ${index === layers.length - 1 ? "mb0" : "mb12"}`} key={index}>
-          <div className="head"><h3>第 {index + 1} 層／{layers.length}：{layer.label}</h3>{facts && <span className="meta">{facts.seen} ・ 時間：{facts.time} ・ 出手方式：{facts.mode}</span>}</div>
-          <div className="row"><b>這層問</b><span className="q">{facts?.ask4 ?? question(layer.path)}</span></div>
-          <div className="row"><b>你填的</b><span>{resolved(layer.path)} {cites(citedUnder(layer.path))}</span></div>
+          <div className="head"><h3>第 {index + 1} {U}／{layers.length}：{layer.label}</h3>{facts && <span className="meta">{facts.seen} ・ 時間：{facts.time} ・ 出手方式：{facts.mode}</span>}</div>
+          <div className="row"><b>這{U}問</b><span className="q">{facts?.ask4 ?? question(layer.path)}</span></div>
+          <div className="row"><b>你填的</b><span>{filledIn(layer)} {cites(citedIn(layer))}</span></div>
           <div className="row"><b>這代表</b>{reading ? <span>{withDefinitions(reading.meaning)} {cites(reading.citations)}</span> : <span className="sub">{missingLayerReading}</span>}</div>
-          <div className="row"><b>在這層出手</b>{reading ? <span>{reading.action}{/[。！？]$/.test(reading.action) ? "" : "。"}<b>效果</b>：{reading.effect}<span className={`lever ${reading.leverage}`}>槓桿：{LEVER[reading.leverage] ?? reading.leverage}</span></span> : <span className="sub">{missingLayerReading}</span>}</div>
-          <div className="row"><b>對應方案</b><span>{opts.length ? opts.map((option) => `⑦ ${optionTag(option)}${solutions?.recommended && recommendedOption(option) ? "★ 本次建議" : ""}`).join("、") : drawn?.homes?.trend.includes(unit) && solutions?.metrics?.length ? "⑦ C 的追蹤指標（不是方案，是量法）" : solutions ? "—（⑦ 沒有方案在這層出手）" : "這次沒有方案草稿"}{solutions?.recommended ? "" : focusKey === unit ? (opts.length ? "★ 本次建議" : "　★ 本次建議先在這層出手") : ""}</span></div>
-          <div className="row"><b>資料厚度</b><span>你填 {result.data_thickness?.[unit]?.own_statements ?? 0} 句・外部 {externalSourceCount(reading)} 筆 → {verdict(unit) === "最薄" || verdict(unit) === "薄" ? <span className="warn">{verdict(unit)}</span> : verdict(unit)}{thicknessNote(unit)}</span></div>
+          <div className="row"><b>在這{U}出手</b>{reading ? <span>{reading.action}{/[。！？]$/.test(reading.action) ? "" : "。"}<b>效果</b>：{reading.effect}<span className={`lever ${reading.leverage}`}>槓桿：{LEVER[reading.leverage] ?? reading.leverage}</span></span> : <span className="sub">{missingLayerReading}</span>}</div>
+          <div className="row"><b>對應方案</b><span>{opts.length ? opts.map((option) => `⑦ ${optionTag(option)}${solutions?.recommended && recommendedOption(option) ? "★ 本次建議" : ""}`).join("、") : drawn?.homes?.trend.includes(unit) && solutions?.metrics?.length ? "⑦ C 的追蹤指標（不是方案，是量法）" : solutions ? `—（⑦ 沒有方案在這${U}出手）` : "這次沒有方案草稿"}{solutions?.recommended ? "" : focusAt === index ? (opts.length ? "★ 本次建議" : `　★ 本次建議先在這${U}出手`) : ""}</span></div>
+          <div className="row"><b>資料厚度</b><span>你填 {countOf(unit)} 句・外部 {externalSourceCount(reading)} 筆 → {verdict(unit) === "最薄" || verdict(unit) === "薄" ? <span className="warn">{verdict(unit)}</span> : verdict(unit)}{thicknessNote(unit)}</span></div>
         </div>; }) : <p className="mb0">這個工具的結果是一張圖，不分層；請對照上面的圖逐項看。</p>}
     </Card>
 
-    <Card id="5" title={focusLayer ? "⑤ 總結：在哪一層出手" : "⑤ 總結"} read="三句話：問題在哪、先做哪層、還缺什麼。" act="手上有缺口的資料，就回上面補、再執行。">
+    <Card id="5" title={focusLayer ? `⑤ 總結：在哪一${U}出手` : "⑤ 總結"} read={`三句話：問題在哪、先做哪${U}、還缺什麼。`} act="手上有缺口的資料，就回上面補、再執行。">
       {result.diagnosis ? <div className="finding"><b>主要發現：{result.diagnosis.title}</b>{result.diagnosis.text} {cites(result.diagnosis.citations)}</div>
         : <div className="finding"><b>主要發現</b>{result.summary ?? findings.map((item) => item.title || item.text).join("；")}</div>}
-      {result.priority ? <div className="finding"><b>建議順序{result.priority_short ? `：${result.priority_short}` : focusLayer ? `：先第 ${layers.indexOf(focusLayer) + 1} 層` : ""}</b>{result.priority}</div> : <div className="finding"><b>建議順序</b>{missing("priority", "出手順序")}</div>}
+      {result.priority ? <div className="finding"><b>建議順序{result.priority_short ? `：${result.priority_short}` : focusLayer ? `：先第 ${focusAt + 1} ${U}` : ""}</b>{result.priority}</div> : <div className="finding"><b>建議順序</b>{missing("priority", "出手順序")}</div>}
       {(result.gaps ?? []).length > 0 ? <div className="finding warn"><b>證據缺口（老實說）</b>{(result.gaps ?? []).map((gap, index) => <span key={index}>{index ? gapSeparator(result.gaps?.[index - 1]?.text) : ""}{gap.path ? `「${inputName(gap.path)}」` : ""}{gap.text}{gapNeed(gap.needed_evidence)}{gap.citations?.length ? <> {cites(gap.citations)}</> : null}</span>)}</div> : <div className="finding warn"><b>證據缺口（老實說）</b>這次分析沒有列出缺口；沒有外部來源時，結論全靠你填的內容。</div>}
     </Card>
 
-    <Card id="6" title={`⑥ ${drawn?.table?.title ?? "對照表"}`} read={focusLayer ? "一列一層，★ 是建議先出手的列。" : "一列一個你填的欄位。"} act={solutions ? `${layers.length ? `${NUMERAL[layers.length] ?? layers.length}列` : "每一列"}都要有人負責，填在 ⑦ B 表。` : "看哪一列最薄，就先補那一列。"}>
+    <Card id="6" title={`⑥ ${drawn?.table?.title ?? "對照表"}`} read={focusLayer ? `一列一${U}，★ 是建議先出手的列。` : "一列一個你填的欄位。"} act={solutions ? `${layers.length ? `${NUMERAL[layers.length] ?? layers.length}列` : "每一列"}都要有人負責，填在 ⑦ B 表。` : "看哪一列最薄，就先補那一列。"}>
       <div className="scroll-x"><table>
-        <thead><tr>{factTable ? <><th>層</th><th>出手方式</th><th>時間取向</th></> : <th>欄位</th>}<th>這一層問的問題</th><th>你的案例</th><th>建議動作</th></tr></thead>
-        <tbody>{layers.map((layer, index) => { const facts = factTable ? factsOf(layer.path) : undefined; const star = focusKey === keyOf(layer.path) ? " ★" : ""; const reading = readingOf(layer.path);
-          return <tr key={index}>{facts ? <><td>{facts.short}{star}</td><td>{facts.mode}</td><td>{facts.when}</td></> : <td>{inputName(layer.path)}{star}</td>}<td>{facts?.asks ?? question(layer.path)}</td><td>{reading?.brief ?? resolved(layer.path)} {cites(citedUnder(layer.path))}</td><td>{reading?.step ?? reading?.action ?? "—"}</td></tr>; })}</tbody>
+        <thead><tr>{factTable ? <><th>層</th><th>出手方式</th><th>時間取向</th></> : <th>{layered ? "欄位" : U}</th>}<th>這一{U}問的問題</th><th>你的案例</th><th>建議動作</th></tr></thead>
+        <tbody>{layers.map((layer, index) => { const facts = factTable ? factsOf(layer.path) : undefined; const star = focusAt === index ? " ★" : ""; const reading = readingAt(index);
+          return <tr key={index}>{facts ? <><td>{facts.short}{star}</td><td>{facts.mode}</td><td>{facts.when}</td></> : <td>{layerName(layer)}{star}</td>}<td>{facts?.asks ?? question(layer.path)}</td><td>{reading?.brief ?? filledIn(layer)} {cites(citedIn(layer))}</td><td>{reading?.step ?? reading?.action ?? "—"}</td></tr>; })}</tbody>
       </table></div>
       {drawn?.table && <p className="sub mt8 mb0">{drawn.table.note}</p>}
     </Card>
@@ -469,7 +484,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         <h3 className="mt6 mb8">A. 選方案：{NUMERAL[solutions.options.length] ?? solutions.options.length}條路比一比（可複選）</h3>
         <div className="scroll-x"><table>
           <thead><tr><th>方案</th><th>做什麼</th><th>見效</th><th>成本</th><th>持久度</th><th>風險</th><th>建議</th></tr></thead>
-          <tbody>{solutions.options.map((option, index) => <tr key={index}><td>{optionLabel(option)} {optionName(option)}<br /><button type="button" className="btn mt4" data-demo-ok aria-pressed={chosen.includes(option.name)} onClick={() => setChosen((current) => (current.includes(option.name) ? current.filter((name) => name !== option.name) : [...current, option.name]))}>{chosen.includes(option.name) ? "已選 ✓" : "選這條"}</button></td><td>{option.what}{option.paths.length ? `（第 ${layerNumbers(option.paths).join("、")} 層）` : ""}</td><td>{option.takes}</td><td>{option.cost}</td><td>{option.durability}</td><td>{option.risk}</td><td>{recommendedOption(option) ? <b>{option.advice}</b> : option.advice}</td></tr>)}</tbody>
+          <tbody>{solutions.options.map((option, index) => <tr key={index}><td>{optionLabel(option)} {optionName(option)}<br /><button type="button" className="btn mt4" data-demo-ok aria-pressed={chosen.includes(option.name)} onClick={() => setChosen((current) => (current.includes(option.name) ? current.filter((name) => name !== option.name) : [...current, option.name]))}>{chosen.includes(option.name) ? "已選 ✓" : "選這條"}</button></td><td>{option.what}{option.paths.length ? `（第 ${layerNumbers(option.paths).join("、")} ${U}）` : ""}</td><td>{option.takes}</td><td>{option.cost}</td><td>{option.durability}</td><td>{option.risk}</td><td>{recommendedOption(option) ? <b>{option.advice}</b> : option.advice}</td></tr>)}</tbody>
         </table></div>
         <div className="finding mt12"><b>如果只做一件事，明天就做</b>{solutions.first_step}</div>
         {(solutions.plan ?? []).length > 0 && <>
@@ -555,7 +570,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
         <a className="btn ghost" href="#approve">都不做，先核准存檔（⑨ 下方）</a>
       </div>
       {note && <p className="mocknote" role="status">{note}</p>}
-      <p className="sub mt8 mb0">每一張都列出會帶入什麼、還要你填什麼；按下去在新分頁開預填好的表單，你確認才執行、才花錢。③ 已經畫出的圖（迴路、趨勢、四層槓桿）和{project ? thisHolder(project.isCase) : "這裡"}做過的工具不再推薦。</p>
+      <p className="sub mt8 mb0">每一張都列出會帶入什麼、還要你填什麼；按下去在新分頁開預填好的表單，你確認才執行、才花錢。③ 已經畫出的圖（迴路、趨勢{ownCharts.map((chart) => `、${chart.short}`).join("")}）和{project ? thisHolder(project.isCase) : "這裡"}做過的工具不再推薦。</p>
     </Card>
 
     <Card id="9" title="⑨ 引註（每個 [n] 都指向一段可查的來源）" read="[n] 是那句話的來源。" act="引錯了，按下方「退回並說原因」。">
