@@ -90,7 +90,6 @@ export function toolLabel(names: Record<string, string>, id: string): string {
   return names[id] ?? (METHOD_ID_SHAPE.test(id) ? "（找不到名稱的工具）" : id);
 }
 
-export const ICEBERG_ID = "systems.iceberg_model";   // the one tool whose form fields are its layers (docs/mockups/iceberg-result-mock.html)
 
 /** The family a tool belongs to, as the mock's tool line writes it: 系統思考 Systems Thinking; null without a catalog. */
 export function familyLabel(catalog: Catalog | null, id: string): string | null {

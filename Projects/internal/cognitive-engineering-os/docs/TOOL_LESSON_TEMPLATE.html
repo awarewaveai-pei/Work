@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>冰山模型五分鐘課</title>
+<style>
+  /* == shared design system: start (byte-identical in every mock; check-mocks.py enforces) == */
+/* Cognitive OS design system — the ONE stylesheet for every page (mocks now, web/app later).
+   Theme = the token blocks below and nothing else: to add a theme, add `:root[data-theme="<name>"]{…}` defining the
+   same token keys as the dark block. Components never carry a colour literal, pages never carry their own CSS,
+   markup never carries style= (utilities at the bottom cover spacing). check-mocks.py enforces all of it;
+   sync-design-system.py copies this file into every mock. */
+  :root{--bg:#f6f2e9;--card:#fffdf8;--ink:#232019;--muted:#6f6757;--line:#e3dbc8;--accent:#0e5b50;--accent-hover:#093f38;--ok:#1f6b47;--warn:#a3611c;--bad:#a13328;
+        --tag:#e2eeea;--soft:#f3efe4;--good-bg:#e2eeea;--bad-bg:#f3ddd8;--node:#fffdf8;--axis:#9ca3af;
+        --banner-bg:#fff4e0;--banner-line:#f1c27a;--banner-ink:#6b4300;--code-bg:#0f172a;--code-ink:#d6e2f0;
+        --l1:#f4a582;--l2:#9fc3e0;--l3:#5a93c4;--l4:#245b8a;--l4d:#0b2a4a;--water:#dbeafe;--on-ice:#f3efe4;--ice-tip-ink:#14213d;
+        --fs-h1:28px;--fs-h2:20px;--fs-h3:18px;--fs-body:16px;--fs-small:14px;--fs-tag:12px;--measure:80em}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
+        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4;--ice-tip-ink:#14213d}}
+  :root[data-theme="dark"]{color-scheme:dark;--bg:#1c2b27;--card:#243530;--ink:#f3efe4;--muted:#a9beb6;--line:#3a4b45;--accent:#8fc7b0;--accent-hover:#b5dcc9;--ok:#5fcf8f;--warn:#f0a44a;--bad:#e08a80;
+        --tag:#22403a;--soft:#2a3b36;--good-bg:#14301f;--bad-bg:#3a1c1a;--node:#2a3b36;--axis:#5b6b7d;
+        --banner-bg:#3a2a10;--banner-line:#8a6a2a;--banner-ink:#f3d9a4;--code-bg:#0b1220;--code-ink:#d6e2f0;--water:#12304a;--on-ice:#f3efe4;--ice-tip-ink:#14213d}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;background:var(--bg);color:var(--ink);font:var(--fs-body)/1.65 system-ui,-apple-system,"Segoe UI","PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif}
+  .wrap{width:100%;max-width:1360px;margin:0 auto;padding-inline:16px;padding-block:16px}   /* width: a grid item with auto margins would shrink to its content */
+  .app{display:grid;grid-template-columns:216px minmax(0,1fr);align-items:start;min-height:100vh}
+  .side{position:sticky;top:env(safe-area-inset-top,0px);height:100vh;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:14px 10px;background:var(--card);border-right:1px solid var(--line)}
+  .side .brand{display:flex;flex-direction:column;padding:4px 12px 14px;color:var(--ink);text-decoration:none;line-height:1.35}
+  .side .brand small{font-size:var(--fs-tag);color:var(--muted)}
+  .navi{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--ink);text-decoration:none;font-weight:600}
+  .navi:hover{background:var(--soft)}
+  .navi[aria-current]{background:var(--tag);color:var(--accent)}
+  .navi small{margin-left:auto;font-size:var(--fs-tag);font-weight:400;color:var(--muted)}
+  /* phone: the menu is a bottom bar; each item is as wide as its icon or label, so 8 fit in 375px with no sideways scroll (B10) */
+  @media (max-width:760px){.app{display:block}.side{position:fixed;left:0;right:0;bottom:0;top:auto;height:auto;z-index:10;flex-direction:row;gap:0;padding:4px 4px calc(4px + env(safe-area-inset-bottom,0px));border-right:0;border-top:1px solid var(--line);overflow-x:auto}.side .brand,.navi small{display:none}.navi{flex:1 1 auto;min-width:0;flex-direction:column;justify-content:center;gap:2px;padding:6px 4px;font-size:var(--fs-tag);white-space:nowrap}.app>.wrap{padding-bottom:88px;padding-inline:12px}}
+  .banner{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);padding:8px 14px;border-radius:8px;font-size:var(--fs-small);margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:14px}
+  @media (max-width:760px){.card{padding:14px 12px}}
+  h1{font-size:var(--fs-h1);line-height:1.3;margin:0 0 4px}
+  h2{font-size:var(--fs-h2);line-height:1.4;margin:0 0 10px}
+  h3{font-size:var(--fs-h3);line-height:1.4;margin:0}
+  .sub{color:var(--muted);font-size:var(--fs-small)}
+  .lead{font-size:var(--fs-body);margin:10px 0 6px}
+  a{color:var(--accent)}
+  .crumbs{font-size:var(--fs-tag);color:var(--muted);margin-bottom:8px}
+  .crumbs a{text-decoration:none}
+  .crumbs a:hover{text-decoration:underline}
+  .top{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;margin-bottom:4px}
+  .howto{font-size:var(--fs-small);color:var(--bg);background:var(--accent);border-radius:8px;padding:6px 12px;white-space:nowrap;text-decoration:none;font-weight:600}
+  .howto:hover{background:var(--accent-hover)}
+  .status{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:var(--fs-small);color:var(--muted);margin:6px 0 10px;align-items:center}
+  .pill{padding:2px 9px;border-radius:999px;font-weight:600;border:1px solid var(--warn);color:var(--warn)}
+  .pill.ok{border-color:var(--ok);color:var(--ok)}
+  .how{font-size:var(--fs-small);color:var(--muted);margin:-4px 0 10px;line-height:1.55}
+  .how b{color:var(--accent);font-weight:600;margin-right:4px}
+  .how b:not(:first-child){margin-left:12px}
+  .grid2c{display:grid;grid-template-columns:1fr;gap:10px;margin:8px 0}
+  .can,.cant{border-radius:8px;padding:8px 10px;font-size:var(--fs-small)}
+  .can{border:1px solid var(--ok)}
+  .cant{border:1px solid var(--warn)}
+  .can b,.cant b{display:block}
+  .btns{display:flex;flex-wrap:wrap;gap:8px}
+  .btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:9px 14px;font-size:var(--fs-small);font-family:inherit;line-height:inherit;text-align:left;cursor:pointer;text-decoration:none;display:inline-block}
+  .btn:hover{border-color:var(--accent)}
+  .btn.primary{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  .btn.primary:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+  .btn.ghost{color:var(--muted)}
+  .btn small{display:block;font-size:var(--fs-tag);color:inherit;opacity:.85}
+  .mocknote{background:var(--banner-bg);border:1px solid var(--banner-line);color:var(--banner-ink);border-radius:8px;padding:6px 10px;font-size:var(--fs-small);margin:6px 0 0}
+  .journey{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:var(--fs-small);margin:8px 0}
+  .journey span,.journey a{padding:4px 10px;border-radius:999px;background:var(--tag);color:var(--accent);text-decoration:none}
+  .journey a:hover{text-decoration:underline}
+  .journey span.done{background:var(--ok);color:var(--bg)}
+  .journey span.now,.journey span.next{background:var(--accent);color:var(--bg)}
+  .journey a.done{background:var(--ok);color:var(--bg)}
+  .journey a.next{outline:2px solid var(--accent);outline-offset:1px}
+  .journey i{color:var(--muted);font-style:normal}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+  .chip{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:var(--fs-small);cursor:pointer}
+  .chip.on{background:var(--accent);color:var(--bg);border-color:var(--accent)}
+  .tags span{display:inline-block;background:var(--tag);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:var(--fs-tag);margin:2px 4px 2px 0}
+  cite{font-style:normal;color:var(--accent);font-size:var(--fs-tag);vertical-align:super}
+  table{width:100%;border-collapse:collapse;font-size:var(--fs-small)}
+  th,td{border-bottom:1px solid var(--line);padding:8px 6px;text-align:left;vertical-align:top}
+  th{font-size:var(--fs-tag);color:var(--muted);font-weight:600;background:var(--soft)}
+  td:first-child{white-space:nowrap;font-weight:600}
+  .finding{border-left:4px solid var(--accent);padding:6px 12px;margin:0 0 10px;background:var(--soft);border-radius:0 8px 8px 0;font-size:var(--fs-body)}
+  .finding b{display:block}
+  .finding.warn{border-color:var(--warn)}
+  .finding.ok{border-color:var(--ok)}
+  .row{display:grid;grid-template-columns:110px 1fr;gap:8px;padding:6px 0;border-top:1px dashed var(--line);font-size:var(--fs-body)}
+  .row b{color:var(--muted);font-weight:600;font-size:var(--fs-small)}
+  .row .q{color:var(--ink)}
+  @media (max-width:560px){.row{grid-template-columns:1fr;gap:2px}}
+  .gb{display:grid;grid-template-columns:1fr;gap:10px;margin-top:6px}
+  .gb .ex{display:grid;gap:10px}
+  .good,.bad{border-radius:8px;padding:8px 10px;font-size:var(--fs-small)}
+  .good{background:var(--good-bg);border:1px solid var(--ok)}
+  .bad{background:var(--bad-bg);border:1px solid var(--bad)}
+  .mistake{display:grid;grid-template-columns:24px 1fr;gap:8px;padding:6px 0;font-size:var(--fs-body)}
+  .good b{color:var(--ok)}
+  .bad b{color:var(--bad)}
+  .mistake i{font-style:normal;color:var(--bad);font-weight:700}
+  .judge{border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin-top:10px;font-size:var(--fs-small)}
+  .judge .btns{margin:6px 0}
+  textarea{width:100%;min-height:56px;border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:var(--card);color:var(--ink)}
+  .conf{display:inline-block;font-size:var(--fs-tag);padding:1px 7px;border-radius:10px;border:1px solid var(--line);color:var(--muted);margin-left:6px;font-weight:400}
+  .conf.mid,.conf.low{border-color:var(--warn);color:var(--warn)}
+  .conf.high{border-color:var(--ok);color:var(--ok)}
+  .read{font-size:var(--fs-small);color:var(--muted);margin-top:6px;line-height:1.5}
+  .read b{color:var(--ink)}
+  .thick{font-size:var(--fs-small);color:var(--muted);margin-top:6px}
+  .terms{font-size:var(--fs-small);color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px}
+  .terms b{color:var(--ink)}
+  ol.src{padding-left:20px;font-size:var(--fs-small)}
+  .meta-bar{display:flex;flex-wrap:wrap;gap:14px;font-size:var(--fs-small);color:var(--muted)}
+  .meta-bar b{color:var(--ink)}
+  .ok{color:var(--ok)}
+  details summary{cursor:pointer;color:var(--muted);font-size:var(--fs-small)}
+  pre{background:var(--code-bg);color:var(--code-ink);font-size:var(--fs-tag);padding:12px;border-radius:8px;overflow:auto}
+  dfn{font-style:normal;border-bottom:1px dotted var(--muted)}
+  svg{width:100%;height:auto;display:block}
+  svg text{fill:var(--ink)}
+  svg text.m{fill:var(--muted)}
+  svg text.a{fill:var(--accent)}
+  svg text.w{fill:var(--on-ice)}
+  svg text.tip{fill:var(--ice-tip-ink)}
+  svg text.warn{fill:var(--warn)}
+  svg .node{fill:var(--node)}
+  svg .water{fill:var(--water)}
+  svg .axis{stroke:var(--axis)}
+  p,.lead,.how,.sub,.read,.finding,.station .why,.mocknote,.banner{max-width:var(--measure)}   /* line width: prose only; tables, pictures and card grids keep the full column */
+  :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+  /* == page components (merged from the four pages; .mcard = method/station card, .filled = filled example) == */
+  .todos{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+  .todo{background:var(--tag);border-radius:8px;padding:10px 12px;font-size:var(--fs-body)}
+  .todo b{display:block;color:var(--accent);margin-bottom:2px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:var(--fs-small);color:var(--muted);margin-top:8px}
+  .legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  .layer{border-left:6px solid var(--l2);padding-left:14px}
+  .layer.l1{border-color:var(--l1)}
+  .layer.l2{border-color:var(--l2)}
+  .layer.l3{border-color:var(--l3)}
+  .layer.l4{border-color:var(--l4)}
+  .layer .head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:baseline;margin-bottom:8px}
+  .layer .meta{font-size:var(--fs-tag);color:var(--muted)}
+  .lever{display:inline-block;padding:1px 8px;border-radius:999px;font-size:var(--fs-tag);color:var(--on-ice);margin-left:6px}
+  .lever.low{background:var(--axis)}
+  .lever.mid{background:var(--l3)}
+  .lever.high{background:var(--l4)}
+  .lever.max{background:var(--l4d)}
+  .charts{display:grid;grid-template-columns:1fr;gap:14px}
+  .charts svg{max-width:640px;margin:0 auto}
+  .charts figure{margin:0;border:1px solid var(--line);border-radius:10px;padding:10px}
+  .charts figcaption{font-size:var(--fs-small);margin-bottom:4px}
+  .kpis{display:grid;grid-template-columns:1fr;gap:10px}
+  .kpi{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:grid;gap:2px;font-size:var(--fs-small)}
+  .kpi b{font-size:var(--fs-small)}
+  .kpi .now{color:var(--muted)}
+  .kpi .goal{color:var(--ok);font-weight:700}
+  .kpi .when{color:var(--muted);font-size:var(--fs-tag)}
+  .mcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(max(260px,calc(50% - 5px)),1fr));gap:10px;margin-top:10px}
+  .mcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:var(--fs-small);display:grid;gap:4px;align-content:start}
+  .mcard.now{border-color:var(--accent);box-shadow:0 0 0 2px var(--tag)}
+  .mcard b{font-size:var(--fs-body)}
+  .mcard .k{color:var(--muted);font-size:var(--fs-tag)}
+  .mcard .need{color:var(--warn)}
+  .card .tag{display:inline-block;font-size:var(--fs-tag);padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);vertical-align:middle}
+  .mcard .tag{display:inline-block;font-size:var(--fs-tag);padding:1px 7px;border-radius:999px;background:var(--tag);color:var(--accent);margin-left:6px;vertical-align:middle}
+  h2 small{font-weight:400;color:var(--muted);font-size:var(--fs-small);margin-left:8px}
+  .grid2{display:grid;grid-template-columns:1fr;gap:12px}
+  .exlayer{border-left:6px solid var(--l2);padding:10px 12px;background:var(--soft);border-radius:0 10px 10px 0}
+  .exlayer.l1{border-color:var(--l1)}
+  .exlayer.l2{border-color:var(--l2)}
+  .exlayer.l3{border-color:var(--l3)}
+  .exlayer.l4{border-color:var(--l4)}
+  .exlayer b{display:block;font-size:var(--fs-body)}
+  .exlayer .q{color:var(--accent);font-size:var(--fs-small);margin:2px 0}
+  .exlayer .ex{font-size:var(--fs-small);color:var(--muted)}
+  .step{display:grid;grid-template-columns:34px 1fr;gap:10px;padding:8px 0;border-top:1px dashed var(--line)}
+  .step .n{width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);display:grid;place-items:center;font-weight:700;font-size:var(--fs-small)}
+  ul.check{padding-left:20px;margin:6px 0}
+  ul.check li{margin-bottom:4px}
+  .quiz{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+  .quiz details{margin:4px 0;font-size:var(--fs-body)}
+  .quiz summary{cursor:pointer}
+  .mcard.done{border-color:var(--ok)}
+  .station{border-left:6px solid var(--accent);background:var(--soft);border-radius:0 10px 10px 0;padding:12px 16px;margin-top:12px}
+  .station h3{margin:0 0 2px;font-size:var(--fs-h3)}
+  .station .why{color:var(--muted);font-size:var(--fs-small);margin:0 0 8px}
+  .row b.need{color:var(--warn)}
+  .row a{white-space:nowrap}
+  .row ul{margin:0;padding-left:18px}
+  .row li{margin:2px 0}
+  .filled{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:var(--fs-small)}
+  .filled .lab{display:block;color:var(--accent);font-size:var(--fs-tag);font-weight:600;margin-bottom:2px}
+  .search{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:inherit;background:var(--card);color:var(--ink)}
+  .fam{font-size:var(--fs-h3);margin:14px 0 2px;color:var(--accent)}
+  .fam .k{color:var(--muted);font-size:var(--fs-small);font-weight:400;margin-left:6px}
+  .fam small{font-weight:400;color:var(--muted);font-size:var(--fs-tag);margin-left:8px}
+  .tool{position:relative;padding:7px 0;border-top:1px dashed var(--line);font-size:var(--fs-small)}
+  .tool:hover{background:var(--soft)}
+  .tool b a{text-decoration:none}
+  .tool b a::after{content:"";position:absolute;inset:0}
+  .tool:hover b a{text-decoration:underline}
+  .tool b small{font-weight:400;color:var(--muted);font-size:var(--fs-tag);margin-left:6px}
+  .tool .k{color:var(--muted);font-size:var(--fs-small);margin-left:8px}
+  .tool .sub{margin-top:1px}
+  .glyph{width:26px;height:26px;flex:none}
+  .glyph *{fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .shape{width:72px;height:45px;flex:none;background:var(--soft);border-radius:8px;padding:3px}
+  .shape *{fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+  .shape .f{fill:var(--tag)}
+  .gh{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .gh b{font-size:var(--fs-body)}
+  details.dir{border-top:1px dashed var(--line);padding:8px 0}
+  details.dir summary{font-size:var(--fs-body);color:var(--ink)}
+  details.dir summary small{color:var(--muted);font-weight:400;font-size:var(--fs-tag);margin-left:8px}
+  details.dir .tool{border-top:none;padding-left:12px}
+  /* == lesson tabs (plan U15: one kind of content per tab; WAI-ARIA tabs: button[role=tab] + section[role=tabpanel]) == */
+  .tabs{display:flex;flex-wrap:wrap;gap:2px;border-bottom:1px solid var(--line);margin:6px 0 14px}
+  .tab{border:0;border-bottom:3px solid transparent;margin-bottom:-1px;background:none;color:var(--muted);font:inherit;font-weight:600;padding:8px 12px;cursor:pointer}
+  .tab:hover{color:var(--ink)}
+  .tab[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab small{font-weight:400;font-size:var(--fs-tag);margin-left:4px}
+  .tabnext{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 14px}
+  /* == the one action a page exists for (start a case, fill the fields): a thick accent frame and a big button == */
+  .card.cta{border:2px solid var(--accent)}
+  .btn.big{font-size:var(--fs-body);font-weight:700;padding:12px 22px}
+  /* == run form (the tool page's input, plan U14): label, one-line hint, the field; .layer .lN colours a layer field == */
+  .field{display:grid;gap:4px;padding:8px 0 8px 14px;border-left:6px solid var(--line);margin-top:10px}
+  .field label,.field>b{font-weight:700}
+  .field .hint{font-size:var(--fs-small);color:var(--muted);margin:0}
+  .carried{background:var(--soft);border-radius:8px;padding:8px 10px;font-size:var(--fs-small)}
+  /* == utilities and modifiers: spacing only, must stay last so they win over component margins == */
+  .mt0{margin-top:0}
+  .mt4{margin-top:4px}
+  .mt6{margin-top:6px}
+  .mt8{margin-top:8px}
+  .mt10{margin-top:10px}
+  .mt12{margin-top:12px}
+  .mt14{margin-top:14px}
+  .mb0{margin-bottom:0}
+  .mb8{margin-bottom:8px}
+  .mb12{margin-bottom:12px}
+  .my6{margin:6px 0}
+  .scroll-x{overflow-x:auto}
+  table.plan{table-layout:fixed;width:100%}   /* ⑦ B: every column fits the card; long text wraps, never cut */
+  table.plan th:nth-child(1){width:10%}table.plan th:nth-child(2){width:11%}table.plan th:nth-child(3){width:25%}table.plan th:nth-child(4),table.plan th:nth-child(5){width:13%}table.plan th:nth-child(6),table.plan th:nth-child(7){width:14%}
+  table.plan td,table.plan td:first-child{white-space:normal;overflow-wrap:anywhere;vertical-align:top}
+  table.plan input{width:100%;box-sizing:border-box;font:inherit}
+  table.plan tr.group td{background:var(--soft);font-weight:700}
+  .warn{color:var(--warn)}
+  .card.accent{border-left:6px solid var(--accent)}
+  .card.okline{border-left:6px solid var(--ok)}
+  /* == task cards (任務卡): one per task, a child indented under its parent; a journal entry inside == */
+  .tasks{display:grid;grid-template-columns:1fr;gap:12px}
+  .tcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .tcard.child{margin-left:24px;border-left:3px solid var(--accent)}
+  .tcard .head{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;justify-content:space-between}
+  .tcard .meta{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:var(--fs-small);color:var(--muted);margin:4px 0}
+  .tnotes{display:grid;grid-template-columns:1fr;gap:8px}
+  .tnote{border-top:1px dashed var(--line);padding-top:6px;font-size:var(--fs-small)}
+  .tnote b{color:var(--accent);margin-right:4px}
+  /* == shared design system: end == */
+  /* == page-specific == */
+</style>
+<!-- == partial: lesson-chip-script: start (verbatim from partials/lesson-chip-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Example set follows the line the user came in from; the operator's default is art reflection (plan D18 / U21).
+  document.addEventListener("click", function (e) {
+    var chip = e.target.closest && e.target.closest(".chip");
+    if (!chip) return;
+    var set = chip.getAttribute("data-set");
+    document.querySelectorAll(".chip").forEach(function (c) { c.classList.toggle("on", c === chip); c.setAttribute("aria-selected", c === chip ? "true" : "false"); });
+    document.querySelectorAll(".ex").forEach(function (el) { el.hidden = el.getAttribute("data-set") !== set; });
+  });
+</script>
+<!-- == partial: lesson-chip-script: end == -->
+<!-- == partial: page-actions-script: start (verbatim from partials/page-actions-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Every page. (1) A control the product wires (start a tool, approve, export…) is a <button data-mock="what it will
+  // do">; a mock cannot do it, so a click writes that sentence under the button's row instead of doing nothing. Anything
+  // the mock CAN show is a real <a href>; check-mocks.py forbids span buttons, href="#" and buttons without a behaviour.
+  // (2) An in-page link whose target sits in a closed <details> opens that fold (browsers do not, when the target is
+  // the details itself); the home router does the same for its views.
+  // window.mockNote is the one note writer (run-form-script uses it too): one p.mocknote right after `row`, reused.
+  window.mockNote = function (row, text) {
+    var note = row.nextElementSibling;
+    if (!note || !note.classList.contains("mocknote")) {
+      note = document.createElement("p"); note.className = "mocknote"; note.setAttribute("role", "status");
+      row.parentNode.insertBefore(note, row.nextSibling);
+    }
+    note.textContent = text;
+  };
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("button[data-mock]");
+      if (b) { window.mockNote(b.closest(".btns") || b, "示意稿：" + b.getAttribute("data-mock")); return; }
+      var a = e.target.closest && e.target.closest('a[href^="#"]'), t = a && document.getElementById(a.getAttribute("href").slice(1));
+      var d = t && t.closest("details");
+      if (d) d.open = true;
+    });
+  });
+</script>
+<!-- == partial: page-actions-script: end == -->
+<!-- == partial: tabs-script: start (verbatim from partials/tabs-script.html via sync-design-system.py; check-mocks.py enforces) == -->
+<script>
+  // Lessons (plan U15, operator 2026-09-25: one kind of content per tab, not one long page). .tabs[role=tablist] holds
+  // button[role=tab][aria-controls] tabs; each controls one section[role=tabpanel] (WAI-ARIA tabs, automatic activation:
+  // click, or ←/→/Home/End on the focused tab; roving tabindex). The address picks a tab too — #panel-<id> or any id
+  // inside a panel (the tool page links to #panel-read), on load and on hashchange — and so does an in-page link or a
+  // [data-tab-go="<id>"] button pointing into a hidden panel. Visibility uses the hidden attribute only.
+  (function (start) { if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start); else start(); })(function () {
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.tabs [role="tab"]'));
+    if (!tabs.length) return;
+    var bar = tabs[0].parentNode;
+    function select(tab, focus) {
+      tabs.forEach(function (t) {
+        var on = t === tab, p = document.getElementById(t.getAttribute("aria-controls"));
+        t.setAttribute("aria-selected", on ? "true" : "false"); t.tabIndex = on ? 0 : -1;
+        if (p) p.hidden = !on;
+      });
+      if (focus) tab.focus();
+    }
+    function tabFor(el) {
+      var p = el && el.closest && el.closest('[role="tabpanel"]');
+      return p ? tabs.filter(function (t) { return t.getAttribute("aria-controls") === p.id; })[0] : null;
+    }
+    function route() {
+      var id = location.hash.slice(1);
+      try { id = decodeURIComponent(id); } catch (e) {}          // a malformed %-escape: use the raw hash
+      var el = id && document.getElementById(id), t = tabFor(el);
+      if (!t) return;
+      select(t);
+      (el.getAttribute("role") === "tabpanel" ? bar : el).scrollIntoView();
+    }
+    document.addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest('.tabs [role="tab"]');
+      if (t) { select(t); return; }
+      var go = e.target.closest && e.target.closest("[data-tab-go]");
+      if (go) {
+        var g = document.getElementById("tab-" + go.getAttribute("data-tab-go"));
+        if (g) { select(g, true); bar.scrollIntoView(); }
+        return;
+      }
+      var a = e.target.closest && e.target.closest('a[href^="#"]'), at = a && tabFor(document.getElementById(a.getAttribute("href").slice(1)));
+      if (at) select(at);
+    });
+    bar.addEventListener("keydown", function (e) {
+      var i = tabs.indexOf(document.activeElement);
+      var n = e.key === "ArrowRight" ? i + 1 : e.key === "ArrowLeft" ? i - 1 : e.key === "Home" ? 0 : e.key === "End" ? tabs.length - 1 : null;
+      if (i < 0 || n === null) return;
+      e.preventDefault(); select(tabs[(n + tabs.length) % tabs.length], true);
+    });
+    window.addEventListener("hashchange", route);
+    route();
+  });
+</script>
+<!-- == partial: tabs-script: end == -->
+<style>mark.slot{background:#ffe9a8;color:#3a2a00;padding:0 3px;border-radius:3px;font-weight:600;word-break:break-word}mark.slot small{font-weight:400;font-size:11px;opacity:.75;word-break:break-all;margin-left:.4em}code{word-break:break-all}.wrap table{display:block;overflow-x:auto;max-width:100%}.wrap th,.wrap td{word-break:break-word}@media(prefers-color-scheme:dark){mark.slot{background:#5a4300;color:#ffe9a8}}</style></head>
+<body>
+<div class="app">
+  <!-- == partial: app-nav: start (rendered for this page by mockkit.PER_PAGE via sync-design-system.py; check-mocks.py enforces) == -->
+  <nav class="side" aria-label="主選單">
+    <a class="brand" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home"><b>認知作業系統</b><small>思考工具・示意稿</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#home" data-view="home"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg><span>首頁</span></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools" data-view="tools" aria-current="true"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg><span>工具</span><small aria-hidden="true">286</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#workflows" data-view="workflows"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M7.5 12h4M11.5 12c3 0 3-6 5-6M11.5 12c3 0 3 6 5 6"/></svg><span>工作流</span><small aria-hidden="true">13</small></a>
+    <a class="navi" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#projects" data-view="projects"><svg class="glyph" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg><span>我的專案</span></a>
+  </nav>
+  <!-- == partial: app-nav: end == -->
+<main class="wrap">
+<div class="card" style="border:2px dashed currentColor"><h2>這一頁就是說明書的模板</h2><p><mark class="slot">黃底的字</mark>＝每個工具要自己寫的資料，寫在 <code>evolution/lessons/vN.yaml</code>，黃底裡的字就是它在檔案裡的位置。其他一般的字＝固定文字，由 <code>docs/mockups/lessonkit.py</code> 產生，每個工具自動都一樣，不用寫。</p><p>六個分頁在這裡全部攤開、由上往下排；正式頁面一次只顯示一個。「約 5 分鐘」的 5 也是資料（<code>minutes</code>）。狀態列這裡顯示「知識不足：缺 M8」，是因為模板沒有課文、沒有 [n]；真的課寫完會自動變成「工具齊備」。</p><p>清單的最少數量：<code>start.prepare</code> 至少 3（冰山 4）；<code>units.items</code> 至少 2（冰山 4）；<code>worked.cases.rows</code> 至少 2（冰山 4）；<code>fill.steps</code> 至少 2（冰山 4）；<code>mistakes.items</code> 至少 3（冰山 4）；<code>quiz</code> 至少 2（冰山 3）；<code>read.steps</code> 至少 3（冰山 3）；<code>read.terms</code> 至少 2（冰山 4）；<code>read.rows</code> 至少 2（冰山 10）；<code>teach.flow</code> 至少 2（冰山 5）；<code>teach.script</code> 至少 2（冰山 6）；<code>teach.questions</code> 至少 2（冰山 3）；<code>teach.errors</code> 至少 2（冰山 3）；<code>sources</code> 至少 2（冰山 3）。</p></div>
+
+  <div class="banner"><b>示意稿</b>：這是第一次用「<mark class="slot">工具中文名（來自 method-display-metadata.yaml）<small>name_zh</small></mark>」的人，按下工具之前會先看到的一堂課：最上面一張「開始」卡，下面的分頁按內容分開，不用一次看完。之後每個工具都照這個樣子有一堂，內容來自工具資料，會隨回饋改進。</div>
+  <div class="crumbs"><a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#tools">工具</a> › <a href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#t-systems.iceberg_model"><mark class="slot">工具中文名（來自 method-display-metadata.yaml）<small>name_zh</small></mark></a> › 5 分鐘課</div>
+
+  <div class="top">
+    <div>
+      <h1><mark class="slot">工具中文名（來自 method-display-metadata.yaml）<small>name_zh</small></mark>：開始前 5 分鐘</h1>
+      <div class="sub">想直接做，按下面的「開始填我的案例」；想先學，照分頁一頁一頁看，每頁不到兩分鐘。</div>
+    </div>
+  </div>
+  <div class="status"><span class="pill">知識不足：缺 M8（來源 [1]、[2]、[3] 沒有被課文引用）</span><span>課程來源 3 筆 <cite>[1]</cite><cite>[2]</cite><cite>[3]</cite></span><span>約 5 分鐘</span><span>學完你會：<mark class="slot">學完你會什麼（3–4 件，用頓號分開）<small>outcomes</small></mark></span><span>教材版在「教材版」分頁（給老師／帶領者）</span></div>
+
+  <!-- 開始：這堂課唯一的主要動作，永遠在最上面 -->
+  <div class="card cta" id="start">
+    <h2>開始：填你自己的案例<small>準備 30 秒</small></h2>
+    <div class="how"><b>怎麼讀</b>這張卡一直在最上面；下面的分頁是課程，看完或看到一半都能回來按。<b>你要做的</b>按「開始填我的案例」；還不確定，先用示範案例試一次，或按第三顆讓系統幫你挑。</div>
+    <div class="btns">
+      <a class="btn primary big" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →<small><mark class="slot">「開始填我的案例」的小字：有幾格、每格有提示和例子、按執行才開始<small>start.new</small></mark></small></a>
+      <a class="btn" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#demo">用示範案例試一次<small><span class="ex" data-set="edd"><mark class="slot">「用示範案例試一次」的小字：是哪個示範例子（五個領域各寫一份）<small>start.demo</small></mark>，已填好，按執行就看結果</span><span class="ex" data-set="partner" hidden><mark class="slot">「用示範案例試一次」的小字：是哪個示範例子（五個領域各寫一份）<small>start.demo</small></mark>，已填好，按執行就看結果</span><span class="ex" data-set="decision" hidden><mark class="slot">「用示範案例試一次」的小字：是哪個示範例子（五個領域各寫一份）<small>start.demo</small></mark>，已填好，按執行就看結果</span><span class="ex" data-set="ecom" hidden><mark class="slot">「用示範案例試一次」的小字：是哪個示範例子（五個領域各寫一份）<small>start.demo</small></mark>，已填好，按執行就看結果</span><span class="ex" data-set="daily" hidden><mark class="slot">「用示範案例試一次」的小字：是哪個示範例子（五個領域各寫一份）<small>start.demo</small></mark>，已填好，按執行就看結果</span></small></a>
+      <a class="btn ghost" href="https://claude.ai/artifact/5j9jef81ts5mqmYpVARNmJ#ask">這工具適合我的問題嗎？<small>描述你的問題，系統幫你挑，最多三個建議</small></a>
+    </div>
+    <p class="sub mt10 mb0">手邊有這些會填得比較快，沒有也可以先填、之後補：</p>
+    <ul class="check">
+      <li><mark class="slot">準備清單一項：手邊有什麼會填得比較快<small>start.prepare[0]</small></mark></li>
+      <li><mark class="slot">準備清單一項：手邊有什麼會填得比較快<small>start.prepare[1]</small></mark></li>
+      <li><mark class="slot">準備清單一項：手邊有什麼會填得比較快<small>start.prepare[2]</small></mark></li>
+      <li><mark class="slot">準備清單一項：手邊有什麼會填得比較快<small>start.prepare[3]</small></mark></li>
+    </ul>
+    <p class="sub mb0">這堂課之後不會再自動出現；想再看，工具頁右上角「怎麼用？」隨時能打開，會另開一個分頁，填到一半的格子不會不見。</p>
+  </div>
+
+  <!-- == partial: domain-chips: start (verbatim from partials/domain-chips.html via sync-design-system.py; check-mocks.py enforces) == -->
+    <div class="chips" role="tablist" aria-label="例子領域">
+      <span class="sub">例子領域：</span>
+      <button class="chip on" role="tab" aria-selected="true" data-set="edd" id="chip-edd">藝術反思／EdD 研究（你的預設）</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="partner" id="chip-partner">合作對象</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="decision" id="chip-decision">一個決策</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="ecom" id="chip-ecom">電商後台</button>
+      <button class="chip" role="tab" aria-selected="false" data-set="daily" id="chip-daily">日常</button>
+    </div>
+  <!-- == partial: domain-chips: end == -->
+  <!-- == partial: lesson-tabs: start (rendered for this page by mockkit.PER_PAGE via sync-design-system.py; check-mocks.py enforces) == -->
+  <div class="tabs" role="tablist" aria-label="課程內容">
+    <button class="tab" type="button" role="tab" id="tab-learn" aria-controls="panel-learn" aria-selected="true" tabindex="0">認識<small>1.5 分</small></button>
+    <button class="tab" type="button" role="tab" id="tab-example" aria-controls="panel-example" aria-selected="false" tabindex="-1">看例子<small>1 分</small></button>
+    <button class="tab" type="button" role="tab" id="tab-fill" aria-controls="panel-fill" aria-selected="false" tabindex="-1">怎麼填<small>1.5 分</small></button>
+    <button class="tab" type="button" role="tab" id="tab-read" aria-controls="panel-read" aria-selected="false" tabindex="-1">看懂結果<small>1 分</small></button>
+    <button class="tab" type="button" role="tab" id="tab-teach" aria-controls="panel-teach" aria-selected="false" tabindex="-1">教材版</button>
+    <button class="tab" type="button" role="tab" id="tab-sources" aria-controls="panel-sources" aria-selected="false" tabindex="-1">來源</button>
+  </div>
+  <!-- == partial: lesson-tabs: end == -->
+
+  <section class="tabpanel" id="panel-learn" role="tabpanel" aria-labelledby="tab-learn">
+  <div class="card">
+    <h2>這是什麼<small>30 秒</small></h2>
+    <div class="how"><mark class="slot">「這是什麼」的怎麼讀／你要做的（含什麼情況不適合用）<small>what.how</small></mark></div>
+    <div class="grid2">
+      <div>
+        <p class="lead"><mark class="slot">一句比喻，讓人一秒懂<small>what.lead</small></mark></p>
+        <p><mark class="slot">定義：這工具是什麼、做什麼，附 [n]<small>what.body</small></mark></p>
+        <p class="sub"><mark class="slot">什麼時候用、什麼時候不用，附 [n]<small>what.when</small></mark></p>
+      </div>
+      <svg role="img" aria-label="slot" viewBox="0 0 600 120" width="100%"><rect x="1" y="1" width="598" height="118" fill="none" stroke="currentColor" stroke-dasharray="6 4"/><text x="300" y="56" text-anchor="middle" font-size="20" font-weight="600">工具的原生圖（跟結果頁 ② 同一張）</text><text x="300" y="86" text-anchor="middle" font-size="14">what.picture</text></svg>
+    </div>
+    <div class="grid2c">
+      <div class="can"><b>這工具能回答</b><mark class="slot">這工具能回答什麼<small>what.can</small></mark></div>
+      <div class="cant"><b>這工具不能回答</b><mark class="slot">這工具不能回答什麼<small>what.cant</small></mark></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><mark class="slot">單位一節的標題（例：四層，各配一個你領域的例子）<small>units.title</small></mark><small>1 分鐘</small></h2>
+    <div class="how"><mark class="slot">單位一節的怎麼讀／你要做的，附 [n]<small>units.how</small></mark></div>
+    <div class="grid2" id="examples">
+      <div class="exlayer l1"><b><mark class="slot">這個單位的名稱（中文＋英文）<small>units.items[0].head</small></mark></b><div class="q">問：<mark class="slot">這個單位要問的問題<small>units.items[0].ask</small></mark></div>
+        <div class="ex" data-set="edd">例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[0].examples</small></mark></div>
+        <div class="ex" data-set="partner" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[0].examples</small></mark></div>
+        <div class="ex" data-set="decision" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[0].examples</small></mark></div>
+        <div class="ex" data-set="ecom" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[0].examples</small></mark></div>
+        <div class="ex" data-set="daily" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[0].examples</small></mark></div></div>
+      <div class="exlayer l2"><b><mark class="slot">這個單位的名稱（中文＋英文）<small>units.items[1].head</small></mark></b><div class="q">問：<mark class="slot">這個單位要問的問題<small>units.items[1].ask</small></mark></div>
+        <div class="ex" data-set="edd">例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[1].examples</small></mark></div>
+        <div class="ex" data-set="partner" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[1].examples</small></mark></div>
+        <div class="ex" data-set="decision" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[1].examples</small></mark></div>
+        <div class="ex" data-set="ecom" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[1].examples</small></mark></div>
+        <div class="ex" data-set="daily" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[1].examples</small></mark></div></div>
+      <div class="exlayer l3"><b><mark class="slot">這個單位的名稱（中文＋英文）<small>units.items[2].head</small></mark></b><div class="q">問：<mark class="slot">這個單位要問的問題<small>units.items[2].ask</small></mark></div>
+        <div class="ex" data-set="edd">例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[2].examples</small></mark></div>
+        <div class="ex" data-set="partner" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[2].examples</small></mark></div>
+        <div class="ex" data-set="decision" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[2].examples</small></mark></div>
+        <div class="ex" data-set="ecom" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[2].examples</small></mark></div>
+        <div class="ex" data-set="daily" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[2].examples</small></mark></div></div>
+      <div class="exlayer l4"><b><mark class="slot">這個單位的名稱（中文＋英文）<small>units.items[3].head</small></mark></b><div class="q">問：<mark class="slot">這個單位要問的問題<small>units.items[3].ask</small></mark></div>
+        <div class="ex" data-set="edd">例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[3].examples</small></mark></div>
+        <div class="ex" data-set="partner" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[3].examples</small></mark></div>
+        <div class="ex" data-set="decision" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[3].examples</small></mark></div>
+        <div class="ex" data-set="ecom" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[3].examples</small></mark></div>
+        <div class="ex" data-set="daily" hidden>例：<mark class="slot">這個單位的例子（五個領域各寫一份）<small>units.items[3].examples</small></mark></div></div>
+    </div>
+    <p class="sub mt10 mb0"><mark class="slot">一句記法<small>units.mnemonic</small></mark></p>
+  </div>
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="example">下一個分頁：看例子 →</button><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →</a></div>
+  </section>
+
+  <section class="tabpanel" id="panel-example" role="tabpanel" aria-labelledby="tab-example">
+  <div class="card">
+    <h2>看一個做完的例子<small>1 分鐘</small></h2>
+    <div class="how"><mark class="slot">看例子的怎麼讀／你要做的<small>worked.how</small></mark></div>
+    <div id="worked">
+    <div class="ex" data-set="edd">
+      <p class="lead"><mark class="slot">做完的例子：案例一句（五個領域各寫一份）<small>worked.cases.lead</small></mark></p>
+      <table>
+        <tr><th><mark class="slot">例子表的欄名<small>worked.columns[0]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[1]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[2]</small></mark></th></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[0][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[0][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[0][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[1][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[1][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[1][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[2][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[2][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[2][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[3][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[3][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[3][2]</small></mark></td></tr>
+      </table>
+    </div>
+    <div class="ex" data-set="partner" hidden>
+      <p class="lead"><mark class="slot">做完的例子：案例一句（五個領域各寫一份）<small>worked.cases.lead</small></mark></p>
+      <table>
+        <tr><th><mark class="slot">例子表的欄名<small>worked.columns[0]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[1]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[2]</small></mark></th></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[0][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[0][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[0][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[1][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[1][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[1][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[2][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[2][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[2][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[3][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[3][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[3][2]</small></mark></td></tr>
+      </table>
+    </div>
+    <div class="ex" data-set="decision" hidden>
+      <p class="lead"><mark class="slot">做完的例子：案例一句（五個領域各寫一份）<small>worked.cases.lead</small></mark></p>
+      <table>
+        <tr><th><mark class="slot">例子表的欄名<small>worked.columns[0]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[1]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[2]</small></mark></th></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[0][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[0][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[0][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[1][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[1][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[1][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[2][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[2][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[2][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[3][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[3][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[3][2]</small></mark></td></tr>
+      </table>
+    </div>
+    <div class="ex" data-set="ecom" hidden>
+      <p class="lead"><mark class="slot">做完的例子：案例一句（五個領域各寫一份）<small>worked.cases.lead</small></mark></p>
+      <table>
+        <tr><th><mark class="slot">例子表的欄名<small>worked.columns[0]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[1]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[2]</small></mark></th></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[0][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[0][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[0][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[1][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[1][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[1][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[2][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[2][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[2][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[3][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[3][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[3][2]</small></mark></td></tr>
+      </table>
+    </div>
+    <div class="ex" data-set="daily" hidden>
+      <p class="lead"><mark class="slot">做完的例子：案例一句（五個領域各寫一份）<small>worked.cases.lead</small></mark></p>
+      <table>
+        <tr><th><mark class="slot">例子表的欄名<small>worked.columns[0]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[1]</small></mark></th><th><mark class="slot">例子表的欄名<small>worked.columns[2]</small></mark></th></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[0][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[0][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[0][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[1][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[1][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[1][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[2][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[2][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[2][2]</small></mark></td></tr>
+        <tr><td><mark class="slot">例子表一列：單位（五個領域各寫一份）<small>worked.cases.rows[3][0]</small></mark></td><td><mark class="slot">例子表一列：填了什麼（五個領域各寫一份）<small>worked.cases.rows[3][1]</small></mark></td><td><mark class="slot">例子表一列：只看這個單位會做什麼（五個領域各寫一份）<small>worked.cases.rows[3][2]</small></mark></td></tr>
+      </table>
+    </div>
+    </div>
+    <p class="sub mt8 mb0"><mark class="slot">例子表下面的總結句<small>worked.after</small></mark></p>
+    <div class="btns mt8"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">看一個完整分析頁 →<small><span class="ex" data-set="edd"><mark class="slot">「看一個完整分析頁」按鈕的小字（五個領域各寫一份）<small>worked.result_link</small></mark></span><span class="ex" data-set="partner" hidden><mark class="slot">「看一個完整分析頁」按鈕的小字（五個領域各寫一份）<small>worked.result_link</small></mark></span><span class="ex" data-set="decision" hidden><mark class="slot">「看一個完整分析頁」按鈕的小字（五個領域各寫一份）<small>worked.result_link</small></mark></span><span class="ex" data-set="ecom" hidden><mark class="slot">「看一個完整分析頁」按鈕的小字（五個領域各寫一份）<small>worked.result_link</small></mark></span><span class="ex" data-set="daily" hidden><mark class="slot">「看一個完整分析頁」按鈕的小字（五個領域各寫一份）<small>worked.result_link</small></mark></span></small></a></div>
+  </div>
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="fill">下一個分頁：怎麼填 →</button><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →</a></div>
+  </section>
+
+  <section class="tabpanel" id="panel-fill" role="tabpanel" aria-labelledby="tab-fill">
+  <div class="card">
+    <h2><mark class="slot">怎麼填的標題（幾格、每格一好一壞）<small>fill.title</small></mark><small>1 分鐘</small></h2>
+    <div class="how"><mark class="slot">怎麼填的怎麼讀／你要做的<small>fill.how</small></mark></div>
+    <div class="step"><div class="n">1</div><div><b><mark class="slot">這一格的做法（一句）<small>fill.steps[0].title</small></mark></b>：<mark class="slot">這一格要寫到什麼程度<small>fill.steps[0].how</small></mark>
+      <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[0].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[0].bad</small></mark></div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[0].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[0].bad</small></mark></div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[0].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[0].bad</small></mark></div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[0].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[0].bad</small></mark></div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[0].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[0].bad</small></mark></div></div></div></div></div>
+    <div class="step"><div class="n">2</div><div><b><mark class="slot">這一格的做法（一句）<small>fill.steps[1].title</small></mark></b>：<mark class="slot">這一格要寫到什麼程度<small>fill.steps[1].how</small></mark>
+      <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[1].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[1].bad</small></mark></div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[1].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[1].bad</small></mark></div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[1].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[1].bad</small></mark></div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[1].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[1].bad</small></mark></div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[1].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[1].bad</small></mark></div></div></div></div></div>
+    <div class="step"><div class="n">3</div><div><b><mark class="slot">這一格的做法（一句）<small>fill.steps[2].title</small></mark></b>：<mark class="slot">這一格要寫到什麼程度<small>fill.steps[2].how</small></mark>
+      <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[2].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[2].bad</small></mark></div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[2].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[2].bad</small></mark></div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[2].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[2].bad</small></mark></div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[2].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[2].bad</small></mark></div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[2].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[2].bad</small></mark></div></div></div></div></div>
+    <div class="step"><div class="n">4</div><div><b><mark class="slot">這一格的做法（一句）<small>fill.steps[3].title</small></mark></b>：<mark class="slot">這一格要寫到什麼程度<small>fill.steps[3].how</small></mark>
+      <div class="gb"><div class="ex" data-set="edd"><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[3].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[3].bad</small></mark></div></div><div class="ex" data-set="partner" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[3].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[3].bad</small></mark></div></div><div class="ex" data-set="decision" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[3].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[3].bad</small></mark></div></div><div class="ex" data-set="ecom" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[3].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[3].bad</small></mark></div></div><div class="ex" data-set="daily" hidden><div class="good"><b>好</b>：<mark class="slot">好例子（五個領域各寫一份）<small>fill.steps[3].good</small></mark></div><div class="bad"><b>壞</b>：<mark class="slot">壞例子，括號寫它缺什麼（五個領域各寫一份）<small>fill.steps[3].bad</small></mark></div></div></div></div></div>
+    <p class="sub mt8 mb0"><mark class="slot">「留白比硬湊好」那一句<small>fill.after</small></mark></p>
+  </div>
+
+  <div class="card">
+    <h2>常見錯誤<small>30 秒</small></h2>
+    <div class="how"><mark class="slot">常見錯誤的怎麼讀／你要做的<small>mistakes.how</small></mark></div>
+    <div class="mistake"><i>✕</i><span><b><mark class="slot">錯誤的名稱<small>mistakes.items[0].title</small></mark></b>：<mark class="slot">錯在哪、怎麼改<small>mistakes.items[0].text</small></mark></span></div>
+    <div class="mistake"><i>✕</i><span><b><mark class="slot">錯誤的名稱<small>mistakes.items[1].title</small></mark></b>：<mark class="slot">錯在哪、怎麼改<small>mistakes.items[1].text</small></mark></span></div>
+    <div class="mistake"><i>✕</i><span><b><mark class="slot">錯誤的名稱<small>mistakes.items[2].title</small></mark></b>：<span class="ex" data-set="edd"><mark class="slot">錯在哪、怎麼改（每個領域不同時）（五個領域各寫一份）<small>mistakes.items[2].by_domain</small></mark></span><span class="ex" data-set="partner" hidden><mark class="slot">錯在哪、怎麼改（每個領域不同時）（五個領域各寫一份）<small>mistakes.items[2].by_domain</small></mark></span><span class="ex" data-set="decision" hidden><mark class="slot">錯在哪、怎麼改（每個領域不同時）（五個領域各寫一份）<small>mistakes.items[2].by_domain</small></mark></span><span class="ex" data-set="ecom" hidden><mark class="slot">錯在哪、怎麼改（每個領域不同時）（五個領域各寫一份）<small>mistakes.items[2].by_domain</small></mark></span><span class="ex" data-set="daily" hidden><mark class="slot">錯在哪、怎麼改（每個領域不同時）（五個領域各寫一份）<small>mistakes.items[2].by_domain</small></mark></span></span></div>
+    <div class="mistake"><i>✕</i><span><b><mark class="slot">錯誤的名稱<small>mistakes.items[3].title</small></mark></b>：<mark class="slot">錯在哪、怎麼改<small>mistakes.items[3].text</small></mark></span></div>
+    <div class="quiz"><b>自我檢查（30 秒，點開看答案）</b>
+      <div class="ex" data-set="edd">
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[0][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[0][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[1][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[1][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[2][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[2][1]</small></mark></details>
+      </div>
+      <div class="ex" data-set="partner" hidden>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[0][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[0][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[1][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[1][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[2][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[2][1]</small></mark></details>
+      </div>
+      <div class="ex" data-set="decision" hidden>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[0][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[0][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[1][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[1][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[2][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[2][1]</small></mark></details>
+      </div>
+      <div class="ex" data-set="ecom" hidden>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[0][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[0][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[1][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[1][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[2][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[2][1]</small></mark></details>
+      </div>
+      <div class="ex" data-set="daily" hidden>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[0][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[0][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[1][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[1][1]</small></mark></details>
+        <details><summary><mark class="slot">自我檢查一題：題目（五個領域各寫一份）<small>quiz[2][0]</small></mark></summary><mark class="slot">自我檢查一題：答案（五個領域各寫一份）<small>quiz[2][1]</small></mark></details>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabnext"><button type="button" class="btn" data-tab-go="read">下一個分頁：看懂結果 →</button><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →</a></div>
+  </section>
+
+  <section class="tabpanel" id="panel-read" role="tabpanel" aria-labelledby="tab-read">
+  <div class="card">
+    <h2>看懂結果：按「執行分析」之後那一頁怎麼讀<small>1 分鐘</small></h2>
+    <div class="how"><mark class="slot">看懂結果的怎麼讀／你要做的<small>read.how</small></mark></div>
+    <div class="todos">
+      <div class="todo"><b><mark class="slot">三步讀法的一步：步驟名<small>read.steps[0][0]</small></mark></b><mark class="slot">三步讀法的一步：說明<small>read.steps[0][1]</small></mark></div>
+      <div class="todo"><b><mark class="slot">三步讀法的一步：步驟名<small>read.steps[1][0]</small></mark></b><mark class="slot">三步讀法的一步：說明<small>read.steps[1][1]</small></mark></div>
+      <div class="todo"><b><mark class="slot">三步讀法的一步：步驟名<small>read.steps[2][0]</small></mark></b><mark class="slot">三步讀法的一步：說明<small>read.steps[2][1]</small></mark></div>
+    </div>
+    <p class="sub mt8"><mark class="slot">只有 30 秒的話看哪裡<small>read.short</small></mark></p>
+    <div class="terms"><b><mark class="slot">「幾個詞」的標題<small>read.terms_label</small></mark>：</b><span><b><mark class="slot">一個詞和它的一句話：詞<small>read.terms[0][0]</small></mark></b> <mark class="slot">一個詞和它的一句話：一句話<small>read.terms[0][1]</small></mark></span><span><b><mark class="slot">一個詞和它的一句話：詞<small>read.terms[1][0]</small></mark></b> <mark class="slot">一個詞和它的一句話：一句話<small>read.terms[1][1]</small></mark></span><span><b><mark class="slot">一個詞和它的一句話：詞<small>read.terms[2][0]</small></mark></b> <mark class="slot">一個詞和它的一句話：一句話<small>read.terms[2][1]</small></mark></span><span><b><mark class="slot">一個詞和它的一句話：詞<small>read.terms[3][0]</small></mark></b> <mark class="slot">一個詞和它的一句話：一句話<small>read.terms[3][1]</small></mark></span></div>
+    <h3 class="fam">頁首和九段，每段回答一件事</h3>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[0][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[0][1]</small></mark></span></div>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[1][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[1][1]</small></mark></span></div>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[2][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[2][1]</small></mark></span></div>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[3][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[3][1]</small></mark></span></div>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[4][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[4][1]</small></mark></span></div>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[5][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[5][1]</small></mark></span></div>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[6][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[6][1]</small></mark></span></div>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[7][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[7][1]</small></mark></span></div>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[8][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[8][1]</small></mark></span></div>
+    <div class="row"><b><mark class="slot">結果頁的一段和它怎麼讀：段名<small>read.rows[9][0]</small></mark></b><span><mark class="slot">結果頁的一段和它怎麼讀：這段怎麼讀<small>read.rows[9][1]</small></mark></span></div>
+  </div>
+  <div class="tabnext"><a class="btn primary" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq#new">開始填我的案例 →</a><a class="btn" href="https://claude.ai/artifact/7JLjM7mGyqTMLJmCMUmWqq">對照一個做完的結果頁 →</a></div>
+  </section>
+
+  <section class="tabpanel" id="panel-teach" role="tabpanel" aria-labelledby="tab-teach">
+  <div class="card">
+    <h2>教材版：給老師／帶領者<small>同一份資料，另一種排版</small></h2>
+    <div class="how"><mark class="slot">教材版的怎麼讀／你要做的<small>teach.how</small></mark></div>
+    <details><summary><b>課堂流程（45 分鐘）</b></summary>
+      <table class="mt6">
+        <tr><th>分</th><th>做什麼</th><th>用學員版哪一頁</th></tr>
+        <tr><td>0–5</td><td><mark class="slot">課堂流程的一列：做什麼<small>teach.flow[0][1]</small></mark></td><td><mark class="slot">課堂流程的一列：用學員版哪一頁<small>teach.flow[0][2]</small></mark></td></tr>
+        <tr><td>5–15</td><td><mark class="slot">課堂流程的一列：做什麼<small>teach.flow[1][1]</small></mark></td><td><mark class="slot">課堂流程的一列：用學員版哪一頁<small>teach.flow[1][2]</small></mark></td></tr>
+        <tr><td>15–30</td><td><mark class="slot">課堂流程的一列：做什麼<small>teach.flow[2][1]</small></mark></td><td><mark class="slot">課堂流程的一列：用學員版哪一頁<small>teach.flow[2][2]</small></mark></td></tr>
+        <tr><td>30–40</td><td><mark class="slot">課堂流程的一列：做什麼<small>teach.flow[3][1]</small></mark></td><td><mark class="slot">課堂流程的一列：用學員版哪一頁<small>teach.flow[3][2]</small></mark></td></tr>
+        <tr><td>40–45</td><td><mark class="slot">課堂流程的一列：做什麼<small>teach.flow[4][1]</small></mark></td><td><mark class="slot">課堂流程的一列：用學員版哪一頁<small>teach.flow[4][2]</small></mark></td></tr>
+      </table>
+    </details>
+    <details><summary><b>講稿要點（每步 2–3 句）</b></summary>
+      <ul class="check">
+        <li><mark class="slot">講稿要點的一步<small>teach.script[0]</small></mark></li>
+        <li><mark class="slot">講稿要點的一步<small>teach.script[1]</small></mark></li>
+        <li><mark class="slot">講稿要點的一步<small>teach.script[2]</small></mark></li>
+        <li><mark class="slot">講稿要點的一步<small>teach.script[3]</small></mark></li>
+        <li><mark class="slot">講稿要點的一步<small>teach.script[4]</small></mark></li>
+        <li><mark class="slot">講稿要點的一步<small>teach.script[5]</small></mark></li>
+      </ul>
+    </details>
+    <details><summary><b>討論題（3 題）</b></summary>
+      <ol class="src">
+        <li><mark class="slot">討論題<small>teach.questions[0]</small></mark></li>
+        <li><mark class="slot">討論題<small>teach.questions[1]</small></mark></li>
+        <li><mark class="slot">討論題<small>teach.questions[2]</small></mark></li>
+      </ol>
+    </details>
+    <details><summary><b>學員最常錯的三件事，怎麼接</b></summary>
+      <ul class="check">
+        <li><mark class="slot">學員常錯的一件，和怎麼接<small>teach.errors[0]</small></mark></li>
+        <li><mark class="slot">學員常錯的一件，和怎麼接<small>teach.errors[1]</small></mark></li>
+        <li><mark class="slot">學員常錯的一件，和怎麼接<small>teach.errors[2]</small></mark></li>
+      </ul>
+    </details>
+    <details><summary><b>講義與投影片</b></summary>
+      <p class="my6"><mark class="slot">講義與投影片怎麼組<small>teach.handout</small></mark></p>
+    </details>
+    <p class="sub mt8 mb0"><mark class="slot">兩版同源的說明<small>teach.note</small></mark></p>
+  </div>
+  </section>
+
+  <section class="tabpanel" id="panel-sources" role="tabpanel" aria-labelledby="tab-sources">
+  <div class="card">
+    <h2>課程來源（每段課文的 [n]）</h2>
+    <div class="how"><b>怎麼讀</b>[n] 是那段課文的依據；來源不足的工具會在頂端顯示「知識不足：缺哪幾項」。<b>你要做的</b>不用做；發現寫錯可以回報。</div>
+    <ol class="src">
+      <li><mark class="slot">來源：出處＋用了它的什麼<small>sources[0].text</small></mark></li>
+      <li><mark class="slot">來源：出處＋用了它的什麼<small>sources[1].text</small></mark> <a href="https://source.example/sources[1].url" target="_blank" rel="noopener">source.example ↗</a></li>
+      <li><mark class="slot">來源：出處＋用了它的什麼<small>sources[2].text</small></mark> <a href="https://source.example/sources[2].url" target="_blank" rel="noopener">source.example ↗</a></li>
+    </ol>
+    <p class="sub">課文由工具自己的資料庫（來源、契約、範例）生成並由人審定；之後每個工具都用同一套規則產生自己的課。</p>
+  </div>
+  </section>
+<div class="card"><h2>附錄：每個單位還要寫給結果頁用的 12 格</h2><p>這些字不在說明書上，而是結果頁 ② 的圖、④ 的卡、⑥ 的對照表在用（<code>units.items[].result</code>）。每個單位都要寫一份。右欄是冰山「結構」這一層實際寫的字。</p><table><tr><th>欄位</th><th>要寫什麼</th><th>冰山「結構」層的例子</th></tr><tr><td><code>name</code></td><td><mark class="slot">結果頁用：單位名（中英）</mark></td><td>結構 Structures</td></tr><tr><td><code>title</code></td><td><mark class="slot">結果頁 ④ 卡標題（中英全名）</mark></td><td>結構與流程 Structures & Processes</td></tr><tr><td><code>short</code></td><td><mark class="slot">結果頁用：一個字的簡稱</mark></td><td>結構</td></tr><tr><td><code>question</code></td><td><mark class="slot">結果頁 ② 圖上的問題（短）</mark></td><td>什麼流程、制度在製造這個模式？</td></tr><tr><td><code>ask4</code></td><td><mark class="slot">結果頁 ④「這層問」</mark></td><td>什麼流程、制度、權力安排在製造上面的模式？</td></tr><tr><td><code>asks</code></td><td><mark class="slot">結果頁 ⑥「這一層問的問題」</mark></td><td>什麼制度在製造這些模式？</td></tr><tr><td><code>seen</code></td><td><mark class="slot">看得見／看不見（來源有定義才填）</mark></td><td>看不見</td></tr><tr><td><code>time</code></td><td><mark class="slot">結果頁 ④ 的時間（來源有定義才填）</mark></td><td>現在到未來</td></tr><tr><td><code>when</code></td><td><mark class="slot">結果頁 ⑥ 的時間取向（來源有定義才填）</mark></td><td>現在→未來</td></tr><tr><td><code>mode</code></td><td><mark class="slot">出手方式（介入動詞＋英文）</mark></td><td>設計 Design</td></tr><tr><td><code>effect</code></td><td><mark class="slot">在這裡出手會改到什麼</mark></td><td>改流程、改制度</td></tr><tr><td><code>lasting</code></td><td><mark class="slot">效果能撐多久</mark></td><td>持久</td></tr></table></div>
+</main>
+</div>
+</body>
+</html>

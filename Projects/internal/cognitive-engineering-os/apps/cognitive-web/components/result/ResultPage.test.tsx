@@ -12,6 +12,9 @@ import { apiFetch } from "../../lib/api";
 import { MethodForm } from "../MethodForm";
 import { DescribeFirst, RunInputCard, SaveTo } from "../RunPage";
 import { ResultPage, withDefinitions } from "./ResultPage";
+import { OWN_CHARTS } from "./Charts";
+import { RESULT_PAGE_SHOWS } from "../../lib/toolsheets.generated";
+import { formIsUnits, unitFields } from "../../lib/units";
 
 vi.mock("../../lib/api", () => ({ apiFetch: vi.fn() }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -86,6 +89,34 @@ describe("ResultPage", () => {
     writeFileSync(artifact, other.replace('data-method="systems.causal_loop_diagram"', 'data-method="systems.iceberg_model"'));
     const wrong = spawnSync("python", [checker, "--page", "result", artifact], { encoding: "utf8" });
     expect([wrong.status, wrong.stdout.includes("layered iceberg SVG missing")]).toEqual([1, true]);
+  });
+  it("a tool without the iceberg's registration gets all nine sections and no iceberg words; ③'s own charts match result-page-shows.yaml (template §12)", async () => {
+    const demo = (await import("../../fixtures/demo-iceberg.json")).default as unknown as { result: React.ComponentProps<typeof ResultPage>["result"] };
+    const fields = [{ key: "problem_summary", kind: "text", label: "問題一句" }, { key: "hypotheses", kind: "list", label: "可能的原因" }];
+    // the demo's AI text names the iceberg once; renamed, so any iceberg word left on the page is one the code wrote
+    const fish = JSON.parse(JSON.stringify({ ...demo.result, method_id: "root_cause.fishbone", visual: { kind: "tree", bindings: {} } }).replaceAll("冰山", "魚骨")) as typeof demo.result;
+    const rec = { problem_summary: "分享從 6 人掉到 2 人", hypotheses: [{ id: "H1", statement: "帶領者先講意義", category: "人" }] };
+    const html = renderToStaticMarkup(<ResultPage result={fish} record={rec} fields={fields} display={{ name_zh: "魚骨圖" }} />);
+    expect([...html.matchAll(/data-section="([^"]+)"/g)].map((m) => m[1])).toEqual(["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "approve"]);
+    expect(html).toContain('data-visual="fishbone"');
+    for (const text of ["⑥ 對照表", "③ 圖表分析（兩張圖各回答一個問題）", "兩張圖各自對應圖上的一格或幾格；圖 A 用你的數字，圖 B 由分析結果生成。"]) expect(html).toContain(text);
+    for (const text of ["冰山", "Anderson", "圖 C", "四列", "⑦ C 的追蹤指標"]) expect(html, text).not.toContain(text);
+    const artifact = path.resolve(process.cwd(), ".artifacts/fishbone-result.html");
+    mkdirSync(path.dirname(artifact), { recursive: true });
+    writeFileSync(artifact, html);
+    const checked = spawnSync("python", [path.resolve(process.cwd(), "../../docs/mockups/check-mocks.py"), "--page", "result", artifact], { encoding: "utf8" }).stdout;
+    expect(checked, checked).toContain("green");
+    expect(unitFields("root_cause.fishbone", fields)).toEqual([]);   // its run form is not layered
+    const berg = ["events", "patterns", "structures", "mental_models"].map((key) => ({ key }));
+    expect(unitFields("systems.iceberg_model", [...berg, { key: "extra" }])).toHaveLength(4);
+    expect([formIsUnits("systems.iceberg_model", berg), formIsUnits("systems.iceberg_model", [...berg, { key: "extra" }])]).toEqual([true, false]);   // one non-unit field keeps required checks
+    expect(Object.fromEntries(Object.entries(OWN_CHARTS).map(([methodId, charts]) => [methodId, charts.map((chart) => chart.shows)]))).toEqual(RESULT_PAGE_SHOWS);
+    // the demo's read-only note names the tool it is
+    vi.mocked(apiFetch).mockResolvedValue({} as never);
+    const { host, done } = await mount(<ResultPage demo result={fish} record={rec} fields={fields} display={{ name_zh: "魚骨圖" }} />);
+    await act(async () => { [...host.querySelectorAll("button")].find((b) => b.textContent === "核准，存進紀錄")!.click(); });
+    expect(host.textContent).toContain("用你自己的案例在「魚骨圖」跑一次");
+    await done();
   });
   it("uses layer keys for iceberg facts, counts only that layer's external citations, and makes no unbuilt-form promise", () => {
     const sparse = {

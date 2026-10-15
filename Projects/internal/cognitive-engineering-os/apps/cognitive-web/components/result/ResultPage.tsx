@@ -11,10 +11,11 @@ import { costLine, daysOf, holderWord, plusDays, STANCE, thisHolder, todayIso, t
 import { fieldAt, plain, recordValue, shownPath } from "../../lib/record";
 import { formatTime } from "../../lib/time";
 import { RunHeader } from "../RunHeader";
-import { LeverageChart, LoopChart, TrendChart, type Loop, type TrendSeries } from "./Charts";
+import { LoopChart, OWN_CHARTS, TrendChart, type Loop, type TrendSeries } from "./Charts";
 import { HowTo } from "./HowTo";
 import { MethodVisual, recordPicture, type Unit } from "./MethodVisual";
 import { KNOWLEDGE_GAPS, NO_LESSON, UNIT_FACTS } from "../../lib/toolsheets.generated";
+import { unitFields as unitFieldsOf } from "../../lib/units";
 
 // The result, card by card as docs/mockups/iceberg-result-mock.html (① conclusion … ⑨ citations, then the approve
 // card), filled only from what the interpretation returns (schema method-interpretation 1.2.0). A section the
@@ -114,6 +115,7 @@ const GATE_TIP: Record<string, string> = { citation_integrity: "每個發現的 
 const PICTURE: Record<string, string> = { layered: "你的問題在每一層各是什麼", quadrant: "每一項落在哪一格" };
 const COST: Record<string, string> = { S: "小", M: "中", L: "大", XS: "很小", XL: "很大", low: "低", medium: "中", high: "高" };   // the model's size codes, spelled out
 const NUMERAL = ["", "一", "兩", "三", "四", "五", "六", "七", "八", "九"];
+const ownLetter = (index: number) => String.fromCharCode(67 + index);   // ③: A trend, B loop, then the tool's own charts C, D…
 const UNSPECIFIED_EVIDENCE = new Set(["未指定；需使用者補充證據", "Not specified; user must supply evidence"]);
 // a section the gate dropped says why in plain words (the evidence itself stays in the expert JSON)
 const DROPPED: Record<string, string> = {
@@ -167,7 +169,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const unitFacts = UNIT_FACTS[result.method_id];
   const knowledgeGaps = KNOWLEDGE_GAPS[result.method_id] ?? NO_LESSON;   // I11: a tool whose knowledge is incomplete says what it lacks
   const factsOf = (path: string) => unitFacts?.find((unit) => unit.key === keyOf(path));
-  const unitFields = unitFacts ? fields.filter((field) => factsOf(`r/${field.key}`)) : [];
+  const unitFields = unitFieldsOf(result.method_id, fields);
   // every [n] on the page, in reading order: findings, recommendations, the per-layer readings, the loop, the trend, the metrics,
   // and the tool's units themselves (the mock numbers every layer, cited or not)
   const layerPaths = unitFields.map((field) => `r/${field.key}`);
@@ -208,8 +210,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const optionName = (option: { name: string }) => option.name.replace(/^[甲乙丙丁戊]\s*/, "") || option.name;   // a bare 「乙」 keeps its name rather than none
   const optionLabel = (option: { name: string }) => OPTION_MARKS[(solutions?.options ?? []).indexOf(option as never)] ?? "";
   const optionTag = (option: { name: string }) => `${optionLabel(option)}「${optionName(option)}」`;
-  const iceberg = result.method_id === "systems.iceberg_model";
-  const drawn = recordPicture(result.method_id, record);   // a picture drawn from the record names its own card ②
+  const drawn = recordPicture(result.method_id, record);   // a picture drawn from the record names its own card ②, and says what ③④⑥ need of it
+  const ownCharts = OWN_CHARTS[result.method_id] ?? [];
   const externalSourceCount = (reading?: UnitReading) => new Set(
     (reading?.citations ?? []).filter((id) => manifestById.get(id)?.kind === "project_source"),
   ).size;
@@ -264,7 +266,9 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const layerCount = layers.length ? `${NUMERAL[layers.length] ?? layers.length}層` : "逐層";
   const deepest = layers.length - 1;
   const beliefNodes = new Set((result.loop?.feeders ?? []).length ? [] : (result.loop?.nodes ?? []).filter((node) => node.citations.length > 0 && node.citations.every((id) => layerIndex(id) === deepest) && deepest >= 2).map((node) => node.id));
-  const chartCount = [result.trend, result.loop, iceberg].filter(Boolean).length;
+  const chartCount = [result.trend, result.loop].filter(Boolean).length + ownCharts.length;
+  // a chart's units: where the tool's registration homes it, else the units it cites
+  const chartNote = (chart: "trend" | "loop", cited: string[]) => layerNote(drawn?.homes ? drawn.homes[chart].map((key) => `r/${key}`) : cited);
   const loopCites = new Set((result.loop?.nodes ?? []).flatMap((node) => node.citations));
   const loopFindings = findings.map((finding, index) => index + 1).filter((number) => findings[number - 1].citations.some((id) => loopCites.has(id)));
   const saveJudgment = async (stance: Stance, text: string) => {
@@ -369,7 +373,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     const button = (event.target as HTMLElement).closest("button");
     if (!button || button.hasAttribute("data-demo-ok")) return;
     event.preventDefault(); event.stopPropagation();
-    setDemoNote("這是示範分析：不能核准、存任務、排提醒或寫判斷。用你自己的案例在「冰山模型」跑一次，這些按鈕就都能用。");
+    setDemoNote(`這是示範分析：不能核准、存任務、排提醒或寫判斷。用你自己的案例在「${name}」跑一次，這些按鈕就都能用。`);
   };
   return <div className="result-page" onClickCapture={demo ? blockInDemo : undefined}>
     {demo && <div className="finding warn" role="status"><b>示範分析（免費，不花錢）</b>這是示範案例的一次真實分析，給你先看終點。要分析你自己的案例：<Link href={`/methods/${encodeURIComponent(result.method_id)}/run`}>到「{display?.name_zh ?? toolLabel(names, result.method_id)}」填你的格子 →</Link>{demoNote && <><br />{demoNote}</>}</div>}
@@ -402,7 +406,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       </div>
     </Card>
 
-    <Card id="2" title={iceberg ? "② 冰山圖：你的問題在四層各是什麼" : `② ${drawn?.heading ?? `${name}圖`}：${drawn?.caption ?? PICTURE[result.visual.kind] ?? "你的資料放在圖上的哪裡"}`} read={focusLayer ? "從上往下；★ 是建議先出手的層。" : "圖上每一個位置都對應你填的一段。"} act={layers.length ? `看你填的${NUMERAL[layers.length] ?? ""}段話有沒有放錯層。` : "看你填的內容有沒有放錯位置。"}>
+    <Card id="2" title={`② ${drawn?.heading ?? `${name}圖`}：${drawn?.caption ?? PICTURE[result.visual.kind] ?? "你的資料放在圖上的哪裡"}`} read={focusLayer ? "從上往下；★ 是建議先出手的層。" : "圖上每一個位置都對應你填的一段。"} act={layers.length ? `看你填的${NUMERAL[layers.length] ?? ""}段話有沒有放錯層。` : "看你填的內容有沒有放錯位置。"}>
       <MethodVisual kind={result.visual.kind} bindings={result.visual.bindings} methodId={result.method_id} name={name} units={units} record={record} fields={fields} />
       {thickness.length > 0 && <div className="thick"><b>資料厚度</b>（你填了多少）：{thickness.map(([unit, value]) => `${layerNo(unit)} ${dots(value.own_statements ?? 0)}${thicknessOf(unit)?.note ? `（${thicknessOf(unit)!.note}）` : thinnest && thinnest[0] === unit && thickness.length > 1 ? `（最薄：只有 ${value.own_statements ?? 0} 句）` : ""}`).join("　")}。薄的層，結論的信心就低。</div>}
       {removedNote("units", "層的解讀")}
@@ -411,24 +415,24 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
     <Card id="3" title={`③ 圖表分析（${NUMERAL[chartCount] ?? chartCount}張圖各回答一個問題）`} read="每張圖回答一個問題，讀法寫在圖下。" act="不用做；圖 A 沒畫出來時，是你填的內容裡同一件事的數字不到兩個。">
       <div className="charts">
         {result.trend && <figure>
-          <figcaption><b>圖 A｜趨勢：{result.trend.question ?? "真的在變嗎？"}</b>{iceberg ? "（第 2 層）" : layerNote(result.trend.series.flatMap((series) => series.points.map((point) => point.citation)))}</figcaption>
+          <figcaption><b>圖 A｜趨勢：{result.trend.question ?? "真的在變嗎？"}</b>{chartNote("trend", result.trend.series.flatMap((series) => series.points.map((point) => point.citation)))}</figcaption>
           <TrendChart series={result.trend.series} cite={citeText} />
           <div className="read"><b>怎麼看：</b>左軸是{result.trend.series[0].name}（實線）{result.trend.series[1] ? `，右軸是${result.trend.series[1].name}（虛線）` : ""}；橫軸是你寫下的時間點。<b>看到：</b>{result.trend.reading}{result.trend.series.length > 1 && <><b>注意：</b>同時發生不等於一個造成另一個。</>}<b>來源：</b>{cites(result.trend.series.flatMap((series) => series.points.map((point) => point.citation)))}</div>
         </figure>}
         {result.loop && <figure>
-          <figcaption><b>圖 B｜因果迴路：是什麼在推？</b>{iceberg ? "（第 3、4 層）" : layerNote(result.loop.nodes.flatMap((node) => node.citations))}</figcaption>
+          <figcaption><b>圖 B｜因果迴路：是什麼在推？</b>{chartNote("loop", result.loop.nodes.flatMap((node) => node.citations))}</figcaption>
           <LoopChart loop={result.loop} dashed={beliefNodes} />
           <div className="read"><b>怎麼看：</b>{NUMERAL[result.loop.nodes.length] ?? result.loop.nodes.length}個方框繞一圈是迴路，箭頭方向是「誰讓誰更嚴重」{beliefNodes.size ? "；虛線框是信念層在餵它" : ""}。<b>看到：</b>{result.loop.reading}<b>來源：</b>{cites(result.loop.nodes.flatMap((node) => node.citations))}{loopFindings.length ? `、${loopFindings.map((number) => `發現 ${number}`).join("、")}` : ""}</div>
         </figure>}
-        {iceberg && <figure>
-          <figcaption><b>圖 C｜槓桿對比：在哪一層出手最值得？</b>（四層）</figcaption>
-          <LeverageChart />
-          <div className="read"><b>怎麼看：</b>灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。<b>看到：</b>第 3 層是「做得到、也撐得久」的交會點。{focusLayer ? `這次建議先出手的是「${factsOf(focusLayer.path)?.short ?? focusLayer.label}」：${result.focus?.why}` : ""}<b>來源：</b>冰山模型本身的介入模式，不是你的資料。</div>
-        </figure>}
+        {ownCharts.map((chart, index) => <figure key={chart.shows}>
+          <figcaption><b>圖 {ownLetter(index)}｜{chart.title}</b>{chart.scope}</figcaption>
+          {chart.draw()}
+          <div className="read"><b>怎麼看：</b>{chart.how}<b>看到：</b>{chart.saw}{focusLayer ? `這次建議先出手的是「${factsOf(focusLayer.path)?.short ?? focusLayer.label}」：${result.focus?.why}` : ""}<b>來源：</b>{chart.source}，不是你的資料。</div>
+        </figure>)}
       </div>
       {!result.trend && <p className="sub mt8 mb0">圖 A 趨勢：{dropped.trend ? DROPPED.trend : "這次沒有畫：分析沒有從你填的內容裡挑出同一件事在兩個時間點的數字；有的話，回上面把它們寫在同一格再執行。"}{removed.trend?.length ? "（有數字對不上你填的內容，已拿掉）" : ""}</p>}
       {!result.loop && <p className="sub mt8 mb0">圖 B 因果迴路：{missing("loop", "有出處的因果迴路")}</p>}
-      <p className="sub mt8 mb0">{NUMERAL[chartCount] ?? chartCount}張圖各自對應{iceberg ? "冰山的一層或幾層" : "圖上的一格或幾格"}；圖 A 用你的數字，圖 B 由分析結果生成{iceberg ? "，圖 C 是冰山模型本身的介入模式" : ""}。</p>
+      <p className="sub mt8 mb0">{NUMERAL[chartCount] ?? chartCount}張圖各自對應{drawn?.parts ?? "圖上的一格或幾格"}；圖 A 用你的數字，圖 B 由分析結果生成{ownCharts.map((chart, index) => `，圖 ${ownLetter(index)} 是${chart.source}`).join("")}。</p>
     </Card>
 
     <Card id="4" title={`④ 由上往下${layerCount}解讀（每張卡同一格式）`} read={`${layers.length ? `${NUMERAL[layers.length] ?? layers.length}張` : "每張"}卡同一格式，由上往下。`} act="找出資料最薄的一層，之後補。">
@@ -439,7 +443,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
           <div className="row"><b>你填的</b><span>{resolved(layer.path)} {cites(citedUnder(layer.path))}</span></div>
           <div className="row"><b>這代表</b>{reading ? <span>{withDefinitions(reading.meaning)} {cites(reading.citations)}</span> : <span className="sub">{missingLayerReading}</span>}</div>
           <div className="row"><b>在這層出手</b>{reading ? <span>{reading.action}{/[。！？]$/.test(reading.action) ? "" : "。"}<b>效果</b>：{reading.effect}<span className={`lever ${reading.leverage}`}>槓桿：{LEVER[reading.leverage] ?? reading.leverage}</span></span> : <span className="sub">{missingLayerReading}</span>}</div>
-          <div className="row"><b>對應方案</b><span>{opts.length ? opts.map((option) => `⑦ ${optionTag(option)}${solutions?.recommended && recommendedOption(option) ? "★ 本次建議" : ""}`).join("、") : iceberg && index === 1 && solutions?.metrics?.length ? "⑦ C 的追蹤指標（不是方案，是量法）" : solutions ? "—（⑦ 沒有方案在這層出手）" : "這次沒有方案草稿"}{solutions?.recommended ? "" : focusKey === unit ? (opts.length ? "★ 本次建議" : "　★ 本次建議先在這層出手") : ""}</span></div>
+          <div className="row"><b>對應方案</b><span>{opts.length ? opts.map((option) => `⑦ ${optionTag(option)}${solutions?.recommended && recommendedOption(option) ? "★ 本次建議" : ""}`).join("、") : drawn?.homes?.trend.includes(unit) && solutions?.metrics?.length ? "⑦ C 的追蹤指標（不是方案，是量法）" : solutions ? "—（⑦ 沒有方案在這層出手）" : "這次沒有方案草稿"}{solutions?.recommended ? "" : focusKey === unit ? (opts.length ? "★ 本次建議" : "　★ 本次建議先在這層出手") : ""}</span></div>
           <div className="row"><b>資料厚度</b><span>你填 {result.data_thickness?.[unit]?.own_statements ?? 0} 句・外部 {externalSourceCount(reading)} 筆 → {verdict(unit) === "最薄" || verdict(unit) === "薄" ? <span className="warn">{verdict(unit)}</span> : verdict(unit)}{thicknessNote(unit)}</span></div>
         </div>; }) : <p className="mb0">這個工具的結果是一張圖，不分層；請對照上面的圖逐項看。</p>}
     </Card>
@@ -451,13 +455,13 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       {(result.gaps ?? []).length > 0 ? <div className="finding warn"><b>證據缺口（老實說）</b>{(result.gaps ?? []).map((gap, index) => <span key={index}>{index ? gapSeparator(result.gaps?.[index - 1]?.text) : ""}{gap.path ? `「${inputName(gap.path)}」` : ""}{gap.text}{gapNeed(gap.needed_evidence)}{gap.citations?.length ? <> {cites(gap.citations)}</> : null}</span>)}</div> : <div className="finding warn"><b>證據缺口（老實說）</b>這次分析沒有列出缺口；沒有外部來源時，結論全靠你填的內容。</div>}
     </Card>
 
-    <Card id="6" title={iceberg ? "⑥ 理解層次對照表（改編自 Anderson & Johnson）" : "⑥ 對照表"} read={focusLayer ? "一列一層，★ 是建議先出手的列。" : "一列一個你填的欄位。"} act={solutions ? "四列都要有人負責，填在 ⑦ B 表。" : "看哪一列最薄，就先補那一列。"}>
+    <Card id="6" title={`⑥ ${drawn?.table?.title ?? "對照表"}`} read={focusLayer ? "一列一層，★ 是建議先出手的列。" : "一列一個你填的欄位。"} act={solutions ? `${layers.length ? `${NUMERAL[layers.length] ?? layers.length}列` : "每一列"}都要有人負責，填在 ⑦ B 表。` : "看哪一列最薄，就先補那一列。"}>
       <div className="scroll-x"><table>
         <thead><tr>{factTable ? <><th>層</th><th>出手方式</th><th>時間取向</th></> : <th>欄位</th>}<th>這一層問的問題</th><th>你的案例</th><th>建議動作</th></tr></thead>
         <tbody>{layers.map((layer, index) => { const facts = factTable ? factsOf(layer.path) : undefined; const star = focusKey === keyOf(layer.path) ? " ★" : ""; const reading = readingOf(layer.path);
           return <tr key={index}>{facts ? <><td>{facts.short}{star}</td><td>{facts.mode}</td><td>{facts.when}</td></> : <td>{inputName(layer.path)}{star}</td>}<td>{facts?.asks ?? question(layer.path)}</td><td>{reading?.brief ?? resolved(layer.path)} {cites(citedUnder(layer.path))}</td><td>{reading?.step ?? reading?.action ?? "—"}</td></tr>; })}</tbody>
       </table></div>
-      {iceberg && <p className="sub mt8 mb0">越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。</p>}
+      {drawn?.table && <p className="sub mt8 mb0">{drawn.table.note}</p>}
     </Card>
 
     <Card id="7" className="card okline" anchor="solution" title="⑦ 解決方案：從分析到行動（選方案 → 行動計畫 → 追蹤驗證）" read={`A 選方案（可複選）、B 短期一個月＋長期一${SPAN_LABEL[span]}、C ${solutions?.metrics?.length ? `${NUMERAL[solutions.metrics.length] ?? solutions.metrics.length}個數字盯著` : "這次沒有指標"}。`} act={solutions ? "選方案、按「填入建議」再改，存成任務。" : "這次沒有方案草稿；先用 ① 的建議和 ⑧ 的下一步。"}>

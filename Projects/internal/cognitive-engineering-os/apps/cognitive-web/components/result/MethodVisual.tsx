@@ -88,10 +88,17 @@ function Layers({ units, name }: { units: Unit[]; name: string }) {
 
 // A tool whose picture is drawn from the record itself, whatever the reading binds (the record is the one source): its
 // card ② heading (without it, "<tool name>圖"), caption, whether this record can be drawn, and the drawing. A record the
-// picture cannot use falls back to the generic picture of the tool's visual kind.
-type RecordPicture = { visual: string; heading?: string; caption: string; usable: (record?: Record<string, unknown>) => boolean; draw: (record: Record<string, unknown>, fields: FormField[]) => React.ReactNode };
+// picture cannot use falls back to the generic picture of the tool's visual kind. A tool whose units are its form fields
+// (lessons units.items) may also name, by unit key, the units ③'s charts sit on (`homes`: A trend -- ⑦ C's metrics track
+// it -- and B loop; without, a chart names the units it cites), what ③'s charts map to (`parts`), and ⑥'s title and
+// closing line (`table`). ResultPage reads these and has no branch of its own on a method id (template §12).
+type RecordPicture = { visual: string; heading?: string; caption: string; usable: (record?: Record<string, unknown>) => boolean; draw: (record: Record<string, unknown>, fields: FormField[], units: Unit[]) => React.ReactNode;
+  homes?: { trend: string[]; loop: string[] }; parts?: string; table?: { title: string; note: string } };
 const optionLabel = (fields: FormField[], key: string) => (value: string) => fields.find((field) => field.key === key)?.options?.find((option) => option.value === value)?.label ?? value;
 const RECORD_PICTURES: Record<string, RecordPicture> = {
+  "systems.iceberg_model": { visual: "layered", heading: "冰山圖", caption: "你的問題在四層各是什麼", usable: () => true, draw: (_record, _fields, units) => <Iceberg units={units} />,
+    homes: { trend: ["patterns"], loop: ["structures", "mental_models"] }, parts: "冰山的一層或幾層",
+    table: { title: "理解層次對照表（改編自 Anderson & Johnson）", note: "越往下一列：出手越慢、越難，但改變越根本。四列都要有人負責，不是只選一列。" } },
   "delivery.risk_register": { visual: "risk-matrix", caption: "每個風險落在機率×衝擊的哪一格", usable: (record) => risksOf(record).length > 0,
     draw: (record) => <RiskMatrix risks={risksOf(record)} total={riskCount(record)} /> },
   "framing.problem_statement": { visual: "problem-gap", heading: "問題陳述", caption: "現況和期望差在哪裡", usable: (record) => problemOf(record) !== null,
@@ -103,16 +110,17 @@ const RECORD_PICTURES: Record<string, RecordPicture> = {
   "root_cause.pareto": { visual: "pareto", heading: "柏拉圖", caption: "哪幾個原因佔了大部分", usable: (record) => paretoOf(record) !== null,
     draw: (record) => <ParetoChart pareto={paretoOf(record)!} /> },
 };
-/** Card ②'s heading and caption for a record-drawn picture, or undefined when that picture is not drawn (same test as the body). */
-export function recordPicture(methodId: string, record?: Record<string, unknown>): { heading?: string; caption: string } | undefined {
+/** Card ②'s heading and caption, and what the tool's registration says about ③④⑥, for a picture drawn from the record,
+ *  or undefined when that picture is not drawn (same test as the body). */
+export function recordPicture(methodId: string, record?: Record<string, unknown>): Omit<RecordPicture, "visual" | "usable" | "draw"> | undefined {
   const picture = RECORD_PICTURES[methodId];
-  return picture?.usable(record) ? { heading: picture.heading, caption: picture.caption } : undefined;
+  return picture?.usable(record) ? { heading: picture.heading, caption: picture.caption, homes: picture.homes, parts: picture.parts, table: picture.table } : undefined;
 }
 
 export function MethodVisual({ kind, bindings, methodId, name = "", units = [], record, fields = [] }: { kind: string; bindings: Bindings; methodId?: string; name?: string; units?: Unit[]; record?: Record<string, unknown>; fields?: FormField[] }) {
   const picture = methodId ? RECORD_PICTURES[methodId] : undefined;
-  if (picture && record && picture.usable(record)) return <div data-visual={picture.visual} data-method={methodId}>{picture.draw(record, fields)}</div>;
-  if (kind === "layered") return <div data-visual="layered" data-method={methodId}>{methodId === "systems.iceberg_model" ? <Iceberg units={units} /> : <Layers units={units} name={name} />}</div>;
+  if (picture && record && picture.usable(record)) return <div data-visual={picture.visual} data-method={methodId}>{picture.draw(record, fields, units)}</div>;
+  if (kind === "layered") return <div data-visual="layered" data-method={methodId}><Layers units={units} name={name} /></div>;
   if (kind === "quadrant") {
     return <dl className="visual-quadrant" data-visual="quadrant">
       {Object.entries(bindings).map(([key, value]) => <React.Fragment key={key}><dt>{key}</dt><dd><code>{String(value)}</code></dd></React.Fragment>)}

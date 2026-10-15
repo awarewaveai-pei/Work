@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-15（續18）認知平台：結果頁不再寫死冰山——工具之間的差別只來自登記（工具模板 §15.1 第 1 項，未部署）
+
+**根因**: 套用模板到第二個工具前，`ResultPage.tsx` 有 10 處 `const iceberg = method_id === "systems.iceberg_model"` 分岔（② 標題、③ 圖 A/B 的層註、圖 C、圖張數、結尾句、④ 追蹤指標列、⑥ 標題與表下句），另有示範提示寫死「冰山模型」、⑥ 動作句寫死「四列」、`RunPage` 用 `ICEBERG_ID` 決定分層顏色。每加一個工具就得再改一次 `ResultPage`。
+
+**做了**:
+- 不變量：`ResultPage` 沒有以方法 id 分岔的程式；工具的差別只來自兩處登記＋課的單位資料（`TOOL_PAGE_TEMPLATE.md` §12 改寫成「原本寫死 → 現在由誰決定」）。
+- `MethodVisual.tsx` `RECORD_PICTURES`：冰山加一筆（和魚骨等四工具同一條路），登記可帶 `homes`（圖 A、B 坐在哪幾個單位；圖 A 的單位印「⑦ C 的追蹤指標」）、`parts`（③ 結尾句）、`table`（⑥ 標題與表下句）；沒登記的工具照引用算單位、印「⑥ 對照表」。
+- `Charts.tsx` `OWN_CHARTS`：工具自己的圖（C、D…，字母用算的）；每張帶 `shows`。`lessonkit.render_web_units` 把 `result-page-shows.yaml` `by_method` 產生進 `toolsheets.generated.ts` `RESULT_PAGE_SHOWS`，測試比對兩邊（⑧ 不推薦的工具 = ③ 畫了的工具）。
+- `lib/units.ts`：`unitFields`（表單欄位裡是課單位的）、`formIsUnits`（整張表單都是單位才分層）；`ICEBERG_ID` 刪除。
+- `TOOL_PAGE_TEMPLATE.md` 所有 `檔:行` 重新對齊；`test_tool_page_template.py` 錨字改成檔內唯一（前一個 session 收緊規則後有 34 條紅，含本次以外的 20 多條，一起修綠）。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run components lib → 54 files / 462 passed（新測試：魚骨跑完九段、頁上無「冰山／Anderson／圖 C／四列／追蹤指標」字、`check-mocks.py --page result` 綠、示範提示寫工具名、`OWN_CHARTS` ≡ `RESULT_PAGE_SHOWS`、`formIsUnits` 多一格非單位即 false） | exit=0 | ms=12000
+- REALTEST_EVIDENCE: tool=Bash | cmd=冰山既有測試含 `check-mocks.py --page result --parity`（示意稿每個標題、標籤、圖說、按鈕都在頁上）→ 綠，冰山輸出未變 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python docs/mockups/check-mocks.py；check-mocks-selftest.py → all rules green；215/215 mutations caught | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest tests/unit/test_tool_page_template.py → 4 passed | exit=0 | ms=3800
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run → Ran 1418 tests, OK | exit=0 | ms=1154076
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+  - Codex `agency-os/reports/oracle/2026-10-15-partialreview-4bb0f7f0.md`：F1 第六張自有圖字母 undefined → 成立，改成算的；F2 只要一格是單位整張表單就分層並跳過必填檢查 → 成立，改成 `formIsUnits`（整張都是單位才算），測試一例。
+- ORACLE_WAIVED: Codex 之後只改了 F1/F2 的修法＋對應測試與模板引用，tsc＋vitest＋模板閘全綠
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os,lobster-factory/infra/hetzner-phase1-core/tests | grep=ICEBERG_ID|OWN_LETTERS|LeverageChart | hits=3
+  - 實際程式只剩 `Charts.tsx` 自己的 `LeverageChart` 定義與登記；`RESULT_PAGE_GAP_REPORT.md` 為歷史報告不改；`.next` 為建置產物。
+
+**剩餘風險**: 未部署。② 以外的字（⑥ 標題等）放在程式登記而非課的資料：它們描述程式畫的那張圖，和圖放一起；要改成課的資料得升 lessons 版本、操作者 promote。下一步 §15.1 第 2 項（魚骨等單位不是表單欄位的工具，④⑥ 一單位一卡）。
+
+**rollback**: `git revert`；沒有資料或 schema 變動。
 ## 2026-10-15（續17）C6–C11 社群發文畫面、輪播、審核、媒體庫、WordPress 文章、紀錄（程式；0101／0102 未套正式、未部署）
 
 **做了**（照 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md`，樣稿 `mockups/social-manager-mock.html` 為規格）：

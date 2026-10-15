@@ -3,8 +3,8 @@ import { lineHeight, textWidth, useLines, Wrap } from "./svgtext";
 
 // ③ of docs/mockups/iceberg-result-mock.html: each chart answers one question and says how to read it, what it shows
 // and where it comes from. A: the numbers your record states (the interpretation's `trend`; its gate checks every value
-// against the cited line). B: the feedback loop the interpretation found (`loop`, every node cited). C: the iceberg
-// model's own leverage pattern -- method knowledge, never your data. No text in them is ever cut: it wraps and the
+// against the cited line). B: the feedback loop the interpretation found (`loop`, every node cited). C…: the tool's
+// own charts (OWN_CHARTS, e.g. the iceberg's leverage pattern) -- method knowledge, never your data. No text in them is ever cut: it wraps and the
 // drawing grows (svgtext.tsx).
 export type TrendSeries = { name: string; unit: string; points: Array<{ label: string; value: number; citation: string }> };
 export type Loop = { kind: "reinforcing" | "balancing"; name: string; reading: string; nodes: Array<{ id: string; text: string; citations: string[] }>; edges: Array<{ from: string; to: string }>;
@@ -125,6 +125,15 @@ export function LoopChart({ loop, dashed = new Set<string>() }: { loop: Loop; da
     <Wrap x={titleX} y={titleTop + titleH} width={titleW} height={noteH} size={11} align="center" className="m">{note1}<br />{note2}</Wrap>
   </svg>;
 }
+
+// A tool's own charts in ③, after A and B, lettered C, D… in this order: method knowledge, never your data (the reading
+// names the source). `shows` = the tool whose view it draws; methods/registry/result-page-shows.yaml by_method lists the
+// same ids (⑧ stops recommending them), and ResultPage.test fails while the two differ.
+export type OwnChart = { shows: string; title: string; scope: string; draw: () => React.ReactNode; how: string; saw: string; source: string };
+export const OWN_CHARTS: Record<string, OwnChart[]> = {
+  "systems.iceberg_model": [{ shows: "systems.leverage_point_analysis", title: "槓桿對比：在哪一層出手最值得？", scope: "（四層）", draw: () => <LeverageChart />,
+    how: "灰條是改變難度，藍條是效果與持久，越下面的層兩條都越長。", saw: "第 3 層是「做得到、也撐得久」的交會點。", source: "冰山模型本身的介入模式" }],
+};
 
 // The iceberg model's pattern (Anderson & Johnson): the deeper the layer, the harder to change and the longer it lasts.
 const LEVERAGE: Array<[string, number, number, string]> = [["事件", 60, 60, "當次有效"], ["模式", 120, 120, "提早看到"], ["結構", 180, 260, "切斷迴路，持久"], ["心智模型", 300, 330, "最難、最慢，但最根本"]];

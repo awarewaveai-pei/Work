@@ -15,7 +15,8 @@ import React from "react";
 import { ApiError, apiFetch } from "../lib/api";
 import { docs } from "../lib/blocks";
 import { caseBrief } from "../lib/case-brief";
-import { analysisHref, ICEBERG_ID, projectHref, toolLabel } from "../lib/catalog";
+import { analysisHref, projectHref, toolLabel } from "../lib/catalog";
+import { formIsUnits } from "../lib/units";
 import { failureReason, humanError } from "../lib/errors";
 import { fieldKey, fieldsNamedIn, FormField, initialState, toCheck } from "../lib/form-model";
 import type { MapContent, SenseCard } from "../lib/map";
@@ -262,7 +263,7 @@ export function RunPage({ methodId, lesson, names = {}, lessons = {}, family = n
       </div>{projects.length > 8 && <p className="sub mb0">更早的案子或分析：到「我的案子」打開它，在那一頁再用「{name}」分析一次。</p>}</details>}
       {prefillNotice && <p className="mocknote" role="status">{prefillNotice}</p>}
       {recorded && rerun && <p className="mocknote" role="status">{recorded}</p>}
-      <MethodForm fields={form.form.fields} state={state} onState={setState} example={example} onFill={showDemo ? fill : undefined} onClear={clear} label={`${name}的${numeral}個格子`} busy={Boolean(pendingId) || starting} layered={methodId === ICEBERG_ID} needs={prefillNeeds}
+      <MethodForm fields={form.form.fields} state={state} onState={setState} example={example} onFill={showDemo ? fill : undefined} onClear={clear} label={`${name}的${numeral}個格子`} busy={Boolean(pendingId) || starting} layered={formIsUnits(methodId, form.form.fields)} needs={prefillNeeds}
         onSubmit={async (payload) => {
         if (pendingId || starting) return;
         if (suggested.length) { setError("請先確認 AI 幫你填的格子"); return; }
