@@ -1436,6 +1436,9 @@
 
 ## Next — 已完成歷程（查詢用）
 
+- [ ] **社群發文 C12 上線（操作者 2026-10-15「go」1→4）**：C5–C11 程式已在 main（`50ca7df4d` C5、`df4f87eba` C6–C11），正式站未動。卡點：全部是 High-STOP 正式機動作，已授權的只有 1→4；5（子網域 social.aware-wave.com＋middleware host 導向＋ContentStudio 換連結）、6（middleware 身分標頭帶 user id→`authz.ts` 讀 `social_brand_members`）未授權。**下一步**：① `node scripts/apply-db-migration.mjs 0100 0101 0102`（0101 換掉 0098 的 `social_save_list` 7 參數版，必須和 next-admin 部署同一窗口） ② `scripts/safe-infra-patch.sh compose` 在 next-admin 加 `SOCIAL_DISPATCH_TOKEN`（新隨機值）、`SOCIAL_DISPATCH_ENABLED=true`、`SOCIAL_DISPATCH_MODE=draft`，`docker exec lobster-next-admin printenv` 驗 ③ `sg-deploy.sh next-admin` → `/playwright smoke` ④ Trigger deploy（`trigger-deploy-agent`，`tr_pat_*`；`scripts/lobster-trigger-deploy.ps1` 從 running next-admin 帶 token）：`social-dispatch`、`social-rotation` ⑤ 驗收：soulful 品牌排一則 Bluesky 貼文到 15 分鐘內 → 等 dispatch → `social_post_targets.postiz_post_id` 有值、Postiz `GET /posts` 該則 DRAFT 且 settings 有 `awarewave_send_key` → 刪該草稿 → compose 改 `SOCIAL_DISPATCH_MODE=apply` ⑥ WORKLOG 記證據、計畫 C5 標上線。步驟正本 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md` C12 段；回滾見 WORKLOG 2026-10-15 續15／續17。
+  - `▶️ 可動工` · `2026-10-15 開` · `1→4 已授權；5、6 待問`
+
 ### 2026-09-20 — Claude+Codex 共用資產稽核（結案）
 
 - [x] **【✅ 2026-09-20 結案】skills／commands／agents／tools 全面稽核與機械化** — 13 項全處理。最大收穫：**生成器與檢查器各有一份硬編三筆名單**，對同一個錯誤集合達成共識，所以沒人報警 —— 42/45 commands 從未到 Codex（含 `/claude-review`，而它正是 Codex 寫的改動必須用的 oracle）。41 個已 commit 的 wrapper 內嵌 `D:\Work` 絕對路徑（換機／Linux container 直接斷）；AGENT_INDEX 宣稱 critic／db-expert／vuln-verifier／debugger／planner 是 `opus` 但那 5 個檔案根本沒有 `model:` 行 —— 文件宣稱 ≠ 實際設定，最吃判斷力的 5 個 agent 一直跑「父層剛好是什麼」。
@@ -1989,5 +1992,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-10-14 11:19:38 UTC_
+_Last synced: 2026-10-15 04:09:33 UTC_
 
