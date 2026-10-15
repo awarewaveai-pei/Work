@@ -76,7 +76,8 @@ def generate_five_whys_validation(
     before construction -- the schema's own ``const: false`` gates are the
     second, independent layer, not the only one.
     """
-    hypothesis_ids = {h["id"] for h in cause_hypothesis_set.get("hypotheses", [])}
+    statements = {h["id"]: h.get("statement") for h in cause_hypothesis_set.get("hypotheses", [])}
+    hypothesis_ids = set(statements)
     if target_hypothesis_id not in hypothesis_ids:
         raise InvariantViolation(
             f"FIVEWHYS_PRECONDITION_FAILED: target_hypothesis_id {target_hypothesis_id!r} is not a member of "
@@ -102,7 +103,7 @@ def generate_five_whys_validation(
             "refusing to construct a FiveWhysValidation record that would fail its own schema's const:false gates"
         )
 
-    return {
+    record = {
         "id": validation_id,
         "version": version,
         "cause_hypothesis_set_ref": cause_hypothesis_set["id"],
@@ -113,6 +114,9 @@ def generate_five_whys_validation(
         "failure_mode_self_check": failure_mode_self_check,
         "provenance": provenance,
     }
+    if isinstance(statements[target_hypothesis_id], str):
+        record["target_hypothesis_statement"] = statements[target_hypothesis_id]   # names the cause (its result page sees only it)
+    return record
 
 
 def _result(gate_id: str, passed: bool, evidence: list[Any], validator: str, timestamp: str) -> dict[str, Any]:

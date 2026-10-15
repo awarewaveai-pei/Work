@@ -270,16 +270,24 @@ class MethodFormRoundTripTests(unittest.TestCase):
         self.assertEqual(failures, {})
 
     def test_every_domain_example_set_is_accepted_by_the_real_builder_and_gates(self):
-        """N-55: a lesson domain chip's 「那個例子，已填好」 is a real example, pushed through the builder like the default."""
+        """N-55: a lesson domain chip's 「那個例子，已填好」 is a real example, pushed through the builder like the default;
+        a tool with domain examples has one for every active domain but the default (the default domain = `input`)."""
         from ai_lego.apps.api.method_form import load_examples
         from ai_lego import resolve_spec_root
-        sets = load_examples(resolve_spec_root())["systems.iceberg_model"]["sets"]
-        self.assertEqual(sorted(sets), ["daily", "decision", "ecom", "partner"])
-        form = method_form("systems.iceberg_model")
-        for name, example in sets.items():
-            kwargs = serialize_fields(form["fields"], example["input"], {})
-            _, gates = invoke("systems.iceberg_model", kwargs)
-            self.assertTrue(all(g["status"] in ("PASS", "NOT_APPLICABLE") for g in gates), (name, gates))
+        spec = resolve_spec_root()
+        domains = yaml.safe_load((Path(spec) / "methods/examples/domains.yaml").read_text(encoding="utf-8"))
+        others = sorted(d["id"] for d in domains["domains"] if d["status"] == "active" and d["id"] != domains["default"])
+        with_sets = {method_id: example["sets"] for method_id, example in load_examples(spec).items() if example.get("sets")}
+        self.assertIn("systems.iceberg_model", with_sets)
+        for method_id, sets in with_sets.items():
+            self.assertEqual(sorted(sets), others, method_id)
+            form = method_form(method_id)
+            keys = {field["key"] for field in form["fields"]}
+            for name, example in sets.items():
+                self.assertEqual(sorted(set(example["input"]) - keys), [], (method_id, name))   # the form shows every key
+                kwargs = serialize_fields(form["fields"], example["input"], collect_defs(form["fields"], {}), by_param=True)
+                _, gates = invoke(method_id, kwargs)
+                self.assertTrue(all(g["status"] in ("PASS", "NOT_APPLICABLE") for g in gates), (method_id, name, gates))
 
     def test_an_unknown_dimension_never_sends_its_answer_even_if_one_was_typed(self):
         """5W1H refuses an UNKNOWN row carrying ``answer`` at all. A person who typed an answer and then

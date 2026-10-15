@@ -1,7 +1,12 @@
 import React from "react";
 import { UNIT_FACTS } from "../../lib/toolsheets.generated";
 import { lineHeight, useLines, Wrap } from "./svgtext";
+import type { FormField } from "../../lib/form-model";
+import { bonesOf, Fishbone } from "./Fishbone";
+import { ParetoChart, paretoOf } from "./ParetoChart";
+import { ProblemGap, problemOf } from "./ProblemGap";
 import { RiskMatrix, riskCount, risksOf } from "./RiskMatrix";
+import { chainOf, WhyChain } from "./WhyChain";
 
 type Bindings = Record<string, unknown>;
 // One unit of a layered picture: its form field key, its name, what you filled in (and its short form, when the analysis
@@ -81,16 +86,32 @@ function Layers({ units, name }: { units: Unit[]; name: string }) {
   </svg>;
 }
 
-// A tool whose picture is drawn from the record itself, whatever the reading binds (the record is the one source).
-const RECORD_PICTURES: Record<string, string> = { "delivery.risk_register": "每個風險落在機率×衝擊的哪一格" };
-/** Card ②'s caption for a record-drawn picture, or undefined when that picture is not drawn (same test as the body). */
-export function recordPictureCaption(methodId: string, record?: Record<string, unknown>): string | undefined {
-  return methodId === "delivery.risk_register" && risksOf(record).length ? RECORD_PICTURES[methodId] : undefined;
+// A tool whose picture is drawn from the record itself, whatever the reading binds (the record is the one source): its
+// card ② heading (without it, "<tool name>圖"), caption, whether this record can be drawn, and the drawing. A record the
+// picture cannot use falls back to the generic picture of the tool's visual kind.
+type RecordPicture = { visual: string; heading?: string; caption: string; usable: (record?: Record<string, unknown>) => boolean; draw: (record: Record<string, unknown>, fields: FormField[]) => React.ReactNode };
+const optionLabel = (fields: FormField[], key: string) => (value: string) => fields.find((field) => field.key === key)?.options?.find((option) => option.value === value)?.label ?? value;
+const RECORD_PICTURES: Record<string, RecordPicture> = {
+  "delivery.risk_register": { visual: "risk-matrix", caption: "每個風險落在機率×衝擊的哪一格", usable: (record) => risksOf(record).length > 0,
+    draw: (record) => <RiskMatrix risks={risksOf(record)} total={riskCount(record)} /> },
+  "framing.problem_statement": { visual: "problem-gap", heading: "問題陳述", caption: "現況和期望差在哪裡", usable: (record) => problemOf(record) !== null,
+    draw: (record) => <ProblemGap content={problemOf(record)!} /> },
+  "root_cause.fishbone": { visual: "fishbone", heading: "魚骨圖", caption: "可能的原因，分在哪幾根骨頭上", usable: (record) => bonesOf(record).length > 0,
+    draw: (record) => <Fishbone bones={bonesOf(record)} problem={typeof record.problem_summary === "string" ? record.problem_summary : undefined} /> },
+  "root_cause.five_whys": { visual: "why-chain", heading: "為什麼鏈", caption: "從一個原因一路問到流程", usable: (record) => chainOf(record) !== null,
+    draw: (record, fields) => <WhyChain chain={chainOf(record)!} stopLabel={optionLabel(fields, "stop_conditions_met")} /> },
+  "root_cause.pareto": { visual: "pareto", heading: "柏拉圖", caption: "哪幾個原因佔了大部分", usable: (record) => paretoOf(record) !== null,
+    draw: (record) => <ParetoChart pareto={paretoOf(record)!} /> },
+};
+/** Card ②'s heading and caption for a record-drawn picture, or undefined when that picture is not drawn (same test as the body). */
+export function recordPicture(methodId: string, record?: Record<string, unknown>): { heading?: string; caption: string } | undefined {
+  const picture = RECORD_PICTURES[methodId];
+  return picture?.usable(record) ? { heading: picture.heading, caption: picture.caption } : undefined;
 }
 
-export function MethodVisual({ kind, bindings, methodId, name = "", units = [], record }: { kind: string; bindings: Bindings; methodId?: string; name?: string; units?: Unit[]; record?: Record<string, unknown> }) {
-  const risks = methodId === "delivery.risk_register" ? risksOf(record) : [];
-  if (risks.length) return <div data-visual="risk-matrix" data-method={methodId}><RiskMatrix risks={risks} total={riskCount(record)} /></div>;
+export function MethodVisual({ kind, bindings, methodId, name = "", units = [], record, fields = [] }: { kind: string; bindings: Bindings; methodId?: string; name?: string; units?: Unit[]; record?: Record<string, unknown>; fields?: FormField[] }) {
+  const picture = methodId ? RECORD_PICTURES[methodId] : undefined;
+  if (picture && record && picture.usable(record)) return <div data-visual={picture.visual} data-method={methodId}>{picture.draw(record, fields)}</div>;
   if (kind === "layered") return <div data-visual="layered" data-method={methodId}>{methodId === "systems.iceberg_model" ? <Iceberg units={units} /> : <Layers units={units} name={name} />}</div>;
   if (kind === "quadrant") {
     return <dl className="visual-quadrant" data-visual="quadrant">

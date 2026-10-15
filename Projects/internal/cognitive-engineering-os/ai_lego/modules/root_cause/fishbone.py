@@ -104,6 +104,9 @@ def generate_cause_hypothesis_set(
         "hypotheses": list(hypotheses),
         "promotion": {"validation_methods_applied": [], "ready_for_promotion": False},
     }
+    summary = (problem_statement.get("content") or {}).get("current_state")
+    if isinstance(summary, str) and summary.strip():
+        record["problem_summary"] = summary   # the fish's head: the set names its own problem (its result page sees only it)
     if suggested_categories:
         record["suggested_categories"] = list(suggested_categories)
     return record

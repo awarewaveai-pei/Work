@@ -399,6 +399,32 @@
 - 無 subagent。
 
 **rollback**: `git revert <本 commit>`。
+## 2026-10-14（續23）認知平台：根本原因四工具（問題陳述／魚骨／五個為什麼／柏拉圖）結果頁 ② 畫出自己的圖；紀錄寫出它引用的內容；五領域示範案例（未部署）
+
+**根因**: 操作者要四個工具「完整度和冰山一樣」。查下來結果頁陽春不只是缺圖：① 結果頁 ② 對 `table` 類工具只印綁定路徑（`MethodVisual.tsx` table 分支）；② 五個為什麼、柏拉圖的紀錄只存假設編號（H1），魚骨只存問題編號——AI 解讀與結果頁都只看得到紀錄（`interpret_method_record.py:59` `build_prompt_manifest(record)`），所以柏拉圖說不出「哪個原因」；③ 四個工具各只有一個示範案例，故事跟五個例子領域無關（客服、結帳），課程的「用示範案例試一次」會打開不相干的例子（`RunPage.tsx:98` 沒有領域例子就退回預設）。
+
+**做了**:
+- 紀錄寫出它引用的內容（選填欄位，typed-object 1.1.0，builder 從輸入照抄、不經 AI）：`CauseHypothesisSet.problem_summary`（魚頭＝問題陳述的現況）、`FiveWhysValidation.target_hypothesis_statement`、`ParetoAnalysis.causes`；`SPEC_QUICKREF.md` 重產。
+- 結果頁 ②：`MethodVisual.tsx` 一張 `RECORD_PICTURES` 表（風險矩陣移進來）＋四張由紀錄直接畫的圖 `ProblemGap`／`Fishbone`／`WhyChain`／`ParetoChart`（ASQ 程序：左軸到總數、與右軸 100% 對齊；只有你定了門檻才標關鍵少數）；`recordPicture()` 給 ② 標題與說明。
+- `method-form-examples.yaml`：四個工具的預設改成藝術反思故事＋四個領域 `sets`（共 20 個，接冰山的示範故事）；kepner_tregoe 範例拿掉不再成立的「延續魚骨」。`test_method_form.py` 領域例子測試從只測冰山改成「有 sets 的工具都測、sets 必須正好是非預設的啟用領域、每個 key 表單都顯示」。
+- TEACH 草稿課 `framing.problem_statement`：例子句由它自己的產生器 `draft_for_tool` 重產（舊句講客服案例，已不存在）→ version 3 ＋ HISTORY 指紋；`test_teach_content.py` 版本釘改 3。
+- 來源已讀全文（給下一步課程用）：ASQ fishbone、ASQ Pareto（WebFetch 403，用瀏覽器讀）、Wikipedia Five whys／Ishikawa diagram／Pareto chart／Problem statement、Lean Enterprise Institute 5 Whys、Juran Institute problem statement。
+
+**驗證結果**:
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest tests/unit/test_method_form.py tests/unit/test_method_form_examples.py（含 JS 序列化一致性）→ 12 passed, 286 subtests；20 個新示範經真 builder＋gates 全 PASS | exit=0 | ms=7000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run → 152 個受影響測試模組 OK | exit=0 | ms=~1800000
+- REALTEST_EVIDENCE: tool=Bash | cmd=run_golden_tests.py; gen_spec_index.py --check → 0 0 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run components/result → 48 passed（新 RootCausePictures.test 3 個） | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=Bash | cmd=Playwright 截圖 scratchpad rca-preview.html（桌面亮／暗、手機）→ 無橫向捲動；修了為什麼鏈「為什麼？為什麼」「因為 因為」重字、柏拉圖第一根柱的數字壓在累積點上 | exit=0 | ms=30000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+  - Codex `agency-os/reports/oracle/2026-10-14-partialreview-373fc9c4.md`（`-Path` 只審本次路徑）：F1 全為 0 的柏拉圖左軸被 `|| 1` 謊報總數 1 → 成立（真 builder 會擋 `PARETO_RANKING_ZERO_TOTAL`，圖改成同一條規則：總數 0 不畫、退回一般圖）；測試加這一例。
+- ORACLE_WAIVED: Codex 之後唯一改動 = `ParetoChart.tsx` 總數 0 不畫（F1 的修法）＋ 對應測試一例，tsc＋vitest 48 綠
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,Projects/internal/cognitive-engineering-os | grep=recordPictureCaption|客服平均要在3個不同系統|結帳放棄率過高|延續 root_cause | hits=3
+  - `recordPictureCaption` 呼叫端（ResultPage、RiskMatrix.test）已改；舊故事只剩 kepner_tregoe 自己的範例（自洽，拿掉錯的「延續」）與 `MethodForm.test.tsx` 自己的 fixture。
+
+**剩餘風險**: 未部署。手機上四張圖跟冰山一樣整張縮小、字很小（加 min-width 會被 check-mocks `responsive` 擋；結果頁全頁的手機圖要另一張卡處理，不在這裡放寬規則）。④⑥「一項一張卡」還沒做（需要解讀 schema 加 picture_units、prompt 一行、伺服器算單位）＝下一張卡。舊紀錄沒有新欄位 → 柏拉圖標籤只顯示編號（不會壞）。預覽：https://claude.ai/artifact/WTcjkNkRBFzq3XiLb3CHnr
+
+**rollback**: `git revert`；typed-object 欄位是選填，舊紀錄照常驗過。
 ## 2026-10-14（續22）客戶 tenant 自動化退役；查清每日 guard 的 0xC000013A 與 ssh 卡住
 
 **操作者**：「你去查是怎麼回事」→ 刪不刪「你決定，你才是專家」。

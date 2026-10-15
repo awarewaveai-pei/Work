@@ -13,7 +13,7 @@ import { formatTime } from "../../lib/time";
 import { RunHeader } from "../RunHeader";
 import { LeverageChart, LoopChart, TrendChart, type Loop, type TrendSeries } from "./Charts";
 import { HowTo } from "./HowTo";
-import { MethodVisual, recordPictureCaption, type Unit } from "./MethodVisual";
+import { MethodVisual, recordPicture, type Unit } from "./MethodVisual";
 import { KNOWLEDGE_GAPS, NO_LESSON, UNIT_FACTS } from "../../lib/toolsheets.generated";
 
 // The result, card by card as docs/mockups/iceberg-result-mock.html (① conclusion … ⑨ citations, then the approve
@@ -209,6 +209,7 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
   const optionLabel = (option: { name: string }) => OPTION_MARKS[(solutions?.options ?? []).indexOf(option as never)] ?? "";
   const optionTag = (option: { name: string }) => `${optionLabel(option)}「${optionName(option)}」`;
   const iceberg = result.method_id === "systems.iceberg_model";
+  const drawn = recordPicture(result.method_id, record);   // a picture drawn from the record names its own card ②
   const externalSourceCount = (reading?: UnitReading) => new Set(
     (reading?.citations ?? []).filter((id) => manifestById.get(id)?.kind === "project_source"),
   ).size;
@@ -401,8 +402,8 @@ export function ResultPage({ result, record = {}, manifest = [], gateResults = [
       </div>
     </Card>
 
-    <Card id="2" title={iceberg ? "② 冰山圖：你的問題在四層各是什麼" : `② ${name}圖：${recordPictureCaption(result.method_id, record) ?? PICTURE[result.visual.kind] ?? "你的資料放在圖上的哪裡"}`} read={focusLayer ? "從上往下；★ 是建議先出手的層。" : "圖上每一個位置都對應你填的一段。"} act={layers.length ? `看你填的${NUMERAL[layers.length] ?? ""}段話有沒有放錯層。` : "看你填的內容有沒有放錯位置。"}>
-      <MethodVisual kind={result.visual.kind} bindings={result.visual.bindings} methodId={result.method_id} name={name} units={units} record={record} />
+    <Card id="2" title={iceberg ? "② 冰山圖：你的問題在四層各是什麼" : `② ${drawn?.heading ?? `${name}圖`}：${drawn?.caption ?? PICTURE[result.visual.kind] ?? "你的資料放在圖上的哪裡"}`} read={focusLayer ? "從上往下；★ 是建議先出手的層。" : "圖上每一個位置都對應你填的一段。"} act={layers.length ? `看你填的${NUMERAL[layers.length] ?? ""}段話有沒有放錯層。` : "看你填的內容有沒有放錯位置。"}>
+      <MethodVisual kind={result.visual.kind} bindings={result.visual.bindings} methodId={result.method_id} name={name} units={units} record={record} fields={fields} />
       {thickness.length > 0 && <div className="thick"><b>資料厚度</b>（你填了多少）：{thickness.map(([unit, value]) => `${layerNo(unit)} ${dots(value.own_statements ?? 0)}${thicknessOf(unit)?.note ? `（${thicknessOf(unit)!.note}）` : thinnest && thinnest[0] === unit && thickness.length > 1 ? `（最薄：只有 ${value.own_statements ?? 0} 句）` : ""}`).join("　")}。薄的層，結論的信心就低。</div>}
       {removedNote("units", "層的解讀")}
     </Card>

@@ -1,7 +1,7 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "ai-lego://specs/cognitive/typed-objects/five-whys-validation.schema.yaml"
 title: Five Whys Validation
-version: "1.0.0"
+version: "1.1.0"
 status: ACTIVE
 
 description: >
@@ -121,6 +121,12 @@ properties:
       member of that set's hypotheses (checked by the runtime builder, not
       by this schema -- a cross-object structural check, same class as
       root-cause-fact.schema.yaml's own `promoted_hypothesis_id`).
+
+  target_hypothesis_statement:
+    type: string
+    description: >
+      The statement of target_hypothesis_id in the referenced set, copied by the builder so the chain names the cause it
+      drills into -- the result page and its interpretation see only this record.
 
   generated_by_method:
     type: string

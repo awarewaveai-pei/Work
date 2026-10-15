@@ -3146,12 +3146,67 @@ examples:
       review_cadence: 每兩週一次團隊回顧會議
     scenario: 為客服團隊設定本季 OKR。
   framing.problem_statement:
+    # one example per lesson domain chip (lessons data); the lesson's 用示範案例試一次 opens #demo=<set>
     input:
-      current_state: 客服平均要在3個不同系統間切換才能處理一張客訴單
-      expected_state: 客服可以在單一介面看到客戶完整歷程並直接處理客訴
-      gap: 缺少一個整合訂單、金流、歷史客服紀錄的統一工作台
-      impact: 平均每張客訴單處理時間多花12分鐘，一年估計多耗費800人時
-    scenario: 建立跨部門對「客服處理效率低落」問題的共同定義。
+      current_state: 這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次有 6 位。三期都是從第 4 次開始往下掉。
+      expected_state: 每次 session 至少 5 位主動說自己的作品，第 4 次以後也守得住。
+      gap: 第 6 次比期望少 3 位；而且每一期從第 4 次起都在往下掉。
+      impact: 反思紀錄裡幾乎只剩帶領者的解讀，研究拿不到參與者用自己的話說的經驗。
+      affected_stakeholders:
+      - 參與者
+      - 帶領者團隊
+      - 研究者
+      scope_non_goals: 只寫主動分享人數的落差；不判斷是誰的錯，也還不談怎麼改。
+    scenario: 團體反思 session 的主動分享從 6 人掉到 2 人：先把落差寫清楚，不急著找原因。
+    sets:
+      partner:
+        scenario: 畫廊一再延後付款：先把這一檔晚了多少、影響多大寫清楚。
+        input:
+          current_state: 這季第 3 檔展覽結束已經 60 天，4 件已售作品的款項還沒收到；上一檔拖到第 75 天才付。
+          expected_state: 每檔展覽結束後 30 天內收到全部已售作品的款項。
+          gap: 這一檔已經比期望晚 30 天；過去 5 檔有 4 檔超過 45 天才付。
+          impact: 這兩個月的材料費和工作室房租要先自己墊，下一檔的備料也跟著延後。
+          affected_stakeholders:
+          - 藝術家
+          - 畫廊
+          - 買家
+          scope_non_goals: 只寫付款晚了多少；不評斷畫廊的人，也還不談要不要換畫廊。
+      decision:
+        scenario: 才藝教室暑假前的報名詢問接不住：先把接住多少、漏掉多少寫清楚。
+        input:
+          current_state: 今年 6 月第 1 週接到 42 通報名詢問，只收得下 18 人；問平日晚上的家長，我們沒有任何班可以排。
+          expected_state: 暑假前的報名詢問，至少 7 成排得進我們開得出來的班。
+          gap: 這一週 42 通只接住 18 通，不到一半；問平日晚上的全部接不住。
+          impact: 去年暑假候補的家長大多去了別家，9 月的續報少了一整班。
+          affected_stakeholders:
+          - 家長與學生
+          - 老師
+          - 老闆
+          scope_non_goals: 只寫報名接不住的落差；還不決定要不要加開平日班。
+      ecom:
+        scenario: 網店每次上新品退貨率就衝高：先把高多少、集中在哪裡寫清楚。
+        input:
+          current_state: 上個月上新 30 款，退貨率 12%；平常月份是 5%。退貨理由 7 成是「尺寸不合」。
+          expected_state: 上新的月份，退貨率也維持在 6% 以內。
+          gap: 比期望高 6 個百分點以上，而且集中在上新後的 2 週。
+          impact: 退貨的來回運費和客服處理時間比平常月份多出一倍以上，新品的評價也被拉低。
+          affected_stakeholders:
+          - 買家
+          - 客服
+          - 負責上架的同事
+          scope_non_goals: 只看上新月份的退貨落差；不談全部商品的退貨。
+      daily:
+        scenario: 兩個人總在週日晚上吵架：先把吵了幾次、都在什麼時候寫清楚，不翻舊帳。
+        input:
+          current_state: 這個月 4 個週日晚上吵了 3 次，都是 9 點以後講到下週的接送。
+          expected_state: 下週的接送在週五前就排好，週日晚上不用再為行程吵。
+          gap: 4 個週日有 3 個在吵；下週的行程每次都拖到週日晚上 9 點以後才排。
+          impact: 週一早上兩個人都帶著氣出門，小孩也聽到了。
+          affected_stakeholders:
+          - 我
+          - 另一半
+          - 小孩
+          scope_non_goals: 只寫週日晚上的爭吵；不翻舊帳，也不判誰對誰錯。
   framing.reframing:
     input:
       original_frame:
@@ -4054,64 +4109,572 @@ examples:
         gate_ref: G1
     scenario: 分析伺服器無法開機的所有可能根因組合。
   root_cause.fishbone:
+    # one example per lesson domain chip (lessons data); the lesson's 用示範案例試一次 opens #demo=<set>
     input:
       hypotheses:
-      - category: 技術／設備
+      - category: 人
         id: H1
-        statement: 結帳頁面載入過慢
-      - category: 流程
+        statement: 帶領者先講作品的意義，參與者習慣等著被解讀
+      - category: 方法
         id: H2
-        statement: 必填欄位過多讓使用者放棄
+        statement: 90 分鐘裡帶領者說明佔 35 分鐘，輪到分享時時間已經不夠
+      - category: 量測
+        id: H3
+        statement: 紀錄表只問「是否達到本次目標洞察」，沒有記誰開口
+      - category: 環境
+        id: H4
+        statement: 線上場大家關著鏡頭，看不到彼此的作品
+      - category: 材料
+        id: H5
+        statement: 第 4 次起換成比較難掌握的媒材，作品比較不敢拿出來
+      - category: 人
+        id: H6
+        statement: 參與者彼此還不熟，怕說錯話
       problem_statement:
         content:
-          current_state: 結帳放棄率過高
-          expected_state: 結帳放棄率降低
-        id: PROB-T1
+          current_state: 這一期第 6 次 session，8 位參與者只有 2 位主動說自己的作品；第 1 次有 6 位。三期都是從第 4 次開始往下掉。
+          expected_state: 每次 session 至少 5 位主動說自己的作品，第 4 次以後也守得住。
+          gap: 第 6 次比期望少 3 位；而且每一期從第 4 次起都在往下掉。
+          impact: 反思紀錄裡幾乎只剩帶領者的解讀，研究拿不到參與者用自己的話說的經驗。
+          affected_stakeholders:
+          - 參與者
+          - 帶領者團隊
+          - 研究者
+          scope_non_goals: 只寫主動分享人數的落差；不判斷是誰的錯，也還不談怎麼改。
+        id: PROB-EDD1
         provenance:
-          authorship_state: AI_SUGGESTED
-          epistemic_type: AI_INFERENCE
+          authorship_state: HUMAN_ORIGINAL
+          epistemic_type: HUMAN_OPINION
           locked: null
         status: validated
         version: 1.0.0
-    scenario: 分析「網站結帳流程放棄率過高」的候選原因。
+      suggested_categories:
+      - 人
+      - 方法
+      - 量測
+      - 環境
+      - 材料
+    scenario: 主動分享從 6 人掉到 2 人：把可能的原因按「人、方法、量測、環境、材料」分開列，先不判斷哪個是真的。
+    sets:
+      partner:
+        scenario: 畫廊一再延後付款：把可能的原因按「合約、流程、買家、人、紀錄」分開列。
+        input:
+          hypotheses:
+          - category: 合約
+            id: H1
+            statement: 合約只寫「展後結算」，沒寫幾天內付，也沒寫逾期怎麼辦
+          - category: 流程
+            id: H2
+            statement: 畫廊每個月底才一次對帳，而且要等展覽收場後才開始算
+          - category: 買家
+            id: H3
+            statement: 買家分期付款時，畫廊要等最後一期入帳才整筆付給藝術家
+          - category: 人
+            id: H4
+            statement: 我們這邊沒有人負責追款
+          - category: 紀錄
+            id: H5
+            statement: 沒有記每一檔「說好哪天付、實際哪天付」
+          problem_statement:
+            content:
+              current_state: 這季第 3 檔展覽結束已經 60 天，4 件已售作品的款項還沒收到；上一檔拖到第 75 天才付。
+              expected_state: 每檔展覽結束後 30 天內收到全部已售作品的款項。
+              gap: 這一檔已經比期望晚 30 天；過去 5 檔有 4 檔超過 45 天才付。
+              impact: 這兩個月的材料費和工作室房租要先自己墊，下一檔的備料也跟著延後。
+              affected_stakeholders:
+              - 藝術家
+              - 畫廊
+              - 買家
+              scope_non_goals: 只寫付款晚了多少；不評斷畫廊的人，也還不談要不要換畫廊。
+            id: PROB-PTN1
+            provenance:
+              authorship_state: HUMAN_ORIGINAL
+              epistemic_type: HUMAN_OPINION
+              locked: null
+            status: validated
+            version: 1.0.0
+          suggested_categories:
+          - 合約
+          - 流程
+          - 買家
+          - 人
+          - 紀錄
+      decision:
+        scenario: 暑假前的報名接不住：把可能的原因按「設備、人、方法、量測」分開列。
+        input:
+          hypotheses:
+          - category: 設備
+            id: H1
+            statement: 只有 1 間教室，平日晚上租給別的團體
+          - category: 人
+            id: H2
+            statement: 兩位老師都是兼職，平日晚上排不出人
+          - category: 方法
+            id: H3
+            statement: 課表照週末班設計，從來沒有排過平日時段
+          - category: 方法
+            id: H4
+            statement: 候補名單沒有人回電
+          - category: 量測
+            id: H5
+            statement: 詢問紀錄沒有記家長問的是哪個時段
+          problem_statement:
+            content:
+              current_state: 今年 6 月第 1 週接到 42 通報名詢問，只收得下 18 人；問平日晚上的家長，我們沒有任何班可以排。
+              expected_state: 暑假前的報名詢問，至少 7 成排得進我們開得出來的班。
+              gap: 這一週 42 通只接住 18 通，不到一半；問平日晚上的全部接不住。
+              impact: 去年暑假候補的家長大多去了別家，9 月的續報少了一整班。
+              affected_stakeholders:
+              - 家長與學生
+              - 老師
+              - 老闆
+              scope_non_goals: 只寫報名接不住的落差；還不決定要不要加開平日班。
+            id: PROB-DEC1
+            provenance:
+              authorship_state: HUMAN_ORIGINAL
+              epistemic_type: HUMAN_OPINION
+              locked: null
+            status: validated
+            version: 1.0.0
+          suggested_categories:
+          - 設備
+          - 人
+          - 方法
+          - 量測
+      ecom:
+        scenario: 上新後退貨率衝高：把可能的原因按「材料、方法、量測、人、環境」分開列。
+        input:
+          hypotheses:
+          - category: 材料
+            id: H1
+            statement: 商品頁只放一張平拍尺寸表，跟實品對不起來
+          - category: 方法
+            id: H2
+            statement: 新品上架前沒有人試穿量測
+          - category: 量測
+            id: H3
+            statement: 退貨單只能勾「不喜歡」或「尺寸不合」，看不出真正的原因
+          - category: 人
+            id: H4
+            statement: 客人問尺寸時，客服沒有統一的回答
+          - category: 環境
+            id: H5
+            statement: 上新常搭配促銷，衝動下單的比較多
+          problem_statement:
+            content:
+              current_state: 上個月上新 30 款，退貨率 12%；平常月份是 5%。退貨理由 7 成是「尺寸不合」。
+              expected_state: 上新的月份，退貨率也維持在 6% 以內。
+              gap: 比期望高 6 個百分點以上，而且集中在上新後的 2 週。
+              impact: 退貨的來回運費和客服處理時間比平常月份多出一倍以上，新品的評價也被拉低。
+              affected_stakeholders:
+              - 買家
+              - 客服
+              - 負責上架的同事
+              scope_non_goals: 只看上新月份的退貨落差；不談全部商品的退貨。
+            id: PROB-ECM1
+            provenance:
+              authorship_state: HUMAN_ORIGINAL
+              epistemic_type: HUMAN_OPINION
+              locked: null
+            status: validated
+            version: 1.0.0
+          suggested_categories:
+          - 材料
+          - 方法
+          - 量測
+          - 人
+          - 環境
+      daily:
+        scenario: 週日晚上一再吵架：把可能的原因按「方法、工具、時間、人、環境」分開列。
+        input:
+          hypotheses:
+          - category: 方法
+            id: H1
+            statement: 下週的行程要到週日晚上才一起排
+          - category: 工具
+            id: H2
+            statement: 兩個人各自答應別人的活動，沒有共用的行事曆
+          - category: 時間
+            id: H3
+            statement: 週日晚上 9 點前都在陪小孩寫作業，排行程時兩個人都累了
+          - category: 人
+            id: H4
+            statement: 平常有不滿不說，累積到週日一起爆
+          - category: 環境
+            id: H5
+            statement: 週末兩天都排滿活動
+          problem_statement:
+            content:
+              current_state: 這個月 4 個週日晚上吵了 3 次，都是 9 點以後講到下週的接送。
+              expected_state: 下週的接送在週五前就排好，週日晚上不用再為行程吵。
+              gap: 4 個週日有 3 個在吵；下週的行程每次都拖到週日晚上 9 點以後才排。
+              impact: 週一早上兩個人都帶著氣出門，小孩也聽到了。
+              affected_stakeholders:
+              - 我
+              - 另一半
+              - 小孩
+              scope_non_goals: 只寫週日晚上的爭吵；不翻舊帳，也不判誰對誰錯。
+            id: PROB-DLY1
+            provenance:
+              authorship_state: HUMAN_ORIGINAL
+              epistemic_type: HUMAN_OPINION
+              locked: null
+            status: validated
+            version: 1.0.0
+          suggested_categories:
+          - 方法
+          - 工具
+          - 時間
+          - 人
+          - 環境
   root_cause.five_whys:
+    # one example per lesson domain chip (lessons data); the lesson's 用示範案例試一次 opens #demo=<set>
     input:
       cause_hypothesis_set:
         generated_by_method: root_cause.fishbone
         hypotheses:
-        - category: 技術／設備
+        - category: 人
           id: H1
           provenance:
-            authorship_state: AI_SUGGESTED
-            epistemic_type: AI_INFERENCE
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
             locked: null
-          statement: 結帳頁面載入過慢
-        - category: 流程
+          statement: 帶領者先講作品的意義，參與者習慣等著被解讀
+        - category: 方法
           id: H2
           provenance:
-            authorship_state: AI_SUGGESTED
-            epistemic_type: AI_INFERENCE
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
             locked: null
-          statement: 必填欄位過多讓使用者放棄
-        id: CHS-T1
-        problem_statement_ref: PROB-T1
+          statement: 90 分鐘裡帶領者說明佔 35 分鐘，輪到分享時時間已經不夠
+        - category: 量測
+          id: H3
+          provenance:
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
+            locked: null
+          statement: 紀錄表只問「是否達到本次目標洞察」，沒有記誰開口
+        - category: 環境
+          id: H4
+          provenance:
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
+            locked: null
+          statement: 線上場大家關著鏡頭，看不到彼此的作品
+        - category: 材料
+          id: H5
+          provenance:
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
+            locked: null
+          statement: 第 4 次起換成比較難掌握的媒材，作品比較不敢拿出來
+        - category: 人
+          id: H6
+          provenance:
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
+            locked: null
+          statement: 參與者彼此還不熟，怕說錯話
+        id: CHS-EDD1
+        problem_statement_ref: PROB-EDD1
         promotion:
           ready_for_promotion: false
           validation_methods_applied: []
         version: 1.0.0
       stop_conditions_met:
       - FOUND_SYSTEM_PROCESS_MECHANISM
+      - CONTROLLABLE_BY_ORGANIZATION
       target_hypothesis_id: H1
       why_chain:
-      - answer: 因為載入了未優化的高解析度圖片
-        question: 為什麼結帳頁面載入過慢?
+      - answer: 因為從第 4 次起，每件作品都由帶領者先講它的意義，參與者只剩回應。
+        question: 為什麼第 4 次以後主動分享的人變少？
         step: 1
         supporting_evidence_refs:
-        - perf-report-2026-09
-      - answer: 部署流程沒有自動壓縮圖片的步驟
-        question: 為什麼圖片沒有優化?
+        - E-1
+      - answer: 因為第 4 次起的流程表寫著「帶領者示範解讀，再請參與者回應」。
+        question: 為什麼帶領者要先講？
         step: 2
-    scenario: 延續上面 root_cause.fishbone 的例子，驗證「結帳頁面載入過慢」這個假設（hypothesis H1）。
+        supporting_evidence_refs:
+        - E-2
+      - answer: 因為紀錄表只問「是否達到本次目標洞察」，帶領者怕沒達到，就先把意義講出來。
+        question: 為什麼流程表要這樣排？
+        step: 3
+      - answer: 因為機構每季的成效報告只看「洞察達成率」這一個數字。
+        question: 為什麼紀錄表只問洞察？
+        step: 4
+        supporting_evidence_refs:
+        - E-3
+    scenario: 延續魚骨圖：追問「帶領者先講作品的意義」為什麼會讓第 4 次以後的分享變少，一路問到流程和規定。
+    sets:
+      partner:
+        scenario: 延續魚骨圖：追問「要等買家分期全部入帳才付」為什麼會讓這一檔拖到 60 天。
+        input:
+          cause_hypothesis_set:
+            generated_by_method: root_cause.fishbone
+            hypotheses:
+            - category: 合約
+              id: H1
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 合約只寫「展後結算」，沒寫幾天內付，也沒寫逾期怎麼辦
+            - category: 流程
+              id: H2
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 畫廊每個月底才一次對帳，而且要等展覽收場後才開始算
+            - category: 買家
+              id: H3
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 買家分期付款時，畫廊要等最後一期入帳才整筆付給藝術家
+            - category: 人
+              id: H4
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 我們這邊沒有人負責追款
+            - category: 紀錄
+              id: H5
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 沒有記每一檔「說好哪天付、實際哪天付」
+            id: CHS-PTN1
+            problem_statement_ref: PROB-PTN1
+            promotion:
+              ready_for_promotion: false
+              validation_methods_applied: []
+            version: 1.0.0
+          stop_conditions_met:
+          - CONTROLLABLE_BY_ORGANIZATION
+          - FOUND_SYSTEM_PROCESS_MECHANISM
+          target_hypothesis_id: H3
+          why_chain:
+          - answer: 畫廊回信說 4 件裡有 2 件買家分期，要等最後一期入帳才一起付。
+            question: 為什麼這一檔拖到 60 天還沒付？
+            step: 1
+            supporting_evidence_refs:
+            - E-1
+          - answer: 因為畫廊的做法是一檔展覽只結一次帳，整筆付給藝術家。
+            question: 為什麼要等全部入帳才付？
+            step: 2
+          - answer: 因為合約只寫「展後結算」，沒寫分期賣出的作品怎麼付、幾天內付。
+            question: 為什麼不能先付已經收到的部分？
+            step: 3
+            supporting_evidence_refs:
+            - E-2
+          - answer: 因為簽的是畫廊的範本合約，簽約時我們沒有逐條改。
+            question: 為什麼合約沒寫？
+            step: 4
+      decision:
+        scenario: 延續魚骨圖：追問「平日晚上排不出老師」，一路問到課表是怎麼定的。
+        input:
+          cause_hypothesis_set:
+            generated_by_method: root_cause.fishbone
+            hypotheses:
+            - category: 設備
+              id: H1
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 只有 1 間教室，平日晚上租給別的團體
+            - category: 人
+              id: H2
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 兩位老師都是兼職，平日晚上排不出人
+            - category: 方法
+              id: H3
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 課表照週末班設計，從來沒有排過平日時段
+            - category: 方法
+              id: H4
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 候補名單沒有人回電
+            - category: 量測
+              id: H5
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 詢問紀錄沒有記家長問的是哪個時段
+            id: CHS-DEC1
+            problem_statement_ref: PROB-DEC1
+            promotion:
+              ready_for_promotion: false
+              validation_methods_applied: []
+            version: 1.0.0
+          stop_conditions_met:
+          - CONTROLLABLE_BY_ORGANIZATION
+          - CLEAR_EVIDENCE_TO_VERIFY
+          target_hypothesis_id: H2
+          why_chain:
+          - answer: 因為兩位老師平日晚上都排不出時間。
+            question: 為什麼平日晚上開不了班？
+            step: 1
+            supporting_evidence_refs:
+            - E-1
+          - answer: 因為兩位都是兼職，平日在別的地方上班。
+            question: 為什麼排不出？
+            step: 2
+          - answer: 因為課表照週末班設計，一週只有 12 小時的課，撐不起專任老師。
+            question: 為什麼只請兼職老師？
+            step: 3
+          - answer: 因為開業時只有週末有人問，之後沒有人回頭看詢問紀錄。
+            question: 為什麼課表只照週末班設計？
+            step: 4
+            supporting_evidence_refs:
+            - E-2
+      ecom:
+        scenario: 延續魚骨圖：追問「尺寸表跟實品對不起來」，一路問到上架流程。
+        input:
+          cause_hypothesis_set:
+            generated_by_method: root_cause.fishbone
+            hypotheses:
+            - category: 材料
+              id: H1
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 商品頁只放一張平拍尺寸表，跟實品對不起來
+            - category: 方法
+              id: H2
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 新品上架前沒有人試穿量測
+            - category: 量測
+              id: H3
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 退貨單只能勾「不喜歡」或「尺寸不合」，看不出真正的原因
+            - category: 人
+              id: H4
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 客人問尺寸時，客服沒有統一的回答
+            - category: 環境
+              id: H5
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 上新常搭配促銷，衝動下單的比較多
+            id: CHS-ECM1
+            problem_statement_ref: PROB-ECM1
+            promotion:
+              ready_for_promotion: false
+              validation_methods_applied: []
+            version: 1.0.0
+          stop_conditions_met:
+          - FOUND_SYSTEM_PROCESS_MECHANISM
+          - CONTROLLABLE_BY_ORGANIZATION
+          target_hypothesis_id: H1
+          why_chain:
+          - answer: 因為退貨裡 7 成勾的是「尺寸不合」。
+            question: 為什麼上新後退貨率衝到 12%？
+            step: 1
+            supporting_evidence_refs:
+            - E-1
+          - answer: 因為抽量 10 件新品，有 7 件跟商品頁的尺寸表差 2 公分以上。
+            question: 為什麼尺寸不合？
+            step: 2
+            supporting_evidence_refs:
+            - E-2
+          - answer: 因為尺寸表直接貼供應商給的平拍數字，上架前沒有人量過實品。
+            question: 為什麼尺寸表會差這麼多？
+            step: 3
+          - answer: 因為上架檢查清單只有「照片、價格、庫存」三項。
+            question: 為什麼沒有人量？
+            step: 4
+            supporting_evidence_refs:
+            - E-3
+      daily:
+        scenario: 延續魚骨圖：追問「行程要到週日晚上才排」，問到兩個人的行程是怎麼放的。
+        input:
+          cause_hypothesis_set:
+            generated_by_method: root_cause.fishbone
+            hypotheses:
+            - category: 方法
+              id: H1
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 下週的行程要到週日晚上才一起排
+            - category: 工具
+              id: H2
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 兩個人各自答應別人的活動，沒有共用的行事曆
+            - category: 時間
+              id: H3
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 週日晚上 9 點前都在陪小孩寫作業，排行程時兩個人都累了
+            - category: 人
+              id: H4
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 平常有不滿不說，累積到週日一起爆
+            - category: 環境
+              id: H5
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 週末兩天都排滿活動
+            id: CHS-DLY1
+            problem_statement_ref: PROB-DLY1
+            promotion:
+              ready_for_promotion: false
+              validation_methods_applied: []
+            version: 1.0.0
+          stop_conditions_met:
+          - FOUND_SYSTEM_PROCESS_MECHANISM
+          - CONTROLLABLE_BY_ORGANIZATION
+          target_hypothesis_id: H1
+          why_chain:
+          - answer: 因為下週的接送要到週日晚上 9 點以後才一起排。
+            question: 為什麼總是週日晚上吵？
+            step: 1
+            supporting_evidence_refs:
+            - E-1
+          - answer: 因為兩個人各自答應的活動，要坐下來對過才知道有沒有撞期。
+            question: 為什麼拖到週日晚上才排？
+            step: 2
+          - answer: 因為沒有共用的行事曆，行程都在各自的手機裡。
+            question: 為什麼要坐下來才對得到？
+            step: 3
   root_cause.kepner_tregoe:
     input:
       changes:
@@ -4144,42 +4707,308 @@ examples:
           locked: null
         status: validated
         version: 1.0.0
-    scenario: 延續 root_cause.fishbone 的問題陳述，用結構化方式界定「結帳頁面載入過慢」發生的確切範圍。
+    scenario: 網站結帳流程放棄率過高：用結構化方式界定「結帳頁面載入過慢」發生的確切範圍。
   root_cause.pareto:
+    # one example per lesson domain chip (lessons data); the lesson's 用示範案例試一次 opens #demo=<set>
     input:
       cause_hypothesis_set:
         generated_by_method: root_cause.fishbone
         hypotheses:
-        - category: 技術／設備
+        - category: 人
           id: H1
           provenance:
-            authorship_state: AI_SUGGESTED
-            epistemic_type: AI_INFERENCE
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
             locked: null
-          statement: 結帳頁面載入過慢
-        - category: 流程
+          statement: 帶領者先講作品的意義，參與者習慣等著被解讀
+        - category: 方法
           id: H2
           provenance:
-            authorship_state: AI_SUGGESTED
-            epistemic_type: AI_INFERENCE
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
             locked: null
-          statement: 必填欄位過多讓使用者放棄
-        id: CHS-T1
-        problem_statement_ref: PROB-T1
+          statement: 90 分鐘裡帶領者說明佔 35 分鐘，輪到分享時時間已經不夠
+        - category: 量測
+          id: H3
+          provenance:
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
+            locked: null
+          statement: 紀錄表只問「是否達到本次目標洞察」，沒有記誰開口
+        - category: 環境
+          id: H4
+          provenance:
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
+            locked: null
+          statement: 線上場大家關著鏡頭，看不到彼此的作品
+        - category: 材料
+          id: H5
+          provenance:
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
+            locked: null
+          statement: 第 4 次起換成比較難掌握的媒材，作品比較不敢拿出來
+        - category: 人
+          id: H6
+          provenance:
+            authorship_state: HUMAN_ORIGINAL
+            epistemic_type: HYPOTHESIS
+            locked: null
+          statement: 參與者彼此還不熟，怕說錯話
+        id: CHS-EDD1
+        problem_statement_ref: PROB-EDD1
         promotion:
           ready_for_promotion: false
           validation_methods_applied: []
         version: 1.0.0
       dataset:
       - hypothesis_id: H1
-        metric_value: 45
+        metric_value: 17
       - hypothesis_id: H2
         metric_value: 12
-      - hypothesis_id: H1
-        metric_value: 8
-      metric_name: 客訴次數
+      - hypothesis_id: H4
+        metric_value: 6
+      - hypothesis_id: H5
+        metric_value: 3
+      - hypothesis_id: H6
+        metric_value: 2
+      metric_name: 期末訪談中「那次沒開口」的原因（三期共 40 則）
       vital_few_threshold_percent: 80
-    scenario: 延續 root_cause.fishbone 的假設集合，統計哪些假設對應的客訴次數最多。
+    scenario: 延續魚骨圖：用三期期末訪談裡參與者說的「那次沒開口的原因」計數，看哪幾個原因佔了大部分。
+    sets:
+      partner:
+        scenario: 延續魚骨圖：把近一年 5 檔展覽延後的天數按原因分，看哪幾個原因佔了大部分。
+        input:
+          cause_hypothesis_set:
+            generated_by_method: root_cause.fishbone
+            hypotheses:
+            - category: 合約
+              id: H1
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 合約只寫「展後結算」，沒寫幾天內付，也沒寫逾期怎麼辦
+            - category: 流程
+              id: H2
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 畫廊每個月底才一次對帳，而且要等展覽收場後才開始算
+            - category: 買家
+              id: H3
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 買家分期付款時，畫廊要等最後一期入帳才整筆付給藝術家
+            - category: 人
+              id: H4
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 我們這邊沒有人負責追款
+            - category: 紀錄
+              id: H5
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 沒有記每一檔「說好哪天付、實際哪天付」
+            id: CHS-PTN1
+            problem_statement_ref: PROB-PTN1
+            promotion:
+              ready_for_promotion: false
+              validation_methods_applied: []
+            version: 1.0.0
+          dataset:
+          - hypothesis_id: H3
+            metric_value: 85
+          - hypothesis_id: H2
+            metric_value: 50
+          - hypothesis_id: H4
+            metric_value: 30
+          - hypothesis_id: H5
+            metric_value: 15
+          metric_name: 近一年 5 檔展覽延後付款的天數，依原因分（共 180 天）
+          vital_few_threshold_percent: 80
+      decision:
+        scenario: 延續魚骨圖：把 6 月第 1 週沒排進班的 24 通詢問按原因分，看先處理哪幾個最值得。
+        input:
+          cause_hypothesis_set:
+            generated_by_method: root_cause.fishbone
+            hypotheses:
+            - category: 設備
+              id: H1
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 只有 1 間教室，平日晚上租給別的團體
+            - category: 人
+              id: H2
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 兩位老師都是兼職，平日晚上排不出人
+            - category: 方法
+              id: H3
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 課表照週末班設計，從來沒有排過平日時段
+            - category: 方法
+              id: H4
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 候補名單沒有人回電
+            - category: 量測
+              id: H5
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 詢問紀錄沒有記家長問的是哪個時段
+            id: CHS-DEC1
+            problem_statement_ref: PROB-DEC1
+            promotion:
+              ready_for_promotion: false
+              validation_methods_applied: []
+            version: 1.0.0
+          dataset:
+          - hypothesis_id: H3
+            metric_value: 13
+          - hypothesis_id: H4
+            metric_value: 6
+          - hypothesis_id: H1
+            metric_value: 3
+          - hypothesis_id: H5
+            metric_value: 2
+          metric_name: 6 月第 1 週沒排進班的詢問，依原因分（共 24 通）
+          vital_few_threshold_percent: 80
+      ecom:
+        scenario: 延續魚骨圖：把上個月的退貨件數按原因分，看哪幾個原因佔了大部分。
+        input:
+          cause_hypothesis_set:
+            generated_by_method: root_cause.fishbone
+            hypotheses:
+            - category: 材料
+              id: H1
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 商品頁只放一張平拍尺寸表，跟實品對不起來
+            - category: 方法
+              id: H2
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 新品上架前沒有人試穿量測
+            - category: 量測
+              id: H3
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 退貨單只能勾「不喜歡」或「尺寸不合」，看不出真正的原因
+            - category: 人
+              id: H4
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 客人問尺寸時，客服沒有統一的回答
+            - category: 環境
+              id: H5
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 上新常搭配促銷，衝動下單的比較多
+            id: CHS-ECM1
+            problem_statement_ref: PROB-ECM1
+            promotion:
+              ready_for_promotion: false
+              validation_methods_applied: []
+            version: 1.0.0
+          dataset:
+          - hypothesis_id: H1
+            metric_value: 70
+          - hypothesis_id: H5
+            metric_value: 22
+          - hypothesis_id: H4
+            metric_value: 15
+          - hypothesis_id: H3
+            metric_value: 13
+          metric_name: 上個月的退貨件數，依原因分（共 120 件）
+          vital_few_threshold_percent: 80
+      daily:
+        scenario: 延續魚骨圖：把過去 2 個月的 10 次吵架按起因分，看先處理哪個最值得。
+        input:
+          cause_hypothesis_set:
+            generated_by_method: root_cause.fishbone
+            hypotheses:
+            - category: 方法
+              id: H1
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 下週的行程要到週日晚上才一起排
+            - category: 工具
+              id: H2
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 兩個人各自答應別人的活動，沒有共用的行事曆
+            - category: 時間
+              id: H3
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 週日晚上 9 點前都在陪小孩寫作業，排行程時兩個人都累了
+            - category: 人
+              id: H4
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 平常有不滿不說，累積到週日一起爆
+            - category: 環境
+              id: H5
+              provenance:
+                authorship_state: HUMAN_ORIGINAL
+                epistemic_type: HYPOTHESIS
+                locked: null
+              statement: 週末兩天都排滿活動
+            id: CHS-DLY1
+            problem_statement_ref: PROB-DLY1
+            promotion:
+              ready_for_promotion: false
+              validation_methods_applied: []
+            version: 1.0.0
+          dataset:
+          - hypothesis_id: H1
+            metric_value: 5
+          - hypothesis_id: H5
+            metric_value: 2
+          - hypothesis_id: H4
+            metric_value: 2
+          - hypothesis_id: H3
+            metric_value: 1
+          metric_name: 過去 2 個月的吵架，依起因分（共 10 次）
+          vital_few_threshold_percent: 80
   security.abuse_case:
     input:
       stages:

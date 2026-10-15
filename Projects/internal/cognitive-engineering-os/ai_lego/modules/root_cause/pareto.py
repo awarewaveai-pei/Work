@@ -65,6 +65,10 @@ def generate_pareto_analysis(
         raise InvariantViolation(f"PARETO_PRECONDITION_FAILED: dataset references hypothesis_id(s) not in {cause_hypothesis_set.get('id')}: {unknown}")
 
     ranking = pareto_ranking(dataset)
+    by_id = {h["id"]: h for h in cause_hypothesis_set.get("hypotheses", [])}
+    measured = list(dict.fromkeys(record["hypothesis_id"] for record in dataset))
+    causes = [{"hypothesis_id": i, "statement": by_id[i]["statement"], **({"category": by_id[i]["category"]} if by_id[i].get("category") else {})}
+              for i in measured if isinstance(by_id[i].get("statement"), str)]   # names the causes (its result page sees only the record)
 
     if vital_few_threshold_percent is None:
         threshold_status = "OPERATOR_SET_PENDING"
@@ -79,6 +83,7 @@ def generate_pareto_analysis(
         "cause_hypothesis_set_ref": cause_hypothesis_set["id"],
         "generated_by_method": generated_by_method,
         "metric_name": metric_name,
+        "causes": causes,
         "dataset": list(dataset),
         "ranking": ranking,
         "vital_few_threshold_percent": vital_few_threshold_percent,

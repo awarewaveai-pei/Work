@@ -79,7 +79,7 @@
 | `specs/cognitive/typed-objects/causal-dag-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, nodes, edges, acyclic_verified, computation_provenance_ref, provenance] properties[9] |
 | `specs/cognitive/typed-objects/causal-loop-diagram.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, variables, edges, loops, provenance] properties[7] |
 | `specs/cognitive/typed-objects/causal-view-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, knowledge_ref, rendered_edges, state, provenance] properties[7] |
-| `specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, problem_statement_ref, hypotheses] properties[7] |
+| `specs/cognitive/typed-objects/cause-hypothesis-set.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, problem_statement_ref, hypotheses] properties[8] |
 | `specs/cognitive/typed-objects/change-analysis-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_analysis, fault_description, baseline, changes, provenance] properties[8] |
 | `specs/cognitive/typed-objects/change-risk-matrix-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, change_description, factors, risk_tier, required_controls, provenance] properties[8] |
 | `specs/cognitive/typed-objects/chaos-experiment.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, steady_state_hypothesis, blast_radius, injected_failure, recovered_as_hypothesized, status, provenance] properties[10] |
@@ -141,7 +141,7 @@
 | `specs/cognitive/typed-objects/fault-tree-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_under_analysis, top_event, basic_events, gates, provenance] properties[8] |
 | `specs/cognitive/typed-objects/financial-assumptions-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject_ref, currency, discount_rate, horizon_years, assumptions, cash_flow_projection, provenance] properties[10] |
 | `specs/cognitive/typed-objects/fitness-function-set.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, architecture_under_governance, functions, provenance] properties[6] |
-| `specs/cognitive/typed-objects/five-whys-validation.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, target_hypothesis_id, why_chain, stop_conditions_met, failure_mode_self_check, provenance] properties[9] |
+| `specs/cognitive/typed-objects/five-whys-validation.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, target_hypothesis_id, why_chain, stop_conditions_met, failure_mode_self_check, provenance] properties[10] |
 | `specs/cognitive/typed-objects/flowchart-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, title, nodes, edges, provenance] properties[7] |
 | `specs/cognitive/typed-objects/fmea-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject_ref, failure_modes, provenance] properties[6] |
 | `specs/cognitive/typed-objects/focus-group-session.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, topic, participant_count, moderation_approach, discussion_summary, analysis, generalizability_scope, provenance] properties[10] |
@@ -217,7 +217,7 @@
 | `specs/cognitive/typed-objects/ooda-cycle-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, situation, stages, provenance] properties[6] |
 | `specs/cognitive/typed-objects/outcome-roadmap-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, themes, outcomes, bets, next_review, provenance] properties[8] |
 | `specs/cognitive/typed-objects/outlier-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, outliers, provenance] properties[5] |
-| `specs/cognitive/typed-objects/pareto-analysis.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, metric_name, dataset, ranking, threshold_status, engine, computation_provenance_ref, provenance] properties[13] |
+| `specs/cognitive/typed-objects/pareto-analysis.schema.yaml` | ACTIVE | 1.1.0 | `(root)`: type=object required=[id, version, cause_hypothesis_set_ref, metric_name, dataset, ranking, threshold_status, engine, computation_provenance_ref, provenance] properties[14] |
 | `specs/cognitive/typed-objects/pareto-frontier-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, subject, objectives, options, option_values, frontier_classification, engine, computation_provenance_ref, provenance] properties[11] |
 | `specs/cognitive/typed-objects/pasta-threat-model-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, system_or_component, assets, trust_boundaries, entry_points, stages, provenance] properties[9] |
 | `specs/cognitive/typed-objects/pdca-cycle-record.schema.yaml` | ACTIVE | 1.0.0 | `(root)`: type=object required=[id, version, process_under_improvement, cycles, provenance] properties[6] |

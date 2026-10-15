@@ -1,7 +1,7 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MethodVisual, recordPictureCaption } from "./MethodVisual";
+import { MethodVisual, recordPicture } from "./MethodVisual";
 import { gradeOf, risksOf, zoneOf } from "./RiskMatrix";
 
 const record = { risks: [
@@ -43,8 +43,8 @@ describe("risk matrix (delivery.risk_register)", () => {
     expect(renderToStaticMarkup(<MethodVisual kind="table" bindings={{ a: "r/x" }} methodId="delivery.risk_register" record={{}} />)).toContain('data-visual="table"');
     expect(risksOf({ risks: [{ risk_id: "X", description: "", probability: 1.5, impact: 0.2 }, { risk_id: "Y", description: "", probability: "0.3", impact: 0.2 },
       { risk_id: "Z", description: {}, probability: 0.3, impact: 0.2 }, { risk_id: "W", description: "", probability: 0.3, impact: 0.2, exposure: "0.06" }] })).toEqual([]);
-    expect(recordPictureCaption("delivery.risk_register", {})).toBeUndefined();
-    expect(recordPictureCaption("delivery.risk_register", record)).toContain("機率×衝擊");
+    expect(recordPicture("delivery.risk_register", {})).toBeUndefined();
+    expect(recordPicture("delivery.risk_register", record)?.caption).toContain("機率×衝擊");
   });
 
   it("says how many risks it could not draw instead of dropping them silently", () => {
