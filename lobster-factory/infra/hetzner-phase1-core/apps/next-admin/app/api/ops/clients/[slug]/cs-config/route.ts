@@ -13,6 +13,8 @@
 import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { KB_MIN_RETRIEVAL_SCORE_RANGE, kbMinRetrievalScoreOf } from "@/lib/cs/cis";
+import { CS_THRESHOLDS } from "@/lib/cs/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,6 +62,9 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     ok: true,
     csEnabled,
     kbKeywordModeDefault,
+    // The knowledge-gap floor this tenant's AI uses; null = the global default (lib/cs/config.ts).
+    kbMinRetrievalScore: kbMinRetrievalScoreOf(config.kbMinRetrievalScore) ?? null,
+    kbMinRetrievalScoreDefault: CS_THRESHOLDS.minRetrievalScore,
     knowledgeCount: knowledgeRes.count ?? 0,
     intents: intentsRes.data ?? [],
   });
@@ -82,7 +87,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
   }
   const hasCsEnabled = typeof body.csEnabled === "boolean";
   const hasKeywordDefault = body.kbKeywordModeDefault === "fuzzy" || body.kbKeywordModeDefault === "exact";
-  if (!hasCsEnabled && !hasKeywordDefault) {
+  // null clears the override (back to the global default); a number must sit inside the range.
+  const hasMinScore = "kbMinRetrievalScore" in body;
+  const minScore = hasMinScore && body.kbMinRetrievalScore !== null ? kbMinRetrievalScoreOf(body.kbMinRetrievalScore) : undefined;
+  if (hasMinScore && body.kbMinRetrievalScore !== null && minScore === undefined) {
+    return NextResponse.json({ ok: false, error: "kbMinRetrievalScore_out_of_range", range: KB_MIN_RETRIEVAL_SCORE_RANGE }, { status: 400 });
+  }
+  if (!hasCsEnabled && !hasKeywordDefault && !hasMinScore) {
     return NextResponse.json({ ok: false, error: "csEnabled_or_kbKeywordModeDefault_required" }, { status: 400 });
   }
 
@@ -95,6 +106,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
   const clientConfig = clientConfigOf(org.metadata);
   if (hasCsEnabled) clientConfig.csEnabled = body.csEnabled as boolean;
   if (hasKeywordDefault) clientConfig.kbKeywordModeDefault = body.kbKeywordModeDefault as string;
+  if (hasMinScore) {
+    if (minScore === undefined) delete clientConfig.kbMinRetrievalScore;
+    else clientConfig.kbMinRetrievalScore = minScore;
+  }
 
   const { error: writeErr } = await supabase
     .from("organizations")
@@ -115,6 +130,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       payload: { csEnabled: body.csEnabled, role_source: resolved.source },
     });
   }
+  if (hasMinScore) {
+    await supabase.from("ops_audit_events").insert({
+      organization_id: org.id,
+      actor_role: resolved.role,
+      event_type: "cs_kb_min_retrieval_score_changed",
+      target_type: "organizations",
+      target_id: org.id,
+      trace_id: crypto.randomUUID(),
+      payload: { kbMinRetrievalScore: minScore ?? null, role_source: resolved.source },
+    });
+  }
   if (hasKeywordDefault) {
     await supabase.from("ops_audit_events").insert({
       organization_id: org.id,
@@ -127,5 +153,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     });
   }
 
-  return NextResponse.json({ ok: true, csEnabled: clientConfig.csEnabled !== false, kbKeywordModeDefault: clientConfig.kbKeywordModeDefault === "exact" ? "exact" : "fuzzy" });
+  return NextResponse.json({
+    ok: true,
+    csEnabled: clientConfig.csEnabled !== false,
+    kbKeywordModeDefault: clientConfig.kbKeywordModeDefault === "exact" ? "exact" : "fuzzy",
+    kbMinRetrievalScore: kbMinRetrievalScoreOf(clientConfig.kbMinRetrievalScore) ?? null,
+  });
 }

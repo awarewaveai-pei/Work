@@ -30,7 +30,17 @@ export async function loadCis(organizationId: string): Promise<CisProfile> {
       ? { accountId: cw.accountId, baseUrl: cw.baseUrl }
       : undefined;
   const csFaq = sanitizeFaq(cc.csFaq);
-  return { organizationId, brandColors, csVoice, csEnabled, chatwoot, csFaq };
+  const minRetrievalScore = kbMinRetrievalScoreOf(cc.kbMinRetrievalScore);
+  return { organizationId, brandColors, csVoice, csEnabled, chatwoot, csFaq, ...(minRetrievalScore !== undefined ? { minRetrievalScore } : {}) };
+}
+
+/** Bounds shared with the cs-config route: below 0.2 everything "matches", above 0.8 nothing does. */
+export const KB_MIN_RETRIEVAL_SCORE_RANGE = { min: 0.2, max: 0.8 } as const;
+
+export function kbMinRetrievalScoreOf(raw: unknown): number | undefined {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() ? Number(raw) : NaN;
+  if (!Number.isFinite(n) || n < KB_MIN_RETRIEVAL_SCORE_RANGE.min || n > KB_MIN_RETRIEVAL_SCORE_RANGE.max) return undefined;
+  return n;
 }
 
 const SAFETY_PREAMBLE = [

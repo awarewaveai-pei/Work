@@ -109,13 +109,14 @@ export async function handleInbound(message: InboundMessage): Promise<CsDecision
     // visible to it). A tenant tree would pass the whole chain here and change nothing in the KB.
     // includeSensitive: false (migration 0083) -- this IS the customer-service AI's own answer path;
     // a document ticked "敏感" in the ops UI must never end up quoted back to an end user.
-    const retrieved = await retrieveAcrossLanguages(message.organizationId, message.text);
+    const minRetrievalScore = cis.minRetrievalScore ?? CS_THRESHOLDS.minRetrievalScore;
+    const retrieved = await retrieveAcrossLanguages(message.organizationId, message.text, minRetrievalScore);
     const { chunks } = retrieved;
     const retrievalScore = topScore(chunks);
     const chunkIds = chunks.map((c) => c.id);
 
     // 4b. Nothing to answer from: hand off before any generation spend.
-    const gap = knowledgeGate(retrievalScore);
+    const gap = knowledgeGate(retrievalScore, minRetrievalScore);
     if (gap) {
       const d: CsDecision = {
         ...makeHandoff("knowledge_gap", { classification: cls, retrievalScore, retrievalQuery: retrieved.translated ?? null }, chunkIds),
@@ -158,6 +159,7 @@ export async function handleInbound(message: InboundMessage): Promise<CsDecision
       grounded: verdict.grounded && verdict.safe,
       messageText: message.text,
       roll,
+      minRetrievalScore,
     });
 
     const trace: Record<string, unknown> = {
@@ -165,6 +167,7 @@ export async function handleInbound(message: InboundMessage): Promise<CsDecision
       classification: cls,
       verdict,
       retrievalScore,
+      minRetrievalScore,
       retrievalQuery: retrieved.translated ?? null,
       canaryRoll: roll,
       toolHandoff,
@@ -222,10 +225,10 @@ const NON_LATIN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/;
  * question is rendered into English by the cheap model and retrieval runs once more; the set with
  * the higher top score wins. The extra call happens only on a miss.
  */
-async function retrieveAcrossLanguages(organizationId: string, text: string): Promise<{ chunks: RetrievedChunk[]; translated?: string }> {
+async function retrieveAcrossLanguages(organizationId: string, text: string, minRetrievalScore: number): Promise<{ chunks: RetrievedChunk[]; translated?: string }> {
   const ctx = { scope: [organizationId], viewer: organizationId, includeSensitive: false };
   const first = await retrieve(ctx, text);
-  if (topScore(first) >= CS_THRESHOLDS.minRetrievalScore || !NON_LATIN.test(text)) return { chunks: first };
+  if (topScore(first) >= minRetrievalScore || !NON_LATIN.test(text)) return { chunks: first };
   const translated = await translateForRetrieval(organizationId, text);
   if (!translated) return { chunks: first };
   const second = await retrieve(ctx, translated);

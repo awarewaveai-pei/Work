@@ -158,6 +158,8 @@ export interface CisProfile {
   chatwoot?: ChatwootConfig;
   /** Free keyword answers, checked before any AI work (lib/cs/faq.ts). */
   csFaq?: CsFaqEntry[];
+  /** Per-tenant knowledge-gap floor (client_config.kbMinRetrievalScore); CS_THRESHOLDS.minRetrievalScore when unset. */
+  minRetrievalScore?: number;
 }
 
 // ── Offline eval (golden set → graduation gate, plan §5.2) ────────────────────

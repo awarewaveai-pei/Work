@@ -88,6 +88,24 @@ describe("PATCH", () => {
     expect(state.auditCalls[0]).toMatchObject({ event_type: "cs_killswitch_toggled" });
   });
 
+  it("sets the tenant knowledge floor, rejects one outside 0.2–0.8, and null clears it", async () => {
+    let res = await PATCH(req("PATCH", { role: "admin", body: { kbMinRetrievalScore: 0.4 } }), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, kbMinRetrievalScore: 0.4 });
+    expect(state.updateCalls[0]).toMatchObject({ metadata: { client_config: { kbMinRetrievalScore: 0.4 } } });
+    expect(state.auditCalls[0]).toMatchObject({ event_type: "cs_kb_min_retrieval_score_changed" });
+
+    res = await PATCH(req("PATCH", { role: "admin", body: { kbMinRetrievalScore: 0.95 } }), ctx());
+    expect(res.status).toBe(400);
+
+    state.metadata = { client_config: { kbMinRetrievalScore: 0.4 } };
+    res = await PATCH(req("PATCH", { role: "admin", body: { kbMinRetrievalScore: null } }), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, kbMinRetrievalScore: null });
+    const written = state.updateCalls.at(-1) as { metadata: { client_config: Record<string, unknown> } };
+    expect("kbMinRetrievalScore" in written.metadata.client_config).toBe(false);
+  });
+
   it("rejects a body with neither field", async () => {
     const res = await PATCH(req("PATCH", { role: "admin", body: {} }), ctx());
     expect(res.status).toBe(400);

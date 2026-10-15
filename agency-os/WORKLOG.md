@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-15（續37）Soulful AI 層知識門檻校準：0.5 擋掉 6 題可答的 5 題 → 每客戶可設 `kbMinRetrievalScore`，Soulful 0.40（程式未部署；確認句修正 `1c316c638` 已部署並真測送達）
+
+**操作者問**：「資料庫有對應→自動回覆；沒有→AI 找答案；AI 無法回→真人，不是這樣嗎？」真測「我最近壓力很大，適合來嗎？」直接轉真人（收到確認句＋問名字 ✅ `1c316c638` 部署後），但網站明明有壓力模組頁。
+**根因**：`CS_THRESHOLDS.minRetrievalScore` 0.5 是未校準的猜測值（`config.ts` 註解 "cosine-ish"）。校準（主機 curl OpenAI `text-embedding-3-small` → pgvector `<=>` 對 Soulful 15 頁，`scratchpad/calib.sh`）：
+
+| 問題（英文） | 最高分 | 命中頁 |
+|---|---|---|
+| stressed lately, suitable for me? | 0.454 | stress-awareness-and-release ✅ |
+| What healing courses do you offer? | 0.522 | services ✅ |
+| workshops for older adults? | 0.486 | joy-cards ✅ |
+| I cannot draw, can I still join? | 0.409 | joy-cards（弱） |
+| What is the WuSheng module? | 0.729 | wusheng ✅ |
+| return policy for damaged items? | 0.439 | refund_returns ✅ |
+| How much does a session cost?（網站沒有） | 0.378 | — |
+| ship T-shirts to Japan?（網站沒有） | 0.351 | — |
+| 我最近壓力很大（中文直查） | 0.346 | （證明翻譯重查必要） |
+
+可答 0.409–0.729、不可答 ≤0.378 → 分界 0.40。不是「調門檻讓偵測器閉嘴」：不變量＝門檻要在真問題上分開可答／不可答，0.5 做不到。
+**改動**（未部署）：`CisProfile.minRetrievalScore`（`client_config.kbMinRetrievalScore`，0.2–0.8，`cis.ts` `kbMinRetrievalScoreOf`）；`knowledgeGate(score, min)`／`preGenerationGate`／`decideAnswerAction` 吃租戶值，無值用全域 0.5（其他客戶不變）；`retrieveAcrossLanguages` 用同一值決定要不要翻譯重查；trace 記 `minRetrievalScore`。`cs-config` GET 回 `kbMinRetrievalScore`＋預設值、PATCH 收數字／null（審計 `cs_kb_min_retrieval_score_changed`）；客服分頁 kill-switch 卡加「知識門檻」欄。Soulful DB 已寫 0.4（jsonb_set）。
+**不做**：改全域預設（只量了 Soulful）；Soulful 意圖仍 L1 草稿，AI 答案先給專員看，門檻放寬不會直接到客人。
+**共用 index 失真**：私有 index commit 後 `git status` 把 faq.ts 等 3 個新檔顯示成「已 stage 刪除＋未追蹤」，`git diff HEAD` 看起來像整檔消失；`git reset -q -- <paths>` 對齊 HEAD 即正常（worktree 未動）。任何 session 若 `commit -a` 會把刪除帶進去——記在此供下次對照。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=calib.sh（9 題 embedding＋pgvector top-3）；psql jsonb_set kbMinRetrievalScore=0.4；對話 6 真測確認句＋問名字送達 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run lib/cs app/api/webhooks/chatwoot app/api/ops/clients/[slug]/cs-config（150 pass；新測試：租戶門檻 0.4 放行 0.45、無租戶值走預設、cs-config PATCH 數字／超界／null） | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 設定管線（型別→載入→閘→API→UI），每段指名測試；Codex 本日對同檔三輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands | grep=kbMinRetrievalScore|knowledgeGate|KB_MIN_RETRIEVAL_SCORE_RANGE|kbMinRetrievalScoreOf | hits=37（本次改動 7 檔＋WORKLOG 3）
+- ORACLE_WAIVED: 同上
+
+**rollback**：DB 刪 `kbMinRetrievalScore` key（或客服分頁留空存）即回全域 0.5；程式未部署。
 ## 2026-10-15（續36）排程頁重做：每項說明、GPT 寫文案、主題 token、台北時間、表格轉置
 
 **操作者**：「應該在那個網頁說明那些東西是做什麼的；中文很爛，問 gpt 怎麼寫，原則清楚易懂不冗長不要冗詞；UI/UX 太爛，要注意 css 主題設定 /tools/theme」。

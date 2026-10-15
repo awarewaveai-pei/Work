@@ -57,6 +57,8 @@ export interface AnswerDecisionInput {
   messageText: string;
   /** Canary roll for this message (0..99). */
   roll: number;
+  /** Tenant knowledge-gap floor (CisProfile.minRetrievalScore); CS_THRESHOLDS.minRetrievalScore when absent. */
+  minRetrievalScore?: number;
 }
 
 export interface AnswerDecision {
@@ -70,8 +72,8 @@ export interface AnswerDecision {
  * 2026-10-15 paid for an Opus draft that was then thrown away as knowledge_gap). decideAnswerAction
  * runs them again first, so the order of gates is defined once.
  */
-export function preGenerationGate(input: Pick<AnswerDecisionInput, "intent" | "retrievalScore" | "messageText">): AnswerDecision | null {
-  return safetyGate(input.intent, input.messageText) ?? knowledgeGate(input.retrievalScore);
+export function preGenerationGate(input: Pick<AnswerDecisionInput, "intent" | "retrievalScore" | "messageText" | "minRetrievalScore">): AnswerDecision | null {
+  return safetyGate(input.intent, input.messageText) ?? knowledgeGate(input.retrievalScore, input.minRetrievalScore);
 }
 
 /** Needs neither retrieval nor a reply: checked before the first embedding call. */
@@ -82,8 +84,14 @@ export function safetyGate(intent: Intent, messageText: string): AnswerDecision 
   return null;
 }
 
-export function knowledgeGate(retrievalScore: number): AnswerDecision | null {
-  return retrievalScore < CS_THRESHOLDS.minRetrievalScore ? { action: "handoff", handoffReason: "knowledge_gap" } : null;
+/**
+ * The floor is per tenant: text-embedding-3-small puts an answerable English question at 0.41–0.73
+ * against Soulful's pages and an unanswerable one at ≤0.38 (calibration 2026-10-15, WORKLOG), so the
+ * global 0.5 rejected five of six answerable questions there. Calibrate from real questions, never
+ * lower it to make a handoff go away.
+ */
+export function knowledgeGate(retrievalScore: number, minRetrievalScore: number = CS_THRESHOLDS.minRetrievalScore): AnswerDecision | null {
+  return retrievalScore < minRetrievalScore ? { action: "handoff", handoffReason: "knowledge_gap" } : null;
 }
 
 /**

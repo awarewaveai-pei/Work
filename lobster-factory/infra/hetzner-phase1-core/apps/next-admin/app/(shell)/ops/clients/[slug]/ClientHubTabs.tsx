@@ -1174,6 +1174,8 @@ type CsIntentRow = {
 function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [loading, setLoading] = useState(true);
   const [csEnabled, setCsEnabled] = useState(true);
+  const [minScore, setMinScore] = useState<string>("");
+  const [minScoreDefault, setMinScoreDefault] = useState<number>(0.5);
   const [intents, setIntents] = useState<CsIntentRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -1184,8 +1186,12 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
   async function reloadConfig() {
     try {
       const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, { headers: { ...roleHeader("admin") } });
-      const data = (await res.json()) as { ok?: boolean; csEnabled?: boolean; intents?: CsIntentRow[] };
-      if (data.ok) { setCsEnabled(data.csEnabled ?? true); setIntents(data.intents ?? []); }
+      const data = (await res.json()) as { ok?: boolean; csEnabled?: boolean; intents?: CsIntentRow[]; kbMinRetrievalScore?: number | null; kbMinRetrievalScoreDefault?: number };
+      if (data.ok) {
+        setCsEnabled(data.csEnabled ?? true); setIntents(data.intents ?? []);
+        setMinScore(typeof data.kbMinRetrievalScore === "number" ? String(data.kbMinRetrievalScore) : "");
+        if (typeof data.kbMinRetrievalScoreDefault === "number") setMinScoreDefault(data.kbMinRetrievalScoreDefault);
+      }
     } catch { /* ignore */ }
   }
   useEffect(() => {
@@ -1208,6 +1214,22 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
       if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
       setCsEnabled(data.csEnabled ?? next);
       setMsg(next ? "✓ 已啟用此客戶 AI 客服" : "✓ 已停用 AI（不花錢）— 常見問答仍會自動回覆，其他訊息轉真人");
+    } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
+  }
+
+  async function saveMinScore() {
+    setSaving(true); setMsg(null);
+    try {
+      const value = minScore.trim() === "" ? null : Number(minScore);
+      const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: JSON.stringify({ kbMinRetrievalScore: value }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string; kbMinRetrievalScore?: number | null };
+      if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
+      setMinScore(typeof data.kbMinRetrievalScore === "number" ? String(data.kbMinRetrievalScore) : "");
+      setMsg(value === null ? `✓ 知識門檻改回預設 ${minScoreDefault}` : `✓ 知識門檻已存：${value}`);
     } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
   }
 
@@ -1248,6 +1270,16 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
           style={{ ...cisBtnStyle, background: csEnabled ? "var(--red)" : "var(--accent)", opacity: saving ? 0.6 : 1 }}>
           {saving ? "處理中…" : csEnabled ? "停用 AI 客服" : "啟用 AI 客服"}
         </button>
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+          <span style={{ color: "var(--text-muted)", width: 88, flexShrink: 0 }}>知識門檻</span>
+          <input value={minScore} onChange={(e) => setMinScore(e.target.value)} placeholder={`預設 ${minScoreDefault}`} inputMode="decimal"
+            style={{ width: 80, fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }} />
+          <button onClick={saveMinScore} disabled={saving} style={{ ...cisBtnStyle, marginTop: 0 }}>存</button>
+        </div>
+        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "6px 0 0", lineHeight: 1.6 }}>
+          知識庫最相近段落的分數低於這個值，AI 就不寫答案、直接轉真人（也不花錢）。0.2–0.8；留空＝預設。
+          英文網站配中文客人，用真問題量過再填（Soulful 2026-10-15 量到 0.40）。
+        </p>
         {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
       </Card>
 

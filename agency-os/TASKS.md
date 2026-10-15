@@ -499,7 +499,7 @@
   - [x] Meta App 開發模式擋真客人訊息 → 隱私權政策改寫＋操作者按發佈切上線（免審，實測非角色帳號訊息送達）。見 WORKLOG 2026-10-15「Meta App 切上線模式」。
   - [x] Chatwoot v4.18 AgentBot 5 秒逾時 → webhook 先回應再處理＋claim 完成標記＋5 分鐘 sweep（a2adf459c／43ee9ad37）。見 WORKLOG 2026-10-15「CS webhook 先回應再處理」兩條。
   - [ ] **下一步（操作者 2026-10-15 同意順序）** ① 轉真人確認句＋問名字：程式在 main（`c3ef11ba9`），**未部署**。操作者 2026-10-15 決定：不單獨部署（sg-deploy 只能部署 main HEAD，會連帶上線還沒套 0100–0102 的社群 C5–C11），**跟社群 C12 同一次 sg-deploy 上線**（見本檔「社群發文 C12 上線」③）。部署後驗收：非角色帳號（John Doe）傳訊 → AI 轉真人 → 客人收到確認句＋問名字 → 回名字 → Chatwoot 聯絡人改名；`cs_ai_replies` 有 completed_at。見 WORKLOG 2026-10-15（續19）。② 再做下一項 KB。
-  - [ ] Soulful 客服三層（問答→AI→真人）**已上線** 2026-10-15（next-admin `427d89e10`；14 題問答＋AI 已開；真測：問答 1 秒直答 $0、AI 層先查後生成未花 Opus）。剩：① 轉真人確認句被 bot token 401 擋下的修正（main 已修，等下次部署——每天 03:00 自動或手動）② **操作者**：Chatwoot 個人檔案建 **User** access token，存 vault `cs:chatwoot:2bf60452-3d4d-47c2-9970-b9046ed1a35a:api_token`（bot token 不能讀訊息／改聯絡人，問名字才寫得回去）③ `minRetrievalScore` 0.5 對英文庫偏嚴（壓力問題只 0.41），要用真問題集校準再調。見 WORKLOG 2026-10-15「Soulful 客服三層上線」。
+  - [ ] Soulful 客服三層（問答→AI→真人）**已上線** 2026-10-15（next-admin `1c316c638`；14 題問答＋AI 已開；真測：問答 1 秒直答 $0；轉真人確認句＋問名字已送達）。剩：① **操作者**：Chatwoot 個人檔案建 **User** access token，存 vault `cs:chatwoot:2bf60452-3d4d-47c2-9970-b9046ed1a35a:api_token`（bot token 不能讀訊息／改聯絡人，問名字的答案才寫得回聯絡人）② AI 層知識門檻：量過 9 題（可答 0.41–0.73、不可答 ≤0.38）→ 每客戶可設 `kbMinRetrievalScore`（客服分頁「知識門檻」），Soulful 已設 0.40；程式在 main 等部署後生效，再用「我最近壓力很大，適合來嗎？」驗 AI 草稿。見 WORKLOG 2026-10-15「Soulful 客服三層上線」與「AI 知識門檻校準」。
   - [ ] 客人最後訊息 >24h 後無法回覆（`ENABLE_MESSENGER_CHANNEL_HUMAN_AGENT`=false）；要開需 Meta App Review `HUMAN_AGENT`＋等上游 PR #15932 釋出（現版開了會連 bot 回覆都標 tag）。
   - [ ] `safe-infra-patch.sh compose` 寫死 `cd /root/lobster-phase1`（server 版第 85 行），`/root/chatwoot`、`postiz` 等獨立 compose 專案無法走此閘；本次手動等價（備份→套用→健康→回滾路徑）。
 

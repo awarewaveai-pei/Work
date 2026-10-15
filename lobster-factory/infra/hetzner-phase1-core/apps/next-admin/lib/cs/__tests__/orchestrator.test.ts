@@ -2,7 +2,8 @@
 // generation, and a non-Latin question that misses the knowledge base is retried once in English.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/cs/cis", () => ({ loadCis: vi.fn(async () => ({ organizationId: "o", csEnabled: true })) }));
+const loadCis = vi.fn(async (): Promise<Record<string, unknown>> => ({ organizationId: "o", csEnabled: true }));
+vi.mock("@/lib/cs/cis", () => ({ loadCis }));
 const recordReply = vi.fn(async () => undefined);
 vi.mock("@/lib/cs/db", () => ({
   loadIntents: vi.fn(async () => []),
@@ -29,6 +30,8 @@ const msg = (text: string) => ({
 });
 
 beforeEach(() => {
+  loadCis.mockReset();
+  loadCis.mockResolvedValue({ organizationId: "o", csEnabled: true });
   retrieve.mockReset();
   generateReply.mockClear();
   generateText.mockClear();
@@ -64,6 +67,24 @@ describe("handleInbound -- no spend before the gates", () => {
     const d = await handleInbound(msg("What courses do you offer?"));
     expect(generateReply).toHaveBeenCalledTimes(1);
     expect(d.action).toBe("draft");
+  });
+});
+
+describe("handleInbound -- per-tenant knowledge floor", () => {
+  it("a tenant floor of 0.4 lets a 0.45 match through where the 0.5 default would hand off", async () => {
+    loadCis.mockResolvedValue({ organizationId: "o", csEnabled: true, minRetrievalScore: 0.4 });
+    retrieve.mockResolvedValue([chunk(0.45)]);
+    const d = await handleInbound(msg("What courses do you offer?"));
+    expect(generateReply).toHaveBeenCalledTimes(1);
+    expect(d.action).toBe("draft");
+    expect(d.traceMeta.minRetrievalScore).toBe(0.4);
+  });
+
+  it("without a tenant floor the default applies", async () => {
+    retrieve.mockResolvedValue([chunk(0.45)]);
+    const d = await handleInbound(msg("What courses do you offer?"));
+    expect(d.handoffReason).toBe("knowledge_gap");
+    expect(generateReply).not.toHaveBeenCalled();
   });
 });
 
