@@ -23,10 +23,11 @@ const ERROR_TEXT: Record<string, string> = {
   version_conflict: "別人剛改過這一格，已重新載入；確認後再改一次。",
 };
 
-function dotColor(c: ScheduleCell): string {
-  if (c.lastError) return "var(--red)";
-  if (c.lastRunAt) return "var(--green)";
-  return "var(--card-border)";
+// Three states, three looks: a theme colour for "never ran" would read as one of the other two.
+function dot(c: ScheduleCell): { glyph: string; color: string; label: string } {
+  if (c.lastError) return { glyph: "●", color: "var(--red)", label: "上次失敗" };
+  if (c.lastRunAt) return { glyph: "●", color: "var(--green)", label: "上次正常" };
+  return { glyph: "○", color: "var(--text-muted)", label: "還沒跑過" };
 }
 
 function fmt(iso: string | null): string {
@@ -150,7 +151,7 @@ export function ScheduleTable({ only }: { only?: string }) {
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) => void save(c, { enabled: e.target.checked })}
                         />{" "}
-                        <span style={{ color: dotColor(c) }}>●</span>
+                        <span style={{ color: dot(c).color }} title={dot(c).label}>{dot(c).glyph}</span>
                         {c.unavailable ? <span style={{ color: "var(--text-muted)" }}> 不會執行</span> : null}
                       </td>
                     );

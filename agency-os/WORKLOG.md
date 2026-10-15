@@ -14,6 +14,30 @@
 **剩餘風險**: 無（本機）。
 
 **rollback**: `git revert`；容器用 `docker compose -f Projects/internal/cognitive-engineering-os/docker-compose.yml up -d` 可重建（試映像時才該這樣做）。
+## 2026-10-15（續32）排程頁操作者驗收抓到：7 支 route 的 audit 從來沒寫進 DB（supabase builder 沒 await＝沒送出）
+
+**操作者驗收**（10:47–10:48 UTC，登入後在 `/ops/schedules` 改了幾格）：`client_schedules` 3 列寫入正確（AwareWave Ops 自動爬取已開，weekly 一 03 UTC）、site_watch 兩筆 `site_watch_config_updated` 有 audit；**`client_schedule_updated` 0 筆**。
+
+**根因**：supabase-js builder 是 lazy，`then()`／`await` 才送出。`void getSupabaseWriteClient()?.from("ops_audit_events").insert(...)` 從不執行。prod `ops_audit_events` 按 event_type 統計：這 7 支 route 的事件（`collection_source_*`、`collection_run`、`cs_intent_*`、`cs_knowledge_*`、`cognitive_os_import`、`hci_import`、`collection_schedule_updated`）**有史以來 0 列**；有 await 的 route（`tenant_config_updated` 13、`brand_colors_updated` 2…）正常。同類第 8 處：`lib/content/video/job-store.ts:112` 的 TTL 清理從未執行。續2 我以「既有寫法」拒絕 Codex F6（audit 非持久）——拒錯了，既有寫法本身就是 bug。
+
+**做了什麼**
+- `lib/ops-audit.ts` `recordOpsAudit`（await；失敗只 log，不讓已成功的變更回 500）；7 支 route 刪本地 `audit()` 改 `await recordOpsAudit(...)`（3 處在 `.then` 回呼內，改 async）。
+- `job-store.ts` 清理改 `.then(ok, err)`（真的送出、不留 unhandled rejection）。
+- 守門測試 `lib/__tests__/supabase-builder-executed.test.ts`：掃 `app/`、`lib/` 中「自成一句、沒 await／return／賦值／頂層 `.then` 的 `.from(` 鏈」，含 `if (x)` 無大括號與參數內 `.then` 兩種假陰性案例。
+- `ScheduleTable`：「還沒跑過」原本用 `--card-border`（本主題是綠色）＝看起來跟「上次正常」一樣 → 改空心灰 ○＋hover 字。
+
+**Codex（`reports/oracle/2026-10-15-partialreview-a71005f8.md`，4 項全收）**：F1 audit 傳輸失敗會讓成功變更回 500 → try/catch；F2 清理無 rejection handler → 補；F3 守門漏 `if (x)\n void …` → 邊界加 `)`／`else`；F4 守門把參數內 `.then` 當執行 → 只認頂層 `.then(`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql ops_audit_events group by event_type（7 支 route 事件 0 列）＋ client_schedules 3 列 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit && npm test（256 files／2381 tests，含新守門 2 支） | exit=0 | ms=14000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n（全收）
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os | grep=void .*\.from\(|from\("ops_audit_events"\)\.insert | hits=0（剩下的 insert 皆有 await；守門測試掃全 app/lib）
+- 無 subagent。
+
+**注意**：AwareWave Ops 的「自動爬取」現在是開的，但該客戶 0 個已核准來源 → 下週一 03 UTC 會以 `collect_errors:no_approved_sources` 失敗並開 incident（設計如此：開了卻沒東西可抓就該通知）。不要的話在排程頁取消勾選。
+
+**rollback**：`git revert`（行為退回＝audit 再次靜默不寫）。
 ## 2026-10-15（續31）next-admin 改每天台灣 03:00 自動部署＋部署前 migration 閘；ContentStudio 舊 Postiz 面板換成「到社群發文」連結；CS 待上線兩筆一起部署
 
 **做了**（操作者：「每天凌晨 3 點台灣時間自動部署一次」「檢查哪些還沒部署，都處理好吧」）：

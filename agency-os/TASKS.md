@@ -109,11 +109,11 @@
 ### 未完成
 
 - [ ] **【產品｜施工】app.aware-wave.com 排程頁：一個地方管理所有例行工作**
-  - `🟢 上線，待操作者驗收` · `2026-10-15` · `無`
+  - `🟢 上線，操作者驗收過` · `2026-10-15` · `無`
   - **一句話**：客戶例行工作在 app 裡設定：`/ops/schedules` 總表＋客戶頁維護分頁，同一個 `ScheduleTable`、同一份資料（`client_schedules`＋巡檢 adapter）；工作只能從 `lib/schedules/jobs.ts` 選。
-  - **現在到哪**：已上線；`schedules-heartbeat` 18:00 UTC 首跑綠；過渡 route 與舊 token 已刪。
-  - **下一步**：操作者登入 `/ops/schedules` 改一格（步 4 寫入 smoke）；要看真跑就勾 AwareWave Ops 自動爬取到下一整點（步 6）。之後關卡。建議模型：Opus 5.5
-  - **證據**：WORKLOG 2026-10-15（續2、續3、續8）
+  - **現在到哪**：上線；心跳綠；操作者改格寫入正確。驗收抓到 7 支 route 的 audit 從沒寫入（續32 已修，隨下次部署生效）。
+  - **下一步**：台灣 03:00 部署後改一格 → 查 `ops_audit_events` 有 `client_schedule_updated`，就關卡。AwareWave Ops 自動爬取已開但 0 個核准來源，週一會失敗開 incident（不要就取消勾）。建議模型：Opus 5.5
+  - **證據**：WORKLOG 2026-10-15（續2、續3、續8、續32）
 - [ ] **【治理｜小】連 ssh 的檢查腳本沒有存活檢查：連線中途斷掉就無限期卡住，每晚 guard 會被卡死**
   - `🟠 未開始` · `2026-10-14` · `無`
   - **一句話**：2026-10-14 19:25 實測 guard 卡在 check-deploy-drift.ps1:270 的 ssh 16 分鐘（只有 ConnectTimeout=8）；任務是 IgnoreNew，卡住的那次會讓之後的排程都被跳過。10 支會連 ssh 的檢查只有 check-capacity-health.ps1 有 ServerAliveInterval；另外 ssh 被中止時 drift 那一項被記成 WARN 通過。

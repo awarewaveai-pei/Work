@@ -25,6 +25,7 @@ import { importFolderSources, importOrganizationSources, type ImportSummary } fr
 import { isCognitiveOsConfigured } from "@/lib/cognitive-os/client";
 import { isResearchBridgesEnabled, researchBridgesFrozenBody } from "@/lib/research-bridges";
 import { startRunJob, getRunJob } from "@/lib/collect/run-jobs";
+import { recordOpsAudit } from "@/lib/ops-audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,17 +38,6 @@ async function orgOf(slug: string): Promise<{ id: string; name: string } | null>
   return error || !data ? null : { id: data.id as string, name: data.name as string };
 }
 
-function audit(orgId: string, role: string, source: string, event: string, payload: Record<string, unknown>) {
-  void getSupabaseWriteClient()?.from("ops_audit_events").insert({
-    organization_id: orgId,
-    actor_role: role,
-    event_type: event,
-    target_type: "organizations",
-    target_id: orgId,
-    trace_id: crypto.randomUUID(),
-    payload: { ...payload, role_source: source },
-  });
-}
 
 /** Own job "kind" (checked by getRunJob/startRunJob, lib/collect/run-jobs.ts) plus its own key
  *  namespace — belt and suspenders against a run started by the OTHER route sharing this same
@@ -120,8 +110,8 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   startRunJob<ImportSummary>(
     JOB_KIND,
     jobKey(orgId, runKey),
-    importResult.then((summary) => {
-      audit(orgId, resolved.role, resolved.source, "cognitive_os_import", {
+    importResult.then(async (summary) => {
+      await recordOpsAudit(orgId, resolved.role, resolved.source, "cognitive_os_import", {
         folderId: folderId ?? null,
         projectId: summary.projectId,
         imported: summary.imported,

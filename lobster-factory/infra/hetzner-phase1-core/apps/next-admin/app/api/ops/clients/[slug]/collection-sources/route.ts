@@ -22,6 +22,7 @@ import { addSource, approveSource, disableSource, listSources } from "@/lib/coll
 import { runCollection, defaultRunKey } from "@/lib/collect/run";
 import { startRunJob, getRunJob } from "@/lib/collect/run-jobs";
 import "@/lib/collect/blocks";
+import { recordOpsAudit } from "@/lib/ops-audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,17 +38,6 @@ async function orgIdOf(slug: string): Promise<string | null> {
   return error || !data ? null : (data.id as string);
 }
 
-function audit(orgId: string, role: string, source: string, event: string, payload: Record<string, unknown>) {
-  void getSupabaseWriteClient()?.from("ops_audit_events").insert({
-    organization_id: orgId,
-    actor_role: role,
-    event_type: event,
-    target_type: "organizations",
-    target_id: orgId,
-    trace_id: crypto.randomUUID(),
-    payload: { ...payload, role_source: source },
-  });
-}
 
 export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
   const resolved = resolveOpsRole(request); // internal console — viewer+ may read the catalogue/sources below
@@ -110,8 +100,8 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     startRunJob(
       "collection-run",
       `${orgId}:${runKey}`,
-      runCollection({ organizationId: orgId, sourceIds, dryRun, runKey }).then((result) => {
-        audit(orgId, resolved.role, resolved.source, dryRun ? "collection_dry_run" : "collection_run", {
+      runCollection({ organizationId: orgId, sourceIds, dryRun, runKey }).then(async (result) => {
+        await recordOpsAudit(orgId, resolved.role, resolved.source, dryRun ? "collection_dry_run" : "collection_run", {
           runKey: result.runKey,
           sources: result.sources,
           written: result.sink.written,
@@ -138,7 +128,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   });
   if (!written.ok) return NextResponse.json({ ok: false, errors: written.errors }, { status: 400 });
 
-  audit(orgId, resolved.role, resolved.source, "collection_source_added", { blockId, entry });
+  await recordOpsAudit(orgId, resolved.role, resolved.source, "collection_source_added", { blockId, entry });
   return NextResponse.json({ ok: true, source: written.source });
 }
 
@@ -166,7 +156,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       : await disableSource(orgId, id);
   if (!result.ok) return NextResponse.json({ ok: false, errors: result.errors }, { status: 400 });
 
-  audit(orgId, resolved.role, resolved.source, `collection_source_${body.action === "approve" ? "approved" : "disabled"}`, { id });
+  await recordOpsAudit(orgId, resolved.role, resolved.source, `collection_source_${body.action === "approve" ? "approved" : "disabled"}`, { id });
   return NextResponse.json({ ok: true, source: result.source });
 }
 
@@ -190,6 +180,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ slug
   // Soft, always: a deleted row takes with it the answer to "where did this document come from?".
   const result = await disableSource(orgId, id);
   if (!result.ok) return NextResponse.json({ ok: false, errors: result.errors }, { status: 400 });
-  audit(orgId, resolved.role, resolved.source, "collection_source_disabled", { id });
+  await recordOpsAudit(orgId, resolved.role, resolved.source, "collection_source_disabled", { id });
   return NextResponse.json({ ok: true, source: result.source });
 }

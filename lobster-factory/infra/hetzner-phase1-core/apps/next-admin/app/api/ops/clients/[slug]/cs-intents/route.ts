@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { upsertIntent, deleteIntent } from "@/lib/cs";
+import { recordOpsAudit } from "@/lib/ops-audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,13 +22,6 @@ async function orgIdOf(slug: string): Promise<string | null> {
   return error || !data ? null : (data.id as string);
 }
 
-function audit(orgId: string, role: string, source: string, event: string, payload: Record<string, unknown>) {
-  void getSupabaseWriteClient()?.from("ops_audit_events").insert({
-    organization_id: orgId, actor_role: role, event_type: event,
-    target_type: "organizations", target_id: orgId, trace_id: crypto.randomUUID(),
-    payload: { ...payload, role_source: source },
-  });
-}
 
 export async function POST(request: Request, context: { params: Promise<{ slug: string }> }) {
   const resolved = resolveOpsRole(request);
@@ -51,7 +45,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
   const ok = await upsertIntent(orgId, { key, label, answerLevel, actionLevel, isSensitive, confidenceThreshold, canaryPct });
-  if (ok) audit(orgId, resolved.role, resolved.source, "cs_intent_upserted", { key, answerLevel, actionLevel, isSensitive });
+  if (ok) await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_intent_upserted", { key, answerLevel, actionLevel, isSensitive });
   return ok ? NextResponse.json({ ok: true, key }) : NextResponse.json({ ok: false, error: "upsert_failed" }, { status: 409 });
 }
 
@@ -70,6 +64,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ slug
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
   const ok = await deleteIntent(orgId, key);
-  if (ok) audit(orgId, resolved.role, resolved.source, "cs_intent_deleted", { key });
+  if (ok) await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_intent_deleted", { key });
   return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, error: "delete_failed" }, { status: 409 });
 }

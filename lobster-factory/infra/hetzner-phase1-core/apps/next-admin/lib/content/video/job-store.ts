@@ -108,8 +108,15 @@ export async function createJob(organizationId: string | null): Promise<VideoJob
     .from(TABLE)
     .insert({ id: job.id, status: "running", organization_id: organizationId });
   if (error) throw new Error(`[job-store] createJob insert failed: ${error.message}`);
-  // 順手清過期列（best-effort，不阻塞、不拋）。
-  void supabase.from(TABLE).delete().lt("created_at", new Date(Date.now() - TTL_MS).toISOString());
+  // 順手清過期列（best-effort，不阻塞、不拋）。then() 才會真的送出：supabase builder 不 await／不 then 就不執行。
+  void supabase
+    .from(TABLE)
+    .delete()
+    .lt("created_at", new Date(Date.now() - TTL_MS).toISOString())
+    .then(
+      ({ error: e }) => { if (e) console.warn("[job-store] TTL cleanup failed:", e.message); },
+      (e) => console.warn("[job-store] TTL cleanup failed:", String(e)),
+    );
   return job;
 }
 

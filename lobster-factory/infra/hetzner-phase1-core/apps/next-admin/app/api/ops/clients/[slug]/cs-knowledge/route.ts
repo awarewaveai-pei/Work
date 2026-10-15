@@ -37,6 +37,7 @@ import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { buildFolderDossier } from "@/lib/dossier/folder";
 import { isAiTextModel } from "@/lib/ai/text-model-options";
+import { recordOpsAudit } from "@/lib/ops-audit";
 import {
   ingestKnowledge,
   listKnowledgeSources,
@@ -103,13 +104,6 @@ async function orgIdOf(slug: string): Promise<string | null> {
   return error || !data ? null : (data.id as string);
 }
 
-function audit(orgId: string, role: string, source: string, event: string, payload: Record<string, unknown>) {
-  void getSupabaseWriteClient()?.from("ops_audit_events").insert({
-    organization_id: orgId, actor_role: role, event_type: event,
-    target_type: "organizations", target_id: orgId, trace_id: crypto.randomUUID(),
-    payload: { ...payload, role_source: source },
-  });
-}
 
 export async function GET(request: Request, context: { params: Promise<{ slug: string }> }) {
   const resolved = resolveOpsRole(request); // internal console — viewer+ may read
@@ -126,7 +120,7 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     // text — cheap to close for the one case that matters (a locked-down flag with zero visibility
     // into who looked), not worth it for every ordinary read.
     if (detail.isSensitive) {
-      audit(orgId, resolved.role, resolved.source, "cs_knowledge_detail_viewed", { sourceId });
+      await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_knowledge_detail_viewed", { sourceId });
     }
     // docFamilyId is a point-in-time read; a concurrent PATCH rebind (below) changing it between
     // these two calls would make the version list miss the very document just fetched. Accepted
@@ -167,7 +161,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     if (!mode) return NextResponse.json({ ok: false, error: "valid_mode_required" }, { status: 400 });
     const ok = await setKeywordMode(orgId, sourceId, mode);
     if (!ok) return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
-    audit(orgId, resolved.role, resolved.source, "cs_knowledge_keyword_mode_set", { sourceId, mode });
+    await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_knowledge_keyword_mode_set", { sourceId, mode });
     return NextResponse.json({ ok: true });
   }
 
@@ -177,7 +171,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     if (folderId === undefined) return NextResponse.json({ ok: false, error: "folderId_required" }, { status: 400 });
     const result = await moveSourceToFolder(orgId, sourceId, folderId);
     if (result.ok === true) {
-      audit(orgId, resolved.role, resolved.source, "cs_knowledge_moved_folder", { sourceId, folderId });
+      await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_knowledge_moved_folder", { sourceId, folderId });
       return NextResponse.json({ ok: true });
     }
     const err: FolderError = result.error;
@@ -189,7 +183,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     if (!url) return NextResponse.json({ ok: false, error: "valid_https_url_required" }, { status: 400 });
     const result = await rebindManualDocumentUrl(orgId, sourceId, url);
     if (result.ok === true) {
-      audit(orgId, resolved.role, resolved.source, "cs_knowledge_rebound", { sourceId, canonicalUrl: url });
+      await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_knowledge_rebound", { sourceId, canonicalUrl: url });
       return NextResponse.json({ ok: true });
     }
     const err: RebindError = result.error;
@@ -199,7 +193,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
   const ok = action === "archive"
     ? await archiveKnowledgeSource(orgId, sourceId)
     : await restoreKnowledgeSource(orgId, sourceId);
-  if (ok) audit(orgId, resolved.role, resolved.source, action === "archive" ? "cs_knowledge_archived" : "cs_knowledge_restored", { sourceId });
+  if (ok) await recordOpsAudit(orgId, resolved.role, resolved.source, action === "archive" ? "cs_knowledge_archived" : "cs_knowledge_restored", { sourceId });
   return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, error: `${action}_failed` }, { status: 409 });
 }
 
@@ -234,7 +228,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
         { status },
       );
     }
-    audit(orgIdForDossier, resolved.role, resolved.source, "cs_knowledge_dossier_built", {
+    await recordOpsAudit(orgIdForDossier, resolved.role, resolved.source, "cs_knowledge_dossier_built", {
       folderId,
       sourceId: result.sourceId ?? null,
       sourcesUsed: result.sourcesUsed,
@@ -268,7 +262,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     if (!result.sourceId) return NextResponse.json({ ok: false, error: "ingest_failed" }, { status: 503 });
     // Re-posting the same title with new text supersedes the previous version (K1); re-posting
     // identical text is a no-op, reported as unchanged rather than as a new version.
-    audit(orgId, resolved.role, resolved.source, result.unchanged ? "cs_knowledge_unchanged" : "cs_knowledge_added", {
+    await recordOpsAudit(orgId, resolved.role, resolved.source, result.unchanged ? "cs_knowledge_unchanged" : "cs_knowledge_added", {
       title, kind, chunks: result.chunks, version: result.version, docFamilyId: result.docFamilyId,
     });
     return NextResponse.json({
@@ -297,6 +291,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ slug
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
   const ok = await deleteKnowledgeSource(orgId, sourceId);
-  if (ok) audit(orgId, resolved.role, resolved.source, "cs_knowledge_deleted", { sourceId });
+  if (ok) await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_knowledge_deleted", { sourceId });
   return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, error: "delete_failed" }, { status: 409 });
 }

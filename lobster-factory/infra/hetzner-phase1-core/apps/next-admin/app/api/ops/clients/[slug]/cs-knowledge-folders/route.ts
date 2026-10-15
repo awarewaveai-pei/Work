@@ -17,6 +17,7 @@ import { NextResponse } from "next/server";
 import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { listFolders, createFolder, renameFolder, moveFolder, deleteFolder, type FolderError } from "@/lib/kb";
+import { recordOpsAudit } from "@/lib/ops-audit";
 
 const FOLDER_ERROR_HINT: Record<FolderError, string> = {
   name_required: "資料夾名稱不可為空",
@@ -38,17 +39,6 @@ async function orgIdOf(slug: string): Promise<string | null> {
   return error || !data ? null : (data.id as string);
 }
 
-// Same shape as cs-knowledge/route.ts's own local audit() — not shared, matching this codebase's
-// established per-route pattern (cs-config does the same). Critic finding 2026-09-17: DELETE here
-// cascade-removes an entire subfolder subtree with no record of who did it; every write below is now
-// audited for the same reason cs-knowledge/route.ts audits archive/restore/rebind/move_folder.
-function audit(orgId: string, role: string, source: string, event: string, payload: Record<string, unknown>) {
-  void getSupabaseWriteClient()?.from("ops_audit_events").insert({
-    organization_id: orgId, actor_role: role, event_type: event,
-    target_type: "organizations", target_id: orgId, trace_id: crypto.randomUUID(),
-    payload: { ...payload, role_source: source },
-  });
-}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,7 +68,7 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
 
   const result = await createFolder(orgId, name, parentId);
   if (result.ok === false) return NextResponse.json({ ok: false, error: result.error, hint: FOLDER_ERROR_HINT[result.error] }, { status: statusOf(result.error) });
-  audit(orgId, resolved.role, resolved.source, "cs_knowledge_folder_created", { folderId: result.id, name, parentId });
+  await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_knowledge_folder_created", { folderId: result.id, name, parentId });
   return NextResponse.json({ ok: true, id: result.id });
 }
 
@@ -101,7 +91,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
     ? await renameFolder(orgId, folderId, typeof body.name === "string" ? body.name : "")
     : await moveFolder(orgId, folderId, typeof body.parentId === "string" && body.parentId ? body.parentId : null);
   if (result.ok === false) return NextResponse.json({ ok: false, error: result.error, hint: FOLDER_ERROR_HINT[result.error] }, { status: statusOf(result.error) });
-  audit(orgId, resolved.role, resolved.source, action === "rename" ? "cs_knowledge_folder_renamed" : "cs_knowledge_folder_moved", { folderId, ...body });
+  await recordOpsAudit(orgId, resolved.role, resolved.source, action === "rename" ? "cs_knowledge_folder_renamed" : "cs_knowledge_folder_moved", { folderId, ...body });
   return NextResponse.json({ ok: true });
 }
 
@@ -120,6 +110,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ slug
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
   const ok = await deleteFolder(orgId, folderId);
-  if (ok) audit(orgId, resolved.role, resolved.source, "cs_knowledge_folder_deleted", { folderId });
+  if (ok) await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_knowledge_folder_deleted", { folderId });
   return ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, error: "delete_failed" }, { status: 409 });
 }

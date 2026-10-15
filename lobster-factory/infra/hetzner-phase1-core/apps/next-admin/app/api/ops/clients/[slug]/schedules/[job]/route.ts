@@ -11,21 +11,11 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { clientJob } from "@/lib/schedules/jobs";
 import { upsertSchedule } from "@/lib/schedules/store";
 import { SITE_WATCH_JOB, writeSiteWatchCell } from "@/lib/schedules/adapters/site-watch";
+import { recordOpsAudit } from "@/lib/ops-audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function audit(orgId: string, role: string, source: string, event: string, payload: Record<string, unknown>) {
-  void getSupabaseWriteClient()?.from("ops_audit_events").insert({
-    organization_id: orgId,
-    actor_role: role,
-    event_type: event,
-    target_type: "organizations",
-    target_id: orgId,
-    trace_id: crypto.randomUUID(),
-    payload: { ...payload, role_source: source },
-  });
-}
 
 export async function PATCH(request: Request, context: { params: Promise<{ slug: string; job: string }> }) {
   const resolved = resolveOpsRole(request);
@@ -64,7 +54,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ slug:
       updatedBy: `${resolved.role}:${resolved.source}`,
     });
     if (!result.ok) return NextResponse.json({ ok: false, error: result.errors.join(",") }, { status: 400 });
-    audit(orgId, resolved.role, resolved.source, "client_schedule_updated", {
+    await recordOpsAudit(orgId, resolved.role, resolved.source, "client_schedule_updated", {
       job_key: job.key,
       enabled: result.schedule?.enabled,
       frequency: result.schedule?.frequency,

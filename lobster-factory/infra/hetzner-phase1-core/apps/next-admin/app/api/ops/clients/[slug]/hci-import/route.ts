@@ -18,6 +18,7 @@ import { importOrganizationSourcesToHci, type HciImportSummary } from "@/lib/hci
 import { isHciConfigured } from "@/lib/hci/client";
 import { isResearchBridgesEnabled, researchBridgesFrozenBody } from "@/lib/research-bridges";
 import { startRunJob, getRunJob } from "@/lib/collect/run-jobs";
+import { recordOpsAudit } from "@/lib/ops-audit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,17 +31,6 @@ async function orgIdOf(slug: string): Promise<string | null> {
   return error || !data ? null : (data.id as string);
 }
 
-function audit(orgId: string, role: string, source: string, event: string, payload: Record<string, unknown>) {
-  void getSupabaseWriteClient()?.from("ops_audit_events").insert({
-    organization_id: orgId,
-    actor_role: role,
-    event_type: event,
-    target_type: "organizations",
-    target_id: orgId,
-    trace_id: crypto.randomUUID(),
-    payload: { ...payload, role_source: source },
-  });
-}
 
 /** Own job "kind" plus its own key namespace -- belt and suspenders against a run started by the
  *  OTHER import route sharing this same in-memory Map ever being readable as this route's own result
@@ -94,8 +84,8 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   startRunJob<HciImportSummary>(
     JOB_KIND,
     jobKey(orgId, runKey),
-    importOrganizationSourcesToHci(orgId).then((summary) => {
-      audit(orgId, resolved.role, resolved.source, "hci_import", {
+    importOrganizationSourcesToHci(orgId).then(async (summary) => {
+      await recordOpsAudit(orgId, resolved.role, resolved.source, "hci_import", {
         imported: summary.imported,
         alreadyImported: summary.alreadyImported,
         rejected: summary.rejected.length,
