@@ -65,20 +65,36 @@ export interface AnswerDecision {
 }
 
 /**
+ * The gates that need no reply to decide. The orchestrator runs them BEFORE generation, so a
+ * sensitive question or an unanswerable one costs no model call (the Soulful test message of
+ * 2026-10-15 paid for an Opus draft that was then thrown away as knowledge_gap). decideAnswerAction
+ * runs them again first, so the order of gates is defined once.
+ */
+export function preGenerationGate(input: Pick<AnswerDecisionInput, "intent" | "retrievalScore" | "messageText">): AnswerDecision | null {
+  return safetyGate(input.intent, input.messageText) ?? knowledgeGate(input.retrievalScore);
+}
+
+/** Needs neither retrieval nor a reply: checked before the first embedding call. */
+export function safetyGate(intent: Intent, messageText: string): AnswerDecision | null {
+  if (intent.isSensitive || hitsRedLine(messageText)) {
+    return { action: "handoff", handoffReason: intent.isSensitive ? "sensitive_intent" : "red_line" };
+  }
+  return null;
+}
+
+export function knowledgeGate(retrievalScore: number): AnswerDecision | null {
+  return retrievalScore < CS_THRESHOLDS.minRetrievalScore ? { action: "handoff", handoffReason: "knowledge_gap" } : null;
+}
+
+/**
  * The autonomy decision. Order matters — safety gates first, autonomy last. A draft (L1) means the
  * AI wrote it but a human must press send; auto_sent (L2 + canary) means the AI sent it.
  */
 export function decideAnswerAction(input: AnswerDecisionInput): AnswerDecision {
-  const { intent, confidence, retrievalScore, grounded, messageText, roll } = input;
-
-  // 1. Hard safety gates — these win over any per-intent config.
-  if (intent.isSensitive || hitsRedLine(messageText)) {
-    return { action: "handoff", handoffReason: intent.isSensitive ? "sensitive_intent" : "red_line" };
-  }
-  // 2. Knowledge gap — never answer without support.
-  if (retrievalScore < CS_THRESHOLDS.minRetrievalScore) {
-    return { action: "handoff", handoffReason: "knowledge_gap" };
-  }
+  const { intent, confidence, retrievalScore, grounded, roll } = input;
+  // 1–2. Hard safety gates and the knowledge gap — these win over any per-intent config.
+  const early = preGenerationGate(input);
+  if (early) return early;
   // 3. Grounding — the draft must be supported.
   if (!grounded) {
     return { action: "handoff", handoffReason: "not_grounded" };

@@ -1,43 +1,192 @@
 {
-  "_note": "Soulful 客服常見問答草稿（2026-10-15，依 soulfulexpression.org 公開內容起草）。部署後貼進客戶頁「客服」分頁的「常見問答自動回覆」，或用 PATCH /api/ops/clients/soulful-expression/cis {csFaq: entries} 載入。網站沒寫的資訊（費用、開課時間、地點）一律 handoff:true 交給老師，不代答。",
+  "_note": "Soulful 客服常見問答草稿（2026-10-15，依 soulfulexpression.org 公開內容起草）。部署後貼進客戶頁「客服」分頁的「常見問答自動回覆」，或用 PATCH /api/ops/clients/soulful-expression/cis {csFaq: entries} 載入。網站沒寫的資訊（費用、開課時間、地點）一律 handoff:true 交給老師，不代答。 網站是英文站（2026-10-15 操作者），英文客人用 *-en 題；中文客人用原題。同一題不會兩種語言同時命中。",
   "entries": [
     {
       "id": "courses",
-      "keywords": ["課程", "療癒模組", "工作坊", "有什麼課", "上什麼課", "上課內容"],
+      "keywords": [
+        "課程",
+        "療癒模組",
+        "工作坊",
+        "有什麼課",
+        "上什麼課",
+        "上課內容"
+      ],
       "answer": "您好！我們目前有四個藝術療癒模組，都不需要任何美術基礎：\n・回到原點：透過想像和拼貼，重新走進童年的房間，和小時候的自己說說話。\n・壓力覺察與釋放：用簡單的創作找出壓力藏在哪裡，再一步一步把它放下。\n・喜悅卡（適合 60 歲以上的長輩）：用色彩和小圖卡回想溫暖的記憶，讓心情比較平穩。可以一對一，也可以 6 到 8 人的小團體，一次 90 到 120 分鐘。\n・五生療癒模組：分成五個階段的創作旅程，陪您走過生活中的轉變期。\n每個模組的完整介紹在這裡：https://soulfulexpression.org/healing-modules/\n如果想知道開課時間或費用，直接留言告訴我們，老師會親自回覆您 🙏"
     },
     {
       "id": "art-therapy",
-      "keywords": ["藝術治療是什麼", "什麼是藝術治療", "藝術治療", "不會畫畫", "不會畫", "沒有美術基礎"],
+      "keywords": [
+        "藝術治療是什麼",
+        "什麼是藝術治療",
+        "藝術治療",
+        "不會畫畫",
+        "不會畫",
+        "沒有美術基礎"
+      ],
       "answer": "藝術治療是用畫畫、拼貼、黏土這些創作，把說不出口的感受慢慢表達出來。重點是過程和感受，不是畫得好不好看，所以完全不需要美術基礎，不會畫畫也沒關係。\n想多了解的話，可以看看這裡的介紹：https://soulfulexpression.org/insights/art-therapy-explained/"
     },
     {
       "id": "formats",
-      "keywords": ["一對一", "個別", "團體", "小團體", "線上", "實體", "上課地點"],
+      "keywords": [
+        "一對一",
+        "個別",
+        "團體",
+        "小團體",
+        "線上",
+        "實體",
+        "上課地點"
+      ],
       "answer": "我們有三種形式：一對一的個別藝術治療、和其他人一起進行的團體課程，以及主題工作坊。想知道哪一種比較適合您，或是上課地點和方式，請留言告訴我們您的狀況，老師會親自回覆您。",
       "handoff": true
     },
     {
       "id": "booking",
-      "keywords": ["預約", "報名", "費用", "價格", "多少錢", "收費", "怎麼約", "開課時間", "什麼時候開課"],
+      "keywords": [
+        "預約",
+        "報名",
+        "費用",
+        "價格",
+        "多少錢",
+        "收費",
+        "怎麼約",
+        "開課時間",
+        "什麼時候開課"
+      ],
       "answer": "謝謝您的詢問！預約、費用和開課時間目前都由老師親自安排。請留言告訴我們您想參加的課程或想談的主題，還有方便的時間，老師會盡快回覆您 🙏",
       "handoff": true
     },
     {
       "id": "shop",
-      "keywords": ["T恤", "衣服", "商品", "尺寸", "商店"],
+      "keywords": [
+        "T恤",
+        "衣服",
+        "商品",
+        "尺寸",
+        "商店"
+      ],
       "answer": "我們的商店目前有三款 T 恤，都是下單後才印製，比較不浪費：\n・High Priestess 神祕藝術 T 恤：標價 $24.99 起\n・Soulful Expression Bloom T 恤：標價 $28.50 起\n・Unisex T 恤：標價 $31.00 起\n尺寸和顏色可以在商品頁選：https://soulfulexpression.org/shop/"
     },
     {
       "id": "returns",
-      "keywords": ["退貨", "換貨", "退換", "壞掉", "損壞", "瑕疵"],
+      "keywords": [
+        "退貨",
+        "換貨",
+        "退換",
+        "壞掉",
+        "損壞",
+        "瑕疵"
+      ],
       "answer": "手工藝術作品、客製商品，以及拆封過的香氛類商品，因為性質特殊，沒辦法退換貨。如果商品在運送中損壞，或有製作上的瑕疵，請在收到後 7 天內傳照片給我們，並附上訂單編號，我們會協助處理。完整說明在這裡：https://soulfulexpression.org/refund_returns/",
       "handoff": true
     },
     {
       "id": "contact",
-      "keywords": ["email", "信箱", "聯絡方式", "怎麼聯絡"],
+      "keywords": [
+        "信箱",
+        "聯絡方式",
+        "怎麼聯絡",
+        "電子郵件"
+      ],
       "answer": "您可以直接在這裡留言，或寫信到 info@soulfulexpression.org，我們都會回覆您。"
+    },
+    {
+      "id": "courses-en",
+      "keywords": [
+        "course",
+        "courses",
+        "module",
+        "modules",
+        "workshop",
+        "class",
+        "classes",
+        "program"
+      ],
+      "answer": "Hi! We currently run four art-based healing modules, and none of them needs any art background:\n- Back to the Origin: walk back into your childhood room through imagination and collage.\n- Stress Awareness and Release: simple art activities that show you where stress sits, so you can start letting it go.\n- Joy Cards (for adults 60+): colour and small picture cards that bring back warm memories. One-to-one or small groups of 6–8, 90–120 minutes.\n- WuSheng Healing Module: a five-phase creative journey for times when life is changing.\nFull descriptions: https://soulfulexpression.org/healing-modules/\nFor dates or fees, just reply here and the therapist will get back to you personally 🙏"
+    },
+    {
+      "id": "art-therapy-en",
+      "keywords": [
+        "what is art therapy",
+        "art therapy",
+        "can't draw",
+        "cannot draw",
+        "not an artist",
+        "no art background"
+      ],
+      "answer": "Art therapy uses drawing, collage, clay and other ways of making to express what is hard to put into words. It is about the process and what you feel, not how the picture looks, so no art background is needed at all.\nMore here: https://soulfulexpression.org/insights/art-therapy-explained/"
+    },
+    {
+      "id": "formats-en",
+      "keywords": [
+        "one-to-one",
+        "one on one",
+        "individual",
+        "group",
+        "online",
+        "in person",
+        "location",
+        "where are you"
+      ],
+      "answer": "We offer three formats: one-to-one individual art therapy, group sessions, and themed workshops. Tell us a little about your situation and the therapist will suggest which one fits, along with where and how the sessions take place.",
+      "handoff": true
+    },
+    {
+      "id": "booking-en",
+      "keywords": [
+        "book a",
+        "booking",
+        "appointment",
+        "price",
+        "prices",
+        "cost",
+        "fee",
+        "fees",
+        "how much",
+        "schedule",
+        "dates",
+        "available",
+        "sign up",
+        "register"
+      ],
+      "answer": "Thank you for asking! Bookings, fees and session times are arranged personally by the therapist. Please reply with the module or topic you are interested in and the times that suit you, and we will get back to you as soon as we can 🙏",
+      "handoff": true
+    },
+    {
+      "id": "shop-en",
+      "keywords": [
+        "t-shirt",
+        "tshirt",
+        "shirt",
+        "shop",
+        "size",
+        "sizes",
+        "merch"
+      ],
+      "answer": "Our shop currently has three T-shirts, all printed to order:\n- High Priestess Mystical Art T-Shirt: from $24.99\n- Soulful Expression Bloom T-Shirt: from $28.50\n- Unisex T-Shirt: from $31.00\nSizes and colours are on the product pages: https://soulfulexpression.org/shop/"
+    },
+    {
+      "id": "returns-en",
+      "keywords": [
+        "return",
+        "returns",
+        "exchange",
+        "damaged",
+        "broken",
+        "defect",
+        "faulty"
+      ],
+      "answer": "Handmade artworks, custom-made items and opened fragrance products cannot be returned or exchanged. If an item arrived damaged or has a manufacturing defect, send us photos and your order number within 7 days of receiving it and we will sort it out. Full policy: https://soulfulexpression.org/refund_returns/",
+      "handoff": true
+    },
+    {
+      "id": "contact-en",
+      "keywords": [
+        "email",
+        "e-mail",
+        "contact",
+        "reach you"
+      ],
+      "answer": "You can reply right here, or email info@soulfulexpression.org – we answer both."
     }
   ]
 }

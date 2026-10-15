@@ -1,4 +1,36 @@
 # Worklog
+## 2026-10-15（續27）Soulful：網站草稿／假字清掉（正式站）、CS 改成「問答→AI→真人」且 AI 先查知識再花錢、中文問英文庫翻譯重查（程式未部署）、Zoho Desk 評估
+
+**操作者決定**：AI 留著當第二層（「不花錢的自動回覆無法回，再用 AI，AI 無法回，再轉真人」）；網站 4 頁「我不會 你去處理」；「聽說 Zoho Desk 功能很棒，你去研究」；網站是英文站（還沒加語言外掛）。
+
+**正式站 soulfulexpression.org（Kadence 區塊，wp-cli 經 `soulful-wp` 容器）**：
+- 備份：`/home/ubuntu/soulful-page-backup-20261015T074550Z/post-{35,2079,2076,13}.json`（`wp post get --format=json`）＋ WP 修訂版（`WP_POST_REVISIONS` unlimited；修訂 7745–7748 及之後兩次 13 的修訂）。回滾＝後台「修訂版本」還原，或 `wp post update <id> <備份 post_content>`。
+- 首頁（ID 35，`page_on_front`）：刪最後一列 `35_29ae4c-dd`「🏠【首頁內容區塊建議】」規劃稿（53,309→46,898 bytes）。
+- `/book-a-session/`（2079）：只留兩個 FluentBooking 區塊，刪整列規劃稿（含「NT$ xxx」）。
+- `/assessments/`（2076）：刪列 `2076_d9ab08-4a` 規劃稿；「still taking shape」施工說明保留。
+- `/support-faq/`（13）：8 格 Lorem ipsum 手風琴 → 7 題英文問答（內容只用網站已有事實；費用／時間導向表單）；開頭 Lorem 一句改掉。第一版誤寫中文，操作者指正「我是英文網站」→ 重做英文版（修訂多兩次）。
+- 快取：`/etc/nginx/conf.d/soulful-cache.conf` proxy_cache（inactive 10m）→ `find /var/cache/nginx/soulful -type f -delete` 後 curl 4 頁：lorem=0、草稿字 0、FAQ 英文出現、booking 區塊在；再抓 cs=HIT 為新內容。瀏覽器實看 FAQ 手風琴展開正常。
+- 程式沒動；`wp post update` 走 stdin，存回 md5 與檔案一致（只差結尾換行）。
+
+**程式（next-admin，未部署）**：
+- `lib/cs/autonomy.ts`：`safetyGate`（敏感意圖／紅線）、`knowledgeGate`（score < 0.5）、`preGenerationGate`＝兩者合併；`decideAnswerAction` 先呼叫同一函式，閘順序只定義一次。
+- `lib/cs/orchestrator.ts`：分類後先 `safetyGate`（不 embedding、不翻譯、不生成）；`retrieveAcrossLanguages`：第一次檢索 < 門檻且訊息含 CJK/韓文 → Haiku 把問題翻成英文（`/cs/translate`，200 tokens，只當文字）再檢索一次，取分數高的一組，翻譯失敗用第一組；再 `knowledgeGate` → 轉真人，都在生成之前。trace 記 `retrievalQuery`。原本順序是生成（Opus $0.018）→ 才判 knowledge_gap 丟掉。
+- `lib/cs/__tests__/orchestrator.test.ts`（新，8 個）。
+- `cs-faq.json` 加 7 題英文（`*-en`），移除中英共用關鍵字 `email`、刪太寬的 `book`／`when`（`facebook`、任何含 when 的句子都會命中）。
+**Codex**：`agency-os/reports/oracle/2026-10-15-partialreview-361530b9.md` 1 項（敏感意圖＋CJK 低分仍先花翻譯）→ 安全閘移到檢索前。
+
+**Zoho Desk 評估**（來源見 TASKS 同條）：每位客服每月 US$14（Standard，年繳）起才有 Messenger／WhatsApp 即時訊息與 Answer Bot；免費版 3 席只有 email 工單；Zia 生成式 AI 在 Professional US$23 以上，BYOK 自帶 OpenAI 金鑰另付。現況 Chatwoot 自架＝同類開源工具，已接 Messenger 雙粉專，0 月費。結論：不換；Zoho 多出來的是 SLA／報表／多席位協作，操作者一人用不到。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp post update 35/2079/2076/13（stdin）→ md5 一致；find cache -delete；curl 4 頁 lorem=0 draft=0 faq=2 booking>0 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run lib/cs app/api/webhooks/chatwoot（137 pass）；突變：拔 preGenerationGate 呼叫 → 2 紅、還原綠；cs-faq.json 12 句真比對（中英各半） | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex 361530b9（1 修：安全閘提前到檢索前）
+- ORACLE_WAIVED: Codex 之後只做那一項的窄修（safetyGate 前移）＋ 指名測試「sensitive intent: hands off without generating」改成低分＋CJK 斷言不檢索不翻譯
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands | grep=preGenerationGate|safetyGate|knowledgeGate|retrieveAcrossLanguages|translateForRetrieval|/cs/translate | hits=14（全為本次改動與 oracle 報告；`decideAnswerAction` 另一個呼叫者 `lib/cs/eval.ts:94` 走同一函式，行為不變）
+- REVIEW_WAIVED: NA -- 網站內容改動（非程式），以 curl＋瀏覽器實看為驗證
+
+**剩**：部署（跟社群 C12 同批）後：① 客戶頁「客服」貼 `cs-faq.json` 14 題 ② 開回 `csEnabled`（AI 第二層，有 FAQ 與先查後生成後才划算）③ 非角色帳號傳中文「請問你們有哪些療癒課程？」驗 FAQ 直答；傳 FAQ 沒有的問題驗 AI 翻譯檢索＋草稿。
+
+**rollback**：網站＝修訂版還原或備份 JSON；程式未部署。
 ## 2026-10-15（續26）Soulful 客服：知識庫重建、AI 關閉（零花費）、新增免費關鍵字問答自動回覆（問答程式未部署）
 
 **操作者決定**：「我要自動回覆 又不花錢」。AI 回答每則約 US$0.02（`ai_call_logs` 實測：Haiku 分類 0.0003＋Opus 生成 0.0181＋Haiku 監督 0.0020），操作者不接受 → AI 關、改純程式問答。
