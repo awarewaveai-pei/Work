@@ -49,6 +49,7 @@
 - 盤點未部署：next-admin＝CS `c8e57a18d`、`a21321d4b`（無 migration、無新環境變數）＋本條；Trigger workflows、migrations（103/103 已套）、compose 無落差；認知平台 `2e7d70c46` 主機已檢出但 07:58Z 測試閘失敗，另一個 session（COS web 404）正在修，本條不碰。
 
 **驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=部署 next-admin（`sg-deploy.sh next-admin`，拉到 origin/main `2a02b2b84`＝本條 `43e4a50c2`＋CS `c8e57a18d`、`a21321d4b`，`2a02b2b84` 本身只動 COS 本機設定）：sync-host-scripts 裝上 check-migrations-applied.sh → `migration-gate: OK -- 103 repo migrations are in the ledger, unchanged`（log sg-deploy-20261015-105945.log:46-47）→ healthy 9s → smoke 5/5 → `.deployed-commit=2a02b2b84`；公網：social `/`→307 login、`/api/ops/summary`→404、`/api/social/brands`→401；app `/social`→404；容器 static chunk 有「排程、審核、送出都在社群發文」、「推送到 Postiz」0 筆 | exit=0 | ms=400000
 - REALTEST_EVIDENCE: tool=SSH | cmd=主機跑 `check-migrations-applied.sh`（最終版）：/root/Work → `OK -- 103 … unchanged` exit 0；複製目錄＋改 0100 內容＋`9999_a b.sql` → 兩類各列一個 exit 1；只差 CRLF → exit 0；假 docker 失敗 → `cannot read public.schema_migrations` exit 2 | exit=0 | ms=20000
 - REALTEST_EVIDENCE: tool=Bash | cmd=本機 harness 執行 sg-deploy 1.86 區塊（假閘門）：rc0→繼續；rc1→FAIL＋flag；rc1+override→繼續；rc2+override→FAIL＋flag；rc1+dry-run→只報告繼續；rc1+hci-app→不檢查 | exit=0 | ms=5000
 - REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit -p .`＋`npx vitest run`（全套 256 files／2381 passed）；`bash -n` sg-deploy.sh、check-migrations-applied.sh、auto-deploy-next-admin.sh | exit=0 | ms=120000
