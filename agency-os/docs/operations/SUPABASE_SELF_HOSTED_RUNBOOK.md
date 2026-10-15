@@ -260,7 +260,7 @@ Numbered `*.sql` files are the **authoritative** DDL/RLS sequence for the Lobste
 | Studio Security Advisor (`0013_rls_disabled_in_public`) | Flags **`public` tables with RLS off** (`relrowsecurity = false`) where **`anon` or `authenticated` has SELECT** (same idea as the linter). **`git` 裡有 `0014` 不代表 EU 資料庫已套用**；若從未對 EU Postgres 跑過 `0014`，Advisor 會一直顯示約 17 筆 ERROR。套用 **`0014`**（再 **`0016`**）後，到 Studio **Security Advisor 手動重新整理／稍候重掃**；套用前後可用 repo 內 **`lobster-factory/packages/db/scripts/verify-public-rls-supabase-advisor.sql`** 在 SQL Editor 跑，結果應為 **0 rows**。 |
 | Drift / linter | Partial stacks produce Studio **RLS disabled in public** and runtime surprises; redeploy from repo order instead of hand-fixing individual tables. |
 | RLS vs policies | `0014` enables RLS broadly; `0016_ops_console_and_permission_catalog_rls_policies.sql` adds **authenticated** policies for ops-console tables and permission catalogs so JWT clients keep intended reads; **`service_role` bypasses RLS** for jobs and admin automation. |
-| PostgREST | After new tables or renames: `NOTIFY pgrst, 'reload schema';` or `docker compose restart supabase-rest` (see `0013_ops_inbox.sql`). |
+| PostgREST | `scripts/apply-db-migration.mjs` sends `NOTIFY pgrst, 'reload schema';` after every committed batch. SQL applied any other way: run it yourself, or `docker compose restart supabase-rest` — until then new columns/tables are invisible to supabase-js ("not in the schema cache"). |
 
 Do **not** run production DDL from IDE agents without the same gates as human operators.
 

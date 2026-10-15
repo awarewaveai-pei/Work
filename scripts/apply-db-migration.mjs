@@ -341,6 +341,7 @@ export function runApply(nums, { transport, statusTransport, appliedBy, forceRea
   }
 
   const results = [];
+  let failure = null;
   for (const { number, filename, file } of files) {
     const buf = fs.readFileSync(file);
     const sha256 = migrationSha256(buf);
@@ -348,15 +349,29 @@ export function runApply(nums, { transport, statusTransport, appliedBy, forceRea
     const rep = transport(withLedger);
     const out = `${rep.stdout ?? ""}${rep.stderr ?? ""}`.trim();
     if (rep.status !== 0) {
-      throw new Error(`FAILED at ${number} after ${results.length}/${files.length}. ON_ERROR_STOP rolled that file back whole; earlier files are committed.\n${out.split("\n").slice(-25).join("\n")}`);
+      failure = new Error(`FAILED at ${number} after ${results.length}/${files.length}. ON_ERROR_STOP rolled that file back whole; earlier files are committed.\n${out.split("\n").slice(-25).join("\n")}`);
+      break;
     }
     if (!/^COMMIT$/m.test(out)) {
       // psql exits 0 on an empty or comment-only input too. No COMMIT line means nothing was committed.
-      throw new Error(`NO COMMIT for ${number}.\n${out.split("\n").slice(-25).join("\n")}`);
+      failure = new Error(`NO COMMIT for ${number}.\n${out.split("\n").slice(-25).join("\n")}`);
+      break;
     }
     results.push({ number, filename, sha256 });
   }
+  // PostgREST serves from a schema cache: until reloaded, a new column or table is invisible to every
+  // supabase-js caller ("Could not find the 'x' column ... in the schema cache"; 0099 on 2026-10-15).
+  // Committed files need it even when a later file failed.
+  if (results.length > 0) reloadPostgrestSchema(transport);
+  if (failure) throw failure;
   return results;
+}
+
+export function reloadPostgrestSchema(transport) {
+  const rep = transport("NOTIFY pgrst, 'reload schema';\n");
+  if (rep.status !== 0) {
+    throw new Error(`migrations committed, but the PostgREST schema reload failed -- run NOTIFY pgrst, 'reload schema'; by hand.\n${(rep.stderr || rep.stdout || "").slice(0, 2000)}`);
+  }
 }
 
 // ─────────────────────────────────────────────

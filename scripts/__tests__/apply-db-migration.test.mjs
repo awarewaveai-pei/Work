@@ -178,7 +178,7 @@ test("runApply: --force-reapply skips the conflict check and applies (upserting 
     const status = ledgerStatus({ applied: ["0099_x.sql"] });
     const results = runApply(["0099"], { transport: write.transport, statusTransport: status.transport, appliedBy: "tester", forceReapply: true, migrationsDir: dir });
     assert.equal(results.length, 1);
-    assert.equal(write.calls.length, 1);
+    assert.deepEqual(write.calls.slice(1), ["NOTIFY pgrst, 'reload schema';\n"]); // one apply, then the schema reload
     assert.match(write.calls[0], /ON CONFLICT \(filename\) DO UPDATE/);
     assert.equal(status.calls.some((c) => /SELECT filename FROM/.test(c)), false, "no conflict query under --force-reapply");
   });
@@ -225,6 +225,48 @@ test("runApply: no COMMIT in psql's output (exit 0 but nothing committed) is als
     assert.throws(
       () => runApply(["0099"], { transport: emptyOutputTransport, statusTransport, appliedBy: "t", forceReapply: false, migrationsDir: dir }),
       /NO COMMIT/,
+    );
+  });
+});
+
+const RELOAD = "NOTIFY pgrst, 'reload schema';\n";
+
+test("runApply: after a commit the PostgREST schema cache is reloaded (0099 on 2026-10-15: new column invisible to supabase-js)", () => {
+  withTmpMigrationsDir({ "0099_x.sql": SIMPLE_MIGRATION }, (dir) => {
+    const write = okTransport();
+    runApply(["0099"], { transport: write.transport, statusTransport: ledgerStatus().transport, appliedBy: "t", forceReapply: false, migrationsDir: dir });
+    assert.equal(write.calls.length, 2);
+    assert.equal(write.calls[1], RELOAD);
+  });
+});
+
+test("runApply: a later file failing still reloads for the files already committed; nothing committed -> no reload", () => {
+  withTmpMigrationsDir({ "0098_a.sql": SIMPLE_MIGRATION, "0099_b.sql": SIMPLE_MIGRATION }, (dir) => {
+    const calls = [];
+    const transport = (input) => {
+      calls.push(input);
+      return input === RELOAD || calls.length === 1 ? { status: 0, stdout: "COMMIT\n", stderr: "" } : { status: 1, stdout: "", stderr: "boom" };
+    };
+    assert.throws(
+      () => runApply(["0098", "0099"], { transport, statusTransport: ledgerStatus().transport, appliedBy: "t", forceReapply: false, migrationsDir: dir }),
+      /FAILED at 0099/,
+    );
+    assert.equal(calls.at(-1), RELOAD);
+  });
+  withTmpMigrationsDir({ "0099_x.sql": SIMPLE_MIGRATION }, (dir) => {
+    const calls = [];
+    const transport = (input) => (calls.push(input), { status: 1, stdout: "", stderr: "boom" });
+    assert.throws(() => runApply(["0099"], { transport, statusTransport: ledgerStatus().transport, appliedBy: "t", forceReapply: false, migrationsDir: dir }), /FAILED at 0099/);
+    assert.ok(!calls.includes(RELOAD));
+  });
+});
+
+test("runApply: a failed reload is an error naming the manual fix", () => {
+  withTmpMigrationsDir({ "0099_x.sql": SIMPLE_MIGRATION }, (dir) => {
+    const transport = (input) => (input === RELOAD ? { status: 1, stdout: "", stderr: "no route" } : { status: 0, stdout: "COMMIT\n", stderr: "" });
+    assert.throws(
+      () => runApply(["0099"], { transport, statusTransport: ledgerStatus().transport, appliedBy: "t", forceReapply: false, migrationsDir: dir }),
+      /schema reload failed -- run NOTIFY pgrst/,
     );
   });
 });

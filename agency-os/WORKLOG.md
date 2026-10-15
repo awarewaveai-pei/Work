@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-15（續16）CS webhook 先回應再處理：部署＋實測；apply-db-migration 自動 reload PostgREST schema
+
+**部署（a2adf459c）**：0099 apply（4/4 回填、partial index）→ 主機 `/root/lobster-phase1/.env` 加 `CS_SWEEP_TOKEN`（主機 openssl 產生、未顯示，備份 `.bak-*-cs-sweep`）→ safe-infra-patch compose next-admin（備份 `docker-compose.yml.bak.safe-patch-20261015-013835`，healthy 9s）→ sg-deploy next-admin（01:44:04Z，smoke 全 OK）→ 時間窗回填 UPDATE 0 → lobster-trigger-deploy 20261015.2（17 tasks，`CS_SWEEP_TOKEN set: yes`）。
+- C1 **0099 後 PostgREST schema cache 未 reload** → `completeClaim` 報「Could not find the 'completed_at' column ... in the schema cache」；sweep 實測時正確回 502 留未完成、但每次重試重發筆記（測試對話多 2 則私人筆記）。手動 `NOTIFY pgrst, 'reload schema'` 後 sweep 200 `handedOff:1`。**根治**：`scripts/apply-db-migration.mjs` `runApply` 任一檔 commit 後送 reload（後續檔失敗也送；reload 失敗＝錯誤並指名手動修法）；`SUPABASE_SELF_HOSTED_RUNBOOK.md` PostgREST 列改寫（原為手動步驟、0099 即漏）。
+- C2 **`after()` 在 prod 跑完**：真訊息 conv 7 webhook 回應 325–498 ms，pipeline 回應後 7.3 s 完成（`completed_at-created_at`）→ 推翻 2026-06-17（`WORKLOG-archive/2026-06.md:4209`）「after() 被切」對現況的適用性（當時為 5 分鐘長工作、舊主機）。claim＋sweep 仍保底。
+- 測試資料陷阱：`cs_ai_replies.chatwoot_conversation_id` 存 Chatwoot **display_id**（webhook payload），非內部 id；種假 claim 用內部 id 6 → 404。
+**實測**：(1) sweep 端點：對 token 200、錯 token 401；假 stale claim（display 3）→ handoff＋筆記＋completed。(2) 真人（非 App 角色帳號）傳訊 → 無「error with the agent bot」、`cs_ai_replies` handoff、completed_at 有值、Chatwoot「Soulful Bot 重新開啟了對話」。(3) 已轉真人（open）對話再傳 → 依設計靜默（`route.ts:90` human_owns_thread）。
+**rollback**：sg-deploy 回 474fdb9ee；0099 down；Trigger 刪 cs-inbound-sweep；compose 備份還原。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql chatwoot messages conv 7 + cs_ai_replies(completed 7.3s) + sidekiq WebhookJob 325-498ms；node --test scripts/__tests__/apply-db-migration.test.mjs（34 pass） | exit=0 | ms=7300
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- apply-db-migration 改動＝提交後一條 NOTIFY＋迴圈 throw→break 以保留 reload；3 個新測試＋force-reapply 斷言改窄
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=reload schema | hits=119（多為歷史 handoff/報告；現行規則 `HETZNER_PROVISIONING_HARDENING_SOP.md:57`、`system-health-check.ps1:469` 仍正確不改；runbook 已改）
+- ORACLE_WAIVED: apply-db-migration 改動為單一 NOTIFY 呼叫與錯誤傳遞，3 個指名測試鎖住；無授權／資料邏輯
 ## 2026-10-15（續15）C5 社群送出與對帳：認領一次、每次送出一把冪等鍵、寫回只落在自己的認領、孤兒必刪、系統模式擋發送（程式；未套正式、未部署）
 
 **根因／要關的類**：排程的真相在我們的資料庫（ADR 016 §2），Postiz 只送信。送信員跟 Postiz 之間任何一步斷掉（逾時、重疊的兩輪、人在中途改時間）都不能變成「發兩次」或「該撤的照發」。
