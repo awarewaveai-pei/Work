@@ -172,6 +172,7 @@
 - REALTEST_EVIDENCE: tool=Bash | cmd=python scripts/affected_tests.py --run（最終版程式）→ Ran 1471 tests OK | exit=0 | ms=1520676
 - REALTEST_EVIDENCE: tool=SSH | cmd=操作者「應該已經部署了」→ 主機 /opt/cognitive-os ff-only fcc494eb4→3104c03af（含 7a8586f9b、2a02b2b84，無 migration／compose／Dockerfile）；deploy/deploy.sh（/tmp/cos-deploy-20261016a.out）測試閘門 PASS、smoke local／web local／database／public 全 PASS，2026-10-16T01:28:37Z done | exit=0 | ms=600000
 - REALTEST_EVIDENCE: tool=curl | cmd=正式站：/api/exists/method/no-such-tool → 404 METHOD_RESOLUTION_BLOCKED、/api/exists/method/systems.iceberg_model 204、/api/exists/project/x 無 session 401；頁面（假 cookie）工具／run／課／示範 有效 200、未知 404（/methods/no-such-tool/run 由 200 變 404＝method 檢查不需登入生效）；無 cookie 307 /login | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=Bash | cmd=正式站，操作者在瀏覽器窗格自己登入後，同源 fetch（純 GET、無 RSC）：自己的案子與 /govern 200、自己案子下 /analyses/no-such-analysis 404、/projects/no-such-project 與其 /govern 404、/projects/new 200、/groups/no-such-group 404、run 未知 404／iceberg 200（每頁 350–660 ms） | exit=0 | ms=4300
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
   - Codex `agency-os/reports/oracle/2026-10-15-partialreview-aee2c44a.md`：F1 `/exists/method` 要登入而 form 不用；F2 非 method 的檢查也先載入 method catalog，catalog 壞時專案檢查失敗（web 會放行成 200）。同一個根因：一條路由服務所有 kind，依賴取聯集。不變量：每個檢查只依賴它的讀取路由依賴的東西 → 拆成一個 kind 一條路由（上面），各一條測試，突變紅綠。
 - ORACLE_WAIVED: Codex 之後的改動只是把一條路由拆成四條（同樣的守衛）＋兩條測試；突變紅綠、e2e、affected 皆重跑
