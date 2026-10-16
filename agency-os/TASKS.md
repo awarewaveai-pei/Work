@@ -130,10 +130,14 @@
 - [x] **【資料｜Cognitive OS 專案指標 19／19 懸空】主庫存的專案 id 在 Cognitive OS 都不存在，B2 `ids:cognitive-os-projects` 每天照實 FAIL**
   - `✅ 完成` · `2026-10-15` · 根因＝10/02 操作者核准抹除的專案；匯入改成重用前先向 Cognitive OS 確認（`5f38b4a06`，已部署）；19 筆依操作者決定改回「未匯入」，對帳 0 懸空（WORKLOG 2026-10-15 續11、續13）
 
-- [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–5 開卡做**
+- [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–7 開卡做**
   - `🟠 未開始` · `2026-10-14` · WORKLOG 續15、續17；第 3 步前查定期扣款外掛；`ADR_INDEX.md` 那列已改「已接受」（2026-10-15）
   - **監工台**（plan 唯一狀態頁，操作者 2026-10-16「要有監工頁面」）：https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr ← `agency-os/handoffs/2026-10-16-customer-model-supervisor/`（`data.mjs` 改狀態 → `node build.mjs` → `node check.mjs` → 重發同 URL）。每步 done 時改 `STEPS[n].status`＋`commit`。
   - 2026-10-16 §0 改三軸（部署／商業／操作），順序加 6 API 通道、7 轉售；第 1 步啟動時一併改 System Foundry 問卷三缺口（代操 CAP、`self_hosted` 獨立題、API 通道；藍圖必寫「許可只問 `can()`」），WORKLOG 2026-10-16「三條軸」條目
+  - **操作者待決（2026-10-16「目前尚未決定，之後決定」）**，各卡住一步，第 1、2、4 步不受影響：
+    - [ ] 待決 1：訂閱每月扣款用哪個 WooCommerce 定期扣款外掛；台灣金流是否支援定期扣款（ADR 017 產品決定 Q3）→ 擋第 3 步
+    - [ ] 待決 2：Postiz（AGPL-3.0）買斷交付前請律師確認（ADR 017 §5）→ 擋第 5 步
+    - [ ] 待決 3：點數不退、不轉讓的條款寫法（台灣數位內容解除權例外）；賣點數的款項用掉前列預收，請會計師確認（ADR 015 §4）→ 擋第 3 步
 
 - [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**
   - `🟠 未開始` · `2026-10-14` · `G3 Meta 審核狀態（操作者）；G5 要 go-ahead`
