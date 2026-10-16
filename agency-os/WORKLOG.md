@@ -9,6 +9,33 @@
 - REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin（npm test 2399 pass、healthy 9s、smoke 5/5、.deployed-commit b2508e931）；playwright smoke 26/0/6；chatwoot psql messages 52–57＋contacts id 6 name=pei；cs_ai_replies conv 9；ai_call_logs 0.00034 | exit=0 | ms=600000
 - REVIEW_WAIVED: NA -- 部署＋驗收，無程式改動（修正在續7）
 - BUGHUNT_WAIVED: NA -- 無程式改動
+## 2026-10-16（續8）員工替客戶開帳號：客戶頁「帳號」分頁＋寄設定密碼信（Resend）＋/login/set-password；email 驗證前不能加品牌成員
+
+**來源**：卡片（schedules 頁 session 開出）＋操作者「是否應該建立一個開帳號的畫面和其他相關事項? 如果是就去處理」。prod 只有 owner 一個帳號、沒有任何開帳號入口；`portal/api/signup/route.ts:9` `SIGNUP_VERIFIES_EMAIL=false` 關著；Supabase 寄信指向 `supabase-mail`（prod 該容器不存在，`docker ps` 無），信寄不出去。
+**不變量**（續38）：帳號只能透過「本人證明過的 email」拿到品牌角色；唯一證明欄位 = `auth.users.email_confirmed_at`（0103 `social_add_member` 只認它）。
+**寄信路徑選擇**：用既有 Resend（`aware-wave.com` verified，list-domains；Chatwoot SMTP 已用同帳號 WORKLOG 2026-09-11），由 next-admin 呼叫 Resend HTTP API；**不改 GoTrue SMTP**——改它會讓公開註冊（prod `GOTRUE_DISABLE_SIGNUP=false`）的帳號也能完成驗證，變成沒有 `user_kind` 的 staff viewer，爆炸半徑大。
+**做法**：
+- `lib/accounts/client-invite.ts`：`createUser(email_confirm:false, 無密碼, app_metadata{user_kind:client, org_id})` → profiles＋organization_memberships（失敗即刪回）→ `generateLink`（不寄信）取 `hashed_token` → 連結 `https://<產品門>/login/set-password#token_hash=…&type=invite`（token 在 fragment，不進 log／Referer）。已存在且未驗證＝重寄 invite；已驗證＝寄 recovery（忘記密碼／驗證後沒設密碼）；屬於 staff 或別的客戶＝409 不碰。
+- `app/login/set-password/`：`/login` 前綴不經 middleware，每個門都可用；按按鈕才 `verifyOtp`（信件掃描器開連結不會用掉 token），之後 `updateUser({password})`，載入後清掉網址 fragment。
+- `app/api/ops/clients/[slug]/accounts/route.ts`：staff owner/admin 才可（`userKind==="staff"`＋`canWriteTenantConfig`），只限 `type=client` 的組織；`recordOpsAudit("client_account_link_sent")` 不含 token。
+- 客戶頁新分頁「帳號」（`AccountsCard.tsx`，hub-ui＋theme token）；社群「成員」提示與 SC404 錯誤改指向它（`lib/social/store.ts`、`Members.tsx`）。
+- Codex 兩輪（主 diff `2026-10-16-partialreview-17acf915.md` 4 項；set-password 兩檔因檔名含 password 被擷取規則跳過，改 inspect 補審 `2026-10-16-inspect-8c49e72a.md` 2 項），6 項全核實後修：F1 generateLink 依 email 解析→要求 auth email 與輸入相同；F2 getUserById 錯誤不再當「沒帳號」（503／清單 throw）；F3 undo 刪 profile 失敗就保留 auth user，重按時 `ensureMembership` upsert 補完（不再有擋死 email 的孤兒 profile）；F4 24 小時＝prod 未設 `GOTRUE_MAILER_OTP_EXP` 預設 86400，加註；S1 `sentry.client.config.ts` 原本不洗網址→breadcrumb／request.url 一律去掉 `#…`；S2 驗證後存密碼失敗再重整會卡→無連結時用現有 session 設密碼。
+- critic（opus，verify-recent）0c/2M/7m，2M 核實後修：**M1** `generateLink("invite")` 遇不存在的使用者會自建一個沒有 `user_kind` 的帳號（middleware.ts:113 當成員工）→ 一律用 `recovery`（找不到使用者回 404、不建帳號；verify 會確認未驗證 email），且回傳的 `link.user.id` 必須等於剛檢查的帳號；**M2** 打錯 email 無法撤銷、帳號驗證後就能看該客戶品牌內容（`lib/social/authz.ts:30`）→ 加 DELETE（只刪本客戶、無品牌角色的帳號；先刪 auth user 立即失效）＋說明文字改正。小項修：密碼 72 bytes 上限與 weak/same 錯誤分開、PostHog `before_send` 去掉網址 fragment（不依 effect 順序）、StrictMode 只讀一次、已開著的頁收到新連結（hashchange）、org 查詢錯誤回 503、audit 加 `actor_user_id`、null body。未修：m1 沒 profile 的孤兒 auth user（需 auth.users 依 email 查詢＝migration）、m2 同時按兩次只有最新連結有效（文字已告知）。
+- 文字：GPT 寫（`agency-os/reports/oracle/2026-10-16-inspect-b3200efc.md`、`-5bfe6007.md`），集中於 `lib/accounts/invite-copy.ts`。
+- repo compose／`.env.example`：next-admin 加 `RESEND_API_KEY`、`MAIL_FROM`（prod 主機 `.env` 已有 `RESEND_API_KEY`，長度 36，但 compose 沒傳進 next-admin）。**prod compose 尚未改**＝High，等操作者 go ahead 走 `safe-infra-patch.sh compose`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=修前 npx tsc --noEmit && npm test（260 files／2404 pass） | exit=0 | ms=14000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/ops/clients/[slug]/accounts lib/social/__tests__/members-store.test.ts（10 pass）；突變於拋棄式 worktree：拔角色閘→3 紅、email_confirm:true→1 紅、拔 belongsTo→1 紅，還原→綠 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash packages/db/scripts/0103_social_brand_members-local-verify.sh（unconfirmed email 被 SC404 拒） | exit=0 | ms=11830
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 next dev /login/set-password：fragment 讀到後網址被清、密碼不一致擋下、假 token→「連結已過期或已使用」；修後重載與同頁換 # 皆出現表單且網址已清 | exit=0 | ms=5000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/8m/7n
+- REALTEST_EVIDENCE: tool=Bash | cmd=修後 npx tsc --noEmit && npm test（260 files／2408 pass）；突變：拔 auth-email 相符檢查→1 紅；recovery→invite、拔 link.user.id 核對、拔刪除的 belongsTo、拔 still_member 各 1 紅；還原綠 | exit=0 | ms=15000
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=還沒有帳號：請 AwareWave 先開帳號 | hits=0（舊 SC404 文案；WORKLOG 歷史條目除外）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=Sentry.init | hits=3（client＝本次修；server／edge 收不到 fragment，既有 query 清除不變）
+- ORACLE_WAIVED: Codex 兩輪皆為 partial（-Path 範圍；共享工作樹有他人未提交改動，不能審整棵樹），6 項全修並補測
+
+**剩餘風險**：⓪Codex／critic 修後未再送下一輪（皆就地修＋指名測試＋突變）。①prod 尚未接 `RESEND_API_KEY`→部署後按鈕會建帳號但回「伺服器尚未設定寄信功能」。②公開註冊開著（`GOTRUE_DISABLE_SIGNUP=false`）：陌生人可先用某人 email 註冊未驗證帳號，之後這裡回 email_taken（阻斷，非提權）；若日後 GoTrue 接真寄信，公開註冊會產生 staff viewer——TASKS 一行。③客戶頁「帳號」卡未在瀏覽器實看（本機需 prod 登入），部署後實看。④`D:\tmp\wt-acct`、`D:\tmp\wt-acct2` 突變 worktree 目錄殘留（已 prune，hook 擋 rm -rf）。
+**rollback**：`git revert <commit>`；prod compose 若已改，`safe-infra-patch.sh` 失敗自動還原，手動還原用其備份檔。
 ## 2026-10-16（續7）next-admin 手動部署被 test 閘擋：新 Chatwoot token route 沒列入 production-change 覆蓋清單（2abb9acd5 從沒跑過全套）
 
 **操作者**：「部署 next-admin（go ahead），部署完我用 John Doe 測名字寫回」。

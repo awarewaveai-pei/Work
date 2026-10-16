@@ -283,6 +283,10 @@ services:
       # call threw "POSTIZ_API_BASE_URL env var not set" (found by the B8 reconcile check, 2026-10-15).
       POSTIZ_API_BASE_URL: ${POSTIZ_API_BASE_URL:-}
       POSTIZ_API_KEY: ${POSTIZ_API_KEY:-}
+      # Client account links (lib/mail/resend.ts, ops client hub → 帳號). Same Resend account as Chatwoot's SMTP.
+      # Empty = accounts are still created but the panel says mail is not set up; MAIL_FROM defaults to noreply@<base domain>.
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
       # Cognitive OS research runs (RESEARCH_LINES_MASTER_PLAN §12.7): RUNS = COS -> /api/internal/collect/runs and
       # this app -> COS grant exchange (same value in COS deploy/.env); EXECUTE = Trigger worker -> runs/execute.
       # Empty = both endpoints 401 (fail closed).

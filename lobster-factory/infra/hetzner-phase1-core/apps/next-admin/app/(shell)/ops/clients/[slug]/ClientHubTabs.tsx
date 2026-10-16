@@ -6,6 +6,7 @@ import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
 import { SiteWatchCard } from "./SiteWatchCard";
+import { AccountsCard } from "./AccountsCard";
 import { ScheduleTable } from "@/app/(shell)/ops/schedules/ScheduleTable";
 import { CollectionSourcesPanel } from "@/app/(shell)/ops/collect/CollectionSourcesPanel";
 import { KnowledgeDetailModal } from "./KnowledgeDetailModal";
@@ -2919,7 +2920,7 @@ function OutreachTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "知識庫", "資料蒐集", "客服", "社群頻道", "憑證庫", "冷開發"] as const;
+const TABS = ["內容工具", "整合", "佈建", "維護", "設定", "品牌識別", "知識庫", "資料蒐集", "客服", "社群頻道", "帳號", "憑證庫", "冷開發"] as const;
 type Tab = typeof TABS[number];
 
 export function ClientHubTabs(props: ClientHubTabsProps) {
@@ -3003,6 +3004,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "資料蒐集" && <CollectionTab org={org} />}
         {activeTab === "客服" && <><CsFaqCard slug={org.slug} initial={cfg.csFaq} /><CustomerServiceTab org={org} /></>}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
+        {activeTab === "帳號" && <AccountsCard slug={org.slug} />}
         {activeTab === "憑證庫" && <CredentialsTab org={org} />}
         {activeTab === "冷開發" && <OutreachTab org={org} />}
       </div>

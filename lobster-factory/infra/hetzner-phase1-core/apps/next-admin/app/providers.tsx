@@ -25,6 +25,16 @@ export function PHProvider({ children }: { children: React.ReactNode }) {
         maskTextSelector: '[data-sensitive]',
       },
       persistence: 'localStorage',
+      // /login/set-password gets a one-time sign-in token in its URL fragment (lib/accounts/client-invite.ts); no URL
+      // fragment is ever sent, whichever effect runs first.
+      before_send: (event) => {
+        const props = event?.properties as Record<string, unknown> | undefined
+        if (props) for (const k of Object.keys(props)) {
+          const v = props[k]
+          if (typeof v === 'string' && /^https?:\/\/[^#]*#/.test(v)) props[k] = v.replace(/#.*$/, '')
+        }
+        return event
+      },
       loaded: (ph) => {
         ph.register({
           site_name: 'Aware Wave Admin',

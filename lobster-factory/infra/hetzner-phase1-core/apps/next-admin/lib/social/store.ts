@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { selectAll } from "@/lib/supabase-paging";
+import { ACCOUNT_COPY } from "@/lib/accounts/invite-copy";
 import { connectUrl, listAllIntegrations, uploadMedia, type RawIntegration } from "@/lib/content/postiz";
 import type { BrandRole, PostSnapshot, PostState, Transition } from "./state";
 
@@ -64,7 +65,7 @@ export interface Member { user_id: string; email: string | null; role: BrandRole
 
 /** The member functions' refusals in words a brand owner can act on (customers see these; the database text is not). */
 const MEMBER_REFUSALS: Array<[string, RegExp, 400 | 404 | 409, string]> = [
-  ["SC404", /no account/, 404, "這個 email 還沒有帳號：請 AwareWave 先開帳號，email 要驗證過"],
+  ["SC404", /no account/, 404, ACCOUNT_COPY.members_no_account_error],
   ["SC404", /not a member/, 404, "這個人已經不是此品牌的成員"],
   ["SC409", /already a member/, 409, "這個人已經是此品牌的成員"],
   ["SC409", /last owner/, 409, "品牌至少要留一位擁有者：先把另一位成員設成擁有者"],

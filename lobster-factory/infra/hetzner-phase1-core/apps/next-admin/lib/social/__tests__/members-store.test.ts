@@ -17,7 +17,8 @@ async function refusal(run: () => Promise<unknown>): Promise<InstanceType<typeof
 
 describe("member refusals", () => {
   it.each([
-    [{ code: "SC404", message: "no account with this email" }, 404, /還沒有帳號/],
+    // an account made in ops → 帳號 stays unverified until its owner opens the mail (0103 checks email_confirmed_at)
+    [{ code: "SC404", message: "no account with this email" }, 404, /沒有已驗證的帳號/],
     [{ code: "SC409", message: "already a member of this brand" }, 409, /已經是/],
     [{ code: "22023", message: "this email matches more than one account" }, 409, /不只一個帳號/],
   ])("add: %j -> %s", async (err, status, words) => {

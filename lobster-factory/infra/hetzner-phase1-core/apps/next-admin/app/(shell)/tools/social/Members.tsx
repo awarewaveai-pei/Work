@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError, api, type Member } from "./api";
 import type { SlotContext } from "./SocialManager";
 import type { BrandRole } from "@/lib/social/state";
+import { ACCOUNT_COPY } from "@/lib/accounts/invite-copy";
 
 export const ROLE_NAMES: Record<BrandRole, string> = { owner: "擁有者", editor: "編輯", reviewer: "審核人", client: "唯讀" };
 const ROLES = Object.keys(ROLE_NAMES) as BrandRole[];
@@ -38,6 +39,7 @@ export function MembersSetting({ ctx }: { ctx: SlotContext }) {
     <div className="sm-sec">
       <h3>成員</h3>
       <span className="sm-muted">每個品牌各自的成員與角色：擁有者管理成員與核准，編輯寫文與排程，審核人核准或退回，唯讀只能看。AwareWave 的擁有者／管理員帳號在所有品牌都是擁有者，不必加。</span>
+      <span className="sm-muted">{ACCOUNT_COPY.members_hint}</span>
       {members === null ? <span className="sm-muted">載入中…</span> : members.length === 0 ? <span className="sm-muted">還沒有成員。</span> : members.map((m) => (
         <div className="sm-row" key={m.user_id}>
           <span>{m.email ?? "（帳號已刪除）"}</span>
