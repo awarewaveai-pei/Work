@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-16（續2）Soulful 客服 AI 層驗收通過：門檻 0.40 部署後，「壓力很大適合嗎」→ AI 草稿進私人筆記、客人收到確認句＋問名字
+
+**前提**：`eabcfc311`（`kbMinRetrievalScore`，Soulful 0.40）於 2026-10-15 11:33Z 部署（主機 `/root/lobster-phase1/.deployed-commit`）。上一次同題（對話 7，11:16Z）在部署前，0.405 < 0.5 → 轉真人。
+**真測（Chatwoot 對話 8，非角色帳號 John Doe／Messenger，01:15:41Z）**：
+- `cs_ai_replies`：courses_services 0.75、retrieval 0.422 ≥ 0.40、L1、action=draft、claude-opus-5-5、4 個 chunk、完成 15.3s。
+- Chatwoot：msg 45 私人筆記＝AI 草稿（壓力覺察與釋放工作坊適合對象、非醫療聲明、時間／費用不知道就不編、提議轉真人）；msg 47 公開「已收到您的訊息，我們會盡快回覆您 🙏／請問怎麼稱呼您呢？」；對話 open、分配給 Awarewave。
+- 費用（`ai_call_logs`）：classify 0.000315＋translate 0.000151＋generate（Opus）0.016744＋supervise 0.002013 = **0.0192 USD ≈ NT$0.6**。
+**剩**：Chatwoot User access token → 伺服器 vault `cs:chatwoot:2bf60452-3d4d-47c2-9970-b9046ed1a35a:api_token`（next-admin `lib/cs/chatwoot-client.ts:55` `getSecret`；不是本機 `secrets-vault.ps1`）。目前**沒有操作者自己存的畫面**（`app/api/ops/clients/credentials/secret/route.ts:54` ref 綁 credentialId，不收任意鍵）→ 已提案客服分頁加 token 欄。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql cs_ai_replies conv 8＋chatwoot messages 44–48＋ai_call_logs 01:15:40–01:16:10Z | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 純驗收，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-10-16（續1）排程頁：每項工作的費用、伺服器排程點開看詳細（放哪、去哪查、壞了會怎樣）
 
 **操作者**：「自動爬取這要花多少錢？」「備份覆蓋、巡檢心跳要詳細說明，放哪裡、去哪查」。
