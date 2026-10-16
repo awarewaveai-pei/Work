@@ -14,6 +14,8 @@ export interface JobMeta {
   label: string;
   /** One sentence shown under the job's name: what it does. */
   description: string;
+  /** What one run costs (paid APIs only; our own server is not counted). */
+  cost: string;
   frequencies: FrequencyOption[];
 }
 
@@ -49,6 +51,8 @@ export interface SystemRow {
   lastAt: string | null;
   state: "ok" | "stale" | "missing" | "failed";
   detail: string;
+  /** Shown when the row is clicked. Values written by GPT to the operator's rule (WORKLOG 2026-10-16). */
+  details: { what: string; when: string; where: string; look: string; lookHref: string; fail: string };
 }
 
 export interface ScheduleOrg {

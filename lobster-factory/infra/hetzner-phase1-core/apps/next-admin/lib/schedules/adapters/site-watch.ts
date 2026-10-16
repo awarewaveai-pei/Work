@@ -12,6 +12,7 @@ export const SITE_WATCH_JOB: JobMeta = {
   key: "site_watch",
   label: "網站巡檢",
   description: "定期檢查客戶網站是否正常，並比對畫面變化。",
+  cost: "沒有付費 API；R2 儲存費可忽略。",
   frequencies: CONFIGURABLE_FREQUENCIES.map((f) => ({ value: f, label: FREQUENCY_LABEL[f] ?? f, usesHour: f === "daily", usesDay: false })),
 };
 

@@ -54,7 +54,7 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
 
   const today = now.toISOString().slice(0, 10);
   return {
-    jobs: [...CLIENT_JOBS.map(({ key, label, description, frequencies }) => ({ key, label, description, frequencies })), SITE_WATCH_JOB],
+    jobs: [...CLIENT_JOBS.map(({ key, label, description, cost, frequencies }) => ({ key, label, description, cost, frequencies })), SITE_WATCH_JOB],
     orgs: orgs.map((o) => ({ id: o.id, slug: o.slug, name: o.name ?? o.slug })),
     cells,
     system: opts.slug ? [] : await hostStatusRows(sb, now.getTime()),

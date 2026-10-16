@@ -24,6 +24,9 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
     key: "collect_crawl",
     label: "自動爬取",
     description: "定期整理客戶核准的網頁內容，更新客服知識庫。",
+    // Prices 2026-10: OpenAI text-embedding-3-small 0.02 USD/1M tokens, Serper ~0.001, Brave ~0.005 per query;
+    // caps: DEFAULT_BUDGET 200 fetches (lib/collect/run.ts), MAX_QUERIES 16 (lib/collect/search/query-plan.ts).
+    cost: "網頁抓取免費；新增或變更頁面每次最多約 0.02 美元。有實體檔案來源時，每次最多約 0.12 美元。",
     frequencies: DAILY_WEEKLY,
     defaults: { frequency: "weekly", hourUtc: 3, dayOfWeekUtc: 1 },
     async run(organizationId, runKey) {

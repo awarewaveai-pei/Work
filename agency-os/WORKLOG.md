@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-16（續1）排程頁：每項工作的費用、伺服器排程點開看詳細（放哪、去哪查、壞了會怎樣）
+
+**操作者**：「自動爬取這要花多少錢？」「備份覆蓋、巡檢心跳要詳細說明，放哪裡、去哪查」。
+
+**費用（查證）**：抓網頁／論文（OpenAlex、Crossref、arXiv）在自己主機＝免費；只有新增或變更的頁面做向量（`lib/kb/rag.ts` OpenAI `text-embedding-3-small`，0.02 USD／1M tokens），304 與內容雜湊相同都跳過；每次上限 200 頁（`lib/collect/run.ts:76`）≈ 最多 0.02 USD。「實體檔案」來源每次最多 16 次搜尋（`lib/collect/search/query-plan.ts:102`）× Serper（~0.001）＋ Brave（~0.005）≈ 0.10 USD。prod 現有來源：網頁 17、論文 1、實體檔案 1（`collection_sources` approved）。網站巡檢：自己主機截圖，R2 存 30 天，無付費 API。價格來源：OpenAI 模型頁、第三方價目（Serper、Brave 官方頁無法直接讀，見回覆來源）。
+
+**做了什麼**
+- `JobMeta.cost`（registry／site-watch adapter）；表頭與右欄顯示「每次執行費用」。
+- `SystemRow.details`（工作內容／執行時間／結果存放位置／查看位置＋連結／失敗處理），寫在 `adapters/host-status.ts`，事實出處註在旁邊；伺服器列可點，詳細顯示在右欄；伺服器區移到左欄，右欄緊鄰點的東西。
+- 文案仍由 GPT 寫（`reports/oracle/2026-10-16-inspect-a35fb56e.md`），照用。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit && npm test（258 files／2396 tests） | exit=0 | ms=14000
+- REALTEST_EVIDENCE: tool=Bash | cmd=jsdom 渲染真元件（點客戶格、點伺服器列兩種狀態）＋globals.css＋prod 主題 → 瀏覽器 1470px 截圖 | exit=0 | ms=2000
+- REVIEW_WAIVED: NA -- 文案與版面；無新邏輯
+- ORACLE_WAIVED: 文案與版面改動；同檔邏輯已審（6bd06ee9、a71005f8）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os | grep=cost:|details: | hits=4（jobs.ts、site-watch.ts、host-status.ts×2，皆本次）
+- 無 subagent。
+
+**rollback**：`git revert`。
 ## 2026-10-15（續38）社群品牌成員管理：0103 RPC（email 找帳號、改角色、移除、最後一位擁有者留下）＋ /api/social/members（只限擁有者）＋設定頁「成員」區塊；暫停：0103 未套、未推送
 
 **做了**（操作者「在這裡執行此任務：社群品牌成員管理畫面」→「0103 套到正式庫 部署 commit push」）：

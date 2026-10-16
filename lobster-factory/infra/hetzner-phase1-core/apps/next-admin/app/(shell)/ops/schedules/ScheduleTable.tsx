@@ -18,6 +18,9 @@ const T = {
   statFailing: "失敗排程",
   sectionClient: "客戶排程",
   sectionServer: "伺服器排程（唯讀）",
+  serverHint: "點選伺服器工作列，查看詳細資料。",
+  cost: "每次執行費用",
+  detail: { what: "工作內容", when: "執行時間", where: "結果存放位置", look: "查看位置", fail: "失敗處理" },
   cellOff: "未啟用",
   cellBlocked: "已啟用，無法執行：",
   panelEmpty: "請先點選一個排程。",
@@ -73,6 +76,9 @@ export function ScheduleTable({ only }: { only?: string }) {
   const [view, setView] = useState<SchedulesView | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<{ jobKey: string; organizationId: string } | null>(null);
+  const [serverKey, setServerKey] = useState<string | null>(null);
+  const pickCell = (jobKey: string, organizationId: string) => { setSelected({ jobKey, organizationId }); setServerKey(null); };
+  const pickServer = (key: string) => { setServerKey(key); setSelected(null); };
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -129,6 +135,7 @@ export function ScheduleTable({ only }: { only?: string }) {
   const selOrg = sel ? view.orgs.find((o) => o.id === sel.organizationId) : undefined;
   const selFreq = selJob?.frequencies.find((f) => f.value === sel?.frequency);
   const selTp = sel ? taipeiFromUtc(sel.dayOfWeekUtc, sel.hourUtc) : null;
+  const server = serverKey ? view.system.find((r) => r.key === serverKey) : undefined;
 
   return (
     <div>
@@ -149,9 +156,10 @@ export function ScheduleTable({ only }: { only?: string }) {
 
       {notice && <p style={{ color: "var(--red)", fontSize: "var(--font-size-sm)", margin: "0 0 12px" }}>{notice}</p>}
 
-      <div className="section-title">{T.sectionClient}</div>
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 28 }}>
-        <div style={{ ...card, flex: "1 1 520px", minWidth: 0, overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 520px", minWidth: 0 }}>
+        <div className="section-title">{T.sectionClient}</div>
+        <div style={{ ...card, overflowX: "auto", marginBottom: 28 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", color: "var(--text-primary)" }}>
             <thead>
               <tr>
@@ -160,6 +168,7 @@ export function ScheduleTable({ only }: { only?: string }) {
                   <th key={job.key} style={{ ...th, whiteSpace: "normal", minWidth: 200 }}>
                     <div style={{ fontSize: "var(--font-size-sm)", fontWeight: 700, color: "var(--text-primary)" }}>{job.label}</div>
                     <div style={{ fontWeight: 400, marginTop: 4, lineHeight: "var(--line-height-base)" }}>{job.description}</div>
+                    <div style={{ fontWeight: 400, marginTop: 4, lineHeight: "var(--line-height-base)", color: "var(--text-secondary)" }}>{T.cost}：{job.cost}</div>
                   </th>
                 ))}
               </tr>
@@ -175,7 +184,7 @@ export function ScheduleTable({ only }: { only?: string }) {
                     return (
                       <td
                         key={job.key}
-                        onClick={() => setSelected({ jobKey: job.key, organizationId: o.id })}
+                        onClick={() => pickCell(job.key, o.id)}
                         style={{ ...td, cursor: "pointer", background: isSel ? "var(--bg-hover)" : undefined, boxShadow: isSel ? "inset 3px 0 0 var(--accent)" : undefined }}
                       >
                         <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }} onClick={(e) => e.stopPropagation()}>
@@ -199,14 +208,59 @@ export function ScheduleTable({ only }: { only?: string }) {
             </tbody>
           </table>
         </div>
+        {view.system.length > 0 && (
+          <>
+            <div className="section-title">{T.sectionServer}</div>
+            <p style={{ color: "var(--text-muted)", fontSize: "var(--font-size-xs)", margin: "-6px 0 10px" }}>{T.serverHint}</p>
+            <div className="ops-table">
+              {view.system.map((r) => (
+                <div
+                  key={r.key}
+                  className="ops-row"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => pickServer(r.key)}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") pickServer(r.key); }}
+                  style={{ gridTemplateColumns: "minmax(140px, max-content) 1fr auto", cursor: "pointer", background: serverKey === r.key ? "var(--bg-hover)" : undefined, boxShadow: serverKey === r.key ? "inset 3px 0 0 var(--accent)" : undefined }}
+                >
+                  <div className="ops-row-key">{r.label}</div>
+                  <div className="ops-row-val">
+                    {r.description}
+                    <div>{r.cadence} · {taipeiTime(r.lastAt)}{r.detail ? ` · ${r.detail}` : ""}</div>
+                  </div>
+                  <span className={`card-badge ${SERVER_BADGE[r.state]}`}>{T.server[r.state]}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        </div>
+
 
         <aside style={{ ...card, flex: "0 1 320px", minWidth: 280, padding: "16px 18px", fontSize: "var(--font-size-sm)", color: "var(--text-primary)", position: "sticky", top: 16 }}>
-          {!sel || !selJob || !selOrg || !selTp ? (
+          {server ? (
+            <>
+              <div style={{ fontWeight: 700, fontSize: "var(--font-size-md)" }}>{server.label}</div>
+              <div style={{ color: "var(--text-muted)", marginTop: 2 }}>{server.cadence} · {T.server[server.state]}</div>
+              {(["what", "when", "where", "look", "fail"] as const).map((k) => (
+                <div key={k}>
+                  <div style={label}>{T.detail[k]}</div>
+                  <div style={{ lineHeight: "var(--line-height-base)" }}>
+                    {server.details[k]}
+                    {k === "look" && (
+                      <> <a href={server.details.lookHref} style={{ color: "var(--accent)" }}>前往</a></>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          ) : !sel || !selJob || !selOrg || !selTp ? (
             <p style={{ color: "var(--text-muted)", margin: 0 }}>{T.panelEmpty}</p>
           ) : (
             <>
               <div style={{ fontWeight: 700, fontSize: "var(--font-size-md)" }}>{selJob.label}</div>
               <div style={{ color: "var(--text-muted)", marginTop: 2 }}>{selOrg.name}</div>
+              <div style={{ color: "var(--text-secondary)", marginTop: 8, fontSize: "var(--font-size-xs)", lineHeight: "var(--line-height-base)" }}>{T.cost}：{selJob.cost}</div>
               {sel.enabled && sel.unavailable && <div style={{ color: "var(--yellow)", marginTop: 8 }}>{T.cellBlocked}{sel.unavailable}</div>}
 
               <label style={{ display: "flex", gap: 8, alignItems: "center", cursor: "pointer", marginTop: 14 }}>
@@ -265,23 +319,6 @@ export function ScheduleTable({ only }: { only?: string }) {
         </aside>
       </div>
 
-      {view.system.length > 0 && (
-        <>
-          <div className="section-title">{T.sectionServer}</div>
-          <div className="ops-table">
-            {view.system.map((r) => (
-              <div key={r.key} className="ops-row" style={{ gridTemplateColumns: "minmax(140px, max-content) 1fr auto" }}>
-                <div className="ops-row-key">{r.label}</div>
-                <div className="ops-row-val">
-                  {r.description}
-                  <div>{r.cadence} · {taipeiTime(r.lastAt)}{r.detail ? ` · ${r.detail}` : ""}</div>
-                </div>
-                <span className={`card-badge ${SERVER_BADGE[r.state]}`}>{T.server[r.state]}</span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
     </div>
   );
 }
