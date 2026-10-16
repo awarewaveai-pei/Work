@@ -1,6 +1,6 @@
 // 監工台的閘。規則全在這裡；任何一條破了 exit 1。
 //   node check.mjs            驗 data.mjs 的規則，並確認 supervisor.html 是 build.mjs 最新產物
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY } from './data.mjs';
@@ -25,6 +25,7 @@ STEPS.forEach((s, i) => {
   if (!['not_started', 'in_progress', 'done'].includes(s.status)) fail(`step ${s.n}: status ${s.status}`);
   if (s.status === 'done' && !/^[0-9a-f]{9,}$/.test(s.commit || '')) fail(`step ${s.n}: done 沒有 commit`);
   for (const d of s.depends) if (!(d < s.n)) fail(`step ${s.n}: depends ${d} 不在前面`);
+  if (!s.card || !existsSync(path.join(here, s.card))) fail(`step ${s.n}: 執行卡 ${s.card} 不存在`);
 });
 
 // 3. 待決每條指向一個存在的步驟；該步驟的 before 欄提到它

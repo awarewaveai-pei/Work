@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-16（續15）客戶怎麼來：全鏈對照後一次補齊——七張執行卡（指令＋路徑＋預期）、到期／寬限／保留／金鑰／RLS／代操授權／更新管道寫進 ADR 017、13 個工具目錄歸位、ADR 015 順序 1 列為第 3 步前置；監工台每步接卡、閘要求有卡
+
+**觸發**：操作者「不要我問一句你做一件事」。此前每題補一處，沒有一次把整條鏈走完。
+
+**根因**：plan 只有順序 1–7 的標題，沒有可執行的卡；旅程走一遍才看到的缺口（到期、試用結束、金鑰、RLS、代操授權、更新管道、營運看得到、WordPress 一次性碼前置）沒寫；`app/(shell)/tools/` 13 個目錄只有 social 有登記列（ADR 012 §8 早點名 video 違反），反向登記閘一開就會紅 12 個。
+
+**[現況分析]**（file:line）：ADR 012 §8 抽取順序 `012:138-143`（帳本泛化最後）與 ADR 017 順序一致；ADR 015 順序 1「WordPress 一鍵進入」`015:64` 不在 ADR 017 順序裡 → 補為第 3 步前置；`products.ts:51-58` 三列、無 `features`；`app/(shell)/tools/` 13 目錄；`lib/cs/billing.ts` 引用 `product_key` 但 cs 未登記；`app/api/webhooks/video-billing/` 已有簽章 webhook 慣例；`scripts/apply-db-migration.mjs:382-388` 只有 `--status/--check/--record-only/--force-reapply/--i-verified`，沒有 dry-run／down 旗標（卡片已照實寫）；0077 `org_level` group/company/individual、根＝`parent_organization_id is null`。
+
+**[已修改]**
+- 新 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md … step-7.md`：每張 Decision／Files／步驟／Acceptance（指令→預期）／突變／Rollback／模型。卡 1 含 13 目錄歸位表（video、tarot、studio、design、content、cs 六個新產品；theme、ai-models 為員工門工具並由測試證明不 import 付費 SDK）。
+- `017-entitlements-and-self-hosted-modules.md`：§3 加到期寬限 7 天、試用結束保留 90 天、代操授權、金鑰兩把與 kid 輪替、RLS；§5 加更新管道與 `BUYOUT=1` 建置變體；順序 1 加 13 目錄歸位；順序 3 加 ADR 015 順序 1 前置與 `/ops/billing`；順序段首指向卡片。
+- 監工台：`data.mjs` 每步 `card`、第 3 步 before 加 ADR 015 順序 1；`check.mjs` 每步卡片必須存在；`build.mjs` 工程細節顯示卡片路徑；v9 重發同 URL。
+- `agency-os/TASKS.md:133` 條目加卡片路徑一行。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node build.mjs && node check.mjs` | exit=0 | ms=400 → `ok: 5 ways, 7 steps, 3 open, page fresh`（新規則：每步卡片存在）
+- REALTEST_EVIDENCE: tool=Bash | cmd=卡片引用的路徑／旗標逐一 `ls`／`grep`：release-wp-bridge.sh、affected_tests.py、serverAdapterFactory.ts、claude-request.ts、Dockerfile、wp-bridge-plugin 皆存在；apply-db-migration 旗標對照後改寫卡 2／3／6 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/verify-governance-pointers.mjs` | exit=0 | ms=9000 → PASSED 147
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1m/0n -- 自審抓到卡片寫了不存在的 `--dry-run`／`--target local`／`--down`，已改成 `--check`＋拋棄式 Postgres＋套 down.sql
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`cards/step-|STAFF_UTILITIES|entitlements-expire|ENTITLEMENT_SIGNING_KEY|LICENCE_SIGNING_KEY` | hits=只在 ADR 017、卡片、data.mjs（新名字，無舊引用）
+- ORACLE_WAIVED: 無 source 檔改動
+
+**剩餘風險**：卡 1 的目錄歸位是預設值，操作者可改；卡 3 的 Woo 事件名要等待決 1 選定外掛後對照；卡 5 的 Multipass／時租主機驗收環境尚未備。
+
+**rollback**：`git revert <本 commit>`；全為文件與監工台。
 ## 2026-10-16（續14）「客戶怎麼來」監工台：一頁看三扇門→三軸→五種方式→順序 1–7 狀態；資料一處、頁面生成、閘驗規則（操作者「plan 到處散，要有監工頁面」）
 
 **根因**：plan 散在 ADR 017 順序、ADR 018、TASKS:133、AGENTS §0、WORKLOG 續13 五處，沒有一頁寫「現在到哪、下一步誰做、哪些要操作者先定」。照認知主權平台監工台的既有模式（`agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/platform-supervisor.html`＋`check-supervisor.mjs`）再做一張，不另發明。

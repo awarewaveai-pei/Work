@@ -63,6 +63,10 @@
 - **合約＝0062**：一列＝一個（計費帳戶、產品、方案）。加 `plan_key`、`source_ref`（Woo 訂閱編號）。唯一索引改為（organization_id, product_key, plan_key）且非 canceled；每產品最多一個 base（控制面寫入時檢查，它是唯一寫入者）。試用＝base 列的 `trial` 狀態，付款時就地改 `active`、填 `plan_key`，不新增列。加購＝另一列 addon 方案。CHECK 改成包含所有登記表的產品（現在缺 `social`）。
 - **權利＝新表 `organization_entitlements`**：`organization_id`（計費帳戶）、`product_key`、`feature_key`（必填）、`source`（contract／comp）、`source_ref`（合約 id 或贈送原因）、`starts_at`、`ends_at`、`status`、上限。合約變動時控制面重算該帳戶的權利列。贈送整個產品＝照一個具名方案展開成每個功能一列。
 - 點數不變成權利：按次扣點的功能，許可帶「這次最多花多少」（015 §1）。
+- **到期與寬限**：權利列 `ends_at = current_period_end + 7 天`（預設，操作者可改）；每日 job（schedules 表一列 `entitlements-expire`）把過期列改 `expired`，不刪列。**試用結束**無付款同樣過期；資料保留 90 天後標 `erasure_due`，實際刪除走既有擦除流程。
+- **代操授權**：員工替組織 X 簽許可，只在該員工對 X 有角色（成員列或 `ops_role` owner/admin）時成立，否則 403；`actor` 永遠記員工本人。
+- **金鑰**：許可簽章私鑰 `ENTITLEMENT_SIGNING_KEY`（vault → `mcp/user-env.ps1` → 容器 env）；公鑰清單 `ENTITLEMENT_PUBLIC_KEYS`（`kid:公鑰`，可多把，換鑰時新舊並存一個 `expires_at` 窗）。授權檔私鑰 `LICENCE_SIGNING_KEY` 另一把，同法。
+- **RLS**：`plans`、`organization_entitlements`、0062 只給 `service_role`；`anon`／`authenticated` 無 policy。價格在 Woo，不在這三表。
 - **只有控制面碰這三張表**（0062、`plans`、`organization_entitlements`）：靜態檢查只允許 `lib/entitlements/**` 與 `app/portal/**` 引用它們，其他地方出現就建置失敗。社群、collect 跟控制面在同一個 app，用的是繞過 RLS 的 service-role client（0062:51-52），沒有這道檢查就擋不住直讀。
 - **許可**（012 §4 `entitlement_ref` 擴充，取代 ADR-0031 gate 1 欄位）：`tenant`（計費帳戶）、`product_key`、`feature_key`、`entitlement_id`、`source_ref`、上限、可花點數上限、`actor`、`on_behalf_of`（§0 C 軸；`on_behalf_of` 永遠等於 `tenant`，代操時 `actor` 是員工）、`issued_at`、`expires_at`（分鐘級）、`kid`、簽章。只在該功能有 active 權利列時簽發（取代 gate 2 條件）。用量回報帶 `entitlement_id`（取代 gate 4 的 `subscription_ref`）與 `actor`／`on_behalf_of`，點數永遠扣 `on_behalf_of`，稽核永遠記 `actor`。畫面要灰掉沒買的按鈕時，產品要一份簽章的「此帳戶能用的功能與上限」，快取幾分鐘。
 - 認知平台：`check_entitlement` 改收 session 對應的計費帳戶與 `feature_key`、驗許可，不再只看 tenant。
@@ -85,6 +89,7 @@
 - **一份程式**：next-admin 照一個 app 出貨，沒選的模組路由與選單關掉；含 SAFETY_GATE 的程式碼在建置時排除（§2）。
 - **授權檔**：`format_version`、`kid`、`install_id`、客戶、模組、每個 `feature_key` 的上限、`updates_until`、`max_tenants`（預設 1；>1 才是轉售，順序第 7 步）、簽章（Ed25519，同 ADR 007）。安裝內存一組可接受的公鑰，換金鑰時舊授權檔仍可驗。功能沒有到期日；`updates_until` 只管能不能拿新版。
 - **不放遠端關閉開關**：我們的伺服器停了客戶照常能用。授權檔是合約工具，不是防破解。
+- **更新管道**：版本＝簽章的 release（image tag＋migrations＋changelog）放我方 registry；安裝在 `updates_until` 內可拉，過期不擋使用。建置變體 `BUYOUT=1` 把含 SAFETY_GATE 的檔案排除在 image 外，測試在 image 內 grep 證明。
 - RATE_LIMIT 照樣在本機執行，因為它保護外部資源（例：Postiz 每小時 30 次、抓取禮貌預算）。
 - Postiz 是 AGPL-3.0：交付未修改的官方映像並附原始碼位置；我們的程式只走它的公開 API（016 §7）。交付前請律師確認。
 
@@ -109,9 +114,11 @@
 
 ## 順序（風險由低到高，每段做完現有產品照常）
 
-1. `products.ts` 加 `features[]`、`accessChannels`（`ui`；`api` 等順序第 6 步）；登記表機械閘（012 §5）加「收費功能都有登記」「可買斷模組無 SAFETY_GATE」「**反向登記**：`app/(shell)/tools/<x>` 與 `app/<門前綴>` 每個目錄都對得到登記表一列，對不到紅燈；`app/(shell)/ops/*` 是營運後台頁，不是產品，不在登記表」；**產生器** `scripts/new-product.mjs`（新產品的唯一入口，操作者 2026-10-16「要去哪裡按什麼」）：問 SOP §18 五題，寫登記列、`app/<門前綴>/{layout,page}.tsx` 骨架、`lib/<key>/can-points.ts`（收費點呼叫 `can()` 的範例）、測試；System Foundry 藍圖末節就是這五個答案。之後 `/ops/products` 的「新增產品」表單只是跑同一條命令；`products.test.ts` 改比對全部產品（現在只比 self-signup）。只讀。
+每步的執行卡（Decision／Files／指令／預期結果／Rollback）在 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-N.md`；監工台 `check.mjs` 要求每步都有卡。
+
+1. `products.ts` 加 `features[]`、`accessChannels`（`ui`；`api` 等順序第 6 步）；登記表機械閘（012 §5）加「收費功能都有登記」「可買斷模組無 SAFETY_GATE」「**反向登記**：`app/(shell)/tools/<x>` 與 `app/<門前綴>` 每個目錄都對得到登記表一列，對不到紅燈；`app/(shell)/ops/*` 是營運後台頁，不是產品，不在登記表」。**現況 13 個 tools 目錄只有 social 有登記列**，本步一次歸位（預設：video、tarot、studio、design＝canvas+designs+mockup+banner+vector-editor、content＝content+publish+events、cs；theme 與 ai-models 列 `STAFF_UTILITIES` 並由測試證明不 import 付費 SDK），表在 `handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md`；**產生器** `scripts/new-product.mjs`（新產品的唯一入口，操作者 2026-10-16「要去哪裡按什麼」）：問 SOP §18 五題，寫登記列、`app/<門前綴>/{layout,page}.tsx` 骨架、`lib/<key>/can-points.ts`（收費點呼叫 `can()` 的範例）、測試；System Foundry 藍圖末節就是這五個答案。之後 `/ops/products` 的「新增產品」表單只是跑同一條命令；`products.test.ts` 改比對全部產品（現在只比 self-signup）。只讀。
 2. Migration：`plans`、`organization_entitlements`、`organizations.kind`（`internal`／`customer`，預設 customer，Account#0 改 internal）；0062 加 `plan_key`、`source_ref`、改唯一索引、放寬 CHECK（0062 目前 0 筆，不用雙寫期）；三表只給控制面的靜態檢查。控制面發功能級許可（012 §8 第 3 步）。
-3. Woo 付款通知 → 合約與權利；帳本泛化（015 §4 第 2 步）。
+3. Woo 付款通知 → 合約與權利；帳本泛化（015 §4 第 2 步）。**前置：ADR 015 順序 1（WordPress 一次性碼進入產品門）**，否則付了錢的人進不了門；營運唯讀頁 `/ops/billing`（合約、權利、餘額、帳本）同步做。
    **付費入口唯一閘**（第 2、4 步一起落地，補「沒登記也能收錢」的洞）：付費供應商 SDK（`@anthropic-ai/sdk`、`openai`、`replicate`、fal、google-genai）、錢包帳本 client、三張權利表，只准在 `lib/entitlements/**` 與 `lib/ai/gateway.ts`（進去先問 `can()`）引用；測試掃全部 import，別處出現建置失敗。認知平台同理：`ai_lego/platform/ai_execution/gateway.py` 是唯一 AI 入口，呼叫端必須帶 grant。沒登記的產品拿不到 grant，所以收不了錢、也叫不到付費 AI。
 4. 各產品收費點接 `can()`；認知平台 `check_entitlement(store, tenant_id, capability_id) -> bool`（`ai_lego/platform/entitlement/check.py:25`）改成 `can()` 的薄接頭：加 `actor`、回傳 grant 物件（allowed／limits／max_spend／report），呼叫端只有 `ai_lego/apps/api/main.py` 9 處，同一 commit 改完；它 docstring 的「Phase 2 換內容不換簽章」由本步取代（讀過 2026-10-16）。HCI 側照 ADR-0031 gate 1–4 的位置落地，欄位改本 ADR §3（`entitlement_id`＋`source_ref`＋`actor`＋`on_behalf_of`）；主體解析照 ADR-0009（portal `organizations` 是 tenant 的 adapter，`external_tenant_id` 對應）。
 5. 買斷安裝階段：模組清單、建置時排除、授權檔簽發、客戶 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。

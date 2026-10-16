@@ -47,6 +47,7 @@ export function render() {
         <p>${esc(s.what)}</p>
         <p><b>${esc(L.depends)}：</b>${s.depends.length ? s.depends.map((d) => t(L.item, { n: d })).join('、') : esc(L.none)}${s.before ? `；${esc(s.before)}` : ''}</p>
         <p><b>${esc(L.files)}：</b>${s.files.map((f) => `<code>${esc(f)}</code>`).join(' ')}</p>
+        <p><b>${esc(L.card)}：</b><code>${esc(META.self)}${esc(s.card)}</code></p>
         ${s.commit ? `<p><b>${esc(L.doneAt)}：</b><code>${esc(s.commit)}</code></p>` : ''}
       </details>
     </div></li>`).join('');
