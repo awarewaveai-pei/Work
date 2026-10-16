@@ -186,7 +186,7 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
     await recordReply({ ...claim, action: "handoff", retrievedChunkIds: [] });
     if (cis.chatwoot) {
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, hitsCrisis(inbound.text));
     }
     await completeClaim(claim);
     return;
@@ -194,6 +194,10 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
 
   // handleInbound records its decision (recordReply) on every path, failures included.
   const decision = await handleInbound(inbound);
+  // The classifier's crisis intent (CS_CRISIS_INTENT_KEY) catches what the keywords cannot; it is known
+  // only now, so its page goes out here, still before any Chatwoot call. A keyword hit was paged above.
+  const crisis = hitsCrisis(inbound.text) || decision.handoffReason === "crisis";
+  if (crisis && !hitsCrisis(inbound.text)) await pageCrisis(organizationId, conversationId, cis.chatwoot);
 
   // No Account API config yet (Chatwoot bring-up before client_config.chatwoot is set): the decision
   // is recorded, nothing can be sent.
@@ -203,10 +207,10 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
     } else if (decision.action === "draft" && decision.replyText) {
       await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, decision.replyText);
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis);
     } else if (decision.action === "handoff") {
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis);
     } else if (decision.action !== "suppressed") {
       // "suppressed" = the engine intentionally stayed silent (agent owns the thread). Anything else
       // is an upstream invariant break, e.g. auto_sent with an empty replyText: leave it to the sweep.
@@ -231,11 +235,11 @@ async function acknowledgeHandoff(
   contact: ContactRef,
   customerMessageId: number,
   customerText: string,
+  crisis: boolean,
 ): Promise<void> {
   const { organizationId } = cis;
   // A crisis acknowledgement is skipped only when the help lines themselves already followed: any other
   // public message (an agent's line, a template) does not carry them (Codex 58beec4d F4).
-  const crisis = hitsCrisis(customerText);
   // The dedupe read is best-effort on its own: an AgentBot token may send messages yet be refused
   // on GET (2026-10-15, Soulful: 401 on messages?after= skipped the whole acknowledgement). A read
   // that fails must never cost the customer the reply; the worst case is one duplicate sentence.
@@ -249,7 +253,7 @@ async function acknowledgeHandoff(
   if (alreadyAnswered) return;
   try {
     const askName = typeof contact.id === "number" && isPlaceholderContactName(contact.name);
-    await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName, customerText));
+    await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName, customerText, crisis));
   } catch (err) {
     Sentry.captureException(err, { extra: { organizationId, conversationId, step: "handoff_ack" } });
   }

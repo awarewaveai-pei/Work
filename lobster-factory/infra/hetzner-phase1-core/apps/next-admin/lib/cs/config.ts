@@ -81,6 +81,15 @@ export const CS_CRISIS_KEYWORDS = [
   "cant take it anymore", "overdose",
 ] as const;
 
+/**
+ * A tenant intent with this key AND is_sensitive is the classifier's catch for what CS_CRISIS_KEYWORDS
+ * cannot list (euphemisms). It routes exactly like a keyword hit: reason "crisis", help lines,
+ * operator page. A specific key, so an unrelated "crisis" intent (financial, PR) never pages anyone
+ * (Codex 2026-10-16 partialreview-6e23abdb). Soulful has it since 2026-10-16 (WORKLOG). Not covered:
+ * paths where no classification runs (credit exhausted, a human already owns the thread) -- keywords only.
+ */
+export const CS_CRISIS_INTENT_KEY = "self_harm";
+
 /** Sensitive intents → always handoff (broader than red-line; includes complaints/escalation). */
 export const CS_SENSITIVE_KEYWORDS = [
   ...CS_RED_LINE_KEYWORDS,

@@ -97,6 +97,13 @@ describe("crisis and medication always reach a human", () => {
     expect(safetyGate(intent(), text)).toEqual({ action: "handoff", handoffReason: "crisis" });
     expect(inputGuards(text)).toMatchObject({ pass: false, handoffReason: "crisis" });
   });
+  it("the classifier's crisis intent routes like a keyword hit (euphemisms no list holds)", () => {
+    expect(safetyGate(intent({ key: "self_harm", isSensitive: true }), "我覺得自己好像沒有存在的必要了")).toEqual({ action: "handoff", handoffReason: "crisis" });
+  });
+  it("an unrelated intent cannot borrow the crisis route", () => {
+    expect(safetyGate(intent({ key: "crisis", label: "financial crisis" }), "Our store has a cash crisis")).toBeNull();
+    expect(safetyGate(intent({ key: "self_harm", isSensitive: false }), "hello")).toBeNull();
+  });
   it("crisis wins over a sensitive intent and a red-line word in the same message", () => {
     expect(safetyGate(intent({ isSensitive: true }), "我想退款，我不想活了")?.handoffReason).toBe("crisis");
   });

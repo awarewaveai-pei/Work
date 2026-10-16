@@ -26,10 +26,10 @@ export function isPlaceholderContactName(name: string | null | undefined): boole
  * acknowledgement sentence; csVoice.askName replaces the name question. Defaults follow the
  * page's honorific and emoji policy.
  */
-export function handoffAckText(cis: CisProfile, askName: boolean, customerText = ""): string {
+export function handoffAckText(cis: CisProfile, askName: boolean, customerText = "", crisis = hitsCrisis(customerText)): string {
   const v = cis.csVoice ?? {};
   const you = v.honorifics === "你" ? "你" : "您";
-  if (hitsCrisis(customerText)) {
+  if (crisis) {
     const english = !NON_LATIN.test(customerText);
     const ack = english ? CRISIS_ACK_EN : crisisAckZh(you);
     return askName ? `${ack}\n${english ? ASK_NAME_EN : askNameZh(cis)}` : ack;

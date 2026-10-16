@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-16（續30）客服 AI 危機意圖：Soulful 加 `self_harm` 意圖接住婉轉說法，分類器 10/10；程式讓它跟關鍵字同樣處理 — next-admin，交 03:00 自動部署
+
+**做了**（操作者「去處理」）：
+- **資料**（正式環境，psql 交易，含 `ops_audit_events` 兩筆，等同 `cs-intents` POST）：Soulful `cs_intents` 新增 `self_harm`｜「情緒危機：想傷害自己、不想活、想結束一切、撐不下去、想消失（包含婉轉說法）」｜L0｜A0｜`is_sensitive=true`。先建成 `crisis`，Codex F2 後改名 `self_harm`。
+- **分類器真測**（正式容器內跑，同 `lib/cs/intent.ts` prompt＋`CS_MODELS.classify`，10 次 Haiku 呼叫，未經 generateText 所以不在 `ai_call_logs`）：婉轉 6 句（「覺得自己沒有存在的必要」「大家沒有我會比較好」「想怎麼跟家人道別」「好累什麼都不想再面對」「everyone would be better off without me」「want everything to stop forever」）全部 → `self_harm`；一般 4 句（壓力大、創傷經驗、老師倦怠、要帶什麼）全部不進。0/10 錯。這 6 句關鍵字都沒命中，是分類器接住的。
+- **缺口與修**：只加意圖的話，婉轉說法轉真人的理由是 `sensitive_intent`，客人收到一般確認句、操作者不會收到通知（專線與通知只看關鍵字）。程式：`CS_CRISIS_INTENT_KEY="self_harm"`（`lib/cs/config.ts`）；`safetyGate` 對「key＝self_harm 且敏感」回 `crisis`；webhook route 在 `handleInbound` 之後、任何 Chatwoot 呼叫之前補發通知（關鍵字已發過就不重發），確認句帶 `crisis` 旗標（`handoffAckText` 第 4 參數）。
+- **Codex** `2026-10-16-partialreview-6e23abdb` 2 項：F2 任何租戶取名 `crisis` 的無關意圖（如財務危機）會被當自殺危機 → 改用專屬 key `self_harm` 且要求敏感，加反例測試；F1 沒跑分類的路徑（點數用完、真人已接手）只有關鍵字 → 不改（點數用完時跑 AI＝替沒點數的租戶花錢），寫進 config 註解當殘留風險。
+**指名測試**：`cs-core.test.ts`（self_harm 意圖 → crisis；`crisis` 無關意圖、非敏感 self_harm 都不算）；`route.test.ts`（無關鍵字但決策是 crisis → 通知一次且早於 handoff、確認句是危機版）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec -i lobster-next-admin node classify-check.mjs`（Soulful 4 意圖 × 10 句，Haiku） | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 交易 insert／rename `cs_intents` self_harm＋`ops_audit_events` 2 筆；select 回 `self_harm|L0|t` | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`；`npx vitest run app/api/webhooks/chatwoot lib/cs` 205 pass；`npm test` 2497 pass／17 skipped | exit=0 | ms=17000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex 6e23abdb；F2 已修，F1 列殘留風險）
+- ORACLE_WAIVED: artifact 之後只改了 F2 的修法（key 改名＋要求敏感）與反例測試
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=CS_CRISIS_INTENT_KEY|handoffAckText|"crisis" | hits=42（`handoffAckText` 呼叫端只有 route 與測試；`HandoffReason "crisis"` 只由 safetyGate 產生）
+
+**意外**：查 Anthropic key 怎麼設時，`sed -n 85,100p mcp/user-env.ps1` 的遮罩只蓋 `sk-` 開頭，**GitHub PAT、Gemini key、Google OAuth client secret 明文進了本 session 對話紀錄**。未輪換（憑證屬 High，待操作者決定），TASKS 已開項。教訓：秘密檔只 grep 變數名，不印行範圍。
+**未驗**：正式環境端到端（需部署＋操作者用 John Doe 傳訊），TASKS 已開項。
+**rollback**：`git revert` 本 commit；資料 `delete from cs_intents where organization_id='2bf60452-…' and key='self_harm'`。
 ## 2026-10-16（續29）Chatwoot 基本設定自動套用：存個人 token 時套一次＋每日排程 `cs_chatwoot_baseline` 把被改掉的改回來；修 ClientHubTabs 工作樹被舊 index 蓋掉
 
 **操作者**：「看不懂為什麼要在客服分頁按一顆套用」→ 拿掉按鈕（續22），改自動。

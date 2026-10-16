@@ -495,6 +495,16 @@ describe("POST /api/webhooks/chatwoot -- crisis message", () => {
     expect(updateContactName).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, 77, "小美");
   });
 
+  it("no keyword, but the classifier said crisis: one page and the help-line acknowledgement", async () => {
+    const quiet = "我覺得自己好像沒有存在的必要了";
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    await post(makePayload({ content: quiet, sender: JOHN }));
+    await runAfter();
+    expect(sendText).toHaveBeenCalledTimes(1);
+    expect(sendText.mock.invocationCallOrder[0]).toBeLessThan(handoffToHuman.mock.invocationCallOrder[0]);
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", handoffAckText(CIS, true, quiet, true));
+  });
+
   it("an ordinary handoff pages nobody", async () => {
     handleInbound.mockResolvedValueOnce({ ...HANDOFF, handoffReason: "knowledge_gap" });
     await post(makePayload({ content: "想報名課程", sender: JOHN }));
