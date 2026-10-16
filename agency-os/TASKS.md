@@ -511,6 +511,9 @@
   - [ ] **🔴 已上線的 bug｜客服設定 GET 500**：`app/api/ops/clients/[slug]/cs-config/route.ts:67` 在 `const config`（:72）宣告前呼叫 `knowledgeFloorOf(config)`；任何意圖有 graduation 紀錄（Soulful 課程類 10:34Z 考完）就 ReferenceError。修＝把 `config` 那行移到 map 之前＋一個有 graduation 的 GET 測試。Codex `2026-10-16-partialreview-98a30a32` F1。
   - [ ] **操作者決定｜危機訊息轉真人時回客人的話**：自傷／自殺字已由規則轉真人（理由 `crisis`，`lib/cs/config.ts` `CS_CRISIS_KEYWORDS`），客人仍只收到一般確認句。要決定：① 附不附求助資源、依什麼選（台灣 1925 安心專線／1995 生命線；澳洲 Lifeline 13 11 14；看客人語言或地區）② 危機時是否不問「怎麼稱呼您」③ 要不要即時通知操作者。定案後改 `lib/cs/handoff-ack.ts` 依理由分支。另：婉轉說法規則抓不完，建議 Soulful 加一個 `isSensitive` 的「危機」意圖讓分類器接住。見 WORKLOG 2026-10-16「危機與用藥一律轉真人」。
   - [ ] 產品決定：知識庫內容／模型／prompt 變動要不要讓「考過」失效並自動重考（計畫 §5.2 CI 閘）。現況不失效；網站每週重爬，若失效又沒自動重考，自動回覆每週會退回草稿。見 WORKLOG 2026-10-16（續11）「沒涵蓋」。
+  - [ ] Soulful 常見問答的價格／時間／地點／報名是**測試值**（WORKLOG 2026-10-16（續22））：對外宣傳前操作者給真值，在客服分頁「常見問答」改 `pricing`／`schedule`／`location`（＋ -en）四條。
+  - [ ] 考試要照正式路徑先過常見問答：現在 `runEvalCase` 只跑 `planReply`（AI 層），正式 `webhooks/chatwoot/route.ts:163` 先 `matchFaq`。價格／報名題在正式環境由 FAQ 回，考試卻記成「危險誤答」。修法：考試先 `matchFaq`，命中＝依 entry.handoff 判定。見 WORKLOG 2026-10-16（續19）（續22）。
+  - [ ] Chatwoot 基本設定（`lib/cs/chatwoot-baseline.ts`）目前只有自動結案＋結案巨集；標籤、預設回覆、收件匣營業時間仍手動。有第二個客服客戶時再納入。
   - [ ] 客人最後訊息 >24h 後無法回覆（`ENABLE_MESSENGER_CHANNEL_HUMAN_AGENT`=false）；要開需 Meta App Review `HUMAN_AGENT`＋等上游 PR #15932 釋出（現版開了會連 bot 回覆都標 tag）。
   - [ ] `safe-infra-patch.sh compose` 寫死 `cd /root/lobster-phase1`（server 版第 85 行），`/root/chatwoot`、`postiz` 等獨立 compose 專案無法走此閘；本次手動等價（備份→套用→健康→回滾路徑）。
 

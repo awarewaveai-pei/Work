@@ -14,6 +14,8 @@ export { runEval, gradeIntent, examIntent } from "@/lib/cs/eval";
 export { loadIntents, loadIntent, upsertIntent, updateIntent, deleteIntent, graduationOf, loadIntentMetadata, setIntentGraduation, loadGraduations, listEvalCases, replaceEvalCases, loadEvalCases, loadEvalCasesByIntent, rowGraduated, knowledgeFloorOf, loadKnowledgeFloor } from "@/lib/cs/db";
 export type { IntentFields, EvalCaseRow } from "@/lib/cs/db";
 export { ACTION_LEVELS, ANSWER_LEVELS, examInFlight, intentBehavior, parseEvalCases, parseIntentPatch } from "@/lib/cs/intent-config";
+export { applyChatwootBaseline, desiredChatwootBaseline, planChatwootBaseline, AUTO_RESOLVE_MINUTES, CLOSING_MACRO_NAME } from "@/lib/cs/chatwoot-baseline";
+export type { BaselineChange } from "@/lib/cs/chatwoot-baseline";
 
 export type {
   InboundMessage,

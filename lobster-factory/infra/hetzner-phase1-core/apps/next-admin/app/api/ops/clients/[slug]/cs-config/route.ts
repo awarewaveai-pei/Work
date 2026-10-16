@@ -55,9 +55,12 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
       .eq("organization_id", org.id),
     loadEvalCasesByIntent(org.id),
   ]);
+  const config = clientConfigOf(org.metadata);
   // metadata stays server-side and this GET is open to viewers: the exam's verdict, never its
   // per-case questions and answers (those go through cs-eval-cases, owner/admin only).
   // `current`: the pass still matches this intent's golden set and decision settings (lib/cs/graduation.ts).
+  // (`config` is read inside the map callback: it must be declared above it -- 2026-10-16 it was
+  // declared below, which tsc accepts and which threw once Soulful's first exam wrote a graduation.)
   const intents = ((intentsRes.data ?? []) as Array<Record<string, unknown>>).map((full) => {
     const { metadata, ...row } = full;
     const cases = casesByIntent.get(row.key as string) ?? [];
@@ -69,7 +72,6 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     };
   });
 
-  const config = clientConfigOf(org.metadata);
   const csEnabled = config.csEnabled !== false; // default ON
   const kbKeywordModeDefault = config.kbKeywordModeDefault === "exact" ? "exact" : "fuzzy"; // default fuzzy (today's only behaviour, pre-K2i)
 

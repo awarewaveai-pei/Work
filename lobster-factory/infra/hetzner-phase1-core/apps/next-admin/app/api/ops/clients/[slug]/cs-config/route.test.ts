@@ -8,6 +8,7 @@ const ORG = "11111111-1111-4111-8111-111111111111";
 
 const state = vi.hoisted(() => ({
   metadata: {} as Record<string, unknown>,
+  intents: [] as Array<Record<string, unknown>>,
   updateCalls: [] as Array<Record<string, unknown>>,
   auditCalls: [] as Array<Record<string, unknown>>,
 }));
@@ -23,7 +24,7 @@ const sb = vi.hoisted(() => ({
       };
     }
     if (table === "cs_intents") {
-      return { select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }) };
+      return { select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: state.intents, error: null }) }) }) };
     }
     if (table === "cs_eval_cases") {
       return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
@@ -55,11 +56,24 @@ function req(method: string, opts: { role?: string; body?: unknown } = {}): Requ
 beforeEach(() => {
   vi.clearAllMocks();
   state.metadata = {};
+  state.intents = [];
   state.updateCalls = [];
   state.auditCalls = [];
 });
 
 describe("GET", () => {
+  it("an intent that sat an exam comes back with its verdict summary and whether it is still current (2026-10-16: this threw before any intent had one)", async () => {
+    state.intents = [{
+      key: "courses", label: "c", answer_level: "L1", action_level: "A0", is_sensitive: false, confidence_threshold: 0.7, canary_pct: 0,
+      metadata: { graduation: { status: "failed", startedAt: "t", results: [{ question: "secret" }] } },
+    }];
+    const res = await GET(req("GET"), ctx());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.intents[0].graduation).toMatchObject({ status: "failed", current: false });
+    expect(body.intents[0].graduation.results).toBeUndefined();
+  });
+
   it("defaults kbKeywordModeDefault to fuzzy when unset — today's only behaviour, pre-K2i", async () => {
     const res = await GET(req("GET"), ctx());
     const body = await res.json();

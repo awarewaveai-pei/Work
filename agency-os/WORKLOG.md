@@ -22,6 +22,25 @@
 
 **避免再發生**：一律轉真人的類別要有規則，不能靠檢索剛好失敗；考試的危險題要看「轉真人的理由」，不只看有沒有轉。
 **rollback**：`git revert` 本 commit（未部署前只動 repo；部署後 revert 再走 03:00 自動部署）。
+## 2026-10-16（續22）Soulful 常見問答加價格／時間／地點／報名（測試值）；Chatwoot 基本設定改由程式套用（自動結案＋結案巨集，5 種客戶同一份）
+
+**操作者**：「現在是測試所以你自己寫」「直接在 Chatwoot 設自動解決對話和送出＋結案巨集」「所有設定都要考慮 5 個對象」；問「設 Chatwoot 自動化是不是就不花錢？」→ 答：常見問答 0 元（字串比對），Chatwoot 自動化也 0 元但不會回答問題；只有 AI 層花錢（今日 Soulful 約 0.4 USD，其中考試 0.37）。
+**常見問答（直接寫 DB `client_config.csFaq`，jsonb_set 只動這個 key，其他 17 key 不變；API 要登入身分）**：14 → 20 條。新 `pricing`／`schedule`／`location`（＋ -en）給具體值；`booking`／`booking-en` 改成報名三步、仍 handoff；`formats`／`formats-en` 拿掉線上／實體／地點字，避免與 `location` 打平（`matchFaq` 平手＝不答）。**全部是測試值**（NT$1,800／2,400／1,200／2,500、每月第二四週六 14:00–17:00、線上 Google Meet／實體台北市），上線宣傳前要換真值（TASKS）。
+**Chatwoot 基本設定（程式，`lib/cs/chatwoot-baseline.ts`）**：為什麼不用手點：設定是每個 Chatwoot 帳號一份；hosted 四種客戶＝我們的 Chatwoot 一客戶一帳號，買斷＝客戶自己的 Chatwoot 換網址＋token，同一份程式套。內容：`auto_resolve_after=2880` 分鐘（48h 沒動靜自動結案 → 對話回到 AI；`auto_resolve_ignore_waiting=false` 等專員回覆中的也結，否則被忘記的對話永遠擋住 AI）＋結案訊息；全域巨集「回覆完結案（AI 接回）」= send_message 結尾句 + resolve_conversation。文案跟 csVoice（敬語、emoji）。冪等：讀現況→算差異→只寫有差的；gate `checkProductionChangeAllowed` 放在 `applyChatwootBaseline` 裡面（同 publishToWordPress），不靠呼叫端。
+- `chatwoot-client.ts`：`getAccountSettings`／`updateAccountSettings`（PATCH /accounts/:id，`permitted_settings_attributes`，administrator）／`listMacros`／`createMacro`／`updateMacro`，用 User token。
+- 呼叫點**還沒接**：原本做成客服分頁一顆「套用」按鈕＋route，操作者問「為什麼要按一顆套用」→ 按鈕＝每個客戶都要有人記得按，違反零記憶自動化；拿掉（route／UI 未 commit）。下一步：存 Chatwoot 個人 token 時自動套一次＋每日巡檢比對差異重套（TASKS）。
+- 查證（主機 chatwoot-rails 原始碼）：`accounts_controller.rb:123` 允許 `auto_resolve_after/_message/_ignore_waiting`；`conversation.rb:96-104` 單位＝分鐘；`account_policy.rb:14` update 需 administrator；`macro.rb:33` 動作名單；`features.yml:259` `api_and_webhooks` 預設開；`macros_controller.rb` create/update 參數 `actions[action_name, action_params[]]`。
+**同 commit 修線上 bug**：`cs-config/route.ts` GET 在 `const config` 宣告前於 map 回呼內呼叫 `knowledgeFloorOf(config)`（ebaec8226 引入；tsc 不擋回呼內的 TDZ）→ Soulful 10:34Z 考完試有 graduation 紀錄後，客服分頁 GET 500（主機 log `ReferenceError: Cannot access 'j' before initialization`）。另一 session 先記在 TASKS（Codex partialreview-98a30a32 F1）。修＝`config` 搬到 map 之前＋一個「有 graduation 的 GET 回 200、不含逐題」測試。
+**沒做**：Chatwoot 其他選單（標籤、預設回覆、收件匣營業時間）維持手動，等有第二個客戶再納入基本設定。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql jsonb_set csFaq（faq_count 20、config_keys 17）；chatwoot-rails grep 上列 6 處 | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test（270 files／2478 pass，含後來拿掉的 route 測試 3）；拿掉 route／UI 後 tsc＋cs-config／lib/cs 測試重跑綠 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（`reports/oracle/2026-10-16-partialreview-5e355bb3.md`，NO FINDINGS）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=applyChatwootBaseline|getAccountSettings|listMacros|chatwoot-baseline|CLOSING_MACRO_NAME|updateAccountSettings | hits=37（全在本次新增／改動的 7 檔＋ `.next/types` 產生檔）
+
+**剩餘風險**：測試值若被真客人讀到會當真（FAQ 答案末尾寫「以官網最新公告為準」）；Chatwoot 自動結案 48h 會把沒人回的對話也結掉（客人再傳＝新對話，AI 接手）。
+**rollback**：FAQ：客服分頁刪四條或 DB 把 `csFaq` 改回 14 條（jsonb）；程式 `git revert`；Chatwoot：帳戶設定把自動解決關掉、刪巨集。
 ## 2026-10-16（續21）社群發文對照 Postiz v2.25／Metricool 盤點：13 項 UI 缺陷、19 項功能缺口、建版＝樣稿 1:1、手機版壞；順手修 B1 換貼文留舊文字
 
 **操作者**：「社群發文可以發文了，但是功能不齊全，UI/UX 非常醜，去 postiz 和 metricool 看自己的缺失和遺漏」。

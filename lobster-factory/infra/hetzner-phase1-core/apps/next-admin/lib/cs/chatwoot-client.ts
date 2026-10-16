@@ -184,3 +184,70 @@ export async function handoffToHuman(organizationId: string, config: ChatwootCon
   if (!apiToken) throw new Error("chatwoot_api_token_missing");
   await chatwootRequest({ config, apiToken, path: `/conversations/${conversationId}/toggle_status`, body: { status: "open" } });
 }
+
+// ── Account settings and macros (operator's User token; an AgentBot token gets 401) ──────────────
+
+/** The account's `settings` store (auto_resolve_after in minutes, auto_resolve_message, …): GET /accounts/:id. */
+export async function getAccountSettings(organizationId: string, config: ChatwootConfig): Promise<Record<string, unknown>> {
+  const apiToken = await loadReadToken(organizationId);
+  if (!apiToken) throw new Error("chatwoot_api_token_missing");
+  const res = await chatwootRequest<{ settings?: Record<string, unknown> }>({ config, apiToken, method: "GET", path: "" });
+  return res.settings ?? {};
+}
+
+export interface ChatwootAutoResolveSettings {
+  auto_resolve_after: number; // minutes of inactivity; 0 = off
+  auto_resolve_message: string;
+  auto_resolve_ignore_waiting: boolean;
+}
+
+/** PATCH /accounts/:id merges these into the account's settings (accounts_controller permitted_settings_attributes); administrator only. */
+export async function updateAccountSettings(organizationId: string, config: ChatwootConfig, settings: ChatwootAutoResolveSettings): Promise<void> {
+  const apiToken = await loadReadToken(organizationId);
+  if (!apiToken) throw new Error("chatwoot_api_token_missing");
+  await chatwootRequest({ config, apiToken, method: "PATCH", path: "", body: settings });
+}
+
+export interface ChatwootMacroAction {
+  action_name: string;
+  action_params: unknown[];
+}
+
+export interface ChatwootMacro {
+  id: number;
+  name: string;
+  visibility: "global" | "personal";
+  actions: ChatwootMacroAction[];
+}
+
+export type ChatwootMacroInput = Omit<ChatwootMacro, "id">;
+
+function parseMacro(m: Record<string, unknown>): ChatwootMacro | null {
+  if (typeof m.id !== "number" || typeof m.name !== "string") return null;
+  const actions = Array.isArray(m.actions)
+    ? (m.actions as Array<Record<string, unknown>>)
+        .filter((a) => a && typeof a.action_name === "string")
+        .map((a) => ({ action_name: a.action_name as string, action_params: Array.isArray(a.action_params) ? a.action_params : [] }))
+    : [];
+  return { id: m.id, name: m.name, visibility: m.visibility === "global" ? "global" : "personal", actions };
+}
+
+/** Macros this user can see: every global one plus their own personal ones (Macro.with_visibility). */
+export async function listMacros(organizationId: string, config: ChatwootConfig): Promise<ChatwootMacro[]> {
+  const apiToken = await loadReadToken(organizationId);
+  if (!apiToken) throw new Error("chatwoot_api_token_missing");
+  const res = await chatwootRequest<{ payload?: Array<Record<string, unknown>> }>({ config, apiToken, method: "GET", path: "/macros" });
+  return (res.payload ?? []).map(parseMacro).filter((m): m is ChatwootMacro => m !== null);
+}
+
+export async function createMacro(organizationId: string, config: ChatwootConfig, macro: ChatwootMacroInput): Promise<void> {
+  const apiToken = await loadReadToken(organizationId);
+  if (!apiToken) throw new Error("chatwoot_api_token_missing");
+  await chatwootRequest({ config, apiToken, path: "/macros", body: macro });
+}
+
+export async function updateMacro(organizationId: string, config: ChatwootConfig, id: number, macro: ChatwootMacroInput): Promise<void> {
+  const apiToken = await loadReadToken(organizationId);
+  if (!apiToken) throw new Error("chatwoot_api_token_missing");
+  await chatwootRequest({ config, apiToken, method: "PATCH", path: `/macros/${id}`, body: macro });
+}
