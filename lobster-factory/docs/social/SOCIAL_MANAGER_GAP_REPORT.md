@@ -18,7 +18,23 @@
 | 每個檢視的真實 render（1280×660 ＋ 390 寬，12 張） | `node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/render-views.mjs <outDir>`，對 `next-admin-social-ui`（port 3902，無 Supabase）跑 Playwright，API 由腳本內假資料回答（8 則各狀態貼文、3 帳號含一個失效、1 清單、3 媒體、紀錄 3 筆） | 腳本進 repo；輸出不進 git（`$env:TEMP`） |
 | 樣稿 render | 同腳本 `--mock`，對 `social-mocks`（port 8766）同尺寸截圖 | 同上 |
 | 程式碼 | 整檔讀：`SocialManager.tsx`、`Editor.tsx`、`Calendar.tsx`、`Settings.tsx`、`MediaView.tsx`、`Lists.tsx`、`Review.tsx`、`ArticleSource.tsx`、`social.css`、`model.ts`、`api.ts`；`lib/social/compose.ts`、`limits.ts`；`packages/db/migrations/0096_social_manager.sql` | — |
-| 參考品 | web-researcher 一輪（Postiz 讀原始碼檔案路徑；Metricool 讀 help），UNVERIFIED 項已剔除或標註（§5） | 本檔各列 |
+| 參考品（文字） | web-researcher 一輪（Postiz 讀原始碼檔案路徑；Metricool 讀 help），UNVERIFIED 項已剔除或標註（§5） | 本檔各列 |
+| 參考品（**親眼看**，2026-10-16 補） | 內建瀏覽器設 1440×900：操作者登入的自架 Postiz v2.25.1（`postiz.aware-wave.com/launches`）與操作者的 Metricool 帳號（`app.metricool.com/planner`）；打開「建立貼文」、選頻道、打字看預覽，未存檔即關閉（Postiz「Yes, close it!」丟棄；Metricool Close）。另截 Metricool 官網／help 的產品圖（帳號內無貼文，卡片樣子用官網圖） | §1.1 |
+
+### 1.1 親眼看到的（取代 §2 裡只靠文字推的部分）
+
+| 畫面 | Postiz（自架，暗色） | Metricool（亮色） | 我們 |
+|---|---|---|---|
+| 外框 | 左邊細欄 icon（Calendar／Agent／Analytics／Media／Settings），左第二欄「Channels」頻道頭像清單＋Add Channel＋紫色 Create Post | 頂部深色橫列（Analytics／Reporting／Inbox／Planning／SmartLinks／Ads），下一列分頁（Calendar／List／Posts library／Autolists／Deleted posts） | 員工側欄＋頁首一排 chip |
+| 行事曆工具列 | 一列：日期區間＋Today、右邊 Filter icon、Day／Week／Month 分段、日曆／清單 icon | 一列：Search、This week、日期區間、Filter icon、⋮、Best times、頻道選擇、Create view、「＋ Create post」 | 三列：日期＋7 個檢視鈕、平台 chip、7 個狀態 chip＋搜尋（U2） |
+| 行事曆本體 | 週格斜紋＝過去；已發佈卡片＝綠框＋頂部紫色條＋頻道頭像 | 格子以深淺藍標「最佳發文時段」；官網卡片＝大圖＋標題＋兩行文字＋平台 icon＋時間 | 卡片 40px，三個字（U3） |
+| 寫貼文 | 全螢幕彈窗：左邊編輯、**右邊整欄預覽一直在**；上方頻道頭像（點了才選）、下一列「地球＝共用」＋每頻道小頭像分頁；切到頻道分頁時文字框**鎖住**，按「Edit content」才另寫 | 彈窗：上方平台 icon＋格式下拉（POST／REEL）＋「＋」；**一個大文字框**，框內底部一排小 icon（圖、檔案、表情、留言、連結、AI、常用文字）＋右下字數；預覽按「Show preview」**換掉**編輯區，有手機／電腦切換 | 文字框 72px，四周約 15 個 chip（U5） |
+| 平台設定 | 文字框下方紫色「Settings」橫條，展開是該頻道專屬（Bluesky＝串文結尾開關） | 文字框下方摺疊列「Global presets」「LinkedIn presets」… | 「格式」chip 只有 IG／FB（F3） |
+| 預覽 | 名稱＋handle＋藍勾＋頭像，共用模式顯示「Global Edit」 | 真頭像、名稱、追蹤數、時間、**讚／留言／分享／傳送列**（LinkedIn） | 190px 通用卡、空頭像（U4） |
+| 底部 | 左：Add New Tag、Repeat Post Every…；右：日期、Save as draft、主按鈕「Add to Calendar ▾」（沒選頻道時寫「Check the circles above」） | 左：Cancel；右：日期、「Schedule ▾」（下拉：存草稿／送審／排程／立即發佈） | 原生日期＋時間＋四顆並排鈕（U6） |
+| 共同點 | **一個大文字框＋框內一排小 icon；其餘選項收進摺疊列或下拉**；主動作只有一顆鈕，其他收進它的下拉 | 同左 | 所有選項攤開成 chip |
+
+結論不變（U1–U6 成立），但修正兩處：U5 的「三層」改為「頻道列＋大文字框（icon 在框內）＋摺疊的平台設定」；預覽兩種做法都可（Postiz 並排、Metricool 切換），我們一屏 1280 寬應走 Postiz 的並排。
 
 正式站 `social.aware-wave.com` 要登入，本次沒有登入；render 走 `/tools/social`（含員工側欄），`/social` 門是同一個 `SocialApp`（`app/social/page.tsx:2`），差別只有外殼。
 
@@ -90,4 +106,4 @@
 ## 5. 驗證
 
 - 本檔每個 file:line 由 grep 取得（2026-10-16）；render 用 `render-views.mjs` 可重現。
-- 參考品 UNVERIFIED 項未採用：Metricool 卡片縮圖、hashtag UI、手機外框、shuffle、跨品牌首頁、深色模式。
+- 參考品 UNVERIFIED 項未採用：hashtag UI、手機外框、shuffle、跨品牌首頁、深色模式。Metricool 卡片縮圖已在官網產品圖親眼確認（§1.1）。

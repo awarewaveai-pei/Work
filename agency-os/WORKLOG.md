@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-16（續25）社群發文盤點補「親眼看」：自架 Postiz 與 Metricool 用 1440 寬實際打開，GAP_REPORT §1.1
+
+**操作者**：「你有去看 Postiz 和 Metricool 長什麼樣？」——續21 的參考品資料只來自原始碼與說明文字，沒看過畫面，據實回報後補做。
+**做法**：操作者在內建瀏覽器登入自架 Postiz v2.25.1 與自己的 Metricool；分頁設 1440×900，打開「建立貼文」、選頻道、打字看預覽，未存檔關閉（Postiz「Yes, close it!」丟棄，行事曆無新項）。Postiz 官網／GitHub 沒有 App 畫面，只能看自架那台；Metricool 帳號無貼文，卡片樣子用官網產品圖。
+**結論**：兩邊共同做法＝一個大文字框、選項收成框內小 icon 與摺疊列、主動作一顆鈕＋下拉；我們把選項全攤成 chip。U1–U6 成立；U5 改為「頻道列＋大文字框＋摺疊平台設定」，預覽走 Postiz 並排。細節 `lobster-factory/docs/social/SOCIAL_MANAGER_GAP_REPORT.md` §1.1。
+
+**驗證結果**：
+- REALTEST_WAIVED: DOC_ONLY -- 只改報告；畫面證據為內建瀏覽器截圖（未存檔）
+- REVIEW_WAIVED: DOC_ONLY -- 報告補一節，讀回確認表格成對
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式或 symbol 變更
 ## 2026-10-16（續24）video-service 與 next-admin 上線 7ff1bdef4（續20 技術品質檢查、沒證據不算通過；操作者「部署」）
 
 - video-service（runbook `DEPLOY_ROLLBACK_RUNBOOK.md` §2 有自己 compose 的 app）：`/root/Work` ff-only 到 7ff1bdef4（只有 2 個未追蹤檔）；compose.video.yml／requirements.txt／Dockerfile 與主機相同；備份 `lobster-video-service:pre-qa-restore-20261016`（= 舊 :local 86db1ab7da36）；rsync（`.env.video` 保留）；`up -d --build` → 新映像 58cde5c8e40b，healthy。
