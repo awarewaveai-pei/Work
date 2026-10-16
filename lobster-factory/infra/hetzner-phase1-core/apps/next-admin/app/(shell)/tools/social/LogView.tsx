@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, type LogRow, type NeedsResult } from "./api";
 import { platformOf, shortDate, STATE_NAMES, zoned } from "./model";
 import type { SlotContext } from "./SocialManager";
-import { ROLE_NAMES } from "./Members";
+import { ROLE_NAMES } from "./model";
 import type { PostState } from "@/lib/social/state";
 
 export const ACTION_NAMES: Record<string, string> = {

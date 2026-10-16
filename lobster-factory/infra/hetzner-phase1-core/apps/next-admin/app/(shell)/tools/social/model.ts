@@ -1,7 +1,7 @@
 // Pure helpers for the social manager page (SOCIAL_MANAGER_PLAN.md C6): the brand's time zone, the calendar's dates,
 // the platform marks and the state names. No React, no fetch: tested in __tests__/model.test.ts.
 // Dates are "YYYY-MM-DD" strings in the BRAND's time zone (organizations.default_timezone), never the viewer's.
-import type { PostState } from "@/lib/social/state";
+import type { BrandRole, PostState } from "@/lib/social/state";
 
 export interface Brand { id: string; slug: string; name: string; default_timezone: string; role: "owner" | "editor" | "reviewer" | "client" }
 export interface Account { id: string; platform: string; label: string; status: "connected" | "expired" | "disabled"; postiz_integration_id: string }
@@ -36,6 +36,14 @@ export const FORMATS: Record<string, Array<{ key: string; label: string }>> = {
 };
 export const formatsOf = (p: string) => FORMATS[p] ?? [{ key: "post", label: "貼文" }];
 
+export const ROLE_NAMES: Record<BrandRole, string> = { owner: "擁有者", editor: "編輯", reviewer: "審核人", client: "唯讀" };
+/** What a person who may not write sees where the new-post editor would be (copy by GPT, agency-os/reports/oracle/
+ *  2026-10-16-inspect-3f5d29af.md). null = may write. An account an invitation created has no brand role yet = client. */
+export function cannotWriteNotice(role: BrandRole): string | null {
+  if (role === "reviewer") return "你可以在這裡閱讀貼文。你可以核准或退回待審核的貼文。品牌擁有者可以在設定 → 成員中將你的角色改為編輯，讓你取得發文權限。";
+  if (role === "client") return "你只能在這裡閱讀貼文。你可以查看紀錄。品牌擁有者可以在設定 → 成員中將你的角色改為編輯，讓你取得發文權限。";
+  return null;
+}
 export const STATE_NAMES: Record<PostState, string> = {
   draft: "草稿", review: "待審核", scheduled: "已排程", queued: "送出中", published: "已發佈", error: "發佈失敗", rotation: "輪播中", deleted: "已刪除",
 };

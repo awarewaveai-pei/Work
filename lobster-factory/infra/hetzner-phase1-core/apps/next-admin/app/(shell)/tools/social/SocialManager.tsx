@@ -12,7 +12,7 @@ import { ListView, MonthView, stateStyle, WeekView } from "./Calendar";
 import { useLists } from "./Lists";
 import Editor from "./Editor";
 import Settings from "./Settings";
-import { addDays, instantAt, mondayOf, monthGridStart, monthStart, platformOf, shortDate, STATE_NAMES, zoned, type Account, type Brand, type Post } from "./model";
+import { addDays, cannotWriteNotice, instantAt, mondayOf, monthGridStart, monthStart, platformOf, ROLE_NAMES, shortDate, STATE_NAMES, zoned, type Account, type Brand, type Post } from "./model";
 import "./social.css";
 
 export type View = "week" | "month" | "list" | "lists" | "media" | "log" | "settings";
@@ -219,6 +219,8 @@ export default function SocialManager({ slots = {} }: { slots?: Slots }) {
     : selection.kind === "new" || selection.kind === "article" ? `${selection.kind}:${selection.key}` : "none";
   const articleDay = selection.kind === "article" ? selection.article.date.slice(0, 10) : null;
   const right = slots.rightPanel?.(selection, ctx);
+  // A new post or an article draft needs write access; without it the panel says why instead of an editor that ignores typing.
+  const notice = selection.kind === "new" || selection.kind === "article" ? cannotWriteNotice(brand.role) : null;
 
   return (
     <div className="sm-app">
@@ -273,10 +275,10 @@ export default function SocialManager({ slots = {} }: { slots?: Slots }) {
         </section>
 
         <section className="sm-panel">
-          <h2><span>{selection.kind === "post" ? "編輯貼文" : selection.kind === "list" ? "輪播清單" : selection.kind === "article" ? "文章 → 社群貼文" : "新貼文"}</span>
+          <h2><span>{selection.kind === "post" ? "編輯貼文" : selection.kind === "list" ? "輪播清單" : selection.kind === "article" ? "文章 → 社群貼文" : notice ? `你的角色：${ROLE_NAMES[brand.role]}` : "新貼文"}</span>
             <span className="sm-right">{canWrite && <button type="button" onClick={() => setSelection({ kind: "new", key: Date.now() })}>＋ 新貼文</button>}</span>
           </h2>
-          {right ?? (selection.kind === "post" && !selectedPost
+          {right ?? (notice ? <p className="sm-side">{notice}</p> : selection.kind === "post" && !selectedPost
             ? <div className="sm-side sm-muted">載入中…</div>
             : (selection.kind === "post" || selection.kind === "new" || selection.kind === "article") && (
               <Editor key={editorKey} brand={brand} accounts={accounts} media={media} post={editorPost} today={today} lists={lists}

@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-16（續12）社群發文：不能寫的人開頁看到打不了字的「新貼文」→ 改成說明角色與怎麼取得發文權限
+
+**症狀**（操作者截圖）：從客戶頁「帳號」邀請 graphicdesignpeijing@gmail.com「成為管理員」，對方登入後「新貼文」輸入框打不了字。
+**根因**：
+- 正式庫查：帳號 `user_kind=client`、org 2bf60452、`organization_memberships` member、`social_brand_members` 0 列 → `lib/social/authz.ts:30` 給 `client`（唯讀）。品牌角色只有擁有者／編輯／審核人／唯讀，沒有「管理員」；邀請只開帳號，寫的權限要擁有者到「設定 → 成員」給（`lib/accounts/invite-copy.ts` 已這樣寫）。
+- 畫面缺陷：`SocialManager.tsx:56`／`:115` 開頁與換品牌都預設「新貼文」，不看角色；`Editor.tsx:52` `canWrite` false → textarea readOnly，沒有任何說明。不變量：不能寫的人永遠看不到打不了字的編輯器。新貼文入口只有三處：預設選取（此處）、「＋ 新貼文」與行事曆點空格（已擋 `canWrite`）、文章 → 貼文（同一個 new/article 分支），一處修完整類。
+
+**改了**：
+- `model.ts`：`ROLE_NAMES` 從 `Members.tsx` 移來（一處；`LogView.tsx` 原從 Members 匯入）；`cannotWriteNotice(role)`（審核人／唯讀各一段，GPT 寫，`agency-os/reports/oracle/2026-10-16-inspect-3f5d29af.md`）。
+- `SocialManager.tsx`：selection 為 new／article 且角色不能寫 → 右欄顯示說明、標題「你的角色：<角色>」，不渲染 Editor。伺服器端寫入閘（`WRITE_ROLES`）不變。
+- 測試 `__tests__/SocialManager.cannot-write.render.test.tsx`（jsdom）：client／reviewer 有說明、沒有「貼文內容」輸入框；owner／editor 有編輯器。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 唯讀查 auth.users／organization_memberships／social_brand_members（該 email）→ client、member、0 列 | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit -p .` exit 0；`npx vitest run` 266 files／2443 passed | exit=0 | ms=180000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（拋棄式 worktree D:/tmp/mut-notice）拿掉 `notice ?` 分支 → client／reviewer 兩則紅、owner／editor 綠 | exit=1 | ms=60000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n -- Codex `agency-os/reports/oracle/2026-10-16-partialreview-55caada6.md` NO FINDINGS
+- ORACLE_WAIVED: Codex 以 -Path 審本次全部 5 個 source 檔（partial artifact），即 staged 的全部 source
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`ROLE_NAMES`、`from "./Members"` | hits=6（Members.tsx 4、LogView.tsx 2，皆改從 ./model；無其他匯入）
+
+**剩**：操作者到「社群發文 → 設定 → 成員」把該 email 加為編輯或擁有者（＝成員功能 UI 驗收）；本修正隨今晚 03:00 自動部署或手動 sg-deploy 上線。
+
+**rollback**：`git revert` 本 commit（只有畫面，無資料）。
 ## 2026-10-16（續11）客服意圖：存檔不再歸零、只有考過的意圖能開自動（API＋引擎雙層、指紋綁定考題與設定）、考試走正式路徑 planReply、客服分頁重做
 
 **操作者**：「沒回就沒什麼意義了」→ 推薦先修分頁再開課程類；讀到計畫 D1／§5.2（`agency-os/docs/Customer_service/Customer_service_automation_plan.md:42,165`）要求每意圖考過離線 eval 才升 L2，停下回報 → 操作者選 A（照計畫考）。

@@ -6,8 +6,8 @@ import { ApiError, api, type Member } from "./api";
 import type { SlotContext } from "./SocialManager";
 import type { BrandRole } from "@/lib/social/state";
 import { ACCOUNT_COPY } from "@/lib/accounts/invite-copy";
+import { ROLE_NAMES } from "./model";
 
-export const ROLE_NAMES: Record<BrandRole, string> = { owner: "擁有者", editor: "編輯", reviewer: "審核人", client: "唯讀" };
 const ROLES = Object.keys(ROLE_NAMES) as BrandRole[];
 
 export function MembersSetting({ ctx }: { ctx: SlotContext }) {
