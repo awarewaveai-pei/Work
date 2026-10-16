@@ -6,7 +6,7 @@
 // PromptGuard-2 model on top (plan §5.4) — wire it in `inputGuards` when available.
 
 import type { GuardrailResult } from "@/lib/cs/types";
-import { hitsSensitive } from "@/lib/cs/autonomy";
+import { hitsCrisis, hitsSensitive } from "@/lib/cs/autonomy";
 
 const PASS: GuardrailResult = { pass: true };
 
@@ -33,6 +33,11 @@ export function checkPromptInjection(text: string): GuardrailResult {
   return PASS;
 }
 
+/** Input guard: self-harm / suicide goes to a human under its own reason (runs first in inputGuards). */
+export function checkCrisis(text: string): GuardrailResult {
+  return hitsCrisis(text) ? { pass: false, reason: "crisis", handoffReason: "crisis" } : PASS;
+}
+
 /** Input guard: route sensitive topics (refund/identity/legal/complaint…) straight to a human. */
 export function checkSensitiveIntent(text: string): GuardrailResult {
   if (hitsSensitive(text)) {
@@ -43,7 +48,7 @@ export function checkSensitiveIntent(text: string): GuardrailResult {
 
 /** Run all input guards; first failure wins. */
 export function inputGuards(text: string): GuardrailResult {
-  const checks = [checkPromptInjection, checkSensitiveIntent];
+  const checks = [checkCrisis, checkPromptInjection, checkSensitiveIntent];
   for (const check of checks) {
     const r = check(text);
     if (!r.pass) return r;

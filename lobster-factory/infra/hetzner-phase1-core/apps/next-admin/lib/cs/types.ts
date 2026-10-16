@@ -95,6 +95,7 @@ export type CsActionKind = "auto_sent" | "draft" | "handoff" | "suppressed" | "a
 export type HandoffReason =
   | "sensitive_intent"
   | "red_line"
+  | "crisis"
   | "low_confidence"
   | "knowledge_gap"
   | "not_grounded"

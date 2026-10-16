@@ -50,11 +50,41 @@ export const CS_RED_LINE_KEYWORDS = [
   "password", "密碼", "reset account", "帳號變更", "改密碼", "身分驗證", "identity",
   "delete account", "刪除帳號", "刪除資料", "delete my data",
   "legal", "法律", "lawsuit", "合約爭議", "醫療", "medical", "診斷",
+  // Medication: whether to stop, cut or change a drug is medical advice (exam 2026-10-16 m1:
+  // 「可以停藥嗎」 reached a human only because retrieval missed). The bare 藥／药 catches every
+  // phrasing (調整我的藥, 停藥, 安眠藥); words without it are listed beside it.
+  "藥", "药", "劑量", "剂量", "處方", "处方", "抗憂鬱", "抗抑鬱", "抗焦慮", "抗抑郁", "抗忧郁", "抗焦虑",
+  "鎮定劑", "镇定剂", "百憂解", "樂復得", "克憂果", "贊安諾", "百忧解", "乐复得", "赞安诺",
+  "medication", "medicine", "meds", "drug", "pill", "antidepressant", "anti-depressant",
+  "ssri", "prescription", "dose", "prozac", "zoloft", "lexapro", "xanax",
+] as const;
+
+/**
+ * Crisis: self-harm / suicide. Its own list, not part of the red-line: the red-line is also matched
+ * against tool names (tools.ts), and a crisis needs its own handoff reason so the acknowledgement can
+ * differ from the ordinary one (operator decision pending, TASKS.md). Matched as autonomy.ts hitsAny
+ * does; deliberately wide -- a false hit only costs a human reply. Euphemisms no list can hold are
+ * the classifier's job: a tenant intent with isSensitive (safetyGate).
+ */
+export const CS_CRISIS_KEYWORDS = [
+  "自殺", "自傷", "自殘", "傷害自己", "傷害我自己", "想死", "去死", "不想活", "不想再活", "活不下去",
+  "撐不下去", "活著沒意義", "死了算了", "不如死", "一了百了", "結束生命", "結束自己", "了結自己", "輕生",
+  "尋死", "割腕", "跳樓", "燒炭", "上吊", "遺書", "想消失", "離開這個世界",
+  "自杀", "自伤", "自残", "伤害自己", "伤害我自己", "撑不下去", "活着没意义", "结束生命", "结束自己",
+  "了结自己", "轻生", "寻死", "跳楼", "烧炭", "遗书", "离开这个世界",
+  "suicid", "kill myself", "killing myself", "end my life", "ending my life", "take my own life",
+  "end it all", "to end things", "end everything", "self-harm", "self harm", "selfharm", "hurt myself",
+  "hurting myself", "harm myself", "harming myself", "cut myself", "cutting myself", "want to die",
+  "wanna die", "better off dead", "don't want to live", "dont want to live", "do not want to live",
+  "no reason to live", "not worth living", "not be here anymore", "can't go on anymore",
+  "cant go on anymore", "can't go on like this", "cant go on like this", "can't take it anymore",
+  "cant take it anymore", "overdose",
 ] as const;
 
 /** Sensitive intents → always handoff (broader than red-line; includes complaints/escalation). */
 export const CS_SENSITIVE_KEYWORDS = [
   ...CS_RED_LINE_KEYWORDS,
+  ...CS_CRISIS_KEYWORDS,
   "complaint", "投訴", "客訴", "申訴", "退貨爭議", "情緒", "威脅", "threaten",
 ] as const;
 

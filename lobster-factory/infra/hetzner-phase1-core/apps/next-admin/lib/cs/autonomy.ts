@@ -2,7 +2,7 @@
 // every "can the AI act autonomously?" question is answered here by deterministic code, never by
 // the LLM. See plan §1 (two-axis autonomy), §3.4 (action gate), §5 (guardrails).
 
-import { CS_RED_LINE_KEYWORDS, CS_SENSITIVE_KEYWORDS, CS_THRESHOLDS } from "@/lib/cs/config";
+import { CS_CRISIS_KEYWORDS, CS_RED_LINE_KEYWORDS, CS_SENSITIVE_KEYWORDS, CS_THRESHOLDS } from "@/lib/cs/config";
 import type { RetrievedChunk } from "@/lib/kb/types";
 import type {
   CsActionKind,
@@ -11,9 +11,25 @@ import type {
 } from "@/lib/cs/types";
 
 // NFKC first: full-width "ｒｅｆｕｎｄ" must hit "refund" (Codex 2026-10-15, partialreview-eb4e82c1).
+// Then curly apostrophes become straight, zero-width characters go, whitespace collapses to one
+// space and disappears next to CJK, on both sides: "自 殺" and "kill   myself" hit, while Latin word
+// boundaries survive so "do sessions" never reads as "dose" (Codex 2026-10-16, partialreview-98a30a32).
+const CJK = "\u3000-\u303f\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff";
+const SPACE_BY_CJK = new RegExp(`(?<=[${CJK}]) | (?=[${CJK}])`, "g");
+
+function fold(s: string): string {
+  return s
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u02bc]/g, "'")
+    .replace(/[\u00ad\u200b-\u200d\u2060\ufeff]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(SPACE_BY_CJK, "");
+}
+
 function hitsAny(text: string, keywords: readonly string[]): boolean {
-  const t = text.normalize("NFKC").toLowerCase();
-  return keywords.some((k) => t.includes(k.normalize("NFKC").toLowerCase()));
+  const t = fold(text);
+  return keywords.some((k) => t.includes(fold(k)));
 }
 
 /** A3 red-line: money / identity / legal / medical. Matched anywhere ⇒ hard handoff. */
@@ -21,7 +37,12 @@ export function hitsRedLine(text: string): boolean {
   return hitsAny(text, CS_RED_LINE_KEYWORDS);
 }
 
-/** Broader sensitive set (red-line + complaints/escalation/emotion). */
+/** Self-harm / suicide. Matched anywhere ⇒ hard handoff with reason "crisis". */
+export function hitsCrisis(text: string): boolean {
+  return hitsAny(text, CS_CRISIS_KEYWORDS);
+}
+
+/** Broader sensitive set (red-line + crisis + complaints/escalation/emotion). */
 export function hitsSensitive(text: string): boolean {
   return hitsAny(text, CS_SENSITIVE_KEYWORDS);
 }
@@ -78,6 +99,8 @@ export function preGenerationGate(input: Pick<AnswerDecisionInput, "intent" | "r
 
 /** Needs neither retrieval nor a reply: checked before the first embedding call. */
 export function safetyGate(intent: Intent, messageText: string): AnswerDecision | null {
+  // First, so a crisis is never relabelled by the intent config or a red-line word in the same message.
+  if (hitsCrisis(messageText)) return { action: "handoff", handoffReason: "crisis" };
   if (intent.isSensitive || hitsRedLine(messageText)) {
     return { action: "handoff", handoffReason: intent.isSensitive ? "sensitive_intent" : "red_line" };
   }

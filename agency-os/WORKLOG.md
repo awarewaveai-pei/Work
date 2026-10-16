@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-16（續23）客服 AI：危機與用藥一律轉真人（規則，不再靠「剛好查不到」）— next-admin，交今晚 03:00 自動部署
+
+**根因**：續19 考試 m1——「想傷害自己」「可以停藥嗎」轉真人的理由是 knowledge_gap；`CS_RED_LINE_KEYWORDS`（`lib/cs/config.ts:48`）沒有這類字，知識庫一有相近內容 AI 就可能自己回答。
+**改了**（next-admin `lib/cs/`）：
+- `config.ts` 新 `CS_CRISIS_KEYWORDS`（自傷／自殺，繁簡英＋常見婉轉說法）：獨立清單，不進紅線——紅線也比對工具名稱（`tools.ts:50`），且危機要有自己的理由好讓確認句分支。併入 `CS_SENSITIVE_KEYWORDS`，所以問答層 `faq.ts:23` 也跳過。
+- 用藥併入紅線的醫療組：單字「藥／药」＋不含藥字的詞（劑量、處方、抗憂鬱、藥名、medication、meds、drug、pill、dose…）。
+- `types.ts` `HandoffReason` 加 `"crisis"`；`autonomy.ts` `safetyGate` 第一個檢查 `hitsCrisis`（危機優先於敏感意圖與紅線）；`guardrails.ts` `checkCrisis` 排在 `inputGuards` 第一個（分類器之前就轉）。
+- `autonomy.ts` `hitsAny` 改用 `fold()`：NFKC＋小寫＋彎引號轉直＋去零寬字元＋空白合一、CJK 旁的空白去掉（「自 殺」命中；英文字界保留，「do sessions」不會讀成「dose」）。
+- 確認句（`handoff-ack.ts`）未改：牽涉客戶文案，寫進 TASKS 給操作者決定（求助資源依語言／地區、危機時要不要問名字、要不要即時通知）。
+**Codex 審**：第一輪 `2026-10-16-partialreview-98a30a32` 5 項——F2 婉轉說法、F3 空白／零寬字元繞過、F4「調整我的藥」漏、F5「精神科」誤擋，全修並加進指名測試；**F1 不在本卡範圍但已上線**：`app/api/ops/clients/[slug]/cs-config/route.ts:67` 在 `const config`（:72）宣告前呼叫 `knowledgeFloorOf(config)`（TDZ），任何意圖有 graduation 紀錄時 GET 會 500——Soulful 課程類 10:34Z 考完後就有紀錄。回報給開卡 session，TASKS 開項。第二輪 `2026-10-16-partialreview-5817fa13` 3 項——`self harm`（中間空白）漏、單數 `pill` 漏、`can't go on` 太寬（「can't go on to the next lesson」）：前兩項補字，第三項收窄成 `can't go on anymore`／`like this`，三句都進指名測試。
+**不變量（第三次修清單前寫）**：規則只保證「明確的字，不論全形、空白、零寬、彎引號都命中」——這一類由 `fold()` 整類關閉；兩輪剩下的都是字表召回率，不是同一個 bug 一再出現。字表永遠抓不完婉轉說法，那一類交給分類器（租戶設 `isSensitive` 的危機意圖，`safetyGate` 已會轉），已寫進 TASKS。
+**指名測試**（`cs-core.test.ts` 「crisis and medication always reach a human」）：危機 11 句（含考題原句、簡體、英文、全形、空白、零寬）→ `safetyGate`／`inputGuards` 都是 `crisis`；用藥 6 句 → `red_line`；危機＋退款同句仍是 `crisis`；一般 6 句（含「我在精神科工作…」「Do sessions run on weekends?」「I can't go on to the next lesson yet」）不受影響。另用 scratchpad 腳本把 Soulful 30 題考題過一遍新清單：20 題應答題 0 命中；停藥、自傷兩題命中。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0 | ms=6000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/cs` 66 pass；`npm test` 全套 2481 pass／17 skipped（同一工作目錄含其他 session 未提交檔；較早一次唯一失敗是另一 session 未追蹤的 `chatwoot-baseline.test.ts`，非本 commit） | exit=0 | ms=16000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsx check-golden.mts`（Soulful 30 題 × 新清單） → 應答 20 題 0 命中；第 26、27 題命中 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/8m/0n（Codex 兩輪 5＋3；本卡 7 項已修，F1 在範圍外開 TASKS）
+- ORACLE_WAIVED: 第二輪 artifact 之後只改了字表（補 `self harm`／`pill`、收窄 `can't go on`）並加對應測試，無新邏輯；不變量分析見上，不跑第三輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=CS_RED_LINE_KEYWORDS|CS_SENSITIVE_KEYWORDS|hitsRedLine|hitsSensitive|HandoffReason | hits=47（worktree，含 WORKLOG／oracle 報告；程式比對全經 `hitsAny`：`guardrails.ts`、`tools.ts:50`、`faq.ts:23`；`HandoffReason` 無 UI 標籤表，tsc 綠；文件無清單內容主張）
+
+**避免再發生**：一律轉真人的類別要有規則，不能靠檢索剛好失敗；考試的危險題要看「轉真人的理由」，不只看有沒有轉。
+**rollback**：`git revert` 本 commit（未部署前只動 repo；部署後 revert 再走 03:00 自動部署）。
 ## 2026-10-16（續21）社群發文對照 Postiz v2.25／Metricool 盤點：13 項 UI 缺陷、19 項功能缺口、建版＝樣稿 1:1、手機版壞；順手修 B1 換貼文留舊文字
 
 **操作者**：「社群發文可以發文了，但是功能不齊全，UI/UX 非常醜，去 postiz 和 metricool 看自己的缺失和遺漏」。
