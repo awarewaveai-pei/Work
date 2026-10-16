@@ -43,6 +43,7 @@ import socket
 import ipaddress
 import threading
 import subprocess
+import hashlib
 from urllib.parse import urlparse, quote, parse_qs
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -51,6 +52,7 @@ import requests
 from auth_policy import authentication_required
 import config
 import pipeline
+from quality import evaluate_probe, evaluate_signal_quality
 
 HOST = os.getenv("VIDEO_SERVICE_HOST", "127.0.0.1")
 PORT = int(os.getenv("VIDEO_SERVICE_PORT", "8732"))
@@ -68,6 +70,8 @@ R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "")
 # 影片輸出專用 bucket（隔離於圖片 bucket；後續可設 7 天 lifecycle）
 R2_VIDEO_BUCKET = os.getenv("R2_VIDEO_BUCKET", "lobster-videos")
 R2_VIDEO_PUBLIC_BASE = os.getenv("R2_VIDEO_PUBLIC_BASE", "").rstrip("/")
+# staging points this at its allowlisted egress proxy (docker-compose.renderer-staging.yml); prod keeps the default
+R2_API_BASE_URL = os.getenv("R2_API_BASE_URL", "https://api.cloudflare.com").rstrip("/")
 _render_lock = threading.Lock()
 
 # /generate-job 全自動管道憑證
@@ -82,7 +86,7 @@ def _r2_video_configured() -> bool:
 def _r2_put(object_key: str, data: bytes, content_type: str, bucket: str, public_base: str) -> str:
     """上傳一個物件到指定 R2 bucket（CF R2 API），回 public URL；失敗丟例外。"""
     key_path = quote(object_key, safe="/")
-    url = (f"https://api.cloudflare.com/client/v4/accounts/{R2_ACCOUNT_ID}"
+    url = (f"{R2_API_BASE_URL}/client/v4/accounts/{R2_ACCOUNT_ID}"
            f"/r2/buckets/{bucket}/objects/{key_path}")
     r = requests.put(url, headers={"Authorization": f"Bearer {R2_API_TOKEN}",
                                    "Content-Type": content_type}, data=data, timeout=120)
@@ -176,13 +180,12 @@ def _validate(payload: dict):
     return scenes, assets, out_name, False
 
 
-def _probe_video_size(path: str) -> dict:
-    """Return actual mp4 width/height using ffprobe from the ffmpeg package."""
+def _probe_video(path: str) -> dict:
+    """Return the reproducible ffprobe evidence used by technical QA."""
     res = subprocess.run(
         [
             "ffprobe", "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height",
+            "-show_entries", "stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt:format=duration,size",
             "-of", "json",
             path,
         ],
@@ -192,22 +195,59 @@ def _probe_video_size(path: str) -> dict:
     )
     if res.returncode != 0:
         raise RuntimeError(f"ffprobe failed for {path}: {res.stderr[-300:]}")
-    streams = json.loads(res.stdout or "{}").get("streams", [])
+    parsed = json.loads(res.stdout or "{}")
+    streams = parsed.get("streams", [])
     if not streams:
         raise RuntimeError(f"ffprobe found no video stream: {path}")
-    width = int(streams[0].get("width") or 0)
-    height = int(streams[0].get("height") or 0)
+    video = next((s for s in streams if s.get("codec_type") == "video"), None)
+    width = int((video or {}).get("width") or 0)
+    height = int((video or {}).get("height") or 0)
     if width <= 0 or height <= 0:
         raise RuntimeError(f"ffprobe invalid dimensions for {path}: {width}x{height}")
-    return {"width": width, "height": height}
+    return parsed
+
+
+def _signal_probe(path: str, duration: float) -> dict:
+    """Collect black/freeze/loudness evidence with one bounded ffmpeg pass."""
+    res = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-nostats", "-i", path,
+         "-vf", "blackdetect=d=0.5:pix_th=0.98,freezedetect=n=-60dB:d=0.5",
+         "-af", "ebur128=framelog=verbose", "-f", "null", "-"],
+        capture_output=True, text=True, timeout=60,
+    )
+    output = f"{res.stdout}\n{res.stderr}"
+    black_seconds = sum(float(end) - float(start) for start, end in re.findall(r"black_start:\s*([0-9.]+).*?black_end:\s*([0-9.]+)", output))
+    freeze_events = len(re.findall(r"freeze_start:\s*[0-9.]+", output))
+    lufs = [float(value) for value in re.findall(r"\bI:\s*(-?[0-9]+(?:\.[0-9]+)?)\s+LUFS", output)]
+    peaks = [float(value) for value in re.findall(r"\b(?:Peak|Peak level):\s*(-?[0-9]+(?:\.[0-9]+)?)\s+dBFS", output)]
+    return {
+        "blackRatio": max(0.0, min(1.0, black_seconds / duration)) if duration > 0 else 0.0,
+        "freezeEvents": freeze_events,
+        "integratedLufs": lufs[-1] if lufs else None,
+        "truePeakDb": peaks[-1] if peaks else None,
+        "ffmpegExitCode": res.returncode,
+    }
 
 
 def _build_output_meta(outputs: dict) -> dict:
     meta = {}
     for fmt, path in outputs.items():
-        size = _probe_video_size(str(path))
+        probe = _probe_video(str(path))
+        video = next(s for s in probe["streams"] if s.get("codec_type") == "video")
+        size = {"width": int(video["width"]), "height": int(video["height"])}
         expected = config.FORMATS.get(fmt)
         item = dict(size)
+        # The checksum is part of the immutable media identity.  Compute it
+        # after rendering and before upload so downstream media_assets and QA
+        # records can pin evidence to the exact bytes that were delivered.
+        digest = hashlib.sha256()
+        byte_size = 0
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1024 * 1024), b""):
+                byte_size += len(chunk)
+                digest.update(chunk)
+        item["byteSize"] = byte_size
+        item["checksumSha256"] = digest.hexdigest()
         if expected:
             item["expected_width"] = expected[0]
             item["expected_height"] = expected[1]
@@ -216,6 +256,12 @@ def _build_output_meta(outputs: dict) -> dict:
                     f"output {fmt} dimensions {size['width']}x{size['height']} "
                     f"!= expected {expected[0]}x{expected[1]}"
                 )
+        qa = evaluate_probe(probe, expected)
+        item["technical_qa"] = qa
+        signal_qa = evaluate_signal_quality(probe, _signal_probe(str(path), float((probe.get("format") or {}).get("duration") or 0)))
+        item["signal_qa"] = signal_qa
+        if qa["status"] == "failed" or signal_qa["status"] == "failed":
+            raise RuntimeError(f"technical QA failed for output {fmt}")
         meta[fmt] = item
     return meta
 

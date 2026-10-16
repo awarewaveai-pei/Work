@@ -36,6 +36,16 @@ class TechnicalQualityTests(unittest.TestCase):
         self.assertEqual(report["status"], "failed")
         self.assertEqual({f["ruleId"] for f in report["findings"]}, {"picture.black_frames", "picture.freeze", "audio.loudness", "audio.true_peak", "caption.timing"})
 
+    def test_a_measurement_that_was_not_taken_fails(self):
+        probe = {"streams": [{"codec_type": "video"}, {"codec_type": "audio"}], "format": {"duration": "4"}}
+        failed_pass = evaluate_signal_quality(probe, {"integratedLufs": -16, "ffmpegExitCode": 1})
+        self.assertEqual(failed_pass["status"], "failed")
+        self.assertIn("signal.probe_failed", {f["ruleId"] for f in failed_pass["findings"]})
+        no_loudness = evaluate_signal_quality(probe, {"integratedLufs": None, "ffmpegExitCode": 0})
+        self.assertEqual(no_loudness["status"], "failed")
+        self.assertIn("audio.loudness_unmeasured", {f["ruleId"] for f in no_loudness["findings"]})
+        self.assertEqual(evaluate_signal_quality(probe, {"integratedLufs": -16, "ffmpegExitCode": 0})["status"], "passed")
+
 
 if __name__ == "__main__":
     unittest.main()

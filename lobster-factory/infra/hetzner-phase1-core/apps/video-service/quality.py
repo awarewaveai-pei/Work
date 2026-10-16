@@ -71,7 +71,15 @@ def evaluate_signal_quality(
     freeze_events = signal.get("freezeEvents")
     if isinstance(freeze_events, (int, float)) and freeze_events > 0:
         findings.append(Finding("picture.freeze", "warn", "freeze events detected", {"freezeEvents": freeze_events}))
+    # A measurement that could not be taken is not a pass: the worker's ffmpeg pass failed, or there is audio and no
+    # loudness reading came back (Codex 2026-10-16). Only when a signal pass was attempted (signal given).
+    exit_code = signal.get("ffmpegExitCode")
+    if isinstance(exit_code, int) and exit_code != 0:
+        findings.append(Finding("signal.probe_failed", "fail", "the signal measurement pass failed", {"ffmpegExitCode": exit_code}))
     integrated_lufs = signal.get("integratedLufs")
+    has_audio = any(s.get("codec_type") == "audio" for s in probe.get("streams") or [])
+    if signal and has_audio and not isinstance(integrated_lufs, (int, float)):
+        findings.append(Finding("audio.loudness_unmeasured", "fail", "the output has audio but no loudness was measured", {}))
     if isinstance(integrated_lufs, (int, float)) and (integrated_lufs < -30 or integrated_lufs > -6):
         findings.append(Finding("audio.loudness", "fail", "integrated loudness is outside -30 to -6 LUFS", {"integratedLufs": integrated_lufs}))
     true_peak = signal.get("truePeakDb")

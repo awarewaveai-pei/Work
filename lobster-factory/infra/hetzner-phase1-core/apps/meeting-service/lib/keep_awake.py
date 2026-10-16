@@ -24,12 +24,17 @@ import ctypes
 import os
 import subprocess
 import sys
+import threading
 
 ES_CONTINUOUS = 0x80000000
 ES_SYSTEM_REQUIRED = 0x00000001
 
 # WSL2 下持有電源請求的 powershell helper；None = 目前沒有持有
 _wsl_helper = None
+# Jobs run in threads and share this one helper: count holders and release only when the last leaves
+# (Codex 2026-10-16: two overlapping jobs, the first to finish let the machine sleep under the second).
+_wsl_holders = 0
+_wsl_lock = threading.Lock()
 
 # helper 本體：持續持有 ES_CONTINUOUS|ES_SYSTEM_REQUIRED 直到被終止。
 # 用 Sleep 迴圈而非 Read-Host，因為這個 process 沒有 stdin 可讀。
@@ -78,6 +83,14 @@ def prevent_sleep():
     if not _is_wsl():
         return
 
+    global _wsl_holders
+    with _wsl_lock:
+        _wsl_holders += 1
+        _start_wsl_helper()
+
+
+def _start_wsl_helper():
+    global _wsl_helper
     if _wsl_helper is not None and _wsl_helper.poll() is None:
         return  # 已經持有，重複呼叫不再起第二個
 
@@ -100,6 +113,16 @@ def allow_sleep():
         ctypes.windll.kernel32.SetThreadExecutionState(ES_CONTINUOUS)
         return
 
+    global _wsl_holders
+    with _wsl_lock:
+        _wsl_holders = max(0, _wsl_holders - 1)
+        if _wsl_holders:
+            return  # another job still needs the machine awake
+        _stop_wsl_helper()
+
+
+def _stop_wsl_helper():
+    global _wsl_helper
     if _wsl_helper is None:
         return
     try:

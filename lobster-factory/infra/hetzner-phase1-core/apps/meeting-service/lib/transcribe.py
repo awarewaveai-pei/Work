@@ -182,3 +182,17 @@ def write_srt(segs: list, path: str):
     with open(path, "w", encoding="utf-8") as f:
         for i, s in enumerate(segs, 1):
             f.write(f"{i}\n{fmt_srt_ts(s['start'])} --> {fmt_srt_ts(s['end'])}\n{s['text']}\n\n")
+
+
+def fmt_vtt_ts(sec: float) -> str:
+    """WebVTT timestamp; retain millisecond precision and use a dot separator."""
+    return fmt_srt_ts(sec).replace(",", ".")
+
+
+def write_vtt(segs: list, path: str):
+    """Write a deterministic WebVTT rendition without mutating transcript segments."""
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("WEBVTT\n\n")
+        for i, s in enumerate(segs, 1):
+            cue_id = str(s.get("id", i)).replace("\r", " ").replace("\n", " ").strip() or str(i)
+            f.write(f"{cue_id}\n{fmt_vtt_ts(s['start'])} --> {fmt_vtt_ts(s['end'])}\n{s['text'].strip()}\n\n")

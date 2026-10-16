@@ -21,7 +21,7 @@ import time
 import traceback
 
 from lib import archive, deck, diarize, excel, hallucination, keep_awake, merge_segments, speaker_notes, summarize, word
-from lib.transcribe import transcribe, write_srt
+from lib.transcribe import transcribe, write_srt, write_vtt
 
 
 class JobLogger:
@@ -122,6 +122,7 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
         json.dump(result, open(os.path.join(job_dir, "transcript.json"), "w", encoding="utf-8"),
                   ensure_ascii=False, indent=2)
         write_srt(result["segments"], os.path.join(job_dir, "transcript.srt"))
+        write_vtt(result["segments"], os.path.join(job_dir, "transcript.vtt"))
         write_status(job_dir, transcribe_stats={
             "audio_duration_sec": result["audio_duration_sec"],
             "realtime_factor": result["realtime_factor"],
@@ -209,6 +210,35 @@ def run_pipeline_phase1(job_dir: str, media_path: str, model_name: str = "large-
         # awaiting_summary 這段使用者在操作瀏覽器（複製/貼上），本身會產生
         # 滑鼠鍵盤活動重置 Windows 閒置計時，不需要人工續命；只有這段無人值守
         # 的自動化區間需要 prevent_sleep。
+        keep_awake.allow_sleep()
+        log.close()
+
+
+def run_video_transcription(job_dir: str, media_path: str, model_name: str = "large-v3") -> None:
+    """Run the media-only Whisper worker path used by Video LEGO.
+
+    It deliberately stops after immutable JSON/SRT/VTT outputs; meeting summary,
+    diarization and external providers are not part of a video caption job.
+    """
+    log = JobLogger(job_dir)
+    write_status(job_dir, stage="preflight", error=None, done=False, started_at=time.time(), kind="video_transcription")
+    keep_awake.prevent_sleep()
+    try:
+        write_status(job_dir, stage="transcribe")
+        result = transcribe(media_path, model_name=model_name, log=log)
+        with open(os.path.join(job_dir, "transcript.json"), "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+        write_srt(result["segments"], os.path.join(job_dir, "transcript.srt"))
+        write_vtt(result["segments"], os.path.join(job_dir, "transcript.vtt"))
+        write_status(job_dir, stage="done", done=True, transcribe_stats={
+            "audio_duration_sec": result["audio_duration_sec"],
+            "realtime_factor": result["realtime_factor"],
+            "backend": result["backend"],
+        })
+    except Exception as e:
+        log(f"[FAIL] {type(e).__name__}: {e}")
+        write_status(job_dir, stage="error", done=True, error=f"{type(e).__name__}: {e}")
+    finally:
         keep_awake.allow_sleep()
         log.close()
 

@@ -1381,7 +1381,7 @@
 
 #### I. 📥 收件匣（`/tomo` 落地區，待分類）
 
-- [ ] **補回 2026-09-10 誤合併 `91fdfe31a` 丟掉、之後又有新 commit 的可部署檔**：video-service `pipeline.py`／`server.py`、`docker-compose.yml`、`docker-compose.renderer-staging.yml`、`.env.example`、meeting-service 3 檔。逐檔比 `dbe28f317` 版與 main（`git log 91fdfe31a..origin/main -- <path>`），只補沒被後續取代的內容；video-service 主機目前＝main 版（正式環境也少了那些改動，補回後要部署）。remotion-service 已補（WORKLOG 2026-10-16「部署盤點」條目）；工具 `merge-drops.py` 寫法在該條目。建議模型：Opus 5.5
+- [x] **【✅ 2026-10-16 程式完成，見 WORKLOG 同日「補回 91fdfe31a」條目；video-service 部署待操作者 go】補回 2026-09-10 誤合併 `91fdfe31a` 丟掉、之後又有新 commit 的可部署檔**：video-service `pipeline.py`／`server.py`、`docker-compose.yml`、`docker-compose.renderer-staging.yml`、`.env.example`、meeting-service 3 檔。逐檔比 `dbe28f317` 版與 main（`git log 91fdfe31a..origin/main -- <path>`），只補沒被後續取代的內容；video-service 主機目前＝main 版（正式環境也少了那些改動，補回後要部署）。remotion-service 已補（WORKLOG 2026-10-16「部署盤點」條目）；工具 `merge-drops.py` 寫法在該條目。建議模型：Opus 5.5
   - `▶️ 可動工` · `2026-10-16 開`
 
 - [ ] **認知主權平台：步驟 2 已併進 main（未 push）；接下來儲存切換 W1–W3（PostgreSQL 每區域一台）→ 步驟 3+4 → 才問上線；Codex 可照接手包接手** → handoffs/2026-10-04-1400-cos-step2-merged-storage-next.md

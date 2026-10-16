@@ -1,4 +1,35 @@
 # Worklog
+## 2026-10-16（續20）補回 91fdfe31a 丟掉的影片改動：video-service 技術品質檢查移植回來、「沒證據不算通過」兩處、meeting-service／staging 補回
+
+**根因**：2026-09-10 合併 `91fdfe31a` 對 8 個檔取了舊的一邊（本地那邊對它們 0 改動，結果應＝`dbe28f317`）；當天補回只做 next-admin（同日 續18 補 remotion）。查證（`git diff <base> dbe28f317` 與合併後 commit）：
+- video-service：素材剪接已由 `46eeac2e9` 另寫（`render_footage_multiformat`），不補；**技術品質檢查沒人重做**：`_build_output_meta` 只量尺寸，沒有 `technical_qa`／`signal_qa`／`byteSize`／`checksumSha256`（`quality.py` 與測試還在，呼叫被丟）。
+- next-admin `qa-persistence.ts:39-45`：沒有報告也算 `passed`；正式環境 `MEDIA_PRODUCTION_PERSISTENCE_ENABLED=true`。至今沒寫出假紀錄只因沒有 checksum 時 `:25` 先跳出（`media_qa_reports` 只有 9/9 兩筆）。
+- compose／.env.example：能用的部分 9/20 已補回；剩 Whisper（空值＝關閉）與 Stripe（金流，不順手加）→ 不補。
+
+**改了**：
+- video-service `server.py`：從 `dbe28f317` 移回 `_probe_video`／`_signal_probe`／`_build_output_meta`（兩條渲染路徑共用），`R2_API_BASE_URL`（預設不變，staging 用）。
+- 不變量「量不到不算通過」：`quality.py` 加 `signal.probe_failed`（ffmpeg 失敗）、`audio.loudness_unmeasured`（有音軌沒量到音量）兩條 fail；next-admin `qa-persistence.ts` 每個輸出格式都要有兩份報告且狀態已知，否則不寫紀錄並 warn。
+- meeting-service `app.py`／`pipeline.py`／`lib/transcribe.py`、`docker-compose.renderer-staging.yml` 整檔回 `dbe28f317`（合併後 0 commit）；`.env.renderer-staging.example` 補 3 個 R2_S3 佔位（compose `:?` 必填）。
+- meeting-service `lib/keep_awake.py`：WSL helper 改計數＋鎖，最後一個工作結束才放開（Windows 原生的 `SetThreadExecutionState` 本就每執行緒各自，不動）。
+
+**Codex**（`agency-os/reports/oracle/2026-10-16-partialreview-d106358f.md`，4 項）：
+- F1 staging 範本缺 R2_S3_* → 修（舊範本 `docker compose config` 重現錯誤、新範本 exit 0）。
+- F2 ffmpeg 量測失敗仍算通過 → 修（quality.py 兩條規則）。
+- F3 staging 代理 300 MiB 上限 → 不修：只影響沒在跑的 staging，正式環境直傳 R2。
+- F4 兩個工作重疊時防睡眠被先結束的關掉 → 修（計數）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 `docker build` video-service（與正式同一 Dockerfile）→ 容器內 test_auth_policy 4、test_footage_render 17、test_output_meta_qa 3（ffmpeg 真的渲染 1 秒片：正常→有 checksum＋兩份報告；黑畫面→warned；無聲→拒絕）、test_quality 5 全過 | exit=0 | ms=600000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變（拋棄容器）：拿掉「QA 失敗就拒絕」→ 無聲那則紅；拿掉 probe_failed 規則 → test_quality 紅 | exit=1 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx tsc --noEmit -p .` 0；`npx vitest run` 267 files／2448 passed；qa-persistence.test.ts 5；突變（拋棄 worktree D:/tmp/mut-qa）拿掉 missing 判斷 → 4 紅 | exit=0 | ms=200000
+- REALTEST_EVIDENCE: tool=Bash | cmd=meeting-service `pytest tests/` 6 passed（test_vtt 5＋test_keep_awake 1）；突變（scratch 副本）計數判斷改 `if False` → 紅 | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker compose -f docker-compose.renderer-staging.yml --env-file .env.renderer-staging.example config --quiet` → 0（舊範本 → R2_S3_SECRET_ACCESS_KEY is required） | exit=0 | ms=2000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- Codex d106358f；F1/F2/F4 修、F3 接受（staging only）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`evaluate_signal_quality`、`_probe_video_size`、`persistAutomaticTechnicalQa`、`allow_sleep` | hits=12（evaluate_signal_quality 僅 server.py 一處呼叫；_probe_video_size 0 殘留；persistAutomaticTechnicalQa 僅 status route；allow_sleep 3 處皆經計數）
+
+**剩**：video-service 部署（runbook `DEPLOY_ROLLBACK_RUNBOOK.md` §2「有自己 compose 的 app」：tag 備份 → rsync → `docker compose -f docker-compose.video.yml --env-file .env.video up -d --build`），等操作者 go；next-admin 隨 03:00 或手動。注意：上線後音量超出 −30～−6 LUFS 或量不到的影片會被拒（9/9 合併前的原設計）。
+
+**rollback**：`git revert` 本 commit；video-service 部署前先 `docker tag lobster-video-service:local lobster-video-service:pre-qa-restore`，失敗標回 `:local` 後 `up -d --no-build`。
 ## 2026-10-16（續19）Soulful 課程類第一次考試：沒過（17/30＝56.7%、危險誤答 2、該轉真人 recall 80%）— next-admin `ebaec8226` 部署、30 題匯入
 
 **部署**（操作者 go ahead）：`sg-deploy.sh next-admin` → 2439 pass、healthy 9s、smoke 5/5、`.deployed-commit=ebaec8226`（04:40Z）；`playwright-runner -Mode smoke` 26/0/6。

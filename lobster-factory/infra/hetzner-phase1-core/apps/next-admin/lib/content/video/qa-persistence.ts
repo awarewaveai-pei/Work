@@ -26,6 +26,18 @@ export async function persistAutomaticTechnicalQa(params: {
   const db = getSupabaseWriteClient();
   if (!db) return null;
 
+  // No evidence is not a pass: every delivered format needs both worker reports (2026-09-10 merge 91fdfe31a had
+  // dropped them from video-service, and a missing report used to count as "passed").
+  const QA_STATES = ["passed", "warned", "failed"];
+  const missing = Object.keys(params.outputs).filter((format) => {
+    const meta = params.outputMeta?.[format];
+    return !QA_STATES.includes(String(meta?.technical_qa?.status)) || !QA_STATES.includes(String(meta?.signal_qa?.status));
+  });
+  if (!Object.keys(params.outputs).length || missing.length) {
+    console.warn("[video-qa] no technical evidence from video-service, nothing recorded:", missing.join(",") || "no outputs");
+    return null;
+  }
+
   const reports = Object.fromEntries(
     Object.entries(params.outputMeta ?? {}).map(([format, meta]) => [format, {
       width: meta.width,
