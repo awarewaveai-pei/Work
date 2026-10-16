@@ -21,7 +21,7 @@ deletes index + marker.
 
 Selection: --worklog-entry N = the block `## <date>（續N）` .. next `## ` header, taken from the worktree and inserted
 into HEAD before the next header that also exists in HEAD (after `# Worklog` when none); --range = OLD-side start
-lines of hunks (git diff -U0); --keep-re = regex on hunk-body lines (bytes, e.g. ^\\+MINE). A file with a mode change
+lines of hunks (git diff -U0 HEAD); --keep-re = regex on hunk-body lines (bytes, e.g. ^\\+MINE). A file with a mode change
 is refused. Line endings follow HEAD's copy of the file. Scratch dir: $PARTIAL_COMMIT_SCRATCH or
 $TEMP/git-partial-worktree-commit (the hooks read the same variable).
 """
@@ -190,7 +190,9 @@ def stage(args):
             print(f"HEAD moved since {args.index} was created ({marker.get('head', '?')[:12]} -> {head_sha()[:12]}); drop --index {args.index} and stage again"); return 2
         if rel in marker["entries"]:
             print(f"{rel} is already in {args.index}; drop and start over to change it"); return 2
-    diff = run("git", "diff", "-U0", "--", rel).stdout
+    # Against HEAD, not the shared index: the hunks are applied onto a HEAD-based index, and another session's
+    # stale staging in the shared index shifts the old side so nothing applies (2026-10-16, TASKS.md).
+    diff = run("git", "diff", "-U0", "HEAD", "--", rel).stdout
     if not diff.strip():
         print(f"nothing uncommitted in {rel}"); return 2
     if has_mode_change(diff):

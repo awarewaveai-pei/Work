@@ -171,6 +171,16 @@ class PartialWorktreeCommitTest(unittest.TestCase):
         self.assertEqual(self.mod.main(["stage", "shared.md", "--range", "10", "--range", "30-30"]), 0)
         self.assertEqual(self.private("shared.md", self.index_path()), self.expect_mine())
 
+    def test_stale_shared_index_does_not_shift_hunks(self):
+        # another session staged an older edit (a line at the top) and never committed it
+        stale = "STALE top\n" + self.base
+        write("shared.md", stale)
+        git(self.repo, "add", "shared.md")
+        write("shared.md", self.edited())
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE"]), 0)
+        self.assertEqual(self.private("shared.md", self.index_path()), self.expect_mine())
+        self.assertEqual(git(self.repo, "show", ":shared.md"), stale, "shared index untouched")
+
     def test_refusals_and_mode_change(self):
         write("shared.md", self.base + "FOREIGN tail\n")
         self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE"]), 2, "no hunk of mine")
