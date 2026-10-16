@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-16（續9）Soulful 客服名字寫回驗收通過：next-admin `b2508e931` 手動部署，真 Messenger 回答名字 → Chatwoot 聯絡人 John Doe → pei
+
+**部署**（操作者 go ahead）：`sg-deploy.sh next-admin` 第二次（第一次被 test 閘擋，見續7）→ 259 files／2399 pass、build、healthy 9s、HTTP smoke 5/5、`.deployed-commit=b2508e931`（02:42:32Z，前一版 `38102e22f`）；`playwright-runner -Mode smoke` 26 pass／0 fail／6 skip（`agency-os/reports/e2e/2026-10-16/smoke`）。
+**第一輪沒寫回（設計如此）**：對話 8 的問名字後第一則是部署前 01:16Z 的「PEI」（舊碼用 bot token 401）；部署後再回「pei」（msg 50）→ `captureName` 用 user_token 讀訊息成功（無 401 warn），但前一則公開訊息是客人自己的「PEI」不是問句 → 依 `lib/cs/handoff-ack.ts` 規則（只認緊接問句的那一則）跳過。用 bot token `toggle_status` 把對話 8 標已解決重測。
+**真測（對話 9）**：msg 52「pei」→ other 0.243 → handoff（`cs_ai_replies` 03:05:56Z）→ msg 55「已收到您的訊息…／請問怎麼稱呼您呢？」→ msg 56「pei」→ **contacts.id=6 name=pei**（03:06:06Z）。費用 0.00034 USD（無 Opus）。msg 57 之後對話 open → human_owns_thread 靜默（設計）。
+**觀察**：操作者 ~03:00 說「寫了名字沒回我」時 Chatwoot 最後一筆 Facebook 事件是 02:53:24Z；第一則「pei」03:05:51Z 才到 → Meta 投遞延遲數分鐘，非本系統。回答名字後客人不會收到回覆（只改聯絡人卡），操作者以為壞了一次；要不要加一句「謝謝 XX」由操作者決定，未改。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin（npm test 2399 pass、healthy 9s、smoke 5/5、.deployed-commit b2508e931）；playwright smoke 26/0/6；chatwoot psql messages 52–57＋contacts id 6 name=pei；cs_ai_replies conv 9；ai_call_logs 0.00034 | exit=0 | ms=600000
+- REVIEW_WAIVED: NA -- 部署＋驗收，無程式改動（修正在續7）
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-10-16（續7）next-admin 手動部署被 test 閘擋：新 Chatwoot token route 沒列入 production-change 覆蓋清單（2abb9acd5 從沒跑過全套）
 
 **操作者**：「部署 next-admin（go ahead），部署完我用 John Doe 測名字寫回」。
