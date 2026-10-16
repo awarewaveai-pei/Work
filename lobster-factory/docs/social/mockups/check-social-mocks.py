@@ -12,21 +12,28 @@ Rules (operator, 2026-09-24 .. 2026-10-14), each finding starts with its [code]:
     (--p-* in globals.css since 2026-10-15, so the product page and the mock read the same ones)
   [inline-font] no font sizes in style="" attributes    [sample] the page says it is a 樣稿
   [action] the four post actions are real buttons        [tags]/[unclosed]/[self-close] markup balances
+  rendered (measure-mock.mjs, Playwright at 1280x660; C13 / GAP_REPORT U1, U3):
+  [chips] at most CHIP_MAX pill-shaped boxes on any one screen (opening screen + every [data-view])
+  [card-thumb] every week card has a thumbnail element (.cthumb), and the opening week shows cards at all
+  [render] the page could not be measured or threw a script error (not a pass)
 Notes (printed, not findings): font sizes under 14px inside the copied app block — the app's own values, changed in globals.css.
 CSS is parsed by sync-app-theme.py (rules/declarations); markup by html.parser. A page that cannot be read is a finding."""
-import html.parser, importlib.util, pathlib, re, sys
+import html.parser, importlib.util, json, pathlib, re, subprocess, sys, tempfile
 
 sys.dont_write_bytecode = True   # the sync module is loaded by path; a stale .pyc from a same-second edit would be reused
 HERE = pathlib.Path(__file__).resolve().parent
 PAGES = sorted(HERE.glob("*-mock.html"))
 _spec = importlib.util.spec_from_file_location("sync_app_theme", HERE / "sync-app-theme.py")
 sync = importlib.util.module_from_spec(_spec); _spec.loader.exec_module(sync)
+_pspec = importlib.util.spec_from_file_location("preview_server", HERE / "preview-server.py")
+preview = importlib.util.module_from_spec(_pspec); _pspec.loader.exec_module(preview)   # the skeleton the publisher adds
 
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 SVG_SELF = {"path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "use", "stop"}
 ACTIONS = ["存草稿", "送審", "排程", "立即發佈"]
 TYPE_TOKENS = {"--fs-h1": 14, "--fs-h2": 14, "--fs-body": 14, "--fs-tag": 12}       # name -> minimum px
-LAYOUT_TOKENS = {"--rail", "--hour"}
+LAYOUT_TOKENS = {"--ed-w", "--av", "--thumb-h"}   # editor width, account avatar, week-card thumbnail height
+CHIP_MAX = 20   # pills on one screen (U1: before v14 there were ~60)
 LOCAL_TOKENS = set(TYPE_TOKENS) | LAYOUT_TOKENS
 COLOUR_FN = re.compile(r"\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color-mix|color)\s*\(", re.I)
 HEX = re.compile(r"#[0-9a-fA-F]{3,8}\b")
@@ -228,13 +235,67 @@ def app_notes(want: str) -> list[str]:
     return notes
 
 
+def render_findings(pages: dict[str, str]) -> dict[str, list[str]]:
+    """{name: page source} -> {name: findings} from measure-mock.mjs; one browser for all pages. No result = a finding."""
+    out = {n: [] for n in pages}
+    with tempfile.TemporaryDirectory() as tmp:
+        files = {}
+        for i, (n, src) in enumerate(pages.items()):
+            f = pathlib.Path(tmp) / f"p{i}.html"
+            f.write_bytes((preview.SKELETON_HEAD + src + "</body></html>").encode("utf-8"))
+            files[str(f)] = n
+        try:
+            r = subprocess.run(["node", str(HERE / "measure-mock.mjs"), *files], capture_output=True, timeout=300,
+                               encoding="utf-8", errors="replace")
+            rows = []
+            for x in r.stdout.splitlines():
+                if x.startswith("{"):
+                    try:
+                        rows.append(json.loads(x))
+                    except ValueError:
+                        for n in out:
+                            out[n].append(f"[render] unreadable measurement line: {x[:80]}")
+        except Exception as e:
+            rows, r = [], None
+            for n in out:
+                out[n].append(f"[render] cannot run measure-mock.mjs: {e!r}")
+        got = set()
+        for row in rows:
+            n = files.get(row.get("file", ""))
+            if n is None:
+                continue
+            got.add(n)
+            if "error" in row:
+                out[n].append(f"[render] {row['error'][:120]}"); continue
+            for e in row.get("errors", []):
+                out[n].append(f"[render] script error: {e[:120]}")
+            if len(row["views"]) < 2:
+                out[n].append("[render] no [data-view] control found, so only the opening screen was measured")
+            for v, c in row["views"].items():
+                if not isinstance(c, int):
+                    out[n].append(f"[render] view '{v}': {c}")
+                elif c > CHIP_MAX:
+                    out[n].append(f"[chips] view '{v}': {c} pills on one screen (max {CHIP_MAX}); pills are values, actions are buttons")
+            if not row["cards"]:
+                out[n].append("[card-thumb] the opening week shows no cards, so the thumbnail rule proved nothing")
+            elif row["noThumb"]:
+                out[n].append(f"[card-thumb] {row['noThumb']} of {row['cards']} week cards have no thumbnail (.cthumb)")
+        for n in out:
+            if n not in got and not out[n]:
+                out[n].append(f"[render] no measurement came back{(': ' + r.stderr.strip()[-160:]) if r and r.stderr.strip() else ''}")
+    return {n: [f"{n}: {f}" for f in fs] for n, fs in out.items()}
+
+
 def run(pages) -> int:
-    allf, want = [], sync.render()
+    allf, want, srcs = [], sync.render(), {}
     for p in pages:
         try:
-            allf += findings(p.name, p.read_text(encoding="utf-8"), want)
+            srcs[p.name] = p.read_text(encoding="utf-8")
+            allf += findings(p.name, srcs[p.name], want)
         except Exception as e:  # a page that cannot be read is a finding
             allf.append(f"{p.name}: cannot read: {e!r}")
+    for fs in render_findings(srcs).values():
+        allf += fs
     for f in allf:
         print(f)
     for n in app_notes(want):
@@ -270,15 +331,15 @@ def selftest() -> int:
         "fs-rem": (src.replace("--fs-tag:12px", "--fs-tag:.75rem", 1), "[fs-unit]"),
         "fs-hyphen": (src.replace("--fs-tag:12px;", "--fs-tag:12px; --fs-tag-sm:10px;", 1), "[token-name]"),
         "fs-outside-root": (src.replace("button:hover{", "button:hover{--fs-body:10px;", 1), "[token-scope]"),
-        "fs-small-at-breakpoint": (src.replace("--rail:34px", "--rail:34px;--fs-body:11px", 1), "[fs-min]"),
-        "platform-at-breakpoint": (src.replace("--rail:34px", "--rail:34px;--p-fb:#000000", 1), "[token-name]"),
+        "fs-small-at-breakpoint": (src.replace("--av:30px", "--av:30px;--fs-body:11px", 1), "[fs-min]"),
+        "platform-at-breakpoint": (src.replace("--av:30px", "--av:30px;--p-fb:#000000", 1), "[token-name]"),
         "px-font-size": (src.replace("button:hover{", "button:hover{font-size:11px;", 1), "[font-size]"),
         "undeclared-fs": (src.replace("button:hover{", "button:hover{font-size:var(--fs-xs);", 1), "[font-size]"),
         "px-font-shorthand": (src.replace("button:hover{", "button:hover{font:600 11px x;", 1), "[font]"),
         "rem-font-shorthand": (src.replace("button:hover{", "button:hover{font:600 .6rem Inter;", 1), "[font]"),
-        "own-token": (src.replace("--rail:46px;", "--rail:46px; --brand:#123456;", 1), "[token-name]"),
-        "p-palette": (src.replace("--rail:46px;", "--rail:46px; --p-page-bg:#fdf2f8;", 1), "[token-name]"),
-        "platform-redefined": (src.replace("--rail:46px;", "--rail:46px; --p-fb:#000000;", 1), "[token-name]"),
+        "own-token": (src.replace("--ed-w:580px;", "--ed-w:580px; --brand:#123456;", 1), "[token-name]"),
+        "p-palette": (src.replace("--ed-w:580px;", "--ed-w:580px; --p-page-bg:#fdf2f8;", 1), "[token-name]"),
+        "platform-redefined": (src.replace("--ed-w:580px;", "--ed-w:580px; --p-fb:#000000;", 1), "[token-name]"),
         "repoint-app-token": (src.replace(".app{", ".app{--accent:var(--p-ig);", 1), "[token-name]"),
         "upper-token": (src[:style_end] + ":root{--Brand:#123456}\n" + src[style_end:], "[token-name]"),
         "second-palette": (src.replace("html,body{height:100%}", "@media (prefers-color-scheme: dark){html{opacity:1}}\nhtml,body{height:100%}", 1), "[palette]"),
@@ -297,6 +358,20 @@ def selftest() -> int:
         got = findings(k, v, want)
         if v == src or not any(code in f for f in got):
             missed.append(f"{k} (wanted {code}; got {[f.split(': ', 1)[1][:40] for f in got][:3]})")
+    rmuts = {  # rendered rules: one browser run for the base page and these
+        "chips-21": (src.replace("<main>", "<main><div>" + '<span class="chip">x</span>' * (CHIP_MAX + 1) + "</div>", 1), "[chips] view 'opening'"),
+        "card-no-thumb": (src.replace('class="cthumb ', 'class="cthumx ', 1), "week cards have no thumbnail"),
+        "no-week-cards": (src.replace('class="week" id="weekView"', 'class="wk" id="weekView"', 1), "shows no cards"),
+        "page-throws": (src.replace("<script>", "<script>throw new Error('selftest');", 1), "[render] script error"),
+        "no-views": (src.replace("data-view=", "data-vw=").replace('[data-view]', '[data-vw]'), "[render] no [data-view]"),
+    }
+    rendered = render_findings({"base": src, **{k: v for k, (v, _) in rmuts.items()}})
+    if rendered["base"]:
+        print("self-test needs a green rendered page first:"); print("\n".join(rendered["base"])); return 1
+    for k, (v, code) in rmuts.items():
+        if v == src or not any(code in f for f in rendered[k]):
+            missed.append(f"{k} (wanted {code}; got {[f.split(': ', 1)[1][:60] for f in rendered[k]][:3]})")
+    muts.update(rmuts)
     print(f"self-test: {len(muts) - len(missed)}/{len(muts)} mutations raised their own rule" + ("; MISSED: " + "; ".join(missed) if missed else ""))
     return 1 if missed else 0
 

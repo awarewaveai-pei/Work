@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-16（續31）社群發文樣稿第 14 版（C13，GAP_REPORT U1–U6、U12、U13）＋檢查加「一屏 pill ≤ 20」「週卡要有縮圖」兩條（真的開瀏覽器量）— 等操作者看圖，沒動 next-admin
+
+**為什麼**：續21／續25 盤點結論：建版與樣稿第 13 版一模一樣，所以「醜」是設計本身，要先重做樣稿、操作者看圖同意後才改程式。
+**改了什麼**（`lobster-factory/docs/social/mockups/`）：
+- `social-manager-mock.html` 第 14 版（app-theme 區塊原樣保留，`sync-app-theme.py --check` up to date）：
+  - U1 控制只有三種：主要動作＝`.btn-primary`、切換＝分段控制 `.seg`、篩選＝一顆「篩選 · N」鈕＋面板（勾選＝只看這些；N＝已勾數）。pill 只放「值」（狀態、格式）。
+  - U2 篩選列與狀態圖例拿掉；狀態看卡片左邊色條，篩選面板兼圖例。
+  - U3 週檢視每天一欄、卡片照時間往下疊：縮圖（文字貼文是一條細的「文字」，縮圖左上是頻道標記）、時間、兩行文字、色條；滑過出 預覽／複製／刪除；過去的日子斜紋。
+  - U4 預覽分平台：Bluesky／Facebook／Instagram／Threads／LinkedIn 五種外框（品牌頭像、名稱、handle、多圖點點、IG 沒圖紅框提醒、超過字數的字紅底）；沒有假互動數字。「共用」分頁一次列出所有選的平台，平台分頁只看那一個。
+  - U5 編輯器三層：①頭像選帳號（灰＝沒選，紅「!」＝授權過期點了到設定重連，「…」＝平台審核中）＋共用／各平台分頁（藍點＝另寫，紅「!」＝超過字數）②大文字框，框內底部 8 個 icon（第一則留言、連結與 UTM、替代文字、常用文字、AI、表情、媒體、備註）＋最緊平台的字數 ③平台設定（IG／FB 貼文／Reel／限時動態、Threads 結尾留言、LinkedIn 文件輪播、Bluesky 說明下一版）。
+  - U6 自製日期時間選擇（月曆＋幾點＋幾分，token 樣式）；主按鈕依狀態換字：新貼文「加入行事曆」、草稿「排程」、已排程「更新」、輪播「加入輪播清單」、已發佈「複製成新貼文」；存草稿／送審／立即發佈收進 ▾，立即發佈仍要再確認。
+  - U12 輪播／媒體／紀錄／設定全寬，編輯器只在行事曆（週／月／清單）出現；輪播清單左右兩欄（清單｜內容）；設定兩欄（帳號＋加帳號方格｜審核、時區、團隊）。
+  - U13 第三個品牌「新品牌」沒資料，每個檢視都看得到空狀態（圖＋一句＋一顆鈕）。
+  - 手機（≤640px，U10 規格，程式在 C16）：日檢視（上方一週日期條）、＋浮動鈕、編輯器全螢幕 sheet，頂部「編輯／預覽」切換；390 寬任何檢視頁寬＝390（`.app` 欄位改 `minmax(0,1fr)`，寬表格在面板內捲）。
+- `check-social-mocks.py` 加兩條（實際開瀏覽器量）：`[chips]` 開頁畫面＋每個 `[data-view]` 切換後，視窗內 pill 形狀（圓角 ≥ 高度一半、比高寬、有框或底色）≤ `CHIP_MAX`=20；`[card-thumb]` 週卡片都要有 `.cthumb`，且開頁要真的有卡片（沒卡片＝沒證明）。量不到、頁面 JS 出錯、找不到 `[data-view]`＝`[render]` finding（不算過）。pill 判定：有 `.chip`／`.pill` class 一律算，其餘看形狀。版面 token 改 `--ed-w`／`--av`／`--thumb-h`，selftest 錨點跟著改；新增 `measure-mock.mjs`（Playwright 取 `infra/hetzner-phase1-core/tests` 的安裝，字型請求擋掉求穩定）。
+- 量到的數字：開頁 2、週 2、月 2、清單 7、設定 4、輪播／媒體／紀錄 0；週卡 9 張、缺縮圖 0。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/docs/social/mockups/check-social-mocks.py → 1 page(s), 0 finding(s)；--selftest → 44/44 mutations raised their own rule（含 chips-21、card-no-thumb、no-week-cards、page-throws、no-views）；sync-app-theme.py --check → up to date | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/render-views.mjs <tmp> --mock（1280×660）＋ scratch Playwright 390×844 各檢視（日、月、清單、輪播、媒體、紀錄、設定、編輯 sheet、預覽、日期選擇）scrollWidth 全 390、pageerror 0 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/1m/3n -- critic agent：M1 一個字的 pill 比例 1.23 被漏算、chips-21 突變只靠清單檢視才紅 → 有 .chip/.pill class 一律算、形狀門檻 1.1、突變改一列 21 個並指定 opening；n1 沒有 [data-view] 時只量開頁不報 → [render]；n2 一行壞 JSON 作廢整批 → 逐行；n3 [render]／沒卡片沒有突變 → 補 3 個。全修。另自審：每個檢視看過截圖（桌機 18 張、手機 10 張），修掉 header 擠行、「週日」雙字、字數被切、卡片頻道標記被時間擠掉、選取卡片動作列擋標記、IG 分頁文字框被壓扁、空品牌清單雙空狀態、390 寬表格撐寬頁面
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=check-social-mocks|measure-mock|social-manager-mock|LAYOUT_TOKENS | hits=12 -- 改動檔以外 12 行，全是指向樣稿路徑的文件／註解（路徑沒變）；沒有程式讀樣稿內部（next-admin `__tests__/page-rules.test.ts` 只讀自己的檔案）。過時主張 1 處：ADR 016 §5（`016-social-manager-third-product.md:45`）寫「左邊行事曆（週／月／清單／輪播／媒體／紀錄／設定），右邊編輯＋預覽」，v14 改成側檢視全寬——等操作者同意 v14 再改 ADR（本卡範圍只到樣稿）
+- ORACLE_WAIVED: 只改樣稿與樣稿檢查（docs 資料夾，不上線）；證據＝41/41 突變＋截圖
+
+**剩**：操作者看圖（`c13-mock-v14-1280x660.png`、`c13-mock-v14-390-day.png`、`c13-mock-v14-390-sheet.png`，在 side-session-notes 資料夾；`python lobster-factory/docs/social/mockups/preview-server.py` 後開 http://127.0.0.1:8766/social-manager-mock.html 可以點）。同意後才開 C13 實作卡（next-admin）。`render-views.mjs --mock` 只截 1280，390 截圖用的是暫存腳本；C16 依卡片把 390 斷言加進 render-views.mjs。
+**rollback**：`git revert <本 commit>`（只動 mockups/ 三檔＋一新檔）。
 ## 2026-10-16（續30）客服 AI 危機意圖：Soulful 加 `self_harm` 意圖接住婉轉說法，分類器 10/10；程式讓它跟關鍵字同樣處理 — next-admin，交 03:00 自動部署
 
 **做了**（操作者「去處理」）：
