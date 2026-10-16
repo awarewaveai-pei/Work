@@ -20,6 +20,15 @@ export interface SceneItem {
   transitionOut?: "cut" | "fade" | "slide_left" | "slide_right";
 }
 
+const Captions: React.FC<{ items: Array<{ startFrame: number; endFrame: number; text: string }> }> = ({ items }) => {
+  const frame = useCurrentFrame();
+  const active = items.find((item) => frame >= item.startFrame && frame < item.endFrame);
+  if (!active) return null;
+  return <div style={{ position: "absolute", left: "8%", right: "8%", bottom: "8%", textAlign: "center", padding: "12px 20px", background: "rgba(0,0,0,.68)", borderRadius: 12 }}>
+    <span style={{ color: "#fff", fontSize: 44, fontFamily: "Noto Sans CJK SC, sans-serif", fontWeight: 700, lineHeight: 1.25 }}>{active.text}</span>
+  </div>;
+};
+
 // ── Private slide renderer ────────────────────────────────────────────────────
 // useCurrentFrame() is automatically 0-relative inside its parent <Sequence>.
 const Slide: React.FC<{
@@ -233,11 +242,13 @@ export const SceneSeries: React.FC<{
   backgroundColor?: string;
   audioUrl?: string;
   transitionDurationSeconds?: number;
+  captions?: Array<{ startFrame: number; endFrame: number; text: string }>;
 }> = ({
   scenes,
   backgroundColor = "#0ebba2",
   audioUrl,
   transitionDurationSeconds = 1.0,
+  captions = [],
 }) => {
   const { fps } = useVideoConfig();
   const transitionFrames = Math.round(fps * transitionDurationSeconds);
@@ -288,6 +299,7 @@ export const SceneSeries: React.FC<{
         );
       })}
       {audioUrl && <Audio src={audioUrl} />}
+      {captions.length > 0 && <Captions items={captions} />}
     </AbsoluteFill>
   );
 };

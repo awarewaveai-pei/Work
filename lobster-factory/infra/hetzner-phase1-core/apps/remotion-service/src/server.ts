@@ -26,6 +26,7 @@ const R2_API_TOKEN = process.env.R2_API_TOKEN ?? "";
 const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID ?? "";
 const R2_VIDEO_BUCKET = process.env.R2_VIDEO_BUCKET ?? "lobster-videos";
 const R2_VIDEO_PUBLIC_BASE = (process.env.R2_VIDEO_PUBLIC_BASE ?? "").replace(/\/$/, "");
+const R2_API_BASE_URL = (process.env.R2_API_BASE_URL ?? "https://api.cloudflare.com").replace(/\/$/, "");
 
 const authPolicy = evaluateRendererAuthPolicy({
   token: AUTH_TOKEN,
@@ -107,7 +108,7 @@ async function getBundle(): Promise<string> {
 // ── R2 upload ─────────────────────────────────────────────────────────────────
 async function uploadToR2(filePath: string, r2Key: string): Promise<string> {
   const buf = await fs.promises.readFile(filePath);
-  const url = `https://api.cloudflare.com/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_VIDEO_BUCKET}/objects/${r2Key}`;
+  const url = `${R2_API_BASE_URL}/client/v4/accounts/${R2_ACCOUNT_ID}/r2/buckets/${R2_VIDEO_BUCKET}/objects/${r2Key}`;
   const resp = await fetch(url, {
     method: "PUT",
     headers: {
@@ -271,6 +272,7 @@ app.post("/render", requireAuth, (req: express.Request, res: express.Response) =
         serveUrl,
         id: compositionId,
         inputProps,
+        browserExecutable: process.env.REMOTION_CHROME_EXECUTABLE_PATH,
       });
 
       // Data-driven templates set durationInFrames via calculateMetadata (scenes[] sum).
@@ -286,6 +288,7 @@ app.post("/render", requireAuth, (req: express.Request, res: express.Response) =
         codec: "h264",
         outputLocation: outFile,
         inputProps,
+        browserExecutable: process.env.REMOTION_CHROME_EXECUTABLE_PATH,
         concurrency: 1,
         chromiumOptions: {
           headless: true,

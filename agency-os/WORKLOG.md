@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-16（續18）部署盤點：沒有待部署的程式；發現 main 的 remotion-service 比正式環境舊（2026-09-10 誤合併 91fdfe31a 丟掉），已補回
+
+**做了**（操作者「該部署的一起做」）：
+- 盤點：next-admin 已在 3b146fd0f（之後推上的 16 個 commit 只有文件與監工台頁，無 app／migration）。其他 app 用 scratchpad `app-drift.py` 比對 origin/main 與主機 `/root/lobster-phase1/apps/<app>`（CRLF→LF sha256）：node-api 5/5、renderer 7/7、video-service 18/18 相同；r2-egress-proxy 只差 `test/proxy.test.cjs`（部署不帶測試）；**remotion-service 3 檔不同**。
+- 方向相反：主機版本較新（字幕 `Captions`、`R2_API_BASE_URL`、`REMOTION_CHROME_EXECUTABLE_PATH`）。`91fdfe31a`（2026-09-10 reconcile merge）第一親代 82cf5cf3f、第二親代 dbe28f317，結果取了舊的一邊；724044af7（captions）在 main 歷史裡但內容不在。2026-09-10「補回 91fdfe31a merge 撤銷」那次（本檔該日條目）只補了 next-admin 16 檔，沒補 remotion-service。若從 main 部署 remotion-service，正式環境會退回沒有字幕的版本（next-admin `timeline-remotion.ts` 的 `compileCaptions` 會送 captions）。
+- 修：三檔改回 `dbe28f317` 版（`git show dbe28f317:<path>`），合併後 0 個新 commit；blob 與主機完全相同：server.ts fbf63e2、SceneSeries.tsx 9bd62af、DynamicSlideshow.tsx 059addb。正式環境不需部署（已在跑這版）。
+- 掃整個 merge（scratchpad `merge-drops.py 91fdfe31a`）：其餘被丟的可部署檔合併後都有新 commit，不能整檔換回，開 TASKS 逐行比對：video-service `pipeline.py`（2）／`server.py`（1）、meeting-service 3 檔（0，但主機無此 app）、`docker-compose.yml`（27）、`docker-compose.renderer-staging.yml`（0）、`.env.example`（4）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=`python app-drift.py node-api hci-app r2-egress-proxy remotion-service renderer video-service` → remotion-service differ=3，其餘 0（r2 缺測試檔）；主機三檔 `git hash-object` = dbe28f317 的 blob | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`git hash-object` 補回後三檔 = fbf63e2／9bd62af／059addb（= 主機） | exit=0 | ms=500
+- REVIEW_WAIVED: NA -- 換回已在正式環境運行的同一份內容（位元組相同），不是新程式
+- ORACLE_WAIVED: 內容＝正式環境現行版本（blob 相同），無新邏輯可審
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`merge-drops.py 91fdfe31a`（整個 merge 的被丟檔） | hits=37（next-admin 16 檔已於 2026-09-10 補回；remotion 3 檔本條補回；其餘列入 TASKS）
+
+**rollback**：`git revert` 本 commit（只動 repo；正式環境不變）。
 ## 2026-10-16（續17）社群成員管理 UI 驗收完成：操作者在設定頁「成員」把客戶帳號加為編輯
 
 - REALTEST_EVIDENCE: tool=SSH | cmd=psql 唯讀：`social_brand_members` 該帳號 `editor|2026-10-16 08:23:08Z`；`social_audit_log` `ops:owner member_add {"role":"editor"}` 一筆 | exit=0 | ms=2000
