@@ -1,5 +1,5 @@
 # Repair Center Phase 4 週巡檢
-- 日期: 2026-10-09 14:22 TPE
+- 日期: 2026-10-16 14:15 TPE
 - 觸發: Claude routine AgencyOS-RepairCenterPhase4Weekly
 - Check 1 重複修復: SKIP — gh exit=1
 - Check 2 needs-human-review PR: SKIP — gh exit=1
@@ -7,8 +7,8 @@
   - company-p1-pilot: SKIP — not-onboarded
   - company-scenery-travel-mongolia: SKIP — not-onboarded
   - company-soulful-expression 3A 還原演練: PASS — 最近 PASS 2026-08-16，下次到期 2026-11-14（間隔 90 天）
-  - company-soulful-expression 3B 備份新鮮度: WARNING — 距上次成功 43 天（2026-08-26T08:12:07Z），超過 8 天門檻
+  - company-soulful-expression 3B 備份新鮮度: WARNING — 距上次成功 50 天（2026-08-26T08:12:07Z），超過 8 天門檻
   - company-soulful-expression 3C 最近結果: PASS — 最新一次成功
-  - company-soulful-expression 3D 真相來源: WARNING — backup task 已 43 天無變化（2026-08-27T01:11:03Z）—— 備份停擺或 EU sync 已死，3B/3C 本輪不可信
+  - company-soulful-expression 3D 真相來源: WARNING — backup task 已 50 天無變化（2026-08-27T01:11:03Z）—— 備份停擺或 EU sync 已死，3B/3C 本輪不可信
 - Check 4 VPS auto-reboot SSOT: PASS
 - 整體: ⚠️ 1 項需注意, 2 項 SKIP
