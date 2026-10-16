@@ -517,7 +517,7 @@
   - [x] **✅ 危機訊息轉真人時回客人的話**（操作者 2026-10-16 定案）：確認句附求助專線（依客人語言寫，台灣 119／1925／1995＋澳洲 000／Lifeline 13 11 14 都列）、照樣問名字、即時 Telegram 通知操作者（不帶客人原文）。見 WORKLOG 2026-10-16（續27）。
   - [x] 婉轉說法：Soulful 加了意圖 `self_harm`（敏感、L0），分類器 10/10（6 句婉轉說法全進、4 句一般問題不進）；程式讓這個意圖跟關鍵字同樣處理（專線＋通知）。見 WORKLOG 2026-10-16（續30）。
   - [ ] **🔴 憑證外洩到對話紀錄（2026-10-16）**：一個 session 印出 `mcp/user-env.ps1` 第 85–100 行，GitHub PAT（`GITHUB_PERSONAL_ACCESS_TOKEN`／`COPILOT_MCP_BEARER_TOKEN`）、`GEMINI_API_KEY`、`GOOGLE_OAUTH_CLIENT_SECRET` 明文進了 Claude Code 對話紀錄。待操作者決定是否輪換（High：憑證）。
-  - [ ] **危機訊息正式環境驗收**（等部署）：部署含 `4f381881f` 與危機意圖那個 commit 後，操作者用 John Doe（非粉專角色）在 Messenger 傳兩句：一句關鍵字（例「我最近一直想傷害自己」）、一句婉轉（例「有時候覺得大家沒有我會比較好」）；先把對話結案（open＝真人接手時 AI 靜默）。驗：客人收到專線確認句＋名字問題、Telegram 各一則、`cs_ai_replies` handoff。
+  - [ ] **危機訊息正式環境驗收**（已部署 `940169245`，2026-10-16 12:20Z；等操作者傳訊）：操作者用 John Doe（非粉專角色）在 Messenger 傳兩句：一句關鍵字（例「我最近一直想傷害自己」）、一句婉轉（例「有時候覺得大家沒有我會比較好」）；先把對話結案（open＝真人接手時 AI 靜默）。驗：客人收到專線確認句＋名字問題、Telegram 各一則、`cs_ai_replies` handoff。
   - [ ] 產品決定：知識庫內容／模型／prompt 變動要不要讓「考過」失效並自動重考（計畫 §5.2 CI 閘）。現況不失效；網站每週重爬，若失效又沒自動重考，自動回覆每週會退回草稿。見 WORKLOG 2026-10-16（續11）「沒涵蓋」。
   - [ ] Soulful 常見問答的價格／時間／地點／報名是**測試值**（WORKLOG 2026-10-16（續22））：對外宣傳前操作者給真值，在客服分頁「常見問答」改 `pricing`／`schedule`／`location`（＋ -en）四條。
   - [ ] 考試要照正式路徑先過常見問答：現在 `runEvalCase` 只跑 `planReply`（AI 層），正式 `webhooks/chatwoot/route.ts:163` 先 `matchFaq`。價格／報名題在正式環境由 FAQ 回，考試卻記成「危險誤答」。修法：考試先 `matchFaq`，命中＝依 entry.handoff 判定。見 WORKLOG 2026-10-16（續19）（續22）。

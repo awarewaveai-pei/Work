@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-16（續33）next-admin `940169245` 手動部署（操作者「go ahead: deploy next-admin now」）：危機專線確認句＋Telegram 通知（4f381881f）＋self_harm 意圖（479de8737）上線
+
+**範圍**：`81eefab9c..940169245` 的 next-admin commit：`4f381881f`、`5d9a6aa09`（另一 session：Chatwoot 基本設定每日排程）、`479de8737`；無 migration；`DEPLOY_HOLD` 無；`check-deploy-drift` behind 8、compose 變數無漂移。
+**結果**：`sg-deploy.sh next-admin` exit 0，healthy 10 秒，HTTP smoke 5/5，`.deployed-commit=940169245`（12:20:59Z）；容器名正常；build 內含 `self_harm`（5 個 chunk）與 `13 11 14`（2 個）；部署後 3 分鐘 log error 0；`playwright-runner -Mode smoke` 26 pass／0 fail／6 skip。
+**未驗**：危機訊息端到端（要操作者用 John Doe 在 Messenger 傳訊），見 TASKS「危機訊息正式環境驗收」。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin`（healthy 10s、smoke 5/5、.deployed-commit=940169245） | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke -SkipInstall` 26/0/6 | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 部署，程式已在各自 commit 審過（Codex 58beec4d／e444b6c1／6e23abdb）
+- BUGHUNT_WAIVED: NA -- 部署，無程式改動
+
+**rollback**：主機 `/root/lobster-phase1/scripts/rollback-phase1.sh`，或 `git revert` 後重新部署（DEPLOY_ROLLBACK_RUNBOOK §2.1）。
 ## 2026-10-16（續32）社群 C13 收尾：共用 git index 停在舊版（bare commit 會倒退 39 檔）已同步回 HEAD；render-views --mock 加手機 390 截圖＋寬度把關；ADR 016 §5 寫進樣稿第 14 版
 
 **操作者**：「全部去處理好」（續31 列的剩餘項）。
