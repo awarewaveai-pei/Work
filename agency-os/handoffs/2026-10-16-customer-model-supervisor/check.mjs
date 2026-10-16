@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { AXES, WAYS, STEPS, OPEN, DOORS, NOW } from './data.mjs';
+import { AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY } from './data.mjs';
 import { render } from './build.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +15,7 @@ const domain = Object.fromEntries(AXES.map((a) => [a.key, new Set(a.values.map((
 for (const w of WAYS) for (const k of Object.keys(domain)) if (!domain[k].has(w[k])) fail(`way ${w.name}: ${k}=${w[k]} 不在軸的值域`);
 if (new Set(WAYS.map((w) => w.name)).size !== WAYS.length) fail('WAYS 名字重複');
 for (const w of WAYS) if (!w.story) fail(`way ${w.name}: 缺 story（白話例子）`);
+if (!COPY || !COPY.nav) fail('缺 COPY.nav');
 for (const a of AXES) { if (!a.q) fail(`axis ${a.key}: 缺 q`); for (const v of a.values) if (!v.plain) fail(`axis ${a.key}.${v.v}: 缺 plain`); }
 
 // 2. 順序：編號 1..n 連續；每步有 gate／risk／model／status；done 必有 commit；depends 指向更小的編號
@@ -41,11 +42,12 @@ for (const r of NOW) if (!['yes', 'no'].includes(r.state)) fail(`NOW ${r.what}: 
 const page = readFileSync(path.join(here, 'supervisor.html'), 'utf8');
 if (page !== render()) fail('supervisor.html 不是 build.mjs 的最新產物：跑 node build.mjs');
 
-// 6. 頁面裡每個「N 步／N 種／N 扇」都是算出來的（帶 data-computed），不是手打
-for (const m of page.matchAll(/(\d+)\s*(種，|件：|做完|做到一半|還沒開始|種現在有)/g)) {
-  const before = page.slice(Math.max(0, m.index - 40), m.index);
-  if (!before.includes('data-computed')) fail(`手打數字：${m[0]}`);
-}
+// 6. 數字只能來自資料：拿掉 <span data-computed>…</span> 後，「N 種／N 項／N／M」不得再出現
+const stripped = page.replace(/<style>[\s\S]*?<\/style>/, '').replace(/<span data-computed>[^<]*<\/span>/g, '');
+for (const m of stripped.matchAll(/\d+\s*(種|項|／\s*\d)/g)) fail(`手打數字：${m[0]}`);
+
+// 7. 頁面不用「我們」（操作者 2026-10-16）
+if (/我們/.test(page)) fail('頁面出現「我們」');
 
 if (errors.length) { console.error(errors.map((e) => 'FAIL ' + e).join('\n')); process.exit(1); }
 console.log(`ok: ${WAYS.length} ways, ${STEPS.length} steps, ${OPEN.length} open, page fresh`);

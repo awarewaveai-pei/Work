@@ -2,31 +2,42 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&family=IBM+Plex+Mono:wght@400&display=swap">
 <style>
-/* 單欄、一題一段。顏色只載意義：有／沒有、做完／沒做、風險高低。 */
+/* 左側欄＋右側單欄內容；手機時側欄在上。顏色只載意義：有／沒有、狀態、風險。 */
 :root{
-  --bg:#f4f5f7; --paper:#ffffff; --ink:#1b2230; --muted:#5d6878; --line:#d8dde5; --accent:#2b4ea2;
+  --bg:#f4f5f7; --paper:#ffffff; --ink:#1b2230; --muted:#5d6878; --line:#d8dde5; --accent:#2b4ea2; --rail:#e9ecf1;
   --todo:#8b95a5; --doing:#c2410c; --done:#1f7a3a; --no:#b42318; --high:#b42318; --med:#9a6700; --low:#1f7a3a;
   --display:"Noto Serif TC","Songti TC",serif; --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;color-scheme:dark}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121722;--paper:#1b2231;--ink:#e7eaf1;--muted:#9aa5b6;--line:#2c3547;--accent:#92a9ea;--rail:#171d2a;--todo:#7c8698;--doing:#f49c5c;--done:#62c983;--no:#f0776b;--high:#f0776b;--med:#e4b84a;--low:#62c983;color-scheme:dark}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.6;font-size:16px}
-.wrap{max-width:820px;margin:0 auto;padding-block:24px 56px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-h1{font-family:var(--display);font-size:28px;margin:0 0 6px;text-wrap:balance}
-.sub{color:var(--muted);margin:0 0 22px;font-size:14px}
-section{margin-bottom:36px}
-section>h2{font-family:var(--display);font-size:21px;margin:0 0 4px;text-wrap:balance}
-section>h2 .cnt{font-family:var(--body);font-size:14px;color:var(--muted);font-weight:400;margin-left:8px}
+.shell{display:grid;grid-template-columns:240px minmax(0,1fr);min-height:100%}
+@media (max-width:820px){.shell{grid-template-columns:1fr}}
+aside{background:var(--rail);border-right:1px solid var(--line);padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px}
+@media (max-width:820px){aside{border-right:0;border-bottom:1px solid var(--line);padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px}}
+aside .in{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px)}
+@media (max-width:820px){aside .in{position:static}}
+aside h1{font-family:var(--display);font-size:20px;margin:0 0 4px;text-wrap:balance}
+aside .upd{color:var(--muted);font-size:12.5px;margin:0 0 14px}
+.bar{display:flex;height:8px;border-radius:999px;overflow:hidden;background:var(--line);margin:0 0 16px}
+.bar i{display:block;height:100%}.bar .d{background:var(--done)}.bar .g{background:var(--doing)}
+nav{display:grid;gap:2px}
+@media (max-width:820px){nav{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}}
+nav a{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 10px;border-radius:8px;color:var(--ink);text-decoration:none;font-size:15px}
+nav a:hover,nav a:focus-visible{background:var(--paper);outline:none}
+nav a small{color:var(--muted);font-size:12.5px;white-space:nowrap}
+main{min-width:0;max-width:820px;padding-block:24px 56px;padding-left:24px;padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:820px){main{padding-left:max(16px,env(safe-area-inset-left,0px))}}
+.sub{color:var(--muted);margin:0 0 24px;font-size:15px}
+section{margin-bottom:36px;scroll-margin-top:16px}
+section>h2{font-family:var(--display);font-size:21px;margin:0 0 4px}
 section>.lead{color:var(--muted);margin:0 0 14px;font-size:15px}
 code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border-radius:4px;padding:1px 5px;color:var(--muted)}
 small{display:block;color:var(--muted);font-size:13px;font-weight:400}
-/* 有／沒有 */
 ul.yn{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 ul.yn li{display:grid;grid-template-columns:52px 1fr;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
-ul.yn li b{font-size:15px;align-self:start}
 ul.yn li.yes b{color:var(--done)}ul.yn li.no b{color:var(--no)}
 ul.yn li span{min-width:0}
-/* 五種樣子 */
 .ways{display:grid;gap:12px}
 .way{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0;border-left:5px solid var(--todo)}
 .way.live{border-left-color:var(--done)}
@@ -41,10 +52,9 @@ ul.yn li span{min-width:0}
 .way dt{font-size:12.5px;color:var(--muted)}.way dd{margin:0;font-size:14px;font-weight:500}
 .way dd code{display:block;margin-top:2px;background:transparent;padding:0;font-weight:400}
 .way .note{margin:8px 0 0;font-size:13px;color:var(--muted)}
-/* 七件事、待決 */
 ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
-.step,ol.steps li{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
-.step .n,ol.steps li .n{width:30px;height:30px;border-radius:50%;background:var(--todo);color:#fff;text-align:center;line-height:30px;font-weight:700;font-size:14px}
+ol.steps li{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0;scroll-margin-top:16px}
+ol.steps li .n{width:30px;height:30px;border-radius:50%;background:var(--todo);color:#fff;text-align:center;line-height:30px;font-weight:700;font-size:14px}
 .step.doing .n{background:var(--doing)}.step.done .n{background:var(--done)}
 ol.open li .n{background:var(--accent)}
 .b{min-width:0}
@@ -53,158 +63,154 @@ ol.open li .n{background:var(--accent)}
 .pill{border-radius:999px;padding:1px 9px;border:1px solid currentColor;white-space:nowrap}
 .st-todo{color:var(--todo)}.st-doing{color:var(--doing)}.st-done{color:var(--done)}
 .risk-high{color:var(--high)}.risk-med{color:var(--med)}.risk-low{color:var(--low)}
-.who{color:var(--muted)}
+.who{color:var(--muted)} a.who{color:var(--accent)}
 .donewhen{margin:0 0 6px;font-size:14px}
 details{font-size:13.5px;color:var(--muted)}
 details summary{cursor:pointer;color:var(--accent)}
 details p{margin:6px 0 0}
-details code{font-size:12px}
-.prog{display:flex;gap:6px;height:10px;border-radius:999px;overflow:hidden;background:var(--line);margin:8px 0 14px}
-.prog i{display:block;height:100%}.prog .d{background:var(--done)}.prog .g{background:var(--doing)}
-/* 門、檔案 */
+details code{font-size:12px;word-break:break-all}
 ul.doors{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 ul.doors li{display:grid;grid-template-columns:72px 1fr;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;font-size:14.5px}
 ul.doors li span{min-width:0}
 .paths{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px}
-.paths div{display:grid;grid-template-columns:150px 1fr;gap:8px;padding:4px 0;border-top:1px solid var(--line);min-width:0}
+.paths div{display:grid;grid-template-columns:130px 1fr;gap:8px;padding:5px 0;border-top:1px solid var(--line);min-width:0}
 .paths div:first-child{border-top:0}
 .paths code{word-break:break-all}
 @media (max-width:560px){.paths div{grid-template-columns:1fr}}
-:target{scroll-margin-top:12px;box-shadow:0 0 0 2px var(--accent)}
+:target{box-shadow:0 0 0 2px var(--accent)}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
 </style>
-<div class="wrap">
-<h1>客戶怎麼來 監工台</h1>
-<p class="sub">客戶從哪裡進來、誰付錢、誰在按；系統還差哪幾件事。更新 2026-10-16。</p>
+<div class="shell">
+<aside><div class="in">
+  <h1>客戶怎麼來 監工台</h1>
+  <p class="upd">更新於 <span data-computed>2026-10-16</span></p>
+  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#steps"><span>待建項目</span><small><span data-computed>0</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>3</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+</div></aside>
+<main>
+<p class="sub">說明客戶來源、付款方、操作人，以及系統尚缺的項目。</p>
 
-<section id="now"><h2>一、現在怎樣</h2><p class="lead">今天查的實況。客戶進不來，也沒有人付錢；所有東西都是你自己用，或我們替客戶做。</p>
-<ul class="yn"><li class="no"><b>沒有</b><span>客戶能自己登入<small>今天才開：員工替客戶開帳號 → 設定密碼信；prod 缺 RESEND_API_KEY，portal 公開註冊關著（WORKLOG 2026-10-16 續8、續10）</small></span></li><li class="no"><b>沒有</b><span>有人付錢<small>0062 合約 0 筆、錢包帳本 0 筆、Woo 未賣點數包（ADR 015:13、ADR 017 脈絡）</small></span></li><li class="no"><b>沒有</b><span>買斷<small>授權檔、安裝程式、模組清單未建（順序 5）</small></span></li><li class="no"><b>沒有</b><span>許可判斷<small>lib/entitlements 不存在；認知平台 check_entitlement 永遠 grant（check.py:25）</small></span></li></ul></section>
+<section id="now"><h2>現況</h2><p class="lead">客戶目前無法自行登入，也尚未收費；現在只有自用與代操。</p><ul class="yn"><li class="no"><b>沒有</b><span>客戶可自行登入<small>今天才開放：員工替客戶開立帳號，寄出設定密碼信；prod 缺少 RESEND_API_KEY，portal 的公開註冊仍關閉（WORKLOG 2026-10-16 續8、續10）</small></span></li><li class="no"><b>沒有</b><span>已有付費客戶<small>0062 合約 0 筆、錢包帳本 0 筆、Woo 尚未販售點數包（ADR 015:13、ADR 017 脈絡）</small></span></li><li class="no"><b>沒有</b><span>買斷<small>授權檔、安裝程式與模組清單均未建立（順序 5）</small></span></li><li class="no"><b>沒有</b><span>許可判斷<small>lib/entitlements 不存在；認知平台 check_entitlement 永遠回傳 grant（check.py:25）</small></span></li></ul></section>
 
-<section id="ways"><h2>二、客戶的五種樣子<span class="cnt" data-computed>5 種，2 種現在有</span></h2>
-<p class="lead">每一種只要回答三個問題：裝在哪裡、錢從哪裡來、誰在按按鈕。程式只存這三個答案，所以以後多一種客戶，不用改程式。</p>
-<div class="ways"><article class="way live">
-    <header><span class="k">1</span><h3>自用<small>我們自己用</small></h3><span class="tag">現在有</span></header>
-    <p class="story">例：你自己在 app.aware-wave.com 用社群發文、客服、蒐集，沒有人付錢。</p>
-    <dl><div><dt>裝在哪裡？</dt><dd>我們的主機<code>hosted</code></dd></div><div><dt>錢從哪裡來？</dt><dd>不收錢（自己用或送的）<code>comp</code></dd></div><div><dt>誰在按按鈕？</dt><dd>我們的員工（替客戶按）<code>staff</code></dd></div></dl>
-    <p class="note">計費帳戶 organizations.kind = internal（Account#0）</p></article><article class="way live">
-    <header><span class="k">2</span><h3>代操<small>我們替客戶操作</small></h3><span class="tag">現在有</span></header>
-    <p class="story">例：Soulful 付月費，我們的員工替她發文、回客服；她自己不登入。</p>
-    <dl><div><dt>裝在哪裡？</dt><dd>我們的主機<code>hosted</code></dd></div><div><dt>錢從哪裡來？</dt><dd>按月／按年訂閱<code>contract</code></dd></div><div><dt>誰在按按鈕？</dt><dd>我們的員工（替客戶按）<code>staff</code></dd></div></dl>
-    <p class="note">也可 credits；客戶買維運時 self_hosted；on_behalf_of = 客戶</p></article><article class="way ">
-    <header><span class="k">3</span><h3>訂閱<small>客戶自己用，按期付</small></h3><span class="tag">還沒有</span></header>
-    <p class="story">例：一家公司在 aware-wave.com 訂閱社群發文，每月扣款，員工自己登入 social.aware-wave.com 用。</p>
-    <dl><div><dt>裝在哪裡？</dt><dd>我們的主機<code>hosted</code></dd></div><div><dt>錢從哪裡來？</dt><dd>按月／按年訂閱<code>contract</code></dd></div><div><dt>誰在按按鈕？</dt><dd>客戶自己<code>customer</code></dd></div></dl>
-    <p class="note">14 天 trial 起</p></article><article class="way ">
-    <header><span class="k">4</span><h3>點數<small>客戶自己用，按次扣</small></h3><span class="tag">還沒有</span></header>
-    <p class="story">例：一個人買 500 點，在認知平台按一次 AI 分析扣 3 點，用完再買。</p>
-    <dl><div><dt>裝在哪裡？</dt><dd>我們的主機<code>hosted</code></dd></div><div><dt>錢從哪裡來？</dt><dd>先買點數，用一次扣一次<code>credits</code></dd></div><div><dt>誰在按按鈕？</dt><dd>客戶自己<code>customer</code></dd></div></dl>
+<section id="ways"><h2>五種客戶</h2><p class="lead">每種客戶由三個答案決定：安裝位置、付款來源、操作人。新增客戶類型只需增加一列，不必修改程式。</p><div class="ways"><article class="way live">
+    <header><span class="k">1</span><h3>自用<small>AwareWave 自用</small></h3><span class="tag">已運作</span></header>
+    <p class="story">例：在 app.aware-wave.com 使用社群發文、客服與資料蒐集，不收費。</p>
+    <dl><div><dt>安裝位置</dt><dd>AwareWave 主機<code>hosted</code></dd></div><div><dt>付款來源</dt><dd>免費（自用或贈送）<code>comp</code></dd></div><div><dt>操作人</dt><dd>AwareWave 員工<code>staff</code></dd></div></dl>
+    <p class="note">計費帳戶的 organizations.kind = internal（Account#0）</p></article><article class="way live">
+    <header><span class="k">2</span><h3>代操<small>員工替客戶操作</small></h3><span class="tag">已運作</span></header>
+    <p class="story">例：Soulful 支付月費，由 AwareWave 員工代操發文與回覆客服，客戶不必登入。</p>
+    <dl><div><dt>安裝位置</dt><dd>AwareWave 主機<code>hosted</code></dd></div><div><dt>付款來源</dt><dd>訂閱<code>contract</code></dd></div><div><dt>操作人</dt><dd>AwareWave 員工<code>staff</code></dd></div></dl>
+    <p class="note">也可使用 credits；客戶買維運時採 self_hosted；on_behalf_of = 客戶</p></article><article class="way ">
+    <header><span class="k">3</span><h3>訂閱<small>客戶自用，按期付費</small></h3><span class="tag">未開放</span></header>
+    <p class="story">例：公司在 aware-wave.com 訂閱社群發文服務，每月扣款；員工登入 social.aware-wave.com 使用。</p>
+    <dl><div><dt>安裝位置</dt><dd>AwareWave 主機<code>hosted</code></dd></div><div><dt>付款來源</dt><dd>訂閱<code>contract</code></dd></div><div><dt>操作人</dt><dd>客戶本人<code>customer</code></dd></div></dl>
+    <p class="note">trial 自 14 天起</p></article><article class="way ">
+    <header><span class="k">4</span><h3>點數<small>客戶自用，按次付費</small></h3><span class="tag">未開放</span></header>
+    <p class="story">例：購買 500 點，在認知平台每次進行 AI 分析扣 3 點，用完再補。</p>
+    <dl><div><dt>安裝位置</dt><dd>AwareWave 主機<code>hosted</code></dd></div><div><dt>付款來源</dt><dd>點數<code>credits</code></dd></div><div><dt>操作人</dt><dd>客戶本人<code>customer</code></dd></div></dl>
     <p class="note">共用錢包（ADR 015）</p></article><article class="way ">
-    <header><span class="k">5</span><h3>賣人＝買斷<small>裝在客戶主機</small></h3><span class="tag">還沒有</span></header>
-    <p class="story">例：一個集團一次付清，我們裝到他們的主機，用他們自己的 AI key；子公司、分公司都在同一套裡，不另收。</p>
-    <dl><div><dt>裝在哪裡？</dt><dd>客戶自己的主機<code>self_hosted</code></dd></div><div><dt>錢從哪裡來？</dt><dd>一次買斷<code>perpetual</code></dd></div><div><dt>誰在按按鈕？</dt><dd>客戶自己<code>customer</code></dd></div></dl>
-    <p class="note">＋updates_until；客人已有網站就接進來（§6）；買維運時 staff</p></article></div></section>
+    <header><span class="k">5</span><h3>賣人＝買斷<small>安裝於客戶主機</small></h3><span class="tag">未開放</span></header>
+    <p class="story">例：集團一次付清，系統安裝在集團主機，使用集團自己的 AI 金鑰；子公司與分公司共用同一套，不另收費。</p>
+    <dl><div><dt>安裝位置</dt><dd>客戶主機<code>self_hosted</code></dd></div><div><dt>付款來源</dt><dd>一次買斷<code>perpetual</code></dd></div><div><dt>操作人</dt><dd>客戶本人<code>customer</code></dd></div></dl>
+    <p class="note">＋updates_until；客戶已有網站就接入（§6）；購買維運時採 staff</p></article></div></section>
 
-<section id="steps"><h2>三、要做的事<span class="cnt" data-computed>7 件：0 做完、0 做到一半、7 還沒開始</span></h2>
-<p class="lead">照這個順序做，每一件做完才算數的證據都寫在卡上。風險 High 的要你說「go」才動。</p>
-<div class="prog" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
-<ol class="steps"><li class="step todo" id="s1">
+<section id="steps"><h2>待建項目</h2><p class="lead">項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。</p><ol class="steps"><li class="step todo" id="s1">
     <div class="n">1</div>
     <div class="b">
-      <p class="plain">每個產品寫清楚「哪些功能要收費」。少寫一個，測試就紅燈。</p>
-      <p class="meta"><span class="pill st-todo">還沒開始</span><span class="pill risk-low">風險 Low</span><span class="who">誰做：Opus 5.5</span></p>
-      <p class="donewhen"><b>做完的證據：</b>products.test.ts：漏填紅燈；可買斷模組含 SAFETY_GATE 紅燈</p>
+      <p class="plain">每項產品都列出收費功能，漏列就會導致測試失敗。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成條件：</b>products.test.ts：漏填時紅燈；可買斷模組含 SAFETY_GATE 時顯示紅燈</p>
       <details><summary>工程細節：登記表加 features[] 與 accessChannels；機械閘</summary>
         <p>products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。</p>
-        <p><b>先決：</b>無</p>
+        <p><b>前置：</b>無</p>
         <p><b>檔案：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts</code></p>
         
       </details>
     </div></li><li class="step todo" id="s2">
     <div class="n">2</div>
     <div class="b">
-      <p class="plain">資料庫知道「誰買了什麼方案、到期日、是哪個員工替誰按的」。</p>
-      <p class="meta"><span class="pill st-todo">還沒開始</span><span class="pill risk-med">風險 Medium</span><span class="who">誰做：Opus 5.5（先出計畫）</span></p>
-      <p class="donewhen"><b>做完的證據：</b>靜態檢查：三表只准 lib/entitlements/** 與 app/portal/** 引用，別處出現建置失敗</p>
+      <p class="plain">資料庫記錄誰購買哪個方案、何時到期，以及哪位員工替哪位客戶操作。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5（先出計畫）</span></p>
+      <p class="donewhen"><b>完成條件：</b>靜態檢查：三表只能由 lib/entitlements/** 與 app/portal/** 引用；其他位置出現引用就建置失敗</p>
       <details><summary>工程細節：Migration：plans、organization_entitlements、organizations.kind；許可帶 actor</summary>
         <p>三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。</p>
-        <p><b>先決：</b>第 1 件</p>
+        <p><b>前置：</b>第 <span data-computed>1</span> 項</p>
         <p><b>檔案：</b><code>lobster-factory/packages/db/migrations/</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/</code></p>
         
       </details>
     </div></li><li class="step todo" id="s3">
     <div class="n">3</div>
     <div class="b">
-      <p class="plain">客戶在 aware-wave.com 付了錢，系統自動開通，不用你手動。</p>
-      <p class="meta"><span class="pill st-todo">還沒開始</span><span class="pill risk-high">風險 High（金流）</span><span class="who">誰做：Opus 5.5</span></p>
-      <p class="donewhen"><b>做完的證據：</b>測試：一筆付款通知只產生一組合約與權利列（冪等）</p>
+      <p class="plain">客戶在 aware-wave.com 付款後，系統自動開通，不需人工處理。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（金流）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成條件：</b>測試確認一筆付款通知只產生一組合約與權利列（冪等）</p>
       <details><summary>工程細節：Woo 付款通知 → 合約與權利；帳本泛化</summary>
         <p>付款通知帶 Woo 商品 id → plans.woo_product_ids 查方案 → 合約列 → 重算權利列；media_ 帳本去前綴加 product_key（ADR 015 §4）。</p>
-        <p><b>先決：</b>第 2 件；定期扣款外掛與台灣金流查定（待決 1）；點數條款與預收會計（待決 3）</p>
+        <p><b>前置：</b>第 <span data-computed>2</span> 項；定期扣款外掛與台灣金流的支援方式（待決 1）；點數條款與預收會計處理（待決 3）</p>
         <p><b>檔案：</b><code>lobster-factory/packages/wp-bridge-plugin/</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/portal/</code></p>
         
       </details>
     </div></li><li class="step todo" id="s4">
     <div class="n">4</div>
     <div class="b">
-      <p class="plain">每個收費按鈕按下去前先問一次「這個人能不能用」。沒買的按鈕灰掉。</p>
-      <p class="meta"><span class="pill st-todo">還沒開始</span><span class="pill risk-med">風險 Medium</span><span class="who">誰做：Opus 5.5</span></p>
-      <p class="donewhen"><b>做完的證據：</b>測試：代操時點數扣 on_behalf_of、稽核記 actor；沒有 active 權利列不簽許可</p>
+      <p class="plain">每項收費功能執行前都先確認權限；未購買時按鈕顯示停用。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="donewhen"><b>完成條件：</b>測試：代操時按 on_behalf_of 扣點數，稽核記錄 actor；沒有 active 權利列時不簽許可</p>
       <details><summary>工程細節：每個收費點只問 can(主體, feature_key, actor)</summary>
         <p>社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。</p>
-        <p><b>先決：</b>第 2 件</p>
+        <p><b>前置：</b>第 <span data-computed>2</span> 項</p>
         <p><b>檔案：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts</code> <code>Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py</code> <code>Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py</code></p>
         
       </details>
     </div></li><li class="step todo" id="s5">
     <div class="n">5</div>
     <div class="b">
-      <p class="plain">一鍵把整套裝到客戶主機，交接時收回我們的鑰匙。</p>
-      <p class="meta"><span class="pill st-todo">還沒開始</span><span class="pill risk-high">風險 High（交付）</span><span class="who">誰做：Fable 5.1 設計 → Opus 5.5 做</span></p>
-      <p class="donewhen"><b>做完的證據：</b>授權檔離線驗章；我們的伺服器停了安裝照常能用</p>
+      <p class="plain">系統可一鍵完整安裝到客戶主機；交接時收回 AwareWave 的存取權。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（交付）</span><span class="who">負責：Fable 5.1 設計 → Opus 5.5 做</span></p>
+      <p class="donewhen"><b>完成條件：</b>授權檔離線驗章；AwareWave 的伺服器停止後，安裝仍可正常使用</p>
       <details><summary>工程細節：買斷安裝階段</summary>
         <p>模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、客戶主機商 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。</p>
-        <p><b>先決：</b>第 4 件；Postiz AGPL 交付請律師確認（待決 2）</p>
+        <p><b>前置：</b>第 <span data-computed>4</span> 項；交付 Postiz AGPL 前請律師確認（待決 2）</p>
         <p><b>檔案：</b><code>lobster-factory/packages/workflows/src/provision/</code> <code>agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md</code></p>
         
       </details>
     </div></li><li class="step todo" id="s6">
     <div class="n">6</div>
     <div class="b">
-      <p class="plain">客戶不開畫面、只用程式串我們，也能算錢。</p>
-      <p class="meta"><span class="pill st-todo">還沒開始</span><span class="pill risk-med">風險 Medium</span><span class="who">誰做：Opus 5.5</span><span class="who">等第一個只串 API 的客戶</span></p>
-      <p class="donewhen"><b>做完的證據：</b>測試：key 的 scope 外功能被拒</p>
+      <p class="plain">客戶只透過程式串接、不使用畫面時，系統也能計費。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span><span class="who">待第一個只串 API 的客戶出現</span></p>
+      <p class="donewhen"><b>完成條件：</b>測試：key 的 scope 外功能會被拒絕</p>
       <details><summary>工程細節：API 通道</summary>
         <p>計費帳戶發 API key（scope = feature_key 子集），actor = api_key:&lt;id&gt;，用量走同一個 report()；登記表 accessChannels 加 api。</p>
-        <p><b>先決：</b>第 4 件</p>
+        <p><b>前置：</b>第 <span data-computed>4</span> 項</p>
         <p><b>檔案：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/</code></p>
         
       </details>
     </div></li><li class="step todo" id="s7">
     <div class="n">7</div>
     <div class="b">
-      <p class="plain">代理商買一套去服務多家客戶，照客戶數收。</p>
-      <p class="meta"><span class="pill st-todo">還沒開始</span><span class="pill risk-med">風險 Medium</span><span class="who">誰做：Opus 5.5</span><span class="who">等第一個轉售客戶</span></p>
-      <p class="donewhen"><b>做完的證據：</b>測試：超過 max_tenants 的租戶建立被拒</p>
+      <p class="plain">代理商用同一套系統服務多家客戶時，系統按客戶數計費。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span><span class="who">待第一個轉售客戶出現</span></p>
+      <p class="donewhen"><b>完成條件：</b>測試：建立的租戶超過 max_tenants 時會被拒絕</p>
       <details><summary>工程細節：轉售（代理商版）</summary>
         <p>授權檔 max_tenants &gt; 1，安裝內「根組織」數受它限制：一家公司或一個集團（含子公司、分公司、部門）都算 1，不另收；代理商買去替多家不相干的客戶代操才是 &gt;1，另訂價，隔離責任在客戶主機（操作者 2026-10-16 定案）。</p>
-        <p><b>先決：</b>第 5 件</p>
+        <p><b>前置：</b>第 <span data-computed>5</span> 項</p>
         <p><b>檔案：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/（授權檔格式，順序 5 建）</code></p>
         
       </details>
     </div></li></ol></section>
 
-<section id="open"><h2>四、你要先決定的<span class="cnt" data-computed>3 件</span></h2><p class="lead">這些 agent 不能替你定。定了，對應那件事才能開工。</p>
-<ol class="steps open"><li><div class="n">1</div><div class="b"><p class="plain">訂閱每月扣款：WooCommerce 用哪個定期扣款外掛？台灣金流能不能定期扣款？</p><p class="meta"><span class="who">要在第 3 件之前定</span><span class="who">出處：ADR 017 產品決定 Q3</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">Postiz 是 AGPL-3.0：買斷交付前請律師確認</p><p class="meta"><span class="who">要在第 5 件之前定</span><span class="who">出處：ADR 017 §5</span></p></div></li><li><div class="n">3</div><div class="b"><p class="plain">點數不退、不轉讓的條款寫法（台灣數位內容解除權例外）；賣點數的錢用掉前算預收，問會計師</p><p class="meta"><span class="who">要在第 3 件之前定</span><span class="who">出處：ADR 015 §4</span></p></div></li></ol></section>
+<section id="open"><h2>待你決定</h2><p class="lead">以下事項待你決定；決定後才能啟動對應項目。</p><ol class="steps open"><li><div class="n">1</div><div class="b"><p class="plain">訂閱每月扣款：WooCommerce 應使用哪個定期扣款外掛？台灣金流是否支援定期扣款？</p><p class="meta"><a href="#s3" class="who">須於第 <span data-computed>3</span> 項前決定</a><span class="who">出處：ADR 017 產品決定 Q3</span></p></div></li><li><div class="n">2</div><div class="b"><p class="plain">Postiz 是 AGPL-3.0；買斷交付前請律師確認。</p><p class="meta"><a href="#s5" class="who">須於第 <span data-computed>5</span> 項前決定</a><span class="who">出處：ADR 017 §5</span></p></div></li><li><div class="n">3</div><div class="b"><p class="plain">點數不退、不轉讓的條款如何撰寫（台灣數位內容解除權例外）；賣點數的款項使用前列為預收，請會計師確認。</p><p class="meta"><a href="#s3" class="who">須於第 <span data-computed>3</span> 項前決定</a><span class="who">出處：ADR 015 §4</span></p></div></li></ol></section>
 
-<section id="doors"><h2>五、客戶從哪個網址進來</h2><p class="lead">三個入口，各自登入；網址是設定，不寫死在程式。</p>
-<ul class="doors"><li><b>公開門</b><span><code>aware-wave.com（WordPress）</code><br>所有人：介紹、訂閱、付款、會員帳號（WooCommerce）<small>登入：WordPress 會員</small></span></li><li><b>產品門</b><span><code>&lt;產品&gt;.aware-wave.com，每個產品一個</code><br>付費客戶；員工也可用：只有這個產品的頁面和 API，只看自己是成員的品牌<small>登入：local／awarewave-wp／customer-wp</small></span></li><li><b>員工門</b><span><code>app.aware-wave.com</code><br>操作者和團隊：管客戶、管網站、管所有品牌，也能用每個產品<small>登入：現有後台帳號</small></span></li><li><b>另外</b><span>System Foundry 問卷對齊三軸：補「代操」CAP、self_hosted 獨立題、API 通道；藍圖必寫「許可只問 can()」<small>順序 1 啟動時；TASKS.md:133</small></span></li><li><b>另外</b><span>app.aware-wave.com /ops/products 頁：從 products.ts 與 customer-model.ts 渲染三扇門、三軸、五種<small>卡片 task_86d6f772；本 session</small></span></li></ul></section>
+<section id="doors"><h2>入口</h2><p class="lead">三個網址分開登入；網址由設定決定，不寫入程式。</p><ul class="doors"><li><b>公開門</b><span><code>aware-wave.com（WordPress）</code><br>所有人：介紹、訂閱、付款與會員帳號管理（WooCommerce）<small>登入：WordPress 會員</small></span></li><li><b>產品門</b><span><code>&lt;產品&gt;.aware-wave.com，每個產品一個</code><br>付費客戶；員工也可使用：只能查看這個產品的頁面與 API，以及自己所屬的品牌<small>登入：local／awarewave-wp／customer-wp</small></span></li><li><b>員工門</b><span><code>app.aware-wave.com</code><br>操作者與團隊：管理客戶、網站與所有品牌，也能使用每個產品<small>登入：現有後台帳號</small></span></li><li><b>另有</b><span>System Foundry 問卷須對齊三軸：補上「代操」CAP、將 self_hosted 設為獨立題目、加入 API 通道；藍圖必須寫明「許可只問 can()」<small>順序 1 啟動時；TASKS.md:133</small></span></li><li><b>另有</b><span>app.aware-wave.com /ops/products 頁面從 products.ts 與 customer-model.ts 渲染三扇門、三軸與五種客戶<small>卡片 task_86d6f772；本 session</small></span></li></ul></section>
 
-<section id="paths"><h2>六、檔案在哪</h2>
+<section id="paths"><h2>檔案</h2>
 <div class="paths">
-<div><b>計畫正本（七件事、三個問題）</b><code>agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md</code></div>
-<div><b>三個入口</b><code>agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md</code></div>
-<div><b>共用平台層／錢包</b><span><code>agency-os/docs/architecture/decisions/012-shared-platform-layer.md</code><br><code>agency-os/docs/architecture/decisions/015-awarewave-account-and-shared-wallet.md</code></span></div>
+<div><b>計畫正本</b><code>agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md</code></div>
+<div><b>入口規則</b><code>agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md</code></div>
+<div><b>共用平台與錢包</b><span><code>agency-os/docs/architecture/decisions/012-shared-platform-layer.md</code><br><code>agency-os/docs/architecture/decisions/015-awarewave-account-and-shared-wallet.md</code></span></div>
 <div><b>追蹤</b><span><code>agency-os/TASKS.md:133</code><br><code>agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）</code></span></div>
-<div><b>這一頁</b><span><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/</code><br>改 <code>data.mjs</code> → <code>node build.mjs</code> → <code>node check.mjs</code> → 重發同一個網址</span></div>
+<div><b>本頁來源</b><span><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/</code><br>修改 data.mjs，再執行 node build.mjs、node check.mjs，最後重新發布</span></div>
 </div></section>
+</main>
 </div>
