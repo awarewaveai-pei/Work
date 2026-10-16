@@ -7,6 +7,10 @@ export const META = {
   adr017: 'agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md',
   adr018: 'agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md',
   tasks: 'agency-os/TASKS.md:133',
+  adr012: 'agency-os/docs/architecture/decisions/012-shared-platform-layer.md',
+  adr015: 'agency-os/docs/architecture/decisions/015-awarewave-account-and-shared-wallet.md',
+  worklog: 'agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）',
+  self: 'agency-os/handoffs/2026-10-16-customer-model-supervisor/',
   url: 'https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr',
 };
 
@@ -56,17 +60,17 @@ export const NOW = [
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
 export const STEPS = [
   { n: 1, title: '登記表加 features[] 與 accessChannels；機械閘', what: 'products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。',
-    files: ['next-admin lib/portal/products.ts', 'lib/portal/__tests__/products.test.ts'], gate: 'products.test.ts：漏填紅燈；可買斷模組含 SAFETY_GATE 紅燈', risk: 'Low', model: 'Opus 5.5', depends: [], status: 'not_started' },
+    files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts'], gate: 'products.test.ts：漏填紅燈；可買斷模組含 SAFETY_GATE 紅燈', risk: 'Low', model: 'Opus 5.5', depends: [], status: 'not_started' },
   { n: 2, title: 'Migration：plans、organization_entitlements、organizations.kind；許可帶 actor', what: '三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。',
-    files: ['lobster-factory/packages/db/migrations/', 'next-admin lib/entitlements/'], gate: '靜態檢查：三表只准 lib/entitlements/** 與 app/portal/** 引用，別處出現建置失敗', risk: 'Medium', model: 'Opus 5.5（先出計畫）', depends: [1], status: 'not_started' },
+    files: ['lobster-factory/packages/db/migrations/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '靜態檢查：三表只准 lib/entitlements/** 與 app/portal/** 引用，別處出現建置失敗', risk: 'Medium', model: 'Opus 5.5（先出計畫）', depends: [1], status: 'not_started' },
   { n: 3, title: 'Woo 付款通知 → 合約與權利；帳本泛化', what: '付款通知帶 Woo 商品 id → plans.woo_product_ids 查方案 → 合約列 → 重算權利列；media_ 帳本去前綴加 product_key（ADR 015 §4）。',
-    files: ['wp-bridge 外掛', 'next-admin app/portal/'], gate: '測試：一筆付款通知只產生一組合約與權利列（冪等）', risk: 'High（金流）', model: 'Opus 5.5', depends: [2], status: 'not_started', before: '定期扣款外掛與台灣金流查定（待決 1）；點數條款與預收會計（待決 3）' },
+    files: ['lobster-factory/packages/wp-bridge-plugin/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/portal/'], gate: '測試：一筆付款通知只產生一組合約與權利列（冪等）', risk: 'High（金流）', model: 'Opus 5.5', depends: [2], status: 'not_started', before: '定期扣款外掛與台灣金流查定（待決 1）；點數條款與預收會計（待決 3）' },
   { n: 4, title: '每個收費點只問 can(主體, feature_key, actor)', what: '社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。',
-    files: ['next-admin lib/entitlements/can.ts', 'ai_lego/platform/entitlement/check.py', 'ai_lego/apps/api/main.py'], gate: '測試：代操時點數扣 on_behalf_of、稽核記 actor；沒有 active 權利列不簽許可', risk: 'Medium', model: 'Opus 5.5', depends: [2], status: 'not_started' },
+    files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts', 'Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py', 'Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py'], gate: '測試：代操時點數扣 on_behalf_of、稽核記 actor；沒有 active 權利列不簽許可', risk: 'Medium', model: 'Opus 5.5', depends: [2], status: 'not_started' },
   { n: 5, title: '買斷安裝階段', what: '模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、客戶主機商 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。',
-    files: ['lobster-factory/packages/workflows/src/provision/', 'APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md'], gate: '授權檔離線驗章；我們的伺服器停了安裝照常能用', risk: 'High（交付）', model: 'Fable 5.1 設計 → Opus 5.5 做', depends: [4], status: 'not_started', before: 'Postiz AGPL 交付請律師確認（待決 2）' },
-  { n: 6, title: 'API 通道', what: '計費帳戶發 API key（scope = feature_key 子集），actor = api_key:<id>，用量走同一個 report()；登記表 accessChannels 加 api。', files: ['next-admin lib/entitlements/'], gate: '測試：key 的 scope 外功能被拒', risk: 'Medium', model: 'Opus 5.5', depends: [4], status: 'not_started', waitFor: '等第一個只串 API 的客戶' },
-  { n: 7, title: '轉售', what: '授權檔 max_tenants > 1，安裝內租戶數受它限制；合約與價格另訂。', files: ['授權檔格式'], gate: '測試：超過 max_tenants 的租戶建立被拒', risk: 'Medium', model: 'Opus 5.5', depends: [5], status: 'not_started', waitFor: '等第一個轉售客戶' },
+    files: ['lobster-factory/packages/workflows/src/provision/', 'agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md'], gate: '授權檔離線驗章；我們的伺服器停了安裝照常能用', risk: 'High（交付）', model: 'Fable 5.1 設計 → Opus 5.5 做', depends: [4], status: 'not_started', before: 'Postiz AGPL 交付請律師確認（待決 2）' },
+  { n: 6, title: 'API 通道', what: '計費帳戶發 API key（scope = feature_key 子集），actor = api_key:<id>，用量走同一個 report()；登記表 accessChannels 加 api。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '測試：key 的 scope 外功能被拒', risk: 'Medium', model: 'Opus 5.5', depends: [4], status: 'not_started', waitFor: '等第一個只串 API 的客戶' },
+  { n: 7, title: '轉售', what: '授權檔 max_tenants > 1，安裝內租戶數受它限制；合約與價格另訂。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/（授權檔格式，順序 5 建）'], gate: '測試：超過 max_tenants 的租戶建立被拒', risk: 'Medium', model: 'Opus 5.5', depends: [5], status: 'not_started', waitFor: '等第一個轉售客戶' },
 ];
 
 // 操作者自己要決定的（agent 不能替她定）

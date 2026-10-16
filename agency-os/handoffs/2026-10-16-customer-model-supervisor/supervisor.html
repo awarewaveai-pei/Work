@@ -14,7 +14,8 @@
 body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.55;font-size:15px}
 .wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h1{font-family:var(--display);font-size:26px;margin:0 0 4px;text-wrap:balance}
-.sub{color:var(--muted);margin:0 0 18px;font-size:13px}
+.sub{color:var(--muted);margin:0 0 10px;font-size:13px}
+.paths{margin-bottom:18px}.paths th{white-space:nowrap;font-size:13px}.paths td{font-size:13px}
 .cols{display:grid;grid-template-columns:320px minmax(0,1fr);gap:24px;align-items:start}
 @media (max-width:880px){.cols{grid-template-columns:1fr}}
 .map{position:sticky;top:env(safe-area-inset-top,0px);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
@@ -76,7 +77,14 @@ footer code{font-size:11.5px}
 </style>
 <div class="wrap">
 <h1>客戶怎麼來 監工台</h1>
-<p class="sub">客戶從哪扇門進來、錢從哪裡來、誰在操作；程式該照什麼順序建。更新 2026-10-16。事實正本：ADR 017、ADR 018；這頁只放狀態與指向。</p>
+<p class="sub">客戶從哪扇門進來、錢從哪裡來、誰在操作；程式該照什麼順序建。更新 2026-10-16。這頁只放狀態與指向。</p>
+<div class="tbl paths"><table><tbody>
+<tr><th>plan 正本（順序 1–7、三軸）</th><td><code>agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md</code></td></tr>
+<tr><th>三扇門</th><td><code>agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md</code></td></tr>
+<tr><th>共用平台層／錢包</th><td><code>agency-os/docs/architecture/decisions/012-shared-platform-layer.md</code>　<code>agency-os/docs/architecture/decisions/015-awarewave-account-and-shared-wallet.md</code></td></tr>
+<tr><th>追蹤</th><td><code>agency-os/TASKS.md:133</code>　<code>agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）</code></td></tr>
+<tr><th>本頁</th><td><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/</code>（改 <code>data.mjs</code> → <code>node build.mjs</code> → <code>node check.mjs</code> → 重發同 URL）</td></tr>
+</tbody></table></div>
 <div class="cols">
 <aside class="map">
   <h2>一張圖</h2>
@@ -98,7 +106,7 @@ footer code{font-size:11.5px}
     <header><span class="n">1</span><h3>登記表加 features[] 與 accessChannels；機械閘</h3><span class="pill st-todo">未開始</span><span class="pill risk-low">Low</span></header>
     <p>products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。</p>
     <dl>
-      <dt>檔案</dt><dd><code>next-admin lib/portal/products.ts</code> <code>lib/portal/__tests__/products.test.ts</code></dd>
+      <dt>檔案</dt><dd><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts</code></dd>
       <dt>閘（紅燈條件）</dt><dd>products.test.ts：漏填紅燈；可買斷模組含 SAFETY_GATE 紅燈</dd>
       <dt>先決</dt><dd>無</dd>
       <dt>建議模型</dt><dd>Opus 5.5</dd>
@@ -107,7 +115,7 @@ footer code{font-size:11.5px}
     <header><span class="n">2</span><h3>Migration：plans、organization_entitlements、organizations.kind；許可帶 actor</h3><span class="pill st-todo">未開始</span><span class="pill risk-med">Medium</span></header>
     <p>三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。</p>
     <dl>
-      <dt>檔案</dt><dd><code>lobster-factory/packages/db/migrations/</code> <code>next-admin lib/entitlements/</code></dd>
+      <dt>檔案</dt><dd><code>lobster-factory/packages/db/migrations/</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/</code></dd>
       <dt>閘（紅燈條件）</dt><dd>靜態檢查：三表只准 lib/entitlements/** 與 app/portal/** 引用，別處出現建置失敗</dd>
       <dt>先決</dt><dd><a href="#s1">步驟 1</a></dd>
       <dt>建議模型</dt><dd>Opus 5.5（先出計畫）</dd>
@@ -116,7 +124,7 @@ footer code{font-size:11.5px}
     <header><span class="n">3</span><h3>Woo 付款通知 → 合約與權利；帳本泛化</h3><span class="pill st-todo">未開始</span><span class="pill risk-high">High（金流）</span></header>
     <p>付款通知帶 Woo 商品 id → plans.woo_product_ids 查方案 → 合約列 → 重算權利列；media_ 帳本去前綴加 product_key（ADR 015 §4）。</p>
     <dl>
-      <dt>檔案</dt><dd><code>wp-bridge 外掛</code> <code>next-admin app/portal/</code></dd>
+      <dt>檔案</dt><dd><code>lobster-factory/packages/wp-bridge-plugin/</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/portal/</code></dd>
       <dt>閘（紅燈條件）</dt><dd>測試：一筆付款通知只產生一組合約與權利列（冪等）</dd>
       <dt>先決</dt><dd><a href="#s2">步驟 2</a>；定期扣款外掛與台灣金流查定（待決 1）；點數條款與預收會計（待決 3）</dd>
       <dt>建議模型</dt><dd>Opus 5.5</dd>
@@ -125,7 +133,7 @@ footer code{font-size:11.5px}
     <header><span class="n">4</span><h3>每個收費點只問 can(主體, feature_key, actor)</h3><span class="pill st-todo">未開始</span><span class="pill risk-med">Medium</span></header>
     <p>社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。</p>
     <dl>
-      <dt>檔案</dt><dd><code>next-admin lib/entitlements/can.ts</code> <code>ai_lego/platform/entitlement/check.py</code> <code>ai_lego/apps/api/main.py</code></dd>
+      <dt>檔案</dt><dd><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts</code> <code>Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py</code> <code>Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py</code></dd>
       <dt>閘（紅燈條件）</dt><dd>測試：代操時點數扣 on_behalf_of、稽核記 actor；沒有 active 權利列不簽許可</dd>
       <dt>先決</dt><dd><a href="#s2">步驟 2</a></dd>
       <dt>建議模型</dt><dd>Opus 5.5</dd>
@@ -134,7 +142,7 @@ footer code{font-size:11.5px}
     <header><span class="n">5</span><h3>買斷安裝階段</h3><span class="pill st-todo">未開始</span><span class="pill risk-high">High（交付）</span></header>
     <p>模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、客戶主機商 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。</p>
     <dl>
-      <dt>檔案</dt><dd><code>lobster-factory/packages/workflows/src/provision/</code> <code>APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md</code></dd>
+      <dt>檔案</dt><dd><code>lobster-factory/packages/workflows/src/provision/</code> <code>agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md</code></dd>
       <dt>閘（紅燈條件）</dt><dd>授權檔離線驗章；我們的伺服器停了安裝照常能用</dd>
       <dt>先決</dt><dd><a href="#s4">步驟 4</a>；Postiz AGPL 交付請律師確認（待決 2）</dd>
       <dt>建議模型</dt><dd>Fable 5.1 設計 → Opus 5.5 做</dd>
@@ -143,7 +151,7 @@ footer code{font-size:11.5px}
     <header><span class="n">6</span><h3>API 通道</h3><span class="pill st-todo">未開始</span><span class="pill risk-med">Medium</span></header>
     <p>計費帳戶發 API key（scope = feature_key 子集），actor = api_key:&lt;id&gt;，用量走同一個 report()；登記表 accessChannels 加 api。</p>
     <dl>
-      <dt>檔案</dt><dd><code>next-admin lib/entitlements/</code></dd>
+      <dt>檔案</dt><dd><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/</code></dd>
       <dt>閘（紅燈條件）</dt><dd>測試：key 的 scope 外功能被拒</dd>
       <dt>先決</dt><dd><a href="#s4">步驟 4</a>；等第一個只串 API 的客戶</dd>
       <dt>建議模型</dt><dd>Opus 5.5</dd>
@@ -152,7 +160,7 @@ footer code{font-size:11.5px}
     <header><span class="n">7</span><h3>轉售</h3><span class="pill st-todo">未開始</span><span class="pill risk-med">Medium</span></header>
     <p>授權檔 max_tenants &gt; 1，安裝內租戶數受它限制；合約與價格另訂。</p>
     <dl>
-      <dt>檔案</dt><dd><code>授權檔格式</code></dd>
+      <dt>檔案</dt><dd><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/（授權檔格式，順序 5 建）</code></dd>
       <dt>閘（紅燈條件）</dt><dd>測試：超過 max_tenants 的租戶建立被拒</dd>
       <dt>先決</dt><dd><a href="#s5">步驟 5</a>；等第一個轉售客戶</dd>
       <dt>建議模型</dt><dd>Opus 5.5</dd>

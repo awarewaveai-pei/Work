@@ -60,7 +60,8 @@ export function render() {
 body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.55;font-size:15px}
 .wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 h1{font-family:var(--display);font-size:26px;margin:0 0 4px;text-wrap:balance}
-.sub{color:var(--muted);margin:0 0 18px;font-size:13px}
+.sub{color:var(--muted);margin:0 0 10px;font-size:13px}
+.paths{margin-bottom:18px}.paths th{white-space:nowrap;font-size:13px}.paths td{font-size:13px}
 .cols{display:grid;grid-template-columns:320px minmax(0,1fr);gap:24px;align-items:start}
 @media (max-width:880px){.cols{grid-template-columns:1fr}}
 .map{position:sticky;top:env(safe-area-inset-top,0px);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
@@ -122,7 +123,14 @@ footer code{font-size:11.5px}
 </style>
 <div class="wrap">
 <h1>${esc(META.title)}</h1>
-<p class="sub">客戶從哪扇門進來、錢從哪裡來、誰在操作；程式該照什麼順序建。更新 ${esc(META.updated)}。事實正本：ADR 017、ADR 018；這頁只放狀態與指向。</p>
+<p class="sub">客戶從哪扇門進來、錢從哪裡來、誰在操作；程式該照什麼順序建。更新 ${esc(META.updated)}。這頁只放狀態與指向。</p>
+<div class="tbl paths"><table><tbody>
+<tr><th>plan 正本（順序 1–7、三軸）</th><td><code>${esc(META.adr017)}</code></td></tr>
+<tr><th>三扇門</th><td><code>${esc(META.adr018)}</code></td></tr>
+<tr><th>共用平台層／錢包</th><td><code>${esc(META.adr012)}</code>　<code>${esc(META.adr015)}</code></td></tr>
+<tr><th>追蹤</th><td><code>${esc(META.tasks)}</code>　<code>${esc(META.worklog)}</code></td></tr>
+<tr><th>本頁</th><td><code>${esc(META.self)}</code>（改 <code>data.mjs</code> → <code>node build.mjs</code> → <code>node check.mjs</code> → 重發同 URL）</td></tr>
+</tbody></table></div>
 <div class="cols">
 <aside class="map">
   <h2>一張圖</h2>
