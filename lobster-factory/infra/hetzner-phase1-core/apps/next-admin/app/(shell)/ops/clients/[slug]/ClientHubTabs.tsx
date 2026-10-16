@@ -1199,11 +1199,16 @@ function CsChatwootTokenCard({ slug }: { slug: string }) {
         headers: { "Content-Type": "application/json", ...roleHeader("admin") },
         body: method === "PUT" ? JSON.stringify({ token }) : undefined,
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string; configured?: boolean };
+      const data = (await res.json()) as { ok?: boolean; error?: string; configured?: boolean; baseline?: { ok: boolean; changes?: unknown[]; error?: string } };
       if (!res.ok || !data.ok) throw new Error(CHATWOOT_TOKEN_ERRORS[data.error ?? ""] ?? data.error ?? `失敗（${res.status}）`);
       setConfigured(data.configured === true);
       setToken("");
-      setMsg(method === "PUT" ? "✓ 已設定" : "✓ 已清除");
+      // The save also applies the Chatwoot baseline (auto-resolve + closing macro); say what it did.
+      const b = data.baseline;
+      const baselineNote = !b ? "" : b.ok
+        ? (b.changes?.length ? "；Chatwoot 已設好自動結案和結案巨集" : "；Chatwoot 基本設定原本就是對的")
+        : `；但 Chatwoot 基本設定沒套上（${b.error}），每天的檢查會再試`;
+      setMsg(method === "PUT" ? `✓ 已設定${baselineNote}` : "✓ 已清除");
     } catch (e) { setMsg(`⚠ ${e instanceof Error ? e.message : String(e)}`); } finally { setBusy(false); }
   }
 

@@ -4,7 +4,16 @@
 
 import { runCollection } from "@/lib/collect/run";
 import "@/lib/collect/blocks";
+import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { loadCis } from "@/lib/cs/cis";
+import { applyChatwootBaseline } from "@/lib/cs/chatwoot-baseline";
 import type { JobMeta } from "./types";
+
+/** What view.ts knows about a client when deciding whether a job can run there. */
+export interface JobClientFacts {
+  siteUrl: unknown;
+  chatwoot: unknown;
+}
 
 export interface ClientJob extends JobMeta {
   /** What a client with no row reads as. enabled is always false (AGENTS.md 自動化預設 OFF). */
@@ -12,6 +21,8 @@ export interface ClientJob extends JobMeta {
   /** Throws on any failure, including one the job reports instead of throwing; the sweep records it and
    * raises the incident. Returns a one-line summary. */
   run(organizationId: string, runKey: string): Promise<string>;
+  /** Why this job cannot run for the client (shown in the cell, enabling has no effect); null = it can. */
+  unavailable?(client: JobClientFacts): string | null;
 }
 
 const DAILY_WEEKLY: JobMeta["frequencies"] = [
@@ -35,6 +46,29 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
       // that collected nothing must not read as 正常.
       if (result.errors.length) throw new Error(`collect_errors:${result.errors.join(",")} written=${result.sink.written}`);
       return `written=${result.sink.written}`;
+    },
+  },
+  {
+    key: "cs_chatwoot_baseline",
+    label: "Chatwoot 基本設定檢查",
+    description: "每天確認客戶的 Chatwoot 仍有「48 小時沒動靜自動結案」和結案巨集；被改掉就改回來，改不了會通知。",
+    cost: "免費（只呼叫 Chatwoot，不用 AI）。",
+    frequencies: DAILY_WEEKLY,
+    // 02:00 UTC = 10:00 Taipei: a failure (token revoked) is raised while someone is awake to fix it.
+    defaults: { frequency: "daily", hourUtc: 2, dayOfWeekUtc: 1 },
+    unavailable: (c) => (c.chatwoot && typeof c.chatwoot === "object" ? null : "沒有接 Chatwoot"),
+    async run(organizationId) {
+      const cis = await loadCis(organizationId);
+      // Same answer as unavailable() in the table: an enabled row left on a client that no longer has
+      // Chatwoot is skipped, not raised as an incident every day (Codex 2026-10-16 partialreview-482ab2b0).
+      if (!cis.chatwoot) return "skipped: 沒有接 Chatwoot";
+      // Same function the 客服 tab's token save calls (lib/cs/chatwoot-baseline.ts); it gates itself.
+      const r = await applyChatwootBaseline(getSupabaseWriteClient(), organizationId, cis.chatwoot, cis);
+      // A blocking system mode is a deliberate freeze, not a failure: report, raise nothing.
+      if ("blocked" in r) return `skipped: system mode ${r.mode} blocks changes`;
+      return r.changes.length
+        ? `reapplied ${r.changes.map((c) => (c.kind === "account" ? c.field : `${c.kind}:${c.name}`)).join(",")}`
+        : "unchanged";
     },
   },
 ];

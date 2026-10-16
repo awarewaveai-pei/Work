@@ -4,6 +4,9 @@
 // GET    → { configured } — never the value.
 // PUT    { token } → checked against Chatwoot first (checkUserToken: a bot token, or a user who cannot
 //        read this account's contacts, is refused and nothing is stored), then putSecret. owner/admin only; audited without the value.
+//        After a save the Chatwoot baseline is applied once (lib/cs/chatwoot-baseline.ts; it gates itself);
+//        its outcome rides in `baseline` and never fails the save. The daily schedule job
+//        cs_chatwoot_baseline keeps it applied afterwards (lib/schedules/jobs.ts).
 // DELETE → deleteSecret; reads fall back to the bot token.
 
 import { NextResponse } from "next/server";
@@ -14,6 +17,8 @@ import { deleteSecret, getSecret, putSecret } from "@/lib/secret-vault";
 import { recordOpsAudit } from "@/lib/ops-audit";
 import { loadCis } from "@/lib/cs/cis";
 import { checkUserToken, chatwootUserTokenRef } from "@/lib/cs/chatwoot-client";
+import { applyChatwootBaseline, type BaselineChange } from "@/lib/cs/chatwoot-baseline";
+import { BLOCKED_CHANGE_CODE } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,7 +70,8 @@ export async function PUT(request: Request, context: Ctx) {
   const org = await orgOf(request, context);
   if (typeof org !== "string") return org;
 
-  const chatwoot = (await loadCis(org)).chatwoot;
+  const cis = await loadCis(org);
+  const chatwoot = cis.chatwoot;
   if (!chatwoot) return NextResponse.json({ ok: false, error: "chatwoot_not_configured" }, { status: 409 });
 
   const check = await checkUserToken(chatwoot, token);
@@ -80,7 +86,20 @@ export async function PUT(request: Request, context: Ctx) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "vault_write_failed" }, { status: 500 });
   }
   await recordOpsAudit(org, resolved.role, resolved.source, "cs_chatwoot_user_token_set", { accountId: chatwoot.accountId });
-  return NextResponse.json({ ok: true, configured: true });
+
+  let baseline: { ok: true; changes: BaselineChange[] } | { ok: false; error: string };
+  try {
+    const r = await applyChatwootBaseline(getSupabaseWriteClient(), org, chatwoot, cis);
+    baseline = "blocked" in r ? { ok: false, error: BLOCKED_CHANGE_CODE } : { ok: true, changes: r.changes };
+  } catch (e) {
+    baseline = { ok: false, error: e instanceof Error ? e.message : "baseline_failed" };
+  }
+  if (baseline.ok && baseline.changes.length) {
+    await recordOpsAudit(org, resolved.role, resolved.source, "cs_chatwoot_baseline_applied", {
+      changes: baseline.changes.map((c) => (c.kind === "account" ? `${c.kind}:${c.field}` : `${c.kind}:${c.name}`)),
+    });
+  }
+  return NextResponse.json({ ok: true, configured: true, baseline });
 }
 
 export async function DELETE(request: Request, context: Ctx) {

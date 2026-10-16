@@ -13,9 +13,11 @@ const vault = vi.hoisted(() => ({
   deleteSecret: vi.fn(async () => true),
 }));
 const audit = vi.hoisted(() => vi.fn(async () => undefined));
+const applyBaseline = vi.hoisted(() => vi.fn(async (): Promise<unknown> => ({ ok: true, changes: [] })));
 
 vi.mock("@/lib/secret-vault", () => vault);
 vi.mock("@/lib/ops-audit", () => ({ recordOpsAudit: audit }));
+vi.mock("@/lib/cs/chatwoot-baseline", () => ({ applyChatwootBaseline: applyBaseline }));
 vi.mock("@/lib/cs/cis", () => ({
   loadCis: async (organizationId: string) => ({ organizationId, chatwoot: { accountId: 2, baseUrl: "https://chatwoot.example" } }),
 }));
@@ -48,11 +50,21 @@ describe("PUT chatwoot-token", () => {
     const res = await PUT(put("admin"), ctx());
     const text = await res.text();
     expect(res.status).toBe(200);
-    expect(JSON.parse(text)).toEqual({ ok: true, configured: true });
+    expect(JSON.parse(text)).toEqual({ ok: true, configured: true, baseline: { ok: true, changes: [] } });
     expect(text).not.toContain(TOKEN);
     expect(String(fetchMock.mock.calls[0][0])).toBe("https://chatwoot.example/api/v1/accounts/2/contacts?page=1");
     expect(vault.putSecret).toHaveBeenCalledWith(`cs:chatwoot:${ORG}:user_token`, TOKEN);
     expect(JSON.stringify(audit.mock.calls)).not.toContain(TOKEN);
+  });
+
+  it("a saved token applies the Chatwoot baseline once; a failed apply never fails the save", async () => {
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ payload: [] }), { status: 200 }));
+    applyBaseline.mockRejectedValueOnce(new Error("chatwoot_api_403"));
+    const res = await PUT(put("admin"), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, configured: true, baseline: { ok: false, error: "chatwoot_api_403" } });
+    expect(applyBaseline).toHaveBeenCalledTimes(1);
+    expect(vault.putSecret).toHaveBeenCalledTimes(1);
   });
 
   it("refuses a role below owner/admin without calling Chatwoot or the vault", async () => {
@@ -69,5 +81,6 @@ describe("PUT chatwoot-token", () => {
     expect(await res.json()).toMatchObject({ ok: false, error: "token_rejected" });
     expect(vault.putSecret).not.toHaveBeenCalled();
     expect(audit).not.toHaveBeenCalled();
+    expect(applyBaseline).not.toHaveBeenCalled();
   });
 });

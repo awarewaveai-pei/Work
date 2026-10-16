@@ -13,12 +13,13 @@ interface OrgRow {
   name: string | null;
   status: string | null;
   site_url: unknown;
+  chatwoot: unknown;
 }
 
 /** null = the slug names no client. */
 export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: string; now?: Date } = {}): Promise<SchedulesView | null> {
   const now = opts.now ?? new Date();
-  let q = sb.from("organizations").select("id, slug, name, status, site_url:metadata->client_config->site_url").order("name");
+  let q = sb.from("organizations").select("id, slug, name, status, site_url:metadata->client_config->site_url, chatwoot:metadata->client_config->chatwoot").order("name");
   if (opts.slug) q = q.eq("slug", opts.slug);
   const { data, error } = await q;
   if (error) throw new Error(`schedules_db:orgs:${error.message}`);
@@ -30,9 +31,10 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
   for (const job of CLIENT_JOBS) {
     for (const org of orgs) {
       const row = stored.find((s) => s.organizationId === org.id && s.jobKey === job.key);
+      const unavailable = job.unavailable?.({ siteUrl: org.site_url, chatwoot: org.chatwoot }) ?? null;
       cells.push(
         row
-          ? { ...row, stored: true, version: null, unavailable: null }
+          ? { ...row, stored: true, version: null, unavailable }
           : {
               jobKey: job.key,
               organizationId: org.id,
@@ -45,7 +47,7 @@ export async function loadSchedulesView(sb: SupabaseClient, opts: { slug?: strin
               updatedBy: null,
               updatedAt: null,
               version: null,
-              unavailable: null,
+              unavailable,
             },
       );
     }

@@ -64,7 +64,7 @@ const ALLOWLIST: Record<string, string> = {
   "lib/cs/sweep.ts":
     "only posts a private note + hands the conversation to a human -- the exact action a blocking mode itself takes (webhooks/chatwoot/route.ts T27), never AI output.",
   "app/api/ops/clients/[slug]/cs-config/chatwoot-token/route.ts":
-    "imports chatwoot-client only for checkUserToken() (a GET of the account's contacts, to refuse a bot token) and the vault ref name; the token is stored in our own vault, nothing in Chatwoot changes.",
+    "imports chatwoot-client only for checkUserToken() (a GET of the account's contacts, to refuse a bot token) and the vault ref name; its one Chatwoot write is applyChatwootBaseline (lib/cs/chatwoot-baseline.ts), which calls checkProductionChangeAllowed itself.",
 };
 
 function walk(dir: string, out: string[]): void {

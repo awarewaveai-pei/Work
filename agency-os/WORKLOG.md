@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-16（續29）Chatwoot 基本設定自動套用：存個人 token 時套一次＋每日排程 `cs_chatwoot_baseline` 把被改掉的改回來；修 ClientHubTabs 工作樹被舊 index 蓋掉
+
+**操作者**：「看不懂為什麼要在客服分頁按一顆套用」→ 拿掉按鈕（續22），改自動。
+**做了**：
+- 存 token：`cs-config/chatwoot-token/route.ts` PUT 存成功後呼叫 `applyChatwootBaseline`（gate 在函式內）；失敗不影響存檔，結果放回應 `baseline:{ok,changes|error}`；有變更記審計 `cs_chatwoot_baseline_applied`。token 卡訊息帶一句「Chatwoot 已設好自動結案和結案巨集／原本就是對的／沒套上（原因），每天的檢查會再試」。
+- 每日：`lib/schedules/jobs.ts` 加 `cs_chatwoot_baseline`（每天 02:00 UTC＝台北 10:00；費用：免費）。用既有排程（自架 Trigger 每小時心跳 → `/api/internal/schedules/run-due`，失敗記 `last_error`＋開 incident），沒有新表、新 route、新排程器（檔頭規則）。被系統模式擋、或客戶沒接 Chatwoot＝回報 skipped，不開 incident；token 失效等真錯誤才開。預設關（AGENTS.md 自動化預設 OFF），在 `/ops/schedules` 勾選才跑。
+- `ClientJob.unavailable?()`＋`view.ts` 多讀 `client_config.chatwoot`：沒接 Chatwoot 的客戶格子顯示「沒有接 Chatwoot」。
+- `production-change-coverage` allowlist：token route 理由改成「唯一的 Chatwoot 寫入走 applyChatwootBaseline，函式內 gate」。
+- `BLOCKED_CHANGE_CODE` 從 `lib/system-modes/blocked-change.ts` 匯入（契約測試擋自寫字串）。
+**事故（已修，未進 commit）**：續22 拿掉按鈕時我用 `git checkout -- ClientHubTabs.tsx`，它還原的是**共享 index** 的版本，而共享 index 存著別的 session 很久以前 `git add` 的舊檔 → 工作樹比 HEAD 少 170 行（沒有「帳號」分頁、沒有常見問答卡、舊意圖畫面）。prod 不受影響（部署用 main）。查過差異全是舊碼、沒有任何人的新修改 → `git show HEAD:<path> > <path>` 還原後再加本次 7 行。規則：共享工作目錄**不用** `git checkout -- <file>` 復原，用 `git show HEAD:<file> > <file>`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test（270 files／2496 pass；新：chatwoot-token +1、cs-baseline-job 2） | exit=0 | ms=120000
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=cs_chatwoot_baseline|applyChatwootBaseline|unavailable\?\( | hits=26（本次 6 檔＋續22 的 5 檔＋WORKLOG／oracle 紀錄；view.ts 用 `unavailable?.(`）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（`reports/oracle/2026-10-16-partialreview-482ab2b0.md`：「沒接 Chatwoot」只在畫面、執行仍丟錯開 incident → 收，run() 改 skipped＋測試）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD）
+- ORACLE_WAIVED: 修正為一行 throw→return 與對應測試，指名測試鎖住；不再跑第二輪
+
+**操作者動作**：到 `/ops/schedules` 把 Soulful 的「Chatwoot 基本設定檢查」勾起來（預設關）。Soulful 的 token 早已存好，要立刻套用可在客服分頁重存一次 token，或等勾選後的下一個 10:00。
+**rollback**：`git revert`；Chatwoot 端：帳戶設定關自動解決、刪巨集。
 ## 2026-10-16（續28）Soulful 常見問答 `pricing` 真測：Messenger「多少錢」1.2 秒直答、AI 0 次
 
 **真測（John Doe／Messenger）**：第一次「多少錢」（msg 58，11:41:50Z）落在對話 9（open＝human_owns_thread 靜默，設計）→ bot token `toggle_status` 結案 → 再傳（對話 10 msg 60，11:46:07Z）→ msg 61 AgentBot 價目表 11:46:08Z；`cs_ai_replies` `faq:pricing` auto_sent；`ai_call_logs` 20 分鐘 0 筆。部署後 log `ReferenceError` 0。
