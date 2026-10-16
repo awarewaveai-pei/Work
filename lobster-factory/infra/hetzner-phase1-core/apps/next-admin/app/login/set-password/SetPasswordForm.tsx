@@ -88,8 +88,6 @@ export function SetPasswordForm() {
       );
     }
     setDone(true);
-    // full navigation so the middleware reads the new session cookie on this door
-    window.setTimeout(() => window.location.assign("/"), 1200);
   }
 
   return (
@@ -139,7 +137,18 @@ export function SetPasswordForm() {
         </>
       )}
 
-      {done && <div style={{ fontSize: 13, color: "var(--green)" }}>{C.done}</div>}
+      {done && (
+        <>
+          <div style={{ fontSize: 13, color: "var(--green)", lineHeight: 1.7, marginBottom: 14 }}>
+            {C.done.replace("{login}", `${window.location.origin}/login`)}
+          </div>
+          {/* full navigation so the middleware reads the new session cookie on this door; no timer: the reader needs
+              time for the sign-in address above */}
+          <button type="button" className="btn-primary" style={{ width: "100%" }} onClick={() => window.location.assign("/")}>
+            {C.go_button}
+          </button>
+        </>
+      )}
     </form>
   );
 }

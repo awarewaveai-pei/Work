@@ -67,7 +67,7 @@ export function AccountsCard({ slug }: { slug: string }) {
         setNotice({ tone: "error", text: errorText(data.error, { created: data.created }) });
       } else {
         const tpl = data.kind === "recovery" ? C.sent_recovery : data.created ? C.sent_new : C.sent_resend;
-        setNotice({ tone: "ok", text: `${tpl.replace("{email}", target)}${data.created ? "" : C.newest_only}` });
+        setNotice({ tone: "ok", text: `${tpl.replace("{email}", target)}${data.created ? C.sent_next : C.newest_only}` });
         if (target === email.trim().toLowerCase()) setEmail("");
       }
     } catch {
@@ -113,6 +113,13 @@ export function AccountsCard({ slug }: { slug: string }) {
     <Card title={C.card_title}>
       <NoData>{C.card_intro}</NoData>
 
+      <SubLabel>{C.steps_title}</SubLabel>
+      <ol style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.8 }}>
+        {C.steps.map((s) => (
+          <li key={s}>{s}</li>
+        ))}
+      </ol>
+
       <SubLabel>{C.product_label}</SubLabel>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {products.map((p) => (
@@ -147,6 +154,10 @@ export function AccountsCard({ slug }: { slug: string }) {
       )}
 
       <SubLabel>{C.list_title}</SubLabel>
+      <div style={{ fontSize: 11.5, color: "var(--text-muted)", lineHeight: 1.7, marginBottom: 8 }}>
+        <div>{C.status_pending}：{C.status_pending_hint}</div>
+        <div>{C.status_verified}：{C.status_verified_hint}</div>
+      </div>
       {accounts === null ? (
         <NoData>…</NoData>
       ) : accounts.length === 0 ? (

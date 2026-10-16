@@ -7,17 +7,22 @@
 // Every link is GoTrue type "recovery", also for a first invite: generateLink("invite"/"magiclink") CREATES a missing
 // user without app_metadata.user_kind, which middleware.ts reads as staff; "recovery" answers 404 instead, and its
 // verify confirms an unconfirmed email (supabase/auth verify.go recoverVerify), which is the proof 0103 needs.
+// Self-repair: an account an earlier press left half-made (auth user without profile, or a profile whose auth user is
+// gone) is finished or cleared by pressing again -- nobody has to open Supabase. Invariant for every repair step: it
+// only touches rows that are provably this client's alone and in use by nothing else; nothing is ever deleted to undo a
+// failed press (a half-made account cannot sign in, and the next press completes it), so two presses cannot undo each
+// other.
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { nextAdminProducts, productHost } from "@/lib/portal/doors";
+import { getServiceRoleKey, getSupabaseUrl } from "@/lib/supabase-server";
 import { sendMail } from "@/lib/mail/resend";
 import { inviteMail } from "./invite-copy";
 
 /** Which mail to send; the GoTrue link type is always "recovery" (header). */
 export type LinkKind = "invite" | "recovery";
 
-export type InviteOutcome =
-  | { ok: true; userId: string; kind: LinkKind; created: boolean }
-  | { ok: false; status: 400 | 409 | 500 | 502 | 503; error: string; userId?: string; created?: boolean };
+type Fail = { ok: false; status: 400 | 409 | 500 | 502 | 503; error: string; userId?: string; created?: boolean };
+export type InviteOutcome = { ok: true; userId: string; kind: LinkKind; created: boolean } | Fail;
 
 export interface ClientAccount {
   userId: string;
@@ -46,6 +51,33 @@ export function setPasswordLink(host: string, hashedToken: string): string {
 function belongsTo(user: User, orgId: string): boolean {
   const meta = (user.app_metadata ?? {}) as Record<string, unknown>;
   return String(meta.user_kind ?? "").toLowerCase() === "client" && meta.org_id === orgId;
+}
+
+/** The auth user with exactly this email, null if none, "error" if GoTrue could not answer. supabase-js listUsers has no
+ *  filter; GoTrue's admin list does (`filter` = email ILIKE %x%), so the exact match is made here. */
+export async function findAuthUserByEmail(email: string): Promise<User | null | "error"> {
+  const url = getSupabaseUrl();
+  const key = getServiceRoleKey();
+  if (!url || !key) return "error";
+  const PER_PAGE = 100;
+  for (let page = 1; page <= 1000; page++) {
+    let users: User[];
+    try {
+      const res = await fetch(
+        `${url}/auth/v1/admin/users?filter=${encodeURIComponent(email)}&page=${page}&per_page=${PER_PAGE}`,
+        { headers: { apikey: key, authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(10_000) },
+      );
+      if (!res.ok) return "error";
+      users = ((await res.json()) as { users?: User[] }).users ?? [];
+    } catch {
+      return "error";
+    }
+    const hits = users.filter((u) => (u.email ?? "").toLowerCase() === email);
+    if (hits.length > 1) return "error";
+    if (hits.length === 1) return hits[0];
+    if (users.length < PER_PAGE) return null;
+  }
+  return "error";
 }
 
 /** The org's client accounts, from organization_memberships (the identity model, 0001_core) + GoTrue's status. */
@@ -84,11 +116,30 @@ async function ensureMembership(sb: SupabaseClient, orgId: string, userId: strin
   return !error;
 }
 
-/** New account (unverified, no password) + profile + membership. On failure it is undone; if deleting the profile fails
- *  the auth user is kept with it, so pressing the button again finds the pair and finishes it. Left open: deleteUser
- *  failing after the profile is gone, or a createUser whose answer is lost -- an auth user without a profile, which
- *  answers email_taken until removed in Supabase (logged; adopting it needs an auth.users lookup by email). */
-async function createAccount(sb: SupabaseClient, orgId: string, email: string): Promise<{ userId: string } | InviteOutcome> {
+type Ready = { userId: string; created: boolean; verified: boolean };
+
+/** An auth user of this org that has no profile (an earlier press stopped half-way): give it its profile + membership. */
+async function adoptOrphan(sb: SupabaseClient, orgId: string, email: string): Promise<Ready | Fail> {
+  const found = await findAuthUserByEmail(email);
+  if (found === "error" || found === null) return { ok: false, status: 503, error: "auth_lookup_failed" };
+  if (!belongsTo(found, orgId)) return { ok: false, status: 409, error: "email_taken" }; // staff or another client
+  const { data: byId, error: byIdErr } = await sb.from("profiles").select("default_organization_id").eq("id", found.id).maybeSingle();
+  if (byIdErr) return { ok: false, status: 503, error: "profile_lookup_failed" };
+  const existingOrg = (byId as { default_organization_id: string | null } | null)?.default_organization_id;
+  if (byId && existingOrg !== orgId) return { ok: false, status: 409, error: "email_taken" };
+  // upsert: a profile row with this id may survive under an old email (the lookup above went by email)
+  const { error: pErr } = await sb
+    .from("profiles")
+    .upsert({ id: found.id, email, default_organization_id: orgId }, { onConflict: "id" });
+  if (pErr) return { ok: false, status: 503, error: "profile_write_failed" };
+  if (!(await ensureMembership(sb, orgId, found.id))) return { ok: false, status: 503, error: "membership_write_failed" };
+  // created: the account shows in the list for the first time
+  return { userId: found.id, created: true, verified: Boolean(found.email_confirmed_at) };
+}
+
+/** New account (unverified, no password) + profile + membership, each write idempotent. A failure deletes nothing: the
+ *  half-made account cannot sign in, and the next press finishes it (adoptOrphan / existing-profile path). */
+async function createAccount(sb: SupabaseClient, orgId: string, email: string): Promise<Ready | Fail> {
   const { data, error } = await sb.auth.admin.createUser({
     email,
     email_confirm: false,
@@ -96,30 +147,54 @@ async function createAccount(sb: SupabaseClient, orgId: string, email: string): 
   });
   if (error || !data?.user) {
     const taken = error?.code === "email_exists" || /already/i.test(error?.message ?? "");
-    // an auth user with no profile: a staff account or one made outside this flow -- never repurposed here
-    return taken ? { ok: false, status: 409, error: "email_taken" } : { ok: false, status: 500, error: "create_failed" };
+    return taken ? adoptOrphan(sb, orgId, email) : { ok: false, status: 500, error: "create_failed" };
   }
   const userId = data.user.id;
-  const undo = async (why: string): Promise<InviteOutcome> => {
-    const { error: profDelErr } = await sb.from("profiles").delete().eq("id", userId); // cascades the membership
-    if (profDelErr) {
-      console.error("[client-invite] setup failed and undo failed: kept for a retry to finish", { userId, why });
-      return { ok: false, status: 500, error: why };
-    }
-    const { error: delErr } = await sb.auth.admin.deleteUser(userId);
-    if (delErr) console.error("[client-invite] CRITICAL: orphan auth user after failed setup", { userId, why, delErr: delErr.message });
-    return { ok: false, status: 500, error: why };
-  };
-  const { error: pErr } = await sb.from("profiles").insert({ id: userId, email, default_organization_id: orgId });
-  if (pErr) return undo("profile_write_failed");
-  if (!(await ensureMembership(sb, orgId, userId))) return undo("membership_write_failed");
-  return { userId };
+  const { error: pErr } = await sb
+    .from("profiles")
+    .upsert({ id: userId, email, default_organization_id: orgId }, { onConflict: "id" });
+  if (pErr) return { ok: false, status: 503, error: "profile_write_failed", userId, created: true };
+  if (!(await ensureMembership(sb, orgId, userId))) return { ok: false, status: 503, error: "membership_write_failed", userId, created: true };
+  return { userId, created: true, verified: false };
+}
+
+/** The account for `email` in `orgId`: existing (repaired if half-made) or new. */
+async function readyAccount(sb: SupabaseClient, orgId: string, email: string): Promise<Ready | Fail> {
+  const { data, error: profErr } = await sb.from("profiles").select("id, default_organization_id").eq("email", email).maybeSingle();
+  if (profErr) return { ok: false, status: 503, error: "profile_lookup_failed" };
+  const profile = data as { id: string; default_organization_id: string | null } | null;
+  if (!profile) return createAccount(sb, orgId, email);
+
+  const { data: got, error: getErr } = await sb.auth.admin.getUserById(profile.id);
+  if (getErr && getErr.status !== 404) return { ok: false, status: 503, error: "auth_lookup_failed" };
+  const user = got?.user;
+  if (!user) {
+    // a profile whose sign-in account is gone: cleared only when it is this client's alone -- no membership in another
+    // organization (the delete cascades them). A brand role of the gone account is keyed by its auth id, not the profile
+    // (social_brand_members, 0096), so it is untouched here and shows as 「（帳號已刪除）」 in 成員.
+    if (profile.default_organization_id !== orgId) return { ok: false, status: 409, error: "email_taken" };
+    const { count: elsewhere, error: mErr } = await sb
+      .from("organization_memberships")
+      .select("organization_id", { count: "exact", head: true })
+      .eq("user_id", profile.id)
+      .neq("organization_id", orgId);
+    if (mErr) return { ok: false, status: 503, error: "membership_lookup_failed" };
+    if ((elsewhere ?? 0) > 0) return { ok: false, status: 409, error: "email_taken" };
+    const { error: delErr } = await sb.from("profiles").delete().eq("id", profile.id);
+    if (delErr) return { ok: false, status: 503, error: "profile_cleanup_failed" };
+    return createAccount(sb, orgId, email);
+  }
+  // generateLink goes by email, so the account it resolves must be this same user (a profile email can lag an auth
+  // email change)
+  if (!belongsTo(user, orgId) || (user.email ?? "").toLowerCase() !== email) return { ok: false, status: 409, error: "email_taken" };
+  if (!(await ensureMembership(sb, orgId, user.id))) return { ok: false, status: 503, error: "membership_write_failed" };
+  return { userId: user.id, created: false, verified: Boolean(user.email_confirmed_at) };
 }
 
 /**
- * Create (or find) the client account for `email` in `orgId` and mail it a set-password link: the invite wording while
- * the email is unverified (opening it is what proves the email), the reset wording once verified (forgotten password,
- * or a person who verified but never chose one). Each send replaces the previous link.
+ * Create (or find, or repair) the client account for `email` in `orgId` and mail it a set-password link: the invite
+ * wording while the email is unverified (opening it is what proves the email), the reset wording once verified
+ * (forgotten password, or a person who verified but never chose one). Each send replaces the previous link.
  * Never touches an account that is staff or belongs to another organization.
  */
 export async function inviteClientAccount(
@@ -129,29 +204,10 @@ export async function inviteClientAccount(
   const product = inviteProduct(args.productKey);
   if (!product) return { ok: false, status: 400, error: "unknown_product" };
 
-  let userId: string;
-  let created = false;
-  let kind: LinkKind = "invite";
-  const { data: profile, error: profErr } = await sb.from("profiles").select("id").eq("email", args.email).maybeSingle();
-  if (profErr) return { ok: false, status: 503, error: "profile_lookup_failed" };
-  if (profile) {
-    const { data: got, error: getErr } = await sb.auth.admin.getUserById((profile as { id: string }).id);
-    if (getErr && getErr.status !== 404) return { ok: false, status: 503, error: "auth_lookup_failed" };
-    const user = got?.user;
-    // generateLink below goes by email, so the account it resolves must be this same user (a profile email can lag
-    // an auth email change)
-    if (!user || !belongsTo(user, args.orgId) || (user.email ?? "").toLowerCase() !== args.email) {
-      return { ok: false, status: 409, error: "email_taken" };
-    }
-    userId = user.id;
-    if (!(await ensureMembership(sb, args.orgId, userId))) return { ok: false, status: 503, error: "membership_write_failed" };
-    if (user.email_confirmed_at) kind = "recovery";
-  } else {
-    const made = await createAccount(sb, args.orgId, args.email);
-    if ("ok" in made) return made;
-    userId = made.userId;
-    created = true;
-  }
+  const ready = await readyAccount(sb, args.orgId, args.email);
+  if ("ok" in ready) return ready;
+  const { userId, created } = ready;
+  const kind: LinkKind = ready.verified ? "recovery" : "invite";
 
   // never sends mail itself; "recovery" never creates a user (header). The account it resolved must be the one checked
   // above: between the check and here another request may have deleted it.
@@ -160,13 +216,15 @@ export async function inviteClientAccount(
   if (linkErr || !hashed) return { ok: false, status: 502, error: "link_failed", userId, created };
   if (link.user?.id !== userId) return { ok: false, status: 409, error: "email_taken", userId, created };
 
+  const host = productHost(product);
   const mail = inviteMail(kind, {
     orgName: args.orgName,
     productName: product.name,
-    link: setPasswordLink(productHost(product), hashed),
+    link: setPasswordLink(host, hashed),
+    login: `https://${host}/login`,
   });
   const sent = await sendMail({ to: args.email, ...mail });
-  // the account stays: pressing 寄出 again sends a fresh link to the same account
+  // the account stays: pressing again sends a fresh link to the same account
   if ("error" in sent) return { ok: false, status: sent.error === "mail_not_configured" ? 503 : 502, error: sent.error, userId, created };
   return { ok: true, userId, kind, created };
 }
@@ -192,7 +250,7 @@ export async function deleteClientAccount(sb: SupabaseClient, orgId: string, use
   const { error: delErr } = await sb.auth.admin.deleteUser(userId);
   if (delErr) return { ok: false, status: 502, error: "delete_failed" };
   const { error: profErr } = await sb.from("profiles").delete().eq("id", userId);
-  // sign-in is already gone; a leftover profile only makes this email answer email_taken until it is removed
+  // sign-in is already gone; a leftover profile is cleared by the next press for this email (readyAccount)
   if (profErr) console.error("[client-invite] account deleted, profile left behind", { userId, error: profErr.message });
   return { ok: true, email: user.email ?? "" };
 }

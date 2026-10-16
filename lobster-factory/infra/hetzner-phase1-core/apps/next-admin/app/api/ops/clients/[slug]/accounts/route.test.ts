@@ -10,9 +10,11 @@ const OTHER = "33333333-3333-4333-8333-333333333333";
 
 type FakeUser = { id: string; email: string; email_confirmed_at: string | null; app_metadata: Record<string, unknown> };
 const state = vi.hoisted(() => ({
-  profile: null as null | { id: string },
+  profile: null as null | { id: string; default_organization_id?: string },
+  profileById: null as null | { default_organization_id: string },
   user: null as null | FakeUser,
   memberRows: 0,
+  otherOrgMemberships: 0,
 }));
 const admin = vi.hoisted(() => ({
   createUser: vi.fn(),
@@ -20,6 +22,7 @@ const admin = vi.hoisted(() => ({
   generateLink: vi.fn(),
   deleteUser: vi.fn(async (_id: string) => ({ error: null })),
 }));
+const deletes = vi.hoisted(() => vi.fn((_table: string) => undefined));
 const inserts = vi.hoisted(() => vi.fn(async (_table: string, _row: unknown) => ({ error: null })));
 const audit = vi.hoisted(() => vi.fn(async () => undefined));
 const mail = vi.hoisted(() => vi.fn(async (_msg: { to: string; text: string }) => ({ ok: true, id: "m1" })));
@@ -27,22 +30,27 @@ const mail = vi.hoisted(() => vi.fn(async (_msg: { to: string; text: string }) =
 vi.mock("@/lib/ops-audit", () => ({ recordOpsAudit: audit }));
 vi.mock("@/lib/mail/resend", () => ({ sendMail: mail }));
 vi.mock("@/lib/supabase-server", () => ({
+  getSupabaseUrl: () => process.env.SUPABASE_URL,
+  getServiceRoleKey: () => process.env.SUPABASE_SERVICE_ROLE_KEY,
   getSupabaseWriteClient: () => ({
     auth: { admin },
     from: (table: string) => ({
       select: () => ({
-        eq: () => {
+        eq: (col: string) => {
           const one =
             table === "organizations"
               ? { data: { id: ORG, name: "Soulful", type: "client" }, error: null }
-              : { data: state.profile, error: null };
-          // social_brand_members is read as a head count (deleteClientAccount)
-          return Object.assign(Promise.resolve({ count: state.memberRows, error: null }), { maybeSingle: async () => one });
+              : { data: col === "id" ? state.profileById : state.profile, error: null };
+          // head counts: social_brand_members (brand roles), organization_memberships .neq(this org)
+          return Object.assign(Promise.resolve({ count: state.memberRows, error: null }), {
+            maybeSingle: async () => one,
+            neq: async () => ({ count: state.otherOrgMemberships, error: null }),
+          });
         },
       }),
       insert: (row: unknown) => inserts(table, row),
       upsert: (row: unknown) => inserts(table, row),
-      delete: () => ({ eq: async () => ({ error: null }) }),
+      delete: () => ({ eq: async () => (deletes(table), { error: null }) }),
     }),
   }),
 }));
@@ -62,11 +70,18 @@ const del = (userId: string) =>
     headers: { "x-ops-user-kind": "staff", "x-ops-claims-role": "admin" },
   });
 
+const gotrueSearch = vi.fn(async (_url: string) => new Response(JSON.stringify({ users: [] }), { status: 200 }));
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubGlobal("fetch", gotrueSearch);
+  vi.stubEnv("SUPABASE_URL", "https://supabase.example");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-key");
   state.profile = null;
+  state.profileById = null;
   state.user = null;
   state.memberRows = 0;
+  state.otherOrgMemberships = 0;
   admin.createUser.mockImplementation(async (attrs: { email: string; app_metadata: Record<string, unknown> }) => ({
     data: { user: { id: NEW_USER, email: attrs.email, email_confirmed_at: null, app_metadata: attrs.app_metadata } },
     error: null,
@@ -155,5 +170,80 @@ describe("DELETE accounts", () => {
     state.memberRows = 0;
     expect((await DELETE(del(NEW_USER), ctx())).status).toBe(200);
     expect(admin.deleteUser).toHaveBeenCalledWith(NEW_USER);
+  });
+});
+
+describe("POST accounts -- a half-made account is finished by pressing again (nobody opens Supabase)", () => {
+  const exists = { data: { user: null }, error: { code: "email_exists", message: "already registered" } };
+  const searchReturns = (u: FakeUser) =>
+    gotrueSearch.mockResolvedValueOnce(new Response(JSON.stringify({ users: [u] }), { status: 200 }));
+
+  it("adopts this client's auth user that has no profile, then mails it", async () => {
+    admin.createUser.mockResolvedValueOnce(exists);
+    searchReturns({ id: NEW_USER, email: "staff.person@client.example", email_confirmed_at: null, app_metadata: { user_kind: "client", org_id: ORG } });
+    const res = await POST(post({ "x-ops-claims-role": "admin" }), ctx());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true, userId: NEW_USER, kind: "invite", created: true });
+    expect(inserts.mock.calls.map((c) => c[0])).toEqual(["profiles", "organization_memberships"]);
+    expect(mail).toHaveBeenCalledTimes(1);
+  });
+
+  it("never adopts a user the search returned that only resembles the email (the filter is a substring LIKE)", async () => {
+    admin.createUser.mockResolvedValueOnce(exists);
+    searchReturns({ id: OTHER, email: "staff.person@client.example.tw", email_confirmed_at: null, app_metadata: { user_kind: "client", org_id: ORG } });
+    const res = await POST(post({ "x-ops-claims-role": "admin" }), ctx());
+    expect(res.status).toBe(503);
+    expect(inserts).not.toHaveBeenCalled();
+    expect(mail).not.toHaveBeenCalled();
+  });
+
+  it("never adopts a staff (or other client) auth user that has no profile", async () => {
+    admin.createUser.mockResolvedValueOnce(exists);
+    searchReturns({ id: OTHER, email: "staff.person@client.example", email_confirmed_at: "2026-10-01T00:00:00Z", app_metadata: {} });
+    const res = await POST(post({ "x-ops-claims-role": "admin" }), ctx());
+    expect(res.status).toBe(409);
+    expect(inserts).not.toHaveBeenCalled();
+    expect(mail).not.toHaveBeenCalled();
+  });
+
+  it("clears this client's profile whose sign-in account is gone, then creates the account", async () => {
+    state.profile = { id: OTHER, default_organization_id: ORG };
+    const res = await POST(post({ "x-ops-claims-role": "admin" }), ctx());
+    expect(res.status).toBe(200);
+    expect(deletes).toHaveBeenCalledWith("profiles");
+    expect(admin.createUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves another client's leftover profile alone", async () => {
+    state.profile = { id: OTHER, default_organization_id: "another-org" };
+    const res = await POST(post({ "x-ops-claims-role": "admin" }), ctx());
+    expect(res.status).toBe(409);
+    expect(deletes).not.toHaveBeenCalled();
+    expect(admin.createUser).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST accounts -- repair never touches what something else still uses", () => {
+  it("keeps a leftover profile that still has a membership in another organization", async () => {
+    state.profile = { id: OTHER, default_organization_id: ORG };
+    state.otherOrgMemberships = 1;
+    expect((await POST(post({ "x-ops-claims-role": "admin" }), ctx())).status).toBe(409);
+    expect(deletes).not.toHaveBeenCalled();
+  });
+
+  it("does not adopt an auth user whose profile row belongs to another client", async () => {
+    admin.createUser.mockResolvedValueOnce({ data: { user: null }, error: { code: "email_exists", message: "already" } });
+    gotrueSearch.mockResolvedValueOnce(new Response(JSON.stringify({ users: [{ id: NEW_USER, email: "staff.person@client.example", email_confirmed_at: null, app_metadata: { user_kind: "client", org_id: ORG } }] }), { status: 200 }));
+    state.profileById = { default_organization_id: "another-org" };
+    expect((await POST(post({ "x-ops-claims-role": "admin" }), ctx())).status).toBe(409);
+    expect(inserts).not.toHaveBeenCalled();
+  });
+
+  it("a failed press deletes nothing (a second press may already be using the account)", async () => {
+    inserts.mockResolvedValueOnce({ error: { message: "boom" } } as never);
+    expect((await POST(post({ "x-ops-claims-role": "admin" }), ctx())).status).toBe(503);
+    expect(admin.deleteUser).not.toHaveBeenCalled();
+    expect(deletes).not.toHaveBeenCalled();
+    expect(mail).not.toHaveBeenCalled();
   });
 });

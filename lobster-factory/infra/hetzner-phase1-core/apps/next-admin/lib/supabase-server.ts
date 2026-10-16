@@ -1,10 +1,10 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-function getSupabaseUrl() {
+export function getSupabaseUrl() {
   return process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 }
 
-function getServiceRoleKey() {
+export function getServiceRoleKey() {
   return process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 

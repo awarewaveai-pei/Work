@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-16（續10）開客戶帳號收尾：prod 關公開註冊＋接 Resend；「擋住的 email」按一次就自動修好；畫面以第一次使用為前提
+
+**操作者**：續8 的兩個剩餘風險「去處理好」；擋住的 email「是否可以在頁面清除，不要到後台」；「要設定使用者是第一次使用，沒人教和指導」；Resend 接 prod 選「要，一起做」。
+**prod（High，已授權）**：
+- `/root/supabase/.env` `DISABLE_SIGNUP=false→true`（`safe-infra-patch.sh file` 備份 `.env.bak.safe-patch-20261016-032641`，只重建 `auth`）。repo 內無程式呼叫 signUp／OTP／OAuth（grep 0）；admin API 不受此旗標影響。`lobster-factory/infra/supabase/docker-compose.yml` 加註為何必須 true。
+- `/root/lobster-phase1/docker-compose.yml` next-admin 加 `RESEND_API_KEY`／`MAIL_FROM`（`safe-infra-patch.sh compose … next-admin`，備份 `…bak.safe-patch-20261016-032825`，healthy 9s）。
+**自我修復（`lib/accounts/client-invite.ts`）**：createUser 回 email_exists → `findAuthUserByEmail`（GoTrue `/admin/users?filter=`，supabase-js listUsers 無 filter；精確比對）→ 只認領「本客戶的 client 帳號、且同 id profile 不屬別的客戶」；profile 的 auth 帳號已不在 → 只在「預設組織是本客戶、且在別的組織沒有成員資格」時清除再重建。失敗不再刪任何東西（半成品無密碼不能登入，下一次按自動補完）。
+**不變量分析**（Codex 對同段 code 第 2 輪，依 AGENTS §4 先寫）：修復步驟只能動「可證明只屬本客戶、且沒有別的東西在用」的資料；任何會刪除／改寫他人可能在用之物的步驟一律不做。因此：拿掉失敗時的刪除（F1 兩次按互刪）、清除前查跨組織成員資格（F2）、認領前查 profile 歸屬（F4）、分頁上限 20→1000 頁（F5）。F3（舊帳號的品牌角色）經 critic m1 查證：`social_brand_members` 以 auth id 為鍵、與 profile 無關（0103 `social_list_members` join auth.users），清 profile 不影響它，原擋法反而在「唯一擁有者被刪」時讓頁面無路可走 → 拿掉，舊角色在「成員」顯示「（帳號已刪除）」可移除。
+**第一次使用**（GPT 寫，`2026-10-16-inspect-326d7dca.md`、`-60a98f86.md`）：卡片加「怎麼建立帳號」四步、兩種狀態的說明、成功後的下一步；用詞統一（客戶員工／您／電子郵件）；信件加「之後到 {login} 登入」；設定密碼頁不再 1.2 秒自動跳走，改顯示下次登入網址＋「開啟社群發文」按鈕；認領修好的帳號回報為「已建立」。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=GoTrue /auth/v1/settings disable_signup=true；POST /auth/v1/signup → 422 signup_disabled；app/social /login 200 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch compose next-admin → healthy；docker exec lobster-next-admin printenv RESEND_API_KEY 長度 36、MAIL_FROM 宣告存在 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=SSH | cmd=GoTrue GET /admin/users?filter=awarewaveai → 1、filter=nobody-such-zzz → 0（唯讀，確認 filter 可用） | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（本次檔案 0 錯；lib/cs/* 3 錯屬他 session 未提交改動）＋ npm test（261 files／2423 pass）；指名測試 22 pass；突變：認領歸屬、跨組織成員資格、profile 歸屬、精確比對各拔除→1 紅，還原綠 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=Bash | cmd=本機 /login/set-password 重載：網址 fragment 已清、表單與新說明文字出現 | exit=0 | ms=8000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/6n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=old_member | hits=1（只在 GPT 文字稿 `2026-10-16-inspect-69ca6c1d.md`，程式 0）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=getSupabaseUrl | hits=5（supabase-server.ts 定義＋2 處內部用＋client-invite.ts import／使用）
+- ORACLE_WAIVED: Codex `2026-10-16-partialreview-6986e037.md`（-Path 範圍，共享工作樹）5 項全修；修後由 critic 覆審 0 Critical/Major，6 小項全修並補測
+
+**剩餘風險**：①新程式今晚 03:00 自動部署才上線；之後要實寄一封走完「建帳號→收信→設密碼→加成員」。②GoTrue filter 是區分大小寫的 LIKE；GoTrue 寫入的 email 一律小寫，故只有繞過 GoTrue 直接寫進 DB 的大寫 email 查不到（回 503，不會認錯人）。③`D:\tmp\wt-acct*` 突變 worktree 目錄殘留（已 prune）。
+**rollback**：程式 `git revert <commit>`；註冊：`cp /root/supabase/.env.bak.safe-patch-20261016-032641 /root/supabase/.env && cd /root/supabase && docker compose up -d auth`；compose：`cp /root/lobster-phase1/docker-compose.yml.bak.safe-patch-20261016-032825 …/docker-compose.yml` 後 `docker compose --env-file .env up -d --no-build next-admin`。
 ## 2026-10-16（續9）Soulful 客服名字寫回驗收通過：next-admin `b2508e931` 手動部署，真 Messenger 回答名字 → Chatwoot 聯絡人 John Doe → pei
 
 **部署**（操作者 go ahead）：`sg-deploy.sh next-admin` 第二次（第一次被 test 閘擋，見續7）→ 259 files／2399 pass、build、healthy 9s、HTTP smoke 5/5、`.deployed-commit=b2508e931`（02:42:32Z，前一版 `38102e22f`）；`playwright-runner -Mode smoke` 26 pass／0 fail／6 skip（`agency-os/reports/e2e/2026-10-16/smoke`）。

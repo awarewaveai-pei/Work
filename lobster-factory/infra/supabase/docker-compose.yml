@@ -168,6 +168,9 @@ services:
 
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS}
+      # Must stay true (prod /root/supabase/.env DISABLE_SIGNUP=true since 2026-10-16): a self-signup has no
+      # app_metadata.user_kind, which next-admin middleware reads as STAFF. Accounts are made by staff only
+      # (admin API, unaffected by this flag): next-admin lib/accounts/client-invite.ts.
       GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP}
 
       GOTRUE_JWT_ADMIN_ROLES: service_role
