@@ -34,6 +34,20 @@
 | 底部 | 左：Add New Tag、Repeat Post Every…；右：日期、Save as draft、主按鈕「Add to Calendar ▾」（沒選頻道時寫「Check the circles above」） | 左：Cancel；右：日期、「Schedule ▾」（下拉：存草稿／送審／排程／立即發佈） | 原生日期＋時間＋四顆並排鈕（U6） |
 | 共同點 | **一個大文字框＋框內一排小 icon；其餘選項收進摺疊列或下拉**；主動作只有一顆鈕，其他收進它的下拉 | 同左 | 所有選項攤開成 chip |
 
+**操作者截圖補充（2026-10-16，11 張，電腦寬度）**：Metricool Planning 六個分頁（Calendar／List／Posts library／Autolists／Deleted posts／Flows）＋ SmartLinks／Ads／Reporting 介紹頁；Postiz 亮色週曆與串文編輯器。新看到、本檔原本沒寫的：
+
+| # | 看到的 | 我們 | 處理 |
+|---|---|---|---|
+| S1 | Postiz 週曆：滑過空格出紫色「＋」，點了就在那個時間建貼文；左欄頻道頭像每個有「⋮」 | 點空格會建，但沒有任何提示 | U3 一起做 |
+| S2 | Postiz 串文：多個文字框上下疊，每框自己的工具列（Insert Media／Design Media／AI Image／簽名／U／B／表情），右側上移／下移／刪除／延遲；預覽用直線串起每一則；底部 tag 有顏色（「活動」） | 只有一個「第一則留言」 | F4、F10 已列，畫面照此 |
+| S3 | Metricool「Posts library」：存整則貼文（含圖），從 Calendar 拖進行事曆重複用 | 「常用文字」只存文字 | 新增 F20 |
+| S4 | Metricool Autolists 排程是「星期 × 時段」方格，亮橘色＝會發的格子；清單可接 RSS 自動補貨、可循環 | 輪播清單是星期 chip＋一個時間 | 新增 F21（方格選時段）；RSS 仍 V2 |
+| S5 | Metricool「Deleted posts」獨立分頁，欄位：日期／內容／平台／狀態／刪除日期／**刪除者** | 垃圾桶是清單裡的切換鈕，沒有刪除者 | 新增 F22 |
+| S6 | Metricool List：大搜尋框、日期區間、篩選、⋮、「Bulk actions ▾」、「＋ Create post」；表頭 Date／Post content／Networks／Status | 批次鈕放在表格底部 | U2 一起做 |
+| S7 | 空狀態一律：圓形淡色圖示＋粗體一句＋灰色一句說明（＋按鈕） | 一句灰字 | U13 照此 |
+| S8 | 行事曆右上角時區可切換（「8:26 PM - Asia/Taipei ▾」）；現在時間有一條橫線；今天欄頭深色 | 時區只顯示 | 小修 |
+| S9 | Flows（留言／私訊自動回覆）、SmartLinks（連結頁）、Ads、Reporting（PDF／PPT 報表、跨品牌儀表板）都是介紹頁＋升級鈕 | 矩陣已排 V2／V3／不做 | 不變 |
+
 結論不變（U1–U6 成立），但修正兩處：U5 的「三層」改為「頻道列＋大文字框（icon 在框內）＋摺疊的平台設定」；預覽兩種做法都可（Postiz 並排、Metricool 切換），我們一屏 1280 寬應走 Postiz 的並排。
 
 正式站 `social.aware-wave.com` 要登入，本次沒有登入；render 走 `/tools/social`（含員工側欄），`/social` 門是同一個 `SocialApp`（`app/social/page.tsx:2`），差別只有外殼。
@@ -80,6 +94,9 @@
 | F16 | **媒體來源**（Drive／Canva／圖庫） | D V2 | 無 | Metricool：Drive／Canva／Adobe Express／Pexels／Giphy | V2 |
 | F17 | **頻道頭像／名稱** | A V1 隱含 | `social_accounts` 無 `picture`（`0096:57`） | 兩者所有畫面都用頭像辨識頻道 | V1（U4 前置） |
 | F18 | **分析** | E V2 | 無 | Postiz analytics API 已在 v2.25 | V2 |
+| F20 | **貼文庫**：存整則貼文（含圖），拖進行事曆重用 | 矩陣未列 | 只有 `social_saved_texts` 存文字 | Metricool Posts library（§1.1 S3） | V2 |
+| F21 | **輪播時段方格**（星期 × 時段點選） | C 輪播 V1 | 星期 chip＋單一時間（`Lists.tsx` 每週列） | Metricool Autolists（§1.1 S4） | V1（C17） |
+| F22 | **已刪除分頁＋刪除者** | C「已刪除可還原」V1 | 清單內切換鈕；`social_audit_log` 有 actor 但畫面沒顯示 | Metricool Deleted posts（§1.1 S5） | V1（C17） |
 | F19 | 連接進行中只有一行灰字＋取消（`Settings.tsx:80`），無進度、授權分頁完成後不回跳 | — | 已有鎖，缺回饋 | Postiz：連接完成直接回 launches | 小修 |
 
 **順手抓到並修掉的 bug（B）**
