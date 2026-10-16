@@ -1451,7 +1451,7 @@
   - ✅ 2026-10-15 三扇門＋買斷＝[ADR 018](docs/architecture/decisions/018-product-doors-and-buyout-delivery.md)（SOP §18、AGENTS §0 指標、`products.ts` 欄位＋測試擋）；⑥ 程式完成、⑤ 程式完成（未部署）。WORKLOG 2026-10-15「產品三扇門」條目。
   - ✅ 2026-10-15 ⑤⑥ 上線：social.aware-wave.com 開門（DNS、憑證、兩層 nginx、next-admin `4c4e153a7`），WORKLOG 續30；ContentStudio 舊面板換成帶品牌的連結、next-admin 改每天台灣 03:00 自動部署＋部署前 migration 閘，WORKLOG 續31。
   - ✅ 2026-10-15 品牌成員管理：0103（email 找帳號、改角色、移除、最後一位擁有者留下）＋ `/api/social/members`（只限擁有者）＋設定頁「成員」，WORKLOG「社群品牌成員管理」條目；2026-10-16 0103 套正式庫＋`38102e22f` 上線（WORKLOG 2026-10-16 續3），Codex 第二輪無發現、正式庫交易內驗收（ROLLBACK）全過（WORKLOG 2026-10-16「成員管理驗收」條目）。
-  - **剩**：操作者在 social 網址用員工帳號登入看一次，並在設定頁「成員」實際加一位（正式庫只有 1 個帳號，加第二位要先開帳號）（未驗）。
+  - ✅ 2026-10-16 成員 UI 驗收：操作者在設定頁「成員」把客戶帳號加為編輯（稽核 08:23:08Z member_add）；不能寫的人改看角色說明（236c86524，3b146fd0f 上線），WORKLOG 2026-10-16 續12／續16。
   - **前置條件（db-expert 2026-10-15 M1）**：portal 註冊開放（`PORTAL_SIGNUP_ENABLED`）之前，註冊要真的驗證 email（現在 `email_confirm:true` 不驗）——否則有人搶註別人的 email、被加成員就拿到該品牌；或成員改成邀請制。見 `app/portal/api/signup/route.ts` KNOWN V1 GAP。
   - **員工開客戶帳號**（`9c07125b3`＋續10，WORKLOG 2026-10-16 續8／續10）：客戶頁「帳號」分頁＋Resend 寄設定密碼信；prod 已接 `RESEND_API_KEY`、已關公開註冊（`DISABLE_SIGNUP=true`）；擋住的 email 按一次自動修好。**剩**：03:00 自動部署後，實寄一封給自己的另一個信箱走完 建帳號→收信→設密碼→社群「成員」加入。
   - **後續（db-expert m1）**：既有 migration 裡 `SECURITY DEFINER` 函式的 `search_path = public, pg_temp` 改成 `''`（superuser 擁有、public 可被 postgres 建函式，2026-10-15 查 `postgres` 對 public 有 CREATE）；0103 已改。建議模型：Opus 5.5
