@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-16（續13）客戶怎麼來＝三條軸（部署／商業／操作），對外五種方式是組合：ADR 017 §0 重寫、許可加 actor＋on_behalf_of、授權檔加 max_tenants、順序加 API 通道與轉售；AGENTS.md §0 一行
+
+**觸發**：操作者問「客戶來自哪三道門、四種方式」。查遍今日 session／commit／WORKLOG／TASKS／daily／handoffs 都沒這句；repo 只有訂閱／點數／買斷（SOP §18:126、ADR 017 §1）。操作者定案五種：自用／代操／訂閱／點數／賣人＝買斷；再要求「完善的整性，不是畫蛇添足」。中途一次猜錯（`ca619c079` 四種，`c152ee003` 撤回）。
+
+**根因**：五種是銷售語言，存成 enum 會讓「買斷＋代操」「只串 API」沒地方放（每加一種改程式）。程式與資料只存三軸：A 部署（hosted／self_hosted）、B 商業（contract／comp／credits／perpetual）、C 操作（`actor`＋`on_behalf_of`）；五種＝組合。現況缺口（file:line）：`actorOf()` 只有 who 沒有替誰（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/social/authz.ts:78`）；ADR 017 §3 許可欄位無 actor；Account#0 是普通 org（TASKS.md:1001）、0062 無 kind 欄（`0062_organization_product_subscriptions.sql:79-82`，0 筆）；`lib/entitlements` 不存在、plans／entitlements migration 不存在 → 順序 1–5 全未建，現在改模型零重工。
+
+**[已修改]**
+- `agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md`：§0 重寫成三軸表＋五種對應表＋業界對照（Stripe Entitlement／JetBrains fallback／GitLab 授權檔／Shopify collaborator／OpenAI API key）；§3 許可與用量回報加 `actor`、`on_behalf_of`（點數永遠扣 on_behalf_of、稽核永遠記 actor）；§4 `can(主體, feature_key, actor)`，actor 不影響 allowed；§5 授權檔加 `max_tenants`（預設 1）；順序 1 加 `accessChannels`、順序 2 加 `organizations.kind`、新增順序 6 API 通道、7 轉售（等第一個客戶）；不採用加「五種存 enum」；§0 記 System Foundry 三缺口（代操／self_hosted 獨立題／API 通道）。
+- `agency-os/AGENTS.md` §0：五種方式那行改為「程式與資料只存三軸…許可只問 `can(主體, feature_key, actor)`，不自建帳本」。
+- `agency-os/TASKS.md`：ADR 017 順序第 1 步啟動時一併改 System Foundry 問卷（一行）。
+
+**驗證結果**
+- REALTEST_WAIVED: DOC_ONLY -- 只改 ADR／AGENTS／TASKS；`node scripts/verify-governance-pointers.mjs` → PASSED（146 pointers resolved）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n -- 讀回 §0–§5 後抓到 B 軸值（trial／subscription）與 §3 `source`（contract／comp）不一致，改成 contract／comp／credits／perpetual 同一組詞；AGENTS.md 同步
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`客戶五種方式|on_behalf_of|max_tenants|accessChannels|organizations.kind` | hits=2（AGENTS.md、ADR 017 本身；另 3 筆是 video-service `.venv` 第三方套件，無關）；現行 ts/sql/py 0 命中＝沒有舊呼叫端要改
+- ORACLE_WAIVED: 無 source 檔改動
+
+**剩餘風險**：HCI ADR-0009／0031 與 `ai_lego/platform/entitlement/check.py` 本輪未整檔讀，缺口 1（actor）落地到認知平台前先讀。程式面仍是 ADR 017 順序 1–7，一行未建。
+
+**rollback**：`git revert <本 commit>`；無 migration、無程式。
 ## 2026-10-16（續12）社群發文：不能寫的人開頁看到打不了字的「新貼文」→ 改成說明角色與怎麼取得發文權限
 
 **症狀**（操作者截圖）：從客戶頁「帳號」邀請 graphicdesignpeijing@gmail.com「成為管理員」，對方登入後「新貼文」輸入框打不了字。

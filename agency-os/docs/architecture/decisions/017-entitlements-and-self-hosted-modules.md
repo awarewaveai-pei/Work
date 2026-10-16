@@ -19,17 +19,27 @@
 
 ## 決策
 
-### 0. 客戶五種方式（操作者 2026-10-16 定案，每個產品都適用）
+### 0. 三條軸；對外的五種方式是組合（操作者 2026-10-16 定案，每個產品都適用）
 
-| # | 方式 | 誰付 AI／API | 走哪扇門（ADR 018） | 本 ADR 哪一節 |
-|---|---|---|---|---|
-| 1 | 自用 | 我們自己 | 員工門 | — |
-| 2 | 代操（我們替客戶操作） | 客戶點數或合約 | 員工門 | §3 |
-| 3 | 訂閱 | 我們先付，扣客戶合約額度 | 公開門付款 → 產品門使用 | §1 線上、§3 |
-| 4 | 點數（共用錢包按次扣） | 我們先付，扣客戶點數 | 公開門買點數 → 產品門使用 | §1 線上、ADR 015 |
-| 5 | 賣人＝買斷 | 客戶自己的 key | 裝在客戶網域；客人已有網站就接進來 | §1 買斷、§5、§6 |
+程式和資料只存三條軸，各在自己的地方；新方式＝新組合，不改程式。
 
-1–4 線上、資料在我們的庫、控制面簽許可；5 離線授權檔。2026-09-10 原話「自用／訂閱／點數／賣人」（ADR 012:19）加上客服平台化的「代操」（TASKS 客服 §0「自用＋客戶自用＋代操」）。
+| 軸 | 存在哪 | 值 | 本 ADR |
+|---|---|---|---|
+| A 部署 | 每個安裝 | `hosted`（我們主機，控制面簽許可）／`self_hosted`（客戶主機，離線授權檔） | §1、§5 |
+| B 商業（錢從哪來） | 計費帳戶 × 產品 × 功能 | `contract`（0062 合約：trial → active 訂閱）／`comp`（贈送、自用）／`credits`（錢包按次扣，不是權利列）／`perpetual`（授權檔） | §3（前兩個＝`organization_entitlements.source`）、ADR 015（credits）、§5（perpetual） |
+| C 操作 | 每次請求 | `actor`＝誰按（`staff:<uid>`／`customer:<uid>`／`api_key:<id>`）；`on_behalf_of`＝替哪個計費帳戶 | §3 許可欄位、§4 `can()` |
+
+| 對外五種 | A | B | C |
+|---|---|---|---|
+| 自用（我們自己用） | hosted | comp；計費帳戶 `organizations.kind = internal`（Account#0） | staff |
+| 代操（我們替客戶操作） | hosted；客戶買維運時 self_hosted | 客戶的 contract／credits | staff，`on_behalf_of` = 客戶 |
+| 訂閱 | hosted | contract（14 天 trial 起） | customer |
+| 點數（共用錢包按次扣） | hosted | credits（ADR 015） | customer |
+| 賣人＝買斷 | self_hosted | perpetual＋`updates_until`；客人已有網站就接進來（§6） | customer；買維運時 staff |
+
+- **業界對照**（照抄的部分，不重新發明）：B 軸＝Stripe Billing 的 Customer→Subscription→Price→Entitlement，許可與價格分離（Stigg、LaunchDarkly 同）；`perpetual`＋`updates_until`＝JetBrains perpetual fallback；授權檔離線驗章＝GitLab self-managed／Atlassian Data Center；C 軸代操＝Shopify collaborator／Meta Business Manager partner／Google Ads 管理員帳戶（代理商員工用自己的帳號進客戶帳戶、用量記客戶、稽核記「誰替誰」、客戶可撤）；`api_key` actor＝OpenAI／Stripe API key（綁計費帳戶與 scope，用量計 credits）。
+- **已定義、還沒賣的值**（不是待補，是等第一個客戶）：`api_key` actor（順序第 6 步）；轉售＝授權檔 `max_tenants > 1`（順序第 7 步）。值存 text，不存 boolean，加值不改 schema。
+- System Foundry 問卷要對齊三軸：已有 CAP-SUBSCRIPTION／CAP-PREPAID-CREDITS／CAP-LICENSE／CAP-MULTI-TENANT／CAP-CUSTOMER-USERS；缺「代操」、缺 `self_hosted` 獨立題、缺 API 通道；藍圖必寫「許可只問 `can()`，不自建帳本」（TASKS 2026-10-16）。
 
 ### 1. 兩條路，同一份商品目錄、同一個判斷
 
@@ -54,13 +64,14 @@
 - **權利＝新表 `organization_entitlements`**：`organization_id`（計費帳戶）、`product_key`、`feature_key`（必填）、`source`（contract／comp）、`source_ref`（合約 id 或贈送原因）、`starts_at`、`ends_at`、`status`、上限。合約變動時控制面重算該帳戶的權利列。贈送整個產品＝照一個具名方案展開成每個功能一列。
 - 點數不變成權利：按次扣點的功能，許可帶「這次最多花多少」（015 §1）。
 - **只有控制面碰這三張表**（0062、`plans`、`organization_entitlements`）：靜態檢查只允許 `lib/entitlements/**` 與 `app/portal/**` 引用它們，其他地方出現就建置失敗。社群、collect 跟控制面在同一個 app，用的是繞過 RLS 的 service-role client（0062:51-52），沒有這道檢查就擋不住直讀。
-- **許可**（012 §4 `entitlement_ref` 擴充，取代 ADR-0031 gate 1 欄位）：`tenant`（計費帳戶）、`product_key`、`feature_key`、`entitlement_id`、`source_ref`、上限、可花點數上限、`issued_at`、`expires_at`（分鐘級）、`kid`、簽章。只在該功能有 active 權利列時簽發（取代 gate 2 條件）。用量回報帶 `entitlement_id`（取代 gate 4 的 `subscription_ref`）。畫面要灰掉沒買的按鈕時，產品要一份簽章的「此帳戶能用的功能與上限」，快取幾分鐘。
+- **許可**（012 §4 `entitlement_ref` 擴充，取代 ADR-0031 gate 1 欄位）：`tenant`（計費帳戶）、`product_key`、`feature_key`、`entitlement_id`、`source_ref`、上限、可花點數上限、`actor`、`on_behalf_of`（§0 C 軸；`on_behalf_of` 永遠等於 `tenant`，代操時 `actor` 是員工）、`issued_at`、`expires_at`（分鐘級）、`kid`、簽章。只在該功能有 active 權利列時簽發（取代 gate 2 條件）。用量回報帶 `entitlement_id`（取代 gate 4 的 `subscription_ref`）與 `actor`／`on_behalf_of`，點數永遠扣 `on_behalf_of`，稽核永遠記 `actor`。畫面要灰掉沒買的按鈕時，產品要一份簽章的「此帳戶能用的功能與上限」，快取幾分鐘。
 - 認知平台：`check_entitlement` 改收 session 對應的計費帳戶與 `feature_key`、驗許可，不再只看 tenant。
 
-### 4. 程式只有一個判斷：`grant = can(主體, feature_key)`
+### 4. 程式只有一個判斷：`grant = can(主體, feature_key, actor)`
 
 - 回傳 `{allowed, limits, max_spend, report(usage)}`。
-- 線上：主體＝計費帳戶，答案來自許可；`report()` 回報用量給控制面記帳。
+- 主體＝計費帳戶（`on_behalf_of`），`actor`＝這次請求是誰（§0 C 軸）；`actor` 只進稽核與用量，不影響 `allowed`。
+- 線上：答案來自許可；`report()` 回報用量給控制面記帳。
 - 買斷：主體＝這台安裝，答案來自授權檔；`max_spend` 空、`report()` 不做事（用客戶自己的 key）。
 - 每個收費的按鈕或 API 呼叫前問一次；產品程式不知道答案來自合約、贈送還是買斷。
 
@@ -72,7 +83,7 @@
   3. 交接時撤掉我們的 SSH key 與所有我們的密鑰；客戶有買維運才保留一把維運用的 key。
 - **模組清單**（每個產品一份）：System Foundry `kernel/06_MODULARITY_CONTRACT.md` 的十項，加上：需要的基礎服務（例：社群＝next-admin＋Supabase＋Trigger.dev＋Postiz）、要填的設定值（客戶的 API key、網址）、依賴的模組（例：社群依賴帳號層）、可接的外部來源（§6）。安裝程式只讀這份清單。
 - **一份程式**：next-admin 照一個 app 出貨，沒選的模組路由與選單關掉；含 SAFETY_GATE 的程式碼在建置時排除（§2）。
-- **授權檔**：`format_version`、`kid`、`install_id`、客戶、模組、每個 `feature_key` 的上限、`updates_until`、簽章（Ed25519，同 ADR 007）。安裝內存一組可接受的公鑰，換金鑰時舊授權檔仍可驗。功能沒有到期日；`updates_until` 只管能不能拿新版。
+- **授權檔**：`format_version`、`kid`、`install_id`、客戶、模組、每個 `feature_key` 的上限、`updates_until`、`max_tenants`（預設 1；>1 才是轉售，順序第 7 步）、簽章（Ed25519，同 ADR 007）。安裝內存一組可接受的公鑰，換金鑰時舊授權檔仍可驗。功能沒有到期日；`updates_until` 只管能不能拿新版。
 - **不放遠端關閉開關**：我們的伺服器停了客戶照常能用。授權檔是合約工具，不是防破解。
 - RATE_LIMIT 照樣在本機執行，因為它保護外部資源（例：Postiz 每小時 30 次、抓取禮貌預算）。
 - Postiz 是 AGPL-3.0：交付未修改的官方映像並附原始碼位置；我們的程式只走它的公開 API（016 §7）。交付前請律師確認。
@@ -98,14 +109,17 @@
 
 ## 順序（風險由低到高，每段做完現有產品照常）
 
-1. `products.ts` 加 `features[]`；登記表機械閘（012 §5）加「收費功能都有登記」「可買斷模組無 SAFETY_GATE」；`products.test.ts` 改比對全部產品（現在只比 self-signup）。只讀。
-2. Migration：`plans`、`organization_entitlements`；0062 加 `plan_key`、`source_ref`、改唯一索引、放寬 CHECK（0062 目前 0 筆，不用雙寫期）；三表只給控制面的靜態檢查。控制面發功能級許可（012 §8 第 3 步）。
+1. `products.ts` 加 `features[]`、`accessChannels`（`ui`；`api` 等順序第 6 步）；登記表機械閘（012 §5）加「收費功能都有登記」「可買斷模組無 SAFETY_GATE」；`products.test.ts` 改比對全部產品（現在只比 self-signup）。只讀。
+2. Migration：`plans`、`organization_entitlements`、`organizations.kind`（`internal`／`customer`，預設 customer，Account#0 改 internal）；0062 加 `plan_key`、`source_ref`、改唯一索引、放寬 CHECK（0062 目前 0 筆，不用雙寫期）；三表只給控制面的靜態檢查。控制面發功能級許可（012 §8 第 3 步）。
 3. Woo 付款通知 → 合約與權利；帳本泛化（015 §4 第 2 步）。
 4. 各產品收費點接 `can()`；認知平台改 `check_entitlement`。
 5. 買斷安裝階段：模組清單、建置時排除、授權檔簽發、客戶 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。
+6. API 通道（等第一個只串 API 的客戶）：計費帳戶發 API key（scope＝feature_key 子集），`actor = api_key:<id>`，用量走同一個 `report()`；登記表 `accessChannels` 加 `api`。
+7. 轉售（等第一個轉售客戶）：授權檔 `max_tenants > 1`，安裝內租戶數受它限制；合約與價格另訂。
 
 ## 不採用
 
+- **把對外五種方式存成一個 enum**：「買斷＋代操」「只串 API」沒地方放，每加一種改程式；存三軸（§0）。
 - **買斷＝線上權利表裡一筆沒有到期日的列**：客戶還在我們主機、用我們的 API，賣一次永遠倒貼（操作者 2026-10-14 更正）。
 - **每個模組拆成獨立 app**：多出好幾套登入和主題（016「不採用」同理）。
 - **價格寫在程式裡**：每次調價都要部署。
