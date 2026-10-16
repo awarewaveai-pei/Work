@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-16（續4）社群成員管理驗收：Codex 第二輪無發現；正式庫交易內驗收全過（0103 由續3 套、38102e22f 由續3 部署）
+
+**做了**（操作者「可以開始做了」續做 2026-10-15 續38）：
+- Codex 第二輪（續38 的 ORACLE_WAIVED 那一輪，前一個 session 結束時被中斷）重跑，改審 commit `219238c36`（`-DiffRef`，檔已進 main）→ `NO FINDINGS`，`agency-os/reports/oracle/2026-10-16-partialreview-a7ab9b15.md`。
+- 0103 與部署：平行 session 已做（續3：01:21:57Z 套、01:27:46Z 部署 38102e22f）。本 session 的 apply 呼叫被 ledger 拒（已套），手動 sg-deploy 遇鎖（rc=75，對方部署中）未 `--force`，等它完成。ledger sha256 `e49ad4fe…` 與本地檔相同。
+- 驗收不在正式庫留資料：正式庫只有 1 個帳號，UI 加第二位要先開帳號（屬操作者），所以用正式函式在交易內跑一輪再 ROLLBACK（腳本 scratchpad `accept-0103.sql`）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql（supabase_admin，`set local role service_role`）BEGIN → `social_add_member`（唯一帳號，owner）→ `add|t`；`social_list_members` → `list|1|owner`；同 email 再加 → `already a member of this brand`；降級最後一位 owner → `the last owner stays`；不存在 email → `no account with this email`；稽核 `audit|1`；`set local role authenticated` → `permission denied for function social_list_members`；ROLLBACK 後 `social_brand_members` 0 列 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin ls .next/server/app/api/social/members/` → route.js 在；`POST /portal/api/signup` → `coming_soon` | exit=0 | ms=2000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex 第二輪 `2026-10-16-partialreview-a7ab9b15.md` NO FINDINGS（第一輪＋db-expert 見續38）
+- BUGHUNT_WAIVED: NA -- 本條無程式改動（只驗收）
+
+**剩**：操作者在 social.aware-wave.com 用員工帳號登入，設定頁「成員」實際加一位（要先有第二個帳號）。
+
+**rollback**：同續3（程式 rollback 映像；DB 先撤程式再跑 `0103_social_brand_members_down.sql`）。
 ## 2026-10-16（續3）0103 已套（操作者「你來套 0103」）＋ next-admin 38102e22f 上線（排程頁費用／伺服器詳細＋社群成員管理）
 
 **為何由本 session 套**：部署被 migration 閘擋（`sg-deploy.sh` step 1.86：main 有 0103 檔、ledger 沒有）。0103 屬社群 session（續38，2026-10-15）；它的 commit 219238c36 原本只在本機，本 session 推送時一併推上 main。
