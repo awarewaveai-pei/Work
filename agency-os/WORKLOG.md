@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-16（續35）社群發文樣稿第 15 版：照操作者 11 張 Metricool／Postiz 截圖（GAP_REPORT §1.1 S1、S2、S4–S8）— 等操作者看圖
+
+**來源**：主線 session 轉來操作者截圖（沒附文字，當參考，不當成 v14 已同意）；歸納在 `SOCIAL_MANAGER_GAP_REPORT.md` §1.1 S1–S9、F20–F22（99616c6f5）。只改 `lobster-factory/docs/social/mockups/social-manager-mock.html`。
+- S1 週檢視：滑過以後的日子，欄底出現紫色「＋ 新增」（手機一直顯示）。頻道頭像「⋮」沒畫：我們沒有頻道欄，帳號動作在設定頁每列。
+- S2 串文：「第一則留言」和 Threads「結尾留言」合成一件事——文字框下「＋ 接一則」。每則自己的框＋小工具列（圖、表情、字數），右邊上移／下移／刪除／延遲（緊接著／1 分／5 分／1 小時，點一下換）。預覽：Bluesky、Threads 用直線串起每一則；Facebook、Instagram、LinkedIn 顯示成留言。接的那則超過 Bluesky／Threads 字數也擋。
+- S4 輪播清單：星期 × 時段方格（點格子＝那天那時間發一則，橘色＝會發），「＋ 加一個時間」用自製時間選擇；資料改 `times`＋`slots`（`"週幾@HH:MM"`）。今天已過的時段不算。
+- S5 「已刪除」獨立分頁（頁首最後一個）：排定時間／內容／發到／刪除前狀態／刪除時間／誰刪的／還原；清單檢視與篩選不再有「已刪除」。還原回到刪除前的狀態。
+- S6 清單檢視：工具列多一顆「批次動作 · N」（選單：送審所選、刪除所選），表格底部的批次列拿掉；清單檢視不顯示前後週按鈕（騰空間）。
+- S7 空狀態：圓形淡色圖示＋粗體一句＋灰色一句說明＋一顆鈕（9 處統一，`emptyHtml(icon, line, hint, btn, id)`）。
+- S8 時區：頁首右邊「10:40 · Asia/Taipei」可切換（設定頁的時區拿掉，只留一處）；週檢視今天欄頭深色、今天欄裡有紅色「現在 10:40」線。「樣稿」說明與「看成 編輯／審核人」收進頁首「樣稿」鈕的面板。
+- 沒畫：F20 貼文庫、S9（Flows／SmartLinks／Ads／Reporting）＝V2／V3；S2 的彩色 tag＝F10 V2。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/docs/social/mockups/check-social-mocks.py → 1 page(s), 0 finding(s)（含瀏覽器實量 pill／週卡縮圖、頁面 JS 0 錯）；--selftest → 44/44；sync-app-theme.py --check → up to date | exit=0 | ms=6000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/e2e/social/render-views.mjs <tmp> --mock → phone 390 {"day":{"page":390,"over":[]},"sheet":{"page":390,"over":[]}}；另 scratch 截桌機 19 張、手機 10 張，pageerror 0，390 寬各檢視頁寬 390（清單／紀錄的寬表格在面板內捲） | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/4n -- 自審看圖修：清單工具列「批次動作」被擠出右緣（清單檢視藏前後週）、串文預覽名字與 handle 擠一行（改上下）、手機輪播方格寬 451 超出（欄寬改彈性）、手機頁首「樣稿」被 1100px 斷點藏掉（補回並顯示時區）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=bulkCount|finOn|xfc | hits=0 -- 拿掉的 id 沒有別處用（命中只有 video-service .venv 二進位字串）；render-views.mjs／measure-mock.mjs 用的 `.week .card`、`.cthumb`、`[data-view]`、`.day.focus .card[data-kind=social]`、`body.sheet`、`#edPanel` 都還在
+- ORACLE_WAIVED: 只改樣稿（docs，不上線）；證據＝檢查 0 finding＋44/44 突變＋截圖
+
+**剩**：操作者看 v15 圖給意見；同意後才開 next-admin 實作卡（ADR 016 §5 的「第 14 版」那行屆時改成定案版本）。
+**rollback**：`git revert <本 commit>`（只動樣稿一檔＋WORKLOG）。
 ## 2026-10-16（續34）課程類考試修正：考試先跑常見問答、常見問答關鍵字收窄（13 題應答被籠統答案吃掉）、中文問題一律也用英文查（9/9 只有英文找到對的頁面）
 
 **考試先跑常見問答**（`lib/cs/eval.ts` `runEvalCase`）：正式環境 `webhooks/chatwoot/route.ts:163` 先 `matchFaq`，考試原本跳過。命中時：轉真人題依 entry.handoff 判定；應答題被常見問答接走＝不算過（`judgeReason=faq:<id>`），理由同 `classified_as:`。

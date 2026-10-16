@@ -352,6 +352,11 @@ header{display:flex;align-items:center;gap:14px;padding-top:10px;min-width:0}
 header h1{font-size:var(--fs-h1);margin:0;white-space:nowrap}
 header>*{flex:none}
 .hright{flex:1 1 auto;justify-content:flex-end}
+header{position:relative}
+.hpop{top:52px;right:0;width:300px;z-index:8}
+.tzbtn{padding:5px 10px;color:var(--text-muted)}
+#bulkBtn b{color:var(--accent)}
+.bulkmenu{top:52px;bottom:auto;right:12px}
 .seg .mk{display:none}
 .brands button{max-width:170px;overflow:hidden;text-overflow:ellipsis}
 .nav{display:flex;gap:2px}
@@ -388,13 +393,16 @@ main.full{grid-template-columns:minmax(0,1fr)}
 .day:first-child{border-left:0}
 .day.past{background:repeating-linear-gradient(135deg,transparent 0 9px,var(--bg-subtle) 9px 18px)}
 .day.today{background:var(--accent-light)}
+.day.today .dh{background:var(--text-primary);color:var(--btn-primary-text)}
+.day.today .dh .muted,.day.today .dh .n{color:var(--btn-primary-text)}
 .dh{padding:6px 8px;display:flex;align-items:baseline;gap:6px;border-bottom:1px solid var(--card-border);flex:none}
 .dh b{font-size:var(--fs-h2)}
 .dh .n{margin-left:auto;font-size:var(--fs-tag);color:var(--text-muted)}
-.day.today .dh b{color:var(--accent)}
+.now{flex:none;display:flex;align-items:center;gap:4px;color:var(--red);font-size:var(--fs-tag);font-weight:700}
+.now::after{content:"";flex:1;height:2px;background:var(--red)}
 .stack{flex:1;min-height:0;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:6px;cursor:copy}
 .stack.over{outline:2px dashed var(--accent);outline-offset:-3px}
-.add{flex:none;border:1px dashed var(--btn-secondary-border);background:transparent;color:var(--text-muted);display:flex;align-items:center;justify-content:center;gap:2px;padding:3px;visibility:hidden}
+.add{flex:none;border:0;background:var(--accent);color:var(--btn-primary-text);display:flex;align-items:center;justify-content:center;gap:2px;padding:3px;visibility:hidden}
 .day:hover .add{visibility:visible}
 .card{position:relative;flex:none;background:var(--card-bg);border:1px solid var(--card-border);border-left:4px solid var(--status-ignored);border-radius:8px;padding:5px;display:flex;flex-direction:column;gap:4px;cursor:pointer;box-shadow:var(--shadow);text-align:left}
 .card:hover{box-shadow:var(--shadow-hover)}
@@ -438,9 +446,11 @@ td.ttl{white-space:normal;min-width:0}
 .sbar[data-state="scheduled"]{background:var(--yellow)} .sbar[data-state="published"]{background:var(--green)} .sbar[data-state="error"]{background:var(--red)} .sbar[data-state="review"]{background:var(--severity-low)} .sbar[data-state="rotation"]{background:var(--accent)} .sbar[data-state="deleted"]{background:var(--text-muted)}
 
 /* empty states (U13): picture + one sentence + one button */
-.empty{margin:auto;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;padding:24px;max-width:360px}
-.empty svg{width:88px;height:88px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.empty svg .f{fill:var(--accent-light)}
+.empty{margin:auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:24px;max-width:380px}
+.empty .eic{width:64px;height:64px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:grid;place-items:center;margin-bottom:6px}
+.empty .eic svg.i{width:30px;height:30px}
+.empty b{font-size:var(--fs-h2)}
+.empty .btn-primary{margin-top:8px}
 .empty p{margin:0}
 .over-empty{position:absolute;inset:96px 0 0 0;display:flex;pointer-events:none}
 .over-empty .empty{pointer-events:auto;background:var(--card-bg);border-radius:var(--radius);box-shadow:var(--shadow)}
@@ -456,6 +466,13 @@ td.ttl{white-space:normal;min-width:0}
 .frow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .frow>.lab{color:var(--text-muted);width:56px;flex:none}
 .queue{display:flex;flex-direction:column;gap:4px}
+.frow.top{align-items:flex-start}
+.slots{display:flex;flex-direction:column;gap:6px}
+.slots{flex:1 1 300px;min-width:0}
+.sgrid7{display:grid;grid-template-columns:44px repeat(7,minmax(0,44px)) 30px;gap:4px;align-items:center;text-align:center}
+.slot{height:28px;padding:0;border:1px solid var(--card-border);background:var(--bg-subtle);border-radius:6px}
+.slot:hover{border-color:var(--accent)}
+.slot.on{background:var(--yellow);border-color:var(--yellow)}
 .qrow{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--card-border);border-radius:6px;padding:4px 4px 4px 10px}
 .qrow.next{border-color:var(--accent);background:var(--bg-subtle)}
 .qrow .n{color:var(--text-muted);font-size:var(--fs-tag)}
@@ -528,6 +545,18 @@ td.ttl{white-space:normal;min-width:0}
 .xtra .xh .ibtn svg.i{width:14px;height:14px}
 .xtra .xb{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .xtra .xb input[type="text"],.xtra .xb input[type="url"]{flex:1}
+.part{display:grid;grid-template-columns:minmax(0,1fr) 30px;gap:4px;padding-left:14px;border-left:2px solid var(--card-border);margin-left:8px}
+.pbox{border:1px solid var(--btn-secondary-border);border-radius:var(--radius-sm);display:flex;flex-direction:column}
+.pbox:focus-within{border-color:var(--accent)}
+.pbox textarea{border:0;background:transparent;padding:6px 10px;min-height:52px}
+.pbox textarea:focus-visible{outline:0}
+.pbox .mrow{padding:0 10px 6px}
+.pbox .mt{width:40px;height:40px}
+.pbox .tools{gap:2px}
+.pbox .tools .muted{margin-left:4px}
+.pside{display:flex;flex-direction:column;gap:0}
+.pside .ibtn{height:24px}
+.addpart{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .pset{background:var(--bg-subtle);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-direction:column;gap:6px;flex:none}
 .pset h3{margin:0;font-size:var(--fs-tag);color:var(--text-muted);display:flex;gap:6px;align-items:center;font-weight:600}
 .psrow{display:flex;gap:8px;align-items:center}
@@ -571,8 +600,6 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
 .sh.th .tx{padding:2px 0 6px}
 .sh.th .imgs{border-radius:8px;overflow:hidden}
 .sh.th .ic{padding:8px 0 0}
-.sh.th .who{display:flex;gap:6px;align-items:baseline}
-.sh.th .who b{display:inline}
 .state{display:inline-flex;gap:6px;align-items:center;color:var(--text-muted)}
 .state .dot{width:10px;height:10px;border-radius:50%;background:var(--status-ignored)}
 .state[data-state="scheduled"] .dot{background:var(--yellow)} .state[data-state="published"] .dot{background:var(--green)} .state[data-state="error"] .dot{background:var(--red)} .state[data-state="review"] .dot{background:var(--severity-low)} .state[data-state="rotation"] .dot{background:var(--accent)}
@@ -610,8 +637,10 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
   header{flex-wrap:wrap;gap:8px}
   header h1{order:1}
   .hright{order:2;gap:6px}
-  .hright .role,#newTop{display:none}
-  .note{display:inline;font-size:var(--fs-tag);white-space:normal}
+  #newTop{display:none}
+  .note{display:inline-flex}
+  .tzbtn,.note{padding:4px 8px}
+  .hpop{width:auto;left:0}
   .brands button{min-width:0}
   .seg .mk{display:inline}
   .cacts{display:none!important}
@@ -668,10 +697,12 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
   <header>
     <h1>社群發文</h1>
     <span class="seg brands" id="brandSeg"></span>
-    <nav class="nav" id="nav"><button type="button" class="on" data-view="cal">行事曆</button><button type="button" data-view="lists">輪播</button><button type="button" data-view="media">媒體</button><button type="button" data-view="log">紀錄</button><button type="button" data-view="settings">設定</button></nav>
+    <nav class="nav" id="nav"><button type="button" class="on" data-view="cal">行事曆</button><button type="button" data-view="lists">輪播</button><button type="button" data-view="media">媒體</button><button type="button" data-view="log">紀錄</button><button type="button" data-view="settings">設定</button><button type="button" data-view="trash">已刪除</button></nav>
     <div class="hright">
-      <span class="note" title="資料是範例，按鈕只在這一頁有效">樣稿，不會發出</span>
-      <span class="role"><span class="muted">看成</span><span class="seg" id="meSeg"><button type="button" class="on" data-me="editor">編輯</button><button type="button" data-me="reviewer">審核人</button></span></span>
+      <button type="button" class="btn-secondary tzbtn" id="tzBtn" data-i="clock" aria-expanded="false" title="行事曆和排程時間用的時區"><span id="tzNow"></span></button>
+      <button type="button" class="btn-secondary note" id="sampleBtn" aria-expanded="false" title="這是樣稿">樣稿</button>
+      <div class="pop hpop" id="tzPop" hidden><h3>時區（行事曆和排程都用它）</h3><div id="tzList"></div></div>
+      <div class="pop hpop" id="samplePop" hidden><span>樣稿：資料是範例，按鈕只在這一頁有效，不會發出任何貼文。</span><span class="frow"><span class="muted">看成</span><span class="seg" id="meSeg"><button type="button" class="on" data-me="editor">編輯</button><button type="button" data-me="reviewer">審核人</button></span></span></div>
       <button type="button" class="ibtn bell" id="notifBtn" data-i="bell" aria-label="需處理的事" title="需處理的事"><b id="notifN">0</b></button>
       <button type="button" class="btn-primary" id="newTop">＋ 建立貼文</button>
     </div>
@@ -679,12 +710,13 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
   <main>
     <section class="panel" id="calPanel">
       <div class="ptop">
-        <span class="seg"><button type="button" id="prevW" data-i="chevL" aria-label="往前"></button><button type="button" id="todayW">今天</button><button type="button" id="nextW" data-i="chevR" aria-label="往後"></button></span>
+        <span class="seg" id="calNav"><button type="button" id="prevW" data-i="chevL" aria-label="往前"></button><button type="button" id="todayW">今天</button><button type="button" id="nextW" data-i="chevR" aria-label="往後"></button></span>
         <h2 id="rangeLabel"></h2>
         <span class="r">
           <span class="seg" id="calSeg"><button type="button" class="on" data-view="week"><span class="dk">週</span><span class="mk">日</span></button><button type="button" data-view="month">月</button><button type="button" data-view="list">清單</button></span>
           <label class="search"><span data-i="search"></span><input type="search" id="q" placeholder="搜尋貼文" aria-label="搜尋貼文"></label>
           <button type="button" class="btn-secondary" id="filterBtn" data-i="filter" aria-expanded="false">篩選<b id="filterN"></b></button>
+          <button type="button" class="btn-secondary" id="bulkBtn" aria-expanded="false" hidden>批次動作<b id="bulkN"></b></button>
         </span>
       </div>
       <div class="pop filters" id="filterPop" hidden>
@@ -695,7 +727,7 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
       <div class="week" id="weekView"></div>
       <div class="month" id="monthView" hidden><div class="mhead"><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div></div><div class="mgrid" id="mgrid"></div></div>
       <div class="list" id="listView" hidden><table><thead><tr><th><input type="checkbox" id="selAll" aria-label="全選"></th><th></th><th>時間</th><th>發到</th><th>內容</th><th>狀態</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
-      <div class="bulk" id="bulk" hidden><span class="muted" id="bulkCount">已選 0 則</span><button type="button" id="bulkReview">送審所選</button><button type="button" class="danger" id="bulkDel">刪除所選</button><span class="muted">刪掉的可以在這裡還原（狀態篩選勾「已刪除」）。</span></div>
+      <div class="pop menu bulkmenu" id="bulkMenu" hidden><button type="button" id="bulkReview">送審所選</button><button type="button" id="bulkDel">刪除所選（可在「已刪除」還原）</button></div>
       <div class="over-empty" id="calEmpty" hidden></div>
     </section>
     <section class="panel" id="sideView" hidden></section>
@@ -712,8 +744,9 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
             <div class="box">
               <textarea id="text" aria-label="貼文內容"></textarea>
               <div class="mrow" id="mrow" hidden></div>
-              <div class="tools" id="tools"><button type="button" class="ibtn" data-x="fc" data-i="comment" title="第一則留言" aria-label="第一則留言"></button><button type="button" class="ibtn" data-x="link" data-i="link" title="連結與 UTM" aria-label="連結與 UTM"></button><button type="button" class="ibtn" data-x="alt" data-i="eye" title="替代文字（給看不到圖的人）" aria-label="替代文字"></button><button type="button" class="ibtn" data-x="texts" data-i="lines" title="常用文字" aria-label="常用文字"></button><button type="button" class="ibtn" data-x="ai" data-i="spark" title="AI 幫我寫（按了才花錢）" aria-label="AI 幫我寫"></button><button type="button" class="ibtn" data-x="emoji" data-i="smile" title="表情符號" aria-label="表情符號"></button><button type="button" class="ibtn" data-x="media" data-i="image" title="加圖片或影片" aria-label="加圖片或影片"></button><button type="button" class="ibtn" data-x="notes" data-i="note" title="備註（給團隊看，不會發出去）" aria-label="備註"></button><span class="cnt" id="cnt"></span></div>
+              <div class="tools" id="tools"><button type="button" class="ibtn" data-x="part" data-i="comment" title="接一則（串文／留言）" aria-label="接一則（串文／留言）"></button><button type="button" class="ibtn" data-x="link" data-i="link" title="連結與 UTM" aria-label="連結與 UTM"></button><button type="button" class="ibtn" data-x="alt" data-i="eye" title="替代文字（給看不到圖的人）" aria-label="替代文字"></button><button type="button" class="ibtn" data-x="texts" data-i="lines" title="常用文字" aria-label="常用文字"></button><button type="button" class="ibtn" data-x="ai" data-i="spark" title="AI 幫我寫（按了才花錢）" aria-label="AI 幫我寫"></button><button type="button" class="ibtn" data-x="emoji" data-i="smile" title="表情符號" aria-label="表情符號"></button><button type="button" class="ibtn" data-x="media" data-i="image" title="加圖片或影片" aria-label="加圖片或影片"></button><button type="button" class="ibtn" data-x="notes" data-i="note" title="備註（給團隊看，不會發出去）" aria-label="備註"></button><span class="cnt" id="cnt"></span></div>
             </div>
+            <div id="parts"></div>
             <div id="xtras"></div>
             <div class="pset" id="pset" hidden></div>
           </div>
@@ -742,7 +775,7 @@ const PF = {bluesky:{s:"B",n:"Bluesky",max:300},facebook:{s:"f",n:"Facebook",max
 const SOCIAL = ["bluesky","facebook","instagram","threads","linkedin"];
 const STATES = {draft:"草稿",scheduled:"已排程",published:"已發佈",error:"發佈失敗",review:"待審核",rotation:"輪播中",deleted:"已刪除"};
 const FORMATS = {facebook:["貼文","Reel","限時動態"],instagram:["貼文","Reel","限時動態"],linkedin:["貼文","文件輪播"]};
-const TODAY = "2026-10-14";
+const TODAY = "2026-10-14", NOW = "10:40";
 const BRANDS = {
   soulful:{name:"Soulful Expression",av:"soulful",ini:"S",tz:"Asia/Taipei",review:true,
     accounts:[
@@ -758,21 +791,22 @@ const BRANDS = {
          {t:"10/11 21:10",who:"小美",act:"送審",txt:"新的一期「色彩與情緒」課程，十一月開課。",res:"等王老師核准"},
          {t:"10/11 20:30",who:"佩靜",act:"排程",txt:"這週六下午的親子藝術時光還有三個名額。",res:"10/14 12:30"}],
     lists:[
-      {id:"faq",name:"常見問題",days:[1,3],time:"10:00",pfs:["bluesky"],on:true,cursor:1,queue:[
+      {id:"faq",name:"常見問題",times:["10:00","16:00"],slots:["1@10:00","3@10:00","5@16:00"],pfs:["bluesky"],on:true,cursor:1,queue:[
         "藝術治療需要會畫畫嗎？不用。我們看的是過程，不是技巧。",
         "一堂課多久？成人九十分鐘，親子六十分鐘。",
         "可以只來一次嗎？可以。先來體驗，再決定要不要報整期。",
         "幾歲可以參加親子課？三歲以上，家長一起進教室。"]},
-      {id:"promo",name:"課程報名提醒",days:[6],time:"09:00",pfs:["bluesky","threads"],on:false,cursor:0,queue:[
+      {id:"promo",name:"課程報名提醒",times:["09:00"],slots:["6@09:00"],pfs:["bluesky","threads"],on:false,cursor:0,queue:[
         "十一月「色彩與情緒」還有名額，週四晚上，一期六堂。",
         "親子藝術時光每週六下午兩點，當週三前報名。"]}],
     posts:[
       {id:1,date:"2026-10-12",time:"09:00",pfs:["bluesky"],state:"published",imgs:[1],url:"https://bsky.app/profile/soulfulexpression.bsky.social/post/3l5k2",text:"上週末的親子藝術工作坊，孩子們用手指顏料畫出自己的心情。看到每一張作品都不一樣，我們也跟著開心了一整天。"},
       {id:4,date:"2026-10-13",time:"18:00",pfs:["bluesky"],state:"error",text:"今天工作室提早休息，明天照常營業。",err:"Bluesky 回應：App Password 已失效，請到設定重新連接。"},
-      {id:2,date:"2026-10-14",time:"12:30",pfs:["bluesky","instagram","threads"],state:"scheduled",imgs:[2,3],fc:"報名表：soulfulexpression.art/sat",fmt:{instagram:"貼文"},text:"這週六下午的親子藝術時光還有三個名額。不需要任何繪畫基礎，帶著孩子一起來玩顏色就好。報名方式在留言。"},
-      {id:3,date:"2026-10-15",time:"19:00",pfs:["instagram"],state:"review",imgs:[4,1,2],fc:"報名表：soulfulexpression.art/nov",text:"新的一期「色彩與情緒」課程，十一月開課。這一期我們會從最基本的三原色開始，慢慢認識自己對顏色的感覺。",notes:"等老師確認上課日期再發"},
+      {id:2,date:"2026-10-14",time:"12:30",pfs:["bluesky","instagram","threads"],state:"scheduled",imgs:[2,3],parts:[{text:"報名表在這裡：soulfulexpression.art/sat",delay:0},{text:"名額滿了會在這裡說。",delay:60}],fmt:{instagram:"貼文"},text:"這週六下午的親子藝術時光還有三個名額。不需要任何繪畫基礎，帶著孩子一起來玩顏色就好。報名方式在留言。"},
+      {id:3,date:"2026-10-15",time:"19:00",pfs:["instagram"],state:"review",imgs:[4,1,2],parts:[{text:"報名表：soulfulexpression.art/nov",delay:0}],text:"新的一期「色彩與情緒」課程，十一月開課。這一期我們會從最基本的三原色開始，慢慢認識自己對顏色的感覺。",notes:"等老師確認上課日期再發"},
       {id:6,date:"2026-10-16",time:"20:00",pfs:["threads"],state:"scheduled",text:"晚安。今天也辛苦了。睡前給自己五分鐘，隨手畫一條線就好。"},
       {id:5,date:"2026-10-17",time:"10:00",pfs:["bluesky","threads"],state:"draft",imgs:[1],text:"藝術治療不是教你畫得好看，而是讓你透過畫畫，說出平常說不出口的事。很多大人第一次來的時候會說：「我從國小之後就沒畫過畫了。」沒關係，這裡沒有人在打分數。你可以只用一種顏色，也可以把紙塗滿；可以畫一整個小時，也可以畫到一半停下來，看著它發呆。我們在旁邊陪著，偶爾問一句：「這個顏色讓你想到什麼？」有時候答案很簡單，有時候會讓人愣一下。這些時刻，就是藝術治療在做的事。它不急，也不要求你變成一個會畫畫的人。它只是給你一個安全的地方，讓心裡的東西有地方放。如果你最近覺得累、覺得說不清楚自己怎麼了，歡迎來試一次。不用準備任何東西，穿可以弄髒的衣服就好。成人課在週四晚上七點半，一次九十分鐘，報名方式在留言，或直接私訊我們。"},
+      {id:9,date:"2026-10-20",time:"12:00",pfs:["threads"],state:"deleted",prevState:"draft",delAt:"10/15 21:12",delBy:"小美",text:"（舊版）十一月課程表：週四晚上開課，一期六堂。"},
       {id:7,date:"2026-10-18",time:"09:30",pfs:["bluesky","instagram"],state:"scheduled",imgs:[3],text:"每週一句：創作是一種安靜的勇氣。"},
       {id:11,date:"2026-10-16",time:"08:00",kind:"article",state:"published",title:"藝術治療和一般畫畫課有什麼不同？",excerpt:"很多家長問我們，藝術治療和畫畫課差在哪裡。畫畫課教的是技巧；藝術治療看的是過程。孩子選了什麼顏色、下筆的力道、畫到一半停下來的時候，都在告訴我們一些事。",url:"https://soulfulexpression.art/blog/art-therapy-vs-art-class"},
       {id:12,date:"2026-10-19",time:"08:00",kind:"article",state:"scheduled",title:"十一月課程表",excerpt:"十一月的課程表出來了。親子藝術時光改到週六下午兩點，成人的色彩與情緒課程在週四晚上。",url:"https://soulfulexpression.art/blog/november"}
@@ -788,7 +822,7 @@ const BRANDS = {
     texts:["想先看看的朋友，留言告訴我們。"],
     log:[{t:"10/13 10:00",who:"系統",act:"發佈",txt:"我們把客戶的 WordPress 文章自動整理成各平台的貼文。",res:"成功 · facebook.com/…"}],
     lists:[
-      {id:"tips",name:"社群經營小提醒",days:[2,4],time:"12:00",pfs:["facebook"],on:true,cursor:0,queue:[
+      {id:"tips",name:"社群經營小提醒",times:["12:00"],slots:["2@12:00","4@12:00"],pfs:["facebook"],on:true,cursor:0,queue:[
         "一週發兩則，比一天發五則然後消失一個月好。",
         "圖片比例每個平台不一樣，排程前先看預覽。",
         "留言要回。社群的「社」就是這個意思。"]}],
@@ -813,17 +847,8 @@ const ICON = {
   repost:"M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3", send:"M22 2L11 13M22 2l-7 20-4-9-9-4z",
   share:"M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13", bookmark:"M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
   like:"M7 10v11M7 10l4-8a2 2 0 0 1 3 2v5h5a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 17.6 21H7z", more:"M5 12h.01M12 12h.01M19 12h.01",
-  copy:"M9 9h11v11H9zM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1", trash:"M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
+  clock:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2", copy:"M9 9h11v11H9zM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1", trash:"M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
   up:"M12 19V5M5 12l7-7 7 7", down:"M12 5v14M19 12l-7 7-7-7", check:"M20 6L9 17l-5-5", play:"M7 4l13 8-13 8z", globe:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"
-};
-// empty-state pictures (U13), drawn in the accent token
-const ART = {
-  calendar:'<rect class="f" x="14" y="20" width="68" height="60" rx="8"/><path d="M14 36h68M30 14v12M66 14v12M28 50h10M44 50h10M60 50h8M28 64h10M44 64h10"/><circle cx="66" cy="66" r="12" class="f"/><path d="M66 60v12M60 66h12"/>',
-  rotate:'<circle class="f" cx="48" cy="48" r="32"/><path d="M68 34a24 24 0 0 0-40-4M28 62a24 24 0 0 0 40 4M28 22v8h8M68 74v-8h-8"/>',
-  image:'<rect class="f" x="14" y="18" width="68" height="56" rx="8"/><circle cx="34" cy="36" r="6"/><path d="M14 64l22-18 16 12 12-8 18 14"/>',
-  log:'<rect class="f" x="22" y="14" width="52" height="68" rx="6"/><path d="M36 14v-2h24v2M32 34h32M32 46h32M32 58h20"/><path d="M58 64l5 5 10-10"/>',
-  plug:'<circle class="f" cx="28" cy="48" r="14"/><circle class="f" cx="68" cy="48" r="14"/><path d="M42 48h12M24 48h8M64 48h8M48 30v6M48 60v6"/>',
-  check:'<circle class="f" cx="48" cy="48" r="32"/><path d="M34 49l9 9 19-20"/>'
 };
 let brand="soulful", view="week", calView="week", weekStart="2026-10-12", focusDay=TODAY, me="editor", logFilter="all";
 let pfOnly=new Set(), stOnly=new Set(), checked=new Set(), mediaSel=new Set(), selectedList=null, connectPf=null, ed=null, hintTimer=0;
@@ -844,13 +869,14 @@ const bav = (cls="") => `<span class="av ${B().av} ${cls}">${B().ini}</span>`;
 const acct = pf => B().accounts.find(a=>a.pf===pf) || {name:B().name,handle:"",st:"connected"};
 const connected = () => B().accounts.filter(a=>a.st==="connected");
 const unconnected = p => p.virtual || p.kind==="article" ? [] : (p.pfs||[]).filter(k=>!B().accounts.some(a=>a.pf===k&&a.st==="connected"));
-const emptyHtml = (art, line, btn, id) => `<div class="empty"><svg viewBox="0 0 96 96" aria-hidden="true">${ART[art]}</svg><p>${line}</p><button type="button" class="btn-primary" id="${id}">${btn}</button></div>`;
+// empty states (U13, S7): round tinted icon, one bold line, one grey hint, one button
+const emptyHtml = (icon, line, hint, btn, id) => `<div class="empty"><span class="eic">${I(icon)}</span><b>${line}</b><p class="muted">${hint}</p><button type="button" class="btn-primary" id="${id}">${btn}</button></div>`;
 function say(msg, err){ clearTimeout(hintTimer); $("hint").innerHTML = err ? `<span class="err">${msg}</span>` : msg; hintTimer=setTimeout(renderHint, 6000); }
 
 // ---- header ----
 function renderHeader(){
   $("brandSeg").innerHTML = Object.entries(BRANDS).map(([k,b])=>`<button type="button" class="${k===brand?"on":""}" data-brand="${k}" title="${esc(b.name)}">${esc(b.name)}</button>`).join("");
-  $("brandSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ brand=x.dataset.brand; selectedList=null; connectPf=null; checked.clear(); mediaSel.clear(); renderHeader(); renderView(); openDefault(); });
+  $("brandSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ brand=x.dataset.brand; selectedList=null; connectPf=null; checked.clear(); mediaSel.clear(); renderHeader(); renderTz(); renderView(); openDefault(); });
   const side = view==="week"||view==="month"||view==="list" ? "cal" : view;
   $("nav").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.view===side));
   const n=needs().n; $("notifN").textContent=n; $("notifN").classList.toggle("zero", !n);
@@ -869,18 +895,22 @@ function renderView(){
   document.querySelector("main").classList.toggle("full", !cal); $("calPanel").hidden=!cal; $("edPanel").hidden=!cal; $("sideView").hidden=cal;
   $("calSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.view===view));
   for (const [id,k] of [["weekView","week"],["monthView","month"],["listView","list"]]) $(id).hidden = view!==k;
-  $("strip").hidden = view!=="week"; $("bulk").hidden = view!=="list" || !B().posts.length;
-  ({week:renderWeek,month:renderMonth,list:renderList,lists:renderLists,media:renderMedia,log:renderLog,settings:renderSettings})[view]();
+  $("strip").hidden = view!=="week"; $("calNav").hidden = view==="list"; $("bulkBtn").hidden = view!=="list" || !B().posts.length; $("bulkMenu").hidden = true;
+  ({week:renderWeek,month:renderMonth,list:renderList,lists:renderLists,media:renderMedia,log:renderLog,settings:renderSettings,trash:renderTrash})[view]();
   renderFilterBtn(); calEmpty();
 }
 function calEmpty(){ const none = !B().posts.length && !rotationPosts().length && ["week","month","list"].includes(view);
   $("calEmpty").hidden=!none; if(!none) return;
-  $("calEmpty").innerHTML = connected().length ? emptyHtml("calendar","這個品牌還沒有任何貼文。","寫第一則貼文","emptyNew") : emptyHtml("plug","先連接一個社群帳號，才能排貼文。","到設定連接帳號","emptyConn");
+  $("calEmpty").innerHTML = connected().length ? emptyHtml("calendar","這個品牌還沒有貼文","寫好的貼文會照時間排在這裡。","寫第一則貼文","emptyNew") : emptyHtml("link","還沒連接社群帳號","連好帳號，才能排貼文。","到設定連接帳號","emptyConn");
   const a=$("emptyNew"), b=$("emptyConn"); if(a) a.onclick=()=>newPost(); if(b) b.onclick=()=>setView("settings"); }
-function rotationPosts(){ const out=[]; for(const l of B().lists){ if(!l.on||!l.queue.length||!l.days.length) continue; let n=0; for(let i=0;i<60;i++){ const s=addDays(TODAY,i); if(!l.days.includes(dowOf(s)+1)) continue; out.push({id:"r-"+l.id+"-"+s,virtual:true,listId:l.id,date:s,time:l.time,pfs:l.pfs,state:"rotation",text:l.queue[(l.cursor+n)%l.queue.length],idx:(l.cursor+n)%l.queue.length}); n++; } } return out; }
-function nextRun(l){ const r=rotationPosts().find(p=>p.listId===l.id); return r?`${fmt(r.date)} ${r.time}「${r.text.slice(0,16)}…」`:"（已暫停或沒有排程日）"; }
-function visiblePosts(withDeleted){ const q=$("q").value.trim();
-  return [...B().posts,...rotationPosts()].filter(p => (p.state!=="deleted"||withDeleted) && (stOnly.size ? stOnly.has(p.state) : p.state!=="deleted")
+// a list sends at each ticked weekday x time cell (S4), oldest first, cycling through its queue
+const slotTimes = (l, dow) => l.slots.filter(x=>x.startsWith(dow+"@")).map(x=>x.slice(2)).sort();
+function rotationPosts(){ const out=[]; for(const l of B().lists){ if(!l.on||!l.queue.length||!l.slots.length) continue; let n=0;
+  for(let i=0;i<60;i++){ const s=addDays(TODAY,i); for(const t of slotTimes(l, dowOf(s)+1)){ if(s===TODAY && t<NOW) continue; const k=(l.cursor+n)%l.queue.length;
+    out.push({id:"r-"+l.id+"-"+s+"-"+t,virtual:true,listId:l.id,date:s,time:t,pfs:l.pfs,state:"rotation",text:l.queue[k],idx:k}); n++; } } } return out; }
+function nextRun(l){ const r=rotationPosts().find(p=>p.listId===l.id); return r?`${fmt(r.date)} ${r.time}「${r.text.slice(0,16)}…」`:"（已暫停或沒有勾時段）"; }
+function visiblePosts(){ const q=$("q").value.trim();
+  return [...B().posts,...rotationPosts()].filter(p => p.state!=="deleted" && (!stOnly.size || stOnly.has(p.state))
     && (!pfOnly.size || (p.kind==="article" ? pfOnly.has("wordpress") : p.pfs.some(x=>pfOnly.has(x)))) && (!q || (p.text||p.title||"").includes(q))); }
 const byTime = (a,b) => (a.date+a.time).localeCompare(b.date+b.time);
 
@@ -888,7 +918,7 @@ const byTime = (a,b) => (a.date+a.time).localeCompare(b.date+b.time);
 function renderFilterBtn(){ const n=pfOnly.size+stOnly.size; $("filterN").textContent = n ? ` · ${n}` : ""; }
 function renderFilterPop(){
   $("fPf").innerHTML = [...SOCIAL,"wordpress"].map(k=>`<label class="ck"><input type="checkbox" data-pf="${k}" ${pfOnly.has(k)?"checked":""}>${pfb(k)}${PF[k].n}</label>`).join("");
-  $("fSt").innerHTML = Object.keys(STATES).filter(k=>k!=="deleted"||view==="list").map(k=>`<label class="ck"><input type="checkbox" data-st="${k}" ${stOnly.has(k)?"checked":""}><span class="sbar" data-state="${k}"></span>${STATES[k]}</label>`).join("");
+  $("fSt").innerHTML = Object.keys(STATES).filter(k=>k!=="deleted").map(k=>`<label class="ck"><input type="checkbox" data-st="${k}" ${stOnly.has(k)?"checked":""}><span class="sbar" data-state="${k}"></span>${STATES[k]}</label>`).join("");
   $("filterPop").querySelectorAll("input").forEach(c=>c.onchange=()=>{ const set=c.dataset.pf?pfOnly:stOnly, k=c.dataset.pf||c.dataset.st; c.checked?set.add(k):set.delete(k); renderView(); });
 }
 $("filterBtn").onclick=()=>{ const open=$("filterPop").hidden; if(open) renderFilterPop(); $("filterPop").hidden=!open; $("filterBtn").setAttribute("aria-expanded",String(open)); };
@@ -914,7 +944,7 @@ function renderWeek(){
   const days=[...Array(7)].map((_,i)=>addDays(weekStart,i)); if(!days.includes(focusDay)) focusDay=days.includes(TODAY)?TODAY:days[0]; setRange();
   const vp=visiblePosts();
   $("weekView").innerHTML = days.map((s,i)=>{ const ps=vp.filter(p=>p.date===s).sort(byTime);
-    return `<div class="day ${s<TODAY?"past":""} ${s===TODAY?"today":""} ${s===focusDay?"focus":""}" data-date="${s}"><div class="dh"><span class="muted">${DOW[i]}</span><b>${d(s).getDate()}</b><span class="n">${ps.length?ps.length+" 則":""}</span></div><div class="stack" data-date="${s}">${ps.map(cardHtml).join("")}${s>=TODAY?`<button type="button" class="add" data-add="${s}">${I("plus")}新增</button>`:""}</div></div>`; }).join("");
+    return `<div class="day ${s<TODAY?"past":""} ${s===TODAY?"today":""} ${s===focusDay?"focus":""}" data-date="${s}"><div class="dh"><span class="muted">${DOW[i]}</span><b>${d(s).getDate()}</b><span class="n">${ps.length?ps.length+" 則":""}</span></div><div class="stack" data-date="${s}">${s===TODAY ? (()=>{ const k=ps.findIndex(p=>p.time>NOW), at=k<0?ps.length:k; return ps.slice(0,at).map(cardHtml).join("")+`<div class="now">現在 ${NOW}</div>`+ps.slice(at).map(cardHtml).join(""); })() : ps.map(cardHtml).join("")}${s>=TODAY?`<button type="button" class="add" data-add="${s}">${I("plus")}新增</button>`:""}</div></div>`; }).join("");
   $("strip").innerHTML = days.map((s,i)=>`<button type="button" class="${s===focusDay?"on":""} ${s===TODAY?"today":""}" data-day="${s}"><span>${DOW[i]}</span><b>${d(s).getDate()}</b><i class="${vp.some(p=>p.date===s)?"has":""}"></i></button>`).join("");
   $("strip").querySelectorAll("button").forEach(x=>x.onclick=()=>{ focusDay=x.dataset.day; renderWeek(); });
   wireCards($("weekView"));
@@ -932,7 +962,7 @@ function wireCards(root){
     c.querySelectorAll("[data-act]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const a=b.dataset.act;
       if(a==="pv"){ openPost(p.id,{preview:true}); }
       if(a==="dup"){ const c2={...p,id:Date.now(),state:"draft",date:addDays(p.date,7),err:null,url:null}; B().posts.push(c2); renderView(); openPost(c2.id); say("已複製成下週同一天的草稿。"); }
-      if(a==="del"){ p.state="deleted"; addLog("刪除",p,"可在清單還原"); renderView(); if(ed&&ed.id===p.id) newPost(); say("已刪除。清單檢視的篩選勾「已刪除」可以還原。"); } }); });
+      if(a==="del"){ trashPost(p); renderView(); if(ed&&ed.id===p.id) newPost(); say("已刪除。可以在「已刪除」還原。"); } }); });
 }
 function renderMonth(){
   const startDow=dowOf("2026-10-01"); const cells=[]; for(let i=-startDow;i<42-startDow;i++) cells.push(addDays("2026-10-01",i));
@@ -943,19 +973,21 @@ function renderMonth(){
 }
 function renderList(){
   $("rangeLabel").textContent="所有貼文";
-  const ps = visiblePosts(true).filter(p=>!p.virtual && p.kind!=="article").sort(byTime);
-  $("rows").innerHTML = ps.map(p=>`<tr><td><input type="checkbox" data-id="${p.id}" ${checked.has(p.id)?"checked":""} aria-label="選取"></td><td>${(p.imgs||[]).length?`<span class="tthumb ph ph-${p.imgs[0]}"></span>`:`<span class="tthumb txt"></span>`}</td><td>${p.date?fmt(p.date)+" "+p.time:"輪播"}</td><td><span class="avs">${p.pfs.map(pfb).join("")}</span>${unconnected(p).length?' <span class="err" title="有帳號沒連接">⚠</span>':""}</td><td class="ttl">${esc(p.text)}</td><td><span class="pill" data-state="${p.state}">${STATES[p.state]}</span></td><td>${p.state==="deleted"?`<button type="button" data-restore="${p.id}">還原</button>`:`<button type="button" class="ibtn" data-open="${p.id}" title="打開" aria-label="打開">${I("eye")}</button><button type="button" class="ibtn" data-dup="${p.id}" title="複製成下週的草稿" aria-label="複製">${I("copy")}</button>`}</td></tr>`).join("") || (!B().posts.length ? "" : `<tr><td colspan="7"><div class="empty"><svg viewBox="0 0 96 96" aria-hidden="true">${ART.log}</svg><p>沒有符合的貼文。</p><button type="button" class="btn-primary" id="listClear">清除篩選</button></div></td></tr>`);
+  const ps = visiblePosts().filter(p=>!p.virtual && p.kind!=="article").sort(byTime);
+  $("rows").innerHTML = ps.map(p=>`<tr><td><input type="checkbox" data-id="${p.id}" ${checked.has(p.id)?"checked":""} aria-label="選取"></td><td>${(p.imgs||[]).length?`<span class="tthumb ph ph-${p.imgs[0]}"></span>`:`<span class="tthumb txt"></span>`}</td><td>${p.date?fmt(p.date)+" "+p.time:"輪播"}</td><td><span class="avs">${p.pfs.map(pfb).join("")}</span>${unconnected(p).length?' <span class="err" title="有帳號沒連接">⚠</span>':""}</td><td class="ttl">${esc(p.text)}</td><td><span class="pill" data-state="${p.state}">${STATES[p.state]}</span></td><td><button type="button" class="ibtn" data-open="${p.id}" title="打開" aria-label="打開">${I("eye")}</button><button type="button" class="ibtn" data-dup="${p.id}" title="複製成下週的草稿" aria-label="複製">${I("copy")}</button></td></tr>`).join("") || (!B().posts.length ? "" : `<tr><td colspan="7">${emptyHtml("search","沒有符合的貼文","換個搜尋字，或清除篩選。","清除篩選","listClear")}</td></tr>`);
   const lc=$("listClear"); if(lc) lc.onclick=()=>{ pfOnly.clear(); stOnly.clear(); $("q").value=""; renderView(); };
   $("rows").querySelectorAll("input").forEach(c=>c.onchange=()=>{ c.checked?checked.add(+c.dataset.id):checked.delete(+c.dataset.id); bulkBar(); });
   $("rows").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openPost(+b.dataset.open));
   $("rows").querySelectorAll("[data-dup]").forEach(b=>b.onclick=()=>{ const p=B().posts.find(x=>x.id===+b.dataset.dup); B().posts.push({...p,id:Date.now(),state:"draft",date:addDays(p.date||TODAY,7),time:p.time||"10:00",err:null,url:null}); renderList(); say("已複製成下週同一天的草稿。"); });
-  $("rows").querySelectorAll("[data-restore]").forEach(b=>b.onclick=()=>{ const p=B().posts.find(x=>x.id===+b.dataset.restore); p.state="draft"; addLog("還原",p,""); renderList(); });
   bulkBar();
 }
-function bulkBar(){ $("bulkCount").textContent=`已選 ${checked.size} 則`; }
+function bulkBar(){ $("bulkN").textContent = checked.size ? ` · ${checked.size}` : ""; }
+// list toolbar (S6): one 批次動作 button, its menu holds the actions for the ticked rows
+$("bulkBtn").onclick=()=>{ if(!checked.size){ $("bulkMenu").hidden=true; return say("先勾選左邊的貼文，再用批次動作。"); } const open=$("bulkMenu").hidden; $("bulkMenu").hidden=!open; $("bulkBtn").setAttribute("aria-expanded",String(open)); };
+function trashPost(p){ Object.assign(p,{prevState:p.state,state:"deleted",delAt:"10/16 "+NOW,delBy:ME()}); addLog("刪除",p,"可在「已刪除」還原"); }
 $("selAll").onchange=e=>{ $("rows").querySelectorAll("input").forEach(c=>{ c.checked=e.target.checked; e.target.checked?checked.add(+c.dataset.id):checked.delete(+c.dataset.id); }); bulkBar(); };
 $("bulkReview").onclick=()=>{ B().posts.forEach(p=>{ if(checked.has(p.id)){ p.state="review"; addLog("送審",p,""); } }); checked.clear(); renderView(); say("已送審。審核人會收到通知。"); };
-$("bulkDel").onclick=()=>{ B().posts.forEach(p=>{ if(checked.has(p.id)){ p.state="deleted"; addLog("刪除",p,"可還原"); } }); checked.clear(); renderView(); };
+$("bulkDel").onclick=()=>{ B().posts.forEach(p=>{ if(checked.has(p.id)) trashPost(p); }); checked.clear(); renderView(); say("已刪除。可以在「已刪除」還原。"); };
 $("prevW").onclick=()=>{ if(isPhone()&&view==="week"){ focusDay=addDays(focusDay,-1); if(focusDay<weekStart) weekStart=addDays(weekStart,-7); } else weekStart=addDays(weekStart,-7); renderView(); };
 $("nextW").onclick=()=>{ if(isPhone()&&view==="week"){ focusDay=addDays(focusDay,1); if(focusDay>addDays(weekStart,6)) weekStart=addDays(weekStart,7); } else weekStart=addDays(weekStart,7); renderView(); };
 $("todayW").onclick=()=>{ weekStart="2026-10-12"; focusDay=TODAY; renderView(); };
@@ -968,13 +1000,13 @@ function addLog(act, p, res){ B().log.unshift({t:"10/14 "+new Date().toTimeStrin
 function side(html){ $("sideView").innerHTML=html; }
 function renderLists(){
   const ls=B().lists;
-  if(!ls.length){ side(`<div class="ptop"><h2>輪播清單</h2></div>`+emptyHtml("rotate","還沒有輪播清單。清單裡的貼文會照順序，一則一則輪流發。","＋ 建第一個清單","newList")); $("newList").onclick=newList; return; }
+  if(!ls.length){ side(`<div class="ptop"><h2>輪播清單</h2></div>`+emptyHtml("repost","還沒有輪播清單","清單裡的貼文會照順序，一則一則輪流發。","＋ 建第一個清單","newList")); $("newList").onclick=newList; return; }
   if(!ls.some(l=>l.id===selectedList)) selectedList=ls[0].id; const l=ls.find(x=>x.id===selectedList);
   side(`<div class="ptop"><h2>輪播清單</h2><span class="muted">照順序輪流發，發完最後一則再從第一則開始。</span><span class="r"><button type="button" class="btn-secondary" id="newList">＋ 新清單</button></span></div>
-  <div class="cols2"><div class="lcol">${ls.map(x=>`<button type="button" class="lst ${x.on?"":"off"} ${x.id===selectedList?"sel":""}" data-id="${x.id}"><b>${esc(x.name)}（${x.queue.length} 則）</b><span class="nx muted">${x.on?"進行中":"已暫停"} · 每週${x.days.map(n=>DOW[n-1]).join("、")||"（未設定）"} ${x.time}</span><span class="nx muted">下一則：${esc(nextRun(x))}</span></button>`).join("")}</div>
+  <div class="cols2"><div class="lcol">${ls.map(x=>`<button type="button" class="lst ${x.on?"":"off"} ${x.id===selectedList?"sel":""}" data-id="${x.id}"><b>${esc(x.name)}（${x.queue.length} 則）</b><span class="nx muted">${x.on?"進行中":"已暫停"} · 每週 ${x.slots.length} 個時段</span><span class="nx muted">下一則：${esc(nextRun(x))}</span></button>`).join("")}</div>
   <div class="ldet">
     <div class="frow"><span class="lab">名稱</span><input type="text" id="ldName" value="${esc(l.name)}" aria-label="清單名稱"></div>
-    <div class="frow"><span class="lab">每週</span><span class="seg" id="ldDays">${DOW.map((n,i)=>`<button type="button" class="${l.days.includes(i+1)?"on":""}" data-d="${i+1}">${n}</button>`).join("")}</span><button type="button" class="btn-secondary" id="ldTime" data-i="calendar">${l.time}</button></div>
+    <div class="frow top"><span class="lab">時段</span><div class="slots"><div class="sgrid7"><span></span>${DOW.map(n=>`<span class="muted">${n}</span>`).join("")}<span></span>${l.times.map(t=>`<span class="muted tag">${t}</span>${DOW.map((_,i)=>{ const k=(i+1)+"@"+t, on=l.slots.includes(k); return `<button type="button" class="slot ${on?"on":""}" data-slot="${k}" aria-pressed="${on}" aria-label="週${DOW[i]} ${t}"></button>`; }).join("")}<button type="button" class="ibtn" data-rmtime="${t}" aria-label="拿掉 ${t} 這一列" title="拿掉這一列">${I("x")}</button>`).join("")}</div><span class="acts"><button type="button" class="lnk" id="ldAddTime">＋ 加一個時間</button><span class="muted tag">點格子＝那天那個時間發一則</span></span></div></div>
     <div class="frow"><span class="lab">發到</span><span class="acts" id="ldAccts">${B().accounts.map(a=>`<button type="button" class="cav ${l.pfs.includes(a.pf)?"on":""}" data-pf="${a.pf}" ${a.st!=="connected"?"disabled":""} title="${PF[a.pf].n} ${esc(a.handle)}" aria-label="${PF[a.pf].n}">${bav()}${pfb(a.pf)}</button>`).join("")}</span></div>
     <div class="frow"><span class="lab">下一則</span><span>${esc(nextRun(l))}</span></div>
     <div class="queue">${l.queue.length ? l.queue.map((t,i)=>`<div class="qrow ${i===l.cursor?"next":""}"><span class="n">第 ${i+1} 則${i===l.cursor?"・下一則":""}</span><span class="tx" title="${esc(t)}">${esc(t)}</span><span class="acts"><button type="button" class="ibtn" data-up="${i}" aria-label="往上">${I("up")}</button><button type="button" class="ibtn" data-down="${i}" aria-label="往下">${I("down")}</button><button type="button" class="ibtn" data-rm="${i}" aria-label="移除">${I("x")}</button></span></div>`).join("") : `<div class="muted">清單還是空的。按「從草稿加入」，或寫貼文時選「輪播清單」。</div>`}</div>
@@ -984,23 +1016,31 @@ function renderLists(){
   wireIcons($("sideView"));
   $("newList").onclick=newList;
   $("sideView").querySelectorAll(".lst").forEach(x=>x.onclick=()=>{ selectedList=x.dataset.id; renderLists(); });
-  $("ldDays").querySelectorAll("button").forEach(x=>x.onclick=()=>{ const n=+x.dataset.d; l.days.includes(n)?l.days.splice(l.days.indexOf(n),1):l.days.push(n); l.days.sort(); renderLists(); });
-  $("ldTime").onclick=()=>openDtp($("ldTime"), null, l.time, t=>{ l.time=t; renderLists(); });
+  $("sideView").querySelectorAll("[data-slot]").forEach(x=>x.onclick=()=>{ const k=x.dataset.slot, i=l.slots.indexOf(k); i<0?l.slots.push(k):l.slots.splice(i,1); renderLists(); });
+  $("sideView").querySelectorAll("[data-rmtime]").forEach(x=>x.onclick=()=>{ const t=x.dataset.rmtime; l.times=l.times.filter(y=>y!==t); l.slots=l.slots.filter(y=>!y.endsWith("@"+t)); renderLists(); });
+  $("ldAddTime").onclick=()=>openDtp($("ldAddTime"), null, "14:00", t=>{ if(!l.times.includes(t)){ l.times.push(t); l.times.sort(); } renderLists(); });
   $("ldAccts").querySelectorAll("button:not([disabled])").forEach(x=>x.onclick=()=>{ const k=x.dataset.pf; l.pfs.includes(k)?l.pfs.splice(l.pfs.indexOf(k),1):l.pfs.push(k); renderLists(); });
   $("sideView").querySelectorAll("[data-up]").forEach(x=>x.onclick=()=>{ const i=+x.dataset.up; if(i>0){ [l.queue[i-1],l.queue[i]]=[l.queue[i],l.queue[i-1]]; renderLists(); } });
   $("sideView").querySelectorAll("[data-down]").forEach(x=>x.onclick=()=>{ const i=+x.dataset.down; if(i<l.queue.length-1){ [l.queue[i+1],l.queue[i]]=[l.queue[i],l.queue[i+1]]; renderLists(); } });
   $("sideView").querySelectorAll("[data-rm]").forEach(x=>x.onclick=()=>{ l.queue.splice(+x.dataset.rm,1); if(l.cursor>=l.queue.length) l.cursor=0; renderLists(); });
   $("ldSave").onclick=()=>{ l.name=$("ldName").value.trim()||l.name; renderLists(); $("ldHint").textContent="已儲存。下一則："+nextRun(l); };
-  $("ldToggle").onclick=()=>{ if(!l.on&&(!l.days.length||!l.queue.length||!l.pfs.length)){ $("ldHint").innerHTML='<span class="err">要先有排程日、至少一則貼文、至少一個帳號，才能開始輪播。</span>'; return; } l.on=!l.on; renderLists(); };
+  $("ldToggle").onclick=()=>{ if(!l.on&&(!l.slots.length||!l.queue.length||!l.pfs.length)){ $("ldHint").innerHTML='<span class="err">要先勾至少一個時段、至少一則貼文、至少一個帳號，才能開始輪播。</span>'; return; } l.on=!l.on; renderLists(); };
   $("ldDel").onclick=()=>{ B().lists=B().lists.filter(x=>x.id!==l.id); selectedList=null; renderLists(); };
   $("ldAdd").onclick=()=>{ const drafts=B().posts.filter(p=>p.state==="draft"&&!p.kind); if(!drafts.length){ $("ldHint").textContent="這個品牌目前沒有草稿。"; return; }
     $("ldHint").innerHTML="挑一則草稿："+drafts.map(p=>`<button type="button" class="lnk" data-add="${p.id}">${esc(p.text.slice(0,14))}…</button>`).join(" ");
     $("ldHint").querySelectorAll("[data-add]").forEach(x=>x.onclick=()=>{ const p=B().posts.find(y=>y.id===+x.dataset.add); l.queue.push(p.text); Object.assign(p,{state:"rotation",listId:l.id,date:"",time:""}); renderLists(); }); };
 }
-function newList(){ const l={id:"l"+Date.now(),name:"新清單",days:[],time:"10:00",pfs:connected().map(a=>a.pf),on:false,cursor:0,queue:[]}; B().lists.push(l); selectedList=l.id; renderLists(); }
+// deleted posts (S5): own view, with when and who deleted it; restore puts it back as it was
+function renderTrash(){ const ps=B().posts.filter(p=>p.state==="deleted");
+  side(`<div class="ptop"><h2>已刪除</h2><span class="muted">刪掉的貼文留在這裡，可以還原。</span></div>` + (ps.length
+    ? `<div class="list"><table><thead><tr><th>排定時間</th><th>內容</th><th>發到</th><th>刪除前</th><th>刪除時間</th><th>誰刪的</th><th></th></tr></thead><tbody>${ps.map(p=>`<tr><td>${p.date?fmt(p.date)+" "+p.time:"輪播"}</td><td class="ttl">${esc(p.text||p.title)}</td><td><span class="avs">${(p.pfs||[]).map(pfb).join("")}</span></td><td><span class="pill" data-state="${p.prevState||"draft"}">${STATES[p.prevState||"draft"]}</span></td><td>${p.delAt||""}</td><td>${esc(p.delBy||"")}</td><td><button type="button" data-restore="${p.id}">還原</button></td></tr>`).join("")}</tbody></table></div>`
+    : emptyHtml("trash","沒有刪掉的貼文","從行事曆或清單刪掉的貼文，會留在這裡。","回行事曆","trashBack")));
+  $("sideView").querySelectorAll("[data-restore]").forEach(x=>x.onclick=()=>{ const p=B().posts.find(y=>y.id===+x.dataset.restore); p.state=p.prevState||"draft"; addLog("還原",p,""); renderTrash(); say("已還原。"); });
+  const bk=$("trashBack"); if(bk) bk.onclick=()=>setView(calView); }
+function newList(){ const l={id:"l"+Date.now(),name:"新清單",times:["10:00"],slots:[],pfs:connected().map(a=>a.pf),on:false,cursor:0,queue:[]}; B().lists.push(l); selectedList=l.id; renderLists(); }
 function openList(id){ selectedList=id; setView("lists"); }
 function renderMedia(){ const m=B().media;
-  if(!m.length){ side(`<div class="ptop"><h2>媒體庫</h2></div>`+emptyHtml("image","媒體庫是空的。上傳過的圖片和影片會留在這裡，下次直接拿來用。","上傳圖片或影片","upload")); $("upload").onclick=upload; return; }
+  if(!m.length){ side(`<div class="ptop"><h2>媒體庫</h2></div>`+emptyHtml("image","媒體庫是空的","上傳過的圖片和影片會留在這裡，下次直接用。","上傳圖片或影片","upload")); $("upload").onclick=upload; return; }
   side(`<div class="ptop"><h2>媒體庫</h2><span class="muted">點圖片選取，可以一次選好幾張。</span><span class="r"><button type="button" class="btn-secondary" id="upload">＋ 上傳</button></span></div>
   <div class="media-grid">${m.map(x=>`<button type="button" class="mtile ${mediaSel.has(x.id)?"on":""}" data-m="${x.id}"><span class="mimg ph ph-${x.ph}">${x.kind==="video"?I("play"):""}</span><span class="tick">${mediaSel.has(x.id)?I("check"):""}</span><span class="mn" title="${esc(x.name)}">${esc(x.name)}</span><span class="muted tag">${x.kind==="video"?"影片 · ":""}用過 ${x.used} 次</span></button>`).join("")}</div>
   <div class="bulk" ${mediaSel.size?"":"hidden"}><span>已選 ${mediaSel.size} 個</span><button type="button" class="btn-primary" id="useMedia">用這些寫新貼文</button><button type="button" id="clearMedia">取消選取</button></div>`);
@@ -1014,7 +1054,7 @@ function renderLog(){ const nd=needs();
   const rows = logFilter==="needs" ? [...nd.posts.map(p=>({t:p.date?fmt(p.date)+" "+p.time:"",who:"系統",act:p.state==="error"?"發佈失敗":"等你審核",txt:p.text,res:p.err||"按「打開」處理",id:p.id})),...nd.accts.map(a=>({t:"",who:"系統",act:"連線失效",txt:PF[a.pf].n+" "+a.name,res:"到設定重新連接",pf:a.pf}))] : B().log;
   const top = `<div class="ptop"><h2>紀錄與通知</h2><span class="seg" id="lfSeg"><button type="button" class="${logFilter==="all"?"on":""}" data-lf="all">全部紀錄</button><button type="button" class="${logFilter==="needs"?"on":""}" data-lf="needs">需處理（${nd.n}）</button></span><span class="muted">發佈失敗和連線失效也會發 Telegram 通知。</span></div>`;
   const body = rows.length ? `<div class="list"><table><thead><tr><th>時間</th><th>誰</th><th>動作</th><th>貼文</th><th>結果</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.t}</td><td>${esc(r.who)}</td><td>${r.act}</td><td class="ttl">${esc((r.txt||"").slice(0,40))}</td><td class="ttl">${esc(r.res)}</td><td>${r.id?`<button type="button" data-open="${r.id}">打開</button>`:r.pf?`<button type="button" data-connect="${r.pf}">重新連接</button>`:""}</td></tr>`).join("")}</tbody></table></div>`
-    : logFilter==="needs" ? emptyHtml("check","沒有要處理的事。","回行事曆","logBack") : emptyHtml("log","還沒有任何紀錄。發文、排程、審核都會記在這裡。","寫第一則貼文","logNew");
+    : logFilter==="needs" ? emptyHtml("check","沒有要處理的事","發佈失敗或帳號斷線時，會出現在這裡。","回行事曆","logBack") : emptyHtml("lines","還沒有任何紀錄","發文、排程、審核都會記在這裡。","寫第一則貼文","logNew");
   side(top+body);
   $("lfSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ logFilter=x.dataset.lf; renderLog(); });
   $("sideView").querySelectorAll("[data-open]").forEach(x=>x.onclick=()=>{ setView(calView); openPost(+x.dataset.open); });
@@ -1025,12 +1065,11 @@ function renderSettings(){ const b=B();
   const why = a => a.st==="expired" ? "授權過期，排在這個帳號的貼文發不出去。按「重新連接」。" : a.st==="review" ? "平台還在審核我們的 app，通過前不能連接。" : "";
   const conn = connectPf ? `<div class="connect"><b>連接 ${PF[connectPf].n}</b><span>按下面的按鈕，會跳到 ${PF[connectPf].n} 的授權頁。選好要管理的帳號，授權完會自動回到這裡。我們不會拿到你的密碼。</span><span class="acts"><button type="button" class="btn-primary" id="cdGo">前往 ${PF[connectPf].n} 授權</button><button type="button" id="cdBack">取消</button></span></div>` : "";
   const accts = b.accounts.length ? b.accounts.map(a=>`<div class="arow"><span class="aav">${bav()}${pfb(a.pf)}</span><span class="who"><b>${esc(a.name)}</b><span class="muted tag">${PF[a.pf].n} · ${esc(a.handle)}</span></span><span class="pill" data-st="${a.st}">${a.st==="connected"?"已連接":a.st==="expired"?"連線失效":"平台審核中"}</span><span class="acts">${a.st==="review"?"":`<button type="button" ${a.st==="expired"?'class="btn-primary"':""} data-connect="${a.pf}">重新連接</button>`}<button type="button" class="ibtn" data-remove="${a.pf}" title="移除" aria-label="移除 ${PF[a.pf].n}">${I("trash")}</button></span>${why(a)?`<span class="why">${why(a)}</span>`:""}</div>`).join("")
-    : emptyHtml("plug","還沒連接任何社群帳號。","連接第一個帳號","firstConn");
+    : emptyHtml("link","還沒連接社群帳號","從下面挑一個平台開始。","連接第一個帳號","firstConn");
   const add = SOCIAL.filter(k=>!b.accounts.some(a=>a.pf===k));
   side(`<div class="ptop"><h2>${esc(b.name)} 的設定</h2></div><div class="sgrid">
     <div class="sec"><h3>社群帳號</h3>${conn}${accts}${add.length?`<h3>加帳號</h3><div class="tiles">${add.map(k=>`<button type="button" class="tile" data-connect="${k}">${pfb(k)}<span>${PF[k].n}</span></button>`).join("")}</div>`:""}</div>
     <div class="sec"><h3>發文前要先審核</h3><span class="seg" id="revSeg"><button type="button" class="${b.review?"":"on"}" data-rv="0">不用</button><button type="button" class="${b.review?"on":""}" data-rv="1">要</button></span><span class="muted">要審核時，編輯只能送審；審核人核准後才照時間發。</span>
-      <h3>時區</h3><div>${TZS.map(z=>`<label class="ck"><input type="radio" name="tz" value="${z}" ${z===b.tz?"checked":""}>${z}</label>`).join("")}</div>
       <h3>團隊</h3>${b.team.map((m,i)=>`<div class="mrole"><span>${esc(m.name)}${m.me?"（我）":""}</span><span class="seg">${Object.keys(ROLES).map(r=>`<button type="button" class="${m.role===r?"on":""}" data-role="${r}" data-idx="${i}">${ROLES[r]}</button>`).join("")}</span><button type="button" class="ibtn" data-kick="${i}" ${m.role==="owner"?"disabled":""} aria-label="移除成員" title="移除">${I("x")}</button></div>`).join("")}
       <div class="frow"><input type="email" id="invite" placeholder="email" aria-label="邀請 email"><button type="button" id="inviteBtn">邀請成員</button></div></div></div>`);
   $("sideView").querySelectorAll("[data-connect]").forEach(x=>x.onclick=()=>{ connectPf=x.dataset.connect; renderSettings(); });
@@ -1039,24 +1078,23 @@ function renderSettings(){ const b=B();
   const bk=$("cdBack"); if(bk) bk.onclick=()=>{ connectPf=null; renderSettings(); };
   $("sideView").querySelectorAll("[data-remove]").forEach(x=>x.onclick=()=>{ b.accounts=b.accounts.filter(a=>a.pf!==x.dataset.remove); addLog("移除帳號",null,PF[x.dataset.remove].n); renderSettings(); });
   $("revSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ b.review=x.dataset.rv==="1"; renderSettings(); });
-  $("sideView").querySelectorAll("input[name=tz]").forEach(x=>x.onchange=()=>{ b.tz=x.value; renderSettings(); });
   $("sideView").querySelectorAll("[data-role]").forEach(x=>x.onclick=()=>{ b.team[+x.dataset.idx].role=x.dataset.role; renderSettings(); });
   $("sideView").querySelectorAll("[data-kick]").forEach(x=>x.onclick=()=>{ b.team.splice(+x.dataset.kick,1); renderSettings(); });
   $("inviteBtn").onclick=()=>{ const v=$("invite").value.trim(); if(!v) return; b.team.push({name:v,role:"editor"}); addLog("邀請成員",null,v); renderSettings(); };
 }
 
 // ---- editor (U5): the working copy of one post ----
-const XTRA = {fc:"第一則留言",link:"連結與 UTM",alt:"替代文字",texts:"常用文字",ai:"AI 幫我寫",emoji:"表情符號",notes:"備註"};
-const XICON = {fc:"comment",link:"link",alt:"eye",texts:"lines",ai:"spark",emoji:"smile",notes:"note"};
+const XTRA = {link:"連結與 UTM",alt:"替代文字",texts:"常用文字",ai:"AI 幫我寫",emoji:"表情符號",notes:"備註"};
+const XICON = {link:"link",alt:"eye",texts:"lines",ai:"spark",emoji:"smile",notes:"note"};
 const effText = k => ed.custom[k] ?? ed.text;
 const effLen = k => [...effText(k)].length;
-function blank(){ return {id:null,kind:null,state:"draft",text:"",pfs:new Set(connected().map(a=>a.pf)),custom:{},tab:"all",imgs:[],fc:"",link:"",utm:false,alt:"",fmt:{},fin:{on:false,text:""},notes:"",date:"2026-10-16",time:"09:00",wm:"fixed",listId:null,open:new Set()}; }
+function blank(){ return {id:null,kind:null,state:"draft",text:"",pfs:new Set(connected().map(a=>a.pf)),custom:{},tab:"all",imgs:[],parts:[],link:"",utm:false,alt:"",fmt:{},notes:"",date:"2026-10-16",time:"09:00",wm:"fixed",listId:null,open:new Set()}; }
 function openPost(id, o={}){
   const p=B().posts.find(x=>x.id===id); if(!p) return newPost();
   ed=blank(); Object.assign(ed,{id:p.id,kind:p.kind||null,state:p.state,date:p.date||TODAY,time:p.time||"10:00",listId:p.listId||null,wm:p.state==="rotation"?"rot":"fixed"});
   if(p.kind==="article"){ ed.state="draft"; ed.time="12:00"; }
-  else Object.assign(ed,{text:p.text,pfs:new Set(p.pfs),custom:{...(p.custom||{})},imgs:[...(p.imgs||[])],fc:p.fc||"",link:p.link||"",utm:!!p.utm,alt:p.alt||"",fmt:{...(p.fmt||{})},fin:{...(p.fin||{on:false,text:""})},notes:p.notes||""});
-  for(const k of ["fc","link","alt","notes"]) if(ed[k]) ed.open.add(k);
+  else Object.assign(ed,{text:p.text,pfs:new Set(p.pfs),custom:{...(p.custom||{})},imgs:[...(p.imgs||[])],parts:(p.parts||[]).map(x=>({...x})),link:p.link||"",utm:!!p.utm,alt:p.alt||"",fmt:{...(p.fmt||{})},notes:p.notes||""});
+  for(const k of ["link","alt","notes"]) if(ed[k]) ed.open.add(k);
   showEditor(o); if(o.preview) setPv("pv");
 }
 function newPost(date, time, imgs, o={}){ ed=blank(); if(date) ed.date=date; if(time) ed.time=time; if(imgs) ed.imgs=imgs; showEditor(o); if(date) say(`在 ${fmtLong(date)} ${ed.time} 寫一則新貼文。`); $("text").focus({preventScroll:true}); }
@@ -1066,12 +1104,12 @@ function showEditor(o){
   if(isPhone() && !o.noSheet) document.body.classList.add("sheet"); if(!o.keepSheet) setPv("ed");
   $("menu").hidden=true; $("confirmNow").hidden=true; $("dtp").hidden=true;
   const none=!B().accounts.length; $("ed").hidden=none; $("edEmpty").hidden=!none;
-  if(none){ $("edTitle").textContent="寫貼文"; setState("draft",""); $("edEmpty").innerHTML=emptyHtml("plug","這個品牌還沒連接社群帳號。連好之後，就能在這裡寫貼文。","到設定連接帳號","edConn"); $("edConn").onclick=()=>setView("settings"); return; }
+  if(none){ $("edTitle").textContent="寫貼文"; setState("draft",""); $("edEmpty").innerHTML=emptyHtml("link","還沒連接社群帳號","連好之後，就能在這裡寫貼文。","到設定連接帳號","edConn"); $("edConn").onclick=()=>setView("settings"); return; }
   $("edTitle").textContent = ed.kind==="article" ? "文章 → 社群貼文" : ed.id==null ? "新貼文" : "編輯貼文";
   setState(ed.state, ed.id==null||ed.kind==="article" ? "（還沒存）" : "");
   $("srcBox").hidden = ed.kind!=="article"; if(ed.kind==="article") $("srcTitle").textContent=B().posts.find(x=>x.id===ed.id).title;
   $("revBar").hidden = !(me==="reviewer" && ed.state==="review"); $("reason").value="";
-  renderChan(); renderTabs(); fillText(); renderMrow(); renderXtras(); renderPset(); renderCnt(); renderPreview(); renderFoot(); renderHint();
+  renderChan(); renderTabs(); fillText(); renderMrow(); renderParts(); renderXtras(); renderPset(); renderCnt(); renderPreview(); renderFoot(); renderHint();
   if(["week","month","list"].includes(view)) renderView();
 }
 function setState(s, extra){ $("edState").dataset.state=s; $("edStateTxt").textContent=STATES[s]+(extra?" "+extra:""); }
@@ -1111,11 +1149,10 @@ function renderMrow(){ const r=$("mrow"); r.hidden=!ed.imgs.length;
   const m=$("madd"); if(m) m.onclick=addImg; }
 function addImg(){ ed.imgs.push(1+(ed.imgs.length+1)%4); refresh(); }
 // ② the icon toolbar inside the text box: each icon opens its block under the box; 媒體 adds a picture
-$("tools").querySelectorAll("[data-x]").forEach(x=>x.onclick=()=>{ if(ro()) return; const k=x.dataset.x; if(k==="media") return addImg(); ed.open.has(k)?ed.open.delete(k):ed.open.add(k); renderXtras(); });
+$("tools").querySelectorAll("[data-x]").forEach(x=>x.onclick=()=>{ if(ro()) return; const k=x.dataset.x; if(k==="media") return addImg(); if(k==="part") return addPart(); ed.open.has(k)?ed.open.delete(k):ed.open.add(k); renderXtras(); });
 function renderXtras(){
   $("tools").querySelectorAll("[data-x]").forEach(x=>x.classList.toggle("on", ed.open.has(x.dataset.x)));
   const body = {
-    fc:()=>`<input type="text" id="xfc" value="${esc(ed.fc)}" placeholder="貼文發出後，用自己的帳號留的第一則留言" aria-label="第一則留言">`,
     link:()=>`<input type="url" id="xlink" value="${esc(ed.link)}" placeholder="https://" aria-label="連結"><label class="ck"><input type="checkbox" id="xutm" ${ed.utm?"checked":""}>加 UTM</label><span class="muted tag" id="xshort"></span>`,
     alt:()=>ed.imgs.length?`<input type="text" id="xalt" value="${esc(ed.alt)}" placeholder="給看不到圖的人描述第 1 張圖" aria-label="替代文字">`:`<span class="muted">先加一張圖片。</span>`,
     texts:()=>B().texts.map((t,i)=>`<button type="button" data-t="${i}" title="${esc(t)}">${esc(t.slice(0,10))}…</button>`).join("")+`<button type="button" class="lnk" id="xsave">把目前文字存起來</button>`,
@@ -1127,7 +1164,7 @@ function renderXtras(){
   const X=$("xtras");
   X.querySelectorAll("[data-close]").forEach(x=>x.onclick=()=>{ ed.open.delete(x.dataset.close); renderXtras(); });
   const bind=(id,key)=>{ const el=$(id); if(el){ el.readOnly=ro(); el.oninput=()=>{ ed[key]=el.value; renderPreview(); if(key==="link") shortLink(); }; } };
-  bind("xfc","fc"); bind("xlink","link"); bind("xalt","alt"); bind("xnotes","notes");
+  bind("xlink","link"); bind("xalt","alt"); bind("xnotes","notes");
   const u=$("xutm"); if(u) u.onchange=()=>{ ed.utm=u.checked; shortLink(); }; shortLink();
   X.querySelectorAll("[data-t]").forEach(x=>x.onclick=()=>insertText(B().texts[+x.dataset.t]));
   const sv=$("xsave"); if(sv) sv.onclick=()=>{ const t=$("text").value.trim(); if(t){ B().texts.push(t); renderXtras(); say("已存到常用文字。"); } };
@@ -1136,16 +1173,34 @@ function renderXtras(){
 }
 function shortLink(){ const s=$("xshort"); if(!s) return; const v=ed.link.trim(); s.textContent = v ? `會縮成 aw.link/${(v.length*7919%46655+1296).toString(36)}${ed.utm?"，帶 utm_source=各平台名":""}` : ""; }
 function insertText(t, inline){ const el=$("text"); if(el.readOnly) return say("這個分頁用共用文字。要改，先按「另外寫一份」。"); const v=el.value; el.value = inline ? v.slice(0,el.selectionStart)+t+v.slice(el.selectionEnd) : (v+"\n"+t).trim(); el.dispatchEvent(new Event("input")); }
+// the parts after the post (S2): Bluesky and Threads join them into a thread, Facebook / Instagram / LinkedIn post them as comments
+const THREAD = ["bluesky","threads"], DELAYS = [0,1,5,60];
+const delayTxt = m => m ? (m<60 ? `${m} 分鐘後` : `${m/60} 小時後`) : "緊接著";
+function addPart(){ ed.parts.push({text:"",delay:0}); renderParts(); renderPreview(); const t=$("parts").querySelectorAll("textarea"); if(t.length) t[t.length-1].focus(); }
+function partCnt(t){ const ks=[...ed.pfs].filter(k=>THREAD.includes(k)); if(!ks.length) return ""; const k=ks.reduce((a,b)=>PF[b].max<PF[a].max?b:a), n=[...t].length;
+  return `<span class="cnt ${n>PF[k].max?"over":""}">${pfb(k)} ${n}／${PF[k].max}</span>`; }
+function renderParts(){ const el=$("parts"), P=ed.parts;
+  el.innerHTML = P.map((x,i)=>`<div class="part"><div class="pbox"><textarea data-pi="${i}" rows="2" aria-label="第 ${i+2} 則" placeholder="第 ${i+2} 則" ${ro()?"readonly":""}>${esc(x.text)}</textarea>${x.img?`<div class="mrow"><span class="mt ph ph-${x.img}"></span></div>`:""}<div class="tools"><button type="button" class="ibtn" data-pimg="${i}" title="加一張圖" aria-label="加一張圖">${I("image")}</button><button type="button" class="ibtn" data-pem="${i}" title="加表情" aria-label="加表情">${I("smile")}</button><span class="muted tag">${delayTxt(x.delay)}發</span>${partCnt(x.text)}</div></div>`
+    + `<div class="pside"><button type="button" class="ibtn" data-pup="${i}" aria-label="往上" ${i?"":"disabled"}>${I("up")}</button><button type="button" class="ibtn" data-pdown="${i}" aria-label="往下" ${i<P.length-1?"":"disabled"}>${I("down")}</button><button type="button" class="ibtn" data-pdel="${i}" aria-label="刪掉這一則">${I("trash")}</button><button type="button" class="ibtn ${x.delay?"on":""}" data-pdelay="${i}" title="前一則發出後多久發：${delayTxt(x.delay)}（點一下換）" aria-label="延遲">${I("clock")}</button></div></div>`).join("")
+    + (ro() ? "" : `<div class="addpart"><button type="button" class="btn-secondary" id="addPart">＋ 接一則</button><span class="muted tag">Bluesky、Threads 接成串文；Facebook、Instagram、LinkedIn 變成留言。</span></div>`);
+  const a=$("addPart"); if(a) a.onclick=addPart;
+  el.querySelectorAll("[data-pi]").forEach(t=>t.oninput=()=>{ P[+t.dataset.pi].text=t.value; renderPreview(); renderHint(); t.parentElement.querySelector(".cnt")?.replaceWith(...(()=>{ const d=document.createElement("span"); d.innerHTML=partCnt(t.value); return d.childNodes.length?[d.firstChild]:[]; })()); });
+  const mv=(i,j)=>{ [P[i],P[j]]=[P[j],P[i]]; renderParts(); renderPreview(); };
+  el.querySelectorAll("[data-pup]").forEach(b=>b.onclick=()=>mv(+b.dataset.pup, +b.dataset.pup-1));
+  el.querySelectorAll("[data-pdown]").forEach(b=>b.onclick=()=>mv(+b.dataset.pdown, +b.dataset.pdown+1));
+  el.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>{ P.splice(+b.dataset.pdel,1); renderParts(); renderPreview(); });
+  el.querySelectorAll("[data-pdelay]").forEach(b=>b.onclick=()=>{ const x=P[+b.dataset.pdelay]; x.delay=DELAYS[(DELAYS.indexOf(x.delay)+1)%DELAYS.length]; renderParts(); });
+  el.querySelectorAll("[data-pimg]").forEach(b=>b.onclick=()=>{ const x=P[+b.dataset.pimg]; x.img = x.img ? null : 1+(+b.dataset.pimg+2)%4; renderParts(); renderPreview(); });
+  el.querySelectorAll("[data-pem]").forEach(b=>b.onclick=()=>{ const x=P[+b.dataset.pem]; x.text+="🙂"; renderParts(); renderPreview(); });
+}
 // ③ platform settings: 共用 lists each platform's setting; a platform tab shows its own
 function renderPset(){ const el=$("pset"), k=ed.tab;
-  const sum = p => FORMATS[p] ? (ed.fmt[p]||"貼文") : p==="threads" ? (ed.fin.on?"有結尾留言":"沒有結尾留言") : "";
+  const sum = p => FORMATS[p] ? (ed.fmt[p]||"貼文") : "";
   if(k==="all"){ const pfs=[...ed.pfs].filter(sum); el.hidden=!pfs.length; el.innerHTML = `<h3>各平台設定</h3>`+pfs.map(p=>`<div class="psrow">${pfb(p)}<span>${PF[p].n}</span><span class="chip">${sum(p)}</span><button type="button" class="lnk" data-tab="${p}">改</button></div>`).join(""); }
   else { el.hidden=false; el.innerHTML = `<h3>${PF[k].n} 設定</h3>` + (FORMATS[k] ? `<span class="seg" id="fmtSeg">${FORMATS[k].map(f=>`<button type="button" class="${(ed.fmt[k]||"貼文")===f?"on":""}" data-f="${f}">${f}</button>`).join("")}</span>`+({instagram:`<span class="muted tag">放 2 張以上的圖，會變成多圖輪播。限時動態不顯示文字。</span>`,facebook:`<span class="muted tag">Reel 和限時動態要直式影片或圖片。</span>`,linkedin:`<span class="muted tag">文件輪播要上傳 PDF，一頁一張。</span>`}[k])
-      : k==="threads" ? `<label class="ck"><input type="checkbox" id="finOn" ${ed.fin.on?"checked":""}>串文最後補一則（結尾留言）</label><input type="text" id="finTx" value="${esc(ed.fin.text)}" placeholder="例如：報名連結在這裡" aria-label="結尾留言" ${ed.fin.on?"":"hidden"}>`
-      : `<span class="muted">${PF[k].n} 沒有另外的設定。接續好幾則的串文在下一版。</span>`); }
+      : `<span class="muted">${PF[k].n} 沒有另外的設定。要接成串文，按文字框下面的「接一則」。</span>`); }
   el.querySelectorAll("[data-tab]").forEach(x=>x.onclick=()=>{ ed.tab=x.dataset.tab; renderTabs(); fillText(); renderPset(); renderCnt(); renderPreview(); });
   el.querySelectorAll("[data-f]").forEach(x=>x.onclick=()=>{ if(ro()) return; ed.fmt[k]=x.dataset.f; renderPset(); renderPreview(); });
-  const fo=$("finOn"), ft=$("finTx"); if(fo) fo.onchange=()=>{ ed.fin.on=fo.checked; renderPset(); renderPreview(); }; if(ft) ft.oninput=()=>{ ed.fin.text=ft.value; renderPreview(); };
 }
 // previews (U4): each platform's own shell, the brand's avatar, name and handle; no made-up like counts; text past the limit in red
 function grid(imgs){ if(!imgs.length) return ""; const n=Math.min(imgs.length,4); return `<div class="imgs n${n}">${imgs.slice(0,4).map(m=>`<span class="im ph ph-${m}"></span>`).join("")}</div>`; }
@@ -1155,20 +1210,24 @@ function shell(k){
   const when = ed.wm==="rot" ? "輪播" : `${fmt(ed.date)} ${ed.time}`, imgs=ed.imgs;
   const lab = `<div class="shl">${pfb(k)}${PF[k].n}${f!=="貼文"?" · "+f:""}</div>`;
   const ic = ns => ns.map(n=>I(n)).join("");
-  if(k==="bluesky") return lab+`<div class="sh bs"><div class="hd">${bav("s32")}<div class="who"><b>${esc(a.name)}</b><span>${esc(a.handle)} · ${when}</span></div></div><div class="tx">${body}</div>${grid(imgs)}<div class="ic">${ic(["comment","repost","heart"])}<span class="end">${I("more")}</span></div></div>`;
-  if(k==="facebook") return lab+`<div class="sh fb"><div class="hd">${bav("s32")}<div class="who"><b>${esc(a.name)}</b><span>${when} · 公開</span></div></div><div class="tx clamp5">${body}</div>${grid(imgs)}<div class="ic bar"><span>${I("like")}讚</span><span>${I("comment")}留言</span><span>${I("share")}分享</span></div>${ed.fc?`<div class="cm"><b>${esc(a.name)}</b> ${esc(ed.fc)}</div>`:""}</div>`;
+  const mark = x => x ? esc([...x].slice(0,max).join("")) + ([...x].length>max ? `<mark class="over" title="超過 ${max} 字">${esc([...x].slice(max).join(""))}</mark>` : "") : `<span class="muted">（空的）</span>`;
+  const parts = ed.parts.filter(x=>x.text.trim()||x.img);
+  const cms = name => parts.map(x=>`<div class="cm"><b>${esc(name)}</b> ${esc(x.text)}</div>`).join("");
+  const thread = (name, sub, icons) => { const all=[{html:body,imgs}, ...parts.map(x=>({html:mark(x.text),imgs:x.img?[x.img]:[],delay:x.delay}))];
+    return `<div class="sh th">${all.map((e,i)=>`<div class="tl">${bav("s32")}${i<all.length-1?"<i></i>":""}</div><div><div class="who"><b>${esc(name)}</b><span>${i?delayTxt(e.delay):sub}</span></div><div class="tx">${e.html}</div>${grid(e.imgs)}<div class="ic">${ic(icons)}</div></div>`).join("")}</div>`; };
+  if(k==="bluesky") return lab+thread(a.name, `${a.handle} · ${when}`, ["comment","repost","heart"]);
+  if(k==="facebook") return lab+`<div class="sh fb"><div class="hd">${bav("s32")}<div class="who"><b>${esc(a.name)}</b><span>${when} · 公開</span></div></div><div class="tx clamp5">${body}</div>${grid(imgs)}<div class="ic bar"><span>${I("like")}讚</span><span>${I("comment")}留言</span><span>${I("share")}分享</span></div>${cms(a.name)}</div>`;
   if(k==="instagram"){ const h=a.handle.replace(/^@/,""); const tall=f!=="貼文";
     const pic = imgs.length ? `<div class="sq ph ph-${imgs[0]} ${tall?"tall":""}"></div>${imgs.length>1&&!tall?`<div class="dots">${imgs.map((_,i)=>`<i class="${i?"":"on"}"></i>`).join("")}</div>`:""}` : `<div class="need">Instagram 一定要有圖片或影片。</div>`;
-    return lab+`<div class="sh ig"><div class="hd">${bav("s32")}<div class="who"><b>${esc(h)}</b></div><span class="end muted">${I("more")}</span></div>${pic}<div class="ic">${ic(["heart","comment","send"])}<span class="end">${I("bookmark")}</span></div>${f==="限時動態"?"":`<div class="tx clamp2"><b>${esc(h)}</b> ${body}</div>`}${ed.fc&&f!=="限時動態"?`<div class="cm"><b>${esc(h)}</b> ${esc(ed.fc)}</div>`:""}</div>`; }
-  if(k==="threads"){ const h=a.handle.replace(/^@/,""); const fin=ed.fin.on&&ed.fin.text;
-    return lab+`<div class="sh th"><div class="tl">${bav("s32")}${fin?"<i></i>":""}</div><div><div class="who"><b>${esc(h)}</b><span>${when}</span></div><div class="tx">${body}</div>${grid(imgs)}<div class="ic">${ic(["heart","comment","repost","send"])}</div></div>${fin?`<div class="tl">${bav("s32")}</div><div><div class="who"><b>${esc(h)}</b></div><div class="tx">${esc(ed.fin.text)}</div></div>`:""}</div>`; }
-  if(k==="linkedin") return lab+`<div class="sh li"><div class="hd">${bav("s32 sq")}<div class="who"><b>${esc(a.name)}</b><span>${esc(a.handle)} · ${when}</span></div></div><div class="tx clamp3">${body}</div>${f==="文件輪播"?`<div class="need">文件輪播：上傳 PDF 後，這裡一頁一頁翻。</div>`:grid(imgs)}<div class="ic bar"><span>${I("like")}讚</span><span>${I("comment")}留言</span><span>${I("repost")}轉發</span><span>${I("send")}傳送</span></div></div>`;
+    return lab+`<div class="sh ig"><div class="hd">${bav("s32")}<div class="who"><b>${esc(h)}</b></div><span class="end muted">${I("more")}</span></div>${pic}<div class="ic">${ic(["heart","comment","send"])}<span class="end">${I("bookmark")}</span></div>${f==="限時動態"?"":`<div class="tx clamp2"><b>${esc(h)}</b> ${body}</div>`}${f==="限時動態"?"":cms(h)}</div>`; }
+  if(k==="threads") return lab+thread(a.handle.replace(/^@/,""), when, ["heart","comment","repost","send"]);
+  if(k==="linkedin") return lab+`<div class="sh li"><div class="hd">${bav("s32 sq")}<div class="who"><b>${esc(a.name)}</b><span>${esc(a.handle)} · ${when}</span></div></div><div class="tx clamp3">${body}</div>${f==="文件輪播"?`<div class="need">文件輪播：上傳 PDF 後，這裡一頁一頁翻。</div>`:grid(imgs)}<div class="ic bar"><span>${I("like")}讚</span><span>${I("comment")}留言</span><span>${I("repost")}轉發</span><span>${I("send")}傳送</span></div>${cms(a.name)}</div>`;
   return "";
 }
 function renderPreview(){ const pfs = ed.tab==="all" ? [...ed.pfs] : [ed.tab];
   $("pvNote").textContent = pfs.length>1 ? `${pfs.length} 個平台，往下看` : "";
   $("screen").innerHTML = pfs.length ? pfs.map(shell).join("") : `<span class="muted">先點上面的頭像，選要發到哪些帳號。</span>`; }
-function refresh(){ renderChan(); renderTabs(); fillText(); renderMrow(); renderXtras(); renderPset(); renderCnt(); renderPreview(); renderFoot(); }
+function refresh(){ renderChan(); renderTabs(); fillText(); renderMrow(); renderParts(); renderXtras(); renderPset(); renderCnt(); renderPreview(); renderFoot(); }
 // footer (U6): fixed time or a rotation list; the main button says what it does; the rest wait behind ▾
 function mainLabel(){ if(ro()) return "複製成新貼文"; if(ed.wm==="rot") return "加入輪播清單"; if(ed.id==null||ed.kind==="article") return "加入行事曆"; if(ed.state==="draft"||ed.state==="error") return "排程"; return "更新"; }
 function renderFoot(){
@@ -1199,13 +1258,14 @@ function renderHint(){ if(!ed) return; const p=ed.id!=null?B().posts.find(x=>x.i
   $("hint").innerHTML = h.join("　"); }
 function validate(state){ if(!ed.text.trim() && !Object.values(ed.custom).some(x=>x&&x.trim())) return "貼文還是空的。";
   if(state==="draft") return null; if(!ed.pfs.size) return "還沒選要發到哪裡：點上面的頭像。";
+  const pover=[...ed.pfs].filter(k=>THREAD.includes(k)&&ed.parts.some(x=>[...x.text].length>PF[k].max)); if(pover.length) return `接的那幾則有一則超過 ${pover.map(k=>PF[k].n).join("、")} 的字數上限。`;
   const over=[...ed.pfs].filter(k=>effLen(k)>PF[k].max); if(over.length) return `${over.map(k=>PF[k].n).join("、")} 超過字數上限，發不出去。`;
   if(ed.pfs.has("instagram")&&!ed.imgs.length) return "Instagram 一定要有圖片或影片。"; return null; }
 function save(state){
   const e=validate(state); if(e) return say(e, true);
   let p = ed.id!=null ? B().posts.find(x=>x.id===ed.id) : null;
   if(!p || p.kind==="article"){ p={id:Date.now()}; B().posts.push(p); ed.id=p.id; ed.kind=null; }
-  const data={text:ed.text,pfs:[...ed.pfs],custom:{...ed.custom},imgs:[...ed.imgs],fc:ed.fc,link:ed.link,utm:ed.utm,alt:ed.alt,fmt:{...ed.fmt},fin:{...ed.fin},notes:ed.notes,err:null};
+  const data={text:ed.text,pfs:[...ed.pfs],custom:{...ed.custom},imgs:[...ed.imgs],parts:ed.parts.map(x=>({...x})),link:ed.link,utm:ed.utm,alt:ed.alt,fmt:{...ed.fmt},notes:ed.notes,err:null};
   if(state==="scheduled" && ed.wm==="rot"){ const l=B().lists.find(x=>x.id===ed.listId); if(!l) return say("還沒有輪播清單，先到「輪播」建一個。", true);
     if(p.listId!==l.id) l.queue.push(ed.text); Object.assign(p,data,{date:"",time:"",state:"rotation",listId:l.id}); addLog("加入輪播",p,l.name); openPost(p.id,{keepSheet:true}); return say(`已加到「${esc(l.name)}」最後。下一則：${esc(nextRun(l))}`); }
   const label={draft:"存草稿",review:"送審",scheduled:"排程",published:"立即發佈"}[state];
@@ -1240,9 +1300,14 @@ function renderDtp(){ const s=dtState, el=$("dtp"); const [y,m]=s.month.split("-
   el.querySelectorAll("[data-m]").forEach(x=>x.onclick=()=>{ s.time=hh+":"+x.dataset.m; renderDtp(); });
   $("dtOk").onclick=()=>{ el.hidden=true; s.pick(s.time, s.day); };
 }
-document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ $("dtp").hidden=true; $("menu").hidden=true; $("filterPop").hidden=true; } });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ for(const id of ["dtp","menu","filterPop","tzPop","samplePop","bulkMenu"]) $(id).hidden=true; } });
+function renderTz(){ $("tzNow").textContent=`${NOW} · ${B().tz}`; $("tzTxt").textContent=B().tz;
+  $("tzList").innerHTML = TZS.map(z=>`<label class="ck"><input type="radio" name="tz" value="${z}" ${z===B().tz?"checked":""}>${z}</label>`).join("");
+  $("tzList").querySelectorAll("input").forEach(x=>x.onchange=()=>{ B().tz=x.value; renderTz(); $("tzPop").hidden=true; say(`時區改成 ${x.value}。行事曆和排程時間都照這個。`); }); }
+const pop = (btn, id) => { $(btn).onclick=()=>{ const open=$(id).hidden; for(const x of ["tzPop","samplePop"]) $(x).hidden=true; $(id).hidden=!open; $(btn).setAttribute("aria-expanded",String(open)); }; };
+pop("tzBtn","tzPop"); pop("sampleBtn","samplePop");
 
 function wireIcons(root){ root.querySelectorAll("[data-i]").forEach(el=>{ if(!el.querySelector("svg")) el.insertAdjacentHTML("afterbegin", I(el.dataset.i)); }); }
 wireIcons(document);
-renderHeader(); renderView(); openDefault();
+renderHeader(); renderTz(); renderView(); openDefault();
 </script>
