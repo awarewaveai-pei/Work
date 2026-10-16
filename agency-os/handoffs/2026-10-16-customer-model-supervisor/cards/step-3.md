@@ -1,6 +1,6 @@
 # 第 3 項：付款 → 合約 → 權利；錢包帳本泛化；營運看得到
 
-**狀態** 未開始　**風險** High（金流）　**模型** Opus 5.5　**前置** 第 2 項；待決 1（定期扣款外掛）；待決 3（點數條款與預收）；ADR 015 順序 1（WordPress 一次性碼進入產品門，否則付了錢的人進不來）　**正本** ADR 017 §2、§3、順序 3；ADR 015 §3、§4
+**風險** High（金流）　**模型** Opus 5.5　**前置** 第 2 項；待決 1（定期扣款外掛）；待決 3（點數條款與預收）；ADR 015 順序 1（WordPress 一次性碼進入產品門，否則付了錢的人進不來）　**正本** ADR 017 §2、§3、順序 3；ADR 015 §3、§4
 
 ## Decision
 - wp-bridge 外掛（`lobster-factory/packages/wp-bridge-plugin/`）在 Woo 訂單完成、訂閱續約、訂閱取消、點數包購買四個事件，POST 簽章 webhook 到 next-admin `app/api/webhooks/woo/route.ts`，照既有 `app/api/webhooks/video-billing/` 的驗證寫法（Bearer token＋HMAC）。

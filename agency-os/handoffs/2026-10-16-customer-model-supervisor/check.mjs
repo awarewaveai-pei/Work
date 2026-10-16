@@ -3,7 +3,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY } from './data.mjs';
+import { META, AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY } from './data.mjs';
 import { render } from './build.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -33,6 +33,22 @@ for (const o of OPEN) {
   const s = STEPS.find((x) => x.n === o.before);
   if (!s) fail(`open ${o.n}: before=${o.before} 不存在`);
   else if (!(s.before || '').includes(`待決 ${o.n}`)) fail(`open ${o.n}: step ${s.n}.before 沒提到「待決 ${o.n}」`);
+}
+
+// 3b. 跨檔綁定：ADR 017「順序」條數＝步驟數；TASKS 待決條數＝待決數；每張卡標題是「第 N 項」且不寫狀態
+const repo = path.resolve(here, '../..', '..');
+const adr = readFileSync(path.join(repo, META.adr017), 'utf8');
+const order = adr.split(/^## 順序/m)[1]?.split(/^## /m)[0] || '';
+const adrSteps = (order.match(/^\d+\. /gm) || []).length;
+if (adrSteps !== STEPS.length) fail(`ADR 017 順序有 ${adrSteps} 條，監工台有 ${STEPS.length} 步`);
+const tasks = readFileSync(path.join(repo, 'agency-os/TASKS.md'), 'utf8');
+const taskOpen = (tasks.match(/^\s*- \[[ x]\] 待決 \d+：/gm) || []).length;
+if (taskOpen !== OPEN.length) fail(`TASKS 有 ${taskOpen} 條待決，監工台有 ${OPEN.length} 條`);
+for (const s of STEPS) {
+  if (!s.card) continue;
+  const card = readFileSync(path.join(here, s.card), 'utf8');
+  if (!card.startsWith(`# 第 ${s.n} 項`)) fail(`卡 ${s.card} 標題不是「第 ${s.n} 項」`);
+  if (/\*\*狀態\*\*/.test(card)) fail(`卡 ${s.card} 寫了狀態；狀態只在 data.mjs`);
 }
 
 // 4. 三扇門三個、不重複；現況每列 state 只有 yes/no

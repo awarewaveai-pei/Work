@@ -1,6 +1,6 @@
 # 第 7 項：轉售（代理商版；等第一個轉售客戶）
 
-**狀態** 未開始　**風險** Medium　**模型** Opus 5.5　**前置** 第 5 項　**正本** ADR 017 順序 7（`max_tenants` 數根組織）
+**風險** Medium　**模型** Opus 5.5　**前置** 第 5 項　**正本** ADR 017 順序 7（`max_tenants` 數根組織）
 
 ## Decision
 - 授權檔 `max_tenants`＝根組織數（`organizations.parent_organization_id is null`）。一家公司或一個集團（含子公司、分公司、部門）＝1，不另收；代理商替多家不相干客戶代操 ＝ >1，另訂價，隔離責任在客戶主機，合約寫明。

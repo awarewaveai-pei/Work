@@ -1,6 +1,6 @@
 # 第 4 項：每個收費點只問 `can(主體, feature_key, actor)`；認知平台接同一個判斷
 
-**狀態** 未開始　**風險** Medium　**模型** Opus 5.5　**前置** 第 2 項　**正本** ADR 017 §4、順序 4
+**風險** Medium　**模型** Opus 5.5　**前置** 第 2 項　**正本** ADR 017 §4、順序 4
 
 ## Decision
 - `lib/entitlements/can.ts`：`can(subject, featureKey, actor) → { allowed, limits, maxSpend, report(usage) }`。線上：驗許可（第 2 步 `permit.ts`）；沒有 active 權利列 → `allowed:false`，附 `reason: "no_entitlement"`。`actor` 只進稽核與用量，不影響 `allowed`。

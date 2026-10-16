@@ -1,6 +1,6 @@
 # 第 1 項：登記表補齊、每個工具目錄歸位、產生器、機械閘
 
-**狀態** 未開始　**風險** Low　**模型** Opus 5.5　**前置** 無　**正本** ADR 017 順序 1、ADR 018 §2／§5
+**風險** Low　**模型** Opus 5.5　**前置** 無　**正本** ADR 017 順序 1、ADR 018 §2／§5
 
 ## Decision
 - `lib/portal/products.ts` 加 `features[]`（`feature_key`、`name`、`limitKind: QUOTA|RATE_LIMIT|SAFETY_GATE`、`buyout: boolean`）與 `accessChannels: readonly ("ui"|"api")[]`。

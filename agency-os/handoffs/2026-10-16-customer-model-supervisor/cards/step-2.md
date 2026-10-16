@@ -1,6 +1,6 @@
 # 第 2 項：方案表、權利表、組織種類；許可簽發；付費入口唯一閘
 
-**狀態** 未開始　**風險** Medium（本機與 staging 先跑；套 prod 時 High，要 go）　**模型** Opus 5.5，先出計畫　**前置** 第 1 項　**正本** ADR 017 §3、順序 2、付費入口唯一閘
+**風險** Medium（本機與 staging 先跑；套 prod 時 High，要 go）　**模型** Opus 5.5，先出計畫　**前置** 第 1 項　**正本** ADR 017 §3、順序 2、付費入口唯一閘
 
 ## Decision
 - Migration `0104_plans_entitlements.sql`（＋`.down.sql`）：
