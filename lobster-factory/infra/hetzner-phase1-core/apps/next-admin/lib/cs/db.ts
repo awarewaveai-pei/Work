@@ -3,13 +3,27 @@
 // empty result or no-op, never a throw that could crash the inbound webhook.
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { graduationBasis, isCurrentGraduation } from "@/lib/cs/graduation";
+import { kbMinRetrievalScoreOf } from "@/lib/cs/cis";
+import { CS_THRESHOLDS } from "@/lib/cs/config";
 import type {
   CsActionKind,
   EvalCase,
   Intent,
+  IntentGraduation,
   ToolRisk,
   ToolSpec,
 } from "@/lib/cs/types";
+
+function mapEvalCase(r: Record<string, unknown>): EvalCase {
+  return {
+    question: typeof r.question === "string" ? r.question : "",
+    intentKey: typeof r.intent_key === "string" ? r.intent_key : "",
+    expectedPoints: Array.isArray(r.expected_points) ? (r.expected_points as unknown[]).filter((x): x is string => typeof x === "string") : [],
+    expectHandoff: r.expect_handoff === true,
+    isAdversarial: r.is_adversarial === true,
+  };
+}
 
 /** Load the golden-set eval cases for a tenant (optionally one intent). Degrades to []. */
 export async function loadEvalCases(organizationId: string, intentKey?: string): Promise<EvalCase[]> {
@@ -22,13 +36,7 @@ export async function loadEvalCases(organizationId: string, intentKey?: string):
   if (intentKey) q = q.eq("intent_key", intentKey);
   const { data, error } = await q;
   if (error || !data) return [];
-  return data.map((r) => ({
-    question: typeof r.question === "string" ? r.question : "",
-    intentKey: typeof r.intent_key === "string" ? r.intent_key : "",
-    expectedPoints: Array.isArray(r.expected_points) ? (r.expected_points as unknown[]).filter((x): x is string => typeof x === "string") : [],
-    expectHandoff: r.expect_handoff === true,
-    isAdversarial: r.is_adversarial === true,
-  }));
+  return data.map(mapEvalCase);
 }
 
 interface IntentRow {
@@ -39,9 +47,43 @@ interface IntentRow {
   is_sensitive: boolean;
   confidence_threshold: number;
   canary_pct: number;
+  metadata?: Record<string, unknown> | null;
 }
 
-function mapIntent(r: IntentRow): Intent {
+const INTENT_COLUMNS = "key,label,answer_level,action_level,is_sensitive,confidence_threshold,canary_pct,metadata";
+
+/** The graduation record inside cs_intents.metadata, or null when absent / malformed. */
+export function graduationOf(metadata: unknown): IntentGraduation | null {
+  const g = metadata && typeof metadata === "object" ? (metadata as Record<string, unknown>).graduation : undefined;
+  if (!g || typeof g !== "object") return null;
+  const status = (g as Record<string, unknown>).status;
+  return status === "running" || status === "passed" || status === "failed" ? (g as IntentGraduation) : null;
+}
+
+/** The knowledge floor the engine applies for a tenant (the same rule as orchestrator planReply). */
+export function knowledgeFloorOf(clientConfig: Record<string, unknown> | null | undefined): number {
+  return kbMinRetrievalScoreOf(clientConfig?.kbMinRetrievalScore) ?? CS_THRESHOLDS.minRetrievalScore;
+}
+
+export async function loadKnowledgeFloor(organizationId: string): Promise<number> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return CS_THRESHOLDS.minRetrievalScore;
+  const { data } = await sb.from("organizations").select("metadata").eq("id", organizationId).maybeSingle();
+  const metadata = (data as { metadata?: { client_config?: Record<string, unknown> } } | null)?.metadata;
+  return knowledgeFloorOf(metadata?.client_config);
+}
+
+/** Whether the row's passed exam still certifies it: same golden set, decision settings and floor. */
+export function rowGraduated(r: IntentRow, cases: EvalCase[], knowledgeFloor: number): boolean {
+  const basis = graduationBasis(
+    { confidenceThreshold: Number(r.confidence_threshold ?? 0.8), isSensitive: !!r.is_sensitive, actionLevel: r.action_level ?? "A0" },
+    cases,
+    knowledgeFloor,
+  );
+  return isCurrentGraduation(graduationOf(r.metadata), basis);
+}
+
+function mapIntent(r: IntentRow, cases: EvalCase[], knowledgeFloor: number): Intent {
   return {
     key: r.key,
     label: r.label,
@@ -50,47 +92,202 @@ function mapIntent(r: IntentRow): Intent {
     isSensitive: !!r.is_sensitive,
     confidenceThreshold: Number(r.confidence_threshold ?? 0.8),
     canaryPct: Number(r.canary_pct ?? 0),
+    graduated: rowGraduated(r, cases, knowledgeFloor),
   };
+}
+
+/** A tenant's golden set grouped by intent key. */
+export async function loadEvalCasesByIntent(organizationId: string): Promise<Map<string, EvalCase[]>> {
+  const out = new Map<string, EvalCase[]>();
+  for (const c of await loadEvalCases(organizationId)) {
+    const list = out.get(c.intentKey) ?? [];
+    list.push(c);
+    out.set(c.intentKey, list);
+  }
+  return out;
 }
 
 export async function loadIntents(organizationId: string): Promise<Intent[]> {
   const sb = getSupabaseWriteClient();
   if (!sb) return [];
-  const { data, error } = await sb
-    .from("cs_intents")
-    .select("key,label,answer_level,action_level,is_sensitive,confidence_threshold,canary_pct")
-    .eq("organization_id", organizationId);
+  const [{ data, error }, cases, floor] = await Promise.all([
+    sb.from("cs_intents").select(INTENT_COLUMNS).eq("organization_id", organizationId),
+    loadEvalCasesByIntent(organizationId),
+    loadKnowledgeFloor(organizationId),
+  ]);
   if (error || !data) return [];
-  return (data as IntentRow[]).map(mapIntent);
+  return (data as IntentRow[]).map((r) => mapIntent(r, cases.get(r.key) ?? [], floor));
 }
 
-/** Create or update an intent (config — ops UI). Upsert on (organization_id, key). */
-export async function upsertIntent(
-  organizationId: string,
-  i: { key: string; label: string; answerLevel: string; actionLevel: string; isSensitive: boolean; confidenceThreshold?: number; canaryPct?: number },
-): Promise<boolean> {
+/** One intent; `after` evaluates graduation as if those fields were already saved (a PATCH that
+ * changes a decision setting together with L2 must be judged on the settings it will leave). */
+export async function loadIntent(organizationId: string, key: string, after: IntentFields = {}): Promise<Intent | null> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return null;
+  const [{ data, error }, cases, floor] = await Promise.all([
+    sb.from("cs_intents").select(INTENT_COLUMNS).eq("organization_id", organizationId).eq("key", key).maybeSingle(),
+    loadEvalCases(organizationId, key),
+    loadKnowledgeFloor(organizationId),
+  ]);
+  if (error || !data) return null;
+  const row = { ...(data as IntentRow), ...intentColumns(after) } as IntentRow;
+  return mapIntent(row, cases, floor);
+}
+
+export interface IntentFields {
+  label?: string;
+  answerLevel?: string;
+  actionLevel?: string;
+  isSensitive?: boolean;
+  confidenceThreshold?: number;
+  canaryPct?: number;
+}
+
+/** Columns for exactly the fields given. A field the caller did not send is never written, so a
+ * save from a screen that does not show canary_pct or confidence_threshold cannot reset them
+ * (2026-10-16: every save from the 客服 tab wrote canary_pct 0 and confidence_threshold 0.8). */
+export function intentColumns(f: IntentFields): Record<string, unknown> {
+  const c: Record<string, unknown> = {};
+  if (f.label !== undefined) c.label = f.label;
+  if (f.answerLevel !== undefined) c.answer_level = f.answerLevel;
+  if (f.actionLevel !== undefined) c.action_level = f.actionLevel;
+  if (f.isSensitive !== undefined) c.is_sensitive = f.isSensitive;
+  if (f.confidenceThreshold !== undefined) c.confidence_threshold = f.confidenceThreshold;
+  if (f.canaryPct !== undefined) c.canary_pct = f.canaryPct;
+  return c;
+}
+
+/** Create or update an intent (config — ops UI). Upsert on (organization_id, key); a new row takes
+ * the table defaults for every field not given, an existing row keeps them. */
+export async function upsertIntent(organizationId: string, i: IntentFields & { key: string; label: string }): Promise<boolean> {
   const sb = getSupabaseWriteClient();
   if (!sb) return false;
   const { error } = await sb.from("cs_intents").upsert(
-    {
-      organization_id: organizationId,
-      key: i.key,
-      label: i.label,
-      answer_level: i.answerLevel,
-      action_level: i.actionLevel,
-      is_sensitive: i.isSensitive,
-      confidence_threshold: i.confidenceThreshold ?? 0.8,
-      canary_pct: i.canaryPct ?? 0,
-      updated_at: new Date().toISOString(),
-    },
+    { organization_id: organizationId, key: i.key, ...intentColumns(i), updated_at: new Date().toISOString() },
     { onConflict: "organization_id,key" },
   );
   return !error;
 }
 
+/** Change fields of an existing intent. */
+export async function updateIntent(organizationId: string, key: string, f: IntentFields): Promise<"ok" | "not_found" | "error"> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return "error";
+  const { data, error } = await sb
+    .from("cs_intents")
+    .update({ ...intentColumns(f), updated_at: new Date().toISOString() })
+    .eq("organization_id", organizationId)
+    .eq("key", key)
+    .select("key");
+  if (error) return "error";
+  return data && data.length > 0 ? "ok" : "not_found";
+}
+
+/** cs_intents.metadata of one intent; null when the intent is missing or unreadable. */
+export async function loadIntentMetadata(organizationId: string, key: string): Promise<Record<string, unknown> | null> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return null;
+  const { data, error } = await sb.from("cs_intents").select("metadata").eq("organization_id", organizationId).eq("key", key).maybeSingle();
+  if (error || !data) return null;
+  return (data as { metadata?: Record<string, unknown> | null }).metadata ?? {};
+}
+
+/**
+ * Replace (or, with null, remove) the intent's graduation record, keeping the rest of metadata.
+ * With ifRunId the write is one conditional UPDATE: it lands only while the stored record still
+ * belongs to that run, so a run whose set was replaced (record removed) or that a newer run took
+ * over can never write its verdict (Codex 2026-10-16, partialreview-1e95d4c4 F1). cs_intents.metadata
+ * has no other writer; the read-merge-write keeps any key added later.
+ */
+export async function setIntentGraduation(
+  organizationId: string,
+  key: string,
+  graduation: IntentGraduation | null,
+  opts: { ifRunId?: string } = {},
+): Promise<"ok" | "superseded" | "error"> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return "error";
+  const current = await loadIntentMetadata(organizationId, key);
+  if (!current) return "error";
+  const metadata = { ...current };
+  if (graduation) metadata.graduation = graduation;
+  else delete metadata.graduation;
+  let q = sb.from("cs_intents").update({ metadata }).eq("organization_id", organizationId).eq("key", key);
+  if (opts.ifRunId) q = q.eq("metadata->graduation->>runId", opts.ifRunId);
+  const { data, error } = await q.select("key");
+  if (error) return "error";
+  return data && data.length > 0 ? "ok" : opts.ifRunId ? "superseded" : "error";
+}
+
+/** Every intent's graduation record for a tenant, by intent key. */
+export async function loadGraduations(organizationId: string): Promise<Map<string, IntentGraduation>> {
+  const out = new Map<string, IntentGraduation>();
+  const sb = getSupabaseWriteClient();
+  if (!sb) return out;
+  const { data, error } = await sb.from("cs_intents").select("key,metadata").eq("organization_id", organizationId);
+  if (error || !data) return out;
+  for (const r of data as Array<{ key: string; metadata: unknown }>) {
+    const g = graduationOf(r.metadata);
+    if (g) out.set(r.key, g);
+  }
+  return out;
+}
+
+export interface EvalCaseRow extends EvalCase {
+  id: string;
+}
+
+export async function listEvalCases(organizationId: string): Promise<EvalCaseRow[]> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("cs_eval_cases")
+    .select("id,question,intent_key,expected_points,expect_handoff,is_adversarial")
+    .eq("organization_id", organizationId)
+    .order("created_at");
+  if (error || !data) return [];
+  return data.map((r) => ({ id: String(r.id), ...mapEvalCase(r) }));
+}
+
+/** Replace one intent's golden set. The graduation goes FIRST: it was earned on the old set, and
+ * with no transaction across the three writes, every later failure must leave the intent ungraduated
+ * (L2 drafts) rather than certified on cases nobody examined (Codex 2026-10-16, partialreview-1e95d4c4
+ * F2). New cases are inserted before the old ones are deleted, so a failed insert keeps the old set;
+ * a failed delete leaves both sets, and the next replace removes them all. */
+export async function replaceEvalCases(organizationId: string, intentKey: string, cases: Omit<EvalCase, "intentKey">[]): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  if ((await setIntentGraduation(organizationId, intentKey, null)) !== "ok") return false;
+  const { data: old, error: readErr } = await sb.from("cs_eval_cases").select("id").eq("organization_id", organizationId).eq("intent_key", intentKey);
+  if (readErr) return false;
+  if (cases.length > 0) {
+    const { error: insErr } = await sb.from("cs_eval_cases").insert(
+      cases.map((c) => ({
+        organization_id: organizationId,
+        intent_key: intentKey,
+        question: c.question,
+        expected_points: c.expectedPoints,
+        expect_handoff: c.expectHandoff,
+        is_adversarial: c.isAdversarial,
+      })),
+    );
+    if (insErr) return false;
+  }
+  const oldIds = (old ?? []).map((r) => r.id as string);
+  if (oldIds.length > 0) {
+    const { error: delErr } = await sb.from("cs_eval_cases").delete().eq("organization_id", organizationId).in("id", oldIds);
+    if (delErr) return false;
+  }
+  return true;
+}
+
+/** Delete an intent together with its golden set: the cases belong to it, and an intent recreated
+ * under the same key must not inherit questions written for the old one. */
 export async function deleteIntent(organizationId: string, key: string): Promise<boolean> {
   const sb = getSupabaseWriteClient();
   if (!sb) return false;
+  const { error: casesErr } = await sb.from("cs_eval_cases").delete().eq("organization_id", organizationId).eq("intent_key", key);
+  if (casesErr) return false;
   const { error } = await sb.from("cs_intents").delete().eq("organization_id", organizationId).eq("key", key);
   return !error;
 }

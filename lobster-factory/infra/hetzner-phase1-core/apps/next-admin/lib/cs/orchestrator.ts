@@ -14,6 +14,7 @@ import type { RetrievedChunk } from "@/lib/kb/types";
 import { generateReply, runAgenticTurn, superviseReply } from "@/lib/cs/generate";
 import { loadEnabledTools, loadIntents, loadMemory, recordReply } from "@/lib/cs/db";
 import type {
+  CisProfile,
   CsDecision,
   HandoffReason,
   InboundMessage,
@@ -31,6 +32,7 @@ function defaultIntent(key: string): Intent {
     isSensitive: false,
     confidenceThreshold: CS_THRESHOLDS.defaultConfidence,
     canaryPct: 0,
+    graduated: false,
   };
 }
 
@@ -65,7 +67,7 @@ export async function handleInbound(message: InboundMessage): Promise<CsDecision
   }
 
   try {
-    // 1. Input guards — cheap rejection before any spend.
+    // Input guards first: a rejected message costs no DB read either.
     const guard = inputGuards(message.text);
     if (!guard.pass) {
       const d = makeHandoff(guard.handoffReason ?? "guardrail_block", { guard: guard.reason });
@@ -73,146 +75,166 @@ export async function handleInbound(message: InboundMessage): Promise<CsDecision
       return d;
     }
 
-    // 2. Tenant context.
     const [cis, intents, memory] = await Promise.all([
       loadCis(message.organizationId),
       loadIntents(message.organizationId),
       loadMemory(message.organizationId, message.contactRef),
     ]);
 
-    // 2b. Per-tenant kill-switch — if disabled, route to a human before any LLM spend.
+    // Per-tenant kill-switch — if disabled, route to a human before any LLM spend.
     if (cis.csEnabled === false) {
       const d = makeHandoff("tenant_killswitch", { killSwitch: true });
       await persist(message, d);
       return d;
     }
 
-    // 3. Classify intent.
-    const cls = await classifyIntent({ organizationId: message.organizationId, message: message.text, intents });
-    const intent = resolveIntent(intents, cls.intentKey);
-
-    // 3b. Sensitive intent or a red-line word needs no knowledge to decide: hand off before the
-    // embedding call, the translation retry and the generation (Codex 2026-10-15, partialreview-361530b9).
-    const unsafe = safetyGate(intent, message.text);
-    if (unsafe) {
-      const d: CsDecision = {
-        ...makeHandoff(unsafe.handoffReason ?? "red_line", { classification: cls }),
-        intentKey: intent.key,
-        confidence: cls.confidence,
-      };
-      await persist(message, d, intent.answerLevel);
-      return d;
-    }
-
-    // 4. Retrieve knowledge.
-    // Flat tenant today: scope = the org itself, viewer = the org (so its own sensitive docs are
-    // visible to it). A tenant tree would pass the whole chain here and change nothing in the KB.
-    // includeSensitive: false (migration 0083) -- this IS the customer-service AI's own answer path;
-    // a document ticked "敏感" in the ops UI must never end up quoted back to an end user.
-    const minRetrievalScore = cis.minRetrievalScore ?? CS_THRESHOLDS.minRetrievalScore;
-    const retrieved = await retrieveAcrossLanguages(message.organizationId, message.text, minRetrievalScore);
-    const { chunks } = retrieved;
-    const retrievalScore = topScore(chunks);
-    const chunkIds = chunks.map((c) => c.id);
-
-    // 4b. Nothing to answer from: hand off before any generation spend.
-    const gap = knowledgeGate(retrievalScore, minRetrievalScore);
-    if (gap) {
-      const d: CsDecision = {
-        ...makeHandoff("knowledge_gap", { classification: cls, retrievalScore, retrievalQuery: retrieved.translated ?? null }, chunkIds),
-        intentKey: intent.key,
-        confidence: cls.confidence,
-        retrievalScore,
-      };
-      await persist(message, d, intent.answerLevel);
-      return d;
-    }
-
-    // 5. Generate (agentic when the tenant has tools, else plain RAG reply).
-    const tools = await loadEnabledTools(message.organizationId);
-    let replyText = "";
-    let provider = "claude";
-    let toolCalls: ToolCallResult[] = [];
-    let toolHandoff = false;
-    if (tools.length) {
-      const a = await runAgenticTurn({ cis, message: message.text, chunks, memory, tools });
-      replyText = a.text;
-      toolCalls = a.toolCalls;
-      toolHandoff = a.needsHandoff;
-    } else {
-      const g = await generateReply({ cis, message: message.text, chunks, memory });
-      replyText = g.text;
-      provider = g.provider;
-    }
-
-    // 6. Supervisor verdict (grounding + safety).
-    const verdict = replyText
-      ? await superviseReply({ reply: replyText, chunks, organizationId: message.organizationId })
-      : { grounded: false, safe: false, reason: "empty_reply" };
-
-    // 7. Autonomy decision (deterministic).
-    const roll = canaryRoll(message.messageId);
-    const decided = decideAnswerAction({
-      intent,
-      confidence: cls.confidence,
-      retrievalScore,
-      grounded: verdict.grounded && verdict.safe,
-      messageText: message.text,
-      roll,
-      minRetrievalScore,
-    });
-
-    const trace: Record<string, unknown> = {
-      provider,
-      classification: cls,
-      verdict,
-      retrievalScore,
-      minRetrievalScore,
-      retrievalQuery: retrieved.translated ?? null,
-      canaryRoll: roll,
-      toolHandoff,
-    };
-
-    // 8. Combine overrides: tool handoff / output-guard fail / empty reply all force a human.
-    let action = decided.action;
-    let handoffReason: HandoffReason | undefined = decided.handoffReason;
-
-    if (toolHandoff && action !== "handoff") {
-      action = "handoff";
-      handoffReason = "guardrail_block";
-    }
-    if (action !== "handoff" && action !== "suppressed") {
-      const og = outputGuards(replyText);
-      if (!og.pass) {
-        action = "handoff";
-        handoffReason = og.handoffReason ?? "guardrail_block";
-        trace.outputGuard = og.reason;
-      }
-    }
-    if (action !== "handoff" && !replyText.trim()) {
-      action = "handoff";
-      handoffReason = "engine_error";
-    }
-
-    const decision: CsDecision = {
-      action,
-      replyText: action === "auto_sent" || action === "draft" ? replyText : undefined,
-      intentKey: intent.key,
-      confidence: cls.confidence,
-      retrievalScore,
-      retrievedChunkIds: chunkIds,
-      handoffReason: action === "handoff" ? handoffReason : undefined,
-      toolCalls,
-      traceMeta: trace,
-    };
-
-    await persist(message, decision, intent.answerLevel);
+    const { decision, answerLevel } = await planReply({ cis, intents, text: message.text, memory, roll: canaryRoll(message.messageId) });
+    await persist(message, decision, answerLevel);
     return decision;
   } catch (err) {
     const d = makeHandoff("engine_error", { error: err instanceof Error ? err.message : String(err) });
     await persist(message, d).catch(() => undefined);
     return d;
   }
+}
+
+/**
+ * The decision for one customer message, without side effects: no audit row, no send. handleInbound
+ * and the offline eval (lib/cs/eval.ts) both call it, so an exam grades exactly what customers get
+ * (tenant knowledge floor, the English retry, tools, output guards). Throws on infrastructure
+ * failure; each caller turns that into a handoff.
+ */
+export async function planReply(input: {
+  cis: CisProfile;
+  intents: Intent[];
+  text: string;
+  memory: string[];
+  roll: number;
+}): Promise<{ decision: CsDecision; answerLevel?: string }> {
+  const { cis, intents, text, memory, roll } = input;
+  const organizationId = cis.organizationId;
+
+  const guard = inputGuards(text);
+  if (!guard.pass) {
+    return { decision: makeHandoff(guard.handoffReason ?? "guardrail_block", { guard: guard.reason }) };
+  }
+
+  // 1. Classify intent.
+  const cls = await classifyIntent({ organizationId, message: text, intents });
+  const intent = resolveIntent(intents, cls.intentKey);
+
+  // 1b. Sensitive intent or a red-line word needs no knowledge to decide: hand off before the
+  // embedding call, the translation retry and the generation (Codex 2026-10-15, partialreview-361530b9).
+  const unsafe = safetyGate(intent, text);
+  if (unsafe) {
+    const d: CsDecision = {
+      ...makeHandoff(unsafe.handoffReason ?? "red_line", { classification: cls }),
+      intentKey: intent.key,
+      confidence: cls.confidence,
+    };
+    return { decision: d, answerLevel: intent.answerLevel };
+  }
+
+  // 2. Retrieve knowledge.
+  // Flat tenant today: scope = the org itself, viewer = the org (so its own sensitive docs are
+  // visible to it). A tenant tree would pass the whole chain here and change nothing in the KB.
+  // includeSensitive: false (migration 0083) -- this IS the customer-service AI's own answer path;
+  // a document ticked "敏感" in the ops UI must never end up quoted back to an end user.
+  const minRetrievalScore = cis.minRetrievalScore ?? CS_THRESHOLDS.minRetrievalScore;
+  const retrieved = await retrieveAcrossLanguages(organizationId, text, minRetrievalScore);
+  const { chunks } = retrieved;
+  const retrievalScore = topScore(chunks);
+  const chunkIds = chunks.map((c) => c.id);
+
+  // 2b. Nothing to answer from: hand off before any generation spend.
+  const gap = knowledgeGate(retrievalScore, minRetrievalScore);
+  if (gap) {
+    const d: CsDecision = {
+      ...makeHandoff("knowledge_gap", { classification: cls, retrievalScore, retrievalQuery: retrieved.translated ?? null }, chunkIds),
+      intentKey: intent.key,
+      confidence: cls.confidence,
+      retrievalScore,
+    };
+    return { decision: d, answerLevel: intent.answerLevel };
+  }
+
+  // 3. Generate (agentic when the tenant has tools, else plain RAG reply).
+  const tools = await loadEnabledTools(organizationId);
+  let replyText = "";
+  let provider = "claude";
+  let toolCalls: ToolCallResult[] = [];
+  let toolHandoff = false;
+  if (tools.length) {
+    const a = await runAgenticTurn({ cis, message: text, chunks, memory, tools });
+    replyText = a.text;
+    toolCalls = a.toolCalls;
+    toolHandoff = a.needsHandoff;
+  } else {
+    const g = await generateReply({ cis, message: text, chunks, memory });
+    replyText = g.text;
+    provider = g.provider;
+  }
+
+  // 4. Supervisor verdict (grounding + safety).
+  const verdict = replyText
+    ? await superviseReply({ reply: replyText, chunks, organizationId })
+    : { grounded: false, safe: false, reason: "empty_reply" };
+
+  // 5. Autonomy decision (deterministic).
+  const decided = decideAnswerAction({
+    intent,
+    confidence: cls.confidence,
+    retrievalScore,
+    grounded: verdict.grounded && verdict.safe,
+    messageText: text,
+    roll,
+    minRetrievalScore,
+  });
+
+  const trace: Record<string, unknown> = {
+    provider,
+    classification: cls,
+    verdict,
+    retrievalScore,
+    minRetrievalScore,
+    retrievalQuery: retrieved.translated ?? null,
+    canaryRoll: roll,
+    toolHandoff,
+  };
+
+  // 6. Combine overrides: tool handoff / output-guard fail / empty reply all force a human.
+  let action = decided.action;
+  let handoffReason: HandoffReason | undefined = decided.handoffReason;
+
+  if (toolHandoff && action !== "handoff") {
+    action = "handoff";
+    handoffReason = "guardrail_block";
+  }
+  if (action !== "handoff" && action !== "suppressed") {
+    const og = outputGuards(replyText);
+    if (!og.pass) {
+      action = "handoff";
+      handoffReason = og.handoffReason ?? "guardrail_block";
+      trace.outputGuard = og.reason;
+    }
+  }
+  if (action !== "handoff" && !replyText.trim()) {
+    action = "handoff";
+    handoffReason = "engine_error";
+  }
+
+  const decision: CsDecision = {
+    action,
+    replyText: action === "auto_sent" || action === "draft" ? replyText : undefined,
+    intentKey: intent.key,
+    confidence: cls.confidence,
+    retrievalScore,
+    retrievedChunkIds: chunkIds,
+    handoffReason: action === "handoff" ? handoffReason : undefined,
+    toolCalls,
+    traceMeta: trace,
+  };
+  return { decision, answerLevel: intent.answerLevel };
 }
 
 const NON_LATIN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/;

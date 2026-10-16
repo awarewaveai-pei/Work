@@ -25,6 +25,9 @@ const sb = vi.hoisted(() => ({
     if (table === "cs_intents") {
       return { select: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }) };
     }
+    if (table === "cs_eval_cases") {
+      return { select: () => ({ eq: () => Promise.resolve({ data: [], error: null }) }) };
+    }
     if (table === "cs_knowledge_sources") {
       return { select: () => ({ eq: () => Promise.resolve({ count: 0, error: null }) }) };
     }

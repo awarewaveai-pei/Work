@@ -9,9 +9,11 @@
 export { handleInbound } from "@/lib/cs/orchestrator";
 export { registerTool } from "@/lib/cs/tools";
 export { loadCis } from "@/lib/cs/cis";
-export { runEval, gradeIntent } from "@/lib/cs/eval";
+export { runEval, gradeIntent, examIntent } from "@/lib/cs/eval";
 // Ops-console CRUD (intents only — knowledge CRUD lives in "@/lib/kb").
-export { loadIntents, upsertIntent, deleteIntent } from "@/lib/cs/db";
+export { loadIntents, loadIntent, upsertIntent, updateIntent, deleteIntent, graduationOf, loadIntentMetadata, setIntentGraduation, loadGraduations, listEvalCases, replaceEvalCases, loadEvalCases, loadEvalCasesByIntent, rowGraduated, knowledgeFloorOf, loadKnowledgeFloor } from "@/lib/cs/db";
+export type { IntentFields, EvalCaseRow } from "@/lib/cs/db";
+export { ACTION_LEVELS, ANSWER_LEVELS, examInFlight, intentBehavior, parseEvalCases, parseIntentPatch } from "@/lib/cs/intent-config";
 
 export type {
   InboundMessage,
@@ -21,4 +23,6 @@ export type {
   CisProfile,
   EvalSummary,
   IntentGrade,
+  IntentGraduation,
+  EvalCase,
 } from "@/lib/cs/types";

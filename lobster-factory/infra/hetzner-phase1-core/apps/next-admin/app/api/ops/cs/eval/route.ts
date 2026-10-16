@@ -1,13 +1,16 @@
-// POST /api/ops/cs/eval — run the offline golden-set eval for one tenant (optionally one intent)
-// and return the summary + graduation verdict. Gated by canCreateAiImageJob (owner/admin/operator)
-// because it spends LLM. Body: { slug: string, intentKey?: string }.
-// NOTE: runs cases sequentially; large golden sets may take a while — keep sets modest or move to a
-// background job (Trigger.dev) later. cs_* reads use the service-role client.
+// POST /api/ops/cs/eval — the offline golden-set eval (plan §5.2). Gated by canCreateAiImageJob
+// (owner/admin/operator) because it spends LLM. Body: { slug: string, intentKey?: string }.
+// With intentKey: an exam. It answers 202 at once and runs after the response (30 cases outlast a
+// request); the verdict lands in cs_intents.metadata.graduation, which the 客服 tab polls through
+// cs-config. A passed exam is what lets the intent be set to L2 (cs-intents route).
+// Without intentKey: a whole-tenant run, answered inline, never a graduation verdict.
 
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { runEval, gradeIntent } from "@/lib/cs";
+import { recordOpsAudit } from "@/lib/ops-audit";
+import { examInFlight, examIntent, graduationOf, loadEvalCases, loadIntentMetadata, runEval, setIntentGraduation } from "@/lib/cs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,21 +38,51 @@ export async function POST(request: Request) {
   const { data: org, error } = await supabase.from("organizations").select("id").eq("slug", slug).single();
   if (error || !org) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
-  const summary = await runEval(org.id as string, intentKey);
-  // Graduation is per-intent (plan §5.2) — only grade when a single intent was evaluated; a
-  // whole-tenant run blends heterogeneous intents and must not yield one L1→L2 verdict.
-  const grade = intentKey ? gradeIntent(summary) : null;
+  const orgId = org.id as string;
 
-  // Don't echo full answers/questions (may contain PII) — return metrics + verdict only.
+  if (intentKey) {
+    const metadata = await loadIntentMetadata(orgId, intentKey);
+    if (!metadata) return NextResponse.json({ ok: false, error: "intent_not_found" }, { status: 404 });
+    if (examInFlight(graduationOf(metadata))) return NextResponse.json({ ok: false, error: "exam_running" }, { status: 409 });
+    const cases = await loadEvalCases(orgId, intentKey);
+    if (cases.length === 0) return NextResponse.json({ ok: false, error: "no_eval_cases" }, { status: 400 });
+
+    const runId = crypto.randomUUID();
+    const startedAt = new Date().toISOString();
+    if ((await setIntentGraduation(orgId, intentKey, { status: "running", runId, startedAt, heartbeatAt: startedAt })) !== "ok") {
+      return NextResponse.json({ ok: false, error: "graduation_write_failed" }, { status: 500 });
+    }
+    after(async () => {
+      try {
+        const g = await examIntent(orgId, intentKey, { runId, startedAt });
+        if (g) {
+          await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_intent_exam_finished", {
+            intentKey, runId, status: g.status, n: g.n, passRate: g.passRate, dangerousErrorRate: g.dangerousErrorRate, handoffRecall: g.handoffRecall,
+          });
+        }
+      } catch (err) {
+        Sentry.captureException(err, { extra: { orgId, intentKey, runId, step: "cs_exam" } });
+        await setIntentGraduation(orgId, intentKey, {
+          status: "failed", runId, startedAt, finishedAt: new Date().toISOString(), reasons: [`考試中斷：${String(err).slice(0, 200)}`],
+        }, { ifRunId: runId }).catch(() => undefined);
+      }
+    });
+    await recordOpsAudit(orgId, resolved.role, resolved.source, "cs_intent_exam_started", { intentKey, runId, n: cases.length });
+    return NextResponse.json({ ok: true, started: true, intentKey, n: cases.length }, { status: 202 });
+  }
+
+  const summary = await runEval(orgId);
+
+  // Don't echo full answers/questions (may contain PII) — return metrics only.
   return NextResponse.json({
     ok: true,
     slug,
-    intentKey: intentKey ?? null,
+    intentKey: null,
     n: summary.n,
     passRate: Number(summary.passRate.toFixed(4)),
     dangerousErrorRate: Number(summary.dangerousErrorRate.toFixed(4)),
     handoffRecall: Number(summary.handoffRecall.toFixed(4)),
-    grade,
-    note: intentKey ? undefined : "whole-tenant run — pass intentKey to get an L1→L2 graduation verdict",
+    grade: null,
+    note: "whole-tenant run — pass intentKey to sit one intent's exam",
   });
 }

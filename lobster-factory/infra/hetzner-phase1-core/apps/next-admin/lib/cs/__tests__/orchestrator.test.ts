@@ -52,7 +52,7 @@ describe("handleInbound -- no spend before the gates", () => {
     classifyIntent.mockResolvedValueOnce({ intentKey: "general", confidence: 0.9 });
     const { loadIntents } = await import("@/lib/cs/db");
     vi.mocked(loadIntents).mockResolvedValueOnce([
-      { key: "general", label: "g", answerLevel: "L1", actionLevel: "A0", isSensitive: true, confidenceThreshold: 0.5, canaryPct: 0 },
+      { key: "general", label: "g", answerLevel: "L1", actionLevel: "A0", isSensitive: true, confidenceThreshold: 0.5, canaryPct: 0, graduated: false },
     ]);
     retrieve.mockResolvedValue([chunk(0.3)]);
     const d = await handleInbound(msg("請問你們有哪些療癒課程？"));

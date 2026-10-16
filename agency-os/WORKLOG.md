@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-16（續11）客服意圖：存檔不再歸零、只有考過的意圖能開自動（API＋引擎雙層、指紋綁定考題與設定）、考試走正式路徑 planReply、客服分頁重做
+
+**操作者**：「沒回就沒什麼意義了」→ 推薦先修分頁再開課程類；讀到計畫 D1／§5.2（`agency-os/docs/Customer_service/Customer_service_automation_plan.md:42,165`）要求每意圖考過離線 eval 才升 L2，停下回報 → 操作者選 A（照計畫考）。
+**查到的缺口**：
+- C1 存檔歸零：`lib/cs/db.ts` upsert 寫死 `canary_pct: i.canaryPct ?? 0`、`confidence_threshold ?? 0.8`；分頁從不送 → 選「L2 自動」仍是 0%＝草稿，Soulful 的 0.7 門檻也會被改回 0.8。
+- C2 畢業閘只是建議：`gradeIntent`（`lib/cs/eval.ts`）回 verdict，沒有任何地方強制；Soulful `cs_eval_cases` 0 題。
+- C3 考試引擎與正式路徑漂移：`runEvalCase` 自己重算，用全域 0.5（正式用租戶 0.40）、沒有中文→英文重查 → 考的是比正式更嚴的另一套。
+- m1 `cs-config` 卡片文字說意圖層級在「客服營運中心」，該頁只有計數。
+**做了**：
+- `intentColumns`：只寫有送的欄位（upsert／新 `updateIntent`）；新 `PATCH cs-intents`（欄位錯 400，不默默套預設）。
+- `planReply`（`lib/cs/orchestrator.ts`）：從 `handleInbound` 抽出、無副作用；正式與考試共用（C3 整類關掉）。
+- 畢業：`cs_intents.metadata.graduation`（無 migration）；`lib/cs/graduation.ts` 指紋＝考題內容＋影響決策的設定（信心門檻、敏感、行動層級）＋租戶知識門檻，每次讀取重算比對 → 換題／刪掉重建／直接改 DB／考後降門檻都自動失效。API（POST/PATCH，依存檔後的設定判斷）回 409 `not_graduated`；`decideAnswerAction` 未畢業的 L2 一律草稿。
+- 考試：至少 10 題「應該回答」才可能畢業（`MIN_ANSWER_CASES`，只考轉真人不算會回答）；`POST /api/ops/cs/eval` 帶 intentKey → 202，`after()` 背景跑，4 題並行；runId＋心跳（30s，3 分鐘沒心跳＝中斷可重考）；所有寫入以 runId 條件更新（PostgREST `metadata->graduation->>runId=eq.`，prod 唯讀實測 200）；被換題／被新考試接手 → 下次心跳即停、結果不寫；結果寫不進去＝失敗、不報完成。答題題目被分到別的意圖 → 不算過（`classified_as:`）。
+- `cs-eval-cases` GET/PUT：整組取代，先撤畢業再插新刪舊；刪意圖連考題一起刪。逐題結果只走這支（owner/admin）；`cs-config`（viewer 可讀）只回摘要＋`current`。
+- 分頁 `CsIntentsCard.tsx`：回覆方式三顆按鈕（自動未考過不可按）、自動比例、行動按鈕、一句「實際會怎樣」（`intentBehavior`，跟引擎同規則）、考試狀態／開始考試／考題與逐題結果／貼 JSON 取代；新增意圖表單改按鈕、不提供自動。`ChipBtn` 加 disabled/title。
+- 考題：`agency-os/tenants/company-soulful-expression/core/cs-eval-courses_services.json`（30 題：20 應答＋10 應轉真人，含自傷、停藥、退費、prompt injection）；寫題前讀過知識庫 11 頁。
+**Codex**：第一輪 `reports/oracle/2026-10-16-partialreview-1e95d4c4.md` 6 項全收（非原子寫入、換題半失敗留畢業、寫失敗報完成、分類錯也算過、viewer 看得到逐題、固定 15 分鐘鎖）；第二輪 `-5c84dbcc.md` 3 項全收（換題在開考前、刪意圖留考題、考後改門檻）→ 同段第二次被報，先寫不變量（「畢業＝與受考條件相等的指紋，讀取時重算」）再改；第三輪 `-a505e9f6.md` 7 項：收 3（只有轉真人題也能畢業 → 至少 10 題應答；UI 把 0% 顯示成 100%、按存會開自動；租戶知識門檻沒進指紋）；不收 4：KB 內容變動不撤畢業（已列沒涵蓋，網站每週重爬，要先有自動重考，產品決定）、兩人同時取代考題會合併（兩邊都先撤畢業＝安全方向，機率極低）、同時按兩次開考（最多多花約 NT$20，只寫一份結果）、刪題後刪意圖失敗（意圖變未畢業＝安全方向，再刪一次即乾淨）。依「不做無效益工作」停在第三輪，不跑第四輪。
+**沒涵蓋（TASKS 開項）**：知識庫內容／模型／prompt 變動不會讓畢業失效（計畫 §5.2 的「改 KB 就重考」閘未建）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test（265 files／2439 pass；新：intent-config 8、cs-intents route 3、exam 4、graduation 5、eval-cases-replace 1、cs-core +1、cs-eval +1） | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=丟棄式 worktree D:/tmp/wt-cs-mut 突變 8 個守衛（API 409、引擎草稿、superseded 丟棄、只寫有送欄位、指紋綁定、分類錯不算過、先撤畢業、至少 10 題應答）→ 各自指名測試 RED，還原 green | exit=0 | ms=180000
+- REALTEST_EVIDENCE: tool=SSH | cmd=lobster-next-admin 內 fetch PostgREST cs_intents?metadata->graduation->>runId=eq.no-such-run → 200 []；Soulful 3 筆 | exit=0 | ms=2000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/16m/0n（三輪 6＋3＋7；收 12、不收 4，理由見上）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD，`:(literal)` pathspec）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=upsertIntent|setIntentGraduation|graduationBasis|planReply|examIntent|intentColumns | hits=52（全在本次改動檔與其測試；`upsertIntent` 唯一呼叫點 cs-intents route；`decideAnswerAction` 呼叫點只剩 planReply）
+- ORACLE_WAIVED: 第三輪後的 3 項修正（指紋加門檻、應答題下限、UI 顯示真值）由指名測試＋突變 M5/M8 鎖住；依「不做無效益工作」不跑第四輪
+
+**剩餘風險**：KB／模型／prompt 變了畢業不失效（TASKS 開項）；Soulful 考試尚未跑（等部署＋操作者看過考題）。
+**rollback**：`git revert`；資料面無 migration，`cs_intents.metadata.graduation` 可留（舊碼不讀它），`cs_eval_cases` 新列無害。
 ## 2026-10-16（續10）開客戶帳號收尾：prod 關公開註冊＋接 Resend；「擋住的 email」按一次就自動修好；畫面以第一次使用為前提
 
 **操作者**：續8 的兩個剩餘風險「去處理好」；擋住的 email「是否可以在頁面清除，不要到後台」；「要設定使用者是第一次使用，沒人教和指導」；Resend 接 prod 選「要，一起做」。

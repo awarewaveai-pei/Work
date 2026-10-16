@@ -28,6 +28,7 @@ function intent(p: Partial<Intent> = {}): Intent {
     isSensitive: false,
     confidenceThreshold: 0.8,
     canaryPct: 100,
+    graduated: true,
     ...p,
   };
 }
@@ -96,6 +97,9 @@ describe("decideAnswerAction", () => {
   it("L2 outside canary still drafts", () => {
     const d = decideAnswerAction({ ...baseDecision, intent: intent({ canaryPct: 0 }), roll: 50 });
     expect(d.action).toBe("draft");
+  });
+  it("L2 that has not passed its exam drafts (plan §5.2), even fully inside the canary", () => {
+    expect(decideAnswerAction({ ...baseDecision, intent: intent({ graduated: false }) }).action).toBe("draft");
   });
 });
 

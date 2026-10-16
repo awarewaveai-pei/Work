@@ -118,6 +118,11 @@ export function decideAnswerAction(input: AnswerDecisionInput): AnswerDecision {
   if (intent.answerLevel === "L1") {
     return { action: "draft" };
   }
+  // L2 needs a passed exam on the intent's current golden set (plan §5.2). The ops API refuses L2
+  // without one; this holds the rule when the row was edited elsewhere or the set changed since.
+  if (!intent.graduated) {
+    return { action: "draft" };
+  }
   // L2: auto only inside the canary ramp, else still a draft.
   return passesCanary(intent.canaryPct, roll) ? { action: "auto_sent" } : { action: "draft" };
 }

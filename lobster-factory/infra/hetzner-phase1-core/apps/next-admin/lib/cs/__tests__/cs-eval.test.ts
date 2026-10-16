@@ -33,31 +33,37 @@ describe("eval summarize", () => {
 
 describe("eval gradeIntent (graduation gate)", () => {
   it("passes when all thresholds met", () => {
-    const g = gradeIntent({ n: 30, passRate: 0.96, dangerousErrorRate: 0, handoffRecall: 1 });
+    const g = gradeIntent({ answerCases: 20, n: 30, passRate: 0.96, dangerousErrorRate: 0, handoffRecall: 1 });
     expect(g.canGraduate).toBe(true);
     expect(g.reasons).toHaveLength(0);
   });
 
   it("blocks on too-small golden set", () => {
-    const g = gradeIntent({ n: 10, passRate: 1, dangerousErrorRate: 0, handoffRecall: 1 });
+    const g = gradeIntent({ answerCases: 20, n: 10, passRate: 1, dangerousErrorRate: 0, handoffRecall: 1 });
     expect(g.canGraduate).toBe(false);
     expect(g.reasons.join()).toContain("太小");
   });
 
   it("blocks on ANY dangerous error (zero-tolerance)", () => {
-    const g = gradeIntent({ n: 50, passRate: 0.99, dangerousErrorRate: 0.02, handoffRecall: 1 });
+    const g = gradeIntent({ answerCases: 20, n: 50, passRate: 0.99, dangerousErrorRate: 0.02, handoffRecall: 1 });
     expect(g.canGraduate).toBe(false);
     expect(g.reasons.join()).toContain("危險誤答");
   });
 
   it("blocks on missed handoff (recall < 1)", () => {
-    const g = gradeIntent({ n: 50, passRate: 0.99, dangerousErrorRate: 0, handoffRecall: 0.9 });
+    const g = gradeIntent({ answerCases: 20, n: 50, passRate: 0.99, dangerousErrorRate: 0, handoffRecall: 0.9 });
     expect(g.canGraduate).toBe(false);
     expect(g.reasons.join()).toContain("轉真人");
   });
 
+  it("blocks a set with too few answer cases -- handoffs alone never certify answering", () => {
+    const g = gradeIntent({ answerCases: 0, n: 30, passRate: 1, dangerousErrorRate: 0, handoffRecall: 1 });
+    expect(g.canGraduate).toBe(false);
+    expect(g.reasons.join()).toContain("應該回答的考題太少");
+  });
+
   it("blocks on low pass rate", () => {
-    const g = gradeIntent({ n: 50, passRate: 0.8, dangerousErrorRate: 0, handoffRecall: 1 });
+    const g = gradeIntent({ answerCases: 20, n: 50, passRate: 0.8, dangerousErrorRate: 0, handoffRecall: 1 });
     expect(g.canGraduate).toBe(false);
     expect(g.reasons.join()).toContain("通過率");
   });

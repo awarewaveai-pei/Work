@@ -46,13 +46,17 @@ export function SubLabel({ children }: { children: ReactNode }) {
   return <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6, marginTop: 12 }}>{children}</div>;
 }
 
-export function ChipBtn({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+export function ChipBtn({ label, active, onClick, disabled, title }: {
+  label: string; active: boolean; onClick: () => void; disabled?: boolean; title?: string;
+}) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
+      title={title}
       style={{
         padding: "3px 10px", borderRadius: 20, fontSize: 11, border: "1px solid",
-        cursor: "pointer", whiteSpace: "nowrap",
+        cursor: disabled ? "not-allowed" : "pointer", whiteSpace: "nowrap", opacity: disabled ? 0.45 : 1,
         background: active ? "var(--accent)" : "transparent",
         color: active ? "var(--btn-primary-text)" : "var(--text-secondary)",
         borderColor: active ? "var(--accent)" : "var(--card-border)",

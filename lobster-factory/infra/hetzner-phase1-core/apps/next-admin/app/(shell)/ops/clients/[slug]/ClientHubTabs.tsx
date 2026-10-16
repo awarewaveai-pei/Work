@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, type CSSProperties } from "react";
+import { useState, useEffect, useRef, useCallback, type CSSProperties } from "react";
 import Link from "next/link";
 import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
 import { SiteWatchCard } from "./SiteWatchCard";
 import { AccountsCard } from "./AccountsCard";
+import { CsIntentsCard, type CsIntentRow } from "./CsIntentsCard";
 import { ScheduleTable } from "@/app/(shell)/ops/schedules/ScheduleTable";
 import { CollectionSourcesPanel } from "@/app/(shell)/ops/collect/CollectionSourcesPanel";
 import { KnowledgeDetailModal } from "./KnowledgeDetailModal";
@@ -1231,11 +1232,6 @@ function CsChatwootTokenCard({ slug }: { slug: string }) {
 
 // ── Customer service tab ──────────────────────────────────────────────────────
 
-type CsIntentRow = {
-  key: string; label: string; answer_level: string; action_level: string;
-  is_sensitive: boolean; confidence_threshold: number; canary_pct: number;
-};
-
 function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [loading, setLoading] = useState(true);
   const [csEnabled, setCsEnabled] = useState(true);
@@ -1244,11 +1240,7 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
   const [intents, setIntents] = useState<CsIntentRow[]>([]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  // new-intent form
-  const [iKey, setIKey] = useState(""); const [iLabel, setILabel] = useState(""); const [iAns, setIAns] = useState("L1"); const [iAct, setIAct] = useState("A0");
-  const [iSensitive, setISensitive] = useState(false); const [iSaving, setISaving] = useState(false); const [iMsg, setIMsg] = useState<string | null>(null);
-
-  async function reloadConfig() {
+  const reloadConfig = useCallback(async () => {
     try {
       const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, { headers: { ...roleHeader("admin") } });
       const data = (await res.json()) as { ok?: boolean; csEnabled?: boolean; intents?: CsIntentRow[]; kbMinRetrievalScore?: number | null; kbMinRetrievalScoreDefault?: number };
@@ -1258,13 +1250,12 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
         if (typeof data.kbMinRetrievalScoreDefault === "number") setMinScoreDefault(data.kbMinRetrievalScoreDefault);
       }
     } catch { /* ignore */ }
-  }
+  }, [org.slug]);
   useEffect(() => {
     let alive = true;
     (async () => { await reloadConfig(); if (alive) setLoading(false); })();
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [org.slug]);
+  }, [reloadConfig]);
 
   async function toggleKill() {
     setSaving(true); setMsg(null);
@@ -1298,38 +1289,11 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
     } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
   }
 
-  async function addIntent() {
-    setISaving(true); setIMsg(null);
-    try {
-      const res = await fetch(`/api/ops/clients/${org.slug}/cs-intents`, {
-        method: "POST", headers: { "Content-Type": "application/json", ...roleHeader("admin") },
-        body: JSON.stringify({ key: iKey, label: iLabel, answerLevel: iAns, actionLevel: iAct, isSensitive: iSensitive }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? `failed_${res.status}`);
-      setIMsg("✓ 已新增意圖"); setIKey(""); setILabel(""); setISensitive(false);
-      await reloadConfig();
-    } catch (e) { setIMsg(`⚠ ${String(e)}`); } finally { setISaving(false); }
-  }
-  async function delIntent(key: string) {
-    await fetch(`/api/ops/clients/${org.slug}/cs-intents`, { method: "DELETE", headers: { "Content-Type": "application/json", ...roleHeader("admin") }, body: JSON.stringify({ key }) });
-    await reloadConfig();
-  }
-
-  const ansBadge = (l: string) =>
-    l === "L2" ? badge("var(--badge-green-bg)", "var(--green)", "L2 自動")
-      : l === "L1" ? badge("var(--bg-canvas)", "var(--text-secondary)", "L1 草稿")
-        : badge("var(--bg-canvas)", "var(--text-muted)", "L0 關閉");
-  const actBadge = (l: string) =>
-    l === "A2" ? badge("var(--bg-canvas)", "var(--text-secondary)", "A2 受閘寫")
-      : l === "A1" ? badge("var(--bg-canvas)", "var(--text-secondary)", "A1 唯讀")
-        : badge("var(--bg-canvas)", "var(--text-muted)", "A0 無動作");
-
   return (
     <>
       <Card title={csEnabled ? "🟢 AI 客服：啟用中" : "🔴 AI 客服：已停用 (kill-switch)"}>
         <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-          每租戶 kill-switch：停用後不呼叫 AI（不花錢），沒有命中常見問答的訊息一律轉真人；常見問答自動回覆照常。意圖層級與全域開關另在「客服營運中心」。
+          每租戶 kill-switch：停用後不呼叫 AI（不花錢），沒有命中常見問答的訊息一律轉真人；常見問答自動回覆照常。每個意圖怎麼回在下方「意圖與自動化分級」。
         </p>
         <button onClick={toggleKill} disabled={saving}
           style={{ ...cisBtnStyle, background: csEnabled ? "var(--red)" : "var(--accent)", opacity: saving ? 0.6 : 1 }}>
@@ -1350,34 +1314,7 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
 
       <CsChatwootTokenCard slug={org.slug} />
 
-      <Card title={`意圖與自動化分級（${loading ? "…" : intents.length}）`}>
-        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-          雙軸：答覆 L0 關閉 / L1 草稿 / L2 自動 × 行動 A0 無 / A1 唯讀 / A2 受閘寫；勾「敏感」= money/身分/法律，永遠轉真人。
-        </p>
-        {!loading && intents.map((it) => (
-          <div key={it.key} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--border-subtle)", fontSize: 12 }}>
-            <span style={{ flex: 1, fontWeight: 500 }}>{it.label}<span style={{ color: "var(--text-muted)", fontWeight: 400, marginLeft: 6, fontFamily: "monospace", fontSize: 10 }}>{it.key}</span></span>
-            {it.is_sensitive && badge("var(--badge-red-bg)", "var(--red)", "敏感·轉真人")}
-            {ansBadge(it.answer_level)}
-            {actBadge(it.action_level)}
-            {it.canary_pct > 0 && it.canary_pct < 100 && badge("var(--bg-canvas)", "var(--text-secondary)", `canary ${it.canary_pct}%`)}
-            <button onClick={() => delIntent(it.key)} aria-label="刪除" style={{ border: "none", background: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: 14 }}>×</button>
-          </div>
-        ))}
-        <div style={{ borderTop: "1px solid var(--border-subtle)", paddingTop: 10, marginTop: 4 }}>
-          <CisText label="代碼 key" value={iKey} onChange={setIKey} placeholder="order_status" mono />
-          <CisText label="名稱" value={iLabel} onChange={setILabel} placeholder="訂單狀態查詢" />
-          <CisSelect label="答覆" value={iAns} onChange={setIAns} options={[["L0", "L0 關閉"], ["L1", "L1 草稿"], ["L2", "L2 自動"]]} />
-          <CisSelect label="行動" value={iAct} onChange={setIAct} options={[["A0", "A0 無"], ["A1", "A1 唯讀"], ["A2", "A2 受閘寫"]]} />
-          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)", padding: "4px 0 0 96px" }}>
-            <input type="checkbox" checked={iSensitive} onChange={(e) => setISensitive(e.target.checked)} /> 敏感（永遠轉真人）
-          </label>
-          <button onClick={addIntent} disabled={iSaving || !iKey || !iLabel} style={{ ...cisBtnStyle, opacity: iSaving || !iKey || !iLabel ? 0.5 : 1 }}>
-            {iSaving ? "新增中…" : "新增意圖"}
-          </button>
-          {iMsg && <div style={{ marginTop: 6, fontSize: 11, color: iMsg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{iMsg}</div>}
-        </div>
-      </Card>
+      <CsIntentsCard slug={org.slug} intents={intents} loading={loading} reload={reloadConfig} />
     </>
   );
 }

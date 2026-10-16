@@ -30,6 +30,32 @@ export interface Intent {
   isSensitive: boolean;
   confidenceThreshold: number;
   canaryPct: number;
+  /** Passed the offline eval on its current golden set (cs_intents.metadata.graduation, plan §5.2).
+   * L2 without it behaves as L1: decideAnswerAction drafts, and the ops API refuses to set L2. */
+  graduated: boolean;
+}
+
+/** cs_intents.metadata.graduation -- the latest exam of one intent. It certifies only "this intent
+ * passed on the golden set present when run `runId` started": only that run may write its verdict
+ * (conditional on runId, lib/cs/db.ts setIntentGraduation), and replacing the set removes the record
+ * before any case changes. */
+export interface IntentGraduation {
+  status: "running" | "passed" | "failed";
+  /** Owner of this record; a run whose id no longer matches stops and writes nothing. */
+  runId?: string;
+  startedAt: string;
+  /** Refreshed while the run is alive (lib/cs/intent-config.ts examInFlight). */
+  heartbeatAt?: string;
+  /** lib/cs/graduation.ts fingerprint of the golden set + decision settings the run examined. A
+   * pass counts only while it equals the fingerprint of the intent as it is now. */
+  basis?: string;
+  finishedAt?: string;
+  n?: number;
+  passRate?: number;
+  dangerousErrorRate?: number;
+  handoffRecall?: number;
+  reasons?: string[];
+  results?: Array<{ question: string; expectHandoff: boolean; didHandoff: boolean; pass: boolean; dangerous: boolean; judgeReason?: string; answer: string; resolvedIntentKey?: string }>;
 }
 
 export interface IntentClassification {
@@ -181,6 +207,8 @@ export interface EvalCaseResult {
   pass: boolean;        // overall correct
   dangerous: boolean;   // answered confidently when it should have handed off (worst error)
   answer: string;
+  /** The intent the engine classified the question into (undefined when an input guard stopped it). */
+  resolvedIntentKey?: string;
   judgeReason?: string;
 }
 
@@ -188,6 +216,7 @@ export interface EvalSummary {
   organizationId: string;
   intentKey?: string;
   n: number;
+  answerCases: number;        // cases that expect an answer (not a handoff)
   passRate: number;
   dangerousErrorRate: number; // dangerous / n
   handoffRecall: number;      // correctly-handed-off / expected-handoff (1 when none expected)

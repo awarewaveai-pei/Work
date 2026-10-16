@@ -15,6 +15,7 @@ import { canWriteTenantConfig, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { KB_MIN_RETRIEVAL_SCORE_RANGE, kbMinRetrievalScoreOf } from "@/lib/cs/cis";
 import { CS_THRESHOLDS } from "@/lib/cs/config";
+import { graduationOf, knowledgeFloorOf, loadEvalCasesByIntent, rowGraduated } from "@/lib/cs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,17 +43,31 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
   const org = await resolveOrg(supabase, slug);
   if (!org) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
-  const [intentsRes, knowledgeRes] = await Promise.all([
+  const [intentsRes, knowledgeRes, casesByIntent] = await Promise.all([
     supabase
       .from("cs_intents")
-      .select("key,label,answer_level,action_level,is_sensitive,confidence_threshold,canary_pct")
+      .select("key,label,answer_level,action_level,is_sensitive,confidence_threshold,canary_pct,metadata")
       .eq("organization_id", org.id)
       .order("key"),
     supabase
       .from("cs_knowledge_sources")
       .select("id", { count: "exact", head: true })
       .eq("organization_id", org.id),
+    loadEvalCasesByIntent(org.id),
   ]);
+  // metadata stays server-side and this GET is open to viewers: the exam's verdict, never its
+  // per-case questions and answers (those go through cs-eval-cases, owner/admin only).
+  // `current`: the pass still matches this intent's golden set and decision settings (lib/cs/graduation.ts).
+  const intents = ((intentsRes.data ?? []) as Array<Record<string, unknown>>).map((full) => {
+    const { metadata, ...row } = full;
+    const cases = casesByIntent.get(row.key as string) ?? [];
+    const g = graduationOf(metadata);
+    return {
+      ...row,
+      graduation: g ? { ...g, results: undefined, current: rowGraduated(full as never, cases, knowledgeFloorOf(config)) } : null,
+      evalCaseCount: cases.length,
+    };
+  });
 
   const config = clientConfigOf(org.metadata);
   const csEnabled = config.csEnabled !== false; // default ON
@@ -66,7 +81,7 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     kbMinRetrievalScore: kbMinRetrievalScoreOf(config.kbMinRetrievalScore) ?? null,
     kbMinRetrievalScoreDefault: CS_THRESHOLDS.minRetrievalScore,
     knowledgeCount: knowledgeRes.count ?? 0,
-    intents: intentsRes.data ?? [],
+    intents,
   });
 }
 
