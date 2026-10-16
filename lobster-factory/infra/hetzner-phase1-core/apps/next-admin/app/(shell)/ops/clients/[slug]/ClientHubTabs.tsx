@@ -1164,6 +1164,70 @@ function CsFaqCard({ slug, initial }: { slug: string; initial?: ClientConfig["cs
   );
 }
 
+const CHATWOOT_TOKEN_ERRORS: Record<string, string> = {
+  token_rejected: "Chatwoot 不接受這組 token。要用你自己的，不能用機器人的。",
+  token_not_in_account: "這組 token 讀不到這個客戶的 Chatwoot 聯絡人。",
+  token_unreachable: "連不到 Chatwoot，沒有存。稍後再試。",
+  chatwoot_not_configured: "這個客戶還沒接上 Chatwoot。",
+  forbidden_role: "只有擁有者或管理員能改。",
+};
+
+/** The operator's own Chatwoot token (vault only, never shown again): lets the system write a customer's name into the contact. */
+function CsChatwootTokenCard({ slug }: { slug: string }) {
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const url = `/api/ops/clients/${slug}/cs-config/chatwoot-token`;
+
+  useEffect(() => {
+    let alive = true;
+    fetch(url, { headers: { ...roleHeader("admin") } })
+      .then((r) => r.json() as Promise<{ ok?: boolean; configured?: boolean }>)
+      .then((d) => { if (alive && d.ok) setConfigured(d.configured === true); })
+      .catch(() => { /* status stays unknown */ });
+    return () => { alive = false; };
+  }, [url]);
+
+  async function send(method: "PUT" | "DELETE") {
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
+        body: method === "PUT" ? JSON.stringify({ token }) : undefined,
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string; configured?: boolean };
+      if (!res.ok || !data.ok) throw new Error(CHATWOOT_TOKEN_ERRORS[data.error ?? ""] ?? data.error ?? `失敗（${res.status}）`);
+      setConfigured(data.configured === true);
+      setToken("");
+      setMsg(method === "PUT" ? "✓ 已設定" : "✓ 已清除");
+    } catch (e) { setMsg(`⚠ ${e instanceof Error ? e.message : String(e)}`); } finally { setBusy(false); }
+  }
+
+  return (
+    <Card title={`Chatwoot 個人 token：${configured === null ? "…" : configured ? "已設定" : "未設定"}`}>
+      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px", lineHeight: 1.6 }}>
+        設定後，客人回答名字時，系統會把名字寫進 Chatwoot 聯絡人。
+        到 Chatwoot 右上頭像 → 個人資料設定 → 存取權杖，複製貼在這裡。
+        存之前會先向 Chatwoot 確認；只存在伺服器，之後不會再顯示。
+      </p>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+        <input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off"
+          placeholder={configured ? "貼上新的 token 會取代舊的" : "貼上 token"}
+          style={{ flex: 1, minWidth: 0, fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }} />
+        <button onClick={() => send("PUT")} disabled={busy || !token.trim()}
+          style={{ ...cisBtnStyle, marginTop: 0, opacity: busy || !token.trim() ? 0.5 : 1 }}>{busy ? "確認中…" : "存"}</button>
+        {configured && (
+          <button onClick={() => send("DELETE")} disabled={busy}
+            style={{ ...cisBtnStyle, marginTop: 0, background: "transparent", color: "var(--red)", border: "1px solid var(--red)" }}>清除</button>
+        )}
+      </div>
+      {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
+    </Card>
+  );
+}
+
 // ── Customer service tab ──────────────────────────────────────────────────────
 
 type CsIntentRow = {
@@ -1282,6 +1346,8 @@ function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
         </p>
         {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
       </Card>
+
+      <CsChatwootTokenCard slug={org.slug} />
 
       <Card title={`意圖與自動化分級（${loading ? "…" : intents.length}）`}>
         <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>

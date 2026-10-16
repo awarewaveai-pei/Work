@@ -55,6 +55,41 @@ async function loadApiToken(organizationId: string): Promise<string | null> {
   return loadSecret(`cs:chatwoot:${organizationId}:api_token`);
 }
 
+/** Vault key of the operator's Chatwoot User access token (saved from the 客服 tab). Kept apart from
+ * api_token (the AgentBot's): customer-visible messages stay sent as the bot; this one only reads
+ * messages and edits contacts, which Chatwoot refuses to a bot (BOT_ACCESSIBLE_ENDPOINTS). */
+export function chatwootUserTokenRef(organizationId: string): string {
+  return `cs:chatwoot:${organizationId}:user_token`;
+}
+
+/** Token for reads and contact edits: the User token when saved, else the bot token (whose 401 callers already handle). */
+async function loadReadToken(organizationId: string): Promise<string | null> {
+  return (await loadSecret(chatwootUserTokenRef(organizationId))) ?? (await loadApiToken(organizationId));
+}
+
+export type UserTokenCheck = "ok" | "rejected" | "not_in_account" | "unreachable";
+
+/**
+ * Can this token read contacts of `config.accountId` — the capability it is saved for? Probes that
+ * exact endpoint (not /profile, which answers 200 even when the account's API access is off):
+ * an AgentBot token, an invalid token or a non-member gets 401 (contacts#index is not a bot
+ * endpoint); 403/404 = this account refuses it. Nothing from the body is returned or logged.
+ */
+export async function checkUserToken(config: ChatwootConfig, token: string): Promise<UserTokenCheck> {
+  let res: Response;
+  try {
+    res = await fetch(`${config.baseUrl.replace(/\/$/, "")}/api/v1/accounts/${config.accountId}/contacts?page=1`, {
+      headers: { api_access_token: token },
+      signal: AbortSignal.timeout(CS_TIMEOUTS.chatwootMs),
+    });
+  } catch {
+    return "unreachable";
+  }
+  if (res.status === 401) return "rejected";
+  if (res.status === 403 || res.status === 404) return "not_in_account";
+  return res.ok ? "ok" : "unreachable";
+}
+
 interface ChatwootRequestOpts {
   config: ChatwootConfig;
   apiToken: string;
@@ -87,14 +122,14 @@ export async function sendReply(organizationId: string, config: ChatwootConfig, 
 
 /** Rename a contact (PUT /contacts/:id; other fields are left as stored). */
 export async function updateContactName(organizationId: string, config: ChatwootConfig, contactId: number, name: string): Promise<void> {
-  const apiToken = await loadApiToken(organizationId);
+  const apiToken = await loadReadToken(organizationId);
   if (!apiToken) throw new Error("chatwoot_api_token_missing");
   await chatwootRequest({ config, apiToken, method: "PUT", path: `/contacts/${contactId}`, body: { name } });
 }
 
 /** The contact's current name (contacts/show.json.jbuilder wraps it in payload). */
 export async function getContactName(organizationId: string, config: ChatwootConfig, contactId: number): Promise<string | undefined> {
-  const apiToken = await loadApiToken(organizationId);
+  const apiToken = await loadReadToken(organizationId);
   if (!apiToken) throw new Error("chatwoot_api_token_missing");
   const res = await chatwootRequest<{ payload?: { name?: unknown } }>({ config, apiToken, method: "GET", path: `/contacts/${contactId}` });
   return typeof res.payload?.name === "string" ? res.payload.name : undefined;
@@ -118,7 +153,7 @@ export async function listMessages(
   conversationId: string,
   window: { after: number } | { before: number },
 ): Promise<ChatwootMessageSummary[]> {
-  const apiToken = await loadApiToken(organizationId);
+  const apiToken = await loadReadToken(organizationId);
   if (!apiToken) throw new Error("chatwoot_api_token_missing");
   const query = "after" in window ? `after=${window.after}` : `before=${window.before}`;
   const res = await chatwootRequest<{ payload?: Array<{ id?: unknown; message_type?: unknown; private?: unknown; content?: unknown }> }>({

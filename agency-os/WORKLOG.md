@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-16（續5）客服分頁加「Chatwoot 個人 token」欄：操作者自己存 User token 進伺服器 vault（不貼給 agent），名字寫回聯絡人的缺口關閉（待 03:00 部署＋操作者貼 token）
+
+**根因**：vault 只有 AgentBot token（`cs:chatwoot:<org>:api_token`）；Chatwoot `access_token_auth_helper.rb` `BOT_ACCESSIBLE_ENDPOINTS` 不含 messages#index／contacts → `captureName` 讀不到也改不了聯絡人（續34）。沒有任何畫面能寫這個鍵（`credentials/secret/route.ts:54` 綁 credentialId）。
+**設計（偏離交辦一處）**：User token 存**另一把鍵** `cs:chatwoot:<org>:user_token`，不覆蓋 `api_token`。理由：送給客人的回覆、私人草稿、轉真人仍用 bot 身分，發送者不變；User token 只用在讀訊息／讀改聯絡人（`lib/cs/chatwoot-client.ts` `loadReadToken`：user_token 優先，沒有就退回 bot token，既有 401 處理不變）。
+**做了**：
+- `chatwoot-client.ts`：`chatwootUserTokenRef`、`loadReadToken`（`listMessages`／`getContactName`／`updateContactName` 改用）、`checkUserToken`（探 `GET /accounts/<id>/contacts?page=1`＝要用的那個能力；401＝bot／無效／非成員，403/404＝此帳號拒絕）。
+- 新 route `app/api/ops/clients/[slug]/cs-config/chatwoot-token/route.ts`：GET 只回 `configured`；PUT 先 `checkUserToken` 通過才 `putSecret`，回應／審計不含值（`cs_chatwoot_user_token_set`／`_cleared`）；owner/admin（`canWriteTenantConfig`）＋`assertOrgAccess`；DELETE 清除。
+- `ClientHubTabs.tsx` `CsChatwootTokenCard`：密碼框＋「已設定／未設定」＋清除鈕，theme token 樣式，無 `<select>`。
+**Codex**（`reports/oracle/2026-10-16-partialreview-5a0db9a9.md`，3 項）：F1 收——原本驗 `/api/v1/profile`，帳號 API 關閉時仍 200（代理指標）→ 改探 contacts 本身；F2 不收——`recordOpsAudit` 依 `lib/ops-audit.ts` 設計為 best-effort，全站同一契約；F3 不收——dev 模擬角色 403 與同分頁 kill-switch／知識門檻同一路徑（`roleHeader("admin")`＋`canWriteTenantConfig`），非本改動引入。
+**Codex 第二輪**（`reports/oracle/2026-10-16-partialreview-7624c3b8.md`，1 項）：「成員可能無法列聯絡人 → 誤拒」不收——部署映像 `app/policies/contact_policy.rb` `index?`／`update?` 皆 `true`（任何帳號成員）；403/404 只在帳號拒絕 API 時出現，正是第一輪 F1 要擋的情況。同段 code 兩輪方向相反，不做第三次修改。
+**操作者動作**：03:00 自動部署後，客戶頁 → 客服分頁 →「Chatwoot 個人 token」貼 Chatwoot 右上頭像 → 個人資料設定 → 存取權杖 → 顯示「已設定」。之後客人回答名字即寫回聯絡人。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run app/api/ops/clients/[slug]/cs-config app/api/webhooks/chatwoot lib/cs（11 files／153 pass；新 3 個：存成功不回值不入審計、viewer 403 不碰 Chatwoot/vault、bot token 401 → 422 不存） | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機上 secret_get(api_token) 存 shell 變數（不印）→ curl chatwoot.aware-wave.com /api/v1/accounts/2/contacts?page=1 → 401、/profile → 401（bot token 確實被探針拒絕） | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=丟棄式 worktree 突變：拔 `canWriteTenantConfig` 閘 → 「refuses a role below owner/admin」紅；拔 `check !== "ok"` → 「refuses an AgentBot token」紅；還原 3/3 綠 | exit=0 | ms=20000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/4m/0n（兩輪：3＋1；收 1、不收 3，理由見上）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD，避開共享 index 的他人 staged 內容）；F1 已修，F2/F3 理由見上
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=chatwootUserTokenRef|checkUserToken|loadReadToken|:user_token|cs_chatwoot_user_token | hits=21
+  - 全在本次新增／改動的 4 檔＋本條；`webhooks/chatwoot/route.ts:269` warn 字串「needs a User access token」仍正確（沒存 user_token 時退回 bot token 照樣 401）。
+
+**剩餘風險**：User token 綁操作者個人帳號；該帳號離開 Soulful 帳號或重設 token 時寫回失效（退回 bot token → 照舊只 warn）→ 重新貼即可。
+**rollback**：`git revert`；vault 清除＝客服分頁「清除」或 `secret_delete('cs:chatwoot:<org>:user_token')`。
 ## 2026-10-16（續4）社群成員管理驗收：Codex 第二輪無發現；正式庫交易內驗收全過（0103 由續3 套、38102e22f 由續3 部署）
 
 **做了**（操作者「可以開始做了」續做 2026-10-15 續38）：
