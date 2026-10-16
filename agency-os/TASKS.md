@@ -1446,6 +1446,7 @@
   - **前置條件（db-expert 2026-10-15 M1）**：portal 註冊開放（`PORTAL_SIGNUP_ENABLED`）之前，註冊要真的驗證 email（現在 `email_confirm:true` 不驗）——否則有人搶註別人的 email、被加成員就拿到該品牌；或成員改成邀請制。見 `app/portal/api/signup/route.ts` KNOWN V1 GAP。
   - **後續（db-expert m1）**：既有 migration 裡 `SECURITY DEFINER` 函式的 `search_path = public, pg_temp` 改成 `''`（superuser 擁有、public 可被 postgres 建函式，2026-10-15 查 `postgres` 對 public 有 CREATE）；0103 已改。建議模型：Opus 5.5
   - `▶️ 收尾中` · `2026-10-15`
+- [ ] **排程頁收尾＋社群成員修正上線（schedules-page-closeout）**：排程頁已上線 prod `38102e22f`（費用、伺服器詳細、修改紀錄修正 `7b5381d80`）；社群「成員」結果改在區塊內顯示 `888de6aad` 已推未部署。卡點：今晚 03:00 自動部署的測試閘會被 `lib/system-modes/__tests__/production-change-coverage.test.ts` 擋——`app/api/ops/clients/[slug]/cs-config/chatwoot-token/route.ts`（CS session `2abb9acd5`）沒呼叫 `checkProductionChangeAllowed`。**下一步**：① 操作者在 https://app.aware-wave.com/ops/schedules 改一格後跑 `ssh -p 58122 ubuntu@145.239.195.47 "sudo docker exec supabase-db psql -U supabase_admin -d postgres -tA -c \"select event_type, created_at from ops_audit_events where event_type='client_schedule_updated' order by created_at desc limit 3\""`，有列＝修改紀錄修正生效 ② 把 `agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md` §0 與本檔「app.aware-wave.com 排程頁」條目改完成、移到已完成歷程（共享檔走 `scripts/git-partial-worktree-commit.py stage`）③ 確認 CS session 修好 chatwoot-token 的 gate 測試後，部署帶上 `888de6aad`，操作者在 social 設定→成員用 awarewaveai@gmail.com 加入再移除驗收 ④ 開帳號功能在 session local_108dbe7d 進行中，不重做。證據：WORKLOG 2026-10-16 續3、續6。建議模型：Opus 5.5
 
 ### 2026-09-20 — Claude+Codex 共用資產稽核（結案）
 
@@ -2000,5 +2001,5 @@
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `tenants/NEW_TENANT_ONBOARDING_SOP.md`
 
-_Last synced: 2026-10-15 04:09:33 UTC_
+_Last synced: 2026-10-16 00:15:40 UTC_
 
