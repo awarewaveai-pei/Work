@@ -1,0 +1,190 @@
+<title>客戶怎麼來 監工台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 版面：左邊一張圖固定不動（門 → 軸 → 方式 → 步驟），右邊是細節；手機上下疊。顏色只載意義：狀態、風險、三條軸各一色。 */
+:root{
+  --bg:#f3f5f8; --paper:#ffffff; --ink:#1a2330; --muted:#5b6778; --line:#d9dee6; --accent:#2f4fa8;
+  --todo:#8b95a5; --doing:#c2410c; --done:#1f7a3a; --high:#b42318; --med:#9a6700; --low:#1f7a3a;
+  --deployment:#2f4fa8; --money:#8a6d00; --actor:#7b3fa0;
+  --display:"Noto Serif TC","Songti TC",serif; --body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; --mono:"IBM Plex Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#111622;--paper:#1a2130;--ink:#e6eaf2;--muted:#9aa6b8;--line:#2b3446;--accent:#8fa6ea;--todo:#7b8597;--doing:#f59e5b;--done:#5fc77e;--high:#f0776b;--med:#e4b84a;--low:#5fc77e;--deployment:#8fa6ea;--money:#e4b84a;--actor:#c58fe6;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#111622;--paper:#1a2130;--ink:#e6eaf2;--muted:#9aa6b8;--line:#2b3446;--accent:#8fa6ea;--todo:#7b8597;--doing:#f59e5b;--done:#5fc77e;--high:#f0776b;--med:#e4b84a;--low:#5fc77e;--deployment:#8fa6ea;--money:#e4b84a;--actor:#c58fe6;color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.55;font-size:15px}
+.wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1{font-family:var(--display);font-size:26px;margin:0 0 4px;text-wrap:balance}
+.sub{color:var(--muted);margin:0 0 18px;font-size:13px}
+.cols{display:grid;grid-template-columns:320px minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:880px){.cols{grid-template-columns:1fr}}
+.map{position:sticky;top:env(safe-area-inset-top,0px);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+@media (max-width:880px){.map{position:static}}
+.map h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.map .row{margin-bottom:12px}
+.map .arrow{color:var(--muted);text-align:center;font-size:12px;margin:-4px 0 6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:13px;color:var(--muted)}
+.chip.live{border-color:var(--done);color:var(--done)}
+.chip.ax{color:var(--ink)}.chip.deployment{border-color:var(--deployment)}.chip.money{border-color:var(--money)}.chip.actor{border-color:var(--actor)}
+.ms{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:start;padding:5px 6px;border-radius:6px;text-decoration:none;color:var(--ink);font-size:13px}
+.ms:hover,.ms:focus-visible{background:var(--bg);outline:none}
+.ms b{display:inline-block;width:20px;height:20px;border-radius:50%;text-align:center;line-height:20px;font-size:12px;color:#fff;background:var(--todo)}
+.ms.doing b{background:var(--doing)}.ms.done b{background:var(--done)}
+.ms span{min-width:0}
+.prog{font-size:13px;color:var(--muted);margin-top:6px}
+.prog b{color:var(--ink)}
+main{min-width:0}
+section{margin-bottom:28px}
+section>h2{font-family:var(--display);font-size:19px;margin:0 0 4px}
+section>.lead{color:var(--muted);margin:0 0 12px;font-size:14px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-top:1px solid var(--line)}
+thead th{border-top:0;color:var(--muted);font-weight:500;font-size:12px;letter-spacing:.04em}
+tbody th{font-weight:700;white-space:nowrap}
+tbody th small{display:block;font-weight:400;color:var(--muted);font-size:12px;white-space:normal}
+code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border-radius:4px;padding:1px 5px}
+code.deployment{color:var(--deployment)}code.money{color:var(--money)}code.actor{color:var(--actor)}
+.st{font-weight:700;white-space:nowrap}.st.yes{color:var(--done)}.st.no{color:var(--todo)}
+.axes{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.axis{background:var(--paper);border:1px solid var(--line);border-left-width:4px;border-radius:10px;padding:10px 12px;min-width:0}
+.axis.deployment{border-left-color:var(--deployment)}.axis.money{border-left-color:var(--money)}.axis.actor{border-left-color:var(--actor)}
+.axis h4{margin:0 0 6px;font-size:15px}.axis h4 small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.axis ul{margin:0;padding-left:0;list-style:none}.axis li{padding:3px 0;font-size:14px}
+.steps{display:grid;gap:12px}
+.step{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0;border-left:4px solid var(--todo)}
+.step.doing{border-left-color:var(--doing)}.step.done{border-left-color:var(--done)}
+.step header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:6px}
+.step .n{width:26px;height:26px;border-radius:50%;background:var(--todo);color:#fff;text-align:center;line-height:26px;font-weight:700;font-size:13px}
+.step.doing .n{background:var(--doing)}.step.done .n{background:var(--done)}
+.step h3{margin:0;font-size:16px;flex:1 1 240px;min-width:0}
+.pill{border-radius:999px;padding:1px 9px;font-size:12px;border:1px solid currentColor}
+.st-todo{color:var(--todo)}.st-doing{color:var(--doing)}.st-done{color:var(--done)}
+.risk-high{color:var(--high)}.risk-med{color:var(--med)}.risk-low{color:var(--low)}
+.step p{margin:0 0 8px;font-size:14px}
+.step dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0;font-size:13px}
+.step dt{color:var(--muted)}.step dd{margin:0;min-width:0}
+.step a{color:var(--accent)}
+ol.open,ul.side{margin:0;padding-left:20px}
+ol.open li,ul.side li{margin-bottom:8px}
+ol.open small,ul.side small{display:block;color:var(--muted);font-size:12px}
+ol.open a{color:var(--accent)}
+footer{color:var(--muted);font-size:12px;margin-top:24px}
+footer code{font-size:11.5px}
+:target{scroll-margin-top:12px;box-shadow:0 0 0 2px var(--accent)}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+<div class="wrap">
+<h1>客戶怎麼來 監工台</h1>
+<p class="sub">客戶從哪扇門進來、錢從哪裡來、誰在操作；程式該照什麼順序建。更新 2026-10-16。事實正本：ADR 017、ADR 018；這頁只放狀態與指向。</p>
+<div class="cols">
+<aside class="map">
+  <h2>一張圖</h2>
+  <div class="row"><div class="chips" data-computed><span class="chip">公開門</span><span class="chip">產品門</span><span class="chip">員工門</span></div></div>
+  <div class="arrow">↓ 進來之後，程式只存三條軸</div>
+  <div class="row"><div class="chips"><span class="chip ax deployment">A 部署</span><span class="chip ax money">B 錢從哪來</span><span class="chip ax actor">C 誰在按</span></div></div>
+  <div class="arrow">↓ 對外講的方式是組合（綠框＝現在在跑）</div>
+  <div class="row"><div class="chips" data-computed><span class="chip live">自用</span><span class="chip live">代操</span><span class="chip ">訂閱</span><span class="chip ">點數</span><span class="chip ">賣人＝買斷</span></div></div>
+  <div class="arrow">↓ 要把它變成程式的順序</div>
+  <div class="row"><a class="ms todo" href="#s1"><b>1</b><span>登記表加 features[] 與 accessChannels；機械閘</span></a><a class="ms todo" href="#s2"><b>2</b><span>Migration：plans、organization_entitlements、organizations.kind；許可帶 actor</span></a><a class="ms todo" href="#s3"><b>3</b><span>Woo 付款通知 → 合約與權利；帳本泛化</span></a><a class="ms todo" href="#s4"><b>4</b><span>每個收費點只問 can(主體, feature_key, actor)</span></a><a class="ms todo" href="#s5"><b>5</b><span>買斷安裝階段</span></a><a class="ms todo" href="#s6"><b>6</b><span>API 通道</span></a><a class="ms todo" href="#s7"><b>7</b><span>轉售</span></a></div>
+  <p class="prog" data-computed>7 個步驟：<b>0</b> 完成、<b>0</b> 進行中、<b>7</b> 未開始</p>
+</aside>
+<main>
+<section id="now"><h2>現在真的在跑的</h2><p class="lead">今天查的實況，不是計畫。</p>
+<div class="tbl"><table><thead><tr><th></th><th>什麼</th><th>證據</th></tr></thead><tbody><tr><td class="st no">沒有</td><th>客戶能自己登入</th><td>今天才開：員工替客戶開帳號 → 設定密碼信；prod 缺 RESEND_API_KEY，portal 公開註冊關著（WORKLOG 2026-10-16 續8、續10）</td></tr><tr><td class="st no">沒有</td><th>有人付錢</th><td>0062 合約 0 筆、錢包帳本 0 筆、Woo 未賣點數包（ADR 015:13、ADR 017 脈絡）</td></tr><tr><td class="st no">沒有</td><th>買斷</th><td>授權檔、安裝程式、模組清單未建（順序 5）</td></tr><tr><td class="st no">沒有</td><th>許可判斷</th><td>lib/entitlements 不存在；認知平台 check_entitlement 永遠 grant（check.py:25）</td></tr></tbody></table></div></section>
+
+<section id="steps"><h2>順序</h2><p class="lead">ADR 017「順序」。每步完成＝它的閘紅得起來；High 的步驟要操作者 go。</p>
+<div class="steps"><article class="step todo" id="s1">
+    <header><span class="n">1</span><h3>登記表加 features[] 與 accessChannels；機械閘</h3><span class="pill st-todo">未開始</span><span class="pill risk-low">Low</span></header>
+    <p>products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。</p>
+    <dl>
+      <dt>檔案</dt><dd><code>next-admin lib/portal/products.ts</code> <code>lib/portal/__tests__/products.test.ts</code></dd>
+      <dt>閘（紅燈條件）</dt><dd>products.test.ts：漏填紅燈；可買斷模組含 SAFETY_GATE 紅燈</dd>
+      <dt>先決</dt><dd>無</dd>
+      <dt>建議模型</dt><dd>Opus 5.5</dd>
+      
+    </dl></article><article class="step todo" id="s2">
+    <header><span class="n">2</span><h3>Migration：plans、organization_entitlements、organizations.kind；許可帶 actor</h3><span class="pill st-todo">未開始</span><span class="pill risk-med">Medium</span></header>
+    <p>三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。</p>
+    <dl>
+      <dt>檔案</dt><dd><code>lobster-factory/packages/db/migrations/</code> <code>next-admin lib/entitlements/</code></dd>
+      <dt>閘（紅燈條件）</dt><dd>靜態檢查：三表只准 lib/entitlements/** 與 app/portal/** 引用，別處出現建置失敗</dd>
+      <dt>先決</dt><dd><a href="#s1">步驟 1</a></dd>
+      <dt>建議模型</dt><dd>Opus 5.5（先出計畫）</dd>
+      
+    </dl></article><article class="step todo" id="s3">
+    <header><span class="n">3</span><h3>Woo 付款通知 → 合約與權利；帳本泛化</h3><span class="pill st-todo">未開始</span><span class="pill risk-high">High（金流）</span></header>
+    <p>付款通知帶 Woo 商品 id → plans.woo_product_ids 查方案 → 合約列 → 重算權利列；media_ 帳本去前綴加 product_key（ADR 015 §4）。</p>
+    <dl>
+      <dt>檔案</dt><dd><code>wp-bridge 外掛</code> <code>next-admin app/portal/</code></dd>
+      <dt>閘（紅燈條件）</dt><dd>測試：一筆付款通知只產生一組合約與權利列（冪等）</dd>
+      <dt>先決</dt><dd><a href="#s2">步驟 2</a>；定期扣款外掛與台灣金流查定（待決 1）；點數條款與預收會計（待決 3）</dd>
+      <dt>建議模型</dt><dd>Opus 5.5</dd>
+      
+    </dl></article><article class="step todo" id="s4">
+    <header><span class="n">4</span><h3>每個收費點只問 can(主體, feature_key, actor)</h3><span class="pill st-todo">未開始</span><span class="pill risk-med">Medium</span></header>
+    <p>社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。</p>
+    <dl>
+      <dt>檔案</dt><dd><code>next-admin lib/entitlements/can.ts</code> <code>ai_lego/platform/entitlement/check.py</code> <code>ai_lego/apps/api/main.py</code></dd>
+      <dt>閘（紅燈條件）</dt><dd>測試：代操時點數扣 on_behalf_of、稽核記 actor；沒有 active 權利列不簽許可</dd>
+      <dt>先決</dt><dd><a href="#s2">步驟 2</a></dd>
+      <dt>建議模型</dt><dd>Opus 5.5</dd>
+      
+    </dl></article><article class="step todo" id="s5">
+    <header><span class="n">5</span><h3>買斷安裝階段</h3><span class="pill st-todo">未開始</span><span class="pill risk-high">High（交付）</span></header>
+    <p>模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、客戶主機商 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。</p>
+    <dl>
+      <dt>檔案</dt><dd><code>lobster-factory/packages/workflows/src/provision/</code> <code>APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md</code></dd>
+      <dt>閘（紅燈條件）</dt><dd>授權檔離線驗章；我們的伺服器停了安裝照常能用</dd>
+      <dt>先決</dt><dd><a href="#s4">步驟 4</a>；Postiz AGPL 交付請律師確認（待決 2）</dd>
+      <dt>建議模型</dt><dd>Fable 5.1 設計 → Opus 5.5 做</dd>
+      
+    </dl></article><article class="step todo" id="s6">
+    <header><span class="n">6</span><h3>API 通道</h3><span class="pill st-todo">未開始</span><span class="pill risk-med">Medium</span></header>
+    <p>計費帳戶發 API key（scope = feature_key 子集），actor = api_key:&lt;id&gt;，用量走同一個 report()；登記表 accessChannels 加 api。</p>
+    <dl>
+      <dt>檔案</dt><dd><code>next-admin lib/entitlements/</code></dd>
+      <dt>閘（紅燈條件）</dt><dd>測試：key 的 scope 外功能被拒</dd>
+      <dt>先決</dt><dd><a href="#s4">步驟 4</a>；等第一個只串 API 的客戶</dd>
+      <dt>建議模型</dt><dd>Opus 5.5</dd>
+      
+    </dl></article><article class="step todo" id="s7">
+    <header><span class="n">7</span><h3>轉售</h3><span class="pill st-todo">未開始</span><span class="pill risk-med">Medium</span></header>
+    <p>授權檔 max_tenants &gt; 1，安裝內租戶數受它限制；合約與價格另訂。</p>
+    <dl>
+      <dt>檔案</dt><dd><code>授權檔格式</code></dd>
+      <dt>閘（紅燈條件）</dt><dd>測試：超過 max_tenants 的租戶建立被拒</dd>
+      <dt>先決</dt><dd><a href="#s5">步驟 5</a>；等第一個轉售客戶</dd>
+      <dt>建議模型</dt><dd>Opus 5.5</dd>
+      
+    </dl></article></div></section>
+
+<section id="open"><h2>操作者要先決定的</h2><p class="lead">agent 不能替你定；定了再開對應步驟。</p><ol class="open"><li><b>待決 1</b> 訂閱每月扣款：WooCommerce 用哪個定期扣款外掛？台灣金流能不能定期扣款？<small>要在<a href="#s3">步驟 3</a>之前定；ADR 017 產品決定 Q3</small></li><li><b>待決 2</b> Postiz 是 AGPL-3.0：買斷交付前請律師確認<small>要在<a href="#s5">步驟 5</a>之前定；ADR 017 §5</small></li><li><b>待決 3</b> 點數不退、不轉讓的條款寫法（台灣數位內容解除權例外）；賣點數的錢用掉前算預收，問會計師<small>要在<a href="#s3">步驟 3</a>之前定；ADR 015 §4</small></li></ol></section>
+
+<section id="ways"><h2>對外五種方式 ＝ 三軸的組合</h2><p class="lead">加方式＝加一列，不改程式；產品程式只問 <code>can(主體, feature_key, actor)</code>。</p>
+<div class="tbl"><table><thead><tr><th>方式</th><th>A 部署</th><th>B 錢從哪來</th><th>C 誰在按</th><th>備註</th><th>現況</th></tr></thead><tbody><tr><th>自用<small>我們自己用</small></th>
+    <td><code class="deployment">hosted</code></td><td><code class="money">comp</code></td><td><code class="actor">staff</code></td>
+    <td>計費帳戶 organizations.kind = internal（Account#0）</td><td class="st yes">在跑</td></tr><tr><th>代操<small>我們替客戶操作</small></th>
+    <td><code class="deployment">hosted</code></td><td><code class="money">contract</code></td><td><code class="actor">staff</code></td>
+    <td>也可 credits；客戶買維運時 self_hosted；on_behalf_of = 客戶</td><td class="st yes">在跑</td></tr><tr><th>訂閱<small>客戶自己用，按期付</small></th>
+    <td><code class="deployment">hosted</code></td><td><code class="money">contract</code></td><td><code class="actor">customer</code></td>
+    <td>14 天 trial 起</td><td class="st no">還沒</td></tr><tr><th>點數<small>客戶自己用，按次扣</small></th>
+    <td><code class="deployment">hosted</code></td><td><code class="money">credits</code></td><td><code class="actor">customer</code></td>
+    <td>共用錢包（ADR 015）</td><td class="st no">還沒</td></tr><tr><th>賣人＝買斷<small>裝在客戶主機</small></th>
+    <td><code class="deployment">self_hosted</code></td><td><code class="money">perpetual</code></td><td><code class="actor">customer</code></td>
+    <td>＋updates_until；客人已有網站就接進來（§6）；買維運時 staff</td><td class="st no">還沒</td></tr></tbody></table></div></section>
+
+<section id="axes"><h2>三條軸</h2><p class="lead">各在自己的地方；值存文字，加值不改 schema。</p><div class="axes"><div class="axis deployment"><h4>A 部署<small>每個安裝</small></h4><ul><li><code>hosted</code> 我們主機，控制面簽許可</li><li><code>self_hosted</code> 客戶主機，離線授權檔</li></ul></div><div class="axis money"><h4>B 錢從哪來<small>計費帳戶 × 產品 × 功能</small></h4><ul><li><code>contract</code> 0062 合約：trial → active 訂閱</li><li><code>comp</code> 贈送、自用</li><li><code>credits</code> 錢包按次扣，不是權利列</li><li><code>perpetual</code> 買斷授權檔</li></ul></div><div class="axis actor"><h4>C 誰在按<small>每次請求</small></h4><ul><li><code>staff</code> 員工，帶 on_behalf_of = 替哪個計費帳戶</li><li><code>customer</code> 客戶自己</li><li><code>api_key</code> 機器；等第一個只串 API 的客戶（順序 6）</li></ul></div></div></section>
+
+<section id="doors"><h2>三扇門</h2><p class="lead">ADR 018 §1。網址由設定組出來，程式不寫死。</p>
+<div class="tbl"><table><thead><tr><th>門</th><th>網址</th><th>給誰</th><th>做什麼</th><th>登入</th></tr></thead><tbody><tr><th>公開門</th><td><code>aware-wave.com（WordPress）</code></td><td>所有人</td><td>介紹、訂閱、付款、會員帳號（WooCommerce）</td><td>WordPress 會員</td></tr><tr><th>產品門</th><td><code>&lt;產品&gt;.aware-wave.com，每個產品一個</code></td><td>付費客戶；員工也可用</td><td>只有這個產品的頁面和 API，只看自己是成員的品牌</td><td>local／awarewave-wp／customer-wp</td></tr><tr><th>員工門</th><td><code>app.aware-wave.com</code></td><td>操作者和團隊</td><td>管客戶、管網站、管所有品牌，也能用每個產品</td><td>現有後台帳號</td></tr></tbody></table></div></section>
+
+<section id="side"><h2>一起改、不是順序步驟</h2><ul class="side"><li>System Foundry 問卷對齊三軸：補「代操」CAP、self_hosted 獨立題、API 通道；藍圖必寫「許可只問 can()」<small>順序 1 啟動時；TASKS.md:133</small></li><li>app.aware-wave.com /ops/products 頁：從 products.ts 與 customer-model.ts 渲染三扇門、三軸、五種<small>卡片 task_86d6f772；本 session</small></li></ul></section>
+
+<section id="log"><h2>紀錄</h2><p class="lead">今天誰改了什麼，含猜錯的那次。</p>
+<div class="tbl"><table><thead><tr><th>commit</th><th>做了什麼</th><th>結果</th></tr></thead><tbody><tr><td><code>ca619c079</code></td><td>猜了四種（訂閱／點數／贈送／買斷）寫進 AGENTS.md</td><td>錯，撤回</td></tr><tr><td><code>c152ee003</code></td><td>撤回上面那行</td><td></td></tr><tr><td><code>1d6aefb34</code></td><td>操作者定案五種：自用／代操／訂閱／點數／賣人＝買斷；AGENTS.md §0 一行、ADR 017 §0 表</td><td>被 2c90ee8b4 重寫</td></tr><tr><td><code>2c90ee8b4</code></td><td>ADR 017 §0 改三軸＋五種對應＋業界對照；§3 許可加 actor／on_behalf_of；§5 授權檔 max_tenants；順序 6、7；不採用「五種存 enum」；WORKLOG 續13</td><td>現行</td></tr><tr><td><code>9def149a6</code></td><td>順序 4：認知平台 check_entitlement 改 can() 薄接頭，呼叫端 main.py 9 處；HCI 照 ADR-0031 閘、ADR-0009 主體</td><td>現行</td></tr></tbody></table></div></section>
+
+<footer>正本：<code>agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md</code>　<code>agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md</code>　追蹤：<code>agency-os/TASKS.md:133</code>　本頁由 <code>agency-os/handoffs/2026-10-16-customer-model-supervisor/build.mjs</code> 從 <code>data.mjs</code> 產生，<code>check.mjs</code> 驗規則。</footer>
+</main>
+</div>
+</div>

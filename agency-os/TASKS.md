@@ -132,6 +132,7 @@
 
 - [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–5 開卡做**
   - `🟠 未開始` · `2026-10-14` · WORKLOG 續15、續17；第 3 步前查定期扣款外掛；`ADR_INDEX.md` 那列已改「已接受」（2026-10-15）
+  - **監工台**（plan 唯一狀態頁，操作者 2026-10-16「要有監工頁面」）：https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr ← `agency-os/handoffs/2026-10-16-customer-model-supervisor/`（`data.mjs` 改狀態 → `node build.mjs` → `node check.mjs` → 重發同 URL）。每步 done 時改 `STEPS[n].status`＋`commit`。
   - 2026-10-16 §0 改三軸（部署／商業／操作），順序加 6 API 通道、7 轉售；第 1 步啟動時一併改 System Foundry 問卷三缺口（代操 CAP、`self_hosted` 獨立題、API 通道；藍圖必寫「許可只問 `can()`」），WORKLOG 2026-10-16「三條軸」條目
 
 - [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**

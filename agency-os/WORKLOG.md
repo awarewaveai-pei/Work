@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-16（續14）「客戶怎麼來」監工台：一頁看三扇門→三軸→五種方式→順序 1–7 狀態；資料一處、頁面生成、閘驗規則（操作者「plan 到處散，要有監工頁面」）
+
+**根因**：plan 散在 ADR 017 順序、ADR 018、TASKS:133、AGENTS §0、WORKLOG 續13 五處，沒有一頁寫「現在到哪、下一步誰做、哪些要操作者先定」。照認知主權平台監工台的既有模式（`agency-os/handoffs/2026-10-02-cognitive-sovereignty-platform/platform-supervisor.html`＋`check-supervisor.mjs`）再做一張，不另發明。
+
+**[已修改]**（新資料夾 `agency-os/handoffs/2026-10-16-customer-model-supervisor/`）
+- `data.mjs`：唯一資料來源——DOORS（3）、AXES（3 軸、值存 text）、WAYS（5，含 live 旗標）、NOW（今天實況 4 列）、STEPS（順序 1–7：做什麼／檔案／閘／風險／建議模型／先決／status／commit）、OPEN（操作者要先定的 3 條，各指向要在哪一步之前）、SIDE（SF 問卷、/ops/products 卡）、LOG（今天 5 個 commit 含猜錯那次）。
+- `build.mjs`：從 data 產生 `supervisor.html`；左欄固定一張圖（門→軸→方式→步驟進度，數字全算出來、帶 `data-computed`），右欄細節；雙主題、手機單欄；顏色只載意義（狀態／風險／三軸各一色）。
+- `check.mjs`：閘——方式的值在軸的值域內、步驟編號連續且 depends 往前、done 必有 commit、待決條目必被對應步驟的 `before` 提到、html 必須是 build 的最新產物、頁面數字不得手打。第一次跑就抓到待決 3（點數條款）沒掛在步驟 3 → 補上。
+- 發布：https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr（私人）。`agency-os/TASKS.md:133` 條目加監工台指向與更新步驟。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node build.mjs && node check.mjs` | exit=0 | ms=400 → `ok: 5 ways, 7 steps, 3 open, page fresh`（之前一次 exit=1：`open 3: step 3.before 沒提到「待決 3」`，修後綠）
+- REALTEST_EVIDENCE: tool=Bash | cmd=內建瀏覽器開本機 supervisor.html 截圖一次（740px 寬 → 單欄，一張圖在最上面；artifact URL 在瀏覽器窗未登入看不到） | exit=0 | ms=5000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n -- 閘抓到的待決 3 漏掛即 1m，已修；讀回頁面各段與 ADR 017 §0／順序 1–7 一致
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`customer-model-supervisor|Htm4xqe362YM987Fo8YLCr` | hits=TASKS.md、data.mjs、本條目（新名字，無舊引用）
+- ORACLE_WAIVED: 無 source 檔改動（handoff 工具腳本與 html）
+
+**剩餘風險**：頁面狀態靠人改 `data.mjs`；每步 done 時若忘了改，監工台會落後 git。補救：TASKS:133 寫了更新步驟；順序每步的 WORKLOG 條目要附監工台重發。
+
+**rollback**：`git revert <本 commit>`；artifact 留著不影響任何系統。
 ## 2026-10-16（續13）客戶怎麼來＝三條軸（部署／商業／操作），對外五種方式是組合：ADR 017 §0 重寫、許可加 actor＋on_behalf_of、授權檔加 max_tenants、順序加 API 通道與轉售；AGENTS.md §0 一行
 
 **觸發**：操作者問「客戶來自哪三道門、四種方式」。查遍今日 session／commit／WORKLOG／TASKS／daily／handoffs 都沒這句；repo 只有訂閱／點數／買斷（SOP §18:126、ADR 017 §1）。操作者定案五種：自用／代操／訂閱／點數／賣人＝買斷；再要求「完善的整性，不是畫蛇添足」。中途一次猜錯（`ca619c079` 四種，`c152ee003` 撤回）。
