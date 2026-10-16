@@ -121,7 +121,7 @@ export default function SocialManager({ slots = {} }: { slots?: Slots }) {
   useEffect(() => {
     if (!brand || selection.kind !== "post") { setSelectedPost(null); return; }
     let live = true;
-    api.get(brand.id, selection.id).then((r) => { if (live) setSelectedPost(r.post); }).catch((e) => say(e instanceof Error ? e.message : String(e), true));
+    api.get(brand.id, selection.id).then((r) => { if (live) setSelectedPost(r.post); }).catch((e) => { if (live) say(e instanceof Error ? e.message : String(e), true); });
     return () => { live = false; };
   }, [brand, selection, say]);
 
@@ -133,7 +133,11 @@ export default function SocialManager({ slots = {} }: { slots?: Slots }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   ), [posts, trash, showTrash, view, stFilter, pfFilter, query, accounts]);
 
-  const canAttach = selection.kind === "new" || (selection.kind === "post" && !!selectedPost && ["draft", "review", "scheduled", "error", "rotation"].includes(selectedPost.state));
+  // The loaded post counts only while it IS the selected one: the editor remounts on `${id}:${version}`, so a post
+  // still loaded from the previous selection, under the new id at an equal version, would show (and save) the previous
+  // post's text into this one (2026-10-16, GAP_REPORT B1). A same-id reload keeps the editor on screen until it arrives.
+  const editorPost = selection.kind === "post" && selectedPost?.id === selection.id ? selectedPost : null;
+  const canAttach = selection.kind === "new" || (!!editorPost && ["draft", "review", "scheduled", "error", "rotation"].includes(editorPost.state));
   const ctx: SlotContext | null = brand ? {
     brand, accounts, posts, media, today, select: setSelection, reload: async () => { await reload(); setListsKey((k) => k + 1); }, say, setView,
     canAttach, attach: (id) => setAttachRequest((r) => ({ id, n: (r?.n ?? 0) + 1 })), mediaAdded: (m) => setMedia((list) => [m, ...list]),
@@ -214,8 +218,7 @@ export default function SocialManager({ slots = {} }: { slots?: Slots }) {
     : view === "list" ? (showTrash ? "已刪除" : `${at.slice(0, 4)} 年 ${Number(at.slice(5, 7))} 月前後六週`) : VIEWS.find(([v]) => v === view)?.[1] ?? "";
   const step = (n: number) => setAnchor(view === "week" ? addDays(at, 7 * n) : monthStart(addDays(monthStart(at), n * 31)));
   const allPlatforms = [...new Set(accounts.map((a) => a.platform))];
-  const editorPost = selection.kind === "post" ? selectedPost : null;
-  const editorKey = selection.kind === "post" ? `${selection.id}:${selectedPost?.version ?? "loading"}`
+  const editorKey = selection.kind === "post" ? `${selection.id}:${editorPost?.version ?? "loading"}`
     : selection.kind === "new" || selection.kind === "article" ? `${selection.kind}:${selection.key}` : "none";
   const articleDay = selection.kind === "article" ? selection.article.date.slice(0, 10) : null;
   const right = slots.rightPanel?.(selection, ctx);
@@ -278,7 +281,7 @@ export default function SocialManager({ slots = {} }: { slots?: Slots }) {
           <h2><span>{selection.kind === "post" ? "編輯貼文" : selection.kind === "list" ? "輪播清單" : selection.kind === "article" ? "文章 → 社群貼文" : notice ? `你的角色：${ROLE_NAMES[brand.role]}` : "新貼文"}</span>
             <span className="sm-right">{canWrite && <button type="button" onClick={() => setSelection({ kind: "new", key: Date.now() })}>＋ 新貼文</button>}</span>
           </h2>
-          {right ?? (notice ? <p className="sm-side">{notice}</p> : selection.kind === "post" && !selectedPost
+          {right ?? (notice ? <p className="sm-side">{notice}</p> : selection.kind === "post" && !editorPost
             ? <div className="sm-side sm-muted">載入中…</div>
             : (selection.kind === "post" || selection.kind === "new" || selection.kind === "article") && (
               <Editor key={editorKey} brand={brand} accounts={accounts} media={media} post={editorPost} today={today} lists={lists}

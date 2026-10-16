@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-16（續21）社群發文對照 Postiz v2.25／Metricool 盤點：13 項 UI 缺陷、19 項功能缺口、建版＝樣稿 1:1、手機版壞；順手修 B1 換貼文留舊文字
+
+**操作者**：「社群發文可以發文了，但是功能不齊全，UI/UX 非常醜，去 postiz 和 metricool 看自己的缺失和遺漏」。
+**做法**：整檔讀 `app/(shell)/tools/social/*`、`lib/social/compose.ts`／`limits.ts`、0096；寫 `tests/e2e/social/render-views.mjs`（無 Supabase dev server＋假資料，12 張 1280×660／390 render 到 `$TEMP`，`--mock` 截樣稿）真的看每個檢視；web-researcher 一輪讀 Postiz 原始碼路徑＋Metricool help（UNVERIFIED 項剔除）。
+**結論**（正本 `lobster-factory/docs/social/SOCIAL_MANAGER_GAP_REPORT.md`）：
+- C1 建版與樣稿第 13 版 1:1 → 「醜」是設計本身：全 chip、篩選列 90px、週格卡 40px 無縮圖、通用預覽 190px 空頭像、原生 date/time、右欄永遠是編輯器、空狀態一句話（U1–U13）。
+- C2 功能缺口：影片（`accept="image/*"`）、多圖輪播、平台設定（`compose.ts` 只有 IG/FB story）、串文、mention/emoji、shortLink 寫死 false、跨品牌複製、裁切、AI 鈕、頭像欄（F1–F19）。審核／輪播／紀錄／成員比 Postiz 完整，不動。
+- C3 手機 390px：週格 7 欄各 28px、側欄佔 2/3、頁高 2543；`social.css:128` 只有 1100px 斷點。
+- 下一批 C13–C18 寫在 GAP_REPORT §4，C13 樣稿 v14 先過操作者再動程式；PLAN.md、TASKS.md 各一段指向。
+
+**B1 bug（render 時抓到，已修）**：開 A 再開 B、版本號相同 → 編輯器留 A 的文字、狀態列是 B；存檔會把 A 文字寫進 B。根因 `SocialManager.tsx` 讀下一則前沒清 `selectedPost`，Editor 以 `${id}:${version}` 重掛。修：render 時只在 `selectedPost.id === selection.id` 才把載入的貼文交給 Editor（不變量在 render 層；同 id 重讀不閃）；`.catch` 尊重 `live`。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node tests/e2e/social/render-views.mjs $TEMP/social-renders2`（12 張；04-edit-review 修後顯示 B 的文字） | exit=0 | ms=25000
+- REALTEST_EVIDENCE: tool=Bash | cmd=next-admin `npx vitest run "app/(shell)/tools/social/__tests__"` 4 files／12 passed；`npx tsc --noEmit -p .` | exit=0 | ms=120000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：拿掉 `selectedPost?.id === selection.id` → `SocialManager.switch-post.render.test.tsx` 1 failed → 還原綠 | exit=1 | ms=5000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/1M/3m -- M：測試用「明天」在週日掉出週檢視（時鐘釘在 2026-10-14 週三）；m：effect 清 null 不關整類＋同 id 重讀閃現（改 render 層 id 比對）、`.catch` 不看 `live`（已改）；全修。render 腳本不碰正式資料（env 清空＋page.route 全攔）
+- ORACLE_WAIVED: 3 行 UI 修正＋突變證據；報告與腳本為 docs/test 類
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`setSelectedPost`、`GAP_REPORT`、`render-views` | hits=3（皆 SocialManager.tsx 內）／PLAN.md、TASKS.md 新增指向
+
+**rollback**：`git revert`（文件＋測試＋3 行 UI）。
 ## 2026-10-16（續20）補回 91fdfe31a 丟掉的影片改動：video-service 技術品質檢查移植回來、「沒證據不算通過」兩處、meeting-service／staging 補回
 
 **根因**：2026-09-10 合併 `91fdfe31a` 對 8 個檔取了舊的一邊（本地那邊對它們 0 改動，結果應＝`dbe28f317`）；當天補回只做 next-admin（同日 續18 補 remotion）。查證（`git diff <base> dbe28f317` 與合併後 commit）：

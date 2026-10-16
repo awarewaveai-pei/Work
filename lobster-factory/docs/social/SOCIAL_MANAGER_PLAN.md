@@ -91,6 +91,10 @@
   5. ✅ 2026-10-15 上線（DNS、憑證 11 SAN、主機 nginx、lobster-nginx、sg-deploy `4c4e153a7`；證據 WORKLOG 2026-10-15 C12 ⑤⑥ 上線條目）。未做：ContentStudio 的 Postiz 面板換連結。以下為當時的步驟：子網域（規則＝ADR 018 三扇門）。程式已完成：`lib/portal/doors.ts`、middleware 把 social 網址的頁面改寫到 `/social`（`app/social/`，不套員工側欄）、其他 API 404；登入 cookie 不跨子網域，social 網址自己登入。repo 已寫好 lobster-nginx `nginx/default.conf` social 區塊（擋 matcher 跳過的路徑與編碼路徑）與主機 `sg-stack.aware-wave.com.conf` server_name。**上線待 go**：Cloudflare DNS `social`（proxied）→ 憑證加 social（`/etc/letsencrypt/live/aware-wave.com` 2026-10-15 查：SAN 10 個網址，沒有 social；用該憑證原本的簽發方式 expand）→ 主機 nginx（`safe-infra-patch.sh host-nginx`）→ lobster-nginx（`safe-infra-patch.sh nginx`）→ `sg-deploy.sh next-admin` → `/playwright smoke`＋social 網址實測（未登入轉 /login、/api/ops 404、員工登入看得到社群）；ContentStudio 的 Postiz 面板換成「到社群發文」連結。
   6. ✅ 程式 2026-10-15：middleware 帶 `x-ops-user-id`；`authz.ts` 讀 `social_brand_members`（成員列優先，員工 owner/admin 全品牌 owner）；客戶不能開新頻道連接（時間配對只對員工安全）、看不到員工角色與 user id。2026-10-15 成員管理也完成：0103 RPC＋`/api/social/members`（只限擁有者）＋設定頁「成員」。
 
+### C13–C18（2026-10-16 盤點後的下一批；卡片內容與依賴見 [`SOCIAL_MANAGER_GAP_REPORT.md`](SOCIAL_MANAGER_GAP_REPORT.md) §4，開卡時照六項格式補進本節）
+- C13 版面規格 v2（樣稿 v14 先過操作者）／C14 媒體與影片／C15 編輯器完整化／C16 手機／C17 小修／C18 V2 預備。
+- 看畫面用 `tests/e2e/social/render-views.mjs <outDir>`（無 Supabase dev server，假資料），不猜。
+
 ## 2. V2（開放訂閱前）
 `social_audit_log` 保留期限或按月分割（每則貼文約 2 列，768 MB 主機）；WordPress 會員一鍵進入（ADR 015 §2）；方案與用量上限＋WooCommerce；Postiz analytics（審核後）；Chatwoot 入口與未讀數；最佳時段；重複貼文；find-slot 佇列；對外 API／MCP；服務條款、隱私政策、資料刪除；第二台 Postiz 的 instance 對應。
 
