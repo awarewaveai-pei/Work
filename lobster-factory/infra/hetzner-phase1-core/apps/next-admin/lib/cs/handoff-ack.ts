@@ -11,6 +11,7 @@
 // needs business verification) are created as "John Doe" -- Chatwoot v4.18
 // app/builders/messages/facebook/message_builder.rb process_contact_params_result.
 
+import { hitsCrisis } from "@/lib/cs/autonomy";
 import type { CisProfile } from "@/lib/cs/types";
 
 /** Names Chatwoot invents when it cannot read a profile. Only these are ever overwritten. */
@@ -25,18 +26,66 @@ export function isPlaceholderContactName(name: string | null | undefined): boole
  * acknowledgement sentence; csVoice.askName replaces the name question. Defaults follow the
  * page's honorific and emoji policy.
  */
-export function handoffAckText(cis: CisProfile, askName: boolean): string {
+export function handoffAckText(cis: CisProfile, askName: boolean, customerText = ""): string {
   const v = cis.csVoice ?? {};
   const you = v.honorifics === "你" ? "你" : "您";
+  if (hitsCrisis(customerText)) {
+    const english = !NON_LATIN.test(customerText);
+    const ack = english ? CRISIS_ACK_EN : crisisAckZh(you);
+    return askName ? `${ack}\n${english ? ASK_NAME_EN : askNameZh(cis)}` : ack;
+  }
   const ack = v.escalationTone?.trim() || `已收到${you}的訊息，我們會盡快回覆${you}${v.emojiPolicy === "none" ? "。" : " 🙏"}`;
   if (!askName) return ack;
-  return `${ack}\n${v.askName?.trim() || `請問怎麼稱呼${you}呢？`}`;
+  return `${ack}\n${askNameZh(cis)}`;
+}
+
+/** Exactly one of the acknowledgements that ask the name (ordinary, crisis in Chinese, crisis in English). */
+export function isNameQuestionAck(cis: CisProfile, content: string | null | undefined): boolean {
+  const you = cis.csVoice?.honorifics === "你" ? "你" : "您";
+  return [handoffAckText(cis, true), `${crisisAckZh(you)}\n${askNameZh(cis)}`, `${CRISIS_ACK_EN}\n${ASK_NAME_EN}`].includes(content ?? "");
+}
+
+/** A crisis acknowledgement, with or without the name question (dedupe: another pipeline already sent the help lines). */
+export function isCrisisAck(cis: CisProfile, content: string | null | undefined): boolean {
+  const you = cis.csVoice?.honorifics === "你" ? "你" : "您";
+  const c = content ?? "";
+  return c.startsWith(crisisAckZh(you)) || c.startsWith(CRISIS_ACK_EN);
+}
+
+function askNameZh(cis: CisProfile): string {
+  const v = cis.csVoice ?? {};
+  return v.askName?.trim() || `請問怎麼稱呼${v.honorifics === "你" ? "你" : "您"}呢？`;
+}
+
+// Self-harm / suicide (lib/cs/config.ts CS_CRISIS_KEYWORDS): help lines on top of "a person will reply".
+// Wording follows the customer's language; both regions are listed because a Chinese-speaking
+// customer may be in Australia (Soulful) or in Taiwan (Aware Wave). Not tenant-editable: the numbers
+// must not drift with a page setting. Operator decision 2026-10-16 (WORKLOG). Numbers: Taiwan 119
+// emergency, 1925 安心專線, 1995 生命線; Australia 000 emergency, Lifeline 13 11 14 -- all 24 h.
+const NON_LATIN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/;
+const ASK_NAME_EN = "May I ask your name?";
+const CRISIS_ACK_EN = [
+  "Thank you for telling us. We have your message, and someone from our team will reply to you personally as soon as possible.",
+  "If you are in immediate danger, please call emergency services now: 000 in Australia, 119 in Taiwan.",
+  "To talk to someone any time: Lifeline 13 11 14 (Australia), 1925 or 1995 (Taiwan).",
+].join("\n");
+
+function crisisAckZh(you: string): string {
+  return [
+    `謝謝${you}願意告訴我們。訊息我們收到了，工作人員會盡快親自回覆${you}。`,
+    `如果${you}現在有立即的危險，請馬上打緊急電話：台灣 119、澳洲 000。`,
+    "想找人說說話，24 小時都有人接：台灣 1925 安心專線、1995 生命線；澳洲 Lifeline 13 11 14。",
+  ].join("\n");
 }
 
 // A reply that reads like a question or a request is not a name. Deliberately conservative: a
 // missed name costs nothing (the agent can still ask), a wrong one makes the agent greet the
 // customer by a sentence.
-const NOT_A_NAME = /[?？0-9０-９@/:]|嗎|呢|什麼|甚麼|怎麼|多少|請問|想問|可以|能不能|課程|報名|價格|費用|時間|地址|退款|謝謝你|不用|不要|沒有/;
+const NOT_A_NAME = /[?？0-9０-９@/:]|嗎|呢|什麼|甚麼|怎麼|多少|請問|想問|可以|能不能|課程|報名|價格|費用|時間|地址|退款|謝謝你|不用|不要|沒有|需要|幫|救|難過|痛苦|害怕|好累|不想|想要/;
+// A Latin reply with a pronoun or a verb of need is a sentence about the customer ("I need help"
+// after the crisis acknowledgement, Codex 2026-10-16 partialreview-58beec4d), not a name. Checked
+// after the lead-in is stripped, so "my name is Hiro" still yields Hiro.
+const LATIN_SENTENCE = /\b(?:i|we|you|me|my|need|want|help|please|can|could|would|not|no|dont|don't|what|how|why|feel|have|am|is|are|sorry)\b/i;
 // Latin greetings and lead-ins need a separator after them, so "Hiro" and "Imogen" stay whole.
 const LEADING = /^(?:(?:您好|你好|哈囉|嗨)[\s,，!！~～。.]*|(?:hi|hello|hey)[\s,，!！~～。.]+)?(?:(?:我的名字是|我的名字叫|名字是|我叫做|我叫|叫我|我是|我姓)\s*|(?:my name is|i am|i'm|im|this is|call me|it's|its)\s+)?/i;
 const TRAILING = /(?:就好了?|就可以了?|即可|就行了?)?[\s喔哦噢唷呦啦囉耶呀~～。．.!！,，]*$/;
@@ -51,11 +100,12 @@ const ACKNOWLEDGEMENTS = new Set([
 /** The name in a reply to the name question, or null when the reply does not look like one. */
 export function parseNameReply(text: string): string | null {
   const firstLine = text.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "";
-  if (!firstLine || NOT_A_NAME.test(firstLine)) return null;
+  if (!firstLine || NOT_A_NAME.test(firstLine) || hitsCrisis(text)) return null;
   const name = firstLine.replace(LEADING, "").replace(TRAILING, "").trim();
   if (!name || ACKNOWLEDGEMENTS.has(name.toLowerCase())) return null;
   const chars = [...name].length;
   const latin = /[a-z]/i.test(name);
+  if (latin && LATIN_SENTENCE.test(name)) return null;
   if (chars > 20) return null;
   if (latin && name.split(/\s+/).length > 4) return null;
   // A CJK name longer than 6 characters is a sentence (我下午再過去看看).

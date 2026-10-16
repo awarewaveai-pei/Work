@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handoffAckText, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
+import { handoffAckText, isNameQuestionAck, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
 
 const ORG = "o";
 
@@ -28,6 +28,8 @@ describe("parseNameReply", () => {
     "收到～",
     "",
     "I would like to ask about the workshop next week",
+    "I need help",
+    "我需要幫忙",
   ])("not a name: %s", (text) => expect(parseNameReply(text)).toBeNull());
 });
 
@@ -42,6 +44,26 @@ describe("handoffAckText", () => {
   it("per-page text replaces both sentences", () => {
     const cis = { organizationId: ORG, csVoice: { escalationTone: "收到囉，小幫手馬上來！", askName: "怎麼稱呼你？" } };
     expect(handoffAckText(cis, true)).toBe("收到囉，小幫手馬上來！\n怎麼稱呼你？");
+  });
+});
+
+// Operator decision 2026-10-16: a crisis acknowledgement carries the help lines and still asks the name.
+describe("crisis acknowledgement", () => {
+  const LINES = ["119", "000", "1925", "1995", "13 11 14"];
+  it("Chinese message: Chinese wording, both regions' lines, name question last", () => {
+    const t = handoffAckText({ organizationId: ORG }, true, "我最近一直想傷害自己");
+    for (const n of LINES) expect(t).toContain(n);
+    expect(t.split("\n").at(-1)).toBe("請問怎麼稱呼您呢？");
+    expect(isNameQuestionAck({ organizationId: ORG }, t)).toBe(true);
+  });
+  it("English message: English wording, same lines, English name question", () => {
+    const t = handoffAckText({ organizationId: ORG }, true, "I want to kill myself");
+    for (const n of LINES) expect(t).toContain(n);
+    expect(t.split("\n").at(-1)).toBe("May I ask your name?");
+    expect(isNameQuestionAck({ organizationId: ORG }, t)).toBe(true);
+  });
+  it("an ordinary message keeps the ordinary acknowledgement", () => {
+    expect(handoffAckText({ organizationId: ORG }, false, "想報名課程")).toBe("已收到您的訊息，我們會盡快回覆您 🙏");
   });
 });
 

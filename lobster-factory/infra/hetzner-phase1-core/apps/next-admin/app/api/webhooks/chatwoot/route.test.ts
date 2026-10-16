@@ -61,7 +61,11 @@ const fakeDb = vi.hoisted(() => ({}));
 const getSupabaseWriteClient = vi.hoisted(() => vi.fn((): unknown => fakeDb));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient }));
 
+const sendText = vi.hoisted(() => vi.fn(async (_text: string) => ({ kind: "sent" as const })));
+vi.mock("@/lib/ops-inbox/notify/telegram", () => ({ buildOperatorTelegramNotifier: () => ({ sendText }) }));
+
 const { POST } = await import("./route");
+const { handoffAckText } = await import("@/lib/cs/handoff-ack");
 
 const ORG_ID = "55555555-5555-4555-8555-555555555555";
 const CHATWOOT_CONFIG = { accountId: 42, baseUrl: "https://chatwoot.example" };
@@ -429,6 +433,73 @@ describe("POST /api/webhooks/chatwoot -- handoff acknowledgement + name question
     await post(answer("小美"));
     await runAfter();
     expect(updateContactName).not.toHaveBeenCalled();
+  });
+});
+
+// Operator decision 2026-10-16: a crisis message gets the help lines, still asks the name, and pages
+// the operator on Telegram (first, before any Chatwoot call) without the customer's words.
+describe("POST /api/webhooks/chatwoot -- crisis message", () => {
+  const HANDOFF = { ...DEFAULT_DECISION, action: "handoff" as const, replyText: undefined, handoffReason: "crisis" };
+  const JOHN = { type: "contact", id: 77, name: "John Doe" };
+  const TEXT = "我最近一直想傷害自己";
+  const CIS = { organizationId: ORG_ID, chatwoot: CHATWOOT_CONFIG, csEnabled: true };
+  beforeEach(() => sendText.mockClear());
+
+  it("handoff: one page with the conversation link and none of the customer's words, then the help-line acknowledgement", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    await post(makePayload({ content: TEXT, sender: JOHN }));
+    await runAfter();
+    expect(sendText).toHaveBeenCalledTimes(1);
+    const page = sendText.mock.calls[0][0];
+    expect(page).toContain("https://chatwoot.example/app/accounts/42/conversations/999");
+    expect(page).not.toContain(TEXT);
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", handoffAckText(CIS, true, TEXT));
+  });
+
+  it("the handoff fails: the operator was already paged", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    handoffToHuman.mockRejectedValueOnce(new Error("chatwoot down"));
+    await post(makePayload({ content: TEXT, sender: JOHN }));
+    await runAfter();
+    expect(sendText).toHaveBeenCalledTimes(1);
+  });
+
+  it("the tenant config cannot be read: still one page, without the link", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    loadCis.mockRejectedValue(new Error("db down"));
+    await post(makePayload({ content: TEXT, sender: JOHN }));
+    await runAfter();
+    expect(sendText).toHaveBeenCalledTimes(1);
+    expect(sendText.mock.calls[0][0]).toContain("#999");
+  });
+
+  it("a template after the message does not stand in for the help lines", async () => {
+    handleInbound.mockResolvedValueOnce(HANDOFF);
+    listMessages.mockResolvedValueOnce([{ id: 130, messageType: 3, private: false, content: "template" }]);
+    await post(makePayload({ content: TEXT, sender: JOHN }));
+    await runAfter();
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", handoffAckText(CIS, true, TEXT));
+  });
+
+  it("a human already owns the thread: no automatic reply, still one page", async () => {
+    await post(makePayload({ content: TEXT, sender: { type: "contact", id: 77, name: "林小美" }, conversation: { id: 999, status: "open" } }));
+    await runAfter();
+    expect(sendReply).not.toHaveBeenCalled();
+    expect(sendText).toHaveBeenCalledTimes(1);
+  });
+
+  it("the name reply after the crisis acknowledgement is captured", async () => {
+    listMessages.mockResolvedValueOnce([{ id: 501, messageType: 1, private: false, content: handoffAckText(CIS, true, TEXT) }]);
+    await post(makePayload({ id: 510, content: "小美", sender: JOHN, conversation: { id: 999, status: "open" } }));
+    await runAfter();
+    expect(updateContactName).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, 77, "小美");
+  });
+
+  it("an ordinary handoff pages nobody", async () => {
+    handleInbound.mockResolvedValueOnce({ ...HANDOFF, handoffReason: "knowledge_gap" });
+    await post(makePayload({ content: "想報名課程", sender: JOHN }));
+    await runAfter();
+    expect(sendText).not.toHaveBeenCalled();
   });
 });
 

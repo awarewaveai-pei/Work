@@ -509,7 +509,8 @@
   - [x] Soulful 客服三層（問答→AI→真人）**全部真測通過** 2026-10-16：問答直答 $0；AI 層門檻 0.40 → 私人筆記草稿＋確認句（NT$0.6）；User token（vault `…:user_token`）→ 回答名字寫回聯絡人（John Doe → pei）。next-admin `b2508e931` 已部署。見 WORKLOG 2026-10-15（續34）（續37）、2026-10-16（續2）（續5）（續7）（續8）。
   - [ ] Soulful 課程類開 AI 自動回覆：考試閘已寫好（只有考過的意圖能開自動，見 WORKLOG 2026-10-16（續11））。剩：部署 → 匯入 `agency-os/tenants/company-soulful-expression/core/cs-eval-courses_services.json`（30 題，操作者看過）→ 客服分頁「開始考試」→ 過了操作者自己按「自動」；沒過看逐題結果決定（價格／時間題預期會失敗：AI 說「沒有資料」不算轉真人）。
   - [x] **✅ 客服設定 GET 500**（`cs-config/route.ts` 在 `const config` 宣告前使用它，有 graduation 紀錄就 ReferenceError；Codex `2026-10-16-partialreview-98a30a32` F1）：`8355f9f03` 把 `config` 移到 map 之前＋有 graduation 的 GET 測試。見 WORKLOG 2026-10-16（續22）。
-  - [ ] **操作者決定｜危機訊息轉真人時回客人的話**：自傷／自殺字已由規則轉真人（理由 `crisis`，`lib/cs/config.ts` `CS_CRISIS_KEYWORDS`），客人仍只收到一般確認句。要決定：① 附不附求助資源、依什麼選（台灣 1925 安心專線／1995 生命線；澳洲 Lifeline 13 11 14；看客人語言或地區）② 危機時是否不問「怎麼稱呼您」③ 要不要即時通知操作者。定案後改 `lib/cs/handoff-ack.ts` 依理由分支。另：婉轉說法規則抓不完，建議 Soulful 加一個 `isSensitive` 的「危機」意圖讓分類器接住。見 WORKLOG 2026-10-16「危機與用藥一律轉真人」。
+  - [x] **✅ 危機訊息轉真人時回客人的話**（操作者 2026-10-16 定案）：確認句附求助專線（依客人語言寫，台灣 119／1925／1995＋澳洲 000／Lifeline 13 11 14 都列）、照樣問名字、即時 Telegram 通知操作者（不帶客人原文）。程式在 main，等 03:00 自動部署；部署後驗收待做：非角色帳號傳一句危機訊息 → 收到專線確認句＋Telegram。見 WORKLOG 2026-10-16（續27）。
+  - [ ] 婉轉說法規則抓不完，建議 Soulful 加一個 `isSensitive` 的「危機」意圖讓分類器接住（操作者在客服分頁加意圖）。
   - [ ] 產品決定：知識庫內容／模型／prompt 變動要不要讓「考過」失效並自動重考（計畫 §5.2 CI 閘）。現況不失效；網站每週重爬，若失效又沒自動重考，自動回覆每週會退回草稿。見 WORKLOG 2026-10-16（續11）「沒涵蓋」。
   - [ ] Soulful 常見問答的價格／時間／地點／報名是**測試值**（WORKLOG 2026-10-16（續22））：對外宣傳前操作者給真值，在客服分頁「常見問答」改 `pricing`／`schedule`／`location`（＋ -en）四條。
   - [ ] 考試要照正式路徑先過常見問答：現在 `runEvalCase` 只跑 `planReply`（AI 層），正式 `webhooks/chatwoot/route.ts:163` 先 `matchFaq`。價格／報名題在正式環境由 FAQ 回，考試卻記成「危險誤答」。修法：考試先 `matchFaq`，命中＝依 entry.handoff 判定。見 WORKLOG 2026-10-16（續19）（續22）。

@@ -4,7 +4,10 @@ import { handleInbound } from "@/lib/cs/orchestrator";
 import { loadCis } from "@/lib/cs/cis";
 import { claimMessage, completeClaim, findOrganizationIdByChatwootAccountId, recordReply } from "@/lib/cs/db";
 import { getContactName, handoffToHuman, listMessages, sendPrivateDraft, sendReply, updateContactName, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
-import { handoffAckText, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
+import { handoffAckText, isCrisisAck, isNameQuestionAck, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
+import { hitsCrisis } from "@/lib/cs/autonomy";
+import { alertOperatorOfCrisis } from "@/lib/cs/crisis-alert";
+import { buildOperatorTelegramNotifier } from "@/lib/ops-inbox/notify/telegram";
 import { matchFaq } from "@/lib/cs/faq";
 import { reserveCsCredit } from "@/lib/cs/billing";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
@@ -97,6 +100,10 @@ export async function POST(req: Request): Promise<Response> {
       const reply = { organizationId, conversationId, messageId: Number(messageId), contactId, text: payload.content ?? "" };
       after(() => captureName(reply).catch((err) => Sentry.captureException(err, { extra: { organizationId, conversationId, messageId } })));
     }
+    // A crisis message still pages the operator: whoever owns the thread may not be looking at it.
+    if (!isFromAgent && hitsCrisis(payload.content ?? "")) {
+      after(async () => pageCrisis(organizationId, conversationId, await chatwootConfigOrNone(organizationId)));
+    }
     return NextResponse.json({ ok: true, ignored: true, reason: "human_owns_thread" });
   }
 
@@ -139,6 +146,10 @@ interface ContactRef {
 async function runPipeline(inbound: InboundMessage, contact: ContactRef, customerMessageId: number): Promise<void> {
   const { organizationId, conversationId, messageId } = inbound;
   const claim = { organizationId, conversationId, messageId };
+  // A crisis pages the operator before anything that can fail or be switched off (tenant config read,
+  // system mode, missing Chatwoot config, a failed handoff or acknowledgement): the config only adds the
+  // conversation link, so a failed read still pages, without it.
+  if (hitsCrisis(inbound.text)) await pageCrisis(organizationId, conversationId, await chatwootConfigOrNone(organizationId));
   const cis = await loadCis(organizationId);
 
   // T27 (agency-os/reports/decisions/2026-09-26-system-mode-inbound-events.md): a blocking system
@@ -175,7 +186,7 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
     await recordReply({ ...claim, action: "handoff", retrievedChunkIds: [] });
     if (cis.chatwoot) {
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text);
     }
     await completeClaim(claim);
     return;
@@ -192,10 +203,10 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
     } else if (decision.action === "draft" && decision.replyText) {
       await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, decision.replyText);
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text);
     } else if (decision.action === "handoff") {
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text);
     } else if (decision.action !== "suppressed") {
       // "suppressed" = the engine intentionally stayed silent (agent owns the thread). Anything else
       // is an upstream invariant break, e.g. auto_sent with an empty replyText: leave it to the sweep.
@@ -219,30 +230,50 @@ async function acknowledgeHandoff(
   conversationId: string,
   contact: ContactRef,
   customerMessageId: number,
+  customerText: string,
 ): Promise<void> {
   const { organizationId } = cis;
+  // A crisis acknowledgement is skipped only when the help lines themselves already followed: any other
+  // public message (an agent's line, a template) does not carry them (Codex 58beec4d F4).
+  const crisis = hitsCrisis(customerText);
   // The dedupe read is best-effort on its own: an AgentBot token may send messages yet be refused
   // on GET (2026-10-15, Soulful: 401 on messages?after= skipped the whole acknowledgement). A read
   // that fails must never cost the customer the reply; the worst case is one duplicate sentence.
   let alreadyAnswered = false;
   try {
     const later = await listMessages(organizationId, chatwoot, conversationId, { after: customerMessageId });
-    alreadyAnswered = later.some((m) => !m.private && (m.messageType === 1 || m.messageType === 3));
+    alreadyAnswered = later.some((m) => !m.private && (m.messageType === 1 || m.messageType === 3) && (!crisis || isCrisisAck(cis, m.content)));
   } catch (err) {
     Sentry.captureException(err, { extra: { organizationId, conversationId, step: "handoff_ack_dedupe" } });
   }
   if (alreadyAnswered) return;
   try {
     const askName = typeof contact.id === "number" && isPlaceholderContactName(contact.name);
-    await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName));
+    await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName, customerText));
   } catch (err) {
     Sentry.captureException(err, { extra: { organizationId, conversationId, step: "handoff_ack" } });
   }
 }
 
+async function chatwootConfigOrNone(organizationId: string): Promise<ChatwootConfig | undefined> {
+  return loadCis(organizationId).then((c) => c.chatwoot, () => undefined);
+}
+
+/** Operator page for a crisis message (lib/cs/crisis-alert.ts). Best-effort: never fails the pipeline. */
+async function pageCrisis(organizationId: string, conversationId: string, chatwoot?: ChatwootConfig): Promise<void> {
+  try {
+    const notifier = buildOperatorTelegramNotifier();
+    const r = await alertOperatorOfCrisis(notifier ? (text) => notifier.sendText(text) : null, organizationId, conversationId, chatwoot);
+    if (r.kind !== "sent") Sentry.captureMessage(`cs crisis page not delivered: ${r.code}`, { extra: { organizationId, conversationId } });
+  } catch (err) {
+    Sentry.captureException(err, { extra: { organizationId, conversationId, step: "crisis_page" } });
+  }
+}
+
 /**
- * The reply counts only when the public message right before it is the name question we send
- * (same text), so an agent or template speaking in between, or a second customer message, never
+ * The reply counts only when the public message right before it is an acknowledgement that asks the
+ * name (same text; lib/cs/handoff-ack.ts isNameQuestionAck: the ordinary one or the crisis one), so an
+ * agent or template speaking in between, or a second customer message, never
  * counts. Only a placeholder name is overwritten, read fresh because an agent may have renamed the
  * contact after this webhook was sent. Residual: a rename landing between that read and the write
  * (Chatwoot has no conditional update) is overwritten.
@@ -271,7 +302,7 @@ async function captureName(reply: { organizationId: string; conversationId: stri
     }
     throw err;
   }
-  if (previous?.messageType !== 1 || previous.content !== handoffAckText(cis, true)) return;
+  if (previous?.messageType !== 1 || !isNameQuestionAck(cis, previous.content)) return;
   if (!isPlaceholderContactName(await getContactName(organizationId, cis.chatwoot, reply.contactId))) return;
   await updateContactName(organizationId, cis.chatwoot, reply.contactId, name);
 }

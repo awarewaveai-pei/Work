@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-16（續27）客服 AI：危機訊息的確認句附求助專線、照樣問名字、即時通知操作者 — next-admin，交今晚 03:00 自動部署
+
+**操作者決定**（同日）：① 確認句附求助資源，依客人語言或地區 ② 危機時照樣問「怎麼稱呼您」③ 即時通知操作者：可以。
+**改了**（next-admin）：
+- `lib/cs/handoff-ack.ts`：`handoffAckText(cis, askName, customerText)`；客人訊息命中 `hitsCrisis` → 危機確認句，中文訊息用中文、其他用英文；兩區都列（Soulful 在澳洲、客人多說中文，也可能在台灣）：台灣 119／1925 安心專線／1995 生命線，澳洲 000／Lifeline 13 11 14；後接名字問題（英文版 "May I ask your name?"）。號碼寫在程式，不開放頁面設定（不讓號碼隨設定漂移）。
+- `lib/cs/crisis-alert.ts`（新）：Telegram 文字＝提醒＋Chatwoot 對話連結＋org，**不帶客人原文**；走既有操作者頻道 `buildOperatorTelegramNotifier().sendText`（與 ops-inbox、site-watch 同開關；正式環境 `OPS_INBOX_TELEGRAM_NOTIFY_ENABLED=true`、token／chats 已設，`docker exec printenv` 查證）。
+- `app/api/webhooks/chatwoot/route.ts`：**通知排在最前面**——`runPipeline` 讀租戶設定、系統模式、任何 Chatwoot 呼叫之前；租戶設定讀不到也照發（少連結）。對話已在真人手上（`open`）時不自動回覆，但照樣通知。危機確認句的去重只認「後面已有危機確認句」，其他公開訊息（客服一句話、範本）不算數。
+- 名字擷取：`isNameQuestionAck` 精確比對三種會問名字的確認句（一般、危機中文、危機英文）；`parseNameReply` 拒絕危機字、含代名詞／需求動詞的英文句（"I need help"）、含 需要／幫／救／難過 等的中文。
+**Codex 審**：第一輪 `2026-10-16-partialreview-58beec4d` 7 項——F1／F2／F5 根因相同（通知排在 Chatwoot 呼叫之後、又宣稱客人收到與否）→ 改成最先發、文字不宣稱；F4 去重 → 只認危機確認句；F6 名字比對放寬 → 回到精確比對；F7 "I need help" 被當名字 → 解析器拒絕；F3（`after()` 遇容器重啟不持久）與既有 pipeline 同一殘留風險，未改。第二輪 `2026-10-16-partialreview-e444b6c1` 2 項——讀租戶設定失敗仍擋住通知（同一不變量沒關完）→ 通知不再依賴任何讀取；通知文字與自動回覆矛盾 → 改「請馬上打開對話，親自確認並回覆客人。」兩項都修並加測試。
+**不變量**：危機訊息一進來就通知，不依賴任何讀取或 Chatwoot 結果；通知文字在每條路徑都為真。
+**指名測試**：`handoff-ack.test.ts`（中文／英文危機句：五個號碼都在、最後一行是名字問題、會被認成問名字的確認句；一般訊息不變；"I need help"、「我需要幫忙」不是名字）；`route.test.ts`「crisis message」7 項（通知含連結不含原文、確認句＝危機版；handoff 失敗仍通知；租戶設定讀不到仍通知；範本不算數；真人接手的對話不回覆但通知；危機確認句後回名字會寫入；一般轉真人不通知）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin） | exit=0 | ms=6000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/webhooks/chatwoot lib/cs` 202 pass；`npm test` 全套 2491 pass／17 skipped | exit=0 | ms=16000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv OPS_INBOX_TELEGRAM_NOTIFY_ENABLED`=true；TELEGRAM_BOT_TOKEN、chat ids 已設 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/9m/0n（Codex 兩輪 7＋2；8 項已修，F3 為既有殘留風險）
+- ORACLE_WAIVED: 第二輪 artifact 之後的修改就是第二輪兩項的修法（通知不依賴讀取、通知文字）＋對應測試；不變量分析見上，不跑第三輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=handoffAckText|isNameQuestionAck|parseNameReply|buildOperatorTelegramNotifier | hits=50（呼叫端只有 webhook route 與測試；`handoffAckText(cis, true)` 舊精確比對改為 `isNameQuestionAck`）
+- auto-repair 路徑前置檢查：`dogfood-auto-repair.ps1 -Mode HealthOnly` 10/10、C1–C5 未觸及
+
+**未驗**：正式環境實測（部署後非角色帳號傳危機句 → 確認句＋Telegram），已列 TASKS。
+**rollback**：`git revert` 本 commit。
 ## 2026-10-16（續26）next-admin `81eefab9c` 手動部署：客服分頁 GET 500 修復（續22）＋危機／停藥一律轉真人（安全項 session）上線
 
 **部署**（操作者 go ahead）：`sg-deploy.sh next-admin` → 2479 pass、healthy 9s、HTTP smoke 5/5、`.deployed-commit=81eefab9c`（11:37Z，前一版 7ff1bdef4）。`playwright-runner -Mode smoke` 第一次 25/1（`04-onboard-page` `net::ERR_NETWORK_CHANGED`＝筆電網路切換，非伺服器）→ 重跑 26/0/6。
