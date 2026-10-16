@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-16（續3）0103 已套（操作者「你來套 0103」）＋ next-admin 38102e22f 上線（排程頁費用／伺服器詳細＋社群成員管理）
+
+**為何由本 session 套**：部署被 migration 閘擋（`sg-deploy.sh` step 1.86：main 有 0103 檔、ledger 沒有）。0103 屬社群 session（續38，2026-10-15）；它的 commit 219238c36 原本只在本機，本 session 推送時一併推上 main。
+
+**套前查**：讀完整檔＋down；只加 5 個函式、不改表；prod 無同名函式、`social_brand_members` PK (organization_id,user_id)、`social_audit_log` 欄位、`auth.users` 三欄都在；成員 0 列；續38 的本機驗證（Postgres 15.8 `SOCIAL_0103_{BEHAVIOUR,ACCESS}_OK`）、突變、db-expert、Codex 第一輪（`2026-10-15-partialreview-9a3d08d3.md` F1＝portal 註冊不驗證 email）已修：0103 要求 `email_confirmed_at`、main 的 `app/portal/api/signup/route.ts:9` `SIGNUP_VERIFIES_EMAIL=false`；prod `PORTAL_SIGNUP_ENABLED` 未設＝註冊本來就關。續38 的 Codex 第二輪結果沒有落檔。
+
+**結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0103 → APPLY_OK；--status → `{"applied":104}`；5 函式 anon=f／authenticated=f／service_role=t | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → migration 閘過、healthy 9s、5 個 smoke OK、deployed 38102e22f（rollback 映像 lobster-phase1-next-admin:rollback-20261016-012318） | exit=0 | ms=280000
+- REALTEST_EVIDENCE: tool=SSH | cmd=GET /api/ops/schedules（sync key）→ 兩個 job 有 cost、兩個系統列有 details；`/api/social/members` 無 session → 401 | exit=0 | ms=2000
+- REVIEW_WAIVED: NA -- 套別人已審過的 migration＋部署；審查證據見上
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：社群 session 續38 的 ⑤（在 social 設定頁實際加一位成員驗收）；操作者在 /ops/schedules 改一格驗 `client_schedule_updated` audit。
+
+**rollback**：程式＝`/root/lobster-phase1/scripts/rollback-phase1.sh` 用上列映像；DB＝先撤程式再跑 `packages/db/scripts/0103_social_brand_members_down.sql`。
 ## 2026-10-16（續2）Soulful 客服 AI 層驗收通過：門檻 0.40 部署後，「壓力很大適合嗎」→ AI 草稿進私人筆記、客人收到確認句＋問名字
 
 **前提**：`eabcfc311`（`kbMinRetrievalScore`，Soulful 0.40）於 2026-10-15 11:33Z 部署（主機 `/root/lobster-phase1/.deployed-commit`）。上一次同題（對話 7，11:16Z）在部署前，0.405 < 0.5 → 轉真人。
