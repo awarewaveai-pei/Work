@@ -16,7 +16,7 @@
 - **自動化預設 OFF**：DB 寫入 `LOBSTER_ENABLE_DB_WRITES=true`；Manifest `LOBSTER_EXECUTE_MANIFEST_STEPS=true` + `LOBSTER_MANIFEST_EXECUTION_MODE=dry_run|apply`；auto-remediation `AUTO_REMEDIATE_ENABLED=true` + `AUTO_REMEDIATE_SERVICE_WHITELIST=<compose services>` 兩者皆設才生效（SSOT：next-admin `lib/repair-center/remediations/`，precheck → execute → healthcheck → rollback）。
 - **監控分工**：endpoint-alert 打本機端口（避 hairpin timeout）；Uptime Kuma 負責 public reachability。
 - **單機現況**：僅筆電 `LAPTOP-R7I86OR5`；跨機 import 回報「無其他機器較新匯出」= 正常。
-- **對外產品三扇門**：aware-wave.com（WordPress 收錢）／`<產品>.aware-wave.com`（客戶）／app（員工）；網址與登入來源由 next-admin `lib/portal/products.ts`＋環境變數決定，不寫死網域；買斷同一份程式換設定。新產品先填該檔（測試擋），規則 [ADR 018](docs/architecture/decisions/018-product-doors-and-buyout-delivery.md)。
+- **對外產品三扇門**：aware-wave.com（WordPress 收錢）／`<產品>.aware-wave.com`（客戶）／app（員工）；網址與登入來源由 next-admin `lib/portal/products.ts`＋環境變數決定，不寫死網域；買斷同一份程式換設定。新產品先填該檔（測試擋），規則 [ADR 018](docs/architecture/decisions/018-product-doors-and-buyout-delivery.md)。**客戶五種方式**（操作者 2026-10-16 定案）：自用（我們自己用）／代操（我們替客戶操作）／訂閱／點數（共用錢包按次扣）／賣人＝買斷（一鍵架站到客戶主機，或客人已有自己的網站就接進來）；細節 [ADR 017 §0](docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md)。
 
 ## 1. 身份與 R0 架構師模式（所有任務，優先級最高）
 
