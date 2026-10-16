@@ -109,7 +109,7 @@
 
 ## 順序（風險由低到高，每段做完現有產品照常）
 
-1. `products.ts` 加 `features[]`、`accessChannels`（`ui`；`api` 等順序第 6 步）；登記表機械閘（012 §5）加「收費功能都有登記」「可買斷模組無 SAFETY_GATE」「**反向登記**：`app/(shell)/tools/<x>` 與 `app/<門前綴>` 每個目錄都對得到登記表一列，對不到紅燈；`app/(shell)/ops/*` 是營運後台頁，不是產品，不在登記表」；`products.test.ts` 改比對全部產品（現在只比 self-signup）。只讀。
+1. `products.ts` 加 `features[]`、`accessChannels`（`ui`；`api` 等順序第 6 步）；登記表機械閘（012 §5）加「收費功能都有登記」「可買斷模組無 SAFETY_GATE」「**反向登記**：`app/(shell)/tools/<x>` 與 `app/<門前綴>` 每個目錄都對得到登記表一列，對不到紅燈；`app/(shell)/ops/*` 是營運後台頁，不是產品，不在登記表」；**產生器** `scripts/new-product.mjs`（新產品的唯一入口，操作者 2026-10-16「要去哪裡按什麼」）：問 SOP §18 五題，寫登記列、`app/<門前綴>/{layout,page}.tsx` 骨架、`lib/<key>/can-points.ts`（收費點呼叫 `can()` 的範例）、測試；System Foundry 藍圖末節就是這五個答案。之後 `/ops/products` 的「新增產品」表單只是跑同一條命令；`products.test.ts` 改比對全部產品（現在只比 self-signup）。只讀。
 2. Migration：`plans`、`organization_entitlements`、`organizations.kind`（`internal`／`customer`，預設 customer，Account#0 改 internal）；0062 加 `plan_key`、`source_ref`、改唯一索引、放寬 CHECK（0062 目前 0 筆，不用雙寫期）；三表只給控制面的靜態檢查。控制面發功能級許可（012 §8 第 3 步）。
 3. Woo 付款通知 → 合約與權利；帳本泛化（015 §4 第 2 步）。
    **付費入口唯一閘**（第 2、4 步一起落地，補「沒登記也能收錢」的洞）：付費供應商 SDK（`@anthropic-ai/sdk`、`openai`、`replicate`、fal、google-genai）、錢包帳本 client、三張權利表，只准在 `lib/entitlements/**` 與 `lib/ai/gateway.ts`（進去先問 `can()`）引用；測試掃全部 import，別處出現建置失敗。認知平台同理：`ai_lego/platform/ai_execution/gateway.py` 是唯一 AI 入口，呼叫端必須帶 grant。沒登記的產品拿不到 grant，所以收不了錢、也叫不到付費 AI。

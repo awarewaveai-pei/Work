@@ -117,13 +117,13 @@ ul.doors li span{min-width:0}
 <section id="steps"><h2>待建項目</h2><p class="lead">項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。</p><ol class="steps"><li class="step todo" id="s1">
     <div class="n">1</div>
     <div class="b">
-      <p class="plain">每項產品都列出收費功能並保留子網域；漏列或未登記的工具都會讓測試失敗。</p>
+      <p class="plain">新產品只有一個入口：執行 scripts/new-product.mjs，回答五題，登記列、頁面骨架、收費點與測試就產生好；漏填或未登記的工具都會讓測試失敗。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>products.test.ts：漏填亮紅燈；可買斷模組含 SAFETY_GATE 亮紅燈；app 內任何產品目錄沒有登記列也亮紅燈（/ops/* 是後台頁，不算產品）</p>
-      <details><summary>工程細節：登記表加 features[] 與 accessChannels；機械閘</summary>
+      <details><summary>工程細節：登記表加 features[] 與 accessChannels；產生器 new-product.mjs；機械閘</summary>
         <p>products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。</p>
         <p><b>前置：</b>無</p>
-        <p><b>檔案：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts</code></p>
+        <p><b>檔案：</b><code>scripts/new-product.mjs</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts</code></p>
         
       </details>
     </div></li><li class="step todo" id="s2">
