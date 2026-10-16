@@ -1,4 +1,11 @@
 # Worklog
+## 2026-10-16（續17）社群成員管理 UI 驗收完成：操作者在設定頁「成員」把客戶帳號加為編輯
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 唯讀：`social_brand_members` 該帳號 `editor|2026-10-16 08:23:08Z`；`social_audit_log` `ops:owner member_add {"role":"editor"}` 一筆 | exit=0 | ms=2000
+- REVIEW_WAIVED: NA -- 無程式改動（續38 成員功能＋續12 唯讀說明的驗收）
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+C12 成員管理（續38→續4→續12→續16）全部結案；TASKS C12 該行改 ✅。
 ## 2026-10-16（續16）next-admin 3b146fd0f 上線（含續12 唯讀說明 236c86524；操作者「部署」）
 
 - REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → migration 閘 OK（104）、smoke 5/5、deployed 3b146fd0f（rollback 映像 lobster-phase1-next-admin:rollback-20261016-082205） | exit=0 | ms=300000
