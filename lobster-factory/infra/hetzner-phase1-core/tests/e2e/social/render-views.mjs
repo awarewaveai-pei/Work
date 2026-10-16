@@ -3,7 +3,8 @@
 // answered here with fixed sample data (8 posts across the states, 3 accounts incl. one expired, 1 list, 3 media, 3 log rows).
 // Nothing reaches a database or Postiz. Output goes OUTSIDE the repo (renders are not committed).
 //   node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/render-views.mjs "$env:TEMP/social-renders"
-//   node .../render-views.mjs <outDir> --mock      # the approved mock instead (launch.json "social-mocks", port 8766)
+//   node .../render-views.mjs <outDir> --mock      # the mock instead (launch.json "social-mocks", port 8766): 1280x660 + phone 390
+//                                                   day view and editor sheet; exit 1 when the phone page is wider than 390
 import { chromium } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 
@@ -11,12 +12,37 @@ const out = process.argv[2];
 if (!out) { console.error("usage: node render-views.mjs <outDir> [--mock]"); process.exit(2); }
 mkdirSync(out, { recursive: true });
 if (process.argv.includes("--mock")) {
+  // what sticks out past the right edge of the screen: the page itself, plus any element (the editor sheet is fixed with
+  // overflow hidden, so the page width alone cannot see inside it); children of a sideways-scrolling box are its business
+  const sticksOut = () => {
+    const w = innerWidth, scrolls = (e) => { for (let a = e.parentElement; a; a = a.parentElement) if (/auto|scroll/.test(getComputedStyle(a).overflowX)) return true; return false; };
+    const els = [...document.querySelectorAll("body *")].filter((e) => { const r = e.getBoundingClientRect(); return r.width && r.height && r.right > w + 1 && !scrolls(e); });
+    return { page: document.scrollingElement.scrollWidth, over: els.slice(0, 5).map((e) => `${e.tagName.toLowerCase()}.${e.className}`.slice(0, 60)) };
+  };
   const b = await chromium.launch();
-  const pg = await b.newPage({ viewport: { width: 1280, height: 660 } });
-  await pg.goto("http://127.0.0.1:8766/social-manager-mock.html", { waitUntil: "networkidle" });
-  await pg.waitForTimeout(800);
-  await pg.screenshot({ path: `${out}/mock-01.png` });
-  await b.close();
+  let bad = [];
+  try {
+    const pg = await b.newPage({ viewport: { width: 1280, height: 660 } });
+    await pg.goto("http://127.0.0.1:8766/social-manager-mock.html", { waitUntil: "networkidle" });
+    await pg.waitForTimeout(800);
+    await pg.screenshot({ path: `${out}/mock-01.png` });
+    // phone (U10): day view, then the editor sheet
+    const ph = await b.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+    await ph.goto("http://127.0.0.1:8766/social-manager-mock.html", { waitUntil: "networkidle" });
+    await ph.waitForTimeout(500);
+    await ph.screenshot({ path: `${out}/mock-02-phone-day.png` });
+    const day = await ph.evaluate(sticksOut);
+    await ph.locator(".day.focus .card[data-kind=social]:not([data-state=rotation])").first().click({ timeout: 5000 });
+    await ph.waitForFunction(() => document.body.classList.contains("sheet") && document.getElementById("edPanel").getBoundingClientRect().width > 0, null, { timeout: 5000 });
+    await ph.waitForTimeout(300);
+    await ph.screenshot({ path: `${out}/mock-03-phone-sheet.png` });
+    const sheet = await ph.evaluate(sticksOut);
+    console.log("phone, 390 wide", JSON.stringify({ day, sheet }));
+    for (const [n, m] of [["day", day], ["sheet", sheet]]) if (m.page > 390 || m.over.length) bad.push(n);
+  } finally {
+    await b.close();
+  }
+  if (bad.length) { console.error(`FAIL: on the phone (${bad.join(", ")}) something is wider than the 390px screen`); process.exit(1); }
   console.log("done", out);
   process.exit(0);
 }

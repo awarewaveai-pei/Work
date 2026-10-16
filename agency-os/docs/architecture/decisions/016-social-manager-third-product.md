@@ -42,7 +42,9 @@
 
 ### 5. 介面
 
-- 樣稿 = 規格：`lobster-factory/docs/social/mockups/social-manager-mock.html`。一個畫面：左邊行事曆（週／月／清單／輪播／媒體／紀錄／設定），右邊編輯＋預覽；沒有下拉選單；文字不小於 14px。
+- 樣稿 = 規格：`lobster-factory/docs/social/mockups/social-manager-mock.html`。沒有下拉選單；文字不小於 14px（標籤 12px）。
+  - 第 14 版（2026-10-16，C13，`SOCIAL_MANAGER_GAP_REPORT.md` U1–U6、U12、U13；**等操作者看圖同意**，產品程式仍是第 13 版）：行事曆（週／月／清單）在左、編輯＋各平台預覽在右；輪播／媒體／紀錄／設定改全寬、不帶編輯器。控制只有三種（主要動作、分段切換、一顆篩選鈕＋面板），一屏 pill ≤ 20；週檢視每天一欄、卡片照時間疊、有縮圖。手機（≤640px）日檢視＋全螢幕編輯。`check-social-mocks.py` 以瀏覽器實量把關（`[chips]`、`[card-thumb]`）。
+  - 第 13 版（2026-10-14 同意）：一個畫面，左邊行事曆（週／月／清單／輪播／媒體／紀錄／設定），右邊永遠是編輯＋預覽。
 - 樣式只有一個來源：next-admin `app/globals.css`（`mockups/sync-app-theme.py` 同步、`check-social-mocks.py` 比對）。產品實作直接用同一組 token 與 `.btn-primary`／`.btn-secondary`；狀態色對應 `--status-ignored`／`--yellow`／`--green`／`--red`／`--severity-low`／`--accent`。
 - 輪播清單（Metricool autolists）在 V1；CSV 匯入以「從 WordPress 文章清單批次做貼文」取代。
 

@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-16（續32）社群 C13 收尾：共用 git index 停在舊版（bare commit 會倒退 39 檔）已同步回 HEAD；render-views --mock 加手機 390 截圖＋寬度把關；ADR 016 §5 寫進樣稿第 14 版
+
+**操作者**：「全部去處理好」（續31 列的剩餘項）。
+- **共用 index 倒退（C1）**：`D:\Work` 共用 index 39 筆都是舊版——29 筆 M（index＝舊內容，worktree＝HEAD）＋10 筆 D（已 commit 的檔在 index 被標刪除：`SOCIAL_MANAGER_GAP_REPORT.md`、`render-views.mjs`、`SocialManager.switch-post.render.test.tsx`、`lib/cs/chatwoot-baseline.ts`＋2 測試、`cs-faq.json`、3 個 oracle partialreview）。逐筆以 blob hash 比對：39/39 worktree＝HEAD，沒有任何人真的暫存的內容。任何 session 下一次 bare commit 會把 8355f9f03、34537487b 等的成果倒退或刪除。處理：先備份 `.git/index`（scratch `shared-index-before-reset.bak`），`git reset -q`（只動 index，worktree 不動）→ 0 staged，39 檔 status 全乾淨。**止血非治本**：為何 private-index commit 後的同步（`git-commit-scope-guard.js:407` `syncSharedIndexAfterPrivateCommit`）沒涵蓋這些路徑未查，開 TASKS。
+- **render-views.mjs --mock**：多截 `mock-02-phone-day.png`、`mock-03-phone-sheet.png`（390×844 isMobile）；量頁寬＋任何超出右緣的元素（編輯 sheet 是 fixed＋overflow hidden，只看頁寬看不到裡面；橫向可捲容器的子元素除外），要確認 sheet 真的打開；超出 → exit 1；瀏覽器 try/finally 關閉。
+- **ADR 016 §5**：寫進第 14 版版面（標「等操作者看圖同意，產品程式仍是第 13 版」），第 13 版留一行。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/e2e/social/render-views.mjs <tmp> --mock → phone 390 {"day":{"page":390,"over":[]},"sheet":{"page":390,"over":[]}}；突變（scratch 頁在 sheet 內塞 600px 元素）→ page 仍 390、over=["div."] 被抓到 | exit=0 | ms=15000
+- REALTEST_EVIDENCE: tool=Bash | cmd=git diff --cached --name-only | wc -l → 0（reset 前 39，39/39 blob hash worktree＝HEAD）；git status --short -- <39 路徑> → 空 | exit=0 | ms=2000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/2n -- M1 sheet 是 fixed＋overflow hidden，頁寬量不到裡面 → 改量超出右緣的元素；n1 沒確認 sheet 打開 → waitForFunction body.sheet；n2 沒 try/finally → 加。全修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=render-views.mjs | hits=7 -- 改動檔以外都是文件提到用法（GAP_REPORT 3、PLAN 1、TASKS 1、worklog-excerpt 2），`--mock` 用法沒有其他呼叫者；ADR 016 §5 舊主張已改
+- ORACLE_WAIVED: render-views.mjs 是本機截圖工具（不上線）；證據＝實跑＋突變
+
+**剩**：操作者看 v14 圖（續31）。TASKS 新開「共用 git index 倒退」根因。
+**rollback**：`git revert <本 commit>`；index 要還原舊狀態可 `cp <scratch>/shared-index-before-reset.bak .git/index`（不建議，那是會倒退 39 檔的狀態）。
 ## 2026-10-16（續31）社群發文樣稿第 14 版（C13，GAP_REPORT U1–U6、U12、U13）＋檢查加「一屏 pill ≤ 20」「週卡要有縮圖」兩條（真的開瀏覽器量）— 等操作者看圖，沒動 next-admin
 
 **為什麼**：續21／續25 盤點結論：建版與樣稿第 13 版一模一樣，所以「醜」是設計本身，要先重做樣稿、操作者看圖同意後才改程式。

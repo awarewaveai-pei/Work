@@ -108,6 +108,11 @@
 
 ### 未完成
 
+- [ ] **【治理｜小】D:\Work 共用 git index 停在舊版：bare commit 會把別人已 commit 的檔倒退或刪除**
+  - `🟠 未開始` · `2026-10-16` · `無`
+  - **一句話**：2026-10-16 共用 index 有 39 筆舊版（29 筆舊內容、10 筆把已 commit 的檔標成刪除），worktree 全等於 HEAD；已 `git reset -q` 同步（止血）。private-index commit 後的同步（`mcp/claude-userlevel/hooks/rules/git-commit-scope-guard.js:407`）為何沒涵蓋這些路徑未查。
+  - **完成定義**：找到哪條 commit 路徑會留下舊 index（Codex、AO-RESUME ff-only、或沒走 marker 的 commit）並關掉；AO-RESUME 偵測「index ≠ HEAD 且 worktree＝HEAD」的路徑並警告。
+  - **證據**：WORKLOG 2026-10-16（續32）
 - [ ] **【產品｜施工】app.aware-wave.com 排程頁：一個地方管理所有例行工作**
   - `🟢 上線，操作者驗收過` · `2026-10-15` · `無`
   - **一句話**：客戶例行工作在 app 裡設定：`/ops/schedules` 總表＋客戶頁維護分頁，同一個 `ScheduleTable`、同一份資料（`client_schedules`＋巡檢 adapter）；工作只能從 `lib/schedules/jobs.ts` 選。
