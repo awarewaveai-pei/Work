@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-16（續26）next-admin `81eefab9c` 手動部署：客服分頁 GET 500 修復（續22）＋危機／停藥一律轉真人（安全項 session）上線
+
+**部署**（操作者 go ahead）：`sg-deploy.sh next-admin` → 2479 pass、healthy 9s、HTTP smoke 5/5、`.deployed-commit=81eefab9c`（11:37Z，前一版 7ff1bdef4）。`playwright-runner -Mode smoke` 第一次 25/1（`04-onboard-page` `net::ERR_NETWORK_CHANGED`＝筆電網路切換，非伺服器）→ 重跑 26/0/6。
+**驗證邊界**：`/api/ops/clients/soulful-expression/cs-config` 直接 wget 回 401（要登入），機器無法打到該路徑；部署後 20 分鐘主機 log `ReferenceError` 0 筆、尚無 cs-config 請求（操作者還沒開分頁）。真測＝操作者開客服分頁（預期 200、課程類顯示「沒通過」）＋ Messenger 傳「多少錢」（預期 FAQ `pricing` 1 秒直答），結果待記。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin（81eefab9c healthy、smoke 5/5）；docker logs ReferenceError=0 | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=playwright-runner -Mode smoke（25/1 網路切換 → 重跑 26/0/6） | exit=0 | ms=70000
+- REVIEW_WAIVED: NA -- 部署，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
+**rollback**：`sg-deploy` 回 `7ff1bdef4`（快照 `rollback-20261016-113312`）。
 ## 2026-10-16（續25）社群發文盤點補「親眼看」：自架 Postiz 與 Metricool 用 1440 寬實際打開，GAP_REPORT §1.1
 
 **操作者**：「你有去看 Postiz 和 Metricool 長什麼樣？」——續21 的參考品資料只來自原始碼與說明文字，沒看過畫面，據實回報後補做。
