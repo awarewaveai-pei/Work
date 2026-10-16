@@ -17,6 +17,8 @@ export function MembersSetting({ ctx }: { ctx: SlotContext }) {
   const [role, setRole] = useState<BrandRole>("editor");
   const [removing, setRemoving] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The result shows under the add row: the page-level note sits at the top of the page, out of sight from here.
+  const [msg, setMsg] = useState<{ text: string; error: boolean } | null>(null);
 
   const load = useCallback(async () => {
     try { setMembers((await api.members(brand.id)).members); } catch (e) { say(e instanceof ApiError ? e.message : String(e), true); }
@@ -27,7 +29,8 @@ export function MembersSetting({ ctx }: { ctx: SlotContext }) {
 
   async function run(work: () => Promise<unknown>, done: string) {
     setBusy(true);
-    try { await work(); ctx.say(done); await load(); } catch (e) { ctx.say(e instanceof ApiError ? e.message : String(e), true); }
+    setMsg(null);
+    try { await work(); setMsg({ text: done, error: false }); await load(); } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), error: true }); }
     finally { setBusy(false); setRemoving(null); }
   }
 
@@ -59,6 +62,7 @@ export function MembersSetting({ ctx }: { ctx: SlotContext }) {
         <button type="button" disabled={busy || !email.trim()}
           onClick={() => run(async () => { await api.addMember(brand.id, email.trim(), role); setEmail(""); }, `已加入為${ROLE_NAMES[role]}。`)}>加入</button>
       </div>
+      {msg && <span className={msg.error ? "sm-err" : "sm-muted"} role="status">{msg.text}</span>}
       <span className="sm-muted">對方要先有帳號（目前由 AwareWave 開）。</span>
     </div>
   );

@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-16（續6）社群發文「成員」按加入看似沒反應：結果訊息顯示在頁首，改成顯示在該區塊
+
+**操作者**：social.aware-wave.com 設定 → 成員，輸入 graphicdesignpeijing@gmail.com 按加入「沒反應」。
+
+**查到**：nginx 有 `POST /api/social/members 404`（02:18:47Z）；`auth.users` 沒有這個 email（整個系統只有 awarewaveai@gmail.com）→ 0103 `social_add_member` SC404，`lib/social/store.ts` `MEMBER_REFUSALS` 已轉成中文。問題在顯示位置：`Members.tsx` 用 `ctx.say` 寫到頁首的 `.sm-head .sm-note`（`SocialManager.tsx:232`），設定頁在下方看不到。同一個設定頁的「審核」開關（`Review.tsx`）同樣問題。另：訊息寫「請對方先註冊」，但自助註冊已關（`signup/route.ts:9`）。
+
+**改**：`Members.tsx`、`Review.tsx` 的結果與錯誤顯示在各自區塊（`role="status"`）；SC404 文案改「這個 email 還沒有帳號：請 AwareWave 先開帳號，email 要驗證過」。清單讀取失敗仍走頁首。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=nginx access log `/api/social/members`（GET 200、POST 404）＋ auth.users 查 email | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd NA && npx tsc --noEmit && npm test（258 passed；1 failed＝`lib/system-modes/__tests__/production-change-coverage.test.ts` 指 `app/api/ops/clients/[slug]/cs-config/chatwoot-token/route.ts`，CS session 2abb9acd5，非本次） | exit=1 | ms=14000
+- REVIEW_WAIVED: NA -- 顯示位置與一句文案
+- BUGHUNT_DONE: scope=lobster-factory | grep=ctx.say | hits=2（Settings 檢視內只有 Members、Review 兩處，皆已改）
+- 無 subagent。
+
+**交 CS session**：chatwoot-token route 沒過 production-change gate 測試 → 今晚 03:00 自動部署測試閘會擋（停在現版）。
+
+**rollback**：`git revert`。
 ## 2026-10-16（續5）客服分頁加「Chatwoot 個人 token」欄：操作者自己存 User token 進伺服器 vault（不貼給 agent），名字寫回聯絡人的缺口關閉（待 03:00 部署＋操作者貼 token）
 
 **根因**：vault 只有 AgentBot token（`cs:chatwoot:<org>:api_token`）；Chatwoot `access_token_auth_helper.rb` `BOT_ACCESSIBLE_ENDPOINTS` 不含 messages#index／contacts → `captureName` 讀不到也改不了聯絡人（續34）。沒有任何畫面能寫這個鍵（`credentials/secret/route.ts:54` 綁 credentialId）。

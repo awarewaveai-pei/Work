@@ -64,7 +64,7 @@ export interface Member { user_id: string; email: string | null; role: BrandRole
 
 /** The member functions' refusals in words a brand owner can act on (customers see these; the database text is not). */
 const MEMBER_REFUSALS: Array<[string, RegExp, 400 | 404 | 409, string]> = [
-  ["SC404", /no account/, 404, "這個 email 還沒有帳號：請對方先註冊，或請 AwareWave 開帳號"],
+  ["SC404", /no account/, 404, "這個 email 還沒有帳號：請 AwareWave 先開帳號，email 要驗證過"],
   ["SC404", /not a member/, 404, "這個人已經不是此品牌的成員"],
   ["SC409", /already a member/, 409, "這個人已經是此品牌的成員"],
   ["SC409", /last owner/, 409, "品牌至少要留一位擁有者：先把另一位成員設成擁有者"],

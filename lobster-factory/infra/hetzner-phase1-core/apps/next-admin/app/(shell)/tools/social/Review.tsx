@@ -15,6 +15,8 @@ export function NeedsButton({ ctx }: { ctx: SlotContext }) {
 
 export function ReviewSetting({ ctx }: { ctx: SlotContext }) {
   const [on, setOn] = useState<boolean | null>(null);
+  // Shown in this section: the page-level note sits at the top of the page, out of sight from the settings view.
+  const [msg, setMsg] = useState<{ text: string; error: boolean } | null>(null);
   const owner = ctx.brand.role === "owner";
   useEffect(() => { api.settings(ctx.brand.id).then((r) => setOn(r.requireReview)).catch(() => setOn(null)); }, [ctx.brand.id]);
   return (
@@ -23,11 +25,12 @@ export function ReviewSetting({ ctx }: { ctx: SlotContext }) {
       <div className="sm-row sm-chips"><span className="sm-lab">發文前要先審核</span>
         {([[false, "不用"], [true, "要"]] as const).map(([v, label]) => (
           <button type="button" key={label} className={on === v ? "sm-on" : ""} disabled={!owner || on === null}
-            onClick={async () => { try { setOn((await api.setRequireReview(ctx.brand.id, v)).requireReview); ctx.say(v ? "之後編輯的貼文要先送審，擁有者核准才會排程。" : "編輯可以直接排程。"); } catch (e) { ctx.say(e instanceof ApiError ? e.message : String(e), true); } }}>
+            onClick={async () => { try { setOn((await api.setRequireReview(ctx.brand.id, v)).requireReview); setMsg({ text: v ? "之後編輯的貼文要先送審，擁有者核准才會排程。" : "編輯可以直接排程。", error: false }); } catch (e) { setMsg({ text: e instanceof ApiError ? e.message : String(e), error: true }); } }}>
             {label}
           </button>
         ))}
       </div>
+      {msg && <span className={msg.error ? "sm-err" : "sm-muted"} role="status">{msg.text}</span>}
       <span className="sm-muted">要審核時：編輯只能送審，擁有者核准或退回；已核准的貼文，編輯要先取消排程才能改內容。</span>
       <span className="sm-muted">沒有加成員的後台帳號照後台角色：擁有者／管理員＝擁有者（可核准），操作員＝編輯，檢視者＝唯讀。每個品牌的成員與審核人在下面「成員」指定。</span>
     </div>
