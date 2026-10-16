@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-16（續24）video-service 與 next-admin 上線 7ff1bdef4（續20 技術品質檢查、沒證據不算通過；操作者「部署」）
+
+- video-service（runbook `DEPLOY_ROLLBACK_RUNBOOK.md` §2 有自己 compose 的 app）：`/root/Work` ff-only 到 7ff1bdef4（只有 2 個未追蹤檔）；compose.video.yml／requirements.txt／Dockerfile 與主機相同；備份 `lobster-video-service:pre-qa-restore-20261016`（= 舊 :local 86db1ab7da36）；rsync（`.env.video` 保留）；`up -d --build` → 新映像 58cde5c8e40b，healthy。
+  - 坑：第一次 `cd /root/lobster-phase1/apps/video-service` 以 ubuntu 執行被拒、`&&` 串使 `set -e` 不擋，build 沒跑但舊容器 healthy 看起來像成功；改 `sudo sh -c "cd … && docker compose …"` 重跑。驗新容器要看映像 ID／建立時間，不是只看 healthy。
+- next-admin：sg-deploy → migration 閘 OK、smoke 5/5、deployed 7ff1bdef4（rollback 映像 `lobster-phase1-next-admin:rollback-20261016-110456`）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=video-service `up -d --build` → `Image lobster-video-service:local Built`、`Up 6 seconds (healthy)`、映像 58cde5c8e40b 59 秒前；容器內 server.py 含 `_signal_probe`／checksumSha256／R2_API_BASE_URL（4）、quality.py 含兩條新規則（2）、ffmpeg 有 ebur128 濾鏡（1）；log 無錯 | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → smoke 5/5、deployed commit 7ff1bdef4 | exit=0 | ms=300000
+- REVIEW_WAIVED: NA -- 部署已審過的 commit（續20）
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：下一支真實影片渲染時看 `media_qa_reports` 是否有 technical 新列（狀態依實際檢查）；音量超出 −30～−6 LUFS 或量不到的影片會被拒（原設計）。
+**rollback**：video-service `docker tag lobster-video-service:pre-qa-restore-20261016 lobster-video-service:local` 後在該目錄 `docker compose -f docker-compose.video.yml --env-file .env.video up -d --no-build`；next-admin `rollback-phase1.sh` 用上列映像。
 ## 2026-10-16（續23）客服 AI：危機與用藥一律轉真人（規則，不再靠「剛好查不到」）— next-admin，交今晚 03:00 自動部署
 
 **根因**：續19 考試 m1——「想傷害自己」「可以停藥嗎」轉真人的理由是 knowledge_gap；`CS_RED_LINE_KEYWORDS`（`lib/cs/config.ts:48`）沒有這類字，知識庫一有相近內容 AI 就可能自己回答。
