@@ -73,8 +73,8 @@ export const NOW = [
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
 export const STEPS = [
-  { n: 1, plain: '每項產品都列出收費功能與使用對象（客戶或員工）；漏列或未登記的工具都會讓測試失敗。', title: '登記表加 features[] 與 accessChannels；機械閘', what: 'products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。',
-    files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts'], gate: 'products.test.ts：漏填亮紅燈；可買斷模組含 SAFETY_GATE 亮紅燈；app 內任何工具目錄沒有登記列也亮紅燈', risk: 'Low', model: 'Opus 5.5', depends: [], status: 'not_started' },
+  { n: 1, plain: '每項產品都列出收費功能並保留子網域；漏列或未登記的工具都會讓測試失敗。', title: '登記表加 features[] 與 accessChannels；機械閘', what: 'products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。',
+    files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts'], gate: 'products.test.ts：漏填亮紅燈；可買斷模組含 SAFETY_GATE 亮紅燈；app 內任何產品目錄沒有登記列也亮紅燈（/ops/* 是後台頁，不算產品）', risk: 'Low', model: 'Opus 5.5', depends: [], status: 'not_started' },
   { n: 2, plain: '資料庫記錄誰購買哪個方案、何時到期，以及哪位員工替哪位客戶操作。', title: 'Migration：plans、organization_entitlements、organizations.kind；許可帶 actor', what: '三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。',
     files: ['lobster-factory/packages/db/migrations/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '靜態檢查：三張權利表、錢包帳本與付費 AI 的 SDK，只准在 lib/entitlements/** 與 lib/ai/gateway.ts 引用；其他位置出現就建置失敗', risk: 'Medium', model: 'Opus 5.5（先出計畫）', depends: [1], status: 'not_started' },
   { n: 3, plain: '客戶在 aware-wave.com 付款後，系統自動開通，不需人工處理。', title: 'Woo 付款通知 → 合約與權利；帳本泛化', what: '付款通知帶 Woo 商品 id → plans.woo_product_ids 查方案 → 合約列 → 重算權利列；media_ 帳本去前綴加 product_key（ADR 015 §4）。',

@@ -250,7 +250,7 @@ Auto-repair Issue 必含中文摘要（問題/原因/修法/風險/建議）。�
 | 4 | **Rollback 指令** | `DEPLOY_ROLLBACK_RUNBOOK.md` 補充對應回滾步驟 |
 | 5 | **Notification** | Slack/Telegram 通知涵蓋 SUCCESS/FAIL/SMOKE_WARN |
 | 6 | **Typecheck gate** | `package.json` 加 `"typecheck": "tsc --noEmit"` + sg-deploy 加 `npm run typecheck` + `.github/workflows/<service>-typecheck.yml` |
-| 7 | **產品登記列** | 會給客戶用或會收費的服務，`next-admin lib/portal/products.ts` 先有一列（`audience`、`door`、`features[]`；不在 next-admin 就 `external`）；沒有登記列拿不到許可，收不了錢也叫不到付費 AI（ADR 017 順序 1、付費入口唯一閘；ADR 018 §5） |
+| 7 | **產品登記列** | 會給客戶用或會收費的服務，`next-admin lib/portal/products.ts` 先有一列（`subdomain`、`door`、`features[]`；不在 next-admin 就 `external`）；沒有登記列拿不到許可，收不了錢也叫不到付費 AI（ADR 017 順序 1、付費入口唯一閘；ADR 018 §5） |
 
 ## 共享檔 commit 機制
 

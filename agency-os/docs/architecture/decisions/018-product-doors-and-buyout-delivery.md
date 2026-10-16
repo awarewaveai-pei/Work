@@ -28,7 +28,7 @@
 ### 2. 網址由設定決定：程式裡不寫死網域
 
 - `lib/portal/products.ts` 每個產品宣告 `subdomain`，以及在 next-admin 裡的頁面前綴、API 前綴（產品不在 next-admin 就宣告 external）。
-- **只有客戶會自己登入的產品才有子網域**（`audience: customer`）。只給員工用、或只拿來代操的工具（`audience: staff`）沒有子網域、沒有產品門，只走員工門 `/tools/<x>`；要開給客戶時把 `audience` 改成 customer、填 `subdomain`，程式不變（操作者 2026-10-16 問「都要做成子網域嗎」）。
+- **每個產品都有子網域，登記那天就保留**：每個產品都適用五種方式（ADR 017 §0），「誰操作」是每次請求的值，不是產品的屬性，所以登記表不分客戶版／員工版。子網域開不開是部署狀態（DNS、nginx、`status`），不是程式差異。沒有子網域的是營運後台頁 `/ops/*`，它們不是產品、不在登記表（操作者 2026-10-16 問「都要做成子網域嗎」；先前擬的 `audience` 欄已撤，理由同上）。
 - 網址＝`subdomain`＋基底網域。基底網域讀環境變數 `PUBLIC_BASE_DOMAIN`（預設 aware-wave.com），單一產品可用 `PRODUCT_HOST_<KEY>` 覆寫。網址對應到哪扇門，只在 `lib/portal/doors.ts` 判斷，middleware 和頁面都問它。
 - 產品門上：不在該產品前綴的路徑改寫到頁面前綴（`/` → `/social`）；員工路由和其他產品的 API 回 404。產品的頁面前綴在別的網址也回 404。
 - 產品門的頁面用自己的精簡版面，不套員工側欄；畫面元件和員工門的 `/tools/<產品>` 共用同一份。
@@ -50,7 +50,7 @@
 
 ### 5. 怎麼讓它成為預設
 
-- **測試擋**：`lib/portal/__tests__/products.test.ts` 檢查每個產品都填了 `audience`、門（next-admin 前綴或 external）、`loginSources`（不得為空，要有 `local`）、`standalone`；`audience: customer` 必填 `subdomain`，`staff` 不得填。反向：`app/(shell)/tools/<x>` 與 `app/<門前綴>` 每個目錄都要對得到一列（ADR 017 順序 1）。子網域不能重複，也不能用 app、portal、www。前綴不能和員工路由重疊，也不能跟別的產品重疊。漏填就紅燈，提交不了。
+- **測試擋**：`lib/portal/__tests__/products.test.ts` 檢查每個產品都填了 `subdomain`、門（next-admin 前綴或 external）、`loginSources`（不得為空，要有 `local`）、`standalone`。反向：`app/(shell)/tools/<x>` 與 `app/<門前綴>` 每個目錄都要對得到一列（ADR 017 順序 1）。子網域不能重複，也不能用 app、portal、www。前綴不能和員工路由重疊，也不能跟別的產品重疊。漏填就紅燈，提交不了。
 - **規劃時想到**：[`GOVERNED_SYSTEM_BUILD_SOP.md`](../../operations/GOVERNED_SYSTEM_BUILD_SOP.md) §18 開新系統的必填清單。
 - **每輪都看得到**：`agency-os/AGENTS.md` §0 一行指向本 ADR。
 
