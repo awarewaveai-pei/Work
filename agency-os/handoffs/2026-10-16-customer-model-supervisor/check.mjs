@@ -14,11 +14,13 @@ const fail = (m) => errors.push(m);
 const domain = Object.fromEntries(AXES.map((a) => [a.key, new Set(a.values.map((x) => x.v))]));
 for (const w of WAYS) for (const k of Object.keys(domain)) if (!domain[k].has(w[k])) fail(`way ${w.name}: ${k}=${w[k]} 不在軸的值域`);
 if (new Set(WAYS.map((w) => w.name)).size !== WAYS.length) fail('WAYS 名字重複');
+for (const w of WAYS) if (!w.story) fail(`way ${w.name}: 缺 story（白話例子）`);
+for (const a of AXES) { if (!a.q) fail(`axis ${a.key}: 缺 q`); for (const v of a.values) if (!v.plain) fail(`axis ${a.key}.${v.v}: 缺 plain`); }
 
 // 2. 順序：編號 1..n 連續；每步有 gate／risk／model／status；done 必有 commit；depends 指向更小的編號
 STEPS.forEach((s, i) => {
   if (s.n !== i + 1) fail(`step ${s.n}: 編號不連續`);
-  for (const k of ['title', 'what', 'gate', 'risk', 'model', 'status']) if (!s[k]) fail(`step ${s.n}: 缺 ${k}`);
+  for (const k of ['title', 'plain', 'what', 'gate', 'risk', 'model', 'status']) if (!s[k]) fail(`step ${s.n}: 缺 ${k}`);
   if (!['not_started', 'in_progress', 'done'].includes(s.status)) fail(`step ${s.n}: status ${s.status}`);
   if (s.status === 'done' && !/^[0-9a-f]{9,}$/.test(s.commit || '')) fail(`step ${s.n}: done 沒有 commit`);
   for (const d of s.depends) if (!(d < s.n)) fail(`step ${s.n}: depends ${d} 不在前面`);
@@ -40,7 +42,7 @@ const page = readFileSync(path.join(here, 'supervisor.html'), 'utf8');
 if (page !== render()) fail('supervisor.html 不是 build.mjs 的最新產物：跑 node build.mjs');
 
 // 6. 頁面裡每個「N 步／N 種／N 扇」都是算出來的（帶 data-computed），不是手打
-for (const m of page.matchAll(/(\d+)\s*(個步驟|種方式|扇門|步未開始|步完成)/g)) {
+for (const m of page.matchAll(/(\d+)\s*(種，|件：|做完|做到一半|還沒開始|種現在有)/g)) {
   const before = page.slice(Math.max(0, m.index - 40), m.index);
   if (!before.includes('data-computed')) fail(`手打數字：${m[0]}`);
 }

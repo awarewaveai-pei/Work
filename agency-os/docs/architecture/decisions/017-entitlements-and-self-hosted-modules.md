@@ -115,7 +115,7 @@
 4. 各產品收費點接 `can()`；認知平台 `check_entitlement(store, tenant_id, capability_id) -> bool`（`ai_lego/platform/entitlement/check.py:25`）改成 `can()` 的薄接頭：加 `actor`、回傳 grant 物件（allowed／limits／max_spend／report），呼叫端只有 `ai_lego/apps/api/main.py` 9 處，同一 commit 改完；它 docstring 的「Phase 2 換內容不換簽章」由本步取代（讀過 2026-10-16）。HCI 側照 ADR-0031 gate 1–4 的位置落地，欄位改本 ADR §3（`entitlement_id`＋`source_ref`＋`actor`＋`on_behalf_of`）；主體解析照 ADR-0009（portal `organizations` 是 tenant 的 adapter，`external_tenant_id` 對應）。
 5. 買斷安裝階段：模組清單、建置時排除、授權檔簽發、客戶 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。
 6. API 通道（等第一個只串 API 的客戶）：計費帳戶發 API key（scope＝feature_key 子集），`actor = api_key:<id>`，用量走同一個 `report()`；登記表 `accessChannels` 加 `api`。
-7. 轉售（等第一個轉售客戶）：授權檔 `max_tenants > 1`，安裝內租戶數受它限制；合約與價格另訂。
+7. 轉售（等第一個轉售客戶）：授權檔 `max_tenants > 1`，安裝內租戶數受它限制；合約與價格另訂。**`max_tenants` 數的是根組織**（`parent_organization_id IS NULL` 的 `organizations` 列，0077）：一家公司、或一個集團含子公司／分公司／部門，都是 1，組織樹是產品本來的功能，不另收；多個不相干的客戶（代理商買去代操）才是 >1，隔離責任在客戶主機，合約寫明（操作者 2026-10-16 定案）。我們替買斷客戶代操不算租戶數，是維運加購（產品決定 Q6）。
 
 ## 不採用
 

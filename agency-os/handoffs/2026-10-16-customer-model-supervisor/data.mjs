@@ -23,30 +23,30 @@ export const DOORS = [
 
 // ADR 017 §0：三條軸。值存 text，不存 boolean；加值不改 schema。
 export const AXES = [
-  { key: 'deployment', name: 'A 部署', where: '每個安裝', values: [
-    { v: 'hosted', zh: '我們主機，控制面簽許可' },
-    { v: 'self_hosted', zh: '客戶主機，離線授權檔' },
+  { key: 'deployment', name: 'A 部署', q: '裝在哪裡？', where: '每個安裝', values: [
+    { v: 'hosted', plain: '我們的主機', zh: '我們主機，控制面簽許可' },
+    { v: 'self_hosted', plain: '客戶自己的主機', zh: '客戶主機，離線授權檔' },
   ] },
-  { key: 'money', name: 'B 錢從哪來', where: '計費帳戶 × 產品 × 功能', values: [
-    { v: 'contract', zh: '0062 合約：trial → active 訂閱' },
-    { v: 'comp', zh: '贈送、自用' },
-    { v: 'credits', zh: '錢包按次扣，不是權利列' },
-    { v: 'perpetual', zh: '買斷授權檔' },
+  { key: 'money', name: 'B 錢從哪來', q: '錢從哪裡來？', where: '計費帳戶 × 產品 × 功能', values: [
+    { v: 'contract', plain: '按月／按年訂閱', zh: '0062 合約：trial → active 訂閱' },
+    { v: 'comp', plain: '不收錢（自己用或送的）', zh: '贈送、自用' },
+    { v: 'credits', plain: '先買點數，用一次扣一次', zh: '錢包按次扣，不是權利列' },
+    { v: 'perpetual', plain: '一次買斷', zh: '買斷授權檔' },
   ] },
-  { key: 'actor', name: 'C 誰在按', where: '每次請求', values: [
-    { v: 'staff', zh: '員工，帶 on_behalf_of = 替哪個計費帳戶' },
-    { v: 'customer', zh: '客戶自己' },
-    { v: 'api_key', zh: '機器；等第一個只串 API 的客戶（順序 6）' },
+  { key: 'actor', name: 'C 誰在按', q: '誰在按按鈕？', where: '每次請求', values: [
+    { v: 'staff', plain: '我們的員工（替客戶按）', zh: '員工，帶 on_behalf_of = 替哪個計費帳戶' },
+    { v: 'customer', plain: '客戶自己', zh: '客戶自己' },
+    { v: 'api_key', plain: '客戶的程式（不開畫面）', zh: '機器；等第一個只串 API 的客戶（順序 6）' },
   ] },
 ];
 
 // ADR 017 §0：對外五種方式 = 三軸的組合
 export const WAYS = [
-  { name: '自用', zh: '我們自己用', deployment: 'hosted', money: 'comp', actor: 'staff', note: '計費帳戶 organizations.kind = internal（Account#0）', live: true },
-  { name: '代操', zh: '我們替客戶操作', deployment: 'hosted', money: 'contract', actor: 'staff', note: '也可 credits；客戶買維運時 self_hosted；on_behalf_of = 客戶', live: true },
-  { name: '訂閱', zh: '客戶自己用，按期付', deployment: 'hosted', money: 'contract', actor: 'customer', note: '14 天 trial 起', live: false },
-  { name: '點數', zh: '客戶自己用，按次扣', deployment: 'hosted', money: 'credits', actor: 'customer', note: '共用錢包（ADR 015）', live: false },
-  { name: '賣人＝買斷', zh: '裝在客戶主機', deployment: 'self_hosted', money: 'perpetual', actor: 'customer', note: '＋updates_until；客人已有網站就接進來（§6）；買維運時 staff', live: false },
+  { name: '自用', zh: '我們自己用', story: '例：你自己在 app.aware-wave.com 用社群發文、客服、蒐集，沒有人付錢。', deployment: 'hosted', money: 'comp', actor: 'staff', note: '計費帳戶 organizations.kind = internal（Account#0）', live: true },
+  { name: '代操', zh: '我們替客戶操作', story: '例：Soulful 付月費，我們的員工替她發文、回客服；她自己不登入。', deployment: 'hosted', money: 'contract', actor: 'staff', note: '也可 credits；客戶買維運時 self_hosted；on_behalf_of = 客戶', live: true },
+  { name: '訂閱', zh: '客戶自己用，按期付', story: '例：一家公司在 aware-wave.com 訂閱社群發文，每月扣款，員工自己登入 social.aware-wave.com 用。', deployment: 'hosted', money: 'contract', actor: 'customer', note: '14 天 trial 起', live: false },
+  { name: '點數', zh: '客戶自己用，按次扣', story: '例：一個人買 500 點，在認知平台按一次 AI 分析扣 3 點，用完再買。', deployment: 'hosted', money: 'credits', actor: 'customer', note: '共用錢包（ADR 015）', live: false },
+  { name: '賣人＝買斷', zh: '裝在客戶主機', story: '例：一個集團一次付清，我們裝到他們的主機，用他們自己的 AI key；子公司、分公司都在同一套裡，不另收。', deployment: 'self_hosted', money: 'perpetual', actor: 'customer', note: '＋updates_until；客人已有網站就接進來（§6）；買維運時 staff', live: false },
 ];
 
 // 現在真的在跑的（2026-10-16 查）
@@ -59,18 +59,18 @@ export const NOW = [
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
 export const STEPS = [
-  { n: 1, title: '登記表加 features[] 與 accessChannels；機械閘', what: 'products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。',
+  { n: 1, plain: '每個產品寫清楚「哪些功能要收費」。少寫一個，測試就紅燈。', title: '登記表加 features[] 與 accessChannels；機械閘', what: 'products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。',
     files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts'], gate: 'products.test.ts：漏填紅燈；可買斷模組含 SAFETY_GATE 紅燈', risk: 'Low', model: 'Opus 5.5', depends: [], status: 'not_started' },
-  { n: 2, title: 'Migration：plans、organization_entitlements、organizations.kind；許可帶 actor', what: '三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。',
+  { n: 2, plain: '資料庫知道「誰買了什麼方案、到期日、是哪個員工替誰按的」。', title: 'Migration：plans、organization_entitlements、organizations.kind；許可帶 actor', what: '三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。',
     files: ['lobster-factory/packages/db/migrations/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '靜態檢查：三表只准 lib/entitlements/** 與 app/portal/** 引用，別處出現建置失敗', risk: 'Medium', model: 'Opus 5.5（先出計畫）', depends: [1], status: 'not_started' },
-  { n: 3, title: 'Woo 付款通知 → 合約與權利；帳本泛化', what: '付款通知帶 Woo 商品 id → plans.woo_product_ids 查方案 → 合約列 → 重算權利列；media_ 帳本去前綴加 product_key（ADR 015 §4）。',
+  { n: 3, plain: '客戶在 aware-wave.com 付了錢，系統自動開通，不用你手動。', title: 'Woo 付款通知 → 合約與權利；帳本泛化', what: '付款通知帶 Woo 商品 id → plans.woo_product_ids 查方案 → 合約列 → 重算權利列；media_ 帳本去前綴加 product_key（ADR 015 §4）。',
     files: ['lobster-factory/packages/wp-bridge-plugin/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/portal/'], gate: '測試：一筆付款通知只產生一組合約與權利列（冪等）', risk: 'High（金流）', model: 'Opus 5.5', depends: [2], status: 'not_started', before: '定期扣款外掛與台灣金流查定（待決 1）；點數條款與預收會計（待決 3）' },
-  { n: 4, title: '每個收費點只問 can(主體, feature_key, actor)', what: '社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。',
+  { n: 4, plain: '每個收費按鈕按下去前先問一次「這個人能不能用」。沒買的按鈕灰掉。', title: '每個收費點只問 can(主體, feature_key, actor)', what: '社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。',
     files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts', 'Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py', 'Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py'], gate: '測試：代操時點數扣 on_behalf_of、稽核記 actor；沒有 active 權利列不簽許可', risk: 'Medium', model: 'Opus 5.5', depends: [2], status: 'not_started' },
-  { n: 5, title: '買斷安裝階段', what: '模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、客戶主機商 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。',
+  { n: 5, plain: '一鍵把整套裝到客戶主機，交接時收回我們的鑰匙。', title: '買斷安裝階段', what: '模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、客戶主機商 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。',
     files: ['lobster-factory/packages/workflows/src/provision/', 'agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md'], gate: '授權檔離線驗章；我們的伺服器停了安裝照常能用', risk: 'High（交付）', model: 'Fable 5.1 設計 → Opus 5.5 做', depends: [4], status: 'not_started', before: 'Postiz AGPL 交付請律師確認（待決 2）' },
-  { n: 6, title: 'API 通道', what: '計費帳戶發 API key（scope = feature_key 子集），actor = api_key:<id>，用量走同一個 report()；登記表 accessChannels 加 api。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '測試：key 的 scope 外功能被拒', risk: 'Medium', model: 'Opus 5.5', depends: [4], status: 'not_started', waitFor: '等第一個只串 API 的客戶' },
-  { n: 7, title: '轉售', what: '授權檔 max_tenants > 1，安裝內租戶數受它限制；合約與價格另訂。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/（授權檔格式，順序 5 建）'], gate: '測試：超過 max_tenants 的租戶建立被拒', risk: 'Medium', model: 'Opus 5.5', depends: [5], status: 'not_started', waitFor: '等第一個轉售客戶' },
+  { n: 6, plain: '客戶不開畫面、只用程式串我們，也能算錢。', title: 'API 通道', what: '計費帳戶發 API key（scope = feature_key 子集），actor = api_key:<id>，用量走同一個 report()；登記表 accessChannels 加 api。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '測試：key 的 scope 外功能被拒', risk: 'Medium', model: 'Opus 5.5', depends: [4], status: 'not_started', waitFor: '等第一個只串 API 的客戶' },
+  { n: 7, plain: '代理商買一套去服務多家客戶，照客戶數收。', title: '轉售（代理商版）', what: '授權檔 max_tenants > 1，安裝內「根組織」數受它限制：一家公司或一個集團（含子公司、分公司、部門）都算 1，不另收；代理商買去替多家不相干的客戶代操才是 >1，另訂價，隔離責任在客戶主機（操作者 2026-10-16 定案）。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/（授權檔格式，順序 5 建）'], gate: '測試：超過 max_tenants 的租戶建立被拒', risk: 'Medium', model: 'Opus 5.5', depends: [5], status: 'not_started', waitFor: '等第一個轉售客戶' },
 ];
 
 // 操作者自己要決定的（agent 不能替她定）
