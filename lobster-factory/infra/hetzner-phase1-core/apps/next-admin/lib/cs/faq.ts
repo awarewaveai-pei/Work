@@ -8,7 +8,7 @@
 // marked `handoff` answers AND hands over, for questions a person has to follow up (booking, prices).
 
 import { hitsSensitive } from "@/lib/cs/autonomy";
-import type { CsFaqEntry } from "@/lib/cs/types";
+import type { CisProfile, CsFaqEntry } from "@/lib/cs/types";
 
 /** Limits shared by the API sanitizer and the editor. */
 export const CS_FAQ_LIMITS = { entries: 50, keywords: 20, keywordChars: 30, answerChars: 1000 } as const;
@@ -37,6 +37,13 @@ export function matchFaq(entries: readonly CsFaqEntry[], text: string): CsFaqEnt
     }
   }
   return best && !tied ? best : null;
+}
+
+/** The FAQ answer a tenant gives this message, or null. The FAQ only answers where there is a
+ * Chatwoot to send through; the webhook and the offline exam both ask here, so they cannot drift
+ * (Codex 2026-10-16 partialreview-e9405b9c F1). */
+export function tenantFaqAnswer(cis: Pick<CisProfile, "chatwoot" | "csFaq">, text: string): CsFaqEntry | null {
+  return cis.chatwoot ? matchFaq(cis.csFaq ?? [], text) : null;
 }
 
 /** Validates operator input (cis API) and stored config (loadCis) alike; drops what does not fit. */

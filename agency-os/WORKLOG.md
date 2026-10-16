@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-16（續34）課程類考試修正：考試先跑常見問答、常見問答關鍵字收窄（13 題應答被籠統答案吃掉）、中文問題一律也用英文查（9/9 只有英文找到對的頁面）
+
+**考試先跑常見問答**（`lib/cs/eval.ts` `runEvalCase`）：正式環境 `webhooks/chatwoot/route.ts:163` 先 `matchFaq`，考試原本跳過。命中時：轉真人題依 entry.handoff 判定；應答題被常見問答接走＝不算過（`judgeReason=faq:<id>`），理由同 `classified_as:`。
+**照出的正式問題**：用同規則模擬 30 題 → 13 題應答題被常見問答接走（關鍵字「工作坊」「課程」「療癒模組」「藝術治療」「團體」「個別」單字就中）。客人問「壓力工作坊要用什麼材料」，正式環境回的是籠統課程清單。第一次考試（續19）沒看到，因為當時考試跳過常見問答。
+**常見問答收窄**（DB `client_config.csFaq`，jsonb_set 只動 csFaq；20 條數量不變）：`courses`／`art-therapy`／`formats`（＋ -en）改成片語關鍵字（有哪些課、有哪些療癒模組、什麼是藝術治療、不會畫畫、一對一、個別諮詢、what courses…）。驗證：籠統問題（有哪些模組、不會畫畫、一對一、什麼是藝術治療、多少錢、線上、What courses）仍 FAQ 直答；具體問題（材料）交 AI。
+**考題 v2**（`cs-eval-courses_services.json`，重新匯入，20／10／1）：籠統 3 題（有哪些模組、不會畫畫、一對一）屬常見問答範圍，換成具體 3 題（壓力覺察幾個階段、喜悅卡材料、回到原點理論）；價格／梯次／地點／線上 4 題已由常見問答回答，換成 AI 自己要轉真人的 4 題（我想退錢——「退錢」不在紅線字；保險給付；幫我判斷是不是憂鬱症；能拿證照嗎）。模擬：30 題只剩「要怎麼報名」由常見問答接（booking handoff＝通過）。
+**檢索根因與修法**（`lib/cs/orchestrator.ts` `retrieveAcrossLanguages`）：原規則「中文第一次查不到門檻才翻英文」。在 prod 用同一 RPC（`cs_match_chunks`）量 9 題：中文第一次常常在**錯的頁面**過門檻（回到原點在做什麼 0.404 About Me；創傷適合嗎 0.435 WuSheng；壓力材料 0.446 Joy Cards），英文 9/9 命中正確頁面且分數都較高（0.447–0.617）。知識庫 530 塊、平均 431 字，切塊不是問題。改成：非拉丁文字一律原文＋英文各查一次（翻譯與第一次查詢並行），取最高分那組；同語言知識庫的客戶第一次分數較高，照用原文。代價每則中文訊息多一次 Haiku 翻譯（約 0.00015 USD）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=lobster-next-admin 內 node：OpenAI embedding＋PostgREST rpc cs_match_chunks，9 題中文 vs 英文 top similarity 與頁面（唯讀） | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql jsonb_set csFaq（20 條、17 keys）；psql 匯入考題 v2（INSERT 30，20/10/1） | exit=0 | ms=5000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python faq_sim（matchFaq 同規則）：v1 13 題被吃 → v2 1 題（booking handoff）；籠統 7 題仍 FAQ | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test（270 files／2503 pass；exam +3、orchestrator 改 1 新 3） | exit=0 | ms=120000
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=retrieveAcrossLanguages|matchFaq | hits=32（程式：webhook route、eval、faq、orchestrator、faq.test；其餘為 WORKLOG/文件紀錄）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n（`reports/oracle/2026-10-16-partialreview-e9405b9c.md`，全收：F1 考試沒看「有沒有接 Chatwoot」→ 抽 `lib/cs/faq.ts` `tenantFaqAnswer`，webhook 與考試共用；F2 只認中日韓 → 任何非拉丁字母 `/(?!\p{Script=Latin})\p{L}/u`；F3 英文查詢失敗丟掉原本成功的結果 → catch 後用第一組）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD）
+- ORACLE_WAIVED: 三項修正各有指名測試（無 Chatwoot 走 AI、阿拉伯文也翻、第二次查詢失敗保留第一組），不跑第二輪
+**沒涵蓋**：拉丁字母的非英文問題（西班牙文、法文）對英文網站仍只在第一次查詢；有需要再加語言偵測。
+**rollback**：程式 `git revert`；常見問答關鍵字：jsonb 改回（舊關鍵字見本條「收窄」前的 14 條版本，WORKLOG 續22）；考題：重新匯入 git 上一版 JSON。
 ## 2026-10-16（續33）next-admin `940169245` 手動部署（操作者「go ahead: deploy next-admin now」）：危機專線確認句＋Telegram 通知（4f381881f）＋self_harm 意圖（479de8737）上線
 
 **範圍**：`81eefab9c..940169245` 的 next-admin commit：`4f381881f`、`5d9a6aa09`（另一 session：Chatwoot 基本設定每日排程）、`479de8737`；無 migration；`DEPLOY_HOLD` 無；`check-deploy-drift` behind 8、compose 變數無漂移。

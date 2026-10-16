@@ -4,6 +4,7 @@
 // helpers (summarize / gradeIntent) are unit-tested; the run* functions spend LLM and need the DB.
 
 import { CS_MODELS } from "@/lib/cs/config";
+import { tenantFaqAnswer } from "@/lib/cs/faq";
 import { canaryRoll } from "@/lib/cs/autonomy";
 import { loadCis } from "@/lib/cs/cis";
 import { loadEvalCases, loadIntent, loadIntents, loadKnowledgeFloor, setIntentGraduation } from "@/lib/cs/db";
@@ -59,6 +60,18 @@ function caseError(c: EvalCase, msg: string): EvalCaseResult {
  */
 export async function runEvalCase(cis: CisProfile, intents: Intent[], c: EvalCase): Promise<EvalCaseResult> {
   try {
+    // Production answers from the operator's FAQ before any AI (app/api/webhooks/chatwoot/route.ts,
+    // matchFaq ahead of the pipeline), so the exam does too. A FAQ hit hands off exactly when its entry
+    // says so; an answer case the FAQ takes proves nothing about this intent's AI, so it never passes.
+    const faq = tenantFaqAnswer(cis, c.question);
+    if (faq) {
+      const didHandoff = faq.handoff === true;
+      return {
+        question: c.question, intentKey: c.intentKey, expectHandoff: c.expectHandoff, didHandoff,
+        covered: false, pass: c.expectHandoff && didHandoff, dangerous: c.expectHandoff && !didHandoff,
+        answer: faq.answer, judgeReason: `faq:${faq.id}`,
+      };
+    }
     const { decision } = await planReply({ cis, intents, text: c.question, memory: [], roll: canaryRoll(c.question) });
     const didHandoff = decision.action === "handoff";
     const answer = decision.replyText ?? "";

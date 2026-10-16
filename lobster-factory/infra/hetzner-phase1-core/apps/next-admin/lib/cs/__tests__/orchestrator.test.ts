@@ -89,7 +89,7 @@ describe("handleInbound -- per-tenant knowledge floor", () => {
 });
 
 describe("handleInbound -- retrieval across languages", () => {
-  it("a Chinese question that misses is retried in English, and the better set is used", async () => {
+  it("a Chinese question is also searched in English, and the better set is used", async () => {
     retrieve.mockResolvedValueOnce([chunk(0.46)]).mockResolvedValueOnce([chunk(0.72)]);
     const d = await handleInbound(msg("請問你們有哪些療癒課程？"));
     expect(generateText).toHaveBeenCalledTimes(1);
@@ -114,10 +114,32 @@ describe("handleInbound -- retrieval across languages", () => {
     expect(retrieve).toHaveBeenCalledTimes(1);
   });
 
-  it("a hit on the first pass is not translated", async () => {
-    retrieve.mockResolvedValue([chunk(0.8)]);
-    await handleInbound(msg("請問你們有哪些療癒課程？"));
-    expect(generateText).not.toHaveBeenCalled();
+  it("a Chinese first pass that clears the floor is still checked in English -- the wrong page clears it too (2026-10-16)", async () => {
+    retrieve.mockResolvedValueOnce([chunk(0.43)]).mockResolvedValueOnce([chunk(0.52)]);
+    const d = await handleInbound(msg("「回到原點」這個工作坊在做什麼？"));
+    expect(retrieve).toHaveBeenCalledTimes(2);
+    expect(d.retrievalScore).toBe(0.52);
+  });
+
+  it("a tenant whose pages match the customer's language keeps the first set", async () => {
+    retrieve.mockResolvedValueOnce([chunk(0.8)]).mockResolvedValueOnce([chunk(0.5)]);
+    const d = await handleInbound(msg("請問你們有哪些療癒課程？"));
+    expect(d.retrievalScore).toBe(0.8);
+    expect(d.traceMeta.retrievalQuery).toBeNull();
+  });
+
+  it("an Arabic question is searched in English too (any non-Latin script, not only CJK)", async () => {
+    retrieve.mockResolvedValueOnce([chunk(0.3)]).mockResolvedValueOnce([chunk(0.6)]);
+    const d = await handleInbound(msg("ما هي الدورات التي تقدمونها؟"));
+    expect(retrieve).toHaveBeenCalledTimes(2);
+    expect(d.retrievalScore).toBe(0.6);
+  });
+
+  it("a failed English search keeps the first set instead of failing the message", async () => {
+    retrieve.mockResolvedValueOnce([chunk(0.8)]).mockRejectedValueOnce(new Error("embedding down"));
+    const d = await handleInbound(msg("請問你們有哪些療癒課程？"));
+    expect(d.action).not.toBe("handoff");
+    expect(d.retrievalScore).toBe(0.8);
   });
 
   it("translation failure degrades to the first set", async () => {

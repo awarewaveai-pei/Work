@@ -8,7 +8,7 @@ import { handoffAckText, isCrisisAck, isNameQuestionAck, isPlaceholderContactNam
 import { hitsCrisis } from "@/lib/cs/autonomy";
 import { alertOperatorOfCrisis } from "@/lib/cs/crisis-alert";
 import { buildOperatorTelegramNotifier } from "@/lib/ops-inbox/notify/telegram";
-import { matchFaq } from "@/lib/cs/faq";
+import { tenantFaqAnswer } from "@/lib/cs/faq";
 import { reserveCsCredit } from "@/lib/cs/billing";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
@@ -171,7 +171,7 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
 
   // Operator-written answers: plain keyword matching, no model call, so no credit either (lib/cs/faq.ts).
   // A failed send throws and leaves the claim to the sweep, like every other delivery here.
-  const faq = cis.chatwoot ? matchFaq(cis.csFaq ?? [], inbound.text) : null;
+  const faq = tenantFaqAnswer(cis, inbound.text);
   if (faq && cis.chatwoot) {
     await sendReply(organizationId, cis.chatwoot, conversationId, faq.answer);
     if (faq.handoff) await handoffToHuman(organizationId, cis.chatwoot, conversationId);

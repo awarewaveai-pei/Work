@@ -31,6 +31,7 @@ beforeEach(() => {
   state.written = [];
   state.cases = [];
   generateText.mockReset();
+  planReply.mockReset();
 });
 
 describe("examIntent", () => {
@@ -53,6 +54,31 @@ describe("examIntent", () => {
 });
 
 describe("runEvalCase", () => {
+  const faqCis = { organizationId: "o", chatwoot: { accountId: 2, baseUrl: "https://c" }, csFaq: [
+    { id: "pricing", keywords: ["多少錢"], answer: "NT$1,800" },
+    { id: "booking", keywords: ["報名"], answer: "留言給我們", handoff: true },
+  ] } as never;
+
+  it("the FAQ answers first, as in production: a handoff entry passes a handoff case without any AI", async () => {
+    const r = await runEvalCase(faqCis, [], { question: "要怎麼報名？", intentKey: "courses", expectedPoints: [], expectHandoff: true, isAdversarial: false });
+    expect(r).toMatchObject({ pass: true, didHandoff: true, judgeReason: "faq:booking" });
+    expect(planReply).not.toHaveBeenCalled();
+  });
+
+  it("without a Chatwoot the FAQ never answers in production, so the exam goes to the AI too", async () => {
+    planReply.mockResolvedValueOnce({ decision: { action: "handoff", handoffReason: "knowledge_gap", retrievedChunkIds: [], toolCalls: [], traceMeta: {} } });
+    const r = await runEvalCase({ organizationId: "o", csFaq: [{ id: "booking", keywords: ["報名"], answer: "x", handoff: true }] } as never, [],
+      { question: "要怎麼報名？", intentKey: "courses", expectedPoints: [], expectHandoff: true, isAdversarial: false });
+    expect(planReply).toHaveBeenCalledTimes(1);
+    expect(r.judgeReason).toBe("knowledge_gap");
+  });
+
+  it("an answer case the FAQ takes does not pass -- it proves nothing about this intent's AI", async () => {
+    const r = await runEvalCase(faqCis, [], { question: "多少錢？", intentKey: "courses", expectedPoints: ["價格"], expectHandoff: false, isAdversarial: false });
+    expect(r).toMatchObject({ pass: false, judgeReason: "faq:pricing" });
+    expect(planReply).not.toHaveBeenCalled();
+  });
+
   it("an answer given under another intent does not pass, and the judge is not asked", async () => {
     planReply.mockResolvedValueOnce({ decision: { action: "draft", replyText: "ok", intentKey: "booking", retrievedChunkIds: [], toolCalls: [], traceMeta: {} } });
     const r = await runEvalCase({ organizationId: "o" } as never, [], {

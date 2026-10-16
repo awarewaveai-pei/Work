@@ -141,7 +141,7 @@ export async function planReply(input: {
   // includeSensitive: false (migration 0083) -- this IS the customer-service AI's own answer path;
   // a document ticked "敏感" in the ops UI must never end up quoted back to an end user.
   const minRetrievalScore = cis.minRetrievalScore ?? CS_THRESHOLDS.minRetrievalScore;
-  const retrieved = await retrieveAcrossLanguages(organizationId, text, minRetrievalScore);
+  const retrieved = await retrieveAcrossLanguages(organizationId, text);
   const { chunks } = retrieved;
   const retrievalScore = topScore(chunks);
   const chunkIds = chunks.map((c) => c.id);
@@ -237,23 +237,27 @@ export async function planReply(input: {
   return { decision, answerLevel: intent.answerLevel };
 }
 
-const NON_LATIN = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/;
+/** Any letter outside the Latin script (CJK, Arabic, Cyrillic, Thai, …): such a question is also searched in English. */
+const NON_LATIN = /(?!\p{Script=Latin})\p{L}/u;
 
 /**
  * A knowledge base can be written in a different language from the one customers write in
- * (Soulful: English pages, Chinese questions). Embedding similarity across languages lands well
- * under minRetrievalScore (0.46 for a question the pages did answer, 2026-10-15), which would hand
- * every question to a human. When the first pass misses and the question is not Latin-script, the
- * question is rendered into English by the cheap model and retrieval runs once more; the set with
- * the higher top score wins. The extra call happens only on a miss.
+ * (Soulful: English pages, Chinese questions). A non-Latin question is therefore always searched
+ * twice -- as written and rendered into English by the cheap model -- and the set with the higher
+ * top score wins. Retrying only when the first pass missed the floor was wrong: a Chinese question
+ * clears the floor on the WRONG page often enough (2026-10-16, Soulful exam: 「回到原點在做什麼」
+ * 0.404 on About Me vs 0.447 on Back To The Origin in English; 9 of 9 measured questions found the
+ * right page only in English). A tenant whose pages share the customer's language keeps its own
+ * set, because its first pass scores higher. The translation runs alongside the first search.
  */
-async function retrieveAcrossLanguages(organizationId: string, text: string, minRetrievalScore: number): Promise<{ chunks: RetrievedChunk[]; translated?: string }> {
+async function retrieveAcrossLanguages(organizationId: string, text: string): Promise<{ chunks: RetrievedChunk[]; translated?: string }> {
   const ctx = { scope: [organizationId], viewer: organizationId, includeSensitive: false };
-  const first = await retrieve(ctx, text);
-  if (topScore(first) >= minRetrievalScore || !NON_LATIN.test(text)) return { chunks: first };
-  const translated = await translateForRetrieval(organizationId, text);
+  if (!NON_LATIN.test(text)) return { chunks: await retrieve(ctx, text) };
+  const [first, translated] = await Promise.all([retrieve(ctx, text), translateForRetrieval(organizationId, text)]);
   if (!translated) return { chunks: first };
-  const second = await retrieve(ctx, translated);
+  // The English search is a second opinion: when it fails, the first set still stands.
+  const second = await retrieve(ctx, translated).catch(() => null);
+  if (!second) return { chunks: first };
   return topScore(second) > topScore(first) ? { chunks: second, translated } : { chunks: first };
 }
 
