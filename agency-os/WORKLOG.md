@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-16（續16）next-admin 3b146fd0f 上線（含續12 唯讀說明 236c86524；操作者「部署」）
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → migration 閘 OK（104）、smoke 5/5、deployed 3b146fd0f（rollback 映像 lobster-phase1-next-admin:rollback-20261016-082205） | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`git merge-base --is-ancestor 236c86524 3b146fd0f` 成立；容器 `.next/static/chunks/6415-*.js` 含「讓你取得發文權限」 | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 部署已審過的 commit（續12）
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：操作者到「社群發文 → 設定 → 成員」把 graphicdesignpeijing@gmail.com 加為編輯或擁有者。
+**rollback**：`rollback-phase1.sh` 用上列映像。
 ## 2026-10-16（續15）客戶怎麼來：全鏈對照後一次補齊——七張執行卡（指令＋路徑＋預期）、到期／寬限／保留／金鑰／RLS／代操授權／更新管道寫進 ADR 017、13 個工具目錄歸位、ADR 015 順序 1 列為第 3 步前置；監工台每步接卡、閘要求有卡
 
 **觸發**：操作者「不要我問一句你做一件事」。此前每題補一處，沒有一次把整條鏈走完。
