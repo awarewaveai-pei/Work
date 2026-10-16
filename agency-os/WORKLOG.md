@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-16（續7）next-admin 手動部署被 test 閘擋：新 Chatwoot token route 沒列入 production-change 覆蓋清單（2abb9acd5 從沒跑過全套）
+
+**操作者**：「部署 next-admin（go ahead），部署完我用 John Doe 測名字寫回」。
+**擋下**：`sg-deploy.sh next-admin`（02:34Z）npm test 1 紅 → 自動中止，prod 仍 `38102e22f`、`lobster-next-admin` healthy。紅的是 `lib/system-modes/__tests__/production-change-coverage.test.ts`：凡 import `lib/cs/chatwoot-client` 的檔必須呼叫 `checkProductionChangeAllowed` 或列 ALLOWLIST；續5 新增的 `cs-config/chatwoot-token/route.ts` 兩者皆無。
+**根因**：續5 只跑指名 CS 測試（`vitest run app/api/ops/clients/[slug]/cs-config app/api/webhooks/chatwoot lib/cs`），這支跨檔結構測試在 `lib/system-modes`，第一次跑到是部署閘。不修的話今晚 03:00 自動部署也會在同一步失敗。
+**修**：ALLOWLIST 加該 route，一行理由：只用 `checkUserToken()`（GET contacts，擋 bot token）與 vault ref 名，token 存自家 vault，Chatwoot 端不改任何東西（同 `app/api/tools/studio/mockup/route.ts` 只讀條目）。route 確認：`chatwoot-token/route.ts:16` import、`:71` checkUserToken、`:77` putSecret；`chatwoot-client.ts:81` fetch 無 method＝GET。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin → npm test 1 failed（production-change-coverage）→ deploy aborted；docker ps lobster-next-admin healthy；.deployed-commit 38102e22f | exit=1 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test（259 files／2399 pass） | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 測試檔 ALLOWLIST 一行，該檔自述的既定機制
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=chatwoot-token/route | hits=3（ALLOWLIST 新條目、route 本身、本條）
+- ORACLE_WAIVED: 一行豁免清單＋理由，全套測試綠
 ## 2026-10-16（續6）社群發文「成員」按加入看似沒反應：結果訊息顯示在頁首，改成顯示在該區塊
 
 **操作者**：social.aware-wave.com 設定 → 成員，輸入 graphicdesignpeijing@gmail.com 按加入「沒反應」。

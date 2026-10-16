@@ -63,6 +63,8 @@ const ALLOWLIST: Record<string, string> = {
   "lib/social/withdraw.ts": "deletes a post still waiting in Postiz: it can only stop a publication, which a blocking mode must never prevent.",
   "lib/cs/sweep.ts":
     "only posts a private note + hands the conversation to a human -- the exact action a blocking mode itself takes (webhooks/chatwoot/route.ts T27), never AI output.",
+  "app/api/ops/clients/[slug]/cs-config/chatwoot-token/route.ts":
+    "imports chatwoot-client only for checkUserToken() (a GET of the account's contacts, to refuse a bot token) and the vault ref name; the token is stored in our own vault, nothing in Chatwoot changes.",
 };
 
 function walk(dir: string, out: string[]): void {
