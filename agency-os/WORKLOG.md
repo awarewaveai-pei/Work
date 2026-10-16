@@ -1,4 +1,12 @@
 # Worklog
+## 2026-10-16（續28）Soulful 常見問答 `pricing` 真測：Messenger「多少錢」1.2 秒直答、AI 0 次
+
+**真測（John Doe／Messenger）**：第一次「多少錢」（msg 58，11:41:50Z）落在對話 9（open＝human_owns_thread 靜默，設計）→ bot token `toggle_status` 結案 → 再傳（對話 10 msg 60，11:46:07Z）→ msg 61 AgentBot 價目表 11:46:08Z；`cs_ai_replies` `faq:pricing` auto_sent；`ai_call_logs` 20 分鐘 0 筆。部署後 log `ReferenceError` 0。
+**未驗**：客服分頁 GET（要登入，機器打 401）留給操作者下次開分頁時確認。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=chatwoot psql messages 58–61＋cs_ai_replies faq:pricing＋ai_call_logs 0＋docker logs ReferenceError 0 | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 驗收，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-10-16（續27）客服 AI：危機訊息的確認句附求助專線、照樣問名字、即時通知操作者 — next-admin，交今晚 03:00 自動部署
 
 **操作者決定**（同日）：① 確認句附求助資源，依客人語言或地區 ② 危機時照樣問「怎麼稱呼您」③ 即時通知操作者：可以。
