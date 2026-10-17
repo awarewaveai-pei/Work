@@ -127,6 +127,7 @@
   7. `social_smart_links(organization_id primary key, slug unique, title, bio, colour, published boolean)`、`social_smart_link_items(id, organization_id, position, title, url, active boolean)`、`social_smart_link_clicks(item_id, day date, n integer, primary key(item_id, day))`。
   8. `social_metrics_daily(account_id, day date, followers, reach, impressions, engagement, posts, primary key(account_id, day))`、`social_post_metrics(target_id primary key, reach, engagement, fetched_at)`（F18；每日快照，趨勢不靠平台回溯）。
   9. `social_reports(id, organization_id, name, period_from date, period_to date, format text check in ('pdf'), account_ids uuid[], sections text[], created_at, created_by)`（F23；PPT 是 V2，不開欄位）。
+  10. `social_accounts`＋`chatwoot_inbox_id integer null`（C29 用：頻道 ↔ Chatwoot inbox）。
   RLS 全部 default deny＋org policy 照 0096；`social_audit_log` 寫入點：標籤、規則、智慧連結、報表各一動作名。
 - 驗收：拋棄式 DB 套 0105 → down → 0105 再套（`feedback_never_test_against_prod_container`）；`db-expert` 審（鎖、回填、cascade）；`lib/social/__tests__/store.test.ts`、`rotation.test.ts` 加 slots 用例；`npm test` 綠；**不套正式庫**，跟第一張用到它的 UI 卡同一次部署（`DEPLOY_HOLD` 擋 03:00 自動部署直到 C19＋C21 都在 main）。
 - 邊界：不動 0096–0104；不動 `dispatch.ts` 的送出邏輯（留言多則由 C21 改 `compose.ts`）。
@@ -139,7 +140,7 @@
 - 驗收：`npx tsc --noEmit`；vitest：`compose.test.ts` N 則留言 values、`limits` 留言超限、`store.test.ts` repeat／tags／comments 寫讀；`render-views.mjs` 加 `02-compose`、`03-compose-menu`、`04-compose-picker`；e2e：建立→兩則留言→設定行程→回日曆看到卡。
 - 邊界：不做 mention 自動完成、hashtag 建議（V2）；AI 鈕只開面板＋標費用，呼叫走既有 `lib/ai/cost-model.ts`（有就接，沒有就只畫）；不做影片（C31）。
 
-### C22 日曆、卡片、清單、已刪除、篩選（Sonnet 5.5；C19、C20 之後，與 C21 不同檔）
+### C22 日曆、卡片、清單、已刪除、篩選（Sonnet 5.5；C19、C20 之後；與 C21 不同檔）
 - 目標：定案 4 的日曆內容：每天一欄、卡片照時間疊、縮圖、標籤色條、🔁／🤖、現在線、今天欄深色、最佳發布時間、篩選面板（平台／狀態／標籤）、貼文清單＋批次動作鈕、已刪除貼文分頁（誰刪的）、月檢視可換月。
 - 範圍：`Calendar.tsx`（整檔：`WeekView` 小時格 :13–57 → 疊放；`MonthView` 加換月＋格內 2 則＋「還有 N 則」）、`social.css` 日曆區（:41–60）、新 `Trash.tsx`（已刪除分頁；`social_audit_log` 的 actor＝誰刪的，`GET /api/social/posts?trash=1` 已有）、`SocialManager.tsx` 篩選面板與批次選單（C19 留的鈕）、`api.ts`／`app/api/social/posts/route.ts`（`tags` 篩選參數）。
 - 輸入：樣稿 `function cardHtml`、`function renderWeek`、`function renderMonth`、`function renderList`、`function renderTrash`、`function renderFilterPop`、`BEST`／`bestFor`；`model.ts:47–55` 狀態名與色 token。
@@ -147,7 +148,7 @@
 - 驗收：`model.test.ts` 加 `occurrences`（週期性展開）與最佳時段；`render-views.mjs` 加 `05-best`、`06-filter`、`07-trash`、`08-month`；e2e：勾兩則→批次送審→狀態變。
 - 邊界：不碰 `Editor`／`compose/`；不做拖拉改分鐘（卡片疊放後拖到別天即可，時間不變）。
 
-### C23 自動發布清單方格（Opus 5.5；C20 之後）
+### C23 自動發布清單方格（Opus 5.5；C20、C21 之後）
 - 目標：F21：清單時段＝星期 × 時間方格；「＋ 加一個時間」加一列；每列可拿掉；發到＝頻道按鈕；分頁頂端一句例子。
 - 範圍：`Lists.tsx`（`ListDetail` 的每週列 :142 附近 → 方格）、`lib/social/rotation.ts`（`listSlots` :26 讀 `social_list_slots`）、`lib/social/lists.ts`、`app/api/social/lists/*`、`api.ts:40–41` `ListRow`/`ListInput`（`slots: Array<{weekday, send_time}>`）。
 - 輸入：樣稿 `function renderLists`（`.sgrid7`、`.slot`）；0101 具體化不變量（檔頭）。
@@ -171,7 +172,7 @@
 - 驗收：`render-views.mjs` `13-reporting`＋`14-report-print`（Playwright `page.pdf()` 存一份看版面）；`jobs` 測試有新 key。
 - 邊界：不接 PPT；不做跨品牌儀表板。
 
-### C26 智慧連結（Opus 5.5；C20 之後）
+### C26 智慧連結（Opus 5.5；C19、C20 之後）
 - 目標：一個放簡介的連結頁：標題、介紹、按鈕顏色、連結（顯示／文字／網址／排序／刪／加）、發布開關、複製連結、手機預覽；每個連結點擊數。
 - 範圍：新 `smartlinks/page.tsx`＋`SmartLinks.tsx`、`app/api/social/smartlink/*`、公開頁 `app/l/[slug]/page.tsx`（走 `social.aware-wave.com/l/<slug>`；middleware 允許匿名；`noindex` 可選）、`app/l/[slug]/go/[item]/route.ts`（302＋`social_smart_link_clicks` +1）。
 - 輸入：樣稿 `function renderSmart`（`.phone` 預覽）。
@@ -188,7 +189,7 @@
 - 驗收：`auto-rules.test.ts`：單則優先、關鍵字比對、平台過濾、關掉的規則不中；`render-views.mjs` `15-flows`。
 - 邊界：Bluesky／Threads 不做；不做多步流程（Metricool 的 chained sequences，V2）。
 
-### C28 廣告管理（Sonnet 5.5；G3 `ads_read` 通過才開；之前只放殼）
+### C28 廣告管理（Sonnet 5.5；C19、C20 之後；G3 `ads_read` 通過才開，之前只有 C19 的殼）
 - 目標：連接 Meta／Google 廣告帳號，看花費／曝光／點擊／轉換，活動暫停／繼續；不在這裡建廣告。
 - 範圍：`ads/page.tsx`＋`Ads.tsx`、`lib/social/ads.ts`（Meta Marketing API `act_<id>/campaigns,insights`；Google Ads V2）、表 `social_ad_accounts`／`social_ad_campaigns_daily`（**本卡自己開 0106**，C20 不預開）。
 - 輸入：樣稿 `function renderAds`。
@@ -196,7 +197,7 @@
 - 驗收：`ads.test.ts` 期間換算；`render-views.mjs` `16-ads`。
 - 邊界：不建、不改廣告；TikTok 不做。
 
-### C29 訊息收件匣（Sonnet 5.5；C19 之後）
+### C29 訊息收件匣（Sonnet 5.5；C19、C20 之後）
 - 目標：Chatwoot 入口＋各頻道未讀數（ADR 016 §6：收件匣＝Chatwoot）。
 - 範圍：`inbox/page.tsx`＋`Inbox.tsx`、`app/api/social/inbox/route.ts`（用 `lib/cs/chatwoot-client.ts` 既有 token 流程 :61–78 查未讀；Chatwoot inbox ↔ `social_accounts` 的對應存 `social_accounts.chatwoot_inbox_id`，**C20 一併加欄**）。
 - 輸出：每頻道一列＝圖＋名稱＋「N 則未讀／都讀了」；「打開收件匣」開 Chatwoot 新分頁；沒連 Chatwoot 的租戶顯示怎麼連。
@@ -225,5 +226,5 @@
 
 ## 3. 順序與依賴
 C1 → C2、C3（並行）→ C4 → C5、C6（並行；C6 可先用 C4 的 mock 資料）→ C7、C8、C9、C10、C11（並行，互不碰檔）→ C12。
-V1.5：C20 → C19 → {C21｜C22｜C23｜C26｜C29（並行，互不碰檔：C21 `compose/`＋`Editor.tsx`＋`compose.ts`；C22 `Calendar.tsx`＋`Trash.tsx`；C23 `Lists.tsx`＋`rotation.ts`；C26 `smartlinks/`＋`app/l/`；C29 `inbox/`）} → C24 → C25；C27 在 C21 後；C30 在 C21、C22 後；C31 在 C21 後；C28 等 G3。模型：想（卡內取捨）Fable 5.1；C19／C20／C21／C23／C24／C26／C27／C31 Opus 5.5；C22／C25／C28／C29／C30 Sonnet 5.5。
+V1.5：C20 → C19 → {C21｜C22｜C26｜C29（並行，互不碰檔：C21 `compose/`＋`Editor.tsx`＋`compose.ts`；C22 `Calendar.tsx`＋`Trash.tsx`；C26 `smartlinks/`＋`app/l/`；C29 `inbox/`）} → C23（用 C21 的 `DateTimePicker`）、C24 → C25；C27、C31 在 C21 後；C30 在 C21、C22 後；C28 等 G3。模型：想（卡內取捨）Fable 5.1；C19／C20／C21／C23／C24／C26／C27／C31 Opus 5.5；C22／C25／C28／C29／C30 Sonnet 5.5。狀態只在監工台 `agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs`，本檔卡片標題不寫狀態。
 寫程式的 session 一次一張卡、一組檔；兩個 session 不碰同一檔。

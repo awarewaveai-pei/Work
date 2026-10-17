@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-17（續14）社群 V1.5 監工台上線（13 張卡 C19–C31 的唯一狀態頁）；PLAN §1b 修兩處依賴錯
+
+**操作者**：「先做…監工台」「給我連結」「在這裡做」。
+- 監工台 https://claude.ai/artifact/R5rPFgHj5uuRfiWeSbr8h9 ← `agency-os/handoffs/2026-10-17-social-v15-supervisor/`（`data.mjs` 唯一狀態來源 → `build.mjs` → `check.mjs`）。版面沿用操作者接受的「客戶怎麼來 監工台」第 5 版：左側欄進度＋連結，右側現況／待建項目（13 卡，依開工順序編號，同組可同時做）／待你決定（2 項）／檔案。
+- `check.mjs` 綁 PLAN §1b：卡號集合相同；PLAN 卡片標題括號「Cxx 之後」＝`depends`；標題不得寫狀態；done 要 commit；數字只能算出來（N 項／張／則／M）；不得「我們」。突變：PLAN 標題加 ✅ 並改依賴 → 兩條 FAIL（已還原）。
+- 做監工台時抓到 PLAN 兩處錯，已改：C23 用 C21 的 `DateTimePicker` 卻排在 C21 並行組 → 改「C20、C21 之後」，§3 順序調整；C29 要的 `social_accounts.chatwoot_inbox_id` 不在 C20 清單 → C20 加第 10 項。C26／C28／C29 標題補齊 C19 依賴；C22 標題「，」改「；」讓依賴可機械讀。
+- 待你決定：智慧連結網址（social.aware-wave.com/l/名字 或另買短網域，C26 前）；報表 V1 只做 PDF、PPT 下一版（C25 前）。
+- TASKS 社群條目加監工台指標；memory `project_social_v15_supervisor.md`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=node agency-os/handoffs/2026-10-17-social-v15-supervisor/check.mjs → ok: 13 cards bound to PLAN §1b, 2 open, page fresh；突變 → 2 FAIL；Playwright 390 寬 scrollWidth=390 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n -- 自審看截圖：COPY.sub 與現況各一個手打「13 張卡」→ 改算出來，check 規則 6 加「張／則」
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=之後|social-v15-supervisor | hits=13 -- PLAN §1b 13 個卡片標題全部被 check.mjs 機械讀；監工台路徑只在 TASKS、memory、本條
+- ORACLE_WAIVED: 文件與狀態頁（不上線程式）
 ## 2026-10-17（續13）客服：威脅傷害他人＝立刻 Telegram 通知操作者（機器人／真人接手中兩種狀態）；回客人的話 GPT 已寫、等操作者同意＋真人接手中回覆需 migration
 
 **操作者**（Messenger 真測後）：「激進言論沒有處理，只說『已收到您的訊息，我們會盡快回覆您 🙏』」；決定「做『威脅傷害他人』的處理：立刻 Telegram 通知我、真人接手中也要處理、回客人的話先用 GPT 寫給我看，我同意後才上線」。
