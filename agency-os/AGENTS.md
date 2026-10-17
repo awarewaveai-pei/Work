@@ -76,10 +76,10 @@
   | 工作性質 | 模型 |
   |---|---|
   | 想：方向／架構／設計取捨／產卡／期末閘審 | Fable 5.1（Opus 5.5 可） |
-  | 做：一般開發、除錯、照卡改檔＋驗收 | Opus 5.5；卡已寫死每一步 → Sonnet 5.5／Codex |
-  | 填：YAML／範例／課文等純資料 | Haiku 5.5 |
+  | 做：一般開發、除錯、照卡改檔＋驗收 | Opus 5.5；卡已寫死每一步 → 派 `fullstack-engineer`（Sonnet）／Codex |
+  | 填：YAML／範例／課文等純資料 | 派 `data-filler`（Haiku） |
 
-  手上工作與目前 session 模型不匹配 → **回覆首行**寫 `⚠ 建議切 <模型>：<一句原因>`；匹配不提。agent 不能改自己 session 的模型，由操作者在模型選單切。計畫的「下一步」行與 AO-RESUME §8 每個下一步都附 `建議模型：<…>`。
+  手上工作與目前 session 模型不匹配 → **回覆首行**寫 `⚠ 建議切 <模型>：<一句原因>`；匹配不提。agent 不能改自己 session 的模型，由操作者在模型選單切；「做（卡寫死）」與「填」不必切，主 session 用 Agent tool 派上表小幫手，自己只驗收。計畫的「下一步」行與 AO-RESUME §8 每個下一步都附 `建議模型：<…>`。
 - **共享工作目錄同時最多 2 個 session**。`spawn_task` 卡片只有操作者開的主線 session 可留；卡片開出的 session 發現範圍外問題寫 `TASKS.md` 一行＋WORKLOG 連結，**不得再留卡**；卡片由操作者決定何時點開，一次一張。§Agent 扇出治理
 - **Session 切換**（操作者不記；閘 `suggest-compact.js` 只在 CTX ≥ 80% 注入一次 `[Hook][CTX]`；**每種提醒同一 session 只說一次**，說過就不再提，操作者沒照做也不追）：
 
@@ -90,7 +90,7 @@
   | 任務未完且 CTX ≥ 80%、本 session 已壓過 | 先 `/tomo` 落 handoff，再 `⚠ 建議 /clear → 貼：「<開場句>」` |
 
   開場句 = 零記憶的新 session 讀完就能動手的一行：`續做 <任務名>：讀 <SSOT 路徑>（TASKS.md 條目／handoffs packet／計畫 §），從 <第一個具體動作> 開始；完成 = <條件>。建議模型：<模型>`；handoff packet 首行「續接語」寫同一句。與模型提醒同時命中併成一行 `⚠ 建議 /clear → 切 <模型> → 貼：「…」`；不命中不提；同任務的後續小步、操作者繼續問同一件事、CTX < 80% 都不提；任務進行中不建議 `/clear`（重讀比留著貴）；CLAUDE.md／AGENTS.md 等固定內容每個 session 都一樣，不是 clear 或 compact 的理由。§Session 衛生
-- **讀法分級**：要改／要驗證的檔**整檔讀**；確認單一事實用 grep；20+ 檔掃模式交 Codex；大 log 先 `grep`／`tail`；外部 CLI 輸出導檔再取。摘要的邊界 = 問題的邊界。設計討論每三輪自問「該落地成文件了嗎」。§Session 衛生
+- **讀法分級**：要改／要驗證的檔**整檔讀**；確認單一事實用 grep；20+ 檔掃模式交 Codex（閘 `read-sweep-to-codex.js` 第 20 個檔提醒一次）；大 log 先 `grep`／`tail`；外部 CLI 輸出導檔再取。摘要的邊界 = 問題的邊界。設計討論每三輪自問「該落地成文件了嗎」。§Session 衛生
 - **扇出**（閘 `subagent-budget.js`，SSOT `mcp/claude-userlevel/hooks/rules/`）：Agent tool 20 分鐘滑動視窗 0–5 放行、6–10 需 prompt 含獨立一行 `CONFIRMED-INDEPENDENT-WORKSTREAM: <理由>`、>10 無條件 block（被擋重試也計入）。**Workflow tool 已關閉**（`permissions.deny`，`tests/hooks/settings-deny-parity.test.mjs` 守）；多代理一律走 Agent tool 固定角色模板。
 - **agent 數跟角色走**：理解／執行／critic／獨立觀點／整合，固定 4–5 個；**禁止**按 finding／檔案 1:N 複製角色（閘擋不到）；真正獨立可切割的工作分批 ≤10 個。**讀資料預設主 agent 自己讀**；例外 A 獨立驗證 critic 每 commit ≤1（§4）；例外 B >100KB 純調查 ≤1 agent 或 Codex，產出寫檔附 `file:line`。§Agent 扇出治理
 - **失敗重試**：同一件事同一方式失敗兩次 = 停，讀錯誤換方法；換法仍敗第二次 → 問一題說明兩種失敗。閘 `repeat-failure-guard.js` 同一 Bash 文字第 3 次 BLOCK，首行 `# RETRY-JUSTIFIED: <什麼變了>` 解鎖。

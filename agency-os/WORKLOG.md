@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-17（續23）模型分工與 Codex 讀檔接上機制：Haiku 小幫手 `data-filler`、主 session 派工不切模型、讀到第 20 個檔提醒交 Codex（已安裝）
+
+**根因**：§5 模型表與「20+ 檔交 Codex」只是文字。實測近 7 天：主 session 輸出 Sonnet 49%／Opus 36%／Fable 14%／Haiku 0%；小幫手無任何 haiku 定義（SUBAGENT_CHARTER 寫「nothing qualifies yet」）；19 個 session 有 6 個自己讀 ≥20 個不同檔；Codex inspect 總共只 23 次（review 311 次）。`codex-continue.ps1` 只跑認知平台卡片佇列、手動啟動，最後一次 2026-10-08。
+
+**做了**：
+- `.claude/agents/data-filler.md`（model: haiku）：照現成格式填純資料，缺值留 TODO、遇選擇就停、parse 驗證、不 commit；`.codex/agents/data-filler.toml` 由 `sync-claude-to-codex.ps1` 產生；`AGENT_INDEX.md`、`TOOL_TRIGGER_MAP.md` Agents 表（26 個）、`SUBAGENT_CHARTER.md` haiku 列。
+- `agency-os/AGENTS.md` §5：做（卡寫死）→ 派 `fullstack-engineer`（Sonnet）、填 → 派 `data-filler`（Haiku），主 session 不切模型只驗收；讀法分級指向新閘。
+- `mcp/claude-userlevel/hooks/rules/read-sweep-to-codex.js`（PreToolUse ^Read$）：同 session 第 20 個不同檔注入一次 `codex-oracle.ps1 -Mode inspect` 指令；`tests/hooks/read-sweep-to-codex-rule.test.mjs` 3 條；manifest、`test-hooks.sh`、TOOL_TRIGGER_MAP hooks 表。
+- 未做：Claude 額度用完時自動叫 Codex 接手——Claude 的方案額度只有 app 內工具讀得到，排程程式看不到，無法可靠偵測；維持手動跑 `codex-continue.ps1`。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh（367/367）＋ node scripts/verify-asset-parity.mjs（26 agents, 26 Codex agent bridges OK）＋ verify-governance-pointers PASSED | exit=0 | ms=72000
+- REALTEST_EVIDENCE: tool=Bash | cmd=sync-claude-userlevel.ps1 -Mode merge PASS；~/.claude/agents/data-filler.md 存在、charter 與規則 cmp 相同 | exit=0 | ms=20000
+- REALTEST_WAIVED: NA -- data-filler 實跑要新 session 才載入（本 session Agent tool 回 not found，定義在 session 啟動時讀）；下一個新 session 第一次派工即驗
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回全部 diff；閘只注入一次、I/O 失敗只少一次提醒
+- ORACLE_WAIVED: 新規則為一次性提示、不擋任何操作，指名測試覆蓋；依「不做無效益工作」不開 Codex 輪
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=data-filler | hits=9
+
+**rollback**：`git revert <本 commit>` → `scripts/sync-claude-userlevel.ps1 -Mode merge` → `mcp/codex-userlevel/scripts/sync-claude-to-codex.ps1`。
 ## 2026-10-17（續22）客戶中心「客服」分頁重排：狀態列＋四個子分頁，意圖與問答帶標籤可篩選（branch feat/cs-tab-subtabs，操作者指定只 commit 5 檔）
 
 **操作者**：app.aware-wave.com 客服分頁「排版排序沒有邏輯、內容塞在一起、UI/UX 很糟，設計成 tabs，善用分類與標籤」；點名常見問答自動回覆／AI 客服／Chatwoot／意圖與自動化分級。

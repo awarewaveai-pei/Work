@@ -289,7 +289,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 
 ---
 
-## Agents（25 個）
+## Agents（26 個）
 
 ### DevOps / 維護
 
@@ -314,6 +314,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 | Agent | 功能 | 觸發 |
 |-------|------|------|
 | `fullstack-engineer` | P7 全端 feature 實作 | 🟢 跨前後端 feature 需求 |
+| `data-filler` | 照現成格式填純資料（YAML/JSON 列、fixture、課文填格、改名換格式），Haiku | 🟢 AGENTS.md §5「填」：主 session 不切模型，直接派它 |
 | `frontend-designer` | UI / 頁面設計 | 🟢 你說要做 landing page / dashboard / UI 改版 |
 | `refactor-specialist` | 10+ 檔案大規模重構 | 🟢 重構範圍 ≥ 10 檔案 |
 | `migration-engineer` | 框架/套件 major 版本升級 | 🟢 「升級 Next.js」「Vue 2→3」「套件大版本」|
@@ -380,6 +381,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 | `rules/file-path-router.js` | Write\|Edit | BLOCK（首次/分類）：路由到正確 agent（auth/db/supabase/n8n/nginx/wp/trigger）|
 | `rules/mcp-health.js` | mcp__.\* | 執行前檢查 MCP server 健康（backoff 斷路器）|
 | `rules/large-file-warner.js` | Read | WARN 500KB / BLOCK 2MB：保護 context window |
+| `rules/read-sweep-to-codex.js` | Read | 同 session 讀到第 20 個不同檔 → 注入一次：剩下的掃描交 `codex-oracle.ps1 -Mode inspect`（AGENTS.md §5 讀法分級；2026-10-17）|
 
 ### PostToolUse（工具呼叫後）
 

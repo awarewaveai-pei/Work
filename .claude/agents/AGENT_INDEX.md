@@ -33,6 +33,7 @@
 
 | Agent | Model | 工具 | 描述 |
 |---|---|---|---|
+| [data-filler](data-filler.md) | haiku | Read, Edit, Write, Glob, Grep, Bash | 照現成格式填純資料：YAML/JSON 列、fixture、課文填格、改名換格式；不做設計決定，缺值留 TODO 回報。AGENTS.md §5「填」。 |
 | [fullstack-engineer](fullstack-engineer.md) | sonnet | Read, Edit, Write, Glob, Grep, Bash, WebSearch, WebFetch | P7 方法論資深全端：讀現況→設計→影響分析→實作→三問自審→[P7-COMPLETION]。單功能與跨模組改動。 |
 | [frontend-designer](frontend-designer.md) | sonnet | Read, Edit, Write, Glob, Grep, Bash, WebSearch, WebFetch | 前端設計師：landing page、dashboard、component；拒絕 AI slop，押大膽美學方向，出 production 品質。 |
 | [refactor-specialist](refactor-specialist.md) | sonnet | Read, Edit, Write, Glob, Grep, Bash, WebSearch | 大規模安全重構：跨多檔 rename、抽 module、搬檔、重組資料夾。比 fullstack 更謹慎、scope 嚴、重驗證。10+ 檔的重構用。 |

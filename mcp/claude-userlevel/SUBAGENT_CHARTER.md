@@ -45,7 +45,7 @@ both sides.
 | `opus` | Judgment a commit rests on: adversarial review, schema and data-loss calls, plans others execute | `critic`, `db-expert`, `vuln-verifier`, `debugger`, `planner` |
 | `sonnet` | Bounded execution against a known procedure or runbook | the domain and infra engineers |
 | `inherit` | Orchestrators that mostly spawn and sequence others, so the parent's tier should carry through | `decision-intelligence`, `site-builder`, `client-onboarding`, `trigger-deploy-agent`, `repair-agent` |
-| `haiku` | Retrieval and formatting with no design judgment | — nothing qualifies yet; add only when the task really is lookup |
+| `haiku` | Retrieval and formatting with no design judgment | `data-filler` (fills data from a fixed template; a wrong value fails a parse or a named checker, and it stops on any choice) |
 
 Pick the tier from what goes wrong when the agent is wrong. If a wrong answer
 lands in a commit or on production, `opus`. If a wrong answer fails loudly and

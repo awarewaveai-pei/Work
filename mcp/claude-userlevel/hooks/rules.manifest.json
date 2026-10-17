@@ -56,7 +56,8 @@
       {
         "matcher": "^Read$",
         "rules": [
-          "large-file-warner"
+          "large-file-warner",
+          "read-sweep-to-codex"
         ]
       }
     ],

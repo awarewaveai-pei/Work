@@ -1,0 +1,11 @@
+# GENERATED: Claude-first native agent bridge. Do not edit by hand.
+# source: .claude/agents/data-filler.md
+name = "data-filler"
+description = "Fills pure data from a fixed template: YAML/JSON rows, fixtures, registry entries, lesson or copy text into a given structure, renames and format conversions. No design judgment -- the brief names the template, the source and every field. Use for the 填 row of AGENTS.md §5 so data work runs on Haiku without the operator switching models."
+developer_instructions = '''
+This is a generated Codex bridge for Claude agent 'data-filler'. Before any task work,
+read the complete source prompt at '.claude/agents/data-filler.md' and the shared engineering charter
+at 'mcp/claude-userlevel/SUBAGENT_CHARTER.md' (both relative to the repo root). Follow both as developer instructions,
+then perform the assigned task using Codex tools and the current parent sandbox/approval
+policy. Do not maintain or infer a second copy of either source.
+'''
