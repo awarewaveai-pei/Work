@@ -511,11 +511,11 @@ describe("POST /api/webhooks/chatwoot -- crisis message", () => {
       expect(await (await post(owned(TEXT))).json()).toMatchObject({ ignored: true, reason: "human_owns_thread" });
       await runAfter();
       expect(sendText).toHaveBeenCalledTimes(1);
-      expect(claimCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", 1800, 120);
+      expect(claimCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "self_harm", 1800, 120);
       expect(sendReply).toHaveBeenCalledTimes(1);
       expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", HOLDING_ZH);
       expect(sendText.mock.invocationCallOrder[0]).toBeLessThan(sendReply.mock.invocationCallOrder[0]);
-      expect(confirmCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "claim-1");
+      expect(confirmCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "self_harm", "claim-1");
       expect(sendReply.mock.invocationCallOrder[0]).toBeLessThan(confirmCrisisHolding.mock.invocationCallOrder[0]);
       expect(sendReply.mock.calls[0][3]).not.toContain("看到");
       expect(handleInbound).not.toHaveBeenCalled();
@@ -545,7 +545,7 @@ describe("POST /api/webhooks/chatwoot -- crisis message", () => {
       sendReply.mockRejectedValueOnce(new Error("chatwoot down"));
       await post(owned(TEXT));
       await runAfter();
-      expect(releaseCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "claim-1");
+      expect(releaseCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "self_harm", "claim-1");
       expect(confirmCrisisHolding).not.toHaveBeenCalled();
       expect(captureException).toHaveBeenCalled();
     });
@@ -602,14 +602,16 @@ describe("POST /api/webhooks/chatwoot -- crisis message", () => {
   });
 });
 
-// Operator decision 2026-10-17: a threat to hurt others pages the operator at once, also while a
-// human owns the conversation. What the customer hears waits for the operator's approval of the wording.
+// Operator decisions 2026-10-17: a threat to hurt others pages the operator at once, also while a
+// human owns the conversation, and the customer gets the approved sentence (once per window there).
 describe("POST /api/webhooks/chatwoot -- threat to hurt others", () => {
   const JOHN = { type: "contact", id: 77, name: "John Doe" };
   const TEXT = "我要殺光所有的人";
+  // The operator-approved wording (WORKLOG 2026-10-17 續13), pinned so it cannot drift.
+  const REPLY_ZH = "系統已收到您的訊息。工作人員會親自回覆您。如果有人現在有立即危險，請撥打台灣119或澳洲000。";
   beforeEach(() => sendText.mockClear());
 
-  it("a human owns the thread: one threat page with the link and none of the words; no reply, no AI", async () => {
+  it("a human owns the thread: one threat page first, then the approved reply in the threat window; no AI", async () => {
     await post(makePayload({ content: TEXT, sender: JOHN, conversation: { id: 999, status: "open" } }));
     await runAfter();
     expect(sendText).toHaveBeenCalledTimes(1);
@@ -617,18 +619,30 @@ describe("POST /api/webhooks/chatwoot -- threat to hurt others", () => {
     expect(page).toContain("要傷害別人");
     expect(page).toContain("https://chatwoot.example/app/accounts/42/conversations/999");
     expect(page).not.toContain(TEXT);
-    expect(sendReply).not.toHaveBeenCalled();
-    expect(claimCrisisHolding).not.toHaveBeenCalled();
+    expect(claimCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "threat", 1800, 120);
+    expect(sendReply).toHaveBeenCalledTimes(1);
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", REPLY_ZH);
+    expect(sendText.mock.invocationCallOrder[0]).toBeLessThan(sendReply.mock.invocationCallOrder[0]);
+    expect(confirmCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "threat", "claim-1");
     expect(handleInbound).not.toHaveBeenCalled();
   });
 
-  it("the bot owns the thread: one threat page before the handoff", async () => {
+  it("a human owns the thread, threat window already used: no reply, still one page", async () => {
+    claimCrisisHolding.mockResolvedValueOnce({ kind: "recent" });
+    await post(makePayload({ content: TEXT, sender: JOHN, conversation: { id: 999, status: "open" } }));
+    await runAfter();
+    expect(sendReply).not.toHaveBeenCalled();
+    expect(sendText).toHaveBeenCalledTimes(1);
+  });
+
+  it("the bot owns the thread: one threat page before the handoff, then the approved reply instead of the ordinary one, no name question", async () => {
     handleInbound.mockResolvedValueOnce({ ...DEFAULT_DECISION, action: "handoff" as const, replyText: undefined, handoffReason: "threat" });
     await post(makePayload({ content: TEXT, sender: JOHN }));
     await runAfter();
     expect(sendText).toHaveBeenCalledTimes(1);
     expect(sendText.mock.calls[0][0]).toContain("要傷害別人");
     expect(sendText.mock.invocationCallOrder[0]).toBeLessThan(handoffToHuman.mock.invocationCallOrder[0]);
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", REPLY_ZH);
   });
 
   it("no keyword, but the classifier said threat: one threat page", async () => {
@@ -637,15 +651,17 @@ describe("POST /api/webhooks/chatwoot -- threat to hurt others", () => {
     await runAfter();
     expect(sendText).toHaveBeenCalledTimes(1);
     expect(sendText.mock.calls[0][0]).toContain("要傷害別人");
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", REPLY_ZH);
   });
 
-  it("self-harm and a threat in one message: two pages, and the help lines while a human owns it", async () => {
+  it("self-harm and a threat in one message: two pages, and only the help lines (self-harm window) while a human owns it", async () => {
     await post(makePayload({ content: "我要殺光所有的人然後自殺", sender: JOHN, conversation: { id: 999, status: "open" } }));
     await runAfter();
     expect(sendText).toHaveBeenCalledTimes(2);
     expect(sendText.mock.calls.map((c) => c[0]).join("\n")).toContain("自傷或自殺");
     expect(sendText.mock.calls.map((c) => c[0]).join("\n")).toContain("要傷害別人");
     expect(claimCrisisHolding).toHaveBeenCalledTimes(1);
+    expect(claimCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "self_harm", 1800, 120);
   });
 });
 

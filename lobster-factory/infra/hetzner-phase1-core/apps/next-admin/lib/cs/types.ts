@@ -238,3 +238,6 @@ export interface IntentGrade {
 
 // KnowledgeInput / EmbeddingProvider / RetrievedChunk moved to lib/kb/types.ts in K0
 // (ADR 011 §決策 3) — the KB is a general product, not a customer-service internal.
+
+/** Self-harm or a threat to hurt others: one Telegram page each, one holding-reply window each (migration 0107 CHECK). */
+export type CrisisKind = "self_harm" | "threat";

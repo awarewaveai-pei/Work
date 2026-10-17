@@ -6,17 +6,14 @@
 // The customer's words never leave Chatwoot: only a link to the conversation.
 
 import type { TelegramDelivery } from "@/lib/ops-inbox/notify/telegram";
-import type { ChatwootConfig } from "@/lib/cs/types";
+import type { ChatwootConfig, CrisisKind } from "@/lib/cs/types";
 
-/** What the page is about: self-harm / suicide, or a threat to hurt other people (CS_THREAT_KEYWORDS). */
-export type CrisisPageKind = "self_harm" | "threat";
-
-const PAGE_TITLE: Record<CrisisPageKind, string> = {
+const PAGE_TITLE: Record<CrisisKind, string> = {
   self_harm: "🔴 客服：客人的訊息提到自傷或自殺",
   threat: "🔴 客服：客人的訊息提到要傷害別人",
 };
 
-export function crisisAlertText(organizationId: string, conversationId: string, chatwoot?: ChatwootConfig, kind: CrisisPageKind = "self_harm"): string {
+export function crisisAlertText(organizationId: string, conversationId: string, chatwoot?: ChatwootConfig, kind: CrisisKind = "self_harm"): string {
   const link = chatwoot
     ? `${chatwoot.baseUrl.replace(/\/+$/, "")}/app/accounts/${chatwoot.accountId}/conversations/${conversationId}`
     : `Chatwoot 對話 #${conversationId}`;
@@ -34,7 +31,7 @@ export async function alertOperatorOfCrisis(
   organizationId: string,
   conversationId: string,
   chatwoot?: ChatwootConfig,
-  kind: CrisisPageKind = "self_harm",
+  kind: CrisisKind = "self_harm",
 ): Promise<TelegramDelivery> {
   if (!send) return { kind: "rejected", code: "telegram_notify_disabled" };
   return send(crisisAlertText(organizationId, conversationId, chatwoot, kind));

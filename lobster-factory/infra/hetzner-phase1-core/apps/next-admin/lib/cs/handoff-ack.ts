@@ -26,7 +26,7 @@ export function isPlaceholderContactName(name: string | null | undefined): boole
  * acknowledgement sentence; csVoice.askName replaces the name question. Defaults follow the
  * page's honorific and emoji policy.
  */
-export function handoffAckText(cis: CisProfile, askName: boolean, customerText = "", crisis = hitsCrisis(customerText), intentReply?: string): string {
+export function handoffAckText(cis: CisProfile, askName: boolean, customerText = "", crisis = hitsCrisis(customerText), intentReply?: string, threat = hitsThreat(customerText)): string {
   const v = cis.csVoice ?? {};
   const you = v.honorifics === "你" ? "你" : "您";
   if (crisis) {
@@ -34,6 +34,8 @@ export function handoffAckText(cis: CisProfile, askName: boolean, customerText =
     const ack = english ? CRISIS_ACK_EN : crisisAckZh(you);
     return askName ? `${ack}\n${english ? ASK_NAME_EN : askNameZh(cis)}` : ack;
   }
+  // A threat to hurt others: the approved sentence, no name question, nothing tenant-editable.
+  if (threat) return threatReplyText(cis, customerText);
   // An intent's own reply (refund: ask the reason; medical: see a doctor) replaces the ordinary sentence;
   // the help lines above always win over it.
   const ack = intentReply?.trim() || v.escalationTone?.trim() || `已收到${you}的訊息，我們會盡快回覆${you}${v.emojiPolicy === "none" ? "。" : " 🙏"}`;
@@ -95,6 +97,21 @@ export function crisisHoldingText(cis: CisProfile, customerText: string): string
     "24 小時求助專線：台灣 1925 安心專線、1995 生命線；澳洲 Lifeline 13 11 14。",
   ].join("\n");
 }
+
+/**
+ * A message threatening to hurt other people, in either state (first handoff, or a human already owns
+ * the conversation). Only what is true: received, a staff member will reply personally, emergency
+ * numbers for anyone in danger. No name question. Wording by GPT, approved by the operator 2026-10-17
+ * (WORKLOG 2026-10-17 續13: 「同意這句」).
+ */
+export function threatReplyText(cis: CisProfile, customerText: string): string {
+  if (!NON_LATIN.test(customerText)) return THREAT_REPLY_EN;
+  const you = cis.csVoice?.honorifics === "你" ? "你" : "您";
+  return `系統已收到${you}的訊息。工作人員會親自回覆${you}。如果有人現在有立即危險，請撥打台灣119或澳洲000。`;
+}
+
+const THREAT_REPLY_EN =
+  "The system has received your message. A staff member will reply to you personally. If anyone is in immediate danger, call 119 in Taiwan or 000 in Australia.";
 
 const CRISIS_HOLDING_EN = [
   "Your message has been received, and a staff member will reply to you personally.",

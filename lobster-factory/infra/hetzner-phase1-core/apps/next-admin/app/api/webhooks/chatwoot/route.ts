@@ -4,17 +4,17 @@ import { handleInbound } from "@/lib/cs/orchestrator";
 import { loadCis } from "@/lib/cs/cis";
 import { claimCrisisHolding, claimMessage, completeClaim, confirmCrisisHolding, findOrganizationIdByChatwootAccountId, recordReply, releaseCrisisHolding } from "@/lib/cs/db";
 import { getContactName, handoffToHuman, listMessages, sendPrivateDraft, sendReply, updateContactName, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
-import { crisisHoldingText, handoffAckText, isCrisisAck, isNameQuestionAck, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
+import { crisisHoldingText, handoffAckText, isCrisisAck, isNameQuestionAck, isPlaceholderContactName, parseNameReply, threatReplyText } from "@/lib/cs/handoff-ack";
 import { CS_CRISIS_HOLDING_INFLIGHT_SECONDS, CS_CRISIS_HOLDING_WINDOW_SECONDS } from "@/lib/cs/config";
 import { hitsCrisis, hitsThreat } from "@/lib/cs/autonomy";
-import { alertOperatorOfCrisis, type CrisisPageKind } from "@/lib/cs/crisis-alert";
+import { alertOperatorOfCrisis } from "@/lib/cs/crisis-alert";
 import { buildOperatorTelegramNotifier } from "@/lib/ops-inbox/notify/telegram";
 import { tenantFaqAnswer } from "@/lib/cs/faq";
 import { reserveCsCredit } from "@/lib/cs/billing";
 import { readWebhookBody } from "@/lib/ops-inbox/readRequestBody";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import type { ChatwootConfig, CisProfile, InboundMessage } from "@/lib/cs/types";
+import type { ChatwootConfig, CisProfile, CrisisKind, InboundMessage } from "@/lib/cs/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -101,15 +101,17 @@ export async function POST(req: Request): Promise<Response> {
       const reply = { organizationId, conversationId, messageId: Number(messageId), contactId, text: payload.content ?? "" };
       after(() => captureName(reply).catch((err) => Sentry.captureException(err, { extra: { organizationId, conversationId, messageId } })));
     }
-    // A crisis or a threat still pages the operator (whoever owns the thread may not be looking at it);
-    // a crisis then gets the help lines, once per conversation per window.
+    // A crisis or a threat still pages the operator (whoever owns the thread may not be looking at it),
+    // then the customer gets one reply per kind per window: the help lines when the message is about
+    // self-harm (they already say a staff member will reply), else the threat reply.
     const customerText = payload.content ?? "";
     const pages = isFromAgent ? [] : keywordPages(customerText);
     if (pages.length) {
       after(async () => {
         const cis = await loadCis(organizationId).catch(() => undefined);
         for (const kind of pages) await pageCrisis(organizationId, conversationId, cis?.chatwoot, kind);
-        if (cis?.chatwoot && pages.includes("self_harm")) await sendCrisisHolding(cis, cis.chatwoot, conversationId, customerText);
+        const replyKind: CrisisKind = pages.includes("self_harm") ? "self_harm" : "threat";
+        if (cis?.chatwoot) await sendCrisisHolding(cis, cis.chatwoot, conversationId, replyKind, customerText);
       });
     }
     return NextResponse.json({ ok: true, ignored: true, reason: "human_owns_thread" });
@@ -209,9 +211,10 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
   // The classifier's crisis and threat intents catch what the keywords cannot; they are known only
   // now, so their page goes out here, still before any Chatwoot call. Keyword hits were paged above.
   const crisis = hitsCrisis(inbound.text) || decision.handoffReason === "crisis";
-  const classifierPage: CrisisPageKind | null =
+  const classifierPage: CrisisKind | null =
     decision.handoffReason === "crisis" ? "self_harm" : decision.handoffReason === "threat" ? "threat" : null;
   if (classifierPage && !keywordPaged.includes(classifierPage)) await pageCrisis(organizationId, conversationId, cis.chatwoot, classifierPage);
+  const threat = !crisis && (keywordPaged.includes("threat") || decision.handoffReason === "threat");
 
   // No Account API config yet (Chatwoot bring-up before client_config.chatwoot is set): the decision
   // is recorded, nothing can be sent.
@@ -221,10 +224,10 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
     } else if (decision.action === "draft" && decision.replyText) {
       await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, decision.replyText);
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis, decision.handoffReply);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis, decision.handoffReply, threat);
     } else if (decision.action === "handoff") {
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis, decision.handoffReply);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis, decision.handoffReply, threat);
     } else if (decision.action !== "suppressed") {
       // "suppressed" = the engine intentionally stayed silent (agent owns the thread). Anything else
       // is an upstream invariant break, e.g. auto_sent with an empty replyText: leave it to the sweep.
@@ -251,6 +254,7 @@ async function acknowledgeHandoff(
   customerText: string,
   crisis: boolean,
   intentReply?: string,
+  threat = false,
 ): Promise<void> {
   const { organizationId } = cis;
   // A crisis acknowledgement is skipped only when the help lines themselves already followed: any other
@@ -268,7 +272,7 @@ async function acknowledgeHandoff(
   if (alreadyAnswered) return;
   try {
     const askName = typeof contact.id === "number" && isPlaceholderContactName(contact.name);
-    await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName, customerText, crisis, intentReply));
+    await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName, customerText, crisis, intentReply, threat));
   } catch (err) {
     Sentry.captureException(err, { extra: { organizationId, conversationId, step: "handoff_ack" } });
   }
@@ -279,8 +283,9 @@ async function chatwootConfigOrNone(organizationId: string): Promise<ChatwootCon
 }
 
 /**
- * The help lines for a crisis message while a human owns the conversation, at most once per
- * conversation per CS_CRISIS_HOLDING_WINDOW_SECONDS (operator decision 2026-10-17). T27: a blocking
+ * The reply to a crisis (help lines) or threat message while a human owns the conversation, at most
+ * once per conversation per kind per CS_CRISIS_HOLDING_WINDOW_SECONDS (operator decisions 2026-10-17;
+ * one window per kind, migration 0107, so a threat reply never holds back the help lines). T27: a blocking
  * or unreadable system mode sends nothing. Invariant: a repeated help line costs less than a missing
  * one, so a window that cannot be claimed (DB error) still sends, a failed send gives the window back,
  * and only a confirmed send blocks for the whole window (migration 0104). Best-effort.
@@ -288,21 +293,21 @@ async function chatwootConfigOrNone(organizationId: string): Promise<ChatwootCon
  * fails is not retried; a send Chatwoot accepted but answered after the client timeout counts as
  * failed, so a later crisis message may get the lines twice.
  */
-async function sendCrisisHolding(cis: CisProfile, chatwoot: ChatwootConfig, conversationId: string, customerText: string): Promise<void> {
+async function sendCrisisHolding(cis: CisProfile, chatwoot: ChatwootConfig, conversationId: string, kind: CrisisKind, customerText: string): Promise<void> {
   const { organizationId } = cis;
   try {
     const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
     if (!gate.allowed) return;
-    const claim = await claimCrisisHolding(organizationId, conversationId, CS_CRISIS_HOLDING_WINDOW_SECONDS, CS_CRISIS_HOLDING_INFLIGHT_SECONDS);
+    const claim = await claimCrisisHolding(organizationId, conversationId, kind, CS_CRISIS_HOLDING_WINDOW_SECONDS, CS_CRISIS_HOLDING_INFLIGHT_SECONDS);
     if (claim.kind === "recent") return;
     if (claim.kind === "error") Sentry.captureException(claim.error, { extra: { organizationId, conversationId, step: "crisis_holding_claim" } });
     try {
-      await sendReply(organizationId, chatwoot, conversationId, crisisHoldingText(cis, customerText));
+      await sendReply(organizationId, chatwoot, conversationId, kind === "self_harm" ? crisisHoldingText(cis, customerText) : threatReplyText(cis, customerText));
     } catch (err) {
-      if (claim.kind === "claimed") await releaseCrisisHolding(organizationId, conversationId, claim.claimId);
+      if (claim.kind === "claimed") await releaseCrisisHolding(organizationId, conversationId, kind, claim.claimId);
       throw err;
     }
-    if (claim.kind === "claimed" && !(await confirmCrisisHolding(organizationId, conversationId, claim.claimId))) {
+    if (claim.kind === "claimed" && !(await confirmCrisisHolding(organizationId, conversationId, kind, claim.claimId))) {
       Sentry.captureMessage("cs crisis holding reply sent but not recorded", { extra: { organizationId, conversationId } });
     }
   } catch (err) {
@@ -311,15 +316,15 @@ async function sendCrisisHolding(cis: CisProfile, chatwoot: ChatwootConfig, conv
 }
 
 /** The pages a message's own words call for: self-harm and threat are separate pages, a message may need both. */
-function keywordPages(text: string): CrisisPageKind[] {
-  const pages: CrisisPageKind[] = [];
+function keywordPages(text: string): CrisisKind[] {
+  const pages: CrisisKind[] = [];
   if (hitsCrisis(text)) pages.push("self_harm");
   if (hitsThreat(text)) pages.push("threat");
   return pages;
 }
 
 /** Operator page for a crisis or threat message (lib/cs/crisis-alert.ts). Best-effort: never fails the pipeline. */
-async function pageCrisis(organizationId: string, conversationId: string, chatwoot?: ChatwootConfig, kind: CrisisPageKind = "self_harm"): Promise<void> {
+async function pageCrisis(organizationId: string, conversationId: string, chatwoot?: ChatwootConfig, kind: CrisisKind = "self_harm"): Promise<void> {
   try {
     const notifier = buildOperatorTelegramNotifier();
     const r = await alertOperatorOfCrisis(notifier ? (text) => notifier.sendText(text) : null, organizationId, conversationId, chatwoot, kind);

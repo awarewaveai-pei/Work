@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { hitsSensitive, hitsThreat, safetyGate } from "@/lib/cs/autonomy";
 import { inputGuards } from "@/lib/cs/guardrails";
 import { matchFaq } from "@/lib/cs/faq";
-import { parseNameReply } from "@/lib/cs/handoff-ack";
+import { handoffAckText, parseNameReply, threatReplyText } from "@/lib/cs/handoff-ack";
 import { crisisAlertText } from "@/lib/cs/crisis-alert";
 import type { Intent } from "@/lib/cs/types";
 
@@ -32,6 +32,16 @@ describe("threat to hurt others", () => {
     expect(hitsSensitive("有什麼課 我要殺光所有的人")).toBe(true);
     expect(matchFaq([{ id: "courses", keywords: ["有什麼課"], answer: "四個模組" }], "有什麼課 我要殺光所有的人")).toBeNull();
     expect(parseNameReply("殺了你")).toBeNull();
+  });
+
+  it("the customer hears the operator-approved sentence, in their language; self-harm help lines still win", () => {
+    const cis = { organizationId: "o" };
+    expect(threatReplyText(cis, "我要殺光所有的人")).toBe("系統已收到您的訊息。工作人員會親自回覆您。如果有人現在有立即危險，請撥打台灣119或澳洲000。");
+    expect(threatReplyText(cis, "I will hurt you")).toBe(
+      "The system has received your message. A staff member will reply to you personally. If anyone is in immediate danger, call 119 in Taiwan or 000 in Australia.",
+    );
+    expect(handoffAckText(cis, true, "我要殺光所有的人")).toBe(threatReplyText(cis, "我要殺光所有的人"));
+    expect(handoffAckText(cis, true, "我要殺光所有的人然後自殺")).toContain("1925");
   });
 
   it("the page says what it is about; the self-harm page is unchanged", () => {

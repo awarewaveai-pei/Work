@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-17（續15）客服：威脅傷害他人回客人操作者核准的句子（機器人狀態取代一般確認句；真人接手中 30 分鐘一次）＋migration 0107 已套 prod
+
+**操作者**：「同意這句。機器人狀態用它取代一般確認句；真人接手中也回這句，同一對話 30 分鐘一次，需要的 migration 可以做。做完一起部署。」
+**句子**（GPT，續13）：ZH「系統已收到您的訊息。工作人員會親自回覆您。如果有人現在有立即危險，請撥打台灣119或澳洲000。」EN「The system has received your message. A staff member will reply to you personally. If anyone is in immediate danger, call 119 in Taiwan or 000 in Australia.」不問名字；`lib/cs/handoff-ack.ts` `threatReplyText`（依 csVoice 你／您），測試釘死原文。
+**做了**：
+- `handoffAckText` 順序：自傷求助專線 > 威脅句 > 意圖自訂回覆 > 一般確認句；webhook 機器人狀態威脅（關鍵字或分類器）用威脅句。
+- 真人接手中：同一則有自傷 → 只回求助專線（已含緊急電話與工作人員會回覆）；只有威脅 → 威脅句；各自一個 30 分鐘視窗。
+- migration `0107_cs_holding_reply_kinds.sql`（0105／0106 已被社群計畫預留）：`cs_crisis_holding_replies` 加 `kind`（CHECK self_harm|threat，回填後拿掉預設值），主鍵改（組織、對話、種類）；新 `cs_claim_holding_reply`／`cs_confirm_holding_reply`；0104 兩個函式同簽名改為轉呼叫 self_harm，部署前舊程式照常運作。down 檔：先鎖表、刪威脅列、還原 0104、清 ledger、reload PostgREST。
+- `lib/cs/types.ts` `CrisisKind` 一個名字給通知、視窗、DB CHECK 共用（原 `CrisisPageKind` 刪除）。
+**下一個設計題（操作者提問「一下自動回一下 AI 一下真人，系統無法處理接續變化」）**：現在只有「機器人在管／真人在管」兩態，轉真人後整個對話靜默到結案。建議三態：機器人在管／等真人（已轉、工作人員還沒回：一般問題照答、敏感留給真人）／真人在講（工作人員回過話：靜默，危機與威脅除外），工作人員一段時間沒回或結案就回機器人。需記錄工作人員最後回話時間（新表）＋操作者定時間長度。另開 session，先給規則再寫程式。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=拋棄式 postgres:15-alpine：0104 → 0107（既有列＝self_harm、預設值 none、漏寫 kind 被擋）→ 函式檢查（舊函式視窗、威脅視窗獨立、CHECK 擋未知種類、權限 service_role only）→ down（主鍵還原、ledger 清掉）→ 0107 重套 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0107` → APPLY_OK 1/1；psql：pk (org, conv, kind)、self_harm:1、default none、grants true/false/false、ledger 有 0107；PostgREST rpc cs_confirm_holding_reply 200（no-op） | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run（273 files／2528 pass；route 威脅 5、threat.test 6） | exit=0 | ms=17511
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=threatReplyText|cs_claim_holding_reply|cs_confirm_holding_reply|CrisisPageKind | hits=23（本次程式／測試／migration 檔＋oracle 報告；CrisisPageKind 0 殘留）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（`reports/oracle/2026-10-17-partialreview-86ad534c.md`：0107 沒 reload PostgREST → 套用腳本 `scripts/apply-db-migration.mjs:371` 本來就做，仍照 0090–0097 慣例在檔內加 NOTIFY）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD）
+  - db-expert 審 0107：0 critical／0 major；收 3 minor（down 檔 reload＋ledger、先鎖表、威脅列刪除寫進檔頭）＋1 建議（回填後拿掉預設值）
+- ORACLE_WAIVED: NOTIFY 一行與 down 檔修正已在拋棄式 DB 重跑 up/down/up，不跑第二輪
+
+**rollback**：先部署不用新函式的程式（`git revert`），再手動跑 `0107_cs_holding_reply_kinds.down.sql`（psql as supabase_admin）。
 ## 2026-10-17（續14）社群 V1.5 監工台上線（13 張卡 C19–C31 的唯一狀態頁）；PLAN §1b 修兩處依賴錯
 
 **操作者**：「先做…監工台」「給我連結」「在這裡做」。

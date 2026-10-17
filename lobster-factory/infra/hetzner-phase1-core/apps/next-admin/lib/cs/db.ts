@@ -6,14 +6,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { graduationBasis, isCurrentGraduation } from "@/lib/cs/graduation";
 import { kbMinRetrievalScoreOf } from "@/lib/cs/cis";
 import { CS_THRESHOLDS } from "@/lib/cs/config";
-import type {
-  CsActionKind,
-  EvalCase,
-  Intent,
-  IntentGraduation,
-  ToolRisk,
-  ToolSpec,
-} from "@/lib/cs/types";
+import type { CsActionKind, EvalCase, Intent, IntentGraduation, ToolRisk, ToolSpec, CrisisKind } from "@/lib/cs/types";
 
 function mapEvalCase(r: Record<string, unknown>): EvalCase {
   return {
@@ -555,7 +548,7 @@ export async function claimMessage(organizationId: string, conversationId: strin
 export type CrisisHoldingClaim = { kind: "claimed"; claimId: string } | { kind: "recent" } | { kind: "error"; error: unknown };
 
 /**
- * Claims the conversation's crisis holding-reply window (migration 0104 cs_claim_crisis_holding):
+ * Claims the conversation's holding-reply window for one kind (migration 0107 cs_claim_holding_reply):
  * one atomic upsert, so of two webhooks racing on one conversation exactly one gets "claimed".
  * "recent" = a confirmed send inside the window, or a send still in flight. A claim never confirmed
  * (process killed mid-send) stops blocking after inflightSeconds. "error" is returned, not thrown.
@@ -563,14 +556,16 @@ export type CrisisHoldingClaim = { kind: "claimed"; claimId: string } | { kind: 
 export async function claimCrisisHolding(
   organizationId: string,
   conversationId: string,
+  kind: CrisisKind,
   windowSeconds: number,
   inflightSeconds: number,
 ): Promise<CrisisHoldingClaim> {
   const sb = getSupabaseWriteClient();
   if (!sb) return { kind: "error", error: new Error("cs_db_unconfigured") };
-  const { data, error } = await sb.rpc("cs_claim_crisis_holding", {
+  const { data, error } = await sb.rpc("cs_claim_holding_reply", {
     p_organization_id: organizationId,
     p_conversation_id: conversationId,
+    p_kind: kind,
     p_window_seconds: windowSeconds,
     p_inflight_seconds: inflightSeconds,
   });
@@ -579,19 +574,20 @@ export async function claimCrisisHolding(
 }
 
 /** Records the send, so the claim blocks for the whole window. False = not recorded (it then blocks only while in flight). */
-export async function confirmCrisisHolding(organizationId: string, conversationId: string, claimId: string): Promise<boolean> {
+export async function confirmCrisisHolding(organizationId: string, conversationId: string, kind: CrisisKind, claimId: string): Promise<boolean> {
   const sb = getSupabaseWriteClient();
   if (!sb) return false;
-  const { data, error } = await sb.rpc("cs_confirm_crisis_holding", {
+  const { data, error } = await sb.rpc("cs_confirm_holding_reply", {
     p_organization_id: organizationId,
     p_conversation_id: conversationId,
+    p_kind: kind,
     p_claim_id: claimId,
   });
   return !error && data === true;
 }
 
 /** Gives the window back after a failed send. Deletes only this claim: a later winner keeps its own. */
-export async function releaseCrisisHolding(organizationId: string, conversationId: string, claimId: string): Promise<boolean> {
+export async function releaseCrisisHolding(organizationId: string, conversationId: string, kind: CrisisKind, claimId: string): Promise<boolean> {
   const sb = getSupabaseWriteClient();
   if (!sb) return false;
   const { error } = await sb
@@ -599,6 +595,7 @@ export async function releaseCrisisHolding(organizationId: string, conversationI
     .delete()
     .eq("organization_id", organizationId)
     .eq("chatwoot_conversation_id", conversationId)
+    .eq("kind", kind)
     .eq("claim_id", claimId);
   return !error;
 }
