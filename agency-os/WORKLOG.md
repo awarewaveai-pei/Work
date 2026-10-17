@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-17（續22）客戶中心「客服」分頁重排：狀態列＋四個子分頁，意圖與問答帶標籤可篩選（branch feat/cs-tab-subtabs，操作者指定只 commit 5 檔）
+
+**操作者**：app.aware-wave.com 客服分頁「排版排序沒有邏輯、內容塞在一起、UI/UX 很糟，設計成 tabs，善用分類與標籤」；點名常見問答自動回覆／AI 客服／Chatwoot／意圖與自動化分級。
+**根因**：`ClientHubTabs.tsx` 客服 tab 把四張卡直疊、規則說明在每張卡重複，`CsIntentsCard.tsx` 每個意圖攤開全部控制項。
+**改法**（`apps/next-admin/app/(shell)/ops/clients/[slug]/`）：新 `CustomerServiceTab.tsx`（狀態列 + 子分頁 AI 開關／常見問答／意圖與自動化／Chatwoot 連線，順序照訊息流向；四區全掛載只隱藏，切子分頁不丟草稿）；`CsIntentsCard.tsx` 意圖收合成一列帶標籤（回覆方式／行動／敏感／考試狀態）＋篩選列含數量＋新增表單按鈕展開＋刪除先 confirm；`hub-ui.tsx` 加 `Tag`／`SubTabs`；`ClientHubTabs.tsx` 移除舊三張卡。API 與寫入不變。
+**critic 後修**（3 Major 全修）：篩選改成按下時的快照（打字／改狀態不會把列藏掉）；知識門檻與自動比例先 NFKC 正規化、非數字擋下不送（原本 NaN→null 會把校準值重設成預設）；FAQ 存檔以伺服器回傳重建列表 + `router.refresh()`（原本切回分頁拿到頁載舊資料，再存會覆蓋）；另修：reload 序號防亂序、讀取失敗顯示錯誤而非空列表、新增意圖拒絕重複 key 並給 ✓、狀態列用與列標籤同一個 `intentMode()`、FAQ 規則文案改成「命中一樣多才轉真人」、Chatwoot 個人 token 未設改灰色（選填）、token 欄 `autoComplete="new-password"`、tabs 加 id／aria-controls。未修：子分頁方向鍵導航（nit）。
+**剩餘風險**：只在本機 `next dev` 以 soulful-expression 真實資料看過，未部署；`.claude/launch.json` 不支援 env，預覽是手動 `NEXT_PUBLIC_SUPABASE_ANON_KEY= npx next dev -p 3001` 走 middleware 的開發放行。
+**回退**：revert 該 commit（5 檔，無 migration）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（exit 0）；npx vitest run app/(shell)/ops/clients/[slug]/__tests__（6 檔 30 測試全過，新增 CustomerServiceTab.render.test.tsx 6 測試）；next dev -p 3001 內建瀏覽器看四個子分頁與展開意圖列 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/13n（3 Major 與 9 Minor 已修，見上）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=CsFaqCard\|CsChatwootTokenCard | hits=1（agency-os/WORKLOG.md 歷史記錄；程式碼 0）
+- ORACLE_WAIVED: 操作者指定只 commit 這 5 個 UI 檔到 feat/cs-tab-subtabs；跨模型 /codex-review 在合 main 前補
+
 ## 2026-10-17（續21）知識庫排序修法定案：每段加一句說明後重建索引（Contextual Retrieval）— 等 Soulful 網站內容做好才做
 
 **操作者**：看完做法與花費後「但網站內容我還沒做好」→「等網站做好，你寫一個 task」。

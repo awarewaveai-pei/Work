@@ -46,6 +46,80 @@ export function SubLabel({ children }: { children: ReactNode }) {
   return <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-secondary)", marginBottom: 6, marginTop: 12 }}>{children}</div>;
 }
 
+// ── Tags and sub-tabs (客服 tab; reusable by any tab that classifies rows) ─────
+
+export type TagTone = "green" | "red" | "gray" | "yellow" | "accent" | "ai";
+
+const TAG_TONES: Record<TagTone, { bg: string; fg: string }> = {
+  green:  { bg: "var(--badge-green-bg)",  fg: "var(--badge-green-text)" },
+  red:    { bg: "var(--badge-red-bg)",    fg: "var(--badge-red-text)" },
+  gray:   { bg: "var(--badge-gray-bg)",   fg: "var(--badge-gray-text)" },
+  yellow: { bg: "var(--badge-yellow-bg)", fg: "var(--badge-yellow-text)" },
+  accent: { bg: "var(--accent-light)",    fg: "var(--accent)" },
+  ai:     { bg: "var(--ai-bg)",           fg: "var(--ai-text)" },
+};
+
+/** Small classification label: a status, a category, a count. Pure presentation. */
+export function Tag({ tone = "gray", children, title, dot }: {
+  tone?: TagTone; children: ReactNode; title?: string;
+  /** Leading status dot in the tone's text colour (for on/off states). */
+  dot?: boolean;
+}) {
+  const t = TAG_TONES[tone];
+  return (
+    <span title={title} style={{
+      display: "inline-flex", alignItems: "center", gap: 4, fontSize: 10, fontWeight: 600, lineHeight: 1.5,
+      padding: "2px 7px", borderRadius: 5, background: t.bg, color: t.fg, whiteSpace: "nowrap",
+    }}>
+      {dot && <span aria-hidden style={{ fontSize: 7 }}>●</span>}
+      {children}
+    </span>
+  );
+}
+
+export type SubTab<K extends string> = {
+  key: K;
+  label: string;
+  /** Category caption under the label (免費 / AI / 整合…). */
+  caption?: string;
+  /** Count or status shown beside the label. */
+  badge?: ReactNode;
+};
+
+/** Second-level tab bar inside a hub tab: segmented pills, one per area, with a caption and a badge. */
+export function SubTabs<K extends string>({ tabs, active, onChange, label, idPrefix }: {
+  tabs: Array<SubTab<K>>; active: K; onChange: (key: K) => void; label: string;
+  /** Tabs get id `<prefix>-tab-<key>` and point at panel `<prefix>-panel-<key>`; the caller gives its panels those ids. */
+  idPrefix: string;
+}) {
+  return (
+    <div role="tablist" aria-label={label} style={{
+      display: "flex", gap: 4, padding: 4, borderRadius: 10, marginBottom: 14, flexWrap: "wrap",
+      background: "var(--bg-card)", border: "1px solid var(--border-subtle)",
+    }}>
+      {tabs.map((t) => {
+        const on = t.key === active;
+        return (
+          <button key={t.key} role="tab" id={`${idPrefix}-tab-${t.key}`} aria-controls={`${idPrefix}-panel-${t.key}`}
+            aria-selected={on} onClick={() => onChange(t.key)} style={{
+            flex: "1 1 140px", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
+            padding: "8px 12px", borderRadius: 7, border: "none", cursor: "pointer", textAlign: "left",
+            background: on ? "var(--accent-light)" : "transparent",
+            boxShadow: on ? "inset 0 0 0 1px var(--accent)" : "none",
+          }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: on ? 700 : 500,
+              color: on ? "var(--accent)" : "var(--text-primary)" }}>
+              {t.label}
+              {t.badge}
+            </span>
+            {t.caption && <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{t.caption}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ChipBtn({ label, active, onClick, disabled, title }: {
   label: string; active: boolean; onClick: () => void; disabled?: boolean; title?: string;
 }) {

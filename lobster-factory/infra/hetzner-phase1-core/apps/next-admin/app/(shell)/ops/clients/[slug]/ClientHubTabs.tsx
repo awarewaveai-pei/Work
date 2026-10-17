@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, type CSSProperties } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import Link from "next/link";
 import { roleHeader } from "@/lib/ops-role";
 import { WpUpdateButtons } from "./WpUpdateButtons";
 import { Card, ChipBtn, NoData, SubLabel, relativeTime } from "./hub-ui";
 import { SiteWatchCard } from "./SiteWatchCard";
 import { AccountsCard } from "./AccountsCard";
-import { CsIntentsCard, type CsIntentRow } from "./CsIntentsCard";
+import { CustomerServiceTab } from "./CustomerServiceTab";
 import { ScheduleTable } from "@/app/(shell)/ops/schedules/ScheduleTable";
 import { CollectionSourcesPanel } from "@/app/(shell)/ops/collect/CollectionSourcesPanel";
 import { KnowledgeDetailModal } from "./KnowledgeDetailModal";
@@ -1098,231 +1098,10 @@ function BrandIdentityTab({ org, cfg }: Pick<ClientHubTabsProps, "org" | "cfg">)
   );
 }
 
-/** Small coloured label. Pure presentation, shared by the knowledge and customer-service tabs. */
+/** Small coloured label. Pure presentation (knowledge tab); hub-ui Tag is the toned variant. */
 const badge = (bg: string, fg: string, text: string) => (
   <span style={{ fontSize: 10, padding: "2px 7px", borderRadius: 5, background: bg, color: fg, whiteSpace: "nowrap" }}>{text}</span>
 );
-
-type FaqDraft = { id: string; keywords: string; answer: string; handoff: boolean };
-
-/** Free automatic answers (lib/cs/faq.ts): keyword match, sent as written, no AI and no credit. */
-function CsFaqCard({ slug, initial }: { slug: string; initial?: ClientConfig["csFaq"] }) {
-  const [rows, setRows] = useState<FaqDraft[]>(
-    (initial ?? []).map((e) => ({ id: e.id, keywords: e.keywords.join("、"), answer: e.answer, handoff: e.handoff === true })),
-  );
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const update = (i: number, patch: Partial<FaqDraft>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
-
-  async function save() {
-    setSaving(true); setMsg(null);
-    try {
-      await patchCis(slug, { csFaq: rows.map((r) => ({
-        id: r.id,
-        keywords: r.keywords.split(/[,，、\n]/).map((k) => k.trim()).filter(Boolean),
-        answer: r.answer,
-        handoff: r.handoff,
-      })) });
-      setMsg("✓ 已儲存。少了關鍵字或答案的題目不會存。");
-    } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
-  }
-
-  const field = { fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)",
-    background: "var(--bg-canvas)", color: "var(--text-primary)", fontFamily: "inherit" } as const;
-
-  return (
-    <Card title={`常見問答自動回覆（${rows.length}）`}>
-      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px", lineHeight: 1.6 }}>
-        客人的訊息含有某一題的關鍵字，就直接送出那一題的答案。不經過 AI，不花錢。
-        兩題一樣符合、或訊息提到退款／投訴／法律等，會轉真人。關鍵字用頓號或逗號分開。
-      </p>
-      {rows.map((r, i) => (
-        <div key={r.id || i} style={{ borderTop: "1px solid var(--card-border)", padding: "8px 0", display: "grid", gap: 6 }}>
-          <input value={r.keywords} onChange={(e) => update(i, { keywords: e.target.value })}
-            placeholder="關鍵字，例如：課程、療癒模組、上課" style={field} />
-          <textarea value={r.answer} onChange={(e) => update(i, { answer: e.target.value })} rows={3}
-            placeholder="送給客人的答案" style={{ ...field, resize: "vertical" }} />
-          <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 6, color: "var(--text-secondary)" }}>
-            <input type="checkbox" checked={r.handoff} onChange={(e) => update(i, { handoff: e.target.checked })} />
-            答完也轉真人（預約、費用這類要有人接手的問題）
-          </label>
-          <button onClick={() => setRows((rs) => rs.filter((_, j) => j !== i))}
-            style={{ ...cisBtnStyle, marginTop: 0, justifySelf: "start", background: "transparent", color: "var(--red)", border: "1px solid var(--red)" }}>
-            刪除這題
-          </button>
-        </div>
-      ))}
-      <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={() => setRows((rs) => [...rs, { id: "", keywords: "", answer: "", handoff: false }])}
-          style={{ ...cisBtnStyle, background: "transparent", color: "var(--accent)", border: "1px solid var(--accent)" }}>
-          ＋ 新增一題
-        </button>
-        <button onClick={save} disabled={saving} style={{ ...cisBtnStyle, opacity: saving ? 0.6 : 1 }}>
-          {saving ? "儲存中…" : "儲存問答"}
-        </button>
-      </div>
-      {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
-    </Card>
-  );
-}
-
-const CHATWOOT_TOKEN_ERRORS: Record<string, string> = {
-  token_rejected: "Chatwoot 不接受這組 token。要用你自己的，不能用機器人的。",
-  token_not_in_account: "這組 token 讀不到這個客戶的 Chatwoot 聯絡人。",
-  token_unreachable: "連不到 Chatwoot，沒有存。稍後再試。",
-  chatwoot_not_configured: "這個客戶還沒接上 Chatwoot。",
-  forbidden_role: "只有擁有者或管理員能改。",
-};
-
-/** The operator's own Chatwoot token (vault only, never shown again): lets the system write a customer's name into the contact. */
-function CsChatwootTokenCard({ slug }: { slug: string }) {
-  const [configured, setConfigured] = useState<boolean | null>(null);
-  const [token, setToken] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const url = `/api/ops/clients/${slug}/cs-config/chatwoot-token`;
-
-  useEffect(() => {
-    let alive = true;
-    fetch(url, { headers: { ...roleHeader("admin") } })
-      .then((r) => r.json() as Promise<{ ok?: boolean; configured?: boolean }>)
-      .then((d) => { if (alive && d.ok) setConfigured(d.configured === true); })
-      .catch(() => { /* status stays unknown */ });
-    return () => { alive = false; };
-  }, [url]);
-
-  async function send(method: "PUT" | "DELETE") {
-    setBusy(true); setMsg(null);
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
-        body: method === "PUT" ? JSON.stringify({ token }) : undefined,
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string; configured?: boolean; baseline?: { ok: boolean; changes?: unknown[]; error?: string } };
-      if (!res.ok || !data.ok) throw new Error(CHATWOOT_TOKEN_ERRORS[data.error ?? ""] ?? data.error ?? `失敗（${res.status}）`);
-      setConfigured(data.configured === true);
-      setToken("");
-      // The save also applies the Chatwoot baseline (auto-resolve + closing macro); say what it did.
-      const b = data.baseline;
-      const baselineNote = !b ? "" : b.ok
-        ? (b.changes?.length ? "；Chatwoot 已設好自動結案和結案巨集" : "；Chatwoot 基本設定原本就是對的")
-        : `；但 Chatwoot 基本設定沒套上（${b.error}），每天的檢查會再試`;
-      setMsg(method === "PUT" ? `✓ 已設定${baselineNote}` : "✓ 已清除");
-    } catch (e) { setMsg(`⚠ ${e instanceof Error ? e.message : String(e)}`); } finally { setBusy(false); }
-  }
-
-  return (
-    <Card title={`Chatwoot 個人 token：${configured === null ? "…" : configured ? "已設定" : "未設定"}`}>
-      <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px", lineHeight: 1.6 }}>
-        設定後，客人回答名字時，系統會把名字寫進 Chatwoot 聯絡人。
-        到 Chatwoot 右上頭像 → 個人資料設定 → 存取權杖，複製貼在這裡。
-        存之前會先向 Chatwoot 確認；只存在伺服器，之後不會再顯示。
-      </p>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-        <input type="password" value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off"
-          placeholder={configured ? "貼上新的 token 會取代舊的" : "貼上 token"}
-          style={{ flex: 1, minWidth: 0, fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }} />
-        <button onClick={() => send("PUT")} disabled={busy || !token.trim()}
-          style={{ ...cisBtnStyle, marginTop: 0, opacity: busy || !token.trim() ? 0.5 : 1 }}>{busy ? "確認中…" : "存"}</button>
-        {configured && (
-          <button onClick={() => send("DELETE")} disabled={busy}
-            style={{ ...cisBtnStyle, marginTop: 0, background: "transparent", color: "var(--red)", border: "1px solid var(--red)" }}>清除</button>
-        )}
-      </div>
-      {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
-    </Card>
-  );
-}
-
-// ── Customer service tab ──────────────────────────────────────────────────────
-
-function CustomerServiceTab({ org }: Pick<ClientHubTabsProps, "org">) {
-  const [loading, setLoading] = useState(true);
-  const [csEnabled, setCsEnabled] = useState(true);
-  const [minScore, setMinScore] = useState<string>("");
-  const [minScoreDefault, setMinScoreDefault] = useState<number>(0.5);
-  const [intents, setIntents] = useState<CsIntentRow[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const reloadConfig = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, { headers: { ...roleHeader("admin") } });
-      const data = (await res.json()) as { ok?: boolean; csEnabled?: boolean; intents?: CsIntentRow[]; kbMinRetrievalScore?: number | null; kbMinRetrievalScoreDefault?: number };
-      if (data.ok) {
-        setCsEnabled(data.csEnabled ?? true); setIntents(data.intents ?? []);
-        setMinScore(typeof data.kbMinRetrievalScore === "number" ? String(data.kbMinRetrievalScore) : "");
-        if (typeof data.kbMinRetrievalScoreDefault === "number") setMinScoreDefault(data.kbMinRetrievalScoreDefault);
-      }
-    } catch { /* ignore */ }
-  }, [org.slug]);
-  useEffect(() => {
-    let alive = true;
-    (async () => { await reloadConfig(); if (alive) setLoading(false); })();
-    return () => { alive = false; };
-  }, [reloadConfig]);
-
-  async function toggleKill() {
-    setSaving(true); setMsg(null);
-    const next = !csEnabled;
-    try {
-      const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
-        body: JSON.stringify({ csEnabled: next }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string; csEnabled?: boolean };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
-      setCsEnabled(data.csEnabled ?? next);
-      setMsg(next ? "✓ 已啟用此客戶 AI 客服" : "✓ 已停用 AI（不花錢）— 常見問答仍會自動回覆，其他訊息轉真人");
-    } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
-  }
-
-  async function saveMinScore() {
-    setSaving(true); setMsg(null);
-    try {
-      const value = minScore.trim() === "" ? null : Number(minScore);
-      const res = await fetch(`/api/ops/clients/${org.slug}/cs-config`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...roleHeader("admin") },
-        body: JSON.stringify({ kbMinRetrievalScore: value }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string; kbMinRetrievalScore?: number | null };
-      if (!res.ok || !data.ok) throw new Error(data.error ?? `save_failed_${res.status}`);
-      setMinScore(typeof data.kbMinRetrievalScore === "number" ? String(data.kbMinRetrievalScore) : "");
-      setMsg(value === null ? `✓ 知識門檻改回預設 ${minScoreDefault}` : `✓ 知識門檻已存：${value}`);
-    } catch (e) { setMsg(`⚠ ${String(e)}`); } finally { setSaving(false); }
-  }
-
-  return (
-    <>
-      <Card title={csEnabled ? "🟢 AI 客服：啟用中" : "🔴 AI 客服：已停用 (kill-switch)"}>
-        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "0 0 8px" }}>
-          每租戶 kill-switch：停用後不呼叫 AI（不花錢），沒有命中常見問答的訊息一律轉真人；常見問答自動回覆照常。每個意圖怎麼回在下方「意圖與自動化分級」。
-        </p>
-        <button onClick={toggleKill} disabled={saving}
-          style={{ ...cisBtnStyle, background: csEnabled ? "var(--red)" : "var(--accent)", opacity: saving ? 0.6 : 1 }}>
-          {saving ? "處理中…" : csEnabled ? "停用 AI 客服" : "啟用 AI 客服"}
-        </button>
-        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-          <span style={{ color: "var(--text-muted)", width: 88, flexShrink: 0 }}>知識門檻</span>
-          <input value={minScore} onChange={(e) => setMinScore(e.target.value)} placeholder={`預設 ${minScoreDefault}`} inputMode="decimal"
-            style={{ width: 80, fontSize: 12, padding: "5px 8px", borderRadius: 6, border: "1px solid var(--card-border)", background: "var(--bg-canvas)", color: "var(--text-primary)" }} />
-          <button onClick={saveMinScore} disabled={saving} style={{ ...cisBtnStyle, marginTop: 0 }}>存</button>
-        </div>
-        <p style={{ fontSize: 11, color: "var(--text-muted)", margin: "6px 0 0", lineHeight: 1.6 }}>
-          知識庫最相近段落的分數低於這個值，AI 就不寫答案、直接轉真人（也不花錢）。0.2–0.8；留空＝預設。
-          英文網站配中文客人，用真問題量過再填（Soulful 2026-10-15 量到 0.40）。
-        </p>
-        {msg && <div style={{ marginTop: 6, fontSize: 11, color: msg.startsWith("✓") ? "var(--green)" : "var(--red)" }}>{msg}</div>}
-      </Card>
-
-      <CsChatwootTokenCard slug={org.slug} />
-
-      <CsIntentsCard slug={org.slug} intents={intents} loading={loading} reload={reloadConfig} />
-    </>
-  );
-}
 
 // ── Knowledge base tab ───────────────────────────────────────────────────────
 //
@@ -2944,7 +2723,7 @@ export function ClientHubTabs(props: ClientHubTabsProps) {
         {activeTab === "品牌識別" && <BrandIdentityTab org={org} cfg={cfg} />}
         {activeTab === "知識庫" && <KnowledgeTab org={org} researchBridgesEnabled={props.researchBridgesEnabled} />}
         {activeTab === "資料蒐集" && <CollectionTab org={org} />}
-        {activeTab === "客服" && <><CsFaqCard slug={org.slug} initial={cfg.csFaq} /><CustomerServiceTab org={org} /></>}
+        {activeTab === "客服" && <CustomerServiceTab org={org} cfg={cfg} />}
         {activeTab === "社群頻道" && <SocialChannelsTab org={org} />}
         {activeTab === "帳號" && <AccountsCard slug={org.slug} />}
         {activeTab === "憑證庫" && <CredentialsTab org={org} />}
