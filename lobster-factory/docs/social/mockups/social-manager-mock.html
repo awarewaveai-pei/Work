@@ -1,10 +1,11 @@
 <title>社群發文</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
 <style>
-/* v14 (C13, SOCIAL_MANAGER_GAP_REPORT.md U1-U6, U12, U13). One laptop screen (1280x660), no page scroll: left = calendar,
-   right = editor + platform previews; side views (輪播／媒體／紀錄／設定) take the full width. Phone (<=640px): day view,
-   editor as a full-screen sheet. Three kinds of control only: primary action (.btn-primary), switch (.seg), filter (one
-   button + panel). Pills (.chip/.pill) carry values, never actions; check-social-mocks.py counts them (<= 20 a screen).
+/* v16 (ADR 016 §5 操作者定案 2026-10-17): six-section top bar; under 貼文排程 six tabs; the calendar page = channel list on
+   the left (scrolls, built for 100 accounts) + calendar with a one-row toolbar; 建立貼文 / a card opens the composer as its
+   own full page. Every page fits one laptop screen (1280x660); inside the composer only the writing column scrolls.
+   Phone (<=640px): day view, channel list and composer full screen. Three kinds of control: primary action
+   (.btn-primary), switch (.seg), filter (one button + panel). Pills (.chip/.pill) carry values only.
    Colours, body font and the two button classes are app.aware-wave.com's (next-admin app/globals.css), pasted between the
    app-theme markers by sync-app-theme.py; check-social-mocks.py fails when they drift. The mock defines no colour. */
 /* app-theme:start */
@@ -295,8 +296,9 @@ body {
   border-color: var(--btn-secondary-hover-border);
 }
 /* app-theme:end */
+
 /* mock-local: layout + type scale (the app has no type tokens yet; text you read is never under 14px, labels >= 12px) */
-:root{ --fs-h1:18px; --fs-h2:15px; --fs-body:14px; --fs-tag:12px; --ed-w:580px; --av:34px; --thumb-h:46px; }
+:root{ --fs-h1:18px; --fs-h2:15px; --fs-body:14px; --fs-tag:12px; --chan-w:236px; --pv-w:330px; --av:32px; --thumb-h:58px; }
 /* platform brand colours (--p-*): app tokens in globals.css, copied above with the rest */
 
 html,body{height:100%}
@@ -313,9 +315,10 @@ textarea{width:100%;resize:none;line-height:1.6}
 .muted{color:var(--text-muted)}
 .tag{font-size:var(--fs-tag)}
 .err{color:var(--red)}
+.up{color:var(--green)} .down{color:var(--red)}
 svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
-/* the three kinds of control (U1) + values */
+/* the three kinds of control + values */
 .seg{display:inline-flex;align-items:center;background:var(--bg-subtle);border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:2px;gap:2px;flex:none}
 .seg button{border:0;background:transparent;padding:3px 10px;border-radius:6px;color:var(--text-muted);font-weight:600;white-space:nowrap}
 .seg button:hover{color:var(--text-primary);background:var(--bg-hover)}
@@ -331,88 +334,127 @@ svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .ck{display:flex;align-items:center;gap:8px;cursor:pointer;padding:3px 0}
 .ck input{margin:0;accent-color:var(--accent)}
 .sbar{width:4px;height:16px;border-radius:2px;background:var(--status-ignored);flex:none}
+.sbar[data-state="scheduled"]{background:var(--yellow)} .sbar[data-state="published"]{background:var(--green)} .sbar[data-state="error"]{background:var(--red)} .sbar[data-state="review"]{background:var(--severity-low)} .sbar[data-state="rotation"]{background:var(--accent)}
 .pf{display:inline-flex;width:18px;height:18px;border-radius:50%;color:var(--p-ink);font-size:var(--fs-tag);line-height:18px;justify-content:center;font-weight:700;flex:none}
 .pf-facebook{background:var(--p-fb)} .pf-instagram{background:var(--p-ig)} .pf-threads{background:var(--p-th)} .pf-linkedin{background:var(--p-li)} .pf-bluesky{background:var(--p-bs)} .pf-wordpress{background:var(--p-wp)}
-/* brand avatars (the account picture from Postiz in the product, F17) */
-.av{width:var(--av);height:var(--av);border-radius:50%;display:inline-grid;place-items:center;color:var(--p-ink);font-weight:700;flex:none}
-.av.soulful{background:radial-gradient(circle at 30% 30%,var(--p-ig) 0 18%,transparent 48%),radial-gradient(circle at 72% 70%,var(--yellow) 0 16%,transparent 52%),var(--p-bs)}
-.av.awarewave{background:linear-gradient(135deg,var(--sidebar-logo-gradient-start),var(--sidebar-logo-gradient-end))}
-.av.fresh{background:var(--status-ignored)}
-.av.s32{width:32px;height:32px}
+/* account pictures (the channel's own picture from Postiz in the product, F17) */
+.av{width:var(--av);height:var(--av);border-radius:50%;display:inline-grid;place-items:center;color:var(--p-ink);font-weight:700;flex:none;font-size:var(--fs-tag)}
+.av.c0{background:radial-gradient(circle at 30% 30%,var(--p-ig) 0 18%,transparent 48%),radial-gradient(circle at 72% 70%,var(--yellow) 0 16%,transparent 52%),var(--p-bs)}
+.av.c1{background:linear-gradient(135deg,var(--sidebar-logo-gradient-start),var(--sidebar-logo-gradient-end))}
+.av.c2{background:linear-gradient(135deg,var(--green),var(--p-li))}
+.av.c3{background:linear-gradient(135deg,var(--yellow),var(--red))}
+.av.c4{background:linear-gradient(135deg,var(--p-th),var(--status-ignored))}
 .av.sq{border-radius:6px}
-/* sample photos: the post images in the mock, drawn with app tokens */
+.aav{position:relative;display:inline-grid;flex:none}
+.aav>.pf{position:absolute;right:-4px;bottom:-4px;box-shadow:0 0 0 2px var(--card-bg);width:16px;height:16px;line-height:16px}
+.aav .bang{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--red);color:var(--btn-primary-text);font-size:var(--fs-tag);line-height:16px;font-style:normal;font-weight:700;text-align:center}
+.aav .bang.wait{background:var(--status-ignored)}
+/* sample photos, drawn with app tokens */
 .ph{background-color:var(--badge-yellow-bg)}
 .ph-1{background:radial-gradient(circle at 28% 38%,var(--p-ig) 0 14%,transparent 34%),radial-gradient(circle at 70% 58%,var(--yellow) 0 18%,transparent 40%),radial-gradient(circle at 46% 92%,var(--p-bs) 0 12%,transparent 34%),var(--badge-yellow-bg)}
 .ph-2{background:radial-gradient(circle at 70% 30%,var(--green) 0 12%,transparent 36%),radial-gradient(circle at 25% 70%,var(--accent) 0 16%,transparent 42%),var(--icon-ops-bg)}
 .ph-3{background:radial-gradient(circle at 50% 45%,var(--red) 0 10%,transparent 30%),radial-gradient(circle at 20% 25%,var(--yellow) 0 14%,transparent 38%),radial-gradient(circle at 82% 80%,var(--p-li) 0 14%,transparent 38%),var(--badge-gray-bg)}
 .ph-4{background:linear-gradient(160deg,var(--accent-light),transparent 60%),radial-gradient(circle at 60% 60%,var(--p-ig) 0 20%,transparent 46%),var(--intake-success-bg)}
 
-.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);padding-inline:16px;gap:10px} /* minmax(0,...): a wide table scrolls inside its panel, never widens the page */
-header{display:flex;align-items:center;gap:14px;padding-top:10px;min-width:0}
-header h1{font-size:var(--fs-h1);margin:0;white-space:nowrap}
+/* frame: top bar (six sections), section bar (tabs or the composer's title), page */
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr)} /* minmax(0,...): a wide table scrolls inside its panel, never widens the page */
+header{display:flex;align-items:center;gap:6px;padding:0 16px;height:52px;background:var(--text-primary);color:var(--btn-primary-text);position:relative;min-width:0}
 header>*{flex:none}
-.hright{flex:1 1 auto;justify-content:flex-end}
-header{position:relative}
-.hpop{top:52px;right:0;width:300px;z-index:8}
-.tzbtn{padding:5px 10px;color:var(--text-muted)}
-#bulkBtn b{color:var(--accent)}
-.bulkmenu{top:52px;bottom:auto;right:12px}
-.seg .mk{display:none}
-.brands button{max-width:170px;overflow:hidden;text-overflow:ellipsis}
-.nav{display:flex;gap:2px}
-.nav button{border:0;background:transparent;padding:5px 10px;color:var(--text-muted);font-weight:600;border-radius:6px;white-space:nowrap}
-.nav button.on{color:var(--accent);background:var(--accent-light)}
-.hright{margin-left:auto;display:flex;align-items:center;gap:10px;min-width:0}
-.note{color:var(--text-muted);white-space:nowrap}
-.role{display:flex;align-items:center;gap:6px}
+header h1{font-size:var(--fs-h1);margin:0 12px 0 0;white-space:nowrap}
+.top{display:flex;gap:2px;min-width:0;flex:0 1 auto;overflow-x:auto;scrollbar-width:none}
+.top button{border:0;background:transparent;color:var(--btn-primary-text);opacity:.75;display:flex;gap:6px;align-items:center;padding:6px 10px;white-space:nowrap}
+.top button:hover{opacity:1;background:transparent}
+.top button.on{opacity:1;background:var(--accent)}
+.top button b{font-weight:600}
+.hright{margin-left:auto;display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.hright .hb{border:1px solid var(--btn-primary-text);background:transparent;color:var(--btn-primary-text);opacity:.85}
+.hright .hb:hover{opacity:1;background:transparent}
+.hright .ibtn{color:var(--btn-primary-text)}
 .bell{position:relative}
 .bell b{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:var(--btn-primary-text);font-size:var(--fs-tag);line-height:18px;text-align:center}
 .bell b.zero{display:none}
+.hpop{top:48px;right:12px;width:300px;z-index:8;color:var(--text-primary)}
+.subbar{display:flex;align-items:center;gap:2px;padding:0 16px;border-bottom:1px solid var(--card-border);background:var(--card-bg);min-height:46px;min-width:0}
+.tabs{display:flex;gap:2px;min-width:0;overflow-x:auto;scrollbar-width:none}
+.tabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:12px 12px 10px;color:var(--text-muted);font-weight:600;white-space:nowrap}
+.tabs button:hover{background:transparent;color:var(--text-primary)}
+.tabs button.on{color:var(--text-primary);border-bottom-color:var(--accent)}
+.tabs .soon{font-size:var(--fs-tag);color:var(--text-muted);font-weight:400}
+.subbar .r{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
+.subbar h2{margin:0;padding:6px 0;font-size:var(--fs-h2);display:flex;gap:8px;align-items:center;white-space:nowrap}
+.tzbtn{padding:4px 10px;color:var(--text-muted)}
 .fab{display:none}
 
-main{display:grid;grid-template-columns:minmax(0,1fr) var(--ed-w);gap:12px;min-height:0;padding-bottom:14px}
+main{display:grid;grid-template-columns:var(--chan-w) minmax(0,1fr);grid-template-rows:minmax(0,1fr);grid-row:3;gap:12px;min-height:0;padding:12px 16px 14px} /* row 3 even when the section bar is hidden */
 main.full{grid-template-columns:minmax(0,1fr)}
 .panel{background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--shadow);min-height:0;display:flex;flex-direction:column;overflow:hidden;position:relative}
-.ptop{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--card-border);min-height:48px;flex:none}
+.ptop{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--card-border);min-height:50px;flex:none}
 .ptop h2{font-size:var(--fs-h2);margin:0;white-space:nowrap}
 .ptop .r{margin-left:auto;display:flex;gap:8px;align-items:center}
-.search{display:flex;align-items:center;gap:4px;border:1px solid var(--btn-secondary-border);border-radius:var(--radius-sm);padding:0 6px;color:var(--text-muted)}
-.search input{border:0;padding:4px 0;width:110px;background:transparent}
-.search:focus-within{border-color:var(--accent)}
-#filterBtn{padding:5px 12px}
-#filterBtn b{color:var(--accent)}
 .pop{position:absolute;z-index:5;background:var(--card-bg);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--shadow-hover);padding:12px;display:flex;flex-direction:column;gap:8px}
 .pop h3{font-size:var(--fs-tag);color:var(--text-muted);margin:0;font-weight:600}
-.filters{top:52px;right:12px;width:320px}
+.menu{padding:6px;gap:2px}
+.menu button{border:0;background:transparent;text-align:left;padding:8px 10px}
+.menu button:hover{background:var(--bg-hover)}
+
+/* channel list (decision 1): scrolls, one row per account, ⋮ for that account's menu */
+.chan{min-height:0}
+.chan .ptop{flex-wrap:wrap}
+.chan .find{margin:8px 10px 4px;display:flex;align-items:center;gap:4px;border:1px solid var(--btn-secondary-border);border-radius:var(--radius-sm);padding:0 6px;color:var(--text-muted)}
+.chan .find input{border:0;padding:4px 0;width:100%;background:transparent}
+.clist{flex:1;min-height:0;overflow-y:auto;padding:4px 6px 8px;display:flex;flex-direction:column;gap:1px}
+.crow{text-align:left;width:100%;background:transparent;display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 4px 6px 8px;border-radius:var(--radius-sm);border:1px solid transparent;cursor:pointer}
+.crow:hover{background:var(--bg-hover)}
+.crow.on{background:var(--accent-light);border-color:var(--accent)}
+.crow .nm{min-width:0;line-height:1.3}
+.crow .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .nm span{display:block;font-size:var(--fs-tag);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .nm span.err{color:var(--red)}
+.crow .ibtn{width:26px;height:26px}
+.cmenu{width:200px}
+.cfoot{border-top:1px solid var(--card-border);padding:8px 10px;font-size:var(--fs-tag);color:var(--text-muted);flex:none}
+
+/* calendar toolbar (decision 4): one row */
+.toolbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--card-border);flex:none;position:relative}
+.search{display:flex;align-items:center;gap:4px;border:1px solid var(--btn-secondary-border);border-radius:var(--radius-sm);padding:0 8px;color:var(--text-muted);flex:0 1 220px;min-width:120px}
+.search input{border:0;padding:5px 0;width:100%;background:transparent}
+.search:focus-within{border-color:var(--accent)}
+.range{font-weight:600;white-space:nowrap}
+#filterBtn b,#bulkBtn b{color:var(--accent)}
+#bestBtn.on{background:var(--accent-light);border-color:var(--accent);color:var(--accent)}
+.toolbar .end{margin-left:auto;display:flex;gap:8px;align-items:center}
+.filters{top:52px;right:180px;width:330px}
 .filters .cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .filters .ft{display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--card-border);padding-top:8px}
+.bulkmenu{top:52px;right:12px}
+.bestbar{display:flex;align-items:center;gap:8px;padding:6px 12px;border-bottom:1px solid var(--card-border);background:var(--accent-light);flex:none}
 
-/* week: one column a day, cards stacked in time order (U3) */
+/* week: one column a day, cards stacked in time order */
 .week{flex:1;min-height:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
 .day{border-left:1px solid var(--card-border);display:flex;flex-direction:column;min-height:0;min-width:0}
 .day:first-child{border-left:0}
 .day.past{background:repeating-linear-gradient(135deg,transparent 0 9px,var(--bg-subtle) 9px 18px)}
 .day.today{background:var(--accent-light)}
-.day.today .dh{background:var(--text-primary);color:var(--btn-primary-text)}
-.day.today .dh .muted,.day.today .dh .n{color:var(--btn-primary-text)}
 .dh{padding:6px 8px;display:flex;align-items:baseline;gap:6px;border-bottom:1px solid var(--card-border);flex:none}
 .dh b{font-size:var(--fs-h2)}
 .dh .n{margin-left:auto;font-size:var(--fs-tag);color:var(--text-muted)}
-.now{flex:none;display:flex;align-items:center;gap:4px;color:var(--red);font-size:var(--fs-tag);font-weight:700}
-.now::after{content:"";flex:1;height:2px;background:var(--red)}
+.day.today .dh{background:var(--text-primary);color:var(--btn-primary-text)}
+.day.today .dh .muted,.day.today .dh .n{color:var(--btn-primary-text)}
 .stack{flex:1;min-height:0;overflow-y:auto;padding:6px;display:flex;flex-direction:column;gap:6px;cursor:copy}
 .stack.over{outline:2px dashed var(--accent);outline-offset:-3px}
+.best{flex:none;display:flex;gap:4px;flex-wrap:wrap;align-items:center;font-size:var(--fs-tag);color:var(--accent)}
+.best button{border:1px dashed var(--accent);background:var(--card-bg);color:var(--accent);padding:0 6px;font-size:var(--fs-tag);border-radius:4px}
+.now{flex:none;display:flex;align-items:center;gap:4px;color:var(--red);font-size:var(--fs-tag);font-weight:700}
+.now::after{content:"";flex:1;height:2px;background:var(--red)}
 .add{flex:none;border:0;background:var(--accent);color:var(--btn-primary-text);display:flex;align-items:center;justify-content:center;gap:2px;padding:3px;visibility:hidden}
 .day:hover .add{visibility:visible}
 .card{position:relative;flex:none;background:var(--card-bg);border:1px solid var(--card-border);border-left:4px solid var(--status-ignored);border-radius:8px;padding:5px;display:flex;flex-direction:column;gap:4px;cursor:pointer;box-shadow:var(--shadow);text-align:left}
 .card:hover{box-shadow:var(--shadow-hover)}
-.card.sel{outline:2px solid var(--accent);outline-offset:-1px}
 .card[data-state="scheduled"]{border-left-color:var(--yellow)} .card[data-state="published"]{border-left-color:var(--green)} .card[data-state="error"]{border-left-color:var(--red)} .card[data-state="review"]{border-left-color:var(--severity-low)} .card[data-state="rotation"]{border-left-color:var(--accent)}
 .card[data-kind="article"]{background:var(--bg-subtle);border-style:dashed}
-.cthumb{height:var(--thumb-h);border-radius:5px;position:relative;display:grid;place-items:center;color:var(--text-muted);font-size:var(--fs-tag);flex:none}
+.cthumb{height:var(--thumb-h);border-radius:5px;position:relative;display:grid;place-items:center end;padding-right:6px;color:var(--text-muted);font-size:var(--fs-tag);flex:none}
 .cthumb.txt{height:22px;background:var(--bg-subtle)}
 .cthumb .avs{position:absolute;left:3px;top:3px}
-.cthumb.txt{place-items:center end;padding-right:6px}
 .cthumb .more{position:absolute;right:3px;bottom:3px;background:var(--card-bg);border-radius:4px;padding:0 4px;color:var(--text-primary)}
 .cmeta{display:flex;align-items:center;gap:4px;font-size:var(--fs-tag);color:var(--text-muted);min-width:0;white-space:nowrap;overflow:hidden}
 .avs{display:flex;flex:none}
@@ -440,53 +482,50 @@ table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--card-border);white-space:nowrap;vertical-align:middle}
 th{color:var(--text-muted);font-weight:600;font-size:var(--fs-tag);position:sticky;top:0;background:var(--card-bg)}
 td.ttl{white-space:normal;min-width:0}
+td.num{text-align:right}
 .tthumb{width:40px;height:40px;border-radius:6px;display:block}
 .tthumb.txt{background:var(--bg-subtle)}
 .bulk{display:flex;gap:8px;align-items:center;padding:8px 12px;border-top:1px solid var(--card-border)}
-.sbar[data-state="scheduled"]{background:var(--yellow)} .sbar[data-state="published"]{background:var(--green)} .sbar[data-state="error"]{background:var(--red)} .sbar[data-state="review"]{background:var(--severity-low)} .sbar[data-state="rotation"]{background:var(--accent)} .sbar[data-state="deleted"]{background:var(--text-muted)}
 
-/* empty states (U13): picture + one sentence + one button */
-.empty{margin:auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:24px;max-width:380px}
+/* empty / not-yet pages: round tinted icon, bold line, grey hint, at most one button */
+.empty{margin:auto;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;padding:24px;max-width:420px}
 .empty .eic{width:64px;height:64px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:grid;place-items:center;margin-bottom:6px}
 .empty .eic svg.i{width:30px;height:30px}
 .empty b{font-size:var(--fs-h2)}
-.empty .btn-primary{margin-top:8px}
 .empty p{margin:0}
-.over-empty{position:absolute;inset:96px 0 0 0;display:flex;pointer-events:none}
+.empty .btn-primary{margin-top:8px}
+.over-empty{position:absolute;inset:100px 0 0 0;display:flex;pointer-events:none}
 .over-empty .empty{pointer-events:auto;background:var(--card-bg);border-radius:var(--radius);box-shadow:var(--shadow)}
 
-/* full-width side views (U12) */
-.cols2{flex:1;min-height:0;display:grid;grid-template-columns:360px minmax(0,1fr)}
+/* rotation lists, library, deleted, settings */
+.cols2{flex:1;min-height:0;display:grid;grid-template-columns:340px minmax(0,1fr)}
 .lcol{border-right:1px solid var(--card-border);overflow:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
-.lst{border:1px solid var(--card-border);border-left:4px solid var(--accent);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;text-align:left;background:var(--card-bg)}
+.lst{border:1px solid var(--card-border);border-left:4px solid var(--accent);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;text-align:left;background:var(--card-bg);min-width:0}
 .lst.off{border-left-color:var(--status-ignored)}
 .lst.sel{outline:2px solid var(--accent);outline-offset:-1px}
 .lst .nx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ldet{min-height:0;overflow:auto;padding:12px 16px;display:flex;flex-direction:column;gap:10px}
 .frow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.frow>.lab{color:var(--text-muted);width:56px;flex:none}
-.queue{display:flex;flex-direction:column;gap:4px}
 .frow.top{align-items:flex-start}
-.slots{display:flex;flex-direction:column;gap:6px}
-.slots{flex:1 1 300px;min-width:0}
+.frow>.lab{color:var(--text-muted);width:56px;flex:none}
+.slots{display:flex;flex-direction:column;gap:6px;flex:1 1 300px;min-width:0}
 .sgrid7{display:grid;grid-template-columns:44px repeat(7,minmax(0,44px)) 30px;gap:4px;align-items:center;text-align:center}
 .slot{height:28px;padding:0;border:1px solid var(--card-border);background:var(--bg-subtle);border-radius:6px}
 .slot:hover{border-color:var(--accent)}
 .slot.on{background:var(--yellow);border-color:var(--yellow)}
+.queue{display:flex;flex-direction:column;gap:4px}
 .qrow{display:grid;grid-template-columns:104px minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--card-border);border-radius:6px;padding:4px 4px 4px 10px}
 .qrow.next{border-color:var(--accent);background:var(--bg-subtle)}
 .qrow .n{color:var(--text-muted);font-size:var(--fs-tag)}
 .qrow .tx{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .acts{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.media-grid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;padding:12px;align-content:start}
-.mtile{border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:6px;text-align:left;display:flex;flex-direction:column;gap:4px;min-width:0;position:relative}
-.mtile.on{outline:2px solid var(--accent);outline-offset:-1px}
-.mtile .mimg{height:110px;border-radius:6px;display:grid;place-items:center;color:var(--card-bg)}
-.mtile .mimg svg.i{width:32px;height:32px;stroke-width:2.4}
-.mtile .mn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mtile .tick{position:absolute;top:10px;left:10px;width:22px;height:22px;border-radius:50%;background:var(--card-bg);border:1px solid var(--btn-secondary-border);display:grid;place-items:center;color:var(--accent)}
-.mtile.on .tick{background:var(--accent);color:var(--btn-primary-text);border-color:var(--accent)}
-.mtile .tick svg.i{width:14px;height:14px;stroke-width:3}
+.lib{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:12px;align-content:start}
+.ltile{border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:8px;display:flex;flex-direction:column;gap:6px;min-width:0;position:relative;text-align:left;background:var(--card-bg)}
+.ltile.on{outline:2px solid var(--accent);outline-offset:-1px}
+.ltile .limg{height:110px;border-radius:6px;display:grid;place-items:center;color:var(--card-bg)}
+.ltile .limg svg.i{width:32px;height:32px;stroke-width:2.4}
+.ltile .limg.txt{background:var(--bg-subtle);color:var(--text-muted);height:60px}
+.ltile .lt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .sgrid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;padding:12px;align-content:start}
 .sec{border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
 .sec h3{margin:0;font-size:var(--fs-h2)}
@@ -494,57 +533,89 @@ td.ttl{white-space:normal;min-width:0}
 .arow .who{min-width:0}
 .arow .who b,.arow .who span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .arow .why{grid-column:2/-1;color:var(--red);font-size:var(--fs-tag)}
-.aav{position:relative;display:inline-grid;flex:none}
-.aav>.pf{position:absolute;right:-4px;bottom:-4px;box-shadow:0 0 0 2px var(--card-bg)}
 .tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
 .tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px}
 .tile .pf{width:32px;height:32px;line-height:32px}
 .mrole{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center}
 .connect{background:var(--bg-subtle);border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:8px}
 
-/* editor (U5): ① channel avatars + edit tabs ② one big text box, icon toolbar inside ③ the tab's platform settings */
-.ed{flex:1;min-height:0;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto}
-.chan{display:flex;gap:10px;align-items:center;padding:8px 12px 6px}
-.chan .chn{margin-left:4px}
-.cav{position:relative;width:var(--av);height:var(--av);padding:0;border:0;border-radius:50%;background:transparent;display:inline-grid;flex:none}
-.cav:hover{background:transparent}
-.cav>.pf{position:absolute;right:-4px;bottom:-4px;box-shadow:0 0 0 2px var(--card-bg)}
-.cav:not(.on)>.av{filter:grayscale(1);opacity:.4}
-.cav:not(.on)>.pf{filter:grayscale(1)}
-.cav.on>.av{box-shadow:0 0 0 2px var(--card-bg),0 0 0 4px var(--accent)}
-.cav .bang{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:var(--red);color:var(--btn-primary-text);font-size:var(--fs-tag);line-height:16px;font-style:normal;font-weight:700;text-align:center}
-.cav .bang.wait{background:var(--status-ignored)}
-.etabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--card-border);overflow-x:auto;scrollbar-width:none}
-.etabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:6px 8px;display:flex;gap:6px;align-items:center;color:var(--text-muted);font-weight:600;white-space:nowrap}
+/* analytics + reporting (decision 2: real pages) */
+.akpi{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding:12px 12px 0;flex:none}
+.kpi{border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-direction:column;gap:2px;text-align:left;background:var(--card-bg)}
+.kpi.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.kpi b{font-size:var(--fs-h1)}
+.kpi span{font-size:var(--fs-tag)}
+.abody{flex:1;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:10px;padding:10px 12px 12px}
+.chartbox{border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.chartbox svg{width:100%;height:150px;display:block}
+.chartbox .ax{stroke:var(--card-border);stroke-width:1}
+.chartbox .bar{fill:var(--accent-light)}
+.chartbox .line{fill:none;stroke:var(--accent);stroke-width:2.5}
+.chartbox .prev{fill:none;stroke:var(--status-ignored);stroke-width:1.5;stroke-dasharray:4 4}
+.chartbox .xl{display:flex;justify-content:space-between;font-size:var(--fs-tag);color:var(--text-muted);padding:0 12px}
+.chartbox .lg{display:flex;gap:14px;font-size:var(--fs-tag);color:var(--text-muted)}
+.chartbox .lg i{display:inline-block;width:14px;height:3px;background:var(--accent);vertical-align:middle;margin-right:4px}
+.chartbox .lg i.p{background:var(--status-ignored)}
+.atable{min-height:0;overflow:auto;border:1px solid var(--card-border);border-radius:var(--radius-sm)}
+.rgrid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:12px;padding:12px;overflow:hidden}
+.rform{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto}
+.rform .row{display:flex;gap:16px;flex-wrap:wrap}
+.rform .row>div{display:flex;flex-direction:column;gap:6px}
+.swatch{width:28px;height:28px;border-radius:50%;padding:0;border:2px solid var(--card-bg);box-shadow:0 0 0 1px var(--card-border)}
+.swatch.on{box-shadow:0 0 0 2px var(--text-primary)}
+.sw-a{background:var(--accent)} .sw-b{background:var(--p-ig)} .sw-c{background:var(--green)} .sw-d{background:var(--p-li)} .sw-e{background:var(--yellow)}
+.rprev{display:flex;flex-direction:column;gap:10px;min-height:0}
+.page{border:1px solid var(--card-border);border-radius:6px;box-shadow:var(--shadow);background:var(--card-bg);aspect-ratio:1.414/1;padding:14px;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden}
+.page .band{position:absolute;left:0;top:0;bottom:0;width:6px}
+.page .ph1{display:flex;align-items:center;gap:8px}
+.page .ph1 b{font-size:var(--fs-h2)}
+.page .mini{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.page .mini div{border:1px solid var(--card-border);border-radius:4px;padding:4px 6px;font-size:var(--fs-tag);display:flex;flex-direction:column}
+.page .mini b{font-size:var(--fs-body)}
+.page svg{width:100%;height:70px}
+.page .line{fill:none;stroke-width:2.5}
+.past{display:flex;flex-direction:column;gap:4px;min-height:0;overflow:auto}
+.prow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;border-bottom:1px solid var(--card-border);padding:6px 0}
+.irow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--card-border)}
+.unread{font-weight:700;color:var(--accent)}
+
+/* composer (decision 5): its own page; channel picker | writing | previews; only the writing column scrolls */
+.cgrid{flex:1;min-height:0;display:grid;grid-template-columns:var(--chan-w) minmax(0,1fr) var(--pv-w);grid-template-rows:minmax(0,1fr) auto}
+.cgrid>.chan{border-right:1px solid var(--card-border);display:flex;flex-direction:column;min-height:0}
+.cgrid>.chan .ptop{min-height:44px}
+.pick{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:8px;align-items:center;padding:5px 6px;border-radius:var(--radius-sm);cursor:pointer}
+.pick:hover{background:var(--bg-hover)}
+.pick.on{background:var(--accent-light)}
+.pick.off{opacity:.6;cursor:not-allowed}
+.pick input{margin:0;accent-color:var(--accent)}
+.pick .nm{min-width:0;line-height:1.3}
+.pick .nm b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick .nm span{display:block;font-size:var(--fs-tag);color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pick .nm span.err{color:var(--red)}
+.ewrite{display:flex;flex-direction:column;min-height:0;min-width:0}
+.etabs{display:flex;gap:2px;padding:0 12px;border-bottom:1px solid var(--card-border);overflow-x:auto;scrollbar-width:none;flex:none}
+.etabs button{border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent;padding:10px 8px 8px;display:flex;gap:6px;align-items:center;color:var(--text-muted);font-weight:600;white-space:nowrap}
 .etabs button:hover{background:transparent;color:var(--text-primary)}
 .etabs button.on{color:var(--text-primary);border-bottom-color:var(--accent)}
 .etabs .cdot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
 .etabs .cwarn{width:16px;height:16px;border-radius:50%;background:var(--red);color:var(--btn-primary-text);font-size:var(--fs-tag);line-height:16px;text-align:center;font-style:normal}
-.ebody{display:grid;grid-template-columns:minmax(0,1fr) 228px;gap:12px;padding:10px 12px;min-height:0}
-.write{display:flex;flex-direction:column;gap:8px;min-height:0;min-width:0;overflow:auto}
-.box{border:1px solid var(--btn-secondary-border);border-radius:var(--radius);display:flex;flex-direction:column;flex:1 0 auto;min-height:170px}
+.write{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;padding:10px 12px}
+.box{border:1px solid var(--btn-secondary-border);border-radius:var(--radius);display:flex;flex-direction:column;flex:1 0 auto;min-height:190px}
 .box:focus-within{border-color:var(--accent)}
-.box textarea{border:0;flex:1;padding:10px 12px;background:transparent;min-height:90px;border-radius:var(--radius)}
+.box textarea{border:0;flex:1;padding:10px 12px;background:transparent;min-height:110px;border-radius:var(--radius)}
 .box textarea:focus-visible{outline:0}
 .box textarea[readonly]{color:var(--text-muted)}
 .mrow{display:flex;gap:8px;padding:2px 12px 8px;flex-wrap:wrap}
-.mt{width:52px;height:52px;border-radius:6px;position:relative;flex:none}
+.mt{width:56px;height:56px;border-radius:6px;position:relative;flex:none}
 .mt .x{position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;padding:0;display:grid;place-items:center;background:var(--card-bg);border:1px solid var(--btn-secondary-border)}
 .mt .x svg.i{width:12px;height:12px}
-.madd{width:52px;height:52px;padding:0;border-style:dashed;display:grid;place-items:center;color:var(--text-muted)}
-.tools{display:flex;align-items:center;gap:0;border-top:1px solid var(--card-border);padding:3px 6px}
-.tools .ibtn{width:26px;height:28px}
+.madd{width:56px;height:56px;padding:0;border-style:dashed;display:grid;place-items:center;color:var(--text-muted)}
+.tools{display:flex;align-items:center;gap:2px;border-top:1px solid var(--card-border);padding:3px 6px}
 .tools .cnt{margin-left:auto;font-size:var(--fs-tag);color:var(--text-muted);white-space:nowrap;padding-left:6px;display:flex;gap:4px;align-items:center}
-.tools .cnt.over{color:var(--red);font-weight:700}
+.cnt.over{color:var(--red);font-weight:700}
 .lockbar,.revbar,.src{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--bg-subtle);border-radius:var(--radius-sm);padding:6px 10px}
 .revbar{border-left:4px solid var(--severity-low)}
 .src .ttl{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.xtra{border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:6px 8px 8px 10px;display:flex;flex-direction:column;gap:6px}
-.xtra .xh{display:flex;align-items:center;gap:6px;color:var(--text-muted);font-size:var(--fs-tag);font-weight:600}
-.xtra .xh .ibtn{margin-left:auto;width:22px;height:22px}
-.xtra .xh .ibtn svg.i{width:14px;height:14px}
-.xtra .xb{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.xtra .xb input[type="text"],.xtra .xb input[type="url"]{flex:1}
 .part{display:grid;grid-template-columns:minmax(0,1fr) 30px;gap:4px;padding-left:14px;border-left:2px solid var(--card-border);margin-left:8px}
 .pbox{border:1px solid var(--btn-secondary-border);border-radius:var(--radius-sm);display:flex;flex-direction:column}
 .pbox:focus-within{border-color:var(--accent)}
@@ -552,16 +623,21 @@ td.ttl{white-space:normal;min-width:0}
 .pbox textarea:focus-visible{outline:0}
 .pbox .mrow{padding:0 10px 6px}
 .pbox .mt{width:40px;height:40px}
-.pbox .tools{gap:2px}
 .pbox .tools .muted{margin-left:4px}
-.pside{display:flex;flex-direction:column;gap:0}
+.pside{display:flex;flex-direction:column}
 .pside .ibtn{height:24px}
 .addpart{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.xtra{border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:6px 8px 8px 10px;display:flex;flex-direction:column;gap:6px}
+.xtra .xh{display:flex;align-items:center;gap:6px;color:var(--text-muted);font-size:var(--fs-tag);font-weight:600}
+.xtra .xh .ibtn{margin-left:auto;width:22px;height:22px}
+.xtra .xh .ibtn svg.i{width:14px;height:14px}
+.xtra .xb{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.xtra .xb input[type="text"],.xtra .xb input[type="url"]{flex:1}
 .pset{background:var(--bg-subtle);border-radius:var(--radius-sm);padding:8px 10px;display:flex;flex-direction:column;gap:6px;flex:none}
 .pset h3{margin:0;font-size:var(--fs-tag);color:var(--text-muted);display:flex;gap:6px;align-items:center;font-weight:600}
 .psrow{display:flex;gap:8px;align-items:center}
 .psrow .lnk{margin-left:auto}
-.prev{display:flex;flex-direction:column;gap:6px;min-height:0;min-width:0}
+.prev{display:flex;flex-direction:column;gap:6px;min-height:0;min-width:0;border-left:1px solid var(--card-border);padding:10px 12px}
 .phd{display:flex;gap:6px;align-items:baseline}
 .screen{flex:1;min-height:0;overflow:auto;background:var(--body-bg);border:1px solid var(--card-border);border-radius:16px;padding:8px}
 .shl{display:flex;gap:6px;align-items:center;font-size:var(--fs-tag);color:var(--text-muted);margin:2px 2px 4px}
@@ -574,14 +650,12 @@ td.ttl{white-space:normal;min-width:0}
 .sh .tx{padding:0 10px 8px;white-space:pre-wrap;word-break:break-word}
 .sh .clamp2,.sh .clamp3,.sh .clamp5{display:-webkit-box;-webkit-box-orient:vertical;overflow:hidden}
 .sh .clamp2{-webkit-line-clamp:2} .sh .clamp3{-webkit-line-clamp:3} .sh .clamp5{-webkit-line-clamp:5}
-.sh .fold{padding:0 10px 8px;margin-top:-6px;color:var(--text-muted);font-size:var(--fs-tag)}
 mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
 .imgs{display:grid;gap:2px}
 .imgs.n2,.imgs.n3,.imgs.n4{grid-template-columns:1fr 1fr}
 .imgs.n3 .im:first-child{grid-column:1/-1}
 .imgs .im{aspect-ratio:1}
 .imgs.n1 .im,.imgs.n3 .im:first-child{aspect-ratio:16/10}
-.sh.bs .imgs{margin:0 10px 6px;border-radius:8px;overflow:hidden}
 .sh .ic{display:flex;gap:16px;padding:8px 10px;color:var(--text-muted)}
 .sh .ic.bar{justify-content:space-around;border-top:1px solid var(--card-border);gap:4px}
 .sh .ic.bar span{display:flex;gap:4px;align-items:center;font-size:var(--fs-tag)}
@@ -600,22 +674,18 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
 .sh.th .tx{padding:2px 0 6px}
 .sh.th .imgs{border-radius:8px;overflow:hidden}
 .sh.th .ic{padding:8px 0 0}
-.state{display:inline-flex;gap:6px;align-items:center;color:var(--text-muted)}
+.state{display:inline-flex;gap:6px;align-items:center;color:var(--text-muted);font-weight:400}
 .state .dot{width:10px;height:10px;border-radius:50%;background:var(--status-ignored)}
 .state[data-state="scheduled"] .dot{background:var(--yellow)} .state[data-state="published"] .dot{background:var(--green)} .state[data-state="error"] .dot{background:var(--red)} .state[data-state="review"] .dot{background:var(--severity-low)} .state[data-state="rotation"] .dot{background:var(--accent)}
-.hint{padding:0 12px;min-height:22px;color:var(--text-muted)}
-.hint:empty{min-height:0}
-.foot{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--card-border);flex-wrap:wrap;position:relative}
+.foot{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--card-border);flex-wrap:wrap;position:relative}
+.hint{min-height:20px;color:var(--text-muted);flex:1 1 200px;min-width:0}
 .when{display:flex;align-items:center;gap:8px;min-width:0}
-.dtbtn{padding:5px 10px}
-.split{margin-left:auto;display:inline-flex}
+.split{display:inline-flex}
 .split .btn-primary{border-radius:8px 0 0 8px;padding:8px 16px}
 .split .more{border-radius:0 8px 8px 0;padding:8px 8px;border-left:1px solid var(--accent-hover)}
-.menu{bottom:56px;right:12px;width:230px;padding:6px;gap:2px}
-.menu button{border:0;background:transparent;text-align:left;padding:8px 10px}
-.menu button:hover{background:var(--bg-hover)}
+.pmenu{bottom:56px;right:12px;width:230px}
 .confirm{width:100%;background:var(--bg-subtle);border-left:4px solid var(--red);padding:6px 10px;border-radius:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-/* date + time picker (U6): app tokens, no native control */
+/* date + time picker: app tokens, no native control */
 .dtp{position:fixed;z-index:30;flex-direction:row;gap:14px}
 .dhd{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px}
 .cal7{display:grid;grid-template-columns:repeat(7,34px);gap:2px;text-align:center}
@@ -627,34 +697,31 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
 .tgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px}
 .tgrid button{padding:3px 0;border:0;background:var(--bg-subtle)}
 .dtime .btn-primary{margin-top:auto}
-.sheet-x,.mswitch{display:none}
+.mswitch,.chanbtn,.seg .mk{display:none}
 
-@media (max-width:1100px){ main{grid-template-columns:minmax(0,1fr) 480px} .ebody{grid-template-columns:1fr} .prev{display:none} .note{display:none} }
-/* phone (U10, built in C16): day view, editor as a full-screen sheet */
+@media (max-width:1100px){ .top b{display:none} :root{--pv-w:280px} .akpi{grid-template-columns:repeat(3,minmax(0,1fr))} }
+/* phone (built in C16): day view; the channel list and the composer open full screen */
 @media (max-width:640px){
   :root{--av:30px}
-  .app{height:auto;min-height:100%;padding-inline:12px;gap:8px}
-  header{flex-wrap:wrap;gap:8px}
+  .app{height:auto;min-height:100%}
+  header{flex-wrap:wrap;height:auto;padding:8px 12px;gap:6px}
   header h1{order:1}
-  .hright{order:2;gap:6px}
-  #newTop{display:none}
-  .note{display:inline-flex}
-  .tzbtn,.note{padding:4px 8px}
-  .hpop{width:auto;left:0}
-  .brands button{min-width:0}
-  .seg .mk{display:inline}
-  .cacts{display:none!important}
-  .lst,.lst .nx,.frow>span,.qrow{min-width:0;max-width:100%}
-  .frow>span:not(.seg):not(.acts){flex:1 1 200px}
-  .brands{order:3;width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
-  .brands button{max-width:none}
-  .nav{order:4;width:100%;justify-content:space-between}
-  main,main.full{display:block;padding-bottom:88px}
-  #calPanel,#sideView{min-height:calc(100vh - 150px)}
-  .ptop{flex-wrap:wrap}
-  .ptop .r{margin-left:0;width:100%;justify-content:space-between}
-  .search{display:none}
+  .hright{order:2}
+  .top{order:3;width:100%}
+  .top b{display:inline}
+  .hright .hb.brand{max-width:110px;overflow:hidden;text-overflow:ellipsis}
+  .subbar{padding:0 12px;flex-wrap:wrap}
+  .subbar .r{margin-left:0}
+  main,main.full{display:block;padding:10px 12px 88px}
+  main>.panel{min-height:calc(100vh - 170px)}
+  #chanPanel{display:none}
+  body.chans #chanPanel{display:flex;position:fixed;inset:0;z-index:20;border-radius:0}
+  .chanbtn{display:inline-flex}
+  .toolbar{flex-wrap:wrap}
+  .search{flex:1 1 100%}
+  .toolbar .end{margin-left:0}
   .seg .dk{display:none}
+  .seg .mk{display:inline}
   .strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:8px 10px;border-bottom:1px solid var(--card-border)}
   .strip button{display:flex;flex-direction:column;align-items:center;padding:4px 0;border-color:transparent;background:transparent}
   .strip button b{font-size:var(--fs-h2)}
@@ -670,25 +737,28 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
   .stack{padding:10px;gap:8px;overflow:visible}
   .add{visibility:visible;padding:8px}
   .card{display:grid;grid-template-columns:64px minmax(0,1fr);grid-template-rows:auto auto;column-gap:10px;padding:8px}
-  .card .cthumb{grid-row:1/3;height:64px}
-  .card .cthumb.txt{height:64px}
-  .cacts{top:auto;bottom:6px}
+  .card .cthumb,.card .cthumb.txt{grid-row:1/3;height:64px}
+  .cacts{display:none!important}
   .over-empty{position:static}
-  .cols2,.sgrid{display:block}
+  .cols2,.sgrid,.rgrid{display:block}
   .lcol{border-right:0}
   .tiles{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .akpi{grid-template-columns:repeat(2,minmax(0,1fr))}
   .fab{display:grid;place-items:center;position:fixed;right:16px;bottom:20px;width:56px;height:56px;border-radius:50%;padding:0;z-index:10}
   .fab svg.i{width:26px;height:26px}
-  #edPanel{display:none}
-  body.sheet #edPanel{display:flex;position:fixed;inset:0;z-index:20;border-radius:0;border:0}
   body.sheet .fab{display:none}
-  .sheet-x,.mswitch{display:inline-flex}
-  .ebody{grid-template-columns:1fr}
-  .prev{display:none}
+  body.sheet #edPanel{min-height:calc(100vh - 150px)}
+  .cgrid{display:flex;flex-direction:column}
+  .cgrid>.chan{display:none}
+  body.picking .cgrid>.chan{display:flex;position:fixed;inset:0;z-index:25;background:var(--card-bg)}
+  .mswitch{display:inline-flex}
+  .prev{display:none;border-left:0}
   body.pv .prev{display:flex}
-  body.pv .write{display:none}
+  body.pv .ewrite{display:none}
   .foot{padding-bottom:16px}
   .dtp{left:8px!important;right:8px;flex-direction:column}
+  .lst,.lst .nx,.frow>span,.qrow{min-width:0;max-width:100%}
+  .frow>span:not(.seg):not(.acts){flex:1 1 200px}
 }
 @media (prefers-reduced-motion: reduce){ *{transition:none!important} }
 </style>
@@ -696,48 +766,68 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
 <div class="app">
   <header>
     <h1>社群發文</h1>
-    <span class="seg brands" id="brandSeg"></span>
-    <nav class="nav" id="nav"><button type="button" class="on" data-view="cal">行事曆</button><button type="button" data-view="lists">輪播</button><button type="button" data-view="media">媒體</button><button type="button" data-view="log">紀錄</button><button type="button" data-view="settings">設定</button><button type="button" data-view="trash">已刪除</button></nav>
+    <nav class="top" id="top"><button type="button" data-view="analytics" data-i="chart"><b>數據分析</b></button><button type="button" data-view="reporting" data-i="report"><b>報表管理</b></button><button type="button" data-view="inbox" data-i="inbox"><b>訊息收件匣</b></button><button type="button" class="on" data-view="plan" data-i="calendar"><b>貼文排程</b></button><button type="button" data-view="smartlinks" data-i="link"><b>智慧連結</b></button><button type="button" data-view="ads" data-i="megaphone"><b>廣告管理</b></button></nav>
     <div class="hright">
-      <button type="button" class="btn-secondary tzbtn" id="tzBtn" data-i="clock" aria-expanded="false" title="行事曆和排程時間用的時區"><span id="tzNow"></span></button>
-      <button type="button" class="btn-secondary note" id="sampleBtn" aria-expanded="false" title="這是樣稿">樣稿</button>
-      <div class="pop hpop" id="tzPop" hidden><h3>時區（行事曆和排程都用它）</h3><div id="tzList"></div></div>
-      <div class="pop hpop" id="samplePop" hidden><span>樣稿：資料是範例，按鈕只在這一頁有效，不會發出任何貼文。</span><span class="frow"><span class="muted">看成</span><span class="seg" id="meSeg"><button type="button" class="on" data-me="editor">編輯</button><button type="button" data-me="reviewer">審核人</button></span></span></div>
-      <button type="button" class="ibtn bell" id="notifBtn" data-i="bell" aria-label="需處理的事" title="需處理的事"><b id="notifN">0</b></button>
-      <button type="button" class="btn-primary" id="newTop">＋ 建立貼文</button>
+      <button type="button" class="btn-secondary hb brand" id="brandBtn" aria-expanded="false" title="切換品牌"><span id="brandNow"></span></button>
+      <button type="button" class="btn-secondary hb" id="sampleBtn" aria-expanded="false" title="這是樣稿">樣稿</button>
+      <button type="button" class="ibtn bell" id="notifBtn" data-view="log" data-i="bell" aria-label="需處理的事和紀錄" title="需處理的事和紀錄"><b id="notifN">0</b></button>
+      <button type="button" class="ibtn" data-view="settings" data-i="gear" aria-label="設定" title="設定：帳號、審核、團隊"></button>
     </div>
+    <div class="pop hpop menu" id="brandPop" hidden></div>
+    <div class="pop hpop" id="samplePop" hidden><span>樣稿：資料和數字都是範例，按鈕只在這一頁有效，不會發出任何貼文。</span><span class="frow"><span class="muted">看成</span><span class="seg" id="meSeg"><button type="button" class="on" data-me="editor">編輯</button><button type="button" data-me="reviewer">審核人</button></span></span></div>
   </header>
+  <div class="subbar">
+    <nav class="tabs" id="tabs"><button type="button" class="on" data-view="week">排程日曆</button><button type="button" data-view="list">貼文清單</button><button type="button" data-view="library">貼文素材庫</button><button type="button" data-view="lists">自動發布清單</button><button type="button" data-view="trash">已刪除貼文</button><button type="button" data-view="flows">自動化流程 <span class="soon">尚未開通</span></button></nav>
+    <h2 id="compHead" hidden><button type="button" class="btn-secondary" id="backBtn" data-i="arrowL">回排程日曆</button><span id="edTitle">編輯貼文</span><span class="state" id="edState" data-state="draft"><span class="dot"></span><span id="edStateTxt">草稿</span></span></h2>
+    <span class="r">
+      <span class="seg mswitch" id="pvSeg"><button type="button" class="on" data-pv="ed">編輯</button><button type="button" data-pv="pv">預覽</button></span>
+      <button type="button" class="btn-secondary tzbtn" id="tzBtn" data-i="clock" aria-expanded="false" title="行事曆和排程時間用的時區"><span id="tzNow"></span></button>
+    </span>
+    <div class="pop hpop" id="tzPop" hidden><h3>時區（行事曆和排程都用它）</h3><div id="tzList"></div></div>
+  </div>
   <main>
+    <section class="panel chan" id="chanPanel">
+      <div class="ptop"><h2>頻道 <span class="muted tag" id="chanN"></span></h2><span class="r"><button type="button" class="btn-secondary" id="addChan" data-i="plus">加頻道</button><button type="button" class="ibtn chanbtn" id="chanClose" data-i="x" aria-label="關閉頻道清單"></button></span></div>
+      <label class="find"><span data-i="search"></span><input type="search" id="chanQ" placeholder="找頻道" aria-label="找頻道"></label>
+      <div class="clist" id="chanList"></div>
+      <div class="cfoot" id="chanFoot"></div>
+      <div class="pop menu cmenu" id="chanMenu" hidden></div>
+    </section>
     <section class="panel" id="calPanel">
-      <div class="ptop">
-        <span class="seg" id="calNav"><button type="button" id="prevW" data-i="chevL" aria-label="往前"></button><button type="button" id="todayW">今天</button><button type="button" id="nextW" data-i="chevR" aria-label="往後"></button></span>
-        <h2 id="rangeLabel"></h2>
-        <span class="r">
-          <span class="seg" id="calSeg"><button type="button" class="on" data-view="week"><span class="dk">週</span><span class="mk">日</span></button><button type="button" data-view="month">月</button><button type="button" data-view="list">清單</button></span>
-          <label class="search"><span data-i="search"></span><input type="search" id="q" placeholder="搜尋貼文" aria-label="搜尋貼文"></label>
-          <button type="button" class="btn-secondary" id="filterBtn" data-i="filter" aria-expanded="false">篩選<b id="filterN"></b></button>
-          <button type="button" class="btn-secondary" id="bulkBtn" aria-expanded="false" hidden>批次動作<b id="bulkN"></b></button>
-        </span>
+      <div class="toolbar">
+        <label class="search"><span data-i="search"></span><input type="search" id="q" placeholder="搜尋貼文" aria-label="搜尋貼文"></label>
+        <span class="seg" id="calNav"><button type="button" id="prevW" data-i="chevL" aria-label="往前"></button><button type="button" id="todayW">本週</button><button type="button" id="nextW" data-i="chevR" aria-label="往後"></button></span>
+        <span class="range" id="rangeLabel"></span>
+        <span class="seg" id="calSeg"><button type="button" class="on" data-view="week"><span class="dk">週</span><span class="mk">日</span></button><button type="button" data-view="month">月</button></span>
+        <button type="button" class="btn-secondary" id="filterBtn" data-i="filter" aria-expanded="false">篩選<b id="filterN"></b></button>
+        <button type="button" class="btn-secondary" id="bestBtn" data-i="star" aria-pressed="false" title="各社群最佳發布時間">最佳發布時間</button>
+        <button type="button" class="btn-secondary" id="bulkBtn" aria-expanded="false" hidden>批次動作<b id="bulkN"></b></button>
+        <span class="end"><button type="button" class="btn-secondary chanbtn" id="chanOpen" data-i="users">頻道</button><button type="button" class="btn-primary" data-view="compose" data-i="plus">建立貼文</button></span>
       </div>
+      <div class="bestbar" id="bestBar" hidden><span class="muted">看哪個平台的最佳時間：</span><span class="seg" id="bestSeg"></span><span class="muted tag">點時間就在那個時間寫一則。</span></div>
       <div class="pop filters" id="filterPop" hidden>
         <div class="cols"><div><h3>只看這些平台</h3><div id="fPf"></div></div><div><h3>只看這些狀態</h3><div id="fSt"></div></div></div>
         <div class="ft"><span class="muted">都不勾＝全部都看</span><span class="acts"><button type="button" id="fClear">清除</button><button type="button" class="btn-primary" id="fDone">完成</button></span></div>
       </div>
+      <div class="pop menu bulkmenu" id="bulkMenu" hidden><button type="button" id="bulkReview">送審所選</button><button type="button" id="bulkDel">刪除所選（可在「已刪除貼文」還原）</button></div>
       <div class="strip" id="strip"></div>
       <div class="week" id="weekView"></div>
       <div class="month" id="monthView" hidden><div class="mhead"><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div></div><div class="mgrid" id="mgrid"></div></div>
       <div class="list" id="listView" hidden><table><thead><tr><th><input type="checkbox" id="selAll" aria-label="全選"></th><th></th><th>時間</th><th>發到</th><th>內容</th><th>狀態</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
-      <div class="pop menu bulkmenu" id="bulkMenu" hidden><button type="button" id="bulkReview">送審所選</button><button type="button" id="bulkDel">刪除所選（可在「已刪除」還原）</button></div>
       <div class="over-empty" id="calEmpty" hidden></div>
     </section>
     <section class="panel" id="sideView" hidden></section>
-    <section class="panel" id="edPanel">
-      <div class="ptop"><button type="button" class="ibtn sheet-x" id="sheetX" data-i="x" aria-label="關閉編輯"></button><h2 id="edTitle">編輯貼文</h2><span class="state" id="edState" data-state="draft"><span class="dot"></span><span id="edStateTxt">草稿</span></span><span class="r"><span class="seg mswitch" id="pvSeg"><button type="button" class="on" data-pv="ed">編輯</button><button type="button" data-pv="pv">預覽</button></span></span></div>
-      <div class="ed" id="ed">
-        <div class="chan"><span class="muted">發到</span><span class="acts" id="chanAv"></span></div>
-        <div class="etabs" id="etabs"></div>
-        <div class="ebody">
+    <section class="panel" id="edPanel" hidden>
+      <div class="cgrid" id="ed">
+        <div class="chan">
+          <div class="ptop"><h2>發到 <span class="muted tag" id="pickN"></span></h2><span class="r"><button type="button" class="ibtn chanbtn" id="pickClose" data-i="x" aria-label="選好了"></button></span></div>
+          <label class="find"><span data-i="search"></span><input type="search" id="pickQ" placeholder="找頻道" aria-label="找頻道"></label>
+          <div class="clist" id="pickList"></div>
+        </div>
+        <div class="ewrite">
+          <div class="etabs" id="etabs"></div>
           <div class="write" id="write">
+            <button type="button" class="btn-secondary chanbtn" id="pickOpen" data-i="users"><span id="pickBtnTxt">選頻道</span></button>
             <div class="src" id="srcBox" hidden><span class="pf pf-wordpress">W</span><span class="ttl" id="srcTitle"></span><button type="button" id="useExcerpt">用文章摘要</button><button type="button" id="useAi">AI 改寫（約 NT$2）</button></div>
             <div class="revbar" id="revBar" hidden><b>審核這則</b><input type="text" id="reason" placeholder="退回理由（退回時必填）" aria-label="退回理由"><button type="button" class="btn-primary" id="approveBtn">核准</button><button type="button" class="danger" id="rejectBtn">退回</button></div>
             <div class="lockbar" id="lockBar" hidden></div>
@@ -750,89 +840,78 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
             <div id="xtras"></div>
             <div class="pset" id="pset" hidden></div>
           </div>
-          <div class="prev" id="prev"><div class="phd"><b>預覽</b><span class="muted tag" id="pvNote"></span></div><div class="screen" id="screen"></div></div>
         </div>
-        <div class="hint" id="hint"></div>
+        <div class="prev" id="prev"><div class="phd"><b>預覽</b><span class="muted tag" id="pvNote"></span></div><div class="screen" id="screen"></div></div>
         <div class="foot">
-          <span class="seg" id="wmSeg"><button type="button" class="on" data-wm="fixed">固定時間</button><button type="button" data-wm="rot">輪播清單</button></span>
-          <span class="when" id="fixedWhen"><button type="button" class="btn-secondary dtbtn" id="dtBtn" data-i="calendar"><span id="dtTxt"></span></button><span class="muted tag" id="tzTxt"></span></span>
+          <span class="hint" id="hint"></span>
+          <span class="seg" id="wmSeg"><button type="button" class="on" data-wm="fixed">固定時間</button><button type="button" data-wm="rot">自動發布清單</button></span>
+          <span class="when" id="fixedWhen"><button type="button" class="btn-secondary" id="dtBtn" data-i="calendar"><span id="dtTxt"></span></button><span class="muted tag" id="tzTxt"></span></span>
           <span class="when" id="rotWhen" hidden></span>
           <span class="split"><button type="button" class="btn-primary" id="btnMain">排程</button><button type="button" class="btn-primary more" id="btnMore" data-i="chevD" aria-label="其他做法" aria-expanded="false"></button></span>
-          <div class="pop menu" id="menu" hidden><button type="button" id="btnDraft" title="先存著，不排時間">存草稿</button><button type="button" id="btnReview" title="審核人核准後，照排定時間發">送審</button><button type="button" id="btnNow" title="不等排定時間，現在就發">立即發佈</button></div>
-          <div class="confirm" id="confirmNow" hidden><span>會馬上發到所有選的帳號。發出去之後，這裡收不回來，要到各平台自己刪。</span><button type="button" class="danger" id="nowYes">確定發佈</button><button type="button" id="nowNo">取消</button></div>
+          <div class="pop menu pmenu" id="menu" hidden><button type="button" id="btnDraft" title="先存著，不排時間">存草稿</button><button type="button" id="btnReview" title="審核人核准後，照排定時間發">送審</button><button type="button" id="btnNow" title="不等排定時間，現在就發">立即發佈</button><button type="button" id="btnLib" title="整則（含圖）存到貼文素材庫，之後重複用">存到素材庫</button></div>
+          <div class="confirm" id="confirmNow" hidden><span>會馬上發到所有選的頻道。發出去之後，這裡收不回來，要到各平台自己刪。</span><button type="button" class="danger" id="nowYes">確定發佈</button><button type="button" id="nowNo">取消</button></div>
         </div>
       </div>
       <div class="empty" id="edEmpty" hidden></div>
     </section>
   </main>
   <div class="pop dtp" id="dtp" hidden></div>
-  <button type="button" class="btn-primary fab" id="fab" data-i="plus" aria-label="建立貼文"></button>
+  <button type="button" class="btn-primary fab" data-view="compose" data-i="plus" aria-label="建立貼文"></button>
 </div>
 
 <script>
-// ---- example data (three brands; dates are 2026-10, today = 10/14 Wed). 新品牌 is empty: it shows every empty state ----
+// ---- example data: three brands; dates are 2026-10, today = 10/14 Wed. Channels are accounts (id), many per platform:
+// Aware Wave runs pages for other businesses (代操), so its list is long and scrolls. 新品牌 is empty: every empty state ----
 const PF = {bluesky:{s:"B",n:"Bluesky",max:300},facebook:{s:"f",n:"Facebook",max:63206},instagram:{s:"IG",n:"Instagram",max:2200},threads:{s:"@",n:"Threads",max:500},linkedin:{s:"in",n:"LinkedIn",max:3000},wordpress:{s:"W",n:"WordPress",max:0}};
 const SOCIAL = ["bluesky","facebook","instagram","threads","linkedin"];
 const STATES = {draft:"草稿",scheduled:"已排程",published:"已發佈",error:"發佈失敗",review:"待審核",rotation:"輪播中",deleted:"已刪除"};
 const FORMATS = {facebook:["貼文","Reel","限時動態"],instagram:["貼文","Reel","限時動態"],linkedin:["貼文","文件輪播"]};
+const BEST = {bluesky:["12:00","20:00"],facebook:["13:00","20:00"],instagram:["11:00","19:00"],threads:["09:00","21:00"],linkedin:["08:00","12:00"]}; // from each platform's own analytics in the product (F12)
 const TODAY = "2026-10-14", NOW = "10:40";
+const ac = (id,pf,name,handle,st,c) => ({id,pf,name,handle,st:st||"connected",c:c||0});
 const BRANDS = {
-  soulful:{name:"Soulful Expression",av:"soulful",ini:"S",tz:"Asia/Taipei",review:true,
-    accounts:[
-      {pf:"bluesky",name:"Soulful Expression",handle:"@soulfulexpression.bsky.social",st:"connected"},
-      {pf:"instagram",name:"Soulful Expression",handle:"@soulful.expression",st:"connected"},
-      {pf:"threads",name:"Soulful Expression",handle:"@soulful.expression",st:"connected"},
-      {pf:"facebook",name:"Soulful Expression 藝術療癒",handle:"粉絲專頁",st:"expired"}],
+  soulful:{name:"Soulful Expression",tz:"Asia/Taipei",review:true,
+    accounts:[ac("s-bs","bluesky","Soulful Expression","@soulfulexpression.bsky.social"),ac("s-ig","instagram","Soulful Expression","@soulful.expression"),ac("s-th","threads","Soulful Expression","@soulful.expression"),ac("s-fb","facebook","Soulful Expression 藝術療癒","粉絲專頁","expired")],
     team:[{name:"佩靜",role:"owner",me:true},{name:"小美",role:"editor"},{name:"王老師",role:"reviewer"},{name:"Soulful 客戶帳號",role:"client"}],
-    media:[{id:"m1",name:"親子工作坊-01.jpg",kind:"image",ph:1,used:2},{id:"m2",name:"色彩與情緒-海報.png",kind:"image",ph:2,used:1},{id:"m3",name:"工作室導覽.mp4",kind:"video",ph:3,used:0},{id:"m4",name:"十一月課表.jpg",kind:"image",ph:4,used:0}],
+    library:[{id:"L1",kind:"post",ph:1,text:"親子藝術時光每週六下午兩點，當週三前報名。",accts:["s-bs","s-ig"]},{id:"L2",kind:"post",text:"藝術治療需要會畫畫嗎？不用。我們看的是過程，不是技巧。",accts:["s-bs","s-th"]},{id:"m1",kind:"image",ph:1,name:"親子工作坊-01.jpg",used:2},{id:"m2",kind:"image",ph:2,name:"色彩與情緒-海報.png",used:1},{id:"m3",kind:"video",ph:3,name:"工作室導覽.mp4",used:0},{id:"m4",kind:"image",ph:4,name:"十一月課表.jpg",used:0}],
     texts:["報名方式在留言。","工作室地址：台北市大安區，捷運站步行五分鐘。","全文在部落格，連結在下方。"],
-    log:[{t:"10/13 18:00",who:"系統",act:"發佈失敗",txt:"今天工作室提早休息，明天照常營業。",res:"Bluesky：App Password 已失效"},
-         {t:"10/12 09:00",who:"系統",act:"發佈",txt:"上週末的親子藝術工作坊，孩子們用手指顏料畫出自己的心情。",res:"成功 · bsky.app/…/3l5k2"},
-         {t:"10/11 21:10",who:"小美",act:"送審",txt:"新的一期「色彩與情緒」課程，十一月開課。",res:"等王老師核准"},
-         {t:"10/11 20:30",who:"佩靜",act:"排程",txt:"這週六下午的親子藝術時光還有三個名額。",res:"10/14 12:30"}],
+    log:[{t:"10/13 18:00",who:"系統",act:"發佈失敗",txt:"今天工作室提早休息，明天照常營業。",res:"Bluesky：App Password 已失效"},{t:"10/12 09:00",who:"系統",act:"發佈",txt:"上週末的親子藝術工作坊，孩子們用手指顏料畫出自己的心情。",res:"成功 · bsky.app/…/3l5k2"},{t:"10/11 21:10",who:"小美",act:"送審",txt:"新的一期「色彩與情緒」課程，十一月開課。",res:"等王老師核准"}],
+    reports:[{name:"九月成效報告",at:"10/01 09:00",fmt:"PDF"},{name:"第三季成效報告",at:"10/01 09:05",fmt:"PPT"}],
     lists:[
-      {id:"faq",name:"常見問題",times:["10:00","16:00"],slots:["1@10:00","3@10:00","5@16:00"],pfs:["bluesky"],on:true,cursor:1,queue:[
-        "藝術治療需要會畫畫嗎？不用。我們看的是過程，不是技巧。",
-        "一堂課多久？成人九十分鐘，親子六十分鐘。",
-        "可以只來一次嗎？可以。先來體驗，再決定要不要報整期。",
-        "幾歲可以參加親子課？三歲以上，家長一起進教室。"]},
-      {id:"promo",name:"課程報名提醒",times:["09:00"],slots:["6@09:00"],pfs:["bluesky","threads"],on:false,cursor:0,queue:[
-        "十一月「色彩與情緒」還有名額，週四晚上，一期六堂。",
-        "親子藝術時光每週六下午兩點，當週三前報名。"]}],
+      {id:"faq",name:"常見問題",times:["10:00","16:00"],slots:["1@10:00","3@10:00","5@16:00"],accts:["s-bs"],on:true,cursor:1,queue:["藝術治療需要會畫畫嗎？不用。我們看的是過程，不是技巧。","一堂課多久？成人九十分鐘，親子六十分鐘。","可以只來一次嗎？可以。先來體驗，再決定要不要報整期。","幾歲可以參加親子課？三歲以上，家長一起進教室。"]},
+      {id:"promo",name:"課程報名提醒",times:["09:00"],slots:["6@09:00"],accts:["s-bs","s-th"],on:false,cursor:0,queue:["十一月「色彩與情緒」還有名額，週四晚上，一期六堂。","親子藝術時光每週六下午兩點，當週三前報名。"]}],
     posts:[
-      {id:1,date:"2026-10-12",time:"09:00",pfs:["bluesky"],state:"published",imgs:[1],url:"https://bsky.app/profile/soulfulexpression.bsky.social/post/3l5k2",text:"上週末的親子藝術工作坊，孩子們用手指顏料畫出自己的心情。看到每一張作品都不一樣，我們也跟著開心了一整天。"},
-      {id:4,date:"2026-10-13",time:"18:00",pfs:["bluesky"],state:"error",text:"今天工作室提早休息，明天照常營業。",err:"Bluesky 回應：App Password 已失效，請到設定重新連接。"},
-      {id:2,date:"2026-10-14",time:"12:30",pfs:["bluesky","instagram","threads"],state:"scheduled",imgs:[2,3],parts:[{text:"報名表在這裡：soulfulexpression.art/sat",delay:0},{text:"名額滿了會在這裡說。",delay:60}],fmt:{instagram:"貼文"},text:"這週六下午的親子藝術時光還有三個名額。不需要任何繪畫基礎，帶著孩子一起來玩顏色就好。報名方式在留言。"},
-      {id:3,date:"2026-10-15",time:"19:00",pfs:["instagram"],state:"review",imgs:[4,1,2],parts:[{text:"報名表：soulfulexpression.art/nov",delay:0}],text:"新的一期「色彩與情緒」課程，十一月開課。這一期我們會從最基本的三原色開始，慢慢認識自己對顏色的感覺。",notes:"等老師確認上課日期再發"},
-      {id:6,date:"2026-10-16",time:"20:00",pfs:["threads"],state:"scheduled",text:"晚安。今天也辛苦了。睡前給自己五分鐘，隨手畫一條線就好。"},
-      {id:5,date:"2026-10-17",time:"10:00",pfs:["bluesky","threads"],state:"draft",imgs:[1],text:"藝術治療不是教你畫得好看，而是讓你透過畫畫，說出平常說不出口的事。很多大人第一次來的時候會說：「我從國小之後就沒畫過畫了。」沒關係，這裡沒有人在打分數。你可以只用一種顏色，也可以把紙塗滿；可以畫一整個小時，也可以畫到一半停下來，看著它發呆。我們在旁邊陪著，偶爾問一句：「這個顏色讓你想到什麼？」有時候答案很簡單，有時候會讓人愣一下。這些時刻，就是藝術治療在做的事。它不急，也不要求你變成一個會畫畫的人。它只是給你一個安全的地方，讓心裡的東西有地方放。如果你最近覺得累、覺得說不清楚自己怎麼了，歡迎來試一次。不用準備任何東西，穿可以弄髒的衣服就好。成人課在週四晚上七點半，一次九十分鐘，報名方式在留言，或直接私訊我們。"},
-      {id:9,date:"2026-10-20",time:"12:00",pfs:["threads"],state:"deleted",prevState:"draft",delAt:"10/15 21:12",delBy:"小美",text:"（舊版）十一月課程表：週四晚上開課，一期六堂。"},
-      {id:7,date:"2026-10-18",time:"09:30",pfs:["bluesky","instagram"],state:"scheduled",imgs:[3],text:"每週一句：創作是一種安靜的勇氣。"},
+      {id:13,date:"2026-10-08",time:"19:30",accts:["s-ig","s-th"],state:"published",imgs:[4],text:"十月的「色彩與情緒」最後一堂：大家把六週的作品排在一起看，顏色慢慢變亮了。"},
+      {id:14,date:"2026-10-10",time:"12:00",accts:["s-bs","s-th"],state:"published",text:"週末不知道去哪？工作室週六下午開放自由畫畫，材料都準備好了。"},
+      {id:1,date:"2026-10-12",time:"09:00",accts:["s-bs"],state:"published",imgs:[1],url:"https://bsky.app/profile/soulfulexpression.bsky.social/post/3l5k2",text:"上週末的親子藝術工作坊，孩子們用手指顏料畫出自己的心情。看到每一張作品都不一樣，我們也跟著開心了一整天。"},
+      {id:4,date:"2026-10-13",time:"18:00",accts:["s-bs"],state:"error",text:"今天工作室提早休息，明天照常營業。",err:"Bluesky 回應：App Password 已失效，請到設定重新連接。"},
+      {id:2,date:"2026-10-14",time:"12:30",accts:["s-bs","s-ig","s-th"],state:"scheduled",imgs:[2,3],parts:[{text:"報名表在這裡：soulfulexpression.art/sat",delay:0},{text:"名額滿了會在這裡說。",delay:60}],fmt:{"s-ig":"貼文"},text:"這週六下午的親子藝術時光還有三個名額。不需要任何繪畫基礎，帶著孩子一起來玩顏色就好。報名方式在留言。"},
+      {id:3,date:"2026-10-15",time:"19:00",accts:["s-ig"],state:"review",imgs:[4,1,2],parts:[{text:"報名表：soulfulexpression.art/nov",delay:0}],text:"新的一期「色彩與情緒」課程，十一月開課。這一期我們會從最基本的三原色開始，慢慢認識自己對顏色的感覺。",notes:"等老師確認上課日期再發"},
+      {id:6,date:"2026-10-16",time:"20:00",accts:["s-th"],state:"scheduled",text:"晚安。今天也辛苦了。睡前給自己五分鐘，隨手畫一條線就好。"},
+      {id:5,date:"2026-10-17",time:"10:00",accts:["s-bs","s-th"],state:"draft",imgs:[1],text:"藝術治療不是教你畫得好看，而是讓你透過畫畫，說出平常說不出口的事。很多大人第一次來的時候會說：「我從國小之後就沒畫過畫了。」沒關係，這裡沒有人在打分數。你可以只用一種顏色，也可以把紙塗滿；可以畫一整個小時，也可以畫到一半停下來，看著它發呆。我們在旁邊陪著，偶爾問一句：「這個顏色讓你想到什麼？」有時候答案很簡單，有時候會讓人愣一下。這些時刻，就是藝術治療在做的事。它不急，也不要求你變成一個會畫畫的人。它只是給你一個安全的地方，讓心裡的東西有地方放。如果你最近覺得累、覺得說不清楚自己怎麼了，歡迎來試一次。不用準備任何東西，穿可以弄髒的衣服就好。成人課在週四晚上七點半，一次九十分鐘，報名方式在留言，或直接私訊我們。"},
+      {id:9,date:"2026-10-20",time:"12:00",accts:["s-th"],state:"deleted",prevState:"draft",delAt:"10/15 21:12",delBy:"小美",text:"（舊版）十一月課程表：週四晚上開課，一期六堂。"},
+      {id:7,date:"2026-10-18",time:"09:30",accts:["s-bs","s-ig"],state:"scheduled",imgs:[3],text:"每週一句：創作是一種安靜的勇氣。"},
       {id:11,date:"2026-10-16",time:"08:00",kind:"article",state:"published",title:"藝術治療和一般畫畫課有什麼不同？",excerpt:"很多家長問我們，藝術治療和畫畫課差在哪裡。畫畫課教的是技巧；藝術治療看的是過程。孩子選了什麼顏色、下筆的力道、畫到一半停下來的時候，都在告訴我們一些事。",url:"https://soulfulexpression.art/blog/art-therapy-vs-art-class"},
       {id:12,date:"2026-10-19",time:"08:00",kind:"article",state:"scheduled",title:"十一月課程表",excerpt:"十一月的課程表出來了。親子藝術時光改到週六下午兩點，成人的色彩與情緒課程在週四晚上。",url:"https://soulfulexpression.art/blog/november"}
     ]},
-  awarewave:{name:"Aware Wave",av:"awarewave",ini:"A",tz:"Asia/Taipei",review:false,
-    accounts:[
-      {pf:"facebook",name:"Aware Wave",handle:"粉絲專頁",st:"connected"},
-      {pf:"linkedin",name:"Aware Wave",handle:"公司專頁",st:"connected"},
-      {pf:"instagram",name:"awarewave.ai",handle:"@awarewave.ai",st:"review"},
-      {pf:"threads",name:"awarewave.ai",handle:"@awarewave.ai",st:"review"}],
+  awarewave:{name:"Aware Wave（代操）",tz:"Asia/Taipei",review:false,
+    accounts:[ac("a-fb","facebook","Aware Wave","粉絲專頁","connected",1),ac("a-li","linkedin","Aware Wave","公司專頁","connected",1),ac("a-ig","instagram","awarewave.ai","@awarewave.ai","review",1),ac("a-th","threads","awarewave.ai","@awarewave.ai","review",1),
+      ac("k1-fb","facebook","好日子咖啡","粉絲專頁 · 代操","connected",3),ac("k1-ig","instagram","好日子咖啡","@goodday.coffee · 代操","connected",3),ac("k2-fb","facebook","木作小室","粉絲專頁 · 代操","connected",2),ac("k2-ig","instagram","木作小室","@woodroom.tw · 代操","connected",2),
+      ac("k3-fb","facebook","晨光瑜伽","粉絲專頁 · 代操","connected",4),ac("k3-ig","instagram","晨光瑜伽","@morning.yoga · 代操","expired",4),ac("k4-li","linkedin","青田會計事務所","公司專頁 · 代操","connected",2),ac("k5-fb","facebook","阿美烘焙","粉絲專頁 · 代操","connected",3),ac("k5-ig","instagram","阿美烘焙","@amei.bakery · 代操","connected",3),ac("k6-th","threads","小鎮書店","@town.books · 代操","connected",4)],
     team:[{name:"佩靜",role:"owner",me:true}],
-    media:[{id:"a1",name:"社群工具-截圖.png",kind:"image",ph:2,used:1}],
+    library:[{id:"a1",kind:"image",ph:2,name:"社群工具-截圖.png",used:1}],
     texts:["想先看看的朋友，留言告訴我們。"],
     log:[{t:"10/13 10:00",who:"系統",act:"發佈",txt:"我們把客戶的 WordPress 文章自動整理成各平台的貼文。",res:"成功 · facebook.com/…"}],
-    lists:[
-      {id:"tips",name:"社群經營小提醒",times:["12:00"],slots:["2@12:00","4@12:00"],pfs:["facebook"],on:true,cursor:0,queue:[
-        "一週發兩則，比一天發五則然後消失一個月好。",
-        "圖片比例每個平台不一樣，排程前先看預覽。",
-        "留言要回。社群的「社」就是這個意思。"]}],
+    reports:[],
+    lists:[{id:"tips",name:"社群經營小提醒",times:["12:00"],slots:["2@12:00","4@12:00"],accts:["a-fb"],on:true,cursor:0,queue:["一週發兩則，比一天發五則然後消失一個月好。","圖片比例每個平台不一樣，排程前先看預覽。","留言要回。社群的「社」就是這個意思。"]}],
     posts:[
-      {id:21,date:"2026-10-13",time:"10:00",pfs:["facebook"],state:"published",url:"https://www.facebook.com/awarewave/posts/1029384756",text:"我們把客戶的 WordPress 文章自動整理成各平台的貼文，一次排好一整週的內容。"},
-      {id:22,date:"2026-10-15",time:"09:30",pfs:["facebook","linkedin"],state:"scheduled",imgs:[2],fmt:{linkedin:"貼文"},text:"下週開放社群發文工具的試用。想先看看的朋友，留言告訴我們。"},
-      {id:23,date:"2026-10-16",time:"14:00",pfs:["linkedin"],state:"draft",text:"客戶最常問的三個問題：貼文要多久發一次？要不要每個平台都發？圖片要多大？我們整理成一篇文章。"},
-      {id:31,date:"2026-10-16",time:"08:00",kind:"article",state:"published",title:"小型工作室的社群排程：一週一小時就夠",excerpt:"大部分的小型工作室不需要天天發文。一週挑一個小時，把這週要說的事一次寫好、排好時間，剩下的交給工具。",url:"https://aware-wave.com/blog/weekly-social-hour"}
+      {id:21,date:"2026-10-13",time:"10:00",accts:["a-fb"],state:"published",url:"https://www.facebook.com/awarewave/posts/1029384756",text:"把客戶的 WordPress 文章自動整理成各平台的貼文，一次排好一整週的內容。"},
+      {id:22,date:"2026-10-15",time:"09:30",accts:["a-fb","a-li"],state:"scheduled",imgs:[2],text:"下週開放社群發文工具的試用。想先看看的朋友，留言告訴我。"},
+      {id:24,date:"2026-10-14",time:"15:00",accts:["k1-fb","k1-ig"],state:"scheduled",imgs:[3],text:"秋天限定：桂花拿鐵開賣。這週六日買一送一。"},
+      {id:25,date:"2026-10-16",time:"11:00",accts:["k3-fb"],state:"review",imgs:[4],text:"週末晨間流瑜伽，新手也可以。名額 12 位。"},
+      {id:23,date:"2026-10-16",time:"14:00",accts:["a-li"],state:"draft",text:"客戶最常問的三個問題：貼文要多久發一次？要不要每個平台都發？圖片要多大？整理成一篇文章。"}
     ]},
-  fresh:{name:"新品牌",av:"fresh",ini:"新",tz:"Asia/Taipei",review:false,accounts:[],team:[{name:"佩靜",role:"owner",me:true}],media:[],texts:[],log:[],lists:[],posts:[]}
+  fresh:{name:"新品牌",tz:"Asia/Taipei",review:false,accounts:[],team:[{name:"佩靜",role:"owner",me:true}],library:[],texts:[],log:[],reports:[],lists:[],posts:[]}
 };
 const ICON = {
   bell:"M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0", chevL:"M15 18l-6-6 6-6", chevR:"M9 18l6-6-6-6", chevD:"M6 9l6 6 6-6",
@@ -846,12 +925,16 @@ const ICON = {
   heart:"M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z",
   repost:"M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3", send:"M22 2L11 13M22 2l-7 20-4-9-9-4z",
   share:"M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13", bookmark:"M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z",
-  like:"M7 10v11M7 10l4-8a2 2 0 0 1 3 2v5h5a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 17.6 21H7z", more:"M5 12h.01M12 12h.01M19 12h.01",
+  like:"M7 10v11M7 10l4-8a2 2 0 0 1 3 2v5h5a2 2 0 0 1 2 2.3l-1.4 8A2 2 0 0 1 17.6 21H7z", more:"M5 12h.01M12 12h.01M19 12h.01", vdots:"M12 5h.01M12 12h.01M12 19h.01",
   clock:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2", copy:"M9 9h11v11H9zM5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1", trash:"M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6",
-  up:"M12 19V5M5 12l7-7 7 7", down:"M12 5v14M19 12l-7 7-7-7", check:"M20 6L9 17l-5-5", play:"M7 4l13 8-13 8z", globe:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"
+  up:"M12 19V5M5 12l7-7 7 7", down:"M12 5v14M19 12l-7 7-7-7", check:"M20 6L9 17l-5-5", play:"M7 4l13 8-13 8z", globe:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18",
+  chart:"M3 3v18h18M7 15l4-4 3 3 5-6", report:"M5 3h10l4 4v14H5zM14 3v5h5M9 17v-3M12 17v-6M15 17v-2", inbox:"M22 12h-6l-2 3h-4l-2-3H2M5.5 5h13L22 12v7H2v-7z",
+  megaphone:"M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1zM15 9a3 3 0 0 1 0 6M18 6a7 7 0 0 1 0 12", gear:"M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4.9a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.5a7 7 0 0 0-2 1.2l-2.4-.9-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-.9a7 7 0 0 0 2 1.2L10 21h4l.5-2.5a7 7 0 0 0 2-1.2l2.4.9 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z",
+  arrowL:"M19 12H5M12 19l-7-7 7-7", download:"M12 3v12M7 10l5 5 5-5M5 21h14", star:"M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z",
+  users:"M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8", flow:"M6 3v4M6 17v4M4 7h4v10H4zM16 7h4v4h-4zM16 13h4v4h-4zM8 12h4l2-3M12 12l2 3"
 };
-let brand="soulful", view="week", calView="week", weekStart="2026-10-12", focusDay=TODAY, me="editor", logFilter="all";
-let pfOnly=new Set(), stOnly=new Set(), checked=new Set(), mediaSel=new Set(), selectedList=null, connectPf=null, ed=null, hintTimer=0;
+let brand="soulful", view="week", calView="week", weekStart="2026-10-12", focusDay=TODAY, me="editor", logFilter="all", bestPf=null, libKind="post";
+let pfOnly=new Set(), stOnly=new Set(), chanOnly=new Set(), checked=new Set(), libSel=new Set(), selectedList=null, connectPf=null, ed=null, hintTimer=0, aAcct="all", aPeriod=28, aMetric="reach";
 const $ = id => document.getElementById(id);
 const B = () => BRANDS[brand];
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -865,56 +948,99 @@ const dowOf = s => (d(s).getDay()+6)%7;
 const fmtLong = s => { const x=d(s); return `${x.getMonth()+1}月${x.getDate()}日（${DOW[dowOf(s)]}）`; };
 const isPhone = () => matchMedia("(max-width:640px)").matches;
 const pfb = pf => `<span class="pf pf-${pf}" title="${PF[pf].n}">${PF[pf].s}</span>`;
-const bav = (cls="") => `<span class="av ${B().av} ${cls}">${B().ini}</span>`;
-const acct = pf => B().accounts.find(a=>a.pf===pf) || {name:B().name,handle:"",st:"connected"};
+const A = id => B().accounts.find(a=>a.id===id) || {id, pf:"bluesky", name:B().name, handle:"", st:"connected", c:0};
+const pfOf = id => A(id).pf;
+const avOf = (a, cls="") => `<span class="av c${a.c} ${cls}">${esc((a.name||"?").slice(0,1))}</span>`;
+const aav = a => `<span class="aav">${avOf(a)}${pfb(a.pf)}${a.st==="expired"?'<i class="bang" title="授權過期">!</i>':a.st==="review"?'<i class="bang wait" title="平台審核中">…</i>':""}</span>`;
 const connected = () => B().accounts.filter(a=>a.st==="connected");
-const unconnected = p => p.virtual || p.kind==="article" ? [] : (p.pfs||[]).filter(k=>!B().accounts.some(a=>a.pf===k&&a.st==="connected"));
-// empty states (U13, S7): round tinted icon, one bold line, one grey hint, one button
-const emptyHtml = (icon, line, hint, btn, id) => `<div class="empty"><span class="eic">${I(icon)}</span><b>${line}</b><p class="muted">${hint}</p><button type="button" class="btn-primary" id="${id}">${btn}</button></div>`;
+const postPfs = p => p.kind==="article" ? ["wordpress"] : [...new Set((p.accts||[]).map(pfOf))];
+const unconnected = p => p.virtual || p.kind==="article" ? [] : (p.accts||[]).filter(id=>A(id).st!=="connected");
+const acctLine = a => `${PF[a.pf].n} · ${a.handle}`;
+const emptyHtml = (icon, line, hint, btn, id) => `<div class="empty"><span class="eic">${I(icon)}</span><b>${line}</b><p class="muted">${hint}</p>${btn?`<button type="button" class="btn-primary" id="${id}">${btn}</button>`:""}</div>`;
 function say(msg, err){ clearTimeout(hintTimer); $("hint").innerHTML = err ? `<span class="err">${msg}</span>` : msg; hintTimer=setTimeout(renderHint, 6000); }
+function wireIcons(root){ root.querySelectorAll("[data-i]").forEach(el=>{ if(!el.querySelector("svg")) el.insertAdjacentHTML("afterbegin", I(el.dataset.i)); }); }
 
-// ---- header ----
-function renderHeader(){
-  $("brandSeg").innerHTML = Object.entries(BRANDS).map(([k,b])=>`<button type="button" class="${k===brand?"on":""}" data-brand="${k}" title="${esc(b.name)}">${esc(b.name)}</button>`).join("");
-  $("brandSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ brand=x.dataset.brand; selectedList=null; connectPf=null; checked.clear(); mediaSel.clear(); renderHeader(); renderTz(); renderView(); openDefault(); });
-  const side = view==="week"||view==="month"||view==="list" ? "cal" : view;
-  $("nav").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.view===side));
+// ---- navigation: top bar sections; 貼文排程 has six tabs; the composer is its own page ----
+const PLAN = ["week","month","list","library","lists","trash","flows"];
+const sectionOf = v => PLAN.includes(v)||v==="compose" ? "plan" : v;
+function setView(v){
+  if(v==="plan") v=calView;
+  if(v==="compose"){ return newPost(); }
+  if(v==="week"||v==="month") calView=v;
+  if(view==="compose") closeComposer(false);
+  view=v; for(const id of ["filterPop","dtp","bulkMenu","chanMenu","tzPop","brandPop","samplePop"]) $(id).hidden=true;
+  renderFrame(); renderView();
+}
+document.querySelectorAll("[data-view]").forEach(x=>x.onclick=()=>setView(x.dataset.view));
+function renderFrame(){
+  const sec=sectionOf(view), comp=view==="compose", cal=["week","month","list"].includes(view);
+  $("top").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.view===sec));
+  document.querySelector(".subbar").hidden = sec!=="plan"; $("tabs").hidden = comp; $("compHead").hidden=!comp; // other sections: the page title is in the panel
+  $("tabs").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.view===(cal&&view!=="list"?"week":view)));
+  $("tzBtn").hidden = !(sec==="plan"); $("pvSeg").hidden = !comp;
+  const main=document.querySelector("main"); main.classList.toggle("full", !cal);
+  $("chanPanel").hidden=!cal; $("calPanel").hidden=!cal; $("edPanel").hidden=!comp; $("sideView").hidden = cal||comp;
+  document.body.classList.toggle("sheet", comp);
   const n=needs().n; $("notifN").textContent=n; $("notifN").classList.toggle("zero", !n);
+  $("brandNow").textContent=B().name;
+}
+function renderView(){
+  if(["week","month","list"].includes(view)){
+    $("calSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.view===view));
+    for (const [id,k] of [["weekView","week"],["monthView","month"],["listView","list"]]) $(id).hidden = view!==k;
+    $("strip").hidden = view!=="week"; $("calSeg").hidden = view==="list"; $("calNav").hidden = view==="list"; $("rangeLabel").hidden = view==="list";
+    $("bestBtn").hidden = view==="list"; $("bestBar").hidden = view==="list" || !bestPf;
+    $("bulkBtn").hidden = view!=="list" || !B().posts.length; $("bulkMenu").hidden = true;
+    renderChannels(); ({week:renderWeek,month:renderMonth,list:renderList})[view](); renderFilterBtn(); calEmpty();
+  } else if(view!=="compose") ({library:renderLibrary,lists:renderLists,trash:renderTrash,flows:renderFlows,analytics:renderAnalytics,reporting:renderReporting,inbox:renderInbox,smartlinks:renderSmart,ads:renderAds,settings:renderSettings,log:renderLog})[view]();
 }
 function needs(){ const posts=B().posts.filter(p=>p.state==="error"||(me==="reviewer"&&p.state==="review")); const accts=B().accounts.filter(a=>a.st==="expired"); return {posts,accts,n:posts.length+accts.length}; }
 $("notifBtn").onclick=()=>{ logFilter="needs"; setView("log"); };
-$("meSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ me=x.dataset.me; $("meSeg").querySelectorAll("button").forEach(y=>y.classList.toggle("on",y===x)); renderHeader(); if(ed&&ed.id!=null) openPost(ed.id,{keepSheet:true}); });
-$("newTop").onclick=()=>{ if(!["week","month","list"].includes(view)) setView(calView); newPost(); };
-$("fab").onclick=()=>newPost();
+const pop = (btn, id, fill) => { $(btn).onclick=()=>{ const open=$(id).hidden; for(const x of ["tzPop","samplePop","brandPop"]) $(x).hidden=true; if(open&&fill) fill(); $(id).hidden=!open; $(btn).setAttribute("aria-expanded",String(open)); }; };
+pop("sampleBtn","samplePop"); pop("tzBtn","tzPop", renderTz);
+pop("brandBtn","brandPop", ()=>{ $("brandPop").innerHTML = Object.entries(BRANDS).map(([k,b])=>`<button type="button" data-brand="${k}">${k===brand?"✓ ":""}${esc(b.name)}</button>`).join("");
+  $("brandPop").querySelectorAll("button").forEach(x=>x.onclick=()=>{ brand=x.dataset.brand; $("brandPop").hidden=true; chanOnly.clear(); selectedList=null; connectPf=null; checked.clear(); libSel.clear(); aAcct="all"; bestPf=null; $("bestBtn").classList.remove("on"); renderTz(); setView(view==="compose"?calView:view); }); });
+$("meSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ me=x.dataset.me; $("meSeg").querySelectorAll("button").forEach(y=>y.classList.toggle("on",y===x)); renderFrame(); if(view==="compose"&&ed&&ed.id!=null) openPost(ed.id); });
+const TZS = ["Asia/Taipei","Asia/Tokyo","Asia/Singapore","Europe/London","America/Los_Angeles"];
+function renderTz(){ $("tzNow").textContent=`${NOW} · ${B().tz}`; $("tzTxt").textContent=B().tz;
+  $("tzList").innerHTML = TZS.map(z=>`<label class="ck"><input type="radio" name="tz" value="${z}" ${z===B().tz?"checked":""}>${z}</label>`).join("");
+  $("tzList").querySelectorAll("input").forEach(x=>x.onchange=()=>{ B().tz=x.value; renderTz(); $("tzPop").hidden=true; }); }
 
-// ---- views: calendar (week / month / list) keeps the editor beside it; the side views take the full width (U12) ----
-function setView(v){ if(v==="cal") v=calView; if(["week","month","list"].includes(v)) calView=v; view=v; $("filterPop").hidden=true; $("dtp").hidden=true; renderHeader(); renderView(); }
-document.querySelectorAll("[data-view]").forEach(x=>x.onclick=()=>setView(x.dataset.view));
-function renderView(){
-  const cal=["week","month","list"].includes(view);
-  document.querySelector("main").classList.toggle("full", !cal); $("calPanel").hidden=!cal; $("edPanel").hidden=!cal; $("sideView").hidden=cal;
-  $("calSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.view===view));
-  for (const [id,k] of [["weekView","week"],["monthView","month"],["listView","list"]]) $(id).hidden = view!==k;
-  $("strip").hidden = view!=="week"; $("calNav").hidden = view==="list"; $("bulkBtn").hidden = view!=="list" || !B().posts.length; $("bulkMenu").hidden = true;
-  ({week:renderWeek,month:renderMonth,list:renderList,lists:renderLists,media:renderMedia,log:renderLog,settings:renderSettings,trash:renderTrash})[view]();
-  renderFilterBtn(); calEmpty();
+// ---- channel list (decision 1): one row per account, scrolls; click = only this channel on the calendar; ⋮ = its menu ----
+function renderChannels(){ const q=$("chanQ").value.trim(), all=B().accounts, rows=all.filter(a=>!q||(a.name+a.handle+PF[a.pf].n).includes(q));
+  $("chanN").textContent = all.length ? `${all.length} 個` : "";
+  $("chanList").innerHTML = rows.map(a=>`<div class="crow ${chanOnly.has(a.id)?"on":""}" data-ch="${a.id}" role="button" tabindex="0" title="${chanOnly.has(a.id)?"再點一下取消":"只看這個頻道的貼文"}">${aav(a)}<span class="nm"><b>${esc(a.name)}</b><span class="${a.st==="expired"?"err":""}">${a.st==="expired"?"授權過期，按 ⋮ 重新連接":a.st==="review"?PF[a.pf].n+" · 平台審核中":esc(acctLine(a))}</span></span><button type="button" class="ibtn" data-chm="${a.id}" aria-label="${esc(a.name)} 的選單">${I("vdots")}</button></div>`).join("")
+    || (all.length ? `<p class="muted tag">找不到「${esc(q)}」。</p>` : emptyHtml("link","還沒有頻道","連接社群帳號後，會列在這裡。","加頻道","chanFirst"));
+  $("chanFoot").textContent = chanOnly.size ? `只看 ${chanOnly.size} 個頻道` : all.length ? "點一個頻道，只看它的貼文。" : "";
+  $("chanList").querySelectorAll("[data-ch]").forEach(r=>{ r.onclick=e=>{ if(e.target.closest("[data-chm]")) return; const k=r.dataset.ch; chanOnly.has(k)?chanOnly.delete(k):chanOnly.add(k); renderView(); }; r.onkeydown=e=>{ if(e.key==="Enter") r.onclick(e); }; });
+  $("chanList").querySelectorAll("[data-chm]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const a=A(b.dataset.chm), m=$("chanMenu");
+    m.innerHTML = `<button type="button" data-cm="only">只看這個頻道</button><button type="button" data-cm="new">用這個頻道寫貼文</button><button type="button" data-cm="${a.st==="expired"?"reconnect":"prefs"}">${a.st==="expired"?"重新連接":"偏好設定"}</button><button type="button" data-cm="remove">移除頻道</button>`;
+    const r=b.getBoundingClientRect(), pr=$("chanPanel").getBoundingClientRect(); m.style.top=(r.bottom-pr.top+4)+"px"; m.style.right="8px"; m.hidden=false;
+    m.querySelectorAll("button").forEach(x=>x.onclick=()=>{ m.hidden=true; const c=x.dataset.cm;
+      if(c==="only"){ chanOnly=new Set([a.id]); renderView(); }
+      if(c==="new"){ newPost(null,null,null,[a.id]); }
+      if(c==="reconnect"||c==="prefs"){ connectPf=c==="reconnect"?a.pf:null; setView("settings"); }
+      if(c==="remove"){ B().accounts=B().accounts.filter(y=>y.id!==a.id); chanOnly.delete(a.id); renderView(); } }); });
+  const cf=$("chanFirst"); if(cf) cf.onclick=()=>setView("settings");
 }
-function calEmpty(){ const none = !B().posts.length && !rotationPosts().length && ["week","month","list"].includes(view);
-  $("calEmpty").hidden=!none; if(!none) return;
-  $("calEmpty").innerHTML = connected().length ? emptyHtml("calendar","這個品牌還沒有貼文","寫好的貼文會照時間排在這裡。","寫第一則貼文","emptyNew") : emptyHtml("link","還沒連接社群帳號","連好帳號，才能排貼文。","到設定連接帳號","emptyConn");
-  const a=$("emptyNew"), b=$("emptyConn"); if(a) a.onclick=()=>newPost(); if(b) b.onclick=()=>setView("settings"); }
-// a list sends at each ticked weekday x time cell (S4), oldest first, cycling through its queue
+$("chanQ").oninput=renderChannels; $("addChan").onclick=()=>setView("settings");
+$("chanOpen").onclick=()=>document.body.classList.add("chans"); $("chanClose").onclick=()=>document.body.classList.remove("chans");
+
+// ---- calendar ----
 const slotTimes = (l, dow) => l.slots.filter(x=>x.startsWith(dow+"@")).map(x=>x.slice(2)).sort();
 function rotationPosts(){ const out=[]; for(const l of B().lists){ if(!l.on||!l.queue.length||!l.slots.length) continue; let n=0;
   for(let i=0;i<60;i++){ const s=addDays(TODAY,i); for(const t of slotTimes(l, dowOf(s)+1)){ if(s===TODAY && t<NOW) continue; const k=(l.cursor+n)%l.queue.length;
-    out.push({id:"r-"+l.id+"-"+s+"-"+t,virtual:true,listId:l.id,date:s,time:t,pfs:l.pfs,state:"rotation",text:l.queue[k],idx:k}); n++; } } } return out; }
+    out.push({id:"r-"+l.id+"-"+s+"-"+t,virtual:true,listId:l.id,date:s,time:t,accts:l.accts,state:"rotation",text:l.queue[k],idx:k}); n++; } } } return out; }
 function nextRun(l){ const r=rotationPosts().find(p=>p.listId===l.id); return r?`${fmt(r.date)} ${r.time}「${r.text.slice(0,16)}…」`:"（已暫停或沒有勾時段）"; }
 function visiblePosts(){ const q=$("q").value.trim();
   return [...B().posts,...rotationPosts()].filter(p => p.state!=="deleted" && (!stOnly.size || stOnly.has(p.state))
-    && (!pfOnly.size || (p.kind==="article" ? pfOnly.has("wordpress") : p.pfs.some(x=>pfOnly.has(x)))) && (!q || (p.text||p.title||"").includes(q))); }
+    && (!pfOnly.size || postPfs(p).some(x=>pfOnly.has(x))) && (!chanOnly.size || (p.accts||[]).some(x=>chanOnly.has(x)))
+    && (!q || (p.text||p.title||"").includes(q))); }
 const byTime = (a,b) => (a.date+a.time).localeCompare(b.date+b.time);
-
-// filter: one button + a panel; the button says how many conditions are on (U1, U2)
+function calEmpty(){ const none = !B().posts.length && !rotationPosts().length;
+  $("calEmpty").hidden=!none; if(!none) return;
+  $("calEmpty").innerHTML = connected().length ? emptyHtml("calendar","這個品牌還沒有貼文","寫好的貼文會照時間排在這裡。","寫第一則貼文","emptyNew") : emptyHtml("link","還沒連接社群帳號","連好帳號，才能排貼文。","到設定連接帳號","emptyConn");
+  const a=$("emptyNew"), b=$("emptyConn"); if(a) a.onclick=()=>newPost(); if(b) b.onclick=()=>setView("settings"); }
 function renderFilterBtn(){ const n=pfOnly.size+stOnly.size; $("filterN").textContent = n ? ` · ${n}` : ""; }
 function renderFilterPop(){
   $("fPf").innerHTML = [...SOCIAL,"wordpress"].map(k=>`<label class="ck"><input type="checkbox" data-pf="${k}" ${pfOnly.has(k)?"checked":""}>${pfb(k)}${PF[k].n}</label>`).join("");
@@ -925,18 +1051,23 @@ $("filterBtn").onclick=()=>{ const open=$("filterPop").hidden; if(open) renderFi
 $("fDone").onclick=()=>{ $("filterPop").hidden=true; $("filterBtn").setAttribute("aria-expanded","false"); };
 $("fClear").onclick=()=>{ pfOnly.clear(); stOnly.clear(); renderFilterPop(); renderView(); };
 $("q").oninput=()=>renderView();
-
-// week: every day is a column, its posts stacked in time order (U3); the phone shows one day (U10)
+// best publishing times (decision 4): pick a platform, each day shows its best times; a time is a shortcut to write a post then
+function bestPlatforms(){ return [...new Set(B().accounts.map(a=>a.pf))].filter(k=>BEST[k]); }
+$("bestBtn").onclick=()=>{ bestPf = bestPf ? null : (bestPlatforms()[0]||null); if(!bestPf&&!bestPlatforms().length) say("先連接社群帳號，才看得到最佳時間。"); $("bestBtn").classList.toggle("on", !!bestPf); $("bestBtn").setAttribute("aria-pressed", String(!!bestPf)); renderBest(); renderView(); };
+function renderBest(){ $("bestSeg").innerHTML = bestPlatforms().map(k=>`<button type="button" class="${k===bestPf?"on":""}" data-bp="${k}">${pfb(k)} ${PF[k].n}</button>`).join("");
+  $("bestSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ bestPf=x.dataset.bp; renderBest(); renderView(); }); }
+const bestFor = (pf, s) => { const t=BEST[pf]; if(!t) return []; const w=dowOf(s); return w>=5 ? [t[0].replace(/^(\d\d)/, h=>String(+h+1).padStart(2,"0"))] : t; };
 function setRange(){ const a=d(weekStart), z=d(addDays(weekStart,6));
-  $("rangeLabel").textContent = isPhone() && view==="week" ? fmtLong(focusDay) : a.getMonth()===z.getMonth() ? `${a.getMonth()+1}月${a.getDate()}日 – ${z.getDate()}日` : `${a.getMonth()+1}月${a.getDate()}日 – ${z.getMonth()+1}月${z.getDate()}日`; }
+  $("rangeLabel").textContent = isPhone() && view==="week" ? fmtLong(focusDay) : view==="month" ? "2026年10月" : a.getMonth()===z.getMonth() ? `${a.getMonth()+1}月${a.getDate()}日 – ${z.getDate()}日` : `${a.getMonth()+1}月${a.getDate()}日 – ${z.getMonth()+1}月${z.getDate()}日`; }
 function cardHtml(p){
   const imgs = p.imgs||[], art = p.kind==="article", mine = !p.virtual && !art;
   const tcls = imgs.length ? "ph ph-"+imgs[0] : "txt";
-  const inner = (imgs.length>1 ? `<span class="more">+${imgs.length-1}</span>` : imgs.length ? "" : art ? "文章" : "文字") + `<span class="avs">${(art?["wordpress"]:p.pfs).map(pfb).join("")}</span>`;
-  const flag = (p.virtual?`<span title="來自輪播清單">↻</span>`:"") + (unconnected(p).length?`<span class="err" title="有帳號沒連接，這則發不出去">⚠</span>`:"");
-  return `<div class="card ${ed&&ed.id===p.id?"sel":""}" data-id="${p.id}" data-state="${p.state}" data-kind="${art?"article":"social"}" draggable="${mine&&p.state!=="published"}" tabindex="0" title="${STATES[p.state]}">`
+  const inner = (imgs.length>1 ? `<span class="more">+${imgs.length-1}</span>` : imgs.length ? "" : art ? "文章" : "文字") + `<span class="avs">${postPfs(p).map(pfb).join("")}</span>`;
+  const who = art ? "WordPress" : [...new Set((p.accts||[]).map(id=>A(id).name))].join("、");
+  const flag = (p.virtual?`<span title="來自自動發布清單">↻</span>`:"") + (unconnected(p).length?`<span class="err" title="有頻道沒連接，這則發不出去">⚠</span>`:"");
+  return `<div class="card" data-id="${p.id}" data-state="${p.state}" data-kind="${art?"article":"social"}" draggable="${mine&&p.state!=="published"}" tabindex="0" title="${STATES[p.state]} · ${esc(who)}">`
     + `<div class="cthumb ${tcls}">${inner}</div>`
-    + `<div class="cmeta"><span>${p.time}</span>${flag}</div><div class="ctext">${esc(art?"文章："+p.title:p.text)}</div>`
+    + `<div class="cmeta"><span>${p.time}</span>${flag}<span>${esc(who)}</span></div><div class="ctext">${esc(art?"文章："+p.title:p.text)}</div>`
     + (mine?`<span class="cacts"><button type="button" data-act="pv" title="預覽" aria-label="預覽">${I("eye")}</button><button type="button" data-act="dup" title="複製成下週的草稿" aria-label="複製">${I("copy")}</button><button type="button" data-act="del" title="${p.state==="published"?"已發佈的不能從這裡刪":"刪除（可還原）"}" aria-label="刪除" ${p.state==="published"?"disabled":""}>${I("trash")}</button></span>`:"")
     + `</div>`;
 }
@@ -944,15 +1075,18 @@ function renderWeek(){
   const days=[...Array(7)].map((_,i)=>addDays(weekStart,i)); if(!days.includes(focusDay)) focusDay=days.includes(TODAY)?TODAY:days[0]; setRange();
   const vp=visiblePosts();
   $("weekView").innerHTML = days.map((s,i)=>{ const ps=vp.filter(p=>p.date===s).sort(byTime);
-    return `<div class="day ${s<TODAY?"past":""} ${s===TODAY?"today":""} ${s===focusDay?"focus":""}" data-date="${s}"><div class="dh"><span class="muted">${DOW[i]}</span><b>${d(s).getDate()}</b><span class="n">${ps.length?ps.length+" 則":""}</span></div><div class="stack" data-date="${s}">${s===TODAY ? (()=>{ const k=ps.findIndex(p=>p.time>NOW), at=k<0?ps.length:k; return ps.slice(0,at).map(cardHtml).join("")+`<div class="now">現在 ${NOW}</div>`+ps.slice(at).map(cardHtml).join(""); })() : ps.map(cardHtml).join("")}${s>=TODAY?`<button type="button" class="add" data-add="${s}">${I("plus")}新增</button>`:""}</div></div>`; }).join("");
+    const best = bestPf && s>=TODAY ? `<div class="best">${I("star")}${bestFor(bestPf,s).map(t=>`<button type="button" data-bt="${s}@${t}" title="在 ${t} 寫一則">${t}</button>`).join("")}</div>` : "";
+    const cards = s===TODAY ? (()=>{ const k=ps.findIndex(p=>p.time>NOW), at=k<0?ps.length:k; return ps.slice(0,at).map(cardHtml).join("")+`<div class="now">現在 ${NOW}</div>`+ps.slice(at).map(cardHtml).join(""); })() : ps.map(cardHtml).join("");
+    return `<div class="day ${s<TODAY?"past":""} ${s===TODAY?"today":""} ${s===focusDay?"focus":""}" data-date="${s}"><div class="dh"><span class="muted">${DOW[i]}</span><b>${d(s).getDate()}</b><span class="n">${ps.length?ps.length+" 則":""}</span></div><div class="stack" data-date="${s}">${best}${cards}${s>=TODAY?`<button type="button" class="add" data-add="${s}">${I("plus")}新增</button>`:""}</div></div>`; }).join("");
   $("strip").innerHTML = days.map((s,i)=>`<button type="button" class="${s===focusDay?"on":""} ${s===TODAY?"today":""}" data-day="${s}"><span>${DOW[i]}</span><b>${d(s).getDate()}</b><i class="${vp.some(p=>p.date===s)?"has":""}"></i></button>`).join("");
   $("strip").querySelectorAll("button").forEach(x=>x.onclick=()=>{ focusDay=x.dataset.day; renderWeek(); });
   wireCards($("weekView"));
   $("weekView").querySelectorAll(".stack").forEach(st=>{ const s=st.dataset.date;
     st.onclick=e=>{ if(e.target===st && s>=TODAY) newPost(s,"10:00"); };
     st.ondragover=e=>{ e.preventDefault(); st.classList.add("over"); }; st.ondragleave=()=>st.classList.remove("over");
-    st.ondrop=e=>{ e.preventDefault(); st.classList.remove("over"); const p=B().posts.find(x=>String(x.id)===e.dataTransfer.getData("text/plain")); if(!p) return; p.date=s; if(p.state==="error") p.state="scheduled"; addLog("改日期",p,`${fmt(s)} ${p.time}`); renderView(); if(ed&&ed.id===p.id) openPost(p.id,{keepSheet:true}); say(`已改到 ${fmtLong(s)} ${p.time}，時間不變。`); }; });
+    st.ondrop=e=>{ e.preventDefault(); st.classList.remove("over"); const p=B().posts.find(x=>String(x.id)===e.dataTransfer.getData("text/plain")); if(!p) return; p.date=s; if(p.state==="error") p.state="scheduled"; addLog("改日期",p,`${fmt(s)} ${p.time}`); renderView(); }; });
   $("weekView").querySelectorAll("[data-add]").forEach(x=>x.onclick=e=>{ e.stopPropagation(); newPost(x.dataset.add,"10:00"); });
+  $("weekView").querySelectorAll("[data-bt]").forEach(x=>x.onclick=e=>{ e.stopPropagation(); const [s,t]=x.dataset.bt.split("@"); newPost(s,t,null,B().accounts.filter(a=>a.pf===bestPf&&a.st==="connected").map(a=>a.id)); });
 }
 function wireCards(root){
   root.querySelectorAll(".card").forEach(c=>{ const id=c.dataset.id; const p=[...B().posts,...rotationPosts()].find(x=>String(x.id)===id);
@@ -960,195 +1094,253 @@ function wireCards(root){
     c.onkeydown=e=>{ if(e.key==="Enter") c.onclick(); };
     c.ondragstart=e=>e.dataTransfer.setData("text/plain", id);
     c.querySelectorAll("[data-act]").forEach(b=>b.onclick=e=>{ e.stopPropagation(); const a=b.dataset.act;
-      if(a==="pv"){ openPost(p.id,{preview:true}); }
-      if(a==="dup"){ const c2={...p,id:Date.now(),state:"draft",date:addDays(p.date,7),err:null,url:null}; B().posts.push(c2); renderView(); openPost(c2.id); say("已複製成下週同一天的草稿。"); }
-      if(a==="del"){ trashPost(p); renderView(); if(ed&&ed.id===p.id) newPost(); say("已刪除。可以在「已刪除」還原。"); } }); });
+      if(a==="pv") openPost(p.id,{preview:true});
+      if(a==="dup"){ const c2={...p,id:Date.now(),state:"draft",date:addDays(p.date,7),err:null,url:null}; B().posts.push(c2); openPost(c2.id); say("已複製成下週同一天的草稿。"); }
+      if(a==="del"){ trashPost(p); renderView(); } }); });
 }
 function renderMonth(){
   const startDow=dowOf("2026-10-01"); const cells=[]; for(let i=-startDow;i<42-startDow;i++) cells.push(addDays("2026-10-01",i));
-  $("rangeLabel").textContent="2026年10月"; const vp=visiblePosts();
+  setRange(); const vp=visiblePosts();
   $("mgrid").innerHTML = cells.map(s=>{ const ps=vp.filter(p=>p.date===s).sort(byTime);
     return `<div class="mday ${s===TODAY?"today":""} ${s.startsWith("2026-10")?"":"out"}" data-date="${s}"><div class="n">${d(s).getDate()}</div>${ps.slice(0,2).map(p=>`<div class="mi"><span class="sbar" data-state="${p.state}"></span>${p.time} ${esc(p.kind==="article"?"文章："+p.title:p.text)}</div>`).join("")}${ps.length>2?`<div class="n">還有 ${ps.length-2} 則</div>`:""}</div>`; }).join("");
   $("mgrid").querySelectorAll(".mday").forEach(c=>c.onclick=()=>{ const s=c.dataset.date; weekStart=addDays(s,-dowOf(s)); focusDay=s; setView("week"); });
 }
 function renderList(){
-  $("rangeLabel").textContent="所有貼文";
   const ps = visiblePosts().filter(p=>!p.virtual && p.kind!=="article").sort(byTime);
-  $("rows").innerHTML = ps.map(p=>`<tr><td><input type="checkbox" data-id="${p.id}" ${checked.has(p.id)?"checked":""} aria-label="選取"></td><td>${(p.imgs||[]).length?`<span class="tthumb ph ph-${p.imgs[0]}"></span>`:`<span class="tthumb txt"></span>`}</td><td>${p.date?fmt(p.date)+" "+p.time:"輪播"}</td><td><span class="avs">${p.pfs.map(pfb).join("")}</span>${unconnected(p).length?' <span class="err" title="有帳號沒連接">⚠</span>':""}</td><td class="ttl">${esc(p.text)}</td><td><span class="pill" data-state="${p.state}">${STATES[p.state]}</span></td><td><button type="button" class="ibtn" data-open="${p.id}" title="打開" aria-label="打開">${I("eye")}</button><button type="button" class="ibtn" data-dup="${p.id}" title="複製成下週的草稿" aria-label="複製">${I("copy")}</button></td></tr>`).join("") || (!B().posts.length ? "" : `<tr><td colspan="7">${emptyHtml("search","沒有符合的貼文","換個搜尋字，或清除篩選。","清除篩選","listClear")}</td></tr>`);
-  const lc=$("listClear"); if(lc) lc.onclick=()=>{ pfOnly.clear(); stOnly.clear(); $("q").value=""; renderView(); };
+  $("rows").innerHTML = ps.map(p=>`<tr><td><input type="checkbox" data-id="${p.id}" ${checked.has(p.id)?"checked":""} aria-label="選取"></td><td>${(p.imgs||[]).length?`<span class="tthumb ph ph-${p.imgs[0]}"></span>`:`<span class="tthumb txt"></span>`}</td><td>${p.date?fmt(p.date)+" "+p.time:"輪播"}</td><td><span class="avs">${postPfs(p).map(pfb).join("")}</span>${unconnected(p).length?' <span class="err" title="有頻道沒連接">⚠</span>':""}</td><td class="ttl">${esc(p.text)}</td><td><span class="pill" data-state="${p.state}">${STATES[p.state]}</span></td><td><button type="button" class="ibtn" data-open="${p.id}" title="打開" aria-label="打開">${I("eye")}</button><button type="button" class="ibtn" data-dup="${p.id}" title="複製成下週的草稿" aria-label="複製">${I("copy")}</button></td></tr>`).join("")
+    || (!B().posts.length ? "" : `<tr><td colspan="7">${emptyHtml("search","沒有符合的貼文","換個搜尋字，或清除篩選。","清除篩選","listClear")}</td></tr>`);
+  const lc=$("listClear"); if(lc) lc.onclick=()=>{ pfOnly.clear(); stOnly.clear(); chanOnly.clear(); $("q").value=""; renderView(); };
   $("rows").querySelectorAll("input").forEach(c=>c.onchange=()=>{ c.checked?checked.add(+c.dataset.id):checked.delete(+c.dataset.id); bulkBar(); });
   $("rows").querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>openPost(+b.dataset.open));
-  $("rows").querySelectorAll("[data-dup]").forEach(b=>b.onclick=()=>{ const p=B().posts.find(x=>x.id===+b.dataset.dup); B().posts.push({...p,id:Date.now(),state:"draft",date:addDays(p.date||TODAY,7),time:p.time||"10:00",err:null,url:null}); renderList(); say("已複製成下週同一天的草稿。"); });
+  $("rows").querySelectorAll("[data-dup]").forEach(b=>b.onclick=()=>{ const p=B().posts.find(x=>x.id===+b.dataset.dup); B().posts.push({...p,id:Date.now(),state:"draft",date:addDays(p.date||TODAY,7),time:p.time||"10:00",err:null,url:null}); renderList(); });
   bulkBar();
 }
 function bulkBar(){ $("bulkN").textContent = checked.size ? ` · ${checked.size}` : ""; }
-// list toolbar (S6): one 批次動作 button, its menu holds the actions for the ticked rows
-$("bulkBtn").onclick=()=>{ if(!checked.size){ $("bulkMenu").hidden=true; return say("先勾選左邊的貼文，再用批次動作。"); } const open=$("bulkMenu").hidden; $("bulkMenu").hidden=!open; $("bulkBtn").setAttribute("aria-expanded",String(open)); };
-function trashPost(p){ Object.assign(p,{prevState:p.state,state:"deleted",delAt:"10/16 "+NOW,delBy:ME()}); addLog("刪除",p,"可在「已刪除」還原"); }
+$("bulkBtn").onclick=()=>{ if(!checked.size){ $("bulkMenu").hidden=true; return; } const open=$("bulkMenu").hidden; $("bulkMenu").hidden=!open; $("bulkBtn").setAttribute("aria-expanded",String(open)); };
 $("selAll").onchange=e=>{ $("rows").querySelectorAll("input").forEach(c=>{ c.checked=e.target.checked; e.target.checked?checked.add(+c.dataset.id):checked.delete(+c.dataset.id); }); bulkBar(); };
-$("bulkReview").onclick=()=>{ B().posts.forEach(p=>{ if(checked.has(p.id)){ p.state="review"; addLog("送審",p,""); } }); checked.clear(); renderView(); say("已送審。審核人會收到通知。"); };
-$("bulkDel").onclick=()=>{ B().posts.forEach(p=>{ if(checked.has(p.id)) trashPost(p); }); checked.clear(); renderView(); say("已刪除。可以在「已刪除」還原。"); };
+$("bulkReview").onclick=()=>{ B().posts.forEach(p=>{ if(checked.has(p.id)){ p.state="review"; addLog("送審",p,""); } }); checked.clear(); renderView(); };
+$("bulkDel").onclick=()=>{ B().posts.forEach(p=>{ if(checked.has(p.id)) trashPost(p); }); checked.clear(); renderView(); };
 $("prevW").onclick=()=>{ if(isPhone()&&view==="week"){ focusDay=addDays(focusDay,-1); if(focusDay<weekStart) weekStart=addDays(weekStart,-7); } else weekStart=addDays(weekStart,-7); renderView(); };
 $("nextW").onclick=()=>{ if(isPhone()&&view==="week"){ focusDay=addDays(focusDay,1); if(focusDay>addDays(weekStart,6)) weekStart=addDays(weekStart,7); } else weekStart=addDays(weekStart,7); renderView(); };
 $("todayW").onclick=()=>{ weekStart="2026-10-12"; focusDay=TODAY; renderView(); };
-
-// ---- side views, full width ----
-const ROLES = {owner:"擁有者",editor:"編輯",reviewer:"審核人",client:"客戶唯讀"};
-const TZS = ["Asia/Taipei","Asia/Tokyo","Asia/Singapore","Europe/London","America/Los_Angeles"];
 const ME = () => B().team.find(m=>m.me)?.name || "我";
-function addLog(act, p, res){ B().log.unshift({t:"10/14 "+new Date().toTimeString().slice(0,5), who:ME(), act, txt:(p&&(p.text||p.title))||"", res:res||""}); renderHeader(); }
-function side(html){ $("sideView").innerHTML=html; }
+function addLog(act, p, res){ B().log.unshift({t:"10/14 "+NOW, who:ME(), act, txt:(p&&(p.text||p.title))||"", res:res||""}); }
+function trashPost(p){ Object.assign(p,{prevState:p.state,state:"deleted",delAt:"10/14 "+NOW,delBy:ME()}); addLog("刪除",p,"可在「已刪除貼文」還原"); }
+
+// ---- full-width pages ----
+function side(html){ $("sideView").innerHTML=html; wireIcons($("sideView")); }
+const soon = (icon, name, what) => side(`<div class="ptop"><h2>${name}</h2></div>`+emptyHtml(icon, `${name}尚未開通`, what));
+function renderFlows(){ soon("flow","自動化流程","開通後：有人留言或私訊特定關鍵字，就自動回覆或接著傳下一則。"); }
+function renderSmart(){ soon("link","智慧連結","開通後：做一個放在個人簡介的連結頁，集中官網、報名表和各平台，並看每個連結被點幾次。"); }
+function renderAds(){ soon("megaphone","廣告管理","開通後：在這裡看 Meta、Google 廣告的花費和成效，跟一般貼文的數據放在一起比。"); }
+// 貼文素材庫: whole posts saved to reuse, plus pictures and videos
+function renderLibrary(){ const all=B().library, items=all.filter(x=>libKind==="post"?x.kind==="post":x.kind!=="post");
+  const top=`<div class="ptop"><h2>貼文素材庫</h2><span class="seg" id="libSeg"><button type="button" class="${libKind==="post"?"on":""}" data-lk="post">存起來的貼文</button><button type="button" class="${libKind==="media"?"on":""}" data-lk="media">圖片和影片</button></span><span class="muted">${libKind==="post"?"常用的貼文存在這裡，下次直接拿來改。":"上傳過的圖片和影片都在這裡。"}</span><span class="r"><button type="button" class="btn-secondary" id="libAdd" data-i="plus">${libKind==="post"?"存一則貼文":"上傳"}</button></span></div>`;
+  const body = items.length ? `<div class="lib">${items.map(x=>`<button type="button" class="ltile ${libSel.has(x.id)?"on":""}" data-l="${x.id}">${x.kind==="post"?`<span class="limg ${x.ph?"ph ph-"+x.ph:"txt"}">${x.ph?"":"文字貼文"}</span><span class="lt">${esc(x.text)}</span><span class="avs">${[...new Set((x.accts||[]).map(pfOf))].map(pfb).join("")}</span>`:`<span class="limg ph ph-${x.ph}">${x.kind==="video"?I("play"):""}</span><span class="lt">${esc(x.name)}</span><span class="muted tag">${x.kind==="video"?"影片 · ":""}用過 ${x.used} 次</span>`}</button>`).join("")}</div>${libSel.size?`<div class="bulk"><span>已選 ${libSel.size} 個</span><button type="button" class="btn-primary" id="libUse">用這些寫新貼文</button><button type="button" id="libClear">取消選取</button></div>`:""}`
+    : libKind==="post" ? emptyHtml("bookmark","還沒有存起來的貼文","在撰寫頁按 ▾「存到素材庫」，就會出現在這裡。","寫一則貼文","libNew") : emptyHtml("image","還沒有圖片和影片","上傳過的會留在這裡，下次直接用。","上傳圖片或影片","libUp");
+  side(top+body);
+  $("libSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ libKind=x.dataset.lk; libSel.clear(); renderLibrary(); });
+  const up=()=>{ all.unshift(libKind==="post"?{id:"L"+Date.now(),kind:"post",text:"（新存的貼文）週末工作坊報名開始。",accts:connected().slice(0,1).map(a=>a.id)}:{id:"m"+Date.now(),kind:"image",ph:1+all.length%4,name:"新上傳-"+(all.length+1)+".jpg",used:0}); renderLibrary(); };
+  for(const id of ["libAdd","libUp"]) if($(id)) $(id).onclick=up;
+  if($("libNew")) $("libNew").onclick=()=>newPost();
+  $("sideView").querySelectorAll("[data-l]").forEach(x=>x.onclick=()=>{ const k=x.dataset.l; libSel.has(k)?libSel.delete(k):libSel.add(k); renderLibrary(); });
+  if($("libClear")) $("libClear").onclick=()=>{ libSel.clear(); renderLibrary(); };
+  if($("libUse")) $("libUse").onclick=()=>{ const sel=all.filter(x=>libSel.has(x.id)); const post=sel.find(x=>x.kind==="post"); const imgs=sel.filter(x=>x.ph).map(x=>x.ph); libSel.clear(); newPost(null,null,imgs,post?post.accts:null,post?post.text:""); };
+}
+// 自動發布清單 (= rotation lists): weekday x time cells
 function renderLists(){
   const ls=B().lists;
-  if(!ls.length){ side(`<div class="ptop"><h2>輪播清單</h2></div>`+emptyHtml("repost","還沒有輪播清單","清單裡的貼文會照順序，一則一則輪流發。","＋ 建第一個清單","newList")); $("newList").onclick=newList; return; }
+  if(!ls.length){ side(`<div class="ptop"><h2>自動發布清單</h2></div>`+emptyHtml("repost","還沒有自動發布清單","清單裡的貼文會照順序，在勾好的時段一則一則發。","＋ 建第一個清單","newList")); $("newList").onclick=newList; return; }
   if(!ls.some(l=>l.id===selectedList)) selectedList=ls[0].id; const l=ls.find(x=>x.id===selectedList);
-  side(`<div class="ptop"><h2>輪播清單</h2><span class="muted">照順序輪流發，發完最後一則再從第一則開始。</span><span class="r"><button type="button" class="btn-secondary" id="newList">＋ 新清單</button></span></div>
+  side(`<div class="ptop"><h2>自動發布清單</h2><span class="muted">照順序輪流發，發完最後一則再從第一則開始。</span><span class="r"><button type="button" class="btn-secondary" id="newList">＋ 新清單</button></span></div>
   <div class="cols2"><div class="lcol">${ls.map(x=>`<button type="button" class="lst ${x.on?"":"off"} ${x.id===selectedList?"sel":""}" data-id="${x.id}"><b>${esc(x.name)}（${x.queue.length} 則）</b><span class="nx muted">${x.on?"進行中":"已暫停"} · 每週 ${x.slots.length} 個時段</span><span class="nx muted">下一則：${esc(nextRun(x))}</span></button>`).join("")}</div>
   <div class="ldet">
     <div class="frow"><span class="lab">名稱</span><input type="text" id="ldName" value="${esc(l.name)}" aria-label="清單名稱"></div>
     <div class="frow top"><span class="lab">時段</span><div class="slots"><div class="sgrid7"><span></span>${DOW.map(n=>`<span class="muted">${n}</span>`).join("")}<span></span>${l.times.map(t=>`<span class="muted tag">${t}</span>${DOW.map((_,i)=>{ const k=(i+1)+"@"+t, on=l.slots.includes(k); return `<button type="button" class="slot ${on?"on":""}" data-slot="${k}" aria-pressed="${on}" aria-label="週${DOW[i]} ${t}"></button>`; }).join("")}<button type="button" class="ibtn" data-rmtime="${t}" aria-label="拿掉 ${t} 這一列" title="拿掉這一列">${I("x")}</button>`).join("")}</div><span class="acts"><button type="button" class="lnk" id="ldAddTime">＋ 加一個時間</button><span class="muted tag">點格子＝那天那個時間發一則</span></span></div></div>
-    <div class="frow"><span class="lab">發到</span><span class="acts" id="ldAccts">${B().accounts.map(a=>`<button type="button" class="cav ${l.pfs.includes(a.pf)?"on":""}" data-pf="${a.pf}" ${a.st!=="connected"?"disabled":""} title="${PF[a.pf].n} ${esc(a.handle)}" aria-label="${PF[a.pf].n}">${bav()}${pfb(a.pf)}</button>`).join("")}</span></div>
+    <div class="frow"><span class="lab">發到</span><span class="acts" id="ldAccts">${B().accounts.map(a=>`<button type="button" class="btn-secondary ${l.accts.includes(a.id)?"":"muted"}" data-acc="${a.id}" ${a.st!=="connected"?"disabled":""} aria-pressed="${l.accts.includes(a.id)}">${l.accts.includes(a.id)?"✓ ":""}${pfb(a.pf)} ${esc(a.name)}</button>`).join("")}</span></div>
     <div class="frow"><span class="lab">下一則</span><span>${esc(nextRun(l))}</span></div>
-    <div class="queue">${l.queue.length ? l.queue.map((t,i)=>`<div class="qrow ${i===l.cursor?"next":""}"><span class="n">第 ${i+1} 則${i===l.cursor?"・下一則":""}</span><span class="tx" title="${esc(t)}">${esc(t)}</span><span class="acts"><button type="button" class="ibtn" data-up="${i}" aria-label="往上">${I("up")}</button><button type="button" class="ibtn" data-down="${i}" aria-label="往下">${I("down")}</button><button type="button" class="ibtn" data-rm="${i}" aria-label="移除">${I("x")}</button></span></div>`).join("") : `<div class="muted">清單還是空的。按「從草稿加入」，或寫貼文時選「輪播清單」。</div>`}</div>
+    <div class="queue">${l.queue.length ? l.queue.map((t,i)=>`<div class="qrow ${i===l.cursor?"next":""}"><span class="n">第 ${i+1} 則${i===l.cursor?"・下一則":""}</span><span class="tx" title="${esc(t)}">${esc(t)}</span><span class="acts"><button type="button" class="ibtn" data-up="${i}" aria-label="往上">${I("up")}</button><button type="button" class="ibtn" data-down="${i}" aria-label="往下">${I("down")}</button><button type="button" class="ibtn" data-rm="${i}" aria-label="移除">${I("x")}</button></span></div>`).join("") : `<div class="muted">清單還是空的。按「從草稿加入」，或寫貼文時選「自動發布清單」。</div>`}</div>
     <div class="hint" id="ldHint"></div>
-    <div class="acts"><button type="button" id="ldAdd">從草稿加入</button><button type="button" id="ldToggle">${l.on?"暫停":"開始輪播"}</button><button type="button" class="danger" id="ldDel">刪除清單</button><button type="button" class="btn-primary" id="ldSave">儲存</button></div>
+    <div class="acts"><button type="button" id="ldAdd">從草稿加入</button><button type="button" id="ldToggle">${l.on?"暫停":"開始發布"}</button><button type="button" class="danger" id="ldDel">刪除清單</button><button type="button" class="btn-primary" id="ldSave">儲存</button></div>
   </div></div>`);
-  wireIcons($("sideView"));
   $("newList").onclick=newList;
   $("sideView").querySelectorAll(".lst").forEach(x=>x.onclick=()=>{ selectedList=x.dataset.id; renderLists(); });
   $("sideView").querySelectorAll("[data-slot]").forEach(x=>x.onclick=()=>{ const k=x.dataset.slot, i=l.slots.indexOf(k); i<0?l.slots.push(k):l.slots.splice(i,1); renderLists(); });
   $("sideView").querySelectorAll("[data-rmtime]").forEach(x=>x.onclick=()=>{ const t=x.dataset.rmtime; l.times=l.times.filter(y=>y!==t); l.slots=l.slots.filter(y=>!y.endsWith("@"+t)); renderLists(); });
   $("ldAddTime").onclick=()=>openDtp($("ldAddTime"), null, "14:00", t=>{ if(!l.times.includes(t)){ l.times.push(t); l.times.sort(); } renderLists(); });
-  $("ldAccts").querySelectorAll("button:not([disabled])").forEach(x=>x.onclick=()=>{ const k=x.dataset.pf; l.pfs.includes(k)?l.pfs.splice(l.pfs.indexOf(k),1):l.pfs.push(k); renderLists(); });
+  $("ldAccts").querySelectorAll("button:not([disabled])").forEach(x=>x.onclick=()=>{ const k=x.dataset.acc; l.accts.includes(k)?l.accts.splice(l.accts.indexOf(k),1):l.accts.push(k); renderLists(); });
   $("sideView").querySelectorAll("[data-up]").forEach(x=>x.onclick=()=>{ const i=+x.dataset.up; if(i>0){ [l.queue[i-1],l.queue[i]]=[l.queue[i],l.queue[i-1]]; renderLists(); } });
   $("sideView").querySelectorAll("[data-down]").forEach(x=>x.onclick=()=>{ const i=+x.dataset.down; if(i<l.queue.length-1){ [l.queue[i+1],l.queue[i]]=[l.queue[i],l.queue[i+1]]; renderLists(); } });
   $("sideView").querySelectorAll("[data-rm]").forEach(x=>x.onclick=()=>{ l.queue.splice(+x.dataset.rm,1); if(l.cursor>=l.queue.length) l.cursor=0; renderLists(); });
   $("ldSave").onclick=()=>{ l.name=$("ldName").value.trim()||l.name; renderLists(); $("ldHint").textContent="已儲存。下一則："+nextRun(l); };
-  $("ldToggle").onclick=()=>{ if(!l.on&&(!l.slots.length||!l.queue.length||!l.pfs.length)){ $("ldHint").innerHTML='<span class="err">要先勾至少一個時段、至少一則貼文、至少一個帳號，才能開始輪播。</span>'; return; } l.on=!l.on; renderLists(); };
+  $("ldToggle").onclick=()=>{ if(!l.on&&(!l.slots.length||!l.queue.length||!l.accts.length)){ $("ldHint").innerHTML='<span class="err">要先勾至少一個時段、至少一則貼文、至少一個頻道，才能開始發布。</span>'; return; } l.on=!l.on; renderLists(); };
   $("ldDel").onclick=()=>{ B().lists=B().lists.filter(x=>x.id!==l.id); selectedList=null; renderLists(); };
   $("ldAdd").onclick=()=>{ const drafts=B().posts.filter(p=>p.state==="draft"&&!p.kind); if(!drafts.length){ $("ldHint").textContent="這個品牌目前沒有草稿。"; return; }
     $("ldHint").innerHTML="挑一則草稿："+drafts.map(p=>`<button type="button" class="lnk" data-add="${p.id}">${esc(p.text.slice(0,14))}…</button>`).join(" ");
     $("ldHint").querySelectorAll("[data-add]").forEach(x=>x.onclick=()=>{ const p=B().posts.find(y=>y.id===+x.dataset.add); l.queue.push(p.text); Object.assign(p,{state:"rotation",listId:l.id,date:"",time:""}); renderLists(); }); };
 }
-// deleted posts (S5): own view, with when and who deleted it; restore puts it back as it was
-function renderTrash(){ const ps=B().posts.filter(p=>p.state==="deleted");
-  side(`<div class="ptop"><h2>已刪除</h2><span class="muted">刪掉的貼文留在這裡，可以還原。</span></div>` + (ps.length
-    ? `<div class="list"><table><thead><tr><th>排定時間</th><th>內容</th><th>發到</th><th>刪除前</th><th>刪除時間</th><th>誰刪的</th><th></th></tr></thead><tbody>${ps.map(p=>`<tr><td>${p.date?fmt(p.date)+" "+p.time:"輪播"}</td><td class="ttl">${esc(p.text||p.title)}</td><td><span class="avs">${(p.pfs||[]).map(pfb).join("")}</span></td><td><span class="pill" data-state="${p.prevState||"draft"}">${STATES[p.prevState||"draft"]}</span></td><td>${p.delAt||""}</td><td>${esc(p.delBy||"")}</td><td><button type="button" data-restore="${p.id}">還原</button></td></tr>`).join("")}</tbody></table></div>`
-    : emptyHtml("trash","沒有刪掉的貼文","從行事曆或清單刪掉的貼文，會留在這裡。","回行事曆","trashBack")));
-  $("sideView").querySelectorAll("[data-restore]").forEach(x=>x.onclick=()=>{ const p=B().posts.find(y=>y.id===+x.dataset.restore); p.state=p.prevState||"draft"; addLog("還原",p,""); renderTrash(); say("已還原。"); });
-  const bk=$("trashBack"); if(bk) bk.onclick=()=>setView(calView); }
-function newList(){ const l={id:"l"+Date.now(),name:"新清單",times:["10:00"],slots:[],pfs:connected().map(a=>a.pf),on:false,cursor:0,queue:[]}; B().lists.push(l); selectedList=l.id; renderLists(); }
+function newList(){ const l={id:"l"+Date.now(),name:"新清單",times:["10:00"],slots:[],accts:connected().slice(0,1).map(a=>a.id),on:false,cursor:0,queue:[]}; B().lists.push(l); selectedList=l.id; renderLists(); }
 function openList(id){ selectedList=id; setView("lists"); }
-function renderMedia(){ const m=B().media;
-  if(!m.length){ side(`<div class="ptop"><h2>媒體庫</h2></div>`+emptyHtml("image","媒體庫是空的","上傳過的圖片和影片會留在這裡，下次直接用。","上傳圖片或影片","upload")); $("upload").onclick=upload; return; }
-  side(`<div class="ptop"><h2>媒體庫</h2><span class="muted">點圖片選取，可以一次選好幾張。</span><span class="r"><button type="button" class="btn-secondary" id="upload">＋ 上傳</button></span></div>
-  <div class="media-grid">${m.map(x=>`<button type="button" class="mtile ${mediaSel.has(x.id)?"on":""}" data-m="${x.id}"><span class="mimg ph ph-${x.ph}">${x.kind==="video"?I("play"):""}</span><span class="tick">${mediaSel.has(x.id)?I("check"):""}</span><span class="mn" title="${esc(x.name)}">${esc(x.name)}</span><span class="muted tag">${x.kind==="video"?"影片 · ":""}用過 ${x.used} 次</span></button>`).join("")}</div>
-  <div class="bulk" ${mediaSel.size?"":"hidden"}><span>已選 ${mediaSel.size} 個</span><button type="button" class="btn-primary" id="useMedia">用這些寫新貼文</button><button type="button" id="clearMedia">取消選取</button></div>`);
-  $("upload").onclick=upload;
-  $("sideView").querySelectorAll(".mtile").forEach(x=>x.onclick=()=>{ const k=x.dataset.m; mediaSel.has(k)?mediaSel.delete(k):mediaSel.add(k); renderMedia(); });
-  const u=$("useMedia"); if(u) u.onclick=()=>{ const imgs=m.filter(x=>mediaSel.has(x.id)).map(x=>{ x.used++; return x.ph; }); mediaSel.clear(); setView("week"); newPost(null,null,imgs); };
-  const c=$("clearMedia"); if(c) c.onclick=()=>{ mediaSel.clear(); renderMedia(); };
+// 已刪除貼文: when and who; restore puts it back as it was
+function renderTrash(){ const ps=B().posts.filter(p=>p.state==="deleted");
+  side(`<div class="ptop"><h2>已刪除貼文</h2><span class="muted">刪掉的貼文留在這裡，可以還原。</span></div>` + (ps.length
+    ? `<div class="list"><table><thead><tr><th>排定時間</th><th>內容</th><th>發到</th><th>刪除前</th><th>刪除時間</th><th>誰刪的</th><th></th></tr></thead><tbody>${ps.map(p=>`<tr><td>${p.date?fmt(p.date)+" "+p.time:"輪播"}</td><td class="ttl">${esc(p.text||p.title)}</td><td><span class="avs">${postPfs(p).map(pfb).join("")}</span></td><td><span class="pill" data-state="${p.prevState||"draft"}">${STATES[p.prevState||"draft"]}</span></td><td>${p.delAt||""}</td><td>${esc(p.delBy||"")}</td><td><button type="button" data-restore="${p.id}">還原</button></td></tr>`).join("")}</tbody></table></div>`
+    : emptyHtml("trash","沒有刪掉的貼文","從日曆或清單刪掉的貼文，會留在這裡。","回排程日曆","trashBack")));
+  $("sideView").querySelectorAll("[data-restore]").forEach(x=>x.onclick=()=>{ const p=B().posts.find(y=>y.id===+x.dataset.restore); p.state=p.prevState||"draft"; addLog("還原",p,""); renderTrash(); });
+  if($("trashBack")) $("trashBack").onclick=()=>setView(calView); }
+
+// ---- 數據分析 (decision 2): pick a channel on the left, a period top right; cards, trend, posts ----
+const seed = s => { let h=7; for(const ch of s) h=(h*31+ch.charCodeAt(0))%100003; return h; };
+const METRICS = [["followers","追蹤者",""],["reach","觸及",""],["impr","曝光",""],["eng","互動",""],["rate","互動率","%"],["posts","發文數",""]];
+function stats(id, days){ const h=seed(id+days), k=days/28;
+  const v={followers:1200+h%3800, reach:Math.round((3000+h%9000)*k), impr:Math.round((5200+h%15000)*k), eng:Math.round((180+h%900)*k), posts:Math.max(1,Math.round((6+h%10)*k))};
+  v.rate=+(v.eng/v.reach*100).toFixed(1); const dl={}; for(const [m] of METRICS) dl[m]=((h>>(m.length))%37-12); return {v,dl}; }
+function series(id, days, m){ const h=seed(id+m), n=Math.min(days,28), out=[], prev=[]; for(let i=0;i<n;i++){ out.push(40+((h*(i+3))%55)+Math.round(20*Math.sin((i+h%7)/3))); prev.push(35+((h*(i+5))%45)); } return {out,prev}; }
+function renderAnalytics(){ const accs=B().accounts.filter(a=>a.st!=="review");
+  if(!accs.length){ side(`<div class="ptop"><h2>數據分析</h2></div>`+emptyHtml("chart","還沒有可以分析的頻道","連接社群帳號後，這裡會出現追蹤者、觸及和互動。","到設定連接帳號","anConn")); $("anConn").onclick=()=>setView("settings"); return; }
+  const ids = aAcct==="all" ? accs.map(a=>a.id) : [aAcct];
+  const sum={v:{},dl:{}}; for(const [m] of METRICS){ sum.v[m]=0; sum.dl[m]=0; }
+  ids.forEach(id=>{ const s=stats(id,aPeriod); for(const [m] of METRICS){ sum.v[m]+=s.v[m]; sum.dl[m]+=s.dl[m]/ids.length; } }); sum.v.rate=+(sum.v.eng/Math.max(1,sum.v.reach)*100).toFixed(1);
+  const ser=series(ids.join(","),aPeriod,aMetric), W=640, H=150, n=ser.out.length, X=i=>20+i*(W-40)/(n-1), Y=v=>H-18-(v/100)*(H-34);
+  const path=a=>a.map((v,i)=>(i?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1)).join(" ");
+  const posts=B().posts.filter(p=>p.state==="published"&&p.kind!=="article"&&(aAcct==="all"||(p.accts||[]).includes(aAcct))).map(p=>({p,...stats("post"+p.id,28).v})).sort((a,b)=>b.eng-a.eng);
+  side(`<div class="cols2" style="grid-template-columns:var(--chan-w) minmax(0,1fr)"><div class="lcol"><h3 class="muted tag">選頻道</h3><button type="button" class="crow ${aAcct==="all"?"on":""}" data-an="all"><span class="aav"><span class="av c1">全</span></span><span class="nm"><b>全部頻道</b><span>${accs.length} 個加總</span></span><span></span></button>${accs.map(a=>`<button type="button" class="crow ${aAcct===a.id?"on":""}" data-an="${a.id}">${aav(a)}<span class="nm"><b>${esc(a.name)}</b><span>${esc(acctLine(a))}</span></span><span></span></button>`).join("")}</div>
+  <div style="display:flex;flex-direction:column;min-height:0;min-width:0">
+    <div class="ptop"><h2>${aAcct==="all"?"全部頻道":esc(A(aAcct).name)}</h2><span class="muted tag">範例數字（樣稿）；正式版從各平台 API 拉，要等平台審核通過</span><span class="r"><span class="seg" id="anPer">${[[7,"7 天"],[28,"28 天"],[90,"90 天"]].map(([v,t])=>`<button type="button" class="${aPeriod===v?"on":""}" data-per="${v}">${t}</button>`).join("")}</span><span class="muted">${fmt(addDays(TODAY,-aPeriod))} – ${fmt(TODAY)}</span></span></div>
+    <div class="akpi">${METRICS.map(([m,t,u])=>`<button type="button" class="kpi ${aMetric===m?"on":""}" data-met="${m}"><span class="muted">${t}</span><b>${sum.v[m].toLocaleString()}${u}</b>${(()=>{ const r=Math.round(sum.dl[m]); return `<span class="${r>=0?"up":"down"}">${r>=0?"▲":"▼"} ${Math.abs(r)}% 比上一期</span>`; })()}</button>`).join("")}</div>
+    <div class="abody"><div class="chartbox"><div class="lg"><b>${METRICS.find(x=>x[0]===aMetric)[1]}：每天</b><span><i></i>這一期</span><span><i class="p"></i>上一期</span></div><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="趨勢圖">${[0,1,2,3].map(k=>`<line class="ax" x1="20" x2="${W-20}" y1="${Y(k*33)}" y2="${Y(k*33)}"></line>`).join("")}${ser.out.map((v,i)=>`<rect class="bar" x="${X(i)-4}" y="${Y(v*0.6)}" width="8" height="${H-18-Y(v*0.6)}"></rect>`).join("")}<path class="prev" d="${path(ser.prev)}"></path><path class="line" d="${path(ser.out)}"></path></svg><div class="xl">${[0,Math.floor(n/2),n-1].map(i=>`<span>${fmt(addDays(TODAY,-(n-1-i)*Math.max(1,Math.round(aPeriod/n))))}</span>`).join("")}</div></div>
+    <div class="atable"><table><thead><tr><th></th><th>發佈</th><th>頻道</th><th>內容</th><th class="num">觸及</th><th class="num">互動</th><th class="num">互動率</th></tr></thead><tbody>${posts.map(x=>`<tr><td>${(x.p.imgs||[]).length?`<span class="tthumb ph ph-${x.p.imgs[0]}"></span>`:`<span class="tthumb txt"></span>`}</td><td>${fmt(x.p.date)} ${x.p.time}</td><td><span class="avs">${postPfs(x.p).map(pfb).join("")}</span></td><td class="ttl">${esc(x.p.text)}</td><td class="num">${x.reach.toLocaleString()}</td><td class="num">${x.eng.toLocaleString()}</td><td class="num">${x.rate}%</td></tr>`).join("") || `<tr><td colspan="7" class="muted">這段期間沒有已發佈的貼文。</td></tr>`}</tbody></table></div></div>
+  </div></div>`);
+  $("sideView").querySelectorAll("[data-an]").forEach(x=>x.onclick=()=>{ aAcct=x.dataset.an; renderAnalytics(); });
+  $("sideView").querySelectorAll("[data-per]").forEach(x=>x.onclick=()=>{ aPeriod=+x.dataset.per; renderAnalytics(); });
+  $("sideView").querySelectorAll("[data-met]").forEach(x=>x.onclick=()=>{ aMetric=x.dataset.met; renderAnalytics(); });
 }
-function upload(){ const b=B(); b.media.unshift({id:"m"+Date.now(),name:"新上傳-"+(b.media.length+1)+".jpg",kind:"image",ph:1+b.media.length%4,used:0}); renderMedia(); }
+// ---- 報表管理 (decision 2): pick channels + period + contents -> PDF / PPT with the brand's logo and colour ----
+let rep={accts:null,per:"lastm",fmt:"PDF",sw:"a",parts:new Set(["sum","plat","top"]),mail:false};
+function renderReporting(){ const accs=B().accounts.filter(a=>a.st!=="review"); if(!rep.accts||!rep.accts.every(id=>accs.some(a=>a.id===id))) rep.accts=accs.map(a=>a.id);
+  if(!accs.length){ side(`<div class="ptop"><h2>報表管理</h2></div>`+emptyHtml("report","還沒有可以做報表的頻道","連接社群帳號後，就能做每月成效報表給客戶。","到設定連接帳號","repConn")); $("repConn").onclick=()=>setView("settings"); return; }
+  const PER={lastw:"上週",lastm:"上個月（9 月）",q:"上一季（7–9 月）"}, PARTS={sum:"摘要（追蹤者、觸及、互動）",plat:"各平台成效",top:"表現最好的 5 則貼文",aud:"受眾（年齡、地區）",cmp:"和上一期比較"};
+  const sel=accs.filter(a=>rep.accts.includes(a.id)), s={reach:0,eng:0,followers:0}; sel.forEach(a=>{ const v=stats(a.id,28).v; s.reach+=v.reach; s.eng+=v.eng; s.followers+=v.followers; });
+  side(`<div class="ptop"><h2>報表管理</h2><span class="muted">選頻道、期間和內容，產生 PDF 或 PPT，用品牌的 logo 和顏色。</span><span class="r"><span class="hint" id="repHint"></span><button type="button" class="btn-primary" id="repGo" data-i="download">產生 ${rep.fmt}</button></span></div><div class="rgrid"><div class="rform">
+    <div class="row"><div><h3 class="muted tag">品牌 logo</h3><span class="acts">${avOf({name:B().name,c:0},"sq")}<button type="button" class="btn-secondary" id="repLogo">換 logo</button></span></div>
+      <div><h3 class="muted tag">報表主色</h3><span class="acts">${["a","b","c","d","e"].map(k=>`<button type="button" class="swatch sw-${k} ${rep.sw===k?"on":""}" data-sw="${k}" aria-label="顏色 ${k}"></button>`).join("")}</span></div>
+      <div><h3 class="muted tag">格式</h3><span class="seg" id="repFmt">${["PDF","PPT"].map(f=>`<button type="button" class="${rep.fmt===f?"on":""}" data-fmt="${f}">${f}</button>`).join("")}</span></div></div>
+    <div><h3 class="muted tag">期間</h3><span class="seg" id="repPer">${Object.entries(PER).map(([k,t])=>`<button type="button" class="${rep.per===k?"on":""}" data-rper="${k}">${t}</button>`).join("")}</span></div>
+    <div class="row"><div><h3 class="muted tag">放進報表的頻道（${sel.length}/${accs.length}）</h3>${accs.map(a=>`<label class="ck"><input type="checkbox" data-racc="${a.id}" ${rep.accts.includes(a.id)?"checked":""}>${pfb(a.pf)} ${esc(a.name)}</label>`).join("")}</div>
+      <div><h3 class="muted tag">內容</h3>${Object.entries(PARTS).map(([k,t])=>`<label class="ck"><input type="checkbox" data-rpart="${k}" ${rep.parts.has(k)?"checked":""}>${t}</label>`).join("")}<label class="ck"><input type="checkbox" id="repMail" ${rep.mail?"checked":""}>每月 1 號自動寄給客戶</label></div></div>
+  </div><div class="rprev"><h3 class="muted tag">第一頁長這樣</h3><div class="page"><span class="band sw-${rep.sw}"></span><div class="ph1">${avOf({name:B().name,c:0},"sq")}<span><b>${esc(B().name)} · 社群成效報告</b><br><span class="muted tag">${PER[rep.per]} · ${sel.length} 個頻道</span></span></div>
+      <div class="mini"><div><span class="muted">追蹤者</span><b>${s.followers.toLocaleString()}</b></div><div><span class="muted">觸及</span><b>${s.reach.toLocaleString()}</b></div><div><span class="muted">互動</span><b>${s.eng.toLocaleString()}</b></div><div><span class="muted">貼文</span><b>${B().posts.filter(p=>p.state==="published").length}</b></div></div>
+      <svg viewBox="0 0 300 70" preserveAspectRatio="none" aria-hidden="true"><path class="line" style="stroke:var(--${{a:"accent",b:"p-ig",c:"green",d:"p-li",e:"yellow"}[rep.sw]})" d="M0 55 L40 48 L80 52 L120 35 L160 38 L200 22 L240 28 L300 12"></path></svg></div>
+    <h3 class="muted tag">做過的報表</h3><div class="past">${B().reports.map(r=>`<div class="prow"><span>${esc(r.name)}</span><span class="muted tag">${r.at} · ${r.fmt}</span><button type="button" class="ibtn" aria-label="下載 ${esc(r.name)}">${I("download")}</button></div>`).join("") || `<span class="muted">還沒有做過。</span>`}</div></div></div>`);
+  $("sideView").querySelectorAll("[data-sw]").forEach(x=>x.onclick=()=>{ rep.sw=x.dataset.sw; renderReporting(); });
+  $("sideView").querySelectorAll("[data-fmt]").forEach(x=>x.onclick=()=>{ rep.fmt=x.dataset.fmt; renderReporting(); });
+  $("sideView").querySelectorAll("[data-rper]").forEach(x=>x.onclick=()=>{ rep.per=x.dataset.rper; renderReporting(); });
+  $("sideView").querySelectorAll("[data-racc]").forEach(x=>x.onchange=()=>{ const k=x.dataset.racc; x.checked?rep.accts.push(k):rep.accts=rep.accts.filter(y=>y!==k); renderReporting(); });
+  $("sideView").querySelectorAll("[data-rpart]").forEach(x=>x.onchange=()=>{ const k=x.dataset.rpart; x.checked?rep.parts.add(k):rep.parts.delete(k); });
+  $("repMail").onchange=e=>{ rep.mail=e.target.checked; };
+  $("repLogo").onclick=()=>{ $("repHint").textContent="（樣稿）會打開上傳圖片。"; };
+  $("repGo").onclick=()=>{ if(!rep.accts.length) return $("repHint").innerHTML='<span class="err">至少選一個頻道。</span>'; B().reports.unshift({name:`${PER[rep.per]}成效報告`,at:"10/14 "+NOW,fmt:rep.fmt}); renderReporting(); $("repHint").textContent=`已產生 ${rep.fmt}（樣稿不會真的下載）。`; };
+}
+// ---- 訊息收件匣: the inbox is Chatwoot (ADR 016 §6); this page is the door + unread counts ----
+function renderInbox(){ const accs=B().accounts.filter(a=>a.st==="connected"), un=a=>seed(a.id)%6;
+  side(`<div class="ptop"><h2>訊息收件匣</h2><span class="muted">留言和私訊在客服收件匣（Chatwoot）回覆。這裡看每個頻道有幾則還沒讀。</span><span class="r"><button type="button" class="btn-primary" id="cwGo">打開收件匣</button></span></div>`
+    + (accs.length ? `<div class="list" style="padding:4px 16px">${accs.map(a=>`<div class="irow">${aav(a)}<span class="nm"><b>${esc(a.name)}</b><span class="muted tag"> · ${esc(acctLine(a))}</span></span><span class="${un(a)?"unread":"muted"}">${un(a)?un(a)+" 則未讀":"都讀了"}</span></div>`).join("")}</div>`
+      : emptyHtml("inbox","還沒有頻道","連接社群帳號後，留言和私訊會進收件匣。","到設定連接帳號","cwConn")));
+  $("cwGo").onclick=()=>{ $("cwGo").textContent="（樣稿）會開新分頁到 Chatwoot"; }; if($("cwConn")) $("cwConn").onclick=()=>setView("settings"); }
+// ---- 需處理與紀錄 (the bell) ----
 function renderLog(){ const nd=needs();
   const rows = logFilter==="needs" ? [...nd.posts.map(p=>({t:p.date?fmt(p.date)+" "+p.time:"",who:"系統",act:p.state==="error"?"發佈失敗":"等你審核",txt:p.text,res:p.err||"按「打開」處理",id:p.id})),...nd.accts.map(a=>({t:"",who:"系統",act:"連線失效",txt:PF[a.pf].n+" "+a.name,res:"到設定重新連接",pf:a.pf}))] : B().log;
-  const top = `<div class="ptop"><h2>紀錄與通知</h2><span class="seg" id="lfSeg"><button type="button" class="${logFilter==="all"?"on":""}" data-lf="all">全部紀錄</button><button type="button" class="${logFilter==="needs"?"on":""}" data-lf="needs">需處理（${nd.n}）</button></span><span class="muted">發佈失敗和連線失效也會發 Telegram 通知。</span></div>`;
-  const body = rows.length ? `<div class="list"><table><thead><tr><th>時間</th><th>誰</th><th>動作</th><th>貼文</th><th>結果</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.t}</td><td>${esc(r.who)}</td><td>${r.act}</td><td class="ttl">${esc((r.txt||"").slice(0,40))}</td><td class="ttl">${esc(r.res)}</td><td>${r.id?`<button type="button" data-open="${r.id}">打開</button>`:r.pf?`<button type="button" data-connect="${r.pf}">重新連接</button>`:""}</td></tr>`).join("")}</tbody></table></div>`
-    : logFilter==="needs" ? emptyHtml("check","沒有要處理的事","發佈失敗或帳號斷線時，會出現在這裡。","回行事曆","logBack") : emptyHtml("lines","還沒有任何紀錄","發文、排程、審核都會記在這裡。","寫第一則貼文","logNew");
-  side(top+body);
+  side(`<div class="ptop"><h2>需處理與紀錄</h2><span class="seg" id="lfSeg"><button type="button" class="${logFilter==="needs"?"on":""}" data-lf="needs">需處理（${nd.n}）</button><button type="button" class="${logFilter==="all"?"on":""}" data-lf="all">全部紀錄</button></span><span class="muted">發佈失敗和連線失效也會發 Telegram 通知。</span></div>`
+    + (rows.length ? `<div class="list"><table><thead><tr><th>時間</th><th>誰</th><th>動作</th><th>貼文</th><th>結果</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.t}</td><td>${esc(r.who)}</td><td>${r.act}</td><td class="ttl">${esc((r.txt||"").slice(0,40))}</td><td class="ttl">${esc(r.res)}</td><td>${r.id?`<button type="button" data-open="${r.id}">打開</button>`:r.pf?`<button type="button" data-connect="${r.pf}">重新連接</button>`:""}</td></tr>`).join("")}</tbody></table></div>`
+      : logFilter==="needs" ? emptyHtml("check","沒有要處理的事","發佈失敗或帳號斷線時，會出現在這裡。","回排程日曆","logBack") : emptyHtml("lines","還沒有任何紀錄","發文、排程、審核都會記在這裡。","寫第一則貼文","logNew")));
   $("lfSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ logFilter=x.dataset.lf; renderLog(); });
-  $("sideView").querySelectorAll("[data-open]").forEach(x=>x.onclick=()=>{ setView(calView); openPost(+x.dataset.open); });
+  $("sideView").querySelectorAll("[data-open]").forEach(x=>x.onclick=()=>openPost(+x.dataset.open));
   $("sideView").querySelectorAll("[data-connect]").forEach(x=>x.onclick=()=>{ connectPf=x.dataset.connect; setView("settings"); });
-  const a=$("logBack"), b=$("logNew"); if(a) a.onclick=()=>setView(calView); if(b) b.onclick=()=>{ setView(calView); newPost(); };
-}
+  if($("logBack")) $("logBack").onclick=()=>setView(calView); if($("logNew")) $("logNew").onclick=()=>newPost(); }
+// ---- 設定 (gear): accounts, review, team ----
+const ROLES = {owner:"擁有者",editor:"編輯",reviewer:"審核人",client:"客戶唯讀"};
 function renderSettings(){ const b=B();
-  const why = a => a.st==="expired" ? "授權過期，排在這個帳號的貼文發不出去。按「重新連接」。" : a.st==="review" ? "平台還在審核我們的 app，通過前不能連接。" : "";
-  const conn = connectPf ? `<div class="connect"><b>連接 ${PF[connectPf].n}</b><span>按下面的按鈕，會跳到 ${PF[connectPf].n} 的授權頁。選好要管理的帳號，授權完會自動回到這裡。我們不會拿到你的密碼。</span><span class="acts"><button type="button" class="btn-primary" id="cdGo">前往 ${PF[connectPf].n} 授權</button><button type="button" id="cdBack">取消</button></span></div>` : "";
-  const accts = b.accounts.length ? b.accounts.map(a=>`<div class="arow"><span class="aav">${bav()}${pfb(a.pf)}</span><span class="who"><b>${esc(a.name)}</b><span class="muted tag">${PF[a.pf].n} · ${esc(a.handle)}</span></span><span class="pill" data-st="${a.st}">${a.st==="connected"?"已連接":a.st==="expired"?"連線失效":"平台審核中"}</span><span class="acts">${a.st==="review"?"":`<button type="button" ${a.st==="expired"?'class="btn-primary"':""} data-connect="${a.pf}">重新連接</button>`}<button type="button" class="ibtn" data-remove="${a.pf}" title="移除" aria-label="移除 ${PF[a.pf].n}">${I("trash")}</button></span>${why(a)?`<span class="why">${why(a)}</span>`:""}</div>`).join("")
+  const why = a => a.st==="expired" ? "授權過期，排在這個頻道的貼文發不出去。按「重新連接」。" : a.st==="review" ? "平台還在審核 app，通過前不能連接。" : "";
+  const conn = connectPf ? `<div class="connect"><b>連接 ${PF[connectPf].n}</b><span>按下面的按鈕，會跳到 ${PF[connectPf].n} 的授權頁。選好要管理的帳號，授權完會自動回到這裡。這裡拿不到你的密碼。</span><span class="acts"><button type="button" class="btn-primary" id="cdGo">前往 ${PF[connectPf].n} 授權</button><button type="button" id="cdBack">取消</button></span></div>` : "";
+  const accts = b.accounts.length ? b.accounts.map(a=>`<div class="arow">${aav(a)}<span class="who"><b>${esc(a.name)}</b><span class="muted tag">${esc(acctLine(a))}</span></span><span class="pill" data-st="${a.st}">${a.st==="connected"?"已連接":a.st==="expired"?"連線失效":"平台審核中"}</span><span class="acts">${a.st==="review"?"":`<button type="button" ${a.st==="expired"?'class="btn-primary"':""} data-connect="${a.pf}">重新連接</button>`}<button type="button" class="ibtn" data-remove="${a.id}" title="移除" aria-label="移除 ${esc(a.name)}">${I("trash")}</button></span>${why(a)?`<span class="why">${why(a)}</span>`:""}</div>`).join("")
     : emptyHtml("link","還沒連接社群帳號","從下面挑一個平台開始。","連接第一個帳號","firstConn");
-  const add = SOCIAL.filter(k=>!b.accounts.some(a=>a.pf===k));
   side(`<div class="ptop"><h2>${esc(b.name)} 的設定</h2></div><div class="sgrid">
-    <div class="sec"><h3>社群帳號</h3>${conn}${accts}${add.length?`<h3>加帳號</h3><div class="tiles">${add.map(k=>`<button type="button" class="tile" data-connect="${k}">${pfb(k)}<span>${PF[k].n}</span></button>`).join("")}</div>`:""}</div>
+    <div class="sec"><h3>頻道（社群帳號）</h3>${conn}<div style="max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:8px">${accts}</div><h3>加頻道</h3><div class="tiles">${SOCIAL.map(k=>`<button type="button" class="tile" data-connect="${k}">${pfb(k)}<span>${PF[k].n}</span></button>`).join("")}</div></div>
     <div class="sec"><h3>發文前要先審核</h3><span class="seg" id="revSeg"><button type="button" class="${b.review?"":"on"}" data-rv="0">不用</button><button type="button" class="${b.review?"on":""}" data-rv="1">要</button></span><span class="muted">要審核時，編輯只能送審；審核人核准後才照時間發。</span>
       <h3>團隊</h3>${b.team.map((m,i)=>`<div class="mrole"><span>${esc(m.name)}${m.me?"（我）":""}</span><span class="seg">${Object.keys(ROLES).map(r=>`<button type="button" class="${m.role===r?"on":""}" data-role="${r}" data-idx="${i}">${ROLES[r]}</button>`).join("")}</span><button type="button" class="ibtn" data-kick="${i}" ${m.role==="owner"?"disabled":""} aria-label="移除成員" title="移除">${I("x")}</button></div>`).join("")}
       <div class="frow"><input type="email" id="invite" placeholder="email" aria-label="邀請 email"><button type="button" id="inviteBtn">邀請成員</button></div></div></div>`);
   $("sideView").querySelectorAll("[data-connect]").forEach(x=>x.onclick=()=>{ connectPf=x.dataset.connect; renderSettings(); });
-  const fc=$("firstConn"); if(fc) fc.onclick=()=>{ connectPf=add[0]; renderSettings(); };
-  const go=$("cdGo"); if(go) go.onclick=()=>{ let a=b.accounts.find(x=>x.pf===connectPf); if(!a){ a={pf:connectPf,name:b.name,handle:connectPf==="facebook"?"粉絲專頁":"@"+brand,st:"connected"}; b.accounts.push(a); } else a.st="connected"; addLog("連接帳號",null,PF[connectPf].n+" 已連接"); connectPf=null; renderSettings(); };
-  const bk=$("cdBack"); if(bk) bk.onclick=()=>{ connectPf=null; renderSettings(); };
-  $("sideView").querySelectorAll("[data-remove]").forEach(x=>x.onclick=()=>{ b.accounts=b.accounts.filter(a=>a.pf!==x.dataset.remove); addLog("移除帳號",null,PF[x.dataset.remove].n); renderSettings(); });
+  if($("firstConn")) $("firstConn").onclick=()=>{ connectPf="bluesky"; renderSettings(); };
+  if($("cdGo")) $("cdGo").onclick=()=>{ const ex=b.accounts.find(x=>x.pf===connectPf&&x.st==="expired"); if(ex) ex.st="connected"; else b.accounts.push(ac(connectPf+Date.now(),connectPf,b.name,connectPf==="facebook"?"粉絲專頁":"@"+brand,"connected",0)); addLog("連接頻道",null,PF[connectPf].n+" 已連接"); connectPf=null; renderSettings(); };
+  if($("cdBack")) $("cdBack").onclick=()=>{ connectPf=null; renderSettings(); };
+  $("sideView").querySelectorAll("[data-remove]").forEach(x=>x.onclick=()=>{ b.accounts=b.accounts.filter(a=>a.id!==x.dataset.remove); renderSettings(); });
   $("revSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ b.review=x.dataset.rv==="1"; renderSettings(); });
   $("sideView").querySelectorAll("[data-role]").forEach(x=>x.onclick=()=>{ b.team[+x.dataset.idx].role=x.dataset.role; renderSettings(); });
   $("sideView").querySelectorAll("[data-kick]").forEach(x=>x.onclick=()=>{ b.team.splice(+x.dataset.kick,1); renderSettings(); });
-  $("inviteBtn").onclick=()=>{ const v=$("invite").value.trim(); if(!v) return; b.team.push({name:v,role:"editor"}); addLog("邀請成員",null,v); renderSettings(); };
+  $("inviteBtn").onclick=()=>{ const v=$("invite").value.trim(); if(!v) return; b.team.push({name:v,role:"editor"}); renderSettings(); };
 }
 
-// ---- editor (U5): the working copy of one post ----
+// ---- composer (decision 5): its own page. Left: which channels (a list that scales); middle: writing; right: previews ----
 const XTRA = {link:"連結與 UTM",alt:"替代文字",texts:"常用文字",ai:"AI 幫我寫",emoji:"表情符號",notes:"備註"};
 const XICON = {link:"link",alt:"eye",texts:"lines",ai:"spark",emoji:"smile",notes:"note"};
+const THREAD = ["bluesky","threads"], DELAYS = [0,1,5,60];
+const delayTxt = m => m ? (m<60 ? `${m} 分鐘後` : `${m/60} 小時後`) : "緊接著";
 const effText = k => ed.custom[k] ?? ed.text;
 const effLen = k => [...effText(k)].length;
-function blank(){ return {id:null,kind:null,state:"draft",text:"",pfs:new Set(connected().map(a=>a.pf)),custom:{},tab:"all",imgs:[],parts:[],link:"",utm:false,alt:"",fmt:{},notes:"",date:"2026-10-16",time:"09:00",wm:"fixed",listId:null,open:new Set()}; }
+const maxOf = id => PF[pfOf(id)].max;
+function blank(){ return {id:null,kind:null,state:"draft",text:"",accts:new Set(connected().slice(0,3).map(a=>a.id)),custom:{},tab:"all",imgs:[],parts:[],link:"",utm:false,alt:"",fmt:{},notes:"",date:"2026-10-16",time:"09:00",wm:"fixed",listId:null,open:new Set()}; }
 function openPost(id, o={}){
   const p=B().posts.find(x=>x.id===id); if(!p) return newPost();
   ed=blank(); Object.assign(ed,{id:p.id,kind:p.kind||null,state:p.state,date:p.date||TODAY,time:p.time||"10:00",listId:p.listId||null,wm:p.state==="rotation"?"rot":"fixed"});
   if(p.kind==="article"){ ed.state="draft"; ed.time="12:00"; }
-  else Object.assign(ed,{text:p.text,pfs:new Set(p.pfs),custom:{...(p.custom||{})},imgs:[...(p.imgs||[])],parts:(p.parts||[]).map(x=>({...x})),link:p.link||"",utm:!!p.utm,alt:p.alt||"",fmt:{...(p.fmt||{})},notes:p.notes||""});
+  else Object.assign(ed,{text:p.text,accts:new Set(p.accts),custom:{...(p.custom||{})},imgs:[...(p.imgs||[])],parts:(p.parts||[]).map(x=>({...x})),link:p.link||"",utm:!!p.utm,alt:p.alt||"",fmt:{...(p.fmt||{})},notes:p.notes||""});
   for(const k of ["link","alt","notes"]) if(ed[k]) ed.open.add(k);
-  showEditor(o); if(o.preview) setPv("pv");
+  showComposer(o);
 }
-function newPost(date, time, imgs, o={}){ ed=blank(); if(date) ed.date=date; if(time) ed.time=time; if(imgs) ed.imgs=imgs; showEditor(o); if(date) say(`在 ${fmtLong(date)} ${ed.time} 寫一則新貼文。`); $("text").focus({preventScroll:true}); }
-function openDefault(){ const p=B().posts.find(x=>x.id===2) || B().posts.find(x=>!x.kind&&x.state!=="deleted"); p ? openPost(p.id,{noSheet:true}) : newPost(null,null,null,{noSheet:true}); }
-function showEditor(o){
-  if(!["week","month","list"].includes(view)) setView(calView);
-  if(isPhone() && !o.noSheet) document.body.classList.add("sheet"); if(!o.keepSheet) setPv("ed");
-  $("menu").hidden=true; $("confirmNow").hidden=true; $("dtp").hidden=true;
+function newPost(date, time, imgs, accts, text){ ed=blank(); if(date) ed.date=date; if(time) ed.time=time; if(imgs) ed.imgs=imgs; if(accts&&accts.length) ed.accts=new Set(accts.filter(id=>A(id).st==="connected")); if(text) ed.text=text; showComposer({}); if(date) say(`在 ${fmtLong(date)} ${ed.time} 寫一則新貼文。`); }
+function showComposer(o){
+  if(view!=="compose"){ view="compose"; }
+  for(const id of ["filterPop","bulkMenu","chanMenu","tzPop","brandPop","samplePop","menu","dtp"]) $(id).hidden=true;
+  $("confirmNow").hidden=true; document.body.classList.remove("chans");
+  renderFrame(); setPv(o.preview?"pv":"ed");
   const none=!B().accounts.length; $("ed").hidden=none; $("edEmpty").hidden=!none;
   if(none){ $("edTitle").textContent="寫貼文"; setState("draft",""); $("edEmpty").innerHTML=emptyHtml("link","還沒連接社群帳號","連好之後，就能在這裡寫貼文。","到設定連接帳號","edConn"); $("edConn").onclick=()=>setView("settings"); return; }
-  $("edTitle").textContent = ed.kind==="article" ? "文章 → 社群貼文" : ed.id==null ? "新貼文" : "編輯貼文";
+  $("edTitle").textContent = ed.kind==="article" ? "文章 → 社群貼文" : ed.id==null ? "建立貼文" : "編輯貼文";
   setState(ed.state, ed.id==null||ed.kind==="article" ? "（還沒存）" : "");
   $("srcBox").hidden = ed.kind!=="article"; if(ed.kind==="article") $("srcTitle").textContent=B().posts.find(x=>x.id===ed.id).title;
   $("revBar").hidden = !(me==="reviewer" && ed.state==="review"); $("reason").value="";
-  renderChan(); renderTabs(); fillText(); renderMrow(); renderParts(); renderXtras(); renderPset(); renderCnt(); renderPreview(); renderFoot(); renderHint();
-  if(["week","month","list"].includes(view)) renderView();
+  refresh(); renderHint();
 }
+function closeComposer(go=true){ document.body.classList.remove("sheet","pv","picking"); if(go){ view=calView; renderFrame(); renderView(); } }
+$("backBtn").onclick=()=>closeComposer(true);
 function setState(s, extra){ $("edState").dataset.state=s; $("edStateTxt").textContent=STATES[s]+(extra?" "+extra:""); }
 const ro = () => ed.state==="published";
-// ① who it goes to: one avatar per account; grey = not chosen, ! = authorisation expired, … = platform still reviewing our app
-function renderChan(){
-  $("chanAv").innerHTML = B().accounts.map(a=>{ const on=ed.pfs.has(a.pf); const tip = a.st==="expired" ? `${PF[a.pf].n}：授權過期，點一下到設定重新連接` : a.st==="review" ? `${PF[a.pf].n}：平台還在審核，還不能發` : `${PF[a.pf].n} ${a.handle}`;
-    return `<button type="button" class="cav ${on?"on":""}" data-pf="${a.pf}" title="${esc(tip)}" aria-label="${esc(tip)}" aria-pressed="${on}" ${ro()?"disabled":""}>${bav()}${pfb(a.pf)}${a.st==="expired"?'<i class="bang">!</i>':a.st==="review"?'<i class="bang wait">…</i>':""}</button>`; }).join("")
-    + `<span class="muted chn">${ed.pfs.size?`發到 ${ed.pfs.size} 個帳號`:"點頭像，選要發到哪裡"}</span>`;
-  $("chanAv").querySelectorAll(".cav").forEach(x=>x.onclick=()=>{ const a=acct(x.dataset.pf);
-    if(a.st==="expired"){ connectPf=a.pf; setView("settings"); return; }
-    if(a.st==="review"){ say(`${PF[a.pf].n} 還在等平台審核，通過後才能發。`); return; }
-    ed.pfs.has(a.pf)?ed.pfs.delete(a.pf):ed.pfs.add(a.pf); refresh(); });
+function renderPick(){ const q=$("pickQ").value.trim(), all=B().accounts, rows=all.filter(a=>!q||(a.name+a.handle+PF[a.pf].n).includes(q));
+  $("pickN").textContent = `已選 ${ed.accts.size}`; $("pickBtnTxt").textContent = `選頻道（已選 ${ed.accts.size}）`;
+  $("pickList").innerHTML = rows.map(a=>{ const on=ed.accts.has(a.id), ok=a.st==="connected";
+    return `<label class="pick ${on?"on":""} ${ok?"":"off"}" title="${ok?"":a.st==="expired"?"授權過期，到設定重新連接":"平台審核中，還不能發"}"><input type="checkbox" data-pk="${a.id}" ${on?"checked":""} ${ok&&!ro()?"":"disabled"}>${aav(a)}<span class="nm"><b>${esc(a.name)}</b><span class="${a.st==="expired"?"err":""}">${a.st==="expired"?"授權過期":a.st==="review"?PF[a.pf].n+" · 平台審核中":esc(acctLine(a))}</span></span></label>`; }).join("") || `<p class="muted tag">找不到「${esc(q)}」。</p>`;
+  $("pickList").querySelectorAll("[data-pk]").forEach(c=>c.onchange=()=>{ const k=c.dataset.pk; c.checked?ed.accts.add(k):ed.accts.delete(k); refresh(); });
 }
-function renderTabs(){ const pfs=[...ed.pfs]; if(ed.tab!=="all"&&!ed.pfs.has(ed.tab)) ed.tab="all";
-  $("etabs").innerHTML = `<button type="button" class="${ed.tab==="all"?"on":""}" data-tab="all">${I("globe")}共用</button>` + pfs.map(k=>`<button type="button" class="${ed.tab===k?"on":""}" data-tab="${k}" title="${ed.custom[k]!=null?"這個平台另外寫了一份":"這個平台用共用文字"}">${pfb(k)}${PF[k].n}${ed.custom[k]!=null?'<i class="cdot"></i>':""}${effLen(k)>PF[k].max?'<i class="cwarn" title="超過字數上限">!</i>':""}</button>`).join("");
+$("pickQ").oninput=renderPick; $("pickOpen").onclick=()=>document.body.classList.add("picking"); $("pickClose").onclick=()=>document.body.classList.remove("picking");
+function renderTabs(){ const ids=[...ed.accts]; if(ed.tab!=="all"&&!ed.accts.has(ed.tab)) ed.tab="all";
+  $("etabs").innerHTML = `<button type="button" class="${ed.tab==="all"?"on":""}" data-tab="all">${I("globe")}共用</button>` + ids.map(k=>{ const a=A(k); return `<button type="button" class="${ed.tab===k?"on":""}" data-tab="${k}" title="${ed.custom[k]!=null?"這個頻道另外寫了一份":"這個頻道用共用文字"}">${pfb(a.pf)}${esc(a.name)}${ed.custom[k]!=null?'<i class="cdot"></i>':""}${effLen(k)>maxOf(k)?'<i class="cwarn" title="超過字數上限">!</i>':""}</button>`; }).join("");
   $("etabs").querySelectorAll("button").forEach(x=>x.onclick=()=>{ ed.tab=x.dataset.tab; renderTabs(); fillText(); renderPset(); renderCnt(); renderPreview(); });
 }
 function fillText(){ const t=$("text"), k=ed.tab, own = k!=="all" && ed.custom[k]!=null;
   t.value = own ? ed.custom[k] : ed.text; t.readOnly = ro() || (k!=="all" && !own);
-  t.placeholder = k==="all" ? "寫一份文字，上面選的帳號都用這份。某個平台要不同，點上面它的名字另外寫。" : "";
+  t.placeholder = k==="all" ? "寫一份文字，選的頻道都用這份。某個頻道要不同，點上面它的名字另外寫。" : "";
   $("lockBar").hidden = k==="all";
-  if(k!=="all") $("lockBar").innerHTML = own ? `${pfb(k)}<span>${PF[k].n} 用自己的一份文字。</span><button type="button" class="lnk" id="lkBack">改回共用文字</button>` : `${pfb(k)}<span>${PF[k].n} 現在用共用文字。</span><button type="button" class="lnk" id="lkOwn">另外寫一份</button>`;
-  const a=$("lkOwn"), b=$("lkBack");
-  if(a) a.onclick=()=>{ ed.custom[k]=ed.text; refresh(); $("text").focus(); };
-  if(b) b.onclick=()=>{ delete ed.custom[k]; refresh(); };
+  if(k!=="all"){ const a=A(k); $("lockBar").innerHTML = own ? `${pfb(a.pf)}<span>${esc(a.name)} 用自己的一份文字。</span><button type="button" class="lnk" id="lkBack">改回共用文字</button>` : `${pfb(a.pf)}<span>${esc(a.name)} 現在用共用文字。</span><button type="button" class="lnk" id="lkOwn">另外寫一份</button>`; }
+  const a=$("lkOwn"), b=$("lkBack"); if(a) a.onclick=()=>{ ed.custom[k]=ed.text; refresh(); $("text").focus(); }; if(b) b.onclick=()=>{ delete ed.custom[k]; refresh(); };
 }
-$("text").oninput=()=>{ const v=$("text").value; if(ed.tab==="all") ed.text=v; else ed.custom[ed.tab]=v; renderTabs(); renderCnt(); renderPreview(); };
-function renderCnt(){ const pfs = ed.tab==="all" ? [...ed.pfs] : [ed.tab]; const c=$("cnt");
-  if(!pfs.length){ c.innerHTML=""; return; }
-  const k = pfs.reduce((a,b)=>effLen(b)/PF[b].max > effLen(a)/PF[a].max ? b : a); const n=effLen(k);
-  c.className = "cnt"+(n>PF[k].max?" over":""); c.innerHTML = `${pfb(k)} ${n}／${PF[k].max.toLocaleString()}`;
-  c.title = `${PF[k].n} 字數` + (ed.tab==="all" && pfs.length>1 ? "（顯示上限最緊的那個平台）" : ""); }
+$("text").oninput=()=>{ const v=$("text").value; if(ed.tab==="all") ed.text=v; else ed.custom[ed.tab]=v; renderTabs(); renderCnt(); renderPreview(); renderHint(); };
+function renderCnt(){ const ids = ed.tab==="all" ? [...ed.accts] : [ed.tab]; const c=$("cnt"); if(!ids.length){ c.innerHTML=""; return; }
+  const k = ids.reduce((x,y)=>effLen(y)/maxOf(y) > effLen(x)/maxOf(x) ? y : x), n=effLen(k), pf=pfOf(k);
+  c.className = "cnt"+(n>PF[pf].max?" over":""); c.innerHTML = `${pfb(pf)} ${n}／${PF[pf].max.toLocaleString()}`; c.title = `${PF[pf].n} 字數` + (ed.tab==="all" && ids.length>1 ? "（顯示上限最緊的那個）" : ""); }
 function renderMrow(){ const r=$("mrow"); r.hidden=!ed.imgs.length;
-  r.innerHTML = ed.imgs.map((m,i)=>`<span class="mt ph ph-${m}" title="第 ${i+1} 張">${ro()?"":`<button type="button" class="x" data-rm="${i}" aria-label="移除第 ${i+1} 張">${I("x")}</button>`}</span>`).join("") + (ro()?"":`<button type="button" class="madd" id="madd" title="加圖片或影片" aria-label="加圖片或影片">${I("plus")}</button>`);
-  r.querySelectorAll("[data-rm]").forEach(x=>x.onclick=()=>{ ed.imgs.splice(+x.dataset.rm,1); refresh(); });
-  const m=$("madd"); if(m) m.onclick=addImg; }
+  r.innerHTML = ed.imgs.map((m,i)=>`<span class="mt ph ph-${m}" title="第 ${i+1} 張">${ro()?"":`<button type="button" class="x" data-rm="${i}" aria-label="移除第 ${i+1} 張">${I("x")}</button>`}</span>`).join("") + (ro()?"":`<button type="button" class="madd" id="madd" title="從素材庫或電腦加圖片、影片" aria-label="加圖片或影片">${I("plus")}</button>`);
+  r.querySelectorAll("[data-rm]").forEach(x=>x.onclick=()=>{ ed.imgs.splice(+x.dataset.rm,1); refresh(); }); const m=$("madd"); if(m) m.onclick=addImg; }
 function addImg(){ ed.imgs.push(1+(ed.imgs.length+1)%4); refresh(); }
-// ② the icon toolbar inside the text box: each icon opens its block under the box; 媒體 adds a picture
 $("tools").querySelectorAll("[data-x]").forEach(x=>x.onclick=()=>{ if(ro()) return; const k=x.dataset.x; if(k==="media") return addImg(); if(k==="part") return addPart(); ed.open.has(k)?ed.open.delete(k):ed.open.add(k); renderXtras(); });
 function renderXtras(){
   $("tools").querySelectorAll("[data-x]").forEach(x=>x.classList.toggle("on", ed.open.has(x.dataset.x)));
@@ -1169,73 +1361,67 @@ function renderXtras(){
   X.querySelectorAll("[data-t]").forEach(x=>x.onclick=()=>insertText(B().texts[+x.dataset.t]));
   const sv=$("xsave"); if(sv) sv.onclick=()=>{ const t=$("text").value.trim(); if(t){ B().texts.push(t); renderXtras(); say("已存到常用文字。"); } };
   X.querySelectorAll("[data-em]").forEach(x=>x.onclick=()=>insertText(x.dataset.em, true));
-  X.querySelectorAll("[data-ai]").forEach(x=>x.onclick=()=>say(x.dataset.ai==="short"?"（樣稿）AI 會把這一份改短，改好先給你看，你按「用這版」才換掉。這次約 NT$1。":"（樣稿）AI 會換個溫暖的口氣重寫，改好先給你看。這次約 NT$1。"));
+  X.querySelectorAll("[data-ai]").forEach(x=>x.onclick=()=>say(x.dataset.ai==="short"?"（樣稿）AI 會把這一份改短，改好先給你看，按「用這版」才換掉。這次約 NT$1。":"（樣稿）AI 會換個溫暖的口氣重寫，改好先給你看。這次約 NT$1。"));
 }
 function shortLink(){ const s=$("xshort"); if(!s) return; const v=ed.link.trim(); s.textContent = v ? `會縮成 aw.link/${(v.length*7919%46655+1296).toString(36)}${ed.utm?"，帶 utm_source=各平台名":""}` : ""; }
 function insertText(t, inline){ const el=$("text"); if(el.readOnly) return say("這個分頁用共用文字。要改，先按「另外寫一份」。"); const v=el.value; el.value = inline ? v.slice(0,el.selectionStart)+t+v.slice(el.selectionEnd) : (v+"\n"+t).trim(); el.dispatchEvent(new Event("input")); }
-// the parts after the post (S2): Bluesky and Threads join them into a thread, Facebook / Instagram / LinkedIn post them as comments
-const THREAD = ["bluesky","threads"], DELAYS = [0,1,5,60];
-const delayTxt = m => m ? (m<60 ? `${m} 分鐘後` : `${m/60} 小時後`) : "緊接著";
+// the parts after the post: Bluesky / Threads join them into a thread; Facebook / Instagram / LinkedIn post them as comments
 function addPart(){ ed.parts.push({text:"",delay:0}); renderParts(); renderPreview(); const t=$("parts").querySelectorAll("textarea"); if(t.length) t[t.length-1].focus(); }
-function partCnt(t){ const ks=[...ed.pfs].filter(k=>THREAD.includes(k)); if(!ks.length) return ""; const k=ks.reduce((a,b)=>PF[b].max<PF[a].max?b:a), n=[...t].length;
+function partCnt(t){ const ks=[...ed.accts].map(pfOf).filter(k=>THREAD.includes(k)); if(!ks.length) return ""; const k=ks.reduce((a,b)=>PF[b].max<PF[a].max?b:a), n=[...t].length;
   return `<span class="cnt ${n>PF[k].max?"over":""}">${pfb(k)} ${n}／${PF[k].max}</span>`; }
 function renderParts(){ const el=$("parts"), P=ed.parts;
   el.innerHTML = P.map((x,i)=>`<div class="part"><div class="pbox"><textarea data-pi="${i}" rows="2" aria-label="第 ${i+2} 則" placeholder="第 ${i+2} 則" ${ro()?"readonly":""}>${esc(x.text)}</textarea>${x.img?`<div class="mrow"><span class="mt ph ph-${x.img}"></span></div>`:""}<div class="tools"><button type="button" class="ibtn" data-pimg="${i}" title="加一張圖" aria-label="加一張圖">${I("image")}</button><button type="button" class="ibtn" data-pem="${i}" title="加表情" aria-label="加表情">${I("smile")}</button><span class="muted tag">${delayTxt(x.delay)}發</span>${partCnt(x.text)}</div></div>`
     + `<div class="pside"><button type="button" class="ibtn" data-pup="${i}" aria-label="往上" ${i?"":"disabled"}>${I("up")}</button><button type="button" class="ibtn" data-pdown="${i}" aria-label="往下" ${i<P.length-1?"":"disabled"}>${I("down")}</button><button type="button" class="ibtn" data-pdel="${i}" aria-label="刪掉這一則">${I("trash")}</button><button type="button" class="ibtn ${x.delay?"on":""}" data-pdelay="${i}" title="前一則發出後多久發：${delayTxt(x.delay)}（點一下換）" aria-label="延遲">${I("clock")}</button></div></div>`).join("")
     + (ro() ? "" : `<div class="addpart"><button type="button" class="btn-secondary" id="addPart">＋ 接一則</button><span class="muted tag">Bluesky、Threads 接成串文；Facebook、Instagram、LinkedIn 變成留言。</span></div>`);
   const a=$("addPart"); if(a) a.onclick=addPart;
-  el.querySelectorAll("[data-pi]").forEach(t=>t.oninput=()=>{ P[+t.dataset.pi].text=t.value; renderPreview(); renderHint(); t.parentElement.querySelector(".cnt")?.replaceWith(...(()=>{ const d=document.createElement("span"); d.innerHTML=partCnt(t.value); return d.childNodes.length?[d.firstChild]:[]; })()); });
+  el.querySelectorAll("[data-pi]").forEach(t=>t.oninput=()=>{ P[+t.dataset.pi].text=t.value; renderPreview(); renderHint(); });
   const mv=(i,j)=>{ [P[i],P[j]]=[P[j],P[i]]; renderParts(); renderPreview(); };
   el.querySelectorAll("[data-pup]").forEach(b=>b.onclick=()=>mv(+b.dataset.pup, +b.dataset.pup-1));
   el.querySelectorAll("[data-pdown]").forEach(b=>b.onclick=()=>mv(+b.dataset.pdown, +b.dataset.pdown+1));
   el.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>{ P.splice(+b.dataset.pdel,1); renderParts(); renderPreview(); });
-  el.querySelectorAll("[data-pdelay]").forEach(b=>b.onclick=()=>{ const x=P[+b.dataset.pdelay]; x.delay=DELAYS[(DELAYS.indexOf(x.delay)+1)%DELAYS.length]; renderParts(); });
+  el.querySelectorAll("[data-pdelay]").forEach(b=>b.onclick=()=>{ const x=P[+b.dataset.pdelay]; x.delay=DELAYS[(DELAYS.indexOf(x.delay)+1)%DELAYS.length]; renderParts(); renderPreview(); });
   el.querySelectorAll("[data-pimg]").forEach(b=>b.onclick=()=>{ const x=P[+b.dataset.pimg]; x.img = x.img ? null : 1+(+b.dataset.pimg+2)%4; renderParts(); renderPreview(); });
   el.querySelectorAll("[data-pem]").forEach(b=>b.onclick=()=>{ const x=P[+b.dataset.pem]; x.text+="🙂"; renderParts(); renderPreview(); });
 }
-// ③ platform settings: 共用 lists each platform's setting; a platform tab shows its own
+// platform settings: 共用 lists each channel's format; a channel tab shows its own
 function renderPset(){ const el=$("pset"), k=ed.tab;
-  const sum = p => FORMATS[p] ? (ed.fmt[p]||"貼文") : "";
-  if(k==="all"){ const pfs=[...ed.pfs].filter(sum); el.hidden=!pfs.length; el.innerHTML = `<h3>各平台設定</h3>`+pfs.map(p=>`<div class="psrow">${pfb(p)}<span>${PF[p].n}</span><span class="chip">${sum(p)}</span><button type="button" class="lnk" data-tab="${p}">改</button></div>`).join(""); }
-  else { el.hidden=false; el.innerHTML = `<h3>${PF[k].n} 設定</h3>` + (FORMATS[k] ? `<span class="seg" id="fmtSeg">${FORMATS[k].map(f=>`<button type="button" class="${(ed.fmt[k]||"貼文")===f?"on":""}" data-f="${f}">${f}</button>`).join("")}</span>`+({instagram:`<span class="muted tag">放 2 張以上的圖，會變成多圖輪播。限時動態不顯示文字。</span>`,facebook:`<span class="muted tag">Reel 和限時動態要直式影片或圖片。</span>`,linkedin:`<span class="muted tag">文件輪播要上傳 PDF，一頁一張。</span>`}[k])
-      : `<span class="muted">${PF[k].n} 沒有另外的設定。要接成串文，按文字框下面的「接一則」。</span>`); }
+  const sum = id => FORMATS[pfOf(id)] ? (ed.fmt[id]||"貼文") : "";
+  if(k==="all"){ const ids=[...ed.accts].filter(sum); el.hidden=!ids.length; el.innerHTML = `<h3>各頻道格式</h3>`+ids.map(id=>`<div class="psrow">${pfb(pfOf(id))}<span>${esc(A(id).name)}</span><span class="chip">${sum(id)}</span><button type="button" class="lnk" data-tab="${id}">改</button></div>`).join(""); }
+  else { const pf=pfOf(k); el.hidden=false; el.innerHTML = `<h3>${esc(A(k).name)}（${PF[pf].n}）設定</h3>` + (FORMATS[pf] ? `<span class="seg">${FORMATS[pf].map(f=>`<button type="button" class="${(ed.fmt[k]||"貼文")===f?"on":""}" data-f="${f}">${f}</button>`).join("")}</span>`+({instagram:`<span class="muted tag">放 2 張以上的圖，會變成多圖輪播。限時動態不顯示文字。</span>`,facebook:`<span class="muted tag">Reel 和限時動態要直式影片或圖片。</span>`,linkedin:`<span class="muted tag">文件輪播要上傳 PDF，一頁一張。</span>`}[pf])
+      : `<span class="muted">${PF[pf].n} 沒有另外的設定。要接成串文，按文字框下面的「接一則」。</span>`); }
   el.querySelectorAll("[data-tab]").forEach(x=>x.onclick=()=>{ ed.tab=x.dataset.tab; renderTabs(); fillText(); renderPset(); renderCnt(); renderPreview(); });
   el.querySelectorAll("[data-f]").forEach(x=>x.onclick=()=>{ if(ro()) return; ed.fmt[k]=x.dataset.f; renderPset(); renderPreview(); });
 }
-// previews (U4): each platform's own shell, the brand's avatar, name and handle; no made-up like counts; text past the limit in red
+// previews: each platform's own shell, the channel's picture, name and handle; no made-up like counts; text past the limit in red
 function grid(imgs){ if(!imgs.length) return ""; const n=Math.min(imgs.length,4); return `<div class="imgs n${n}">${imgs.slice(0,4).map(m=>`<span class="im ph ph-${m}"></span>`).join("")}</div>`; }
-function shell(k){
-  const a=acct(k), t=effText(k), max=PF[k].max, f=ed.fmt[k]||"貼文";
-  const body = t ? esc([...t].slice(0,max).join("")) + ([...t].length>max ? `<mark class="over" title="超過 ${max} 字，這段發不出去">${esc([...t].slice(max).join(""))}</mark>` : "") : `<span class="muted">（文字會出現在這裡）</span>`;
-  const when = ed.wm==="rot" ? "輪播" : `${fmt(ed.date)} ${ed.time}`, imgs=ed.imgs;
-  const lab = `<div class="shl">${pfb(k)}${PF[k].n}${f!=="貼文"?" · "+f:""}</div>`;
-  const ic = ns => ns.map(n=>I(n)).join("");
-  const mark = x => x ? esc([...x].slice(0,max).join("")) + ([...x].length>max ? `<mark class="over" title="超過 ${max} 字">${esc([...x].slice(max).join(""))}</mark>` : "") : `<span class="muted">（空的）</span>`;
-  const parts = ed.parts.filter(x=>x.text.trim()||x.img);
-  const cms = name => parts.map(x=>`<div class="cm"><b>${esc(name)}</b> ${esc(x.text)}</div>`).join("");
+function shell(id){
+  const a=A(id), k=a.pf, t=effText(id), max=PF[k].max, f=ed.fmt[id]||"貼文";
+  const mark = x => x ? esc([...x].slice(0,max).join("")) + ([...x].length>max ? `<mark class="over" title="超過 ${max} 字，這段發不出去">${esc([...x].slice(max).join(""))}</mark>` : "") : `<span class="muted">（文字會出現在這裡）</span>`;
+  const body = mark(t), when = ed.wm==="rot" ? "自動發布" : `${fmt(ed.date)} ${ed.time}`, imgs=ed.imgs;
+  const lab = `<div class="shl">${pfb(k)}${esc(a.name)}${f!=="貼文"?" · "+f:""}</div>`, ic = ns => ns.map(n=>I(n)).join(""), av=avOf(a);
+  const parts = ed.parts.filter(x=>x.text.trim()||x.img), cms = name => parts.map(x=>`<div class="cm"><b>${esc(name)}</b> ${esc(x.text)}</div>`).join("");
   const thread = (name, sub, icons) => { const all=[{html:body,imgs}, ...parts.map(x=>({html:mark(x.text),imgs:x.img?[x.img]:[],delay:x.delay}))];
-    return `<div class="sh th">${all.map((e,i)=>`<div class="tl">${bav("s32")}${i<all.length-1?"<i></i>":""}</div><div><div class="who"><b>${esc(name)}</b><span>${i?delayTxt(e.delay):sub}</span></div><div class="tx">${e.html}</div>${grid(e.imgs)}<div class="ic">${ic(icons)}</div></div>`).join("")}</div>`; };
+    return `<div class="sh th">${all.map((e,i)=>`<div class="tl">${av}${i<all.length-1?"<i></i>":""}</div><div><div class="who"><b>${esc(name)}</b><span>${i?delayTxt(e.delay):sub}</span></div><div class="tx">${e.html}</div>${grid(e.imgs)}<div class="ic">${ic(icons)}</div></div>`).join("")}</div>`; };
   if(k==="bluesky") return lab+thread(a.name, `${a.handle} · ${when}`, ["comment","repost","heart"]);
-  if(k==="facebook") return lab+`<div class="sh fb"><div class="hd">${bav("s32")}<div class="who"><b>${esc(a.name)}</b><span>${when} · 公開</span></div></div><div class="tx clamp5">${body}</div>${grid(imgs)}<div class="ic bar"><span>${I("like")}讚</span><span>${I("comment")}留言</span><span>${I("share")}分享</span></div>${cms(a.name)}</div>`;
-  if(k==="instagram"){ const h=a.handle.replace(/^@/,""); const tall=f!=="貼文";
+  if(k==="threads") return lab+thread(a.handle.replace(/^@/,"").split(" ")[0], when, ["heart","comment","repost","send"]);
+  if(k==="facebook") return lab+`<div class="sh fb"><div class="hd">${av}<div class="who"><b>${esc(a.name)}</b><span>${when} · 公開</span></div></div><div class="tx clamp5">${body}</div>${grid(imgs)}<div class="ic bar"><span>${I("like")}讚</span><span>${I("comment")}留言</span><span>${I("share")}分享</span></div>${cms(a.name)}</div>`;
+  if(k==="instagram"){ const h=a.handle.replace(/^@/,"").split(" ")[0], tall=f!=="貼文";
     const pic = imgs.length ? `<div class="sq ph ph-${imgs[0]} ${tall?"tall":""}"></div>${imgs.length>1&&!tall?`<div class="dots">${imgs.map((_,i)=>`<i class="${i?"":"on"}"></i>`).join("")}</div>`:""}` : `<div class="need">Instagram 一定要有圖片或影片。</div>`;
-    return lab+`<div class="sh ig"><div class="hd">${bav("s32")}<div class="who"><b>${esc(h)}</b></div><span class="end muted">${I("more")}</span></div>${pic}<div class="ic">${ic(["heart","comment","send"])}<span class="end">${I("bookmark")}</span></div>${f==="限時動態"?"":`<div class="tx clamp2"><b>${esc(h)}</b> ${body}</div>`}${f==="限時動態"?"":cms(h)}</div>`; }
-  if(k==="threads") return lab+thread(a.handle.replace(/^@/,""), when, ["heart","comment","repost","send"]);
-  if(k==="linkedin") return lab+`<div class="sh li"><div class="hd">${bav("s32 sq")}<div class="who"><b>${esc(a.name)}</b><span>${esc(a.handle)} · ${when}</span></div></div><div class="tx clamp3">${body}</div>${f==="文件輪播"?`<div class="need">文件輪播：上傳 PDF 後，這裡一頁一頁翻。</div>`:grid(imgs)}<div class="ic bar"><span>${I("like")}讚</span><span>${I("comment")}留言</span><span>${I("repost")}轉發</span><span>${I("send")}傳送</span></div>${cms(a.name)}</div>`;
+    return lab+`<div class="sh ig"><div class="hd">${av}<div class="who"><b>${esc(h)}</b></div><span class="end muted">${I("more")}</span></div>${pic}<div class="ic">${ic(["heart","comment","send"])}<span class="end">${I("bookmark")}</span></div>${f==="限時動態"?"":`<div class="tx clamp2"><b>${esc(h)}</b> ${body}</div>${cms(h)}`}</div>`; }
+  if(k==="linkedin") return lab+`<div class="sh li"><div class="hd">${avOf(a,"sq")}<div class="who"><b>${esc(a.name)}</b><span>${esc(a.handle)} · ${when}</span></div></div><div class="tx clamp3">${body}</div>${f==="文件輪播"?`<div class="need">文件輪播：上傳 PDF 後，這裡一頁一頁翻。</div>`:grid(imgs)}<div class="ic bar"><span>${I("like")}讚</span><span>${I("comment")}留言</span><span>${I("repost")}轉發</span><span>${I("send")}傳送</span></div>${cms(a.name)}</div>`;
   return "";
 }
-function renderPreview(){ const pfs = ed.tab==="all" ? [...ed.pfs] : [ed.tab];
-  $("pvNote").textContent = pfs.length>1 ? `${pfs.length} 個平台，往下看` : "";
-  $("screen").innerHTML = pfs.length ? pfs.map(shell).join("") : `<span class="muted">先點上面的頭像，選要發到哪些帳號。</span>`; }
-function refresh(){ renderChan(); renderTabs(); fillText(); renderMrow(); renderParts(); renderXtras(); renderPset(); renderCnt(); renderPreview(); renderFoot(); }
-// footer (U6): fixed time or a rotation list; the main button says what it does; the rest wait behind ▾
-function mainLabel(){ if(ro()) return "複製成新貼文"; if(ed.wm==="rot") return "加入輪播清單"; if(ed.id==null||ed.kind==="article") return "加入行事曆"; if(ed.state==="draft"||ed.state==="error") return "排程"; return "更新"; }
+function renderPreview(){ const ids = ed.tab==="all" ? [...ed.accts] : [ed.tab];
+  $("pvNote").textContent = ids.length>1 ? `${ids.length} 個頻道，往下看` : "";
+  $("screen").innerHTML = ids.length ? ids.map(shell).join("") : `<span class="muted">先在左邊勾選要發到哪些頻道。</span>`; }
+function refresh(){ renderPick(); renderTabs(); fillText(); renderMrow(); renderParts(); renderXtras(); renderPset(); renderCnt(); renderPreview(); renderFoot(); }
+function mainLabel(){ if(ro()) return "複製成新貼文"; if(ed.wm==="rot") return "加入自動發布清單"; if(ed.id==null||ed.kind==="article") return "加入行事曆"; if(ed.state==="draft"||ed.state==="error") return "排程"; return "更新"; }
 function renderFoot(){
   $("wmSeg").querySelectorAll("button").forEach(x=>{ x.classList.toggle("on", x.dataset.wm===ed.wm); x.disabled=ro(); });
   $("fixedWhen").hidden = ed.wm!=="fixed"; $("rotWhen").hidden = ed.wm!=="rot";
   $("dtTxt").textContent = `${fmtLong(ed.date)} ${ed.time}`; $("dtBtn").disabled=ro(); $("tzTxt").textContent=B().tz;
   if(ed.wm==="rot"){ const ls=B().lists; if(!ls.some(l=>l.id===ed.listId)) ed.listId=ls[0]?.id ?? null;
-    $("rotWhen").innerHTML = ls.length ? `<span class="seg">${ls.map(l=>`<button type="button" class="${l.id===ed.listId?"on":""}" data-l="${l.id}">${esc(l.name)}${l.on?"":"（暫停）"}</button>`).join("")}</span>` : `<span class="muted">還沒有清單，先到「輪播」建一個。</span>`;
+    $("rotWhen").innerHTML = ls.length ? `<span class="seg">${ls.map(l=>`<button type="button" class="${l.id===ed.listId?"on":""}" data-l="${l.id}">${esc(l.name)}${l.on?"":"（暫停）"}</button>`).join("")}</span>` : `<span class="muted">還沒有清單，先到「自動發布清單」建一個。</span>`;
     $("rotWhen").querySelectorAll("[data-l]").forEach(x=>x.onclick=()=>{ ed.listId=x.dataset.l; renderFoot(); }); }
   $("btnMain").textContent = mainLabel(); $("btnMore").disabled = ro();
 }
@@ -1247,45 +1433,43 @@ $("btnDraft").onclick=()=>{ $("menu").hidden=true; save("draft"); };
 $("btnReview").onclick=()=>{ $("menu").hidden=true; save("review"); };
 $("btnNow").onclick=()=>{ $("menu").hidden=true; $("confirmNow").hidden=false; };
 $("nowNo").onclick=()=>{ $("confirmNow").hidden=true; };
+$("btnLib").onclick=()=>{ $("menu").hidden=true; if(!ed.text.trim()) return say("貼文還是空的。", true); B().library.unshift({id:"L"+Date.now(),kind:"post",ph:ed.imgs[0],text:ed.text,accts:[...ed.accts]}); say("已存到貼文素材庫。"); };
 $("nowYes").onclick=()=>{ $("confirmNow").hidden=true; ed.date=TODAY; ed.time="10:40"; save("published"); };
-function renderHint(){ if(!ed) return; const p=ed.id!=null?B().posts.find(x=>x.id===ed.id):null; const h=[];
+function renderHint(){ if(!ed||view!=="compose") return; const p=ed.id!=null?B().posts.find(x=>x.id===ed.id):null; const h=[];
   if(p&&p.err) h.push(`<span class="err">${esc(p.err)}</span>`);
-  if(p&&p.kind!=="article"){ const miss=unconnected(p); if(miss.length) h.push(`<span class="err">${miss.map(k=>PF[k].n).join("、")} 沒連接或授權過期，這則發不出去。</span>`); }
-  if(ro()) h.push(`已發佈，不能改。${p&&p.url?`<a href="${p.url}" target="_blank" rel="noopener">到 ${PF[(p.pfs||["bluesky"])[0]].n} 看這則</a>`:""}`);
+  if(p&&p.kind!=="article"){ const miss=unconnected(p); if(miss.length) h.push(`<span class="err">${miss.map(id=>A(id).name).join("、")} 沒連接或授權過期，這則發不出去。</span>`); }
+  if(ro()) h.push(`已發佈，不能改。${p&&p.url?`<a href="${p.url}" target="_blank" rel="noopener">到平台上看這則</a>`:""}`);
   if(ed.state==="review"&&me!=="reviewer") h.push("等審核人核准，核准後照排定時間發。");
   if(ed.kind==="article") h.push("先按「用文章摘要」或「AI 改寫」，再排時間。");
-  const over=[...ed.pfs].filter(k=>effLen(k)>PF[k].max); if(over.length&&!ro()) h.push(`<span class="err">${over.map(k=>PF[k].n).join("、")} 超過字數上限。點上面「${PF[over[0]].n}」另外寫一份短的，其他平台不受影響。</span>`);
+  const over=[...ed.accts].filter(k=>effLen(k)>maxOf(k)); if(over.length&&!ro()) h.push(`<span class="err">${over.map(k=>A(k).name+"（"+PF[pfOf(k)].n+"）").join("、")} 超過字數上限。點上面它的名字另外寫一份短的。</span>`);
   $("hint").innerHTML = h.join("　"); }
 function validate(state){ if(!ed.text.trim() && !Object.values(ed.custom).some(x=>x&&x.trim())) return "貼文還是空的。";
-  if(state==="draft") return null; if(!ed.pfs.size) return "還沒選要發到哪裡：點上面的頭像。";
-  const pover=[...ed.pfs].filter(k=>THREAD.includes(k)&&ed.parts.some(x=>[...x.text].length>PF[k].max)); if(pover.length) return `接的那幾則有一則超過 ${pover.map(k=>PF[k].n).join("、")} 的字數上限。`;
-  const over=[...ed.pfs].filter(k=>effLen(k)>PF[k].max); if(over.length) return `${over.map(k=>PF[k].n).join("、")} 超過字數上限，發不出去。`;
-  if(ed.pfs.has("instagram")&&!ed.imgs.length) return "Instagram 一定要有圖片或影片。"; return null; }
+  if(state==="draft") return null; if(!ed.accts.size) return "還沒選要發到哪裡：在左邊勾頻道。";
+  const pover=[...ed.accts].filter(k=>THREAD.includes(pfOf(k))&&ed.parts.some(x=>[...x.text].length>maxOf(k))); if(pover.length) return "接的那幾則有一則超過字數上限。";
+  const over=[...ed.accts].filter(k=>effLen(k)>maxOf(k)); if(over.length) return `${over.map(k=>A(k).name).join("、")} 超過字數上限，發不出去。`;
+  if([...ed.accts].some(k=>pfOf(k)==="instagram")&&!ed.imgs.length) return "Instagram 一定要有圖片或影片。"; return null; }
 function save(state){
   const e=validate(state); if(e) return say(e, true);
   let p = ed.id!=null ? B().posts.find(x=>x.id===ed.id) : null;
   if(!p || p.kind==="article"){ p={id:Date.now()}; B().posts.push(p); ed.id=p.id; ed.kind=null; }
-  const data={text:ed.text,pfs:[...ed.pfs],custom:{...ed.custom},imgs:[...ed.imgs],parts:ed.parts.map(x=>({...x})),link:ed.link,utm:ed.utm,alt:ed.alt,fmt:{...ed.fmt},notes:ed.notes,err:null};
-  if(state==="scheduled" && ed.wm==="rot"){ const l=B().lists.find(x=>x.id===ed.listId); if(!l) return say("還沒有輪播清單，先到「輪播」建一個。", true);
-    if(p.listId!==l.id) l.queue.push(ed.text); Object.assign(p,data,{date:"",time:"",state:"rotation",listId:l.id}); addLog("加入輪播",p,l.name); openPost(p.id,{keepSheet:true}); return say(`已加到「${esc(l.name)}」最後。下一則：${esc(nextRun(l))}`); }
-  const label={draft:"存草稿",review:"送審",scheduled:"排程",published:"立即發佈"}[state];
+  const data={text:ed.text,accts:[...ed.accts],custom:{...ed.custom},imgs:[...ed.imgs],parts:ed.parts.map(x=>({...x})),link:ed.link,utm:ed.utm,alt:ed.alt,fmt:{...ed.fmt},notes:ed.notes,err:null};
+  if(state==="scheduled" && ed.wm==="rot"){ const l=B().lists.find(x=>x.id===ed.listId); if(!l) return say("還沒有自動發布清單，先建一個。", true);
+    if(p.listId!==l.id) l.queue.push(ed.text); Object.assign(p,data,{date:"",time:"",state:"rotation",listId:l.id}); addLog("加入自動發布清單",p,l.name); openPost(p.id); return say(`已加到「${esc(l.name)}」最後。`); }
   Object.assign(p,data,{date:ed.date,time:ed.time,state,listId:null});
   if(state==="published") p.url="https://bsky.app/profile/"+brand+"/post/"+Date.now().toString(36);
-  addLog(label,p,state==="scheduled"?`${fmt(ed.date)} ${ed.time}`:"");
-  openPost(p.id,{keepSheet:true});
-  say(state==="draft"?"已存成草稿。":state==="review"?"已送審，審核人會收到通知。":state==="scheduled"?`已排在 ${fmtLong(ed.date)} ${ed.time}。`:"已發出。");
+  addLog({draft:"存草稿",review:"送審",scheduled:"排程",published:"立即發佈"}[state],p,state==="scheduled"?`${fmt(ed.date)} ${ed.time}`:"");
+  openPost(p.id);
+  say(state==="draft"?"已存成草稿。":state==="review"?"已送審，審核人會收到通知。":state==="scheduled"?`已排在 ${fmtLong(ed.date)} ${ed.time}。按「回排程日曆」看它在哪。`:"已發出。");
 }
-function duplicate(){ const p=B().posts.find(x=>x.id===ed.id); const c={...p,id:Date.now(),state:"draft",date:addDays(p.date||TODAY,7),err:null,url:null}; B().posts.push(c); openPost(c.id,{keepSheet:true}); say("已複製成下週同一天的草稿。"); }
-$("approveBtn").onclick=()=>{ const p=B().posts.find(x=>x.id===ed.id); p.state="scheduled"; addLog("核准",p,`排在 ${fmt(p.date)} ${p.time}`); openPost(p.id,{keepSheet:true}); say("已核准，照原定時間發。"); };
-$("rejectBtn").onclick=()=>{ const r=$("reason").value.trim(); if(!r) return say("退回要寫理由，編輯才知道要改什麼。", true); const p=B().posts.find(x=>x.id===ed.id); p.state="draft"; p.notes=(p.notes?p.notes+"\n":"")+"退回："+r; addLog("退回",p,r); openPost(p.id,{keepSheet:true}); say("已退回成草稿，理由寫在備註。"); };
+function duplicate(){ const p=B().posts.find(x=>x.id===ed.id); const c={...p,id:Date.now(),state:"draft",date:addDays(p.date||TODAY,7),err:null,url:null}; B().posts.push(c); openPost(c.id); say("已複製成下週同一天的草稿。"); }
+$("approveBtn").onclick=()=>{ const p=B().posts.find(x=>x.id===ed.id); p.state="scheduled"; addLog("核准",p,`排在 ${fmt(p.date)} ${p.time}`); openPost(p.id); say("已核准，照原定時間發。"); };
+$("rejectBtn").onclick=()=>{ const r=$("reason").value.trim(); if(!r) return say("退回要寫理由，編輯才知道要改什麼。", true); const p=B().posts.find(x=>x.id===ed.id); p.state="draft"; p.notes=(p.notes?p.notes+"\n":"")+"退回："+r; addLog("退回",p,r); openPost(p.id); say("已退回成草稿，理由寫在備註。"); };
 $("useExcerpt").onclick=()=>{ const p=B().posts.find(x=>x.id===ed.id); ed.text=p.excerpt+"\n\n全文："+p.url; ed.imgs=[4]; refresh(); say("用的是文章本身的摘要和主圖，沒有花錢。"); };
-$("useAi").onclick=()=>{ const p=B().posts.find(x=>x.id===ed.id); ed.text="（AI 改寫範例）"+p.excerpt.split("。")[0]+"。想知道為什麼嗎？全文在這裡："+p.url; ed.imgs=[4]; refresh(); say("AI 替每個選的平台各寫一版，這次大約 NT$2。"); };
-// phone: the editor is a full-screen sheet with an 編輯／預覽 switch
+$("useAi").onclick=()=>{ const p=B().posts.find(x=>x.id===ed.id); ed.text="（AI 改寫範例）"+p.excerpt.split("。")[0]+"。想知道為什麼嗎？全文在這裡："+p.url; ed.imgs=[4]; refresh(); say("AI 替每個選的頻道各寫一版，這次大約 NT$2。"); };
 function setPv(m){ document.body.classList.toggle("pv", m==="pv"); $("pvSeg").querySelectorAll("button").forEach(x=>x.classList.toggle("on", x.dataset.pv===m)); }
 $("pvSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>setPv(x.dataset.pv));
-$("sheetX").onclick=()=>{ document.body.classList.remove("sheet","pv"); };
 
-// date + time picker (U6): a month grid and a time grid, in the app's tokens
+// date + time picker: a month grid and a time grid, in the app's tokens
 let dtState=null;
 function openDtp(anchor, day, time, pick){ dtState={day, time, month:(day||TODAY).slice(0,7), pick, anchor}; renderDtp(); }
 function renderDtp(){ const s=dtState, el=$("dtp"); const [y,m]=s.month.split("-").map(Number); const first=`${s.month}-01`; const dim=new Date(y,m,0).getDate();
@@ -1300,14 +1484,9 @@ function renderDtp(){ const s=dtState, el=$("dtp"); const [y,m]=s.month.split("-
   el.querySelectorAll("[data-m]").forEach(x=>x.onclick=()=>{ s.time=hh+":"+x.dataset.m; renderDtp(); });
   $("dtOk").onclick=()=>{ el.hidden=true; s.pick(s.time, s.day); };
 }
-document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ for(const id of ["dtp","menu","filterPop","tzPop","samplePop","bulkMenu"]) $(id).hidden=true; } });
-function renderTz(){ $("tzNow").textContent=`${NOW} · ${B().tz}`; $("tzTxt").textContent=B().tz;
-  $("tzList").innerHTML = TZS.map(z=>`<label class="ck"><input type="radio" name="tz" value="${z}" ${z===B().tz?"checked":""}>${z}</label>`).join("");
-  $("tzList").querySelectorAll("input").forEach(x=>x.onchange=()=>{ B().tz=x.value; renderTz(); $("tzPop").hidden=true; say(`時區改成 ${x.value}。行事曆和排程時間都照這個。`); }); }
-const pop = (btn, id) => { $(btn).onclick=()=>{ const open=$(id).hidden; for(const x of ["tzPop","samplePop"]) $(x).hidden=true; $(id).hidden=!open; $(btn).setAttribute("aria-expanded",String(open)); }; };
-pop("tzBtn","tzPop"); pop("sampleBtn","samplePop");
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ for(const id of ["dtp","menu","filterPop","tzPop","samplePop","brandPop","bulkMenu","chanMenu"]) $(id).hidden=true; } });
+document.addEventListener("click", e=>{ if(!e.target.closest("#chanMenu,[data-chm]")) $("chanMenu").hidden=true; });
 
-function wireIcons(root){ root.querySelectorAll("[data-i]").forEach(el=>{ if(!el.querySelector("svg")) el.insertAdjacentHTML("afterbegin", I(el.dataset.i)); }); }
 wireIcons(document);
-renderHeader(); renderTz(); renderView(); openDefault();
+renderTz(); renderBest(); renderFrame(); renderView();
 </script>

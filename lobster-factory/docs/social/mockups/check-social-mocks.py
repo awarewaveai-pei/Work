@@ -15,6 +15,7 @@ Rules (operator, 2026-09-24 .. 2026-10-14), each finding starts with its [code]:
   rendered (measure-mock.mjs, Playwright at 1280x660; C13 / GAP_REPORT U1, U3):
   [chips] at most CHIP_MAX pill-shaped boxes on any one screen (opening screen + every [data-view])
   [card-thumb] every week card has a thumbnail element (.cthumb), and the opening week shows cards at all
+  [one-screen] no page scrolls at 1280x660 (opening screen + every [data-view]); scrolling happens inside panels only
   [render] the page could not be measured or threw a script error (not a pass)
 Notes (printed, not findings): font sizes under 14px inside the copied app block — the app's own values, changed in globals.css.
 CSS is parsed by sync-app-theme.py (rules/declarations); markup by html.parser. A page that cannot be read is a finding."""
@@ -32,7 +33,7 @@ VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "met
 SVG_SELF = {"path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "use", "stop"}
 ACTIONS = ["存草稿", "送審", "排程", "立即發佈"]
 TYPE_TOKENS = {"--fs-h1": 14, "--fs-h2": 14, "--fs-body": 14, "--fs-tag": 12}       # name -> minimum px
-LAYOUT_TOKENS = {"--ed-w", "--av", "--thumb-h"}   # editor width, account avatar, week-card thumbnail height
+LAYOUT_TOKENS = {"--chan-w", "--pv-w", "--av", "--thumb-h"}   # channel column, preview column, account picture, week-card thumbnail
 CHIP_MAX = 20   # pills on one screen (U1: before v14 there were ~60)
 LOCAL_TOKENS = set(TYPE_TOKENS) | LAYOUT_TOKENS
 COLOUR_FN = re.compile(r"\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color-mix|color)\s*\(", re.I)
@@ -273,6 +274,14 @@ def render_findings(pages: dict[str, str]) -> dict[str, list[str]]:
                 out[n].append("[render] no [data-view] control found, so only the opening screen was measured")
             for v, c in row["views"].items():
                 if not isinstance(c, int):
+                    continue  # reported below as [render]
+                h, w = row["heights"].get(v), row["widths"].get(v)
+                if h is None or w is None:
+                    out[n].append(f"[render] view '{v}': no page size measured")
+                elif h > 660 or w > 1280:
+                    out[n].append(f"[one-screen] view '{v}': the page is {w}x{h}px at 1280x660; scroll inside a panel instead")
+            for v, c in row["views"].items():
+                if not isinstance(c, int):
                     out[n].append(f"[render] view '{v}': {c}")
                 elif c > CHIP_MAX:
                     out[n].append(f"[chips] view '{v}': {c} pills on one screen (max {CHIP_MAX}); pills are values, actions are buttons")
@@ -337,9 +346,9 @@ def selftest() -> int:
         "undeclared-fs": (src.replace("button:hover{", "button:hover{font-size:var(--fs-xs);", 1), "[font-size]"),
         "px-font-shorthand": (src.replace("button:hover{", "button:hover{font:600 11px x;", 1), "[font]"),
         "rem-font-shorthand": (src.replace("button:hover{", "button:hover{font:600 .6rem Inter;", 1), "[font]"),
-        "own-token": (src.replace("--ed-w:580px;", "--ed-w:580px; --brand:#123456;", 1), "[token-name]"),
-        "p-palette": (src.replace("--ed-w:580px;", "--ed-w:580px; --p-page-bg:#fdf2f8;", 1), "[token-name]"),
-        "platform-redefined": (src.replace("--ed-w:580px;", "--ed-w:580px; --p-fb:#000000;", 1), "[token-name]"),
+        "own-token": (src.replace("--chan-w:236px;", "--chan-w:236px; --brand:#123456;", 1), "[token-name]"),
+        "p-palette": (src.replace("--chan-w:236px;", "--chan-w:236px; --p-page-bg:#fdf2f8;", 1), "[token-name]"),
+        "platform-redefined": (src.replace("--chan-w:236px;", "--chan-w:236px; --p-fb:#000000;", 1), "[token-name]"),
         "repoint-app-token": (src.replace(".app{", ".app{--accent:var(--p-ig);", 1), "[token-name]"),
         "upper-token": (src[:style_end] + ":root{--Brand:#123456}\n" + src[style_end:], "[token-name]"),
         "second-palette": (src.replace("html,body{height:100%}", "@media (prefers-color-scheme: dark){html{opacity:1}}\nhtml,body{height:100%}", 1), "[palette]"),
@@ -363,6 +372,8 @@ def selftest() -> int:
         "card-no-thumb": (src.replace('class="cthumb ', 'class="cthumx ', 1), "week cards have no thumbnail"),
         "no-week-cards": (src.replace('class="week" id="weekView"', 'class="wk" id="weekView"', 1), "shows no cards"),
         "page-throws": (src.replace("<script>", "<script>throw new Error('selftest');", 1), "[render] script error"),
+        "page-scrolls": (src.replace("<main>", '<main><div style="height:2000px"></div>', 1), "[one-screen]"),
+        "composer-scrolls": (src[:style_end] + "#edPanel{min-height:2000px}" + src[style_end:], "[one-screen] view 'compose'"),
         "no-views": (src.replace("data-view=", "data-vw=").replace('[data-view]', '[data-vw]'), "[render] no [data-view]"),
     }
     rendered = render_findings({"base": src, **{k: v for k, (v, _) in rmuts.items()}})

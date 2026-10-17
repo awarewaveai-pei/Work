@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-17（續2）社群發文樣稿第 16 版：照操作者五項定案重畫骨架（ADR 016 §5「操作者定案」1–5）— 等操作者看圖
+
+**來源**：操作者否決 v14／v15 骨架，自己寫了五項定案（67885b767）＋ 20 張截圖（12–21；22–31 是重複，md5 相同；沒有數據分析／報表的截圖，這兩頁照 Metricool Summary 的慣例畫）。只改 `lobster-factory/docs/social/mockups/`＋ADR 016 §5 版本行。
+- 定案 1 頻道：左側清單（`#chanPanel`），一列＝頭像＋名稱＋平台·handle＋⋮（只看這個頻道／用這個頻道寫／重新連接或偏好設定／移除）；有搜尋；點一列＝日曆只看它。資料改成以帳號 id 為單位（v15 以平台為 key，一個平台只能一個帳號，撐不到代操 100 個）；樣稿「Aware Wave（代操）」放 14 個頻道示範捲動。
+- 定案 2 頂部六區：數據分析（左選頻道、右上 7／28／90 天、6 張指標卡可點換趨勢圖、趨勢圖這一期 vs 上一期、已發佈貼文表）／報表管理（logo、主色、PDF｜PPT、期間、頻道、內容勾選、每月自動寄、第一頁預覽、做過的報表）／訊息收件匣（Chatwoot 入口＋各頻道未讀）／貼文排程／智慧連結、廣告管理（「尚未開通」＋一句會做什麼）。設定改頂部齒輪；需處理與紀錄改鈴鐺。
+- 定案 3 貼文排程六分頁：排程日曆／貼文清單／貼文素材庫（存起來的貼文｜圖片和影片；撰寫頁 ▾「存到素材庫」）／自動發布清單（＝輪播，星期×時段方格）／已刪除貼文／自動化流程（尚未開通）。
+- 定案 4 日曆一列：搜尋／‹ 本週 ›＋日期／週｜月／篩選／最佳發布時間（按了出平台切換，每天顯示該平台最佳時間，點時間＝在那時間寫一則）／建立貼文。
+- 定案 5 撰寫獨立整頁（`[data-view=compose]`，`#edPanel`）：左選頻道（勾選清單、可搜尋）、中撰寫（共用＋各頻道分頁、串文、平台格式）、右預覽；上方「回排程日曆」；日曆頁沒有右欄。
+- 照搬 v15：疊放卡片＋縮圖、三種控制、串文＋延遲、方格時段、已刪除（誰刪的）、空狀態、現在線、時區、手機日檢視。
+- 沒畫（她的截圖有、清單沒列）：Metricool 工具列的 ⋮、Create view、媒體圖示鈕；Postiz 頻道欄的「分享連結」鈕與左側 icon 欄（被頂部六區取代）；升級方案橫幅；Flows／SmartLinks／Ads 的介紹插圖。
+- 檢查：`check-social-mocks.py` 加 `[one-screen]`（開頁＋每個 `[data-view]`，頁面 1280×660 不捲、不橫捲）；版面 token 改 `--chan-w`／`--pv-w`；鈴鐺改 `data-view="log"` 讓它也被量到；`measure-mock.mjs` 記 heights／widths。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/docs/social/mockups/check-social-mocks.py → 1 page(s), 0 finding(s)（16 個頁面都量過 pill／頁面大小，JS 0 錯）；--selftest → 46/46（新 page-scrolls、composer-scrolls）；sync-app-theme.py --check → up to date | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/e2e/social/render-views.mjs <tmp> --mock → phone 390 {"day":{"page":390,"over":[]},"sheet":{"page":390,"over":[]}}；scratch 截桌機 24 張、手機 5 張，pageerror 0，手機各頁寬 390 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/2m/3n -- critic：M1 鈴鐺的頁沒有 data-view、量不到 → 加 data-view；M2 page-scrolls 突變在開頁就紅、證明不了每頁都量 → 加只讓撰寫頁變高的突變並指定 view 'compose'；n1 heights 缺 key 靜默放過 → 缺就 [render]；n2 沒查橫捲 → 加 widths；n3 無用的 cal 選擇器 → 拿掉。全修。另自審看圖修：非排程區的雙標題、main 掉到第二列、分析頁按鈕置中、趨勢圖文字被拉長、報表的產生鈕被捲走、「週日」雙字
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=measure-mock|LAYOUT_TOKENS|--ed-w|--chan-w | hits=6 -- 改動檔以外只有 WORKLOG／worklog-excerpt 的舊紀錄；render-views.mjs 用的 `.day.focus .card[data-kind=social]`、`body.sheet`、`#edPanel` 照舊可用（實跑過）
+- ORACLE_WAIVED: 只改樣稿與樣稿檢查（docs，不上線）；證據＝0 finding＋46/46 突變＋截圖
+
+**剩**：操作者看 v16 圖。同意後才開 next-admin 實作卡（資料模型要改成以帳號為單位，現在產品程式的編輯器以平台為 key）。
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-17（續1）每個意圖可設「轉真人時回客人的話」；Soulful 加退款（先問原因）、醫療判斷（建議看醫生）兩個敏感意圖
 
 **操作者**（考試 #2 照出「我想退錢」「幫我判斷是不是憂鬱症」被 AI 回答，續34）：「退款要請他先留下原因，然後轉真人；醫療判斷請他去看醫生」。

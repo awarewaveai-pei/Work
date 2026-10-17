@@ -1,5 +1,5 @@
 // Rendered half of check-social-mocks.py: opens each page at 1280x660 and reports what only a browser can see.
-//   node measure-mock.mjs <page.html>...   -> one JSON line per page: {file, views:{<view>:chips}, cards, noThumb} | {file, error}
+//   node measure-mock.mjs <page.html>...   -> one JSON line per page: {file, views:{<view>:chips}, heights:{<view>:px}, widths:{<view>:px}, cards, noThumb} | {file, error}
 // chips = visible boxes inside the viewport that are .chip/.pill, or pill-shaped (radius >= half the height, 14-40px high,
 // width >= 1.1 x height so circles stay out, with a border or a fill), counted on the opening screen and after clicking
 // every [data-view] control. cards / noThumb = week cards (.week .card) on the opening screen and how many lack a .cthumb.
@@ -41,16 +41,17 @@ try {
       await page.goto(pathToFileURL(path.resolve(file)).href, { waitUntil: "load" });
       await page.waitForTimeout(150);
       const cards = await page.evaluate(() => { const c = [...document.querySelectorAll(".week .card")]; return { cards: c.length, noThumb: c.filter((x) => !x.querySelector(".cthumb")).length }; });
-      const views = { opening: await page.evaluate(chips) };
+      const pageH = () => document.scrollingElement.scrollHeight, pageW = () => document.scrollingElement.scrollWidth;  // one-screen: the page itself never scrolls
+      const views = { opening: await page.evaluate(chips) }, heights = { opening: await page.evaluate(pageH) }, widths = { opening: await page.evaluate(pageW) };
       const names = await page.evaluate(() => [...new Set([...document.querySelectorAll("[data-view]")].map((x) => x.dataset.view))]);
       for (const v of names) {
         const b = page.locator(`[data-view="${v}"]:visible`).first();
-        if (!(await b.count())) await page.locator(`[data-view="cal"]:visible`).first().click().catch(() => {});  // calendar switches live inside the calendar
+        if (!(await b.count())) await page.locator(`[data-view="plan"]:visible`).first().click().catch(() => {});  // planning tabs live under 貼文排程
         if (!(await b.count())) { views[v] = "not reachable"; continue; }
         await b.click(); await page.waitForTimeout(60);
-        views[v] = await page.evaluate(chips);
+        views[v] = await page.evaluate(chips); heights[v] = await page.evaluate(pageH); widths[v] = await page.evaluate(pageW);
       }
-      console.log(JSON.stringify({ file, views, ...cards, errors }));
+      console.log(JSON.stringify({ file, views, heights, widths, ...cards, errors }));
       await page.close();
     } catch (e) {
       console.log(JSON.stringify({ file, error: String(e).split("\n")[0] }));
