@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-17（續16）社群 V1.5 兩件待決定案：智慧連結網址 social.aware-wave.com/smartlink/名字；報表 V1 只做 PDF
+
+**操作者**：「智慧連結的網址：可以用 social.aware-wave.com/smartlink/名字 嗎?」「報表先只做 PDF，PPT, excel 放到下一版」。
+- PLAN.md C26：公開頁 `app/smartlink/[slug]/page.tsx`、`/smartlink/[slug]/go/[item]` 計點擊；slug 只用小寫英數與 `-`、全品牌唯一、保留 go／admin／api／new（中文名字放進網址分享時會變成一長串 %E5…）。C25：V1 只有 PDF，PPT、Excel 下一版。§3 檔案分組 `app/l/` → `app/smartlink/`。
+- 樣稿：智慧連結頁網址改 social.aware-wave.com/smartlink/…；撰寫頁連結縮短提示拿掉自編的 aw.link 網域（改「發出時會縮成短網址」）。
+- 監工台：待決清空，C26／C25 細節寫「你的決定」；重發同網址（第 2 版）。
+- 已傳給 C20 session（social-c20-schema）：slug 約束；並更正它的 brief——不要寫 DEPLOY_HOLD（會擋所有 session 的 03:00 部署，cs 的 0107 正等著上線），0105 做成可單獨上線（只增不刪、回填可重跑），推 main 前停下來等操作者 go-ahead（推 migration＝當晚套正式庫＝High），並查證部署的 migration 閘是逐檔套用（0107 已先在 main）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=node agency-os/handoffs/2026-10-17-social-v15-supervisor/check.mjs → ok: 13 cards, 0 open, page fresh；python lobster-factory/docs/social/mockups/check-social-mocks.py → 0 finding(s) | exit=0 | ms=40000
+- REVIEW_WAIVED: DOC_ONLY -- 計畫與樣稿文字、狀態頁
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=aw.link|app/l/ | hits=0 -- 樣稿與 PLAN 都已清掉；WORKLOG 舊條目的提及是歷史
+- ORACLE_WAIVED: 文件
 ## 2026-10-17（續15）客服：威脅傷害他人回客人操作者核准的句子（機器人狀態取代一般確認句；真人接手中 30 分鐘一次）＋migration 0107 已套 prod
 
 **操作者**：「同意這句。機器人狀態用它取代一般確認句；真人接手中也回這句，同一對話 30 分鐘一次，需要的 migration 可以做。做完一起部署。」

@@ -170,11 +170,11 @@
 - 輸入：樣稿 `function renderReporting`（第一頁預覽、顏色 swatch＝token 鍵、內容勾選）；`social_metrics_daily`。
 - 輸出：表單＋第一頁預覽＋做過的報表＋每月寄送開關；報表頁本身可列印。
 - 驗收：`render-views.mjs` `13-reporting`＋`14-report-print`（Playwright `page.pdf()` 存一份看版面）；`jobs` 測試有新 key。
-- 邊界：不接 PPT；不做跨品牌儀表板。
+- 邊界：V1 只有 PDF（操作者 2026-10-17 定）；PPT、Excel 下一版；不做跨品牌儀表板。
 
 ### C26 智慧連結（Opus 5.5；C19、C20 之後）
 - 目標：一個放簡介的連結頁：標題、介紹、按鈕顏色、連結（顯示／文字／網址／排序／刪／加）、發布開關、複製連結、手機預覽；每個連結點擊數。
-- 範圍：新 `smartlinks/page.tsx`＋`SmartLinks.tsx`、`app/api/social/smartlink/*`、公開頁 `app/l/[slug]/page.tsx`（走 `social.aware-wave.com/l/<slug>`；middleware 允許匿名；`noindex` 可選）、`app/l/[slug]/go/[item]/route.ts`（302＋`social_smart_link_clicks` +1）。
+- 範圍：新 `smartlinks/page.tsx`＋`SmartLinks.tsx`、`app/api/social/smartlink/*`、公開頁 `app/smartlink/[slug]/page.tsx`（走 `social.aware-wave.com/smartlink/<slug>`，操作者 2026-10-17 定；slug 只用小寫英數與 `-`，全品牌唯一，保留 go／admin／api／new；middleware 允許匿名；`noindex` 可選）、`app/smartlink/[slug]/go/[item]/route.ts`（302＋`social_smart_link_clicks` +1）。
 - 輸入：樣稿 `function renderSmart`（`.phone` 預覽）。
 - 輸出：編輯頁＋公開頁同一份 `LinkPage` 元件（預覽＝公開頁縮小）；未發布的 slug 回「這頁還沒開放」。
 - 驗收：`smartlink.test.ts`：slug 唯一、未發布 404 文案、點擊累加同日 upsert；e2e：加連結→公開頁看到→點→計數 +1。
@@ -226,5 +226,5 @@
 
 ## 3. 順序與依賴
 C1 → C2、C3（並行）→ C4 → C5、C6（並行；C6 可先用 C4 的 mock 資料）→ C7、C8、C9、C10、C11（並行，互不碰檔）→ C12。
-V1.5：C20 → C19 → {C21｜C22｜C26｜C29（並行，互不碰檔：C21 `compose/`＋`Editor.tsx`＋`compose.ts`；C22 `Calendar.tsx`＋`Trash.tsx`；C26 `smartlinks/`＋`app/l/`；C29 `inbox/`）} → C23（用 C21 的 `DateTimePicker`）、C24 → C25；C27、C31 在 C21 後；C30 在 C21、C22 後；C28 等 G3。模型：想（卡內取捨）Fable 5.1；C19／C20／C21／C23／C24／C26／C27／C31 Opus 5.5；C22／C25／C28／C29／C30 Sonnet 5.5。狀態只在監工台 `agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs`，本檔卡片標題不寫狀態。
+V1.5：C20 → C19 → {C21｜C22｜C26｜C29（並行，互不碰檔：C21 `compose/`＋`Editor.tsx`＋`compose.ts`；C22 `Calendar.tsx`＋`Trash.tsx`；C26 `smartlinks/`＋`app/smartlink/`；C29 `inbox/`）} → C23（用 C21 的 `DateTimePicker`）、C24 → C25；C27、C31 在 C21 後；C30 在 C21、C22 後；C28 等 G3。模型：想（卡內取捨）Fable 5.1；C19／C20／C21／C23／C24／C26／C27／C31 Opus 5.5；C22／C25／C28／C29／C30 Sonnet 5.5。狀態只在監工台 `agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs`，本檔卡片標題不寫狀態。
 寫程式的 session 一次一張卡、一組檔；兩個 session 不碰同一檔。

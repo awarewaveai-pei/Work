@@ -31,6 +31,7 @@ export function render() {
       <p class="donewhen"><b>${esc(L.evidence)}：</b>${esc(s.gate)}</p>
       <details><summary>${esc(L.details)}：${esc(s.code)} ${esc(s.title)}</summary>
         <p><b>${esc(L.depends)}：</b>${s.depends.length ? s.depends.map((c) => `<a href="#${c}">${esc(c)}</a>`).join('、') : esc(L.none)}${s.before ? `；${esc(s.before)}` : ''}</p>
+        ${s.decided ? `<p><b>${esc(L.decided)}：</b>${esc(s.decided)}</p>` : ''}
         <p><b>${esc(L.card)}：</b><code>${esc(META.plan)} §1b ${esc(s.code)}</code></p>
         ${s.commit ? `<p><b>${esc(L.doneAt)}：</b><code>${esc(s.commit)}</code></p>` : ''}
       </details>
@@ -122,7 +123,7 @@ details code{font-size:12px;word-break:break-all}
 
 <section id="steps"><h2>${esc(COPY.steps.h)}</h2><p class="lead">${esc(COPY.steps.lead)}</p><ol class="steps">${steps}</ol></section>
 
-<section id="open"><h2>${esc(COPY.open.h)}</h2><p class="lead">${esc(COPY.open.lead)}</p><ol class="open">${open}</ol></section>
+<section id="open"><h2>${esc(COPY.open.h)}</h2><p class="lead">${esc(COPY.open.lead)}</p>${OPEN.length ? `<ol class="open">${open}</ol>` : `<p class="lead">${esc(COPY.open.none)}</p>`}</section>
 
 <section id="paths"><h2>${esc(P.h)}</h2>
 <div class="paths">

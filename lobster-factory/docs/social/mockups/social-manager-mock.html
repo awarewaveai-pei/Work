@@ -1185,7 +1185,7 @@ function side(html){ $("sideView").innerHTML=html; wireIcons($("sideView")); }
 // 智慧連結 (operator 2026-10-17: every feature works in the mock): one page behind the link in your bio
 function smartOf(){ const b=B(); if(!b.smart) b.smart={on:!!b.accounts.length,slug:brand,title:b.name,bio:"",sw:"a",links:b.accounts.length?[{id:1,title:"官網",url:"https://soulfulexpression.art",clicks:128,on:true},{id:2,title:"十一月課程報名",url:"https://soulfulexpression.art/nov",clicks:211,on:true},{id:3,title:"親子藝術時光",url:"https://soulfulexpression.art/sat",clicks:47,on:false}]:[]}; return b.smart; }
 function renderSmart(){ const m=smartOf(), on=m.links.filter(l=>l.on);
-  side(`<div class="ptop"><h2>智慧連結</h2><span class="muted">放在個人簡介的一個連結。打開是一頁，列出官網、報名表和各平台。</span><span class="r"><span class="muted">aw.link/${esc(m.slug)}</span><button type="button" class="btn-secondary" id="slCopy" data-i="copy">複製連結</button><span class="seg" id="slOn"><button type="button" class="${m.on?"on":""}" data-on="1">發布中</button><button type="button" class="${m.on?"":"on"}" data-on="0">先不發布</button></span></span></div>
+  side(`<div class="ptop"><h2>智慧連結</h2><span class="muted">放在個人簡介的一個連結。打開是一頁，列出官網、報名表和各平台。</span><span class="r"><span class="muted">social.aware-wave.com/smartlink/${esc(m.slug)}</span><button type="button" class="btn-secondary" id="slCopy" data-i="copy">複製連結</button><span class="seg" id="slOn"><button type="button" class="${m.on?"on":""}" data-on="1">發布中</button><button type="button" class="${m.on?"":"on"}" data-on="0">先不發布</button></span></span></div>
   <div class="rgrid" style="grid-template-columns:minmax(0,1fr) 300px"><div class="rform">
     <div class="row"><div style="flex:1"><h3 class="muted tag">頁面標題</h3><input type="text" id="slTitle" value="${esc(m.title)}" aria-label="頁面標題"></div><div style="flex:2"><h3 class="muted tag">一句介紹</h3><input type="text" id="slBio" value="${esc(m.bio)}" placeholder="例如：用畫畫說出說不出口的事" aria-label="一句介紹"></div><div><h3 class="muted tag">按鈕顏色</h3><span class="acts">${["a","b","c","d","e"].map(k=>`<button type="button" class="swatch sw-${k} ${m.sw===k?"on":""}" data-ssw="${k}" aria-label="顏色 ${k}"></button>`).join("")}</span></div></div>
     <div><h3 class="muted tag">連結（${m.links.length} 個，28 天看過的人 ${m.links.length?"1,240":"0"}、點擊 ${m.links.reduce((a,l)=>a+l.clicks,0)}；範例數字）</h3>
@@ -1193,7 +1193,7 @@ function renderSmart(){ const m=smartOf(), on=m.links.filter(l=>l.on);
     <div class="frow"><input type="text" id="slNewT" placeholder="按鈕文字，例如：預約" aria-label="新按鈕文字"><input type="url" id="slNewU" placeholder="https://" aria-label="新網址"><button type="button" class="btn-secondary" id="slAdd" data-i="plus">加連結</button><span class="hint" id="slHint"></span></div>
   </div><div class="rprev"><h3 class="muted tag">別人打開會看到</h3><div class="phone"><span class="av c0">${esc(m.title.slice(0,1)||"?")}</span><b>${esc(m.title)}</b><span class="muted tag">${esc(m.bio)}</span>${on.map(l=>`<span class="lbtn sw-${m.sw}">${esc(l.title)}</span>`).join("")}<span class="avs">${[...new Set(connected().map(a=>a.pf))].map(pfb).join("")}</span>${m.on?"":`<span class="err tag">（先不發布：別人打開會看到「這頁還沒開放」）</span>`}</div></div></div>`);
   const S=$("sideView"), save=()=>renderSmart();
-  $("slCopy").onclick=()=>{ $("slHint").textContent=`已複製 aw.link/${m.slug}（樣稿不會真的複製）`; };
+  $("slCopy").onclick=()=>{ $("slHint").textContent=`已複製 social.aware-wave.com/smartlink/${m.slug}（樣稿不會真的複製）`; };
   S.querySelectorAll("[data-on]").forEach(x=>x.onclick=()=>{ m.on=x.dataset.on==="1"; save(); });
   $("slTitle").onchange=e=>{ m.title=e.target.value; save(); }; $("slBio").onchange=e=>{ m.bio=e.target.value; save(); };
   S.querySelectorAll("[data-ssw]").forEach(x=>x.onclick=()=>{ m.sw=x.dataset.ssw; save(); });
@@ -1500,7 +1500,7 @@ function renderXtras(){
   X.querySelectorAll("[data-em]").forEach(x=>x.onclick=()=>insertText(x.dataset.em, true));
   X.querySelectorAll("[data-ai]").forEach(x=>x.onclick=()=>say(x.dataset.ai==="short"?"（樣稿）AI 會把這一份改短，改好先給你看，按「用這版」才換掉。這次約 NT$1。":"（樣稿）AI 會換個溫暖的口氣重寫，改好先給你看。這次約 NT$1。"));
 }
-function shortLink(){ const s=$("xshort"); if(!s) return; const v=ed.link.trim(); s.textContent = v ? `會縮成 aw.link/${(v.length*7919%46655+1296).toString(36)}${ed.utm?"，帶 utm_source=各平台名":""}` : ""; }
+function shortLink(){ const s=$("xshort"); if(!s) return; const v=ed.link.trim(); s.textContent = v ? `發出時會縮成短網址${ed.utm?"，帶 utm_source=各平台名":""}` : ""; }
 function insertText(t, inline){ const el=$("text"); if(el.readOnly) return say("這個分頁用共用文字。要改，先按「另外寫一份」。"); const v=el.value; el.value = inline ? v.slice(0,el.selectionStart)+t+v.slice(el.selectionEnd) : (v+"\n"+t).trim(); el.dispatchEvent(new Event("input")); }
 // the parts after the post: Bluesky / Threads join them into a thread; Facebook / Instagram / LinkedIn post them as comments
 function addPart(){ ed.parts.push({text:"",delay:0}); renderParts(); renderPreview(); const t=$("parts").querySelectorAll("textarea"); if(t.length) t[t.length-1].focus(); }
