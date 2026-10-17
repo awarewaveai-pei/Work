@@ -46,7 +46,9 @@
 | S6 | Metricool List：大搜尋框、日期區間、篩選、⋮、「Bulk actions ▾」、「＋ Create post」；表頭 Date／Post content／Networks／Status | 批次鈕放在表格底部 | U2 一起做 |
 | S7 | 空狀態一律：圓形淡色圖示＋粗體一句＋灰色一句說明（＋按鈕） | 一句灰字 | U13 照此 |
 | S8 | 行事曆右上角時區可切換（「8:26 PM - Asia/Taipei ▾」）；現在時間有一條橫線；今天欄頭深色 | 時區只顯示 | 小修 |
-| S9 | Flows（留言／私訊自動回覆）、SmartLinks（連結頁）、Ads、Reporting（PDF／PPT 報表、跨品牌儀表板）都是介紹頁＋升級鈕 | 矩陣已排 V2／V3／不做 | 不變 |
+| S9 | Flows（留言／私訊自動回覆）、SmartLinks（連結頁）、Ads、Reporting（PDF／PPT 報表、跨品牌儀表板）都是介紹頁＋升級鈕 | 矩陣排 V2／V3／不做 | **操作者 2026-10-17 改判**：六區都進頂部功能列、都要有頁；數據分析／報表管理 V1 畫面（F18／F23）；收件匣頁＝Chatwoot 入口＋未讀數；智慧連結、廣告管理先畫「尚未開通」頁 |
+
+**操作者定案（2026-10-17，正本 ADR 016 §5「操作者定案」）**：頻道放左側清單（撐 100 個）；頂部六區（數據分析／報表管理／訊息收件匣／貼文排程／智慧連結／廣告管理）；貼文排程六分頁；日曆上方一列（搜尋／本週／篩選／最佳發布時間／建立貼文）；**建立貼文開獨立整頁**。數據分析與報表管理**是 V1 設計範圍**——本檔 S9 與 §3 F18 原本寫「V2／不畫」是錯的，已改。
 
 結論不變（U1–U6 成立），但修正兩處：U5 的「三層」改為「頻道列＋大文字框（icon 在框內）＋摺疊的平台設定」；預覽兩種做法都可（Postiz 並排、Metricool 切換），我們一屏 1280 寬應走 Postiz 的並排。
 
@@ -93,7 +95,8 @@
 | F15 | **CSV 匯入／匯出** | C V2 | 無 | Metricool 兩者皆有 | V2 |
 | F16 | **媒體來源**（Drive／Canva／圖庫） | D V2 | 無 | Metricool：Drive／Canva／Adobe Express／Pexels／Giphy | V2 |
 | F17 | **頻道頭像／名稱** | A V1 隱含 | `social_accounts` 無 `picture`（`0096:57`） | 兩者所有畫面都用頭像辨識頻道 | V1（U4 前置） |
-| F18 | **分析** | E V2 | 無 | Postiz analytics API 已在 v2.25 | V2 |
+| F18 | **數據分析頁**（觸及、互動、粉絲成長；左欄選平台，右上選期間；指標卡＋趨勢圖＋貼文表） | E「各平台帳號分析」「單則貼文成效」 | 無 | Metricool Analytics（操作者截圖 Summary／LinkedIn 頁）；Postiz analytics API v2.25 | **V1 畫面（操作者 2026-10-17）**；真資料接平台審核後 |
+| F23 | **報表管理頁**（選平台＋期間 → PDF／PPT；套品牌 logo 色；排程寄出） | E「自動報表」 | 無 | Metricool Reporting（操作者截圖）；Postiz 無 | **V1 畫面（操作者 2026-10-17）**；產出走既有報表管道 |
 | F20 | **貼文庫**：存整則貼文（含圖），拖進行事曆重用 | 矩陣未列 | 只有 `social_saved_texts` 存文字 | Metricool Posts library（§1.1 S3） | V2 |
 | F21 | **輪播時段方格**（星期 × 時段點選） | C 輪播 V1 | 星期 chip＋單一時間（`Lists.tsx` 每週列） | Metricool Autolists（§1.1 S4） | V1（C17） |
 | F22 | **已刪除分頁＋刪除者** | C「已刪除可還原」V1 | 清單內切換鈕；`social_audit_log` 有 actor 但畫面沒顯示 | Metricool Deleted posts（§1.1 S5） | V1（C17） |
@@ -111,7 +114,7 @@
 
 | 卡 | 內容 | 依賴 | 建議模型 |
 |---|---|---|---|
-| **C13 版面規格 v2**（U1–U6、U12、U13） | 先出樣稿 v14：頭像頻道列、篩選按鈕、週檢視堆疊卡＋縮圖、三層編輯器、每平台預覽殼、日期選擇、側檢視全寬、空狀態；`check-social-mocks.py` 加「一屏 chip ≤ 20」「卡片含縮圖」規則；操作者看圖同意後才動程式 | F17（頭像欄） | Fable 5.1（設計）→ Opus 5.5（實作） |
+| **C13 版面規格 v2**（U1–U6、U12、U13；**骨架照 ADR 016 §5 操作者定案 1–5**：左側頻道清單、頂部六區、排程六分頁、建立貼文整頁、數據分析／報表管理頁） | 先出樣稿 v14：頭像頻道列、篩選按鈕、週檢視堆疊卡＋縮圖、三層編輯器、每平台預覽殼、日期選擇、側檢視全寬、空狀態；`check-social-mocks.py` 加「一屏 chip ≤ 20」「卡片含縮圖」規則；操作者看圖同意後才動程式 | F17（頭像欄） | Fable 5.1（設計）→ Opus 5.5（實作） |
 | **C14 媒體與影片**（F1、F2、F8、U8） | video 上傳（Postiz `upload` 已收影片）、封面、多圖排序、裁切、媒體庫 modal | — | Opus 5.5 |
 | **C15 編輯器完整化**（F3、F4、F5、F6、F9） | 平台設定面板（先 IG Reel／Threads finisher／LinkedIn），串文＋延遲，mention／emoji，shortLink 偏好，AI 鈕 | C13 | Opus 5.5 |
 | **C16 手機**（U10） | 日檢視、全螢幕 sheet 編輯器、`render-views.mjs` 加 390 寬斷言（頁寬 = 視窗寬） | C13 | Opus 5.5 |

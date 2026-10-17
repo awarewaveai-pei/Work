@@ -45,13 +45,20 @@
 - 樣稿 = 規格：`lobster-factory/docs/social/mockups/social-manager-mock.html`。沒有下拉選單；文字不小於 14px（標籤 12px）。
   - 第 14 版（2026-10-16，C13，`SOCIAL_MANAGER_GAP_REPORT.md` U1–U6、U12、U13；**等操作者看圖同意**，產品程式仍是第 13 版）：行事曆（週／月／清單）在左、編輯＋各平台預覽在右；輪播／媒體／紀錄／設定改全寬、不帶編輯器。控制只有三種（主要動作、分段切換、一顆篩選鈕＋面板），一屏 pill ≤ 20；週檢視每天一欄、卡片照時間疊、有縮圖。手機（≤640px）日檢視＋全螢幕編輯。`check-social-mocks.py` 以瀏覽器實量把關（`[chips]`、`[card-thumb]`）。
   - 第 13 版（2026-10-14 同意）：一個畫面，左邊行事曆（週／月／清單／輪播／媒體／紀錄／設定），右邊永遠是編輯＋預覽。
+- **操作者定案（2026-10-17，看過 Metricool／自架 Postiz 電腦版後；取代第 13／14／15 版的版面骨架，功能不變）**：
+  1. **頻道不放上面**：頻道（連接的社群帳號）放左側可捲動清單（Postiz 式），每列頭像＋名稱＋「⋮」；要撐到一個品牌或代操 100 個帳號，不能是一排頭像。
+  2. **頂部功能列六區**（Metricool 式，中文名定案）：數據分析 Analytics／報表管理 Reporting／訊息收件匣 Inbox／貼文排程 Planning／智慧連結 SmartLinks／廣告管理 Ads。**數據分析與報表管理是重點，V1 就要在設計裡**（§6 原本「分析 V2」只指資料來源要等平台審核，不是畫面）。
+  3. **貼文排程底下六個分頁**：排程日曆 Calendar／貼文清單 List／貼文素材庫 Posts library／自動發布清單 Autolists（＝輪播）／已刪除貼文 Deleted posts／自動化流程 Flows。
+  4. **日曆上方一列**：搜尋／本週＋左右切換／篩選／各社群最佳發布時間（可切平台）／建立貼文。
+  5. **建立貼文開獨立整頁**（按「建立貼文」或日曆格的「＋」），不是右欄；右欄太小不好操作。
+  這五項是版面骨架；第 14／15 版做出來的卡片、三種控制、串文、方格時段、空狀態照搬進新骨架。
 - 樣式只有一個來源：next-admin `app/globals.css`（`mockups/sync-app-theme.py` 同步、`check-social-mocks.py` 比對）。產品實作直接用同一組 token 與 `.btn-primary`／`.btn-secondary`；狀態色對應 `--status-ignored`／`--yellow`／`--green`／`--red`／`--severity-low`／`--accent`。
 - 輪播清單（Metricool autolists）在 V1；CSV 匯入以「從 WordPress 文章清單批次做貼文」取代。
 
 ### 6. 不在本產品裡重做的
 
 - 收件匣 = Chatwoot（既有決策）；Meta 審核過後在 Chatwoot 接 FB／IG，本產品只放入口與未讀數。
-- 數據分析走 Postiz analytics API（原始碼 11 個 provider 有 `analytics`），審核時一併申請分析權限；V2。
+- 數據分析走 Postiz analytics API（原始碼 11 個 provider 有 `analytics`），審核時一併申請分析權限。**畫面在 V1（§5 定案 2）**；真資料等各平台分析權限審核通過才接。
 - 不做：廣告管理、手機 app、X。
 
 ### 7. 收費與 AGPL
