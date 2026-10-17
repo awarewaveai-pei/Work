@@ -52,7 +52,7 @@
 5. **外部供應商一律在接頭後面**，接頭的值是設定不是程式：付款 `payments: woo | stripe | local`、會員與登入 `loginSources`（ADR 018 §3）、CRM 事件下游 `crm: fluentcrm | none`、AI `lib/ai/gateway.ts`、主機商 `serverAdapterFactory`。
 6. **離開 WordPress 測試**（可替換性的具體形式）：整套測試以 `payments=local`、`loginSources=[local]`、`crm=none` 跑一遍必須全綠；任何核心邏輯 import WordPress／Woo／Fluent 的符號即紅燈（第 2 步 import-boundary 閘加這一組）。WordPress 是今天的門口與收銀台（ADR 015），不是房子；哪天自建會員與金流，換接頭的值，產品程式不動。
 7. **選配**：`features[]` 與 `plans` 決定一個客戶能用哪些功能；`standalone`＋`dependsOn` 決定買斷能單獨裝哪些積木。
-8. **只有一個入口**：新系統只從 `scripts/new-product.mjs` 長出來（順序 1）；手寫一列＝閘紅。
+8. **只有一個入口，兩條路進來**：新系統只從 `scripts/new-product.mjs` 長出來（順序 1）；手寫一列＝閘紅。整套新系統先走 System Foundry（`python scripts/serve_configurator.py` → 答要／不要 → Submit → `generated/<名稱>/`），再 `new-product.mjs --from-foundry generated/<名稱>`：讀 `.foundry/resolution/foundry-plan.json` 與藍圖末節「交付登記」，十項宣告直接填進 `MODULE_MANIFEST.json`（欄位名與 `kernel/06` 相同），只補問子網域與逐項收費功能；小工具直接 `new-product.mjs` 答五題。兩條路同一份登記表、同一個 `can()`、同一個 manifest。
 
 ### 1. 兩條路，同一份商品目錄、同一個判斷
 

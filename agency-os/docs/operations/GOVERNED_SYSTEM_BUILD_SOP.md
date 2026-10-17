@@ -123,7 +123,7 @@ VBC 的最低步驟是：讀原始主張與其追蹤紀錄、查詢實際現況�
 
 ## 18. 對外販售的產品：開工前填完交付清單
 
-AwareWave 的產品或系統工具只要會給客戶用（訂閱、點數或買斷），規劃時就逐條回答下面五題，答案寫進 `lib/portal/products.ts` 那一列；少填一欄，`products.test.ts` 就紅燈。規則本體是 ADR 018，這裡只列要回答的題目。**實證出處：** `018-product-doors-and-buyout-delivery.md` §1–5；`017-entitlements-and-self-hosted-modules.md` §5。
+AwareWave 的產品或系統工具只要會給客戶用（代操、訂閱、點數或買斷），規劃時就逐條回答下面五題；答案由 `scripts/new-product.mjs` 寫進 `lib/portal/products.ts` 那一列（整套新系統先走 System Foundry 問卷，再 `new-product.mjs --from-foundry`；小工具直接答五題；ADR 017 §0b 第 8 條）。少填一欄，`products.test.ts` 就紅燈。規則本體是 ADR 018，這裡只列要回答的題目。**實證出處：** `018-product-doors-and-buyout-delivery.md` §1–5；`017-entitlements-and-self-hosted-modules.md` §5。
 
 1. **子網域**（`subdomain`）：線上叫什麼？不能是 app、portal、www。網址由基底網域組出來，程式裡不寫網域。
 2. **門**（`door`）：頁面和 API 在 next-admin 的哪個前綴？前綴不能碰到員工路由；不在 next-admin 就填 external。

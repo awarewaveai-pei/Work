@@ -31,7 +31,7 @@ export const COPY = {
 
 // 每個系統都要過的規則（ADR 017 §0b）；監工台最上面一段
 export const RULES = [
-  { h: '同一個模式', t: '新系統只從 scripts/new-product.mjs 長出來：登記列、自己的門、自己的資料、收費前只問 can()。手寫一列，測試紅燈。' },
+  { h: '同一個模式', t: '整套新系統先在 System Foundry 答「要／不要」，再執行 scripts/new-product.mjs --from-foundry；小工具直接執行 new-product.mjs 答五題。兩條路都產生同一份登記列、自己的門、自己的資料、收費前只問 can() 的骨架。手寫一列，測試紅燈。' },
   { h: '離開 WordPress 也能跑', t: '付款、登入、CRM 都在接頭後面，接頭的值是設定。整套測試以 payments=local、login=local、crm=none 跑一遍必須全綠。WordPress 是今天的門口與收銀台，不是房子。' },
   { h: '樂高：選配與串接', t: '功能用 features 與方案決定；買斷能單獨裝哪些積木由 standalone 與 dependsOn 決定；積木之間只走 API 與簽章事件，不讀對方的表。' },
 ];
