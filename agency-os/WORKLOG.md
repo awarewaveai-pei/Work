@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-17（續3）危機訊息正式驗收通過（Telegram 兩則操作者確認收到）；「真人接手中也回一句」文案由 GPT 寫好，等操作者同意才改程式
+
+**操作者**：「我已確認 Telegram 有收到『我想死』和『我不想活了』兩則危機通知，這部分驗收通過」；接手中回一句的文案「交給 GPT 寫，只寫實話…不能說『我們看到了』…同一對話 30 分鐘內只回一次。寫好先給我看文案，我同意才改程式」。
+
+**驗收結果**（TASKS「危機訊息正式環境驗收」）：
+- 客人端：「我想死」1.9 秒收到專線確認句（前 session，TASKS 2026-10-17 進度）✅
+- 操作者端：「我想死」「我不想活了」各一則 Telegram 通知，操作者 2026-10-17 確認收到 ✅
+- 「我覺得活著很痛苦」沒通知＝沒中關鍵字＋對話已由真人接手（open）；接手中的分支只做 captureName 與危機 page（`app/api/webhooks/chatwoot/route.ts:97-107`），不回客人 → 本條的待辦。
+
+**文案（Codex CLI＝GPT 寫，prompt 與輸出在 session scratchpad；只給事實：系統收到、工作人員親自回覆、119／000、1925／1995／Lifeline）**：
+- ZH：「系統已收到您的訊息，工作人員會親自回覆您。／如果您現在有立即的危險，請馬上撥打緊急電話：台灣 119、澳洲 000。／24 小時求助專線：台灣 1925 安心專線、1995 生命線；澳洲 Lifeline 13 11 14。」
+- EN（GPT 原稿專線名稱夾中文「1925 安心專線, 1995 生命線」，改程式時對齊現有 `CRISIS_ACK_EN` 寫法「1925 or 1995 (Taiwan)」）：「Your message has been received, and a staff member will reply to you personally. / If you are in immediate danger, please call emergency services now: Taiwan 119, Australia 000. / 24-hour support lines: Lifeline 13 11 14 (Australia), 1925 or 1995 (Taiwan).」
+- 與現有第一次轉真人文案（`lib/cs/handoff-ack.ts` `crisisAckZh`）差別：少「謝謝您願意告訴我們」、不問名字、「會親自回覆」不寫「盡快」。
+
+**程式方案（等文案同意後做，改 `route.ts` human_owns_thread 分支）**：客人訊息命中 `hitsCrisis` 且對話 open → `after()` 內：T27 閘 `checkProductionChangeAllowed`（同 captureName）→ 查同一對話 30 分鐘內是否已送過 holding 句 → 沒送過才 `sendReply`。30 分鐘狀態存 DB（bot token 讀 Chatwoot 訊息會 401，`route.ts:300`，不能靠讀對話）：A＝`cs_ai_replies` 加 action `crisis_holding`（以客人 message id 為鍵，查該對話最近一筆 `created_at`；但 `lobster-factory/packages/db/migrations/0051_cs_core.sql:171` 的 CHECK 要放寬，且 sweep `listUnfinishedClaims` 要排除它）；B＝新表 `cs_crisis_holding_replies(organization_id, chatwoot_conversation_id, sent_at)`。兩案都要 migration，B 不碰既有 claim 語意，建議 B。check-then-act 併發最壞＝兩句重複（同 `acknowledgeHandoff` 現有取捨）。分類器 `self_harm` 意圖在接手中分支抓不到（分支不跑分類），只靠關鍵字，與現況一致。
+
+- REALTEST_WAIVED: DOC_ONLY -- 本條只記錄驗收結果與文案，程式未改
+- REVIEW_WAIVED: DOC_ONLY -- 無程式改動
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式改動
+
+**剩**：操作者看文案 → 同意後改程式（上述方案 A／B 擇一，含 vitest `route.test.ts` 「a human already owns the thread」系列加 30 分鐘案例）→ 部署 → John Doe 在接手中對話傳危機句驗收。建議模型：Opus 5.5
 ## 2026-10-17（續2）社群發文樣稿第 16 版：照操作者五項定案重畫骨架（ADR 016 §5「操作者定案」1–5）— 等操作者看圖
 
 **來源**：操作者否決 v14／v15 骨架，自己寫了五項定案（67885b767）＋ 20 張截圖（12–21；22–31 是重複，md5 相同；沒有數據分析／報表的截圖，這兩頁照 Metricool Summary 的慣例畫）。只改 `lobster-factory/docs/social/mockups/`＋ADR 016 §5 版本行。
