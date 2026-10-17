@@ -41,6 +41,19 @@
 - **已定義、還沒賣的值**（不是待補，是等第一個客戶）：`api_key` actor（順序第 6 步）；轉售＝授權檔 `max_tenants > 1`（順序第 7 步）。值存 text，不存 boolean，加值不改 schema。
 - System Foundry 問卷要對齊三軸：已有 CAP-SUBSCRIPTION／CAP-PREPAID-CREDITS／CAP-LICENSE／CAP-MULTI-TENANT／CAP-CUSTOMER-USERS；缺「代操」、缺 `self_hosted` 獨立題、缺 API 通道；藍圖必寫「許可只問 `can()`，不自建帳本」（TASKS 2026-10-16）。
 
+### 0b. 每個系統同一個模式：積木契約（操作者 2026-10-17「每次開發系統要用同一個模式」「樂高積木」「未來某天不掛 WordPress」）
+
+一個產品＝一塊積木。十項宣告照 System Foundry `kernel/06_MODULARITY_CONTRACT.md`（state／behavior／API 與事件契約／不變量／依賴／失敗隔離／資料生命週期／可觀測／遷移回滾／替換策略），寫在登記表那一列的 `modules` 與產生器產出的 `MODULE_MANIFEST.json`。本 ADR 加的、每塊都要過的八條：
+
+1. **登記列**：`products.ts` 一列（門、登入來源、`features[]`、`accessChannels`、`modules`）。沒有列＝不是產品，拿不到許可。
+2. **自己的門**：子網域保留，頁面在自己的前綴下（ADR 018）。
+3. **自己的資料**：不讀寫別的產品的表（HCI ADR-0002）；要資料走對方的 API 或簽章事件。
+4. **只問一個判斷**：收費動作前 `can(主體, feature_key, actor)`；不自建帳本、不自建方案表。
+5. **外部供應商一律在接頭後面**，接頭的值是設定不是程式：付款 `payments: woo | stripe | local`、會員與登入 `loginSources`（ADR 018 §3）、CRM 事件下游 `crm: fluentcrm | none`、AI `lib/ai/gateway.ts`、主機商 `serverAdapterFactory`。
+6. **離開 WordPress 測試**（可替換性的具體形式）：整套測試以 `payments=local`、`loginSources=[local]`、`crm=none` 跑一遍必須全綠；任何核心邏輯 import WordPress／Woo／Fluent 的符號即紅燈（第 2 步 import-boundary 閘加這一組）。WordPress 是今天的門口與收銀台（ADR 015），不是房子；哪天自建會員與金流，換接頭的值，產品程式不動。
+7. **選配**：`features[]` 與 `plans` 決定一個客戶能用哪些功能；`standalone`＋`dependsOn` 決定買斷能單獨裝哪些積木。
+8. **只有一個入口**：新系統只從 `scripts/new-product.mjs` 長出來（順序 1）；手寫一列＝閘紅。
+
 ### 1. 兩條路，同一份商品目錄、同一個判斷
 
 | | 線上（在我們的平台用） | 買斷（裝在客戶自己的主機） |
@@ -129,6 +142,7 @@
 
 ## 不採用
 
+- **每個系統各自做會員、登入、計費、方案**（2026-10-17 前的實況：八個系統四套互不相容的訂閱與點數，ADR 012 脈絡）：違反 §0b 第 4、5 條；改成每塊只問 `can()`、供應商在接頭後。
 - **把對外五種方式存成一個 enum**：「買斷＋代操」「只串 API」沒地方放，每加一種改程式；存三軸（§0）。
 - **買斷＝線上權利表裡一筆沒有到期日的列**：客戶還在我們主機、用我們的 API，賣一次永遠倒貼（操作者 2026-10-14 更正）。
 - **每個模組拆成獨立 app**：多出好幾套登入和主題（016「不採用」同理）。

@@ -18,7 +18,8 @@ export const META = {
 export const COPY = {
   sub: '說明客戶來源、付款方、操作人，以及系統尚缺的項目。',
   updated: '更新於 {date}',
-  nav: { now: '現況', ways: '五種客戶', steps: '待建項目', open: '待你決定', doors: '入口', paths: '檔案' },
+  nav: { rules: '規則', now: '現況', ways: '五種客戶', steps: '待建項目', open: '待你決定', doors: '入口', paths: '檔案' },
+  rules: { h: '每個系統都要過的規則', lead: '這三條寫在 ADR 017 §0b，測試會擋，不靠記憶。' },
   now: { h: '現況', lead: '客戶目前無法自行登入，也尚未收費；現在只有自用與代操。' },
   ways: { h: '五種客戶', lead: '每種客戶由三個答案決定：安裝位置、付款來源、操作人。新增客戶類型只需增加一列，不必修改程式。', count: '共 {total} 種，{live} 種已運作' },
   steps: { h: '待建項目', lead: '項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。', count: '{done}／{total} 完成' },
@@ -27,6 +28,13 @@ export const COPY = {
   paths: { h: '檔案', plan: '計畫正本', doors: '入口規則', platform: '共用平台與錢包', track: '追蹤', self: '本頁來源', howto: '修改 data.mjs，再執行 node build.mjs、node check.mjs，最後重新發布' },
   label: { card: '執行卡', yes: '有', no: '沒有', live: '已運作', notLive: '未開放', todo: '未開始', doing: '進行中', done: '已完成', risk: '風險', who: '負責', evidence: '完成條件', details: '工程細節', depends: '前置', files: '檔案', none: '無', doneAt: '完成於', item: '第 {n} 項', also: '另有' },
 };
+
+// 每個系統都要過的規則（ADR 017 §0b）；監工台最上面一段
+export const RULES = [
+  { h: '同一個模式', t: '新系統只從 scripts/new-product.mjs 長出來：登記列、自己的門、自己的資料、收費前只問 can()。手寫一列，測試紅燈。' },
+  { h: '離開 WordPress 也能跑', t: '付款、登入、CRM 都在接頭後面，接頭的值是設定。整套測試以 payments=local、login=local、crm=none 跑一遍必須全綠。WordPress 是今天的門口與收銀台，不是房子。' },
+  { h: '樂高：選配與串接', t: '功能用 features 與方案決定；買斷能單獨裝哪些積木由 standalone 與 dependsOn 決定；積木之間只走 API 與簽章事件，不讀對方的表。' },
+];
 
 // ADR 018 §1：三扇門
 export const DOORS = [

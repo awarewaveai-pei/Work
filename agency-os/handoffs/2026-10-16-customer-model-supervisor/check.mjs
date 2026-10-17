@@ -3,7 +3,7 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { META, AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY } from './data.mjs';
+import { META, AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY, RULES } from './data.mjs';
 import { render } from './build.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -53,6 +53,8 @@ for (const s of STEPS) {
 
 // 4. 三扇門三個、不重複；現況每列 state 只有 yes/no
 if (DOORS.length !== 3) fail('DOORS 不是 3');
+if (!Array.isArray(RULES) || RULES.length < 3 || RULES.some((r) => !r.h || !r.t)) fail('RULES 少於 3 條或有空欄');
+if (!/### 0b\./.test(adr)) fail('ADR 017 沒有 §0b 積木契約');
 for (const r of NOW) if (!['yes', 'no'].includes(r.state)) fail(`NOW ${r.what}: state ${r.state}`);
 
 // 5. 頁面是最新產物（沒有手改 html）

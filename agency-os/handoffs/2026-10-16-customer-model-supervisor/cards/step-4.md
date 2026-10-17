@@ -3,6 +3,7 @@
 **風險** High（金流）　**模型** Opus 5.5　**前置** 第 3 項；待決 1（定期扣款外掛）；待決 3（點數條款與預收）；ADR 015 順序 1（WordPress 一次性碼進入產品門，否則付了錢的人進不來）　**正本** ADR 017 §2、§3、順序 4；ADR 015 §3、§4
 
 ## Decision
+- 付款走接頭 `lib/payments/provider.ts`：介面 `{ verify(req), parse(req) → PaymentEvent }`，實作 `woo.ts` 與 `local.ts`（測試與離開 WordPress 用）；設定值 `PAYMENTS_PROVIDER=woo|local`。控制面只認 `PaymentEvent`，不認 Woo 欄位（ADR 017 §0b 第 5、6 條）。
 - wp-bridge 外掛（`lobster-factory/packages/wp-bridge-plugin/`）在 Woo 訂單完成、訂閱續約、訂閱取消、點數包購買四個事件，POST 簽章 webhook 到 next-admin `app/api/webhooks/woo/route.ts`，照既有 `app/api/webhooks/video-billing/` 的驗證寫法（Bearer token＋HMAC）。
 - 控制面處理：用 `plans.woo_product_ids` 查方案 → 0062 upsert（冪等鍵＝Woo 訂閱編號＋事件 id）→ 重算該計費帳戶該產品的 `organization_entitlements`（舊列 `ends_at` 設為現在、新列 active）。點數包 → 帳本 `grant` 一筆（冪等鍵＝Woo 訂單編號）。
 - 帳本泛化：`media_billing_accounts`／`media_credit_ledger` → `billing_accounts`／`credit_ledger`，加 `product_key`；migration `0105_credit_ledger_generalize.sql` 用 view 雙名過渡一版（ADR 012 §8 第 4 步「最後、expand-contract」）。
@@ -28,6 +29,7 @@ curl -s -X POST http://localhost:3000/api/webhooks/woo -H "Authorization: Bearer
 → `{"ok":true,"contract":"<uuid>","entitlements":N}`；同一請求再打一次 → `{"ok":true,"replayed":true}`；`/ops/billing` 顯示該帳戶。
 真實：Woo 測試模式下單一筆（金流沙盒）→ prod `/ops/billing` 出現合約；`select count(*) from organization_entitlements where status='active'` ≥ 1。
 突變：拔掉冪等鍵檢查 → `replaying…` 測試紅；還原綠。
+離開 WordPress 測試：`PAYMENTS_PROVIDER=local LOGIN_SOURCES=local CRM_SINK=none npx vitest run` 全綠；在 `lib/entitlements/contracts.ts` 加一行 `import "@/lib/wp-bridge"` → import-boundary 測試紅；移除綠。
 
 ## Rollback
 webhook route 下架（回 410）；套 `0105_credit_ledger_generalize.down.sql`（view 過渡期內無資料損失）；Woo 側停用外掛事件；`git revert`。

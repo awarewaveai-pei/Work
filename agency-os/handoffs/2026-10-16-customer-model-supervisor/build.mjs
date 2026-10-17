@@ -5,7 +5,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { META, COPY, DOORS, AXES, WAYS, NOW, STEPS, OPEN, SIDE } from './data.mjs';
+import { META, COPY, RULES, DOORS, AXES, WAYS, NOW, STEPS, OPEN, SIDE } from './data.mjs';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const t = (s, v = {}) => esc(s).replace(/\{(\w+)\}/g, (_, k) => `<span data-computed>${esc(v[k])}</span>`);
@@ -20,6 +20,7 @@ export function render() {
   const axisOf = Object.fromEntries(AXES.map((a) => [a.key, a]));
   const val = (k, v) => axisOf[k].values.find((x) => x.v === v);
   const counts = {
+    rules: '',
     now: '',
     ways: t(COPY.ways.count, { total: WAYS.length, live }),
     steps: t(COPY.steps.count, { done, total: STEPS.length }),
@@ -96,6 +97,7 @@ code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border-radius
 small{display:block;color:var(--muted);font-size:13px;font-weight:400}
 ul.yn{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 ul.yn li{display:grid;grid-template-columns:52px 1fr;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
+ul.yn.rules li{grid-template-columns:130px 1fr}ul.yn.rules li b{color:var(--accent)}
 ul.yn li.yes b{color:var(--done)}ul.yn li.no b{color:var(--no)}
 ul.yn li span{min-width:0}
 .ways{display:grid;gap:12px}
@@ -149,6 +151,8 @@ ul.doors li span{min-width:0}
 </div></aside>
 <main>
 <p class="sub">${esc(COPY.sub)}</p>
+
+<section id="rules"><h2>${esc(COPY.rules.h)}</h2><p class="lead">${esc(COPY.rules.lead)}</p><ul class="yn rules">${RULES.map((r) => `<li><b>${esc(r.h)}</b><span>${esc(r.t)}</span></li>`).join('')}</ul></section>
 
 <section id="now"><h2>${esc(COPY.now.h)}</h2><p class="lead">${esc(COPY.now.lead)}</p><ul class="yn">${now}</ul></section>
 
