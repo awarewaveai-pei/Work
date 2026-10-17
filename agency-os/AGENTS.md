@@ -81,15 +81,15 @@
 
   手上工作與目前 session 模型不匹配 → **回覆首行**寫 `⚠ 建議切 <模型>：<一句原因>`；匹配不提。agent 不能改自己 session 的模型，由操作者在模型選單切。計畫的「下一步」行與 AO-RESUME §8 每個下一步都附 `建議模型：<…>`。
 - **共享工作目錄同時最多 2 個 session**。`spawn_task` 卡片只有操作者開的主線 session 可留；卡片開出的 session 發現範圍外問題寫 `TASKS.md` 一行＋WORKLOG 連結，**不得再留卡**；卡片由操作者決定何時點開，一次一張。§Agent 扇出治理
-- **Session 切換**（操作者不記；閘 `suggest-compact.js` 每輪注入 `[Hook][CTX] <N>k tokens ≈ <P>%`，agent 據此自判並提醒，格式同模型提醒）：
+- **Session 切換**（操作者不記；閘 `suggest-compact.js` 只在 CTX ≥ 80% 注入一次 `[Hook][CTX]`；**每種提醒同一 session 只說一次**，說過就不再提，操作者沒照做也不追）：
 
   | 情境 | 回覆首行 |
   |---|---|
-  | 任務收尾（§1 四段已輸出、commit 完）；操作者換題（舊任務未完先 `/tomo`） | `⚠ 建議 /clear → 新 session 第一句貼：「<開場句>」` |
-  | 任務未完且 CTX ≥ 50% | `⚠ 建議 /compact：保留 <焦點一句>` |
-  | 任務未完且 CTX ≥ 80%，或 compact 後仍鈍 | 先 `/tomo` 落 handoff，再 `⚠ 建議 /clear → 貼：「<開場句>」` |
+  | 任務收尾（§1 四段已輸出、commit 完）**且下一件是不同任務** | `⚠ 建議 /clear → 新 session 第一句貼：「<開場句>」` |
+  | 任務未完且 CTX ≥ 80%、本 session 沒壓過（快做完就不壓，做完再 clear） | `⚠ 建議 /compact：保留 <焦點一句>` |
+  | 任務未完且 CTX ≥ 80%、本 session 已壓過 | 先 `/tomo` 落 handoff，再 `⚠ 建議 /clear → 貼：「<開場句>」` |
 
-  開場句 = 零記憶的新 session 讀完就能動手的一行：`續做 <任務名>：讀 <SSOT 路徑>（TASKS.md 條目／handoffs packet／計畫 §），從 <第一個具體動作> 開始；完成 = <條件>。建議模型：<模型>`；handoff packet 首行「續接語」寫同一句。與模型提醒同時命中併成一行 `⚠ 建議 /clear → 切 <模型> → 貼：「…」`；不命中不提；任務進行中不建議 `/clear`（重讀比留著貴）；狀態在檔案不在對話。§Session 衛生
+  開場句 = 零記憶的新 session 讀完就能動手的一行：`續做 <任務名>：讀 <SSOT 路徑>（TASKS.md 條目／handoffs packet／計畫 §），從 <第一個具體動作> 開始；完成 = <條件>。建議模型：<模型>`；handoff packet 首行「續接語」寫同一句。與模型提醒同時命中併成一行 `⚠ 建議 /clear → 切 <模型> → 貼：「…」`；不命中不提；同任務的後續小步、操作者繼續問同一件事、CTX < 80% 都不提；任務進行中不建議 `/clear`（重讀比留著貴）；CLAUDE.md／AGENTS.md 等固定內容每個 session 都一樣，不是 clear 或 compact 的理由。§Session 衛生
 - **讀法分級**：要改／要驗證的檔**整檔讀**；確認單一事實用 grep；20+ 檔掃模式交 Codex；大 log 先 `grep`／`tail`；外部 CLI 輸出導檔再取。摘要的邊界 = 問題的邊界。設計討論每三輪自問「該落地成文件了嗎」。§Session 衛生
 - **扇出**（閘 `subagent-budget.js`，SSOT `mcp/claude-userlevel/hooks/rules/`）：Agent tool 20 分鐘滑動視窗 0–5 放行、6–10 需 prompt 含獨立一行 `CONFIRMED-INDEPENDENT-WORKSTREAM: <理由>`、>10 無條件 block（被擋重試也計入）。**Workflow tool 已關閉**（`permissions.deny`，`tests/hooks/settings-deny-parity.test.mjs` 守）；多代理一律走 Agent tool 固定角色模板。
 - **agent 數跟角色走**：理解／執行／critic／獨立觀點／整合，固定 4–5 個；**禁止**按 finding／檔案 1:N 複製角色（閘擋不到）；真正獨立可切割的工作分批 ≤10 個。**讀資料預設主 agent 自己讀**；例外 A 獨立驗證 critic 每 commit ≤1（§4）；例外 B >100KB 純調查 ≤1 agent 或 Codex，產出寫檔附 `file:line`。§Agent 扇出治理
@@ -213,5 +213,5 @@ Auto-Repair 流程 `incident → triage → backup → repair → health gate �
 - `docs/overview/REMOTE_WORKSTATION_STARTUP.md`
 - `README.md`
 
-_Last synced: 2026-10-15 06:19:20 UTC_
+_Last synced: 2026-10-17 07:05:49 UTC_
 

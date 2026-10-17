@@ -132,7 +132,7 @@
 
 **每一輪對話都會把整段歷史重送一次**，所以早期塞進 context 的東西之後每輪都在重複付費。這比 oracle 分工更大的槓桿，順序不可顛倒：
 
-1. **一個任務一個 session**。任務完成 → AO-CLOSE（狀態落進 `WORKLOG.md`／`TASKS.md`／memory）→ `/clear`。本 repo 的狀態不在對話裡而在檔案裡，所以 clear 幾乎零損失——這是 AO 生命週期設計的直接紅利。任務**進行中**不要 clear（重讀檔案比留著貴）；只是變長變鈍用 `/compact`。「變長變鈍」有量測：閘 `suggest-compact.js`（UserPromptSubmit）每輪讀 transcript 最後一則 assistant `usage`（input＋cache_creation＋cache_read＋output）注入 `[Hook][CTX] <N>k tokens ≈ <P>%`；視窗大小 transcript 不記，依 model id 查表（Claude 5 家族與 `[1m]` = 1M：2026-10-15 app `get_usage` 量得 Fable 5.1 = 1,000,000、Opus 5.5 transcript 量到 823k；其餘假定 200k，量到超過即升 1M 並標示；`CLAUDE_CONTEXT_WINDOW` 覆蓋），注入行標明來源。分級 ≥50% `/compact`、≥80% `/tomo` → `/clear`。前身「每 50 次 tool call WARN」2026-10-15 退場：計數不是 context，且 PreToolUse 的 stderr 操作者看不到。
+1. **一個任務一個 session**。任務完成 → AO-CLOSE（狀態落進 `WORKLOG.md`／`TASKS.md`／memory）→ `/clear`。本 repo 的狀態不在對話裡而在檔案裡，所以 clear 幾乎零損失——這是 AO 生命週期設計的直接紅利。任務**進行中**不要 clear（重讀檔案比留著貴）；只是變長變鈍用 `/compact`。「變長變鈍」有量測：閘 `suggest-compact.js`（UserPromptSubmit）讀 transcript 最後一則 assistant `usage`（input＋cache_creation＋cache_read＋output）注入 `[Hook][CTX] <N>k tokens ≈ <P>%`；視窗大小 transcript 不記，依 model id 查表（Claude 5 家族與 `[1m]` = 1M：2026-10-15 app `get_usage` 量得 Fable 5.1 = 1,000,000、Opus 5.5 transcript 量到 823k；其餘假定 200k，量到超過即升 1M 並標示；`CLAUDE_CONTEXT_WINDOW` 覆蓋），注入行標明來源。只在 ≥80% 注入、每種提醒每 session 一次（狀態檔在 tmpdir）：沒壓過 → `/compact` 一次；壓過 → `/tomo` → `/clear`。依據（2026-10-15 量本機 91 次 compact）：每次等約 4 分鐘、之後每步只快 1–2 秒、對話剩約 5%；常 compact 的 session 都是開了好幾天沒 clear。50% 門檻與每輪注入 2026-10-17 撤：agent 每輪都提 clear／compact（操作者：「一直要我 clear 很煩」）。固定內容（工具、MCP、CLAUDE.md＋AGENTS.md 約 8 萬 token）每個 session 都有，clear 和 compact 都省不掉它。前身「每 50 次 tool call WARN」2026-10-15 退場：計數不是 context，且 PreToolUse 的 stderr 操作者看不到。
 2. **不讓大輸出進 context —— 但省的是「不需要的」，不是「該讀的」**。分級，不可一律片段化：
 
    | 情境 | 怎麼讀 |
@@ -303,5 +303,5 @@ Repo 內 .md（WORKLOG / TASKS / runbooks）走 git，免 BOM。
 - `AGENTS.md`
 - `docs/operations/TOOL_TRIGGER_MAP.md`
 
-_Last synced: 2026-10-15 06:19:20 UTC_
+_Last synced: 2026-10-17 07:05:49 UTC_
 

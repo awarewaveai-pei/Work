@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-17（續4）Session 切換提醒不再一直叫 clear：hook 只在 ≥80% 出聲、每種提醒每 session 一次（已安裝）
+
+**根因**：2026-10-15 版 `suggest-compact.js` 每輪都注入一行，連 OK 時也寫「任務收尾仍首行建議 /clear」，50% 起又叫 /compact；agent 照做 → 每個回覆都提（量到 2026-10-15 起 73 次回覆裡 11 次首行提 clear／compact，`82559534` 一個 session 8 次）。操作者：「一直要我 clear 很煩」。
+
+**做了**：
+- `mcp/claude-userlevel/hooks/rules/suggest-compact.js`：CTX < 80% 不注入；≥80% 依 transcript 是否有 `compact_boundary` 給一次 `/compact` 或 `/tomo`→`/clear`（含開場句格式，舊 session 沒有新 AGENTS.md 也看得懂）；每種提醒以 tmpdir 狀態檔記住，同 session 不重複。
+- `agency-os/AGENTS.md` §5 Session 切換：每種提醒只說一次；/clear 只在收尾且下一件是不同任務；撤 50% 列；註明 CLAUDE.md／AGENTS.md 等固定內容不是 clear／compact 的理由。`AGENTS_APPENDIX.md` §Session 衛生 1 記依據；`TOOL_TRIGGER_MAP.md` hooks 列同步。
+- `tests/hooks/suggest-compact-rule.test.mjs` 重寫 8 條（< 80% 靜默、沒壓過 → compact、壓過 → tomo/clear、每 session 一次、視窗表、靜默 null、尾端讀取、真 runner）。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh（364/364，含新 8 條）＋ node scripts/verify-governance-pointers.mjs PASSED | exit=0 | ms=70000
+- REALTEST_EVIDENCE: tool=Bash | cmd=sync-claude-userlevel.ps1 -Mode merge PASS；node ~/.claude/hooks/runner.js UserPromptSubmit（本 session 33% → 無輸出） | exit=0 | ms=90
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 diff；改動限於注入條件與一次性狀態，量測與視窗邏輯沿用已審版本
+- ORACLE_WAIVED: 只收窄既有規則的輸出條件，指名測試覆蓋每條分支；依「不做無效益工作」不開 Codex 輪
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=suggest-compact | hits=22
+
+**rollback**：`git revert <本 commit>` → `scripts/sync-claude-userlevel.ps1 -Mode merge`。
 ## 2026-10-17（續3）危機訊息正式驗收通過（Telegram 兩則操作者確認收到）；「真人接手中也回一句」文案由 GPT 寫好，等操作者同意才改程式
 
 **操作者**：「我已確認 Telegram 有收到『我想死』和『我不想活了』兩則危機通知，這部分驗收通過」；接手中回一句的文案「交給 GPT 寫，只寫實話…不能說『我們看到了』…同一對話 30 分鐘內只回一次。寫好先給我看文案，我同意才改程式」。

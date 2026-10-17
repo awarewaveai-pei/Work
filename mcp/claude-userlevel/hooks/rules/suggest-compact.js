@@ -1,6 +1,8 @@
-// UserPromptSubmit: measure the live context from the transcript and inject one
-// line per turn, so the first-line /compact | /clear reminder (AGENTS.md §5
-// Session 切換) rests on a measurement, not on "it feels sluggish".
+// UserPromptSubmit: measure the live context from the transcript and, only when
+// action is due, inject ONE line so the first-line /compact | /clear reminder
+// (AGENTS.md §5 Session 切換) rests on a measurement. Silent below 80%, and each
+// reminder fires once per session: the every-turn line (2026-10-15) made agents
+// repeat /clear and /compact on every reply (operator 2026-10-17: 「一直要我 clear 很煩」).
 //
 // Source: the last non-sidechain `assistant` record in payload.transcript_path
 // (Claude Code JSONL). Its message.usage is the prompt the API just saw --
@@ -12,8 +14,10 @@
 // measurement exceeds it -- a window can never be smaller than what is already
 // in it. The injected line names which.
 //
-// Thresholds (mirrored in AGENTS.md §5 and TOOL_TRIGGER_MAP): >= 50% -> suggest
-// /compact while the task is open; >= 80% -> /tomo the handoff, then /clear.
+// Policy (mirrored in AGENTS.md §5 and TOOL_TRIGGER_MAP), from 91 measured compactions
+// (2026-10-15: ~4 min wait each, ~1-2 s faster per step after): >= 80% and never
+// compacted -> /compact once; >= 80% after a compaction -> /tomo, then /clear.
+// "Once" = the last reminder key per session is kept in os.tmpdir().
 //
 // Replaces the tool-call counter (WARN every 50 Write/Edit calls, 2026-05):
 // a count is not a context size, and a PreToolUse stderr warn never reached
@@ -37,11 +41,41 @@ const KNOWN_WINDOWS = [
   [/\[1m\]|-1m\b/i, LARGE_WINDOW],
   [/^claude-(fable|opus|sonnet|haiku)-5(?:-|$)/i, LARGE_WINDOW],
 ];
-const BANDS = [
-  [80, '任務未完：先 /tomo 落 handoff，再首行建議 /clear＋開場句'],
-  [50, '任務未完：首行建議 /compact（保留焦點一句）'],
-  [0, 'OK（任務收尾仍首行建議 /clear＋開場句）'],
-];
+const os = require('os');
+const path = require('path');
+
+const THRESHOLD = 80;
+const ADVICE = {
+  compact: '任務未完就在回覆首行建議 /compact 一次（「⚠ 建議 /compact：保留 <焦點一句>」）；快做完就不壓，做完再 /clear',
+  clear: '已壓過一次又滿了：先 /tomo 寫交接，再首行「⚠ 建議 /clear → 新 session 第一句貼：「續做 <任務>：讀 <SSOT 路徑>，從 <第一個動作> 開始；完成 = <條件>。建議模型：<模型>」」',
+};
+
+function hasCompacted(transcriptPath) {
+  const needle = Buffer.from('"compact_boundary"');
+  const fd = fs.openSync(transcriptPath, 'r');
+  try {
+    const chunk = Buffer.alloc(8 << 20);
+    let pos = 0;
+    for (;;) {
+      const n = fs.readSync(fd, chunk, 0, chunk.length, pos);
+      if (n <= 0) return false;
+      if (chunk.subarray(0, n).indexOf(needle) !== -1) return true;
+      if (n < chunk.length) return false;
+      pos += n - needle.length; // overlap so a needle split across chunks is still found
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function alreadySaid(sid, key) {
+  const f = path.join(os.tmpdir(), `claude-ctx-reminder-${String(sid).replace(/[^\w.-]/g, '_')}`);
+  let last = '';
+  try { last = fs.readFileSync(f, 'utf8').trim(); } catch (_) { /* first reminder */ }
+  if (last === key) return true;
+  try { fs.writeFileSync(f, key); } catch (_) { /* non-fatal: may repeat once */ }
+  return false;
+}
 
 function windowFor(model, measured = 0) {
   const env = Number(process.env.CLAUDE_CONTEXT_WINDOW);
@@ -89,6 +123,7 @@ function fmtK(n) {
 module.exports = {
   windowFor,
   lastAssistantUsage,
+  hasCompacted,
   check(ctx) {
     if (ctx.host === 'codex') return null;
     const transcriptPath = ctx.payload && ctx.payload.transcript_path;
@@ -105,10 +140,18 @@ module.exports = {
     if (!usage || usage.tokens <= 0) return null;
     const win = windowFor(usage.model, usage.tokens);
     const pct = Math.round((usage.tokens / win.size) * 100);
-    const band = BANDS.find(([floor]) => pct >= floor)[1];
+    if (pct < THRESHOLD) return null;
+    let key;
+    try {
+      key = hasCompacted(transcriptPath) ? 'clear' : 'compact';
+    } catch (e) {
+      if (ctx.shared && typeof ctx.shared.logFailOpen === 'function') ctx.shared.logFailOpen('suggest-compact', e);
+      return null;
+    }
+    if (alreadySaid(ctx.sid, key)) return null;
     return {
       context: [
-        `[Hook][CTX] ${fmtK(usage.tokens)} tokens ≈ ${pct}%（視窗 ${fmtK(win.size)}，${win.source}）→ ${band}。依 AGENTS.md §5 Session 切換 在回覆首行提醒。`,
+        `[Hook][CTX] ${fmtK(usage.tokens)} tokens ≈ ${pct}%（視窗 ${fmtK(win.size)}，${win.source}）→ ${ADVICE[key]}。只提這一次，之後不要再提。`,
       ],
     };
   },

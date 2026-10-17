@@ -411,7 +411,7 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 |------|------|
 | `rules/session-banner.js` | SessionStart：報告治理狀態（規則/事件數由 manifest 推導，不手寫）|
 | `rules/vbc-reminder.js` | UserPromptSubmit：偵測「他方已完成」語境 → 注入 VBC 協議提醒（2026-07-02 Phase 4，非阻擋）|
-| `rules/suggest-compact.js` | UserPromptSubmit：讀 transcript 最後一則 assistant usage → 注入 `[Hook][CTX] <N>k tokens ≈ <P>%`＋分級（≥50% `/compact`、≥80% `/tomo`→`/clear`）；agent 依 AGENTS.md §5 Session 切換 在回覆首行提醒（2026-10-15，取代每 50 次 tool call 的 WARN）|
+| `rules/suggest-compact.js` | UserPromptSubmit：讀 transcript 最後一則 assistant usage；CTX ≥ 80% 才注入 `[Hook][CTX]`，每種提醒每 session 一次（沒壓過 → `/compact`；壓過 → `/tomo`→`/clear`）；agent 依 AGENTS.md §5 Session 切換 在回覆首行提醒（2026-10-15 取代每 50 次 tool call 的 WARN；2026-10-17 撤 50% 與每輪注入）|
 | `ao-resume-on-prompt.ps1` | UserPromptSubmit（僅工作站）：偵測開工關鍵字 → 觸發 AO-RESUME（每 session 一次，seen-sessions ledger）|
 | `post-push-trigger-deploy.ps1` | git push 後（僅工作站）：自動觸發 Trigger.dev deploy（若設定）|
 
@@ -437,5 +437,5 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 ## Related Documents (Auto-Synced)
 - `docs/operations/AGENTS_APPENDIX.md`
 
-_Last synced: 2026-10-15 06:19:20 UTC_
+_Last synced: 2026-10-17 07:05:49 UTC_
 
