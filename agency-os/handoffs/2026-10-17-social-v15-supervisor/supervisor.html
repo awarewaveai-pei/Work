@@ -70,25 +70,25 @@ details code{font-size:12px;word-break:break-all}
 <aside><div class="in">
   <h1>社群發文 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-17</span></p>
-  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>0</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:7.6923076923076925%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>1</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">把定案的新畫面做進 social.aware-wave.com。共 <span data-computed>13</span> 張卡，一張一個工作階段。</p>
 
 <section id="now"><h2>現況</h2><p class="lead">目前的版本可以發文。新畫面已定案，還沒做進產品。</p><ul class="yn"><li class="yes"><b>有</b><span>可以發文<small>social.aware-wave.com 上線中（PLAN.md C12）；是舊版畫面</small></span></li><li class="yes"><b>有</b><span>新畫面定案<small>樣稿第 16 版；ADR 016 §5 操作者定案 1–6（commit 0755e32ab）</small></span></li><li class="no"><b>還沒有</b><span>數據分析有真數字<small>要先查 Postiz 有沒有分析資料可拿（C24 第一步）</small></span></li><li class="no"><b>還沒有</b><span>留言自動回覆真的會動作<small>要等 Meta 審核通過（TASKS.md「Postiz Task 2 OAuth app 審核」）</small></span></li></ul></section>
 
-<section id="steps"><h2>待建項目</h2><p class="lead">依編號順序做。同一組的卡可以同時做，因為改的檔案不重疊。風險 High 的卡要你同意才動工。</p><ol class="steps"><li class="step todo" id="C20">
+<section id="steps"><h2>待建項目</h2><p class="lead">依編號順序做。同一組的卡可以同時做，因為改的檔案不重疊。風險 High 的卡要你同意才動工。</p><ol class="steps"><li class="step done" id="C20">
     <div class="n">1</div>
     <div class="b">
       <p class="plain">先在資料庫開好新功能要用的欄位：頻道照片、標籤、多則留言、週期性安排、自動回覆、智慧連結、數據、報表。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（資料庫結構）</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-high">風險 High（資料庫結構）</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>拋棄式資料庫套用、還原、再套用都成功；資料庫審查通過；測試全綠；不碰正式資料庫</p>
       <details><summary>工程細節：C20 資料表 0105</summary>
         <p><b>要先完成：</b>無</p>
         
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C20</code></p>
-        
+        <p><b>完成於：</b><code>9fc5bdbe3</code></p>
       </details>
     </div></li><li class="step todo" id="C19">
     <div class="n">2</div>

@@ -50,7 +50,7 @@
 - ORACLE_WAIVED: 卡片指定 db-expert 審一次＋拋棄式 DB 全套斷言＋一個所有權守衛突變；不加第二輪
 - db-expert 修正（同一支 0105）：M1 貼文自己的規則＝它的子資料，存／刪規則先 touch 貼文（version＋1），沒動過的子貼文才不會連規則被撤回；M2 `social_stop_repeat` 先鎖列、queued 回 SC409（0100：queued 只經 release）；M3 slots 回填只補沒有 slots 的清單（重套不會把方格加寬）；m4 開頭一次拿齊 5 張表的 ACCESS EXCLUSIVE；m5 已到期未被領走的子貼文不撤回；m6 子貼文／輪播貼文連同模板的專屬規則一起複製（快照）；m8 down 檔頭補兩項損失＋離峰執行。m7（解除頻道會連每日數據一起刪、報表留下失效帳號 id）＝保留政策，寫 TASKS。
 - slug 改成發起 session 指定的 `^[a-z0-9][a-z0-9-]{1,39}$`＋保留 go/admin/api/new。
-**剩**：C20 已完成（監工台 done）；C19 接著做。卡外：TASKS 一行（LogView 新動作名；C21 接 comments／tags 與「只刪這次」語意；C27 存規則後重做子貼文；數據保留政策）。
+**剩**：C20 已完成：code＋migration `9fc5bdbe3` 已推 main（03:00 自動部署上線程式；HEAD typecheck OK）；監工台 C20 done（第 4 版）。C19 接著做。卡外：TASKS 一行（LogView 新動作名；C21 接 comments／tags 與「只刪這次」語意；C27 存規則後重做子貼文；數據保留政策）。
 **rollback**：`0105_social_v16.down.sql`（先部署不讀新欄位的程式；一次性損失列在檔頭）。
 ## 2026-10-17（續17）客服三態：轉真人後機器人只在「工作人員 30 分鐘內公開回過話」時靜默，其他時候照常回答＋migration 0108 已套 prod
 

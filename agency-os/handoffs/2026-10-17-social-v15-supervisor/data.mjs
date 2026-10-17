@@ -36,7 +36,7 @@ export const NOW = [
 // PLAN.md §1b 的卡，依開工順序編號。status: not_started | in_progress | done；done 必填 commit。
 // depends 用卡號（code），必須跟 PLAN.md 卡片標題括號裡的「Cxx 之後」一致（check.mjs 驗）。
 export const STEPS = [
-  { n: 1, code: 'C20', group: 'A', plain: '先在資料庫開好新功能要用的欄位：頻道照片、標籤、多則留言、週期性安排、自動回覆、智慧連結、數據、報表。', title: '資料表 0105', gate: '拋棄式資料庫套用、還原、再套用都成功；資料庫審查通過；測試全綠；不碰正式資料庫', risk: 'High（資料庫結構）', model: 'Opus 5.5', status: 'not_started', depends: [] },
+  { n: 1, code: 'C20', group: 'A', plain: '先在資料庫開好新功能要用的欄位：頻道照片、標籤、多則留言、週期性安排、自動回覆、智慧連結、數據、報表。', title: '資料表 0105', gate: '拋棄式資料庫套用、還原、再套用都成功；資料庫審查通過；測試全綠；不碰正式資料庫', risk: 'High（資料庫結構）', model: 'Opus 5.5', status: 'done', commit: '9fc5bdbe3', depends: [] },
   { n: 2, code: 'C19', group: 'B', plain: '畫面換成定案的樣子：上面六區、左邊頻道清單、日曆上方一列工具；建立貼文改成一整頁。', title: '骨架與路由', gate: '六區和六個分頁都能點；按「建立貼文」進到整頁再回日曆；檢查樣稿每個頁面在產品裡都有', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C20'] },
   { n: 3, code: 'C21', group: 'C', plain: '建立貼文的整頁：左邊選頻道、中間寫、右邊看各平台預覽；可以加多則留言、標籤、週期性安排和這則的自動回覆。', title: '撰寫頁', gate: '寫一則、加兩則留言、設定行程，回日曆看到它；截圖跟樣稿同一頁比對', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C19', 'C20'] },
   { n: 4, code: 'C22', group: 'C', plain: '日曆卡片有縮圖和標籤顏色，看得到現在時間和最佳發布時間；可以篩選、一次處理多則、看誰刪了哪則。', title: '日曆、卡片、清單、已刪除、篩選', gate: '勾兩則按「批次動作」送審，狀態跟著變；截圖跟樣稿比對', risk: 'Low', model: 'Sonnet 5.5', status: 'not_started', depends: ['C19', 'C20'] },
