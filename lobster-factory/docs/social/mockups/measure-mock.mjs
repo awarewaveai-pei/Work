@@ -51,7 +51,23 @@ try {
         await b.click(); await page.waitForTimeout(60);
         views[v] = await page.evaluate(chips); heights[v] = await page.evaluate(pageH); widths[v] = await page.evaluate(pageW);
       }
-      console.log(JSON.stringify({ file, views, heights, widths, ...cards, errors }));
+      // dead buttons (operator 2026-10-17 「你要確認每個功能有作用」): fresh page, go to the view, click one visible enabled
+      // button, compare the whole page before/after; nothing changed = it does nothing. Buttons in closed popovers are not seen.
+      const go = async (v) => { await page.evaluate((v) => { const vis = (e) => e.offsetParent !== null; const f = (q) => [...document.querySelectorAll(q)].find(vis);
+        let el = f(`[data-view="${v}"]`); if (!el) { const pl = f('[data-view="plan"]'); if (pl) pl.click(); el = f(`[data-view="${v}"]`); } if (el) el.click(); }, v); await page.waitForTimeout(20); };
+      const visibleButtons = () => [...document.querySelectorAll("button")].filter((b) => !b.disabled && b.offsetParent !== null && !b.closest("[data-view]") && !b.matches("[data-view]") && !b.classList.contains("on") && b.getAttribute("aria-pressed") !== "true");
+      const snap = () => document.body.innerHTML + [...document.querySelectorAll("input,textarea")].map((e) => e.type === "checkbox" || e.type === "radio" ? e.checked : e.value).join("|");
+      const dead = {};
+      for (const v of names) {
+        await page.reload({ waitUntil: "load" }); await go(v);
+        const n = await page.evaluate(`(${visibleButtons.toString()})().length`);
+        for (let i = 0; i < n; i++) {
+          await page.reload({ waitUntil: "load" }); await go(v);
+          const r = await page.evaluate(async ([i, vb, sn]) => { const list = eval(vb)(); const b = list[i]; if (!b) return null; const before = eval(sn)(); b.click(); await new Promise((r) => setTimeout(r, 40)); return { label: (b.getAttribute("aria-label") || b.textContent || b.title || b.id).trim().slice(0, 40), same: eval(sn)() === before }; }, [i, `(${visibleButtons.toString()})`, `(${snap.toString()})`]);
+          if (r && r.same) (dead[v] ||= []).push(r.label);
+        }
+      }
+      console.log(JSON.stringify({ file, views, heights, widths, dead, ...cards, errors }));
       await page.close();
     } catch (e) {
       console.log(JSON.stringify({ file, error: String(e).split("\n")[0] }));

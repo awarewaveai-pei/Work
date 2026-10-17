@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-17（續8）社群發文樣稿：週期性安排、設定行程、標籤、時間清單、白話文字；智慧連結／廣告管理／自動化流程能操作；檢查加 `[dead-button]`
+
+**操作者**（附 Metricool／Postiz 截圖）：「為什麼沒有週期性安排」「按鍵【設定行程】」「你的中文我看不懂（接一則？各頻道格式？）」「行事曆的時間顯示非常不明顯，找不到時間」「沒有 tag 或分類管理」「你要確認每個功能有作用，例如 smart link」。
+- ▾ 選單：排程改名「設定行程」；新增「週期性安排」（每天／每週哪幾天／每月幾號、不停或發幾次就停），日曆上每次出現都畫出來（🔁）。時間鈕寫「每週二、四 08:00（10/13 起）」。
+- 發佈時間：左邊月曆、右邊「幾點發」時間清單（每 15 分鐘，選中的捲到中間），下面時區；週期性安排時上面多「多久一次／哪幾天／什麼時候停」。
+- 文字：「接一則」→「＋ 新增留言」（貼文發出後用你的帳號留言；Bluesky、Threads 沒有留言，會接成下一則貼文）；「各頻道格式」→「要發成哪一種」，Instagram／Facebook 直接列 貼文｜Reel｜限時動態。
+- 標籤（分類，F10）：撰寫頁左下「標籤」（勾選、改名、點色點換色、刪除、新增），卡片頂端色條＋ #名稱，篩選多「只看這些標籤」，設定頁可管理。
+- 智慧連結：頁面標題、介紹、按鈕顏色、連結（顯示／改字／改網址／排序／刪除／新增）、發布開關、複製連結、手機預覽。廣告管理：連接／中斷 Meta、Google 廣告帳號，期間切換，花費／曝光／點擊／轉換，活動暫停／繼續。自動化流程：關鍵字自動回覆規則（留言或私訊、哪些頻道、私訊回他或回覆留言、開關、新增／儲存／刪除）。範例數字都標「範例」。
+- `[dead-button]`：每個 `[data-view]` 頁，乾淨頁面上每顆看得到、可按、不是已選中的按鈕各按一次，整頁沒變＝沒作用。第一次跑抓到 7 個（月檢視前後切換沒作用、本週在本週時沒作用、批次動作沒勾也能按、設定的新增標籤／邀請成員空白時沒反應、清單第一列往上、已選中的清單），全修：月檢視能換月、「本週／本月」在當下時灰掉、批次動作沒勾灰掉、空白會標紅並提示、首列往上末列往下灰掉、已選中的清單 aria-pressed。
+- ADR 016 §5 第 16 版那行同步（三頁可操作、底部按鈕、標籤、`[dead-button]`）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/docs/social/mockups/check-social-mocks.py → 1 page(s), 0 finding(s)（含 dead-button 全頁、one-screen、chips）；--selftest → 48/48（新 dead-button、label-outside-b）；sync-app-theme.py --check → up to date；render-views.mjs --mock → phone 390 | exit=0 | ms=260000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n -- 自審看圖（選單、週期性安排、時間清單、標籤、智慧連結、廣告、自動化流程、篩選），修掉標籤面板被 .menu 樣式蓋掉色點與按鈕；pageerror 0
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=renderSmart|renderAds|renderFlows|ACTIONS | hits=0 -- 只在樣稿與檢查腳本內；ADR 016 §5 舊主張（三頁尚未開通）已改
+- ORACLE_WAIVED: 只改樣稿與樣稿檢查（docs，不上線）；證據＝0 finding＋48/48 突變＋截圖
+
+**剩**：操作者看圖。共用 git index 又停在舊版（21 筆），同 TASKS「共用 git index 停在舊版」那條，這次沒動。
 ## 2026-10-17（續7）真人接手中的危機訊息也回一句（操作者同意 GPT 文案＋方案 B）：程式＋migration 0104；0104 已套正式庫，程式隨 03:00 自動部署上線
 
 **操作者**：「文案同意，照建議方案 B 改程式（human_owns_thread 分支＋新表 30 分鐘去重），寫完給我看驗證結果」。文案見（續3）。

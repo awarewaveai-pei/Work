@@ -17,6 +17,7 @@ Rules (operator, 2026-09-24 .. 2026-10-14), each finding starts with its [code]:
   [chips] at most CHIP_MAX pill-shaped boxes on any one screen (opening screen + every [data-view])
   [card-thumb] every week card has a thumbnail element (.cthumb), and the opening week shows cards at all
   [one-screen] no page scrolls at 1280x660 (opening screen + every [data-view]); scrolling happens inside panels only
+  [dead-button] every visible, enabled, not-already-selected button changes something when clicked (on a fresh page, per view)
   [render] the page could not be measured or threw a script error (not a pass)
 Notes (printed, not findings): font sizes under 14px inside the copied app block — the app's own values, changed in globals.css.
 CSS is parsed by sync-app-theme.py (rules/declarations); markup by html.parser. A page that cannot be read is a finding."""
@@ -32,7 +33,7 @@ preview = importlib.util.module_from_spec(_pspec); _pspec.loader.exec_module(pre
 
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
 SVG_SELF = {"path", "rect", "circle", "ellipse", "line", "polyline", "polygon", "use", "stop"}
-ACTIONS = ["存草稿", "送審", "排程", "立即發佈"]
+ACTIONS = ["存草稿", "送審", "設定行程", "立即發佈"]   # 排程 renamed 設定行程 by the operator 2026-10-17
 TYPE_TOKENS = {"--fs-h1": 14, "--fs-h2": 14, "--fs-body": 14, "--fs-tag": 12}       # name -> minimum px
 LAYOUT_TOKENS = {"--chan-w", "--pv-w", "--av", "--thumb-h"}   # channel column, preview column, account picture, week-card thumbnail
 CHIP_MAX = 20   # pills on one screen (U1: before v14 there were ~60)
@@ -280,6 +281,10 @@ def render_findings(pages: dict[str, str]) -> dict[str, list[str]]:
                 out[n].append(f"[render] {row['error'][:120]}"); continue
             for e in row.get("errors", []):
                 out[n].append(f"[render] script error: {e[:120]}")
+            if "dead" not in row:
+                out[n].append("[render] the dead-button pass did not run")
+            for v, labels in row.get("dead", {}).items():
+                out[n].append(f"[dead-button] view '{v}': clicking changes nothing: {', '.join(sorted(set(labels)))[:200]}")
             if len(row["views"]) < 2:
                 out[n].append("[render] no [data-view] control found, so only the opening screen was measured")
             for v, c in row["views"].items():
@@ -383,6 +388,7 @@ def selftest() -> int:
         "card-no-thumb": (src.replace('class="cthumb ', 'class="cthumx ', 1), "week cards have no thumbnail"),
         "no-week-cards": (src.replace('class="week" id="weekView"', 'class="wk" id="weekView"', 1), "shows no cards"),
         "page-throws": (src.replace("<script>", "<script>throw new Error('selftest');", 1), "[render] script error"),
+        "dead-button": (src.replace('<span class="end">', '<button type="button" id="deadx">沒作用</button><span class="end">', 1), "[dead-button]"),
         "page-scrolls": (src.replace("<main>", '<main><div style="height:2000px"></div>', 1), "[one-screen]"),
         "composer-scrolls": (src[:style_end] + "#edPanel{min-height:2000px}" + src[style_end:], "[one-screen] view 'compose'"),
         "no-views": (src.replace("data-view=", "data-vw=").replace('[data-view]', '[data-vw]'), "[render] no [data-view]"),
