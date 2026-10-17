@@ -52,6 +52,7 @@
   3. **貼文排程底下六個分頁**：排程日曆 Calendar／貼文清單 List／貼文素材庫 Posts library／自動發布清單 Autolists（＝輪播）／已刪除貼文 Deleted posts／自動化流程 Flows。
   4. **日曆上方一列**：搜尋／本週＋左右切換／篩選／各社群最佳發布時間（可切平台）／建立貼文。
   5. **建立貼文開獨立整頁**（按「建立貼文」或日曆格的「＋」），不是右欄；右欄太小不好操作。
+  6. **自動化流程兩層**（2026-10-17）：品牌通用規則＋單則貼文另外設，單則的優先（「自動化流程照兩層畫：品牌通用規則＋單則貼文另外設，單則的優先。」）。
   這五項是版面骨架；第 14／15 版做出來的卡片、三種控制、串文、方格時段、空狀態照搬進新骨架。
 - 樣式只有一個來源：next-admin `app/globals.css`（`mockups/sync-app-theme.py` 同步、`check-social-mocks.py` 比對）。產品實作直接用同一組 token 與 `.btn-primary`／`.btn-secondary`；狀態色對應 `--status-ignored`／`--yellow`／`--green`／`--red`／`--severity-low`／`--accent`。
 - 輪播清單（Metricool autolists）在 V1；CSV 匯入以「從 WordPress 文章清單批次做貼文」取代。

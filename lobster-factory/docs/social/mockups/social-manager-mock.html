@@ -529,6 +529,14 @@ td.num{text-align:right}
 .phone{border:1px solid var(--card-border);border-radius:24px;padding:22px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;background:var(--bg-subtle);box-shadow:var(--shadow)}
 .phone .av{width:56px;height:56px}
 .lbtn{display:block;width:100%;padding:9px;border-radius:var(--radius-sm);color:var(--btn-primary-text);font-weight:600}
+.flnote{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--badge-yellow-bg);color:var(--badge-yellow-text);font-size:var(--fs-tag);flex:none}
+.flnote svg.i{width:14px;height:14px}
+.lst .lsel{padding:0;text-align:left;color:var(--text-primary)}
+.ownline{display:flex;flex-direction:column;align-items:flex-start;gap:4px;border-top:1px solid var(--card-border);padding-top:8px}
+.autobox{border:1px solid var(--card-border);border-radius:var(--radius-sm);flex:none}
+.autohead{width:100%;border:0;background:transparent;display:flex;gap:8px;align-items:center;padding:8px 10px;text-align:left}
+.autohead .muted{margin-left:auto}
+.autobody{display:flex;flex-direction:column;gap:8px;padding:0 10px 10px}
 .ltile .lt{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .sgrid{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:12px;padding:12px;align-content:start}
 .sec{border:1px solid var(--card-border);border-radius:var(--radius-sm);padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -869,6 +877,7 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
             <div id="parts"></div>
             <div id="xtras"></div>
             <div class="pset" id="pset" hidden></div>
+            <div class="autobox" id="autoBox"></div>
           </div>
         </div>
         <div class="prev" id="prev"><div class="phd"><b>預覽</b><span class="muted tag" id="pvNote"></span></div><div class="screen" id="screen"></div></div>
@@ -922,7 +931,7 @@ const BRANDS = {
       {id:14,date:"2026-10-10",time:"12:00",accts:["s-bs","s-th"],state:"published",text:"週末不知道去哪？工作室週六下午開放自由畫畫，材料都準備好了。"},
       {id:1,date:"2026-10-12",time:"09:00",accts:["s-bs"],state:"published",imgs:[1],url:"https://bsky.app/profile/soulfulexpression.bsky.social/post/3l5k2",text:"上週末的親子藝術工作坊，孩子們用手指顏料畫出自己的心情。看到每一張作品都不一樣，我們也跟著開心了一整天。"},
       {id:4,date:"2026-10-13",time:"18:00",accts:["s-bs"],state:"error",text:"今天工作室提早休息，明天照常營業。",err:"Bluesky 回應：App Password 已失效，請到設定重新連接。"},
-      {id:2,date:"2026-10-14",time:"12:30",accts:["s-bs","s-ig","s-th"],state:"scheduled",imgs:[2,3],tags:["t1"],parts:[{text:"報名表在這裡：soulfulexpression.art/sat",delay:0},{text:"名額滿了會在這裡說。",delay:60}],fmt:{"s-ig":"貼文"},text:"這週六下午的親子藝術時光還有三個名額。不需要任何繪畫基礎，帶著孩子一起來玩顏色就好。報名方式在留言。"},
+      {id:2,date:"2026-10-14",time:"12:30",accts:["s-bs","s-ig","s-th"],state:"scheduled",imgs:[2,3],tags:["t1"],auto:{mode:"own",rule:{name:"這則專用",on:true,trig:"comment",words:"報名, 還有名額",pfs:["instagram"],how:"both",reply:"還有名額！報名表私訊給你了。",hits:0}},parts:[{text:"報名表在這裡：soulfulexpression.art/sat",delay:0},{text:"名額滿了會在這裡說。",delay:60}],fmt:{"s-ig":"貼文"},text:"這週六下午的親子藝術時光還有三個名額。不需要任何繪畫基礎，帶著孩子一起來玩顏色就好。報名方式在留言。"},
       {id:3,date:"2026-10-15",time:"19:00",accts:["s-ig"],state:"review",imgs:[4,1,2],tags:["t2"],parts:[{text:"報名表：soulfulexpression.art/nov",delay:0}],text:"新的一期「色彩與情緒」課程，十一月開課。這一期我們會從最基本的三原色開始，慢慢認識自己對顏色的感覺。",notes:"等老師確認上課日期再發"},
       {id:6,date:"2026-10-16",time:"20:00",accts:["s-th"],state:"scheduled",text:"晚安。今天也辛苦了。睡前給自己五分鐘，隨手畫一條線就好。"},
       {id:5,date:"2026-10-17",time:"10:00",accts:["s-bs","s-th"],state:"draft",imgs:[1],text:"藝術治療不是教你畫得好看，而是讓你透過畫畫，說出平常說不出口的事。很多大人第一次來的時候會說：「我從國小之後就沒畫過畫了。」沒關係，這裡沒有人在打分數。你可以只用一種顏色，也可以把紙塗滿；可以畫一整個小時，也可以畫到一半停下來，看著它發呆。我們在旁邊陪著，偶爾問一句：「這個顏色讓你想到什麼？」有時候答案很簡單，有時候會讓人愣一下。這些時刻，就是藝術治療在做的事。它不急，也不要求你變成一個會畫畫的人。它只是給你一個安全的地方，讓心裡的東西有地方放。如果你最近覺得累、覺得說不清楚自己怎麼了，歡迎來試一次。不用準備任何東西，穿可以弄髒的衣服就好。成人課在週四晚上七點半，一次九十分鐘，報名方式在留言，或直接私訊我們。"},
@@ -1107,7 +1116,7 @@ function cardHtml(p){
   const tcls = imgs.length ? "ph ph-"+imgs[0] : "txt";
   const inner = (imgs.length>1 ? `<span class="more">+${imgs.length-1}</span>` : imgs.length ? "" : art ? "文章" : "文字") + `<span class="avs">${postPfs(p).map(pfb).join("")}</span>`;
   const who = art ? "WordPress" : [...new Set((p.accts||[]).map(id=>A(id).name))].join("、");
-  const flag = (p.virtual?`<span title="來自自動發布清單">↻</span>`:"") + (p.rep?`<span title="週期性安排：${esc(repeatTxt(p.repeat,p.date,p.time))}">🔁</span>`:"") + (unconnected(p).length?`<span class="err" title="有頻道沒連接，這則發不出去">⚠</span>`:"");
+  const flag = (p.virtual?`<span title="來自自動發布清單">↻</span>`:"") + (p.rep?`<span title="週期性安排：${esc(repeatTxt(p.repeat,p.date,p.time))}">🔁</span>`:"") + (p.auto&&p.auto.mode==="own"?`<span title="這則有自己的自動回覆規則">🤖</span>`:"") + (unconnected(p).length?`<span class="err" title="有頻道沒連接，這則發不出去">⚠</span>`:"");
   return `<div class="card" data-id="${p.id}" data-state="${p.state}" data-kind="${art?"article":"social"}" draggable="${mine&&!p.rep&&p.state!=="published"}" tabindex="0" title="${STATES[p.state]} · ${esc(who)}">`
     + tagBar(p) + `<div class="cthumb ${tcls}">${inner}</div>`
     + `<div class="cmeta"><span>${p.time}</span>${flag}${tagNames(p)}<span>${esc(who)}</span></div><div class="ctext">${esc(art?"文章："+p.title:p.text)}</div>`
@@ -1209,34 +1218,51 @@ function renderAds(){ const a=adsOf(), k=a.per/28, t={spend:0,impr:0,clicks:0,co
   S.querySelectorAll("[data-adis]").forEach(x=>x.onclick=()=>{ a.accts[x.dataset.adis]=null; renderAds(); });
   S.querySelectorAll("[data-atog]").forEach(x=>x.onclick=()=>{ const c=a.camps.find(y=>y.id==x.dataset.atog); c.on=!c.on; renderAds(); });
 }
-// 自動化流程: when a comment or a DM contains a word, reply automatically
+// 自動化流程 (operator 2026-10-17): two layers -- the brand's rules, and a post may set its own; the post's own wins.
+// Only Facebook / Instagram: comment auto-replies need Meta's review first. Bluesky / Threads are not promised.
+const FLOW_PF = ["facebook","instagram"], TRIG = {comment:"留言含關鍵字",dm:"私訊含關鍵字"}, HOWS = {reply:"公開回覆留言",dm:"私訊對方",both:"兩者"};
+const blankRule = () => ({name:"",on:true,trig:"comment",words:"",pfs:[...FLOW_PF],how:"reply",reply:"",hits:0});
 let flowSel=null;
-function flowsOf(){ const b=B(); if(!b.flows) b.flows=b.accounts.length?[{id:1,name:"報名表",on:true,trig:"comment",words:"報名, 怎麼報",accts:b.accounts.filter(a=>a.st==="connected").slice(0,2).map(a=>a.id),how:"dm",reply:"謝謝你！報名表在這裡：soulfulexpression.art/nov",hits:12},{id:2,name:"上課地點",on:false,trig:"dm",words:"地址, 在哪",accts:b.accounts.filter(a=>a.st==="connected").slice(0,1).map(a=>a.id),how:"dm",reply:"工作室在台北市大安區，捷運站步行五分鐘。",hits:3}]:[]; return b.flows; }
+function flowsOf(){ const b=B(); if(!b.flows) b.flows=b.accounts.length?[{id:1,name:"報名表",on:true,trig:"comment",words:"報名, 怎麼報",pfs:["facebook","instagram"],how:"both",reply:"謝謝你！報名表在這裡：soulfulexpression.art/nov",hits:12},{id:2,name:"上課地點",on:false,trig:"dm",words:"地址, 在哪",pfs:["instagram"],how:"dm",reply:"工作室在台北市大安區，捷運站步行五分鐘。",hits:3}]:[]; return b.flows; }
+// the rule form, shared by the brand tab and the composer (scoped to one post)
+function ruleForm(f, idp){ return `
+    <div class="frow"><span class="lab">當</span><span class="seg">${Object.entries(TRIG).map(([k,t])=>`<button type="button" class="${f.trig===k?"on":""}" data-${idp}t="${k}">${t}</button>`).join("")}</span><input type="text" id="${idp}Words" value="${esc(f.words)}" placeholder="關鍵字，用逗號分開：報名, 怎麼報" aria-label="關鍵字" style="flex:1"></div>
+    <div class="frow"><span class="lab">哪些平台</span>${FLOW_PF.map(k=>`<label class="ck"><input type="checkbox" data-${idp}p="${k}" ${f.pfs.includes(k)?"checked":""}>${pfb(k)} ${PF[k].n}</label>`).join("")}</div>
+    <div class="frow"><span class="lab">就</span><span class="seg">${Object.entries(HOWS).map(([k,t])=>`<button type="button" class="${f.how===k?"on":""}" data-${idp}h="${k}">${t}</button>`).join("")}</span></div>
+    <div class="frow top"><span class="lab">回覆內容</span><textarea id="${idp}Reply" rows="2" style="flex:1" aria-label="回覆內容">${esc(f.reply)}</textarea></div>`; }
+function wireRuleForm(root, f, idp, after){
+  root.querySelectorAll(`[data-${idp}t]`).forEach(x=>x.onclick=()=>{ f.trig=x.getAttribute(`data-${idp}t`); after(); });
+  root.querySelectorAll(`[data-${idp}h]`).forEach(x=>x.onclick=()=>{ f.how=x.getAttribute(`data-${idp}h`); after(); });
+  root.querySelectorAll(`[data-${idp}p]`).forEach(x=>x.onchange=()=>{ const k=x.getAttribute(`data-${idp}p`); x.checked?f.pfs.push(k):f.pfs.splice(f.pfs.indexOf(k),1); });
+  $(idp+"Words").oninput=e=>{ f.words=e.target.value; }; $(idp+"Reply").oninput=e=>{ f.reply=e.target.value; };
+}
+const ruleLine = x => `${TRIG[x.trig].replace("關鍵字","")}「${esc(x.words)}」→ ${HOWS[x.how]}`;
 function renderFlows(){ const F=flowsOf(); if(flowSel!=null&&!F.some(f=>f.id===flowSel)&&flowSel!=="new") flowSel=null; if(flowSel==null&&F.length) flowSel=F[0].id;
-  const f = flowSel==="new" ? {id:"new",name:"",on:true,trig:"comment",words:"",accts:connected().slice(0,1).map(a=>a.id),how:"dm",reply:"",hits:0} : F.find(x=>x.id===flowSel);
-  const TR={comment:"留言",dm:"私訊"}, HOW={dm:"私訊回他",reply:"回覆他的留言"};
-  side(`<div class="ptop"><h2>自動化流程</h2><span class="muted">有人留言或私訊含某些字，就自動回覆。</span><span class="r"><button type="button" class="btn-secondary" id="flNew" data-i="plus">新增規則</button></span></div>`
+  const own=B().posts.filter(p=>p.state!=="deleted"&&p.auto&&p.auto.mode==="own");
+  if(flowSel==="new" && !renderFlows.draft) renderFlows.draft={id:"new",...blankRule()}; if(flowSel!=="new") renderFlows.draft=null;
+  const f = flowSel==="new" ? renderFlows.draft : F.find(x=>x.id===flowSel);
+  side(`<div class="ptop"><h2>自動化流程</h2><span class="muted">品牌通用的自動回覆。單則貼文可以另外設，單則的優先。</span><span class="r"><button type="button" class="btn-secondary" id="flNew" data-i="plus">新增規則</button></span></div>
+  <div class="flnote">${I("clock")}留言自動回覆要等 Meta 審核通過才會真的動作（Facebook、Instagram）。</div>`
   + (!F.length && flowSel!=="new" ? emptyHtml("flow","還沒有自動回覆規則","例如：有人留言「報名」，就私訊報名表給他。","新增第一條規則","flFirst")
-  : `<div class="cols2"><div class="lcol">${F.map(x=>`<button type="button" class="lst ${x.on?"":"off"} ${x.id===flowSel?"sel":""}" data-fl="${x.id}" aria-pressed="${x.id===flowSel}"><b>${esc(x.name||"（沒命名）")}</b><span class="nx muted">有人${TR[x.trig]}含「${esc(x.words)}」→ ${HOW[x.how]}</span><span class="nx muted">${x.on?"開著":"關著"} · 這週用了 ${x.hits} 次</span></button>`).join("")}</div>
+  : `<div class="cols2"><div class="lcol">${F.map(x=>`<div class="lst ${x.on?"":"off"} ${x.id===flowSel?"sel":""}"><button type="button" class="lnk lsel" data-fl="${x.id}" aria-pressed="${x.id===flowSel}"><b>${esc(x.name||"（沒命名）")}</b></button><span class="nx">${ruleLine(x)}</span><span class="nx muted">「${esc(x.reply.slice(0,26))}${x.reply.length>26?"…":""}」</span><span class="acts"><span class="avs">${x.pfs.map(pfb).join("")}</span><span class="muted tag">7 天用了 ${x.hits} 次</span><span class="seg"><button type="button" class="${x.on?"on":""}" data-fon="${x.id}" aria-pressed="${x.on}">開</button><button type="button" class="${x.on?"":"on"}" data-foff="${x.id}" aria-pressed="${!x.on}">關</button></span></span></div>`).join("")}
+    <div class="ownline">${own.length?`<b>${own.length} 則貼文有自己的規則</b>`+own.map(p=>`<button type="button" class="lnk" data-fpost="${p.id}">🤖 ${fmt(p.date)} ${esc(p.text.slice(0,16))}…</button>`).join(""):`<span class="muted">沒有貼文另外設規則。</span>`}</div></div>
   <div class="ldet">
-    <div class="frow"><span class="lab">名稱</span><input type="text" id="flName" value="${esc(f.name)}" placeholder="例如：報名表" aria-label="規則名稱"><span class="seg" id="flOn"><button type="button" class="${f.on?"on":""}" data-fo="1">開</button><button type="button" class="${f.on?"":"on"}" data-fo="0">關</button></span></div>
-    <div class="frow"><span class="lab">當有人</span><span class="seg" id="flTrig">${Object.entries(TR).map(([k,t])=>`<button type="button" class="${f.trig===k?"on":""}" data-ft="${k}">${t}</button>`).join("")}</span><span>內容有這些字（用逗號分開）</span><input type="text" id="flWords" value="${esc(f.words)}" placeholder="報名, 怎麼報" aria-label="關鍵字"></div>
-    <div class="frow top"><span class="lab">哪些頻道</span><span class="acts">${connected().map(a=>`<label class="ck"><input type="checkbox" data-fa="${a.id}" ${f.accts.includes(a.id)?"checked":""}>${pfb(a.pf)} ${esc(a.name)}</label>`).join("")}</span></div>
-    <div class="frow"><span class="lab">就</span><span class="seg" id="flHow">${Object.entries(HOW).map(([k,t])=>`<button type="button" class="${f.how===k?"on":""}" data-fh="${k}">${t}</button>`).join("")}</span></div>
-    <div class="frow top"><span class="lab">回覆內容</span><textarea id="flReply" rows="3" style="flex:1" aria-label="回覆內容">${esc(f.reply)}</textarea></div>
+    <div class="frow"><span class="lab">名稱</span><input type="text" id="flName" value="${esc(f.name)}" placeholder="例如：報名表" aria-label="規則名稱"></div>
+    ${ruleForm(f,"fl")}
     <div class="hint" id="flHint"></div>
     <div class="acts">${f.id!=="new"?`<button type="button" class="danger" id="flDel">刪除規則</button>`:`<button type="button" id="flCancel">取消</button>`}<button type="button" class="btn-primary" id="flSave">儲存規則</button></div>
   </div></div>`));
   const S=$("sideView");
   $("flNew").onclick=()=>{ flowSel="new"; renderFlows(); }; if($("flFirst")) $("flFirst").onclick=()=>{ flowSel="new"; renderFlows(); };
+  S.querySelectorAll("[data-fpost]").forEach(x=>x.onclick=()=>openPost(+x.dataset.fpost,{auto:true}));
   if(!$("flSave")) return;
   S.querySelectorAll("[data-fl]").forEach(x=>x.onclick=()=>{ flowSel=+x.dataset.fl; renderFlows(); });
-  S.querySelectorAll("[data-fo]").forEach(x=>x.onclick=()=>{ f.on=x.dataset.fo==="1"; S.querySelectorAll("[data-fo]").forEach(y=>y.classList.toggle("on",y===x)); });
-  S.querySelectorAll("[data-ft]").forEach(x=>x.onclick=()=>{ f.trig=x.dataset.ft; S.querySelectorAll("[data-ft]").forEach(y=>y.classList.toggle("on",y===x)); });
-  S.querySelectorAll("[data-fh]").forEach(x=>x.onclick=()=>{ f.how=x.dataset.fh; S.querySelectorAll("[data-fh]").forEach(y=>y.classList.toggle("on",y===x)); });
-  S.querySelectorAll("[data-fa]").forEach(x=>x.onchange=()=>{ const k=x.dataset.fa; x.checked?f.accts.push(k):f.accts.splice(f.accts.indexOf(k),1); });
-  $("flSave").onclick=()=>{ f.name=$("flName").value.trim(); f.words=$("flWords").value.trim(); f.reply=$("flReply").value.trim();
-    if(!f.words||!f.reply||!f.accts.length) return $("flHint").innerHTML='<span class="err">關鍵字、回覆內容、至少一個頻道都要有。</span>';
+  S.querySelectorAll("[data-fon]").forEach(x=>x.onclick=()=>{ F.find(y=>y.id==x.dataset.fon).on=true; renderFlows(); });
+  S.querySelectorAll("[data-foff]").forEach(x=>x.onclick=()=>{ F.find(y=>y.id==x.dataset.foff).on=false; renderFlows(); });
+  wireRuleForm(S, f, "fl", ()=>{ f.name=$("flName").value; const keep=flowSel; renderFlows(); flowSel=keep; });
+  $("flName").oninput=e=>{ f.name=e.target.value; };
+  $("flSave").onclick=()=>{ f.name=$("flName").value.trim();
+    if(!f.words.trim()||!f.reply.trim()||!f.pfs.length) return $("flHint").innerHTML='<span class="err">關鍵字、回覆內容、至少一個平台都要有。</span>';
     if(f.id==="new"){ f.id=Date.now(); F.push(f); } flowSel=f.id; renderFlows(); $("flHint").textContent="已儲存。"; };
   if($("flDel")) $("flDel").onclick=()=>{ B().flows=F.filter(x=>x.id!==f.id); flowSel=null; renderFlows(); };
   if($("flCancel")) $("flCancel").onclick=()=>{ flowSel=null; renderFlows(); };
@@ -1399,10 +1425,10 @@ const delayTxt = m => m ? (m<60 ? `${m} 分鐘後` : `${m/60} 小時後`) : "立
 const effText = k => ed.custom[k] ?? ed.text;
 const effLen = k => [...effText(k)].length;
 const maxOf = id => PF[pfOf(id)].max;
-function blank(){ return {id:null,kind:null,state:"draft",text:"",accts:new Set(connected().slice(0,3).map(a=>a.id)),custom:{},tab:"all",imgs:[],parts:[],link:"",utm:false,alt:"",fmt:{},notes:"",date:"2026-10-16",time:"09:00",act:null,repeat:null,tags:[],listId:null,open:new Set()}; }
+function blank(){ return {id:null,kind:null,state:"draft",text:"",accts:new Set(connected().slice(0,3).map(a=>a.id)),custom:{},tab:"all",imgs:[],parts:[],link:"",utm:false,alt:"",fmt:{},notes:"",date:"2026-10-16",time:"09:00",act:null,repeat:null,tags:[],auto:{mode:"brand",rule:null},autoOpen:false,listId:null,open:new Set()}; }
 function openPost(id, o={}){
   const p=B().posts.find(x=>x.id===id); if(!p) return newPost();
-  ed=blank(); Object.assign(ed,{id:p.id,kind:p.kind||null,state:p.state,date:p.date||TODAY,time:p.time||"10:00",listId:p.listId||null,act:p.repeat?"repeat":null,repeat:p.repeat?{...p.repeat,days:[...p.repeat.days]}:null,tags:[...(p.tags||[])]});
+  ed=blank(); Object.assign(ed,{id:p.id,kind:p.kind||null,state:p.state,date:p.date||TODAY,time:p.time||"10:00",listId:p.listId||null,act:p.repeat?"repeat":null,repeat:p.repeat?{...p.repeat,days:[...p.repeat.days]}:null,tags:[...(p.tags||[])],auto:p.auto?{mode:p.auto.mode,rule:p.auto.rule?{...p.auto.rule,pfs:[...p.auto.rule.pfs]}:null}:{mode:"brand",rule:null},autoOpen:!!o.auto||!!(p.auto&&p.auto.mode==="own")});
   if(p.kind==="article"){ ed.state="draft"; ed.time="12:00"; }
   else Object.assign(ed,{text:p.text,accts:new Set(p.accts),custom:{...(p.custom||{})},imgs:[...(p.imgs||[])],parts:(p.parts||[]).map(x=>({...x})),link:p.link||"",utm:!!p.utm,alt:p.alt||"",fmt:{...(p.fmt||{})},notes:p.notes||""});
   for(const k of ["link","alt","notes"]) if(ed[k]) ed.open.add(k);
@@ -1524,13 +1550,25 @@ function shell(id){
 function renderPreview(){ const ids = ed.tab==="all" ? [...ed.accts] : [ed.tab];
   $("pvNote").textContent = ids.length>1 ? `${ids.length} 個頻道，往下看` : "";
   $("screen").innerHTML = ids.length ? ids.map(shell).join("") : `<span class="muted">先在左邊勾選要發到哪些頻道。</span>`; }
-function refresh(){ renderPick(); renderTabs(); fillText(); renderMrow(); renderParts(); renderXtras(); renderPset(); renderCnt(); renderPreview(); renderFoot(); }
+function refresh(){ renderPick(); renderTabs(); fillText(); renderMrow(); renderParts(); renderXtras(); renderPset(); renderAuto(); renderCnt(); renderPreview(); renderFoot(); }
 // 週期性安排: the same post again on a rhythm -- every day / these weekdays / this day of the month, until stopped or N times
 const newRepeat = () => ({freq:"week",days:[dowOf(ed&&ed.date||TODAY)+1],mday:d(ed&&ed.date||TODAY).getDate(),end:"never",count:8});
 const repeatTxt = (r, date, time) => `${r.freq==="day"?"每天":r.freq==="week"?"每週"+r.days.slice().sort().map(n=>DOW[n-1]).join("、"):"每月 "+r.mday+" 號"} ${time}（${fmt(date)} 起${r.end==="count"?"，共 "+r.count+" 次":""}）`;
 function occurrences(p){ const r=p.repeat, out=[]; if(!r) return out; let n=0;
   for(let i=0;i<70 && (r.end!=="count"||n<r.count);i++){ const s=addDays(p.date,i), hit = r.freq==="day" || (r.freq==="week"&&r.days.includes(dowOf(s)+1)) || (r.freq==="month"&&d(s).getDate()===r.mday);
     if(hit){ out.push({...p,date:s,rep:true}); n++; } } return out; }
+// 這則的自動回覆: the brand's rules by default; 「這則另外設」 makes a rule for this post only, and it wins over the brand's
+const AUTO = {none:"不用",brand:"照品牌規則",own:"這則另外設"};
+function renderAuto(){ const el=$("autoBox"), a=ed.auto, F=flowsOf();
+  const sum = a.mode==="brand" ? `照品牌規則（${F.filter(x=>x.on).length} 條開著）` : a.mode==="none" ? "不用" : "這則另外設";
+  el.innerHTML = `<button type="button" class="autohead" id="autoHead" aria-expanded="${ed.autoOpen}">${I(ed.autoOpen?"chevD":"chevR")}<b>這則的自動回覆</b><span class="muted">${sum}</span></button>`
+    + (ed.autoOpen ? `<div class="autobody"><span class="seg" id="autoSeg">${Object.entries(AUTO).map(([k,t])=>`<button type="button" class="${a.mode===k?"on":""}" data-am="${k}">${t}</button>`).join("")}</span>
+      <span class="muted tag">這則的規則優先，品牌規則不會對這則再回一次。只有 Facebook、Instagram，要等 Meta 審核通過才會真的動作。</span>
+      ${a.mode==="own" ? ruleForm(a.rule,"ar") : a.mode==="brand" ? `<div class="muted tag">${F.filter(x=>x.on).map(x=>`・${esc(x.name)}：${ruleLine(x)}`).join("<br>")||"品牌目前沒有開著的規則。"}</div>` : ""}</div>` : "");
+  $("autoHead").onclick=()=>{ ed.autoOpen=!ed.autoOpen; renderAuto(); };
+  el.querySelectorAll("[data-am]").forEach(x=>x.onclick=()=>{ if(ro()) return; a.mode=x.dataset.am; if(a.mode==="own"&&!a.rule) a.rule={...blankRule(),name:"這則專用"}; renderAuto(); });
+  if(a.mode==="own" && ed.autoOpen) wireRuleForm(el, a.rule, "ar", renderAuto);
+}
 // tags: one list per brand; pick in the composer, add / rename / recolour / delete here or in settings
 const TCOL = ["a","b","c","d","e"];
 function tagEditor(el, onPick){ const b=B(), sel=onPick?ed.tags:null;
@@ -1579,12 +1617,13 @@ function validate(state){ if(!ed.text.trim() && !Object.values(ed.custom).some(x
   const pover=[...ed.accts].filter(k=>THREAD.includes(pfOf(k))&&ed.parts.some(x=>[...x.text].length>maxOf(k))); if(pover.length) return `有一則留言超過 ${pover.map(k=>PF[pfOf(k)].n).join("、")} 的字數上限。`;
   const over=[...ed.accts].filter(k=>effLen(k)>maxOf(k)); if(over.length) return `${over.map(k=>A(k).name).join("、")} 超過字數上限，發不出去。`;
   if([...ed.accts].some(k=>pfOf(k)==="instagram")&&!ed.imgs.length) return "Instagram 一定要有圖片或影片。";
-  if(ed.act==="repeat"&&ed.repeat.freq==="week"&&!ed.repeat.days.length) return "週期性安排：至少選一天。"; return null; }
+  if(ed.act==="repeat"&&ed.repeat.freq==="week"&&!ed.repeat.days.length) return "週期性安排：至少選一天。";
+  if(ed.auto.mode==="own"&&(!ed.auto.rule.words.trim()||!ed.auto.rule.reply.trim()||!ed.auto.rule.pfs.length)) return "這則的自動回覆：關鍵字、回覆內容、至少一個平台都要有。"; return null; }
 function save(state){
   const e=validate(state); if(e) return say(e, true);
   let p = ed.id!=null ? B().posts.find(x=>x.id===ed.id) : null;
   if(!p || p.kind==="article"){ p={id:Date.now()}; B().posts.push(p); ed.id=p.id; ed.kind=null; }
-  const data={tags:[...ed.tags],repeat:ed.act==="repeat"?{...ed.repeat,days:[...ed.repeat.days]}:null,text:ed.text,accts:[...ed.accts],custom:{...ed.custom},imgs:[...ed.imgs],parts:ed.parts.map(x=>({...x})),link:ed.link,utm:ed.utm,alt:ed.alt,fmt:{...ed.fmt},notes:ed.notes,err:null};
+  const data={auto:ed.auto.mode==="brand"?null:{mode:ed.auto.mode,rule:ed.auto.mode==="own"?{...ed.auto.rule,pfs:[...ed.auto.rule.pfs]}:null},tags:[...ed.tags],repeat:ed.act==="repeat"?{...ed.repeat,days:[...ed.repeat.days]}:null,text:ed.text,accts:[...ed.accts],custom:{...ed.custom},imgs:[...ed.imgs],parts:ed.parts.map(x=>({...x})),link:ed.link,utm:ed.utm,alt:ed.alt,fmt:{...ed.fmt},notes:ed.notes,err:null};
   Object.assign(p,data,{date:ed.date,time:ed.time,state,listId:null});
   if(state==="published") p.url="https://bsky.app/profile/"+brand+"/post/"+Date.now().toString(36);
   addLog({draft:"存草稿",review:"送審",scheduled:"排程",published:"立即發佈"}[state],p,state==="scheduled"?`${fmt(ed.date)} ${ed.time}`:"");

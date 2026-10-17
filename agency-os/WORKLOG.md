@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-17（續10）社群發文樣稿：自動化流程兩層（品牌通用規則＋單則另外設，單則優先）；ADR 016 §5 定案 6
+
+**操作者**：「自動化流程照兩層畫：品牌通用規則＋單則貼文另外設，單則的優先。」寫進 ADR 016 §5「操作者定案」第 6 條。
+- 自動化流程分頁＝品牌規則清單：每條顯示名稱、留言／私訊含哪些關鍵字、平台、做什麼（公開回覆留言／私訊對方／兩者）、回覆內容開頭、7 天用了幾次、開｜關；右邊是同一張規則表單；清單下面「N 則貼文有自己的規則」，點了開那則的撰寫頁並展開自動回覆。頂部一句：留言自動回覆要等 Meta 審核通過才會真的動作（Facebook、Instagram）。平台只列 Facebook、Instagram，不承諾 Bluesky／Threads。
+- 撰寫頁：收合的「這則的自動回覆」，不用／照品牌規則（預設，列出開著的品牌規則）／這則另外設（同一張表單，只對這則）；說明：這則的規則優先，品牌規則不會對這則再回一次。另外設時關鍵字、回覆、平台沒填不能存。
+- 日曆卡片：有自己規則的貼文顯示 🤖。範例：10/14 那則有自己的規則。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/docs/social/mockups/check-social-mocks.py → 1 page(s), 0 finding(s)（dead-button：新按鈕都有作用；one-screen；chips）；render-views.mjs --mock → phone 390 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 自審看自動化流程分頁、撰寫頁「這則的自動回覆」、日曆截圖，pageerror 0
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=renderFlows|ruleForm|autoBox | hits=0 -- 只在樣稿；ADR 016 §5 第 16 版那行的自動化流程描述（關鍵字自動回覆規則）仍成立，第 6 條補兩層
+- ORACLE_WAIVED: 只改樣稿與 ADR（docs，不上線）
 ## 2026-10-17（續9）社群發文樣稿：Bluesky、Threads 的留言就是留言，不接成下一則貼文
 
 **操作者**：「Bluesky、Threads 沒有留言，會接成下一則貼文 >>> 不要接成下一則貼文」。主線 session 查 Postiz 原始碼：`bluesky.provider.ts` comment() 用 `reply: { root, parent }`、`threads.provider.ts` comment() 用 `reply_to_id`，兩者都是貼在原文下面的回覆＝留言。
