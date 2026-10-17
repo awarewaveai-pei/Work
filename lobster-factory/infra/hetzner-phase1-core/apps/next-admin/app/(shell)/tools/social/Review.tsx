@@ -4,13 +4,19 @@
 // Roles: a member row on the brand (Members.tsx, 0103), else ops_role (lib/social/authz.ts roleOn): owner/admin = 擁有者, operator = 編輯, viewer = 唯讀.
 import { useEffect, useState } from "react";
 import { api, ApiError } from "./api";
+import Icon from "./Icon";
 import { instantAt, zoned, type Brand, type Post } from "./model";
 import type { SlotContext } from "./SocialManager";
 
 export function NeedsButton({ ctx }: { ctx: SlotContext }) {
   const [n, setN] = useState<number | null>(null);
   useEffect(() => { api.needs(ctx.brand.id).then((r) => setN(r.n)).catch(() => setN(null)); }, [ctx.brand.id, ctx.posts, ctx.accounts]);
-  return <button type="button" onClick={ctx.openNeeds} title="發佈失敗、連線失效、等你審核">通知 <b>{n ?? "–"}</b></button>;
+  // the bell (C19 top bar): the count is a badge, gone at zero
+  return (
+    <button type="button" className="sm-ibtn sm-bell" onClick={ctx.openNeeds} aria-label={`需處理的事和紀錄${n ? `（${n} 件要處理）` : ""}`} title="發佈失敗、連線失效、等你審核的貼文，以及所有紀錄">
+      <Icon name="bell" />{!!n && <b>{n}</b>}
+    </button>
+  );
 }
 
 export function ReviewSetting({ ctx }: { ctx: SlotContext }) {

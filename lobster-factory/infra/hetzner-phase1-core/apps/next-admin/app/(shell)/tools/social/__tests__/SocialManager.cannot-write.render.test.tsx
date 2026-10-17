@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 //
 // A person who may not write (an invited account with no brand role = 唯讀, or 審核人) opened the page and met the
-// new-post editor, which ignored typing without a word (operator 2026-10-16). The panel says why instead; writers keep the editor.
+// new-post editor, which ignored typing without a word (operator 2026-10-16). The composer page says why instead
+// (C19: compose/new); writers get the editor.
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -22,7 +23,7 @@ afterEach(() => cleanup());
 describe("social manager -- who may write", () => {
   it.each([["client", /只能在這裡閱讀/], ["reviewer", /核准或退回/]])("%s: a notice where the editor was, no post box", async (r, words) => {
     role = r;
-    render(<SocialManager />);
+    render(<SocialManager route={{ kind: "compose", postId: null }} />);
     await waitFor(() => expect(screen.getByText(words)).toBeTruthy());
     expect(screen.getByText(/設定 → 成員/)).toBeTruthy();
     expect(screen.queryByLabelText("貼文內容")).toBeNull();
@@ -30,7 +31,7 @@ describe("social manager -- who may write", () => {
 
   it.each(["owner", "editor"])("%s: the new-post editor", async (r) => {
     role = r;
-    render(<SocialManager />);
+    render(<SocialManager route={{ kind: "compose", postId: null }} />);
     await waitFor(() => expect(screen.getByLabelText("貼文內容")).toBeTruthy());
     expect(screen.queryByText(/設定 → 成員/)).toBeNull();
   });

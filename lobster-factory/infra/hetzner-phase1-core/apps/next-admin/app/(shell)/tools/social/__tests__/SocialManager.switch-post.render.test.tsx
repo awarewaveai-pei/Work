@@ -2,10 +2,9 @@
 //
 // Opening post B right after post A, both at the same version, left A's text in the editor under B's id (the editor
 // remounts on `${id}:${version}` and the manager kept A until B arrived; GAP_REPORT.md 2026-10-16 B1). A save would
-// have written A's text into B. The manager now hands the editor a loaded post only while its id is the selected one.
-// The clock is pinned to a Wednesday: the week view shows Monday..Sunday of "today", so "tomorrow" on a Sunday would
-// fall off it (critic 2026-10-16).
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+// have written A's text into B. The manager now hands the editor a loaded post only while its id is the one on the
+// route (C19: the composer is its own page, compose/<id>; going from A's page to B's keeps the same component).
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 beforeAll(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-14T04:00:00Z")); });   // Wed 12:00 Taipei
@@ -40,11 +39,9 @@ afterEach(() => cleanup());
 
 describe("social manager -- switching between two posts", () => {
   it("the editor shows the post that was opened last, even at an equal version", async () => {
-    render(<SocialManager />);
-    await waitFor(() => expect(screen.getByTitle(/第一則的文字/)).toBeTruthy());
-    fireEvent.click(screen.getByTitle(/第一則的文字/));
+    const { rerender } = render(<SocialManager route={{ kind: "compose", postId: "p-a" }} />);
     await waitFor(() => expect((screen.getByLabelText("貼文內容") as HTMLTextAreaElement).value).toBe("第一則的文字"));
-    fireEvent.click(screen.getByTitle(/第二則的文字/));
+    rerender(<SocialManager route={{ kind: "compose", postId: "p-b" }} />);
     await waitFor(() => expect((screen.getByLabelText("貼文內容") as HTMLTextAreaElement).value).toBe("第二則的文字"));
   });
 });

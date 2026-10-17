@@ -1,7 +1,8 @@
 /**
  * /tools/social UI flows (lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md C6 acceptance): create -> schedule ->
  * drag -> list bulk -> restore, and the one-screen rule (1280x660, no page scroll); C7 a rotation list takes a draft;
- * C10 a WordPress article starts a post from its own excerpt.
+ * C10 a WordPress article starts a post from its own excerpt. C19: 建立貼文 opens the composer's own page
+ * (compose/new), 回排程日曆 comes back to the calendar.
  * Every /api/social call is answered by an in-memory fake below (page.route), so this tests the page, never a
  * database or Postiz; the API itself is covered by next-admin app/api/social/__tests__. Run against a dev server
  * with no Supabase configured (.claude/launch.json "next-admin-social-ui", port 3902):
@@ -106,11 +107,21 @@ function fakeServer() {
 async function open(page: Page) {
   const server = fakeServer();
   await page.route('**/api/social/**', (r) => server.handle(r));
+  // a Wednesday noon in Taipei: the week view ends on Sunday, so on a Saturday evening "tomorrow" is its last column and
+  // the drag below could only go back into the past (same pin as __tests__/SocialManager.switch-post.render.test.tsx)
+  await page.clock.setFixedTime(new Date('2026-10-14T04:00:00Z'));
   await page.setViewportSize({ width: 1280, height: 660 });
   await page.goto(`/tools/social?brand=${BRAND.id}`);
   await expect(page.getByRole('heading', { name: '社群發文' })).toBeVisible();
   await expect(page.getByRole('button', { name: BRAND.name })).toBeVisible();
   return server;
+}
+
+/** 建立貼文 -> the composer's own page */
+async function compose(page: Page) {
+  await page.getByRole('button', { name: '建立貼文' }).click();
+  await page.waitForURL(/\/tools\/social\/compose\/new/);
+  await expect(page.getByLabel('貼文內容')).toBeVisible();
 }
 
 test.describe('social manager', () => {
@@ -125,13 +136,22 @@ test.describe('social manager', () => {
   test('create -> schedule -> drag to another day -> list bulk delete -> restore', async ({ page }) => {
     const server = await open(page);
 
-    // create and schedule: tomorrow 09:00 is the new post's default
+    // create on the composer's page and schedule (tomorrow 12:00 is the new post's default); the address becomes the post's
+    await compose(page);
     await page.getByLabel('貼文內容').fill('週六親子藝術時光還有三個名額。');
     await page.getByRole('button', { name: '排程', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('已排在');
     const [post] = [...server.posts.values()];
     expect(post.state).toBe('scheduled');
     expect(post.targets.map((t: any) => t.account_id).sort()).toEqual(ACCOUNTS.map((a) => a.id).sort());
+    await expect(page).toHaveURL(new RegExp(`/tools/social/compose/${post.id}`));
+    await page.getByRole('button', { name: '回排程日曆' }).click();
+    await page.waitForURL(/\/tools\/social\?/);
+    // Back reopens the saved post, not an empty composer that would save a duplicate (critic 2026-10-17)
+    await page.goBack();
+    await expect(page.getByLabel('貼文內容')).toHaveValue('週六親子藝術時光還有三個名額。');
+    await page.getByRole('button', { name: '回排程日曆' }).click();
+    await page.waitForURL(/\/tools\/social\?/);
 
     // the week shows it; drag it one day later
     const before = post.scheduled_at as string;
@@ -150,12 +170,12 @@ test.describe('social manager', () => {
     expect(Math.abs(Date.parse(after) - Date.parse(before) - 24 * 3600_000)).toBeLessThan(3600_000);   // a day later, about the same time
 
     // list: tick it, bulk delete; then the bin restores it
-    await page.getByRole('button', { name: '清單', exact: true }).click();
+    await page.getByRole('button', { name: '貼文清單', exact: true }).click();
     await page.getByLabel('選取').first().check();
     await page.getByRole('button', { name: '刪除所選' }).click();
     await expect(page.getByRole('status')).toContainText('已刪除');
     expect(server.posts.get(post.id)!.state).toBe('deleted');
-    await page.getByRole('button', { name: '已刪除', exact: true }).click();
+    await page.getByRole('button', { name: '已刪除貼文', exact: true }).click();
     await page.getByRole('button', { name: '還原' }).click();
     await expect(page.getByRole('status')).toContainText('已還原');
     expect(server.posts.get(post.id)!.state).toBe('draft');
@@ -163,6 +183,7 @@ test.describe('social manager', () => {
 
   test('publishing now asks once more before it sends', async ({ page }) => {
     const server = await open(page);
+    await compose(page);
     await page.getByLabel('貼文內容').fill('現在就發。');
     await page.getByRole('button', { name: '立即發佈' }).click();
     await expect(page.getByText('發出去之後，這裡收不回來')).toBeVisible();
@@ -174,10 +195,12 @@ test.describe('social manager', () => {
 
   test('C7: a rotation list is created and takes a draft', async ({ page }) => {
     const server = await open(page);
+    await compose(page);
     await page.getByLabel('貼文內容').fill('藝術治療需要會畫畫嗎？不用。');
     await page.getByRole('button', { name: '存草稿' }).click();
     await expect(page.getByRole('status')).toContainText('已存起來');
-    await page.getByRole('button', { name: '輪播', exact: true }).click();
+    await page.getByRole('button', { name: '回排程日曆' }).click();
+    await page.getByRole('button', { name: '自動發布清單', exact: true }).click();
     await page.getByRole('button', { name: '＋ 新清單' }).click();
     await page.getByLabel('清單名稱').fill('常見問題');
     await page.getByRole('button', { name: '一', exact: true }).click();
@@ -193,6 +216,7 @@ test.describe('social manager', () => {
   test('C10: a WordPress article starts a post from its own excerpt, at no cost', async ({ page }) => {
     await open(page);
     await page.locator('.sm-post.sm-article').first().click();
+    await page.waitForURL(/\/compose\/new\?.*article=42/);
     await expect(page.getByRole('button', { name: /AI 改寫（約 NT\$/ })).toBeVisible();
     await page.getByRole('button', { name: '用文章摘要' }).click();
     await expect(page.getByLabel('貼文內容')).toHaveValue(/藝術治療看的是過程。\n\n全文：https:\/\/soulful.example\/a/);

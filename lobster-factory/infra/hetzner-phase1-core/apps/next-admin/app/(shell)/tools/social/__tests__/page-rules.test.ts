@@ -5,13 +5,15 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const DIR = path.resolve(__dirname, "..");
-const files = readdirSync(DIR).filter((f) => /\.(tsx?|css)$/.test(f)).map((f) => ({ f, src: readFileSync(path.join(DIR, f), "utf8") }));
+// every page file, sub-folders too (compose/, (sections)/ -- C19); the tests themselves are not page code
+const files = (readdirSync(DIR, { recursive: true }) as string[]).map((f) => f.split(path.sep).join("/"))
+  .filter((f) => /\.(tsx?|css)$/.test(f) && !f.startsWith("__tests__/")).map((f) => ({ f, src: readFileSync(path.join(DIR, f), "utf8") }));
 const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");   // comments may name a rule
 const NAMED = /\b(?:color|background(?:-color)?|border(?:-[a-z]+)?-?color|fill|stroke|outline-color)\s*:\s*[^;{}]*\b(white|black|red|green|blue|gray|grey|yellow|orange|purple|pink)\b/i;
 
 describe("/tools/social page rules", () => {
   it("covers the page's files", () => {
-    expect(files.map((x) => x.f)).toEqual(expect.arrayContaining(["SocialManager.tsx", "Editor.tsx", "Calendar.tsx", "social.css"]));
+    expect(files.map((x) => x.f)).toEqual(expect.arrayContaining(["SocialManager.tsx", "Editor.tsx", "Calendar.tsx", "social.css", "compose/[id]/page.tsx", "(sections)/analytics/page.tsx"]));
   });
 
   it("no <select>, in JSX or built by script", () => {

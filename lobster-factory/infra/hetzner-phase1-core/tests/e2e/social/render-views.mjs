@@ -1,4 +1,5 @@
-// Renders every /tools/social view to PNG so a design change can be looked at, not guessed (SOCIAL_MANAGER_GAP_REPORT.md §1).
+// Renders every /tools/social view to PNG so a design change can be looked at, not guessed (SOCIAL_MANAGER_GAP_REPORT.md §1);
+// the C19 frame: plan tabs, the composer's own page, the five section shells. Phone renders come with C30.
 // Against the no-Supabase dev server (.claude/launch.json "next-admin-social-ui", port 3902); every /api/social call is
 // answered here with fixed sample data (8 posts across the states, 3 accounts incl. one expired, 1 list, 3 media, 3 log rows).
 // Nothing reaches a database or Postiz. Output goes OUTSIDE the repo (renders are not committed).
@@ -49,9 +50,9 @@ if (process.argv.includes("--mock")) {
 const BRAND = { id: "0b0b0b0b-0000-4000-8000-000000000001", slug: "soulful", name: "Soulful Expression", default_timezone: "Asia/Taipei", role: "owner" };
 const BRAND2 = { id: "0b0b0b0b-0000-4000-8000-000000000002", slug: "aw", name: "Aware Wave", default_timezone: "Asia/Taipei", role: "owner" };
 const ACCOUNTS = [
-  { id: "acc00000-0000-4000-8000-000000000001", platform: "bluesky", label: "soulfulexpression.bsky.social", status: "connected", postiz_integration_id: "i1" },
-  { id: "acc00000-0000-4000-8000-000000000002", platform: "facebook", label: "Soulful Expression Art Therapy", status: "connected", postiz_integration_id: "i2" },
-  { id: "acc00000-0000-4000-8000-000000000003", platform: "instagram", label: "soulful.art", status: "expired", postiz_integration_id: "i3" },
+  { id: "acc00000-0000-4000-8000-000000000001", platform: "bluesky", label: "Soulful Expression", status: "connected", postiz_integration_id: "i1", picture: null, handle: "soulfulexpression.bsky.social", chatwoot_inbox_id: null },
+  { id: "acc00000-0000-4000-8000-000000000002", platform: "facebook", label: "Soulful Expression Art Therapy", status: "connected", postiz_integration_id: "i2", picture: null, handle: "", chatwoot_inbox_id: null },
+  { id: "acc00000-0000-4000-8000-000000000003", platform: "instagram", label: "soulful.art", status: "expired", postiz_integration_id: "i3", picture: null, handle: "soulful.art", chatwoot_inbox_id: null },
 ];
 const now = new Date();
 const day = (d, h, m = 0) => { const x = new Date(now); x.setDate(x.getDate() + d); x.setHours(h, m, 0, 0); return x.toISOString(); };
@@ -111,41 +112,55 @@ async function handle(route) {
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 660 }, deviceScaleFactor: 1 });
 await page.route("**/api/social/**", handle);
+page.on("console", (m) => { if (m.type() === "error") console.log("console error:", m.text().slice(0, 300)); });   // the dev overlay counts these
+const shot = async (name) => { await page.waitForTimeout(600); await page.screenshot({ path: `${out}/${name}.png` }); };
+// C19 frame: the plan page (channel list + toolbar + week), then every tab and the views behind the bell and the gear.
+// Names: the cards' own (01 calendar, 02 compose, 10 sections); x-* are the other views, so a later card's number stays free.
 await page.goto(`http://127.0.0.1:3902/tools/social?brand=${BRAND.id}`, { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "社群發文" }).waitFor();
-await page.waitForTimeout(800);
-await page.screenshot({ path: `${out}/01-week-new.png` });
-// open a scheduled post
-await page.getByTitle(/已排程/).first().click();
-await page.waitForTimeout(600);
-await page.screenshot({ path: `${out}/02-week-edit-scheduled.png` });
-// the header's 通知 N opens the log on 需處理
-await page.getByRole("button", { name: /通知/ }).click();
-await page.waitForTimeout(600);
-await page.screenshot({ path: `${out}/03-needs.png` });
-await page.getByRole("button", { name: "週", exact: true }).click();
-await page.waitForTimeout(400);
-// the review one -> reviewer bar
-await page.locator(".sm-post[data-state=review]").first().click();
-await page.waitForTimeout(600);
-await page.screenshot({ path: `${out}/04-edit-review.png` });
-for (const [v, name] of [["月", "05-month"], ["清單", "06-list"], ["輪播", "07-lists"], ["媒體", "08-media"], ["紀錄", "09-log"], ["設定", "10-settings"]]) {
-  await page.getByRole("button", { name: v, exact: true }).click();
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: `${out}/${name}.png` });
+await shot("01-calendar");
+await page.getByRole("button", { name: "Soulful Expression Art Therapy 的選單" }).click();
+await shot("x-channel-menu");
+await page.keyboard.press("Escape");
+await page.getByRole("button", { name: "Soulful Expression Art Therapy 的選單" }).click();
+await page.getByRole("button", { name: /^篩選/ }).click();
+await shot("x-filter");
+await page.getByRole("button", { name: "完成" }).click();
+await page.getByRole("button", { name: "月", exact: true }).click();
+await shot("x-month");
+for (const [tab, name] of [["貼文清單", "x-list"], ["貼文素材庫", "x-library"], ["自動發布清單", "x-lists"], ["已刪除貼文", "x-trash"], ["自動化流程", "x-flows"]]) {
+  await page.getByRole("button", { name: tab, exact: true }).click();
+  await shot(name);
 }
-// list detail on the right
-await page.getByRole("button", { name: "輪播", exact: true }).click();
-await page.waitForTimeout(400);
+await page.getByRole("button", { name: "自動發布清單", exact: true }).click();
 await page.getByText("常青內容").first().click();
-await page.waitForTimeout(600);
-await page.screenshot({ path: `${out}/11-list-detail.png` });
-// mobile
-await page.setViewportSize({ width: 390, height: 844 });
-await page.getByRole("button", { name: "週", exact: true }).click();
-await page.waitForTimeout(700);
-await page.screenshot({ path: `${out}/12-mobile-week.png`, fullPage: true });
+await shot("x-list-detail");
+await page.getByRole("button", { name: /需處理的事和紀錄/ }).click();
+await shot("x-log-needs");
+await page.getByRole("button", { name: "設定", exact: true }).click();
+await shot("x-settings");
+// the composer's own page: 建立貼文, then an existing post (a scheduled one, the one waiting for review)
+await page.getByRole("button", { name: "排程日曆", exact: true }).click();
+await page.getByRole("button", { name: "建立貼文" }).click();
+await page.waitForURL(/\/tools\/social\/compose\/new/);
+await page.getByLabel("貼文內容").waitFor();
+await shot("02-compose-route");
+await page.getByRole("button", { name: "回排程日曆" }).click();
+await page.waitForURL(/\/tools\/social\?/);
+await page.getByTitle(/已排程/).first().click();
+await page.waitForURL(/\/compose\/0000/);
+await page.getByLabel("貼文內容").waitFor();
+await shot("x-compose-scheduled");
+await page.goto(`http://127.0.0.1:3902/tools/social/compose/00000000-0000-4000-8000-000000000005?brand=${BRAND.id}`, { waitUntil: "networkidle" });
+await page.getByLabel("貼文內容").waitFor();
+await shot("x-compose-review");
+// the five sections that are shells until their cards (C24-C29)
+for (const [label, key] of [["數據分析", "analytics"], ["報表管理", "reporting"], ["訊息收件匣", "inbox"], ["智慧連結", "smartlinks"], ["廣告管理", "ads"]]) {
+  await page.getByRole("button", { name: label, exact: true }).click();
+  await page.waitForURL(new RegExp(`/tools/social/${key}`));
+  await shot(`10-${key}`);
+}
 const size = await page.evaluate(() => ({ h: document.scrollingElement.scrollHeight, w: document.scrollingElement.scrollWidth }));
-console.log("mobile page size", size, size.w > 390 ? "(wider than the viewport: horizontal overflow)" : "");
+console.log("page size on the last section", size);
 await browser.close();
 console.log("done", out);

@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-17（續24）社群 V1.5 C19：骨架與路由（頂部六區、六分頁、左側頻道清單、一列工具列、撰寫頁獨立整頁）
+
+**範圍**：PLAN.md §1b C19。路徑 `apps/next-admin/app/(shell)/tools/social/`。
+**做了**：
+- `routes.ts`：SECTIONS／PLAN_TABS／VIEWS＝樣稿 data-view 值；`socialBase`（/tools/social、/social、門根 ""）；`routeHref`。
+- 新元件 `TopBar`／`PlanTabs`／`ChannelList`（搜尋、點列＝只看、⋮ 四項、移除前確認）／`Toolbar`（搜尋、‹本週›、週｜月、篩選鈕＋面板〔平台／狀態〕、最佳發布時間鈕〔內容 C22〕、建立貼文）／`SectionShell`（五區＋自動化流程「尚未開通」）／`Icon`／`RoutePage`。
+- `SocialManager.tsx` 重寫：右欄退場；post／new／article → `compose/<id>`、`compose/new?date&time`（文章帶 site／article／title／day）；brand、view 同步網址。`SocialApp.tsx` 改 slots（右欄 → 自動發布清單分頁內 `ListsTab`）。`Review.tsx` NeedsButton → 鈴鐺。
+- 路由：`compose/new`、`compose/[id]`（非 UUID → notFound）、`(sections)/{analytics,reporting,inbox,smartlinks,ads}`，`app/social/` 門下同一組。
+- 文案：GPT（`agency-os/reports/oracle/2026-10-17-inspect-9551174c.md`）照原文。
+- 測試：新 `mock-parity.test.ts`（data-view 全對到、頂部與分頁順序文字、每區兩棵樹都有頁）；`page-rules.test.ts` 改遞迴；兩支 render 測試改掛 compose 路由；e2e 建立→撰寫頁→回日曆（含 Back 不變空白）；e2e 釘時鐘到週三（週六晚「明天」在最後一欄，拖拉只能往過去）。
+**卡外（未做，屬他卡）**：「用這個頻道寫」帶 `?accounts=`，今天的 Editor 不讀（C21）；篩選標籤欄、最佳時段內容、已刪除誰刪的（C22）；手機（C30）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test（275 files／2553 pass） | exit=0 | ms=17295
+- REALTEST_EVIDENCE: tool=Bash | cmd=PLAYWRIGHT_SOCIAL_URL=http://127.0.0.1:3902 npx playwright test --project social（5 pass） | exit=0 | ms=18772
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/e2e/social/render-views.mjs <scratch>（20 張含 01-calendar、02-compose-route、10-<五區>；看過圖，修了工具列擠壓、選中色被 hover 蓋掉、鈴鐺 hover 消失） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/4n（M1 複製後編輯器仍是舊貼文、M2 replaceState 讓 Back 開出空白撰寫頁 → 改走 router＋carried 訊息；m1 撰寫頁換品牌先發錯品牌請求；m2 [id] 未驗 UUID；m3 清單少期間標籤；m4 parity 未查頁面存在；全修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=rightPanel|setView("media")|name: /通知/|sm-head|01-week-new|12-mobile-week | hits=2（只剩舊 WORKLOG 與 GAP_REPORT 歷史紀錄，不改）
+- ORACLE_WAIVED: PLAN §1b 每卡 1 個 critic；critic 6 項全修並加 e2e Back 檢查
+**rollback**：`git revert <本 commit>`（不碰資料表）。
 ## 2026-10-17（續23）模型分工與 Codex 讀檔接上機制：Haiku 小幫手 `data-filler`、主 session 派工不切模型、讀到第 20 個檔提醒交 Codex（已安裝）
 
 **根因**：§5 模型表與「20+ 檔交 Codex」只是文字。實測近 7 天：主 session 輸出 Sonnet 49%／Opus 36%／Fable 14%／Haiku 0%；小幫手無任何 haiku 定義（SUBAGENT_CHARTER 寫「nothing qualifies yet」）；19 個 session 有 6 個自己讀 ≥20 個不同檔；Codex inspect 總共只 23 次（review 311 次）。`codex-continue.ps1` 只跑認知平台卡片佇列、手動啟動，最後一次 2026-10-08。
