@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-17（續9）社群發文樣稿：Bluesky、Threads 的留言就是留言，不接成下一則貼文
+
+**操作者**：「Bluesky、Threads 沒有留言，會接成下一則貼文 >>> 不要接成下一則貼文」。主線 session 查 Postiz 原始碼：`bluesky.provider.ts` comment() 用 `reply: { root, parent }`、`threads.provider.ts` comment() 用 `reply_to_id`，兩者都是貼在原文下面的回覆＝留言。
+- 「＋ 新增留言」所有平台同一句（拿掉 Bluesky／Threads 的特別說明）；預覽裡留言一律縮排、小一號、在貼文下面（頭像＋名稱＋內容＋「1 小時後留」），不再用串文直線畫成第二則貼文；每則留言的延遲保留。字數超過時的提示改「有一則留言超過 Bluesky 的字數上限」。
+- 給實作的備註（不上畫面）：Postiz 把第 2 則以後的留言回在上一則留言下（`lastCommentId || postId`），2 則以上會一層層巢狀。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/docs/social/mockups/check-social-mocks.py → 1 page(s), 0 finding(s)（含 dead-button／one-screen）；render-views.mjs --mock → phone 390 | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 自審看撰寫頁截圖（Bluesky 預覽兩則留言縮排在貼文下），pageerror 0
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=接成 | hits=0 -- 樣稿裡「接成」已全清（腳本斷言）；ADR 016 §5 沒寫這句
+- ORACLE_WAIVED: 只改樣稿（docs，不上線）
 ## 2026-10-17（續8）社群發文樣稿：週期性安排、設定行程、標籤、時間清單、白話文字；智慧連結／廣告管理／自動化流程能操作；檢查加 `[dead-button]`
 
 **操作者**（附 Metricool／Postiz 截圖）：「為什麼沒有週期性安排」「按鍵【設定行程】」「你的中文我看不懂（接一則？各頻道格式？）」「行事曆的時間顯示非常不明顯，找不到時間」「沒有 tag 或分類管理」「你要確認每個功能有作用，例如 smart link」。

@@ -671,7 +671,10 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
 .dots{display:flex;justify-content:center;gap:4px;padding-top:8px}
 .dots i{width:6px;height:6px;border-radius:50%;background:var(--card-border)}
 .dots i.on{background:var(--severity-low)}
-.sh .cm{padding:0 10px 10px;font-size:var(--fs-tag);color:var(--text-muted)}
+.sh .cm{display:grid;grid-template-columns:20px minmax(0,1fr);gap:6px;margin:0 10px 8px 34px;padding:6px 8px;border-radius:10px;background:var(--bg-subtle);font-size:var(--fs-tag);color:var(--text-primary)}
+.sh .cm .imgs{margin-top:4px;border-radius:6px;overflow:hidden;max-width:120px}
+.sh .cm .cmw{display:block;color:var(--text-muted)}
+.av.s20{width:20px;height:20px;font-size:var(--fs-tag)}
 .sh.th{display:grid;grid-template-columns:32px minmax(0,1fr);gap:8px;padding:10px}
 .sh.th .tl{display:flex;flex-direction:column;align-items:center;gap:4px}
 .sh.th .tl i{flex:1;width:2px;background:var(--card-border)}
@@ -1480,7 +1483,7 @@ function partCnt(t){ const ks=[...ed.accts].map(pfOf).filter(k=>THREAD.includes(
 function renderParts(){ const el=$("parts"), P=ed.parts;
   el.innerHTML = P.map((x,i)=>`<div class="part"><div class="pbox"><textarea data-pi="${i}" rows="2" aria-label="第 ${i+1} 則留言" placeholder="第 ${i+1} 則留言" ${ro()?"readonly":""}>${esc(x.text)}</textarea>${x.img?`<div class="mrow"><span class="mt ph ph-${x.img}"></span></div>`:""}<div class="tools"><button type="button" class="ibtn" data-pimg="${i}" title="加一張圖" aria-label="加一張圖">${I("image")}</button><button type="button" class="ibtn" data-pem="${i}" title="加表情" aria-label="加表情">${I("smile")}</button><span class="muted tag">貼文發出後${delayTxt(x.delay)}留</span>${partCnt(x.text)}</div></div>`
     + `<div class="pside"><button type="button" class="ibtn" data-pup="${i}" aria-label="往上" ${i?"":"disabled"}>${I("up")}</button><button type="button" class="ibtn" data-pdown="${i}" aria-label="往下" ${i<P.length-1?"":"disabled"}>${I("down")}</button><button type="button" class="ibtn" data-pdel="${i}" aria-label="刪掉這則留言">${I("trash")}</button><button type="button" class="ibtn ${x.delay?"on":""}" data-pdelay="${i}" title="貼文發出後多久留：${delayTxt(x.delay)}（點一下換）" aria-label="什麼時候留">${I("clock")}</button></div></div>`).join("")
-    + (ro() ? "" : `<div class="addpart"><button type="button" class="btn-secondary" id="addPart">＋ 新增留言</button><span class="muted tag">貼文發出後，用你的帳號在下面留言。Bluesky、Threads 沒有留言，會接成下一則貼文。</span></div>`);
+    + (ro() ? "" : `<div class="addpart"><button type="button" class="btn-secondary" id="addPart">＋ 新增留言</button><span class="muted tag">貼文發出後，用你的帳號在下面留言。</span></div>`);
   const a=$("addPart"); if(a) a.onclick=addPart;
   el.querySelectorAll("[data-pi]").forEach(t=>t.oninput=()=>{ P[+t.dataset.pi].text=t.value; renderPreview(); renderHint(); });
   const mv=(i,j)=>{ [P[i],P[j]]=[P[j],P[i]]; renderParts(); renderPreview(); };
@@ -1507,11 +1510,10 @@ function shell(id){
   const mark = x => x ? esc([...x].slice(0,max).join("")) + ([...x].length>max ? `<mark class="over" title="超過 ${max} 字，這段發不出去">${esc([...x].slice(max).join(""))}</mark>` : "") : `<span class="muted">（文字會出現在這裡）</span>`;
   const body = mark(t), when = ed.act==="now" ? "剛剛" : `${fmt(ed.date)} ${ed.time}`, imgs=ed.imgs;
   const lab = `<div class="shl">${pfb(k)}${esc(a.name)}${f!=="貼文"?" · "+f:""}</div>`, ic = ns => ns.map(n=>I(n)).join(""), av=avOf(a);
-  const parts = ed.parts.filter(x=>x.text.trim()||x.img), cms = name => parts.map(x=>`<div class="cm"><b>${esc(name)}</b> ${esc(x.text)}</div>`).join("");
-  const thread = (name, sub, icons) => { const all=[{html:body,imgs}, ...parts.map(x=>({html:mark(x.text),imgs:x.img?[x.img]:[],delay:x.delay}))];
-    return `<div class="sh th">${all.map((e,i)=>`<div class="tl">${av}${i<all.length-1?"<i></i>":""}</div><div><div class="who"><b>${esc(name)}</b><span>${i?delayTxt(e.delay):sub}</span></div><div class="tx">${e.html}</div>${grid(e.imgs)}<div class="ic">${ic(icons)}</div></div>`).join("")}</div>`; };
-  if(k==="bluesky") return lab+thread(a.name, `${a.handle} · ${when}`, ["comment","repost","heart"]);
-  if(k==="threads") return lab+thread(a.handle.replace(/^@/,"").split(" ")[0], when, ["heart","comment","repost","send"]);
+  const parts = ed.parts.filter(x=>x.text.trim()||x.img), cms = name => parts.map(x=>`<div class="cm">${avOf(a,"s20")}<span><b>${esc(name)}</b> ${mark(x.text)}${x.img?grid([x.img]):""}<span class="cmw">${delayTxt(x.delay)}留</span></span></div>`).join("");
+  const plain = (name, sub, icons) => `<div class="sh"><div class="hd">${av}<div class="who"><b>${esc(name)}</b><span>${sub}</span></div></div><div class="tx">${body}</div>${grid(imgs)}<div class="ic">${ic(icons)}</div>${cms(name)}</div>`;
+  if(k==="bluesky") return lab+plain(a.name, `${a.handle} · ${when}`, ["comment","repost","heart"]);
+  if(k==="threads") return lab+plain(a.handle.replace(/^@/,"").split(" ")[0], when, ["heart","comment","repost","send"]);
   if(k==="facebook") return lab+`<div class="sh fb"><div class="hd">${av}<div class="who"><b>${esc(a.name)}</b><span>${when} · 公開</span></div></div><div class="tx clamp5">${body}</div>${grid(imgs)}<div class="ic bar"><span>${I("like")}讚</span><span>${I("comment")}留言</span><span>${I("share")}分享</span></div>${cms(a.name)}</div>`;
   if(k==="instagram"){ const h=a.handle.replace(/^@/,"").split(" ")[0], tall=f!=="貼文";
     const pic = imgs.length ? `<div class="sq ph ph-${imgs[0]} ${tall?"tall":""}"></div>${imgs.length>1&&!tall?`<div class="dots">${imgs.map((_,i)=>`<i class="${i?"":"on"}"></i>`).join("")}</div>`:""}` : `<div class="need">Instagram 一定要有圖片或影片。</div>`;
@@ -1574,7 +1576,7 @@ function renderHint(){ if(!ed||view!=="compose") return; const p=ed.id!=null?B()
   $("hint").innerHTML = h.join("　"); }
 function validate(state){ if(!ed.text.trim() && !Object.values(ed.custom).some(x=>x&&x.trim())) return "貼文還是空的。";
   if(state==="draft") return null; if(!ed.accts.size) return "還沒選要發到哪裡：在左邊勾頻道。";
-  const pover=[...ed.accts].filter(k=>THREAD.includes(pfOf(k))&&ed.parts.some(x=>[...x.text].length>maxOf(k))); if(pover.length) return "接的那幾則有一則超過字數上限。";
+  const pover=[...ed.accts].filter(k=>THREAD.includes(pfOf(k))&&ed.parts.some(x=>[...x.text].length>maxOf(k))); if(pover.length) return `有一則留言超過 ${pover.map(k=>PF[pfOf(k)].n).join("、")} 的字數上限。`;
   const over=[...ed.accts].filter(k=>effLen(k)>maxOf(k)); if(over.length) return `${over.map(k=>A(k).name).join("、")} 超過字數上限，發不出去。`;
   if([...ed.accts].some(k=>pfOf(k)==="instagram")&&!ed.imgs.length) return "Instagram 一定要有圖片或影片。";
   if(ed.act==="repeat"&&ed.repeat.freq==="week"&&!ed.repeat.days.length) return "週期性安排：至少選一天。"; return null; }
