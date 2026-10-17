@@ -1,10 +1,12 @@
 // Post payloads for POST /api/social/posts and PUT /api/social/posts/[id]: what may be sent, and the body limits.
 import { BadRequest, uuid } from "./http";
 import { overLimit } from "./limits";
-import { accountPlatforms, type MediaInput, type PostFields, type TargetInput } from "./store";
+import { accountPlatforms, type AutoMode, type MediaInput, type PostFields, type TargetInput } from "./store";
 import { composeText, ComposeError } from "./compose";
+import { parseRepeat, RepeatError } from "./repeat-rule";
 
 const TEXT_FIELDS = ["first_comment", "link_url", "notes", "source_url"] as const;
+const AUTO_MODES: readonly AutoMode[] = ["brand", "none", "own"];
 const MAX_TARGETS = 100;   // more channels than one brand has
 const MAX_MEDIA = 20;      // the largest carousel a platform takes
 
@@ -34,6 +36,19 @@ export function parsePostPayload(body: Record<string, unknown>): PostPayload {
   if ("link_utm" in raw) {
     if (typeof raw.link_utm !== "boolean") throw new BadRequest("fields.link_utm must be a boolean");
     fields.link_utm = raw.link_utm;
+  }
+  // 0105: null = not a series (stopping one with children already made is store.ts stopRepeat)
+  if ("repeat" in raw) {
+    try {
+      fields.repeat = raw.repeat === null ? null : parseRepeat(raw.repeat);
+    } catch (e) {
+      if (e instanceof RepeatError) throw new BadRequest(`fields.repeat: ${e.message}`);
+      throw e;
+    }
+  }
+  if ("auto_mode" in raw) {
+    if (!AUTO_MODES.includes(raw.auto_mode as AutoMode)) throw new BadRequest(`fields.auto_mode must be one of ${AUTO_MODES.join(", ")}`);
+    fields.auto_mode = raw.auto_mode as AutoMode;
   }
   let targets: TargetInput[] | null = null;
   if (body.targets !== undefined) {

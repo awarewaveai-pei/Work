@@ -26,6 +26,32 @@
 - BUGHUNT_WAIVED: NA -- 無程式改動
 
 **剩**：課程類考試（操作者按「開始考試」）；Soulful 自動結案仍關（`/ops/schedules` 勾「Chatwoot 基本設定檢查」）。
+## 2026-10-17（續18）社群 V1.5 C20：migration 0105 資料表一次開齊＋0109 系列時段綁版本，兩支已套 prod（操作者 go-ahead）
+
+**範圍**：PLAN.md §1b C20 輸出 1–10。brief 依續16 更正：不寫 DEPLOY_HOLD；0105 做成可單獨上線；推 main 前停。
+**查證**：部署 migration 閘＝`scripts/check-migrations-applied.sh` 要求 repo 每個 migration 都在正式 ledger（不是逐檔套用、也不會自動套）→ 0105 推上 main 而未套 = 03:00 自動部署整個被擋（所有 session 的程式都上不去）。正確順序：go-ahead → `node scripts/apply-db-migration.mjs 0105` → 推 main → 03:00 部署。
+**做了**：
+- `packages/db/migrations/0105_social_v16.sql`（不變量在檔頭）：accounts＋picture／handle／chatwoot_inbox_id；social_tags／social_post_tags；social_post_comments（first_comment 回填 position 0，含已發佈）；posts＋repeat／repeat_of／auto_mode＋週期性函式（social_repeat_materialize／social_withdraw_repeat／social_stop_repeat）；social_list_slots（weekdays×send_time 回填）；social_auto_rules；智慧連結三表（slug 規則：小寫英數與 -、全品牌唯一、保留 go/admin/api/new）；social_metrics_daily／social_post_metrics；social_reports（只有 pdf；加 colour＝樣稿 swatch，卡片列表漏列）。每張新表 RLS＋service_role only；標籤／規則／智慧連結／報表寫入各一個函式＋同交易 audit 列。
+- 相容（現在跑的程式不動也能用）：social_save_post／social_save_list 舊參數名不變、新參數有預設；first_comment 與 comment 0 雙寫；weekdays／send_time 跟著 slots。
+- 週期性：子貼文 repeat_of＋origin_slot 唯一＝每格只做一次；模板被人存檔或改狀態時，同交易撤回「沒人動過」的子貼文（scheduled 且 version=1），app 立刻重做（`store.ts` refreshSeries）；每日 social-rotation 也做（`rotation.ts` runRotation）。draft／review 模板不產子貼文；未送出前刪模板＝停止系列。
+- `.down.sql` 由腳本從 0098／0101 原文生成。
+- next-admin：`lib/social/repeat-rule.ts`（新，伺服器與日曆共用）、`store.ts`（欄位、留言／標籤參數、系列、標籤 CRUD、清單 slots、頻道圖補填）、`posts.ts`（repeat、auto_mode）、`rotation.ts`（`listSlots` 讀 slots）、`model.ts`、`api.ts` 型別。路由不動：comments／tags 進路由、字數上限、審核閘由 C21 接。
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/packages/db/scripts/0105_social_v16-local-verify.sh（拋棄式 postgres:15.8-alpine：0096–0103 → 舊資料 seed → 0105 → 9 組斷言 → 0100／0101 斷言在 0105 上重跑 → down → 0101 斷言 → 重套 → 再套一次） | exit=0 | ms=16373
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變：拿掉 social_create_report 的品牌檢查 → 「another brand's account in a report」紅；還原綠 | exit=1→0 | ms=30000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test（273 files／2542 pass／0 fail；store.test 6、rotation.test 4） | exit=0 | ms=17408
+- 跑的過程抓到並修掉：回填留下待檢查的延遲 FK 讓之後 ALTER TABLE 失敗（加 set constraints all immediate）；check 用的函式 service_role 要有 EXECUTE；repeat 檢查少了 key 時是 NULL＝被接受（加 coalesce）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0105` → APPLY_OK 1/1；`--status` 前只缺 0105；psql：ledger 0105 有、11 表 RLS 全開、anon／authenticated 表與函式權限 0、social_save_post／social_save_list 各 1 個 overload、回填 0/0（prod 尚無 first_comment 與清單） | exit=0 | ms=16575
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/5n（db-expert：今天單獨套安全；3 Major＋m4／m5／m6／m8 已修進 0105 並加斷言，重跑全綠；m7 → TASKS）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=social_repeat_materialize|social_withdraw_repeat|social_stop_repeat|social_list_slots|social_post_comments|social_post_tags|materializeSeries|refreshSeries | hits=97（8 檔：本次的 migration／腳本／程式／測試＋PLAN.md 卡片文字）；listSlots 呼叫者只剩 rotation.ts
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/3m/3n（critic，TS 端，/verify-recent）：M1 每日任務／存檔後讀了模板才算時段，中間有人改規則 → 舊時段配新內容 → **0109** `social_repeat_materialize` 多 `p_expected_version`（舊版本回 -1，TS 重讀重算，最多 3 次）；M2 模板查詢沒分頁（PostgREST 1000 列）→ `selectAll`；M3 Postiz 沒列到的帳號每次載入都再問 Postiz → 寫 ""；n1 出貨前刪掉的模板每天還跑 → 濾掉；n2／n3（day 忽略 days、count 依模板當天是否符合）記給 C21／C22
+- REALTEST_EVIDENCE: tool=Bash | cmd=0105_social_v16-local-verify.sh 加 0109（套 → SOCIAL_0109_{BEHAVIOUR,ACCESS}_OK → down 還原 0105 函式 → 重套兩次）；npm test 273 files／2543 pass；store.test 新增「模板中途變了就重讀」 | exit=0 | ms=17000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0109` → APPLY_OK；psql：ledger 0105＋0109 兩列、social_repeat_materialize 只剩 6 參數版、anon 無、service_role 有；`--status` STATUS_OK applied 109、無 missing | exit=0 | ms=15000
+- ORACLE_WAIVED: 卡片指定 db-expert 審一次＋拋棄式 DB 全套斷言＋一個所有權守衛突變；不加第二輪
+- db-expert 修正（同一支 0105）：M1 貼文自己的規則＝它的子資料，存／刪規則先 touch 貼文（version＋1），沒動過的子貼文才不會連規則被撤回；M2 `social_stop_repeat` 先鎖列、queued 回 SC409（0100：queued 只經 release）；M3 slots 回填只補沒有 slots 的清單（重套不會把方格加寬）；m4 開頭一次拿齊 5 張表的 ACCESS EXCLUSIVE；m5 已到期未被領走的子貼文不撤回；m6 子貼文／輪播貼文連同模板的專屬規則一起複製（快照）；m8 down 檔頭補兩項損失＋離峰執行。m7（解除頻道會連每日數據一起刪、報表留下失效帳號 id）＝保留政策，寫 TASKS。
+- slug 改成發起 session 指定的 `^[a-z0-9][a-z0-9-]{1,39}$`＋保留 go/admin/api/new。
+**剩**：C20 已完成（監工台 done）；C19 接著做。卡外：TASKS 一行（LogView 新動作名；C21 接 comments／tags 與「只刪這次」語意；C27 存規則後重做子貼文；數據保留政策）。
+**rollback**：`0105_social_v16.down.sql`（先部署不讀新欄位的程式；一次性損失列在檔頭）。
 ## 2026-10-17（續17）客服三態：轉真人後機器人只在「工作人員 30 分鐘內公開回過話」時靜默，其他時候照常回答＋migration 0108 已套 prod
 
 **操作者**：「一下轉自動回 一下轉AI 一下轉真人 好像系統無法處理這種接續的變化」→ 同意三條規則、N = 30 分鐘：「照這個做：migration 0108、程式、測試、審查，做完套 migration 並部署」。

@@ -29,7 +29,11 @@ const q = (o: Record<string, string>) => new URLSearchParams(o).toString();
 
 export interface SavedRef { id: string; version: number }
 export interface PostInput {
-  fields: { body?: string; first_comment?: string | null; link_url?: string | null; link_utm?: boolean; notes?: string | null; source_url?: string | null };
+  // repeat / auto_mode: migration 0105; comments and tags reach the routes with C21
+  fields: {
+    body?: string; first_comment?: string | null; link_url?: string | null; link_utm?: boolean; notes?: string | null; source_url?: string | null;
+    repeat?: import("./model").RepeatRule | null; auto_mode?: import("./model").AutoMode;
+  };
   targets: Array<{ account_id: string; custom_body: string | null; format: string }>;
   /** omitted = unchanged (a post that went out keeps its media as sent) */
   media?: Array<{ media_id: string; alt_text: string | null }>;
@@ -37,7 +41,11 @@ export interface PostInput {
 export interface StateInput { action: string; scheduledAt?: string; listId?: string; listPosition?: number; reason?: string; confirmPublishNow?: boolean }
 /** lib/content/wp-calendar.ts CalendarPost: date is the site's wall clock, no zone */
 export interface WpPost { siteId: string; siteName: string; id: number; title: string; status: "draft" | "future" | "publish"; date: string; viewUrl?: string }
-export interface ListRow { id: string; name: string; weekdays: number[]; send_time: string; active: boolean; cursor: number; accounts: Array<{ account_id: string }> }
+/** slots = the weekday x time grid (0105); weekdays / send_time follow it until C23 */
+export interface ListRow {
+  id: string; name: string; weekdays: number[]; send_time: string; active: boolean; cursor: number; accounts: Array<{ account_id: string }>;
+  slots: Array<{ weekday: number; send_time: string }>;
+}
 export interface ListInput { name: string; weekdays: number[]; send_time: string; active: boolean; account_ids: string[] }
 export interface LogRow { id: number; at: string; actor: string; action: string; post_id: string | null; detail: Record<string, unknown> | null }
 export interface NeedsResult {

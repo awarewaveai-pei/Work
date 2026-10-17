@@ -1,5 +1,5 @@
-// Data access for /api/social (SOCIAL_MANAGER_PLAN.md C4). Tables: migration 0096; atomic writes: 0098's
-// social_save_post / social_set_state / social_save_list (supabase-js has no transactions). Every query is scoped by
+// Data access for /api/social (SOCIAL_MANAGER_PLAN.md C4). Tables: migration 0096 (+0105 V1.5); atomic writes: 0098's
+// social_save_post / social_set_state / social_save_list as 0105 left them (supabase-js has no transactions). Every query is scoped by
 // organization_id = the brand; the composite foreign keys of 0096 refuse a child row pointing into another brand even
 // if a query forgot.
 
@@ -8,6 +8,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { selectAll } from "@/lib/supabase-paging";
 import { ACCOUNT_COPY } from "@/lib/accounts/invite-copy";
 import { connectUrl, listAllIntegrations, uploadMedia, type RawIntegration } from "@/lib/content/postiz";
+import { repeatSlots, type RepeatRule } from "./repeat-rule";
 import type { BrandRole, PostSnapshot, PostState, Transition } from "./state";
 
 export class SocialStoreError extends Error {
@@ -33,7 +34,7 @@ async function logAction(sb: SupabaseClient, brandId: string, actor: string, act
 function fail(error: { code?: string; message: string }, what: string): never {
   const byCode: Record<string, 400 | 404 | 409> = {
     SC404: 404, SC409: 409, "23505": 409, "23503": 409,
-    "23514": 400, "22P02": 400, "22023": 400, "23502": 400, "22003": 400, "21000": 400,
+    "23514": 400, "22P02": 400, "22023": 400, "23502": 400, "22003": 400, "21000": 400, "22007": 400, "22008": 400,
   };
   throw new SocialStoreError(byCode[error.code ?? ""] ?? 500, `${what}: ${error.message}`);
 }
@@ -104,17 +105,47 @@ export async function removeMember(brandId: string, userId: string, actor: strin
 
 // ---- accounts -------------------------------------------------------------------------------------------------
 
-export interface Account { id: string; platform: string; label: string; status: "connected" | "expired" | "disabled"; postiz_integration_id: string }
+/** picture / handle: null = not looked up yet, "" = Postiz has none (0105). */
+export interface Account {
+  id: string; platform: string; label: string; status: "connected" | "expired" | "disabled"; postiz_integration_id: string;
+  picture: string | null; handle: string | null; chatwoot_inbox_id: number | null;
+}
 export interface OpenAttempt { id: string; platform: string; started_at: string }
 
 const ATTEMPT_TTL_MS = 15 * 60 * 1000;   // a connection nobody finished frees the brand and the instance again
 const POSTIZ_INSTANCE = "ks-aw-01";        // 0096/0098 default: the one Postiz every brand shares
 
+const profileOf = (i: RawIntegration) => ({ picture: (i.picture ?? "").slice(0, 2048), handle: (i.profile ?? "").slice(0, 200) });
+
 export async function listAccounts(brandId: string): Promise<Account[]> {
-  const { data, error } = await db().from("social_accounts").select("id, platform, label, status, postiz_integration_id")
+  const sb = db();
+  const { data, error } = await sb.from("social_accounts").select("id, platform, label, status, postiz_integration_id, picture, handle, chatwoot_inbox_id")
     .eq("organization_id", brandId).order("platform");
   if (error) fail(error, "accounts");
-  return (data ?? []) as Account[];
+  const accounts = (data ?? []) as Account[];
+  if (accounts.some((a) => a.picture === null || a.handle === null)) await fillProfiles(sb, accounts);
+  return accounts;
+}
+
+/** 0105 backfill: picture and handle from Postiz for accounts never looked up. Best effort: without an answer the
+ *  list is shown without them and the next load tries again. */
+async function fillProfiles(sb: SupabaseClient, accounts: Account[]): Promise<void> {
+  let live: RawIntegration[];
+  try {
+    live = await listAllIntegrations();
+  } catch (e) {
+    console.error(`[social] channel pictures: Postiz did not answer: ${e instanceof Error ? e.message : String(e)}`);
+    return;
+  }
+  for (const a of accounts) {
+    if (a.picture !== null && a.handle !== null) continue;
+    const i = live.find((x) => x.id === a.postiz_integration_id);
+    // Postiz answered without it: "" (none), or every load would ask Postiz again (critic 2026-10-17); a reconnect refills
+    const p = i ? profileOf(i) : { picture: "", handle: "" };
+    const { error } = await sb.from("social_accounts").update(p).eq("id", a.id);
+    if (error) console.error(`[social] channel picture for ${a.id}: ${error.message}`);
+    else Object.assign(a, p);
+  }
 }
 
 /** The integration a new-channel attempt produced: new since the press, of its platform, and no brand's yet. Two such
@@ -154,7 +185,7 @@ export async function resolveConnectAttempt(brandId: string): Promise<{ open: Op
     if (accErr) fail(accErr, "account");
     const now = live.find((i) => i.id === acc?.postiz_integration_id);
     if (acc && now && !now.disabled) {
-      const { error: upErr } = await sb.from("social_accounts").update({ status: "connected" }).eq("id", acc.id);
+      const { error: upErr } = await sb.from("social_accounts").update({ status: "connected", ...profileOf(now) }).eq("id", acc.id);
       if (upErr) fail(upErr, "account status");
       accountId = acc.id;
     }
@@ -170,7 +201,7 @@ export async function resolveConnectAttempt(brandId: string): Promise<{ open: Op
     const fresh = pickFreshIntegration(live, open.known_integration_ids, owned, open.platform);
     if (fresh) {
       const { data: acc, error: insErr } = await sb.from("social_accounts")
-        .insert({ organization_id: brandId, postiz_integration_id: fresh.id, platform: fresh.identifier, label: fresh.name, status: fresh.disabled ? "expired" : "connected" })
+        .insert({ organization_id: brandId, postiz_integration_id: fresh.id, platform: fresh.identifier, label: fresh.name, status: fresh.disabled ? "expired" : "connected", ...profileOf(fresh) })
         .select("id").single();
       if (insErr?.code === "23505") {   // attached elsewhere between the check and the insert: end it, never loop on it
         await closeAttempt(sb, open.id, "expired");
@@ -245,17 +276,27 @@ export async function unlinkAccount(brandId: string, accountId: string, actor: s
 
 // No created_by: it holds actorOf() (staff role + auth user id) and posts go to customers too; the audit log, which
 // filters it per viewer (authz.ts actorForViewer), is where "who" is shown.
+// first_comment = comments[position 0] until C21 moves the sender to comments (0105 header). Embedded comments come
+// back unordered: sort by position.
 export const POST_COLUMNS = "id, state, body, scheduled_at, list_id, list_position, first_comment, link_url, link_utm, notes, source_url, " +
-  "published_at, deleted_at, version, created_at, updated_at, " +
+  "published_at, deleted_at, version, created_at, updated_at, repeat, repeat_of, origin_slot, auto_mode, " +
   "targets:social_post_targets(id, account_id, custom_body, format, state, postiz_post_id, release_url, error), " +
-  "media:social_post_media(media_id, position, alt_text)";
+  "media:social_post_media(media_id, position, alt_text), " +
+  "comments:social_post_comments(position, body, delay_minutes, media_id), tags:social_post_tags(tag_id)";
+
+export type AutoMode = "brand" | "none" | "own";
+export interface CommentInput { body: string; delay_minutes?: 0 | 1 | 5 | 60; media_id?: string | null }
 
 export interface PostRow {
   id: string; state: PostState; body: string; scheduled_at: string | null; list_id: string | null; list_position: number | null;
   first_comment: string | null; link_url: string | null; link_utm: boolean; notes: string | null; source_url: string | null;
   published_at: string | null; deleted_at: string | null; version: number;
+  /** 0105: a template holds repeat; its children carry repeat_of + origin_slot (neither ever changes) */
+  repeat: RepeatRule | null; repeat_of: string | null; origin_slot: string | null; auto_mode: AutoMode;
   targets: Array<{ id: string; account_id: string; custom_body: string | null; format: string; state: string; postiz_post_id: string | null; release_url: string | null; error: string | null }>;
   media: Array<{ media_id: string; position: number; alt_text: string | null }>;
+  comments: Array<{ position: number; body: string; delay_minutes: number; media_id: string | null }>;
+  tags: Array<{ tag_id: string }>;
 }
 
 export function snapshotOf(p: PostRow): PostSnapshot {
@@ -330,41 +371,108 @@ export async function getPostAt(brandId: string, id: string, version: number): P
   return post;
 }
 
-export interface PostFields { body?: string; first_comment?: string | null; link_url?: string | null; link_utm?: boolean; notes?: string | null; source_url?: string | null }
+export interface PostFields {
+  body?: string; first_comment?: string | null; link_url?: string | null; link_utm?: boolean; notes?: string | null; source_url?: string | null;
+  repeat?: RepeatRule | null; auto_mode?: AutoMode;
+}
 export interface TargetInput { account_id: string; custom_body?: string | null; format?: string }
 export interface MediaInput { media_id: string; position?: number; alt_text?: string | null }
+/** null / absent = unchanged; comments replace the set in this order (position 0 = first_comment, 0105) */
+export interface PostChildren { comments?: CommentInput[] | null; tags?: string[] | null }
+/** repeat: a template's children made right after the write; error = they were not now (the daily run makes them) */
+export interface SavedPost { id: string; version: number; repeat?: { made: number } | { error: string } }
+
+const REPEAT_ACTOR = "system:social-repeat";
+
+export interface SeriesRow {
+  id: string; organization_id: string; version: number; repeat: RepeatRule | null; scheduled_at: string | null;
+  organization: { default_timezone: string } | null;
+}
+export const SERIES_COLUMNS = "id, organization_id, version, repeat, scheduled_at, organization:organizations(default_timezone)";
+
+/** A template's children for the next REPEAT_DAYS (0105 social_repeat_materialize: once per slot, only for a template
+ *  that may send). `withdraw` first takes back the untouched ones: 0105's save and state functions already did that
+ *  in their own transaction, 0100's release did not. The slots are computed from the version read; when the template
+ *  moved meanwhile the database answers -1 (0109) and it is read again -- old slots never get new content. */
+export async function materializeSeries(sb: SupabaseClient, post: SeriesRow, withdraw: boolean, now = new Date()): Promise<number> {
+  let row: SeriesRow | null = post;
+  for (let attempt = 0; attempt < 3 && row; attempt++) {
+    const tz = row.organization?.default_timezone ?? "UTC";
+    const slots = row.repeat && row.scheduled_at ? repeatSlots(row.repeat, row.scheduled_at, tz, now) : [];
+    if (!withdraw && !slots.length) return 0;
+    const { data, error } = await sb.rpc("social_repeat_materialize", {
+      p_org: row.organization_id, p_template: row.id, p_slots: slots, p_withdraw: withdraw, p_actor: REPEAT_ACTOR, p_expected_version: row.version,
+    });
+    if (error) fail(error, "repeat series");
+    if (data !== -1) return (data as number) ?? 0;
+    const again = await sb.from("social_posts").select(SERIES_COLUMNS).eq("id", row.id).eq("organization_id", row.organization_id).maybeSingle();
+    if (again.error) fail(again.error, "repeat series");
+    row = again.data as unknown as SeriesRow | null;
+  }
+  if (!row) return 0;   // the template is gone
+  throw new SocialStoreError(409, `repeat series ${post.id}: the template kept changing; the next run makes its children`);
+}
+
+/** After a person's write: a template's children again. Never fails the write, which already landed. */
+async function refreshSeries(sb: SupabaseClient, brandId: string, id: string, withdraw: boolean): Promise<SavedPost["repeat"]> {
+  try {
+    const { data, error } = await sb.from("social_posts").select(SERIES_COLUMNS).eq("id", id).eq("organization_id", brandId).maybeSingle();
+    if (error) fail(error, "repeat series");
+    if (!data?.repeat) return undefined;
+    return { made: await materializeSeries(sb, data as unknown as SeriesRow, withdraw) };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error(`[social] repeat series of ${id}: ${message}`);
+    return { error: message };
+  }
+}
 
 export async function savePost(brandId: string, id: string | null, expectedVersion: number | null, fields: PostFields,
-  targets: TargetInput[] | null, media: MediaInput[] | null, actor: string): Promise<{ id: string; version: number }> {
-  const { data, error } = await db().rpc("social_save_post", {
+  targets: TargetInput[] | null, media: MediaInput[] | null, actor: string, children: PostChildren = {}): Promise<SavedPost> {
+  const sb = db();
+  const { data, error } = await sb.rpc("social_save_post", {
     p_org: brandId, p_post_id: id, p_expected_version: expectedVersion, p_post: fields, p_targets: targets, p_media: media, p_actor: actor,
+    p_comments: children.comments ?? null, p_tags: children.tags ?? null,
   });
   if (error) fail(error, "save post");
   const row = (data as Array<{ saved_post_id: string; saved_version: number }>)[0];
-  return { id: row.saved_post_id, version: row.saved_version };
+  const repeat = await refreshSeries(sb, brandId, row.saved_post_id, false);
+  return { id: row.saved_post_id, version: row.saved_version, ...(repeat ? { repeat } : {}) };
 }
 
 export async function setState(brandId: string, id: string, expectedVersion: number, next: Transition, actor: string,
-  action: string, detail: Record<string, unknown> = {}): Promise<{ id: string; version: number }> {
-  const { data, error } = await db().rpc("social_set_state", {
+  action: string, detail: Record<string, unknown> = {}): Promise<SavedPost> {
+  const sb = db();
+  const { data, error } = await sb.rpc("social_set_state", {
     p_org: brandId, p_post_id: id, p_expected_version: expectedVersion, p_state: next.state, p_scheduled_at: next.scheduledAt,
     p_list_id: next.listId, p_list_position: next.listPosition, p_actor: actor, p_action: action, p_detail: detail,
   });
   if (error) fail(error, `${action} post`);
   const row = (data as Array<{ saved_post_id: string; saved_version: number }>)[0];
-  return { id: row.saved_post_id, version: row.saved_version };
+  const repeat = await refreshSeries(sb, brandId, row.saved_post_id, false);
+  return { id: row.saved_post_id, version: row.saved_version, ...(repeat ? { repeat } : {}) };
+}
+
+/** 「全部」 on a series (0105 social_stop_repeat): the rule and the untouched children go; the template stays. */
+export async function stopRepeat(brandId: string, id: string, expectedVersion: number, actor: string): Promise<{ id: string; version: number; withdrawn: number }> {
+  const { data, error } = await db().rpc("social_stop_repeat", { p_org: brandId, p_template: id, p_expected_version: expectedVersion, p_actor: actor });
+  if (error) fail(error, "stop repeat");
+  const row = (data as Array<{ saved_post_id: string; saved_version: number; withdrawn: number }>)[0];
+  return { id: row.saved_post_id, version: row.saved_version, withdrawn: row.withdrawn };
 }
 
 /** A queued post changed by a person, after withdraw.ts deleted its Postiz posts (0100 social_release_post). */
 export async function releasePost(brandId: string, id: string, expectedVersion: number, deletedPostizIds: string[], next: Transition,
-  actor: string, action: string, detail: Record<string, unknown> = {}): Promise<{ id: string; version: number }> {
-  const { data, error } = await db().rpc("social_release_post", {
+  actor: string, action: string, detail: Record<string, unknown> = {}): Promise<SavedPost> {
+  const sb = db();
+  const { data, error } = await sb.rpc("social_release_post", {
     p_org: brandId, p_post_id: id, p_expected_version: expectedVersion, p_deleted_postiz_ids: deletedPostizIds, p_state: next.state,
     p_scheduled_at: next.scheduledAt, p_actor: actor, p_action: action, p_detail: detail,
   });
   if (error) fail(error, `${action} post`);
   const row = (data as Array<{ saved_post_id: string; saved_version: number }>)[0];
-  return { id: row.saved_post_id, version: row.saved_version };
+  const repeat = await refreshSeries(sb, brandId, row.saved_post_id, true);   // 0100's release withdraws no children
+  return { id: row.saved_post_id, version: row.saved_version, ...(repeat ? { repeat } : {}) };
 }
 
 /** Platform per account of this brand, for the body limits. An account of another brand is simply absent. */
@@ -377,11 +485,14 @@ export async function accountPlatforms(brandId: string, accountIds: string[]): P
 
 // ---- rotation lists --------------------------------------------------------------------------------------------
 
-export interface ListInput { name: string; weekdays: number[]; send_time?: string; active?: boolean; account_ids: string[] }
+/** slots (0105 social_list_slots) win; without them weekdays x send_time are the slots (the callers before C23). */
+export interface ListSlot { weekday: number; send_time: string }
+export interface ListInput { name: string; weekdays: number[]; send_time?: string; active?: boolean; account_ids: string[]; slots?: ListSlot[] }
 
 export async function listLists(brandId: string) {
   const { data, error } = await db().from("social_lists")
-    .select("id, name, weekdays, send_time, active, cursor, accounts:social_list_accounts(account_id)").eq("organization_id", brandId).order("name");
+    .select("id, name, weekdays, send_time, active, cursor, accounts:social_list_accounts(account_id), slots:social_list_slots(weekday, send_time)")
+    .eq("organization_id", brandId).order("name");
   if (error) fail(error, "lists");
   return data ?? [];
 }
@@ -391,10 +502,34 @@ export async function listLists(brandId: string) {
 export async function saveList(brandId: string, id: string | null, input: ListInput, actor: string): Promise<string> {
   const { data, error } = await db().rpc("social_save_list", {
     p_org: brandId, p_list_id: id, p_name: input.name, p_weekdays: input.weekdays, p_send_time: input.send_time ?? "10:00",
-    p_active: input.active ?? false, p_account_ids: input.account_ids, p_actor: actor,
+    p_active: input.active ?? false, p_account_ids: input.account_ids, p_actor: actor, p_slots: input.slots ?? null,
   });
   if (error) fail(error, "save list");
   return data as string;
+}
+
+// ---- tags (0105) -----------------------------------------------------------------------------------------------
+
+/** colour = a token key (the page maps a..e to --red / --accent / --green / --yellow / --p-li) */
+export interface Tag { id: string; name: string; colour: "a" | "b" | "c" | "d" | "e" }
+
+export async function listTags(brandId: string): Promise<Tag[]> {
+  const { data, error } = await db().from("social_tags").select("id, name, colour").eq("organization_id", brandId).order("name");
+  if (error) fail(error, "tags");
+  return (data ?? []) as Tag[];
+}
+
+/** id null = a new tag. The name is unique per brand ignoring case (409); logged as action tag. */
+export async function saveTag(brandId: string, id: string | null, name: string, colour: Tag["colour"], actor: string): Promise<string> {
+  const { data, error } = await db().rpc("social_save_tag", { p_org: brandId, p_tag_id: id, p_name: name, p_colour: colour, p_actor: actor });
+  if (error) fail(error, "save tag");
+  return data as string;
+}
+
+/** Off every post it was on, too. */
+export async function deleteTag(brandId: string, id: string, actor: string): Promise<void> {
+  const { error } = await db().rpc("social_delete_tag", { p_org: brandId, p_tag_id: id, p_actor: actor });
+  if (error) fail(error, "delete tag");
 }
 
 // ---- media and log ---------------------------------------------------------------------------------------------
