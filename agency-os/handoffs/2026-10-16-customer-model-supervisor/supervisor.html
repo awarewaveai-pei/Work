@@ -95,7 +95,7 @@ ul.doors li span{min-width:0}
 
 <section id="now"><h2>現況</h2><p class="lead">客戶目前無法自行登入，也尚未收費；現在只有自用與代操。</p><ul class="yn"><li class="no"><b>沒有</b><span>客戶可自行登入<small>今天才開放：員工替客戶開立帳號，寄出設定密碼信；prod 缺少 RESEND_API_KEY，portal 的公開註冊仍關閉（WORKLOG 2026-10-16 續8、續10）</small></span></li><li class="no"><b>沒有</b><span>已有付費客戶<small>0062 合約 0 筆、錢包帳本 0 筆、Woo 尚未販售點數包（ADR 015:13、ADR 017 脈絡）</small></span></li><li class="no"><b>沒有</b><span>買斷<small>授權檔、安裝程式與模組清單均未建立（順序 5）</small></span></li><li class="no"><b>沒有</b><span>許可判斷<small>lib/entitlements 不存在；認知平台 check_entitlement 永遠回傳 grant（check.py:25）</small></span></li></ul></section>
 
-<section id="ways"><h2>五種客戶</h2><p class="lead">每種客戶由三個答案決定：安裝位置、付款來源、操作人。新增客戶類型只需增加一列，不必修改程式。</p><div class="ways"><article class="way live">
+<section id="ways"><h2>五種客戶</h2><p class="lead">每種客戶由三個答案決定：裝在哪、錢從哪來、誰操作。答案屬於客戶帳戶與每次請求，不屬於產品，所以每個產品五種都有、不用選。新增客戶類型只需增加一列，不必修改程式。</p><div class="ways"><article class="way live">
     <header><span class="k">1</span><h3>自用<small>AwareWave 自用</small></h3><span class="tag">已運作</span></header>
     <p class="story">例：在 app.aware-wave.com 使用社群發文、客服與資料蒐集，不收費。</p>
     <dl><div><dt>安裝位置</dt><dd>AwareWave 主機<code>hosted</code></dd></div><div><dt>付款來源</dt><dd>免費（自用或贈送）<code>comp</code></dd></div><div><dt>操作人</dt><dd>AwareWave 員工<code>staff</code></dd></div></dl>
