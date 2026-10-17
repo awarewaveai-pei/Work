@@ -18,7 +18,7 @@
 
 - `lib/cs/`（客服，`lib/cs/billing.ts` 已引用 `product_key`）登記 key `cs`，`door: { app: "next-admin", page: "/cs", api: ["/api/cs"] }`，subdomain `cs`。
 - 產生器 `scripts/new-product.mjs` 兩種用法：`--from-foundry <generated 專案目錄>`（讀 `.foundry/resolution/foundry-plan.json`、`docs/modules/<module>/00_REQUIREMENTS.md … 08_IMPLEMENTATION_BACKLOG.md` 與藍圖末節「交付登記」，十項宣告填進 manifest，只補問子網域與收費功能；目錄缺 `foundry-plan.json` 即拒絕）或直接問 SOP §18 五題 → 寫登記列、`app/<page>/{layout,page}.tsx` 骨架（複製 `app/social/` 的精簡版面）、`lib/<key>/can-points.ts`（一個呼叫 `can()` 的範例，第 4 步前先 throw「尚未接 can()」）、`lib/portal/__tests__/products.test.ts` 不用改（它讀登記表）。
-- 子網域每個產品都保留（ADR 018 §2）；開不開是 `status`。
+- 子網域每個產品都保留（ADR 018 §2）；開不開是 `status`。產生器不問、登記表不收「支援哪幾種方式」：五種全由共用層給（ADR 017 §0「產品不選方式」）；預設 `features[].buyout = true`（SAFETY_GATE 例外）、`modules.dependsOn = []`。測試：登記表型別不得出現 `audience`／`ways`／`channels` 這類欄位名。
 - 產生器同時寫 `lib/<key>/MODULE_MANIFEST.json`：System Foundry `kernel/06` 的十項宣告（state／behavior／API 與事件／不變量／依賴／失敗隔離／資料生命週期／可觀測／遷移回滾／替換策略），空欄用 `TODO` 字樣，`products.test.ts` 擋 `TODO` 進 `status: available` 的產品（ADR 017 §0b）。
 
 ## Files
