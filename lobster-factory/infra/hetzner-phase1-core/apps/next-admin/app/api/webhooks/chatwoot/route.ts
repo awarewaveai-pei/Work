@@ -2,9 +2,10 @@ import { after, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { handleInbound } from "@/lib/cs/orchestrator";
 import { loadCis } from "@/lib/cs/cis";
-import { claimMessage, completeClaim, findOrganizationIdByChatwootAccountId, recordReply } from "@/lib/cs/db";
+import { claimCrisisHolding, claimMessage, completeClaim, confirmCrisisHolding, findOrganizationIdByChatwootAccountId, recordReply, releaseCrisisHolding } from "@/lib/cs/db";
 import { getContactName, handoffToHuman, listMessages, sendPrivateDraft, sendReply, updateContactName, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
-import { handoffAckText, isCrisisAck, isNameQuestionAck, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
+import { crisisHoldingText, handoffAckText, isCrisisAck, isNameQuestionAck, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
+import { CS_CRISIS_HOLDING_INFLIGHT_SECONDS, CS_CRISIS_HOLDING_WINDOW_SECONDS } from "@/lib/cs/config";
 import { hitsCrisis } from "@/lib/cs/autonomy";
 import { alertOperatorOfCrisis } from "@/lib/cs/crisis-alert";
 import { buildOperatorTelegramNotifier } from "@/lib/ops-inbox/notify/telegram";
@@ -100,9 +101,15 @@ export async function POST(req: Request): Promise<Response> {
       const reply = { organizationId, conversationId, messageId: Number(messageId), contactId, text: payload.content ?? "" };
       after(() => captureName(reply).catch((err) => Sentry.captureException(err, { extra: { organizationId, conversationId, messageId } })));
     }
-    // A crisis message still pages the operator: whoever owns the thread may not be looking at it.
+    // A crisis message still pages the operator (whoever owns the thread may not be looking at it),
+    // then the customer gets the help lines, once per conversation per window.
     if (!isFromAgent && hitsCrisis(payload.content ?? "")) {
-      after(async () => pageCrisis(organizationId, conversationId, await chatwootConfigOrNone(organizationId)));
+      const customerText = payload.content ?? "";
+      after(async () => {
+        const cis = await loadCis(organizationId).catch(() => undefined);
+        await pageCrisis(organizationId, conversationId, cis?.chatwoot);
+        if (cis?.chatwoot) await sendCrisisHolding(cis, cis.chatwoot, conversationId, customerText);
+      });
     }
     return NextResponse.json({ ok: true, ignored: true, reason: "human_owns_thread" });
   }
@@ -262,6 +269,38 @@ async function acknowledgeHandoff(
 
 async function chatwootConfigOrNone(organizationId: string): Promise<ChatwootConfig | undefined> {
   return loadCis(organizationId).then((c) => c.chatwoot, () => undefined);
+}
+
+/**
+ * The help lines for a crisis message while a human owns the conversation, at most once per
+ * conversation per CS_CRISIS_HOLDING_WINDOW_SECONDS (operator decision 2026-10-17). T27: a blocking
+ * or unreadable system mode sends nothing. Invariant: a repeated help line costs less than a missing
+ * one, so a window that cannot be claimed (DB error) still sends, a failed send gives the window back,
+ * and only a confirmed send blocks for the whole window (migration 0104). Best-effort.
+ * Residual (Codex partialreview-56ee2770 F2/F3): a webhook that lost the claim to a send that then
+ * fails is not retried; a send Chatwoot accepted but answered after the client timeout counts as
+ * failed, so a later crisis message may get the lines twice.
+ */
+async function sendCrisisHolding(cis: CisProfile, chatwoot: ChatwootConfig, conversationId: string, customerText: string): Promise<void> {
+  const { organizationId } = cis;
+  try {
+    const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
+    if (!gate.allowed) return;
+    const claim = await claimCrisisHolding(organizationId, conversationId, CS_CRISIS_HOLDING_WINDOW_SECONDS, CS_CRISIS_HOLDING_INFLIGHT_SECONDS);
+    if (claim.kind === "recent") return;
+    if (claim.kind === "error") Sentry.captureException(claim.error, { extra: { organizationId, conversationId, step: "crisis_holding_claim" } });
+    try {
+      await sendReply(organizationId, chatwoot, conversationId, crisisHoldingText(cis, customerText));
+    } catch (err) {
+      if (claim.kind === "claimed") await releaseCrisisHolding(organizationId, conversationId, claim.claimId);
+      throw err;
+    }
+    if (claim.kind === "claimed" && !(await confirmCrisisHolding(organizationId, conversationId, claim.claimId))) {
+      Sentry.captureMessage("cs crisis holding reply sent but not recorded", { extra: { organizationId, conversationId } });
+    }
+  } catch (err) {
+    Sentry.captureException(err, { extra: { organizationId, conversationId, step: "crisis_holding" } });
+  }
 }
 
 /** Operator page for a crisis message (lib/cs/crisis-alert.ts). Best-effort: never fails the pipeline. */

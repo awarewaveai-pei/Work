@@ -90,6 +90,14 @@ export const CS_CRISIS_KEYWORDS = [
  */
 export const CS_CRISIS_INTENT_KEY = "self_harm";
 
+/**
+ * A crisis message while a human owns the conversation gets the help lines at most once per
+ * conversation per this window (operator decision 2026-10-17; state in migration 0104).
+ */
+export const CS_CRISIS_HOLDING_WINDOW_SECONDS = 30 * 60;
+/** A claim whose send was never confirmed stops blocking after this long (a send in flight; 0104). */
+export const CS_CRISIS_HOLDING_INFLIGHT_SECONDS = 120;
+
 /** Sensitive intents → always handoff (broader than red-line; includes complaints/escalation). */
 export const CS_SENSITIVE_KEYWORDS = [
   ...CS_RED_LINE_KEYWORDS,

@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-17（續7）真人接手中的危機訊息也回一句（操作者同意 GPT 文案＋方案 B）：程式＋migration 0104；0104 已套正式庫，程式隨 03:00 自動部署上線
+
+**操作者**：「文案同意，照建議方案 B 改程式（human_owns_thread 分支＋新表 30 分鐘去重），寫完給我看驗證結果」。文案見（續3）。
+
+**改了什麼**：
+- `lobster-factory/packages/db/migrations/0104_cs_crisis_holding_replies.sql`（＋ `.down.sql`）：表 `cs_crisis_holding_replies`（每對話一列：claim_id／claimed_at／sent_at）、`cs_claim_crisis_holding`（INSERT … ON CONFLICT DO UPDATE … WHERE，原子搶窗口）、`cs_confirm_crisis_holding`（送出後記 sent_at）。RLS 開、只有 service_role 可執行。
+- `next-admin/app/api/webhooks/chatwoot/route.ts`：human_owns_thread 分支命中 `hitsCrisis` → `after()` 先 Telegram page，再 `sendCrisisHolding`：T27 閘 → 搶窗口 → 送 `crisisHoldingText` → confirm；送失敗 → 釋放窗口；搶窗口 DB 錯 → 照送（報 Sentry）。
+- `lib/cs/handoff-ack.ts` `crisisHoldingText`（中文＝GPT 原稿逐字；英文專線段對齊 `CRISIS_ACK_EN`）；`lib/cs/db.ts` claim／confirm／release；`lib/cs/config.ts` 30 分鐘窗口、120 秒 in-flight。
+- **不變量**：漏回專線比重複回一次更糟。所以只有「確認送出」擋滿 30 分鐘；搶到但沒確認（程序中途被殺、釋放失敗）只擋 120 秒（Codex 56ee2770 F1 的修法）。
+
+**Codex 審查**：第 1 輪 `agency-os/reports/oracle/2026-10-17-partialreview-56ee2770.md` 3 個 finding：
+- F1（送出失敗且釋放失敗／程序被殺 → 窗口卡 30 分鐘、客人收不到專線）成立 → 已修（pending／confirmed 兩態）。
+- F2（並行的第二則 webhook 搶輸、搶贏者送失敗 → 都沒送）成立但窄（需兩則危機句同秒＋Chatwoot 送失敗）→ 列殘餘風險，寫在 `route.ts` sendCrisisHolding 註解。
+- F3（Chatwoot 已收但回應超過 10 秒 → 當失敗釋放 → 30 分鐘內可能再回一次）→ 最壞重複一句專線，接受。
+- 第 2 輪（審修法）codex 900 秒逾時、log 0 bytes，沒審到東西，不計 → 書面自審＋突變（下）。
+
+**書面自審（修法差異）**：confirm 失敗 → 列停在 pending → 120 秒後可再送（重複，接受）；A 送超過 120 秒被 B 重搶 → A 的 confirm/release 以 claim_id 比對全部 no-op，B 的列不受影響；page 在搶窗口之前，不計入 in-flight 時間；`sendReply` 10 秒 abort 遠小於 120 秒；rpc 參數名與 SQL 簽名一致（tsc＋SQL 實跑）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`docker run postgres:15-alpine` 拋棄式容器跑 0104 up → 15 項檢查（首搶贏、pending 擋 120 秒內、過期 pending 可重搶、confirm 只認自己的 claim、confirmed 擋 29 分鐘、31 分鐘可重搶、他對話獨立、anon／authenticated 無執行權、service_role 有、RLS 開、down 乾淨、可重套）全 t ＋ 20 路並發搶同對話 `race_winners=1 of 20` | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run app/api/webhooks/chatwoot/route.test.ts lib/cs/__tests__/handoff-ack.test.ts` | exit=0 | ms=1622 | result=85 passed（新增 7：先 page 後回＋不跑 AI／不扣點、窗口內不回、英文版、送失敗釋放、DB 錯照送、T27 擋、一般訊息／客服打的字不觸發）；production-change-coverage 6 passed
+- MUTATION: 拔 0104 `OR (r.sent_at IS NULL AND r.claimed_at <= now() - … p_inflight_seconds)` → `stale_pending_reclaimed|f`；還原 → `|t`
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n | artifact=`agency-os/reports/oracle/2026-10-17-partialreview-56ee2770.md`（F1 修、F2／F3 列殘餘）
+- ORACLE_WAIVED: 第 2 輪 codex-oracle 900 秒逾時（log 0 bytes），修法差異以書面自審＋上列突變代替
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=cs_crisis_holding|crisisHoldingText|CS_CRISIS_HOLDING|human_owns_thread | hits=10（新符號：route.ts／route.test.ts／config.ts／db.ts／handoff-ack.ts／0104 up＋down／oracle artifact／TASKS／WORKLOG，全為本改動）；human_owns_thread 另 1 處 `lib/cs/orchestrator.ts:66`（suppressed 理由字串，不受影響）；docs 無「接手後 AI 完全不回」的過時主張
+
+**正式庫**（操作者「go ahead: apply migration 0104 to the production database, confirm with --status, then commit and push」）：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/apply-db-migration.mjs 0104` | exit=0 | ms=17275 | result=`APPLY_OK 1/1: 0104`；之後 `--status` → `STATUS_OK {"applied":105}`（套前 missing=1 只有 0104）
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec supabase-db psql … to_regclass／relrowsecurity／has_function_privilege` | exit=0 | result=table t、rls t、service_role 兩個函式可執行 t、anon 不可 f、0 列
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit && npx vitest run route.test.ts handoff-ack.test.ts production-change-coverage.test.ts`（在 0ffd277c4 之上重跑） | exit=0 | result=91 passed
+**下一步**：03:00 自動部署（確認 `/root/lobster-phase1/.deployed-commit` 含本 commit）→ John Doe 在真人接手中的對話傳「我想死」→ 預期 Telegram 一則＋客人收到上面中文三行；30 分鐘內再傳 → 只有 Telegram。rollback：`git revert`＋`0104_cs_crisis_holding_replies.down.sql`。建議模型：Opus 5.5
 ## 2026-10-17（續6）社群發文樣稿：撰寫頁底部照操作者的 Metricool 圖重做（發佈時間鈕＋一顆主按鈕＋▾ 選做法）；「自動發布清單」不再是撰寫頁的選項
 
 **操作者**：截了 Metricool 的發佈時間選擇和 ▾ 選單，說「貼文排程這些按鍵安排的邏輯有問題」「自動發布清單很怪、看不懂」「排進自動發布清單…這啥小」「再試一次」。

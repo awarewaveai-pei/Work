@@ -27,7 +27,19 @@ const claimMessage = vi.hoisted(() => vi.fn());
 const findOrganizationIdByChatwootAccountId = vi.hoisted(() => vi.fn());
 const recordReply = vi.hoisted(() => vi.fn(async () => undefined));
 const completeClaim = vi.hoisted(() => vi.fn(async () => true));
-vi.mock("@/lib/cs/db", () => ({ claimMessage, completeClaim, findOrganizationIdByChatwootAccountId, recordReply }));
+type HoldingClaim = { kind: "claimed"; claimId: string } | { kind: "recent" } | { kind: "error"; error: unknown };
+const claimCrisisHolding = vi.hoisted(() => vi.fn(async (..._args: unknown[]): Promise<HoldingClaim> => ({ kind: "claimed", claimId: "claim-1" })));
+const releaseCrisisHolding = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => true));
+const confirmCrisisHolding = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => true));
+vi.mock("@/lib/cs/db", () => ({
+  claimCrisisHolding,
+  claimMessage,
+  completeClaim,
+  confirmCrisisHolding,
+  findOrganizationIdByChatwootAccountId,
+  recordReply,
+  releaseCrisisHolding,
+}));
 
 const handoffToHuman = vi.hoisted(() => vi.fn(async () => undefined));
 const sendPrivateDraft = vi.hoisted(() => vi.fn(async () => undefined));
@@ -102,6 +114,10 @@ beforeEach(() => {
   findOrganizationIdByChatwootAccountId.mockResolvedValue(ORG_ID);
   recordReply.mockClear();
   completeClaim.mockClear();
+  claimCrisisHolding.mockReset();
+  claimCrisisHolding.mockResolvedValue({ kind: "claimed", claimId: "claim-1" });
+  releaseCrisisHolding.mockClear();
+  confirmCrisisHolding.mockClear();
   handoffToHuman.mockClear();
   handoffToHuman.mockResolvedValue(undefined);
   sendPrivateDraft.mockClear();
@@ -481,11 +497,84 @@ describe("POST /api/webhooks/chatwoot -- crisis message", () => {
     expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", handoffAckText(CIS, true, TEXT));
   });
 
-  it("a human already owns the thread: no automatic reply, still one page", async () => {
-    await post(makePayload({ content: TEXT, sender: { type: "contact", id: 77, name: "林小美" }, conversation: { id: 999, status: "open" } }));
-    await runAfter();
-    expect(sendReply).not.toHaveBeenCalled();
-    expect(sendText).toHaveBeenCalledTimes(1);
+  describe("a human already owns the thread", () => {
+    const MEI = { type: "contact", id: 77, name: "林小美" };
+    const owned = (content: string, sender: Record<string, unknown> = MEI) => makePayload({ content, sender, conversation: { id: 999, status: "open" } });
+    // The operator-approved wording (WORKLOG 2026-10-17 續3), pinned so it cannot drift.
+    const HOLDING_ZH = [
+      "系統已收到您的訊息，工作人員會親自回覆您。",
+      "如果您現在有立即的危險，請馬上撥打緊急電話：台灣 119、澳洲 000。",
+      "24 小時求助專線：台灣 1925 安心專線、1995 生命線；澳洲 Lifeline 13 11 14。",
+    ].join("\n");
+
+    it("one page first, then the help lines once; no AI, no credit, no claim of the message", async () => {
+      expect(await (await post(owned(TEXT))).json()).toMatchObject({ ignored: true, reason: "human_owns_thread" });
+      await runAfter();
+      expect(sendText).toHaveBeenCalledTimes(1);
+      expect(claimCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", 1800, 120);
+      expect(sendReply).toHaveBeenCalledTimes(1);
+      expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", HOLDING_ZH);
+      expect(sendText.mock.invocationCallOrder[0]).toBeLessThan(sendReply.mock.invocationCallOrder[0]);
+      expect(confirmCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "claim-1");
+      expect(sendReply.mock.invocationCallOrder[0]).toBeLessThan(confirmCrisisHolding.mock.invocationCallOrder[0]);
+      expect(sendReply.mock.calls[0][3]).not.toContain("看到");
+      expect(handleInbound).not.toHaveBeenCalled();
+      expect(reserveCsCredit).not.toHaveBeenCalled();
+      expect(claimMessage).not.toHaveBeenCalled();
+    });
+
+    it("inside the window (already sent): no reply, still one page", async () => {
+      claimCrisisHolding.mockResolvedValueOnce({ kind: "recent" });
+      await post(owned(TEXT));
+      await runAfter();
+      expect(sendReply).not.toHaveBeenCalled();
+      expect(sendText).toHaveBeenCalledTimes(1);
+    });
+
+    it("an English message gets the English help lines", async () => {
+      await post(owned("I want to end my life", { type: "contact", id: 77, name: "Mia" }));
+      await runAfter();
+      expect(sendReply.mock.calls[0][3]).toBe(
+        "Your message has been received, and a staff member will reply to you personally.\n" +
+          "If you are in immediate danger, please call emergency services now: Taiwan 119, Australia 000.\n" +
+          "24-hour support lines: Lifeline 13 11 14 (Australia), 1925 or 1995 (Taiwan).",
+      );
+    });
+
+    it("the send fails: reported, and the window is given back", async () => {
+      sendReply.mockRejectedValueOnce(new Error("chatwoot down"));
+      await post(owned(TEXT));
+      await runAfter();
+      expect(releaseCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "claim-1");
+      expect(confirmCrisisHolding).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalled();
+    });
+
+    it("the window cannot be read (DB error): reported, the help lines still go out", async () => {
+      claimCrisisHolding.mockResolvedValueOnce({ kind: "error", error: new Error("db down") });
+      await post(owned(TEXT));
+      await runAfter();
+      expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", HOLDING_ZH);
+      expect(captureException).toHaveBeenCalled();
+    });
+
+    it("system mode blocked: no reply and no window used (T27), still one page", async () => {
+      checkProductionChangeAllowed.mockResolvedValueOnce({ allowed: false, mode: "maintenance" });
+      await post(owned(TEXT));
+      await runAfter();
+      expect(claimCrisisHolding).not.toHaveBeenCalled();
+      expect(sendReply).not.toHaveBeenCalled();
+      expect(sendText).toHaveBeenCalledTimes(1);
+    });
+
+    it("an ordinary message, or an agent writing the words: nothing", async () => {
+      await post(owned("請問下週有課嗎"));
+      await post(owned(TEXT, { type: "user", id: 5, name: "Agent" }));
+      await runAfter();
+      expect(claimCrisisHolding).not.toHaveBeenCalled();
+      expect(sendReply).not.toHaveBeenCalled();
+      expect(sendText).not.toHaveBeenCalled();
+    });
   });
 
   it("the name reply after the crisis acknowledgement is captured", async () => {

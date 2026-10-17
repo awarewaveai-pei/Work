@@ -80,6 +80,28 @@ function crisisAckZh(you: string): string {
   ].join("\n");
 }
 
+/**
+ * A crisis message while a human already owns the conversation (route.ts human_owns_thread). Only
+ * what is true: the system received it, a staff member will reply personally, the help lines. Never
+ * "we saw it" (nobody has read it yet), no name question. Wording by GPT, approved by the operator
+ * 2026-10-17 (WORKLOG 2026-10-17 續3); the English help-line part follows CRISIS_ACK_EN.
+ */
+export function crisisHoldingText(cis: CisProfile, customerText: string): string {
+  if (!NON_LATIN.test(customerText)) return CRISIS_HOLDING_EN;
+  const you = cis.csVoice?.honorifics === "你" ? "你" : "您";
+  return [
+    `系統已收到${you}的訊息，工作人員會親自回覆${you}。`,
+    `如果${you}現在有立即的危險，請馬上撥打緊急電話：台灣 119、澳洲 000。`,
+    "24 小時求助專線：台灣 1925 安心專線、1995 生命線；澳洲 Lifeline 13 11 14。",
+  ].join("\n");
+}
+
+const CRISIS_HOLDING_EN = [
+  "Your message has been received, and a staff member will reply to you personally.",
+  "If you are in immediate danger, please call emergency services now: Taiwan 119, Australia 000.",
+  "24-hour support lines: Lifeline 13 11 14 (Australia), 1925 or 1995 (Taiwan).",
+].join("\n");
+
 // A reply that reads like a question or a request is not a name. Deliberately conservative: a
 // missed name costs nothing (the agent can still ask), a wrong one makes the agent greet the
 // customer by a sentence.

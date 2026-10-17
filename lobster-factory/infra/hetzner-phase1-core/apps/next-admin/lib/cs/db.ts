@@ -551,3 +551,54 @@ export async function claimMessage(organizationId: string, conversationId: strin
   if (!error) return "claimed";
   return error.code === "23505" ? "duplicate" : "error";
 }
+
+export type CrisisHoldingClaim = { kind: "claimed"; claimId: string } | { kind: "recent" } | { kind: "error"; error: unknown };
+
+/**
+ * Claims the conversation's crisis holding-reply window (migration 0104 cs_claim_crisis_holding):
+ * one atomic upsert, so of two webhooks racing on one conversation exactly one gets "claimed".
+ * "recent" = a confirmed send inside the window, or a send still in flight. A claim never confirmed
+ * (process killed mid-send) stops blocking after inflightSeconds. "error" is returned, not thrown.
+ */
+export async function claimCrisisHolding(
+  organizationId: string,
+  conversationId: string,
+  windowSeconds: number,
+  inflightSeconds: number,
+): Promise<CrisisHoldingClaim> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return { kind: "error", error: new Error("cs_db_unconfigured") };
+  const { data, error } = await sb.rpc("cs_claim_crisis_holding", {
+    p_organization_id: organizationId,
+    p_conversation_id: conversationId,
+    p_window_seconds: windowSeconds,
+    p_inflight_seconds: inflightSeconds,
+  });
+  if (error) return { kind: "error", error };
+  return typeof data === "string" && data ? { kind: "claimed", claimId: data } : { kind: "recent" };
+}
+
+/** Records the send, so the claim blocks for the whole window. False = not recorded (it then blocks only while in flight). */
+export async function confirmCrisisHolding(organizationId: string, conversationId: string, claimId: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { data, error } = await sb.rpc("cs_confirm_crisis_holding", {
+    p_organization_id: organizationId,
+    p_conversation_id: conversationId,
+    p_claim_id: claimId,
+  });
+  return !error && data === true;
+}
+
+/** Gives the window back after a failed send. Deletes only this claim: a later winner keeps its own. */
+export async function releaseCrisisHolding(organizationId: string, conversationId: string, claimId: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { error } = await sb
+    .from("cs_crisis_holding_replies")
+    .delete()
+    .eq("organization_id", organizationId)
+    .eq("chatwoot_conversation_id", conversationId)
+    .eq("claim_id", claimId);
+  return !error;
+}
