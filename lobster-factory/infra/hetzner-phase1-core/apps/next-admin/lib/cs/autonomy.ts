@@ -2,7 +2,7 @@
 // every "can the AI act autonomously?" question is answered here by deterministic code, never by
 // the LLM. See plan §1 (two-axis autonomy), §3.4 (action gate), §5 (guardrails).
 
-import { CS_CRISIS_INTENT_KEY, CS_CRISIS_KEYWORDS, CS_RED_LINE_KEYWORDS, CS_SENSITIVE_KEYWORDS, CS_THRESHOLDS } from "@/lib/cs/config";
+import { CS_CRISIS_INTENT_KEY, CS_CRISIS_KEYWORDS, CS_RED_LINE_KEYWORDS, CS_SENSITIVE_KEYWORDS, CS_THREAT_INTENT_KEY, CS_THREAT_KEYWORDS, CS_THRESHOLDS } from "@/lib/cs/config";
 import type { RetrievedChunk } from "@/lib/kb/types";
 import type {
   CsActionKind,
@@ -42,7 +42,12 @@ export function hitsCrisis(text: string): boolean {
   return hitsAny(text, CS_CRISIS_KEYWORDS);
 }
 
-/** Broader sensitive set (red-line + crisis + complaints/escalation/emotion). */
+/** A threat to hurt other people. Matched anywhere ⇒ hard handoff with reason "threat" and an operator page. */
+export function hitsThreat(text: string): boolean {
+  return hitsAny(text, CS_THREAT_KEYWORDS);
+}
+
+/** Broader sensitive set (red-line + crisis + threat + complaints/escalation/emotion). */
 export function hitsSensitive(text: string): boolean {
   return hitsAny(text, CS_SENSITIVE_KEYWORDS);
 }
@@ -101,6 +106,7 @@ export function preGenerationGate(input: Pick<AnswerDecisionInput, "intent" | "r
 export function safetyGate(intent: Intent, messageText: string): AnswerDecision | null {
   // First, so a crisis is never relabelled by the intent config or a red-line word in the same message.
   if (hitsCrisis(messageText) || (intent.key === CS_CRISIS_INTENT_KEY && intent.isSensitive)) return { action: "handoff", handoffReason: "crisis" };
+  if (hitsThreat(messageText) || (intent.key === CS_THREAT_INTENT_KEY && intent.isSensitive)) return { action: "handoff", handoffReason: "threat" };
   if (intent.isSensitive || hitsRedLine(messageText)) {
     return { action: "handoff", handoffReason: intent.isSensitive ? "sensitive_intent" : "red_line" };
   }

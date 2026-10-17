@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-17（續13）客服：威脅傷害他人＝立刻 Telegram 通知操作者（機器人／真人接手中兩種狀態）；回客人的話 GPT 已寫、等操作者同意＋真人接手中回覆需 migration
+
+**操作者**（Messenger 真測後）：「激進言論沒有處理，只說『已收到您的訊息，我們會盡快回覆您 🙏』」；決定「做『威脅傷害他人』的處理：立刻 Telegram 通知我、真人接手中也要處理、回客人的話先用 GPT 寫給我看，我同意後才上線」。
+**真測照出的根因**（chatwoot msg 85–89，`cs_ai_replies` conv 13）：「我討厭你們」→ other 0.85、檢索 0.297 → knowledge_gap 一般確認句；1 秒後「我要殺光所有的人」到時對話已轉真人（open）→ human_owns_thread 靜默，沒分類、沒通知。危機處理只涵蓋自傷（`CS_CRISIS_KEYWORDS`），沒有傷害他人。
+**做了**（照自傷危機同一套，不另建）：
+- `lib/cs/config.ts` `CS_THREAT_KEYWORDS`（繁簡英片語，不放單字「殺」以免殺價／殺時間）、`CS_THREAT_INTENT_KEY="threat_to_others"`；威脅字併入 `CS_SENSITIVE_KEYWORDS` → 常見問答不搶答。
+- `HandoffReason` 加 `threat`；`safetyGate` 自傷先、威脅次；`inputGuards` 加 `checkThreat`（在一般敏感之前）；`parseNameReply` 排除威脅句。
+- `lib/cs/crisis-alert.ts` 通知分兩種標題（自傷原文不變；威脅「🔴 客服：客人的訊息提到要傷害別人」），一樣只給對話連結、不含客人原文。
+- webhook：`keywordPages` 決定要發哪幾種通知；真人接手中命中威脅字 → 通知（不回客人）；機器人狀態 → 關鍵字在任何 Chatwoot 呼叫前通知，分類器判 threat 也通知；同一則同時自傷＋威脅 → 兩則通知，自傷照回求助專線。
+- Soulful DB 意圖 `threat_to_others`（is_sensitive、L0、0.8）。正式分類 prompt 模擬（加入該意圖，各 2 次）：殺光所有人 0.99、你們等著瞧我會讓你們後悔 0.95、我知道你們老師住哪裡 0.85、我很生氣想打人 0.95 → threat_to_others；我討厭你們、你們的課很爛 → other；退錢 refund、判斷憂鬱症 medical_judgment、活著很痛苦 self_harm、喜悅卡 courses_services 不受影響。
+**沒做（等操作者）**：回客人的話。GPT（Codex CLI，`reports/oracle/2026-10-17-inspect-7682402d.md`）兩種情境寫同一句：「系統已收到您的訊息。工作人員會親自回覆您。如果有人現在有立即危險，請撥打台灣119或澳洲000。」EN：「The system has received your message. A staff member will reply to you personally. If anyone is in immediate danger, call 119 in Taiwan or 000 in Australia.」目前機器人狀態仍回一般確認句、真人接手中不回。真人接手中要回這句需 migration：`cs_crisis_holding_replies` 以對話為鍵，威脅若共用會讓 30 分鐘內的自傷求助專線被擋（違反 0104「寧可重複不可漏」），要加「種類」欄位。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run（273 files／2526 pass；threat.test 5、route 威脅 4） | exit=0 | ms=17673
+- REALTEST_EVIDENCE: tool=SSH | cmd=lobster-next-admin 內正式分類 prompt（加 threat_to_others）10 句 × 2；psql insert cs_intents threat_to_others → t|L0|0.8 | exit=0 | ms=20000
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=hitsThreat|CS_THREAT_KEYWORDS|CS_THREAT_INTENT_KEY|keywordPages|CrisisPageKind | hits=30（本次 7 個程式／測試檔＋oracle 報告；WORKLOG 除外）；另查 handoff 原因列舉：只有 types.ts 與 route.ts，DB 無 CHECK
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（`reports/oracle/2026-10-17-partialreview-346529c4.md`）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD）
+
+**rollback**：程式 `git revert`；意圖 `delete from cs_intents where key='threat_to_others' and organization_id='2bf6…'`。
 ## 2026-10-17（續12）社群發文 V1.5 卡片計畫：樣稿 v16 → 產品，C19–C31 開卡（PLAN.md §1b），可發包 Opus／Sonnet
 
 **操作者**：「把 plan 整理好，完成後可以發包給 opus 和 sonnet 做」（模型切 Fable 5.1）。

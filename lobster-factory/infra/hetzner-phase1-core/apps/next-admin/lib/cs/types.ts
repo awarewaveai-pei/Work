@@ -99,6 +99,7 @@ export type HandoffReason =
   | "sensitive_intent"
   | "red_line"
   | "crisis"
+  | "threat"
   | "low_confidence"
   | "knowledge_gap"
   | "not_grounded"

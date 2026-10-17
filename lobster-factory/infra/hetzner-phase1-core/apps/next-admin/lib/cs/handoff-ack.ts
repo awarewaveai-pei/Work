@@ -11,7 +11,7 @@
 // needs business verification) are created as "John Doe" -- Chatwoot v4.18
 // app/builders/messages/facebook/message_builder.rb process_contact_params_result.
 
-import { hitsCrisis } from "@/lib/cs/autonomy";
+import { hitsCrisis, hitsThreat } from "@/lib/cs/autonomy";
 import type { CisProfile } from "@/lib/cs/types";
 
 /** Names Chatwoot invents when it cannot read a profile. Only these are ever overwritten. */
@@ -124,7 +124,7 @@ const ACKNOWLEDGEMENTS = new Set([
 /** The name in a reply to the name question, or null when the reply does not look like one. */
 export function parseNameReply(text: string): string | null {
   const firstLine = text.split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? "";
-  if (!firstLine || NOT_A_NAME.test(firstLine) || hitsCrisis(text)) return null;
+  if (!firstLine || NOT_A_NAME.test(firstLine) || hitsCrisis(text) || hitsThreat(text)) return null;
   const name = firstLine.replace(LEADING, "").replace(TRAILING, "").trim();
   if (!name || ACKNOWLEDGEMENTS.has(name.toLowerCase())) return null;
   const chars = [...name].length;

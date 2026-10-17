@@ -602,6 +602,53 @@ describe("POST /api/webhooks/chatwoot -- crisis message", () => {
   });
 });
 
+// Operator decision 2026-10-17: a threat to hurt others pages the operator at once, also while a
+// human owns the conversation. What the customer hears waits for the operator's approval of the wording.
+describe("POST /api/webhooks/chatwoot -- threat to hurt others", () => {
+  const JOHN = { type: "contact", id: 77, name: "John Doe" };
+  const TEXT = "我要殺光所有的人";
+  beforeEach(() => sendText.mockClear());
+
+  it("a human owns the thread: one threat page with the link and none of the words; no reply, no AI", async () => {
+    await post(makePayload({ content: TEXT, sender: JOHN, conversation: { id: 999, status: "open" } }));
+    await runAfter();
+    expect(sendText).toHaveBeenCalledTimes(1);
+    const page = sendText.mock.calls[0][0];
+    expect(page).toContain("要傷害別人");
+    expect(page).toContain("https://chatwoot.example/app/accounts/42/conversations/999");
+    expect(page).not.toContain(TEXT);
+    expect(sendReply).not.toHaveBeenCalled();
+    expect(claimCrisisHolding).not.toHaveBeenCalled();
+    expect(handleInbound).not.toHaveBeenCalled();
+  });
+
+  it("the bot owns the thread: one threat page before the handoff", async () => {
+    handleInbound.mockResolvedValueOnce({ ...DEFAULT_DECISION, action: "handoff" as const, replyText: undefined, handoffReason: "threat" });
+    await post(makePayload({ content: TEXT, sender: JOHN }));
+    await runAfter();
+    expect(sendText).toHaveBeenCalledTimes(1);
+    expect(sendText.mock.calls[0][0]).toContain("要傷害別人");
+    expect(sendText.mock.invocationCallOrder[0]).toBeLessThan(handoffToHuman.mock.invocationCallOrder[0]);
+  });
+
+  it("no keyword, but the classifier said threat: one threat page", async () => {
+    handleInbound.mockResolvedValueOnce({ ...DEFAULT_DECISION, action: "handoff" as const, replyText: undefined, handoffReason: "threat" });
+    await post(makePayload({ content: "你們等著瞧，我會讓你們後悔", sender: JOHN }));
+    await runAfter();
+    expect(sendText).toHaveBeenCalledTimes(1);
+    expect(sendText.mock.calls[0][0]).toContain("要傷害別人");
+  });
+
+  it("self-harm and a threat in one message: two pages, and the help lines while a human owns it", async () => {
+    await post(makePayload({ content: "我要殺光所有的人然後自殺", sender: JOHN, conversation: { id: 999, status: "open" } }));
+    await runAfter();
+    expect(sendText).toHaveBeenCalledTimes(2);
+    expect(sendText.mock.calls.map((c) => c[0]).join("\n")).toContain("自傷或自殺");
+    expect(sendText.mock.calls.map((c) => c[0]).join("\n")).toContain("要傷害別人");
+    expect(claimCrisisHolding).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("POST /api/webhooks/chatwoot -- free FAQ answers (no AI, no credit)", () => {
   const FAQ = [{ id: "courses", keywords: ["課程"], answer: "我們有四個療癒模組" }];
   const withFaq = () => loadCis.mockResolvedValue({ organizationId: ORG_ID, chatwoot: CHATWOOT_CONFIG, csEnabled: false, csFaq: FAQ });

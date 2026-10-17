@@ -91,6 +91,34 @@ export const CS_CRISIS_KEYWORDS = [
 export const CS_CRISIS_INTENT_KEY = "self_harm";
 
 /**
+ * Threats to hurt other people (operator decision 2026-10-17: 「我要殺光所有的人」 was answered only by
+ * the ordinary acknowledgement, and a second one went unseen while a human owned the conversation).
+ * Paged to the operator like a crisis, in both states. Phrases, not bare characters: 殺 alone would
+ * page on 殺價 / 殺時間. Wide on purpose -- a false hit costs one page and a human reply. Euphemisms
+ * are the classifier's job (CS_THREAT_INTENT_KEY).
+ */
+export const CS_THREAT_KEYWORDS = [
+  "殺光", "殺死", "殺掉", "殺了你", "殺了他", "殺了她", "殺人", "砍死", "砍人", "砍你", "打死你", "打死他",
+  "弄死", "宰了你", "捅死", "捅你", "炸死", "炸掉", "炸彈", "放火燒", "縱火", "開槍", "槍殺", "毒死",
+  "報復你", "同歸於盡", "血洗", "屠殺", "傷害你們", "傷害別人", "傷害他人", "傷害他們", "讓你們好看",
+  "讓你好看", "給我等著",
+  "杀光", "杀死", "杀掉", "杀了你", "杀了他", "杀了她", "杀人", "打死你", "宰了你", "炸弹", "纵火",
+  "开枪", "枪杀", "报复你", "同归于尽", "屠杀", "伤害你们", "伤害别人", "伤害他人", "伤害他们",
+  "让你们好看", "让你好看", "给我等着",
+  "kill you", "kill them", "kill him", "kill her", "kill everyone", "kill everybody", "kill all",
+  "going to kill", "gonna kill", "murder", "shoot you", "shoot them", "shoot everyone", "bomb",
+  "stab you", "stab them", "hurt you", "hurt them", "hurt someone", "hurt people", "burn it down",
+  "burn down", "make you pay",
+] as const;
+
+/**
+ * A tenant intent with this key AND is_sensitive is the classifier's catch for threats no list holds;
+ * it pages like a keyword hit. Same rule as CS_CRISIS_INTENT_KEY: only this key, so an unrelated
+ * intent never pages. Not covered: a human already owns the thread (no classification) -- keywords only.
+ */
+export const CS_THREAT_INTENT_KEY = "threat_to_others";
+
+/**
  * A crisis message while a human owns the conversation gets the help lines at most once per
  * conversation per this window (operator decision 2026-10-17; state in migration 0104).
  */
@@ -102,6 +130,7 @@ export const CS_CRISIS_HOLDING_INFLIGHT_SECONDS = 120;
 export const CS_SENSITIVE_KEYWORDS = [
   ...CS_RED_LINE_KEYWORDS,
   ...CS_CRISIS_KEYWORDS,
+  ...CS_THREAT_KEYWORDS,
   "complaint", "投訴", "客訴", "申訴", "退貨爭議", "情緒", "威脅", "threaten",
 ] as const;
 

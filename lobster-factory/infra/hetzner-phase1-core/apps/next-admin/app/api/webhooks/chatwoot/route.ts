@@ -6,8 +6,8 @@ import { claimCrisisHolding, claimMessage, completeClaim, confirmCrisisHolding, 
 import { getContactName, handoffToHuman, listMessages, sendPrivateDraft, sendReply, updateContactName, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
 import { crisisHoldingText, handoffAckText, isCrisisAck, isNameQuestionAck, isPlaceholderContactName, parseNameReply } from "@/lib/cs/handoff-ack";
 import { CS_CRISIS_HOLDING_INFLIGHT_SECONDS, CS_CRISIS_HOLDING_WINDOW_SECONDS } from "@/lib/cs/config";
-import { hitsCrisis } from "@/lib/cs/autonomy";
-import { alertOperatorOfCrisis } from "@/lib/cs/crisis-alert";
+import { hitsCrisis, hitsThreat } from "@/lib/cs/autonomy";
+import { alertOperatorOfCrisis, type CrisisPageKind } from "@/lib/cs/crisis-alert";
 import { buildOperatorTelegramNotifier } from "@/lib/ops-inbox/notify/telegram";
 import { tenantFaqAnswer } from "@/lib/cs/faq";
 import { reserveCsCredit } from "@/lib/cs/billing";
@@ -101,14 +101,15 @@ export async function POST(req: Request): Promise<Response> {
       const reply = { organizationId, conversationId, messageId: Number(messageId), contactId, text: payload.content ?? "" };
       after(() => captureName(reply).catch((err) => Sentry.captureException(err, { extra: { organizationId, conversationId, messageId } })));
     }
-    // A crisis message still pages the operator (whoever owns the thread may not be looking at it),
-    // then the customer gets the help lines, once per conversation per window.
-    if (!isFromAgent && hitsCrisis(payload.content ?? "")) {
-      const customerText = payload.content ?? "";
+    // A crisis or a threat still pages the operator (whoever owns the thread may not be looking at it);
+    // a crisis then gets the help lines, once per conversation per window.
+    const customerText = payload.content ?? "";
+    const pages = isFromAgent ? [] : keywordPages(customerText);
+    if (pages.length) {
       after(async () => {
         const cis = await loadCis(organizationId).catch(() => undefined);
-        await pageCrisis(organizationId, conversationId, cis?.chatwoot);
-        if (cis?.chatwoot) await sendCrisisHolding(cis, cis.chatwoot, conversationId, customerText);
+        for (const kind of pages) await pageCrisis(organizationId, conversationId, cis?.chatwoot, kind);
+        if (cis?.chatwoot && pages.includes("self_harm")) await sendCrisisHolding(cis, cis.chatwoot, conversationId, customerText);
       });
     }
     return NextResponse.json({ ok: true, ignored: true, reason: "human_owns_thread" });
@@ -156,7 +157,11 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
   // A crisis pages the operator before anything that can fail or be switched off (tenant config read,
   // system mode, missing Chatwoot config, a failed handoff or acknowledgement): the config only adds the
   // conversation link, so a failed read still pages, without it.
-  if (hitsCrisis(inbound.text)) await pageCrisis(organizationId, conversationId, await chatwootConfigOrNone(organizationId));
+  const keywordPaged = keywordPages(inbound.text);
+  if (keywordPaged.length) {
+    const chatwoot = await chatwootConfigOrNone(organizationId);
+    for (const kind of keywordPaged) await pageCrisis(organizationId, conversationId, chatwoot, kind);
+  }
   const cis = await loadCis(organizationId);
 
   // T27 (agency-os/reports/decisions/2026-09-26-system-mode-inbound-events.md): a blocking system
@@ -201,10 +206,12 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
 
   // handleInbound records its decision (recordReply) on every path, failures included.
   const decision = await handleInbound(inbound);
-  // The classifier's crisis intent (CS_CRISIS_INTENT_KEY) catches what the keywords cannot; it is known
-  // only now, so its page goes out here, still before any Chatwoot call. A keyword hit was paged above.
+  // The classifier's crisis and threat intents catch what the keywords cannot; they are known only
+  // now, so their page goes out here, still before any Chatwoot call. Keyword hits were paged above.
   const crisis = hitsCrisis(inbound.text) || decision.handoffReason === "crisis";
-  if (crisis && !hitsCrisis(inbound.text)) await pageCrisis(organizationId, conversationId, cis.chatwoot);
+  const classifierPage: CrisisPageKind | null =
+    decision.handoffReason === "crisis" ? "self_harm" : decision.handoffReason === "threat" ? "threat" : null;
+  if (classifierPage && !keywordPaged.includes(classifierPage)) await pageCrisis(organizationId, conversationId, cis.chatwoot, classifierPage);
 
   // No Account API config yet (Chatwoot bring-up before client_config.chatwoot is set): the decision
   // is recorded, nothing can be sent.
@@ -303,11 +310,19 @@ async function sendCrisisHolding(cis: CisProfile, chatwoot: ChatwootConfig, conv
   }
 }
 
-/** Operator page for a crisis message (lib/cs/crisis-alert.ts). Best-effort: never fails the pipeline. */
-async function pageCrisis(organizationId: string, conversationId: string, chatwoot?: ChatwootConfig): Promise<void> {
+/** The pages a message's own words call for: self-harm and threat are separate pages, a message may need both. */
+function keywordPages(text: string): CrisisPageKind[] {
+  const pages: CrisisPageKind[] = [];
+  if (hitsCrisis(text)) pages.push("self_harm");
+  if (hitsThreat(text)) pages.push("threat");
+  return pages;
+}
+
+/** Operator page for a crisis or threat message (lib/cs/crisis-alert.ts). Best-effort: never fails the pipeline. */
+async function pageCrisis(organizationId: string, conversationId: string, chatwoot?: ChatwootConfig, kind: CrisisPageKind = "self_harm"): Promise<void> {
   try {
     const notifier = buildOperatorTelegramNotifier();
-    const r = await alertOperatorOfCrisis(notifier ? (text) => notifier.sendText(text) : null, organizationId, conversationId, chatwoot);
+    const r = await alertOperatorOfCrisis(notifier ? (text) => notifier.sendText(text) : null, organizationId, conversationId, chatwoot, kind);
     if (r.kind !== "sent") Sentry.captureMessage(`cs crisis page not delivered: ${r.code}`, { extra: { organizationId, conversationId } });
   } catch (err) {
     Sentry.captureException(err, { extra: { organizationId, conversationId, step: "crisis_page" } });
