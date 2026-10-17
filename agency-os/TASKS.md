@@ -138,7 +138,7 @@
 - [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–7 開卡做**
   - `🟠 未開始` · `2026-10-14` · WORKLOG 續15、續17；第 3 步前查定期扣款外掛；`ADR_INDEX.md` 那列已改「已接受」（2026-10-15）
   - **監工台**（plan 唯一狀態頁，操作者 2026-10-16「要有監工頁面」）：https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr ← `agency-os/handoffs/2026-10-16-customer-model-supervisor/`（`data.mjs` 改狀態 → `node build.mjs` → `node check.mjs` → 重發同 URL）。每步 done 時改 `STEPS[n].status`＋`commit`。
-  - 2026-10-16 §0 改三軸（部署／商業／操作），順序加 6 API 通道、7 轉售；第 1 步啟動時一併改 System Foundry：問卷加 3 題（代操、裝在客戶主機 `self_hosted`、WordPress 登入來源 awarewave-wp／customer-wp；API 通道已有 Q-CH-004）；藍圖末節「交付登記」從 Q-PORT-001/002/003、Q-SCOPE-001（門）、Q-ID-001/005、Q-INT-005（登入來源）、Q-COM-001/002/004/005/006/008（收費模式）推出 SOP §18 五答案，子網域與逐項收費功能留空由 `new-product.mjs` 補問；藍圖必寫「許可只問 `can()`」（2026-10-16 對照 263 題：子網域無、登入來源與買斷只有一半），WORKLOG 2026-10-16「三條軸」條目
+  - 2026-10-16 §0 改三軸（部署／商業／操作），順序加 6 API 通道、7 轉售；第 1 步啟動時一併改 System Foundry：問卷只加 1 題「裝在客戶自己的主機」（self_hosted；License 只暗示不等於）；藍圖末節「交付登記」是一張推導表——五種方式＝既有答案的組合（自用＝員工使用要＋收費不要；代操＝員工要＋外部客戶不要＋收費要；訂閱＝外部客戶要＋訂閱要；點數＝外部客戶要＋預付點數要；買斷＝License 要）、三軸（誰操作＝SCOPE-001/002＋Q-CH-004；錢＝Q-COM-001/002/004/005/006/008；裝在哪＝新題）、根組織數＝Q-ORG-001/002/003/006；子網域與 WordPress 登入來源是 AwareWave 實作值，不進技術中立的問卷，由 `new-product.mjs` 補問；藍圖必寫「許可只問 `can()`」（2026-10-17 更正：昨天寫「缺代操」是錯的，代操是組合不是題），WORKLOG 2026-10-16「三條軸」條目
   - **執行卡**：`agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md … step-7.md`（Decision／Files／指令→預期／突變／Rollback），下一步＝照 step-1.md 做（Opus 5.5）
   - **操作者待決（2026-10-16「目前尚未決定，之後決定」）**，各卡住一步，第 1、2、4 步不受影響：
     - [ ] 待決 1：訂閱每月扣款用哪個 WooCommerce 定期扣款外掛；台灣金流是否支援定期扣款（ADR 017 產品決定 Q3）→ 擋第 3 步
