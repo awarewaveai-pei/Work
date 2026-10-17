@@ -1,6 +1,6 @@
 # 第 5 項：買斷安裝（一鍵裝到客戶主機、授權檔、交接撤鑰）
 
-**風險** High（交付；碰客戶主機）　**模型** Fable 5.1 設計 → Opus 5.5 做　**前置** 第 4 項；待決 2（Postiz AGPL 律師）　**正本** ADR 017 §5、§6、順序 5；ADR 018 §4；一鍵架站總藍圖 Stage 4
+**風險** High（交付；碰客戶主機）　**模型** Fable 5.1 設計 → Opus 5.5 做　**前置** 第 3 項（can()）＋第 4 項（付款）；待決 2（Postiz AGPL 律師）　**正本** ADR 017 §5、§6、順序 5；ADR 018 §4；一鍵架站總藍圖 Stage 4
 
 ## Decision
 - 模組清單：`lib/portal/products.ts` 每列加 `modules: { services: string[], env: string[], dependsOn: ProductKey[] }`（例：social → next-admin、supabase、trigger、postiz；env：`POSTIZ_API_KEY`、`PUBLIC_BASE_DOMAIN`…）。登記表測試：`standalone: true` 的產品，其 `dependsOn` 閉包內不得含 SAFETY_GATE 功能。

@@ -111,6 +111,8 @@
 | 6 | 買斷的主機誰管？ | 我們一鍵裝好；選購維運月費（備份、更新、監控）；主機在客戶名下 |
 | 7 | 買斷能不能只買一個模組？ | 能，連同它依賴的模組 |
 | 8 | 線上和買斷能不能互換？ | 可以，資料匯出匯入另做；先不承諾自動搬 |
+| 9 | 買斷怎麼收錢？（操作者 2026-10-17 問，預設值可改） | **三段**：①買斷價＝36 個月訂閱價，含 12 個月更新；②更新年費＝買斷價 20%，選購，不續仍可用最後版本（JetBrains perpetual fallback）；③維運月費分級（備份、監控、更新套用、支援回應時間），選購，含一把維運 key；AI 與平台 API 客戶自付。對照：Atlassian Data Center 年度維護、WHMCS owned licence＋support/updates。 |
+| 10 | 做的先後？（操作者 2026-10-17） | ①先服務自己的客戶（代操計費：順序 1→2→3）②訂閱／點數在 aware-wave.com（順序 4）③賣斷給一般公司（順序 5）。所以 `can()` 在 Woo 之前。 |
 
 ## 順序（風險由低到高，每段做完現有產品照常）
 
@@ -118,9 +120,9 @@
 
 1. `products.ts` 加 `features[]`、`accessChannels`（`ui`；`api` 等順序第 6 步）；登記表機械閘（012 §5）加「收費功能都有登記」「可買斷模組無 SAFETY_GATE」「**反向登記**：`app/(shell)/tools/<x>` 與 `app/<門前綴>` 每個目錄都對得到登記表一列，對不到紅燈；`app/(shell)/ops/*` 是營運後台頁，不是產品，不在登記表」。**現況 13 個 tools 目錄只有 social 有登記列**，本步一次歸位（預設：video、tarot、studio、design＝canvas+designs+mockup+banner+vector-editor、content＝content+publish+events、cs；theme 與 ai-models 列 `STAFF_UTILITIES` 並由測試證明不 import 付費 SDK），表在 `handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md`；**產生器** `scripts/new-product.mjs`（新產品的唯一入口，操作者 2026-10-16「要去哪裡按什麼」）：問 SOP §18 五題，寫登記列、`app/<門前綴>/{layout,page}.tsx` 骨架、`lib/<key>/can-points.ts`（收費點呼叫 `can()` 的範例）、測試；System Foundry 藍圖末節就是這五個答案。之後 `/ops/products` 的「新增產品」表單只是跑同一條命令；`products.test.ts` 改比對全部產品（現在只比 self-signup）。只讀。
 2. Migration：`plans`、`organization_entitlements`、`organizations.kind`（`internal`／`customer`，預設 customer，Account#0 改 internal）；0062 加 `plan_key`、`source_ref`、改唯一索引、放寬 CHECK（0062 目前 0 筆，不用雙寫期）；三表只給控制面的靜態檢查。控制面發功能級許可（012 §8 第 3 步）。
-3. Woo 付款通知 → 合約與權利；帳本泛化（015 §4 第 2 步）。**前置：ADR 015 順序 1（WordPress 一次性碼進入產品門）**，否則付了錢的人進不了門；營運唯讀頁 `/ops/billing`（合約、權利、餘額、帳本）同步做。
-   **付費入口唯一閘**（第 2、4 步一起落地，補「沒登記也能收錢」的洞）：付費供應商 SDK（`@anthropic-ai/sdk`、`openai`、`replicate`、fal、google-genai）、錢包帳本 client、三張權利表，只准在 `lib/entitlements/**` 與 `lib/ai/gateway.ts`（進去先問 `can()`）引用；測試掃全部 import，別處出現建置失敗。認知平台同理：`ai_lego/platform/ai_execution/gateway.py` 是唯一 AI 入口，呼叫端必須帶 grant。沒登記的產品拿不到 grant，所以收不了錢、也叫不到付費 AI。
-4. 各產品收費點接 `can()`；認知平台 `check_entitlement(store, tenant_id, capability_id) -> bool`（`ai_lego/platform/entitlement/check.py:25`）改成 `can()` 的薄接頭：加 `actor`、回傳 grant 物件（allowed／limits／max_spend／report），呼叫端只有 `ai_lego/apps/api/main.py` 9 處，同一 commit 改完；它 docstring 的「Phase 2 換內容不換簽章」由本步取代（讀過 2026-10-16）。HCI 側照 ADR-0031 gate 1–4 的位置落地，欄位改本 ADR §3（`entitlement_id`＋`source_ref`＋`actor`＋`on_behalf_of`）；主體解析照 ADR-0009（portal `organizations` 是 tenant 的 adapter，`external_tenant_id` 對應）。
+3. 各產品收費點接 `can()`；認知平台 `check_entitlement(store, tenant_id, capability_id) -> bool`（`ai_lego/platform/entitlement/check.py:25`）改成 `can()` 的薄接頭：加 `actor`、回傳 grant 物件（allowed／limits／max_spend／report），呼叫端只有 `ai_lego/apps/api/main.py` 9 處，同一 commit 改完；它 docstring 的「Phase 2 換內容不換簽章」由本步取代（讀過 2026-10-16）。HCI 側照 ADR-0031 gate 1–4 的位置落地，欄位改本 ADR §3（`entitlement_id`＋`source_ref`＋`actor`＋`on_behalf_of`）；主體解析照 ADR-0009（portal `organizations` 是 tenant 的 adapter，`external_tenant_id` 對應）。
+   **付費入口唯一閘**（第 2、3 步一起落地，補「沒登記也能收錢」的洞）：付費供應商 SDK（`@anthropic-ai/sdk`、`openai`、`replicate`、fal、google-genai）、錢包帳本 client、三張權利表，只准在 `lib/entitlements/**` 與 `lib/ai/gateway.ts`（進去先問 `can()`）引用；測試掃全部 import，別處出現建置失敗。認知平台同理：`ai_lego/platform/ai_execution/gateway.py` 是唯一 AI 入口，呼叫端必須帶 grant。沒登記的產品拿不到 grant，所以收不了錢、也叫不到付費 AI。
+4. Woo 付款通知 → 合約與權利；帳本泛化（015 §4 第 2 步）。**前置：ADR 015 順序 1（WordPress 一次性碼進入產品門）**，否則付了錢的人進不了門；營運唯讀頁 `/ops/billing`（合約、權利、餘額、帳本）同步做。
 5. 買斷安裝階段：模組清單、建置時排除、授權檔簽發、客戶 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。
 6. API 通道（等第一個只串 API 的客戶）：計費帳戶發 API key（scope＝feature_key 子集），`actor = api_key:<id>`，用量走同一個 `report()`；登記表 `accessChannels` 加 `api`。
 7. 轉售（等第一個轉售客戶）：授權檔 `max_tenants > 1`，安裝內租戶數受它限制；合約與價格另訂。**`max_tenants` 數的是根組織**（`parent_organization_id IS NULL` 的 `organizations` 列，0077）：一家公司、或一個集團含子公司／分公司／部門，都是 1，組織樹是產品本來的功能，不另收；多個不相干的客戶（代理商買去代操）才是 >1，隔離責任在客戶主機，合約寫明（操作者 2026-10-16 定案）。我們替買斷客戶代操不算租戶數，是維運加購（產品決定 Q6）。
