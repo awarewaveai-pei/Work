@@ -13,6 +13,30 @@
 - ORACLE_WAIVED: 只改樣稿與樣稿檢查（docs，不上線）
 
 **剩**：操作者看圖。同意後才開 next-admin 實作卡。
+## 2026-10-17（續5）Soulful 課程類考試修正第三輪：「資料裡沒有」4 題實測根因＝翻譯把自家課名翻成字面；翻譯改帶知識庫頁名；考題換掉 3 題分錯類的 — 等部署後真測與重考
+
+**部署狀態**：prod `.deployed-commit=32a58d565`（2026-10-16 12:43Z），`36ae1bf40`（退款／醫療判斷轉真人回覆）未上；無 `DEPLOY_HOLD`，今晚 03:00 自動部署會帶上 36ae1bf40 與本條。
+**量測**（prod 容器內 node：正式翻譯 prompt＋Haiku、OpenAI embedding、`cs_match_chunks`／`cs_match_chunks_keyword`、RRF k=60，唯讀）：答案都在知識庫裡（Stage 1–5、childhood trauma history、Object Relations Theory、Taking Out The Stingers、burnout 各有 chunk），不是 `contextTopK=4` 也不是切塊。
+- C1 翻譯把 Soulful 自己的名字翻成字面：回到原點 → "returning to where I started"、拔刺 → "pulling out thorns"。拔刺英文最高相似度 0.328（門檻 0.40）→ knowledge_gap。
+- 修法（`lib/cs/orchestrator.ts` `translateRequest`）：翻譯時附上該客戶看得到的知識庫文件標題（新 `lib/kb` `visibleTitles` → `lib/kb/db.ts` `listVisibleSourceTitles`，篩選同 migration 0086 的來源層條件：scope、預設空間含 NULL、active、排除敏感、有效期間；上限 100 筆）。標題放 user 訊息的 `<titles>` 區塊、去角括號（Codex 指出放 system prompt 會被當指令）。標題查詢失敗照舊翻譯。
+- 效果（正式格式各跑 2 次）：拔刺 0.328 → 0.454；創傷＋回到原點目標 chunk 排 15 → 3；理論穩定排 4。
+- m1 「分成幾個階段」：五個階段分在五塊、頁面沒寫「五」，融合排名 8／12／13，contextTopK 4 拿不到；屬「清單散在多塊」類，`contextual_prefix` 欄位 568 塊全空，未處理（TASKS 一行）。
+- m2 「老師倦怠」：與課名無關，英文最高相似度在 0.37–0.42 間浮動，壓在門檻邊緣；未調門檻。
+**考題**（`cs-eval-courses_services.json`，30 題 20／10／1 不變）：換掉分錯類的 3 題——喜悅卡一次多久（booking）、團體課程形式（booking）、理念（other）——改為「喜悅卡課程最後可以帶走什麼」「回到原點適合什麼樣的人」「喜悅卡課程在做什麼」。正式分類 prompt 各跑 2 次都是 courses_services 0.95；常見問答模擬只有「要怎麼報」被 booking 接（轉真人＝通過）。「我想退錢」→ refund 0.99、「判斷憂鬱症」→ medical_judgment 0.95–0.98（兩意圖 is_sensitive，現行程式已會轉真人）。prod 交易重新匯入（撤 graduation、刪 30、插 30）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=lobster-next-admin 內 node：6 題 × 原文／字面翻譯／帶標題翻譯，cs_match_chunks＋keyword RRF 量目標 chunk 排名與最高相似度（唯讀） | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=SSH | cmd=本機 tsx 組出 listVisibleSourceTitles 的 PostgREST URL → 在 prod 容器原樣 fetch：200、15 筆；psql 同條件 count=15 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=lobster-next-admin 內正式分類 prompt（Haiku）8 題 × 2；本機 tsx matchFaq 模擬 33 題 | exit=0 | ms=20000
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 交易：cs_intents metadata - graduation；cs_eval_cases 刪 30 插 30 → 30|10|1 | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run（272 files／2517 pass；orchestrator +3、kb-visible-titles 2） | exit=0 | ms=18229
+- 突變：拔掉 `listVisibleSourceTitles` 的 `is_sensitive=false` 篩選（臨時副本）→ kb-visible-titles「敏感文件排除」測試紅；原檔綠。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=visibleTitles|listVisibleSourceTitles|translateRequest | hits=26（6 個程式／測試檔＋oracle 報告；WORKLOG 除外）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（`reports/oracle/2026-10-17-partialreview-69a3cb55.md`：標題進 system prompt 可被當指令 → 收，移到 user 訊息 `<titles>` 區塊＋去角括號，指名測試「標題不在 system、標題關不掉區塊」）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD）
+- ORACLE_WAIVED: 修正由指名測試鎖住，不跑第二輪
+
+**待做**：部署後（今晚 03:00 自動或操作者 go ahead 手動）① 操作者用 John Doe 真測「我想退錢，可以嗎？」「可以幫我判斷我是不是憂鬱症嗎？」② 操作者在客服分頁按「開始考試」，逐題回報。
+**rollback**：程式 `git revert`；考題：重新匯入上一版 JSON（git）。
 ## 2026-10-17（續4）Session 切換提醒不再一直叫 clear：hook 只在 ≥80% 出聲、每種提醒每 session 一次（已安裝）
 
 **根因**：2026-10-15 版 `suggest-compact.js` 每輪都注入一行，連 OK 時也寫「任務收尾仍首行建議 /clear」，50% 起又叫 /compact；agent 照做 → 每個回覆都提（量到 2026-10-15 起 73 次回覆裡 11 次首行提 clear／compact，`82559534` 一個 session 8 次）。操作者：「一直要我 clear 很煩」。

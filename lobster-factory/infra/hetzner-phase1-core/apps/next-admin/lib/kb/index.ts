@@ -23,7 +23,7 @@
 //   scope × space × status × sensitive × as_of × embed_model. Both halves of hybrid retrieval share
 //   one predicate text; a caller cannot widen one half. `ctx` with an empty scope returns nothing.
 
-export { ingestKnowledge, retrieve, defaultEmbedder } from "@/lib/kb/rag";
+export { ingestKnowledge, retrieve, visibleTitles, defaultEmbedder } from "@/lib/kb/rag";
 export {
   listKnowledgeSources,
   listArchivedKnowledgeSources,

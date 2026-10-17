@@ -17,6 +17,7 @@ import {
   insertSource,
   matchChunksKeyword,
   matchChunksVector,
+  listVisibleSourceTitles,
   type RetrievalScope,
 } from "@/lib/kb/db";
 import type {
@@ -83,6 +84,23 @@ function scopeOf(ctx: KbContext, model: string): RetrievalScope {
     // Fail-closed: anything other than an explicit `true` excludes sensitive content (migration 0083).
     includeSensitive: ctx.includeSensitive === true,
   };
+}
+
+/** Most document titles visibleTitles() returns: enough for a small business's whole site. */
+export const VISIBLE_TITLES_LIMIT = 100;
+
+/**
+ * The titles of the documents retrieve() could return for this context, newest first, capped at
+ * VISIBLE_TITLES_LIMIT. For a consumer that rewrites a question into a search query: the
+ * business's own names (a programme called "Back To The Origin") are what the documents say, and a
+ * literal translation of the customer's wording ("returning to where I started") misses them.
+ * Same fail-closed checks as retrieve(). Never evidence: a title says a document exists, not what
+ * it supports.
+ */
+export async function visibleTitles(ctx: KbContext): Promise<string[]> {
+  if (!ctx.scope.length || !ctx.viewer || !ctx.scope.includes(ctx.viewer)) return [];
+  const embedder = ctx.embedder ?? defaultEmbedder();
+  return listVisibleSourceTitles(scopeOf(ctx, embedder.id), VISIBLE_TITLES_LIMIT);
 }
 
 /**

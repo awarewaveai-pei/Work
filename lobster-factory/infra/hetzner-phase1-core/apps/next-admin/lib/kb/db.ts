@@ -646,6 +646,35 @@ export interface VectorMatch extends MatchAttribution {
   similarity: number;
 }
 
+/**
+ * Titles of the documents a retrieval with this scope can return, newest first. Same source-level
+ * predicates as the two match RPCs (migration 0086: scope, space, status, sensitive, validity),
+ * written as a PostgREST filter -- keep the two in step. The chunk-level embed_model predicate is
+ * not applied: a title is only a hint for phrasing a query, never returned as evidence.
+ */
+export async function listVisibleSourceTitles(s: RetrievalScope, limit: number): Promise<string[]> {
+  const sb = getSupabaseWriteClient();
+  if (!sb || !s.scope.length) return [];
+  const at = s.asOf ?? new Date().toISOString();
+  const spaces = s.spaces ?? [KB_DEFAULT_SPACE_ID];
+  const others = spaces.filter((id) => id !== KB_DEFAULT_SPACE_ID);
+  let q = sb
+    .from("cs_knowledge_sources")
+    .select("title")
+    .in("organization_id", s.scope)
+    .eq("status", "active")
+    .or(`valid_from.is.null,valid_from.lte."${at}"`)
+    .or(`valid_to.is.null,valid_to.gt."${at}"`);
+  // COALESCE(space_id, default) = ANY(spaces): a NULL space is the default space.
+  q = spaces.includes(KB_DEFAULT_SPACE_ID)
+    ? q.or(`space_id.is.null,space_id.in.(${[KB_DEFAULT_SPACE_ID, ...others].join(",")})`)
+    : q.in("space_id", others);
+  q = s.includeSensitive ? q.or(`is_sensitive.eq.false,organization_id.eq.${s.viewer}`) : q.eq("is_sensitive", false);
+  const { data, error } = await q.order("updated_at", { ascending: false }).limit(limit);
+  if (error || !data) return [];
+  return data.map((r) => String(r.title ?? "").trim()).filter(Boolean);
+}
+
 /** Vector half of hybrid retrieval — cs_match_chunks RPC (six predicates applied inside). */
 export async function matchChunksVector(
   s: RetrievalScope,
