@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-17（續6）社群發文樣稿：撰寫頁底部照操作者的 Metricool 圖重做（發佈時間鈕＋一顆主按鈕＋▾ 選做法）；「自動發布清單」不再是撰寫頁的選項
+
+**操作者**：截了 Metricool 的發佈時間選擇和 ▾ 選單，說「貼文排程這些按鍵安排的邏輯有問題」「自動發布清單很怪、看不懂」「排進自動發布清單…這啥小」「再試一次」。
+- 底部只剩：發佈時間鈕（「2026年10月14日（三）12:30」，title＝設定發佈時間）＋主按鈕＋▾。▾ 是「選主按鈕要做什麼」，每項一行說明、選中打 ✓：存草稿（先存著，之後再排時間）／存到素材庫／送審（核准後照設定的時間發）／排程（到了設定的時間自動發）／立即發佈（按了就發，主按鈕再確認一次）。主按鈕字＝選的那項；品牌要審核且身分是編輯時預設「送審」。拿掉「固定時間｜自動發布清單」切換和清單名稱那排。
+- 發佈時間選擇照她的圖：上面時:分（‹ › 每次一小時／五分鐘），下面時區，再下面月曆，過去的日子灰掉。
+- 自動發布清單只在自己的分頁加貼文；分頁頂端改成一句例子（4 則常見問題、勾週一週三 10:00、輪流發）。
+- `check-social-mocks.py` `[action]`：選單項目的標籤＝按鈕裡第一個 `<b>`（項目還有一行說明）；新突變 label-outside-b。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/docs/social/mockups/check-social-mocks.py → 1 page(s), 0 finding(s)；--selftest → 47/47；sync-app-theme.py --check → up to date；render-views.mjs --mock → phone day + sheet 390 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 自審看圖：選單打開、選「立即發佈」後時間鈕變「現在就發」、時間選擇器四張截圖，pageerror 0
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=wmSeg|rotWhen|btnDraft|tzTxt | hits=0 -- 拿掉的 id 只在樣稿裡，已全清（v16b.py 斷言）；render-views／measure 用的選擇器沒動
+- ORACLE_WAIVED: 只改樣稿與樣稿檢查（docs，不上線）
+
+**剩**：操作者看圖。同意後才開 next-admin 實作卡。
 ## 2026-10-17（續4）Session 切換提醒不再一直叫 clear：hook 只在 ≥80% 出聲、每種提醒每 session 一次（已安裝）
 
 **根因**：2026-10-15 版 `suggest-compact.js` 每輪都注入一行，連 OK 時也寫「任務收尾仍首行建議 /clear」，50% 起又叫 /compact；agent 照做 → 每個回覆都提（量到 2026-10-15 起 73 次回覆裡 11 次首行提 clear／compact，`82559534` 一個 session 8 次）。操作者：「一直要我 clear 很煩」。

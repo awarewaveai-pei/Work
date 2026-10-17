@@ -683,20 +683,27 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
 .split{display:inline-flex}
 .split .btn-primary{border-radius:8px 0 0 8px;padding:8px 16px}
 .split .more{border-radius:0 8px 8px 0;padding:8px 8px;border-left:1px solid var(--accent-hover)}
-.pmenu{bottom:56px;right:12px;width:230px}
+.pmenu{bottom:56px;right:12px;width:290px}
+.pmenu .mi{display:grid;grid-template-columns:minmax(0,1fr) 18px;gap:0 8px;align-items:center}
+.pmenu .mi b{font-weight:600}
+.pmenu .mi small{grid-column:1;font-size:var(--fs-tag);color:var(--text-muted)}
+.pmenu .mi.on{background:var(--bg-hover)}
+.pmenu .mi.on::after{content:"✓";grid-column:2;grid-row:1/3;color:var(--accent);font-weight:700}
+.foot #dtBtn{margin-left:auto}
 .confirm{width:100%;background:var(--bg-subtle);border-left:4px solid var(--red);padding:6px 10px;border-radius:6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 /* date + time picker: app tokens, no native control */
-.dtp{position:fixed;z-index:30;flex-direction:row;gap:14px}
+.dtp{position:fixed;z-index:30;gap:8px;align-items:stretch}
+.ttop{display:flex;align-items:center;justify-content:center;gap:6px}
+.tstep{display:inline-flex;align-items:center;gap:2px}
+.tstep b{min-width:28px;text-align:center;font-size:var(--fs-h2)}
+.tzl{display:flex;align-items:center;justify-content:center;gap:4px}
+.tzl svg.i{width:14px;height:14px}
 .dhd{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px}
 .cal7{display:grid;grid-template-columns:repeat(7,34px);gap:2px;text-align:center}
 .cal7>span{font-size:var(--fs-tag);padding:4px 0}
 .cal7 button{width:34px;height:30px;padding:0;border:0;background:transparent}
 .cal7 button.today{color:var(--accent);font-weight:700}
-.cal7 button.on,.tgrid button.on{background:var(--accent);color:var(--btn-primary-text)}
-.dtime{display:flex;flex-direction:column;gap:6px;width:170px}
-.tgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:3px}
-.tgrid button{padding:3px 0;border:0;background:var(--bg-subtle)}
-.dtime .btn-primary{margin-top:auto}
+.cal7 button.on{background:var(--accent);color:var(--btn-primary-text)}
 .mswitch,.chanbtn,.seg .mk{display:none}
 
 @media (max-width:1100px){ .top b{display:none} :root{--pv-w:280px} .akpi{grid-template-columns:repeat(3,minmax(0,1fr))} }
@@ -756,7 +763,7 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
   body.pv .prev{display:flex}
   body.pv .ewrite{display:none}
   .foot{padding-bottom:16px}
-  .dtp{left:8px!important;right:8px;flex-direction:column}
+  .dtp{left:8px!important;right:8px}
   .lst,.lst .nx,.frow>span,.qrow{min-width:0;max-width:100%}
   .frow>span:not(.seg):not(.acts){flex:1 1 200px}
 }
@@ -844,11 +851,15 @@ mark.over{background:var(--badge-red-bg);color:var(--badge-red-text)}
         <div class="prev" id="prev"><div class="phd"><b>預覽</b><span class="muted tag" id="pvNote"></span></div><div class="screen" id="screen"></div></div>
         <div class="foot">
           <span class="hint" id="hint"></span>
-          <span class="seg" id="wmSeg"><button type="button" class="on" data-wm="fixed">固定時間</button><button type="button" data-wm="rot">自動發布清單</button></span>
-          <span class="when" id="fixedWhen"><button type="button" class="btn-secondary" id="dtBtn" data-i="calendar"><span id="dtTxt"></span></button><span class="muted tag" id="tzTxt"></span></span>
-          <span class="when" id="rotWhen" hidden></span>
-          <span class="split"><button type="button" class="btn-primary" id="btnMain">排程</button><button type="button" class="btn-primary more" id="btnMore" data-i="chevD" aria-label="其他做法" aria-expanded="false"></button></span>
-          <div class="pop menu pmenu" id="menu" hidden><button type="button" id="btnDraft" title="先存著，不排時間">存草稿</button><button type="button" id="btnReview" title="審核人核准後，照排定時間發">送審</button><button type="button" id="btnNow" title="不等排定時間，現在就發">立即發佈</button><button type="button" id="btnLib" title="整則（含圖）存到貼文素材庫，之後重複用">存到素材庫</button></div>
+          <button type="button" class="btn-secondary" id="dtBtn" data-i="calendar" title="設定發佈時間" aria-label="設定發佈時間"><span id="dtTxt"></span></button>
+          <span class="split"><button type="button" class="btn-primary" id="btnMain">排程</button><button type="button" class="btn-primary more" id="btnMore" data-i="chevD" aria-label="換一種做法" aria-expanded="false"></button></span>
+          <div class="pop menu pmenu" id="menu" hidden>
+            <button type="button" class="mi" data-act="draft"><b>存草稿</b><small>先存著，之後再排時間</small></button>
+            <button type="button" class="mi" data-act="library"><b>存到素材庫</b><small>整則（含圖）存起來，之後重複用</small></button>
+            <button type="button" class="mi" data-act="review"><b>送審</b><small>給審核人看，核准後照設定的時間發</small></button>
+            <button type="button" class="mi" data-act="schedule"><b>排程</b><small>到了設定的時間自動發</small></button>
+            <button type="button" class="mi" data-act="now"><b>立即發佈</b><small>不等時間，按了就發</small></button>
+          </div>
           <div class="confirm" id="confirmNow" hidden><span>會馬上發到所有選的頻道。發出去之後，這裡收不回來，要到各平台自己刪。</span><button type="button" class="danger" id="nowYes">確定發佈</button><button type="button" id="nowNo">取消</button></div>
         </div>
       </div>
@@ -1002,7 +1013,7 @@ pop("brandBtn","brandPop", ()=>{ $("brandPop").innerHTML = Object.entries(BRANDS
   $("brandPop").querySelectorAll("button").forEach(x=>x.onclick=()=>{ brand=x.dataset.brand; $("brandPop").hidden=true; chanOnly.clear(); selectedList=null; connectPf=null; checked.clear(); libSel.clear(); aAcct="all"; bestPf=null; $("bestBtn").classList.remove("on"); renderTz(); setView(view==="compose"?calView:view); }); });
 $("meSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ me=x.dataset.me; $("meSeg").querySelectorAll("button").forEach(y=>y.classList.toggle("on",y===x)); renderFrame(); if(view==="compose"&&ed&&ed.id!=null) openPost(ed.id); });
 const TZS = ["Asia/Taipei","Asia/Tokyo","Asia/Singapore","Europe/London","America/Los_Angeles"];
-function renderTz(){ $("tzNow").textContent=`${NOW} · ${B().tz}`; $("tzTxt").textContent=B().tz;
+function renderTz(){ $("tzNow").textContent=`${NOW} · ${B().tz}`;
   $("tzList").innerHTML = TZS.map(z=>`<label class="ck"><input type="radio" name="tz" value="${z}" ${z===B().tz?"checked":""}>${z}</label>`).join("");
   $("tzList").querySelectorAll("input").forEach(x=>x.onchange=()=>{ B().tz=x.value; renderTz(); $("tzPop").hidden=true; }); }
 
@@ -1152,7 +1163,7 @@ function renderLists(){
   const ls=B().lists;
   if(!ls.length){ side(`<div class="ptop"><h2>自動發布清單</h2></div>`+emptyHtml("repost","還沒有自動發布清單","清單裡的貼文會照順序，在勾好的時段一則一則發。","＋ 建第一個清單","newList")); $("newList").onclick=newList; return; }
   if(!ls.some(l=>l.id===selectedList)) selectedList=ls[0].id; const l=ls.find(x=>x.id===selectedList);
-  side(`<div class="ptop"><h2>自動發布清單</h2><span class="muted">照順序輪流發，發完最後一則再從第一則開始。</span><span class="r"><button type="button" class="btn-secondary" id="newList">＋ 新清單</button></span></div>
+  side(`<div class="ptop"><h2>自動發布清單</h2><span class="muted">例子：清單放 4 則常見問題，勾「週一、週三 10:00」。時間到就發下一則，4 則發完再從第 1 則開始。</span><span class="r"><button type="button" class="btn-secondary" id="newList">＋ 新清單</button></span></div>
   <div class="cols2"><div class="lcol">${ls.map(x=>`<button type="button" class="lst ${x.on?"":"off"} ${x.id===selectedList?"sel":""}" data-id="${x.id}"><b>${esc(x.name)}（${x.queue.length} 則）</b><span class="nx muted">${x.on?"進行中":"已暫停"} · 每週 ${x.slots.length} 個時段</span><span class="nx muted">下一則：${esc(nextRun(x))}</span></button>`).join("")}</div>
   <div class="ldet">
     <div class="frow"><span class="lab">名稱</span><input type="text" id="ldName" value="${esc(l.name)}" aria-label="清單名稱"></div>
@@ -1288,10 +1299,10 @@ const delayTxt = m => m ? (m<60 ? `${m} 分鐘後` : `${m/60} 小時後`) : "緊
 const effText = k => ed.custom[k] ?? ed.text;
 const effLen = k => [...effText(k)].length;
 const maxOf = id => PF[pfOf(id)].max;
-function blank(){ return {id:null,kind:null,state:"draft",text:"",accts:new Set(connected().slice(0,3).map(a=>a.id)),custom:{},tab:"all",imgs:[],parts:[],link:"",utm:false,alt:"",fmt:{},notes:"",date:"2026-10-16",time:"09:00",wm:"fixed",listId:null,open:new Set()}; }
+function blank(){ return {id:null,kind:null,state:"draft",text:"",accts:new Set(connected().slice(0,3).map(a=>a.id)),custom:{},tab:"all",imgs:[],parts:[],link:"",utm:false,alt:"",fmt:{},notes:"",date:"2026-10-16",time:"09:00",act:null,listId:null,open:new Set()}; }
 function openPost(id, o={}){
   const p=B().posts.find(x=>x.id===id); if(!p) return newPost();
-  ed=blank(); Object.assign(ed,{id:p.id,kind:p.kind||null,state:p.state,date:p.date||TODAY,time:p.time||"10:00",listId:p.listId||null,wm:p.state==="rotation"?"rot":"fixed"});
+  ed=blank(); Object.assign(ed,{id:p.id,kind:p.kind||null,state:p.state,date:p.date||TODAY,time:p.time||"10:00",listId:p.listId||null});
   if(p.kind==="article"){ ed.state="draft"; ed.time="12:00"; }
   else Object.assign(ed,{text:p.text,accts:new Set(p.accts),custom:{...(p.custom||{})},imgs:[...(p.imgs||[])],parts:(p.parts||[]).map(x=>({...x})),link:p.link||"",utm:!!p.utm,alt:p.alt||"",fmt:{...(p.fmt||{})},notes:p.notes||""});
   for(const k of ["link","alt","notes"]) if(ed[k]) ed.open.add(k);
@@ -1397,7 +1408,7 @@ function grid(imgs){ if(!imgs.length) return ""; const n=Math.min(imgs.length,4)
 function shell(id){
   const a=A(id), k=a.pf, t=effText(id), max=PF[k].max, f=ed.fmt[id]||"貼文";
   const mark = x => x ? esc([...x].slice(0,max).join("")) + ([...x].length>max ? `<mark class="over" title="超過 ${max} 字，這段發不出去">${esc([...x].slice(max).join(""))}</mark>` : "") : `<span class="muted">（文字會出現在這裡）</span>`;
-  const body = mark(t), when = ed.wm==="rot" ? "自動發布" : `${fmt(ed.date)} ${ed.time}`, imgs=ed.imgs;
+  const body = mark(t), when = ed.act==="now" ? "剛剛" : `${fmt(ed.date)} ${ed.time}`, imgs=ed.imgs;
   const lab = `<div class="shl">${pfb(k)}${esc(a.name)}${f!=="貼文"?" · "+f:""}</div>`, ic = ns => ns.map(n=>I(n)).join(""), av=avOf(a);
   const parts = ed.parts.filter(x=>x.text.trim()||x.img), cms = name => parts.map(x=>`<div class="cm"><b>${esc(name)}</b> ${esc(x.text)}</div>`).join("");
   const thread = (name, sub, icons) => { const all=[{html:body,imgs}, ...parts.map(x=>({html:mark(x.text),imgs:x.img?[x.img]:[],delay:x.delay}))];
@@ -1415,25 +1426,26 @@ function renderPreview(){ const ids = ed.tab==="all" ? [...ed.accts] : [ed.tab];
   $("pvNote").textContent = ids.length>1 ? `${ids.length} 個頻道，往下看` : "";
   $("screen").innerHTML = ids.length ? ids.map(shell).join("") : `<span class="muted">先在左邊勾選要發到哪些頻道。</span>`; }
 function refresh(){ renderPick(); renderTabs(); fillText(); renderMrow(); renderParts(); renderXtras(); renderPset(); renderCnt(); renderPreview(); renderFoot(); }
-function mainLabel(){ if(ro()) return "複製成新貼文"; if(ed.wm==="rot") return "加入自動發布清單"; if(ed.id==null||ed.kind==="article") return "加入行事曆"; if(ed.state==="draft"||ed.state==="error") return "排程"; return "更新"; }
+// the main button does the action picked in ▾ (default 排程; 送審 when the brand needs review and you are an editor)
+const ACTS = {draft:"存草稿",library:"存到素材庫",review:"送審",schedule:"排程",now:"立即發佈"};
+const defaultAct = () => B().review && me==="editor" && ed.state!=="scheduled" ? "review" : "schedule";
+const fmtWhen = () => { const x=d(ed.date); return `${x.getFullYear()}年${x.getMonth()+1}月${x.getDate()}日（${DOW[dowOf(ed.date)]}）${ed.time}`; };
 function renderFoot(){
-  $("wmSeg").querySelectorAll("button").forEach(x=>{ x.classList.toggle("on", x.dataset.wm===ed.wm); x.disabled=ro(); });
-  $("fixedWhen").hidden = ed.wm!=="fixed"; $("rotWhen").hidden = ed.wm!=="rot";
-  $("dtTxt").textContent = `${fmtLong(ed.date)} ${ed.time}`; $("dtBtn").disabled=ro(); $("tzTxt").textContent=B().tz;
-  if(ed.wm==="rot"){ const ls=B().lists; if(!ls.some(l=>l.id===ed.listId)) ed.listId=ls[0]?.id ?? null;
-    $("rotWhen").innerHTML = ls.length ? `<span class="seg">${ls.map(l=>`<button type="button" class="${l.id===ed.listId?"on":""}" data-l="${l.id}">${esc(l.name)}${l.on?"":"（暫停）"}</button>`).join("")}</span>` : `<span class="muted">還沒有清單，先到「自動發布清單」建一個。</span>`;
-    $("rotWhen").querySelectorAll("[data-l]").forEach(x=>x.onclick=()=>{ ed.listId=x.dataset.l; renderFoot(); }); }
-  $("btnMain").textContent = mainLabel(); $("btnMore").disabled = ro();
+  if(!ed.act) ed.act=defaultAct();
+  const now=ed.act==="now", noTime=ed.act==="library";
+  $("dtTxt").textContent = now ? "現在就發" : fmtWhen(); $("dtBtn").disabled = ro()||now||noTime; $("dtBtn").title = `設定發佈時間（${B().tz}）`;
+  $("btnMain").textContent = ro() ? "複製成新貼文" : ACTS[ed.act]; $("btnMore").disabled = ro();
+  $("menu").querySelectorAll(".mi").forEach(x=>x.classList.toggle("on", x.dataset.act===ed.act));
 }
-$("wmSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>{ ed.wm=x.dataset.wm; renderFoot(); renderPreview(); });
-$("dtBtn").onclick=()=>openDtp($("dtBtn"), ed.date, ed.time, (t,day)=>{ ed.time=t; if(day) ed.date=day; renderFoot(); renderPreview(); });
+$("menu").querySelectorAll(".mi").forEach(x=>x.onclick=()=>{ ed.act=x.dataset.act; $("menu").hidden=true; $("btnMore").setAttribute("aria-expanded","false"); renderFoot(); });
+$("dtBtn").onclick=()=>openDtp($("dtBtn"), ed.date, ed.time, (t,day)=>{ ed.time=t; if(day) ed.date=day; renderFoot(); renderPreview(); }, true);
 $("btnMore").onclick=()=>{ const open=$("menu").hidden; $("menu").hidden=!open; $("btnMore").setAttribute("aria-expanded",String(open)); };
-$("btnMain").onclick=()=>{ if(ro()) return duplicate(); save("scheduled"); };
-$("btnDraft").onclick=()=>{ $("menu").hidden=true; save("draft"); };
-$("btnReview").onclick=()=>{ $("menu").hidden=true; save("review"); };
-$("btnNow").onclick=()=>{ $("menu").hidden=true; $("confirmNow").hidden=false; };
+$("btnMain").onclick=()=>{ if(ro()) return duplicate(); const a=ed.act;
+  if(a==="now") return $("confirmNow").hidden=false;
+  if(a==="library") return saveToLibrary();
+  save({draft:"draft",review:"review",schedule:"scheduled"}[a]); };
 $("nowNo").onclick=()=>{ $("confirmNow").hidden=true; };
-$("btnLib").onclick=()=>{ $("menu").hidden=true; if(!ed.text.trim()) return say("貼文還是空的。", true); B().library.unshift({id:"L"+Date.now(),kind:"post",ph:ed.imgs[0],text:ed.text,accts:[...ed.accts]}); say("已存到貼文素材庫。"); };
+function saveToLibrary(){ if(!ed.text.trim()) return say("貼文還是空的。", true); B().library.unshift({id:"L"+Date.now(),kind:"post",ph:ed.imgs[0],text:ed.text,accts:[...ed.accts]}); say("已存到貼文素材庫。"); }
 $("nowYes").onclick=()=>{ $("confirmNow").hidden=true; ed.date=TODAY; ed.time="10:40"; save("published"); };
 function renderHint(){ if(!ed||view!=="compose") return; const p=ed.id!=null?B().posts.find(x=>x.id===ed.id):null; const h=[];
   if(p&&p.err) h.push(`<span class="err">${esc(p.err)}</span>`);
@@ -1453,8 +1465,6 @@ function save(state){
   let p = ed.id!=null ? B().posts.find(x=>x.id===ed.id) : null;
   if(!p || p.kind==="article"){ p={id:Date.now()}; B().posts.push(p); ed.id=p.id; ed.kind=null; }
   const data={text:ed.text,accts:[...ed.accts],custom:{...ed.custom},imgs:[...ed.imgs],parts:ed.parts.map(x=>({...x})),link:ed.link,utm:ed.utm,alt:ed.alt,fmt:{...ed.fmt},notes:ed.notes,err:null};
-  if(state==="scheduled" && ed.wm==="rot"){ const l=B().lists.find(x=>x.id===ed.listId); if(!l) return say("還沒有自動發布清單，先建一個。", true);
-    if(p.listId!==l.id) l.queue.push(ed.text); Object.assign(p,data,{date:"",time:"",state:"rotation",listId:l.id}); addLog("加入自動發布清單",p,l.name); openPost(p.id); return say(`已加到「${esc(l.name)}」最後。`); }
   Object.assign(p,data,{date:ed.date,time:ed.time,state,listId:null});
   if(state==="published") p.url="https://bsky.app/profile/"+brand+"/post/"+Date.now().toString(36);
   addLog({draft:"存草稿",review:"送審",scheduled:"排程",published:"立即發佈"}[state],p,state==="scheduled"?`${fmt(ed.date)} ${ed.time}`:"");
@@ -1471,17 +1481,18 @@ $("pvSeg").querySelectorAll("button").forEach(x=>x.onclick=()=>setPv(x.dataset.p
 
 // date + time picker: a month grid and a time grid, in the app's tokens
 let dtState=null;
-function openDtp(anchor, day, time, pick){ dtState={day, time, month:(day||TODAY).slice(0,7), pick, anchor}; renderDtp(); }
+function openDtp(anchor, day, time, pick, withDate){ dtState={day:withDate?(day||TODAY):null, time, month:(day||TODAY).slice(0,7), pick, anchor}; renderDtp(); }
 function renderDtp(){ const s=dtState, el=$("dtp"); const [y,m]=s.month.split("-").map(Number); const first=`${s.month}-01`; const dim=new Date(y,m,0).getDate();
   const days = s.day ? `<div class="dcal"><div class="dhd"><button type="button" class="ibtn" data-mn="-1" aria-label="上個月">${I("chevL")}</button><b>${y} 年 ${m} 月</b><button type="button" class="ibtn" data-mn="1" aria-label="下個月">${I("chevR")}</button></div><div class="cal7">${DOW.map(x=>`<span class="muted">${x}</span>`).join("")}${"<span></span>".repeat(dowOf(first))}${[...Array(dim)].map((_,i)=>{ const v=`${s.month}-${String(i+1).padStart(2,"0")}`; return `<button type="button" class="${v===s.day?"on":""} ${v===TODAY?"today":""}" data-day="${v}" ${v<TODAY?"disabled":""}>${i+1}</button>`; }).join("")}</div></div>` : "";
   const [hh,mm]=s.time.split(":");
-  el.innerHTML = days + `<div class="dtime"><span class="muted tag">幾點</span><div class="tgrid">${[...Array(17)].map((_,i)=>{ const h=String(i+7).padStart(2,"0"); return `<button type="button" class="${h===hh?"on":""}" data-h="${h}">${h}</button>`; }).join("")}</div><span class="muted tag">幾分</span><div class="tgrid">${["00","15","30","45"].map(x=>`<button type="button" class="${x===mm?"on":""}" data-m="${x}">${x}</button>`).join("")}</div><button type="button" class="btn-primary" id="dtOk">好</button></div>`;
+  const step = (k,n) => `<span class="tstep"><button type="button" class="ibtn" data-${k}="-1" aria-label="${k==="h"?"早一小時":"早五分鐘"}">${I("chevL")}</button><b>${n}</b><button type="button" class="ibtn" data-${k}="1" aria-label="${k==="h"?"晚一小時":"晚五分鐘"}">${I("chevR")}</button></span>`;
+  el.innerHTML = `<div class="ttop">${step("h",hh)}<b>:</b>${step("m",mm)}</div><div class="muted tag tzl">${I("clock")}${esc(B().tz)}</div>` + days + `<button type="button" class="btn-primary" id="dtOk">好</button>`;
   el.hidden=false; const r=s.anchor.getBoundingClientRect(); const h=el.offsetHeight;
   el.style.left = Math.max(8, Math.min(r.left, innerWidth-el.offsetWidth-8))+"px"; el.style.top = (r.top-h-8 > 8 ? r.top-h-8 : r.bottom+8)+"px";
   el.querySelectorAll("[data-mn]").forEach(x=>x.onclick=()=>{ const t=new Date(y,m-1+(+x.dataset.mn),1); s.month=iso(t).slice(0,7); renderDtp(); });
   el.querySelectorAll("[data-day]").forEach(x=>x.onclick=()=>{ s.day=x.dataset.day; renderDtp(); });
-  el.querySelectorAll("[data-h]").forEach(x=>x.onclick=()=>{ s.time=x.dataset.h+":"+mm; renderDtp(); });
-  el.querySelectorAll("[data-m]").forEach(x=>x.onclick=()=>{ s.time=hh+":"+x.dataset.m; renderDtp(); });
+  el.querySelectorAll("[data-h]").forEach(x=>x.onclick=()=>{ s.time=String((+hh+24+(+x.dataset.h))%24).padStart(2,"0")+":"+mm; renderDtp(); });
+  el.querySelectorAll("[data-m]").forEach(x=>x.onclick=()=>{ s.time=hh+":"+String((+mm+60+5*(+x.dataset.m))%60).padStart(2,"0"); renderDtp(); });
   $("dtOk").onclick=()=>{ el.hidden=true; s.pick(s.time, s.day); };
 }
 document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ for(const id of ["dtp","menu","filterPop","tzPop","samplePop","brandPop","bulkMenu","chanMenu"]) $(id).hidden=true; } });

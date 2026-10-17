@@ -11,7 +11,8 @@ Rules (operator, 2026-09-24 .. 2026-10-14), each finding starts with its [code]:
   [colour]/[inline-colour]/[svg-colour] no colour of the mock's own (hex, functions, named); platform marks are app tokens
     (--p-* in globals.css since 2026-10-15, so the product page and the mock read the same ones)
   [inline-font] no font sizes in style="" attributes    [sample] the page says it is a 樣稿
-  [action] the four post actions are real buttons        [tags]/[unclosed]/[self-close] markup balances
+  [action] the four post actions are real buttons (label = the whole text, or the first <b> of a menu item that also
+    carries a one-line description)                       [tags]/[unclosed]/[self-close] markup balances
   rendered (measure-mock.mjs, Playwright at 1280x660; C13 / GAP_REPORT U1, U3):
   [chips] at most CHIP_MAX pill-shaped boxes on any one screen (opening screen + every [data-view])
   [card-thumb] every week card has a thumbnail element (.cthumb), and the opening week shows cards at all
@@ -126,6 +127,7 @@ class Markup(html.parser.HTMLParser):
     def __init__(self, out: list):
         super().__init__(convert_charrefs=True)
         self.out, self.stack, self.buttons, self.btn, self.depth_btn = out, [], [], [], 0
+        self.btn_b, self.in_b = None, False   # first <b> inside a button = its label when the button also has a description
         self.text, self.scripts, self.styles, self.mode = [], [], [], None
 
     def _attrs(self, tag, attrs):
@@ -147,7 +149,9 @@ class Markup(html.parser.HTMLParser):
         if tag == "button":
             self.depth_btn += 1
             if self.depth_btn == 1:
-                self.btn = []
+                self.btn, self.btn_b = [], None
+        if tag == "b" and self.depth_btn == 1 and self.btn_b is None:
+            self.btn_b, self.in_b = [], True
         if tag not in VOID:
             self.stack.append((tag, self.getpos()[0]))
 
@@ -159,10 +163,14 @@ class Markup(html.parser.HTMLParser):
     def handle_endtag(self, tag):
         if tag in ("script", "style"):
             self.mode = None
+        if tag == "b" and self.in_b:
+            self.in_b = False
         if tag == "button" and self.depth_btn:
             self.depth_btn -= 1
             if not self.depth_btn:
                 self.buttons.append(" ".join("".join(self.btn).split()))
+                if self.btn_b:
+                    self.buttons.append(" ".join("".join(self.btn_b).split()))
         if tag in VOID:
             return
         if not self.stack or self.stack[-1][0] != tag:
@@ -184,6 +192,8 @@ class Markup(html.parser.HTMLParser):
             self.text.append(data)
             if self.depth_btn:
                 self.btn.append(data)
+                if self.in_b:
+                    self.btn_b.append(data)
 
 
 def findings(name: str, page: str, want: str | None = None) -> list[str]:
@@ -357,7 +367,8 @@ def selftest() -> int:
         "two-markers": (src[:style_end] + sync.START + sync.END + "\n" + src[style_end:], "[markers]"),
         "no-sample": (src.replace("樣稿", "示範"), "[sample]"),
         "no-action": (src.replace(">立即發佈<", ">馬上發<", 1), "[action]"),
-        "commented-action": (src.replace(">立即發佈</button>", ">馬上發</button><!-- <button>立即發佈</button> -->", 1), "[action]"),
+        "commented-action": (src.replace("<b>立即發佈</b>", "<b>馬上發</b><!-- <b>立即發佈</b> -->", 1), "[action]"),
+        "label-outside-b": (src.replace("<b>立即發佈</b>", "<span>立即發佈</span>", 1), "[action]"),
         "mismatch": (src.replace("</header>", "", 1), "[tags]"),
         "unclosed-tail": (src[:last_div] + src[last_div + len("</div>"):], "[unclosed]"),
         "self-close": (src.replace("<main>", "<main><span/>", 1), "[self-close]"),
