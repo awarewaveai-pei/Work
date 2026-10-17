@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-17（續20）Soulful 課程類第三次考試：25/30（83.3%，上次 20、第一次 17）沒過；危險誤答 0、該轉真人 10/10；剩下 5 題都是檢索排序或分類
+
+**考試**（操作者按「開始考試」，11:38:09Z → 11:39:11Z，next-admin 23305526f；99 次 AI 呼叫 0.3705 USD）：graduation failed n=30 passRate=0.833 dangerous=0 recall=1，原因只剩「通過率不足」。
+**變好的**：退錢 → refund、判斷憂鬱症 → medical_judgment（續1 兩個敏感意圖）；拔刺、創傷＋回到原點、回到原點理論、壓力分成幾個階段（續5 翻譯帶頁名）；換上的喜悅卡在做什麼／可以帶走什麼（續5 考題）。
+**仍失敗（5）**：
+- M1 正確段落沒進 AI 拿到的前 4 段（2）：#15 喜悅卡材料（只拿到印刷範本那段，回答「沒有提到繪圖工具」）；#25 五生適合什麼樣的人（最高 0.646 但對象段落排 16，回答「資料沒有說明適合對象」）。
+- M2 低於門檻 0.40 → 轉真人（2）：#29 回到原點適合什麼樣的人（0.400，對象段落排 7）；#2 老師倦怠（0.359，翻成 fatigued，對象段落排 17）。
+- m1 分類（1）：#26「五生這個理論是誰提出的？」→ other（上次分到 courses_services 並答對；分類器說明沒有「理論、由來」）。
+**判斷**：M1、M2 同一類＝短而籠統的問題（適合誰、用什麼材料）在長頁面裡分不出哪一段，正確段落排不進前 4。候選＝每段加頁名＋小標前綴後重新嵌入（`cs_knowledge_chunks.contextual_prefix` 568 塊全空），TASKS「知識庫：清單散在多塊時拿不全」補上這 4 題數據。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql cs_intents.metadata.graduation（failed n=30 passRate=0.833 dangerous=0 recall=1）逐題 results；ai_call_logs 99 筆 0.3705 USD；容器內正式翻譯＋cs_match_chunks／keyword RRF 量 4 題（唯讀） | exit=0 | ms=600000
+- REVIEW_WAIVED: NA -- 考試＋量測，無程式改動
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-10-17（續19）Messenger 真測通過：三態（轉真人沒人回＝照常回答；工作人員公開回覆後 30 分鐘內靜默）＋自傷、威脅回覆與 Telegram 通知（next-admin 23305526f）
 
 **真測**（John Doe／Messenger，Soulful 對話 13，open、已轉真人；chatwoot messages 91–104、`cs_ai_replies`、`cs_conversation_staff_replies`）：
