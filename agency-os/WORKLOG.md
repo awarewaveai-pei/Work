@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-17（續11）next-admin `fbf84da50` 手動部署（操作者「go ahead: deploy next-admin now」）＋退款／醫療判斷真測通過；「我是不是憂鬱症」沒回＝真人接手中靜默，不是關鍵字
+
+**範圍**：`32a58d565..fbf84da50` 的 next-admin：`36ae1bf40`（意圖轉真人回覆）、`0ffd277c4`（翻譯帶知識庫頁名，續5）、`5602722ed`（另一 session：真人接手中的危機訊息回求助專線，migration 0104 已在 prod，`to_regclass` 確認）。`check-deploy-drift` behind 15、compose 變數無漂移、無 DEPLOY_HOLD。
+**結果**：`sg-deploy.sh next-admin` exit 0：test gate 272 files／2517 pass，healthy 9 秒，HTTP smoke 5/5，`.deployed-commit=fbf84da50`（10:02:15Z）；build 內有 `visibleTitles`；部署後 log error 0；`playwright-runner -Mode smoke` 26/0/6。
+**真測**（John Doe／Messenger；對話先用 bot token `toggle_status` 結案，主機 `/tmp/cw-watch.sh` 在 bot 回覆 60 秒後再結案，最多 2 次）：
+- 「我想退錢」（msg 70）→ `refund` 0.99 handoff → msg 72「可以的，麻煩您先留下想退款的原因，以及報名的課程名稱和日期…」✅。沒接問名字：聯絡人已有名字（pei），`handoffAckText` askName=false，設計如此。
+- 「可以幫我判斷我是不是憂鬱症嗎？」（對話 12 msg 77）→ `medical_judgment` 0.98 handoff → msg 80「這需要醫師的專業判斷，建議您先諮詢醫師或身心科…」✅。
+- 「我想死」（msg 73，對話 11 真人接手中）→ msg 74 危機求助專線（5602722ed 生效）。
+- 「我是不是憂鬱症」（msg 75，10:11:13Z）沒回：對話 11 在退款轉真人後是 open（真人接手中），引擎靜默（`orchestrator.ts` human_owns_thread；只有危機訊息例外）；`cs_ai_replies` 無該則。不是關鍵字：正式分類 prompt 各 2 次——我是不是憂鬱症／我是不是有憂鬱症／我這樣算焦慮症嗎／我覺得我有過動／抗憂鬱藥可以不吃嗎 → 全 `medical_judgment` 0.95；我想退錢／退費／可以退款嗎 → 全 `refund` 0.95–0.99。手順問題：我請操作者「等一分鐘」，watcher 在 10:11:33Z 才結案，操作者 10:11:13Z 已送出。
+- 「課程內容」（msg 81，對話 12 接手中）沒回，同理；之後新對話 13「課程內容」→ `faq:courses` auto_sent。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin`（2517 pass、healthy 9s、smoke 5/5、.deployed-commit=fbf84da50） | exit=0 | ms=330000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`playwright-runner.ps1 -Mode smoke -SkipInstall` 26/0/6 | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=SSH | cmd=chatwoot psql messages 68–82（contact 6）＋supabase cs_ai_replies（refund 0.99、medical_judgment 0.98、faq:courses）；容器內正式分類 prompt 8 句 × 2 | exit=0 | ms=20000
+- REVIEW_WAIVED: NA -- 部署＋真測，程式已在各自 commit 審過（Codex partialreview-a6f3a261／69a3cb55；5602722ed 由其 session 審）
+- BUGHUNT_WAIVED: NA -- 部署＋真測，無程式改動
+
+**待做**：操作者按「開始考試」（課程類），結果另記一條。
+**rollback**：主機 `/root/lobster-phase1/scripts/rollback-phase1.sh`（快照 `lobster-phase1-next-admin:rollback-20261017-095749`），或 `git revert` 後重新部署。
 ## 2026-10-17（續10）社群發文樣稿：自動化流程兩層（品牌通用規則＋單則另外設，單則優先）；ADR 016 §5 定案 6
 
 **操作者**：「自動化流程照兩層畫：品牌通用規則＋單則貼文另外設，單則的優先。」寫進 ADR 016 §5「操作者定案」第 6 條。
