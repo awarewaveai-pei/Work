@@ -599,3 +599,30 @@ export async function releaseCrisisHolding(organizationId: string, conversationI
     .eq("claim_id", claimId);
   return !error;
 }
+
+/**
+ * Records a public staff reply in the conversation (migration 0108 cs_record_staff_reply; the database
+ * clock, never moves backwards). False = not recorded; the caller reports it.
+ */
+export async function recordStaffReply(organizationId: string, conversationId: string): Promise<boolean> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return false;
+  const { error } = await sb.rpc("cs_record_staff_reply", { p_organization_id: organizationId, p_conversation_id: conversationId });
+  return !error;
+}
+
+/**
+ * Whether a staff member replied in public in the conversation within `seconds` (0108
+ * cs_staff_replied_within, database clock). "error" is returned, not thrown: the caller decides.
+ */
+export async function staffRepliedWithin(organizationId: string, conversationId: string, seconds: number): Promise<boolean | "error"> {
+  const sb = getSupabaseWriteClient();
+  if (!sb) return "error";
+  const { data, error } = await sb.rpc("cs_staff_replied_within", {
+    p_organization_id: organizationId,
+    p_conversation_id: conversationId,
+    p_seconds: seconds,
+  });
+  if (error || typeof data !== "boolean") return "error";
+  return data;
+}

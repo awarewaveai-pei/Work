@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-17（續17）客服三態：轉真人後機器人只在「工作人員 30 分鐘內公開回過話」時靜默，其他時候照常回答＋migration 0108 已套 prod
+
+**操作者**：「一下轉自動回 一下轉AI 一下轉真人 好像系統無法處理這種接續的變化」→ 同意三條規則、N = 30 分鐘：「照這個做：migration 0108、程式、測試、審查，做完套 migration 並部署」。
+**根因**：webhook 把 Chatwoot status open（轉過真人）一律當「真人在管」→ 整個對話靜默到結案；Soulful 帳號 `auto_resolve_after` 是 null（`lib/cs/chatwoot-baseline.ts` 預計 48h，但每日排程未勾）→ 一次退款轉真人後，之後所有問題都沒人回（Messenger 真測：「課程內容」msg 81）。
+**規則**（`lib/cs/config.ts` `CS_STAFF_ACTIVE_WINDOW_SECONDS=1800`）：① 工作人員 30 分鐘內在該對話有公開回覆 → 靜默（危機、威脅照舊）② 其他時候（含已轉真人但沒人回）→ 照常：常見問答 → AI → 轉真人 ③ 私人筆記不算。
+**做了**：
+- 事實：Chatwoot 把 outgoing 訊息也送 AgentBot webhook（容器內 `app/listeners/agent_bot_listener.rb` message_created、`message_filter_helpers.rb` `webhook_sendable?` = incoming||outgoing||template），工作人員 `sender.type='user'`、帶 `private`。
+- migration `0108_cs_conversation_staff_replies.sql`：表（組織、對話、last_public_reply_at）、`cs_record_staff_reply`（DB now()、GREATEST）、`cs_staff_replied_within`（DB 時鐘判斷）；表權限明寫 service_role only，並補上 0104 表同樣缺口。
+- webhook：工作人員公開回覆 → 驗 token 後**先寫入再回應**（Codex：放 after() 會讓緊接的客人訊息看不到）；客人訊息在 open 對話 → 問 30 分鐘內有無公開回覆，讀取失敗＝當作有（維持舊行為，不插話）；沒有 → 走正常 claim／常見問答／AI。
+- 正常流程最前面：無名聯絡人回答「怎麼稱呼您」→ 先收名字（記 suppressed、完成 claim），不送 AI。
+- 引擎靜默旗標由 `conversationStatus === "open"` 改為 webhook 決定的 `staffActive`（`lib/cs/types.ts` InboundMessage）。
+**沒變**：課程類未通過考試 → AI 回答仍是給工作人員的草稿，客人收到「已收到」。**殘留**：Chatwoot 同一瞬間送達的兩則 webhook 無先後保證；Soulful 自動結案仍關（操作者勾 `/ops/schedules`「Chatwoot 基本設定檢查」才會套 48h）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=拋棄式 postgres:15-alpine（service_role BYPASSRLS 同 prod）：0104→0107→0108；never/just/other conv/31 分鐘後/不倒退/grants/RLS/anon 拒絕；down（表與 ledger 清掉）→ 重套 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`node scripts/apply-db-migration.mjs 0108` → APPLY_OK；psql：table、rls t、anon 無權（含 0104 TRUNCATE）、service_role 有、ledger 0108；PostgREST rpc cs_staff_replied_within 200 false（唯讀） | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run（273 files／2537 pass；route 三態 7、orchestrator 2） | exit=0 | ms=20102
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=staffActive|staffRepliedWithin|recordStaffReply|cs_staff_replied_within|cs_record_staff_reply|CS_STAFF_ACTIVE_WINDOW_SECONDS | hits=49（本次程式／測試／migration 檔＋oracle 報告）；另查 conversationStatus 讀者：只剩 types.ts、route.ts 傳入，引擎不再讀
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（`reports/oracle/2026-10-17-partialreview-7f44408f.md`：工作人員回覆在 after() 才寫 → 收，先寫入再回應＋測試釘住順序）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD）
+  - db-expert 審 0108：0 critical／0 major；收 2 minor（表權限明寫＋補 0104、GREATEST 註解）
+- ORACLE_WAIVED: 修正為把一個 await 移出 after() 並由指名測試鎖住順序，不跑第二輪
+
+**rollback**：先部署舊程式（`git revert`，回到 open＝靜默），再手動跑 `0108_cs_conversation_staff_replies.down.sql`（psql as supabase_admin）。
 ## 2026-10-17（續16）社群 V1.5 兩件待決定案：智慧連結網址 social.aware-wave.com/smartlink/名字；報表 V1 只做 PDF
 
 **操作者**：「智慧連結的網址：可以用 social.aware-wave.com/smartlink/名字 嗎?」「報表先只做 PDF，PPT, excel 放到下一版」。

@@ -126,6 +126,13 @@ export const CS_CRISIS_HOLDING_WINDOW_SECONDS = 30 * 60;
 /** A claim whose send was never confirmed stops blocking after this long (a send in flight; 0104). */
 export const CS_CRISIS_HOLDING_INFLIGHT_SECONDS = 120;
 
+/**
+ * The AI stays silent in a conversation while a staff member has replied there in public within this
+ * window; otherwise it answers as usual, also in a conversation already handed to a human (operator
+ * decision 2026-10-17, N = 30 minutes; state in migration 0108). Private notes do not count.
+ */
+export const CS_STAFF_ACTIVE_WINDOW_SECONDS = 30 * 60;
+
 /** Sensitive intents → always handoff (broader than red-line; includes complaints/escalation). */
 export const CS_SENSITIVE_KEYWORDS = [
   ...CS_RED_LINE_KEYWORDS,

@@ -13,6 +13,11 @@ export interface InboundMessage {
   isFromAgent: boolean;
   /** Conversation status from Chatwoot ('pending' | 'open' | 'resolved'). */
   conversationStatus: string;
+  /**
+   * A staff member replied in public in this conversation within CS_STAFF_ACTIVE_WINDOW_SECONDS: the
+   * engine stays silent. Decided once, by the webhook (migration 0108); "open" alone no longer silences.
+   */
+  staffActive: boolean;
   /** Whether the org is currently within configured business hours. */
   withinBusinessHours: boolean;
 }

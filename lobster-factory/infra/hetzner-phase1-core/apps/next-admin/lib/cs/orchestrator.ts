@@ -61,8 +61,9 @@ async function persist(message: InboundMessage, decision: CsDecision, answerLeve
 }
 
 export async function handleInbound(message: InboundMessage): Promise<CsDecision> {
-  // Silence rules: never reply to an agent's own message, or when a human already owns the thread.
-  if (message.isFromAgent || message.conversationStatus === "open") {
+  // Silence rules: never reply to an agent's own message, or while a staff member is talking in the
+  // conversation (a public reply within CS_STAFF_ACTIVE_WINDOW_SECONDS; decided by the webhook).
+  if (message.isFromAgent || message.staffActive) {
     return { action: "suppressed", retrievedChunkIds: [], toolCalls: [], traceMeta: { reason: "human_owns_thread" } };
   }
 

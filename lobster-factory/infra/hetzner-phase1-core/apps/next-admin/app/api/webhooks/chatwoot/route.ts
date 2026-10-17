@@ -2,10 +2,10 @@ import { after, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { handleInbound } from "@/lib/cs/orchestrator";
 import { loadCis } from "@/lib/cs/cis";
-import { claimCrisisHolding, claimMessage, completeClaim, confirmCrisisHolding, findOrganizationIdByChatwootAccountId, recordReply, releaseCrisisHolding } from "@/lib/cs/db";
+import { claimCrisisHolding, claimMessage, completeClaim, confirmCrisisHolding, findOrganizationIdByChatwootAccountId, recordReply, recordStaffReply, releaseCrisisHolding, staffRepliedWithin } from "@/lib/cs/db";
 import { getContactName, handoffToHuman, listMessages, sendPrivateDraft, sendReply, updateContactName, verifyWebhookToken, loadWebhookSecret } from "@/lib/cs/chatwoot-client";
 import { crisisHoldingText, handoffAckText, isCrisisAck, isNameQuestionAck, isPlaceholderContactName, parseNameReply, threatReplyText } from "@/lib/cs/handoff-ack";
-import { CS_CRISIS_HOLDING_INFLIGHT_SECONDS, CS_CRISIS_HOLDING_WINDOW_SECONDS } from "@/lib/cs/config";
+import { CS_CRISIS_HOLDING_INFLIGHT_SECONDS, CS_CRISIS_HOLDING_WINDOW_SECONDS, CS_STAFF_ACTIVE_WINDOW_SECONDS } from "@/lib/cs/config";
 import { hitsCrisis, hitsThreat } from "@/lib/cs/autonomy";
 import { alertOperatorOfCrisis } from "@/lib/cs/crisis-alert";
 import { buildOperatorTelegramNotifier } from "@/lib/ops-inbox/notify/telegram";
@@ -40,6 +40,7 @@ interface ChatwootMessageCreatedPayload {
   id?: number | string;
   content?: string;
   message_type?: "incoming" | "outgoing" | number;
+  private?: boolean;
   // For an incoming message the sender is the contact (Contact#webhook_data).
   sender?: { type?: string; id?: number; name?: string };
   account?: { id?: number };
@@ -54,14 +55,21 @@ function isIncoming(p: ChatwootMessageCreatedPayload): boolean {
   return p.message_type === "incoming" || p.message_type === 0;
 }
 
+/** A staff member's reply the customer sees (Chatwoot posts outgoing messages to the bot too; sender.type 'user' = staff). */
+function isStaffPublicReply(p: ChatwootMessageCreatedPayload): boolean {
+  return (p.message_type === "outgoing" || p.message_type === 1) && p.sender?.type === "user" && p.private !== true;
+}
+
 export async function POST(req: Request): Promise<Response> {
   const body = await readWebhookBody(req);
   if (body.ok === false) return NextResponse.json({ ok: false, error: body.error }, { status: body.status });
   const payload = body.parsed as ChatwootMessageCreatedPayload;
 
-  // Only "a customer said something" triggers the engine — agent replies, status/typing/other events
-  // are ignored here (Chatwoot fires many event types on the same webhook URL).
-  if (payload.event !== "message_created" || !isIncoming(payload)) {
+  // Only "a customer said something" triggers the engine, and a staff member's public reply is
+  // recorded (it decides when the AI stays silent, migration 0108). Bot replies, private notes,
+  // status/typing/other events are ignored (Chatwoot fires many event types on the same webhook URL).
+  const staffReply = payload.event === "message_created" && isStaffPublicReply(payload);
+  if (payload.event !== "message_created" || (!isIncoming(payload) && !staffReply)) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
@@ -86,18 +94,32 @@ export async function POST(req: Request): Promise<Response> {
   const conversationId = String(payload.conversation?.id ?? "");
   if (!messageId || !conversationId) return NextResponse.json({ ok: false, error: "missing_ids" }, { status: 400 });
 
+  // Recorded BEFORE answering, not in after(): a customer message right behind it must already see it
+  // (Codex 2026-10-17 partialreview-7f44408f). One RPC, well inside Chatwoot's 5 s. Residual: two
+  // webhooks Chatwoot delivers at the same instant are not ordered. A failed write is reported, not
+  // retried (the next staff reply records again).
+  if (staffReply) {
+    if (!(await recordStaffReply(organizationId, conversationId))) {
+      Sentry.captureMessage("cs staff reply not recorded", { extra: { organizationId, conversationId, messageId } });
+    }
+    return NextResponse.json({ ok: true, recorded: "staff_reply" });
+  }
+
   // Same silence rule handleInbound applies internally (orchestrator.ts) — computed here, from the
-  // raw payload, and checked BEFORE claimMessage/reserveCsCredit, not after. Every conversation a
-  // human has ever taken over (conversationStatus 'open') hits this on EVERY subsequent customer
-  // message — that's the normal, common case after any handoff, not an edge case. Checking only
-  // inside handleInbound (as this route did before) meant claimMessage still wrote a permanent fake
-  // 'handoff' audit row and reserveCsCredit still debited a real credit for AI work that never ran.
+  // raw payload, and checked BEFORE claimMessage/reserveCsCredit, not after, so a silenced message
+  // writes no audit row and debits no credit.
+  // Operator rules 2026-10-17 (WORKLOG 續16): the AI is silent only while a staff member is talking --
+  // a public reply in this conversation within CS_STAFF_ACTIVE_WINDOW_SECONDS. A conversation handed
+  // to a human that nobody has answered yet is answered as usual (FAQ -> AI -> human). Unknown (the
+  // read failed) keeps the previous rule for an open conversation: silent, never talking over a person.
   const isFromAgent = payload.sender?.type === "agent_bot" || payload.sender?.type === "user";
+  if (isFromAgent) return NextResponse.json({ ok: true, ignored: true, reason: "from_agent" });
   const conversationStatus = payload.conversation?.status ?? "pending";
-  if (isFromAgent || conversationStatus === "open") {
+  const staffActive = conversationStatus === "open" && (await isStaffActive(organizationId, conversationId));
+  if (staffActive) {
     // The one exception: a nameless contact may be answering the handoff acknowledgement's name question.
     const contactId = payload.sender?.id;
-    if (!isFromAgent && typeof contactId === "number" && isPlaceholderContactName(payload.sender?.name)) {
+    if (typeof contactId === "number" && isPlaceholderContactName(payload.sender?.name)) {
       const reply = { organizationId, conversationId, messageId: Number(messageId), contactId, text: payload.content ?? "" };
       after(() => captureName(reply).catch((err) => Sentry.captureException(err, { extra: { organizationId, conversationId, messageId } })));
     }
@@ -105,7 +127,7 @@ export async function POST(req: Request): Promise<Response> {
     // then the customer gets one reply per kind per window: the help lines when the message is about
     // self-harm (they already say a staff member will reply), else the threat reply.
     const customerText = payload.content ?? "";
-    const pages = isFromAgent ? [] : keywordPages(customerText);
+    const pages = keywordPages(customerText);
     if (pages.length) {
       after(async () => {
         const cis = await loadCis(organizationId).catch(() => undefined);
@@ -138,6 +160,7 @@ export async function POST(req: Request): Promise<Response> {
     text: payload.content ?? "",
     isFromAgent,
     conversationStatus,
+    staffActive,
     // Business-hours gating is a documented seam, not yet computed anywhere (BUILD_PLAN §5 U1 note:
     // "AI 24h 回，非決策") — always true until a per-tenant schedule exists.
     withinBusinessHours: true,
@@ -163,6 +186,19 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
   if (keywordPaged.length) {
     const chatwoot = await chatwootConfigOrNone(organizationId);
     for (const kind of keywordPaged) await pageCrisis(organizationId, conversationId, chatwoot, kind);
+  }
+  // A nameless contact's reply to the acknowledgement's name question is a name, not a question:
+  // taken here (no AI, no credit) now that a handed-off conversation is no longer silent by itself.
+  if (typeof contact.id === "number" && isPlaceholderContactName(contact.name)) {
+    const named = await captureName({ organizationId, conversationId, messageId: customerMessageId, contactId: contact.id, text: inbound.text }).catch((err) => {
+      Sentry.captureException(err, { extra: { organizationId, conversationId, messageId, step: "capture_name" } });
+      return false;
+    });
+    if (named) {
+      await recordReply({ ...claim, action: "suppressed", retrievedChunkIds: [] });
+      await completeClaim(claim);
+      return;
+    }
   }
   const cis = await loadCis(organizationId);
 
@@ -342,15 +378,16 @@ async function pageCrisis(organizationId: string, conversationId: string, chatwo
  * contact after this webhook was sent. Residual: a rename landing between that read and the write
  * (Chatwoot has no conditional update) is overwritten.
  */
-async function captureName(reply: { organizationId: string; conversationId: string; messageId: number; contactId: number; text: string }): Promise<void> {
+/** True only when the contact was renamed. */
+async function captureName(reply: { organizationId: string; conversationId: string; messageId: number; contactId: number; text: string }): Promise<boolean> {
   const { organizationId, conversationId } = reply;
   const name = parseNameReply(reply.text);
-  if (!name) return;
+  if (!name) return false;
   const cis = await loadCis(organizationId);
-  if (!cis.chatwoot) return;
+  if (!cis.chatwoot) return false;
   // T27: a blocking mode makes no automated writes.
   const gate = await checkProductionChangeAllowed(getSupabaseWriteClient(), organizationId);
-  if (!gate.allowed) return;
+  if (!gate.allowed) return false;
   let previous;
   try {
     previous = (await listMessages(organizationId, cis.chatwoot, conversationId, { before: reply.messageId }))
@@ -362,11 +399,22 @@ async function captureName(reply: { organizationId: string; conversationId: stri
     // needs a User token in the vault (cs:chatwoot:<org>:api_token). Not an incident per reply.
     if (String(err).includes("chatwoot_api_401")) {
       console.warn(`[cs] ${organizationId}: name capture needs a User access token (bot token refused on GET)`);
-      return;
+      return false;
     }
     throw err;
   }
-  if (previous?.messageType !== 1 || !isNameQuestionAck(cis, previous.content)) return;
-  if (!isPlaceholderContactName(await getContactName(organizationId, cis.chatwoot, reply.contactId))) return;
+  if (previous?.messageType !== 1 || !isNameQuestionAck(cis, previous.content)) return false;
+  if (!isPlaceholderContactName(await getContactName(organizationId, cis.chatwoot, reply.contactId))) return false;
   await updateContactName(organizationId, cis.chatwoot, reply.contactId, name);
+  return true;
+}
+
+/** Staff talking now? A failed read counts as yes: silence is the previous rule, never talking over a person. */
+async function isStaffActive(organizationId: string, conversationId: string): Promise<boolean> {
+  const r = await staffRepliedWithin(organizationId, conversationId, CS_STAFF_ACTIVE_WINDOW_SECONDS);
+  if (r === "error") {
+    Sentry.captureMessage("cs staff activity unreadable; treated as active", { extra: { organizationId, conversationId } });
+    return true;
+  }
+  return r;
 }

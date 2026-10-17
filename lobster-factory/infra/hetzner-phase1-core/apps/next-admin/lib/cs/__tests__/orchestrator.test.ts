@@ -27,7 +27,7 @@ const { handleInbound, translateRequest } = await import("@/lib/cs/orchestrator"
 const chunk = (score: number) => ({ id: `c${score}`, content: "x", score, citation: {}, provenance: {} });
 const msg = (text: string) => ({
   organizationId: "o", conversationId: "1", messageId: "m1", channel: "website" as const, contactRef: "c",
-  text, isFromAgent: false, conversationStatus: "pending", withinBusinessHours: true,
+  text, isFromAgent: false, conversationStatus: "pending", staffActive: false, withinBusinessHours: true,
 });
 
 beforeEach(() => {
@@ -70,6 +70,22 @@ describe("handleInbound -- no spend before the gates", () => {
     const d = await handleInbound(msg("What courses do you offer?"));
     expect(generateReply).toHaveBeenCalledTimes(1);
     expect(d.action).toBe("draft");
+  });
+});
+
+describe("handleInbound -- who is talking", () => {
+  it("a staff member is talking: silent, nothing recorded or spent", async () => {
+    const d = await handleInbound({ ...msg("請問有哪些課程？"), conversationStatus: "open", staffActive: true });
+    expect(d.action).toBe("suppressed");
+    expect(retrieve).not.toHaveBeenCalled();
+    expect(recordReply).not.toHaveBeenCalled();
+  });
+
+  it("handed to a human but nobody has answered yet: answered as usual (operator rules 2026-10-17)", async () => {
+    retrieve.mockResolvedValue([chunk(0.8)]);
+    const d = await handleInbound({ ...msg("請問有哪些課程？"), conversationStatus: "open", staffActive: false });
+    expect(d.action).toBe("draft");
+    expect(generateReply).toHaveBeenCalledTimes(1);
   });
 });
 

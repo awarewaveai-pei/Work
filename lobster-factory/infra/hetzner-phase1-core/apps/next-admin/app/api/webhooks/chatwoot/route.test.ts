@@ -31,7 +31,13 @@ type HoldingClaim = { kind: "claimed"; claimId: string } | { kind: "recent" } | 
 const claimCrisisHolding = vi.hoisted(() => vi.fn(async (..._args: unknown[]): Promise<HoldingClaim> => ({ kind: "claimed", claimId: "claim-1" })));
 const releaseCrisisHolding = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => true));
 const confirmCrisisHolding = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => true));
+const recordStaffReply = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => true));
+// Default: a staff member is talking, so an open conversation stays silent as the older tests expect;
+// the three-state tests below turn it off.
+const staffRepliedWithin = vi.hoisted(() => vi.fn(async (..._args: unknown[]): Promise<boolean | "error"> => true));
 vi.mock("@/lib/cs/db", () => ({
+  recordStaffReply,
+  staffRepliedWithin,
   claimCrisisHolding,
   claimMessage,
   completeClaim,
@@ -118,6 +124,10 @@ beforeEach(() => {
   claimCrisisHolding.mockResolvedValue({ kind: "claimed", claimId: "claim-1" });
   releaseCrisisHolding.mockClear();
   confirmCrisisHolding.mockClear();
+  recordStaffReply.mockReset();
+  recordStaffReply.mockResolvedValue(true);
+  staffRepliedWithin.mockReset();
+  staffRepliedWithin.mockResolvedValue(true);
   handoffToHuman.mockClear();
   handoffToHuman.mockResolvedValue(undefined);
   sendPrivateDraft.mockClear();
@@ -662,6 +672,76 @@ describe("POST /api/webhooks/chatwoot -- threat to hurt others", () => {
     expect(sendText.mock.calls.map((c) => c[0]).join("\n")).toContain("要傷害別人");
     expect(claimCrisisHolding).toHaveBeenCalledTimes(1);
     expect(claimCrisisHolding).toHaveBeenCalledWith(ORG_ID, "999", "self_harm", 1800, 120);
+  });
+});
+
+// Operator rules 2026-10-17 (WORKLOG 續16): silent only while a staff member replied in public within
+// 30 minutes; a conversation handed to a human that nobody answered yet is answered as usual.
+describe("POST /api/webhooks/chatwoot -- who is talking (three states)", () => {
+  const STAFF = { type: "user", id: 5, name: "Agent" };
+  const JOHN = { type: "contact", id: 77, name: "John Doe" };
+  const open = (content: string, sender: Record<string, unknown> = { type: "contact", id: 77, name: "林小美" }) =>
+    makePayload({ id: 610, content, sender, conversation: { id: 999, status: "open", contact_inbox: { source_id: "c1" } } });
+
+  it("a staff member's public reply is recorded; no AI, no claim", async () => {
+    const res = await post(makePayload({ message_type: "outgoing", sender: STAFF, content: "您好，退款需要…" }));
+    expect(await res.json()).toMatchObject({ ok: true, recorded: "staff_reply" });
+    // Recorded before the response, not left to after(): the next customer message must see it.
+    expect(recordStaffReply).toHaveBeenCalledWith(ORG_ID, "999");
+    await runAfter();
+    expect(claimMessage).not.toHaveBeenCalled();
+    expect(handleInbound).not.toHaveBeenCalled();
+  });
+
+  it("a private note, the bot's own reply, or a bad token records nothing", async () => {
+    await post(makePayload({ message_type: "outgoing", private: true, sender: STAFF, content: "內部備註" }));
+    await post(makePayload({ message_type: "outgoing", sender: { type: "agent_bot", id: 1 }, content: "已收到" }));
+    verifyWebhookToken.mockReturnValueOnce(false);
+    expect((await post(makePayload({ message_type: "outgoing", sender: STAFF }), "bad")).status).toBe(401);
+    await runAfter();
+    expect(recordStaffReply).not.toHaveBeenCalled();
+  });
+
+  it("staff replied within 30 minutes: silent, no claim, no AI", async () => {
+    expect(await (await post(open("課程內容"))).json()).toMatchObject({ ignored: true, reason: "human_owns_thread" });
+    await runAfter();
+    expect(staffRepliedWithin).toHaveBeenCalledWith(ORG_ID, "999", 1800);
+    expect(claimMessage).not.toHaveBeenCalled();
+    expect(handleInbound).not.toHaveBeenCalled();
+  });
+
+  it("handed to a human, nobody answered for 30 minutes: answered as usual", async () => {
+    staffRepliedWithin.mockResolvedValueOnce(false);
+    expect(await (await post(open("課程內容"))).json()).toMatchObject({ accepted: true });
+    await runAfter();
+    expect(claimMessage).toHaveBeenCalledWith(ORG_ID, "999", "610");
+    expect(handleInbound).toHaveBeenCalledWith(expect.objectContaining({ conversationStatus: "open", staffActive: false }));
+    expect(sendReply).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, "999", "hi there");
+  });
+
+  it("the staff activity cannot be read: the previous rule, silent", async () => {
+    staffRepliedWithin.mockResolvedValueOnce("error");
+    expect(await (await post(open("課程內容"))).json()).toMatchObject({ reason: "human_owns_thread" });
+    await runAfter();
+    expect(handleInbound).not.toHaveBeenCalled();
+  });
+
+  it("a conversation the bot owns never asks who is talking", async () => {
+    await post(makePayload({ content: "課程內容" }));
+    await runAfter();
+    expect(staffRepliedWithin).not.toHaveBeenCalled();
+    expect(handleInbound).toHaveBeenCalledTimes(1);
+  });
+
+  it("nobody answering yet, a nameless contact's reply to the name question is a name, not a question", async () => {
+    staffRepliedWithin.mockResolvedValueOnce(false);
+    listMessages.mockResolvedValueOnce([{ id: 601, messageType: 1, private: false, content: handoffAckText({ organizationId: ORG_ID, chatwoot: CHATWOOT_CONFIG, csEnabled: true }, true) }]);
+    await post(open("小美", JOHN));
+    await runAfter();
+    expect(updateContactName).toHaveBeenCalledWith(ORG_ID, CHATWOOT_CONFIG, 77, "小美");
+    expect(recordReply).toHaveBeenCalledWith({ organizationId: ORG_ID, conversationId: "999", messageId: "610", action: "suppressed", retrievedChunkIds: [] });
+    expect(completeClaim).toHaveBeenCalledWith({ organizationId: ORG_ID, conversationId: "999", messageId: "610" });
+    expect(handleInbound).not.toHaveBeenCalled();
   });
 });
 
