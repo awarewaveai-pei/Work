@@ -149,7 +149,7 @@
   - `🟠 未開始` · `2026-10-14` · `G3 Meta 審核狀態（操作者）；G5 要 go-ahead`
   - **一句話**：Metricool 等級的統一發文＋行事曆，Postiz 只當送信員；先自己管多品牌，再開放訂閱
   - **現在到哪**：C1–C12 全部上線（social.aware-wave.com 可發文）。2026-10-16 操作者：「功能不齊全、UI/UX 非常醜」→ 對照 Postiz v2.25／Metricool 盤點完：13 項 UI 缺陷（U1–U13）、19 項功能缺口（F1–F19）、建版＝樣稿 1:1 所以是設計問題、手機版壞掉；順手修 B1（換貼文時編輯器留著上一則文字）。正本 `lobster-factory/docs/social/SOCIAL_MANAGER_GAP_REPORT.md`；render 腳本 `tests/e2e/social/render-views.mjs`
-  - **下一步**：照 GAP_REPORT §4 開 C13–C18：**C13 版面規格 v2 先出樣稿 v14 給操作者看圖**（頭像頻道列、篩選收一顆按鈕、週檢視堆疊卡＋縮圖、三層編輯器、每平台預覽；建議模型：Fable 5.1 設計 → Opus 5.5 實作）；C14 媒體與影片、C15 編輯器完整化、C16 手機、C17 小修（Sonnet 5.5）可與 C13 並行開卡
+  - **下一步**：樣稿 v16 定案後（ADR 016 §5 定案 1–6），照 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md` §1b 開 C19–C31。第一個 session：`續做社群 V1.5 C20：讀 PLAN.md §1b C20 與 0096–0103 檔頭，寫 0105_social_v16.sql＋down，拋棄式 DB 套用，db-expert 審；完成＝npm test 綠、不套正式庫。建議模型：Opus 5.5`。順序與並行組在 PLAN §3。
   - **完成定義**：V1 12 張卡各有 REALTEST／REVIEW／BUGHUNT 行；sg-deploy 上線 `social.aware-wave.com`；ContentStudio 舊 Postiz 面板退場
   - **證據**：WORKLOG 2026-10-14（續6）＋本日 G1 條目；`lobster-factory/docs/social/`；`agency-os/docs/architecture/decisions/016-social-manager-third-product.md`「實測」表
 

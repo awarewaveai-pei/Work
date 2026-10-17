@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-17（續12）社群發文 V1.5 卡片計畫：樣稿 v16 → 產品，C19–C31 開卡（PLAN.md §1b），可發包 Opus／Sonnet
+
+**操作者**：「把 plan 整理好，完成後可以發包給 opus 和 sonnet 做」（模型切 Fable 5.1）。
+- `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md` §1b：C13 標 ✅（樣稿 v16）；新開 13 張卡，每張六項＋建議模型＋樣稿對照（`[data-view]`／函式名）＋ `file:line`（全部 grep 驗過；修正 3 處 model.ts 行號）。GAP §4 舊編號對照：C14→C31、C15 併 C21、C16 併 C30、C17 併 C19／C22／C27、C18 作廢。
+- 架構取捨（寫在卡裡，實作卡不再討論）：C20 一支 migration 0105 開齊所有表（帳號 picture／handle、標籤、留言 N 則、週期性安排模板＋`repeat_of` 子貼文照 0101 輪播具體化、清單 slots 表、自動回覆規則＋`auto_mode`、智慧連結、每日指標快照、報表；RLS 照 0096），UI 卡只讀寫；第一次上線 C20＋C19＋C21 同一晚（`DEPLOY_HOLD`）。報表 V1＝列印版 HTML，不加 PDF／PPT 依賴。自動化流程執行端與廣告管理等 G3 Meta 審核。數據分析先過 G6（Postiz 有無 analytics 端點）。撰寫頁不再有「加入自動發布清單」（定案）。
+- 機械閘：C19 加 `__tests__/mock-parity.test.ts`（樣稿每個 `data-view` 必須對到產品 View／route），`page-rules.test.ts` 改掃子資料夾；C30 把 390 寬 `scrollWidth` 斷言進 `render-views.mjs`。
+- §3 順序：C20 → C19 → {C21｜C22｜C23｜C26｜C29 並行，檔案不重疊} → C24 → C25；C27 在 C21 後；C30 在 C21、C22 後；C31 在 C21 後；C28 等 G3。模型：C19／20／21／23／24／26／27／31 Opus；C22／25／28／29／30 Sonnet。
+- TASKS.md 社群條目「下一步」改指 PLAN §1b。
+
+- REALTEST_WAIVED: DOC_ONLY -- 計畫文件；每個 file:line 以 sed -n 實看（33 處）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/3n -- 自審：model.ts 三處行號錯（:60→:51、:8→:7、:44–57→:47–55）＋ FORMATS :33→:32，已改
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=C13–C18|SOCIAL_MANAGER_PLAN.md | hits=4 -- GAP_REPORT §4 的 C14–C18 編號仍在（本檔 C13 段落寫了對照，不回改歷史）；TASKS.md 社群條目同 commit 改指 §1b；render-views.mjs 註解引用 GAP §1 不受影響
+- ORACLE_WAIVED: 文件
+
+**剩**：操作者看 PLAN §1b；同意後從 C20 開第一個 Opus session（開場句在 TASKS 條目）。
 ## 2026-10-17（續11）next-admin `fbf84da50` 手動部署（操作者「go ahead: deploy next-admin now」）＋退款／醫療判斷真測通過；「我是不是憂鬱症」沒回＝真人接手中靜默，不是關鍵字
 
 **範圍**：`32a58d565..fbf84da50` 的 next-admin：`36ae1bf40`（意圖轉真人回覆）、`0ffd277c4`（翻譯帶知識庫頁名，續5）、`5602722ed`（另一 session：真人接手中的危機訊息回求助專線，migration 0104 已在 prod，`to_regclass` 確認）。`check-deploy-drift` behind 15、compose 變數無漂移、無 DEPLOY_HOLD。
