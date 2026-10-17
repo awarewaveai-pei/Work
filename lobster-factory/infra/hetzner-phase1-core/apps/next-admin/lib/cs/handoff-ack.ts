@@ -26,7 +26,7 @@ export function isPlaceholderContactName(name: string | null | undefined): boole
  * acknowledgement sentence; csVoice.askName replaces the name question. Defaults follow the
  * page's honorific and emoji policy.
  */
-export function handoffAckText(cis: CisProfile, askName: boolean, customerText = "", crisis = hitsCrisis(customerText)): string {
+export function handoffAckText(cis: CisProfile, askName: boolean, customerText = "", crisis = hitsCrisis(customerText), intentReply?: string): string {
   const v = cis.csVoice ?? {};
   const you = v.honorifics === "你" ? "你" : "您";
   if (crisis) {
@@ -34,15 +34,17 @@ export function handoffAckText(cis: CisProfile, askName: boolean, customerText =
     const ack = english ? CRISIS_ACK_EN : crisisAckZh(you);
     return askName ? `${ack}\n${english ? ASK_NAME_EN : askNameZh(cis)}` : ack;
   }
-  const ack = v.escalationTone?.trim() || `已收到${you}的訊息，我們會盡快回覆${you}${v.emojiPolicy === "none" ? "。" : " 🙏"}`;
+  // An intent's own reply (refund: ask the reason; medical: see a doctor) replaces the ordinary sentence;
+  // the help lines above always win over it.
+  const ack = intentReply?.trim() || v.escalationTone?.trim() || `已收到${you}的訊息，我們會盡快回覆${you}${v.emojiPolicy === "none" ? "。" : " 🙏"}`;
   if (!askName) return ack;
   return `${ack}\n${askNameZh(cis)}`;
 }
 
-/** Exactly one of the acknowledgements that ask the name (ordinary, crisis in Chinese, crisis in English). */
+/** An acknowledgement that ends with the name question -- ordinary, crisis, or an intent's own reply. */
 export function isNameQuestionAck(cis: CisProfile, content: string | null | undefined): boolean {
-  const you = cis.csVoice?.honorifics === "你" ? "你" : "您";
-  return [handoffAckText(cis, true), `${crisisAckZh(you)}\n${askNameZh(cis)}`, `${CRISIS_ACK_EN}\n${ASK_NAME_EN}`].includes(content ?? "");
+  const c = content ?? "";
+  return c.endsWith(`\n${askNameZh(cis)}`) || c.endsWith(`\n${ASK_NAME_EN}`);
 }
 
 /** A crisis acknowledgement, with or without the name question (dedupe: another pipeline already sent the help lines). */

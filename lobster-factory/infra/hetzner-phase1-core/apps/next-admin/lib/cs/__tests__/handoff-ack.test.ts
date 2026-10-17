@@ -74,3 +74,15 @@ describe("placeholder names", () => {
     expect(isPlaceholderContactName("John Smith")).toBe(false);
   });
 });
+
+describe("an intent's own handoff reply", () => {
+  const cis = { organizationId: "o", csVoice: {} } as never;
+  it("replaces the ordinary sentence, still asks the name, and is recognised as the name question", () => {
+    const text = handoffAckText(cis, true, "我想退錢", false, "請先留下想退款的原因");
+    expect(text).toBe("請先留下想退款的原因\n請問怎麼稱呼您呢？");
+    expect(isNameQuestionAck(cis, text)).toBe(true);
+  });
+  it("never replaces the crisis help lines", () => {
+    expect(handoffAckText(cis, false, "我想傷害自己", true, "請先留下想退款的原因")).not.toContain("退款");
+  });
+});

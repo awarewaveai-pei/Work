@@ -207,10 +207,10 @@ async function runPipeline(inbound: InboundMessage, contact: ContactRef, custome
     } else if (decision.action === "draft" && decision.replyText) {
       await sendPrivateDraft(organizationId, cis.chatwoot, conversationId, decision.replyText);
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis, decision.handoffReply);
     } else if (decision.action === "handoff") {
       await handoffToHuman(organizationId, cis.chatwoot, conversationId);
-      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis);
+      await acknowledgeHandoff(cis, cis.chatwoot, conversationId, contact, customerMessageId, inbound.text, crisis, decision.handoffReply);
     } else if (decision.action !== "suppressed") {
       // "suppressed" = the engine intentionally stayed silent (agent owns the thread). Anything else
       // is an upstream invariant break, e.g. auto_sent with an empty replyText: leave it to the sweep.
@@ -236,6 +236,7 @@ async function acknowledgeHandoff(
   customerMessageId: number,
   customerText: string,
   crisis: boolean,
+  intentReply?: string,
 ): Promise<void> {
   const { organizationId } = cis;
   // A crisis acknowledgement is skipped only when the help lines themselves already followed: any other
@@ -253,7 +254,7 @@ async function acknowledgeHandoff(
   if (alreadyAnswered) return;
   try {
     const askName = typeof contact.id === "number" && isPlaceholderContactName(contact.name);
-    await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName, customerText, crisis));
+    await sendReply(organizationId, chatwoot, conversationId, handoffAckText(cis, askName, customerText, crisis, intentReply));
   } catch (err) {
     Sentry.captureException(err, { extra: { organizationId, conversationId, step: "handoff_ack" } });
   }

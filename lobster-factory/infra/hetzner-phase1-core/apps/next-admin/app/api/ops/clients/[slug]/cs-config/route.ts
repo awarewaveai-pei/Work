@@ -68,6 +68,7 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
     return {
       ...row,
       graduation: g ? { ...g, results: undefined, current: rowGraduated(full as never, cases, knowledgeFloorOf(config)) } : null,
+      handoffReply: typeof (metadata as Record<string, unknown> | null)?.handoffReply === "string" ? (metadata as Record<string, string>).handoffReply : null,
       evalCaseCount: cases.length,
     };
   });

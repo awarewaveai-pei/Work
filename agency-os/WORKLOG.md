@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-17（續1）每個意圖可設「轉真人時回客人的話」；Soulful 加退款（先問原因）、醫療判斷（建議看醫生）兩個敏感意圖
+
+**操作者**（考試 #2 照出「我想退錢」「幫我判斷是不是憂鬱症」被 AI 回答，續34）：「退款要請他先留下原因，然後轉真人；醫療判斷請他去看醫生」。
+**做了**：
+- `cs_intents.metadata.handoffReply`（無 migration）：該意圖的訊息轉真人時，取代一般確認句；危機專線永遠優先；仍接「請問怎麼稱呼您」。`planReply` 把 `intent.handoffReply` 帶進每個分類後的 decision，webhook 傳給 `acknowledgeHandoff` → `handoffAckText(..., intentReply)`。
+- `isNameQuestionAck` 改成「結尾是問名字句」就算（一般、危機、意圖自訂三種都涵蓋，不用逐一列舉）。
+- `PATCH cs-intents` 收 `handoffReply`（≤300 字，null／空白＝清除，存 metadata）；`cs-config` GET 回 `handoffReply`；客服分頁每個意圖多一格「轉真人時」＋存。
+- Soulful（DB）：`refund`（退錢、退費、要求還錢、取消拿回費用、不滿意想退，含婉轉說法）與 `medical_judgment`（判斷病情／診斷、用藥停藥、取代看醫生），兩者 `is_sensitive=true`、L0，各帶 handoffReply。分類器看「key: label」（`lib/cs/intent.ts:16`），所以說明寫進各種說法；作法同安全項「自傷」意圖（續33）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql insert cs_intents refund／medical_judgment（INSERT 0 2，is_sensitive t、L0、handoffReply 寫入） | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test（271 files／2506 pass；handoff-ack +2、intent-metadata-cas 1） | exit=0 | ms=120000
+- `cs_intents.metadata` 唯一寫入點 `writeIntentMetadata`（`lib/cs/db.ts`）：各寫各的 key、以 `updated_at` compare-and-swap、輸了重讀重套（最多 5 次）；`setIntentGraduation` 與 `updateIntent`（handoffReply）都走它。
+- REALTEST_EVIDENCE: tool=SSH | cmd=lobster-next-admin 內 fetch PostgREST：refund 的 updated_at（微秒）原值當 eq 條件 → matched 1（CAS 不會因精度失敗）（唯讀） | exit=0 | ms=2000
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=handoffReply|isNameQuestionAck | hits=35（全在本次 9 個程式／測試檔）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（`reports/oracle/2026-10-17-partialreview-a6f3a261.md`：兩個 metadata 寫入者並行互蓋 → 收，單一 CAS 寫入點＋指名測試「存回覆時考試結果落地，兩者都留」）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，私有 index＝HEAD）
+- ORACLE_WAIVED: 修正由指名測試鎖住，不跑第二輪
+
+**操作者驗收**（部署後）：John Doe 傳「我想退錢」→ 應收到「麻煩您先留下想退款的原因…」並轉真人；傳「可以幫我判斷我是不是憂鬱症嗎」→「建議您先諮詢醫師…」並轉真人。之後重考課程類。
+**rollback**：程式 `git revert`；意圖：`delete from cs_intents where key in ('refund','medical_judgment') and organization_id='2bf6…'`。
 ## 2026-10-16（續36）課程類第二次考試：20/30（66.7%，上次 17/30）沒過；檢索修好 5 題，新照出 2 題危險誤答（退錢、判斷憂鬱症）
 
 **部署**（操作者 go ahead）：`sg-deploy.sh next-admin` → 2503 pass、healthy 9s、smoke OK、`.deployed-commit=32a58d565`（12:43Z）。操作者 12:44:54Z 按開始考試 → failed；101 次 AI 呼叫 0.38 USD。

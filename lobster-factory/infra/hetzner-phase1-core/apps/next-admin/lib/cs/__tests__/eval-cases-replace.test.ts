@@ -8,9 +8,9 @@ const sb = {
   from: (table: string) => {
     if (table === "cs_intents") {
       return {
-        select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { metadata: { graduation: { status: "passed" } } }, error: null }) }) }) }),
+        select: () => ({ eq: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { metadata: { graduation: { status: "passed" } }, updated_at: "t0" }, error: null }) }) }) }),
         update: (patch: { metadata: Record<string, unknown> }) => ({
-          eq: () => ({ eq: () => ({ select: async () => { steps.push(patch.metadata.graduation ? "write" : "revoke"); return { data: [{ key: "k" }], error: null }; } }) }),
+          eq: () => ({ eq: () => ({ eq: () => ({ select: async () => { steps.push(patch.metadata.graduation ? "write" : "revoke"); return { data: [{ key: "k" }], error: null }; } }) }) }),
         }),
       };
     }

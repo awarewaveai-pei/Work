@@ -33,6 +33,9 @@ export interface Intent {
   /** Passed the offline eval on its current golden set (cs_intents.metadata.graduation, plan §5.2).
    * L2 without it behaves as L1: decideAnswerAction drafts, and the ops API refuses to set L2. */
   graduated: boolean;
+  /** What the customer hears when a message of this intent goes to a human, in place of the
+   * ordinary acknowledgement (cs_intents.metadata.handoffReply; e.g. refund: ask the reason first). */
+  handoffReply?: string;
 }
 
 /** cs_intents.metadata.graduation -- the latest exam of one intent. It certifies only "this intent
@@ -118,6 +121,8 @@ export interface CsDecision {
   toolCalls: ToolCallResult[];
   /** Free-form trace for cs_ai_replies.metadata + Phoenix/Langfuse. */
   traceMeta: Record<string, unknown>;
+  /** The classified intent's handoffReply, for the acknowledgement the webhook sends. */
+  handoffReply?: string;
 }
 
 /** Result of a single guardrail check. */

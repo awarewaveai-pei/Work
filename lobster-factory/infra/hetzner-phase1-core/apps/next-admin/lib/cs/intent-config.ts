@@ -41,6 +41,11 @@ export function parseIntentPatch(body: Record<string, unknown>): { fields: Inten
     if (typeof v !== "number" || !Number.isInteger(v) || v < 0 || v > 100) return { error: "invalid_canaryPct" };
     f.canaryPct = v;
   }
+  if ("handoffReply" in body) {
+    const v = body.handoffReply;
+    if (v !== null && (typeof v !== "string" || v.length > 300)) return { error: "invalid_handoffReply" };
+    f.handoffReply = typeof v === "string" && v.trim() ? v.trim() : null;
+  }
   if ("label" in body) {
     if (typeof body.label !== "string" || !body.label.trim()) return { error: "invalid_label" };
     f.label = body.label.trim();

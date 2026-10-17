@@ -93,6 +93,7 @@ function mapIntent(r: IntentRow, cases: EvalCase[], knowledgeFloor: number): Int
     confidenceThreshold: Number(r.confidence_threshold ?? 0.8),
     canaryPct: Number(r.canary_pct ?? 0),
     graduated: rowGraduated(r, cases, knowledgeFloor),
+    ...handoffReplyOf(r.metadata),
   };
 }
 
@@ -134,6 +135,12 @@ export async function loadIntent(organizationId: string, key: string, after: Int
   return mapIntent(row, cases, floor);
 }
 
+/** The intent's own handoff acknowledgement, when the operator wrote one. */
+function handoffReplyOf(metadata: unknown): { handoffReply?: string } {
+  const v = metadata && typeof metadata === "object" ? (metadata as Record<string, unknown>).handoffReply : undefined;
+  return typeof v === "string" && v.trim() ? { handoffReply: v.trim() } : {};
+}
+
 export interface IntentFields {
   label?: string;
   answerLevel?: string;
@@ -141,6 +148,8 @@ export interface IntentFields {
   isSensitive?: boolean;
   confidenceThreshold?: number;
   canaryPct?: number;
+  /** null clears it. Lives in metadata, not a column; it never changes a decision, only the words. */
+  handoffReply?: string | null;
 }
 
 /** Columns for exactly the fields given. A field the caller did not send is never written, so a
@@ -173,9 +182,19 @@ export async function upsertIntent(organizationId: string, i: IntentFields & { k
 export async function updateIntent(organizationId: string, key: string, f: IntentFields): Promise<"ok" | "not_found" | "error"> {
   const sb = getSupabaseWriteClient();
   if (!sb) return "error";
+  if (f.handoffReply !== undefined) {
+    const reply = f.handoffReply;
+    const r = await writeIntentMetadata(organizationId, key, (m) => {
+      if (reply) m.handoffReply = reply;
+      else delete m.handoffReply;
+      return m;
+    }, { columns: intentColumns(f) });
+    return r === "superseded" ? "error" : r;
+  }
+  const patch: Record<string, unknown> = { ...intentColumns(f), updated_at: new Date().toISOString() };
   const { data, error } = await sb
     .from("cs_intents")
-    .update({ ...intentColumns(f), updated_at: new Date().toISOString() })
+    .update(patch)
     .eq("organization_id", organizationId)
     .eq("key", key)
     .select("key");
@@ -205,18 +224,49 @@ export async function setIntentGraduation(
   graduation: IntentGraduation | null,
   opts: { ifRunId?: string } = {},
 ): Promise<"ok" | "superseded" | "error"> {
+  const r = await writeIntentMetadata(organizationId, key, (m) => {
+    if (graduation) m.graduation = graduation;
+    else delete m.graduation;
+    return m;
+  }, { ifRunId: opts.ifRunId });
+  return r === "not_found" ? "error" : r;
+}
+
+/**
+ * The one way cs_intents.metadata is written. Each writer changes only its own key (graduation,
+ * handoffReply) on a fresh copy and lands it with compare-and-swap on updated_at, retrying on a lost
+ * race, so two keys written at once never erase each other (Codex 2026-10-17 partialreview-a6f3a261).
+ * ifRunId additionally requires the stored graduation to belong to that exam run.
+ */
+async function writeIntentMetadata(
+  organizationId: string,
+  key: string,
+  mutate: (metadata: Record<string, unknown>) => Record<string, unknown>,
+  opts: { ifRunId?: string; columns?: Record<string, unknown> } = {},
+): Promise<"ok" | "not_found" | "superseded" | "error"> {
   const sb = getSupabaseWriteClient();
   if (!sb) return "error";
-  const current = await loadIntentMetadata(organizationId, key);
-  if (!current) return "error";
-  const metadata = { ...current };
-  if (graduation) metadata.graduation = graduation;
-  else delete metadata.graduation;
-  let q = sb.from("cs_intents").update({ metadata }).eq("organization_id", organizationId).eq("key", key);
-  if (opts.ifRunId) q = q.eq("metadata->graduation->>runId", opts.ifRunId);
-  const { data, error } = await q.select("key");
-  if (error) return "error";
-  return data && data.length > 0 ? "ok" : opts.ifRunId ? "superseded" : "error";
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: row, error: readErr } = await sb
+      .from("cs_intents").select("metadata,updated_at").eq("organization_id", organizationId).eq("key", key).maybeSingle();
+    if (readErr) return "error";
+    if (!row) return "not_found";
+    const current = (row as { metadata?: Record<string, unknown> | null; updated_at: string });
+    if (opts.ifRunId && graduationOf(current.metadata)?.runId !== opts.ifRunId) return "superseded";
+    const metadata = mutate({ ...(current.metadata ?? {}) });
+    let q = sb
+      .from("cs_intents")
+      .update({ ...opts.columns, metadata, updated_at: new Date().toISOString() })
+      .eq("organization_id", organizationId)
+      .eq("key", key)
+      .eq("updated_at", current.updated_at);
+    if (opts.ifRunId) q = q.eq("metadata->graduation->>runId", opts.ifRunId);
+    const { data, error } = await q.select("key");
+    if (error) return "error";
+    if (data && data.length > 0) return "ok";
+    // Lost the race: someone wrote the row since the read. Read again and re-apply only our key.
+  }
+  return "error";
 }
 
 /** Every intent's graduation record for a tenant, by intent key. */

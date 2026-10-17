@@ -15,6 +15,7 @@ export type CsIntentRow = {
   key: string; label: string; answer_level: string; action_level: string;
   is_sensitive: boolean; confidence_threshold: number; canary_pct: number;
   graduation: (IntentGraduation & { current?: boolean }) | null; evalCaseCount: number;
+  handoffReply: string | null;
 };
 
 type EvalCaseView = { id: string; intentKey: string; question: string; expectedPoints: string[]; expectHandoff: boolean };
@@ -69,6 +70,8 @@ function IntentItem({ slug, it, reload }: { slug: string; it: CsIntentRow; reloa
   const [cases, setCases] = useState<EvalCaseView[] | null>(null);
   const [results, setResults] = useState<CaseResult[]>([]);
   const [importText, setImportText] = useState("");
+  const [reply, setReply] = useState(it.handoffReply ?? "");
+  useEffect(() => { setReply(it.handoffReply ?? ""); }, [it.handoffReply]);
 
   useEffect(() => { setShare(String(it.canary_pct)); }, [it.canary_pct]);
 
@@ -89,6 +92,7 @@ function IntentItem({ slug, it, reload }: { slug: string; it: CsIntentRow; reloa
     "回覆方式已改",
   );
   const setAction = (level: string) => act(() => send(`/api/ops/clients/${slug}/cs-intents`, "PATCH", { key: it.key, actionLevel: level }), "行動已改");
+  const saveReply = () => act(() => send(`/api/ops/clients/${slug}/cs-intents`, "PATCH", { key: it.key, handoffReply: reply.trim() || null }), reply.trim() ? "轉真人時的回覆已存" : "改回一般確認句");
   const saveShare = () => act(() => send(`/api/ops/clients/${slug}/cs-intents`, "PATCH", { key: it.key, canaryPct: Number(share) }), "自動比例已存");
   const startExam = () => act(() => send("/api/ops/cs/eval", "POST", { slug, intentKey: it.key }), "考試開始，結果會自動出現");
   const remove = () => act(() => send(`/api/ops/clients/${slug}/cs-intents`, "DELETE", { key: it.key }), "已刪除");
@@ -152,6 +156,13 @@ function IntentItem({ slug, it, reload }: { slug: string; it: CsIntentRow; reloa
         {ACTION_CHOICES.map(([v, l]) => (
           <ChipBtn key={v} label={l} active={it.action_level === v} disabled={busy} onClick={() => { if (it.action_level !== v) void setAction(v); }} />
         ))}
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 6, marginTop: 6 }}>
+        <span style={{ ...muted, width: 64, paddingTop: 5 }}>轉真人時</span>
+        <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={2} maxLength={300}
+          placeholder="留空＝一般確認句「已收到您的訊息，我們會盡快回覆您」。例如退款：請先留下想退款的原因"
+          style={{ ...input, flex: 1, minWidth: 0 }} />
+        <button onClick={saveReply} disabled={busy || reply.trim() === (it.handoffReply ?? "")} style={{ ...btn, opacity: busy || reply.trim() === (it.handoffReply ?? "") ? 0.5 : 1 }}>存</button>
       </div>
       <div style={{ marginTop: 6, fontSize: 12, color: autoOn ? "var(--green)" : "var(--text-secondary)" }}>
         → {intentBehavior({ answerLevel: it.answer_level, canaryPct: it.canary_pct, isSensitive: it.is_sensitive, graduated })}

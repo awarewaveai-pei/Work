@@ -132,7 +132,7 @@ export async function planReply(input: {
       intentKey: intent.key,
       confidence: cls.confidence,
     };
-    return { decision: d, answerLevel: intent.answerLevel };
+    return { decision: { ...d, handoffReply: intent.handoffReply }, answerLevel: intent.answerLevel };
   }
 
   // 2. Retrieve knowledge.
@@ -155,7 +155,7 @@ export async function planReply(input: {
       confidence: cls.confidence,
       retrievalScore,
     };
-    return { decision: d, answerLevel: intent.answerLevel };
+    return { decision: { ...d, handoffReply: intent.handoffReply }, answerLevel: intent.answerLevel };
   }
 
   // 3. Generate (agentic when the tenant has tools, else plain RAG reply).
@@ -234,7 +234,7 @@ export async function planReply(input: {
     toolCalls,
     traceMeta: trace,
   };
-  return { decision, answerLevel: intent.answerLevel };
+  return { decision: { ...decision, handoffReply: intent.handoffReply }, answerLevel: intent.answerLevel };
 }
 
 /** Any letter outside the Latin script (CJK, Arabic, Cyrillic, Thai, …): such a question is also searched in English. */
