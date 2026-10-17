@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-17（續19）Messenger 真測通過：三態（轉真人沒人回＝照常回答；工作人員公開回覆後 30 分鐘內靜默）＋自傷、威脅回覆與 Telegram 通知（next-admin 23305526f）
+
+**真測**（John Doe／Messenger，Soulful 對話 13，open、已轉真人；chatwoot messages 91–104、`cs_ai_replies`、`cs_conversation_staff_replies`）：
+- 11:27:19Z、11:27:42Z「有什麼課程?」（工作人員還沒公開回過）→ `faq:courses` auto_sent，1 秒回課程清單 ✅（部署前此處靜默）。
+- 11:28:11Z「我覺得很想死」→ 求助專線確認句 ✅；11:28:19Z「我要殺光所有的人」、11:28:43Z「我要殺死鄰居」→ 核准的威脅句 ✅。操作者確認 Telegram 收到 3 則（1 自傷、2 傷害別人）✅。
+- 11:29:19Z 操作者在 Chatwoot 公開回「您好」→ `cs_conversation_staff_replies` conv 13 = 11:29:20Z ✅。
+- 11:32:04Z、11:33:57Z、11:34:40Z「有什麼課程?」→ 無回覆、`cs_ai_replies` 無新列（沒花費）✅。
+- log：`page not delivered`／`staff reply not recorded`／`unreadable` 0 筆。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=chatwoot psql messages 91–104（contact 6）＋supabase cs_conversation_staff_replies／cs_ai_replies；操作者確認 Telegram 3 則 | exit=0 | ms=5000
+- REVIEW_WAIVED: NA -- 真測驗收，無程式改動（程式審查見續15、續17）
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**剩**：課程類考試（操作者按「開始考試」）；Soulful 自動結案仍關（`/ops/schedules` 勾「Chatwoot 基本設定檢查」）。
 ## 2026-10-17（續17）客服三態：轉真人後機器人只在「工作人員 30 分鐘內公開回過話」時靜默，其他時候照常回答＋migration 0108 已套 prod
 
 **操作者**：「一下轉自動回 一下轉AI 一下轉真人 好像系統無法處理這種接續的變化」→ 同意三條規則、N = 30 分鐘：「照這個做：migration 0108、程式、測試、審查，做完套 migration 並部署」。
