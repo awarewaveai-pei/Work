@@ -25,6 +25,7 @@
 - 產生器 `scripts/new-product.mjs` 兩種用法：`--from-foundry <generated 專案目錄>`（讀 `.foundry/resolution/foundry-plan.json`、`docs/modules/<module>/00_REQUIREMENTS.md … 08_IMPLEMENTATION_BACKLOG.md` 與藍圖末節「交付登記」，十項宣告填進 manifest，只補問子網域與收費功能；目錄缺 `foundry-plan.json` 即拒絕）或直接問 SOP §18 五題 → 寫登記列、`app/<page>/{layout,page}.tsx` 骨架（複製 `app/social/` 的精簡版面）、`lib/<key>/can-points.ts`（一個呼叫 `can()` 的範例，第 3 步前先 throw「尚未接 can()」）、`lib/portal/__tests__/products.test.ts` 不用改（它讀登記表）。
 - `lib/portal/doors.ts` `doorForHost`：未知 host 回 `{ kind: "none" }`，middleware 回 404；員工門只認 `STAFF_HOSTS`（逗號分隔，預設 `app.<base domain>`，開發環境加 `localhost`）；測試：偽造 Host → 404（ADR 018 §1，Codex M19）。
 - 子網域每個產品都保留（ADR 018 §2）；開不開是 `status`。產生器不問、登記表不收「支援哪幾種方式」：五種全由共用層給（ADR 017 §0「產品不選方式」）；預設 `features[].buyout = true`（SAFETY_GATE 例外）、`modules.dependsOn = []`。測試：登記表型別不得出現這些確切欄位名：`audience`、`ways`、`supportedWays`、`channels`（`accessChannels` 允許）。
+- `scripts/sync-foundry-catalog.mjs`（新）：讀 `products.ts`（經 `tsx` 載入）寫 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/generation/awarewave-products.json`，並在 `questionnaires/catalog.json` 生成（或更新）一節 `AW` 「AwareWave 積木」：每產品一題 `Q-AW-<KEY>`（label＝產品名，description＝一句用途）、對應 `CAP-AW-<KEY>`、`rules/question-rules.json` 的依賴＝`dependsOn`；`--check` 模式只比對不寫，差異即 exit 1（ADR 017 §0b 第 7 條，操作者 2026-10-18「在 System Foundry 選擇項目組裝上去」）。SF 側 `make verify` 加 `node ../../../scripts/sync-foundry-catalog.mjs --check`。
 - 產生器同時寫 `lib/<key>/MODULE_MANIFEST.json`：System Foundry `kernel/06` 的十項宣告（state／behavior／API 與事件／不變量／依賴／失敗隔離／資料生命週期／可觀測／遷移回滾／替換策略），空欄用 `TODO` 字樣，`products.test.ts` 擋 `TODO` 進 `status: available` 的產品（ADR 017 §0b）。
 
 ## Files
@@ -59,6 +60,10 @@ cd D:/Work && node scripts/new-product.mjs --key demo --name 示範 --subdomain 
 cd D:/Work && node scripts/new-product.mjs --from-foundry agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/generated/sample-commerce-os --key demo2 --subdomain demo2 --features "demo2.run:QUOTA" --app lobster-factory/infra/hetzner-phase1-core/apps/next-admin
 ```
 → manifest 十項從藍圖填入（非 TODO 的欄 ≥ 6），登記列 `modules.dependsOn` 來自 `foundry-plan.json` 的模組清單；對不存在的目錄 → exit 2 `no foundry-plan.json`；`git show HEAD:lib/portal/products.ts > lib/portal/products.ts && rm -r app/demo app/demo2 lib/demo lib/demo2` 還原（共享工作目錄不得用 `git checkout --`）。
+```bash
+cd D:/Work && node scripts/sync-foundry-catalog.mjs && node scripts/sync-foundry-catalog.mjs --check && cd agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE && python scripts/validate_configurator.py
+```
+→ 目錄檔寫出、`--check` exit 0、SF 驗證綠（`Q-AW-*` 每題有 YES 規則、`CAP-AW-*` 可達）；在 `products.ts` 改一個產品名再 `--check` → exit 1；還原。
 突變：手動把 `app/(shell)/tools/tarot` 的登記列刪掉 → `npx vitest run lib/portal` 紅（反向登記）；還原綠。
 
 ## 完成後

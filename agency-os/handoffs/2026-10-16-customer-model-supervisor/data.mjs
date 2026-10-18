@@ -34,7 +34,7 @@ export const COPY = {
 export const RULES = [
   { h: '同一個模式', t: '整套新系統先在 System Foundry 答「要／不要」，再執行 scripts/new-product.mjs --from-foundry；小工具直接執行 new-product.mjs 答五題。兩條路都產生同一份登記列、自己的門、自己的資料、收費前只問 can() 的骨架。手寫一列，測試紅燈。' },
   { h: '離開 WordPress 也能跑', t: '付款、登入、CRM 都在接頭後面，接頭的值是設定。整套測試以 payments=local、login=local、crm=none 跑一遍必須全綠。WordPress 是今天的門口與收銀台，不是房子。' },
-  { h: '樂高：選配與串接', t: '功能用 features 與方案決定；買斷能單獨裝哪些積木由 standalone 與 dependsOn 決定；積木之間只走 API 與簽章事件，不讀對方的表。' },
+  { h: '樂高：選配與串接', t: '登記表就是積木目錄，匯出到 System Foundry 成一節「AwareWave 積木」：勾行銷、客服、社群…就裝哪些，依賴自動帶入。功能用 features 與方案決定；買斷能單獨裝哪些積木由 standalone 與 dependsOn 決定；積木之間只走 API 與簽章事件，不讀對方的表。' },
 ];
 
 // ADR 017 Q10：做的先後（操作者 2026-10-17）
@@ -97,7 +97,7 @@ export const NOW = [
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
 export const STEPS = [
-  { n: 1, card: 'cards/step-1.md', plain: '新產品只有一個入口：執行 scripts/new-product.mjs，回答五題，登記列、頁面骨架、收費點與測試就產生好；漏填或未登記的工具都會讓測試失敗。', title: '登記表加 features[] 與 accessChannels；產生器 new-product.mjs；機械閘', what: 'products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷、billing: contract|credits）與通道（ui；api 待 API 通道那一項開放）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。',
+  { n: 1, card: 'cards/step-1.md', plain: '新產品只有一個入口：執行 scripts/new-product.mjs，回答五題，登記列、頁面骨架、收費點與測試就產生好；漏填或未登記的工具都會讓測試失敗。', title: '登記表加 features[] 與 accessChannels；產生器 new-product.mjs；機械閘', what: 'products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷、billing: contract|credits）與通道（ui；api 待 API 通道那一項開放）；sync-foundry-catalog.mjs 把登記表匯出成 System Foundry 的「AwareWave 積木」題目；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE、目錄檔等於登記表。',
     files: ['scripts/new-product.mjs', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts'], gate: 'products.test.ts：漏填亮紅燈；可買斷模組含 SAFETY_GATE 亮紅燈；app 內任何目錄既不在登記表、也不在後台清單就亮紅燈（客服、蒐集器、行銷住在 /ops 下也算產品，只補登記列不搬家）', risk: 'Low', model: 'Opus 5.5', depends: [], status: 'not_started' },
   { n: 2, card: 'cards/step-2.md', plain: '資料庫記錄誰購買哪個方案、何時到期，以及哪位員工替哪位客戶操作。', title: 'Migration：plans、organization_entitlements、organizations.kind；許可帶 actor', what: '三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。',
     files: ['lobster-factory/packages/db/migrations/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '靜態檢查：付費 AI 的 SDK 與錢包帳本只准在 lib/entitlements/** 與 lib/ai/gateway.ts 引用；三張權利表只准在 lib/entitlements/** 與 app/portal/**；WordPress／Woo／Fluent 符號只准在各自接頭檔；其他位置出現就建置失敗', risk: 'Medium', model: 'Opus 5.5（先出計畫）', depends: [1], status: 'not_started' },

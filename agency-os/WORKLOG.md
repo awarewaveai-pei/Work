@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-18（續8）客戶怎麼來：登記表＝積木目錄，匯出成 System Foundry 一節「AwareWave 積木」（每產品一題，勾了就把 manifest 當模組放進藍圖、依賴自動閉包）；`sync-foundry-catalog.mjs --check` 當閘
+
+**觸發**：操作者「不像是可以組裝的樂高，之後在 System Foundry 應該要可以選擇項目（行銷、客服、社群…）然後組裝上去」。
+
+**根因**：System Foundry 的 50 個模組是通用模組（commerce OS），AwareWave 的產品不在它的選單；問卷答完組不出「用 AwareWave 積木」的系統。一個事實一處：登記表 `products.ts` 已是唯一產品清單（ADR 012 §5），所以目錄不另寫，由腳本匯出。
+
+**[已修改]**：ADR 017 §0b 第 7 條改寫為「選配＝在 System Foundry 勾積木」（匯出檔 `generation/awarewave-products.json`、問卷節 `Q-AW-<KEY>`、能力 `CAP-AW-<KEY>`、`foundry-plan.json` `modules[]` → 買斷模組清單／線上方案功能；閘：目錄檔等於登記表重匯出、`available` 產品必在目錄、SF `make verify` 加同一檢查）；順序 1 加匯出腳本；卡 1 加 `scripts/sync-foundry-catalog.mjs`（`--check`）與驗收指令、突變；監工台規則第三條改寫、第 1 項 what；TASKS SF 行加「AwareWave 積木」節；v18 重發。
+
+**驗證結果**
+- REALTEST_WAIVED: DOC_ONLY -- `node build.mjs && node check.mjs` ok（8 steps）；`verify-governance-pointers` PASSED
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 對照 SF README「capability dependency fixed-point closure」與 `rules/question-rules.json` 的 CAP 命名，產品映成 `CAP-AW-<KEY>` 走既有閉包，不另寫引擎
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`sync-foundry-catalog|awarewave-products.json|Q-AW-|CAP-AW-` | hits=只在 ADR 017、卡 1、data.mjs、TASKS（新名字）
+- ORACLE_WAIVED: 無 source 檔改動
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-18（續7）客戶怎麼來：新增順序 8「每個產品長成單一產品的樣子」——登記列只給名字，第 8 項給樣子（共用元件、產品門路由、開場即可用、manifest 無 TODO、available 由測試擋）；排在優先段②
 
 **觸發**：操作者「就是我認為他們還沒有展現單一產品的樣貌」。客服、蒐集器、行銷今天是後台裡的一頁，不是一個產品。
