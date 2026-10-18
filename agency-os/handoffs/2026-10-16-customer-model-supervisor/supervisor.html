@@ -129,7 +129,7 @@ ul.doors li span{min-width:0}
     <div class="b">
       <p class="plain">新產品只有一個入口：執行 scripts/new-product.mjs，回答五題，登記列、頁面骨架、收費點與測試就產生好；漏填或未登記的工具都會讓測試失敗。</p>
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
-      <p class="donewhen"><b>完成條件：</b>products.test.ts：漏填亮紅燈；可買斷模組含 SAFETY_GATE 亮紅燈；app 內任何產品目錄沒有登記列也亮紅燈（/ops/* 是後台頁，不算產品）</p>
+      <p class="donewhen"><b>完成條件：</b>products.test.ts：漏填亮紅燈；可買斷模組含 SAFETY_GATE 亮紅燈；app 內任何目錄既不在登記表、也不在後台清單就亮紅燈（客服、蒐集器、行銷住在 /ops 下也算產品，只補登記列不搬家）</p>
       <details><summary>工程細節：登記表加 features[] 與 accessChannels；產生器 new-product.mjs；機械閘</summary>
         <p>products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷、billing: contract|credits）與通道（ui；api 待 API 通道那一項開放）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。</p>
         <p><b>前置：</b>無</p>

@@ -15,8 +15,13 @@
 | canvas、designs、mockup、banner、vector-editor | 一個產品 | design（修圖／設計積木，同一組 Fabric 元件） |
 | content、publish、events | 一個產品 | content |
 | theme、ai-models | 員工門工具，非產品 | 列入 `STAFF_UTILITIES`，各附一句理由，且測試證明它們不 import 付費 SDK |
+| `ops/cs`＋`cs-widget`＋`ops/knowledge` | 產品（會給客戶用、叫付費 AI：`lib/cs/llm.ts`） | cs（door `/cs`、api `/api/cs`、subdomain `cs`） |
+| `ops/collect` | 產品（蒐集器，會給客戶用） | collect（door `/collect`、api `/api/collect`、subdomain `collect`） |
+| `outreach`（cold email） | 產品（行銷） | outreach（door `/outreach`、api `/api/outreach`、subdomain `outreach`） |
+| `ops/clients、schedules、repairs、integrations、system-modes、approvals、backup、inbox、costs、onboarding、tools`、`build`、`ops-console`、`onboard`、`api-check*` | 後台（員工管 AwareWave 營運） | 列入 `BACK_OFFICE`，各附一句理由 |
 
-- `lib/cs/`（客服，`lib/cs/billing.ts` 已引用 `product_key`）登記 key `cs`，`door: { app: "next-admin", page: "/cs", api: ["/api/cs"] }`，subdomain `cs`。
+- 住在 `/ops` 下的產品（cs、collect、outreach）**本步只補登記列**（`status: coming_soon`、子網域保留），路徑、資料表、API 前綴都不動；反向登記測試掃 `app/(shell)/tools/*`、`app/(shell)/ops/*`、`app/(shell)/*` 與 `app/<門前綴>`，每個目錄要在登記表或 `BACK_OFFICE` 清單之一。
+- **從 /ops 開成產品門的固定配方**（之後每個產品都一樣，不在本步做）：①頁面抽成共用元件（照 `app/social/page.tsx` 與 `app/(shell)/tools/social/` 共用 `SocialApp` 的做法）；②加 `app/<key>/{layout,page}.tsx` 產品門路由渲染同一元件；③`status: available`＋DNS、nginx（High，要 go）。員工門舊路徑保留。
 - 產生器 `scripts/new-product.mjs` 兩種用法：`--from-foundry <generated 專案目錄>`（讀 `.foundry/resolution/foundry-plan.json`、`docs/modules/<module>/00_REQUIREMENTS.md … 08_IMPLEMENTATION_BACKLOG.md` 與藍圖末節「交付登記」，十項宣告填進 manifest，只補問子網域與收費功能；目錄缺 `foundry-plan.json` 即拒絕）或直接問 SOP §18 五題 → 寫登記列、`app/<page>/{layout,page}.tsx` 骨架（複製 `app/social/` 的精簡版面）、`lib/<key>/can-points.ts`（一個呼叫 `can()` 的範例，第 3 步前先 throw「尚未接 can()」）、`lib/portal/__tests__/products.test.ts` 不用改（它讀登記表）。
 - `lib/portal/doors.ts` `doorForHost`：未知 host 回 `{ kind: "none" }`，middleware 回 404；員工門只認 `STAFF_HOSTS`（逗號分隔，預設 `app.<base domain>`，開發環境加 `localhost`）；測試：偽造 Host → 404（ADR 018 §1，Codex M19）。
 - 子網域每個產品都保留（ADR 018 §2）；開不開是 `status`。產生器不問、登記表不收「支援哪幾種方式」：五種全由共用層給（ADR 017 §0「產品不選方式」）；預設 `features[].buyout = true`（SAFETY_GATE 例外）、`modules.dependsOn = []`。測試：登記表型別不得出現這些確切欄位名：`audience`、`ways`、`supportedWays`、`channels`（`accessChannels` 允許）。
@@ -33,7 +38,7 @@
 1. `git log --oneline -10 -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/`
 2. 型別與欄位（含 `features[].billing: "contract" | "credits"`）；現有三列：social 的 `features` 從 `lib/social/` 實際付費動作盤點（AI 改寫、發文派送…）、cognitive 的 `features` 從 `ai_lego/apps/api/main.py` 9 個 `check_entitlement` 呼叫點的 capability id 盤點、hci 未開工可空；規則：`status: "available"` 的產品 `features` 不得為空（測試擋），`coming_soon` 可空（Codex 2026-10-18 M12）。
 3. 新增 video／tarot／studio／design／content／cs 六列，`status: "coming_soon"`、`selfSignup: false`、`loginSources: ["local"]`、`standalone` 依 ADR 017 §5 模組清單暫填 `false`，`features` 先填每個目錄裡實際呼叫付費 AI 的動作各一條（grep `lib/ai/claude-request.ts`、`replicate` 的呼叫端）。
-4. 測試加三條：`every tool directory under app/(shell)/tools maps to a product page prefix or a listed staff utility`；`every feature declares a limit kind and no buyout module carries SAFETY_GATE`；`staff utilities import no paid SDK`（掃 `app/(shell)/tools/theme/**`、`ai-models/**` 的 import 字串）。
+4. 測試加三條：`every directory under app/(shell)/{tools,ops} and app/(shell)/* maps to a product or a listed back-office or staff utility`；`every feature declares a limit kind and no buyout module carries SAFETY_GATE`；`staff utilities import no paid SDK`（掃 `app/(shell)/tools/theme/**`、`ai-models/**` 的 import 字串）。
 5. 寫產生器與其測試。
 6. 跑驗收。
 

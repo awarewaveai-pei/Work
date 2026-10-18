@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-18（續6）客戶怎麼來：產品看功能不看路徑——客服（ops/cs＋cs-widget＋knowledge）、蒐集器（ops/collect）、行銷（outreach）住在 /ops 下也是產品：先補登記列、保留子網域、不搬家；開產品門＝固定三步
+
+**觸發**：操作者「客服、行銷、蒐尋器和有些工具目前都不是用子網域，之後要怎麼處理？」
+
+**根因**：卡 1 把 `/ops/*` 一律當後台頁，會讓叫付費 AI 的客服（`lib/cs/llm.ts`、`lib/cs/generate.ts`）落在登記表與 `can()` 之外。判準改成功能：給客戶用、叫付費 AI、或收費＝產品；只有員工管 AwareWave 營運的才是後台（`ops/clients`、`schedules`、`repairs`、`integrations`、`system-modes`、`approvals`、`backup`、`inbox`、`costs`、`onboarding`、`build`、`ops-console`、`api-check*`，各附理由列 `BACK_OFFICE`）。
+
+**[已修改]**：ADR 017 順序 1（反向登記掃 `tools`、`ops`、shell 根；住 `/ops` 的產品只補登記列不搬家；開門三步：抽共用元件照 `app/social/`＋`tools/social` 共用 `SocialApp` 的做法 → 加 `app/<key>/` 產品門路由 → `status: available`＋DNS、nginx）；卡 1 歸位表加 cs／collect／outreach 三列與後台清單；監工台第 1 項閘文字；v16 重發。
+
+**驗證結果**
+- REALTEST_WAIVED: DOC_ONLY -- `node build.mjs && node check.mjs` ok；`verify-governance-pointers` PASSED 154
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 `ls app/(shell)`、`ls app/(shell)/ops` 逐目錄歸位，無遺漏
+- BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`BACK_OFFICE|ops/\* 是營運後台頁` | hits=只在 ADR 017 與卡 1（舊句已改）
+- ORACLE_WAIVED: 無 source 檔改動
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-18（續5）客戶怎麼來：Codex 第二輪——第一輪 25 條全部 CLOSED；新 13 條（2C／9M／2m）逐條驗真後全修：點數許可分支、取消狀態機、授權檔款項落定閘、網域與主機歸屬驗證、API key 到期與輪替、max_tenants 交易鎖、install_id 保留、migration 不鎖號、woo-billing 新路由、adapter 引用行號更正
 
 **觸發**：操作者「再送第二輪是好的話就不是『無效益』」。
