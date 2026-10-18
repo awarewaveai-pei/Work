@@ -45,7 +45,7 @@
 
 一個產品＝一塊積木。十項宣告照 System Foundry `kernel/06_MODULARITY_CONTRACT.md`（state／behavior／API 與事件契約／不變量／依賴／失敗隔離／資料生命週期／可觀測／遷移回滾／替換策略），寫在登記表那一列的 `modules` 與產生器產出的 `MODULE_MANIFEST.json`。本 ADR 加的、每塊都要過的八條：
 
-1. **登記列**：`products.ts` 一列（門、登入來源、`features[]`、`accessChannels`、`modules`）。沒有列＝不是產品，拿不到許可。
+1. **登記列**：`products.ts` 一列（門、登入來源，加上順序 1 新增的 `features[]`、`accessChannels`、`modules`；現有 `products.ts:19-45` 只有門、登入來源、`standalone`、`status`、`selfSignup`）。沒有列＝不是產品，拿不到許可。
 2. **自己的門**：子網域保留，頁面在自己的前綴下（ADR 018）。
 3. **自己的資料**：不讀寫別的產品的表（HCI ADR-0002）；要資料走對方的 API 或簽章事件。
 4. **只問一個判斷**：收費動作前 `can(主體, feature_key, actor)`；不自建帳本、不自建方案表。
@@ -75,7 +75,7 @@
 - **主體＝計費帳戶**：`coalesce(parent_organization_id, id)`（兩層樹的最上層）。品牌、部門這些子組織用上層的權利，「品牌數」上限算在上層。這是 HCI ADR-0009 租戶模型的 adapter 對應，不改它。
 - **試用從註冊那刻就有到期日**：`0063_portal_complete_signup.sql:76-77` 只寫 `status='trial'`、`current_period_end` 為空（Codex 2026-10-18 M4）；順序 2 改成註冊時寫 `current_period_end = now() + 14 天`、`plan_key = <產品的 trial 方案>`，並照方案展開 trial 權利列；每帳戶每產品只能有一次 trial（唯一索引 `(organization_id, product_key) where status='trial'`＋歷史 trial 列不刪）。
 - **合約＝0062**：一列＝一個（計費帳戶、產品、方案）。加 `plan_key`、`source_ref`（Woo 訂閱編號）。唯一索引改為（organization_id, product_key, plan_key）且非 canceled；每產品最多一個 base（控制面寫入時檢查，它是唯一寫入者）。試用＝base 列的 `trial` 狀態，付款時就地改 `active`、填 `plan_key`，不新增列。加購＝另一列 addon 方案。CHECK 改成包含所有登記表的產品（現在缺 `social`）。
-- **權利＝新表 `organization_entitlements`**：`organization_id`（計費帳戶）、`product_key`、`feature_key`（必填）、`source`（contract／comp）、`source_ref`（合約 id 或贈送原因）、`starts_at`、`ends_at`、`status`、上限。合約變動時控制面重算該帳戶的權利列。贈送整個產品＝照一個具名方案展開成每個功能一列。
+- **權利＝新表 `organization_entitlements`**：`organization_id`（計費帳戶）、`product_key`、`feature_key`（必填）、`source`（contract／comp）、`source_ref`（合約 id 或贈送原因）、`starts_at`、`ends_at`、`status`、上限。合約變動時控制面重算該帳戶的權利列，照固定狀態機：**換方案**＝舊列 `ends_at = now()`、新列 active；**取消**＝不新增列，現有列 `ends_at = current_period_end + 寬限`（付到期末仍能用）；**退款**＝`ends_at = now()`；**拒付**＝`status = suspended`（Codex R2-2）。贈送整個產品＝照一個具名方案展開成每個功能一列。
 - 點數不變成權利：功能在登記表宣告 `billing: contract | credits`。`contract` 功能看權利列；`credits` 功能不看權利列，`can()` 查錢包餘額（經帳本 client），餘額 ≥ 該功能最低扣點才 `allowed`，許可帶「這次最多花多少」＝餘額與單次上限取小（015 §1）。沒有權利列也沒有餘額＝拒絕（Codex 2026-10-18 C1）。
 - **到期與寬限**：權利列 `ends_at = current_period_end + 7 天`（預設，操作者可改）；每日全域工作把過期列改 `expired`，不刪列：`client_schedules` 是每客戶一列（`0097:24-25`），不適用；用 Trigger.dev 排程任務 `entitlements-expire` 每日 POST `/api/internal/entitlements/expire`（Bearer `SCHEDULE_INGEST_TOKEN`，與 `schedules-heartbeat` 同法），一次掃全部帳戶（Codex 2026-10-18 M7）。**試用結束**無付款同樣過期；資料保留 90 天後標 `erasure_due`，實際刪除走既有擦除流程。
 - **代操授權**：員工替組織 X 簽許可，只在該員工對 X 有角色（成員列或 `ops_role` owner/admin）時成立，否則 403；`actor` 永遠記員工本人。
@@ -83,7 +83,7 @@
 - **金鑰**：許可簽章私鑰 `ENTITLEMENT_SIGNING_KEY`（vault → `mcp/user-env.ps1` → 容器 env）；公鑰清單 `ENTITLEMENT_PUBLIC_KEYS`（`kid:公鑰`，可多把，換鑰時新舊並存一個 `expires_at` 窗）。授權檔私鑰 `LICENCE_SIGNING_KEY` 另一把，同法。兩把私鑰各留一份離線備份（vault 匯出，不在任何主機上）：遺失＝簽不出新許可與新授權檔，已發的照常驗。許可與授權檔都帶 `format_version`，驗章端拒絕不認識的版本。三張表、錢包帳本、稽核列納入既有每日備份與月度還原演練（B7）；帳本與稽核列永不刪（0066 `ON DELETE RESTRICT` 同法）。
 - **RLS**：`plans`、`organization_entitlements`、0062 只給 `service_role`；`anon`／`authenticated` 無 policy。0062 現有 `org_product_subs_select`（`0062:139-143`，authenticated 可讀自己組織的合約）由順序 2 的 migration 明確 `drop policy`，驗收用 `pg_policies` 查詢證明三表只剩 service_role（Codex 2026-10-18 M5）。客戶要看自己的方案走 `/portal` 的 API，不直讀表。價格在 Woo，不在這三表。
 - **只有控制面碰這三張表**（0062、`plans`、`organization_entitlements`）：靜態檢查只允許 `lib/entitlements/**` 與 `app/portal/**` 引用它們，其他地方出現就建置失敗。社群、collect 跟控制面在同一個 app，用的是繞過 RLS 的 service-role client（0062:51-52），沒有這道檢查就擋不住直讀。
-- **許可**（012 §4 `entitlement_ref` 擴充，取代 ADR-0031 gate 1 欄位）：`tenant`（計費帳戶）、`product_key`、`feature_key`、`entitlement_id`、`source_ref`、上限、可花點數上限、`actor`、`on_behalf_of`（§0 C 軸；`on_behalf_of` 永遠等於 `tenant`，代操時 `actor` 是員工）、`issued_at`、`expires_at`（分鐘級）、`kid`、簽章。只在該功能有 active 權利列時簽發（取代 gate 2 條件）。用量回報帶 `entitlement_id`（取代 gate 4 的 `subscription_ref`）與 `actor`／`on_behalf_of`，點數永遠扣 `on_behalf_of`，稽核永遠記 `actor`。畫面要灰掉沒買的按鈕時，產品要一份簽章的「此帳戶能用的功能與上限」，快取幾分鐘。
+- **許可**（012 §4 `entitlement_ref` 擴充，取代 ADR-0031 gate 1 欄位）：`tenant`（計費帳戶）、`product_key`、`feature_key`、`entitlement_id`、`source_ref`、上限、可花點數上限、`actor`、`on_behalf_of`（§0 C 軸；`on_behalf_of` 永遠等於 `tenant`，代操時 `actor` 是員工）、`issued_at`、`expires_at`（分鐘級）、`kid`、簽章。簽發條件二擇一：`contract` 功能要有 active 權利列（`entitlement_id` 填該列）；`credits` 功能要錢包餘額 ≥ 最低扣點（`entitlement_id` 空、`source: credits`、`max_spend` = min(餘額, 單次上限)）。兩者都沒有不簽（取代 gate 2 條件；Codex R2-1）。用量回報帶 `entitlement_id`（取代 gate 4 的 `subscription_ref`）與 `actor`／`on_behalf_of`，點數永遠扣 `on_behalf_of`，稽核永遠記 `actor`。畫面要灰掉沒買的按鈕時，產品要一份簽章的「此帳戶能用的功能與上限」，快取幾分鐘。
 - 認知平台：`check_entitlement` 改收 session 對應的計費帳戶與 `feature_key`、驗許可，不再只看 tenant。
 
 ### 4. 程式只有一個判斷：`grant = can(主體, feature_key, actor)`
@@ -97,11 +97,12 @@
 ### 5. 買斷＝一鍵架站＋選購模組（LEGO）
 
 - **另開一個「買斷安裝」階段**，不是在[總藍圖](../../operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md) Stage 4／5 上加一步：Stage 4 用我們的主機商 token 和 SSH key（`:148`），Stage 5 把服務接到我們自己的監控（`:154`）。買斷安裝要：
-  1. 主機商 adapter 每次呼叫帶客戶的主機商 token（`lobster-factory/packages/workflows/src/provision/serverAdapterFactory.ts:80`，新主機商＝新 adapter）；
+  1. 主機商 adapter 每次呼叫帶客戶的主機商 token：現有 `serverAdapterFactory.ts:63-67` 只從 `HETZNER_STAGING_TOKEN` 環境變數取 token，沒有買斷分支；順序 5 新增 `{ mode: "buyout", secretRef }` 分支，買斷模式禁止讀環境變數（新主機商＝新 adapter）；
   2. 在客戶主機裝一整套獨立服務（選到的模組需要的聯集）；
   3. 交接時撤掉我們的 SSH key 與所有我們的密鑰；客戶有買維運才保留一把維運用的 key。
 - **模組清單**（每個產品一份）：System Foundry `kernel/06_MODULARITY_CONTRACT.md` 的十項，加上：需要的基礎服務（例：社群＝next-admin＋Supabase＋Trigger.dev＋Postiz）、要填的設定值（客戶的 API key、網址）、依賴的模組（例：社群依賴帳號層）、可接的外部來源（§6）。安裝程式只讀這份清單。
 - **一份程式**：next-admin 照一個 app 出貨，沒選的模組路由與選單關掉；含 SAFETY_GATE 的程式碼在建置時排除（§2）。
+- **授權檔只在款項落定後簽發**：買斷訂單要在 `payment_events` 有已結清列、且退款／拒付窗（預設 30 天，操作者可改）內無反轉事件，或操作者在 `/ops/billing` 標記「匯款已入帳」（High，留稽核列）；安裝工作流在開工前再查一次，未落定即拒（Codex R2-3）。
 - **授權檔**：`format_version`、`kid`、`install_id`、客戶、模組、每個 `feature_key` 的上限、`updates_until`、`max_tenants`（預設 1；>1 才是轉售，順序第 7 步）、簽章（Ed25519，同 ADR 007）。安裝內存一組可接受的公鑰，換金鑰時舊授權檔仍可驗。功能沒有到期日；`updates_until` 只管能不能拿新版。
 - **不放遠端關閉開關**：我們的伺服器停了客戶照常能用。授權檔是合約工具，不是防破解。
 - **更新管道**：版本＝簽章的 release（image tag＋migrations＋changelog）放我方 registry；每個安裝配一組**只屬於它的** registry 拉取憑證（隨授權檔簽發，到期＝`updates_until`，可單獨撤銷），不用任何 AwareWave 共用憑證，交接撤鑰後仍能拉更新（Codex 2026-10-18 M15）；過期不擋使用。建置變體 `BUYOUT=1` 把含 SAFETY_GATE 的檔案排除在 image 外，測試在 image 內 grep 證明。

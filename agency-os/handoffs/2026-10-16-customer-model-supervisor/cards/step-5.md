@@ -6,12 +6,14 @@
 - 模組清單：`lib/portal/products.ts` 每列加 `modules: { services: string[], env: string[], dependsOn: ProductKey[] }`（例：social → next-admin、supabase、trigger、postiz；env：`POSTIZ_API_KEY`、`PUBLIC_BASE_DOMAIN`…）。登記表測試：`standalone: true` 的產品，其 `dependsOn` 閉包內不得含 SAFETY_GATE 功能。
 - 建置變體：SAFETY_GATE 功能的程式只准住 `lib/safety-gated/**` 與 `app/(shell)/**/safety/**`（目錄邊界，不是人工清單）；`BUYOUT=1` 建置把這兩個目錄 alias 成空模組；測試 `safety-gated-reachability.test.ts` 從所有 route 入口走 import 圖，證明 BUYOUT 下到不了它們；再在 image 內 grep 證明（Codex M16）。
 - 授權檔：`scripts/issue-licence.mjs --customer <slug> --modules social,design --max-tenants 1 --updates-until 2027-10-16` → JSON＋Ed25519 簽章（私鑰 `LICENCE_SIGNING_KEY`，vault）。安裝內 `lib/entitlements/licence.ts` 離線驗章，`can()` 在 `self_hosted` 模式從它回答；`report()` 不做事。
-- 安裝流程（新 workflow `provision/buyoutInstall.ts`，排在 Stage 4 之後）：客戶主機商 token 以**每次安裝的密鑰句柄**傳入（`secretRef`，由 vault 解析，不進 payload、不進 log），`serverAdapterFactory` 在買斷模式**禁止**回落到 `HETZNER_STAGING_TOKEN` 等環境變數（`serverAdapterFactory.ts:26`，Codex M14）→ 產生 compose（`-p <install_id>`）、nginx `server_name`、DNS 記錄三份設定，全部從 `PUBLIC_BASE_DOMAIN`／`PRODUCT_HOST_<KEY>` 同一組值產生（ADR 018 §4，Codex M13）→ 裝棧 → 寫授權檔與該安裝專屬的 registry 拉取憑證（到期＝`updates_until`，可撤）→ 跑 smoke（`curl https://<產品>.<客戶網域>/` 200）→ 交接：撤我方 SSH key、撤所有我方密鑰；客戶買維運才留一把維運 key（標在授權檔 `maintenance_key_id`）。
+- 安裝前三道閘（都要過才開工）：①**款項落定**：`payment_events` 有已結清列且退款／拒付窗內無反轉，或操作者在 `/ops/billing` 標「匯款已入帳」（High，留稽核）（Codex R2-3）；②**網域與主機歸屬**：客戶網域 DNS TXT 挑戰（`_awarewave-verify.<domain>` = 安裝 id 的雜湊）通過、SSH host key 指紋由客戶確認並寫進 `buyout_installs`；③**操作者核准**（High-STOP 一次）（R2-4）。
+- `install_id` 先在控制面表 `buyout_installs(install_id unique, customer, host_fingerprint, status)` 交易內保留，再建任何資源；同名即拒（R2-7）。
+- 安裝流程（新 workflow `provision/buyoutInstall.ts`，排在 Stage 4 之後）：客戶主機商 token 以**每次安裝的密鑰句柄**傳入（`secretRef`，由 vault 解析，不進 payload、不進 log）；現有 `serverAdapterFactory.ts:63-67` 只讀 `HETZNER_STAGING_TOKEN` 環境變數、沒有買斷分支，本步新增 `{ mode: "buyout", secretRef }` 分支，買斷模式**禁止**回落到環境變數（Codex M14、R2-10）→ 產生 compose（`-p <install_id>`）、nginx `server_name`、DNS 記錄三份設定，全部從 `PUBLIC_BASE_DOMAIN`／`PRODUCT_HOST_<KEY>` 同一組值產生（ADR 018 §4，Codex M13）→ 裝棧 → 寫授權檔與該安裝專屬的 registry 拉取憑證（到期＝`updates_until`，可撤）→ 跑 smoke（`curl https://<產品>.<客戶網域>/` 200）→ 交接：撤我方 SSH key、撤所有我方密鑰；客戶買維運才留一把維運 key（標在授權檔 `maintenance_key_id`）。
 - 更新管道：版本＝簽章的 release（image tag＋migrations＋changelog）放我方 registry；安裝內 `updates_until` 內可拉。過期不擋使用。
 - 客戶已有網站：wp-bridge 接進來（§6），不搬站。
 
 ## Files
-- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts`（modules）、`lib/portal/safety-gated.ts`
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts`（modules）、`lib/safety-gated/`（目錄邊界，Codex R2-12）
 - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/Dockerfile`（build arg）
 - `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/licence.ts`、`__tests__/licence.test.ts`
 - `scripts/issue-licence.mjs`
@@ -31,6 +33,7 @@ cd D:/Work/lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx vite
 cd D:/Work/lobster-factory/infra/hetzner-phase1-core/apps/next-admin && docker build --build-arg BUYOUT=1 -t next-admin:buyout . && docker run --rm next-admin:buyout sh -c "grep -rl SAFETY_GATE_IMPL /app/.next || echo absent"
 ```
 → `absent`。
+測試名另含 `licence is refused while the order is unsettled or reversed`、`install refuses a domain that fails the TXT challenge`、`two concurrent installs with the same install_id: one wins, one is refused`。
 真實：在拋棄式 VM（本機 Multipass 或一台時租主機）跑 `buyoutInstall` → 所有服務 healthy；`curl https://social.<測試網域>/` 200（nginx 與 DNS 由同一組值產生）；斷網後產品門仍可登入、按鈕可用；交接後 `ssh` 用我方 key 被拒；用安裝專屬 registry 憑證 `docker pull` 成功，用已撤銷的失敗。
 突變：拔掉 licence 驗章 → 指名測試紅；還原綠。
 

@@ -21,7 +21,7 @@
 ```bash
 cd D:/Work/lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx vitest run lib/entitlements lib/social lib/ai
 ```
-→ 綠；測試名含 `a credits feature is allowed by wallet balance without an entitlement row and refused at zero balance`、`a staff actor acting for a customer org debits that org and the audit row names the staff user`、`a staff actor without a role on the org is refused`、`no active entitlement means allowed=false with reason no_entitlement`、`gateway refuses a call without a grant`。
+→ 綠；測試名含 `a credits feature is allowed by wallet balance without an entitlement row and refused at zero balance`、`a credits permit carries source=credits, no entitlement_id and max_spend = min(balance, cap)`、`a staff actor acting for a customer org debits that org and the audit row names the staff user`、`a staff actor without a role on the org is refused`、`no active entitlement means allowed=false with reason no_entitlement`、`gateway refuses a call without a grant`。
 ```bash
 cd D:/Work/Projects/internal/cognitive-engineering-os && python scripts/affected_tests.py --run
 ```

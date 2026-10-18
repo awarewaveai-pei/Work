@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-18（續5）客戶怎麼來：Codex 第二輪——第一輪 25 條全部 CLOSED；新 13 條（2C／9M／2m）逐條驗真後全修：點數許可分支、取消狀態機、授權檔款項落定閘、網域與主機歸屬驗證、API key 到期與輪替、max_tenants 交易鎖、install_id 保留、migration 不鎖號、woo-billing 新路由、adapter 引用行號更正
+
+**觸發**：操作者「再送第二輪是好的話就不是『無效益』」。
+
+**做法**：同一份審閱提示加「先逐條確認第一輪 25 條是否 CLOSED，再審修法本身」→ `agency-os/reports/oracle/2026-10-18-inspect-a10f2f91.md`（271 秒）。結果：25／25 CLOSED；新 13 條。每條程式主張 grep 驗真：migrations 已到 `0109`（卡片寫 0104 會撞號）屬實；`app/api/webhooks/woo-order/` 是 Printful 草稿出貨（`route.ts:10-11`）屬實，付款不能混用；`serverAdapterFactory.ts:63-67` 讀環境變數、無買斷分支（前一輪寫 `:26` 是 sed 偏移的行號，已更正）屬實；`products.ts` 現無 `features`／`accessChannels`／`modules`（是順序 1 新增）屬實；卡 5 Files 寫 `lib/portal/safety-gated.ts` 與目錄邊界 `lib/safety-gated/**` 不一致屬實。
+
+**[已修改]**
+- ADR 017 §3：許可簽發條件二擇一（contract 需 active 權利列；credits 需餘額，`entitlement_id` 空、`source: credits`）（R2-1）；權利列狀態機：換方案舊列即止、取消付到期末＋寬限、退款即止、拒付 suspended（R2-2）；§5 授權檔只在款項落定後簽發（結清＋反轉窗 30 天或操作者標匯款入帳）（R2-3）；§0b 第 1 條註明三個欄位是順序 1 新增（R2-11）；§5 adapter 引用改 `:63-67`＋新增買斷分支（R2-10）。
+- 卡 2：migration 改「次號＝開工時目錄最大號＋1」（R2-8）；簽發條件二擇一。卡 3：credits 許可測試。卡 4：路由改 `app/api/webhooks/woo-billing/`（R2-9）、狀態機、測試名。卡 5：三道開工閘（款項落定／DNS TXT 挑戰＋SSH host key 指紋／操作者核准）（R2-3、R2-4）、`buyout_installs` 交易內保留 install_id（R2-7）、Files 路徑改 `lib/safety-gated/`（R2-12）、三條新測試。卡 6：`expires_at` 365 天、`rotated_from` 7 天寬限、只有根帳戶 owner／admin 能簽發、稽核列、RATE_LIMIT、Bearer 無 CSRF（R2-5）、三條新測試。卡 7：`pg_advisory_xact_lock` 交易內計數＋併發測試（R2-6）。
+- 監工台 data：第 1 項 what 含 `billing` 與 api 通道（R2-13）；第 5 項 what 含三道閘。v15 重發同 URL。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/codex-oracle.ps1 -Mode inspect -PromptFile review_prompt2.txt` | exit=0 | ms=270944 → 25 CLOSED、13 new，artifact `2026-10-18-inspect-a10f2f91.md`
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node build.mjs && node check.mjs`；`node scripts/verify-governance-pointers.mjs`；grep `0104_plans|webhooks/woo/|safety-gated.ts` 卡片與 ADR | exit=0 | ms=10000 → ok / PASSED / 0 命中
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=2c/9m/2n -- Codex 第二輪 13 條逐條 grep 驗真後全修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`woo-billing|buyout_installs|pg_advisory_xact_lock|rotated_from` | hits=只在 ADR 017 與卡片（新名字，無舊呼叫端）
+- ORACLE_WAIVED: 無 source 檔改動（程式仍 0 行）
+
+**剩餘風險**：第三輪未送；兩輪共 38 條皆為文件層。程式開工（第 1 項）時每個 commit 走 `/codex-review`。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-18（續4）社群 C22：日曆卡片／疊放、現在線、最佳發布時間、三欄篩選、批次動作選單、已刪除（誰刪的）、月換月、週期展開
 
 **範圍**：SOCIAL_MANAGER_PLAN C22。`Calendar.tsx` 整檔重寫（每天一欄、卡片＝縮圖＋平台標＋時間＋旗標＋標籤＋頻道＋兩行字、左色條＝狀態、頂色條＝第一個標籤、hover 預覽／複製／刪除、過去日斜紋、今天欄頭深色、現在線、未來日「＋ 新增」→ `compose/new?date=`、拖到別天時間不變）；新 `Trash.tsx`／`EmptyState.tsx`；`Toolbar.tsx`（三欄篩選、最佳時間平台 seg、清單頁「批次動作 · N」選單取代表格底部的批次列）；`model.ts` 加 `occurrences`／`takenSlots`／`bestFor`／`addMonths`；`GET /api/social/posts` 回 `tags`，`?trash=1` 回 `deletions`（`store.ts listDeletions` ＝審計紀錄最新一筆 `delete` 的 actor＋from，路由用 `actorForViewer` 過濾）；`LogView ACTION_NAMES` 補 0105 動作名（C20 卡外 ① 結案）。

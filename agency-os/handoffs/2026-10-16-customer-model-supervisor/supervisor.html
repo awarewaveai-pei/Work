@@ -131,7 +131,7 @@ ul.doors li span{min-width:0}
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>products.test.ts：漏填亮紅燈；可買斷模組含 SAFETY_GATE 亮紅燈；app 內任何產品目錄沒有登記列也亮紅燈（/ops/* 是後台頁，不算產品）</p>
       <details><summary>工程細節：登記表加 features[] 與 accessChannels；產生器 new-product.mjs；機械閘</summary>
-        <p>products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷）與通道（ui）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。</p>
+        <p>products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷、billing: contract|credits）與通道（ui；api 待 API 通道那一項開放）；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE。</p>
         <p><b>前置：</b>無</p>
         <p><b>檔案：</b><code>scripts/new-product.mjs</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts</code></p>
         <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md</code></p>
@@ -183,7 +183,7 @@ ul.doors li span{min-width:0}
       <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-high">風險 High（交付）</span><span class="who">負責：Fable 5.1 設計 → Opus 5.5 做</span></p>
       <p class="donewhen"><b>完成條件：</b>授權檔離線驗章；AwareWave 伺服器停止後安裝仍可用；安裝失敗只清本次 project；客戶網域由 compose、nginx、DNS 同一組值產生並 curl 200</p>
       <details><summary>工程細節：買斷安裝階段</summary>
-        <p>模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、客戶主機商 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。</p>
+        <p>三道閘後才開工：款項落定、客戶網域與主機歸屬驗證、操作者核准；模組清單、建置時排除 SAFETY_GATE、授權檔簽發（含 max_tenants）、安裝專屬更新憑證、客戶主機商 token 以密鑰句柄傳入、交接撤 key。排在一鍵架站 Stage 4 之後。</p>
         <p><b>前置：</b>第 <span data-computed>3</span> 項、第 <span data-computed>4</span> 項；交付 Postiz AGPL 前請律師確認（待決 2）</p>
         <p><b>檔案：</b><code>lobster-factory/packages/workflows/src/provision/</code> <code>agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md</code></p>
         <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-5.md</code></p>
