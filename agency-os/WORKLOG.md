@@ -28,6 +28,31 @@
 - ORACLE_WAIVED: 無 source 檔改動
 
 **rollback**：`git revert <本 commit>`。
+## 2026-10-18（續10）社群 V1.5 C21：撰寫頁（左選頻道、中撰寫、右預覽；底部標籤＋設定發佈時間＋主按鈕▾）；N 則留言帶延遲送進 Postiz；標籤、週期性安排、這則的自動回覆
+
+**範圍**：PLAN.md §1b C21 輸出 (a)–(h)。共享工作目錄與 C22 並行，共用檔只收本卡 hunk。
+**查證（Postiz v2.25.1 原始碼 D:\tmp\postiz-review\src-2251）**：
+- `values[].delay`＝分鐘，每則留言發之前等（`post.workflow.v1.1.2.ts:449`，`create.post.dto.ts:44`）→ 我們的延遲＝「上一則之後」，畫面照寫，不另存。
+- 每一則（貼文＋留言）都對同一個 maxLength 檢查（`posts.service.ts:1033`）→ 留言用貼文的字數上限。
+- Reel 沒有 post_type：IG／FB 單一 mp4 的貼文就是 Reel（`instagram.provider.ts:739`）。
+- 留言帶圖：FB／Threads／Bluesky／X 有；IG（`instagram.provider.ts:1088`）、LinkedIn（`linkedin.provider.ts:806`）只送文字。
+**做了**：
+- `Editor.tsx` 整檔重排，元件在 `compose/`：ChannelPicker、Writer（共用＋各頻道分頁、工具列、連結 UTM／替代文字／常用文字／AI 面板只標費用／表情／備註）、Comments（每則框、圖、表情、延遲 0/1/5/60、上下移、刪）、Formats（加 Reel；LinkedIn 文件輪播只畫、停用＋說明）、AutoReply（不用／照品牌規則／這則另外設）、TagPicker（勾、改名、換色、刪、新增）、Footer（主按鈕＝▾ 選的動作）、DateTimePicker（月曆＋15 分鐘清單＋時區；週期性多三列；只開時間給 C23 用）、Previews、`draft.ts`（純函式）、`compose.css`（token only，字 ≥14px）。SocialManager.tsx 不動（Editor props 不變）。
+- 送出端：`compose.ts` 第一則留言 → N 則（delay、留言圖、限時動態不送留言、Reel 要一支影片）；`dispatch-store.ts` 讀 `social_post_comments`（含圖）；`dispatch.ts` 型別。
+- 路由：posts POST／PUT 把 comments／tags 傳進 `savePost` children；comments 算內容（審核閘）、tags 不算；留言字數上限＋IG／LinkedIn 只有圖的留言 400；PUT 只改頻道也檢查已存留言。
+- 新 API：`/api/social/tags`（C22 篩選可共用）、`/api/social/auto-rules`（＋`lib/social/auto-rules.ts` 純解析、store 規則 CRUD；送出中的貼文不准改規則、審核閘同內容、存／刪後重做系列子貼文＝原 TASKS C27 ③）。
+- 存到素材庫：寫 `social_saved_texts`（只有文字；表沒有媒體欄，C31 前不改 schema）。
+**驗證**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npm test（276 files／2562 pass；compose.test N 則留言／Reel／IG 留言圖／限時動態、limits.test 留言超限、routes.test comments／tags 進 store＋留言超限 400＋審核下留言算內容） | exit=0 | ms=14250
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd tests && PLAYWRIGHT_SOCIAL_URL=http://127.0.0.1:3902 npx playwright test --project social（7 passed；新增 C21：建立→兩則留言→設定行程→回日曆看到卡、留言 delay 進 fake server） | exit=0 | ms=25300
+- REALTEST_EVIDENCE: tool=Bash | cmd=node tests/e2e/social/render-views.mjs <scratch>（02-compose／03-compose-menu／04-compose-picker／x-compose-repeat-picker／x-compose-tags／x-compose-comments 逐張看過；撞名 .sm-split／.sm-top 已改名） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/5m/6n（critic：M1 送出中貼文存規則會動版本→store 擋＋面板唯讀；M2 送出中改標籤／頻道／自動回覆被丟→全部鎖住；M3 輪播貼文設週期性必失敗→移除；M4 IG／LinkedIn 留言圖→compose 不送、只有圖的留言兩端都擋、預覽說明；M5 中途失敗重試會建第二則→記住最後寫入續做＋規則長度先驗；m2 規則審核閘、m3 規則後重做系列、m4 留言編號、m5 預設按鈕可用、m6 限時動態不送留言、n1／n2／n4 收；m1 版本另查非同交易＝殘留，TASKS）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n（`agency-os/reports/oracle/2026-10-18-partialreview-2454d63a.md`：#2 Reel 前端一律擋→改成跟 compose.ts 同規則「剛好一支影片」；#1 重試 409 不成立：`done.ref` 存的是已遞增後的版本，重試 PUT 版本相符）
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path，只送本卡路徑）
+- ORACLE_WAIVED: oracle 之後只改了 finding #2 那一行（Editor.tsx validate＋compose.ts export isVideo），tsc＋115 測試重跑綠，不跑第二輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=firstComment|commentsOverLimit|commentTakesMedia|saveAutoRule|autoRulePost | hits=33（firstComment 0 殘留；其餘全在本卡檔與測試）
+**剩／卡外**（TASKS 社群條目一行）：social.css 舊右欄編輯器樣式已無人用；SocialManager `copy()` 只帶 first_comment（沒帶多則留言、標籤）；規則存檔回傳版本與 SQL 擋送出中要進 migration（`social_touch_post_rules`）；週期性日期改了「哪幾天」不跟著換。render-views.mjs 的撰寫頁兩段已被 C22 的 db3964354 一起提交。
+**rollback**：`git revert <本 commit>`（無 migration；0105 已在 prod）。
 ## 2026-10-18（續9）System Foundry 審核：選擇正確、產出不能開工、沒有監工台 → v1.7 計畫（樣板瘦身、每模組可執行卡、監工台套件共用、接軌 AwareWave、範例 intake 自動重生、self_hosted 題）
 
 **觸發**：操作者「檢查整個 System Foundry，選擇選項送出後是否可以出完美文件讓 Claude 開工？是否會產生連動的監工台？還需要什麼優化？」

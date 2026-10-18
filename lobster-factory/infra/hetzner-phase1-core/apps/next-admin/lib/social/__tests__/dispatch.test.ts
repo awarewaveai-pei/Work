@@ -18,7 +18,7 @@ const QUE: PostizPost = { ...QUE0, settings: JSON.stringify({ __type: "bluesky",
 function post(targets: Array<Partial<QueuedPost["targets"][number]>>, extra: Partial<QueuedPost> = {}): QueuedPost {
   return {
     id: "p1", organizationId: "org", version: 7, state: "queued", scheduledAt: "2026-10-15T10:00:00Z", updatedAt: "2026-10-15T09:50:00Z", body: "launch day",
-    firstComment: null, linkUrl: null, linkUtm: false, media: [],
+    comments: [], linkUrl: null, linkUtm: false, media: [],
     targets: targets.map((t, i) => ({ id: `t${i + 1}`, accountId: "acc", platform: "bluesky", integrationId: INTEGRATION, accountStatus: "connected",
       customBody: null, format: "post", state: "pending", postizPostId: null, updatedAt: "2026-10-15T09:00:00Z", ...t })),
     ...extra,

@@ -1,18 +1,31 @@
 "use client";
-// The right panel's editor (mock: #ed). One text for every channel, a channel may have its own; meters per channel
-// (lib/social/limits.ts, the server's own rule); first comment, link + UTM, alt text, saved texts, format; preview per
-// channel on phone / desktop (lib/social/compose.ts builds the same text the sender sends); time + the four actions.
+// The composer (SOCIAL_MANAGER_PLAN.md C21; ADR 016 §5 decision 5; mock #edPanel): channels on the left, writing in
+// the middle (only it scrolls), previews on the right, and one bottom row -- 標籤, 設定發佈時間, and the main button that
+// does what ▾ picked. The pieces are in compose/; this file holds the post being written and how it is saved.
 // What can change follows the server: content only in the editable states and never after a channel went out (0098);
 // who may do what is lib/social/state.ts RULES (the buttons only mirror it; the server decides).
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { overLimit, BODY_LIMITS, bodyLength } from "@/lib/social/limits";
-import { withUtm } from "@/lib/social/compose";
+import { commentTakesMedia, isVideo } from "@/lib/social/compose";
+import { commentsOverLimit, overLimit } from "@/lib/social/limits";
+import type { RepeatRule } from "@/lib/social/repeat-rule";
 import type { PostState } from "@/lib/social/state";
-import { api, ApiError, type ListRow, type MediaItem, type PostInput, type SavedRef, type StateInput } from "./api";
-import { PfMark, stateStyle } from "./Calendar";
-import { formatsOf, instantAt, platformOf, shortDate, STATE_NAMES, targetProblems, zoned, type Account, type Brand, type Post } from "./model";
+import { splitKeywords } from "@/lib/social/auto-rules";
+import { api, ApiError, type AutoRule, type ListRow, type MediaItem, type PostInput, type SavedRef, type StateInput } from "./api";
+import { instantAt, platformOf, shortDate, targetProblems, zoned, type Account, type AutoMode, type Brand, type Post, type Tag } from "./model";
+import AutoReply, { blankRule, ruleDraftOf, type RuleDraft } from "./compose/AutoReply";
+import ChannelPicker from "./compose/ChannelPicker";
+import Comments from "./compose/Comments";
+import DateTimePicker from "./compose/DateTimePicker";
+import { channelText, cleanRepeat, newRepeat, repeatText, whenText, type Act, type CommentDraft, type Delay } from "./compose/draft";
+import Footer from "./compose/Footer";
+import Formats from "./compose/Formats";
+import Previews from "./compose/Previews";
+import TagPicker from "./compose/TagPicker";
+import Writer, { type Extra } from "./compose/Writer";
+import "./compose/compose.css";
 
 const MAX_UPLOAD = 10 * 1024 * 1024;   // uploadMedia's cap (lib/content/postiz.ts)
+const MAX_COMMENTS = 50;               // 0105 social_post_comments.position 0..49
 
 export interface EditorProps {
   brand: Brand;
@@ -21,7 +34,7 @@ export interface EditorProps {
   post: Post | null;
   defaults: { date: string; time: string };
   today: string;
-  /** the brand's rotation lists (C7): the time row can hand the post to one instead of a fixed time */
+  /** unused since C21: a post goes into an autolist from that list's tab (C23 card boundary) */
   lists?: ListRow[];
   /** the reviewer's approve / reject bar (C8) */
   reviewBar?: ReactNode;
@@ -38,84 +51,111 @@ export interface EditorProps {
 
 function message(e: unknown): string {
   if (e instanceof ApiError) {
-    const over = (e.detail as { overLimit?: Array<{ platform: string; length: number; limit: number }> } | undefined)?.overLimit;
-    if (over?.length) return over.map((o) => `${platformOf(o.platform).name} ${o.length}／${o.limit} 字，太長了`).join("；");
+    const d = e.detail as { overLimit?: Array<{ platform: string; length: number; limit: number }>; commentOverLimit?: Array<{ platform: string; length: number; limit: number; comment: number }> } | undefined;
+    if (d?.overLimit?.length) return d.overLimit.map((o) => `${platformOf(o.platform).name} ${o.length}／${o.limit} 字，太長了`).join("；");
+    if (d?.commentOverLimit?.length) return d.commentOverLimit.map((o) => `第 ${o.comment} 則留言在 ${platformOf(o.platform).name} ${o.length}／${o.limit} 字，太長了`).join("；");
     if (e.status === 409) return `${e.message}（重新整理後再試）`;
     return e.message;
   }
   return e instanceof Error ? e.message : String(e);
 }
 
+const param = (k: string) => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get(k));
+// a read that may fail (or not exist in a test's fake api) only leaves its part empty
+const load = <T,>(read: () => Promise<T>, done: (v: T) => void, fail?: (e: unknown) => void) => { Promise.resolve().then(read).then(done).catch((e) => fail?.(e)); };
+
 export default function Editor(props: EditorProps) {
   const { brand, accounts, post } = props;
   const tz = brand.default_timezone;
   const canWrite = brand.role === "owner" || brand.role === "editor";
   const state: PostState = post?.state ?? "draft";
-  const sentIds = new Set((post?.targets ?? []).filter((t) => t.state === "queued" || t.state === "published").map((t) => t.account_id));
-  const sent = sentIds.size > 0;
-  const contentLocked = !canWrite || state === "queued" || state === "published" || state === "deleted" || sent;
+  const sentIds = useMemo(() => new Set((post?.targets ?? []).filter((t) => t.state === "queued" || t.state === "published").map((t) => t.account_id)), [post]);
+  const contentLocked = !canWrite || state === "queued" || state === "published" || state === "deleted" || sentIds.size > 0;
+  const readOnly = !canWrite || state === "published" || state === "deleted";
+  // queued = in Postiz waiting for its time: only its time, a draft or a submission may change (0100 release); a rule,
+  // tags or channels saved meanwhile would be lost or move the version under the sender (critic 2026-10-18 M1/M2)
+  const queued = state === "queued";
+  const channelEditable = (id: string) => !readOnly && !sentIds.has(id) && state !== "queued";
 
-  const [picked, setPicked] = useState<string[]>(() => post ? post.targets.map((t) => t.account_id) : accounts.filter((a) => a.status === "connected").map((a) => a.id));
+  const connected = accounts.filter((a) => a.status === "connected");
+  const firstPick = () => {
+    if (post) return post.targets.map((t) => t.account_id);
+    const wanted = param("accounts")?.split(",") ?? [];
+    const hit = connected.filter((a) => wanted.includes(a.id)).map((a) => a.id);
+    return hit.length ? hit : connected.slice(0, 3).map((a) => a.id);   // the mock's blank(): the first three
+  };
+  const [picked, setPicked] = useState<string[]>(firstPick);
+  const [tab, setTab] = useState("all");
   const [body, setBody] = useState(post?.body ?? "");
   const [custom, setCustom] = useState<Record<string, string>>(() => Object.fromEntries((post?.targets ?? []).filter((t) => t.custom_body != null).map((t) => [t.account_id, t.custom_body as string])));
   const [formats, setFormats] = useState<Record<string, string>>(() => Object.fromEntries((post?.targets ?? []).map((t) => [t.account_id, t.format])));
-  const [fc, setFc] = useState(post?.first_comment ?? "");
   const [link, setLink] = useState(post?.link_url ?? "");
   const [utm, setUtm] = useState(post?.link_utm ?? false);
   const [notes, setNotes] = useState(post?.notes ?? "");
   const [mediaList, setMediaList] = useState(() => [...(post?.media ?? [])].sort((a, b) => a.position - b.position).map((m) => ({ media_id: m.media_id, alt_text: m.alt_text })));
-  const [open, setOpen] = useState<Record<string, boolean>>({ fc: !!post?.first_comment, link: !!post?.link_url, alt: !!post?.media.some((m) => m.alt_text), texts: false });
-  const scheduledParts = post?.scheduled_at ? zoned(post.scheduled_at, tz) : null;
-  const [date, setDate] = useState(scheduledParts?.date ?? props.defaults.date);
-  const [time, setTime] = useState(scheduledParts?.time ?? props.defaults.time);
-  const [previewId, setPreviewId] = useState<string | null>(null);
-  const [mode, setMode] = useState<"fixed" | "rot">(post?.state === "rotation" ? "rot" : "fixed");
-  const [listId, setListId] = useState<string | null>(post?.list_id ?? props.lists?.[0]?.id ?? null);
-  const [device, setDevice] = useState<"phone" | "desktop">("phone");
+  const keyRef = useRef(0);
+  const [comments, setComments] = useState<CommentDraft[]>(() => [...(post?.comments ?? [])].sort((a, b) => a.position - b.position)
+    .map((c) => ({ key: ++keyRef.current, body: c.body, delay: c.delay_minutes as Delay, media_id: c.media_id })));
+  const [tagIds, setTagIds] = useState<string[]>(() => (post?.tags ?? []).map((t) => t.tag_id));
+  const [tags, setTags] = useState<Tag[] | null>(null);
+  const [autoMode, setAutoMode] = useState<AutoMode>(post?.auto_mode ?? "brand");
+  const [autoOpen, setAutoOpen] = useState(post?.auto_mode === "own");
+  const [brandRules, setBrandRules] = useState<AutoRule[] | null>(null);
+  const [rule, setRule] = useState<RuleDraft | null>(null);
+  const [ruleDirty, setRuleDirty] = useState(false);
+  const [ownRuleIds, setOwnRuleIds] = useState<string[]>([]);
+  const [open, setOpen] = useState<Set<Extra>>(() => new Set<Extra>([...(post?.link_url ? ["link" as const] : []), ...(post?.notes ? ["notes" as const] : []), ...(post?.media.some((m) => m.alt_text) ? ["alt" as const] : [])]));
+  const at = post?.scheduled_at ? zoned(post.scheduled_at, tz) : null;
+  const [date, setDate] = useState(at?.date ?? props.defaults.date);
+  const [time, setTime] = useState(at?.time ?? props.defaults.time);
+  const [repeat, setRepeat] = useState<RepeatRule>(() => post?.repeat ? { ...post.repeat } : newRepeat(at?.date ?? props.defaults.date));
+  const [chosen, setChosen] = useState<Act | null>(null);
+  const [requireReview, setRequireReview] = useState(false);
+  const [dtOpen, setDtOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [confirmNow, setConfirmNow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<{ text: string; error?: boolean } | null>(null);
   const [texts, setTexts] = useState<Array<{ id: string; body: string }> | null>(null);
+  const [sourceUrl, setSourceUrl] = useState<string | null>(post?.source_url ?? null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const uploadFor = useRef<"post" | number>("post");
   const pickTouched = useRef(false);
+  // what this page last wrote: a retry after a later step failed continues from it instead of creating the post twice
+  // or writing against a version it already moved (critic 2026-10-18 M5)
+  const done = useRef<{ ref: SavedRef; state: PostState } | null>(null);
   const lastAttach = useRef(props.attach?.n ?? 0);
   const lastPrefill = useRef(0);
-  const [sourceUrl, setSourceUrl] = useState<string | null>(post?.source_url ?? null);
-  // a new post opened before the brand's channels arrived: take the connected ones once they do, unless someone chose
-  useEffect(() => {
-    if (!post && !pickTouched.current && accounts.length) setPicked(accounts.filter((a) => a.status === "connected").map((a) => a.id));
-  }, [post, accounts]);
-
-  const pickedAccounts = useMemo(() => picked.map((id) => accounts.find((a) => a.id === id)).filter((a): a is Account => !!a), [picked, accounts]);
-  const preview = pickedAccounts.find((a) => a.id === previewId) ?? pickedAccounts[0] ?? null;
-  const textFor = (a: Account) => {
-    let t = custom[a.id] ?? body;
-    if (link.trim()) {
-      const l = utm ? (() => { try { return withUtm(link.trim(), a.platform); } catch { return link.trim(); } })() : link.trim();
-      t = t.includes(link.trim()) ? t.split(link.trim()).join(l) : t.trim() ? `${t}\n\n${l}` : l;
-    }
-    return t;
-  };
-  const problems = overLimit("", pickedAccounts.map((a) => ({ accountId: a.id, platform: a.platform, customBody: textFor(a) })));
-
-  useEffect(() => {
-    if (open.texts && texts === null) api.texts(brand.id).then((r) => setTexts(r.texts)).catch((e) => setHint({ text: message(e), error: true }));
-  }, [open.texts, texts, brand.id]);
-
   const say = (text: string, error = false) => setHint({ text, error });
 
+  // a new post opened before the brand's channels arrived: pick once they do, unless someone chose
+  useEffect(() => {
+    if (!post && !pickTouched.current && accounts.length) setPicked(firstPick());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post, accounts]);
+  useEffect(() => {
+    load(() => api.tags(brand.id), (r) => setTags(r.tags), () => setTags([]));
+    load(() => api.autoRules(brand.id), (r) => setBrandRules(r.rules), () => setBrandRules([]));
+    load(() => api.settings(brand.id), (r) => setRequireReview(r.requireReview));
+  }, [brand.id]);
+  useEffect(() => {
+    if (!post || post.auto_mode !== "own") return;
+    load(() => api.autoRules(brand.id, post.id), (r) => { setOwnRuleIds(r.rules.map((x) => x.id)); setRule(r.rules[0] ? ruleDraftOf(r.rules[0]) : blankRule()); }, (e) => say(message(e), true));
+  }, [brand.id, post]);
+  useEffect(() => {
+    if (open.has("texts") && texts === null) load(() => api.texts(brand.id), (r) => setTexts(r.texts), (e) => say(message(e), true));
+  }, [open, texts, brand.id]);
   useEffect(() => {
     const p = props.prefill;
     if (!p || p.n === lastPrefill.current) return;
     lastPrefill.current = p.n;
     setBody(p.body);
     setLink(p.link);
-    setOpen((o) => ({ ...o, link: !!p.link }));
+    if (p.link) setOpen((o) => new Set(o).add("link"));
     setSourceUrl(p.sourceUrl);
     setCustom(p.custom);
     setMediaList(p.mediaIds.map((id) => ({ media_id: id, alt_text: null })));
   }, [props.prefill]);
-
   useEffect(() => {
     const a = props.attach;
     if (!a || a.n === lastAttach.current) return;
@@ -123,76 +163,149 @@ export default function Editor(props: EditorProps) {
     setMediaList((l) => (l.some((m) => m.media_id === a.id) ? l : [...l, { media_id: a.id, alt_text: null }]));
   }, [props.attach]);
 
-  function input(): PostInput {
+  const channels = useMemo(() => picked.map((id) => accounts.find((a) => a.id === id)).filter((a): a is Account => !!a), [picked, accounts]);
+  const curTab = channels.some((a) => a.id === tab) ? tab : "all";   // a tab whose channel was unticked falls back to 共用
+  const textFor = (a: Account) => channelText(a, body, custom, link, utm);
+  const mediaPath = (id: string) => props.media.find((m) => m.id === id)?.postiz_path ?? null;
+  const images = mediaList.map((m) => mediaPath(m.media_id)).filter((p): p is string => !!p);
+  const liveComments = comments.filter((c) => c.body.trim() || c.media_id);
+  const problems = overLimit("", channels.map((a) => ({ accountId: a.id, platform: a.platform, customBody: textFor(a) })));
+  // numbered over every box on the page (an empty box keeps its number)
+  const commentProblems = commentsOverLimit(comments.map((c) => c.body), channels.map((a) => ({ accountId: a.id, platform: a.platform })));
+  const noCommentImage = channels.filter((a) => !commentTakesMedia(a.platform));
+
+  // ---- what the main button may do (lib/social/state.ts RULES; with review on an editor submits, 0102) ----
+  const reviewGate = requireReview && brand.role === "editor";
+  const unapproved = !post || ["draft", "error", "rotation"].includes(state);
+  const can = {
+    draft: canWrite && (!post || ["draft", "review", "scheduled", "queued", "rotation", "error"].includes(state)),
+    library: canWrite,
+    review: canWrite && (!post || ["draft", "review", "scheduled", "queued", "rotation"].includes(state)),
+    schedule: canWrite && (!post || ["draft", "scheduled", "queued", "error", "rotation"].includes(state)) && !(reviewGate && unapproved),
+    // not from an autolist: 0105 refuses repeat on a rotation post, and the save comes before leaving the list
+    repeat: canWrite && (!post || ["draft", "scheduled", "error"].includes(state)) && !post?.repeat_of && !(reviewGate && unapproved),
+    now: brand.role === "owner" && (!post || ["draft", "scheduled", "queued", "error", "rotation"].includes(state)),
+    keep: canWrite && state === "rotation",
+  };
+  const allowed = (a: Act) => (a === "keep" ? can.keep : can[a]);
+  const preferred = ([state === "rotation" ? "keep" : null, post?.repeat ? "repeat" : null, reviewGate && unapproved ? "review" : null, "schedule", "review", "draft"] as Array<Act | null>)
+    .find((a): a is Act => !!a && allowed(a)) ?? "draft";
+  const act: Act = chosen && allowed(chosen) ? chosen : preferred;
+
+  function validate(kind: Act): string | null {
+    const empty = !body.trim() && !mediaList.length && !channels.some((a) => custom[a.id]?.trim());
+    if (empty && !contentLocked) return "貼文還是空的。";
+    if (kind !== "draft" && kind !== "keep" && !channels.length) return "還沒選要發到哪裡：在左邊勾頻道。";
+    if (problems.length) return `${problems.map((p) => `${accounts.find((a) => a.id === p.accountId)?.label ?? ""}（${platformOf(p.platform).name}）`).join("、")} 超過字數上限，點上面它的名字另外寫一份短的。`;
+    if (commentProblems.length) return `第 ${commentProblems[0].comment} 則留言超過 ${platformOf(commentProblems[0].platform).name} 的字數上限（${commentProblems[0].length}／${commentProblems[0].limit}）。`;
+    const imageOnly = comments.findIndex((c) => c.media_id && !c.body.trim());
+    if (imageOnly >= 0 && noCommentImage.length) return `第 ${imageOnly + 1} 則留言只有圖，${[...new Set(noCommentImage.map((a) => platformOf(a.platform).name))].join("、")} 的留言不能帶圖，請加上文字。`;
+    if (kind !== "draft" && kind !== "keep") {
+      if (channels.some((a) => a.platform.startsWith("instagram")) && !mediaList.length) return "Instagram 一定要有圖片或影片。";
+      // compose.ts: a Reel is a post with exactly one video (Codex 2026-10-18: do not refuse one that has it)
+      if (channels.some((a) => formats[a.id] === "reel") && !(mediaList.length === 1 && isVideo(mediaPath(mediaList[0].media_id)))) return "Reel 要剛好一支影片。影片上傳還沒開放，先改成「貼文」或「限時動態」。";
+    }
+    if (kind === "repeat" && repeat.freq === "week" && !repeat.days?.length) return "週期性安排：至少選一天。";
+    if (autoMode === "own" && rule) {
+      const kw = splitKeywords(rule.keywords);
+      if (!kw.length || !rule.reply.trim() || !rule.platforms.length) return "這則的自動回覆：關鍵字、回覆內容、至少一個平台都要有。";
+      // lib/social/auto-rules.ts parseAutoRule and the 0105 checks
+      if (kw.length > 50 || kw.join(",").length > 2000 || rule.reply.trim().length > 2000 || rule.name.length > 80) return "這則的自動回覆：關鍵字最多 50 個，回覆內容最多 2000 字。";
+    }
+    return null;
+  }
+
+  function input(kind: Act): PostInput {
     const fields: PostInput["fields"] = { notes: notes.trim() || null };
-    if (!contentLocked) Object.assign(fields, { body, first_comment: fc.trim() || null, link_url: link.trim() || null, link_utm: utm, source_url: sourceUrl });
+    if (!contentLocked) Object.assign(fields, { body, link_url: link.trim() || null, link_utm: utm, source_url: sourceUrl });
+    // 0105: a template holds the rule; 設定行程 or 立即發佈 on a template ends the series (its untouched children go)
+    if (kind === "repeat") fields.repeat = cleanRepeat(repeat);
+    else if ((kind === "schedule" || kind === "now") && post?.repeat) fields.repeat = null;
+    if (autoMode !== (post?.auto_mode ?? "brand")) fields.auto_mode = autoMode;
     return {
       fields,
-      targets: picked.map((id) => {
-        const a = accounts.find((x) => x.id === id);
-        return { account_id: id, custom_body: custom[id] ?? null, format: formats[id] ?? (a ? formatsOf(a.platform)[0].key : "post") };
+      targets: picked.map((id) => ({ account_id: id, custom_body: custom[id] ?? null, format: formats[id] ?? "post" })),
+      ...(contentLocked ? {} : {
+        media: mediaList.map((m) => ({ media_id: m.media_id, alt_text: m.alt_text?.trim() || null })),
+        comments: liveComments.map((c) => ({ body: c.body, delay_minutes: c.delay, media_id: c.media_id })),
       }),
-      media: mediaList.map((m) => ({ media_id: m.media_id, alt_text: m.alt_text?.trim() || null })),
+      tags: tagIds,
     };
   }
 
-  async function saveContent(version = post?.version ?? 0, stateNow: PostState = state): Promise<SavedRef> {
-    if (!post) return (await api.create(brand.id, input())).post;
-    if (stateNow === "queued" || stateNow === "published") return { id: post.id, version };   // nothing of its content may change
-    const i = input();
-    if (contentLocked) delete i.media;   // sent: the media set stays as it went out
-    return (await api.save(brand.id, post.id, version, i)).post;
+  async function saveContent(base: SavedRef | null, stateNow: PostState, kind: Act): Promise<SavedRef> {
+    if (!base) return (await api.create(brand.id, input(kind))).post;
+    if (stateNow === "queued" || stateNow === "published") return base;   // nothing of its content may change
+    return (await api.save(brand.id, base.id, base.version, input(kind))).post;
   }
 
-  async function act(kind: "draft" | "review" | "schedule" | "now") {
-    if (!pickedAccounts.length) return say("先勾選要發到哪些帳號。", true);
-    if (!contentLocked && !body.trim() && !mediaList.length && !pickedAccounts.every((a) => custom[a.id]?.trim())) return say("貼文還是空的。", true);
-    if (problems.length) return say(problems.map((p) => `${platformOf(p.platform).name} 超過字數上限（${p.length}／${p.limit}）`).join("；"), true);
-    const toList = kind === "schedule" && mode === "rot";
-    if (toList && !listId) return say("還沒有輪播清單，先到「輪播」建一個。", true);
+  // this post's own auto-reply rule (0105: a rule save moves the post's version, so the next step uses the new one)
+  async function saveRule(ref: SavedRef, stateNow: PostState): Promise<SavedRef> {
+    if (stateNow === "queued") return ref;   // the panel is read-only then; the store refuses it too
+    let version = ref.version;
+    if (autoMode === "own" && rule && (ruleDirty || !rule.id)) {
+      const r = await api.saveAutoRule(brand.id, rule.id, { post_id: ref.id, name: rule.name.trim() || "這則專用", trigger: rule.trigger,
+        keywords: splitKeywords(rule.keywords), platforms: rule.platforms, action: rule.action, reply: rule.reply.trim(), active: true });
+      setRule({ ...rule, id: r.id });
+      setRuleDirty(false);
+      setOwnRuleIds((ids) => (ids.includes(r.id) ? ids : [...ids, r.id]));
+      version = r.postVersion ?? version;
+    } else if (autoMode !== "own" && ownRuleIds.length) {
+      for (const id of ownRuleIds) version = (await api.deleteAutoRule(brand.id, id)).postVersion ?? version;
+      setOwnRuleIds([]);
+    }
+    return { id: ref.id, version };
+  }
+
+  async function run(kind: Act) {
+    setMenuOpen(false);
+    if (kind === "library") {
+      if (!body.trim()) return say("貼文還是空的。", true);
+      try {
+        await api.addText(brand.id, body.trim());
+        setTexts(null);
+        return say("已把文字存到素材庫（常用文字）。圖片之後的版本才會一起存。");
+      } catch (e) {
+        return say(message(e), true);
+      }
+    }
+    const bad = validate(kind);
+    if (bad) return say(bad, true);
     let when: string | null = null;
-    if (kind === "schedule" && !toList) {
-      if (!date || !time) return say("先選日期和時間。", true);
+    if (kind === "schedule" || kind === "repeat") {
       when = instantAt(date, time, tz);
-      if (Date.parse(when) <= Date.now()) return say("排程時間要在未來。要現在發，按「立即發佈」。", true);
+      if (Date.parse(when) <= Date.now()) return say("發佈時間要在未來。要現在發，選「立即發佈」。", true);
     }
     setBusy(true);
     setHint(null);
     try {
-      const live = state === "scheduled" || state === "queued";
-      let ref: SavedRef;
-      const step = async (s: StateInput) => { ref = (await api.setState(brand.id, ref.id, ref.version, s)).post; };
-      if (post && live && (kind === "draft" || kind === "review")) {
+      const st: PostState = done.current?.state ?? state;
+      const live = st === "scheduled" || st === "queued";
+      let ref: SavedRef = done.current?.ref ?? (post ? { id: post.id, version: post.version } : { id: "", version: 0 });
+      const keep = (r: SavedRef, s: PostState) => { ref = r; done.current = { ref: r, state: s }; };
+      const step = async (s: StateInput, to: PostState) => keep((await api.setState(brand.id, ref.id, ref.version, s)).post, to);
+      if (ref.id && live && (kind === "draft" || kind === "review")) {
         // taken off the schedule first, then edited: with review on, an approved post's content is refused while it is
-        // scheduled (review 2026-10-15), and a draft or a submission is what these two buttons ask for anyway
-        ref = { id: post.id, version: post.version };
-        await step({ action: "unschedule" });
-        ref = await saveContent(ref.version, "draft");
+        // scheduled (review 2026-10-15), and a draft or a submission is what these two ask for anyway
+        await step({ action: "unschedule" }, "draft");
+        keep(await saveContent(ref, "draft", kind), "draft");
       } else {
-        ref = await saveContent();
+        keep(await saveContent(ref.id ? ref : null, st, kind), st);
       }
-      if (kind === "draft") {
-        props.onSaved(ref.id, live ? "已取消排程，存成草稿。" : "已存起來。");
-      } else if (kind === "review") {
-        await step({ action: "submit" });
-        props.onSaved(ref.id, "已送審，審核的人核准後才會排程。");
-      } else if (toList) {
-        if (state === "rotation" && post?.list_id === listId) {
-          props.onSaved(ref.id, "已存起來（還在清單裡）。");
-          return;
-        }
-        if (state === "rotation") await step({ action: "from_rotation" });
-        else if (live) await step({ action: "unschedule" });   // (only "加入清單" reaches here for a live post)
-        const { items } = await api.list(brand.id, listId as string);
-        const position = items.length ? Math.max(...items.map((x) => x.list_position ?? 0)) + 1 : 0;
-        await step({ action: "to_rotation", listId: listId as string, listPosition: position });
-        props.onSaved(ref.id, `已加到「${props.lists?.find((l) => l.id === listId)?.name ?? "清單"}」最後。`);
-      } else if (kind === "schedule") {
-        await step({ action: "schedule", scheduledAt: when as string });
+      const now = done.current?.state ?? st;
+      keep(await saveRule(ref, now), now);
+      if (now === "rotation" && kind !== "keep") await step({ action: "from_rotation" }, "draft");
+      if (kind === "draft") props.onSaved(ref.id, live ? "已取消排程，存成草稿。" : st === "rotation" ? "已移出自動發布清單，存成草稿。" : st === "review" ? "已存起來，還在等審核。" : "已存成草稿。");
+      else if (kind === "keep") props.onSaved(ref.id, "已存起來（還在自動發布清單裡）。");
+      else if (kind === "review") {
+        if (st !== "review") await step({ action: "submit" }, "review");
+        props.onSaved(ref.id, st === "review" ? "已存起來，還在等審核。" : "已送審，審核人核准後才會排程。");
+      } else if (kind === "schedule" || kind === "repeat") {
+        await step({ action: "schedule", scheduledAt: when as string }, "scheduled");
         const z = zoned(when as string, tz);
-        props.onSaved(ref.id, `已排在 ${shortDate(z.date)} ${z.time}。`);
+        props.onSaved(ref.id, kind === "repeat" ? `已設定週期：${repeatText(repeat, z.date, z.time)}。` : `已排在 ${shortDate(z.date)} ${z.time}。按「回排程日曆」看它在哪。`);
       } else {
-        await step({ action: "publish_now", confirmPublishNow: true });
+        await step({ action: "publish_now", confirmPublishNow: true }, "scheduled");
         props.onSaved(ref.id, "已交出去，幾分鐘內會看到結果。");
       }
     } catch (e) {
@@ -208,9 +321,11 @@ export default function Editor(props: EditorProps) {
     setBusy(true);
     try {
       const ref = (await api.create(brand.id, {
-        fields: { body: post.body, first_comment: post.first_comment, link_url: post.link_url, link_utm: post.link_utm, notes: post.notes },
+        fields: { body: post.body, link_url: post.link_url, link_utm: post.link_utm, notes: post.notes },
         targets: post.targets.map((t) => ({ account_id: t.account_id, custom_body: t.custom_body, format: t.format })),
         media: [...post.media].sort((a, b) => a.position - b.position).map((m) => ({ media_id: m.media_id, alt_text: m.alt_text })),
+        comments: [...(post.comments ?? [])].sort((a, b) => a.position - b.position).map((c) => ({ body: c.body, delay_minutes: c.delay_minutes as Delay, media_id: c.media_id })),
+        tags: (post.tags ?? []).map((t) => t.tag_id),
       })).post;
       props.onSaved(ref.id, "已複製成新草稿。");
     } catch (e) {
@@ -222,6 +337,7 @@ export default function Editor(props: EditorProps) {
 
   async function upload(file: File) {
     if (file.size > MAX_UPLOAD) return say("圖片超過 10 MB。", true);
+    const target = uploadFor.current;
     setBusy(true);
     try {
       const dataUrl = await new Promise<string>((resolve, reject) => {
@@ -233,198 +349,84 @@ export default function Editor(props: EditorProps) {
       const name = file.name.replace(/[^\w.\- ]/g, "_").slice(0, 200) || "image.webp";
       const { media } = await api.upload(brand.id, dataUrl, name);
       props.onMediaAdded(media);
-      setMediaList((l) => [...l, { media_id: media.id, alt_text: null }]);
+      if (target === "post") setMediaList((l) => [...l, { media_id: media.id, alt_text: null }]);
+      else setComments((cs) => cs.map((c) => (c.key === target ? { ...c, media_id: media.id } : c)));
     } catch (e) {
       say(message(e), true);
     } finally {
       setBusy(false);
     }
   }
+  const pickFile = (target: "post" | number) => { uploadFor.current = target; fileRef.current?.click(); };
+  const addComment = () => {
+    if (comments.length >= MAX_COMMENTS) return say(`留言最多 ${MAX_COMMENTS} 則。`, true);
+    setComments((cs) => [...cs, { key: ++keyRef.current, body: "", delay: 0, media_id: null }]);
+  };
 
-  const mediaPath = (id: string) => props.media.find((m) => m.id === id)?.postiz_path ?? null;
-  const togglePick = (id: string) => {
-    pickTouched.current = true;
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  };
-  const readOnly = !canWrite || state === "published" || state === "deleted";
-  const can = {
-    draft: canWrite && (["draft", "review", "scheduled", "queued", "rotation"].includes(state) || !post),
-    review: canWrite && (["draft", "scheduled", "queued"].includes(state) || !post),
-    schedule: canWrite && (["draft", "scheduled", "queued", "error"].includes(state) || (state === "rotation" && mode === "rot") || !post),
-    now: brand.role === "owner" && (["draft", "scheduled", "queued", "error"].includes(state) || !post),
-  };
-  const notices = [
-    ...(post ? targetProblems(post, accounts) : []),
-    ...(state === "queued" ? ["這則已交給 Postiz 等時間到。可以改時間或取消排程，內容要先取消排程才能改。"] : []),
-    ...(sent && state !== "published" ? ["已有頻道發出了，共用的文字和媒體不能再改；其他頻道可以另寫文字。"] : []),
-    ...(state === "review" && brand.role !== "reviewer" ? ["等審核人核准。核准後會照排定時間發。"] : []),
+  // ---- the bottom row's hint (mock renderHint) ----
+  const notices: Array<{ text: string; error?: boolean }> = [
+    ...(post ? targetProblems(post, accounts).map((text) => ({ text, error: true })) : []),
+    ...(queued ? [{ text: "這則已交給 Postiz 等時間到。可以改時間或取消排程；內容、頻道、標籤、自動回覆和週期性安排要先取消排程（存草稿）才能改。" }] : []),
+    ...(sentIds.size && state !== "published" ? [{ text: "已有頻道發出了，共用的文字和媒體不能再改；其他頻道可以另寫文字。" }] : []),
+    ...(state === "review" && brand.role !== "reviewer" ? [{ text: "等審核人核准，核准後照排定時間發。" }] : []),
+    ...(post?.repeat && !post.published_at ? [{ text: "這則是週期性安排的第一次。在它發出前刪掉，整個系列都會停止。" }] : []),
+    ...(post?.repeat_of ? [{ text: "這是週期性安排產生的一次。改這一則，只改這一次。" }] : []),
+    ...(reviewGate && unapproved ? [{ text: "這個品牌要審核：先送審，擁有者核准後才會排上。" }] : []),
   ];
+  const hintNode = (
+    <>
+      {hint && <span className={hint.error ? "sm-err" : "sm-muted"}>{hint.text}</span>}
+      {!hint && notices.slice(0, 2).map((n) => <span key={n.text} className={n.error ? "sm-err" : "sm-muted"}>{n.text}</span>)}
+      {state === "published" && post && (
+        <span className="sm-muted">已發佈，不能改。{post.targets.filter((t) => t.release_url).map((t) => {
+          const a = accounts.find((x) => x.id === t.account_id);
+          return <a key={t.id} href={t.release_url as string} target="_blank" rel="noopener noreferrer">在 {a ? platformOf(a.platform).name : "平台"} 上看</a>;
+        })}</span>
+      )}
+    </>
+  );
+  const when = act === "now" ? "現在就發" : act === "repeat" ? repeatText(repeat, date, time) : act === "library" ? "不用時間" : whenText(date, time);
 
   return (
-    <div className="sm-ed">
-      <div className="sm-top">
-        <div className="sm-row"><span className="sm-lab">發到</span>
-          {accounts.length === 0 && <span className="sm-muted">這個品牌還沒有社群帳號，先到「設定」連接。</span>}
-          {accounts.map((a) => {
-            const on = picked.includes(a.id);
-            const lockedTarget = sentIds.has(a.id) || state === "queued";
-            return (
-              <button type="button" key={a.id} className={`sm-acct${on ? " sm-on" : ""}`} disabled={readOnly || !!lockedTarget || (a.status !== "connected" && !on)}
-                title={a.status === "connected" ? a.label : "這個帳號的授權失效了，到設定重新連接"} onClick={() => togglePick(a.id)}>
-                <PfMark platform={a.platform} /><span>{platformOf(a.platform).name}</span><small>{a.status === "connected" ? a.label : "連線失效，要重新連接"}</small>
-              </button>
-            );
-          })}
-        </div>
-        {props.source}
+    <div className="sm-cgrid">
+      <ChannelPicker accounts={accounts} picked={picked} locked={sentIds} readOnly={readOnly || queued}
+        onToggle={(id) => { pickTouched.current = true; setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id])); }} />
+      <div className="sm-cwrite">
+        <Writer channels={channels} tab={curTab} onTab={setTab}
+          body={body} custom={custom}
+          onText={(v) => { if (curTab !== "all" && custom[curTab] != null) setCustom((c) => ({ ...c, [curTab]: v })); else setBody(v); }}
+          onOwn={(id, own) => setCustom((c) => { const n = { ...c }; if (own) n[id] = body; else delete n[id]; return n; })}
+          link={link} onLink={setLink} utm={utm} onUtm={setUtm} notes={notes} onNotes={setNotes}
+          media={mediaList} mediaPath={mediaPath} onAlt={(id, alt) => setMediaList((l) => l.map((m) => (m.media_id === id ? { ...m, alt_text: alt } : m)))}
+          onRemoveMedia={(id) => setMediaList((l) => l.filter((m) => m.media_id !== id))} onPickFile={() => pickFile("post")}
+          onOpenLibrary={props.onOpenLibrary}
+          open={open} onOpen={(k) => setOpen((o) => { const n = new Set(o); if (n.has(k)) n.delete(k); else n.add(k); return n; })}
+          onAddComment={addComment} texts={texts}
+          onSaveText={() => load(() => api.addText(brand.id, body.trim()), ({ text }) => { setTexts((t) => [...(t ?? []), text]); say("已存到常用文字。"); }, (e) => say(message(e), true))}
+          textFor={textFor} sharedEditable={!contentLocked} channelEditable={channelEditable} writable={!readOnly}
+          above={<>{props.source}{props.reviewBar}</>}
+          below={<>
+            <Comments comments={comments} channels={channels} editable={!contentLocked} mediaPath={mediaPath} onChange={setComments} onAdd={addComment} onPickImage={(k) => pickFile(k)} />
+            <Formats channels={channels} tab={curTab} formats={formats} editable={channelEditable} onFormat={(id, f) => setFormats((x) => ({ ...x, [id]: f }))} />
+            <AutoReply mode={autoMode} open={autoOpen} brandRules={brandRules} rule={rule} editable={!readOnly && !queued}
+              onMode={(m) => { setAutoMode(m); if (m === "own" && !rule) setRule(blankRule()); }} onOpen={() => setAutoOpen((o) => !o)}
+              onRule={(r) => { setRule(r); setRuleDirty(true); }} />
+          </>} />
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f); }} />
       </div>
-
-      <div className="sm-two">
-        <div className="sm-write">
-          <textarea aria-label="貼文內容" placeholder="寫一份文字，所有勾選的帳號都用這份。" value={preview && custom[preview.id] != null ? custom[preview.id] : body} readOnly={readOnly || (contentLocked && !(preview && custom[preview.id] != null && !sentIds.has(preview.id) && state !== "queued"))}
-            onChange={(e) => { if (preview && custom[preview.id] != null) setCustom((c) => ({ ...c, [preview.id]: e.target.value })); else setBody(e.target.value); }} />
-          <div className="sm-meters">
-            {pickedAccounts.length ? pickedAccounts.map((a) => {
-              const limit = BODY_LIMITS[a.platform];
-              const n = bodyLength(a.platform, textFor(a));
-              return <span key={a.id} className={limit && n > limit ? "sm-over" : ""}>{platformOf(a.platform).name} <b>{n}</b>{limit ? `／${limit.toLocaleString()}` : ""}{a.platform === "threads" ? " 位元組" : ""}</span>;
-            }) : <span>先在上面勾選要發到哪些帳號。</span>}
-          </div>
-          <div className="sm-row sm-chips">
-            {([["fc", "第一則留言"], ["link", "連結與 UTM"], ["alt", "替代文字"], ["texts", "常用文字"]] as const).map(([k, label]) => (
-              <button type="button" key={k} className={open[k] ? "sm-on" : ""} onClick={() => setOpen((o) => ({ ...o, [k]: !o[k] }))}>{label}</button>
-            ))}
-          </div>
-          {open.fc && <div className="sm-row"><span className="sm-lab">第一則留言</span><input type="text" aria-label="第一則留言" placeholder="貼文發出後，用自己的帳號留的第一則留言" style={{ flex: 1, minWidth: 0 }} value={fc} readOnly={contentLocked} onChange={(e) => setFc(e.target.value)} /></div>}
-          {open.link && (
-            <div className="sm-row"><span className="sm-lab">連結</span>
-              <input type="url" aria-label="連結" placeholder="https://" style={{ flex: 1, minWidth: 0 }} value={link} readOnly={contentLocked} onChange={(e) => setLink(e.target.value)} />
-              <span className="sm-chips"><button type="button" className={utm ? "sm-on" : ""} disabled={contentLocked} onClick={() => setUtm((u) => !u)}>加 UTM</button></span>
-              {utm && link && <span className="sm-muted">帶 utm_source=各平台名、utm_medium=social</span>}
-            </div>
-          )}
-          {open.alt && mediaList.map((m, i) => (
-            <div className="sm-row" key={m.media_id}><span className="sm-lab">第 {i + 1} 張的替代文字</span>
-              <input type="text" aria-label={`第 ${i + 1} 張圖片的替代文字`} placeholder="給看不到圖的人描述這張圖" style={{ flex: 1, minWidth: 0 }} value={m.alt_text ?? ""} readOnly={contentLocked}
-                onChange={(e) => setMediaList((l) => l.map((x) => (x.media_id === m.media_id ? { ...x, alt_text: e.target.value } : x)))} />
-            </div>
-          ))}
-          {open.alt && !mediaList.length && <span className="sm-muted">先附一張圖，再寫它的替代文字。</span>}
-          {open.texts && (
-            <div className="sm-row sm-chips"><span className="sm-lab">常用文字</span>
-              {(texts ?? []).map((t) => <button type="button" key={t.id} title={t.body} disabled={contentLocked} onClick={() => setBody((b) => `${b}\n${t.body}`.trim())}>{t.body.slice(0, 12)}</button>)}
-              {texts && !texts.length && <span className="sm-muted">還沒有存過。</span>}
-              {canWrite && <button type="button" disabled={!body.trim()} onClick={async () => { try { const { text } = await api.addText(brand.id, body); setTexts((t) => [...(t ?? []), text]); say("已存到常用文字。"); } catch (e) { say(message(e), true); } }}>把目前文字存起來</button>}
-            </div>
-          )}
-          {preview && formatsOf(preview.platform).length > 1 && (
-            <div className="sm-row sm-chips"><span className="sm-lab">格式</span>
-              {formatsOf(preview.platform).map((f) => (
-                <button type="button" key={f.key} disabled={readOnly} className={(formats[preview.id] ?? "post") === f.key ? "sm-on" : ""} onClick={() => setFormats((x) => ({ ...x, [preview.id]: f.key }))}>{f.label}</button>
-              ))}
-              <span className="sm-muted">{platformOf(preview.platform).name}</span>
-            </div>
-          )}
-          {pickedAccounts.length > 1 && (
-            <div className="sm-row sm-chips"><span className="sm-lab">某個平台要不同？</span>
-              {pickedAccounts.map((a) => (
-                <button type="button" key={a.id} disabled={readOnly || sentIds.has(a.id) || state === "queued"} className={custom[a.id] != null ? "sm-on" : ""}
-                  onClick={() => { setPreviewId(a.id); setCustom((c) => { const n = { ...c }; if (n[a.id] != null) delete n[a.id]; else n[a.id] = body; return n; }); }}>
-                  {platformOf(a.platform).name}{custom[a.id] != null ? "（已另寫）" : ""}
-                </button>
-              ))}
-            </div>
-          )}
-          {props.reviewBar}
-          <div className="sm-row"><span className="sm-lab">媒體</span>
-            {mediaList.map((m) => {
-              const path = mediaPath(m.media_id);
-              return (
-                <span key={m.media_id} className="sm-row" style={{ gap: 2 }}>
-                  {path ? <img className="sm-thumb" src={path} alt={m.alt_text ?? ""} /> : <span className="sm-thumb">圖</span>}
-                  {!contentLocked && <button type="button" aria-label="拿掉這張圖" onClick={() => setMediaList((l) => l.filter((x) => x.media_id !== m.media_id))}>×</button>}
-                </span>
-              );
-            })}
-            {!contentLocked && <button type="button" disabled={busy} onClick={() => fileRef.current?.click()}>＋ 圖片</button>}
-            {!contentLocked && props.onOpenLibrary && <button type="button" onClick={props.onOpenLibrary}>從媒體庫</button>}
-            <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f); }} />
-          </div>
-          <input type="text" aria-label="備註" placeholder="備註（給團隊看，不會發出去）" value={notes} readOnly={!canWrite || readOnly} onChange={(e) => setNotes(e.target.value)} />
-        </div>
-
-        <div className="sm-prev">
-          <div className="sm-row"><span className="sm-lab">預覽</span>
-            <span className="sm-chips">{pickedAccounts.map((a) => <button type="button" key={a.id} className={preview?.id === a.id ? "sm-on" : ""} onClick={() => setPreviewId(a.id)}>{platformOf(a.platform).name}</button>)}</span>
-            <span className="sm-chips" style={{ marginLeft: "auto" }}>
-              <button type="button" className={device === "phone" ? "sm-on" : ""} onClick={() => setDevice("phone")}>手機</button>
-              <button type="button" className={device === "desktop" ? "sm-on" : ""} onClick={() => setDevice("desktop")}>電腦</button>
-            </span>
-          </div>
-          <div className="sm-frame">
-            <div className={`sm-card${device === "desktop" ? " sm-wide" : ""}`}>
-              <div className="sm-who"><span className="sm-av" /><b>{preview?.label ?? brand.name}</b><span className="sm-muted">{preview ? platformOf(preview.platform).name : "（還沒選帳號）"}</span></div>
-              {mediaList[0] && mediaPath(mediaList[0].media_id) && <img className="sm-img" src={mediaPath(mediaList[0].media_id) as string} alt={mediaList[0].alt_text ?? ""} />}
-              <div className="sm-txt">{(preview ? textFor(preview) : body) || "（貼文文字會出現在這裡）"}</div>
-              {fc.trim() && <div className="sm-more">第一則留言：{fc}</div>}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="sm-foot">
-        <div className="sm-when">
-          <span className="sm-state" style={stateStyle(state)}><span className="sm-dot" />{post ? STATE_NAMES[state] : "新貼文（還沒存）"}</span>
-          {props.lists && !readOnly && (
-            <span className="sm-chips">
-              <button type="button" className={mode === "fixed" ? "sm-on" : ""} onClick={() => setMode("fixed")}>固定時間</button>
-              <button type="button" className={mode === "rot" ? "sm-on" : ""} onClick={() => setMode("rot")}>加入輪播</button>
-            </span>
-          )}
-          {mode === "fixed" ? (
-            <span className="sm-chips">
-              <input type="date" aria-label="發文日期" value={date} min={props.today} disabled={readOnly} onChange={(e) => setDate(e.target.value)} />
-              <input type="time" aria-label="發文時間" value={time} disabled={readOnly} onChange={(e) => setTime(e.target.value)} />
-              <span className="sm-muted">{tz}</span>
-            </span>
-          ) : (
-            <span className="sm-chips">
-              {(props.lists ?? []).map((l) => (
-                <button type="button" key={l.id} className={listId === l.id ? "sm-on" : ""} disabled={readOnly} onClick={() => setListId(l.id)}>{l.name}{l.active ? "" : "（已暫停）"}</button>
-              ))}
-              {!props.lists?.length && <span className="sm-muted">還沒有清單，先到「輪播」建一個。</span>}
-            </span>
-          )}
-        </div>
-        <div className="sm-hint">
-          {hint && <span className={hint.error ? "sm-err" : "sm-muted"}>{hint.text}　</span>}
-          {notices.map((n) => <span key={n} className="sm-err">{n}　</span>)}
-          {state === "published" && post && (
-            <span className="sm-muted">已發佈的貼文不能改。
-              {post.targets.filter((t) => t.release_url).map((t) => {
-                const a = accounts.find((x) => x.id === t.account_id);
-                return <a key={t.id} href={t.release_url as string} target="_blank" rel="noopener noreferrer">在 {a ? platformOf(a.platform).name : "平台"} 上看　</a>;
-              })}
-              {canWrite && <button type="button" disabled={busy} onClick={copyAsNew}>複製成新貼文</button>}
-            </span>
-          )}
-        </div>
-        {!readOnly && (
-          <div className="sm-acts">
-            <button type="button" disabled={busy || !can.draft} onClick={() => act("draft")}>存草稿</button>
-            <button type="button" disabled={busy || !can.review} onClick={() => act("review")}>送審</button>
-            <button type="button" className="btn-primary" disabled={busy || !can.schedule} onClick={() => act("schedule")}>{mode === "rot" ? "加入清單" : "排程"}</button>
-            <button type="button" disabled={busy || !can.now} title={can.now ? "" : "只有擁有者可以立即發佈"} onClick={() => setConfirmNow(true)}>立即發佈</button>
-          </div>
-        )}
-        {confirmNow && (
-          <div className="sm-confirm">
-            <span>會馬上發到所有勾選的帳號。發出去之後，這裡收不回來，要到各平台自己刪。</span>
-            <button type="button" className="sm-danger" disabled={busy} onClick={() => act("now")}>確定發佈</button>
-            <button type="button" onClick={() => setConfirmNow(false)}>取消</button>
-          </div>
-        )}
-      </div>
+      <Previews channels={channels} tab={curTab} textFor={textFor} formats={formats} images={images}
+        comments={comments} mediaPath={mediaPath} commentImage={commentTakesMedia} when={act === "now" ? "剛剛" : `${shortDate(date)} ${time}`} />
+      <Footer
+        tags={<TagPicker brandId={brand.id} tags={tags} selected={tagIds} disabled={readOnly || queued} canEdit={canWrite} onSelect={setTagIds} onTags={setTags} say={say} />}
+        hint={hintNode} when={when} whenDisabled={readOnly || act === "now" || act === "library" || act === "keep"} onWhen={() => setDtOpen(true)}
+        picker={dtOpen ? (
+          <DateTimePicker date={date} time={time} tz={tz} today={props.today} repeat={act === "repeat" ? repeat : null} onClose={() => setDtOpen(false)}
+            onDone={(t, d, r) => { setTime(t); if (d) setDate(d); if (r) setRepeat(r); setDtOpen(false); }} />
+        ) : null}
+        act={act} can={can} busy={busy} menuOpen={menuOpen} onMenu={setMenuOpen} onAct={(a) => { setChosen(a); setConfirmNow(false); }}
+        onMain={() => (act === "now" ? setConfirmNow(true) : void run(act))}
+        confirmNow={confirmNow} onConfirm={() => void run("now")} onCancel={() => setConfirmNow(false)}
+        readOnlyMain={readOnly ? (state === "published" && canWrite ? { label: "複製成新貼文", onClick: () => void copyAsNew() } : null) : null} />
     </div>
   );
 }

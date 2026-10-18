@@ -1,7 +1,7 @@
 // /api/social/posts/[id]?brand=<id>
 //   GET     one post with its targets and media
-//   PUT     { brand, version, fields?, targets?, media? } -> save content (version = what the editor loaded; 409 when
-//           someone saved first or the post left the editable states)
+//   PUT     { brand, version, fields?, targets?, media?, comments?, tags? } -> save content (version = what the editor
+//           loaded; 409 when someone saved first or the post left the editable states). Tags are labels, not content.
 //   DELETE  ?brand&version -> to the bin (restore via PUT .../state { action: "restore" })
 import { ANY_ROLE, WRITE_ROLES, actorOf, requireBrandRole } from "@/lib/social/authz";
 import { handle, jsonBody, postVersion, uuid } from "@/lib/social/http";
@@ -31,16 +31,18 @@ export async function PUT(req: Request, { params }: Ctx): Promise<Response> {
     const role = await requireBrandRole(req, brand, WRITE_ROLES);
     const payload = parsePostPayload(body);
     const version = postVersion(body.version);
-    const contentChange = Object.keys(payload.fields).some((k) => k !== "notes") || payload.targets !== null || payload.media !== null;
+    const contentChange = Object.keys(payload.fields).some((k) => k !== "notes") || payload.targets !== null || payload.media !== null
+      || payload.children.comments !== null;
     if (contentChange && (await requiresReview(brand))) assertCanEditContent(true, role, (await getPostAt(brand, id, version)).state);
     const linkChanged = payload.fields.link_url !== undefined || payload.fields.link_utm !== undefined;
-    if (payload.fields.body !== undefined || payload.targets || linkChanged) {
+    if (payload.fields.body !== undefined || payload.targets || linkChanged || payload.children.comments) {
       const current = await getPostAt(brand, id, version);   // the limits are checked against the version being saved
       const targets = payload.targets ?? current.targets.map((t) => ({ account_id: t.account_id, custom_body: t.custom_body, format: t.format }));
       const link = { url: payload.fields.link_url !== undefined ? payload.fields.link_url : current.link_url, utm: payload.fields.link_utm ?? current.link_utm };
-      if (targets.length) await assertWithinLimits(brand, payload.fields.body ?? current.body, targets, link);
+      const comments = payload.children.comments ?? [...current.comments].sort((a, b) => a.position - b.position);
+      if (targets.length) await assertWithinLimits(brand, payload.fields.body ?? current.body, targets, link, comments.map((c) => ({ body: c.body, media_id: c.media_id ?? null })));
     }
-    return { post: await savePost(brand, id, version, payload.fields, payload.targets, payload.media, actorOf(req)) };
+    return { post: await savePost(brand, id, version, payload.fields, payload.targets, payload.media, actorOf(req), payload.children) };
   });
 }
 

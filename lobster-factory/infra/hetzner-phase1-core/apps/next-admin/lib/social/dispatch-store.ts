@@ -10,14 +10,16 @@ import { LEASE, type DispatchPorts, type LeaseResult, type QueuedPost, type Queu
 const ACTOR = "system:social-dispatch";
 const INSTANCE = "ks-aw-01";   // 0096 default: the one Postiz every brand shares
 
-const SELECT = "id, organization_id, version, state, scheduled_at, updated_at, body, first_comment, link_url, link_utm, " +
+const SELECT = "id, organization_id, version, state, scheduled_at, updated_at, body, link_url, link_utm, " +
+  "comments:social_post_comments(position, body, delay_minutes, item:social_media(postiz_media_id, postiz_path)), " +
   "targets:social_post_targets(id, account_id, custom_body, format, state, postiz_post_id, updated_at, " +
   "account:social_accounts(platform, postiz_integration_id, status)), " +
   "media:social_post_media(position, alt_text, item:social_media(postiz_media_id, postiz_path))";
 
 type Row = {
   id: string; organization_id: string; version: number; state: string; scheduled_at: string; updated_at: string; body: string;
-  first_comment: string | null; link_url: string | null; link_utm: boolean;
+  link_url: string | null; link_utm: boolean;
+  comments: Array<{ position: number; body: string; delay_minutes: number; item: { postiz_media_id: string | null; postiz_path: string | null } | null }>;
   targets: Array<{ id: string; account_id: string; custom_body: string | null; format: string; state: QueuedTarget["state"]; postiz_post_id: string | null; updated_at: string;
     account: { platform: string; postiz_integration_id: string; status: string } | null }>;
   media: Array<{ position: number; alt_text: string | null; item: { postiz_media_id: string | null; postiz_path: string | null } | null }>;
@@ -26,7 +28,9 @@ type Row = {
 function toPost(row: Row): QueuedPost {
   return {
     id: row.id, organizationId: row.organization_id, version: row.version, state: row.state, scheduledAt: row.scheduled_at, updatedAt: row.updated_at,
-    body: row.body, firstComment: row.first_comment, linkUrl: row.link_url, linkUtm: row.link_utm,
+    body: row.body, linkUrl: row.link_url, linkUtm: row.link_utm,
+    comments: [...(row.comments ?? [])].sort((a, b) => a.position - b.position)
+      .map((c) => ({ body: c.body, delayMinutes: c.delay_minutes, media: c.item ? { postizMediaId: c.item.postiz_media_id, postizPath: c.item.postiz_path } : null })),
     media: [...row.media].sort((a, b) => a.position - b.position)
       .map((m) => ({ postizMediaId: m.item?.postiz_media_id ?? null, postizPath: m.item?.postiz_path ?? null, altText: m.alt_text })),
     targets: row.targets.map((t) => ({

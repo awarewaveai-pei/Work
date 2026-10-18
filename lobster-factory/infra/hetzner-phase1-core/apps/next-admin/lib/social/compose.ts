@@ -1,13 +1,22 @@
-// What one target sends to Postiz (SOCIAL_MANAGER_PLAN.md C5): the text, the link (with UTM), the media, the first
-// comment, and the provider settings Postiz v2.25.1 validates. Pure: the dispatcher (dispatch.ts) and the C6 preview
+// What one target sends to Postiz (SOCIAL_MANAGER_PLAN.md C5; comments C21): the text, the link (with UTM), the media,
+// the comments, and the provider settings Postiz v2.25.1 validates. Pure: the dispatcher (dispatch.ts) and the C6 preview
 // read the same function, so what is previewed is what is sent.
 // Postiz content is HTML (sanitizePostContent keeps p/br/a/...; each provider turns it back into text): plain text is
 // escaped and every line becomes a <p>, or a "<" in a post would be eaten and line breaks lost.
 
+/** A comment posted under the post by the same account (0105 social_post_comments, in position order). */
+export interface ComposeComment {
+  body: string;
+  /** minutes Postiz waits before this comment, counted from the one above it (the post for the first): Postiz's
+   *  orchestrator sleeps 60000 * delay before each value after the first (post.workflow.v1.1.2.ts:449, v2.25.1) */
+  delayMinutes: number;
+  media: { postizMediaId: string | null; postizPath: string | null } | null;
+}
+
 export interface ComposeInput {
   body: string;
   customBody: string | null;
-  firstComment: string | null;
+  comments: ComposeComment[];
   linkUrl: string | null;
   linkUtm: boolean;
   platform: string;
@@ -16,7 +25,7 @@ export interface ComposeInput {
 }
 
 export interface Composed {
-  values: Array<{ content: string; image: Array<{ id: string; path: string; alt?: string }> }>;
+  values: Array<{ content: string; image: Array<{ id: string; path: string; alt?: string }>; delay?: number }>;
   settings: Record<string, unknown> & { __type: string };
   /** The text as the platform shows it (the adopt check in dispatch.ts compares Postiz's copy against it). */
   text: string;
@@ -40,10 +49,19 @@ const SETTINGS: Record<string, (format: string) => Record<string, unknown>> = {
   linkedin: () => ({}),
   "linkedin-page": () => ({}),
   x: () => ({ who_can_reply_post: "everyone" }),
+  // a Reel is a post with one video: Postiz has no reel post_type, the provider makes a video post a Reel
+  // (instagram.provider.ts media_type=REELS; facebook.provider.ts /reel/)
   instagram: (f) => ({ post_type: f === "story" ? "story" : "post" }),
   "instagram-standalone": (f) => ({ post_type: f === "story" ? "story" : "post" }),
   facebook: (f) => (f === "story" ? { post_type: "story" } : {}),
 };
+
+export const isVideo = (path: string | null) => !!path && /\.mp4(?:$|\?)/i.test(path);
+
+/** Platforms whose provider comment() posts the comment's image (v2.25.1: facebook attachment_url, threads / bluesky / x
+ *  media); instagram and linkedin post the comment's text only, so there an image-only comment cannot go out at all. */
+export const COMMENT_MEDIA_PLATFORMS: readonly string[] = ["facebook", "threads", "bluesky", "x"];
+export const commentTakesMedia = (platform: string) => COMMENT_MEDIA_PLATFORMS.includes(platform);
 
 export const SENDABLE_PLATFORMS: readonly string[] = Object.keys(SETTINGS);
 
@@ -88,7 +106,19 @@ export function compose(input: ComposeInput): Composed {
     return { id: m.postizMediaId, path: m.postizPath, ...(m.altText?.trim() ? { alt: m.altText.trim() } : {}) };
   });
   if (!text.trim() && image.length === 0) throw new ComposeError("nothing to send: no text and no media");
+  if (input.format === "reel" && !(image.length === 1 && isVideo(image[0].path))) throw new ComposeError("a Reel needs exactly one video");
   const values: Composed["values"] = [{ content: toPostizHtml(text), image }];
-  if (input.firstComment?.trim()) values.push({ content: toPostizHtml(input.firstComment), image: [] });
+  // a story shows no comments (the preview says the same)
+  if (input.format !== "story") input.comments.forEach((c, i) => {
+    if (!c.body.trim() && !c.media) return;
+    const media = c.media && commentTakesMedia(input.platform) ? c.media : null;
+    if (!c.body.trim() && !media) throw new ComposeError(`comment ${i + 1} is an image only, and ${input.platform} comments carry no image`);
+    if (media && (!media.postizMediaId || !media.postizPath)) throw new ComposeError(`comment ${i + 1}'s image is not in Postiz storage yet`);
+    values.push({
+      content: toPostizHtml(c.body),
+      image: media ? [{ id: media.postizMediaId as string, path: media.postizPath as string }] : [],
+      ...(c.delayMinutes > 0 ? { delay: c.delayMinutes } : {}),
+    });
+  });
   return { values, settings: { __type: input.platform, ...settingsOf(input.format) }, text };
 }

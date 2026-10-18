@@ -1,9 +1,9 @@
-// What one target sends to Postiz (SOCIAL_MANAGER_PLAN.md C5): HTML Postiz keeps, link with UTM, first comment as the
-// second value, the settings each provider DTO requires, and a refusal before Postiz for what it would refuse.
+// What one target sends to Postiz (SOCIAL_MANAGER_PLAN.md C5; C21 comments): HTML Postiz keeps, link with UTM, each
+// comment a value after the post with its delay, the settings each provider DTO requires, and a refusal before Postiz.
 import { describe, expect, it } from "vitest";
 import { compose, ComposeError, toPostizHtml, withUtm } from "../compose";
 
-const base = { body: "Hello <world> & friends\nsecond line", customBody: null, firstComment: null, linkUrl: null, linkUtm: false,
+const base = { body: "Hello <world> & friends\nsecond line", customBody: null, comments: [], linkUrl: null, linkUtm: false,
   platform: "bluesky", format: "post", media: [] };
 
 describe("compose", () => {
@@ -22,12 +22,43 @@ describe("compose", () => {
     expect(withUtm("https://s.example/?utm_source=keep", "x")).toBe("https://s.example/?utm_source=keep&utm_medium=social");
   });
 
-  it("the first comment is the second value; media keep order and alt text", () => {
-    const c = compose({ ...base, firstComment: "link in bio", platform: "instagram", format: "story",
+  it("a comment is the second value; media keep order and alt text", () => {
+    const c = compose({ ...base, comments: [{ body: "link in bio", delayMinutes: 0, media: null }], platform: "instagram", format: "post",
       media: [{ postizMediaId: "m1", postizPath: "https://p/1.jpg", altText: " a cat " }, { postizMediaId: "m2", postizPath: "https://p/2.jpg", altText: null }] });
     expect(c.values[0].image).toEqual([{ id: "m1", path: "https://p/1.jpg", alt: "a cat" }, { id: "m2", path: "https://p/2.jpg" }]);
     expect(c.values[1]).toEqual({ content: toPostizHtml("link in bio"), image: [] });
-    expect(c.settings).toEqual({ __type: "instagram", post_type: "story" });
+    expect(c.settings).toEqual({ __type: "instagram", post_type: "post" });
+    expect(compose({ ...base, platform: "instagram", format: "story", media: c.values[0].image.map((m) => ({ postizMediaId: m.id, postizPath: m.path, altText: null })) }).settings)
+      .toEqual({ __type: "instagram", post_type: "story" });
+  });
+
+  it("N comments: one value each in order, its delay in minutes when it waits, its image; an empty one is skipped", () => {
+    const c = compose({ ...base, comments: [
+      { body: "sign-up form: example.com/sat", delayMinutes: 0, media: null },
+      { body: "  ", delayMinutes: 5, media: null },
+      { body: "", delayMinutes: 1, media: { postizMediaId: "m9", postizPath: "https://p/9.jpg" } },
+      { body: "full <now>", delayMinutes: 60, media: null },
+    ] });
+    expect(c.values.slice(1)).toEqual([
+      { content: toPostizHtml("sign-up form: example.com/sat"), image: [] },
+      { content: toPostizHtml(""), image: [{ id: "m9", path: "https://p/9.jpg" }], delay: 1 },
+      { content: "<p>full &lt;now&gt;</p>", image: [], delay: 60 },
+    ]);
+    expect(() => compose({ ...base, comments: [{ body: "x", delayMinutes: 0, media: { postizMediaId: null, postizPath: null } }] })).toThrow(/comment 1/);
+    // Instagram / LinkedIn post a comment's text only (critic 2026-10-18 M4): the image is not sent, an image-only one refused
+    const img = { body: "see", delayMinutes: 0, media: { postizMediaId: "m9", postizPath: "https://p/9.jpg" } };
+    expect(compose({ ...base, platform: "instagram", media: [{ postizMediaId: "m1", postizPath: "https://p/1.jpg", altText: null }], comments: [img] }).values[1].image).toEqual([]);
+    expect(() => compose({ ...base, platform: "linkedin", comments: [{ ...img, body: "" }] })).toThrow(/carry no image/);
+    // a story shows no comments, so none are sent (m6)
+    expect(compose({ ...base, platform: "facebook", format: "story", comments: [img] }).values).toHaveLength(1);
+  });
+
+  it("a Reel is a post with exactly one video", () => {
+    const video = { postizMediaId: "v1", postizPath: "https://p/clip.mp4", altText: null };
+    expect(compose({ ...base, platform: "instagram", format: "reel", media: [video] }).settings).toEqual({ __type: "instagram", post_type: "post" });
+    expect(compose({ ...base, platform: "facebook", format: "reel", media: [video] }).settings).toEqual({ __type: "facebook" });
+    expect(() => compose({ ...base, platform: "instagram", format: "reel", media: [{ ...video, postizPath: "https://p/1.jpg" }] })).toThrow(/Reel/);
+    expect(() => compose({ ...base, platform: "facebook", format: "reel" })).toThrow(/Reel/);
   });
 
   it("refuses before Postiz would: a platform needing settings we do not collect, media not in Postiz, nothing to send", () => {

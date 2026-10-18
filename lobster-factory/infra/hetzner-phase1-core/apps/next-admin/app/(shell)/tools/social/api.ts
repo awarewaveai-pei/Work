@@ -29,7 +29,7 @@ const q = (o: Record<string, string>) => new URLSearchParams(o).toString();
 
 export interface SavedRef { id: string; version: number }
 export interface PostInput {
-  // repeat / auto_mode: migration 0105; comments and tags reach the routes with C21
+  // repeat / auto_mode / comments / tags: migration 0105 (C21). comments replace first_comment: never send both
   fields: {
     body?: string; first_comment?: string | null; link_url?: string | null; link_utm?: boolean; notes?: string | null; source_url?: string | null;
     repeat?: import("./model").RepeatRule | null; auto_mode?: import("./model").AutoMode;
@@ -37,6 +37,14 @@ export interface PostInput {
   targets: Array<{ account_id: string; custom_body: string | null; format: string }>;
   /** omitted = unchanged (a post that went out keeps its media as sent) */
   media?: Array<{ media_id: string; alt_text: string | null }>;
+  /** omitted = unchanged; the post's whole set in order (lib/social/posts.ts) */
+  comments?: Array<{ body: string; delay_minutes: 0 | 1 | 5 | 60; media_id: string | null }>;
+  tags?: string[];
+}
+/** lib/social/store.ts AutoRule (0105 social_auto_rules); post_id null = the brand's */
+export interface AutoRule {
+  id: string; post_id: string | null; name: string; trigger: "comment" | "dm"; keywords: string[]; platforms: string[];
+  action: "reply" | "dm" | "both"; reply: string; active: boolean; hits: number;
 }
 export interface StateInput { action: string; scheduledAt?: string; listId?: string; listPosition?: number; reason?: string; confirmPublishNow?: boolean }
 /** lib/content/wp-calendar.ts CalendarPost: date is the site's wall clock, no zone */
@@ -94,4 +102,12 @@ export const api = {
   texts: (brand: string) => call<{ texts: Array<{ id: string; body: string }> }>("GET", `/api/social/texts?${q({ brand })}`),
   addText: (brand: string, body: string) => call<{ text: { id: string; body: string } }>("POST", "/api/social/texts", { brand, body }),
   deleteText: (brand: string, id: string) => call<object>("DELETE", `/api/social/texts?${q({ brand, id })}`),
+  // C21: tags and a post's own auto-reply rule (a rule's save moves its post's version: the next write uses postVersion)
+  tags: (brand: string) => call<{ tags: import("./model").Tag[] }>("GET", `/api/social/tags?${q({ brand })}`),
+  saveTag: (brand: string, id: string | null, name: string, colour: string) => call<{ id: string }>("POST", "/api/social/tags", { brand, id, name, colour }),
+  deleteTag: (brand: string, id: string) => call<object>("DELETE", `/api/social/tags?${q({ brand, id })}`),
+  autoRules: (brand: string, post?: string) => call<{ rules: AutoRule[] }>("GET", `/api/social/auto-rules?${q({ brand, ...(post ? { post } : {}) })}`),
+  saveAutoRule: (brand: string, id: string | null, rule: Omit<AutoRule, "id" | "hits">) =>
+    call<{ id: string; postVersion: number | null }>("POST", "/api/social/auto-rules", { brand, id, rule }),
+  deleteAutoRule: (brand: string, id: string) => call<{ postVersion: number | null }>("DELETE", `/api/social/auto-rules?${q({ brand, id })}`),
 };

@@ -2,7 +2,8 @@
  * /tools/social UI flows (lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md C6 acceptance): create -> schedule ->
  * drag -> list bulk -> restore, and the one-screen rule (1280x660, no page scroll); C7 a rotation list takes a draft;
  * C10 a WordPress article starts a post from its own excerpt. C19: 建立貼文 opens the composer's own page
- * (compose/new), 回排程日曆 comes back to the calendar.
+ * (compose/new), 回排程日曆 comes back to the calendar. C21: the composer's main button does what ▾ picked; two comments
+ * go out with the post.
  * Every /api/social call is answered by an in-memory fake below (page.route), so this tests the page, never a
  * database or Postiz; the API itself is covered by next-admin app/api/social/__tests__. Run against a dev server
  * with no Supabase configured (.claude/launch.json "next-admin-social-ui", port 3902):
@@ -31,6 +32,8 @@ function fakeServer() {
     Object.assign(p, input.fields ?? {});
     if (input.targets) p.targets = input.targets.map((t: any, i: number) => ({ id: `${p.id}-t${i}`, state: 'pending', postiz_post_id: null, release_url: null, error: null, ...t }));
     if (input.media) p.media = input.media.map((m: any, i: number) => ({ ...m, position: i }));
+    if (input.comments) p.comments = input.comments.map((c: any, i: number) => ({ ...c, position: i }));
+    if (input.tags) p.tags = input.tags.map((tag_id: string) => ({ tag_id }));
   };
   async function handle(route: Route) {
     const req = route.request();
@@ -118,6 +121,12 @@ async function open(page: Page) {
   return server;
 }
 
+/** the composer's ▾: pick what the main button does (C21) */
+async function pick(page: Page, act: string) {
+  await page.getByRole('button', { name: '換一種做法' }).click();
+  await page.getByRole('menuitemradio', { name: new RegExp(`^${act}`) }).click();
+}
+
 /** 建立貼文 -> the composer's own page */
 async function compose(page: Page) {
   await page.getByRole('button', { name: '建立貼文' }).click();
@@ -140,7 +149,7 @@ test.describe('social manager', () => {
     // create on the composer's page and schedule (tomorrow 12:00 is the new post's default); the address becomes the post's
     await compose(page);
     await page.getByLabel('貼文內容').fill('週六親子藝術時光還有三個名額。');
-    await page.getByRole('button', { name: '排程', exact: true }).click();
+    await page.getByRole('button', { name: '設定行程', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('已排在');
     const [post] = [...server.posts.values()];
     expect(post.state).toBe('scheduled');
@@ -204,11 +213,35 @@ test.describe('social manager', () => {
     expect([...server.posts.values()].map((p) => p.state)).toEqual(['review', 'review']);
   });
 
+  // C21 acceptance: 建立 -> two comments -> 設定行程 -> back on the calendar the card is there; the comments went with it
+  test('C21: a post with two comments is scheduled and shows on the calendar', async ({ page }) => {
+    const server = await open(page);
+    await compose(page);
+    await page.getByLabel('貼文內容').fill('十一月團體課開放報名。');
+    await page.getByRole('button', { name: '新增留言' }).last().click();
+    await page.getByLabel('第 1 則留言', { exact: true }).fill('報名表在這裡。');
+    await page.getByRole('button', { name: '新增留言' }).last().click();
+    await page.getByLabel('第 2 則留言', { exact: true }).fill('名額滿了會在這裡說。');
+    await page.getByRole('button', { name: '第 2 則什麼時候留' }).click();
+    await page.getByRole('button', { name: '設定行程', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('已排在');
+    const [post] = [...server.posts.values()];
+    expect(post.state).toBe('scheduled');
+    expect(post.comments).toEqual([
+      { body: '報名表在這裡。', delay_minutes: 0, media_id: null, position: 0 },
+      { body: '名額滿了會在這裡說。', delay_minutes: 1, media_id: null, position: 1 },
+    ]);
+    await page.getByRole('button', { name: '回排程日曆' }).click();
+    await page.waitForURL(/\/tools\/social\?/);
+    await expect(page.locator('.sm-post', { hasText: '十一月團體課開放報名' })).toBeVisible();
+  });
+
   test('publishing now asks once more before it sends', async ({ page }) => {
     const server = await open(page);
     await compose(page);
     await page.getByLabel('貼文內容').fill('現在就發。');
-    await page.getByRole('button', { name: '立即發佈' }).click();
+    await pick(page, '立即發佈');
+    await page.getByRole('button', { name: '立即發佈', exact: true }).click();
     await expect(page.getByText('發出去之後，這裡收不回來')).toBeVisible();
     expect(server.calls.some((c) => c.includes('publish_now'))).toBe(false);
     await page.getByRole('button', { name: '確定發佈' }).click();
@@ -220,8 +253,9 @@ test.describe('social manager', () => {
     const server = await open(page);
     await compose(page);
     await page.getByLabel('貼文內容').fill('藝術治療需要會畫畫嗎？不用。');
-    await page.getByRole('button', { name: '存草稿' }).click();
-    await expect(page.getByRole('status')).toContainText('已存起來');
+    await pick(page, '存草稿');
+    await page.getByRole('button', { name: '存草稿', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('已存成草稿');
     await page.getByRole('button', { name: '回排程日曆' }).click();
     await page.getByRole('button', { name: '自動發布清單', exact: true }).click();
     await page.getByRole('button', { name: '＋ 新清單' }).click();

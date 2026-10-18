@@ -174,6 +174,8 @@ await page.getByRole("button", { name: "新增留言" }).last().click();
 await page.getByLabel("第 2 則留言", { exact: true }).fill("名額滿了會在這裡說。");
 await page.getByRole("button", { name: "第 2 則什麼時候留" }).click();
 await page.getByRole("button", { name: "這則的自動回覆" }).click();
+await shot("x-compose-comments");
+await page.locator(".sm-wscroll").evaluate((e) => e.scrollTo(0, 0));
 await shot("02-compose");
 await page.getByRole("button", { name: "換一種做法" }).click();
 await shot("03-compose-menu");

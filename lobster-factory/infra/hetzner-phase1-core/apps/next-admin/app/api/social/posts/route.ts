@@ -58,8 +58,9 @@ export async function POST(req: Request): Promise<Response> {
     await requireBrandRole(req, brand, WRITE_ROLES);
     const payload = parsePostPayload(body);
     if (payload.targets?.length) {
-      await assertWithinLimits(brand, payload.fields.body ?? "", payload.targets, { url: payload.fields.link_url ?? null, utm: payload.fields.link_utm ?? false });
+      await assertWithinLimits(brand, payload.fields.body ?? "", payload.targets, { url: payload.fields.link_url ?? null, utm: payload.fields.link_utm ?? false },
+        payload.children.comments ?? []);
     }
-    return { post: await savePost(brand, null, null, payload.fields, payload.targets, payload.media, actorOf(req)) };
+    return { post: await savePost(brand, null, null, payload.fields, payload.targets, payload.media, actorOf(req), payload.children) };
   });
 }

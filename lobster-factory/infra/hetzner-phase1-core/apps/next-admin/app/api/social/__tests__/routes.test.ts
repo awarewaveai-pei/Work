@@ -36,7 +36,7 @@ function req(method: string, path: string, who: { role?: string; client?: string
 const ctx = (id: string) => ({ params: Promise.resolve({ id }) });
 const draft = (extra = {}) => ({ id: P, state: "draft", body: "hi", scheduled_at: null, list_id: null, list_position: null, published_at: null,
   targets: [{ id: "t1", account_id: ACC, custom_body: null, format: "post", state: "pending", postiz_post_id: null, release_url: null, error: null }],
-  media: [], version: 3, ...extra });
+  media: [], comments: [], tags: [], version: 3, ...extra });
 
 beforeEach(async () => {
   Object.values(store).forEach((f) => f.mockReset());
@@ -91,7 +91,7 @@ describe("/api/social routes", () => {
     expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "owner" }, { brand: A, fields: { body: "x" } }), ctx(P))).status).toBe(400);
     expect((await PUT(req("PUT", `/api/social/posts/${P}`, { client: A }, { brand: A, version: 3, fields: { body: "x" } }), ctx(P))).status).toBe(403);
     expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "operator" }, { brand: A, version: 3, fields: { body: "x" } }), ctx(P))).status).toBe(200);
-    expect(store.savePost).toHaveBeenCalledWith(A, P, 3, { body: "x" }, null, null, "ops:operator");
+    expect(store.savePost).toHaveBeenCalledWith(A, P, 3, { body: "x" }, null, null, "ops:operator", { comments: null, tags: null });
     store.getPost.mockResolvedValue(draft({ state: "queued", scheduled_at: "2026-10-15T00:00:00Z" }));
     store.getPost.mockResolvedValue(draft({ state: "queued", scheduled_at: new Date(Date.now() + 60_000).toISOString(),
       targets: [{ id: "t1", account_id: ACC, custom_body: null, format: "post", state: "queued", postiz_post_id: "pz-1", release_url: null, error: null }] }));
@@ -293,6 +293,31 @@ describe("/api/social routes", () => {
     expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "operator" }, { brand: A, version: 3, fields: { body: "x" } }), ctx(P))).status).toBe(409);
     expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "operator" }, { brand: A, version: 3, fields: { notes: "n" } }), ctx(P))).status).toBe(200);
     expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "owner" }, { brand: A, version: 3, fields: { body: "x" } }), ctx(P))).status).toBe(200);
+  });
+
+  // C21 (left by C20, WORKLOG 2026-10-17 續18): comments and tags reach the store; a comment has its platform's limit;
+  // with review on, comments are content and tags are not
+  it("posts: comments and tags reach the store; a long comment is a 400 naming it; under review comments are content", async () => {
+    const { POST } = await import("../posts/route");
+    const { PUT } = await import("../posts/[id]/route");
+    const T = "55555555-5555-4555-8555-555555555555";
+    const post = (extra: object) => POST(req("POST", "/api/social/posts", { role: "owner" }, { brand: A, fields: { body: "hi" }, targets: [{ account_id: ACC }], ...extra }));
+    expect((await post({ comments: [{ body: "one" }, { body: "two", delay_minutes: 5 }], tags: [T, T] })).status).toBe(200);
+    expect(store.savePost).toHaveBeenLastCalledWith(A, null, null, { body: "hi" }, [{ account_id: ACC, custom_body: null, format: "post" }], null, "ops:owner",
+      { comments: [{ body: "one", delay_minutes: 0, media_id: null }, { body: "two", delay_minutes: 5, media_id: null }], tags: [T] });
+    const long = await post({ comments: [{ body: "ok" }, { body: "x".repeat(301) }] });
+    expect(long.status).toBe(400);
+    expect((await long.json()).detail.commentOverLimit[0]).toMatchObject({ comment: 2, platform: "bluesky", length: 301, limit: 300 });
+    expect((await post({ comments: [{ body: "x", delay_minutes: 2 }] })).status).toBe(400);
+    expect((await post({ comments: [{ body: " " }] })).status).toBe(400);
+    expect((await post({ fields: { body: "hi", first_comment: "a" }, comments: [{ body: "b" }] })).status).toBe(400);
+    // a saved comment counts when only the channels change (a new channel may have a lower limit)
+    store.getPost.mockResolvedValue(draft({ comments: [{ position: 0, body: "y".repeat(301), delay_minutes: 0, media_id: null }] }));
+    expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "owner" }, { brand: A, version: 3, targets: [{ account_id: ACC }] }), ctx(P))).status).toBe(400);
+    review.requiresReview.mockResolvedValueOnce(true).mockResolvedValueOnce(true);
+    store.getPost.mockResolvedValue(draft({ state: "scheduled", scheduled_at: "2099-01-01T00:00:00Z", comments: [] }));
+    expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "operator" }, { brand: A, version: 3, comments: [{ body: "new" }] }), ctx(P))).status).toBe(409);
+    expect((await PUT(req("PUT", `/api/social/posts/${P}`, { role: "operator" }, { brand: A, version: 3, tags: [T] }), ctx(P))).status).toBe(200);
   });
 });
 

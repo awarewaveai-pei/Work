@@ -43,3 +43,19 @@ export function overLimit(body: string, targets: Array<{ accountId: string; plat
     return length > limit ? [{ accountId: t.accountId, platform: t.platform, length, limit }] : [];
   });
 }
+
+export interface CommentProblem extends LimitProblem {
+  /** 1-based, as the editor numbers the comments */
+  comment: number;
+}
+
+/** Each comment against each target's platform limit: Postiz checks every value of a post -- the post and each comment
+ *  -- against the provider's one maxLength (posts.service.ts validation, v2.25.1), so a comment has the post's limit. */
+export function commentsOverLimit(comments: string[], targets: Array<{ accountId: string; platform: string }>): CommentProblem[] {
+  return comments.flatMap((body, i) => targets.flatMap((t) => {
+    const limit = BODY_LIMITS[t.platform];
+    if (!limit) return [];
+    const length = bodyLength(t.platform, body);
+    return length > limit ? [{ accountId: t.accountId, platform: t.platform, length, limit, comment: i + 1 }] : [];
+  }));
+}

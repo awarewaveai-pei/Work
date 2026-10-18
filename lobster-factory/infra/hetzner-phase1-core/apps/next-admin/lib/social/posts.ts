@@ -1,16 +1,20 @@
 // Post payloads for POST /api/social/posts and PUT /api/social/posts/[id]: what may be sent, and the body limits.
 import { BadRequest, uuid } from "./http";
-import { overLimit } from "./limits";
-import { accountPlatforms, type AutoMode, type MediaInput, type PostFields, type TargetInput } from "./store";
-import { composeText, ComposeError } from "./compose";
+import { commentsOverLimit, overLimit } from "./limits";
+import { accountPlatforms, type AutoMode, type CommentInput, type MediaInput, type PostChildren, type PostFields, type TargetInput } from "./store";
+import { commentTakesMedia, composeText, ComposeError } from "./compose";
 import { parseRepeat, RepeatError } from "./repeat-rule";
 
 const TEXT_FIELDS = ["first_comment", "link_url", "notes", "source_url"] as const;
 const AUTO_MODES: readonly AutoMode[] = ["brand", "none", "own"];
 const MAX_TARGETS = 100;   // more channels than one brand has
 const MAX_MEDIA = 20;      // the largest carousel a platform takes
+const MAX_COMMENTS = 50;   // 0105 social_post_comments.position 0..49
+const MAX_TAGS = 50;
+const DELAYS: readonly number[] = [0, 1, 5, 60];   // 0105 delay_minutes check
 
-export interface PostPayload { fields: PostFields; targets: TargetInput[] | null; media: MediaInput[] | null }
+/** children: null = unchanged (0105 social_save_post p_comments / p_tags) */
+export interface PostPayload { fields: PostFields; targets: TargetInput[] | null; media: MediaInput[] | null; children: { comments: CommentInput[] | null; tags: string[] | null } }
 
 /** Only known fields, with their types; absent = unchanged (the database treats a missing key the same way). */
 export function parsePostPayload(body: Record<string, unknown>): PostPayload {
@@ -71,12 +75,33 @@ export function parsePostPayload(body: Record<string, unknown>): PostPayload {
     });
     if (new Set(media.map((m) => m.media_id)).size !== media.length) throw new BadRequest("a media item appears twice");
   }
-  return { fields, targets, media };
+  // 0105: the comments replace the post's set in this order; first_comment is their old one-comment form, so not both
+  let comments: CommentInput[] | null = null;
+  if (body.comments !== undefined && body.comments !== null) {
+    if ("first_comment" in fields) throw new BadRequest("send comments or fields.first_comment, not both");
+    if (!Array.isArray(body.comments) || body.comments.length > MAX_COMMENTS) throw new BadRequest(`comments must be an array of at most ${MAX_COMMENTS}`);
+    comments = body.comments.map((c, i) => {
+      const r = (c && typeof c === "object" ? c : {}) as Record<string, unknown>;
+      if (typeof r.body !== "string" || r.body.length > 10000) throw new BadRequest(`comments[${i}].body must be a string of at most 10000`);
+      const delay = r.delay_minutes ?? 0;
+      if (!DELAYS.includes(delay as number)) throw new BadRequest(`comments[${i}].delay_minutes must be one of ${DELAYS.join(", ")}`);
+      const media_id = r.media_id == null ? null : uuid(r.media_id, `comments[${i}].media_id`);
+      if (!r.body.trim() && !media_id) throw new BadRequest(`comments[${i}] has no text and no image`);
+      return { body: r.body, delay_minutes: delay as CommentInput["delay_minutes"], media_id };
+    });
+  }
+  let tags: string[] | null = null;
+  if (body.tags !== undefined && body.tags !== null) {
+    if (!Array.isArray(body.tags) || body.tags.length > MAX_TAGS) throw new BadRequest(`tags must be an array of at most ${MAX_TAGS}`);
+    tags = [...new Set(body.tags.map((t, i) => uuid(t, `tags[${i}]`)))];
+  }
+  return { fields, targets, media, children: { comments, tags } satisfies PostChildren };
 }
 
-/** 400 when a target's text -- as the sender composes it, link and UTM included -- is longer than its platform takes,
- *  or the account is not this brand's. */
-export async function assertWithinLimits(brandId: string, body: string, targets: TargetInput[], link: { url: string | null; utm: boolean } = { url: null, utm: false }): Promise<void> {
+/** 400 when a target's text -- as the sender composes it, link and UTM included -- or one of the comments is longer than
+ *  its platform takes, or the account is not this brand's. */
+export async function assertWithinLimits(brandId: string, body: string, targets: TargetInput[], link: { url: string | null; utm: boolean } = { url: null, utm: false },
+  comments: Array<{ body: string; media_id?: string | null }> = []): Promise<void> {
   const platforms = await accountPlatforms(brandId, targets.map((t) => t.account_id));
   const missing = targets.filter((t) => !platforms.has(t.account_id)).map((t) => t.account_id);
   if (missing.length) throw new BadRequest("an account in targets is not this brand's", { accounts: missing });
@@ -90,4 +115,9 @@ export async function assertWithinLimits(brandId: string, body: string, targets:
   };
   const problems = overLimit(body, targets.map((t) => { const platform = platforms.get(t.account_id) as string; return { accountId: t.account_id, platform, customBody: textOf(t, platform) }; }));
   if (problems.length) throw new BadRequest("text longer than the platform allows", { overLimit: problems });
+  const inComments = commentsOverLimit(comments.map((c) => c.body), targets.map((t) => ({ accountId: t.account_id, platform: platforms.get(t.account_id) as string })));
+  if (inComments.length) throw new BadRequest("a comment is longer than the platform allows", { commentOverLimit: inComments });
+  const noImage = [...new Set(targets.map((t) => platforms.get(t.account_id) as string))].filter((p) => !commentTakesMedia(p));
+  const imageOnly = comments.findIndex((c) => c.media_id && !c.body.trim());
+  if (imageOnly >= 0 && noImage.length) throw new BadRequest(`comment ${imageOnly + 1} is an image only, and ${noImage.join(", ")} comments carry no image`, { commentImageOnly: { comment: imageOnly + 1, platforms: noImage } });
 }

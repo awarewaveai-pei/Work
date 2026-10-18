@@ -546,6 +546,71 @@ export async function deleteTag(brandId: string, id: string, actor: string): Pro
   if (error) fail(error, "delete tag");
 }
 
+// ---- auto-reply rules (0105; the composer's 這則的自動回覆 C21, the brand's rules tab C27) ------------------------
+
+/** post_id null = the brand's rule; set = that post's own, which wins over the brand's (ADR 016 §5 decision 6) */
+export interface AutoRule {
+  id: string; post_id: string | null; name: string; trigger: "comment" | "dm"; keywords: string[]; platforms: string[];
+  action: "reply" | "dm" | "both"; reply: string; active: boolean; hits: number;
+}
+export type AutoRuleInput = Omit<AutoRule, "id" | "hits">;
+const RULE_COLUMNS = "id, post_id, name, trigger, keywords, platforms, action, reply, active, hits";
+
+/** postId undefined = the brand's rules; a post id = that post's own rules. */
+export async function listAutoRules(brandId: string, postId?: string): Promise<AutoRule[]> {
+  const q = db().from("social_auto_rules").select(RULE_COLUMNS).eq("organization_id", brandId);
+  const { data, error } = await (postId ? q.eq("post_id", postId) : q.is("post_id", null)).order("created_at").limit(200);
+  if (error) fail(error, "auto-reply rules");
+  return (data ?? []) as AutoRule[];
+}
+
+/** The post an existing rule belongs to (null = the brand's rule); 404 when the rule is not this brand's. */
+export async function autoRulePost(brandId: string, ruleId: string): Promise<string | null> {
+  const { data, error } = await db().from("social_auto_rules").select("post_id").eq("id", ruleId).eq("organization_id", brandId).maybeSingle();
+  if (error) fail(error, "auto-reply rule");
+  if (!data) throw new SocialStoreError(404, "no such auto-reply rule in this brand");
+  return (data.post_id as string | null) ?? null;
+}
+
+/** A post's own rule is its child: saving or deleting one updates the post row (0105 social_touch_post_rules), which a
+ *  queued post may only see through 0100's release -- a version moved mid-send makes the sender's record refused and
+ *  its Postiz post an orphan. So a queued post's rules wait; the composer unschedules first. (Checked here, not in the
+ *  touch function: a sender claim landing between this read and the RPC is the remaining window, TASKS C27.) */
+async function rulePostState(brandId: string, postId: string | null): Promise<void> {
+  if (!postId) return;
+  const { data, error } = await db().from("social_posts").select("state").eq("id", postId).eq("organization_id", brandId).maybeSingle();
+  if (error) fail(error, "post");
+  if (data?.state === "queued") throw new SocialStoreError(409, "the post is being sent: unschedule it before changing its own auto-reply rule");
+}
+
+/** After a rule write: the series made again (the touch took back a template's untouched children) and the post's
+ *  version for the editor's next compare-and-set. */
+async function afterRuleWrite(brandId: string, postId: string | null): Promise<number | null> {
+  if (!postId) return null;
+  const sb = db();
+  await refreshSeries(sb, brandId, postId, false);
+  const { data, error } = await sb.from("social_posts").select("version").eq("id", postId).eq("organization_id", brandId).maybeSingle();
+  if (error) fail(error, "post version");
+  return (data?.version as number | undefined) ?? null;
+}
+
+/** id null = a new rule; post_id is fixed at creation (0105). Logged as action auto_rule. */
+export async function saveAutoRule(brandId: string, id: string | null, rule: AutoRuleInput, actor: string): Promise<{ id: string; postVersion: number | null }> {
+  const postId = id ? await autoRulePost(brandId, id) : rule.post_id;
+  await rulePostState(brandId, postId);
+  const { data, error } = await db().rpc("social_save_auto_rule", { p_org: brandId, p_rule_id: id, p_rule: rule, p_actor: actor });
+  if (error) fail(error, "save auto-reply rule");
+  return { id: data as string, postVersion: await afterRuleWrite(brandId, postId) };
+}
+
+export async function deleteAutoRule(brandId: string, id: string, actor: string): Promise<{ postVersion: number | null }> {
+  const postId = await autoRulePost(brandId, id);
+  await rulePostState(brandId, postId);
+  const { error } = await db().rpc("social_delete_auto_rule", { p_org: brandId, p_rule_id: id, p_actor: actor });
+  if (error) fail(error, "delete auto-reply rule");
+  return { postVersion: await afterRuleWrite(brandId, postId) };
+}
+
 // ---- media and log ---------------------------------------------------------------------------------------------
 
 export async function listMedia(brandId: string) {

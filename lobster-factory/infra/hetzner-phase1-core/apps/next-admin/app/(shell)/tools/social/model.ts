@@ -41,11 +41,14 @@ export const PLATFORMS: Record<string, { name: string; mark: string; token: stri
 };
 export const platformOf = (p: string) => PLATFORMS[p] ?? { name: p, mark: p.slice(0, 2), token: "--status-ignored" };
 
-/** Formats the sender can send per platform (lib/social/compose.ts SETTINGS); everything else is a plain post. */
-export const FORMATS: Record<string, Array<{ key: string; label: string }>> = {
-  instagram: [{ key: "post", label: "貼文" }, { key: "story", label: "限時動態" }],
-  "instagram-standalone": [{ key: "post", label: "貼文" }, { key: "story", label: "限時動態" }],
-  facebook: [{ key: "post", label: "貼文" }, { key: "story", label: "限時動態" }],
+/** Formats per platform (lib/social/compose.ts SETTINGS); everything else is a plain post. `off` = drawn, not sendable
+ *  yet, with the reason shown (LinkedIn's document carousel, C21 card). A Reel is a post with one video (compose.ts). */
+export const FORMATS: Record<string, Array<{ key: string; label: string; off?: string }>> = {
+  instagram: [{ key: "post", label: "貼文" }, { key: "reel", label: "Reel" }, { key: "story", label: "限時動態" }],
+  "instagram-standalone": [{ key: "post", label: "貼文" }, { key: "reel", label: "Reel" }, { key: "story", label: "限時動態" }],
+  facebook: [{ key: "post", label: "貼文" }, { key: "reel", label: "Reel" }, { key: "story", label: "限時動態" }],
+  linkedin: [{ key: "post", label: "貼文" }, { key: "document", label: "文件輪播", off: "文件輪播要上傳 PDF，一頁一張。這個功能還沒開放。" }],
+  "linkedin-page": [{ key: "post", label: "貼文" }, { key: "document", label: "文件輪播", off: "文件輪播要上傳 PDF，一頁一張。這個功能還沒開放。" }],
 };
 export const formatsOf = (p: string) => FORMATS[p] ?? [{ key: "post", label: "貼文" }];
 

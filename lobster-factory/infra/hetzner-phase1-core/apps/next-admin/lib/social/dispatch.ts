@@ -14,7 +14,7 @@
 // Ports (dispatch-store.ts) are injected so the decisions are tested without a database or Postiz.
 
 import { PostizApiError, sendKeyOf, type PostizPost, type RawIntegration } from "@/lib/content/postiz";
-import { compose, ComposeError, type Composed } from "./compose";
+import { compose, ComposeError, type ComposeComment, type Composed } from "./compose";
 
 /** dry_run: read only. draft: the whole pipeline, but Postiz only stores drafts (never publishes) -- the rehearsal on
  *  production (plan C5 acceptance). apply: sends. */
@@ -46,7 +46,8 @@ export interface QueuedPost {
   /** when the post last changed: for a queued post, its claim */
   updatedAt: string;
   body: string;
-  firstComment: string | null;
+  /** in position order (0105 social_post_comments) */
+  comments: ComposeComment[];
   linkUrl: string | null;
   linkUtm: boolean;
   media: Array<{ postizMediaId: string | null; postizPath: string | null; altText: string | null }>;
@@ -121,7 +122,7 @@ class OutOfBudget extends Error {}
 class OutOfTime extends Error {}
 
 function composeFor(post: QueuedPost, t: QueuedTarget): Composed {
-  return compose({ body: post.body, customBody: t.customBody, firstComment: post.firstComment, linkUrl: post.linkUrl,
+  return compose({ body: post.body, customBody: t.customBody, comments: post.comments, linkUrl: post.linkUrl,
     linkUtm: post.linkUtm, platform: t.platform, format: t.format, media: post.media });
 }
 
