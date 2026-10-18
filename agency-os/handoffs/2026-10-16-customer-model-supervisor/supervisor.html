@@ -87,8 +87,8 @@ ul.doors li span{min-width:0}
 <aside><div class="in">
   <h1>客戶怎麼來 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-18</span></p>
-  <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>0</span>／<span data-computed>9</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:11.11111111111111%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>1</span>／<span data-computed>9</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">說明客戶來源、付款方、操作人，以及系統尚缺的項目。</p>
@@ -124,18 +124,18 @@ ul.doors li span{min-width:0}
 <h3 class="sub-h">賣斷怎麼收錢</h3>
 <ul class="yn rules"><li><b>買斷價</b><span>等於 36 個月訂閱價，含 12 個月更新。</span></li><li><b>更新年費</b><span>買斷價的 20%，選購；不續約仍可使用最後一版，永不鎖。</span></li><li><b>維運月費</b><span>分級選購：備份、監控、更新套用、支援回應時間；含一把維運用的金鑰。</span></li><li><b>AI 與平台 API</b><span>客戶用自己的金鑰自付。</span></li></ul></section>
 
-<section id="steps"><h2>待建項目</h2><p class="lead">項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。</p><ol class="steps"><li class="step todo" id="s1">
+<section id="steps"><h2>待建項目</h2><p class="lead">項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。</p><ol class="steps"><li class="step done" id="s1">
     <div class="n">1</div>
     <div class="b">
       <p class="plain">新產品只有一個入口：執行 scripts/new-product.mjs，回答五題，登記列、頁面骨架、收費點與測試就產生好；漏填或未登記的工具都會讓測試失敗。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>products.test.ts：漏填亮紅燈；可買斷模組含 SAFETY_GATE 亮紅燈；app 內任何目錄既不在登記表、也不在後台清單就亮紅燈（客服、蒐集器、行銷住在 /ops 下也算產品，只補登記列不搬家）</p>
       <details><summary>工程細節：登記表加 features[] 與 accessChannels；產生器 new-product.mjs；機械閘</summary>
         <p>products.ts 每個產品宣告收費功能（feature_key、上限種類、能不能買斷、billing: contract|credits）與通道（ui；api 待 API 通道那一項開放）；sync-foundry-catalog.mjs 把登記表匯出成 System Foundry 的「AwareWave 積木」題目；閘：收費功能都有登記、可買斷模組無 SAFETY_GATE、目錄檔等於登記表。</p>
         <p><b>前置：</b>無</p>
         <p><b>檔案：</b><code>scripts/new-product.mjs</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/products.ts</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/__tests__/products.test.ts</code></p>
         <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md</code></p>
-        
+        <p><b>完成於：</b><code>1ef1ee419</code></p>
       </details>
     </div></li><li class="step todo" id="s2">
     <div class="n">2</div>

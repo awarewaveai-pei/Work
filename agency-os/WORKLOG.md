@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-18（續14）ADR017 第1項監工台完成狀態
+
+- 實作commit `1ef1ee419`；`verify-head-typecheck.ps1 -Ref 1ef1ee419`在乾淨worktree驗DEPS_IN_SYNC後tsc OK、HEAD_TYPECHECK_OK，exit0。
+- `data.mjs` STEPS[0]＝done、commit＝1ef1ee419；其餘8項狀態未改；supervisor.html由build重生。`node build.mjs`→wrote supervisor.html；`node check.mjs`→ok: 5 ways, 9 steps, 4 open, page fresh。
+- 主程式全部卡片Acceptance與R0證據見續13；完整WORKLOG證據閘另在乾淨隔離snapshot、僅本session證據上exit0，避免共享WORKLOG其他session的歷史hits=0觸發全repo node_modules遞迴。未修改偵測器或他人證據。
+- 操作者指示：私人預覽網址的重發由下一個Claude session執行；本session沒有發布。既有operator memory BOM漂移53檔另屬既有狀態。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs | exit=0 | ms=188
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=1ef1ee419 | hits=2
+- ORACLE_WAIVED: DOC_ONLY -- only supervisor status/commit literals and generated HTML; implementation source reviewed by Claude in 2026-10-18-review-b17ee8b5.md.
+- AUTO_TASK_DONE: ADR017 step1 done; supervisor 1/9, same private preview URL pending Claude republish.
+- rollback：git revert狀態commit；實作獨立revert 1ef1ee419。無prod部署。
+
+
 ## 2026-10-18
 
 ## 2026-10-18（續13）ADR 017 第1項：產品歸位、產生器、Foundry積木、Host邊界
