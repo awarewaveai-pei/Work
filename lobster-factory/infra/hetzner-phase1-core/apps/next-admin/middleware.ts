@@ -236,6 +236,7 @@ export function isWrongHostForProductPage(request: NextRequest): boolean {
   const owner = productPageOwner(request.nextUrl.pathname);
   if (!owner || isDevelopment()) return false;
   const door = doorOf(request);
+
   return !(door.kind === "product" && door.product.key === owner.key);
 }
 
@@ -274,7 +275,15 @@ export function isCrossSiteWrite(request: NextRequest): boolean {
 export async function middleware(request: NextRequest) {
   const door = doorOf(request);
 
-  if (isWrongHostForPortal(request) || isWrongHostForProductPage(request)) {
+  if (door.kind === "probe") {
+    // Preserve compose's wget / -> /login and sg-deploy's real API smoke, without admitting staff pages.
+    if (request.nextUrl.pathname === "/" && request.method === "GET") return blockedResponse(request);
+    if (request.nextUrl.pathname !== "/api/ops/summary" || request.method !== "GET") {
+      return new NextResponse(null, { status: 404 });
+    }
+  }
+
+  if (door.kind === "none" || isWrongHostForPortal(request) || isWrongHostForProductPage(request)) {
     return new NextResponse(null, { status: 404 });
   }
 

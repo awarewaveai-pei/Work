@@ -2499,6 +2499,83 @@
         "CAP-USAGE-METERING"
       ],
       "description": "Customers purchase a bundle of credits upfront, held as an account balance, and each billable usage event decrements that balance directly rather than triggering a separate post-hoc invoice. Requires CAP-USAGE-METERING, not CAP-PAYMENTS directly: usage must already be measured and attributed before it can decrement a balance, the same reasoning CAP-GIFT-CARD uses for requiring only CAP-COMMERCIAL rather than CAP-PAYMENTS -- how the credit pack itself was originally paid for is a separate concern. Distinct from CAP-USAGE-METERING, which only measures/attributes usage without implying prepayment; from CAP-CREDIT-TERMS, which is B2B net-30/60/90 payment after goods are already delivered, the opposite timing; and from CAP-LOYALTY-POINTS, which are earned/non-purchasable rewards, not a directly purchasable billing currency."
+    },
+    {
+      "id": "CAP-AW-COGNITIVE",
+      "name": "AI LEGO Cognitive Engineering OS",
+      "description": "組合認知方法、研究資料與專案。",
+      "module": "aw-cognitive",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-COLLECT",
+      "name": "資料蒐集器",
+      "description": "搜尋並蒐集外部網站與研究資料。",
+      "module": "aw-collect",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-CONTENT",
+      "name": "內容行銷",
+      "description": "產生文章、搜尋素材並安排內容發布。",
+      "module": "aw-content",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-CS",
+      "name": "AI 客服",
+      "description": "根據知識庫回答問題並處理客服交接。",
+      "module": "aw-cs",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-DESIGN",
+      "name": "設計編輯器",
+      "description": "編輯畫布、橫幅、模型圖與向量設計。",
+      "module": "aw-design",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-HCI",
+      "name": "HCI-30",
+      "description": "人機互動與持續監測工具。",
+      "module": "aw-hci",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-OUTREACH",
+      "name": "行銷開發信",
+      "description": "產生開發信並管理寄送名單。",
+      "module": "aw-outreach",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-SOCIAL",
+      "name": "社群發文",
+      "description": "改寫、排程並派送品牌社群貼文。",
+      "module": "aw-social",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-STUDIO",
+      "name": "商品設計工作室",
+      "description": "生成商品圖片、文案與修圖素材。",
+      "module": "aw-studio",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-TAROT",
+      "name": "塔羅製圖",
+      "description": "生成塔羅圖片、提示詞與動態。",
+      "module": "aw-tarot",
+      "requires": []
+    },
+    {
+      "id": "CAP-AW-VIDEO",
+      "name": "影片製作",
+      "description": "生成腳本、場景、動態與旁白影片。",
+      "module": "aw-video",
+      "requires": []
     }
   ]
 }

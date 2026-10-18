@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-18
+
+## 2026-10-18（續13）ADR 017 第1項：產品歸位、產生器、Foundry積木、Host邊界
+
+- 根因：登記表只有3列，工具／客戶產品無反向歸屬；缺產生器與Foundry接口；未知Host被當員工門。
+- 修改：11產品歸位＋300個Cognitive實際功能ID；`products.ts:32`為正本；`products.test.ts:83/104/142`守反向登記／費用種類／員工工具無付費SDK。新產品門`door.enabled=false`只保留名稱，避免coming_soon登記本身開放API；既有social門保留（原status指啟用能力，尚未開self-signup）。第8項開門需啟用door並通過頁面／nginx測試。
+- 生成：`scripts/new-product.mjs:18`讀Foundry交付登記；直接CLI與Foundry兩路均產出5個路徑。十宣告＝kernel/06；未完成填TODO、available不得有TODO。`new-product.mjs:133`原子替換登記表，骨架先open/track再寫；ENOSPC定點注入證明無截斷／殘留。
+- Foundry：`scripts/sync-foundry-catalog.mjs:16`經tsx同步AW問卷／capability／依賴／module metadata，`--check`不寫；`make generate-sample`由bootstrap intake可重現sample。11個AW實際生成及product→product＋native module閉包均通過。integrity在乾淨拋棄worktree重生，未納入他人的V1_7 WIP。
+- Host：`middleware.ts:278`狹義probe門只保留loopback GET /→原登入redirect及GET /api/ops/summary→原API；其他受middleware路徑404。解決本機健康／部署smoke回歸，未更改prod compose。未知Host、預留cs Host、清除偽造身份標頭皆驗證。
+- 實測：next-admin `npx vitest run lib/portal lib/__tests__/middleware-portal-guards.test.ts lib/__tests__/middleware-csrf.test.ts`＝78 passed；`npx tsc --noEmit -p .`＝exit0；`node --test scripts/__tests__/new-product.test.mjs`＝4 passed（含兩處部分寫入）。
+- 卡片驗收：拋棄worktree中直接demo＋Foundry demo2各印5路徑，兩次portal測試綠；sample manifest 10/10非TODO，dependsOn＝plan.modules；缺plan exit2。刪tarot登記→紅／還原→綠；拔unknown-host guard→紅／還原→綠；改產品名→catalog check exit1／還原exit0。共享repo沒有demo殘留。
+- Foundry驗證：sync/check exit0；validate_configurator＝274 questions/314 capabilities/62 modules；validate_artifact_generation PASS；一次完整selection matrix＝274 singles、37395 valid pairs、6 rejected、1000 random、all_yes_caps314。manifest validator在乾淨snapshot PASS。未重跑會再次執行matrix＋全套unittest的doc_numbers／make verify，不宣稱全套通過。
+- 審查：critic兩項Major（截斷、loopback）已修；最終0c/0m/0n。Claude oracle `agency-os/reports/oracle/2026-10-18-review-b17ee8b5.md`只報兩份文件舊pairwise數字（同一finding）；依實測輸出修README:43與V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT:70，grep驗真37401/37395/6；code在oracle捕捉後未修改。
+- 開工heartbeat仍為2026-10-08，手動R0/R4；BOM audit掃143檔、53個既有operator memory缺BOM，本任務未修改那些檔案。私有index只提交本次檔案，不掃他人staged內容。
+- 重新發布：依操作者本session指示，Codex僅更新監工台data/build/check；claude.ai私人預覽頁由下一個Claude session重發。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test scripts/__tests__/new-product.test.mjs | exit=0 | ms=1009
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/cognitive-engineering-os | grep=doorForHost | hits=29
+- AUTO_TASK_DONE: ADR017 step1 implementation and card acceptance complete; supervisor commit reference follows in status commit.
+- rollback：git revert本次implementation commit；無migration、無環境變數、無prod操作。
+
 ## 2026-10-18（續12）客服子分頁改用 app 既有 .tab-bar 元件；去黑框、去捲軸——續3 手刻版被退（「比之前更爛」）
 
 **操作者**（附截圖）：點過的分頁留一圈黑框、右側一組捲軸箭頭、整體像小學生做的。
@@ -215,6 +236,8 @@
 - REVIEW_WAIVED: DOC_ONLY -- 只改 TASKS.md 勾選狀態
 - BUGHUNT_WAIVED: DOC_ONLY -- 只改 TASKS.md 勾選狀態
 **rollback**：`git revert <本 commit>`。
+## 2026-10-17
+
 ## 2026-10-17（續24）社群 V1.5 C19：骨架與路由（頂部六區、六分頁、左側頻道清單、一列工具列、撰寫頁獨立整頁）
 
 **範圍**：PLAN.md §1b C19。路徑 `apps/next-admin/app/(shell)/tools/social/`。

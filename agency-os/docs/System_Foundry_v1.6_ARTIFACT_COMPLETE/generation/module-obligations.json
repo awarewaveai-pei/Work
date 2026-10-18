@@ -1337,6 +1337,259 @@
       "recovery": [
         "Location, per-location balance, transfer, and receipt records are included in backup scope."
       ]
+    },
+    "aw-cognitive": {
+      "purpose": "組合認知方法、研究資料與專案。",
+      "invariants": [
+        "Product registry key: cognitive.",
+        "Source module contract: lib/cognitive/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-collect": {
+      "purpose": "搜尋並蒐集外部網站與研究資料。",
+      "invariants": [
+        "Product registry key: collect.",
+        "Source module contract: lib/collect/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-content": {
+      "purpose": "產生文章、搜尋素材並安排內容發布。",
+      "invariants": [
+        "Product registry key: content.",
+        "Source module contract: lib/content/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-cs": {
+      "purpose": "根據知識庫回答問題並處理客服交接。",
+      "invariants": [
+        "Product registry key: cs.",
+        "Source module contract: lib/cs/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-design": {
+      "purpose": "編輯畫布、橫幅、模型圖與向量設計。",
+      "invariants": [
+        "Product registry key: design.",
+        "Source module contract: lib/design/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-hci": {
+      "purpose": "人機互動與持續監測工具。",
+      "invariants": [
+        "Product registry key: hci.",
+        "Source module contract: lib/hci/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-outreach": {
+      "purpose": "產生開發信並管理寄送名單。",
+      "invariants": [
+        "Product registry key: outreach.",
+        "Source module contract: lib/outreach/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-social": {
+      "purpose": "改寫、排程並派送品牌社群貼文。",
+      "invariants": [
+        "Product registry key: social.",
+        "Source module contract: lib/social/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-studio": {
+      "purpose": "生成商品圖片、文案與修圖素材。",
+      "invariants": [
+        "Product registry key: studio.",
+        "Source module contract: lib/studio/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-tarot": {
+      "purpose": "生成塔羅圖片、提示詞與動態。",
+      "invariants": [
+        "Product registry key: tarot.",
+        "Source module contract: lib/tarot/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
+    },
+    "aw-video": {
+      "purpose": "生成腳本、場景、動態與旁白影片。",
+      "invariants": [
+        "Product registry key: video.",
+        "Source module contract: lib/video/MODULE_MANIFEST.json.",
+        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
+        "Keep authoritative state and public contracts within the declared module boundary.",
+        "Product access uses the shared entitlement contract; no private billing ledger."
+      ],
+      "security": [
+        "Keep provider secrets in deployment configuration.",
+        "Authorize each paid feature through the shared entitlement boundary."
+      ],
+      "tests": [
+        "Verify the product module contract and its declared dependencies before release."
+      ],
+      "operations": [
+        "Record module logs, metrics, alert ownership and the operational runbook."
+      ],
+      "recovery": [
+        "Define and verify module migration, rollback and replacement before release."
+      ]
     }
   }
 }

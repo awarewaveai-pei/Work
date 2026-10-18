@@ -1,0 +1,24 @@
+{
+  "project": { "name": "sample-commerce-os" },
+  "answers": {
+    "Q-AI-011": true,
+    "Q-B2B-001": true,
+    "Q-COM-001": true,
+    "Q-CS-001": true,
+    "Q-CS-009": true,
+    "Q-DATA-003": true,
+    "Q-DATA-004": true,
+    "Q-DATA-009": true,
+    "Q-DATA-016": true,
+    "Q-ID-001": true,
+    "Q-ID-003": true,
+    "Q-MKTOPS-001": true,
+    "Q-PAY-001": true,
+    "Q-PAY-005": true,
+    "Q-SCOPE-002": true,
+    "Q-SHIP-001": true,
+    "Q-SUBC-001": true,
+    "Q-XB-001": true
+  },
+  "custom_requirements": []
+}

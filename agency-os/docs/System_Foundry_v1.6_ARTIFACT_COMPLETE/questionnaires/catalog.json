@@ -293,6 +293,12 @@
       "order": 45,
       "title": "其他需求",
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
+    },
+    {
+      "id": "AW",
+      "order": 46,
+      "title": "AwareWave 積木",
+      "description": "選擇要組裝的 AwareWave 產品；依賴由登記表自動加入。"
     }
   ],
   "questions": [
@@ -3160,6 +3166,94 @@
         "question": "Q-COM-001",
         "equals": true
       }
+    },
+    {
+      "id": "Q-AW-COGNITIVE",
+      "category": "AW",
+      "label": "AI LEGO Cognitive Engineering OS",
+      "description": "組合認知方法、研究資料與專案。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-COLLECT",
+      "category": "AW",
+      "label": "資料蒐集器",
+      "description": "搜尋並蒐集外部網站與研究資料。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-CONTENT",
+      "category": "AW",
+      "label": "內容行銷",
+      "description": "產生文章、搜尋素材並安排內容發布。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-CS",
+      "category": "AW",
+      "label": "AI 客服",
+      "description": "根據知識庫回答問題並處理客服交接。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-DESIGN",
+      "category": "AW",
+      "label": "設計編輯器",
+      "description": "編輯畫布、橫幅、模型圖與向量設計。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-HCI",
+      "category": "AW",
+      "label": "HCI-30",
+      "description": "人機互動與持續監測工具。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-OUTREACH",
+      "category": "AW",
+      "label": "行銷開發信",
+      "description": "產生開發信並管理寄送名單。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-SOCIAL",
+      "category": "AW",
+      "label": "社群發文",
+      "description": "改寫、排程並派送品牌社群貼文。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-STUDIO",
+      "category": "AW",
+      "label": "商品設計工作室",
+      "description": "生成商品圖片、文案與修圖素材。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-TAROT",
+      "category": "AW",
+      "label": "塔羅製圖",
+      "description": "生成塔羅圖片、提示詞與動態。",
+      "answer_type": "boolean",
+      "required_when_active": true
+    },
+    {
+      "id": "Q-AW-VIDEO",
+      "category": "AW",
+      "label": "影片製作",
+      "description": "生成腳本、場景、動態與旁白影片。",
+      "answer_type": "boolean",
+      "required_when_active": true
     }
   ]
 }

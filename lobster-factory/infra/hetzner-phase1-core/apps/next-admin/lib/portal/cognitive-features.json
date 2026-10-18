@@ -1,0 +1,1502 @@
+[
+  {
+    "id": "ai.draft_record",
+    "name": "ai.draft_record -- Plain-language brief to method input draft (AI Gateway)",
+    "billing": "credits"
+  },
+  {
+    "id": "architecture.adr",
+    "name": "架構決策紀錄",
+    "billing": "contract"
+  },
+  {
+    "id": "architecture.atam",
+    "name": "架構取捨分析法",
+    "billing": "contract"
+  },
+  {
+    "id": "architecture.ddd",
+    "name": "領域驅動設計",
+    "billing": "contract"
+  },
+  {
+    "id": "architecture.dependency_mapping",
+    "name": "相依關係地圖",
+    "billing": "contract"
+  },
+  {
+    "id": "architecture.event_storming",
+    "name": "事件風暴",
+    "billing": "contract"
+  },
+  {
+    "id": "architecture.fitness_functions",
+    "name": "架構適應度函數",
+    "billing": "contract"
+  },
+  {
+    "id": "architecture.quality_attribute_scenario",
+    "name": "品質屬性情境",
+    "billing": "contract"
+  },
+  {
+    "id": "architecture.strangler_fig",
+    "name": "絞殺者模式",
+    "billing": "contract"
+  },
+  {
+    "id": "architecture.system_context_model",
+    "name": "C4 模型",
+    "billing": "contract"
+  },
+  {
+    "id": "architecture.trade_off_matrix",
+    "name": "架構取捨矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.conflict_mapping",
+    "name": "衝突地圖",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.full_stop_method",
+    "name": "句點分析法",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.life_timeline",
+    "name": "生命時間線（正向／反向）",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.life_wheel",
+    "name": "生命之輪",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.metaphor_dialogue",
+    "name": "隱喻對話",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.motivation_matrix",
+    "name": "動機矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.personal_swot",
+    "name": "個人 SWOT",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.role_playing",
+    "name": "角色扮演",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.story_completion",
+    "name": "故事延續",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.storytelling",
+    "name": "故事敘說",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.synonym_substitution",
+    "name": "同義詞替換",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.turning_point_analysis",
+    "name": "轉折點分析",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.value_clarification",
+    "name": "價值澄清",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.visual_metaphor",
+    "name": "視覺隱喻創作",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.workshop_certificate_drawing",
+    "name": "工作坊證章畫",
+    "billing": "contract"
+  },
+  {
+    "id": "art_therapy.wusheng_five_phase",
+    "name": "五階段療程系統（五行五階段）",
+    "billing": "contract"
+  },
+  {
+    "id": "artifact.generate_chart",
+    "name": "artifact.generate_chart -- Chart Rendering Capability Contract",
+    "billing": "contract"
+  },
+  {
+    "id": "artifact.generate_proposal",
+    "name": "artifact.generate_proposal -- Business Proposal Artifact Capability Contract",
+    "billing": "contract"
+  },
+  {
+    "id": "artifact.generate_research_paper",
+    "name": "artifact.generate_research_paper -- Research Findings to Research Memo/Paper Artifact Capability Contract",
+    "billing": "contract"
+  },
+  {
+    "id": "association.affinity_diagram",
+    "name": "親和圖／KJ 法",
+    "billing": "contract"
+  },
+  {
+    "id": "association.analogy_mapping",
+    "name": "類比映射",
+    "billing": "contract"
+  },
+  {
+    "id": "association.attribute_listing",
+    "name": "屬性列舉法",
+    "billing": "contract"
+  },
+  {
+    "id": "association.concept_map",
+    "name": "概念圖",
+    "billing": "contract"
+  },
+  {
+    "id": "association.mind_map",
+    "name": "心智圖",
+    "billing": "contract"
+  },
+  {
+    "id": "association.morphological_analysis",
+    "name": "型態分析法",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.counterfactual_reasoning",
+    "name": "反事實推理",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.dag",
+    "name": "因果圖",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.difference_in_differences",
+    "name": "差異中的差異法",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.instrumental_variables",
+    "name": "工具變數法",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.logic_model",
+    "name": "邏輯模型",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.process_tracing",
+    "name": "過程追蹤法",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.rct",
+    "name": "隨機對照試驗",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.regression_discontinuity",
+    "name": "斷點迴歸設計",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.synthetic_control",
+    "name": "合成控制法",
+    "billing": "contract"
+  },
+  {
+    "id": "causal.theory_of_change",
+    "name": "改變理論",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.blue_team",
+    "name": "藍隊防禦",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.counterexample_search",
+    "name": "反例搜尋",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.devils_advocate",
+    "name": "魔鬼代言人",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.disconfirming_evidence",
+    "name": "反證搜尋",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.fmea",
+    "name": "失效模式與影響分析",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.hazop",
+    "name": "危害與可操作性分析",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.independent_judge",
+    "name": "獨立裁決",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.pre_mortem",
+    "name": "事前驗屍",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.red_team",
+    "name": "紅隊攻擊",
+    "billing": "contract"
+  },
+  {
+    "id": "challenge.stress_testing",
+    "name": "壓力測試（情境）",
+    "billing": "contract"
+  },
+  {
+    "id": "computation.monte_carlo",
+    "name": "蒙地卡羅模擬",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.backup_restore_drill",
+    "name": "備份還原演練",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.data_contract",
+    "name": "資料契約",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.data_lineage",
+    "name": "資料血緣",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.data_quality_dimensions",
+    "name": "資料品質維度",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.erd",
+    "name": "實體關係圖",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.expand_contract_migration",
+    "name": "擴張-收縮式遷移",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.normalization",
+    "name": "正規化",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.reconciliation",
+    "name": "資料對帳",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.retention_deletion_model",
+    "name": "保留與刪除模型",
+    "billing": "contract"
+  },
+  {
+    "id": "database_data.schema_compatibility_analysis",
+    "name": "Schema 相容性分析",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.ahp",
+    "name": "層級分析法",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.decision_tree",
+    "name": "決策樹",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.eisenhower_matrix",
+    "name": "艾森豪矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.expected_value",
+    "name": "期望值",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.ice",
+    "name": "ICE 評分法",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.impact_effort",
+    "name": "影響力-努力矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.kano",
+    "name": "卡諾模型",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.mcda",
+    "name": "多準則決策分析",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.moscow",
+    "name": "MoSCoW 優先分級",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.pareto_frontier",
+    "name": "柏拉圖前緣",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.rice",
+    "name": "RICE 優先排序法",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.topsis",
+    "name": "逼近理想解排序法",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.weighted_decision_matrix",
+    "name": "加權決策矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "decision.wsjf",
+    "name": "加權最短工作優先法",
+    "billing": "contract"
+  },
+  {
+    "id": "decomposition.fast",
+    "name": "功能分析系統技術",
+    "billing": "contract"
+  },
+  {
+    "id": "decomposition.functional_decomposition",
+    "name": "功能分解",
+    "billing": "contract"
+  },
+  {
+    "id": "decomposition.hierarchical_task_analysis",
+    "name": "階層式任務分析",
+    "billing": "contract"
+  },
+  {
+    "id": "decomposition.issue_tree",
+    "name": "議題樹",
+    "billing": "contract"
+  },
+  {
+    "id": "decomposition.logic_tree",
+    "name": "邏輯樹",
+    "billing": "contract"
+  },
+  {
+    "id": "decomposition.mece",
+    "name": "MECE 檢查",
+    "billing": "contract"
+  },
+  {
+    "id": "decomposition.objective_tree",
+    "name": "目標樹",
+    "billing": "contract"
+  },
+  {
+    "id": "decomposition.problem_tree",
+    "name": "問題樹",
+    "billing": "contract"
+  },
+  {
+    "id": "decomposition.wbs",
+    "name": "工作分解結構",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.change_risk_matrix",
+    "name": "變更風險矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.critical_path_method",
+    "name": "要徑法",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.decision_log",
+    "name": "決策日誌",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.definition_of_done",
+    "name": "完成的定義",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.dependency_graph",
+    "name": "任務相依圖",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.gantt_chart",
+    "name": "甘特圖",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.outcome_roadmap",
+    "name": "成果導向路線圖",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.raci",
+    "name": "交付 RACI 矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.raid_log",
+    "name": "RAID 日誌",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.risk_register",
+    "name": "風險登記表",
+    "billing": "contract"
+  },
+  {
+    "id": "delivery.stage_gate",
+    "name": "階段關卡法",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.blue_green_deployment",
+    "name": "藍綠部署",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.canary_deployment",
+    "name": "金絲雀部署",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.capacity_model",
+    "name": "容量模型",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.chaos_engineering",
+    "name": "混沌工程",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.error_budget",
+    "name": "錯誤預算",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.game_day",
+    "name": "演習日",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.load_test",
+    "name": "負載測試",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.release_readiness_review",
+    "name": "發布就緒審查",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.rto_rpo",
+    "name": "復原時間目標／復原點目標",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.runbook_execution",
+    "name": "作業手冊執行",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.sli_slo",
+    "name": "服務等級指標／目標／協議",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.soak_test",
+    "name": "浸泡測試",
+    "billing": "contract"
+  },
+  {
+    "id": "devops_sre.stress_test",
+    "name": "壓力測試（工程）",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.brainwriting",
+    "name": "腦力書寫法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.classic_brainstorming",
+    "name": "經典腦力激盪",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.crazy_eights",
+    "name": "瘋狂 8 法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.creative_constraints",
+    "name": "創意限制",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.design_thinking",
+    "name": "設計思考",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.forced_connections",
+    "name": "強制關聯法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.lateral_thinking",
+    "name": "水平思考",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.lotus_blossom",
+    "name": "蓮花座法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.random_stimulus",
+    "name": "隨機刺激法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.reverse_brainstorming",
+    "name": "反向腦力激盪法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.scamper",
+    "name": "SCAMPER 檢核表法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.six_thinking_hats",
+    "name": "六頂思考帽",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.six_three_five",
+    "name": "6-3-5 腦力書寫法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.starbursting",
+    "name": "星爆法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.synectics",
+    "name": "類比創意法",
+    "billing": "contract"
+  },
+  {
+    "id": "divergent.triz",
+    "name": "創新理論工具",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.argument_mapping",
+    "name": "論證地圖",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.assumption_mapping",
+    "name": "假設地圖",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.assumption_registry",
+    "name": "假設登記表",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.bayesian_updating",
+    "name": "貝氏更新",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.confidence_calibration",
+    "name": "信心校準",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.contradiction_detection",
+    "name": "矛盾偵測",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.evidence_hierarchy",
+    "name": "證據強度階層",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.evidence_matrix",
+    "name": "證據矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.ladder_of_inference",
+    "name": "推論階梯",
+    "billing": "contract"
+  },
+  {
+    "id": "epistemic.toulmin_model",
+    "name": "圖爾敏論證模型",
+    "billing": "contract"
+  },
+  {
+    "id": "evidence.triangulation",
+    "name": "證據三角驗證",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.ab_test",
+    "name": "A/B 測試",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.benchmark",
+    "name": "標竿比較",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.concierge_test",
+    "name": "門房測試",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.fake_door",
+    "name": "假門測試",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.mvp",
+    "name": "最小可行產品",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.pilot",
+    "name": "試點計畫",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.proof_of_concept",
+    "name": "概念驗證",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.prototype",
+    "name": "原型測試",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.smoke_test",
+    "name": "煙霧測試（市場）",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.technical_spike",
+    "name": "技術試探",
+    "billing": "contract"
+  },
+  {
+    "id": "experiment.wizard_of_oz",
+    "name": "綠野仙蹤測試",
+    "billing": "contract"
+  },
+  {
+    "id": "feasibility.break_even",
+    "name": "損益兩平分析",
+    "billing": "contract"
+  },
+  {
+    "id": "feasibility.cost_benefit_analysis",
+    "name": "成本效益分析",
+    "billing": "contract"
+  },
+  {
+    "id": "feasibility.cost_effectiveness",
+    "name": "成本效果分析",
+    "billing": "contract"
+  },
+  {
+    "id": "feasibility.irr",
+    "name": "內部報酬率",
+    "billing": "contract"
+  },
+  {
+    "id": "feasibility.npv",
+    "name": "淨現值分析",
+    "billing": "contract"
+  },
+  {
+    "id": "feasibility.real_options",
+    "name": "實質選擇權",
+    "billing": "contract"
+  },
+  {
+    "id": "feasibility.tco",
+    "name": "總持有成本",
+    "billing": "contract"
+  },
+  {
+    "id": "feasibility.telos",
+    "name": "TELOS 可行性檢核",
+    "billing": "contract"
+  },
+  {
+    "id": "feasibility.unit_economics",
+    "name": "單位經濟效益",
+    "billing": "contract"
+  },
+  {
+    "id": "finance.financial_assumptions",
+    "name": "財務假設",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.adjacent_discipline_search",
+    "name": "鄰近學科搜尋",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.backcasting",
+    "name": "回溯規劃",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.black_swan_exercise",
+    "name": "黑天鵝演練",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.cross_country_comparison",
+    "name": "跨國比較",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.cross_impact_analysis",
+    "name": "交叉影響分析",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.cross_industry_transfer",
+    "name": "跨產業移植",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.delphi",
+    "name": "德爾菲法",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.futures_wheel",
+    "name": "未來輪",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.historical_analogy",
+    "name": "歷史類比",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.horizon_scanning",
+    "name": "地平線掃描",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.outlier_analysis",
+    "name": "異常個案分析",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.scenario_planning",
+    "name": "情境規劃",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.weak_signal_detection",
+    "name": "微弱訊號偵測",
+    "billing": "contract"
+  },
+  {
+    "id": "foresight.wild_cards",
+    "name": "外卡情境",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.boundary_critique",
+    "name": "邊界批判",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.five_w_one_h",
+    "name": "5W1H 問題輪廓",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.frame_storming",
+    "name": "框架風暴",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.future_compass",
+    "name": "未來羅盤",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.goal_statement",
+    "name": "目標陳述",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.grow_model",
+    "name": "GROW 模型",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.how_might_we",
+    "name": "我們可以如何…",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.non_goals",
+    "name": "非目標清單",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.north_star_metric",
+    "name": "北極星指標",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.okr",
+    "name": "OKR 目標關鍵成果",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.problem_statement",
+    "name": "問題陳述",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.reframing",
+    "name": "框架轉換",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.smart",
+    "name": "SMART 目標",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.success_criteria",
+    "name": "成功標準",
+    "billing": "contract"
+  },
+  {
+    "id": "framing.value_sorting",
+    "name": "價值觀排序",
+    "billing": "contract"
+  },
+  {
+    "id": "insight.contextual_inquiry",
+    "name": "情境訪查",
+    "billing": "contract"
+  },
+  {
+    "id": "insight.empathy_map",
+    "name": "同理心地圖",
+    "billing": "contract"
+  },
+  {
+    "id": "insight.focus_group",
+    "name": "焦點團體",
+    "billing": "contract"
+  },
+  {
+    "id": "insight.interview",
+    "name": "深度訪談",
+    "billing": "contract"
+  },
+  {
+    "id": "insight.journey_map",
+    "name": "顧客旅程地圖",
+    "billing": "contract"
+  },
+  {
+    "id": "insight.jtbd",
+    "name": "待完成任務理論",
+    "billing": "contract"
+  },
+  {
+    "id": "insight.persona",
+    "name": "使用者原型",
+    "billing": "contract"
+  },
+  {
+    "id": "insight.service_blueprint",
+    "name": "服務藍圖",
+    "billing": "contract"
+  },
+  {
+    "id": "insight.survey",
+    "name": "問卷調查",
+    "billing": "contract"
+  },
+  {
+    "id": "interpret.method_record",
+    "name": "interpret.method_record -- Project-bound AI interpretation of a validated method record",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.applicable_law_graph",
+    "name": "適用法規圖譜",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.compliance_gap_analysis",
+    "name": "合規缺口分析",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.conflict_of_law_review",
+    "name": "法律衝突審查",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.cultural_context_review",
+    "name": "文化脈絡審查",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.data_residency_assessment",
+    "name": "資料落地評估",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.localization_review",
+    "name": "在地化審查",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.market_admission_control",
+    "name": "市場准入控管",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.obligation_to_control_mapping",
+    "name": "義務對應控制措施",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.regulatory_horizon_scan",
+    "name": "法規前瞻掃描",
+    "billing": "contract"
+  },
+  {
+    "id": "jurisdiction.resolver",
+    "name": "管轄權解析器",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.after_action_review",
+    "name": "行動後檢討",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.appreciative_inquiry",
+    "name": "欣賞式探詢",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.build_measure_learn",
+    "name": "建構-衡量-學習",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.decision_journal",
+    "name": "決策日誌",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.dmaic",
+    "name": "定義-測量-分析-改善-控制",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.kill_criteria",
+    "name": "終止條件",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.ooda",
+    "name": "OODA 循環",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.pdca",
+    "name": "PDCA 循環",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.post_mortem",
+    "name": "事後檢討",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.prediction_tracking",
+    "name": "預測追蹤",
+    "billing": "contract"
+  },
+  {
+    "id": "learning.reversal_criteria",
+    "name": "決策逆轉條件",
+    "billing": "contract"
+  },
+  {
+    "id": "literature_search",
+    "name": "literature_search -- Research Question to Literature Set Capability Contract",
+    "billing": "contract"
+  },
+  {
+    "id": "project.manage",
+    "name": "管理專案",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.audio_conversational_view",
+    "name": "語音／對話檢視",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.causal_view",
+    "name": "因果檢視",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.concept_graph_view",
+    "name": "概念圖檢視",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.expert_lego_mode",
+    "name": "專家自由組裝模式",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.guided_mode",
+    "name": "引導模式",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.mind_map_view",
+    "name": "心智圖檢視",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.switching",
+    "name": "表徵切換",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.table_matrix_view",
+    "name": "表格／矩陣檢視",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.text_outline_view",
+    "name": "文字／大綱檢視",
+    "billing": "contract"
+  },
+  {
+    "id": "representation.timeline_view",
+    "name": "時間軸檢視",
+    "billing": "contract"
+  },
+  {
+    "id": "research.collect",
+    "name": "蒐集研究資料",
+    "billing": "contract"
+  },
+  {
+    "id": "research.qualitative_coding",
+    "name": "質性編碼（開放／軸心／選擇性）",
+    "billing": "contract"
+  },
+  {
+    "id": "research.reporting_guideline_checklist",
+    "name": "報告規範查核清單",
+    "billing": "contract"
+  },
+  {
+    "id": "root_cause.barrier_analysis",
+    "name": "屏障分析",
+    "billing": "contract"
+  },
+  {
+    "id": "root_cause.bow_tie",
+    "name": "蝴蝶結分析",
+    "billing": "contract"
+  },
+  {
+    "id": "root_cause.change_analysis",
+    "name": "變更分析",
+    "billing": "contract"
+  },
+  {
+    "id": "root_cause.event_tree",
+    "name": "事件樹分析",
+    "billing": "contract"
+  },
+  {
+    "id": "root_cause.fault_tree",
+    "name": "故障樹分析",
+    "billing": "contract"
+  },
+  {
+    "id": "root_cause.fishbone",
+    "name": "魚骨圖（石川圖）",
+    "billing": "contract"
+  },
+  {
+    "id": "root_cause.five_whys",
+    "name": "五個為什麼",
+    "billing": "contract"
+  },
+  {
+    "id": "root_cause.kepner_tregoe",
+    "name": "凱普納-崔果問題分析",
+    "billing": "contract"
+  },
+  {
+    "id": "root_cause.pareto",
+    "name": "柏拉圖分析（80/20 法則）",
+    "billing": "contract"
+  },
+  {
+    "id": "run_statistics",
+    "name": "run_statistics -- Inter-rater Reliability (Cohen's Kappa) Capability Contract",
+    "billing": "contract"
+  },
+  {
+    "id": "security.abuse_case",
+    "name": "濫用案例",
+    "billing": "contract"
+  },
+  {
+    "id": "security.attack_tree",
+    "name": "攻擊樹",
+    "billing": "contract"
+  },
+  {
+    "id": "security.dpia_pia",
+    "name": "資料保護／隱私影響評估",
+    "billing": "contract"
+  },
+  {
+    "id": "security.linddun",
+    "name": "LINDDUN 隱私威脅模型",
+    "billing": "contract"
+  },
+  {
+    "id": "security.pasta",
+    "name": "PASTA 攻擊模擬與威脅分析流程",
+    "billing": "contract"
+  },
+  {
+    "id": "security.secrets_threat_review",
+    "name": "機密資訊威脅檢視",
+    "billing": "contract"
+  },
+  {
+    "id": "security.security_control_mapping",
+    "name": "安全控制對照表",
+    "billing": "contract"
+  },
+  {
+    "id": "security.stride",
+    "name": "STRIDE 威脅模型",
+    "billing": "contract"
+  },
+  {
+    "id": "security.supply_chain_threat_model",
+    "name": "供應鏈威脅模型",
+    "billing": "contract"
+  },
+  {
+    "id": "security.zero_trust_review",
+    "name": "零信任架構檢視",
+    "billing": "contract"
+  },
+  {
+    "id": "source.manage",
+    "name": "管理來源",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.batna",
+    "name": "最佳替代方案（BATNA）",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.coalition_mapping",
+    "name": "聯盟關係圖",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.game_theory",
+    "name": "賽局理論",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.incentive_mapping",
+    "name": "誘因圖",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.interest_based_negotiation",
+    "name": "利益導向談判",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.power_interest",
+    "name": "權力-利益矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.raci",
+    "name": "RACI 責任矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.salience_model",
+    "name": "顯著性模型",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.stakeholder_map",
+    "name": "利害關係人圖",
+    "billing": "contract"
+  },
+  {
+    "id": "stakeholders.zopa",
+    "name": "可能同意區間（ZOPA）",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.ansoff",
+    "name": "Ansoff 矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.bcg_matrix",
+    "name": "BCG 成長占有率矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.blue_ocean",
+    "name": "藍海策略",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.business_model_canvas",
+    "name": "商業模式圖",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.lean_canvas",
+    "name": "精實畫布",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.market_analysis",
+    "name": "市場分析",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.pestel",
+    "name": "PESTEL 分析",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.porter_five_forces",
+    "name": "五力分析",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.steepv",
+    "name": "STEEPV 分析",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.stp",
+    "name": "STP 市場區隔定位",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.swot",
+    "name": "SWOT 分析",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.three_c",
+    "name": "3C 分析",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.tows",
+    "name": "TOWS 矩陣",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.value_chain",
+    "name": "價值鏈分析",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.value_proposition_canvas",
+    "name": "價值主張圖",
+    "billing": "contract"
+  },
+  {
+    "id": "strategy.vrio",
+    "name": "VRIO 資源分析",
+    "billing": "contract"
+  },
+  {
+    "id": "synthesis.decision_evidence",
+    "name": "synthesis.decision_evidence -- Project-bound AI decision-evidence synthesis from the Source prompt manifest",
+    "billing": "contract"
+  },
+  {
+    "id": "synthesis.dossier_brief",
+    "name": "synthesis.dossier_brief -- Project-bound AI dossier synthesis from the Source prompt manifest",
+    "billing": "contract"
+  },
+  {
+    "id": "synthesis.literature_matrix",
+    "name": "synthesis.literature_matrix -- Project-bound AI literature-matrix synthesis from the Source prompt manifest",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.agent_based_modeling",
+    "name": "主體模型模擬",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.behavior_over_time",
+    "name": "隨時間變化行為圖",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.causal_loop_diagram",
+    "name": "因果回饋圖",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.flowchart",
+    "name": "流程圖",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.force_field_analysis",
+    "name": "場域分析（推力與阻力分析）",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.iceberg_model",
+    "name": "冰山模型",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.leverage_point_analysis",
+    "name": "槓桿點分析",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.life_system_mapping",
+    "name": "生活系統圖",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.rich_picture",
+    "name": "豐富圖像",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.sipoc",
+    "name": "SIPOC（供應者-輸入-流程-輸出-顧客）",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.stock_and_flow",
+    "name": "存量與流量圖",
+    "billing": "contract"
+  },
+  {
+    "id": "systems.systems_archetypes",
+    "name": "系統原型",
+    "billing": "contract"
+  },
+  {
+    "id": "transcribe",
+    "name": "transcribe -- Audio/Video to Transcript Capability Contract",
+    "billing": "contract"
+  }
+]

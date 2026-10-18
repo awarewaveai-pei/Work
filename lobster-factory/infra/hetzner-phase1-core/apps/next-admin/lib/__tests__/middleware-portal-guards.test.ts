@@ -11,7 +11,7 @@ import { NextRequest } from "next/server";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { isPortalPath, isWrongHostForPortal, isWrongHostForProductPage, isClientOutsideDoor, blockedResponse, middleware, config } from "../../middleware";
-import { doorForHost, nextAdminProducts, productHost, type Door } from "@/lib/portal/doors";
+import { doorForHost, servedNextAdminProducts, productHost, type Door } from "@/lib/portal/doors";
 
 describe("isPortalPath — boundary (mirrors the nginx portal(?:/|$) fix)", () => {
   it.each([
@@ -156,7 +156,7 @@ describe("product door nginx block refuses every path the middleware matcher ski
   const skipped = /\(\?!([^)]*)\)/.exec(config.matcher[0])![1].split("|").filter((p) => !DOOR_NEEDS.has(p));
   const conf = readFileSync(path.join(__dirname, "../../../../nginx/default.conf"), "utf8");
 
-  it.each(nextAdminProducts().map((p) => [productHost(p, {})]))("%s", (host) => {
+  it.each(servedNextAdminProducts().map((p) => [productHost(p, {})]))("%s", (host) => {
     const start = conf.indexOf(`server_name ${host};`);
     expect(start, `no server block for ${host} in nginx/default.conf`).toBeGreaterThan(-1);
     const block = conf.slice(start, conf.indexOf(String.fromCharCode(10) + "}", start));

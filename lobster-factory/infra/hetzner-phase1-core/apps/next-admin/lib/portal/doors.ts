@@ -28,15 +28,25 @@ export function nextAdminProducts(): NextAdminProduct[] {
   return PRODUCTS.filter((p): p is NextAdminProduct => p.door.app === "next-admin");
 }
 
-export type Door = { kind: "staff" } | { kind: "portal" } | { kind: "product"; product: NextAdminProduct };
+/** Registration reserves a host before page/DNS/nginx rollout. Legacy doors predate this field. */
+export function servedNextAdminProducts(): NextAdminProduct[] {
+  return nextAdminProducts().filter((p) => p.door.enabled !== false);
+}
 
-/** `host` as sent (x-forwarded-host or host); a port is ignored. Anything unknown is the staff door (today's behaviour). */
+export type Door = { kind: "none" } | { kind: "probe" } | { kind: "staff" } | { kind: "portal" } | { kind: "product"; product: NextAdminProduct };
+
+/** Only configured staff hosts may reach the staff door (ADR 018 §1). */
 export function doorForHost(host: string, env: Env = process.env): Door {
   const h = clean(host.split(",")[0]).replace(/:\d+$/, "");
-  if (!h) return { kind: "staff" };
+  if (!h) return { kind: "none" };
   if (h === portalHost(env)) return { kind: "portal" };
-  const product = nextAdminProducts().find((p) => productHost(p, env) === h);
-  return product ? { kind: "product", product } : { kind: "staff" };
+  const product = servedNextAdminProducts().find((p) => productHost(p, env) === h);
+  if (product) return { kind: "product", product };
+  const staff = (env.STAFF_HOSTS ?? `app.${baseDomain(env)}`).split(",").map(clean).filter(Boolean);
+  if (env.NODE_ENV === "development") staff.push("localhost");
+  if (staff.includes(h)) return { kind: "staff" };
+  // Existing compose and sg-deploy probes use loopback. This is never a staff door.
+  return h === "127.0.0.1" ? { kind: "probe" } : { kind: "none" };
 }
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
@@ -48,7 +58,7 @@ export function isProductPath(pathname: string, product: NextAdminProduct): bool
 
 /** A page path some product serves only on its own door (e.g. /social on the staff host). */
 export function productPageOwner(pathname: string): NextAdminProduct | null {
-  return nextAdminProducts().find((p) => under(pathname, p.door.page)) ?? null;
+  return servedNextAdminProducts().find((p) => under(pathname, p.door.page)) ?? null;
 }
 
 export type ProductRoute = { action: "pass" } | { action: "rewrite"; pathname: string } | { action: "not_found" };

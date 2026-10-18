@@ -220,6 +220,8 @@ def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_c
       'required_documents':MODULE_DOCS,'invariants':obl['invariants'],'security_obligations':obl['security'],
       'test_obligations':obl['tests'],'operational_obligations':obl['operations'],'recovery_obligations':obl['recovery']
     }
+    for key in ('product_key','source_manifest','source_module_manifest'):
+        if key in module_manifest: manifest[key]=module_manifest[key]
     dump(d/'MODULE_MANIFEST.json',manifest)
     for rel in module_manifest['paths']:
         p=stage/rel; p.mkdir(parents=True,exist_ok=True)
@@ -338,6 +340,46 @@ def artifact_manifest(stage):
         rows.append({'path':p.relative_to(stage).as_posix(),'sha256':sha256_file(p),'bytes':p.stat().st_size})
     return {'schema_version':'1.0.0','file_count':len(rows),'files':rows}
 
+def delivery_registration(stage,plan):
+    # These are source-backed planning declarations, never a claim that implementation exists.
+    sections={
+      'state_ownership':('04_DATA_AND_MIGRATION.md','Data obligations'),
+      'behavior_ownership':('01_ARCHITECTURE.md','Stable boundary'),
+      'public_api_event_contract':('02_CONTRACTS.md','Contract obligations'),
+      'invariants':('00_REQUIREMENTS.md','Mandatory invariants'),
+      'dependencies':None,
+      'failure_isolation_boundary':('07_ROLLBACK_AND_RECOVERY.md','Recovery obligations'),
+      'data_lifecycle':('04_DATA_AND_MIGRATION.md','Data obligations'),
+      'observability_contract':('06_OBSERVABILITY_AND_SRE.md','Operational obligations'),
+      'migration_rollback_contract':('07_ROLLBACK_AND_RECOVERY.md','Recovery obligations'),
+      'replacement_strategy':('01_ARCHITECTURE.md','Architecture decisions still required'),
+    }
+    declarations={}
+    for field,spec in sections.items():
+        if spec is None:
+            declarations[field]='Selected modules: '+', '.join(plan['modules'])+' (source: .foundry/resolution/foundry-plan.json#/modules).'
+            continue
+        role,heading=spec; excerpts=[]
+        for mid in plan['modules']:
+            manifest_path=stage/'docs/modules'/mid/'MODULE_MANIFEST.json'
+            manifest=json.loads(manifest_path.read_text(encoding='utf-8')) if manifest_path.is_file() else {}
+            if manifest.get('product_key'):
+                source=manifest.get('source_module_manifest') or {}
+                value=source.get('declarations',{}).get(field)
+                excerpts.append(f'{mid}: {value} (source: {manifest.get("source_manifest")})' if value else f'TODO: {mid} source manifest has no {field}; required before status: available.')
+                continue
+            rel=Path('docs/modules')/mid/role; source=stage/rel
+            if not source.is_file(): continue
+            text=source.read_text(encoding='utf-8'); marker='## '+heading+'\n'
+            if marker not in text: continue
+            body=text.split(marker,1)[1].split('\n## ',1)[0].strip()
+            if body and 'TODO' not in body:
+                excerpts.append(f'Required planning contract ({rel.as_posix()}#{heading.lower().replace(" ","-")}):\n{body}')
+        declarations[field]='\n\n'.join(excerpts) if excerpts else 'TODO: no source module declaration for '+field
+    name=plan['project']['name']
+    return {'schema_version':1,'name':name,'page':'/'+safe_name(name),'loginSources':['local'],
+            'standalone':False,'modules':plan['modules'],'declarations':declarations}
+
 def generate(plan,answers,custom,out_root,industry=None):
     name=safe_name(plan['project']['name']); out_root=Path(out_root).resolve(); target=out_root/name
     if target.exists(): raise FileExistsError('target already exists: '+str(target))
@@ -368,6 +410,8 @@ def generate(plan,answers,custom,out_root,industry=None):
         write(stage/'docs/FOUNDRY_CAPABILITY_PLAN.md','\n'.join(cap_lines))
         active_bp,total_bp=write_blueprints(stage,plan)
         system_lines=[f'# {name} — Generated System Blueprint','',f'Foundry: `{VERSION}`',f"Profile: `{plan['profile']}`",f"Criticality: `{plan['criticality']}`",'', '## Capability resolution',f"- Foundation: {len(plan['foundation'])}",f"- User selected: {len(plan['user_selected'])}",f"- Derived: {len(plan['derived'])}",f"- Deferred: {len(plan['deferred'])}",f"- Current total: {len(plan['current_capabilities'])}",'','## LEGO modules']+[f'- `{m}`' for m in plan['modules']]+['','## Blueprint applicability',f'- Active: {active_bp}',f'- Not applicable: {total_bp-active_bp}',f'- Total controlled sections: {total_bp}','','## Truth boundary','This document is a deterministic planning/assurance output. It does not claim that implementation exists. Implementation claims become VERIFIED only with exact content-addressed file:line evidence.']
+        registration=delivery_registration(stage,plan)
+        system_lines+=['','## 交付登記','','```json',json.dumps(registration,ensure_ascii=False,indent=2),'```']
         write(stage/'docs/SYSTEM_BLUEPRINT.md','\n'.join(system_lines))
         backlog=['# Implementation Backlog','', 'Every selected LEGO module has a generated implementation contract. Execute only after architecture gates converge.','']
         for mid in plan['modules']:

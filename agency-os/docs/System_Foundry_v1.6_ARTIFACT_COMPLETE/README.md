@@ -35,12 +35,12 @@ Generator output is technology-neutral until architecture convergence. It genera
 
 `make verify` proves:
 
-- 263/263 questionnaire questions have deterministic YES rules.
-- 303/303 standard capabilities are reachable in the ALL-YES configuration.
-- 50 standard LEGO modules are produced by ALL-YES; a 51st `custom` extension module is activated only when the user adds custom requirements.
+- 274/274 questionnaire questions have deterministic YES rules.
+- 314/314 standard capabilities are reachable in the ALL-YES configuration.
+- 61 standard LEGO modules are produced by ALL-YES; a 62nd `custom` extension module is activated only when the user adds custom requirements.
 - ALL-NO produces only the locked `core` module.
-- All 263 questions are tested individually.
-- All 34,453 question pairs are attempted; compatible pairs compile and explicit contradictory pairs fail closed.
+- All 274 questions are tested individually.
+- All 37,401 question pairs are attempted; compatible pairs compile and explicit contradictory pairs fail closed.
 - 1,000 deterministic randomized configurations are tested.
 - Every generation module is proven reachable and materialized.
 - Every selected module receives 10 mandatory artifacts; unselected module paths/documents are absent.
@@ -76,6 +76,11 @@ docs/modules/<module>/
 ```
 
 The complete controlled blueprint is in `docs/blueprint/`, with the entry point `docs/SYSTEM_BLUEPRINT.md`.
+
+## AwareWave catalog and sample
+
+Run `node ../../../scripts/sync-foundry-catalog.mjs` after changing the product registry; `make verify` checks catalog drift.
+`make generate-sample` rebuilds `generated/sample-commerce-os` from `bootstrap/sample-commerce-intake.json`, with new active questions defaulting to NO. The blueprint ends in a source-backed delivery registration; missing declarations remain TODO.
 
 ## CLI
 

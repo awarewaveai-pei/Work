@@ -2632,6 +2632,116 @@
       "require": [
         "CAP-PRODUCT-FEED"
       ]
+    },
+    {
+      "id": "RULE-Q-AW-COGNITIVE",
+      "when": {
+        "question": "Q-AW-COGNITIVE",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-COGNITIVE"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-COLLECT",
+      "when": {
+        "question": "Q-AW-COLLECT",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-COLLECT"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-CONTENT",
+      "when": {
+        "question": "Q-AW-CONTENT",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-CONTENT"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-CS",
+      "when": {
+        "question": "Q-AW-CS",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-CS"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-DESIGN",
+      "when": {
+        "question": "Q-AW-DESIGN",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-DESIGN"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-HCI",
+      "when": {
+        "question": "Q-AW-HCI",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-HCI"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-OUTREACH",
+      "when": {
+        "question": "Q-AW-OUTREACH",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-OUTREACH"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-SOCIAL",
+      "when": {
+        "question": "Q-AW-SOCIAL",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-SOCIAL"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-STUDIO",
+      "when": {
+        "question": "Q-AW-STUDIO",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-STUDIO"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-TAROT",
+      "when": {
+        "question": "Q-AW-TAROT",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-TAROT"
+      ]
+    },
+    {
+      "id": "RULE-Q-AW-VIDEO",
+      "when": {
+        "question": "Q-AW-VIDEO",
+        "equals": true
+      },
+      "require": [
+        "CAP-AW-VIDEO"
+      ]
     }
   ]
 }

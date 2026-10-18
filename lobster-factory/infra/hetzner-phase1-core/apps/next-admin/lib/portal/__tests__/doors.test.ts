@@ -6,14 +6,22 @@ import { PRODUCTS } from "../products";
 const social = PRODUCTS.find((p) => p.key === "social")!;
 
 describe("doorForHost", () => {
-  it("defaults to aware-wave.com; a port and case are ignored; unknown hosts are the staff door", () => {
+  it("defaults to aware-wave.com; a port and case are ignored; unknown hosts have no door", () => {
     expect(doorForHost("social.aware-wave.com", {})).toMatchObject({ kind: "product", product: { key: "social" } });
     expect(doorForHost("Social.Aware-Wave.com:443", {})).toMatchObject({ kind: "product" });
     expect(doorForHost("portal.aware-wave.com", {})).toEqual({ kind: "portal" });
     expect(doorForHost("app.aware-wave.com", {})).toEqual({ kind: "staff" });
-    expect(doorForHost("", {})).toEqual({ kind: "staff" });
+    expect(doorForHost("", {})).toEqual({ kind: "none" });
     // external products (cognitive, hci) are not served here, so their hosts are not a door of this app
-    expect(doorForHost("cognitive.aware-wave.com", {})).toEqual({ kind: "staff" });
+    expect(doorForHost("cognitive.aware-wave.com", {})).toEqual({ kind: "none" });
+    expect(doorForHost("attacker.example", {})).toEqual({ kind: "none" });
+    expect(doorForHost("cs.aware-wave.com", {})).toEqual({ kind: "none" });
+    expect(doorForHost("localhost:3000", {})).toEqual({ kind: "none" });
+    expect(doorForHost("localhost:3000", { NODE_ENV: "development" })).toEqual({ kind: "staff" });
+    const env = { STAFF_HOSTS: " console.customer.com, staff.customer.com " };
+    expect(doorForHost("console.customer.com", env)).toEqual({ kind: "staff" });
+    expect(doorForHost("staff.customer.com", env)).toEqual({ kind: "staff" });
+    expect(doorForHost("app.aware-wave.com", env)).toEqual({ kind: "none" });
   });
 
   it("a buyout install: base domain and per-product override come from env", () => {
@@ -21,7 +29,7 @@ describe("doorForHost", () => {
     expect(productHost(social, env)).toBe("posts.customer.com");
     expect(portalHost(env)).toBe("portal.customer.com");
     expect(doorForHost("posts.customer.com", env)).toMatchObject({ kind: "product", product: { key: "social" } });
-    expect(doorForHost("social.aware-wave.com", env)).toEqual({ kind: "staff" });
+    expect(doorForHost("social.aware-wave.com", env)).toEqual({ kind: "none" });
     expect(productHost(social, { PUBLIC_BASE_DOMAIN: "customer.com" })).toBe("social.customer.com");
   });
 });

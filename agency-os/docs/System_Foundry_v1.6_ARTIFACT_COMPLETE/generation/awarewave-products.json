@@ -1,0 +1,2706 @@
+{
+  "schema_version": 1,
+  "source": "lib/portal/products.ts",
+  "products": [
+    {
+      "key": "cognitive",
+      "name": "AI LEGO Cognitive Engineering OS",
+      "description": "組合認知方法、研究資料與專案。",
+      "subdomain": "cognitive",
+      "door": {
+        "app": "external"
+      },
+      "loginSources": [
+        "local",
+        "awarewave-wp"
+      ],
+      "standalone": true,
+      "status": "coming_soon",
+      "selfSignup": true,
+      "features": [
+        {
+          "feature_key": "ai.draft_record",
+          "name": "ai.draft_record -- Plain-language brief to method input draft (AI Gateway)",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "architecture.adr",
+          "name": "架構決策紀錄",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "architecture.atam",
+          "name": "架構取捨分析法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "architecture.ddd",
+          "name": "領域驅動設計",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "architecture.dependency_mapping",
+          "name": "相依關係地圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "architecture.event_storming",
+          "name": "事件風暴",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "architecture.fitness_functions",
+          "name": "架構適應度函數",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "architecture.quality_attribute_scenario",
+          "name": "品質屬性情境",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "architecture.strangler_fig",
+          "name": "絞殺者模式",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "architecture.system_context_model",
+          "name": "C4 模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "architecture.trade_off_matrix",
+          "name": "架構取捨矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.conflict_mapping",
+          "name": "衝突地圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.full_stop_method",
+          "name": "句點分析法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.life_timeline",
+          "name": "生命時間線（正向／反向）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.life_wheel",
+          "name": "生命之輪",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.metaphor_dialogue",
+          "name": "隱喻對話",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.motivation_matrix",
+          "name": "動機矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.personal_swot",
+          "name": "個人 SWOT",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.role_playing",
+          "name": "角色扮演",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.story_completion",
+          "name": "故事延續",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.storytelling",
+          "name": "故事敘說",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.synonym_substitution",
+          "name": "同義詞替換",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.turning_point_analysis",
+          "name": "轉折點分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.value_clarification",
+          "name": "價值澄清",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.visual_metaphor",
+          "name": "視覺隱喻創作",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.workshop_certificate_drawing",
+          "name": "工作坊證章畫",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "art_therapy.wusheng_five_phase",
+          "name": "五階段療程系統（五行五階段）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "artifact.generate_chart",
+          "name": "artifact.generate_chart -- Chart Rendering Capability Contract",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "artifact.generate_proposal",
+          "name": "artifact.generate_proposal -- Business Proposal Artifact Capability Contract",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "artifact.generate_research_paper",
+          "name": "artifact.generate_research_paper -- Research Findings to Research Memo/Paper Artifact Capability Contract",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "association.affinity_diagram",
+          "name": "親和圖／KJ 法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "association.analogy_mapping",
+          "name": "類比映射",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "association.attribute_listing",
+          "name": "屬性列舉法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "association.concept_map",
+          "name": "概念圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "association.mind_map",
+          "name": "心智圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "association.morphological_analysis",
+          "name": "型態分析法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.counterfactual_reasoning",
+          "name": "反事實推理",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.dag",
+          "name": "因果圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.difference_in_differences",
+          "name": "差異中的差異法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.instrumental_variables",
+          "name": "工具變數法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.logic_model",
+          "name": "邏輯模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.process_tracing",
+          "name": "過程追蹤法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.rct",
+          "name": "隨機對照試驗",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.regression_discontinuity",
+          "name": "斷點迴歸設計",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.synthetic_control",
+          "name": "合成控制法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "causal.theory_of_change",
+          "name": "改變理論",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.blue_team",
+          "name": "藍隊防禦",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.counterexample_search",
+          "name": "反例搜尋",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.devils_advocate",
+          "name": "魔鬼代言人",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.disconfirming_evidence",
+          "name": "反證搜尋",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.fmea",
+          "name": "失效模式與影響分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.hazop",
+          "name": "危害與可操作性分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.independent_judge",
+          "name": "獨立裁決",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.pre_mortem",
+          "name": "事前驗屍",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.red_team",
+          "name": "紅隊攻擊",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "challenge.stress_testing",
+          "name": "壓力測試（情境）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "computation.monte_carlo",
+          "name": "蒙地卡羅模擬",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.backup_restore_drill",
+          "name": "備份還原演練",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.data_contract",
+          "name": "資料契約",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.data_lineage",
+          "name": "資料血緣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.data_quality_dimensions",
+          "name": "資料品質維度",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.erd",
+          "name": "實體關係圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.expand_contract_migration",
+          "name": "擴張-收縮式遷移",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.normalization",
+          "name": "正規化",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.reconciliation",
+          "name": "資料對帳",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.retention_deletion_model",
+          "name": "保留與刪除模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "database_data.schema_compatibility_analysis",
+          "name": "Schema 相容性分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.ahp",
+          "name": "層級分析法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.decision_tree",
+          "name": "決策樹",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.eisenhower_matrix",
+          "name": "艾森豪矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.expected_value",
+          "name": "期望值",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.ice",
+          "name": "ICE 評分法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.impact_effort",
+          "name": "影響力-努力矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.kano",
+          "name": "卡諾模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.mcda",
+          "name": "多準則決策分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.moscow",
+          "name": "MoSCoW 優先分級",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.pareto_frontier",
+          "name": "柏拉圖前緣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.rice",
+          "name": "RICE 優先排序法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.topsis",
+          "name": "逼近理想解排序法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.weighted_decision_matrix",
+          "name": "加權決策矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decision.wsjf",
+          "name": "加權最短工作優先法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decomposition.fast",
+          "name": "功能分析系統技術",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decomposition.functional_decomposition",
+          "name": "功能分解",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decomposition.hierarchical_task_analysis",
+          "name": "階層式任務分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decomposition.issue_tree",
+          "name": "議題樹",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decomposition.logic_tree",
+          "name": "邏輯樹",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decomposition.mece",
+          "name": "MECE 檢查",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decomposition.objective_tree",
+          "name": "目標樹",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decomposition.problem_tree",
+          "name": "問題樹",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "decomposition.wbs",
+          "name": "工作分解結構",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.change_risk_matrix",
+          "name": "變更風險矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.critical_path_method",
+          "name": "要徑法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.decision_log",
+          "name": "決策日誌",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.definition_of_done",
+          "name": "完成的定義",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.dependency_graph",
+          "name": "任務相依圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.gantt_chart",
+          "name": "甘特圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.outcome_roadmap",
+          "name": "成果導向路線圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.raci",
+          "name": "交付 RACI 矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.raid_log",
+          "name": "RAID 日誌",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.risk_register",
+          "name": "風險登記表",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "delivery.stage_gate",
+          "name": "階段關卡法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.blue_green_deployment",
+          "name": "藍綠部署",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.canary_deployment",
+          "name": "金絲雀部署",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.capacity_model",
+          "name": "容量模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.chaos_engineering",
+          "name": "混沌工程",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.error_budget",
+          "name": "錯誤預算",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.game_day",
+          "name": "演習日",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.load_test",
+          "name": "負載測試",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.release_readiness_review",
+          "name": "發布就緒審查",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.rto_rpo",
+          "name": "復原時間目標／復原點目標",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.runbook_execution",
+          "name": "作業手冊執行",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.sli_slo",
+          "name": "服務等級指標／目標／協議",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.soak_test",
+          "name": "浸泡測試",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "devops_sre.stress_test",
+          "name": "壓力測試（工程）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.brainwriting",
+          "name": "腦力書寫法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.classic_brainstorming",
+          "name": "經典腦力激盪",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.crazy_eights",
+          "name": "瘋狂 8 法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.creative_constraints",
+          "name": "創意限制",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.design_thinking",
+          "name": "設計思考",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.forced_connections",
+          "name": "強制關聯法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.lateral_thinking",
+          "name": "水平思考",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.lotus_blossom",
+          "name": "蓮花座法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.random_stimulus",
+          "name": "隨機刺激法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.reverse_brainstorming",
+          "name": "反向腦力激盪法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.scamper",
+          "name": "SCAMPER 檢核表法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.six_thinking_hats",
+          "name": "六頂思考帽",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.six_three_five",
+          "name": "6-3-5 腦力書寫法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.starbursting",
+          "name": "星爆法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.synectics",
+          "name": "類比創意法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "divergent.triz",
+          "name": "創新理論工具",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.argument_mapping",
+          "name": "論證地圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.assumption_mapping",
+          "name": "假設地圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.assumption_registry",
+          "name": "假設登記表",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.bayesian_updating",
+          "name": "貝氏更新",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.confidence_calibration",
+          "name": "信心校準",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.contradiction_detection",
+          "name": "矛盾偵測",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.evidence_hierarchy",
+          "name": "證據強度階層",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.evidence_matrix",
+          "name": "證據矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.ladder_of_inference",
+          "name": "推論階梯",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "epistemic.toulmin_model",
+          "name": "圖爾敏論證模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "evidence.triangulation",
+          "name": "證據三角驗證",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.ab_test",
+          "name": "A/B 測試",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.benchmark",
+          "name": "標竿比較",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.concierge_test",
+          "name": "門房測試",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.fake_door",
+          "name": "假門測試",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.mvp",
+          "name": "最小可行產品",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.pilot",
+          "name": "試點計畫",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.proof_of_concept",
+          "name": "概念驗證",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.prototype",
+          "name": "原型測試",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.smoke_test",
+          "name": "煙霧測試（市場）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.technical_spike",
+          "name": "技術試探",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "experiment.wizard_of_oz",
+          "name": "綠野仙蹤測試",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "feasibility.break_even",
+          "name": "損益兩平分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "feasibility.cost_benefit_analysis",
+          "name": "成本效益分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "feasibility.cost_effectiveness",
+          "name": "成本效果分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "feasibility.irr",
+          "name": "內部報酬率",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "feasibility.npv",
+          "name": "淨現值分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "feasibility.real_options",
+          "name": "實質選擇權",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "feasibility.tco",
+          "name": "總持有成本",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "feasibility.telos",
+          "name": "TELOS 可行性檢核",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "feasibility.unit_economics",
+          "name": "單位經濟效益",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "finance.financial_assumptions",
+          "name": "財務假設",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.adjacent_discipline_search",
+          "name": "鄰近學科搜尋",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.backcasting",
+          "name": "回溯規劃",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.black_swan_exercise",
+          "name": "黑天鵝演練",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.cross_country_comparison",
+          "name": "跨國比較",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.cross_impact_analysis",
+          "name": "交叉影響分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.cross_industry_transfer",
+          "name": "跨產業移植",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.delphi",
+          "name": "德爾菲法",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.futures_wheel",
+          "name": "未來輪",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.historical_analogy",
+          "name": "歷史類比",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.horizon_scanning",
+          "name": "地平線掃描",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.outlier_analysis",
+          "name": "異常個案分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.scenario_planning",
+          "name": "情境規劃",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.weak_signal_detection",
+          "name": "微弱訊號偵測",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "foresight.wild_cards",
+          "name": "外卡情境",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.boundary_critique",
+          "name": "邊界批判",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.five_w_one_h",
+          "name": "5W1H 問題輪廓",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.frame_storming",
+          "name": "框架風暴",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.future_compass",
+          "name": "未來羅盤",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.goal_statement",
+          "name": "目標陳述",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.grow_model",
+          "name": "GROW 模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.how_might_we",
+          "name": "我們可以如何…",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.non_goals",
+          "name": "非目標清單",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.north_star_metric",
+          "name": "北極星指標",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.okr",
+          "name": "OKR 目標關鍵成果",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.problem_statement",
+          "name": "問題陳述",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.reframing",
+          "name": "框架轉換",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.smart",
+          "name": "SMART 目標",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.success_criteria",
+          "name": "成功標準",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "framing.value_sorting",
+          "name": "價值觀排序",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "insight.contextual_inquiry",
+          "name": "情境訪查",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "insight.empathy_map",
+          "name": "同理心地圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "insight.focus_group",
+          "name": "焦點團體",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "insight.interview",
+          "name": "深度訪談",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "insight.journey_map",
+          "name": "顧客旅程地圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "insight.jtbd",
+          "name": "待完成任務理論",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "insight.persona",
+          "name": "使用者原型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "insight.service_blueprint",
+          "name": "服務藍圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "insight.survey",
+          "name": "問卷調查",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "interpret.method_record",
+          "name": "interpret.method_record -- Project-bound AI interpretation of a validated method record",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.applicable_law_graph",
+          "name": "適用法規圖譜",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.compliance_gap_analysis",
+          "name": "合規缺口分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.conflict_of_law_review",
+          "name": "法律衝突審查",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.cultural_context_review",
+          "name": "文化脈絡審查",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.data_residency_assessment",
+          "name": "資料落地評估",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.localization_review",
+          "name": "在地化審查",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.market_admission_control",
+          "name": "市場准入控管",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.obligation_to_control_mapping",
+          "name": "義務對應控制措施",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.regulatory_horizon_scan",
+          "name": "法規前瞻掃描",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "jurisdiction.resolver",
+          "name": "管轄權解析器",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.after_action_review",
+          "name": "行動後檢討",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.appreciative_inquiry",
+          "name": "欣賞式探詢",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.build_measure_learn",
+          "name": "建構-衡量-學習",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.decision_journal",
+          "name": "決策日誌",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.dmaic",
+          "name": "定義-測量-分析-改善-控制",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.kill_criteria",
+          "name": "終止條件",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.ooda",
+          "name": "OODA 循環",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.pdca",
+          "name": "PDCA 循環",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.post_mortem",
+          "name": "事後檢討",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.prediction_tracking",
+          "name": "預測追蹤",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "learning.reversal_criteria",
+          "name": "決策逆轉條件",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "literature_search",
+          "name": "literature_search -- Research Question to Literature Set Capability Contract",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "project.manage",
+          "name": "管理專案",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.audio_conversational_view",
+          "name": "語音／對話檢視",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.causal_view",
+          "name": "因果檢視",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.concept_graph_view",
+          "name": "概念圖檢視",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.expert_lego_mode",
+          "name": "專家自由組裝模式",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.guided_mode",
+          "name": "引導模式",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.mind_map_view",
+          "name": "心智圖檢視",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.switching",
+          "name": "表徵切換",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.table_matrix_view",
+          "name": "表格／矩陣檢視",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.text_outline_view",
+          "name": "文字／大綱檢視",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "representation.timeline_view",
+          "name": "時間軸檢視",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "research.collect",
+          "name": "蒐集研究資料",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "research.qualitative_coding",
+          "name": "質性編碼（開放／軸心／選擇性）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "research.reporting_guideline_checklist",
+          "name": "報告規範查核清單",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "root_cause.barrier_analysis",
+          "name": "屏障分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "root_cause.bow_tie",
+          "name": "蝴蝶結分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "root_cause.change_analysis",
+          "name": "變更分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "root_cause.event_tree",
+          "name": "事件樹分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "root_cause.fault_tree",
+          "name": "故障樹分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "root_cause.fishbone",
+          "name": "魚骨圖（石川圖）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "root_cause.five_whys",
+          "name": "五個為什麼",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "root_cause.kepner_tregoe",
+          "name": "凱普納-崔果問題分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "root_cause.pareto",
+          "name": "柏拉圖分析（80/20 法則）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "run_statistics",
+          "name": "run_statistics -- Inter-rater Reliability (Cohen's Kappa) Capability Contract",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.abuse_case",
+          "name": "濫用案例",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.attack_tree",
+          "name": "攻擊樹",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.dpia_pia",
+          "name": "資料保護／隱私影響評估",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.linddun",
+          "name": "LINDDUN 隱私威脅模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.pasta",
+          "name": "PASTA 攻擊模擬與威脅分析流程",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.secrets_threat_review",
+          "name": "機密資訊威脅檢視",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.security_control_mapping",
+          "name": "安全控制對照表",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.stride",
+          "name": "STRIDE 威脅模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.supply_chain_threat_model",
+          "name": "供應鏈威脅模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "security.zero_trust_review",
+          "name": "零信任架構檢視",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "source.manage",
+          "name": "管理來源",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.batna",
+          "name": "最佳替代方案（BATNA）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.coalition_mapping",
+          "name": "聯盟關係圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.game_theory",
+          "name": "賽局理論",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.incentive_mapping",
+          "name": "誘因圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.interest_based_negotiation",
+          "name": "利益導向談判",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.power_interest",
+          "name": "權力-利益矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.raci",
+          "name": "RACI 責任矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.salience_model",
+          "name": "顯著性模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.stakeholder_map",
+          "name": "利害關係人圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "stakeholders.zopa",
+          "name": "可能同意區間（ZOPA）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.ansoff",
+          "name": "Ansoff 矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.bcg_matrix",
+          "name": "BCG 成長占有率矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.blue_ocean",
+          "name": "藍海策略",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.business_model_canvas",
+          "name": "商業模式圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.lean_canvas",
+          "name": "精實畫布",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.market_analysis",
+          "name": "市場分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.pestel",
+          "name": "PESTEL 分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.porter_five_forces",
+          "name": "五力分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.steepv",
+          "name": "STEEPV 分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.stp",
+          "name": "STP 市場區隔定位",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.swot",
+          "name": "SWOT 分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.three_c",
+          "name": "3C 分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.tows",
+          "name": "TOWS 矩陣",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.value_chain",
+          "name": "價值鏈分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.value_proposition_canvas",
+          "name": "價值主張圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "strategy.vrio",
+          "name": "VRIO 資源分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "synthesis.decision_evidence",
+          "name": "synthesis.decision_evidence -- Project-bound AI decision-evidence synthesis from the Source prompt manifest",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "synthesis.dossier_brief",
+          "name": "synthesis.dossier_brief -- Project-bound AI dossier synthesis from the Source prompt manifest",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "synthesis.literature_matrix",
+          "name": "synthesis.literature_matrix -- Project-bound AI literature-matrix synthesis from the Source prompt manifest",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.agent_based_modeling",
+          "name": "主體模型模擬",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.behavior_over_time",
+          "name": "隨時間變化行為圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.causal_loop_diagram",
+          "name": "因果回饋圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.flowchart",
+          "name": "流程圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.force_field_analysis",
+          "name": "場域分析（推力與阻力分析）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.iceberg_model",
+          "name": "冰山模型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.leverage_point_analysis",
+          "name": "槓桿點分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.life_system_mapping",
+          "name": "生活系統圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.rich_picture",
+          "name": "豐富圖像",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.sipoc",
+          "name": "SIPOC（供應者-輸入-流程-輸出-顧客）",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.stock_and_flow",
+          "name": "存量與流量圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "systems.systems_archetypes",
+          "name": "系統原型",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "transcribe",
+          "name": "transcribe -- Audio/Video to Transcript Capability Contract",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/cognitive/MODULE_MANIFEST.json"
+      },
+      "staffPaths": []
+    },
+    {
+      "key": "collect",
+      "name": "資料蒐集器",
+      "description": "搜尋並蒐集外部網站與研究資料。",
+      "subdomain": "collect",
+      "door": {
+        "app": "next-admin",
+        "page": "/collect",
+        "enabled": false,
+        "api": [
+          "/api/collect"
+        ]
+      },
+      "loginSources": [
+        "local"
+      ],
+      "standalone": false,
+      "status": "coming_soon",
+      "selfSignup": false,
+      "features": [
+        {
+          "feature_key": "collect.fetch",
+          "name": "資料蒐集",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/collect/MODULE_MANIFEST.json"
+      },
+      "staffPaths": [
+        "ops/collect"
+      ]
+    },
+    {
+      "key": "content",
+      "name": "內容行銷",
+      "description": "產生文章、搜尋素材並安排內容發布。",
+      "subdomain": "content",
+      "door": {
+        "app": "next-admin",
+        "page": "/content",
+        "enabled": false,
+        "api": [
+          "/api/content"
+        ]
+      },
+      "loginSources": [
+        "local"
+      ],
+      "standalone": false,
+      "status": "coming_soon",
+      "selfSignup": false,
+      "features": [
+        {
+          "feature_key": "content.article",
+          "name": "文章生成",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.humanize",
+          "name": "文章人性化",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.seo-fix",
+          "name": "SEO 修正",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.brand-voice",
+          "name": "品牌語氣擷取",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.outline",
+          "name": "大綱生成",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.title",
+          "name": "標題建議",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.keywords",
+          "name": "關鍵字建議",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.hook-brief",
+          "name": "Hook 草稿",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.syndicate",
+          "name": "多平台內容改寫",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.market-analysis",
+          "name": "市場分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.trending",
+          "name": "趨勢分析",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "content.image",
+          "name": "內容配圖",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/content/MODULE_MANIFEST.json"
+      },
+      "staffPaths": [
+        "tools/content",
+        "tools/publish",
+        "tools/events"
+      ]
+    },
+    {
+      "key": "cs",
+      "name": "AI 客服",
+      "description": "根據知識庫回答問題並處理客服交接。",
+      "subdomain": "cs",
+      "door": {
+        "app": "next-admin",
+        "page": "/cs",
+        "enabled": false,
+        "api": [
+          "/api/cs"
+        ]
+      },
+      "loginSources": [
+        "local"
+      ],
+      "standalone": false,
+      "status": "coming_soon",
+      "selfSignup": false,
+      "features": [
+        {
+          "feature_key": "cs.intent",
+          "name": "意圖分類",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "cs.answer",
+          "name": "客服回答與工具呼叫",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "cs.eval",
+          "name": "回答評測",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "cs.exam",
+          "name": "客服模擬考",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "cs.translate",
+          "name": "訊息翻譯",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/cs/MODULE_MANIFEST.json"
+      },
+      "staffPaths": [
+        "ops/cs",
+        "ops/knowledge",
+        "cs-widget"
+      ]
+    },
+    {
+      "key": "design",
+      "name": "設計編輯器",
+      "description": "編輯畫布、橫幅、模型圖與向量設計。",
+      "subdomain": "design",
+      "door": {
+        "app": "next-admin",
+        "page": "/design",
+        "enabled": false,
+        "api": [
+          "/api/design"
+        ]
+      },
+      "loginSources": [
+        "local"
+      ],
+      "standalone": false,
+      "status": "coming_soon",
+      "selfSignup": false,
+      "features": [
+        {
+          "feature_key": "design.edit",
+          "name": "畫布與向量編輯",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/design/MODULE_MANIFEST.json"
+      },
+      "staffPaths": [
+        "tools/canvas",
+        "tools/designs",
+        "tools/mockup",
+        "tools/banner",
+        "tools/vector-editor"
+      ]
+    },
+    {
+      "key": "hci",
+      "name": "HCI-30",
+      "description": "人機互動與持續監測工具。",
+      "subdomain": "hci",
+      "door": {
+        "app": "external"
+      },
+      "loginSources": [
+        "local",
+        "awarewave-wp"
+      ],
+      "standalone": true,
+      "status": "coming_soon",
+      "selfSignup": true,
+      "features": [],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/hci/MODULE_MANIFEST.json"
+      },
+      "staffPaths": []
+    },
+    {
+      "key": "outreach",
+      "name": "行銷開發信",
+      "description": "產生開發信並管理寄送名單。",
+      "subdomain": "outreach",
+      "door": {
+        "app": "next-admin",
+        "page": "/outreach",
+        "enabled": false,
+        "api": [
+          "/api/outreach"
+        ]
+      },
+      "loginSources": [
+        "local"
+      ],
+      "standalone": false,
+      "status": "coming_soon",
+      "selfSignup": false,
+      "features": [
+        {
+          "feature_key": "outreach.draft",
+          "name": "AI 開發信",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/outreach/MODULE_MANIFEST.json"
+      },
+      "staffPaths": [
+        "outreach"
+      ]
+    },
+    {
+      "key": "social",
+      "name": "社群發文",
+      "description": "改寫、排程並派送品牌社群貼文。",
+      "subdomain": "social",
+      "door": {
+        "app": "next-admin",
+        "page": "/social",
+        "api": [
+          "/api/social"
+        ]
+      },
+      "loginSources": [
+        "local",
+        "awarewave-wp",
+        "customer-wp"
+      ],
+      "standalone": true,
+      "status": "coming_soon",
+      "selfSignup": false,
+      "features": [
+        {
+          "feature_key": "social.rewrite",
+          "name": "AI 多平台改寫",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "social.dispatch",
+          "name": "貼文派送",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/social/MODULE_MANIFEST.json"
+      },
+      "staffPaths": [
+        "tools/social"
+      ]
+    },
+    {
+      "key": "studio",
+      "name": "商品設計工作室",
+      "description": "生成商品圖片、文案與修圖素材。",
+      "subdomain": "studio",
+      "door": {
+        "app": "next-admin",
+        "page": "/studio",
+        "enabled": false,
+        "api": [
+          "/api/tools/studio"
+        ]
+      },
+      "loginSources": [
+        "local"
+      ],
+      "standalone": false,
+      "status": "coming_soon",
+      "selfSignup": false,
+      "features": [
+        {
+          "feature_key": "studio.image",
+          "name": "圖片生成",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "studio.product-copy",
+          "name": "商品文案",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "studio.edit-prompt",
+          "name": "修圖提示詞",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "studio.remove-bg",
+          "name": "去背",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "studio.inpaint",
+          "name": "局部重繪",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "studio.fill",
+          "name": "生成填補",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "studio.upscale",
+          "name": "圖片放大",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/studio/MODULE_MANIFEST.json"
+      },
+      "staffPaths": [
+        "tools/studio"
+      ]
+    },
+    {
+      "key": "tarot",
+      "name": "塔羅製圖",
+      "description": "生成塔羅圖片、提示詞與動態。",
+      "subdomain": "tarot",
+      "door": {
+        "app": "next-admin",
+        "page": "/tarot",
+        "enabled": false,
+        "api": [
+          "/api/tools/tarot"
+        ]
+      },
+      "loginSources": [
+        "local"
+      ],
+      "standalone": false,
+      "status": "coming_soon",
+      "selfSignup": false,
+      "features": [
+        {
+          "feature_key": "tarot.image",
+          "name": "塔羅圖生成",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "tarot.prompt",
+          "name": "提示詞建議",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "tarot.motion",
+          "name": "塔羅動態",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/tarot/MODULE_MANIFEST.json"
+      },
+      "staffPaths": [
+        "tools/tarot"
+      ]
+    },
+    {
+      "key": "video",
+      "name": "影片製作",
+      "description": "生成腳本、場景、動態與旁白影片。",
+      "subdomain": "video",
+      "door": {
+        "app": "next-admin",
+        "page": "/video",
+        "enabled": false,
+        "api": [
+          "/api/video"
+        ]
+      },
+      "loginSources": [
+        "local"
+      ],
+      "standalone": false,
+      "status": "coming_soon",
+      "selfSignup": false,
+      "features": [
+        {
+          "feature_key": "video.script",
+          "name": "腳本生成",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "video.image",
+          "name": "場景圖生成",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "video.motion",
+          "name": "影片動態",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        },
+        {
+          "feature_key": "video.tts",
+          "name": "付費旁白",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "credits"
+        }
+      ],
+      "accessChannels": [
+        "ui"
+      ],
+      "modules": {
+        "dependsOn": [],
+        "manifest": "lib/video/MODULE_MANIFEST.json"
+      },
+      "staffPaths": [
+        "tools/video"
+      ]
+    }
+  ]
+}

@@ -760,6 +760,138 @@
       "activated_by": [
         "CAP-MULTI-LOCATION-STOCK"
       ]
+    },
+    {
+      "id": "aw-cognitive",
+      "paths": [
+        "packages/aw-cognitive"
+      ],
+      "activated_by": [
+        "CAP-AW-COGNITIVE"
+      ],
+      "product_key": "cognitive",
+      "source_manifest": "lib/cognitive/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-collect",
+      "paths": [
+        "packages/aw-collect"
+      ],
+      "activated_by": [
+        "CAP-AW-COLLECT"
+      ],
+      "product_key": "collect",
+      "source_manifest": "lib/collect/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-content",
+      "paths": [
+        "packages/aw-content"
+      ],
+      "activated_by": [
+        "CAP-AW-CONTENT"
+      ],
+      "product_key": "content",
+      "source_manifest": "lib/content/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-cs",
+      "paths": [
+        "packages/aw-cs"
+      ],
+      "activated_by": [
+        "CAP-AW-CS"
+      ],
+      "product_key": "cs",
+      "source_manifest": "lib/cs/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-design",
+      "paths": [
+        "packages/aw-design"
+      ],
+      "activated_by": [
+        "CAP-AW-DESIGN"
+      ],
+      "product_key": "design",
+      "source_manifest": "lib/design/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-hci",
+      "paths": [
+        "packages/aw-hci"
+      ],
+      "activated_by": [
+        "CAP-AW-HCI"
+      ],
+      "product_key": "hci",
+      "source_manifest": "lib/hci/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-outreach",
+      "paths": [
+        "packages/aw-outreach"
+      ],
+      "activated_by": [
+        "CAP-AW-OUTREACH"
+      ],
+      "product_key": "outreach",
+      "source_manifest": "lib/outreach/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-social",
+      "paths": [
+        "packages/aw-social"
+      ],
+      "activated_by": [
+        "CAP-AW-SOCIAL"
+      ],
+      "product_key": "social",
+      "source_manifest": "lib/social/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-studio",
+      "paths": [
+        "packages/aw-studio"
+      ],
+      "activated_by": [
+        "CAP-AW-STUDIO"
+      ],
+      "product_key": "studio",
+      "source_manifest": "lib/studio/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-tarot",
+      "paths": [
+        "packages/aw-tarot"
+      ],
+      "activated_by": [
+        "CAP-AW-TAROT"
+      ],
+      "product_key": "tarot",
+      "source_manifest": "lib/tarot/MODULE_MANIFEST.json",
+      "source_module_manifest": null
+    },
+    {
+      "id": "aw-video",
+      "paths": [
+        "packages/aw-video"
+      ],
+      "activated_by": [
+        "CAP-AW-VIDEO"
+      ],
+      "product_key": "video",
+      "source_manifest": "lib/video/MODULE_MANIFEST.json",
+      "source_module_manifest": null
     }
   ]
 }

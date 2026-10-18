@@ -1,9 +1,10 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS_DIR, migrationFiles } from "../../kb/__tests__/migration-source";
 import { RESERVED_SUBDOMAINS, nextAdminProducts } from "../doors";
-import { DEFAULT_SIGNUP_PRODUCT, LOGIN_SOURCES, PRODUCTS, SELF_SIGNUP_PRODUCTS, isSelfSignupProductKey } from "../products";
+import { BACK_OFFICE, STAFF_UTILITIES, DEFAULT_SIGNUP_PRODUCT, LOGIN_SOURCES, PRODUCTS, SELF_SIGNUP_PRODUCTS, isSelfSignupProductKey } from "../products";
 
 // The registry is the one list of products (ADR 012 §5). The signup form and /api/signup read it; the database's own
 // check on organization_product_subscriptions.product_key (0062, or a later migration that redefines it) must allow
@@ -71,9 +72,91 @@ describe("product registry", () => {
     for (const p of doors) {
       expect(p.door.page, p.key).toMatch(/^\/[a-z][a-z0-9-]*$/);
       expect(staff, p.key).not.toContain(p.door.page.slice(1));
-      expect(readdirSync(path.join(APP_DIR, p.door.page.slice(1))), `${p.key}: app${p.door.page}/ is its door's page`).toContain("page.tsx");
-      for (const a of p.door.api) expect(a, p.key).toMatch(/^\/api\/[a-z][a-z0-9-]*$/);
+      if (p.status === "available") {
+        expect(p.door.enabled, p.key).not.toBe(false);
+        expect(existsSync(path.join(APP_DIR, p.door.page.slice(1), "page.tsx")), p.key).toBe(true);
+      }
+      for (const a of p.door.api) expect(a, p.key).toMatch(/^\/api\/[a-z][a-z0-9-]*(?:\/[a-z][a-z0-9-]*)*$/);
     }
+  });
+
+  it("every directory under app/(shell)/{tools,ops} and app/(shell)/* maps to a product or a listed back-office or staff utility", () => {
+    const dirs = (d: string) => readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+    const shell = path.join(APP_DIR, "(shell)");
+    const actual = [...dirs(shell).filter((n) => !["tools", "ops"].includes(n)),
+      ...["tools", "ops"].flatMap((group) => dirs(path.join(shell, group)).map((n) => `${group}/${n}`))];
+    for (const dir of actual) {
+      const owners = PRODUCTS.filter((p) => p.staffPaths.includes(dir));
+      const count = owners.length + Number(dir in BACK_OFFICE) + Number(dir in STAFF_UTILITIES);
+      expect(count, `${dir}: exactly one owner`).toBe(1);
+    }
+    for (const [dir, reason] of Object.entries({ ...BACK_OFFICE, ...STAFF_UTILITIES })) {
+      expect(reason.trim().length, dir).toBeGreaterThan(0);
+      expect(actual, dir).toContain(dir);
+    }
+    for (const p of PRODUCTS) for (const dir of p.staffPaths) expect(actual, p.key).toContain(dir);
+    // Exempt infrastructure is explicit; every other top-level page must have a registry row.
+    for (const dir of dirs(APP_DIR).filter((n) => !n.startsWith("(") && !["api", "login", "portal"].includes(n))) {
+      expect(PRODUCTS.some((p) => p.door.app === "next-admin" && p.door.page === `/${dir}`), dir).toBe(true);
+    }
+  });
+
+  it("every feature declares a limit kind and no buyout module carries SAFETY_GATE", () => {
+    const keys = new Set<string>();
+    const declarations = ["state_ownership", "behavior_ownership", "public_api_event_contract", "invariants", "dependencies", "failure_isolation_boundary", "data_lifecycle", "observability_contract", "migration_rollback_contract", "replacement_strategy"];
+    for (const p of PRODUCTS) {
+      expect(p.accessChannels.length, p.key).toBeGreaterThan(0);
+      for (const c of p.accessChannels) expect(["ui", "api"]).toContain(c);
+      expect(p.description.trim(), p.key).not.toBe("");
+      expect(Array.isArray(p.modules.dependsOn), p.key).toBe(true);
+      expect(p.modules.manifest, p.key).toBe(`lib/${p.key}/MODULE_MANIFEST.json`);
+      for (const f of p.features) {
+        expect(f.feature_key.trim(), p.key).not.toBe("");
+        expect(keys.has(f.feature_key), f.feature_key).toBe(false); keys.add(f.feature_key);
+        expect(f.name.trim(), f.feature_key).not.toBe("");
+        expect(["QUOTA", "RATE_LIMIT", "SAFETY_GATE"], f.feature_key).toContain(f.limitKind);
+        expect(["contract", "credits"], f.feature_key).toContain(f.billing);
+        expect(typeof f.buyout, f.feature_key).toBe("boolean");
+        if (f.buyout || p.standalone) expect(f.limitKind, f.feature_key).not.toBe("SAFETY_GATE");
+      }
+      if (p.status === "available") {
+        expect(p.features.length, p.key).toBeGreaterThan(0);
+        const manifest = JSON.parse(readFileSync(path.join(APP_DIR, "..", p.modules.manifest), "utf8"));
+        for (const name of declarations) {
+          const value = JSON.stringify(manifest.declarations?.[name] ?? "");
+          expect(value, `${p.key}.${name}`).not.toMatch(/TODO/);
+          expect(value, `${p.key}.${name}`).not.toBe('""');
+        }
+      }
+    }
+    const source = ts.createSourceFile("products.ts", readFileSync(path.join(__dirname, "../products.ts"), "utf8"), ts.ScriptTarget.Latest, true);
+    const visit = (node: ts.Node) => {
+      if (ts.isPropertySignature(node) || ts.isPropertyAssignment(node)) {
+        expect(["audience", "ways", "supportedWays", "channels"]).not.toContain(node.name.getText(source).replace(/["']/g, ""));
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  });
+
+  it("staff utilities import no paid SDK", () => {
+    const paid = /^(?:@anthropic-ai\/sdk|openai|replicate|@fal-ai\/client|@google\/generative-ai|@google\/genai)(?:\/|$)/;
+    const scan = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const file = path.join(dir, e.name);
+        if (e.isDirectory()) scan(file);
+        else if (/\.[cm]?[jt]sx?$/.test(e.name)) {
+          const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+          const visit = (node: ts.Node) => {
+            // Static, dynamic and require imports are all string literals in the source AST.
+            if (ts.isStringLiteral(node)) expect(paid.test(node.text), `${file}: ${node.text}`).toBe(false);
+            ts.forEachChild(node, visit);
+          };
+          visit(source);
+        }
+      }
+    };
+    for (const dir of Object.keys(STAFF_UTILITIES)) scan(path.join(APP_DIR, "(shell)", dir));
   });
 
   it("every self-signup product, and the default, is allowed by the database check", () => {

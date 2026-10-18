@@ -10,7 +10,7 @@ import { NextRequest } from "next/server";
 import { isCrossSiteWrite, middleware } from "../../middleware";
 
 function req(url: string, method: string, headers: Record<string, string> = {}): NextRequest {
-  return new NextRequest(url, { method, headers });
+  return new NextRequest(url, { method, headers: { host: new URL(url).host, ...headers } });
 }
 const WP_UPDATE = "https://app.aware-wave.com/api/ops/clients/acme/wp-update?wave=wave1";
 const SESSION = { cookie: "sb-abc-auth-token=session-value" };

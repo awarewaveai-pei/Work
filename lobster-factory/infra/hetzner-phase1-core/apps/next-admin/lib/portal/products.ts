@@ -1,68 +1,97 @@
-// Product registry: the one list of products (ADR 012 §5) and how each is delivered (ADR 018 -- its own door,
-// its login sources, whether it installs alone). Data-driven on purpose (PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md §6.2):
-// adding a product here is how the launcher and lib/portal/doors.ts become aware of it. No hostnames here: a host is
-// subdomain + the configured base domain (doors.ts), so a buyout install on a customer's domain changes config only.
-// __tests__/products.test.ts fails a product that leaves any delivery field out.
-
-export type ProductKey = "cognitive" | "hci" | "social";
-
-/** How a person signs in (ADR 018 §3); every source ends in this app's own session. */
+// Product/feature delivery registry (ADR 012/017/018). New rows: scripts/new-product.mjs.
+import cognitiveInventory from "./cognitive-features.json";
 export type LoginSource = "local" | "awarewave-wp" | "customer-wp";
 export const LOGIN_SOURCES: readonly LoginSource[] = ["local", "awarewave-wp", "customer-wp"];
-
-/** Where the product's own door is served. next-admin: `page` is the page prefix the door's paths are rewritten
- *  under, `api` the API prefixes the door also serves; nothing else is reachable on that host. */
-export type ProductDoor =
-  | { app: "next-admin"; page: string; api: readonly string[] }
-  | { app: "external" };
-
-export interface PortalProduct {
-  key: ProductKey;
+export type ProductDoor = { app: "next-admin"; page: string; api: readonly string[]; enabled?: boolean } | { app: "external" };
+export interface ProductFeature {
+  feature_key: string;
   name: string;
-  /** Host label: the product's door is `<subdomain>.<base domain>` (doors.ts). Never app, portal or www. */
+  limitKind: "QUOTA" | "RATE_LIMIT" | "SAFETY_GATE";
+  buyout: boolean;
+  billing: "contract" | "credits";
+}
+interface ProductDefinition {
+  key: string;
+  name: string;
+  description: string;
   subdomain: string;
   door: ProductDoor;
-  /** Must include "local": a buyout install signs people in on its own by default (ADR 017 §6). */
   loginSources: readonly LoginSource[];
-  /** A buyout customer can install this product without the others (ADR 017 §5 lists what it depends on). */
   standalone: boolean;
-  /**
-   * "coming_soon": no product-side Tenant-provisioning API exists yet (Cognitive OS is Phase 2
-   * planning per ADR-003; HCI-30 is unstarted). The launcher must render this literally as
-   * "coming soon" — never as a working link — until a product flips this via its own rollout,
-   * not by editing this literal to "available".
-   *
-   * Critic finding (2026-08-29, suggestion): this field was typed as the single literal
-   * "coming_soon", which made app/portal/launcher/page.tsx's `product.status !== "coming_soon"`
-   * check statically unreachable — TypeScript narrowed it to always-false, so the "isReady"
-   * branch this comment describes was dead code with no way to ever become true, contradicting
-   * the very rollout mechanism this comment promises. Typed as a real union so a future product
-   * launch can actually flip this value and the launcher's branch becomes reachable.
-   */
   status: "coming_soon" | "available";
-  /**
-   * Offered on the portal signup form and accepted by /api/signup. Every self-signup key must also be
-   * allowed by the organization_product_subscriptions.product_key check (0062) — the registry test
-   * compares the two. Social is false until V2 opens subscriptions (ADR 016 §7).
-   */
+  // Only self-signup keys must be accepted by migration 0062's CHECK.
   selfSignup: boolean;
+  features: readonly ProductFeature[];
+  accessChannels: readonly ("ui" | "api")[];
+  modules: { dependsOn: readonly string[]; manifest: string };
+  staffPaths: readonly string[];
 }
-
-export const PRODUCTS: readonly PortalProduct[] = [
-  { key: "cognitive", name: "AI LEGO Cognitive Engineering OS", subdomain: "cognitive", door: { app: "external" },
-    loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon", selfSignup: true },
-  { key: "hci", name: "HCI-30", subdomain: "hci", door: { app: "external" },
-    loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon", selfSignup: true },
-  { key: "social", name: "社群發文", subdomain: "social", door: { app: "next-admin", page: "/social", api: ["/api/social"] },
-    loginSources: ["local", "awarewave-wp", "customer-wp"], standalone: true, status: "coming_soon", selfSignup: false }, // ADR 016
-];
-
-/** The products a visitor may pick at signup — the only list the signup form and /api/signup use. */
-export const SELF_SIGNUP_PRODUCTS: readonly PortalProduct[] = PRODUCTS.filter((p) => p.selfSignup);
-
-/** What signup gives a visitor who did not pick one — the form's initial value and /api/signup's fallback. */
+const quota = (feature_key: string, name: string, billing: ProductFeature["billing"] = "credits"): ProductFeature =>
+  ({ feature_key, name, limitKind: "QUOTA", buyout: true, billing });
+const cognitiveFeatures = cognitiveInventory.map((f) => quota(f.id, f.name, f.billing as ProductFeature["billing"]));
+const PRODUCT_DEFINITIONS = [
+  { key: "cognitive", name: "AI LEGO Cognitive Engineering OS", description: "組合認知方法、研究資料與專案。", subdomain: "cognitive", door: { app: "external" },
+    loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon", selfSignup: true,
+    features: cognitiveFeatures, accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/cognitive/MODULE_MANIFEST.json" }, staffPaths: [] },
+  { key: "hci", name: "HCI-30", description: "人機互動與持續監測工具。", subdomain: "hci", door: { app: "external" },
+    loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon", selfSignup: true,
+    features: [], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/hci/MODULE_MANIFEST.json" }, staffPaths: [] },
+  { key: "social", name: "社群發文", description: "改寫、排程並派送品牌社群貼文。", subdomain: "social", door: { app: "next-admin", page: "/social", api: ["/api/social"] },
+    loginSources: ["local", "awarewave-wp", "customer-wp"], standalone: true, status: "coming_soon", selfSignup: false,
+    features: [quota("social.rewrite", "AI 多平台改寫"), quota("social.dispatch", "貼文派送", "contract")], accessChannels: ["ui"],
+    modules: { dependsOn: [], manifest: "lib/social/MODULE_MANIFEST.json" }, staffPaths: ["tools/social"] },
+  { key: "video", name: "影片製作", description: "生成腳本、場景、動態與旁白影片。", subdomain: "video", door: { app: "next-admin", page: "/video", enabled: false, api: ["/api/video"] },
+    loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
+    features: [quota("video.script", "腳本生成"), quota("video.image", "場景圖生成"), quota("video.motion", "影片動態"), quota("video.tts", "付費旁白")],
+    accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/video/MODULE_MANIFEST.json" }, staffPaths: ["tools/video"] },
+  { key: "tarot", name: "塔羅製圖", description: "生成塔羅圖片、提示詞與動態。", subdomain: "tarot", door: { app: "next-admin", page: "/tarot", enabled: false, api: ["/api/tools/tarot"] },
+    loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
+    features: [quota("tarot.image", "塔羅圖生成"), quota("tarot.prompt", "提示詞建議"), quota("tarot.motion", "塔羅動態")],
+    accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/tarot/MODULE_MANIFEST.json" }, staffPaths: ["tools/tarot"] },
+  { key: "studio", name: "商品設計工作室", description: "生成商品圖片、文案與修圖素材。", subdomain: "studio", door: { app: "next-admin", page: "/studio", enabled: false, api: ["/api/tools/studio"] },
+    loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
+    features: [quota("studio.image", "圖片生成"), quota("studio.product-copy", "商品文案"), quota("studio.edit-prompt", "修圖提示詞"), quota("studio.remove-bg", "去背"), quota("studio.inpaint", "局部重繪"), quota("studio.fill", "生成填補"), quota("studio.upscale", "圖片放大")],
+    accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/studio/MODULE_MANIFEST.json" }, staffPaths: ["tools/studio"] },
+  { key: "design", name: "設計編輯器", description: "編輯畫布、橫幅、模型圖與向量設計。", subdomain: "design", door: { app: "next-admin", page: "/design", enabled: false, api: ["/api/design"] },
+    loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
+    // Paid image operations belong to studio above; Fabric editing itself calls no paid model.
+    features: [quota("design.edit", "畫布與向量編輯", "contract")], accessChannels: ["ui"],
+    modules: { dependsOn: [], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-editor"] },
+  { key: "content", name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", enabled: false, api: ["/api/content"] },
+    loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
+    features: [quota("content.article", "文章生成"), quota("content.humanize", "文章人性化"), quota("content.seo-fix", "SEO 修正"), quota("content.brand-voice", "品牌語氣擷取"), quota("content.outline", "大綱生成"), quota("content.title", "標題建議"), quota("content.keywords", "關鍵字建議"), quota("content.hook-brief", "Hook 草稿"), quota("content.syndicate", "多平台內容改寫"), quota("content.market-analysis", "市場分析"), quota("content.trending", "趨勢分析"), quota("content.image", "內容配圖")],
+    accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/content/MODULE_MANIFEST.json" }, staffPaths: ["tools/content", "tools/publish", "tools/events"] },
+  { key: "cs", name: "AI 客服", description: "根據知識庫回答問題並處理客服交接。", subdomain: "cs", door: { app: "next-admin", page: "/cs", enabled: false, api: ["/api/cs"] },
+    loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
+    features: [quota("cs.intent", "意圖分類"), quota("cs.answer", "客服回答與工具呼叫"), quota("cs.eval", "回答評測"), quota("cs.exam", "客服模擬考"), quota("cs.translate", "訊息翻譯")],
+    accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/cs/MODULE_MANIFEST.json" }, staffPaths: ["ops/cs", "ops/knowledge", "cs-widget"] },
+  { key: "collect", name: "資料蒐集器", description: "搜尋並蒐集外部網站與研究資料。", subdomain: "collect", door: { app: "next-admin", page: "/collect", enabled: false, api: ["/api/collect"] },
+    loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
+    features: [quota("collect.fetch", "資料蒐集")], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/collect/MODULE_MANIFEST.json" }, staffPaths: ["ops/collect"] },
+  { key: "outreach", name: "行銷開發信", description: "產生開發信並管理寄送名單。", subdomain: "outreach", door: { app: "next-admin", page: "/outreach", enabled: false, api: ["/api/outreach"] },
+    loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
+    features: [quota("outreach.draft", "AI 開發信")], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/outreach/MODULE_MANIFEST.json" }, staffPaths: ["outreach"] },
+  // NEW_PRODUCT_ROWS: scripts/new-product.mjs inserts before this marker.
+] as const satisfies readonly ProductDefinition[];
+export type ProductKey = (typeof PRODUCT_DEFINITIONS)[number]["key"];
+export type PortalProduct = Omit<ProductDefinition, "key"> & { key: ProductKey };
+export const PRODUCTS: readonly PortalProduct[] = PRODUCT_DEFINITIONS;
+export const SELF_SIGNUP_PRODUCTS = PRODUCTS.filter((p) => p.selfSignup);
 export const DEFAULT_SIGNUP_PRODUCT: ProductKey = SELF_SIGNUP_PRODUCTS[0].key;
-
 export function isSelfSignupProductKey(value: unknown): value is ProductKey {
   return typeof value === "string" && SELF_SIGNUP_PRODUCTS.some((p) => p.key === value);
 }
+export const STAFF_UTILITIES: Readonly<Record<string, string>> = {
+  "tools/theme": "員工調整後台外觀，不呼叫付費 AI。",
+  "tools/ai-models": "員工查閱模型資料，不呼叫付費 AI。",
+};
+export const BACK_OFFICE: Readonly<Record<string, string>> = {
+  "ops/clients": "員工管理客戶組織。", "ops/schedules": "員工管理維護排程。",
+  "ops/repairs": "員工處理服務修復。", "ops/integrations": "員工管理連線設定。",
+  "ops/system-modes": "員工管理系統模式。", "ops/approvals": "員工審批營運操作。",
+  "ops/backup": "員工檢查備份。", "ops/inbox": "員工處理營運告警。",
+  "ops/costs": "員工檢查營運成本。", "ops/onboarding": "員工處理客戶啟用。",
+  "ops/tools": "員工維護工具清單。", "build": "員工執行建站作業。",
+  "ops-console": "員工檢視營運總台。", "onboard": "員工操作佈建流程。",
+  "api-check": "員工檢查 API 連線。", "api-check-client": "員工檢查客戶 API 連線。",
+};
