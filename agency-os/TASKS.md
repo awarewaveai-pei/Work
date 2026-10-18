@@ -353,21 +353,21 @@
     - **選月租，不要 12 個月承諾**（操作者 2026-08-18 確認：「有點想省 $43.20 但又怕出事」）—— 多付 $43.20 買的正是「30 天觀察期後才承諾」：這台是 2017 年二手 Naples 平台，NVMe 磨耗/NUMA/RMA 品質全未驗證。月租跑滿 30 天全綠、SMART/mdadm 正常、未觸發 RMA 後再評估轉 12 個月（買機+30天複審項）
     - **觀望不停，但改由月租承載**：繼續每 2–3 天看 Hetzner auction（篩 ECC + 128GB + ≥2TB + ≤€65）。soulful 生產資料落地新機**前**命中 → 退 KS-6 換機；落地後命中 → 記入下次換機評估，不動生產機
     - **死線前範圍閘**：11/12 前只做 Chatwoot 試機 → soulful 搬完切換。**EU/SG 整併明確排到 2026-11-20 之後**——Pre-mortem 發現：這個決策的財務承諾（省下雲端 €28/月）沒有外部強制力，若不排具體日期，18 個月後很可能三台機器仍並存、白花 €1,008。**操作者 2026-08-19 明確澄清：不是只搬 soulful，EU 和 SG 都要搬過去退役**——以下為具名待辦，避免「範圍閘」變無限期拖延：
-      - [ ] EU①Supabase（**High-risk，需操作者本人在線**，六服務中風險最高、放最後搬）
-      - [ ] EU②Trigger.dev（含 ClickHouse——**搬前先確認 `override.xml` 產生源設定已生效**，2026-08-19 在原機實測過這個坑，同一套修法要複製過去）
-      - [ ] EU③n8n
-      - [ ] EU④Postiz
-      - [ ] EU⑤MainWP（Dashboard 端；child site token 需隨遷移重新確認連線）
-      - [ ] EU⑥Uptime Kuma
-      - [ ] **EU⑥b Remotion/Video 服務（`lobster-remotion-service`＋`lobster-video-service`）**——2026-08-26 SSH 實查 `docker ps` + nginx `server_name` 逐一比對 EU 27 個容器才發現，**先前 EU①-⑥ 清單漏列**；不是內部輔助服務，nginx 有掛外部網域 `remotion-svc.aware-wave.com`／`video-svc.aware-wave.com`，屬對外服務，整併時須比照其他六項排班次，不可漏搬
-      - [ ] SG⑦next-admin（app.aware-wave.com；DNS 見 DR runbook §5 SG 表）
-      - [ ] SG⑧WordPress + WordPress-DB（一對搬，DB 緊耦合；apex/www 指向這裡）
-      - [ ] SG⑨Node API（api.aware-wave.com）
-      - [ ] SG⑩oracle-web（oracle.aware-wave.com；**✅ 2026-08-19 SSH 查證用途：真實產品「Oracle」紫微斗數命理 app**，`Projects/internal/ziwei-doushu/`，有 DNS+TLS+health check，非測試殘留——**搬遷時發現環境變數含明文 OpenAI API key，務必改走 vault 引用**）
-      - [ ] SG⑪Redis（共用快取層，隨最後一個依賴它的服務一起搬，不單獨排波；**檢查現況是否有密碼，新機多服務共用建議補上**）
-      - [ ] SG⑫觀測堆疊（Loki/Grafana/Promtail；**✅ 2026-08-19 SSH 查證用途：SG 主機自己的日誌監控**，loopback-only + SSH tunnel 存取，有正式文件 [`OBSERVABILITY_P1_P2_ROLLOUT.md`](docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md)，為防過去 502 事故而建——**要搬，不是退役項**；搬遷後 SSH tunnel 指令要改指新機 IP）
+      - [x] EU①Supabase（**High-risk，需操作者本人在線**，六服務中風險最高、放最後搬）
+      - [x] EU②Trigger.dev（含 ClickHouse——**搬前先確認 `override.xml` 產生源設定已生效**，2026-08-19 在原機實測過這個坑，同一套修法要複製過去）
+      - [x] EU③n8n
+      - [x] EU④Postiz
+      - [x] EU⑤MainWP（Dashboard 端；child site token 需隨遷移重新確認連線）
+      - [x] EU⑥Uptime Kuma
+      - [x] **EU⑥b Remotion/Video 服務（`lobster-remotion-service`＋`lobster-video-service`）**——2026-08-26 SSH 實查 `docker ps` + nginx `server_name` 逐一比對 EU 27 個容器才發現，**先前 EU①-⑥ 清單漏列**；不是內部輔助服務，nginx 有掛外部網域 `remotion-svc.aware-wave.com`／`video-svc.aware-wave.com`，屬對外服務，整併時須比照其他六項排班次，不可漏搬
+      - [x] SG⑦next-admin（app.aware-wave.com；DNS 見 DR runbook §5 SG 表）
+      - [x] SG⑧WordPress + WordPress-DB（一對搬，DB 緊耦合；apex/www 指向這裡）
+      - [x] SG⑨Node API（api.aware-wave.com）
+      - [x] SG⑩oracle-web（oracle.aware-wave.com；**✅ 2026-08-19 SSH 查證用途：真實產品「Oracle」紫微斗數命理 app**，`Projects/internal/ziwei-doushu/`，有 DNS+TLS+health check，非測試殘留——**搬遷時發現環境變數含明文 OpenAI API key，務必改走 vault 引用**）
+      - [x] SG⑪Redis（共用快取層，隨最後一個依賴它的服務一起搬，不單獨排波；**檢查現況是否有密碼，新機多服務共用建議補上**）
+      - [x] SG⑫觀測堆疊（Loki/Grafana/Promtail；**✅ 2026-08-19 SSH 查證用途：SG 主機自己的日誌監控**，loopback-only + SSH tunnel 存取，有正式文件 [`OBSERVABILITY_P1_P2_ROLLOUT.md`](docs/operations/OBSERVABILITY_P1_P2_ROLLOUT.md)，為防過去 502 事故而建——**要搬，不是退役項**；搬遷後 SSH tunnel 指令要改指新機 IP）
       - **SG 七項逐一對照密碼/權限/寫死IP/SSH/cron/舊帳號哪幾項適用**：見 [`KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md`](../runbooks/KS6-SELF-HOSTED-STACK-HARDENING-CHECKLIST.md) 「既有服務搬遷」節的 SG 對照表，不是每項服務都套用全部六項通用坑
-      - [ ] 兩台雲端主機確認已無流量 → 安全關閉 → 帳單確認只剩一台在計費（呼應 Pre-mortem「切換 +120 天仍 &gt;1 台在跑」的預警指標）
+      - [x] 兩台雲端主機確認已無流量 → 安全關閉 → 帳單確認只剩一台在計費（呼應 Pre-mortem「切換 +120 天仍 &gt;1 台在跑」的預警指標）
     - **✅ 出國行程已確認排除**（操作者 2026-08-18：「沒有，這幾個月都在」）—— Pre-mortem 判定的第二號死因（§5 Supabase 整併是 High-risk、需本人在線）已解除，W4 可照 11/20 起兩週一台的節奏排，不必等行程確認
     - **決策正本**：[`reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md`](reports/decisions/2026-08-17-dedicated-host-spec-upgrade.md)（規格：128GB ECC 等）+ [`reports/decisions/2026-08-18-dedicated-host-purchase-timing.md`](reports/decisions/2026-08-18-dedicated-host-purchase-timing.md)（時機：立刻買）—— 取代 `runbooks/HETZNER-SERVER-MIGRATION-AND-DISASTER-RECOVERY-RUNBOOK.md` §0b 機型表；§0b 其餘決策（Chatwoot 先行 / 單台+RAID1+R2 / HA 延後）不變
     - **下單前確認**：可裝 Ubuntu LTS + 自訂分割 + soft RAID1／rescue mode／刷卡幣別匯率。**Backup Agent 容量一項已移除**（改走既有 R2，同商同地備份在 2021 OVH SBG2 火災中已證實不算備份）
@@ -728,7 +728,7 @@
 - [x] **【2026-08-26 開出｜中】next-admin 沒有 DOM 測試基礎設施，接線層的 bug 測不到** — repo 無 `jsdom` / `happy-dom` / `@testing-library/react`，vitest 全域 `environment: "node"`。實證代價：同一天 Codex 三輪覆審抓到的 3 條 CONFIRMED finding **全部在 React 元件的接線層**（mount-only effect 讀 URL state、`if (sites.length)` 讓決策分支被跳過、`?? wpSites[0]` 靜默替換），而純函式測試對它們一律綠燈 —— 突變測試證實：把 `ContentStudio` 改回舊寫法完全繞過 `pickInitialSite`，5 個測試照樣全過。**決策點**：要不要引進 DOM 測試依賴。影響 `sg-deploy.sh` 的 `npm test` gate 與 57 個現有測試檔的執行環境，屬於操作者的決定，不該塞在功能 commit 裡。 → ✅ 2026-09-25 續2（雲端 T10＋本機）：宣告 `jsdom ^26.1.0`＋@testing-library（逐檔 pragma，全域仍 node）；原本 4 檔已靠傳遞依賴用 jsdom，未另開第二套；ContentStudio 接線測試經突變驗證。
 - [x] **【✅ 2026-08-26 結案｜🔴 跨租戶寫入】客戶頁的 hostname 猜測已改讀權威欄位** — `ops/clients/[slug]/page.tsx` 的 `ilike("url", '%<hostname>%')` → `.eq("organization_id", org.id)`（migration 0061 的權威欄位；該檔其餘每一條並行查詢早就用 organization_id，只有這條在猜）。**EU prod before/after 實測**：舊寫法**兩個方向都壞** —— 3 個 staging org 各撈到橫跨 4 個 org 的 4 列（偽陽性，`ClientHubTabs` 取 `[0]` 恆為 AwareWave → 看到並可寫入別人的 `content_defaults`），而 `awarewave-ops` 因 `site_url` 是 `app.aware-wave.com`、站的 url 是 `aware-wave.com`，`%app.aware-wave.com%` 一列都對不到（偽陰性，自己的客戶頁一直是空的）；新寫法 5 個 org 各自精確 1 列。**連帶修掉兩個**：① `provision-staging` 的 `wireClientToContentTools` insert **從未寫入 organization_id** —— 0061 只回填了當時既有的 5 列，往後每個新佈建的站都會是 null（對 client fail-closed，客戶頁與內容工具都看不到自己的站）② `ClientHubTabs` 儲存鈕在無站時是靜默 no-op，改成會說話。另修 2 處過期註解（仍宣稱內容工具靠 hostname 比對）。
 - [x] **【✅ 2026-08-26 結案｜不變量】佈建的四種持久資源全部有了拆除路徑 + 三層對帳偵測器** — 新增 `lobster-factory/infra/hetzner-phase1-core/scripts/deprovision-staging.sh`（四層一次拆：`wp_sites` 列 → org 的 `client_config.site_url` → MariaDB → 檔案系統；預設 DRY RUN、`--apply` 另需 `--confirm <slug>`、先備份驗證非空才動手、9 個守衛）與 `scripts/check-staging-orphans.ps1`（三層對帳，分類 complete/unregistered/dir_only/db_only/row_only，掛進 `ao-resume.ps1` warn-only + 12h 節流）。**先把 rollback 與 teardown 分開**：這個 codebase 每一層都有 mid-flight rollback（`HetznerHostingAdapter.ts:289`、`dns.ts:117`、`provision-staging:263`），但成功佈建之後的拆除是零。**驗證**：9 例守衛全部拒絕；兩次 canary 全流程（自建拋棄式站 → dry-run 零改動 → apply → 四層全 GONE → 備份還原演練取回 payload 與 db 資料列）；拆完後對帳器獨立確認零殘留且數字精確回到 canary 前。**自審抓到 3 條並修**（`curl` 不檢查狀態碼會拆成半殘、`--keep-days` 負數會刪光備份、wp-cli 以 root 跑讀不到 DB_NAME）。
-- [ ] **【2026-08-26 開出｜中】現存 10 個 staging 孤兒 / 1969.7 MB 待清理（拆除路徑已就緒，清理是決策）** — 見 `agency-os/reports/status/staging-orphans-LATEST.md`。**4 個 unregistered**（`fresh-brew-coffee-f2a3b4` 93MB、`green-valley-farm-28ba09` 217MB、`ssasd-8ebcd4` 306MB、`test-pilot` 93MB）有目錄有 DB 但從未進過 `wp_sites` —— 佈建 wiring 是 best-effort，失敗只回 WARN 不擋佈建。**3 個 complete 但已停用**（`e2e-verify-0704` 357MB、`mongolia-03` 549MB、`test-wp-webhook-co` 355MB），WP REST 實測 404。**6 個 db_only** 只剩資料庫沒有目錄，`deprovision-staging.sh` **刻意拆不動**（要求目錄存在且含 wp-config.php，否則無法證明要 DROP 哪一個），需人工確認後手動處理。SG 根磁碟 67%（48G/75G）。**注意 `test-pilot` 的 DB 叫 `wp_staging_testpilot`，命名規則與自動佈建不同，可能是更早的手工產物，不該和自動佈建的混在一起判斷。**
+- [x] **【✅ 2026-10-18 操作者確認已無孤兒｜2026-08-26 開出｜中】現存 10 個 staging 孤兒 / 1969.7 MB 待清理（拆除路徑已就緒，清理是決策）** — 見 `agency-os/reports/status/staging-orphans-LATEST.md`。**4 個 unregistered**（`fresh-brew-coffee-f2a3b4` 93MB、`green-valley-farm-28ba09` 217MB、`ssasd-8ebcd4` 306MB、`test-pilot` 93MB）有目錄有 DB 但從未進過 `wp_sites` —— 佈建 wiring 是 best-effort，失敗只回 WARN 不擋佈建。**3 個 complete 但已停用**（`e2e-verify-0704` 357MB、`mongolia-03` 549MB、`test-wp-webhook-co` 355MB），WP REST 實測 404。**6 個 db_only** 只剩資料庫沒有目錄，`deprovision-staging.sh` **刻意拆不動**（要求目錄存在且含 wp-config.php，否則無法證明要 DROP 哪一個），需人工確認後手動處理。SG 根磁碟 67%（48G/75G）。**注意 `test-pilot` 的 DB 叫 `wp_staging_testpilot`，命名規則與自動佈建不同，可能是更早的手工產物，不該和自動佈建的混在一起判斷。**
 - [ ] **【2026-08-26 開出｜中】手動新增的站拿不到租戶歸屬
 - [x] **【✅ 2026-08-26 結案】`/api/content/sites` 的 active 過濾收斂成 route 預設（fail-safe）** — GET 不帶參數只回 active（`route.ts:84`），唯一需要看見停用站的 `SiteManager` 以 `?includeInactive=1` 明示 opt-in，`ScriptForge` 那份重複的前端 filter 刪除。**外部覆審連抓 3 條 CONFIRMED，全是同一個實作缺陷的不同表現**：選站決策被算在 fetch callback 的單一分支裡 → ① mount-only effect 讀 URL state，掛載後 `?siteId=` 改變不重算 ② `if (sites.length)` 讓「清單被過濾成空」整個跳過決策，使用者連警告都看不到 ③ 指定的站取不到時靜默改用 `sites[0]`（＝別的客戶）。**收斂**：新增純函式 `lib/content/pick-initial-site.ts`（指定卻找不到 → 不選 + 回報），決策從載入中拆出成單一 effect，依賴是 `(paramSiteId, siteIdsKey)` 即決策的真實輸入；同檔 10 處 `?? wpSites[0]` 收斂成一個 `currentSite`（未選定即 undefined），順帶修掉 `saveAsClientDefault()` 會把表單預設寫進別的客戶那一列；`handlePublish` / `embed-to-wp` 兩個寫入點加上「未選定客戶即拒絕」（否則伺服器端的 `resolveWpSite(req, undefined)` 會挑第一個可存取的站）；`patterns` / `related-posts` 兩個讀取點同理。tsc 0；57 檔 656 測；2 組突變測試證非空跑。
 - [ ] **【2026-08-26 開出｜小｜跟著

@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-18（續1）TASKS 打勾：EU／SG 搬遷 14 項＋staging 孤兒（操作者確認）
+
+**範圍**：`agency-os/TASKS.md` 15 個 `- [ ]` → `- [x]`。AO-RESUME 發現這批看起來早已做完卻沒打勾（AGENTS.md §0 舊主機已退租、只剩 ks-aw-01）。
+**做了**：
+- `TASKS.md:356-368`（EU①②③④⑤⑥⑥b、SG⑦⑧⑨⑩⑪⑫）＋`:370`（兩台雲端主機關閉）共 14 項打勾；`:731` staging 孤兒打勾並在標題加「操作者確認已無孤兒」。
+- 依據：操作者 2026-10-18 在對話明說「#26–#39 已確定完成、#64 沒有了」；`staging-orphans-LATEST.json` 同日 `verdict=OK orphans=0`。未另行 SSH 核對主機（EU／SG 項目依操作者確認）。
+- 開放待辦 142 → 127（`grep -c '^\s*- \[ \]' agency-os/TASKS.md`）。
+- 未動：#90 Soulful 週備份、#50 危機訊息實測（操作者未確認）。
+- REALTEST_WAIVED: DOC_ONLY -- 只改 TASKS.md 勾選狀態
+- REVIEW_WAIVED: DOC_ONLY -- 只改 TASKS.md 勾選狀態
+- BUGHUNT_WAIVED: DOC_ONLY -- 只改 TASKS.md 勾選狀態
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-17（續24）社群 V1.5 C19：骨架與路由（頂部六區、六分頁、左側頻道清單、一列工具列、撰寫頁獨立整頁）
 
 **範圍**：PLAN.md §1b C19。路徑 `apps/next-admin/app/(shell)/tools/social/`。
