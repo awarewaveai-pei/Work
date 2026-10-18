@@ -88,12 +88,15 @@ describe("CustomerServiceTab", () => {
     expect(tab("AI 開關").getAttribute("aria-selected")).toBe("true");
     expect(visiblePanel()).toHaveLength(1);
     expect(visiblePanel()[0].textContent).toContain("AI 總開關");
-    // Status strip reads the loaded config: AI on, 2 FAQ, 3 intents by level, Chatwoot connected.
-    expect(text()).toContain("啟用中");
+    // Header status is plain text (role=status), not buttons: AI on with its threshold, token set.
+    const status = container.querySelector("[role=status]")!;
+    expect(status.querySelectorAll("button")).toHaveLength(0);
+    expect(status.textContent).toContain("AI 啟用中 · 知識門檻 0.4");
+    expect(status.textContent).toContain("Chatwoot 個人 token 已設定");
     expect(text()).toContain("2 題");
-    // 退款 is sensitive (永遠轉真人), so the strip counts it with 關閉, same as its row tag.
-    expect(text()).toContain("自動 1 · 草稿 1 · 關閉 1");
-    expect(text()).toContain("已設定");
+    // Tab counts are plain numbers after the label; the only clickable things above the panels are the tabs.
+    expect(tab("常見問答").textContent).toBe("常見問答 2");
+    expect(tab("意圖與自動化").textContent).toBe("意圖與自動化 3");
   });
 
   it("tags every intent by answer level, action, sensitivity and exam state, and filters by them", async () => {
@@ -146,7 +149,7 @@ describe("CustomerServiceTab", () => {
     await click(tab("常見問答"));
     expect(visiblePanel()[0].querySelectorAll("input[placeholder='例如：課程、療癒模組、上課']")).toHaveLength(3);
     expect(visiblePanel()[0].textContent).toContain("退費");
-    // The badge on the sub-tab and the status tile follow the draft count.
+    // The sub-tab count follows the draft count.
     expect(tab("常見問答").textContent).toContain("3");
   });
 

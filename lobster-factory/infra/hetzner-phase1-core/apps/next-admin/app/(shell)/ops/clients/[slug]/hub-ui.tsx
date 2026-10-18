@@ -80,39 +80,34 @@ export function Tag({ tone = "gray", children, title, dot }: {
 export type SubTab<K extends string> = {
   key: K;
   label: string;
-  /** Category caption under the label (免費 / AI / 整合…). */
-  caption?: string;
-  /** Count or status shown beside the label. */
-  badge?: ReactNode;
+  /** Item count shown after the label in muted text (never a pill: a pill reads as a button). */
+  count?: number | string;
 };
 
-/** Second-level tab bar inside a hub tab: segmented pills, one per area, with a caption and a badge. */
+/** Second-level tab bar inside a hub tab. Same visual language as the hub's own tab bar (text + 2px
+ *  underline on the active tab, one rule under the row): tabs must read as navigation, not as cards
+ *  or buttons, and must not compete with the content below them. */
 export function SubTabs<K extends string>({ tabs, active, onChange, label, idPrefix }: {
   tabs: Array<SubTab<K>>; active: K; onChange: (key: K) => void; label: string;
   /** Tabs get id `<prefix>-tab-<key>` and point at panel `<prefix>-panel-<key>`; the caller gives its panels those ids. */
   idPrefix: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} style={{
-      display: "flex", gap: 4, padding: 4, borderRadius: 10, marginBottom: 14, flexWrap: "wrap",
-      background: "var(--bg-card)", border: "1px solid var(--border-subtle)",
-    }}>
+    <div role="tablist" aria-label={label} style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border-subtle)", marginBottom: 16, overflowX: "auto" }}>
       {tabs.map((t) => {
         const on = t.key === active;
         return (
           <button key={t.key} role="tab" id={`${idPrefix}-tab-${t.key}`} aria-controls={`${idPrefix}-panel-${t.key}`}
             aria-selected={on} onClick={() => onChange(t.key)} style={{
-            flex: "1 1 140px", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 2,
-            padding: "8px 12px", borderRadius: 7, border: "none", cursor: "pointer", textAlign: "left",
-            background: on ? "var(--accent-light)" : "transparent",
-            boxShadow: on ? "inset 0 0 0 1px var(--accent)" : "none",
+            padding: "8px 12px", marginBottom: -1, border: "none", background: "transparent", cursor: "pointer", whiteSpace: "nowrap",
+            borderBottom: `2px solid ${on ? "var(--accent)" : "transparent"}`,
+            fontSize: 12, fontWeight: on ? 600 : 500, color: on ? "var(--accent)" : "var(--text-secondary)",
           }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: on ? 700 : 500,
-              color: on ? "var(--accent)" : "var(--text-primary)" }}>
-              {t.label}
-              {t.badge}
-            </span>
-            {t.caption && <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{t.caption}</span>}
+            {t.label}
+            {t.count !== undefined && (
+              // A real space, so a screen reader says "常見問答 20", not "常見問答20".
+              <>{" "}<span style={{ marginLeft: 2, fontSize: 11, fontWeight: 400, color: on ? "var(--accent)" : "var(--text-muted)" }}>{t.count}</span></>
+            )}
           </button>
         );
       })}

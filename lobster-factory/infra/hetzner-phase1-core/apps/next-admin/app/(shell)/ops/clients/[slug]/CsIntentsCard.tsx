@@ -90,11 +90,11 @@ const EXAM_TAG: Record<ExamState, { tone: TagTone; text: string }> = {
 /** Needs the operator's attention before 自動 can be trusted. */
 const needsExam = (s: ExamState) => s === "none" || s === "untested" || s === "stalled" || s === "stale" || s === "failed";
 
-export type IntentMode = "auto" | "paused" | "draft" | "off" | "sensitive";
+type IntentMode = "auto" | "paused" | "draft" | "off" | "sensitive";
 
-/** What the engine will actually do with this intent now — the one classification behind the row tag,
- *  the status strip and the filters (lib/cs/orchestrator decideAnswerAction: L2 drafts unless graduated and > 0 %). */
-export function intentMode(it: CsIntentRow): IntentMode {
+/** What the engine will actually do with this intent now — the one classification behind the row tag
+ *  (lib/cs/orchestrator decideAnswerAction: L2 drafts unless graduated and > 0 %). */
+function intentMode(it: CsIntentRow): IntentMode {
   const graduated = it.graduation?.status === "passed" && it.graduation.current === true;
   if (it.is_sensitive) return "sensitive";
   if (it.answer_level === "L0") return "off";

@@ -27,6 +27,19 @@
 **剩餘風險**：①未部署（next-admin 03:00 自動部署 main；0105／0109 已在正式庫）。②共享檔分手術 commit：`posts/route.ts`、`store.ts`、`routes.test.ts`、`api.ts`、`model.ts` 與 C21 同檔不同 hunk，只提交 C22 的 hunk。③週／月篩選後無結果仍顯示空格（見上）。④時區切換未做。
 
 **Rollback**：`git revert <本 commit>`（無 migration；`posts` 回應多 `tags`／`deletions` 欄位，舊頁忽略它們）。
+## 2026-10-18（續3）客服分頁頂部重做：狀態改純文字、分頁改底線式——兩排都像按鈕的問題
+
+**操作者**（附截圖）：「他們看起來都像是按鈕，使用者會以為都可以按；第一排的目的不是顯示目前設定狀況，第二排是 tabs；用專業方式去設計」。
+**根因**：續22 把狀態摘要做成四張可點的框卡（`StatusTile` 是 `<button>`），分頁做成有框有底色的 segmented pills 並在每個 tab 下加小字說明——兩排同一種「框＋底色」視覺，可點性與層級分不開。
+**改法**（`apps/next-admin/app/(shell)/ops/clients/[slug]/`）：`hub-ui.tsx` `SubTabs` 改成與 hub 第一層同一套的底線式分頁（文字＋2px 底線、整排一條線、數量用淡色數字不用 pill；型別去掉 `caption`／`badge`，改 `count`）；`CustomerServiceTab.tsx` 刪 `StatusTile`，頂部改成標題「客服」＋一句副標（訊息怎麼走，帶題數／意圖數）＋右側 `role="status"` 純文字狀態（圓點＋字：AI 啟用／停用＋知識門檻、個人 token 已設／未設），全部不可點；意圖分級統計移除（篩選 chip 已有數量）。測試改成斷言狀態區沒有 button、tab 文字為「常見問答2」。
+**驗證**：tsc 0 錯；vitest CustomerServiceTab 6/6；本機 `next dev -p 3001` 1400 寬截圖看過（dev server 第一次編譯 API 時 404 約 20 秒、一次 Supabase 查 org 失敗 notFound，都是暫時現象，重整即正常）。
+**剩餘風險**：未部署（03:00 自動上，或操作者說了再手動）；面板寬度 <1000 時 hub 側欄會蓋住內容，是 hub 既有行為。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run app/(shell)/ops/clients/[slug]/__tests__/CustomerServiceTab.render.test.tsx（6 passed）；next dev -p 3001 內建瀏覽器截圖 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0m/2n（測試過時註解、tab 名與數字間補真正空格給讀屏；另 `intentMode` 收回 export——三項已修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=StatusTile\|SubTabs | hits=1（SubTabs 唯一呼叫端 CustomerServiceTab.tsx 已改；StatusTile 0）
+- ORACLE_WAIVED: 版面改動，critic Quick＋render test 足夠；不佔 Codex 額度
+
 ## 2026-10-18（續2）客戶怎麼來：全鏈自審＋Codex 獨立審閱 25 條全修——點數不走權利列、付款收件表與退款／拒付、試用到期、0062 舊 policy、全域到期工作、許可位元組格式、安裝失敗只清本次、SAFETY_GATE 目錄邊界、安裝專屬 registry 憑證、未知 host 404、API key 只綁根帳戶；監工台加「先後與定價」
 
 **觸發**：操作者「再檢查一次計畫和要做的內容和監工台，不能有一點遺漏和瑕疵與缺失，這個系統我是要整套賣人的」。

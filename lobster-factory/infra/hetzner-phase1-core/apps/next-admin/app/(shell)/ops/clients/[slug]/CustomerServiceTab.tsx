@@ -9,11 +9,11 @@
 // 一起). The APIs are unchanged: /api/ops/clients/[slug]/cs-config (kill-switch, 門檻, intents),
 // /cis (csFaq), /cs-config/chatwoot-token. Intents render in CsIntentsCard.tsx.
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { roleHeader } from "@/lib/ops-role";
 import type { ClientConfig } from "@/app/api/ops/clients/route";
-import { CsIntentsCard, intentMode, type CsIntentRow } from "./CsIntentsCard";
+import { CsIntentsCard, type CsIntentRow } from "./CsIntentsCard";
 import { Card, SubTabs, Tag, type SubTab } from "./hub-ui";
 
 type Area = "ai" | "faq" | "intents" | "chatwoot";
@@ -48,21 +48,17 @@ function Row({ label, children, top }: { label: string; children: ReactNode; top
   );
 }
 
-// ── Status strip ──────────────────────────────────────────────────────────────
+// ── Header status ─────────────────────────────────────────────────────────────
 
-function StatusTile({ label, value, caption, tone, onClick }: {
-  label: string; value: ReactNode; caption?: string; tone: "green" | "red" | "gray" | "accent"; onClick: () => void;
-}) {
-  const color = tone === "green" ? "var(--green)" : tone === "red" ? "var(--red)" : tone === "accent" ? "var(--accent)" : "var(--text-primary)";
+/** One live fact in the header: a coloured dot and plain text. Not a card and not clickable — the
+ *  previous status tiles looked like buttons, so the operator read both rows as things to press. */
+function Status({ tone, children }: { tone: "green" | "red" | "gray"; children: ReactNode }) {
+  const color = tone === "green" ? "var(--green)" : tone === "red" ? "var(--red)" : "var(--text-muted)";
   return (
-    <button onClick={onClick} style={{
-      textAlign: "left", cursor: "pointer", background: "var(--bg-card)", border: "1px solid var(--border-subtle)",
-      borderRadius: 10, padding: "10px 14px", display: "flex", flexDirection: "column", gap: 2, minWidth: 0,
-    }}>
-      <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{label}</span>
-      <span style={{ fontSize: 16, fontWeight: 700, color, lineHeight: 1.3 }}>{value}</span>
-      {caption && <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{caption}</span>}
-    </button>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
+      <span aria-hidden style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
+      {children}
+    </span>
   );
 }
 
@@ -406,37 +402,36 @@ export function CustomerServiceTab({ org, cfg }: { org: { slug: string }; cfg: C
     return () => { alive = false; };
   }, [org.slug, reloadConfig]);
 
-  // Same classification as the row tags in CsIntentsCard, so the strip never calls an intent 自動 that its row calls 暫停.
-  const intentStats = useMemo(() => {
-    const s = { auto: 0, paused: 0, draft: 0, off: 0, sensitive: 0 };
-    for (const i of intents) s[intentMode(i)] += 1;
-    return s;
-  }, [intents]);
-
   const n = (v: number) => (loading ? "…" : String(v));
   const tabs: Array<SubTab<Area>> = [
-    { key: "ai", label: "AI 開關", caption: "總開關・知識門檻", badge: loadError ? <Tag tone="red">讀取失敗</Tag> : <Tag tone={csEnabled ? "green" : "red"} dot>{loading ? "…" : csEnabled ? "啟用" : "停用"}</Tag> },
-    { key: "faq", label: "常見問答", caption: "免費・關鍵字直接回", badge: <Tag tone="gray">{faqCount}</Tag> },
-    { key: "intents", label: "意圖與自動化", caption: "AI 怎麼回每一種問題", badge: <Tag tone="ai">{n(intents.length)}</Tag> },
-    // The personal token is optional (the bot token carries the conversation): missing is gray, not red.
-    { key: "chatwoot", label: "Chatwoot 連線", caption: "整合・個人 token", badge: tokenConfigured === null ? undefined : <Tag tone={tokenConfigured ? "green" : "gray"} dot>{tokenConfigured ? "token 已設" : "token 未設"}</Tag> },
+    { key: "ai", label: "AI 開關" },
+    { key: "faq", label: "常見問答", count: faqCount },
+    { key: "intents", label: "意圖與自動化", count: n(intents.length) },
+    { key: "chatwoot", label: "Chatwoot 連線" },
   ];
-  const intentCaption = loading ? undefined
-    : `自動 ${intentStats.auto}${intentStats.paused ? `（暫停 ${intentStats.paused}）` : ""} · 草稿 ${intentStats.draft} · 關閉 ${intentStats.off + intentStats.sensitive}`;
+  const threshold = savedMinScore === "" ? `預設 ${minScoreDefault}` : savedMinScore;
 
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 14 }}>
-        {loadError ? (
-          <StatusTile label="AI 客服" value="讀取失敗" tone="red" caption={`設定讀不到（${loadError}），重新整理再試`} onClick={() => setArea("ai")} />
-        ) : (
-          <StatusTile label="AI 客服" value={loading ? "…" : csEnabled ? "啟用中" : "已停用"} tone={loading ? "gray" : csEnabled ? "green" : "red"}
-            caption={loading ? undefined : csEnabled ? `知識門檻 ${savedMinScore === "" ? `預設 ${minScoreDefault}` : savedMinScore}` : "常見問答照常，其他轉真人"} onClick={() => setArea("ai")} />
-        )}
-        <StatusTile label="常見問答" value={`${faqCount} 題`} tone="gray" caption="免費自動回覆" onClick={() => setArea("faq")} />
-        <StatusTile label="意圖" value={`${n(intents.length)} 個`} tone="accent" caption={intentCaption} onClick={() => setArea("intents")} />
-        <StatusTile label="Chatwoot 個人 token" value={tokenConfigured === null ? "…" : tokenConfigured ? "已設定" : "未設定"}
-          tone={tokenConfigured === null ? "gray" : tokenConfigured ? "green" : "gray"} caption="寫客人名字進聯絡人用；選填" onClick={() => setArea("chatwoot")} />
+      {/* Header: what this tab is, and the two live states that change how messages are handled.
+          Plain text on purpose — nothing here is clickable; the tabs below are the only navigation. */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap", marginBottom: 12 }}>
+        <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+          <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>客服</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+            客人的訊息先比對常見問答（{faqCount} 題，免費）；沒命中的交給 AI，依意圖（{n(intents.length)} 個）決定關閉、草稿或自動回覆；拿不準的一律轉真人。
+          </p>
+        </div>
+        <div role="status" aria-label="目前狀態" style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", paddingTop: 2 }}>
+          {loadError ? <Status tone="red">設定讀取失敗（{loadError}）</Status>
+            : loading ? <Status tone="gray">讀取中…</Status>
+            : csEnabled ? <Status tone="green">AI 啟用中 · 知識門檻 {threshold}</Status>
+            : <Status tone="red">AI 已停用 · 只回常見問答，其他轉真人</Status>}
+          {/* The personal token is optional (the bot token carries the conversation): missing is gray, not red. */}
+          {tokenConfigured !== null && (
+            <Status tone={tokenConfigured ? "green" : "gray"}>Chatwoot 個人 token {tokenConfigured ? "已設定" : "未設定"}</Status>
+          )}
+        </div>
       </div>
 
       <SubTabs<Area> label="客服設定" idPrefix="cs" tabs={tabs} active={area} onChange={(k) => setArea(k)} />
