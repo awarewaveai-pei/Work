@@ -143,6 +143,7 @@
 6. API 通道（等第一個只串 API 的客戶）：計費帳戶發 API key（scope＝feature_key 子集），`actor = api_key:<id>`，用量走同一個 `report()`；登記表 `accessChannels` 加 `api`。
 7. 轉售（等第一個轉售客戶）：授權檔 `max_tenants > 1`，安裝內租戶數受它限制；合約與價格另訂。**`max_tenants` 數的是客戶根組織**（`parent_organization_id IS NULL AND kind = 'customer'` 的 `organizations` 列，0077；`internal` 不算，Codex 2026-10-18 M17）：一家公司、或一個集團含子公司／分公司／部門，都是 1，組織樹是產品本來的功能，不另收；多個不相干的客戶（代理商買去代操）才是 >1，隔離責任在客戶主機，合約寫明（操作者 2026-10-16 定案）。我們替買斷客戶代操不算租戶數，是維運加購（產品決定 Q6）。
 8. **每個產品長成單一產品的樣子**（操作者 2026-10-18「他們還沒有展現單一產品的樣貌」）：登記列只給名字，本步給樣子。每個登記產品各做一次：頁面抽成共用元件（照 social 的 `SocialApp`）、加產品門路由 `app/<key>/` 精簡版面、開場是可用狀態（功能清單來自登記表與第 3 步的簽章功能清單、有示範資料）、manifest 無 TODO；`status: available` 的條件由測試擋（門頁存在、manifest 完整、features 非空、smoke 綠）。門上線（DNS、憑證、兩層 nginx）逐產品 High。前置：順序 1、3；與順序 4 同一優先段（要賣，先有樣子）。不搬資料表、不改 API 前綴。
+9. **客戶自己的網址指到 hosted 產品門（白牌）**（等第一個要的客戶）：`custom_domains(host, organization_id, product_key, verified_at)`，`doorForHost` 查表、DNS TXT 挑戰、憑證自動（Cloudflare for SaaS 或 on-demand ACME）；ADR 018 §2。買斷安裝不用它（整台就是客戶網域）。
 
 ## 不採用
 

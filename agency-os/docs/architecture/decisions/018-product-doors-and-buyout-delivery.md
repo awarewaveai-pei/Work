@@ -29,7 +29,7 @@
 
 - `lib/portal/products.ts` 每個產品宣告 `subdomain`，以及在 next-admin 裡的頁面前綴、API 前綴（產品不在 next-admin 就宣告 external）。
 - **每個產品都有子網域，登記那天就保留**：每個產品都適用五種方式（ADR 017 §0），「誰操作」是每次請求的值，不是產品的屬性，所以登記表不分客戶版／員工版。子網域開不開是部署狀態（DNS、nginx、`status`），不是程式差異。沒有子網域的是營運後台頁 `/ops/*`，它們不是產品、不在登記表（操作者 2026-10-16 問「都要做成子網域嗎」；先前擬的 `audience` 欄已撤，理由同上）。
-- 網址＝`subdomain`＋基底網域。基底網域讀環境變數 `PUBLIC_BASE_DOMAIN`（預設 aware-wave.com），單一產品可用 `PRODUCT_HOST_<KEY>` 覆寫。網址對應到哪扇門，只在 `lib/portal/doors.ts` 判斷，middleware 和頁面都問它。
+- 網址＝`subdomain`＋基底網域。基底網域讀環境變數 `PUBLIC_BASE_DOMAIN`（預設 aware-wave.com），單一產品可用 `PRODUCT_HOST_<KEY>` 覆寫。**客戶自己的網址指到 hosted 產品門（白牌）**：表 `custom_domains(host unique, organization_id, product_key, verified_at)`，`doorForHost` 在設定網址之後查它，命中＝該產品門＋該計費帳戶；驗證走 DNS TXT 挑戰，憑證走 Cloudflare for SaaS 或 on-demand ACME；每客戶每產品一列（ADR 017 順序 9，等第一個要白牌的客戶；操作者 2026-10-18「有可能掛在客戶自己網域」）。網址對應到哪扇門，只在 `lib/portal/doors.ts` 判斷，middleware 和頁面都問它。
 - 產品門上：不在該產品前綴的路徑改寫到頁面前綴（`/` → `/social`）；員工路由和其他產品的 API 回 404。產品的頁面前綴在別的網址也回 404。
 - 產品門的頁面用自己的精簡版面，不套員工側欄；畫面元件和員工門的 `/tools/<產品>` 共用同一份。
 - middleware 的 matcher 跳過的路徑（`/intake`、`/api/webhooks`、`/api/internal` 等）不經過門的判斷，所以產品門的 nginx 區塊自己擋掉它們，只留 `_next`、favicon、`/login`；也擋編碼過的 `.`／`/`，讓 middleware 和 Next 看到同一條路徑。`middleware-portal-guards.test.ts` 比對 matcher 和 nginx 兩邊，漏擋就紅燈。

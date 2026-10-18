@@ -42,7 +42,7 @@ export const PRIORITY = [
   { h: '① 先服務自己的客戶', t: '代操也要算得出每位客戶用了多少。', steps: [1, 2, 3] },
   { h: '② 訂閱與點數，產品要有樣子', t: '客戶在 aware-wave.com（WordPress）付款後自動開通；每個產品有自己的門與版面，打開就能用。', steps: [4, 8] },
   { h: '③ 賣斷給一般公司', t: '一鍵安裝到客戶主機，交接後收回存取權。', steps: [5] },
-  { h: '④ 等第一個客戶出現再做', t: '只串 API 的客戶，與代理商用一套服務多家客戶；各自獨立，不卡前面三段。', steps: [6, 7] },
+  { h: '④ 等第一個客戶出現再做', t: '只串 API 的客戶、代理商用一套服務多家客戶、客戶要用自己的網址；各自獨立，不卡前面三段。', steps: [6, 7, 9] },
 ];
 // ADR 017 Q9：賣斷怎麼收錢（預設值，可改）
 export const PRICING = [
@@ -110,6 +110,7 @@ export const STEPS = [
   { n: 6, card: 'cards/step-6.md', plain: '客戶只透過程式串接、不使用畫面時，系統也能計費。', title: 'API 通道', what: '計費帳戶發 API key（scope = feature_key 子集），actor = api_key:<id>，用量走同一個 report()；登記表 accessChannels 加 api。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '測試：key 的 scope 外功能會被拒絕', risk: 'Medium', model: 'Opus 5.5', depends: [3], status: 'not_started', waitFor: '待第一個只串 API 的客戶出現' },
   { n: 7, card: 'cards/step-7.md', plain: '代理商用同一套系統服務多家客戶時，系統按客戶數計費。', title: '轉售（代理商版）', what: '授權檔 max_tenants > 1，安裝內「根組織」數受它限制：一家公司或一個集團（含子公司、分公司、部門）都算 1，不另收；代理商買去替多家不相干的客戶代操才是 >1，另訂價，隔離責任在客戶主機（操作者 2026-10-16 定案）。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/（授權檔格式，順序 5 建）'], gate: '測試：建立的租戶超過 max_tenants 時會被拒絕', risk: 'Medium', model: 'Opus 5.5', depends: [5], status: 'not_started', waitFor: '待第一個轉售客戶出現' },
   { n: 8, card: 'cards/step-8.md', plain: '每個產品都有自己的門與版面，一打開就是可用的樣子：產品名、功能清單、示範資料；不再只是後台裡的一頁。', title: '每個產品長成單一產品的樣子', what: '每個登記產品：頁面抽成共用元件、加 app/<key>/ 產品門路由（精簡版面）、開場即可用狀態、MODULE_MANIFEST 無 TODO；status: available 由測試擋；門上線（DNS、憑證、兩層 nginx）逐產品 High。不搬資料表、不改 API 前綴。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/<key>/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/<key>/ui/', 'lobster-factory/infra/hetzner-phase1-core/nginx/default.conf'], gate: '測試：available 的產品必有門頁、完整 manifest、至少一個功能；本機以 <subdomain>.localhost 開門看到產品版面；上線後 playwright smoke 綠', risk: 'Medium（每個門上線 High）', model: 'Fable 5.1 定規則 → Opus 5.5 逐產品做', depends: [1, 3], status: 'not_started' },
+  { n: 9, card: 'cards/step-9.md', plain: '客戶想用自己的網址（例如 social.客戶.com）開 AwareWave 主機上的產品，驗證網域後就能指過來。', title: '客戶自己的網址指到 hosted 產品門（白牌）', what: 'custom_domains 表；doorForHost 查表；DNS TXT 驗證；憑證自動（Cloudflare for SaaS 或 on-demand ACME，待決 4）。買斷安裝不用。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/doors.ts', 'lobster-factory/packages/db/migrations/'], gate: '測試：未驗證的網址不路由；驗證後指到正確產品門與帳戶；網址本身不給登入', risk: 'Medium', model: 'Opus 5.5', depends: [8], status: 'not_started', waitFor: '待第一個要白牌網址的客戶出現', before: '憑證方式（待決 4）' },
 ];
 
 // 操作者自己要決定的（agent 不能替她定）
@@ -117,6 +118,7 @@ export const OPEN = [
   { n: 1, what: '訂閱每月扣款：WooCommerce 應使用哪個定期扣款外掛？台灣金流是否支援定期扣款？', before: 4, src: 'ADR 017 產品決定 Q3' },
   { n: 2, what: 'Postiz 是 AGPL-3.0；買斷交付前請律師確認。', before: 5, src: 'ADR 017 §5' },
   { n: 3, what: '點數不退、不轉讓的條款如何撰寫（台灣數位內容解除權例外）；賣點數的款項使用前列為預收，請會計師確認。', before: 4, src: 'ADR 015 §4' },
+  { n: 4, what: '客戶白牌網址的憑證走 Cloudflare for SaaS（客戶 CNAME 到 AwareWave）還是主機上自動簽發（on-demand ACME）？', before: 9, src: 'ADR 018 §2' },
 ];
 
 // 要一起改但不是順序步驟的

@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-18（續11）客戶怎麼來：客服／蒐集器／行銷與 social 同等——子網域第 1 項保留、第 8 項開門；補漏洞第 9 項「客戶自己的網址指到 hosted 產品門（白牌）」＋待決 4（憑證方式）
+
+**觸發**：操作者「客服／蒐集器／行銷不做成子網域嗎？為什麼 social 就要？凡事考慮三軸五對象；這些平台有可能掛在 WordPress 或客戶自己網域」。
+
+**澄清**：三者都有子網域（登記即保留、第 8 項開門，版面照 social）；「不搬家」只指程式與資料表。掛在哪裡＝三軸 A 的值：hosted＋awarewave-wp／customer-wp 登入、hosted＋客戶白牌網址、買斷裝客戶主機。
+
+**漏洞**：ADR 018 §2 只有整個安裝一組網域（`PUBLIC_BASE_DOMAIN`／`PRODUCT_HOST_<KEY>`），沒有「每個客戶一個網址指到 hosted」。
+
+**[已修改]**：ADR 018 §2 加 `custom_domains(host, organization_id, product_key, verified_at)`、`doorForHost` 查表、DNS TXT 驗證、憑證自動；ADR 017 順序加 9；新卡 `cards/step-9.md`（網址本身不給登入、未驗證不路由、三條測試）；監工台 STEPS 加 9、PRIORITY ④＝[6,7,9]、OPEN 加待決 4（Cloudflare for SaaS vs on-demand ACME）；TASKS 待決 4；v20 重發。
+
+**驗證結果**
+- REALTEST_WAIVED: DOC_ONLY -- `node build.mjs && node check.mjs` ok（9 steps、4 open）；`verify-governance-pointers` PASSED
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 ADR 018 §1 三扇門與 §2 新段不衝突（白牌仍是產品門，只是 host 來源多一張表）
+- BUGHUNT_DONE: scope=agency-os | grep=`custom_domains|待決 4|step-9` | hits=ADR 017／018、卡 9、data.mjs、TASKS（新名字）
+- ORACLE_WAIVED: 無 source 檔改動
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-18（續9）System Foundry 審核：選擇正確、產出不能開工、沒有監工台 → v1.7 計畫（樣板瘦身、每模組可執行卡、監工台套件共用、接軌 AwareWave、範例 intake 自動重生、self_hosted 題）
 
 **觸發**：操作者「檢查整個 System Foundry，選擇選項送出後是否可以出完美文件讓 Claude 開工？是否會產生連動的監工台？還需要什麼優化？」
