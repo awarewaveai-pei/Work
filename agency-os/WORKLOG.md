@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-18（續9）System Foundry 審核：選擇正確、產出不能開工、沒有監工台 → v1.7 計畫（樣板瘦身、每模組可執行卡、監工台套件共用、接軌 AwareWave、範例 intake 自動重生、self_hosted 題）
+
+**觸發**：操作者「檢查整個 System Foundry，選擇選項送出後是否可以出完美文件讓 Claude 開工？是否會產生連動的監工台？還需要什麼優化？」
+
+**實測**（file:line 在 `V1_7_HANDOFF_PLAN.md` 表）：全答 263 題 → `foundry_generate.py` 0.3 秒、180 檔；74 節藍圖 md5 分組只有 3 種內容、62 節同一段樣板；模組 backlog 每模組固定 2 條通用任務（`…/08_IMPLEMENTATION_BACKLOG.md:20-35`）無指令無測試；`packages/<m>/README.md` 空殼；CAP 只有 description 無驗收（`capabilities/catalog.json`）；manifest 13 欄有 obligations；範例 intake 181 答 vs 263 題 → 產生器 fail closed；`.foundry/handoffs/` 空；問卷無 `AW` 節。
+
+**判定**：留選擇引擎與 `make verify`；刪 74 節樣板與重複清單；補每模組一張卡、每專案一個監工台（`supervisor-kit` 共用）、接軌 `products.ts`／`new-product.mjs`、範例自動重生、`Q-DEPLOY-001`。
+
+**[已修改]**：新 `agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md`（實測表、判定、目標產出、六張卡、不做）；客戶怎麼來監工台「另有」列指向它（v19）；TASKS SF 行指向它。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/foundry_generate.py --input $TEMP/sf-audit/input-mini.json --out $TEMP/sf-audit/out-*` | exit=0 | ms=300 → 180 files／173 md／7 modules；blueprint 74 sections → 3 distinct bodies（largest group 62）
+- REALTEST_EVIDENCE: tool=Bash | cmd=同腳本用 `generated/sample-commerce-os/.foundry/intake/answers.json` | exit=1 | ms=1000 → `Q-MKTOPS-007/008, Q-SUBC-005: active question unanswered`（範例 intake 過期）
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 README「73 controlled sections」保證與 V17-1 的衝突已在卡內處理（改為表列數檢查）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`V1_7_HANDOFF_PLAN|supervisor-kit|Q-DEPLOY-001` | hits=只在新檔、data.mjs、TASKS（新名字）
+- ORACLE_WAIVED: 無 source 檔改動
+
+**剩餘風險**：V17-1 改 `EXPECTED_BLUEPRINT_COUNT` 會動到 `make verify` 的既有保證，做時先讀 `validate_artifact_generation.py`。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-18（續8）客戶怎麼來：登記表＝積木目錄，匯出成 System Foundry 一節「AwareWave 積木」（每產品一題，勾了就把 manifest 當模組放進藍圖、依賴自動閉包）；`sync-foundry-catalog.mjs --check` 當閘
 
 **觸發**：操作者「不像是可以組裝的樂高，之後在 System Foundry 應該要可以選擇項目（行銷、客服、社群…）然後組裝上去」。

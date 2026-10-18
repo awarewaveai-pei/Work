@@ -121,7 +121,7 @@ export const OPEN = [
 
 // 要一起改但不是順序步驟的
 export const SIDE = [
-  { what: 'System Foundry 問卷只補一題「裝在客戶自己的主機」；藍圖末節「交付登記」從既有答案推出五種客戶與根組織數；子網域與 WordPress 登入來源由產生器補問', when: '啟動時一併做', step: 1, src: 'TASKS.md:133' },
+  { what: 'System Foundry v1.7：選擇引擎留，產出重做——刪 74 節樣板、每模組一張可執行卡、每個產生的系統自帶監工台（supervisor-kit 共用）、接軌登記表與產生器、範例自動重生、加「裝在客戶自己的主機」一題', when: '啟動時一併做', step: 1, src: 'agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md' },
   { what: 'app.aware-wave.com /ops/products 頁面從 products.ts 與 customer-model.ts 渲染三扇門、三軸與五種客戶', when: '卡片 task_86d6f772', src: '本 session' },
 ];
 
