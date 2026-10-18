@@ -48,19 +48,6 @@ function Row({ label, children, top }: { label: string; children: ReactNode; top
   );
 }
 
-// ── Header status ─────────────────────────────────────────────────────────────
-
-/** One live fact in the header: a coloured dot and plain text. Not a card and not clickable — the
- *  previous status tiles looked like buttons, so the operator read both rows as things to press. */
-function Status({ tone, children }: { tone: "green" | "red" | "gray"; children: ReactNode }) {
-  const color = tone === "green" ? "var(--green)" : tone === "red" ? "var(--red)" : "var(--text-muted)";
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-      <span aria-hidden style={{ width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 }} />
-      {children}
-    </span>
-  );
-}
 
 // ── Area 1: AI 開關 ───────────────────────────────────────────────────────────
 
@@ -413,23 +400,24 @@ export function CustomerServiceTab({ org, cfg }: { org: { slug: string }; cfg: C
 
   return (
     <>
-      {/* Header: what this tab is, and the two live states that change how messages are handled.
-          Plain text on purpose — nothing here is clickable; the tabs below are the only navigation. */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 24, flexWrap: "wrap", marginBottom: 12 }}>
-        <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-          <h2 style={{ fontSize: 14, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>客服</h2>
-          <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6 }}>
-            客人的訊息先比對常見問答（{faqCount} 題，免費）；沒命中的交給 AI，依意圖（{n(intents.length)} 個）決定關閉、草稿或自動回覆；拿不準的一律轉真人。
+      {/* Header: section title and one-line description on the left; the two live states that change
+          how messages are handled on the right, as status tags (the same Tag the cards use). Nothing
+          here is clickable — the tab bar below is the only navigation. */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 24, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ flex: "1 1 360px", minWidth: 0 }}>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: "var(--text-primary)", margin: 0, letterSpacing: "-0.01em" }}>客服</h2>
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.6 }}>
+            客人訊息的處理規則：先比對常見問答，沒命中的由 AI 依意圖分級回覆，拿不準的轉真人。
           </p>
         </div>
-        <div role="status" aria-label="目前狀態" style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", paddingTop: 2 }}>
-          {loadError ? <Status tone="red">設定讀取失敗（{loadError}）</Status>
-            : loading ? <Status tone="gray">讀取中…</Status>
-            : csEnabled ? <Status tone="green">AI 啟用中 · 知識門檻 {threshold}</Status>
-            : <Status tone="red">AI 已停用 · 只回常見問答，其他轉真人</Status>}
+        <div role="status" aria-label="目前狀態" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", paddingTop: 3 }}>
+          {loadError ? <Tag tone="red" dot>設定讀取失敗（{loadError}）</Tag>
+            : loading ? <Tag tone="gray">讀取中…</Tag>
+            : csEnabled ? <><Tag tone="green" dot>AI 啟用中</Tag><span style={{ fontSize: 12, color: "var(--text-muted)" }}>知識門檻 {threshold}</span></>
+            : <Tag tone="red" dot>AI 已停用</Tag>}
           {/* The personal token is optional (the bot token carries the conversation): missing is gray, not red. */}
           {tokenConfigured !== null && (
-            <Status tone={tokenConfigured ? "green" : "gray"}>Chatwoot 個人 token {tokenConfigured ? "已設定" : "未設定"}</Status>
+            <Tag tone={tokenConfigured ? "green" : "gray"} dot>Chatwoot 個人 token {tokenConfigured ? "已設定" : "未設定"}</Tag>
           )}
         </div>
       </div>

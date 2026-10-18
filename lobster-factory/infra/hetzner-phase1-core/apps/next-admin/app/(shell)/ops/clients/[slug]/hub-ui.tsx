@@ -84,29 +84,25 @@ export type SubTab<K extends string> = {
   count?: number | string;
 };
 
-/** Second-level tab bar inside a hub tab. Same visual language as the hub's own tab bar (text + 2px
- *  underline on the active tab, one rule under the row): tabs must read as navigation, not as cards
- *  or buttons, and must not compete with the content below them. */
+/** Second-level tab bar inside a hub tab. Rendered with the app's tab component (`.tab-bar` / `.tab` /
+ *  `.tab--active` in globals.css, tokens `--tab-*` on /tools/theme): hover, active underline and focus
+ *  ring come from there, so every tab bar in the app looks and behaves the same. */
 export function SubTabs<K extends string>({ tabs, active, onChange, label, idPrefix }: {
   tabs: Array<SubTab<K>>; active: K; onChange: (key: K) => void; label: string;
   /** Tabs get id `<prefix>-tab-<key>` and point at panel `<prefix>-panel-<key>`; the caller gives its panels those ids. */
   idPrefix: string;
 }) {
   return (
-    <div role="tablist" aria-label={label} style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border-subtle)", marginBottom: 16, overflowX: "auto" }}>
+    <div className="tab-bar" role="tablist" aria-label={label} style={{ marginBottom: 18 }}>
       {tabs.map((t) => {
         const on = t.key === active;
         return (
-          <button key={t.key} role="tab" id={`${idPrefix}-tab-${t.key}`} aria-controls={`${idPrefix}-panel-${t.key}`}
-            aria-selected={on} onClick={() => onChange(t.key)} style={{
-            padding: "8px 12px", marginBottom: -1, border: "none", background: "transparent", cursor: "pointer", whiteSpace: "nowrap",
-            borderBottom: `2px solid ${on ? "var(--accent)" : "transparent"}`,
-            fontSize: 12, fontWeight: on ? 600 : 500, color: on ? "var(--accent)" : "var(--text-secondary)",
-          }}>
+          <button key={t.key} type="button" role="tab" id={`${idPrefix}-tab-${t.key}`} aria-controls={`${idPrefix}-panel-${t.key}`}
+            aria-selected={on} className={`tab${on ? " tab--active" : ""}`} onClick={() => onChange(t.key)}>
             {t.label}
             {t.count !== undefined && (
               // A real space, so a screen reader says "常見問答 20", not "常見問答20".
-              <>{" "}<span style={{ marginLeft: 2, fontSize: 11, fontWeight: 400, color: on ? "var(--accent)" : "var(--text-muted)" }}>{t.count}</span></>
+              <>{" "}<span className="tab-count">{t.count}</span></>
             )}
           </button>
         );

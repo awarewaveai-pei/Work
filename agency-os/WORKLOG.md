@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-18（續12）客服子分頁改用 app 既有 .tab-bar 元件；去黑框、去捲軸——續3 手刻版被退（「比之前更爛」）
+
+**操作者**（附截圖）：點過的分頁留一圈黑框、右側一組捲軸箭頭、整體像小學生做的。
+**根因**：續3 的 `SubTabs` 是 inline 手刻——沒 focus 樣式（瀏覽器預設深色外框留在點過的分頁上）、`overflowX:auto` + 按鈕 `marginBottom:-1` 溢出生出捲軸、字級／hover 與 app 其他分頁不一致；狀態用自畫圓點＋綠字。**該用而沒用**：`globals.css:2291` 早有 `.tab-bar／.tab／.tab--active`（`--tab-*` token，/tools/theme 在用）。
+**改法**：`hub-ui.tsx` SubTabs 改用 `.tab-bar／.tab／.tab--active`，數量用新 `.tab-count`；`globals.css` `.tab` 補 `:focus-visible` 環與 `:focus:not(:focus-visible){outline:none}`（全 app 的 .tab 一起修）、新 `.tab-count`；`CustomerServiceTab.tsx` 刪自畫 `Status`，右上狀態改用卡片同一套 `Tag`（AI 啟用／停用、個人 token 已設／未設），門檻淡色文字，副標改一句不帶數字；測試斷言 tablist=`tab-bar`、active=`tab tab--active`。
+**驗證**：tsc 0 錯；vitest 6/6；本機 next dev 用滑鼠點分頁後截圖：無黑框、無捲軸、字級同 /tools/theme。
+**避免再發生**：元件先 grep `globals.css` 的 class 與 `/tools/theme` token，不手刻 inline 分頁／狀態。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run …/CustomerServiceTab.render.test.tsx（6 passed）；next dev -p 3001 內建瀏覽器點分頁後截圖 | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 換用既有 .tab class＋Tag，無新邏輯；verify-recent --ack 已記錄
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=tab-count\|function Status | hits=2（hub-ui.tsx 與 globals.css 的新 .tab-count；自畫 Status 0）
+- ORACLE_WAIVED: 樣式換用既有元件，不佔 Codex 額度
 ## 2026-10-18（續11）客戶怎麼來：客服／蒐集器／行銷與 social 同等——子網域第 1 項保留、第 8 項開門；補漏洞第 9 項「客戶自己的網址指到 hosted 產品門（白牌）」＋待決 4（憑證方式）
 
 **觸發**：操作者「客服／蒐集器／行銷不做成子網域嗎？為什麼 social 就要？凡事考慮三軸五對象；這些平台有可能掛在 WordPress 或客戶自己網域」。

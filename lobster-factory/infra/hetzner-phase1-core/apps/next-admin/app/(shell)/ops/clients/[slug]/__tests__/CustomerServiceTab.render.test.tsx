@@ -91,9 +91,12 @@ describe("CustomerServiceTab", () => {
     // Header status is plain text (role=status), not buttons: AI on with its threshold, token set.
     const status = container.querySelector("[role=status]")!;
     expect(status.querySelectorAll("button")).toHaveLength(0);
-    expect(status.textContent).toContain("AI 啟用中 · 知識門檻 0.4");
+    expect(status.textContent).toContain("AI 啟用中");
+    expect(status.textContent).toContain("知識門檻 0.4");
     expect(status.textContent).toContain("Chatwoot 個人 token 已設定");
-    expect(text()).toContain("2 題");
+    // The tab bar is the app's shared tab component, not hand-drawn pills.
+    expect(container.querySelector("[role=tablist]")!.className).toBe("tab-bar");
+    expect(tab("AI 開關").className).toBe("tab tab--active");
     // Tab counts are plain numbers after the label; the only clickable things above the panels are the tabs.
     expect(tab("常見問答").textContent).toBe("常見問答 2");
     expect(tab("意圖與自動化").textContent).toBe("意圖與自動化 3");

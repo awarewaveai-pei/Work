@@ -2314,6 +2314,25 @@ pre {
   color: var(--tab-color-active);
   border-bottom-color: var(--tab-border-active);
 }
+/* Keyboard focus gets a ring in the accent colour; a mouse click leaves no box behind
+   (the browser default is a dark rectangle that reads as a broken border). */
+.tab:focus-visible {
+  outline: 2px solid var(--tab-border-active);
+  outline-offset: -2px;
+}
+.tab:focus:not(:focus-visible) {
+  outline: none;
+}
+/* Item count after a tab label: lighter and smaller than the label, never a pill. */
+.tab-count {
+  margin-left: 2px;
+  font-size: 0.85em;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.tab--active .tab-count {
+  color: var(--tab-color-active);
+}
 
 .designs-tabs {
   display: flex;
