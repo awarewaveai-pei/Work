@@ -10,6 +10,8 @@ import ArticleSource, { type Prefill } from "./ArticleSource";
 import ChannelList from "./ChannelList";
 import { ReviewBar } from "./Review";
 import { ListView, MonthView, stateStyle, WeekView } from "./Calendar";
+import EmptyState from "./EmptyState";
+import Trash, { type Deletions } from "./Trash";
 import { useLists } from "./Lists";
 import Editor from "./Editor";
 import Icon from "./Icon";
@@ -17,9 +19,12 @@ import PlanTabs from "./PlanTabs";
 import { isView, routeHref, socialBase, type Section, type SocialRoute, type View } from "./routes";
 import SectionShell from "./SectionShell";
 import Settings from "./Settings";
-import Toolbar, { type Filters } from "./Toolbar";
+import Toolbar, { noFilters, type Filters } from "./Toolbar";
 import TopBar from "./TopBar";
-import { addDays, cannotWriteNotice, instantAt, mondayOf, monthGridStart, monthStart, ROLE_NAMES, shortDate, STATE_NAMES, zoned, type Account, type Brand, type Post } from "./model";
+import {
+  addDays, addMonths, bestFor, bestKey, bestPlatforms, cannotWriteNotice, instantAt, mondayOf, monthGridStart, monthStart, occurrences, ROLE_NAMES, shortDate,
+  STATE_NAMES, takenSlots, zoned, type Account, type Brand, type CalPost, type Post, type Tag,
+} from "./model";
 import "./social.css";
 
 export type { View } from "./routes";
@@ -66,10 +71,12 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const [articles, setArticles] = useState<WpPost[]>([]);
   const [undatedTruncated, setUndatedTruncated] = useState(false);
   const [trash, setTrash] = useState<Post[]>([]);
+  const [deletions, setDeletions] = useState<Deletions>({});
+  const [tags, setTags] = useState<Tag[]>([]);
   const [media, setMedia] = useState<MediaItem[]>([]);
-  const [filters, setFilters] = useState<Filters>({ platforms: new Set(), states: new Set() });
+  const [filters, setFilters] = useState<Filters>(noFilters);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [best, setBest] = useState(false);
+  const [bestPf, setBestPf] = useState<string | null>(null);
   const [only, setOnly] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
@@ -132,16 +139,19 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
       const start = instantAt(window_.start, "00:00", tz);
       const end = instantAt(addDays(window_.start, window_.days), "00:00", tz);
       const writer = brand.role === "owner" || brand.role === "editor";   // WordPress articles: the content calendar's rule
-      const [p, a] = await Promise.all([api.posts(brand.id, start, end, writer), api.accounts(brand.id)]);
+      // the bin is read with every window: the 已刪除貼文 tab shows it, and a deleted series child keeps its slot taken (occurrences)
+      const [p, a, t] = await Promise.all([api.posts(brand.id, start, end, writer), api.accounts(brand.id), api.trash(brand.id)]);
       setPosts(p.posts);
+      setTags(p.tags ?? []);
       setArticles(p.wordpress ?? []);
       setUndatedTruncated(p.undatedTruncated);
       setAccounts(a.accounts);
-      if (view === "trash") setTrash((await api.trash(brand.id)).posts);
+      setTrash(t.posts);
+      setDeletions(t.deletions ?? {});
     } catch (e) {
       say(e instanceof Error ? e.message : String(e), true);
     }
-  }, [brand, route.kind, window_, tz, view, say]);
+  }, [brand, route.kind, window_, tz, say]);
 
   useEffect(() => { void reload(); }, [reload]);
   useEffect(() => {
@@ -149,7 +159,8 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
     if (route.kind !== "section") api.media(brand.id).then((r) => setMedia(r.media)).catch(() => setMedia([]));
     setChecked(new Set());
     setOnly(new Set());
-    setFilters({ platforms: new Set(), states: new Set() });
+    setFilters(noFilters());
+    setBestPf(null);
     setListId(undefined);
   }, [brand, route.kind]);
 
@@ -173,15 +184,22 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
     else setListId(undefined);
   }, [goTo, openCompose, view, setView]);
 
+  // a series' computed occurrences join the real posts (model.ts occurrences); a deleted-after-published template still makes children
+  const calPosts = useMemo<CalPost[]>(() => {
+    const from = new Date(instantAt(window_.start, "00:00", tz)), until = new Date(instantAt(addDays(window_.start, window_.days), "00:00", tz));
+    const taken = takenSlots(posts, trash), now = new Date();
+    return [...posts, ...[...posts, ...trash].flatMap((t) => occurrences(t, tz, now, from, until, taken))];
+  }, [posts, trash, window_, tz]);
   const platformsOf = (p: Post) => p.targets.map((t) => accounts.find((a) => a.id === t.account_id)?.platform ?? "?");
-  const visible = useMemo(() => posts.filter((p) =>
+  const visible = useMemo(() => calPosts.filter((p) =>
     (!filters.states.size || filters.states.has(p.state))
     && (!filters.platforms.size || platformsOf(p).some((x) => filters.platforms.has(x)) || p.targets.length === 0)
+    && (!filters.tags.size || p.tags.some((t) => filters.tags.has(t.tag_id)))
     && (!only.size || p.targets.some((t) => only.has(t.account_id)))
     && (!query.trim() || `${p.body} ${p.targets.map((t) => t.custom_body ?? "").join(" ")}`.includes(query.trim())),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [posts, filters, only, query, accounts]);
-  const shownArticles = only.size || filters.platforms.size ? [] : articles;
+  ), [calPosts, filters, only, query, accounts]);
+  const shownArticles = only.size || filters.platforms.size || filters.tags.size ? [] : articles;
 
   // The loaded post counts only while it IS the one on the route: the editor remounts on `${id}:${version}`, so a post
   // still loaded from the previous route, under the new id at an equal version, would show (and save) the previous
@@ -217,6 +235,17 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
       const bad = results.filter((r) => !r.ok);
       say(bad.length ? `${results.length - bad.length} 則完成，${bad.length} 則沒有：${bad[0].error}` : action === "delete" ? "已刪除，可在「已刪除貼文」還原。" : "已送審。", bad.length > 0);
       setChecked(new Set());
+      await reload();
+    } catch (e) {
+      say(e instanceof Error ? e.message : String(e), true);
+    }
+  }
+
+  async function removeOne(post: Post) {
+    if (!brand) return;
+    try {
+      await api.setState(brand.id, post.id, post.version, { action: "delete" });
+      say("已刪除，可在「已刪除貼文」還原。");
       await reload();
     } catch (e) {
       say(e instanceof Error ? e.message : String(e), true);
@@ -334,11 +363,26 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
 
   // ---- 貼文排程 ----
   const calendar = view === "week" || view === "month" || view === "list";
-  const step = (n: number) => setAnchor(view === "week" ? addDays(at, 7 * n) : monthStart(addDays(monthStart(at), n * 31)));
+  const step = (n: number) => setAnchor(view === "week" ? addDays(at, 7 * n) : addMonths(at, n));
   const rangeLabel = view === "week" ? `${shortDate(mondayOf(at))} – ${shortDate(addDays(mondayOf(at), 6))}`
     : `${at.slice(0, 4)} 年 ${Number(at.slice(5, 7))} 月${view === "list" ? "前後六週" : ""}`;
   const atToday = view === "week" ? mondayOf(at) === mondayOf(today) : monthStart(at) === monthStart(today);
   const panel = (title: string, body: ReactNode) => <section className="sm-panel"><div className="sm-ptop"><h2>{title}</h2></div>{body}</section>;
+  // only channels that can send: a chip must open a composer that has somewhere to go
+  const bestPlatformKeys = bestPlatforms(accounts.filter((a) => a.status === "connected").map((a) => a.platform));
+  const onBest = (pf: string | null) => { if (pf === null && !bestPf) say("先連接社群帳號，才看得到最佳時間。"); else setBestPf(pf); };
+  const clearAll = () => { setFilters(noFilters()); setOnly(new Set()); setQuery(""); };
+  const nothingYet = !posts.length && !calPosts.length && !shownArticles.length;
+  // S7: the same empty state wherever there is nothing to list -- no posts yet, or none match
+  const empty = nothingYet
+    ? (accounts.some((a) => a.status === "connected")
+      ? <EmptyState icon="calendar" line="這個品牌還沒有貼文" hint="寫好的貼文會照時間排在這裡。" button={canWrite ? "寫第一則貼文" : undefined} onButton={() => openCompose()} />
+      : <EmptyState icon="link" line="還沒連接社群帳號" hint="連好帳號，才能排貼文。" button="到設定連接帳號" onButton={() => setView("settings")} />)
+    : <EmptyState icon="search" line="沒有符合的貼文" hint="換個搜尋字，或清除篩選。" button="清除篩選" onButton={clearAll} />;
+  const shared = {
+    posts: visible, articles: shownArticles, onArticle: (article: WpPost) => select({ kind: "article", article, key: Date.now() }), accounts, media, tags, tz, today, canWrite,
+    onOpen: (id: string) => select({ kind: "post", id }), onCopy: copy, onDelete: removeOne,
+  };
   const toggleOnly = (id: string) => setOnly((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   return (
@@ -352,21 +396,20 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
           <section className="sm-panel sm-cal">
             <Toolbar mode={view as "week" | "month" | "list"} query={query} onQuery={setQuery} rangeLabel={rangeLabel} atToday={atToday}
               onStep={step} onToday={() => setAnchor(null)} onMode={(m) => setView(m)}
-              platforms={[...new Set(accounts.map((a) => a.platform))]} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen}
-              best={best} onBest={() => setBest((b) => !b)} canWrite={canWrite} onCreate={() => openCompose()} />
-            {view === "week" && <WeekView posts={visible} accounts={accounts} tz={tz} today={today} weekStart={mondayOf(at)} selectedId={null}
-              onOpen={(id) => select({ kind: "post", id })} onNew={(date, time) => openCompose(date, time)} onMove={move}
-              articles={shownArticles} onArticle={(article) => select({ kind: "article", article, key: Date.now() })} />}
-            {view === "month" && <MonthView posts={visible} accounts={accounts} tz={tz} today={today} anchor={at} selectedId={null} onOpen={(id) => select({ kind: "post", id })} articles={shownArticles}
-              onPickWeek={(d) => { setAnchor(d); setView("week"); }} />}
-            {view === "list" && <ListView posts={visible} accounts={accounts} tz={tz} today={today} selectedId={null} onOpen={(id) => select({ kind: "post", id })}
-              canWrite={canWrite} showTrash={false} checked={checked} undatedTruncated={undatedTruncated}
-              onCheck={(ids, on) => setChecked((c) => { const n = new Set(c); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; })}
-              onRestore={restore} onCopy={copy} onBulk={bulk} />}
+              platforms={[...new Set(accounts.map((a) => a.platform))]} tags={tags} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen}
+              bestPlatforms={bestPlatformKeys} best={bestPf} onBest={onBest} canWrite={canWrite} onCreate={() => openCompose()}
+              checkedN={checked.size} onBulk={bulk} />
+            {nothingYet ? empty : <>
+              {view === "week" && <WeekView {...shared} weekStart={mondayOf(at)} onNew={(date) => openCompose(date)} onMove={move}
+                bestTimes={bestPf ? (d) => bestFor(bestPf, d) : null}
+                onBestTime={(date, time) => openCompose(date, time, { accounts: accounts.filter((a) => a.status === "connected" && bestKey(a.platform) === bestPf).map((a) => a.id).join(",") })} />}
+              {view === "month" && <MonthView {...shared} anchor={at} onPickWeek={(d) => { setAnchor(d); setView("week"); }} />}
+              {view === "list" && <ListView {...shared} checked={checked} undatedTruncated={undatedTruncated} empty={empty}
+                onCheck={(ids, on) => setChecked((c) => { const n = new Set(c); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; })} />}
+            </>}
           </section>
         </>}
-        {view === "trash" && panel("已刪除貼文", <ListView posts={trash} accounts={accounts} tz={tz} today={today} selectedId={null} onOpen={(id) => select({ kind: "post", id })}
-          canWrite={canWrite} showTrash checked={checked} undatedTruncated={false} onCheck={() => undefined} onRestore={restore} onCopy={copy} onBulk={bulk} />)}
+        {view === "trash" && <Trash posts={trash} deletions={deletions} accounts={accounts} tz={tz} canWrite={canWrite} onRestore={restore} onBack={() => setView("week")} />}
         {view === "library" && panel("貼文素材庫", slots.sideView?.("library", ctx))}
         {view === "lists" && panel("自動發布清單", slots.sideView?.("lists", ctx))}
         {view === "flows" && <SectionShell which="flows" />}

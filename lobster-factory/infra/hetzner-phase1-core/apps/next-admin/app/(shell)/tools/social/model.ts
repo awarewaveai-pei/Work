@@ -2,7 +2,7 @@
 // the platform marks and the state names. No React, no fetch: tested in __tests__/model.test.ts.
 // Dates are "YYYY-MM-DD" strings in the BRAND's time zone (organizations.default_timezone), never the viewer's.
 import type { BrandRole, PostState } from "@/lib/social/state";
-import type { RepeatRule } from "@/lib/social/repeat-rule";
+import { repeatSlots, type RepeatRule } from "@/lib/social/repeat-rule";
 
 export interface Brand { id: string; slug: string; name: string; default_timezone: string; role: "owner" | "editor" | "reviewer" | "client" }
 /** picture / handle: null = not looked up yet, "" = the platform has none (migration 0105) */
@@ -73,6 +73,11 @@ export { addDays, instantAt, weekday, zoned, type ZonedParts } from "@/lib/socia
 
 export const mondayOf = (date: string) => addDays(date, 1 - weekday(date));
 export const monthStart = (date: string) => `${date.slice(0, 7)}-01`;
+/** The 1st of the month n months from `date`'s (n may be negative). */
+export function addMonths(date: string, n: number): string {
+  const m = Number(date.slice(0, 4)) * 12 + Number(date.slice(5, 7)) - 1 + n;
+  return `${Math.floor(m / 12)}-${String((m % 12) + 1).padStart(2, "0")}-01`;
+}
 /** The month grid: six weeks from the Monday on or before the 1st. */
 export const monthGridStart = (date: string) => mondayOf(monthStart(date));
 
@@ -100,3 +105,52 @@ export function targetProblems(post: Post, accounts: Account[]): string[] {
   }
   return out;
 }
+
+// ---- the calendar's computed rows (C22) ---------------------------------------------------------------------------
+
+/** A post as the calendar shows it: a real one, or a computed occurrence of a repeat series (occurrenceOf = its template,
+ *  which is what a click opens). */
+export type CalPost = Post & { occurrenceOf?: string };
+
+/** The states a template makes children in (0105 social_repeat_materialize), and a deleted one that was published: anything else repeats nothing yet. */
+const SERIES_STATES: readonly PostState[] = ["scheduled", "queued", "published", "error"];
+
+/** The times a series will have a child at, in [from, until), that the database has no child for yet (server and page
+ *  share lib/social/repeat-rule.ts repeatSlots). `taken` = `${template id}@${origin_slot ms}` of every child in ANY state,
+ *  deleted ones too: a slot whose child a person moved or deleted is never made again (0105 unique (repeat_of, origin_slot)). */
+export function occurrences(template: Post, tz: string, now: Date, from: Date, until: Date, taken: ReadonlySet<string>): CalPost[] {
+  const makes = SERIES_STATES.includes(template.state) || (template.state === "deleted" && !!template.published_at);   // 0105 header
+  if (!template.repeat || !template.scheduled_at || !makes) return [];
+  const days = Math.max(0, Math.ceil((until.getTime() - now.getTime()) / 86_400_000));
+  return repeatSlots(template.repeat, template.scheduled_at, tz, now, days)
+    .filter((slot) => Date.parse(slot) >= from.getTime() && Date.parse(slot) < until.getTime() && !taken.has(`${template.id}@${Date.parse(slot)}`))
+    .map((slot) => ({
+      ...template, id: `${template.id}@${slot}`, state: "scheduled" as const, scheduled_at: slot, repeat: null, repeat_of: template.id, origin_slot: slot,
+      occurrenceOf: template.id, version: 0,
+    }));
+}
+
+/** `taken` for occurrences(): the children among `posts` and `deleted`. */
+export function takenSlots(...lists: Post[][]): Set<string> {
+  const out = new Set<string>();
+  for (const l of lists) for (const p of l) if (p.repeat_of && p.origin_slot) out.add(`${p.repeat_of}@${Date.parse(p.origin_slot)}`);
+  return out;
+}
+
+/** Best times per platform (SOCIAL_MANAGER_PLAN.md C22; the mock's BEST): reference values until social_metrics_daily
+ *  has enough days to compute a brand's own. */
+const BEST: Record<string, [string, string]> = { bluesky: ["12:00", "20:00"], facebook: ["13:00", "20:00"], instagram: ["11:00", "19:00"], threads: ["09:00", "21:00"], linkedin: ["08:00", "12:00"] };
+const BEST_ALIAS: Record<string, string> = { "instagram-standalone": "instagram", "linkedin-page": "linkedin" };
+export const bestKey = (platform: string) => { const k = BEST_ALIAS[platform] ?? platform; return k in BEST ? k : null; };
+/** The platform keys that have best times among these account platforms, in first-seen order. */
+export const bestPlatforms = (platforms: string[]) => [...new Set(platforms.map(bestKey).filter((k): k is string => !!k))];
+/** A day's best times for a platform; on a weekend the mock offers one, an hour after the first. */
+export function bestFor(platform: string, date: string): string[] {
+  const t = BEST[bestKey(platform) ?? ""];
+  if (!t) return [];
+  if (weekday(date) < 6) return [...t];
+  return [`${String(Number(t[0].slice(0, 2)) + 1).padStart(2, "0")}${t[0].slice(2)}`];
+}
+
+/** A tag's colour key (model Tag.colour) -> the app token (the mock's .tg-a .. .tg-e). */
+export const TAG_TOKEN: Record<Tag["colour"], string> = { a: "--red", b: "--accent", c: "--green", d: "--yellow", e: "--p-li" };

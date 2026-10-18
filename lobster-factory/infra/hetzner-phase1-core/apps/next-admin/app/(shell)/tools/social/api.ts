@@ -1,5 +1,5 @@
 // The page's only way to the server: /api/social/* (C4 routes; lib/social/http.ts says what each status means).
-import type { Account, Brand, Post } from "./model";
+import type { Account, Brand, Post, Tag } from "./model";
 
 export class ApiError extends Error {
   constructor(readonly status: number, message: string, readonly detail?: unknown) {
@@ -65,8 +65,8 @@ export const api = {
   cancelConnect: (brand: string, attempt: string) => call<object>("DELETE", `/api/social/accounts?${q({ brand, attempt })}`),
   unlink: (brand: string, id: string) => call<object>("DELETE", `/api/social/accounts?${q({ brand, id })}`),
   posts: (brand: string, start: string, end: string, wp = false) =>
-    call<{ posts: Post[]; undatedTruncated: boolean; wordpress?: WpPost[] }>("GET", `/api/social/posts?${q({ brand, start, end, ...(wp ? { wp: "1" } : {}) })}`),
-  trash: (brand: string) => call<{ posts: Post[] }>("GET", `/api/social/posts?${q({ brand, trash: "1" })}`),
+    call<{ posts: Post[]; undatedTruncated: boolean; tags: Tag[]; wordpress?: WpPost[] }>("GET", `/api/social/posts?${q({ brand, start, end, ...(wp ? { wp: "1" } : {}) })}`),
+  trash: (brand: string) => call<{ posts: Post[]; deletions: Record<string, { actor: string; from: string | null }> }>("GET", `/api/social/posts?${q({ brand, trash: "1" })}`),
   create: (brand: string, input: PostInput) => call<{ post: SavedRef }>("POST", "/api/social/posts", { brand, ...input }),
   save: (brand: string, id: string, version: number, input: PostInput) => call<{ post: SavedRef }>("PUT", `/api/social/posts/${id}`, { brand, version, ...input }),
   get: (brand: string, id: string) => call<{ post: Post }>("GET", `/api/social/posts/${id}?${q({ brand })}`),

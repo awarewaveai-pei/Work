@@ -1,4 +1,32 @@
 # Worklog
+## 2026-10-18（續4）社群 C22：日曆卡片／疊放、現在線、最佳發布時間、三欄篩選、批次動作選單、已刪除（誰刪的）、月換月、週期展開
+
+**範圍**：SOCIAL_MANAGER_PLAN C22。`Calendar.tsx` 整檔重寫（每天一欄、卡片＝縮圖＋平台標＋時間＋旗標＋標籤＋頻道＋兩行字、左色條＝狀態、頂色條＝第一個標籤、hover 預覽／複製／刪除、過去日斜紋、今天欄頭深色、現在線、未來日「＋ 新增」→ `compose/new?date=`、拖到別天時間不變）；新 `Trash.tsx`／`EmptyState.tsx`；`Toolbar.tsx`（三欄篩選、最佳時間平台 seg、清單頁「批次動作 · N」選單取代表格底部的批次列）；`model.ts` 加 `occurrences`／`takenSlots`／`bestFor`／`addMonths`；`GET /api/social/posts` 回 `tags`，`?trash=1` 回 `deletions`（`store.ts listDeletions` ＝審計紀錄最新一筆 `delete` 的 actor＋from，路由用 `actorForViewer` 過濾）；`LogView ACTION_NAMES` 補 0105 動作名（C20 卡外 ① 結案）。
+
+**根因／取捨**：
+- 月檢視 ‹ 在 3/1 往前會跳過 2 月（舊 `monthStart(addDays(x, n*31))`）→ 改 `addMonths`，有測試。
+- 週期展開：`occurrences` 與伺服器共用 `repeatSlots`；已有子貼文的時段（任何狀態，含已刪除）不再畫（0105 `unique(repeat_of, origin_slot)`），所以日曆每次讀垃圾桶；已發佈後刪掉的模板仍展開（0105 檔頭）。
+- 最佳時段週末只有一個（樣稿 `bestFor`），卡片文字寫「每天 2 個」——照樣稿（規格）。
+- 篩選的標籤在前端過濾（視窗已限 100 天），伺服器只回標籤清單；卡片寫的「`tags` 篩選參數」未做成 query 參數。
+- Codex 審兩輪：①「篩選後沒有符合時週／月沒有空狀態」連報 2 次 → 不採：不變量＝空狀態只取代「沒有東西可畫」的檢視（清單／已刪除表格）；週／月永遠有日期格，樣稿 `renderWeek` 也是留格子。②「只有未連接頻道的平台也列在最佳時間」屬實 → 已修（只用 connected 頻道）。
+
+**未做（要問）**：S8 時區切換——樣稿在頂部有時區鈕（影響日曆＋排程，5 個時區），卡片 C22 沒寫；牽涉撰寫頁（C21）與品牌預設時區是否可被覆寫，等決定。
+
+**[已修改]**：`app/(shell)/tools/social/{Calendar,Toolbar,Trash,EmptyState,Icon,LogView,SocialManager,api,model}.ts(x)`、`social.css`、`__tests__/model.test.ts`；`app/api/social/posts/route.ts`、`lib/social/store.ts`、`app/api/social/__tests__/routes.test.ts`；`tests/e2e/social/{render-views.mjs,social-manager.spec.ts}`。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run "app/(shell)/tools/social" app/api/social lib/social` | exit=0 | ms=2000 → 17 files／115 tests 綠（含 model.test 新 `occurrences`／`bestFor`／`addMonths`、routes.test 刪除者依檢視者過濾）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx playwright test --project social`（dev server 3902）| exit=0 | ms=17800 → 6 passed，含新「勾兩則→批次動作→送審所選→兩則都 review」
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node tests/e2e/social/render-views.mjs <tmp>` | exit=0 | ms=60000 → 01-calendar／05-best／06-filter／07-trash／08-month／x-next-week／x-list 圖已看（`%TEMP%\social-renders-c22c`）
+- `npx tsc --noEmit` 乾淨（改 `.ts/.tsx` 後）。
+- 突變（隱私守衛，一次）：拋棄式 worktree 拿掉 `route.ts` 的 `actorForViewer` → `routes.test.ts` bin 測試紅（`expected {actor:'ops:operator:u-1'…} to deeply equal {actor:'ops'…}`）；worktree 已移除。
+- REVIEW_DONE: critic=Deep (Codex oracle) | verdict=warn→fixed | findings=0c/1m/1n（artifact `agency-os/reports/oracle/2026-10-18-partialreview-e8b9f4de.md`；第一輪 `…402e5428.md`）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/infra/hetzner-phase1-core/tests | grep=showTrash | hits=0（另查 sm-hours／sm-days／x-trash／x-filter／x-month 舊名亦 0）
+- WORKLOG: 本條目
+
+**剩餘風險**：①未部署（next-admin 03:00 自動部署 main；0105／0109 已在正式庫）。②共享檔分手術 commit：`posts/route.ts`、`store.ts`、`routes.test.ts`、`api.ts`、`model.ts` 與 C21 同檔不同 hunk，只提交 C22 的 hunk。③週／月篩選後無結果仍顯示空格（見上）。④時區切換未做。
+
+**Rollback**：`git revert <本 commit>`（無 migration；`posts` 回應多 `tags`／`deletions` 欄位，舊頁忽略它們）。
 ## 2026-10-18（續2）客戶怎麼來：全鏈自審＋Codex 獨立審閱 25 條全修——點數不走權利列、付款收件表與退款／拒付、試用到期、0062 舊 policy、全域到期工作、許可位元組格式、安裝失敗只清本次、SAFETY_GATE 目錄邊界、安裝專屬 registry 憑證、未知 host 404、API key 只綁根帳戶；監工台加「先後與定價」
 
 **觸發**：操作者「再檢查一次計畫和要做的內容和監工台，不能有一點遺漏和瑕疵與缺失，這個系統我是要整套賣人的」。

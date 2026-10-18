@@ -58,17 +58,18 @@ function fakeServer() {
       return ok(route, { list: lists.get(lm[1]), items, upcoming: [] });
     }
     if (path === '/api/social/posts' && req.method() === 'GET') {
-      if (url.searchParams.get('trash') === '1') return ok(route, { posts: [...posts.values()].filter((p) => p.state === 'deleted') });
+      if (url.searchParams.get('trash') === '1') return ok(route, { posts: [...posts.values()].filter((p) => p.state === 'deleted'), deletions: {} });
       const start = Date.parse(url.searchParams.get('start')!), end = Date.parse(url.searchParams.get('end')!);
       // the article sits on the second day of the window, 08:00 site time
       const day = new Date(start + 36 * 3600_000).toISOString().slice(0, 10);
-      return ok(route, { undatedTruncated: false, wordpress: [{ ...ARTICLE, date: `${day}T08:00:00` }], posts: [...posts.values()].filter((p) => p.state !== 'deleted'
+      return ok(route, { undatedTruncated: false, tags: [], wordpress: [{ ...ARTICLE, date: `${day}T08:00:00` }], posts: [...posts.values()].filter((p) => p.state !== 'deleted'
         && (p.scheduled_at === null || (Date.parse(p.scheduled_at) >= start && Date.parse(p.scheduled_at) < end))) });
     }
     if (path === '/api/social/posts' && req.method() === 'POST') {
       const id = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
       const p: Post = { id, state: 'draft', body: '', scheduled_at: null, list_id: null, list_position: null, first_comment: null, link_url: null, link_utm: false,
-        notes: null, source_url: null, published_at: null, deleted_at: null, created_by: 'ops:owner', version: 1, targets: [], media: [] };
+        notes: null, source_url: null, published_at: null, deleted_at: null, created_by: 'ops:owner', version: 1, targets: [], media: [],
+        repeat: null, repeat_of: null, origin_slot: null, auto_mode: 'brand', comments: [], tags: [] };
       write(p, body);
       posts.set(id, p);
       return ok(route, { post: { id, version: 1 } });
@@ -172,13 +173,35 @@ test.describe('social manager', () => {
     // list: tick it, bulk delete; then the bin restores it
     await page.getByRole('button', { name: '貼文清單', exact: true }).click();
     await page.getByLabel('選取').first().check();
-    await page.getByRole('button', { name: '刪除所選' }).click();
+    await page.getByRole('button', { name: /^批次動作/ }).click();
+    await page.getByRole('menuitem', { name: /^刪除所選/ }).click();
     await expect(page.getByRole('status')).toContainText('已刪除');
     expect(server.posts.get(post.id)!.state).toBe('deleted');
     await page.getByRole('button', { name: '已刪除貼文', exact: true }).click();
     await page.getByRole('button', { name: '還原' }).click();
     await expect(page.getByRole('status')).toContainText('已還原');
     expect(server.posts.get(post.id)!.state).toBe('draft');
+  });
+
+  // C22: the list's 批次動作 stays grey until something is ticked; two ticked posts go to review in one go
+  test('C22: tick two posts in the list, 批次動作 -> 送審所選, and both wait for review', async ({ page }) => {
+    const server = await open(page);
+    ['第一則：十一月課程報名', '第二則：親子藝術時光'].forEach((body, i) => {
+      const id = `00000000-0000-4000-8000-00000000009${i}`;
+      server.posts.set(id, { id, state: 'scheduled', body, scheduled_at: `2026-10-15T0${i + 2}:00:00.000Z`, list_id: null, list_position: null, first_comment: null,
+        link_url: null, link_utm: false, notes: null, source_url: null, published_at: null, deleted_at: null, created_by: 'ops:owner', version: 1,
+        targets: [{ id: `${id}-t`, account_id: ACCOUNTS[0].id, custom_body: null, format: 'post', state: 'pending', postiz_post_id: null, release_url: null, error: null }],
+        media: [], repeat: null, repeat_of: null, origin_slot: null, auto_mode: 'brand', comments: [], tags: [] });
+    });
+    await page.reload();
+    await page.getByRole('button', { name: '貼文清單', exact: true }).click();
+    await expect(page.getByRole('button', { name: /^批次動作/ })).toBeDisabled();
+    await page.getByLabel('選取').nth(0).check();
+    await page.getByLabel('選取').nth(1).check();
+    await page.getByRole('button', { name: /^批次動作/ }).click();
+    await page.getByRole('menuitem', { name: '送審所選' }).click();
+    await expect(page.getByRole('status')).toContainText('已送審');
+    expect([...server.posts.values()].map((p) => p.state)).toEqual(['review', 'review']);
   });
 
   test('publishing now asks once more before it sends', async ({ page }) => {

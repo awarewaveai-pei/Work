@@ -17,10 +17,14 @@ export const ACTION_NAMES: Record<string, string> = {
   connect_start: "開始連接帳號", connected: "帳號已連接", connect_cancel: "取消連接", unlink: "移除帳號",
   list_save: "儲存輪播清單", list_delete: "刪除輪播清單", media_upload: "上傳媒體",
   member_add: "加入成員", member_role: "改成員角色", member_remove: "移除成員",
+  // 0105 (V1.5): the repeat series, tags, auto-reply rules, smart links and reports write these
+  repeat_post: "週期貼文排入", repeat_withdraw: "週期貼文撤回", repeat_stop: "停止週期", tag: "標籤", auto_rule: "自動回覆規則", smart_link: "智慧連結", report: "報表",
 };
 
+const OP_NAMES: Record<string, string> = { create: "新增", edit: "改", delete: "刪除", save: "儲存", hit: "觸發" };
+
 // actor = "ops:<role>[:<user id>]" | "client:<org>[:<user id>]" | "system:..." (lib/social/authz.ts actorOf)
-const who = (actor: string) => actor.startsWith("system:") ? "系統" : actor.startsWith("client:") ? "客戶"
+export const who = (actor: string) => actor.startsWith("system:") ? "系統" : actor.startsWith("client:") ? "客戶"
   : actor === "ops" ? "AwareWave 團隊" : actor.startsWith("ops:") ? `團隊・${actor.split(":")[1]}` : actor;
 
 function summary(row: LogRow, tz: string): string {
@@ -32,6 +36,8 @@ function summary(row: LogRow, tz: string): string {
     if (typeof d.from === "string" && typeof d.to === "string") return `${name(d.from)} → ${name(d.to)}`;
     return typeof d.role === "string" ? name(d.role) : "";
   }
+  if (typeof d.op === "string") parts.push(OP_NAMES[d.op] ?? d.op);   // tag / auto_rule / smart_link / report rows
+  if (typeof d.name === "string") parts.push(d.name);
   if (typeof d.from === "string" && typeof d.to === "string") parts.push(`${STATE_NAMES[d.from as PostState] ?? d.from} → ${STATE_NAMES[d.to as PostState] ?? d.to}`);
   if (typeof d.scheduled_at === "string") { const z = zoned(d.scheduled_at, tz); parts.push(`${shortDate(z.date)} ${z.time}`); }
   if (typeof d.reason === "string") parts.push(`理由：${d.reason}`);

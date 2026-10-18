@@ -59,21 +59,30 @@ const day = (d, h, m = 0) => { const x = new Date(now); x.setDate(x.getDate() + 
 const mk = (i, state, at, body, extra = {}) => ({
   id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`, state, body, scheduled_at: at, list_id: null, list_position: null,
   first_comment: null, link_url: null, link_utm: false, notes: null, source_url: null, published_at: state === "published" ? at : null, deleted_at: null,
-  created_by: "ops:owner", version: 1, media: [],
+  created_by: "ops:owner", version: 1, media: [], repeat: null, repeat_of: null, origin_slot: null, auto_mode: "brand", comments: [], tags: [],
   targets: [{ id: `t${i}a`, account_id: ACCOUNTS[0].id, custom_body: null, format: "post", state: state === "published" ? "published" : "pending", postiz_post_id: null, release_url: state === "published" ? "https://bsky.app/x" : null, error: null },
     { id: `t${i}b`, account_id: ACCOUNTS[1].id, custom_body: null, format: "post", state: state === "published" ? "published" : state === "error" ? "error" : "pending", postiz_post_id: null, release_url: null, error: state === "error" ? "Facebook: (#200) permission" : null }],
   ...extra,
 });
+const TAGS = [{ id: "tag-a", name: "活動", colour: "a" }, { id: "tag-b", name: "課程", colour: "b" }, { id: "tag-c", name: "每週一句", colour: "c" }];
+// Taipei's weekday (1 Mon .. 7 Sun) of an instant: the series below repeats weekly on that day
+const taipeiWeekday = (iso) => ((new Date(Date.parse(iso) + 8 * 3600_000).getUTCDay() + 6) % 7) + 1;
 const POSTS = [
   mk(1, "published", day(-2, 10), "本週六的藝術治療體驗課還有 3 個名額，歡迎私訊報名。#藝術治療 #台北"),
   mk(2, "error", day(-1, 9), "新文章上線：藝術治療和畫畫課有什麼不同？全文在部落格。"),
-  mk(3, "scheduled", day(1, 12), "你今天有沒有為自己留一點時間？來畫一張不需要好看的畫。", { media: [{ media_id: "m1", position: 0, alt_text: "水彩" }] }),
+  mk(3, "scheduled", day(1, 12), "你今天有沒有為自己留一點時間？來畫一張不需要好看的畫。", { media: [{ media_id: "m1", position: 0, alt_text: "水彩" }, { media_id: "m2", position: 1, alt_text: null }], tags: [{ tag_id: "tag-b" }] }),
   mk(4, "queued", day(0, 20), "晚安。今天也辛苦了。"),
   mk(5, "review", day(2, 15), "十一月團體課報名開始，早鳥價到 10/31。"),
   mk(6, "draft", null, "（草稿）年底回顧貼文，先放想法。"),
-  mk(7, "scheduled", day(3, 9, 30), "每週一句：創作是一種安靜的勇氣。"),
+  mk(7, "scheduled", day(3, 9, 30), "每週一句：創作是一種安靜的勇氣。", { tags: [{ tag_id: "tag-c" }], repeat: { freq: "week", days: [taipeiWeekday(day(3, 9, 30))], end: "never" } }),
+  mk(9, "scheduled", day(1, 18), "週六親子藝術時光，現在報名還有名額。", { tags: [{ tag_id: "tag-a" }, { tag_id: "tag-b" }], auto_mode: "own" }),
   mk(8, "rotation", null, "常青貼文：什麼是藝術治療？", { list_id: "11111111-0000-4000-8000-000000000001", list_position: 0 }),
 ];
+const TRASHED = [
+  mk(10, "deleted", day(2, 10), "舊的活動預告：十月份體驗課已經額滿。", { deleted_at: day(-1, 15, 20) }),
+  mk(11, "deleted", null, "（草稿）想法太散，先刪掉。", { deleted_at: day(-3, 9, 5) }),
+];
+const DELETIONS = { [TRASHED[0].id]: { actor: "ops:owner:u1", from: "scheduled" }, [TRASHED[1].id]: { actor: "client:soulful", from: "draft" } };
 const LISTS = [{ id: "11111111-0000-4000-8000-000000000001", name: "常青內容", weekdays: [1, 3, 5], send_time: "10:00:00", active: true, cursor: 0, accounts: [{ account_id: ACCOUNTS[0].id }, { account_id: ACCOUNTS[1].id }] }];
 const MEDIA = [
   { id: "m1", kind: "image", file_name: "watercolor-01.jpg", postiz_path: "https://picsum.photos/seed/a/400/300", bytes: 120000, created_at: day(-3, 1), used: 2 },
@@ -91,6 +100,11 @@ async function handle(route) {
   const req = route.request(); const url = new URL(req.url()); const p = url.pathname;
   const ok = (body) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, ...body }) });
   if (p === "/api/social/brands") return ok({ brands: [BRAND, BRAND2] });
+  // C21 composer: the brand's tags and its auto-reply rules (one on, one off)
+  if (p === "/api/social/tags") return ok({ tags: [{ id: "tag-a", name: "活動", colour: "a" }, { id: "tag-b", name: "課程", colour: "b" }, { id: "tag-c", name: "每週一句", colour: "c" }] });
+  if (p === "/api/social/auto-rules") return ok({ rules: url.searchParams.get("post") ? [] : [
+    { id: "r1", post_id: null, name: "報名表", trigger: "comment", keywords: ["報名", "怎麼報"], platforms: ["facebook", "instagram"], action: "both", reply: "謝謝你！報名表在這裡。", active: true, hits: 12 },
+    { id: "r2", post_id: null, name: "上課地點", trigger: "dm", keywords: ["地址"], platforms: ["instagram"], action: "dm", reply: "工作室在台北市大安區。", active: false, hits: 3 }] });
   if (p === "/api/social/accounts") return ok({ accounts: ACCOUNTS, connecting: null, justConnected: null, connectFailed: null });
   if (p === "/api/social/media") return ok({ media: MEDIA });
   if (p === "/api/social/texts") return ok({ texts: [{ id: "x1", body: "#藝術治療 #台北 #自我照顧" }] });
@@ -101,8 +115,8 @@ async function handle(route) {
   if (p === "/api/social/lists" ) return ok({ lists: LISTS });
   if (p.startsWith("/api/social/lists/")) return ok({ list: LISTS[0], items: [POSTS[7]], upcoming: [POSTS[6]] });
   if (p === "/api/social/posts" && req.method() === "GET") {
-    if (url.searchParams.get("trash") === "1") return ok({ posts: [] });
-    return ok({ undatedTruncated: false, wordpress: [ARTICLE], posts: POSTS });
+    if (url.searchParams.get("trash") === "1") return ok({ posts: TRASHED, deletions: DELETIONS });
+    return ok({ undatedTruncated: false, tags: TAGS, wordpress: [ARTICLE], posts: POSTS });
   }
   const m = p.match(/^\/api\/social\/posts\/([^/]+)$/);
   if (m) return ok({ post: POSTS.find((x) => x.id === m[1]) ?? POSTS[0] });
@@ -119,16 +133,24 @@ const shot = async (name) => { await page.waitForTimeout(600); await page.screen
 await page.goto(`http://127.0.0.1:3902/tools/social?brand=${BRAND.id}`, { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "社群發文" }).waitFor();
 await shot("01-calendar");
-await page.getByRole("button", { name: "Soulful Expression Art Therapy 的選單" }).click();
-await shot("x-channel-menu");
-await page.keyboard.press("Escape");
-await page.getByRole("button", { name: "Soulful Expression Art Therapy 的選單" }).click();
+// the next week: every day is ahead, so the best times show on all seven and the posts made for the coming days are there
+await page.getByRole("button", { name: "往後" }).click();
+await shot("x-next-week");
+await page.getByRole("button", { name: /^最佳發布時間/ }).click();
+await shot("05-best");
+await page.getByRole("button", { name: /^最佳發布時間/ }).click();
 await page.getByRole("button", { name: /^篩選/ }).click();
-await shot("x-filter");
+await page.getByLabel("課程").check();
+await shot("06-filter");
+await page.getByRole("button", { name: "清除" }).click();
 await page.getByRole("button", { name: "完成" }).click();
 await page.getByRole("button", { name: "月", exact: true }).click();
-await shot("x-month");
-for (const [tab, name] of [["貼文清單", "x-list"], ["貼文素材庫", "x-library"], ["自動發布清單", "x-lists"], ["已刪除貼文", "x-trash"], ["自動化流程", "x-flows"]]) {
+await shot("08-month");
+await page.getByRole("button", { name: "週", exact: true }).click();
+await page.getByRole("button", { name: "Soulful Expression Art Therapy 的選單" }).click();
+await shot("x-channel-menu");
+await page.getByRole("button", { name: "Soulful Expression Art Therapy 的選單" }).click();   // closes it again
+for (const [tab, name] of [["貼文清單", "x-list"], ["貼文素材庫", "x-library"], ["自動發布清單", "x-lists"], ["已刪除貼文", "07-trash"], ["自動化流程", "x-flows"]]) {
   await page.getByRole("button", { name: tab, exact: true }).click();
   await shot(name);
 }
@@ -139,16 +161,37 @@ await page.getByRole("button", { name: /需處理的事和紀錄/ }).click();
 await shot("x-log-needs");
 await page.getByRole("button", { name: "設定", exact: true }).click();
 await shot("x-settings");
-// the composer's own page: 建立貼文, then an existing post (a scheduled one, the one waiting for review)
+// the composer's own page (C21): 建立貼文 with text, two comments and a tag; ▾ of the main button; 設定發佈時間 (and with
+// 週期性安排); then an existing post (a scheduled one, the one waiting for review)
 await page.getByRole("button", { name: "排程日曆", exact: true }).click();
 await page.getByRole("button", { name: "建立貼文" }).click();
 await page.waitForURL(/\/tools\/social\/compose\/new/);
 await page.getByLabel("貼文內容").waitFor();
-await shot("02-compose-route");
+await page.getByLabel("貼文內容").fill("這週六下午的親子藝術時光還有三個名額。不需要任何繪畫基礎，帶著孩子一起來玩顏色就好。報名方式在留言。");
+await page.getByRole("button", { name: "新增留言" }).last().click();
+await page.getByLabel("第 1 則留言", { exact: true }).fill("報名表在這裡：soulfulexpression.art/sat");
+await page.getByRole("button", { name: "新增留言" }).last().click();
+await page.getByLabel("第 2 則留言", { exact: true }).fill("名額滿了會在這裡說。");
+await page.getByRole("button", { name: "第 2 則什麼時候留" }).click();
+await page.getByRole("button", { name: "這則的自動回覆" }).click();
+await shot("02-compose");
+await page.getByRole("button", { name: "換一種做法" }).click();
+await shot("03-compose-menu");
+await page.getByRole("menuitemradio", { name: /週期性安排/ }).click();
+await page.getByRole("button", { name: /^設定發佈時間/ }).click();
+await shot("x-compose-repeat-picker");
+await page.getByRole("button", { name: "取消" }).click();
+await page.getByRole("button", { name: "換一種做法" }).click();
+await page.getByRole("menuitemradio", { name: /設定行程/ }).click();
+await page.getByRole("button", { name: /^設定發佈時間/ }).click();
+await shot("04-compose-picker");
+await page.getByRole("button", { name: "取消" }).click();
+await page.getByRole("button", { name: /^標籤/ }).click();
+await page.getByLabel("這則加上「活動」").check();
+await shot("x-compose-tags");
 await page.getByRole("button", { name: "回排程日曆" }).click();
 await page.waitForURL(/\/tools\/social\?/);
-await page.getByTitle(/已排程/).first().click();
-await page.waitForURL(/\/compose\/0000/);
+await page.goto(`http://127.0.0.1:3902/tools/social/compose/${POSTS[2].id}?brand=${BRAND.id}`, { waitUntil: "networkidle" });
 await page.getByLabel("貼文內容").waitFor();
 await shot("x-compose-scheduled");
 await page.goto(`http://127.0.0.1:3902/tools/social/compose/00000000-0000-4000-8000-000000000005?brand=${BRAND.id}`, { waitUntil: "networkidle" });

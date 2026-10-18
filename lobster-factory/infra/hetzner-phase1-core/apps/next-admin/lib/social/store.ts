@@ -336,6 +336,20 @@ export async function listTrash(brandId: string): Promise<PostRow[]> {
   return (data ?? []) as unknown as PostRow[];
 }
 
+/** Who put each of these posts in the bin, and from which state: the newest `delete` row of the audit log per post (C22's
+ *  已刪除貼文). Actors are raw; the route filters them per viewer (authz.ts actorForViewer). */
+export async function listDeletions(brandId: string, postIds: string[]): Promise<Record<string, { actor: string; from: string | null }>> {
+  if (!postIds.length) return {};
+  const { data, error } = await db().from("social_audit_log").select("post_id, actor, detail").eq("organization_id", brandId)
+    .eq("action", "delete").in("post_id", postIds).order("id", { ascending: false });
+  if (error) fail(error, "who deleted");
+  const out: Record<string, { actor: string; from: string | null }> = {};
+  for (const r of (data ?? []) as Array<{ post_id: string | null; actor: string; detail: { from?: unknown } | null }>) {
+    if (r.post_id && !(r.post_id in out)) out[r.post_id] = { actor: r.actor, from: typeof r.detail?.from === "string" ? r.detail.from : null };
+  }
+  return out;
+}
+
 // ---- saved texts (C6 editor 常用文字) ------------------------------------------------------------------------------
 
 export async function listTexts(brandId: string): Promise<Array<{ id: string; body: string }>> {

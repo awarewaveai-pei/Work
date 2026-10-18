@@ -1,16 +1,20 @@
 "use client";
-// The left panel's calendar views (mock: #weekView, #monthView, #listView). Times are the brand's (model.ts zoned).
-// Dragging a scheduled / failed / queued post to another slot reschedules it (PUT .../state schedule; a queued one is
-// withdrawn from Postiz first, lib/social/withdraw.ts). Drafts, published and rotation posts do not move.
-import { useMemo, useState, type CSSProperties, type DragEvent, type MouseEvent } from "react";
+// The calendar tab's views (mock v16: #weekView, #monthView, #listView; SOCIAL_MANAGER_PLAN.md C22). Times are the brand's
+// (model.ts zoned). Week = one column per day, cards stacked by time (decision 4); dragging a scheduled / failed / queued
+// card to another day reschedules it at the same time (PUT .../state schedule; a queued one is withdrawn from Postiz first,
+// lib/social/withdraw.ts). Drafts, published, rotation and computed repeat occurrences do not move.
+import { useEffect, useMemo, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import type { PostState } from "@/lib/social/state";
-import { addDays, monthGridStart, platformOf, shortDate, slotTime, STATE_NAMES, STATE_TOKEN, WEEKDAY_NAMES, zoned, type Account, type Post } from "./model";
-import type { WpPost } from "./api";
+import Icon from "./Icon";
+import {
+  addDays, monthGridStart, platformOf, shortDate, STATE_NAMES, STATE_TOKEN, TAG_TOKEN, WEEKDAY_NAMES, zoned,
+  type Account, type CalPost, type Post, type Tag,
+} from "./model";
+import type { MediaItem, WpPost } from "./api";
 
 /** A WordPress article's place on the calendar: its date is already the site's wall clock (wp-calendar.ts). */
-const articleAt = (a: WpPost) => ({ date: a.date.slice(0, 10), time: a.date.slice(11, 16), minutes: Number(a.date.slice(11, 13)) * 60 + Number(a.date.slice(14, 16)) });
+const articleAt = (a: WpPost) => ({ date: a.date.slice(0, 10), time: a.date.slice(11, 16) });
 
-const HOUR_PX = 28;   // --hour in social.css
 const MOVABLE: readonly PostState[] = ["scheduled", "error", "queued"];
 
 export function PfMark({ platform }: { platform: string }) {
@@ -20,80 +24,157 @@ export function PfMark({ platform }: { platform: string }) {
 
 export const stateStyle = (s: PostState) => ({ "--sm-state": `var(${STATE_TOKEN[s]})` }) as CSSProperties;
 
-function platformsOf(post: Post, accounts: Account[]): string[] {
+export function platformsOf(post: Post, accounts: Account[]): string[] {
   return [...new Set(post.targets.map((t) => accounts.find((a) => a.id === t.account_id)?.platform ?? "?"))];
 }
 
-function titleOf(post: Post): string {
+export function titleOf(post: Post): string {
   return post.body.trim() || post.targets.find((t) => t.custom_body?.trim())?.custom_body || "（沒有文字）";
 }
 
-interface ViewProps {
-  posts: Post[];
-  /** C10: the brand's WordPress articles (dashed cards); click = start a post from it */
-  articles?: WpPost[];
-  onArticle?: (a: WpPost) => void;
-  accounts: Account[];
-  tz: string;
-  today: string;
-  selectedId: string | null;
-  onOpen: (id: string) => void;
+/** The brand's wall clock, refreshed every minute: the "現在" line and "today" follow it without a reload. */
+function useClock(tz: string): { date: string; time: string } {
+  const [now, setNow] = useState(() => zoned(new Date(), tz));
+  useEffect(() => {
+    setNow(zoned(new Date(), tz));
+    const t = setInterval(() => setNow(zoned(new Date(), tz)), 60_000);
+    return () => clearInterval(t);
+  }, [tz]);
+  return now;
 }
 
-export function WeekView(props: ViewProps & { weekStart: string; onNew: (date: string, time: string) => void; onMove: (post: Post, date: string, time: string) => void }) {
-  const { posts, accounts, tz, today, selectedId, weekStart } = props;
-  const [over, setOver] = useState<string | null>(null);
-  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart]);
-  const minutesAt = (e: MouseEvent | DragEvent) => {
-    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    return ((e.clientY - r.top) / HOUR_PX) * 60;
-  };
+/** A target on a channel that is gone or not connected: the post cannot go out (published ones already did). */
+const unconnected = (post: Post, accounts: Account[]) => post.state !== "published"
+  && post.targets.some((t) => accounts.find((a) => a.id === t.account_id)?.status !== "connected");
+
+const imagesOf = (post: Post, media: MediaItem[]) => [...post.media].sort((a, b) => a.position - b.position)
+  .map((m) => media.find((x) => x.id === m.media_id)?.postiz_path).filter((u): u is string => !!u);
+
+/** First picture (or the word 文字) with the platform marks on its corner. */
+export function Thumb({ post, accounts, media, size = "card" }: { post: Post; accounts: Account[]; media: MediaItem[]; size?: "card" | "row" }) {
+  const urls = imagesOf(post, media);
+  const n = post.media.length;
   return (
-    <div className="sm-week">
-      <div className="sm-days">
-        <div />
-        {days.map((d, i) => <div key={d} className={d === today ? "sm-today" : ""}>{WEEKDAY_NAMES[i]} {shortDate(d)}</div>)}
-      </div>
-      <div className="sm-grid" ref={(el) => { if (el && !el.dataset.scrolled) { el.scrollTop = HOUR_PX * 8; el.dataset.scrolled = "1"; } }}>
-        <div className="sm-hours">{Array.from({ length: 24 }, (_, h) => <span key={h}>{String(h).padStart(2, "0")}:00</span>)}</div>
-        {days.map((d) => (
-          <div key={d} className={`sm-col${d === today ? " sm-today" : ""}${over === d ? " sm-over" : ""}`} data-date={d}
-            onClick={(e) => props.onNew(d, slotTime(minutesAt(e)))}
-            onDragOver={(e) => { e.preventDefault(); setOver(d); }}
-            onDragLeave={() => setOver(null)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setOver(null);
-              const post = posts.find((p) => p.id === e.dataTransfer.getData("text/plain"));
-              if (post) props.onMove(post, d, slotTime(minutesAt(e)));
-            }}>
-            {(props.articles ?? []).filter((a) => articleAt(a).date === d).map((a) => (
-              <button type="button" key={`${a.siteId}:${a.id}`} className="sm-post sm-article" style={{ top: (articleAt(a).minutes / 60) * HOUR_PX }}
-                onClick={(e) => { e.stopPropagation(); props.onArticle?.(a); }} title={`文章：${a.title}`}>
-                <div className="sm-t"><span>{articleAt(a).time}</span><PfMark platform="wordpress" /></div>
-                <div className="sm-ttl">文章：{a.title}</div>
-              </button>
-            ))}
-            {posts.filter((p) => p.scheduled_at && zoned(p.scheduled_at, tz).date === d).map((p) => {
-              const at = zoned(p.scheduled_at as string, tz);
-              return (
-                <button type="button" key={p.id} className={`sm-post${selectedId === p.id ? " sm-sel" : ""}`} style={{ ...stateStyle(p.state), top: (at.minutes / 60) * HOUR_PX }}
-                  draggable={MOVABLE.includes(p.state)} data-state={p.state}
-                  onDragStart={(e) => e.dataTransfer.setData("text/plain", p.id)}
-                  onClick={(e) => { e.stopPropagation(); props.onOpen(p.id); }}
-                  title={`${STATE_NAMES[p.state]}　${titleOf(p)}`}>
-                  <div className="sm-t"><span>{at.time}</span>{p.state === "error" && <span className="sm-err">⚠</span>}{platformsOf(p, accounts).map((pf) => <PfMark key={pf} platform={pf} />)}</div>
-                  <div className="sm-ttl">{titleOf(p)}</div>
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
+    <div className={`sm-cthumb sm-${size}${n ? "" : " sm-txt"}`}>
+      {urls[0] ? <img src={urls[0]} alt="" loading="lazy" /> : n ? <span className="sm-muted">圖</span> : <span className="sm-muted">文字</span>}
+      {n > 1 && <span className="sm-more">+{n - 1}</span>}
+      <span className="sm-avs">{platformsOf(post, accounts).map((pf) => <PfMark key={pf} platform={pf} />)}</span>
     </div>
   );
 }
 
+interface CardProps {
+  post: CalPost; accounts: Account[]; media: MediaItem[]; tags: Tag[]; tz: string; canWrite: boolean;
+  onOpen: (id: string) => void; onCopy: (post: Post) => void; onDelete: (post: Post) => void;
+}
+
+function Card({ post, accounts, media, tags, tz, canWrite, onOpen, onCopy, onDelete }: CardProps) {
+  const mine = !post.occurrenceOf;
+  const own = post.tags.map((t) => tags.find((x) => x.id === t.tag_id)).filter((t): t is Tag => !!t);
+  const who = [...new Set(post.targets.map((t) => accounts.find((a) => a.id === t.account_id)?.label ?? "已移除的帳號"))].join("、");
+  const open = () => onOpen(post.occurrenceOf ?? post.id);
+  const key = (e: KeyboardEvent) => { if (e.key === "Enter" && e.target === e.currentTarget) open(); };
+  return (
+    <div className="sm-post" role="button" tabIndex={0} style={stateStyle(post.state)} data-state={post.state} data-id={post.id}
+      draggable={mine && MOVABLE.includes(post.state)} onDragStart={(e) => e.dataTransfer.setData("text/plain", post.id)}
+      onClick={(e) => { e.stopPropagation(); open(); }} onKeyDown={key} title={`${STATE_NAMES[post.state]} · ${who}`}>
+      {own[0] && <i className="sm-ctag" style={{ background: `var(${TAG_TOKEN[own[0].colour]})` }} title={`標籤：${own[0].name}`} />}
+      <Thumb post={post} accounts={accounts} media={media} />
+      <div className="sm-cmeta">
+        <span>{post.scheduled_at ? zoned(post.scheduled_at, tz).time : ""}</span>
+        {post.list_id && <span title="來自自動發布清單">↻</span>}
+        {(post.repeat || post.repeat_of) && <span title="週期性安排">🔁</span>}
+        {post.auto_mode === "own" && <span title="這則有自己的自動回覆規則">🤖</span>}
+        {unconnected(post, accounts) && <span className="sm-err" title="有頻道沒連接，這則發不出去">⚠</span>}
+        {own.map((t) => <span key={t.id} style={{ color: `var(${TAG_TOKEN[t.colour]})` }}>#{t.name}</span>)}
+        <span className="sm-ellipsis">{who}</span>
+      </div>
+      <div className="sm-ctext">{titleOf(post)}</div>
+      {mine && (
+        <span className="sm-cacts">
+          <button type="button" title="預覽" aria-label="預覽" onClick={(e) => { e.stopPropagation(); open(); }}><Icon name="eye" /></button>
+          {canWrite && <button type="button" title="複製成新的草稿" aria-label="複製" onClick={(e) => { e.stopPropagation(); onCopy(post); }}><Icon name="copy" /></button>}
+          {canWrite && <button type="button" title={post.state === "published" ? "已發佈的不能從這裡刪" : "刪除（可在已刪除貼文還原）"} aria-label="刪除" disabled={post.state === "published"}
+            onClick={(e) => { e.stopPropagation(); onDelete(post); }}><Icon name="trash" /></button>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+interface ViewProps {
+  posts: CalPost[];
+  /** C10: the brand's WordPress articles (dashed cards); click = start a post from it */
+  articles?: WpPost[];
+  onArticle?: (a: WpPost) => void;
+  accounts: Account[];
+  media: MediaItem[];
+  tags: Tag[];
+  tz: string;
+  today: string;
+  canWrite: boolean;
+  onOpen: (id: string) => void;
+  onCopy: (post: Post) => void;
+  onDelete: (post: Post) => void;
+}
+
+const byTime = (a: CalPost, b: CalPost) => (a.scheduled_at as string).localeCompare(b.scheduled_at as string);
+
+export function WeekView(props: ViewProps & {
+  weekStart: string; onNew: (date: string) => void; onMove: (post: Post, date: string, time: string) => void;
+  /** the chosen platform's best times for a day; null = the best-times mode is off */
+  bestTimes: ((date: string) => string[]) | null; onBestTime: (date: string, time: string) => void;
+}) {
+  const { posts, accounts, tz, canWrite } = props;
+  const clock = useClock(tz);
+  const today = props.today > clock.date ? props.today : clock.date;
+  const [over, setOver] = useState<string | null>(null);
+  const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(props.weekStart, i)), [props.weekStart]);
+  return (
+    <div className="sm-week">
+      {days.map((d, i) => {
+        const ps = posts.filter((p) => p.scheduled_at && zoned(p.scheduled_at, tz).date === d).sort(byTime);
+        const arts = (props.articles ?? []).filter((a) => articleAt(a).date === d);
+        const best = props.bestTimes && d >= today ? props.bestTimes(d) : [];
+        const card = (p: CalPost) => <Card key={p.id} post={p} accounts={accounts} media={props.media} tags={props.tags} tz={tz} canWrite={canWrite}
+          onOpen={props.onOpen} onCopy={props.onCopy} onDelete={props.onDelete} />;
+        const at = d === today ? ps.findIndex((p) => zoned(p.scheduled_at as string, tz).time > clock.time) : -1;
+        const split = at < 0 ? ps.length : at;
+        return (
+          <div key={d} className={`sm-day${d < today ? " sm-past" : ""}${d === today ? " sm-today" : ""}${over === d ? " sm-over" : ""}`} data-date={d}>
+            <div className="sm-dh"><span className="sm-muted">{WEEKDAY_NAMES[i]}</span><b>{Number(d.slice(8))}</b><span className="sm-n">{ps.length ? `${ps.length} 則` : ""}</span></div>
+            <div className="sm-col" data-date={d}
+              onClick={(e) => { if (e.target === e.currentTarget && canWrite && d >= today) props.onNew(d); }}
+              onDragOver={(e) => { e.preventDefault(); setOver(d); }}
+              onDragLeave={() => setOver(null)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setOver(null);
+                const post = posts.find((p) => p.id === e.dataTransfer.getData("text/plain"));
+                if (post?.scheduled_at) props.onMove(post, d, zoned(post.scheduled_at, tz).time);
+              }}>
+              {best.length > 0 && (
+                <div className="sm-best"><Icon name="star" />{best.map((t) => <button type="button" key={t} title={`在 ${t} 寫一則`} onClick={(e) => { e.stopPropagation(); props.onBestTime(d, t); }}>{t}</button>)}</div>
+              )}
+              {arts.map((a) => (
+                <button type="button" key={`${a.siteId}:${a.id}`} className="sm-post sm-article" onClick={(e) => { e.stopPropagation(); props.onArticle?.(a); }} title={`文章：${a.title}`}>
+                  <div className="sm-cmeta"><span>{articleAt(a).time}</span><PfMark platform="wordpress" /><span className="sm-ellipsis">WordPress</span></div>
+                  <div className="sm-ctext">文章：{a.title}</div>
+                </button>
+              ))}
+              {ps.slice(0, split).map(card)}
+              {d === today && <div className="sm-now">現在 {clock.time}</div>}
+              {ps.slice(split).map(card)}
+              {canWrite && d >= today && <button type="button" className="sm-add" onClick={(e) => { e.stopPropagation(); props.onNew(d); }}><Icon name="plus" />新增</button>}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Cells show two posts and 「還有 N 則」; a click opens that week. Changing month is the toolbar's ‹ › (SocialManager step). */
 export function MonthView(props: ViewProps & { anchor: string; onPickWeek: (date: string) => void }) {
   const { posts, tz, today, anchor } = props;
   const start = monthGridStart(anchor);
@@ -104,14 +185,14 @@ export function MonthView(props: ViewProps & { anchor: string; onPickWeek: (date
       <div className="sm-mhead">{WEEKDAY_NAMES.map((n) => <div key={n}>{n}</div>)}</div>
       <div className="sm-mgrid">
         {cells.map((d) => {
-          const ps = posts.filter((p) => p.scheduled_at && zoned(p.scheduled_at, tz).date === d)
-            .sort((a, b) => (a.scheduled_at as string).localeCompare(b.scheduled_at as string));
+          const ps = posts.filter((p) => p.scheduled_at && zoned(p.scheduled_at, tz).date === d).sort(byTime);
+          const arts = (props.articles ?? []).filter((a) => articleAt(a).date === d);
           return (
-            <button type="button" key={d} className={`sm-mday${d === today ? " sm-today" : ""}${d.startsWith(month) ? "" : " sm-out"}`} onClick={() => props.onPickWeek(d)}>
+            <button type="button" key={d} className={`sm-mday${d === today ? " sm-today" : ""}${d.startsWith(month) ? "" : " sm-out"}`} data-date={d} onClick={() => props.onPickWeek(d)}>
               <div className="sm-n">{Number(d.slice(8))}</div>
-              {ps.slice(0, 3).map((p) => <div key={p.id} className="sm-mi" style={stateStyle(p.state)}>{zoned(p.scheduled_at as string, tz).time} {titleOf(p)}</div>)}
-              {ps.length > 3 && <div className="sm-n">還有 {ps.length - 3} 則</div>}
-              {(props.articles ?? []).filter((a) => articleAt(a).date === d).slice(0, 1).map((a) => <div key={a.id} className="sm-mi">文章：{a.title}</div>)}
+              {ps.slice(0, 2).map((p) => <div key={p.id} className="sm-mi" style={stateStyle(p.state)}>{zoned(p.scheduled_at as string, tz).time} {titleOf(p)}</div>)}
+              {ps.length > 2 && <div className="sm-n">還有 {ps.length - 2} 則</div>}
+              {ps.length <= 1 && arts.slice(0, 1).map((a) => <div key={`${a.siteId}:${a.id}`} className="sm-mi">文章：{a.title}</div>)}
             </button>
           );
         })}
@@ -120,49 +201,44 @@ export function MonthView(props: ViewProps & { anchor: string; onPickWeek: (date
   );
 }
 
+/** The list tab: a table (mock #listView); the bulk actions are the toolbar's 批次動作 menu, not a bar under the table. */
 export function ListView(props: ViewProps & {
-  canWrite: boolean; showTrash: boolean; checked: Set<string>; onCheck: (ids: string[], on: boolean) => void;
-  onRestore: (post: Post) => void; onCopy: (post: Post) => void; onBulk: (action: "submit" | "delete") => void; undatedTruncated: boolean;
+  checked: Set<string>; onCheck: (ids: string[], on: boolean) => void; undatedTruncated: boolean;
+  /** shown in place of the rows when none match (SocialManager knows why: nothing yet, or the filters) */
+  empty: ReactNode;
 }) {
-  const { posts, accounts, tz, checked } = props;
+  const { posts, accounts, tz, checked, canWrite } = props;
   const rows = [...posts].sort((a, b) => (a.scheduled_at ?? "9999").localeCompare(b.scheduled_at ?? "9999"));
-  const all = rows.length > 0 && rows.every((p) => checked.has(p.id));
+  const real = rows.filter((p) => !p.occurrenceOf);
+  const all = real.length > 0 && real.every((p) => checked.has(p.id));
+  if (!rows.length) return <div className="sm-list">{props.empty}</div>;
   return (
-    <>
-      <div className="sm-list">
-        <table>
-          <thead><tr>
-            <th>{props.canWrite && !props.showTrash && <input type="checkbox" aria-label="全選" checked={all} onChange={(e) => props.onCheck(rows.map((p) => p.id), e.target.checked)} />}</th>
-            <th>時間</th><th>平台</th><th>內容</th><th>狀態</th><th />
-          </tr></thead>
-          <tbody>
-            {rows.map((p) => (
-              <tr key={p.id}>
-                <td>{props.canWrite && !props.showTrash && <input type="checkbox" aria-label="選取" checked={checked.has(p.id)} onChange={(e) => props.onCheck([p.id], e.target.checked)} />}</td>
-                <td>{p.scheduled_at ? (() => { const z = zoned(p.scheduled_at, tz); return `${shortDate(z.date)} ${z.time}`; })() : p.state === "rotation" ? "輪播" : "未排時間"}</td>
-                <td>{platformsOf(p, accounts).map((pf) => <PfMark key={pf} platform={pf} />)}</td>
-                <td className="sm-wrap">{titleOf(p).slice(0, 120)}</td>
-                <td><span className="sm-pill" style={stateStyle(p.state)}>{STATE_NAMES[p.state]}</span></td>
-                <td>
-                  {p.state === "deleted"
-                    ? props.canWrite && <button type="button" onClick={() => props.onRestore(p)}>還原</button>
-                    : <span className="sm-chips"><button type="button" onClick={() => props.onOpen(p.id)}>打開</button>{props.canWrite && <button type="button" onClick={() => props.onCopy(p)}>複製</button>}</span>}
-                </td>
-              </tr>
-            ))}
-            {rows.length === 0 && <tr><td colSpan={6} className="sm-muted">{props.showTrash ? "垃圾桶是空的。" : "這段時間沒有貼文。"}</td></tr>}
-          </tbody>
-        </table>
-        {props.undatedTruncated && !props.showTrash && <div className="sm-muted" style={{ padding: 8 }}>沒排時間的貼文只列出最新的 500 則。</div>}
-      </div>
-      {props.canWrite && !props.showTrash && (
-        <div className="sm-bulk">
-          <span className="sm-muted">已選 {checked.size} 則</span>
-          <button type="button" disabled={!checked.size} onClick={() => props.onBulk("submit")}>送審所選</button>
-          <button type="button" className="sm-danger" disabled={!checked.size} onClick={() => props.onBulk("delete")}>刪除所選</button>
-          <span className="sm-muted">刪掉的在「已刪除」裡，可以還原。</span>
-        </div>
-      )}
-    </>
+    <div className="sm-list">
+      <table>
+        <thead><tr>
+          <th>{canWrite && <input type="checkbox" aria-label="全選" checked={all} onChange={(e) => props.onCheck(real.map((p) => p.id), e.target.checked)} />}</th>
+          <th /><th>時間</th><th>發到</th><th>內容</th><th>狀態</th><th />
+        </tr></thead>
+        <tbody>
+          {rows.map((p) => (
+            <tr key={p.id}>
+              <td>{canWrite && !p.occurrenceOf && <input type="checkbox" aria-label="選取" checked={checked.has(p.id)} onChange={(e) => props.onCheck([p.id], e.target.checked)} />}</td>
+              <td><Thumb post={p} accounts={accounts} media={props.media} size="row" /></td>
+              <td>{p.scheduled_at ? (() => { const z = zoned(p.scheduled_at, tz); return `${shortDate(z.date)} ${z.time}`; })() : p.state === "rotation" ? "輪播" : "未排時間"}</td>
+              <td><span className="sm-avs">{platformsOf(p, accounts).map((pf) => <PfMark key={pf} platform={pf} />)}</span>{unconnected(p, accounts) && <span className="sm-err" title="有頻道沒連接"> ⚠</span>}</td>
+              <td className="sm-wrap">{titleOf(p).slice(0, 120)}</td>
+              <td><span className="sm-pill" style={stateStyle(p.state)}>{STATE_NAMES[p.state]}</span></td>
+              <td>
+                <span className="sm-chips">
+                  <button type="button" className="sm-ibtn" title="打開" aria-label="打開" onClick={() => props.onOpen(p.occurrenceOf ?? p.id)}><Icon name="eye" /></button>
+                  {canWrite && !p.occurrenceOf && <button type="button" className="sm-ibtn" title="複製成新的草稿" aria-label="複製" onClick={() => props.onCopy(p)}><Icon name="copy" /></button>}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {props.undatedTruncated && <div className="sm-muted" style={{ padding: 8 }}>沒排時間的貼文只列出最新的 500 則。</div>}
+    </div>
   );
 }

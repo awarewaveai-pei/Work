@@ -6,7 +6,7 @@ const store = vi.hoisted(() => ({
   listBrands: vi.fn(), listAccounts: vi.fn(), resolveConnectAttempt: vi.fn(), startConnect: vi.fn(), unlinkAccount: vi.fn(), cancelConnect: vi.fn(),
   listPosts: vi.fn(), getPost: vi.fn(), getPostAt: vi.fn(), savePost: vi.fn(), setState: vi.fn(), accountPlatforms: vi.fn(),
   listLists: vi.fn(), saveList: vi.fn(), deleteList: vi.fn(), listMedia: vi.fn(), addImage: vi.fn(), listLog: vi.fn(), releasePost: vi.fn(),
-  listTrash: vi.fn(), listTexts: vi.fn(), addText: vi.fn(), deleteText: vi.fn(),
+  listTrash: vi.fn(), listDeletions: vi.fn(), listTags: vi.fn(), listTexts: vi.fn(), addText: vi.fn(), deleteText: vi.fn(),
   listMembers: vi.fn(), addMember: vi.fn(), setMemberRole: vi.fn(), removeMember: vi.fn(),
 }));
 const postiz = vi.hoisted(() => ({ listPosts: vi.fn(), deletePost: vi.fn() }));
@@ -50,6 +50,8 @@ beforeEach(async () => {
   store.savePost.mockResolvedValue({ id: P, version: 4 });
   store.setState.mockResolvedValue({ id: P, version: 4 });
   store.accountPlatforms.mockResolvedValue(new Map([[ACC, "bluesky"]]));
+  store.listTags.mockResolvedValue([]);
+  store.listDeletions.mockResolvedValue({});
 });
 
 describe("/api/social routes", () => {
@@ -210,6 +212,10 @@ describe("/api/social routes", () => {
     const bin = await (await posts.GET(req("GET", `/api/social/posts?brand=${A}&trash=1`, { client: A }))).json();
     expect([store.listTrash.mock.calls[0][0], bin.posts[0].state]).toEqual([A, "deleted"]);
     expect(store.listPosts).not.toHaveBeenCalled();
+    // C22: who deleted it; a customer sees "ops", never the staff role or user id (authz.ts actorForViewer)
+    store.listDeletions.mockResolvedValue({ [P]: { actor: "ops:operator:u-1", from: "scheduled" } });
+    expect((await (await posts.GET(req("GET", `/api/social/posts?brand=${A}&trash=1`, { client: A }))).json()).deletions[P]).toEqual({ actor: "ops", from: "scheduled" });
+    expect((await (await posts.GET(req("GET", `/api/social/posts?brand=${A}&trash=1`))).json()).deletions[P].actor).toBe("ops:operator:u-1");
     const texts = await import("../texts/route");
     store.listTexts.mockResolvedValue([{ id: P, body: "hi" }]);
     expect((await texts.GET(req("GET", `/api/social/texts?brand=${A}`, { client: B }))).status).toBe(403);
