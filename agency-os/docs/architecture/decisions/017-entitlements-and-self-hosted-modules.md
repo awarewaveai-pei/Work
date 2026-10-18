@@ -1,7 +1,7 @@
 # ADR 017: 客戶怎麼買 — 線上用「權利」（合約、贈送＋點數），買斷＝一鍵架站到客戶主機、用客戶自己的 API、模組選購
 
 - **狀態**：已接受（操作者 2026-10-14「你決定」：8 題照建議定案，第 3 題是上線前要查的事）
-- **日期**：2026-10-14
+- **日期**：2026-10-14；修訂 2026-10-16（§0 三軸、§3 actor／on_behalf_of、順序 6–7）、2026-10-17（§0b 積木契約、順序 3↔4 對調、Q9–Q10）、2026-10-18（全鏈自審：金鑰託管、會員離開 WordPress、退款、備份）
 - **承接**：[ADR 012](012-shared-platform-layer.md)（產品登記表、共用帳本、簽章許可 `entitlement_ref`）、[ADR 015](015-awarewave-account-and-shared-wallet.md)（一個帳號、一個錢包、WordPress 收費）、[ADR 016](016-social-manager-third-product.md)（社群管理）。
 - **部分取代**（2026-10-14 接受起生效）：
   - HCI [ADR-0031](../../HCI/HCI_AI_LEGO_Blueprint_v2/governance/ADR-0031-ai-lego-usage-metering-attribution.md)：`:33` 不授權「Product/Plan/Feature/Entitlement/Limit engine」→ 由本 ADR 授權。gate 1／2／4（`:39-42`）的許可欄位與簽發條件改照 §3（簽發依據改為 `organization_entitlements`；`subscription_ref` 改為 `entitlement_id`＋`source_ref`）。驗章方式、不得直讀對方資料表不變。HCI `governance/ADR_INDEX.md` 已註記。
@@ -39,7 +39,7 @@
 
 - **業界對照**（照抄的部分，不重新發明）：B 軸＝Stripe Billing 的 Customer→Subscription→Price→Entitlement，許可與價格分離（Stigg、LaunchDarkly 同）；`perpetual`＋`updates_until`＝JetBrains perpetual fallback；授權檔離線驗章＝GitLab self-managed／Atlassian Data Center；C 軸代操＝Shopify collaborator／Meta Business Manager partner／Google Ads 管理員帳戶（代理商員工用自己的帳號進客戶帳戶、用量記客戶、稽核記「誰替誰」、客戶可撤）；`api_key` actor＝OpenAI／Stripe API key（綁計費帳戶與 scope，用量計 credits）。
 - **已定義、還沒賣的值**（不是待補，是等第一個客戶）：`api_key` actor（順序第 6 步）；轉售＝授權檔 `max_tenants > 1`（順序第 7 步）。值存 text，不存 boolean，加值不改 schema。
-- System Foundry 問卷要對齊三軸：已有 CAP-SUBSCRIPTION／CAP-PREPAID-CREDITS／CAP-LICENSE／CAP-MULTI-TENANT／CAP-CUSTOMER-USERS；缺「代操」、缺 `self_hosted` 獨立題、缺 API 通道；藍圖必寫「許可只問 `can()`，不自建帳本」（TASKS 2026-10-16）。
+- System Foundry 問卷已能表達五種方式（都是既有答案的組合：自用＝員工使用要＋收費不要；代操＝員工要＋外部客戶不要＋收費要；訂閱／點數＝外部客戶要＋訂閱／預付點數要；買斷＝License 要）與根組織數（多家公司／分公司／集團／個人自用）；只缺一題「裝在客戶自己的主機」。藍圖末節「交付登記」推出五答案；子網域與 WordPress 登入來源是 AwareWave 實作值，由產生器補問（TASKS 2026-10-17 更正）。
 
 ### 0b. 每個系統同一個模式：積木契約（操作者 2026-10-17「每次開發系統要用同一個模式」「樂高積木」「未來某天不掛 WordPress」）
 
@@ -50,7 +50,7 @@
 3. **自己的資料**：不讀寫別的產品的表（HCI ADR-0002）；要資料走對方的 API 或簽章事件。
 4. **只問一個判斷**：收費動作前 `can(主體, feature_key, actor)`；不自建帳本、不自建方案表。
 5. **外部供應商一律在接頭後面**，接頭的值是設定不是程式：付款 `payments: woo | stripe | local`、會員與登入 `loginSources`（ADR 018 §3）、CRM 事件下游 `crm: fluentcrm | none`、AI `lib/ai/gateway.ts`、主機商 `serverAdapterFactory`。
-6. **離開 WordPress 測試**（可替換性的具體形式）：整套測試以 `payments=local`、`loginSources=[local]`、`crm=none` 跑一遍必須全綠；任何核心邏輯 import WordPress／Woo／Fluent 的符號即紅燈（第 2 步 import-boundary 閘加這一組）。WordPress 是今天的門口與收銀台（ADR 015），不是房子；哪天自建會員與金流，換接頭的值，產品程式不動。
+6. **離開 WordPress 測試**（可替換性的具體形式）：整套測試以 `payments=local`、`loginSources=[local]`、`crm=none` 跑一遍必須全綠；任何核心邏輯 import WordPress／Woo／Fluent 的符號即紅燈（第 2 步 import-boundary 閘加這一組）。WordPress 是今天的門口與收銀台（ADR 015），不是房子；哪天自建會員與金流，換接頭的值，產品程式不動。會員主檔在 Supabase（ADR 005），WordPress 只是登入來源之一：離開時把 `awarewave-wp` 來源的使用者改為 `local`（寄設定密碼信），資料不搬；合約與權利列本來就在控制面，不受影響。
 7. **選配**：`features[]` 與 `plans` 決定一個客戶能用哪些功能；`standalone`＋`dependsOn` 決定買斷能單獨裝哪些積木。
 8. **只有一個入口，兩條路進來**：新系統只從 `scripts/new-product.mjs` 長出來（順序 1）；手寫一列＝閘紅。整套新系統先走 System Foundry（`python scripts/serve_configurator.py` → 答要／不要 → Submit → `generated/<名稱>/`），再 `new-product.mjs --from-foundry generated/<名稱>`：讀 `.foundry/resolution/foundry-plan.json` 與藍圖末節「交付登記」，十項宣告直接填進 `MODULE_MANIFEST.json`（欄位名與 `kernel/06` 相同），只補問子網域與逐項收費功能；小工具直接 `new-product.mjs` 答五題。兩條路同一份登記表、同一個 `can()`、同一個 manifest。
 
@@ -68,18 +68,20 @@
 - `lib/portal/products.ts` 仍是唯一產品清單（012 §5）。每個產品加 `features[]`：`feature_key`、名稱、上限種類（012 §1 QUOTA／RATE_LIMIT／SAFETY_GATE）、能不能買斷。
 - 新表 `plans`：`plan_key`、`product_key`、`kind`（base 基本／addon 加購）、給哪些 `feature_key`、各 QUOTA 上限、`woo_product_ids`。新方案＝加一列。
 - 價格只在 WooCommerce。付款通知帶 Woo 商品 id，控制面用 `plans.woo_product_ids` 查出方案（對應放在 Supabase，ADR 005:16）。
-- **SAFETY_GATE**（例：HCI 持續監測，012:57）不進任何方案，也不能買斷。買斷版的安裝在建置時就排除含 SAFETY_GATE 功能的程式碼，不靠執行時開關（客戶擁有主機，開關改得掉）。登記表機械閘檢查「可買斷的模組沒有任何 SAFETY_GATE 功能」。
+- **SAFETY_GATE**（例：HCI 持續監測，012:57）不進任何方案，也不能買斷。買斷版的安裝在建置時就排除含 SAFETY_GATE 功能的程式碼，不靠執行時開關（客戶擁有主機，開關改得掉）。做法是**目錄邊界**而不是人工清單：SAFETY_GATE 功能的程式只准住在 `lib/safety-gated/**` 與 `app/(shell)/**/safety/**`；`BUYOUT=1` 建置時這兩個目錄被 alias 成空模組，測試從所有入口走 import 圖證明到不了它們，再在 image 內 grep 證明（Codex 2026-10-18 M16）。登記表機械閘檢查「可買斷的模組沒有任何 SAFETY_GATE 功能」。
 
 ### 3. 線上：合約 → 權利 → 許可
 
 - **主體＝計費帳戶**：`coalesce(parent_organization_id, id)`（兩層樹的最上層）。品牌、部門這些子組織用上層的權利，「品牌數」上限算在上層。這是 HCI ADR-0009 租戶模型的 adapter 對應，不改它。
+- **試用從註冊那刻就有到期日**：`0063_portal_complete_signup.sql:76-77` 只寫 `status='trial'`、`current_period_end` 為空（Codex 2026-10-18 M4）；順序 2 改成註冊時寫 `current_period_end = now() + 14 天`、`plan_key = <產品的 trial 方案>`，並照方案展開 trial 權利列；每帳戶每產品只能有一次 trial（唯一索引 `(organization_id, product_key) where status='trial'`＋歷史 trial 列不刪）。
 - **合約＝0062**：一列＝一個（計費帳戶、產品、方案）。加 `plan_key`、`source_ref`（Woo 訂閱編號）。唯一索引改為（organization_id, product_key, plan_key）且非 canceled；每產品最多一個 base（控制面寫入時檢查，它是唯一寫入者）。試用＝base 列的 `trial` 狀態，付款時就地改 `active`、填 `plan_key`，不新增列。加購＝另一列 addon 方案。CHECK 改成包含所有登記表的產品（現在缺 `social`）。
 - **權利＝新表 `organization_entitlements`**：`organization_id`（計費帳戶）、`product_key`、`feature_key`（必填）、`source`（contract／comp）、`source_ref`（合約 id 或贈送原因）、`starts_at`、`ends_at`、`status`、上限。合約變動時控制面重算該帳戶的權利列。贈送整個產品＝照一個具名方案展開成每個功能一列。
-- 點數不變成權利：按次扣點的功能，許可帶「這次最多花多少」（015 §1）。
-- **到期與寬限**：權利列 `ends_at = current_period_end + 7 天`（預設，操作者可改）；每日 job（schedules 表一列 `entitlements-expire`）把過期列改 `expired`，不刪列。**試用結束**無付款同樣過期；資料保留 90 天後標 `erasure_due`，實際刪除走既有擦除流程。
+- 點數不變成權利：功能在登記表宣告 `billing: contract | credits`。`contract` 功能看權利列；`credits` 功能不看權利列，`can()` 查錢包餘額（經帳本 client），餘額 ≥ 該功能最低扣點才 `allowed`，許可帶「這次最多花多少」＝餘額與單次上限取小（015 §1）。沒有權利列也沒有餘額＝拒絕（Codex 2026-10-18 C1）。
+- **到期與寬限**：權利列 `ends_at = current_period_end + 7 天`（預設，操作者可改）；每日全域工作把過期列改 `expired`，不刪列：`client_schedules` 是每客戶一列（`0097:24-25`），不適用；用 Trigger.dev 排程任務 `entitlements-expire` 每日 POST `/api/internal/entitlements/expire`（Bearer `SCHEDULE_INGEST_TOKEN`，與 `schedules-heartbeat` 同法），一次掃全部帳戶（Codex 2026-10-18 M7）。**試用結束**無付款同樣過期；資料保留 90 天後標 `erasure_due`，實際刪除走既有擦除流程。
 - **代操授權**：員工替組織 X 簽許可，只在該員工對 X 有角色（成員列或 `ops_role` owner/admin）時成立，否則 403；`actor` 永遠記員工本人。
-- **金鑰**：許可簽章私鑰 `ENTITLEMENT_SIGNING_KEY`（vault → `mcp/user-env.ps1` → 容器 env）；公鑰清單 `ENTITLEMENT_PUBLIC_KEYS`（`kid:公鑰`，可多把，換鑰時新舊並存一個 `expires_at` 窗）。授權檔私鑰 `LICENCE_SIGNING_KEY` 另一把，同法。
-- **RLS**：`plans`、`organization_entitlements`、0062 只給 `service_role`；`anon`／`authenticated` 無 policy。價格在 Woo，不在這三表。
+- **許可的位元組格式**（JS 簽、Python 驗，必須互通）：`format_version: 1`；payload 用 RFC 8785 JSON Canonicalization（JCS）序列化成 UTF-8 位元組，Ed25519 簽該位元組，簽章 base64url；傳輸＝HTTP header `X-AwareWave-Permit: <base64url(payload)>.<base64url(sig)>`。共用測試向量 `lobster-factory/packages/contracts/fixtures/permit-v1/*.json`（合法、改一 byte、過期、未知 kid、假私鑰），vitest 與 pytest 都跑同一組（Codex 2026-10-18 M11）。
+- **金鑰**：許可簽章私鑰 `ENTITLEMENT_SIGNING_KEY`（vault → `mcp/user-env.ps1` → 容器 env）；公鑰清單 `ENTITLEMENT_PUBLIC_KEYS`（`kid:公鑰`，可多把，換鑰時新舊並存一個 `expires_at` 窗）。授權檔私鑰 `LICENCE_SIGNING_KEY` 另一把，同法。兩把私鑰各留一份離線備份（vault 匯出，不在任何主機上）：遺失＝簽不出新許可與新授權檔，已發的照常驗。許可與授權檔都帶 `format_version`，驗章端拒絕不認識的版本。三張表、錢包帳本、稽核列納入既有每日備份與月度還原演練（B7）；帳本與稽核列永不刪（0066 `ON DELETE RESTRICT` 同法）。
+- **RLS**：`plans`、`organization_entitlements`、0062 只給 `service_role`；`anon`／`authenticated` 無 policy。0062 現有 `org_product_subs_select`（`0062:139-143`，authenticated 可讀自己組織的合約）由順序 2 的 migration 明確 `drop policy`，驗收用 `pg_policies` 查詢證明三表只剩 service_role（Codex 2026-10-18 M5）。客戶要看自己的方案走 `/portal` 的 API，不直讀表。價格在 Woo，不在這三表。
 - **只有控制面碰這三張表**（0062、`plans`、`organization_entitlements`）：靜態檢查只允許 `lib/entitlements/**` 與 `app/portal/**` 引用它們，其他地方出現就建置失敗。社群、collect 跟控制面在同一個 app，用的是繞過 RLS 的 service-role client（0062:51-52），沒有這道檢查就擋不住直讀。
 - **許可**（012 §4 `entitlement_ref` 擴充，取代 ADR-0031 gate 1 欄位）：`tenant`（計費帳戶）、`product_key`、`feature_key`、`entitlement_id`、`source_ref`、上限、可花點數上限、`actor`、`on_behalf_of`（§0 C 軸；`on_behalf_of` 永遠等於 `tenant`，代操時 `actor` 是員工）、`issued_at`、`expires_at`（分鐘級）、`kid`、簽章。只在該功能有 active 權利列時簽發（取代 gate 2 條件）。用量回報帶 `entitlement_id`（取代 gate 4 的 `subscription_ref`）與 `actor`／`on_behalf_of`，點數永遠扣 `on_behalf_of`，稽核永遠記 `actor`。畫面要灰掉沒買的按鈕時，產品要一份簽章的「此帳戶能用的功能與上限」，快取幾分鐘。
 - 認知平台：`check_entitlement` 改收 session 對應的計費帳戶與 `feature_key`、驗許可，不再只看 tenant。
@@ -90,7 +92,7 @@
 - 主體＝計費帳戶（`on_behalf_of`），`actor`＝這次請求是誰（§0 C 軸）；`actor` 只進稽核與用量，不影響 `allowed`。
 - 線上：答案來自許可；`report()` 回報用量給控制面記帳。
 - 買斷：主體＝這台安裝，答案來自授權檔；`max_spend` 空、`report()` 不做事（用客戶自己的 key）。
-- 每個收費的按鈕或 API 呼叫前問一次；產品程式不知道答案來自合約、贈送還是買斷。
+- 每個收費的按鈕或 API 呼叫前問一次；產品程式不知道答案來自合約、贈送還是買斷。收費 API 路由一律用 `withFeature("<feature_key>", handler)` 包起來（順序 3）：它先問 `can()`，同時把「路由→功能」登記進一張程式內的表，順序 6 的 API key scope 檢查就查這張表，不另維護路徑清單（Codex 2026-10-18 M20）。
 
 ### 5. 買斷＝一鍵架站＋選購模組（LEGO）
 
@@ -102,7 +104,7 @@
 - **一份程式**：next-admin 照一個 app 出貨，沒選的模組路由與選單關掉；含 SAFETY_GATE 的程式碼在建置時排除（§2）。
 - **授權檔**：`format_version`、`kid`、`install_id`、客戶、模組、每個 `feature_key` 的上限、`updates_until`、`max_tenants`（預設 1；>1 才是轉售，順序第 7 步）、簽章（Ed25519，同 ADR 007）。安裝內存一組可接受的公鑰，換金鑰時舊授權檔仍可驗。功能沒有到期日；`updates_until` 只管能不能拿新版。
 - **不放遠端關閉開關**：我們的伺服器停了客戶照常能用。授權檔是合約工具，不是防破解。
-- **更新管道**：版本＝簽章的 release（image tag＋migrations＋changelog）放我方 registry；安裝在 `updates_until` 內可拉，過期不擋使用。建置變體 `BUYOUT=1` 把含 SAFETY_GATE 的檔案排除在 image 外，測試在 image 內 grep 證明。
+- **更新管道**：版本＝簽章的 release（image tag＋migrations＋changelog）放我方 registry；每個安裝配一組**只屬於它的** registry 拉取憑證（隨授權檔簽發，到期＝`updates_until`，可單獨撤銷），不用任何 AwareWave 共用憑證，交接撤鑰後仍能拉更新（Codex 2026-10-18 M15）；過期不擋使用。建置變體 `BUYOUT=1` 把含 SAFETY_GATE 的檔案排除在 image 外，測試在 image 內 grep 證明。
 - RATE_LIMIT 照樣在本機執行，因為它保護外部資源（例：Postiz 每小時 30 次、抓取禮貌預算）。
 - Postiz 是 AGPL-3.0：交付未修改的官方映像並附原始碼位置；我們的程式只走它的公開 API（016 §7）。交付前請律師確認。
 
@@ -118,7 +120,7 @@
 |---|---|---|
 | 1 | 功能切多細？ | 先「產品＋幾個加購＋上限」（例：社群＝品牌數、每月貼文數、審核流程）。不要每個按鈕都賣 |
 | 2 | 試用？ | 每個產品 14 天、每個帳戶一次 |
-| 3 | 訂閱怎麼每月扣款？ | WooCommerce 加定期扣款外掛；選哪個、台灣金流能不能定期扣款，在「順序」第 3 步前查定 |
+| 3 | 訂閱怎麼每月扣款？ | WooCommerce 加定期扣款外掛；選哪個、台灣金流能不能定期扣款，在「順序」第 4 步（付款）前查定 |
 | 4 | 買斷含多久更新？ | 含 1 年；之後選購年費繼續拿新版，不續也能一直用目前版本 |
 | 5 | 大改版（例：2.0）買斷客戶有沒有？ | 更新期內有；過期要續 |
 | 6 | 買斷的主機誰管？ | 我們一鍵裝好；選購維運月費（備份、更新、監控）；主機在客戶名下 |
@@ -131,14 +133,14 @@
 
 每步的執行卡（Decision／Files／指令／預期結果／Rollback）在 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-N.md`；監工台 `check.mjs` 要求每步都有卡。
 
-1. `products.ts` 加 `features[]`、`accessChannels`（`ui`；`api` 等順序第 6 步）；登記表機械閘（012 §5）加「收費功能都有登記」「可買斷模組無 SAFETY_GATE」「**反向登記**：`app/(shell)/tools/<x>` 與 `app/<門前綴>` 每個目錄都對得到登記表一列，對不到紅燈；`app/(shell)/ops/*` 是營運後台頁，不是產品，不在登記表」。**現況 13 個 tools 目錄只有 social 有登記列**，本步一次歸位（預設：video、tarot、studio、design＝canvas+designs+mockup+banner+vector-editor、content＝content+publish+events、cs；theme 與 ai-models 列 `STAFF_UTILITIES` 並由測試證明不 import 付費 SDK），表在 `handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md`；**產生器** `scripts/new-product.mjs`（新產品的唯一入口，操作者 2026-10-16「要去哪裡按什麼」）：問 SOP §18 五題，寫登記列、`app/<門前綴>/{layout,page}.tsx` 骨架、`lib/<key>/can-points.ts`（收費點呼叫 `can()` 的範例）、測試；System Foundry 藍圖末節就是這五個答案。之後 `/ops/products` 的「新增產品」表單只是跑同一條命令；`products.test.ts` 改比對全部產品（現在只比 self-signup）。只讀。
+1. `products.ts` 加 `features[]`、`accessChannels`（`ui`；`api` 等順序第 6 步）；登記表機械閘（012 §5）加「收費功能都有登記」「可買斷模組無 SAFETY_GATE」「**反向登記**：`app/(shell)/tools/<x>` 與 `app/<門前綴>` 每個目錄都對得到登記表一列，對不到紅燈；`app/(shell)/ops/*` 是營運後台頁，不是產品，不在登記表」。**現況 13 個 tools 目錄只有 social 有登記列**，本步一次歸位（預設：video、tarot、studio、design＝canvas+designs+mockup+banner+vector-editor、content＝content+publish+events、cs；theme 與 ai-models 列 `STAFF_UTILITIES` 並由測試證明不 import 付費 SDK），表在 `handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md`；**產生器** `scripts/new-product.mjs`（新產品的唯一入口，操作者 2026-10-16「要去哪裡按什麼」）：問 SOP §18 五題，寫登記列、`app/<門前綴>/{layout,page}.tsx` 骨架、`lib/<key>/can-points.ts`（收費點呼叫 `can()` 的範例）、測試；System Foundry 藍圖末節就是這五個答案。之後 `/ops/products` 的「新增產品」表單只是跑同一條命令；`products.test.ts` 改比對全部產品（現在只比 self-signup）。不碰資料庫。
 2. Migration：`plans`、`organization_entitlements`、`organizations.kind`（`internal`／`customer`，預設 customer，Account#0 改 internal）；0062 加 `plan_key`、`source_ref`、改唯一索引、放寬 CHECK（0062 目前 0 筆，不用雙寫期）；三表只給控制面的靜態檢查。控制面發功能級許可（012 §8 第 3 步）。
 3. 各產品收費點接 `can()`；認知平台 `check_entitlement(store, tenant_id, capability_id) -> bool`（`ai_lego/platform/entitlement/check.py:25`）改成 `can()` 的薄接頭：加 `actor`、回傳 grant 物件（allowed／limits／max_spend／report），呼叫端只有 `ai_lego/apps/api/main.py` 9 處，同一 commit 改完；它 docstring 的「Phase 2 換內容不換簽章」由本步取代（讀過 2026-10-16）。HCI 側照 ADR-0031 gate 1–4 的位置落地，欄位改本 ADR §3（`entitlement_id`＋`source_ref`＋`actor`＋`on_behalf_of`）；主體解析照 ADR-0009（portal `organizations` 是 tenant 的 adapter，`external_tenant_id` 對應）。
-   **付費入口唯一閘**（第 2、3 步一起落地，補「沒登記也能收錢」的洞）：付費供應商 SDK（`@anthropic-ai/sdk`、`openai`、`replicate`、fal、google-genai）、錢包帳本 client、三張權利表，只准在 `lib/entitlements/**` 與 `lib/ai/gateway.ts`（進去先問 `can()`）引用；測試掃全部 import，別處出現建置失敗。認知平台同理：`ai_lego/platform/ai_execution/gateway.py` 是唯一 AI 入口，呼叫端必須帶 grant。沒登記的產品拿不到 grant，所以收不了錢、也叫不到付費 AI。
-4. Woo 付款通知 → 合約與權利；帳本泛化（015 §4 第 2 步）。**前置：ADR 015 順序 1（WordPress 一次性碼進入產品門）**，否則付了錢的人進不了門；營運唯讀頁 `/ops/billing`（合約、權利、餘額、帳本）同步做。
+   **付費入口唯一閘**（第 2、3 步一起落地，補「沒登記也能收錢」的洞）：付費供應商 SDK（`@anthropic-ai/sdk`、`openai`、`replicate`、fal、google-genai）與錢包帳本 client 只准在 `lib/entitlements/**` 與 `lib/ai/gateway.ts`（進去先問 `can()`）引用；三張權利表只准在 `lib/entitlements/**` 與 `app/portal/**`（§3）；WordPress／Woo／Fluent 符號只准在各自接頭檔（§0b 第 6 條）。一個測試掃全部 import，別處出現建置失敗。認知平台同理：`ai_lego/platform/ai_execution/gateway.py` 是唯一 AI 入口，呼叫端必須帶 grant。沒登記的產品拿不到 grant，所以收不了錢、也叫不到付費 AI。
+4. Woo 付款通知 → 合約與權利；帳本泛化（015 §4 第 2 步）。**前置：ADR 015 順序 1（WordPress 一次性碼進入產品門）**，否則付了錢的人進不了門；營運唯讀頁 `/ops/billing`（合約、權利、餘額、帳本）同步做。付款事件先落 **收件表** `payment_events(provider, event_id) unique`，再在同一交易裡處理（合約、權利、帳本），重送同一 `event_id` 不做事（Codex 2026-10-18 M8）。事件六種：訂單完成、訂閱續約、訂閱取消、點數包購買、**退款**、**拒付（chargeback）**。退款訂閱＝取消（權利列到期）；退款點數包＝帳本 `refund` 分錄（0066 已有該 `entry_type`），只退未用部分，已用不退（ADR 015）；拒付＝立即把該合約的權利列改 `suspended`、錢包凍結，人工複核後才解（M9）。發票、稅、幣別全在 Woo，控制面不碰。
 5. 買斷安裝階段：模組清單、建置時排除、授權檔簽發、客戶 token 的 adapter、交接撤 key。排在一鍵架站 Stage 4 之後。
 6. API 通道（等第一個只串 API 的客戶）：計費帳戶發 API key（scope＝feature_key 子集），`actor = api_key:<id>`，用量走同一個 `report()`；登記表 `accessChannels` 加 `api`。
-7. 轉售（等第一個轉售客戶）：授權檔 `max_tenants > 1`，安裝內租戶數受它限制；合約與價格另訂。**`max_tenants` 數的是根組織**（`parent_organization_id IS NULL` 的 `organizations` 列，0077）：一家公司、或一個集團含子公司／分公司／部門，都是 1，組織樹是產品本來的功能，不另收；多個不相干的客戶（代理商買去代操）才是 >1，隔離責任在客戶主機，合約寫明（操作者 2026-10-16 定案）。我們替買斷客戶代操不算租戶數，是維運加購（產品決定 Q6）。
+7. 轉售（等第一個轉售客戶）：授權檔 `max_tenants > 1`，安裝內租戶數受它限制；合約與價格另訂。**`max_tenants` 數的是客戶根組織**（`parent_organization_id IS NULL AND kind = 'customer'` 的 `organizations` 列，0077；`internal` 不算，Codex 2026-10-18 M17）：一家公司、或一個集團含子公司／分公司／部門，都是 1，組織樹是產品本來的功能，不另收；多個不相干的客戶（代理商買去代操）才是 >1，隔離責任在客戶主機，合約寫明（操作者 2026-10-16 定案）。我們替買斷客戶代操不算租戶數，是維運加購（產品決定 Q6）。
 
 ## 不採用
 

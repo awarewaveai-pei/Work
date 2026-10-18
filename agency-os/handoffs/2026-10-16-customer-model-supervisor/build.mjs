@@ -5,7 +5,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { META, COPY, RULES, DOORS, AXES, WAYS, NOW, STEPS, OPEN, SIDE } from './data.mjs';
+import { META, COPY, RULES, PRIORITY, PRICING, DOORS, AXES, WAYS, NOW, STEPS, OPEN, SIDE } from './data.mjs';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const t = (s, v = {}) => esc(s).replace(/\{(\w+)\}/g, (_, k) => `<span data-computed>${esc(v[k])}</span>`);
@@ -22,6 +22,7 @@ export function render() {
   const counts = {
     rules: '',
     now: '',
+    priority: '',
     ways: t(COPY.ways.count, { total: WAYS.length, live }),
     steps: t(COPY.steps.count, { done, total: STEPS.length }),
     open: t(COPY.open.count, { n: OPEN.length }),
@@ -56,7 +57,7 @@ export function render() {
   const open = OPEN.map((o) => `<li><div class="n">${o.n}</div><div class="b"><p class="plain">${esc(o.what)}</p><p class="meta"><a href="#s${o.before}" class="who">${t(COPY.open.before, { n: o.before })}</a><span class="who">${esc(COPY.open.src)}：${esc(o.src)}</span></p></div></li>`).join('');
 
   const doors = DOORS.map((d) => `<li><b>${esc(d.name)}</b><span><code>${esc(d.host)}</code><br>${esc(d.who)}：${esc(d.does)}<small>${esc(COPY.doors.login)}：${esc(d.login)}</small></span></li>`).join('');
-  const side = SIDE.map((x) => `<li><b>${esc(L.also)}</b><span>${esc(x.what)}<small>${esc(x.when)}；${esc(x.src)}</small></span></li>`).join('');
+  const side = SIDE.map((x) => `<li><b>${esc(L.also)}</b><span>${esc(x.what)}<small>${x.step ? `<a href="#s${x.step}">${t(L.item, { n: x.step })}</a>` : ''}${esc(x.when)}；${esc(x.src)}</small></span></li>`).join('');
   const P = COPY.paths;
 
   return `<title>${esc(META.title)}</title>
@@ -93,6 +94,8 @@ main{min-width:0;max-width:820px;padding-block:24px 56px;padding-left:24px;paddi
 section{margin-bottom:36px;scroll-margin-top:16px}
 section>h2{font-family:var(--display);font-size:21px;margin:0 0 4px}
 section>.lead{color:var(--muted);margin:0 0 14px;font-size:15px}
+.sub-h{font-size:15px;margin:14px 0 8px;color:var(--muted);font-weight:500}
+ul.yn.rules small a{color:var(--accent)}
 code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border-radius:4px;padding:1px 5px;color:var(--muted)}
 small{display:block;color:var(--muted);font-size:13px;font-weight:400}
 ul.yn{list-style:none;margin:0;padding:0;display:grid;gap:8px}
@@ -157,6 +160,11 @@ ul.doors li span{min-width:0}
 <section id="now"><h2>${esc(COPY.now.h)}</h2><p class="lead">${esc(COPY.now.lead)}</p><ul class="yn">${now}</ul></section>
 
 <section id="ways"><h2>${esc(COPY.ways.h)}</h2><p class="lead">${esc(COPY.ways.lead)}</p><div class="ways">${ways}</div></section>
+
+<section id="priority"><h2>${esc(COPY.priority.h)}</h2><p class="lead">${esc(COPY.priority.lead)}</p>
+<ul class="yn rules">${PRIORITY.map((p) => `<li><b>${esc(p.h)}</b><span>${esc(p.t)}<small>${p.steps.map((d) => `<a href="#s${d}">${t(L.item, { n: d })}</a>`).join('、')}</small></span></li>`).join('')}</ul>
+<h3 class="sub-h">${esc(COPY.priority.pricing)}</h3>
+<ul class="yn rules">${PRICING.map((p) => `<li><b>${esc(p.h)}</b><span>${esc(p.t)}</span></li>`).join('')}</ul></section>
 
 <section id="steps"><h2>${esc(COPY.steps.h)}</h2><p class="lead">${esc(COPY.steps.lead)}</p><ol class="steps">${steps}</ol></section>
 

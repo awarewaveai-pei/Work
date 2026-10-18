@@ -8,11 +8,13 @@
   - `organization_entitlements(id, organization_id, product_key, feature_key, source contract|comp, source_ref, starts_at, ends_at, status, limits jsonb)`，索引 `(organization_id, product_key, feature_key) where status='active'`。
   - `organizations.kind text not null default 'customer' check (kind in ('internal','customer'))`；Account#0 這一列 update 成 `internal`（id 寫在 migration 註解，從 `organizations` 查 slug）。
   - 0062：加 `plan_key`、`source_ref`；CHECK 放寬成登記表全部 key（由測試比對）；唯一索引改 `(organization_id, product_key, plan_key) where status <> 'canceled'`。
-  - 三表 RLS：`service_role` 全權；`anon`／`authenticated` 無任何 policy（控制面是唯一寫者，ADR 017 §3）。
-- `lib/entitlements/`：`tables.ts`（唯一碰三表的 Supabase client 包裝）、`permit.ts`（簽發：`tenant`、`product_key`、`feature_key`、`entitlement_id`、`source_ref`、limits、`max_spend`、`actor`、`on_behalf_of`、`issued_at`、`expires_at`（≤ 10 分鐘）、`kid`、Ed25519 簽章）、`can.ts`（第 4 步接呼叫端，本步先有型別與驗章）。
-- 金鑰：`ENTITLEMENT_SIGNING_KEY`（私鑰，vault → `mcp/user-env.ps1` → 容器 env）與 `ENTITLEMENT_PUBLIC_KEYS`（`kid:公鑰` 清單，可多把，換鑰時新舊並存一個 `expires_at` 窗）。產生：`scripts/secrets-vault.ps1 -Action set -Name ENTITLEMENT_SIGNING_KEY`。
-- 到期：`ends_at = current_period_end + 7 天寬限`（預設，操作者可改）；過期由每日 job（既有 schedules 表加一列 `entitlements-expire`）把 status 改 `expired`，不刪列。
-- 付費入口唯一閘：`lib/entitlements/__tests__/import-boundary.test.ts` 掃 `app/**`、`lib/**` 的 `import`／`require` 字串，命中 `@anthropic-ai/sdk`、`openai`、`replicate`、`@fal-ai`、`@google/genai`、`media_credit_ledger`、`organization_entitlements`、`plans`、`organization_product_subscriptions` 的檔案只准是 `lib/entitlements/**`、`lib/ai/gateway.ts`、`app/portal/**`；命中 WordPress／Woo／Fluent 符號（`wp-bridge`、`woocommerce`、`fluentcrm`）的檔案只准是 `lib/payments/woo.ts`、`lib/auth/sources/awarewave-wp.ts`、`lib/crm/fluentcrm.ts`（離開 WordPress 測試，ADR 017 §0b 第 6 條）；其餘 `lib/entitlements/**`、`lib/ai/gateway.ts`、`app/portal/**`；其餘紅燈。現有 `lib/ai/claude-request.ts` 改名為 `lib/ai/gateway.ts`，其餘呼叫端改 import 它（第 4 步才接 `can()`，本步只收斂入口）。
+  - 三表 RLS：`service_role` 全權；`anon`／`authenticated` 無任何 policy：migration 明確 `drop policy if exists org_product_subs_select on organization_product_subscriptions`（0062:139-143 現在給 authenticated 讀），驗收查 `select policyname, roles from pg_policies where tablename in ('plans','organization_entitlements','organization_product_subscriptions')` → 只有 service_role 列（Codex M5）。
+  - 試用：改 `portal_complete_signup`（0063）寫 `current_period_end = now() + interval '14 days'`、`plan_key = '<product>_trial'`，並展開 trial 權利列；唯一索引 `(organization_id, product_key) where status = 'trial'`（Codex M4）。
+  - **down.sql 守衛**：三表任一非空即 `raise exception 'tables not empty: forward-fix only'`；套 prod 後寫入開始（順序 4）就不再有 rollback，只能前進修（Codex C2）。
+- `lib/entitlements/`：`tables.ts`（唯一碰三表的 Supabase client 包裝）、`permit.ts`（JCS 正規化＋Ed25519＋base64url，header `X-AwareWave-Permit`；共用測試向量 `lobster-factory/packages/contracts/fixtures/permit-v1/`，Python 端同向量，ADR 017 §3；簽發：`tenant`、`product_key`、`feature_key`、`entitlement_id`、`source_ref`、limits、`max_spend`、`actor`、`on_behalf_of`、`issued_at`、`expires_at`（≤ 10 分鐘）、`kid`、Ed25519 簽章）、`can.ts`（第 3 步接呼叫端，本步先有型別與驗章）。
+- 金鑰：`ENTITLEMENT_SIGNING_KEY`（私鑰，vault → `mcp/user-env.ps1` → 容器 env）與 `ENTITLEMENT_PUBLIC_KEYS`（`kid:公鑰` 清單，可多把，換鑰時新舊並存一個 `expires_at` 窗）。產生：`scripts/secrets-vault.ps1 -Action set -Name ENTITLEMENT_SIGNING_KEY`；離線備份一份（vault 匯出到不在主機上的位置），WORKLOG 記「已備份」不記值。許可帶 `format_version: 1`，驗章端拒絕未知版本。
+- 到期：`ends_at = current_period_end + 7 天寬限`（預設，操作者可改）；過期由 Trigger.dev 排程任務 `entitlements-expire`（`lobster-factory/packages/workflows/`，與 `schedules-heartbeat` 同模式）每日 POST `app/api/internal/entitlements/expire/route.ts`（Bearer `SCHEDULE_INGEST_TOKEN`），一次掃全部帳戶把 status 改 `expired`，不刪列；`client_schedules` 是每客戶一列，不用它（Codex M7）。
+- 付費入口唯一閘：`lib/entitlements/__tests__/import-boundary.test.ts` 用三張各自的允許清單（Codex M6），掃 `app/**`、`lib/**` 的 `import`／`require` 字串：命中 `@anthropic-ai/sdk`、`openai`、`replicate`、`@fal-ai`、`@google/genai`、`media_credit_ledger`、`organization_entitlements`、`plans`、`organization_product_subscriptions` 的檔案只准是 `lib/entitlements/**`、`lib/ai/gateway.ts`、`app/portal/**`；命中 WordPress／Woo／Fluent 符號（`wp-bridge`、`woocommerce`、`fluentcrm`）的檔案只准是 `lib/payments/woo.ts`、`lib/auth/sources/awarewave-wp.ts`、`lib/crm/fluentcrm.ts`（離開 WordPress 測試，ADR 017 §0b 第 6 條）；其餘紅燈。現有 `lib/ai/claude-request.ts` 改名為 `lib/ai/gateway.ts`，其餘呼叫端改 import 它（第 3 步才接 `can()`，本步只收斂入口）。
 
 ## Files
 - `lobster-factory/packages/db/migrations/0104_plans_entitlements.sql`、`.down.sql`
@@ -32,7 +34,7 @@ docker run -d --name pg-0104 -e POSTGRES_PASSWORD=x -p 5433:5432 postgres:16 && 
 ```bash
 cd D:/Work/lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx vitest run lib/entitlements lib/portal
 ```
-→ 綠；`permit.test.ts` 含：簽發→驗章 ok；改一個 byte → 拒；`expires_at` 過 → 拒；未知 `kid` → 拒。
+→ 綠；`permit.test.ts` 跑共用向量：合法 → ok；改一個 byte → 拒；`expires_at` 過 → 拒；未知 `kid` → 拒；假私鑰簽的 → 拒。`cd D:/Work/Projects/internal/cognitive-engineering-os && python -m pytest tests/unit/test_permit_vectors.py` 同一組向量綠。
 突變：在 `lib/social/store.ts` 加一行 `import Replicate from "replicate"` → `import-boundary.test.ts` 紅；移除綠。
 ```bash
 cd D:/Work/lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc --noEmit -p .

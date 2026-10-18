@@ -4,7 +4,7 @@
 
 ## Decision
 - `lib/portal/products.ts` 加 `features[]`（`feature_key`、`name`、`limitKind: QUOTA|RATE_LIMIT|SAFETY_GATE`、`buyout: boolean`）與 `accessChannels: readonly ("ui"|"api")[]`。
-- `app/(shell)/tools/` 現有 13 個目錄只有 `social` 有登記列。每個目錄歸位成「產品」或「員工門工具（非產品）」，預設如下，操作者可改：
+- `app/(shell)/tools/` 現有 14 個目錄只有 `social` 有登記列。每個目錄歸位成「產品」或「員工門工具（非產品）」，預設如下，操作者可改：
 
 | 目錄 | 歸位 | 登記 key |
 |---|---|---|
@@ -17,8 +17,9 @@
 | theme、ai-models | 員工門工具，非產品 | 列入 `STAFF_UTILITIES`，各附一句理由，且測試證明它們不 import 付費 SDK |
 
 - `lib/cs/`（客服，`lib/cs/billing.ts` 已引用 `product_key`）登記 key `cs`，`door: { app: "next-admin", page: "/cs", api: ["/api/cs"] }`，subdomain `cs`。
-- 產生器 `scripts/new-product.mjs` 兩種用法：`--from-foundry <generated 專案目錄>`（讀 `.foundry/resolution/foundry-plan.json`、`docs/modules/<module>/00_REQUIREMENTS.md … 08_IMPLEMENTATION_BACKLOG.md` 與藍圖末節「交付登記」，十項宣告填進 manifest，只補問子網域與收費功能；目錄缺 `foundry-plan.json` 即拒絕）或直接問 SOP §18 五題 → 寫登記列、`app/<page>/{layout,page}.tsx` 骨架（複製 `app/social/` 的精簡版面）、`lib/<key>/can-points.ts`（一個呼叫 `can()` 的範例，第 4 步前先 throw「尚未接 can()」）、`lib/portal/__tests__/products.test.ts` 不用改（它讀登記表）。
-- 子網域每個產品都保留（ADR 018 §2）；開不開是 `status`。產生器不問、登記表不收「支援哪幾種方式」：五種全由共用層給（ADR 017 §0「產品不選方式」）；預設 `features[].buyout = true`（SAFETY_GATE 例外）、`modules.dependsOn = []`。測試：登記表型別不得出現 `audience`／`ways`／`channels` 這類欄位名。
+- 產生器 `scripts/new-product.mjs` 兩種用法：`--from-foundry <generated 專案目錄>`（讀 `.foundry/resolution/foundry-plan.json`、`docs/modules/<module>/00_REQUIREMENTS.md … 08_IMPLEMENTATION_BACKLOG.md` 與藍圖末節「交付登記」，十項宣告填進 manifest，只補問子網域與收費功能；目錄缺 `foundry-plan.json` 即拒絕）或直接問 SOP §18 五題 → 寫登記列、`app/<page>/{layout,page}.tsx` 骨架（複製 `app/social/` 的精簡版面）、`lib/<key>/can-points.ts`（一個呼叫 `can()` 的範例，第 3 步前先 throw「尚未接 can()」）、`lib/portal/__tests__/products.test.ts` 不用改（它讀登記表）。
+- `lib/portal/doors.ts` `doorForHost`：未知 host 回 `{ kind: "none" }`，middleware 回 404；員工門只認 `STAFF_HOSTS`（逗號分隔，預設 `app.<base domain>`，開發環境加 `localhost`）；測試：偽造 Host → 404（ADR 018 §1，Codex M19）。
+- 子網域每個產品都保留（ADR 018 §2）；開不開是 `status`。產生器不問、登記表不收「支援哪幾種方式」：五種全由共用層給（ADR 017 §0「產品不選方式」）；預設 `features[].buyout = true`（SAFETY_GATE 例外）、`modules.dependsOn = []`。測試：登記表型別不得出現這些確切欄位名：`audience`、`ways`、`supportedWays`、`channels`（`accessChannels` 允許）。
 - 產生器同時寫 `lib/<key>/MODULE_MANIFEST.json`：System Foundry `kernel/06` 的十項宣告（state／behavior／API 與事件／不變量／依賴／失敗隔離／資料生命週期／可觀測／遷移回滾／替換策略），空欄用 `TODO` 字樣，`products.test.ts` 擋 `TODO` 進 `status: available` 的產品（ADR 017 §0b）。
 
 ## Files
@@ -30,7 +31,7 @@
 
 ## 步驟
 1. `git log --oneline -10 -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/`
-2. 型別與欄位；三個現有產品補 `features: []`、`accessChannels: ["ui"]`。
+2. 型別與欄位（含 `features[].billing: "contract" | "credits"`）；現有三列：social 的 `features` 從 `lib/social/` 實際付費動作盤點（AI 改寫、發文派送…）、cognitive 的 `features` 從 `ai_lego/apps/api/main.py` 9 個 `check_entitlement` 呼叫點的 capability id 盤點、hci 未開工可空；規則：`status: "available"` 的產品 `features` 不得為空（測試擋），`coming_soon` 可空（Codex 2026-10-18 M12）。
 3. 新增 video／tarot／studio／design／content／cs 六列，`status: "coming_soon"`、`selfSignup: false`、`loginSources: ["local"]`、`standalone` 依 ADR 017 §5 模組清單暫填 `false`，`features` 先填每個目錄裡實際呼叫付費 AI 的動作各一條（grep `lib/ai/claude-request.ts`、`replicate` 的呼叫端）。
 4. 測試加三條：`every tool directory under app/(shell)/tools maps to a product page prefix or a listed staff utility`；`every feature declares a limit kind and no buyout module carries SAFETY_GATE`；`staff utilities import no paid SDK`（掃 `app/(shell)/tools/theme/**`、`ai-models/**` 的 import 字串）。
 5. 寫產生器與其測試。
@@ -52,7 +53,7 @@ cd D:/Work && node scripts/new-product.mjs --key demo --name 示範 --subdomain 
 ```bash
 cd D:/Work && node scripts/new-product.mjs --from-foundry agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/generated/sample-commerce-os --key demo2 --subdomain demo2 --features "demo2.run:QUOTA" --app lobster-factory/infra/hetzner-phase1-core/apps/next-admin
 ```
-→ manifest 十項從藍圖填入（非 TODO 的欄 ≥ 6），登記列 `modules.dependsOn` 來自 `foundry-plan.json` 的模組清單；對不存在的目錄 → exit 2 `no foundry-plan.json`；`git checkout -- lib/portal/products.ts && rm -r app/demo lib/demo` 還原。
+→ manifest 十項從藍圖填入（非 TODO 的欄 ≥ 6），登記列 `modules.dependsOn` 來自 `foundry-plan.json` 的模組清單；對不存在的目錄 → exit 2 `no foundry-plan.json`；`git show HEAD:lib/portal/products.ts > lib/portal/products.ts && rm -r app/demo app/demo2 lib/demo lib/demo2` 還原（共享工作目錄不得用 `git checkout --`）。
 突變：手動把 `app/(shell)/tools/tarot` 的登記列刪掉 → `npx vitest run lib/portal` 紅（反向登記）；還原綠。
 
 ## 完成後

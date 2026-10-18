@@ -23,7 +23,7 @@
 | 員工門 | app.aware-wave.com | 操作者和團隊 | 管客戶、管網站、管所有品牌，也能用每個產品（`/tools/<產品>`） | 現有後台帳號，不變 |
 
 - portal.aware-wave.com（現有的註冊與啟動頁）照產品門的規則處理，它的「產品」是啟動頁。V2 由公開門的會員取代註冊時再決定去留。
-- 不認得的網址照員工門處理（現況）。
+- 不認得的網址一律 404（fail closed）：員工門只回應 `STAFF_HOSTS`（預設 app 的網址，本機開發加 localhost）；現況 `doors.ts:34-39` 把未知 host 當員工門，順序 1 改掉（Codex 2026-10-18 M19）。
 
 ### 2. 網址由設定決定：程式裡不寫死網域
 
@@ -59,7 +59,7 @@
 1. 本 ADR、SOP 清單、登記表欄位和測試（2026-10-15）。
 2. ⑥ middleware 帶出使用者 id；`lib/social/authz.ts` 讀成員表。
 3. ⑤ social.aware-wave.com：程式（`doors.ts`、middleware、產品門頁面），再上線（DNS、主機 nginx、lobster-nginx、sg-deploy；High-STOP，要操作者 go）。
-4. V2：WordPress 會員一鍵進入（ADR 015 §2）→ WooCommerce 訂閱開通權限（ADR 017 順序第 3 步）。
+4. V2：WordPress 會員一鍵進入（ADR 015 §2）→ WooCommerce 訂閱開通權限（ADR 017 順序第 4 步）。
 
 ## 不採用
 

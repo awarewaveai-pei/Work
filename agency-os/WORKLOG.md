@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-18（續2）客戶怎麼來：全鏈自審＋Codex 獨立審閱 25 條全修——點數不走權利列、付款收件表與退款／拒付、試用到期、0062 舊 policy、全域到期工作、許可位元組格式、安裝失敗只清本次、SAFETY_GATE 目錄邊界、安裝專屬 registry 憑證、未知 host 404、API key 只綁根帳戶；監工台加「先後與定價」
+
+**觸發**：操作者「再檢查一次計畫和要做的內容和監工台，不能有一點遺漏和瑕疵與缺失，這個系統我是要整套賣人的」。
+
+**做法**：①整檔讀 ADR 017、data.mjs、七張卡，自審抓到 9 處（順序 3↔4 對調後殘留的「第 3 步」引用、SF 段落過時、閘允許清單混寫、卡 2 一句重複、會員離開 WordPress 沒寫、金鑰託管沒寫、退款沒寫、順序 1「只讀」字義、ADR 018 V2 指向舊步號）；②修完後交 Codex 獨立審閱（`agency-os/reports/oracle/2026-10-18-inspect-63f0d161.md`，401 秒，25 條：3C／18M／4m，判定 NOT READY）；③每條程式主張逐一 grep 驗真後全修。
+
+**Codex 主張驗真（file:line）**：0062 `org_product_subs_select` 給 authenticated 讀（`0062_organization_product_subscriptions.sql:139-143`）屬實；註冊只寫 trial 不設 `current_period_end`（`0063_portal_complete_signup.sql:76-77`）屬實；`client_schedules` 每客戶一列（`0097_client_schedules.sql:24-25`）屬實，全域到期工作不能用它；`video-billing/route.ts:11-14` 只驗 Stripe 簽章屬實；`serverAdapterFactory.ts:26` 讀 `HETZNER_STAGING_TOKEN` 環境變數屬實；`doors.ts:34-39` 未知 host 當員工門屬實；`app/(shell)/tools/` 14 個目錄（卡片寫 13）屬實；0066 `entry_type` 已有 `refund`（`:21`）屬實；`check.py:29-30` 只看 tenant active（不是「永遠 grant」）屬實。
+
+**[已修改]**
+- ADR 017：§3 加「功能 `billing: contract|credits`，credits 功能 `can()` 查錢包不查權利列」（C1）、試用註冊即設到期與 trial 權利列＋每帳戶一次（M4）、drop 0062 舊 policy 並以 `pg_policies` 驗收（M5）、到期改 Trigger.dev 全域任務打 `/api/internal/entitlements/expire`（M7）、許可位元組格式 JCS＋Ed25519＋base64url＋header＋共用測試向量（M11）；順序 4 加收件表 `payment_events(provider,event_id)`、六種事件含退款與拒付及其處置（M8、M9）；§4 `withFeature()` 路由包裝＝路由→功能表（M20）；§5 安裝專屬 registry 憑證（M15）、SAFETY_GATE 目錄邊界＋import 圖測試（M16）；順序 7 `max_tenants` 只數 `kind='customer'` 根組織（M17）；日期列加三次修訂。
+- ADR 018：未知 host 一律 404、員工門只認 `STAFF_HOSTS`（M19）；V2 指向改第 4 步。
+- 卡 1：14 個目錄；現有產品 features 盤點規則、`available` 不得空（M12）；禁用欄位改確切名單（m24）；`doorForHost` fail closed；還原指令改 `git show HEAD:`（共享工作目錄禁 `git checkout --`）。卡 2：RLS drop＋驗收查詢、試用、down.sql 非空守衛（C2）、三張允許清單（M6）、JCS 向量與 pytest。卡 3：credits 分支與測試、`withFeature`。卡 4：Woo 原生 `X-WC-Webhook-Signature`（M10）、收件表、六事件、七條測試、rollback 改前進修。卡 5：密鑰句柄＋禁環境回落（M14）、compose／nginx／DNS 同源產生與 curl 驗收（M13）、目錄邊界建置、registry 憑證、失敗只清 `-p <install_id>`（C3）、max_tenants 驗收移到卡 7（M18）。卡 6：`billing_account_id` 根帳戶 CHECK（M21）、scope 查路由表。卡 7：客戶根組織、三條測試。
+- 監工台 `data.mjs`／`build.mjs`／`check.mjs`：新段「先後與定價」（PRIORITY 四段恰好涵蓋七步一次、PRICING 四條，閘驗）；步驟 3／4／5 閘文字更新；NOW 第 4 列改寫（m22）；SIDE 第 1 列改「只補一題」；刪未渲染的 LOG；手打步號改由資料渲染。v14 重發同 URL。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node build.mjs && node check.mjs` | exit=0 | ms=500 → `ok: 5 ways, 7 steps, 3 open, page fresh`（新規則：PRIORITY 恰好涵蓋每步、PRICING ≥4、ADR 有 Q9／Q10；中途兩次 exit=1 抓到手打「第 N 項」，改成由資料渲染）
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node scripts/verify-governance-pointers.mjs` | exit=0 | ms=9000 → PASSED 154
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/codex-oracle.ps1 -Mode inspect -PromptFile review_prompt.txt` | exit=0 | ms=401663 → 25 findings，artifact `2026-10-18-inspect-63f0d161.md`
+- REVIEW_DONE: critic=Deep | verdict=fail→fixed | findings=3c/18m/4n -- Codex 25 條逐條 grep 驗真後全修；自審另 9 處
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`順序第 3 步|順序 3 步|payment_events|withFeature|STAFF_HOSTS|billing_account_id` | hits=舊步號引用只剩 ADR 018:62 已改；新名字只在 ADR 017 與卡片（無舊呼叫端）
+- ORACLE_WAIVED: 本輪無 source 檔改動（Codex 審的是計畫文件；程式仍 0 行）
+
+**剩餘風險**：Codex 判 NOT READY 是對修前版本；修後未再送第二輪（操作者規則：不做無效益重跑），下一輪在第 1 項開工前以 `/codex-review` 審程式本身。其他 session 同時在改 `app/(shell)/tools/social/*`、`lib/social/store.ts`、`app/api/social/*`（048a6194、044ad624），本條目未碰、未提交那些檔。
+
+**rollback**：`git revert <本 commit>`；全為文件與監工台。
 ## 2026-10-18（續1）TASKS 打勾：EU／SG 搬遷 14 項＋staging 孤兒（操作者確認）
 
 **範圍**：`agency-os/TASKS.md` 15 個 `- [ ]` → `- [x]`。AO-RESUME 發現這批看起來早已做完卻沒打勾（AGENTS.md §0 舊主機已退租、只剩 ks-aw-01）。
