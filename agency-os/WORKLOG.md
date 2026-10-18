@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-18（續7）客戶怎麼來：新增順序 8「每個產品長成單一產品的樣子」——登記列只給名字，第 8 項給樣子（共用元件、產品門路由、開場即可用、manifest 無 TODO、available 由測試擋）；排在優先段②
+
+**觸發**：操作者「就是我認為他們還沒有展現單一產品的樣貌」。客服、蒐集器、行銷今天是後台裡的一頁，不是一個產品。
+
+**[已修改]**：ADR 017 順序加第 8 條、Q10 優先段②加入順序 8；新卡 `cards/step-8.md`（每產品五條規則、每產品各跑一次的驗收、門上線 High、不搬資料表）；監工台 `data.mjs` STEPS 加第 8 項、PRIORITY ② 改 [4, 8]（閘：ADR 順序 8 條＝監工台 8 步；PRIORITY 恰好涵蓋每步一次）；v17 重發。
+
+**驗證結果**
+- REALTEST_WAIVED: DOC_ONLY -- `node build.mjs && node check.mjs` ok（8 steps）；`verify-governance-pointers` PASSED
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回卡 8 與 ADR 018 §2「產品門精簡版面、元件與員工門共用」一致
+- BUGHUNT_DONE: scope=agency-os | grep=`順序 8|step-8|PRODUCTS_DONE` | hits=ADR 017、卡 8、data.mjs（新名字）
+- ORACLE_WAIVED: 無 source 檔改動
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-18（續6）客戶怎麼來：產品看功能不看路徑——客服（ops/cs＋cs-widget＋knowledge）、蒐集器（ops/collect）、行銷（outreach）住在 /ops 下也是產品：先補登記列、保留子網域、不搬家；開產品門＝固定三步
 
 **觸發**：操作者「客服、行銷、蒐尋器和有些工具目前都不是用子網域，之後要怎麼處理？」

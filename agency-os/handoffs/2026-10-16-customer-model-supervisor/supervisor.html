@@ -88,7 +88,7 @@ ul.doors li span{min-width:0}
   <h1>客戶怎麼來 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-18</span></p>
   <div class="bar" data-computed><i class="d" style="width:0%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>0</span>／<span data-computed>7</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>3</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>0</span>／<span data-computed>8</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>3</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">說明客戶來源、付款方、操作人，以及系統尚缺的項目。</p>
@@ -120,7 +120,7 @@ ul.doors li span{min-width:0}
     <p class="note">＋updates_until；客戶已有網站就接入（§6）；購買維運時採 staff</p></article></div></section>
 
 <section id="priority"><h2>先後與定價</h2><p class="lead">依你 2026-10-17 的決定排序；賣斷的收費結構是預設值，數字可改。</p>
-<ul class="yn rules"><li><b>① 先服務自己的客戶</b><span>代操也要算得出每位客戶用了多少。<small><a href="#s1">第 <span data-computed>1</span> 項</a>、<a href="#s2">第 <span data-computed>2</span> 項</a>、<a href="#s3">第 <span data-computed>3</span> 項</a></small></span></li><li><b>② 訂閱與點數</b><span>客戶在 aware-wave.com（WordPress）付款後自動開通。<small><a href="#s4">第 <span data-computed>4</span> 項</a></small></span></li><li><b>③ 賣斷給一般公司</b><span>一鍵安裝到客戶主機，交接後收回存取權。<small><a href="#s5">第 <span data-computed>5</span> 項</a></small></span></li><li><b>④ 等第一個客戶出現再做</b><span>只串 API 的客戶，與代理商用一套服務多家客戶；各自獨立，不卡前面三段。<small><a href="#s6">第 <span data-computed>6</span> 項</a>、<a href="#s7">第 <span data-computed>7</span> 項</a></small></span></li></ul>
+<ul class="yn rules"><li><b>① 先服務自己的客戶</b><span>代操也要算得出每位客戶用了多少。<small><a href="#s1">第 <span data-computed>1</span> 項</a>、<a href="#s2">第 <span data-computed>2</span> 項</a>、<a href="#s3">第 <span data-computed>3</span> 項</a></small></span></li><li><b>② 訂閱與點數，產品要有樣子</b><span>客戶在 aware-wave.com（WordPress）付款後自動開通；每個產品有自己的門與版面，打開就能用。<small><a href="#s4">第 <span data-computed>4</span> 項</a>、<a href="#s8">第 <span data-computed>8</span> 項</a></small></span></li><li><b>③ 賣斷給一般公司</b><span>一鍵安裝到客戶主機，交接後收回存取權。<small><a href="#s5">第 <span data-computed>5</span> 項</a></small></span></li><li><b>④ 等第一個客戶出現再做</b><span>只串 API 的客戶，與代理商用一套服務多家客戶；各自獨立，不卡前面三段。<small><a href="#s6">第 <span data-computed>6</span> 項</a>、<a href="#s7">第 <span data-computed>7</span> 項</a></small></span></li></ul>
 <h3 class="sub-h">賣斷怎麼收錢</h3>
 <ul class="yn rules"><li><b>買斷價</b><span>等於 36 個月訂閱價，含 12 個月更新。</span></li><li><b>更新年費</b><span>買斷價的 20%，選購；不續約仍可使用最後一版，永不鎖。</span></li><li><b>維運月費</b><span>分級選購：備份、監控、更新套用、支援回應時間；含一把維運用的金鑰。</span></li><li><b>AI 與平台 API</b><span>客戶用自己的金鑰自付。</span></li></ul></section>
 
@@ -213,6 +213,19 @@ ul.doors li span{min-width:0}
         <p><b>前置：</b>第 <span data-computed>5</span> 項</p>
         <p><b>檔案：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/（授權檔格式，順序 5 建）</code></p>
         <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-7.md</code></p>
+        
+      </details>
+    </div></li><li class="step todo" id="s8">
+    <div class="n">8</div>
+    <div class="b">
+      <p class="plain">每個產品都有自己的門與版面，一打開就是可用的樣子：產品名、功能清單、示範資料；不再只是後台裡的一頁。</p>
+      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium（每個門上線 High）</span><span class="who">負責：Fable 5.1 定規則 → Opus 5.5 逐產品做</span></p>
+      <p class="donewhen"><b>完成條件：</b>測試：available 的產品必有門頁、完整 manifest、至少一個功能；本機以 &lt;subdomain&gt;.localhost 開門看到產品版面；上線後 playwright smoke 綠</p>
+      <details><summary>工程細節：每個產品長成單一產品的樣子</summary>
+        <p>每個登記產品：頁面抽成共用元件、加 app/&lt;key&gt;/ 產品門路由（精簡版面）、開場即可用狀態、MODULE_MANIFEST 無 TODO；status: available 由測試擋；門上線（DNS、憑證、兩層 nginx）逐產品 High。不搬資料表、不改 API 前綴。</p>
+        <p><b>前置：</b>第 <span data-computed>1</span> 項、第 <span data-computed>3</span> 項</p>
+        <p><b>檔案：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/&lt;key&gt;/</code> <code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/&lt;key&gt;/ui/</code> <code>lobster-factory/infra/hetzner-phase1-core/nginx/default.conf</code></p>
+        <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-8.md</code></p>
         
       </details>
     </div></li></ol></section>
