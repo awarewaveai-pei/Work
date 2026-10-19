@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 const h = vi.hoisted(() => ({ client: null as unknown }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => h.client }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
-const { ClickGate, publicPage, saveSmartLink, slugProblem } = await import("../smartlink");
+const { ClickGate, brandDay, publicPage, saveSmartLink, slugProblem } = await import("../smartlink");
 const { SocialStoreError } = await import("../store");
 const { LinkPageClosed } = await import("../../../app/(shell)/tools/social/smartlinks/LinkPage");
 const { GET } = await import("../../../app/(public)/smartlink/[slug]/go/[item]/route");
@@ -89,14 +89,42 @@ describe("a click", () => {
     expect(rpc.rpc).toHaveBeenCalledWith("social_smart_link_click", { p_slug: "soulful", p_item: ITEM });
   });
 
-  it("counts once per visitor, link and day; a robot never", () => {
-    const g = new ClickGate();
-    expect(g.shouldCount("1.1.1.1", "Mozilla/5.0", ITEM, "2026-10-18")).toBe(true);
-    expect(g.shouldCount("1.1.1.1", "Mozilla/5.0", ITEM, "2026-10-18")).toBe(false);   // the same visitor again: not counted
-    expect(g.shouldCount("2.2.2.2", "Mozilla/5.0", ITEM, "2026-10-18")).toBe(true);    // another visitor
-    expect(g.shouldCount("1.1.1.1", "Mozilla/5.0", ITEM, "2026-10-19")).toBe(true);    // the next day
-    expect(g.shouldCount("3.3.3.3", "facebookexternalhit/1.1", ITEM, "2026-10-18")).toBe(false);
-    expect(g.shouldCount("3.3.3.3", "", ITEM, "2026-10-18")).toBe(false);
+  it("counts once per visitor and link in 25h; a robot never", () => {
+    let t = Date.UTC(2026, 9, 18, 12);
+    const g = new ClickGate(50_000, () => t);
+    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(true);
+    g.mark("1.1.1.1", ITEM);
+    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(false);   // the same visitor again: not counted
+    expect(g.allows("2.2.2.2", "Mozilla/5.0", ITEM)).toBe(true);
+    g.mark("2.2.2.2", ITEM);    // another visitor
+    expect(g.allows("1.1.1.1", "Mozilla/5.0", "22222222-2222-4222-8222-222222222222")).toBe(true);
+    g.mark("1.1.1.1", "22222222-2222-4222-8222-222222222222");   // another link
+    expect(g.allows("3.3.3.3", "facebookexternalhit/1.1", ITEM)).toBe(false);
+    expect(g.allows("3.3.3.3", "", ITEM)).toBe(false);
+    t += 24 * 3_600_000;   // a 25h brand day (DST) can hold two counts 24h apart: still held
+    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(false);
+    t += 3_600_000;
+    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(true);
+    g.mark("1.1.1.1", ITEM);
+  });
+
+  it("at the cap only the oldest visitor is forgotten, not everyone", () => {
+    const g = new ClickGate(2);
+    g.mark("1.1.1.1", ITEM);
+    g.mark("2.2.2.2", ITEM);
+    g.mark("3.3.3.3", ITEM);   // evicts 1.1.1.1
+    expect(g.allows("2.2.2.2", "Mozilla/5.0", ITEM)).toBe(false);
+    expect(g.allows("3.3.3.3", "Mozilla/5.0", ITEM)).toBe(false);
+    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(true);
+  });
+
+  it("a count that fails with 503 does not hold the visitor: the retry is counted", async () => {
+    const rpc = (h.client as { rpc: ReturnType<typeof vi.fn> }).rpc;
+    rpc.mockResolvedValueOnce({ data: null, error: { code: "XX", message: "down" } });
+    const who = { "user-agent": "Mozilla/5.0", "x-real-ip": "198.51.100.9" };
+    expect((await go(who)).status).toBe(503);
+    expect((await go(who)).status).toBe(302);
+    expect(rpc.mock.calls.filter((c) => c[0] === "social_smart_link_click")).toHaveLength(2);
   });
 
   it("a repeat is still sent on, without counting", async () => {
@@ -106,5 +134,15 @@ describe("a click", () => {
     const res = await go(who);
     expect(res.status).toBe(302);
     expect(rpc.mock.calls.filter((c) => c[0] === "social_smart_link_click")).toHaveLength(1);
+  });
+});
+
+describe("brandDay", () => {
+  it("steps back whole calendar days across a DST change", () => {
+    const now = new Date("2024-03-11T12:00:00Z");   // New York: DST began 2024-03-10
+    expect(brandDay("America/New_York", 0, now)).toBe("2024-03-11");
+    expect(brandDay("America/New_York", 1, now)).toBe("2024-03-10");
+    expect(brandDay("America/New_York", 2, now)).toBe("2024-03-09");
+    expect(brandDay("Asia/Taipei", 0, new Date("2026-10-18T17:00:00Z"))).toBe("2026-10-19");
   });
 });

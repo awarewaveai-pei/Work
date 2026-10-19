@@ -167,6 +167,33 @@
 **剩餘風險**：291 個能力仍無驗收（V17-2 範圍只要求機制＋可見缺數）；V17-3～6 未做；`generated/` 未追蹤；acceptance 的 test 名稱為行為描述，非可執行指令（技術棧未定，計畫「不做」產碼）。
 
 **rollback**：Foundry 目錄與兩個 scripts 檔以 `git show HEAD:<file> > <file>` 逐檔還原（禁 `git checkout --`）；新檔 `generation/card-template.md`、`scripts/report_acceptance_gap.py` 直接刪；sample 以還原後的 `generate_sample.py --replace` 重生。
+## 2026-10-19（續7）C26 smart link 收尾：Codex 審出的點擊閘門四項修正（F1/F2/F4/F5），F3 記為已知邊界
+
+**觸發**：C26 程式已在 ee3e7bde5；Codex 審 5 項，本 session 修 F1/F2/F4/F5。
+
+**根因／修法**（`apps/next-admin/`）
+- F1：`ClickGate` 用 UTC 日記「已算過」，但 0105 以品牌時區的日子計數，兩邊日界不同。閘門不知道品牌時區（要多一次查詢），改成不分日界：同訪客同連結 25h 內不再算（25h = 最長的一天，DST 回撥日）。不變量：一個品牌日至多算一次；跨午夜最壞少算一次，不會多算。`lib/social/smartlink.ts` ClickGate、`go/[item]/route.ts` 不再傳 day。
+- F2：閘門先記錄、後 `countClick`；`countClick` 丟錯（503）或回 null 時訪客重試被當成重複而不算。`shouldCount` 拆成 `allows()`（只查）＋`mark()`（route 在 `countClick` 回 url 後才呼叫），不用預訂再 `release` 回滾。代價：第一次計數往返中的並發點擊可各算一次（註解已寫）。
+- F4：滿 cap 時 `clear()` 讓所有人可被重算；改為只刪最老一筆（Map 插入順序 = 時間順序，計數時 delete 再 set 維持）。
+- F5：`brandDay` 用 `now - back*86400000`，DST 日會差一天；改為先取品牌今天的日期字串，再用 `Date.UTC(y, m-1, d-back)` 做日曆減法。
+- F3（已知邊界，未修）：閘門是單 process 記憶體；重啟（next-admin 每天 03:00 部署）或多 worker 會忘記，同訪客同日可多算一次。不會少算。Codex 覆審再報同類一項：DB 已 commit 但回應遺失 → 503 → 重試再算一次。同一不變量（記憶體閘門做不到 exactly-once），治本 = 0105 計數函式在 DB 側去重（migration，High，需操作者 go）；兩者都寫進 `smartlink.ts` ClickGate 註解。
+
+**[已修改]**：`lib/social/smartlink.ts`、`app/(public)/smartlink/[slug]/go/[item]/route.ts`、`lib/social/__tests__/smartlink.test.ts`（新增：25h 保持與 24h 仍擋、cap 只刪最老、503 後重試算數、brandDay 跨 DST 與 Asia/Taipei）。
+
+**[驗證結果]**
+- `npx tsc --noEmit`（next-admin）：exit 0。
+- `npx vitest run lib/social/__tests__/smartlink.test.ts "app/(shell)/tools/social/__tests__/page-rules.test.ts"`：14/14（smartlink.test.ts 11 個，page-rules 3 個）。
+- `bash tests/e2e/social/smartlink-real-db.sh`：0105 schema 驗證 ✅，`smartlink.e2e.test.ts` 2/2（真 PostgREST＋docker）。
+- Codex 覆審 `agency-os/reports/oracle/2026-10-19-partialreview-1526451f.md`：1 項（= F3）；allows/mark 改寫後再審 `2026-10-19-partialreview-c956263a.md`：1 項（回應遺失重算，併入 F3 類），其餘無。
+- 抓蟲：`grep -rn "shouldCount\|gate\.release\|ClickGate" lobster-factory agency-os/docs scripts .claude/commands` 7 行命中，全在 route.ts、smartlink.ts、測試；`shouldCount`／`release` 0 殘留。
+
+**[剩餘風險]**：F3；未動 `middleware.ts`／`doors.ts`／`products.ts`／nginx（`/smartlink` 公開路由仍待操作者批准的 High 項）。
+
+**[rollback]**：`git revert` 本 commit；無 DB／設定變更。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash tests/e2e/social/smartlink-real-db.sh | exit=0 | ms=20185
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=ClickGate | hits=7
 ## 2026-10-19（續6）System Foundry v1.7 V17-1 樣板瘦身：藍圖 73 檔＋模組文件 00–07 改為根目錄 `PLAN.md` 一張表（SDK 代跑，Codex 審）
 
 **觸發**：操作者「繼續做 system foundry，用 SDK 和 codex-review」。計畫＝`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md`，六張卡中 V17-1 先做（V17-4 的 catalog 同步先前已完成一半）。

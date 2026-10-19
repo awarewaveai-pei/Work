@@ -20,10 +20,13 @@ export interface SmartLink { slug: string; title: string; bio: string; colour: C
 export interface SmartLinkItem { id: string; title: string; url: string; active: boolean; clicks: number }
 export interface ItemInput { id?: string; title: string; url: string; active: boolean }
 
-/** The brand's calendar day `back` days before today (YYYY-MM-DD), the way 0105 counts a click's day. */
+/** The brand's calendar day `back` days before today (YYYY-MM-DD), the way 0105 counts a click's day. The step back is
+ *  calendar arithmetic on the brand's date, not 24h multiples: a DST day is 23 or 25 hours long. */
 export function brandDay(tz: string, back = 0, now = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" })
-    .format(new Date(now.getTime() - back * 86_400_000));
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  if (!back) return today;
+  const [y, m, d] = today.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d - back)).toISOString().slice(0, 10);
 }
 
 /** The editor's view: the brand's page (null = none yet; suggested = the brand's own slug when it is a valid one). */
@@ -102,24 +105,38 @@ export async function itemUrl(slug: string, itemId: string): Promise<string | nu
   return (item?.url as string | undefined) ?? null;
 }
 
-// One visitor counts once per link per day, so a reload loop or a script cannot run a count up (nginx limit_req on the
-// door caps the request rate on top). The memory is this process's: a restart forgets, which can count a visitor twice
-// that day, never more. Visitors are keyed by a salted hash of their address; the raw address is never kept.
+// One visitor counts at most once per link per brand day, so a reload loop or a script cannot run a count up (nginx
+// limit_req on the door caps the request rate on top). The gate cannot know the brand's timezone, so it holds a visitor
+// off for 25h (the longest calendar day): at worst one missed count across midnight. The gate is marked only after the
+// count succeeded, so a failed count is retried; clicks racing the first count's round trip can each count.
+// The memory is this process's: a restart or a second worker forgets, which can count a visitor again, never lose a
+// count; so does a count whose reply was lost (the retry counts again). Exactly once needs the dedupe in 0105's
+// function (a migration). Visitors are keyed by a salted hash of their address; the raw address is never kept.
 const ROBOT_RE = /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|whatsapp|telegram|discord|skype|curl|wget|python|headless/i;
 const SALT = randomBytes(16).toString("hex");
+const HOLD_MS = 25 * 3_600_000;
 
 export class ClickGate {
-  private seen = new Map<string, string>();   // visitor+item -> day counted
-  constructor(private readonly cap = 50_000) {}
+  private seen = new Map<string, number>();   // visitor+item -> when counted; insertion order = age order
+  constructor(private readonly cap = 50_000, private readonly clock: () => number = Date.now) {}
 
-  /** true = count this click. `day` is the day it would count on; a robot or an empty user agent never counts. */
-  shouldCount(ip: string, userAgent: string, itemId: string, day: string): boolean {
+  private key(ip: string, itemId: string): string {
+    return createHash("sha256").update(`${SALT}:${ip}:${itemId}`).digest("base64url").slice(0, 22);
+  }
+
+  /** true = this click may count (a robot or an empty user agent never). Only a check: `mark` after the count succeeded. */
+  allows(ip: string, userAgent: string, itemId: string): boolean {
     if (!userAgent || ROBOT_RE.test(userAgent)) return false;
-    const key = createHash("sha256").update(`${SALT}:${ip}:${itemId}`).digest("base64url").slice(0, 22);
-    if (this.seen.get(key) === day) return false;
-    if (this.seen.size >= this.cap) this.seen.clear();   // a flood of distinct addresses: forget, do not grow
-    this.seen.set(key, day);
-    return true;
+    const last = this.seen.get(this.key(ip, itemId));
+    return last === undefined || this.clock() - last >= HOLD_MS;
+  }
+
+  /** the visitor counted this link now: hold them off for HOLD_MS */
+  mark(ip: string, itemId: string): void {
+    const key = this.key(ip, itemId);
+    this.seen.delete(key);
+    if (this.seen.size >= this.cap) this.seen.delete(this.seen.keys().next().value as string);   // full: drop the oldest only
+    this.seen.set(key, this.clock());
   }
 }
 

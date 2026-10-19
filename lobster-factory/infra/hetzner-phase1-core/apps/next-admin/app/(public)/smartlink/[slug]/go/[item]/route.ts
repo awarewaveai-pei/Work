@@ -1,6 +1,6 @@
 // /smartlink/<slug>/go/<item> -- a button on the public smart link page (SOCIAL_MANAGER_PLAN.md C26): 302 to the link's
 // url, counted in social_smart_link_clicks (0105 social_smart_link_click). Counted once per visitor, link and day
-// (lib/social/smartlink.ts ClickGate); a robot, a repeat or a HEAD is sent on without counting. The url comes only from
+// (lib/social/smartlink.ts ClickGate, held 25h after a counted click); a robot, a repeat or a HEAD is sent on without counting. The url comes only from
 // the database row of a published page's active link, never from the request: not an open redirect.
 import { NextResponse } from "next/server";
 import { ClickGate, SLUG_RE, countClick, itemUrl, visitorAddress } from "@/lib/social/smartlink";
@@ -18,10 +18,11 @@ const go = (url: string) => NextResponse.redirect(url, { status: 302, headers: {
 async function send(req: Request, ctx: Ctx, mayCount: boolean): Promise<Response> {
   const { slug, item } = await ctx.params;
   if (!SLUG_RE.test(slug) || !UUID_RE.test(item)) return gone();
+  const ip = visitorAddress(req.headers);
   try {
-    // the gate's day is UTC, the count's is the brand's (0105): at worst a visitor counts twice around midnight
-    const count = mayCount && gate.shouldCount(visitorAddress(req.headers), req.headers.get("user-agent") ?? "", item, new Date().toISOString().slice(0, 10));
+    const count = mayCount && gate.allows(ip, req.headers.get("user-agent") ?? "", item);
     const url = count ? await countClick(slug, item) : await itemUrl(slug, item);
+    if (count && url) gate.mark(ip, item);   // only a count that happened holds the visitor off: a failed one is retried
     return url ? go(url) : gone();
   } catch (e) {
     console.error("[smartlink/go]", e);
