@@ -33,7 +33,8 @@
         "FOUND-SECRETS",
         "FOUND-SECURITY",
         "FOUND-SUPPLY-CHAIN",
-        "FOUND-TESTING"
+        "FOUND-TESTING",
+        "CAP-OFFLINE-UPDATE"
       ]
     },
     {

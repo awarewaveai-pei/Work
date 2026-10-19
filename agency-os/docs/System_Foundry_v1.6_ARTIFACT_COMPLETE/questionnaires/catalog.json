@@ -295,8 +295,14 @@
       "description": "預設題庫未涵蓋的特殊需求，可自行新增"
     },
     {
-      "id": "AW",
+      "id": "deployment",
       "order": 46,
+      "title": "安裝位置",
+      "description": "系統裝在哪裡：AwareWave 主機或客戶自己的主機（ADR 017 三軸 A）。"
+    },
+    {
+      "id": "AW",
+      "order": 47,
       "title": "AwareWave 積木",
       "description": "選擇要組裝的 AwareWave 產品；依賴由登記表自動加入。"
     }
@@ -3166,6 +3172,14 @@
         "question": "Q-COM-001",
         "equals": true
       }
+    },
+    {
+      "id": "Q-DEPLOY-001",
+      "category": "deployment",
+      "label": "裝在客戶自己的主機",
+      "description": "系統安裝在客戶自己的主機（買斷／self_hosted），不在 AwareWave 主機上執行。",
+      "answer_type": "boolean",
+      "required_when_active": true
     },
     {
       "id": "Q-AW-COGNITIVE",

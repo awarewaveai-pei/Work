@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-19（續14）System Foundry v1.7 V17-6：新題 `Q-DEPLOY-001`「裝在客戶自己的主機」（v1.7 六張卡完成）
+
+**觸發**：操作者「Continue with V17-6」。
+
+**做法**（純資料，用既有的能力／規則機制，不改引擎）
+- 問卷：新分類 `deployment`「安裝位置」（ADR 017 三軸 A），新題 `Q-DEPLOY-001`；放在 AW 節之前，AW 節的 order 照 `sync-foundry-catalog.mjs` 的 max+1 規則重算（`--check` PASS）。
+- 規則 `RULE-Q-DEPLOY-001`：要 → 新能力 `CAP-OFFLINE-UPDATE`。**偏離計畫**：計畫寫「要 → CAP-LICENSE 必要」，但 `CAP-LICENSE` requires `CAP-COMMERCIAL`，既有 `test_payment_commercial_gating.py` 紅（「Q-DEPLOY-001 reaches CAP-COMMERCIAL while Q-COM-001 is not forced True」）——裝在自家主機自用不需授權檔；授權仍由既有 `Q-COM-006`（只在收費時出現）決定，符合 TASKS「License 只暗示不等於」。計畫該行已改並寫明理由。
+- `CAP-OFFLINE-UPDATE`（module core，requires `FOUND-RELEASE`）＝計畫寫的「FOUND-RELEASE 加離線更新義務」：簽章版本包、在客戶主機驗章套用不連 AwareWave、失敗回上一版；附三條驗收（壞簽章拒絕、斷網可更新、中途失敗回滾）。`generation/module-manifests.json` core 的 `activated_by` 加它，core 卡會列出。
+
+**驗證結果**
+- golden 快照 `tests/fixtures/selection/all_{no,yes}.json` 刻意更新：只差 active_answer_count +1（兩者）與 all-yes 多 `CAP-OFFLINE-UPDATE`。文件數字由 `validate_doc_numbers.py` 指出逐行更新（README:38,39,42,43、CHANGELOG_v1.6:56、V1_6 報告:4,60,65,70,95、QUALITY:39）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=resolve：Q-DEPLOY-001=要 → CAP-OFFLINE-UPDATE、modules=core（不帶收費）；Foundry verify 鏈逐條＋regenerate-samples＋new-product 4/4 | exit=0 | ms=見 verify8
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回四個目錄檔的插入位置（native 區、AW 之前）；`test_selection_matrix` 單題啟用驗效果、`validate_foundry` 驗題↔規則一對一（`test_mutation_coverage` 只管推導規則與 requires 邊，不含問卷規則）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`Q-DEPLOY-001` | hits=新資料、V1_7 計畫、TASKS／ADR 017 既有提及（皆與實作一致）
+- ORACLE_WAIVED: 純目錄資料新增，引擎未改；選擇矩陣與突變覆蓋閘即為此類資料的機械驗證
+
+**突變**（目錄深度相同的暫存複本）：拿掉 `RULE-Q-DEPLOY-001` → `validate_foundry`「question rule coverage is not exactly 1:1」紅、`test_selection_matrix`「all-YES capability coverage 314/315」紅（`validate_semantics` 不管這類，綠）。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-19（續13）System Foundry v1.7 V17-5：範例自動重生進 `make verify`
 
 **觸發**：操作者「Continue with V17-5」。

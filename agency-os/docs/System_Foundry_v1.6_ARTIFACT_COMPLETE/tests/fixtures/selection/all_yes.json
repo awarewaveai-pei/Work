@@ -1,5 +1,5 @@
 {
-  "active_answer_count": 270,
+  "active_answer_count": 271,
   "current_capabilities": [
     "CAP-24X7",
     "CAP-2FA",
@@ -168,6 +168,7 @@
     "CAP-MULTI-TENANT",
     "CAP-NONREPEATABLE",
     "CAP-OFFLINE",
+    "CAP-OFFLINE-UPDATE",
     "CAP-OMNICHANNEL-MESSAGING",
     "CAP-ORDER-EXCEPTION",
     "CAP-ORDER-MERGE",

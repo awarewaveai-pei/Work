@@ -61,7 +61,7 @@
 - 驗收：改一題 id → verify 紅；重生 → 綠。
 
 ### V17-6 新題
-- `Q-DEPLOY-001`「裝在客戶自己的主機」（self_hosted；ADR 017 §0 三軸 A）；規則：要 → `CAP-LICENSE` 必要、`FOUND-RELEASE` 加離線更新義務。
+- `Q-DEPLOY-001`「裝在客戶自己的主機」（self_hosted；ADR 017 §0 三軸 A）；規則：要 → `CAP-OFFLINE-UPDATE`（requires `FOUND-RELEASE`：簽章版本包、離線套用、失敗回上一版）。不帶 `CAP-LICENSE`：它 requires `CAP-COMMERCIAL`，`test_payment_commercial_gating.py` 禁止未答收費就帶入收費能力（自家主機自用不需授權檔）；收費＋授權仍由 `Q-COM-006` 決定。
 
 ## 不做
 - 不產程式碼（技術棧未定前產碼＝猜）；骨架由 `new-product.mjs` 在 AwareWave 的 stack 上產。

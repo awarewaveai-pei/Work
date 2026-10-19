@@ -2634,6 +2634,16 @@
       ]
     },
     {
+      "id": "RULE-Q-DEPLOY-001",
+      "when": {
+        "question": "Q-DEPLOY-001",
+        "equals": true
+      },
+      "require": [
+        "CAP-OFFLINE-UPDATE"
+      ]
+    },
+    {
       "id": "RULE-Q-AW-COGNITIVE",
       "when": {
         "question": "Q-AW-COGNITIVE",

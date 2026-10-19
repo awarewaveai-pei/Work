@@ -2731,6 +2731,29 @@
       "description": "Customers purchase a bundle of credits upfront, held as an account balance, and each billable usage event decrements that balance directly rather than triggering a separate post-hoc invoice. Requires CAP-USAGE-METERING, not CAP-PAYMENTS directly: usage must already be measured and attributed before it can decrement a balance, the same reasoning CAP-GIFT-CARD uses for requiring only CAP-COMMERCIAL rather than CAP-PAYMENTS -- how the credit pack itself was originally paid for is a separate concern. Distinct from CAP-USAGE-METERING, which only measures/attributes usage without implying prepayment; from CAP-CREDIT-TERMS, which is B2B net-30/60/90 payment after goods are already delivered, the opposite timing; and from CAP-LOYALTY-POINTS, which are earned/non-purchasable rewards, not a directly purchasable billing currency."
     },
     {
+      "id": "CAP-OFFLINE-UPDATE",
+      "name": "Offline Update Delivery",
+      "module": "core",
+      "requires": [
+        "FOUND-RELEASE"
+      ],
+      "description": "Each release ships as a signed, versioned package that the customer's own host verifies and applies without reaching AwareWave servers; a failed apply returns to the previous version.",
+      "acceptance": [
+        {
+          "test": "an update package with a broken signature is refused",
+          "expect": "nothing is applied and the installed version is unchanged"
+        },
+        {
+          "test": "an update applies with the vendor servers unreachable",
+          "expect": "the new version runs using only the package already on the host"
+        },
+        {
+          "test": "an update that fails midway",
+          "expect": "the host is back on the previous version with its data intact"
+        }
+      ]
+    },
+    {
       "id": "CAP-AW-COGNITIVE",
       "name": "AI LEGO Cognitive Engineering OS",
       "description": "組合認知方法、研究資料與專案。",
