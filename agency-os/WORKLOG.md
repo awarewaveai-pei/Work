@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-19（續3）ADR017 第2項收尾：監工台 done 與訂閱狀態決定性
+
+- 根因／修改：另一 session 已提交第 2 項實作 `ee3e7bde5`，監工台仍標示 in_progress；補 `data.mjs` 的 done/commit、重建 supervisor.html，並讓多方案同產品的 launcher 狀態按 active > trial > past_due > suspended > canceled 決定，避免查詢順序漂移。
+- REALTEST_EVIDENCE: tool=Bash | cmd=node agency-os/handoffs/2026-10-16-customer-model-supervisor/build.mjs; node agency-os/handoffs/2026-10-16-customer-model-supervisor/check.mjs; npm run typecheck (workflows) | exit=0 | ms=measured per command
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0M/1m (minor resolved: deterministic subscription status precedence)
+- ORACLE_WAIVED: no new full-tree oracle; prior scoped Claude core review and ee3e7bde5 review evidence cover the implementation; shared worktree contains unrelated session files
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=entitlementsExpire|subscriptionStatuses|in_progress|supervisor.html | hits=verified before commit
+- rollback: `git revert <commit>`; no production migration, key, or Trigger deployment performed.
+
 ## 2026-10-19（續2）待提交批次收斂；social metrics production gate
 
 - 根因：共用 index 是舊快照（`agency-os/WORKLOG.md` index 停在 10/16，工作樹已到 10/18），且 `main` 與 `origin/main` 分叉；重建非 `.claude` runtime 的 staging，保留 `.claude` session/runtime 不入產品提交。
