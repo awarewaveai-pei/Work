@@ -40,7 +40,7 @@ export const STEPS = [
   { n: 3, code: 'V17-3', plain: '監工台只有一套版面；每個產生的專案都自帶一個，模組依相依關係分層排好。', title: '監工台套件共用', gate: '產生的專案 node supervisor/build.mjs 和 check.mjs 綠；計畫少一個模組，check 變紅', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '5fa64e1e6', depends: ['V17-2'] },
   { n: 4, code: 'V17-4', plain: '問卷裡勾選 AwareWave 的產品（社群、客服…），它和它依賴的產品就自動帶進專案；新產品產生器讀得懂產出。', title: '接軌 AwareWave', gate: '勾社群 → 模組含社群與其依賴；new-product.mjs --from-foundry 產出的十項宣告至少六項不是 TODO', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '53b222d8d', depends: ['V17-3'] },
   { n: 5, code: 'V17-5', plain: '範例專案每次驗證時從最新問卷重新產生，問卷改了範例就跟著更新，不會過期。', title: '範例 intake 自動重生', gate: '改一題 id → 驗證紅；重生 → 綠', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '92694ea5d', depends: ['V17-4'] },
-  { n: 6, code: 'V17-6', plain: '問卷加一題「裝在客戶自己的主機」；答要，就必須有授權檔，發版要能離線更新。', title: '新題', gate: '答要 → CAP-LICENSE 必選、FOUND-RELEASE 多一條離線更新義務；選擇矩陣綠', risk: 'Low', model: 'Opus 5.5', status: 'not_started', depends: ['V17-5'] },
+  { n: 6, code: 'V17-6', plain: '問卷加一題「裝在客戶自己的主機」；答要，發版就必須能離線更新。授權檔另由「授權碼」那題決定，因為自家主機自用不需要授權檔。', title: '新題', gate: '答要 → 帶入離線更新能力（簽章版本包、離線套用、失敗回上一版）；選擇矩陣與收費閘門皆綠', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '9285bee81', depends: ['V17-5'] },
 ];
 
 // 操作者自己要決定的（agent 不能代為決定）
