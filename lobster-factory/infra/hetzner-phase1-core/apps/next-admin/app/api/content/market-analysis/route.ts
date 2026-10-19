@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { textCallCostUsd } from "@/lib/ai/cost-calculator";
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,6 +65,7 @@ Return ONLY a valid JSON object with these arrays (each item a short phrase, 4-8
 Output ONLY the JSON, no markdown fences, no explanation.`;
 
   try {
+    const Anthropic = await loadAnthropic();
     const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
       model: "claude-haiku-4-5-20251001",

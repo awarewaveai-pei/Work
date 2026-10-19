@@ -1,6 +1,6 @@
 # Capacity health report
 
-- Generated: 2026-10-14 09:53:56 +08:00  (UTC: 2026-10-14 01:53:56)
+- Generated: 2026-10-19 13:10:00 +08:00  (UTC: 2026-10-19 05:10:00)
 - Overall: **PASS** 🟢
 
 > ks-aw-01 runs the strictest thresholds on purpose: it is the sole consolidation host
@@ -9,17 +9,17 @@
 
 | host | verdict | mem used | disk | swap | PSI mem some/full | containers |
 |---|---|---|---|---|---|---|
-| ks-aw-01 | 🟢 | 11.3% of 125.8G | 26% of 935.7G | 16.3% | 0 / 0 | 55/59 |
+| ks-aw-01 | 🟢 | 13.4% of 125.8G | 29% of 935.7G | 15.5% | 0 / 0 | 57/61 |
 
 ## ks-aw-01 (145.239.195.47) 🟢
-- Memory: 11.3% used (14.1G of 125.8G), swap 16.3%
+- Memory: 13.4% used (16.9G of 125.8G), swap 15.5%
 - PSI memory avg60: some 0%, full 0%  | io some 0%
 - OOM kills: vmstat 0, journal(7d) 0
-- Disk /: 26% (228.1G of 935.7G), inodes 9%
-- Docker reclaimable: Images=29.13GB (35%),Containers=38.61MB (4%),Local Volumes=241MB (0%),Build Cache=8.614GB
-- Containers: 55 running / 59 total, unhealthy 0
+- Disk /: 29% (255G of 935.7G), inodes 10%
+- Docker reclaimable: Images=49.77GB (48%),Containers=38.61MB (5%),Local Volumes=241MB (0%),Build Cache=10.03GB
+- Containers: 57 running / 61 total, unhealthy 0
 - Restart counts: trigger-supervisor(1)
-- Top memory: postiz=1.341GiB cognitive-os-api=1.04GiB soulful-wp=1018MiB soulful-db=976.2MiB trigger-webapp=913.5MiB trigger-clickhouse=906.7MiB
-- CPU: 32 cores, load1 1.65 (0.05 per core), PSI cpu some 9.59%, up 4d
-- Disk trend: 13.18 GiB/day since last run -- reaches the 60% warn line in about 23 days at this rate
+- Top memory: buildx_buildkit_trigger0=3.663GiB postiz=1.646GiB cognitive-os-api=1.057GiB soulful-wp=1020MiB soulful-db=1019MiB trigger-clickhouse=1010MiB
+- CPU: 32 cores, load1 3.35 (0.1 per core), PSI cpu some 10.13%, up 4d
+- Disk trend: 0.56 GiB/day since last run -- reaches the 60% warn line in about 491 days at this rate
 

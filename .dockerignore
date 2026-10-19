@@ -13,6 +13,7 @@
 !Projects/internal/cognitive-engineering-os/scripts
 !Projects/internal/cognitive-engineering-os/apps/cognitive-web/fixtures
 !agency-os/docs/AI_LEGO_Cognitive_Engineering_OS
+!lobster-factory/packages/contracts/fixtures/permit-v1
 **/__pycache__
 **/*.pyc
 **/.runtime

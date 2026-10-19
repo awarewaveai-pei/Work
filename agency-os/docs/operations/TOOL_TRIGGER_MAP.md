@@ -439,5 +439,5 @@ MCP 分工完整表：`docs/operations/cursor-mcp-and-plugin-inventory.md`
 ## Related Documents (Auto-Synced)
 - `docs/operations/AGENTS_APPENDIX.md`
 
-_Last synced: 2026-10-17 07:05:49 UTC_
+_Last synced: 2026-10-18 02:09:52 UTC_
 

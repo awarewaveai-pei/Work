@@ -1,8 +1,8 @@
 import { headers } from "next/headers";
 import { requireClientOrg, PortalAccessError } from "@/lib/tenant-guard";
-import { createSupabaseUserClient } from "@/lib/supabase/route-client";
 import { PRODUCTS } from "@/lib/portal/products";
 import { productHost } from "@/lib/portal/doors";
+import { createEntitlementStore } from "@/lib/entitlements/tables";
 
 export const dynamic = "force-dynamic";
 
@@ -12,34 +12,16 @@ export const dynamic = "force-dynamic";
 // it fails closed if the authenticated identity isn't a bound client (e.g. a staff member's
 // session) -- see PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md §9 RISK 3.
 
-type SubscriptionQuery = { data: { product_key: string; status: string }[] | null; error: { message: string } | null };
-
 async function getSubscriptionStatus(organizationId: string): Promise<{ byProduct: Map<string, string>; failed: boolean }> {
-  // Critic finding M3 (2026-08-29): the original version used the service-role client here,
-  // which bypasses RLS entirely -- the 0062 migration's user_has_org_membership() policy, the
-  // whole point of that RLS design, never actually executed on this read path. Switching to the
-  // user-scoped client (lib/supabase/route-client.ts, the house "S2 migration" pattern for any
-  // route serving client users) makes RLS the REAL enforcement, not defense-in-depth theatre:
-  // auth.uid() inside the policy resolves to the actual signed-in customer, so a revoked
-  // organization_memberships row (this specific user, not just "does the org have any active
-  // member") stops returning rows immediately, without needing bespoke re-validation logic here.
-  // Residual (documented, not fixed here -- see PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md §10):
-  // user_has_org_membership() itself does not join organizations.status, so a fully suspended
-  // org whose memberships were never individually revoked is still readable. That gap is in a
-  // shared house function used by ~20 other consumers and is out of this change's boundary.
-  const supabase = await createSupabaseUserClient();
-  if (!supabase) return { byProduct: new Map(), failed: true };
-  const { data, error }: SubscriptionQuery = await supabase
-    .from("organization_product_subscriptions")
-    .select("product_key, status")
-    .eq("organization_id", organizationId);
-  if (error) {
-    console.error("[portal/launcher] subscription read failed", { organizationId, error: error.message });
+  try {
+    // requireClientOrg() above is the user/session and client-org boundary. The table itself
+    // is service-role-only after ADR017/0110, so all subscription reads go through this wrapper.
+    const byProduct = await createEntitlementStore().getSubscriptionStatuses(organizationId);
+    return { byProduct, failed: false };
+  } catch (error) {
+    console.error("[portal/launcher] subscription read failed", { organizationId, error: error instanceof Error ? error.message : String(error) });
     return { byProduct: new Map(), failed: true };
   }
-  const byProduct = new Map<string, string>();
-  for (const row of data ?? []) byProduct.set(row.product_key, row.status);
-  return { byProduct, failed: false };
 }
 
 function AccessDenied() {

@@ -45,7 +45,7 @@ const createWooProduct = vi.hoisted(() =>
 );
 const bridgeBaseUrl = vi.hoisted(() => vi.fn((_clientId?: string): string | null => null));
 const bridgeSiteOrg = vi.hoisted(() => vi.fn(async (): Promise<string | null | undefined> => null));
-vi.mock("../../../../lib/studio/wp-bridge-client", () => ({
+vi.mock("../../../../lib/payments/woo", () => ({
   createWooProduct,
   isBridgeConfigured: () => true,
   listBridgeClients: () => [],

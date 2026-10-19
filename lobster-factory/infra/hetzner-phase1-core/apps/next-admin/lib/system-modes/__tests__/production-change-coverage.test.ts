@@ -20,7 +20,8 @@ const SSH2_SPECIFIER = "ssh2";
 
 const TARGET_MODULES = [
   path.join(ROOT, "lib", "repair-center", "ssh"),
-  path.join(ROOT, "lib", "studio", "wp-bridge-client"),
+  path.join(ROOT, "lib", "payments", "woo"),
+  path.join(ROOT, "lib", "crm", "fluentcrm"),
   path.join(ROOT, "lib", "content", "publish", "wordpress-core"),
   path.join(ROOT, "lib", "studio", "print-provider"),
   path.join(ROOT, "lib", "cs", "chatwoot-client"),
@@ -42,7 +43,9 @@ const ALLOWLIST: Record<string, string> = {
   "lib/content/blocks/publish-wordpress.ts":
     "imports wordpress-core only for publishToWordPress(); the gate lives inside that function, not in this block wrapper.",
   "app/api/content/newsletter/route.ts":
-    "imports wp-bridge-client only for createNewsletter(); the gate lives in bridgePost(), not in this route.",
+    "imports the CRM adapter only for createNewsletter(); the gate lives in bridgePost(), not in this route.",
+  "lib/crm/fluentcrm.ts":
+    "draft campaign adapter delegates every write to the gated bridgePost transport in lib/payments/woo.ts.",
   "lib/studio/print-provider.ts":
     "primitive Printful HTTP transport -- not a call site; every real caller (tools/publish link/pfcreate/pforder, tools/printful/sync PUT, lib/studio/pod-order-inbox.ts for the Woo webhook) gates before calling it. Same pattern as lib/repair-center/ssh.ts.",
   "app/api/tools/studio/mockup/route.ts":
@@ -190,7 +193,7 @@ describe("production-change gate coverage", () => {
     const known = [
       "lib/content/publish/wordpress-core.ts",
       "app/api/content/wp-post/route.ts",
-      "lib/studio/wp-bridge-client.ts",
+      "lib/payments/woo.ts",
       "app/api/tools/publish/route.ts",
       "app/api/tools/printful/sync/route.ts",
       "lib/studio/pod-order-inbox.ts",
@@ -220,12 +223,12 @@ describe("production-change gate coverage", () => {
 
   it("primitive reach: re-export, import() and require() count; import type does not", () => {
     const reach = (src: string) => needsGate(fake(src), FAKE);
-    expect(reach('export { bridgePost } from "@/lib/studio/wp-bridge-client";')).toBe(true);
+    expect(reach('export { bridgePost } from "@/lib/payments/woo";')).toBe(true);
     expect(reach('const m = await import("@/lib/repair-center/ssh");')).toBe(true);
     expect(reach('const { Client } = require("ssh2");')).toBe(true);
-    expect(reach('import type { BridgeResult } from "@/lib/studio/wp-bridge-client";')).toBe(false);
-    expect(reach('import { type BridgeResult } from "@/lib/studio/wp-bridge-client";')).toBe(false);
-    expect(reach('/* import { bridgePost } from "@/lib/studio/wp-bridge-client"; */')).toBe(false);
+    expect(reach('import type { BridgeResult } from "@/lib/payments/woo";')).toBe(false);
+    expect(reach('import { type BridgeResult } from "@/lib/payments/woo";')).toBe(false);
+    expect(reach('/* import { bridgePost } from "@/lib/payments/woo"; */')).toBe(false);
   });
 
   it("gate call: only a real call of the imported gate counts", () => {
@@ -255,7 +258,7 @@ describe("production-change gate coverage", () => {
         .map(
           (f) =>
             `  - ${f}\n` +
-            `    reaches ssh2 / repair-center/ssh / wp-bridge-client / wordpress-core, or writes to WP REST ` +
+            `    reaches ssh2 / repair-center/ssh / payments/woo / wordpress-core, or writes to WP REST ` +
             `directly, but never calls ${GATE_FN}.\n` +
             `    Fix: call checkProductionChangeAllowed(getSupabaseWriteClient(), orgId) before the write ` +
             `(see lib/system-modes/production-change-gate.ts), or add a one-line-justified ALLOWLIST entry ` +

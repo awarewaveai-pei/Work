@@ -1,6 +1,6 @@
 // Shared Anthropic SDK wrapper for review handlers.
 // Uses prompt caching to keep system prompt warm across invocations.
-// Model defaults to CLAUDE_DEFAULT_MODEL (lib/ai/claude-request.ts); ANTHROPIC_MODEL overrides.
+// Model defaults to CLAUDE_DEFAULT_MODEL (lib/ai/gateway.ts); ANTHROPIC_MODEL overrides.
 //
 // Error contract: generateSummary NEVER throws — all failure modes return a
 // human-readable string so callers always produce a completed command result
@@ -8,9 +8,9 @@
 // actionable errors (auth misconfiguration, unexpected API errors) but NOT
 // for rate-limit / overload / transient conditions that resolve themselves.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import * as Sentry from "@sentry/nextjs";
-import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/claude-request";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/gateway";
 
 const DEFAULT_MODEL = process.env.ANTHROPIC_MODEL ?? CLAUDE_DEFAULT_MODEL;
 const SYSTEM_PROMPT = `You are an operations summary writer for the Lobster Factory / Agency OS platform.
@@ -43,6 +43,7 @@ export async function generateSummary(input: AnthropicSummaryInput): Promise<str
     return `_AI summary unavailable: ANTHROPIC_API_KEY not configured._\n${rawFallback(input.payload)}`;
   }
 
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
 
   try {

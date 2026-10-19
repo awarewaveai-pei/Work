@@ -1,5 +1,5 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/claude-request";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/gateway";
 import { selectPackage } from "./package-selector";
 import type { IntakeForm, WebsiteSpec } from "./intake-form";
 
@@ -92,6 +92,7 @@ export async function generateWebsiteSpec(
   if (!apiKey) return { ok: false, error: "missing_anthropic_api_key" };
 
   const { package_slug, packs } = selectPackage(form);
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
 
   // M4: AbortController timeout (same pattern as lib/ops-inbox/ai/claude.ts)

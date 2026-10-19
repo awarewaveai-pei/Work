@@ -1,7 +1,7 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { DEFAULT_AI_TEXT_MODEL, isAiTextModel, isOpenAiTextModel, type AiTextModel } from "../../ai/text-model-options";
 import { logAiCall } from "../../ai/log-ai-call";
-import { claudeFallback, claudeParams } from "../../ai/claude-request";
+import { claudeFallback, claudeParams } from "../../ai/gateway";
 import { textCallCostUsd, resolveTextRate } from "../../ai/cost-calculator";
 
 // Output token budgets. Raised 2026-06-16: the old medium=4096 truncated rich articles
@@ -694,6 +694,7 @@ export async function* streamArticleGeneration(
     yield* streamOpenAiGeneration(config, signal);
     return;
   }
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
   let anthropicStream: ReturnType<typeof client.beta.messages.stream> | null = null;
   try {

@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
@@ -76,6 +76,7 @@ ${failedList}
 Please output the COMPLETE improved article. Fix ONLY the listed failed checks — do not change what already passes.`;
 
   try {
+    const Anthropic = await loadAnthropic();
     const client = new Anthropic({ apiKey });
     // haiku is used here (not sonnet) because seo-fix is a structural text-editing task (fix density,
     // paragraph length, add a section) — not creative writing. haiku responds in ~5-10s vs sonnet's

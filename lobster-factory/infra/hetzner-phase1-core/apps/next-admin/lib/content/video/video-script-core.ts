@@ -4,8 +4,8 @@
  * 唯一職責：組提示 → 呼叫 Claude → 解析 JSON → 回傳型別安全結果。
  * 不做 TTS、不做圖片生成、不做 render。
  */
-import Anthropic from "@anthropic-ai/sdk";
-import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../../ai/claude-request";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../../ai/gateway";
 
 /** 與 Python pipeline.py CLAUDE_MODEL 對齊（影片生成共用同一模型 ID）。 */
 const CLAUDE_MODEL = CLAUDE_DEFAULT_MODEL;
@@ -198,6 +198,7 @@ export async function generateVideoScript(
 
   let response: Anthropic.Beta.Messages.BetaMessage;
   try {
+    const Anthropic = await loadAnthropic();
     const client = new Anthropic({ apiKey });
     // max_tokens 隨場景數放大：6 場 ≈ 4096（沿用原值，無回歸）；場景數可達 20（場景總數滑桿上限）
     // → ~550 tokens/場（narration+image_prompt+broll+JSON 結構，含 160 字長旁白梯次的餘裕），上限 8192。

@@ -4,7 +4,7 @@
 //   runAgenticTurn  — Claude tool loop gated by tools.ts (A1 runs, A2/A3 → human). Used only when
 //                     the tenant has enabled tools; otherwise the orchestrator uses generateReply.
 
-import Anthropic from "@anthropic-ai/sdk";
+import { type Anthropic } from "@/lib/ai/gateway";
 import { CS_MODELS, CS_THRESHOLDS, CS_TIMEOUTS } from "@/lib/cs/config";
 import { buildSystemPrompt, buildUserContext, renderPassage } from "@/lib/cs/cis";
 import { claudeTurn, extractText, extractToolUses, generateText, parseJsonObject } from "@/lib/cs/llm";

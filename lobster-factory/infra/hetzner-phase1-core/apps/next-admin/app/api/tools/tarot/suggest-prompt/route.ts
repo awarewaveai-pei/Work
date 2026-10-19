@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { logAiCall } from "../../../../../lib/ai/log-ai-call";
 
@@ -45,6 +45,7 @@ export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ ok: false, error: "missing_anthropic_api_key" }, { status: 500 });
 
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
 
   const userMessage = body.subject

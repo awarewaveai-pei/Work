@@ -1,4 +1,4 @@
-import { CLAUDE_DEFAULT_MODEL } from "./claude-request";
+import { CLAUDE_DEFAULT_MODEL } from "./claude-params";
 
 // Ordered cheap → expensive within each group (price = lib/ai/cost-model.ts TEXT_RATES).
 // Labels carry no parenthetical descriptor — pricing is shown separately in the picker UI.

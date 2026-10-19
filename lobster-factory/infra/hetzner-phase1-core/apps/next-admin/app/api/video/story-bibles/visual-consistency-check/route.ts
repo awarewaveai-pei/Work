@@ -10,10 +10,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { isDesignsAsset } from "@/lib/storage/r2";
-import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/claude-request";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/gateway";
 
 const CLAUDE_MODEL = CLAUDE_DEFAULT_MODEL;
 const MAX_PAIRS = 12; // 成本閘：草稿場景數通常 3-12，超過只比對前 12 對，其餘視為未檢查
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
 
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
   const content: Anthropic.ContentBlockParam[] = [
     { type: "text", text: "你是短劇角色連續性審核員。以下每一對圖片：第一張是角色定裝照（REFERENCE），第二張是某場景實際生成的畫面（SCENE）。判斷 SCENE 裡的人物是否看起來是同一個角色（髮型/髮色、臉型、大致年齡、服裝風格是否一致；不要求像素級相同，允許角度/表情/光線差異）。" },

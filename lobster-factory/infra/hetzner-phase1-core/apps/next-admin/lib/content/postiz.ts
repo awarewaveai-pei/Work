@@ -420,6 +420,18 @@ export async function listGroups(): Promise<Array<{ id: string; name: string }>>
   return postizRequest("GET", "/groups");
 }
 
+/** One metric a day as the platform's provider labels it (v2.25.1; facebook.provider.js analytics / postAnalytics).
+ *  A provider without analytics answers [] (Bluesky). GETs do not count against API_LIMIT in v2.25.1. */
+export type PostizAnalyticsSeries = { label: string; percentageChange?: number; data: Array<{ total: number | string; date: string }> };
+
+export async function accountAnalytics(integrationId: string, days: number): Promise<PostizAnalyticsSeries[]> {
+  return postizRequest("GET", `/analytics/${encodeURIComponent(integrationId)}?date=${days}`);
+}
+
+export async function postAnalytics(postizPostId: string, days: number): Promise<PostizAnalyticsSeries[]> {
+  return postizRequest("GET", `/analytics/post/${encodeURIComponent(postizPostId)}?date=${days}`);
+}
+
 export function assertCanPublishNow(role: OpsRole, confirmPublishNow: boolean): void {
   if (role !== "owner" && role !== "admin") {
     throw new Error("Only owner or admin may publish immediately");

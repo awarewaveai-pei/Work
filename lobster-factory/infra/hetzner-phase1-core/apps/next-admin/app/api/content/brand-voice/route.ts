@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
@@ -55,6 +55,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: "需要至少 50 字的範例文字" }, { status: 400 });
   }
 
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
   const msg = await client.messages.create({
     model: "claude-haiku-4-5-20251001",

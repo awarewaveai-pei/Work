@@ -38,7 +38,7 @@
 ## 步驟
 1. `git log --oneline -10 -- lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/`
 2. 型別與欄位（含 `features[].billing: "contract" | "credits"`）；現有三列：social 的 `features` 從 `lib/social/` 實際付費動作盤點（AI 改寫、發文派送…）、cognitive 的 `features` 從 `ai_lego/apps/api/main.py` 9 個 `check_entitlement` 呼叫點的 capability id 盤點、hci 未開工可空；規則：`status: "available"` 的產品 `features` 不得為空（測試擋），`coming_soon` 可空（Codex 2026-10-18 M12）。
-3. 新增 video／tarot／studio／design／content／cs 六列，`status: "coming_soon"`、`selfSignup: false`、`loginSources: ["local"]`、`standalone` 依 ADR 017 §5 模組清單暫填 `false`，`features` 先填每個目錄裡實際呼叫付費 AI 的動作各一條（grep `lib/ai/claude-request.ts`、`replicate` 的呼叫端）。
+3. 新增 video／tarot／studio／design／content／cs 六列，`status: "coming_soon"`、`selfSignup: false`、`loginSources: ["local"]`、`standalone` 依 ADR 017 §5 模組清單暫填 `false`，`features` 先填每個目錄裡實際呼叫付費 AI 的動作各一條（grep `lib/ai/gateway.ts`、`replicate` 的呼叫端）。
 4. 測試加三條：`every directory under app/(shell)/{tools,ops} and app/(shell)/* maps to a product or a listed back-office or staff utility`；`every feature declares a limit kind and no buyout module carries SAFETY_GATE`；`staff utilities import no paid SDK`（掃 `app/(shell)/tools/theme/**`、`ai-models/**` 的 import 字串）。
 5. 寫產生器與其測試。
 6. 跑驗收。

@@ -4,6 +4,7 @@ import { putSecret } from "@/lib/secret-vault";
 import { resolveOpsRole, canCreateAiImageJob, canWriteTenantConfig } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { assertMediaProviderAllowed } from "@/lib/content/video/provider-policy";
+import { createEntitlementStore } from "@/lib/entitlements/tables";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,11 +27,13 @@ export async function GET(req: Request): Promise<Response> {
   if (!db) return new NextResponse("db unavailable", { status: 503 });
   const [account, ledger, providers] = await Promise.all([
     db.from("media_billing_accounts").select("organization_id, plan, status, monthly_credit_limit, hard_credit_limit, current_period_end, metadata").eq("organization_id", organizationId).maybeSingle(),
-    db.from("media_credit_ledger").select("units").eq("organization_id", organizationId),
+    createEntitlementStore(db).getCreditBalance(organizationId)
+      .then((data) => ({ data, error: null }))
+      .catch((error: Error) => ({ data: null, error })),
     db.from("media_provider_profiles").select("id, provider, mode, enabled, settings, updated_at").eq("organization_id", organizationId).order("provider"),
   ]);
   if (account.error || ledger.error || providers.error) return NextResponse.json({ ok: false, error: account.error?.message ?? ledger.error?.message ?? providers.error?.message }, { status: 500 });
-  const balance = (ledger.data ?? []).reduce((n, row) => n + Number(row.units ?? 0), 0);
+  const balance = ledger.data;
   return NextResponse.json({ ok: true, account: account.data ?? { organization_id: organizationId, plan: "free", status: "active", monthly_credit_limit: 0, hard_credit_limit: 0 }, balance, providers: providers.data ?? [] });
 }
 

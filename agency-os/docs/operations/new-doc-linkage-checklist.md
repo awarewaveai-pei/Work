@@ -86,5 +86,5 @@ powershell -ExecutionPolicy Bypass -File .\scripts\doc-sync-automation.ps1 -Chan
 - `docs/operations/end-to-end-linkage-checklist.md`
 - `docs/operations/GOVERNED_SYSTEM_BUILD_SOP.md`
 
-_Last synced: 2026-10-14 02:10:48 UTC_
+_Last synced: 2026-10-18 02:09:52 UTC_
 

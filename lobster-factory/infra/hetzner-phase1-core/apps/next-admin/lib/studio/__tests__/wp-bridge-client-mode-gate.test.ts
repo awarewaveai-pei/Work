@@ -32,7 +32,7 @@ vi.stubGlobal("fetch", fetchMock);
 const SEED_B64 = Buffer.alloc(32, 7).toString("base64");
 const savedEnv = { ...process.env };
 
-const { bridgePost } = await import("../wp-bridge-client");
+const { bridgePost } = await import("../../payments/woo");
 
 beforeEach(() => {
   checkProductionChangeAllowed.mockClear();

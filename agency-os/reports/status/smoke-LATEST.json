@@ -1,7 +1,7 @@
 ﻿{
     "checks":  {
                    "docker_watchdog":  "warn:shortcut_unguarded",
-                   "deploy_hold":  "ok:none",
+                   "deploy_hold":  "warn:hold_local_only_not_on_origin_main",
                    "pod_order_inbox_detail":  {
                                                   "ok":  true,
                                                   "deferred":  0,
@@ -12,13 +12,13 @@
                                                   "stuckPending":  0,
                                                   "capped":  false
                                               },
-                   "client_mail":  "ok:no_failures_7d_last_send_2d",
-                   "nightly_health":  "warn:fail_[FAIL]_Nightly_health:_AO-CLOSE_archive_items_not_lifted_to_TASKS.md_(see_archive-lift-last.json)",
-                   "codex_parity":  "warn:Codex_session_rollout-2026-10-11T13-17-59-01a12965-7d8a-7e31-bb83-f94c0aa5be3b.jsonl_ran_after_the_hook_file_was_written_but_no_hook_heartbe",
+                   "client_mail":  "ok:no_failures_7d_last_send_7d",
+                   "nightly_health":  "ok",
+                   "codex_parity":  "ok:parity",
                    "n8n_failures":  "ok:none_24h",
                    "pod_order_inbox":  "ok",
                    "repair_center":  "ok",
-                   "ci_health":  "warn:fail_[FAIL]_CI:_\u0027Cognitive_OS_full_suite\u0027_has_been_failing_for_3_consecutive_run(s)_over_1_day(s)_-_this_",
+                   "ci_health":  "warn:fail_[FAIL]_CI:_\u0027Cognitive_OS_full_suite\u0027_has_been_failing_for_3_consecutive_run(s)_over_6_day(s)_-_this_",
                    "client_sites":  "ok:6_active",
                    "repair_detail":  {
                                          "github_app_status":  "unverified",
@@ -48,11 +48,9 @@
                },
     "overall":  "WARN",
     "blockers":  [
-                     "[FAIL] CI: \u0027Cognitive OS full suite\u0027 has been failing for 3 consecutive run(s) over 1 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/38493906498",
-                     "[FAIL] Nightly health: AO-CLOSE archive items not lifted to TASKS.md (see archive-lift-last.json)",
-                     "[WARN] Backup: WARN -- see reports/status/backup-health-LATEST.md for per-host detail"
+                     "[FAIL] CI: \u0027Cognitive OS full suite\u0027 has been failing for 3 consecutive run(s) over 6 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/38493906498"
                  ],
-    "generated":  "2026-10-14 09:55:16",
+    "generated":  "2026-10-19 13:11:33",
     "blind_spots":  [
 
                     ]

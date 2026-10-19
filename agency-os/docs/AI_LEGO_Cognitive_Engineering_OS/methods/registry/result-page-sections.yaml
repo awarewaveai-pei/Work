@@ -1,0 +1,69 @@
+# The result page's cards, one entry each: what the card answers (every tool lesson's 看懂結果 tab prints `answers`)
+# and the card's 怎麼讀／你要做的 strip (apps/cognitive-web/components/result/ResultPage.tsx prints `read` / `act`, or
+# `read_else` / `act_else` when the card has nothing to point at). One file for both, so the lesson can never describe
+# a card the page does not have. COS/docs/mockups/lessonkit.py validates it and writes it into
+# apps/cognitive-web/lib/toolsheets.generated.ts (sync-design-system.py; check-mocks.py fails while that file differs).
+# `answers` and the reading steps are the same for every tool: no unit word, no tool name. `read` / `act` may name the
+# page's own values as {U} (層, 根骨, 步…) and the {…} below, which ResultPage fills; any other {…} fails validation.
+# leverage / confidence: the words the page and the lessons print for a reading's leverage and a finding's confidence.
+version: 1
+leverage: {low: 低, mid: 中低, high: 高, max: 最高}
+confidence: {high: 高, mid: 中, medium: 中, low: 低}
+steps:
+  - [第 1 步 先看結論和圖, ① 的一句話和每個發現的信心；再看 ② 你填的每一段落在圖上哪一格。]
+  - [第 2 步 看圖表和逐格解讀, ③ 每張圖回答一個問題；④ 每一格一張卡，同一個格式。]
+  - [第 3 步 看總結、方案、下一步, ⑤ 問題在哪、先做哪裡、還缺什麼；⑦ 選方案、排計畫；⑧ 接著用哪個工具，不做也可以。]
+sections:
+  "0":
+    name: 頁首
+    answers: 上面是你填的格子，改了可以再執行一次；右上角「怎麼用？」打開這堂課。狀態列說這頁是 AI 草稿還是已核准、你填了幾段話、外部來源幾筆、每一格填了沒有、這次花了多少。
+  "1":
+    name: ① 結論
+    answers: 一句話結論，加上幾個發現；每個發現標信心（高／中／低）和理由。有「改判條件」時，寫的是出現哪些證據，結論就要改。最下面寫你自己的判斷：你的原話才是紀錄，AI 寫的只是附掛。
+    read: 先看一句話，再看{findings}發現各自的信心。
+    act: 在最下面寫你自己的判斷。
+  "2":
+    name: ② 圖
+    answers: 你填的每一段放在圖上的哪一格；★ 是建議先出手的位置。圖下的「資料厚度」說每一格你填了幾句，薄的那一格，結論的信心就低。
+    read: "{order}★ 是建議先出手的{U}。"
+    read_else: 圖上每一個位置都對應你填的一段。
+    act: 看你填的{count}段話有沒有放錯{U}。
+    act_else: 看你填的內容有沒有放錯位置。
+  "3":
+    name: ③ 圖表分析
+    answers: 每張圖回答一個問題：圖 A 趨勢（真的在變嗎；同一件事你寫了兩個以上的數字才畫）、圖 B 因果迴路（是什麼在推），有的工具還有自己的圖。圖下寫怎麼看、看到什麼、來源；兩條線畫在一起時，多一句「注意」。
+    read: 每張圖回答一個問題，讀法寫在圖下。
+    act: 不用做；圖 A 沒畫出來時，是你填的內容裡同一件事的數字不到兩個。
+  "4":
+    name: ④ 逐一解讀
+    answers: 每一格一張卡，同一個格式：這格問什麼 → 你填的 → 這代表什麼 → 在這裡出手會怎樣（附槓桿：低／中低／高／最高）→ 對應 ⑦ 的哪個方案 → 資料厚度。找出最薄的一格，之後補。
+    read: "{cards}卡同一格式，{order}。"
+    act: 找出資料最薄的一{U}，之後補。
+  "5":
+    name: ⑤ 總結
+    answers: 三件事：主要發現（問題在哪）、建議順序（先做哪裡）、證據缺口（還缺什麼資料）。缺的資料你手上有，就回上面補、再執行一次。
+    read: 三句話：問題在哪、先做哪{U}、還缺什麼。
+    act: 手上有缺口的資料，就回上面補、再執行。
+  "6":
+    name: ⑥ 對照表
+    answers: 一列一格，並排比：這格問的問題、你的案例、建議動作；★ 是建議先出手的列。
+    read: 一列一{U}，★ 是建議先出手的列。
+    read_else: 一列一個你填的欄位。
+    act: "{rows}都要有人負責，填在 ⑦ B 表。"
+    act_else: 看哪一列最薄，就先補那一列。
+  "7":
+    name: ⑦ 解決方案
+    answers: A 幾條路比一比（見效＝多久看得到、成本、持久度＝會不會回彈、風險），可以複選；B 把選的路排成行動計畫，負責人、期限、目標由你定，可以存成任務；C 用來追蹤的數字，現況由系統帶入、目標由你定。到期重跑要你按鈕排提醒，系統不會自己重跑。
+    read: A 選方案（可複選）、B {plan}、C {metrics}。
+    act: 選方案、按「填入建議」再改，存成任務。
+    act_else: 這次沒有方案草稿；先用 ① 的建議和 ⑧ 的下一步。
+  "8":
+    name: ⑧ 下一步
+    answers: 旅程列說你在哪；每張卡是一個建議的下一個工具：回答什麼、會帶入你填的哪些內容、還要你填什麼、要花多少。按下去在新分頁開預填好的表單，你確認才執行、才花錢。把幾步串成一次跑完的工作流還在做。
+    read: 旅程列是你在哪；每張卡寫做了會得到什麼、要你再填什麼。
+    act: 選一張，或都不選。
+  "9":
+    name: ⑨ 引註與核准
+    answers: 每個 [n] 指到一段來源：「你的輸入」是你填的原文，「外部來源」是你加進案子的資料。最下面：核准＝這頁成為正式紀錄；退回＝寫原因重做，這一版保留；專家模式收著閘門表和完整資料。
+    read: "[n] 是那句話的來源。"
+    act: 引錯了，按下方「退回並說原因」。

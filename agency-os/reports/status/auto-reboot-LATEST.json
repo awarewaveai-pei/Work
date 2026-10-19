@@ -1,5 +1,5 @@
 {
-    "generated_utc":  "2026-10-14 01:53:27",
+    "generated_utc":  "2026-10-19 05:09:28",
     "overall_label":  "healthy",
     "overall_user":  "PASS",
     "ssot":  {
@@ -22,8 +22,8 @@
                                       "boot_notify_telegram":  "present",
                                       "reboot_pending":  "0",
                                       "reboot_pkgs":  "",
-                                      "kernel":  "6.8.0-146-generic",
-                                      "last_reboot":  "Fri Oct 9 20:03 still"
+                                      "kernel":  "6.8.0-147-generic",
+                                      "last_reboot":  "Wed Oct 14 20:04 still"
                                   },
                      "verdict":  {
                                      "label":  "healthy",

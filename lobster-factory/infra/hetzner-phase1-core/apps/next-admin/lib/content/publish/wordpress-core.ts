@@ -11,7 +11,7 @@
  */
 import { resolveWpSite, getWpSites, wpAuthHeader } from "@/lib/content/wp-sites";
 import { OrgAccessError } from "@/lib/tenant-guard";
-import { isBridgeConfigured, bridgeBaseUrl, createPost } from "@/lib/studio/wp-bridge-client";
+import { isBridgeConfigured, bridgeBaseUrl, createPost } from "@/lib/payments/woo";
 import { markdownToBlocks } from "@/lib/content/markdown-to-blocks";
 import { decodeWpEntities } from "@/lib/content/wp-entities";
 import { normalizeManyForWp } from "@/lib/studio/wp-web-image";

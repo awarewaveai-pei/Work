@@ -9,7 +9,7 @@
 //   - lib/content/publish/wordpress-core.ts publishToWordPress (resolved WpSite)
 //   - content/wp-post PATCH+DELETE, video/embed-to-wp (resolved WpSite)
 //   - content/social-publish (lib/content/social-org.ts: the site's org, or the given org id)
-//   - lib/studio/wp-bridge-client.ts bridgePost -- every bridge write (wp_sites row on the bridge host)
+//   - lib/payments/woo.ts bridgePost -- every bridge write (wp_sites row on the bridge host)
 //   - build/provision-services, provision (hetzner_cloud dispatch only) (validated body)
 //   - build/runs (caller-supplied organizationId, before org resolution/creation)
 //   - workflows (packages/workflows src/lib/systemMode.ts, a parallel copy of this rule held to

@@ -11,7 +11,7 @@ const createNewsletter = vi.hoisted(() =>
     value: { campaign_id: 1, campaign_status: "draft", edit_url: "u" },
   })),
 );
-vi.mock("@/lib/studio/wp-bridge-client", () => ({
+vi.mock("@/lib/crm/fluentcrm", () => ({
   isBridgeConfigured: () => true,
   createNewsletter,
 }));

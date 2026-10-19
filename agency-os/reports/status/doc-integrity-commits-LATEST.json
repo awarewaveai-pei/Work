@@ -1,7 +1,7 @@
 ﻿{
-    "generatedAtUtc":  "2026-10-03T06:57:42Z",
-    "source":  "ao-close.ps1 (report skeleton commit)",
-    "sha":  "5f028e02b1f39e0046a510e760fbbee72ca32115",
+    "generatedAtUtc":  "2026-10-16T02:42:09Z",
+    "source":  "commit-checkpoint.ps1",
+    "sha":  "db0e713922cc9c9eebbd2d6967357e826d3e154e",
     "ok":  true,
     "brokenCount":  0,
     "broken":  [

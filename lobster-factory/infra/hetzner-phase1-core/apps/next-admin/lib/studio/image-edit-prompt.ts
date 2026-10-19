@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import {
   DEFAULT_AI_TEXT_MODEL,
   isOpenAiTextModel,
@@ -7,7 +7,7 @@ import {
   type AiTextModel,
 } from "../ai/text-model-options";
 import { logAiCall } from "../ai/log-ai-call";
-import { claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/claude-request";
+import { claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/gateway";
 import { isStudioModel, type StudioModel } from "./model-options";
 import type { StyleAnchor } from "./style-design-workbench";
 
@@ -106,6 +106,7 @@ async function generateWithAnthropic(model: AiTextModel, userMessage: string, ac
   if (!apiKey) return { ok: false, status: 503, error: "missing_anthropic_api_key" };
 
   try {
+    const Anthropic = await loadAnthropic();
     const client = new Anthropic({ apiKey });
     const msg = await client.beta.messages.create({
       ...claudeParams(model, 350, "low"),

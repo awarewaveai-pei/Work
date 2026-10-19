@@ -1,0 +1,33 @@
+// /smartlink/<slug>/go/<item> -- a button on the public smart link page (SOCIAL_MANAGER_PLAN.md C26): 302 to the link's
+// url, counted in social_smart_link_clicks (0105 social_smart_link_click). Counted once per visitor, link and day
+// (lib/social/smartlink.ts ClickGate); a robot, a repeat or a HEAD is sent on without counting. The url comes only from
+// the database row of a published page's active link, never from the request: not an open redirect.
+import { NextResponse } from "next/server";
+import { ClickGate, SLUG_RE, countClick, itemUrl, visitorAddress } from "@/lib/social/smartlink";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const gate = new ClickGate();
+type Ctx = { params: Promise<{ slug: string; item: string }> };
+
+const gone = () => new NextResponse("這個連結已經不在了。", { status: 404, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
+const go = (url: string) => NextResponse.redirect(url, { status: 302, headers: { "cache-control": "no-store" } });
+
+async function send(req: Request, ctx: Ctx, mayCount: boolean): Promise<Response> {
+  const { slug, item } = await ctx.params;
+  if (!SLUG_RE.test(slug) || !UUID_RE.test(item)) return gone();
+  try {
+    // the gate's day is UTC, the count's is the brand's (0105): at worst a visitor counts twice around midnight
+    const count = mayCount && gate.shouldCount(visitorAddress(req.headers), req.headers.get("user-agent") ?? "", item, new Date().toISOString().slice(0, 10));
+    const url = count ? await countClick(slug, item) : await itemUrl(slug, item);
+    return url ? go(url) : gone();
+  } catch (e) {
+    console.error("[smartlink/go]", e);
+    return new NextResponse("暫時無法前往，請稍後再試。", { status: 503, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
+  }
+}
+
+export const GET = (req: Request, ctx: Ctx) => send(req, ctx, true);
+export const HEAD = (req: Request, ctx: Ctx) => send(req, ctx, false);

@@ -110,4 +110,17 @@ export const api = {
   saveAutoRule: (brand: string, id: string | null, rule: Omit<AutoRule, "id" | "hits">) =>
     call<{ id: string; postVersion: number | null }>("POST", "/api/social/auto-rules", { brand, id, rule }),
   deleteAutoRule: (brand: string, id: string) => call<{ postVersion: number | null }>("DELETE", `/api/social/auto-rules?${q({ brand, id })}`),
+  // C26: the brand's smart link page (lib/social/smartlink.ts)
+  smartLink: (brand: string) => call<SmartLinkData>("GET", `/api/social/smartlink?${q({ brand })}`),
+  saveSmartLink: (brand: string, link: SmartLinkData["link"] & object, items: Array<{ id?: string; title: string; url: string; active: boolean }>) =>
+    call<{ slug: string }>("PUT", "/api/social/smartlink", { brand, link, items }),
+  // C24: 數據分析; account null = every channel
+  metrics: (brand: string, days: number, account: string | null) =>
+    call<{ analytics: import("@/lib/social/metrics").Analytics }>("GET", `/api/social/metrics?${q({ brand, days: String(days), ...(account ? { account } : {}) })}`),
 };
+/** GET /api/social/smartlink; base = the public address up to the slug; clicks = the brand's last 28 days */
+export interface SmartLinkData {
+  link: { slug: string; title: string; bio: string; colour: import("./model").Tag["colour"]; published: boolean } | null;
+  items: Array<{ id: string; title: string; url: string; active: boolean; clicks: number }>;
+  suggested: string; base: string;
+}

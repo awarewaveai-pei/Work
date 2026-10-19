@@ -7,7 +7,7 @@
 - `withFeature("<feature_key>", handler)`：收費 API 路由的唯一包裝，先 `can()` 再呼叫 handler，並把「路由→功能」登記進 `lib/entitlements/route-features.ts` 的程式內表（第 6 步 scope 檢查查它；Codex M20）。
 - `lib/ai/gateway.ts` 每次呼叫前必帶 grant；沒有 grant 拋 `EntitlementRequired`（型別強制：參數不可省）。
 - 代操授權：員工替組織 X 操作時，`on_behalf_of = X` 只在該員工對 X 有角色（`lib/social/authz.ts` 的成員列或 `ops_role` owner/admin）時簽發；否則 403 `not_authorized_for_org`。`actorOf()` 加 `orgId`（從路由 `[slug]` 或品牌 id 解析）。
-- 呼叫端清單（grep `claude-request`／`replicate`／`fal` 的呼叫檔，第 1 步 features 的來源）：社群 AI 改寫、影片管線、塔羅生圖、文章產生、客服 AI 回覆、蒐集器 AI 摘要、Content Studio。每個收費按鈕前一次 `can()`，畫面用一份簽章的「此帳戶能用的功能」灰掉沒買的按鈕（快取 5 分鐘）。
+- 呼叫端清單（grep `gateway`／`replicate`／`fal` 的呼叫檔，第 1 步 features 的來源）：社群 AI 改寫、影片管線、塔羅生圖、文章產生、客服 AI 回覆、蒐集器 AI 摘要、Content Studio。每個收費按鈕前一次 `can()`，畫面用一份簽章的「此帳戶能用的功能」灰掉沒買的按鈕（快取 5 分鐘）。
 - 認知平台：`Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py` 改成 `can()` 薄接頭（加 `actor`、回 grant 物件）；`ai_lego/apps/api/main.py` 9 處呼叫端同 commit 改；`ai_lego/platform/ai_execution/gateway.py` 呼叫端必帶 grant。HCI 照 ADR-0031 四道閘位置，欄位用本 ADR §3。
 
 ## Files

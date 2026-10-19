@@ -96,6 +96,41 @@ const LOG = [
   { id: 1, at: day(-2, 10), actor: "system", action: "published", post_id: POSTS[0].id, detail: {} },
 ];
 
+// C24 數據分析: sample numbers in the API's shape (lib/social/metrics.ts Analytics). Facebook has reach / impressions /
+// engagement, Bluesky followers / posts / engagement, the expired Instagram nothing -- each gap with its reason.
+function analytics(days, account) {
+  const iso = (d) => { const x = new Date(now); x.setDate(x.getDate() + d); return x.toISOString().slice(0, 10); };
+  const dayList = (off) => Array.from({ length: days }, (_, i) => iso(off - days + 1 + i));
+  const ids = account ? [account] : ACCOUNTS.map((a) => a.id);
+  const has = (id) => ids.includes(id);
+  const fb = has(ACCOUNTS[1].id), bs = has(ACCOUNTS[0].id);
+  const wave = (k, base, amp) => (i) => Math.max(0, Math.round(base + amp * Math.sin((i + k) / 2.3) + ((i * 7 + k) % 5)));
+  const line = (on, f) => Array.from({ length: days }, (_, i) => (on ? f(i) : null));
+  const series = {
+    followers: { cur: line(bs, (i) => 120 + Math.floor(i / 3)), prev: line(bs, (i) => 112 + Math.floor(i / 4)) },
+    reach: { cur: line(fb, wave(1, 60, 25)), prev: line(fb, wave(4, 50, 20)) },
+    impressions: { cur: line(fb, wave(2, 140, 50)), prev: line(fb, wave(5, 120, 40)) },
+    engagement: { cur: line(fb || bs, wave(3, 9, 5)), prev: line(fb || bs, wave(6, 7, 4)) },
+    posts: { cur: line(bs, (i) => (i % 3 === 0 ? 1 : 0)), prev: line(bs, (i) => (i % 4 === 0 ? 1 : 0)) },
+  };
+  series.rate = { cur: line(fb, (i) => Math.round((series.engagement.cur[i] / Math.max(1, series.reach.cur[i])) * 1000) / 10), prev: line(fb, (i) => Math.round((series.engagement.prev[i] / Math.max(1, series.reach.prev[i])) * 1000) / 10) };
+  const sum = (vs) => vs.some((v) => v != null) ? vs.reduce((a, v) => a + (v ?? 0), 0) : null;
+  const last = (vs) => [...vs].reverse().find((v) => v != null) ?? null;
+  const kpis = Object.fromEntries(Object.entries(series).map(([m, s]) => [m, m === "followers" ? { value: last(s.cur), prev: last(s.prev) }
+    : m === "rate" ? { value: fb ? Math.round((sum(series.engagement.cur) / sum(series.reach.cur)) * 1000) / 10 : null, prev: fb ? Math.round((sum(series.engagement.prev) / sum(series.reach.prev)) * 1000) / 10 : null }
+    : { value: sum(s.cur), prev: sum(s.prev) }]));
+  const cur = dayList(-1);
+  const gaps = [
+    ...(fb ? [{ account_id: ACCOUNTS[1].id, fields: ["followers"], reason: "Postiz 只提供每天新增的追蹤數，沒有追蹤者總數" }, { account_id: ACCOUNTS[1].id, fields: ["posts"], reason: "Postiz 沒有提供每天的發文數" }] : []),
+    ...(bs ? [{ account_id: ACCOUNTS[0].id, fields: ["reach", "impressions"], reason: "Bluesky 不提供觸及和曝光數" }] : []),
+    ...(has(ACCOUNTS[2].id) ? [{ account_id: ACCOUNTS[2].id, fields: ["followers", "reach", "impressions", "engagement", "posts"], reason: "要等這個平台審核通過分析權限" }] : []),
+  ];
+  const posts = [POSTS[0], ...TRASHED].slice(0, 3).map((x, i) => ({ id: `${x.id}-a${i}`, body: x.body, published_at: day(-1 - i * 3, 10), account_ids: [ACCOUNTS[i % 2].id],
+    thumb: null, reach: i % 2 ? 84 - i : null, engagement: 6 + i, rate: i % 2 ? Math.round(((6 + i) / (84 - i)) * 1000) / 10 : null })).filter((x) => x.account_ids.some(has));
+  return { period: { from: cur[0], to: cur.at(-1), prevFrom: dayList(-1 - days)[0], prevTo: dayList(-1 - days).at(-1) }, days: cur, accounts: ACCOUNTS,
+    gaps, empty: [], posts, latestDay: cur.at(-1), kpis, series };
+}
+
 async function handle(route) {
   const req = route.request(); const url = new URL(req.url()); const p = url.pathname;
   const ok = (body) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, ...body }) });
@@ -112,6 +147,7 @@ async function handle(route) {
   if (p === "/api/social/settings") return ok({ requireReview: true });
   if (p === "/api/social/members") return ok({ members: [{ user_id: "u1", email: "pei@example.com", role: "owner", created_at: day(-10, 1) }, { user_id: "u2", email: "client@example.com", role: "editor", created_at: day(-1, 1) }] });
   if (p === "/api/social/log") return ok({ log: LOG });
+  if (p === "/api/social/metrics") return ok({ analytics: analytics(Number(url.searchParams.get("days") ?? 28), url.searchParams.get("account")) });
   if (p === "/api/social/lists" ) return ok({ lists: LISTS });
   if (p.startsWith("/api/social/lists/")) return ok({ list: LISTS[0], items: [POSTS[7]], upcoming: [POSTS[6]] });
   if (p === "/api/social/posts" && req.method() === "GET") {
@@ -199,8 +235,17 @@ await shot("x-compose-scheduled");
 await page.goto(`http://127.0.0.1:3902/tools/social/compose/00000000-0000-4000-8000-000000000005?brand=${BRAND.id}`, { waitUntil: "networkidle" });
 await page.getByLabel("貼文內容").waitFor();
 await shot("x-compose-review");
-// the five sections that are shells until their cards (C24-C29)
-for (const [label, key] of [["數據分析", "analytics"], ["報表管理", "reporting"], ["訊息收件匣", "inbox"], ["智慧連結", "smartlinks"], ["廣告管理", "ads"]]) {
+// C24 數據分析: all channels / 28 days, then one channel (Bluesky) with a card it has no number for picked
+await page.getByRole("button", { name: "數據分析", exact: true }).click();
+await page.waitForURL(/\/tools\/social\/analytics/);
+await page.getByText("沒有數字的原因").waitFor({ timeout: 10000 });
+await shot("12-analytics");
+await page.locator(".an-chan .sm-cmain", { hasText: "Soulful Expression" }).first().click();
+await page.getByRole("button", { name: "90 天" }).click();
+await page.locator(".an-card", { hasText: "觸及" }).click();
+await shot("x-analytics-bluesky-90");
+// the sections that are shells until their cards (C25-C29)
+for (const [label, key] of [["報表管理", "reporting"], ["訊息收件匣", "inbox"], ["智慧連結", "smartlinks"], ["廣告管理", "ads"]]) {
   await page.getByRole("button", { name: label, exact: true }).click();
   await page.waitForURL(new RegExp(`/tools/social/${key}`));
   await shot(`10-${key}`);

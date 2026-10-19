@@ -1,3 +1,4 @@
+import { loadAnthropic } from "@/lib/ai/gateway";
 /**
  * trending-sources.ts — 搜尋積木家族（kind:"search"）
  *
@@ -28,7 +29,7 @@ export async function aiChat(prompt: string, _timeoutMs = 10000): Promise<string
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return "";
   try {
-    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const Anthropic = await loadAnthropic();
     const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
       model: "claude-haiku-4-5-20251001",

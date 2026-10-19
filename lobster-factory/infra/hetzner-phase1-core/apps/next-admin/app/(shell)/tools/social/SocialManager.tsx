@@ -16,7 +16,7 @@ import { useLists } from "./Lists";
 import Editor from "./Editor";
 import Icon from "./Icon";
 import PlanTabs from "./PlanTabs";
-import { isView, routeHref, socialBase, type Section, type SocialRoute, type View } from "./routes";
+import { isView, routeHref, socialBase, type OtherSection, type Section, type SocialRoute, type View } from "./routes";
 import SectionShell from "./SectionShell";
 import Settings from "./Settings";
 import Toolbar, { noFilters, type Filters } from "./Toolbar";
@@ -38,6 +38,8 @@ export interface Slots {
   sideView?: (view: View, ctx: SlotContext) => ReactNode;
   headerExtra?: (ctx: SlotContext) => ReactNode;
   settingsExtra?: (ctx: SlotContext) => ReactNode;
+  /** a top-bar section's page (C24 analytics, C26 smart links, ...); null = the not-open shell */
+  section?: (section: OtherSection, ctx: SlotContext) => ReactNode;
 }
 export interface SlotContext {
   brand: Brand; accounts: Account[]; posts: Post[]; media: MediaItem[]; today: string;
@@ -306,7 +308,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
 
   // ---- other sections: the shell until their card lands ----
   if (route.kind === "section") return (
-    <div className="sm-app">{top}{note && <div className="sm-subbar">{statusLine}</div>}<main className="sm-main sm-full"><SectionShell which={route.section} /></main></div>
+    <div className="sm-app">{top}{note && <div className="sm-subbar">{statusLine}</div>}<main className="sm-main sm-full">{slots.section?.(route.section, ctx) ?? <SectionShell which={route.section} />}</main></div>
   );
 
   // ---- the composer's own page (decision 5) ----

@@ -66,6 +66,7 @@ COPY --chown=cognitive:cognitive Projects/internal/cognitive-engineering-os/test
 COPY --chown=cognitive:cognitive Projects/internal/cognitive-engineering-os/eval /app/Projects/internal/cognitive-engineering-os/eval
 COPY --chown=cognitive:cognitive Projects/internal/cognitive-engineering-os/scripts /app/Projects/internal/cognitive-engineering-os/scripts
 COPY --chown=cognitive:cognitive Projects/internal/cognitive-engineering-os/apps/cognitive-web/fixtures /app/Projects/internal/cognitive-engineering-os/apps/cognitive-web/fixtures
+COPY --chown=cognitive:cognitive lobster-factory/packages/contracts/fixtures/permit-v1 /app/lobster-factory/packages/contracts/fixtures/permit-v1
 USER cognitive
 HEALTHCHECK NONE
 CMD ["bash", "scripts/test-gate.sh", "--all"]

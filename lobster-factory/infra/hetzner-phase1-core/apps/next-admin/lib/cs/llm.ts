@@ -2,11 +2,11 @@
 // every call metered via logAiCall (best-effort, never throws). Mirrors the existing patterns in
 // lib/ops-inbox/ai/{claude,gemini}.ts (AbortController timeout / withTimeout race).
 
-import Anthropic from "@anthropic-ai/sdk";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { loadGoogleGenerativeAI } from "@/lib/ai/gateway";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { CS_MODELS, CS_TIMEOUTS } from "@/lib/cs/config";
-import { claudeParams } from "@/lib/ai/claude-request";
+import { claudeParams } from "@/lib/ai/gateway";
 
 export interface ClaudeTurnInput {
   model: string;
@@ -24,6 +24,7 @@ export async function claudeTurn(input: ClaudeTurnInput): Promise<Anthropic.Mess
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("missing ANTHROPIC_API_KEY");
 
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? CS_TIMEOUTS.generateMs);
@@ -73,6 +74,7 @@ const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> => {
 async function geminiText(prompt: string, timeoutMs: number): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("missing GEMINI_API_KEY");
+  const GoogleGenerativeAI = await loadGoogleGenerativeAI();
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: CS_MODELS.geminiFallback });
   const result = await withTimeout(model.generateContent(prompt), timeoutMs);

@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-10-14T01:53:56.3356455Z",
+    "generatedAtUtc":  "2026-10-19T05:09:59.6330784Z",
     "branch":  "main",
     "runsPerWorkflow":  20,
     "probeOk":  true,
@@ -22,19 +22,27 @@
                           "url":  ""
                       },
                       {
+                          "name":  "Backup scripts tests",
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38664005591"
+                      },
+                      {
                           "name":  "Cognitive OS eval harness",
                           "latest":  "success",
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38363135329"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38682512724"
                       },
                       {
                           "name":  "Cognitive OS full suite",
                           "latest":  "failure",
                           "consecutiveFailures":  3,
                           "failingSinceUtc":  "2026-10-13T00:13:37Z",
-                          "failingDays":  1,
+                          "failingDays":  6,
                           "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38493906498"
                       },
                       {
@@ -51,7 +59,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38025804219"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38677064057"
                       },
                       {
                           "name":  "next-admin — TypeScript typecheck",
@@ -59,7 +67,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38326184497"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39091839257"
                       },
                       {
                           "name":  "Perplexity Search-only guard",
@@ -67,7 +75,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38497359996"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39184609666"
                       },
                       {
                           "name":  "Release Gate (main)",
@@ -91,7 +99,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38497360055"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39184609670"
                       },
                       {
                           "name":  "Tenant staging SSOT",
@@ -107,7 +115,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38025804218"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38598733626"
                       },
                       {
                           "name":  "Weekly workflows security audit",
@@ -129,6 +137,6 @@
     "verdict":  "broken",
     "verdictLabel":  "FAIL",
     "findings":  [
-                     "\u0027Cognitive OS full suite\u0027 has been failing for 3 consecutive run(s) over 1 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/38493906498"
+                     "\u0027Cognitive OS full suite\u0027 has been failing for 3 consecutive run(s) over 6 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/38493906498"
                  ]
 }

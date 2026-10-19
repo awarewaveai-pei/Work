@@ -7,7 +7,7 @@ import { toProductImage } from "../../../../lib/studio/to-product-image";
 import { normalizeManyForWp } from "../../../../lib/studio/wp-web-image";
 import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
-import { createWooProduct, isBridgeConfigured, listBridgeClients, bridgeSiteOrg, bridgeBaseUrl } from "../../../../lib/studio/wp-bridge-client";
+import { createWooProduct, isBridgeConfigured, listBridgeClients, bridgeSiteOrg, bridgeBaseUrl } from "../../../../lib/payments/woo";
 import { blockedChangeResponse } from "../../../../lib/system-modes/blocked-change";
 import { checkProductionChangeAllowed } from "../../../../lib/system-modes/production-change-gate";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";

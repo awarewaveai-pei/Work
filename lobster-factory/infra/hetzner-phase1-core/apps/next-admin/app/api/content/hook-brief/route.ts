@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
@@ -72,6 +72,7 @@ ${typeSections}
 Return ONLY a valid JSON object where each key is the hook type name and the value is the brief direction string.
 Example: {"Question": "...", "Statistical or Fact": "..."}`;
 
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
   const msg = await client.messages.create({
     model: "claude-haiku-4-5-20251001",

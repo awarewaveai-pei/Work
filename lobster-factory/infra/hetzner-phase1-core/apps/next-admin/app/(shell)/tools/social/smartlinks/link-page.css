@@ -1,0 +1,13 @@
+/* The smart link page (C26): public at /smartlink/<slug> and the editor's preview. App tokens only (page-rules.test.ts);
+   text >= 14px. --sl-c = the button colour, a tag colour token picked by the brand (model.ts TAG_TOKEN). */
+.sl-page { width: 100%; max-width: 420px; margin: 0 auto; padding: 28px 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; color: var(--text-primary); font-size: var(--font-size-base); box-sizing: border-box; }
+.sl-av { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-light); color: var(--accent); font-size: var(--font-size-xl); font-weight: 700; flex: none; }
+.sl-title { margin: 0; font-size: var(--font-size-lg); font-weight: 700; overflow-wrap: anywhere; }
+.sl-bio { margin: 0; color: var(--text-muted); font-size: var(--font-size-base); line-height: 1.5; overflow-wrap: anywhere; }
+.sl-links { width: 100%; display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.sl-btn { display: block; padding: 12px 16px; border-radius: var(--radius); background: var(--sl-c, var(--accent)); color: var(--btn-primary-text); font-weight: 600; font-size: var(--font-size-md); text-decoration: none; overflow-wrap: anywhere; }
+a.sl-btn:hover { opacity: .9; }
+a.sl-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+/* the public page around it */
+.sl-screen { min-height: 100vh; background: var(--bg-canvas); display: flex; justify-content: center; }

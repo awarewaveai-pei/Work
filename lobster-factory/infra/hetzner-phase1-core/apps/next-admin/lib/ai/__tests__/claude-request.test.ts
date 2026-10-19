@@ -6,7 +6,7 @@ import {
   claudeIncomplete,
   claudeParams,
   claudeText,
-} from "../claude-request";
+} from "../gateway";
 import { DEFAULT_AI_TEXT_MODEL } from "../text-model-options";
 
 describe("claudeParams", () => {

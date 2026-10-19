@@ -18,7 +18,7 @@ export class SocialStoreError extends Error {
   }
 }
 
-function db(): SupabaseClient {
+export function db(): SupabaseClient {
   const sb = getSupabaseWriteClient();
   if (!sb) throw new SocialStoreError(500, "Supabase client not configured");
   return sb;
@@ -31,7 +31,7 @@ async function logAction(sb: SupabaseClient, brandId: string, actor: string, act
   if (error) console.error(`[social] log ${action} for ${brandId}: ${error.message}`);
 }
 
-function fail(error: { code?: string; message: string }, what: string): never {
+export function fail(error: { code?: string; message: string }, what: string): never {
   const byCode: Record<string, 400 | 404 | 409> = {
     SC404: 404, SC409: 409, "23505": 409, "23503": 409,
     "23514": 400, "22P02": 400, "22023": 400, "23502": 400, "22003": 400, "21000": 400, "22007": 400, "22008": 400,

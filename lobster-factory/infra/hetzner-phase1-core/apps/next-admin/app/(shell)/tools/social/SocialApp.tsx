@@ -1,12 +1,14 @@
 "use client";
 // Where the cards' pieces meet: SocialManager (C6, frame C19) with the views the later cards add (slots), on one route.
 import { useRouter } from "next/navigation";
+import Analytics from "./(sections)/analytics/Analytics";
 import { ListDetail, ListsView } from "./Lists";
 import LogView from "./LogView";
 import { MembersSetting } from "./Members";
 import MediaView from "./MediaView";
 import { NeedsButton, ReviewSetting } from "./Review";
 import type { SocialRoute } from "./routes";
+import SmartLinks from "./smartlinks/SmartLinks";
 import SocialManager, { type SlotContext, type Slots } from "./SocialManager";
 
 // C7: the lists, and the open one beside them. Lists.tsx asks for the new-post editor after deleting a list: with no
@@ -28,6 +30,9 @@ const slots: Slots = {
     : null),
   headerExtra: (ctx) => <NeedsButton ctx={ctx} />,   // C8: the bell
   settingsExtra: (ctx) => <><ReviewSetting ctx={ctx} /><MembersSetting ctx={ctx} /></>,   // C8; members: ADR 018 §3
+  section: (s, ctx) => (s === "analytics" ? <Analytics ctx={ctx} />   // C24
+    : s === "smartlinks" ? <SmartLinks ctx={ctx} />   // C26
+    : null),
 };
 
 export default function SocialApp({ route = { kind: "plan" } }: { route?: SocialRoute }) {

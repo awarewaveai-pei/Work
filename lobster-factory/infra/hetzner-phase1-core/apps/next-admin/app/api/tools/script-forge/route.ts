@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { normalizeAiTextModel, isOpenAiTextModel, type AiTextModel } from "@/lib/ai/text-model-options";
-import { claudeFallback, claudeParams } from "@/lib/ai/claude-request";
+import { claudeFallback, claudeParams } from "@/lib/ai/gateway";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -103,6 +103,7 @@ async function streamAnthropic(
   apiKey: string,
   signal: AbortSignal,
 ): Promise<void> {
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
   const stream = await client.beta.messages.create(
     { ...claudeParams(model, MAX_TOKENS), ...claudeFallback(model), system: SYS, messages: [{ role: "user", content: prompt }], stream: true },

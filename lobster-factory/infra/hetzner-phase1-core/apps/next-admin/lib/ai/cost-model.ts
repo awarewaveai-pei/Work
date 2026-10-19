@@ -42,7 +42,7 @@ export const TEXT_RATES: Record<string, TextRate> = {
   "claude-haiku-4-5":          { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic" },
   "claude-sonnet-4-6":         { inputPerM: 3, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Sonnet 4.6", vendor: "Anthropic" },
   "claude-opus-5-5":           { inputPerM: 4, outputPerM: 20, cacheReadMult: 0.05, cacheWriteMult: 1.25, label: "Claude Opus 5.5", vendor: "Anthropic" },
-  // Opus 5 = a classifier-fallback target of Opus 5.5 (lib/ai/claude-request.ts); priced so a rescued call is not mispriced.
+  // Opus 5 = a classifier-fallback target of Opus 5.5 (lib/ai/gateway.ts); priced so a rescued call is not mispriced.
   "claude-opus-5":             { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 5", vendor: "Anthropic" },
   "claude-opus-4-8":           { inputPerM: 5, outputPerM: 25, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Opus 4.8", vendor: "Anthropic" },
   "claude-fable-5":            { inputPerM: 10, outputPerM: 50, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Fable 5", vendor: "Anthropic" },

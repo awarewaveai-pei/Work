@@ -86,8 +86,8 @@ ul.doors li span{min-width:0}
 <div class="shell">
 <aside><div class="in">
   <h1>客戶怎麼來 監工台</h1>
-  <p class="upd">更新於 <span data-computed>2026-10-18</span></p>
-  <div class="bar" data-computed><i class="d" style="width:11.11111111111111%"></i><i class="g" style="width:0%"></i></div>
+  <p class="upd">更新於 <span data-computed>2026-10-19</span></p>
+  <div class="bar" data-computed><i class="d" style="width:11.11111111111111%"></i><i class="g" style="width:11.11111111111111%"></i></div>
   <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>1</span>／<span data-computed>9</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
@@ -137,11 +137,11 @@ ul.doors li span{min-width:0}
         <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md</code></p>
         <p><b>完成於：</b><code>1ef1ee419</code></p>
       </details>
-    </div></li><li class="step todo" id="s2">
+    </div></li><li class="step doing" id="s2">
     <div class="n">2</div>
     <div class="b">
       <p class="plain">資料庫記錄誰購買哪個方案、何時到期，以及哪位員工替哪位客戶操作。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5（先出計畫）</span></p>
+      <p class="meta"><span class="pill st-doing">進行中</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5（先出計畫）</span></p>
       <p class="donewhen"><b>完成條件：</b>靜態檢查：付費 AI 的 SDK 與錢包帳本只准在 lib/entitlements/** 與 lib/ai/gateway.ts 引用；三張權利表只准在 lib/entitlements/** 與 app/portal/**；WordPress／Woo／Fluent 符號只准在各自接頭檔；其他位置出現就建置失敗</p>
       <details><summary>工程細節：Migration：plans、organization_entitlements、organizations.kind；許可帶 actor</summary>
         <p>三表只給控制面；0062 加 plan_key、source_ref、放寬 CHECK；organizations.kind internal／customer（Account#0 → internal）；控制面簽功能級許可，欄位含 actor、on_behalf_of。</p>

@@ -12,13 +12,13 @@
  * self-contained answer capsule; bullets are discrete extractable units; the focus
  * keyword leads the meta title and appears in the first sentence + one bullet.
  *
- * Model: ANTHROPIC_MODEL (default CLAUDE_DEFAULT_MODEL, lib/ai/claude-request.ts) — same client pattern as
+ * Model: ANTHROPIC_MODEL (default CLAUDE_DEFAULT_MODEL, lib/ai/gateway.ts) — same client pattern as
  * lib/command-plane/handlers/_anthropic.ts.
  */
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { checkRankMath, type RankMathReport, type RankMathCheck } from "../seo/rankmath-checker";
 import { logAiCall } from "../ai/log-ai-call";
-import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/claude-request";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/gateway";
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? CLAUDE_DEFAULT_MODEL;
 
@@ -191,6 +191,7 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     : "";
   const userContent = `Product design brief:\n${JSON.stringify(brief, null, 2)}${directive}${fixBlock}`;
 
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
   let text: string;
   try {

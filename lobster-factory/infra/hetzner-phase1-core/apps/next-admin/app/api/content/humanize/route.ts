@@ -1,9 +1,9 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { textCallCostUsd, resolveTextRate } from "@/lib/ai/cost-calculator";
-import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams } from "@/lib/ai/claude-request";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams } from "@/lib/ai/gateway";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +70,7 @@ TASK: Rewrite the provided content to:
 
 Output ONLY the rewritten content in Markdown format, no preamble or explanation.`;
 
+  const Anthropic = await loadAnthropic();
   const client = new Anthropic({ apiKey });
   let anthropicStream: ReturnType<typeof client.beta.messages.stream> | null = null;
 

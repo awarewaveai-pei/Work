@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
-import { isBridgeConfigured, createNewsletter } from "@/lib/studio/wp-bridge-client";
+import { isBridgeConfigured, createNewsletter } from "@/lib/crm/fluentcrm";
 import { blockedChangeResponse } from "@/lib/system-modes/blocked-change";
 
 export const runtime = "nodejs";

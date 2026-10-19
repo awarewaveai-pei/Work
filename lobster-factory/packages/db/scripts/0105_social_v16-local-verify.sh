@@ -9,11 +9,13 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DB_DIR="$(cd "$HERE/.." && pwd)"
-CONTAINER="social-0105-verify-$$"
+# KEEP_CONTAINER=<name>: the container keeps running with the schema applied (C26 tests/e2e/social/smartlink-real-db.sh
+# puts PostgREST in front of it); that caller removes it
+CONTAINER="${KEEP_CONTAINER:-social-0105-verify-$$}"
 IMAGE="${PG_IMAGE:-postgres:15.8-alpine}"   # production supabase-db is 15.8
 
 cleanup() { docker rm -f "$CONTAINER" >/dev/null 2>&1 || true; }
-trap cleanup EXIT
+[ -n "${KEEP_CONTAINER:-}" ] || trap cleanup EXIT
 
 docker run -d --name "$CONTAINER" -e POSTGRES_PASSWORD=verify -e POSTGRES_DB=postgres "$IMAGE" >/dev/null
 for _ in $(seq 1 60); do

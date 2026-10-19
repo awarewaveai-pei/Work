@@ -1,0 +1,31 @@
+/* 智慧連結 editor (SOCIAL_MANAGER_PLAN.md C26; mock v16 renderSmart .rgrid): the form | a 300px phone-wide preview.
+   App tokens only (page-rules.test.ts); text >= 14px; only the link list scrolls. */
+.sm-sl { display: flex; flex-direction: column; min-height: 0; }
+.sm-sl .sm-muted { font-size: var(--font-size-base); }
+.sm-sl-pad { padding: 12px; }
+.sm-sl-top { flex-wrap: wrap; }
+.sm-sl-top .sm-note { flex: 1 1 200px; }
+.sm-sl-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sm-sl-url { display: inline-flex; align-items: center; gap: 2px; }
+.sm-sl-url input { width: 150px; }
+.sm-sl-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; padding: 12px; }
+.sm-sl-form { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
+.sm-sl-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.sm-sl-row label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.sm-sl-f1 { flex: 1 1 160px; } .sm-sl-f2 { flex: 2 1 220px; }
+.sm-sl-row > div { display: flex; flex-direction: column; gap: 4px; }
+.sm-sl-sws { display: inline-flex; gap: 6px; height: 30px; align-items: center; }
+.sm-app button.sm-sl-sw { width: 26px; height: 26px; padding: 0; border-radius: 50%; border: 2px solid var(--card-bg); box-shadow: 0 0 0 1px var(--card-border); }
+.sm-app button.sm-sl-sw.sm-on { box-shadow: 0 0 0 2px var(--text-primary); }
+.sm-sl-h { margin: 0; font-size: var(--font-size-base); font-weight: 600; }
+.sm-sl-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 0; flex: 0 1 auto; }
+.sm-sl-item { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.4fr) auto auto; gap: 8px; align-items: center; padding: 6px 8px; border: 1px solid var(--card-border); border-radius: var(--radius-sm); background: var(--card-bg); }
+.sm-sl-item input[type="text"], .sm-sl-item input[type="url"] { min-width: 0; width: 100%; }
+.sm-sl-n { white-space: nowrap; }
+.sm-sl-btns { display: inline-flex; }
+.sm-sl-add { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 8px; }
+.sm-sl-hint { margin: 0; min-height: 1.5em; }
+.sm-sl-prev { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.sm-sl-phone { border: 1px solid var(--card-border); border-radius: 24px; background: var(--bg-subtle); box-shadow: var(--shadow); overflow-y: auto; min-height: 0; padding-bottom: 8px; }
+.sm-sl-phone .sl-page { padding: 22px 16px 8px; }
+.sm-sl-closed { margin: 0 16px; text-align: center; }

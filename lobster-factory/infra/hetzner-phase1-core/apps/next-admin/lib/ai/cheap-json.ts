@@ -1,7 +1,7 @@
 import { logAiCall } from "./log-ai-call";
-import Anthropic from "@anthropic-ai/sdk";
+import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { isAiTextModel, isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "./text-model-options";
-import { claudeFallback, claudeIncomplete, claudeParams, claudeText } from "./claude-request";
+import { claudeFallback, claudeIncomplete, claudeParams, claudeText } from "./gateway";
 
 export const CHEAP_JSON_MODEL: AiTextModel = "gpt-5.4-nano";
 
@@ -81,6 +81,7 @@ async function generateAnthropicJsonText(args: CheapJsonTextArgs & { model: AiTe
   if (!apiKey) return { ok: false, status: 503, error: "ANTHROPIC_API_KEY not configured" };
 
   try {
+    const Anthropic = await loadAnthropic();
     const client = new Anthropic({ apiKey });
     const msg = await client.beta.messages.create({
       ...claudeParams(args.model, args.maxTokens, "low"),

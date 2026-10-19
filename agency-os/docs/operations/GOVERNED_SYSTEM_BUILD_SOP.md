@@ -140,5 +140,5 @@ AwareWave 的產品或系統工具只要會給客戶用（代操、訂閱、點�
 - `docs/operations/end-to-end-linkage-checklist.md`
 - `docs/operations/new-doc-linkage-checklist.md`
 
-_Last synced: 2026-10-15 06:19:20 UTC_
+_Last synced: 2026-10-18 02:09:52 UTC_
 

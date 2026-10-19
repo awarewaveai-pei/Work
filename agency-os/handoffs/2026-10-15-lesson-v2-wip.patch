@@ -1,0 +1,249 @@
+diff --git a/Projects/internal/cognitive-engineering-os/docs/mockups/lessonkit.py b/Projects/internal/cognitive-engineering-os/docs/mockups/lessonkit.py
+index 25029d472..0b7c2836b 100644
+--- a/Projects/internal/cognitive-engineering-os/docs/mockups/lessonkit.py
++++ b/Projects/internal/cognitive-engineering-os/docs/mockups/lessonkit.py
+@@ -26,26 +26,38 @@ DRAWN = {"systems.iceberg_model": ["events", "patterns", "structures", "mental_m
+ # The shape of one lesson. A dict = exactly these keys ("?key" optional); ("domains", x) = exactly the active domains
+ # of domains.yaml, in its order; ("list", x, n) = at least n items; ("row", n) = exactly n texts.
+ TEXT, SVG, INT, KEY, URL = "text", "svg", "int", "key", "url"
+-UNIT_RESULT = {k: TEXT for k in ("name", "title", "short", "question", "ask4", "asks", "seen", "time", "when", "mode", "effect", "lasting")}
++# A unit's ONE question is its `ask` (lessons v2, D1): the run form's label, the lesson and the result page's ②④⑥ print it.
++UNIT_RESULT = {k: TEXT for k in ("name", "title", "short", "seen", "time", "when", "mode", "effect", "lasting")}
+ SHAPE = {
+     "minutes": INT, "outcomes": TEXT,
+     "start": {"new": TEXT, "demo": ("domains", TEXT), "prepare": ("list", TEXT, 3)},
+     "what": {"how": TEXT, "lead": TEXT, "body": TEXT, "when": TEXT, "picture": SVG, "can": TEXT, "cant": TEXT},
+     "units": {"title": TEXT, "how": TEXT, "mnemonic": TEXT,
+               "items": ("list", {"key": KEY, "head": TEXT, "ask": TEXT, "examples": ("domains", TEXT), "result": UNIT_RESULT}, 2)},
+-    "worked": {"how": TEXT, "columns": ("row", 3), "after": TEXT, "result_link": ("domains", TEXT),
+-               "cases": ("domains", {"lead": TEXT, "rows": ("list", ("row", 3), 2)})},
++    # 看例子's rows come from the tool's demo analyses (D2); the lesson writes only the words around them
++    "worked": {"how": TEXT, "columns": ("row", 4), "after": TEXT, "result_link": TEXT},
+     "fill": {"title": TEXT, "how": TEXT, "after": TEXT,
+              "steps": ("list", {"title": TEXT, "how": TEXT, "good": ("domains", TEXT), "bad": ("domains", TEXT)}, 2)},
+     "mistakes": {"how": TEXT, "items": ("list", {"title": TEXT, "?text": TEXT, "?by_domain": ("domains", TEXT)}, 3)},   # M7
+     "quiz": ("domains", ("list", ("row", 2), 2)),
+-    "read": {"how": TEXT, "short": TEXT, "terms_label": TEXT, "steps": ("list", ("row", 2), 3), "terms": ("list", ("row", 2), 2),
+-             "rows": ("list", ("row", 2), 2)},
++    # the reading steps and what each card answers are the page's (SECTIONS_FILE, D3); the demo reading is the demo's
++    "read": {"how": TEXT, "short": TEXT, "terms_label": TEXT, "terms": ("list", ("row", 2), 2)},
+     "teach": {"how": TEXT, "handout": TEXT, "note": TEXT, "flow": ("list", ("row", 3), 2), "script": ("list", TEXT, 2),
+               "questions": ("list", TEXT, 2), "errors": ("list", TEXT, 2)},
+     "sources": ("list", {"text": TEXT, "?url": URL}, 2),
+ }
+ 
++# The result page's cards (methods/registry/result-page-sections.yaml): what each answers, for every lesson's 看懂結果 tab,
++# and each card's 怎麼讀／你要做的 strip, which ResultPage.tsx prints with its own values in the {…} of VARS.
++SECTION_KEYS = [str(n) for n in range(10)]   # 0 = the header (its strip is RunHeader's), 1–9 = ① … ⑨
++VARS = {"U", "findings", "order", "count", "cards", "rows", "plan", "metrics"}
++STRIPS = ("read", "act", "read_else", "act_else")
++SECTIONS_SHAPE = {
++    "version": INT, "leverage": {k: TEXT for k in ("low", "mid", "high", "max")}, "confidence": {k: TEXT for k in ("high", "mid", "medium", "low")},
++    "steps": ("list", ("row", 2), 3),
++    "sections": {k: {"name": TEXT, "answers": TEXT, **{"?" + s: TEXT for s in STRIPS}} for k in SECTION_KEYS},
++}
++
+ 
+ def _check(v, shape, at, domains):
+     if isinstance(shape, dict):
+@@ -99,6 +111,8 @@ def validate(doc, domains, methods):
+         keys = [u["key"] for u in lesson["units"]["items"]]
+         if len(set(keys)) != len(keys): raise ValueError(f"{mid}.units.items: duplicate key")
+         if mid in DRAWN and keys != DRAWN[mid]: raise ValueError(f"{mid}.units.items: keys {keys} must be {DRAWN[mid]} (its result picture draws exactly these, in order)")
++        for u in lesson["units"]["items"]:   # the lesson's own picture asks each unit's one question, word for word (D1)
++            if mid in DRAWN and u["ask"] not in lesson["what"]["picture"]: raise ValueError(f"{mid}.what.picture: does not ask {u['key']}'s question {u['ask']!r}")
+         for i, m in enumerate(lesson["mistakes"]["items"]):
+             if ("text" in m) == ("by_domain" in m): raise ValueError(f"{mid}.mistakes.items[{i}]: exactly one of text, by_domain")
+         end = 0
+@@ -124,6 +138,52 @@ def gaps(lesson):
+     return out
+ 
+ 
++FORMS_FILE = mk.SPEC / "methods/registry/method-input-forms.yaml"
++SECTIONS_FILE = mk.SPEC / "methods/registry/result-page-sections.yaml"
++
++
++def form_questions(mid):
++    """-> {unit key: the question its run-form label asks} (the label after its first 「：」, or the whole label)."""
++    entry = ((mk._yaml(FORMS_FILE).get("methods") or {}).get(mid)) or {}
++    out = {}
++    for key, v in entry.items():
++        label = v.get("label") if isinstance(v, dict) else v
++        if isinstance(label, str): out[str(key)] = label.split("：", 1)[1] if "：" in label else label
++    return out
++
++
++def lesson_gaps(mid, lesson):
++    """What the lesson still lacks before its 齊備 pill (D5): the knowledge gaps, a unit whose run form asks another
++    question than the lesson (D1), a domain with no demo analysis for 看例子 and 看懂結果 (D2/D3). The result page's
++    knowledge pill stays `gaps` alone: a missing demo is the lesson's, not the tool's knowledge."""
++    out = list(gaps(lesson))
++    asks = form_questions(mid)
++    off = [u["key"] for u in lesson["units"]["items"] if asks.get(u["key"]) != u["ask"]]
++    if off: out.append("每層一個問題（填寫頁的問法和課不同：" + "、".join(off) + "）")
++    d = mk.load_domains()
++    have, label = demos().get(mid, []), {x["id"]: x["label"] for x in d["domains"]}
++    miss = [x for x in mk.active_ids(d) if x not in have]
++    if miss: out.append("示範分析（" + "、".join(label[x] for x in miss) + " 還沒有）")
++    return out
++
++
++def load_sections():
++    """-> the result page's sections (SECTIONS_FILE), validated; ValueError naming the first defect. ① … ⑨ each carry
++    a read and an act strip; an _else strip needs its own; only read/act strips name {…}, and only those in VARS."""
++    doc = mk._yaml(SECTIONS_FILE)
++    _check(doc, SECTIONS_SHAPE, SECTIONS_FILE.name, [])
++    for k, s in doc["sections"].items():
++        if k != "0" and not ("read" in s and "act" in s): raise ValueError(f"{SECTIONS_FILE.name}: section {k} needs read and act")
++        for strip in STRIPS:
++            if strip.endswith("_else") and strip in s and strip[:-5] not in s: raise ValueError(f"{SECTIONS_FILE.name}: section {k} has {strip} without {strip[:-5]}")
++        for field, text in s.items():
++            names = set(re.findall(r"\{(\w*)\}", text))
++            if names and (field not in STRIPS or not names <= VARS): raise ValueError(f"{SECTIONS_FILE.name}: section {k}.{field} names {sorted(names)} (only read/act strips may, and only {sorted(VARS)})")
++    for t in _texts([doc["steps"], doc["leverage"], doc["confidence"]]):
++        if "{" in t: raise ValueError(f"{SECTIONS_FILE.name}: {t!r} names a value; only read/act strips may")
++    return doc
++
++
+ def load(version=None):
+     """-> (version, {method id: lesson}): the champion, or `version` (a candidate to preview); ValueError on any defect."""
+     try:
+@@ -169,6 +229,12 @@ def demos():
+     return {mid: [x for x in ids if x in got] for mid, got in found.items()}
+ 
+ 
++def demo_result(mid, domain):
++    """-> that domain's demo analysis (the fixture: record, result, …), or None while it has none."""
++    path = DEMO_DIR / f"{mid}.{domain}.json"
++    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
++
++
+ def demo_href(mid, domain):
+     """/projects/demo/<method> for the default domain, /projects/demo/<method>/<domain> for the others."""
+     return f"/projects/demo/{mid}" + ("" if domain == mk.load_domains()["default"] else f"/{domain}")
+@@ -182,13 +248,52 @@ def demo_title(mid, domain):
+     return str(entry.get("scenario") or mid).split("：", 1)[0]
+ 
+ 
+-def render(mid, lesson, go, mock):
++WORKED_PENDING = "這個領域的示範分析還在做；先看「認識」分頁裡這個領域的例子。"
++
++
++def worked_rows(lesson, demo, star="★"):
++    """看例子's rows from one demo analysis: per lesson unit, [name (★ on the focus), what was filled in, what it means,
++    how to act there (leverage)]; escaped (the demo's words are a model's, never markup). `star` marks the focus row."""
++    r, record = demo["result"], demo.get("record") or {}
++    lever = load_sections()["leverage"]
++    focus = (r.get("focus") or {}).get("path", "")
++    rows = []
++    for u in lesson["units"]["items"]:
++        reading = next((x for x in r.get("units") or [] if x.get("path", "").split("/")[1:2] == [u["key"]]), None)
++        value = record.get(u["key"])
++        filled = "；".join(map(str, value)) if isinstance(value, list) else str(value or "（沒填）")
++        mark = f" {star}" if focus.split("/")[1:2] == [u["key"]] else ""
++        act = f'{mk._esc(reading["action"])}（槓桿：{lever.get(reading.get("leverage"), mk._esc(reading.get("leverage", "")))}）' if reading else "這次的分析沒有寫這一格"
++        rows.append([u["result"]["short"] + mark, mk._esc(filled), mk._esc(reading["meaning"]) if reading else "這次的分析沒有寫這一格", act])
++    return rows
++
++
++def demo_reading(demo):
++    """看懂結果's demo half: the demo page's own words for ① (summary, each finding's confidence and why, the revision
++    conditions) and ⑤ (the evidence gaps) -- [label, text] pairs, escaped."""
++    r, conf = demo["result"], load_sections()["confidence"]
++    out = [["① 一句話", mk._esc(r["summary"])]] if r.get("summary") else []
++    for i, f in enumerate(r.get("findings") or [], 1):
++        c = f.get("confidence") or {}
++        out.append([f"① 發現 {i}｜{mk._esc(f.get('title', ''))}", f'信心：{conf.get(c.get("level"), mk._esc(c.get("level", "未標")))}——{mk._esc(c.get("reason", ""))}'])
++    for f in r.get("findings") or []:
++        out += [["① 改判條件", f'{mk._esc(x["text"])} → {mk._esc(x["would_change"])}'] for x in f.get("revision_conditions") or []]
++    for g in r.get("gaps") or []:
++        need = f'（需要：{mk._esc(g["needed_evidence"])}）' if g.get("needed_evidence") else ""
++        out.append(["⑤ 證據缺口", mk._esc(g.get("text", "")) + need])
++    return out
++
++
++def render(mid, lesson, go, mock, demo=None):
+     """The lesson's <main> content: with `mock` the mock page's (banner, comment and partial-marker lines), else the
+-    web app's (mockkit.export_lesson's form)."""
++    web app's (mockkit.export_lesson's form). `demo(domain)` -> that domain's demo analysis or None (default: the
++    fixtures, demo_result)."""
+     d = mk.load_domains()
+     ids, default = mk.active_ids(d), d["default"]
+     name = mk._esc(mk._catalog().methods[mid]["name_zh"])
+     tabs = mk.LESSON_TABS["tool"]
++    demo = demo or (lambda x: demo_result(mid, x))
++    sections = load_sections()
+ 
+     def a(target, inner, cls=None, domain=None):
+         kind, value = go(target, domain)
+@@ -212,10 +317,13 @@ def render(mid, lesson, go, mock):
+     def partial(pname, body):
+         return ([f"  {mk.partial_start(pname)}"] if mock else []) + [body.rstrip("\n")] + ([f"  {mk.partial_end(pname)}"] if mock else [])
+ 
++    def per_domain(make):   # one span per domain (only the default visible), e.g. that domain's result button (D4)
++        return "".join(f'<span class="ex" data-set="{x}"{hide(x)}>{make(x)}</span>' for x in ids)
++
+     S, W, U, F, fill, M, R, T = (lesson[k] for k in ("start", "what", "units", "worked", "fill", "mistakes", "read", "teach"))
+     src, minutes = lesson["sources"], lesson["minutes"]
+-    missing = gaps(lesson)
+-    pill = f'<span class="pill">知識不足：缺 {"、".join(missing)}</span>' if missing else '<span class="pill ok">工具齊備 M1–M10 ✓</span>'
++    missing = lesson_gaps(mid, lesson)   # D5: the ✓ only when every lesson check is green
++    pill = f'<span class="pill">還沒齊備：缺 {"、".join(missing)}</span>' if missing else '<span class="pill ok">工具齊備 M1–M10 ✓</span>'
+     out = [""]
+     if mock: out.append(f'  <div class="banner"><b>示意稿</b>：這是第一次用「{name}」的人，按下工具之前會先看到的一堂課：最上面一張「開始」卡，下面的分頁按內容分開，不用一次看完。之後每個工具都照這個樣子有一堂，內容來自工具資料，會隨回饋改進。</div>')
+     out += [f'  <div class="crumbs">{a("tools", "工具")} › {a("tool", name)} › {minutes} 分鐘課</div>', "",
+@@ -246,15 +354,22 @@ def render(mid, lesson, go, mock):
+         out += [f'      <div class="exlayer l{i}"><b>{u["head"]}</b><div class="q">問：{u["ask"]}</div>'] + ["        " + r for r in rows[:-1]] + ["        " + rows[-1] + "</div>"]
+     out += ["    </div>", f'    <p class="sub mt10 mb0">{U["mnemonic"]}</p>', "  </div>", tabnext(0), "  </section>", ""]
+     # 看例子
++    # 看例子 (D2): the demo analysis of each domain, as its result page has it; a domain without one says so
+     out += [panel(1), '  <div class="card">', "    <h2>看一個做完的例子<small>1 分鐘</small></h2>", f'    <div class="how">{F["how"]}</div>', '    <div id="worked">']
+     for x in ids:
+-        c = F["cases"][x]
+-        out += [f'    <div class="ex" data-set="{x}"{hide(x)}>', f'      <p class="lead">{c["lead"]}</p>', "      <table>",
+-                "        <tr>" + "".join(f"<th>{h}</th>" for h in F["columns"]) + "</tr>"]
+-        out += ["        <tr>" + "".join(f"<td>{v}</td>" for v in row) + "</tr>" for row in c["rows"]]
+-        out += ["      </table>", "    </div>"]
++        got = demo(x)
++        out.append(f'    <div class="ex" data-set="{x}"{hide(x)}>')
++        if not got:
++            out += [f'      <p class="sub mb0">{WORKED_PENDING}</p>', "    </div>"]; continue
++        r = got["result"]
++        out += [f'      <p class="lead">{mk._esc(demo_title(mid, x))}</p>', "      <table>", "        <tr>" + "".join(f"<th>{h}</th>" for h in F["columns"]) + "</tr>"]
++        out += ["        <tr>" + "".join(f"<td>{v}</td>" for v in row) + "</tr>" for row in worked_rows(lesson, got)]
++        out.append("      </table>")
++        if (r.get("focus") or {}).get("why"): out.append(f'      <p class="sub mt8 mb0"><b>★ 為什麼先在這一層：</b>{mk._esc(r["focus"]["why"])}</p>')
++        if (r.get("solutions") or {}).get("first_step"): out.append(f'      <p class="sub mt6 mb0"><b>如果只做一件事，明天就做：</b>{mk._esc(r["solutions"]["first_step"])}</p>')
++        out.append("    </div>")
+     out += ["    </div>", f'    <p class="sub mt8 mb0">{F["after"]}</p>',
+-            '    <div class="btns mt8">' + "".join(f'<span class="ex" data-set="{x}"{hide(x)}>' + a("result", f'看一個完整分析頁 →<small>{F["result_link"][x]}</small>', "btn primary", x) + "</span>" for x in ids) + "</div>",
++            '    <div class="btns mt8">' + per_domain(lambda x: a("result", f'看一個完整分析頁 →<small>{F["result_link"]}</small>', "btn primary", x)) + "</div>",
+             "  </div>", tabnext(1), "  </section>", ""]
+     # 怎麼填 (M6) + 常見錯誤 (M7) + 自我檢查
+     out += [panel(2), '  <div class="card">', f'    <h2>{fill["title"]}<small>1 分鐘</small></h2>', f'    <div class="how">{fill["how"]}</div>']
+@@ -273,12 +388,21 @@ def render(mid, lesson, go, mock):
+     out += ["    </div>", "  </div>", "", tabnext(2), "  </section>", ""]
+     # 看懂結果
+     out += [panel(3), '  <div class="card">', "    <h2>看懂結果：按「執行分析」之後那一頁怎麼讀<small>1 分鐘</small></h2>", f'    <div class="how">{R["how"]}</div>', '    <div class="todos">']
+-    out += [f'      <div class="todo"><b>{h}</b>{t}</div>' for h, t in R["steps"]]
++    out += [f'      <div class="todo"><b>{h}</b>{t}</div>' for h, t in sections["steps"]]
+     out += ["    </div>", f'    <p class="sub mt8">{R["short"]}</p>',
+             f'    <div class="terms"><b>{R["terms_label"]}：</b>' + "".join(f"<span><b>{t}</b> {v}</span>" for t, v in R["terms"]) + "</div>",
+-            '    <h3 class="fam">頁首和九段，每段回答一件事</h3>']
+-    out += [f'    <div class="row"><b>{h}</b><span>{t}</span></div>' for h, t in R["rows"]]
+-    out += ["  </div>", f'  <div class="tabnext">{a("new", "開始填我的案例 →", "btn primary")}{a("result", "對照一個做完的結果頁 →", "btn")}</div>', "  </section>", ""]
++            '    <h3 class="fam">示範案例的結論怎麼讀</h3>', '    <div id="readdemo">']   # D3: the demo page's own words
++    for x in ids:
++        got = demo(x)
++        out.append(f'    <div class="ex" data-set="{x}"{hide(x)}>')
++        if not got:
++            out += [f'      <p class="sub mb0">{DEMO_PENDING}</p>', "    </div>"]; continue
++        out += [f'      <p class="sub mb0">「{mk._esc(demo_title(mid, x))}」那次分析頁上的原話；對照下面每段回答什麼來看。</p>', '      <ul class="check">']
++        out += [f"        <li><b>{h}</b>：{t}</li>" for h, t in demo_reading(got)]
++        out += ["      </ul>", "    </div>"]
++    out += ["    </div>", '    <h3 class="fam">頁首和九段，每段回答一件事</h3>']
++    out += [f'    <div class="row"><b>{s["name"]}</b><span>{s["answers"]}</span></div>' for s in sections["sections"].values()]
++    out += ["  </div>", f'  <div class="tabnext">{a("new", "開始填我的案例 →", "btn primary")}' + per_domain(lambda x: a("result", "對照一個做完的結果頁 →", "btn", x)) + "</div>", "  </section>", ""]
+     # 教材版 (D25 ③, M12)
+     total, n_err = T["flow"][-1][0].split("–")[1], len(T["errors"])
+     out += [panel(4), '  <div class="card">', "    <h2>教材版：給老師／帶領者<small>同一份資料，另一種排版</small></h2>", f'    <div class="how">{T["how"]}</div>',

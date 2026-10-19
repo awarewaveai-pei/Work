@@ -13,3 +13,5 @@ export { podOrderInboxSweep } from "./pod-order-inbox-sweep";
 export { csInboundSweep } from "./cs-inbound-sweep";
 export { socialDispatch } from "./social-dispatch";
 export { socialRotation } from "./social-rotation";
+export { socialMetrics } from "./social-metrics";
+export { entitlementsExpire } from "./entitlements-expire";
