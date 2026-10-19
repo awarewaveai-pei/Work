@@ -70,4 +70,4 @@
 
 ## 追蹤
 - 本檔＝v1.7 唯一計畫；狀態在 `agency-os/TASKS.md`「ADR 017 客戶怎麼買」條目與客戶怎麼來監工台「另有」列。
-- 做完 V17-3 後，本計畫自己也用 `supervisor-kit` 出一頁。
+- 本計畫監工台（supervisor-kit）：`agency-os/handoffs/2026-10-18-foundry-v17-supervisor/`；卡號＝本檔 `### V17-n` 標題（`check.mjs` 綁定），狀態只在其 `data.mjs`。

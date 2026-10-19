@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-19（續11）System Foundry v1.7 計畫自己的監工台（supervisor-kit）
+
+**觸發**：V1_7_HANDOFF_PLAN.md「追蹤」：做完 V17-3 後本計畫也用 supervisor-kit 出一頁。
+
+- 新 `agency-os/handoffs/2026-10-18-foundry-v17-supervisor/{data,build,check}.mjs,supervisor.html`：六張卡 V17-1～6（1–3 done：80a73d7e2／6c92f43c8／5fa64e1e6），NOW 五列，OPEN 空。check 綁計畫檔 `### V17-n` 標題（卡號與順序、標題不寫狀態、「照序做」＝depends 前一張）。
+- 發布 `https://claude.ai/artifact/RaVZVfj6yU5XMGkx3JV8SF`；計畫「追蹤」改為指向本頁；Foundry manifest 重算。
+- 操作者看到「待建模組 0／61」：那是測試用全答產生專案的監工台（61 個待建模組，全新專案本來就 0），不是 v1.7 進度；v1.7 進度在本頁 3／6。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node build.mjs && node check.mjs`；`validate_manifest.py`；`validate_doc_numbers.py`；`python -m unittest discover -s tests`（50 OK） | exit=0 | ms=55000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 data.mjs 與 check 綁定；突變：V17-6 改 V17-7 → check 紅（計畫卡≠監工台），位元組還原綠
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`supervisor-kit` 出一頁 | hits=1（V1_7 計畫追蹤行，已改）
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-19（續10）V17-3 收尾：客戶怎麼來監工台改用 `scripts/supervisor-kit`；社群監工台新網址
 
 **觸發**：操作者「繼續完成啊」。V17-3 條目（續9）留下的兩項。
