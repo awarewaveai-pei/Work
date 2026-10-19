@@ -11,7 +11,7 @@ export const META = {
   adr015: 'agency-os/docs/architecture/decisions/015-awarewave-account-and-shared-wallet.md',
   worklog: 'agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）、續15（七張卡）；2026-10-18 全鏈自審條目',
   self: 'agency-os/handoffs/2026-10-16-customer-model-supervisor/',
-  url: 'https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr',
+  url: 'https://claude.ai/artifact/LVBCAdvjGa9RDnFjNGfPTD',
 };
 
 // 頁面上所有固定文字（不含資料列）。{x} 由 build.mjs 代入算出來的值。
