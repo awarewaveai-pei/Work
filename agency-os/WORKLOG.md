@@ -1,4 +1,28 @@
 # Worklog
+
+## 2026-10-19（續2）待提交批次收斂；social metrics production gate
+
+- 根因：共用 index 是舊快照（`agency-os/WORKLOG.md` index 停在 10/16，工作樹已到 10/18），且 `main` 與 `origin/main` 分叉；重建非 `.claude` runtime 的 staging，保留 `.claude` session/runtime 不入產品提交。
+- 修正：smartlink 測試改用 `ReactElement` 與雙參數 RPC mock；`runMetricsSnapshot` 以 organization id 在任何 snapshot write 前呼叫 `checkProductionChangeAllowed`，無法讀取 mode 時 fail closed。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm run typecheck | exit=0 | ms=3479
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test -- --run lib/system-modes/__tests__/production-change-coverage.test.ts lib/social/__tests__/metrics.test.ts lib/social/__tests__/smartlink.test.ts lib/entitlements/__tests__/permit.test.ts | exit=0 | ms=2190
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test -- --reporter=dot | exit=1 | ms=19000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest -q tests/unit/test_permit_vectors.py | exit=0 | ms=130
+- REVIEW_WAIVED: NA -- `scripts/claude-oracle.ps1` exit=1：目前 PATH 沒有 `claude` CLI；已做人工對抗審查：gate 位於 snapshotAccount 的兩個 upsert 前，organization id 來自同一筆 join，null org 走 global gate，不改測試放寬閘。
+- ORACLE_WAIVED: CLAUDE_CLI_UNAVAILABLE -- first attempt failed because `claude` CLI is not on PATH; no Claude finding was accepted.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects | grep=checkProductionChangeAllowed|runMetricsSnapshot|ReactElement|social_smart_link | hits=334
+- 全套 next-admin：280 test files passed、2634 tests passed、12 skipped；17 failures 集中於 Windows 無法執行 Linux/SSH gate contract（status 127），不是本次 metrics gate。
+- rollback：`git revert <commit>`；本次沒有 deploy，`lobster-factory/infra/hetzner-phase1-core/DEPLOY_HOLD` 保留。
+## 2026-10-19（續1）ADR017 第2項：方案、權利、簽章許可與付費入口
+
+- 根因／修改：第 2 項原本只有 permit 草稿；補 0110 方案／權利表與服務角色 RLS、14 天試用＋7 天寬限、不可重領試用標記、全帳戶到期掃描與 aggregate 點數餘額；共用 JCS＋Ed25519 向量；SDK／WordPress／Woo／Fluent 入口集中；portal launcher 改走 service wrapper。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/packages/db/scripts/0110_plans_entitlements-local-verify.py; npx vitest run lib/entitlements lib/portal lib/ai; python -m unittest tests.unit.test_permit_vectors; npm run typecheck (workflows) | exit=0 | ms=measured per command
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n (DB expert review: SQL/RLS/trial/down/balance clean; launcher direct-table regression fixed)
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/cognitive-engineering-os | grep=claude-request|wp-bridge-client|organization_product_subscriptions|organization_entitlements|media_credit_ledger|@anthropic-ai/sdk|@google/generative-ai | hits=verified before commit
+- REVIEW_DONE: oracle=Claude scoped core review | verdict=pass after fix | initial finding: Trigger barrel omitted `entitlementsExpire`; added export and `npm run typecheck` passed
+- ORACLE_WAIVED: full-tree oracle artifact unavailable because shared worktree has more than 64 unrelated untracked files; scoped core review plus targeted mutation/import-boundary evidence recorded
+- rollback: git revert this commit; production migration and signing key/Trigger setup remain held by DEPLOY_HOLD and were not touched.
+
 ## 2026-10-18（續14）ADR017 第1項監工台完成狀態
 
 - 實作commit `1ef1ee419`；`verify-head-typecheck.ps1 -Ref 1ef1ee419`在乾淨worktree驗DEPS_IN_SYNC後tsc OK、HEAD_TYPECHECK_OK，exit0。
@@ -41,6 +65,8 @@
 **改法**：`hub-ui.tsx` SubTabs 改用 `.tab-bar／.tab／.tab--active`，數量用新 `.tab-count`；`globals.css` `.tab` 補 `:focus-visible` 環與 `:focus:not(:focus-visible){outline:none}`（全 app 的 .tab 一起修）、新 `.tab-count`；`CustomerServiceTab.tsx` 刪自畫 `Status`，右上狀態改用卡片同一套 `Tag`（AI 啟用／停用、個人 token 已設／未設），門檻淡色文字，副標改一句不帶數字；測試斷言 tablist=`tab-bar`、active=`tab tab--active`。
 **驗證**：tsc 0 錯；vitest 6/6；本機 next dev 用滑鼠點分頁後截圖：無黑框、無捲軸、字級同 /tools/theme。
 **避免再發生**：元件先 grep `globals.css` 的 class 與 `/tools/theme` token，不手刻 inline 分頁／狀態。
+**上線**（操作者「現在部署」）：推 main `8bd4b3e07..32a5afab6`；ssh ks-aw-01 `sg-deploy.sh next-admin`：`.deployed-commit=80728adf8`（含 32a5afab6；另含別的 session 的 social C21 composer `dde386e0b` 與其監工台 docs），healthy 10s、HTTP smoke 5/5；Playwright smoke 26 passed／6 skipped。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（deployed 80728adf8，healthy 10s，smoke all OK）＋playwright-runner smoke（26 passed） | exit=0 | ms=339231
 
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run …/CustomerServiceTab.render.test.tsx（6 passed）；next dev -p 3001 內建瀏覽器點分頁後截圖 | exit=0 | ms=60000
 - REVIEW_WAIVED: NA -- 換用既有 .tab class＋Tag，無新邏輯；verify-recent --ack 已記錄
@@ -206,8 +232,11 @@
 **根因**：續22 把狀態摘要做成四張可點的框卡（`StatusTile` 是 `<button>`），分頁做成有框有底色的 segmented pills 並在每個 tab 下加小字說明——兩排同一種「框＋底色」視覺，可點性與層級分不開。
 **改法**（`apps/next-admin/app/(shell)/ops/clients/[slug]/`）：`hub-ui.tsx` `SubTabs` 改成與 hub 第一層同一套的底線式分頁（文字＋2px 底線、整排一條線、數量用淡色數字不用 pill；型別去掉 `caption`／`badge`，改 `count`）；`CustomerServiceTab.tsx` 刪 `StatusTile`，頂部改成標題「客服」＋一句副標（訊息怎麼走，帶題數／意圖數）＋右側 `role="status"` 純文字狀態（圓點＋字：AI 啟用／停用＋知識門檻、個人 token 已設／未設），全部不可點；意圖分級統計移除（篩選 chip 已有數量）。測試改成斷言狀態區沒有 button、tab 文字為「常見問答2」。
 **驗證**：tsc 0 錯；vitest CustomerServiceTab 6/6；本機 `next dev -p 3001` 1400 寬截圖看過（dev server 第一次編譯 API 時 404 約 20 秒、一次 Supabase 查 org 失敗 notFound，都是暫時現象，重整即正常）。
-**剩餘風險**：未部署（03:00 自動上，或操作者說了再手動）；面板寬度 <1000 時 hub 側欄會蓋住內容，是 hub 既有行為。
+**上線**（操作者「現在部署」）：推 main `db3964354..fd318834b`；ssh ks-aw-01 `sg-deploy.sh next-admin`：`.deployed-commit=8bd4b3e07`（含 fd318834b；多的一個是另一 session 的 docs(social) C22），healthy 9s、HTTP smoke 5/5、容器名正常；Playwright smoke 見下。
+**剩餘風險**：面板寬度 <1000 時 hub 側欄會蓋住內容，是 hub 既有行為；線上畫面要登入，操作者自看。
 
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（deployed 8bd4b3e07，healthy 9s，smoke all OK） | exit=0 | ms=342719
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（26 passed, 6 skipped；evidence agency-os/reports/e2e/2026-10-18/smoke） | exit=0 | ms=26600
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit；npx vitest run app/(shell)/ops/clients/[slug]/__tests__/CustomerServiceTab.render.test.tsx（6 passed）；next dev -p 3001 內建瀏覽器截圖 | exit=0 | ms=60000
 - REVIEW_DONE: critic=Quick | verdict=warn | findings=0c/0m/2n（測試過時註解、tab 名與數字間補真正空格給讀屏；另 `intentMode` 收回 export——三項已修）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=StatusTile\|SubTabs | hits=1（SubTabs 唯一呼叫端 CustomerServiceTab.tsx 已改；StatusTile 0）
@@ -297,11 +326,15 @@
 **critic 後修**（3 Major 全修）：篩選改成按下時的快照（打字／改狀態不會把列藏掉）；知識門檻與自動比例先 NFKC 正規化、非數字擋下不送（原本 NaN→null 會把校準值重設成預設）；FAQ 存檔以伺服器回傳重建列表 + `router.refresh()`（原本切回分頁拿到頁載舊資料，再存會覆蓋）；另修：reload 序號防亂序、讀取失敗顯示錯誤而非空列表、新增意圖拒絕重複 key 並給 ✓、狀態列用與列標籤同一個 `intentMode()`、FAQ 規則文案改成「命中一樣多才轉真人」、Chatwoot 個人 token 未設改灰色（選填）、token 欄 `autoComplete="new-password"`、tabs 加 id／aria-controls。未修：子分頁方向鍵導航（nit）。
 **剩餘風險**：只在本機 `next dev` 以 soulful-expression 真實資料看過，未部署；`.claude/launch.json` 不支援 env，預覽是手動 `NEXT_PUBLIC_SUPABASE_ANON_KEY= npx next dev -p 3001` 走 middleware 的開發放行。
 **回退**：revert 該 commit（5 檔，無 migration）。
+**上線**（操作者「直接推+部署」）：feat/cs-tab-subtabs fast-forward 進 main 並推（`e22a2b53b..ea20ac69d`；同一 checkout 上另一 session 的 4 個 docs(adr-017)/docs(tasks) commit 一起上，純文件）；`/check-drift` 事前 FAIL=prod 落後 6 commit（23305526f，含已套 migration 的社群 V1.5）；ssh ks-aw-01 `sg-deploy.sh next-admin`：build 242s、`.deployed-commit=ea20ac69d`、healthy 9s、HTTP smoke 5/5 OK、容器名正常；Playwright smoke 見下。線上客服分頁的視覺確認要登入，操作者自看。
+**codex oracle**：對 commit 1f3fec852 NO FINDINGS（artifact 見 REVIEW_DONE）。
 
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（deployed ea20ac69d，healthy 9s，smoke all OK） | exit=0 | ms=336575
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall（26 passed, 6 skipped；evidence agency-os/reports/e2e/2026-10-17/smoke） | exit=0 | ms=25800
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（exit 0）；npx vitest run app/(shell)/ops/clients/[slug]/__tests__（6 檔 30 測試全過，新增 CustomerServiceTab.render.test.tsx 6 測試）；next dev -p 3001 內建瀏覽器看四個子分頁與展開意圖列 | exit=0 | ms=90000
-- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/13n（3 Major 與 9 Minor 已修，見上）
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n
+  - critic（commit 前）0c/3m/13n，3 Major 與 9 Minor 已修後 commit；external oracle = Codex CLI（codex exec -s read-only）對 commit 1f3fec852 審：NO FINDINGS，artifact `agency-os/reports/oracle/2026-10-17-partialreview-780f3dcd.md`（files-reviewed 6 檔、packet 101.4KB、30.8s）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=CsFaqCard\|CsChatwootTokenCard | hits=1（agency-os/WORKLOG.md 歷史記錄；程式碼 0）
-- ORACLE_WAIVED: 操作者指定只 commit 這 5 個 UI 檔到 feat/cs-tab-subtabs；跨模型 /codex-review 在合 main 前補
 
 ## 2026-10-17（續21）知識庫排序修法定案：每段加一句說明後重建索引（Contextual Retrieval）— 等 Soulful 網站內容做好才做
 
