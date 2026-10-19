@@ -1,4 +1,10 @@
 # Worklog
+## 2026-10-19（續1）remote-weekly-agent: weekly summary generated
+
+- 01:12 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-10-19.md
+- REALTEST_WAIVED: DOC_ONLY -- report-only task, no code change
+- REVIEW_WAIVED: DOC_ONLY -- report-only task
+- BUGHUNT_WAIVED: DOC_ONLY -- report-only task
 ## 2026-10-18（續12）客服子分頁改用 app 既有 .tab-bar 元件；去黑框、去捲軸——續3 手刻版被退（「比之前更爛」）
 
 **操作者**（附截圖）：點過的分頁留一圈黑框、右側一組捲軸箭頭、整體像小學生做的。
