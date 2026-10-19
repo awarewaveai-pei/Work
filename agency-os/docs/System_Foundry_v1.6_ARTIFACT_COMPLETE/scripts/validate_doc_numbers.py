@@ -119,6 +119,8 @@ def main():
     standard_modules = len([m for m in mods if not m.get('activated_by_custom_requirements')])
     baseline_caps = len(load('baselines/production-baseline.json')['capabilities'])
     module_artifacts = len(MODULE_DOCS) + 1  # + MODULE_MANIFEST.json, see foundry_generate.validate_generated()
+    # v1.6 docs are shipped history (AGENTS.md section 9: old files are not rewritten); they describe the pre-V17-1 10-file package.
+    V16_MODULE_ARTIFACTS = 10
     gate_scripts = gate_script_count()
     unit_tests = unit_test_count()
     pairwise_valid = sm['pairwise_valid']; pairwise_rejected = sm['pairwise_rejected']
@@ -157,13 +159,13 @@ def main():
 
         ('QUALITY_STRENGTH_MATRIX.md', r'all (\d+) controlled sections emitted ACTIVE/N/A', [blueprints], 'blueprint count'),
         ('QUALITY_STRENGTH_MATRIX.md', r'ALL-NO, ALL-YES, (\d+) singles', [q], 'question count'),
-        ('QUALITY_STRENGTH_MATRIX.md', r'(\d+) required artifacts/module', [module_artifacts], 'per-module artifact count'),
+        ('QUALITY_STRENGTH_MATRIX.md', r'(\d+) required artifacts/module', [V16_MODULE_ARTIFACTS], 'per-module artifact count (v1.6 historical)'),
         ('QUALITY_STRENGTH_MATRIX.md', r'`make verify`-equivalent \((\d+) gate scripts \+ (\d+) unit tests\)',
          [gate_scripts, unit_tests], 'gate script / unit test count'),
 
         ('CHANGELOG_v1.6.md', r'Full (\d+)-section generated System Blueprint', [blueprints], 'blueprint count'),
         ('CHANGELOG_v1.6.md', r'all (\d+) single-question cases', [q], 'question count'),
-        ('CHANGELOG_v1.6.md', r'Complete (\d+)-artifact planning/assurance package', [module_artifacts], 'per-module artifact count'),
+        ('CHANGELOG_v1.6.md', r'Complete (\d+)-artifact planning/assurance package', [V16_MODULE_ARTIFACTS], 'per-module artifact count (v1.6 historical)'),
 
         ('V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md', r'all `2\^(\d+)` theoretical answer vectors', [q], 'question count (as answer-vector exponent)'),
         ('V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md', r'exactly (\d+) blueprint documents', [blueprints], 'blueprint count'),

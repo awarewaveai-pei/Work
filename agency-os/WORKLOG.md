@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-19（續6）System Foundry v1.7 V17-1 樣板瘦身：藍圖 73 檔＋模組文件 00–07 改為根目錄 `PLAN.md` 一張表（SDK 代跑，Codex 審）
+
+**觸發**：操作者「繼續做 system foundry，用 SDK 和 codex-review」。計畫＝`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md`，六張卡中 V17-1 先做（V17-4 的 catalog 同步先前已完成一半）。
+
+**做法**：簡報 `cc.py --quiet --budget 8`（US$1.43、47 turns，log `C:\Users\user1115\ClaudeAgent` 的 `runs\20261019-142921.log`）；我驗收 diff、補修外部消費者、Codex 審。
+
+**根因／設計**：`foundry_generate.py` 舊 `write_blueprints` 對 62 節寫同一段樣板；`module_doc_text` 的 00–07 只是 `MODULE_MANIFEST.json` obligations 的複寫＋通用句。改為 `write_plan()` 寫 `PLAN.md`（73 列 ACTIVE／NOT_APPLICABLE＋原因、模組、能力計數、`## 交付登記` JSON）；`delivery_registration` 改讀 manifest；`validate_generated` 以 PLAN.md 列數對 `EXPECTED_BLUEPRINT_COUNT`。保留 `MODULE_MANIFEST.json`、`BLUEPRINT_ARCHITECTURE.md`、`08_IMPLEMENTATION_BACKLOG.md`（V17-2 取代）、path README。
+
+**我發現／決定**
+- 驗收條件「≤40 檔」不可達：全答產生 61 個模組，每模組至少 2 檔＝122。實際 849→288。計畫的 40 來自舊 7 模組範例；V17-1 驗收改為「無 docs/blueprint、無 00–07、PLAN.md 73 列」，數字寫進本條不改計畫檔。
+- 交付登記 JSON：十項宣告內容相同，只有引用來源字串由 `00_REQUIREMENTS.md` 改為 `MODULE_MANIFEST.json#<field>`（舊引用已指向不存在的檔）。
+- worker 抓到計畫外消費者：`scripts/new-product.mjs:27-41` 讀 `docs/SYSTEM_BLUEPRINT.md`＋要求 00–08 全在，會讓 `--from-foundry` 對新專案全壞，其測試用自建舊版 fixture 不會紅。已改為讀 `PLAN.md`、只要求 manifest＋08；測試 fixture 同步。
+- 我另抓到 `03_SYSTEM_FOUNDRY_EXECUTION_CONTRACT.md:84` 仍宣稱「每模組必含 00–08」→ 改寫並重算 manifest hash。
+
+**[已修改]**：Foundry 目錄 `scripts/foundry_generate.py`、`scripts/test_selection_matrix.py`、`scripts/validate_doc_numbers.py`、`tests/test_artifact_generation.py`、`README.md`、`QUALITY_STRENGTH_MATRIX.md`、`03_SYSTEM_FOUNDRY_EXECUTION_CONTRACT.md`、`manifest.json`；`scripts/new-product.mjs`、`scripts/__tests__/new-product.test.mjs`。`generated/sample-commerce-os` 已重生（未追蹤）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=Makefile verify 鏈 17 條逐條（無 make）＋`python -m unittest discover -s tests`（47 tests）＋`node --test scripts/__tests__/new-product.test.mjs`（4 pass）＋全答產生後 `readFoundry()` 讀回 61 modules／10 declarations／PLAN.md 73 列 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex（`codex-oracle.ps1 -Mode review -Path` 9 檔）NO FINDINGS，artifact `agency-os/reports/oracle/2026-10-19-partialreview-9117b6d0.md`（partial：共享工作樹有他 session 大量未提交改動，無法全庫審）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory/docs,.claude | grep=`00_REQUIREMENTS|docs/blueprint/|blueprint/INDEX|SYSTEM_BLUEPRINT.md` | hits=7（03 契約 :84 已修；new-product.mjs 已修；其餘為歷史 closeout／CHANGELOG／step-1 卡舊敘述，不回改）
+- ORACLE_WAIVED: Codex 已審（artifact 為 partialreview，不滿足整庫 ORACLE gate 格式）
+
+**剩餘風險**：突變只做了 worker 的 PLAN.md 列數守衛一次（73→72 時產生器與 selection matrix 皆紅，還原綠）；`step-1.md:25` 歷史卡仍描述舊輸入檔；V17-2～6 未做；`generated/` 未追蹤。
+
+**rollback**：Foundry 目錄與兩個 scripts 檔以 `git show HEAD:<file> > <file>` 逐檔還原（禁用 `git checkout --`）；sample 重跑舊 generator 的 `generate_sample.py --replace`。
 ## 2026-10-19（續5）客戶怎麼來：買斷服務清單補完——隱性依賴驗證與授權盤點（SDK 代跑，我逐項驗真）；待決 2 擴大到 MinIO 與浮動 Redis；卡 5 加「映像釘版本」閘
 
 **觸發**：操作者「去用 SDK 處理好」（接在上一條的「還沒確認的」三項：隱性依賴、授權條款、清單落檔）。

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
-import sys,tempfile,json,hashlib,random,itertools
+import sys,tempfile,json,hashlib,random,itertools,re
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
 from configurator_engine import load,resolve,active_questions,eval_condition,EXPECTED_BLUEPRINT_COUNT
 from foundry_generate import generate,MODULE_DOCS,blueprint_active
@@ -10,6 +10,7 @@ RULES={r['when']['question']:r for r in load('rules/question-rules.json')['rules
 CAPS={c['id']:c for c in load('capabilities/catalog.json')['capabilities']}
 MODS={m['id']:m for m in load('generation/module-manifests.json')['modules']}
 BPMAP=load('generation/blueprint-map.json')['documents']
+PLAN_TABLE_ROW=re.compile(r'^\| `(\d\d_[^`]+\.md)` \| (ACTIVE|NOT_APPLICABLE) \|',re.M)
 # "<CODE>: " (colon-space suffix, not the bare code) so a code that happens to be a string
 # prefix of another code -- or of an unrelated error message that starts with the same letters
 # -- can't false-match; today all 5 conflict-rules share one code so this is defence in depth,
@@ -112,12 +113,13 @@ def verify_generated(out,plan):
             if (out/'docs/modules'/mid).exists(): raise AssertionError('unselected module docs leaked '+mid)
             for rel in m['paths']:
                 if (out/rel).exists(): raise AssertionError('unselected module path leaked '+mid+':'+rel)
-    bpdocs=list((out/'docs/blueprint').glob('[0-9][0-9]_*.md'))
-    if len(bpdocs)!=EXPECTED_BLUEPRINT_COUNT: raise AssertionError(f'blueprint count != {EXPECTED_BLUEPRINT_COUNT}')
+    if (out/'docs/blueprint').exists(): raise AssertionError('docs/blueprint must not be generated')
+    plan_text=(out/'PLAN.md').read_text(encoding='utf-8')
+    rows={m.group(1):m.group(2) for m in PLAN_TABLE_ROW.finditer(plan_text)}
+    if len(rows)!=EXPECTED_BLUEPRINT_COUNT: raise AssertionError(f'PLAN.md rows {len(rows)} != {EXPECTED_BLUEPRINT_COUNT}')
     for rec in BPMAP:
-        text=(out/'docs/blueprint'/rec['file']).read_text()
-        expected='**ACTIVE**' if blueprint_active(rec['when'],plan) else '**NOT_APPLICABLE**'
-        if expected not in text: raise AssertionError('blueprint applicability mismatch '+rec['file'])
+        expected='ACTIVE' if blueprint_active(rec['when'],plan) else 'NOT_APPLICABLE'
+        if rows.get(rec['file'])!=expected: raise AssertionError('blueprint applicability mismatch '+rec['file'])
     verify_artifact_manifest(out)
 
 def main():

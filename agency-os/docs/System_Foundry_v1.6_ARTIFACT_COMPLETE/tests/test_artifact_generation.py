@@ -1,4 +1,4 @@
-import json,tempfile,unittest,sys
+import json,re,tempfile,unittest,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
 from configurator_engine import resolve,load,EXPECTED_BLUEPRINT_COUNT
@@ -18,12 +18,20 @@ class ArtifactGenerationTests(unittest.TestCase):
         self.assertEqual(len(p['modules']),len(load('generation/module-manifests.json')['modules'])-1)
         with tempfile.TemporaryDirectory() as td:
             out=generate(p,a,[],td)
-            self.assertEqual(len(list((out/'docs/blueprint').glob('[0-9][0-9]_*.md'))),EXPECTED_BLUEPRINT_COUNT)
+            self.assertFalse((out/'docs/blueprint').exists())
             for mid in p['modules']:
                 for role in MODULE_DOCS+['MODULE_MANIFEST.json']:
                     self.assertTrue((out/'docs/modules'/mid/role).is_file(),f'{mid}/{role}')
             cov=json.loads((out/'.foundry/verification/generation-coverage.json').read_text())
             self.assertEqual(cov['blueprints_active'],EXPECTED_BLUEPRINT_COUNT)
+    def test_plan_md_has_every_blueprint_row_and_parseable_registration(self):
+        a=matrix.complete({},True); p=resolve({'name':'plan-unit'},a,[])
+        with tempfile.TemporaryDirectory() as td:
+            text=(generate(p,a,[],td)/'PLAN.md').read_text(encoding='utf-8')
+        self.assertEqual(len(re.findall(r'^\| `\d\d_[^`]+\.md` \| (?:ACTIVE|NOT_APPLICABLE) \|',text,re.M)),EXPECTED_BLUEPRINT_COUNT)
+        block=json.loads(re.search(r'^## 交付登記\s*\n+```json\n(.*?)^```',text,re.S|re.M).group(1))
+        self.assertEqual(len(block['declarations']),10)
+        self.assertEqual(block['modules'],p['modules'])
     def test_custom_requirement_materializes_review_module_without_guessing_capability(self):
         a=matrix.complete({},False); custom=[{'category':'custom','statement':'支援特殊工業設備協定'}]; p=resolve({'name':'custom-unit'},a,custom)
         self.assertIn('custom',p['modules'])

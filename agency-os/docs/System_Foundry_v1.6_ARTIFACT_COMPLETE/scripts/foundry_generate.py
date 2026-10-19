@@ -1,14 +1,23 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 from pathlib import Path
-import argparse, json, tempfile, shutil, os, datetime, hashlib
+import argparse, json, tempfile, shutil, os, datetime, hashlib, re
 from configurator_engine import ROOT, VERSION, load, resolve, questionnaire_digest, safe_name, EXPECTED_BLUEPRINT_COUNT, industry_paths
 from extract_blueprint_content import doc_id as bp_doc_id
 
-MODULE_DOCS=[
- '00_REQUIREMENTS.md','01_ARCHITECTURE.md','02_CONTRACTS.md','03_SECURITY.md','04_DATA_AND_MIGRATION.md',
- '05_TEST_STRATEGY.md','06_OBSERVABILITY_AND_SRE.md','07_ROLLBACK_AND_RECOVERY.md','08_IMPLEMENTATION_BACKLOG.md'
-]
+# v1.7 (V17-1): 00-07 restated MODULE_MANIFEST.json obligations plus boilerplate and are no longer written.
+MODULE_DOCS=['08_IMPLEMENTATION_BACKLOG.md']
+
+# Generic text the deleted 02/04/01 module docs carried; delivery_registration still needs it verbatim.
+DATA_OBLIGATIONS_TEXT="""- Identify authoritative data, owner, lifecycle, retention, and restore semantics before persistence implementation.
+- Derived data must be rebuildable from authoritative sources.
+- Schema/data changes require compatibility, migration, validation, and rollback/forward-recovery plans."""
+CONTRACT_OBLIGATIONS_TEXT="""- All public/inter-module contracts are explicit, versioned, testable, and compatibility-managed.
+- Internal implementation details and vendor-specific semantics do not leak across the module boundary.
+- Consequential writes define idempotency or explicitly prove why retries cannot occur."""
+ARCH_DECISIONS_TEXT="""- Select implementation/provider only after comparing at least three viable options where material.
+- Keep domain semantics and contracts replaceable independently from framework/vendor choices.
+- Record exact paths, migration, rollback, observability, and expected result before implementation."""
 
 # canonical extraction key -> display title. domain_objects..definition_of_done come from Commerce's
 # extract_blueprint_content.SECTION_ALIASES; state_machine/contract_schema were added for the
@@ -140,7 +149,7 @@ def blueprint_active(cond,plan):
     mods=set(plan['modules']); caps=set(plan['current_capabilities'])
     return bool((set(cond.get('any_modules',[])) & mods) or (set(cond.get('any_capabilities',[])) & caps) or (plan['profile'] in cond.get('profiles',[])))
 
-def module_doc_text(mid,role,plan,obl,caps):
+def module_backlog_text(mid,plan,obl,caps):
     mcaps=plan['module_reasons'].get(mid,[])
     caplines=[]
     for cid in mcaps:
@@ -150,11 +159,11 @@ def module_doc_text(mid,role,plan,obl,caps):
     for cid in mcaps:
         refs=plan['traceability'].get(cid,[])
         if refs: trace.append(f"- `{cid}` <- {', '.join(f'`{x}`' for x in refs)}")
-    title=role.replace('_',' ').replace('.md','').title()
-    common=f"""# {mid} — {title}
+    base=f"implementation/{mid}"
+    return f"""# {mid} — 08 Implementation Backlog
 
-Status: **GENERATED_CONTRACT**  
-Foundry: `{VERSION}`  
+Status: **GENERATED_CONTRACT**
+Foundry: `{VERSION}`
 Module: `{mid}`
 
 ## Purpose
@@ -165,34 +174,16 @@ Module: `{mid}`
 
 ## Traceability
 {chr(10).join(trace) if trace else '- Activation comes from locked Foundry baseline.'}
-"""
-    if role=='00_REQUIREMENTS.md':
-        body="## Mandatory invariants\n"+'\n'.join(f'- {x}' for x in obl['invariants'])+"\n\n## Acceptance boundary\n- These invariants are mandatory; implementation technology remains an architecture decision.\n- Custom requirements mapped to this module remain `ARCHITECTURE_REVIEW_REQUIRED` until explicitly mapped.\n"
-    elif role=='01_ARCHITECTURE.md':
-        body="## Stable boundary\n"+'\n'.join(f'- {x}' for x in obl['invariants'])+"\n\n## Architecture decisions still required\n- Select implementation/provider only after comparing at least three viable options where material.\n- Keep domain semantics and contracts replaceable independently from framework/vendor choices.\n- Record exact paths, migration, rollback, observability, and expected result before implementation.\n"
-    elif role=='02_CONTRACTS.md':
-        body="## Contract obligations\n- All public/inter-module contracts are explicit, versioned, testable, and compatibility-managed.\n- Internal implementation details and vendor-specific semantics do not leak across the module boundary.\n- Consequential writes define idempotency or explicitly prove why retries cannot occur.\n\n## Contract test location\n- `tests/contract/` or the module-specific test path generated for this module.\n"
-    elif role=='03_SECURITY.md':
-        body="## Security obligations\n"+'\n'.join(f'- {x}' for x in obl['security'])+"\n\n## Verification\n- Negative authorization/abuse tests are required where a trust boundary exists.\n- Secrets, sensitive data, and elevated actions follow Foundry authority and evidence contracts.\n"
-    elif role=='04_DATA_AND_MIGRATION.md':
-        body="## Data obligations\n- Identify authoritative data, owner, lifecycle, retention, and restore semantics before persistence implementation.\n- Derived data must be rebuildable from authoritative sources.\n- Schema/data changes require compatibility, migration, validation, and rollback/forward-recovery plans.\n\n## Migration gate\n- No destructive migration proceeds without verified backup/restore and reconciliation criteria.\n"
-    elif role=='05_TEST_STRATEGY.md':
-        body="## Required tests\n"+'\n'.join(f'- {x}' for x in obl['tests'])+"\n\n## Gate\n- A selected module is not complete while any required test category has no executable test or explicit evidence-backed N/A rationale.\n"
-    elif role=='06_OBSERVABILITY_AND_SRE.md':
-        body="## Operational obligations\n"+'\n'.join(f'- {x}' for x in obl['operations'])+"\n\n## Required evidence\n- Signals, ownership, alert/routing, dashboard/query, and runbook references are recorded before production release.\n"
-    elif role=='07_ROLLBACK_AND_RECOVERY.md':
-        body="## Recovery obligations\n"+'\n'.join(f'- {x}' for x in obl['recovery'])+"\n\n## Gate\n- Rollback/compensation is defined before implementation and verified before release.\n- Recovery must minimize blast radius and preserve auditability.\n"
-    else:
-        base=f"implementation/{mid}"
-        body=f"""## Implementation tasks
+
+## Implementation tasks
 
 ### TASK-{mid.upper()}-001 — Establish module boundary
 - Exact path: `{base}` or the stack-specific path selected by architecture.
 - Change: implement only the contracts and invariants recorded in this module package.
 - Dependencies: see `.foundry/resolution/foundry-plan.json`.
-- Tests: satisfy `05_TEST_STRATEGY.md`.
-- Observability: satisfy `06_OBSERVABILITY_AND_SRE.md`.
-- Rollback: satisfy `07_ROLLBACK_AND_RECOVERY.md`.
+- Tests: satisfy `test_obligations` in `MODULE_MANIFEST.json`.
+- Observability: satisfy `operational_obligations` in `MODULE_MANIFEST.json`.
+- Rollback: satisfy `recovery_obligations` in `MODULE_MANIFEST.json`.
 - Acceptance criteria: module contract and all negative/positive tests pass.
 - Expected result: replaceable, independently verifiable `{mid}` module.
 
@@ -202,13 +193,11 @@ Module: `{mid}`
 - Acceptance criteria: contract tests pass and no undeclared dependency is introduced.
 - Expected result: LEGO-compatible integration without hidden coupling.
 """
-    return common+'\n'+body
 
 def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_content,item_maps=None,source_pack=''):
     d=stage/'docs/modules'/mid
     d.mkdir(parents=True,exist_ok=True)
-    for role in MODULE_DOCS:
-        write(d/role,module_doc_text(mid,role,plan,obl,caps))
+    for role in MODULE_DOCS: write(d/role,module_backlog_text(mid,plan,obl,caps))
     mcaps=[x for x in plan['module_reasons'].get(mid,[]) if x in caps]
     arch_text=module_architecture_text(mid,bp_mapping,bp_content,mcaps,item_maps,source_pack)
     if arch_text is not None: write(d/'BLUEPRINT_ARCHITECTURE.md',arch_text)
@@ -226,7 +215,7 @@ def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_c
     for rel in module_manifest['paths']:
         p=stage/rel; p.mkdir(parents=True,exist_ok=True)
         link='docs/modules/'+mid+'/MODULE_MANIFEST.json'
-        write(p/'README.md',f"# Generated Foundry Module Path\n\nModule: `{mid}`  \nStatus: `SCAFFOLDED`\n\nThis path is intentionally technology-neutral until architecture selects a stack. The executable requirements are in `{link}` and `docs/modules/{mid}/`.\n\nDo not add implementation that violates the generated module contract.\n")
+        write(p/'README.md',f"# Generated Foundry Module Path\n\nModule: `{mid}`  \nStatus: `SCAFFOLDED`\n\nThis path is intentionally technology-neutral until architecture selects a stack. The executable requirements are in `{link}`.\n\nDo not add implementation that violates the generated module contract.\n")
 
 def write_requirements(stage,plan,answers,industry=None):
     caps,qs=cap_maps(industry); qr={r['when']['question']:r for r in load(industry_paths(industry)['question_rules'])['rules'] if 'question' in r.get('when',{})}
@@ -242,77 +231,36 @@ def write_requirements(stage,plan,answers,industry=None):
         if not plan[key]: lines.append('- None.')
         write(stage/'docs/requirements'/(key.upper()+'.md'),'\n'.join(lines))
 
-def write_blueprints(stage,plan):
-    caps=set(plan['current_capabilities']); mods=set(plan['modules']); bpmap=load('generation/blueprint-map.json')['documents']; index=['# System Blueprint Index','',f"Foundry `{VERSION}` generated applicability from canonical plan.",'','| Document | Status |','|---|---|']
-    active_count=0
-    for rec in bpmap:
-        fn=rec['file']; active=blueprint_active(rec['when'],plan); active_count+=int(active); status='ACTIVE' if active else 'NOT_APPLICABLE'
-        index.append(f'| `{fn}` | {status} |')
-        template=(ROOT/'templates/TOP_TIER_SYSTEM_BLUEPRINT'/fn).read_text(encoding='utf-8'); title=template.splitlines()[0] if template.strip() else '# Blueprint'
-        if active:
+def blueprint_rows(plan):
+    """One (section file, ACTIVE|NOT_APPLICABLE, reason) per generation/blueprint-map.json document."""
+    caps=set(plan['current_capabilities']); mods=set(plan['modules']); rows=[]
+    for rec in load('generation/blueprint-map.json')['documents']:
+        if blueprint_active(rec['when'],plan):
             basis=[]
             if rec['when'].get('always'): basis.append('Foundry baseline')
             basis += [f'module `{x}`' for x in rec['when'].get('any_modules',[]) if x in mods]
             basis += [f'capability `{x}`' for x in rec['when'].get('any_capabilities',[]) if x in caps]
             if plan['profile'] in rec['when'].get('profiles',[]): basis.append(f"profile `{plan['profile']}`")
-            body=f"""{title}
-
-Status: **ACTIVE**  
-Generated from: `.foundry/resolution/foundry-plan.json`
-
-## Purpose
-This blueprint section is applicable because: {', '.join(basis) or 'selected system scope'}.
-
-## Current Truth
-This is a generated new-system contract. Implementation truth is not yet claimed; implementation evidence must be added with exact file:line references when code exists.
-
-## Target Truth
-Implement the selected capabilities through the module contracts in `docs/modules/` while preserving Foundry baseline invariants.
-
-## Evidence
-- Input digest: `{plan['input_digest']}`
-- Current capabilities: {len(plan['current_capabilities'])}
-- Selected modules: {', '.join(f'`{x}`' for x in plan['modules'])}
-
-## Decisions
-Technology/provider decisions remain `UNRESOLVED` until architecture option comparison and human approval where required. This is deliberate to prevent premature lock-in.
-
-## Risks
-Implementation-specific risks must be entered in the risk register before implementation. No unstated risk is treated as verified.
-
-## Exact Paths
-- `.foundry/resolution/foundry-plan.json`
-- `docs/modules/`
-- `docs/requirements/`
-
-## Validation
-- Run Foundry verification and module-specific test contracts.
-- Every factual implementation claim requires content-addressed exact file:line evidence.
-
-## Rollback
-Generation is staging-first and atomic. Implementation changes must define module-specific rollback/compensation before execution.
-
-## Expected Result
-A traceable, replaceable, testable implementation of this applicable blueprint section without adding unselected capabilities.
-"""
+            rows.append((rec['file'],'ACTIVE',', '.join(basis) or 'selected system scope'))
         else:
-            body=f"""{title}
+            rows.append((rec['file'],'NOT_APPLICABLE','no selected module, capability or profile matched the applicability rule in generation/blueprint-map.json'))
+    if len(rows)!=EXPECTED_BLUEPRINT_COUNT: raise RuntimeError(f'blueprint rows {len(rows)} != {EXPECTED_BLUEPRINT_COUNT}')
+    return rows
 
-Status: **NOT_APPLICABLE**
+def write_plan(stage,plan,rows,registration):
+    name=plan['project']['name']; active=sum(1 for r in rows if r[1]=='ACTIVE')
+    lines=[f'# {name} — PLAN','',f'Foundry: `{VERSION}`',f"Profile: `{plan['profile']}`",f"Criticality: `{plan['criticality']}`",f"Input digest: `{plan['input_digest']}`",'',
+      '## Capability resolution',f"- Foundation: {len(plan['foundation'])}",f"- User selected: {len(plan['user_selected'])}",f"- Derived: {len(plan['derived'])}",f"- Deferred: {len(plan['deferred'])}",f"- Current total: {len(plan['current_capabilities'])}",'',
+      '## LEGO modules']+[f'- `{m}` — `docs/modules/{m}/MODULE_MANIFEST.json`' for m in plan['modules']]+['',
+      '## Blueprint applicability',f'Active: {active}; not applicable: {len(rows)-active}; total controlled sections: {len(rows)}. Section text is not generated: the templates in `templates/TOP_TIER_SYSTEM_BLUEPRINT/` define the section, this table records whether it applies.','',
+      '| section file | status | reason |','|---|---|---|']
+    lines += [f'| `{fn}` | {status} | {reason} |' for fn,status,reason in rows]
+    lines += ['','## Truth boundary','Deterministic planning output from `.foundry/resolution/foundry-plan.json`. It does not claim implementation exists; implementation claims become VERIFIED only with exact content-addressed file:line evidence.',
+      '','## 交付登記','','```json',json.dumps(registration,ensure_ascii=False,indent=2),'```']
+    write(stage/'PLAN.md','\n'.join(lines))
+    return active
 
-## Reason
-No selected or derived capability satisfied this blueprint section's applicability rule in `generation/blueprint-map.json`.
-
-## Evidence
-- Input digest: `{plan['input_digest']}`
-- Selected modules: {', '.join(f'`{x}`' for x in plan['modules'])}
-
-## Re-evaluation
-If a future questionnaire answer activates the mapped capability/module/profile, regenerate from the new immutable answer snapshot. Do not manually convert this section to ACTIVE.
-"""
-        write(stage/'docs/blueprint'/fn,body)
-    write(stage/'docs/blueprint/INDEX.md','\n'.join(index))
-    return active_count,len(bpmap)
+PLAN_ROW=re.compile(r'^\| `\d\d_[^`]+\.md` \| (?:ACTIVE|NOT_APPLICABLE) \|',re.M)
 
 def validate_generated(stage,plan,module_data):
     errors=[]
@@ -327,9 +275,12 @@ def validate_generated(stage,plan,module_data):
             if (stage/'docs/modules'/mid).exists(): errors.append(f'unselected module docs generated: {mid}')
             for rel in m['paths']:
                 if (stage/rel).exists(): errors.append(f'unselected module path generated: {mid}:{rel}')
-    bps=list((stage/'docs/blueprint').glob('[0-9][0-9]_*.md'))
-    if len(bps)!=EXPECTED_BLUEPRINT_COUNT: errors.append(f'blueprint document count {len(bps)} != {EXPECTED_BLUEPRINT_COUNT}')
-    required=[stage/'README.md',stage/'.foundry/intake/answers.json',stage/'.foundry/resolution/foundry-plan.json',stage/'.foundry/project-profile.json',stage/'docs/SYSTEM_BLUEPRINT.md',stage/'docs/IMPLEMENTATION_BACKLOG.md']
+    plan_md=stage/'PLAN.md'
+    if plan_md.is_file():
+        n=len(PLAN_ROW.findall(plan_md.read_text(encoding='utf-8')))
+        if n!=EXPECTED_BLUEPRINT_COUNT: errors.append(f'PLAN.md blueprint table rows {n} != {EXPECTED_BLUEPRINT_COUNT}')
+    if (stage/'docs/blueprint').exists(): errors.append('docs/blueprint must not be generated (V17-1)')
+    required=[stage/'PLAN.md',stage/'README.md',stage/'.foundry/intake/answers.json',stage/'.foundry/resolution/foundry-plan.json',stage/'.foundry/project-profile.json',stage/'docs/SYSTEM_BLUEPRINT.md',stage/'docs/IMPLEMENTATION_BACKLOG.md']
     for p in required:
         if not p.is_file(): errors.append('missing required generated file '+str(p.relative_to(stage)))
     if errors: raise RuntimeError('staging validation failed:\n'+'\n'.join(errors))
@@ -342,24 +293,26 @@ def artifact_manifest(stage):
 
 def delivery_registration(stage,plan):
     # These are source-backed planning declarations, never a claim that implementation exists.
+    # (kind, MODULE_MANIFEST.json list key | generic constant, heading) per declaration field; the
+    # generic constants are the text the deleted 01/02/04 module docs carried.
     sections={
-      'state_ownership':('04_DATA_AND_MIGRATION.md','Data obligations'),
-      'behavior_ownership':('01_ARCHITECTURE.md','Stable boundary'),
-      'public_api_event_contract':('02_CONTRACTS.md','Contract obligations'),
-      'invariants':('00_REQUIREMENTS.md','Mandatory invariants'),
+      'state_ownership':('text',DATA_OBLIGATIONS_TEXT,'Data obligations'),
+      'behavior_ownership':('list','invariants','Stable boundary'),
+      'public_api_event_contract':('text',CONTRACT_OBLIGATIONS_TEXT,'Contract obligations'),
+      'invariants':('list','invariants','Mandatory invariants'),
       'dependencies':None,
-      'failure_isolation_boundary':('07_ROLLBACK_AND_RECOVERY.md','Recovery obligations'),
-      'data_lifecycle':('04_DATA_AND_MIGRATION.md','Data obligations'),
-      'observability_contract':('06_OBSERVABILITY_AND_SRE.md','Operational obligations'),
-      'migration_rollback_contract':('07_ROLLBACK_AND_RECOVERY.md','Recovery obligations'),
-      'replacement_strategy':('01_ARCHITECTURE.md','Architecture decisions still required'),
+      'failure_isolation_boundary':('list','recovery_obligations','Recovery obligations'),
+      'data_lifecycle':('text',DATA_OBLIGATIONS_TEXT,'Data obligations'),
+      'observability_contract':('list','operational_obligations','Operational obligations'),
+      'migration_rollback_contract':('list','recovery_obligations','Recovery obligations'),
+      'replacement_strategy':('text',ARCH_DECISIONS_TEXT,'Architecture decisions still required'),
     }
     declarations={}
     for field,spec in sections.items():
         if spec is None:
             declarations[field]='Selected modules: '+', '.join(plan['modules'])+' (source: .foundry/resolution/foundry-plan.json#/modules).'
             continue
-        role,heading=spec; excerpts=[]
+        kind,val,heading=spec; excerpts=[]
         for mid in plan['modules']:
             manifest_path=stage/'docs/modules'/mid/'MODULE_MANIFEST.json'
             manifest=json.loads(manifest_path.read_text(encoding='utf-8')) if manifest_path.is_file() else {}
@@ -368,13 +321,11 @@ def delivery_registration(stage,plan):
                 value=source.get('declarations',{}).get(field)
                 excerpts.append(f'{mid}: {value} (source: {manifest.get("source_manifest")})' if value else f'TODO: {mid} source manifest has no {field}; required before status: available.')
                 continue
-            rel=Path('docs/modules')/mid/role; source=stage/rel
-            if not source.is_file(): continue
-            text=source.read_text(encoding='utf-8'); marker='## '+heading+'\n'
-            if marker not in text: continue
-            body=text.split(marker,1)[1].split('\n## ',1)[0].strip()
+            if not manifest: continue
+            if kind=='list': body='\n'.join(f'- {x}' for x in manifest.get(val,[])).strip(); origin=f'docs/modules/{mid}/MODULE_MANIFEST.json#{val}'
+            else: body=val; origin='Foundry baseline: '+heading.lower()
             if body and 'TODO' not in body:
-                excerpts.append(f'Required planning contract ({rel.as_posix()}#{heading.lower().replace(" ","-")}):\n{body}')
+                excerpts.append(f'Required planning contract ({origin}):\n{body}')
         declarations[field]='\n\n'.join(excerpts) if excerpts else 'TODO: no source module declaration for '+field
     name=plan['project']['name']
     return {'schema_version':1,'name':name,'page':'/'+safe_name(name),'loginSources':['local'],
@@ -394,7 +345,7 @@ def generate(plan,answers,custom,out_root,industry=None):
             if mid not in module_data: raise ValueError('unknown generation module '+mid)
             if mid not in obligations: raise ValueError('missing module obligations '+mid)
             write_module_package(stage,mid,plan,module_data[mid],obligations[mid],caps,bp_mapping,bp_content,item_maps,bp_source_pack)
-        for rel in ['.foundry/intake','.foundry/resolution','.foundry/handoffs','.foundry/verification','.foundry/migration-history','docs/requirements','docs/blueprint']:
+        for rel in ['.foundry/intake','.foundry/resolution','.foundry/handoffs','.foundry/verification','.foundry/migration-history','docs/requirements']:
             (stage/rel).mkdir(parents=True,exist_ok=True)
         now=datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat().replace('+00:00','Z')
         snapshot={'schema_version':'1.0.0','questionnaire_version':load(paths['questionnaire'])['questionnaire_version'],'questionnaire_digest':questionnaire_digest(industry),'submitted_at':now,'project':plan['project'],'answers':dict(sorted(answers.items())),'custom_requirements':plan['custom_requirements']}
@@ -408,10 +359,9 @@ def generate(plan,answers,custom,out_root,industry=None):
         write(stage/'docs/requirements/custom.md','\n'.join(custom_lines)); write_requirements(stage,plan,answers,industry)
         cap_lines=['# Foundry Capability Plan','',f"Generated by System Foundry {VERSION}.",'','## Foundation (locked)']+[f'- {x}' for x in plan['foundation']]+['','## User selected']+[f'- {x}' for x in plan['user_selected']]+['','## Derived']+[f'- {x}' for x in plan['derived']]+['','## Deferred / option preserved']+[f'- {x}' for x in plan['deferred']]
         write(stage/'docs/FOUNDRY_CAPABILITY_PLAN.md','\n'.join(cap_lines))
-        active_bp,total_bp=write_blueprints(stage,plan)
-        system_lines=[f'# {name} — Generated System Blueprint','',f'Foundry: `{VERSION}`',f"Profile: `{plan['profile']}`",f"Criticality: `{plan['criticality']}`",'', '## Capability resolution',f"- Foundation: {len(plan['foundation'])}",f"- User selected: {len(plan['user_selected'])}",f"- Derived: {len(plan['derived'])}",f"- Deferred: {len(plan['deferred'])}",f"- Current total: {len(plan['current_capabilities'])}",'','## LEGO modules']+[f'- `{m}`' for m in plan['modules']]+['','## Blueprint applicability',f'- Active: {active_bp}',f'- Not applicable: {total_bp-active_bp}',f'- Total controlled sections: {total_bp}','','## Truth boundary','This document is a deterministic planning/assurance output. It does not claim that implementation exists. Implementation claims become VERIFIED only with exact content-addressed file:line evidence.']
-        registration=delivery_registration(stage,plan)
-        system_lines+=['','## 交付登記','','```json',json.dumps(registration,ensure_ascii=False,indent=2),'```']
+        rows=blueprint_rows(plan); registration=delivery_registration(stage,plan)
+        active_bp=write_plan(stage,plan,rows,registration); total_bp=len(rows)
+        system_lines=[f'# {name} — Generated System Blueprint','',f'Foundry: `{VERSION}`',f"Profile: `{plan['profile']}`",f"Criticality: `{plan['criticality']}`",'', '## Capability resolution',f"- Foundation: {len(plan['foundation'])}",f"- User selected: {len(plan['user_selected'])}",f"- Derived: {len(plan['derived'])}",f"- Deferred: {len(plan['deferred'])}",f"- Current total: {len(plan['current_capabilities'])}",'','## LEGO modules']+[f'- `{m}`' for m in plan['modules']]+['','## Blueprint applicability and delivery registration','See `PLAN.md` (one row per controlled section, then the 交付登記 JSON).','','## Truth boundary','This document is a deterministic planning/assurance output. It does not claim that implementation exists. Implementation claims become VERIFIED only with exact content-addressed file:line evidence.']
         write(stage/'docs/SYSTEM_BLUEPRINT.md','\n'.join(system_lines))
         backlog=['# Implementation Backlog','', 'Every selected LEGO module has a generated implementation contract. Execute only after architecture gates converge.','']
         for mid in plan['modules']:
@@ -421,7 +371,7 @@ def generate(plan,answers,custom,out_root,industry=None):
         dump(stage/'.foundry/resolution/selection-traceability.json',trace)
         coverage={'schema_version':'1.0.0','modules_selected':len(plan['modules']),'module_artifacts_per_module':len(MODULE_DOCS)+1,'blueprints_active':active_bp,'blueprints_not_applicable':total_bp-active_bp,'blueprints_total':total_bp,'current_capabilities':len(plan['current_capabilities']),'deferred_capabilities':len(plan['deferred'])}
         dump(stage/'.foundry/verification/generation-coverage.json',coverage)
-        write(stage/'README.md',f"# {name}\n\nGenerated by System Foundry {VERSION}.\n\nStart with `docs/SYSTEM_BLUEPRINT.md`, `docs/blueprint/INDEX.md`, and `.foundry/resolution/foundry-plan.json`. Each selected LEGO module has a complete planning/assurance package under `docs/modules/<module>/`.\n")
+        write(stage/'README.md',f"# {name}\n\nGenerated by System Foundry {VERSION}.\n\nStart with `PLAN.md` (selected modules, blueprint applicability table, delivery registration) and `.foundry/resolution/foundry-plan.json`. Each selected LEGO module has `MODULE_MANIFEST.json` and `08_IMPLEMENTATION_BACKLOG.md` under `docs/modules/<module>/`.\n")
         validate_generated(stage,plan,module_data)
         dump(stage/'.foundry/resolution/artifact-manifest.json',artifact_manifest(stage))
         os.replace(stage,target)

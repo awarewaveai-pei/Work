@@ -24,18 +24,18 @@ export function readFoundry(directory) {
   }
   const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
   assert(Array.isArray(plan.modules) && plan.modules.length > 0 && plan.modules.every((m) => typeof m === 'string' && /^[a-z][a-z0-9_-]*$/.test(m)), 'invalid foundry modules');
-  const blueprint = fs.readFileSync(path.join(root, 'docs/SYSTEM_BLUEPRINT.md'), 'utf8');
+  const blueprint = fs.readFileSync(path.join(root, 'PLAN.md'), 'utf8');
   const section = blueprint.split(/^## 交付登記\s*$/m)[1];
   const match = section?.match(/^```json\s*\n([\s\S]*?)^```\s*$/m);
-  assert(match, 'no 交付登記 JSON in SYSTEM_BLUEPRINT.md; regenerate the Foundry project');
+  assert(match, 'no 交付登記 JSON in PLAN.md; regenerate the Foundry project');
   const delivery = JSON.parse(match[1]);
   assert(delivery.schema_version === 1, 'unsupported delivery schema');
   assert(JSON.stringify(delivery.modules) === JSON.stringify(plan.modules), 'delivery modules differ from foundry-plan.json');
   // Refuse incomplete packages rather than manufacture declarations from a directory name.
-  const roles = ['00_REQUIREMENTS', '01_ARCHITECTURE', '02_CONTRACTS', '03_SECURITY', '04_DATA_AND_MIGRATION', '05_TEST_STRATEGY', '06_OBSERVABILITY_AND_SRE', '07_ROLLBACK_AND_RECOVERY', '08_IMPLEMENTATION_BACKLOG'];
-  for (const module of plan.modules) for (const role of roles) {
-    const file = path.join(root, 'docs/modules', module, role + '.md');
-    assert(fs.existsSync(file), `missing Foundry artifact: docs/modules/${module}/${role}.md`);
+  const files = ['MODULE_MANIFEST.json', '08_IMPLEMENTATION_BACKLOG.md'];
+  for (const module of plan.modules) for (const name of files) {
+    const file = path.join(root, 'docs/modules', module, name);
+    assert(fs.existsSync(file), `missing Foundry artifact: docs/modules/${module}/${name}`);
     assert(fs.readFileSync(file, 'utf8').trim(), `empty Foundry artifact: ${file}`);
   }
   assert(delivery.declarations && DECLARATIONS.every((k) => typeof delivery.declarations[k] === 'string' && delivery.declarations[k].trim()), 'missing Foundry declarations');

@@ -47,10 +47,9 @@ test('Foundry CLI imports the module list and sourced declarations; missing plan
   const project = path.join(root, 'generated');
   fs.mkdirSync(path.join(project, '.foundry/resolution'), { recursive: true });
   fs.mkdirSync(path.join(project, 'docs/modules/core'), { recursive: true });
-  const roles = ['00_REQUIREMENTS', '01_ARCHITECTURE', '02_CONTRACTS', '03_SECURITY', '04_DATA_AND_MIGRATION', '05_TEST_STRATEGY', '06_OBSERVABILITY_AND_SRE', '07_ROLLBACK_AND_RECOVERY', '08_IMPLEMENTATION_BACKLOG'];
-  for (const role of roles) fs.writeFileSync(path.join(project, 'docs/modules/core', role + '.md'), '# Core contract\n');
+  for (const name of ['MODULE_MANIFEST.json', '08_IMPLEMENTATION_BACKLOG.md']) fs.writeFileSync(path.join(project, 'docs/modules/core', name), '# Core contract\n');
   fs.writeFileSync(path.join(project, '.foundry/resolution/foundry-plan.json'), JSON.stringify({ modules: ['core'] }));
-  fs.writeFileSync(path.join(project, 'docs/SYSTEM_BLUEPRINT.md'), '## 交付登記\n\n```json\n' + JSON.stringify({ schema_version: 1, name: 'foundry-demo', page: '/foundry-demo', loginSources: ['local'], standalone: false, modules: ['core'], declarations: Object.fromEntries(DECLARATIONS.map((k) => [k, `core contract: ${k}`])) }) + '\n```\n');
+  fs.writeFileSync(path.join(project, 'PLAN.md'), '## 交付登記\n\n```json\n' + JSON.stringify({ schema_version: 1, name: 'foundry-demo', page: '/foundry-demo', loginSources: ['local'], standalone: false, modules: ['core'], declarations: Object.fromEntries(DECLARATIONS.map((k) => [k, `core contract: ${k}`])) }) + '\n```\n');
   const result = run(['--from-foundry', project, '--key', 'demo2', '--subdomain', 'demo2', '--features', 'demo2.run:QUOTA']);
   assert.equal(result.status, 0, result.stderr);
   const manifest = JSON.parse(fs.readFileSync(path.join(app, 'lib/demo2/MODULE_MANIFEST.json')));

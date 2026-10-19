@@ -23,7 +23,7 @@ Binary answers + custom requirements
         -> derived/deferred conflict normalization
         -> exact LEGO module projection
         -> full 73-section blueprint applicability
-        -> complete 10-artifact package per selected module
+        -> complete 2-artifact package per selected module
         -> staging validation / no-unselected-module leakage
         -> generated artifact SHA-256 manifest
         -> atomic commit
@@ -43,7 +43,7 @@ Generator output is technology-neutral until architecture convergence. It genera
 - All 37,401 question pairs are attempted; compatible pairs compile and explicit contradictory pairs fail closed.
 - 1,000 deterministic randomized configurations are tested.
 - Every generation module is proven reachable and materialized.
-- Every selected module receives 10 mandatory artifacts; unselected module paths/documents are absent.
+- Every selected module receives 2 mandatory artifacts (`MODULE_MANIFEST.json` + `08_IMPLEMENTATION_BACKLOG.md`); unselected module paths/documents are absent.
 - Every project gets all 73 controlled blueprint sections marked `ACTIVE` or `NOT_APPLICABLE`.
 - Generated files are content-hashed in `.foundry/resolution/artifact-manifest.json`.
 
@@ -63,24 +63,17 @@ Selected modules receive:
 
 ```text
 docs/modules/<module>/
-  00_REQUIREMENTS.md
-  01_ARCHITECTURE.md
-  02_CONTRACTS.md
-  03_SECURITY.md
-  04_DATA_AND_MIGRATION.md
-  05_TEST_STRATEGY.md
-  06_OBSERVABILITY_AND_SRE.md
-  07_ROLLBACK_AND_RECOVERY.md
   08_IMPLEMENTATION_BACKLOG.md
-  MODULE_MANIFEST.json
+  MODULE_MANIFEST.json      invariants / security / test / operational / recovery obligations
+  BLUEPRINT_ARCHITECTURE.md only when the module has mapped blueprint content
 ```
 
-The complete controlled blueprint is in `docs/blueprint/`, with the entry point `docs/SYSTEM_BLUEPRINT.md`.
+`PLAN.md` at the project root is the one-page entry: selected modules, the 73-row blueprint applicability table (ACTIVE or NOT_APPLICABLE with the reason) and the delivery registration JSON. Section text is not generated; the templates define each section. v1.7 V17-1 removed `docs/blueprint/` and module docs 00-07, which only restated `MODULE_MANIFEST.json`.
 
 ## AwareWave catalog and sample
 
 Run `node ../../../scripts/sync-foundry-catalog.mjs` after changing the product registry; `make verify` checks catalog drift.
-`make generate-sample` rebuilds `generated/sample-commerce-os` from `bootstrap/sample-commerce-intake.json`, with new active questions defaulting to NO. The blueprint ends in a source-backed delivery registration; missing declarations remain TODO.
+`make generate-sample` rebuilds `generated/sample-commerce-os` from `bootstrap/sample-commerce-intake.json`, with new active questions defaulting to NO. `PLAN.md` ends in a source-backed delivery registration; missing declarations remain TODO.
 
 ## CLI
 
