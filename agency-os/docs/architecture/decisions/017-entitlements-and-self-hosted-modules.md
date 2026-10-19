@@ -125,13 +125,47 @@
     | cs | next-admin、supabase、chatwoot、trigger（客服排程工作 `applyChatwootBaseline` 由 `lib/schedules/jobs.ts:9` 引用，排程由 Trigger 的 `schedules-heartbeat.ts` 驅動） | `ANTHROPIC_API_KEY`（或 `GEMINI_API_KEY`）、Messenger／LINE 授權 |
     | collect | next-admin、supabase、trigger、renderer | 搜尋與抓取供應商 key（`BRAVE_SEARCH_API_KEY`、`FIRECRAWL_API_KEY`、`PERPLEXITY_API_KEY`、`SERPER_API_KEY`、`OPENAI_API_KEY`，擇一即可）；內部 `RENDERER_URL`、`RENDERER_SHARED_SECRET` 由安裝產生 |
     | outreach | next-admin、supabase | 客戶自己的 Google OAuth（Gmail connector） |
-    | content（video） | next-admin、supabase、postiz、renderer、video-service、remotion-service | `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`、`PEXELS_API_KEY`、`R2_*`、`STRIPE_SECRET_KEY`（若客戶要收款）、`WP_API_URL`＋`WORDPRESS_JWT_TOKEN`（若客戶要發到 WordPress）；內部 `VIDEO_SERVICE_URL`、`REMOTION_SERVICE_URL` 由安裝產生 |
-    | tarot | next-admin、supabase | `REPLICATE_API_TOKEN`、`OPENAI_API_KEY` |
-    | studio（POD） | next-admin、supabase | `REPLICATE_API_TOKEN`、`ANTHROPIC_API_KEY`、`PRINTFUL_API_KEY`、`WPBRIDGE_*` |
-    | cognitive | cognitive-os（自帶 compose 與 PostgreSQL） | AI key |
+    | content（video） | next-admin、supabase、postiz、video-service、remotion-service | `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`、`PEXELS_API_KEY`、`R2_*`、`STRIPE_SECRET_KEY`（若客戶要收款）、`WP_API_URL`＋`WORDPRESS_JWT_TOKEN`（若客戶要發到 WordPress）；內部 `VIDEO_SERVICE_URL`、`REMOTION_SERVICE_URL` 由安裝產生 |
+    | tarot | next-admin、supabase、trigger（78 張批次生成） | `REPLICATE_API_TOKEN`、`OPENAI_API_KEY`、`R2_API_TOKEN`、`R2_ACCOUNT_ID`、`R2_DESIGNS_BUCKET`、`R2_DESIGNS_PUBLIC_BASE` |
+    | studio（POD） | next-admin、supabase、trigger（訂單收件匣掃描） | `REPLICATE_API_TOKEN`、`ANTHROPIC_API_KEY`、`PRINTFUL_API_KEY`、`WPBRIDGE_*`、`R2_API_TOKEN`、`R2_ACCOUNT_ID`、`R2_DESIGNS_BUCKET`、`R2_DESIGNS_PUBLIC_BASE` |
+    | cognitive | cognitive-os（自帶 compose 與 PostgreSQL）、next-admin 的 collect（收集工作交給它） | `COGNITIVE_OS_ANTHROPIC_API_KEY`、`COGNITIVE_OS_COLLECTION_SERVICE_URL` |
 
+  - **依賴證據（2026-10-19，grep；路徑相對 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`，trigger 任務在 `lobster-factory/packages/workflows/src/trigger/`）**：
+    - social→postiz：`lib/social/store.ts:10`、`lib/social/dispatch.ts:16` 引用 `lib/content/postiz.ts`，env 讀取在 `lib/content/postiz.ts:38-41`。
+    - social→trigger：`social-dispatch.ts:2,15`（另 `social-rotation.ts`、`social-metrics.ts`）。
+    - cs→trigger：`cs-inbound-sweep.ts`；cs→chatwoot：`app/api/webhooks/chatwoot/route.ts`、`lib/cs/chatwoot-client`（token 存組織設定，`app/api/ops/clients/[slug]/cs-config/chatwoot-token/route.ts`，不是環境變數）。
+    - collect→renderer：`lib/collect/net/providers.ts:46`（`RENDERER_URL`）、`lib/collect/collectors/extract-provider.ts:41`。
+    - content→R2：`lib/content/video/reconcile.ts:16-19`、`lib/storage/r2.ts:30-37`；content→collect（同 app，無新服務）：`lib/content/postiz.ts:3`。
+    - content→video-service／remotion-service：`lib/content/video/render-client.ts:55`、`lib/content/video/remotion-client.ts:7`；content→WordPress：`lib/content/publish/wordpress-core.ts:354`、`app/api/content/newsletter/route.ts:171`。
+    - **tarot→R2（新增）**：`lib/tarot/image-gen.ts:12`（`getDesignsPublicBase`）→ `lib/storage/r2.ts:46-47`。**tarot→trigger（新增）**：`tarot-batch-generate.ts:34,58,83`。
+    - **studio→R2（新增）**：`lib/studio/print-file.ts:25`、`lib/studio/upscaler.ts:11`、`lib/studio/wp-web-image.ts:21`、`lib/studio/printful-mockup.ts:26,273`。**studio→trigger（新增）**：`pod-order-inbox-sweep.ts:2,22,32`。studio→WordPress：payload 在 `lib/studio/pod-product.ts:3`，`WPBRIDGE_*` 讀取在共用路由 `app/api/tools/publish/route.ts:351`。
+    - **cognitive→next-admin collect（新增）**：`Projects/internal/cognitive-engineering-os/docker-compose.yml:31`（`COGNITIVE_OS_COLLECTION_SERVICE_URL`）；`:29` 出口白名單含 `app.aware-wave.com`；除此 `ai_lego/*.py` 對 redis／n8n／R2／WP／Chatwoot／Postiz／trigger.dev 無命中。
+    - **更正**：content 列移除 renderer（`lib/content`、`app/api/content`、`app/api/video` 無 `RENDERER_URL` 呼叫；「renderer」只出現在註解與 `rendererKind` 欄位）。
+    - 無證據、不加：八個產品目錄內 n8n、redis（`REDIS_URL`／ioredis）無呼叫；`SCHEDULE_INGEST_TOKEN` 只在 `app/api/internal/schedules/run-due/route.ts:28`、`app/api/internal/entitlements/expire/route.ts:9`（平台層，非單一產品）。
   - 有排程工作的產品（`lib/schedules/jobs.ts` 目前引用 collect、cs）一律另需 trigger（`lobster-factory/packages/workflows/src/trigger/schedules-heartbeat.ts`）；新產品加排程工作時，manifest 的 services 要同步加 trigger。
-  - 授權風險不同：Postiz 是 AGPL-3.0（見下方 Postiz 條，待決 2）；Chatwoot、Trigger.dev、Supabase 的授權條款買斷交付前要逐一讀過，**本步未讀**，不在此下結論。
+  - 授權風險不同：Postiz 是 AGPL-3.0（見下方 Postiz 條，待決 2）；其餘見下表。
+  - **授權盤點（2026-10-19，查官方來源；自己的話摘要，非法律意見，交律師確認前不得對客戶承諾）**：
+
+    | 元件 | 版本或 image tag（compose 行） | 授權 | 未修改映像交付客戶自架的額外義務 | 商業使用限制 | 來源 |
+    |---|---|---|---|---|---|
+    | Chatwoot | `chatwoot/chatwoot:v4.18.0`（`chatwoot/docker-compose.yml:38`） | MIT；`enterprise/` 目錄另有授權檔 | 寬鬆授權；映像是否含 `enterprise/` 待查 | `enterprise/` 條款待查 | https://github.com/chatwoot/chatwoot/blob/develop/LICENSE |
+    | Trigger.dev | `trigger.dev:${TRIGGER_IMAGE_TAG:-v4.4.4}`（`trigger/docker-compose.yml:187,304`） | Apache-2.0 | 保留授權與版權聲明 | 無（頁面未見雲端專屬限制） | https://github.com/triggerdotdev/trigger.dev |
+    | Supabase postgres | `supabase/postgres:15.8.1.085`（`supabase/docker-compose.yml:581`） | PostgreSQL License；內含第三方 extension 各有授權（逐一待查） | 保留聲明 | 無 | https://github.com/supabase/postgres |
+    | Supabase kong | `kong/kong:3.9.1`（`:79`） | Apache-2.0 | 保留聲明 | 無 | https://github.com/Kong/kong |
+    | Supabase auth（gotrue） | `supabase/gotrue:v2.186.0`（`:135`） | MIT | 保留聲明 | 無 | https://github.com/supabase/auth |
+    | Supabase postgrest | `postgrest/postgrest:v14.6`（`:280`） | MIT | 保留聲明 | 無 | https://github.com/PostgREST/postgrest |
+    | Supabase realtime | `supabase/realtime:v2.76.5`（`:312`） | Apache-2.0 | 保留聲明 | 無 | https://github.com/supabase/realtime |
+    | Supabase storage | `supabase/storage-api:v1.44.2`（`:364`） | Apache-2.0 | 保留聲明 | 無 | https://github.com/supabase/storage |
+    | Supabase studio | `supabase/studio:2026.03.16-sha-5528817`（`:14`） | monorepo 為 Apache-2.0；`apps/studio` 有無例外頁面未載，待查 | 保留聲明 | 待查 | https://github.com/supabase/supabase |
+    | Postiz | `postiz-app:v2.25.1`（`postiz/docker-compose.yml:92`） | AGPL-3.0 | 交付映像＝散布，須附上或提供對應原始碼；客戶改程式並對外提供網路服務時須公開其修改；其餘待律師 | 官方稱自架無功能限制；AGPL 與專有程式合併的邊界待律師 | https://github.com/gitroomhq/postiz-app |
+    | Temporal | `temporalio/auto-setup:1.28.1`（`postiz/docker-compose.yml:55`） | MIT | 保留聲明 | 無 | https://github.com/temporalio/temporal |
+    | ClickHouse | `bitnamilegacy/clickhouse:25.7.5-debian-12-r0`（`trigger/docker-compose.yml:66`） | Apache-2.0（上游） | 保留聲明；`bitnamilegacy` 打包層授權與停更狀態待查 | 無 | https://github.com/ClickHouse/ClickHouse |
+    | MinIO | `bitnamilegacy/minio:${MINIO_IMAGE_TAG:-latest}`（`trigger/docker-compose.yml:135`；`hetzner-phase1-core/docker-compose.yml:775` 固定 sha） | **AGPLv3** | 同 Postiz：散布須附原始碼；官方 README 稱用戶自負 AGPL 遵循責任；上游 repo 已封存、不再維護 | AGPL 與專有程式合併的邊界待律師 | https://github.com/minio/minio |
+    | Redis | `redis:7.2-alpine`（postiz `:16`、chatwoot `:130`）；`redis:${REDIS_IMAGE_TAG:-7-alpine}`（`trigger/docker-compose.yml:48`）；`redis:7-alpine`（`hetzner-phase1-core/docker-compose.yml:45`） | ≤7.2：BSD-3-Clause；7.4–7.8：RSALv2 或 SSPLv1 擇一；8.x：再加 AGPLv3 | 7.2 無額外義務；`7-alpine` 是浮動 tag，實際解析版本待查（解析到 7.4 以上＝RSALv2／SSPLv1，禁止當成服務提供給第三方，須律師看） | 7.2 無；7.4 以上有（見左） | https://redis.io/legal/licenses/ |
+    | Electric | `electricsql/electric:${ELECTRIC_IMAGE_TAG:-1.2.4}`（`trigger/docker-compose.yml:161`） | Apache-2.0 | 保留聲明 | 無 | https://github.com/electric-sql/electric |
+
+    - 範圍外未查：supabase 的 logflare、vector、imgproxy、meta、edge-runtime、supavisor，Chatwoot 的 pgvector，docker-proxy，nginx／n8n／mariadb／wordpress（買斷只取需要的服務時再查）。
+    - **建議（只是建議，OPEN 清單在別檔）**：MinIO 是 AGPLv3、Redis `7-alpine` 可能是 RSALv2／SSPLv1，與 Postiz 同屬需律師看的類別，建議把「待決 2」的範圍從 Postiz 擴大到 MinIO 與浮動 tag 的 Redis。
 - **一份程式**：next-admin 照一個 app 出貨，沒選的模組路由與選單關掉；含 SAFETY_GATE 的程式碼在建置時排除（§2）。
 - **授權檔只在款項落定後簽發**：買斷訂單要在 `payment_events` 有已結清列、且退款／拒付窗（預設 30 天，操作者可改）內無反轉事件，或操作者在 `/ops/billing` 標記「匯款已入帳」（High，留稽核列）；安裝工作流在開工前再查一次，未落定即拒（Codex R2-3）。
 - **授權檔**：`format_version`、`kid`、`install_id`、客戶、模組、每個 `feature_key` 的上限、`updates_until`、`max_tenants`（預設 1；>1 才是轉售，順序第 7 步）、簽章（Ed25519，同 ADR 007）。安裝內存一組可接受的公鑰，換金鑰時舊授權檔仍可驗。功能沒有到期日；`updates_until` 只管能不能拿新版。

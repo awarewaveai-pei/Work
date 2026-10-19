@@ -116,7 +116,7 @@ export const STEPS = [
 // 操作者自己要決定的（agent 不能替她定）
 export const OPEN = [
   { n: 1, what: '訂閱每月扣款：WooCommerce 應使用哪個定期扣款外掛？台灣金流是否支援定期扣款？', before: 4, src: 'ADR 017 產品決定 Q3' },
-  { n: 2, what: 'Postiz 是 AGPL-3.0；買斷交付前請律師確認。', before: 5, src: 'ADR 017 §5' },
+  { n: 2, what: '買斷交付前請律師確認授權：Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起授權改為 RSALv2／SSPL）。', before: 5, src: 'ADR 017 §5' },
   { n: 3, what: '點數不退、不轉讓的條款如何撰寫（台灣數位內容解除權例外）；賣點數的款項使用前列為預收，請會計師確認。', before: 4, src: 'ADR 015 §4' },
   { n: 4, what: '客戶白牌網址的憑證走 Cloudflare for SaaS（客戶 CNAME 到 AwareWave）還是主機上自動簽發（on-demand ACME）？', before: 9, src: 'ADR 018 §2' },
 ];

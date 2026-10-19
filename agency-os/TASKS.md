@@ -142,7 +142,7 @@
   - **執行卡**：`agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md … step-7.md`（Decision／Files／指令→預期／突變／Rollback），下一步＝照 step-1.md 做（Opus 5.5）
   - **操作者待決（2026-10-16「目前尚未決定，之後決定」）**，各卡住一步，第 1、2、3 步（代操計費）不受影響：
     - [ ] 待決 1：訂閱每月扣款用哪個 WooCommerce 定期扣款外掛；台灣金流是否支援定期扣款（ADR 017 產品決定 Q3）→ 擋第 4 步（付款）
-    - [ ] 待決 2：Postiz（AGPL-3.0）買斷交付前請律師確認（ADR 017 §5）→ 擋第 5 步
+    - [ ] 待決 2：買斷交付前請律師確認授權——Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起 RSALv2／SSPL）（ADR 017 §5 授權盤點）→ 擋第 5 步
     - [ ] 待決 3：點數不退、不轉讓的條款寫法（台灣數位內容解除權例外）；賣點數的款項用掉前列預收，請會計師確認（ADR 015 §4）→ 擋第 4 步（付款）
     - [ ] 待決 4：客戶白牌網址的憑證走 Cloudflare for SaaS 還是主機 on-demand ACME（ADR 018 §2）→ 擋第 9 步（白牌網址），等第一個客戶再定
 

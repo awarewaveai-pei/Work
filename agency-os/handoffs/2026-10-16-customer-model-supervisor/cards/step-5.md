@@ -9,6 +9,7 @@
 - 安裝前三道閘（都要過才開工）：①**款項落定**：`payment_events` 有已結清列且退款／拒付窗內無反轉，或操作者在 `/ops/billing` 標「匯款已入帳」（High，留稽核）（Codex R2-3）；②**網域與主機歸屬**：客戶網域 DNS TXT 挑戰（`_awarewave-verify.<domain>` = 安裝 id 的雜湊）通過、SSH host key 指紋由客戶確認並寫進 `buyout_installs`；③**操作者核准**（High-STOP 一次）（R2-4）。
 - `install_id` 先在控制面表 `buyout_installs(install_id unique, customer, host_fingerprint, status)` 交易內保留，再建任何資源；同名即拒（R2-7）。
 - 安裝流程（新 workflow `provision/buyoutInstall.ts`，排在 Stage 4 之後）：客戶主機商 token 以**每次安裝的密鑰句柄**傳入（`secretRef`，由 vault 解析，不進 payload、不進 log）；現有 `serverAdapterFactory.ts:63-67` 只讀 `HETZNER_STAGING_TOKEN` 環境變數、沒有買斷分支，本步新增 `{ mode: "buyout", secretRef }` 分支，買斷模式**禁止**回落到環境變數（Codex M14、R2-10）→ 產生 compose（`-p <install_id>`）、nginx `server_name`、DNS 記錄三份設定，全部從 `PUBLIC_BASE_DOMAIN`／`PRODUCT_HOST_<KEY>` 同一組值產生（ADR 018 §4，Codex M13）→ 裝棧 → 寫授權檔與該安裝專屬的 registry 拉取憑證（到期＝`updates_until`，可撤）→ 跑 smoke（`curl https://<產品>.<客戶網域>/` 200）→ 交接：撤我方 SSH key、撤所有我方密鑰；客戶買維運才留一把維運 key（標在授權檔 `maintenance_key_id`）。
+- **映像一律釘具體版本**：買斷用的 compose 不得有浮動 tag；Redis 釘 7.2 系（BSD-3，Postiz、Chatwoot 已如此），Trigger 的 `redis:${REDIS_IMAGE_TAG:-7-alpine}` 與核心的 `redis:7-alpine` 改釘（浮動 tag 會悄悄升到 7.4+，授權變 RSALv2／SSPL；ADR 017 §5 授權盤點）。測試 `every image in a buyout compose pins an exact tag` 掃 `lobster-factory/infra/**` 被模組引用的 compose。
 - 更新管道：版本＝簽章的 release（image tag＋migrations＋changelog）放我方 registry；安裝內 `updates_until` 內可拉。過期不擋使用。
 - 客戶已有網站：wp-bridge 接進來（§6），不搬站。
 

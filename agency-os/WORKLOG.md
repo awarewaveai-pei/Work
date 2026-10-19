@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-19（續5）客戶怎麼來：買斷服務清單補完——隱性依賴驗證與授權盤點（SDK 代跑，我逐項驗真）；待決 2 擴大到 MinIO 與浮動 Redis；卡 5 加「映像釘版本」閘
+
+**觸發**：操作者「去用 SDK 處理好」（接在上一條的「還沒確認的」三項：隱性依賴、授權條款、清單落檔）。
+
+**做法**：簡報（UTF-8 stdin，`PYTHONUTF8=1`，上一輪的亂碼問題已解）交 `cc.py --quiet --budget 3`：US$0.76、29 turns，log `C:\Users\user1115\AppData\Local\ClaudeAgent\runs\20261019-135416.log`。只准改 ADR 017 §5 一段。
+
+**SDK 結果（我驗過的）**：只改 ADR 017 一檔（`git diff HEAD --numstat` 40+/6−）；content 列移除 renderer——`RENDERER_URL` 在 `lib/content`、`app/api/content`、`app/api/video` 0 命中；新增 tarot→R2（`lib/storage/r2.ts:30`）、tarot／studio／cs→trigger（`packages/workflows/src/trigger/{tarot-batch-generate,pod-order-inbox-sweep,cs-inbound-sweep}.ts` 存在）、cognitive→next-admin collect（`Projects/internal/cognitive-engineering-os/docker-compose.yml:31`）；n8n、redis 無呼叫證據故不加。授權表十五列（Chatwoot MIT＋enterprise 目錄待查、Trigger.dev／Electric／ClickHouse／Supabase 多數 Apache-2.0／MIT、Postiz 與 MinIO AGPLv3、Temporal MIT、Redis 7.2 以下 BSD／7.4–7.8 RSALv2 或 SSPL／8 加 AGPLv3），與我已知的各專案授權一致；MinIO「repo 已封存」一項我未獨立驗證，ADR 內附 URL。
+
+**我發現／決定**：Redis tag 實測——`infra/postiz/docker-compose.yml:16`、`infra/chatwoot/docker-compose.yml:130` 釘 `7.2-alpine`（BSD），`infra/trigger/docker-compose.yml:48`（`${REDIS_IMAGE_TAG:-7-alpine}`）與 `hetzner-phase1-core/docker-compose.yml:45` 浮動 `7-alpine`，會悄悄升到 7.4+ 而授權改變。→ 卡 5 加「映像一律釘具體版本」規則與測試 `every image in a buyout compose pins an exact tag`；待決 2 範圍從 Postiz 擴大到 MinIO（Trigger 內含）與 Redis（`data.mjs` OPEN[1]、TASKS 待決 2 同步，條數不變）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`grep RENDERER_URL`＋ls trigger tasks＋`grep image:.*redis`＋`git diff HEAD --numstat` | exit=0 | ms=500 → 如上
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node check.mjs`；`node scripts/verify-governance-pointers.mjs` | exit=0 | ms=10000 → ok: 5 ways, 9 steps, 4 open；PASSED
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 抽驗 SDK 的 8 項主張（renderer、tarot／studio／cs trigger、R2、cognitive collect、redis tag、diff 範圍）皆屬實
+- BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`7-alpine|7.2-alpine|待決 2` | hits=trigger／core／postiz／chatwoot compose、ADR 017、data.mjs、TASKS、卡 5
+- ORACLE_WAIVED: 無 source 檔改動
+
+**剩餘風險**：授權資料來自 WebFetch 摘要，非逐份讀全文；Chatwoot `enterprise/` 範圍、Supabase studio 例外、supabase postgres 內第三方 extension、bitnamilegacy 映像（ClickHouse、MinIO 打包層）待查；Supabase 的 logflare／vector／imgproxy／meta／edge-runtime／supavisor 沒查。這些都是待決 2 律師確認的輸入，不得對客戶承諾。
+
+**rollback**：`git show HEAD:<file> > <file>` 還原各檔。
 ## 2026-10-19（續4）客戶怎麼來：買斷服務清單寫進 ADR 017 §5 與卡 5（SDK 代跑，我逐項驗真並補一處）
 
 **觸發**：操作者「客戶買全部要自架 Postiz、chatbot 嗎？寫在哪、System Foundry？」→「把服務清單表寫進卡 5 與 ADR 017 §5」→「額度快沒了，你直接用 SDK」。
