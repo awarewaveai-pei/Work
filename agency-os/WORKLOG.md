@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-19（續13）System Foundry v1.7 V17-5：範例自動重生進 `make verify`
+
+**觸發**：操作者「Continue with V17-5」。
+
+**根因**：`generate_sample.py` 只產一個範例（商務 intake），且只在手動 `make generate-sample` 跑；`generated/` 不進 git（`.gitignore:199`），範例過期沒人發現（V1_7 計畫實測：sample 181 答 vs 問卷 263 題）。
+
+**做法**：`scripts/generate_sample.py` 改為一次重生三組固定答案：ALL-NO（`sample-all-no`）、ALL-YES（`sample-all-yes`）、商務 intake（`sample-commerce-os`，新題預設 NO）；只有 intake 保留嚴格檢查（未知題 id／選了未啟用的題 → 紅，訊息指出要改 `bootstrap/sample-commerce-intake.json` 與題號）。Makefile `generate-sample` 改名 `regenerate-samples` 並加進 `verify`；README 同步。
+- 抓到既有 bug：`validate_doc_numbers.py:66` 解析 verify 目標的 recipe 時只認 `target:\n`，帶前置的目標（`regenerate-samples: awarewave-catalog`）丟例外。改為允許前置（`[^\n]*`），整類關掉；之後它照設計報出 `QUALITY_STRENGTH_MATRIX.md:4` 16→17 gate scripts、`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md` Release commands 缺 `generate_sample.py`，兩處已補。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python scripts/generate_sample.py --replace`（ALL-NO 1 模組／ALL-YES 61／商務 14）；Foundry verify 鏈逐條＋`regenerate-samples` | exit=0 | ms=見 verify6
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回三組答案的產生路徑；ALL-YES 走 `settle({},True)` 與 `test_selection_matrix.complete` 同語意（皆為啟用題全答要）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`generate-sample` | hits=Makefile、README 已改；其餘僅 WORKLOG 歷史
+- ORACLE_WAIVED: 單一腳本重構＋Makefile 目標改名，突變證明守衛；省 Codex 額度（操作者 2026-10-19 嫌費用）
+
+**突變**（暫存複本，目錄深度照原樣以找到 supervisor-kit）：問卷＋規則把 `Q-AI-011` 改名 `Q-AI-011-X` → 「sample intake names unknown question IDs … Q-AI-011」exit 1；intake 跟著改名 → PASS。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-19（續12）System Foundry v1.7 V17-4：接軌 AwareWave（社群 manifest 十項宣告＋cognitive→collect 依賴）
 
 **觸發**：操作者貼 V17-4 開場句。

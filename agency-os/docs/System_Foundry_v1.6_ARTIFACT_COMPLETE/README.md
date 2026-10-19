@@ -81,7 +81,7 @@ supervisor/kit/             shared layout and common gates
 ## AwareWave catalog and sample
 
 Run `node ../../../scripts/sync-foundry-catalog.mjs` after changing the product registry; `make verify` checks catalog drift.
-`make generate-sample` rebuilds `generated/sample-commerce-os` from `bootstrap/sample-commerce-intake.json`, with new active questions defaulting to NO. `PLAN.md` ends in a source-backed delivery registration; missing declarations remain TODO.
+`make regenerate-samples` (part of `make verify`) rebuilds `generated/sample-all-no`, `generated/sample-all-yes` and `generated/sample-commerce-os` (from `bootstrap/sample-commerce-intake.json`, new active questions defaulting to NO) from the current questionnaire; the intake fails closed on an unknown or inactive selected question. `PLAN.md` ends in a source-backed delivery registration; missing declarations remain TODO.
 
 ## CLI
 

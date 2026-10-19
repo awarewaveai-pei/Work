@@ -64,7 +64,7 @@ def verify_gate_script_lines():
     for target in m.group(1).split():
         if target == 'test':
             continue  # counted separately as "unit tests", not a gate script
-        recipe = re.search(rf'^{re.escape(target)}:\n((?:\t.*\n?)+)', mk, re.M)
+        recipe = re.search(rf'^{re.escape(target)}:[^\n]*\n((?:\t.*\n?)+)', mk, re.M)  # a target may list prerequisites
         if not recipe:
             raise RuntimeError(f'Makefile target {target!r} is a verify: prerequisite but has no recipe')
         lines += re.findall(r'^\tpython (scripts/\S+\.py)', recipe.group(1), re.M)
