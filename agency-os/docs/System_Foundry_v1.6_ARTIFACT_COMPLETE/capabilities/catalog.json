@@ -2735,7 +2735,9 @@
       "name": "AI LEGO Cognitive Engineering OS",
       "description": "組合認知方法、研究資料與專案。",
       "module": "aw-cognitive",
-      "requires": []
+      "requires": [
+        "CAP-AW-COLLECT"
+      ]
     },
     {
       "id": "CAP-AW-COLLECT",

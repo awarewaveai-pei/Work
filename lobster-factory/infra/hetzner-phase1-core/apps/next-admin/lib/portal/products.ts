@@ -32,7 +32,7 @@ const cognitiveFeatures = cognitiveInventory.map((f) => quota(f.id, f.name, f.bi
 const PRODUCT_DEFINITIONS = [
   { key: "cognitive", name: "AI LEGO Cognitive Engineering OS", description: "組合認知方法、研究資料與專案。", subdomain: "cognitive", door: { app: "external" },
     loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon", selfSignup: true,
-    features: cognitiveFeatures, accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/cognitive/MODULE_MANIFEST.json" }, staffPaths: [] },
+    features: cognitiveFeatures, accessChannels: ["ui"], modules: { dependsOn: ["collect"], manifest: "lib/cognitive/MODULE_MANIFEST.json" }, staffPaths: [] },
   { key: "hci", name: "HCI-30", description: "人機互動與持續監測工具。", subdomain: "hci", door: { app: "external" },
     loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon", selfSignup: true,
     features: [], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/hci/MODULE_MANIFEST.json" }, staffPaths: [] },

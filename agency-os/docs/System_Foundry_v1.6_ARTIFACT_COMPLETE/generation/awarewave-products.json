@@ -2123,7 +2123,9 @@
         "ui"
       ],
       "modules": {
-        "dependsOn": [],
+        "dependsOn": [
+          "collect"
+        ],
         "manifest": "lib/cognitive/MODULE_MANIFEST.json"
       },
       "staffPaths": []

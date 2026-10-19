@@ -1504,7 +1504,6 @@
       "invariants": [
         "Product registry key: social.",
         "Source module contract: lib/social/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],

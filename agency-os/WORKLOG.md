@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-19（續12）System Foundry v1.7 V17-4：接軌 AwareWave（社群 manifest 十項宣告＋cognitive→collect 依賴）
+
+**觸發**：操作者貼 V17-4 開場句。
+
+**根因**：Foundry 端機制早已完成（`scripts/sync-foundry-catalog.mjs:63-91` 產 `Q-AW-*`／`CAP-AW-*` 依賴閉包；`scripts/new-product.mjs:18-41` 讀 PLAN.md 交付登記與 cards）。驗收不過的是資料：產品 `MODULE_MANIFEST.json` 一份都沒有（ADR 017:108「manifest 檔目前尚未建立」）→ 只勾社群時十項宣告 1／10；`products.ts` 每個 `dependsOn` 都是 `[]`，但 ADR 017:133,144 已查證 cognitive 呼叫 collect。
+
+**做法**
+- 新 `lib/social/MODULE_MANIFEST.json`（格式＝`new-product.mjs:98` 寫出的 manifest：schema_version／module_id／declarations 十項／configuration）：每項引用 migration 編號與 `lib/social/*.ts` 檔頭註解。`services`／compose 對照留給客戶怎麼來第 5 項（step-5 卡 :6 定義，含 service 存在於 compose 的測試）。
+- `products.ts:35` cognitive `dependsOn: ["collect"]`。tarot／studio 依賴 R2、trigger 是基礎服務不是產品，依 ADR 017:108 屬 manifest `services`，不進 dependsOn。
+- `node scripts/sync-foundry-catalog.mjs` 重生 4 個目錄檔；Foundry manifest 重算、sample 重生。
+- 我說錯一次：先前說「線 C 不碰 next-admin」，只是排程建議不是規則；真正要避開的只有另一 session 正在改的 `lib/social/{authz,metrics,smartlink,store}.ts` 等檔，本次未碰。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=只勾 Q-AW-SOCIAL 產生 → `readFoundry()` 十項宣告非 TODO 10／10（改前 1／10）；只勾 Q-AW-COGNITIVE → modules=aw-cognitive,aw-collect,core；Foundry verify 鏈 18 條＋unittest＋new-product 4/4；next-admin `npx tsc --noEmit`、`npx vitest run lib/portal` | exit=0 | ms=見 verify5
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 manifest 每項的檔名／migration 編號（Glob/grep 皆存在）；loginSources 對照 products.ts:40
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`MODULE_MANIFEST.json` | hits=products.ts manifest 路徑 11 列、sync／new-product 讀取處、ADR 017:108（「尚未建立」對社群已不成立，其餘 10 產品仍成立）
+- ORACLE_WAIVED: 只改資料（一份 JSON manifest、登記表一個陣列值、同步產生的目錄檔），無邏輯變更；以突變證明讀取路徑
+
+**突變**：移走 `lib/social/MODULE_MANIFEST.json` 並重同步 → 只勾社群的十項宣告掉回 1／10；位元組還原 → `sync --check` PASS。
+
+**剩餘風險**：其他 10 個產品仍無 manifest（客戶怎麼來第 5、8 項）；manifest 未含 `services`／`env`（第 5 項）；ADR 017:108 一句已部分過時（社群有了），留第 5 項一併改。
+
+**rollback**：`git revert <本 commit>` 後 `node scripts/sync-foundry-catalog.mjs`。
 ## 2026-10-19（續11）System Foundry v1.7 計畫自己的監工台（supervisor-kit）
 
 **觸發**：V1_7_HANDOFF_PLAN.md「追蹤」：做完 V17-3 後本計畫也用 supervisor-kit 出一頁。

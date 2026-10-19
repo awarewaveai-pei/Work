@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "module_id": "social",
+  "declarations": {
+    "state_ownership": "Owns the social_* tables (migrations 0011, 0096, 0098, 0100, 0102, 0103, 0105, 0109, 0111 in lobster-factory/packages/db/migrations): accounts, lists, posts, post targets, media, saved texts, brand members, audit log, dispatch state, Postiz orphans, brand settings, tags, comments, list slots, auto rules, smart links, metrics, reports. Every row is scoped by organization_id = the brand; 0096 composite foreign keys refuse a child row pointing into another brand (lib/social/store.ts header).",
+    "behavior_ownership": "Composing, scheduling, reviewing and sending brand posts to social platforms: lib/social/state.ts (post state changes), review.ts (require_review and the needs list), dispatch.ts (the sender), withdraw.ts (changing a queued post), authz.ts (brand roles), smartlink.ts (public link page).",
+    "public_api_event_contract": "HTTP: /api/social/* (accounts, brands, lists, posts, media, tags, texts, members, settings, metrics, smartlink, auto-rules, log, needs, wp-article), one error-to-status mapping in lib/social/http.ts; internal: POST /api/internal/social/dispatch, called by the Trigger task social-dispatch every 5 minutes (lib/social/dispatch.ts header). Outbound: the Postiz public API.",
+    "invariants": "A post is claimed once, creates one Postiz post per target, and a published target is never resent; write-backs apply only to their own claim (migration 0100 functions, lib/social/dispatch.ts header). A queued post is changed by deleting its waiting Postiz posts first and releasing second (lib/social/withdraw.ts header). With require_review on, an editor cannot schedule or publish_now (lib/social/review.ts header). Bodies over a platform's limit are refused at save (lib/social/limits.ts).",
+    "dependencies": "supabase (tables above), Postiz (POSTIZ_API_BASE_URL, POSTIZ_API_KEY; platform authorisations live in Postiz), Trigger (social-dispatch schedule), the ops incident inbox for Telegram alerts (lib/social/review.ts header). No other AwareWave product: products.ts dependsOn is empty. Inventory: ADR 017 section 5 row social.",
+    "failure_isolation_boundary": "A Postiz 429 leaves the target pending and backs the whole sender off until the reset; any other 4xx marks only that target error; a Postiz post the database lost track of is recorded in social_postiz_orphans (migration 0100; lib/social/dispatch.ts header). A failing channel does not stop the other targets of the same post.",
+    "data_lifecycle": "Posts are soft-deleted (deleted_at) and listed in a capped trash (lib/social/store.ts); every change writes social_audit_log with the actor (store.ts); metrics are stored per day and per post (social_metrics_daily, social_post_metrics, migration 0105).",
+    "observability_contract": "social_audit_log answers who changed what; needs() lists failed posts, channels whose authorisation died and posts waiting for review, and the same events go to the operator Telegram through the ops inbox (lib/social/review.ts header); social_dispatch_state records the sender's backoff (migration 0100).",
+    "migration_rollback_contract": "Migrations 0105, 0109 and 0111 ship a .down.sql; 0011 to 0103 have no down file and roll forward only. C20's gate applied, reverted and re-applied 0105 on a throwaway database (agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs, step C20).",
+    "replacement_strategy": "Postiz sits behind the sender's ports (lib/social/dispatch-store.ts implements DispatchPorts for dispatch.ts); replacing Postiz means a new ports implementation and per-provider limits (lib/social/limits.ts), with posts, targets and states unchanged."
+  },
+  "configuration": {
+    "PUBLIC_BASE_DOMAIN": "installation base domain",
+    "PRODUCT_HOST_SOCIAL": "optional product host",
+    "loginSources": ["local", "awarewave-wp", "customer-wp"],
+    "apiKeys": "POSTIZ_API_BASE_URL, POSTIZ_API_KEY, SMARTLINK_* and the platform authorisations held in Postiz (ADR 017 section 5 row social)"
+  }
+}
