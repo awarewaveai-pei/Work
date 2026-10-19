@@ -85,3 +85,5 @@ Every selected module must contain: `MODULE_MANIFEST.json` (requirements invaria
 
 Every generated project's root `PLAN.md` lists all controlled blueprint sections in one table. Applicability is explicit `ACTIVE` or `NOT_APPLICABLE`; silent omission is forbidden.
 
+Every generated project contains `supervisor/` (data.mjs, build.mjs, check.mjs, kit/): one step per selected module bound to `cards/<module>.md`; `node supervisor/check.mjs` must fail when `.foundry/resolution/foundry-plan.json` modules or foundation differ from `supervisor/data.mjs` (v1.7 V17-3).
+

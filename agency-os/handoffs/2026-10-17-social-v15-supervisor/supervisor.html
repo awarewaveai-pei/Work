@@ -32,15 +32,19 @@ main{min-width:0;max-width:820px;padding-block:24px 56px;padding-left:24px;paddi
 section{margin-bottom:36px;scroll-margin-top:16px}
 section>h2{font-family:var(--display);font-size:21px;margin:0 0 4px}
 section>.lead{color:var(--muted);margin:0 0 14px;font-size:15px}
+.sub-h{font-size:15px;margin:14px 0 8px;color:var(--muted);font-weight:500}
 code{font-family:var(--mono);font-size:12.5px;background:var(--bg);border-radius:4px;padding:1px 5px;color:var(--muted)}
 small{display:block;color:var(--muted);font-size:13px;font-weight:400}
 ul.yn{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 ul.yn li{display:grid;grid-template-columns:64px 1fr;gap:10px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0}
 ul.yn li.yes b{color:var(--done)}ul.yn li.no b{color:var(--no)}
 ul.yn li span{min-width:0}
+ul.yn.rules li{grid-template-columns:130px 1fr}ul.yn.rules li b{color:var(--accent)}
+ul.yn.rules small a{color:var(--accent)}
 ol.steps{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 ol.steps li.grp{color:var(--muted);font-size:13.5px;padding:4px 2px 0}
 ol.steps li.grp a{color:var(--accent)}
+ol.open{list-style:none;margin:0;padding:0;display:grid;gap:10px}
 ol.steps li.step,ol.open li{display:grid;grid-template-columns:34px 1fr;gap:12px;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0;scroll-margin-top:16px}
 ol.steps .n,ol.open .n{width:30px;height:30px;border-radius:50%;background:var(--todo);color:var(--onDot);text-align:center;line-height:30px;font-weight:700;font-size:14px}
 .step.doing .n{background:var(--doing)}.step.done .n{background:var(--done)}
@@ -75,7 +79,6 @@ details code{font-size:12px;word-break:break-all}
 </div></aside>
 <main>
 <p class="sub">把定案的新畫面做進 social.aware-wave.com。共 <span data-computed>13</span> 張卡，一張一個工作階段。</p>
-
 <section id="now"><h2>現況</h2><p class="lead">目前的版本可以發文。新畫面已定案，還沒做進產品。</p><ul class="yn"><li class="yes"><b>有</b><span>可以發文<small>social.aware-wave.com 上線中（PLAN.md C12）；是舊版畫面</small></span></li><li class="yes"><b>有</b><span>新畫面定案<small>樣稿第 16 版；ADR 016 §5 操作者定案 1–6（commit 0755e32ab）</small></span></li><li class="no"><b>還沒有</b><span>數據分析有真數字<small>要先查 Postiz 有沒有分析資料可拿（C24 第一步）</small></span></li><li class="no"><b>還沒有</b><span>留言自動回覆真的會動作<small>要等 Meta 審核通過（TASKS.md「Postiz Task 2 OAuth app 審核」）</small></span></li></ul></section>
 
 <section id="steps"><h2>待建項目</h2><p class="lead">依編號順序做。同一組的卡可以同時做，因為改的檔案不重疊。風險 High 的卡要你同意才動工。</p><ol class="steps"><li class="step done" id="C20">
@@ -86,7 +89,6 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>拋棄式資料庫套用、還原、再套用都成功；資料庫審查通過；測試全綠；不碰正式資料庫</p>
       <details><summary>工程細節：C20 資料表 0105</summary>
         <p><b>要先完成：</b>無</p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C20</code></p>
         <p><b>完成於：</b><code>9fc5bdbe3</code></p>
       </details>
@@ -98,7 +100,6 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>六區和六個分頁都能點；按「建立貼文」進到整頁再回日曆；檢查樣稿每個頁面在產品裡都有</p>
       <details><summary>工程細節：C19 骨架與路由</summary>
         <p><b>要先完成：</b><a href="#C20">C20</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C19</code></p>
         <p><b>完成於：</b><code>502099318</code></p>
       </details>
@@ -110,7 +111,6 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>寫一則、加兩則留言、設定行程，回日曆看到它；截圖跟樣稿同一頁比對</p>
       <details><summary>工程細節：C21 撰寫頁</summary>
         <p><b>要先完成：</b><a href="#C19">C19</a>、<a href="#C20">C20</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C21</code></p>
         <p><b>完成於：</b><code>dde386e0b</code></p>
       </details>
@@ -122,7 +122,6 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>勾兩則按「批次動作」送審，狀態跟著變；截圖跟樣稿比對</p>
       <details><summary>工程細節：C22 日曆、卡片、清單、已刪除、篩選</summary>
         <p><b>要先完成：</b><a href="#C19">C19</a>、<a href="#C20">C20</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C22</code></p>
         <p><b>完成於：</b><code>db3964354</code></p>
       </details>
@@ -136,7 +135,6 @@ details code{font-size:12px;word-break:break-all}
         <p><b>要先完成：</b><a href="#C19">C19</a>、<a href="#C20">C20</a></p>
         <p><b>你的決定：</b>網址 social.aware-wave.com/smartlink/名字（你 2026-10-17 定）</p>
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C26</code></p>
-        
       </details>
     </div></li><li class="step todo" id="C29">
     <div class="n">6</div>
@@ -146,9 +144,7 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>每個頻道的未讀數跟 Chatwoot 一樣</p>
       <details><summary>工程細節：C29 訊息收件匣</summary>
         <p><b>要先完成：</b><a href="#C19">C19</a>、<a href="#C20">C20</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C29</code></p>
-        
       </details>
     </div></li><li class="grp">可同時做：<a href="#C23">C23</a>、<a href="#C24">C24</a>、<a href="#C27">C27</a>、<a href="#C31">C31</a>、<a href="#C30">C30</a></li><li class="step todo" id="C23">
     <div class="n">7</div>
@@ -158,9 +154,7 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>三個時段跨兩天，系統排出的貼文順序正確；舊清單照常發</p>
       <details><summary>工程細節：C23 自動發布清單方格</summary>
         <p><b>要先完成：</b><a href="#C20">C20</a>、<a href="#C21">C21</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C23</code></p>
-        
       </details>
     </div></li><li class="step todo" id="C24">
     <div class="n">8</div>
@@ -170,9 +164,7 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>一個頻道的一天數字寫進資料庫並顯示在頁面；沒有的數字寫明原因，不填假數字</p>
       <details><summary>工程細節：C24 數據分析</summary>
         <p><b>要先完成：</b><a href="#C19">C19</a>、<a href="#C20">C20</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C24</code></p>
-        
       </details>
     </div></li><li class="step todo" id="C27">
     <div class="n">9</div>
@@ -182,9 +174,7 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>規則比對測試通過（單則優先、關鍵字、平台）；真的回覆要等 Meta 審核</p>
       <details><summary>工程細節：C27 自動化流程</summary>
         <p><b>要先完成：</b><a href="#C20">C20</a>、<a href="#C21">C21</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C27</code></p>
-        
       </details>
     </div></li><li class="step todo" id="C31">
     <div class="n">10</div>
@@ -194,9 +184,7 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>上傳 3 秒影片，預覽後排程成功</p>
       <details><summary>工程細節：C31 媒體與影片</summary>
         <p><b>要先完成：</b><a href="#C21">C21</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C31</code></p>
-        
       </details>
     </div></li><li class="step todo" id="C30">
     <div class="n">11</div>
@@ -206,9 +194,7 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>每一頁在 390 寬的手機上都不會左右捲動</p>
       <details><summary>工程細節：C30 手機</summary>
         <p><b>要先完成：</b><a href="#C19">C19</a>、<a href="#C21">C21</a>、<a href="#C22">C22</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C30</code></p>
-        
       </details>
     </div></li><li class="grp">可同時做：<a href="#C25">C25</a>、<a href="#C28">C28</a></li><li class="step todo" id="C25">
     <div class="n">12</div>
@@ -220,7 +206,6 @@ details code{font-size:12px;word-break:break-all}
         <p><b>要先完成：</b><a href="#C24">C24</a></p>
         <p><b>你的決定：</b>先只做 PDF；PPT、Excel 下一版（你 2026-10-17 定）</p>
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C25</code></p>
-        
       </details>
     </div></li><li class="step todo" id="C28">
     <div class="n">13</div>
@@ -230,21 +215,12 @@ details code{font-size:12px;word-break:break-all}
       <p class="donewhen"><b>完成條件：</b>花費和點擊跟廣告後台一樣；暫停後廣告後台也顯示暫停</p>
       <details><summary>工程細節：C28 廣告管理</summary>
         <p><b>要先完成：</b><a href="#C19">C19</a>、<a href="#C20">C20</a></p>
-        
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C28</code></p>
-        
       </details>
     </div></li></ol></section>
 
 <section id="open"><h2>待你決定</h2><p class="lead">這幾件決定後，對應的卡才能開工。</p><p class="lead">目前沒有要你決定的事。</p></section>
 
-<section id="paths"><h2>檔案</h2>
-<div class="paths">
-<div><b>每張卡怎麼做</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b</code></div>
-<div><b>你定案的版面</b><code>agency-os/docs/architecture/decisions/016-social-manager-third-product.md §5</code></div>
-<div><b>樣稿（規格）</b><code>lobster-factory/docs/social/mockups/social-manager-mock.html</code></div>
-<div><b>追蹤</b><span><code>agency-os/TASKS.md「社群管理平台 V1」</code><br><code>agency-os/WORKLOG.md 2026-10-17</code></span></div>
-<div><b>本頁來源</b><span><code>agency-os/handoffs/2026-10-17-social-v15-supervisor/</code><br>改 data.mjs，執行 node build.mjs 和 node check.mjs，再重新發布同一個網址</span></div>
-</div></section>
+<section id="paths"><h2>檔案</h2><div class="paths"><div><b>每張卡怎麼做</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b</code></div><div><b>你定案的版面</b><code>agency-os/docs/architecture/decisions/016-social-manager-third-product.md §5</code></div><div><b>樣稿（規格）</b><code>lobster-factory/docs/social/mockups/social-manager-mock.html</code></div><div><b>追蹤</b><span><code>agency-os/TASKS.md「社群管理平台 V1」</code><br><code>agency-os/WORKLOG.md 2026-10-17</code></span></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-10-17-social-v15-supervisor/</code><br>改 data.mjs，執行 node build.mjs 和 node check.mjs，再重新發布同一個網址</span></div></div></section>
 </main>
 </div>

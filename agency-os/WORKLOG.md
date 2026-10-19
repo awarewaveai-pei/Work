@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-19（續9）System Foundry v1.7 V17-3：監工台套件共用（`scripts/supervisor-kit`）＋產生的專案自帶 `supervisor/`
+
+**觸發**：操作者批准方案 B（「趕快做啊」）。計畫＝`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md` V17-3。
+
+**根因／設計**
+- 兩個監工台的 build/check.mjs 是複製後各改，已分岔：yn 欄寬 52/64、圓點字色 `#fff`（customer 暗色模式錯）vs `--onDot`、手打數字單位 `種|項` vs `項|張|則`。改：`scripts/supervisor-kit/build.mjs`（外殼、CSS 聯集、各段 renderer；鍵＝`code ?? n`；有 `group` 才顯示分組列；執行卡位置由頁傳 `cardRef`；頁專屬 CSS 傳 `css`）＋`check.mjs`（`checkCommon`：編號、欄位、done→commit、depends 在前、卡檔存在、待決↔before 雙向、NOW yes/no、頁面最新、手打數字聯集、無「我們」）。各頁只留自己的資料段與跨檔綁定；data.mjs 格式不變。
+- Foundry：模組無依賴欄（`generation/module-manifests.json` 只有 id/paths/activated_by），由能力 `requires` 推出 51 條跨模組邊；全答有環 payments↔ai（`CAP-RECEIPT-OCR`→`CAP-AI`、`CAP-AGENTIC-COMMERCE`→`CAP-PAYMENTS`）。`module_layers()`：環＝強連通組，層由整組的外部依賴算一次（自審抓到：逐成員算時環成員可能分到不同層）。`write_supervisor()` 寫 `supervisor/data.mjs`（STEPS＝模組依層排、core 先、card `../cards/<m>.md`、風險＝專案 criticality；RULES＝18 foundation；OPEN＝技術棧（core 前）＋每個 `DER-*-ADAPTER` 供應商；PRIORITY＝層＋環），`generation/supervisor/{build,check}.mjs` 靜態複製，kit 原樣複製到 `supervisor/kit/`。產生器不跑 node：專案內 `node supervisor/build.mjs` 才有 html（計畫 §目標產出列了 supervisor.html，實際由使用者 build）。
+- 產生專案的 check 綁 `foundry-plan.json`：modules＝步驟、foundation＝規則 id、卡路徑、PRIORITY 恰好涵蓋、group＝層、環同層、depends 指向更前面的層、規則欄位非空。
+
+**我發現／決定**
+- 客戶怎麼來監工台的 data.mjs／supervisor.html／cards/step-3,5 有另一 session 未提交改動（影子模式，操作者 2026-10-19）。本 commit **不含**該目錄；worktree 已改用 kit（check 綠），build/check/html 等對方提交後第二個 commit。
+- 社群監工台 artifact `R5rPFgHj5uuRfiWeSbr8h9` 已刪除或失去寫入權，未重發新網址（待操作者）。
+
+**[已修改]**：`scripts/supervisor-kit/{build,check}.mjs`（新）；`agency-os/handoffs/2026-10-17-social-v15-supervisor/{build,check}.mjs,supervisor.html`；Foundry `generation/supervisor/{build,check}.mjs`（新）、`scripts/foundry_generate.py`、`tests/test_artifact_generation.py`（+1：kit 複製檔＝來源、node build/check 綠）、`README.md`、`03_SYSTEM_FOUNDRY_EXECUTION_CONTRACT.md`、`QUALITY_STRENGTH_MATRIX.md`（50 tests）、`manifest.json`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=Makefile verify 鏈 18 條逐條＋`unittest`（50 OK）＋`new-product.test.mjs`（4 pass）＋兩個監工台 check；全答／全不答產生後 `node supervisor/build.mjs && node supervisor/check.mjs`（61 modules 4 層、3 open；1 module、1 open）；社群頁去 style 後內容逐字相同（僅空白）；客戶頁差異＝前置變連結、waitFor 上色、`ol.open` | exit=0 | ms=140000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `codex-oracle.ps1 -Path` 12 檔：同層互相依賴未擋、PRIORITY 未知模組使 check 丟例外、規則內容可空；三項 CONFIRMED 已修（kit `stepLink`/`openList` 壞參照不丟例外一併關）；artifact `agency-os/reports/oracle/2026-10-19-partialreview-8099aa2e.md`
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`supervisor-kit|build\.mjs|check\.mjs` | hits=僅新檔、V1_7 計畫、README／03 新段、ADR 017:202（仍正確）、WORKLOG 歷史
+- ORACLE_WAIVED: Codex 已審（partialreview，不滿足整庫 ORACLE gate 格式）
+
+**突變**：`foundry-plan.json` 拿掉 ai → check 紅（只在 plan／只在監工台差異）、還原綠；ai 移到下一層 → 「ai,payments 不在同一層」紅；Codex 三項各一次：同層依賴、未知模組、空規則 → 皆受控紅，還原綠。
+
+**剩餘風險**：客戶怎麼來監工台第二個 commit 未做（等另一 session）；兩個 artifact 未重發；V17-4～6 未做；計畫「做完 V17-3 本計畫自己也用 supervisor-kit 出一頁」未做。
+
+**rollback**：`git revert <本 commit>`；worktree 的客戶監工台 build/check 以 `git show HEAD:<file> > <file>` 還原後 `node build.mjs`。
 ## 2026-10-19（續8）System Foundry v1.7 V17-2：每模組一張可執行卡（`cards/<module>.md` 取代 `08_IMPLEMENTATION_BACKLOG.md`；能力可帶 `acceptance`）（SDK 代跑，Codex 審）
 
 **觸發**：操作者「接著用 SDK 做 V17-2（每模組一張可執行卡）」。計畫＝`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md` V17-2。

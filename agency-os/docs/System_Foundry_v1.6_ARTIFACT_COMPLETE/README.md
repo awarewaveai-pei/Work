@@ -68,6 +68,14 @@ docs/modules/<module>/
   BLUEPRINT_ARCHITECTURE.md only when the module has mapped blueprint content
 ```
 
+Every project also gets a supervisor page (v1.7 V17-3; same format as the AwareWave supervisors, kit copied byte-for-byte from `scripts/supervisor-kit`):
+
+```text
+supervisor/data.mjs         STEPS = one per module in dependency layers (from capability requires; a cycle shares a layer), RULES = 18 foundation, OPEN = tech stack + one provider per DER-*-ADAPTER
+supervisor/{build,check}.mjs  node supervisor/build.mjs && node supervisor/check.mjs; check fails when foundry-plan.json modules/foundation and data.mjs disagree
+supervisor/kit/             shared layout and common gates
+```
+
 `PLAN.md` at the project root is the one-page entry: selected modules, the 73-row blueprint applicability table (ACTIVE or NOT_APPLICABLE with the reason) and the delivery registration JSON. Section text is not generated; the templates define each section. v1.7 V17-1 removed `docs/blueprint/` and module docs 00-07, which only restated `MODULE_MANIFEST.json`.
 
 ## AwareWave catalog and sample

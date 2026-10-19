@@ -41,6 +41,18 @@ class ArtifactGenerationTests(unittest.TestCase):
             self.assertGreaterEqual(len(re.findall(r'^- CAP-',cs,re.M)),11)
             self.assertGreaterEqual(len(re.findall(r'^  - 指令：.+ → 預期：.+',cs,re.M)),11)
             self.assertIn('TODO: no acceptance defined',(out/'cards/ai.md').read_text(encoding='utf-8'))
+    def test_supervisor_is_the_shared_kit_and_binds_to_the_plan(self):
+        import shutil,subprocess
+        from foundry_generate import SUPERVISOR_KIT
+        a=matrix.complete({},True); p=resolve({'name':'supervisor-unit'},a,[])
+        with tempfile.TemporaryDirectory() as td:
+            out=generate(p,a,[],td)
+            for name in ('build.mjs','check.mjs'):
+                self.assertEqual((out/'supervisor/kit'/name).read_bytes(),(SUPERVISOR_KIT/name).read_bytes(),name)
+            if not shutil.which('node'): self.skipTest('node not installed')
+            for script in ('supervisor/build.mjs','supervisor/check.mjs'):
+                r=subprocess.run(['node',script],cwd=out,capture_output=True,text=True,encoding='utf-8')
+                self.assertEqual(r.returncode,0,r.stderr)
     def test_plan_md_has_every_blueprint_row_and_parseable_registration(self):
         a=matrix.complete({},True); p=resolve({'name':'plan-unit'},a,[])
         with tempfile.TemporaryDirectory() as td:

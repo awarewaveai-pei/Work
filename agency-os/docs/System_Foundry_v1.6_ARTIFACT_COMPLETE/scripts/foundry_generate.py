@@ -175,6 +175,88 @@ def write_cards(stage,plan,module_data,obligations,caps):
     for mid in plan['modules']:
         write(stage/card_rel(mid),card_text(mid,plan,obligations[mid],module_data[mid],caps,template))
 
+# V17-3: one supervisor format for AwareWave and generated projects. The kit lives in the AwareWave repo
+# (scripts/supervisor-kit) and is copied byte-for-byte; generation/supervisor/{build,check}.mjs are static.
+SUPERVISOR_KIT=ROOT.parents[2]/'scripts'/'supervisor-kit'
+SUPERVISOR_FILES=['supervisor/data.mjs','supervisor/build.mjs','supervisor/check.mjs','supervisor/kit/build.mjs','supervisor/kit/check.mjs']
+SUPERVISOR_COPY={
+  'sub':'這個專案由 System Foundry 產生：共 {total} 個模組，每個模組一張執行卡。依層的順序做，同一層可以同時做。',
+  'updated':'更新於 {date}',
+  'nav':{'rules':'規則','priority':'先後','steps':'待建模組','open':'待你決定','paths':'檔案'},
+  'rules':{'h':'每個模組都要過的規則','lead':'Foundation 能力，每個專案都鎖定啟用；說明取自 capabilities/catalog.json。','count':'{n} 條'},
+  'priority':{'h':'先後','lead':'由能力的相依關係推出：每一層只依賴前面的層。','layer':'第 {k} 層','free':'同一層的模組可以同時做。','cycle':'互相依賴，介面要一起設計：'},
+  'steps':{'h':'待建模組','lead':'每個模組的做法、驗收、突變與回滾都在它的執行卡。','count':'{done}／{total} 完成'},
+  'open':{'h':'待你決定','lead':'以下事項決定後，對應的模組才能開工。','none':'目前沒有要你決定的事。','count':'{n} 項','before':'要在 {code} 開工前決定','src':'出處'},
+  'paths':{'h':'檔案','plan':'計畫（選了什麼、為什麼）','planJson':'機器真相','self':'本頁來源','howto':'改 data.mjs 的 status（done 填 commit），執行 node supervisor/build.mjs 和 node supervisor/check.mjs'},
+  'label':{'todo':'未開始','doing':'進行中','done':'已完成','risk':'風險','who':'負責','evidence':'完成條件','details':'工程細節','depends':'要先完成','none':'無','files':'檔案','card':'執行卡','doneAt':'完成於','decided':'決定','group':'可同時做：','item':'第 {n} 項'},
+}
+RISK_BY_CRITICALITY={'mission_critical':'High','high':'High','medium':'Medium','low':'Low'}
+
+def module_layers(plan,caps):
+    """Build order from capability `requires`: module A depends on B when a selected A capability requires a B one.
+    A dependency cycle (e.g. payments <-> ai) is one strongly connected group: its layer is computed once from the
+    group's outside dependencies, so every member lands in the same layer."""
+    mods=sorted(plan['modules']); sel=set(mods); dep={m:set() for m in mods}
+    for cid in plan['current_capabilities']:
+        m=caps.get(cid,{}).get('module')
+        if m not in sel: continue
+        for r in caps[cid].get('requires',[]):
+            rm=caps.get(r,{}).get('module')
+            if rm in sel and rm!=m: dep[m].add(rm)
+    reach={}
+    for m in mods:
+        seen,todo=set(),list(dep[m])
+        while todo:
+            x=todo.pop()
+            if x not in seen: seen.add(x); todo+=dep[x]
+        reach[m]=seen
+    scc={m:frozenset({m}|{x for x in reach[m] if m in reach[x]}) for m in mods}
+    layer={}
+    def lay(m):
+        if m not in layer:
+            v=1+max((lay(d) for d in {d for x in scc[m] for d in dep[x]}-scc[m]),default=0)
+            for x in scc[m]: layer[x]=v
+        return layer[m]
+    for m in mods: lay(m)
+    return dep,scc,layer
+
+def supervisor_data(plan,caps,obligations,date):
+    dep,scc,layer=module_layers(plan,caps)
+    # core is locked into every plan (ALL-NO selects only core), so it goes first and carries the stack decision.
+    order=sorted(plan['modules'],key=lambda m:(layer[m],m!='core',m))
+    first=order[0]
+    open_=[{'n':1,'what':'技術棧：語言、框架、資料庫與部署方式（stacks/stack-profile.schema-example.yaml）；比較至少三個可行選項後再定。','before':first,'src':'PLAN.md；Foundry 不替專案選技術棧'}]
+    for cid in sorted(c for c in plan['current_capabilities'] if c.startswith('DER-') and c.endswith('-ADAPTER') and caps.get(c,{}).get('module') in plan['modules']):
+        open_.append({'n':len(open_)+1,'what':f"{caps[cid]['name']}：選供應商；比較至少三個後再定。",'before':caps[cid]['module'],'src':cid})
+    risk=RISK_BY_CRITICALITY[plan['criticality']]
+    steps=[]
+    for i,m in enumerate(order,1):
+        s={'n':i,'code':m,'group':f'L{layer[m]}','plain':obligations[m]['purpose'],'title':m,
+           'gate':f'{card_rel(m)} 的驗收每一條都通過','risk':risk,'model':'未指派','status':'not_started',
+           'depends':sorted(d for d in dep[m] if d not in scc[m]),'card':'../'+card_rel(m)}
+        pend=[o['n'] for o in open_ if o['before']==m]
+        if pend: s['before']='要先決定：'+'、'.join(f'待決 {n}' for n in pend)
+        steps.append(s)
+    priority=[]
+    for k in sorted(set(layer.values())):
+        ms=[m for m in order if layer[m]==k]
+        cycles=sorted({tuple(sorted(scc[m])) for m in ms if len(scc[m])>1})
+        priority.append({'k':k,'steps':ms,'cycles':[list(c) for c in cycles]})
+    rules=[{'id':cid,'h':caps[cid]['name'],'t':caps[cid]['description']} for cid in plan['foundation']]
+    meta={'title':plan['project']['name']+' 監工台','updated':date,'plan':'PLAN.md','planJson':'.foundry/resolution/foundry-plan.json','self':'supervisor/'}
+    return {'META':meta,'COPY':SUPERVISOR_COPY,'RULES':rules,'PRIORITY':priority,'STEPS':steps,'OPEN':open_}
+
+def write_supervisor(stage,plan,obligations,caps,date):
+    if not SUPERVISOR_KIT.is_dir(): raise FileNotFoundError('supervisor kit missing: '+str(SUPERVISOR_KIT))
+    data=supervisor_data(plan,caps,obligations,date)
+    lines=['// 監工台資料（System Foundry 產生）。只改 STEPS[].status（done 填 commit），再跑 node supervisor/build.mjs 與 node supervisor/check.mjs。']
+    lines+=[f'export const {k} = {json.dumps(v,ensure_ascii=False,indent=2)};' for k,v in data.items()]
+    write(stage/'supervisor/data.mjs','\n'.join(lines))
+    for name in ('build.mjs','check.mjs'):
+        shutil.copyfile(ROOT/'generation/supervisor'/name,stage/'supervisor'/name)
+        (stage/'supervisor/kit').mkdir(parents=True,exist_ok=True)
+        shutil.copyfile(SUPERVISOR_KIT/name,stage/'supervisor/kit'/name)
+
 def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_content,item_maps=None,source_pack=''):
     d=stage/'docs/modules'/mid
     d.mkdir(parents=True,exist_ok=True)
@@ -264,7 +346,7 @@ def validate_generated(stage,plan,module_data):
         if legacy.exists(): errors.append('legacy backlog must not be generated (V17-2): '+legacy.relative_to(stage).as_posix())
     for cf in (stage/'cards').glob('*.md') if (stage/'cards').is_dir() else []:
         if cf.stem not in selected: errors.append('card for unselected module: '+cf.name)
-    required=[stage/'PLAN.md',stage/'README.md',stage/'.foundry/intake/answers.json',stage/'.foundry/resolution/foundry-plan.json',stage/'.foundry/project-profile.json',stage/'docs/SYSTEM_BLUEPRINT.md']
+    required=[stage/'PLAN.md',stage/'README.md',stage/'.foundry/intake/answers.json',stage/'.foundry/resolution/foundry-plan.json',stage/'.foundry/project-profile.json',stage/'docs/SYSTEM_BLUEPRINT.md']+[stage/x for x in SUPERVISOR_FILES]
     for p in required:
         if not p.is_file(): errors.append('missing required generated file '+str(p.relative_to(stage)))
     if errors: raise RuntimeError('staging validation failed:\n'+'\n'.join(errors))
@@ -348,11 +430,12 @@ def generate(plan,answers,custom,out_root,industry=None):
         system_lines=[f'# {name} — Generated System Blueprint','',f'Foundry: `{VERSION}`',f"Profile: `{plan['profile']}`",f"Criticality: `{plan['criticality']}`",'', '## Capability resolution',f"- Foundation: {len(plan['foundation'])}",f"- User selected: {len(plan['user_selected'])}",f"- Derived: {len(plan['derived'])}",f"- Deferred: {len(plan['deferred'])}",f"- Current total: {len(plan['current_capabilities'])}",'','## LEGO modules']+[f'- `{m}`' for m in plan['modules']]+['','## Blueprint applicability and delivery registration','See `PLAN.md` (one row per controlled section, then the 交付登記 JSON).','','## Truth boundary','This document is a deterministic planning/assurance output. It does not claim that implementation exists. Implementation claims become VERIFIED only with exact content-addressed file:line evidence.']
         write(stage/'docs/SYSTEM_BLUEPRINT.md','\n'.join(system_lines))
         write_cards(stage,plan,module_data,obligations,caps)
+        write_supervisor(stage,plan,obligations,caps,now[:10])
         trace={'schema_version':'1.0.0','input_digest':plan['input_digest'],'module_reasons':plan['module_reasons'],'capability_traceability':plan['traceability'],'deferred':plan['deferred']}
         dump(stage/'.foundry/resolution/selection-traceability.json',trace)
         coverage={'schema_version':'1.0.0','modules_selected':len(plan['modules']),'module_artifacts_per_module':2,'blueprints_active':active_bp,'blueprints_not_applicable':total_bp-active_bp,'blueprints_total':total_bp,'current_capabilities':len(plan['current_capabilities']),'deferred_capabilities':len(plan['deferred'])}
         dump(stage/'.foundry/verification/generation-coverage.json',coverage)
-        write(stage/'README.md',f"# {name}\n\nGenerated by System Foundry {VERSION}.\n\nStart with `PLAN.md` (selected modules, blueprint applicability table, delivery registration) and `.foundry/resolution/foundry-plan.json`. Each selected LEGO module has an executable card `cards/<module>.md` and `docs/modules/<module>/MODULE_MANIFEST.json`.\n")
+        write(stage/'README.md',f"# {name}\n\nGenerated by System Foundry {VERSION}.\n\nStart with `PLAN.md` (selected modules, blueprint applicability table, delivery registration) and `.foundry/resolution/foundry-plan.json`. Each selected LEGO module has an executable card `cards/<module>.md` and `docs/modules/<module>/MODULE_MANIFEST.json`. Progress: `node supervisor/build.mjs && node supervisor/check.mjs` writes and verifies `supervisor/supervisor.html`.\n")
         validate_generated(stage,plan,module_data)
         dump(stage/'.foundry/resolution/artifact-manifest.json',artifact_manifest(stage))
         os.replace(stage,target)
