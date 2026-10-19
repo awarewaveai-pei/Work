@@ -1,126 +1,121 @@
-# Weekly Summary 2026-10-12
+# Weekly Summary 2026-10-19
+
+> Period: 2026-10-13 → 2026-10-19 | Generated: 2026-10-19 01:12 UTC by remote-weekly-agent
+
+---
 
 ## Completed this week
 
-### Cognitive OS — Platform Launch & UX Sprint
+### 備份與監控 (2026-10-14/15)
+- **備份覆蓋 B1–B11 全上線**：8 庫全從 Cloudflare R2 演練 PASS（WORKLOG 2026-10-14 續21、續25；2026-10-15 續5、續6）
+- **Cognitive OS 專案 ID 懸空（19/19）修復**：匯入前先向 Cognitive OS 確認；19 筆改「未匯入」（WORKLOG 2026-10-15 續11、續13）
 
-- **認知主權平台第 3、4 步完成並上線** (2026-10-10 続1): 所有積木卡（COLLAB/GOVERN/TEACH/EXPRESS/FACILITATE）merge 到 main；SQLite→PostgreSQL 遷移完成（`move_sqlite_to_pg.py` verify OK）；`deploy.sh` + `lib-db.sh` rollback gate；healthy 上正式站 `cognitive.aware-wave.com`。commits a082fa6a9..9c5077a29。
+### 治理 / 腳本清理 (2026-10-14)
+- **automation/ 兩套排程腳本合一**：刪根目錄 automation/、docs/CHANGE_IMPACT_MATRIX.md 舊副本、.agency-state/；REGISTER_SYSTEM_GUARD_TASKS 改用 repo-roots.ps1（WORKLOG 2026-10-14 續18）
+- **M3 客戶交付報告腳本刪除**（操作者授權）
+- **smoke-status-digest Case1 修正**：HEAD 就紅問題，改成「無報告＝PASS」，19 case 全過
+- **按鈕字級 13px → 14px**（`.btn-primary`/`.btn-secondary`，2026-10-14 操作者同意）
 
-- **平台開關修正 — 全部積木開放** (2026-10-10 続5): `OPEN_BLOCKS = BLOCKS`、`BUILD_STEP/OPEN_STEP = 4`；主選單加「我的群組／帶領／課程／校準／我的資料」；手機底部選單改左右滑；新增兩個 invariant test (`test_every_built_block_is_open`、`test_every_top_level_platform_page_is_in_the_menu`)。
+### ADR 017 客戶怎麼買 — 計畫強化 (2026-10-16~18)
+- **Codex 第一輪審閱 25 條全修**：點數許可分支、取消狀態機、授權檔款項落定閘、API key 到期輪替等（WORKLOG 2026-10-18 續2）
+- **Codex 第二輪審閱 13 條全修**：max_tenants 交易鎖、install_id 保留、woo-billing 路由等（WORKLOG 2026-10-18 續5）
+- **新增順序 8「每個產品長成單一產品的樣子」**：cs/collect/outreach 補登記列，開門三步規範（WORKLOG 2026-10-18 續6、續7）
+- **AwareWave 積木目錄整合 System Foundry**：`sync-foundry-catalog.mjs`，`Q-AW-<KEY>` 問卷節，ADR 017 §0b 第 7 條（WORKLOG 2026-10-18 續8）
+- **白牌網址支援**：ADR 018 §2 加 `custom_domains` 表、DNS TXT 驗證、自動憑證；待決 4（Cloudflare for SaaS vs ACME）；監工台 9 步版重發（WORKLOG 2026-10-18 續11）
+- **TASKS 打勾：EU/SG 搬遷 14 項 + staging 孤兒**（操作者 2026-10-18 確認完成，開放待辦 142→127）
 
-- **認知平台入口第一段（兩道門）** (2026-10-11 続1): 首頁「陪我思考 → /projects/new」、「直接分析 → /analyze」；工程工具對用戶隱藏；案子判定改走伺服器 `is_case`；我的案子分兩區（勾選＋確認永久刪除，是案子回 409）；選單 5 區。commits 735e12468, 51dffee2d, 578ae0a05。
+### System Foundry v1.7 計畫 (2026-10-18)
+- 實測發現 74 節藍圖只有 3 種內容（62 節同一段樣板），範例 intake 過期；六張執行卡 V17-1…V17-6（WORKLOG 2026-10-18 續9）
 
-- **COS EXPRESS 頁面 (卡 52)** (2026-10-08 続9): 新增 `ExpressPage.tsx`、route、測試；讀者/格式/勾選/來源/未查證確認整合。
+### 社群管理平台 V1.5 (2026-10-17~18)
+- **C19 骨架與路由**：頂部六區、六分頁、左側頻道清單（WORKLOG 2026-10-17 續24）
+- **C20 撰寫頁 API 骨架**（WORKLOG 2026-10-17 續18）
+- **C21 撰寫頁**：左選頻道＋中撰寫＋右預覽，N 則留言延遲送出，標籤、週期性安排、自動回覆，tsc 0 + 276 files / 2562 tests green（WORKLOG 2026-10-18 續10）
+- **C22 日曆**：卡片、疊放、三欄篩選、批次動作、已刪除（誰刪的）、月換月、週期展開，LogView ACTION_NAMES 補 0105 動作名（WORKLOG 2026-10-18 續4）
 
-- **COS EXPRESS PDF 換行、已讀、原子送出修正 (卡 51)** (2026-10-08 続4/7): `TextPath` 寬度換行；`DocRead` 不增版本；send 在 write-lock 內重新查版本、已讀、標記；突變 4 項逐一驗證。
-
-- **COS 卡 40/41/42/50 TEACH/EXPRESS 修正** (2026-10-08 続6): TEACH AI action 擋評分/排名；practice consent 綁真實案；完成紀錄可刪；EXPRESS draft 比對舊版 AI 句；4 個練習案例升 v2。
-
-- **COS 卡 00/01/02 CI/DB/queue 修正** (2026-10-08 続5): CI image/checkout manifest 明確分離；dump 先完整讀取再改名 `.corrupt`；佇列統一 validator。
-
-- **COS 卡 60b facilitator 課程** (2026-10-08 続8): 三課 draft facilitator lessons；`TEACH` loader 支援 special `facilitator` course；HISTORY v2。AUTO_TASK_DONE。
-
-- **COS Codex 線 cherry-pick 到 PostgreSQL main** (2026-10-08 続10): 17+2+1+1 commits cherry-pick；ON_DELETE callable hook；`image_test_modules.py` 加 `COS_FULL_SUITE=1` 守衛；15023 tests OK。
-
-- **COS 抹除後的物理保留：VACUUM + dump 7 天** (2026-10-10 続6): `physical_retention_hook` 實作；`touched_tables` 查 `pg_stat_xact_user_tables`；`Databases.vacuum()` autocommit；備份 `KEEP_DAYS` 14→7；已隨主線部署上線。
-
-### CI / Security Fixes
-
-- **Weekly workflows security audit 修正** (2026-10-10 続4): `packages/workflows` 5 個 override 下限更新；4 個新 override；`@types/node` 補 devDependency；`braces` GHSA-vfj7-8cjw-p6xm 期限接受。gate verdict: pass。自 2026-09-07 連 33 天紅 → 已修。
-
-- **HCI-30 restore drill CI 修正** (2026-10-10 続3): `.github/workflows/hci30-restore-drill.yml` 手列 migration 0001–0011 改 glob `migrations/[0-9][0-9][0-9][0-9]_*_up.sql`；32 天紅 → 已修；本機兩個 postgres 容器重播 MATCH。
-
-- **Perplexity Search-only guard 修正** (2026-10-10 続2): `check-perplexity-search-only.mjs` 新增 `readsKey()` 分讀寫；self-test +8 例；collect-wire-v2.test.ts 寫入假 key 不再誤報；自 10-08 紅 → 已修。
+### 客服 UI (2026-10-18)
+- **客服分頁頂部重做**：狀態改純文字、分頁改底線式（續3）
+- **SubTabs 改用 .tab-bar 元件**：去黑框、去捲軸（續12）
 
 ---
 
 ## Open tasks
 
-### A. 有外部截止日
-- **🔴 aware-wave.com DMARC 升第二階段** (pct=25→pct=100，**2026-10-15 觸發，3 天後**) — 需操作者確認 rua 報表後執行
-- **🔴 Soulful 網站搬離 Hostinger 硬死線 2026-11-12** — 主體搬遷已完成；剩③ 網域轉 CF Registrar ④ Hostinger hosting 到期
-- **⚠️ 逾期 76 天｜Defender 木馬 `Trojan:Win32/PowhidSubExec.B`** — 來源查清與善後（原排 2026-06-17）
-- **⚠️ 逾期 42 天｜Codex stop-time review gate** — 2026-08-25 停用，期限 2026-08-31
+### A ⏰ 有外部時鐘
+- `【🔴 硬死線 2026-11-12】` Soulful 網站搬離 Hostinger — 剩③ 網域轉 CF Registrar（④ 到期無需管）
+- `【⚠️ 逾期 76 天｜原 2026-06-17】` Defender 木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清
+- `【⚠️ 逾期 49 天｜到期 2026-08-31】` 重新啟用 Codex stop-time review gate
+- `【2026-10-15 觸發】` aware-wave.com DMARC 升級（pct=25 → pct=100）
 
-### B. 待操作者行動
-- **🔴 staging WP admin 密碼明文在 Trigger.dev run output** — 輪換 2 站 + redact 9 runs + deploy
-- **🔴 HF_TOKEN 明文進對話紀錄** (2026-08-27) — 輪換 token
-- **Codex `/hooks` trust 未執行** — Codex 側無機械閘
-- **DMARC 升級** — 需確認 rua 報表再執行
-- **Postiz Task 2 OAuth app 審核** — Meta IG+FB / Reddit / LinkedIn
-- **Cognitive OS P4 決策** — 報告核准角色與每日 token 額度（一次分析 1.8–4.3 萬）
+### B 🔒 卡在操作者
+- `【資安】` staging WP admin 密碼明文在 Trigger.dev run output — 輪換 2 站 + redact 9 run + deploy
+- `【ADR 017 待決 1】` 訂閱定期扣款用哪個 WooCommerce 外掛（擋第 4 步）
+- `【ADR 017 待決 2】` Postiz AGPL-3.0 買斷交付前律師確認（擋第 5 步）
+- `【ADR 017 待決 3】` 點數不退、不轉讓條款寫法及會計確認（擋第 4 步）
+- `【ADR 017 待決 4】` 白牌憑證走 Cloudflare for SaaS 還是 on-demand ACME（擋第 9 步）
+- `【Postiz Task 2】` OAuth app 審核：Meta IG+FB / Reddit / LinkedIn
+- `【Cognitive OS P4】` 報告核准角色 + 每日 token 額度決策
+- `【Soulful 排程頁驗收】` 台灣 03:00 部署後改一格，確認 ops_audit_events 有寫入
 
-### C. Cognitive OS
-- 認知平台入口第一段**未部署**（High-STOP，等操作者 go-ahead）
-- 研究線：P2 DOD 8/8 完成，剩操作者定門檻，才能做成 Project 工作流
-- 頁面渲染閘（home/tool catalog/tool page/workflow pages 缺 `check-mocks.py --page`）
-- 結果頁快照 fixture 過期；run_recipe_async FAILED flake
+### C 🔒 卡在外部
+- Cognitive OS P2 研究線：操作者定門檻後才能做成 Project 工作流
+- System Foundry v1.7 執行：等 V17-1 開工授權
 
-### D. 基礎設施 / 維護
-- **🔴 客戶站已破圖** — `video/[id]` DELETE 無引用檢查（Soulful post id 7393 嵌壞 MP4）
-- **主機 nginx `hci.aware-wave.com` 區塊漂移** — repo 缺此 server block，覆蓋會讓 hci 站下線
-- **4 個 migration 從未套用到 prod** — 0022/0024/0037/0057
-- MainWP 建站 E2E — bridge 已修，剩真建站 E2E 確認
-- 10 個 staging 孤兒 / ~2GB — 拆除路徑就緒，待決策
-- `system-health-check.ps1` 7)deploy-drift / 9)cloudflare 從未真正執行
-
-### E. 知識庫 / 蒐集
-- `provenance`/`author` 到 sink 就斷（阻擋 §1.3b 完成）
-- per-model partial HNSW 未 EXPLAIN 驗
-- KB migration 0076 五個延後項
-
-### F. 已知技術債
-- check-perplexity-search-only.mjs KEY_READER 抓不到間接讀 key（已開 TASKS）
-- check-trigger-no-direct-fetch.ps1 3 個繞過未修
-- `queryAsTenant()` 缺 transaction 包裹（RLS 隱患）
-- `dev-db-init.ps1` hardcode migration marker 模式債務
-- runner MinIO 孤兒物件問題（HCI-30）
+### D–G ▶️ 可直接做（依優先序）
+- 【D 安全】`video/[id] DELETE 無引用檢查` — 客戶站已破圖（Soulful post 7393 嵌壞 MP4）
+- 【D 安全】`cloudflare-realip.conf` 網段清單靜態、無偵測器
+- 【E 治理】共用 git index 停在舊版（`git-commit-scope-guard.js` 未涵蓋路徑）
+- 【E 治理】SSH 腳本無存活檢查（10 支 ssh 中只有 1 支有 `ServerAliveInterval`）
+- 【E 治理】`verify-governance-pointers` 未接進 commit hook
+- 【F 產品】ADR 017 順序 1–7 開卡做（等待決 1/2/3 解鎖即可開第 1、2、3 步）
+- 【F 產品】社群 V1.5 C23–C31（撰寫頁後半）
+- 【G 基建】主機 nginx `hci.aware-wave.com` 區塊漂移（覆蓋會讓 hci 下線）
+- 【G 基建】MainWP E2E（next-admin DEPLOY_HOLD 解除後）
+- 【G 基建】Cognitive OS run lock 只增不刪
+- 【G 基建】4 個 migration 從未套用到 prod（0022/0024/0037/0057）
+- 【G 基建】`REGISTER_AUTOPILOT_PHASE1_TASKS.ps1` PS 5.1 param bug
 
 ---
 
 ## System health
 
-**基礎設施**: 唯一主機 `ks-aw-01` (145.239.195.47, SSH -p 58122)。SG+EU 已於 2026-08-31 全并入。
+> Source: `reports/status/integrated-status-LATEST.md` (generated 2026-10-14) + 2026-10-13 monthly review
 
-**Cognitive OS**: 2026-10-10 04:20 TW 正式上線，PostgreSQL 模式；物理保留 (VACUUM + dump 7 天) 已隨主線部署。最新：平台入口第一段已 commit，**等待操作者 go-ahead 部署**。
+| 項目 | 狀態 |
+|------|------|
+| ks-aw-01 主機 | 唯一主機，無報告本週異常 |
+| Supabase memory | 33.26% (2026-10-13 monthly review，< 85% 正常) |
+| Backup B1–B11 | ✅ 全上線，R2 演練 PASS (2026-10-14/15) |
+| CI / GitHub Actions | 上週 2026-10-10 修復後無新紅燈報告 |
+| Cognitive OS | 正式站上線；P4 待操作者決策 |
+| social.aware-wave.com | C21/C22 待 03:00 部署 |
+| 排程頁 audit 寫入修正 | 已 commit，待下次 03:00 部署生效 |
 
-**CI 狀態**: workflows-security-audit ✅（33 天紅→修）；hci30-restore-drill ✅（32 天紅→修）；Perplexity guard ✅（4 天紅→修）；Cognitive OS full suite ✅（GitHub Actions run 37993372010 4 jobs pass）。
-
-**lobster next-admin**: `2c0604708` on prod (2026-09-26 deploy)。
-
-**Trigger.dev**: v20260926.6，self-hosted on ks-aw-01。
-
-**注意**: `integrated-status-LATEST.md` 建於 2026-09-30，已 12 天未刷新。本報告基於 WORKLOG / 每日記錄。建議下次在線 session 跑 `/health`。
+> **注意**：integrated-status 報告已 5 天未更新，建議手動或觸發 `generate-integrated-status-report.ps1` 確認最新狀態。
 
 ---
 
 ## Risks & blockers
 
-| 嚴重度 | 項目 | 所需行動 |
-|---|---|---|
-| 🔴 URGENT (3天) | DMARC pct=25→100，2026-10-15 觸發 | 操作者確認 rua 報表後執行 |
-| 🔴 SECURITY | Staging WP admin 密碼在 Trigger run output | 操作者：輪換 2 站 + redact 9 runs |
-| 🔴 SECURITY | HF_TOKEN 明文進對話紀錄 | 操作者：輪換 token |
-| 🔴 CLIENT IMPACT | Soulful 破圖（video DELETE 無引用檢查） | 修 `/api/video/[id]` 或還原 R2 物件 |
-| 🔴 DEPLOY HOLD | 認知平台入口第一段（2026-10-11 commits） | 操作者 go-ahead |
-| ⚠️ OVERDUE 76d | Defender 木馬資安複盤 | 安全複盤 |
-| ⚠️ OVERDUE 42d | Codex stop-time review gate 停用 | 重新啟用 |
-| ⚠️ TECH DEBT | 4 個 migration 未套用到 prod (0022/0024/0037/0057) | `apply-db-migration.mjs` |
-| ⚠️ DRIFT | nginx hci.aware-wave.com 漂移 | 加進 repo 再做任何 nginx 覆蓋 |
-| ⚠️ DEADLINE | Soulful hosting 硬死線 2026-11-12 | 網域轉 CF Registrar |
+| 等級 | 項目 | 說明 |
+|------|------|------|
+| 🔴 Critical | Soulful 硬死線 2026-11-12 | 只剩域名轉移③，須操作者在 Cloudflare Registrar 執行 |
+| 🔴 Critical | 客戶站破圖 | Soulful post 7393 嵌壞 MP4，`video/[id] DELETE` 無引用檢查 |
+| 🔴 高 | Defender 木馬逾期 76 天 | `Trojan:Win32/PowhidSubExec.B` 來源未查 |
+| 🔴 高 | staging 密碼外洩 | Trigger.dev run output 有明文，需操作者輪換 |
+| 🟠 中 | DMARC 升級觸發 | pct=25→100，需確認 rua 報表 |
+| 🟠 中 | ADR 017 四個待決 | 擋第 4、5、9 步，計畫可先做第 1、2、3 步 |
+| 🟡 低 | Codex gate 停用 49 天 | 無機械 stop-time review，靠手動 `/codex-review` 補 |
+| 🟡 低 | integrated-status 報告 5 天未更新 | blind spot |
 
 ---
 
 ## Memory highlights
 
-- **單一主機時代**：ks-aw-01 是自 2026-08-31 起唯一 prod 主機，所有 SG/EU IP 引用已清除或標記。
-
-- **Cognitive OS 已全面 PostgreSQL**：SQLite 徹底退場，2026-10-10 上線。14 塊積木全部開放（OPEN_STEP=4）。平台名定為「認知工程系統／Cognitive Engineering OS」，首頁改兩道門（陪我思考／直接分析）。
-
-- **本週最大改動**：三件 CI 紅止血（workflows-security-audit 33天、hci30-restore-drill 32天、perplexity-guard 4天）全數修復，且都是找到不變量後的根治（非補丁）。
-
-- **Oracle 審查架構**：Claude 寫 → Codex 審；Codex 寫 → Claude 審。本週 Codex/Claude oracle 各輪均有 artifact；三輪 critic round 共 7+4+2 findings 全部閉環（除 LATER 項）。
-
-- **物理保留設計決策**：VACUUM 不會把空間清零（PostgreSQL 頁面殘留），`VACUUM FULL` 或每人金鑰才能完全清除，目前選擇 dump 7 天保留作為補充。
-
-- **AO lifecycle 修正（2026-09-27）**：linked worktree 的 `.git` 為檔案，正確 skip AO-RESUME 所有 junction/hook side effects（v-int2 事件已關）。
+- **ADR 017 三軸定案**：部署（hosted/self_hosted）、商業（contract/credits/perpetual）、操作（actor + on_behalf_of）；五種客戶方式＝三軸組合，不改程式；許可只問 `can()`
+- **ADR 018 白牌網址**：新增 `custom_domains(host, organization_id, product_key, verified_at)`，DNS TXT 驗證，憑證自動；待決 4 決定後才能做第 9 步
+- **AwareWave products ↔ System Foundry**：`products.ts` 是唯一產品清單（ADR 012 §5），`sync-foundry-catalog.mjs` 匯出成問卷節 `Q-AW-<KEY>`
+- **System Foundry v1.7 判定**：留選擇引擎，刪 74 節樣板；補每模組一張可執行卡（六張 V17-1…6）
+- **社群 V1.5 進度**：C19（骨架）、C20（API 骨架）、C21（撰寫頁）、C22（日曆）本週完成；待 C23–C31
+- **EU/SG 搬遷正式關閉**：15 個 TASKS 條目操作者確認打勾，開放待辦 142→127
+- **客服 tab UI**：改用 `.tab-bar`/`.tab-count`，全 app 的 `.tab` 補 `:focus-visible`

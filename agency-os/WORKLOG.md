@@ -1,5 +1,4 @@
 # Worklog
-
 ## 2026-10-19（續2）待提交批次收斂；social metrics production gate
 
 - 根因：共用 index 是舊快照（`agency-os/WORKLOG.md` index 停在 10/16，工作樹已到 10/18），且 `main` 與 `origin/main` 分叉；重建非 `.claude` runtime 的 staging，保留 `.claude` session/runtime 不入產品提交。
@@ -58,6 +57,12 @@
 - AUTO_TASK_DONE: ADR017 step1 implementation and card acceptance complete; supervisor commit reference follows in status commit.
 - rollback：git revert本次implementation commit；無migration、無環境變數、無prod操作。
 
+## 2026-10-19（續1）remote-weekly-agent: weekly summary generated
+
+- 01:12 : remote-weekly-agent: weekly summary generated -> reports/weekly/weekly-summary-2026-10-19.md
+- REALTEST_WAIVED: DOC_ONLY -- report-only task, no code change
+- REVIEW_WAIVED: DOC_ONLY -- report-only task
+ - BUGHUNT_WAIVED: DOC_ONLY -- report-only task
 ## 2026-10-18（續12）客服子分頁改用 app 既有 .tab-bar 元件；去黑框、去捲軸——續3 手刻版被退（「比之前更爛」）
 
 **操作者**（附截圖）：點過的分頁留一圈黑框、右側一組捲軸箭頭、整體像小學生做的。
