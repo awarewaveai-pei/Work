@@ -10,7 +10,7 @@ export const META = {
   tasks: 'agency-os/TASKS.md「社群管理平台 V1」',
   worklog: 'agency-os/WORKLOG.md 2026-10-17',
   self: 'agency-os/handoffs/2026-10-17-social-v15-supervisor/',
-  url: 'https://claude.ai/artifact/R5rPFgHj5uuRfiWeSbr8h9',
+  url: 'https://claude.ai/artifact/FmxrX9FN2bDsw1p5t6Ku2t',
 };
 
 // 頁面上所有固定文字（不含資料列）。{x} 由 build.mjs 代入算出來的值。
