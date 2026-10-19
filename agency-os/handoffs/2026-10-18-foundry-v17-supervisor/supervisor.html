@@ -74,12 +74,12 @@ details code{font-size:12px;word-break:break-all}
 <aside><div class="in">
   <h1>System Foundry v1.7 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-19</span></p>
-  <div class="bar" data-computed><i class="d" style="width:50%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>3</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:66.66666666666666%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>4</span>／<span data-computed>6</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">讓 System Foundry 答完問卷後，產出 Claude 能直接開工的專案資料夾，並自帶監工台。共 <span data-computed>6</span> 張卡，照順序做。</p>
-<section id="now"><h2>現況</h2><p class="lead">選擇引擎原本就正確；這一版重做的是產出。</p><ul class="yn"><li class="yes"><b>有</b><span>問卷選出正確的積木<small>選擇矩陣、突變覆蓋兩道閘全綠（make verify）</small></span></li><li class="yes"><b>有</b><span>產出一頁計畫與每個模組一張執行卡<small>PLAN.md＋cards/&lt;模組&gt;.md（V17-1、V17-2）</small></span></li><li class="yes"><b>有</b><span>每個產生的專案自帶監工台<small>supervisor/，與 AwareWave 監工台同一套 supervisor-kit（V17-3）</small></span></li><li class="no"><b>還沒有</b><span>每個能力都有驗收<small>大多數能力還沒有驗收；缺的在卡上標 TODO，缺數由 report_acceptance_gap.py 在 make verify 印出</small></span></li><li class="no"><b>還沒有</b><span>勾 AwareWave 積木就帶入依賴<small>V17-4</small></span></li></ul></section>
+<section id="now"><h2>現況</h2><p class="lead">選擇引擎原本就正確；這一版重做的是產出。</p><ul class="yn"><li class="yes"><b>有</b><span>問卷選出正確的積木<small>選擇矩陣、突變覆蓋兩道閘全綠（make verify）</small></span></li><li class="yes"><b>有</b><span>產出一頁計畫與每個模組一張執行卡<small>PLAN.md＋cards/&lt;模組&gt;.md（V17-1、V17-2）</small></span></li><li class="yes"><b>有</b><span>每個產生的專案自帶監工台<small>supervisor/，與 AwareWave 監工台同一套 supervisor-kit（V17-3）</small></span></li><li class="no"><b>還沒有</b><span>每個能力都有驗收<small>大多數能力還沒有驗收；缺的在卡上標 TODO，缺數由 report_acceptance_gap.py 在 make verify 印出</small></span></li><li class="yes"><b>有</b><span>勾 AwareWave 積木就帶入依賴<small>勾認知平台會帶入資料蒐集器；社群的十項宣告已填（V17-4）。其他產品的 manifest 等客戶怎麼來的「買斷安裝」與「每個產品長成單一產品」兩項</small></span></li></ul></section>
 
 <section id="steps"><h2>待建項目</h2><p class="lead">照編號順序做，每張卡的驗收寫在計畫檔。</p><ol class="steps"><li class="step done" id="V17-1">
     <div class="n">1</div>
@@ -114,15 +114,16 @@ details code{font-size:12px;word-break:break-all}
         <p><b>做法：</b><code>agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md V17-3</code></p>
         <p><b>完成於：</b><code>5fa64e1e6</code></p>
       </details>
-    </div></li><li class="step todo" id="V17-4">
+    </div></li><li class="step done" id="V17-4">
     <div class="n">4</div>
     <div class="b">
       <p class="plain">問卷裡勾選 AwareWave 的產品（社群、客服…），它和它依賴的產品就自動帶進專案；新產品產生器讀得懂產出。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>勾社群 → 模組含社群與其依賴；new-product.mjs --from-foundry 產出的十項宣告至少六項不是 TODO</p>
       <details><summary>工程細節：V17-4 接軌 AwareWave</summary>
         <p><b>要先完成：</b><a href="#V17-3">V17-3</a></p>
         <p><b>做法：</b><code>agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md V17-4</code></p>
+        <p><b>完成於：</b><code>53b222d8d</code></p>
       </details>
     </div></li><li class="step todo" id="V17-5">
     <div class="n">5</div>

@@ -29,7 +29,7 @@ export const NOW = [
   { what: '產出一頁計畫與每個模組一張執行卡', state: 'yes', ev: 'PLAN.md＋cards/<模組>.md（V17-1、V17-2）' },
   { what: '每個產生的專案自帶監工台', state: 'yes', ev: 'supervisor/，與 AwareWave 監工台同一套 supervisor-kit（V17-3）' },
   { what: '每個能力都有驗收', state: 'no', ev: '大多數能力還沒有驗收；缺的在卡上標 TODO，缺數由 report_acceptance_gap.py 在 make verify 印出' },
-  { what: '勾 AwareWave 積木就帶入依賴', state: 'no', ev: 'V17-4' },
+  { what: '勾 AwareWave 積木就帶入依賴', state: 'yes', ev: '勾認知平台會帶入資料蒐集器；社群的十項宣告已填（V17-4）。其他產品的 manifest 等客戶怎麼來的「買斷安裝」與「每個產品長成單一產品」兩項' },
 ];
 
 // 計畫的卡，依開工順序編號。status: not_started | in_progress | done；done 必填 commit。
@@ -38,7 +38,7 @@ export const STEPS = [
   { n: 1, code: 'V17-1', plain: '刪掉 74 節重複的樣板藍圖，改成專案根目錄一頁 PLAN.md：選了什麼、為什麼、每節適不適用。', title: '樣板瘦身', gate: '全答產生後沒有 docs/blueprint；PLAN.md 每節一列；make verify 綠', risk: 'Low', model: 'Sonnet 5.5（SDK）＋Opus 5.5 驗收', status: 'done', commit: '80a73d7e2', depends: [] },
   { n: 2, code: 'V17-2', plain: '每個模組一張執行卡：做什麼、改哪些檔、用什麼測試證明、怎麼回滾；沒寫驗收的能力標 TODO。', title: '每模組一張可執行卡', gate: '客服模組的卡每個能力都有「指令→預期」；拿掉一個能力的驗收，卡出現 TODO、缺數加一', risk: 'Low', model: 'Sonnet 5.5（SDK）＋Opus 5.5 驗收', status: 'done', commit: '6c92f43c8', depends: ['V17-1'] },
   { n: 3, code: 'V17-3', plain: '監工台只有一套版面；每個產生的專案都自帶一個，模組依相依關係分層排好。', title: '監工台套件共用', gate: '產生的專案 node supervisor/build.mjs 和 check.mjs 綠；計畫少一個模組，check 變紅', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '5fa64e1e6', depends: ['V17-2'] },
-  { n: 4, code: 'V17-4', plain: '問卷裡勾選 AwareWave 的產品（社群、客服…），它和它依賴的產品就自動帶進專案；新產品產生器讀得懂產出。', title: '接軌 AwareWave', gate: '勾社群 → 模組含社群與其依賴；new-product.mjs --from-foundry 產出的十項宣告至少六項不是 TODO', risk: 'Low', model: 'Opus 5.5', status: 'not_started', depends: ['V17-3'] },
+  { n: 4, code: 'V17-4', plain: '問卷裡勾選 AwareWave 的產品（社群、客服…），它和它依賴的產品就自動帶進專案；新產品產生器讀得懂產出。', title: '接軌 AwareWave', gate: '勾社群 → 模組含社群與其依賴；new-product.mjs --from-foundry 產出的十項宣告至少六項不是 TODO', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '53b222d8d', depends: ['V17-3'] },
   { n: 5, code: 'V17-5', plain: '範例專案每次驗證時從最新問卷重新產生，問卷改了範例就跟著更新，不會過期。', title: '範例 intake 自動重生', gate: '改一題 id → 驗證紅；重生 → 綠', risk: 'Low', model: 'Opus 5.5', status: 'not_started', depends: ['V17-4'] },
   { n: 6, code: 'V17-6', plain: '問卷加一題「裝在客戶自己的主機」；答要，就必須有授權檔，發版要能離線更新。', title: '新題', gate: '答要 → CAP-LICENSE 必選、FOUND-RELEASE 多一條離線更新義務；選擇矩陣綠', risk: 'Low', model: 'Opus 5.5', status: 'not_started', depends: ['V17-5'] },
 ];
