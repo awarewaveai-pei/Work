@@ -27,6 +27,7 @@
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
 - ORACLE_WAIVED: Codex 今天審了三輪（69c9a7ca 6 項、2e6742df 3 項、79a6135c 3 項，皆 -Path partial）；最後兩個守衛是第三輪 F2／F3 的修法，由 tsc＋e2e＋本機守衛實測驗證，不再開第四輪
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=notCollected|REFETCH_DAYS|blueskyFeed(|runMetricsSnapshot|metrics-real-db | hits=18
+- 監工台：`agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs` C24 → done（deaf0a7eb），「數據分析有真數字」仍是「還沒有」（正式環境未跑）；`node build.mjs`＋`node check.mjs` ok。
 ## 2026-10-19（續14）System Foundry v1.7 V17-6：新題 `Q-DEPLOY-001`「裝在客戶自己的主機」（v1.7 六張卡完成）
 
 **觸發**：操作者「Continue with V17-6」。

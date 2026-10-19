@@ -73,13 +73,13 @@ details code{font-size:12px;word-break:break-all}
 <div class="shell">
 <aside><div class="in">
   <h1>社群發文 監工台</h1>
-  <p class="upd">更新於 <span data-computed>2026-10-17</span></p>
-  <div class="bar" data-computed><i class="d" style="width:30.76923076923077%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>4</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <p class="upd">更新於 <span data-computed>2026-10-19</span></p>
+  <div class="bar" data-computed><i class="d" style="width:38.46153846153847%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>5</span>／<span data-computed>13</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">把定案的新畫面做進 social.aware-wave.com。共 <span data-computed>13</span> 張卡，一張一個工作階段。</p>
-<section id="now"><h2>現況</h2><p class="lead">目前的版本可以發文。新畫面已定案，還沒做進產品。</p><ul class="yn"><li class="yes"><b>有</b><span>可以發文<small>social.aware-wave.com 上線中（PLAN.md C12）；是舊版畫面</small></span></li><li class="yes"><b>有</b><span>新畫面定案<small>樣稿第 16 版；ADR 016 §5 操作者定案 1–6（commit 0755e32ab）</small></span></li><li class="no"><b>還沒有</b><span>數據分析有真數字<small>要先查 Postiz 有沒有分析資料可拿（C24 第一步）</small></span></li><li class="no"><b>還沒有</b><span>留言自動回覆真的會動作<small>要等 Meta 審核通過（TASKS.md「Postiz Task 2 OAuth app 審核」）</small></span></li></ul></section>
+<section id="now"><h2>現況</h2><p class="lead">目前的版本可以發文。新畫面已定案，還沒做進產品。</p><ul class="yn"><li class="yes"><b>有</b><span>可以發文<small>social.aware-wave.com 上線中（PLAN.md C12）；是舊版畫面</small></span></li><li class="yes"><b>有</b><span>新畫面定案<small>樣稿第 16 版；ADR 016 §5 操作者定案 1–6（commit 0755e32ab）</small></span></li><li class="no"><b>還沒有</b><span>數據分析有真數字<small>程式完成（C24 deaf0a7eb）：Facebook 經 Postiz、Bluesky 走公開 API，測試資料庫已寫進 Soulful Bluesky 一天；正式環境要等部署並開啟每日排程</small></span></li><li class="no"><b>還沒有</b><span>留言自動回覆真的會動作<small>要等 Meta 審核通過（TASKS.md「Postiz Task 2 OAuth app 審核」）</small></span></li></ul></section>
 
 <section id="steps"><h2>待建項目</h2><p class="lead">依編號順序做。同一組的卡可以同時做，因為改的檔案不重疊。風險 High 的卡要你同意才動工。</p><ol class="steps"><li class="step done" id="C20">
     <div class="n">1</div>
@@ -156,15 +156,16 @@ details code{font-size:12px;word-break:break-all}
         <p><b>要先完成：</b><a href="#C20">C20</a>、<a href="#C21">C21</a></p>
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C23</code></p>
       </details>
-    </div></li><li class="step todo" id="C24">
+    </div></li><li class="step done" id="C24">
     <div class="n">8</div>
     <div class="b">
       <p class="plain">看每個頻道的追蹤者、觸及、互動和趨勢，以及哪則貼文表現最好。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>一個頻道的一天數字寫進資料庫並顯示在頁面；沒有的數字寫明原因，不填假數字</p>
       <details><summary>工程細節：C24 數據分析</summary>
         <p><b>要先完成：</b><a href="#C19">C19</a>、<a href="#C20">C20</a></p>
         <p><b>做法：</b><code>lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md §1b C24</code></p>
+        <p><b>完成於：</b><code>deaf0a7eb</code></p>
       </details>
     </div></li><li class="step todo" id="C27">
     <div class="n">9</div>

@@ -3,7 +3,7 @@
 
 export const META = {
   title: '社群發文 監工台',
-  updated: '2026-10-17',
+  updated: '2026-10-19',
   plan: 'lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md',
   adr: 'agency-os/docs/architecture/decisions/016-social-manager-third-product.md',
   mock: 'lobster-factory/docs/social/mockups/social-manager-mock.html',
@@ -29,7 +29,7 @@ export const COPY = {
 export const NOW = [
   { what: '可以發文', state: 'yes', ev: 'social.aware-wave.com 上線中（PLAN.md C12）；是舊版畫面' },
   { what: '新畫面定案', state: 'yes', ev: '樣稿第 16 版；ADR 016 §5 操作者定案 1–6（commit 0755e32ab）' },
-  { what: '數據分析有真數字', state: 'no', ev: '要先查 Postiz 有沒有分析資料可拿（C24 第一步）' },
+  { what: '數據分析有真數字', state: 'no', ev: '程式完成（C24 deaf0a7eb）：Facebook 經 Postiz、Bluesky 走公開 API，測試資料庫已寫進 Soulful Bluesky 一天；正式環境要等部署並開啟每日排程' },
   { what: '留言自動回覆真的會動作', state: 'no', ev: '要等 Meta 審核通過（TASKS.md「Postiz Task 2 OAuth app 審核」）' },
 ];
 
@@ -43,7 +43,7 @@ export const STEPS = [
   { n: 5, code: 'C26', group: 'C', plain: '一個放在個人簡介的連結頁，列出官網和報名表，看得到每個連結被點了幾次。', title: '智慧連結', gate: '加一個連結，公開頁看得到，點一下次數加一', risk: 'Medium（公開頁）', model: 'Opus 5.5', status: 'not_started', depends: ['C19', 'C20'], decided: '網址 social.aware-wave.com/smartlink/名字（你 2026-10-17 定）' },
   { n: 6, code: 'C29', group: 'C', plain: '看每個頻道有幾則留言和私訊還沒讀，一鍵打開客服收件匣。', title: '訊息收件匣', gate: '每個頻道的未讀數跟 Chatwoot 一樣', risk: 'Low', model: 'Sonnet 5.5', status: 'not_started', depends: ['C19', 'C20'] },
   { n: 7, code: 'C23', group: 'D', plain: '自動發布清單用「星期 × 時間」的方格點選要發的時段。', title: '自動發布清單方格', gate: '三個時段跨兩天，系統排出的貼文順序正確；舊清單照常發', risk: 'Medium（改既有排程資料）', model: 'Opus 5.5', status: 'not_started', depends: ['C20', 'C21'] },
-  { n: 8, code: 'C24', group: 'D', plain: '看每個頻道的追蹤者、觸及、互動和趨勢，以及哪則貼文表現最好。', title: '數據分析', gate: '一個頻道的一天數字寫進資料庫並顯示在頁面；沒有的數字寫明原因，不填假數字', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C19', 'C20'] },
+  { n: 8, code: 'C24', group: 'D', plain: '看每個頻道的追蹤者、觸及、互動和趨勢，以及哪則貼文表現最好。', title: '數據分析', gate: '一個頻道的一天數字寫進資料庫並顯示在頁面；沒有的數字寫明原因，不填假數字', risk: 'Medium', model: 'Opus 5.5', status: 'done', commit: 'deaf0a7eb', depends: ['C19', 'C20'] },
   { n: 9, code: 'C27', group: 'D', plain: '有人留言或私訊某些字就自動回覆。品牌有通用規則，單則貼文可以另外設，單則的優先。', title: '自動化流程', gate: '規則比對測試通過（單則優先、關鍵字、平台）；真的回覆要等 Meta 審核', risk: 'High（代替品牌回覆客人）', model: 'Opus 5.5', status: 'not_started', depends: ['C20', 'C21'], waitFor: '真的回覆要等 Meta 審核' },
   { n: 10, code: 'C31', group: 'D', plain: '可以上傳影片、選封面、排列和裁切多張圖片；素材庫可以存整則貼文。', title: '媒體與影片', gate: '上傳 3 秒影片，預覽後排程成功', risk: 'Medium', model: 'Opus 5.5', status: 'not_started', depends: ['C21'] },
   { n: 11, code: 'C30', group: 'D', plain: '手機上也能看日曆和寫貼文，畫面不會被切掉。', title: '手機', gate: '每一頁在 390 寬的手機上都不會左右捲動', risk: 'Low', model: 'Sonnet 5.5', status: 'not_started', depends: ['C19', 'C21', 'C22'] },
