@@ -23,10 +23,12 @@ export type DayValues = Record<Stored, number | null>;
 export interface DayRow extends DayValues { account_id: string; day: string }
 export const PERIODS = [7, 28, 90] as const;
 
-/** Days fetched again on every run (late Facebook counts; Bluesky engagement keeps growing); a channel with no row yet
- *  is backfilled for the longest period. */
-export const REFETCH_DAYS = 28;
+/** Every run fetches the longest period again (late Facebook counts; Bluesky engagement keeps growing; a cut-short first
+ *  run heals itself): the upsert merge makes that safe. */
 export const BACKFILL_DAYS = 90;
+const POOL = 5;               // post-number fetches at once
+const DEADLINE_MS = 240_000;  // no new post fetch after this long into a run (the route has 300 s)
+const SNAPSHOT_POSTS = 200;   // newest targets per channel
 
 /** Why a channel has no value for a field; null = it has one (or will, once collected). Shown on the page as is. */
 export function missingReason(platform: string, field: Stored): string | null {
@@ -42,7 +44,11 @@ export const collects = (platform: string) => platform === "facebook" || platfor
 
 const emptyDay = (): DayValues => ({ followers: null, reach: null, impressions: null, engagement: null, posts: null });
 const isDay = (s: unknown): s is string => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
-const count = (v: unknown): number | null => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.round(n) : null; };
+const count = (v: unknown): number | null => {
+  if (v == null || (typeof v === "string" && v.trim() === "")) return null;   // Number("") is 0: missing must stay null
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : null;
+};
 
 // ---- Facebook through Postiz ------------------------------------------------------------------------------------
 
@@ -88,8 +94,8 @@ const engagementOf = (p: BskyFeedItem["post"]) => (p.likeCount ?? 0) + (p.repost
 const rkeyOf = (uri: string) => uri.split("/").pop() ?? "";
 
 /** The channel's own posts (no reposts, no replies) back past `since`, newest first; complete = the feed was read past
- *  it (a channel with more than MAX_PAGES x 100 posts in the window is cut short: only the days read are counted). */
-async function blueskyFeed(actor: string, since: number): Promise<{ profile: BskyProfile; items: BskyFeedItem[]; complete: boolean }> {
+ *  it (more than 10 x 100 posts in the window, or the run's deadline passed: only the days read are counted). */
+async function blueskyFeed(actor: string, since: number, deadline: number): Promise<{ profile: BskyProfile; items: BskyFeedItem[]; complete: boolean }> {
   const get = async <T>(path: string): Promise<T> => {
     const res = await fetch(`${BSKY}/${path}`, { cache: "no-store", signal: AbortSignal.timeout(20_000) });
     if (!res.ok) throw new Error(`Bluesky ${path.split("?")[0]} returned ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -98,7 +104,7 @@ async function blueskyFeed(actor: string, since: number): Promise<{ profile: Bsk
   const profile = await get<BskyProfile>(`app.bsky.actor.getProfile?actor=${encodeURIComponent(actor)}`);
   const items: BskyFeedItem[] = [];
   let cursor: string | undefined;
-  for (let page = 0; page < 10; page++) {
+  for (let page = 0; page < 10 && Date.now() < deadline; page++) {
     const q = new URLSearchParams({ actor: profile.did, limit: "100", filter: "posts_no_replies", ...(cursor ? { cursor } : {}) });
     const r = await get<{ feed: BskyFeedItem[]; cursor?: string }>(`app.bsky.feed.getAuthorFeed?${q}`);
     items.push(...r.feed);
@@ -157,9 +163,45 @@ function db(): SupabaseClient {
 interface SnapAccount { id: string; platform: string; label: string; handle: string | null; postiz_integration_id: string; organization: { id: string; default_timezone: string } | null }
 export interface SnapshotResult { accounts: number; days: number; posts: number; skipped: number; errors: string[] }
 
-/** One run: every connected channel that has a source gets its days and its published posts' numbers. A channel's
- *  failure is reported and the others go on. */
+export interface PubTarget { id: string; account_id: string; post_id: string; postiz_post_id: string | null; release_url: string | null; published_at: string }
+
+/** Published targets on these channels whose post went out in [from, to) (ISO instants; `to` open), newest post first.
+ *  The snapshot and the page both select through this, so what is collected is what is shown. `brandId` also pins the
+ *  post's brand. Filters run in SQL (a JS filter after a cap loses a channel's older posts). */
+export async function publishedTargets(sb: SupabaseClient, o: { accountIds: readonly string[]; from: string; to?: string; brandId?: string }): Promise<PubTarget[]> {
+  if (!o.accountIds.length) return [];
+  const raw = await selectAll((f, t) => {
+    let q = sb.from("social_post_targets")
+      .select("id, account_id, post_id, postiz_post_id, release_url, post:social_posts!inner(published_at)")
+      .in("account_id", [...o.accountIds]).eq("state", "published").eq("post.state", "published").gte("post.published_at", o.from);
+    if (o.to) q = q.lt("post.published_at", o.to);
+    if (o.brandId) q = q.eq("post.organization_id", o.brandId);
+    return q.order("id").range(f, t);
+  }, (e) => { throw new SocialStoreError(500, `posts: ${e.message}`); }) as unknown as Array<Omit<PubTarget, "published_at"> & { post: { published_at: string } | Array<{ published_at: string }> | null }>;
+  const out: PubTarget[] = [];
+  for (const { post, ...r } of raw) {
+    const at = (Array.isArray(post) ? post[0] : post)?.published_at;
+    if (at) out.push({ ...r, published_at: at });
+  }
+  return out.sort((a, b) => (a.published_at < b.published_at ? 1 : a.published_at > b.published_at ? -1 : a.id < b.id ? -1 : 1));
+}
+
+/** Runs `fn` over `items` with `limit` at a time; an item reached after `deadline` (epoch ms) is not started.
+ *  Returns how many were not started. */
+async function pool<T>(items: readonly T[], limit: number, deadline: number, fn: (x: T) => Promise<void>): Promise<number> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length && Date.now() < deadline) await fn(items[next++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return items.length - next;
+}
+
+/** One run: every connected channel that has a source gets its days and its published posts' numbers. Nothing new starts
+ *  after the deadline, and everything not done -- a channel not started or failed, a feed cut short, a post not reached
+ *  or whose fetch failed -- is in `errors` (the route answers 502), never dropped silently. */
 export async function runMetricsSnapshot(now = new Date()): Promise<SnapshotResult> {
+  const deadline = Date.now() + DEADLINE_MS;
   const sb = db();
   const result: SnapshotResult = { accounts: 0, days: 0, posts: 0, skipped: 0, errors: [] };
   const { data, error } = await sb.from("social_accounts")
@@ -167,9 +209,11 @@ export async function runMetricsSnapshot(now = new Date()): Promise<SnapshotResu
   if (error) throw new SocialStoreError(500, `metrics accounts: ${error.message}`);
   for (const a of (data ?? []) as unknown as SnapAccount[]) {
     if (!collects(a.platform)) { result.skipped++; continue; }
+    if (Date.now() >= deadline) { result.errors.push(`${a.platform} ${a.id}: not started: run deadline passed`); continue; }
     try {
-      const r = await snapshotAccount(sb, a, now);
+      const r = await snapshotAccount(sb, a, now, deadline);
       result.accounts++; result.days += r.days; result.posts += r.posts;
+      for (const gap of r.gaps) result.errors.push(`${a.platform} ${a.id}: ${gap}`);
     } catch (e) {
       result.errors.push(`${a.platform} ${a.id}: ${(e instanceof Error ? e.message : String(e)).slice(0, 300)}`);
     }
@@ -177,21 +221,22 @@ export async function runMetricsSnapshot(now = new Date()): Promise<SnapshotResu
   return result;
 }
 
-async function snapshotAccount(sb: SupabaseClient, a: SnapAccount, now: Date): Promise<{ days: number; posts: number }> {
+async function snapshotAccount(sb: SupabaseClient, a: SnapAccount, now: Date, deadline: number): Promise<{ days: number; posts: number; gaps: string[] }> {
   const gate = await checkProductionChangeAllowed(sb, a.organization?.id ?? null);
   if (!gate.allowed) throw new Error(`metrics writes blocked: ${gate.reason ?? gate.mode}`);
+  if (Date.now() >= deadline) throw new Error("not started: run deadline passed");
   const tz = a.organization?.default_timezone ?? "UTC";
-  const { count: have, error: e0 } = await sb.from("social_metrics_daily").select("day", { count: "exact", head: true }).eq("account_id", a.id);
-  if (e0) throw new Error(`rows: ${e0.message}`);
-  const window = have ? REFETCH_DAYS : BACKFILL_DAYS;
+  const window = BACKFILL_DAYS;
   const from = addDays(zoned(now, tz).date, -window);
   let days: Map<string, Partial<DayValues>>;
   let postNumbers: (t: { postiz_post_id: string | null; release_url: string | null }) => Promise<{ reach: number | null; engagement: number | null } | null>;
+  const gaps: string[] = [];
   if (a.platform === "facebook") {
     days = facebookDays(await accountAnalytics(a.postiz_integration_id, window), now);
     postNumbers = async (t) => (t.postiz_post_id ? facebookPost(await postAnalytics(t.postiz_post_id, window)) : null);
   } else {
-    const feed = await blueskyFeed(a.handle || a.label, Date.parse(instantAt(from, "00:00", tz)));
+    const feed = await blueskyFeed(a.handle || a.label, Date.parse(instantAt(from, "00:00", tz)), deadline);
+    if (!feed.complete) gaps.push("feed cut short (1000 posts or run deadline): older days not counted");
     days = blueskyDays(feed.profile, feed.items, feed.complete, tz, now, from);
     const byKey = new Map(feed.items.filter((x) => !x.reason).map((x) => [rkeyOf(x.post.uri), engagementOf(x.post)]));
     postNumbers = async (t) => {
@@ -207,21 +252,22 @@ async function snapshotAccount(sb: SupabaseClient, a: SnapAccount, now: Date): P
     const { error: e2 } = await sb.from("social_metrics_daily").upsert(mergeDays((old ?? []) as DayRow[], incoming), { onConflict: "account_id,day" });
     if (e2) throw new Error(`write days: ${e2.message}`);
   }
-  // the channel's posts that went out inside the window
-  const { data: targets, error: e3 } = await sb.from("social_post_targets")
-    .select("id, postiz_post_id, release_url, post:social_posts!inner(published_at)")
-    .eq("account_id", a.id).eq("state", "published").gte("post.published_at", instantAt(from, "00:00", tz)).limit(200);
-  if (e3) throw new Error(`posts: ${e3.message}`);
+  // the channel's newest posts that went out inside the window (same selection as the page)
+  const targets = (await publishedTargets(sb, { accountIds: [a.id], from: instantAt(from, "00:00", tz) })).slice(0, SNAPSHOT_POSTS);
   const rows: Array<{ target_id: string; reach: number | null; engagement: number | null; fetched_at: string }> = [];
-  for (const t of (targets ?? []) as Array<{ id: string; postiz_post_id: string | null; release_url: string | null }>) {
-    const n = await postNumbers(t).catch(() => null);   // one post's numbers are not worth the channel's run
+  let failed = 0, firstFailure = "";
+  const notCollected = await pool(targets, POOL, deadline, async (t) => {
+    // one post's failure is not worth the channel's run; counted, not swallowed
+    const n = await postNumbers(t).catch((e: unknown) => { failed++; firstFailure ||= (e instanceof Error ? e.message : String(e)).slice(0, 200); return null; });
     if (n) rows.push({ target_id: t.id, ...n, fetched_at: now.toISOString() });
-  }
+  });
+  if (notCollected) gaps.push(`stopped at deadline: ${notCollected} posts not collected`);
+  if (failed) gaps.push(`${failed} post fetches failed (first: ${firstFailure})`);
   if (rows.length) {
     const { error: e4 } = await sb.from("social_post_metrics").upsert(rows, { onConflict: "target_id" });
     if (e4) throw new Error(`write posts: ${e4.message}`);
   }
-  return { days: incoming.length, posts: rows.length };
+  return { days: incoming.length, posts: rows.length, gaps };
 }
 
 // ---- the page -----------------------------------------------------------------------------------------------------
@@ -315,14 +361,19 @@ export async function loadAnalytics(brandId: string, tz: string, account: string
   const empty = accounts.filter((a) => ids.includes(a.id) && collects(a.platform) && !rows.some((r) => r.account_id === a.id && inPeriod(r))).map((a) => a.id);
 
   // published posts of the period on these channels, with their numbers
-  const { data: ps, error: e2 } = await sb.from("social_posts")
-    .select("id, body, published_at, targets:social_post_targets(id, account_id, state), media:social_post_media(position, item:social_media(postiz_path))")
-    .eq("organization_id", brandId).eq("state", "published")
-    .gte("published_at", instantAt(p.from, "00:00", tz)).lt("published_at", instantAt(addDays(p.to, 1), "00:00", tz))
-    .order("published_at", { ascending: false }).limit(POSTS_CAP);
-  if (e2) throw new SocialStoreError(500, `posts: ${e2.message}`);
-  type P = { id: string; body: string; published_at: string; targets: Array<{ id: string; account_id: string; state: string }>; media: Array<{ position: number; item: { postiz_path: string | null } | null }> };
-  const posts = ((ps ?? []) as unknown as P[]).map((x) => ({ ...x, targets: x.targets.filter((t) => ids.includes(t.account_id) && t.state === "published") })).filter((x) => x.targets.length);
+  const found = await publishedTargets(sb, { accountIds: ids, brandId, from: instantAt(p.from, "00:00", tz), to: instantAt(addDays(p.to, 1), "00:00", tz) });
+  const byPost = new Map<string, PubTarget[]>();
+  for (const t of found) byPost.set(t.post_id, [...(byPost.get(t.post_id) ?? []), t]);
+  const newest = [...byPost.values()].slice(0, POSTS_CAP);   // `found` is newest first, so are the groups
+  type P = { id: string; body: string; published_at: string; media: Array<{ position: number; item: { postiz_path: string | null } | null }> };
+  const detail = new Map<string, P>();
+  for (let i = 0; i < newest.length; i += 100) {
+    const { data, error: e2 } = await sb.from("social_posts").select("id, body, published_at, media:social_post_media(position, item:social_media(postiz_path))")
+      .in("id", newest.slice(i, i + 100).map((g) => g[0].post_id));
+    if (e2) throw new SocialStoreError(500, `posts: ${e2.message}`);
+    for (const x of (data ?? []) as unknown as P[]) detail.set(x.id, x);
+  }
+  const posts = newest.flatMap((g) => { const x = detail.get(g[0].post_id); return x ? [{ ...x, targets: g.map((t) => ({ id: t.id, account_id: t.account_id })) }] : []; });
   const tids = posts.flatMap((x) => x.targets.map((t) => t.id));
   const pm = new Map<string, { reach: number | null; engagement: number | null }>();
   for (let i = 0; i < tids.length; i += 100) {

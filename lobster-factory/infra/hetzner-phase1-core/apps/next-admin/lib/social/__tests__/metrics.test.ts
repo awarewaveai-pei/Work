@@ -2,7 +2,7 @@
 // The Facebook series is a real Postiz v2.25.1 answer (ks-aw-01, 2026-10-18 03:12 UTC, page Soulful Expression Art
 // Therapy, G6 in WORKLOG), cut to two metrics.
 import { describe, expect, it } from "vitest";
-import { facebookDays, mergeDays, periodOf, summarize, type DayRow } from "../metrics";
+import { facebookDays, facebookPost, mergeDays, periodOf, summarize, type DayRow } from "../metrics";
 
 const row = (account_id: string, day: string, v: Partial<DayRow> = {}): DayRow =>
   ({ account_id, day, followers: null, reach: null, impressions: null, engagement: null, posts: null, ...v });
@@ -26,6 +26,24 @@ describe("snapshot merge", () => {
     expect(merged.find((r) => r.day === "2026-10-16")).toEqual(row("a", "2026-10-16", { reach: 1, impressions: 8, engagement: 5 }));
     // a field nobody has stays null, never 0
     expect(merged.find((r) => r.day === "2026-10-14")).toEqual(row("a", "2026-10-14", { reach: 3, impressions: 9 }));
+  });
+});
+
+describe("an empty total is missing, not 0", () => {
+  it("facebookDays leaves a field out of the day when Postiz's total is an empty string", () => {
+    const series = [
+      { label: "Page Impressions", percentageChange: 0, data: [{ total: "", date: "2026-10-15" }, { total: "  ", date: "2026-10-16" }] },
+      { label: "Media views", percentageChange: 0, data: [{ total: 9, date: "2026-10-15" }] },
+    ] as unknown as Parameters<typeof facebookDays>[0];
+    const days = facebookDays(series, new Date("2026-10-18T03:12:07Z"));
+    expect(days.get("2026-10-14")).toEqual({ impressions: 9 });
+    expect(days.has("2026-10-15")).toBe(false);
+  });
+
+  it("facebookPost gives null for an empty total, a real 0 stays 0", () => {
+    const s = (label: string, total: unknown) => ({ label, percentageChange: 0, data: [{ total, date: "2026-10-18" }] });
+    const post = facebookPost([s("Impressions", ""), s("Engagement", 0)] as unknown as Parameters<typeof facebookPost>[0]);
+    expect(post).toEqual({ reach: null, engagement: 0 });
   });
 });
 

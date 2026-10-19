@@ -1,4 +1,32 @@
 # Worklog
+## 2026-10-19（續15）社群 V1.5 C24 數據分析收尾：G6 補記、快照「沒做完的都回報」、真資料一天驗收（拋棄式 DB＋Bluesky 公開 API）
+
+**觸發**：操作者「續做社群 V1.5」。C24 主體（`Analytics.tsx`、`lib/social/metrics.ts`、`/api/social/metrics`、`/api/internal/social/metrics`、Trigger `social-metrics` 19:30 UTC、`render-views.mjs` `12-analytics`）已隨 `ee3e7bde5`（consolidate）進 main，但 G6 與真資料驗收沒有 WORKLOG 條目；工作目錄留有 Codex 第一輪 6 項的修正（未提交）。
+
+**G6（補記；來源 = `metrics.ts:1-7` 檔頭與 `metrics.test.ts:2-3` 的實測序列，2026-10-18 03:12 UTC 對 ks-aw-01 Postiz v2.25.1 打的）**：`GET /public/v1/analytics/{integration}` 只有 Facebook 粉專有回應，Bluesky 回 `[]`。決定：Facebook 走 Postiz；Bluesky 走 `public.api.bsky.app`（免登入）；其他平台欄位顯示「要等這個平台審核通過分析權限」，不填 0。
+
+**本 session 改動**（`apps/next-admin/`）
+- C1（Codex 第一輪，前 session 已改、本次驗證並提交）：空字串 total 不再變 0（`count()`）；每次都重抓 90 天（舊版「有列就只抓 28 天」會讓半途中斷的首跑永遠缺天）；`publishedTargets()` 快照與頁面共用同一個選取（帳號／品牌／期間都在 SQL，最新 200 則）；貼文數字 5 併發＋240 秒截止。
+- C2（Codex 第二輪 F1／F2，同 reviewer 第二次 → 先寫不變量）：**不變量＝快照沒做完的每一件事都進 `result.errors`（route 回 502），截止後不開始新工作**。關掉整類：截止後的頻道不開始並回報；Bluesky feed 翻頁也看截止，讀不完回報「feed cut short」；貼文抓取失敗計數回報（原本 `.catch(() => null)` 吞掉）；未到的貼文回報。
+- C3（Codex 第三輪 `reports/oracle/2026-10-19-partialreview-79a6135c.md`，3 項）：F2 屬實→頻道過了 production 閘後再查一次截止，截止後不發起來源請求（`metrics.ts` snapshotAccount）；F3 屬實→e2e 測試只接受 127.0.0.1／localhost 的 `METRICS_REST`（指到 example.com 實測會丟錯）；F1 不改：`postNumbers` 回 null＝平台沒有這則的數字（Facebook 無 postiz id、Bluesky 貼文已刪或不在 feed），不是沒做完的工作，頁面顯示「—」。
+- 已知邊界（第二輪 F3，不修）：`publishedTargets` 先讀完整個期間的 targets 再取 200；要單一頻道 90 天上萬則才會慢，SMB 品牌不會到。
+- 新增真資料驗收：`tests/e2e/social/metrics-real-db.sh`＋`lib/social/__tests__/metrics.e2e.test.ts`（照 C26 `smartlink-real-db.sh`：0105 verify 留下的拋棄式 Postgres＋PostgREST；清掉 verify 自己種的假數字列；品牌 A 的 Bluesky 頻道設成 Soulful 真 handle；跑真的 `runMetricsSnapshot` 兩次＋真的 `loadAnalytics`）。不碰正式庫；`npm test` 時 skip。
+
+**[驗證結果]**
+- `bash lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/metrics-real-db.sh`：exit 0；`[C24 real] 2026-10-18 followers=0 posts7d=0 engagement7d=0 rows=90`；表內 `2026-10-18 | followers 0 | reach (null) | impressions (null) | engagement 0 | posts 0`。Soulful Bluesky 是新帳號，Bluesky 現值就是 0 追蹤 0 貼文（`getProfile` 直接查：followersCount 0、postsCount 0），測試比對的是 Bluesky 當下的值；重跑第二次列數不變（同日覆蓋）；reach／impressions＝null＋原因「Bluesky 不提供觸及和曝光數」。
+- `npx tsc --noEmit`（next-admin）：exit 0。
+- `npx vitest run lib/social/__tests__/metrics.test.ts lib/social/__tests__/metrics.e2e.test.ts "app/(shell)/tools/social/__tests__/page-rules.test.ts"`：8 passed、1 skipped（e2e 只在腳本內跑）。
+- `render-views.mjs` `12-analytics` 未重截：本次沒改畫面，該腳本用假 API。
+- 未驗：Facebook 經 Postiz 的真資料寫入（要 ks-aw-01 的 Postiz key，正式環境＝不在拋棄式 DB 跑）；正式排程要等部署＋`SOCIAL_DISPATCH_ENABLED=true`。
+
+**[剩餘風險]**：上述 F3 邊界；正式環境還沒跑過第一次快照（監工台「數據分析有真數字」維持「還沒有」）。
+
+**[rollback]**：`git revert` 本 commit；無 DB／設定變更。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/metrics-real-db.sh | exit=0 | ms=21602
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- ORACLE_WAIVED: Codex 今天審了三輪（69c9a7ca 6 項、2e6742df 3 項、79a6135c 3 項，皆 -Path partial）；最後兩個守衛是第三輪 F2／F3 的修法，由 tsc＋e2e＋本機守衛實測驗證，不再開第四輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=notCollected|REFETCH_DAYS|blueskyFeed(|runMetricsSnapshot|metrics-real-db | hits=18
 ## 2026-10-19（續14）System Foundry v1.7 V17-6：新題 `Q-DEPLOY-001`「裝在客戶自己的主機」（v1.7 六張卡完成）
 
 **觸發**：操作者「Continue with V17-6」。
