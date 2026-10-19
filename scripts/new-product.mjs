@@ -32,10 +32,9 @@ export function readFoundry(directory) {
   assert(delivery.schema_version === 1, 'unsupported delivery schema');
   assert(JSON.stringify(delivery.modules) === JSON.stringify(plan.modules), 'delivery modules differ from foundry-plan.json');
   // Refuse incomplete packages rather than manufacture declarations from a directory name.
-  const files = ['MODULE_MANIFEST.json', '08_IMPLEMENTATION_BACKLOG.md'];
-  for (const module of plan.modules) for (const name of files) {
-    const file = path.join(root, 'docs/modules', module, name);
-    assert(fs.existsSync(file), `missing Foundry artifact: docs/modules/${module}/${name}`);
+  for (const module of plan.modules) for (const rel of [`docs/modules/${module}/MODULE_MANIFEST.json`, `cards/${module}.md`]) {
+    const file = path.join(root, rel);
+    assert(fs.existsSync(file), `missing Foundry artifact: ${rel}`);
     assert(fs.readFileSync(file, 'utf8').trim(), `empty Foundry artifact: ${file}`);
   }
   assert(delivery.declarations && DECLARATIONS.every((k) => typeof delivery.declarations[k] === 'string' && delivery.declarations[k].trim()), 'missing Foundry declarations');

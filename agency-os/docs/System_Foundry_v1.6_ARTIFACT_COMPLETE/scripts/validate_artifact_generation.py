@@ -3,8 +3,21 @@ from pathlib import Path
 import sys
 from configurator_engine import ROOT,load,EXPECTED_BLUEPRINT_COUNT
 
+def acceptance_errors():
+    # acceptance is optional (missing is reported by report_acceptance_gap.py); when present it must be real.
+    errs=[]
+    for key,rec in load('industries/REGISTRY.json')['industries'].items():
+        for c in load(rec['capabilities'])['capabilities']:
+            if 'acceptance' not in c: continue
+            acc=c['acceptance']
+            if not isinstance(acc,list) or not acc: errs.append(f"{key}:{c['id']}: acceptance must be a non-empty list"); continue
+            for i,e in enumerate(acc):
+                ok=isinstance(e,dict) and set(e)=={'test','expect'} and all(isinstance(e[k],str) and e[k].strip() for k in ('test','expect'))
+                if not ok: errs.append(f"{key}:{c['id']}: acceptance[{i}] needs non-empty test and expect only")
+    return errs
+
 def main():
-    errors=[]
+    errors=acceptance_errors()
     mods={m['id']:m for m in load('generation/module-manifests.json')['modules']}
     obs=load('generation/module-obligations.json')['modules']
     if set(mods)!=set(obs): errors.append('module obligations set != generation module set')

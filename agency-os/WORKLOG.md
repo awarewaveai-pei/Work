@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-19（續8）System Foundry v1.7 V17-2：每模組一張可執行卡（`cards/<module>.md` 取代 `08_IMPLEMENTATION_BACKLOG.md`；能力可帶 `acceptance`）（SDK 代跑，Codex 審）
+
+**觸發**：操作者「接著用 SDK 做 V17-2（每模組一張可執行卡）」。計畫＝`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md` V17-2。
+
+**做法**：簡報 `cc.py --quiet --budget 8`（US$1.61、54 turns，log `runs\20261019-145856.log`）。**worker 在長閘執行中提前收尾**（回「paused until three long gates finish」），突變與最終 verify 沒做；我接手：逐條跑 Makefile verify 鏈、突變、真實專案讀回、補一處文件閘。
+
+**根因／設計**：舊 08 backlog 每模組固定兩條泛用任務、無指令無預期；314 個能力無一帶驗收。改：`capabilities/catalog.json` 能力可選 `acceptance:[{test,expect}]`（`schemas/capability.schema.json` 加欄位）；`generation/card-template.md`＋`foundry_generate.py write_cards()` 對每個選到的模組寫 `cards/<m>.md`（Decision＝purpose＋不變量＋安全、Files＝manifest paths＋能力、Acceptance＝每能力「指令→預期」、缺者 `TODO`、突變、Rollback）；`scripts/report_acceptance_gap.py` 進 verify（不擋，印缺數）。已填 `customer_service` 11 與 `payments` 12 共 23 個能力；其餘 291 個卡上顯示 TODO（計畫允許「先可見」）。`08_IMPLEMENTATION_BACKLOG.md` 與 `docs/IMPLEMENTATION_BACKLOG.md` 刪除，PLAN.md 模組列帶卡路徑。
+
+**我發現／決定**
+- `new-product.mjs:35-41` 必須改要求 `cards/<m>.md`（否則 `--from-foundry` 對新專案全壞）；worker 已改，測試 4/4。
+- 文件閘：`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md` Release commands 缺 `report_acceptance_gap.py` → `validate_doc_numbers` 紅，我補一行。
+- Codex 發現 manifest 清單未含兩個新檔（`manifest.json` 的 inventory 以 git 追蹤檔為準）：`git add -N` 後重算 hash，`validate_manifest` PASS。
+- 驗收細節：卡片內容語言＝能力描述中文＋manifest 英文 obligations 並存，沿用既有資料，不翻譯。
+
+**[已修改]**：Foundry 目錄 `capabilities/catalog.json`（+23 個 acceptance）、`schemas/capability.schema.json`、`scripts/foundry_generate.py`、`scripts/report_acceptance_gap.py`（新）、`generation/card-template.md`（新）、`Makefile`、`scripts/validate_artifact_generation.py`、`validate_doc_numbers.py`、`validate_foundry.py`、`test_selection_matrix.py`、`tests/test_artifact_generation.py`、`README.md`、`QUALITY_STRENGTH_MATRIX.md`、`03_SYSTEM_FOUNDRY_EXECUTION_CONTRACT.md`、`V1_6_SELECTION_OUTPUT_ASSURANCE_REPORT.md`、`manifest.json`；`scripts/new-product.mjs`＋其測試。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=Makefile verify 鏈 17＋`report_acceptance_gap`逐條（無 make）；`python -m unittest discover -s tests`（49 OK）；`node --test scripts/__tests__/new-product.test.mjs`（4 pass）；全答產生→`cards/` 61 張、無 08 檔、customer_service 卡 11 能力 22 條「指令→預期」0 TODO、ai 卡 20 TODO；`readFoundry()` 讀回 61 modules／10 declarations | exit=0 | ms=133000（收尾重跑：18 條全 exit 0，gap 291/314；doc-numbers 修後 PASS、manifest 重算 PASS）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `codex-oracle.ps1 -Path` 18 檔：1 項 manifest 未含新檔（CONFIRMED，已修）；artifact `agency-os/reports/oracle/2026-10-19-partialreview-abd58544.md`（partial：共享工作樹他 session 改動多）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=`08_IMPLEMENTATION_BACKLOG|IMPLEMENTATION_BACKLOG.md` | hits=見本條修改清單；殘留僅歷史 CHANGELOG／closeout／V1_7 計畫文字（不回改）
+- ORACLE_WAIVED: Codex 已審（artifact 為 partialreview，不滿足整庫 ORACLE gate 格式）
+
+**突變**（一次）：刪除 `CAP-CSAT` 的 `acceptance` → 重生卡該能力顯示 `TODO`、`report_acceptance_gap` 由 291 變 292；位元組還原後回 291。
+
+**剩餘風險**：291 個能力仍無驗收（V17-2 範圍只要求機制＋可見缺數）；V17-3～6 未做；`generated/` 未追蹤；acceptance 的 test 名稱為行為描述，非可執行指令（技術棧未定，計畫「不做」產碼）。
+
+**rollback**：Foundry 目錄與兩個 scripts 檔以 `git show HEAD:<file> > <file>` 逐檔還原（禁 `git checkout --`）；新檔 `generation/card-template.md`、`scripts/report_acceptance_gap.py` 直接刪；sample 以還原後的 `generate_sample.py --replace` 重生。
 ## 2026-10-19（續6）System Foundry v1.7 V17-1 樣板瘦身：藍圖 73 檔＋模組文件 00–07 改為根目錄 `PLAN.md` 一張表（SDK 代跑，Codex 審）
 
 **觸發**：操作者「繼續做 system foundry，用 SDK 和 codex-review」。計畫＝`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md`，六張卡中 V17-1 先做（V17-4 的 catalog 同步先前已完成一半）。

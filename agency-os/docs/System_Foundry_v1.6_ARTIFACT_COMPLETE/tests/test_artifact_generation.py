@@ -2,7 +2,7 @@ import json,re,tempfile,unittest,sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
 from configurator_engine import resolve,load,EXPECTED_BLUEPRINT_COUNT
-from foundry_generate import generate,MODULE_DOCS
+from foundry_generate import generate,card_rel
 import test_selection_matrix as matrix
 
 class ArtifactGenerationTests(unittest.TestCase):
@@ -20,10 +20,27 @@ class ArtifactGenerationTests(unittest.TestCase):
             out=generate(p,a,[],td)
             self.assertFalse((out/'docs/blueprint').exists())
             for mid in p['modules']:
-                for role in MODULE_DOCS+['MODULE_MANIFEST.json']:
-                    self.assertTrue((out/'docs/modules'/mid/role).is_file(),f'{mid}/{role}')
+                self.assertTrue((out/'docs/modules'/mid/'MODULE_MANIFEST.json').is_file(),mid)
+                self.assertTrue((out/card_rel(mid)).is_file(),f'{mid} card')
+            self.assertEqual(list(out.rglob('08_IMPLEMENTATION_BACKLOG.md')),[])
             cov=json.loads((out/'.foundry/verification/generation-coverage.json').read_text())
             self.assertEqual(cov['blueprints_active'],EXPECTED_BLUEPRINT_COUNT)
+    def test_every_catalog_acceptance_entry_has_test_and_expect(self):
+        for key,rec in load('industries/REGISTRY.json')['industries'].items():
+            for c in load(rec['capabilities'])['capabilities']:
+                if 'acceptance' not in c: continue
+                self.assertTrue(c['acceptance'],f"{key}:{c['id']}")
+                for e in c['acceptance']:
+                    self.assertTrue(isinstance(e.get('test'),str) and e['test'].strip() and isinstance(e.get('expect'),str) and e['expect'].strip(),f"{key}:{c['id']}")
+    def test_cards_list_acceptance_and_flag_missing_as_todo(self):
+        a=matrix.complete({},True); p=resolve({'name':'card-unit'},a,[])
+        with tempfile.TemporaryDirectory() as td:
+            out=generate(p,a,[],td)
+            cs=(out/'cards/customer_service.md').read_text(encoding='utf-8')
+            self.assertNotIn('TODO',cs)
+            self.assertGreaterEqual(len(re.findall(r'^- CAP-',cs,re.M)),11)
+            self.assertGreaterEqual(len(re.findall(r'^  - 指令：.+ → 預期：.+',cs,re.M)),11)
+            self.assertIn('TODO: no acceptance defined',(out/'cards/ai.md').read_text(encoding='utf-8'))
     def test_plan_md_has_every_blueprint_row_and_parseable_registration(self):
         a=matrix.complete({},True); p=resolve({'name':'plan-unit'},a,[])
         with tempfile.TemporaryDirectory() as td:

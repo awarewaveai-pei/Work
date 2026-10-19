@@ -81,7 +81,7 @@ Verify tests, migration, security, observability, audit, restore/rollback, docs,
 ## Handoff
 Must contain current state, completed changes, pending work, risks, assumptions, rollback state, test evidence, exact next action, active stop codes, and evidence freshness status.
 ## Generated LEGO Module — Mandatory Artifact Package
-Every selected module must contain: `MODULE_MANIFEST.json` (requirements invariants, security/test/operational/recovery obligations, generated paths) / `08_IMPLEMENTATION_BACKLOG.md`, plus `BLUEPRINT_ARCHITECTURE.md` when a blueprint mapping exists. Roles 00-07 are no longer separate files (v1.7 V17-1): their obligations live only in the manifest. Missing one blocks generator commit. Unselected modules must materialize none of these artifacts or module paths.
+Every selected module must contain: `MODULE_MANIFEST.json` (requirements invariants, security/test/operational/recovery obligations, generated paths) plus the root card `cards/<module>.md` (Decision / Files / Acceptance from `capabilities/catalog.json` / 突變 / Rollback), plus `BLUEPRINT_ARCHITECTURE.md` when a blueprint mapping exists. Roles 00-07 are no longer separate files (v1.7 V17-1): their obligations live only in the manifest. Missing one blocks generator commit. Unselected modules must materialize none of these artifacts or module paths.
 
 Every generated project's root `PLAN.md` lists all controlled blueprint sections in one table. Applicability is explicit `ACTIVE` or `NOT_APPLICABLE`; silent omission is forbidden.
 

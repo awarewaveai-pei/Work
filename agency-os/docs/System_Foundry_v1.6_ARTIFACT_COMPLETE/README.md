@@ -43,7 +43,7 @@ Generator output is technology-neutral until architecture convergence. It genera
 - All 37,401 question pairs are attempted; compatible pairs compile and explicit contradictory pairs fail closed.
 - 1,000 deterministic randomized configurations are tested.
 - Every generation module is proven reachable and materialized.
-- Every selected module receives 2 mandatory artifacts (`MODULE_MANIFEST.json` + `08_IMPLEMENTATION_BACKLOG.md`); unselected module paths/documents are absent.
+- Every selected module receives 2 mandatory artifacts (`docs/modules/<module>/MODULE_MANIFEST.json` + the executable card `cards/<module>.md`); unselected module paths/documents are absent.
 - Every project gets all 73 controlled blueprint sections marked `ACTIVE` or `NOT_APPLICABLE`.
 - Generated files are content-hashed in `.foundry/resolution/artifact-manifest.json`.
 
@@ -59,11 +59,11 @@ Generator output is technology-neutral until architecture convergence. It genera
   verification/generation-coverage.json
 ```
 
-Selected modules receive:
+Selected modules receive (card = per-capability acceptance from `capabilities/catalog.json`, `TODO` where none is defined; gap count: `python scripts/report_acceptance_gap.py`):
 
 ```text
+cards/<module>.md           Decision / Files / Acceptance / 突變 / Rollback
 docs/modules/<module>/
-  08_IMPLEMENTATION_BACKLOG.md
   MODULE_MANIFEST.json      invariants / security / test / operational / recovery obligations
   BLUEPRINT_ARCHITECTURE.md only when the module has mapped blueprint content
 ```

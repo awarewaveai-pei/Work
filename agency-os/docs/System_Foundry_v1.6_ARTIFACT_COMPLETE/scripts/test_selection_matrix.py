@@ -3,7 +3,7 @@ from pathlib import Path
 import sys,tempfile,json,hashlib,random,itertools,re
 ROOT=Path(__file__).resolve().parents[1];sys.path.insert(0,str(ROOT/'scripts'))
 from configurator_engine import load,resolve,active_questions,eval_condition,EXPECTED_BLUEPRINT_COUNT
-from foundry_generate import generate,MODULE_DOCS,blueprint_active
+from foundry_generate import generate,blueprint_active,card_rel
 
 QMAP={q['id']:q for q in load('questionnaires/catalog.json')['questions']}
 RULES={r['when']['question']:r for r in load('rules/question-rules.json')['rules']}
@@ -104,8 +104,8 @@ def verify_artifact_manifest(out):
 def verify_generated(out,plan):
     selected=set(plan['modules'])
     for mid in selected:
-        for role in MODULE_DOCS+['MODULE_MANIFEST.json']:
-            if not (out/'docs/modules'/mid/role).is_file(): raise AssertionError(f'{mid} missing {role}')
+        if not (out/'docs/modules'/mid/'MODULE_MANIFEST.json').is_file(): raise AssertionError(f'{mid} missing MODULE_MANIFEST.json')
+        if not (out/card_rel(mid)).is_file(): raise AssertionError(f'{mid} missing card')
         for rel in MODS[mid]['paths']:
             if not (out/rel/'README.md').is_file(): raise AssertionError(f'{mid} path not materialized: {rel}')
     for mid,m in MODS.items():
@@ -114,6 +114,7 @@ def verify_generated(out,plan):
             for rel in m['paths']:
                 if (out/rel).exists(): raise AssertionError('unselected module path leaked '+mid+':'+rel)
     if (out/'docs/blueprint').exists(): raise AssertionError('docs/blueprint must not be generated')
+    if list(out.rglob('08_IMPLEMENTATION_BACKLOG.md')) or (out/'docs/IMPLEMENTATION_BACKLOG.md').exists(): raise AssertionError('legacy backlog generated')
     plan_text=(out/'PLAN.md').read_text(encoding='utf-8')
     rows={m.group(1):m.group(2) for m in PLAN_TABLE_ROW.finditer(plan_text)}
     if len(rows)!=EXPECTED_BLUEPRINT_COUNT: raise AssertionError(f'PLAN.md rows {len(rows)} != {EXPECTED_BLUEPRINT_COUNT}')

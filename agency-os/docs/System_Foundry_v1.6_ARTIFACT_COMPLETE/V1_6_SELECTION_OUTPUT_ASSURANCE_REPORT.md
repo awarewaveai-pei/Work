@@ -114,6 +114,7 @@ python scripts/test_payment_commercial_gating.py
 python -m unittest discover -s tests -v
 python scripts/validate_manifest.py
 python scripts/validate_doc_numbers.py
+python scripts/report_acceptance_gap.py
 ```
 
 Or:

@@ -1,4 +1,4 @@
-.PHONY: validate semantic configurator artifact-static contracts adversarial bootstrap configurator-e2e configurator-http-e2e selection-matrix mutation-coverage payment-commercial-gating test manifest doc-numbers awarewave-catalog generate-sample verify
+.PHONY: validate semantic configurator artifact-static contracts adversarial bootstrap configurator-e2e configurator-http-e2e selection-matrix mutation-coverage payment-commercial-gating test manifest doc-numbers acceptance-gap awarewave-catalog generate-sample verify
 validate:
 	python scripts/validate_versions.py
 	python scripts/validate_foundry.py
@@ -30,8 +30,10 @@ manifest:
 	python scripts/validate_manifest.py
 doc-numbers:
 	python scripts/validate_doc_numbers.py
+acceptance-gap:
+	python scripts/report_acceptance_gap.py
 awarewave-catalog:
 	node ../../../scripts/sync-foundry-catalog.mjs --check
 generate-sample: awarewave-catalog
 	python scripts/generate_sample.py --replace
-verify: awarewave-catalog validate semantic configurator artifact-static contracts adversarial bootstrap configurator-e2e configurator-http-e2e selection-matrix mutation-coverage payment-commercial-gating test manifest doc-numbers
+verify: awarewave-catalog validate semantic configurator artifact-static contracts adversarial bootstrap configurator-e2e configurator-http-e2e selection-matrix mutation-coverage payment-commercial-gating test manifest doc-numbers acceptance-gap

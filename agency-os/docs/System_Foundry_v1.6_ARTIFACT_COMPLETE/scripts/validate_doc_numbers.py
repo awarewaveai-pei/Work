@@ -29,7 +29,7 @@
 #     (see configurator_engine.py's own header comment -- 5 other files already import it
 #     instead of re-hardcoding 73).
 #   - per-module artifact count ("10 mandatory artifacts"): derived, not hardcoded --
-#     len(foundry_generate.MODULE_DOCS) + 1 for MODULE_MANIFEST.json (see
+#     MODULE_MANIFEST.json + cards/<module>.md = 2 (see
 #     foundry_generate.py's own validate_generated(), which iterates that exact set).
 #   - gate-script count in `make verify` ("N gate scripts"): parsed directly out of this
 #     package's own Makefile `verify:` prerequisite line, so adding/removing a gate can never
@@ -47,7 +47,6 @@
 from pathlib import Path
 import re, subprocess, sys
 from configurator_engine import ROOT, load, EXPECTED_BLUEPRINT_COUNT
-from foundry_generate import MODULE_DOCS
 
 def verify_gate_script_lines():
     # Parsed straight from this package's own Makefile `verify:` prerequisite chain (not the
@@ -118,7 +117,7 @@ def main():
     # this wrong.
     standard_modules = len([m for m in mods if not m.get('activated_by_custom_requirements')])
     baseline_caps = len(load('baselines/production-baseline.json')['capabilities'])
-    module_artifacts = len(MODULE_DOCS) + 1  # + MODULE_MANIFEST.json, see foundry_generate.validate_generated()
+    module_artifacts = 2  # MODULE_MANIFEST.json + cards/<module>.md, see foundry_generate.validate_generated()
     # v1.6 docs are shipped history (AGENTS.md section 9: old files are not rewritten); they describe the pre-V17-1 10-file package.
     V16_MODULE_ARTIFACTS = 10
     gate_scripts = gate_script_count()

@@ -122,7 +122,17 @@
       "requires": [
         "CAP-FINANCIAL-RECORDS"
       ],
-      "description": "Tracks how overdue each outstanding receivable is (e.g. 30/60/90+ days), maintains a due-date schedule for what is expected when, and triggers reminders/escalation to customers who have not paid -- instead of requiring someone to manually check who owes what and when."
+      "description": "Tracks how overdue each outstanding receivable is (e.g. 30/60/90+ days), maintains a due-date schedule for what is expected when, and triggers reminders/escalation to customers who have not paid -- instead of requiring someone to manually check who owes what and when.",
+      "acceptance": [
+        {
+          "test": "一張逾期 45 天的應收帳款",
+          "expect": "帳齡報表把它歸入 31–60 天級距，並列出到期日與未收金額"
+        },
+        {
+          "test": "應收款逾期且尚未提醒",
+          "expect": "系統寄出一次催款提醒並記錄；款項收到後不再寄出"
+        }
+      ]
     },
     {
       "id": "CAP-BANK-RECONCILIATION",
@@ -131,7 +141,17 @@
       "requires": [
         "CAP-FINANCIAL-RECORDS"
       ],
-      "description": "Bank account transactions (from a statement or feed) are automatically matched against recorded invoices/bills/payments to surface discrepancies -- distinct from DER-PAYMENT-RECON, which only reconciles against the payment provider's own settlement ledger (e.g. Stripe), not the actual bank account the funds land in."
+      "description": "Bank account transactions (from a statement or feed) are automatically matched against recorded invoices/bills/payments to surface discrepancies -- distinct from DER-PAYMENT-RECON, which only reconciles against the payment provider's own settlement ledger (e.g. Stripe), not the actual bank account the funds land in.",
+      "acceptance": [
+        {
+          "test": "匯入一筆金額與日期都符合某張發票的銀行交易",
+          "expect": "該交易自動配對到該發票，兩邊標示為已對帳"
+        },
+        {
+          "test": "匯入一筆找不到任何對應單據的銀行交易",
+          "expect": "列入「未配對差異」清單，不被自動標為已對帳"
+        }
+      ]
     },
     {
       "id": "CAP-BARCODE",
@@ -402,7 +422,17 @@
         "CAP-AI",
         "CAP-FINANCIAL-RECORDS"
       ],
-      "description": "Photographed or scanned receipts and invoices are OCR-extracted into structured vendor/date/amount/line-item data, staged for human confirmation before posting to financial records -- never auto-posted, since OCR/AI extraction errors in accounting-grade data have real financial and tax consequences."
+      "description": "Photographed or scanned receipts and invoices are OCR-extracted into structured vendor/date/amount/line-item data, staged for human confirmation before posting to financial records -- never auto-posted, since OCR/AI extraction errors in accounting-grade data have real financial and tax consequences.",
+      "acceptance": [
+        {
+          "test": "上傳一張收據照片",
+          "expect": "取出廠商、日期、金額、品項，狀態為「待人工確認」，尚未寫入財務紀錄"
+        },
+        {
+          "test": "人工確認前查詢財務紀錄",
+          "expect": "該收據的金額不在財務紀錄中；確認後才出現一筆"
+        }
+      ]
     },
     {
       "id": "CAP-GEOLOCATION",
@@ -527,7 +557,17 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": "The system generates invoices for billable transactions."
+      "description": "The system generates invoices for billable transactions.",
+      "acceptance": [
+        {
+          "test": "一筆可開票的交易完成",
+          "expect": "系統產生一張發票，編號唯一，金額等於交易金額加稅"
+        },
+        {
+          "test": "對同一筆交易再要求開票",
+          "expect": "回傳既有發票，不產生第二張"
+        }
+      ]
     },
     {
       "id": "CAP-LEGACY-MIGRATION",
@@ -674,7 +714,17 @@
       "requires": [
         "CAP-REFUNDS"
       ],
-      "description": "Refunds can be issued for a partial amount of a payment."
+      "description": "Refunds can be issued for a partial amount of a payment.",
+      "acceptance": [
+        {
+          "test": "對 100 元的付款退 30 元",
+          "expect": "退款成功，付款剩餘可退金額為 70 元"
+        },
+        {
+          "test": "累計退款金額超過原付款金額",
+          "expect": "請求被拒絕，帳本不變"
+        }
+      ]
     },
     {
       "id": "CAP-PARTNER-PORTAL",
@@ -697,7 +747,17 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": "The system accepts online payments."
+      "description": "The system accepts online payments.",
+      "acceptance": [
+        {
+          "test": "客戶以有效付款方式付一筆訂單",
+          "expect": "付款記錄為已成功，訂單狀態變為已付款"
+        },
+        {
+          "test": "付款被銀行拒絕",
+          "expect": "付款記錄為失敗，訂單維持未付款，客戶看到失敗原因"
+        }
+      ]
     },
     {
       "id": "CAP-PRODUCTS",
@@ -764,7 +824,17 @@
       "requires": [
         "CAP-PAYMENTS"
       ],
-      "description": "The system can issue refunds for a completed payment."
+      "description": "The system can issue refunds for a completed payment.",
+      "acceptance": [
+        {
+          "test": "對已完成的付款申請全額退款",
+          "expect": "產生一筆退款記錄，帳本同時反映退出金額，付款狀態為已退款"
+        },
+        {
+          "test": "對未完成或已全額退款的付款再次退款",
+          "expect": "請求被拒絕，帳本不變"
+        }
+      ]
     },
     {
       "id": "CAP-REPORTS",
@@ -812,7 +882,17 @@
       "requires": [
         "CAP-PAYMENTS"
       ],
-      "description": "Customers can securely save a payment method for future use."
+      "description": "Customers can securely save a payment method for future use.",
+      "acceptance": [
+        {
+          "test": "客戶儲存一張卡後下次直接用它付款",
+          "expect": "付款成功且客戶不需重新輸入卡號"
+        },
+        {
+          "test": "查看系統內所有儲存的資料",
+          "expect": "找不到完整卡號或安全碼，只有代表該卡的代號與末四碼"
+        }
+      ]
     },
     {
       "id": "CAP-SCHEDULING",
@@ -897,7 +977,17 @@
       "requires": [
         "CAP-COMMERCIAL"
       ],
-      "description": "The system calculates applicable tax on transactions."
+      "description": "The system calculates applicable tax on transactions.",
+      "acceptance": [
+        {
+          "test": "對適用 5% 稅率的 200 元交易計稅",
+          "expect": "稅額為 10 元，總額為 210 元，明細逐項列出"
+        },
+        {
+          "test": "交易地區沒有對應稅率設定",
+          "expect": "交易被拒絕並指出缺少稅率，不以 0 稅率默默放行"
+        }
+      ]
     },
     {
       "id": "CAP-TIMEZONES",
@@ -1078,7 +1168,17 @@
       "requires": [
         "CAP-PAYMENTS"
       ],
-      "description": "Payment processing sits behind an owned adapter boundary, not a direct dependency on one payment provider's SDK."
+      "description": "Payment processing sits behind an owned adapter boundary, not a direct dependency on one payment provider's SDK.",
+      "acceptance": [
+        {
+          "test": "把支付供應商換成另一家的測試替身",
+          "expect": "付款流程不改動業務邏輯即可完成，所有付款呼叫都經過同一個自有介面"
+        },
+        {
+          "test": "供應商回傳自己格式的錯誤",
+          "expect": "轉成系統自有的錯誤類型，供應商專屬欄位不外洩到業務層"
+        }
+      ]
     },
     {
       "id": "DER-PAYMENT-IDEMPOTENCY",
@@ -1088,7 +1188,17 @@
         "CAP-PAYMENTS",
         "FOUND-ROLLBACK"
       ],
-      "description": "Payment charge attempts are idempotent and cannot double-charge on retry."
+      "description": "Payment charge attempts are idempotent and cannot double-charge on retry.",
+      "acceptance": [
+        {
+          "test": "用相同的冪等鍵重送同一筆扣款",
+          "expect": "只扣款一次，第二次回傳第一次的結果"
+        },
+        {
+          "test": "扣款逾時後自動重試",
+          "expect": "帳本只有一筆扣款記錄"
+        }
+      ]
     },
     {
       "id": "DER-PAYMENT-RECON",
@@ -1098,7 +1208,17 @@
         "CAP-PAYMENTS",
         "FOUND-AUDIT"
       ],
-      "description": "Payments are reconciled against the payment provider's ledger on a schedule."
+      "description": "Payments are reconciled against the payment provider's ledger on a schedule.",
+      "acceptance": [
+        {
+          "test": "排程對帳時供應商帳本多出一筆本系統沒有的付款",
+          "expect": "產生差異報告列出該筆並通知負責人，不自動改帳"
+        },
+        {
+          "test": "兩邊帳本完全一致時跑對帳",
+          "expect": "對帳結果為零差異，並記錄執行時間"
+        }
+      ]
     },
     {
       "id": "DER-POLICY-FRESHNESS",
@@ -1357,14 +1477,34 @@
       "name": "客服工單系統",
       "module": "customer_service",
       "requires": [],
-      "description": "客戶問題建成工單、追蹤處理進度與負責人。"
+      "description": "客戶問題建成工單、追蹤處理進度與負責人。",
+      "acceptance": [
+        {
+          "test": "客戶送出問題後系統建立工單並指派負責人",
+          "expect": "工單出現在負責人的待辦清單，狀態為「待處理」，客戶可查到工單編號"
+        },
+        {
+          "test": "負責人把工單改成已解決再重新開啟",
+          "expect": "每次狀態變更都留下時間與操作人紀錄，工單進度可由客戶與客服兩端查到"
+        }
+      ]
     },
     {
       "id": "CAP-LIVE-CHAT",
       "name": "即時線上客服對話",
       "module": "customer_service",
       "requires": [],
-      "description": "客戶可在網站/App 裡即時打字跟客服對話。"
+      "description": "客戶可在網站/App 裡即時打字跟客服對話。",
+      "acceptance": [
+        {
+          "test": "客戶在網站送出一則訊息",
+          "expect": "線上客服在 3 秒內看到該訊息，客服回覆後客戶畫面即時出現，對話記錄被保存"
+        },
+        {
+          "test": "客服全部離線時客戶送出訊息",
+          "expect": "客戶看到「目前無人在線」提示，訊息被保留，客服上線後仍看得到"
+        }
+      ]
     },
     {
       "id": "CAP-AI-FIRST-CHAT",
@@ -1374,35 +1514,85 @@
         "CAP-AI",
         "CAP-LIVE-CHAT"
       ],
-      "description": "即時客服預設由 AI 自動回覆，客戶主動要求或問題超出 AI 能力時才轉真人或信件。"
+      "description": "即時客服預設由 AI 自動回覆，客戶主動要求或問題超出 AI 能力時才轉真人或信件。",
+      "acceptance": [
+        {
+          "test": "客戶在即時客服送出常見問題",
+          "expect": "由 AI 先回覆，對話標示為 AI 回覆，未出現真人客服"
+        },
+        {
+          "test": "客戶輸入「轉真人」或問了 AI 答不了的問題",
+          "expect": "對話轉給真人客服（無人在線則轉成信件），客戶不用重述前面的對話"
+        }
+      ]
     },
     {
       "id": "CAP-KNOWLEDGE-BASE",
       "name": "知識庫／常見問題自助查詢",
       "module": "customer_service",
       "requires": [],
-      "description": "客戶可自助查詢常見問題解答，不需真人客服回覆。"
+      "description": "客戶可自助查詢常見問題解答，不需真人客服回覆。",
+      "acceptance": [
+        {
+          "test": "客戶用關鍵字搜尋已發布的常見問題",
+          "expect": "結果列出相關文章，點開可看全文，不需登入客服"
+        },
+        {
+          "test": "搜尋草稿狀態的文章",
+          "expect": "草稿不出現在客戶的搜尋結果"
+        }
+      ]
     },
     {
       "id": "CAP-SLA-TRACKING",
       "name": "客服回應時效追蹤",
       "module": "customer_service",
       "requires": [],
-      "description": "追蹤工單回應/解決時效並對超時提出警示。"
+      "description": "追蹤工單回應/解決時效並對超時提出警示。",
+      "acceptance": [
+        {
+          "test": "工單超過設定的首次回應時限仍無人回覆",
+          "expect": "工單被標示為超時並通知負責人與主管"
+        },
+        {
+          "test": "工單在時限內被回覆",
+          "expect": "不產生警示，回應時間被記錄為達標"
+        }
+      ]
     },
     {
       "id": "CAP-CSAT",
       "name": "客服滿意度調查",
       "module": "customer_service",
       "requires": [],
-      "description": "服務結束後詢問客戶滿意度並記錄評分。"
+      "description": "服務結束後詢問客戶滿意度並記錄評分。",
+      "acceptance": [
+        {
+          "test": "工單結案後客戶收到滿意度問卷並送出 4 分",
+          "expect": "評分與該工單綁定儲存，統計報表的平均分數隨之更新"
+        },
+        {
+          "test": "同一份問卷連結被送出第二次",
+          "expect": "第二次被拒絕，原評分不變"
+        }
+      ]
     },
     {
       "id": "CAP-CALL-CENTER",
       "name": "電話客服／客服中心整合",
       "module": "customer_service",
       "requires": [],
-      "description": "透過電話或客服中心系統（自動撥號、通話錄音）處理客戶問題。"
+      "description": "透過電話或客服中心系統（自動撥號、通話錄音）處理客戶問題。",
+      "acceptance": [
+        {
+          "test": "客戶來電並完成通話",
+          "expect": "系統建立一筆通話紀錄（來電者、起訖時間、處理人）並關聯客戶"
+        },
+        {
+          "test": "客服開啟已結束通話的錄音",
+          "expect": "有權限者可播放，無權限者被拒絕，且每次存取都留下紀錄"
+        }
+      ]
     },
     {
       "id": "CAP-AI-VOICE-SUPPORT",
@@ -1412,7 +1602,17 @@
         "CAP-AI-VOICE",
         "CAP-CALL-CENTER"
       ],
-      "description": "電話或客服中心來電預設由 AI 語音客服自動應答與處理，客戶要求或問題超出 AI 能力時才轉真人。"
+      "description": "電話或客服中心來電預設由 AI 語音客服自動應答與處理，客戶要求或問題超出 AI 能力時才轉真人。",
+      "acceptance": [
+        {
+          "test": "客戶來電說出常見問題",
+          "expect": "AI 語音自動應答並記錄通話內容，未轉接真人"
+        },
+        {
+          "test": "來電者說「找真人」或問題超出 AI 能力",
+          "expect": "通話轉給真人客服，通話紀錄標示轉接原因"
+        }
+      ]
     },
     {
       "id": "CAP-SALES-PIPELINE",
@@ -2166,7 +2366,17 @@
       "name": "全通路訊息平台整合",
       "module": "customer_service",
       "requires": [],
-      "description": "客戶可以透過 LINE 官方帳號、WhatsApp Business、Telegram、Instagram/Messenger 等外部通訊平台傳訊息給客服，不同平台的對話統一進到同一個收件匣供客服回覆與追蹤，跟只能在自家網站或 App 裡即時打字對話的 CAP-LIVE-CHAT 不同，也不是 CAP-TICKETING 把問題建成工單追蹤的方式。"
+      "description": "客戶可以透過 LINE 官方帳號、WhatsApp Business、Telegram、Instagram/Messenger 等外部通訊平台傳訊息給客服，不同平台的對話統一進到同一個收件匣供客服回覆與追蹤，跟只能在自家網站或 App 裡即時打字對話的 CAP-LIVE-CHAT 不同，也不是 CAP-TICKETING 把問題建成工單追蹤的方式。",
+      "acceptance": [
+        {
+          "test": "客戶分別從兩個不同通訊平台傳訊息給客服",
+          "expect": "兩則訊息都出現在同一個收件匣，標示來源平台，客服回覆會送回原平台"
+        },
+        {
+          "test": "同一位客戶從兩個平台傳訊息",
+          "expect": "兩個平台的對話歸在同一位客戶名下"
+        }
+      ]
     },
     {
       "id": "CAP-AGENTIC-COMMERCE",
@@ -2254,7 +2464,17 @@
       "name": "罐頭訊息／快速回覆範本",
       "module": "customer_service",
       "requires": [],
-      "description": "客服人員可在工單或對話中直接套用預先寫好的罐頭訊息／快速回覆範本，不需每次重新輸入常見問題的答案；跟 CAP-AI-GENERATE 每次即時生成內容不同，這裡是人工維護的固定文字範本庫。"
+      "description": "客服人員可在工單或對話中直接套用預先寫好的罐頭訊息／快速回覆範本，不需每次重新輸入常見問題的答案；跟 CAP-AI-GENERATE 每次即時生成內容不同，這裡是人工維護的固定文字範本庫。",
+      "acceptance": [
+        {
+          "test": "客服在工單中選用一則罐頭訊息",
+          "expect": "範本文字被帶入回覆框，客服可修改後送出"
+        },
+        {
+          "test": "非管理者嘗試修改範本庫",
+          "expect": "修改被拒絕，範本內容不變"
+        }
+      ]
     },
     {
       "id": "CAP-DOC-TEMPLATES",
@@ -2263,7 +2483,17 @@
       "requires": [
         "CAP-KNOWLEDGE-BASE"
       ],
-      "description": "可以用預先定義好的文件範本，帶入變數自動產生標準化文件（例如常見問題頁面、政策公告、說明手冊），不需每次手動重新排版撰寫；跟 CAP-KNOWLEDGE-BASE 收錄固定知識文章不同，這裡是動態帶入變數產生文件的能力，且依附於知識庫已存在為前提。"
+      "description": "可以用預先定義好的文件範本，帶入變數自動產生標準化文件（例如常見問題頁面、政策公告、說明手冊），不需每次手動重新排版撰寫；跟 CAP-KNOWLEDGE-BASE 收錄固定知識文章不同，這裡是動態帶入變數產生文件的能力，且依附於知識庫已存在為前提。",
+      "acceptance": [
+        {
+          "test": "以含變數的範本帶入客戶資料產生文件",
+          "expect": "文件中所有變數被取代為實際值，不留未取代的佔位符"
+        },
+        {
+          "test": "知識庫不存在時使用依附它的範本",
+          "expect": "產生被拒絕並說明缺少知識庫，不產出空白文件"
+        }
+      ]
     },
     {
       "id": "CAP-CAPTIONING",

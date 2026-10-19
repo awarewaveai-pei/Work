@@ -5,8 +5,9 @@ import argparse, json, tempfile, shutil, os, datetime, hashlib, re
 from configurator_engine import ROOT, VERSION, load, resolve, questionnaire_digest, safe_name, EXPECTED_BLUEPRINT_COUNT, industry_paths
 from extract_blueprint_content import doc_id as bp_doc_id
 
-# v1.7 (V17-1): 00-07 restated MODULE_MANIFEST.json obligations plus boilerplate and are no longer written.
-MODULE_DOCS=['08_IMPLEMENTATION_BACKLOG.md']
+# v1.7 (V17-1/V17-2): module docs 00-07 and the generic 08 backlog are gone; each module gets
+# MODULE_MANIFEST.json (obligations) plus one executable card at the project root.
+def card_rel(mid): return f'cards/{mid}.md'
 
 # Generic text the deleted 02/04/01 module docs carried; delivery_registration still needs it verbatim.
 DATA_OBLIGATIONS_TEXT="""- Identify authoritative data, owner, lifecycle, retention, and restore semantics before persistence implementation.
@@ -83,7 +84,7 @@ def filter_section_content(did,skey,raw_content,items_for_doc,rev,selected):
     return '\n'.join(kept)
 
 # Real blueprint architecture content, mechanically extracted (extract_blueprint_content.py) --
-# not the generic governance boilerplate in MODULE_DOCS. Returns None (write nothing, no
+# not generic governance boilerplate. Returns None (write nothing, no
 # placeholder) when the module has no mapping, or every mapped doc matched zero sections.
 # mcaps = the module's actually-selected capability IDs from plan['module_reasons'][mid] (the
 # resolved plan, not "module selected/not selected"). item_maps is blueprint_item_maps()'s
@@ -149,55 +150,34 @@ def blueprint_active(cond,plan):
     mods=set(plan['modules']); caps=set(plan['current_capabilities'])
     return bool((set(cond.get('any_modules',[])) & mods) or (set(cond.get('any_capabilities',[])) & caps) or (plan['profile'] in cond.get('profiles',[])))
 
-def module_backlog_text(mid,plan,obl,caps):
-    mcaps=plan['module_reasons'].get(mid,[])
-    caplines=[]
+def card_text(mid,plan,obl,module_manifest,caps,template):
+    mcaps=[x for x in plan['module_reasons'].get(mid,[]) if x in caps]
+    todo=sum(1 for cid in mcaps if not caps[cid].get('acceptance'))
+    decision=[f"- {obl['purpose']}"]+[f'- 不變量：{x}' for x in obl['invariants']]+[f'- 安全：{x}' for x in obl['security']]
+    files=[f'- `docs/modules/{mid}/MODULE_MANIFEST.json`']+[f'- `{p}`' for p in module_manifest['paths']]
+    files+=[f"- `{cid}` {caps[cid]['name']}（{cap_source(plan,cid)}）" for cid in mcaps]
+    acc=[]
     for cid in mcaps:
-        if cid in caps: caplines.append(f"- `{cid}` — {caps[cid]['name']} — **{cap_source(plan,cid)}**")
-        else: caplines.append(f"- `{cid}` — user custom requirement — **USER_CUSTOM**")
-    trace=[]
-    for cid in mcaps:
-        refs=plan['traceability'].get(cid,[])
-        if refs: trace.append(f"- `{cid}` <- {', '.join(f'`{x}`' for x in refs)}")
-    base=f"implementation/{mid}"
-    return f"""# {mid} — 08 Implementation Backlog
+        acc.append(f"- {cid} {caps[cid]['name']}")
+        entries=caps[cid].get('acceptance')
+        if entries: acc+=[f"  - 指令：{e['test']} → 預期：{e['expect']}" for e in entries]
+        else: acc.append('  - TODO: no acceptance defined (catalog.json)')
+    if not mcaps: acc.append('- 無啟用能力（自訂需求待人工對應，見 `docs/requirements/custom.md`）')
+    mutation=['- 拿掉本模組任一條規則 → 上列至少一項驗收必須變紅']+[f'- {x}' for x in obl['tests']]
+    rollback=[f'- {x}' for x in obl['recovery']]
+    body=template
+    for key,val in (('module',mid),('cap_count',str(len(mcaps))),('todo_count',str(todo)),('decision','\n'.join(decision)),('files','\n'.join(files)),('acceptance','\n'.join(acc)),('mutation','\n'.join(mutation)),('rollback','\n'.join(rollback))):
+        body=body.replace('{{'+key+'}}',val)
+    return body
 
-Status: **GENERATED_CONTRACT**
-Foundry: `{VERSION}`
-Module: `{mid}`
-
-## Purpose
-{obl['purpose']}
-
-## Activated capabilities
-{chr(10).join(caplines) if caplines else '- Core foundation only.'}
-
-## Traceability
-{chr(10).join(trace) if trace else '- Activation comes from locked Foundry baseline.'}
-
-## Implementation tasks
-
-### TASK-{mid.upper()}-001 — Establish module boundary
-- Exact path: `{base}` or the stack-specific path selected by architecture.
-- Change: implement only the contracts and invariants recorded in this module package.
-- Dependencies: see `.foundry/resolution/foundry-plan.json`.
-- Tests: satisfy `test_obligations` in `MODULE_MANIFEST.json`.
-- Observability: satisfy `operational_obligations` in `MODULE_MANIFEST.json`.
-- Rollback: satisfy `recovery_obligations` in `MODULE_MANIFEST.json`.
-- Acceptance criteria: module contract and all negative/positive tests pass.
-- Expected result: replaceable, independently verifiable `{mid}` module.
-
-### TASK-{mid.upper()}-002 — Prove integration
-- Exact path: generated module path(s) listed in `MODULE_MANIFEST.json`.
-- Change: connect through explicit interfaces only.
-- Acceptance criteria: contract tests pass and no undeclared dependency is introduced.
-- Expected result: LEGO-compatible integration without hidden coupling.
-"""
+def write_cards(stage,plan,module_data,obligations,caps):
+    template=(ROOT/'generation/card-template.md').read_text(encoding='utf-8')
+    for mid in plan['modules']:
+        write(stage/card_rel(mid),card_text(mid,plan,obligations[mid],module_data[mid],caps,template))
 
 def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_content,item_maps=None,source_pack=''):
     d=stage/'docs/modules'/mid
     d.mkdir(parents=True,exist_ok=True)
-    for role in MODULE_DOCS: write(d/role,module_backlog_text(mid,plan,obl,caps))
     mcaps=[x for x in plan['module_reasons'].get(mid,[]) if x in caps]
     arch_text=module_architecture_text(mid,bp_mapping,bp_content,mcaps,item_maps,source_pack)
     if arch_text is not None: write(d/'BLUEPRINT_ARCHITECTURE.md',arch_text)
@@ -206,7 +186,7 @@ def write_module_package(stage,mid,plan,module_manifest,obl,caps,bp_mapping,bp_c
       'activated_capabilities':[x for x in plan['module_reasons'].get(mid,[]) if x in caps],
       'custom_requirements':[x for x in plan['module_reasons'].get(mid,[]) if x.startswith('REQ-CUSTOM-')],
       'generated_paths':module_manifest['paths'],
-      'required_documents':MODULE_DOCS,'invariants':obl['invariants'],'security_obligations':obl['security'],
+      'required_documents':[card_rel(mid)],'invariants':obl['invariants'],'security_obligations':obl['security'],
       'test_obligations':obl['tests'],'operational_obligations':obl['operations'],'recovery_obligations':obl['recovery']
     }
     for key in ('product_key','source_manifest','source_module_manifest'):
@@ -251,7 +231,7 @@ def write_plan(stage,plan,rows,registration):
     name=plan['project']['name']; active=sum(1 for r in rows if r[1]=='ACTIVE')
     lines=[f'# {name} — PLAN','',f'Foundry: `{VERSION}`',f"Profile: `{plan['profile']}`",f"Criticality: `{plan['criticality']}`",f"Input digest: `{plan['input_digest']}`",'',
       '## Capability resolution',f"- Foundation: {len(plan['foundation'])}",f"- User selected: {len(plan['user_selected'])}",f"- Derived: {len(plan['derived'])}",f"- Deferred: {len(plan['deferred'])}",f"- Current total: {len(plan['current_capabilities'])}",'',
-      '## LEGO modules']+[f'- `{m}` — `docs/modules/{m}/MODULE_MANIFEST.json`' for m in plan['modules']]+['',
+      '## LEGO modules']+[f'- `{m}` — `{card_rel(m)}` — `docs/modules/{m}/MODULE_MANIFEST.json`' for m in plan['modules']]+['',
       '## Blueprint applicability',f'Active: {active}; not applicable: {len(rows)-active}; total controlled sections: {len(rows)}. Section text is not generated: the templates in `templates/TOP_TIER_SYSTEM_BLUEPRINT/` define the section, this table records whether it applies.','',
       '| section file | status | reason |','|---|---|---|']
     lines += [f'| `{fn}` | {status} | {reason} |' for fn,status,reason in rows]
@@ -266,8 +246,8 @@ def validate_generated(stage,plan,module_data):
     errors=[]
     selected=set(plan['modules'])
     for mid in selected:
-        for role in MODULE_DOCS+['MODULE_MANIFEST.json']:
-            if not (stage/'docs/modules'/mid/role).is_file(): errors.append(f'{mid}: missing module artifact {role}')
+        if not (stage/'docs/modules'/mid/'MODULE_MANIFEST.json').is_file(): errors.append(f'{mid}: missing module artifact MODULE_MANIFEST.json')
+        if not (stage/card_rel(mid)).is_file(): errors.append(f'{mid}: missing card {card_rel(mid)}')
         for rel in module_data[mid]['paths']:
             if not (stage/rel/'README.md').is_file(): errors.append(f'{mid}: missing path scaffold {rel}/README.md')
     for mid,m in module_data.items():
@@ -280,7 +260,11 @@ def validate_generated(stage,plan,module_data):
         n=len(PLAN_ROW.findall(plan_md.read_text(encoding='utf-8')))
         if n!=EXPECTED_BLUEPRINT_COUNT: errors.append(f'PLAN.md blueprint table rows {n} != {EXPECTED_BLUEPRINT_COUNT}')
     if (stage/'docs/blueprint').exists(): errors.append('docs/blueprint must not be generated (V17-1)')
-    required=[stage/'PLAN.md',stage/'README.md',stage/'.foundry/intake/answers.json',stage/'.foundry/resolution/foundry-plan.json',stage/'.foundry/project-profile.json',stage/'docs/SYSTEM_BLUEPRINT.md',stage/'docs/IMPLEMENTATION_BACKLOG.md']
+    for legacy in [stage/'docs/IMPLEMENTATION_BACKLOG.md']+[stage/'docs/modules'/m/'08_IMPLEMENTATION_BACKLOG.md' for m in selected]:
+        if legacy.exists(): errors.append('legacy backlog must not be generated (V17-2): '+legacy.relative_to(stage).as_posix())
+    for cf in (stage/'cards').glob('*.md') if (stage/'cards').is_dir() else []:
+        if cf.stem not in selected: errors.append('card for unselected module: '+cf.name)
+    required=[stage/'PLAN.md',stage/'README.md',stage/'.foundry/intake/answers.json',stage/'.foundry/resolution/foundry-plan.json',stage/'.foundry/project-profile.json',stage/'docs/SYSTEM_BLUEPRINT.md']
     for p in required:
         if not p.is_file(): errors.append('missing required generated file '+str(p.relative_to(stage)))
     if errors: raise RuntimeError('staging validation failed:\n'+'\n'.join(errors))
@@ -363,15 +347,12 @@ def generate(plan,answers,custom,out_root,industry=None):
         active_bp=write_plan(stage,plan,rows,registration); total_bp=len(rows)
         system_lines=[f'# {name} — Generated System Blueprint','',f'Foundry: `{VERSION}`',f"Profile: `{plan['profile']}`",f"Criticality: `{plan['criticality']}`",'', '## Capability resolution',f"- Foundation: {len(plan['foundation'])}",f"- User selected: {len(plan['user_selected'])}",f"- Derived: {len(plan['derived'])}",f"- Deferred: {len(plan['deferred'])}",f"- Current total: {len(plan['current_capabilities'])}",'','## LEGO modules']+[f'- `{m}`' for m in plan['modules']]+['','## Blueprint applicability and delivery registration','See `PLAN.md` (one row per controlled section, then the 交付登記 JSON).','','## Truth boundary','This document is a deterministic planning/assurance output. It does not claim that implementation exists. Implementation claims become VERIFIED only with exact content-addressed file:line evidence.']
         write(stage/'docs/SYSTEM_BLUEPRINT.md','\n'.join(system_lines))
-        backlog=['# Implementation Backlog','', 'Every selected LEGO module has a generated implementation contract. Execute only after architecture gates converge.','']
-        for mid in plan['modules']:
-            backlog += [f'## {mid}',f'- Contract: `docs/modules/{mid}/08_IMPLEMENTATION_BACKLOG.md`',f'- Module paths: '+', '.join(f'`{x}`' for x in module_data[mid]['paths']),'']
-        write(stage/'docs/IMPLEMENTATION_BACKLOG.md','\n'.join(backlog))
+        write_cards(stage,plan,module_data,obligations,caps)
         trace={'schema_version':'1.0.0','input_digest':plan['input_digest'],'module_reasons':plan['module_reasons'],'capability_traceability':plan['traceability'],'deferred':plan['deferred']}
         dump(stage/'.foundry/resolution/selection-traceability.json',trace)
-        coverage={'schema_version':'1.0.0','modules_selected':len(plan['modules']),'module_artifacts_per_module':len(MODULE_DOCS)+1,'blueprints_active':active_bp,'blueprints_not_applicable':total_bp-active_bp,'blueprints_total':total_bp,'current_capabilities':len(plan['current_capabilities']),'deferred_capabilities':len(plan['deferred'])}
+        coverage={'schema_version':'1.0.0','modules_selected':len(plan['modules']),'module_artifacts_per_module':2,'blueprints_active':active_bp,'blueprints_not_applicable':total_bp-active_bp,'blueprints_total':total_bp,'current_capabilities':len(plan['current_capabilities']),'deferred_capabilities':len(plan['deferred'])}
         dump(stage/'.foundry/verification/generation-coverage.json',coverage)
-        write(stage/'README.md',f"# {name}\n\nGenerated by System Foundry {VERSION}.\n\nStart with `PLAN.md` (selected modules, blueprint applicability table, delivery registration) and `.foundry/resolution/foundry-plan.json`. Each selected LEGO module has `MODULE_MANIFEST.json` and `08_IMPLEMENTATION_BACKLOG.md` under `docs/modules/<module>/`.\n")
+        write(stage/'README.md',f"# {name}\n\nGenerated by System Foundry {VERSION}.\n\nStart with `PLAN.md` (selected modules, blueprint applicability table, delivery registration) and `.foundry/resolution/foundry-plan.json`. Each selected LEGO module has an executable card `cards/<module>.md` and `docs/modules/<module>/MODULE_MANIFEST.json`.\n")
         validate_generated(stage,plan,module_data)
         dump(stage/'.foundry/resolution/artifact-manifest.json',artifact_manifest(stage))
         os.replace(stage,target)
