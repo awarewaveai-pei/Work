@@ -3,7 +3,7 @@
 **風險** High（交付；碰客戶主機）　**模型** Fable 5.1 設計 → Opus 5.5 做　**前置** 第 3 項（can()）＋第 4 項（付款）；待決 2（Postiz AGPL 律師）　**正本** ADR 017 §5、§6、順序 5；ADR 018 §4；一鍵架站總藍圖 Stage 4
 
 ## Decision
-- 模組清單：`lib/portal/products.ts` 每列加 `modules: { services: string[], env: string[], dependsOn: ProductKey[] }`（例：social → next-admin、supabase、trigger、postiz；env：`POSTIZ_API_KEY`、`PUBLIC_BASE_DOMAIN`…）。登記表測試：`standalone: true` 的產品，其 `dependsOn` 閉包內不得含 SAFETY_GATE 功能。
+- 模組清單：`lib/portal/products.ts` 的 `modules: { dependsOn, manifest }` 已存在（`:26`），**不加欄位**；`services`（compose 檔＋service 名）與 `env` 寫進各產品 `MODULE_MANIFEST.json`，盤點正本 ADR 017 §5「模組清單的盤點」。登記表測試：`standalone: true` 的產品，其 `dependsOn` 閉包內不得含 SAFETY_GATE 功能；另一條：manifest 內每個 service 名都存在於其指名的 `lobster-factory/infra/**` compose 檔（或 `Projects/internal/cognitive-engineering-os/docker-compose.yml`）。
 - 建置變體：SAFETY_GATE 功能的程式只准住 `lib/safety-gated/**` 與 `app/(shell)/**/safety/**`（目錄邊界，不是人工清單）；`BUYOUT=1` 建置把這兩個目錄 alias 成空模組；測試 `safety-gated-reachability.test.ts` 從所有 route 入口走 import 圖，證明 BUYOUT 下到不了它們；再在 image 內 grep 證明（Codex M16）。
 - 授權檔：`scripts/issue-licence.mjs --customer <slug> --modules social,design --max-tenants 1 --updates-until 2027-10-16` → JSON＋Ed25519 簽章（私鑰 `LICENCE_SIGNING_KEY`，vault）。安裝內 `lib/entitlements/licence.ts` 離線驗章，`can()` 在 `self_hosted` 模式從它回答；`report()` 不做事。
 - 安裝前三道閘（都要過才開工）：①**款項落定**：`payment_events` 有已結清列且退款／拒付窗內無反轉，或操作者在 `/ops/billing` 標「匯款已入帳」（High，留稽核）（Codex R2-3）；②**網域與主機歸屬**：客戶網域 DNS TXT 挑戰（`_awarewave-verify.<domain>` = 安裝 id 的雜湊）通過、SSH host key 指紋由客戶確認並寫進 `buyout_installs`；③**操作者核准**（High-STOP 一次）（R2-4）。

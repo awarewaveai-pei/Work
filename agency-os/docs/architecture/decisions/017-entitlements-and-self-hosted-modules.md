@@ -101,6 +101,37 @@
   2. 在客戶主機裝一整套獨立服務（選到的模組需要的聯集）；
   3. 交接時撤掉我們的 SSH key 與所有我們的密鑰；客戶有買維運才保留一把維運用的 key。
 - **模組清單**（每個產品一份）：System Foundry `kernel/06_MODULARITY_CONTRACT.md` 的十項，加上：需要的基礎服務（例：社群＝next-admin＋Supabase＋Trigger.dev＋Postiz）、要填的設定值（客戶的 API key、網址）、依賴的模組（例：社群依賴帳號層）、可接的外部來源（§6）。安裝程式只讀這份清單。
+- **模組清單的盤點（2026-10-19，grep 驗過）**：
+  - 粒度＝產品。「需要的基礎服務」填 **compose 檔＋要用的 service 名**，不是每個 container 都列成模組；Supabase 13、Trigger 9、Postiz 4、Chatwoot 4 個 service 是各自 compose 檔的內部，安裝以整個 compose 檔為單位，不能只裝其中幾個（拆法等第 5 項實作時看實況，不在此預設）。
+  - 清單的正本是每個產品的 `MODULE_MANIFEST.json`（`products.ts` 的 `modules: { dependsOn, manifest }` 已指向它，`:26`）；`services`、`env` 寫進 manifest，**不**另在 `products.ts` 加欄位。manifest 檔目前尚未建立。
+  - 服務所在（路徑相對 `lobster-factory/infra/`）：
+
+    | 基礎服務 | compose 檔 | service |
+    |---|---|---|
+    | next-admin、renderer | `hetzner-phase1-core/docker-compose.yml` | `next-admin`、`renderer`（同檔還有 nginx／redis／n8n／wordpress 等，買斷只取需要的） |
+    | supabase | `supabase/docker-compose.yml` | studio、kong、auth、rest、realtime、storage、imgproxy、meta、functions、analytics、db、vector、supavisor |
+    | trigger | `trigger/docker-compose.yml` | webapp、supervisor、postgres、redis、clickhouse、registry、minio、electric、docker-proxy |
+    | postiz | `postiz/docker-compose.yml` | postiz、postiz-redis、temporal、temporal-postgresql |
+    | chatwoot | `chatwoot/docker-compose.yml` | chatwoot-rails、chatwoot-sidekiq、chatwoot-postgres、chatwoot-redis |
+    | video-service | `hetzner-phase1-core/apps/video-service/docker-compose.video.yml` | video-service |
+    | remotion-service | `hetzner-phase1-core/apps/remotion-service/docker-compose.remotion.yml` | remotion-service |
+    | cognitive-os | `Projects/internal/cognitive-engineering-os/docker-compose.yml`（repo 根相對） | cognitive-os-api、cognitive-os-web、-web-2、-web-3；`cognitive-os-files` 是 volume 不是 service；自己的 PostgreSQL，不用 supabase |
+
+  - 各產品要的服務與客戶要填的設定（env 名在 `lib/` 內有 grep 命中；「客戶自備」＝值是客戶自己的帳號）：
+
+    | 產品 | 基礎服務 | 客戶自備 env |
+    |---|---|---|
+    | social | next-admin、supabase、trigger、postiz | 各社群平台授權（Meta 等）、`POSTIZ_API_BASE_URL`、`POSTIZ_API_KEY`、`SMARTLINK_*` |
+    | cs | next-admin、supabase、chatwoot、trigger（客服排程工作 `applyChatwootBaseline` 由 `lib/schedules/jobs.ts:9` 引用，排程由 Trigger 的 `schedules-heartbeat.ts` 驅動） | `ANTHROPIC_API_KEY`（或 `GEMINI_API_KEY`）、Messenger／LINE 授權 |
+    | collect | next-admin、supabase、trigger、renderer | 搜尋與抓取供應商 key（`BRAVE_SEARCH_API_KEY`、`FIRECRAWL_API_KEY`、`PERPLEXITY_API_KEY`、`SERPER_API_KEY`、`OPENAI_API_KEY`，擇一即可）；內部 `RENDERER_URL`、`RENDERER_SHARED_SECRET` 由安裝產生 |
+    | outreach | next-admin、supabase | 客戶自己的 Google OAuth（Gmail connector） |
+    | content（video） | next-admin、supabase、postiz、renderer、video-service、remotion-service | `ANTHROPIC_API_KEY`、`OPENAI_API_KEY`、`PEXELS_API_KEY`、`R2_*`、`STRIPE_SECRET_KEY`（若客戶要收款）、`WP_API_URL`＋`WORDPRESS_JWT_TOKEN`（若客戶要發到 WordPress）；內部 `VIDEO_SERVICE_URL`、`REMOTION_SERVICE_URL` 由安裝產生 |
+    | tarot | next-admin、supabase | `REPLICATE_API_TOKEN`、`OPENAI_API_KEY` |
+    | studio（POD） | next-admin、supabase | `REPLICATE_API_TOKEN`、`ANTHROPIC_API_KEY`、`PRINTFUL_API_KEY`、`WPBRIDGE_*` |
+    | cognitive | cognitive-os（自帶 compose 與 PostgreSQL） | AI key |
+
+  - 有排程工作的產品（`lib/schedules/jobs.ts` 目前引用 collect、cs）一律另需 trigger（`lobster-factory/packages/workflows/src/trigger/schedules-heartbeat.ts`）；新產品加排程工作時，manifest 的 services 要同步加 trigger。
+  - 授權風險不同：Postiz 是 AGPL-3.0（見下方 Postiz 條，待決 2）；Chatwoot、Trigger.dev、Supabase 的授權條款買斷交付前要逐一讀過，**本步未讀**，不在此下結論。
 - **一份程式**：next-admin 照一個 app 出貨，沒選的模組路由與選單關掉；含 SAFETY_GATE 的程式碼在建置時排除（§2）。
 - **授權檔只在款項落定後簽發**：買斷訂單要在 `payment_events` 有已結清列、且退款／拒付窗（預設 30 天，操作者可改）內無反轉事件，或操作者在 `/ops/billing` 標記「匯款已入帳」（High，留稽核列）；安裝工作流在開工前再查一次，未落定即拒（Codex R2-3）。
 - **授權檔**：`format_version`、`kid`、`install_id`、客戶、模組、每個 `feature_key` 的上限、`updates_until`、`max_tenants`（預設 1；>1 才是轉售，順序第 7 步）、簽章（Ed25519，同 ADR 007）。安裝內存一組可接受的公鑰，換金鑰時舊授權檔仍可驗。功能沒有到期日；`updates_until` 只管能不能拿新版。

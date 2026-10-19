@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-19（續4）客戶怎麼來：買斷服務清單寫進 ADR 017 §5 與卡 5（SDK 代跑，我逐項驗真並補一處）
+
+**觸發**：操作者「客戶買全部要自架 Postiz、chatbot 嗎？寫在哪、System Foundry？」→「把服務清單表寫進卡 5 與 ADR 017 §5」→「額度快沒了，你直接用 SDK」。
+
+**做法**：簡報寫成檔經 stdin 交 `cc.py --quiet --budget 3`（US$0.50、11 turns；log `C:\Users\user1115\AppData\Local\ClaudeAgent\runs\20261019-134606.log`）。stdin 中文被 cp950 吃成亂碼，SDK 靠 repo 內容重建需求，自己更正了我簡報的兩處過時：Codex 已加 `modules: { dependsOn, manifest }`（`products.ts:26`，commit 1ef1ee419），故 services／env 改寫進各產品 `MODULE_MANIFEST.json` 而非加欄位；`cognitive-os-files` 是 volume 不是 service。
+
+**我的驗真（file:line）**：只改兩檔（`git diff HEAD --stat`）；各 compose 的 services 區段用 regex 實測 supabase 13、trigger 9、postiz 4、chatwoot 4、video-service 1、remotion-service 1、cognitive 4、core 12（我簡報裡的 grep 會把 volume 抓進來，SDK 表正確）；`MODULE_MANIFEST.json` 全 repo 0 個；`lib/schedules/jobs.ts:5-9` 引用 collect 與 cs、`packages/workflows/src/trigger/schedules-heartbeat.ts` 存在 → **cs 列缺 trigger，已補**，並加通則「有排程工作的產品一律另需 trigger」。
+
+**[已修改]**：ADR 017 §5 加「模組清單的盤點」（粒度＝產品、正本＝manifest、服務所在表、各產品服務與客戶自備 env 表、排程需 trigger、授權風險＋Chatwoot／Trigger／Supabase 授權未讀）；卡 5 Decision 第一條改指向該表，加測試「manifest 每個 service 名都存在於其指名 compose 檔」。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node check.mjs`（監工台）；`node scripts/verify-governance-pointers.mjs` | exit=0 | ms=10000 → ok: 5 ways, 9 steps, 4 open；PASSED
+- REALTEST_EVIDENCE: tool=Bash | cmd=python regex 解析各 compose `services:` 區段 | exit=0 | ms=300 → 13／9／4／4／1／1／4／12
+- REVIEW_DONE: critic=Quick | verdict=warn→fixed | findings=0c/1m/0n -- cs 缺 trigger（排程依賴）已補
+- BUGHUNT_DONE: scope=agency-os,lobster-factory | grep=`MODULE_MANIFEST|cognitive-os-files|schedules-heartbeat` | hits=ADR 017、卡 5、`products.ts:35-42`、`schedules-heartbeat.ts`；manifest 檔 0 個（已於 ADR 註明尚未建立）
+- ORACLE_WAIVED: 無 source 檔改動
+
+**剩餘風險**：服務表是「依 lib 程式引用」推出的初始值，每產品是否還有隱性依賴（n8n、Redis、R2 儲存）要在第 5 項實裝時以安裝煙霧測試證實；Chatwoot／Trigger／Supabase 授權條款未讀。
+
+**rollback**：`git show HEAD:<file> > <file>` 還原兩檔（共享資料夾禁 `git checkout --`）。
 ## 2026-10-19（續3）ADR017 第2項收尾：監工台 done 與訂閱狀態決定性
 
 - 根因／修改：另一 session 已提交第 2 項實作 `ee3e7bde5`，監工台仍標示 in_progress；補 `data.mjs` 的 done/commit、重建 supervisor.html，並讓多方案同產品的 launcher 狀態按 active > trial > past_due > suspended > canceled 決定，避免查詢順序漂移。
