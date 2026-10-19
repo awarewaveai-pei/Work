@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-19（續10）V17-3 收尾：客戶怎麼來監工台改用 `scripts/supervisor-kit`；社群監工台新網址
+
+**觸發**：操作者「繼續完成啊」。V17-3 條目（續9）留下的兩項。
+
+- 客戶怎麼來監工台：另一 session 的 data.mjs／step-5 已提交（worktree 與 HEAD 相同），只剩其 `cards/step-3.md` 未提交（不碰）。提交本頁 `build.mjs`（只留五種客戶／入口／先後段與頁專屬 CSS）、`check.mjs`（只留軸值域、ADR 017／TASKS 綁定、門／規則／先後／定價）、重生的 `supervisor.html`。頁面差異＝前置變連結、waitFor 上色、`ol.open`、CSS 聯集（圓點字色改 `--onDot`，修暗色模式）。
+- 社群監工台舊 artifact 已刪除；操作者同意後發新網址 `https://claude.ai/artifact/FmxrX9FN2bDsw1p5t6Ku2t`，`data.mjs` META.url 與 TASKS.md 指標已改（commit 1e6585551）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node build.mjs && node check.mjs`（worktree）；`git archive HEAD` 解到 /tmp 後放入本次 3 檔再跑 `check.mjs`（證明提交後的樹單獨也綠，不依賴他人未提交檔） | exit=0 | ms=300
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- 本頁程式已在續9 的 Codex 審查 12 檔內（`2026-10-19-partialreview-8099aa2e.md`），之後未改
+- BUGHUNT_WAIVED: NA -- 續9 已 grep `supervisor-kit|build\.mjs|check\.mjs`，本次只提交當時已審的檔
+
+**rollback**：`git revert <本 commit>`（HEAD 的舊 build/check 自帶版面，revert 後 `node build.mjs` 重生）。
 ## 2026-10-19（續9）System Foundry v1.7 V17-3：監工台套件共用（`scripts/supervisor-kit`）＋產生的專案自帶 `supervisor/`
 
 **觸發**：操作者批准方案 B（「趕快做啊」）。計畫＝`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md` V17-3。
