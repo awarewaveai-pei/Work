@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-20（續5）Foundry v1.7 V17-8：11 個產品 MODULE_MANIFEST.json（十項宣告附證據＋services＋env），manifestStatus() 0/11 → 11/11
+
+**根因**：`products.ts` 每個產品都指向 `lib/<key>/MODULE_MANIFEST.json`，但只有 social 有一份，且缺 `services`／`env`；買斷安裝（ADR 017 順序 5）與 Foundry 勾產品都讀這份。
+
+- 新建 10 份（cognitive、collect、content、cs、design、hci、outreach、studio、tarot、video），social 補 `services`／`env`。格式＝social＋`services:[{compose,service}]`（產品實際呼叫的 service；安裝單位＝整個 compose 檔，`configuration.installUnit`）＋`env`（客戶要給的值與開關）；安裝產生的 token／URL 放 `configuration.generatedByInstall`。lib/cognitive、lib/design、lib/video 原無目錄，只放 manifest。
+- 完整度只看 `scripts/product-manifests.mjs` `manifestStatus()`；`scripts/__tests__/product-manifests.test.mjs` 加「真實 repo 全部 ok」。
+- 更正（盤點／舊宣告錯）：
+  - C1 down 檔有兩處：`migrations/*.down.sql` 與 `packages/db/scripts/*_down.sql`。social 原宣告「0011–0103 無 down」錯（0096/0098/0100–0103 有）；本批 collect／content／video／design 初稿同錯，已改。
+  - C2 `SMARTLINK_*` 不存在（smart link salt 每程序隨機，`lib/social/smartlink.ts:116`）：social manifest 與 ADR 017:130 更正；ADR 017:112「manifest 尚未建立」改為已建立、env 全集以 manifest 為準。
+  - m1 ADR 017 §5 env 表缺：cs `OPENAI_API_KEY`（`lib/kb/rag.ts:41`）、studio `PRINTFUL_STORE_ID`／`PRINTFUL_NATIVE_STORE_ID`／`WC_WEBHOOK_SECRET`、video `PEXELS`／`MEDIA_*`、tarot `ANTHROPIC_API_KEY`／`TAROT_DAILY_LIMIT`；已進 manifest。
+- 範圍外發現（未修，列 follow-up）：
+  - F1 tarot 批次回呼 `/api/tools/tarot/*` 不帶 session，middleware matcher 未排除（`middleware.ts:413`，無 session 擋 `:385`；任務 `tarot-batch-generate.ts:45-60`）→ 推定 prod 批次每張失敗（讀碼，未實跑）。
+  - F2 cs 門 `/api/cs` 不存在（`products.ts:66`）。
+  - F3 程式層依賴未登記 `dependsOn`：studio→tarot `image-gen.ts`（`lib/studio/image-provider.ts:1-13`）、outreach→`lib/social/authz`（`app/api/outreach/messages/route.ts:11`）、design AI 按鈕→studio 路由。
+  - F4 `design.edit` 無任何路由 `grantFor`（只在 `products.ts:60`）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node -e "import('./scripts/product-manifests.mjs').then(m=>m.manifestStatus())"` → 11/11 ok；`node --test scripts/__tests__/product-manifests.test.mjs` 3 pass；scratch `check_refs.py` 解析全部 manifest 的 path:line，存在且不超檔尾（餘 2 筆為逗號清單解析假陽性，手動 `wc -l` 確認） | exit=0 | ms=4000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/6m/0n -- Codex `agency-os/reports/oracle/2026-10-20-partialreview-2a8afff9.md`：F3/F4/F6 開關未進 env → 已加（SOCIAL_DISPATCH_*、POD_DESIGNS_ENABLED／POD_AUTO_FULFILL_ENABLED、MEDIA_PAYMENT_PROVIDER／MEDIA_CHECKOUT_ALLOWED_ORIGIN／MEDIA_PRODUCTION_PERSISTENCE_ENABLED）；F1 cognitive 補「collect 服務由 dependsOn 閉包帶入」；F2（tarot 回呼）、F5（design→studio dependsOn）屬 middleware／登記表改動，列上方 F1／F3。
+- ORACLE_WAIVED: Codex 以 -Path 只審本批 13 檔（partialreview，artifact 如上）；全樹審查會掃進其他 session 未提交的改動
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=`SMARTLINK_|manifest 檔目前尚未建立|0/11` | hits=4（ADR 017:130 已改；Foundry generation/module-manifests.json:882 與 generated sample 由 V17-8 下一步 sync 重產；worklog-excerpt 為歷史）
+
+**rollback**：`git revert <本 commit>`（只新增 manifest／測試、改 social manifest 與 ADR 兩行）。
 ## 2026-10-20（續4）社群 V1.5 C25 報表管理：選頻道＋期間＋內容 → 可列印 PDF 報表、做過的報表、每月自動寄
 
 **觸發**：C25 卡（`SOCIAL_MANAGER_PLAN.md` §1b）。0105 的 `social_reports`／`social_create_report`／`social_delete_report` 已有，不改 schema。

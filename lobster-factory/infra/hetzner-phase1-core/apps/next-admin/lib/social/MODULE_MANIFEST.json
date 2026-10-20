@@ -10,13 +10,23 @@
     "failure_isolation_boundary": "A Postiz 429 leaves the target pending and backs the whole sender off until the reset; any other 4xx marks only that target error; a Postiz post the database lost track of is recorded in social_postiz_orphans (migration 0100; lib/social/dispatch.ts header). A failing channel does not stop the other targets of the same post.",
     "data_lifecycle": "Posts are soft-deleted (deleted_at) and listed in a capped trash (lib/social/store.ts); every change writes social_audit_log with the actor (store.ts); metrics are stored per day and per post (social_metrics_daily, social_post_metrics, migration 0105).",
     "observability_contract": "social_audit_log answers who changed what; needs() lists failed posts, channels whose authorisation died and posts waiting for review, and the same events go to the operator Telegram through the ops inbox (lib/social/review.ts header); social_dispatch_state records the sender's backoff (migration 0100).",
-    "migration_rollback_contract": "Migrations 0105, 0109 and 0111 ship a .down.sql; 0011 to 0103 have no down file and roll forward only. C20's gate applied, reverted and re-applied 0105 on a throwaway database (agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs, step C20).",
+    "migration_rollback_contract": "Migrations 0105, 0109 and 0111 ship a .down.sql beside the forward file; 0096, 0098, 0100, 0101, 0102 and 0103 have a down script in lobster-factory/packages/db/scripts (<n>_down.sql, run by hand; 0096's drops every social_* table with its rows, header :1-4); 0011 has no down file and rolls forward only. C20's gate applied, reverted and re-applied 0105 on a throwaway database (agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs, step C20).",
     "replacement_strategy": "Postiz sits behind the sender's ports (lib/social/dispatch-store.ts implements DispatchPorts for dispatch.ts); replacing Postiz means a new ports implementation and per-provider limits (lib/social/limits.ts), with posts, targets and states unchanged."
   },
+  "services": [
+    { "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml", "service": "next-admin" },
+    { "compose": "lobster-factory/infra/supabase/docker-compose.yml", "service": "kong" },
+    { "compose": "lobster-factory/infra/trigger/docker-compose.yml", "service": "webapp" },
+    { "compose": "lobster-factory/infra/postiz/docker-compose.yml", "service": "postiz" }
+  ],
+  "env": ["POSTIZ_API_BASE_URL", "POSTIZ_API_KEY", "SOCIAL_DISPATCH_ENABLED", "SOCIAL_DISPATCH_MODE"],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_SOCIAL": "optional product host",
     "loginSources": ["local", "awarewave-wp", "customer-wp"],
-    "apiKeys": "POSTIZ_API_BASE_URL, POSTIZ_API_KEY, SMARTLINK_* and the platform authorisations held in Postiz (ADR 017 section 5 row social)"
+    "apiKeys": "POSTIZ_API_BASE_URL, POSTIZ_API_KEY (lib/content/postiz.ts:38-39) and the platform authorisations held in Postiz (ADR 017 section 5 row social). The smart link page needs no key: its visitor hash salt is random per process (lib/social/smartlink.ts:116).",
+    "generatedByInstall": "SOCIAL_DISPATCH_TOKEN (app/api/internal/social/dispatch/route.ts:5; the Trigger worker reads the same value, packages/workflows/src/trigger/social-dispatch.ts:32)",
+    "switches": "SOCIAL_DISPATCH_ENABLED=true turns sending on, SOCIAL_DISPATCH_MODE=apply|draft chooses real sends or Postiz drafts; anything else is a dry run (app/api/internal/social/dispatch/route.ts:6-8)",
+    "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
   }
 }

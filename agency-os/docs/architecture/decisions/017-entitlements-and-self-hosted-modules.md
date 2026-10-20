@@ -109,7 +109,7 @@
 - **模組清單**（每個產品一份）：System Foundry `kernel/06_MODULARITY_CONTRACT.md` 的十項，加上：需要的基礎服務（例：社群＝next-admin＋Supabase＋Trigger.dev＋Postiz）、要填的設定值（客戶的 API key、網址）、依賴的模組（例：社群依賴帳號層）、可接的外部來源（§6）。安裝程式只讀這份清單。
 - **模組清單的盤點（2026-10-19，grep 驗過）**：
   - 粒度＝產品。「需要的基礎服務」填 **compose 檔＋要用的 service 名**，不是每個 container 都列成模組；Supabase 13、Trigger 9、Postiz 4、Chatwoot 4 個 service 是各自 compose 檔的內部，安裝以整個 compose 檔為單位，不能只裝其中幾個（拆法等第 5 項實作時看實況，不在此預設）。
-  - 清單的正本是每個產品的 `MODULE_MANIFEST.json`（`products.ts` 的 `modules: { dependsOn, manifest }` 已指向它，`:26`）；`services`、`env` 寫進 manifest，**不**另在 `products.ts` 加欄位。manifest 檔目前尚未建立。
+  - 清單的正本是每個產品的 `MODULE_MANIFEST.json`（`products.ts` 的 `modules: { dependsOn, manifest }` 已指向它，`:26`）；`services`、`env` 寫進 manifest，**不**另在 `products.ts` 加欄位。十一份已建立（Foundry v1.7 V17-8，2026-10-20），完整度只看 `scripts/product-manifests.mjs` `manifestStatus()`；下表是 2026-10-19 的盤點，env 全集與更正以 manifest 為準（例：manifest 另列 cs 的 `OPENAI_API_KEY`、studio 的 `PRINTFUL_STORE_ID`／`WC_WEBHOOK_SECRET`）。
   - 服務所在（路徑相對 `lobster-factory/infra/`）：
 
     | 基礎服務 | compose 檔 | service |
@@ -127,7 +127,7 @@
 
     | 產品 | 基礎服務 | 客戶自備 env |
     |---|---|---|
-    | social | next-admin、supabase、trigger、postiz | 各社群平台授權（Meta 等）、`POSTIZ_API_BASE_URL`、`POSTIZ_API_KEY`、`SMARTLINK_*` |
+    | social | next-admin、supabase、trigger、postiz | 各社群平台授權（Meta 等）、`POSTIZ_API_BASE_URL`、`POSTIZ_API_KEY`（更正：無 `SMARTLINK_*` 變數，smart link 的訪客雜湊 salt 每個程序隨機，`lib/social/smartlink.ts:116`） |
     | cs | next-admin、supabase、chatwoot、trigger（客服排程工作 `applyChatwootBaseline` 由 `lib/schedules/jobs.ts:9` 引用，排程由 Trigger 的 `schedules-heartbeat.ts` 驅動） | `ANTHROPIC_API_KEY`（或 `GEMINI_API_KEY`）、Messenger／LINE 授權 |
     | collect | next-admin、supabase、trigger、renderer | 搜尋與抓取供應商 key（`BRAVE_SEARCH_API_KEY`、`FIRECRAWL_API_KEY`、`PERPLEXITY_API_KEY`、`SERPER_API_KEY`、`OPENAI_API_KEY`，擇一即可）；內部 `RENDERER_URL`、`RENDERER_SHARED_SECRET` 由安裝產生 |
     | outreach | next-admin、supabase | 客戶自己的 Google OAuth（Gmail connector） |

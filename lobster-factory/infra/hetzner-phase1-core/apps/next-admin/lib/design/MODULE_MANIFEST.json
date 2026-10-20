@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "module_id": "design",
+  "declarations": {
+    "state_ownership": "Owns the design and mockup-preset rows of media_assets (storage_backend r2; app/api/tools/designs/route.ts:211-214, app/api/tools/presets/route.ts:165-176; preset asset domains allowed by migration 0045) and the image files in the customer's R2 designs bucket (lib/storage/r2.ts:8, :36-37). No table of its own: media_assets (0038) is shared with video and studio. The editors keep their working canvas in the browser; only saved designs reach the server. There is no lib/design code; this directory holds only the manifest.",
+    "behavior_ownership": "Browser editors: app/(shell)/tools/canvas (Fabric canvas, CanvasEditor.tsx), tools/banner (BannerStudio.tsx), tools/mockup (MockupStudio.tsx), tools/vector-editor (iframe of public/vector-editor.html, vector-editor/page.tsx:3-5), and the gallery tools/designs (DesignsGallery.tsx). Server side only saves, lists and deletes designs and presets: app/api/tools/designs/route.ts (POST :121, DELETE :269, GET :344) and app/api/tools/presets/route.ts (GET :43, POST :82, DELETE :213).",
+    "public_api_event_contract": "HTTP: GET/POST/DELETE /api/tools/designs and /api/tools/presets. The AI buttons in the editors call other products' routes and are billed as those products' features: /api/tools/studio/genfill, inpaint, remove-bg, generate, mockup, proxy-image (CanvasEditor.tsx:1251, :1475; BannerStudio.tsx:1219; MockupStudio.tsx:437, :484; vector-editor/page.tsx:5) and /api/tools/script-forge (video.script, app/api/tools/script-forge/route.ts:33). The door /api/design in products.ts is not built (door.enabled false; no app/api/design directory). No Trigger task, no webhook.",
+    "invariants": "Saving and deleting a design needs the canCreateAiImageJob role and organization access to the asset (app/api/tools/designs/route.ts:126, :274, :302). A Printful mockup URL is fetched only from the Printful CDN allowlist, size and time capped (designs/route.ts:18-23). Delete removes the R2 object from the bucket that matches the asset type before removing the row (designs/route.ts:305-320). The vector editor's CDN libraries are pinned with SRI integrity hashes (public/vector-editor.html:7-13). The feature key design.edit is declared in lib/portal/products.ts:60 but no route calls grantFor(\"design.edit\") (grep over app and lib), so access today is the ops role, not an entitlement.",
+    "dependencies": "supabase (media_assets, ops_audit_events), R2 designs bucket (R2_API_TOKEN, R2_ACCOUNT_ID required, designs/route.ts:179-181; R2_DESIGNS_BUCKET, R2_DESIGNS_PUBLIC_BASE optional overrides, lib/storage/r2.ts:36-37), the Printful catalog route for mockup products (MockupStudio.tsx:328), public CDNs cdnjs.cloudflare.com and cdn.jsdelivr.net for the vector editor's libraries (vector-editor.html:7-13). products.ts dependsOn is empty; the AI buttons need studio (and script-forge needs video.script) to work.",
+    "failure_isolation_boundary": "Without R2 configured, saving returns r2_not_configured and nothing is written (designs/route.ts:179-181); an R2 delete failure returns 502 and keeps the row (designs/route.ts:312-314). The editors run in the browser, so a server error loses only the save or the AI call, not the open canvas. The vector editor is isolated in an iframe (vector-editor/page.tsx:3-5).",
+    "data_lifecycle": "A design lives until a user deletes it: DELETE removes the R2 object and the media_assets row (designs/route.ts:269-325); presets the same (presets/route.ts:213-272). Lists return at most 60 per group (designs/route.ts:16, :417). Each save and delete writes an ops_audit_events row (designs/route.ts:246, :330-333; presets/route.ts:199, :272).",
+    "observability_contract": "ops_audit_events records who saved or deleted which design or preset (designs/route.ts:246, :330-333; presets/route.ts:199-206); R2 and database failures are logged with the [designs] prefix (designs/route.ts:313, :324).",
+    "migration_rollback_contract": "Migration 0045 has no down file in migrations/ or packages/db/scripts/ and rolls forward only; it recreates the media_assets asset_domain CHECK as NOT VALID, so no table scan (0045_mockup_presets.sql:1-12). 0038 has a down script in lobster-factory/packages/db/scripts (0038_media_assets_reconcile_down.sql).",
+    "replacement_strategy": "Each editor is its own page and the vector editor is a self-contained HTML file registering its blocks with AB.registerBlock (lib/content/blocks/README.md links the contract); replacing an editor touches only its page. Storage goes through lib/storage/r2.ts, so another object store is a new implementation of putDesignObject / deleteDesignObject (designs/route.ts:6)."
+  },
+  "services": [
+    { "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml", "service": "next-admin" },
+    { "compose": "lobster-factory/infra/supabase/docker-compose.yml", "service": "kong" }
+  ],
+  "env": ["R2_API_TOKEN", "R2_ACCOUNT_ID", "R2_DESIGNS_BUCKET", "R2_DESIGNS_PUBLIC_BASE"],
+  "configuration": {
+    "PUBLIC_BASE_DOMAIN": "installation base domain",
+    "PRODUCT_HOST_DESIGN": "optional product host",
+    "loginSources": ["local"],
+    "apiKeys": "R2_API_TOKEN and R2_ACCOUNT_ID (required to save), R2_DESIGNS_BUCKET and R2_DESIGNS_PUBLIC_BASE (customer bucket and public origin; lib/storage/r2.ts:36-37). AI buttons use studio's provider keys.",
+    "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
+  }
+}

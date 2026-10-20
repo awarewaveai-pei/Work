@@ -29,3 +29,9 @@ test('a TODO declaration, a service absent from its compose file or a missing ma
   assert.deepEqual(manifestStatus(fixture(svc))[0].problems, ['service data not in infra/docker-compose.yml']);
   assert.deepEqual(manifestStatus(fixture(null))[0].problems, ['manifest missing']);
 });
+
+test('every registered product in the real repo has a complete manifest (V17-8)', () => {
+  const status = manifestStatus();
+  assert.ok(status.length > 0);
+  assert.deepEqual(status.filter((s) => !s.ok), []);
+});
