@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-20（續6）System Foundry v1.7 V17-7 能力驗收補齊：280 個能力補上 `acceptance`，缺數 291 → 11（只剩 11 個 CAP-AW-*）
+
+**根因**：V17-2 起每張模組卡逐能力列「指令→預期」，291 個能力沒有 `acceptance` → 卡上是 TODO，Claude 拿到卡不知道怎麼證明做完。
+
+- `capabilities/catalog.json`：48 個模組、280 個非 CAP-AW-* 能力各補 1–2 條 `{test, expect}`（繁中，照 customer_service／payments 已填 23 條的風格；範例檔是中文，故不用英文）。只依該能力自己的 `description`／`requires` 寫；不改其他欄位（機械比對：其他欄位 0 變動、id 順序不變）；全 catalog 句子唯一（`apply.py` 斷言，既有 payments 兩處重複為舊資料未動）。分五批 101/56/58/44/21，每批 `regenerate_integrity --write` + verify 各條全 exit 0。
+- 11 個 CAP-AW-*（`sync-foundry-catalog.mjs` 產生）未填、未動同步程式；`report_acceptance_gap.py` 現值 `11 of 315`，全是 `aw-*` 模組各 1。
+- `tests/test_artifact_generation.py` `test_cards_list_acceptance_and_flag_missing_as_todo`：原本寫死「ai 卡必有 TODO」，ai 補齊後必紅；改成不變量「卡上有 TODO ⇔ 該模組有能力缺 acceptance」（all-yes 下 aw-* 卡仍為 TODO，兩個方向都跑到）。
+- 踩坑：`validate_configurator.py:150` 的 `勾選\s*[「"]…[」"]` 會把字串結尾的「勾選」連同 JSON 引號當成引用題目標籤 → test/expect 不可以「勾選」結尾。
+- 並行：V17-8 session 進行中，`sync-foundry-catalog.mjs --check` 在 `generation/awarewave-products.json`、`module-manifests.json`、`module-obligations.json` 報 drift（next-admin `lib/*/MODULE_MANIFEST.json` 未提交）— 不是本卡造成，未跑 sync；verify 其餘各條照跑。PostToolUse hook 對 next-admin／handoffs 檔的「changed by this command」警告非本卡所為（本卡只寫 ROOT 的 catalog.json／manifest.json／tests）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`regenerate_integrity --write` + validate_versions／validate_foundry／validate_semantics／validate_configurator／validate_artifact_generation／validate_contract_fixtures／run_adversarial_contract_tests／test_bootstrap_e2e／test_configurator_e2e／test_configurator_http_e2e／test_selection_matrix／test_mutation_coverage／test_payment_commercial_gating／`unittest discover -s tests`（50 OK）／validate_manifest／validate_doc_numbers／report_acceptance_gap／`generate_sample.py --replace`（五批每批一輪，最後一輪 ALL-GREEN） | exit=0 | ms=90000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回：280 條無技術棧字眼（正則掃 PostgreSQL／Stripe／React／JWT 等 0 命中）、每條只有 test+expect 兩鍵、無「被拒絕」單句空話（補成含狀態不變的句子）
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`TODO: no acceptance defined` | hits=2
+- ORACLE_WAIVED: 280 條資料文字＋一個測試改寫；資料由 validator 與卡片產生測試機械驗證，無隱私／可見範圍／擦除／同意／擁有權守衛，不做突變
+
+**rollback**：`git revert <本 commit>`（catalog.json、manifest.json、測試檔三個檔）。
 ## 2026-10-20（續5）Foundry v1.7 V17-8：11 個產品 MODULE_MANIFEST.json（十項宣告附證據＋services＋env），manifestStatus() 0/11 → 11/11
 
 **根因**：`products.ts` 每個產品都指向 `lib/<key>/MODULE_MANIFEST.json`，但只有 social 有一份，且缺 `services`／`env`；買斷安裝（ADR 017 順序 5）與 Foundry 勾產品都讀這份。

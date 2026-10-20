@@ -40,7 +40,11 @@ class ArtifactGenerationTests(unittest.TestCase):
             self.assertNotIn('TODO',cs)
             self.assertGreaterEqual(len(re.findall(r'^- CAP-',cs,re.M)),11)
             self.assertGreaterEqual(len(re.findall(r'^  - 指令：.+ → 預期：.+',cs,re.M)),11)
-            self.assertIn('TODO: no acceptance defined',(out/'cards/ai.md').read_text(encoding='utf-8'))
+            # TODO shows on a card exactly when one of its capabilities has no acceptance (data-independent: ai was the example until V17-7 filled it)
+            caps={c['id']:c for c in load('capabilities/catalog.json')['capabilities']}
+            for mid in p['modules']:
+                gap=any(not caps[x].get('acceptance') for x in p['module_reasons'].get(mid,[]) if x in caps)
+                self.assertEqual('TODO: no acceptance defined' in (out/card_rel(mid)).read_text(encoding='utf-8'),gap,mid)
     def test_supervisor_is_the_shared_kit_and_binds_to_the_plan(self):
         import shutil,subprocess
         from foundry_generate import SUPERVISOR_KIT
