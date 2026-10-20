@@ -131,6 +131,19 @@ function analytics(days, account) {
     gaps, empty: [], posts, latestDay: cur.at(-1), kpis, series };
 }
 
+// C25 報表管理: the same sample numbers as 數據分析, in the report API's shape (lib/social/reports.ts ReportData). Facebook has
+// reach / impressions / engagement, Bluesky followers / posts / engagement, the expired Instagram nothing.
+const REPORT = { id: "00000000-0000-4000-8000-0000000000a1", name: "上個月成效報告", period_from: "2026-09-01", period_to: "2026-09-30", format: "pdf", colour: "b",
+  account_ids: ACCOUNTS.map((a) => a.id), sections: ["sum", "plat", "top", "cmp"], created_at: day(-1, 10), created_by: "ops:owner" };
+function reportData() {
+  const a = analytics(30, null);
+  const per = (acc, keep) => ({ account_id: acc.id, kpis: Object.fromEntries(Object.entries(a.kpis).map(([m, k]) => [m, keep.includes(m) ? k : { value: null, prev: null }])) });
+  return { brand: { id: BRAND.id, name: BRAND.name }, period: { from: "2026-09-01", to: "2026-09-30", prevFrom: "2026-08-02", prevTo: "2026-08-31", days: a.days },
+    accounts: ACCOUNTS, total: { kpis: a.kpis, series: a.series },
+    perAccount: [per(ACCOUNTS[0], ["followers", "engagement", "posts"]), per(ACCOUNTS[1], ["reach", "impressions", "engagement", "rate"]), per(ACCOUNTS[2], [])],
+    gaps: a.gaps.map((g) => ({ account_id: g.account_id, reason: g.reason })), top: a.posts };
+}
+
 async function handle(route) {
   const req = route.request(); const url = new URL(req.url()); const p = url.pathname;
   const ok = (body) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, ...body }) });
@@ -148,6 +161,9 @@ async function handle(route) {
   if (p === "/api/social/members") return ok({ members: [{ user_id: "u1", email: "pei@example.com", role: "owner", created_at: day(-10, 1) }, { user_id: "u2", email: "client@example.com", role: "editor", created_at: day(-1, 1) }] });
   if (p === "/api/social/log") return ok({ log: LOG });
   if (p === "/api/social/metrics") return ok({ analytics: analytics(Number(url.searchParams.get("days") ?? 28), url.searchParams.get("account")) });
+  if (p === "/api/social/reports/monthly") return ok({ monthly: { enabled: false, lastRunAt: null, lastError: null } });
+  if (p === "/api/social/reports") return url.searchParams.get("preview") === "1" ? ok({ data: reportData() }) : ok({ reports: [REPORT, { ...REPORT, id: "r2", name: "上週成效報告", created_at: day(-8, 10) }] });
+  if (p.startsWith("/api/social/reports/")) return ok({ report: REPORT, data: reportData() });
   if (p === "/api/social/lists" ) return ok({ lists: LISTS });
   if (p.startsWith("/api/social/lists/")) return ok({ list: LISTS[0], items: [POSTS[7]], upcoming: [POSTS[6]] });
   if (p === "/api/social/posts" && req.method() === "GET") {
@@ -166,7 +182,7 @@ page.on("console", (m) => { if (m.type() === "error") console.log("console error
 const shot = async (name) => { await page.waitForTimeout(600); await page.screenshot({ path: `${out}/${name}.png` }); };
 // C19 frame: the plan page (channel list + toolbar + week), then every tab and the views behind the bell and the gear.
 // Names: the cards' own (01 calendar, 02 compose, 10 sections); x-* are the other views, so a later card's number stays free.
-await page.goto(`http://127.0.0.1:3902/tools/social?brand=${BRAND.id}`, { waitUntil: "networkidle" });
+await page.goto(`http://localhost:3902/tools/social?brand=${BRAND.id}`, { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "社群發文" }).waitFor();
 await shot("01-calendar");
 // the next week: every day is ahead, so the best times show on all seven and the posts made for the coming days are there
@@ -229,10 +245,10 @@ await page.getByLabel("這則加上「活動」").check();
 await shot("x-compose-tags");
 await page.getByRole("button", { name: "回排程日曆" }).click();
 await page.waitForURL(/\/tools\/social\?/);
-await page.goto(`http://127.0.0.1:3902/tools/social/compose/${POSTS[2].id}?brand=${BRAND.id}`, { waitUntil: "networkidle" });
+await page.goto(`http://localhost:3902/tools/social/compose/${POSTS[2].id}?brand=${BRAND.id}`, { waitUntil: "networkidle" });
 await page.getByLabel("貼文內容").waitFor();
 await shot("x-compose-scheduled");
-await page.goto(`http://127.0.0.1:3902/tools/social/compose/00000000-0000-4000-8000-000000000005?brand=${BRAND.id}`, { waitUntil: "networkidle" });
+await page.goto(`http://localhost:3902/tools/social/compose/00000000-0000-4000-8000-000000000005?brand=${BRAND.id}`, { waitUntil: "networkidle" });
 await page.getByLabel("貼文內容").waitFor();
 await shot("x-compose-review");
 // C24 數據分析: all channels / 28 days, then one channel (Bluesky) with a card it has no number for picked
@@ -244,8 +260,22 @@ await page.locator(".an-chan .sm-cmain", { hasText: "Soulful Expression" }).firs
 await page.getByRole("button", { name: "90 天" }).click();
 await page.locator(".an-card", { hasText: "觸及" }).click();
 await shot("x-analytics-bluesky-90");
-// the sections that are shells until their cards (C25-C29)
-for (const [label, key] of [["報表管理", "reporting"], ["訊息收件匣", "inbox"], ["智慧連結", "smartlinks"], ["廣告管理", "ads"]]) {
+// C25 報表管理: the form with the first-page preview, then a saved report as the page the browser prints (and its PDF, A4 landscape)
+await page.getByRole("button", { name: "報表管理", exact: true }).click();
+await page.waitForURL(/\/tools\/social\/reporting/);
+await page.getByText("第一頁長這樣").waitFor({ timeout: 10000 });
+await page.locator(".rp-mini b").first().waitFor({ timeout: 10000 });
+await shot("13-reporting");
+await page.goto(`http://localhost:3902/tools/social/reports/${REPORT.id}?brand=${BRAND.id}`, { waitUntil: "networkidle" });
+await page.getByText("各平台成效").first().waitFor({ timeout: 10000 });
+await shot("14-report-print");
+await page.pdf({ path: `${out}/14-report-print.pdf`, format: "A4", landscape: true, printBackground: true });
+await page.emulateMedia({ media: "print" });
+await page.screenshot({ path: `${out}/14-report-print-media.png`, fullPage: true });
+await page.emulateMedia({ media: "screen" });
+await page.goto(`http://localhost:3902/tools/social?brand=${BRAND.id}`, { waitUntil: "networkidle" });   // the report page has no top bar
+// the sections that are shells until their cards (C27-C29)
+for (const [label, key] of [["訊息收件匣", "inbox"], ["智慧連結", "smartlinks"], ["廣告管理", "ads"]]) {
   await page.getByRole("button", { name: label, exact: true }).click();
   await page.waitForURL(new RegExp(`/tools/social/${key}`));
   await shot(`10-${key}`);

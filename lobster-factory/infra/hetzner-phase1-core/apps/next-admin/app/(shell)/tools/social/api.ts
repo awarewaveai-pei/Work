@@ -117,6 +117,15 @@ export const api = {
   // C24: 數據分析; account null = every channel
   metrics: (brand: string, days: number, account: string | null) =>
     call<{ analytics: import("@/lib/social/metrics").Analytics }>("GET", `/api/social/metrics?${q({ brand, days: String(days), ...(account ? { account } : {}) })}`),
+  // C25: 報表管理
+  reports: (brand: string) => call<{ reports: import("@/lib/social/reports").Report[] }>("GET", `/api/social/reports?${q({ brand })}`),
+  reportPreview: (brand: string, from: string, to: string, accounts: string[]) =>
+    call<{ data: import("@/lib/social/reports").ReportData }>("GET", `/api/social/reports?${q({ brand, preview: "1", from, to, accounts: accounts.join(",") })}`),
+  createReport: (brand: string, r: import("@/lib/social/reports").ReportSpec) => call<{ id: string }>("POST", "/api/social/reports", { brand, ...r }),
+  deleteReport: (brand: string, id: string) => call<object>("DELETE", `/api/social/reports?${q({ brand, id })}`),
+  report: (id: string) => call<{ report: import("@/lib/social/reports").Report; data: import("@/lib/social/reports").ReportData }>("GET", `/api/social/reports/${id}`),
+  monthly: (brand: string) => call<{ monthly: { enabled: boolean; lastRunAt: string | null; lastError: string | null } }>("GET", `/api/social/reports/monthly?${q({ brand })}`),
+  setMonthly: (brand: string, enabled: boolean) => call<{ monthly: { enabled: boolean; lastRunAt: string | null; lastError: string | null } }>("PUT", "/api/social/reports/monthly", { brand, enabled }),
 };
 /** GET /api/social/smartlink; base = the public address up to the slug; clicks = the brand's last 28 days */
 export interface SmartLinkData {

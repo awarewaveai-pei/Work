@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-20（續4）社群 V1.5 C25 報表管理：選頻道＋期間＋內容 → 可列印 PDF 報表、做過的報表、每月自動寄
+
+**觸發**：C25 卡（`SOCIAL_MANAGER_PLAN.md` §1b）。0105 的 `social_reports`／`social_create_report`／`social_delete_report` 已有，不改 schema。
+
+**改動**（`apps/next-admin/`）
+- `lib/social/reports.ts`：`loadReportData`（數字只走 `metrics.ts` 的 `summarize`；貼文走 `loadAnalytics`，**每個頻道各呼叫一次**，避開它「全品牌最新 200 則」上限）、`runMonthlyReport`（品牌時區 1–3 號、同月一次、寄給 owner＋client、全部寄失敗就刪報表讓隔天重試）。`lib/social/report-period.ts`：上週／上月／上一季（純函式，頁面與伺服器共用）。
+- API：`app/api/social/reports/route.ts`（列表／preview／建立／刪除）、`reports/[id]/route.ts`（品牌由報表列取得再驗角色）、`reports/monthly/route.ts`（開關＝該品牌 `client_schedules` 的 `social_monthly_report` 列，不加欄位；與排程頁同一列）。
+- 畫面：`(sections)/reporting/Reporting.tsx`＋css（表單、第一頁預覽、做過的報表、每月寄送）；列印頁 `reports/ReportView.tsx`＋css、`reports/[id]/page.tsx` 與 `app/social/reports/[id]/page.tsx`（A4 橫式 `@page`，列印時把祖先放開、兄弟隱藏；不加 PDF 依賴）。`lib/schedules/jobs.ts` 加 `social_monthly_report`（每天看一次，預設 01:00 UTC）。
+- `render-views.mjs`：加 `13-reporting`、`14-report-print`（`page.pdf()` 存 A4 橫式＋print 媒體全頁圖）；URL 改 `localhost:3902`（`127.0.0.1` 在 ADR 018 之後是 probe 門，全部 404，舊腳本跑不起來）。
+- 沒做：品牌 logo 上傳（沒有 logo 欄位，先用品牌名首字）；受眾、PPT、Excel（V2／下一版）。
+
+**critic（Standard，1 個）**：M1 頂部貼文被全品牌 200 則上限截掉→改每頻道一次；m1 列印頁時區寫死→`ReportData.brand.tz`；m2 停用頻道讓舊報表（含已寄連結）數字變→已存報表不濾停用；m3 建立沒擋「最後一天≥今天」→API 擋；m4 月報「做過」靠報表名稱→改 `created_by`＋`period_from`；m5 刪報表失敗蓋掉寄信錯誤→兩個錯誤都帶；m6 換品牌殘留→`live` 旗標＋清狀態。全修。
+
+**[驗證結果]**
+- `npx tsc --noEmit`：exit 0。
+- `npx vitest run lib/social lib/schedules "app/(shell)/tools/social" app/api/social`：27 files passed、172 tests passed、3 skipped（新：`report-period.test.ts` 週／月／季邊界；`social-monthly-job.test.ts` 新 key、1 號寄、4 號與同月第二次不寄、沒收件人不建報表、全寄失敗刪報表）。
+- `node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/render-views.mjs $TEMP/social-renders`（假 API）：`13-reporting.png` 一屏 1280×660 不捲；`14-report-print.pdf` 4 頁、MediaBox 842×596（A4 橫）；print 媒體圖側欄不入紙。
+- 未驗：真資料報表（正式庫未套用／部署；`DEPLOY_HOLD` 在）；真的寄信（要正式 Resend）。
+
+**[剩餘風險]**：報表數字與數據分析同一來源，正式環境還沒跑過第一次快照；每頻道一次 `loadAnalytics` 在頻道很多時多查詢（SMB 品牌可忽略）。
+**[rollback]**：`git revert` 本 commit；無 DB／設定變更（月報開關只在使用者按下才寫 `client_schedules`）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/render-views.mjs $TEMP/social-renders | exit=0 | ms=60000
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/6n
+- ORACLE_WAIVED: Claude 額度內只跑 1 個 critic；本卡為 Low 風險（只讀已收集數字、無金流／身分），寄信路徑由 mock 測試涵蓋
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=social_monthly_report|loadReportData|presetPeriod | hits=6
 ## 2026-10-20（續3）ADR 017 第 3 項：每個收費點只問 can()（影子模式）；認知平台 can() 薄接頭＋取許可；灰掉沒買的按鈕；付費 provider 只走一道縫；真 DB enforce e2e
 
 **觸發**：操作者「繼續做客戶怎麼來第 3 項」→「快去完美完善完整做好」→「修 Codex 第 3 輪 2–4，commit；1（定價）我決定」（卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-3.md`；2026-10-19 起做，筆電沒電中斷一次，暫停點 `agency-os/handoffs/2026-10-19-adr017-step3-resume.md`）。

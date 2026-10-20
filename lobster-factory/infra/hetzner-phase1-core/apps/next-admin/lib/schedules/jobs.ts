@@ -7,6 +7,7 @@ import "@/lib/collect/blocks";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { loadCis } from "@/lib/cs/cis";
 import { applyChatwootBaseline } from "@/lib/cs/chatwoot-baseline";
+import { MONTHLY_JOB, runMonthlyReport } from "@/lib/social/reports";
 import type { JobMeta } from "./types";
 
 /** What view.ts knows about a client when deciding whether a job can run there. */
@@ -70,6 +71,17 @@ export const CLIENT_JOBS: readonly ClientJob[] = [
         ? `reapplied ${r.changes.map((c) => (c.kind === "account" ? c.field : `${c.kind}:${c.name}`)).join(",")}`
         : "unchanged";
     },
+  },
+  {
+    key: MONTHLY_JOB,
+    label: "社群月報自動寄出",
+    description: "每月 1 號把上個月的社群成效報告連結寄給品牌的擁有者和客戶；開關在社群發文的「報表管理」頁。",
+    cost: "免費（只讀已收集的數字，寄信用 Resend，不用 AI）。",
+    // the job decides the month itself (only the 1st-3rd, once per month), so the cadence is a daily look
+    frequencies: [{ value: "daily", label: "每天檢查（只在每月 1–3 號寄）", usesHour: true, usesDay: false }],
+    // 01:00 UTC = 09:00 Taipei
+    defaults: { frequency: "daily", hourUtc: 1, dayOfWeekUtc: 1 },
+    run: (organizationId) => runMonthlyReport(organizationId),
   },
 ];
 
