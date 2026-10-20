@@ -1,2 +1,0 @@
-reason=ADR017 step2 requires reviewed 0110 migration, configured trial plans, production signing-key backup/environment and Trigger deployment before next-admin release; remove only after authorized production acceptance.
-created_utc=2026-10-19T05:10:00Z

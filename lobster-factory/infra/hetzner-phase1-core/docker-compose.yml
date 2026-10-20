@@ -276,6 +276,11 @@ services:
       # token across unrelated callers is a blast-radius mistake already paid for once.
       # Empty = the endpoint fails closed (401 to every caller) until set.
       SCHEDULE_INGEST_TOKEN: ${SCHEDULE_INGEST_TOKEN:-}
+      # ADR 017 permits (lib/entitlements/runtime.ts): Ed25519 PKCS8/SPKI base64 bodies; PUBLIC_KEYS = "kid:spki;kid2:spki".
+      # Empty in shadow mode = every paid call is logged as infra_error and allowed; enforce mode refuses.
+      ENTITLEMENT_SIGNING_KEY: ${ENTITLEMENT_SIGNING_KEY:-}
+      ENTITLEMENT_SIGNING_KID: ${ENTITLEMENT_SIGNING_KID:-}
+      ENTITLEMENT_PUBLIC_KEYS: ${ENTITLEMENT_PUBLIC_KEYS:-}
       # Cross-product id reconciliation -> GET /api/internal/reconcile (BACKUP_COVERAGE_PLAN.md B8). The same value
       # sits in /etc/default/awarewave-reconcile for backup-coverage-check.py on the host. Empty = 401 (fail closed).
       RECONCILE_TOKEN: ${RECONCILE_TOKEN:-}

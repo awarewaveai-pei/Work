@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-20（續8）ADR 017 DEPLOY_HOLD 四前提完成 → 解除 hold；0110／0111／0112 套正式庫；簽章金鑰進容器；Trigger 20261020.1
+
+**觸發**：操作者「把那四項做完，再解除 hold，兩批一起上線」；試用方案＝先不設（註冊關著：`PORTAL_SIGNUP_ENABLED` 未設，無方案時 `portal_complete_signup` fail closed，0110:113-117）；金鑰備份＝vault＋USB；部署＝完成後手動立刻。
+**做了什麼**：
+- 金鑰：筆電產生 Ed25519（kid `k2026-10`，round-trip 驗章過）→ vault `ENTITLEMENT_SIGNING_KID/KEY/PUBLIC_KEYS` → 離線備份檔放操作者桌面待拷 USB 後刪（值未顯示、未進 repo）。
+- 主機 `.env`：`safe-infra-patch.sh file` 加 3 行（備份 `.env.bak.safe-patch-20261020-061718`）；compose next-admin 加 3 個映射，`safe-infra-patch.sh compose`（備份 `docker-compose.yml.bak.safe-patch-20261020-061753`，healthy 9s）；repo compose／`.env.example` 同步。
+- Trigger：`lobster-trigger-deploy.ps1` → 版本 `20261020.1`，21 tasks；`entitlements-expire` 已登記且排程 active（trigger-postgres 查）。
+- Migration：前提唯讀查（subs=0、Account#0 存在、舊索引／約束在）→ 0110 本機驗證重跑綠 → 0110、0111、0112 apply → `STATUS_OK {"applied":112}`；抽查 3 表 RLS=true、Account#0 kind=internal、4 個新函式在。
+- 解除 `DEPLOY_HOLD`（本 commit）→ 手動 sg-deploy next-admin（結果見下一條或本條補記）。
+**未做／交接**：
+- 試用方案（cognitive；hci features 空 → 不能有試用）：開註冊前決定。
+- cognitive 服務側 `ENTITLEMENT_PUBLIC_KEYS`／`ENTITLEMENT_BILLING_ACCOUNTS`／`ENTITLEMENT_ISSUER_URL/TOKEN` 未設（影子模式只記 infra_error、放行）。
+- 操作者：把桌面 `ENTITLEMENT_KEY_BACKUP_2026-10-20.txt` 拷到 USB 後刪除。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv ENTITLEMENT_SIGNING_KEY|ENTITLEMENT_SIGNING_KID|ENTITLEMENT_PUBLIC_KEYS | wc -c` → 65／9／70；`node scripts/apply-db-migration.mjs --status` → `STATUS_OK {"applied":112}`；trigger-postgres `entitlements-expire|20261020.1`，schedule active=1 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python lobster-factory/packages/db/scripts/0110_plans_entitlements-local-verify.py`；`npm run typecheck` + `npx vitest run src/lib/entitlements`（workflows，2 passed） | exit=0 | ms=20000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 prod compose diff（只 +3 行在 next-admin）、repo compose／.env.example 同名同位置；0110 前提逐條對照 0110:41-63
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`ENTITLEMENT_SIGNING_KEY|ENTITLEMENT_PUBLIC_KEYS|ENTITLEMENT_SIGNING_KID` | hits=15
+- ORACLE_WAIVED: 本 commit 只動 config／compose 對照檔／刪 hold 檔，無程式邏輯；程式部分（0110 等）已在 10-19 審過
 ## 2026-10-20（續7）社群 V1.5 C23/C27/C29–C31 批次（Codex 寫）收尾 commit：0111＋0112 migration、收件匣未讀數；review 抓到的 4 項已修
 
 **觸發**：操作者要求把未 commit 的社群批次驗完再推（批准 0112 上正式 DB；`DEPLOY_HOLD` 仍在 origin/main，今晚不會部署，migration 仍待 sg-deploy migration 閘）。
