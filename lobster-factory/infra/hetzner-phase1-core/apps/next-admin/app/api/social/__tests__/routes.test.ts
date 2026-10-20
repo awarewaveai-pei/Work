@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const store = vi.hoisted(() => ({
   listBrands: vi.fn(), listAccounts: vi.fn(), resolveConnectAttempt: vi.fn(), startConnect: vi.fn(), unlinkAccount: vi.fn(), cancelConnect: vi.fn(),
   listPosts: vi.fn(), getPost: vi.fn(), getPostAt: vi.fn(), savePost: vi.fn(), setState: vi.fn(), accountPlatforms: vi.fn(),
-  listLists: vi.fn(), saveList: vi.fn(), deleteList: vi.fn(), listMedia: vi.fn(), addImage: vi.fn(), listLog: vi.fn(), releasePost: vi.fn(),
+  listLists: vi.fn(), saveList: vi.fn(), deleteList: vi.fn(), listMedia: vi.fn(), addImage: vi.fn(), addVideo: vi.fn(), listLog: vi.fn(), releasePost: vi.fn(),
   listTrash: vi.fn(), listDeletions: vi.fn(), listTags: vi.fn(), listTexts: vi.fn(), addText: vi.fn(), deleteText: vi.fn(),
   listMembers: vi.fn(), addMember: vi.fn(), setMemberRole: vi.fn(), removeMember: vi.fn(),
 }));
@@ -199,6 +199,21 @@ describe("/api/social routes", () => {
     expect(store.addImage).not.toHaveBeenCalled();
   });
 
+  it("media: accepts a video URL through the video-only store path", async () => {
+    const { POST } = await import("../media/route");
+    store.addVideo.mockResolvedValue({ id: "v1", kind: "video", file_name: "clip.mp4" });
+    const res = await POST(req("POST", "/api/social/media", { role: "owner" }, { brand: A, videoUrl: "data:video/mp4;base64,AAAA", fileName: "clip.mp4" }));
+    expect(res.status).toBe(200);
+    expect(store.addVideo).toHaveBeenCalledWith(A, "data:video/mp4;base64,AAAA", "clip.mp4", expect.stringMatching(/^ops:/));
+  });
+
+  it("media: rejects a non-base64 video data URL before storage", async () => {
+    const { POST } = await import("../media/route");
+    const res = await POST(req("POST", "/api/social/media", { role: "owner" }, { brand: A, videoUrl: "data:video/mp4,not-base64", fileName: "clip.mp4" }));
+    expect(res.status).toBe(400);
+    expect(store.addVideo).not.toHaveBeenCalled();
+  });
+
   it("log: another brand's client is refused; before must be an id", async () => {
     const { GET } = await import("../log/route");
     expect((await GET(req("GET", `/api/social/log?brand=${A}`, { client: B }))).status).toBe(403);
@@ -217,13 +232,17 @@ describe("/api/social routes", () => {
     expect((await (await posts.GET(req("GET", `/api/social/posts?brand=${A}&trash=1`, { client: A }))).json()).deletions[P]).toEqual({ actor: "ops", from: "scheduled" });
     expect((await (await posts.GET(req("GET", `/api/social/posts?brand=${A}&trash=1`))).json()).deletions[P].actor).toBe("ops:operator:u-1");
     const texts = await import("../texts/route");
-    store.listTexts.mockResolvedValue([{ id: P, body: "hi" }]);
+    store.listTexts.mockResolvedValue([{ id: P, body: "hi", mediaIds: [] }]);
     expect((await texts.GET(req("GET", `/api/social/texts?brand=${A}`, { client: B }))).status).toBe(403);
     expect((await texts.POST(req("POST", "/api/social/texts", { client: A }, { brand: A, body: "x" }))).status).toBe(403);
     expect((await texts.POST(req("POST", "/api/social/texts", { role: "operator" }, { brand: A, body: "  " }))).status).toBe(400);
     store.addText.mockResolvedValue({ id: P, body: "x" });
     expect((await texts.POST(req("POST", "/api/social/texts", { role: "operator" }, { brand: A, body: " x " }))).status).toBe(200);
-    expect(store.addText).toHaveBeenCalledWith(A, "x");
+    expect(store.addText).toHaveBeenCalledWith(A, "x", []);
+    expect((await texts.POST(req("POST", "/api/social/texts", { role: "operator" }, { brand: A, body: "x", mediaIds: [P] }))).status).toBe(200);
+    expect(store.addText).toHaveBeenLastCalledWith(A, "x", [P]);
+    expect((await texts.POST(req("POST", "/api/social/texts", { role: "operator" }, { brand: A, body: "x", mediaIds: [P, P] }))).status).toBe(400);
+    expect((await texts.POST(req("POST", "/api/social/texts", { role: "operator" }, { brand: A, body: "x", mediaIds: ["not-a-uuid"] }))).status).toBe(400);
     expect((await texts.DELETE(req("DELETE", `/api/social/texts?brand=${A}&id=${P}`, { role: "operator" }))).status).toBe(200);
     expect(store.deleteText).toHaveBeenCalledWith(A, P);
   });

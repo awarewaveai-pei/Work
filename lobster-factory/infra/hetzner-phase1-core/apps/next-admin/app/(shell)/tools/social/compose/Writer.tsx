@@ -22,8 +22,8 @@ export interface WriterProps {
   channels: Account[]; tab: string; onTab: (t: string) => void;
   body: string; custom: Record<string, string>; onText: (v: string) => void; onOwn: (id: string, own: boolean) => void;
   link: string; onLink: (v: string) => void; utm: boolean; onUtm: (v: boolean) => void; notes: string; onNotes: (v: string) => void;
-  media: Array<{ media_id: string; alt_text: string | null }>; mediaPath: (id: string) => string | null;
-  onAlt: (id: string, alt: string) => void; onRemoveMedia: (id: string) => void; onPickFile: () => void; onOpenLibrary?: () => void;
+  media: Array<{ media_id: string; alt_text: string | null }>; mediaPath: (id: string) => string | null; mediaKind: (id: string) => string | null;
+  onAlt: (id: string, alt: string) => void; onRemoveMedia: (id: string) => void; onMoveMedia: (id: string, delta: -1 | 1) => void; onPickFile: () => void; cropOnUpload: boolean; onCropUpload: (on: boolean) => void; onOpenLibrary?: () => void;
   open: ReadonlySet<Extra>; onOpen: (k: Extra) => void; onAddComment: () => void;
   texts: Array<{ id: string; body: string }> | null; onSaveText: () => void;
   textFor: (a: Account) => string;
@@ -81,12 +81,14 @@ export default function Writer(p: WriterProps) {
                 const path = p.mediaPath(m.media_id);
                 return (
                   <span key={m.media_id} className="sm-mt" title={`第 ${i + 1} 張`}>
-                    {path ? <img src={path} alt={m.alt_text ?? ""} /> : <span>圖</span>}
+                    {path ? p.mediaKind(m.media_id) === "video" ? <video src={path} muted preload="metadata" /> : <img src={path} alt={m.alt_text ?? ""} /> : <span>{p.mediaKind(m.media_id) === "video" ? "影片" : "圖"}</span>}
+                    {p.sharedEditable && <span className="sm-morder"><button type="button" aria-label={`第 ${i + 1} 張往前`} disabled={i === 0} onClick={() => p.onMoveMedia(m.media_id, -1)}>↑</button><button type="button" aria-label={`第 ${i + 1} 張往後`} disabled={i === p.media.length - 1} onClick={() => p.onMoveMedia(m.media_id, 1)}>↓</button></span>}
                     {p.sharedEditable && <button type="button" className="sm-x" aria-label={`移除第 ${i + 1} 張`} onClick={() => p.onRemoveMedia(m.media_id)}><CIcon name="x" /></button>}
                   </span>
                 );
               })}
-              {p.sharedEditable && <button type="button" className="sm-madd" aria-label="從電腦加圖片" title="從電腦加圖片" onClick={p.onPickFile}><CIcon name="plus" /></button>}
+              {p.sharedEditable && <button type="button" className="sm-madd" aria-label="從電腦加圖片或影片" title="從電腦加圖片或影片" onClick={p.onPickFile}><CIcon name="plus" /></button>}
+              {p.sharedEditable && <label className="sm-ck"><input type="checkbox" checked={p.cropOnUpload} onChange={(e) => p.onCropUpload(e.target.checked)} />圖片裁成方形</label>}
               {p.sharedEditable && p.onOpenLibrary && <button type="button" className="sm-lnk" onClick={p.onOpenLibrary}>從媒體庫選</button>}
             </div>
           )}
@@ -96,7 +98,7 @@ export default function Writer(p: WriterProps) {
               <button type="button" key={x.key} className={`sm-ibtn${p.open.has(x.key) ? " sm-act" : ""}`} title={x.label} aria-label={x.label} aria-pressed={p.open.has(x.key)}
                 disabled={!p.writable} onClick={() => p.onOpen(x.key)}><CIcon name={x.icon} /></button>
             ))}
-            <button type="button" className="sm-ibtn" title="加圖片" aria-label="加圖片" disabled={!p.sharedEditable} onClick={p.onPickFile}><CIcon name="image" /></button>
+            <button type="button" className="sm-ibtn" title="加圖片或影片" aria-label="加圖片或影片" disabled={!p.sharedEditable} onClick={p.onPickFile}><CIcon name="image" /></button>
             {tight && (
               <span className={`sm-cnt${tight.n > tight.max ? " sm-over" : ""}`} title={`${platformOf(tight.a.platform).name} 字數${!ch && counted.length > 1 ? "（顯示上限最緊的那個）" : ""}`}>
                 <PfMark platform={tight.a.platform} /> {tight.n}／{tight.max.toLocaleString()}{tight.a.platform === "threads" ? " 位元組" : ""}

@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-20（續7）社群 V1.5 C23/C27/C29–C31 批次（Codex 寫）收尾 commit：0111＋0112 migration、收件匣未讀數；review 抓到的 4 項已修
+
+**觸發**：操作者要求把未 commit 的社群批次驗完再推（批准 0112 上正式 DB；`DEPLOY_HOLD` 仍在 origin/main，今晚不會部署，migration 仍待 sg-deploy migration 閘）。
+**根因（review fail 1c/2m/3n → 修）**：
+- C1 `app/api/social/inbox/route.ts:3` import `getInboxUnreadCount`，只在未 commit 的 `lib/cs/chatwoot-client.ts` → 只推社群檔 main 會 tsc 紅。修：chatwoot-client.ts＋其測試同 commit 並審過。
+- M1 影片上限 200 MB，但 base64 JSON body 受 nginx `client_max_body_size 50M`（`nginx/default.conf:271`）→ ~37 MB 以上全 413。修：`tools/social/media.ts` 單一來源 `MAX_VIDEO_UPLOAD=36MiB`＋`uploadTooLarge()`，Editor.tsx／MediaView.tsx 共用（兩處原各自寫死）。
+- n1 inbox 回應頂層 `chatwoot.baseUrl` 未消毒（可能含帳密）。修：回應只剩 `{ inboxes }`；測試斷言回應文字不含 `password`。
+- n2 0112 新表沒開 RLS。修：`enable row level security`＋`"service_role only"` policy（0096 pattern）；verify 腳本斷言兩者。
+- M2（共用 index 已 staged 的 smartlink `g.release` 測試）：本 commit 走私有 index、取 worktree，worktree 與 HEAD 一致，不帶入。
+- 未修（操作者範圍外，Low）：收件匣每帳號最多 100 頁循序翻頁、無快取 → 慢；非正確性／安全問題。
+**交接**：上線前確認 ks-aw-01 的 lobster-nginx app server block 仍是 50M；0111／0112 套正式 DB 走 `node scripts/apply-db-migration.mjs 0111`／`0112`（High）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p tsconfig.json --incremental false` + `npx vitest run "app/(shell)/tools/social" app/api/social lib/social lib/cs`（355 passed／3 skipped），於只含本 commit 檔案的一次性 worktree | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash lobster-factory/packages/db/scripts/0111_social_rule_post_guard-local-verify.sh` && `bash lobster-factory/packages/db/scripts/0112_social_saved_text_media-local-verify.sh`（postgres:15.8 一次性容器；突變：拿掉 RLS 行 → `ERROR: RLS is on` exit 3，還原 → exit 0） | exit=0 | ms=17000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n -- critic agent 兩輪（第一輪 fail 1c/2m/3n，修後 pass）；`/claude-review` oracle 兩次失敗（PATH 無 claude CLI；claude -p 無 answer 檔），改走 critic
+- ORACLE_WAIVED: claude-oracle.ps1 連兩次失敗（CLI 不在 PATH／claude -p 無輸出），以 Claude critic agent 兩輪獨立 review＋RLS 突變證據替代
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`MAX_VIDEO_UPLOAD|getInboxUnreadCount|uploadTooLarge` | hits=20 -- 全在 media.ts／Editor／MediaView／inbox route＋test／chatwoot-client＋test；social 內無殘留 "200 MB"（postiz.ts 的 200 MB 只管 https 影片 URL，正確）
 ## 2026-10-20（續6）System Foundry v1.7 V17-7 能力驗收補齊：280 個能力補上 `acceptance`，缺數 291 → 11（只剩 11 個 CAP-AW-*）
 
 **根因**：V17-2 起每張模組卡逐能力列「指令→預期」，291 個能力沒有 `acceptance` → 卡上是 TODO，Claude 拿到卡不知道怎麼證明做完。

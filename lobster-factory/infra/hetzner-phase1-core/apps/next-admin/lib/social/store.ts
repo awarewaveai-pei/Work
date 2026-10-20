@@ -7,7 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { selectAll } from "@/lib/supabase-paging";
 import { ACCOUNT_COPY } from "@/lib/accounts/invite-copy";
-import { connectUrl, listAllIntegrations, uploadMedia, type RawIntegration } from "@/lib/content/postiz";
+import { connectUrl, listAllIntegrations, uploadMedia, uploadVideo, type RawIntegration } from "@/lib/content/postiz";
 import { repeatSlots, type RepeatRule } from "./repeat-rule";
 import type { BrandRole, PostSnapshot, PostState, Transition } from "./state";
 
@@ -117,13 +117,13 @@ const POSTIZ_INSTANCE = "ks-aw-01";        // 0096/0098 default: the one Postiz 
 
 const profileOf = (i: RawIntegration) => ({ picture: (i.picture ?? "").slice(0, 2048), handle: (i.profile ?? "").slice(0, 200) });
 
-export async function listAccounts(brandId: string): Promise<Account[]> {
+export async function listAccounts(brandId: string, options: { hydrateProfile?: boolean } = {}): Promise<Account[]> {
   const sb = db();
   const { data, error } = await sb.from("social_accounts").select("id, platform, label, status, postiz_integration_id, picture, handle, chatwoot_inbox_id")
     .eq("organization_id", brandId).order("platform");
   if (error) fail(error, "accounts");
   const accounts = (data ?? []) as Account[];
-  if (accounts.some((a) => a.picture === null || a.handle === null)) await fillProfiles(sb, accounts);
+  if (options.hydrateProfile !== false && accounts.some((a) => a.picture === null || a.handle === null)) await fillProfiles(sb, accounts);
   return accounts;
 }
 
@@ -350,18 +350,21 @@ export async function listDeletions(brandId: string, postIds: string[]): Promise
   return out;
 }
 
-// ---- saved texts (C6 editor 常用文字) ------------------------------------------------------------------------------
+// ---- saved texts (C6 editor 常用文字; 0112 keeps the chosen media order) -----------------------------------------
 
-export async function listTexts(brandId: string): Promise<Array<{ id: string; body: string }>> {
-  const { data, error } = await db().from("social_saved_texts").select("id, body").eq("organization_id", brandId).order("created_at").limit(200);
+export async function listTexts(brandId: string): Promise<Array<{ id: string; body: string; mediaIds: string[] }>> {
+  const { data, error } = await db().rpc("social_list_saved_texts", { p_org: brandId });
   if (error) fail(error, "saved texts");
-  return (data ?? []) as Array<{ id: string; body: string }>;
+  return ((data ?? []) as Array<{ id: string; body: string; media_ids: string[] | null }>).map((row) => ({
+    id: row.id, body: row.body, mediaIds: Array.isArray(row.media_ids) ? row.media_ids : [],
+  }));
 }
 
-export async function addText(brandId: string, body: string): Promise<{ id: string; body: string }> {
-  const { data, error } = await db().from("social_saved_texts").insert({ organization_id: brandId, body }).select("id, body").single();
+export async function addText(brandId: string, body: string, mediaIds: string[] = []): Promise<{ id: string; body: string; mediaIds: string[] }> {
+  const { data, error } = await db().rpc("social_save_text", { p_org: brandId, p_body: body, p_media_ids: mediaIds });
   if (error) fail(error, "save text");
-  return data as { id: string; body: string };
+  const row = (Array.isArray(data) ? data[0] : data) as { id: string; body: string; media_ids?: string[] | null };
+  return { id: row.id, body: row.body, mediaIds: Array.isArray(row.media_ids) ? row.media_ids : mediaIds };
 }
 
 export async function deleteText(brandId: string, id: string): Promise<void> {
@@ -572,43 +575,31 @@ export async function autoRulePost(brandId: string, ruleId: string): Promise<str
   return (data.post_id as string | null) ?? null;
 }
 
-/** A post's own rule is its child: saving or deleting one updates the post row (0105 social_touch_post_rules), which a
- *  queued post may only see through 0100's release -- a version moved mid-send makes the sender's record refused and
- *  its Postiz post an orphan. So a queued post's rules wait; the composer unschedules first. (Checked here, not in the
- *  touch function: a sender claim landing between this read and the RPC is the remaining window, TASKS C27.) */
-async function rulePostState(brandId: string, postId: string | null): Promise<void> {
-  if (!postId) return;
-  const { data, error } = await db().from("social_posts").select("state").eq("id", postId).eq("organization_id", brandId).maybeSingle();
-  if (error) fail(error, "post");
-  if (data?.state === "queued") throw new SocialStoreError(409, "the post is being sent: unschedule it before changing its own auto-reply rule");
-}
-
-/** After a rule write: the series made again (the touch took back a template's untouched children) and the post's
- *  version for the editor's next compare-and-set. */
-async function afterRuleWrite(brandId: string, postId: string | null): Promise<number | null> {
-  if (!postId) return null;
-  const sb = db();
-  await refreshSeries(sb, brandId, postId, false);
-  const { data, error } = await sb.from("social_posts").select("version").eq("id", postId).eq("organization_id", brandId).maybeSingle();
-  if (error) fail(error, "post version");
-  return (data?.version as number | undefined) ?? null;
+/** A post's own rule is its child: saving or deleting one updates the post row, so 0111 refuses a queued post (SC409:
+ *  a version moved mid-send makes the sender's record refused and its Postiz post an orphan; the composer unschedules
+ *  first) and returns the post's version from the same transaction, for the editor's next compare-and-set. A series
+ *  template's untouched children were taken back by the touch (0105); they are made again here. The remake never updates
+ *  the template, so the returned version stays current. */
+async function afterRuleWrite(brandId: string, postId: string | null): Promise<void> {
+  if (postId) await refreshSeries(db(), brandId, postId, false);
 }
 
 /** id null = a new rule; post_id is fixed at creation (0105). Logged as action auto_rule. */
 export async function saveAutoRule(brandId: string, id: string | null, rule: AutoRuleInput, actor: string): Promise<{ id: string; postVersion: number | null }> {
   const postId = id ? await autoRulePost(brandId, id) : rule.post_id;
-  await rulePostState(brandId, postId);
-  const { data, error } = await db().rpc("social_save_auto_rule", { p_org: brandId, p_rule_id: id, p_rule: rule, p_actor: actor });
+  const { data, error } = await db().rpc("social_save_post_rule", { p_org: brandId, p_rule_id: id, p_rule: rule, p_actor: actor });
   if (error) fail(error, "save auto-reply rule");
-  return { id: data as string, postVersion: await afterRuleWrite(brandId, postId) };
+  const row = (data as Array<{ rule_id: string; post_version: number | null }>)[0];
+  await afterRuleWrite(brandId, postId);
+  return { id: row.rule_id, postVersion: row.post_version };
 }
 
 export async function deleteAutoRule(brandId: string, id: string, actor: string): Promise<{ postVersion: number | null }> {
   const postId = await autoRulePost(brandId, id);
-  await rulePostState(brandId, postId);
-  const { error } = await db().rpc("social_delete_auto_rule", { p_org: brandId, p_rule_id: id, p_actor: actor });
+  const { data, error } = await db().rpc("social_delete_post_rule", { p_org: brandId, p_rule_id: id, p_actor: actor });
   if (error) fail(error, "delete auto-reply rule");
-  return { postVersion: await afterRuleWrite(brandId, postId) };
+  await afterRuleWrite(brandId, postId);
+  return { postVersion: (data as number | null) ?? null };
 }
 
 // ---- media and log ---------------------------------------------------------------------------------------------
@@ -636,6 +627,23 @@ export async function addImage(brandId: string, imageUrl: string, fileName: stri
     .select("id, kind, file_name, postiz_path, created_at").single();
   if (error) fail(error, "media");
   await logAction(sb, brandId, actor, "media_upload", { media_id: data.id, file_name: fileName });
+  return { ...data, used: 0 };
+}
+
+/** Video counterpart of addImage; kind is stored explicitly so previews do not infer it from a URL. */
+export async function addVideo(brandId: string, videoUrl: string, fileName: string, actor: string) {
+  let up: { id: string; path: string };
+  try {
+    up = await uploadVideo({ videoUrl, filename: fileName });
+  } catch (e) {
+    throw new SocialStoreError(400, `upload refused: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  const sb = db();
+  const { data, error } = await sb.from("social_media")
+    .insert({ organization_id: brandId, kind: "video", file_name: fileName, storage_path: up.path, postiz_media_id: up.id, postiz_path: up.path, created_by: actor })
+    .select("id, kind, file_name, postiz_path, created_at").single();
+  if (error) fail(error, "media");
+  await logAction(sb, brandId, actor, "media_upload", { media_id: data.id, file_name: fileName, kind: "video" });
   return { ...data, used: 0 };
 }
 

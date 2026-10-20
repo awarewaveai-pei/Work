@@ -54,7 +54,7 @@ export interface ListRow {
   id: string; name: string; weekdays: number[]; send_time: string; active: boolean; cursor: number; accounts: Array<{ account_id: string }>;
   slots: Array<{ weekday: number; send_time: string }>;
 }
-export interface ListInput { name: string; weekdays: number[]; send_time: string; active: boolean; account_ids: string[] }
+export interface ListInput { name: string; weekdays: number[]; send_time: string; active: boolean; account_ids: string[]; slots?: Array<{ weekday: number; send_time: string }> }
 export interface LogRow { id: number; at: string; actor: string; action: string; post_id: string | null; detail: Record<string, unknown> | null }
 export interface NeedsResult {
   failed: Array<{ id: string; body: string; scheduled_at: string | null; errors: string[] }>;
@@ -65,10 +65,23 @@ export interface NeedsResult {
 /** /api/social/members (0103); owners only */
 export interface Member { user_id: string; email: string | null; role: import("@/lib/social/state").BrandRole; created_at: string }
 export interface MediaItem { id: string; kind: string; file_name: string; postiz_path: string | null; bytes: number | null; created_at: string; used?: number }
+export interface InboxRow {
+  accountId: string;
+  platform: string;
+  label: string;
+  handle: string | null;
+  picture: string | null;
+  chatwootInboxId: number | null;
+  unread: number;
+  chatwootUrl: string | null;
+  status: "ok" | "unlinked" | "not_configured" | "unavailable";
+}
+export interface InboxData { inboxes: InboxRow[] }
 
 export const api = {
   brands: () => call<{ brands: Brand[] }>("GET", "/api/social/brands"),
   accounts: (brand: string) => call<{ accounts: Account[]; connecting: { id: string; platform: string; started_at: string } | null; justConnected: string | null; connectFailed: string | null }>("GET", `/api/social/accounts?${q({ brand })}`),
+  inbox: (brand: string) => call<InboxData>("GET", `/api/social/inbox?${q({ brand })}`),
   connect: (brand: string, platform: string, accountId?: string) => call<{ attemptId: string; url: string }>("POST", "/api/social/accounts", { brand, platform, accountId }),
   cancelConnect: (brand: string, attempt: string) => call<object>("DELETE", `/api/social/accounts?${q({ brand, attempt })}`),
   unlink: (brand: string, id: string) => call<object>("DELETE", `/api/social/accounts?${q({ brand, id })}`),
@@ -83,6 +96,7 @@ export const api = {
     call<{ results: Array<{ id: string; ok: boolean; error?: string; version?: number; state?: string }> }>("POST", "/api/social/posts/bulk", { brand, items }),
   media: (brand: string) => call<{ media: MediaItem[] }>("GET", `/api/social/media?${q({ brand })}`),
   upload: (brand: string, imageUrl: string, fileName: string) => call<{ media: MediaItem }>("POST", "/api/social/media", { brand, imageUrl, fileName }),
+  uploadVideo: (brand: string, videoUrl: string, fileName: string) => call<{ media: MediaItem }>("POST", "/api/social/media", { brand, videoUrl, fileName }),
   lists: (brand: string) => call<{ lists: ListRow[] }>("GET", `/api/social/lists?${q({ brand })}`),
   list: (brand: string, id: string) => call<{ list: ListRow; items: Post[]; upcoming: Post[] }>("GET", `/api/social/lists/${id}?${q({ brand })}`),
   createList: (brand: string, input: ListInput) => call<{ id: string }>("POST", "/api/social/lists", { brand, ...input }),
@@ -99,8 +113,8 @@ export const api = {
   addMember: (brand: string, email: string, role: string) => call<{ userId: string }>("POST", "/api/social/members", { brand, email, role }),
   setMemberRole: (brand: string, userId: string, role: string) => call<object>("PATCH", "/api/social/members", { brand, userId, role }),
   removeMember: (brand: string, userId: string) => call<object>("DELETE", `/api/social/members?${q({ brand, userId })}`),
-  texts: (brand: string) => call<{ texts: Array<{ id: string; body: string }> }>("GET", `/api/social/texts?${q({ brand })}`),
-  addText: (brand: string, body: string) => call<{ text: { id: string; body: string } }>("POST", "/api/social/texts", { brand, body }),
+  texts: (brand: string) => call<{ texts: Array<{ id: string; body: string; mediaIds: string[] }> }>("GET", `/api/social/texts?${q({ brand })}`),
+  addText: (brand: string, body: string, mediaIds: string[] = []) => call<{ text: { id: string; body: string; mediaIds: string[] } }>("POST", "/api/social/texts", { brand, body, mediaIds }),
   deleteText: (brand: string, id: string) => call<object>("DELETE", `/api/social/texts?${q({ brand, id })}`),
   // C21: tags and a post's own auto-reply rule (a rule's save moves its post's version: the next write uses postVersion)
   tags: (brand: string) => call<{ tags: import("./model").Tag[] }>("GET", `/api/social/tags?${q({ brand })}`),

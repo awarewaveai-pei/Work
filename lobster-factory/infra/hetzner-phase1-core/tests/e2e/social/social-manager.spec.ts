@@ -43,8 +43,11 @@ function fakeServer() {
     calls.push(`${req.method()} ${path}${body?.action ? ` ${body.action}` : ''}`);
     if (path === '/api/social/brands') return ok(route, { brands: [BRAND] });
     if (path === '/api/social/accounts') return ok(route, { accounts: ACCOUNTS, connecting: null, justConnected: null, connectFailed: null });
-    if (path === '/api/social/media') return ok(route, { media: [] });
-    if (path === '/api/social/texts') return ok(route, { texts: [] });
+    if (path === '/api/social/media') return ok(route, { media: [
+      { id: 'media-image', kind: 'image', file_name: 'poster.png', postiz_path: null, bytes: 10, created_at: '2026-10-01T00:00:00Z', used: 0 },
+      { id: 'media-video', kind: 'video', file_name: 'clip.mp4', postiz_path: null, bytes: 20, created_at: '2026-10-02T00:00:00Z', used: 0 },
+    ] });
+    if (path === '/api/social/texts') return ok(route, { texts: [{ id: 'saved-1', body: '素材庫裡的貼文文字。', mediaIds: ['media-image'] }] });
     if (path === '/api/social/needs') return ok(route, { failed: [], expired: [], review: [], n: 0 });
     if (path === '/api/social/settings') return ok(route, { requireReview: false });
     if (path === '/api/social/log') return ok(route, { log: [] });
@@ -278,5 +281,25 @@ test.describe('social manager', () => {
     await page.getByRole('button', { name: '用文章摘要' }).click();
     await expect(page.getByLabel('貼文內容')).toHaveValue(/藝術治療看的是過程。\n\n全文：https:\/\/soulful.example\/a/);
     await expect(page.getByText('沒有花錢')).toBeVisible();
+  });
+
+  test('C31: library tabs seed saved text or multiple media into a new post', async ({ page }) => {
+    await open(page);
+    await page.getByRole('button', { name: '貼文素材庫', exact: true }).click();
+    await expect(page.getByRole('button', { name: '存起來的貼文' })).toBeVisible();
+    await expect(page.getByText('素材庫裡的貼文文字。')).toBeVisible();
+    await page.getByText('素材庫裡的貼文文字。').click();
+    await page.waitForURL(/\/tools\/social\/compose\/new/);
+    await expect(page.getByLabel('貼文內容')).toHaveValue('素材庫裡的貼文文字。');
+    await expect(page.locator('.sm-mt')).toHaveCount(1);
+
+    await page.getByRole('button', { name: '回排程日曆' }).click();
+    await page.getByRole('button', { name: '貼文素材庫', exact: true }).click();
+    await page.getByRole('button', { name: '圖片和影片' }).click();
+    await page.getByTitle('poster.png').click();
+    await page.getByTitle('clip.mp4').click();
+    await page.getByRole('button', { name: '用這些寫新貼文（2）' }).click();
+    await page.waitForURL(/\/tools\/social\/compose\/new/);
+    await expect(page.locator('.sm-mt')).toHaveCount(2);
   });
 });

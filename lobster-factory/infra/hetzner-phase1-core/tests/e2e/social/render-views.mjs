@@ -155,7 +155,7 @@ async function handle(route) {
     { id: "r2", post_id: null, name: "上課地點", trigger: "dm", keywords: ["地址"], platforms: ["instagram"], action: "dm", reply: "工作室在台北市大安區。", active: false, hits: 3 }] });
   if (p === "/api/social/accounts") return ok({ accounts: ACCOUNTS, connecting: null, justConnected: null, connectFailed: null });
   if (p === "/api/social/media") return ok({ media: MEDIA });
-  if (p === "/api/social/texts") return ok({ texts: [{ id: "x1", body: "#藝術治療 #台北 #自我照顧" }] });
+  if (p === "/api/social/texts") return ok({ texts: [{ id: "x1", body: "#藝術治療 #台北 #自我照顧", mediaIds: [] }] });
   if (p === "/api/social/needs") return ok({ failed: [POSTS[1]].map((x) => ({ id: x.id, body: x.body, scheduled_at: x.scheduled_at, errors: ["Facebook: (#200) permission"] })), expired: [{ id: ACCOUNTS[2].id, platform: "instagram", label: "soulful.art" }], review: [{ id: POSTS[4].id, body: POSTS[4].body, scheduled_at: POSTS[4].scheduled_at }], n: 3 });
   if (p === "/api/social/settings") return ok({ requireReview: true });
   if (p === "/api/social/members") return ok({ members: [{ user_id: "u1", email: "pei@example.com", role: "owner", created_at: day(-10, 1) }, { user_id: "u2", email: "client@example.com", role: "editor", created_at: day(-1, 1) }] });

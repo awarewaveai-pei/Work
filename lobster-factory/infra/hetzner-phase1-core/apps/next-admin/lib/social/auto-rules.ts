@@ -2,6 +2,7 @@
 // 這則的自動回覆 (C21) writes a post's own rule; the brand's rules tab and matching come with C27.
 // Pure (the composer imports it): RuleError here, the route turns it into a 400 (the repeat-rule.ts pattern).
 import type { AutoRuleInput } from "./store";
+import type { AutoRule } from "./store";
 
 export const RULE_PLATFORMS = ["facebook", "instagram"] as const;   // Meta's review covers these two only (0105 check)
 const TRIGGERS = ["comment", "dm"] as const;
@@ -45,4 +46,21 @@ export function parseAutoRule(raw: unknown): AutoRuleInput {
     name: str("name", 80), trigger: r.trigger as AutoRuleInput["trigger"], keywords, platforms: platforms as string[],
     action: r.action as AutoRuleInput["action"], reply, active: r.active === undefined ? true : r.active === true,
   };
+}
+
+export interface AutoRuleMatchInput {
+  postId?: string | null;
+  trigger: AutoRule["trigger"];
+  platform: string;
+  text: string;
+}
+
+/** Choose the first active rule matching the event; a post rule wins over brand rules. */
+export function matchAutoRule(rules: AutoRule[], input: AutoRuleMatchInput): AutoRule | null {
+  const ownRules = input.postId ? rules.filter((rule) => rule.post_id === input.postId) : [];
+  const candidates = ownRules.length ? ownRules : rules.filter((rule) => rule.post_id === null);
+  return candidates.find((rule) => rule.active
+    && rule.trigger === input.trigger
+    && rule.platforms.includes(input.platform)
+    && rule.keywords.some((keyword) => keyword.trim() && input.text.toLocaleLowerCase().includes(keyword.trim().toLocaleLowerCase()))) ?? null;
 }

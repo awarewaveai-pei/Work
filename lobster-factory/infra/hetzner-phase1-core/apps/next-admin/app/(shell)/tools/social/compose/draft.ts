@@ -2,7 +2,8 @@
 // and time wording, and each channel's text as the sender composes it. No React, no fetch.
 import { composeText } from "@/lib/social/compose";
 import type { RepeatRule } from "@/lib/social/repeat-rule";
-import { weekday, WEEKDAY_NAMES, type Account } from "../model";
+import type { PostInput } from "../api";
+import { weekday, WEEKDAY_NAMES, type Account, type Post } from "../model";
 
 /** ▾ of the main button (mock #menu); keep = a post in an autolist saves and stays there (lists are added to in their tab) */
 export type Act = "draft" | "library" | "review" | "schedule" | "repeat" | "now" | "keep";
@@ -25,6 +26,19 @@ export function delayText(d: number, first: boolean): string {
   return `${first ? "貼文發出後" : "上一則留完"} ${d < 60 ? `${d} 分鐘` : `${d / 60} 小時`}後留`;
 }
 
+/** A copy of a post as a new draft: everything the sender reads, in order. No first_comment: comments replace it
+ *  (lib/social/posts.ts refuses both), and the editor already shows first_comment as comment 1. Used by the editor and the calendar. */
+export function copyInput(post: Post): PostInput {
+  const byPos = <T extends { position: number }>(xs: T[] | undefined) => [...(xs ?? [])].sort((a, b) => a.position - b.position);
+  return {
+    fields: { body: post.body, link_url: post.link_url, link_utm: post.link_utm, notes: post.notes },
+    targets: post.targets.map((t) => ({ account_id: t.account_id, custom_body: t.custom_body, format: t.format })),
+    media: byPos(post.media).map((m) => ({ media_id: m.media_id, alt_text: m.alt_text })),
+    comments: byPos(post.comments).map((c) => ({ body: c.body, delay_minutes: c.delay_minutes as Delay, media_id: c.media_id })),
+    tags: (post.tags ?? []).map((t) => t.tag_id),
+  };
+}
+
 export interface CommentDraft { key: number; body: string; delay: Delay; media_id: string | null }
 
 /** The text a channel shows: its own or the shared one, with the link (and UTM) as the sender adds it. A link that is
@@ -40,6 +54,14 @@ export function channelText(a: Account, body: string, custom: Record<string, str
 
 /** A new repeat rule: weekly on the post's weekday, until stopped (mock newRepeat). */
 export const newRepeat = (date: string): RepeatRule => ({ freq: "week", days: [weekday(date)], mday: Number(date.slice(8, 10)), end: "never", count: 8 });
+
+/** The start day moved: a weekly rule still on the old day's weekday, or a monthly rule still on the old day's number, follows
+ *  it. One the sender picked themselves (other days, another number) stays. */
+export function followStart(rule: RepeatRule, oldDate: string, newDate: string): RepeatRule {
+  if (rule.freq === "week" && rule.days?.length === 1 && rule.days[0] === weekday(oldDate)) return { ...rule, days: [weekday(newDate)] };
+  if (rule.freq === "month" && rule.mday === Number(oldDate.slice(8, 10))) return { ...rule, mday: Number(newDate.slice(8, 10)) };
+  return rule;
+}
 
 /** Only the keys the rule's frequency and end use (lib/social/repeat-rule.ts parseRepeat stores what it is given). */
 export function cleanRepeat(r: RepeatRule): RepeatRule {

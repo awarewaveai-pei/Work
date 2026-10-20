@@ -1,6 +1,6 @@
 // /api/social/texts -- a brand's saved texts (the editor's 常用文字; table social_saved_texts, 0096)
 //   GET     ?brand
-//   POST    { brand, body }        1..10000 characters
+//   POST    { brand, body, mediaIds? }  1..10000 characters; mediaIds stay in order
 //   DELETE  ?brand&id
 import { ANY_ROLE, WRITE_ROLES, requireBrandRole } from "@/lib/social/authz";
 import { BadRequest, handle, jsonBody, uuid } from "@/lib/social/http";
@@ -23,7 +23,11 @@ export async function POST(req: Request): Promise<Response> {
     const brand = uuid(body.brand, "brand");
     await requireBrandRole(req, brand, WRITE_ROLES);
     if (typeof body.body !== "string" || !body.body.trim() || body.body.length > 10000) throw new BadRequest("body must be 1..10000 characters");
-    return { text: await addText(brand, body.body.trim()) };
+    const rawMediaIds = body.mediaIds;
+    if (rawMediaIds !== undefined && (!Array.isArray(rawMediaIds) || rawMediaIds.length > 50)) throw new BadRequest("mediaIds must be an array of at most 50 ids");
+    const mediaIds = Array.isArray(rawMediaIds) ? rawMediaIds.map((id: unknown) => uuid(id, "mediaIds")) : [];
+    if (new Set(mediaIds).size !== mediaIds.length) throw new BadRequest("mediaIds must be unique");
+    return { text: await addText(brand, body.body.trim(), mediaIds) };
   });
 }
 

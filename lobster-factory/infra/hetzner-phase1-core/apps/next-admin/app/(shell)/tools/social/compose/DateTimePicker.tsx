@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { RepeatRule } from "@/lib/social/repeat-rule";
 import { addDays, weekday, WEEKDAY_NAMES } from "../model";
+import { followStart } from "./draft";
 import CIcon from "./icons";
 
 const TIMES = Array.from({ length: 96 }, (_, i) => `${String(Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`);
@@ -71,7 +72,7 @@ export default function DateTimePicker({ date, time, tz, today, repeat, onDone, 
               {Array.from({ length: weekday(first) - 1 }, (_, i) => <span key={`b${i}`} />)}
               {Array.from({ length: dim }, (_, i) => {
                 const v = addDays(first, i);
-                return <button type="button" key={v} className={`${v === day ? "sm-on" : ""}${v === today ? " sm-today" : ""}`} aria-pressed={v === day} disabled={v < today} onClick={() => setDay(v)}>{i + 1}</button>;
+                return <button type="button" key={v} className={`${v === day ? "sm-on" : ""}${v === today ? " sm-today" : ""}`} aria-pressed={v === day} disabled={v < today} onClick={() => { setR(r && day ? followStart(r, day, v) : r); setDay(v); }}>{i + 1}</button>;
               })}
             </div>
           </div>

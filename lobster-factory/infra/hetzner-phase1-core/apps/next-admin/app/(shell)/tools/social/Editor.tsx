@@ -11,12 +11,13 @@ import type { RepeatRule } from "@/lib/social/repeat-rule";
 import type { PostState } from "@/lib/social/state";
 import { splitKeywords } from "@/lib/social/auto-rules";
 import { api, ApiError, type AutoRule, type ListRow, type MediaItem, type PostInput, type SavedRef, type StateInput } from "./api";
+import { fileDataUrl, uploadTooLarge } from "./media";
 import { instantAt, platformOf, shortDate, targetProblems, zoned, type Account, type AutoMode, type Brand, type Post, type Tag } from "./model";
 import AutoReply, { blankRule, ruleDraftOf, type RuleDraft } from "./compose/AutoReply";
 import ChannelPicker from "./compose/ChannelPicker";
 import Comments from "./compose/Comments";
 import DateTimePicker from "./compose/DateTimePicker";
-import { channelText, cleanRepeat, newRepeat, repeatText, whenText, type Act, type CommentDraft, type Delay } from "./compose/draft";
+import { channelText, cleanRepeat, copyInput, newRepeat, repeatText, whenText, type Act, type CommentDraft, type Delay } from "./compose/draft";
 import Footer from "./compose/Footer";
 import Formats from "./compose/Formats";
 import Previews from "./compose/Previews";
@@ -24,7 +25,6 @@ import TagPicker from "./compose/TagPicker";
 import Writer, { type Extra } from "./compose/Writer";
 import "./compose/compose.css";
 
-const MAX_UPLOAD = 10 * 1024 * 1024;   // uploadMedia's cap (lib/content/postiz.ts)
 const MAX_COMMENTS = 50;               // 0105 social_post_comments.position 0..49
 
 export interface EditorProps {
@@ -46,6 +46,8 @@ export interface EditorProps {
   prefill?: import("./ArticleSource").Prefill | null;
   /** C9: a library item to attach (n changes on every click, so the same item twice attaches once and says so) */
   attach?: { id: string; n: number } | null;
+  attachMany?: { ids: string[]; n: number } | null;
+  seed?: { body: string; mediaIds: string[]; n: number } | null;
   onOpenLibrary?: () => void;
 }
 
@@ -115,6 +117,7 @@ export default function Editor(props: EditorProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmNow, setConfirmNow] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [squareCrop, setSquareCrop] = useState(false);
   const [hint, setHint] = useState<{ text: string; error?: boolean } | null>(null);
   const [texts, setTexts] = useState<Array<{ id: string; body: string }> | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(post?.source_url ?? null);
@@ -125,7 +128,9 @@ export default function Editor(props: EditorProps) {
   // or writing against a version it already moved (critic 2026-10-18 M5)
   const done = useRef<{ ref: SavedRef; state: PostState } | null>(null);
   const lastAttach = useRef(props.attach?.n ?? 0);
+  const lastAttachMany = useRef(props.attachMany?.n ?? 0);
   const lastPrefill = useRef(0);
+  const lastSeed = useRef(0);
   const say = (text: string, error = false) => setHint({ text, error });
 
   // a new post opened before the brand's channels arrived: pick once they do, unless someone chose
@@ -157,17 +162,33 @@ export default function Editor(props: EditorProps) {
     setMediaList(p.mediaIds.map((id) => ({ media_id: id, alt_text: null })));
   }, [props.prefill]);
   useEffect(() => {
+    const seed = props.seed;
+    if (!seed || seed.n === lastSeed.current || post) return;
+    lastSeed.current = seed.n;
+    setBody(seed.body);
+    setMediaList(seed.mediaIds.map((id) => ({ media_id: id, alt_text: null })));
+  }, [props.seed, post]);
+  useEffect(() => {
     const a = props.attach;
     if (!a || a.n === lastAttach.current) return;
     lastAttach.current = a.n;
     setMediaList((l) => (l.some((m) => m.media_id === a.id) ? l : [...l, { media_id: a.id, alt_text: null }]));
   }, [props.attach]);
+  useEffect(() => {
+    const a = props.attachMany;
+    if (!a || a.n === lastAttachMany.current) return;
+    lastAttachMany.current = a.n;
+    setMediaList((l) => [...l, ...a.ids.filter((id) => !l.some((m) => m.media_id === id)).map((media_id) => ({ media_id, alt_text: null }))]);
+  }, [props.attachMany]);
 
   const channels = useMemo(() => picked.map((id) => accounts.find((a) => a.id === id)).filter((a): a is Account => !!a), [picked, accounts]);
   const curTab = channels.some((a) => a.id === tab) ? tab : "all";   // a tab whose channel was unticked falls back to 共用
   const textFor = (a: Account) => channelText(a, body, custom, link, utm);
   const mediaPath = (id: string) => props.media.find((m) => m.id === id)?.postiz_path ?? null;
-  const images = mediaList.map((m) => mediaPath(m.media_id)).filter((p): p is string => !!p);
+  const mediaKind = (id: string) => props.media.find((m) => m.id === id)?.kind ?? null;
+  const previewMedia = mediaList.map((m) => ({ path: mediaPath(m.media_id), kind: mediaKind(m.media_id) })).filter((m): m is { path: string; kind: string | null } => !!m.path);
+  const images = previewMedia.map((m) => m.path);
+  const mediaKinds = previewMedia.map((m) => m.kind ?? "image");
   const liveComments = comments.filter((c) => c.body.trim() || c.media_id);
   const problems = overLimit("", channels.map((a) => ({ accountId: a.id, platform: a.platform, customBody: textFor(a) })));
   // numbered over every box on the page (an empty box keeps its number)
@@ -262,9 +283,9 @@ export default function Editor(props: EditorProps) {
     if (kind === "library") {
       if (!body.trim()) return say("貼文還是空的。", true);
       try {
-        await api.addText(brand.id, body.trim());
+        await api.addText(brand.id, body.trim(), mediaList.map((m) => m.media_id));
         setTexts(null);
-        return say("已把文字存到素材庫（常用文字）。圖片之後的版本才會一起存。");
+        return say(mediaList.length ? `已把文字和 ${mediaList.length} 個媒體存到素材庫。` : "已把文字存到素材庫（常用文字）。");
       } catch (e) {
         return say(message(e), true);
       }
@@ -320,13 +341,7 @@ export default function Editor(props: EditorProps) {
     if (!post) return;
     setBusy(true);
     try {
-      const ref = (await api.create(brand.id, {
-        fields: { body: post.body, link_url: post.link_url, link_utm: post.link_utm, notes: post.notes },
-        targets: post.targets.map((t) => ({ account_id: t.account_id, custom_body: t.custom_body, format: t.format })),
-        media: [...post.media].sort((a, b) => a.position - b.position).map((m) => ({ media_id: m.media_id, alt_text: m.alt_text })),
-        comments: [...(post.comments ?? [])].sort((a, b) => a.position - b.position).map((c) => ({ body: c.body, delay_minutes: c.delay_minutes as Delay, media_id: c.media_id })),
-        tags: (post.tags ?? []).map((t) => t.tag_id),
-      })).post;
+      const ref = (await api.create(brand.id, copyInput(post))).post;
       props.onSaved(ref.id, "已複製成新草稿。");
     } catch (e) {
       say(message(e), true);
@@ -336,18 +351,15 @@ export default function Editor(props: EditorProps) {
   }
 
   async function upload(file: File) {
-    if (file.size > MAX_UPLOAD) return say("圖片超過 10 MB。", true);
+    const video = file.type.startsWith("video/");
+    const tooLarge = uploadTooLarge(file);
+    if (tooLarge) return say(tooLarge, true);
     const target = uploadFor.current;
     setBusy(true);
     try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result as string);
-        r.onerror = () => reject(r.error);
-        r.readAsDataURL(file);
-      });
-      const name = file.name.replace(/[^\w.\- ]/g, "_").slice(0, 200) || "image.webp";
-      const { media } = await api.upload(brand.id, dataUrl, name);
+      const dataUrl = await fileDataUrl(file, squareCrop);
+      const name = file.name.replace(/[^\w.\- ]/g, "_").slice(0, 200) || (video ? "video.mp4" : "image.webp");
+      const { media } = video ? await api.uploadVideo(brand.id, dataUrl, name) : await api.upload(brand.id, dataUrl, name);
       props.onMediaAdded(media);
       if (target === "post") setMediaList((l) => [...l, { media_id: media.id, alt_text: null }]);
       else setComments((cs) => cs.map((c) => (c.key === target ? { ...c, media_id: media.id } : c)));
@@ -357,6 +369,12 @@ export default function Editor(props: EditorProps) {
       setBusy(false);
     }
   }
+  const moveMedia = (id: string, delta: -1 | 1) => setMediaList((list) => {
+    const index = list.findIndex((m) => m.media_id === id);
+    const target = index + delta;
+    if (index < 0 || target < 0 || target >= list.length) return list;
+    const next = [...list]; [next[index], next[target]] = [next[target], next[index]]; return next;
+  });
   const pickFile = (target: "post" | number) => { uploadFor.current = target; fileRef.current?.click(); };
   const addComment = () => {
     if (comments.length >= MAX_COMMENTS) return say(`留言最多 ${MAX_COMMENTS} 則。`, true);
@@ -397,8 +415,9 @@ export default function Editor(props: EditorProps) {
           onText={(v) => { if (curTab !== "all" && custom[curTab] != null) setCustom((c) => ({ ...c, [curTab]: v })); else setBody(v); }}
           onOwn={(id, own) => setCustom((c) => { const n = { ...c }; if (own) n[id] = body; else delete n[id]; return n; })}
           link={link} onLink={setLink} utm={utm} onUtm={setUtm} notes={notes} onNotes={setNotes}
-          media={mediaList} mediaPath={mediaPath} onAlt={(id, alt) => setMediaList((l) => l.map((m) => (m.media_id === id ? { ...m, alt_text: alt } : m)))}
-          onRemoveMedia={(id) => setMediaList((l) => l.filter((m) => m.media_id !== id))} onPickFile={() => pickFile("post")}
+          media={mediaList} mediaPath={mediaPath} mediaKind={mediaKind} onAlt={(id, alt) => setMediaList((l) => l.map((m) => (m.media_id === id ? { ...m, alt_text: alt } : m)))}
+          onRemoveMedia={(id) => setMediaList((l) => l.filter((m) => m.media_id !== id))} onMoveMedia={moveMedia} onPickFile={() => pickFile("post")}
+          cropOnUpload={squareCrop} onCropUpload={setSquareCrop}
           onOpenLibrary={props.onOpenLibrary}
           open={open} onOpen={(k) => setOpen((o) => { const n = new Set(o); if (n.has(k)) n.delete(k); else n.add(k); return n; })}
           onAddComment={addComment} texts={texts}
@@ -412,9 +431,9 @@ export default function Editor(props: EditorProps) {
               onMode={(m) => { setAutoMode(m); if (m === "own" && !rule) setRule(blankRule()); }} onOpen={() => setAutoOpen((o) => !o)}
               onRule={(r) => { setRule(r); setRuleDirty(true); }} />
           </>} />
-        <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f); }} />
+        <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload(f); }} />
       </div>
-      <Previews channels={channels} tab={curTab} textFor={textFor} formats={formats} images={images}
+      <Previews channels={channels} tab={curTab} textFor={textFor} formats={formats} images={images} mediaKinds={mediaKinds}
         comments={comments} mediaPath={mediaPath} commentImage={commentTakesMedia} when={act === "now" ? "剛剛" : `${shortDate(date)} ${time}`} />
       <Footer
         tags={<TagPicker brandId={brand.id} tags={tags} selected={tagIds} disabled={readOnly || queued} canEdit={canWrite} onSelect={setTagIds} onTags={setTags} say={say} />}

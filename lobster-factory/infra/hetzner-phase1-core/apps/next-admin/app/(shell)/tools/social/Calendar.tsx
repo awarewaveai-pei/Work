@@ -130,9 +130,15 @@ export function WeekView(props: ViewProps & {
   const today = props.today > clock.date ? props.today : clock.date;
   const [over, setOver] = useState<string | null>(null);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(props.weekStart, i)), [props.weekStart]);
+  const [mobileDay, setMobileDay] = useState(() => props.today >= props.weekStart && props.today < addDays(props.weekStart, 7) ? props.today : props.weekStart);
+  useEffect(() => { if (!days.includes(mobileDay)) setMobileDay(props.today >= props.weekStart && props.today < addDays(props.weekStart, 7) ? props.today : props.weekStart); }, [days, mobileDay, props.today, props.weekStart]);
   return (
-    <div className="sm-week">
-      {days.map((d, i) => {
+    <div className="sm-week-wrap">
+      <div className="sm-mobile-dates" aria-label="選擇日期">
+        {days.map((d, i) => <button type="button" key={d} className={d === mobileDay ? "sm-on" : ""} onClick={() => setMobileDay(d)}><span>{WEEKDAY_NAMES[i]}</span><b>{Number(d.slice(8))}</b></button>)}
+      </div>
+      <div className="sm-week">
+        {days.map((d, i) => {
         const ps = posts.filter((p) => p.scheduled_at && zoned(p.scheduled_at, tz).date === d).sort(byTime);
         const arts = (props.articles ?? []).filter((a) => articleAt(a).date === d);
         const best = props.bestTimes && d >= today ? props.bestTimes(d) : [];
@@ -141,7 +147,7 @@ export function WeekView(props: ViewProps & {
         const at = d === today ? ps.findIndex((p) => zoned(p.scheduled_at as string, tz).time > clock.time) : -1;
         const split = at < 0 ? ps.length : at;
         return (
-          <div key={d} className={`sm-day${d < today ? " sm-past" : ""}${d === today ? " sm-today" : ""}${over === d ? " sm-over" : ""}`} data-date={d}>
+          <div key={d} className={`sm-day${d < today ? " sm-past" : ""}${d === today ? " sm-today" : ""}${d === mobileDay ? " sm-mobile-selected" : ""}${over === d ? " sm-over" : ""}`} data-date={d}>
             <div className="sm-dh"><span className="sm-muted">{WEEKDAY_NAMES[i]}</span><b>{Number(d.slice(8))}</b><span className="sm-n">{ps.length ? `${ps.length} 則` : ""}</span></div>
             <div className="sm-col" data-date={d}
               onClick={(e) => { if (e.target === e.currentTarget && canWrite && d >= today) props.onNew(d); }}
@@ -169,7 +175,8 @@ export function WeekView(props: ViewProps & {
             </div>
           </div>
         );
-      })}
+        })}
+      </div>
     </div>
   );
 }

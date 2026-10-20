@@ -18,9 +18,9 @@ function Text({ text, platform }: { text: string; platform: string }) {
   return <>{g.slice(0, max).join("")}<mark className="sm-overmark" title={`超過 ${max} 字，這段發不出去`}>{g.slice(max).join("")}</mark></>;
 }
 
-export default function Previews({ channels, tab, textFor, formats, images, comments, mediaPath, commentImage, when }: {
+export default function Previews({ channels, tab, textFor, formats, images, mediaKinds, comments, mediaPath, commentImage, when }: {
   channels: Account[]; tab: string; textFor: (a: Account) => string; formats: Record<string, string>;
-  images: string[]; comments: CommentDraft[]; mediaPath: (id: string) => string | null;
+  images: string[]; mediaKinds?: string[]; comments: CommentDraft[]; mediaPath: (id: string) => string | null;
   /** the platform posts a comment's image (lib/social/compose.ts commentTakesMedia) */
   commentImage: (platform: string) => boolean; when: string;
 }) {
@@ -46,7 +46,7 @@ export default function Previews({ channels, tab, textFor, formats, images, comm
                 {!(ig && story) && <div className="sm-tx"><Text text={textFor(a)} platform={a.platform} /></div>}
                 {images.length > 0 && (
                   <div className={`sm-imgs sm-n${Math.min(images.length, 4)}${story ? " sm-tall" : ""}`}>
-                    {images.slice(0, story ? 1 : 4).map((p) => <img key={p} src={p} alt="" />)}
+                    {images.slice(0, story ? 1 : 4).map((p, i) => mediaKinds?.[i] === "video" ? <video key={p} src={p} muted controls preload="metadata" /> : <img key={p} src={p} alt="" />)}
                   </div>
                 )}
                 {parts.length > 0 && !story && (

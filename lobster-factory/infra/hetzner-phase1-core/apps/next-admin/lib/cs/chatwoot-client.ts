@@ -113,6 +113,42 @@ async function chatwootRequest<T>({ config, apiToken, path, method = "POST", bod
   return (await res.json()) as T;
 }
 
+interface ConversationListResponse {
+  data?: {
+    meta?: { all_count?: unknown };
+    payload?: Array<{ unread_count?: unknown }>;
+  };
+}
+
+const MAX_CONVERSATION_PAGES = 100;
+const MAX_CONVERSATION_SCAN_MS = 30_000;
+
+/** Read-only unread total for one Chatwoot inbox. Tokens stay vault-backed and never leave this module. */
+export async function getInboxUnreadCount(organizationId: string, config: ChatwootConfig, inboxId: number): Promise<number> {
+  const apiToken = await loadReadToken(organizationId);
+  if (!apiToken) throw new Error("chatwoot_api_token_missing");
+
+  let total = 0;
+  let seen = 0;
+  const deadline = Date.now() + MAX_CONVERSATION_SCAN_MS;
+  for (let page = 1; page <= MAX_CONVERSATION_PAGES; page += 1) {
+    if (Date.now() >= deadline) throw new Error("chatwoot_conversations_timeout");
+    const query = new URLSearchParams({ inbox_id: String(inboxId), status: "all", page: String(page) });
+    const res = await chatwootRequest<ConversationListResponse>({ config, apiToken, method: "GET", path: `/conversations?${query.toString()}` });
+    const payload = res.data?.payload ?? [];
+    for (const conversation of payload) {
+      const unread = typeof conversation.unread_count === "number" ? conversation.unread_count : Number(conversation.unread_count);
+      if (Number.isFinite(unread) && unread > 0) total += Math.floor(unread);
+    }
+    seen += payload.length;
+    const allCount = Number(res.data?.meta?.all_count);
+    const complete = payload.length === 0 || (Number.isFinite(allCount) && allCount > 0 && seen >= allCount);
+    if (complete) break;
+    if (page === MAX_CONVERSATION_PAGES) throw new Error("chatwoot_conversations_page_limit");
+  }
+  return total;
+}
+
 /** Send a customer-visible message (auto_sent reply, handoff acknowledgement). */
 export async function sendReply(organizationId: string, config: ChatwootConfig, conversationId: string, text: string): Promise<void> {
   const apiToken = await loadApiToken(organizationId);

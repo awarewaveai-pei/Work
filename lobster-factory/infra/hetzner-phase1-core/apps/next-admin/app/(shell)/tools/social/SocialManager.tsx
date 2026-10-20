@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { api, ApiError, type MediaItem, type WpPost } from "./api";
 import ArticleSource, { type Prefill } from "./ArticleSource";
 import ChannelList from "./ChannelList";
+import { copyInput } from "./compose/draft";
 import { ReviewBar } from "./Review";
 import { ListView, MonthView, stateStyle, WeekView } from "./Calendar";
 import EmptyState from "./EmptyState";
@@ -30,7 +31,7 @@ import "./social.css";
 export type { View } from "./routes";
 
 /** What a view asks to open. post / new / article go to the composer page; list opens in 自動發布清單. */
-export type Selection = { kind: "post"; id: string } | { kind: "new"; date?: string; time?: string; key: number } | { kind: "list"; id: string | null }
+export type Selection = { kind: "post"; id: string } | { kind: "new"; date?: string; time?: string; key: number; body?: string; mediaIds?: string[] } | { kind: "list"; id: string | null }
   | { kind: "article"; article: WpPost; key: number } | { kind: "none" };
 
 /** What the later cards plug in; each returns null until its card lands. */
@@ -45,7 +46,7 @@ export interface SlotContext {
   brand: Brand; accounts: Account[]; posts: Post[]; media: MediaItem[]; today: string;
   select: (s: Selection) => void; reload: () => Promise<void>; say: (t: string, error?: boolean) => void; setView: (v: View) => void;
   /** C9: the post open in the composer can take a library item */
-  canAttach: boolean; attach: (mediaId: string) => void; mediaAdded: (m: MediaItem) => void;
+  canAttach: boolean; attach: (mediaId: string) => void; attachMany: (mediaIds: string[]) => void; mediaAdded: (m: MediaItem) => void;
   /** C11: the log view opens on 「需處理」 when the bell was pressed */
   logFilter: "all" | "needs"; openNeeds: () => void;
   /** C7: the list open in 自動發布清單; null = a new one, undefined = none */
@@ -57,6 +58,7 @@ type Go = (href: string, replace?: boolean) => void;
 // A note said right before moving to another page of the app (a copy opens in the composer): client navigation keeps
 // this module, so the next route shows it once. A full reload drops it, which is fine for a status line.
 let carried: Note | null = null;
+let carriedComposeSeed: { body: string; mediaIds: string[]; n: number } | null = null;
 
 const param = (k: string) => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get(k));
 
@@ -95,6 +97,8 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const [postKey, setPostKey] = useState(0);
   const [loadedPost, setLoadedPost] = useState<Post | null>(null);
   const [attachRequest, setAttachRequest] = useState<{ id: string; n: number } | null>(null);
+  const [attachManyRequest, setAttachManyRequest] = useState<{ ids: string[]; n: number } | null>(null);
+  const [composeSeed, setComposeSeed] = useState<{ body: string; mediaIds: string[]; n: number } | null>(() => carriedComposeSeed);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [newKey] = useState(() => Date.now());
@@ -180,7 +184,11 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   }, [canWrite, goTo]);
   const select = useCallback((s: Selection) => {
     if (s.kind === "post") goTo({ kind: "compose", postId: s.id });
-    else if (s.kind === "new") openCompose(s.date, s.time);
+    else if (s.kind === "new") {
+      carriedComposeSeed = s.body || s.mediaIds?.length ? { body: s.body ?? "", mediaIds: s.mediaIds ?? [], n: s.key } : null;
+      setComposeSeed(carriedComposeSeed);
+      openCompose(s.date, s.time);
+    }
     else if (s.kind === "article") openCompose(undefined, undefined, { site: s.article.siteId, article: String(s.article.id), title: s.article.title, day: s.article.date.slice(0, 10) });
     else if (s.kind === "list") { setListId(s.id); if (view !== "lists") setView("lists"); }
     else setListId(undefined);
@@ -210,7 +218,9 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const canAttach = route.kind === "compose" && (!postId || (!!editorPost && ["draft", "review", "scheduled", "error", "rotation"].includes(editorPost.state)));
   const ctx: SlotContext | null = brand ? {
     brand, accounts, posts, media, today, select, reload: async () => { await reload(); setListsKey((k) => k + 1); }, say, setView,
-    canAttach, attach: (id) => setAttachRequest((r) => ({ id, n: (r?.n ?? 0) + 1 })), mediaAdded: (m) => setMedia((list) => [m, ...list]),
+    canAttach, attach: (id) => setAttachRequest((r) => ({ id, n: (r?.n ?? 0) + 1 })),
+    attachMany: (ids) => setAttachManyRequest((r) => ({ ids: [...new Set(ids)], n: (r?.n ?? 0) + 1 })),
+    mediaAdded: (m) => setMedia((list) => [m, ...list]),
     logFilter, openNeeds: () => { if (route.kind === "plan") { setLogFilter("needs"); setView("log"); } else goTo({ kind: "plan" }, { view: "log", log: "needs" }); },
     listId,
   } : null;
@@ -268,11 +278,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   async function copy(post: Post) {
     if (!brand) return;
     try {
-      const { post: ref } = await api.create(brand.id, {
-        fields: { body: post.body, first_comment: post.first_comment, link_url: post.link_url, link_utm: post.link_utm, notes: post.notes },
-        targets: post.targets.map((t) => ({ account_id: t.account_id, custom_body: t.custom_body, format: t.format })),
-        media: [...post.media].sort((a, b) => a.position - b.position).map((m) => ({ media_id: m.media_id, alt_text: m.alt_text })),
-      });
+      const { post: ref } = await api.create(brand.id, copyInput(post));
       goTo({ kind: "compose", postId: ref.id }, {}, { text: "已複製成新草稿。" });
     } catch (e) {
       say(e instanceof Error ? e.message : String(e), true);
@@ -341,7 +347,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
           <section className="sm-panel">
             {notice ? <p className="sm-side">{notice}</p> : postId && !editorPost ? <div className="sm-side sm-muted">載入中…</div> : (
               <Editor key={postId ? `${postId}:${editorPost?.version}` : `new:${newKey}`} brand={brand} accounts={accounts} media={media} post={editorPost} today={today} lists={lists}
-                attach={attachRequest} onOpenLibrary={() => setLibraryOpen(true)} defaults={defaults}
+                  attach={attachRequest} attachMany={attachManyRequest} seed={composeSeed} onOpenLibrary={() => setLibraryOpen(true)} defaults={defaults}
                 prefill={articleFor && prefill?.for === articleFor ? prefill : null}
                 reviewBar={editorPost ? <ReviewBar brand={brand} post={editorPost} onDone={async (_id, msg) => { say(msg); setPostKey((k) => k + 1); }} /> : undefined}
                 source={article && !postId && canWrite ? (
@@ -353,6 +359,8 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
                   // another post (a new one's first save replaces compose/new; 複製成新貼文 is a new page): through the
                   // router, so Back returns to a page that matches its address (critic 2026-10-17: history.replaceState
                   // kept compose/new's route under compose/<id>, and Back opened an empty composer that saved a duplicate)
+                  carriedComposeSeed = null;
+                  setComposeSeed(null);
                   if (id !== postId) goTo({ kind: "compose", postId: id }, {}, { text: msg }, !postId);
                   else { say(msg); setPostKey((k) => k + 1); }
                 }} />
@@ -414,7 +422,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
         {view === "trash" && <Trash posts={trash} deletions={deletions} accounts={accounts} tz={tz} canWrite={canWrite} onRestore={restore} onBack={() => setView("week")} />}
         {view === "library" && panel("貼文素材庫", slots.sideView?.("library", ctx))}
         {view === "lists" && panel("自動發布清單", slots.sideView?.("lists", ctx))}
-        {view === "flows" && <SectionShell which="flows" />}
+        {view === "flows" && (slots.sideView?.("flows", ctx) ?? <SectionShell which="flows" />)}
         {view === "log" && panel("需處理的事和紀錄", slots.sideView?.("log", ctx))}
         {view === "settings" && panel("設定", <Settings brand={brand} accounts={accounts} onAccounts={setAccounts} team={slots.settingsExtra?.(ctx)} />)}
       </main>
