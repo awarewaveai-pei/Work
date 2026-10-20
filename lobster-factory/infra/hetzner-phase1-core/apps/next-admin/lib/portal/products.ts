@@ -2,7 +2,9 @@
 import cognitiveInventory from "./cognitive-features.json";
 export type LoginSource = "local" | "awarewave-wp" | "customer-wp";
 export const LOGIN_SOURCES: readonly LoginSource[] = ["local", "awarewave-wp", "customer-wp"];
-export type ProductDoor = { app: "next-admin"; page: string; api: readonly string[]; enabled?: boolean } | { app: "external" };
+// anonymous: path prefixes served with no login, on this product's own door only (pages and GET/HEAD routes;
+// lib/portal/__tests__/products.test.ts reads the files under them).
+export type ProductDoor = { app: "next-admin"; page: string; api: readonly string[]; anonymous?: readonly string[]; enabled?: boolean } | { app: "external" };
 export interface ProductFeature {
   feature_key: string;
   name: string;
@@ -36,7 +38,7 @@ const PRODUCT_DEFINITIONS = [
   { key: "hci", name: "HCI-30", description: "人機互動與持續監測工具。", subdomain: "hci", door: { app: "external" },
     loginSources: ["local", "awarewave-wp"], standalone: true, status: "coming_soon", selfSignup: true,
     features: [], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/hci/MODULE_MANIFEST.json" }, staffPaths: [] },
-  { key: "social", name: "社群發文", description: "改寫、排程並派送品牌社群貼文。", subdomain: "social", door: { app: "next-admin", page: "/social", api: ["/api/social"] },
+  { key: "social", name: "社群發文", description: "改寫、排程並派送品牌社群貼文。", subdomain: "social", door: { app: "next-admin", page: "/social", api: ["/api/social"], anonymous: ["/smartlink"] },
     loginSources: ["local", "awarewave-wp", "customer-wp"], standalone: true, status: "coming_soon", selfSignup: false,
     features: [quota("social.rewrite", "AI 多平台改寫"), quota("social.dispatch", "貼文派送", "contract")], accessChannels: ["ui"],
     modules: { dependsOn: [], manifest: "lib/social/MODULE_MANIFEST.json" }, staffPaths: ["tools/social"] },

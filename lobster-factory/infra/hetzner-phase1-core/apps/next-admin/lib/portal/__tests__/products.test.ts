@@ -80,6 +80,37 @@ describe("product registry", () => {
     }
   });
 
+  it("a no-login path is a plain prefix no other door owns, lives in app/(public), and serves only pages and GET/HEAD routes", () => {
+    const doors = nextAdminProducts();
+    const owned = doors.flatMap((p) => [p.door.page, ...p.door.api]);
+    const anon = doors.flatMap((p) => p.door.anonymous ?? []);
+    expect(new Set(anon).size).toBe(anon.length);
+    const files: Array<{ url: string; file: string }> = [];
+    const walk = (dir: string, url: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const f = path.join(dir, e.name);
+        if (e.isDirectory()) walk(f, e.name.startsWith("(") ? url : `${url}/${e.name}`);
+        else files.push({ url: url || "/", file: f });
+      }
+    };
+    walk(APP_DIR, "");
+    for (const a of anon) {
+      expect(a).toMatch(/^\/[a-z][a-z0-9-]*$/);
+      for (const o of owned) expect(o === a || o.startsWith(`${a}/`) || a.startsWith(`${o}/`), `${a} vs ${o}`).toBe(false);
+      const served = files.filter((x) => x.url === a || x.url.startsWith(`${a}/`));
+      expect(served.some((x) => path.basename(x.file) === "page.tsx"), a).toBe(true);
+      for (const { file } of served) {
+        expect(path.relative(APP_DIR, file).split(path.sep)[0], file).toBe("(public)");   // not beside a staff page
+        const text = readFileSync(file, "utf8");
+        expect(text, file).not.toMatch(/["']use server["']/);
+        if (/^route\.(t|j)sx?$/.test(path.basename(file))) {
+          expect(text, file).not.toMatch(/export\s+(?:async\s+)?(?:const|function)\s+(?:POST|PUT|PATCH|DELETE|OPTIONS)\b/);
+          expect(text, file).toMatch(/export\s+(?:async\s+)?(?:const|function)\s+GET\b/);
+        }
+      }
+    }
+  });
+
   it("every directory under app/(shell)/{tools,ops} and app/(shell)/* maps to a product or a listed back-office or staff utility", () => {
     const dirs = (d: string) => readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
     const shell = path.join(APP_DIR, "(shell)");

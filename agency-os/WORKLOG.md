@@ -1,4 +1,38 @@
 # Worklog
+## 2026-10-20（續1）C26 公開頁免登入：產品登記 `door.anonymous`，只在 social 門放行、其他門 404（操作者批准方案 A）
+
+**觸發**：操作者「照方案 A 做」。之前匿名訪客開 `social.aware-wave.com/smartlink/<slug>` 會被導去登入。
+
+**根因／設計**（`apps/next-admin/`）
+- 舊行為：social 門把不在 `/social`、`/api/social` 下的頁面路徑改寫到 `/social/...`，`/smartlink` 變成 `/social/smartlink` → 404；就算不改寫，session 閘門也會導去登入。
+- 不變量：免登入路徑是產品登記的事實（一處），只在該產品的門上提供，其他門 404，身分 header 一律剝掉。
+- `lib/portal/products.ts`：`ProductDoor` 加 `anonymous?`；social `anonymous: ["/smartlink"]`。
+- `lib/portal/doors.ts`：`isAnonymousPath`；併入 `isProductPath`（門上直接通過、不改寫）與 `productPageOwner`（`isWrongHostForProductPage` 讓 staff／portal／其他門 404）。
+- `middleware.ts`：門與 host 檢查、header 剝除之後，session 閘門之前，`door.kind === "product" && isAnonymousPath` → passthrough。matcher、nginx 不動（social 門已是 Cloudflare-only＋`limit_req zone=admin burst=40`，`nginx/default.conf` social server）。
+- 不選：B 搬到 `app/social/` 下（`app/social/layout.tsx` 有登出鈕，要拆整個門的 route group）；C 在 middleware 加字面集合（像 `PORTAL_PUBLIC_PATHS`，不分門 → `app.aware-wave.com/smartlink` 也公開，且產品事實寫第二處）。
+
+**守衛（測試）**
+- `middleware-door.test.ts`：social 門 `/smartlink/<slug>`、`/go/<item>` 通過、無改寫、偽造的 `x-ops-claims-role`／`x-ops-user-kind` 被剝；staff、portal 門 404；`/smartlinkx` 走登入閘；portal 經 nginx 前綴的 `/portal/smartlink/...` 走登入閘。
+- `doors.test.ts`：`/smartlink/soulful` pass、`/smartlinkx` 改寫。
+- `products.test.ts`：免登入前綴不與任何門的 page／api 重疊；底下檔案都在 `app/(public)`、無 `"use server"`、route 有 GET 且無 POST/PUT/PATCH/DELETE/OPTIONS——之後有人在 `/smartlink` 下加寫入端點會紅。
+- 突變（可見範圍守衛，一次）：拋棄式 worktree 拔掉 `productPageOwner` 的 `isAnonymousPath` → `app.aware-wave.com: expected 307 to be 404` 紅；還原 4/4 綠。
+
+**[已修改]**：`middleware.ts`、`lib/portal/{doors,products}.ts`、`lib/portal/__tests__/{doors,middleware-door,products}.test.ts`。
+
+**[驗證結果]**
+- `npx tsc --noEmit`：exit 0。
+- `npx vitest run lib/portal lib/__tests__/middleware-portal-guards.test.ts lib/__tests__/middleware-csrf.test.ts`：82/82；加 `lib/social/__tests__/smartlink.test.ts` 共 93/93。
+- `node --test scripts/__tests__/new-product.test.mjs`：4/4（讀產品登記）。
+- Codex `agency-os/reports/oracle/2026-10-20-partialreview-f57bc9fc.md`：1 項——portal 門經 nginx `/portal/` 前綴後是登入導向而非 404。查證 `nginx/default.conf` portal `rewrite` 屬實；`/portal/smartlink` 沒有頁面，任何未知 portal 路徑都同樣導登入，無曝露。已把該路徑加進測試，不改程式。
+- 抓蟲：`grep -rn "isAnonymousPath\|door\.anonymous\|productPageOwner" lobster-factory scripts agency-os/docs .claude/commands` 14 行（`isAnonymousPath` 單獨 6 行），全在 middleware、doors、products 與其測試；`SOCIAL_MANAGER_PLAN.md:177`「middleware 允許匿名」現在成立。
+
+**[剩餘風險]**：上線要等部署：`DEPLOY_HOLD`（ADR017 step2）解除前，03:00 自動部署不會帶上它。本機沒有起 dev server 用 curl 打（middleware 測試直接呼叫真的 `middleware()`）。拋棄式 worktree 的資料夾 `D:\tmp\mut-anon` 已解除註冊，但因檔案被鎖住還沒刪掉。
+
+**[rollback]**：`git revert` 本 commit；無 DB／nginx／設定變更。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal lib/__tests__/middleware-portal-guards.test.ts lib/__tests__/middleware-csrf.test.ts | exit=0 | ms=2000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=isAnonymousPath | hits=6
 ## 2026-10-19（續15）社群 V1.5 C24 數據分析收尾：G6 補記、快照「沒做完的都回報」、真資料一天驗收（拋棄式 DB＋Bluesky 公開 API）
 
 **觸發**：操作者「續做社群 V1.5」。C24 主體（`Analytics.tsx`、`lib/social/metrics.ts`、`/api/social/metrics`、`/api/internal/social/metrics`、Trigger `social-metrics` 19:30 UTC、`render-views.mjs` `12-analytics`）已隨 `ee3e7bde5`（consolidate）進 main，但 G6 與真資料驗收沒有 WORKLOG 條目；工作目錄留有 Codex 第一輪 6 項的修正（未提交）。

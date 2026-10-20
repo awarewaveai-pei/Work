@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createSupabaseMiddlewareClient, isSupabaseAuthConfigured, type RefreshedCookie } from "@/lib/supabase/ssr";
 import { getFreshCachedRole, consumeStaleCachedRole, cacheValidatedRole, type CachedIdentity } from "@/lib/supabase/session-cache";
 import type { OpsRole } from "@/lib/ops-contracts";
-import { doorForHost, isProductPath, portalHost, productPageOwner, routeOnProductDoor, type Door } from "@/lib/portal/doors";
+import { doorForHost, isAnonymousPath, isProductPath, portalHost, productPageOwner, routeOnProductDoor, type Door } from "@/lib/portal/doors";
 
 // Identity layer for the admin console (Supabase Auth, email+password).
 // Browser flow: validate the Supabase session cookie → resolve role from the user's
@@ -306,6 +306,12 @@ export async function middleware(request: NextRequest) {
     ? NextResponse.rewrite(new URL(rewriteTo + request.nextUrl.search, request.url), { request: { headers } })
     : NextResponse.next({ request: { headers } });
   const passthrough = () => forward(baseHeaders);
+
+  // A product's no-login paths (registry door.anonymous, e.g. the public smart link page): only on that product's door
+  // (isWrongHostForProductPage above 404s them on every other door) and without any identity header.
+  if (door.kind === "product" && isAnonymousPath(pathname, door.product)) {
+    return passthrough();
+  }
 
   // Portal's own pre-auth pages (no session exists yet by definition, same reasoning as the
   // admin console's own /login exclusion). Handled HERE inside the middleware body — NOT via a

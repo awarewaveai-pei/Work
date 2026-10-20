@@ -45,6 +45,8 @@ describe("routeOnProductDoor", () => {
     ["/api/social/posts", { action: "pass" }],
     ["/api/social", { action: "pass" }],
     ["/api/socialx", { action: "not_found" }],
+    ["/smartlink/soulful", { action: "pass" }],
+    ["/smartlinkx", { action: "rewrite", pathname: "/social/smartlinkx" }],
     ["/api/ops/clients", { action: "not_found" }],
     ["/api/content/syndicate", { action: "not_found" }],
     ["/portal/api/signup", { action: "not_found" }],

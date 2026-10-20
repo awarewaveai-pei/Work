@@ -51,14 +51,19 @@ export function doorForHost(host: string, env: Env = process.env): Door {
 
 const under = (pathname: string, prefix: string) => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
-/** The product's own page and API paths. */
-export function isProductPath(pathname: string, product: NextAdminProduct): boolean {
-  return under(pathname, product.door.page) || product.door.api.some((a) => under(pathname, a));
+/** A path the product serves with no login (registry `door.anonymous`, e.g. /smartlink). */
+export function isAnonymousPath(pathname: string, product: NextAdminProduct): boolean {
+  return (product.door.anonymous ?? []).some((a) => under(pathname, a));
 }
 
-/** A page path some product serves only on its own door (e.g. /social on the staff host). */
+/** The product's own page, API and no-login paths. */
+export function isProductPath(pathname: string, product: NextAdminProduct): boolean {
+  return under(pathname, product.door.page) || product.door.api.some((a) => under(pathname, a)) || isAnonymousPath(pathname, product);
+}
+
+/** A page path some product serves only on its own door (e.g. /social or /smartlink on the staff host). */
 export function productPageOwner(pathname: string): NextAdminProduct | null {
-  return servedNextAdminProducts().find((p) => under(pathname, p.door.page)) ?? null;
+  return servedNextAdminProducts().find((p) => under(pathname, p.door.page) || isAnonymousPath(pathname, p)) ?? null;
 }
 
 export type ProductRoute = { action: "pass" } | { action: "rewrite"; pathname: string } | { action: "not_found" };

@@ -14,6 +14,20 @@ describe("host visibility boundary", () => {
     expect(productPageOwner("/outreach")).toBeNull();
     expect(productPageOwner("/outreach/campaigns")).toBeNull();
   });
+  it("a product's no-login path passes only on its own door, with no identity header", async () => {
+    const get = (url: string) => middleware(new NextRequest(url, { headers: { host: new URL(url).host, "x-ops-claims-role": "owner", "x-ops-user-kind": "staff" } }));
+    for (const p of ["/smartlink/soulful", "/smartlink/soulful/go/11111111-1111-4111-8111-111111111111"]) {
+      const res = await get(`https://social.aware-wave.com${p}`);
+      expect(res.headers.get("x-middleware-next"), p).toBe("1");
+      expect(res.headers.get("x-middleware-rewrite"), p).toBeNull();
+      expect(res.headers.get("x-middleware-request-x-ops-claims-role"), p).toBeNull();
+      expect(res.headers.get("x-middleware-request-x-ops-user-kind"), p).toBeNull();
+    }
+    for (const host of ["app.aware-wave.com", "portal.aware-wave.com"]) expect((await get(`https://${host}/smartlink/soulful`)).status, host).toBe(404);
+    expect((await get("https://social.aware-wave.com/smartlinkx")).status).toBe(307);   // not the prefix: the login gate
+    // nginx prefixes every portal path with /portal (nginx/default.conf portal server): never the no-login branch
+    expect((await get("https://portal.aware-wave.com/portal/smartlink/soulful")).status).toBe(307);
+  });
   it("loopback probes keep the existing liveness paths but cannot enter staff routes", async () => {
     const request = (pathname: string, method = "GET") => new NextRequest(`http://127.0.0.1:3000${pathname}`, {
       method, headers: { host: "127.0.0.1:3000", "x-ops-claims-role": "owner" },
