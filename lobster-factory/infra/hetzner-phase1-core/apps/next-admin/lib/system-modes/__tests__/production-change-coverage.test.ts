@@ -52,6 +52,8 @@ const ALLOWLIST: Record<string, string> = {
     "imports print-provider only for getCatalogVariants() (a read, used to resolve a mockup image variant) -- never calls a write function (createSyncProductOnNative / createDraftOrderOnNative / linkSyncVariant).",
   "lib/cs/chatwoot-client.ts":
     "primitive Chatwoot HTTP transport -- not a call site; app/api/webhooks/chatwoot/route.ts gates before the AI pipeline and also calls the same functions after an allowed gate, so the gate cannot live inside them.",
+  "app/api/social/inbox/route.ts":
+    "read-only Chatwoot inbox unread counts; this route only performs GET requests and never sends, edits, or hands off a conversation.",
   "lib/content/postiz.ts":
     "primitive Postiz HTTP transport -- not a call site; publishing callers gate first (content/social-publish route, lib/social/dispatch-store.ts sendAllowed -> runDispatch).",
   "app/api/content/social-admin/connections/route.ts": "reads Postiz integrations (listAllIntegrations) to map channels to clients; publishes nothing.",

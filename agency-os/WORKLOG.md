@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-20（續9）sg-deploy 被測試閘擋：inbox route 的 production-change 豁免行漏 commit（cf2b4ecc1 的缺漏）
+
+**根因**：`lib/system-modes/__tests__/production-change-coverage.test.ts` 把 `lib/cs/chatwoot-client` 列為正式環境寫入原語；`app/api/social/inbox/route.ts` 匯入它但只做 GET。Codex 已在工作目錄加豁免行，但 cf2b4ecc1 的檔案清單只列社群／cs 目錄，漏了這個測試檔；commit 前的驗證只跑社群子集（355 tests），沒跑全套 → sg-deploy 在主機跑全套（2773）時 1 紅，部署中止、prod 未變（仍 80728adf8，healthy）。
+**修**：commit 該豁免行（理由屬實：route 只 GET 未讀數，critic 第二輪確認）。
+**避免再發生**：commit 新 route／新 import 前，跑全套 next-admin `npx vitest run`（或至少 `lib/system-modes` 結構測試），不只跑功能子集；結構測試會掃整個 app/lib。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/system-modes/__tests__/production-change-coverage.test.ts`（6 passed）；主機 sg-deploy 全套先前 1 failed／2750 passed，唯一失敗即此檔 | exit=0 | ms=5000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回豁免行；inbox/route.ts 只呼叫 getInboxUnreadCount（GET）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=`getInboxUnreadCount` | hits=13 -- 呼叫端只有 inbox route（GET）與 chatwoot-client 本身＋測試；無寫入路徑
 ## 2026-10-20（續8）ADR 017 DEPLOY_HOLD 四前提完成 → 解除 hold；0110／0111／0112 套正式庫；簽章金鑰進容器；Trigger 20261020.1
 
 **觸發**：操作者「把那四項做完，再解除 hold，兩批一起上線」；試用方案＝先不設（註冊關著：`PORTAL_SIGNUP_ENABLED` 未設，無方案時 `portal_complete_signup` fail closed，0110:113-117）；金鑰備份＝vault＋USB；部署＝完成後手動立刻。
