@@ -63,6 +63,16 @@
 ### V17-6 新題
 - `Q-DEPLOY-001`「裝在客戶自己的主機」（self_hosted；ADR 017 §0 三軸 A）；規則：要 → `CAP-OFFLINE-UPDATE`（requires `FOUND-RELEASE`：簽章版本包、離線套用、失敗回上一版）。不帶 `CAP-LICENSE`：它 requires `CAP-COMMERCIAL`，`test_payment_commercial_gating.py` 禁止未答收費就帶入收費能力（自家主機自用不需授權檔）；收費＋授權仍由 `Q-COM-006` 決定。
 
+### V17-7 能力驗收補齊（V17-2 之後）
+- `capabilities/catalog.json` 每個缺 `acceptance` 的能力補 1–2 條 `{test, expect}`：只依該能力的 `description`／`requires`，不寫技術棧字眼，不寫兩個能力共用的泛用句。依模組分批（每批 ≤10 模組），照卡寫死的格式可派 `data-filler`；每批跑 `make verify`。
+- 進度＝`python scripts/report_acceptance_gap.py` 的缺數（監工台每次 build 現算）。
+- 驗收：缺數 0；監工台 check 在缺數 > 0 時拒絕把本卡標 done。
+
+### V17-8 產品 manifest 補齊（V17-4 之後）
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/<key>/MODULE_MANIFEST.json`，每個登記產品一份；格式＝`lib/social/MODULE_MANIFEST.json`＋`services`／`env`（客戶怎麼來 `cards/step-5.md:6`）；十項宣告逐項附 `file:line`；服務與 env 依 ADR 017 §5 盤點表。交付客戶怎麼來 `cards/step-8.md:10`（manifest 無 TODO）與 step-5 的 manifest 部分。
+- 「完整」只有一個定義：`scripts/product-manifests.mjs` `manifestStatus()`（十項無 TODO、`services` 非空且每個 service 存在於其 compose 檔、`env` 為字串陣列）。
+- 驗收：`manifestStatus()` 全部 ok；收尾加一個測試斷言全部 ok；監工台 check 在未全部 ok 時拒絕把本卡標 done。
+
 ## 不做
 - 不產程式碼（技術棧未定前產碼＝猜）；骨架由 `new-product.mjs` 在 AwareWave 的 stack 上產。
 - 不自寫市場研究／競品章節（04–06 節）：沒有輸入就沒有內容，寫出來的是樣板。

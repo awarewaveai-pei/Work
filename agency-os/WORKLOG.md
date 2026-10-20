@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-20（續2）System Foundry v1.7 加 V17-7 能力驗收補齊、V17-8 產品 manifest 補齊；監工台現算進度並擋假完成
+
+**觸發**：操作者問「這會處理所有的問題？」→「要，但要怎知道有沒有做？」
+
+- 計畫 `V1_7_HANDOFF_PLAN.md` 加 `### V17-7`（V17-2 之後）、`### V17-8`（V17-4 之後）。不另開計畫／監工台。產業包不排（無真實輸入）；產生專案不附 html 為設計。
+- 「manifest 完整」唯一定義：新 `scripts/product-manifests.mjs` `manifestStatus()`（十項無 TODO、`services:[{compose,service}]` 非空且 service 在該 compose 檔 `services:` 區塊、`env` 字串陣列；格式＝客戶怎麼來 `cards/step-5.md:6`）。測試 `scripts/__tests__/product-manifests.test.mjs`。客戶怎麼來 step-5／step-8 卡未改（另一 session 有未提交改動），V17-8 引用它們的定義。
+- 監工台 `2026-10-18-foundry-v17-supervisor`：build 每次現算「沒有驗收的能力」（呼叫 Foundry `report_acceptance_gap.py`，唯一算法）與「manifest 完整的產品」；check 在數字未到時拒絕 V17-7／V17-8 標 done；depends 改讀計畫標題「（Vxx 之後）」，沒寫則為前一張。現值：缺驗收 291／315、manifest 0／11（社群缺 services／env，其餘 10 份不存在）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node build.mjs && node check.mjs`（ok: 8 cards, gap 291/315, manifests 0/11）；`node --test scripts/__tests__/product-manifests.test.mjs scripts/__tests__/new-product.test.mjs`（6 pass）；Foundry `validate_manifest`、`validate_doc_numbers` PASS | exit=0 | ms=50000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 manifestStatus 每條檢查與測試對應
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=`manifestStatus|product-manifests` | hits=只在新檔與 build/check
+- ORACLE_WAIVED: 計畫與監工台資料＋一個小檢查函式，突變逐項證明
+
+**突變**：V17-7 標 done → 「還有 291 個能力沒有驗收」紅；V17-8 標 done → 「manifest 只有 0/11 完整」紅；V17-8 depends 改 V17-7 → 「計畫寫 depends V17-4」紅；拿掉 manifestStatus 的 `services:` 區塊限定 → 測試 1 fail（volume 被當成 service）；全部還原綠。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-20（續1）C26 公開頁免登入：產品登記 `door.anonymous`，只在 social 門放行、其他門 404（操作者批准方案 A）
 
 **觸發**：操作者「照方案 A 做」。之前匿名訪客開 `social.aware-wave.com/smartlink/<slug>` 會被導去登入。
