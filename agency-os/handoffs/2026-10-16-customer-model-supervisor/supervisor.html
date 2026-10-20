@@ -91,8 +91,8 @@ ul.doors li span{min-width:0}
 <aside><div class="in">
   <h1>客戶怎麼來 監工台</h1>
   <p class="upd">更新於 <span data-computed>2026-10-19</span></p>
-  <div class="bar" data-computed><i class="d" style="width:22.22222222222222%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>2</span>／<span data-computed>9</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <div class="bar" data-computed><i class="d" style="width:33.33333333333333%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>3</span>／<span data-computed>9</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">說明客戶來源、付款方、操作人，以及系統尚缺的項目。</p>
@@ -152,17 +152,18 @@ ul.doors li span{min-width:0}
         <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-2.md</code></p>
         <p><b>完成於：</b><code>ee3e7bde5</code></p>
       </details>
-    </div></li><li class="step todo" id="s3">
+    </div></li><li class="step done" id="s3">
     <div class="n">3</div>
     <div class="b">
       <p class="plain">每項收費功能執行前都先確認權限；未購買時按鈕顯示停用。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>測試：點數功能看餘額不看權利列，餘額 0 即拒；代操時從 on_behalf_of 扣點，稽核記 actor；沒有 active 權利列不簽許可；沒有登記列的產品拿不到 grant</p>
       <details><summary>工程細節：每個收費點只問 can(主體, feature_key, actor)</summary>
         <p>社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。</p>
         <p><b>前置：</b><a href="#s2">第 <span data-computed>2</span> 項</a></p>
         <p><b>檔案：</b><code>lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/can.ts</code> <code>Projects/internal/cognitive-engineering-os/ai_lego/platform/entitlement/check.py</code> <code>Projects/internal/cognitive-engineering-os/ai_lego/apps/api/main.py</code></p>
         <p><b>執行卡：</b><code>agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-3.md</code></p>
+        <p><b>完成於：</b><code>e87de9225</code></p>
       </details>
     </div></li><li class="step todo" id="s4">
     <div class="n">4</div>
