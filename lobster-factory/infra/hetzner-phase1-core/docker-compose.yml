@@ -281,6 +281,9 @@ services:
       ENTITLEMENT_SIGNING_KEY: ${ENTITLEMENT_SIGNING_KEY:-}
       ENTITLEMENT_SIGNING_KID: ${ENTITLEMENT_SIGNING_KID:-}
       ENTITLEMENT_PUBLIC_KEYS: ${ENTITLEMENT_PUBLIC_KEYS:-}
+      # Bearer for POST /api/internal/entitlements/permit/cognitive (lib/entitlements/issuer.ts); the SAME value is
+      # ENTITLEMENT_ISSUER_TOKEN in /opt/cognitive-os/.../deploy/.env. Empty = the issuer answers 401 (fail closed).
+      ENTITLEMENT_ISSUER_TOKEN_COGNITIVE: ${ENTITLEMENT_ISSUER_TOKEN_COGNITIVE:-}
       # Cross-product id reconciliation -> GET /api/internal/reconcile (BACKUP_COVERAGE_PLAN.md B8). The same value
       # sits in /etc/default/awarewave-reconcile for backup-coverage-check.py on the host. Empty = 401 (fail closed).
       RECONCILE_TOKEN: ${RECONCILE_TOKEN:-}

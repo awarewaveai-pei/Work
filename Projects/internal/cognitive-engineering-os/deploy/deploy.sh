@@ -71,6 +71,43 @@ if find /tmp -maxdepth 1 -iname "ai-lego-*" -not -user "$_me" -print -quit 2>/de
   find /tmp -maxdepth 1 -iname "ai-lego-*" -not -user "$_me" -print0 2>/dev/null | xargs -0 --no-run-if-empty sudo -n chown -R "$_me:$_mygroup"
 fi
 
+# -- 0a. Build context = HEAD: every Dockerfile COPY source must be tracked, materialized and unchanged. Prod is a sparse
+#    clone, so a new COPY from outside its set (e87de9225: lobster-factory/.../permit-v1) failed at docker build 2026-10-20.
+#    The Dockerfile is the one list (continuation lines joined): sources outside the sparse set are added here (a file by
+#    its directory: prod is cone mode), never kept by hand; anything git status reports under a source (deleted, modified,
+#    untracked) or an assume-unchanged mark stops the deploy -- a disk check would ship stale files (Codex review
+#    2026-10-20, three rounds). Runs before step 0: its pip install already reads requirements.lock and pyproject.toml.
+#    Gitignored files are not checked (.dockerignore's job). --
+mapfile -t COPY_SOURCES < <(awk '{ if (sub(/\\[ \t]*$/, "")) { buf = buf $0 " "; next } $0 = buf $0; buf = "" }
+  $1 == "COPY" && $0 !~ /--from=/ { n = 0; for (i = 2; i <= NF; i++) if ($i !~ /^--/) src[++n] = $i; for (i = 1; i < n; i++) print src[i] }' "$PRODUCT_ROOT/Dockerfile")
+(( ${#COPY_SOURCES[@]} )) || { log "build-context | FAIL: no COPY source parsed from the Dockerfile"; notify "FAILED at build context"; exit 1; }
+# Outside the checkout = nothing tracked under the path, or a tracked file there is skip-worktree ("S" = outside the sparse set).
+unmaterialized() {
+  local p
+  for p in "${COPY_SOURCES[@]}"; do
+    # awk reads to the end: `grep -q` would exit early, SIGPIPE git, and pipefail would read that as "no S".
+    if [[ -z "$(git -C "$REPO_ROOT" ls-files -- "$p")" ]] || git -C "$REPO_ROOT" ls-files -t -- "$p" | awk '/^S /{f=1} END{exit !f}'; then echo "$p"; fi
+  done
+}
+build_context_fail() { log "build-context | FAIL: $*"; notify "FAILED at build context"; exit 1; }
+mapfile -t MISSING < <(unmaterialized)
+if (( ${#MISSING[@]} )) && [[ "$(git -C "$REPO_ROOT" config --bool core.sparseCheckout || true)" == true ]]; then
+  ADD=(); for p in "${MISSING[@]}"; do [[ "$(git -C "$REPO_ROOT" ls-files -- "$p")" == "$p" ]] && ADD+=("$(dirname "$p")") || ADD+=("$p"); done
+  log "build-context | adding to the sparse checkout: ${ADD[*]}"
+  git -C "$REPO_ROOT" sparse-checkout add "${ADD[@]}" >>"$LOG" 2>&1 || build_context_fail "git sparse-checkout add ${ADD[*]}"
+  mapfile -t MISSING < <(unmaterialized)
+fi
+(( ${#MISSING[@]} )) && build_context_fail "COPY source(s) not tracked in this checkout: ${MISSING[*]}"
+# = HEAD covers what the builds read besides the COPY sources: the Dockerfile and .dockerignore that decide them, and the
+# web image's whole context (apps/cognitive-web/Dockerfile `COPY . .`). All sit inside the sparse set.
+CHECKED=("${COPY_SOURCES[@]}" Projects/internal/cognitive-engineering-os/Dockerfile .dockerignore Projects/internal/cognitive-engineering-os/apps/cognitive-web)
+DRIFT="$(git -C "$REPO_ROOT" status --porcelain --untracked-files=all -- "${CHECKED[@]}")"
+[[ -z "$DRIFT" ]] || build_context_fail "build input(s) differ from HEAD (git status): $(tr '\n' ' ' <<<"$DRIFT")"
+# git status skips assume-unchanged files (ls-files -v: lowercase tag), so an edit under that mark would ship unseen.
+HIDDEN="$(git -C "$REPO_ROOT" ls-files -v -- "${CHECKED[@]}" | grep '^[a-z] ' || true)"
+[[ -z "$HIDDEN" ]] || build_context_fail "assume-unchanged file(s) among the build inputs: $(tr '\n' ' ' <<<"$HIDDEN")"
+log "build-context | ${#COPY_SOURCES[@]} COPY source(s), Dockerfile, .dockerignore, web context = HEAD"
+
 # -- 0. Typecheck/test-gate venv. Self-contained on purpose: this script must not depend on
 #    the invoking shell having already `source`d a venv (true for cron/systemd, and for any
 #    fresh SSH session that doesn't know this repo's local convention -- discovered 2026-09-18

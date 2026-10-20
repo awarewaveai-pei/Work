@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-20（續12）ADR 017 認知平台許可接線（上）：next-admin issuer token 已上 prod；cognitive deploy.sh 加 build context＝HEAD 閘
+
+**背景**：要讓 cognitive 的 shadow 稽核留下真判定（不是 infra_error）。操作者 2026-10-20 批准計畫，並定 tenant→計費帳戶對應：efa91107…、7932ebb6…（AwareWave self-use）→ 39ad4149…（AwareWave Ops）；2741349f…（EdD Research）→ ecf4e311…（EdD 論文研究）。
+**查到的事實**：
+- F1 prod cognitive-os-api 跑的是 3104c03af（10-15）。容器裡的 `check.py` 只有 32 行（Phase 1 版），沒有 `permit.py`／`entitlement_issuer.py`。e87de9225 的 shadow `can()` 根本還沒部署到 cognitive，光設 env 沒有作用。
+- F2 next-admin 的 compose（主機與 repo）原本沒有 `ENTITLEMENT_ISSUER_TOKEN_COGNITIVE`，所以 issuer 一律回 401。
+- F3 `ENTITLEMENT_ISSUER_URL` 只能是 `https://app.aware-wave.com`：對外連線只准 https 加主機白名單（`Projects/internal/cognitive-engineering-os/docker-compose.yml:26-30`）。從容器內實測 POST → 401，0.17 s。
+- F4 cognitive 的 env 在 `/opt/cognitive-os/Projects/internal/cognitive-engineering-os/deploy/.env`（compose `env_file`）。`/opt/cognitive-os` 是 sparse clone，cone 模式，原本的 sparse 集＝cognitive 產品目錄、AI_LEGO 文件、`agency-os/reports/audit`。
+**已做**：
+- A（prod）：在主機上產生 token 寫進 `/root/lobster-phase1/.env`（不印值）；用 `safe-infra-patch.sh compose … next-admin` 加 env 行（backup `docker-compose.yml.bak.safe-patch-20261020-070638`，healthy 9s）。repo 的 compose 與 `.env.example` 同步加同一行。
+- B（prod，進行中）：cognitive 的 `deploy/.env` 加 4 行（PUBLIC_KEYS 複製自 lobster `.env`、ISSUER_URL、ISSUER_TOKEN＝A 的同一個值、BILLING_ACCOUNTS＝上面的對應；backup `.env.bak.entitlement-*`）；`git pull --ff-only` 到 ea9f3a269 後跑 `deploy.sh`，**在 `docker build --target test` 失敗**，原因是 `Dockerfile:69` 的 `COPY lobster-factory/packages/contracts/fixtures/permit-v1`（e87de9225 新增）不在 sparse 集內。失敗發生在換 image 之前，prod 容器沒有被動到。
+- 治本：`deploy.sh` 新增步驟 0a，執行順序在 venv 之前。
+  - **不變量**：Dockerfile 每個 COPY 來源＝HEAD。也就是要被 git 追蹤、不是 skip-worktree、`git status` 是空的、沒有 assume-unchanged 標記。
+  - 來源清單直接從 Dockerfile 解析（續行會接起來、排除 `--from`）；不在 sparse 集的來源用 `git sparse-checkout add` 補上（單一檔案就補它的目錄），不靠人工維護清單。
+  - Codex 三輪：R1 1m（用磁碟判斷存在 → 改問 git）、R2 3m（追蹤中但被刪的檔、旁邊多出的未追蹤檔、多行 COPY）、R3 3m（cone 模式下的單一檔案、assume-unchanged、步驟順序要在 pip 之前），全部已修。同一個 reviewer 第 3 輪前先寫了上面的不變量（AGENTS §4）。
+  - critic（verify-recent）1M 2m 全修：M1 Dockerfile 本身和 `.dockerignore` 沒查（在主機上註解掉 :69 就能過，跟這次事故同型）→ 納入 = HEAD 檢查；m1 `grep -q` 在 pipefail 下遇到大量輸出會 SIGPIPE，被讀成「沒有 S」→ 改用 awk 讀到底；m2 web image 的 context（`apps/cognitive-web`，`COPY . .`）沒查 → 納入。
+- 剩餘風險：被 gitignore 的檔案不檢查，交給 `.dockerignore` 管。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機一次性 sparse clone（/tmp，已刪）跑最終版步驟 0a：sparse 缺口→補上 PASS／旁邊多未追蹤檔→拒／追蹤檔被刪→拒／不存在的路徑→拒／assume-unchanged 被改→拒／Dockerfile 改了沒 commit→拒／web context 多未追蹤檔→拒。多行 COPY 和 cone 單一檔案這兩種，是前一版實測 PASS（解析與補目錄的程式碼之後沒動；這次 clone 來自 blobless 來源，無法在裡面 commit 新的 Dockerfile） | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv ENTITLEMENT_ISSUER_TOKEN_COGNITIVE` 的位元組數 → 64；safe-infra-patch 結果 `success`，healthy 9s | exit=0 | ms=12000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/8m/2n
+  - external oracle = Codex CLI（agency-os/reports/oracle/2026-10-20-partialreview-c56c4125.md、-040b73c6.md、-4acf3b3c.md）＋ critic subagent；10 個 finding 全修並在主機實測
+- ORACLE_WAIVED: R3 Codex 和 critic 的 finding 是在最後一份 artifact 之後才修的。三輪都在收斂同一個不變量；修完在主機上實測，結果全部符合預期。依「不做無效益的重跑」（AGENTS §1）不開第 4 輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/cognitive-engineering-os,runbooks,.claude/commands | grep=ENTITLEMENT_ISSUER_TOKEN_COGNITIVE | hits=7
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/cognitive-engineering-os,runbooks,.claude/commands | grep=sparse-checkout add | hits=2
+- rollback：A＝`cp docker-compose.yml.bak.safe-patch-20261020-070638 docker-compose.yml` 後用 safe-infra-patch 重建；B 的 env＝cognitive `deploy/.env` 刪掉 4 行 ENTITLEMENT_ 後重新部署；0a＝revert 本 commit。
 ## 2026-10-20（續11）Foundry v1.7 V17-8 收尾：產品 manifest 帶驗收 → CAP-AW-* 有驗收；Foundry sync＋rehash＋verify 全綠；驗收缺 11 → 0
 
 **根因**：V17-7 後 `report_acceptance_gap.py` 剩 11 缺，全是 `scripts/sync-foundry-catalog.mjs` 由 products.ts 產生的 `CAP-AW-<KEY>`；驗收正本應在產品 manifest，sync 沒帶。
