@@ -27,6 +27,7 @@ import { renderPrintCard, applyGradeToDataUrl, CARD_TEMPLATES, type CardTemplate
 // type-only import (erased at build — does not pull the server lib into the client bundle);
 // keeps the model union in sync with the server. maxRefs/cost stay local on purpose.
 import type { TarotModel } from "@/lib/tarot/image-gen";
+import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 
 type Mode = "text" | "image";
 
@@ -181,6 +182,7 @@ async function toGalleryArt(dataUrl: string, maxDim = 2048, quality = 0.9): Prom
 }
 
 export default function TarotStudio() {
+  const { canUse, why } = usePaidFeatures();
   // Multi-select for comparison; batch generation always uses lockedModel (set at lock time).
   const [selectedModels, setSelectedModels] = useState<Set<TarotModel>>(new Set<TarotModel>());
   const [lockedModel, setLockedModel] = useState<TarotModel>("flux-schnell");
@@ -1557,9 +1559,9 @@ export default function TarotStudio() {
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
                   <span style={{ fontSize: 10, color: "var(--text-muted)" }}>🎨 送給模型的英文</span>
-                  <button
+                  <button title={why("tarot.prompt")}
                     type="button"
-                    disabled={locked || suggestBusy}
+                    disabled={(locked || suggestBusy) || !canUse("tarot.prompt")}
                     onClick={() => void suggestPrompt()}
                     style={{ ...ghostBtn(), cursor: locked || suggestBusy ? "default" : "pointer", opacity: locked || suggestBusy ? 0.5 : 1 }}
                   >

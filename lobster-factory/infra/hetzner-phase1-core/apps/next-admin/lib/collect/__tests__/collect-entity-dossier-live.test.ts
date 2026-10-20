@@ -23,6 +23,9 @@ import { RateLimiter } from "@/lib/collect/net/rate-limit";
 import { httpHtmlCollector } from "@/lib/collect/collectors/http-html";
 import { entityDossierCollector, ENTITY_SCHEME } from "@/lib/collect/collectors/entity-dossier";
 import type { RawDoc, SinkBlock } from "@/lib/collect/types";
+import { collectGrant } from "./grant-fixture";
+
+const GRANT = await collectGrant();
 
 loadEnvFile({ path: path.resolve(__dirname, "../../../.env.local"), override: false });
 
@@ -89,7 +92,7 @@ describe.skipIf(!LIVE)("entity dossier, live", () => {
             rateLimiter: new RateLimiter({ ratePerSecond: 1, burst: 2 }),
             log: (m) => log.push(m),
           }),
-          callProvider: createProviderCall({ budget, log: (m) => log.push(m) }),
+          callProvider: createProviderCall({ grant: GRANT, budget, log: (m) => log.push(m) }),
         },
       );
 

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
 import { logAiCall } from "../../../../../lib/ai/log-ai-call";
 
@@ -24,7 +26,8 @@ interface SuggestBody {
   subject?: string;
 }
 
-export async function POST(request: Request) {
+export const POST = withFeature("tarot.prompt", handlePost);
+async function handlePost(request: Request, grant: Grant) {
   const resolved = resolveOpsRole(request);
   if (!canCreateAiImageJob(resolved.role)) {
     return NextResponse.json({ ok: false, error: "forbidden_role" }, { status: 403 });
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ ok: false, error: "missing_anthropic_api_key" }, { status: 500 });
 
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
 
   const userMessage = body.subject

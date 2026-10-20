@@ -12,6 +12,8 @@ import { crawl, type CrawlProgress, type CrawlResult, type SeedInput } from "@/l
 import { createBudget, type BudgetLimits } from "@/lib/collect/budget";
 import { createCollectFetch } from "@/lib/collect/net/fetcher";
 import { createProviderCall } from "@/lib/collect/net/providers";
+import { EntitlementRequired, type Grant } from "@/lib/entitlements/can";
+import { grantFor, type GrantContext } from "@/lib/entitlements/grant";
 import { RateLimiter, createSupabaseRateLimitStore } from "@/lib/collect/net/rate-limit";
 import { collectors } from "@/lib/collect/registry";
 import { approvedSeeds, recordRunOutcome, type CollectionSource } from "@/lib/collect/sources-store";
@@ -103,11 +105,29 @@ interface CrawlWithOptions {
   keepAside: boolean;
   /** Search calls draw from this one when given (a research run), page fetches from `budget`. */
   queryBudget?: ReturnType<typeof createBudget>;
+  /** The run's collect.fetch grant (paid vendors only; null = none, the free tier still crawls). */
+  grant: Grant | null;
   onProgress?: (p: CrawlProgress) => void;
   log: (msg: string) => void;
 }
 
 /** The one crawl assembly (fetch, rate limit, url state, providers, blocks); every run kind goes through it. */
+async function quietGateDependencies() {
+  const { runtimeGateDependencies } = await import("@/lib/entitlements/runtime");
+  return { ...runtimeGateDependencies(), audit: async () => {} };
+}
+
+/** One grant per run for the paid vendors. A refusal (enforce) is not a failed run: those calls fail like a missing key. */
+async function collectGrant(ctx: GrantContext, log: (msg: string) => void): Promise<Grant | null> {
+  try {
+    return await grantFor("collect.fetch", ctx);
+  } catch (e) {
+    if (!(e instanceof EntitlementRequired)) throw e;
+    log(`collect.fetch not granted (${e.code}): paid providers off for this run`);
+    return null;
+  }
+}
+
 function crawlWith(o: CrawlWithOptions): Promise<CrawlResult> {
   // A durable store here is WHY per-host politeness holds across two concurrently scheduled runs
   // (DATA_COLLECTION_PLAN.md C3 DoD) — an omitted rateLimiter would make createCollectFetch fall
@@ -129,7 +149,7 @@ function crawlWith(o: CrawlWithOptions): Promise<CrawlResult> {
     urlState: o.urlState ? createSupabaseUrlStateStore() : undefined,
     fetch: createCollectFetch({ budget: o.budget, log: o.log, rateLimiter }),
     // Present only so a provider-backed tier CAN run; it still scores 0 without a key.
-    callProvider: createProviderCall({ budget: o.queryBudget ?? o.budget, log: o.log }),
+    callProvider: createProviderCall({ budget: o.queryBudget ?? o.budget, grant: o.grant, log: o.log }),
   });
 }
 
@@ -184,6 +204,8 @@ export async function runResearchCollection(opts: ResearchCollectionOptions): Pr
     urlState: false,
     keepAside: opts.wire === "2",
     queryBudget,
+    // COS gated research.collect on its side (check_entitlement); here the run spends the internal account's vendors.
+    grant: await collectGrant({}, opts.log ?? (() => {})),
     onProgress: opts.onProgress,
     log: opts.log ?? (() => {}),
   });
@@ -225,6 +247,8 @@ export async function runCollection(opts: RunCollectionOptions): Promise<RunColl
     budget,
     tenantRef: opts.organizationId,
     runKey,
+    // A dry run leaves no trace anywhere: same verdict, but its audit row is not written.
+    grant: await collectGrant({ orgId: opts.organizationId, ...(opts.dryRun ? { deps: await quietGateDependencies() } : {}) }, log),
     maxDepth: opts.maxDepth ?? 2,
     durableRateLimit: !opts.dryRun,
     // "A dry run leaves no trace anywhere" (see below) — a cached etag IS a trace.

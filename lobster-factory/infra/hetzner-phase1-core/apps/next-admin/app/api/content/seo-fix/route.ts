@@ -1,4 +1,6 @@
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
@@ -27,7 +29,8 @@ META_DESC: [improved description here]
 <!-- CONTENT_META_END -->
 - If no title/meta changes are needed, omit the block entirely`;
 
-export async function POST(req: Request): Promise<Response> {
+export const POST = withFeature("content.seo-fix", handlePost);
+async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
@@ -76,7 +79,7 @@ ${failedList}
 Please output the COMPLETE improved article. Fix ONLY the listed failed checks — do not change what already passes.`;
 
   try {
-    const Anthropic = await loadAnthropic();
+    const Anthropic = await loadAnthropic(grant);
     const client = new Anthropic({ apiKey });
     // haiku is used here (not sonnet) because seo-fix is a structural text-editing task (fix density,
     // paragraph length, add a section) — not creative writing. haiku responds in ~5-10s vs sonnet's

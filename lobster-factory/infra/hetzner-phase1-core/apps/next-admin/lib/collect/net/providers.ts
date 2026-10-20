@@ -16,6 +16,7 @@
 // business logic (ADR 011 §決策 5, ADR 013 §決策 6).
 
 import type { Budget } from "@/lib/collect/types";
+import type { Grant } from "@/lib/entitlements/can";
 
 export interface ProviderSpec {
   id: string;
@@ -134,6 +135,9 @@ export type ProviderCall = (providerId: string, init: ProviderCallInit) => Promi
 
 export interface ProviderCallOptions {
   budget: Budget;
+  /** ADR 017 §4: the run's `collect.fetch` grant. Required (null = refused or unresolved): a paid vendor is never
+   *  called without one; the call fails like a missing key, so the free crawl tier still runs. */
+  grant: Grant | null;
   timeoutMs?: number;
   maxBytes?: number;
   transport?: typeof fetch;
@@ -157,6 +161,7 @@ export function createProviderCall(opts: ProviderCallOptions): ProviderCall {
     const key = env[spec.apiKeyEnv];
     if (!key) throw new ProviderCallError(`missing_${spec.apiKeyEnv}`, "unconfigured");
     if (!opts.budget.ok()) throw new ProviderCallError("budget_exhausted", "budget");
+    if (!opts.grant?.allowed) throw new ProviderCallError(`entitlement_${opts.grant?.reason ?? "missing_grant"}`, "unconfigured");
 
     // Path only. `new URL(path, origin)` with an absolute path keeps the origin; an absolute URL
     // would replace it, so it is rejected rather than silently honoured.

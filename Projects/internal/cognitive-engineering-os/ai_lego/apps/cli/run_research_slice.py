@@ -189,7 +189,7 @@ def run_research_slice(config: SliceConfig) -> dict[str, Any]:
         available, reason = ollama_available()
         if not available:
             raise AdapterUnavailable(f"OLLAMA_UNAVAILABLE: {reason}")
-        gateway = AIGateway(default_local_registry(config.local_model))
+        gateway = AIGateway(default_local_registry(config.local_model), grant=None)   # loopback Ollama only
     spec_root = resolve_spec_root(config.spec_root)
     # ADR-023: the capability catalog is loaded FIRST, before any side effect (runtime dir, adapters, ingest), so that
     # a catalog problem (CONTRACT_ID_DUPLICATE / CONTRACT_CATALOG_UNREADABLE) or an expired bypass declaration stops

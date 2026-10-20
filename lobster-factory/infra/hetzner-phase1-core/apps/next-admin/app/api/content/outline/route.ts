@@ -1,4 +1,6 @@
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
@@ -9,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 const SIZE_SECTIONS: Record<string, number> = { short: 4, medium: 7, long: 12 };
 
-export async function POST(req: Request): Promise<Response> {
+export const POST = withFeature("content.outline", handlePost);
+async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -30,7 +33,7 @@ export async function POST(req: Request): Promise<Response> {
   const sections = SIZE_SECTIONS[articleSize] ?? 7;
   const titleLine = title ? `Article title: "${title}"` : "";
 
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   const msg = await client.messages.create({
     model: "claude-haiku-4-5-20251001",

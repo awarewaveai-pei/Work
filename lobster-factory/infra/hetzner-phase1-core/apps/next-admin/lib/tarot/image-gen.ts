@@ -10,6 +10,8 @@
 // Write prompts in English for best results — no Claude translation step.
 
 import { getDesignsPublicBase } from "../storage/r2";
+import { providerUrl } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
 export const REPLICATE_POLL_MS = 2_500;
@@ -400,6 +402,7 @@ export async function fetchWithRetry429(url: string, options: RequestInit & { si
 
 // ── FLUX (Replicate) — legacy path kept for backward compatibility ─────────────
 async function generateFlux(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
+  const grant = await grantFor("tarot.image");
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate_api_token" };
 
@@ -434,7 +437,7 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
     Prefer: "wait",
   };
 
-  const createRes = await fetchWithRetry429(`https://api.replicate.com/v1/models/${config.fluxModel}/predictions`, {
+  const createRes = await fetchWithRetry429(providerUrl(grant, "replicate", `/v1/models/${config.fluxModel}/predictions`), {
     method: "POST",
     headers,
     body: JSON.stringify({ input }),
@@ -474,6 +477,7 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
 
 // ── Generic Replicate — new models via per-model buildInput abstraction ─────────
 async function generateReplicate(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
+  const grant = await grantFor("tarot.image");
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate_api_token" };
   if (!config.slug || !config.buildInput) return { ok: false, error: "model_config_incomplete" };
@@ -492,7 +496,7 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
     Prefer: "wait",
   };
 
-  const createRes = await fetchWithRetry429(`https://api.replicate.com/v1/models/${config.slug}/predictions`, {
+  const createRes = await fetchWithRetry429(providerUrl(grant, "replicate", `/v1/models/${config.slug}/predictions`), {
     method: "POST",
     headers,
     body: JSON.stringify({ input }),
@@ -532,6 +536,7 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
 
 // ── OpenAI gpt-image-1 ──────────────────────────────────────────────────────────
 async function generateOpenai(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
+  const grant = await grantFor("tarot.image");
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { ok: false, error: "missing_openai_api_key" };
 
@@ -568,14 +573,14 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
       if (!fetched) return { ok: false, error: "invalid_reference_image" };
       form.append("image[]", fetched.blob, `reference-${i}.${fetched.ext}`);
     }
-    res = await fetch("https://api.openai.com/v1/images/edits", {
+    res = await fetch(providerUrl(grant, "openai", "/v1/images/edits"), {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },
       body: form,
       signal,
     });
   } else {
-    res = await fetch("https://api.openai.com/v1/images/generations", {
+    res = await fetch(providerUrl(grant, "openai", "/v1/images/generations"), {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "gpt-image-1", prompt: params.prompt, size: SIZE, quality, n: 1 }),

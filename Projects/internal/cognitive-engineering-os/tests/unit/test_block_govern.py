@@ -607,7 +607,7 @@ class AccountErasureTests(GovernApiTestCase):
         self.assertFalse(broken.exists() or blob.exists())
 
     def test_a_suspended_tenant_does_not_take_the_right_to_delete_away(self):
-        with mock.patch.object(api_main, "check_entitlement", return_value=False):
+        with mock.patch.object(api_main, "check_entitlement", return_value=mock.Mock(allowed=False, reason="tenant_inactive")):
             self.assertEqual(self.client.delete(f"/projects/{self.second}").status_code, 403)   # the case route still asks (control)
             response = self.client.post("/govern/account/erase", json={"confirm": self.PHRASE})
         self.assertEqual(response.status_code, 200, response.text)

@@ -12,6 +12,7 @@ import TimelineValidationPanel from "./TimelineValidationPanel";
 import FootageEditor from "./FootageEditor";
 import ReleaseDeliveryPanel from "./ReleaseDeliveryPanel";
 import MediaOperationsPanel from "./MediaOperationsPanel";
+import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 
 // 影片專屬攝影風格 preset（放最前 = 預設組）。值為英文 prompt，直接送 Flux。
 const VIDEO_STYLE_PRESETS: { zh: string; group: string; prompt: string }[] = [
@@ -211,6 +212,7 @@ interface VideoStudioEmbedded {
 }
 
 export default function VideoStudio({ initial, remotionInitial, embedded }: { initial?: VideoStudioInitial; remotionInitial?: ScriptRemotionPrefill; embedded?: VideoStudioEmbedded } = {}) {
+  const { canUse } = usePaidFeatures();
   // ── Config knobs ──
   const [customScenes] = useState(initial?.customScenes ?? 3);
   const [imageModel, setImageModel] = useState(() => {
@@ -470,7 +472,8 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
       setDraftPreviewFormat(primaryFmt);
       setDraftR2Keys(j.r2Keys ?? []);
       setDraftTitle(j.title ?? topic.trim());
-      void runVisualConsistencyCheck(nextDraftScenes);
+      // Automatic, not a button: an account without video.image just does not get the check (ADR 017 §4).
+      if (canUse("video.image")) void runVisualConsistencyCheck(nextDraftScenes);
     } catch (e: unknown) {
       setGenError(e instanceof Error ? e.message : "網路錯誤，請重試");
       setGenStatus("error");

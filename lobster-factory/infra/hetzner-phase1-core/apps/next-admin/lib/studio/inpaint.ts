@@ -1,3 +1,5 @@
+import { providerUrl } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 /**
  * Studio object-removal (inpaint) behind a provider-neutral seam.
  *
@@ -39,6 +41,7 @@ function sleep(ms: number): Promise<void> {
  * @param maskDataUrl  base64 data URL of the binary mask (WHITE = remove)
  */
 export async function removeObject(imageDataUrl: string, maskDataUrl: string): Promise<InpaintResult> {
+  const grant = await grantFor("studio.inpaint");
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate" };
   const version = process.env.INPAINT_VERSION ?? ERASER_VERSION_DEFAULT;
@@ -48,7 +51,7 @@ export async function removeObject(imageDataUrl: string, maskDataUrl: string): P
   try {
     let res: Response;
     try {
-      res = await fetch("https://api.replicate.com/v1/predictions", {
+      res = await fetch(providerUrl(grant, "replicate", "/v1/predictions"), {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -74,7 +77,7 @@ export async function removeObject(imageDataUrl: string, maskDataUrl: string): P
       if (Date.now() > deadline) return { ok: false, error: "generation_timeout" };
       await sleep(POLL_INTERVAL_MS);
       try {
-        const poll = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        const poll = await fetch(providerUrl(grant, "replicate", `/v1/predictions/${prediction.id}`), {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });

@@ -1,6 +1,8 @@
 // Gemini REST client (free-tier compatible) — the ai_generation step of the Free-Plan Router.
 // SECURITY: the API key goes in the query string per Google's API; NEVER log the url or the key.
 // Errors surface the HTTP status + response body (which does not contain the key).
+import { providerUrl } from "@/lib/ai/gateway";
+import type { Grant } from "@/lib/entitlements/can";
 
 export interface GeminiResult {
   text: string;
@@ -13,11 +15,12 @@ export interface GeminiResult {
 export const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-flash-latest";
 
 export async function generateWithGemini(
+  grant: Grant,
   apiKey: string,
   prompt: string,
   model = DEFAULT_GEMINI_MODEL,
 ): Promise<GeminiResult> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = providerUrl(grant, "gemini", `/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`);
   const resp = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },

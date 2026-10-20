@@ -17,6 +17,8 @@
  */
 
 import { OUTPAINT_PRESETS, type OutpaintPreset } from "./outpaint-presets";
+import { providerUrl } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 
 // Re-export so existing server-side imports (the route) keep resolving from this module.
 export { OUTPAINT_PRESETS };
@@ -58,6 +60,7 @@ function sleep(ms: number): Promise<void> {
  * ignores the mask (outpaint wins, per its schema).
  */
 export async function generativeFill(args: GenerativeFillInput): Promise<GenerativeFillResult> {
+  const grant = await grantFor("studio.fill");
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate" };
   if (!args.prompt || args.prompt.trim().length < 2) return { ok: false, error: "prompt_required" };
@@ -80,7 +83,7 @@ export async function generativeFill(args: GenerativeFillInput): Promise<Generat
   try {
     let res: Response;
     try {
-      res = await fetch("https://api.replicate.com/v1/predictions", {
+      res = await fetch(providerUrl(grant, "replicate", "/v1/predictions"), {
         method: "POST",
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ version, input }),
@@ -103,7 +106,7 @@ export async function generativeFill(args: GenerativeFillInput): Promise<Generat
       if (Date.now() > deadline) return { ok: false, error: "generation_timeout" };
       await sleep(POLL_INTERVAL_MS);
       try {
-        const poll = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        const poll = await fetch(providerUrl(grant, "replicate", `/v1/predictions/${prediction.id}`), {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });

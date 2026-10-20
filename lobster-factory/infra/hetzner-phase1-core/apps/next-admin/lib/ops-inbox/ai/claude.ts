@@ -1,4 +1,5 @@
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 import type { Incident } from "@/lib/ops-inbox/types";
 
 const CLAUDE_TIMEOUT_MS = 12_000;
@@ -7,7 +8,7 @@ export async function summarizeIncidentWithClaude(incident: Incident, evidenceTe
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("missing ANTHROPIC_API_KEY");
 
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(await grantFor("ops.inbox-ai"));
   const client = new Anthropic({ apiKey });
 
   const userMessage = [

@@ -7,6 +7,8 @@ import { generateWithGemini } from "@/lib/outreach/ai-gemini";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { generateWithClaude } from "@/lib/outreach/ai-claude";
 import { generateWithOpenAI } from "@/lib/outreach/ai-openai";
+import { grantFor } from "@/lib/entitlements/grant";
+import { actorFor } from "@/lib/social/authz";
 
 // Cold Outreach — message generation (task T8) + list (task T9). Table: co_messages (migration 0048).
 // Flow: Cold Gate (block if no observation/source_url/do_not_contact) → router ladder resolves the
@@ -168,13 +170,18 @@ export async function POST(req: Request): Promise<Response> {
 
   if (apiKey && resolvedProvider) {
     try {
+      // Billed to the lead's organization (ADR 017 §3), through actorFor; a caller without a role there gets the gate's
+      // not_authorized_for_org (shadow allows and audits it, enforce refuses). A lead with no org = the internal account.
+      const org = lead.organization_id;
+      const acting = org ? await actorFor(req, org).catch(() => null) : null;
+      const grant = await grantFor("outreach.draft", acting ? { req, acting } : org ? { req, orgId: org } : { req });
       let out: { text: string; model: string };
       if (resolvedProvider === "claude") {
-        out = await generateWithClaude(apiKey, prompt);
+        out = await generateWithClaude(grant, apiKey, prompt);
       } else if (resolvedProvider === "openai") {
-        out = await generateWithOpenAI(apiKey, prompt);
+        out = await generateWithOpenAI(grant, apiKey, prompt);
       } else {
-        out = await generateWithGemini(apiKey, prompt);
+        out = await generateWithGemini(grant, apiKey, prompt);
       }
       bodyText = out.text;
       aiModel = out.model;

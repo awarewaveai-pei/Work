@@ -1,5 +1,7 @@
 // Claude API client for cold outreach message generation.
 // SECURITY: API key is passed in; NEVER log it.
+import { providerUrl } from "@/lib/ai/gateway";
+import type { Grant } from "@/lib/entitlements/can";
 
 export interface ClaudeResult {
   text: string;
@@ -10,11 +12,12 @@ export const DEFAULT_CLAUDE_MODEL =
   process.env.CLAUDE_OUTREACH_MODEL?.trim() || "claude-haiku-4-5-20251001";
 
 export async function generateWithClaude(
+  grant: Grant,
   apiKey: string,
   prompt: string,
   model = DEFAULT_CLAUDE_MODEL,
 ): Promise<ClaudeResult> {
-  const resp = await fetch("https://api.anthropic.com/v1/messages", {
+  const resp = await fetch(providerUrl(grant, "anthropic", "/v1/messages"), {
     method: "POST",
     headers: {
       "content-type": "application/json",

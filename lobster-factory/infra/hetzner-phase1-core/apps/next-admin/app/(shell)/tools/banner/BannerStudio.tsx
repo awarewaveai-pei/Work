@@ -7,6 +7,7 @@ import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { STUDIO_MODEL_OPTIONS, modelSupportsRefs, modelCompositesProduct, type StudioModel } from "@/lib/studio/model-options";
 import { STYLE_CATALOG } from "../tarot/tarotStyles";
 import { resolveStylePrompt } from "../tarot/cards";
+import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 
 // ---------------------------------------------------------------------------
 // Size presets & constants
@@ -985,6 +986,7 @@ function StepCard({
 // ---------------------------------------------------------------------------
 
 export default function BannerStudio() {
+  const { canUse, why } = usePaidFeatures();
   const [s, setS]         = useState<State>(INIT);
   const bgFileRef         = useRef<HTMLInputElement>(null);
   const productFileRef    = useRef<HTMLInputElement>(null);
@@ -1470,11 +1472,11 @@ export default function BannerStudio() {
                 </div>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button className="btn btn-primary" disabled={s.copyGenerating || s.designing || !s.copyBrief.trim()}
+                <button title={why("video.script")} className="btn btn-primary" disabled={(s.copyGenerating || s.designing || !s.copyBrief.trim()) || !canUse("video.script")}
                   onClick={generateCopy}>
                   {s.copyGenerating ? "生成中…" : "生成文案"}
                 </button>
-                <button className="btn btn-primary" disabled={s.designing || s.copyGenerating || !s.copyBrief.trim()}
+                <button title={why("video.script")} className="btn btn-primary" disabled={(s.designing || s.copyGenerating || !s.copyBrief.trim()) || !canUse("video.script")}
                   onClick={generateFullDesign}
                   style={{ background: "linear-gradient(135deg,#7c3aed,#ec4899)", border: "none" }}>
                   {s.designing ? "設計中…" : "✨ AI 一鍵設計整張"}

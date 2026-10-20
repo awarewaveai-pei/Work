@@ -16,6 +16,7 @@
  * lib/command-plane/handlers/_anthropic.ts.
  */
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 import { checkRankMath, type RankMathReport, type RankMathCheck } from "../seo/rankmath-checker";
 import { logAiCall } from "../ai/log-ai-call";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "../ai/gateway";
@@ -191,7 +192,7 @@ export async function generateProductCopy(input: ProductCopyInput): Promise<Prod
     : "";
   const userContent = `Product design brief:\n${JSON.stringify(brief, null, 2)}${directive}${fixBlock}`;
 
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(await grantFor("studio.product-copy"));
   const client = new Anthropic({ apiKey });
   let text: string;
   try {

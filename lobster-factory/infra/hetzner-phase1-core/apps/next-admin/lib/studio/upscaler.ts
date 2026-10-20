@@ -10,6 +10,8 @@
  */
 import { putDesignObject } from "../storage/r2";
 import { randomUUID } from "node:crypto";
+import { providerUrl } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 
 const REALESRGAN_VERSION_DEFAULT =
   "b3ef194191d13140337468c916c2c5b96dd0cb06dffc032a022a31807f6a5ea8"; // nightmareai/real-esrgan (live-verified pin 2026-06-11)
@@ -78,9 +80,10 @@ async function runOnePass(
   scale: number,
   signal: AbortSignal,
 ): Promise<{ ok: true; outputUrl: string } | { ok: false; error: string }> {
+  const grant = await grantFor("studio.upscale");
   let res: Response;
   try {
-    res = await fetch("https://api.replicate.com/v1/predictions", {
+    res = await fetch(providerUrl(grant, "replicate", "/v1/predictions"), {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({ version, input: { image: imageUrl, scale, face_enhance: false } }),
@@ -102,7 +105,7 @@ async function runOnePass(
     if (signal.aborted) return { ok: false, error: "upscale_timeout" };
     await sleep(POLL_INTERVAL_MS);
     try {
-      const poll = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+      const poll = await fetch(providerUrl(grant, "replicate", `/v1/predictions/${prediction.id}`), {
         headers: { Authorization: `Bearer ${token}` },
         signal,
       });

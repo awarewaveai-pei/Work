@@ -2,7 +2,7 @@ import { createPrivateKey } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { can, type CanDependencies, type EntitlementRecord } from "../can";
+import { issuePermit as can, type CanDependencies, type EntitlementRecord } from "../can";
 import { canonicalize, PermitError, signPermit, verifyPermit, type PermitBinding, type PermitPayload } from "../permit";
 
 interface Vector {

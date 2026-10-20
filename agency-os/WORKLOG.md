@@ -1,4 +1,37 @@
 # Worklog
+## 2026-10-20（續3）ADR 017 第 3 項：每個收費點只問 can()（影子模式）；認知平台 can() 薄接頭＋取許可；灰掉沒買的按鈕；付費 provider 只走一道縫；真 DB enforce e2e
+
+**觸發**：操作者「繼續做客戶怎麼來第 3 項」→「快去完美完善完整做好」→「修 Codex 第 3 輪 2–4，commit；1（定價）我決定」（卡 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-3.md`；2026-10-19 起做，筆電沒電中斷一次，暫停點 `agency-os/handoffs/2026-10-19-adr017-step3-resume.md`）。
+
+**根因／現況**：next-admin 側前一個 session 寫完未提交（2026-10-19 14:25 後無人動）：`lib/entitlements/can.ts` `can()`＋`Grant`、`grant.ts` `withFeature`／`grantFor`、`subject.ts`、`runtime.ts`、`route-features.ts`、`lib/ai/gateway.ts` loader 必帶 grant、`lib/social/authz.ts` `actorFor`、12 條收費路由＋11 個 lib 呼叫端。本 session 補其餘全部。
+
+**做法**
+- 認知平台 `ai_lego/platform/entitlement/check.py` 重寫成 `can()` 薄接頭：`check_entitlement(store, tenant_id, feature_key, actor) -> Grant`（唯讀）；先看 `X-AwareWave-Permit`（`PermitHeaderMiddleware` → ContextVar），沒有就向 next-admin issuer 要；一律本地驗章＋綁（計費帳戶、cognitive、feature、actor），驗過才快取到到期前 30 秒；`ENTITLEMENT_MODE` 只認 `enforce`；shadow 拒絕寫 `entitlement.would_deny`、設定／issuer 壞寫 `entitlement.infra_error`，都放行；tenant 停用兩模式都拒。`IdentityStore` 改 Protocol（AI gateway import 它，CLI AI 路徑不得碰到案件 repo：`test_block_foundation` 抓到）。
+- `ai_lego/apps/api/main.py` 9 處 → 一個 `require_entitlement`（actor＝`cognitive:<identity_id>`）；向 issuer 要許可的 HTTP 放在新網路縫 `ai_lego/platform/net/entitlement_issuer.py`（同 collect 的 `app.aware-wave.com`，不加新 host），登記進 `test_egress_allowlist_parity.py:75` 與 `test_block_verify.py:1140` 兩份網路縫清單（那兩個測試寫明「新 net 模組是決定」——決定依據＝本卡 ADR 017 §4）；`ai_execution/gateway.py` `AIGateway(registry, *, grant)` 必填，外部 provider 要 allowed grant，`None` 只准本機 Ollama。`deploy/.env.example` 加 5 個 `ENTITLEMENT_*`；部署藍圖第 2 點簽章更新。
+- next-admin 新增：`lib/entitlements/issuer.ts`＋`app/api/internal/entitlements/permit/[product]/route.ts`（每產品一把 Bearer，只簽該產品功能、`<product>:<id>` actor、根組織）；`lib/entitlements/features.ts`＋`app/api/entitlements/features/route.ts`（`verdictOf` 不寫稽核、Ed25519 簽章、伺服器每帳號快取 5 分鐘）；`lib/entitlements/use-paid-features.ts`（載入中／失敗不灰）；灰按鈕：ContentStudio 8 顆、SeoCheckPanel 1、BannerStudio 2、TarotStudio 1；VideoStudio 自動一致性檢查沒權利就不跑；ScriptForge 所有按鈕走模組級 `claude()`，閘放那裡＋頁首提示。
+- Codex oracle 三輪，逐項 grep 驗真：
+  - 第一輪（`agency-os/reports/oracle/2026-10-19-partialreview-56ebcd13.md`）5 項全修：C1 `grantFor({orgId})` 有人呼叫時繞過 `actorFor` → `refuseBeforeVerdict` `not_authorized_for_org`；M2/M3 grant 可改 → TS freeze、Python `__setattr__` 擋；M4 actor 契約 → issuer 只簽 `<product>:<id>`、check.py docstring；M5 debit 後 audit 失敗 throw＋隨機冪等鍵 → 冪等鍵必填、debit 後 audit 只 log。
+  - 第二輪（`2026-10-19-partialreview-cc8242fa.md`）4 項全修：C 直接打 provider HTTP 繞過 gateway（22 處：文章、cheap-json、KB embedding、outreach×3、studio×4、tarot×2、script-forge、image-edit-prompt）→ `lib/ai/gateway.ts` `providerUrl(grant, provider, path)` 是唯一拼 provider 網址處＋boundary test；M grant.subject 可改 → 複製後 freeze；M shadow 下 allowed 的 credits 仍會扣點 → `report()` 只在 enforce 扣；M 瀏覽器端清單快取跨帳號 → 瀏覽器不快取。
+  - 第三輪（`2026-10-19-partialreview-f80ff6a5.md`）4 項：F1 沒有路由呼叫 `grant.report()` ＝定價，**操作者決定**（`ledger.ts` `DEFAULT_CREDIT_POLICY` 佔位，ADR 017 §4 已寫）；F2 outreach 草稿算到員工的 internal 帳戶 → `app/api/outreach/messages/route.ts` 經 `actorFor(req, lead.organization_id)` 傳 `acting`，沒角色就照樣指名該 org（閘回 `not_authorized_for_org`，shadow 放行稽核、enforce 拒→退回 manual_prompt）；F3 collect 付費搜尋／抽取 vendor 沒 grant → `lib/collect/net/providers.ts` `createProviderCall({ grant: Grant | null })` 必填，沒 grant 或被拒就在發請求前丟 `entitlement_*`（kind unconfigured，免費爬取照跑），`run.ts` `runCollection` 以該 org 取 `collect.fetch`、research run 取 internal（COS 端已檢 `research.collect`）；F4 boundary test 擋不到 `"https://api." + "openai.com"` → 先把 `+` 鏈與 template 的字面片段接起來再比對。
+  - 第四輪（`2026-10-20-partialreview-4683e414.md`，F2–F4 修正）3 項：provider host 比對大小寫敏感 → regex 加 `i`＋測試；dry run 取 grant 會寫稽核列（違反「dry run 不留痕」）→ dry run 用不寫稽核的 deps（判決相同）＋測試；provider 網址由環境變數組成擋不到 → 今天 app/lib 沒有任何 provider base 來自 env（grep `_API_BASE|_BASE_URL` 無 provider 命中），不寫無對象的檢查，邊界寫進 ADR 017 §4（新 provider origin 只准放 `PROVIDER_ORIGINS`）。
+- **不變量分析**（同一 reviewer 第 3 次報同一段，AGENTS §4）：不變量＝「每個付費 vendor 請求都帶著對**正確計費帳戶**的 allowed grant，且這件事由一個地方機械保證」。三輪抓到的都是「另有一條路沒經過縫」：SDK 載入（gateway loader）、直打 HTTP（`providerUrl`）、collect vendor（`createProviderCall` 必填 grant）、算錯帳戶（`actorFor`／`acting`）。關整類的做法：付費呼叫只剩三道縫（gateway loader、`providerUrl`、`createProviderCall`），三道都以型別要求 grant；provider host 在 app/lib 任何字串（含拼接）出現於縫外即測試紅。剩餘邊界：新 vendor 不在 `PROVIDER_ORIGINS`／collect registry 的會不受測試保護——加 vendor 必須加進其中之一（ADR 017 §4）。
+- 真 DB e2e 腳本固定 port 54331 在重開機後落入 Windows 保留區（`bind: forbidden`）→ 改每次挑空 port（`ENTITLEMENTS_REST_PORT` 仍可覆寫）。
+
+**驗證**
+- next-admin：`npx vitest run lib app` → 289 files／2704 passed／22 skipped；第四輪修正後 `npx vitest run lib/collect lib/entitlements app/api/outreach` → 529 passed；`npx tsc --noEmit` 唯一錯誤在 `lib/social/reports.ts:136`（另一 session 正在改，非本任務檔）（e2e 由下條跑）；卡上 9 個指名測試各 1 處命中。
+- 真 DB（enforce，拋棄式 Postgres＋PostgREST，不碰 prod）：`python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py` → 餘額 0 時清單 `content.title` 灰（no_credits）、`POST /api/content/title` 403 `{code:no_credits}`；寫一筆錢包 grant 後清單可用、路由過閘到 handler 的 503（沒放 API key，不打模型）；issuer 錯 token 401、無權利列 `no_entitlement`、insert active 列後簽出許可；Python `check_entitlement` enforce 驗過該真實許可（`COGNITIVE_CHECK_VERIFIED_REAL_PERMIT_OK`），換 actor 被拒；`{"result":"PASS","production_touched":false}`。
+- COS：完整 `python scripts/affected_tests.py --run`（2026-10-19，15194 tests）1 失敗（`test_block_verify` 網路縫清單，見上）已修；之後只動 issuer 縫＋兩份清單＋`check.py`，針對跑 9 個模組 → 357 passed（2026-10-20，3 分 46 秒）。20:00 那輪完整重跑因停電中斷、無結果，未補跑。
+- 突變（TS 在 scratchpad 複本）：拔 `actorFor` 成員檢查 → `a staff actor without a role on the org is refused` 紅、還原綠；拔 `assertGrant` → `gateway refuses a call without a grant` 紅、還原綠；Python `mock.patch(gw.assert_grant)` → `test_gateway_refuses_a_call_without_a_grant` 紅、還原綠。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py` | exit=0 | ms=7740
+- REALTEST_EVIDENCE: tool=Bash | cmd=`python -m pytest tests/unit/test_entitlement_check.py tests/unit/test_gateway.py tests/unit/test_block_foundation.py tests/unit/test_block_verify.py tests/unit/test_egress_allowlist_parity.py tests/unit/test_block_govern.py tests/unit/test_api_main.py tests/unit/test_second_coder.py tests/unit/test_every_paid_call_is_metered.py` | exit=0 | ms=228605
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=2c/14m/0n
+  - external oracle = Codex CLI，四輪（`2026-10-19-partialreview-56ebcd13.md`、`cc8242fa`、`f80ff6a5`、`2026-10-20-partialreview-4683e414`）；除 F1 定價外全修、各加測試
+- ORACLE_WAIVED: 第四輪後只改 regex `i` 旗標與 dry-run 不寫稽核兩處，各有指名測試（`import-boundary.test.ts` 大寫 host、`collect-run-rate-limit-wiring.test.ts` dry run 稽核）；不再跑第五輪
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,Projects/internal/cognitive-engineering-os | grep=check_entitlement | hits=33
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep=api\.openai\.com|api\.anthropic\.com|api\.replicate\.com | hits=4
+  - 4 處全在 `lib/ai/gateway.ts` `PROVIDER_ORIGINS`（允許處）
+
+**避免再發生**：TS／Python 兩邊 gate 規則（只認 `enforce`、grant 唯讀、冪等鍵必填、只有 enforce 扣點、許可驗過才快取）各有測試；付費呼叫只有三道縫且型別要求 grant，provider host 縫外出現（含拼接）測試紅；真 DB 腳本可重跑；新產品服務照 ADR 017 §4「獨立產品服務取許可」接。
 ## 2026-10-20（續2）System Foundry v1.7 加 V17-7 能力驗收補齊、V17-8 產品 manifest 補齊；監工台現算進度並擋假完成
 
 **觸發**：操作者問「這會處理所有的問題？」→「要，但要怎知道有沒有做？」

@@ -147,7 +147,7 @@ class AssembleWithModelSecondCoderTests(unittest.TestCase):
 
 class GatewayOptionsTests(unittest.TestCase):
     def test_ollama_payload_carries_seed_and_temperature_only_when_given(self):
-        gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b"}})
+        gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b"}}, grant=None)
         with mock.patch.object(egress._LOOPBACK_OPENER, "open") as opened:
             opened.return_value.__enter__.return_value.read.return_value = json.dumps({"message": {"content": "[]"}}).encode("utf-8")
             gateway.complete("local", system="s", prompt="p", seed=42, temperature=0.0)

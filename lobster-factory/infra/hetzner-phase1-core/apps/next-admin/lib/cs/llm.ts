@@ -4,6 +4,7 @@
 
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { loadGoogleGenerativeAI } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 import { logAiCall } from "@/lib/ai/log-ai-call";
 import { CS_MODELS, CS_TIMEOUTS } from "@/lib/cs/config";
 import { claudeParams } from "@/lib/ai/gateway";
@@ -24,7 +25,7 @@ export async function claudeTurn(input: ClaudeTurnInput): Promise<Anthropic.Mess
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error("missing ANTHROPIC_API_KEY");
 
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(await grantFor("cs.answer", { orgId: input.organizationId }));
   const client = new Anthropic({ apiKey });
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), input.timeoutMs ?? CS_TIMEOUTS.generateMs);
@@ -71,10 +72,10 @@ const withTimeout = <T>(p: Promise<T>, ms: number): Promise<T> => {
 };
 
 /** Gemini text completion — the failover path. Throws if GEMINI_API_KEY missing. */
-async function geminiText(prompt: string, timeoutMs: number): Promise<string> {
+async function geminiText(prompt: string, timeoutMs: number, organizationId?: string | null): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("missing GEMINI_API_KEY");
-  const GoogleGenerativeAI = await loadGoogleGenerativeAI();
+  const GoogleGenerativeAI = await loadGoogleGenerativeAI(await grantFor("cs.answer", { orgId: organizationId }));
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: CS_MODELS.geminiFallback });
   const result = await withTimeout(model.generateContent(prompt), timeoutMs);
@@ -118,7 +119,7 @@ export async function generateText(opts: GenerateTextInput): Promise<GenerateTex
     throw new Error("empty_claude_response");
   } catch {
     // Failover. If Gemini also fails, let it throw — orchestrator catches and routes to a human.
-    const text = await geminiText(`${opts.system}\n\n${opts.user}`, timeoutMs);
+    const text = await geminiText(`${opts.system}\n\n${opts.user}`, timeoutMs, opts.organizationId);
     return { text, provider: "gemini" };
   }
 }

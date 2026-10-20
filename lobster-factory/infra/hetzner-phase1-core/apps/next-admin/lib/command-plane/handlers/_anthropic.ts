@@ -9,6 +9,7 @@
 // for rate-limit / overload / transient conditions that resolve themselves.
 
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 import * as Sentry from "@sentry/nextjs";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/gateway";
 
@@ -43,7 +44,7 @@ export async function generateSummary(input: AnthropicSummaryInput): Promise<str
     return `_AI summary unavailable: ANTHROPIC_API_KEY not configured._\n${rawFallback(input.payload)}`;
   }
 
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(await grantFor("ops.command-plane"));
   const client = new Anthropic({ apiKey });
 
   try {

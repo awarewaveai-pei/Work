@@ -13,6 +13,8 @@
  */
 
 import { fetchWithRetry429, REPLICATE_POLL_MS, isAllowedOutputUrl } from "./image-gen";
+import { providerUrl } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 
 const GEN_TIMEOUT_MS = 280_000; // 留在 nginx app.aware-wave.com /api/ 的 proxy_read_timeout 300s 內
 // 影片比圖片檔案大很多（5-8s 720p 常見 5-20MB）；20MB（image-gen.ts 的圖片上限）太緊，但box 本來就
@@ -105,6 +107,7 @@ export async function generateVideoMotion(
   motionPrompt: string,
   aspectRatio: "16:9" | "9:16" = "16:9",
 ): Promise<VideoMotionOutcome> {
+  const grant = await grantFor("tarot.motion");
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate_api_token" };
   const config = MOTION_MODELS[model];
@@ -114,7 +117,7 @@ export async function generateVideoMotion(
   try {
     const input = config.buildInput({ imageUrl, prompt: motionPrompt, aspectRatio, durationSec: config.defaultDurationSec });
     const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Prefer: "wait" };
-    const createRes = await fetchWithRetry429(`https://api.replicate.com/v1/models/${config.slug}/predictions`, {
+    const createRes = await fetchWithRetry429(providerUrl(grant, "replicate", `/v1/models/${config.slug}/predictions`), {
       method: "POST", headers, body: JSON.stringify({ input }), signal: controller.signal,
     });
     if (!createRes.ok) {

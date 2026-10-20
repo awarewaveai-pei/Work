@@ -11,6 +11,9 @@ import { entityDossierCollector } from "@/lib/collect/collectors/entity-dossier"
 import { createProviderCall } from "@/lib/collect/net/providers";
 import { createBudget } from "@/lib/collect/budget";
 import { canonicalize } from "@/lib/collect/canonical";
+import { collectGrant } from "./grant-fixture";
+
+const GRANT = await collectGrant();
 
 const LIVE = process.env.COLLECT_CLAIM_LIVE === "1";
 
@@ -38,7 +41,7 @@ describe.skipIf(!LIVE)("claim search, live", () => {
         fetch: async () => {
           throw new Error("this test fetches no page");
         },
-        callProvider: createProviderCall({ budget }),
+        callProvider: createProviderCall({ grant: GRANT, budget }),
         canonicalize,
         budget,
         tenantRef: "live",

@@ -67,6 +67,7 @@ from typing import Any
 
 from ai_lego.errors import AdapterUnavailable, InvariantViolation
 from ai_lego.platform.ai_gateway.provider import AnthropicProvider
+from ai_lego.platform.entitlement.check import Grant, assert_grant
 from ai_lego.platform.net.egress import fetch_loopback_json
 
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
@@ -102,8 +103,11 @@ class AIGateway:
     module is the invocation path, not the registry's own validator.
     """
 
-    def __init__(self, registry: dict[str, dict[str, Any]], *, api_key: str | None = None) -> None:
+    def __init__(self, registry: dict[str, dict[str, Any]], *, grant: Grant | None, api_key: str | None = None) -> None:
+        """``grant`` is required (ADR 017 §4): an allowed ``check_entitlement`` grant before any external (paid) provider;
+        ``None`` is accepted only for loopback Ollama, which bills no one."""
         self.registry = registry
+        self._grant = grant
         self._api_key = api_key
 
     def _entry(self, model_profile_id: str) -> dict[str, Any]:
@@ -135,6 +139,8 @@ class AIGateway:
                 f"(model profile {model_profile_id!r}) -- policies/ai-execution/network-egress.yaml rule EGRESS-MP64-1 (EC §101). "
                 f"Select a non-external-model profile (provider='self-hosted') instead."
             )
+        if provider in EXTERNAL_MODEL_PROVIDERS:
+            assert_grant(self._grant)
         if provider == "anthropic":
             return self._complete_anthropic(model_profile_id, entry, system=system, prompt=prompt, max_tokens=max_tokens, trace_id=trace_id, prompt_version=prompt_version)
         if provider == "self-hosted":

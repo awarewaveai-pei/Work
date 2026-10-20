@@ -1138,7 +1138,8 @@ class EngineReachesNothingOutsideTests(unittest.TestCase):
         texts = {path.relative_to(lego).as_posix(): path.read_text(encoding="utf-8") for path in lego.rglob("*.py")}
         self.assertEqual(sorted(f"{name}: {word}" for name, text in texts.items() for word in banned if word in text), [])
         self.assertEqual(sorted(name for name, text in texts.items() if "fetch_json" in text),
-                         ["platform/ai_gateway/provider.py", "platform/net/collection_service.py", "platform/net/egress.py"])
+                         ["platform/ai_gateway/provider.py", "platform/net/collection_service.py", "platform/net/egress.py",
+                          "platform/net/entitlement_issuer.py"])   # ADR 017 §4 permit issuer, same host as collect
 
     def test_the_allowlist_keeps_only_the_ai_provider_and_collect(self):
         from tests.unit.test_egress_allowlist_parity import _compose_allowlist

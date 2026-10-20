@@ -18,6 +18,11 @@ import { httpHtmlCollector } from "@/lib/collect/collectors/http-html";
 import { createCollectFetch } from "@/lib/collect/net/fetcher";
 import { RateLimiter } from "@/lib/collect/net/rate-limit";
 import type { Target } from "@/lib/collect/types";
+import { collectGrant } from "./grant-fixture";
+import { can } from "@/lib/entitlements/can";
+import { CUSTOMER, gateFixture } from "@/lib/entitlements/__tests__/gate-fixtures";
+
+const GRANT = await collectGrant();
 
 const KEY_ENV = "FIRECRAWL_API_KEY";
 const ARTICLE = "退貨政策：商品到貨後七日內可申請退貨，商品需保持完整包裝與配件，恕不接受人為損壞。".repeat(6);
@@ -77,7 +82,7 @@ describe("createProviderCall", () => {
 
   it("injects the credential and refuses to let a caller replace it", async () => {
     let sent: Record<string, string> = {};
-    const call = createProviderCall({
+    const call = createProviderCall({ grant: GRANT,
       budget: createBudget(),
       env,
       transport: (async (_u: string | URL, init?: RequestInit) => {
@@ -90,29 +95,40 @@ describe("createProviderCall", () => {
     expect(sent.authorization).toBe("Bearer fc-secret");
   });
 
+  it("a paid vendor is never called without an allowed collect.fetch grant (ADR 017 §4)", async () => {
+    const transport = vi.fn(async () => firecrawlResponse("x"));
+    const refused = await can(CUSTOMER, "collect.fetch", "system", gateFixture({ balance: 0 }).deps);
+    for (const grant of [null, refused]) {
+      const call = createProviderCall({ grant, budget: createBudget(), env, transport: transport as unknown as typeof fetch });
+      await expect(call("firecrawl", { path: "/v1/scrape", body: { url: "https://shop.example.com/" } }))
+        .rejects.toMatchObject({ message: expect.stringMatching(/^entitlement_/), kind: "unconfigured" });
+    }
+    expect(transport).not.toHaveBeenCalled();
+  });
+
   it("will not let a block send the call somewhere else", async () => {
-    const call = createProviderCall({ budget: createBudget(), env, transport: (async () => firecrawlResponse("x")) as unknown as typeof fetch });
+    const call = createProviderCall({ grant: GRANT, budget: createBudget(), env, transport: (async () => firecrawlResponse("x")) as unknown as typeof fetch });
     // A path, never a URL: the origin belongs to the registry.
     await expect(call("firecrawl", { path: "https://attacker.test/steal" })).rejects.toThrow(/absolute_path_not_allowed/);
     await expect(call("firecrawl", { path: "//attacker.test/steal" })).rejects.toThrow(/absolute_path_not_allowed/);
   });
 
   it("says so plainly when the provider is not configured", async () => {
-    const call = createProviderCall({ budget: createBudget(), env: {}, transport: (async () => firecrawlResponse("x")) as unknown as typeof fetch });
+    const call = createProviderCall({ grant: GRANT, budget: createBudget(), env: {}, transport: (async () => firecrawlResponse("x")) as unknown as typeof fetch });
     await expect(call("firecrawl", { path: "/v1/scrape" })).rejects.toThrow(/missing_FIRECRAWL_API_KEY/);
     await expect(call("nope", { path: "/v1/scrape" })).rejects.toThrow(/unknown_provider_nope/);
   });
 
   it("charges the run budget, and stops when it is gone", async () => {
     const budget = createBudget({ fetches: 1 });
-    const call = createProviderCall({ budget, env, transport: (async () => firecrawlResponse("x")) as unknown as typeof fetch });
+    const call = createProviderCall({ grant: GRANT, budget, env, transport: (async () => firecrawlResponse("x")) as unknown as typeof fetch });
     await call("firecrawl", { path: "/v1/scrape" });
     expect(budget.snapshot().spent.fetches).toBe(1);
     await expect(call("firecrawl", { path: "/v1/scrape" })).rejects.toThrow(/budget_exhausted/);
   });
 
   it("reports a vendor error as a status the orchestrator can classify", async () => {
-    const call = createProviderCall({
+    const call = createProviderCall({ grant: GRANT,
       budget: createBudget(),
       env,
       transport: (async () => new Response("{}", { status: 402 })) as unknown as typeof fetch,
@@ -124,7 +140,7 @@ describe("createProviderCall", () => {
 
   it("allows Perplexity only on /search — chat/agent endpoints never leave the process", async () => {
     const hit: string[] = [];
-    const call = createProviderCall({
+    const call = createProviderCall({ grant: GRANT,
       budget: createBudget(),
       env: { PERPLEXITY_API_KEY: "pplx-test" },
       transport: (async (u: string | URL) => {
@@ -182,7 +198,7 @@ describe("degradation: JS-rendered page", () => {
         rateLimiter: new RateLimiter({ ratePerSecond: 1000, burst: 1000 }),
         robots: null,
       }),
-      callProvider: createProviderCall({
+      callProvider: createProviderCall({ grant: GRANT,
         budget,
         env: { [KEY_ENV]: "fc-secret" },
         transport: (async (_u: string | URL, init?: RequestInit) => {

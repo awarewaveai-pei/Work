@@ -1,4 +1,5 @@
 import { loadAnthropic } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 /**
  * trending-sources.ts — 搜尋積木家族（kind:"search"）
  *
@@ -29,7 +30,7 @@ export async function aiChat(prompt: string, _timeoutMs = 10000): Promise<string
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return "";
   try {
-    const Anthropic = await loadAnthropic();
+    const Anthropic = await loadAnthropic(await grantFor("content.trending"));
     const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
       model: "claude-haiku-4-5-20251001",

@@ -72,7 +72,8 @@ class EgressAllowlistParityTests(unittest.TestCase):
         self.assertEqual(_compose_allowlist(), ENGINE_HOSTS)
         self.assertLessEqual(ENGINE_HOSTS, _policy_allowlist())   # the policy is the ceiling for several services; the engine uses two
         net = PRODUCT_ROOT / "ai_lego" / "platform" / "net"
-        self.assertEqual({path.stem for path in net.glob("*.py")}, {"__init__", "egress", "collection_service", "collect_lookups"})
+        self.assertEqual({path.stem for path in net.glob("*.py")}, {"__init__", "egress", "collection_service", "collect_lookups",
+                                                                     "entitlement_issuer"})   # ADR 017 §4 (2026-10-19): permits from the control plane, same host as collect
 
     def test_only_egress_opens_a_connection(self):
         """Codex 2026-10-04 F1: the CLI model gateway opened its own urllib connection to any endpoint.uri, and the SDK it

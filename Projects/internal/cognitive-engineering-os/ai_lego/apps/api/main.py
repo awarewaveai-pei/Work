@@ -76,7 +76,7 @@ import logging
 from ai_lego.errors import InvariantViolation, case_gone
 from ai_lego.platform.ai_execution.method_resolver import MethodCatalog
 from ai_lego.platform.ai_execution.capability_resolver import CapabilityCatalog, capability_refs, plan_executability
-from ai_lego.platform.entitlement.check import check_entitlement
+from ai_lego.platform.entitlement.check import PERMIT_HEADER, Grant, check_entitlement, current_permit
 from ai_lego.platform.ai_gateway.draft import AI_DRAFT_CAPABILITY, MAX_BRIEF_CHARS, MAX_LABELS_PER_REQUEST, AiDraftProviderError, draft_method_kwargs, draft_recipe_source, recipe_draft_plan
 from ai_lego.platform.ai_gateway.pricing import cost_twd
 from ai_lego.platform.ai_gateway.provider import (DEFAULT_MODEL, SCOPE_PERSON, SCOPE_TENANT, AiProvider, AnthropicProvider, ProviderCallError, budget_exceeded, daily_person_budget,
@@ -245,6 +245,28 @@ class ApiPrefixMiddleware:
 
 
 app.add_middleware(ApiPrefixMiddleware)
+
+
+class PermitHeaderMiddleware:
+    """Hands the request's X-AwareWave-Permit (ADR 017 §3 transport) to check_entitlement through a context variable."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        name = PERMIT_HEADER.lower().encode("latin-1")
+        value = next((v.decode("latin-1") for k, v in scope.get("headers", []) if k.lower() == name), None)
+        token = current_permit.set(value)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            current_permit.reset(token)
+
+
+app.add_middleware(PermitHeaderMiddleware)
 JOURNAL_KEY_RESOLVER: Callable[[str, str], bytes] | None = None
 
 
@@ -1116,8 +1138,7 @@ def run_recipe(
         raise HTTPException(status_code=501, detail=str(error)) from error
     capability_handlers = wrap_capability_handlers_with_artifact_persistence(capability_handlers, session["tenant_id"], artifact_store)
     for ref in [*method_ids, *capability_ids]:
-        if not check_entitlement(store, session["tenant_id"], ref):
-            raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {ref!r}")
+        require_entitlement(store, session, ref)
     source = body.get("source")
     if not isinstance(source, dict):
         raise HTTPException(status_code=400, detail="WORKFLOW_SOURCE_REQUIRED: body.source must be a JSON object")
@@ -1378,8 +1399,7 @@ def invoke_method(
     if not catalog.is_resolvable(method_id):
         raise HTTPException(status_code=404, detail=f"METHOD_RESOLUTION_BLOCKED: no ACTIVE contract for {method_id!r}")
 
-    if not check_entitlement(store, session["tenant_id"], method_id):
-        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {method_id!r}")
+    require_entitlement(store, session, method_id)
 
     try:
         builder = resolve_builder(method_id)
@@ -1418,16 +1438,15 @@ def invoke_capability(
     Generic over EVERY registered capability (see recipe_runtime.build_registered_capability_adapters),
     not chart-only -- deliberately not narrowed to artifact.generate_chart, matching this
     dispatch layer's existing "new capability needs zero new endpoint code" convention. Not a new
-    privilege boundary: check_entitlement is a Phase-1 stub granting any active tenant everything
-    regardless of ref (ai_lego/platform/entitlement/check.py), and any tenant could already reach
+    privilege boundary: require_entitlement asks the same per-ref question as a recipe run
+    (ai_lego/platform/entitlement/check.py), and any tenant could already reach
     every one of these same handlers today by composing a trivial 1-node custom workflow via
     POST /workflows/custom + /recipes/{id}/run (critic review, 2026-09-18)."""
     capability_catalog = CapabilityCatalog.from_spec_root(resolve_spec_root())
     if not capability_catalog.is_resolvable(capability_id):
         raise HTTPException(status_code=404, detail=f"CAPABILITY_RESOLUTION_BLOCKED: no ACTIVE contract for {capability_id!r}")
 
-    if not check_entitlement(store, session["tenant_id"], capability_id):
-        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {capability_id!r}")
+    require_entitlement(store, session, capability_id)
 
     try:
         adapters = build_api_capability_adapters(capability_catalog, [capability_id])
@@ -1527,13 +1546,21 @@ def _today_utc_start_iso() -> str:
     return now.strftime("%Y-%m-%dT00:00:00Z")
 
 
+def require_entitlement(store: IdentityStore, session: dict[str, Any], feature_key: str) -> Grant:
+    """The one entitlement gate of this API (ADR 017 §4 can(); shadow mode allows, enforce answers 403). The actor is the
+    signed-in person; the subject is the tenant's billing account."""
+    grant = check_entitlement(store, session["tenant_id"], feature_key, f"cognitive:{session['identity_id']}")
+    if not grant.allowed:
+        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {feature_key!r} ({grant.reason})")
+    return grant
+
+
 def _ai_budgets(provider: AiProvider | None, store: IdentityStore, session: dict[str, Any]) -> tuple[int, int]:
     """(this person's daily share, the tenant's daily ceiling), once the provider is configured and the tenant may use AI
     (503 / 403 otherwise). Either value misconfigured is a 503, never unlimited."""
     if provider is None:
         raise HTTPException(status_code=503, detail="AI_PROVIDER_UNCONFIGURED: set COGNITIVE_OS_ANTHROPIC_API_KEY (deploy/.env) to enable AI drafting")
-    if not check_entitlement(store, session["tenant_id"], AI_DRAFT_CAPABILITY):
-        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {AI_DRAFT_CAPABILITY!r}")
+    require_entitlement(store, session, AI_DRAFT_CAPABILITY)
     try:
         return daily_person_budget(), daily_token_budget()
     except InvariantViolation as error:
@@ -2817,8 +2844,7 @@ def create_project(
     store: IdentityStore = Depends(get_store),
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
 ) -> dict[str, Any]:
-    if not check_entitlement(store, session["tenant_id"], PROJECT_MANAGE_CAPABILITY):
-        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
+    require_entitlement(store, session, PROJECT_MANAGE_CAPABILITY)
     workspace_id = payload.workspace_id
     if workspace_id is None:
         workspaces = store.list_workspaces(session["tenant_id"])
@@ -2930,8 +2956,7 @@ def rename_project(
     """N-83: 專案名稱 is editable after creation (create_project's own name stays a one-time default, not a
     dead end)."""
     tenant_id = session["tenant_id"]
-    if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
-        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
+    require_entitlement(store, session, PROJECT_MANAGE_CAPABILITY)
     _project_or_404(repo, session, project_id)
     try:
         name = require_text("PROJECT", "name", payload.name, maximum=200)
@@ -2973,8 +2998,7 @@ def erase_project(
     要怎麼處理): a project that became a case since the page loaded (開案資料 saved in another tab) answers 409
     PROJECT_IS_A_CASE and is not erased -- checked inside the erasure's decision, under the case lock."""
     tenant_id = session["tenant_id"]
-    if not check_entitlement(store, tenant_id, PROJECT_MANAGE_CAPABILITY):
-        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {PROJECT_MANAGE_CAPABILITY!r}")
+    require_entitlement(store, session, PROJECT_MANAGE_CAPABILITY)
     erasure = erasure_for(repo, source_cas, artifact_store)
     if erasure.pending_for(tenant_id, ERASURE_CASE, project_id, session["identity_id"]):   # decided before, files not all gone yet
         result = _without_empty_failed({"project_id": project_id, **erasure.finish(tenant_id, ERASURE_CASE, project_id)})
@@ -3024,8 +3048,7 @@ def create_source(
     repo: ProjectSourceRepository = Depends(get_project_source_repository),
     source_cas: TenantScopedCas = Depends(get_source_cas),
 ) -> dict[str, Any]:
-    if not check_entitlement(store, session["tenant_id"], SOURCE_MANAGE_CAPABILITY):
-        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {session['tenant_id']!r} may not invoke {SOURCE_MANAGE_CAPABILITY!r}")
+    require_entitlement(store, session, SOURCE_MANAGE_CAPABILITY)
     project = _project_or_404(repo, session, project_id)
     if payload.media_type not in TEXT_MEDIA_TYPES:
         raise HTTPException(status_code=400, detail=f"SOURCE_MEDIA_TYPE_UNSUPPORTED: {payload.media_type!r} not in {sorted(TEXT_MEDIA_TYPES)} (Phase 1 Source Import is UTF-8 text only)")
@@ -3426,8 +3449,7 @@ def start_collection(project_id: str, payload: CollectionRequest, response: Resp
     saved once the run exists and before the Collection Service is asked; it raises to refuse, and the run then fails
     with nothing sent (VERIFY: one open 「去查」 per claim version, checked in the same save)."""
     tenant_id = session["tenant_id"]
-    if not check_entitlement(store, tenant_id, RESEARCH_COLLECT_CAPABILITY):
-        raise HTTPException(status_code=403, detail=f"ENTITLEMENT_DENIED: tenant {tenant_id!r} may not invoke {RESEARCH_COLLECT_CAPABILITY!r}")
+    require_entitlement(store, session, RESEARCH_COLLECT_CAPABILITY)
     _project_or_404(repo, session, project_id)
     seeds = _research_seeds(payload)
     fetches = (payload.budget or CollectionBudget()).fetches

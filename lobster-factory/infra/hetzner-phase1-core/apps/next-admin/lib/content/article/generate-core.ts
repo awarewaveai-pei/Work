@@ -1,4 +1,5 @@
-import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 import { DEFAULT_AI_TEXT_MODEL, isAiTextModel, isOpenAiTextModel, type AiTextModel } from "../../ai/text-model-options";
 import { logAiCall } from "../../ai/log-ai-call";
 import { claudeFallback, claudeParams } from "../../ai/gateway";
@@ -694,7 +695,7 @@ export async function* streamArticleGeneration(
     yield* streamOpenAiGeneration(config, signal);
     return;
   }
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(await grantFor("content.article"));
   const client = new Anthropic({ apiKey });
   let anthropicStream: ReturnType<typeof client.beta.messages.stream> | null = null;
   try {
@@ -784,13 +785,14 @@ async function* streamOpenAiGeneration(
   config: ArticlePreparedConfig,
   signal?: AbortSignal,
 ): AsyncGenerator<string, void, unknown> {
+  const grant = await grantFor("content.article");
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     yield "\n\n<!-- GENERATION_ERROR: OPENAI_API_KEY not configured -->";
     return;
   }
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetch(providerUrl(grant, "openai", "/v1/chat/completions"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

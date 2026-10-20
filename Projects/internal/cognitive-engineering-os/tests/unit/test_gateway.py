@@ -18,10 +18,19 @@ from unittest import mock
 
 from ai_lego.errors import AdapterUnavailable, InvariantViolation
 from ai_lego.platform.ai_execution.gateway import AIGateway, GatewayResult, ollama_available
+from ai_lego.platform.entitlement import check as entitlement
+from ai_lego.platform.entitlement.check import EntitlementRequired
 from ai_lego.platform.net import egress
 
 CLOUD = {"provider": "anthropic", "model_identifier": "claude-haiku-4-5-20251001"}
 ALLOWED = {egress.EGRESS_ALLOWLIST_ENV: "api.anthropic.com"}
+
+
+def _grant(allowed=True, reason=None):
+    return entitlement.Grant(entitlement._MINT, allowed=allowed, shadow=False, reason=reason, feature_key="ai.draft_record", subject="org-1", actor="cognitive:me")
+
+
+GRANT = _grant()
 
 
 def answer(payload):
@@ -41,12 +50,12 @@ def local(payload):
 
 class ModelProfileResolutionTests(unittest.TestCase):
     def test_unregistered_profile_raises_with_the_profile_id_named(self):
-        gateway = AIGateway({})
+        gateway = AIGateway({}, grant=None)
         with self.assertRaisesRegex(InvariantViolation, "MODEL_PROFILE_NOT_REGISTERED: 'missing-profile'"):
             gateway.complete("missing-profile", system="s", prompt="p")
 
     def test_unimplemented_provider_raises_naming_the_provider(self):
-        gateway = AIGateway({"p1": {"provider": "google", "model_identifier": "x"}})
+        gateway = AIGateway({"p1": {"provider": "google", "model_identifier": "x"}}, grant=None)
         with self.assertRaisesRegex(InvariantViolation, "PROVIDER_NOT_IMPLEMENTED: 'google'"):
             gateway.complete("p1", system="s", prompt="p")
 
@@ -60,27 +69,27 @@ class EgressPolicyTests(unittest.TestCase):
     def test_restricted_to_external_model_is_denied_before_any_key_or_network_use(self):
         # api_key is deliberately a poison value: if the guard did not fire first, this test would instead
         # fail on an auth error, which would still prove the guard was bypassed but for the wrong reason.
-        gateway = AIGateway(self.registry, api_key="POISON-should-never-be-read")
+        gateway = AIGateway(self.registry, api_key="POISON-should-never-be-read", grant=GRANT)
         with mock.patch.object(egress._OPENER, "open") as opened:
             with self.assertRaisesRegex(InvariantViolation, "EGRESS_MP64_1_VIOLATION.*Restricted.*anthropic"):
                 gateway.complete("cloud", system="s", prompt="p", classification_tag="Restricted")
         opened.assert_not_called()
 
     def test_restricted_to_self_hosted_is_allowed_by_the_same_check(self):
-        gateway = AIGateway(self.registry)
+        gateway = AIGateway(self.registry, grant=None)
         with local({"message": {"content": "ok"}, "prompt_eval_count": 1, "eval_count": 1}):
             result = gateway.complete("local", system="s", prompt="p", classification_tag="Restricted")
         self.assertEqual(result.provider, "self-hosted")
 
     def test_non_restricted_classification_does_not_block_external_model(self):
-        gateway = AIGateway(self.registry, api_key="k")
+        gateway = AIGateway(self.registry, api_key="k", grant=GRANT)
         with mock.patch.dict("os.environ", ALLOWED), mock.patch.object(egress._OPENER, "open", return_value=claude()):
             for tag in ("Internal", None):
                 self.assertEqual(gateway.complete("cloud", system="s", prompt="p", classification_tag=tag).provider, "anthropic")
 
     def test_the_cloud_model_is_reached_only_through_the_egress_allowlist(self):
         """Codex 2026-10-04 F1: the SDK took ANTHROPIC_BASE_URL from the environment and never asked the allowlist."""
-        gateway = AIGateway(self.registry, api_key="k")
+        gateway = AIGateway(self.registry, api_key="k", grant=GRANT)
         with mock.patch.dict("os.environ", {egress.EGRESS_ALLOWLIST_ENV: "", "ANTHROPIC_BASE_URL": "https://elsewhere.example"}), \
                 mock.patch.object(egress._OPENER, "open") as opened:
             with self.assertRaisesRegex(AdapterUnavailable, "ANTHROPIC_CALL_FAILED: NETWORK_EGRESS_DENIED"):
@@ -94,7 +103,7 @@ class EgressPolicyTests(unittest.TestCase):
     def test_a_local_model_off_this_machine_is_refused_before_any_connection(self):
         """Codex 2026-10-04 F1: endpoint.uri could name any host, and a case's words went there over plain http."""
         for uri in ("http://ollama.example:11434", "http://localhost:11434", "http://10.0.0.5:11434", "file:///etc/passwd"):
-            gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b", "endpoint": {"uri": uri}}})
+            gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b", "endpoint": {"uri": uri}}}, grant=None)
             with mock.patch.object(egress._LOOPBACK_OPENER, "open") as opened:
                 with self.assertRaisesRegex(InvariantViolation, "NETWORK_EGRESS_DENIED"):
                     gateway.complete("local", system="s", prompt="p")
@@ -102,13 +111,27 @@ class EgressPolicyTests(unittest.TestCase):
 
 
 class AnthropicDispatchTests(unittest.TestCase):
+    def test_gateway_refuses_a_call_without_a_grant(self):
+        """ADR 017 §4: an external (paid) model call needs an allowed grant; the parameter cannot be left out."""
+        with self.assertRaises(TypeError):
+            AIGateway({"cloud": CLOUD}, api_key="k")
+        for grant, code in ((None, "missing_grant"), (_grant(False, "no_entitlement"), "no_entitlement")):
+            gateway = AIGateway({"cloud": CLOUD}, grant=grant, api_key="k")
+            with mock.patch.dict("os.environ", ALLOWED), mock.patch.object(egress._OPENER, "open") as opened:
+                with self.assertRaises(EntitlementRequired) as refused:
+                    gateway.complete("cloud", system="s", prompt="p")
+            self.assertEqual(refused.exception.code, code)
+            opened.assert_not_called()
+        with self.assertRaises(EntitlementRequired):
+            entitlement.Grant(object(), allowed=True, shadow=False, reason=None, feature_key="x", subject=None, actor="a")
+
     def test_missing_api_key_raises_adapter_unavailable_not_a_bare_key_error(self):
-        gateway = AIGateway({"cloud": CLOUD})
+        gateway = AIGateway({"cloud": CLOUD}, grant=GRANT)
         with self.assertRaisesRegex(AdapterUnavailable, "ANTHROPIC_API_KEY_MISSING"):
             gateway.complete("cloud", system="s", prompt="p")
 
     def test_successful_call_carries_trace_id_and_prompt_version_through(self):
-        gateway = AIGateway({"cloud": CLOUD}, api_key="k")
+        gateway = AIGateway({"cloud": CLOUD}, api_key="k", grant=GRANT)
         with mock.patch.dict("os.environ", ALLOWED), mock.patch.object(egress._OPENER, "open", return_value=claude("PONG", 5, 1)):
             result = gateway.complete("cloud", system="s", prompt="p", trace_id="T-1", prompt_version="v3")
         self.assertIsInstance(result, GatewayResult)
@@ -118,19 +141,19 @@ class AnthropicDispatchTests(unittest.TestCase):
 class OllamaDispatchTests(unittest.TestCase):
     def test_request_is_posted_to_the_configured_endpoint_uri(self):
         for uri in ("http://127.0.0.1:9999", "http://[::1]:9999"):
-            gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b", "endpoint": {"uri": uri}}})
+            gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b", "endpoint": {"uri": uri}}}, grant=None)
             with local({"message": {"content": "hi"}, "prompt_eval_count": 2, "eval_count": 4}) as opened:
                 gateway.complete("local", system="s", prompt="p")
             self.assertEqual(opened.call_args[0][0].full_url, f"{uri}/api/chat")
 
     def test_ollama_error_body_raises_adapter_unavailable_naming_the_model(self):
-        gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "missing-model"}})
+        gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "missing-model"}}, grant=None)
         with local({"error": "model not found"}):
             with self.assertRaisesRegex(AdapterUnavailable, "OLLAMA_CALL_FAILED.*missing-model"):
                 gateway.complete("local", system="s", prompt="p")
 
     def test_unreachable_service_raises_adapter_unavailable(self):
-        gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b"}})
+        gateway = AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b"}}, grant=None)
         with mock.patch.object(egress._LOOPBACK_OPENER, "open", side_effect=urllib.error.URLError("connection refused")):
             with self.assertRaisesRegex(AdapterUnavailable, "OLLAMA_UNAVAILABLE"):
                 gateway.complete("local", system="s", prompt="p")
@@ -165,7 +188,7 @@ class RealLoopbackTests(unittest.TestCase):
         self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
 
     def gateway(self, base):
-        return AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b", "endpoint": {"uri": base}}})
+        return AIGateway({"local": {"provider": "self-hosted", "model_identifier": "gemma3:4b", "endpoint": {"uri": base}}}, grant=None)
 
     def test_a_model_on_this_machine_answers_over_a_real_socket(self):
         result = self.gateway(self.base).complete("local", system="s", prompt="hello")

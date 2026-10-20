@@ -1,5 +1,6 @@
 import { logAiCall } from "./log-ai-call";
-import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 import { isAiTextModel, isOpenAiTextModel, normalizeAiTextModel, type AiTextModel } from "./text-model-options";
 import { claudeFallback, claudeIncomplete, claudeParams, claudeText } from "./gateway";
 
@@ -36,11 +37,12 @@ export async function generateCheapJsonText(args: CheapJsonTextArgs): Promise<Ch
 }
 
 async function generateOpenAiJsonText(args: CheapJsonTextArgs & { model: AiTextModel }): Promise<CheapJsonTextResult> {
+  const grant = await grantFor("ops.cheap-json");
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { ok: false, status: 503, error: "OPENAI_API_KEY not configured" };
 
   try {
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const res = await fetch(providerUrl(grant, "openai", "/v1/chat/completions"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -81,7 +83,7 @@ async function generateAnthropicJsonText(args: CheapJsonTextArgs & { model: AiTe
   if (!apiKey) return { ok: false, status: 503, error: "ANTHROPIC_API_KEY not configured" };
 
   try {
-    const Anthropic = await loadAnthropic();
+    const Anthropic = await loadAnthropic(await grantFor("ops.cheap-json"));
     const client = new Anthropic({ apiKey });
     const msg = await client.beta.messages.create({
       ...claudeParams(args.model, args.maxTokens, "low"),

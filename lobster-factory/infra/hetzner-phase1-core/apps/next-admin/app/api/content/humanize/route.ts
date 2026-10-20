@@ -1,4 +1,6 @@
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
@@ -22,7 +24,8 @@ const AI_WORDS_EXTENDED = [
   "Harnessing", "Elevating", "Robust", "Seamlessly", "Transformative",
 ];
 
-export async function POST(req: Request): Promise<Response> {
+export const POST = withFeature("content.humanize", handlePost);
+async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -70,7 +73,7 @@ TASK: Rewrite the provided content to:
 
 Output ONLY the rewritten content in Markdown format, no preamble or explanation.`;
 
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   let anthropicStream: ReturnType<typeof client.beta.messages.stream> | null = null;
 

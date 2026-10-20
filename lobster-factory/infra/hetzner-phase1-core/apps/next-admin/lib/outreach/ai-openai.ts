@@ -1,5 +1,7 @@
 // OpenAI API client for cold outreach message generation.
 // SECURITY: API key is passed in; NEVER log it.
+import { providerUrl } from "@/lib/ai/gateway";
+import type { Grant } from "@/lib/entitlements/can";
 
 export interface OpenAIResult {
   text: string;
@@ -10,11 +12,12 @@ export const DEFAULT_OPENAI_MODEL =
   process.env.OPENAI_OUTREACH_MODEL?.trim() || "gpt-4o-mini";
 
 export async function generateWithOpenAI(
+  grant: Grant,
   apiKey: string,
   prompt: string,
   model = DEFAULT_OPENAI_MODEL,
 ): Promise<OpenAIResult> {
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+  const resp = await fetch(providerUrl(grant, "openai", "/v1/chat/completions"), {
     method: "POST",
     headers: {
       "content-type": "application/json",

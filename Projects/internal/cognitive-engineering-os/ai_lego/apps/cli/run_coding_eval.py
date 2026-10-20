@@ -34,7 +34,7 @@ def _safe(name: str) -> str:
 
 def _run_one(model: str, dataset: dict, repeats: int, datasets: tuple[str, ...], stages: tuple[str, ...], out: Path) -> dict:
     registry = default_local_registry(model)
-    gateway = AIGateway(registry)
+    gateway = AIGateway(registry, grant=None)   # loopback Ollama only: bills no one
     print(f"== eval {model} ({len([c for c in dataset['cases'] if c['dataset'] in datasets and c['stage'] in stages])} cases x {repeats} repeats) ==", file=sys.stderr)
     record = run_eval(gateway, DEFAULT_LOCAL_MODEL_PROFILE, registry[DEFAULT_LOCAL_MODEL_PROFILE], dataset=dataset, repeats=repeats, datasets=datasets, stages=stages, progress=lambda line: print(line, file=sys.stderr))
     write_json(out / f"eval_run.{_safe(model)}.json", record)

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { loadAnthropic, type Anthropic, providerUrl } from "@/lib/ai/gateway";
+import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { normalizeAiTextModel, isOpenAiTextModel, type AiTextModel } from "@/lib/ai/text-model-options";
 import { claudeFallback, claudeParams } from "@/lib/ai/gateway";
@@ -28,7 +30,8 @@ interface ScriptForgeBody {
   model?: string;
 }
 
-export async function POST(req: Request): Promise<Response> {
+export const POST = withFeature("video.script", handlePost);
+async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return new NextResponse("forbidden", { status: 403 });
@@ -66,9 +69,9 @@ export async function POST(req: Request): Promise<Response> {
       const encoder = new TextEncoder();
       try {
         if (useOpenAi) {
-          await streamOpenAi(controller, encoder, model, prompt, apiKey, ac.signal);
+          await streamOpenAi(controller, encoder, model, prompt, apiKey, ac.signal, grant);
         } else {
-          await streamAnthropic(controller, encoder, model, prompt, apiKey, ac.signal);
+          await streamAnthropic(controller, encoder, model, prompt, apiKey, ac.signal, grant);
         }
       } catch (err) {
         // 串流已開始 → 無法改 HTTP status；把錯誤塞進串流尾端讓前端 JSON.parse 失敗時可見。
@@ -102,8 +105,9 @@ async function streamAnthropic(
   prompt: string,
   apiKey: string,
   signal: AbortSignal,
+  grant: Grant,
 ): Promise<void> {
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   const stream = await client.beta.messages.create(
     { ...claudeParams(model, MAX_TOKENS), ...claudeFallback(model), system: SYS, messages: [{ role: "user", content: prompt }], stream: true },
@@ -126,8 +130,9 @@ async function streamOpenAi(
   prompt: string,
   apiKey: string,
   signal: AbortSignal,
+  grant: Grant,
 ): Promise<void> {
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+  const res = await fetch(providerUrl(grant, "openai", "/v1/chat/completions"), {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({

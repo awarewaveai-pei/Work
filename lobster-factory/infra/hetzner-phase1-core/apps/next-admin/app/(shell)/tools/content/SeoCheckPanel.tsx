@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { RankMathReport, RankMathCheck } from "@/lib/seo/rankmath-checker";
+import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 
 interface FixResponse {
   ok: boolean;
@@ -238,6 +239,7 @@ export function SeoCheckPanel({
   articleMarkdown, focusKeyword, seoTitle, metaDescription, slug,
   onFixApply, onCost, onFix,
 }: Props) {
+  const { canUse, why } = usePaidFeatures();
   const [fixing,     setFixing]     = useState(false);
   const [fixError,   setFixError]   = useState("");
   const [fixMessage, setFixMessage] = useState("");
@@ -355,10 +357,10 @@ export function SeoCheckPanel({
           background: "var(--bg-subtle)",
           display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap",
         }}>
-          <button
+          <button title={onFix ? undefined : why("content.seo-fix")}
             className="btn-primary"
             onClick={handleFix}
-            disabled={fixing}
+            disabled={(fixing) || (!onFix && !canUse("content.seo-fix"))}
             style={{ fontSize: "12px", padding: "6px 14px" }}
           >
             {fixing ? "🤖 AI 修正中…" : "🤖 AI 自動修正 SEO"}

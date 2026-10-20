@@ -21,6 +21,9 @@ import { RateLimiter } from "@/lib/collect/net/rate-limit";
 import { createNullSink } from "@/lib/collect/sinks/null";
 import { httpHtmlCollector } from "@/lib/collect/collectors/http-html";
 import { webSearchCollector, SEARCH_SCHEME } from "@/lib/collect/collectors/web-search";
+import { collectGrant } from "./grant-fixture";
+
+const GRANT = await collectGrant();
 
 loadEnvFile({ path: path.resolve(__dirname, "../../../.env.local"), override: false });
 
@@ -64,7 +67,7 @@ describe.skipIf(!LIVE)("web search, live", () => {
           rateLimiter: new RateLimiter({ ratePerSecond: 1, burst: 2 }),
           log: (m) => log.push(m),
         }),
-        callProvider: createProviderCall({ budget, log: (m) => log.push(m) }),
+        callProvider: createProviderCall({ grant: GRANT, budget, log: (m) => log.push(m) }),
       });
 
       const searchLine = log.find((l) => l.startsWith("search "));

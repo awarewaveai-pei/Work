@@ -14,6 +14,9 @@ import { httpHtmlCollector } from "@/lib/collect/collectors/http-html";
 import { createCollectFetch } from "@/lib/collect/net/fetcher";
 import { RateLimiter } from "@/lib/collect/net/rate-limit";
 import type { Target } from "@/lib/collect/types";
+import { collectGrant } from "./grant-fixture";
+
+const GRANT = await collectGrant();
 
 const SECRET_ENV = "RENDERER_SHARED_SECRET";
 const ARTICLE = "Theo Farrell is Vice-Chancellor and President of La Trobe University. ".repeat(20);
@@ -66,7 +69,7 @@ describe("vendor selection", () => {
 describe("provider seam", () => {
   it("sends the secret in its own header, only to /render, and never lets a caller replace it", async () => {
     const seen: Array<{ url: string; headers: Record<string, string> }> = [];
-    const call = createProviderCall({
+    const call = createProviderCall({ grant: GRANT,
       budget: createBudget(),
       env: { [SECRET_ENV]: "real-secret" },
       transport: (async (u: string | URL, init?: RequestInit) => {
@@ -100,7 +103,7 @@ async function crawlOnce(cheap: Response, reply: () => Response) {
       rateLimiter: new RateLimiter({ ratePerSecond: 1000, burst: 1000 }),
       robots: null,
     }),
-    callProvider: createProviderCall({
+    callProvider: createProviderCall({ grant: GRANT,
       budget,
       env: { [SECRET_ENV]: "s" },
       transport: (async (_u: string | URL, init?: RequestInit) => {

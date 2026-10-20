@@ -9,6 +9,8 @@ const TABLES = new Set(["plans", "organization_entitlements", "organization_prod
 // These are separate boundaries: portal pages may read subscription state, but may not import SDKs.
 const sdkAllowed = (file: string) => file === "lib/ai/gateway.ts" || file.startsWith("lib/entitlements/");
 const tableAllowed = (file: string) => file.startsWith("lib/entitlements/") || file.startsWith("app/portal/");
+// Raw HTTP to a paid model provider: the origin may only be spelled in the gateway (providerUrl asserts the grant).
+const PROVIDER_HOST = /(?:api\.openai\.com|api\.anthropic\.com|generativelanguage\.googleapis\.com|api\.replicate\.com)/i;   // hosts are case-insensitive
 const PROVIDER_ADAPTERS = new Set(["lib/payments/woo.ts", "lib/auth/sources/awarewave-wp.ts", "lib/crm/fluentcrm.ts"]);
 
 function providerDependency(spec: string, file: string): boolean {
@@ -20,6 +22,26 @@ function providerDependency(spec: string, file: string): boolean {
     return /(?:^|\/)(?:wp-bridge[^/]*|woocommerce[^/]*|fluentcrm[^/]*)(?:\/|$)/i.test(resolved);
   }
   return /(?:^|[/@-])(?:wp-bridge|wordpress|woocommerce|fluentcrm)(?:[/@-]|$)/i.test(spec);
+}
+
+const isPlus = (n: ts.Node): n is ts.BinaryExpression => ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.PlusToken;
+const unwrap = (n: ts.Node): ts.Node => (ts.isParenthesizedExpression(n) ? unwrap(n.expression) : n);
+const insidePlus = (n: ts.Node): boolean => {
+  let p = n.parent;
+  while (p && ts.isParenthesizedExpression(p)) p = p.parent;
+  return !!p && isPlus(p);
+};
+/** A string literal, template or `+` chain that is not itself part of a bigger `+` chain (checked once, whole). */
+function isStringTop(n: ts.Node): boolean {
+  return (ts.isStringLiteralLike(n) || ts.isTemplateExpression(n) || isPlus(n)) && !insidePlus(n);
+}
+/** The literal text a string expression contributes; a non-literal operand contributes nothing (joins its neighbours). */
+function joinedText(n: ts.Node): string {
+  const u = unwrap(n);
+  if (ts.isStringLiteralLike(u)) return u.text;
+  if (ts.isTemplateExpression(u)) return u.head.text + u.templateSpans.map((s) => joinedText(s.expression) + s.literal.text).join("");
+  if (isPlus(u)) return joinedText(u.left) + joinedText(u.right);
+  return "";
 }
 
 function violations(content: string, file: string): string[] {
@@ -39,7 +61,12 @@ function violations(content: string, file: string): string[] {
       dependency(node.moduleReference.expression.text);
     } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteralLike(node.argument.literal)) {
       dependency(node.argument.literal.text);
-    } else if (ts.isCallExpression(node)) {
+    } else if (file !== "lib/ai/gateway.ts" && isStringTop(node)) {
+      // The whole string a piece of code can build: "api." + "openai.com" and `https://api.${x}openai.com` count too.
+      const text = joinedText(node);
+      if (PROVIDER_HOST.test(text)) found.push(`provider host ${PROVIDER_HOST.exec(text)?.[0]} outside lib/ai/gateway.ts providerUrl`);
+    }
+    if (ts.isCallExpression(node)) {
       const call = node.expression;
       const arg = node.arguments[0];
       if (arg && ts.isStringLiteralLike(arg)) {
@@ -74,6 +101,19 @@ describe("paid entry import boundaries (ADR 017)", () => {
     expect(failures).toEqual([]);
   });
 
+  it("every gateway loader call passes a grant and only can() mints one (step 3)", () => {
+    const sources = ["app", "lib"].flatMap((dir) => files(path.join(ROOT, dir)));
+    const failures = sources.flatMap((file) => {
+      const relative = path.relative(ROOT, file).split(path.sep).join("/");
+      const text = readFileSync(file, "utf8");
+      const found: string[] = [];
+      if (/\bload(?:Anthropic|GoogleGenerativeAI)\(\s*\)/.test(text)) found.push("gateway loader called without a grant");
+      if (relative !== "lib/entitlements/can.ts" && /\bnew Grant\(/.test(text)) found.push("Grant constructed outside can.ts");
+      return found.map((message) => `${relative}: ${message}`);
+    });
+    expect(failures).toEqual([]);
+  });
+
   it("detects the card's Replicate import and every loader spelling, including type imports", () => {
     const file = "lib/social/store.ts";
     for (const source of [
@@ -86,6 +126,18 @@ describe("paid entry import boundaries (ADR 017)", () => {
     ]) expect(violations(source, file)).toHaveLength(1);
     expect(violations('import Replicate from "replicate";', "app/portal/page.tsx")).toHaveLength(1);
     expect(violations('import Replicate from "replicate";', "lib/ai/gateway.ts")).toEqual([]);
+  });
+
+  it("a paid provider's host outside the gateway is a violation (raw fetch would skip the grant)", () => {
+    expect(violations('await fetch("https://api.openai.com/v1/chat/completions", {});', "lib/content/x.ts")).toHaveLength(1);
+    expect(violations('await fetch(`https://api.replicate.com/v1/models/${m}/predictions`);', "lib/tarot/x.ts")).toHaveLength(1);
+    expect(violations('const u = `${a}https://generativelanguage.googleapis.com/x`;', "lib/outreach/x.ts")).toHaveLength(1);
+    expect(violations('await fetch("https://api." + "openai.com/v1/chat/completions");', "lib/content/x.ts")).toHaveLength(1);
+    expect(violations('const u = ("https://api.repl" + (`icate.com`)) + path;', "lib/studio/x.ts")).toHaveLength(1);
+    expect(violations('const u = `https://api.${""}anthropic.com/v1/messages`;', "lib/outreach/x.ts")).toHaveLength(1);
+    expect(violations('await fetch("https://API.OpenAI.com/v1/chat/completions");', "lib/content/x.ts")).toHaveLength(1);
+    expect(violations('const o = { openai: "https://api.openai.com" };', "lib/ai/gateway.ts")).toEqual([]);
+    expect(violations(["// see https://api.openai.com/docs", 'const site = "https://openai.com";'].join(String.fromCharCode(10)), "lib/content/x.ts")).toEqual([]);
   });
 
   it("detects real table and vendor dependencies without treating UI text or comments as imports", () => {

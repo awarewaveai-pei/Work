@@ -1,4 +1,5 @@
 import { loadGoogleGenerativeAI } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 import type { Incident } from "@/lib/ops-inbox/types";
 
 const GEMINI_TIMEOUT_MS = 12_000;
@@ -9,7 +10,7 @@ export async function summarizeIncidentWithGemini(incident: Incident, evidenceTe
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("missing GEMINI_API_KEY");
 
-  const GoogleGenerativeAI = await loadGoogleGenerativeAI();
+  const GoogleGenerativeAI = await loadGoogleGenerativeAI(await grantFor("ops.inbox-ai"));
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
   const prompt = [

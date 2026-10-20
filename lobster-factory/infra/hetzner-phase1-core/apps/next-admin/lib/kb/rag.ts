@@ -30,17 +30,20 @@ import type {
   RetrievedChunk,
 } from "@/lib/kb/types";
 import type { MatchAttribution } from "@/lib/kb/db";
+import { providerUrl } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 
 class OpenAIEmbeddingProvider implements EmbeddingProvider {
   id = KB_EMBEDDING.model;
   dimensions = KB_EMBEDDING.dimensions;
   async embed(texts: string[]): Promise<number[][]> {
+  const grant = await grantFor("cs.answer");
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("missing OPENAI_API_KEY");
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), KB_TIMEOUTS.embedMs);
     try {
-      const res = await fetch("https://api.openai.com/v1/embeddings", {
+      const res = await fetch(providerUrl(grant, "openai", "/v1/embeddings"), {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({ model: KB_EMBEDDING.model, input: texts }),

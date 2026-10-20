@@ -1,4 +1,6 @@
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { logAiCall } from "@/lib/ai/log-ai-call";
@@ -32,7 +34,8 @@ async function fetchUrlText(url: string): Promise<string> {
   } catch { return ""; }
 }
 
-export async function POST(req: Request): Promise<Response> {
+export const POST = withFeature("content.brand-voice", handlePost);
+async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -55,7 +58,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: "需要至少 50 字的範例文字" }, { status: 400 });
   }
 
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   const msg = await client.messages.create({
     model: "claude-haiku-4-5-20251001",

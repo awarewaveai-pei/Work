@@ -14,6 +14,7 @@ import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
 import { resolveStylePrompt } from "@/app/(shell)/tools/tarot/cards";
 import { DEFAULT_IMAGE_MODEL, IMAGE_RATES } from "@/lib/ai/cost-model";
 import { AI_TEXT_MODEL_GROUPS as AI_MODEL_GROUPS, AI_TEXT_MODELS as AI_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-options";
+import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 
 // ─── Video config constants (mirrors VideoStudio) ────────────────────────────
 
@@ -509,6 +510,7 @@ function ChipBtn({ label, active, onClick, disabled }: { label: string; active: 
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function ContentStudio() {
+  const { canUse, why } = usePaidFeatures();
   const searchParams = useSearchParams();
   // 字串而非 searchParams 物件本身當依賴 —— 物件每次 render 都是新的，會讓下面的
   // effect 每 render 重跑並蓋掉操作者手動選的站。
@@ -2389,8 +2391,8 @@ export default function ContentStudio() {
                   <input className="form-input" value={form.keyword} onChange={e => setF("keyword", e.target.value)}
                     placeholder="例：藝術療癒" disabled={isGenerating} style={{ flex: 1 }} />
                   <div style={{ position: "relative" }}>
-                    <button className="btn-secondary" onClick={handleSuggestTitles}
-                      disabled={isGenerating || !form.keyword.trim() || titleLoading}
+                    <button title={why("content.title")} className="btn-secondary" onClick={handleSuggestTitles}
+                      disabled={(isGenerating || !form.keyword.trim() || titleLoading) || !canUse("content.title")}
                       style={{ whiteSpace: "nowrap", fontSize: "12px" }}>
                       {titleLoading ? "…" : "✨ 建議標題"}
                     </button>
@@ -2509,7 +2511,7 @@ export default function ContentStudio() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                 <label className="form-label" style={{ margin: 0 }}>Introductory Hook Brief</label>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <button type="button" disabled={isGenerating || hookBriefLoading || !form.keyword.trim()}
+                  <button type="button" disabled={(isGenerating || hookBriefLoading || !form.keyword.trim()) || !canUse("content.hook-brief")}
                     style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "4px", border: "1px solid var(--card-border)", cursor: "pointer", background: "var(--bg-hover)" }}
                     title={hookTypesSelected.size > 1 ? `為 ${hookTypesSelected.size} 個類型各生成一個 Hook 範例` : "AI 幫你寫一個 Hook 草稿"}
                     onClick={() => {
@@ -2638,8 +2640,8 @@ export default function ContentStudio() {
                 自訂大綱
                 <span style={{ fontWeight: 400, color: "var(--text-muted)", marginLeft: 6 }}>— ## H2、### H3、#### H4；每個標題含關鍵字或近義變體，生成全文時嚴格遵循</span>
               </label>
-              <button className="btn-secondary" style={{ fontSize: "12px" }}
-                onClick={handleGenOutline} disabled={isGenerating || !form.keyword.trim() || outlineLoading}>
+              <button title={why("content.outline")} className="btn-secondary" style={{ fontSize: "12px" }}
+                onClick={handleGenOutline} disabled={(isGenerating || !form.keyword.trim() || outlineLoading) || !canUse("content.outline")}>
                 {outlineLoading ? "…" : "✨ AI 自動生成大綱"}
               </button>
             </div>
@@ -2660,8 +2662,8 @@ export default function ContentStudio() {
                   placeholder="例：表達藝術, 自我探索, 藝術工作坊, 創意療癒" disabled={isGenerating} />
               </div>
               <div style={{ position: "relative" }}>
-                <button className="btn-secondary" style={{ fontSize: "12px", whiteSpace: "nowrap" }}
-                  onClick={handleGenKeywords} disabled={isGenerating || !form.keyword.trim() || kwLoading}>
+                <button title={why("content.keywords")} className="btn-secondary" style={{ fontSize: "12px", whiteSpace: "nowrap" }}
+                  onClick={handleGenKeywords} disabled={(isGenerating || !form.keyword.trim() || kwLoading) || !canUse("content.keywords")}>
                   {kwLoading ? "…" : "✨ AI 自動生成關鍵字"}
                 </button>
                 {showKwDrop && kwSugs.length > 0 && (
@@ -3305,8 +3307,8 @@ export default function ContentStudio() {
               value={bvSampleText} onChange={e => setBvSampleText(e.target.value)}
               placeholder="貼入品牌文章、廣告文案或 About 頁面文字…" />
             <div style={{ display: "flex", gap: "10px", marginTop: "10px", alignItems: "center", flexWrap: "wrap" }}>
-              <button className="btn-secondary" onClick={handleAnalyzeBrandVoice}
-                disabled={bvLoading || (!bvSampleText.trim() && !bvSampleUrl.trim())}
+              <button title={why("content.brand-voice")} className="btn-secondary" onClick={handleAnalyzeBrandVoice}
+                disabled={(bvLoading || (!bvSampleText.trim() && !bvSampleUrl.trim())) || !canUse("content.brand-voice")}
                 style={{ fontSize: "12px" }}>
                 {bvLoading ? "分析中…" : "🔍 分析品牌聲音"}
               </button>
@@ -3352,8 +3354,8 @@ export default function ContentStudio() {
           {/* ── #5 競業與痛點分析 ── */}
           <SectionToggle label="🔍 競業與痛點分析（多角度市場研究）" open={showMarket} onToggle={() => setShowMarket(v => !v)}>
             <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "8px" }}>
-              <button className="btn-secondary" onClick={handleMarketAnalysis}
-                disabled={marketLoading || !form.keyword.trim()} style={{ fontSize: "12px" }}>
+              <button title={why("content.market-analysis")} className="btn-secondary" onClick={handleMarketAnalysis}
+                disabled={(marketLoading || !form.keyword.trim()) || !canUse("content.market-analysis")} style={{ fontSize: "12px" }}>
                 {marketLoading ? "分析中（約 10–30 秒）…" : "🔍 分析競業與痛點"}
               </button>
               {marketContext && <span style={{ color: "var(--green)", fontSize: "12px" }}>✓ 已納入，產生文章時自動注入</span>}
@@ -3631,9 +3633,9 @@ export default function ContentStudio() {
                       )}
                     </div>
                   ))}
-                  <button className="btn-primary" style={{ fontSize: "12px", padding: "5px 14px" }}
+                  <button title={why("content.syndicate")} className="btn-primary" style={{ fontSize: "12px", padding: "5px 14px" }}
                     onClick={handleSyndicate}
-                    disabled={synStatus === "generating" || !Object.values(synEnabled).some(Boolean)}>
+                    disabled={(synStatus === "generating" || !Object.values(synEnabled).some(Boolean)) || !canUse("content.syndicate")}>
                     {synStatus === "generating" ? "生成中…" : "生成社群貼文"}
                   </button>
                   {synStale && synStatus === "done" && (
@@ -4129,7 +4131,7 @@ export default function ContentStudio() {
               value={humInput} onChange={e => setHumInput(e.target.value)} disabled={isHumanizing}
               placeholder="貼上要處理的 AI 文章或任何文字…" />
             <div style={{ display: "flex", gap: "10px", alignItems: "center", marginTop: "12px" }}>
-              <button className="btn-primary" onClick={handleHumanize} disabled={isHumanizing || !humInput.trim()}>
+              <button title={why("content.humanize")} className="btn-primary" onClick={handleHumanize} disabled={(isHumanizing || !humInput.trim()) || !canUse("content.humanize")}>
                 {isHumanizing ? "處理中…" : humMode === "humanize" ? "人性化文字" : "SEO 改寫"}
               </button>
               {isHumanizing && (

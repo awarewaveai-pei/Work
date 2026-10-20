@@ -20,6 +20,9 @@ import { RateLimiter } from "@/lib/collect/net/rate-limit";
 import { httpHtmlCollector } from "@/lib/collect/collectors/http-html";
 import { extractProviderCollector } from "@/lib/collect/collectors/extract-provider";
 import type { RawDoc, SinkBlock } from "@/lib/collect/types";
+import { collectGrant } from "./grant-fixture";
+
+const GRANT = await collectGrant();
 
 const LIVE = process.env.RENDERER_LIVE === "1";
 const ENTITY = { name: "Theo Farrell", kind: "person", anchors: ["La Trobe", "war studies", "Afghanistan"], aliases: [], strictAnchors: false };
@@ -63,7 +66,7 @@ describe.skipIf(!LIVE)("rendered tier, live", () => {
           blocks: [httpHtmlCollector, extractProviderCollector],
           log: (m) => log.push(m),
           fetch: createCollectFetch({ budget, robots, rateLimiter: new RateLimiter({ ratePerSecond: 1, burst: 2 }), log: (m) => log.push(m) }),
-          callProvider: createProviderCall({ budget, log: (m) => log.push(m) }),
+          callProvider: createProviderCall({ grant: GRANT, budget, log: (m) => log.push(m) }),
         },
       );
 

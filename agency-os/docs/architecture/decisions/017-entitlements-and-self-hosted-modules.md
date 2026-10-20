@@ -94,6 +94,12 @@
 - 買斷：主體＝這台安裝，答案來自授權檔；`max_spend` 空、`report()` 不做事（用客戶自己的 key）。
 - 每個收費的按鈕或 API 呼叫前問一次；產品程式不知道答案來自合約、贈送還是買斷。收費 API 路由一律用 `withFeature("<feature_key>", handler)` 包起來（順序 3）：它先問 `can()`，同時把「路由→功能」登記進一張程式內的表，順序 6 的 API key scope 檢查就查這張表，不另維護路徑清單（Codex 2026-10-18 M20）。
 
+- **影子模式（操作者 2026-10-19 定案）**：環境變數 `ENTITLEMENT_MODE` = `shadow`（預設，未設或拼錯也是 shadow）｜`enforce`（只認這個字）。shadow：`can()` 照算真實判決，拒絕時寫稽核 `entitlement.would_deny`（feature_key、subject、actor、reason）但**回傳 allowed**；表不存在、讀不到 `ENTITLEMENT_SIGNING_KEY`／`ENTITLEMENT_PUBLIC_KEYS`、DB 連不上等基礎設施錯誤一律 log（`entitlement.infra_error`）後放行，不丟例外；shadow 不扣點。enforce：fail-closed，拒絕與基礎設施錯誤都拒絕。原因：0110 與簽章金鑰尚未套 prod、prod 沒有任何權利資料，約 20 個付費 AI 呼叫點若預設拒絕，DEPLOY_HOLD 一解除全部 AI 功能停擺。**翻到 `enforce` 是 High，要操作者 go**；前置＝0110 與簽章金鑰已套 prod、internal 帳戶與現有客戶的 comp／trial 權利已 seed、`entitlement.would_deny` 稽核近期為零或已逐筆解釋。員工自用（back-office，無客戶）記在 internal 帳戶，名單 `BACK_OFFICE_FEATURES`（`lib/entitlements/can.ts`）。
+- **獨立產品服務取許可（2026-10-19 實作）**：認知平台這類不在 next-admin 內的服務，請求沒帶 `X-AwareWave-Permit` 時向 `POST /api/internal/entitlements/permit/<product>` 要（Bearer＝該產品專屬 `ENTITLEMENT_ISSUER_TOKEN_<PRODUCT>`，只能簽該產品的功能、`<product>:<id>` 形式的 actor、根組織），拿到後仍在本地用公鑰驗並綁自己的（計費帳戶、功能、actor）；驗過才快取到到期前 30 秒。認知平台的 tenant→計費帳戶目前是 `ENTITLEMENT_BILLING_ACCOUNTS` 設定（`ai_lego/platform/entitlement/check.py`）。翻 enforce 的前置再加：各產品 issuer token 與公鑰已配、每個 tenant 已對應計費帳戶。
+- **灰掉沒買的按鈕**：`GET /api/entitlements/features` 回該帳戶「能用的功能」（每個收費路由功能一個判決、不寫稽核、Ed25519 簽章、快取 5 分鐘）；畫面用 `usePaidFeatures()`（`lib/entitlements/use-paid-features.ts`）灰按鈕，載入中或拿不到就不灰（API 照樣問 `can()`）。shadow 時全部可用，清單仍帶真實判決。
+- **付費 vendor 只有三道縫**：SDK 走 `lib/ai/gateway.ts` loader，直打 HTTP 走同檔 `providerUrl(grant, provider, path)`（origin 只在 `PROVIDER_ORIGINS`），collect 搜尋／抽取走 `createProviderCall({ grant })`；三道都以型別要求 grant。`import-boundary.test.ts` 擋縫外任何字串（含拼接、大小寫）出現 provider host。邊界：origin 若從環境變數或設定組成，測試看不到——新 provider 一律加進 `PROVIDER_ORIGINS` 或 collect registry，不從 env 讀 origin。
+- **扣點尚未接**：`grant.report({units, idempotencyKey})` 已備（冪等鍵必填），但沒有路由呼叫——每個功能扣幾點（`lib/entitlements/ledger.ts` `DEFAULT_CREDIT_POLICY` 是佔位值）屬定價，由操作者定；定案前 enforce 下 credits 功能只看餘額不扣點。
+
 ### 5. 買斷＝一鍵架站＋選購模組（LEGO）
 
 - **另開一個「買斷安裝」階段**，不是在[總藍圖](../../operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md) Stage 4／5 上加一步：Stage 4 用我們的主機商 token 和 SSH key（`:148`），Stage 5 把服務接到我們自己的監控（`:154`）。買斷安裝要：

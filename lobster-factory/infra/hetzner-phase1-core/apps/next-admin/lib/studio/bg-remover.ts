@@ -1,3 +1,5 @@
+import { providerUrl } from "@/lib/ai/gateway";
+import { grantFor } from "@/lib/entitlements/grant";
 /**
  * Studio BgRemover — background removal behind a provider-neutral seam.
  *
@@ -31,6 +33,7 @@ function sleep(ms: number): Promise<void> {
 
 /** Remove the background of an image (base64 data URL in, transparent PNG data URL out). */
 export async function removeBackground(imageDataUrl: string): Promise<BgRemoveResult> {
+  const grant = await grantFor("studio.remove-bg");
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate" };
   const version = process.env.BG_REMOVER_VERSION ?? BG_REMOVER_VERSION_DEFAULT;
@@ -42,7 +45,7 @@ export async function removeBackground(imageDataUrl: string): Promise<BgRemoveRe
   try {
     let res: Response;
     try {
-      res = await fetch("https://api.replicate.com/v1/predictions", {
+      res = await fetch(providerUrl(grant, "replicate", "/v1/predictions"), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -71,7 +74,7 @@ export async function removeBackground(imageDataUrl: string): Promise<BgRemoveRe
       if (Date.now() > deadline) return { ok: false, error: "generation_timeout" };
       await sleep(POLL_INTERVAL_MS);
       try {
-        const poll = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+        const poll = await fetch(providerUrl(grant, "replicate", `/v1/predictions/${prediction.id}`), {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });

@@ -5,6 +5,7 @@ import { AI_TEXT_MODELS, DEFAULT_AI_TEXT_MODEL } from "@/lib/ai/text-model-optio
 import { chipStyle } from "@/components/tools/panel-primitives";
 import StoryBibleWorkbench from "./StoryBibleWorkbench";
 import OrganizationPicker from "./OrganizationPicker";
+import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 
 // Palette mapped onto the GLOBAL theme CSS vars so ScriptForge matches the rest of the
 // app (was a bespoke coral/violet/jade palette) AND follows /tools/theme automatically.
@@ -34,7 +35,10 @@ const SF_LANGS = ["繁體中文", "English", "簡體中文", "日本語", "한�
 let SF_LANG: string = SF_LANGS[0];
 let SF_SCENE_COUNT = 6;
 let SF_CUSTOM_SCENES = 3;
+// Set from usePaidFeatures in ScriptForge: every module button calls claude(), so the gate lives here (ADR 017 §4).
+let SF_NOT_USABLE: string | undefined;
 async function claude(prompt: string, onChunk?: (full: string) => void){
+  if(SF_NOT_USABLE)throw new Error(SF_NOT_USABLE);
   const brollScenes = Math.max(0, SF_SCENE_COUNT - SF_CUSTOM_SCENES);
   const langified=`【預設輸出語言：${SF_LANG}】未另行指定語言時，所有文字內容（標題/台詞/字幕/說明等）請用此語言撰寫；JSON 的英文 key 與結構保持不變。若輸出 scenes，請輸出剛好 ${SF_SCENE_COUNT} 個 scene，其中剛好 ${SF_CUSTOM_SCENES} 個 visual_type="custom"（AI 原生生圖）、剛好 ${brollScenes} 個 visual_type="broll"（圖庫/實拍素材），並在每個 scene 額外提供 visual_type（"custom" 或 "broll"）與 broll_keyword（英文 1-3 個字；custom 可留空），供後續影片生產保留素材策略。\n\n${prompt}`;
   const res=await fetch("/api/tools/script-forge",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:langified,model:SF_MODEL})});
@@ -1009,6 +1013,9 @@ function HistoryModule({setNav}){
 
 /* ═══ ROOT ═══ */
 export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { onSendToProduction?: SendToProduction; onSendToRemotion?: SendToRemotion } = {}){
+  const { why } = usePaidFeatures();
+  SF_NOT_USABLE = why("video.script");
+  const notUsable = SF_NOT_USABLE;
   const[nav,setNav]=useState("manual");
   const[brand,setBrand]=useState(()=>{try{const s=localStorage.getItem("sf_brand");return s?JSON.parse(s):null;}catch{return null;}});
   const groups=["生成","工具","分析","設定","規劃","紀錄"];
@@ -1051,6 +1058,7 @@ export default function ScriptForge({ onSendToProduction, onSendToRemotion }: { 
     <ProductionBridge.Provider value={onSendToProduction ?? null}>
     <RemotionBridge.Provider value={onSendToRemotion ?? null}>
     <div style={{minHeight:"100vh",background:C.paper,fontFamily:"DM Sans,sans-serif"}}>
+    {notUsable&&<div role="status" style={{padding:"10px 16px",background:C.corallt,color:C.coral,fontSize:13,fontWeight:600}}>腳本生成：{notUsable}，按鈕會直接回報這個原因。</div>}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&family=DM+Serif+Display:ital@0;1&display=swap');
         @keyframes bonce{from{transform:translateY(0)}to{transform:translateY(-8px)}}

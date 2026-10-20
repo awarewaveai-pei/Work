@@ -6,6 +6,7 @@
 import { resolveOpsRole } from "@/lib/ops-role";
 import type { OpsRole } from "@/lib/ops-contracts";
 import { resolveTenant } from "@/lib/tenant-guard";
+import { AuthorizedOrg, requestActor } from "@/lib/entitlements/subject";
 import type { BrandRole } from "./state";
 import { memberRoles } from "./store";
 
@@ -74,10 +75,27 @@ export const ANY_ROLE: readonly BrandRole[] = ["owner", "editor", "reviewer", "c
 export const WRITE_ROLES: readonly BrandRole[] = ["owner", "editor"];
 
 /** Who did it, for created_by and the audit log: `ops:<role>` or `client:<org>`, then `:<user id>`. Only headers
- *  middleware sets (a caller-supplied header such as an email would let anyone write someone else's name into the log). */
+ *  middleware sets (a caller-supplied header such as an email would let anyone write someone else's name into the log).
+ *  One definition, shared with the entitlement gate. */
 export function actorOf(req: Request): string {
+  return requestActor(req);
+}
+
+export class NotAuthorizedForOrgError extends BrandAccessError {
+  readonly code = "not_authorized_for_org";
+  constructor(orgId: string) {
+    super(`not_authorized_for_org: ${orgId}`);
+    this.name = "NotAuthorizedForOrgError";
+  }
+}
+
+/** on_behalf_of = orgId, only for a caller with a role there: staff owner/admin, a member row (keyed by org/brand id),
+ *  or the client's own org. `actor` stays the real person. actorOf is sync and used everywhere, so the async check lives here. */
+export async function actorFor(req: Request, orgId: string): Promise<AuthorizedOrg> {
   const tenant = resolveTenant(req);
-  const who = tenant.userKind === "client" ? `client:${tenant.orgId}` : `ops:${resolveOpsRole(req).role}`;
+  const actor = requestActor(req);
+  if (tenant.userKind === "client" ? tenant.orgId === orgId : ["owner", "admin"].includes(resolveOpsRole(req).role)) return new AuthorizedOrg(orgId, actor);
   const userId = req.headers.get("x-ops-user-id")?.trim();
-  return userId ? `${who}:${userId}` : who;
+  if (!userId || !(await memberRoles(userId)).has(orgId)) throw new NotAuthorizedForOrgError(orgId);
+  return new AuthorizedOrg(orgId, actor);
 }

@@ -45,6 +45,8 @@ vi.mock("@/lib/collect/net/rate-limit", () => ({
   }),
 }));
 vi.mock("@/lib/collect/registry", () => ({ collectors: vi.fn(() => []) }));
+const grants = vi.hoisted(() => ({ grantFor: vi.fn(async (_feature: string, _ctx?: { deps?: { audit: (e: unknown) => Promise<void> } }) => ({ allowed: true })) }));
+vi.mock("@/lib/entitlements/grant", () => grants);
 vi.mock("@/lib/collect/sources-store", () => ({
   approvedSeeds: vi.fn(async () => [{ source: { id: "s1", entry: {} }, seed: { uri: "https://example.com" } }]),
   recordRunOutcome: vi.fn(async () => {}),
@@ -95,6 +97,18 @@ describe("runCollection × rate limiter wiring", () => {
     await runCollection({ organizationId: "11111111-1111-4111-8111-111111111111", dryRun: true });
     expect(spies.supabaseStoreBuilds).toBe(0);
     expect(spies.rateLimiterStores).toEqual([undefined]);
+  });
+
+  it("a dry run's collect.fetch grant writes no audit row; a real run's does (ADR 017 §4)", async () => {
+    grants.grantFor.mockClear();
+    await runCollection({ organizationId: "11111111-1111-4111-8111-111111111111", dryRun: true });
+    const dry = grants.grantFor.mock.calls[0];
+    expect(dry?.[0]).toBe("collect.fetch");
+    expect(dry?.[1]?.deps?.audit).toBeTypeOf("function");
+    await expect(dry?.[1]?.deps?.audit({})).resolves.toBeUndefined();   // the quiet audit
+    grants.grantFor.mockClear();
+    await runCollection({ organizationId: "11111111-1111-4111-8111-111111111111" });
+    expect(grants.grantFor.mock.calls[0]?.[1]?.deps).toBeUndefined();   // runtime deps, audited
   });
 });
 

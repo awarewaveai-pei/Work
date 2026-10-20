@@ -11,6 +11,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { isDesignsAsset } from "@/lib/storage/r2";
 import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText } from "@/lib/ai/gateway";
@@ -22,7 +24,8 @@ const TIMEOUT_MS = 45_000; // 多張圖 vision 比對可能較慢；逾時回明
 interface Pair { sceneIndex: number; referenceImageUrl: string; generatedImageUrl: string }
 interface Body { pairs?: Pair[] }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export const POST = withFeature("video.image", handlePost);
+async function handlePost(req: NextRequest, grant: Grant): Promise<NextResponse> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return NextResponse.json({ ok: false, error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
 
-  const Anthropic = await loadAnthropic();
+  const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   const content: Anthropic.ContentBlockParam[] = [
     { type: "text", text: "你是短劇角色連續性審核員。以下每一對圖片：第一張是角色定裝照（REFERENCE），第二張是某場景實際生成的畫面（SCENE）。判斷 SCENE 裡的人物是否看起來是同一個角色（髮型/髮色、臉型、大致年齡、服裝風格是否一致；不要求像素級相同，允許角度/表情/光線差異）。" },
