@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-20（續10）next-admin 上線 3db84c0e1：ADR 017 第 2／3 步＋社群 V1.5 兩批（hold 解除後首次部署，80728adf8 → 3db84c0e1）
+
+**結果**：sg-deploy 第一次在測試閘中止（續9 根因），修後第二次成功：healthy 10s、HTTP smoke 5/5 200、容器名正常；Playwright smoke 26 passed／6 skipped。主機上直接打 `POST /api/internal/entitlements/expire`（Bearer SCHEDULE_INGEST_TOKEN）→ `{"ok":true,"expired":0}`；部署後 5 分鐘 log 無 `entitlement_*_key` 錯誤。
+**帶上線的 next-admin commit**（11 個）：1ef1ee419、ee3e7bde5、f55f13080、53b222d8d、deaf0a7eb、cb2c8ef74、ca16c97b3、e87de9225、44be66e02、f81e78433、cf2b4ecc1（＋3db84c0e1 測試豁免行）。
+**rollback**：主機 `bash /root/lobster-phase1/scripts/sg-deploy.sh next-admin` 部署 80728adf8 的方式見 `DEPLOY_ROLLBACK_RUNBOOK.md` §2.1；migration 0110／0111／0112 各有 `.down.sql`（0110 三表非空即拒絕，只能前進修）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=`sg-deploy.sh next-admin` → `deployed commit: 3db84c0e1`、smoke all endpoints OK；`wget POST /api/internal/entitlements/expire` → `{"ok":true,"expired":0}` | exit=0 | ms=300000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`powershell -File scripts/playwright-runner.ps1 -Mode smoke -SkipInstall` → 26 passed／6 skipped | exit=0 | ms=240000
+- REVIEW_WAIVED: NA -- 部署紀錄，無程式改動
+- BUGHUNT_WAIVED: NA -- 部署紀錄，無程式改動
 ## 2026-10-20（續9）sg-deploy 被測試閘擋：inbox route 的 production-change 豁免行漏 commit（cf2b4ecc1 的缺漏）
 
 **根因**：`lib/system-modes/__tests__/production-change-coverage.test.ts` 把 `lib/cs/chatwoot-client` 列為正式環境寫入原語；`app/api/social/inbox/route.ts` 匯入它但只做 GET。Codex 已在工作目錄加豁免行，但 cf2b4ecc1 的檔案清單只列社群／cs 目錄，漏了這個測試檔；commit 前的驗證只跑社群子集（355 tests），沒跑全套 → sg-deploy 在主機跑全套（2773）時 1 紅，部署中止、prod 未變（仍 80728adf8，healthy）。
