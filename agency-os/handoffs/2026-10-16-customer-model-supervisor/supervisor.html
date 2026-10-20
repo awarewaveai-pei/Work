@@ -90,7 +90,7 @@ ul.doors li span{min-width:0}
 <div class="shell">
 <aside><div class="in">
   <h1>客戶怎麼來 監工台</h1>
-  <p class="upd">更新於 <span data-computed>2026-10-19</span></p>
+  <p class="upd">更新於 <span data-computed>2026-10-20</span></p>
   <div class="bar" data-computed><i class="d" style="width:33.33333333333333%"></i><i class="g" style="width:0%"></i></div>
   <nav><a href="#rules"><span>規則</span><small></small></a><a href="#now"><span>現況</span><small></small></a><a href="#ways"><span>五種客戶</span><small>共 <span data-computed>5</span> 種，<span data-computed>2</span> 種已運作</small></a><a href="#priority"><span>先後與定價</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>3</span>／<span data-computed>9</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>4</span> 項</small></a><a href="#doors"><span>入口</span><small></small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
@@ -98,7 +98,7 @@ ul.doors li span{min-width:0}
 <p class="sub">說明客戶來源、付款方、操作人，以及系統尚缺的項目。</p>
 <section id="rules"><h2>每個系統都要過的規則</h2><p class="lead">這三條寫在 ADR 017 §0b，測試會擋，不靠記憶。</p><ul class="yn rules"><li><b>同一個模式</b><span>整套新系統先在 System Foundry 答「要／不要」，再執行 scripts/new-product.mjs --from-foundry；小工具直接執行 new-product.mjs 答五題。兩條路都產生同一份登記列、自己的門、自己的資料、收費前只問 can() 的骨架。手寫一列，測試紅燈。</span></li><li><b>離開 WordPress 也能跑</b><span>付款、登入、CRM 都在接頭後面，接頭的值是設定。整套測試以 payments=local、login=local、crm=none 跑一遍必須全綠。WordPress 是今天的門口與收銀台，不是房子。</span></li><li><b>樂高：選配與串接</b><span>登記表就是積木目錄，匯出到 System Foundry 成一節「AwareWave 積木」：勾行銷、客服、社群…就裝哪些，依賴自動帶入。功能用 features 與方案決定；買斷能單獨裝哪些積木由 standalone 與 dependsOn 決定；積木之間只走 API 與簽章事件，不讀對方的表。</span></li></ul></section>
 
-<section id="now"><h2>現況</h2><p class="lead">客戶目前無法自行登入，也尚未收費；現在只有自用與代操。</p><ul class="yn"><li class="no"><b>沒有</b><span>客戶可自行登入<small>今天才開放：員工替客戶開立帳號，寄出設定密碼信；prod 缺少 RESEND_API_KEY，portal 的公開註冊仍關閉（WORKLOG 2026-10-16 續8、續10）</small></span></li><li class="no"><b>沒有</b><span>已有付費客戶<small>0062 合約 0 筆、錢包帳本 0 筆、Woo 尚未販售點數包（ADR 015:13、ADR 017 脈絡）</small></span></li><li class="no"><b>沒有</b><span>買斷<small>授權檔、安裝程式與模組清單均未建立（順序 5）</small></span></li><li class="no"><b>沒有</b><span>許可判斷<small>lib/entitlements 不存在；認知平台 check_entitlement 只看租戶是否 active，不看功能（check.py:29-30）</small></span></li></ul></section>
+<section id="now"><h2>現況</h2><p class="lead">客戶目前無法自行登入，也尚未收費；現在只有自用與代操。</p><ul class="yn"><li class="no"><b>沒有</b><span>客戶可自行登入<small>今天才開放：員工替客戶開立帳號，寄出設定密碼信；prod 缺少 RESEND_API_KEY，portal 的公開註冊仍關閉（WORKLOG 2026-10-16 續8、續10）</small></span></li><li class="no"><b>沒有</b><span>已有付費客戶<small>0062 合約 0 筆、錢包帳本 0 筆、Woo 尚未販售點數包（ADR 015:13、ADR 017 脈絡）</small></span></li><li class="no"><b>沒有</b><span>買斷<small>授權檔、安裝程式與模組清單均未建立（順序 5）</small></span></li><li class="yes"><b>有</b><span>許可判斷<small>每個收費點只問 can()（e87de9225），目前影子模式：照算判決並記錄，但一律放行、不扣點；翻成強制要你同意（High），每功能扣幾點待你定價</small></span></li></ul></section>
 
 <section id="ways"><h2>五種客戶</h2><p class="lead">每種客戶由三個答案決定：裝在哪、錢從哪來、誰操作。答案屬於客戶帳戶與每次請求，不屬於產品，所以每個產品五種都有、不用選。新增客戶類型只需增加一列，不必修改程式。</p><div class="ways"><article class="way live">
     <header><span class="k">1</span><h3>自用<small>AwareWave 自用</small></h3><span class="tag">已運作</span></header>

@@ -3,7 +3,7 @@
 
 export const META = {
   title: '客戶怎麼來 監工台',
-  updated: '2026-10-19',
+  updated: '2026-10-20',
   adr017: 'agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md',
   adr018: 'agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md',
   tasks: 'agency-os/TASKS.md:133',
@@ -92,7 +92,7 @@ export const NOW = [
   { what: '客戶可自行登入', state: 'no', ev: '今天才開放：員工替客戶開立帳號，寄出設定密碼信；prod 缺少 RESEND_API_KEY，portal 的公開註冊仍關閉（WORKLOG 2026-10-16 續8、續10）' },
   { what: '已有付費客戶', state: 'no', ev: '0062 合約 0 筆、錢包帳本 0 筆、Woo 尚未販售點數包（ADR 015:13、ADR 017 脈絡）' },
   { what: '買斷', state: 'no', ev: '授權檔、安裝程式與模組清單均未建立（順序 5）' },
-  { what: '許可判斷', state: 'no', ev: 'lib/entitlements 不存在；認知平台 check_entitlement 只看租戶是否 active，不看功能（check.py:29-30）' },
+  { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），目前影子模式：照算判決並記錄，但一律放行、不扣點；翻成強制要你同意（High），每功能扣幾點待你定價' },
 ];
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
