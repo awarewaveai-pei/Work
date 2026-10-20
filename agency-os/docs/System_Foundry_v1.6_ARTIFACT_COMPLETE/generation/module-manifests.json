@@ -772,7 +772,72 @@
       ],
       "product_key": "cognitive",
       "source_manifest": "lib/cognitive/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "cognitive",
+        "declarations": {
+          "state_ownership": "Owns its own PostgreSQL database cognitive_os in the cognitive-db service, never the shared Supabase (Projects/internal/cognitive-engineering-os/docs/platform/STORAGE_SWITCH.md:3-5, D8 :18; ops/cognitive-db/docker-compose.cognitive-db.yml): tenants and identities, projects, records, Sources, AI artifacts, runs, groups, research exports and the erasure outbox, built by Alembic versions 0001_baseline to 0008_hot_path_indexes (ai_lego/data/migrations/versions). Data is kept per region; COGNITIVE_OS_DATABASE_URLS maps region to database and one tenant -> region directory is the only cross-region table (STORAGE_SWITCH.md D6 :16). Blobs (Source CAS, artifacts, run journals) live on disk in the per-region volume cognitive-os-files (STORAGE_SWITCH.md D7 :17; docker-compose.yml cognitive-os-api volumes). The runtime lives in Projects/internal/cognitive-engineering-os; lib/cognitive in next-admin holds only this manifest.",
+          "behavior_ownership": "Composing cognitive methods, recipes, research projects and their evidence: ai_lego/modules (method and recipe blocks), ai_lego/platform/workflow (workflows), ai_lego/platform/ai_execution (contract and capability catalogs; CapabilityCatalog.invoke is the capability entry, capability_resolver.py:65, contract_catalog.py:145), ai_lego/platform/erasure.py (case and account erasure), ai_lego/platform/net (all outbound calls). HTTP API ai_lego/apps/api/main.py; web UI apps/cognitive-web (Next.js).",
+          "public_api_event_contract": "HTTP API on cognitive-os-api :8420 (ai_lego/apps/api/main.py, 66 routes in the committed version): /health (:732), /auth/*, /projects/* (29 routes), /methods/*, /recipes/*, /workflows/*, /interpretations/*, /ai/status and /ai/draft/method|recipe/{id} (:1597, :1642, :1664), /projects/{project_id}/collections (:3432), /collect-grants, /catalog, /capabilities, /artifacts, /sources. The web replicas call it at COS_API_ORIGIN (docker-compose.yml cognitive-os-web environment). Outbound: Anthropic, and the AwareWave collect product at COGNITIVE_OS_COLLECTION_SERVICE_URL (ai_lego/platform/net/collection_service.py:18, :60) which answers at next-admin /api/internal/collect/runs.",
+          "invariants": "Every outbound call goes through ai_lego/platform/net/egress.py: https only and deny-by-default against COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST (egress.py:48-52, docker-compose.yml cognitive-os-api environment; parity with policy EGRESS-EC99-2 tested by tests/unit/test_egress_allowlist_parity.py). One aggregate's events are totally ordered with no gap or duplicate; nothing is written to an erased case; a tenant's rows and blobs stay in its region (STORAGE_SWITCH.md invariants 1, 3, 4 at :22-28). The engine refuses to start when the schema is not at head and never auto-migrates in production (STORAGE_SWITCH.md D2 :12). Erasure does nothing irreversible before the decision it depends on is durable, and a durable decision can always be finished (ai_lego/platform/erasure.py:1-6).",
+          "dependencies": "Its own services cognitive-os-api, cognitive-os-web (+ -web-2, -web-3) and cognitive-db (Projects/internal/cognitive-engineering-os/docker-compose.yml, ops/cognitive-db/docker-compose.cognitive-db.yml), Anthropic for AI drafting (COGNITIVE_OS_ANTHROPIC_API_KEY; absent key -> /ai/* 503 AI_PROVIDER_UNCONFIGURED, main.py:663, :1562), and the AwareWave collect product for research collection (products.ts dependsOn [\"collect\"]; collection_service.py:60); collect's own services and env come from lib/collect/MODULE_MANIFEST.json through that dependsOn closure, not from this list. No Supabase, no Trigger, no Redis (ADR 017 section 5 row cognitive and its evidence list). Inventory: ADR 017 section 5 row cognitive.",
+          "failure_isolation_boundary": "A missing Anthropic key disables only /ai/* (503) and every other route keeps working (docker-compose.yml cognitive-os-api env_file comment; main.py:1562); the daily AI token budget refuses further drafting with AI_DAILY_TOKEN_BUDGET_EXCEEDED instead of spending (main.py:1527). Its database, volume and containers are separate from next-admin and Supabase (docker-compose.yml, ops/cognitive-db). A deploy tags the running image :rollback before building and restores it when health or smoke fails (deploy/deploy.sh:139-143, HEALTH_URLS :19).",
+          "data_lifecycle": "DELETE /projects/{id} and account deletion run one durable, idempotent erasure: rows and the outbox entry commit first, files named in the outbox are removed afterwards (ai_lego/platform/erasure.py:1-15; Alembic 0004_erasure_outbox). Subject keys support crypto-shredding (ai_lego/security/__init__.py:1, key_vault). Nightly host-side pg_dump of cognitive-db (STORAGE_SWITCH.md D8 :18; ops/cognitive-db/backup-cognitive-db.sh, README.md:40-46) with documented restore (ops/cognitive-db/restore-cognitive-db.md).",
+          "observability_contract": "GET /health on the API and /login on the web for health checks (docker-compose.yml healthchecks; deploy/deploy.sh:19); GET /ai/status reports AI availability (main.py:1597); PostgreSQL logs statements slower than one second (docker-compose.cognitive-db.yml command log_min_duration_statement=1000); deploy.sh follows the deployable-service checklist test gate -> healthcheck -> smoke -> rollback -> notification (deploy.sh:3).",
+          "migration_rollback_contract": "Alembic with raw-SQL migrations, explicit migration step in deploy and never automatic (STORAGE_SWITCH.md D2 :12; deploy/deploy.sh:9); 8 of the 8 versions define downgrade() (grep def downgrade in ai_lego/data/migrations/versions; 0001_baseline.py:319). deploy.sh rolls back the image and takes a pre-deploy dump through the cognitive-db backup script (deploy/lib-db.sh:77, deploy.sh:9). The SQLite volume from before the move is kept untouched as the rollback source (docker-compose.yml cognitive-os-api volumes comment).",
+          "replacement_strategy": "Capabilities are reached only through CapabilityCatalog.invoke, so an implementation is swapped behind its contract (ai_lego/platform/ai_execution/contract_catalog.py:145); storage is one thin module ai_lego/data/db.py with plain PostgreSQL and no ORM (STORAGE_SWITCH.md D1 :11); every outbound host is one entry in the egress allowlist (egress.py). Collection is a client of the collect product's HTTP contract (collection_service.py), replaceable by another service answering it."
+        },
+        "services": [
+          {
+            "compose": "Projects/internal/cognitive-engineering-os/docker-compose.yml",
+            "service": "cognitive-os-api"
+          },
+          {
+            "compose": "Projects/internal/cognitive-engineering-os/docker-compose.yml",
+            "service": "cognitive-os-web"
+          },
+          {
+            "compose": "Projects/internal/cognitive-engineering-os/docker-compose.yml",
+            "service": "cognitive-os-web-2"
+          },
+          {
+            "compose": "Projects/internal/cognitive-engineering-os/docker-compose.yml",
+            "service": "cognitive-os-web-3"
+          },
+          {
+            "compose": "Projects/internal/cognitive-engineering-os/ops/cognitive-db/docker-compose.cognitive-db.yml",
+            "service": "cognitive-db"
+          }
+        ],
+        "env": [
+          "COGNITIVE_OS_ANTHROPIC_API_KEY",
+          "COGNITIVE_OS_AI_MODEL",
+          "COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET",
+          "COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET_PER_PERSON",
+          "COGNITIVE_OS_COLLECTION_SERVICE_URL"
+        ],
+        "acceptance": [
+          {
+            "test": "an outbound call to a host that is not on the egress allowlist",
+            "expect": "呼叫在送出前被拒絕，不產生任何網路連線"
+          },
+          {
+            "test": "delete a project",
+            "expect": "專案的紀錄、來源與 AI 產出都被移除，之後無法再寫入該專案"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_COGNITIVE": "optional product host",
+          "loginSources": [
+            "local",
+            "awarewave-wp"
+          ],
+          "apiKeys": "COGNITIVE_OS_ANTHROPIC_API_KEY (optional COGNITIVE_OS_AI_MODEL and daily token budgets), all in deploy/.env on the host (deploy/.env.example). COGNITIVE_OS_COLLECTION_SERVICE_URL points at the customer's own collect installation.",
+          "generatedByInstall": "COGNITIVE_OS_DATABASE_URLS and the cognitive_db_password secret (ops/cognitive-db/install-cognitive-db.sh), COGNITIVE_OS_JOURNAL_KEY_MODE / COGNITIVE_OS_JOURNAL_KEY_B64, COLLECT_RESEARCH_RUNS_TOKEN (same value as the collect installation), ENTITLEMENT_* (deploy/.env.example); COGNITIVE_OS_NETWORK_EGRESS_ALLOWLIST must name the customer's collect host instead of app.aware-wave.com (docker-compose.yml).",
+          "installUnit": "Each services entry names a service of its compose file; the installer installs both whole compose files (ADR 017 section 5 inventory)."
+        }
+      }
     },
     {
       "id": "aw-collect",
@@ -784,7 +849,70 @@
       ],
       "product_key": "collect",
       "source_manifest": "lib/collect/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "collect",
+        "declarations": {
+          "state_ownership": "Owns collection_runs and collection_issues (migration 0073, 0090), collection_sources (0074), collection_url_state (0080), collection_schedules (0081), collection_rate_limit_buckets (0082) and the fact-check mirror collect_claimreview_mirror / collect_claimreview_reviews (0095), all in lobster-factory/packages/db/migrations. Every row is keyed by organization_id; a dry run stores nothing (lib/collect/run.ts:236 null sink). Collected documents are not collect's state: they belong to the knowledge base (cs_knowledge_sources) and arrive only through lib/collect/sinks/kb.ts.",
+          "behavior_ownership": "Fetching approved external sources and handing the documents to a sink: lib/collect/orchestrator.ts (routing, budget, politeness, de-duplication, resumption, retry; header), collectors/* (one block per source kind, registered via lib/collect/registry.ts:19), sinks/* (kb, cognitive, signal, null; registry.ts:25), sources-store.ts (approve / withdraw a source), lookups/* (answer and fact-check lookups for Cognitive OS), run.ts (the single assembly used by schedule, webhook and button; header).",
+          "public_api_event_contract": "HTTP: GET/POST/PATCH/DELETE /api/ops/clients/[slug]/collection-sources (catalogue, sources, run now, poll ?runKey=; app/api/ops/clients/[slug]/collection-sources/route.ts:1-8), POST /api/internal/collect/runs (Cognitive OS asks for a research run, token COLLECT_RESEARCH_RUNS_TOKEN, app/api/internal/collect/runs/route.ts:16) which starts the Trigger task collect-research-run (packages/workflows/src/trigger/collect-research-run.ts) that calls back POST /api/internal/collect/runs/execute (token COLLECT_RESEARCH_EXECUTE_TOKEN, app/api/internal/collect/runs/execute/route.ts:28), GET /api/internal/collect/runs/progress and POST /api/internal/collect/lookups (app/api/internal/collect/lookups/route.ts:19). Scheduled: the collect_crawl job (lib/schedules/jobs.ts:35) run by /api/internal/schedules/run-due. Exported library surface: lib/collect/index.ts.",
+          "invariants": "Only approved collection_sources rows become crawl seeds; a discovered candidate is data, not permission (lib/collect/sources-store.ts:6, approvedSeeds :228). Every outbound crawl request goes through ctx.fetch with the SSRF gate on each hop (lib/collect/net/fetcher.ts:226) and robots/politeness; provider calls go only to the fixed origins in lib/collect/net/providers.ts and the API key never reaches a block (providers.ts header). Every collected document is stamped EVIDENCE / SOURCE_QUOTATION, never SOURCE_FACT, and instruction-shaped text goes to a human queue instead of the store (lib/collect/provenance.ts header, orchestrator.ts:440). A run needs the collect.fetch grant (lib/collect/run.ts:118). Each run is capped at 200 fetches, 200 MB and 10 minutes (run.ts:78).",
+          "dependencies": "supabase (tables above plus ops_incidents for alerts and cs_knowledge_sources through the kb sink), renderer (default rendered tier, RENDERER_URL / RENDERER_SHARED_SECRET, lib/collect/net/providers.ts:45-48), trigger (collect-research-run task; schedules-heartbeat drives run-due), external search/extract vendors chosen by configuration (Brave, Serper, Perplexity, Firecrawl; providers.ts:57-99), OpenAI embeddings when the kb sink stores documents (lib/kb/rag.ts:41). No other AwareWave product: products.ts dependsOn is empty; Cognitive OS depends on collect, not the reverse. Inventory: ADR 017 section 5 row collect.",
+          "failure_isolation_boundary": "A candidate block that fails extraction degrades to the next candidate for the same URL and records an issue instead of stopping the run (lib/collect/orchestrator.ts header ordering, :529); budget exhaustion ends the run with a report, not an exception (lib/collect/budget.ts). Run state is persisted so a budget-limited crawl resumes instead of restarting (lib/collect/state.ts header). A manual run is not awaited by the HTTP request; losing the in-memory tracker on restart loses only the polling answer, not the crawl or its durable record (lib/collect/run-jobs.ts header). Deleting the kb sink leaves collection and the knowledge base both working (lib/collect/sinks/kb.ts header).",
+          "data_lifecycle": "collection_runs keeps one row per run with its report (lib/collect/report-store.ts:84); collection_url_state keeps etag / last-modified / capped outbound links per URL so unchanged pages are not refetched (lib/collect/url-state.ts header); the fact-check mirror replaces whole generations and prunes the old one in short batches (migration 0095 comments :18-21, :135); the in-memory research progress map drops finished entries after a fixed age (lib/collect/research-progress.ts:27-32). Knowledge-base versions and deletion are the knowledge base's lifecycle, not collect's.",
+          "observability_contract": "Every real run writes collection_runs and collection_issues (lib/collect/report-store.ts:84); trouble raises one ops_incidents row per tenant and failure shape with fingerprint collection:<org>:<shape>, so it reaches Telegram/Slack through the existing incident pipeline with its de-duplication (report-store.ts:147-170). The collect-research-run task logs its result and sends exceptions to Sentry (collect-research-run.ts). The operator page app/(shell)/ops/collect shows sources, refusal reasons and run results.",
+          "migration_rollback_contract": "Migrations 0073, 0074, 0080, 0081, 0082, 0090 and 0095 each have a down script in lobster-factory/packages/db/scripts (<n>_down.sql, run by hand, not by the forward migration runner); 0073's deletes the collection incidents before restoring the ops_incidents source constraint (0073_collection_runs_and_issues_down.sql:1-6). 0095 also has a local verify script (scripts/0095_collect_claimreview_mirror-local-verify.sh). 0080 is optional at runtime: without a url-state store the crawler behaves as before the table existed (lib/collect/url-state.ts header).",
+          "replacement_strategy": "Each source kind is one collector block and each destination one sink block, added or removed by one file that calls registerCollector / registerSink (lib/collect/registry.ts:9-25); a vendor is one entry in lib/collect/net/providers.ts plus a driver, selected by COLLECT_SEARCH_PROVIDER / COLLECT_EXTRACT_PROVIDER (lib/collect/search/drivers.ts:15, collectors/extract-provider.ts:40). No vendor name appears in business logic (providers.ts header)."
+        },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "next-admin"
+          },
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "renderer"
+          },
+          {
+            "compose": "lobster-factory/infra/supabase/docker-compose.yml",
+            "service": "kong"
+          },
+          {
+            "compose": "lobster-factory/infra/trigger/docker-compose.yml",
+            "service": "webapp"
+          }
+        ],
+        "env": [
+          "BRAVE_SEARCH_API_KEY",
+          "SERPER_API_KEY",
+          "PERPLEXITY_API_KEY",
+          "FIRECRAWL_API_KEY",
+          "OPENAI_API_KEY",
+          "COLLECT_SEARCH_PROVIDER",
+          "COLLECT_EXTRACT_PROVIDER",
+          "COLLECT_CONTACT_EMAIL"
+        ],
+        "acceptance": [
+          {
+            "test": "never turns a candidate into a seed (lib/collect/__tests__)",
+            "expect": "只有核准的來源會被爬取；系統提議的候選來源在核准前不產生任何抓取"
+          },
+          {
+            "test": "does not create a second version when the same page comes back unchanged (lib/collect/__tests__)",
+            "expect": "同一頁內容未變時知識庫不多一個版本；內容變了才出新版本並停用舊版"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_COLLECT": "optional product host",
+          "loginSources": [
+            "local"
+          ],
+          "apiKeys": "One search vendor key is enough (Brave or Serper; Perplexity only by explicit COLLECT_SEARCH_PROVIDER), FIRECRAWL_API_KEY only for COLLECT_EXTRACT_PROVIDER=firecrawl, OPENAI_API_KEY for knowledge-base embeddings (ADR 017 section 5 row collect).",
+          "generatedByInstall": "RENDERER_URL, RENDERER_SHARED_SECRET, COLLECT_RESEARCH_RUNS_TOKEN, COLLECT_RESEARCH_EXECUTE_TOKEN, TRIGGER_API_URL, TRIGGER_ACCESS_TOKEN",
+          "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
+        }
+      }
     },
     {
       "id": "aw-content",
@@ -796,7 +924,74 @@
       ],
       "product_key": "content",
       "source_manifest": "lib/content/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "content",
+        "declarations": {
+          "state_ownership": "Owns content_drafts (migration 0041) and content_sources (0042) in lobster-factory/packages/db/migrations, and the content defaults on wp_sites (0039, 0040, 0044; organization_id added by 0061). Social-publish idempotency rows live in media_delivery_attempts (0065, 0068), shared with video through lib/content/video/delivery-receipts.ts. Text-LLM usage rows go to the platform table ai_call_logs (0043, lib/ai/log-ai-call.ts:2), which content writes but does not own. Channels are read from social_accounts, which social owns.",
+          "behavior_ownership": "Writing, checking and publishing articles: lib/content/article/generate-core.ts (article generation), quality/seo-check-core.ts (SEO check), publish/wordpress-core.ts (one WordPress publish core for the route and the headless block; header), trending-sources.ts (topic search blocks), pipeline.ts (headless article -> quality -> WordPress draft; header), blocks/registry.ts (self-registering content blocks), postiz.ts (social channels and posting through Postiz). The HTTP shells are app/api/content/* (brand-voice, outline, title, keywords, humanize, seo-fix, syndicate, market-analysis, trending, image, newsletter, publish, social-publish, drafts, sources, sites and more).",
+          "public_api_event_contract": "HTTP: /api/content/* route handlers (26 route.ts files under app/api/content); paid ones are wrapped by withFeature(\"content.<feature>\") or call grantFor (e.g. app/api/content/humanize/route.ts:27, lib/content/article/generate-core.ts:788). Outbound: WordPress REST or the signed wp-bridge /post (lib/content/publish/wordpress-core.ts:313), FluentCRM newsletters through the bridge (app/api/content/newsletter/route.ts:3), the Postiz public API (lib/content/postiz.ts:38-39). No Trigger task and no inbound webhook (packages/workflows/src/trigger has no content task).",
+          "invariants": "WordPress publishing is draft-first: status defaults to draft, publish and future are explicit (lib/content/publish/wordpress-core.ts:38, :313); the production-change gate runs before any write to the site (wordpress-core.ts:365-367). A site from the environment fallback has no owner and is fail-closed for client users (lib/content/wp-sites.ts:11-13). Social publishing reserves idempotent delivery rows before calling Postiz, so a retried request cannot post twice (app/api/content/social-publish/route.ts:164). Every paid AI call needs a grant; the provider SDK loaders refuse without one (lib/ai/gateway.ts header).",
+          "dependencies": "supabase (tables above), postiz (social-publish and channel listing, lib/content/postiz.ts), WordPress sites of the customer (WP REST or wp-bridge, WPBRIDGE_* read in lib/payments/woo.ts:86-89), image generation through the shared toolkit lib/tarot/image-gen.ts and R2 storage lib/storage/r2.ts:30-37 (app/api/content/image/route.ts), Anthropic (loadAnthropic; app/api/content/brand-voice/route.ts:42), OpenAI (article generation, generate-core.ts:789), Serper for source links (generate-core.ts:196). Uses collect's remote-file fetcher for media (lib/content/postiz.ts:3), same app, no new service. products.ts dependsOn is empty. Video rendering is the separate video product. Inventory: ADR 017 section 5 row content.",
+          "failure_isolation_boundary": "Trending topic blocks run with Promise.allSettled, so one failing source does not empty the list (lib/content/trending-sources.ts:379); a malformed CONTENT_TRENDING_FEEDS only drops the custom feeds and logs a warning (trending-sources.ts:362-364). A missing SERPER_API_KEY yields no source links instead of failing generation (generate-core.ts:196-197); a missing OPENAI_API_KEY ends the stream with a marked error (generate-core.ts:789-791). A WordPress site that is not configured returns 503 for that request only (wordpress-core.ts:359).",
+          "data_lifecycle": "content_drafts are hard-deleted by DELETE /api/content/drafts, scoped to the row's organization (app/api/content/drafts/route.ts:211-236); content_sources are read-only to the route (app/api/content/sources/route.ts:57-65). Published articles live in the customer's WordPress, not here. ai_call_logs retention is the platform's.",
+          "observability_contract": "Every text-LLM call writes ai_call_logs with route and exact usage (lib/ai/log-ai-call.ts:2, :59); image calls log their cost (app/api/content/image/route.ts:17). Social-publish keeps a delivery receipt per destination in media_delivery_attempts (lib/content/video/delivery-receipts.ts:76). Feed configuration errors are logged, not swallowed (trending-sources.ts:363).",
+          "migration_rollback_contract": "Migrations 0061, 0065 and 0068 have a down script in lobster-factory/packages/db/scripts (<n>_down.sql, run by hand); 0039, 0040, 0041, 0042 and 0044 have no down file in either place (migrations/ or scripts/) and roll forward only.",
+          "replacement_strategy": "Each capability is a content block that registers itself and talks only through ctx; adding one is one file calling register(), deleting the file removes it, and the orchestrator never changes (lib/content/blocks/registry.ts header, lib/content/blocks/README.md). WordPress transport switches between wp-bridge and REST inside one core (wordpress-core.ts header); Postiz is reached only through lib/content/postiz.ts; image providers sit behind lib/tarot/image-gen.ts."
+        },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "next-admin"
+          },
+          {
+            "compose": "lobster-factory/infra/supabase/docker-compose.yml",
+            "service": "kong"
+          },
+          {
+            "compose": "lobster-factory/infra/postiz/docker-compose.yml",
+            "service": "postiz"
+          }
+        ],
+        "env": [
+          "ANTHROPIC_API_KEY",
+          "OPENAI_API_KEY",
+          "SERPER_API_KEY",
+          "REPLICATE_API_TOKEN",
+          "R2_API_TOKEN",
+          "R2_ACCOUNT_ID",
+          "R2_DESIGNS_BUCKET",
+          "R2_DESIGNS_PUBLIC_BASE",
+          "POSTIZ_API_BASE_URL",
+          "POSTIZ_API_KEY",
+          "WP_API_URL",
+          "WORDPRESS_JWT_TOKEN",
+          "WPBRIDGE_BASE_URL",
+          "WPBRIDGE_KEY_ID",
+          "WPBRIDGE_PRIVATE_KEY",
+          "WPBRIDGE_NAME",
+          "CONTENT_TRENDING_FEEDS"
+        ],
+        "acceptance": [
+          {
+            "test": "publish an article to a connected WordPress site without choosing a status",
+            "expect": "WordPress 出現一篇草稿而不是已發佈文章，網站前台看不到"
+          },
+          {
+            "test": "one trending source fails while the others answer",
+            "expect": "選題清單仍列出其他來源的結果，失敗的來源只被略過"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_CONTENT": "optional product host",
+          "loginSources": [
+            "local"
+          ],
+          "apiKeys": "ANTHROPIC_API_KEY and OPENAI_API_KEY for text, REPLICATE_API_TOKEN (and OPENAI_API_KEY) for images through lib/tarot/image-gen.ts:406,540, R2_* for stored images (lib/storage/r2.ts:30-37), SERPER_API_KEY optional for source links, POSTIZ_* only for social publishing, WP_API_URL + WORDPRESS_JWT_TOKEN or WPBRIDGE_* only when publishing to the customer's WordPress (wordpress-core.ts:354-355, lib/payments/woo.ts:86-89), CONTENT_TRENDING_FEEDS optional JSON feed list (trending-sources.ts:13).",
+          "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
+        }
+      }
     },
     {
       "id": "aw-cs",
@@ -808,7 +1003,65 @@
       ],
       "product_key": "cs",
       "source_manifest": "lib/cs/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "cs",
+        "declarations": {
+          "state_ownership": "Owns cs_intents, cs_tools, cs_eval_cases, cs_customer_memory, cs_ai_replies, cs_action_log (migration 0051), cs_ai_replies.completed_at (0099), cs_crisis_holding_replies (0104, kind column 0107), cs_conversation_staff_replies (0108) and the unique Chatwoot accountId per organization (0079), all in lobster-factory/packages/db/migrations and reached only through lib/cs/db.ts (header :1-3). The knowledge-base tables cs_knowledge_sources / chunks / folders (0051, 0072-0089) are the knowledge base's, touched through lib/kb. Conversations and messages stay in Chatwoot; per-tenant configuration lives in organizations.metadata.client_config (lib/cs/cis.ts:1-3); Chatwoot tokens are in the secret vault per organization (lib/cs/chatwoot-client.ts:50-62).",
+          "behavior_ownership": "Answering customer messages from the Chatwoot AgentBot webhook: claim the message, system-mode gate, free FAQ, credit reservation, AI pipeline, delivery (app/api/webhooks/chatwoot/route.ts:179-274); pipeline lib/cs/orchestrator.ts (handleInbound :62-99); autonomy, red lines and safety in autonomy.ts, tools.ts, guardrails.ts; eval and graduation in eval.ts, graduation.ts; crisis pages in crisis-alert.ts; unfinished-claim sweep in sweep.ts; daily Chatwoot account baseline chatwoot-baseline.ts run as schedule job cs_chatwoot_baseline (lib/schedules/jobs.ts:53-67).",
+          "public_api_event_contract": "Inbound HTTP: POST /api/webhooks/chatwoot with a per-organization ?token= secret (chatwoot/route.ts:85-91); POST /api/internal/cs/sweep with Bearer CS_SWEEP_TOKEN (app/api/internal/cs/sweep/route.ts:15-20), called every 5 minutes by the Trigger task cs-inbound-sweep (packages/workflows/src/trigger/cs-inbound-sweep.ts:24-26); staff routes /api/ops/clients/[slug]/{cs-config, cs-config/chatwoot-token, cs-intents, cs-eval-cases, cis, cs-knowledge, cs-knowledge-folders} and /api/ops/cs/eval. Library surface lib/cs/index.ts:9-12. The registry door /api/cs (lib/portal/products.ts:66) is not built: there is no app/api/cs directory. Outbound: Chatwoot Account API (chatwoot-client.ts), Anthropic and Gemini (lib/cs/llm.ts:25, :76), OpenAI embeddings through lib/kb (lib/kb/rag.ts:41), operator Telegram.",
+          "invariants": "One claim per Chatwoot message (unique organization_id + chatwoot_message_id, migration 0051; claimMessage lib/cs/db.ts:534); a redelivery returns deduped (chatwoot/route.ts:145-146). completed_at is set only after the outcome reached Chatwoot (chatwoot/route.ts:22-30, 0099). Money limits are code constants, not configuration: MAX_REFUND_CENTS = 0 (lib/cs/config.ts:4, :148). handleInbound never throws; any failure becomes a recorded handoff (orchestrator.ts:94-98). The AI stays silent while staff replied publicly in the last 30 minutes (config.ts:134, 0108). At most one holding reply per conversation and kind per 30-minute window (config.ts:125, 0104, 0107). An unknown account and a bad token get the same 401 (chatwoot/route.ts:77-91). The answer needs the cs.answer grant (llm.ts:28, :78).",
+          "dependencies": "supabase (tables above; shared media_billing_accounts and rpc media_credit_reserve from 0066, lib/cs/billing.ts:44-62), chatwoot (lobster-factory/infra/chatwoot/docker-compose.yml), trigger (cs-inbound-sweep; schedules-heartbeat drives cs_chatwoot_baseline, lib/schedules/jobs.ts:9, :53), Anthropic with Gemini failover (llm.ts:1-3), OpenAI embeddings for knowledge retrieval (lib/kb/rag.ts:41), the knowledge base lib/kb and the system-modes gate in the same app (chatwoot/route.ts:15, :211). products.ts dependsOn is empty. Inventory: ADR 017 section 5 row cs.",
+          "failure_isolation_boundary": "Every db function degrades to empty or no-op and never throws (lib/cs/db.ts:1-3); a claim database error returns 502 and goes to Sentry (chatwoot/route.ts:147-151). Billing fails open: a lookup or rpc error, or an organization without a billing row, lets the message through unmetered (billing.ts:49-53). A blocking system mode hands off with no AI call and no credit (chatwoot/route.ts:205-220). If staff activity cannot be read it counts as active and the AI stays silent (chatwoot/route.ts:412-419). Claims unfinished after 10 minutes go to a human and the AI is never re-run (lib/cs/sweep.ts:5, :13). The sweep task makes one attempt per tick and skips when its token is unset (cs-inbound-sweep.ts:27-34).",
+          "data_lifecycle": "Every cs table has organization_id with ON DELETE CASCADE (0051, 0104, 0108). cs_customer_memory.expires_at is filtered at read (lib/cs/db.ts:360-366); no code deletes expired rows and no code writes cs_customer_memory at all (grep: only the select at db.ts:360). No retention job exists for cs_ai_replies, cs_conversation_staff_replies or holding-reply rows; code deletes only eval cases, intents and holding-reply claims (lib/cs/db.ts). recordAction (db.ts:470) and registerTool (tools.ts:16) have no callers, so cs_action_log is not written today.",
+          "observability_contract": "cs_ai_replies keeps one row per AI turn with intent, confidence, retrieval score, action, chunk ids and model (0051; orchestrator.ts:46-60); every Claude call is metered through logAiCall (llm.ts:43-48); Sentry receives claim failures, unrecorded staff replies, failed holding replies and undelivered pages (chatwoot/route.ts:103, :148, :339, :347, :367); crisis and threat pages go to the operator Telegram (crisis-alert.ts:1-6); the sweep route returns 502/500 so a failure fails the Trigger run (cs/sweep/route.ts:26-31).",
+          "migration_rollback_contract": "0079, 0099, 0104, 0107 and 0108 ship a .down.sql beside the forward file; 0051 has lobster-factory/packages/db/scripts/0051_cs_core_down.sql (drops all eight 0051 tables) and the knowledge-base migrations 0072, 0075, 0076, 0083-0089 have *_down.sql there too. Down files are run by hand (the forward runner skips them, 0107_cs_holding_reply_kinds.down.sql:2-3); 0107's down deletes threat-window rows and 0108's loses staff-reply times (0107_cs_holding_reply_kinds.down.sql:4-5, 0108_cs_conversation_staff_replies.down.sql:4).",
+          "replacement_strategy": "lib/cs/index.ts is the only public surface, kept so the engine can be extracted as a service (index.ts:1-3). Chatwoot sits behind lib/cs/chatwoot-client.ts (outbound) and app/api/webhooks/chatwoot/route.ts (inbound); replacing it means a new client and webhook adapter. LLM failover lives in llm.ts; billing changes only the rpc name when 0066 is generalised (billing.ts:9-10)."
+        },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "next-admin"
+          },
+          {
+            "compose": "lobster-factory/infra/supabase/docker-compose.yml",
+            "service": "kong"
+          },
+          {
+            "compose": "lobster-factory/infra/chatwoot/docker-compose.yml",
+            "service": "chatwoot-rails"
+          },
+          {
+            "compose": "lobster-factory/infra/trigger/docker-compose.yml",
+            "service": "webapp"
+          }
+        ],
+        "env": [
+          "ANTHROPIC_API_KEY",
+          "GEMINI_API_KEY",
+          "OPENAI_API_KEY"
+        ],
+        "acceptance": [
+          {
+            "test": "the same Chatwoot message is delivered twice",
+            "expect": "只產生一筆回覆紀錄與一則回覆，第二次標記為重複"
+          },
+          {
+            "test": "a customer writes while staff replied publicly in the last 30 minutes",
+            "expect": "AI 不回覆，對話留給真人客服"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_CS": "optional product host",
+          "loginSources": [
+            "local"
+          ],
+          "apiKeys": "ANTHROPIC_API_KEY (GEMINI_API_KEY as failover, lib/cs/llm.ts:25, :76), OPENAI_API_KEY for knowledge retrieval (lib/kb/rag.ts:41). Messenger / LINE channel authorisations live in Chatwoot; the Chatwoot webhook secret and API tokens are stored per organization in the secret vault, not in env (lib/cs/chatwoot-client.ts:50-62).",
+          "generatedByInstall": "CS_SWEEP_TOKEN (app/api/internal/cs/sweep/route.ts:16; the Trigger worker reads the same value, cs-inbound-sweep.ts:30), AWAREWAVE_WEBHOOK_BASE_URL on the Trigger worker (cs-inbound-sweep.ts:13)",
+          "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
+        }
+      }
     },
     {
       "id": "aw-design",
@@ -820,7 +1073,57 @@
       ],
       "product_key": "design",
       "source_manifest": "lib/design/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "design",
+        "declarations": {
+          "state_ownership": "Owns the design and mockup-preset rows of media_assets (storage_backend r2; app/api/tools/designs/route.ts:211-214, app/api/tools/presets/route.ts:165-176; preset asset domains allowed by migration 0045) and the image files in the customer's R2 designs bucket (lib/storage/r2.ts:8, :36-37). No table of its own: media_assets (0038) is shared with video and studio. The editors keep their working canvas in the browser; only saved designs reach the server. There is no lib/design code; this directory holds only the manifest.",
+          "behavior_ownership": "Browser editors: app/(shell)/tools/canvas (Fabric canvas, CanvasEditor.tsx), tools/banner (BannerStudio.tsx), tools/mockup (MockupStudio.tsx), tools/vector-editor (iframe of public/vector-editor.html, vector-editor/page.tsx:3-5), and the gallery tools/designs (DesignsGallery.tsx). Server side only saves, lists and deletes designs and presets: app/api/tools/designs/route.ts (POST :121, DELETE :269, GET :344) and app/api/tools/presets/route.ts (GET :43, POST :82, DELETE :213).",
+          "public_api_event_contract": "HTTP: GET/POST/DELETE /api/tools/designs and /api/tools/presets. The AI buttons in the editors call other products' routes and are billed as those products' features: /api/tools/studio/genfill, inpaint, remove-bg, generate, mockup, proxy-image (CanvasEditor.tsx:1251, :1475; BannerStudio.tsx:1219; MockupStudio.tsx:437, :484; vector-editor/page.tsx:5) and /api/tools/script-forge (video.script, app/api/tools/script-forge/route.ts:33). The door /api/design in products.ts is not built (door.enabled false; no app/api/design directory). No Trigger task, no webhook.",
+          "invariants": "Saving and deleting a design needs the canCreateAiImageJob role and organization access to the asset (app/api/tools/designs/route.ts:126, :274, :302). A Printful mockup URL is fetched only from the Printful CDN allowlist, size and time capped (designs/route.ts:18-23). Delete removes the R2 object from the bucket that matches the asset type before removing the row (designs/route.ts:305-320). The vector editor's CDN libraries are pinned with SRI integrity hashes (public/vector-editor.html:7-13). The feature key design.edit is declared in lib/portal/products.ts:60 but no route calls grantFor(\"design.edit\") (grep over app and lib), so access today is the ops role, not an entitlement.",
+          "dependencies": "supabase (media_assets, ops_audit_events), R2 designs bucket (R2_API_TOKEN, R2_ACCOUNT_ID required, designs/route.ts:179-181; R2_DESIGNS_BUCKET, R2_DESIGNS_PUBLIC_BASE optional overrides, lib/storage/r2.ts:36-37), the Printful catalog route for mockup products (MockupStudio.tsx:328), public CDNs cdnjs.cloudflare.com and cdn.jsdelivr.net for the vector editor's libraries (vector-editor.html:7-13). products.ts dependsOn is empty; the AI buttons need studio (and script-forge needs video.script) to work.",
+          "failure_isolation_boundary": "Without R2 configured, saving returns r2_not_configured and nothing is written (designs/route.ts:179-181); an R2 delete failure returns 502 and keeps the row (designs/route.ts:312-314). The editors run in the browser, so a server error loses only the save or the AI call, not the open canvas. The vector editor is isolated in an iframe (vector-editor/page.tsx:3-5).",
+          "data_lifecycle": "A design lives until a user deletes it: DELETE removes the R2 object and the media_assets row (designs/route.ts:269-325); presets the same (presets/route.ts:213-272). Lists return at most 60 per group (designs/route.ts:16, :417). Each save and delete writes an ops_audit_events row (designs/route.ts:246, :330-333; presets/route.ts:199, :272).",
+          "observability_contract": "ops_audit_events records who saved or deleted which design or preset (designs/route.ts:246, :330-333; presets/route.ts:199-206); R2 and database failures are logged with the [designs] prefix (designs/route.ts:313, :324).",
+          "migration_rollback_contract": "Migration 0045 has no down file in migrations/ or packages/db/scripts/ and rolls forward only; it recreates the media_assets asset_domain CHECK as NOT VALID, so no table scan (0045_mockup_presets.sql:1-12). 0038 has a down script in lobster-factory/packages/db/scripts (0038_media_assets_reconcile_down.sql).",
+          "replacement_strategy": "Each editor is its own page and the vector editor is a self-contained HTML file registering its blocks with AB.registerBlock (lib/content/blocks/README.md links the contract); replacing an editor touches only its page. Storage goes through lib/storage/r2.ts, so another object store is a new implementation of putDesignObject / deleteDesignObject (designs/route.ts:6)."
+        },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "next-admin"
+          },
+          {
+            "compose": "lobster-factory/infra/supabase/docker-compose.yml",
+            "service": "kong"
+          }
+        ],
+        "env": [
+          "R2_API_TOKEN",
+          "R2_ACCOUNT_ID",
+          "R2_DESIGNS_BUCKET",
+          "R2_DESIGNS_PUBLIC_BASE"
+        ],
+        "acceptance": [
+          {
+            "test": "save a canvas design to My Designs, then delete it",
+            "expect": "存檔後圖庫出現該設計；刪除後圖庫與儲存空間都不再有它，稽核紀錄有兩筆"
+          },
+          {
+            "test": "save a design when object storage is not configured",
+            "expect": "回報儲存未設定，圖庫沒有新增任何資料"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_DESIGN": "optional product host",
+          "loginSources": [
+            "local"
+          ],
+          "apiKeys": "R2_API_TOKEN and R2_ACCOUNT_ID (required to save), R2_DESIGNS_BUCKET and R2_DESIGNS_PUBLIC_BASE (customer bucket and public origin; lib/storage/r2.ts:36-37). AI buttons use studio's provider keys.",
+          "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
+        }
+      }
     },
     {
       "id": "aw-hci",
@@ -832,7 +1135,63 @@
       ],
       "product_key": "hci",
       "source_manifest": "lib/hci/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "hci",
+        "declarations": {
+          "state_ownership": "Owns the hci schema in its own PostgreSQL 15.8 container hci-postgres, never the shared Supabase (Projects/internal/hci30/app/server.mjs:80-91, ADR-0021 / ADR-0002 as cited there): tenants, cases, persons, subject_records, source snapshots and relationships, decisions, decision_claims, data_encryption_keys and the rest, built by Projects/internal/hci30/database/migrations 0001-0020 (docs/domain/HCI_DOMAIN_ERD.md and HCI_ENTITY_DICTIONARY.md list every table). Raw fetched pages live in its own object storage hci-object-storage (hetzner-phase1-core/docker-compose.yml service hci-object-storage). Today the data is synthetic only: two hardcoded test tenants a and b (server.mjs:42-48; README). next-admin keeps only the knowledge-base link column from migration 0088 (lobster-factory/packages/db/migrations/0088_kb_hci_link.sql); lib/hci holds the import client and this manifest.",
+          "behavior_ownership": "Human-centred investigation cases: Projects/internal/hci30/app/server.mjs (cases, persons, subject records, reports, decisions, discovered-source seeds), packages/intelligence/* (trust-domain roll-up, evidence quality, severity floor, rule engine; server.mjs:8-12), public-intelligence/* (discovered-source orchestration, sink and promotion; server.mjs:14-21). Fetching a target is the fetch runner's job only, never the app's (server.mjs:93-101, ADR-0029). In next-admin: lib/hci/client.ts and lib/hci/import-sources.ts send knowledge-base URLs to HCI-30 seeds (frozen since 2026-09-23, lib/research-bridges.ts:1-22).",
+          "public_api_event_contract": "HTTP (Express, application/problem+json errors, server.mjs:114, :127): GET /health (:138), GET/POST /api/hci/v1/cases (:147, :168), POST cases/:caseId/reopen, risk-tier, auto-promote-rule-findings, reports, records, decisions (:215-536), GET/POST /api/hci/v1/persons (:294, :305), GET/POST /api/hci/v1/seeds, seeds/:sourceId/reject, content, promote (:570-726). Conventions: Projects/internal/hci30/api/API_CONTRACT_STANDARD.md, api/openapi/hci-v1.yaml, api/asyncapi/hci-events-v1.yaml. Caller from next-admin: POST /api/ops/clients/[slug]/hci-import, which answers 410 while the research bridges are frozen (lib/research-bridges.ts:22).",
+          "invariants": "Every tenant-owned table has tenant_id NOT NULL, RLS enabled and forced, policy tenant_id = hci.current_tenant_id() resolved from the acting Postgres role, and tenant_id is immutable (docs/domain/HCI_INVARIANTS.md:11-28); a catalog query test fails any tenant table without RLS (HCI_INVARIANTS.md:213). Append-only and no-delete tables are enforced by grants and by reject_update_delete() triggers (HCI_INVARIANTS.md:30-48). There is no universal human trust score (HCI_INVARIANTS.md:199, ADR-0004). The app never fetches a target itself; only the isolated fetch runner does (server.mjs:93-101). No authentication exists yet: the tenant is an explicit request value mapped to a NOLOGIN role (server.mjs:36-48; docs/HCI_C1_C10_DECISIONS.md).",
+          "dependencies": "Its own services only: hci-app, hci-postgres, hci-fetch-runner, hci-object-storage (lobster-factory/infra/hetzner-phase1-core/docker-compose.yml, services hci-postgres, hci-app, hci-fetch-runner, hci-object-storage). No Supabase, no Trigger, no AI provider key (process.env reads in app/server.mjs are only HCI_DB_*, HCI_FETCH_RUNNER_*, HCI_DEV_DB_PASSWORD and PORT, :29, :86-101, :767). products.ts dependsOn is empty. The optional next-admin import bridge needs HCI_API_BASE_URL and HCI_IMPORT_TENANT (lib/hci/client.ts:20-22). Not in the ADR 017 section 5 inventory table.",
+          "failure_isolation_boundary": "Its database, object storage and fetch runner are separate containers: hci-postgres is reachable only on hci-net, the fetch runner and object storage only on hci-fetch-runner-net, and hci-app alone also joins lobster-net (hetzner-phase1-core/docker-compose.yml hci-app networks), so an HCI failure does not touch Supabase or next-admin data. Without a fetch runner the seed endpoints return a clear 503 instead of doing nothing (server.mjs:93-99). /health is liveness only, without a database round-trip, so a pool problem does not fail deploy health (server.mjs:133-138). SECURITY DEFINER functions are pinned to fail closed under RLS (HCI_INVARIANTS.md:226).",
+          "data_lifecycle": "Bitemporal history keeps every superseded version instead of updating in place (migration 0005, HCI_INVARIANTS.md:74); erasure is crypto-shredding: destroying a subject's data key makes its records unreadable (migration 0007_wave1_crypto_shredding_up.sql:1-6, ADR-0018; the DSR-wired erasure is labelled Wave 4 there). Evidence rows are hash-chained for tamper evidence (0018). Append-only tables cannot be deleted or truncated (HCI_INVARIANTS.md:30-48).",
+          "observability_contract": "Evidence hash chain (migration 0018) and an immutable audit trail of the auto-promote switch (0019_wave1_case_auto_promote_audit_up.sql:1-5); errors use registered codes (Projects/internal/hci30/database/ERROR_CODE_REGISTRY.md, HCI_INVARIANTS.md:243); GET /health for liveness (server.mjs:138). A cross-box restore drill passed (security/DR_RESTORE_DRILL_RECORD.md, .github/workflows/hci30-restore-drill.yml per README).",
+          "migration_rollback_contract": "Every migration 0001-0020 ships a paired _down.sql (Projects/internal/hci30/database/migrations: 40 files, up and down per number). scripts/mutation-check-wave1.ps1 removes each control in turn and requires the negative tests to go red (README).",
+          "replacement_strategy": "HCI-30 is a separate application with its own image (hci-app build context ./apps/hci-app) and database; replacing it means another service answering the same /api/hci/v1 contract (api/openapi/hci-v1.yaml). next-admin talks to it only through lib/hci/client.ts, and that bridge can be switched off without effect on either side (lib/research-bridges.ts:1-22)."
+        },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "hci-app"
+          },
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "hci-postgres"
+          },
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "hci-fetch-runner"
+          },
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "hci-object-storage"
+          }
+        ],
+        "env": [],
+        "acceptance": [
+          {
+            "test": "a query run as one tenant database role reads another tenant's cases (RLS-LEAK tests in Projects/internal/hci30/database/tests/wave1-negative-tests.sql)",
+            "expect": "以租戶 A 的資料庫角色查詢，租戶 B 的案件一筆都讀不到；注意 HTTP 層尚無登入，租戶由請求參數指定（app/server.mjs:36-48）"
+          },
+          {
+            "test": "skips a source already sent (hciSourceId set) without calling HCI-30 again (lib/hci/__tests__)",
+            "expect": "已送過的來源不會重複送進 HCI-30"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_HCI": "optional product host",
+          "loginSources": [
+            "local",
+            "awarewave-wp"
+          ],
+          "apiKeys": "None: HCI-30 reads no customer-owned provider key (app/server.mjs process.env reads :29, :86-101, :767).",
+          "generatedByInstall": "HCI_DB_PASSWORD, HCI_FETCH_RUNNER_SHARED_SECRET, HCI_FETCH_RUNNER_MINIO_ROOT_USER, HCI_FETCH_RUNNER_MINIO_ROOT_PASSWORD, HCI_FETCH_RUNNER_MINIO_IP (hetzner-phase1-core/docker-compose.yml hci-* services); HCI_API_BASE_URL and HCI_IMPORT_TENANT only for the next-admin import bridge.",
+          "readiness": "Synthetic-only skeleton without an authentication layer (Projects/internal/hci30/README.md); not installable for a customer until real login exists (docs/HCI_C6_REAL_LOGIN_PLAN.md).",
+          "installUnit": "These four services are the HCI-30 subset of the core compose file; the installer takes them, not the whole file (ADR 017 section 5: buyout takes only what it needs from that file)."
+        }
+      }
     },
     {
       "id": "aw-outreach",
@@ -844,7 +1203,56 @@
       ],
       "product_key": "outreach",
       "source_manifest": "lib/outreach/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "outreach",
+        "declarations": {
+          "state_ownership": "Owns the twelve co_* tables of migration 0048 (lobster-factory/packages/db/migrations/0048_co_outreach_core.sql:28-299), RLS on with service-role-only policies; organization_id is a client filter with ON DELETE CASCADE, not a per-login boundary (0048:5-11, lib/outreach/db.ts:4-8). Connector API keys and Gmail refresh tokens are in the Supabase Vault (migration 0049), only their reference in co_connector_accounts.credentials_ref (app/api/outreach/connectors/secret/route.ts:7-10, lib/outreach/google-oauth.ts:3-5). co_connector_usage, co_timeline_events and co_verified_emails have no code reference today (grep over app and lib).",
+          "behavior_ownership": "Lead import, scoring and de-duplication (app/api/outreach/inbox, leads; lib/outreach/normalize.ts, scoring.ts), the Cold Gate and message lint (lib/outreach/cold-gate.ts:1-7), AI draft generation (app/api/outreach/messages/route.ts:88-228) and human review (PATCH :232-268), Gmail draft creation (messages/gmail-draft/route.ts), Gmail OAuth (connectors/gmail/authorize, oauth/callback; google-oauth.ts), suppression list, service profiles and follow-ups.",
+          "public_api_event_contract": "HTTP /api/outreach/{connectors, connectors/secret, connectors/gmail/authorize, connectors/gmail/oauth/callback, followups, inbox, leads, messages, messages/gmail-draft, service-profiles, suppression}; writes require canManageOutreach (owner/admin/operator, lib/ops-role.ts:110-112), reads rely on the middleware session. Outbound: Google OAuth and the Gmail API with the gmail.compose scope only (google-oauth.ts:1-10), Claude / OpenAI / Gemini through the AI gateway (lib/outreach/ai-claude.ts, ai-openai.ts, ai-gemini.ts). No webhook, no internal route, no Trigger task (grep packages/workflows/src/trigger for outreach: none).",
+          "invariants": "Nothing is ever sent: the OAuth scope is gmail.compose, never gmail.send (google-oauth.ts:1-3), and generated text is stored as a draft (messages/route.ts:17-18, :217). drafted is set only after a successful Gmail API call, never by the client (gmail-draft/route.ts:9-12, :197). The daily draft limit is a live count of today's draft_created events on the Asia/Taipei day (gmail-draft/route.ts:126-141). The Cold Gate refuses generation without an observation and source_url, or for a do_not_contact lead, with 422 (messages/route.ts:112-116, cold-gate.ts:3-5). Raw keys never reach a normal table (connectors/secret/route.ts:7-10). Drafts need the outreach.draft grant, billed to the lead's organization (messages/route.ts:173-177).",
+          "dependencies": "supabase (co_* tables and the vault of migration 0049), the customer's Google OAuth client (GOOGLE_OAUTH_CLIENT_ID / _SECRET, connectors/gmail/authorize/route.ts:28-29), AI provider keys per organization or agency from the vault, not env (messages/route.ts:139-164), the entitlement gate. Code import inside the same app: actorFor from lib/social/authz (messages/route.ts:11, :176); products.ts dependsOn is empty. No Trigger, no schedule job. Inventory: ADR 017 section 5 row outreach.",
+          "failure_isolation_boundary": "A vault error on one provider moves on to the next provider (messages/route.ts:160-163); provider failure or no key falls back to a manual_prompt draft with the error kept in ai_model (messages/route.ts:189-198). lib/outreach/db.ts helpers fail soft (db.ts:10). A Gmail draft whose status update fails returns a warning, not an error, so a retry does not create a duplicate draft (gmail-draft/route.ts:191-199).",
+          "data_lifecycle": "Hard delete only, through the DELETE handlers of connectors, inbox, leads, messages, service-profiles and suppression (app/api/outreach/*/route.ts); co_messages cascade with their lead, co_sending_events keep their row with lead and message set null (0048:138, :260-261); deleting an organization cascades every table (0048 foreign keys). No soft delete, no retention job.",
+          "observability_contract": "Each draft keeps prompt_snapshot, evidence_snapshot, ai_model and lint scores (messages/route.ts:204-216); co_sending_events records draft_created with the Gmail draft id (gmail-draft/route.ts:179-188). There is no logAiCall, Sentry or console logging in lib/outreach or app/api/outreach (grep: none); errors surface only in HTTP responses.",
+          "migration_rollback_contract": "0048 has lobster-factory/packages/db/scripts/0048_co_outreach_core_down.sql, which drops all twelve tables in reverse foreign-key order and destroys all outreach data (header :1-5); it is run by hand.",
+          "replacement_strategy": "Each AI provider is its own client file called with (grant, key, prompt) (ai-claude.ts, ai-openai.ts, ai-gemini.ts); Gmail is isolated in google-oauth.ts. The provider order claude -> openai -> gemini -> gemini_agency -> manual is fixed in messages/route.ts:131-133, so swapping a provider means editing that route."
+        },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "next-admin"
+          },
+          {
+            "compose": "lobster-factory/infra/supabase/docker-compose.yml",
+            "service": "kong"
+          }
+        ],
+        "env": [
+          "GOOGLE_OAUTH_CLIENT_ID",
+          "GOOGLE_OAUTH_CLIENT_SECRET"
+        ],
+        "acceptance": [
+          {
+            "test": "never requests gmail.send or any broader scope than compose (lib/outreach/__tests__)",
+            "expect": "Gmail 授權只要求建立草稿的權限，系統無法替客戶寄信"
+          },
+          {
+            "test": "blocks when source_url missing (lib/outreach/__tests__)",
+            "expect": "沒有觀察依據或來源網址的名單，產生開發信被拒絕並說明原因"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_OUTREACH": "optional product host",
+          "loginSources": [
+            "local"
+          ],
+          "apiKeys": "The customer's Google OAuth client (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET); AI provider keys are entered per organization into the vault through /api/outreach/connectors/secret, not env. Optional model overrides CLAUDE_OUTREACH_MODEL, OPENAI_OUTREACH_MODEL, GEMINI_MODEL (lib/outreach/ai-claude.ts:12, ai-openai.ts:12, ai-gemini.ts:15).",
+          "generatedByInstall": "NEXT_PUBLIC_APP_URL = the installation's own app URL, used for the OAuth redirect (lib/outreach/google-oauth.ts:61)",
+          "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
+        }
+      }
     },
     {
       "id": "aw-social",
@@ -860,7 +1268,7 @@
         "schema_version": 1,
         "module_id": "social",
         "declarations": {
-          "state_ownership": "Owns the social_* tables (migrations 0011, 0096, 0098, 0100, 0102, 0103, 0105, 0109, 0111 in lobster-factory/packages/db/migrations): accounts, lists, posts, post targets, media, saved texts, brand members, audit log, dispatch state, Postiz orphans, brand settings, tags, comments, list slots, auto rules, smart links, metrics, reports. Every row is scoped by organization_id = the brand; 0096 composite foreign keys refuse a child row pointing into another brand (lib/social/store.ts header).",
+          "state_ownership": "Owns the social_* tables (migrations 0011, 0096, 0098, 0100, 0102, 0103, 0105, 0109, 0111, 0112 in lobster-factory/packages/db/migrations): accounts, lists, posts, post targets, media, saved texts and their ordered media, brand members, audit log, dispatch state, Postiz orphans, brand settings, tags, comments, list slots, auto rules, smart links, metrics, reports. Every row is scoped by organization_id = the brand; 0096/0112 composite foreign keys refuse a child row pointing into another brand (lib/social/store.ts header).",
           "behavior_ownership": "Composing, scheduling, reviewing and sending brand posts to social platforms: lib/social/state.ts (post state changes), review.ts (require_review and the needs list), dispatch.ts (the sender), withdraw.ts (changing a queued post), authz.ts (brand roles), smartlink.ts (public link page).",
           "public_api_event_contract": "HTTP: /api/social/* (accounts, brands, lists, posts, media, tags, texts, members, settings, metrics, smartlink, auto-rules, log, needs, wp-article), one error-to-status mapping in lib/social/http.ts; internal: POST /api/internal/social/dispatch, called by the Trigger task social-dispatch every 5 minutes (lib/social/dispatch.ts header). Outbound: the Postiz public API.",
           "invariants": "A post is claimed once, creates one Postiz post per target, and a published target is never resent; write-backs apply only to their own claim (migration 0100 functions, lib/social/dispatch.ts header). A queued post is changed by deleting its waiting Postiz posts first and releasing second (lib/social/withdraw.ts header). With require_review on, an editor cannot schedule or publish_now (lib/social/review.ts header). Bodies over a platform's limit are refused at save (lib/social/limits.ts).",
@@ -868,9 +1276,43 @@
           "failure_isolation_boundary": "A Postiz 429 leaves the target pending and backs the whole sender off until the reset; any other 4xx marks only that target error; a Postiz post the database lost track of is recorded in social_postiz_orphans (migration 0100; lib/social/dispatch.ts header). A failing channel does not stop the other targets of the same post.",
           "data_lifecycle": "Posts are soft-deleted (deleted_at) and listed in a capped trash (lib/social/store.ts); every change writes social_audit_log with the actor (store.ts); metrics are stored per day and per post (social_metrics_daily, social_post_metrics, migration 0105).",
           "observability_contract": "social_audit_log answers who changed what; needs() lists failed posts, channels whose authorisation died and posts waiting for review, and the same events go to the operator Telegram through the ops inbox (lib/social/review.ts header); social_dispatch_state records the sender's backoff (migration 0100).",
-          "migration_rollback_contract": "Migrations 0105, 0109 and 0111 ship a .down.sql; 0011 to 0103 have no down file and roll forward only. C20's gate applied, reverted and re-applied 0105 on a throwaway database (agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs, step C20).",
+          "migration_rollback_contract": "Migrations 0105, 0109, 0111 and 0112 ship a .down.sql beside the forward file; 0096, 0098, 0100, 0101, 0102 and 0103 have a down script in lobster-factory/packages/db/scripts (<n>_down.sql, run by hand; 0096's drops every social_* table with its rows, header :1-4); 0011 has no down file and rolls forward only. C20's gate applied, reverted and re-applied 0105 on a throwaway database (agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs, step C20).",
           "replacement_strategy": "Postiz sits behind the sender's ports (lib/social/dispatch-store.ts implements DispatchPorts for dispatch.ts); replacing Postiz means a new ports implementation and per-provider limits (lib/social/limits.ts), with posts, targets and states unchanged."
         },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "next-admin"
+          },
+          {
+            "compose": "lobster-factory/infra/supabase/docker-compose.yml",
+            "service": "kong"
+          },
+          {
+            "compose": "lobster-factory/infra/trigger/docker-compose.yml",
+            "service": "webapp"
+          },
+          {
+            "compose": "lobster-factory/infra/postiz/docker-compose.yml",
+            "service": "postiz"
+          }
+        ],
+        "env": [
+          "POSTIZ_API_BASE_URL",
+          "POSTIZ_API_KEY",
+          "SOCIAL_DISPATCH_ENABLED",
+          "SOCIAL_DISPATCH_MODE"
+        ],
+        "acceptance": [
+          {
+            "test": "a failed target is resent only after its Postiz ERROR post is deleted; published ones are left alone (lib/social/__tests__)",
+            "expect": "已發佈的平台貼文不會被重送，失敗的只在清掉 Postiz 錯誤貼文後重送"
+          },
+          {
+            "test": "submit notifies the approvers; with review on an editor cannot schedule a draft (lib/social/__tests__)",
+            "expect": "開啟審核時編輯者無法排程或立即發佈，審核者收到通知"
+          }
+        ],
         "configuration": {
           "PUBLIC_BASE_DOMAIN": "installation base domain",
           "PRODUCT_HOST_SOCIAL": "optional product host",
@@ -879,7 +1321,10 @@
             "awarewave-wp",
             "customer-wp"
           ],
-          "apiKeys": "POSTIZ_API_BASE_URL, POSTIZ_API_KEY, SMARTLINK_* and the platform authorisations held in Postiz (ADR 017 section 5 row social)"
+          "apiKeys": "POSTIZ_API_BASE_URL, POSTIZ_API_KEY (lib/content/postiz.ts:38-39) and the platform authorisations held in Postiz (ADR 017 section 5 row social). The smart link page needs no key: its visitor hash salt is random per process (lib/social/smartlink.ts:116).",
+          "generatedByInstall": "SOCIAL_DISPATCH_TOKEN (app/api/internal/social/dispatch/route.ts:5; the Trigger worker reads the same value, packages/workflows/src/trigger/social-dispatch.ts:32)",
+          "switches": "SOCIAL_DISPATCH_ENABLED=true turns sending on, SOCIAL_DISPATCH_MODE=apply|draft chooses real sends or Postiz drafts; anything else is a dry run (app/api/internal/social/dispatch/route.ts:6-8)",
+          "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
         }
       }
     },
@@ -893,7 +1338,76 @@
       ],
       "product_key": "studio",
       "source_manifest": "lib/studio/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "studio",
+        "declarations": {
+          "state_ownership": "Owns pod_order_inbox (migration 0093:18-29), keyed by woo_order_id, service-role-only RLS (0093:35-39); organization_id is nullable with ON DELETE SET NULL and written as null today (0093:11, app/api/webhooks/woo-order/route.ts:82-85). Generated files go to the customer's R2 designs bucket through putDesignObject (lib/studio/print-file.ts:178, upscaler.ts:191, wp-web-image.ts:126, printful-mockup.ts:272). Mockup presets (0045) belong to design, not studio.",
+          "behavior_ownership": "AI image generation, background removal, inpaint, generative fill, mockups, culture and trending ideas and edit prompts (app/api/tools/studio/*); print files and PDF/X (lib/studio/print-file.ts, ghostscript-pdfx.ts); the Printful catalog, sync and mockups (print-provider.ts, printful-catalog.ts, printful-mockup.ts); paid Woo order -> Printful DRAFT order through the durable inbox (pod-order-inbox.ts:1-13, woo-order/route.ts). Product copy and upscale are library functions used by the shared /api/tools/publish route (app/api/tools/publish/route.ts:4, :9).",
+          "public_api_event_contract": "HTTP /api/tools/studio/{culture, edit-prompt, generate, genfill, inpaint, mockup, proxy-image, remove-bg, trending}; POST /api/webhooks/woo-order with HMAC x-wc-webhook-signature (woo-order/route.ts:43-45, lib/studio/woo-webhook.ts:39); POST /api/internal/pod-orders/sweep and GET /api/internal/pod-orders/stats with Bearer POD_INBOX_SWEEP_TOKEN (lib/studio/pod-inbox-auth.ts:5-10), the sweep called every 10 minutes by the Trigger task pod-order-inbox-sweep (packages/workflows/src/trigger/pod-order-inbox-sweep.ts:32-34). Outbound: Printful https://api.printful.com (print-provider.ts:19), Replicate, Anthropic / OpenAI (image-edit-prompt.ts:106, :133), R2.",
+          "invariants": "Printful orders are DRAFT only: POST /orders never carries confirm, so nothing is charged or printed (print-provider.ts:465-470). Every inbox state change is conditional on (status, attempts), so two workers cannot both call Printful for one order (pod-order-inbox.ts:8-10, :100-111); at most 5 attempts with 5/10/20/40-minute backoff, a stale claim is reclaimable after 15 minutes (pod-order-inbox.ts:21-24). A redelivery never resets status (pod-order-inbox.ts:63-67). Kill switches default off: POD_AUTO_FULFILL_ENABLED !== \"true\" keeps the webhook dormant (woo-order/route.ts:39) and POD_DESIGNS_ENABLED !== \"true\" answers 503 on the studio routes (app/api/tools/studio/generate/route.ts:49). Paid calls need studio.* grants (lib/studio/bg-remover.ts:36, inpaint.ts:44, upscaler.ts:83).",
+          "dependencies": "supabase (pod_order_inbox), trigger (pod-order-inbox-sweep), R2 designs bucket, Printful, Replicate, Anthropic, OpenAI, WooCommerce webhooks, wp-bridge through the shared publish route (WPBRIDGE_*, app/api/tools/publish/route.ts:351), the system-modes gate (pod-order-inbox.ts:16, :126). The image engine is lib/tarot/image-gen.ts in the same app, reached through lib/studio/image-provider.ts:1-13; products.ts dependsOn is empty. Inventory: ADR 017 section 5 row studio.",
+          "failure_isolation_boundary": "The Woo webhook answers 2xx once the order is recorded; only a failed inbox write returns 5xx (woo-order/route.ts:20-25, :86-88). A paid order that cannot be parsed is kept as failed without retries for manual forwarding (pod-order-inbox.ts:87-99). A blocked system mode defers the row and the drain stops at the first deferral (pod-order-inbox.ts:126-131, :158-160); the drain never throws (:161-186). The sweep task makes one attempt per tick and skips when its token is unset (pod-order-inbox-sweep.ts:35-41).",
+          "data_lifecycle": "pod_order_inbox rows are never deleted by code; done rows keep done_at (pod-order-inbox.ts:81); deleting an organization sets organization_id null (0093:20). R2 objects written by studio are not deleted by studio code (deleteDesignObject is defined at lib/storage/r2.ts:253 and not called from lib/studio); designs saved to the gallery are deleted through design's /api/tools/designs.",
+          "observability_contract": "GET /api/internal/pod-orders/stats returns deferred, oldest deferred age, retrying, overdue retries, gave-up, stuck pending and capped counts, and ok:false rather than zeros when the table is unreadable (pod-order-inbox.ts:213-249); the AO smoke check reads it (app/api/internal/pod-orders/stats/route.ts:1-4). Image cost is logged per route with logImageCost (generate/route.ts:126, remove-bg/route.ts:43, mockup/route.ts:121). Inbox failures are written to console.error (pod-order-inbox.ts:81, :109, :171).",
+          "migration_rollback_contract": "0093 has lobster-factory/packages/db/scripts/0093_pod_order_inbox_down.sql, which refuses while any order is pending, deferred or failed and removes the 0093 ledger row (header :1-4); it is run by hand.",
+          "replacement_strategy": "Printful sits behind a provider-neutral seam (print-provider.ts:1-2); image generation behind lib/studio/image-provider.ts so the engine can move without touching studio callers (:1-7); WooCommerce parsing and signature checks are isolated in lib/studio/woo-webhook.ts."
+        },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "next-admin"
+          },
+          {
+            "compose": "lobster-factory/infra/supabase/docker-compose.yml",
+            "service": "kong"
+          },
+          {
+            "compose": "lobster-factory/infra/trigger/docker-compose.yml",
+            "service": "webapp"
+          }
+        ],
+        "env": [
+          "REPLICATE_API_TOKEN",
+          "ANTHROPIC_API_KEY",
+          "OPENAI_API_KEY",
+          "PRINTFUL_API_KEY",
+          "PRINTFUL_STORE_ID",
+          "PRINTFUL_NATIVE_STORE_ID",
+          "WC_WEBHOOK_SECRET",
+          "R2_API_TOKEN",
+          "R2_ACCOUNT_ID",
+          "R2_DESIGNS_BUCKET",
+          "R2_DESIGNS_PUBLIC_BASE",
+          "WPBRIDGE_BASE_URL",
+          "WPBRIDGE_KEY_ID",
+          "WPBRIDGE_PRIVATE_KEY",
+          "WPBRIDGE_NAME",
+          "POD_DESIGNS_ENABLED",
+          "POD_AUTO_FULFILL_ENABLED"
+        ],
+        "acceptance": [
+          {
+            "test": "allowed: claims (attempts 1), creates one draft, ends done (lib/studio/__tests__)",
+            "expect": "一筆已付款的 WooCommerce 訂單在 Printful 產生一張未確認的草稿訂單，沒有扣款也沒有送印"
+          },
+          {
+            "test": "inserts a pending row, and a re-delivery never resets its status, attempts or payload (lib/studio/__tests__)",
+            "expect": "同一訂單的 webhook 重送不會重置狀態，也不會產生第二張 Printful 訂單"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_STUDIO": "optional product host",
+          "loginSources": [
+            "local"
+          ],
+          "apiKeys": "REPLICATE_API_TOKEN, ANTHROPIC_API_KEY, OPENAI_API_KEY; PRINTFUL_API_KEY with PRINTFUL_STORE_ID / PRINTFUL_NATIVE_STORE_ID (lib/studio/print-provider.ts:56-87); WC_WEBHOOK_SECRET from the customer's WooCommerce (woo-order/route.ts:44); R2_* designs bucket (lib/storage/r2.ts:30-37); WPBRIDGE_* only to publish products to the customer's WordPress (lib/payments/woo.ts:86-89). Optional model pins BG_REMOVER_VERSION, GENFILL_VERSION, INPAINT_VERSION, REALESRGAN_VERSION, ANTHROPIC_MODEL.",
+          "generatedByInstall": "POD_INBOX_SWEEP_TOKEN (lib/studio/pod-inbox-auth.ts:6; the Trigger worker reads the same value), AWAREWAVE_WEBHOOK_BASE_URL on the Trigger worker (pod-order-inbox-sweep.ts:21)",
+          "switches": "POD_DESIGNS_ENABLED=true enables the studio routes; POD_AUTO_FULFILL_ENABLED=true enables Woo -> Printful draft orders (woo-order/route.ts:39); POD_OUTPUT_INTENT_DEPLOYED and POD_ICC_* for PDF/X output (lib/studio/ghostscript-pdfx.ts:44, :63)",
+          "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
+        }
+      }
     },
     {
       "id": "aw-tarot",
@@ -905,7 +1419,66 @@
       ],
       "product_key": "tarot",
       "source_manifest": "lib/tarot/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "tarot",
+        "declarations": {
+          "state_ownership": "No tables: no migration creates a tarot table (grep -i tarot in lobster-factory/packages/db/migrations finds only comments and the 0110 product_key check). Batch jobs live in an in-process Map (lib/tarot/batch-store.ts:1-5) and the daily quota is an in-process counter (lib/tarot/quota.ts:1-16); both are lost on restart. Batch images go to the customer's R2 at tarot-batch/<jobId>/<index>.png (app/api/tools/tarot/batch/[jobId]/card/route.ts:77-78), a data URL in memory without R2 (:88-89). Single generations return to the browser; saving goes through design's /api/tools/designs. Cost rows go to the platform table ai_call_logs (lib/ai/log-ai-call.ts:111).",
+          "behavior_ownership": "Text and image-to-image tarot generation across many models (lib/tarot/image-gen.ts; app/api/tools/tarot/generate/route.ts), style-prompt suggestion (suggest-prompt/route.ts), the 78-card background batch (batch/route.ts, batch/[jobId]/route.ts, batch/[jobId]/card/route.ts, Trigger task tarot-batch-generate). lib/tarot/image-gen.ts is also the shared engine of studio (lib/studio/image-provider.ts:1-13), content (app/api/content/image/route.ts:10) and video (lib/content/blocks/video-pipeline.ts:23-24). The declared feature tarot.motion has no tarot route; lib/tarot/video-motion-gen.ts is used by video.",
+          "public_api_event_contract": "HTTP POST /api/tools/tarot/generate; POST /api/tools/tarot/suggest-prompt (withFeature(\"tarot.prompt\"), suggest-prompt/route.ts:29); POST|GET /api/tools/tarot/batch; GET|PATCH /api/tools/tarot/batch/[jobId]; POST /api/tools/tarot/batch/[jobId]/card. The batch route starts the Trigger task through REST POST <TRIGGER_API_URL>/api/v1/tasks/tarot-batch-generate/trigger (batch/route.ts:58-76), and the task calls the jobId and card routes back (packages/workflows/src/trigger/tarot-batch-generate.ts:40-60). Outbound: Replicate and OpenAI images (image-gen.ts:406, :540), Anthropic (suggest-prompt/route.ts:48), R2.",
+          "invariants": "At most 78 cards per batch (batch/route.ts:41-43). A global daily image cap TAROT_DAILY_LIMIT, default 300, resetting at UTC midnight, is checked before every generation (quota.ts:4, :15-16; tarot/generate/route.ts:89; card/route.ts:58-61); a card refused by the quota aborts the rest of the batch (tarot-batch-generate.ts:113-117). At most 2 concurrent batch runs, 90 minutes each (tarot-batch-generate.ts:36-39). All routes require owner/admin/operator (canCreateAiImageJob, lib/ops-role.ts:68-70). Images need the tarot.image grant (image-gen.ts:405, :480, :539).",
+          "dependencies": "next-admin with Supabase for login sessions (middleware.ts:2, :362) and cost logging (lib/ai/log-ai-call.ts:111); trigger (tarot-batch-generate); Replicate, OpenAI, Anthropic; R2 (lib/storage/r2.ts:30-37). No tarot table in Supabase. products.ts dependsOn is empty. Inventory: ADR 017 section 5 row tarot.",
+          "failure_isolation_boundary": "Generation errors return HTTP 200 with ok:false so nginx does not replace the body (tarot/generate/route.ts:113-116); a failed card is counted and the batch continues after one retry (tarot-batch-generate.ts:80-130); an R2 failure falls back to the public URL or a data URL (card/route.ts:79-89); missing Trigger configuration returns 503 (batch/route.ts:19-26). The task's callbacks to /api/tools/tarot/* carry no login session (tarot-batch-generate.ts:45-60) and that path is inside the session middleware (matcher middleware.ts:413, no-session refusal :385); from the code they are refused, not tested live.",
+          "data_lifecycle": "Job and quota state disappear on process restart (batch-store.ts:2-4, quota.ts:1-4); the job Map is never pruned, reads are capped at 10 (batch-store.ts:89-93). R2 tarot-batch/ objects are not deleted by tarot code (grep delete in lib/tarot and app/api/tools/tarot: none).",
+          "observability_contract": "logImageCost (tool tarot) runs when the caller passes a job id (tarot/generate/route.ts:107-110); the card route logs no cost; suggest-prompt logs through logAiCall (suggest-prompt/route.ts:66); the Trigger run logs each card (tarot-batch-generate.ts:72-130). Job status exists only in memory through GET /batch and /batch/[jobId]; there is no persistent audit trail.",
+          "migration_rollback_contract": "No migrations, nothing to roll back. batch-store.ts:4 proposes a tarot_batch_jobs table that does not exist.",
+          "replacement_strategy": "The model registry and transports are in lib/tarot/image-gen.ts; studio consumes it through a facade (lib/studio/image-provider.ts:1-7) and content and video import it directly, so replacing the engine affects those products too. The batch store is a small module (batch-store.ts:32-93) that a durable store can replace without route changes."
+        },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "next-admin"
+          },
+          {
+            "compose": "lobster-factory/infra/supabase/docker-compose.yml",
+            "service": "kong"
+          },
+          {
+            "compose": "lobster-factory/infra/trigger/docker-compose.yml",
+            "service": "webapp"
+          }
+        ],
+        "env": [
+          "REPLICATE_API_TOKEN",
+          "OPENAI_API_KEY",
+          "ANTHROPIC_API_KEY",
+          "R2_API_TOKEN",
+          "R2_ACCOUNT_ID",
+          "R2_DESIGNS_BUCKET",
+          "R2_DESIGNS_PUBLIC_BASE",
+          "TAROT_DAILY_LIMIT"
+        ],
+        "acceptance": [
+          {
+            "test": "generate one tarot card image with a chosen model and style",
+            "expect": "回傳一張圖片；當日張數超過上限時回傳 429 與「每日生成上限已達」"
+          },
+          {
+            "test": "start a 78-card batch",
+            "expect": "批次進度逐張增加，失敗的卡片被計數而批次繼續，結束時列出成功與失敗張數"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_TAROT": "optional product host",
+          "loginSources": [
+            "local"
+          ],
+          "apiKeys": "REPLICATE_API_TOKEN and OPENAI_API_KEY (lib/tarot/image-gen.ts:406, :540), ANTHROPIC_API_KEY for prompt suggestions (suggest-prompt/route.ts:48), R2_* (lib/storage/r2.ts:30-37), TAROT_DAILY_LIMIT optional (quota.ts:15).",
+          "generatedByInstall": "TRIGGER_API_URL, TRIGGER_ACCESS_TOKEN, BATCH_INTERNAL_SECRET, INTERNAL_ADMIN_BASE_URL (app/api/tools/tarot/batch/route.ts:19-20, :50, :72)",
+          "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
+        }
+      }
     },
     {
       "id": "aw-video",
@@ -917,7 +1490,76 @@
       ],
       "product_key": "video",
       "source_manifest": "lib/video/MODULE_MANIFEST.json",
-      "source_module_manifest": null
+      "source_module_manifest": {
+        "schema_version": 1,
+        "module_id": "video",
+        "declarations": {
+          "state_ownership": "Owns video_jobs (migration 0047, organization_id by 0060; short-lived progress, lib/content/video/job-store.ts header), the Media LEGO tables media_qa_reports, media_releases, media_delivery_attempts, media_outcome_snapshots (0065, 0068), media_billing_accounts, media_credit_ledger, media_provider_profiles (0066), media_transcription_jobs (0069), media_story_bible_revisions (0070, 0071), media_production_projects (0071), and the video rows of media_assets (0038, 0067), all in lobster-factory/packages/db/migrations. The video files themselves live in the customer's R2 video bucket (lib/content/video/reconcile.ts:16-19). The code lives in lib/content/video and app/api/video; lib/video holds only this manifest.",
+          "behavior_ownership": "Script -> scenes -> render -> QA -> release -> delivery for short videos: lib/content/video/video-script-core.ts (script, video.script grant :202), lib/content/blocks/video-pipeline.ts (scene images through lib/tarot/image-gen.ts, motion through lib/tarot/video-motion-gen.ts, B-roll through pexels.ts), render-client.ts and remotion-client.ts (HTTP to the two render services), release-gate.ts and release-evidence.ts (release approval), delivery-receipts.ts (idempotent delivery), reconcile.ts (orphan repair), payment-provider.ts (Stripe checkout for media credits). HTTP shells: app/api/video/* (28 entries).",
+          "public_api_event_contract": "HTTP: /api/video/* (generate, status, regenerate-image, render-draft, remotion-render, remotion-status, remotion-job-status, timeline, story-bibles, qa, release, outcomes, credits, billing, transcription, reconcile, cleanup and more). Outbound: video-service POST /render at VIDEO_SERVICE_URL (lib/content/video/render-client.ts:55), remotion-service POST /render at REMOTION_SERVICE_URL (remotion-client.ts:7), the transcription worker at MEDIA_TRANSCRIBE_WORKER_URL (app/api/video/transcription/dispatch/route.ts:22-24), Pexels (pexels.ts:45), Stripe checkout (payment-provider.ts:24-31). Host cron: scripts/reconcile-videos.sh every 15 minutes calls /api/video/reconcile (reconcile-videos.sh:2); /api/video/cleanup is for a weekly cron behind x-ops-sync-key (video/cleanup/route.ts:2-4). No Trigger task.",
+          "invariants": "A release needs one current QA report per required kind whose checksum matches the candidate asset; a duplicate, missing, failed or stale report refuses the release (lib/content/video/release-gate.ts), evaluated from authoritative records (release-evidence.ts:94) by a role allowed to approve (app/api/video/release/route.ts:3-5). Media providers are fail-closed: an empty MEDIA_PROVIDER_ALLOWLIST allows none and browsers cannot supply base URLs (lib/content/video/provider-policy.ts:5-14). Credit reservation is idempotent per key (app/api/video/credits/reserve/route.ts:20, rpc media_credit_reserve). Card data never enters this app (payment-provider.ts:3). Reconciliation is idempotent by object_key (reconcile.ts header).",
+          "dependencies": "supabase (tables above), video-service (TTS + ffmpeg composition, render-client.ts header) and remotion-service (timeline renders, remotion-client.ts header), R2 video bucket (reconcile.ts:16-19, lib/storage/r2.ts:290), Anthropic for scripts (video-pipeline.ts:604), Replicate / OpenAI image and motion models through the shared tarot toolkit (video-pipeline.ts:23-24, lib/tarot/video-motion-gen.ts:111), Pexels B-roll (pexels.ts:45), optional Stripe (payment-provider.ts:25), optional transcription worker apps/video-whisper-worker (a separate RTX machine process, not a compose service; its README). products.ts dependsOn is empty. Inventory: ADR 017 section 5 row content (video).",
+          "failure_isolation_boundary": "Long renders run asynchronously: /generate returns a job id and /status polls, so a render outlives the 100 s edge timeout, and job progress survives container restarts in video_jobs (lib/content/video/job-store.ts header). A finished video that was never recorded (closed tab, restart) is repaired by the 15-minute reconcile from R2 (reconcile.ts header). A missing ANTHROPIC_API_KEY returns 503 for that request only (video-pipeline.ts:604-605). The render services run in their own compose files and networks (docker-compose.video.yml, docker-compose.remotion.yml).",
+          "data_lifecycle": "video_jobs rows expire after 1 hour and are cleaned when a job is created (lib/content/video/job-store.ts:61, :115); videos older than N days (default 30) are deleted by POST /api/video/cleanup (video/cleanup/route.ts:3, :26-27); story bible revisions are versioned and approved through rpc approve_media_story_bible_revision (0070, 0071); the media credit ledger keeps every reservation (0066).",
+          "observability_contract": "Image and motion costs are logged per call (lib/content/blocks/video-pipeline.ts:26 logImageCost); QA reports, releases and delivery attempts are stored rows (0065), outcome snapshots record post-release results (0065); the reconcile cron alerts instead of only writing /var/log/reconcile-videos.log (scripts/reconcile-videos.sh:7, :24-25).",
+          "migration_rollback_contract": "Migration 0069 ships 0069_media_transcription_jobs.down.sql beside the forward file; 0038, 0047, 0060, 0065, 0066, 0067 and 0068 have a down script in lobster-factory/packages/db/scripts (<n>_down.sql, run by hand); 0070 and 0071 have no down file in either place and roll forward only.",
+          "replacement_strategy": "Each render backend is one HTTP client with its own URL (render-client.ts, remotion-client.ts) behind the shared renderer auth (renderer-auth.ts); image and motion models sit behind lib/tarot/image-gen.ts and video-motion-gen.ts; payments sit behind the PaymentProvider interface (payment-provider.ts:12, MEDIA_PAYMENT_PROVIDER :24); the pipeline steps are content blocks registered in lib/content/blocks/registry.ts."
+        },
+        "services": [
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml",
+            "service": "next-admin"
+          },
+          {
+            "compose": "lobster-factory/infra/supabase/docker-compose.yml",
+            "service": "kong"
+          },
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/apps/video-service/docker-compose.video.yml",
+            "service": "video-service"
+          },
+          {
+            "compose": "lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/docker-compose.remotion.yml",
+            "service": "remotion-service"
+          }
+        ],
+        "env": [
+          "ANTHROPIC_API_KEY",
+          "OPENAI_API_KEY",
+          "REPLICATE_API_TOKEN",
+          "PEXELS_API_KEY",
+          "R2_API_TOKEN",
+          "R2_ACCOUNT_ID",
+          "R2_VIDEO_BUCKET",
+          "R2_VIDEO_PUBLIC_BASE",
+          "STRIPE_SECRET_KEY",
+          "MEDIA_PROVIDER_ALLOWLIST",
+          "MEDIA_PAYMENT_PROVIDER",
+          "MEDIA_CHECKOUT_ALLOWED_ORIGIN",
+          "MEDIA_PRODUCTION_PERSISTENCE_ENABLED"
+        ],
+        "acceptance": [
+          {
+            "test": "blocks stale, failed, and duplicate evidence (lib/content/video/__tests__)",
+            "expect": "QA 報告與候選影片不符、失敗或重複時，發佈被拒絕並說明是哪一項"
+          },
+          {
+            "test": "generate a short video and close the page before it finishes",
+            "expect": "影片完成後仍出現在媒體庫（定期對帳補記），不會成為孤兒檔案"
+          }
+        ],
+        "configuration": {
+          "PUBLIC_BASE_DOMAIN": "installation base domain",
+          "PRODUCT_HOST_VIDEO": "optional product host",
+          "loginSources": [
+            "local"
+          ],
+          "apiKeys": "ANTHROPIC_API_KEY, REPLICATE_API_TOKEN / OPENAI_API_KEY for images and motion, PEXELS_API_KEY, R2_* video bucket (reconcile.ts:16-19); STRIPE_SECRET_KEY with MEDIA_PAYMENT_PROVIDER and MEDIA_CHECKOUT_ALLOWED_ORIGIN only if the customer sells media credits (payment-provider.ts:24-31); MEDIA_PROVIDER_ALLOWLIST lists the providers the customer allows (provider-policy.ts:7).",
+          "generatedByInstall": "VIDEO_SERVICE_URL, REMOTION_SERVICE_URL, MEDIA_RENDER_AUTH_TOKEN / VIDEO_SERVICE_SECRET / REMOTION_AUTH_TOKEN (lib/content/video/renderer-auth.ts:28-34), OPS_PROXY_SHARED_SECRET (video/cleanup/route.ts:20); MEDIA_TRANSCRIBE_WORKER_URL / _TOKEN / MEDIA_TRANSCRIBE_CALLBACK_BASE_URL only with a transcription worker.",
+          "switches": "MEDIA_PRODUCTION_PERSISTENCE_ENABLED (lib/content/video/caption-qa-persistence.ts:10)",
+          "installUnit": "Each services entry names the service this product calls; the installer installs that entry's whole compose file (ADR 017 section 5 inventory)."
+        }
+      }
     }
   ]
 }

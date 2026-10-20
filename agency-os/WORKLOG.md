@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-20（續11）Foundry v1.7 V17-8 收尾：產品 manifest 帶驗收 → CAP-AW-* 有驗收；Foundry sync＋rehash＋verify 全綠；驗收缺 11 → 0
+
+**根因**：V17-7 後 `report_acceptance_gap.py` 剩 11 缺，全是 `scripts/sync-foundry-catalog.mjs` 由 products.ts 產生的 `CAP-AW-<KEY>`；驗收正本應在產品 manifest，sync 沒帶。
+
+- 11 份 `lib/<key>/MODULE_MANIFEST.json` 加 `acceptance: [{test, expect}]` 各 2 條（test＝英文行為測試名，有現成測試就引用其名稱與目錄；expect＝可觀察結果）。social 那份已被另一 session 的 cf2b4ecc1 一併提交（內容同本批）。
+- `sync-foundry-catalog.mjs`：CAP-AW-<KEY> 帶 `sourceManifest.acceptance`；沒有就不帶（缺＝可見）。CAP-AW-DEPENDENCY-* 不帶。
+- `product-manifests.mjs` `manifestStatus()` 完整多一條：acceptance 非空陣列、每條 test／expect 非空；測試 fixture 補 acceptance，新增「缺 acceptance／expect 空白 → 不完整」。
+- Foundry sync 同時補上 ca16c97b3 已提交但未同步的 social `door.anonymous`（awarewave-products.json）；generation/module-manifests.json 不再含 `SMARTLINK_*`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test scripts/__tests__/product-manifests.test.mjs`（4 pass）；`manifestStatus()` 11/11；`node scripts/sync-foundry-catalog.mjs` → `PYTHONUTF8=1 python scripts/regenerate_integrity.py --write` → Makefile verify 18 條逐條 exit 0（sync --check、validate_versions/foundry/semantics/configurator/artifact_generation/contract_fixtures、adversarial、bootstrap/configurator/http e2e、selection-matrix、mutation-coverage、payment gating、unittest、validate_manifest、doc_numbers、report_acceptance_gap「0 of 315」、generate_sample --replace）；samples 後再 rehash，validate_manifest PASS | exit=0 | ms=420000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `agency-os/reports/oracle/2026-10-20-partialreview-a4711651.md`：F1 hci 驗收寫「只看到自己租戶」不實（HTTP 無登入、租戶由參數指定）→ 改為 DB 角色層 RLS-LEAK 測試並註明無登入；F2「Foundry 檔未重產」為 -Path 範圍外的假陽性（sync --check PASS）；F3 只驗非空不驗真＝卡片定義，真偽靠 review，不改
+- ORACLE_WAIVED: Codex 以 -Path 只審本批檔（partialreview）；全樹會掃進其他 session 未提交改動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`sourceManifest.acceptance|acceptance missing` | hits=3（sync、product-manifests、測試，皆本批）
+
+**rollback**：`git revert <本 commit>`；Foundry 檔由 sync＋rehash 重產。
 ## 2026-10-20（續10）next-admin 上線 3db84c0e1：ADR 017 第 2／3 步＋社群 V1.5 兩批（hold 解除後首次部署，80728adf8 → 3db84c0e1）
 
 **結果**：sg-deploy 第一次在測試閘中止（續9 根因），修後第二次成功：healthy 10s、HTTP smoke 5/5 200、容器名正常；Playwright smoke 26 passed／6 skipped。主機上直接打 `POST /api/internal/entitlements/expire`（Bearer SCHEDULE_INGEST_TOKEN）→ `{"ok":true,"expired":0}`；部署後 5 分鐘 log 無 `entitlement_*_key` 錯誤。

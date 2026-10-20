@@ -2,6 +2,7 @@
 // count progress and by V17-8's closing test; format = new-product.mjs manifest + services/env (customer-model step-5.md:6).
 //   services: [{ compose: "<repo-relative compose file>", service: "<service key under services:>" }]
 //   env:      ["NAME", ...]  names the customer supplies (ADR 017 §5 inventory)
+//   acceptance: [{ test, expect }]  sync-foundry-catalog.mjs copies it onto the product's CAP-AW-<KEY>
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +35,8 @@ export function manifestStatus({ root = repo, products } = {}) {
       if (!new RegExp(`^  ${escape(s.service)}:\\s*$`, 'm').test(block)) problems.push(`service ${s.service} not in ${s.compose}`);
     }
     if (!Array.isArray(m.env) || m.env.some((e) => typeof e !== 'string' || !e.trim())) problems.push('env missing');
+    const filled = (v) => typeof v === 'string' && v.trim() !== '';
+    if (!Array.isArray(m.acceptance) || !m.acceptance.length || m.acceptance.some((a) => !filled(a?.test) || !filled(a?.expect))) problems.push('acceptance missing');
     return { key: p.key, ok: problems.length === 0, problems };
   });
 }

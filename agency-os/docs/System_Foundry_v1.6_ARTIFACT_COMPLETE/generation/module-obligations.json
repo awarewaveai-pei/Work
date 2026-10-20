@@ -1343,7 +1343,6 @@
       "invariants": [
         "Product registry key: cognitive.",
         "Source module contract: lib/cognitive/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],
@@ -1366,7 +1365,6 @@
       "invariants": [
         "Product registry key: collect.",
         "Source module contract: lib/collect/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],
@@ -1389,7 +1387,6 @@
       "invariants": [
         "Product registry key: content.",
         "Source module contract: lib/content/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],
@@ -1412,7 +1409,6 @@
       "invariants": [
         "Product registry key: cs.",
         "Source module contract: lib/cs/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],
@@ -1435,7 +1431,6 @@
       "invariants": [
         "Product registry key: design.",
         "Source module contract: lib/design/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],
@@ -1458,7 +1453,6 @@
       "invariants": [
         "Product registry key: hci.",
         "Source module contract: lib/hci/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],
@@ -1481,7 +1475,6 @@
       "invariants": [
         "Product registry key: outreach.",
         "Source module contract: lib/outreach/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],
@@ -1526,7 +1519,6 @@
       "invariants": [
         "Product registry key: studio.",
         "Source module contract: lib/studio/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],
@@ -1549,7 +1541,6 @@
       "invariants": [
         "Product registry key: tarot.",
         "Source module contract: lib/tarot/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],
@@ -1572,7 +1563,6 @@
       "invariants": [
         "Product registry key: video.",
         "Source module contract: lib/video/MODULE_MANIFEST.json.",
-        "TODO: source module manifest is missing; complete its ten declarations before status: available.",
         "Keep authoritative state and public contracts within the declared module boundary.",
         "Product access uses the shared entitlement contract; no private billing ledger."
       ],

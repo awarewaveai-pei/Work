@@ -16,7 +16,8 @@ function fixture(manifest) {
   return { root, products: [{ key: 'demo', modules: { manifest: 'lib/demo/MODULE_MANIFEST.json' } }] };
 }
 const complete = () => ({ schema_version: 1, module_id: 'demo', declarations: Object.fromEntries(DECLARATIONS.map((k) => [k, `${k} fact (lib/demo/x.ts:1)`])),
-  services: [{ compose: 'infra/docker-compose.yml', service: 'next-admin' }], env: ['DEMO_API_KEY'] });
+  services: [{ compose: 'infra/docker-compose.yml', service: 'next-admin' }], env: ['DEMO_API_KEY'],
+  acceptance: [{ test: 'open the demo page', expect: 'the page shows the demo list' }] });
 
 test('a manifest with ten declarations, services found in their compose file and env is complete', () => {
   assert.deepEqual(manifestStatus(fixture(complete()))[0], { key: 'demo', ok: true, problems: [] });
@@ -28,6 +29,13 @@ test('a TODO declaration, a service absent from its compose file or a missing ma
   const svc = complete(); svc.services = [{ compose: 'infra/docker-compose.yml', service: 'data' }]; // a volume, not a service
   assert.deepEqual(manifestStatus(fixture(svc))[0].problems, ['service data not in infra/docker-compose.yml']);
   assert.deepEqual(manifestStatus(fixture(null))[0].problems, ['manifest missing']);
+});
+
+test('a manifest without acceptance, or with an empty expect, is incomplete', () => {
+  const none = complete(); delete none.acceptance;
+  assert.deepEqual(manifestStatus(fixture(none))[0].problems, ['acceptance missing']);
+  const blank = complete(); blank.acceptance = [{ test: 'open the demo page', expect: ' ' }];
+  assert.deepEqual(manifestStatus(fixture(blank))[0].problems, ['acceptance missing']);
 });
 
 test('every registered product in the real repo has a complete manifest (V17-8)', () => {

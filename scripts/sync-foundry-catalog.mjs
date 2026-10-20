@@ -73,7 +73,10 @@ export async function syncCatalog({ app = defaultApp, foundry = defaultFoundry, 
     }
     questions.questions.push({ id: qid, category: 'AW', label: p.name, description: p.description,
       answer_type: 'boolean', required_when_active: true });
-    capabilities.capabilities.push({ id: cid, name: p.name, description: p.description, module: mid, requires });
+    // Acceptance comes only from the product manifest; absent stays absent so report_acceptance_gap.py shows it.
+    const acceptance = Array.isArray(sourceManifest?.acceptance) && sourceManifest.acceptance.length
+      ? sourceManifest.acceptance.map(({ test, expect }) => ({ test, expect })) : null;
+    capabilities.capabilities.push({ id: cid, name: p.name, description: p.description, module: mid, requires, ...(acceptance && { acceptance }) });
     rules.rules.push({ id: `RULE-${qid}`, when: { question: qid, equals: true }, require: [cid] });
     manifests.modules.push({ id: mid, paths: [`packages/${mid}`], activated_by: [cid],
       product_key: p.key, source_manifest: p.modules.manifest, source_module_manifest: sourceManifest });

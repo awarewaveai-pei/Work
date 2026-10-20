@@ -20,6 +20,10 @@
     { "compose": "lobster-factory/infra/hetzner-phase1-core/apps/remotion-service/docker-compose.remotion.yml", "service": "remotion-service" }
   ],
   "env": ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "REPLICATE_API_TOKEN", "PEXELS_API_KEY", "R2_API_TOKEN", "R2_ACCOUNT_ID", "R2_VIDEO_BUCKET", "R2_VIDEO_PUBLIC_BASE", "STRIPE_SECRET_KEY", "MEDIA_PROVIDER_ALLOWLIST", "MEDIA_PAYMENT_PROVIDER", "MEDIA_CHECKOUT_ALLOWED_ORIGIN", "MEDIA_PRODUCTION_PERSISTENCE_ENABLED"],
+  "acceptance": [
+    {"test": "blocks stale, failed, and duplicate evidence (lib/content/video/__tests__)", "expect": "QA 報告與候選影片不符、失敗或重複時，發佈被拒絕並說明是哪一項"},
+    {"test": "generate a short video and close the page before it finishes", "expect": "影片完成後仍出現在媒體庫（定期對帳補記），不會成為孤兒檔案"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_VIDEO": "optional product host",

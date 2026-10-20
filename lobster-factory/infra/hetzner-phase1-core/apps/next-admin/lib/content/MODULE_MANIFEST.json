@@ -19,6 +19,10 @@
     { "compose": "lobster-factory/infra/postiz/docker-compose.yml", "service": "postiz" }
   ],
   "env": ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "SERPER_API_KEY", "REPLICATE_API_TOKEN", "R2_API_TOKEN", "R2_ACCOUNT_ID", "R2_DESIGNS_BUCKET", "R2_DESIGNS_PUBLIC_BASE", "POSTIZ_API_BASE_URL", "POSTIZ_API_KEY", "WP_API_URL", "WORDPRESS_JWT_TOKEN", "WPBRIDGE_BASE_URL", "WPBRIDGE_KEY_ID", "WPBRIDGE_PRIVATE_KEY", "WPBRIDGE_NAME", "CONTENT_TRENDING_FEEDS"],
+  "acceptance": [
+    {"test": "publish an article to a connected WordPress site without choosing a status", "expect": "WordPress 出現一篇草稿而不是已發佈文章，網站前台看不到"},
+    {"test": "one trending source fails while the others answer", "expect": "選題清單仍列出其他來源的結果，失敗的來源只被略過"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_CONTENT": "optional product host",

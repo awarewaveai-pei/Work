@@ -19,6 +19,10 @@
     { "compose": "lobster-factory/infra/trigger/docker-compose.yml", "service": "webapp" }
   ],
   "env": ["REPLICATE_API_TOKEN", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "R2_API_TOKEN", "R2_ACCOUNT_ID", "R2_DESIGNS_BUCKET", "R2_DESIGNS_PUBLIC_BASE", "TAROT_DAILY_LIMIT"],
+  "acceptance": [
+    {"test": "generate one tarot card image with a chosen model and style", "expect": "回傳一張圖片；當日張數超過上限時回傳 429 與「每日生成上限已達」"},
+    {"test": "start a 78-card batch", "expect": "批次進度逐張增加，失敗的卡片被計數而批次繼續，結束時列出成功與失敗張數"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_TAROT": "optional product host",

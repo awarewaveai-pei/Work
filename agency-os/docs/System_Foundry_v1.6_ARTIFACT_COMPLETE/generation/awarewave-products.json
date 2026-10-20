@@ -2473,6 +2473,9 @@
         "page": "/social",
         "api": [
           "/api/social"
+        ],
+        "anonymous": [
+          "/smartlink"
         ]
       },
       "loginSources": [

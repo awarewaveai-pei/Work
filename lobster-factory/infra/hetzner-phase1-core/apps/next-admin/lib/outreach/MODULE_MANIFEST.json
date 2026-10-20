@@ -18,6 +18,10 @@
     { "compose": "lobster-factory/infra/supabase/docker-compose.yml", "service": "kong" }
   ],
   "env": ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+  "acceptance": [
+    {"test": "never requests gmail.send or any broader scope than compose (lib/outreach/__tests__)", "expect": "Gmail 授權只要求建立草稿的權限，系統無法替客戶寄信"},
+    {"test": "blocks when source_url missing (lib/outreach/__tests__)", "expect": "沒有觀察依據或來源網址的名單，產生開發信被拒絕並說明原因"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_OUTREACH": "optional product host",

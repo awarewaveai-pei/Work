@@ -20,6 +20,10 @@
     { "compose": "lobster-factory/infra/trigger/docker-compose.yml", "service": "webapp" }
   ],
   "env": ["BRAVE_SEARCH_API_KEY", "SERPER_API_KEY", "PERPLEXITY_API_KEY", "FIRECRAWL_API_KEY", "OPENAI_API_KEY", "COLLECT_SEARCH_PROVIDER", "COLLECT_EXTRACT_PROVIDER", "COLLECT_CONTACT_EMAIL"],
+  "acceptance": [
+    {"test": "never turns a candidate into a seed (lib/collect/__tests__)", "expect": "只有核准的來源會被爬取；系統提議的候選來源在核准前不產生任何抓取"},
+    {"test": "does not create a second version when the same page comes back unchanged (lib/collect/__tests__)", "expect": "同一頁內容未變時知識庫不多一個版本；內容變了才出新版本並停用舊版"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_COLLECT": "optional product host",

@@ -20,6 +20,10 @@
     { "compose": "lobster-factory/infra/hetzner-phase1-core/docker-compose.yml", "service": "hci-object-storage" }
   ],
   "env": [],
+  "acceptance": [
+    {"test": "a query run as one tenant database role reads another tenant's cases (RLS-LEAK tests in Projects/internal/hci30/database/tests/wave1-negative-tests.sql)", "expect": "以租戶 A 的資料庫角色查詢，租戶 B 的案件一筆都讀不到；注意 HTTP 層尚無登入，租戶由請求參數指定（app/server.mjs:36-48）"},
+    {"test": "skips a source already sent (hciSourceId set) without calling HCI-30 again (lib/hci/__tests__)", "expect": "已送過的來源不會重複送進 HCI-30"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_HCI": "optional product host",

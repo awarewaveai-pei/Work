@@ -21,6 +21,10 @@
     { "compose": "Projects/internal/cognitive-engineering-os/ops/cognitive-db/docker-compose.cognitive-db.yml", "service": "cognitive-db" }
   ],
   "env": ["COGNITIVE_OS_ANTHROPIC_API_KEY", "COGNITIVE_OS_AI_MODEL", "COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET", "COGNITIVE_OS_AI_DAILY_TOKEN_BUDGET_PER_PERSON", "COGNITIVE_OS_COLLECTION_SERVICE_URL"],
+  "acceptance": [
+    {"test": "an outbound call to a host that is not on the egress allowlist", "expect": "呼叫在送出前被拒絕，不產生任何網路連線"},
+    {"test": "delete a project", "expect": "專案的紀錄、來源與 AI 產出都被移除，之後無法再寫入該專案"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_COGNITIVE": "optional product host",

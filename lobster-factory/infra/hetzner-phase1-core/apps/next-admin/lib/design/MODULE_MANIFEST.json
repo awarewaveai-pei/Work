@@ -18,6 +18,10 @@
     { "compose": "lobster-factory/infra/supabase/docker-compose.yml", "service": "kong" }
   ],
   "env": ["R2_API_TOKEN", "R2_ACCOUNT_ID", "R2_DESIGNS_BUCKET", "R2_DESIGNS_PUBLIC_BASE"],
+  "acceptance": [
+    {"test": "save a canvas design to My Designs, then delete it", "expect": "存檔後圖庫出現該設計；刪除後圖庫與儲存空間都不再有它，稽核紀錄有兩筆"},
+    {"test": "save a design when object storage is not configured", "expect": "回報儲存未設定，圖庫沒有新增任何資料"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_DESIGN": "optional product host",

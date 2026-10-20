@@ -19,6 +19,10 @@
     { "compose": "lobster-factory/infra/trigger/docker-compose.yml", "service": "webapp" }
   ],
   "env": ["REPLICATE_API_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "PRINTFUL_API_KEY", "PRINTFUL_STORE_ID", "PRINTFUL_NATIVE_STORE_ID", "WC_WEBHOOK_SECRET", "R2_API_TOKEN", "R2_ACCOUNT_ID", "R2_DESIGNS_BUCKET", "R2_DESIGNS_PUBLIC_BASE", "WPBRIDGE_BASE_URL", "WPBRIDGE_KEY_ID", "WPBRIDGE_PRIVATE_KEY", "WPBRIDGE_NAME", "POD_DESIGNS_ENABLED", "POD_AUTO_FULFILL_ENABLED"],
+  "acceptance": [
+    {"test": "allowed: claims (attempts 1), creates one draft, ends done (lib/studio/__tests__)", "expect": "一筆已付款的 WooCommerce 訂單在 Printful 產生一張未確認的草稿訂單，沒有扣款也沒有送印"},
+    {"test": "inserts a pending row, and a re-delivery never resets its status, attempts or payload (lib/studio/__tests__)", "expect": "同一訂單的 webhook 重送不會重置狀態，也不會產生第二張 Printful 訂單"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_STUDIO": "optional product host",

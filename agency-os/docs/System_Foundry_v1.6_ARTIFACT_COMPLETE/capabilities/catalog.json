@@ -5560,6 +5560,16 @@
       "module": "aw-cognitive",
       "requires": [
         "CAP-AW-COLLECT"
+      ],
+      "acceptance": [
+        {
+          "test": "an outbound call to a host that is not on the egress allowlist",
+          "expect": "呼叫在送出前被拒絕，不產生任何網路連線"
+        },
+        {
+          "test": "delete a project",
+          "expect": "專案的紀錄、來源與 AI 產出都被移除，之後無法再寫入該專案"
+        }
       ]
     },
     {
@@ -5567,70 +5577,170 @@
       "name": "資料蒐集器",
       "description": "搜尋並蒐集外部網站與研究資料。",
       "module": "aw-collect",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "never turns a candidate into a seed (lib/collect/__tests__)",
+          "expect": "只有核准的來源會被爬取；系統提議的候選來源在核准前不產生任何抓取"
+        },
+        {
+          "test": "does not create a second version when the same page comes back unchanged (lib/collect/__tests__)",
+          "expect": "同一頁內容未變時知識庫不多一個版本；內容變了才出新版本並停用舊版"
+        }
+      ]
     },
     {
       "id": "CAP-AW-CONTENT",
       "name": "內容行銷",
       "description": "產生文章、搜尋素材並安排內容發布。",
       "module": "aw-content",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "publish an article to a connected WordPress site without choosing a status",
+          "expect": "WordPress 出現一篇草稿而不是已發佈文章，網站前台看不到"
+        },
+        {
+          "test": "one trending source fails while the others answer",
+          "expect": "選題清單仍列出其他來源的結果，失敗的來源只被略過"
+        }
+      ]
     },
     {
       "id": "CAP-AW-CS",
       "name": "AI 客服",
       "description": "根據知識庫回答問題並處理客服交接。",
       "module": "aw-cs",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "the same Chatwoot message is delivered twice",
+          "expect": "只產生一筆回覆紀錄與一則回覆，第二次標記為重複"
+        },
+        {
+          "test": "a customer writes while staff replied publicly in the last 30 minutes",
+          "expect": "AI 不回覆，對話留給真人客服"
+        }
+      ]
     },
     {
       "id": "CAP-AW-DESIGN",
       "name": "設計編輯器",
       "description": "編輯畫布、橫幅、模型圖與向量設計。",
       "module": "aw-design",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "save a canvas design to My Designs, then delete it",
+          "expect": "存檔後圖庫出現該設計；刪除後圖庫與儲存空間都不再有它，稽核紀錄有兩筆"
+        },
+        {
+          "test": "save a design when object storage is not configured",
+          "expect": "回報儲存未設定，圖庫沒有新增任何資料"
+        }
+      ]
     },
     {
       "id": "CAP-AW-HCI",
       "name": "HCI-30",
       "description": "人機互動與持續監測工具。",
       "module": "aw-hci",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "a query run as one tenant database role reads another tenant's cases (RLS-LEAK tests in Projects/internal/hci30/database/tests/wave1-negative-tests.sql)",
+          "expect": "以租戶 A 的資料庫角色查詢，租戶 B 的案件一筆都讀不到；注意 HTTP 層尚無登入，租戶由請求參數指定（app/server.mjs:36-48）"
+        },
+        {
+          "test": "skips a source already sent (hciSourceId set) without calling HCI-30 again (lib/hci/__tests__)",
+          "expect": "已送過的來源不會重複送進 HCI-30"
+        }
+      ]
     },
     {
       "id": "CAP-AW-OUTREACH",
       "name": "行銷開發信",
       "description": "產生開發信並管理寄送名單。",
       "module": "aw-outreach",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "never requests gmail.send or any broader scope than compose (lib/outreach/__tests__)",
+          "expect": "Gmail 授權只要求建立草稿的權限，系統無法替客戶寄信"
+        },
+        {
+          "test": "blocks when source_url missing (lib/outreach/__tests__)",
+          "expect": "沒有觀察依據或來源網址的名單，產生開發信被拒絕並說明原因"
+        }
+      ]
     },
     {
       "id": "CAP-AW-SOCIAL",
       "name": "社群發文",
       "description": "改寫、排程並派送品牌社群貼文。",
       "module": "aw-social",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "a failed target is resent only after its Postiz ERROR post is deleted; published ones are left alone (lib/social/__tests__)",
+          "expect": "已發佈的平台貼文不會被重送，失敗的只在清掉 Postiz 錯誤貼文後重送"
+        },
+        {
+          "test": "submit notifies the approvers; with review on an editor cannot schedule a draft (lib/social/__tests__)",
+          "expect": "開啟審核時編輯者無法排程或立即發佈，審核者收到通知"
+        }
+      ]
     },
     {
       "id": "CAP-AW-STUDIO",
       "name": "商品設計工作室",
       "description": "生成商品圖片、文案與修圖素材。",
       "module": "aw-studio",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "allowed: claims (attempts 1), creates one draft, ends done (lib/studio/__tests__)",
+          "expect": "一筆已付款的 WooCommerce 訂單在 Printful 產生一張未確認的草稿訂單，沒有扣款也沒有送印"
+        },
+        {
+          "test": "inserts a pending row, and a re-delivery never resets its status, attempts or payload (lib/studio/__tests__)",
+          "expect": "同一訂單的 webhook 重送不會重置狀態，也不會產生第二張 Printful 訂單"
+        }
+      ]
     },
     {
       "id": "CAP-AW-TAROT",
       "name": "塔羅製圖",
       "description": "生成塔羅圖片、提示詞與動態。",
       "module": "aw-tarot",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "generate one tarot card image with a chosen model and style",
+          "expect": "回傳一張圖片；當日張數超過上限時回傳 429 與「每日生成上限已達」"
+        },
+        {
+          "test": "start a 78-card batch",
+          "expect": "批次進度逐張增加，失敗的卡片被計數而批次繼續，結束時列出成功與失敗張數"
+        }
+      ]
     },
     {
       "id": "CAP-AW-VIDEO",
       "name": "影片製作",
       "description": "生成腳本、場景、動態與旁白影片。",
       "module": "aw-video",
-      "requires": []
+      "requires": [],
+      "acceptance": [
+        {
+          "test": "blocks stale, failed, and duplicate evidence (lib/content/video/__tests__)",
+          "expect": "QA 報告與候選影片不符、失敗或重複時，發佈被拒絕並說明是哪一項"
+        },
+        {
+          "test": "generate a short video and close the page before it finishes",
+          "expect": "影片完成後仍出現在媒體庫（定期對帳補記），不會成為孤兒檔案"
+        }
+      ]
     }
   ]
 }

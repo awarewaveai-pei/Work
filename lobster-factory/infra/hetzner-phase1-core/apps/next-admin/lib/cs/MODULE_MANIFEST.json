@@ -20,6 +20,10 @@
     { "compose": "lobster-factory/infra/trigger/docker-compose.yml", "service": "webapp" }
   ],
   "env": ["ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY"],
+  "acceptance": [
+    {"test": "the same Chatwoot message is delivered twice", "expect": "只產生一筆回覆紀錄與一則回覆，第二次標記為重複"},
+    {"test": "a customer writes while staff replied publicly in the last 30 minutes", "expect": "AI 不回覆，對話留給真人客服"}
+  ],
   "configuration": {
     "PUBLIC_BASE_DOMAIN": "installation base domain",
     "PRODUCT_HOST_CS": "optional product host",
