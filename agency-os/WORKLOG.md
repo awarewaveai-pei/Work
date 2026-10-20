@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-20（續13）ADR 017 認知平台許可接線（下）：cognitive 上線 2bc73fe06，shadow 稽核留下真判定
+
+**結果**：cognitive-os-api 從 3104c03af 部署到 2bc73fe06（含 e87de9225 的 `can()` 轉接層）。`deploy.sh` 新的步驟 0a 在 prod 第一次真正跑：自動把 `lobster-factory/packages/contracts/fixtures/permit-v1` 加進 sparse 集，並記下 `11 COPY source(s), Dockerfile, .dockerignore, web context = HEAD`。之後 test-gate 跑 425 個模組 PASS、web-test PASS、healthy、本機／資料庫／公開 smoke 都 PASS。web 的 image 沒變，所以三個 web 容器沒有重建。
+**shadow 呼叫**（在容器內跑正式的 `check_entitlement`，用容器自己的 env、issuer、DB）：tenant efa91107…（AwareWave self-use）、`project.manage`、actor `cognitive:8b0c468a…` → issuer 回答 `entitlement.would_deny reason=no_entitlement subject=39ad4149…`（AwareWave Ops），結果 allowed=True shadow=True，`entitlement_audit` 寫入 id 131。部署後 log 裡 `entitlement.infra_error` 0 次。`ENTITLEMENT_MODE` 沒有設（printenv exit 1）＝ shadow，未翻 enforce。
+**接下來**：要翻 enforce，還缺三件事：AwareWave Ops 與 EdD 兩個 org 的授權或方案、tenant→計費帳戶的對應改存在 tenant 欄位（`check.py:119-120` 說這是 enforce 的前置），以及操作者明示同意（High）。
+**rollback**：cognitive＝`deploy.sh` 部署前已把舊 image 標成 `:rollback`（07:46:20Z）；env＝`deploy/.env` 刪掉 4 行 ENTITLEMENT_ 後重新部署。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=`git -C /opt/cognitive-os pull --ff-only` ＋ `deploy.sh` → build-context 補上 permit-v1、test-gate PASS、smoke public PASS、done | exit=0 | ms=630000
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec cognitive-os-api python shadow_call.py efa91107… 8b0c468a… project.manage` → would_deny no_entitlement subject=39ad4149…；`entitlement_audit` id 131；printenv 四個 ENTITLEMENT_ 都 exit 0、ENTITLEMENT_MODE exit 1 | exit=0 | ms=4000
+- REVIEW_WAIVED: NA -- 部署與驗證紀錄，程式改動已在續12 審過
+- BUGHUNT_WAIVED: NA -- 部署與驗證紀錄，沒有新的程式改動
 ## 2026-10-20（續12）ADR 017 認知平台許可接線（上）：next-admin issuer token 已上 prod；cognitive deploy.sh 加 build context＝HEAD 閘
 
 **背景**：要讓 cognitive 的 shadow 稽核留下真判定（不是 infra_error）。操作者 2026-10-20 批准計畫，並定 tenant→計費帳戶對應：efa91107…、7932ebb6…（AwareWave self-use）→ 39ad4149…（AwareWave Ops）；2741349f…（EdD Research）→ ecf4e311…（EdD 論文研究）。
