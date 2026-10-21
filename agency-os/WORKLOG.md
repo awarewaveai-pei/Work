@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-21（續7）
+
+**任務**：tarot batch 修復（603485b3b）兩個 Low 後續。
+
+**根因／改動**：
+- `lobster-factory/packages/workflows/src/tasks/sync-global-events.ts` 不在 `trigger.config.ts:13` dirs（從未部署），且打 session 閘的 `/api/tools/events/sync`（部署了也 401）。操作者 2026-10-21 定「刪」→ 已刪；路由與 `lib/events/sync.ts` 保留（瀏覽器用）。repo 內無任何 import／測試引用（grep 見證據行）。
+- `infra/hetzner-phase1-core/.env.example` 缺 next-admin 在 `/api/internal/**` 檢查的 bearer：補 SOCIAL_DISPATCH_TOKEN／CS_SWEEP_TOKEN／POD_INBOX_SWEEP_TOKEN／COLLECT_RESEARCH_RUNS_TOKEN／COLLECT_RESEARCH_EXECUTE_TOKEN／RECONCILE_TOKEN／COGNITIVE_OS_IMPORT_INGEST_TOKEN（空值＋file:line 註解）。清單來源＝`scripts/lobster-trigger-deploy.ps1:164-175` printenv 行 ＋ `process.env.*` 於 `app/api/internal/**`。
+- TASKS.md:566「未清」改為已清。
+
+**避免再發生**：新增 Trigger callback token 時同步 `.env.example`（與 BATCH_INTERNAL_SECRET 同區）。止血非治本：無。
+
+**驗證結果**：
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd lobster-factory/packages/workflows && npm run typecheck | exit=0 | ms=4000
+- REVIEW_WAIVED: NA -- 刪除未部署檔＋example 註解，讀回 diff 確認只動這兩檔與 TASKS 一行
+- BUGHUNT_DONE: scope=lobster-factory,scripts,agency-os,.claude/commands | grep=sync-global-events|syncGlobalEventsTask | hits=0
+- BUGHUNT_SCOPE_NARROW: hits=0 指刪除後 lobster-factory/scripts/.claude/commands 無引用；agency-os 內只剩 WORKLOG／memory／archive 歷史敘述（刻意不改）
+- ORACLE_WAIVED: deletion of an undeployed file + .env.example comments (no runtime logic changed)
 ## 2026-10-21（續6）Trigger 重新部署 20261021.2（tarot 批次回呼改 /api/internal，603485b3b）
 
 **觸發**：操作者「1>現在就部署」（High，明確同意）。

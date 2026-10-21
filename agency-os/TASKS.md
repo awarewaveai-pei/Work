@@ -563,7 +563,7 @@
 
 - [x] **【✅ 2026-10-20 程式已修，待 Trigger 重新部署｜資安｜tarot】`BATCH_INTERNAL_SECRET` 經 Trigger run payload 傳遞（payload 會持久化、dashboard 看得到）**
   - 修法：callback 移到 `/api/internal/tarot/batch/[jobId]/{start,card}`，worker 從自身 env 讀 secret（`lobster-trigger-deploy.ps1` 由執行中 next-admin 同步）。細節 WORKLOG 2026-10-20「tarot batch callback」。
-  - 未清：`packages/workflows/src/tasks/sync-global-events.ts` 不在 `trigger.config.ts:13` dirs（從未部署），且打 session 閘的 `/api/tools/events/sync`；刪或移 `/api/internal` 由操作者定。另 `infra/hetzner-phase1-core/.env.example` 缺 `SOCIAL_DISPATCH_TOKEN`／`CS_SWEEP_TOKEN`／`POD_INBOX_SWEEP_TOKEN` 等 Trigger callback token（只列了 SITE_WATCH／SCHEDULE），新裝機會漏設。
+  - ✅ 2026-10-21 已清：`packages/workflows/src/tasks/sync-global-events.ts`（從未部署、打 session 閘路由）操作者定「刪」，已刪（`git log -1 -- lobster-factory/packages/workflows/src/tasks/sync-global-events.ts` 取 commit；路由 `/api/tools/events/sync` 保留）；`infra/hetzner-phase1-core/.env.example` 補齊 7 個 `/api/internal` bearer（SOCIAL_DISPATCH／CS_SWEEP／POD_INBOX_SWEEP／COLLECT_RESEARCH_RUNS／COLLECT_RESEARCH_EXECUTE／RECONCILE／COGNITIVE_OS_IMPORT_INGEST）。
   - `🟡 潛伏` · `2026-09-23 發現；2026-09-26 補登` · `續110 寫了「開 TASKS D」但該條從未 commit（b443b77d3 只含 WORKLOG 與程式）`
   - 一句話：`next-admin/app/api/tools/tarot/batch/route.ts:72` 把 secret 放進 payload → `packages/workflows/src/trigger/tarot-batch-generate.ts:41,45-46` 取出當 Bearer；MainWP 已定憑證不得進 payload。細節 WORKLOG 2026-09-23 續110「剩餘風險／延後」④。
 
