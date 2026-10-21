@@ -158,6 +158,11 @@ async function handle(route) {
   if (p === "/api/social/texts") return ok({ texts: [{ id: "x1", body: "#藝術治療 #台北 #自我照顧", mediaIds: [] }] });
   if (p === "/api/social/needs") return ok({ failed: [POSTS[1]].map((x) => ({ id: x.id, body: x.body, scheduled_at: x.scheduled_at, errors: ["Facebook: (#200) permission"] })), expired: [{ id: ACCOUNTS[2].id, platform: "instagram", label: "soulful.art" }], review: [{ id: POSTS[4].id, body: POSTS[4].body, scheduled_at: POSTS[4].scheduled_at }], n: 3 });
   if (p === "/api/social/settings") return ok({ requireReview: true });
+  // C29 訊息收件匣: Facebook linked with 3 unread, Bluesky linked and all read, Instagram not linked to an inbox
+  if (p === "/api/social/inbox") return ok({ home: "https://chat.example/app/accounts/1/conversations", inboxes: [
+    { accountId: ACCOUNTS[1].id, platform: "facebook", label: ACCOUNTS[1].label, handle: "", picture: null, chatwootInboxId: 7, unread: 3, status: "ok", chatwootUrl: "https://chat.example/app/accounts/1/inbox/7" },
+    { accountId: ACCOUNTS[0].id, platform: "bluesky", label: ACCOUNTS[0].label, handle: ACCOUNTS[0].handle, picture: null, chatwootInboxId: 8, unread: 0, status: "ok", chatwootUrl: "https://chat.example/app/accounts/1/inbox/8" },
+    { accountId: ACCOUNTS[2].id, platform: "instagram", label: ACCOUNTS[2].label, handle: ACCOUNTS[2].handle, picture: null, chatwootInboxId: null, unread: 0, status: "unlinked", chatwootUrl: null }] });
   if (p === "/api/social/members") return ok({ members: [{ user_id: "u1", email: "pei@example.com", role: "owner", created_at: day(-10, 1) }, { user_id: "u2", email: "client@example.com", role: "editor", created_at: day(-1, 1) }] });
   if (p === "/api/social/log") return ok({ log: LOG });
   if (p === "/api/social/metrics") return ok({ analytics: analytics(Number(url.searchParams.get("days") ?? 28), url.searchParams.get("account")) });
@@ -275,11 +280,17 @@ await page.screenshot({ path: `${out}/14-report-print-media.png`, fullPage: true
 await page.emulateMedia({ media: "screen" });
 await page.goto(`http://localhost:3902/tools/social?brand=${BRAND.id}`, { waitUntil: "networkidle" });   // the report page has no top bar
 // the sections that are shells until their cards (C27-C29)
-for (const [label, key] of [["訊息收件匣", "inbox"], ["智慧連結", "smartlinks"], ["廣告管理", "ads"]]) {
+for (const [label, key] of [["智慧連結", "smartlinks"], ["廣告管理", "ads"]]) {
   await page.getByRole("button", { name: label, exact: true }).click();
   await page.waitForURL(new RegExp(`/tools/social/${key}`));
   await shot(`10-${key}`);
 }
+// C29 訊息收件匣: per-channel unread, "打開收件匣" in a new tab, and how to connect for the channel with no inbox
+await page.getByRole("button", { name: "訊息收件匣", exact: true }).click();
+await page.waitForURL(/\/tools\/social\/inbox/);
+await page.getByText("3 則未讀").first().waitFor({ timeout: 10000 });
+if ((await page.getByRole("link", { name: "打開收件匣" }).getAttribute("target")) !== "_blank") { console.error("FAIL: 打開收件匣 does not open a new tab"); process.exit(1); }
+await shot("17-inbox");
 const size = await page.evaluate(() => ({ h: document.scrollingElement.scrollHeight, w: document.scrollingElement.scrollWidth }));
 console.log("page size on the last section", size);
 await browser.close();

@@ -35,6 +35,7 @@ describe("GET /api/social/inbox", () => {
       expect.objectContaining({ accountId: "facebook-1", unread: 3, status: "ok", chatwootUrl: "https://chatwoot.example/app/accounts/42/inbox/7" }),
       expect.objectContaining({ accountId: "ig-1", unread: 0, status: "unlinked", chatwootUrl: null }),
     ]);
+    expect(body.home).toBe("https://chatwoot.example/app/accounts/42/conversations");
     expect(JSON.stringify(body)).not.toContain("token");
     expect(store.listAccounts).toHaveBeenCalledWith(BRAND, { hydrateProfile: false });
     expect(chatwoot.getInboxUnreadCount).toHaveBeenCalledWith(BRAND, { accountId: 42, baseUrl: "https://chatwoot.example" }, 7);
@@ -55,6 +56,14 @@ describe("GET /api/social/inbox", () => {
     expect(body.inboxes[0]).toEqual(expect.objectContaining({ status: "not_configured", unread: 0 }));
   });
 
+  it("keeps a path prefix in the Chatwoot link", async () => {
+    const { GET } = await import("./route");
+    cis.loadCis.mockResolvedValue({ organizationId: BRAND, chatwoot: { accountId: 42, baseUrl: "https://host.example/chatwoot/" } });
+    const body = await (await GET(req())).json();
+    expect(body.inboxes[0].chatwootUrl).toBe("https://host.example/chatwoot/app/accounts/42/inbox/7");
+    expect(body.home).toBe("https://host.example/chatwoot/app/accounts/42/conversations");
+  });
+
   it("does not emit a non-http Chatwoot link", async () => {
     const { GET } = await import("./route");
     cis.loadCis.mockResolvedValue({ organizationId: BRAND, chatwoot: { accountId: 42, baseUrl: "javascript:alert(1)" } });
@@ -67,6 +76,7 @@ describe("GET /api/social/inbox", () => {
     cis.loadCis.mockResolvedValue({ organizationId: BRAND, chatwoot: { accountId: 42, baseUrl: "https://user:password@chatwoot.example" } });
     const text = await (await GET(req())).text();
     expect(JSON.parse(text).inboxes[0].chatwootUrl).toBeNull();
+    expect(JSON.parse(text).home).toBeNull();
     expect(text).not.toContain("password");
   });
 

@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-21（續4）社群 V1.5 C29 訊息收件匣補齊（Codex 批次 cf2b4ecc1 已做路由／頁面／未讀數，這裡只補缺的）
+
+- [對照卡片] 已做（cf2b4ecc1）：`app/api/social/inbox/route.ts`＋`route.test.ts`（未讀合計、不洩 token／baseUrl、角色閘；即卡片的 inbox.test.ts，不重複寫）、`inbox/Inbox.tsx` 每頻道一列「N 則未讀／都讀了」、`chatwoot_inbox_id` 欄（C20）。缺：「打開收件匣」總按鈕、沒連 Chatwoot 怎麼連、`17-inbox` 截圖。
+- [修改] `route.ts`：回應加 `home`（同一套 http/https＋無帳密檢查；`/app/accounts/<id>/conversations`）；Codex F3：連結保留 baseUrl 的路徑前綴（chatwoot-client.ts:81,102 的 API 也用同一 base）。`Inbox.tsx`：「打開收件匣」`target=_blank`＋沒連線／未對應時的「怎麼連上 Chatwoot？」說明＋重新整理失敗時顯示警示（Codex F1，原本會靜默留著舊數字）。新 `inbox.css`（`<a>` 按鈕樣式、`.ib-row`；先前 `.sm-row` 被當成列表列，截圖看到排版壞掉）。`render-views.mjs`：inbox 假資料＋`17-inbox`（斷言新分頁）。
+- [不修] Codex F2（e2e 用假回應不驗真路由）：截圖腳本本來就是看畫面，真路由由 route.test.ts 覆蓋。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit`（next-admin）＋`npx vitest run app/api/social/inbox lib/cs`（184 passed；新增路徑前綴測試後 inbox 7 passed）＋`node tests/e2e/social/render-views.mjs D:/tmp/c29r`（看過 17-inbox.png：三列、3 則未讀／都讀了／尚未對應、頂端打開收件匣＋說明框） | exit=0 | ms=448732
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/1n -- Codex `agency-os/reports/oracle/2026-10-21-partialreview-c781a330.md`（-Path 只審 C29 檔）：F1、F3 已修，F2 不修（見上）
+- ORACLE_WAIVED: Codex 以 -Path 只審本批 C29 檔（partialreview）；全樹含其他 session 未提交改動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`chatwootInboxUrl|InboxData|chatwootUrl` | hits=5（檔：route.ts、route.test.ts、api.ts、Inbox.tsx、render-views.mjs，皆已對齊）
+- [rollback] `git revert` 本 commit；無 migration、無 env。部署＝每晚 03:00 自動部署 main。
 ## 2026-10-21（續3）試用到期訂閱跟著結束＋啟動頁認 trial（0110 審查 M1/M2）
 
 - [根因] M1：`portal_complete_signup`（0110:122-126）建 `status='trial'` 訂閱＋以 `source_ref=訂閱 id` 寫 contract 授權（ends_at＝期末＋7 天寬限）；每日到期只把授權改 expired（`tables.ts` `expireEntitlements`），訂閱永遠停在 trial（0062:82 狀態集無 expired）。M2：`app/portal/launcher/page.tsx` 只把 `active` 當已開通，試用客戶看到「即將推出」。不變量：訂閱列不得在自己的授權全結束後仍宣稱可用；試用中＝可開。目前休眠（`PORTAL_SIGNUP_ENABLED` 未設、plans 0 列）。

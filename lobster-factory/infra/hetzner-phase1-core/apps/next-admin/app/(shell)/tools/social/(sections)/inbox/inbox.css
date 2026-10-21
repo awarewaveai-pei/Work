@@ -1,0 +1,8 @@
+/* C29: Chatwoot links are <a>, so they need the button look social.css gives <button> only */
+.sm-app a.btn-primary, .sm-app a.btn-secondary { display: inline-flex; align-items: center; gap: 4px; font: inherit; text-decoration: none; border: 1px solid var(--btn-secondary-border); border-radius: var(--radius-sm); padding: 4px 10px; color: var(--btn-secondary-text); background: var(--btn-secondary-bg); }
+.sm-app a.btn-primary { color: var(--btn-primary-text); background: var(--btn-primary-bg); border-color: var(--btn-primary-bg); }
+.sm-app a.btn-primary:hover { background: var(--btn-primary-hover); }
+.sm-note-box { margin: 0 0 12px; padding: 10px 12px; border: 1px solid var(--btn-secondary-border); border-radius: var(--radius-sm); background: var(--bg-subtle); }
+.sm-note-box p { margin: 4px 0 0; }
+.ib-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 4px; border-bottom: 1px solid var(--card-border); }
+.ib-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }

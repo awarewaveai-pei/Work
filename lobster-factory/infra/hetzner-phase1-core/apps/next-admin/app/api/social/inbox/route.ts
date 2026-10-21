@@ -8,11 +8,13 @@ import { listAccounts } from "@/lib/social/store";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function chatwootInboxUrl(baseUrl: string, accountId: number, inboxId: number): string | null {
+function chatwootInboxUrl(baseUrl: string, accountId: number, inboxId?: number): string | null {
   try {
     const url = new URL(baseUrl);
     if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) return null;
-    url.pathname = `/app/accounts/${accountId}/inbox/${inboxId}`;
+    // keep a path prefix (https://host/chatwoot): chatwoot-client builds its API calls on the same base
+    const prefix = url.pathname.replace(/\/+$/, "");
+    url.pathname = `${prefix}/app/accounts/${accountId}/${inboxId ? `inbox/${inboxId}` : "conversations"}`;
     url.search = "";
     url.hash = "";
     return url.toString();
@@ -50,6 +52,6 @@ export async function GET(req: Request): Promise<Response> {
       }
     }));
     // only the sanitised per-inbox links leave the server; the configured baseUrl never does (it may carry credentials)
-    return { inboxes: rows };
+    return { inboxes: rows, home: cis.chatwoot ? chatwootInboxUrl(cis.chatwoot.baseUrl, cis.chatwoot.accountId) : null };
   });
 }

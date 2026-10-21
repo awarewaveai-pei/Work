@@ -76,7 +76,7 @@ export interface InboxRow {
   chatwootUrl: string | null;
   status: "ok" | "unlinked" | "not_configured" | "unavailable";
 }
-export interface InboxData { inboxes: InboxRow[] }
+export interface InboxData { inboxes: InboxRow[]; home: string | null }
 
 export const api = {
   brands: () => call<{ brands: Brand[] }>("GET", "/api/social/brands"),
