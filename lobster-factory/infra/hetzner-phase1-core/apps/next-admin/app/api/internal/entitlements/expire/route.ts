@@ -12,8 +12,11 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   try {
-    const expired = await createEntitlementStore().expireEntitlements();
-    return NextResponse.json({ ok: true, expired });
+    const store = createEntitlementStore();
+    const now = new Date();
+    const expired = await store.expireEntitlements(now);
+    const trialsEnded = await store.endLapsedTrials(now);   // after grants, so grace ends both together
+    return NextResponse.json({ ok: true, expired, trials_ended: trialsEnded });
   } catch (error) {
     console.error("[entitlements-expire] sweep failed", error);
     return NextResponse.json({ ok: false, error: "expiry_failed" }, { status: 500 });

@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-21（續3）試用到期訂閱跟著結束＋啟動頁認 trial（0110 審查 M1/M2）
+
+- [根因] M1：`portal_complete_signup`（0110:122-126）建 `status='trial'` 訂閱＋以 `source_ref=訂閱 id` 寫 contract 授權（ends_at＝期末＋7 天寬限）；每日到期只把授權改 expired（`tables.ts` `expireEntitlements`），訂閱永遠停在 trial（0062:82 狀態集無 expired）。M2：`app/portal/launcher/page.tsx` 只把 `active` 當已開通，試用客戶看到「即將推出」。不變量：訂閱列不得在自己的授權全結束後仍宣稱可用；試用中＝可開。目前休眠（`PORTAL_SIGNUP_ENABLED` 未設、plans 0 列）。
+- [修改] `lib/entitlements/tables.ts` 新 `endLapsedTrials(now)`：trial 且 `current_period_end<=now`（keyset 分頁 200）→ 讀自己的 contract 授權（active/suspended，keyset 分頁 500，避 PostgREST 1000 列截斷）→ 全無者 `status='canceled'`（`eq status trial` 防覆寫），寬限只留在 0110 一處。`app/api/internal/entitlements/expire/route.ts` 先 expire 授權再結束試用，回應加 `trials_ended`（`expired` 不變，Trigger `postExpire.ts` 相容）。`launcher/page.tsx` trial＝可開，標「試用中」。canceled 離開 live_uniq，0110 trigger 保留 trial_started_at → 不能重領試用。
+- [不修，記錄] Codex r2：讀授權與 update 之間若有人以「同一舊訂閱 id」新增 contract 授權會被誤結束。目前唯一寫入者是 `portal_complete_signup`（同交易新建訂閱，grep 證實無其他 insert），不可達；日後加「延長試用」必須走 SQL 函式在同交易重驗。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py（新 e2e：期滿授權已過→canceled、寬限中→仍 trial、重跑 0/0）；npx vitest run lib/entitlements → 107 passed；npx tsc --noEmit | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/0n -- Codex r1 授權讀取被 1000 列截斷（已修＋測試）；r2 併發新增授權（不可達，見上）；artifact `agency-os/reports/oracle/2026-10-21-partialreview-a1ef74d0.md`
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`=== "active"|organization_entitlements insert|entitlements/expire|expired` | hits=launcher 1 處（已改）；授權 insert 只在 0110；expire 消費者只有 workflows postExpire.ts（只驗 ok/expired，相容）
+- [rollback] `git revert` 本 commit；無 migration、無 env。
 ## 2026-10-21（續1）tarot batch callback 被 session 閘擋（401）→ 移到 `/api/internal/tarot/batch/*`＋自有 token；secret 離開 Trigger payload
 
 **根因**：Trigger task `tarot-batch-generate` 回呼 `PATCH /api/tools/tarot/batch/[jobId]`、`POST .../card`，沒有登入 session；`middleware.ts:413` matcher 不排除 `/api/tools` → `:302-304` 剝掉 `x-ops-claims-role` → `:385` 無 session 回 401 → 78 張全失敗、job 停在 pending。另：card 的 `BATCH_INTERNAL_SECRET` 比對用 `!==`；secret 經 run payload 傳遞（TASKS 資安項，2026-09-23 續110 ④）。

@@ -16,6 +16,7 @@ const SUBSCRIPTION_STATUS_PRIORITY: Record<string, number> = {
 /** Control-plane access only: never give a browser a service-role client. */
 export function createEntitlementStore(client: SupabaseClient | null = getSupabaseWriteClient()): CanStore & {
   expireEntitlements(now?: Date): Promise<number>;
+  endLapsedTrials(now?: Date): Promise<number>;
   getSubscriptionStatuses(organizationId: string): Promise<Map<string, string>>;
 } {
   if (!client) throw new Error("entitlements_db_unavailable");
@@ -69,5 +70,47 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
       if (count === null) throw new Error("missing_expiry_count");
       return count;
     },
+    async endLapsedTrials(now = new Date()) {
+      // A trial row ends when its own contract grants are gone (portal_complete_signup writes them
+      // with source_ref = subscription id), so the 7-day grace lives only in 0110, not here too.
+      // Run after expireEntitlements(). Keyset pages: no offset that skips rows as statuses change.
+      let ended = 0;
+      let after = "00000000-0000-0000-0000-000000000000";
+      for (;;) {
+        const { data: page, error } = await db.from("organization_product_subscriptions")
+          .select("id").eq("status", "trial").lte("current_period_end", now.toISOString())
+          .gt("id", after).order("id").limit(TRIAL_PAGE);
+        if (error) throw new Error(error.message);
+        if (!page?.length) return ended;
+        const ids = page.map((row) => row.id as string);
+        after = ids[ids.length - 1];
+        // One trial has one grant per feature, so a page of trials can exceed PostgREST's row cap:
+        // read the live grants in id pages too, or a truncated answer cancels a trial still in grace.
+        const stillGranted = new Set<string>();
+        let afterGrant = "00000000-0000-0000-0000-000000000000";
+        for (;;) {
+          const { data: live, error: liveError } = await db.from("organization_entitlements")
+            .select("id, source_ref").eq("source", "contract").in("source_ref", ids).in("status", ["active", "suspended"])
+            .gt("id", afterGrant).order("id").limit(GRANT_PAGE);
+          if (liveError) throw new Error(liveError.message);
+          for (const row of live ?? []) stillGranted.add(row.source_ref as string);
+          if (!live || live.length < GRANT_PAGE) break;
+          afterGrant = live[live.length - 1].id as string;
+        }
+        const lapsed = ids.filter((id) => !stillGranted.has(id));
+        if (lapsed.length) {
+          const { error: endError, count } = await db.from("organization_product_subscriptions")
+            .update({ status: "canceled", updated_at: now.toISOString() }, { count: "exact" })
+            .in("id", lapsed).eq("status", "trial");
+          if (endError) throw new Error(endError.message);
+          if (count === null) throw new Error("missing_trial_end_count");
+          ended += count;
+        }
+        if (page.length < TRIAL_PAGE) return ended;
+      }
+    },
   };
 }
+
+const TRIAL_PAGE = 200;
+const GRANT_PAGE = 500;   // below PostgREST's max-rows (1000), so a full page is never a silent truncation

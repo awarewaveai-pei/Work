@@ -55,6 +55,37 @@ describe.skipIf(!REST)("entitlements against a real database (enforce)", () => {
   });
   afterAll(() => new Promise<void>((ok) => proxy?.close(() => ok())));
 
+  it("the expiry sweep ends a trial once its grants lapse and keeps one still in grace", async () => {
+    const { POST } = await import("../../../app/api/internal/entitlements/expire/route");
+    const day = 86_400_000;
+    const at = (offset: number) => new Date(Date.now() + offset).toISOString();
+    const insert = async (table: string, rows: object | object[]) => {
+      const { data, error } = await db.from(table).insert(rows).select("*");
+      if (error) throw new Error(`${table}: ${error.message}`);
+      return data as Array<{ id: string }>;
+    };
+    await insert("plans", [
+      { plan_key: "cognitive_trial", product_key: "cognitive", kind: "base", features: ["trial.lapsed"] },
+      { plan_key: "hci_trial", product_key: "hci", kind: "base", features: ["trial.grace"] },
+    ]);
+    const [lapsed, grace] = await insert("organization_product_subscriptions", [
+      { organization_id: CUSTOMER, product_key: "cognitive", plan_key: "cognitive_trial", status: "trial", started_at: at(-22 * day), current_period_end: at(-8 * day) },
+      { organization_id: CUSTOMER, product_key: "hci", plan_key: "hci_trial", status: "trial", started_at: at(-15 * day), current_period_end: at(-day) },
+    ]);
+    await insert("organization_entitlements", [
+      { organization_id: CUSTOMER, product_key: "cognitive", feature_key: "trial.lapsed", source: "contract", source_ref: lapsed.id, starts_at: at(-22 * day), ends_at: at(-day) },
+      { organization_id: CUSTOMER, product_key: "hci", feature_key: "trial.grace", source: "contract", source_ref: grace.id, starts_at: at(-15 * day), ends_at: at(6 * day) },
+    ]);
+    process.env.SCHEDULE_INGEST_TOKEN = "expiry-e2e-token";
+    const sweep = () => POST(new Request("http://app.test/api/internal/entitlements/expire", { method: "POST", headers: { authorization: "Bearer expiry-e2e-token" } }));
+
+    expect(await (await sweep()).json()).toEqual({ ok: true, expired: 1, trials_ended: 1 });
+    const { data, error } = await db.from("organization_product_subscriptions").select("product_key, status, trial_started_at").order("product_key");
+    if (error) throw new Error(error.message);
+    expect(data?.map((r) => [r.product_key, r.status, r.trial_started_at !== null])).toEqual([["cognitive", "canceled", true], ["hci", "trial", true]]);
+    expect(await (await sweep()).json()).toEqual({ ok: true, expired: 0, trials_ended: 0 });   // idempotent
+  });
+
   it("zero balance: the button list greys content.title and the paid route answers 403 no_credits; a wallet grant opens both", async () => {
     const { GET } = await import("../../../app/api/entitlements/features/route");
     const { POST } = await import("../../../app/api/content/title/route");

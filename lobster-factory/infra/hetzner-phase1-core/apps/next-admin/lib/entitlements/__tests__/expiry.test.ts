@@ -11,8 +11,29 @@ function database(result: object) {
   query.update.mockReturnValue(query);
   query.in.mockReturnValue(query);
   query.lte.mockResolvedValue(result);
-  const db = { from: vi.fn(() => query), rpc: vi.fn() };
+  // endLapsedTrials' first page read: no lapsed trials.
+  const trials = { select: vi.fn(), eq: vi.fn(), lte: vi.fn(), gt: vi.fn(), order: vi.fn(), limit: vi.fn() };
+  for (const step of ["select", "eq", "lte", "gt", "order"] as const) trials[step].mockReturnValue(trials);
+  trials.limit.mockResolvedValue({ data: [], error: null });
+  const db = { from: vi.fn((table: string) => (table === "organization_product_subscriptions" ? trials : query)), rpc: vi.fn() };
   return { db, query, client: db as unknown as SupabaseClient };
+}
+
+// Thenable chain per table: every filter call is recorded, awaiting it pops the next result.
+function trialDb(results: Record<string, object[]>) {
+  const calls: Array<{ table: string; op: string; args: unknown[] }> = [];
+  const from = vi.fn((table: string) => {
+    const chain: Record<string, unknown> = {};
+    for (const op of ["select", "update", "eq", "in", "lte", "gt", "order", "limit"]) {
+      chain[op] = (...args: unknown[]) => { calls.push({ table, op, args }); return chain; };
+    }
+    chain.then = (ok: (value: object) => unknown, fail: (error: unknown) => unknown) => {
+      const next = results[table].shift();
+      return next ? Promise.resolve(next).then(ok) : Promise.reject(new Error(`unexpected ${table} query`)).then(ok, fail);
+    };
+    return chain;
+  });
+  return { calls, client: { from } as unknown as SupabaseClient };
 }
 
 describe("global entitlement expiry", () => {
@@ -48,11 +69,72 @@ describe("global entitlement expiry", () => {
       method: "POST", headers: { Authorization: "Bearer expiry-test-token" },
     });
     mocks.client.mockReturnValue(database({ error: null, count: 1501 }).client);
-    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501 });
+    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501, trials_ended: 0 });
     mocks.client.mockReturnValue(database({ error: { message: "unavailable" }, count: null }).client);
     expect((await POST(request())).status).toBe(500);
     mocks.client.mockReturnValue(database({ error: null, count: null }).client);
     expect((await POST(request())).status).toBe(500);
+  });
+
+  it("ends only trials whose own contract grants are all gone, and only while still trial", async () => {
+    const now = new Date("2026-10-21T00:00:00Z");
+    const { calls, client } = trialDb({
+      organization_product_subscriptions: [{ data: [{ id: "a" }, { id: "b" }], error: null }, { error: null, count: 1 }],
+      organization_entitlements: [{ data: [{ id: "g1", source_ref: "a" }], error: null }],
+    });
+    expect(await createEntitlementStore(client).endLapsedTrials(now)).toBe(1);
+    const read = calls.filter((c) => c.table === "organization_product_subscriptions").slice(0, 6);
+    expect(read).toEqual([
+      { table: "organization_product_subscriptions", op: "select", args: ["id"] },
+      { table: "organization_product_subscriptions", op: "eq", args: ["status", "trial"] },
+      { table: "organization_product_subscriptions", op: "lte", args: ["current_period_end", now.toISOString()] },
+      { table: "organization_product_subscriptions", op: "gt", args: ["id", "00000000-0000-0000-0000-000000000000"] },
+      { table: "organization_product_subscriptions", op: "order", args: ["id"] },
+      { table: "organization_product_subscriptions", op: "limit", args: [200] },
+    ]);
+    expect(calls.filter((c) => c.table === "organization_entitlements")).toEqual([
+      { table: "organization_entitlements", op: "select", args: ["id, source_ref"] },
+      { table: "organization_entitlements", op: "eq", args: ["source", "contract"] },
+      { table: "organization_entitlements", op: "in", args: ["source_ref", ["a", "b"]] },
+      { table: "organization_entitlements", op: "in", args: ["status", ["active", "suspended"]] },
+      { table: "organization_entitlements", op: "gt", args: ["id", "00000000-0000-0000-0000-000000000000"] },
+      { table: "organization_entitlements", op: "order", args: ["id"] },
+      { table: "organization_entitlements", op: "limit", args: [500] },
+    ]);
+    expect(calls.filter((c) => c.table === "organization_product_subscriptions").slice(6)).toEqual([
+      { table: "organization_product_subscriptions", op: "update", args: [{ status: "canceled", updated_at: now.toISOString() }, { count: "exact" }] },
+      { table: "organization_product_subscriptions", op: "in", args: ["id", ["b"]] },
+      { table: "organization_product_subscriptions", op: "eq", args: ["status", "trial"] },
+    ]);
+  });
+
+  it("reads live grants past a full grant page, so a trial in grace is never canceled by truncation", async () => {
+    const manyForA = Array.from({ length: 500 }, (_, i) => ({ id: `g-${String(i).padStart(3, "0")}`, source_ref: "a" }));
+    const { calls, client } = trialDb({
+      organization_product_subscriptions: [{ data: [{ id: "a" }, { id: "b" }], error: null }],
+      organization_entitlements: [{ data: manyForA, error: null }, { data: [{ id: "g-500", source_ref: "b" }], error: null }],
+    });
+    expect(await createEntitlementStore(client).endLapsedTrials()).toBe(0);
+    expect(calls.filter((c) => c.table === "organization_entitlements" && c.op === "gt").map((c) => c.args[1]))
+      .toEqual(["00000000-0000-0000-0000-000000000000", "g-499"]);
+    expect(calls.some((c) => c.op === "update")).toBe(false);
+  });
+
+  it("pages by id past a full page and fails loudly on a write error", async () => {
+    const full = Array.from({ length: 200 }, (_, i) => ({ id: `id-${String(i).padStart(3, "0")}` }));
+    const paged = trialDb({
+      organization_product_subscriptions: [{ data: full, error: null }, { data: [], error: null }],
+      organization_entitlements: [{ data: full.map((r) => ({ id: `g-${r.id}`, source_ref: r.id })), error: null }],
+    });
+    expect(await createEntitlementStore(paged.client).endLapsedTrials()).toBe(0);
+    expect(paged.calls.filter((c) => c.table === "organization_product_subscriptions" && c.op === "gt").map((c) => c.args[1])).toEqual(["00000000-0000-0000-0000-000000000000", "id-199"]);
+    expect(paged.calls.some((c) => c.op === "update")).toBe(false);
+
+    const failing = trialDb({
+      organization_product_subscriptions: [{ data: [{ id: "a" }], error: null }, { error: { message: "write denied" }, count: null }],
+      organization_entitlements: [{ data: [], error: null }],
+    });
+    await expect(createEntitlementStore(failing.client).endLapsedTrials()).rejects.toThrow("write denied");
   });
 
   it("uses the aggregate balance RPC and refuses invalid balances", async () => {

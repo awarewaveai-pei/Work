@@ -65,12 +65,14 @@ export default async function PortalLauncherPage() {
           // "coming_soon" from the registry means the product has no provisioning API yet --
           // this overrides subStatus even if a subscription row exists (V1 boundary, see
           // PORTAL_AWARE_WAVE_DESIGN_PROPOSAL.md §5 "不做": never fake a provisioned state).
-          const isReady = product.status !== "coming_soon" && subStatus === "active";
+          // A trial opens the product like a paid plan; the expiry sweep turns it canceled when its grants end.
+          const isTrial = subStatus === "trial";
+          const isReady = product.status !== "coming_soon" && (subStatus === "active" || isTrial);
           return (
             <div key={product.key} className="card" style={{ padding: 20 }}>
               <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{product.name}</h2>
               <p style={{ fontSize: 12.5, color: "var(--text-muted)", marginBottom: 12 }}>
-                {isReady ? "已開通" : "即將推出"}
+                {isReady ? (isTrial ? "試用中" : "已開通") : "即將推出"}
               </p>
               {isReady ? (
                 <a href={`https://${productHost(product)}`} className="btn-primary">開啟</a>
