@@ -124,7 +124,8 @@ export function summarizeBatch(job: JobRow, cards: CardRow[], now: number, runSt
     state = job.status;
   } else if (runStatus && RUN_ENDED.has(runStatus)) {
     if (runStatus === "TIMED_OUT") { state = "timed_out"; error = "timed_out"; }
-    else if (runStatus === "COMPLETED") state = done > 0 ? "done" : "error"; // worker stopped early (quota)
+    // The run ended with cards unaccounted for (worker stopped early, e.g. quota): not a finished deck.
+    else if (runStatus === "COMPLETED") { state = "error"; error = "run_ended_incomplete"; }
     else { state = "error"; error = `run_${runStatus.toLowerCase()}`; }
   } else if (now > deadlineAt) {
     state = "timed_out";
@@ -288,8 +289,9 @@ export async function getJob(jobId: string, opts: { now?: number; runStatus?: Ru
 export async function listRecentJobs(
   scope: { organizationId: string | null; createdBy: string | null },
   limit = 10,
-  now = Date.now(),
+  opts: { now?: number; runStatus?: RunStatusLookup } = {},
 ): Promise<StoredBatchJob[]> {
+  const now = opts.now ?? Date.now();
   const client = db();
   let q = client.from(JOBS).select("*");
   if (scope.organizationId) q = q.eq("organization_id", scope.organizationId);
@@ -298,5 +300,14 @@ export async function listRecentJobs(
   if (error) throw new BatchStoreUnavailableError(`batch_store_read_failed: ${error.message}`);
   const rows = (data ?? []) as JobRow[];
   const cards = await readCards(client, rows.map((r) => r.id));
-  return rows.map((r) => summarizeBatch(r, cards, now));
+  // Same derivation as getJob (incl. the Trigger run status), so the list never shows a failed run as running.
+  return Promise.all(rows.map(async (r) => {
+    let job = summarizeBatch(r, cards, now);
+    if (!TERMINAL.has(job.state) && r.run_id && opts.runStatus) {
+      const runStatus = await opts.runStatus(r.run_id).catch(() => null);
+      job = summarizeBatch(r, cards, now, runStatus);
+    }
+    await persistTerminal(client, r, job);
+    return job;
+  }));
 }

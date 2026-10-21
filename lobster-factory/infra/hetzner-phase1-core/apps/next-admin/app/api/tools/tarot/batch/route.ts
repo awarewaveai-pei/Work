@@ -4,6 +4,7 @@ import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role
 import {
   BatchStoreUnavailableError, createJob, deleteJob, listRecentJobs, setRunId, toPublicJob,
 } from "../../../../../lib/tarot/batch-store";
+import { fetchTriggerRunStatus } from "../../../../../lib/tarot/batch-run-status";
 import { isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
 import { isR2Configured } from "../../../../../lib/storage/r2";
 import { effectiveOrgId, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../../lib/tenant-guard";
@@ -135,7 +136,7 @@ export async function GET(req: Request): Promise<Response> {
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
   const createdBy = resolveTenant(req).userKind === "staff" ? req.headers.get("x-ops-user-id")?.trim() || null : null;
   try {
-    const jobs = await listRecentJobs({ organizationId, createdBy }, 10);
+    const jobs = await listRecentJobs({ organizationId, createdBy }, 10, { runStatus: fetchTriggerRunStatus });
     return NextResponse.json({ ok: true, jobs: jobs.map(toPublicJob) });
   } catch (e) {
     const res = storeUnavailable(e);

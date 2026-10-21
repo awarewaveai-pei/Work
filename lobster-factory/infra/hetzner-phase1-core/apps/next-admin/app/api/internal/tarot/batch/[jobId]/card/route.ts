@@ -46,6 +46,10 @@ export async function POST(
   if (!job) {
     return NextResponse.json({ ok: false, error: "job_not_found" }, { status: 404 });
   }
+  // A job past its deadline (or stored as ended) takes no new cards: nothing is generated or billed for it.
+  if (job.state === "timed_out" || job.state === "error") {
+    return NextResponse.json({ ok: false, error: `job_${job.state}` }, { status: 410 });
+  }
 
   let body: Record<string, unknown>;
   try { body = await req.json(); }

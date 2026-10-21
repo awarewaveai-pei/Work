@@ -57,7 +57,8 @@ export const tarotBatchGenerate = task({
 
     // 401 (token drift) or 404 (job lost to a next-admin restart) can never succeed: fail the run so it is seen,
     // instead of finishing "completed" with every card failed while the browser polls a job stuck at pending.
-    const refused = (status: number) => status === 401 || status === 404;
+    // 410 = next-admin ended the job (deadline passed): stop instead of walking the remaining cards.
+    const refused = (status: number) => status === 401 || status === 404 || status === 410;
 
     // Mark job as running
     const start = await fetch(`${base}/api/internal/tarot/batch/${jobId}/start`, {
