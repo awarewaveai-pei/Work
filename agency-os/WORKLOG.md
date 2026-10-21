@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-21（續14）tarot 78 張批次：next-admin 已含內部回呼路由，免重部署；批次因需登入 session 未啟動（Claude 經 SDK）
+
+**觸發**：操作者「Deploy next-admin now with sg-deploy (High), then run one 78-card tarot batch」。
+
+**發現**：續13 已把 a4ab42ac4 部署上線，`603485b3b`（/api/internal/tarot/batch/[jobId]/{start,card}）是其祖先；主機 `.deployed-commit`=a4ab42ac4、容器 healthy；落後 origin/main 只剩 1 個純 docs 提交（10ed0d9a8）。再跑 sg-deploy 只會重建同一份程式，故**未重複部署**（無效益 High 操作）。
+
+**驗證**：路由 POST 無 token 回 401 JSON（不存在路徑回 404，證明路由已在）；容器 `BATCH_INTERNAL_SECRET` 已設（只印 set）。
+
+**批次未啟動**：唯一支援入口 `POST /api/tools/tarot/batch`（`app/api/tools/tarot/batch/route.ts:13-17`）要 `resolveOpsRole(req)` claims 角色（`lib/ops-role.ts:42-50`，無 claims = viewer → 403），需登入瀏覽器 session。依指示不建帳號／不造 session／不繞過；直接用 trigger_task 會跳過 `createJob`，不是支援路徑。需要：操作者在已登入的 /tools/tarot 頁按 78 張批次，或給可用的 claims 路徑。
+
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -s -o /dev/null -w '%{http_code}' -X POST https://app.aware-wave.com/api/internal/tarot/batch/does-not-exist/start | exit=0 | ms=300 (輸出 401)
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh -p 58122 ubuntu@145.239.195.47 'sudo docker exec lobster-next-admin printenv BATCH_INTERNAL_SECRET' (只印 set) + docker ps + cat .deployed-commit | exit=0 | ms=2000
+- REVIEW_WAIVED: NA -- deploy of already-reviewed commits, no deploy performed
+- BUGHUNT_WAIVED: NA -- no code change
+
+**[rollback]**：無變更。若日後需回退：主機 `/root/lobster-phase1/scripts/sg-deploy.sh` 部署 3faa2c419。
 ## 2026-10-21（續13）next-admin 正式部署 3faa2c419 → a4ab42ac4（Claude 經 SDK，操作者批准）
 
 **觸發**：操作者「先部署，有好幾個東西等著一起部署」；前置 /verify 誤紅由續12 修掉後部署。
