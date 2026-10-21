@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-21（續22）智慧連結 0113 部署停在前置檢查（需要 0114，不在核准範圍）＋worktree 清理時誤刪主 node_modules（已補回）
+
+- 已完成：env `SMARTLINK_VISITOR_HASH_SALT` 由主機 `openssl rand -hex 32` 寫入 `/root/lobster-phase1/.env`（備份 `.env.bak-*-smartlink-salt`，值沒印出）；compose 走 `safe-infra-patch.sh compose`（備份 `docker-compose.yml.bak.safe-patch-20261021-074244`）→ `docker exec lobster-next-admin printenv SMARTLINK_VISITOR_HASH_SALT >/dev/null` exit 0。repo 對照檔 f5e69bff6。main 已 push（e0e10cde9／020e2da4a／f5e69bff6）。
+- 停止原因：`node scripts/apply-db-migration.mjs --status` → 0113、0114 都是 missing。main 已含另一 session 的 Meta commit fdf9ad468，它的 `lib/social/store.ts` 用到 0114 的 `social_auto_rule_events`。sg-deploy migration 閘（`sg-deploy.sh:185-209`）只會檢查、不會套用，所以部署必須連 0114 一起套；0114 不在本次核准範圍。單獨套 0113 會刪掉舊的 2 參數函式，現行程式的點擊會回 503，所以也沒套。每晚 03:00 的自動部署會被同一道閘擋下，不會在沒有 salt、沒有 0113 的狀態上線。
+- 待操作者決定：0113＋0114 一起套，然後 `sg-deploy.sh next-admin`；接著跑 smoke，點擊實測（同 UA 連點兩次 → 兩次都 302、計數只 +1）。
+- 事件：`git worktree remove D:/tmp/smartlink-dedupe` 時 next-admin/node_modules junction 還在（前一步 `cmd //c rmdir` 因 Git Bash 吃掉反斜線而失敗，回「找不到路徑」，我沒檢查就往下做）。git 穿過 junction 遞迴刪除，主 node_modules 從 295 項降到 287 項，`.bin` 也不見了。修復：PowerShell `[System.IO.Directory]::Delete(<junction>, $false)` 只拆連結，再用 `npm install --no-save` 依 lock 補回（added 38、changed 28；295 項、.bin 93 個，package-lock 沒變）。c27-codex 是在 junction 拆掉後才移除，沒有影響。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social/__tests__/smartlink.test.ts (10/10, after node_modules restore) | exit=0 | ms=1765
+- REVIEW_WAIVED: NA -- 本條沒有程式改動；程式審查記在 續19
+- BUGHUNT_WAIVED: NA -- 本條沒有程式改動
 ## 2026-10-21（續21）Meta migration 編號 correction
 
 - CORRECTION：續18 entry 的 migration 名稱是 provisional `0113_social_meta_webhook_idempotency`；因同時存在另一組 smart-link `0113`，本次 Meta migration 最終採用 `0114_social_meta_webhook_idempotency.sql`，down 檔同步於 `packages/db/migrations/0114_social_meta_webhook_idempotency.down.sql` 與 `packages/db/scripts/0114_social_meta_webhook_idempotency_down.sql`。既有 smart-link 0113 不改。
