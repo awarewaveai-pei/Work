@@ -11,6 +11,9 @@
 - REVIEW_DONE: critic=Standard | verdict=warn | findings=1c/1m/0n
 - BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=setMetaCampaignStatus | hits=11（4 個原始檔：route.ts、route.test.ts、meta-ads.ts、meta-ads.test.ts，全數已跟新簽名；其餘為 .next 建置產物）
 - ORACLE_WAIVED: 本筆是 Claude 審 Codex 的 commit（跨模型審查本身）；Claude 的修補小（2 函式＋測試），操作者指定不開 /codex-review，以突變紅→綠代替。
+- 部署：正式庫 `node scripts/apply-db-migration.mjs 0116` APPLY_OK（ledger 0116；`social_meta_assets` relrowsecurity=t、anon/authenticated select=f、0 列）。`sg-deploy.sh next-admin` exit 1：npm test 閘 1 failed／2802 passed——`app/(shell)/tools/social/__tests__/page-rules.test.ts:21`「no <select>」擋下 Codex 在 `Ads.tsx:79` 加的 Meta 資產種類下拉；部署在測試階段中止，正式機仍是 0aa0b1f67（未 build、無需 rollback）。照指示不重試。
+- C2（已修，主路徑）：該下拉也會擋今晚 03:00 自動部署；改成三個 `aria-pressed` 按鈕（同 `Analytics.tsx:87` 寫法），`page-rules.test.ts` 3 passed、`tsc --noEmit` exit 0。今晚自動部署會帶上 47d781e3f＋本修補（0116 已在正式庫，migration 閘會過）。
+- 開關：正式容器沒有任何 `META_*`（drift 報 onlyInRepo 8 個）→ webhook POST 回 503、自動回覆與廣告寫入皆關；未打開任何開關。
 ## 2026-10-21（續36）Meta 自動回覆（C27 第二段）＋廣告（C28）查證：Standard Access 可行，IG 貼文留言除外；Codex 任務書＋操作者 9 步清單（Claude，只讀＋查文件）
 
 **操作者**：「你去處理好, 2個目前都是我的網站, 只是我設定 aware wave 是公司, soulful 是代操」。本條只查證＋計畫，不改程式／正式設定。
