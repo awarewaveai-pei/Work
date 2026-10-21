@@ -1,4 +1,7 @@
 # Worklog
+## 2026-10-21（續21）Meta migration 編號 correction
+
+- CORRECTION：續18 entry 的 migration 名稱是 provisional `0113_social_meta_webhook_idempotency`；因同時存在另一組 smart-link `0113`，本次 Meta migration 最終採用 `0114_social_meta_webhook_idempotency.sql`，down 檔同步於 `packages/db/migrations/0114_social_meta_webhook_idempotency.down.sql` 與 `packages/db/scripts/0114_social_meta_webhook_idempotency_down.sql`。既有 smart-link 0113 不改。
 ## 2026-10-21（續20）tarot 工作台四個操作者回報缺陷：鎖定無說明、主角中文不轉英、78 張無法停止、生成後要重整（Claude）
 
 `app/(shell)/tools/tarot/TarotStudio.tsx`（next-admin）。未部署，03:00 自動部署 main。
