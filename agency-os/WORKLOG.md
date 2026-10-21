@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-21（續34）智慧連結 awarewave-ops 點擊去重正式實測通過＋「頻道只剩一個」查證：沒有頻道被移除（Claude，只讀）
+
+**【一】點擊實測**（操作者發布的頁，正式環境只讀＋點擊）
+- 公開頁 `https://social.aware-wave.com/smartlink/awarewave-ops` → 200。品牌 AwareWave Ops（`39ad4149-…`），`default_timezone=UTC`，品牌今天 2026-10-21；item `334b1568-71c8-41bd-8f14-e0c5e381b654`（TEST → https://aware-wave.com/）。
+- 基準：`social_smart_link_clicks` n=1、dedupe 1 列（操作者那次，2026-10-21 09:39:15 UTC）。
+- 筆電（220.138.x）UA「AW-ClickTest/1.0 (A)」×2 → 302／302，n 仍 1：與操作者同 IP＝同一訪客、今天已計過。換 UA (B) ×1 → 302，n 仍 1。訪客鍵＝IP 的 HMAC（`lib/social/smartlink.ts:112-116`；UA 只用來排除機器人 `:110`），換 UA 不算新訪客＝設計如此。
+- ks-aw-01（145.239.x，另一訪客）同 UA ×2 → 302／302，n 1→2（只 +1），dedupe 2 列。
+- 隱私：dedupe 欄位只有 item_id／day／visitor_hash／created_at；2 列 hash 皆 `^[0-9a-f]{64}$`，無 IP／UA 字樣。
+- 在 app 看：社群管理 → 智慧連結頁（`app/(shell)/tools/social/smartlinks/SmartLinks.tsx`）每條連結右側「點了 N 次」（`:131`），N＝近 CLICK_DAYS 天加總（`lib/social/smartlink.ts:47-50`）；總數 `total`（`:90`）。測試點擊留在計數中（n=2，其中 1 為本次 ks-aw-01）。
+
+**【二】「頻道本來好幾個、現在只剩一個」**：不是被移除，是看的品牌不同
+- 正式庫 `social_accounts` 全部 3 列：awarewave-ops 1（facebook「Aware Wave」connected，created 2026-10-14 12:11:08，updated 10-19 07:05）；soulful-expression 2（bluesky「soulfulexpression.bsky.social」、facebook「Soulful Expression Art Therapy」，皆 connected）。表無 deleted／disabled 欄。
+- Postiz 庫 `Integration` 全部也只有這 3 個（disabled=f、deletedAt 全空，同一 Postiz 組織 AwareWave）＝從未多過 3 個、也沒刪過。
+- `social_audit_log`：近 14 天無任何頻道動作；全期無 `unlink`／connect 類動作（只有 1 列貼文 delete，2026-10-15）。
+- 清單條件：`listAccounts` 只篩 `organization_id = 目前品牌`，不篩 status（`lib/social/store.ts:120-123`）；`SocialManager.tsx:145/150` 依選定品牌載入；ChannelList 只做搜尋字過濾（`ChannelList.tsx:21`）。品牌過濾自 C4（d55ec7686，10-15）即如此。「本來好幾個」最可能是看到 Soulful 品牌（2 個）或 10-15 前 Content Studio 舊面板（`/api/content/social-channels`，43e4a50c2 移除）；後者列多少個未查證。
+- 恢復：無資料要救。看 Soulful 兩個頻道 → 左上品牌切到 Soulful Expression；要讓 AwareWave Ops 有更多頻道 → 在該品牌「連接頻道」新連。
+- 卡外（不修，記錄）：`app/api/content/social-admin/connections/route.ts:105-130` DELETE 直接刪 `social_accounts` 卻不寫 `social_audit_log`（`store.ts:267-273` unlinkAccount 有寫）→ 若有人經此路由刪頻道會無稽核紀錄。本次 3=3 對得上，未發生。
+
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -A "AW-ClickTest/1.0 (A|B)" https://social.aware-wave.com/smartlink/awarewave-ops/go/334b1568-71c8-41bd-8f14-e0c5e381b654（筆電 A×2、B×1、ks-aw-01 A×2）＋psql 唯讀 social_smart_link_clicks → 1,1,1,2 | exit=0 | ms=6000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec supabase-db psql（begin read only）social_accounts／social_audit_log；postiz 庫 "Integration" | exit=0 | ms=3000
+- REVIEW_WAIVED: NA -- 只讀查證＋點擊，無程式改動
+- BUGHUNT_DONE: scope=lobster-factory | grep=social_accounts | hits=12 files（刪除路徑只有 store.ts:269 與 social-admin/connections/route.ts:125）
+- BUGHUNT_SCOPE_NARROW: 只讀查證，無改動 symbol，不涉 agency-os／scripts
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-10-21（續33）tarot 背景批次改存資料表（0115，方案 B）＋正式庫套 0115、部署 next-admin 4f8d44fb8 → 0aa0b1f67、Trigger 20261021.6（Claude，操作者批准「Approve option B … go ahead, High」）
 
 - 根因：`lib/tarot/batch-store.ts` 舊版把批次存在程序記憶體 Map。C1 卡片回呼每次都重新生成（`card/route.ts` 舊 :64），Trigger 重試＝重算＋重複計費；C2 run 被 Trigger 殺掉後 job 永遠 running（無期限）；C3 next-admin 重啟／部署＝全部 job 消失；M1 `GET /api/tools/tarot/batch` 列出所有人的 job。
