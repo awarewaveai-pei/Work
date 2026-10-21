@@ -25,6 +25,15 @@
 - REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/0m/4n
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=ClickGate|social_smart_link_click(|SMARTLINK_VISITOR_HASH_SALT | hits=34
 - ORACLE_WAIVED: Codex 撰寫，Claude 主 session 為非作者審查者（操作者指定不開 /claude-review）
+## 2026-10-21（續18）Meta C27／C28 M1–M3 修正（Codex）
+
+- ROOT_CAUSE：webhook event 沒帶 Meta post/media id 對應的本系統貼文 uuid，`matchAutoRule` 因而永遠只看品牌規則；回覆後才寫 hit，hit 寫入失敗時 redelivery 可能重送。
+- CHANGE：published Meta target 保存 `p.releaseId` 到 `social_post_targets.meta_post_id`；webhook 以 platform + published target 對照 post uuid，未知 id 只走 brand rule；以 `social_auto_rule_events` 的 organization/event primary key 先 claim、送出後標記 replied/failed；compose 補 `META_GRAPH_API_VERSION`，TASKS ① 寫入 operator-only production procedure。auto-reply defaults 仍 false。
+- DB：新增 migration `0113_social_meta_webhook_idempotency.sql`，down 同步於 `packages/db/migrations/0113_social_meta_webhook_idempotency.down.sql` 與 `packages/db/scripts/0113_social_meta_webhook_idempotency_down.sql`。
+- REALTEST_EVIDENCE：`npx vitest run lib/social/__tests__/meta-webhook.test.ts lib/social/__tests__/meta-auto-reply.test.ts lib/social/__tests__/meta-ads.test.ts app/api/webhooks/meta/route.test.ts` → 4 files／16 tests passed；`npx vitest run lib/social/__tests__/dispatch.test.ts` → 1 file／20 tests passed；`npx tsc --noEmit` → exit 0。
+- REVIEW_DONE：self-review verified Meta/non-Meta outcome shape, brand fallback, claim-before-send order, terminal failed-send path, default-off switches, no production access; `git diff --check` only reports pre-existing WORKLOG EOF whitespace warning.
+- BUGHUNT_DONE：scope=agency-os,scripts,lobster-factory | grep=parseMetaWebhookPayload | hits=5
+- ORACLE_WAIVED：`scripts/claude-oracle.ps1` quota clear but `'claude' CLI not on PATH`; no oracle artifact. No production SSH/deploy/push performed.
 ## 2026-10-21（續17）社群 C27／C28 審查（Codex 0d85eb44c）：修自動回覆回覆自己留言的迴圈（Claude）
 
 - 範圍：審 Codex 0d85eb44c（Meta webhook／自動回覆／廣告）＋5e2b505e1，Deep（簽章＝auth 級）。

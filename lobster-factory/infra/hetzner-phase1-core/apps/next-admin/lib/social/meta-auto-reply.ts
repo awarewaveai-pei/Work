@@ -2,7 +2,7 @@
 // the Meta review switch is set by the operator after Meta approves the requested use case.
 import { matchAutoRule } from "./auto-rules";
 import { autoReplyReady, getMetaSocialConfig, parseMetaWebhookPayload, replyToMetaEvent, type MetaSocialEnv } from "./meta-webhook";
-import { autoRuleEventHandled, listAutoRules, recordAutoRuleHit } from "./store";
+import { claimAutoRuleEvent, completeAutoRuleEvent, findPostIdByMetaId, listAutoRules, recordAutoRuleHit } from "./store";
 
 export type MetaAutoReplyResult = {
   enabled: boolean;
@@ -21,27 +21,41 @@ export async function processMetaWebhook(payload: unknown, env: MetaSocialEnv = 
   const events = parseMetaWebhookPayload(payload);
   const result = { ...emptyResult(true), received: events.length };
   if (!events.length) return result;
-  const rules = await listAutoRules(config.organizationId);
+  const brandRules = await listAutoRules(config.organizationId);
   for (const event of events) {
-    if (await autoRuleEventHandled(config.organizationId, event.eventId)) {
+    const postId = event.metaPostId ? await findPostIdByMetaId(config.organizationId, event.platform, event.metaPostId) : null;
+    const postRules = postId ? await listAutoRules(config.organizationId, postId) : [];
+    const rules = [...brandRules, ...postRules];
+    const rule = matchAutoRule(rules, { postId, trigger: event.kind, platform: event.platform, text: event.text });
+    const canReply = rule && (event.kind === "comment" ? (rule.action === "reply" || rule.action === "both") : (rule.action === "dm" || rule.action === "both"));
+    if (!rule || !canReply) {
       result.skipped++;
       continue;
     }
-    const rule = matchAutoRule(rules, { trigger: event.kind, platform: event.platform, text: event.text });
-    const canReply = rule && (event.kind === "comment" ? (rule.action === "reply" || rule.action === "both") : (rule.action === "dm" || rule.action === "both"));
-    if (!rule || !canReply) {
+    if (!(await claimAutoRuleEvent(config.organizationId, event.eventId, rule.id, postId))) {
       result.skipped++;
       continue;
     }
     result.matched++;
     try {
       await replyToMetaEvent(event, rule.reply, env);
-      await recordAutoRuleHit(config.organizationId, rule.id, "meta:webhook", {
-        event_id: event.eventId, platform: event.platform, kind: event.kind, target_id: event.targetId,
-      });
+      await completeAutoRuleEvent(config.organizationId, event.eventId, "replied");
+      try {
+        await recordAutoRuleHit(config.organizationId, rule.id, "meta:webhook", {
+          event_id: event.eventId, platform: event.platform, kind: event.kind, target_id: event.targetId,
+        });
+      } catch (error) {
+        // The event is already terminal; a failed audit counter must not make Meta send again.
+        console.error(`[social/meta] auto-reply hit record failed for ${event.eventId}:`, error instanceof Error ? error.message : String(error));
+      }
       result.replied++;
     } catch (error) {
       result.failed++;
+      try {
+        await completeAutoRuleEvent(config.organizationId, event.eventId, "failed", error instanceof Error ? error.message : String(error));
+      } catch (resultError) {
+        console.error(`[social/meta] auto-reply result record failed for ${event.eventId}:`, resultError instanceof Error ? resultError.message : String(resultError));
+      }
       console.error(`[social/meta] auto-reply failed for ${event.eventId}:`, error instanceof Error ? error.message : String(error));
     }
   }

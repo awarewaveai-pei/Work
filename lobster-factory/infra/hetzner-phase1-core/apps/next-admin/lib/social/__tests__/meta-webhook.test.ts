@@ -46,7 +46,7 @@ describe("Meta auto-reply webhook", () => {
     expect(() => getMetaSocialConfig({ META_SOCIAL_ACCESS_TOKEN: "token" })).toThrow("META_SOCIAL_ORGANIZATION_ID");
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "reply-1" }), { status: 200 }));
     await replyToMetaEvent({
-      eventId: "instagram:comment:c-1", kind: "comment", platform: "instagram", channelId: "ig-1", senderId: "person-1", targetId: "c-1", text: "hi",
+      eventId: "instagram:comment:c-1", kind: "comment", platform: "instagram", channelId: "ig-1", senderId: "person-1", targetId: "c-1", metaPostId: null, text: "hi",
     }, "歡迎", {
       META_SOCIAL_ACCESS_TOKEN: "secret-token",
       META_SOCIAL_ORGANIZATION_ID: "org-1",

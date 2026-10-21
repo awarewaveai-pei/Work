@@ -54,7 +54,7 @@ export interface QueuedPost {
   targets: QueuedTarget[];
 }
 
-export interface OutcomeChange { id: string; state: "published" | "error"; release_url?: string | null; error?: string | null }
+export interface OutcomeChange { id: string; state: "published" | "error"; release_url?: string | null; meta_post_id?: string | null; error?: string | null }
 
 export interface DispatchPorts {
   getBackoff(): Promise<Date | null>;
@@ -302,7 +302,8 @@ export async function runDispatch(ports: DispatchPorts, opts: { mode: DispatchMo
           const seen = await postizWindow();
           for (const t of waiting) {
             const p = seen.get(t.postizPostId as string);
-            if (p?.state === "PUBLISHED") changes.push({ id: t.id, state: "published", release_url: p.releaseURL });
+            if (p?.state === "PUBLISHED") changes.push({ id: t.id, state: "published", release_url: p.releaseURL,
+              ...(t.platform === "facebook" || t.platform === "instagram" ? { meta_post_id: p.releaseId } : {}) });
             else if (p?.state === "DRAFT" && opts.mode !== "draft") {
               // a rehearsal draft (SOCIAL_DISPATCH_MODE=draft) never goes out by itself: settle it, the person schedules again
               changes.push({ id: t.id, state: "error", error: "a rehearsal draft in Postiz (draft mode); schedule the post again to send it" });

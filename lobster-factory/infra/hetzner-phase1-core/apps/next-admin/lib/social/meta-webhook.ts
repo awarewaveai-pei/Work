@@ -14,6 +14,8 @@ export type MetaWebhookEvent = {
   channelId: string;
   senderId: string;
   targetId: string;
+  /** Facebook post_id / Instagram media_id; null for direct messages. */
+  metaPostId: string | null;
   text: string;
 };
 
@@ -75,9 +77,10 @@ function addComment(events: MetaWebhookEvent[], platform: MetaSocialPlatform, ch
   const message = text(value.message) ?? text(value.text);
   const from = record(value.from);
   const senderId = text(from?.id);
+  const metaPostId = text(value.post_id) ?? text(value.media_id);
   // The page/IG account's own comments (incl. our auto-replies) arrive here too; answering them loops.
   if (!id || !message || !senderId || senderId === channelId) return;
-  events.push({ eventId: `${platform}:comment:${id}`, kind: "comment", platform, channelId, senderId, targetId: id, text: message });
+  events.push({ eventId: `${platform}:comment:${id}`, kind: "comment", platform, channelId, senderId, targetId: id, metaPostId, text: message });
 }
 
 function addMessage(events: MetaWebhookEvent[], platform: MetaSocialPlatform, channelId: string, value: Record<string, unknown>): void {
@@ -90,7 +93,7 @@ function addMessage(events: MetaWebhookEvent[], platform: MetaSocialPlatform, ch
   const recipientId = text(recipient?.id) ?? channelId;
   const body = text(message?.text);
   if (!eventId || !senderId || !recipientId || !body) return;
-  events.push({ eventId: `${platform}:dm:${eventId}`, kind: "dm", platform, channelId: recipientId, senderId, targetId: eventId, text: body });
+  events.push({ eventId: `${platform}:dm:${eventId}`, kind: "dm", platform, channelId: recipientId, senderId, targetId: eventId, metaPostId: null, text: body });
 }
 
 /** Convert both Page `feed` changes and Instagram `comments` changes to one safe event shape. */

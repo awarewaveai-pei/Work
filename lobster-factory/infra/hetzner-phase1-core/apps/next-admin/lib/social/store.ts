@@ -280,7 +280,7 @@ export async function unlinkAccount(brandId: string, accountId: string, actor: s
 // back unordered: sort by position.
 export const POST_COLUMNS = "id, state, body, scheduled_at, list_id, list_position, first_comment, link_url, link_utm, notes, source_url, " +
   "published_at, deleted_at, version, created_at, updated_at, repeat, repeat_of, origin_slot, auto_mode, " +
-  "targets:social_post_targets(id, account_id, custom_body, format, state, postiz_post_id, release_url, error), " +
+  "targets:social_post_targets(id, account_id, custom_body, format, state, postiz_post_id, meta_post_id, release_url, error), " +
   "media:social_post_media(media_id, position, alt_text), " +
   "comments:social_post_comments(position, body, delay_minutes, media_id), tags:social_post_tags(tag_id)";
 
@@ -293,7 +293,7 @@ export interface PostRow {
   published_at: string | null; deleted_at: string | null; version: number;
   /** 0105: a template holds repeat; its children carry repeat_of + origin_slot (neither ever changes) */
   repeat: RepeatRule | null; repeat_of: string | null; origin_slot: string | null; auto_mode: AutoMode;
-  targets: Array<{ id: string; account_id: string; custom_body: string | null; format: string; state: string; postiz_post_id: string | null; release_url: string | null; error: string | null }>;
+  targets: Array<{ id: string; account_id: string; custom_body: string | null; format: string; state: string; postiz_post_id: string | null; meta_post_id?: string | null; release_url: string | null; error: string | null }>;
   media: Array<{ media_id: string; position: number; alt_text: string | null }>;
   comments: Array<{ position: number; body: string; delay_minutes: number; media_id: string | null }>;
   tags: Array<{ tag_id: string }>;
@@ -378,6 +378,20 @@ export async function getPost(brandId: string, id: string): Promise<PostRow> {
   if (error) fail(error, "post");
   if (!data) throw new SocialStoreError(404, "no such post in this brand");
   return data as unknown as PostRow;
+}
+
+/** A published Meta target owns the provider's post/media id; unknown ids deliberately return null. */
+export async function findPostIdByMetaId(brandId: string, platform: string, metaPostId: string): Promise<string | null> {
+  const { data: targets, error: targetError } = await db().from("social_post_targets")
+    .select("post_id, account_id").eq("organization_id", brandId).eq("meta_post_id", metaPostId).eq("state", "published").limit(10);
+  if (targetError) fail(targetError, "Meta post mapping");
+  const rows = (targets ?? []) as Array<{ post_id: string; account_id: string }>;
+  if (!rows.length) return null;
+  const { data: accounts, error: accountError } = await db().from("social_accounts")
+    .select("id").eq("organization_id", brandId).eq("platform", platform).in("id", rows.map((row) => row.account_id));
+  if (accountError) fail(accountError, "Meta account mapping");
+  const accountIds = new Set((accounts ?? []).map((account) => account.id as string));
+  return rows.find((row) => accountIds.has(row.account_id))?.post_id ?? null;
 }
 
 /** The post as the caller last saw it. A decision taken against version N is written with N (0098 CAS), so a newer
@@ -602,13 +616,22 @@ export async function deleteAutoRule(brandId: string, id: string, actor: string)
   return { postVersion: (data as number | null) ?? null };
 }
 
-/** Meta retries webhook deliveries. The immutable audit row is the idempotency record; event_id is opaque Meta data. */
-export async function autoRuleEventHandled(brandId: string, eventId: string): Promise<boolean> {
-  const { data, error } = await db().from("social_audit_log")
-    .select("id").eq("organization_id", brandId).eq("action", "auto_rule")
-    .filter("detail->>event_id", "eq", eventId).limit(1);
-  if (error) fail(error, "auto-reply event");
-  return (data ?? []).length > 0;
+/** Claim before the external send; the unique key serialises Meta redeliveries. */
+export async function claimAutoRuleEvent(brandId: string, eventId: string, ruleId: string, postId: string | null): Promise<boolean> {
+  const { error } = await db().from("social_auto_rule_events").insert({
+    organization_id: brandId, event_id: eventId, rule_id: ruleId, post_id: postId, status: "claimed",
+  });
+  if (error?.code === "23505") return false;
+  if (error) fail(error, "auto-reply event claim");
+  return true;
+}
+
+/** Mark the claimed event after the external send. A failed send stays terminal to prevent a duplicate reply. */
+export async function completeAutoRuleEvent(brandId: string, eventId: string, status: "replied" | "failed", errorMessage?: string): Promise<void> {
+  const { error } = await db().from("social_auto_rule_events").update({
+    status, error: errorMessage?.slice(0, 2000) ?? null, updated_at: new Date().toISOString(),
+  }).eq("organization_id", brandId).eq("event_id", eventId).eq("status", "claimed");
+  if (error) fail(error, "auto-reply event result");
 }
 
 /** 0105's database function increments hits and appends the audit row atomically. */

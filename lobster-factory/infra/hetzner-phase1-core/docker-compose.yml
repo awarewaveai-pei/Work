@@ -297,6 +297,7 @@ services:
       META_MARKETING_ORGANIZATION_ID: ${META_MARKETING_ORGANIZATION_ID:-}
       META_MARKETING_API_VERSION: ${META_MARKETING_API_VERSION:-v24.0}
       META_GRAPH_API_BASE_URL: ${META_GRAPH_API_BASE_URL:-https://graph.facebook.com}
+      META_GRAPH_API_VERSION: ${META_GRAPH_API_VERSION:-v24.0}
       META_AD_ACCOUNT_ID: ${META_AD_ACCOUNT_ID:-}
       # Meta C27 webhook. Valid signature is accepted while the two switches remain off; no reply is sent.
       META_SOCIAL_ACCESS_TOKEN: ${META_SOCIAL_ACCESS_TOKEN:-}

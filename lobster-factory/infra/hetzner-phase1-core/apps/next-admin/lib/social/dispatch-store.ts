@@ -82,6 +82,11 @@ export function dispatchPorts(sb: SupabaseClient | null = getSupabaseWriteClient
       return check(await sb.rpc("social_reset_target", { ...ids(post), p_target_id: targetId, p_deleted_postiz_post_id: deleted }), "reset target") as boolean;
     },
     async recordOutcome(post, changes) {
+      for (const change of changes) {
+        if (change.meta_post_id === undefined) continue;
+        check(await sb.from("social_post_targets").update({ meta_post_id: change.meta_post_id })
+          .eq("organization_id", post.organizationId).eq("post_id", post.id).eq("id", change.id).eq("state", "queued"), "record Meta post id");
+      }
       return check(await sb.rpc("social_record_outcome", { ...ids(post), p_targets: changes, p_actor: ACTOR }), "record outcome") as string | null;
     },
     async setAccountStatus(accountId, status) {
