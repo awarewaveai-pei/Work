@@ -19,12 +19,13 @@ describe("Meta auto-reply webhook", () => {
     expect(verifyMetaSignature(body, "sha1=bad", "app-secret")).toBe(false);
   });
 
-  it("normalises Facebook comments and Instagram direct messages, while ignoring echoes", () => {
+  it("normalises Facebook comments and Instagram direct messages, while ignoring echoes and the page's own comments", () => {
     const events = parseMetaWebhookPayload({
       object: "page",
       entry: [{
         id: "page-1",
-        changes: [{ field: "feed", value: { item: "comment", comment_id: "c-1", message: "我要報名", from: { id: "person-1" } } }],
+        changes: [{ field: "feed", value: { item: "comment", comment_id: "c-1", message: "我要報名", from: { id: "person-1" } } },
+          { field: "feed", value: { item: "comment", comment_id: "c-own", message: "我要報名", from: { id: "page-1" } } }],
         messaging: [{ sender: { id: "person-2" }, recipient: { id: "page-1" }, message: { mid: "m-1", text: "你好" } },
           { sender: { id: "page-1" }, recipient: { id: "person-2" }, message: { mid: "m-echo", text: "回覆", is_echo: true } }],
       }],

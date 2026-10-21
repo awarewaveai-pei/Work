@@ -75,7 +75,8 @@ function addComment(events: MetaWebhookEvent[], platform: MetaSocialPlatform, ch
   const message = text(value.message) ?? text(value.text);
   const from = record(value.from);
   const senderId = text(from?.id);
-  if (!id || !message || !senderId) return;
+  // The page/IG account's own comments (incl. our auto-replies) arrive here too; answering them loops.
+  if (!id || !message || !senderId || senderId === channelId) return;
   events.push({ eventId: `${platform}:comment:${id}`, kind: "comment", platform, channelId, senderId, targetId: id, text: message });
 }
 

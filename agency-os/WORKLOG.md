@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-21（續17）社群 C27／C28 審查（Codex 0d85eb44c）：修自動回覆回覆自己留言的迴圈（Claude）
+
+- 範圍：審 Codex 0d85eb44c（Meta webhook／自動回覆／廣告）＋5e2b505e1，Deep（簽章＝auth 級）。
+- C1 已修：`lib/social/meta-webhook.ts` addComment 沒排除粉專／IG 帳號自己的留言；自動回覆本身也會觸發 feed／comments webhook，回覆文含關鍵字就無限自回。不變量：自己發的事件永不進回覆流程（DM 已有 `is_echo`，留言補 `senderId === channelId`）。
+- 確認無誤：簽章用 raw body、hex 64 正規式先擋→`timingSafeEqual` 長度恆等不丟例外；缺 secret 503、缺/錯簽章 403；GET verify_token 比對；兩開關預設 false（`.env.example`／compose）；`event_id` 查 audit 去重；hit＋audit 由 0105 `social_auto_rule_hit` 原子寫；廣告 GET 任何品牌角色、PATCH 限 owner/editor＋`META_MARKETING_ORGANIZATION_ID` 綁品牌，token 只在 Authorization header；`.env.example` 只有空值／預設。
+- 未修（記 TASKS「C27／C28 上線前」）：M1 單則規則在 webhook 端不生效（未傳 postId，C27 卡「單則優先」）；M2 回覆成功但 hit 寫入失敗→重送重複回覆；M3 prod compose 需 safe-infra-patch。m：廣告暫停/啟用無本系統 audit 列（Meta 帳戶活動紀錄有）；compose 少 `META_GRAPH_API_VERSION`（程式預設 v24.0）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social/__tests__/meta-webhook.test.ts lib/social/__tests__/meta-auto-reply.test.ts lib/social/__tests__/meta-ads.test.ts app/api/webhooks/meta/route.test.ts | exit=0 | ms=462
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=120000
+- 突變：拔 `|| senderId === channelId`（D:/tmp/mut-meta 副本）→ 指名測試 1 failed／3 passed；真檔 13/13 綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=1c/3m/2n
+- ORACLE_WAIVED: Codex 寫的改動由本 Claude session 審（AGENTS §4 審查者＝非作者）；`claude-oracle.ps1 -AllowSameHost` 回「'claude' CLI not on PATH」無 artifact；Claude 自寫的 1 行修正以突變證據代替 /codex-review
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=parseMetaWebhookPayload | hits=5
 ## 2026-10-21（續16）
 
 ### Social Manager C27/C28 — Meta execution and fail-closed review
