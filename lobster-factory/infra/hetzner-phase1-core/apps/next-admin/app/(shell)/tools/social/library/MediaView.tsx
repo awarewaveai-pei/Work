@@ -3,9 +3,9 @@
 // upload adds one (through Postiz storage, lib/social/store.ts addImage); a click attaches it to the post open on the
 // right (the editor takes it through SlotContext.attach). Storage moves to R2 on its own card (runbook R2 item).
 import { useRef, useState } from "react";
-import { api, ApiError } from "./api";
-import { fileDataUrl, uploadTooLarge } from "./media";
-import type { SlotContext } from "./SocialManager";
+import { api, ApiError } from "../api";
+import { fileDataUrl, uploadTooLarge } from "../media";
+import type { SlotContext } from "../SocialManager";
 
 export default function MediaView({ ctx, selected, onToggle }: { ctx: SlotContext; selected?: Set<string>; onToggle?: (id: string) => void }) {
   const { brand, media } = ctx;

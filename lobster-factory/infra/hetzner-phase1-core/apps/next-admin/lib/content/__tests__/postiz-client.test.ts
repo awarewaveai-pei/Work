@@ -6,7 +6,7 @@ import { join } from "path";
 
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => null }));
 
-const { listPosts, deletePost, changeStatus, connectUrl, listGroups, createSocialPost, createPost, sendKeyOf, PostizApiError } = await import("../postiz");
+const { listPosts, deletePost, changeStatus, connectUrl, listGroups, createSocialPost, createPost, uploadVideo, sendKeyOf, PostizApiError } = await import("../postiz");
 
 const fixture = (name: string) => readFileSync(join(__dirname, "fixtures", "postiz-v2.25.1", name), "utf8");
 const fetchMock = vi.fn();
@@ -110,5 +110,17 @@ describe("Postiz v2.25.1 client", () => {
     const [r] = await createSocialPost({ clientId: "c1", mode: "draft", posts: [{ integrationId: "cmqe3jw960001p58nt0xohbi8", platform: "bluesky", content: "hi" }] });
     expect(r).toMatchObject({ status: "ok", postizPostId: "cmv8oh9kq0000rk8znfwq2ll1" });
     expect(JSON.parse(lastCall().init.body as string).posts[0].value[0].image).toEqual([]);
+  });
+
+  it("uploadVideo: decodes a browser data URL and posts it as a video file", async () => {
+    answer(200, '{"id":"video-1","path":"https://cdn.example/video-1.mp4"}');
+    await expect(uploadVideo({ videoUrl: "data:video/mp4;base64,AAAA", filename: "clip.mp4" }))
+      .resolves.toEqual({ id: "video-1", path: "https://cdn.example/video-1.mp4" });
+    const { url, init } = lastCall();
+    expect([url.pathname, init.method]).toEqual(["/api/public/v1/upload", "POST"]);
+    const file = (init.body as FormData).get("file");
+    expect(file).toBeInstanceOf(Blob);
+    expect(file).toMatchObject({ name: "clip.mp4", type: "video/mp4", size: 3 });
+    expect(new Uint8Array(await (file as Blob).arrayBuffer())).toEqual(new Uint8Array([0, 0, 0]));
   });
 });

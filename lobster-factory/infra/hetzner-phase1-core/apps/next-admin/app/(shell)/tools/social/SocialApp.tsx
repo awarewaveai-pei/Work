@@ -7,7 +7,7 @@ import Flows from "./Flows";
 import Reporting from "./(sections)/reporting/Reporting";
 import { ListDetail, ListsView } from "./Lists";
 import LogView from "./LogView";
-import Library from "./Library";
+import Library from "./library/Library";
 import { MembersSetting } from "./Members";
 import { NeedsButton, ReviewSetting } from "./Review";
 import type { SocialRoute } from "./routes";

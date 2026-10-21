@@ -3,7 +3,7 @@
 // SOCIAL_MANAGER_PLAN.md C19, ADR 016 §5 decisions 1-5). Top bar of six sections; 貼文排程 = six tabs, the calendar
 // tabs with the channel list on the left and one toolbar row; the composer is its own page (compose/new, compose/<id>).
 // Every read and write goes through /api/social (C4); this file holds only what is on screen.
-// Views by card: 自動發布清單 C7 (Lists), 貼文素材庫 C9 (MediaView), 紀錄 C11 (LogView), 審核 C8, 文章 C10.
+// Views by card: 自動發布清單 C7 (Lists), 貼文素材庫 C9/C31 (library/), 紀錄 C11 (LogView), 審核 C8, 文章 C10.
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api, ApiError, type MediaItem, type WpPost } from "./api";
 import ArticleSource, { type Prefill } from "./ArticleSource";

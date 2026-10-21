@@ -89,6 +89,7 @@ const MEDIA = [
   { id: "m1", kind: "image", file_name: "watercolor-01.jpg", postiz_path: "https://picsum.photos/seed/a/400/300", bytes: 120000, created_at: day(-3, 1), used: 2 },
   { id: "m2", kind: "image", file_name: "studio.jpg", postiz_path: "https://picsum.photos/seed/b/400/300", bytes: 220000, created_at: day(-4, 1), used: 0 },
   { id: "m3", kind: "image", file_name: "poster-nov.png", postiz_path: "https://picsum.photos/seed/c/400/300", bytes: 320000, created_at: day(-5, 1), used: 1 },
+  { id: "m4", kind: "video", file_name: "workshop.mp4", postiz_path: null, bytes: 840000, created_at: day(-2, 1), used: 0 },
 ];
 const ARTICLE = { siteId: "site-1", siteName: "Soulful", id: 42, title: "藝術治療和畫畫課有什麼不同", status: "publish", date: day(1, 8).slice(0, 19), viewUrl: "https://soulful.example/a" };
 const LOG = [
@@ -212,6 +213,10 @@ for (const [tab, name] of [["貼文清單", "x-list"], ["貼文素材庫", "x-li
   await page.getByRole("button", { name: tab, exact: true }).click();
   await shot(name);
 }
+await page.getByRole("button", { name: "貼文素材庫", exact: true }).click();
+await page.getByRole("button", { name: "圖片和影片", exact: true }).click();
+await page.getByText("workshop.mp4", { exact: true }).waitFor();
+await shot("18-library");
 await page.getByRole("button", { name: "自動發布清單", exact: true }).click();
 await page.getByText("常青內容").first().click();
 await shot("11-list-detail");   // C23: two time rows (10:00 Mon+Wed, 18:00 Fri) = 3 weekly slots

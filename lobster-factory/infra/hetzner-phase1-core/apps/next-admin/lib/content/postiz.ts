@@ -131,6 +131,18 @@ export async function listIntegrations(clientId: string): Promise<SocialChannel[
   });
 }
 
+/** A base64 data URL as bytes; one decoder for images and videos so the size and encoding checks cannot drift. */
+function decodeDataUrl(url: string, maxBytes: number, what: string): { bytes: Buffer; contentType: string } {
+  const comma = url.indexOf(",");
+  if (comma === -1) throw new Error(`Invalid ${what.toLowerCase()} data URL: missing comma`);
+  const [contentType, ...params] = url.slice(5, comma).split(";");
+  if (!params.includes("base64")) throw new Error(`${what} data URL must be base64`);
+  const bytes = Buffer.from(url.slice(comma + 1), "base64");
+  if (!bytes.length) throw new Error("base64 decode produced empty buffer");
+  if (bytes.length > maxBytes) throw new Error(`${what} too large: ${bytes.length} bytes (max ${maxBytes})`);
+  return { bytes, contentType };
+}
+
 export async function uploadMedia(opts: {
   imageUrl: string;
   filename?: string;
@@ -142,17 +154,9 @@ export async function uploadMedia(opts: {
   let mimeType = "image/webp";
 
   if (imageUrl.startsWith("data:")) {
-    const comma = imageUrl.indexOf(",");
-    if (comma === -1) throw new Error("Invalid data URL: missing comma");
-    const meta = imageUrl.slice(5, comma);
-    const [mime] = meta.split(";");
-    mimeType = mime || "image/webp";
-    const b64 = imageUrl.slice(comma + 1);
-    buffer = Buffer.from(b64, "base64");
-    if (buffer.length === 0) throw new Error("base64 decode produced empty buffer");
-    if (buffer.length > MAX_IMAGE_BYTES) {
-      throw new Error(`Image too large: ${buffer.length} bytes (max ${MAX_IMAGE_BYTES})`);
-    }
+    const file = decodeDataUrl(imageUrl, MAX_IMAGE_BYTES, "Image");
+    mimeType = file.contentType || "image/webp";
+    buffer = file.bytes;
   } else {
     const file = await fetchRemoteFile(imageUrl, {
       maxBytes: MAX_IMAGE_BYTES, timeoutMs: IMAGE_FETCH_TIMEOUT_MS, accept: (ct) => ct.startsWith("image/"),
@@ -191,11 +195,18 @@ export async function uploadVideo(opts: {
 }): Promise<PostizMediaRef> {
   const { videoUrl, filename = "video.mp4" } = opts;
   const cfg = getPostizConfig();
-  const file = await fetchRemoteFile(videoUrl, {
-    maxBytes: MAX_VIDEO_BYTES, timeoutMs: VIDEO_FETCH_TIMEOUT_MS,
-    // R2 presigned URLs sometimes omit the type: the file name says it then
-    accept: (ct) => ct.startsWith("video/") || ct === "" || ct === "application/octet-stream" || ct === "binary/octet-stream",
-  });
+  let file: { bytes: Uint8Array; contentType: string };
+  if (videoUrl.startsWith("data:")) {
+    // the composer sends the browser's FileReader data URL (tools/social/media.ts fileDataUrl)
+    file = decodeDataUrl(videoUrl, MAX_VIDEO_BYTES, "Video");
+    if (!file.contentType.startsWith("video/")) throw new Error("Video data URL must carry a video MIME type");
+  } else {
+    file = await fetchRemoteFile(videoUrl, {
+      maxBytes: MAX_VIDEO_BYTES, timeoutMs: VIDEO_FETCH_TIMEOUT_MS,
+      // R2 presigned URLs sometimes omit the type: the file name says it then
+      accept: (ct) => ct.startsWith("video/") || ct === "" || ct === "application/octet-stream" || ct === "binary/octet-stream",
+    });
+  }
   const ext = filename.split(".").pop()?.toLowerCase() ?? "mp4";
   const mimeType = file.contentType.startsWith("video/") ? file.contentType
     : ext === "webm" ? "video/webm" : ext === "mov" ? "video/quicktime" : "video/mp4";

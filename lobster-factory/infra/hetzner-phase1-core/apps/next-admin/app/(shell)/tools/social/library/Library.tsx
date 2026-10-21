@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, ApiError } from "./api";
+import { api, ApiError } from "../api";
 import MediaView from "./MediaView";
-import type { SlotContext } from "./SocialManager";
+import type { SlotContext } from "../SocialManager";
 
 /** C31: the two library modes from the product brief. The current database stores saved post copy in
  * social_saved_texts; media stays in social_media. A saved text can seed a new post, while selected media can
