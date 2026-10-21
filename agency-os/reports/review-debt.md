@@ -62,7 +62,7 @@ Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（
 
 ## deferred
 
-e465e39e6 worktree reparse guard and migration copy validation -- needs Claude review
+~~e465e39e6 worktree reparse guard and migration copy validation~~（實際 commit 為 ceedee5fa）2026-10-21 Claude 審畢：通過（2 個 nit 不修），WORKLOG 2026-10-21（續32）
 
 - `scripts/dev/prod_projects_check.py`、`scripts/dev/prod_read_analyses.py` 仍以 sqlite3 讀 `repo.db_path`（PG 版 repo 無此屬性）；dev 工具、非 CI/主路徑，切換上線後改讀 PG 或刪除。
 - `CaseDocs.save_many` 個人批次 check 持 person 鎖 exclusive，其 `from_case` 項再取 case 鎖 shared；`erasure.admit_run` 為 case→person 順序。同時有 case 抹除排隊 exclusive 時可成三方環，PostgreSQL deadlock detector 中止其一（錯誤，非卡死）；如出現再統一 person/case 取鎖順序。

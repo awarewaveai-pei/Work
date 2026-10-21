@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-21（續32）Claude 審 Codex ceedee5fa（down 檔雙份檢查接 validate + worktree-reparse-guard）
+
+- 範圍：ceedee5fa（review-debt 原寫 `e465e39e6`，該 hash 不在任何 ref，`git log --all` 0 筆；實際 commit = ceedee5fa）。無修改，審畢通過。
+- A 讀取點屬實：`scripts/apply-db-migration.mjs:49,78,256`（Codex 寫 :50，差一行）只讀 `migrations/` 正向檔（排除 `.down.sql`）；`scripts/` 下 `_down.sql` 由 local verifier 讀（`packages/db/scripts/0100_social_dispatch-local-verify.sh:68`、`kb-local-verify.sh:113-120`、`next-admin/scripts/collect-rate-limit-verify.ts:169`）。兩份皆有讀者，未刪，合理。
+- A 測試路徑：`lobster-factory/scripts/bootstrap-validate.mjs:78-81` 跑 `scripts/__tests__/down-migration-copies.test.mjs`；`npm run validate` = 該檔；CI `.github/workflows/release-gate-main.yml:30` 無 path filter，每次 main push 跑。突變（throwaway worktree，0101 scripts 版尾加一行）→ validate exit 1「0101_social_rotation: migrations/ and scripts/ down files differ」；還原 exit 0。
+- B：含 junction 擋（exit 2，含 `D:/…`、`D:\…` 引號/無引號、`/d/…` 三種寫法）；無 junction 的整份 repo worktree 放行 271ms；目標不存在 → rule crash → fail-open 放行；`echo git worktree remove …` 不誤擋。實機 hook 在本 session 擋下我自己的 `git worktree remove`（junction 未刪時），刪 junction 後放行。
+- m1（不修）：目標路徑不存在時走 crash 路徑，每次寫 fail-open log 一行（非阻擋）。m2（不修）：`git -C <dir> worktree remove <相對路徑>` 以 cwd 解析，可能漏擋。
+- `scripts/sync-claude-userlevel.ps1 -Mode merge` PASS；`~/.claude/hooks/rules/worktree-reparse-guard.js` 與 repo 版 cmp 相同，manifest 含該 rule。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd lobster-factory && npm run validate（基線 + 突變 0101_social_rotation_down.sql + 還原，throwaway worktree）| exit=0/1/0 | ms=20000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,mcp,.claude,tests | grep=worktree-reparse-guard | hits=4
+- ORACLE_WAIVED: 本條即 Claude 對 Codex commit 的跨模型審查；無新 source 改動
+- `bash scripts/test-hooks.sh` exit 1：368/369 pass，唯一 fail = asset-mcp-refs 48 筆，全在 `.claude/skills/synced/*`（主機同步的內建 skill 引用 `remote-devices`／`memory` server），與本 commit 無關，既有。
 ## 2026-10-21（續31）tarot：任何語言主角／風格每副牌翻英文一次＋人物不再飄在空中（Claude）
 
 **觸發**：操作者「所有語言自動翻成英文也可以嗎? $0.01?」；THE FOOL 的狗／貓畫在山上空中。
