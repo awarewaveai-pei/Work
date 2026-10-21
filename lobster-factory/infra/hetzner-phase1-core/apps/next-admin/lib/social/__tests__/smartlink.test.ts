@@ -1,14 +1,14 @@
 // C26 smart link (SOCIAL_MANAGER_PLAN.md §1b): slug unique, an unpublished page answers 404 with its words, a click is
-// counted (once per visitor, link and day) and sent on. The SQL side (one row per item and day, n + 1) is
-// packages/db/scripts/0105_social_v16-local-verify.sql SOCIAL_0105_SMARTLINK_OK; the real chain is
-// tests/e2e/social/smartlink-real-db.mjs.
-import { beforeEach, describe, expect, it, vi } from "vitest";
+// counted (once per visitor, link and day) and sent on. The SQL side is
+// packages/db/scripts/0113_social_smart_link_visitor_dedupe-local-verify.sh; the real chain is
+// tests/e2e/social/smartlink-real-db.sh.
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const h = vi.hoisted(() => ({ client: null as unknown }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => h.client }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
-const { ClickGate, brandDay, publicPage, saveSmartLink, slugProblem } = await import("../smartlink");
+const { brandDay, publicPage, saveSmartLink, slugProblem } = await import("../smartlink");
 const { SocialStoreError } = await import("../store");
 const { LinkPageClosed } = await import("../../../app/(shell)/tools/social/smartlinks/LinkPage");
 const { GET } = await import("../../../app/(public)/smartlink/[slug]/go/[item]/route");
@@ -64,7 +64,7 @@ describe("an unpublished page", () => {
     const rpc = fake({ social_smart_links: { organization_id: "b1", published: false } });
     const res = await go();
     expect(res.status).toBe(404);
-    expect(rpc.mock.calls.map((c) => c[1])).toEqual([{ p_slug: "soulful", p_item: ITEM }]);   // 0105 itself returns null: no row
+    expect(rpc.mock.calls.filter((c) => c[0] === "social_smart_link_click")).toHaveLength(0);
   });
 
   it("a published page shows only what the brand typed, and its buttons go through /go", async () => {
@@ -78,44 +78,20 @@ describe("an unpublished page", () => {
 });
 
 describe("a click", () => {
-  beforeEach(() => fake({ social_smart_links: { organization_id: "b1", published: true }, social_smart_link_items: { url: "https://soulful.example" } },
-    { social_smart_link_click: { data: "https://soulful.example" } }));
+  beforeEach(() => {
+    process.env.SMARTLINK_VISITOR_HASH_SALT = "unit-test-only-salt";
+    fake({ social_smart_links: { organization_id: "b1", published: true }, social_smart_link_items: { url: "https://soulful.example" } },
+      { social_smart_link_click: { data: { url: "https://soulful.example", counted: true } } });
+  });
+  afterEach(() => { delete process.env.SMARTLINK_VISITOR_HASH_SALT; });
 
   it("is counted and sent on with a 302 to the link's own url", async () => {
     const rpc = h.client as { rpc: ReturnType<typeof vi.fn> };
     const res = await go({ "user-agent": "Mozilla/5.0", "x-real-ip": "198.51.100.1" });
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("https://soulful.example/");
-    expect(rpc.rpc).toHaveBeenCalledWith("social_smart_link_click", { p_slug: "soulful", p_item: ITEM });
-  });
-
-  it("counts once per visitor and link in 25h; a robot never", () => {
-    let t = Date.UTC(2026, 9, 18, 12);
-    const g = new ClickGate(50_000, () => t);
-    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(true);
-    g.mark("1.1.1.1", ITEM);
-    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(false);   // the same visitor again: not counted
-    expect(g.allows("2.2.2.2", "Mozilla/5.0", ITEM)).toBe(true);
-    g.mark("2.2.2.2", ITEM);    // another visitor
-    expect(g.allows("1.1.1.1", "Mozilla/5.0", "22222222-2222-4222-8222-222222222222")).toBe(true);
-    g.mark("1.1.1.1", "22222222-2222-4222-8222-222222222222");   // another link
-    expect(g.allows("3.3.3.3", "facebookexternalhit/1.1", ITEM)).toBe(false);
-    expect(g.allows("3.3.3.3", "", ITEM)).toBe(false);
-    t += 24 * 3_600_000;   // a 25h brand day (DST) can hold two counts 24h apart: still held
-    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(false);
-    t += 3_600_000;
-    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(true);
-    g.mark("1.1.1.1", ITEM);
-  });
-
-  it("at the cap only the oldest visitor is forgotten, not everyone", () => {
-    const g = new ClickGate(2);
-    g.mark("1.1.1.1", ITEM);
-    g.mark("2.2.2.2", ITEM);
-    g.mark("3.3.3.3", ITEM);   // evicts 1.1.1.1
-    expect(g.allows("2.2.2.2", "Mozilla/5.0", ITEM)).toBe(false);
-    expect(g.allows("3.3.3.3", "Mozilla/5.0", ITEM)).toBe(false);
-    expect(g.allows("1.1.1.1", "Mozilla/5.0", ITEM)).toBe(true);
+    expect(rpc.rpc.mock.calls[0][1].p_visitor_hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(rpc.rpc.mock.calls[0][1].p_visitor_hash).not.toContain("198.51.100.1");
   });
 
   it("a count that fails with 503 does not hold the visitor: the retry is counted", async () => {
@@ -129,11 +105,21 @@ describe("a click", () => {
 
   it("a repeat is still sent on, without counting", async () => {
     const rpc = (h.client as { rpc: ReturnType<typeof vi.fn> }).rpc;
+    rpc.mockResolvedValueOnce({ data: { url: "https://soulful.example", counted: true }, error: null });
+    rpc.mockResolvedValueOnce({ data: { url: "https://soulful.example", counted: false }, error: null });
     const who = { "user-agent": "Mozilla/5.0", "x-real-ip": "198.51.100.2" };
     await go(who);
     const res = await go(who);
     expect(res.status).toBe(302);
-    expect(rpc.mock.calls.filter((c) => c[0] === "social_smart_link_click")).toHaveLength(1);
+    expect(rpc.mock.calls.filter((c) => c[0] === "social_smart_link_click")).toHaveLength(2);
+  });
+
+  it("fails closed without the salt but still redirects", async () => {
+    delete process.env.SMARTLINK_VISITOR_HASH_SALT;
+    const rpc = (h.client as { rpc: ReturnType<typeof vi.fn> }).rpc;
+    const res = await go();
+    expect(res.status).toBe(302);
+    expect(rpc.mock.calls.some((c) => c[0] === "social_smart_link_click")).toBe(false);
   });
 });
 

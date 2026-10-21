@@ -1,10 +1,11 @@
 // The smart link page (SOCIAL_MANAGER_PLAN.md C26): one public page per brand at social.aware-wave.com/smartlink/<slug>.
-// Tables and writes: migration 0105 §7 (social_smart_links / _items / _clicks, social_save_smart_link, social_smart_link_click);
+// Tables and writes: migration 0105 §7 plus 0113 (social_smart_links / _items / _clicks, visitor dedupe,
+// social_save_smart_link, social_smart_link_click);
 // the slug rule and the reserved words live in 0105's check constraint, mirrored here only to say what is wrong in words.
 // The editor (/api/social/smartlink) and the public page + its click route (app/(public)/smartlink) read through here.
 // The public side returns only what the brand typed onto the page: no ids of the brand, no urls before the click.
 
-import { createHash, randomBytes } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { SLUG_RE, slugProblem } from "./smartlink-rules";
 import { SocialStoreError, db, fail } from "./store";
 
@@ -85,12 +86,12 @@ export async function publicPage(slug: string): Promise<PublicPage | null> {
   return { title: link.title, bio: link.bio, colour: link.colour as Colour, items: (items ?? []) as PublicPage["items"] };
 }
 
-/** Counts one click (0105: on the brand's own day, one row per item and day) and returns where to send the visitor;
- *  null = no such published page, or the link is off or not on it. */
-export async function countClick(slug: string, itemId: string): Promise<string | null> {
-  const { data, error } = await db().rpc("social_smart_link_click", { p_slug: slug, p_item: itemId });
+/** Counts one click (0113: one row per item, brand day and visitor hash) and returns the destination plus whether it counted. */
+export async function countClick(slug: string, itemId: string, visitorHash: string): Promise<{ url: string | null; counted: boolean }> {
+  const { data, error } = await db().rpc("social_smart_link_click", { p_slug: slug, p_item: itemId, p_visitor_hash: visitorHash });
   if (error) fail(error, "smart link click");
-  return (data as string | null) ?? null;
+  const result = (data as { url?: string | null; counted?: boolean } | null) ?? {};
+  return { url: result.url ?? null, counted: result.counted === true };
 }
 
 /** Where to send the visitor without counting (a repeat click, a link preview robot, a HEAD). */
@@ -105,39 +106,14 @@ export async function itemUrl(slug: string, itemId: string): Promise<string | nu
   return (item?.url as string | undefined) ?? null;
 }
 
-// One visitor counts at most once per link per brand day, so a reload loop or a script cannot run a count up (nginx
-// limit_req on the door caps the request rate on top). The gate cannot know the brand's timezone, so it holds a visitor
-// off for 25h (the longest calendar day): at worst one missed count across midnight. The gate is marked only after the
-// count succeeded, so a failed count is retried; clicks racing the first count's round trip can each count.
-// The memory is this process's: a restart or a second worker forgets, which can count a visitor again, never lose a
-// count; so does a count whose reply was lost (the retry counts again). Exactly once needs the dedupe in 0105's
-// function (a migration). Visitors are keyed by a salted hash of their address; the raw address is never kept.
 const ROBOT_RE = /bot|crawl|spider|slurp|preview|facebookexternalhit|embedly|whatsapp|telegram|discord|skype|curl|wget|python|headless/i;
-const SALT = randomBytes(16).toString("hex");
-const HOLD_MS = 25 * 3_600_000;
+export function isCountableVisitor(userAgent: string): boolean { return Boolean(userAgent) && !ROBOT_RE.test(userAgent); }
 
-export class ClickGate {
-  private seen = new Map<string, number>();   // visitor+item -> when counted; insertion order = age order
-  constructor(private readonly cap = 50_000, private readonly clock: () => number = Date.now) {}
-
-  private key(ip: string, itemId: string): string {
-    return createHash("sha256").update(`${SALT}:${ip}:${itemId}`).digest("base64url").slice(0, 22);
-  }
-
-  /** true = this click may count (a robot or an empty user agent never). Only a check: `mark` after the count succeeded. */
-  allows(ip: string, userAgent: string, itemId: string): boolean {
-    if (!userAgent || ROBOT_RE.test(userAgent)) return false;
-    const last = this.seen.get(this.key(ip, itemId));
-    return last === undefined || this.clock() - last >= HOLD_MS;
-  }
-
-  /** the visitor counted this link now: hold them off for HOLD_MS */
-  mark(ip: string, itemId: string): void {
-    const key = this.key(ip, itemId);
-    this.seen.delete(key);
-    if (this.seen.size >= this.cap) this.seen.delete(this.seen.keys().next().value as string);   // full: drop the oldest only
-    this.seen.set(key, this.clock());
-  }
+export function visitorHash(address: string): string | null {
+  const salt = process.env.SMARTLINK_VISITOR_HASH_SALT?.trim();
+  // Missing salt fails closed: do not count, but still redirect.
+  if (!salt) return null;
+  return createHmac("sha256", salt).update(address, "utf8").digest("hex");
 }
 
 /** The visitor's address as the door's nginx sets it (X-Real-IP = $remote_addr after the Cloudflare real-ip module). */
