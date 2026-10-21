@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-21（續6）Trigger 重新部署 20261021.2（tarot 批次回呼改 /api/internal，603485b3b）
+
+**觸發**：操作者「1>現在就部署」（High，明確同意）。
+- 部署前查：主機 `/root/Work` HEAD＝`603485b3b`；上次部署 `20261020.1`（WORKLOG 2026-10-20 續8）之後 workflows 只有 603485b3b 一個 commit（`tarot-batch-generate.ts`、`trigger.config.ts`），其他 task 不受影響。
+- `scripts/lobster-trigger-deploy.ps1` → `Successfully deployed version 20261021.2`，21 tasks；`BATCH_INTERNAL_SECRET set: yes (from running next-admin)`。
+- **批次尚未恢復**：新 worker 打 `/api/internal/tarot/batch/[jobId]/{start,card}`，這些路由要等 next-admin 部署（台灣 03:00 自動，或手動 sg-deploy＝High 待操作者決定）。在那之前批次照舊失敗，且失敗會顯示在 Trigger run（603485b3b 起不再「完成但全失敗」），無退步。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`powershell -File scripts/lobster-trigger-deploy.ps1`（env parity gate 綠 → git pull → trigger deploy） | exit=0 | ms=240000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 部署範圍以 `git log db6d5f8a7..origin/main -- lobster-factory/packages/workflows` 確認只有 603485b3b
+- BUGHUNT_WAIVED: NA -- 部署既有 commit，無新程式
+- 待做：next-admin 上線後實跑一次 78 張批次確認
+
+**rollback**：`git revert 603485b3b` 後再跑 `scripts/lobster-trigger-deploy.ps1`（回到舊 worker；舊 worker 本來就讓批次失敗）。
 ## 2026-10-21（續5）監工台：C29 標為完成（fd63291e4）
 
 - [修改] `agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs` 只改 C29 那列（status done＋commit fd63291e4）；`node build.mjs && node check.mjs` → ok 13 cards bound, page fresh；Artifact 重發同網址。
