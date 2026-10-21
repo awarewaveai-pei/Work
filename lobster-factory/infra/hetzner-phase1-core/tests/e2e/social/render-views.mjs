@@ -187,7 +187,7 @@ await page.route("**/api/social/**", handle);
 page.on("console", (m) => { if (m.type() === "error") console.log("console error:", m.text().slice(0, 300)); });   // the dev overlay counts these
 const shot = async (name) => { await page.waitForTimeout(600); await page.screenshot({ path: `${out}/${name}.png` }); };
 // C19 frame: the plan page (channel list + toolbar + week), then every tab and the views behind the bell and the gear.
-// Names: the cards' own (01 calendar, 02 compose, 10 sections); x-* are the other views, so a later card's number stays free.
+// Names: the cards' own (01 calendar, 02 compose, 10 sections, 15 C27 flows); x-* are the other views.
 await page.goto(`http://localhost:3902/tools/social?brand=${BRAND.id}`, { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "社群發文" }).waitFor();
 await shot("01-calendar");
@@ -208,7 +208,7 @@ await page.getByRole("button", { name: "週", exact: true }).click();
 await page.getByRole("button", { name: "Soulful Expression Art Therapy 的選單" }).click();
 await shot("x-channel-menu");
 await page.getByRole("button", { name: "Soulful Expression Art Therapy 的選單" }).click();   // closes it again
-for (const [tab, name] of [["貼文清單", "x-list"], ["貼文素材庫", "x-library"], ["自動發布清單", "x-lists"], ["已刪除貼文", "07-trash"], ["自動化流程", "x-flows"]]) {
+for (const [tab, name] of [["貼文清單", "x-list"], ["貼文素材庫", "x-library"], ["自動發布清單", "x-lists"], ["已刪除貼文", "07-trash"], ["自動化流程", "15-flows"]]) {
   await page.getByRole("button", { name: tab, exact: true }).click();
   await shot(name);
 }

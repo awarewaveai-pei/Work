@@ -55,12 +55,18 @@ export interface AutoRuleMatchInput {
   text: string;
 }
 
+/** Choose the first active keyword rule; an explicitly supplied post rule excludes brand rules. */
+export function matchRule(text: string, rules: AutoRule[], postRule?: AutoRule | null): AutoRule | null {
+  const candidates = postRule ? [postRule] : rules;
+  const lowerText = text.toLocaleLowerCase();
+  return candidates.find((rule) => rule.active
+    && rule.keywords.some((keyword) => splitKeywords(keyword).some((part) => lowerText.includes(part.toLocaleLowerCase())))) ?? null;
+}
+
 /** Choose the first active rule matching the event; a post rule wins over brand rules. */
 export function matchAutoRule(rules: AutoRule[], input: AutoRuleMatchInput): AutoRule | null {
   const ownRules = input.postId ? rules.filter((rule) => rule.post_id === input.postId) : [];
-  const candidates = ownRules.length ? ownRules : rules.filter((rule) => rule.post_id === null);
-  return candidates.find((rule) => rule.active
-    && rule.trigger === input.trigger
-    && rule.platforms.includes(input.platform)
-    && rule.keywords.some((keyword) => keyword.trim() && input.text.toLocaleLowerCase().includes(keyword.trim().toLocaleLowerCase()))) ?? null;
+  const candidates = (ownRules.length ? ownRules : rules.filter((rule) => rule.post_id === null))
+    .filter((rule) => rule.trigger === input.trigger && rule.platforms.includes(input.platform));
+  return matchRule(input.text, candidates);
 }

@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-21（續9）社群 V1.5 C27 自動化流程第一段收尾（Codex 寫，Claude 審）
+
+**觸發**：操作者「也可以搭配 codex 做」。C27 規則 CRUD、分頁、比對、單則規則 queued 守衛（0111）已在 cf2b4ecc1；Codex 在拋棄式 worktree `D:/tmp/c27-codex` 補缺口（commit 62052067b），本 session 審過後併入 main。第二段（Meta webhook、真的回覆）等 G3，未做。
+
+**Codex 補的**（`apps/next-admin/`）：卡片點名的 `matchRule(text, rules, postRule)`（單則規則存在就只用它；`matchAutoRule` 先依 trigger／平台篩再呼叫它）；分頁顯示「N 則貼文有自己的規則」；規則表單原本用不存在的 class `sm-frow` → 改既有 `sm-row`／`sm-sec`；render-views 的分頁截圖改名 `15-flows`。
+
+**Review（Claude，非作者）**：空白關鍵字由 `splitKeywords` 濾掉，不會全部命中；單則優先正確；m1「N 則」只算畫面已載入的貼文（`ctx.posts`），非全品牌——不影響動作，不修。m2 15-flows 版面樸素、內容無左右留白——外觀，不修。
+
+**[驗證結果]**
+- Codex（worktree）：`npx tsc --noEmit` exit 0；`vitest auto-rules.test.ts + page-rules.test.ts` 7 passed。
+- 本 session（main）：`node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/render-views.mjs $TEMP/c27-renders` 完成，`15-flows.png` 看過（規則 2 條、啟用／停用、命中數、Meta 審核說明）。
+
+**[rollback]**：`git revert` 本 commit。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=node lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/render-views.mjs $TEMP/c27-renders | exit=0 | ms=180000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n
+- ORACLE_WAIVED: Codex 寫、Claude 本 session 人工審（claude-oracle CLI 走訂閱，本週額度已滿）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=matchRule|matchAutoRule | hits=15
 ## 2026-10-21（續8）社群 V1.5 C23 自動發布清單方格收尾（cc.py SDK 做主體，本 session 收尾）
 
 **觸發**：操作者「沒完成的去開 sessions 做，要用適合的模型」→「用 SDK API 的方式做」。C23 主體（星期 × 時間方格、slots 讀寫、listSlots）已在 Codex 批次 cf2b4ecc1；本次只補缺的。

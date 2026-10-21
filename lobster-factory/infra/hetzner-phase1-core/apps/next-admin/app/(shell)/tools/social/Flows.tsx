@@ -17,14 +17,14 @@ function RuleEditor({ draft, canWrite, busy, onChange, onSave, onCancel }: {
   draft: Draft; canWrite: boolean; busy: boolean; onChange: (next: Draft) => void; onSave: () => void; onCancel: () => void;
 }) {
   const set = (patch: Partial<Draft>) => onChange({ ...draft, ...patch });
-  return <div className="sm-rule" aria-label="自動回覆規則編輯器">
-    <div className="sm-frow"><label className="sm-lab" htmlFor="flow-name">名稱</label><input id="flow-name" type="text" maxLength={80} value={draft.name} onChange={(e) => set({ name: e.target.value })} disabled={!canWrite || busy} placeholder="例如：報名問題" /></div>
-    <div className="sm-frow"><span className="sm-lab">當</span><span className="sm-seg" role="group" aria-label="觸發事件">{TRIGGERS.map(([key, label]) => <button type="button" key={key} className={draft.trigger === key ? "sm-on" : ""} aria-pressed={draft.trigger === key} disabled={!canWrite || busy} onClick={() => set({ trigger: key })}>{label}</button>)}</span></div>
-    <div className="sm-frow"><label className="sm-lab" htmlFor="flow-keywords">關鍵字</label><input id="flow-keywords" type="text" value={draft.keywords.join(", ")} onChange={(e) => set({ keywords: e.target.value.split(/[,，、]/).map((x) => x.trim()).filter(Boolean) })} disabled={!canWrite || busy} placeholder="報名, 怎麼報" /></div>
-    <div className="sm-frow"><span className="sm-lab">平台</span>{PLATFORMS.map(([key, label]) => <label className="sm-ck" key={key}><input type="checkbox" checked={draft.platforms.includes(key)} disabled={!canWrite || busy} onChange={(e) => set({ platforms: e.target.checked ? [...draft.platforms, key] : draft.platforms.filter((p) => p !== key) })} />{label}</label>)}</div>
-    <div className="sm-frow"><span className="sm-lab">動作</span><span className="sm-seg" role="group" aria-label="回覆動作">{ACTIONS.map(([key, label]) => <button type="button" key={key} className={draft.action === key ? "sm-on" : ""} aria-pressed={draft.action === key} disabled={!canWrite || busy} onClick={() => set({ action: key })}>{label}</button>)}</span></div>
-    <div className="sm-frow sm-ftop"><label className="sm-lab" htmlFor="flow-reply">回覆內容</label><textarea id="flow-reply" rows={3} maxLength={2000} value={draft.reply} onChange={(e) => set({ reply: e.target.value })} disabled={!canWrite || busy} placeholder="謝謝你的留言，我們會盡快回覆。" /></div>
-    <div className="sm-frow"><label className="sm-ck"><input type="checkbox" checked={draft.active} disabled={!canWrite || busy} onChange={(e) => set({ active: e.target.checked })} />啟用這條規則</label><span className="sm-r"><button type="button" className="btn-secondary" disabled={busy} onClick={onCancel}>取消</button><button type="button" className="btn-primary" disabled={!canWrite || busy} onClick={onSave}>{busy ? "儲存中…" : "儲存規則"}</button></span></div>
+  return <div className="sm-sec sm-rule" aria-label="自動回覆規則編輯器">
+    <div className="sm-row"><label className="sm-lab" htmlFor="flow-name">名稱</label><input id="flow-name" type="text" maxLength={80} value={draft.name} onChange={(e) => set({ name: e.target.value })} disabled={!canWrite || busy} placeholder="例如：報名問題" /></div>
+    <div className="sm-row"><span className="sm-lab">當</span><span className="sm-seg" role="group" aria-label="觸發事件">{TRIGGERS.map(([key, label]) => <button type="button" key={key} className={draft.trigger === key ? "sm-on" : ""} aria-pressed={draft.trigger === key} disabled={!canWrite || busy} onClick={() => set({ trigger: key })}>{label}</button>)}</span></div>
+    <div className="sm-row"><label className="sm-lab" htmlFor="flow-keywords">關鍵字</label><input id="flow-keywords" type="text" value={draft.keywords.join(", ")} onChange={(e) => set({ keywords: e.target.value.split(/[,，、]/).map((x) => x.trim()).filter(Boolean) })} disabled={!canWrite || busy} placeholder="報名, 怎麼報" /></div>
+    <div className="sm-row"><span className="sm-lab">平台</span>{PLATFORMS.map(([key, label]) => <label className="sm-ck" key={key}><input type="checkbox" checked={draft.platforms.includes(key)} disabled={!canWrite || busy} onChange={(e) => set({ platforms: e.target.checked ? [...draft.platforms, key] : draft.platforms.filter((p) => p !== key) })} />{label}</label>)}</div>
+    <div className="sm-row"><span className="sm-lab">動作</span><span className="sm-seg" role="group" aria-label="回覆動作">{ACTIONS.map(([key, label]) => <button type="button" key={key} className={draft.action === key ? "sm-on" : ""} aria-pressed={draft.action === key} disabled={!canWrite || busy} onClick={() => set({ action: key })}>{label}</button>)}</span></div>
+    <div className="sm-row"><label className="sm-lab" htmlFor="flow-reply">回覆內容</label><textarea id="flow-reply" rows={3} maxLength={2000} value={draft.reply} onChange={(e) => set({ reply: e.target.value })} disabled={!canWrite || busy} placeholder="謝謝你的留言，我們會盡快回覆。" /></div>
+    <div className="sm-row"><label className="sm-ck"><input type="checkbox" checked={draft.active} disabled={!canWrite || busy} onChange={(e) => set({ active: e.target.checked })} />啟用這條規則</label><span className="sm-r"><button type="button" className="btn-secondary" disabled={busy} onClick={onCancel}>取消</button><button type="button" className="btn-primary" disabled={!canWrite || busy} onClick={onSave}>{busy ? "儲存中…" : "儲存規則"}</button></span></div>
   </div>;
 }
 
@@ -35,6 +35,7 @@ export default function Flows({ ctx }: { ctx: SlotContext }) {
   const [error, setError] = useState<string | null>(null);
   const requestRef = useRef(0);
   const canWrite = ctx.brand.role === "owner" || ctx.brand.role === "editor";
+  const ownRulePosts = ctx.posts.filter((post) => post.auto_mode === "own" && post.state !== "deleted");
   const load = useCallback(() => {
     const requestId = ++requestRef.current;
     setError(null);
@@ -64,6 +65,7 @@ export default function Flows({ ctx }: { ctx: SlotContext }) {
   return <section className="sm-panel" aria-label="自動化流程">
     <div className="sm-ptop"><div><h2>自動化流程</h2><span className="sm-muted">品牌規則 · 單則貼文規則會優先</span></div>{canWrite && <button type="button" className="btn-primary" disabled={busy} onClick={() => setEditing({ id: null, draft: blank() })}>新增規則</button>}</div>
     <div className="sm-note" role="note">Meta 審核完成前不會實際自動回覆；目前可先建立與測試規則。</div>
+    <div className="sm-row sm-muted"><b>{ownRulePosts.length} 則貼文有自己的規則</b></div>
     {error && <p className="sm-err" role="alert">{error}</p>}
     {editing && <RuleEditor draft={editing.draft} canWrite={canWrite} busy={busy} onChange={(draft) => setEditing({ ...editing, draft })} onSave={() => void save()} onCancel={() => setEditing(null)} />}
     {rules === null ? <p className="sm-muted">讀取規則中…</p> : !rules.length ? <p className="sm-muted">還沒有品牌自動回覆規則。</p> : <div className="sm-list">{rules.map((rule) => <div className="sm-row" key={rule.id}>
