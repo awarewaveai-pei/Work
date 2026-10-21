@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-21（續38）tarot studio「英文提示詞」區塊：說明＋顯眼翻譯鈕＋中文錯誤訊息（Claude）
+
+- 操作者：看不出英文欄位用途、翻譯鈕不明顯。改：標題「英文提示詞（實際送給圖片模型）」+ 範例說明；`TranslateButton`（`btn-primary` 實心、🌐 翻成英文、副行 約 NT$0.01、翻譯中…、已是英文不用翻 disabled）；主角與風格兩處共用。
+- 錯誤：`translateErrorText` 把 401／authentication／missing key 轉「AI 金鑰無效，請通知管理員」，其餘「翻譯失敗，請稍後再試」；原始錯誤只進 console.error。prod Anthropic key 無效是另一件事，未處理。
+- 樣式只用 `btn-primary`、`--accent-light`、`--card-border`、`--red`；無新色。
+- 截圖：未做（頁面需登入＋DB，本機起不來）；沒看到畫面，不宣稱好看。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit && npx vitest run lib/tarot app | exit=0 | ms=9000
+- REVIEW_WAIVED: NA -- 純文案／樣式，自讀 diff
+- BUGHUNT_WAIVED: NA -- 無 symbol／schema 變更，僅 TarotStudio.tsx 內部
+- 備註：vitest 有 1 紅＝social/page-rules（social.css color-mix），他人未提交的 social 改動，與本改動無關。
+- rollback: git revert 本 commit
 ## 2026-10-21（續37）審 Codex 47d781e3f（Meta C27 第二段＋C28）：1 處修——廣告暫停／繼續可跨品牌改到別人的活動（Claude，非作者）
 - 審查範圍（High：代表品牌回覆、動廣告花費）：webhook 驗簽 `lib/social/meta-webhook.ts:48-54`（raw body HMAC-SHA256、先驗 64 hex 再 `timingSafeEqual`，等長不會丟例外）OK；冪等 `meta-auto-reply.ts:51` 先 `claimAutoRuleEvent` 才送、送後記帳失敗不改判 failed（`:68`）OK；開關 `autoReplyReady` 兩個都要 `true`（`meta-webhook.ts:56-59`）、`META_ADS_WRITE_ENABLED` 在 PATCH 第一行（`app/api/social/ads/route.ts:28`）、compose 預設 `:-false` OK；品牌解析走 `social_meta_assets`（`unique(kind, external_id)`，一個粉專只屬一個品牌），規則只讀該 asset 的 org OK；`can({org}, "social.auto-reply", "system:meta-webhook")`（`meta-auto-reply.ts:46`）、`withFeature("social.ads"|"social.meta")` OK；token 只從 env `META_PAGE_TOKEN_<page>`，走 Authorization header 不進 URL、不進 DB、不回瀏覽器 OK；IG 貼文留言明確跳過（`meta-auto-reply.ts:27`）。
 - C1（已修）：`setMetaCampaignStatus` 只收 `campaignId`，route 只驗「帳戶屬於品牌」不驗「活動屬於帳戶」；同一個廣告 token 看得到兩品牌所有帳戶 → 品牌 A 的 editor 帶 A 的帳戶＋B 的活動 ID 就能暫停／開啟 B 的廣告。不變量：任何廣告寫入前，被寫的物件必須證明在本品牌已綁定的帳戶內。修：`lib/social/meta-ads.ts` `setMetaCampaignStatus(accountId, campaignId, status)` 先 GET `<campaign>?fields=account_id`，不等於該帳戶 → 403 `meta_ads_campaign_mismatch`，不送 POST。

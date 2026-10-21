@@ -88,6 +88,30 @@ async function translateText(text: string): Promise<string> {
   if (!data.ok || !data.english) throw new Error(data.error ?? data.code ?? `HTTP ${res.status}`);
   return data.english;
 }
+// Raw route/SDK error -> one Chinese sentence for staff; the raw text stays in the console.
+function translateErrorText(raw: string): string {
+  if (/401|authentication|invalid x-api-key|missing_anthropic_api_key/i.test(raw)) return "翻譯失敗：AI 金鑰無效，請通知管理員";
+  if (/forbidden_role|403|grant|entitle/i.test(raw)) return "翻譯失敗：這個帳號沒有使用翻譯的權限";
+  return "翻譯失敗，請稍後再試";
+}
+
+// Filled primary button + cost badge; nothing-to-translate shows the reason instead of a dead button.
+function TranslateButton(p: { busy: boolean; disabled: boolean; done: boolean; title?: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="btn-primary"
+      disabled={p.busy || p.disabled || p.done}
+      onClick={p.onClick}
+      title={p.done ? "已是英文，不用翻" : p.title}
+      style={{ flexDirection: "column", gap: 0, padding: "7px 16px", lineHeight: 1.25 }}
+    >
+      <span>{p.busy ? "翻譯中…" : p.done ? "✓ 已是英文，不用翻" : "🌐 翻成英文"}</span>
+      {!p.busy && !p.done && <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.85 }}>約 NT$0.01</span>}
+    </button>
+  );
+}
+
 // One in-browser card run: its stop signal and the deck it was started for (deckGenRef value).
 type CardRun = { signal: AbortSignal; deck: number };
 type CompareResult = { model: TarotModel; image: string | null; seed: number | null; error?: string; busy: boolean };
@@ -216,6 +240,7 @@ export default function TarotStudio() {
   const [subjectEnglish, setSubjectEnglish] = useState("");
   const [subjectEnglishSrc, setSubjectEnglishSrc] = useState("");
   const [translateBusy, setTranslateBusy] = useState(false);
+  const [translateError, setTranslateError] = useState<string | null>(null);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   // The final English actually sent. Defaults to the auto-resolved English from the zh chips, but
   // the user can edit it directly before generating; once edited, `styleEnglishEdited` pins their text.
@@ -493,6 +518,7 @@ export default function TarotStudio() {
     const styleSrc = pinned ? effectiveEnglish : styleTokens.filter((t) => !PRESET_LABELS.has(t)).join(", ");
     if (!needsEnglish(subjectIn) && !needsEnglish(styleSrc)) return { style: effectiveEnglish, subject: subjectForPrompt };
     setTranslateBusy(true);
+    setTranslateError(null);
     try {
       const en = await translateForDeck({ subject: subjectIn, style: styleSrc }, translateText);
       if (subjectNeedsEnglish) {
@@ -508,7 +534,10 @@ export default function TarotStudio() {
       }
       return { style, subject: en.subject };
     } catch (e) {
-      setMessage(`翻成英文失敗：${e instanceof Error ? e.message : String(e)}`);
+      console.error("[tarot] translate failed", e);
+      const zh = translateErrorText(e instanceof Error ? e.message : String(e));
+      setTranslateError(zh);
+      setMessage(zh);
       return null;
     } finally {
       setTranslateBusy(false);
@@ -1507,21 +1536,24 @@ export default function TarotStudio() {
                 換掉每張牌的主角，整副 78 張同一角色。任何語言都可以，產生預覽時自動翻成英文一次，78 張共用。
               </div>
               {subjectNeedsEnglish && (
-                <div style={{ marginTop: 6 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>送給模型的英文</span>
-                    <button title={why("tarot.prompt")}
-                      type="button"
-                      disabled={locked || translateBusy || !canUse("tarot.prompt")}
+                <div style={{ marginTop: 10, padding: 10, borderRadius: 10, border: "1px solid var(--card-border)", background: "var(--accent-light)" }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>英文提示詞（實際送給圖片模型）</div>
+                  <div className="form-hint" style={{ fontSize: 13, margin: "4px 0 8px" }}>
+                    例：你在上面填「藍色貓咪」，這裡會變成 &quot;a blue cat&quot;。圖片模型只看得懂英文，可以直接改。
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+                    <TranslateButton
+                      busy={translateBusy}
+                      disabled={locked || !canUse("tarot.prompt")}
+                      done={!!subjectForPrompt}
+                      title={why("tarot.prompt")}
                       onClick={() => void ensureEnglish()}
-                      style={{ ...ghostBtn(), cursor: locked || translateBusy ? "default" : "pointer", opacity: locked || translateBusy ? 0.5 : 1 }}
-                    >
-                      {translateBusy ? "翻譯中…" : "翻成英文 ≈ NT$0.01"}
-                    </button>
+                    />
+                    {translateError && <span style={{ fontSize: 13, color: "var(--red)" }}>{translateError}</span>}
                   </div>
                   <input
                     className="form-input"
-                    placeholder="（按「翻成英文」或產生預覽時自動填入；可直接修改）"
+                    placeholder="按「翻成英文」自動填入"
                     value={subjectForPrompt}
                     onChange={(e) => { setSubjectEnglish(e.target.value); setSubjectEnglishSrc(subjectText.trim()); }}
                     disabled={locked}
@@ -1774,7 +1806,7 @@ export default function TarotStudio() {
               />
               <div style={{ marginTop: 8 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 10, color: "var(--text-muted)" }}>🎨 送給模型的英文</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>🎨 英文提示詞（實際送給圖片模型）</span>
                   <button title={why("tarot.prompt")}
                     type="button"
                     disabled={(locked || suggestBusy) || !canUse("tarot.prompt")}
@@ -1783,6 +1815,15 @@ export default function TarotStudio() {
                   >
                     {suggestBusy ? "✨ AI 生成中…" : "✨ 幫我想 prompt"}
                   </button>
+                  {needsEnglish(effectiveEnglish) && (
+                    <TranslateButton
+                      busy={translateBusy}
+                      disabled={locked || !canUse("tarot.prompt")}
+                      done={false}
+                      title={why("tarot.prompt")}
+                      onClick={() => void ensureEnglish()}
+                    />
+                  )}
                   {styleOverride && (
                     <button
                       type="button"
@@ -1797,14 +1838,14 @@ export default function TarotStudio() {
                 <textarea
                   className="form-textarea"
                   style={{ minHeight: 72, fontSize: 11, background: "rgba(99,102,241,0.06)" }}
-                  placeholder="（選風格後自動帶出；可直接修改）"
+                  placeholder="選風格後自動帶出，可直接改"
                   value={effectiveEnglish}
                   onChange={(e) => { setStyleEnglish(e.target.value); setStyleEnglishEdited(true); setStyleAutoSrc(null); }}
                   disabled={locked}
                 />
                 {needsEnglish(effectiveEnglish) ? (
-                  <div className="form-hint" style={{ color: "var(--yellow)", marginTop: 2 }}>
-                    含非英文：產生預覽時自動翻成英文（≈ NT$0.01），整副共用。
+                  <div className="form-hint" style={{ fontSize: 13, color: translateError ? "var(--red)" : "var(--yellow)", marginTop: 2 }}>
+                    {translateError ?? "含非英文：按「翻成英文」，或產生預覽時自動翻成英文（約 NT$0.01），整副共用。"}
                   </div>
                 ) : styleOverride && (
                   <div className="form-hint" style={{ color: "var(--yellow)", marginTop: 2 }}>
