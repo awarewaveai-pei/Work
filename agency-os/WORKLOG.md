@@ -13,6 +13,20 @@
 - ORACLE_WAIVED: 移除一個選單項與一行文件，無邏輯變更
 
 **rollback**：`git revert <本 commit>`。
+## 2026-10-21（續26）next-admin 正式部署 a4ab42ac4 → 94c4b7c01＋正式庫套 0113、0114（Claude，操作者批准「全部部署，含其他 sessions 要部署的」）
+
+- 範圍：push 本機 2 個 commit（ca009ec99 IG 留言 media.id、94c4b7c01 tarot 非同步續跑）；套 0113 smart link 點擊去重（續19／續22 待決）、0114 Meta webhook 冪等（續23）；`sg-deploy.sh next-admin`。
+- 前置：主機無 sg-deploy／apply-db 進程、本機與主機皆無 DEPLOY_HOLD；`apply-db-migration.mjs --status` = 112 applied／2 missing（0113、0114，無其他待套）。down 檔：0113 只有 `migrations/0113_social_smart_link_visitor_dedupe.down.sql`（`packages/db/scripts/` 無 `_down` 副本，不違反可回滾，但與 0114 兩處慣例不一致）；0114 兩處內容一致。
+- 順序：0113 → 0114 → 立即部署（0113 刪舊 2 參數 `social_smart_link_click`，舊容器點擊在套用到新容器起來之間回 503，窗口約 6 分鐘）。
+- 結果：ledger `STATUS_OK {"applied":114}`；`sg-deploy.sh` exit 0（368 s；npm test 2785 passed、migration 閘過、healthy 10s、HTTP smoke 5/5 200），`.deployed-commit` a4ab42ac4 → 94c4b7c01，rollback 映像 `lobster-phase1-next-admin:rollback-20261021-081418`；容器 StartedAt 08:19:05Z、RestartCount 0；Playwright smoke 26 passed／6 skipped；app／social `/login` 200。
+- Meta 自動回覆兩開關部署前後都 OFF（`docker exec lobster-next-admin printenv META_AUTO_REPLY_ENABLED`／`META_AUTO_REPLY_REVIEW_APPROVED` exit 1，`lib/social/meta-webhook.ts:56-57` 兩者皆 "true" 才開）。操作者無實體公司，Meta 審核預期不過 → 維持關閉，C27／C28 M3（prod compose 加 META_*）暫不執行。
+- 未做：smart link 點擊實測（同 UA 連點兩次只 +1）未跑 — 需要一個已發布 slug，留部署後操作者或下個 session；compose／nginx／其他服務不在批准範圍，本次無待辦。
+- [rollback]：主機 `docker tag lobster-phase1-next-admin:rollback-20261021-081418` 回滾或 sg-deploy a4ab42ac4；DB：先回滾程式再依序跑 0114、0113 的 `.down.sql`（0113 down 會還原 2 參數函式）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=368000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs 0113 ; 0114 ; --status | exit=0 | ms=37000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/playwright-runner.ps1 -Mode smoke -SkipInstall | exit=0 | ms=36000
+- REVIEW_WAIVED: NA -- 部署操作，無程式改動；程式審查在各來源提交（0113 續19、0114／ca009ec99 續23；94c4b7c01 見其 commit）
+- BUGHUNT_WAIVED: NA -- 部署操作，無程式改動
 ## 2026-10-21（續25）tarot 工作台：Codex 對 b07eaceff 的 5 個 finding，用「deck／job 身分」一個機制關整類（Claude）
 
 - 來源：`agency-os/reports/oracle/2026-10-21-partialreview-d933a07c.md`（F1–F5，逐條 grep 對過 b07eaceff 行號屬實）。同一 reviewer 第二次點這段 code → 先寫不變量（AGENTS.md §4）。
