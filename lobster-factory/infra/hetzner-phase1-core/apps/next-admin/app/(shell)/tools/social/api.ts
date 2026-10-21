@@ -77,11 +77,18 @@ export interface InboxRow {
   status: "ok" | "unlinked" | "not_configured" | "unavailable";
 }
 export interface InboxData { inboxes: InboxRow[]; home: string | null }
+export interface AdsAccount { id: string; name: string; account_status: number | null; currency: string | null; timezone_name: string | null }
+export interface AdsCampaign { id: string; name: string; status: string | null; effective_status: string | null; objective: string | null; daily_budget: string | null; lifetime_budget: string | null; start_time: string | null; stop_time: string | null }
+export interface AdsInsight { spend: string | null; impressions: string | null; clicks: string | null; reach: string | null; actions: Array<{ action_type: string; value: string }> }
 
 export const api = {
   brands: () => call<{ brands: Brand[] }>("GET", "/api/social/brands"),
   accounts: (brand: string) => call<{ accounts: Account[]; connecting: { id: string; platform: string; started_at: string } | null; justConnected: string | null; connectFailed: string | null }>("GET", `/api/social/accounts?${q({ brand })}`),
   inbox: (brand: string) => call<InboxData>("GET", `/api/social/inbox?${q({ brand })}`),
+  adsAccounts: (brand: string) => call<{ accounts: AdsAccount[] }>("GET", `/api/social/ads?${q({ brand, view: "accounts" })}`),
+  adsCampaigns: (brand: string, account: string) => call<{ account: string; campaigns: AdsCampaign[] }>("GET", `/api/social/ads?${q({ brand, view: "campaigns", account })}`),
+  adsInsights: (brand: string, account: string, datePreset = "last_30d") => call<{ account: string; insights: AdsInsight[] }>("GET", `/api/social/ads?${q({ brand, view: "insights", account, datePreset })}`),
+  setAdsCampaignStatus: (brand: string, campaignId: string, status: "ACTIVE" | "PAUSED") => call<{ campaignId: string; status: string }>("PATCH", "/api/social/ads", { brand, campaignId, status }),
   connect: (brand: string, platform: string, accountId?: string) => call<{ attemptId: string; url: string }>("POST", "/api/social/accounts", { brand, platform, accountId }),
   cancelConnect: (brand: string, attempt: string) => call<object>("DELETE", `/api/social/accounts?${q({ brand, attempt })}`),
   unlink: (brand: string, id: string) => call<object>("DELETE", `/api/social/accounts?${q({ brand, id })}`),

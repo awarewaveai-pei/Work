@@ -2,6 +2,7 @@
 // Where the cards' pieces meet: SocialManager (C6, frame C19) with the views the later cards add (slots), on one route.
 import { useRouter } from "next/navigation";
 import Analytics from "./(sections)/analytics/Analytics";
+import Ads from "./(sections)/ads/Ads";
 import Inbox from "./(sections)/inbox/Inbox";
 import Flows from "./Flows";
 import Reporting from "./(sections)/reporting/Reporting";
@@ -35,6 +36,7 @@ const slots: Slots = {
   headerExtra: (ctx) => <NeedsButton ctx={ctx} />,   // C8: the bell
   settingsExtra: (ctx) => <><ReviewSetting ctx={ctx} /><MembersSetting ctx={ctx} /></>,   // C8; members: ADR 018 §3
   section: (s, ctx) => (s === "analytics" ? <Analytics ctx={ctx} />   // C24
+    : s === "ads" ? <Ads ctx={ctx} />   // C28
     : s === "reporting" ? <Reporting ctx={ctx} />   // C25
     : s === "smartlinks" ? <SmartLinks ctx={ctx} />   // C26
     : s === "inbox" ? <Inbox key={ctx.brand.id} ctx={ctx} />   // C29

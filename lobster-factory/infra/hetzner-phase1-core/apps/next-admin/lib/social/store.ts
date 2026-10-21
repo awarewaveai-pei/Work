@@ -602,6 +602,24 @@ export async function deleteAutoRule(brandId: string, id: string, actor: string)
   return { postVersion: (data as number | null) ?? null };
 }
 
+/** Meta retries webhook deliveries. The immutable audit row is the idempotency record; event_id is opaque Meta data. */
+export async function autoRuleEventHandled(brandId: string, eventId: string): Promise<boolean> {
+  const { data, error } = await db().from("social_audit_log")
+    .select("id").eq("organization_id", brandId).eq("action", "auto_rule")
+    .filter("detail->>event_id", "eq", eventId).limit(1);
+  if (error) fail(error, "auto-reply event");
+  return (data ?? []).length > 0;
+}
+
+/** 0105's database function increments hits and appends the audit row atomically. */
+export async function recordAutoRuleHit(brandId: string, ruleId: string, actor: string, detail: Record<string, unknown>): Promise<number | null> {
+  const { data, error } = await db().rpc("social_auto_rule_hit", {
+    p_org: brandId, p_rule_id: ruleId, p_actor: actor, p_detail: detail,
+  });
+  if (error) fail(error, "auto-reply hit");
+  return typeof data === "number" ? data : null;
+}
+
 // ---- media and log ---------------------------------------------------------------------------------------------
 
 export async function listMedia(brandId: string) {

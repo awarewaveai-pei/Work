@@ -4,6 +4,7 @@ import { PostizApiError } from "@/lib/content/postiz";
 import { BrandAccessError } from "./authz";
 import { SocialStoreError } from "./store";
 import { TransitionError } from "./state";
+import { MetaAdsError } from "./meta-ads";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -47,6 +48,7 @@ export async function handle(run: () => Promise<unknown>): Promise<Response> {
     if (e instanceof TransitionError) return reply(e.code === "forbidden" ? 403 : e.code === "illegal" ? 409 : 400, e.message);
     if (e instanceof SocialStoreError) return reply(e.status, e.message);
     if (e instanceof PostizApiError) return reply(502, e.message, e.retryAfterSeconds !== undefined ? { retryAfterSeconds: e.retryAfterSeconds } : undefined);
+    if (e instanceof MetaAdsError) return reply(e.status, e.message, { code: e.code });
     console.error("[api/social]", e);
     return reply(500, "internal error");
   }

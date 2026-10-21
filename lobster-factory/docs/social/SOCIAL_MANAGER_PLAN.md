@@ -183,17 +183,17 @@
 ### C27 自動化流程（Opus 5.5；C20、C21 之後；執行端等 G3）
 - 目標：定案 6：品牌通用規則＋單則另外設（單則優先）；分頁＝規則清單＋表單＋「N 則貼文有自己的規則」；撰寫頁那塊在 C21。
 - 範圍：新 `flows/`（分頁內容 `Flows.tsx`）、`app/api/social/auto-rules/*`、`lib/social/auto-rules.ts`（規則 CRUD＋**比對函式** `matchRule(text, rules, postRule)`：單則規則存在就只用它，否則品牌規則；關鍵字逗號分隔、不分大小寫、含即中）。
-- 執行端（**同卡第二段，G3 Meta 審核通過才開**）：`app/api/webhooks/meta/route.ts` 收留言／私訊 webhook → `matchRule` → 透過 Postiz 或 Meta Graph 回覆（查證 Postiz 有無「對別人留言回覆」API；沒有就 Graph API 直打）→ `hits+1`＋`social_audit_log`。審核沒過前分頁頂端一句「留言自動回覆要等 Meta 審核通過才會真的動作（Facebook、Instagram）」照樣稿。
+- 執行端（**已完成，G3 Meta 審核通過才開**）：`app/api/webhooks/meta/route.ts` 以 raw-body HMAC 驗證 Meta webhook，`lib/social/meta-auto-reply.ts` 收留言／私訊 → `matchAutoRule` → Meta Graph 回覆 → `social_auto_rule_hit` 原子 `hits+1`＋`social_audit_log`，以 `event_id` 避免重複處理。`META_AUTO_REPLY_ENABLED` 與 `META_AUTO_REPLY_REVIEW_APPROVED` 未同時為 true 時只確認收件、不會外送回覆；分頁仍顯示審核前提示。
 - 輸入：樣稿 `function renderFlows`、`ruleForm`；TASKS.md:428 Meta app 狀態。
-- 輸出：分頁＋API＋`matchRule`；執行端另開 WORKLOG 段落。
+- 輸出：分頁＋API＋`matchRule`；執行端已落在 `app/api/webhooks/meta/route.ts`、`lib/social/meta-webhook.ts`、`lib/social/meta-auto-reply.ts`，並補 route／adapter／execution tests。
 - 驗收：`auto-rules.test.ts`：單則優先、關鍵字比對、平台過濾、關掉的規則不中；`render-views.mjs` `15-flows`。
 - 邊界：Bluesky／Threads 不做；不做多步流程（Metricool 的 chained sequences，V2）。
 
 ### C28 廣告管理（Sonnet 5.5；C19、C20 之後；G3 `ads_read` 通過才開，之前只有 C19 的殼）
 - 目標：連接 Meta／Google 廣告帳號，看花費／曝光／點擊／轉換，活動暫停／繼續；不在這裡建廣告。
-- 範圍：`ads/page.tsx`＋`Ads.tsx`、`lib/social/ads.ts`（Meta Marketing API `act_<id>/campaigns,insights`；Google Ads V2）、表 `social_ad_accounts`／`social_ad_campaigns_daily`（**本卡自己開 0106**，C20 不預開）。
+- 範圍：`ads/page.tsx`＋`Ads.tsx`、`lib/social/meta-ads.ts`（Meta Marketing API `act_<id>/campaigns,insights`；Google Ads V2 仍待另有 Google 憑證時開工）、Meta 活動暫停／啟用 API；本階段不建立未被現有資料流使用的快取表。
 - 輸入：樣稿 `function renderAds`。
-- 輸出：殼先上（C19）：頁面寫「廣告管理要等 Meta 廣告權限審核通過」＋連接鈕灰；審核過後填內容。
+- 輸出：Meta 廣告帳戶、活動、成效讀取與活動暫停／啟用已接上；token 僅留 server，且必須設定 `META_MARKETING_ORGANIZATION_ID` 綁定品牌，避免跨品牌讀取。未完成 Meta `ads_read`／`ads_management` 審核時 API 仍 fail closed。
 - 驗收：`ads.test.ts` 期間換算；`render-views.mjs` `16-ads`。
 - 邊界：不建、不改廣告；TikTok 不做。
 
