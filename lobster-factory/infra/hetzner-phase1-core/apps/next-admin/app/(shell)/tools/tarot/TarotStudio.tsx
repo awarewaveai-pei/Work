@@ -74,6 +74,11 @@ const MODEL_OPTIONS: ModelOption[] = [
   { value: "openai-high",          label: "GPT-Image-1 高",       group: "OpenAI",   costNt: 5.5,  maxRefs: 5 },
 ];
 
+// Chinese / Japanese / Korean script in the subject (models read English only). RegExp constructor:
+// tsconfig targets ES2017, which rejects u-flag property escapes in a regex literal.
+const CJK_TEXT = new RegExp(String.raw`\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}`, "u");
+// One in-browser card run: its stop signal and the deck it was started for (deckGenRef value).
+type CardRun = { signal: AbortSignal; deck: number };
 type CompareResult = { model: TarotModel; image: string | null; seed: number | null; error?: string; busy: boolean };
 
 function modelOption(m: TarotModel): ModelOption {
@@ -298,6 +303,17 @@ export default function TarotStudio() {
   // Abort handle for the running in-browser card loop (group or single). Aborting cancels the
   // in-flight fetch and the loop checks it before each card, so no request leaves after stop.
   const batchAbortRef = useRef<AbortController | null>(null);
+  // Async-continuation identity. Every continuation (card generate → grade/render → FileReader →
+  // gallery save; background poll; background results load) captures the deck/job it started for
+  // and re-checks it right before each state write or outgoing request, so work from a previous
+  // deck or job can never land in the current one. deckGenRef bumps on every deck reset
+  // (startNewDeck / unlockStyle); bgJobRef mirrors bgJobId plus the deck that launched the job.
+  const deckGenRef = useRef(0);
+  const bgJobRef = useRef<{ id: string; deck: number } | null>(null);
+  function setBgJob(job: { id: string; deck: number } | null) {
+    bgJobRef.current = job;
+    setBgJobId(job?.id ?? null);
+  }
   useEffect(() => {
     batchRef.current = batch;
   }, [batch]);
@@ -353,13 +369,18 @@ export default function TarotStudio() {
   // Poll background batch status every 8s while running.
   useEffect(() => {
     if (!bgJobId || bgStatus === "done" || bgStatus === "error" || bgStatus === "idle") return;
+    const jobId = bgJobId;
+    const isCurrentJob = () => bgJobRef.current?.id === jobId;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/tools/tarot/batch/${bgJobId}`, {
+        if (!isCurrentJob()) { clearInterval(interval); return; }
+        const res = await fetch(`/api/tools/tarot/batch/${jobId}`, {
           headers: { ...roleHeader("operator") },
         });
         if (!res.ok) return;
         const data = (await res.json()) as { ok: boolean; job?: { status: string; completedCards: number; totalCards: number } };
+        // A poll that was in flight when the job was cleared/replaced must not resurrect it.
+        if (!isCurrentJob()) { clearInterval(interval); return; }
         if (!data.ok || !data.job) return;
         const j = data.job;
         setBgProgress({ done: j.completedCards, total: j.totalCards });
@@ -546,14 +567,16 @@ export default function TarotStudio() {
 
   // Fresh 78-slot deck after a (re)lock. A finished background job belongs to the previous deck:
   // its done/error panel hides 「背景生成全 78 張」, so drop it. A running job is kept (still paid).
+  // A running job keeps its own deck id, so its results never merge into this new deck (loadBatchResults).
   function startNewDeck() {
+    deckGenRef.current++;
     setBatch((prev) => {
       prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
       return TAROT_CARDS.map((card) => ({ card, status: "idle" }));
     });
     setSavedArt(new Set()); // new deck — drop stale "已存無框圖" marks
     if (bgStatus === "done" || bgStatus === "error") {
-      setBgJobId(null);
+      setBgJob(null);
       setBgStatus("idle");
       setBgProgress({ done: 0, total: 0 });
     }
@@ -563,6 +586,7 @@ export default function TarotStudio() {
   // Unlock = back to step 1. Stops any running card loop first so it cannot keep writing into
   // (and paying for) a deck that is about to be replaced.
   function unlockStyle() {
+    deckGenRef.current++;
     stopBatch();
     setLocked(false);
   }
@@ -628,7 +652,11 @@ export default function TarotStudio() {
   // Pass an explicit fresh seed for *regeneration* — deterministic models (FLUX go_fast:false,
   // ideogram v2a/v3) reproduce the identical image from the same seed, so reusing previewSeed
   // made "重新生成" silently no-op. A new seed forces a genuinely different result.
-  async function generateOne(card: TarotCard, index: number, seedOverride: number | null | undefined, signal: AbortSignal): Promise<void> {
+  async function generateOne(card: TarotCard, index: number, seedOverride: number | null | undefined, run: CardRun): Promise<void> {
+    const { signal } = run;
+    // Same deck and not stopped — checked before every state write and outgoing request below.
+    const live = () => !signal.aborted && deckGenRef.current === run.deck;
+    if (!live()) return;
     patchItem(index, { status: "pending", error: undefined });
     try {
       const resp = await callGenerate({
@@ -639,6 +667,7 @@ export default function TarotStudio() {
         printQuality: true,
         _jobId: jobIdRef.current,
       }, signal);
+      if (!live()) throw new DOMException("stale card run", "AbortError");
       if (!resp.ok || !resp.image) {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });
         return;
@@ -655,22 +684,26 @@ export default function TarotStudio() {
       // and shrinks what we retain in React state. The full-res artForPrint is still used for the
       // printable card above; only this collected copy is capped.
       const galleryArt = await toGalleryArt(artForPrint);
+      // Stopped or deck replaced during grade/render: drop the result (catch restores the slot).
+      if (!live()) {
+        URL.revokeObjectURL(url);
+        throw new DOMException("stale card run", "AbortError");
+      }
       // Save the colour-graded card to gallery (洞2 fix): previously saved raw resp.image BEFORE
       // renderPrintCard, so the gallery always got the ungraded original. Now we convert the graded
       // blob to a data URL and save that — gallery and download are always in sync.
-      // Skipped after stop (no request leaves after 停止); the card itself is still kept below.
-      if (!signal.aborted) {
-        void new Promise<string>((res) => {
-          const reader = new FileReader();
-          reader.onload = () => res(reader.result as string);
-          reader.readAsDataURL(blob);
-        }).then((dataUrl) =>
-          saveToGallery(dataUrl, "tarot", {
-            cardName: card.name,
-            prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
-          }),
-        );
-      }
+      // live() is re-checked inside the async read: stop can land between here and onload.
+      void new Promise<string>((res) => {
+        const reader = new FileReader();
+        reader.onload = () => res(reader.result as string);
+        reader.readAsDataURL(blob);
+      }).then((dataUrl) => {
+        if (!live()) return;
+        saveToGallery(dataUrl, "tarot", {
+          cardName: card.name,
+          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
+        });
+      });
       // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
       // on demand — the user collects only the pictures she likes, no auto-flooding the gallery.
       // revoke any prior url for this slot (retry case) before replacing
@@ -689,6 +722,8 @@ export default function TarotStudio() {
         return next;
       });
     } catch (e) {
+      // Deck replaced: the slots this run knew are gone — write nothing.
+      if (deckGenRef.current !== run.deck) return;
       if (signal.aborted) {
         // Stopped mid-card: not a failure. A slot that already had art goes back to done.
         setBatch((prev) => prev.map((it, i) => (i === index ? { ...it, status: it.url ? "done" : "idle", error: undefined } : it)));
@@ -700,21 +735,26 @@ export default function TarotStudio() {
 
   // Shared lifecycle for every in-browser card run: one AbortController, busy flags always
   // cleared in finally (also after stop / error), so the next action works without a reload.
-  async function runCardLoop(work: (signal: AbortSignal) => Promise<void>): Promise<boolean> {
+  async function runCardLoop(work: (run: CardRun) => Promise<void>): Promise<boolean> {
     const ctrl = new AbortController();
+    const run: CardRun = { signal: ctrl.signal, deck: deckGenRef.current };
     batchAbortRef.current = ctrl;
     jobIdRef.current = crypto.randomUUID();
     setBatchBusy(true);
     setBatchStopping(false);
     setMessage(null);
     try {
-      await work(ctrl.signal);
+      await work(run);
     } finally {
-      if (batchAbortRef.current === ctrl) batchAbortRef.current = null;
-      setBatchBusy(false);
-      setBatchStopping(false);
+      // Only the current run owns the busy flags; a superseded run must not clear a newer one's.
+      if (batchAbortRef.current === ctrl) {
+        batchAbortRef.current = null;
+        setBatchBusy(false);
+        setBatchStopping(false);
+      }
     }
-    return ctrl.signal.aborted;
+    // A stopped run whose deck is still current reports the stop; a replaced deck says nothing.
+    return ctrl.signal.aborted && deckGenRef.current === run.deck;
   }
 
   // Generate pending/failed cards in the currently-selected group (skips already-done by default).
@@ -735,13 +775,13 @@ export default function TarotStudio() {
         `預估費用約 NT$${estNt}，約 ${mins} 分鐘，請保持此分頁開啟。\n\n確定開始？`,
     );
     if (!ok) return;
-    const stopped = await runCardLoop(async (signal) => {
+    const stopped = await runCardLoop(async (run) => {
       for (const t of targets) {
-        if (signal.aborted) break;
+        if (run.signal.aborted || deckGenRef.current !== run.deck) break;
         // "重新生成全組" (skipDone=false) redoes already-done cards → needs a fresh seed each,
         // else deterministic models reproduce the same images. "填補未完成" (skipDone=true) is
         // first-fill → keep the deck seed (previewSeed) for cross-card consistency.
-        await generateOne(t.it.card, t.i, skipDone ? undefined : Math.floor(Math.random() * 1_000_000_000), signal);
+        await generateOne(t.it.card, t.i, skipDone ? undefined : Math.floor(Math.random() * 1_000_000_000), run);
       }
     });
     if (stopped) setMessage("已停止。生成好的牌都保留，可下載 ZIP。");
@@ -757,6 +797,7 @@ export default function TarotStudio() {
         `生成完成後回來按「載入批次結果」即可。\n\n確定開始？`,
     );
     if (!ok) return;
+    const deck = deckGenRef.current; // the job belongs to this deck even if it is relocked mid-request
     setBgStatus("pending");
     setBgProgress({ done: 0, total: 78 });
     setMessage(null);
@@ -782,7 +823,7 @@ export default function TarotStudio() {
         setBgStatus("idle");
         return;
       }
-      setBgJobId(data.jobId);
+      setBgJob({ id: data.jobId, deck });
       setBgStatus("running");
       setMessage(`背景批次已啟動 (job: ${data.jobId.slice(0, 8)}) — 可關閉瀏覽器，8 秒自動更新進度。`);
     } catch (e) {
@@ -792,12 +833,23 @@ export default function TarotStudio() {
   }
 
   // Load results from a completed background batch into the local batch grid.
+  // Results merge only into the deck that launched the job. A job from a previous deck (style was
+  // relocked while it ran) is dropped with a message instead of filling the new deck by card index.
   async function loadBatchResults() {
-    if (!bgJobId) return;
+    const job = bgJobRef.current;
+    if (!job) return;
+    const isCurrent = () => bgJobRef.current?.id === job.id && deckGenRef.current === job.deck;
+    if (!isCurrent()) {
+      setBgJob(null);
+      setBgStatus("idle");
+      setBgProgress({ done: 0, total: 0 });
+      setMessage(`背景批次 ${job.id.slice(0, 8)} 是上一副牌（風格已重新鎖定）產生的，不載入到目前這副牌。`);
+      return;
+    }
     setBgLoadBusy(true);
     setMessage("載入背景批次結果中…");
     try {
-      const res = await fetch(`/api/tools/tarot/batch/${bgJobId}`, {
+      const res = await fetch(`/api/tools/tarot/batch/${job.id}`, {
         headers: { ...roleHeader("operator") },
       });
       const data = (await res.json()) as {
@@ -805,6 +857,7 @@ export default function TarotStudio() {
         job?: { results: Array<{ cardIndex: number; cardName: string; url: string }> };
         error?: string;
       };
+      if (!isCurrent()) return; // deck or job changed while loading
       if (!data.ok || !data.job) {
         setMessage(`載入失敗：${data.error ?? "unknown"}`);
         return;
@@ -823,7 +876,7 @@ export default function TarotStudio() {
       });
       setMessage(`已載入 ${results.length} 張背景批次結果。如需含框 ZIP，請點「下載 ZIP」（會自動套框）。`);
     } catch (e) {
-      setMessage(`載入失敗：${e instanceof Error ? e.message : String(e)}`);
+      if (isCurrent()) setMessage(`載入失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBgLoadBusy(false);
     }
@@ -832,10 +885,10 @@ export default function TarotStudio() {
   // Generate (or regenerate) a single card — fast, no confirm.
   async function generateSingle(index: number) {
     if (batchBusy) return;
-    const stopped = await runCardLoop(async (signal) => {
+    const stopped = await runCardLoop(async (run) => {
       // Always a fresh seed: this button is "regenerate this card", whether the slot was blank
       // or already done. Without a new seed, deterministic models redraw the identical image.
-      await generateOne(batch[index].card, index, Math.floor(Math.random() * 1_000_000_000), signal);
+      await generateOne(batch[index].card, index, Math.floor(Math.random() * 1_000_000_000), run);
     });
     if (!stopped) setMessage("✓ 已重新生成");
   }
@@ -1381,9 +1434,9 @@ export default function TarotStudio() {
                 換掉每張牌的主角，整副 78 張同一角色。請用英文填寫。
               </div>
               {/* Nothing translates the subject: it goes verbatim into buildCardPrompt (cards.ts). */}
-              {/[\u3400-\u9fff\uf900-\ufaff]/.test(subjectText) && (
+              {CJK_TEXT.test(subjectText) && (
                 <div className="form-hint" style={{ marginTop: 2, color: "var(--yellow)" }}>
-                  ⚠ 含中文：FLUX 等模型讀不懂，主角可能不會換。請改英文，例：a blue cat
+                  ⚠ 含中日韓文字：FLUX 等模型讀不懂，主角可能不會換。請改英文，例：a blue cat
                 </div>
               )}
             </div>
