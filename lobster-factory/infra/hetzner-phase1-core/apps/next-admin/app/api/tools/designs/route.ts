@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import { buildDesignKey, deleteDesignObject, deleteVideoObjects, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
-import { MOCKUP_SOURCES } from "../../../../lib/studio/asset-group";
+import { decodeCursor, listDesigns, type SortOrder, type TimeRange } from "../../../../lib/studio/designs-list";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 
 export const runtime = "nodejs";
@@ -13,7 +13,6 @@ export const maxDuration = 60;
 // Same ceiling as the tarot reference-image path (~9 MB of base64).
 const MAX_IMAGE_CHARS = 12_000_000;
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
-const LIST_LIMIT = 60;
 
 // `sourceUrl` lets the client persist a Printful mockup (temporary S3 URL — note the
 // "/tmp/" path, it expires) into My Designs. Allowlist ONLY Printful's mockup CDN hosts
@@ -372,16 +371,30 @@ export async function GET(request: Request) {
   // 影片與圖片同屬 asset_domain="ai_generated"（DB CHECK 僅允許 ai_generated/wp_product/wp_blog），
   // 用 mime_type 區分：?domain=ai_video → video/*；default → image/*。避免動 prod schema。
   const wantVideo = url.searchParams.get("domain") === "ai_video";
-  const mimePrefix = wantVideo ? "video/%" : "image/%";
+  const mimePrefix = wantVideo ? ("video/%" as const) : ("image/%" as const);
 
-  // Optional source-group filter for the publish picker's split 設計圖 / 商品照 sections.
-  // "mockup" → only product mockups; "design" → everything that is NOT a mockup (tarot / studio /
-  // canvas / null source). Applied in the DB BEFORE .limit() so each group gets its own LIST_LIMIT
-  // budget — a gallery flooded with tarot art can no longer starve mockups out of the publish picker
-  // (the洗版 bug: 60-row cap × 87% tarot left mockups invisible). source lives at metadata->>source.
-  // Unknown values are ignored (falls back to the un-filtered list — backward compatible with
-  // My Designs, which never passes ?group).
-  const group = url.searchParams.get("group");
+  // Optional source-group filter for the publish picker's split 設計圖 / 商品照 sections and the
+  // My Designs tabs. Applied in the DB (lib/studio/designs-list.ts applyFilters) so each group pages
+  // on its own — the 洗版 bug (60-row cap × 87% tarot left mockups invisible) stays closed.
+  // Unknown values are ignored (un-filtered list, backward compatible).
+  const groupParam = url.searchParams.get("group");
+  const group = groupParam === "mockup" || groupParam === "design" ? groupParam : null;
+
+  // Paging: ?cursor=<nextCursor from the previous page>; keyset on (created_at, id), no OFFSET.
+  const cursorParam = url.searchParams.get("cursor");
+  const cursor = cursorParam ? decodeCursor(cursorParam) : null;
+  if (cursorParam && !cursor) {
+    return NextResponse.json({ ok: false, error: "invalid_cursor" }, { status: 400 });
+  }
+  const order: SortOrder = url.searchParams.get("order") === "asc" ? "asc" : "desc";
+  const timeParam = url.searchParams.get("time");
+  const time: TimeRange | null = timeParam === "today" || timeParam === "week" || timeParam === "month" ? timeParam : null;
+  const tzRaw = Number(url.searchParams.get("tz") ?? "0");
+  const tzOffsetMin = Number.isInteger(tzRaw) && Math.abs(tzRaw) <= 840 ? tzRaw : 0;
+  const text = (k: string) => {
+    const v = url.searchParams.get(k);
+    return v && v !== "all" ? v.slice(0, 120) : null;
+  };
 
   // Prefer the service-role client: media_assets has RLS keyed to Clerk JWTs, and this
   // server route carries no user JWT — the anon client would silently return 0 rows.
@@ -390,36 +403,26 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "supabase_not_configured" }, { status: 503 });
   }
 
-  let query = supabase
-    .from("media_assets")
-    .select("id,object_key,object_url,mime_type,byte_size,created_at,metadata")
-    .eq("storage_backend", "r2")
-    .eq("asset_domain", "ai_generated")
-    .like("mime_type", mimePrefix)
-    .eq("is_current", true);
-
-  // null = staff 未指定 → 不過濾（看全部 org）。client 走不到這裡帶 null（effectiveOrgId 會先拋）。
-  if (organizationId) query = query.eq("organization_id", organizationId);
-
-  if (group === "mockup") {
-    // 商品照: any mockup save-source (MOCKUP_SOURCES SSOT). or-of-eq keeps each disjunct a primitive.
-    query = query.or(MOCKUP_SOURCES.map((s) => `metadata->>source.eq.${s}`).join(","));
-  } else if (group === "design") {
-    // 設計圖: NOT any mockup source, INCLUDING null source. jsonb ->> yields NULL for an absent key,
-    // which a bare .neq would silently drop (Postgres three-valued logic) — so OR in is.null
-    // explicitly; the per-source negations are AND-ed (must differ from every mockup source).
-    const negated = MOCKUP_SOURCES.map((s) => `metadata->>source.neq.${s}`).join(",");
-    query = query.or(`metadata->>source.is.null,and(${negated})`);
-  }
-
-  const { data, error } = await query
-    .order("created_at", { ascending: false })
-    .limit(LIST_LIMIT);
-
-  if (error) {
-    console.error("[designs] list failed:", error.message);
+  try {
+    const result = await listDesigns(
+      supabase,
+      {
+        organizationId,
+        mimePrefix,
+        group,
+        model: text("model"),
+        product: text("product"),
+        theme: text("theme"),
+        brand: text("brand"),
+        time,
+        tzOffsetMin,
+      },
+      // ?counts=1 (My Designs) adds total + per-chip counts on the first page; pickers skip the cost.
+      { cursor, order, withCounts: url.searchParams.get("counts") === "1" },
+    );
+    return NextResponse.json({ ok: true, ...result });
+  } catch (e) {
+    console.error("[designs] list failed:", e instanceof Error ? e.message : String(e));
     return NextResponse.json({ ok: false, error: "list_failed" }, { status: 500 });
   }
-
-  return NextResponse.json({ ok: true, assets: data ?? [] });
 }

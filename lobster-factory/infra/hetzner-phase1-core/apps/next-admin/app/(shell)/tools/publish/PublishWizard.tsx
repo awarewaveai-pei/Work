@@ -187,7 +187,7 @@ export default function PublishWizard() {
     void (async () => {
       try {
         // Two grouped fetches: 設計圖 art for the print-file source, mockups for the商品照 gallery.
-        // Each carries its own LIST_LIMIT, so neither starves the other (per-group洗版 fix).
+        // Each pages on its own (PAGE_SIZE, lib/studio/designs-list.ts), so neither starves the other (per-group洗版 fix).
         const [dRes, mRes] = await Promise.all([
           fetch("/api/tools/designs?group=design", { cache: "no-store" }),
           fetch("/api/tools/designs?group=mockup", { cache: "no-store" }),

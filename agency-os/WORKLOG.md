@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-21（續24）My Designs 只顯示 60 張、篩選數字錯：改 DB 端篩選＋keyset 分頁＋DB 計數（Claude）
+
+- 根因：`app/api/tools/designs/route.ts:16` `LIST_LIMIT = 60` 套在 GET 的 `.limit()`（舊 :417），無分頁；篩選、排序、chip 計數全在 `DesignsGallery.tsx` 用這 60 筆算 → 78 張牌組顯示「60 / 60」「FLUX schnell (60)」。
+- 修法（不變量：頁面、總數、每個 chip 數字＝同一組 DB 條件）：新 `lib/studio/designs-list.ts` `applyFilters` 是唯一條件來源（org 範圍、group 洗版修法照舊、model/product/theme/brand/time），列表與計數都經它。
+  - GET 新參數：`cursor`（上一頁 `nextCursor`，keyset `(created_at,id)`，無 OFFSET；壞 cursor→400 `invalid_cursor`）、`order=asc|desc`、`model`、`product`、`theme`、`brand`、`time=today|week|month`＋`tz`（瀏覽器 getTimezoneOffset）、`counts=1`。回應：`assets`、`nextCursor`（最後一頁 null，多取 1 筆判斷）、`total`＋`facets{model,product,theme,brand,time}`（只在 counts=1 且第一頁）。
+  - 計數＝每個值一個 PostgREST HEAD `count=exact`（DB COUNT(*)），並行。未用 GROUP BY：本機棧 PostgREST aggregates 未開（repo grep `AGGREGATES` 0 命中），SQL 函式要 migration → migration 閘（`scripts/sg-deploy.sh:185-211`）會擋今晚所有人的自動部署。
+  - 畫面：篩選／排序送伺服器；「載入更多」到 nextCursor=null；表頭「顯示 N / total 張」；時間 chip 也顯示數字；model/product 標籤移到 `lib/studio/asset-group.ts`（伺服器計數與畫面同一份 key）。背景刷新保留已載入頁（依 id 去重）。
+- 剩餘風險：影片分頁、MockupStudio 素材挑選（:320）、發布挑選器（PublishWizard :192）仍只拿第一頁 60 筆（卡片範圍外）；PostgREST 實際語法（引號 cursor、`and(or(),or())`）只在 fake 驗過，未打真 PostgREST（本機 DB 連不上）→ 部署後 `/playwright` 看 /tools/designs 第二頁。未部署。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/api/tools/designs lib/studio (next-admin) | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p . (next-admin) | exit=0 | ms=90000
+- 測試：`app/api/tools/designs/route.test.ts` 兩個（第二頁接續無重複無缺漏；計數＝總數 81／flux-schnell 78，非頁內 60）。fake 依 route 實際送出的 eq/in/or 樹/order/limit/HEAD count 對記憶體資料求值。
+- 突變（可見範圍守衛，一次）：`countWhere` 改傳 `organizationId: null` → 「counts are DB totals…」紅（expected 86 to be 81）；還原 2/2 綠。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+  - 自讀 diff（route GET、designs-list.ts、DesignsGallery.tsx、PublishWizard 註解）；Codex 審查另行。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api/tools/designs | hits=54
+  - GET 呼叫者：DesignsGallery、PublishWizard（?group=，只讀 assets，相容）、MockupStudio:320（相容）；其餘為 POST/DELETE。PublishWizard:190 舊註解提 LIST_LIMIT → 改指 PAGE_SIZE。
 ## 2026-10-21（續22）智慧連結 0113 部署停在前置檢查（需要 0114，不在核准範圍）＋worktree 清理時誤刪主 node_modules（已補回）
 
 - 已完成：env `SMARTLINK_VISITOR_HASH_SALT` 由主機 `openssl rand -hex 32` 寫入 `/root/lobster-phase1/.env`（備份 `.env.bak-*-smartlink-salt`，值沒印出）；compose 走 `safe-infra-patch.sh compose`（備份 `docker-compose.yml.bak.safe-patch-20261021-074244`）→ `docker exec lobster-next-admin printenv SMARTLINK_VISITOR_HASH_SALT >/dev/null` exit 0。repo 對照檔 f5e69bff6。main 已 push（e0e10cde9／020e2da4a／f5e69bff6）。

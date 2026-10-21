@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STYLE_PRESETS } from "../tarot/cards";
 // SSOT for source→group classification — shared with the publish picker + /api/tools/designs filter.
-import { assetToolGroup as toolGroup } from "@/lib/studio/asset-group";
+import { assetToolGroup as toolGroup, GALLERY_MODEL_LABELS, GALLERY_PRODUCT_LABELS } from "@/lib/studio/asset-group";
 import {
   EDGE_MASK_STYLES,
   applyEdgeMask,
@@ -58,23 +58,24 @@ type LoadState = "loading" | "ready" | "error" | "disabled";
 type SortOrder = "desc" | "asc";
 type TimeRange = "all" | "today" | "week" | "month";
 
-const MODEL_LABELS: Record<string, string> = {
-  "flux-schnell": "FLUX schnell",
-  "flux-dev": "FLUX dev",
-  "flux-2-max": "FLUX 2 Max",
-  "ideogram-v2a-turbo": "Ideogram v2a Turbo",
-  "ideogram-v3-balanced": "Ideogram v3 Balanced",
-  "ideogram-v4-turbo": "Ideogram v4 Turbo",
-  "ideogram-v4-quality": "Ideogram v4 Quality",
-  "ideogram-character": "Ideogram Character",
-  "seedream-4.5": "Seedream 4.5",
-  "nano-banana-2": "Nano Banana 2",
-  "nano-banana-pro": "Nano Banana Pro",
-  "imagen-4": "Imagen 4",
-  "openai-low": "GPT-Image-1 低",
-  "openai-medium": "GPT-Image-1 中",
-  "openai-high": "GPT-Image-1 高",
-};
+/** GET /api/tools/designs list response (lib/studio/designs-list.ts DesignListResult). */
+interface DesignListResponse {
+  ok: boolean;
+  error?: string;
+  assets?: DesignAsset[];
+  nextCursor?: string | null;
+  total?: number;
+  facets?: {
+    model: Record<string, number>;
+    product: Record<string, number>;
+    theme: Record<string, number>;
+    brand: Record<string, number>;
+    time: Record<TimeRange, number>;
+  };
+}
+type DesignFacets = NonNullable<DesignListResponse["facets"]>;
+
+const MODEL_LABELS = GALLERY_MODEL_LABELS;
 
 const TOOL_GROUP_LABELS: Record<string, string> = {
   tarot: "Tarot",
@@ -89,15 +90,7 @@ const SOURCE_SUBTYPE: Record<string, string> = {
   tarot: "牌卡",
 };
 
-const PRODUCT_LABELS: Record<string, string> = {
-  "tarot-card": "塔羅牌",
-  tshirt: "T-shirt",
-  hoodie: "Hoodie",
-  mug: "Mug",
-  poster: "Poster",
-  sticker: "Sticker",
-  "mockup-composite": "商品合成",
-};
+const PRODUCT_LABELS = GALLERY_PRODUCT_LABELS;
 
 function assetProduct(asset: DesignAsset): string | null {
   const src = asset.metadata?.source;
@@ -128,10 +121,6 @@ function startOfWeek(d: Date): Date {
 }
 function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-
-function unique<T>(arr: T[]): T[] {
-  return Array.from(new Set(arr));
 }
 
 const MIME_EXTENSION: Record<string, string> = {
@@ -269,6 +258,15 @@ export default function DesignsGallery() {
 
   /* ── images state ── */
   const [assets, setAssets] = useState<DesignAsset[]>([]);
+  // Filters, sort, paging and counts run in the DB (GET /api/tools/designs); the page only shows
+  // what was loaded so far, with totals from the server.
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
+  const [facets, setFacets] = useState<DesignFacets | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const listSeq = useRef(0);
+  const assetsRef = useRef<DesignAsset[]>([]);
+  assetsRef.current = assets;
   const [state, setState] = useState<LoadState>("loading");
   const [errorMessage, setErrorMessage] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -319,24 +317,75 @@ export default function DesignsGallery() {
   /* kebab overflow menu */
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setState("loading");
+  const designGroup = activeTab === "mockups" ? "mockup" : "design";
+
+  const fetchPage = useCallback(async (cursor: string | null): Promise<DesignListResponse> => {
+    const p = new URLSearchParams({ group: designGroup, order: sortOrder, tz: String(new Date().getTimezoneOffset()) });
+    if (filterModel !== "all") p.set("model", filterModel);
+    if (filterProduct !== "all") p.set("product", filterProduct);
+    if (filterTheme !== "all") p.set("theme", filterTheme);
+    if (filterBrand !== "all") p.set("brand", filterBrand);
+    if (filterTime !== "all") p.set("time", filterTime);
+    if (cursor) p.set("cursor", cursor);
+    else p.set("counts", "1");
+    const res = await fetch(`/api/tools/designs?${p.toString()}`, { cache: "no-store" });
+    return (await res.json()) as DesignListResponse;
+  }, [designGroup, sortOrder, filterModel, filterProduct, filterTheme, filterBrand, filterTime]);
+
+  /** "reset": first page for the current filters. "refresh": re-read first page + counts and keep
+   *  the pages already loaded (dedupe by id) so a background refresh never collapses the list. */
+  const load = useCallback(async (mode: "reset" | "refresh" = "reset") => {
+    const seq = ++listSeq.current;
+    setState((s) => (s === "ready" ? s : "loading"));
     try {
-      const res = await fetch("/api/tools/designs", { cache: "no-store" });
-      const json = (await res.json()) as { ok: boolean; assets?: DesignAsset[]; error?: string };
+      const json = await fetchPage(null);
+      if (seq !== listSeq.current) return; // a newer filter change already answered
       if (!json.ok) {
         if (json.error === "pod_designs_disabled") { setState("disabled"); return; }
         setErrorMessage(json.error ?? "unknown_error");
         setState("error");
         return;
       }
-      setAssets(json.assets ?? []);
+      const first = json.assets ?? [];
+      const firstNext = json.nextCursor ?? null;
+      const loaded = assetsRef.current;
+      if (mode === "refresh" && loaded.length > first.length) {
+        const seen = new Set(first.map((a) => a.id));
+        setAssets([...first, ...loaded.filter((a) => !seen.has(a.id))]); // nextCursor stays at the deepest page
+      } else {
+        setAssets(first);
+        setNextCursor(firstNext);
+      }
+      setTotal(json.total ?? null);
+      setFacets(json.facets ?? null);
       setState("ready");
     } catch (err) {
+      if (seq !== listSeq.current) return;
       setErrorMessage(err instanceof Error ? err.message : String(err));
       setState("error");
     }
-  }, []);
+  }, [fetchPage]);
+
+  const loadMore = useCallback(async () => {
+    if (!nextCursor || loadingMore) return;
+    const seq = listSeq.current;
+    setLoadingMore(true);
+    try {
+      const json = await fetchPage(nextCursor);
+      if (seq !== listSeq.current) return;
+      if (!json.ok) { alert(`載入失敗：${json.error ?? "unknown"}`); return; }
+      const page = json.assets ?? [];
+      setAssets((prev) => {
+        const seen = new Set(prev.map((a) => a.id));
+        return [...prev, ...page.filter((a) => !seen.has(a.id))];
+      });
+      setNextCursor(json.nextCursor ?? null);
+    } catch {
+      alert("載入失敗：網路錯誤");
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [nextCursor, loadingMore, fetchPage]);
 
   const loadVideos = useCallback(async () => {
     setVideoState("loading");
@@ -360,9 +409,9 @@ export default function DesignsGallery() {
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    const onVisible = () => { if (!document.hidden) { void load(); void loadVideos(); } };
+    const onVisible = () => { if (!document.hidden) { void load("refresh"); void loadVideos(); } };
     document.addEventListener("visibilitychange", onVisible);
-    const timer = setInterval(() => { if (!document.hidden) { void load(); void loadVideos(); } }, 300_000);
+    const timer = setInterval(() => { if (!document.hidden) { void load("refresh"); void loadVideos(); } }, 300_000);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       clearInterval(timer);
@@ -412,6 +461,7 @@ export default function DesignsGallery() {
       if (json.ok) {
         setAssets((prev) => prev.filter((a) => a.id !== asset.id));
         setSelectedIds((prev) => { const n = new Set(prev); n.delete(asset.id); return n; });
+        void load("refresh"); // totals + chip counts come from the server
       } else {
         alert(`刪除失敗：${json.error ?? "unknown"}`);
       }
@@ -420,7 +470,7 @@ export default function DesignsGallery() {
     } finally {
       setDeletingId(null);
     }
-  }, []);
+  }, [load]);
 
 
   /* Single-image download — fetch through the SAME-ORIGIN download proxy
@@ -538,7 +588,7 @@ export default function DesignsGallery() {
       if (json.ok) {
         const u = json.asset?.object_url ?? null;
         setEditSavedUrl(u);
-        void load();
+        void load("refresh");
         return u;
       }
       setEditError(`儲存失敗：${json.error ?? "unknown"}`);
@@ -559,92 +609,31 @@ export default function DesignsGallery() {
 
 
 
-  /* ─── derive filter option lists ─── */
-  const modelOptions = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const a of assets) {
-      const k = a.metadata?.model_name;
-      if (k) counts[k] = (counts[k] ?? 0) + 1;
-    }
-    const total = Object.values(counts).reduce((s, n) => s + n, 0);
-    return [
-      { key: "all", label: "全部", count: total },
-      ...Object.keys(MODEL_LABELS).map((k) => ({
-        key: k,
-        label: MODEL_LABELS[k],
-        count: counts[k] ?? 0,
-      })),
-    ];
-  }, [assets]);
+  /* ─── filter option lists: counts are DB totals for the current filters (facets) ─── */
+  const modelOptions = useMemo(() => [
+    { key: "all", label: "全部", count: total ?? 0 },
+    ...Object.keys(MODEL_LABELS).map((k) => ({ key: k, label: MODEL_LABELS[k], count: facets?.model[k] ?? 0 })),
+  ], [facets, total]);
 
-  const productOptions = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const a of assets) {
-      const k = assetProduct(a);
-      if (k) counts[k] = (counts[k] ?? 0) + 1;
-    }
-    const total = Object.values(counts).reduce((s, n) => s + n, 0);
-    return [
-      { key: "all", label: "全部", count: total },
-      ...Object.entries(counts).map(([k, n]) => ({
-        key: k,
-        label: PRODUCT_LABELS[k] ?? k,
-        count: n,
-      })),
-    ];
-  }, [assets]);
+  const productOptions = useMemo(() => [
+    { key: "all", label: "全部", count: total ?? 0 },
+    ...Object.entries(facets?.product ?? {}).map(([k, n]) => ({ key: k, label: PRODUCT_LABELS[k] ?? k, count: n })),
+  ], [facets, total]);
 
-  const themeOptions = useMemo(() => {
-    const vals = unique(assets.map((a) => a.metadata?.theme).filter((t): t is string => !!t));
-    const counts: Record<string, number> = {};
-    for (const a of assets) {
-      const k = a.metadata?.theme;
-      if (k) counts[k] = (counts[k] ?? 0) + 1;
-    }
-    return [
-      { key: "all", label: "全部", count: vals.length > 0 ? assets.filter((a) => a.metadata?.theme).length : 0 },
-      ...vals.map((v) => ({ key: v, label: v, count: counts[v] ?? 0 })),
-    ];
-  }, [assets]);
+  const themeOptions = useMemo(() => [
+    { key: "all", label: "全部", count: total ?? 0 },
+    ...Object.entries(facets?.theme ?? {}).map(([k, n]) => ({ key: k, label: k, count: n })),
+  ], [facets, total]);
 
-  const brandOptions = useMemo(() => {
-    const vals = unique(assets.map((a) => a.metadata?.brand).filter((b): b is string => !!b));
-    const counts: Record<string, number> = {};
-    for (const a of assets) {
-      const k = a.metadata?.brand;
-      if (k) counts[k] = (counts[k] ?? 0) + 1;
-    }
-    return [
-      { key: "all", label: "全部", count: vals.length > 0 ? assets.filter((a) => a.metadata?.brand).length : 0 },
-      ...vals.map((v) => ({ key: v, label: v, count: counts[v] ?? 0 })),
-    ];
-  }, [assets]);
+  const brandOptions = useMemo(() => [
+    { key: "all", label: "全部", count: total ?? 0 },
+    ...Object.entries(facets?.brand ?? {}).map(([k, n]) => ({ key: k, label: k, count: n })),
+  ], [facets, total]);
 
-  /* ─── apply filters + sort ─── */
-  const visible = useMemo(() => {
-    const now = new Date();
-    const cutoff: Date | null =
-      filterTime === "today" ? startOfDay(now)
-      : filterTime === "week" ? startOfWeek(now)
-      : filterTime === "month" ? startOfMonth(now)
-      : null;
-
-    const filtered = assets.filter((a) => {
-      /* tab segregation */
-      const isMockupAsset = toolGroup(a.metadata?.source) === "mockup";
-      if (activeTab === "designs" && isMockupAsset) return false;
-      if (activeTab === "mockups" && !isMockupAsset) return false;
-
-      if (filterModel !== "all" && a.metadata?.model_name !== filterModel) return false;
-      if (filterProduct !== "all" && assetProduct(a) !== filterProduct) return false;
-      if (filterTheme !== "all" && a.metadata?.theme !== filterTheme) return false;
-      if (filterBrand !== "all" && a.metadata?.brand !== filterBrand) return false;
-      if (cutoff && new Date(a.created_at) < cutoff) return false;
-      return true;
-    });
-
-    return sortOrder === "asc" ? [...filtered].reverse() : filtered;
-  }, [assets, activeTab, filterModel, filterProduct, filterTheme, filterBrand, filterTime, sortOrder]);
+  /* tab, filters and sort are applied by the server; `visible` = the pages loaded so far */
+  const visible = assets;
+  const filtersActive =
+    filterModel !== "all" || filterProduct !== "all" || filterTheme !== "all" || filterBrand !== "all" || filterTime !== "all";
 
   /* bulk delete — scoped to visible set so filtered-out assets are never deleted */
   const bulkDelete = useCallback(async () => {
@@ -670,8 +659,9 @@ export default function DesignsGallery() {
       }
     }
     setBulkDeleting(false);
+    if (done > 0) void load("refresh");
     if (failed > 0) alert(`${failed} 張刪除失敗（${done} 張成功）`);
-  }, [visible, selectedIds]);
+  }, [visible, selectedIds, load]);
 
   /* bulk download — scoped to visible set so filtered-out assets are never downloaded */
   const bulkDownload = useCallback(async () => {
@@ -1130,7 +1120,7 @@ export default function DesignsGallery() {
     );
   }
 
-  if (assets.length === 0) {
+  if (assets.length === 0 && !filtersActive && activeTab === "designs" && (facets?.time.all ?? 0) === 0) {
     return (
       <div className="designs-page">
         {TabBar}
@@ -1169,6 +1159,7 @@ export default function DesignsGallery() {
                 onClick={() => setFilterTime(k)}
               >
                 {lbl}
+                {k !== "all" && facets && <span className="designs-chip-count">({facets.time[k]})</span>}
               </button>
             );
           })}
@@ -1186,7 +1177,7 @@ export default function DesignsGallery() {
           >
             舊→新
           </button>
-          <button className="designs-refresh-btn" onClick={() => void load()}>
+          <button className="designs-refresh-btn" onClick={() => void load("reset")}>
             重新整理
           </button>
         </div>
@@ -1199,7 +1190,7 @@ export default function DesignsGallery() {
         const allVisibleSelected = visibleSelected === visible.length && visible.length > 0;
         return (
           <div className="designs-toolbar">
-            <span className="designs-toolbar-count">顯示 {visible.length} / {assets.length} 張</span>
+            <span className="designs-toolbar-count">顯示 {visible.length} / {total ?? visible.length} 張</span>
             <span className="designs-filter-spacer" />
             <button
               className="designs-toolbar-btn"
@@ -1239,7 +1230,9 @@ export default function DesignsGallery() {
       {/* ── Per-tab empty hint ───────────────────────────────────── */}
       {visible.length === 0 && (
         <div className="designs-state">
-          {activeTab === "mockups"
+          {filtersActive
+            ? "沒有符合篩選條件的圖片。"
+            : activeTab === "mockups"
             ? "還沒有已儲存的 Mockup — 在 Mockup 工具生成後會自動出現在這裡。"
             : "還沒有已儲存的設計 — 生成後會自動出現在這裡。"}
         </div>
@@ -1429,6 +1422,14 @@ export default function DesignsGallery() {
           );
         })}
       </div>
+
+      {nextCursor && (
+        <div className="designs-state">
+          <button className="btn-secondary" disabled={loadingMore} onClick={() => void loadMore()}>
+            {loadingMore ? "載入中…" : "載入更多"}
+          </button>
+        </div>
+      )}
 
       {/* ── ✨ Edge-mask editor modal ─────────────────────────────── */}
       {editAsset ? (
