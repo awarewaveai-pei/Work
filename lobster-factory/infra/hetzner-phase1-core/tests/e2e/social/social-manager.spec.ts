@@ -10,6 +10,10 @@
  *   cd lobster-factory/infra/hetzner-phase1-core/tests && PLAYWRIGHT_SOCIAL_URL=http://127.0.0.1:3902 npx playwright test --project social
  */
 import { expect, test, type Page, type Route } from '@playwright/test';
+import { existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const BRAND = { id: '0b0b0b0b-0000-4000-8000-000000000001', slug: 'soulful', name: 'Soulful Expression', default_timezone: 'Asia/Taipei', role: 'owner' };
 const ACCOUNTS = [
@@ -43,10 +47,23 @@ function fakeServer() {
     calls.push(`${req.method()} ${path}${body?.action ? ` ${body.action}` : ''}`);
     if (path === '/api/social/brands') return ok(route, { brands: [BRAND] });
     if (path === '/api/social/accounts') return ok(route, { accounts: ACCOUNTS, connecting: null, justConnected: null, connectFailed: null });
-    if (path === '/api/social/media') return ok(route, { media: [
+    if (path === '/api/social/media' && req.method() === 'GET') return ok(route, { media: [
       { id: 'media-image', kind: 'image', file_name: 'poster.png', postiz_path: null, bytes: 10, created_at: '2026-10-01T00:00:00Z', used: 0 },
       { id: 'media-video', kind: 'video', file_name: 'clip.mp4', postiz_path: null, bytes: 20, created_at: '2026-10-02T00:00:00Z', used: 0 },
     ] });
+    if (path === '/api/social/media' && req.method() === 'POST') {
+      const videoUrl = typeof body.videoUrl === 'string' ? body.videoUrl : null;
+      const id = videoUrl ? 'uploaded-video' : 'uploaded-image';
+      return ok(route, { media: {
+        id,
+        kind: videoUrl ? 'video' : 'image',
+        file_name: body.fileName,
+        postiz_path: videoUrl ?? body.imageUrl,
+        bytes: 1,
+        created_at: '2026-10-21T00:00:00Z',
+        used: 0,
+      } });
+    }
     if (path === '/api/social/texts') return ok(route, { texts: [{ id: 'saved-1', body: '素材庫裡的貼文文字。', mediaIds: ['media-image'] }] });
     if (path === '/api/social/needs') return ok(route, { failed: [], expired: [], review: [], n: 0 });
     if (path === '/api/social/settings') return ok(route, { requireReview: false });
@@ -135,6 +152,15 @@ async function compose(page: Page) {
   await page.getByRole('button', { name: '建立貼文' }).click();
   await page.waitForURL(/\/tools\/social\/compose\/new/);
   await expect(page.getByLabel('貼文內容')).toBeVisible();
+}
+
+function threeSecondMp4(): string {
+  const generated = join(tmpdir(), `social-c31-${process.pid}.mp4`);
+  if (!existsSync(generated) && spawnSync('ffmpeg', [
+    '-y', '-f', 'lavfi', '-i', 'color=c=black:s=16x16:r=1', '-t', '3', '-an',
+    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', generated,
+  ], { stdio: 'ignore' }).status === 0) return generated;
+  return join(__dirname, 'fixtures', 'social-c31-3s.mp4');
 }
 
 test.describe('social manager', () => {
@@ -301,5 +327,27 @@ test.describe('social manager', () => {
     await page.getByRole('button', { name: '用這些寫新貼文（2）' }).click();
     await page.waitForURL(/\/tools\/social\/compose\/new/);
     await expect(page.locator('.sm-mt')).toHaveCount(2);
+  });
+
+  test('C31: a 3-second mp4 uploads, previews, schedules, and appears on the calendar', async ({ page }) => {
+    const server = await open(page);
+    await page.getByRole('button', { name: '建立貼文' }).first().click();
+    await page.waitForURL(/\/tools\/social\/compose\/new/);
+    await expect(page.getByLabel('貼文內容')).toBeVisible();
+    await page.getByLabel('貼文內容').fill('三秒影片貼文。');
+    await page.locator('input[type="file"][accept="image/*,video/*"]').setInputFiles(threeSecondMp4());
+    await expect(page.locator('.sm-mt video')).toBeVisible();
+    await expect(page.locator('[aria-label="預覽"] video').first()).toBeVisible();
+    expect(server.calls.filter((call) => call === 'POST /api/social/media')).toHaveLength(1);
+
+    await page.getByRole('button', { name: '設定行程', exact: true }).click();
+    await expect(page.getByRole('status')).toContainText('已排在');
+    const [post] = [...server.posts.values()];
+    expect(post.state).toBe('scheduled');
+    expect(post.media).toEqual([{ media_id: 'uploaded-video', alt_text: null, position: 0 }]);
+
+    await page.getByRole('button', { name: '回排程日曆' }).click();
+    await page.waitForURL(/\/tools\/social\?/);
+    await expect(page.locator('.sm-post', { hasText: '三秒影片貼文' })).toBeVisible();
   });
 });
