@@ -34,31 +34,36 @@ export interface TarotCard {
    * article (the scene template supplies "a"/"the"/"two"). RWS-faithful human identity.
    */
   hero: string;
+  /** The scene puts a figure off the ground on purpose (falling, rising, hanging, floating); buildCardPrompt then
+   *  skips the grounding sentence. Floating OBJECTS (cups, coins, symbols) do not need this flag. */
+  airborne?: true;
 }
+// An airborne card loses the grounding sentence for ALL its figures, so its scene text must itself put any
+// standing figure on the ground (THE LOVERS: the pair on the grass, the angel in the clouds).
 
 const MAJOR: TarotCard[] = [
-  { id: 0, name: "THE FOOL", roman: "0", type: "major", theme: "new beginnings, adventure, innocence", colors: ["#f0c040", "#fff8dc"], symbols: ["sun", "mountains", "flower"], hero: "carefree young traveler in bright ragged clothes", scene: "a {hero} stepping lightly toward the edge of a high cliff while gazing up at the sky, a small white dog leaping at the heels, holding a white rose in one hand and a knapsack tied to a slender staff over the shoulder, a bright golden morning sky and snowy mountains far below" },
+  { id: 0, name: "THE FOOL", roman: "0", type: "major", theme: "new beginnings, adventure, innocence", colors: ["#f0c040", "#fff8dc"], symbols: ["sun", "mountains", "flower"], hero: "carefree young traveler in bright ragged clothes", scene: "a {hero} standing at the very edge of a high cliff top while gazing up at the sky, a small white dog trotting at the heels on the cliff top, holding a white rose in one hand and a knapsack tied to a slender staff over the shoulder, a bright golden morning sky and snowy mountains far below" },
   { id: 1, name: "THE MAGICIAN", roman: "I", type: "major", theme: "willpower, skill, manifestation", colors: ["#c0392b", "#fff"], symbols: ["infinity", "wand", "pentagram"], hero: "robed magician", scene: "a {hero} standing behind a low altar, one arm raised holding a wand toward the sky and the other hand pointing down to the earth, a glowing infinity symbol floating above the head, a serpent belt at the waist, a cup a sword a pentacle and a wand laid on the altar, red roses and white lilies blooming around" },
   { id: 2, name: "THE HIGH PRIESTESS", roman: "II", type: "major", theme: "intuition, mystery, inner wisdom", colors: ["#1a1a6e", "#c8b8f8"], symbols: ["crescent moon", "pillars", "veil"], hero: "serene priestess", scene: "a {hero} seated calmly between one black pillar and one white pillar, a horned crown bearing a full moon on the brow, a crescent moon resting at the feet, a tapestry veil patterned with pomegranates and palms behind, a partly hidden scroll in the lap" },
   { id: 3, name: "THE EMPRESS", roman: "III", type: "major", theme: "abundance, fertility, nature", colors: ["#2d6a4f", "#b7e4c7"], symbols: ["wheat", "venus", "crown"], hero: "crowned empress", scene: "a {hero} reclining on lush red cushions in a golden field of ripe wheat, a crown of twelve stars on the head, a heart-shaped shield bearing the symbol of Venus resting beside, a waterfall and deep green forest behind" },
   { id: 4, name: "THE EMPEROR", roman: "IV", type: "major", theme: "authority, structure, fatherhood", colors: ["#6b2d8b", "#e8c8f8"], symbols: ["throne", "ram", "scepter"], hero: "stern bearded emperor", scene: "a {hero} seated upright on a massive stone throne carved with four ram heads, holding an ankh scepter in one hand and a golden orb in the other, armor showing beneath flowing red robes, jagged barren red mountains behind" },
   { id: 5, name: "THE HIEROPHANT", roman: "V", type: "major", theme: "tradition, faith, institutions", colors: ["#8b4513", "#f5deb3"], symbols: ["cross", "pillars", "keys"], hero: "high priest in sacred vestments", scene: "a {hero} wearing a triple-tiered crown seated between two stone pillars, one hand raised in blessing while holding a triple cross staff, two tonsured acolytes kneeling below, a pair of crossed golden keys at the feet" },
-  { id: 6, name: "THE LOVERS", roman: "VI", type: "major", theme: "love, choice, union", colors: ["#e91e63", "#fce4ec"], symbols: ["angel", "sun", "hearts"], hero: "nude figure", scene: "a {hero} and a second {hero} standing apart in a green garden beneath a great winged angel with outstretched arms haloed by a radiant sun, behind one a tree bearing flames, behind the other a tree entwined with a serpent and fruit" },
+  { id: 6, name: "THE LOVERS", roman: "VI", type: "major", theme: "love, choice, union", colors: ["#e91e63", "#fce4ec"], symbols: ["angel", "sun", "hearts"], hero: "nude figure", airborne: true, scene: "a {hero} and a second {hero} standing apart with their feet on the grass of a green garden, beneath a great winged angel in the clouds with outstretched arms haloed by a radiant sun, behind one a tree bearing flames, behind the other a tree entwined with a serpent and fruit" },
   { id: 7, name: "THE CHARIOT", roman: "VII", type: "major", theme: "victory, control, determination", colors: ["#1565c0", "#e3f2fd"], symbols: ["armor", "sphinxes", "stars"], hero: "crowned warrior in armor", scene: "a {hero} standing erect in a stone chariot beneath a starry blue canopy, the chariot drawn by one black sphinx and one white sphinx resting in front, a winged sun emblem on the chariot, a walled city behind" },
   { id: 8, name: "STRENGTH", roman: "VIII", type: "major", theme: "strength, courage, patience", colors: ["#ff8f00", "#fff8e1"], symbols: ["infinity", "lion", "flowers"], hero: "gentle woman in a white robe", scene: "a {hero} wearing a garland of flowers calmly closing the jaws of a great tawny lion with both hands, a glowing infinity symbol floating above the head, a tranquil green meadow under a soft sky" },
   { id: 9, name: "THE HERMIT", roman: "IX", type: "major", theme: "solitude, introspection, guidance", colors: ["#546e7a", "#eceff1"], symbols: ["lantern", "staff", "mountain"], hero: "grey-hooded hermit", scene: "a {hero} standing alone on a snowy mountain peak at night, raising a lantern that holds a glowing six-pointed star, leaning on a tall wooden staff, a deep blue sky behind" },
-  { id: 10, name: "WHEEL OF FORTUNE", roman: "X", type: "major", theme: "fate, cycles, turning point", colors: ["#6d4c41", "#efebe9"], symbols: ["wheel", "sphinx", "serpent"], hero: "sphinx", scene: "a great golden wheel rising in the sky inscribed with mystic letters, a blue sphinx with a sword resting on top, a red serpent descending the left side, a jackal-headed figure rising on the right, and an angel an eagle a bull and a lion reading books in the four corners among clouds" },
+  { id: 10, name: "WHEEL OF FORTUNE", roman: "X", type: "major", theme: "fate, cycles, turning point", colors: ["#6d4c41", "#efebe9"], symbols: ["wheel", "sphinx", "serpent"], hero: "sphinx", airborne: true, scene: "a great golden wheel rising in the sky inscribed with mystic letters, a blue sphinx with a sword resting on top, a red serpent descending the left side, a jackal-headed figure rising on the right, and an angel an eagle a bull and a lion reading books in the four corners among clouds" },
   { id: 11, name: "JUSTICE", roman: "XI", type: "major", theme: "justice, truth, law", colors: ["#c62828", "#ffebee"], symbols: ["scales", "sword", "crown"], hero: "crowned judge in red robes", scene: "a {hero} seated between two stone pillars with a purple veil behind, holding an upright double-edged sword in the right hand and perfectly balanced golden scales in the left" },
-  { id: 12, name: "THE HANGED MAN", roman: "XII", type: "major", theme: "sacrifice, waiting, new perspective", colors: ["#00695c", "#e0f2f1"], symbols: ["tree", "halo", "rope"], hero: "serene man", scene: "a {hero} hanging upside down suspended by one ankle from a living T-shaped wooden cross, the free leg crossed behind to form a four, hands clasped behind the back, a bright halo of light glowing around the head, a calm peaceful expression" },
+  { id: 12, name: "THE HANGED MAN", roman: "XII", type: "major", theme: "sacrifice, waiting, new perspective", colors: ["#00695c", "#e0f2f1"], symbols: ["tree", "halo", "rope"], hero: "serene man", airborne: true, scene: "a {hero} hanging upside down suspended by one ankle from a living T-shaped wooden cross, the free leg crossed behind to form a four, hands clasped behind the back, a bright halo of light glowing around the head, a calm peaceful expression" },
   { id: 13, name: "DEATH", roman: "XIII", type: "major", theme: "transformation, endings, rebirth", colors: ["#212121", "#9e9e9e"], symbols: ["skeleton", "rose", "dawn"], hero: "skeleton in black armor", scene: "a {hero} riding slowly on a white horse and carrying a black banner emblazoned with a white five-petaled rose, a fallen figure and kneeling onlookers before it, a rising sun glowing between two distant towers on the horizon" },
   { id: 14, name: "TEMPERANCE", roman: "XIV", type: "major", theme: "balance, moderation, patience", colors: ["#1b5e20", "#f1f8e9"], symbols: ["angel wings", "water", "triangle"], hero: "great winged angel", scene: "a {hero} standing with one foot on land and one foot resting in a pool, pouring shimmering liquid in an arc between two golden cups, a triangle within a square on the chest, yellow irises blooming nearby, a winding path leading to mountains crowned by a glowing crown of light" },
   { id: 15, name: "THE DEVIL", roman: "XV", type: "major", theme: "bondage, materialism, shadow", colors: ["#4a148c", "#f3e5f5"], symbols: ["chains", "torch", "pentagram"], hero: "horned figure with bat wings", scene: "a {hero} perched on a black half-cube, an inverted pentagram glowing on the brow, one hand raised and a downward-pointing torch in the other, two horned and tailed captives loosely chained by the neck to the cube below" },
-  { id: 16, name: "THE TOWER", roman: "XVI", type: "major", theme: "sudden change, revelation, chaos", colors: ["#b71c1c", "#ffcdd2"], symbols: ["lightning", "crown", "flames"], hero: "falling figure", scene: "a tall grey stone tower on a rocky peak struck by a jagged bolt of lightning, its golden crown blasted off, flames bursting from the windows, a {hero} and a second {hero} plunging headfirst into the darkness, sparks like flames scattered across the night sky" },
-  { id: 17, name: "THE STAR", roman: "XVII", type: "major", theme: "hope, inspiration, renewal", colors: ["#0277bd", "#e1f5fe"], symbols: ["stars", "water", "naked figure"], hero: "kneeling nude woman", scene: "a {hero} kneeling at the edge of a still pool with one foot on the water and one knee on land, pouring water from two jugs, one streaming onto the land and one into the pool, one great radiant eight-pointed star and seven smaller stars shining above, an ibis bird perched in a tree" },
+  { id: 16, name: "THE TOWER", roman: "XVI", type: "major", theme: "sudden change, revelation, chaos", colors: ["#b71c1c", "#ffcdd2"], symbols: ["lightning", "crown", "flames"], hero: "falling figure", airborne: true, scene: "a tall grey stone tower on a rocky peak struck by a jagged bolt of lightning, its golden crown blasted off, flames bursting from the windows, a {hero} and a second {hero} plunging headfirst into the darkness, sparks like flames scattered across the night sky" },
+  { id: 17, name: "THE STAR", roman: "XVII", type: "major", theme: "hope, inspiration, renewal", colors: ["#0277bd", "#e1f5fe"], symbols: ["stars", "water", "naked figure"], hero: "kneeling nude woman", scene: "a {hero} kneeling at the edge of a still pool with one foot resting in the water and one knee on the grassy bank, pouring water from two jugs, one streaming onto the land and one into the pool, one great radiant eight-pointed star and seven smaller stars shining above, an ibis bird perched in a tree" },
   { id: 18, name: "THE MOON", roman: "XVIII", type: "major", theme: "illusion, fear, subconscious", colors: ["#1a237e", "#e8eaf6"], symbols: ["moon", "wolf", "path"], hero: "wolf", scene: "a full moon with a serene face shedding luminous dewdrops, set between two tall grey towers, a dog and a wolf howling upward, a crayfish crawling out of a pool in the foreground, a long winding path leading back toward distant hills" },
   { id: 19, name: "THE SUN", roman: "XIX", type: "major", theme: "joy, success, vitality", colors: ["#f57f17", "#fff9c4"], symbols: ["sun face", "sunflowers", "child"], hero: "joyful naked child", scene: "a {hero} wearing a wreath and riding a calm white horse while holding a large red banner, beneath a great radiant sun with a gentle face and straight and wavy rays, a stone wall lined with tall sunflowers behind" },
-  { id: 20, name: "JUDGEMENT", roman: "XX", type: "major", theme: "awakening, judgement, rebirth", colors: ["#880e4f", "#fce4ec"], symbols: ["angel", "trumpet", "rising"], hero: "rising figure", scene: "a great winged angel blowing a golden trumpet hung with a white-and-red cross banner from the clouds above, and below a {hero}, a second {hero} and a small child rising with arms uplifted from open grey coffins floating on a calm sea, snowy mountains in the far distance" },
-  { id: 21, name: "THE WORLD", roman: "XXI", type: "major", theme: "completion, integration, achievement", colors: ["#004d40", "#e0f2f1"], symbols: ["wreath", "dancer", "four elements"], hero: "dancing figure draped in a violet sash", scene: "a {hero} floating within a great oval laurel wreath bound at top and bottom by red ribbons, holding a short wand in each hand, a human head an eagle a bull and a lion appearing in the four corners among soft clouds" },
+  { id: 20, name: "JUDGEMENT", roman: "XX", type: "major", theme: "awakening, judgement, rebirth", colors: ["#880e4f", "#fce4ec"], symbols: ["angel", "trumpet", "rising"], hero: "rising figure", airborne: true, scene: "a great winged angel blowing a golden trumpet hung with a white-and-red cross banner from the clouds above, and below a {hero}, a second {hero} and a small child rising with arms uplifted from open grey coffins floating on a calm sea, snowy mountains in the far distance" },
+  { id: 21, name: "THE WORLD", roman: "XXI", type: "major", theme: "completion, integration, achievement", colors: ["#004d40", "#e0f2f1"], symbols: ["wreath", "dancer", "four elements"], hero: "dancing figure draped in a violet sash", airborne: true, scene: "a {hero} floating within a great oval laurel wreath bound at top and bottom by red ribbons, holding a short wand in each hand, a human head an eagle a bull and a lion appearing in the four corners among soft clouds" },
 ];
 
 const SUITS: { name: string; key: TarotSuit; color: string; bg: string; element: string; theme: string }[] = [
@@ -77,7 +82,7 @@ const MINOR_ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"
 // Each entry: `hero` = bare noun core for the central figure (no leading article); `scene` = the
 // full RWS composition with `{hero}` where the figure(s) appear. Non-figure cards (Aces, 8 of
 // Wands, 3 of Swords) carry no `{hero}` token and `hero` is unused (kept for shape only).
-type MinorScene = { hero: string; scene: string };
+type MinorScene = { hero: string; scene: string; airborne?: true };
 const MINOR_SCENES: Record<TarotSuit, Record<string, MinorScene>> = {
   major: {},
   wands: {
@@ -99,18 +104,18 @@ const MINOR_SCENES: Record<TarotSuit, Record<string, MinorScene>> = {
   cups: {
     ACE: { hero: "figure", scene: "a hand emerging from a cloud holding an overflowing golden chalice with five streams of water spilling over, a white dove descending with a round wafer toward the cup, a calm sea dotted with water lilies below" },
     TWO: { hero: "figure", scene: "a {hero} and a second {hero} facing each other and pledging two golden cups in a vow, between them a winged lion's head above a caduceus of two entwined serpents, a green landscape and a small house behind" },
-    THREE: { hero: "dancing woman", scene: "three {hero} figures dancing in a circle and raising golden cups together in a joyful toast, ripe fruit and a harvest of pumpkins at their feet" },
+    THREE: { hero: "dancing woman", scene: "three {hero} figures dancing in a circle on a grassy meadow and raising golden cups together in a joyful toast, ripe fruit and a harvest of pumpkins at their feet" },
     FOUR: { hero: "youth", scene: "a {hero} sitting under a tree with arms folded, looking discontent at three golden cups on the ground in front, a hand from a cloud offering a fourth cup" },
     FIVE: { hero: "cloaked figure", scene: "a {hero} in a long black cloak standing with the head bowed in grief over three spilled cups, two upright cups still standing behind, a bridge leading to a castle across a river" },
     SIX: { hero: "child", scene: "a {hero} child handing a cup filled with white flowers to a smaller {hero} child in a peaceful village courtyard, six large flower-filled cups arranged around them" },
     SEVEN: { hero: "figure", scene: "a {hero} seen from behind gazing up in wonder at seven golden cups floating in the clouds, each cup holding a different vision: a castle, jewels, a laurel wreath, a dragon, a glowing head, a coiled snake, and a shrouded glowing figure" },
     EIGHT: { hero: "cloaked traveler", scene: "a {hero} in a red cloak walking away with a staff toward distant mountains, leaving behind eight golden cups stacked with a gap in the row, an eclipsed moon in the night sky above" },
     NINE: { hero: "satisfied man", scene: "a {hero} seated contentedly with arms crossed and a broad smile, nine golden cups arranged in an arc on a curved blue-draped table behind" },
-    TEN: { hero: "figure", scene: "a {hero} and a second {hero} standing with arms raised in joy beneath a great rainbow holding ten golden cups, two small {hero} children dancing nearby, a cottage and green hills behind" },
+    TEN: { hero: "figure", scene: "a {hero} and a second {hero} standing on a green lawn with arms raised in joy beneath a great rainbow holding ten golden cups, two small {hero} children dancing on the grass nearby, a cottage and green hills behind" },
     PAGE: { hero: "young page", scene: "a {hero} in a tunic patterned with lotus flowers standing by a wavy sea, holding up a golden cup from which a small fish curiously rises" },
     KNIGHT: { hero: "knight", scene: "a {hero} in armor riding a white horse slowly and gracefully, a winged helmet on the head, holding out a golden cup, a river winding through the landscape" },
     QUEEN: { hero: "queen", scene: "a {hero} seated on an ornate throne carved with cherubs at the water's edge, gazing tenderly at a closed ornate golden chalice held in both hands" },
-    KING: { hero: "king", scene: "a {hero} seated on a stone throne floating on a choppy sea, holding a golden cup in one hand and a short scepter in the other, a fish amulet at the neck, a ship and a leaping fish in the waves behind" },
+    KING: { hero: "king", scene: "a {hero} seated on a stone throne set on a broad stone block rising from a choppy sea, holding a golden cup in one hand and a short scepter in the other, a fish amulet at the neck, a ship and a leaping fish in the waves behind" },
   },
   swords: {
     ACE: { hero: "figure", scene: "a hand emerging from a cloud gripping a single upright double-edged sword, its tip crowned with a golden crown wreathed in laurel and palm, jagged grey mountains below" },
@@ -130,7 +135,7 @@ const MINOR_SCENES: Record<TarotSuit, Record<string, MinorScene>> = {
   },
   pentacles: {
     ACE: { hero: "figure", scene: "a hand emerging from a cloud holding up a single large golden coin engraved with a five-pointed pentagram, below it a lush garden with white lilies and an arched trellis of roses opening onto a path toward distant mountains" },
-    TWO: { hero: "young man", scene: "a {hero} dancing while juggling two golden pentacles linked by a green ribbon looped into an infinity sign, two ships rising and dipping on big waves in the sea behind" },
+    TWO: { hero: "young man", scene: "a {hero} dancing on the sandy shore while juggling two golden pentacles linked by a green ribbon looped into an infinity sign, two ships rising and dipping on big waves in the sea behind" },
     THREE: { hero: "sculptor", scene: "a {hero} standing on a bench carving stone in a cathedral and pausing to consult a {hero} monk and a {hero} architect holding plans, three pentacles set into the carved archway above" },
     FOUR: { hero: "miser", scene: "a {hero} seated on a stool clutching one golden pentacle tightly to the chest, one pentacle balanced on the crown of the head and one beneath each foot, a grey town skyline behind" },
     FIVE: { hero: "ragged beggar", scene: "a {hero} and a second {hero}, one on crutches with a bandaged leg, trudging through falling snow past a glowing stained-glass church window set with five pentacles" },
@@ -141,7 +146,7 @@ const MINOR_SCENES: Record<TarotSuit, Record<string, MinorScene>> = {
     TEN: { hero: "white-bearded elder", scene: "a {hero} seated under an archway with two dogs, a {hero} couple and a small {hero} child nearby, ten golden pentacles arranged across the scene, a walled town beyond" },
     PAGE: { hero: "young page", scene: "a {hero} standing in a flowering green field, holding up a single golden pentacle in both hands and gazing at it intently, a freshly plowed field and trees behind" },
     KNIGHT: { hero: "knight", scene: "a {hero} in armor sitting still on a heavy black plow-horse at rest, holding a golden pentacle out on an open palm, gazing over freshly plowed fields" },
-    QUEEN: { hero: "queen", scene: "a {hero} seated on a throne carved with goats fruit and cherubs in a blooming garden, cradling a golden pentacle in the lap, a rabbit leaping in the foreground, roses arching overhead" },
+    QUEEN: { hero: "queen", scene: "a {hero} seated on a throne carved with goats fruit and cherubs in a blooming garden, cradling a golden pentacle in the lap, a rabbit sitting in the grass in the foreground, roses arching overhead" },
     KING: { hero: "king", scene: "a {hero} seated on a throne draped with grapevines and carved with bulls, wearing robes embroidered with grapes, one hand resting on a golden pentacle and the other holding a scepter, a castle behind" },
   },
 };
@@ -166,6 +171,7 @@ for (const suit of SUITS) {
       symbols: [suit.element, suit.name.toLowerCase()],
       hero: s.hero,
       scene: s.scene,
+      ...(s.airborne ? { airborne: true as const } : {}),
     });
   });
 }
@@ -225,6 +231,12 @@ export function resolveStylePrompt(raw: string): string {
     })
     .join(". ");
 }
+
+// FLUX schnell paints verbs like "leaping" / "stepping toward the edge" as figures hanging in mid-air. Cards with a
+// figure get this sentence unless `airborne`. Phrased positively on purpose: FLUX draws what a negation names.
+// Figure-less cards (Aces, Moon, 3 of Swords, 8 of Wands) skip it so it cannot add people to them.
+export const GROUNDING =
+  "Every figure and land animal stands, sits, kneels or lies on a solid visible surface such as ground, floor, rock or a seat, feet touching it.";
 
 // Default style used when the user gives none — keeps un-styled output looking like a deck.
 const DEFAULT_STYLE = "ornate colored-pencil fantasy illustration, Rider-Waite inspired, warm antique palette";
@@ -296,5 +308,6 @@ export function buildCardPrompt(card: TarotCard, input: CardPromptInput = {}): s
   }
 
   // Style leads — FLUX weights early tokens most. The tail is a short cohesion cue, not a restatement.
-  return `${lead}. ${scene}. Single vertical full-bleed scene in one cohesive consistent art style, rich symbolic detail.`;
+  const grounding = card.scene.includes("{hero}") && !card.airborne ? ` ${GROUNDING}` : "";
+  return `${lead}. ${scene}.${grounding} Single vertical full-bleed scene in one cohesive consistent art style, rich symbolic detail.`;
 }

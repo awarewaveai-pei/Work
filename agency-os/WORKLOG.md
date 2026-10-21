@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-21（續31）tarot：任何語言主角／風格每副牌翻英文一次＋人物不再飄在空中（Claude）
+
+**觸發**：操作者「所有語言自動翻成英文也可以嗎? $0.01?」；THE FOOL 的狗／貓畫在山上空中。
+- 翻譯：新 `app/api/tools/tarot/translate/route.ts`（同 suggest-prompt：`resolveOpsRole`＋`canCreateAiImageJob`、`withFeature("tarot.prompt")`、Haiku 4.5、上限 500 字；只有拉丁字母 → 原樣回、不呼叫 AI）。`lib/tarot/translate.ts` `needsEnglish`（任何非拉丁字母）＋`translateForDeck`。TarotStudio `ensureEnglish()` 在預覽／比較／鎖定前各跑一次，結果進 state（主角英文欄可改；風格寫進既有英文欄），78 張卡讀 state——絕不逐張翻。舊「請用英文填寫」警告移除。e6a3a72a6 的逐張翻譯不復活。費用顯示「翻成英文 ≈ NT$0.01」。
+- 飄浮根因：FLUX schnell 把 leaping／stepping toward the edge 畫成懸空。抽看今日正式庫 78 張（Klimt 風格，縮圖）：THE FOOL 狗在懸崖外空中、TEN OF CUPS 人物與小孩浮在山丘上、QUEEN OF PENTACLES 兔子跳在半空；其餘多為金箔平塗背景、無明顯懸空。
+- 修整類：`cards.ts` `GROUNDING`（正面敘述；FLUX 會畫出否定句提到的東西）加在每張有 `{hero}` 且非 `airborne` 的卡；無人物卡（Ace、Moon、3 of Swords、8 of Wands）不加，以免多畫人。`airborne: true`：LOVERS（天使在空中）、WHEEL、HANGED MAN、TOWER、JUDGEMENT、WORLD。改動詞：Fool、Star、3／10／King of Cups、2／Queen of Pentacles。浮在空中的物件（杯、金幣、符號）不受影響。牌組未重生（操作者自己重生）。
+- 重啟註記的「TarotStudio 5 行未 commit」實為共享 index 過期：那 5 行已在 HEAD（a9f5a1370）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit` exit 0；`npx vitest run lib/tarot app` 78 files／532 passed（含 translate route 2 測、translateForDeck 1 測、grounding 1 測）| exit=0 | ms=60000
+- 突變：拔 route 的 `canCreateAiImageJob` 判斷 → 「refuses a viewer before any AI call」紅；還原 → 綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- Codex `agency-os/reports/oracle/2026-10-21-partialreview-c2ba82d1.md`：
+  - M2 已修：自動翻譯把風格英文永久釘住，之後換風格晶片沒作用 → `styleAutoSrc` 記錄翻譯來源，風格框一改就退回自動英文；手動／AI 建議的英文照舊釘住。
+  - M4 已修：LOVERS 標 airborne 後兩位主角也失去接地句 → 場景文字自己寫「feet on the grass」、天使「in the clouds」；`cards.ts` 註解寫明此規則。
+  - M1 不修：西班牙文等拉丁字母語言視為英文、不翻——卡片規格明定「只有拉丁字母就跳過呼叫」。
+  - M3 不修：翻譯進行中改主角，舊預覽會被標為過期（previewSig 含原文），鎖定時 `ensureEnglish` 再翻一次；不會進入整副牌。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`CJK_TEXT|no Claude translation|請用英文填寫` | hits=3（皆 `.agency-state/worklog-excerpt.md` 歷史紀錄；程式內 0；`image-gen.ts:10` 註解已改）
+
+**rollback**：`git revert <本 commit>`；route-features 一行隨之移除。
 ## 2026-10-21（續30）next-admin 正式部署 94c4b7c01 → 4f8d44fb8（Claude，操作者批准「0113、0114 一起套、部署 next-admin、智慧連結點擊實測和 smoke」）
 
 - 範圍：上線 a9f5a1370（tarot 舊預覽不覆蓋新 AI 編輯）、8ac56c4bb（影片選單移除 Seedream 4.5）、4f8d44fb8（0114 down ledger，續28；只動 DB 檔，不影響容器）。

@@ -9,6 +9,7 @@ import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, buildSemanticBase } from "@/lib/studio/semantic-filename";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type TarotCard } from "./cards";
+import { needsEnglish, translateForDeck } from "@/lib/tarot/translate";
 import { tabStyle, chipStyle, ghostBtn } from "@/components/tools/panel-primitives";
 
 type GroupKey = "all" | "major" | "wands" | "cups" | "swords" | "pentacles";
@@ -74,9 +75,19 @@ const MODEL_OPTIONS: ModelOption[] = [
   { value: "openai-high",          label: "GPT-Image-1 高",       group: "OpenAI",   costNt: 5.5,  maxRefs: 5 },
 ];
 
-// Chinese / Japanese / Korean script in the subject (models read English only). RegExp constructor:
-// tsconfig targets ES2017, which rejects u-flag property escapes in a regex literal.
-const CJK_TEXT = new RegExp(String.raw`\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}`, "u");
+const PRESET_LABELS = new Set(STYLE_PRESETS.map((p) => p.zh));
+
+// One Haiku call per non-English field per deck (lib/tarot/translate.ts); throws with the route's error.
+async function translateText(text: string): Promise<string> {
+  const res = await fetch("/api/tools/tarot/translate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...roleHeader("operator") },
+    body: JSON.stringify({ text }),
+  });
+  const data = (await res.json()) as { ok: boolean; english?: string; error?: string; code?: string };
+  if (!data.ok || !data.english) throw new Error(data.error ?? data.code ?? `HTTP ${res.status}`);
+  return data.english;
+}
 // One in-browser card run: its stop signal and the deck it was started for (deckGenRef value).
 type CardRun = { signal: AbortSignal; deck: number };
 type CompareResult = { model: TarotModel; image: string | null; seed: number | null; error?: string; busy: boolean };
@@ -201,11 +212,18 @@ export default function TarotStudio() {
   const [template, setTemplate] = useState<CardTemplate>("gold");
   const [stylePrompt, setStylePrompt] = useState("");
   const [subjectText, setSubjectText] = useState(""); // optional character override (text channel)
+  // English for a non-English subject + the original it was made from; editing the original invalidates it.
+  const [subjectEnglish, setSubjectEnglish] = useState("");
+  const [subjectEnglishSrc, setSubjectEnglishSrc] = useState("");
+  const [translateBusy, setTranslateBusy] = useState(false);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
   // The final English actually sent. Defaults to the auto-resolved English from the zh chips, but
   // the user can edit it directly before generating; once edited, `styleEnglishEdited` pins their text.
   const [styleEnglish, setStyleEnglish] = useState("");
   const [styleEnglishEdited, setStyleEnglishEdited] = useState(false);
+  // Style box text an AUTO translation was made from (null = typed / AI-suggested English, pinned until reset).
+  // Changing the chips afterwards drops the auto translation instead of pinning a stale style.
+  const [styleAutoSrc, setStyleAutoSrc] = useState<string | null>(null);
 
   const [suggestBusy, setSuggestBusy] = useState(false);
 
@@ -267,10 +285,16 @@ export default function TarotStudio() {
 
   // English actually sent: the user's edited text if they touched it, else auto-resolved from chips.
   const autoEnglish = resolveStylePrompt(stylePrompt);
-  const effectiveEnglish = styleEnglishEdited ? styleEnglish : autoEnglish;
+  const styleOverride = styleEnglishEdited && (styleAutoSrc === null || styleAutoSrc === stylePrompt);
+  const effectiveEnglish = styleOverride ? styleEnglish : autoEnglish;
+  // Subject actually sent to every card: typed English as is; non-English only via its translation ("" until translated).
+  const subjectNeedsEnglish = needsEnglish(subjectText);
+  const subjectForPrompt = !subjectNeedsEnglish ? subjectText : subjectEnglishSrc === subjectText.trim() ? subjectEnglish : "";
+  const sigOf = (model: string, style: string, subject: string) =>
+    `${model}::${style.trim()}::subj=${subjectText.trim()}=>${subject.trim()}::refs=${referenceImages.length}`;
 
   // Stale when model selection, aspect ratio, style, subject, or refs changed after last generate.
-  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== `${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`;
+  const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== sigOf(activeModel, effectiveEnglish, subjectForPrompt);
 
   // The deck's style anchor uses lockedModel's maxRefs (set at lock time, not current selection).
   const lockedMaxRefs = modelOption(lockedModel).maxRefs;
@@ -299,7 +323,7 @@ export default function TarotStudio() {
   const jobIdRef = useRef<string | null>(null);
   // Prompt values captured at compare-generation time — used in selectCompareResult so that
   // previewSig reflects the prompt that actually made the comparison images, not an edited value.
-  const compareStyleRef = useRef({ english: "", subject: "" });
+  const compareStyleRef = useRef<{ english: string; sig: (model: string) => string }>({ english: "", sig: () => "" });
   // Abort handle for the running in-browser card loop (group or single). Aborting cancels the
   // in-flight fetch and the loop checks it before each card, so no request leaves after stop.
   const batchAbortRef = useRef<AbortController | null>(null);
@@ -449,10 +473,45 @@ export default function TarotStudio() {
       }
       setStyleEnglish(data.prompt);
       setStyleEnglishEdited(true);
+      setStyleAutoSrc(null);
     } catch (e) {
       setMessage(`AI 生成失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSuggestBusy(false);
+    }
+  }
+
+  // Non-English subject / free-typed style → English ONCE, before preview, compare and lock. The result lands in
+  // state and every card reuses it. Returns null (message shown) when translation fails.
+  async function ensureEnglish(): Promise<{ style: string; subject: string } | null> {
+    const subjectSrc = subjectText.trim();
+    const subjectIn = subjectNeedsEnglish && !subjectForPrompt ? subjectSrc : subjectForPrompt;
+    // No override: only free-typed tokens can be non-English (catalog prompts are English). A current auto
+    // translation is English already, so only a typed override can still need translating here.
+    const presetTokens = styleTokens.filter((t) => PRESET_LABELS.has(t));
+    const pinned = styleOverride;
+    const styleSrc = pinned ? effectiveEnglish : styleTokens.filter((t) => !PRESET_LABELS.has(t)).join(", ");
+    if (!needsEnglish(subjectIn) && !needsEnglish(styleSrc)) return { style: effectiveEnglish, subject: subjectForPrompt };
+    setTranslateBusy(true);
+    try {
+      const en = await translateForDeck({ subject: subjectIn, style: styleSrc }, translateText);
+      if (subjectNeedsEnglish) {
+        setSubjectEnglish(en.subject);
+        setSubjectEnglishSrc(subjectSrc);
+      }
+      let style = effectiveEnglish;
+      if (needsEnglish(styleSrc)) {
+        style = pinned ? en.style : [resolveStylePrompt(presetTokens.join(",")), en.style].filter(Boolean).join(". ");
+        setStyleEnglish(style);
+        setStyleEnglishEdited(true);
+        if (!pinned) setStyleAutoSrc(stylePrompt);
+      }
+      return { style, subject: en.subject };
+    } catch (e) {
+      setMessage(`翻成英文失敗：${e instanceof Error ? e.message : String(e)}`);
+      return null;
+    } finally {
+      setTranslateBusy(false);
     }
   }
 
@@ -466,9 +525,11 @@ export default function TarotStudio() {
     // An AI edit landing meanwhile (onEditedImage → unlockStyle) bumps the deck; this response is then stale.
     const deck = deckGenRef.current;
     try {
+      const en = await ensureEnglish();
+      if (!en || deckGenRef.current !== deck) return;
       const resp = await callGenerate({
         model: activeModel,
-        prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText }),
+        prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject }),
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
         printQuality: true,
@@ -481,13 +542,13 @@ export default function TarotStudio() {
       }
       setPreviewImage(resp.image);
       setPreviewSeed(resp.seed ?? null);
-      setPreviewSig(`${activeModel}::${effectiveEnglish.trim()}::subj=${subjectText.trim()}::refs=${referenceImages.length}`);
+      setPreviewSig(sigOf(activeModel, en.style, en.subject));
       // Save colour-graded preview to gallery (Bug 1 fix: raw resp.image ≠ what user sees).
       const gradedPreview = !grade.neutral
         ? await applyGradeToDataUrl(resp.image, grade.params).catch(() => resp.image)
         : resp.image;
       if (deckGenRef.current !== deck) return;
-      saveToGallery(gradedPreview, "tarot-preview", { model: activeModel, prompt: effectiveEnglish });
+      saveToGallery(gradedPreview, "tarot-preview", { model: activeModel, prompt: en.style });
     } catch (e) {
       if (deckGenRef.current !== deck) return;
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
@@ -506,9 +567,14 @@ export default function TarotStudio() {
     jobIdRef.current = crypto.randomUUID();
     const modelList = Array.from(selectedModels);
     const genId = ++compareGenIdRef.current;
+    const en = await ensureEnglish();
+    if (!en || compareGenIdRef.current !== genId) {
+      if (compareGenIdRef.current === genId) setCompareBusy(false);
+      return;
+    }
     // Capture prompt at compare time; selectCompareResult reads these for previewSig.
-    compareStyleRef.current = { english: effectiveEnglish, subject: subjectText };
-    const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText });
+    compareStyleRef.current = { english: en.style, sig: (m: string) => sigOf(m, en.style, en.subject) };
+    const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject });
     // Initialise all slots as busy so the UI shows every pending card immediately
     const slots: CompareResult[] = modelList.map((m) => ({ model: m, image: null, seed: null, busy: true }));
     setCompareResults([...slots]);
@@ -552,7 +618,7 @@ export default function TarotStudio() {
     // The invalidated loop skips its own setCompareBusy(false), so clear it here — otherwise the
     // compare button stays 「生成中…」 for the rest of the page's life.
     setCompareBusy(false);
-    const { english, subject } = compareStyleRef.current; // use prompt that produced these images
+    const { english, sig } = compareStyleRef.current; // use prompt that produced these images
     const gradedSelected = !grade.neutral
       ? await applyGradeToDataUrl(r.image, grade.params).catch(() => r.image!)
       : r.image;
@@ -562,7 +628,7 @@ export default function TarotStudio() {
     setPreviewSeed(r.seed);
     setSelectedModels(new Set([newModel]));
     setLockedModel(newModel);
-    setPreviewSig(`${newModel}::${english.trim()}::subj=${subject.trim()}::refs=${referenceImages.length}`);
+    setPreviewSig(sig(newModel));
     setCompareResults([]);
     setCompareZoom(null);
     // Selecting from comparison means "I want this style" → auto-lock and proceed to batch step
@@ -604,6 +670,8 @@ export default function TarotStudio() {
 
   async function lockStyle() {
     if (!previewImage) return;
+    // Text edited since the preview may be untranslated; the deck's cards read the translation from state.
+    if (!(await ensureEnglish())) return;
     // NOTE: do NOT saveToGallery here — whichever path produced previewImage already saved it:
     // generatePreview + selectCompareResult save "tarot-preview", the AI quick-edit saves
     // "tarot-preview-edit". Locking is a UI state transition, not a new generation; re-saving
@@ -666,7 +734,7 @@ export default function TarotStudio() {
     try {
       const resp = await callGenerate({
         model: lockedModel,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt }),
         referenceImages: lockedRefs,
         seed: seedOverride !== undefined ? seedOverride : previewSeed,
         printQuality: true,
@@ -706,7 +774,7 @@ export default function TarotStudio() {
         if (!live()) return;
         saveToGallery(dataUrl, "tarot", {
           cardName: card.name,
-          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
+          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt }),
         });
       });
       // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
@@ -810,7 +878,7 @@ export default function TarotStudio() {
       const cards = TAROT_CARDS.map((card, i) => ({
         index: i,
         name: card.name,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt }),
       }));
       const res = await fetch("/api/tools/tarot/batch", {
         method: "POST",
@@ -1436,12 +1504,28 @@ export default function TarotStudio() {
                 disabled={locked}
               />
               <div className="form-hint" style={{ marginTop: 4 }}>
-                換掉每張牌的主角，整副 78 張同一角色。請用英文填寫。
+                換掉每張牌的主角，整副 78 張同一角色。任何語言都可以，產生預覽時自動翻成英文一次，78 張共用。
               </div>
-              {/* Nothing translates the subject: it goes verbatim into buildCardPrompt (cards.ts). */}
-              {CJK_TEXT.test(subjectText) && (
-                <div className="form-hint" style={{ marginTop: 2, color: "var(--yellow)" }}>
-                  ⚠ 含中日韓文字：FLUX 等模型讀不懂，主角可能不會換。請改英文，例：a blue cat
+              {subjectNeedsEnglish && (
+                <div style={{ marginTop: 6 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>送給模型的英文</span>
+                    <button title={why("tarot.prompt")}
+                      type="button"
+                      disabled={locked || translateBusy || !canUse("tarot.prompt")}
+                      onClick={() => void ensureEnglish()}
+                      style={{ ...ghostBtn(), cursor: locked || translateBusy ? "default" : "pointer", opacity: locked || translateBusy ? 0.5 : 1 }}
+                    >
+                      {translateBusy ? "翻譯中…" : "翻成英文 ≈ NT$0.01"}
+                    </button>
+                  </div>
+                  <input
+                    className="form-input"
+                    placeholder="（按「翻成英文」或產生預覽時自動填入；可直接修改）"
+                    value={subjectForPrompt}
+                    onChange={(e) => { setSubjectEnglish(e.target.value); setSubjectEnglishSrc(subjectText.trim()); }}
+                    disabled={locked}
+                  />
                 </div>
               )}
             </div>
@@ -1699,11 +1783,11 @@ export default function TarotStudio() {
                   >
                     {suggestBusy ? "✨ AI 生成中…" : "✨ 幫我想 prompt"}
                   </button>
-                  {styleEnglishEdited && (
+                  {styleOverride && (
                     <button
                       type="button"
                       disabled={locked}
-                      onClick={() => { setStyleEnglish(""); setStyleEnglishEdited(false); }}
+                      onClick={() => { setStyleEnglish(""); setStyleEnglishEdited(false); setStyleAutoSrc(null); }}
                       style={{ ...ghostBtn(), cursor: locked ? "default" : "pointer", opacity: locked ? 0.5 : 1 }}
                     >
                       ↻ 重設
@@ -1715,12 +1799,16 @@ export default function TarotStudio() {
                   style={{ minHeight: 72, fontSize: 11, background: "rgba(99,102,241,0.06)" }}
                   placeholder="（選風格後自動帶出；可直接修改）"
                   value={effectiveEnglish}
-                  onChange={(e) => { setStyleEnglish(e.target.value); setStyleEnglishEdited(true); }}
+                  onChange={(e) => { setStyleEnglish(e.target.value); setStyleEnglishEdited(true); setStyleAutoSrc(null); }}
                   disabled={locked}
                 />
-                {styleEnglishEdited && (
+                {needsEnglish(effectiveEnglish) ? (
                   <div className="form-hint" style={{ color: "var(--yellow)", marginTop: 2 }}>
-                    ✏ 已手動編輯英文，生成時送這段。
+                    含非英文：產生預覽時自動翻成英文（≈ NT$0.01），整副共用。
+                  </div>
+                ) : styleOverride && (
+                  <div className="form-hint" style={{ color: "var(--yellow)", marginTop: 2 }}>
+                    ✏ 英文已改過（手動或自動翻譯），生成時送這段。
                   </div>
                 )}
               </div>
@@ -1810,7 +1898,7 @@ export default function TarotStudio() {
                   </button>
                   <ImageEditPromptPanel
                     sourceImage={previewImage}
-                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectText })}
+                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt })}
                     imageModel={activeModel}
                     target="tarot-preview"
                     generateEndpoint="/api/tools/tarot/generate"
@@ -1820,7 +1908,7 @@ export default function TarotStudio() {
                       model: activeModel,
                       mode,
                       stylePrompt: effectiveEnglish,
-                      subject: subjectText.trim(),
+                      subject: subjectForPrompt.trim(),
                       refs: referenceImages.length,
                     }}
                     onEditedImage={async (image, meta) => {
@@ -1916,7 +2004,7 @@ export default function TarotStudio() {
                     setSavingArt(true);
                     const ok = await postDesign(item.art, "tarot-art", {
                       cardName: item.card.name,
-                      prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectText }),
+                      prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectForPrompt }),
                     });
                     setSavingArt(false);
                     if (ok) setSavedArt((prev) => new Set(prev).add(idx));

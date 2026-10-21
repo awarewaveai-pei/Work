@@ -7,7 +7,7 @@
 //   imagen-4          → Google Imagen 4 via Replicate
 //   flux-2-max        → BFL Flux.2 Max via Replicate
 // Returns uniform `data:image/png;base64,...` so the client treats all models the same.
-// Write prompts in English for best results — no Claude translation step.
+// Prompts arrive in English: the studio translates non-English subject/style once per deck (lib/tarot/translate.ts), never here.
 
 import { getDesignsPublicBase } from "../storage/r2";
 import { providerUrl } from "@/lib/ai/gateway";

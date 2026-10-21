@@ -17,6 +17,7 @@ export const ROUTE_FEATURES: Readonly<Record<string, string>> = {
   "/api/tools/studio/generate": "studio.image",
   "/api/tools/tarot/generate": "tarot.image",
   "/api/tools/tarot/suggest-prompt": "tarot.prompt",
+  "/api/tools/tarot/translate": "tarot.prompt",
   "/api/video/story-bibles/visual-consistency-check": "video.image",
 };
 export const routeFeatureKeys = (): ReadonlySet<string> => new Set(Object.values(ROUTE_FEATURES));
