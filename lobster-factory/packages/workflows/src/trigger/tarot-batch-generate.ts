@@ -2,7 +2,8 @@
  * Trigger.dev task: background 78-card tarot batch generation.
  *
  * Calls next-admin's POST /api/internal/tarot/batch/[jobId]/start, then .../card once per card. The card callback
- * generates the image with next-admin's API keys, saves it to R2 and updates its in-memory batch store.
+ * generates the image with next-admin's API keys, saves it to R2 and records the card's row (migration 0115). A retried
+ * card callback is safe: next-admin claims the card first, so it never generates or counts a card twice.
  *
  * Token: BATCH_INTERNAL_SECRET, synced by scripts/lobster-trigger-deploy.ps1 from the RUNNING next-admin. Never in the
  * payload: run payloads are stored and shown in the Trigger dashboard. Unset -> the run fails at once.
@@ -37,8 +38,9 @@ export const tarotBatchGenerate = task({
   queue: { concurrencyLimit: 2 },
   // No whole-run retry: it would restart at card 0 and bill every finished card again; cards retry on their own below.
   retry: { maxAttempts: 1 },
-  // Allow up to 90 min for a full 78-card run (worst case: 78 × ~60s + retries).
-  maxDuration: 5400,
+  // Worst case 78 cards × 2 attempts × 65 s = 10,140 s. next-admin's job deadline is this + 10 min
+  // (RUN_BUDGET_MS in apps/next-admin/lib/tarot/batch-store.ts): change both together.
+  maxDuration: 10_800,
   run: async (payload: BatchPayload) => {
     const { jobId, cards, model, aspectRatio, seed } = payload;
     const token = process.env.BATCH_INTERNAL_SECRET?.trim();

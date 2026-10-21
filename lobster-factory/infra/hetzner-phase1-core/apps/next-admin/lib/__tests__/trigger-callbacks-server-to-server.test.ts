@@ -6,10 +6,14 @@
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { config, middleware } from "../../middleware";
 import { createJob } from "../tarot/batch-store";
+import { createFakeBatchDb } from "../tarot/__tests__/fake-batch-db";
+
+const fakeDb = vi.hoisted(() => ({ client: null as unknown }));
+vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: () => fakeDb.client }));
 import { POST as start } from "../../app/api/internal/tarot/batch/[jobId]/start/route";
 import { POST as card } from "../../app/api/internal/tarot/batch/[jobId]/card/route";
 
@@ -68,8 +72,10 @@ describe("tarot batch callbacks: own token, never a role header", () => {
 
   it("start: the right token marks a known job running", async () => {
     process.env.BATCH_INTERNAL_SECRET = "batch-secret-for-test";
-    createJob("job-1", "flux-schnell", "2:3", 1);
-    expect((await call(start, "job-1", { authorization: "Bearer batch-secret-for-test" })).status).toBe(200);
+    fakeDb.client = createFakeBatchDb().client;
+    const jobId = "00000000-0000-4000-8000-000000000001";
+    await createJob({ jobId, organizationId: null, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+    expect((await call(start, jobId, { authorization: "Bearer batch-secret-for-test" })).status).toBe(200);
     expect((await call(start, "unknown", { authorization: "Bearer batch-secret-for-test" })).status).toBe(404);
   });
 });
