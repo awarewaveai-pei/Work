@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-21（續28）0114 down 補刪 schema_migrations 列＋0114 本機驗證腳本（Codex 寫、Claude 審）
+
+- 根因：`migrations/0114_social_meta_webhook_idempotency.down.sql` 只拆 schema，不刪自己的 ledger 列 → 回滾後 `apply-db-migration.mjs --status` 仍顯示 0114 applied，再套會被跳過（帳本與實況不符）。0113 down 已有同寫法（`0113_social_smart_link_visitor_dedupe.down.sql:5-10`）。
+- 修：0114 down 開頭加同樣的 `to_regclass` 守衛 + `delete ... where filename='0114_social_meta_webhook_idempotency.sql'`；新增 `packages/db/scripts/0114_social_meta_webhook_idempotency-local-verify.sh`（拋棄式 postgres:15.8 容器，借 0113 verifier 建 0096–0113 → up → 驗欄位／部分索引／RLS／service_role-only／ledger → down → 驗全拆且 0113 列仍在 → re-up → second up 冪等）。Codex 提交 dc676bd32（拋棄式 worktree D:/tmp/m0114），以私有 index 併入 main（共享 index 有他 session staged 檔，cherry-pick 拒絕；內容逐位元組相同）。
+- 正式庫：0113／0114 已於續26 套用（ledger 114），本次只改 down 檔 → up 檔 sha 不變，不需重套。
+- 剩餘：`packages/db/scripts/0114_social_meta_webhook_idempotency_down.sql`（fdf9ad468 的舊副本）仍無 ledger 清理；0105 起本機 verifier 只用 `migrations/*.down.sql`，回滾請用該檔。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash packages/db/scripts/0114_social_meta_webhook_idempotency-local-verify.sh | exit=0 | ms=29272
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/1m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands | grep=0114_social_meta_webhook_idempotency | hits=14
+- ORACLE_WAIVED: Codex 寫、Claude（本 session，非作者）審為跨模型審查；操作者指示不開 /codex-review
 ## 2026-10-21（續27）影片工作室移除 Seedream 4.5（ByteDance）
 
 **觸發**：操作者「Seedream 4.5移除」（不用中國廠商 AI）。
