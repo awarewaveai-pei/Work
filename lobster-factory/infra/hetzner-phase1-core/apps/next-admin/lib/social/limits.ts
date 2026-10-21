@@ -3,6 +3,10 @@
 // Postiz would refuse a longer post only at send time; saving refuses it (C4: 400) so the editor shows it first.
 // A platform not listed has no limit here. Counted as people see characters (graphemes); Threads counts UTF-8 bytes.
 
+/** C23 list grid: weekday x time slots a list may hold (one per hour per weekday); the server check and the grid's
+ *  add-row button both read it, so the grid cannot build what the save refuses. */
+export const MAX_LIST_SLOTS = 7 * 24;
+
 export const BODY_LIMITS: Record<string, number> = {
   x: 280,
   bluesky: 300,

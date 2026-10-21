@@ -40,6 +40,9 @@
 .sm-bell { position: relative; }
 .sm-bell b { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 10px; background: var(--red); color: var(--btn-primary-text); font-size: var(--font-size-base); line-height: 20px; text-align: center; }
 .sm-pop { position: absolute; z-index: 5; background: var(--card-bg); color: var(--text-primary); border: 1px solid var(--card-border); border-radius: var(--radius); box-shadow: var(--shadow-hover); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+/* C23: the list grid's time picker opens over the grid (compose's .sm-dtp opens upward from the composer footer) */
+.sm-lsdtp .sm-dtp { top: 0; bottom: auto; left: 0; right: auto; width: 200px; }
+.sm-lsdtp .sm-dtrow { grid-template-columns: minmax(0, 1fr); }
 .sm-pop h3 { font-size: var(--font-size-base); color: var(--text-muted); margin: 0; font-weight: 600; }
 .sm-menu { padding: 6px; gap: 2px; min-width: 180px; }
 .sm-app .sm-menu button { border: 0; background: transparent; text-align: left; padding: 8px 10px; }

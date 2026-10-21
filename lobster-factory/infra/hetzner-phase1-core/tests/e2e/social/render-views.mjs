@@ -83,7 +83,8 @@ const TRASHED = [
   mk(11, "deleted", null, "（草稿）想法太散，先刪掉。", { deleted_at: day(-3, 9, 5) }),
 ];
 const DELETIONS = { [TRASHED[0].id]: { actor: "ops:owner:u1", from: "scheduled" }, [TRASHED[1].id]: { actor: "client:soulful", from: "draft" } };
-const LISTS = [{ id: "11111111-0000-4000-8000-000000000001", name: "常青內容", weekdays: [1, 3, 5], send_time: "10:00:00", active: true, cursor: 0, accounts: [{ account_id: ACCOUNTS[0].id }, { account_id: ACCOUNTS[1].id }] }];
+const LISTS = [{ id: "11111111-0000-4000-8000-000000000001", name: "常青內容", weekdays: [1, 3, 5], send_time: "10:00:00", active: true, cursor: 0, accounts: [{ account_id: ACCOUNTS[0].id }, { account_id: ACCOUNTS[1].id }],
+  slots: [{ weekday: 1, send_time: "10:00:00" }, { weekday: 3, send_time: "10:00:00" }, { weekday: 5, send_time: "18:00:00" }] }];
 const MEDIA = [
   { id: "m1", kind: "image", file_name: "watercolor-01.jpg", postiz_path: "https://picsum.photos/seed/a/400/300", bytes: 120000, created_at: day(-3, 1), used: 2 },
   { id: "m2", kind: "image", file_name: "studio.jpg", postiz_path: "https://picsum.photos/seed/b/400/300", bytes: 220000, created_at: day(-4, 1), used: 0 },
@@ -213,7 +214,11 @@ for (const [tab, name] of [["貼文清單", "x-list"], ["貼文素材庫", "x-li
 }
 await page.getByRole("button", { name: "自動發布清單", exact: true }).click();
 await page.getByText("常青內容").first().click();
-await shot("x-list-detail");
+await shot("11-list-detail");   // C23: two time rows (10:00 Mon+Wed, 18:00 Fri) = 3 weekly slots
+await page.getByRole("button", { name: "＋ 加一個時間" }).click();
+await page.getByRole("button", { name: /^改時間 12:00/ }).click();
+await shot("11-list-time");   // the composer's DateTimePicker, time only
+await page.keyboard.press("Escape");
 await page.getByRole("button", { name: /需處理的事和紀錄/ }).click();
 await shot("x-log-needs");
 await page.getByRole("button", { name: "設定", exact: true }).click();

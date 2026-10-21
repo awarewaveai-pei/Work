@@ -1,8 +1,7 @@
 // Rotation list payload (POST /api/social/lists, PUT /api/social/lists/[id]). The database checks the same shape (0096).
 import { BadRequest, uuid } from "./http";
+import { MAX_LIST_SLOTS as MAX_SLOTS } from "./limits";
 import type { ListInput, ListSlot } from "./store";
-
-const MAX_SLOTS = 7 * 24;   // a grid of one slot per hour per weekday is already more than a brand posts
 
 /** C23: the weekday x time grid. HH:MM or HH:MM:00 in, HH:MM out; the same weekday+time twice is one slot (the table's
  *  primary key says so); sorted by weekday then time so the saved grid reads the same however it was clicked. */

@@ -6,6 +6,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type ListInput, type ListRow } from "./api";
 import { PfMark } from "./Calendar";
 import DateTimePicker from "./compose/DateTimePicker";
+import "./compose/compose.css";
+import { MAX_LIST_SLOTS } from "@/lib/social/limits";   // the picker's styles; the Lists tab can load without the composer
 import { platformOf, shortDate, WEEKDAY_NAMES, zoned, type Account, type Brand, type Post } from "./model";
 import type { SlotContext } from "./SocialManager";
 
@@ -85,7 +87,7 @@ export function ListDetail({ ctx, listId }: { ctx: SlotContext; listId: string |
     setList(r.list);
     setName(r.list.name);
     const loaded = rowsFromList(r.list);
-    nextKey.current = loaded.length;
+    nextKey.current = Math.max(loaded.length, 1);   // the empty fallback row below is r0 too: a new row must not reuse it
     setRows(loaded.length ? loaded : [{ key: "r0", time: r.list.send_time.slice(0, 5), days: [] }]);
     setPicked(r.list.accounts.map((a) => a.account_id));
     setItems(r.items);
@@ -170,7 +172,7 @@ export function ListDetail({ ctx, listId }: { ctx: SlotContext; listId: string |
   return (
     <div className="sm-ed" style={{ gridTemplateRows: "auto auto auto minmax(0,1fr) auto" }}>
       <div className="sm-row"><span className="sm-lab">名稱</span><input type="text" aria-label="清單名稱" value={name} disabled={!canWrite} onChange={(e) => setName(e.target.value)} style={{ flex: 1, minWidth: 0 }} /></div>
-      <div className="sm-side" style={{ padding: 0, position: "relative" }}>
+      <div className="sm-side" style={{ padding: 0, position: "relative", overflow: "visible" }}>
         <span className="sm-lab">每週發文時段　<span className="sm-muted">{tz}</span></span>
         {rows.map((r) => (
           <div key={r.key} className="sm-row sm-chips">
@@ -186,12 +188,12 @@ export function ListDetail({ ctx, listId }: { ctx: SlotContext; listId: string |
           </div>
         ))}
         {!rows.length && <span className="sm-muted">還沒有時段，按「＋ 加一個時間」。</span>}
-        {canWrite && (
+        {canWrite && (rows.length + 1) * 7 <= MAX_LIST_SLOTS && (
           <span><button type="button" onClick={() => setRows((rs) => [...rs, { key: `r${nextKey.current++}`, time: SUGGESTED.find((t) => !rs.some((x) => x.time === t)) ?? "10:00", days: [] }])}>＋ 加一個時間</button></span>
         )}
         {pickRow && rows.some((r) => r.key === pickRow) && (
-          <DateTimePicker date={null} time={rows.find((r) => r.key === pickRow)!.time} tz={tz} today={zoned(new Date(), tz).date} onClose={() => setPickRow(null)}
-            onDone={(t) => { setRows((rs) => rs.map((x) => (x.key === pickRow ? { ...x, time: t } : x))); setPickRow(null); }} />
+          <div className="sm-lsdtp"><DateTimePicker date={null} time={rows.find((r) => r.key === pickRow)!.time} tz={tz} today={zoned(new Date(), tz).date} onClose={() => setPickRow(null)}
+            onDone={(t) => { setRows((rs) => rs.map((x) => (x.key === pickRow ? { ...x, time: t } : x))); setPickRow(null); }} /></div>
         )}
       </div>
       <div className="sm-row"><span className="sm-lab">發到</span>

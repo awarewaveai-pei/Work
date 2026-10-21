@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-21（續8）社群 V1.5 C23 自動發布清單方格收尾（cc.py SDK 做主體，本 session 收尾）
+
+**觸發**：操作者「沒完成的去開 sessions 做，要用適合的模型」→「用 SDK API 的方式做」。C23 主體（星期 × 時間方格、slots 讀寫、listSlots）已在 Codex 批次 cf2b4ecc1；本次只補缺的。
+
+**做了什麼**（`apps/next-admin/`）
+- cc.py（Opus，session 0d2675d4，US$1.83）補：載入沒有 slots 的清單時空白列 key 與新列撞號（`Lists.tsx` nextKey）；方格的時間選擇器（C21 `DateTimePicker` 只開時間）原本被方格裁掉看不到 → 包 `.sm-lsdtp` 往下開、方格 `overflow: visible`、補載 `compose.css`；`render-views.mjs` 清單假資料加 slots，截 `11-list-detail`、`11-list-time`。
+- cc.py 跑到 Codex 審查背景等待時結束（SDK 收不到背景通知），本 session 接手：Codex `reports/oracle/2026-10-21-partialreview-5dda7adb.md` F1 屬實——選擇器每 15 分鐘一格，25 列 × 7 天＝175 個時段，伺服器上限 168 → 存檔 400。修法：上限只放一處 `lib/social/limits.ts` `MAX_LIST_SLOTS`，伺服器 `lists.ts` parseSlots 與方格的「＋ 加一個時間」都讀它（列數 × 7 超過就不給加）。
+- cc.py 失敗原因（另記）：從 Claude Code session 啟動時繼承 `CLAUDE_*` 環境變數 → 子程序走訂閱登入撞週上限；`C:/Users/user1115/ClaudeAgent/cc.py` 已改為丟掉所有 `CLAUDE*` 變數（不在 repo）。
+
+**[驗證結果]**
+- `npx tsc --noEmit`（next-admin）：exit 0。
+- `npx vitest run lib/social/__tests__/rotation.test.ts lib/social/__tests__/lists.test.ts "app/(shell)/tools/social/__tests__/page-rules.test.ts"`：23 passed。
+- 截圖 `11-list-detail`／`11-list-time` 由 cc.py 那次拍；本次只改按鈕顯示條件，未重拍。
+
+**[剩餘風險]**：無新增。
+**[rollback]**：`git revert` 本 commit；無 DB／設定變更。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social/__tests__/rotation.test.ts lib/social/__tests__/lists.test.ts app/(shell)/tools/social/__tests__/page-rules.test.ts | exit=0 | ms=1674
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/1m/0n
+- ORACLE_WAIVED: Codex 審一輪（5dda7adb，1 項已修）；修法只把上限搬到共用常數，由 tsc＋lists.test 驗證
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=MAX_SLOTS|MAX_LIST_SLOTS | hits=5
 ## 2026-10-21（續7）
 
 **任務**：tarot batch 修復（603485b3b）兩個 Low 後續。
