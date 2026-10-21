@@ -1,4 +1,11 @@
 # Worklog
+## 2026-10-21（續5）監工台：C29 標為完成（fd63291e4）
+
+- [修改] `agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs` 只改 C29 那列（status done＋commit fd63291e4）；`node build.mjs && node check.mjs` → ok 13 cards bound, page fresh；Artifact 重發同網址。
+- REALTEST_WAIVED: DOC_ONLY -- 只改監工台資料與產生頁，check.mjs 已跑過
+- REVIEW_WAIVED: DOC_ONLY -- 單列狀態更新；實作的審查見同日 C29 條目
+- BUGHUNT_WAIVED: DOC_ONLY -- 單列狀態更新
+- [rollback] `git revert` 本 commit。
 ## 2026-10-21（續4）社群 V1.5 C29 訊息收件匣補齊（Codex 批次 cf2b4ecc1 已做路由／頁面／未讀數，這裡只補缺的）
 
 - [對照卡片] 已做（cf2b4ecc1）：`app/api/social/inbox/route.ts`＋`route.test.ts`（未讀合計、不洩 token／baseUrl、角色閘；即卡片的 inbox.test.ts，不重複寫）、`inbox/Inbox.tsx` 每頻道一列「N 則未讀／都讀了」、`chatwoot_inbox_id` 欄（C20）。缺：「打開收件匣」總按鈕、沒連 Chatwoot 怎麼連、`17-inbox` 截圖。
