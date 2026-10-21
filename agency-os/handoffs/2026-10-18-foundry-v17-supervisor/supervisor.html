@@ -73,15 +73,15 @@ details code{font-size:12px;word-break:break-all}
 <div class="shell">
 <aside><div class="in">
   <h1>System Foundry v1.7 監工台</h1>
-  <p class="upd">更新於 <span data-computed>2026-10-20</span></p>
-  <div class="bar" data-computed><i class="d" style="width:75%"></i><i class="g" style="width:0%"></i></div>
-  <nav><a href="#now"><span>現況</span><small></small></a><a href="#measure"><span>進度數字</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>6</span>／<span data-computed>8</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
+  <p class="upd">更新於 <span data-computed>2026-10-21</span></p>
+  <div class="bar" data-computed><i class="d" style="width:100%"></i><i class="g" style="width:0%"></i></div>
+  <nav><a href="#now"><span>現況</span><small></small></a><a href="#measure"><span>進度數字</span><small></small></a><a href="#steps"><span>待建項目</span><small><span data-computed>8</span>／<span data-computed>8</span> 完成</small></a><a href="#open"><span>待你決定</span><small><span data-computed>0</span> 項</small></a><a href="#paths"><span>檔案</span><small></small></a></nav>
 </div></aside>
 <main>
 <p class="sub">讓 System Foundry 答完問卷後，產出 Claude 能直接開工的專案資料夾，並自帶監工台。共 <span data-computed>8</span> 張卡。</p>
 <section id="now"><h2>現況</h2><p class="lead">選擇引擎原本就正確；這一版重做的是產出。</p><ul class="yn"><li class="yes"><b>有</b><span>問卷選出正確的積木<small>選擇矩陣、突變覆蓋兩道閘全綠（make verify）</small></span></li><li class="yes"><b>有</b><span>產出一頁計畫與每個模組一張執行卡<small>PLAN.md＋cards/&lt;模組&gt;.md（V17-1、V17-2）</small></span></li><li class="yes"><b>有</b><span>每個產生的專案自帶監工台<small>supervisor/，與 AwareWave 監工台同一套 supervisor-kit（V17-3）</small></span></li><li class="yes"><b>有</b><span>勾 AwareWave 積木就帶入依賴<small>勾認知平台會帶入資料蒐集器；社群的十項宣告已填（V17-4）；其他產品的 manifest 見下方進度數字（V17-8）</small></span></li></ul></section>
 
-<section id="measure"><h2>進度數字</h2><p class="lead">每次產生頁面時從檔案現算；數字沒到，對應的卡不能標完成。</p><ul class="yn"><li class="no"><b>還沒有</b><span>沒有驗收的能力：<span data-computed>291</span>／<span data-computed>315</span> 個<small>V17-7</small></span></li><li class="no"><b>還沒有</b><span>manifest 完整的產品：<span data-computed>0</span>／<span data-computed>11</span> 個<small>V17-8；還缺：<span data-computed>cognitive、collect、content、cs、design、hci、outreach、social、studio、tarot、video</span></small></span></li></ul></section>
+<section id="measure"><h2>進度數字</h2><p class="lead">每次產生頁面時從檔案現算；數字沒到，對應的卡不能標完成。</p><ul class="yn"><li class="yes"><b>有</b><span>沒有驗收的能力：<span data-computed>0</span>／<span data-computed>315</span> 個<small>V17-7</small></span></li><li class="yes"><b>有</b><span>manifest 完整的產品：<span data-computed>11</span>／<span data-computed>11</span> 個<small>V17-8</small></span></li></ul></section>
 
 <section id="steps"><h2>待建項目</h2><p class="lead">依「要先完成」的順序做；每張卡的驗收寫在計畫檔。</p><ol class="steps"><li class="step done" id="V17-1">
     <div class="n">1</div>
@@ -149,30 +149,32 @@ details code{font-size:12px;word-break:break-all}
         <p><b>做法：</b><code>agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md V17-6</code></p>
         <p><b>完成於：</b><code>9285bee81</code></p>
       </details>
-    </div></li><li class="step todo" id="V17-7">
+    </div></li><li class="step done" id="V17-7">
     <div class="n">7</div>
     <div class="b">
       <p class="plain">每個能力都寫上「怎麼證明做好了」：一條測試名加一句預期結果；寫完，每張執行卡就沒有 TODO。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Haiku 5.5 照格式填（data-filler）＋Opus 5.5 驗收</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Sonnet 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>沒有驗收的能力 0 個（進度數字現算）</p>
       <details><summary>工程細節：V17-7 能力驗收補齊</summary>
         <p><b>要先完成：</b><a href="#V17-2">V17-2</a></p>
         <p><b>做法：</b><code>agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md V17-7</code></p>
+        <p><b>完成於：</b><code>19554c605</code></p>
       </details>
-    </div></li><li class="step todo" id="V17-8">
+    </div></li><li class="step done" id="V17-8">
     <div class="n">8</div>
     <div class="b">
       <p class="plain">每個 AwareWave 產品都有一份完整說明：管哪些資料、對外介面、出錯怎麼隔離、怎麼回滾，以及買斷時要裝哪些服務、客戶要填哪些金鑰。</p>
-      <p class="meta"><span class="pill st-todo">未開始</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
+      <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-low">風險 Low</span><span class="who">負責：Opus 5.5</span></p>
       <p class="donewhen"><b>完成條件：</b>manifest 完整的產品 = 全部（進度數字現算）</p>
       <details><summary>工程細節：V17-8 產品 manifest 補齊</summary>
         <p><b>要先完成：</b><a href="#V17-4">V17-4</a></p>
         <p><b>做法：</b><code>agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md V17-8</code></p>
+        <p><b>完成於：</b><code>ea9f3a269</code></p>
       </details>
     </div></li></ol></section>
 
 <section id="open"><h2>待你決定</h2><p class="lead">這幾件決定後，對應的卡才能開工。</p><p class="lead">目前沒有要你決定的事。</p></section>
 
-<section id="paths"><h2>檔案</h2><div class="paths"><div><b>每張卡怎麼做</b><code>agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md</code></div><div><b>追蹤</b><span><code>agency-os/TASKS.md「ADR 017 客戶怎麼買」</code><br><code>agency-os/WORKLOG.md 2026-10-19 續6、續8、續9、續10</code></span></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-10-18-foundry-v17-supervisor/</code><br>改 data.mjs，執行 node build.mjs 和 node check.mjs，再重新發布同一個網址</span></div></div></section>
+<section id="paths"><h2>檔案</h2><div class="paths"><div><b>每張卡怎麼做</b><code>agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md</code></div><div><b>追蹤</b><span><code>agency-os/TASKS.md「ADR 017 客戶怎麼買」</code><br><code>agency-os/WORKLOG.md 2026-10-19 續6–續14、2026-10-20（V17-7、V17-8）</code></span></div><div><b>本頁來源</b><span><code>agency-os/handoffs/2026-10-18-foundry-v17-supervisor/</code><br>改 data.mjs，執行 node build.mjs 和 node check.mjs，再重新發布同一個網址</span></div></div></section>
 </main>
 </div>

@@ -3,10 +3,10 @@
 
 export const META = {
   title: 'System Foundry v1.7 監工台',
-  updated: '2026-10-20',
+  updated: '2026-10-21',
   plan: 'agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md',
   tasks: 'agency-os/TASKS.md「ADR 017 客戶怎麼買」',
-  worklog: 'agency-os/WORKLOG.md 2026-10-19 續6、續8、續9、續10',
+  worklog: 'agency-os/WORKLOG.md 2026-10-19 續6–續14、2026-10-20（V17-7、V17-8）',
   self: 'agency-os/handoffs/2026-10-18-foundry-v17-supervisor/',
   url: 'https://claude.ai/artifact/RaVZVfj6yU5XMGkx3JV8SF',
 };
@@ -41,8 +41,8 @@ export const STEPS = [
   { n: 4, code: 'V17-4', plain: '問卷裡勾選 AwareWave 的產品（社群、客服…），它和它依賴的產品就自動帶進專案；新產品產生器讀得懂產出。', title: '接軌 AwareWave', gate: '勾社群 → 模組含社群與其依賴；new-product.mjs --from-foundry 產出的十項宣告至少六項不是 TODO', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '53b222d8d', depends: ['V17-3'] },
   { n: 5, code: 'V17-5', plain: '範例專案每次驗證時從最新問卷重新產生，問卷改了範例就跟著更新，不會過期。', title: '範例 intake 自動重生', gate: '改一題 id → 驗證紅；重生 → 綠', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '92694ea5d', depends: ['V17-4'] },
   { n: 6, code: 'V17-6', plain: '問卷加一題「裝在客戶自己的主機」；答要，發版就必須能離線更新。授權檔另由「授權碼」那題決定，因為自家主機自用不需要授權檔。', title: '新題', gate: '答要 → 帶入離線更新能力（簽章版本包、離線套用、失敗回上一版）；選擇矩陣與收費閘門皆綠', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: '9285bee81', depends: ['V17-5'] },
-  { n: 7, code: 'V17-7', plain: '每個能力都寫上「怎麼證明做好了」：一條測試名加一句預期結果；寫完，每張執行卡就沒有 TODO。', title: '能力驗收補齊', gate: '沒有驗收的能力 0 個（進度數字現算）', risk: 'Low', model: 'Haiku 5.5 照格式填（data-filler）＋Opus 5.5 驗收', status: 'not_started', depends: ['V17-2'] },
-  { n: 8, code: 'V17-8', plain: '每個 AwareWave 產品都有一份完整說明：管哪些資料、對外介面、出錯怎麼隔離、怎麼回滾，以及買斷時要裝哪些服務、客戶要填哪些金鑰。', title: '產品 manifest 補齊', gate: 'manifest 完整的產品 = 全部（進度數字現算）', risk: 'Low', model: 'Opus 5.5', status: 'not_started', depends: ['V17-4'] },
+  { n: 7, code: 'V17-7', plain: '每個能力都寫上「怎麼證明做好了」：一條測試名加一句預期結果；寫完，每張執行卡就沒有 TODO。', title: '能力驗收補齊', gate: '沒有驗收的能力 0 個（進度數字現算）', risk: 'Low', model: 'Sonnet 5.5', status: 'done', commit: '19554c605', depends: ['V17-2'] },
+  { n: 8, code: 'V17-8', plain: '每個 AwareWave 產品都有一份完整說明：管哪些資料、對外介面、出錯怎麼隔離、怎麼回滾，以及買斷時要裝哪些服務、客戶要填哪些金鑰。', title: '產品 manifest 補齊', gate: 'manifest 完整的產品 = 全部（進度數字現算）', risk: 'Low', model: 'Opus 5.5', status: 'done', commit: 'ea9f3a269', depends: ['V17-4'] },
 ];
 
 // 操作者自己要決定的（agent 不能代為決定）
