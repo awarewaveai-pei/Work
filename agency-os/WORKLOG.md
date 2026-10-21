@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-21（續29）智慧連結去重正式實測通過（3 次點擊 → 計數 2）＋0100–0114 down 檔兩處補齊＋一致性測試（Claude）
+
+- 實測（操作者要求）：AwareWave Ops（`39ad4149-…`，內部）用 app 同一個 RPC `social_save_smart_link` 建 `test-dedupe-2026-10-21`（標題 TEST-dedupe-2026-10-21，item `baa64409-…` → https://aware-wave.com/，published）。建立走 SQL 而非 `/api/social/smartlink`：該 API 要登入 session（`lib/social/authz.ts:38-56`，sync-key 得 null caller → 403）。
+- 點擊（真的公開網址 `https://social.aware-wave.com/smartlink/<slug>/go/<item>`，同一瀏覽器 UA）：筆電 ×2（訪客 A）→ 302/302；ks-aw-01 本機 ×1（訪客 B，不同 IP）→ 302。`social_smart_link_clicks` = `2026-10-21|2`，`social_smart_link_click_dedupe` 2 列 ✅。訪客定義＝IP 的 HMAC（`lib/social/smartlink.ts:112-122`，UA 只用來排除機器人）。
+- 額外：偽造 `X-Real-IP`／`X-Forwarded-For`／`CF-Connecting-IP` → 403（邊緣擋下）；`facebookexternalhit` → 302 不計；計數仍 2。
+- 清除：刪 item＋link（clicks／dedupe cascade）→ 四項計數 0|0|0|0，公開頁 404。`social_audit_log` 留 1 列 actor=`claude:test-dedupe-2026-10-21`（稽核紀錄不刪，已自帶測試標記）。
+- down 檔：慣例在 0104 由 `scripts/NNNN_*_down.sql` 換成 `migrations/NNNN_*.down.sql`，兩邊各缺一半，0114 的 scripts 副本已漂移（少 ledger 清理，續28）。補：migrations ← 0100–0103（4 檔）；scripts ← 0104、0105、0107–0113（9 檔）；0114 scripts 副本覆寫為 migrations 版。0106 號從未存在。`.down.sql` 不會被套用（`scripts/apply-db-migration.mjs:78`、`check-migrations-applied.sh:21` 皆排除）。
+- 防再漂移：`scripts/__tests__/down-migration-copies.test.mjs`（0100 起每支 migration 兩處 down 檔都要存在且位元組相同）。未進 CI（無 DB 類 workflow），本機 `node --test` 跑。
+- REALTEST_EVIDENCE: tool=curl | cmd=curl -A <UA> https://social.aware-wave.com/smartlink/test-dedupe-2026-10-21/go/baa64409-df10-4317-880a-98717d76c8ae（筆電 ×2＋ks-aw-01 ×1）→ psql social_smart_link_clicks n=2 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=node --test scripts/__tests__/down-migration-copies.test.mjs（1 pass；突變：0113 scripts 副本加一行 → fail「the two down files differ」，還原 → pass） | exit=0 | ms=66
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 14 對 cmp 全 same；讀回測試檔
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=\.down\.sql|_down\.sql | hits=66 files（只有 apply-db-migration.mjs／check-migrations-applied.sh 讀 migrations 目錄，皆排除 down 檔）
+- ORACLE_WAIVED: 檔案複製＋一支只讀測試，無邏輯變更；實測為真實公開路徑
 ## 2026-10-21（續28）0114 down 補刪 schema_migrations 列＋0114 本機驗證腳本（Codex 寫、Claude 審）
 
 - 根因：`migrations/0114_social_meta_webhook_idempotency.down.sql` 只拆 schema，不刪自己的 ledger 列 → 回滾後 `apply-db-migration.mjs --status` 仍顯示 0114 applied，再套會被跳過（帳本與實況不符）。0113 down 已有同寫法（`0113_social_smart_link_visitor_dedupe.down.sql:5-10`）。
