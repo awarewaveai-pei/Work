@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-21（續12）system-health-check 同步檢查 exit code 被壓成 1 → /verify 誤判 HARD FAIL（Claude 經 SDK）
+
+**觸發**：next-admin 部署前置 /verify 紅：`Critical gate failed: Claude Code sync infrastructure broken`，但 health 明細 `worst=soft, hard=0, soft=1`。操作者選 b：先修再部署。
+
+**根因**：`scripts/system-health-check.ps1:777-778` 以 `powershell.exe -Command "...; & 'check-claude-sync.ps1' -Quiet"` 呼叫子腳本；PS 5.1 `-Command` 不傳遞子腳本 `exit N`，只回 0/1。check-claude-sync 定義 0 pass／1 hard／2 soft（`check-claude-sync.ps1:13-25`），health 依 0/1/2/3 分類（`system-health-check.ps1:801-806`）→ 2（只有提醒：他 session 未提交的 `.claude/commands/ao-resume.md`）與 3（未安裝）都被當 1＝critical。
+
+**修法**：`:777` `$syncCmd` 結尾加 `; exit `$LASTEXITCODE`（子程序展開，保留 `-Command` 以先設 UTF-8 輸出，見 `:775-776`）。只改此行；同類呼叫另一處 `check-claude-sync.ps1:188` 只判 ==0，壓成 1 不改變結果，操作者指定不擴大。
+
+**[驗證結果]**：`$env:TEMP\probe.ps1`（只寫 `exit 2` 的子腳本，同字串兩種寫法）`before=1`／`after=2`；`verify-build-gates.ps1` 修前連兩次 exit 1，修後 exit 0（105118 ms）；`agency-os/reports/health/health-20261021-124709.json` 同步列 `pass: true, detail: WARN (soft): worst=soft, hard=0, soft=1`。
+
+**[rollback]**：`git revert <本 commit>`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -ExecutionPolicy Bypass -File ./scripts/verify-build-gates.ps1 | exit=0 | ms=105118
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- ORACLE_WAIVED: 一行字串修正，操作者指定不開 /codex-review；修前修後實測 exit code 為證
+- BUGHUNT_DONE: scope=agency-os,scripts | grep=-ExecutionPolicy Bypass -Command $ | hits=2
+
 ## 2026-10-21（續11）社群 V1.5 收尾第二輪：審 Codex C31 e2e、C30 日期條查證、續10 小問題全修（Claude 經 SDK）
 
 **觸發**：操作者「可以檢查和抓蟲，但不要重做」；續10 審查小問題「全部修掉」。

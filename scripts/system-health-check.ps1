@@ -774,7 +774,7 @@ if (Test-Path -LiteralPath $syncCheckScript) {
     try {
         # CP950 trap: nested powershell.exe inherits parent console OutputEncoding.
         # Force UTF-8 inside child so JSON paths / Chinese filenames aren't mangled.
-        $syncCmd = "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); & '$syncCheckScript' -Quiet"
+        $syncCmd = "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new(); & '$syncCheckScript' -Quiet; exit `$LASTEXITCODE"
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -Command $syncCmd 2>&1 | Out-Null
         $syncExit = $LASTEXITCODE
         $syncJsonPath = Join-Path $monoRoot "agency-os\.agency-state\sync-check-last.json"
