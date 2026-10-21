@@ -100,6 +100,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const [attachManyRequest, setAttachManyRequest] = useState<{ ids: string[]; n: number } | null>(null);
   const [composeSeed, setComposeSeed] = useState<{ body: string; mediaIds: string[]; n: number } | null>(() => carriedComposeSeed);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [mobileChannels, setMobileChannels] = useState(false);
   const [prefill, setPrefill] = useState<Prefill | null>(null);
   const [newKey] = useState(() => Date.now());
 
@@ -399,16 +400,17 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
     <div className="sm-app">
       {top}
       <PlanTabs view={view} onView={setView} right={<span className="sm-r">{statusLine}<span className="sm-muted">時區 {tz}</span></span>} />
-      <main className={`sm-main${calendar ? "" : " sm-full"}`}>
+      <main className={`sm-main${calendar ? "" : " sm-full"}${mobileChannels ? " sm-mobile-channels" : ""}`}>
         {calendar && <>
           <ChannelList accounts={accounts} only={only} canWrite={canWrite} onToggle={toggleOnly} onOnly={(id) => setOnly(new Set([id]))}
-            onWrite={(id) => openCompose(undefined, undefined, { accounts: id })} onSettings={() => setView("settings")} onRemove={unlink} />
+            onWrite={(id) => openCompose(undefined, undefined, { accounts: id })} onSettings={() => setView("settings")} onRemove={unlink}
+            onCloseMobile={() => setMobileChannels(false)} />
           <section className="sm-panel sm-cal">
             <Toolbar mode={view as "week" | "month" | "list"} query={query} onQuery={setQuery} rangeLabel={rangeLabel} atToday={atToday}
               onStep={step} onToday={() => setAnchor(null)} onMode={(m) => setView(m)}
               platforms={[...new Set(accounts.map((a) => a.platform))]} tags={tags} filters={filters} onFilters={setFilters} filterOpen={filterOpen} onFilterOpen={setFilterOpen}
               bestPlatforms={bestPlatformKeys} best={bestPf} onBest={onBest} canWrite={canWrite} onCreate={() => openCompose()}
-              checkedN={checked.size} onBulk={bulk} />
+              checkedN={checked.size} onBulk={bulk} onMobileChannels={() => setMobileChannels(true)} />
             {nothingYet ? empty : <>
               {view === "week" && <WeekView {...shared} weekStart={mondayOf(at)} onNew={(date) => openCompose(date)} onMove={move}
                 bestTimes={bestPf ? (d) => bestFor(bestPf, d) : null}
@@ -416,6 +418,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
               {view === "month" && <MonthView {...shared} anchor={at} onPickWeek={(d) => { setAnchor(d); setView("week"); }} />}
               {view === "list" && <ListView {...shared} checked={checked} undatedTruncated={undatedTruncated} empty={empty}
                 onCheck={(ids, on) => setChecked((c) => { const n = new Set(c); ids.forEach((id) => (on ? n.add(id) : n.delete(id))); return n; })} />}
+              {view === "week" && canWrite && <button type="button" className="sm-mobile-fab" aria-label="建立貼文" onClick={() => openCompose()}><Icon name="plus" /></button>}
             </>}
           </section>
         </>}

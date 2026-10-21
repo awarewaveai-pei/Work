@@ -231,7 +231,7 @@ await shot("x-settings");
 // the composer's own page (C21): 建立貼文 with text, two comments and a tag; ▾ of the main button; 設定發佈時間 (and with
 // 週期性安排); then an existing post (a scheduled one, the one waiting for review)
 await page.getByRole("button", { name: "排程日曆", exact: true }).click();
-await page.getByRole("button", { name: "建立貼文" }).click();
+await page.locator(".sm-toolbar .sm-end button").click();
 await page.waitForURL(/\/tools\/social\/compose\/new/);
 await page.getByLabel("貼文內容").waitFor();
 await page.getByLabel("貼文內容").fill("這週六下午的親子藝術時光還有三個名額。不需要任何繪畫基礎，帶著孩子一起來玩顏色就好。報名方式在留言。");
@@ -303,5 +303,35 @@ if ((await page.getByRole("link", { name: "打開收件匣" }).getAttribute("tar
 await shot("17-inbox");
 const size = await page.evaluate(() => ({ h: document.scrollingElement.scrollHeight, w: document.scrollingElement.scrollWidth }));
 console.log("page size on the last section", size);
+
+// C30: the product at 390px, not only the static mock. Each view must fit the viewport exactly.
+const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+await phone.route("**/api/social/**", handle);
+const phoneShot = async (name) => {
+  await phone.waitForTimeout(500);
+  const width = await phone.evaluate(() => document.scrollingElement.scrollWidth);
+  console.log(`${name} scrollWidth`, width);
+  if (width !== 390) throw new Error(`${name} is ${width}px wide, expected 390px`);
+  await phone.screenshot({ path: `${out}/${name}.png` });
+};
+const phoneHome = `http://localhost:3902/tools/social?brand=${BRAND.id}`;
+await phone.goto(phoneHome, { waitUntil: "networkidle" });
+await phone.getByRole("heading", { name: "社群發文" }).waitFor();
+await phoneShot("phone-01-calendar");
+await phone.getByRole("button", { name: "月", exact: true }).click();
+await phoneShot("phone-02-month");
+await phone.goto(phoneHome, { waitUntil: "networkidle" });
+await phone.getByRole("button", { name: "貼文清單", exact: true }).click();
+await phoneShot("phone-03-list");
+await phone.goto(phoneHome, { waitUntil: "networkidle" });
+await phone.getByRole("button", { name: "頻道", exact: true }).click();
+await phone.getByRole("button", { name: "關閉", exact: true }).waitFor();
+await phoneShot("phone-04-channels");
+await phone.getByRole("button", { name: "關閉", exact: true }).click();
+await phone.locator(".sm-toolbar .sm-end button").click();
+await phone.getByLabel("貼文內容").waitFor();
+await phoneShot("phone-05-compose-edit");
+await phone.locator(".sm-mobile-compose-tabs button").nth(1).click();
+await phoneShot("phone-06-compose-preview");
 await browser.close();
 console.log("done", out);

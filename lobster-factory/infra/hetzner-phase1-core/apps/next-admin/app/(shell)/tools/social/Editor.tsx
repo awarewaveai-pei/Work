@@ -118,6 +118,7 @@ export default function Editor(props: EditorProps) {
   const [confirmNow, setConfirmNow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [squareCrop, setSquareCrop] = useState(false);
+  const [mobilePane, setMobilePane] = useState<"write" | "preview">("write");
   const [hint, setHint] = useState<{ text: string; error?: boolean } | null>(null);
   const [texts, setTexts] = useState<Array<{ id: string; body: string }> | null>(null);
   const [sourceUrl, setSourceUrl] = useState<string | null>(post?.source_url ?? null);
@@ -406,7 +407,11 @@ export default function Editor(props: EditorProps) {
   const when = act === "now" ? "現在就發" : act === "repeat" ? repeatText(repeat, date, time) : act === "library" ? "不用時間" : whenText(date, time);
 
   return (
-    <div className="sm-cgrid">
+    <div className={`sm-cgrid${mobilePane === "preview" ? " sm-mobile-preview" : ""}`}>
+      <div className="sm-mobile-compose-tabs" role="tablist" aria-label="撰寫頁檢視">
+        <button type="button" role="tab" aria-selected={mobilePane === "write"} className={mobilePane === "write" ? "sm-on" : ""} onClick={() => setMobilePane("write")}>編輯</button>
+        <button type="button" role="tab" aria-selected={mobilePane === "preview"} className={mobilePane === "preview" ? "sm-on" : ""} onClick={() => setMobilePane("preview")}>預覽</button>
+      </div>
       <ChannelPicker accounts={accounts} picked={picked} locked={sentIds} readOnly={readOnly || queued}
         onToggle={(id) => { pickTouched.current = true; setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id])); }} />
       <div className="sm-cwrite">

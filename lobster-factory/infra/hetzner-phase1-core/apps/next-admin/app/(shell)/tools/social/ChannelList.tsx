@@ -10,10 +10,10 @@ import { platformOf, type Account } from "./model";
 const lineOf = (a: Account) => a.status === "expired" ? "授權已過期，請按 ⋮ 選擇「重新連接」。"
   : `${platformOf(a.platform).name} · ${a.handle || a.label}`;
 
-export default function ChannelList({ accounts, only, canWrite, onToggle, onOnly, onWrite, onSettings, onRemove }: {
+export default function ChannelList({ accounts, only, canWrite, onToggle, onOnly, onWrite, onSettings, onRemove, onCloseMobile }: {
   accounts: Account[]; only: Set<string>; canWrite: boolean;
   onToggle: (id: string) => void; onOnly: (id: string) => void; onWrite: (id: string) => void; onSettings: () => void;
-  onRemove: (a: Account) => Promise<void>;
+  onRemove: (a: Account) => Promise<void>; onCloseMobile?: () => void;
 }) {
   const [q, setQ] = useState("");
   const [menu, setMenu] = useState<string | null>(null);
@@ -23,6 +23,7 @@ export default function ChannelList({ accounts, only, canWrite, onToggle, onOnly
     <section className="sm-panel sm-chan" aria-label="頻道">
       <div className="sm-ptop">
         <h2>頻道 {accounts.length > 0 && <span className="sm-muted">{accounts.length} 個</span>}</h2>
+        {onCloseMobile && <button type="button" className="sm-mobile-close sm-r" onClick={onCloseMobile}>關閉</button>}
         {canWrite && <button type="button" className="sm-r" onClick={onSettings}><Icon name="plus" />加頻道</button>}
       </div>
       <label className="sm-find"><Icon name="search" /><input type="search" placeholder="找頻道" aria-label="找頻道" value={q} onChange={(e) => setQ(e.target.value)} /></label>

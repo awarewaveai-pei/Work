@@ -22,6 +22,8 @@ export default function Toolbar(props: {
   canWrite: boolean; onCreate: () => void;
   /** 批次動作 on the list tab: how many are ticked, and what the menu does */
   checkedN: number; onBulk: (action: "submit" | "delete") => void;
+  /** C30: the channel list is a full-screen mobile page rather than a hidden desktop column. */
+  onMobileChannels?: () => void;
 }) {
   const { mode, filters } = props;
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -31,6 +33,7 @@ export default function Toolbar(props: {
     <>
       <div className="sm-toolbar">
         <label className="sm-search"><Icon name="search" /><input type="search" placeholder="搜尋貼文" aria-label="搜尋貼文" value={props.query} onChange={(e) => props.onQuery(e.target.value)} /></label>
+        {props.onMobileChannels && <button type="button" className="sm-mobile-channel-button" onClick={props.onMobileChannels}>頻道</button>}
         {mode === "list" && <span className="sm-range">{props.rangeLabel}</span>}
         {mode !== "list" && <>
           <span className="sm-seg">
