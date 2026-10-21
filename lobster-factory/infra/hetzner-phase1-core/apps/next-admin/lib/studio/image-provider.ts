@@ -11,6 +11,7 @@ import {
   type TarotGenParams,
   type TarotGenResult,
 } from "../tarot/image-gen";
+import type { Grant } from "@/lib/entitlements/can";
 export {
   isAspectRatio,
   isStudioModel,
@@ -24,6 +25,6 @@ export type StudioGenParams = TarotGenParams;
 export type StudioGenResult = TarotGenResult;
 
 /** Generate one image. Same engine as Tarot Studio — model registry included. */
-export function generateImage(params: StudioGenParams): Promise<StudioGenResult> {
-  return generateTarotImage(params);
+export function generateImage(params: StudioGenParams, grant: Grant): Promise<StudioGenResult> {
+  return generateTarotImage(params, grant);
 }

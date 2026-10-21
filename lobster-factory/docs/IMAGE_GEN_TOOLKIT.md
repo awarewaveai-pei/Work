@@ -21,12 +21,12 @@ const result = await generateTarotImage({
   aspectRatio: "4:5",              // "2:3" | "3:2" | "4:5" | "1:1" | "9:16"
   seed: 42,                        // 可選；無 seed 的模型自動忽略
   referenceImages: [dataUrl],      // 可選；data URL 陣列
-});
+}, grant);                         // 呼叫端自己產品的 grant：withFeature 的 handler 參數，或 await grantFor("studio.image")
 // result: { ok: true, image: "data:image/png;base64,...", seed } | { ok: false, error }
 ```
 
-不在 next-admin 的服務（Trigger.dev / n8n）：複製 `image-gen.ts`（零依賴，只用 fetch + Buffer）
-或等抽成 package。環境需求：`REPLICATE_API_TOKEN` + `OPENAI_API_KEY`。
+不在 next-admin 的服務（Trigger.dev / n8n）：呼叫 next-admin 的路由；`image-gen.ts` 依賴 `lib/ai/gateway`
+（`providerUrl(grant, …)`）與 grant，不能單獨複製。環境需求：`REPLICATE_API_TOKEN` + `OPENAI_API_KEY`。
 
 ## 模型總表（2026-06-11 live schema 驗證）
 

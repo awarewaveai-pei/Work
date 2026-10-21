@@ -1,6 +1,8 @@
 import sharp from "sharp";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import {
   generateTarotImage,
   isTarotModel,
@@ -161,7 +163,8 @@ function friendlyError(code: string): string {
   }
 }
 
-export async function POST(req: Request): Promise<Response> {
+export const POST = withFeature("content.image", handlePost);
+async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -224,7 +227,7 @@ export async function POST(req: Request): Promise<Response> {
     ? `${prompt}, ${styleMod}`
     : `${prompt}, professional social media graphic, high quality, clean composition, no text overlay`;
 
-  const result = await generateTarotImage({ model, prompt: finalPrompt, aspectRatio, seed, referenceImages });
+  const result = await generateTarotImage({ model, prompt: finalPrompt, aspectRatio, seed, referenceImages }, grant);
 
   if (!result.ok) {
     const code = (result as { ok: false; error: string }).error;

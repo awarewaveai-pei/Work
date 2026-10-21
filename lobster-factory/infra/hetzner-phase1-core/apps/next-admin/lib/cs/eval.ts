@@ -11,6 +11,7 @@ import { loadEvalCases, loadIntent, loadIntents, loadKnowledgeFloor, setIntentGr
 import { graduationBasis } from "@/lib/cs/graduation";
 import { EXAM_HEARTBEAT_MS } from "@/lib/cs/intent-config";
 import { generateText, parseJsonObject } from "@/lib/cs/llm";
+import { grantFor } from "@/lib/entitlements/grant";
 import { planReply } from "@/lib/cs/orchestrator";
 import type { CisProfile, EvalCase, EvalCaseResult, EvalSummary, Intent, IntentGrade, IntentGraduation } from "@/lib/cs/types";
 
@@ -37,6 +38,7 @@ export async function judgeCovers(opts: {
     maxTokens: 200,
     route: "/cs/eval/judge",
     organizationId: opts.organizationId,
+    grant: await grantFor("cs.eval", { orgId: opts.organizationId }),
   });
   const v = parseJsonObject<{ covered?: boolean; reason?: string }>(text);
   return { covered: v?.covered === true, reason: v?.reason ?? "judge_parse_failed" };

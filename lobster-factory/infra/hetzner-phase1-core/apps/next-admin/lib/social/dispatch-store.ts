@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { ingestIncident } from "@/lib/ops-inbox/ingest";
 import { checkProductionChangeAllowed } from "@/lib/system-modes/production-change-gate";
+import { EntitlementRequired } from "@/lib/entitlements/can";
+import { grantFor } from "@/lib/entitlements/grant";
 import { createPost, deletePost, listAllIntegrations, listPosts } from "@/lib/content/postiz";
 import { LEASE, type DispatchPorts, type LeaseResult, type QueuedPost, type QueuedTarget } from "./dispatch";
 
@@ -86,7 +88,14 @@ export function dispatchPorts(sb: SupabaseClient | null = getSupabaseWriteClient
       check(await sb.from("social_accounts").update({ status }).eq("id", accountId).neq("status", "disabled"), "account status");
     },
     async sendAllowed(organizationId) {
-      return (await checkProductionChangeAllowed(sb, organizationId)).allowed;
+      if (!(await checkProductionChangeAllowed(sb, organizationId)).allowed) return false;
+      try {
+        await grantFor("social.dispatch", { orgId: organizationId, actor: ACTOR });
+        return true;
+      } catch (e) {
+        if (e instanceof EntitlementRequired) return false;
+        throw e;
+      }
     },
     async raiseIncident(post, message) {
       const { data: org } = await sb.from("organizations").select("slug").eq("id", post.organizationId).maybeSingle();

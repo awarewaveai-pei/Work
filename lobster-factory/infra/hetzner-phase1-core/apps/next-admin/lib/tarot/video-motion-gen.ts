@@ -14,7 +14,7 @@
 
 import { fetchWithRetry429, REPLICATE_POLL_MS, isAllowedOutputUrl } from "./image-gen";
 import { providerUrl } from "@/lib/ai/gateway";
-import { grantFor } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 
 const GEN_TIMEOUT_MS = 280_000; // 留在 nginx app.aware-wave.com /api/ 的 proxy_read_timeout 300s 內
 // 影片比圖片檔案大很多（5-8s 720p 常見 5-20MB）；20MB（image-gen.ts 的圖片上限）太緊，但box 本來就
@@ -102,12 +102,12 @@ export type VideoMotionOutcome =
  *                     這裡描述「畫面接下來怎麼動」，兩者疊加效果比同一句話硬用兩次更好）。
  */
 export async function generateVideoMotion(
+  grant: Grant,
   model: VideoMotionModel,
   imageUrl: string,
   motionPrompt: string,
   aspectRatio: "16:9" | "9:16" = "16:9",
 ): Promise<VideoMotionOutcome> {
-  const grant = await grantFor("tarot.motion");
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate_api_token" };
   const config = MOTION_MODELS[model];
@@ -186,9 +186,10 @@ export interface VideoMotionJob {
  * 無上限 Promise.all 會讓多數場景 429 兩次後直接靜默降級回靜態圖，使用者付了心力設定動態卻大半
  * 沒生效。回傳陣列順序與輸入 jobs 相同，供呼叫端用索引對回各自的場景/格式。
  */
-export async function generateVideoMotionBatch(model: VideoMotionModel, jobs: VideoMotionJob[]): Promise<VideoMotionOutcome[]> {
+/** The caller asks for its own feature (video asks video.motion). */
+export async function generateVideoMotionBatch(grant: Grant, model: VideoMotionModel, jobs: VideoMotionJob[]): Promise<VideoMotionOutcome[]> {
   const MOTION_CONCURRENCY = 3;
   return runWithConcurrency(MOTION_CONCURRENCY, jobs.map((job) => () =>
-    generateVideoMotion(model, job.imageUrl, job.motionPrompt, job.aspectRatio ?? "16:9"),
+    generateVideoMotion(grant, model, job.imageUrl, job.motionPrompt, job.aspectRatio ?? "16:9"),
   ));
 }

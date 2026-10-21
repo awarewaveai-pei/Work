@@ -11,7 +11,7 @@
 
 import { getDesignsPublicBase } from "../storage/r2";
 import { providerUrl } from "@/lib/ai/gateway";
-import { grantFor } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 
 const GEN_TIMEOUT_MS = 58_000; // stay under the 60s nginx/route ceiling
 export const REPLICATE_POLL_MS = 2_500;
@@ -401,8 +401,7 @@ export async function fetchWithRetry429(url: string, options: RequestInit & { si
 }
 
 // ── FLUX (Replicate) — legacy path kept for backward compatibility ─────────────
-async function generateFlux(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
-  const grant = await grantFor("tarot.image");
+async function generateFlux(params: TarotGenParams, config: ModelConfig, signal: AbortSignal, grant: Grant): Promise<TarotGenResult> {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate_api_token" };
 
@@ -476,8 +475,7 @@ async function generateFlux(params: TarotGenParams, config: ModelConfig, signal:
 }
 
 // ── Generic Replicate — new models via per-model buildInput abstraction ─────────
-async function generateReplicate(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
-  const grant = await grantFor("tarot.image");
+async function generateReplicate(params: TarotGenParams, config: ModelConfig, signal: AbortSignal, grant: Grant): Promise<TarotGenResult> {
   const token = process.env.REPLICATE_API_TOKEN;
   if (!token) return { ok: false, error: "missing_replicate_api_token" };
   if (!config.slug || !config.buildInput) return { ok: false, error: "model_config_incomplete" };
@@ -535,8 +533,7 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
 }
 
 // ── OpenAI gpt-image-1 ──────────────────────────────────────────────────────────
-async function generateOpenai(params: TarotGenParams, config: ModelConfig, signal: AbortSignal): Promise<TarotGenResult> {
-  const grant = await grantFor("tarot.image");
+async function generateOpenai(params: TarotGenParams, config: ModelConfig, signal: AbortSignal, grant: Grant): Promise<TarotGenResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return { ok: false, error: "missing_openai_api_key" };
 
@@ -602,15 +599,16 @@ async function generateOpenai(params: TarotGenParams, config: ModelConfig, signa
   return { ok: true, image: `data:image/png;base64,${b64}`, seed: null };
 }
 
-export async function generateTarotImage(params: TarotGenParams): Promise<TarotGenResult> {
+/** Shared by tarot, studio, content and video: the caller asks for its own product's feature (e.g. grantFor("studio.image")). */
+export async function generateTarotImage(params: TarotGenParams, grant: Grant): Promise<TarotGenResult> {
   const config = TAROT_MODELS[params.model];
   if (!config) return { ok: false, error: "unknown_model" };
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GEN_TIMEOUT_MS);
   try {
-    if (config.provider === "flux") return await generateFlux(params, config, controller.signal);
-    if (config.provider === "replicate") return await generateReplicate(params, config, controller.signal);
-    return await generateOpenai(params, config, controller.signal);
+    if (config.provider === "flux") return await generateFlux(params, config, controller.signal, grant);
+    if (config.provider === "replicate") return await generateReplicate(params, config, controller.signal, grant);
+    return await generateOpenai(params, config, controller.signal, grant);
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     return { ok: false, error: msg === "The operation was aborted." ? "generation_timeout" : msg };

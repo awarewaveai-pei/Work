@@ -8,6 +8,24 @@
 - REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/0n -- Codex r1 授權讀取被 1000 列截斷（已修＋測試）；r2 併發新增授權（不可達，見上）；artifact `agency-os/reports/oracle/2026-10-21-partialreview-a1ef74d0.md`
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`=== "active"|organization_entitlements insert|entitlements/expire|expired` | hits=launcher 1 處（已改）；授權 insert 只在 0110；expire 消費者只有 workflows postExpire.ts（只驗 ok/expired，相容）
 - [rollback] `git revert` 本 commit；無 migration、無 env。
+## 2026-10-21（續2）產品登記表三類事實改成可驗：門 API 真的存在、每個 feature_key 都有人問、跨產品呼叫都有宣告
+
+**根因**：`lib/portal/products.ts` 的宣告沒有對照程式的閘，三類不實：(1) 門 API `/api/cs`、`/api/design`、`/api/collect` 不存在；(2) 共用引擎寫死某產品的 key（`lib/tarot/image-gen.ts` 三處 `grantFor("tarot.image")`、`video-motion-gen.ts` `tarot.motion`、`lib/cs/llm.ts` 全部 `cs.answer`），所以 studio/content/video 的圖、video 的動態、cs 的 intent/eval/translate 都記在別人帳上，宣告的 studio.image/content.image/video.motion/cs.intent/cs.eval/cs.exam/cs.translate/design.edit/social.rewrite/social.dispatch/video.tts 沒有任何呼叫點；(3) design/content/video 呼叫別的產品的路由或付費功能，登記表沒寫。
+
+- 新閘 `lib/portal/__tests__/registry-code.test.ts`（AST 掃 app＋lib）：門 API＝app/api 下有 route 的目錄、不在 webhooks/internal、不和別的產品重疊；next-admin 產品每個 feature_key 與每個 BACK_OFFICE key 都有字面 `grantFor`/`withFeature`，被問的 key 都有宣告；P 的程式打到 Q 的門 API／ROUTE_FEATURES 路由、問 Q 的 key、或 import 一個問 Q key 的檔 → Q 必須在 dependsOn 閉包或 `optional`，且宣告的每項都有程式證據；standalone 的 dependsOn 閉包無 SAFETY_GATE。純 lib import 不算依賴（一份程式出貨，ADR 017 §5）。紅：3 條失敗（`/api/design` 不存在、social.rewrite 無人問、33 條未宣告的跨產品呼叫）→ 綠 5/5。
+- 決定（操作者選 A，經 v17-8 session 轉達）：不合併產品；video.dependsOn=content、design 與 content dependsOn=studio；新增 `modules.optional`＝某些按鈕用到、沒有也能用的產品（design→video 的 script-forge；content→video：ContentStudio 的影片分頁＝寄居在 content 的 video UI），optional 不進 Foundry 閉包，所以 content↔video 互呼不成循環、測試不需豁免。
+- 門：cs `/api/ops/cs`；design `/api/tools/presets`（`/api/tools/designs` 是 tarot/studio/content 共用的素材庫，不屬 design、不加閘）；collect `[]`；video 加 `/api/tools/script-forge`。
+- 引擎改由呼叫端給 grant：`generateTarotImage(params, grant)`、`generateVideoMotion(grant, …)`、cs `claudeTurn`/`generateText` 的 `grant` 欄。tarot/studio/content 圖片路由改 `withFeature`（tarot.image／studio.image／content.image）；video 場景圖 video.image、動態 video.motion；staging 首圖 `ops.staging-image`（取代沒人問的 `ops.visual-check`）；cs 各呼叫各問自己的 key，模擬考按鈕問 cs.exam（actorFor，同 outreach）。
+- design.edit：mockup preset 的 POST/DELETE `withFeature`。video.tts：`render-client.ts` 送 OpenAI 旁白前問。social.dispatch：發送器 `sendAllowed` 埠（每品牌每輪一次），enforce 下沒有就留 queued。social.rewrite：新 `/api/social/rewrite`（syndicate 改寫抽到 `lib/content/syndicate.ts`，content 與 social 各以自己的 key 掛），社群門上原本 `/api/content/syndicate` 404（`doors.test.ts:51`）。tarot.motion 刪除（tarot 沒有動態功能）。
+- tarot 卡片 callback（603485b3b 新路由）補 `grantFor("tarot.image")`；8 份 MODULE_MANIFEST 文字同步（tarot 份含 tarot session 交接的路徑／行號，行號因本批 import +1）；Foundry sync＋rehash＋verify。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/portal/__tests__/registry-code.test.ts`（紅 3 fail → 綠 5/5）；`npx vitest run lib/portal lib/entitlements lib/cs lib/social lib/content lib/system-modes lib/security lib/hosting lib/tarot lib/studio app/api/internal/social app/api/video app/api/tools app/api/social app/api/content`（138 files／1040 pass）；`npx tsc --noEmit` 綠；`node --test scripts/__tests__/product-manifests.test.mjs scripts/__tests__/new-product.test.mjs` 8 pass；manifestStatus 11/11；Foundry sync → regenerate_integrity --write → Makefile verify 20 步逐條 exit 0（tarot 603485b3b 之後重跑） → generate_sample --replace → rehash → validate_manifest exit 0 | exit=0 | ms=780000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/1n -- Codex `agency-os/reports/oracle/2026-10-21-partialreview-e1a6140c.md`：F1「同產品 helper 問別產品 key 漏抓」假陽性（helper 自己的 `asks` 已算邊，紅燈時 `video-script-core.ts asks video.script` 有列出）；F2 video 的 grantFor 沒帶客戶 org＝改前即如此（video 路由未包 withFeature），進 TASKS
+- ORACLE_WAIVED: Codex 以 -Path 只審本批 28 檔（partialreview）；全樹含其他 session 未提交改動
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`generateTarotImage\(|generateVideoMotionBatch\(|syndicateHandler|"/api/social/rewrite"|ops\.staging-image|tarot\.motion|ops\.visual-check|"/api/cs"|/api/design` | hits=22（全是本批呼叫點；tarot.motion／ops.visual-check／舊門 0）；`lobster-factory/docs/IMAGE_GEN_TOOLKIT.md` 範例補 grant 參數
+
+**剩餘**：見 TASKS.md「登記表事實 follow-up」。**rollback**：`git revert <本 commit>`；Foundry 檔由 sync＋rehash 重產。
 ## 2026-10-21（續1）tarot batch callback 被 session 閘擋（401）→ 移到 `/api/internal/tarot/batch/*`＋自有 token；secret 離開 Trigger payload
 
 **根因**：Trigger task `tarot-batch-generate` 回呼 `PATCH /api/tools/tarot/batch/[jobId]`、`POST .../card`，沒有登入 session；`middleware.ts:413` matcher 不排除 `/api/tools` → `:302-304` 剝掉 `x-ops-claims-role` → `:385` 無 session 回 401 → 78 張全失敗、job 停在 pending。另：card 的 `BATCH_INTERNAL_SECRET` 比對用 `!==`；secret 經 run payload 傳遞（TASKS 資安項，2026-09-23 續110 ④）。

@@ -68,7 +68,8 @@ export interface DispatchPorts {
   resetTarget(post: QueuedPost, targetId: string, deletedPostizPostId: string | null): Promise<boolean>;
   recordOutcome(post: QueuedPost, changes: OutcomeChange[]): Promise<string | null>;
   setAccountStatus(accountId: string, status: "connected" | "expired"): Promise<void>;
-  /** The brand's (and global) system mode allows publishing (lib/system-modes/production-change-gate.ts). */
+  /** The brand's (and global) system mode allows publishing (lib/system-modes/production-change-gate.ts) and the brand
+   *  holds social.dispatch (enforce only; shadow always holds it). */
   sendAllowed(organizationId: string): Promise<boolean>;
   /** null = raised; otherwise why not (the run then fails, so Sentry has it) */
   raiseIncident(post: QueuedPost, message: string): Promise<string | null>;
@@ -107,7 +108,8 @@ export interface DispatchResult {
   published: number;
   errored: number;
   orphansDeleted: number;
-  /** posts whose brand (or the whole system) is in a mode that blocks publishing: left queued, sent once it allows */
+  /** posts whose brand (or the whole system) is in a mode that blocks publishing, or (enforce) the brand lacks
+   *  social.dispatch: left queued, sent once it allows */
   blockedByMode: number;
   postizCalls: number;
   stoppedEarly: "budget" | "time" | null;

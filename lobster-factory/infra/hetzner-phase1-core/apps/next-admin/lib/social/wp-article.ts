@@ -1,7 +1,8 @@
 // A WordPress article as the start of a social post (SOCIAL_MANAGER_PLAN.md C10). Free path: the article's own excerpt,
 // featured image and link (WP REST, the site's application password; read only). The AI path rewrites it per channel
-// through the existing /api/content/syndicate; this file maps our platforms to its keys and prices the call from
-// lib/ai/cost-model.ts (TEXT_FEATURES "syndicate") so the button shows the cost before anyone presses it.
+// through /api/social/rewrite (lib/content/syndicate.ts, also served as /api/content/syndicate); this file maps our
+// platforms to its keys and prices the call from lib/ai/cost-model.ts (TEXT_FEATURES "syndicate") so the button shows
+// the cost before anyone presses it.
 import { featureUnitCostUsd } from "@/lib/ai/cost-calculator";
 import { TEXT_FEATURES, TWD_RATE } from "@/lib/ai/cost-model";
 

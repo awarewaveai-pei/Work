@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
 import { generateTarotImage, isTarotModel, isAspectRatio } from "@/lib/tarot/image-gen";
+import { grantFor } from "@/lib/entitlements/grant";
 import { recordCardResult, getJob } from "@/lib/tarot/batch-store";
 import { putDesignObject, parseImageDataUrl, isR2Configured, getDesignsPublicBase } from "@/lib/storage/r2";
 import { checkAndConsumeQuota } from "@/lib/tarot/quota";
@@ -60,7 +61,7 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "quota_exceeded", code: "quota_exceeded" }, { status: 429 });
   }
 
-  const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true });
+  const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true }, await grantFor("tarot.image"));
 
   if (!result.ok) {
     const errMsg = (result as { ok: false; error: string }).error;

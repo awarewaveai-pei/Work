@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
+import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 import {
   generateImage,
   isStudioModel,
@@ -45,7 +47,8 @@ function friendlyError(code: string): string {
   return `生成失敗：${code}`;
 }
 
-export async function POST(request: Request) {
+export const POST = withFeature("studio.image", handlePost);
+async function handlePost(request: Request, grant: Grant): Promise<Response> {
   if (process.env.POD_DESIGNS_ENABLED !== "true") {
     return NextResponse.json({ ok: false, error: "pod_designs_disabled" }, { status: 503 });
   }
@@ -118,7 +121,7 @@ export async function POST(request: Request) {
     referenceImages,
     seed: body.seed ?? null,
     aspectRatio: isAspectRatio(body.aspectRatio) ? body.aspectRatio : undefined,
-  });
+  }, grant);
 
   if (result.ok) {
     const jobId = typeof body._jobId === "string" ? body._jobId : null;

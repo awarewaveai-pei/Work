@@ -5,6 +5,8 @@
  * video-service 負責 TTS + ffmpeg 合成；本模組只傳資料、接結果。
  */
 import { optionalRendererAuthHeaders, resolveRendererAuth } from "./renderer-auth";
+import { EntitlementRequired } from "@/lib/entitlements/can";
+import { grantFor } from "@/lib/entitlements/grant";
 
 /** /render POST body 的場景格式（最小需求；duration 由服務端計算）。 */
 interface RenderScene {
@@ -133,6 +135,13 @@ export async function submitRender(
     const capability = await assertNativeMultiformat(base, opts!.formats!);
     if (capability.ok === false) return { ok: false, status: 503, error: capability.error };
     serviceCapability = capability.capability;
+  }
+  // OpenAI narration is the paid voice (video-cost.ts "openai"); video-service calls it, so the render asks here.
+  if (opts?.ttsProvider === "openai") {
+    try { await grantFor("video.tts"); } catch (e) {
+      if (e instanceof EntitlementRequired) return { ok: false, status: 403, error: e.message };
+      throw e;
+    }
   }
   try {
     const res = await fetch(`${base}/render`, {

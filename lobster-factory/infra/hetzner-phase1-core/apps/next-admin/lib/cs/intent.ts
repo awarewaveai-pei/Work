@@ -3,6 +3,7 @@
 
 import { CS_MODELS, CS_TIMEOUTS } from "@/lib/cs/config";
 import { generateText, parseJsonObject } from "@/lib/cs/llm";
+import { grantFor } from "@/lib/entitlements/grant";
 import type { Intent, IntentClassification } from "@/lib/cs/types";
 
 export async function classifyIntent(opts: {
@@ -33,6 +34,7 @@ export async function classifyIntent(opts: {
       maxTokens: 120,
       route: "/cs/classify",
       organizationId,
+      grant: await grantFor("cs.intent", { orgId: organizationId }),
       timeoutMs: CS_TIMEOUTS.classifyMs,
     });
     const parsed = parseJsonObject<{ intentKey?: string; confidence?: number }>(text);

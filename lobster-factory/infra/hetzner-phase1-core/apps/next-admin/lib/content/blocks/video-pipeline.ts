@@ -22,6 +22,7 @@ import {
 import { submitRender, type RenderOutputMeta, type RenderOutputs, type VideoServiceCapability } from "../video/render-client";
 import { generateTarotImage, isTarotModel } from "../../tarot/image-gen";
 import { generateVideoMotionBatch, isVideoMotionModel } from "../../tarot/video-motion-gen";
+import { grantFor } from "@/lib/entitlements/grant";
 import { VIDEO_MOTION_RATES } from "../../ai/cost-model";
 import { logImageCost } from "../../ai/log-ai-call";
 import { getSupabaseWriteClient } from "../../supabase-server";
@@ -358,7 +359,7 @@ export async function buildSceneAsset(
     prompt: styledPrompt,
     aspectRatio,
     referenceImages: referenceImageUrl ? [referenceImageUrl] : undefined,
-  });
+  }, await grantFor("video.image"));
   if (img.ok === false) return { ok: false, status: 502, error: `場景 ${scene.id} 圖片生成失敗：${img.error}` };
   const parsed = parseImageDataUrl(img.image);
   const key = parsed ? buildDesignKey(parsed.mime) : null;
@@ -408,7 +409,7 @@ export async function applyVideoMotionToPrimaryFormat(
     motionPrompt: `${s.image_prompt}. The subject moves naturally and visibly (gesture, expression, or action) — not just a slow camera drift. Cinematic camera movement.`,
     aspectRatio: primaryAspectRatio as "16:9" | "9:16",
   }));
-  const results = await generateVideoMotionBatch(motionModel, jobs);
+  const results = await generateVideoMotionBatch(await grantFor("video.motion"), motionModel, jobs);
 
   // 這批（同一支影片、最多 MAX_MOTION_SCENES 個場景）共用一個關聯 id，讓 /ops/costs「⑤ 流水帳」
   // 能把同一支影片的多筆動態收費歸成一組，而非各自散落、事後對不回是哪支影片花的（critic 2026-09-12）。

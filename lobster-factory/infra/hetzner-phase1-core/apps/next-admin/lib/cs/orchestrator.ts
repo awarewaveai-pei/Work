@@ -10,6 +10,7 @@ import { inputGuards, outputGuards } from "@/lib/cs/guardrails";
 import { classifyIntent } from "@/lib/cs/intent";
 import { retrieve, visibleTitles } from "@/lib/kb";
 import { generateText } from "@/lib/cs/llm";
+import { grantFor } from "@/lib/entitlements/grant";
 import type { RetrievedChunk } from "@/lib/kb/types";
 import { generateReply, runAgenticTurn, superviseReply } from "@/lib/cs/generate";
 import { loadEnabledTools, loadIntents, loadMemory, recordReply } from "@/lib/cs/db";
@@ -301,6 +302,7 @@ async function translateForRetrieval(organizationId: string, text: string, title
       maxTokens: 200,
       route: "/cs/translate",
       organizationId,
+      grant: await grantFor("cs.translate", { orgId: organizationId }),
       timeoutMs: CS_TIMEOUTS.classifyMs,
     });
     const cleaned = out.trim();

@@ -5594,7 +5594,9 @@
       "name": "內容行銷",
       "description": "產生文章、搜尋素材並安排內容發布。",
       "module": "aw-content",
-      "requires": [],
+      "requires": [
+        "CAP-AW-STUDIO"
+      ],
       "acceptance": [
         {
           "test": "publish an article to a connected WordPress site without choosing a status",
@@ -5628,7 +5630,9 @@
       "name": "設計編輯器",
       "description": "編輯畫布、橫幅、模型圖與向量設計。",
       "module": "aw-design",
-      "requires": [],
+      "requires": [
+        "CAP-AW-STUDIO"
+      ],
       "acceptance": [
         {
           "test": "save a canvas design to My Designs, then delete it",
@@ -5730,7 +5734,9 @@
       "name": "影片製作",
       "description": "生成腳本、場景、動態與旁白影片。",
       "module": "aw-video",
-      "requires": [],
+      "requires": [
+        "CAP-AW-CONTENT"
+      ],
       "acceptance": [
         {
           "test": "blocks stale, failed, and duplicate evidence (lib/content/video/__tests__)",

@@ -8,6 +8,7 @@ import { type Anthropic } from "@/lib/ai/gateway";
 import { CS_MODELS, CS_THRESHOLDS, CS_TIMEOUTS } from "@/lib/cs/config";
 import { buildSystemPrompt, buildUserContext, renderPassage } from "@/lib/cs/cis";
 import { claudeTurn, extractText, extractToolUses, generateText, parseJsonObject } from "@/lib/cs/llm";
+import { grantFor } from "@/lib/entitlements/grant";
 import { getToolHandler, resolveToolDecision } from "@/lib/cs/tools";
 import type { RetrievedChunk } from "@/lib/kb/types";
 import type {
@@ -32,6 +33,7 @@ export async function generateReply(opts: {
     maxTokens: 800,
     route: "/cs/generate",
     organizationId: opts.cis.organizationId,
+    grant: await grantFor("cs.answer", { orgId: opts.cis.organizationId }),
     timeoutMs: CS_TIMEOUTS.generateMs,
   });
   return { text, provider };
@@ -75,6 +77,7 @@ export async function superviseReply(opts: {
       maxTokens: 200,
       route: "/cs/supervise",
       organizationId: opts.organizationId,
+      grant: await grantFor("cs.answer", { orgId: opts.organizationId }),
       timeoutMs: CS_TIMEOUTS.supervisorMs,
     });
     const v = parseJsonObject<{ grounded?: boolean; safe?: boolean; reason?: string }>(text);
@@ -126,6 +129,7 @@ export async function runAgenticTurn(opts: {
       tools: anthropicTools,
       route: "/cs/agentic",
       organizationId: opts.cis.organizationId,
+      grant: await grantFor("cs.answer", { orgId: opts.cis.organizationId }),
       timeoutMs: CS_TIMEOUTS.generateMs,
     });
 

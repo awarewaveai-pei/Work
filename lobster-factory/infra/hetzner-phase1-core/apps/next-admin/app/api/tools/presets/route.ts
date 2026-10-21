@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
+import { withFeature } from "../../../../lib/entitlements/grant";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import {
   buildDesignKey,
@@ -79,7 +80,10 @@ export async function GET(request: Request) {
 }
 
 /** POST — save a new preset (model or product). */
-export async function POST(request: Request) {
+// Saving and deleting mockup presets is design's own paid edit (contract); listing is free. The shared asset gallery
+// (/api/tools/designs) is used by tarot, studio and content too, so it stays ungated.
+export const POST = withFeature("design.edit", handlePost);
+async function handlePost(request: Request): Promise<Response> {
   if (!featureEnabled()) {
     return NextResponse.json({ ok: false, error: "pod_designs_disabled" }, { status: 503 });
   }
@@ -210,7 +214,8 @@ export async function POST(request: Request) {
 }
 
 /** DELETE — remove a preset. Requires canCreateAiImageJob. */
-export async function DELETE(request: Request) {
+export const DELETE = withFeature("design.edit", handleDelete);
+async function handleDelete(request: Request): Promise<Response> {
   if (!featureEnabled()) {
     return NextResponse.json({ ok: false, error: "pod_designs_disabled" }, { status: 503 });
   }

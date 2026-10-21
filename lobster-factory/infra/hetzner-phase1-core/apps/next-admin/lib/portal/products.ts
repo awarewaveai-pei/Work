@@ -25,7 +25,9 @@ interface ProductDefinition {
   selfSignup: boolean;
   features: readonly ProductFeature[];
   accessChannels: readonly ("ui" | "api")[];
-  modules: { dependsOn: readonly string[]; manifest: string };
+  // dependsOn: installed with this product (Foundry requires). optional: products some of its buttons call or bill; it
+  // works without them. lib/portal/__tests__/registry-code.test.ts checks both against the code.
+  modules: { dependsOn: readonly string[]; optional?: readonly string[]; manifest: string };
   staffPaths: readonly string[];
 }
 const quota = (feature_key: string, name: string, billing: ProductFeature["billing"] = "credits"): ProductFeature =>
@@ -42,32 +44,33 @@ const PRODUCT_DEFINITIONS = [
     loginSources: ["local", "awarewave-wp", "customer-wp"], standalone: true, status: "coming_soon", selfSignup: false,
     features: [quota("social.rewrite", "AI 多平台改寫"), quota("social.dispatch", "貼文派送", "contract")], accessChannels: ["ui"],
     modules: { dependsOn: [], manifest: "lib/social/MODULE_MANIFEST.json" }, staffPaths: ["tools/social"] },
-  { key: "video", name: "影片製作", description: "生成腳本、場景、動態與旁白影片。", subdomain: "video", door: { app: "next-admin", page: "/video", enabled: false, api: ["/api/video"] },
+  { key: "video", name: "影片製作", description: "生成腳本、場景、動態與旁白影片。", subdomain: "video", door: { app: "next-admin", page: "/video", enabled: false, api: ["/api/video", "/api/tools/script-forge"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("video.script", "腳本生成"), quota("video.image", "場景圖生成"), quota("video.motion", "影片動態"), quota("video.tts", "付費旁白")],
-    accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/video/MODULE_MANIFEST.json" }, staffPaths: ["tools/video"] },
+    accessChannels: ["ui"], modules: { dependsOn: ["content"], manifest: "lib/video/MODULE_MANIFEST.json" }, staffPaths: ["tools/video"] },
   { key: "tarot", name: "塔羅製圖", description: "生成塔羅圖片、提示詞與動態。", subdomain: "tarot", door: { app: "next-admin", page: "/tarot", enabled: false, api: ["/api/tools/tarot"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
-    features: [quota("tarot.image", "塔羅圖生成"), quota("tarot.prompt", "提示詞建議"), quota("tarot.motion", "塔羅動態")],
+    features: [quota("tarot.image", "塔羅圖生成"), quota("tarot.prompt", "提示詞建議")],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/tarot/MODULE_MANIFEST.json" }, staffPaths: ["tools/tarot"] },
   { key: "studio", name: "商品設計工作室", description: "生成商品圖片、文案與修圖素材。", subdomain: "studio", door: { app: "next-admin", page: "/studio", enabled: false, api: ["/api/tools/studio"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("studio.image", "圖片生成"), quota("studio.product-copy", "商品文案"), quota("studio.edit-prompt", "修圖提示詞"), quota("studio.remove-bg", "去背"), quota("studio.inpaint", "局部重繪"), quota("studio.fill", "生成填補"), quota("studio.upscale", "圖片放大")],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/studio/MODULE_MANIFEST.json" }, staffPaths: ["tools/studio"] },
-  { key: "design", name: "設計編輯器", description: "編輯畫布、橫幅、模型圖與向量設計。", subdomain: "design", door: { app: "next-admin", page: "/design", enabled: false, api: ["/api/design"] },
+  { key: "design", name: "設計編輯器", description: "編輯畫布、橫幅、模型圖與向量設計。", subdomain: "design", door: { app: "next-admin", page: "/design", enabled: false, api: ["/api/tools/presets"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     // Paid image operations belong to studio above; Fabric editing itself calls no paid model.
     features: [quota("design.edit", "畫布與向量編輯", "contract")], accessChannels: ["ui"],
-    modules: { dependsOn: [], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-editor"] },
+    modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/design/MODULE_MANIFEST.json" }, staffPaths: ["tools/canvas", "tools/designs", "tools/mockup", "tools/banner", "tools/vector-editor"] },
   { key: "content", name: "內容行銷", description: "產生文章、搜尋素材並安排內容發布。", subdomain: "content", door: { app: "next-admin", page: "/content", enabled: false, api: ["/api/content"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("content.article", "文章生成"), quota("content.humanize", "文章人性化"), quota("content.seo-fix", "SEO 修正"), quota("content.brand-voice", "品牌語氣擷取"), quota("content.outline", "大綱生成"), quota("content.title", "標題建議"), quota("content.keywords", "關鍵字建議"), quota("content.hook-brief", "Hook 草稿"), quota("content.syndicate", "多平台內容改寫"), quota("content.market-analysis", "市場分析"), quota("content.trending", "趨勢分析"), quota("content.image", "內容配圖")],
-    accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/content/MODULE_MANIFEST.json" }, staffPaths: ["tools/content", "tools/publish", "tools/events"] },
-  { key: "cs", name: "AI 客服", description: "根據知識庫回答問題並處理客服交接。", subdomain: "cs", door: { app: "next-admin", page: "/cs", enabled: false, api: ["/api/cs"] },
+    accessChannels: ["ui"], modules: { dependsOn: ["studio"], optional: ["video"], manifest: "lib/content/MODULE_MANIFEST.json" }, staffPaths: ["tools/content", "tools/publish", "tools/events"] },
+  // cs and collect also use /api/ops/clients/[slug]/{cs-*,collection-sources}: not a prefix a door can own; ADR 017 step 8 decides.
+  { key: "cs", name: "AI 客服", description: "根據知識庫回答問題並處理客服交接。", subdomain: "cs", door: { app: "next-admin", page: "/cs", enabled: false, api: ["/api/ops/cs"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("cs.intent", "意圖分類"), quota("cs.answer", "客服回答與工具呼叫"), quota("cs.eval", "回答評測"), quota("cs.exam", "客服模擬考"), quota("cs.translate", "訊息翻譯")],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/cs/MODULE_MANIFEST.json" }, staffPaths: ["ops/cs", "ops/knowledge", "cs-widget"] },
-  { key: "collect", name: "資料蒐集器", description: "搜尋並蒐集外部網站與研究資料。", subdomain: "collect", door: { app: "next-admin", page: "/collect", enabled: false, api: ["/api/collect"] },
+  { key: "collect", name: "資料蒐集器", description: "搜尋並蒐集外部網站與研究資料。", subdomain: "collect", door: { app: "next-admin", page: "/collect", enabled: false, api: [] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("collect.fetch", "資料蒐集")], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/collect/MODULE_MANIFEST.json" }, staffPaths: ["ops/collect"] },
   { key: "outreach", name: "行銷開發信", description: "產生開發信並管理寄送名單。", subdomain: "outreach", door: { app: "next-admin", page: "/outreach", enabled: false, api: ["/api/outreach"] },

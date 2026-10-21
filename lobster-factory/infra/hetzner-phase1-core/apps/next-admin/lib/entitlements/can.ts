@@ -77,7 +77,7 @@ export interface GateDependencies {
 }
 
 /** Staff tooling billed to the internal account; there is no product row to seed a comp entitlement on. */
-export const BACK_OFFICE_FEATURES: ReadonlySet<string> = new Set(["ops.inbox-ai", "ops.onboarding-spec", "ops.command-plane", "ops.cheap-json", "ops.visual-check"]);
+export const BACK_OFFICE_FEATURES: ReadonlySet<string> = new Set(["ops.inbox-ai", "ops.onboarding-spec", "ops.command-plane", "ops.cheap-json", "ops.staging-image"]);
 
 export class EntitlementRequired extends Error {
   readonly status = 403;

@@ -1,6 +1,6 @@
 "use client";
 // 文章 → 社群貼文 (SOCIAL_MANAGER_PLAN.md C10; mock: #srcBox). Two ways to start the post: the article's own excerpt,
-// featured image and link (free), or an AI rewrite per channel through /api/content/syndicate (cost on the button,
+// featured image and link (free), or an AI rewrite per channel through /api/social/rewrite (cost on the button,
 // lib/social/wp-article.ts rewriteCostTwd from lib/ai/cost-model.ts). Either one fills the editor; nothing is saved
 // until someone presses one of its four buttons.
 import { useState } from "react";
@@ -57,7 +57,7 @@ export default function ArticleSource({ brand, accounts, siteId, postId, title, 
       const a = await article();
       const platforms = syndicatePlatforms(connected.map((x) => x.platform));
       if (!platforms.length) throw new Error("先連接至少一個社群帳號。");
-      const res = await fetch("/api/content/syndicate", {
+      const res = await fetch("/api/social/rewrite", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({ article: `${a.title}\n\n${a.content || a.excerpt}`, platforms, articleUrl: a.link, mediaType: a.image ? "image" : "text" }),
       });

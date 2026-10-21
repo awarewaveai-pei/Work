@@ -2139,9 +2139,7 @@
         "app": "next-admin",
         "page": "/collect",
         "enabled": false,
-        "api": [
-          "/api/collect"
-        ]
+        "api": []
       },
       "loginSources": [
         "local"
@@ -2278,7 +2276,12 @@
         "ui"
       ],
       "modules": {
-        "dependsOn": [],
+        "dependsOn": [
+          "studio"
+        ],
+        "optional": [
+          "video"
+        ],
         "manifest": "lib/content/MODULE_MANIFEST.json"
       },
       "staffPaths": [
@@ -2297,7 +2300,7 @@
         "page": "/cs",
         "enabled": false,
         "api": [
-          "/api/cs"
+          "/api/ops/cs"
         ]
       },
       "loginSources": [
@@ -2366,7 +2369,7 @@
         "page": "/design",
         "enabled": false,
         "api": [
-          "/api/design"
+          "/api/tools/presets"
         ]
       },
       "loginSources": [
@@ -2388,7 +2391,12 @@
         "ui"
       ],
       "modules": {
-        "dependsOn": [],
+        "dependsOn": [
+          "studio"
+        ],
+        "optional": [
+          "video"
+        ],
         "manifest": "lib/design/MODULE_MANIFEST.json"
       },
       "staffPaths": [
@@ -2627,13 +2635,6 @@
           "limitKind": "QUOTA",
           "buyout": true,
           "billing": "credits"
-        },
-        {
-          "feature_key": "tarot.motion",
-          "name": "塔羅動態",
-          "limitKind": "QUOTA",
-          "buyout": true,
-          "billing": "credits"
         }
       ],
       "accessChannels": [
@@ -2657,7 +2658,8 @@
         "page": "/video",
         "enabled": false,
         "api": [
-          "/api/video"
+          "/api/video",
+          "/api/tools/script-forge"
         ]
       },
       "loginSources": [
@@ -2700,7 +2702,9 @@
         "ui"
       ],
       "modules": {
-        "dependsOn": [],
+        "dependsOn": [
+          "content"
+        ],
         "manifest": "lib/video/MODULE_MANIFEST.json"
       },
       "staffPaths": [

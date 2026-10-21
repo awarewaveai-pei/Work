@@ -10,6 +10,9 @@ import * as Sentry from "@sentry/nextjs";
 import { canCreateAiImageJob, resolveOpsRole } from "@/lib/ops-role";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { recordOpsAudit } from "@/lib/ops-audit";
+import { EntitlementRequired } from "@/lib/entitlements/can";
+import { grantFor } from "@/lib/entitlements/grant";
+import { actorFor } from "@/lib/social/authz";
 import { examInFlight, examIntent, graduationOf, loadEvalCases, loadIntentMetadata, runEval, setIntentGraduation } from "@/lib/cs";
 
 export const runtime = "nodejs";
@@ -46,6 +49,15 @@ export async function POST(request: Request) {
     if (examInFlight(graduationOf(metadata))) return NextResponse.json({ ok: false, error: "exam_running" }, { status: 409 });
     const cases = await loadEvalCases(orgId, intentKey);
     if (cases.length === 0) return NextResponse.json({ ok: false, error: "no_eval_cases" }, { status: 400 });
+    // Billed to the client's org through actorFor, as outreach does (messages/route.ts); without a role there the gate
+    // answers not_authorized_for_org (shadow allows and audits it).
+    const acting = await actorFor(request, orgId).catch(() => null);
+    try {
+      await grantFor("cs.exam", acting ? { req: request, acting } : { req: request, orgId });
+    } catch (e) {
+      if (e instanceof EntitlementRequired) return NextResponse.json({ ok: false, code: e.code }, { status: 403 });
+      throw e;
+    }
 
     const runId = crypto.randomUUID();
     const startedAt = new Date().toISOString();
