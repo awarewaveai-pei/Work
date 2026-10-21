@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-21（續36）Meta 自動回覆（C27 第二段）＋廣告（C28）查證：Standard Access 可行，IG 貼文留言除外；Codex 任務書＋操作者 9 步清單（Claude，只讀＋查文件）
+
+**操作者**：「你去處理好, 2個目前都是我的網站, 只是我設定 aware wave 是公司, soulful 是代操」。本條只查證＋計畫，不改程式／正式設定。
+
+- F1 官方規則：Standard Access 自動給、免 App Review；Advanced 要審核＋商家驗證（https://developers.facebook.com/docs/graph-api/overview/access-levels/）。Webhook：開發模式只收測試通知或 app 角色用戶發起的通知 → 真客人留言要上線模式（https://developers.facebook.com/docs/graph-api/webhooks）。Page `feed` 需 `pages_manage_metadata`＋`pages_show_list`，`messages` 另需 `pages_messaging`，粉專要 `subscribed_apps`（https://developers.facebook.com/docs/graph-api/webhooks/getting-started/webhooks-for-pages）。**IG `comments` 通知官方寫「Advanced Access is required」**（https://developers.facebook.com/documentation/instagram-platform/webhooks/setup）→ IG 貼文留言自動回覆無審核做不到。Marketing API Standard 改名 Limited：重度限流、可管 app 管理員／開發者的廣告帳號，未提商家驗證（https://developers.facebook.com/docs/marketing-api/overview/authorization/）。
+- F2 先例：app「AwareWave Postiz」已上線模式＋隱私權政策、未送審，非角色帳號私訊已收到（本檔 2026-10-15 續10）→ FB 留言／私訊路線可行。
+- F3 現況：執行端已有（`lib/social/meta-webhook.ts` HMAC :47-53、雙開關 :55-58；`meta-auto-reply.ts` claim 冪等；0114 `social_auto_rule_events`）；廣告 `lib/social/meta-ads.ts`＋`app/api/social/ads/route.ts`（GET 讀、PATCH 暫停／啟用）。**缺口**：只綁一個品牌（`meta-webhook.ts:60-72` `META_SOCIAL_ORGANIZATION_ID`、`meta-ads.ts:123-127` `META_MARKETING_ORGANIZATION_ID`）→ 兩品牌不能並存；未走 can()（`lib/entitlements/route-features.ts` 無 social.ads）；暫停廣告無獨立開關；`REVIEW_APPROVED` 名稱與實況（不送審）不符。
+- F4 正式：`lobster-next-admin` 10 個 `META_*` printenv 全 exit=1（未設）；`https://app.aware-wave.com/api/webhooks/meta` 回 503（可達、未設定）。Postiz 已持有兩粉專（Integration：facebook「Aware Wave」、「Soulful Expression Art Therapy」，無 IG）；不沿用其 token（耦合 Postiz 內部表，且權限範圍不含 messaging）。
+- F5 遷移編號：0115 已被 `0115_tarot_batch_jobs` 用 → 任務書改用 0116（`social_meta_assets`：Meta 資產 id → 品牌）。
+- 產出（scratchpad，未進 repo）：`cards/meta-codex.md`（G1 多品牌資產表＋每頁 token env、G2 can()、G3 開關改名＋`META_ADS_WRITE_ENABLED`、驗收 8 條）、`cards/meta-operator.md`（9 步）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo docker exec lobster-next-admin printenv META_*（10 個，只看 exit）＋postiz DB Integration 查詢 | exit=0 | ms=4000
+- REVIEW_WAIVED: DOC_ONLY -- 只查證與寫任務書，無程式改動
+- BUGHUNT_WAIVED: DOC_ONLY -- 無程式改動；缺口以 file:line 列在 F3
 ## 2026-10-21（續35）「以前頻道清單看得到全部」查證：社群管理頁從第一版起就是一次一個品牌，沒有回歸；Aware Wave 員工切品牌看得到 Soulful（Claude，只讀）
 
 **操作者**：「之前有全部!!! 而且還已經測試過! 記住我的3軸5對象, 我的公司是 aware wave, soulful expression 是我代操的公司」——否定續34【二】。
