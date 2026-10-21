@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-21（續30）next-admin 正式部署 94c4b7c01 → 4f8d44fb8（Claude，操作者批准「0113、0114 一起套、部署 next-admin、智慧連結點擊實測和 smoke」）
+
+- 範圍：上線 a9f5a1370（tarot 舊預覽不覆蓋新 AI 編輯）、8ac56c4bb（影片選單移除 Seedream 4.5）、4f8d44fb8（0114 down ledger，續28；只動 DB 檔，不影響容器）。
+- 0113／0114：續26 已套（VBC：`apply-db-migration.mjs --status` = `STATUS_OK {"applied":114}`，兩支 applied），本次不重套；sg-deploy migration 閘 `114 repo migrations are in the ledger, unchanged`。
+- 前置：本機 = origin = 4f8d44fb8；本機／主機無 DEPLOY_HOLD；主機無 sg-deploy／apply-db 進程；`/verify` ALL PASSED；`/check-drift` FAIL 只因 behind=6（即本次部署）＋已知 compose META_* onlyInRepo（續26 決定暫不加，自動回覆維持 OFF）；`printenv SMARTLINK_VISITOR_HASH_SALT` rc=0。
+- 結果：`sg-deploy.sh next-admin` exit 0（356 s；npm test 2785 passed／23 skipped、healthy 10s、HTTP smoke 5/5），`.deployed-commit` 94c4b7c01 → 4f8d44fb8，rollback 映像 `lobster-phase1-next-admin:rollback-20261021-084328`；容器 StartedAt 08:48:10Z、RestartCount 0、healthy。
+- 部署後：Playwright smoke 26 passed／6 skipped；social／app `/login` 200；未登入 `GET /api/social/posts` 401；容器內以 `lib/social/store.ts:281-285` POST_COLUMNS 查 `social_posts`（含 `targets.meta_post_id`）→ 200、2 rows／3 targets、欄位皆在。
+- 智慧連結點擊實測：跳過 — 正式庫 `social_smart_links` total=0（無任何已發布 slug），TASKS C27／C28 該待補項仍開著，等第一個連結發布後再跑。
+- [rollback]：主機 `docker tag lobster-phase1-next-admin:rollback-20261021-084328` 回滾或 sg-deploy 94c4b7c01；DB 本次未動。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=356023
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/playwright-runner.ps1 -Mode smoke -SkipInstall | exit=0 | ms=31933
+- REALTEST_EVIDENCE: tool=Bash | cmd=node scripts/apply-db-migration.mjs --status | exit=0 | ms=7399
+- REVIEW_WAIVED: NA -- 部署操作，無程式改動；程式審查在各來源提交
+- BUGHUNT_WAIVED: NA -- 部署操作，無程式改動
 ## 2026-10-21（續29）智慧連結去重正式實測通過（3 次點擊 → 計數 2）＋0100–0114 down 檔兩處補齊＋一致性測試（Claude）
 
 - 實測（操作者要求）：AwareWave Ops（`39ad4149-…`，內部）用 app 同一個 RPC `social_save_smart_link` 建 `test-dedupe-2026-10-21`（標題 TEST-dedupe-2026-10-21，item `baa64409-…` → https://aware-wave.com/，published）。建立走 SQL 而非 `/api/social/smartlink`：該 API 要登入 session（`lib/social/authz.ts:38-56`，sync-key 得 null caller → 403）。
