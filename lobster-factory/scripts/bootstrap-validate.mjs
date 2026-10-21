@@ -75,6 +75,11 @@ const required = [
 for (const r of required) assertExists(r);
 
 // 2) run content validation
+console.log("Running DB down-migration copy validation...");
+execSync(`node --test "${path.join(repoRoot, "..", "scripts", "__tests__", "down-migration-copies.test.mjs")}"`, {
+  stdio: "inherit",
+});
+
 console.log("Running manifest validation...");
 execSync(`node "${path.join(repoRoot, "scripts", "validate-manifests.mjs")}"`, {
   stdio: "inherit",
@@ -125,4 +130,3 @@ execSync(`node "${path.join(repoRoot, "scripts", "validate-doc-integrity.mjs")}"
 });
 
 console.log("Bootstrap validation PASSED ✅");
-

@@ -11,6 +11,7 @@
         "matcher": "Bash",
         "rules": [
           "dangerous-bash",
+          "worktree-reparse-guard",
           "branch-protection",
           "commit-quality",
           "verify-gate-commit",
