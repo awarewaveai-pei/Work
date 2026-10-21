@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-21（續16）
+
+### Social Manager C27/C28 — Meta execution and fail-closed review
+
+- AUTO_TASK_DONE: C27 Meta webhook signature verification, comment/DM normalization, review/deployment gate, Graph replies, and auto-rule audit path; C28 Meta accounts/campaigns/insights/status API and UI with server-only token handling and explicit brand binding.
+- REALTEST_EVIDENCE: `npx vitest run lib/social app/api/social app/api/webhooks/meta 'app/(shell)/tools/social/__tests__/page-rules.test.ts'` exited 0 — 24 files passed, 164 tests passed, 3 skipped.
+- BUILD_GATE: `npm run typecheck` exited 0; `npm run build` exited 0; `/api/webhooks/meta` appeared in the route output; `git diff --check` reported no errors.
+- REVIEW_DONE: adversarial self-review passed for the C27/C28 scope. Fixed missing Meta signature handling from a 500 path to 403, replaced the new native Ads select that violated the existing page contract, and confirmed the token-in-URL scan returned no hits. Independent Claude oracle was unavailable because the CLI was not on PATH and bounded SDK attempts produced no response.
+- BUGHUNT_DONE: cross-scope scan found 57 expected Meta/C27/C28 references. Full `npm test` reached 299 passed, 14 skipped, and 18 failures confined to the existing hosting/autorepair gate-contract files on Windows (Unix `/root` command status 127 and temp cleanup EPERM); no Social/Meta failure.
+- ENVIRONMENT_NOTE: `docker compose config --quiet` was initially blocked by missing local HCI/Renderer credentials; the blocker was resolved below with vault-generated local credentials. Meta business verification/App Review and ads permissions remain external Meta gates, so no production deploy or external approval was claimed.
+
+### Local HCI/Renderer secret recovery
+
+- ROOT_CAUSE: the five required service secrets were absent from the local vault and all discoverable user-env backups; `HCI_FETCH_RUNNER_MINIO_IP` was also absent from the User environment. No running HCI/Renderer containers existed, so no existing credential was rotated.
+- CHANGE: generated five high-entropy local service credentials into the encrypted vault and Windows User environment; set `HCI_FETCH_RUNNER_MINIO_IP=10.240.1.10` inside the declared `10.240.1.0/24` fetch-runner network. No values were printed, committed, or written to Git.
+- REALTEST_EVIDENCE: tool=PowerShell/docker compose | cmd=`docker compose -f .\\lobster-factory\\infra\\hetzner-phase1-core\\docker-compose.yml config --quiet` | exit=0 | result=PASS; only pre-existing blank `REDIS_PASSWORD` warnings remained.
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0; verified the container list had no existing HCI/Renderer instances before generating credentials and verified all six required names are now persisted without exposing values.
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`HCI_[A-Z0-9_]+|RENDERER_[A-Z0-9_]+` | hits=compose-required names plus expected documentation/code references; no secret values emitted.
 ## 2026-10-21（續15）社群數據每日抓取查證：開關早已開、social-metrics 已在跑，未改任何設定（Claude 經 SDK，唯讀）
 
 - 起因：操作者要求「開啟數據分析的每日抓取」；`app/api/internal/social/metrics/route.ts:6,26` 與 rotation（`rotation/route.ts:28`）、dispatch（`dispatch/route.ts:29`）共用 `SOCIAL_DISPATCH_ENABLED`，開它 = 同時開自動清單展開與送 Postiz。先唯讀查現況。
