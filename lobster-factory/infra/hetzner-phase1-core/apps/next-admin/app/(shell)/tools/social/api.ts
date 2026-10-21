@@ -80,6 +80,7 @@ export interface InboxData { inboxes: InboxRow[]; home: string | null }
 export interface AdsAccount { id: string; name: string; account_status: number | null; currency: string | null; timezone_name: string | null }
 export interface AdsCampaign { id: string; name: string; status: string | null; effective_status: string | null; objective: string | null; daily_budget: string | null; lifetime_budget: string | null; start_time: string | null; stop_time: string | null }
 export interface AdsInsight { spend: string | null; impressions: string | null; clicks: string | null; reach: string | null; actions: Array<{ action_type: string; value: string }> }
+export interface MetaAsset { id: string; kind: "facebook_page" | "instagram_account" | "ad_account"; externalId: string; pageExternalId: string | null; label: string | null; enabled: boolean }
 
 export const api = {
   brands: () => call<{ brands: Brand[] }>("GET", "/api/social/brands"),
@@ -88,7 +89,10 @@ export const api = {
   adsAccounts: (brand: string) => call<{ accounts: AdsAccount[] }>("GET", `/api/social/ads?${q({ brand, view: "accounts" })}`),
   adsCampaigns: (brand: string, account: string) => call<{ account: string; campaigns: AdsCampaign[] }>("GET", `/api/social/ads?${q({ brand, view: "campaigns", account })}`),
   adsInsights: (brand: string, account: string, datePreset = "last_30d") => call<{ account: string; insights: AdsInsight[] }>("GET", `/api/social/ads?${q({ brand, view: "insights", account, datePreset })}`),
-  setAdsCampaignStatus: (brand: string, campaignId: string, status: "ACTIVE" | "PAUSED") => call<{ campaignId: string; status: string }>("PATCH", "/api/social/ads", { brand, campaignId, status }),
+  setAdsCampaignStatus: (brand: string, account: string, campaignId: string, status: "ACTIVE" | "PAUSED") => call<{ campaignId: string; status: string }>("PATCH", "/api/social/ads", { brand, account, campaignId, status }),
+  metaAssets: (brand: string) => call<{ assets: MetaAsset[] }>("GET", `/api/social/meta-assets?${q({ brand })}`),
+  addMetaAsset: (brand: string, input: { kind: MetaAsset["kind"]; externalId: string; pageExternalId?: string | null; label?: string | null }) => call<{ asset: MetaAsset }>("POST", "/api/social/meta-assets", { brand, ...input }),
+  setMetaAssetEnabled: (brand: string, id: string, enabled: boolean) => call<{ asset: MetaAsset }>("PATCH", "/api/social/meta-assets", { brand, id, enabled }),
   connect: (brand: string, platform: string, accountId?: string) => call<{ attemptId: string; url: string }>("POST", "/api/social/accounts", { brand, platform, accountId }),
   cancelConnect: (brand: string, attempt: string) => call<object>("DELETE", `/api/social/accounts?${q({ brand, attempt })}`),
   unlink: (brand: string, id: string) => call<object>("DELETE", `/api/social/accounts?${q({ brand, id })}`),

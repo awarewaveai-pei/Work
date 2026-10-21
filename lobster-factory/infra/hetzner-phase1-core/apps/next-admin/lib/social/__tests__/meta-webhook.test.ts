@@ -36,20 +36,19 @@ describe("Meta auto-reply webhook", () => {
     ]);
   });
 
-  it("requires both the deployment switch and Meta review switch", () => {
+  it("requires both deployment switches", () => {
     expect(autoReplyReady({})).toBe(false);
     expect(autoReplyReady({ META_AUTO_REPLY_ENABLED: "true" })).toBe(false);
-    expect(autoReplyReady({ META_AUTO_REPLY_ENABLED: "true", META_AUTO_REPLY_REVIEW_APPROVED: "true" })).toBe(true);
+    expect(autoReplyReady({ META_AUTO_REPLY_ENABLED: "true", META_AUTO_REPLY_OPERATOR_APPROVED: "true" })).toBe(true);
   });
 
-  it("fails closed without an account binding and sends replies with the token in Authorization only", async () => {
-    expect(() => getMetaSocialConfig({ META_SOCIAL_ACCESS_TOKEN: "token" })).toThrow("META_SOCIAL_ORGANIZATION_ID");
+  it("fails closed without a page token and sends it in Authorization only", async () => {
+    expect(() => getMetaSocialConfig({ kind: "facebook_page", externalId: "page-1", pageExternalId: null }, {})).toThrow("META_PAGE_TOKEN_page-1");
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "reply-1" }), { status: 200 }));
     await replyToMetaEvent({
       eventId: "instagram:comment:c-1", kind: "comment", platform: "instagram", channelId: "ig-1", senderId: "person-1", targetId: "c-1", metaPostId: null, text: "hi",
-    }, "歡迎", {
-      META_SOCIAL_ACCESS_TOKEN: "secret-token",
-      META_SOCIAL_ORGANIZATION_ID: "org-1",
+    }, "歡迎", { kind: "facebook_page", externalId: "page-1", pageExternalId: null }, {
+      "META_PAGE_TOKEN_page-1": "secret-token",
       META_GRAPH_API_VERSION: "v24.0",
     });
     const [url, init] = fetchMock.mock.calls[0];

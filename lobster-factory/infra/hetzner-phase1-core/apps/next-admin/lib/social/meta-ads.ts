@@ -1,6 +1,8 @@
 // C28: the small server-side adapter for Meta Marketing API.
 // Access tokens never cross the browser boundary; the route reads META_MARKETING_ACCESS_TOKEN from the
 // deployment secret environment. Postiz owns publishing OAuth, but it does not expose ad-account tokens.
+import { getMetaGraphApiVersion } from "./meta-webhook";
+import { findEnabledMetaAssetForBrand, listMetaAssets } from "./store";
 
 export type MetaAdAccount = {
   id: string;
@@ -45,7 +47,7 @@ export class MetaAdsConfigError extends MetaAdsError {
 }
 
 export type MetaAdsEnv = Record<string, string | undefined>;
-type MetaAdsConfig = { baseUrl: string; accessToken: string; defaultAccountId: string | null };
+type MetaAdsConfig = { baseUrl: string; accessToken: string };
 
 function accountPath(accountId: string): string {
   const value = accountId.trim().replace(/^act_/, "");
@@ -56,12 +58,11 @@ function accountPath(accountId: string): string {
 export function getMetaAdsConfig(env: MetaAdsEnv = process.env): MetaAdsConfig {
   const accessToken = env.META_MARKETING_ACCESS_TOKEN?.trim();
   if (!accessToken) throw new MetaAdsConfigError("Meta 廣告 API 未設定 META_MARKETING_ACCESS_TOKEN");
-  const version = (env.META_MARKETING_API_VERSION?.trim() || "v24.0").replace(/^v/, "v");
-  if (!/^v\d+\.\d+$/.test(version)) throw new MetaAdsConfigError("META_MARKETING_API_VERSION 格式不正確");
+  let version: string;
+  try { version = getMetaGraphApiVersion(env); } catch { throw new MetaAdsConfigError("META_GRAPH_API_VERSION 格式不正確"); }
   return {
     baseUrl: `${env.META_GRAPH_API_BASE_URL?.trim() || "https://graph.facebook.com"}/${version}`,
     accessToken,
-    defaultAccountId: env.META_AD_ACCOUNT_ID?.trim() || null,
   };
 }
 
@@ -84,12 +85,14 @@ async function request<T>(method: "GET" | "POST", path: string, params: Record<s
   return body as T;
 }
 
-export async function listMetaAdAccounts(env?: MetaAdsEnv): Promise<MetaAdAccount[]> {
+export async function listMetaAdAccounts(brandId: string, env?: MetaAdsEnv): Promise<MetaAdAccount[]> {
+  const mapped = await listMetaAssets(brandId, "ad_account");
+  const allowed = new Set(mapped.filter((asset) => asset.enabled).map((asset) => accountPath(asset.externalId)));
   const result = await request<{ data?: MetaAdAccount[] }>("GET", "me/adaccounts", {
     fields: "id,name,account_status,currency,timezone_name",
     limit: "100",
   }, env);
-  return result.data ?? [];
+  return (result.data ?? []).filter((account) => allowed.has(accountPath(account.id)));
 }
 
 export async function listMetaCampaigns(accountId: string, env?: MetaAdsEnv): Promise<MetaCampaign[]> {
@@ -115,13 +118,8 @@ export async function setMetaCampaignStatus(campaignId: string, status: "ACTIVE"
   await request("POST", campaignId.trim(), { status }, env);
 }
 
-export function configuredMetaAdAccount(env: MetaAdsEnv = process.env): string | null {
-  return getMetaAdsConfig(env).defaultAccountId;
-}
-
-/** The token is deployment-scoped, so bind it to one explicit brand before any route can use it. */
-export function assertMetaAdsBrand(brandId: string, env: MetaAdsEnv = process.env): void {
-  const configuredBrand = env.META_MARKETING_ORGANIZATION_ID?.trim();
-  if (!configuredBrand) throw new MetaAdsConfigError("Meta 廣告 API 未設定 META_MARKETING_ORGANIZATION_ID");
-  if (configuredBrand !== brandId) throw new MetaAdsError(403, "此品牌未綁定 Meta 廣告帳戶", "meta_ads_brand_mismatch");
+/** The requested account must be an enabled asset owned by this brand before any Meta call. */
+export async function assertMetaAdsBrand(brandId: string, accountId: string): Promise<void> {
+  const asset = await findEnabledMetaAssetForBrand(brandId, "ad_account", accountId.trim().replace(/^act_/, ""));
+  if (!asset) throw new MetaAdsError(403, "此品牌未綁定 Meta 廣告帳戶", "meta_ads_brand_mismatch");
 }

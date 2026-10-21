@@ -12,6 +12,8 @@ export const ROUTE_FEATURES: Readonly<Record<string, string>> = {
   "/api/content/syndicate": "content.syndicate",
   "/api/content/title": "content.title",
   "/api/social/rewrite": "social.rewrite",
+  "/api/social/ads": "social.ads",
+  "/api/social/meta-assets": "social.meta",
   "/api/tools/presets": "design.edit",
   "/api/tools/script-forge": "video.script",
   "/api/tools/studio/generate": "studio.image",

@@ -2,6 +2,7 @@
 // The webhook route owns auth/tenant lookup; this module keeps Meta's wire shapes and
 // access-token handling out of the browser and makes them testable without a live Meta app.
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { MetaAsset } from "./store";
 
 export type MetaSocialEnv = Record<string, string | undefined>;
 export type MetaEventKind = "comment" | "dm";
@@ -19,7 +20,7 @@ export type MetaWebhookEvent = {
   text: string;
 };
 
-type MetaSocialConfig = { baseUrl: string; accessToken: string; organizationId: string };
+type MetaSocialConfig = { baseUrl: string; accessToken: string; pageExternalId: string };
 
 export class MetaSocialError extends Error {
   constructor(readonly status: number, message: string, readonly code = "meta_social_error") {
@@ -54,20 +55,26 @@ export function verifyMetaSignature(rawBody: string, signature: string | null, a
 
 export function autoReplyReady(env: MetaSocialEnv = process.env): boolean {
   return env.META_AUTO_REPLY_ENABLED?.trim().toLowerCase() === "true"
-    && env.META_AUTO_REPLY_REVIEW_APPROVED?.trim().toLowerCase() === "true";
+    && env.META_AUTO_REPLY_OPERATOR_APPROVED?.trim().toLowerCase() === "true";
 }
 
-export function getMetaSocialConfig(env: MetaSocialEnv = process.env): MetaSocialConfig {
-  const accessToken = env.META_SOCIAL_ACCESS_TOKEN?.trim();
-  const organizationId = env.META_SOCIAL_ORGANIZATION_ID?.trim();
-  if (!accessToken) throw new MetaSocialConfigError("Meta 自動回覆未設定 META_SOCIAL_ACCESS_TOKEN");
-  if (!organizationId) throw new MetaSocialConfigError("Meta 自動回覆未設定 META_SOCIAL_ORGANIZATION_ID");
+export function getMetaGraphApiVersion(env: MetaSocialEnv = process.env): string {
   const version = (env.META_GRAPH_API_VERSION?.trim() || "v24.0").replace(/^v/, "v");
-  if (!/^v\d+\.\d+$/.test(version)) throw new MetaSocialConfigError("META_GRAPH_API_VERSION 格式不正確");
+  if (!/^v\d+\.\d+$/.test(version)) throw new Error("META_GRAPH_API_VERSION 格式不正確");
+  return version;
+}
+
+export function getMetaSocialConfig(asset: Pick<MetaAsset, "kind" | "externalId" | "pageExternalId">, env: MetaSocialEnv = process.env): MetaSocialConfig {
+  const pageExternalId = asset.kind === "instagram_account" ? asset.pageExternalId?.trim() : asset.externalId.trim();
+  if (!pageExternalId) throw new MetaSocialConfigError("Meta Instagram 帳號未設定 linked Page ID");
+  const accessToken = env[`META_PAGE_TOKEN_${pageExternalId}`]?.trim();
+  if (!accessToken) throw new MetaSocialConfigError(`Meta 自動回覆未設定 META_PAGE_TOKEN_${pageExternalId}`);
+  let version: string;
+  try { version = getMetaGraphApiVersion(env); } catch { throw new MetaSocialConfigError("META_GRAPH_API_VERSION 格式不正確"); }
   return {
     baseUrl: `${env.META_GRAPH_API_BASE_URL?.trim() || "https://graph.facebook.com"}/${version}`,
     accessToken,
-    organizationId,
+    pageExternalId,
   };
 }
 
@@ -125,8 +132,8 @@ export function parseMetaWebhookPayload(payload: unknown): MetaWebhookEvent[] {
   return events;
 }
 
-async function graphPost(path: string, params: Record<string, string>, env?: MetaSocialEnv): Promise<Record<string, unknown>> {
-  const config = getMetaSocialConfig(env);
+async function graphPost(path: string, params: Record<string, string>, asset: Pick<MetaAsset, "kind" | "externalId" | "pageExternalId">, env?: MetaSocialEnv): Promise<Record<string, unknown>> {
+  const config = getMetaSocialConfig(asset, env);
   const url = new URL(`${config.baseUrl}/${path.replace(/^\//, "")}`);
   const response = await fetch(url, {
     method: "POST",
@@ -144,15 +151,16 @@ async function graphPost(path: string, params: Record<string, string>, env?: Met
 }
 
 /** Reply publicly to a comment or send a DM, using the endpoint for the event's platform. */
-export async function replyToMetaEvent(event: MetaWebhookEvent, message: string, env?: MetaSocialEnv): Promise<void> {
+export async function replyToMetaEvent(event: MetaWebhookEvent, message: string, asset: Pick<MetaAsset, "kind" | "externalId" | "pageExternalId">, env?: MetaSocialEnv): Promise<void> {
   const body = message.trim();
   if (!body) throw new MetaSocialError(400, "自動回覆內容不可為空", "empty_reply");
   if (event.kind === "comment") {
-    await graphPost(`${event.targetId}/${event.platform === "instagram" ? "replies" : "comments"}`, { message: body }, env);
+    await graphPost(`${event.targetId}/${event.platform === "instagram" ? "replies" : "comments"}`, { message: body }, asset, env);
     return;
   }
-  await graphPost(`${event.channelId}/messages`, {
+  const pageId = getMetaSocialConfig(asset, env).pageExternalId;
+  await graphPost(`${pageId}/messages`, {
     recipient: JSON.stringify({ id: event.senderId }),
     message: JSON.stringify({ text: body }),
-  }, env);
+  }, asset, env);
 }

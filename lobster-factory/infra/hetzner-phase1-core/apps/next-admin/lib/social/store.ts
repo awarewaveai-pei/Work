@@ -18,6 +18,36 @@ export class SocialStoreError extends Error {
   }
 }
 
+export type MetaAssetKind = "facebook_page" | "instagram_account" | "ad_account";
+
+export interface MetaAsset {
+  id: string;
+  organizationId: string;
+  kind: MetaAssetKind;
+  externalId: string;
+  pageExternalId: string | null;
+  label: string | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const META_ASSET_COLUMNS = "id, organization_id, kind, external_id, page_external_id, label, enabled, created_at, updated_at";
+
+function metaAssetOf(row: Record<string, unknown>): MetaAsset {
+  return {
+    id: row.id as string,
+    organizationId: row.organization_id as string,
+    kind: row.kind as MetaAssetKind,
+    externalId: row.external_id as string,
+    pageExternalId: (row.page_external_id as string | null) ?? null,
+    label: (row.label as string | null) ?? null,
+    enabled: row.enabled === true,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
+
 export function db(): SupabaseClient {
   const sb = getSupabaseWriteClient();
   if (!sb) throw new SocialStoreError(500, "Supabase client not configured");
@@ -37,6 +67,58 @@ export function fail(error: { code?: string; message: string }, what: string): n
     "23514": 400, "22P02": 400, "22023": 400, "23502": 400, "22003": 400, "21000": 400, "22007": 400, "22008": 400,
   };
   throw new SocialStoreError(byCode[error.code ?? ""] ?? 500, `${what}: ${error.message}`);
+}
+
+// ---- Meta asset map (0116; provider ids are never trusted without a brand scope) -------------------------------
+
+export async function listMetaAssets(brandId: string, kind?: MetaAssetKind): Promise<MetaAsset[]> {
+  let q = db().from("social_meta_assets").select(META_ASSET_COLUMNS).eq("organization_id", brandId);
+  if (kind) q = q.eq("kind", kind);
+  const { data, error } = await q.order("kind").order("label").order("external_id");
+  if (error) fail(error, "Meta assets");
+  return ((data ?? []) as Array<Record<string, unknown>>).map(metaAssetOf);
+}
+
+/** Resolves a webhook entry globally by provider asset id; disabled rows intentionally resolve to null. */
+export async function findEnabledMetaAsset(kind: MetaAssetKind, externalId: string): Promise<MetaAsset | null> {
+  const { data, error } = await db().from("social_meta_assets").select(META_ASSET_COLUMNS)
+    .eq("kind", kind).eq("external_id", externalId).eq("enabled", true).maybeSingle();
+  if (error) fail(error, "Meta asset");
+  return data ? metaAssetOf(data as Record<string, unknown>) : null;
+}
+
+/** Brand-scoped lookup used before every ads read/write; this is the cross-brand isolation guard. */
+export async function findEnabledMetaAssetForBrand(brandId: string, kind: MetaAssetKind, externalId: string): Promise<MetaAsset | null> {
+  const { data, error } = await db().from("social_meta_assets").select(META_ASSET_COLUMNS)
+    .eq("organization_id", brandId).eq("kind", kind).eq("external_id", externalId).eq("enabled", true).maybeSingle();
+  if (error) fail(error, "Meta asset");
+  return data ? metaAssetOf(data as Record<string, unknown>) : null;
+}
+
+export type MetaAssetInput = {
+  kind: MetaAssetKind;
+  externalId: string;
+  pageExternalId: string | null;
+  label: string | null;
+};
+
+export async function addMetaAsset(brandId: string, input: MetaAssetInput, actor: string): Promise<MetaAsset> {
+  const { data, error } = await db().from("social_meta_assets").insert({
+    organization_id: brandId, kind: input.kind, external_id: input.externalId,
+    page_external_id: input.pageExternalId, label: input.label, enabled: true,
+  }).select(META_ASSET_COLUMNS).single();
+  if (error) fail(error, "add Meta asset");
+  await logAction(db(), brandId, actor, "meta_asset_add", { kind: input.kind, external_id: input.externalId });
+  return metaAssetOf(data as Record<string, unknown>);
+}
+
+export async function setMetaAssetEnabled(brandId: string, assetId: string, enabled: boolean, actor: string): Promise<MetaAsset> {
+  const { data, error } = await db().from("social_meta_assets").update({ enabled, updated_at: new Date().toISOString() })
+    .eq("id", assetId).eq("organization_id", brandId).select(META_ASSET_COLUMNS).maybeSingle();
+  if (error) fail(error, "update Meta asset");
+  if (!data) throw new SocialStoreError(404, "no such Meta asset in this brand");
+  await logAction(db(), brandId, actor, "meta_asset_enable", { asset_id: assetId, enabled });
+  return metaAssetOf(data as Record<string, unknown>);
 }
 
 // ---- brands ---------------------------------------------------------------------------------------------------

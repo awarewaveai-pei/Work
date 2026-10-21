@@ -42,7 +42,7 @@ const PRODUCT_DEFINITIONS = [
     features: [], accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/hci/MODULE_MANIFEST.json" }, staffPaths: [] },
   { key: "social", name: "社群發文", description: "改寫、排程並派送品牌社群貼文。", subdomain: "social", door: { app: "next-admin", page: "/social", api: ["/api/social"], anonymous: ["/smartlink"] },
     loginSources: ["local", "awarewave-wp", "customer-wp"], standalone: true, status: "coming_soon", selfSignup: false,
-    features: [quota("social.rewrite", "AI 多平台改寫"), quota("social.dispatch", "貼文派送", "contract")], accessChannels: ["ui"],
+    features: [quota("social.rewrite", "AI 多平台改寫"), quota("social.dispatch", "貼文派送", "contract"), quota("social.auto-reply", "Meta 自動回覆", "contract"), quota("social.ads", "Meta 廣告管理", "contract"), quota("social.meta", "Meta 資產設定", "contract")], accessChannels: ["ui"],
     modules: { dependsOn: [], manifest: "lib/social/MODULE_MANIFEST.json" }, staffPaths: ["tools/social"] },
   { key: "video", name: "影片製作", description: "生成腳本、場景、動態與旁白影片。", subdomain: "video", door: { app: "next-admin", page: "/video", enabled: false, api: ["/api/video", "/api/tools/script-forge"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,

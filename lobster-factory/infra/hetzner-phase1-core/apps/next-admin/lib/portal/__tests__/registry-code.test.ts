@@ -41,6 +41,8 @@ function scan(file: string, text: string): Scan {
         if (n.expression.kind === ts.SyntaxKind.ImportKeyword) spec(arg.text);
         if (ts.isIdentifier(n.expression) && ["grantFor", "withFeature"].includes(n.expression.text)) out.asked.push(arg.text);
       }
+      const featureArg = n.arguments[1];
+      if (ts.isIdentifier(n.expression) && n.expression.text === "can" && featureArg && ts.isStringLiteralLike(featureArg)) out.asked.push(featureArg.text);
     }
     const text = ts.isStringLiteralLike(n) ? n.text : ts.isTemplateExpression(n) ? n.head.text : null;
     if (text?.startsWith("/api/")) out.apis.push(text.split(/[?#]/)[0].replace(/\/$/, ""));
