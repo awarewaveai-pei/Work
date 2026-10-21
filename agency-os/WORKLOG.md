@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-21（續39）正式機 ANTHROPIC_API_KEY 輪替（舊金鑰 401）
+
+**觸發**：操作者回報「翻成英文失敗：401 invalid x-api-key」，並指定新金鑰位置（操作者本機筆記 942–943 行；值未顯示、未進 repo）。
+- 根因：next-admin 容器的 `ANTHROPIC_API_KEY` 對 `api.anthropic.com/v1/models` 回 401；本機保管庫同一把也是 401（已撤銷或過期）。影響所有經 `lib/ai/gateway.ts loadAnthropic` 的功能（tarot 翻譯／幫我想 prompt、AI 客服等），不是翻譯程式的錯。
+- 新金鑰先本機驗證 200 → `scripts/secrets-vault.ps1 -Action set`（經 vault run 讀回驗證 200）→ 主機：`safe-infra-patch.sh file /root/lobster-phase1/.env`（只換 `ANTHROPIC_API_KEY=` 一行，金鑰只走 stdin；備份 `.env.bak.safe-patch-20261021-104907`）→ `safe-infra-patch.sh compose ... next-admin`（備份 `docker-compose.yml.bak.safe-patch-20261021-104911`，healthy PASS 9s）。
+- **未處理**：`cognitive-os-api` 容器的 `COGNITIVE_OS_ANTHROPIC_API_KEY` 也是 401（認知平台 AI 同樣壞），待操作者同意後另換；本機 `mcp/user-env.ps1` 是否仍存舊值未查。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec -i lobster-next-admin node -`（只印狀態碼）→ `ANTHROPIC_API_KEY status 200`；容器 healthy，`.deployed-commit`＝0aa0b1f67（版本未變） | exit=0 | ms=60000
+- REVIEW_WAIVED: NA -- 憑證輪替，無程式變更
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`ANTHROPIC_API_KEY` | hits=compose:344 映射（不變）、cognitive-os 另一把（列於未處理）
+
+**rollback**：`sudo cp /root/lobster-phase1/.env.bak.safe-patch-20261021-104907 /root/lobster-phase1/.env` 後再跑一次 `safe-infra-patch.sh compose ... next-admin`（回到舊金鑰＝回到 401，僅在新金鑰造成別的問題時用）。
 ## 2026-10-21（續38）tarot studio「英文提示詞」區塊：說明＋顯眼翻譯鈕＋中文錯誤訊息（Claude）
 
 - 操作者：看不出英文欄位用途、翻譯鈕不明顯。改：標題「英文提示詞（實際送給圖片模型）」+ 範例說明；`TranslateButton`（`btn-primary` 實心、🌐 翻成英文、副行 約 NT$0.01、翻譯中…、已是英文不用翻 disabled）；主角與風格兩處共用。
