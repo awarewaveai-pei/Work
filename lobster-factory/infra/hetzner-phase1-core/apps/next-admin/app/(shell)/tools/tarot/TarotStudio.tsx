@@ -463,6 +463,8 @@ export default function TarotStudio() {
     setCompareResults([]);
     setCompareZoom(null);
     jobIdRef.current = crypto.randomUUID();
+    // An AI edit landing meanwhile (onEditedImage → unlockStyle) bumps the deck; this response is then stale.
+    const deck = deckGenRef.current;
     try {
       const resp = await callGenerate({
         model: activeModel,
@@ -472,6 +474,7 @@ export default function TarotStudio() {
         printQuality: true,
         _jobId: jobIdRef.current,
       });
+      if (deckGenRef.current !== deck) return;
       if (!resp.ok || !resp.image) {
         setMessage(`預覽生成失敗：${resp.error ?? "unknown"}`);
         return;
@@ -483,8 +486,10 @@ export default function TarotStudio() {
       const gradedPreview = !grade.neutral
         ? await applyGradeToDataUrl(resp.image, grade.params).catch(() => resp.image)
         : resp.image;
+      if (deckGenRef.current !== deck) return;
       saveToGallery(gradedPreview, "tarot-preview", { model: activeModel, prompt: effectiveEnglish });
     } catch (e) {
+      if (deckGenRef.current !== deck) return;
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setPreviewBusy(false);
