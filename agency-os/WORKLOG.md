@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-21（續20）tarot 工作台四個操作者回報缺陷：鎖定無說明、主角中文不轉英、78 張無法停止、生成後要重整（Claude）
+
+`app/(shell)/tools/tarot/TarotStudio.tsx`（next-admin）。未部署，03:00 自動部署 main。
+
+- C1「文字生圖」沒反應：鎖定後側欄所有設定 `disabled={locked}`（模式鈕、主角欄、模型、風格）只剩半透明，無說明；解鎖鈕只在左側預覽卡。已選文字模式再點本來就不變（`chipStyle(active)` 有高亮，屬預期）。修：側欄頂端加「🔒 風格已鎖定」＋「解除鎖定」鈕。
+- C2 主角替換沒反應：(a) 同 C1，鎖定中輸入框 disabled；(b) 提示寫「中文自動轉英」但沒有任何翻譯——`subjectText` 原樣進 `buildCardPrompt`（`cards.ts` normalizeSubject 只去冠詞），FLUX schnell 讀不懂「藍色貓咪」→ 主角不換。修：提示改「請用英文填寫」，含中文時黃字警告。真翻譯需新 server route（AI 費用），未做，待操作者決定。
+- C3 78 張無法中斷：`generateGroup` for 迴圈無中止點、fetch 無 signal。修：`runCardLoop` 共用 AbortController，迴圈每張前檢查、`callGenerate` 帶 signal；「■ 停止」鈕；中止的那張回 idle（原有圖回 done）；停止後不送 gallery 存檔；離開頁面（unmount）也 abort。
+- C4 生成後要重整：(a) 鎖定狀態無出口（C1）；(b) `selectCompareResult` 遞增 genId 後比較迴圈跳過 `setCompareBusy(false)` → 比較鈕永久「生成中…」；(c) 重新鎖定不清背景批次 done/error → 「背景生成全 78 張」鈕消失；(d) fetch 卡住時 batchBusy 永不解除（C3 停止鈕即出口）。修：select 時清 compareBusy；`startNewDeck` 清已結束的背景批次；解鎖／快速編輯先停迴圈。
+- 測試：此頁無 component test（`grep -r TarotStudio __tests__` 0），依規不新建。
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx vitest run lib/tarot app | exit=0 | ms=10916
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd apps/next-admin && npx tsc --noEmit -p . | exit=0 | ms=10303
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude/commands,.claude/agents | grep=generateOne(|callGenerate(|中文自動轉英 | hits=8
+- ORACLE_WAIVED: Codex review 由派工方另行執行
 ## 2026-10-21（續19）智慧連結點擊防重複改由資料庫保證（0113，Codex df9ef06d5 → main e0e10cde9）＋監工台「數據分析有真數字」→ yes
 
 - 根因：C26 的 `ClickGate` 是行程記憶體，重啟／每晚 03:00 部署／第二個 worker 會忘記，同一訪客同一天可重複計數（oracle 2026-10-19-partialreview-1526451f.md:21）。

@@ -100,11 +100,12 @@ async function callGenerate(body: {
   seed?: number | null;
   printQuality?: boolean;
   _jobId?: string | null;
-}): Promise<GenResponse> {
+}, signal?: AbortSignal): Promise<GenResponse> {
   const res = await fetch("/api/tools/tarot/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...roleHeader("operator") },
     body: JSON.stringify(body),
+    signal,
   });
   return (await res.json()) as GenResponse;
 }
@@ -213,6 +214,7 @@ export default function TarotStudio() {
 
   const [batch, setBatch] = useState<BatchItem[]>([]);
   const [batchBusy, setBatchBusy] = useState(false);
+  const [batchStopping, setBatchStopping] = useState(false);
   const [zipBusy, setZipBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   // Background batch (Trigger.dev)
@@ -293,11 +295,15 @@ export default function TarotStudio() {
   // Prompt values captured at compare-generation time — used in selectCompareResult so that
   // previewSig reflects the prompt that actually made the comparison images, not an edited value.
   const compareStyleRef = useRef({ english: "", subject: "" });
+  // Abort handle for the running in-browser card loop (group or single). Aborting cancels the
+  // in-flight fetch and the loop checks it before each card, so no request leaves after stop.
+  const batchAbortRef = useRef<AbortController | null>(null);
   useEffect(() => {
     batchRef.current = batch;
   }, [batch]);
   useEffect(
     () => () => {
+      batchAbortRef.current?.abort(); // leaving the page must not keep paying for cards
       batchRef.current.forEach((it) => it.url && URL.revokeObjectURL(it.url));
     },
     [],
@@ -517,6 +523,9 @@ export default function TarotStudio() {
     if (!r.image) return;
     const newModel = r.model;
     compareGenIdRef.current++; // invalidate any in-flight compare so it won't repopulate after lock
+    // The invalidated loop skips its own setCompareBusy(false), so clear it here — otherwise the
+    // compare button stays 「生成中…」 for the rest of the page's life.
+    setCompareBusy(false);
     const { english, subject } = compareStyleRef.current; // use prompt that produced these images
     const gradedSelected = !grade.neutral
       ? await applyGradeToDataUrl(r.image, grade.params).catch(() => r.image!)
@@ -532,12 +541,36 @@ export default function TarotStudio() {
     setCompareZoom(null);
     // Selecting from comparison means "I want this style" → auto-lock and proceed to batch step
     setLocked(true);
+    startNewDeck();
+  }
+
+  // Fresh 78-slot deck after a (re)lock. A finished background job belongs to the previous deck:
+  // its done/error panel hides 「背景生成全 78 張」, so drop it. A running job is kept (still paid).
+  function startNewDeck() {
     setBatch((prev) => {
       prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
       return TAROT_CARDS.map((card) => ({ card, status: "idle" }));
     });
     setSavedArt(new Set()); // new deck — drop stale "已存無框圖" marks
+    if (bgStatus === "done" || bgStatus === "error") {
+      setBgJobId(null);
+      setBgStatus("idle");
+      setBgProgress({ done: 0, total: 0 });
+    }
     setMessage(null);
+  }
+
+  // Unlock = back to step 1. Stops any running card loop first so it cannot keep writing into
+  // (and paying for) a deck that is about to be replaced.
+  function unlockStyle() {
+    stopBatch();
+    setLocked(false);
+  }
+
+  function stopBatch() {
+    if (!batchAbortRef.current) return;
+    batchAbortRef.current.abort();
+    setBatchStopping(true);
   }
 
   async function lockStyle() {
@@ -554,12 +587,7 @@ export default function TarotStudio() {
     setLockedModel(activeModel); // freeze which model is used for batch generation
     setLocked(true);
     setCompareResults([]);
-    setBatch((prev) => {
-      prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
-      return TAROT_CARDS.map((card) => ({ card, status: "idle" }));
-    });
-    setSavedArt(new Set()); // new deck — drop stale "已存無框圖" marks
-    setMessage(null);
+    startNewDeck();
   }
 
   function patchItem(index: number, patch: Partial<BatchItem>) {
@@ -600,7 +628,7 @@ export default function TarotStudio() {
   // Pass an explicit fresh seed for *regeneration* — deterministic models (FLUX go_fast:false,
   // ideogram v2a/v3) reproduce the identical image from the same seed, so reusing previewSeed
   // made "重新生成" silently no-op. A new seed forces a genuinely different result.
-  async function generateOne(card: TarotCard, index: number, seedOverride?: number | null): Promise<void> {
+  async function generateOne(card: TarotCard, index: number, seedOverride: number | null | undefined, signal: AbortSignal): Promise<void> {
     patchItem(index, { status: "pending", error: undefined });
     try {
       const resp = await callGenerate({
@@ -610,7 +638,7 @@ export default function TarotStudio() {
         seed: seedOverride !== undefined ? seedOverride : previewSeed,
         printQuality: true,
         _jobId: jobIdRef.current,
-      });
+      }, signal);
       if (!resp.ok || !resp.image) {
         patchItem(index, { status: "error", error: resp.error ?? "unknown" });
         return;
@@ -630,16 +658,19 @@ export default function TarotStudio() {
       // Save the colour-graded card to gallery (洞2 fix): previously saved raw resp.image BEFORE
       // renderPrintCard, so the gallery always got the ungraded original. Now we convert the graded
       // blob to a data URL and save that — gallery and download are always in sync.
-      void new Promise<string>((res) => {
-        const reader = new FileReader();
-        reader.onload = () => res(reader.result as string);
-        reader.readAsDataURL(blob);
-      }).then((dataUrl) =>
-        saveToGallery(dataUrl, "tarot", {
-          cardName: card.name,
-          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
-        }),
-      );
+      // Skipped after stop (no request leaves after 停止); the card itself is still kept below.
+      if (!signal.aborted) {
+        void new Promise<string>((res) => {
+          const reader = new FileReader();
+          reader.onload = () => res(reader.result as string);
+          reader.readAsDataURL(blob);
+        }).then((dataUrl) =>
+          saveToGallery(dataUrl, "tarot", {
+            cardName: card.name,
+            prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectText }),
+          }),
+        );
+      }
       // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
       // on demand — the user collects only the pictures she likes, no auto-flooding the gallery.
       // revoke any prior url for this slot (retry case) before replacing
@@ -658,8 +689,32 @@ export default function TarotStudio() {
         return next;
       });
     } catch (e) {
+      if (signal.aborted) {
+        // Stopped mid-card: not a failure. A slot that already had art goes back to done.
+        setBatch((prev) => prev.map((it, i) => (i === index ? { ...it, status: it.url ? "done" : "idle", error: undefined } : it)));
+        return;
+      }
       patchItem(index, { status: "error", error: e instanceof Error ? e.message : String(e) });
     }
+  }
+
+  // Shared lifecycle for every in-browser card run: one AbortController, busy flags always
+  // cleared in finally (also after stop / error), so the next action works without a reload.
+  async function runCardLoop(work: (signal: AbortSignal) => Promise<void>): Promise<boolean> {
+    const ctrl = new AbortController();
+    batchAbortRef.current = ctrl;
+    jobIdRef.current = crypto.randomUUID();
+    setBatchBusy(true);
+    setBatchStopping(false);
+    setMessage(null);
+    try {
+      await work(ctrl.signal);
+    } finally {
+      if (batchAbortRef.current === ctrl) batchAbortRef.current = null;
+      setBatchBusy(false);
+      setBatchStopping(false);
+    }
+    return ctrl.signal.aborted;
   }
 
   // Generate pending/failed cards in the currently-selected group (skips already-done by default).
@@ -680,19 +735,16 @@ export default function TarotStudio() {
         `預估費用約 NT$${estNt}，約 ${mins} 分鐘，請保持此分頁開啟。\n\n確定開始？`,
     );
     if (!ok) return;
-    jobIdRef.current = crypto.randomUUID();
-    setBatchBusy(true);
-    setMessage(null);
-    try {
+    const stopped = await runCardLoop(async (signal) => {
       for (const t of targets) {
+        if (signal.aborted) break;
         // "重新生成全組" (skipDone=false) redoes already-done cards → needs a fresh seed each,
         // else deterministic models reproduce the same images. "填補未完成" (skipDone=true) is
         // first-fill → keep the deck seed (previewSeed) for cross-card consistency.
-        await generateOne(t.it.card, t.i, skipDone ? undefined : Math.floor(Math.random() * 1_000_000_000));
+        await generateOne(t.it.card, t.i, skipDone ? undefined : Math.floor(Math.random() * 1_000_000_000), signal);
       }
-    } finally {
-      setBatchBusy(false);
-    }
+    });
+    if (stopped) setMessage("已停止。生成好的牌都保留，可下載 ZIP。");
   }
 
   // Launch a Trigger.dev background batch for all 78 cards (browser can be closed).
@@ -780,17 +832,12 @@ export default function TarotStudio() {
   // Generate (or regenerate) a single card — fast, no confirm.
   async function generateSingle(index: number) {
     if (batchBusy) return;
-    jobIdRef.current = crypto.randomUUID();
-    setBatchBusy(true);
-    setMessage(null);
-    try {
+    const stopped = await runCardLoop(async (signal) => {
       // Always a fresh seed: this button is "regenerate this card", whether the slot was blank
       // or already done. Without a new seed, deterministic models redraw the identical image.
-      await generateOne(batch[index].card, index, Math.floor(Math.random() * 1_000_000_000));
-      setMessage("✓ 已重新生成");
-    } finally {
-      setBatchBusy(false);
-    }
+      await generateOne(batch[index].card, index, Math.floor(Math.random() * 1_000_000_000), signal);
+    });
+    if (!stopped) setMessage("✓ 已重新生成");
   }
 
   async function downloadZip() {
@@ -976,7 +1023,7 @@ export default function TarotStudio() {
                     ✓ 鎖定這個風格，進入整套生成
                   </button>
                 ) : (
-                  <button className="btn-secondary" onClick={() => setLocked(false)}>
+                  <button className="btn-secondary" onClick={unlockStyle}>
                     解除鎖定，重新設計
                   </button>
                 )}
@@ -1027,6 +1074,11 @@ export default function TarotStudio() {
                   <button className="btn-primary" onClick={() => void generateGroup(true)} disabled={batchBusy || groupPending === 0}>
                     {batchBusy ? `生成中… ${groupDone}/${groupItems.length}` : `生成未完成 ${groupPending} 張`}
                   </button>
+                  {batchBusy && (
+                    <button className="btn-secondary" onClick={stopBatch} disabled={batchStopping} title="停止，已生成的牌保留">
+                      {batchStopping ? "停止中…" : "■ 停止"}
+                    </button>
+                  )}
                   {groupDone > 0 && (
                     <button
                       className="btn-secondary"
@@ -1171,6 +1223,22 @@ export default function TarotStudio() {
           </div>
         )}
 
+        {/* Locked: every setting below is disabled on purpose (one deck = one style). Say so and
+            offer the way back here — the only other unlock button sits in the left preview card. */}
+        {locked && (
+          <div style={{
+            marginBottom: 10, padding: "8px 12px", borderRadius: 7,
+            border: "1px solid var(--card-border)", background: "rgba(99,102,241,0.06)",
+            fontSize: 12, color: "var(--text-muted)",
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <span style={{ flex: 1 }}>🔒 風格已鎖定，下方設定不能改。</span>
+            <button type="button" className="btn-secondary" style={{ fontSize: 12, padding: "4px 10px" }} onClick={unlockStyle}>
+              解除鎖定
+            </button>
+          </div>
+        )}
+
         {/* Compare-mode generate button — single-model preview button lives in 調色/修圖 panel */}
         {isMultiModel && (
           <div style={{ marginBottom: 12 }}>
@@ -1304,14 +1372,20 @@ export default function TarotStudio() {
             <div style={{ paddingBottom: 12 }}>
               <input
                 className="form-input"
-                placeholder="留空＝標準塔羅人物。例：a fluffy orange cat / 一隻柴犬"
+                placeholder="留空＝標準塔羅人物。例：a fluffy orange cat"
                 value={subjectText}
                 onChange={(e) => setSubjectText(e.target.value)}
                 disabled={locked}
               />
               <div className="form-hint" style={{ marginTop: 4 }}>
-                換掉每張牌的主角，整副 78 張同一角色。中文自動轉英。
+                換掉每張牌的主角，整副 78 張同一角色。請用英文填寫。
               </div>
+              {/* Nothing translates the subject: it goes verbatim into buildCardPrompt (cards.ts). */}
+              {/[\u3400-\u9fff\uf900-\ufaff]/.test(subjectText) && (
+                <div className="form-hint" style={{ marginTop: 2, color: "var(--yellow)" }}>
+                  ⚠ 含中文：FLUX 等模型讀不懂，主角可能不會換。請改英文，例：a blue cat
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1697,7 +1771,7 @@ export default function TarotStudio() {
                       setLockedGradedPreview(null); // edit resets lock; graded set at next lockStyle()
                       setPreviewSeed(meta.seed);
                       setPreviewSig(`${meta.model}::${meta.prompt}::edit=1`);
-                      setLocked(false);
+                      unlockStyle(); // also stops a running card loop — its deck is dropped below
                       setBatch((prev) => {
                         prev.forEach((it) => it.url && URL.revokeObjectURL(it.url));
                         return [];
