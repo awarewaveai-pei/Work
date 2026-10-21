@@ -151,7 +151,7 @@ CONTENT_TRENDING_FEEDS='[{"id":"hn","title":"Hacker News","url":"https://hnrss.o
 |---|---|
 | BFL / FLUX | `flux-schnell`, `flux-dev`, `flux-kontext-dev`, `flux-kontext-pro`, `flux-2-max` |
 | Ideogram | `ideogram-v2a-turbo`, `ideogram-v3-balanced`, `ideogram-v4-turbo`, `ideogram-v4-quality`, `ideogram-character` |
-| Google / Replicate | `seedream-4.5`, `nano-banana-2`, `nano-banana-pro`, `imagen-4` |
+| Google / Replicate | `nano-banana-2`, `nano-banana-pro`, `imagen-4` |
 | OpenAI | `openai-low`, `openai-medium`, `openai-high` (`gpt-image-1`) |
 
 ### AI / Prompt 積木

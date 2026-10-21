@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-21（續27）影片工作室移除 Seedream 4.5（ByteDance）
+
+**觸發**：操作者「Seedream 4.5移除」（不用中國廠商 AI）。
+- 查證：Replicate 的 Seedream 4.5 頁與官方模型文件都沒寫模型在哪跑、也無資料條款；Seedream 權重未公開，第三方多半轉呼叫字節跳動服務（推論，未獲官方確認）→ 透過 Replicate 不保證資料不到字節跳動。
+- 伺服器模型表 `lib/tarot/image-gen.ts` 早已無 Seedream；只剩影片工作室選單殘留（選了會失敗）。移除 `app/(shell)/tools/video/VideoStudio.tsx` 的 `"ByteDance": ["seedream-4.5"]` 與 `lib/content/blocks/README.md` 表格中的 `seedream-4.5`。
+- 保留 `lib/studio/asset-group.ts:48` 的顯示名稱：正式庫仍有 10 張舊 Seedream 圖（`media_assets` metadata 含 seedream），圖庫要能顯示其模型名。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx tsc --noEmit -p .`（apps/next-admin，0 errors）；grep -i seedream `app/(shell)/tools/video lib/content` 0 命中 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 IMAGE_VENDOR_GROUPS，vendorForModel 對未知模型回 FLUX，無其他引用
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`seedream` | hits=3（asset-group 顯示名稱保留；docs/POD_STUDIO_ROADMAP.md、IMAGE_GEN_TOOLKIT 為歷史研究紀錄不回改）
+- ORACLE_WAIVED: 移除一個選單項與一行文件，無邏輯變更
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-21（續25）tarot 工作台：Codex 對 b07eaceff 的 5 個 finding，用「deck／job 身分」一個機制關整類（Claude）
 
 - 來源：`agency-os/reports/oracle/2026-10-21-partialreview-d933a07c.md`（F1–F5，逐條 grep 對過 b07eaceff 行號屬實）。同一 reviewer 第二次點這段 code → 先寫不變量（AGENTS.md §4）。
