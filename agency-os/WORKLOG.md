@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-21（續33）tarot 背景批次改存資料表（0115，方案 B）＋正式庫套 0115、部署 next-admin 4f8d44fb8 → 0aa0b1f67、Trigger 20261021.6（Claude，操作者批准「Approve option B … go ahead, High」）
+
+- 根因：`lib/tarot/batch-store.ts` 舊版把批次存在程序記憶體 Map。C1 卡片回呼每次都重新生成（`card/route.ts` 舊 :64），Trigger 重試＝重算＋重複計費；C2 run 被 Trigger 殺掉後 job 永遠 running（無期限）；C3 next-admin 重啟／部署＝全部 job 消失；M1 `GET /api/tools/tarot/batch` 列出所有人的 job。
+- 不變量：進度＝資料列，主鍵 (job_id, card_index)。`tarot_batch_claim_card` 在生成前搶卡（done → 回存好的 URL、新鮮 claim → 409），`tarot_batch_finish_card` 不覆蓋 done；job 狀態由卡片列＋`deadline_at`（＋Trigger run 狀態）推得，逾時回 timed_out（給舊瀏覽器 status=error）；列表依 effectiveOrgId（客戶）／建立者（員工）過濾。RLS 只給 service_role，比照 0047 video_jobs。TarotStudio.tsx 未改（API 形狀向後相容）。
+- Codex 審 45e465758（`agency-os/reports/oracle/2026-10-21-partialreview-6fb6e154.md`）4 項：F2／F3／F4 CONFIRMED 已修於 0aa0b1f67（run 提早結束＝error run_ended_incomplete；逾期 job 卡片回呼 410 不生成、worker 視 410 為拒絕即停；列表也查 run 狀態）。F1（R2 圖檔活得比 7 天列 TTL 久）未修：舊記憶體版也從不刪 R2，非本次退化。
+- 部署順序：`apply-db-migration.mjs 0115`（APPLY_OK，ledger 115）→ prod 確認兩表 RLS=t、anon/authenticated 無權限 → `sg-deploy.sh next-admin` exit 0（359 s；npm test 2793 passed、migration 閘 115 OK、healthy 10s、HTTP smoke 5/5）→ `lobster-trigger-deploy.ps1` exit 0，版本 20261021.6（21 tasks）→ Playwright smoke 26 passed／6 skipped；未登入 curl 批次狀態／列表／internal card 皆 401；`BATCH_INTERNAL_SECRET` 容器內存在。
+- 剩餘：操作者瀏覽器實跑一次 78 張（無法代跑）。F1 R2 清理未做。
+- [rollback]：程式先回 → 主機 `docker tag lobster-phase1-next-admin:rollback-20261021-092854` 回滾或 sg-deploy 4f8d44fb8；Trigger 回前一版本重新 deploy；最後 DB 跑 `lobster-factory/packages/db/migrations/0115_tarot_batch_jobs.down.sql`（同時刪 ledger 列）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/packages/db/scripts/0115_tarot_batch_jobs-local-verify.sh ; node scripts/apply-db-migration.mjs 0115 ; npx vitest run lib/tarot app (542 passed) ; curl unauth batch routes -> 401 | exit=0 | ms=17151
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/1n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=listRecentJobs | hits=7（程式 3：定義／import／呼叫，皆已改；TASKS 舊主張本次勾掉；其餘為 oracle 報告／快照）
+- 突變：拔 `listRecentJobs` 的 organization_id 過濾 → 「the job list returns only the caller's organization's jobs」紅；還原 4/4 綠。
 ## 2026-10-21（續32）Claude 審 Codex ceedee5fa（down 檔雙份檢查接 validate + worktree-reparse-guard）
 
 - 範圍：ceedee5fa（review-debt 原寫 `e465e39e6`，該 hash 不在任何 ref，`git log --all` 0 筆；實際 commit = ceedee5fa）。無修改，審畢通過。
