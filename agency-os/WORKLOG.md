@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-21（續1）tarot batch callback 被 session 閘擋（401）→ 移到 `/api/internal/tarot/batch/*`＋自有 token；secret 離開 Trigger payload
+
+**根因**：Trigger task `tarot-batch-generate` 回呼 `PATCH /api/tools/tarot/batch/[jobId]`、`POST .../card`，沒有登入 session；`middleware.ts:413` matcher 不排除 `/api/tools` → `:302-304` 剝掉 `x-ops-claims-role` → `:385` 無 session 回 401 → 78 張全失敗、job 停在 pending。另：card 的 `BATCH_INTERNAL_SECRET` 比對用 `!==`；secret 經 run payload 傳遞（TASKS 資安項，2026-09-23 續110 ④）。
+**不變量**：Trigger → next-admin 只走 matcher 排除的 `/api/internal/*`／`/api/webhooks/*`，自帶 token；這些路徑不經 middleware，所以 route 不得信任身分 header。
+**修**：
+- 新 `app/api/internal/tarot/batch/[jobId]/{start,card}/route.ts`：Bearer `BATCH_INTERNAL_SECRET` 用 `lib/security/timingSafeEqual`，未設＝拒絕，不退回角色 header；刪舊 card route 與 `[jobId]` 的 PATCH（GET 留給瀏覽器輪詢）。
+- `batch/route.ts`：payload 不再帶 secret／`sgBaseUrl`；先 `createJob` 再呼叫 Trigger，失敗則 `deleteJob`（關掉 trigger-先於-create 的競態，Codex 第二輪 CONFIRMED）；刪無讀者的 `triggerRunId` 欄位。
+- `tarot-batch-generate.ts`：從 worker env 讀 `BATCH_INTERNAL_SECRET`＋`AWAREWAVE_WEBHOOK_BASE_URL`；start／card 回 401／404 → run 失敗（critic m1）；`retry.maxAttempts: 1`（整 run 重試會從第 0 張重新計費）。
+- `trigger.config.ts` 同步 `BATCH_INTERNAL_SECRET`；`scripts/lobster-trigger-deploy.ps1` 從執行中 next-admin 取值（同 `SOCIAL_DISPATCH_TOKEN`）；`.env.example` 補該行（oracle finding）。
+- 守衛測試 `lib/__tests__/trigger-callbacks-server-to-server.test.ts`：掃 workflows 中所有打 next-admin 的 `${base}/api/...`，須被 matcher 排除；新 route 的 token 守衛。
+- `lib/tarot/MODULE_MANIFEST.json`＋Foundry `module-manifests.json` 的宣告已改，由 registry-fixes session 與其 products 改動一起 commit（同檔共寫）。
+**未做（High，操作者）**：Trigger 重新部署（`scripts/lobster-trigger-deploy.ps1`）。部署前 batch 照舊壞（無退步）；next-admin 03:00 自動部署 main 後舊路徑消失，Trigger 部署後才通。前提已查：`lobster-next-admin` 內 `BATCH_INTERNAL_SECRET` 有值。
+**避免再發生**：上述守衛測試讓新 Trigger callback 打 session 閘的 route 在 CI 紅。殘留：`src/tasks/sync-global-events.ts`（未部署，打 `/api/tools/events/sync`）與 `.env.example` 缺其他 callback token → TASKS。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/__tests__/trigger-callbacks-server-to-server.test.ts`（修前 1 failed：列出 tarot 兩條路徑；修後 6 passed）；`npx tsc --noEmit`（next-admin，race fix 前全綠；之後唯一錯＝registry-fixes 未 commit 的 `image-gen.ts` grant 參數，HEAD `image-gen.ts:605` 仍單參數）＋`npm run typecheck`（workflows）0；全套 `npx vitest run` 2760 passed／2 failed＝他 session 未追蹤的 `lib/portal/__tests__/registry-code.test.ts`（tarot→design，非本改動）；`node --test scripts/__tests__/product-manifests.test.mjs` 4 passed；ssh `docker exec lobster-next-admin` 確認 `BATCH_INTERNAL_SECRET=set` | exit=0 | ms=18065
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- critic agent 0c/0m/2m（m1 401/404 不讓 run 失敗→已修；m2 sync-global-events 掃不到→未部署，TASKS）；Codex oracle `2026-10-20-partialreview-4e45188c.md` 1m（.env.example 缺 secret→已補）、`2026-10-20-partialreview-15ca2310.md` 1m（start 404 遇建立競態→改先建 job）、`2026-10-21-partialreview-244e0557.md` 1m（Trigger 逾時但 run 已建立時 deleteJob→run 首次回呼 404 失敗：刻意，使用者已收到 502，不讓背後偷跑計費，不改）
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts,.claude | grep=`tarot/batch/\[jobId\]/card|PATCH /api/tools/tarot|sgBaseUrl|batchSecret|INTERNAL_ADMIN_BASE_URL` | hits=8 -- 不含 WORKLOG／reports／memory／generated 歷史；程式無舊呼叫端（TarotStudio.tsx:352/748 只 GET）；`INTERNAL_ADMIN_BASE_URL` 仍由 ops-console/page.tsx:26 使用，保留；manifest／TASKS 敘述已改
 ## 2026-10-20（續13）ADR 017 認知平台許可接線（下）：cognitive 上線 2bc73fe06，shadow 稽核留下真判定
 
 **結果**：cognitive-os-api 從 3104c03af 部署到 2bc73fe06（含 e87de9225 的 `can()` 轉接層）。`deploy.sh` 新的步驟 0a 在 prod 第一次真正跑：自動把 `lobster-factory/packages/contracts/fixtures/permit-v1` 加進 sparse 集，並記下 `11 COPY source(s), Dockerfile, .dockerignore, web context = HEAD`。之後 test-gate 跑 425 個模組 PASS、web-test PASS、healthy、本機／資料庫／公開 smoke 都 PASS。web 的 image 沒變，所以三個 web 容器沒有重建。

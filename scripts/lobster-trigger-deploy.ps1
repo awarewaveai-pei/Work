@@ -171,6 +171,8 @@ export "SOCIAL_DISPATCH_TOKEN=`$(docker exec lobster-next-admin printenv SOCIAL_
 # collect-research-run token: same rule -- optional, from the RUNNING next-admin; empty = the relay task fails and
 # Cognitive OS reads the run as failed at its deadline.
 export "COLLECT_RESEARCH_EXECUTE_TOKEN=`$(docker exec lobster-next-admin printenv COLLECT_RESEARCH_EXECUTE_TOKEN 2>/dev/null)"
+# tarot-batch-generate token: same rule -- from the RUNNING next-admin; empty = a tarot batch run fails at once.
+export "BATCH_INTERNAL_SECRET=`$(docker exec lobster-next-admin printenv BATCH_INTERNAL_SECRET 2>/dev/null)"
 
 echo '=== Env ready ==='
 echo "  TRIGGER_API_URL (CLI):          `$TRIGGER_API_URL"
@@ -189,6 +191,7 @@ if [ -n "`$POD_INBOX_SWEEP_TOKEN" ]; then echo "  POD_INBOX_SWEEP_TOKEN set: yes
 if [ -n "`$CS_SWEEP_TOKEN" ]; then echo "  CS_SWEEP_TOKEN set: yes (from running next-admin)"; else echo "  CS_SWEEP_TOKEN set: no (next-admin has none; cs-inbound-sweep will skip)"; fi
 if [ -n "`$SOCIAL_DISPATCH_TOKEN" ]; then echo "  SOCIAL_DISPATCH_TOKEN set: yes (from running next-admin)"; else echo "  SOCIAL_DISPATCH_TOKEN set: no (next-admin has none; social-dispatch will skip)"; fi
 if [ -n "`$COLLECT_RESEARCH_EXECUTE_TOKEN" ]; then echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: yes (from running next-admin)"; else echo "  COLLECT_RESEARCH_EXECUTE_TOKEN set: no (next-admin has none; collect-research-run will fail at the relay)"; fi
+if [ -n "`$BATCH_INTERNAL_SECRET" ]; then echo "  BATCH_INTERNAL_SECRET set: yes (from running next-admin)"; else echo "  BATCH_INTERNAL_SECRET set: no (next-admin has none; tarot-batch-generate will fail)"; fi
 
 cd /root/Work/lobster-factory/packages/workflows
 

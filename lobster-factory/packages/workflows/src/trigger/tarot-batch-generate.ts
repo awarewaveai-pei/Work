@@ -1,9 +1,11 @@
 /**
  * Trigger.dev task: background 78-card tarot batch generation.
  *
- * Runs on EU Trigger.dev worker → calls SG next-admin card callback endpoint for each card.
- * The callback generates the image (using SG's API keys), saves to R2, and updates the
- * in-memory batch store. This keeps all secrets and R2 access on the SG server.
+ * Calls next-admin's POST /api/internal/tarot/batch/[jobId]/start, then .../card once per card. The card callback
+ * generates the image with next-admin's API keys, saves it to R2 and updates its in-memory batch store.
+ *
+ * Token: BATCH_INTERNAL_SECRET, synced by scripts/lobster-trigger-deploy.ps1 from the RUNNING next-admin. Never in the
+ * payload: run payloads are stored and shown in the Trigger dashboard. Unset -> the run fails at once.
  */
 
 import { task, logger } from "@trigger.dev/sdk";
@@ -20,8 +22,6 @@ interface BatchPayload {
   model: string;
   aspectRatio: string;
   seed?: number | null;
-  sgBaseUrl: string;      // e.g. https://app.aware-wave.com
-  batchSecret?: string;   // BATCH_INTERNAL_SECRET — optional in dev, required in prod
 }
 
 interface CardCallbackResult {
@@ -35,16 +35,16 @@ export const tarotBatchGenerate = task({
   id: "tarot-batch-generate",
   // Limit to 2 concurrent batch runs to avoid exhausting Replicate quota.
   queue: { concurrencyLimit: 2 },
+  // No whole-run retry: it would restart at card 0 and bill every finished card again; cards retry on their own below.
+  retry: { maxAttempts: 1 },
   // Allow up to 90 min for a full 78-card run (worst case: 78 × ~60s + retries).
   maxDuration: 5400,
   run: async (payload: BatchPayload) => {
-    const { jobId, cards, model, aspectRatio, seed, sgBaseUrl, batchSecret } = payload;
-    const base = sgBaseUrl.replace(/\/$/, "");
-
-    // Build auth headers for card callback — prefer shared secret, fall back to role header.
-    const cardAuthHeaders: Record<string, string> = batchSecret
-      ? { Authorization: `Bearer ${batchSecret}` }
-      : { "x-ops-claims-role": "operator" };
+    const { jobId, cards, model, aspectRatio, seed } = payload;
+    const token = process.env.BATCH_INTERNAL_SECRET?.trim();
+    if (!token) throw new Error("tarot-batch: BATCH_INTERNAL_SECRET not set on this worker");
+    const base = (process.env.AWAREWAVE_WEBHOOK_BASE_URL ?? "https://app.aware-wave.com").replace(/\/$/, "");
+    const headers = { "Content-Type": "application/json", Authorization: `Bearer ${token}` };
 
     logger.info("tarot-batch: started", {
       jobId,
@@ -53,17 +53,20 @@ export const tarotBatchGenerate = task({
       aspectRatio,
     });
 
+    // 401 (token drift) or 404 (job lost to a next-admin restart) can never succeed: fail the run so it is seen,
+    // instead of finishing "completed" with every card failed while the browser polls a job stuck at pending.
+    const refused = (status: number) => status === 401 || status === 404;
+
     // Mark job as running
-    try {
-      await fetch(`${base}/api/tools/tarot/batch/${jobId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-ops-claims-role": "operator" }, // status endpoint uses role check
-        body: JSON.stringify({}),
-        signal: AbortSignal.timeout(10_000),
-      });
-    } catch (e) {
+    const start = await fetch(`${base}/api/internal/tarot/batch/${jobId}/start`, {
+      method: "POST",
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    }).catch((e) => {
       logger.warn("tarot-batch: failed to mark running", { jobId, error: String(e) });
-    }
+      return null;
+    });
+    if (start && refused(start.status)) throw new Error(`tarot-batch: next-admin refused start (${start.status})`);
 
     let done = 0;
     let failed = 0;
@@ -76,14 +79,15 @@ export const tarotBatchGenerate = task({
 
       let result: CardCallbackResult = { ok: false, error: "unknown" };
       let quotaExceeded = false;
+      let refusedStatus = 0;
       // Retry once on transient errors (timeout / 5xx).
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           const res = await fetch(
-            `${base}/api/tools/tarot/batch/${jobId}/card`,
+            `${base}/api/internal/tarot/batch/${jobId}/card`,
             {
               method: "POST",
-              headers: { "Content-Type": "application/json", ...cardAuthHeaders },
+              headers,
               body: JSON.stringify({
                 cardIndex: card.index,
                 cardName: card.name,
@@ -96,6 +100,7 @@ export const tarotBatchGenerate = task({
               signal: AbortSignal.timeout(65_000),
             },
           );
+          if (refused(res.status)) { refusedStatus = res.status; break; }
           result = (await res.json()) as CardCallbackResult;
           if (res.status === 429) { quotaExceeded = true; break; }
           if (result.ok) break;
@@ -109,6 +114,8 @@ export const tarotBatchGenerate = task({
           }
         }
       }
+
+      if (refusedStatus) throw new Error(`tarot-batch: next-admin refused card ${card.index} (${refusedStatus})`);
 
       if (quotaExceeded) {
         logger.warn("tarot-batch: quota exceeded — aborting remaining cards", { jobId, done, failed });

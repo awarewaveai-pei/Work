@@ -21,7 +21,6 @@ export interface BatchJob {
   completedCards: number;
   failedCards: number;
   status: BatchJobStatus;
-  triggerRunId: string | null;
   results: BatchCardResult[];
   createdAt: number; // Date.now()
   updatedAt: number;
@@ -34,7 +33,6 @@ export function createJob(
   model: string,
   aspectRatio: string,
   totalCards: number,
-  triggerRunId: string | null,
 ): BatchJob {
   const job: BatchJob = {
     jobId,
@@ -44,13 +42,16 @@ export function createJob(
     completedCards: 0,
     failedCards: 0,
     status: "pending",
-    triggerRunId,
     results: [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
   store.set(jobId, job);
   return job;
+}
+
+export function deleteJob(jobId: string): void {
+  store.delete(jobId);
 }
 
 export function getJob(jobId: string): BatchJob | undefined {

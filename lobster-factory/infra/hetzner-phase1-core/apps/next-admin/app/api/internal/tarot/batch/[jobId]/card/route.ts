@@ -1,34 +1,33 @@
+// POST /api/internal/tarot/batch/[jobId]/card
+//
+// Called once per card by the Trigger task tarot-batch-generate (packages/workflows/src/trigger/tarot-batch-generate.ts).
+// Generates the image with this server's API keys, saves it to R2 and records it in the in-memory batch store.
+// Own token BATCH_INTERNAL_SECRET. The middleware does not run on /api/internal/*, so client identity headers are NOT
+// stripped here: never fall back to a role header.
+
 import { NextResponse } from "next/server";
-import { canCreateAiImageJob, resolveOpsRole } from "../../../../../../../lib/ops-role";
-import { generateTarotImage, isTarotModel, isAspectRatio } from "../../../../../../../lib/tarot/image-gen";
-import { recordCardResult, getJob } from "../../../../../../../lib/tarot/batch-store";
-import { putDesignObject, parseImageDataUrl, isR2Configured, getDesignsPublicBase } from "../../../../../../../lib/storage/r2";
-import { checkAndConsumeQuota } from "../../../../../../../lib/tarot/quota";
+import { timingSafeEqual } from "@/lib/security/timingSafeEqual";
+import { generateTarotImage, isTarotModel, isAspectRatio } from "@/lib/tarot/image-gen";
+import { recordCardResult, getJob } from "@/lib/tarot/batch-store";
+import { putDesignObject, parseImageDataUrl, isR2Configured, getDesignsPublicBase } from "@/lib/storage/r2";
+import { checkAndConsumeQuota } from "@/lib/tarot/quota";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+function verifyToken(request: Request): boolean {
+  const expected = process.env.BATCH_INTERNAL_SECRET?.trim();
+  if (!expected) return false; // fail closed: unset means nobody is authorized, not everybody
+  const m = (request.headers.get("authorization") ?? "").match(/^Bearer\s+(.+)$/i);
+  return !!m && timingSafeEqual(m[1].trim(), expected);
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ jobId: string }> },
 ): Promise<Response> {
-  // Primary guard: shared secret for Trigger.dev → SG server-to-server calls.
-  // If BATCH_INTERNAL_SECRET is set, require it in Authorization header.
-  // Falls back to ops-role check (dev/local where secret may not be configured).
-  const batchSecret = process.env.BATCH_INTERNAL_SECRET?.trim();
-  if (batchSecret) {
-    const authHeader = req.headers.get("authorization") ?? "";
-    const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : "";
-    if (provided !== batchSecret) {
-      return NextResponse.json({ ok: false, error: "forbidden_secret" }, { status: 403 });
-    }
-  } else {
-    const { role } = resolveOpsRole(req);
-    if (!canCreateAiImageJob(role)) {
-      return NextResponse.json({ ok: false, error: "forbidden_role" }, { status: 403 });
-    }
-  }
+  if (!verifyToken(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
 
   const { jobId } = await params;
   const job = getJob(jobId);

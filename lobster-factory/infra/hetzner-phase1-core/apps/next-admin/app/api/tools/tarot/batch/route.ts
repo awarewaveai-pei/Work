@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
-import { createJob, listRecentJobs } from "../../../../../lib/tarot/batch-store";
+import { createJob, deleteJob, listRecentJobs } from "../../../../../lib/tarot/batch-store";
 import { isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
 
 export const runtime = "nodejs";
@@ -46,15 +46,12 @@ export async function POST(req: Request): Promise<Response> {
   const aspectRatio = isAspectRatio(arRaw) ? arRaw : "2:3";
   const seed        = typeof body.seed === "number" ? body.seed : null;
 
-  const sgBaseUrl = (
-    process.env.INTERNAL_ADMIN_BASE_URL ||
-    process.env.NEXTAUTH_URL ||
-    "https://app.aware-wave.com"
-  ).replace(/\/$/, "");
-
   const jobId = randomUUID();
 
-  // Trigger Trigger.dev task
+  // Trigger Trigger.dev task. No secret or callback URL in the payload (it is stored and shown in the Trigger
+  // dashboard): the worker reads BATCH_INTERNAL_SECRET and AWAREWAVE_WEBHOOK_BASE_URL from its own env.
+  // The job exists before the run does: the task's first callback must find it (no create-after-trigger race).
+  createJob(jobId, model, aspectRatio, cards.length);
   const triggerUrl = `${apiUrl.replace(/\/$/, "")}/api/v1/tasks/tarot-batch-generate/trigger`;
   let triggerRunId: string | null = null;
   try {
@@ -68,8 +65,6 @@ export async function POST(req: Request): Promise<Response> {
           model,
           aspectRatio,
           seed,
-          sgBaseUrl,
-          batchSecret: process.env.BATCH_INTERNAL_SECRET?.trim() || undefined,
         },
       }),
       signal: AbortSignal.timeout(20_000),
@@ -80,19 +75,19 @@ export async function POST(req: Request): Promise<Response> {
     } else {
       const txt = await trigRes.text().catch(() => "");
       console.error("[tarot-batch] trigger failed", trigRes.status, txt.slice(0, 300));
+      deleteJob(jobId);
       return NextResponse.json(
         { ok: false, error: `Trigger.dev HTTP ${trigRes.status} — check TRIGGER_ACCESS_TOKEN and task deployment` },
         { status: 502 },
       );
     }
   } catch (e) {
+    deleteJob(jobId);
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ ok: false, error: `Trigger.dev unreachable: ${msg}` }, { status: 502 });
   }
 
-  const job = createJob(jobId, model, aspectRatio, cards.length, triggerRunId);
-
-  return NextResponse.json({ ok: true, jobId: job.jobId, runId: triggerRunId, totalCards: cards.length });
+  return NextResponse.json({ ok: true, jobId, runId: triggerRunId, totalCards: cards.length });
 }
 
 export async function GET(req: Request): Promise<Response> {

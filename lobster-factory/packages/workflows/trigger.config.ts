@@ -80,6 +80,10 @@ export default defineConfig({
         const researchExecuteToken = process.env.COLLECT_RESEARCH_EXECUTE_TOKEN ?? "";
         if (researchExecuteToken.trim()) out.COLLECT_RESEARCH_EXECUTE_TOKEN = researchExecuteToken.trim();
 
+        // tarot-batch-generate -> next-admin /api/internal/tarot/batch/*. Own token, same rule.
+        const tarotBatchToken = process.env.BATCH_INTERNAL_SECRET ?? "";
+        if (tarotBatchToken.trim()) out.BATCH_INTERNAL_SECRET = tarotBatchToken.trim();
+
         // ── Supabase (Lobster DB writes) ─────────────────────────────────────
         const supabaseUrl = process.env.LOBSTER_SUPABASE_URL ?? "";
         const supabaseSrk = process.env.LOBSTER_SUPABASE_SERVICE_ROLE_KEY ?? "";
@@ -169,8 +173,6 @@ export default defineConfig({
         const wpSshKey = process.env.LOBSTER_WP_SSH_PRIVATE_KEY ?? "";
         if (wpSshKey.trim()) out.LOBSTER_WP_SSH_PRIVATE_KEY = wpSshKey.trim();
 
-        // No BATCH_INTERNAL_SECRET here: tarot-batch-generate never reads it from env, next-admin
-        // passes it in the run payload (app/api/tools/tarot/batch/route.ts).
 
         return out;
       }),
