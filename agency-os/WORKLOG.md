@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-21（續25）tarot 工作台：Codex 對 b07eaceff 的 5 個 finding，用「deck／job 身分」一個機制關整類（Claude）
+
+- 來源：`agency-os/reports/oracle/2026-10-21-partialreview-d933a07c.md`（F1–F5，逐條 grep 對過 b07eaceff 行號屬實）。同一 reviewer 第二次點這段 code → 先寫不變量（AGENTS.md §4）。
+- 不變量：任何非同步後續（抽牌生成 → 調色/套框 → FileReader → 存圖庫；背景 job 輪詢；背景結果載入；預覽生成）只有在「它開始時的那副牌／那個 job 仍是目前的、且沒按停止」時，才可以寫 React state 或送出請求。F1–F4 都是「上一副牌／上一個 job 的後續寫進目前這副」的實例。
+- 機制（commit 94c4b7c01）：`deckGenRef`（`startNewDeck`、`unlockStyle` 各 +1）＋`bgJobRef {id, deck}`（`setBgJob` 同步 ref 與 state）。開始時記下 deck／job，每次寫入與請求前重驗：`generateOne` 的 `live()`（`!signal.aborted && deck 相同`）、輪詢 `isCurrentJob()`、`loadBatchResults` 的 `isCurrent()`。`runCardLoop` 只在自己仍是目前這輪時才清 busy 旗標。
+- 背景 job 的選擇：job 帶著發起它的 deck id；deck 不同 → 不合併，清掉 job 並顯示「是上一副牌產生的，不載入」（選 drop，最簡單且正確；執行中的已付費 job 仍顯示進度，到載入時才拒絕）。
+- 對抗檢查（每個 finding 在哪一行被丟掉，行號＝a9f5a1370 的 `TarotStudio.tsx`）：
+  - F1 背景結果灌進重鎖的新牌組：`:847` `if (!isCurrent())` → 清 job＋訊息，不呼叫 `setBatch`；載入途中換牌 `:865`。
+  - F2 停止/換牌後調色完成仍寫舊圖：`:675`（生成回來後）、`:693`（調色/套框/縮圖後，revoke url）丟到 catch；`:731` 換牌 → 什麼都不寫；同牌組按停止 → 槽位還原 done/idle。
+  - F3 停止後 FileReader 仍存圖庫：`:706` `onload` 之後、`saveToGallery` 之前 `if (!live()) return`。
+  - F4 進行中的輪詢把已清掉的 job 叫回來：`:383` 回應後 `isCurrentJob()` 不符 → `clearInterval`＋return；送出前 `:376`。
+  - F5 中日韓警告：`:79` `CJK_TEXT`＝`\p{Script=Han|Hiragana|Katakana|Hangul}`（u flag；用 RegExp 建構子，因 tsconfig target ES2017 不收 literal 的 property escape）；`:1442` 使用，文字改「含中日韓文字」。
+- Codex 第二輪（`agency-os/reports/oracle/2026-10-21-partialreview-3ce67455.md`，5 個）：
+  - F5 預覽回應蓋掉較新的 AI 編輯（屬實：編輯面板在預覽生成中可用，`onEditedImage` → `unlockStyle`）→ 同機制修，commit a9f5a1370：`generatePreview` 記 deck，`:477`／`:489`／`:492` 不符就丟。
+  - F1 背景 POST 回來時牌已換仍設成 running：不修，屬設計——job 帶舊 deck id，進度照顯示（已付費），載入時 `:847` 拒絕合併。
+  - F2–F4 在伺服器端（`packages/workflows/src/trigger/tarot-batch-generate.ts`、`lib/tarot/batch-store.ts` 記憶體 store：重試重複計數、超時無終態、重啟遺失結果）：本檔範圍外、b07eaceff 前即存在，未驗證行號，未修 → 留給背景批次持久化任務。
+- 剩餘風險：本頁無元件測試，以上靠對抗檢查與 tsc；未部署（next-admin 03:00 自動部署 main 會帶上）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/tarot app (next-admin) 75 files / 528 passed | exit=0 | ms=8700
+- REALTEST_EVIDENCE: tool=Bash | cmd=node -e CJK_TEXT on ねこ/カタ/고양이/貓 true, "a blue cat" false | exit=0 | ms=100
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n
+  - external oracle = Codex CLI（codex-oracle.ps1 -Mode review -DiffRef 94c4b7c01），1 個在本檔已修（a9f5a1370），1 個屬設計，3 個在伺服器端範圍外。
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=setBgJobId|startNewDeck|unlockStyle|deckGenRef | hits=27
+  - code 命中只在 `TarotStudio.tsx`（27 行）；其餘為 WORKLOG／oracle 報告文字。
 ## 2026-10-21（續24）My Designs 只顯示 60 張、篩選數字錯：改 DB 端篩選＋keyset 分頁＋DB 計數（Claude）
 
 - 根因：`app/api/tools/designs/route.ts:16` `LIST_LIMIT = 60` 套在 GET 的 `.limit()`（舊 :417），無分頁；篩選、排序、chip 計數全在 `DesignsGallery.tsx` 用這 60 筆算 → 78 張牌組顯示「60 / 60」「FLUX schnell (60)」。
