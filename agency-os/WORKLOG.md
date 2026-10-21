@@ -15,6 +15,21 @@
   - 自讀 diff（route GET、designs-list.ts、DesignsGallery.tsx、PublishWizard 註解）；Codex 審查另行。
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=api/tools/designs | hits=54
   - GET 呼叫者：DesignsGallery、PublishWizard（?group=，只讀 assets，相容）、MockupStudio:320（相容）；其餘為 POST/DELETE。PublishWizard:190 舊註解提 LIST_LIMIT → 改指 PAGE_SIZE。
+## 2026-10-21（續23）審 Codex fdf9ad468＋2160b814d（Meta C27 M1/M2/m2/M3）：IG 留言對不到貼文、送出後記帳失敗被標 failed（Claude）
+
+- 範圍：fdf9ad468（meta-webhook／meta-auto-reply／store／dispatch／0114）＋2160b814d（WORKLOG 編號更正）。
+- M1 已修：`lib/social/meta-webhook.ts` addComment 讀 `value.media_id`，Meta IG comments webhook 實際是 `value.media.id`（Meta 文件 instagram-platform/webhooks/examples）→ IG 單則規則在正式環境永遠不生效（測試 fixture 用的是自編欄位所以綠）。改：facebook 讀 `post_id`，instagram 讀 `media.id`；fixture 改真實形狀。
+- m1 已修：`lib/social/meta-auto-reply.ts` 送出成功後 `completeAutoRuleEvent("replied")` 拋錯會落進送出失敗的 catch → 事件標 failed、計 failed，與事實不符。改：只把送出包在 try；之後的狀態／hit 寫入各自記錄錯誤、不改結果。新增點名測試。
+- 確認無誤：claim 在送出前（PK organization_id+event_id，23505→skip，併發同 event 只一個 insert 成功）；兩個查詢都限 organization_id（store.ts findPostIdByMetaId）；dispatch-store 直接 update meta_post_id 走 0096 social_children_guard 的 sender write-back 分支；social_record_outcome 的 jsonb_to_recordset 忽略多出的 meta_post_id；0114 RLS/grant 同 0113／0096；down 兩處內容一致；編號不撞 0113。
+- 送失敗＝terminal 的語意：可接受。webhook route 對送出失敗仍回 200（`app/api/webhooks/meta/route.ts:41`），Meta 本就不會重送；只有 DB 例外讓整批 500 → Meta 重送，已 claim 的跳過。代價：Meta 暫時故障的那則永不回、claim 後程序崩潰卡 claimed 永不回（at-most-once，寧漏回不重回）。
+- 部署：0114 推上 main 不會被自動套。sg-deploy.sh 1.86 migration 閘（`scripts/sg-deploy.sh:185-211`）repo 領先帳本即 fail；auto-deploy-next-admin.sh 只發警報（`:198-206`）。兩支腳本都沒有套 migration 的步驟。結果：套 0114 前每晚 03:00 自動部署會失敗並警報。
+- 未修（剩餘）：`instagram-standalone` 帳號的 meta_post_id 不記錄也對不到（dispatch.ts:306、findPostIdByMetaId 只認 "instagram"）；UI 不能接這種帳號（Settings.tsx:16），所以先不修。FB 影片貼文的 Postiz releaseId 可能是單純 video id，與 webhook `<page>_<post>` 對不上 → 退回品牌規則（安全）。0114 沒有 local-verify 腳本（0111–0113 都有）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social/__tests__/meta-auto-reply.test.ts lib/social/__tests__/meta-webhook.test.ts app/api/webhooks/meta/route.test.ts | exit=0 | ms=411
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit (next-admin) | exit=0 | ms=90000
+- 突變（M2 守衛，D:/tmp/m2mut 副本）：claim 判斷改 `false && …` → 點名「does not send a Meta redelivery when the hit audit write fails」紅 1/6；還原 6/6 綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/1n
+  - external oracle = Codex CLI（codex-oracle.ps1 -Path 三檔）NO FINDINGS，artifact agency-os/reports/oracle/2026-10-21-partialreview-391e6144.md；審 Codex 原 commit 的部分由本 Claude session 做：1M/1m 已修
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=completeAutoRuleEvent | hits=14
 ## 2026-10-21（續22）智慧連結 0113 部署停在前置檢查（需要 0114，不在核准範圍）＋worktree 清理時誤刪主 node_modules（已補回）
 
 - 已完成：env `SMARTLINK_VISITOR_HASH_SALT` 由主機 `openssl rand -hex 32` 寫入 `/root/lobster-phase1/.env`（備份 `.env.bak-*-smartlink-salt`，值沒印出）；compose 走 `safe-infra-patch.sh compose`（備份 `docker-compose.yml.bak.safe-patch-20261021-074244`）→ `docker exec lobster-next-admin printenv SMARTLINK_VISITOR_HASH_SALT >/dev/null` exit 0。repo 對照檔 f5e69bff6。main 已 push（e0e10cde9／020e2da4a／f5e69bff6）。

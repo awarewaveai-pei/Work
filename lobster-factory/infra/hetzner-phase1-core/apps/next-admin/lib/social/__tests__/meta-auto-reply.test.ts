@@ -47,7 +47,7 @@ describe("C27 Meta auto-reply execution", () => {
     ports.completeAutoRuleEvent.mockResolvedValue(undefined);
     ports.recordAutoRuleHit.mockResolvedValue(1);
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "reply-1" }), { status: 200 }));
-    await processMetaWebhook({ object: "instagram", entry: [{ id: "ig-1", changes: [{ field: "comments", value: { id: "comment-known", media_id: "media-1", text: "hello", from: { id: "person-1" } } }] }] }, env);
+    await processMetaWebhook({ object: "instagram", entry: [{ id: "ig-1", changes: [{ field: "comments", value: { id: "comment-known", media: { id: "media-1", media_product_type: "FEED" }, text: "hello", from: { id: "person-1" } } }] }] }, env);
     expect(ports.findPostIdByMetaId).toHaveBeenCalledWith("org-1", "instagram", "media-1");
     expect(ports.recordAutoRuleHit).toHaveBeenCalledWith("org-1", "post-rule", "meta:webhook", expect.anything());
   });
@@ -58,7 +58,7 @@ describe("C27 Meta auto-reply execution", () => {
     ports.completeAutoRuleEvent.mockResolvedValue(undefined);
     ports.recordAutoRuleHit.mockRejectedValue(new Error("audit unavailable"));
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "reply-1" }), { status: 200 }));
-    const payload = { object: "instagram", entry: [{ id: "ig-1", changes: [{ field: "comments", value: { id: "comment-redelivered", media_id: "media-1", text: "hello", from: { id: "person-1" } } }] }] };
+    const payload = { object: "instagram", entry: [{ id: "ig-1", changes: [{ field: "comments", value: { id: "comment-redelivered", media: { id: "media-1", media_product_type: "FEED" }, text: "hello", from: { id: "person-1" } } }] }] };
     await processMetaWebhook(payload, env);
     const result = await processMetaWebhook(payload, env);
     expect(result).toMatchObject({ received: 1, matched: 0, replied: 0, skipped: 1, failed: 0 });
@@ -73,6 +73,17 @@ describe("C27 Meta auto-reply execution", () => {
     const result = await processMetaWebhook({ object: "instagram", entry: [{ id: "ig-1", changes: [{ field: "comments", value: { id: "comment-failed", text: "hello", from: { id: "person-1" } } }] }] }, env);
     expect(result).toMatchObject({ received: 1, matched: 1, replied: 0, failed: 1 });
     expect(ports.completeAutoRuleEvent).toHaveBeenCalledWith("org-1", "instagram:comment:comment-failed", "failed", "Meta unavailable");
+  });
+
+  it("keeps a sent reply counted as replied when its result write fails", async () => {
+    ports.listAutoRules.mockResolvedValue([{ id: "rule-1", post_id: null, name: "brand", trigger: "comment", keywords: ["hello"], platforms: ["instagram"], action: "reply", reply: "reply", active: true, hits: 0 }]);
+    ports.claimAutoRuleEvent.mockResolvedValue(true);
+    ports.completeAutoRuleEvent.mockRejectedValue(new Error("db blip"));
+    ports.recordAutoRuleHit.mockResolvedValue(1);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ id: "reply-1" }), { status: 200 }));
+    const result = await processMetaWebhook({ object: "instagram", entry: [{ id: "ig-1", changes: [{ field: "comments", value: { id: "comment-sent", text: "hello", from: { id: "person-1" } } }] }] }, env);
+    expect(result).toMatchObject({ matched: 1, replied: 1, failed: 0 });
+    expect(ports.completeAutoRuleEvent).not.toHaveBeenCalledWith("org-1", "instagram:comment:comment-sent", "failed", expect.anything());
   });
 
   it("stays a no-op before both switches are enabled", async () => {

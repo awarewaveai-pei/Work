@@ -39,16 +39,6 @@ export async function processMetaWebhook(payload: unknown, env: MetaSocialEnv = 
     result.matched++;
     try {
       await replyToMetaEvent(event, rule.reply, env);
-      await completeAutoRuleEvent(config.organizationId, event.eventId, "replied");
-      try {
-        await recordAutoRuleHit(config.organizationId, rule.id, "meta:webhook", {
-          event_id: event.eventId, platform: event.platform, kind: event.kind, target_id: event.targetId,
-        });
-      } catch (error) {
-        // The event is already terminal; a failed audit counter must not make Meta send again.
-        console.error(`[social/meta] auto-reply hit record failed for ${event.eventId}:`, error instanceof Error ? error.message : String(error));
-      }
-      result.replied++;
     } catch (error) {
       result.failed++;
       try {
@@ -57,6 +47,21 @@ export async function processMetaWebhook(payload: unknown, env: MetaSocialEnv = 
         console.error(`[social/meta] auto-reply result record failed for ${event.eventId}:`, resultError instanceof Error ? resultError.message : String(resultError));
       }
       console.error(`[social/meta] auto-reply failed for ${event.eventId}:`, error instanceof Error ? error.message : String(error));
+      continue;
+    }
+    // The reply is out: a bookkeeping error below must not relabel it failed. The claim already blocks a resend.
+    result.replied++;
+    try {
+      await completeAutoRuleEvent(config.organizationId, event.eventId, "replied");
+    } catch (error) {
+      console.error(`[social/meta] auto-reply result record failed for ${event.eventId}:`, error instanceof Error ? error.message : String(error));
+    }
+    try {
+      await recordAutoRuleHit(config.organizationId, rule.id, "meta:webhook", {
+        event_id: event.eventId, platform: event.platform, kind: event.kind, target_id: event.targetId,
+      });
+    } catch (error) {
+      console.error(`[social/meta] auto-reply hit record failed for ${event.eventId}:`, error instanceof Error ? error.message : String(error));
     }
   }
   return result;
