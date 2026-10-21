@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-21（續19）智慧連結點擊防重複改由資料庫保證（0113，Codex df9ef06d5 → main e0e10cde9）＋監工台「數據分析有真數字」→ yes
+
+- 根因：C26 的 `ClickGate` 是行程記憶體，重啟／每晚 03:00 部署／第二個 worker 會忘記，同一訪客同一天可重複計數（oracle 2026-10-19-partialreview-1526451f.md:21）。
+- 治本：0113 `social_smart_link_click_dedupe`（PK item_id+day+visitor_hash，`on conflict do nothing` 決定是否 +1，DB 原子保證）；只存 HMAC-SHA256(IP, `SMARTLINK_VISITOR_HASH_SALT`) 64 hex，不存 IP/UA 原文；保留 3 個品牌日；RLS 開、只 service_role；item 刪除 cascade；函式非 SECURITY DEFINER。缺 salt = 不計數仍 302（`lib/social/smartlink.ts` visitorHash）。
+- 審查（Claude，非作者）m1：過期 hash 只在同 item 下次點擊時清，之後不再被點的 item 會留到下次點擊（有 salt 不可逆，低風險，不修）。m2：無 IP 標頭時落到 "unknown" 共用一個 hash（nginx 必設 X-Real-IP，不修）。m3：0113 drop 舊 2 參數函式 → 套 migration 到新容器起來之間舊程式點擊回 503，套用緊接部署以縮短窗口。m4：D:\Work 有另一 session 未提交的 `0113_social_meta_webhook_idempotency.sql`（同號；ledger 以檔名為鍵不衝突，但提交者應改號）。
+- 部署注意：sg-deploy migration 閘只檢查不套用（`sg-deploy.sh:185-209`），0113 須先 `node scripts/apply-db-migration.mjs 0113_social_smart_link_visitor_dedupe.sql`。
+- 監工台 `agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs` NOW「數據分析有真數字」→ yes（證據 續15），`node build.mjs && node check.mjs` 綠；頁面需主 session 重發。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/packages/db/scripts/0113_social_smart_link_visitor_dedupe-local-verify.sh | exit=0 | ms=26740
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash lobster-factory/infra/hetzner-phase1-core/tests/e2e/social/smartlink-real-db.sh (2/2) | exit=0 | ms=29434
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/0m/4n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=ClickGate|social_smart_link_click(|SMARTLINK_VISITOR_HASH_SALT | hits=34
+- ORACLE_WAIVED: Codex 撰寫，Claude 主 session 為非作者審查者（操作者指定不開 /claude-review）
 ## 2026-10-21（續17）社群 C27／C28 審查（Codex 0d85eb44c）：修自動回覆回覆自己留言的迴圈（Claude）
 
 - 範圍：審 Codex 0d85eb44c（Meta webhook／自動回覆／廣告）＋5e2b505e1，Deep（簽章＝auth 級）。

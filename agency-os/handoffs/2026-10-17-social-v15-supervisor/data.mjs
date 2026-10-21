@@ -3,7 +3,7 @@
 
 export const META = {
   title: '社群發文 監工台',
-  updated: '2026-10-19',
+  updated: '2026-10-21',
   plan: 'lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md',
   adr: 'agency-os/docs/architecture/decisions/016-social-manager-third-product.md',
   mock: 'lobster-factory/docs/social/mockups/social-manager-mock.html',
@@ -29,7 +29,7 @@ export const COPY = {
 export const NOW = [
   { what: '可以發文', state: 'yes', ev: 'social.aware-wave.com 上線中（PLAN.md C12）；是舊版畫面' },
   { what: '新畫面定案', state: 'yes', ev: '樣稿第 16 版；ADR 016 §5 操作者定案 1–6（commit 0755e32ab）' },
-  { what: '數據分析有真數字', state: 'no', ev: '程式完成（C24 deaf0a7eb）：Facebook 經 Postiz、Bluesky 走公開 API，測試資料庫已寫進 Soulful Bluesky 一天；正式環境要等部署並開啟每日排程' },
+  { what: '數據分析有真數字', state: 'yes', ev: '正式庫 social_metrics_daily 268 列（07-22～10-19，3 個頻道），排程每天台灣 03:30（WORKLOG 2026-10-21 續15）' },
   { what: '留言自動回覆真的會動作', state: 'no', ev: '要等 Meta 審核通過（TASKS.md「Postiz Task 2 OAuth app 審核」）' },
 ];
 
