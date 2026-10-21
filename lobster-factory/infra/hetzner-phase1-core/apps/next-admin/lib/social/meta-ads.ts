@@ -113,8 +113,13 @@ export async function getMetaInsights(accountId: string, datePreset: string, env
   return result.data ?? [];
 }
 
-export async function setMetaCampaignStatus(campaignId: string, status: "ACTIVE" | "PAUSED", env?: MetaAdsEnv): Promise<void> {
+/** One token sees every mapped account, so the campaign must be proven to sit in the brand's account before a write. */
+export async function setMetaCampaignStatus(accountId: string, campaignId: string, status: "ACTIVE" | "PAUSED", env?: MetaAdsEnv): Promise<void> {
   if (!/^\d+$/.test(campaignId.trim())) throw new MetaAdsError(400, "活動 ID 格式不正確", "invalid_campaign");
+  const owner = await request<{ account_id?: unknown }>("GET", campaignId.trim(), { fields: "account_id" }, env);
+  if (typeof owner.account_id !== "string" || accountPath(owner.account_id) !== accountPath(accountId)) {
+    throw new MetaAdsError(403, "此活動不屬於指定的廣告帳戶", "meta_ads_campaign_mismatch");
+  }
   await request("POST", campaignId.trim(), { status }, env);
 }
 

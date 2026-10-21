@@ -9,7 +9,9 @@ const meta = vi.hoisted(() => ({
   MetaAdsError: class MetaAdsError extends Error { constructor(readonly status: number, message: string, readonly code: string) { super(message); } },
 }));
 vi.mock("@/lib/entitlements/grant", () => ({ withFeature: (_key: string, handler: (req: Request) => Promise<Response>) => handler }));
-vi.mock("@/lib/social/authz", () => ({ ANY_ROLE: ["owner"], WRITE_ROLES: ["owner"], requireBrandRole: vi.fn(), BrandAccessError: class BrandAccessError extends Error {}, }));
+const store = vi.hoisted(() => ({ recordMetaAdsStatusChange: vi.fn() }));
+vi.mock("@/lib/social/store", () => ({ ...store, SocialStoreError: class SocialStoreError extends Error {} }));
+vi.mock("@/lib/social/authz", () => ({ ANY_ROLE: ["owner"], WRITE_ROLES: ["owner"], actorOf: () => "ops:owner:u1", requireBrandRole: vi.fn(), BrandAccessError: class BrandAccessError extends Error {}, }));
 vi.mock("@/lib/social/meta-ads", () => meta);
 
 import { GET, PATCH } from "./route";
@@ -34,6 +36,7 @@ describe("/api/social/ads", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ detail: { code: "meta_ads_write_disabled" } });
     expect(meta.setMetaCampaignStatus).not.toHaveBeenCalled();
+    expect(store.recordMetaAdsStatusChange).not.toHaveBeenCalled();
   });
 
   it("checks the requested account before an enabled write", async () => {
@@ -43,6 +46,7 @@ describe("/api/social/ads", () => {
     const response = await PATCH(new Request("https://example.test/api/social/ads", { method: "PATCH", body: JSON.stringify({ brand: B, account: "act_123", campaignId: "42", status: "PAUSED" }) }));
     expect(response.status).toBe(200);
     expect(meta.assertMetaAdsBrand).toHaveBeenCalledWith(B, "act_123");
-    expect(meta.setMetaCampaignStatus).toHaveBeenCalledWith("42", "PAUSED");
+    expect(meta.setMetaCampaignStatus).toHaveBeenCalledWith("act_123", "42", "PAUSED");
+    expect(store.recordMetaAdsStatusChange).toHaveBeenCalledWith(B, "ops:owner:u1", { account: "act_123", campaign_id: "42", status: "PAUSED" });
   });
 });

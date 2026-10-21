@@ -26,10 +26,21 @@ describe("Meta Marketing API adapter", () => {
   });
 
   it("only permits ACTIVE and PAUSED campaign writes", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }));
-    await setMetaCampaignStatus("42", "PAUSED", { META_MARKETING_ACCESS_TOKEN: "secret-token" });
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ account_id: "123", id: "42" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ success: true }), { status: 200 }));
+    await setMetaCampaignStatus("act_123", "42", "PAUSED", { META_MARKETING_ACCESS_TOKEN: "secret-token" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1]?.method).toBe("POST");
+    await expect(setMetaCampaignStatus("act_123", "not-an-id", "PAUSED", { META_MARKETING_ACCESS_TOKEN: "secret-token" })).rejects.toThrow("活動 ID 格式不正確");
+  });
+
+  it("refuses to write a campaign that sits in another brand's ad account", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({ account_id: "456", id: "42" }), { status: 200 }));
+    await expect(setMetaCampaignStatus("act_123", "42", "PAUSED", { META_MARKETING_ACCESS_TOKEN: "secret-token" }))
+      .rejects.toMatchObject({ status: 403, code: "meta_ads_campaign_mismatch" });
     expect(fetchMock).toHaveBeenCalledOnce();
-    await expect(setMetaCampaignStatus("not-an-id", "PAUSED", { META_MARKETING_ACCESS_TOKEN: "secret-token" })).rejects.toThrow("活動 ID 格式不正確");
+    expect(fetchMock.mock.calls[0][1]?.method).toBe("GET");
   });
 
   it("blocks a cross-brand account before any Meta call", async () => {

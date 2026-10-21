@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-21（續37）審 Codex 47d781e3f（Meta C27 第二段＋C28）：1 處修——廣告暫停／繼續可跨品牌改到別人的活動（Claude，非作者）
+- 審查範圍（High：代表品牌回覆、動廣告花費）：webhook 驗簽 `lib/social/meta-webhook.ts:48-54`（raw body HMAC-SHA256、先驗 64 hex 再 `timingSafeEqual`，等長不會丟例外）OK；冪等 `meta-auto-reply.ts:51` 先 `claimAutoRuleEvent` 才送、送後記帳失敗不改判 failed（`:68`）OK；開關 `autoReplyReady` 兩個都要 `true`（`meta-webhook.ts:56-59`）、`META_ADS_WRITE_ENABLED` 在 PATCH 第一行（`app/api/social/ads/route.ts:28`）、compose 預設 `:-false` OK；品牌解析走 `social_meta_assets`（`unique(kind, external_id)`，一個粉專只屬一個品牌），規則只讀該 asset 的 org OK；`can({org}, "social.auto-reply", "system:meta-webhook")`（`meta-auto-reply.ts:46`）、`withFeature("social.ads"|"social.meta")` OK；token 只從 env `META_PAGE_TOKEN_<page>`，走 Authorization header 不進 URL、不進 DB、不回瀏覽器 OK；IG 貼文留言明確跳過（`meta-auto-reply.ts:27`）。
+- C1（已修）：`setMetaCampaignStatus` 只收 `campaignId`，route 只驗「帳戶屬於品牌」不驗「活動屬於帳戶」；同一個廣告 token 看得到兩品牌所有帳戶 → 品牌 A 的 editor 帶 A 的帳戶＋B 的活動 ID 就能暫停／開啟 B 的廣告。不變量：任何廣告寫入前，被寫的物件必須證明在本品牌已綁定的帳戶內。修：`lib/social/meta-ads.ts` `setMetaCampaignStatus(accountId, campaignId, status)` 先 GET `<campaign>?fields=account_id`，不等於該帳戶 → 403 `meta_ads_campaign_mismatch`，不送 POST。
+- M1（已修）：廣告狀態寫入沒有 audit；新增 `store.ts` `recordMetaAdsStatusChange`（`social_audit_log`：actor＝`actorOf(req)` 員工、organization_id＝代為操作的品牌＝on_behalf_of），route 寫入成功後記。
+- 未修（不在「會壞主路徑／重複回覆／誤動廣告／洩漏」範圍）：auto-rule hit 的 actor 字串是既有的 `meta:webhook`，can() 用 `system:meta-webhook`，兩個名稱不同但都記錄了機器身分；`META_PAGE_TOKEN_<id>` 是動態變數名，repo compose `environment:` 沒列，操作者做完 meta-operator.md 後送 env 上主機時要一併加（步驟 9 由 agent 做）。
+- 附帶：next-admin `node_modules` 在 Codex 拆 worktree 後缺 `.bin`／部分套件（vitest 起不來），`npm install --no-save` 補回，package-lock 未變。
+- 監工台：`agency-os/handoffs/2026-10-17-social-v15-supervisor/data.mjs` C27／C28 commit→47d781e3f、gate 改寫、waitFor＝等操作者完成同資料夾 `meta-operator.md`（從 scratchpad 收進 repo）；`node build.mjs && node check.mjs` ok。
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social/__tests__/meta-ads.test.ts lib/social/__tests__/meta-auto-reply.test.ts lib/social/__tests__/meta-webhook.test.ts app/api/social/ads/route.test.ts app/api/webhooks/meta/route.test.ts (27 passed) ; npx tsc --noEmit ; bash lobster-factory/packages/db/scripts/0116_social_meta_assets-local-verify.sh (up/down/re-up OK) | exit=0 | ms=11022
+- 突變（擁有權守衛，一次，throwaway worktree D:/tmp/wt-meta-mut）：把 account_id 比對改成 `false && owner` → `refuses to write a campaign that sits in another brand's ad account` 紅（1 failed／7）→ 還原 7 passed。
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=1c/1m/0n
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=setMetaCampaignStatus | hits=11（4 個原始檔：route.ts、route.test.ts、meta-ads.ts、meta-ads.test.ts，全數已跟新簽名；其餘為 .next 建置產物）
+- ORACLE_WAIVED: 本筆是 Claude 審 Codex 的 commit（跨模型審查本身）；Claude 的修補小（2 函式＋測試），操作者指定不開 /codex-review，以突變紅→綠代替。
 ## 2026-10-21（續36）Meta 自動回覆（C27 第二段）＋廣告（C28）查證：Standard Access 可行，IG 貼文留言除外；Codex 任務書＋操作者 9 步清單（Claude，只讀＋查文件）
 
 **操作者**：「你去處理好, 2個目前都是我的網站, 只是我設定 aware wave 是公司, soulful 是代操」。本條只查證＋計畫，不改程式／正式設定。

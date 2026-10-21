@@ -121,6 +121,11 @@ export async function setMetaAssetEnabled(brandId: string, assetId: string, enab
   return metaAssetOf(data as Record<string, unknown>);
 }
 
+/** Ads status writes spend money: actor = the staff user, organization_id = the brand acted for (on_behalf_of). */
+export async function recordMetaAdsStatusChange(brandId: string, actor: string, detail: Record<string, unknown>): Promise<void> {
+  await logAction(db(), brandId, actor, "meta_ads_campaign_status", detail);
+}
+
 // ---- brands ---------------------------------------------------------------------------------------------------
 
 export interface Brand { id: string; slug: string; name: string; default_timezone: string }

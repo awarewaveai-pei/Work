@@ -1,7 +1,8 @@
 // C28: Meta ad-account, campaign and insight reads; campaign status writes are owner/editor only.
-import { ANY_ROLE, WRITE_ROLES, requireBrandRole } from "@/lib/social/authz";
+import { ANY_ROLE, WRITE_ROLES, actorOf, requireBrandRole } from "@/lib/social/authz";
 import { withFeature } from "@/lib/entitlements/grant";
 import { BadRequest, handle, jsonBody, uuid } from "@/lib/social/http";
+import { recordMetaAdsStatusChange } from "@/lib/social/store";
 import { assertMetaAdsBrand, getMetaInsights, listMetaAdAccounts, listMetaCampaigns, MetaAdsError, setMetaCampaignStatus } from "@/lib/social/meta-ads";
 
 export const runtime = "nodejs";
@@ -33,7 +34,8 @@ async function patch(req: Request): Promise<Response> {
     await assertMetaAdsBrand(brand, body.account);
     if (typeof body.campaignId !== "string" || !/^\d+$/.test(body.campaignId)) throw new BadRequest("campaignId must be numeric");
     if (body.status !== "ACTIVE" && body.status !== "PAUSED") throw new BadRequest("status must be ACTIVE or PAUSED");
-    await setMetaCampaignStatus(body.campaignId, body.status);
+    await setMetaCampaignStatus(body.account, body.campaignId, body.status);
+    await recordMetaAdsStatusChange(brand, actorOf(req), { account: body.account, campaign_id: body.campaignId, status: body.status });
     return { campaignId: body.campaignId, status: body.status };
   });
 }
