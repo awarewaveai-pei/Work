@@ -563,6 +563,8 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
+- [ ] **【資料正確性｜tarot】每日生圖額度只存在記憶體**：`lib/tarot/quota.ts` 的計數隨 next-admin 重啟歸零，額度形同沒有上限。2026-10-21 批次可靠性計畫調查時發現（`~/.claude/plans/task-read-only-investigation-curried-possum.md`）；另開，不併入批次 B 方案。
+- [ ] **【可見範圍｜tarot】批次列表不分建立者**：`app/api/tools/tarot/batch/route.ts:98` `listRecentJobs(10)` 回傳所有人的 job（含 prompt）。目前只有員工能進，影響小；客戶從產品門進來前必修。2026-10-21 同上計畫發現；併入批次 B 方案（列表改從新資料表讀時一併依組織／建立者過濾）。
 - [x] **【✅ 2026-10-20 程式已修，待 Trigger 重新部署｜資安｜tarot】`BATCH_INTERNAL_SECRET` 經 Trigger run payload 傳遞（payload 會持久化、dashboard 看得到）**
   - 修法：callback 移到 `/api/internal/tarot/batch/[jobId]/{start,card}`，worker 從自身 env 讀 secret（`lobster-trigger-deploy.ps1` 由執行中 next-admin 同步）。細節 WORKLOG 2026-10-20「tarot batch callback」。
   - ✅ 2026-10-21 已清：`packages/workflows/src/tasks/sync-global-events.ts`（從未部署、打 session 閘路由）操作者定「刪」，已刪（`git log -1 -- lobster-factory/packages/workflows/src/tasks/sync-global-events.ts` 取 commit；路由 `/api/tools/events/sync` 保留）；`infra/hetzner-phase1-core/.env.example` 補齊 7 個 `/api/internal` bearer（SOCIAL_DISPATCH／CS_SWEEP／POD_INBOX_SWEEP／COLLECT_RESEARCH_RUNS／COLLECT_RESEARCH_EXECUTE／RECONCILE／COGNITIVE_OS_IMPORT_INGEST）。
