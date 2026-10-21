@@ -38,6 +38,7 @@ export interface TextRate {
  * Anthropic ids per generate-core.ts ALLOWED_MODELS; OpenAI per OPENAI_MODELS; Gemini per ops-inbox.
  */
 export const TEXT_RATES: Record<string, TextRate> = {
+  "claude-haiku-5-5":          { inputPerM: 0.1, outputPerM: 0.5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 5.5", vendor: "Anthropic" },
   "claude-haiku-4-5-20251001": { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic" },
   "claude-haiku-4-5":          { inputPerM: 1, outputPerM: 5, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Haiku 4.5", vendor: "Anthropic" },
   "claude-sonnet-4-6":         { inputPerM: 3, outputPerM: 15, cacheReadMult: 0.1, cacheWriteMult: 1.25, label: "Claude Sonnet 4.6", vendor: "Anthropic" },

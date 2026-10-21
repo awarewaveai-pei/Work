@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-21（續41）塔羅翻譯改用 Claude Haiku 5.5（關閉 thinking）＋價目表補 Haiku 5.5
+
+**觸發**：操作者「那就改成Haiku 5.5」。
+- `app/api/tools/tarot/translate/route.ts:43` `claude-haiku-4-5-20251001` → `claude-haiku-5-5`。Haiku 5.5 預設開 adaptive thinking（effort medium），一句翻譯不需要 → 加 `thinking: { type: "disabled" }`（Haiku 5.5 只在 effort ≤ high 時接受 disabled；預設 medium，合法）。
+- 價格（claude-api 技能 2026-10-06 快取表）：Haiku 5.5 輸入 US$0.10／輸出 US$0.50 每百萬 token（Haiku 4.5 為 1／5）。`lib/ai/cost-model.ts` 補 `claude-haiku-5-5` 一列，否則 logAiCall 算不到成本。
+- 頁面費用字樣 `TarotStudio.tsx`「約 NT$0.01」→「不到 NT$0.01」（實測每次約 NT$0.0003）。
+- 其他仍用 Haiku 4.5 的 17 個檔未改（操作者只指這一支）；`lib/ai/claude-params.ts:22` `NO_EFFORT = /^claude-haiku-/` 對 Haiku 5.5 已不成立（5.5 支援 effort），日後全面換 5.5 時要一起改。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=正式 next-admin 容器內直接打 `/v1/messages`（model claude-haiku-5-5、thinking disabled、「藍色貓咪」）→ status 200，"Blue cat"，usage input 40／output 7／thinking 0；`npx tsc --noEmit` 0 errors；`npx vitest run lib/ai app/api/tools/tarot lib/tarot` 34 passed | exit=0 | ms=120000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回三檔 diff（6 增 3 刪）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`claude-haiku-4-5` | hits=17 檔（next-admin，其他功能，未在範圍）
+- ORACLE_WAIVED: 換模型 id＋一個參數＋一列價目，已用真實 API 呼叫驗證
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-21（續40）Cognitive OS 的 COGNITIVE_OS_ANTHROPIC_API_KEY 換成新金鑰（舊的 401）
 
 **觸發**：操作者「Replace the Cognitive OS Claude key ... through the safe path, then verify it returns 200」。

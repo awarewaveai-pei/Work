@@ -40,8 +40,10 @@ async function handlePost(request: Request, grant: Grant) {
   try {
     const Anthropic = await loadAnthropic(grant);
     const msg = await new Anthropic({ apiKey }).messages.create({
-      model: "claude-haiku-4-5-20251001",
+      model: "claude-haiku-5-5",
       max_tokens: 400,
+      // Haiku 5.5 thinks by default (adaptive, effort medium); a one-line translation needs none, so turn it off.
+      thinking: { type: "disabled" },
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: text }],
     });

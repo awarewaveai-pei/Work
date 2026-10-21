@@ -107,7 +107,7 @@ function TranslateButton(p: { busy: boolean; disabled: boolean; done: boolean; t
       style={{ flexDirection: "column", gap: 0, padding: "7px 16px", lineHeight: 1.25 }}
     >
       <span>{p.busy ? "翻譯中…" : p.done ? "✓ 已是英文，不用翻" : "🌐 翻成英文"}</span>
-      {!p.busy && !p.done && <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.85 }}>約 NT$0.01</span>}
+      {!p.busy && !p.done && <span style={{ fontSize: 12, fontWeight: 500, opacity: 0.85 }}>不到 NT$0.01</span>}
     </button>
   );
 }
@@ -1845,7 +1845,7 @@ export default function TarotStudio() {
                 />
                 {needsEnglish(effectiveEnglish) ? (
                   <div className="form-hint" style={{ fontSize: 13, color: translateError ? "var(--red)" : "var(--yellow)", marginTop: 2 }}>
-                    {translateError ?? "含非英文：按「翻成英文」，或產生預覽時自動翻成英文（約 NT$0.01），整副共用。"}
+                    {translateError ?? "含非英文：按「翻成英文」，或產生預覽時自動翻成英文（不到 NT$0.01），整副共用。"}
                   </div>
                 ) : styleOverride && (
                   <div className="form-hint" style={{ color: "var(--yellow)", marginTop: 2 }}>
