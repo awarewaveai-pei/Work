@@ -3,8 +3,9 @@
 規則：`agency-os/AGENTS.md` §4。誰寫的 commit，就不能由同一個模型審。Claude 寫的 → Codex 審（`/codex-review`）；Codex 寫的 → Claude 審（`/claude-review`）。
 Codex 每寫一個 commit，在下面加一行；Claude 審完把那行劃掉（`~~…~~`）並寫審查結果。接手說明見 `agency-os/handoffs/2026-10-04-1400-cos-step2-merged-storage-next.md` 的「審查債」。
 
-451f18004 social C31 -- needs Claude review
-c0fd8c378 social C30 -- needs Claude review
+~~451f18004 social C31~~ 2026-10-21 Claude 經 SDK 審畢：通過，WORKLOG 2026-10-21（續10）
+~~c0fd8c378 social C30~~ 2026-10-21 Claude 經 SDK 審畢：通過，WORKLOG 2026-10-21（續10）
+~~4d2cc725f social supervisor~~ 2026-10-21 Claude 經 SDK 審畢：通過，WORKLOG 2026-10-21（續10）
 
 | 寫的模型 | commit | 一句話改了什麼 | 碰到的不變量 | 機器證據（突變／閘門） | 狀態 |
 |---|---|---|---|---|---|

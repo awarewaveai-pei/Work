@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-21（續10）社群 V1.5 C31 媒體與影片＋C30 手機收尾（Codex 寫，Claude 審）
+
+**觸發**：操作者「審 Codex 的三個本機提交並推上 main」；「可以檢查和抓蟲，但不要重做」。審 451f18004（C31）、c0fd8c378（C30）、4d2cc725f（監工台），對照 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md:207-217`。
+
+**Review（Claude 經 SDK，非作者）**：無會壞主路徑／丟資料／洩漏隱私的缺陷，未改 code。
+- n1 C31：`Library.tsx`／`MediaView.tsx` 搬進 `library/`，唯一 import `SocialApp.tsx:10` 已改；`decodeDataUrl` 把圖與影片的 data URL 解碼合一，影片另驗 `video/` MIME（`lib/content/postiz.ts`）。
+- n2 C31：卡片驗收「e2e 上傳 3 秒 mp4 → 預覽 → 排程」未做，只有 unit test（`postiz-client.test.ts` uploadVideo data URL）＋ `18-library` 截圖。
+- n3 C31：`app/api/content/social-publish/route.ts:252` 的 `videoUrl` 現在也收 data URL（上限 `MAX_VIDEO_BYTES` 200MB，`postiz.ts:54`），大檔整包進記憶體；需登入，不修。
+- n4 C30：卡片的 `Calendar.tsx` 日期條不在本 commit（是否先前已做未查）。
+- n5 C30：手機頻道頁按「寫貼文／只看」後 `mobileChannels` 不會自動關，回日曆要按「關閉」（`SocialManager.tsx` `setMobileChannels`）；不丟資料。
+- n6 C30：舊 CSS `.sm-cgrid > .sm-chan` 選錯 class，改成 `.sm-cchan`（`compose/ChannelPicker.tsx:15`），順手修對。
+- n7 監工台：`data.mjs` C30／C31 標完成；review-debt 第 3 行 Codex 留在工作樹未提交，本 commit 一起帶上並劃掉三行。
+
+**[驗證結果]**（本 session，main）：`npx tsc --noEmit` exit 0；`npx vitest run lib/content/__tests__/postiz-client.test.ts "app/(shell)/tools/social"` 8 files 39 passed。未重拍截圖、未跑 e2e。
+
+**[rollback]**：`git revert 4d2cc725f c0fd8c378 451f18004`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/content/__tests__/postiz-client.test.ts app/(shell)/tools/social | exit=0 | ms=2263
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/7n
+- ORACLE_WAIVED: Claude 經 SDK 人工審 Codex 提交
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=uploadVideo|decodeDataUrl|sm-mobile-|social/MediaView|social/Library | hits=185
 ## 2026-10-21（續9）社群 V1.5 C27 自動化流程第一段收尾（Codex 寫，Claude 審）
 
 **觸發**：操作者「也可以搭配 codex 做」。C27 規則 CRUD、分頁、比對、單則規則 queued 守衛（0111）已在 cf2b4ecc1；Codex 在拋棄式 worktree `D:/tmp/c27-codex` 補缺口（commit 62052067b），本 session 審過後併入 main。第二段（Meta webhook、真的回覆）等 G3，未做。
