@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-21（續15）社群數據每日抓取查證：開關早已開、social-metrics 已在跑，未改任何設定（Claude 經 SDK，唯讀）
+
+- 起因：操作者要求「開啟數據分析的每日抓取」；`app/api/internal/social/metrics/route.ts:6,26` 與 rotation（`rotation/route.ts:28`）、dispatch（`dispatch/route.ts:29`）共用 `SOCIAL_DISPATCH_ENABLED`，開它 = 同時開自動清單展開與送 Postiz。先唯讀查現況。
+- 現況（`sudo docker exec lobster-next-admin printenv`）：`SOCIAL_DISPATCH_ENABLED=true`、`SOCIAL_DISPATCH_MODE=apply`、`SOCIAL_DISPATCH_TOKEN` 存在（exit 0）→ 無需開啟，發文自動化也早已是 apply。
+- 自架 Trigger（trigger-postgres `TaskRun`）：`social-metrics`（cron `30 19 * * *`，`packages/workflows/src/trigger/social-metrics.ts:25`）2026-10-21 02:48 UTC 部署；2026-10-19 19:30 `COMPLETED_WITH_ERRORS`（`social/metrics 404` = 路由當時未上線），2026-10-20 19:30 `COMPLETED_SUCCESSFULLY`。rotation 近 6 天全綠；dispatch 3 天 862 綠／1 錯（10-19 20:25）。
+- 正式庫（supabase-db，read-only transaction）：`social_metrics_daily` 268 列、90 天（2026-07-22..2026-10-19，首跑 BACKFILL_DAYS=90，`lib/social/metrics.ts:28`），每日 3 列（bluesky×1、facebook×2）；max(day)=10-19 正確（品牌 `default_timezone=UTC`，`metrics.ts:228`；跑在 10-20 19:30 UTC → 寫昨天）。`social_post_metrics` 1 列；active `social_lists` 0；scheduled/queued `social_posts` 0。
+- 結論：不改。下次跑 2026-10-21 19:30 UTC（台灣 03:30）。未來若要「只開數據、不開發文」才需拆 `SOCIAL_METRICS_ENABLED`（改 metrics route + 測試 + compose env）；現況兩者都開，不急。
+- REALTEST_EVIDENCE: tool=SSH | cmd=ssh ubuntu@ks-aw-01 sudo docker exec lobster-next-admin printenv SOCIAL_DISPATCH_ENABLED; psql trigger-postgres TaskRun; psql supabase-db social_metrics_daily | exit=0 | ms=4000
+- REVIEW_WAIVED: NA -- 唯讀查證，無程式改動
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin,lobster-factory/packages/workflows | grep=SOCIAL_DISPATCH_ENABLED | hits=9
+- BUGHUNT_SCOPE_NARROW: 唯讀查證，只需列出讀開關的程式點；未改 agency-os／scripts
 ## 2026-10-21（續14）tarot 78 張批次：next-admin 已含內部回呼路由，免重部署；批次因需登入 session 未啟動（Claude 經 SDK）
 
 **觸發**：操作者「Deploy next-admin now with sg-deploy (High), then run one 78-card tarot batch」。
