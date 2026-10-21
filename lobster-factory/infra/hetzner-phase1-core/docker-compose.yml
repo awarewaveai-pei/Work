@@ -320,6 +320,7 @@ services:
       # M4 fingerprint salt. Empty = fingerprint_v2 mirrors the legacy fingerprint
       # (no-op). Set a high-entropy server-only secret to make fingerprints unforgeable.
       OPS_INBOX_FINGERPRINT_SALT: ${OPS_INBOX_FINGERPRINT_SALT:-}
+      SMARTLINK_VISITOR_HASH_SALT: ${SMARTLINK_VISITOR_HASH_SALT:-}
       OPS_INBOX_NOTIFY_ENABLED: ${OPS_INBOX_NOTIFY_ENABLED:-}
       OPS_INBOX_SLACK_INCIDENTS_WEBHOOK: ${OPS_INBOX_SLACK_INCIDENTS_WEBHOOK:-}
       OPS_INBOX_PUBLIC_URL: ${OPS_INBOX_PUBLIC_URL:-}
