@@ -231,7 +231,22 @@
 .sm-foot .sm-hint { grid-column: 1; min-height: 1.5em; min-width: 0; }
 .sm-foot .sm-acts { grid-column: 2; display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
 .sm-foot .sm-acts button { white-space: nowrap; padding: 4px 8px; }
-.sm-confirm { grid-column: 1 / -1; background: var(--bg-subtle); border-left: 4px solid var(--red); padding: 6px 10px; border-radius: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.sm-dialog-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: color-mix(in srgb, var(--text-primary) 58%, transparent); }
+.sm-dialog { width: min(520px, calc(100vw - 32px)); padding: 22px; color: var(--text-primary); background: var(--card-bg); border: 2px solid var(--red); border-radius: var(--radius); box-shadow: var(--shadow-hover); }
+.sm-dialog-heading { display: flex; gap: 12px; align-items: flex-start; }
+.sm-dialog-heading h2 { margin: 0; font-size: var(--font-size-lg); }
+.sm-dialog-heading p, .sm-dialog-warning { margin: 6px 0 0; font-size: var(--font-size-base); line-height: 1.55; }
+.sm-dialog-icon { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--red); color: var(--btn-primary-text); font-size: var(--font-size-md); font-weight: var(--font-weight-bold); }
+.sm-dialog-channels { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 14px; padding: 0; list-style: none; }
+.sm-dialog-channels li { display: inline-flex; align-items: center; gap: 7px; padding: 7px 10px; background: var(--bg-subtle); border: 1px solid var(--card-border); border-radius: var(--radius-sm); font-size: var(--font-size-base); }
+.sm-dialog-warning { padding: 10px 12px; color: var(--red); background: color-mix(in srgb, var(--red) 10%, var(--card-bg)); border-left: 4px solid var(--red); }
+.sm-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.sm-app .sm-dialog-actions button.sm-danger { color: var(--btn-primary-text); background: var(--red); border-color: var(--red); }
+.sm-dialog-actions .sm-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--red) 82%, var(--text-primary)); }
+.sm-release-links { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+.sm-release-links a { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 4px 6px; color: var(--accent); background: var(--bg-subtle); border: 1px solid var(--card-border); border-radius: var(--radius-sm); font-size: var(--font-size-base); line-height: 1.35; text-decoration: none; }
+.sm-release-links a:hover { color: var(--text-primary); border-color: var(--accent); background: var(--accent-light); }
+.sm-release-links-own { margin-top: 8px; }
 .sm-state { display: inline-flex; gap: 6px; align-items: center; font-weight: normal; }
 .sm-state .sm-dot { width: 10px; height: 10px; margin: 0; background: var(--sm-state, var(--status-ignored)); }
 .sm-mobile-channel-button, .sm-mobile-close, .sm-mobile-fab, .sm-mobile-compose-tabs { display: none; }

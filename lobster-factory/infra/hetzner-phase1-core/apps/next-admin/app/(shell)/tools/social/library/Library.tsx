@@ -13,6 +13,7 @@ export default function Library({ ctx }: { ctx: SlotContext }) {
   const [texts, setTexts] = useState<Array<{ id: string; body: string; mediaIds: string[] }> | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const canWrite = ctx.brand.role === "owner" || ctx.brand.role === "editor";
+  const fromComposer = ctx.canAttach;
 
   useEffect(() => {
     let live = true;
@@ -46,7 +47,7 @@ export default function Library({ ctx }: { ctx: SlotContext }) {
           <button type="button" className={tab === "posts" ? "sm-on" : ""} aria-pressed={tab === "posts"} onClick={() => setTab("posts")}>存起來的貼文</button>
           <button type="button" className={tab === "media" ? "sm-on" : ""} aria-pressed={tab === "media"} onClick={() => setTab("media")}>圖片和影片</button>
         </div>
-        {tab === "media" && <button type="button" disabled={!canWrite || !selected.size} onClick={useSelected}>用這些寫新貼文（{selected.size}）</button>}
+        {tab === "media" && !fromComposer && <button type="button" disabled={!canWrite || !selected.size} onClick={useSelected}>用這些寫新貼文（{selected.size}）</button>}
       </div>
       {tab === "posts" ? (
         <>
@@ -62,7 +63,7 @@ export default function Library({ ctx }: { ctx: SlotContext }) {
       ) : (
         <>
           <span className="sm-muted">點選多個圖片或影片，再一次帶入新貼文；目前編輯貼文時也可直接附加。</span>
-          <MediaView ctx={ctx} selected={selected} onToggle={(id) => setSelected((old) => { const next = new Set(old); if (next.has(id)) next.delete(id); else next.add(id); return next; })} />
+          <MediaView ctx={ctx} selected={fromComposer ? undefined : selected} onToggle={fromComposer ? undefined : (id) => setSelected((old) => { const next = new Set(old); if (next.has(id)) next.delete(id); else next.add(id); return next; })} />
         </>
       )}
     </div>

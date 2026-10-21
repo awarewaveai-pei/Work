@@ -69,7 +69,7 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
   const tz = brand?.default_timezone ?? "UTC";
   const today = useMemo(() => zoned(new Date(), tz).date, [tz]);
   const [view, setViewState] = useState<View>(() => { const v = param("view"); return isView(v) ? v : "week"; });
-  const [anchor, setAnchor] = useState<string | null>(null);
+  const [anchor, setAnchor] = useState<string | null>(() => param("date"));
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [articles, setArticles] = useState<WpPost[]>([]);
@@ -356,13 +356,14 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
                     onPrefill={(p) => setPrefill((cur) => ({ ...p, n: (cur?.n ?? 0) + 1 }))} />
                 ) : undefined}
                 onMediaAdded={(m) => setMedia((list) => [m, ...list])}
-                onSaved={(id, msg) => {
+                onSaved={(id, msg, plan) => {
                   // another post (a new one's first save replaces compose/new; 複製成新貼文 is a new page): through the
                   // router, so Back returns to a page that matches its address (critic 2026-10-17: history.replaceState
                   // kept compose/new's route under compose/<id>, and Back opened an empty composer that saved a duplicate)
                   carriedComposeSeed = null;
                   setComposeSeed(null);
-                  if (id !== postId) goTo({ kind: "compose", postId: id }, {}, { text: msg }, !postId);
+                  if (plan) { setViewState("week"); setAnchor(plan.date); goTo({ kind: "plan" }, { date: plan.date }, { text: msg }); }
+                  else if (id !== postId) goTo({ kind: "compose", postId: id }, {}, { text: msg }, !postId);
                   else { say(msg); setPostKey((k) => k + 1); }
                 }} />
             )}

@@ -74,6 +74,7 @@ function Card({ post, accounts, media, tags, tz, canWrite, onOpen, onCopy, onDel
   const who = [...new Set(post.targets.map((t) => accounts.find((a) => a.id === t.account_id)?.label ?? "已移除的帳號"))].join("、");
   const open = () => onOpen(post.occurrenceOf ?? post.id);
   const key = (e: KeyboardEvent) => { if (e.key === "Enter" && e.target === e.currentTarget) open(); };
+  const releases = post.state === "published" ? post.targets.filter((t) => t.release_url) : [];
   return (
     <div className="sm-post" role="button" tabIndex={0} style={stateStyle(post.state)} data-state={post.state} data-id={post.id}
       draggable={mine && MOVABLE.includes(post.state)} onDragStart={(e) => e.dataTransfer.setData("text/plain", post.id)}
@@ -90,6 +91,11 @@ function Card({ post, accounts, media, tags, tz, canWrite, onOpen, onCopy, onDel
         <span className="sm-ellipsis">{who}</span>
       </div>
       <div className="sm-ctext">{titleOf(post)}</div>
+      {!!releases.length && <div className="sm-release-links" aria-label="已發佈貼文連結">{releases.map((t) => {
+        const account = accounts.find((a) => a.id === t.account_id);
+        const label = `在 ${account ? platformOf(account.platform).name : "平台"} 查看貼文`;
+        return <a key={t.id} href={t.release_url as string} target="_blank" rel="noopener noreferrer" aria-label={label} onClick={(e) => e.stopPropagation()}><PfMark platform={account?.platform ?? ""} />{label}</a>;
+      })}</div>}
       {mine && (
         <span className="sm-cacts">
           <button type="button" title="預覽" aria-label="預覽" onClick={(e) => { e.stopPropagation(); open(); }}><Icon name="eye" /></button>

@@ -23,6 +23,7 @@ import Formats from "./compose/Formats";
 import Previews from "./compose/Previews";
 import TagPicker from "./compose/TagPicker";
 import Writer, { type Extra } from "./compose/Writer";
+import { PfMark } from "./Calendar";
 import "./compose/compose.css";
 
 const MAX_COMMENTS = 50;               // 0105 social_post_comments.position 0..49
@@ -40,7 +41,7 @@ export interface EditorProps {
   reviewBar?: ReactNode;
   /** a WordPress article this post starts from (C10) */
   source?: ReactNode;
-  onSaved: (id: string, message: string) => void;
+  onSaved: (id: string, message: string, plan?: { date: string }) => void;
   onMediaAdded: (m: MediaItem) => void;
   /** C10: text, link, channel texts and media from a WordPress article; applied when n changes */
   prefill?: import("./ArticleSource").Prefill | null;
@@ -325,10 +326,10 @@ export default function Editor(props: EditorProps) {
       } else if (kind === "schedule" || kind === "repeat") {
         await step({ action: "schedule", scheduledAt: when as string }, "scheduled");
         const z = zoned(when as string, tz);
-        props.onSaved(ref.id, kind === "repeat" ? `已設定週期：${repeatText(repeat, z.date, z.time)}。` : `已排在 ${shortDate(z.date)} ${z.time}。按「回排程日曆」看它在哪。`);
+        props.onSaved(ref.id, kind === "repeat" ? `已設定週期：${repeatText(repeat, z.date, z.time)}。` : `已排在 ${shortDate(z.date)} ${z.time}。按「回排程日曆」看它在哪。`, { date: z.date });
       } else {
         await step({ action: "publish_now", confirmPublishNow: true }, "scheduled");
-        props.onSaved(ref.id, "已交出去，幾分鐘內會看到結果。");
+        props.onSaved(ref.id, "已交出去，幾分鐘內會看到結果。", { date: zoned(new Date().toISOString(), tz).date });
       }
     } catch (e) {
       say(message(e), true);
@@ -397,10 +398,11 @@ export default function Editor(props: EditorProps) {
       {hint && <span className={hint.error ? "sm-err" : "sm-muted"}>{hint.text}</span>}
       {!hint && notices.slice(0, 2).map((n) => <span key={n.text} className={n.error ? "sm-err" : "sm-muted"}>{n.text}</span>)}
       {state === "published" && post && (
-        <span className="sm-muted">已發佈，不能改。{post.targets.filter((t) => t.release_url).map((t) => {
+        <span className="sm-muted">已發佈，不能改。<span className="sm-release-links sm-release-links-own" aria-label="已發佈貼文連結">{post.targets.filter((t) => t.release_url).map((t) => {
           const a = accounts.find((x) => x.id === t.account_id);
-          return <a key={t.id} href={t.release_url as string} target="_blank" rel="noopener noreferrer">在 {a ? platformOf(a.platform).name : "平台"} 上看</a>;
-        })}</span>
+          const label = `在 ${a ? platformOf(a.platform).name : "平台"} 查看貼文`;
+          return <a key={t.id} href={t.release_url as string} target="_blank" rel="noopener noreferrer" aria-label={label}><PfMark platform={a?.platform ?? ""} />{label}</a>;
+        })}</span></span>
       )}
     </>
   );
@@ -449,7 +451,7 @@ export default function Editor(props: EditorProps) {
         ) : null}
         act={act} can={can} busy={busy} menuOpen={menuOpen} onMenu={setMenuOpen} onAct={(a) => { setChosen(a); setConfirmNow(false); }}
         onMain={() => (act === "now" ? setConfirmNow(true) : void run(act))}
-        confirmNow={confirmNow} onConfirm={() => void run("now")} onCancel={() => setConfirmNow(false)}
+        confirmNow={confirmNow} confirmChannels={channels} onConfirm={() => void run("now")} onCancel={() => setConfirmNow(false)}
         readOnlyMain={readOnly ? (state === "published" && canWrite ? { label: "複製成新貼文", onClick: () => void copyAsNew() } : null) : null} />
     </div>
   );

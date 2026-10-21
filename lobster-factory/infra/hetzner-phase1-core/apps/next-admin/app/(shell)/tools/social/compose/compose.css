@@ -118,7 +118,6 @@
 .sm-app .sm-tg-d { background: var(--yellow); } .sm-app .sm-tg-e { background: var(--p-li); }
 .sm-tnew { display: flex; gap: 6px; }
 .sm-tnew input { flex: 1; min-width: 0; }
-.sm-cfootbar .sm-confirm { flex-basis: 100%; }
 
 /* 設定發佈時間 */
 .sm-dtp { bottom: calc(100% + 8px); right: 12px; width: 560px; max-width: calc(100vw - 32px); }

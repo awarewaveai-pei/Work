@@ -61,7 +61,7 @@ const mk = (i, state, at, body, extra = {}) => ({
   first_comment: null, link_url: null, link_utm: false, notes: null, source_url: null, published_at: state === "published" ? at : null, deleted_at: null,
   created_by: "ops:owner", version: 1, media: [], repeat: null, repeat_of: null, origin_slot: null, auto_mode: "brand", comments: [], tags: [],
   targets: [{ id: `t${i}a`, account_id: ACCOUNTS[0].id, custom_body: null, format: "post", state: state === "published" ? "published" : "pending", postiz_post_id: null, release_url: state === "published" ? "https://bsky.app/x" : null, error: null },
-    { id: `t${i}b`, account_id: ACCOUNTS[1].id, custom_body: null, format: "post", state: state === "published" ? "published" : state === "error" ? "error" : "pending", postiz_post_id: null, release_url: null, error: state === "error" ? "Facebook: (#200) permission" : null }],
+    { id: `t${i}b`, account_id: ACCOUNTS[1].id, custom_body: null, format: "post", state: state === "published" ? "published" : state === "error" ? "error" : "pending", postiz_post_id: null, release_url: state === "published" ? "https://www.facebook.com/example/posts/1" : null, error: state === "error" ? "Facebook: (#200) permission" : null }],
   ...extra,
 });
 const TAGS = [{ id: "tag-a", name: "活動", colour: "a" }, { id: "tag-b", name: "課程", colour: "b" }, { id: "tag-c", name: "每週一句", colour: "c" }];
@@ -192,6 +192,9 @@ const shot = async (name) => { await page.waitForTimeout(600); await page.screen
 await page.goto(`http://localhost:3902/tools/social?brand=${BRAND.id}`, { waitUntil: "networkidle" });
 await page.getByRole("heading", { name: "社群發文" }).waitFor();
 await shot("01-calendar");
+await page.locator('.sm-post[data-state="published"]').first().hover();
+await page.getByRole("link", { name: "在 Bluesky 查看貼文" }).waitFor();
+await shot("x-card-links");
 // the next week: every day is ahead, so the best times show on all seven and the posts made for the coming days are there
 await page.getByRole("button", { name: "往後" }).click();
 await shot("x-next-week");
@@ -230,6 +233,22 @@ await page.getByRole("button", { name: "設定", exact: true }).click();
 await shot("x-settings");
 // the composer's own page (C21): 建立貼文 with text, two comments and a tag; ▾ of the main button; 設定發佈時間 (and with
 // 週期性安排); then an existing post (a scheduled one, the one waiting for review)
+await page.goto(`http://localhost:3902/tools/social/compose/new?brand=${BRAND.id}`, { waitUntil: "networkidle" });
+await page.getByLabel("貼文內容").waitFor();
+await page.getByLabel("貼文內容").fill("這則貼文要立即發佈，先確認頻道和不可撤回的風險。");
+await page.getByRole("button", { name: "換一種做法" }).click();
+await page.getByRole("menuitemradio", { name: /立即發佈/ }).click();
+await page.getByRole("button", { name: "立即發佈", exact: true }).click();
+await page.getByRole("dialog").waitFor();
+await shot("x-publish-confirm");
+await page.goto(`http://localhost:3902/tools/social/compose/new?brand=${BRAND.id}`, { waitUntil: "networkidle" });
+await page.getByLabel("貼文內容").waitFor();
+await page.getByRole("button", { name: "從媒體庫選" }).click();
+await page.getByRole("button", { name: "圖片和影片", exact: true }).click();
+await page.getByText("watercolor-01.jpg", { exact: true }).waitFor();
+await page.getByRole("button", { name: /watercolor-01\.jpg/ }).click();
+await page.locator(".sm-cwrite .sm-mt img").first().waitFor();
+await shot("x-compose-media-picked");
 await page.getByRole("button", { name: "排程日曆", exact: true }).click();
 await page.locator(".sm-toolbar .sm-end button").click();
 await page.waitForURL(/\/tools\/social\/compose\/new/);
