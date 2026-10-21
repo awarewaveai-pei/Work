@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-21（續35）「以前頻道清單看得到全部」查證：社群管理頁從第一版起就是一次一個品牌，沒有回歸；Aware Wave 員工切品牌看得到 Soulful（Claude，只讀）
+
+**操作者**：「之前有全部!!! 而且還已經測試過! 記住我的3軸5對象, 我的公司是 aware wave, soulful expression 是我代操的公司」——否定續34【二】。
+
+- F1 頻道清單＝選定品牌的頻道：`SocialManager.tsx:145/150` 呼叫 `api.accounts(brand.id)`；路由 `app/api/social/accounts/route.ts:15-21` 要 `?brand=` 單一品牌；`lib/social/store.ts:120-123` 篩 `organization_id`。第一版 UI df4f87eba（10-15 C6）`git show df4f87eba:./app/(shell)/tools/social/SocialManager.tsx` :89 已是 `api.accounts(brand.id)`；C19 前（502099318^ :100）、C19（502099318 :135）、HEAD 皆同。樣稿也是：`lobster-factory/docs/social/mockups/social-manager-mock.html:919-920` 頻道掛在各品牌底下＋`:809` 切換品牌鈕。→ 沒有任何 commit 把「全部」改成「一個」。
+- F2 員工看得到代操品牌：正式庫 `auth.users` awarewaveai@gmail.com＝user_kind 空（staff）、ops_role=owner；`authz.ts:30-33` roleOn → staff owner 每個品牌都是 owner；`brands/route.ts:14` staff 傳 null → `store.ts:47-54` 回全部 organizations（6 個：AwareWave Ops、E2E-Verify-0704、EdD 論文研究、MONGOLIA-03、Soulful Expression Art Therapy、Test WP Webhook Co）。部署中 `lobster-next-admin` 的 `.next/server/app/api/social/brands/route.js` 存在，同一邏輯。今天的 entitlements（e87de9225、b4843733a、c64de1cb1）沒動 brands／accounts 路由與 roleOn（`git log --since=10-14 -- lib/social/authz.ts app/api/social/brands` 只到 4c4e153a7／e87de9225 的 actorFor 新增，`authz.ts:93-100` 只用於 on_behalf_of 驗證）；middleware 門（`middleware.ts:190-192`）只限制 client，不改 staff 標頭。
+- F3 為何一登入只看到 1 個：品牌依名稱排序（`store.ts:49`），沒帶 `?brand=` 時開第一個（`SocialManager.tsx:135`）＝AwareWave Ops，它只有 facebook「Aware Wave」1 個；Soulful 的 2 個（bluesky、facebook）在右上「切換品牌」（`TopBar.tsx:24-35`）選 Soulful 才出現。頻道歸屬自建立起未變：social_accounts 與舊表 social_postiz_connections 對照，3 列 organization 相同（bluesky 06-23、兩個 facebook 10-14）。
+- F4 「全部頻道一張清單」在哪裡真的存在過／還存在：(a) 自架 Postiz `postiz.aware-wave.com/launches`：3 個 integration 同一個 Postiz workspace（ADR 016 :39），一頁全列；10-16 操作者登入看過（`SOCIAL_MANAGER_GAP_REPORT.md:22`）。(b) 員工客戶中心 社群分頁 `app/(shell)/ops/clients/[slug]/ClientHubTabs.tsx:1898-1901` 抓 `/api/content/social-admin/integrations`（`listAllIntegrations()`，全部 3 個）＋該客戶已連的；仍在，未被移除。
+- F5 測試：`lib/social/__tests__/authz.test.ts:17-28`（staff owner／admin 每品牌 owner）、`app/api/social/__tests__/routes.test.ts:58-63`（client 只見自己品牌）；本次跑 2 檔 39 passed。沒有、也從未有「員工一張清單看多品牌頻道」的測試（grep `brands`／`roleOn` 於 tests 只此兩處；e2e 無多品牌案例）。
+- 結論：不是回歸，是設計（ADR 016 §5 決定 1、樣稿 :919）＝頻道清單跟著 on_behalf_of（目前選的品牌）走。三軸對照：她＝actor staff:owner；能代操的 on_behalf_of＝全部品牌（已達成，在品牌選單）；但「自用＋代操同一畫面看全部頻道」未被做過。
+- 修法建議（未實作，待操作者定）：B 完整＝加「全部品牌」檢視：`app/api/social/accounts/route.ts` GET 接受 `brand=all`，伺服器對 `listBrands` 結果逐一 `roleOn(caller,…)` 過濾後回 `accounts[]` 帶 `organization_id`＋品牌名（不加豁免，權限仍是 roleOn 單一來源）；`store.ts` 加 `listAccountsFor(brandIds)` 一次 `.in("organization_id", …)`；`ChannelList.tsx` 依品牌分組標題；`TopBar.tsx` 品牌選單頂端加「全部品牌」；寫入（撰寫、連接、移除）仍需單一品牌，選「全部」時撰寫頁依所選頻道的 organization_id 決定 brand。測試：routes.test 加「staff 看 all＝兩品牌頻道；client 看 all＝只自己品牌」。A 最小＝員工預設開最後使用／頻道最多的品牌，不解決「同時看全部」。另：品牌選單混著 3 個測試 org（E2E-Verify、MONGOLIA-03、Test WP Webhook Co），屬資料清理，另議。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec -i supabase-db psql -U supabase_admin（begin read only）auth.users／organizations／social_accounts／social_postiz_connections／social_brand_members | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social/__tests__/authz.test.ts app/api/social/__tests__/routes.test.ts → 2 files 39 passed | exit=0 | ms=1330
+- REVIEW_WAIVED: NA -- 只讀查證，無程式改動
+- BUGHUNT_DONE: scope=lobster-factory,agency-os,scripts | grep=listAllIntegrations | hits=10 files（UI 列全部頻道者只有 social-admin/integrations → ClientHubTabs）
+- ORACLE_WAIVED: 無 source 改動
 ## 2026-10-21（續34）智慧連結 awarewave-ops 點擊去重正式實測通過＋「頻道只剩一個」查證：沒有頻道被移除（Claude，只讀）
 
 **【一】點擊實測**（操作者發布的頁，正式環境只讀＋點擊）
