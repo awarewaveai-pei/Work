@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-21（續13）next-admin 正式部署 3faa2c419 → a4ab42ac4（Claude 經 SDK，操作者批准）
+
+**觸發**：操作者「先部署，有好幾個東西等著一起部署」；前置 /verify 誤紅由續12 修掉後部署。
+
+**範圍**：`git log 3faa2c419..a4ab42ac4 -- apps/next-admin packages/db/migrations` 9 個 next-admin 提交（社群 V1.5 C23/C27/C29/C30/C31＋e354195b1 收尾、603485b3b tarot 內部回呼、b4843733a 試用到期、c64de1cb1 products.ts）；migrations 無變更。
+
+**前置**：main＝origin/main、本機與主機皆無 DEPLOY_HOLD、`check-deploy-drift.ps1` 只報落後 17（composeVarDrift 空）、`verify-build-gates.ps1` exit 0（續12）。
+
+**[驗證結果]**：`sg-deploy.sh next-admin` exit 0（387 s；npm ci／tsc／npm test／migration gate 過，healthy 9s，HTTP smoke 5/5 200），主機 `.deployed-commit`=a4ab42ac4；`playwright-runner.ps1 -Mode smoke` 26 passed／6 skipped；curl social／app `/login` 皆 200；`docker exec lobster-next-admin printenv BATCH_INTERNAL_SECRET` exit 0（603485b3b 回呼 token 在容器內，未印值）。Trigger 不在本次範圍：7b8c9050b 已記 Trigger 20261021.2 部署含 603485b3b。無 rollback。
+
+**[rollback]**：主機 `/root/lobster-phase1/scripts/sg-deploy.sh` 部署 3faa2c419（或 `git revert` 後走 sg-deploy）。
+
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=387000
+- REVIEW_WAIVED: NA -- 部署操作，無程式改動；程式審查在各來源提交
+- BUGHUNT_WAIVED: NA -- 部署操作，無程式改動
+
 ## 2026-10-21（續12）system-health-check 同步檢查 exit code 被壓成 1 → /verify 誤判 HARD FAIL（Claude 經 SDK）
 
 **觸發**：next-admin 部署前置 /verify 紅：`Critical gate failed: Claude Code sync infrastructure broken`，但 health 明細 `worst=soft, hard=0, soft=1`。操作者選 b：先修再部署。
