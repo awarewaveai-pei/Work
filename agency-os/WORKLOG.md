@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-21（續40）Cognitive OS 的 COGNITIVE_OS_ANTHROPIC_API_KEY 換成新金鑰（舊的 401）
+
+**觸發**：操作者「Replace the Cognitive OS Claude key ... through the safe path, then verify it returns 200」。
+- 金鑰在主機 `/opt/cognitive-os/Projects/internal/cognitive-engineering-os/deploy/.env`（compose `env_file`，只有 `cognitive-os-api` 用）。`safe-infra-patch.sh file` 只換 `COGNITIVE_OS_ANTHROPIC_API_KEY=` 一行（金鑰只走 stdin；備份 `deploy/.env.bak.safe-patch-20261021-105225`）。
+- 重建只 `cognitive-os-api`（同一 image，`docker compose up -d --no-build`，非 force-recreate）。`safe-infra-patch.sh compose` 不能用：它固定 `cd` 到 /root/lobster-phase1 並用那邊的 .env。完整 `deploy.sh` 會跑測試、重 build、部署 HEAD，只換金鑰不需要。
+- 踩到兩個坑：(1) 從 Windows 用 text 模式 stdin 上傳 shell 腳本會變 CRLF → 改 bytes 上傳；(2) compose 需要 `COGNITIVE_OS_REGION`（deploy.sh/lib-db.sh:52-59 從 deploy/.env 推出）→ 改從執行中容器的 volume 名 `cognitive-os-files-<region>` 取（aw01），保證掛同一份資料；第一次腳本只看 health 沒看 compose exit，誤判成功 → 加 compose exit 與 StartedAt 變更檢查。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=重建後 `docker exec cognitive-os-api python3`（只印狀態碼）→ `COGNITIVE_OS_ANTHROPIC_API_KEY status 200`；`cognitive-os-api Up 6 seconds (healthy)`；`https://cognitive.aware-wave.com/api/health` 200 | exit=0 | ms=120000
+- REVIEW_WAIVED: NA -- 憑證輪替，無程式變更
+- BUGHUNT_DONE: scope=agency-os,scripts,Projects | grep=`COGNITIVE_OS_ANTHROPIC_API_KEY` | hits=compose:32 註解、deploy/.env.example（名稱）；無其他讀取點
+
+**避免再發生**：只換 Cognitive OS 環境變數沒有現成的安全腳本（safe-infra-patch 只認 lobster-phase1）。已記 TASKS 一行。
+
+**rollback**：`sudo cp <deploy/.env.bak.safe-patch-20261021-105225> deploy/.env`，再以同樣方式（export COGNITIVE_OS_REGION=aw01）`docker compose up -d --no-build cognitive-os-api`。
 ## 2026-10-21（續39）正式機 ANTHROPIC_API_KEY 輪替（舊金鑰 401）
 
 **觸發**：操作者回報「翻成英文失敗：401 invalid x-api-key」，並指定新金鑰位置（操作者本機筆記 942–943 行；值未顯示、未進 repo）。

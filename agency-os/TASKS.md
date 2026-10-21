@@ -564,6 +564,7 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
+- [ ] **【維運｜cognitive-os】只換環境變數沒有安全腳本**：`safe-infra-patch.sh compose` 固定 /root/lobster-phase1；2026-10-21 換 `COGNITIVE_OS_ANTHROPIC_API_KEY` 時手寫重建腳本（需 export `COGNITIVE_OS_REGION`、檢查 compose exit 與 StartedAt）。做法與坑見 WORKLOG 2026-10-21「Cognitive OS 的 COGNITIVE_OS_ANTHROPIC_API_KEY」條；應收成 safe-infra-patch 的一個模式或 deploy.sh 的 `--env-only`。
 - [ ] **【資料正確性｜共用層】生圖額度改成三軸五對象（操作者 2026-10-21 定案；「塔羅牌是一個樂高積木」＝做在共用層，不做在 tarot 裡）**：額度只由共用 `can()` 決定、花費煞車只做在共用 `lib/ai/gateway.ts`（所有付費 AI 都經過它；目前無任何花費控制），每塊積木繼承、不各自計數；tarot 只刪自己的 `quota.ts`。原狀：現在 `lib/tarot/quota.ts:15` 是全站一天 300 張（`TAROT_DAILY_LIMIT`），只存在記憶體、重啟歸零，且一天做 5 套（390 張）就被擋。改為：(1) 每張圖前由 `can(主體, feature_key, actor)` 決定扣誰的額度——自用（comp、staff）不限張數；代操扣被代操客戶；訂閱／點數扣客戶自己；買斷用客戶自己的金鑰、不限（ADR 017 §0）；(2) 全站只留**花費煞車**（以金額計、例如每小時上限、存資料庫、觸發即暫停並通知操作者），不再有全站張數上限；(3) 刪 `checkAndConsumeQuota`（呼叫點 `app/api/tools/tarot/generate/route.ts:92`、`app/api/internal/tarot/batch/[jobId]/card/route.ts:58`）。排在批次 B 方案之後（B 改同一支 card route）。
 - [x] **【可見範圍｜tarot】批次列表不分建立者**（2026-10-21 已修：0115 資料表＋依組織／建立者過濾，45e465758／0aa0b1f67，WORKLOG 續33）：`app/api/tools/tarot/batch/route.ts:98` `listRecentJobs(10)` 回傳所有人的 job（含 prompt）。目前只有員工能進，影響小；客戶從產品門進來前必修。2026-10-21 同上計畫發現；併入批次 B 方案（列表改從新資料表讀時一併依組織／建立者過濾）。
 - [x] **【✅ 2026-10-20 程式已修，待 Trigger 重新部署｜資安｜tarot】`BATCH_INTERNAL_SECRET` 經 Trigger run payload 傳遞（payload 會持久化、dashboard 看得到）**
