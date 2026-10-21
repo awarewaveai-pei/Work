@@ -137,6 +137,8 @@ function decodeDataUrl(url: string, maxBytes: number, what: string): { bytes: Bu
   if (comma === -1) throw new Error(`Invalid ${what.toLowerCase()} data URL: missing comma`);
   const [contentType, ...params] = url.slice(5, comma).split(";");
   if (!params.includes("base64")) throw new Error(`${what} data URL must be base64`);
+  // size from the encoded length first, so an oversized upload is refused before its decoded copy is allocated
+  if (Math.floor((url.length - comma - 1) * 3 / 4) > maxBytes + 2) throw new Error(`${what} too large (max ${maxBytes} bytes)`);
   const bytes = Buffer.from(url.slice(comma + 1), "base64");
   if (!bytes.length) throw new Error("base64 decode produced empty buffer");
   if (bytes.length > maxBytes) throw new Error(`${what} too large: ${bytes.length} bytes (max ${maxBytes})`);

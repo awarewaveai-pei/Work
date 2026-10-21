@@ -10,7 +10,7 @@ const N8N_URL   = process.env.PLAYWRIGHT_N8N_URL   || 'https://n8n.aware-wave.co
 const CLIENT_URL = process.env.PLAYWRIGHT_CLIENT_URL || '';
 const COGNITIVE_URL = process.env.PLAYWRIGHT_COS_URL || 'http://127.0.0.1:8421';
 // /tools/social UI flows: a next-admin dev server with no Supabase (.claude/launch.json "next-admin-social-ui")
-const SOCIAL_URL = process.env.PLAYWRIGHT_SOCIAL_URL || 'http://127.0.0.1:3902';
+const SOCIAL_URL = process.env.PLAYWRIGHT_SOCIAL_URL || 'http://localhost:3902';
 
 // Screenshot output dir — runner passes this; tests import from env.ts helper
 const SCREENSHOTS_DIR = process.env.PLAYWRIGHT_SCREENSHOTS_DIR ||

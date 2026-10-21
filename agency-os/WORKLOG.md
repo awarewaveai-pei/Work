@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-21（續11）社群 V1.5 收尾第二輪：審 Codex C31 e2e、C30 日期條查證、續10 小問題全修（Claude 經 SDK）
+
+**觸發**：操作者「可以檢查和抓蟲，但不要重做」；續10 審查小問題「全部修掉」。
+
+**C31 e2e 審查（Codex a6906385b；review-debt 記 9733ecaa3＝amend 前的同一份）**：通過。`tests/e2e/social/social-manager.spec.ts:332-352` 走 撰寫頁 → 選 3 秒 mp4（ffmpeg 現產，無則 `fixtures/social-c31-3s.mp4`）→ 撰寫區與預覽各見 `<video>` → POST /api/social/media 恰 1 次 → 設定行程 → state=scheduled、media=uploaded-video → 回日曆見卡。影片上傳只走 `api.uploadVideo`（`tools/social/api.ts:99`，`Editor.tsx:363`）＝ `/api/social/**` 被 `page.route` 假伺服器全接，不碰 DB／Postiz。
+- 跑測時發現：`127.0.0.1` 依 ADR 018 是 probe 門（`lib/portal/doors.ts:49`），頁面一律 404；dev 只認 `localhost` 為 staff。spec 檔頭與 `tests/playwright.config.ts:13` 預設都寫 127.0.0.1 → 改 localhost（同一類，兩處）。
+
+**C30 日期條**：已存在，不補。`Calendar.tsx:137-139`（`sm-mobile-dates`，cf2b4ecc1 引入）＋`social.css:140,272-275`；390 寬斷言在 `tests/e2e/social/render-views.mjs:31-46`（`--mock` 分支，page.scrollWidth>390 即 exit 1）。
+
+**續10 小問題（n1、n6、n7 是描述／已修，實際問題 5 項＝n2–n6）**：
+- n2 C31 缺 e2e → Codex a6906385b 補上，本 session 實跑通過（上）。
+- n3 影片 data URL 先整包 base64 解碼才比大小 → `decodeDataUrl` 先以編碼長度估算，超過上限不解碼即拒（`lib/content/postiz.ts:140-141`）。
+- n4 C30 日期條未查 → 已查，存在（上）。
+- n5 手機頻道頁按「只看這個頻道／用這個頻道寫貼文」不關 → 兩個 handler 加 `setMobileChannels(false)`（`tools/social/SocialManager.tsx:405-406`）。
+- n6 `.sm-cgrid > .sm-chan` 選錯 class → c0fd8c378 已改 `.sm-cchan`，現況確認（`social.css:289,293`；`compose/ChannelPicker.tsx:15`）。
+
+**[驗證結果]**：`npx tsc --noEmit` exit 0；`npx vitest run lib/content/__tests__/postiz-client.test.ts "app/(shell)/tools/social"` 8 files 39 passed；`PLAYWRIGHT_SOCIAL_URL=http://localhost:3903 npx playwright test --project social -g "3-second mp4"` 1 passed（另起 no-Supabase dev server 3903，3902 上的既有 server 回 404 未動它）。未重拍截圖、未跑全套 e2e、n3/n5 無新增測試。
+
+**[rollback]**：`git revert <本 commit>`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=cd tests && PLAYWRIGHT_SOCIAL_URL=http://localhost:3903 npx playwright test --project social -g "3-second mp4" | exit=0 | ms=12500
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n
+- ORACLE_WAIVED: Claude 經 SDK 審 Codex 提交
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=127\.0\.0\.1:3902 | hits=4
 ## 2026-10-21（續10）社群 V1.5 C31 媒體與影片＋C30 手機收尾（Codex 寫，Claude 審）
 
 **觸發**：操作者「審 Codex 的三個本機提交並推上 main」；「可以檢查和抓蟲，但不要重做」。審 451f18004（C31）、c0fd8c378（C30）、4d2cc725f（監工台），對照 `lobster-factory/docs/social/SOCIAL_MANAGER_PLAN.md:207-217`。

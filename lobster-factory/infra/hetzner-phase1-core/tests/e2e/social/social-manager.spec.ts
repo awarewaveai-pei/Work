@@ -7,7 +7,7 @@
  * Every /api/social call is answered by an in-memory fake below (page.route), so this tests the page, never a
  * database or Postiz; the API itself is covered by next-admin app/api/social/__tests__. Run against a dev server
  * with no Supabase configured (.claude/launch.json "next-admin-social-ui", port 3902):
- *   cd lobster-factory/infra/hetzner-phase1-core/tests && PLAYWRIGHT_SOCIAL_URL=http://127.0.0.1:3902 npx playwright test --project social
+ *   cd lobster-factory/infra/hetzner-phase1-core/tests && PLAYWRIGHT_SOCIAL_URL=http://localhost:3902 npx playwright test --project social
  */
 import { expect, test, type Page, type Route } from '@playwright/test';
 import { existsSync } from 'node:fs';

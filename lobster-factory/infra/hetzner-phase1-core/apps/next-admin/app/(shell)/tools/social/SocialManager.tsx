@@ -402,8 +402,8 @@ export default function SocialManager({ slots = {}, route = { kind: "plan" }, go
       <PlanTabs view={view} onView={setView} right={<span className="sm-r">{statusLine}<span className="sm-muted">時區 {tz}</span></span>} />
       <main className={`sm-main${calendar ? "" : " sm-full"}${mobileChannels ? " sm-mobile-channels" : ""}`}>
         {calendar && <>
-          <ChannelList accounts={accounts} only={only} canWrite={canWrite} onToggle={toggleOnly} onOnly={(id) => setOnly(new Set([id]))}
-            onWrite={(id) => openCompose(undefined, undefined, { accounts: id })} onSettings={() => setView("settings")} onRemove={unlink}
+          <ChannelList accounts={accounts} only={only} canWrite={canWrite} onToggle={toggleOnly} onOnly={(id) => { setOnly(new Set([id])); setMobileChannels(false); }}
+            onWrite={(id) => { setMobileChannels(false); openCompose(undefined, undefined, { accounts: id }); }} onSettings={() => setView("settings")} onRemove={unlink}
             onCloseMobile={() => setMobileChannels(false)} />
           <section className="sm-panel sm-cal">
             <Toolbar mode={view as "week" | "month" | "list"} query={query} onQuery={setQuery} rangeLabel={rangeLabel} atToday={atToday}
