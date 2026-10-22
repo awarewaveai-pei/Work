@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-22（續14）session 摘要不進 git；dispatch log 歸 GENERATED
+
+- 現象：file-claim-guard 對 `.claude/sessions/*.md`、`agency-os/reports/agent-dispatch/dispatch-*.jsonl` 報「another session is editing」。非同檔互改：每檔單一程式寫入，他 session 的 hook 在本 session Bash 期間追加 → 被算成本指令的變更。
+- C1 sessions：mcp/claude-userlevel/hooks/rules/session-summary.js:9-37 每次 Stop 追加 git status＋git log 快照（每 session 一檔）。無讀者（grep scripts/hooks/commands）；最後 commit 2026-10-14（86 未追蹤、15 已追蹤但磁碟已刪）→ 舊 .gitignore:42-47「機器故障留紀錄」已失效；且污染 oracle packet（WORKLOG 2026-09-20 81% 噪音）、bughunt grep、file claims。處置：.gitignore 整個 `.claude/sessions/`，15 檔以刪除 commit；hook 照寫本機。工作紀錄 = commits＋WORKLOG。oracle-capture-policy.ps1 RuntimePaths 保留（縱深）。
+- C2 dispatch log：唯一寫入者 rules/agent-dispatch-log.js:103 appendFileSync；讀者 scripts/append-agent-dispatch-to-worklog.ps1（ao-close）。保留追蹤；加入 lib/file-claims.js GENERATED（多 session 追加同一機器 log，commit 帶走他人行無損失）。
+- C3 scripts/git-partial-worktree-commit.py stage `-- <own>`：`git add` 拒收 .gitignore 新涵蓋的路徑 → 取消追蹤的刪除無法 commit（本次 15 檔；3c3f415ea worker 曾手改 marker 繞過）。依不變量重寫（own 路徑：私有 index = 工作樹；ignored 內容不新增）：本 index 已有的 → `git add -u`（改動＋刪除，不受 ignore 限）；新內容 → `git add`（明指 ignored 檔仍失敗）；`check-ignore --no-index`（預設對含追蹤項的路徑報不 ignored）。Codex 3 輪：r1 資料夾刪除/重複 stage、r2 ignored 資料夾內追蹤子檔刪除＋ignored 兄弟檔 → 皆入測試；r3 NO FINDINGS。
+- 不變量：claim 只保護親手寫的 hunk；程式寫的檔不 claim；repo 不追蹤沒人讀的機器輸出。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=83053
+- REALTEST_EVIDENCE: tool=Bash | cmd=python -m pytest tests/scripts/git_partial_worktree_commit_test.py（7/7；突變 4 處各紅）＋node --test tests/hooks/shared-file-guard.test.mjs（12/12） | exit=0 | ms=6000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n（C3 r1 2m、r2 1m 已修，r3 0）
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude | grep=agent-dispatch|claude/sessions/ | hits=12（hooks/scripts/commands 檔數；寫入者僅 2 hook；讀者 append-agent-dispatch-to-worklog.ps1、oracle-capture-policy.ps1）
+- 驗證：test-hooks 371/371；generated 測試參數化 2/2；突變（註解 dispatch pattern）→ 1 fail → 還原綠；git status 不再列 .claude/sessions；sync-claude-userlevel merge 後 live 與 SSOT 相同。Codex artifacts 2026-10-22-partialreview-6e09ca9d.md、-1d636692.md、-56045bf3.md、-0d85d4cc.md、-f32c1077.md。本 commit 即用新 helper 暫存 15 筆刪除（實測）。
+- rollback：git revert <本 commit>＋scripts/sync-claude-userlevel.ps1 -Mode merge。
 ## 2026-10-22（續13）check-claude-sync S1 改由 git 判定「多出的檔」
 
 - 根因：scripts/check-claude-sync.ps1 S1 走檔案系統，3c3f415ea gitignore 的 app 輸出 `.claude/skills/synced/`（510 檔）被報成本機未 commit 工作，fix 還叫人 `git add`（= 7de686789 誤 commit app 檔的源頭）。

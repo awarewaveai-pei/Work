@@ -244,7 +244,19 @@ def stage(args):
 
     own = [rel_of(p, root) for p in (args.own or [])]
     if own:
-        run("git", "add", "--", *own, env=env)
+        # Tracked content (edits AND deletions, files or dirs) via `add -u`, which .gitignore does not gate --
+        # plain `git add` refuses a path .gitignore now covers, so untracking failed. New content via `git add`
+        # only, so an explicitly named ignored path still fails instead of being force-added.
+        # "tracked" = has entries in THIS index (not HEAD): a deletion already staged here makes a re-stage a no-op.
+        tracked = [p for p in own if run("git", "ls-files", "--", p, env=env).stdout.strip()]
+        if tracked:
+            run("git", "add", "-u", "--", *tracked, env=env)
+        # --no-index: by default check-ignore calls a path with tracked entries "not ignored"
+        ignored = lambda p: run("git", "check-ignore", "-q", "--no-index", "--", p, check=False).returncode == 0
+        fresh = [p for p in own if (os.path.lexists(os.path.join(root, p)) and not ignored(p))
+                 or not (p in tracked or head_blob(p))]  # unknown everywhere: let `git add` name the bad path
+        if fresh:
+            run("git", "add", "--", *fresh, env=env)
         for p in own:
             if p not in marker["own"]:
                 marker["own"].append(p)

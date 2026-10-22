@@ -160,6 +160,26 @@ class PartialWorktreeCommitTest(unittest.TestCase):
         write("shared.md", self.base + "MINE tail\n")
         self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE", "--index", idx]), 2, "still refused on the moved HEAD even with a real selection")
 
+    def test_untracking_an_ignored_path_stages_the_deletion_but_never_force_adds(self):
+        os.makedirs("logs")
+        write("logs/a.md", "log\n")
+        git(self.repo, "add", "logs/a.md")
+        git(self.repo, "commit", "-q", "-m", "tracked log")
+        write(".gitignore", "logs/\n")
+        os.remove("logs/a.md")
+        write("logs/c.md", "ignored sibling, on disk\n")
+        write("agency-os/WORKLOG.md", "# Worklog\n\n" + MINE + HEAD_WORKLOG[len("# Worklog\n\n"):])
+        self.assertEqual(self.mod.main(["stage", "agency-os/WORKLOG.md", "--worklog-entry", "2", "--date", "2026-09-23",
+                                        "--", ".gitignore", "logs"]), 0, "an ignored dir: tracked child deleted, ignored sibling on disk")
+        idx = self.index_path()
+        write("shared.md", self.edited())
+        self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE", "--index", idx, "--", "logs"]), 0,
+                         "the same deletion staged again into the same index")
+        self.assertEqual(git(self.repo, "diff", "--cached", "--name-status", "HEAD", "--", "logs", env={"GIT_INDEX_FILE": idx}).split(), ["D", "logs/a.md"])
+        write("logs/b.md", "ignored, on disk\n")
+        with self.assertRaises(SystemExit, msg="an ignored file still on disk is refused, not force-added"):
+            self.mod.main(["stage", "agency-os/WORKLOG.md", "--worklog-entry", "2", "--date", "2026-09-23", "--", "logs/b.md"])
+
     def test_stage_hunks_by_keep_re_and_range(self):
         write("shared.md", self.edited())
         self.assertEqual(self.mod.main(["stage", "shared.md", "--keep-re", "^\\+MINE"]), 0)

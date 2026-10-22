@@ -39,14 +39,10 @@ _paid-plugins/
 # 還原 70fb8e51（2026-06-04 誤把 memory 納入 git，違反 R1，造成 ao-close guard 卡死）。
 .claude/projects/
 .claude/session-env/
-# Session summaries (Stop hook, mcp/claude-userlevel/hooks/rules/session-summary.js) are
-# TRACKED as of 2026-08-25 so a machine failure does not take the record of what was in
-# flight with it. Only *.md: this directory also holds runtime .json and, critically, .key
-# files -- ignore everything, then re-include the summaries explicitly.
-# Churn is bounded: nothing commits mid-session any more (the per-prompt auto-checkpoint
-# was removed 2026-08-25), so these land once per AO-CLOSE rather than once per prompt.
-.claude/sessions/*
-!.claude/sessions/*.md
+# Claude Code runtime (.json/.key) + per-session Stop-hook logs (rules/session-summary.js): local only.
+# The logs were tracked 2026-08-25..2026-10-22; nothing read them and they polluted oracle packets,
+# bughunt greps and file claims (WORKLOG 2026-10-22). The record of work = commits + WORKLOG.
+.claude/sessions/
 .claude/shell-snapshots/
 .claude/skills/*
 # All project skill folders + .skill files are tracked (cross-machine sync via git symlink).

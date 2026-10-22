@@ -121,9 +121,13 @@ function stateOf(repo) {
   return { dirty, blob, head };
 }
 
-// Whole-file output of scripts (no hand-written hunk to carry): never claimed, never warned about. Only paths
-// whose every writer is a script -- add a pattern after grepping its writers, not because a warning annoyed.
-const GENERATED = [/^agency-os\/reports\/status\/[^/]+-LATEST\.(json|md)$/i];
+// Script-written files -- whole rewrites or append-only machine logs, no hand-written hunk to carry: never
+// claimed, never warned about. Only paths whose every writer is a script -- add a pattern after grepping its
+// writers, not because a warning annoyed.
+const GENERATED = [
+  /^agency-os\/reports\/status\/[^/]+-LATEST\.(json|md)$/i, // status scripts, whole rewrite
+  /^agency-os\/reports\/agent-dispatch\/dispatch-\d{8}\.jsonl$/i, // rules/agent-dispatch-log.js, append only
+];
 const isGenerated = (rel) => GENERATED.some((re) => re.test(rel));
 
 const isShared = (rel, list) => list.some((s) => (process.platform === 'win32' ? s.toLowerCase() === rel.toLowerCase() : s === rel));
