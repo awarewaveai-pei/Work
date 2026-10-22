@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-22（續19）parity 合併補 Codex 2 項（staged 內容不得遺失）
+
+- Codex `agency-os/reports/oracle/2026-10-22-partialreview-9116c7aa.md`（審 `4d73ef128`）2 項屬實：F1 index 有與檔案不同的 staged 內容時，合併只讀檔案、`git reset` 把 staged 內容丟掉；F2 ff 失敗回滾只還原檔案、沒還原 index。
+- 不變量：不得丟掉任何只存在 index 的內容。修：`scripts/git-parity-merge.py` index≠HEAD 且 ≠檔案 → 全不動；index≠HEAD 但＝檔案 → 允許，ff 失敗時 `git add` 還原 staged。
+- 測試 P14（staged B、檔案 A、origin 改 C → refused，staged 與檔案都不動）；突變：拔掉檢查 → P14 3 項紅，還原 → 84 全綠。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -NoProfile -ExecutionPolicy Bypass -File tests/ao-resume-shared-worktree.test.ps1 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n（Codex external oracle，2 項皆修）
+- BUGHUNT_DONE: scope=agency-os,scripts,tests | grep=git-parity-merge | hits=6
 ## 2026-10-22（續18）共用 checkout 永遠追不上 origin → commit 必繞路：parity 改為乾淨 3-way 帶過 dirty 檔；doc-sync 不再只改時間戳
 
 - **症狀**：session `local_3c4f6ba5` 一次「COMMIT」＝22 次模型呼叫、讀約 330 萬 token（每次 ~15 萬 context）：push 被拒（D:\Work 落後）→ 不能 rebase（別人 dirty）→ worktree cherry-pick → 退本地重複 commit。

@@ -48,9 +48,19 @@ def main():
     tracked = names("diff", "--name-only", "-z", "HEAD") | names("diff", "--name-only", "-z", "--cached", "HEAD")
     untracked = names("ls-files", "-z", "--others", "--exclude-standard")
 
-    plan, moved = [], []
+    def oid(*args):
+        r = git(*args, check=False)
+        return r.stdout.decode().split()[1] if args[0] == "ls-files" and r.stdout else r.stdout.decode().strip()
+
+    plan, moved, staged = [], [], []
     for p in sorted(up & tracked):
         path = os.path.join(a.root, p)
+        # The merge reads the worktree only: staged bytes that differ from it would be lost by the index reset.
+        idx, head = oid("ls-files", "-s", "--", p), oid("rev-parse", f"HEAD:{p}")
+        if idx != head:
+            if not os.path.exists(path) or idx != oid("hash-object", "--", path):
+                return done(False, f"{p}: staged content differs from the file")
+            staged.append(p)
         base, theirs = blob("HEAD", p), blob(a.target, p)
         ours = open(path, "rb").read() if os.path.exists(path) else None
         if base is None or theirs is None or ours is None:
@@ -87,6 +97,8 @@ def main():
             os.replace(os.path.join(side, str(i)), path)
         for p, path, *_, ours in plan:
             open(path, "wb").write(ours)
+        if staged:
+            git("add", "--", *staged)          # staged == worktree bytes (checked above), so this restores the index
         return done(False, "ff-only still refused: " + ff.stderr.decode("utf-8", "replace").strip())
     for p, path, _, merged, _ in plan:
         open(path, "wb").write(merged)

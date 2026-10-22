@@ -182,6 +182,14 @@ try {
     Assert-Eq $r.Action 'fast-forward' 'P13 action'
     Assert-Eq (Read-File (Join-Path $f.Wt 'c.txt')) "c-origin`n" 'P13 file content kept'
 
+    # P14 staged bytes differ from the file (staged B, file back to A) -> refused, index and file untouched
+    $f = New-Fixture 'p14'; Advance-Origin $f 'a.txt' "a2`n"
+    Set-File (Join-Path $f.Wt 'a.txt') "a-staged`n"; G $f.Wt @('add', 'a.txt') | Out-Null; Set-File (Join-Path $f.Wt 'a.txt') "a1`n"
+    $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
+    Assert-Eq $r.Action 'ff-refused' 'P14 action'
+    Assert-Eq (G $f.Wt @('show', ':a.txt')) 'a-staged' 'P14 staged content kept'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'a.txt')) "a1`n" 'P14 file untouched'
+
     # ---------------- I3: hooks act on the MAIN checkout only (2026-09-27) ----------------
     # A linked worktree (git worktree add) has `.git` as a FILE. Accepting it as the root wrote hook
     # state / reports into D:\tmp\<wt> and ensure-claude-junction replaced the worktree's tracked
