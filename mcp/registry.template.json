@@ -2,6 +2,12 @@
     "version":  1,
     "servers":  {
                     "work-global":  {
+                                        "clients":  {
+                                                        "workspace":  {
+                                                                          "exclude":  true
+                                                                      }
+                                                    },
+                                        "note":  "Excluded from Claude .mcp.json 2026-10-22: duplicates Claude Code's built-in Read/Write/Glob, 0 calls in 203 sessions; per-session tool-list overhead only. Codex/Copilot/Gemini keep it.",
                                         "enabled":  true,
                                         "transport":  "stdio",
                                         "command":  "powershell",
@@ -124,6 +130,12 @@
                                                   }
                                       },
                     "copilot":  {
+                                    "clients":  {
+                                                    "workspace":  {
+                                                                      "exclude":  true
+                                                                  }
+                                                },
+                                    "note":  "Excluded from Claude .mcp.json 2026-10-22: same GitHub surface as the github server (which agents use), 0 calls in 203 sessions; per-session tool-list overhead only. Codex/Copilot/Gemini keep it.",
                                     "enabled":  true,
                                     "transport":  "http",
                                     "url":  "https://api.githubcopilot.com/mcp",

@@ -1,4 +1,15 @@
 # Worklog
+## 2026-10-22（續6）Claude 每輪固定 token 精簡（研討會 Tokenomics 對照）
+
+- 根因：每輪固定載入 MEMORY.md 21.3KB（21 條只是重述 AGENTS.md 的規則）＋ Claude .mcp.json 13 個 server，其中 copilot（與 github 重複）、work-global（與內建 Read/Write/Glob 重複）在 203 個歷史 session 呼叫數 0。app 端 AI 30 天僅 US$1.48（agency-os/reports/cost/aware-wave-cost-2026-10-22.md），不是優化標的。
+- 步驟：(1) 刪 21 個重述 AGENTS.md／已過時的 memory 檔，MEMORY.md 重寫為分組短索引（21312→8876 bytes；備份 %TEMP%/mem-backup-2026-10-22，不進 git）。(2) mcp/registry.template.json 對 copilot、work-global 加 clients.workspace.exclude=true＋note（canva 前例），跑 scripts/sync-mcp-config.ps1；Codex／Copilot／Gemini 保留。
+- 避免再發生：memory 只放 repo 沒記的事（auto-memory 規則）；新增 MCP 前查是否與內建工具或既有 server 重複。
+- REALTEST_EVIDENCE: tool=Bash | cmd=python mcpdiff.py mcp-before.json .mcp.json | exit=0 | ms=200
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude | grep=work-global|copilot | hits=42（files；mcp__work-global__/mcp__copilot__ 於 .claude/scripts/mcp 呼叫點 0）
+- ORACLE_WAIVED: config-only change (two exclude flags + notes), no source code
+- 驗證：.mcp.json before 13 after 11，removed ['copilot','work-global']；~/.codex/config.toml 仍含兩者（grep -c=3）；MEMORY.md 所有連結檔存在（0 BROKEN）。
+- rollback：刪兩個 clients/note 區塊後重跑 sync-mcp-config.ps1；memory 從備份資料夾複製回去。
 ## 2026-10-22（續5）塔羅愚人牌：狗背包袱、繩子飄在空中、出現兩隻狗 → 提示詞語序修正（Claude）
 
 **根因**：`app/(shell)/tools/tarot/cards.ts:45` 愚人 scene 把「holding a white rose… knapsack tied to a slender staff over the shoulder」寫在「a small white dog trotting at the heels」之後，模型把玫瑰／包袱／細棍歸給狗（操作者截圖：白狗背包袱拖棍，像飄浮的牽繩）；也沒寫只有一隻狗。RWS 原圖的狗本就沒有牽繩。
