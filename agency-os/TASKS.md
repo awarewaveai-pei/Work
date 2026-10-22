@@ -65,6 +65,7 @@
 
 ## Next — 未完成（目前正式隊列）
 
+- [ ] **worktree 流程收尾：舊閘門何時刪（2026-10-22 決策 `agency-os/reports/decisions/2026-10-22-per-session-worktree-pilot.md`）**：舊閘門（scope-guard／add-tracker／shared-file-guard／file-claim／私有 index，約 2,300 行）暫留。**觸發**：累計 3 張寫碼 commit 走 worktree 且無閘門缺口 → 提議刪除並附 rollback；任一缺口 → 寫進決策記錄、不刪。**進度 2/3**（`bfa17b4a0`、`76390ae87`）。**誰告訴你**：下一個讀 TASKS.md 的 session 開頭回報進度；到 3/3 時直接給刪除提案。建議模型：Opus 5.5
 > **版面規約（減少漏勾／誤判）**  
 > - **本節只保留 `- [ ]`。**已結案請移到 **`## Next — 已完成歷程（查詢用）`**，不要留在這裡。  
 > - **代理**：完成某一條 DoD 時，當日 **`WORKLOG`** 必須有 **`- AUTO_TASK_DONE: <子字串>`**（命中該條待辦）；`AO-CLOSE` 會跑 **`apply-closeout-task-checkmarks`**。  
