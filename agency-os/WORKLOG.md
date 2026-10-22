@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-22（續15）C25 補 Codex 審（ORACLE_WAIVED 的欠債）：3 項全屬實已修；同時驗 worktree 寫碼流程
+
+**觸發**：C25 提交（44be66e02）時以「省 Claude 額度」豁免 Codex 審，理由不成立（Codex 不吃 Claude 額度），補審。`scripts/codex-oracle.ps1 -DiffRef 44be66e02^..44be66e02`，artifact `agency-os/reports/oracle/2026-10-22-partialreview-fd7dcf44.md`。
+
+**Codex 3 項（逐項讀碼驗過）**
+- F1 Facebook 日是太平洋日（`metrics.ts:7,60-70`），報表按品牌日取列→邊界差數小時。屬實，但是 C24 的資料語意、數據分析頁同樣；不改資料，報表頁尾加一句揭露（`ReportView.tsx`）。
+- F2 部分收件人寄失敗被當成功（`reports.ts` 月報）。屬實→部分失敗改 throw（含失敗名單、報表 id），報表保留；隔天不重寄（同月已有），漏收者需手動補寄。新測試 `social-monthly-job.test.ts` 部分失敗。
+- F3 報表丟掉 `empty`（有連線但期間無列），誤報成「平台不提供」。屬實→`ReportData.empty` 由每頻道 `loadAnalytics.empty` 帶出，頁尾列「還沒收集到資料的頻道」。
+
+**同次驗證 worktree 寫碼流程**（決策記錄 `reports/decisions/2026-10-22-per-session-worktree-pilot.md`）：本修正即在 detached worktree 內做、`node_modules` junction、tsc 與 vitest 在 worktree 跑、普通 commit、rebase、`push HEAD:main`。
+
+**[驗證結果]**：`npx tsc --noEmit` exit 0；`npx vitest run lib/social lib/schedules "app/(shell)/tools/social" app/api/social`：35 files passed、236 passed、3 skipped。未重截 render（只加頁尾兩行，mock 補 `empty: []`）。
+**[剩餘風險]**：F2 漏收者要人補寄；AO-CLOSE 從 worktree 跑未驗。
+**[rollback]**：`git revert` 本 commit。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/social lib/schedules "app/(shell)/tools/social" app/api/social | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n
+- ORACLE: Codex `2026-10-22-partialreview-fd7dcf44.md`（external oracle，3 項皆修）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=ReportData|runMonthlyReport|loadReportData | hits=9
 ## 2026-10-22（續14）session 摘要不進 git；dispatch log 歸 GENERATED
 
 - 現象：file-claim-guard 對 `.claude/sessions/*.md`、`agency-os/reports/agent-dispatch/dispatch-*.jsonl` 報「another session is editing」。非同檔互改：每檔單一程式寫入，他 session 的 hook 在本 session Bash 期間追加 → 被算成本指令的變更。

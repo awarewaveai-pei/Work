@@ -69,6 +69,13 @@ describe("social_monthly_report", () => {
     expect(rpcs.calls).toEqual([]);
   });
 
+  it("when only some mails fail it raises the failure and keeps the report, so the missed person is not silently dropped", async () => {
+    members.list = [{ user_id: "u1", email: "owner@x.test", role: "owner" }, { user_id: "u3", email: "client@x.test", role: "client" }];
+    mail.send.mockResolvedValueOnce({ ok: true, id: "m1" }).mockResolvedValueOnce({ ok: false, error: "mail_rejected_422" });
+    await expect(runMonthlyReport("b1", at("2026-10-01T01:00:00Z"))).rejects.toThrow(/partial 1\/2 sent, not delivered: client@x.test:mail_rejected_422/);
+    expect(rpcs.calls.map((c) => c.name)).toEqual(["social_create_report"]);
+  });
+
   it("when every mail fails it throws and deletes the report, so the next day tries again", async () => {
     mail.send.mockResolvedValue({ ok: false, error: "mail_rejected_422" });
     await expect(runMonthlyReport("b1", at("2026-10-01T01:00:00Z"))).rejects.toThrow(/mail_rejected_422/);

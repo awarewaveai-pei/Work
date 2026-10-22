@@ -143,7 +143,7 @@ function reportData() {
   return { brand: { id: BRAND.id, name: BRAND.name }, period: { from: "2026-09-01", to: "2026-09-30", prevFrom: "2026-08-02", prevTo: "2026-08-31", days: a.days },
     accounts: ACCOUNTS, total: { kpis: a.kpis, series: a.series },
     perAccount: [per(ACCOUNTS[0], ["followers", "engagement", "posts"]), per(ACCOUNTS[1], ["reach", "impressions", "engagement", "rate"]), per(ACCOUNTS[2], [])],
-    gaps: a.gaps.map((g) => ({ account_id: g.account_id, reason: g.reason })), top: a.posts };
+    gaps: a.gaps.map((g) => ({ account_id: g.account_id, reason: g.reason })), empty: [], top: a.posts };
 }
 
 async function handle(route) {

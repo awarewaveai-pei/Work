@@ -25,4 +25,7 @@ commit 要只含自己寫的，但所有 session 共用一個工作目錄與 ind
 2026-10-22 doc 提交走完整一輪，用本檔自己：`git worktree add --detach D:/tmp/wt-pilot origin/main` → 改檔 → 普通 `git add`＋`git commit`（無私有 index、無 marker、閘門沒擋）→ `git fetch`＋`git rebase origin/main`（up to date）→ `git push origin HEAD:main` 成功（0e84c4273）→ `git worktree remove`（第一次 Permission denied，因 shell 還在該目錄；離開後 `--force` 乾淨移除）。
 - 已驗：settings deny 不擋 `git worktree add --detach` 與 `push HEAD:main`；detached worktree 的 index 獨立，commit 只含自己的檔。
 - 未驗：寫碼卡（`node_modules` junction、`npx tsc`／vitest 在 worktree 跑、verify-gate／ORACLE 閘對 worktree 的行為）、AO-CLOSE 從 worktree 跑。第一張寫碼卡走 worktree 時補填。
+- 寫碼卡已驗（2026-10-22）：`node_modules` 以 junction 掛主目錄 → `npx tsc --noEmit` 綠、vitest social＋schedules 236 過、程式碼 commit 與 push 都不經私有 index；`worktree-reparse-guard` 在 junction 未拆時擋 remove（用它印的 `[IO.Directory]::Delete` 拆後主 `node_modules` 293 項完好）。
+- 陷阱：`git worktree remove` 報 Permission denied ＝ session 的 cwd 還在該 worktree；cwd 回主目錄後清乾淨。清殘留用 `cmd /c rmdir /s /q <明列路徑>`（`rm -rf` 被閘擋）。
+- 仍未驗：AO-CLOSE 從 worktree 跑；ORACLE／closeout 閘對 worktree 的行為（只在 AO-CLOSE 觸發）。
 - 採用：操作者 2026-10-22「直接改」→ AGENTS.md §8 Git 加一句「同時有別的 session 在寫 → 開 detached worktree」；舊閘門全留。

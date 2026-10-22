@@ -140,6 +140,8 @@ export default function ReportView({ id }: { id: string }) {
         )}
 
         <footer className="rv-foot">
+          {data.empty.length > 0 && <p>這段期間還沒收集到資料的頻道：{data.empty.map((id) => byId.get(id)?.label ?? "已移除的頻道").join("、")}（每天台灣時間 03:30 收集一次，這些頻道的數字是「還沒有」，不是 0）。</p>}
+          {data.accounts.some((a) => a.platform === "facebook") && <p>Facebook 的每一天是太平洋時間的一天，和這份報表的日期線差幾個小時。</p>}
           {data.gaps.length > 0 && <p>沒有數字的原因：{[...new Set(data.gaps.map((g) => `${platformOf(byId.get(g.account_id)?.platform ?? "").name}：${g.reason}`))].join("；")}。</p>}
           <p>數字來自各平台的每日收集；「—」代表平台沒有提供，不是 0。</p>
         </footer>

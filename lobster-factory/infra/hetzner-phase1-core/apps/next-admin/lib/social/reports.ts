@@ -59,6 +59,8 @@ export interface ReportData {
   total: Summary;
   perAccount: Array<{ account_id: string; kpis: Summary["kpis"] }>;
   gaps: Array<{ account_id: string; reason: string }>;
+  /** channels that collect but have no daily row in the period: "nothing collected yet", which is not "the platform gives no number" */
+  empty: string[];
   top: AnalyticsPost[];
 }
 
@@ -96,7 +98,7 @@ export async function loadReportData(brand: { id: string; name: string; default_
     brand: { id: brand.id, name: brand.name, tz },
     period: { from: p.from, to: p.to, prevFrom: p.prevFrom, prevTo: p.prevTo, days: p.days },
     accounts, total: summarize(rows, ids, p), perAccount: ids.map((id) => ({ account_id: id, kpis: summarize(rows, [id], p).kpis })),
-    gaps: per.flatMap((a) => a.gaps).map((g) => ({ account_id: g.account_id, reason: g.reason })), top,
+    gaps: per.flatMap((a) => a.gaps).map((g) => ({ account_id: g.account_id, reason: g.reason })), empty: per.flatMap((a) => a.empty), top,
   };
 }
 
@@ -144,6 +146,12 @@ export async function runMonthlyReport(brandId: string, now = new Date()): Promi
     const why = results.map((r) => ("error" in r ? r.error : "ok")).join(",");
     try { await deleteReport(brandId, id, ACTOR); } catch (e) { throw new Error(`monthly_report:mail failed ${why}; and the report ${id} could not be taken back: ${e instanceof Error ? e.message : e}`); }
     throw new Error(`monthly_report:mail failed ${why}`);
+  }
+  // some got it: the report stays (the link works for them) and the failure is raised, not recorded as a success; tomorrow's run
+  // skips this month, so the missed people need a resend by hand
+  if (sent < emails.length) {
+    const failed = results.flatMap((r, i) => ("error" in r ? [`${emails[i]}:${r.error}`] : []));
+    throw new Error(`monthly_report:partial ${sent}/${emails.length} sent, not delivered: ${failed.join(",")}; report ${id}`);
   }
   return `sent ${name} to ${sent}/${emails.length}`;
 }
