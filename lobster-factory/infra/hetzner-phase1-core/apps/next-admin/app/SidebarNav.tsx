@@ -125,6 +125,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link', href: '/ops-console',      icon: '▣',  label: 'Ops Console',          title: '架構邊界 · Tenant 設定 · M3 · AI Job' },
       { type: 'link', href: '/ops/inbox',        icon: '◇',  label: 'Ops Inbox',            title: '事件收斂中心' },
       { type: 'link', href: '/ops/costs',        icon: '$',  label: 'AI Costs',              title: 'LLM 呼叫花費帳本' },
+      { type: 'link', href: '/ops/ai-models',    icon: '◈',  label: 'AI Models',             title: '圖片模型規格：能讀多長、參考圖、改寫' },
       { type: 'link', href: '/api-check-client', icon: '⬡',  label: 'API Health (browser)', title: 'Node API 健康（browser-side）' },
     ],
   },

@@ -79,7 +79,7 @@ export type PropKind = keyof typeof PROP_PLACEMENT;
 // standing figure on the ground (THE LOVERS: the pair on the grass, the angel in the clouds).
 
 const MAJOR: TarotCard[] = [
-  { id: 0, name: "THE FOOL", roman: "0", type: "major", theme: "new beginnings, adventure, innocence", colors: ["#f0c040", "#fff8dc"], symbols: ["sun", "mountains", "flower"], hero: "carefree young traveler in bright ragged clothes", pose: "a {hero} striding across the flat cliff top toward its edge, both feet planted on the rock, body leaning slightly forward, head tilted up smiling at the sky", upright: true, natural: "with a white rose held in its mouth and a knapsack tied to a slender staff lying beside it", scene: "a {hero} walking on the flat top of a high cliff to its very edge with both feet on the rock while gazing up at the sky, the {hero} holding a white rose in the left hand and a knapsack tied to a slender staff resting on the {hero}'s own right shoulder; exactly one small white dog running free on its own four paws, leaping playfully at the {hero}'s heels on the cliff top; a radiant white sun shining in the upper right of a bright golden morning sky, snowy mountains rising in the distance" },
+  { id: 0, name: "THE FOOL", roman: "0", type: "major", theme: "new beginnings, adventure, innocence", colors: ["#f0c040", "#fff8dc"], symbols: ["sun", "mountains", "flower"], hero: "carefree young traveler in bright ragged clothes", pose: "a {hero} striding across the flat cliff top toward its edge, both feet planted on the rock, body leaning slightly forward, head tilted up smiling at the sky", upright: true, natural: "with a white rose held in its mouth and a knapsack tied to a slender staff lying beside it", scene: "a {hero} at the very edge of a high flat cliff top, holding a white rose in the left hand and a knapsack tied to a slender staff over the right shoulder; exactly one small white dog running free at the {hero}'s heels; a radiant white sun in the upper right of a golden morning sky, snowy mountains in the distance" },
   { id: 1, name: "THE MAGICIAN", roman: "I", type: "major", theme: "willpower, skill, manifestation", colors: ["#c0392b", "#fff"], symbols: ["infinity", "wand", "pentagram"], hero: "robed magician", pose: "a {hero} standing tall, the right hand raising a wand high overhead and the left hand pointing one finger straight down at the ground", upright: true, holds: ["wands"], scene: "a {hero} standing behind a low altar, one arm raised holding a wand toward the sky and the other hand pointing down to the earth, a glowing infinity symbol floating above the head, a serpent belt at the waist, a cup a sword a pentacle and a wand laid on the altar, red roses and white lilies blooming around" },
   { id: 2, name: "THE HIGH PRIESTESS", roman: "II", type: "major", theme: "intuition, mystery, inner wisdom", colors: ["#1a1a6e", "#c8b8f8"], symbols: ["crescent moon", "pillars", "veil"], hero: "serene priestess", pose: "a {hero} seated perfectly still and upright between two pillars, facing straight ahead, a half-hidden scroll held in the lap", upright: true, holds: ["scroll"], scene: "a {hero} seated calmly between one black pillar and one white pillar, a horned crown bearing a full moon on the brow, a crescent moon resting at the feet, a tapestry veil patterned with pomegranates and palms behind, a partly hidden scroll in the lap" },
   { id: 3, name: "THE EMPRESS", roman: "III", type: "major", theme: "abundance, fertility, nature", colors: ["#2d6a4f", "#b7e4c7"], symbols: ["wheat", "venus", "crown"], hero: "crowned empress", pose: "a {hero} seated at ease on a cushioned throne in a wheat field, crowned with stars, the right hand raising a golden scepter topped with an orb", upright: true, holds: ["scepter"], scene: "a {hero} seated on a throne heaped with lush red cushions in a golden field of ripe wheat, wearing a flowing white gown patterned with pomegranates, a crown of twelve stars on the head, a golden scepter topped with an orb held in the right hand, a heart-shaped shield bearing the symbol of Venus resting beside, a waterfall and deep green forest behind" },
@@ -340,6 +340,10 @@ export interface CardPromptInput {
   heroKind?: HeroKind;
   /** 「戀人組合」 buttons for a `couple` card (THE LOVERS). Absent = "man-woman" (RWS). */
   couple?: Couple;
+  /** From lib/tarot/model-specs.ts `promptOrder`. "content-first" puts the scene before the long style detail for
+   *  models that cut (FLUX schnell: 256 T5 tokens, silent) or weaken (Ideogram: ~150 words) late words; the painter's
+   *  name stays in the first sentence. Absent = "style-second". */
+  order?: "content-first" | "style-second";
 }
 
 export type Couple = "man-woman" | "man-man" | "woman-woman";
@@ -450,7 +454,12 @@ export function buildCardPrompt(card: TarotCard, input: CardPromptInput = {}): s
   const anchor = styleRecap(lead);
   const head = pose ? `${pose}, ${anchor.charAt(0).toLowerCase()}${anchor.slice(1)}.${animal} ` : "";
   const grounding = card.scene.includes("{hero}") && !card.airborne ? ` ${GROUNDING}` : "";
-  return `${head}${lead}. ${scene}.${grounding} ${anchor}, one cohesive consistent art style across a single vertical full-bleed scene, rich symbolic detail.`;
+  const tail = `${anchor}, one cohesive consistent art style across a single vertical full-bleed scene, rich symbolic detail.`;
+  if (input.order === "content-first") {
+    // Figure-less cards have no pose sentence: the painter's name opens the prompt on its own.
+    return `${head || `${anchor}. `}${scene}.${grounding} ${lead}. ${tail}`;
+  }
+  return `${head}${lead}. ${scene}.${grounding} ${tail}`;
 }
 
 function capitalize(s: string): string {

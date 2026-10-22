@@ -4,6 +4,7 @@ import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { generateTarotImage, isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen";
 import { checkAndConsumeQuota } from "../../../../../lib/tarot/quota";
+import { MAX_REFS_PER_REQUEST } from "../../../../../lib/tarot/model-specs";
 import { imageCostUsd } from "../../../../../lib/ai/cost-calculator";
 import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
@@ -20,7 +21,7 @@ interface GenerateBody {
   _jobId?: string;
 }
 
-const MAX_REF_IMAGES = 5;
+const MAX_REF_IMAGES = MAX_REFS_PER_REQUEST;
 const MAX_REF_CHARS = 12_000_000; // ~9 MB base64
 
 /** Map an internal error code to a human-readable (zh-TW) message for the UI. */

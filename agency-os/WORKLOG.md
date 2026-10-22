@@ -1,4 +1,32 @@
 # Worklog
+## 2026-10-22（續16）塔羅生圖依每個模型的官方規格處理；System 新增「AI Models」頁（Claude）
+
+**觸發**：操作者截圖「非常有問題」：戀人牌（flux-dev）出現愚人的懸崖與背包客；schnell 愚人沒有小狗與道具。追問「你有去搞清楚所有模型的特性和要求嗎？」→ 查 14 個模型官方規格，並寫進 app 的 System。
+
+**根因（皆有證據）**
+- C1 鎖定預覽被當每張牌的參考圖：`TarotStudio.tsx` lockedRefs 在無上傳參考圖時用預覽；flux-dev `maxRefs: 1`＋`supportsImg2img`，`image-gen.ts` 以 `image`＋`prompt_strength 0.82` 送出＝以圖生圖起始圖。正式庫 media_assets 14:46:14 戀人提示詞內容正確（無懸崖／背包），圖卻有 → 只可能來自參考圖。schnell 不收參考圖，戀人構圖正確（14:39、14:41）。gpt-image-1 有參考圖時走 /images/edits（修改原圖）。
+- C2 schnell 截斷：BFL 參考碼 `src/flux/cli.py` `max_length=256 if name == "flux-schnell" else 512`，超過靜默截斷（`conditioner.py` truncation=True）。重建的愚人提示詞 1552 字／261 字詞，小狗在第 1063 字；schnell 4 張皆無狗、dev 3 張皆有。
+- m1 圖庫預覽只存風格文字（`saveToGallery(... prompt: en.style)`），看起來像提示詞很短。
+- m2 Nano Banana Pro `allow_fallback_model: true`，Replicate 說明其備援為 bytedance/seedream-5（違反「不用中國 AI」）。
+- m3 Ideogram v2a/v3/Character 的 Magic Prompt 預設 Auto 會改寫提示詞。
+
+**修改**
+- `lib/tarot/model-specs.ts`（新，唯一來源）：14 模型的閱讀上限、promptOrder、referenceRole、usesDeckPreview、rewriteOff、seed、否定詞、官方建議順序、來源 URL；`MAX_REFS_PER_REQUEST`。官方查證：web-researcher（BFL／Ideogram／Google／OpenAI 文件）＋ Replicate 即時 schema。
+- `cards.ts` buildCardPrompt `order`：content-first（動作＋畫家名 → 場景 → 著地句 → 風格細節）給 schnell 與 Ideogram；愚人場景刪去與動作句重複的描述以落在上限內。
+- `TarotStudio.tsx`：每個呼叫用該次模型的順序（預覽 activeModel、比較逐模型、牌卡 lockedModel）；鎖定預覽只送給 usesDeckPreview 的模型（Ideogram Character 固定角色）；預覽／比較存實際送出的提示詞；Codex F2 Ideogram Character 沒有參考圖時擋下；F1 背景批次不帶參考圖 → 有參考圖時擋下並說明；F3 參考圖上限取 min(模型, 5)，與 `app/api/tools/tarot/generate/route.ts` 共用常數。
+- `image-gen.ts`：Replicate 呼叫合併 `rewriteOff`（Ideogram magic_prompt_option Off）；Nano Banana Pro `allow_fallback_model: false`。
+- `app/(shell)/ops/ai-models/page.tsx`（新）：渲染 MODEL_SPECS；`SidebarNav.tsx` System 加「AI Models」於 AI Costs 下；`products.ts` BACK_OFFICE 登記 ops/ai-models。
+- 未修（Codex F4/F5，非本次範圍、現行 UI 不觸發）：generate route 拒絕 HTTPS 參考圖；batch route 把不合法比例靜默改 2:3。
+- 另見：47d781e3f（社群 Meta）改 products.ts／social manifest 未同步 Foundry，`sync-foundry-catalog.mjs --check` 目前 drift；本次未動。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/tarot lib/portal "app/(shell)/tools/tarot" app/api/tools/tarot`（55 pass；新 `lib/tarot/__tests__/model-specs.test.ts`：鎖定預覽只給身分參考模型、content-first 下 78 張×3 種主角的動作與場景 ≤160 字詞、順序、Nano Banana Pro 無備援）；`npx tsc --noEmit` exit 0；AiModelsPage 伺服器端實際渲染：17 列（16 模型）、3 個「本系統已關閉」、1 個送預覽 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n -- Codex `agency-os/reports/oracle/2026-10-22-partialreview-103414d6.md`：F1–F3 已修，F4–F5 記為後續
+- ORACLE_WAIVED: Codex 以 -Path 只審本批 8 檔（partialreview）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`buildCardPrompt\(|allow_fallback_model|MAX_REF_IMAGES|lockedRefs` | hits=14（TarotStudio 7 呼叫皆帶 order；fallback 僅 image-gen 一處；參考圖上限兩處共用常數）
+
+**未驗證**：新頁與參考圖擋下訊息未在已登入瀏覽器點過（本機 dev 導向登入）；修正後尚未實際生圖對照。
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-22（續15）C25 補 Codex 審（ORACLE_WAIVED 的欠債）：3 項全屬實已修；同時驗 worktree 寫碼流程
 
 **觸發**：C25 提交（44be66e02）時以「省 Claude 額度」豁免 Codex 審，理由不成立（Codex 不吃 Claude 額度），補審。`scripts/codex-oracle.ps1 -DiffRef 44be66e02^..44be66e02`，artifact `agency-os/reports/oracle/2026-10-22-partialreview-fd7dcf44.md`。

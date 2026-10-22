@@ -10,6 +10,7 @@
 // Prompts arrive in English: the studio translates non-English subject/style once per deck (lib/tarot/translate.ts), never here.
 
 import { getDesignsPublicBase } from "../storage/r2";
+import { MODEL_SPECS } from "./model-specs";
 import { providerUrl } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
 
@@ -227,7 +228,8 @@ export const TAROT_MODELS: Record<TarotModel, ModelConfig> = {
         aspect_ratio: aspectRatio,
         resolution: "2K",
         output_format: "png",
-        allow_fallback_model: true,
+        // Its fallback is a ByteDance model (Replicate schema, 2026-10-22); the deck never uses Chinese-vendor models.
+        allow_fallback_model: false,
       };
       if (referenceImages.length > 0) {
         input.image_input = referenceImages;
@@ -487,6 +489,8 @@ async function generateReplicate(params: TarotGenParams, config: ModelConfig, si
     seed,
     referenceImages: params.referenceImages ?? [],
   });
+  // Provider prompt rewriting (Ideogram Magic Prompt) would replace the card's RWS details; off where the model allows.
+  Object.assign(input, MODEL_SPECS[params.model].rewriteOff ?? {});
 
   const headers = {
     Authorization: `Bearer ${token}`,

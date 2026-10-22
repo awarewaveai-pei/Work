@@ -28,6 +28,10 @@ import { renderPrintCard, applyGradeToDataUrl, CARD_TEMPLATES, type CardTemplate
 // type-only import (erased at build — does not pull the server lib into the client bundle);
 // keeps the model union in sync with the server. maxRefs/cost stay local on purpose.
 import type { TarotModel } from "@/lib/tarot/image-gen";
+import { MODEL_SPECS, MAX_REFS_PER_REQUEST } from "@/lib/tarot/model-specs";
+
+// Each model gets the prompt order its reading limit needs (lib/tarot/model-specs.ts).
+const orderOf = (m: TarotModel) => MODEL_SPECS[m].promptOrder;
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 
 type Mode = "text" | "image";
@@ -130,7 +134,8 @@ type CardRun = { signal: AbortSignal; deck: number };
 type CompareResult = { model: TarotModel; image: string | null; seed: number | null; error?: string; busy: boolean };
 
 function modelOption(m: TarotModel): ModelOption {
-  return MODEL_OPTIONS.find((o) => o.value === m) ?? MODEL_OPTIONS[0];
+  const o = MODEL_OPTIONS.find((x) => x.value === m) ?? MODEL_OPTIONS[0];
+  return { ...o, maxRefs: Math.min(o.maxRefs, MAX_REFS_PER_REQUEST) };
 }
 
 const MODEL_GROUPS = Array.from(new Set(MODEL_OPTIONS.map((o) => o.group)));
@@ -339,11 +344,15 @@ export default function TarotStudio() {
 
   // The deck's style anchor uses lockedModel's maxRefs (set at lock time, not current selection).
   const lockedMaxRefs = modelOption(lockedModel).maxRefs;
+  // The locked preview is a reference only where the model uses it for identity (MODEL_SPECS usesDeckPreview): as an
+  // img2img start or edit image it copied THE FOOL's cliff into THE LOVERS (2026-10-22). Uploaded refs always go.
   const lockedRefs: string[] =
     lockedMaxRefs === 0
       ? []
       : referenceImages.length > 0
         ? referenceImages.slice(0, lockedMaxRefs)
+        : !MODEL_SPECS[lockedModel].usesDeckPreview
+          ? []
         // Use the colour-graded snapshot (set at lock time) so the AI sees what the user
         // sees — not the raw ungraded artwork. Falls back to raw if grade was neutral.
         : (lockedGradedPreview ?? previewImage)
@@ -364,7 +373,7 @@ export default function TarotStudio() {
   const jobIdRef = useRef<string | null>(null);
   // Prompt values captured at compare-generation time — used in selectCompareResult so that
   // previewSig reflects the prompt that actually made the comparison images, not an edited value.
-  const compareStyleRef = useRef<{ english: string; sig: (model: string) => string }>({ english: "", sig: () => "" });
+  const compareStyleRef = useRef<{ english: string; promptFor: (model: TarotModel) => string; sig: (model: string) => string }>({ english: "", promptFor: () => "", sig: () => "" });
   // Abort handle for the running in-browser card loop (group or single). Aborting cancels the
   // in-flight fetch and the loop checks it before each card, so no request leaves after stop.
   const batchAbortRef = useRef<AbortController | null>(null);
@@ -483,6 +492,11 @@ export default function TarotStudio() {
       setMessage("以圖生圖模式請先上傳至少一張參考圖（或切到文字模式並填描述）");
       return false;
     }
+    // An identity-reference model (Ideogram Character) refuses to run without the character image.
+    if (MODEL_SPECS[activeModel].referenceRole === "character" && (mode !== "image" || referenceImages.length === 0)) {
+      setMessage(`${MODEL_SPECS[activeModel].label} 需要一張角色參考圖：切到「以圖生圖」並上傳角色照片`);
+      return false;
+    }
     const hasStyle = effectiveEnglish.trim().length >= 3;
     const hasSubject = subjectText.trim().length >= 2;
     const hasRef = mode === "image" && referenceImages.length > 0;
@@ -572,9 +586,10 @@ export default function TarotStudio() {
     try {
       const en = await ensureEnglish();
       if (!en || deckGenRef.current !== deck) return;
+      const previewPrompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind, couple, order: orderOf(activeModel) });
       const resp = await callGenerate({
         model: activeModel,
-        prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind, couple }),
+        prompt: previewPrompt,
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
         printQuality: true,
@@ -593,7 +608,7 @@ export default function TarotStudio() {
         ? await applyGradeToDataUrl(resp.image, grade.params).catch(() => resp.image)
         : resp.image;
       if (deckGenRef.current !== deck) return;
-      saveToGallery(gradedPreview, "tarot-preview", { model: activeModel, prompt: en.style });
+      saveToGallery(gradedPreview, "tarot-preview", { model: activeModel, prompt: previewPrompt });
     } catch (e) {
       if (deckGenRef.current !== deck) return;
       setMessage(`預覽生成失敗：${e instanceof Error ? e.message : String(e)}`);
@@ -618,8 +633,8 @@ export default function TarotStudio() {
       return;
     }
     // Capture prompt at compare time; selectCompareResult reads these for previewSig.
-    compareStyleRef.current = { english: en.style, sig: (m: string) => sigOf(m, en.style, en.subject) };
-    const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind, couple });
+    const promptFor = (m: TarotModel) => buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind, couple, order: orderOf(m) });
+    compareStyleRef.current = { english: en.style, promptFor, sig: (m: string) => sigOf(m, en.style, en.subject) };
     // Initialise all slots as busy so the UI shows every pending card immediately
     const slots: CompareResult[] = modelList.map((m) => ({ model: m, image: null, seed: null, busy: true }));
     setCompareResults([...slots]);
@@ -627,6 +642,7 @@ export default function TarotStudio() {
     for (let i = 0; i < modelList.length; i++) {
       if (compareGenIdRef.current !== genId) break; // user already selected a winner
       const m = modelList[i];
+      const prompt = promptFor(m);
       let result: CompareResult;
       try {
         const resp = await callGenerate({
@@ -663,11 +679,11 @@ export default function TarotStudio() {
     // The invalidated loop skips its own setCompareBusy(false), so clear it here — otherwise the
     // compare button stays 「生成中…」 for the rest of the page's life.
     setCompareBusy(false);
-    const { english, sig } = compareStyleRef.current; // use prompt that produced these images
+    const { promptFor, sig } = compareStyleRef.current; // use prompt that produced these images
     const gradedSelected = !grade.neutral
       ? await applyGradeToDataUrl(r.image, grade.params).catch(() => r.image!)
       : r.image;
-    saveToGallery(gradedSelected, "tarot-preview", { model: newModel, prompt: english });
+    saveToGallery(gradedSelected, "tarot-preview", { model: newModel, prompt: promptFor(newModel) });
     setLockedGradedPreview(!grade.neutral ? gradedSelected : null);
     setPreviewImage(r.image);
     setPreviewSeed(r.seed);
@@ -779,7 +795,7 @@ export default function TarotStudio() {
     try {
       const resp = await callGenerate({
         model: lockedModel,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple }),
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
         referenceImages: lockedRefs,
         seed: seedOverride !== undefined ? seedOverride : previewSeed,
         printQuality: true,
@@ -819,7 +835,7 @@ export default function TarotStudio() {
         if (!live()) return;
         saveToGallery(dataUrl, "tarot", {
           cardName: card.name,
-          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple }),
+          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
         });
       });
       // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
@@ -907,6 +923,12 @@ export default function TarotStudio() {
 
   // Launch a Trigger.dev background batch for all 78 cards (browser can be closed).
   async function startBackgroundBatch() {
+    // The background job carries prompts only (tarot-batch-generate payload); reference images would be dropped
+    // silently, and an identity-reference model fails every card without one.
+    if (lockedRefs.length > 0 || MODEL_SPECS[lockedModel].referenceRole === "character") {
+      setMessage("背景批次不能帶參考圖。這副牌用了參考圖，請用上方的「生成未完成」按鈕在這個頁面生成。");
+      return;
+    }
     const opt = modelOption(lockedModel);
     const estNt = Math.round(78 * opt.costNt);
     const ok = window.confirm(
@@ -923,7 +945,7 @@ export default function TarotStudio() {
       const cards = TAROT_CARDS.map((card, i) => ({
         index: i,
         name: card.name,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple }),
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
       }));
       const res = await fetch("/api/tools/tarot/batch", {
         method: "POST",
@@ -1995,7 +2017,7 @@ export default function TarotStudio() {
                   </button>
                   <ImageEditPromptPanel
                     sourceImage={previewImage}
-                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple })}
+                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(activeModel) })}
                     imageModel={activeModel}
                     target="tarot-preview"
                     generateEndpoint="/api/tools/tarot/generate"
@@ -2101,7 +2123,7 @@ export default function TarotStudio() {
                     setSavingArt(true);
                     const ok = await postDesign(item.art, "tarot-art", {
                       cardName: item.card.name,
-                      prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple }),
+                      prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
                     });
                     setSavingArt(false);
                     if (ok) setSavedArt((prev) => new Set(prev).add(idx));
