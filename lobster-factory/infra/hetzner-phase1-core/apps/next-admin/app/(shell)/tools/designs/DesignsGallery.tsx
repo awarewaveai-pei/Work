@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STYLE_PRESETS } from "../tarot/cards";
 // SSOT for source→group classification — shared with the publish picker + /api/tools/designs filter.
-import { assetToolGroup as toolGroup, GALLERY_MODEL_LABELS, GALLERY_PRODUCT_LABELS } from "@/lib/studio/asset-group";
+import { assetToolGroup as toolGroup, GALLERY_MODEL_LABELS, GALLERY_PRODUCT_LABELS, TAROT_SOURCES } from "@/lib/studio/asset-group";
 import {
   EDGE_MASK_STYLES,
   applyEdgeMask,
@@ -71,6 +71,7 @@ interface DesignListResponse {
     theme: Record<string, number>;
     brand: Record<string, number>;
     time: Record<TimeRange, number>;
+    all: Record<"model" | "product" | "theme" | "brand", number>;
   };
 }
 type DesignFacets = NonNullable<DesignListResponse["facets"]>;
@@ -85,6 +86,7 @@ const TOOL_GROUP_LABELS: Record<string, string> = {
 
 const SOURCE_SUBTYPE: Record<string, string> = {
   "tarot-preview": "預覽",
+  "tarot-preview-edit": "預覽修改",
   "tarot-compare": "比較",
   "tarot-art": "原圖",
   tarot: "牌卡",
@@ -94,14 +96,14 @@ const PRODUCT_LABELS = GALLERY_PRODUCT_LABELS;
 
 function assetProduct(asset: DesignAsset): string | null {
   const src = asset.metadata?.source;
-  if (src === "tarot" || src === "tarot-preview" || src === "tarot-compare" || src === "tarot-art") return "tarot-card";
+  if (isTarotSrc(src)) return "tarot-card";
   if (src === "pod-studio") return asset.metadata?.product_type ?? null;
   if (src === "mockup") return "mockup-composite";
   return null;
 }
 
 function isTarotSrc(source: string | null | undefined): boolean {
-  return source === "tarot" || source === "tarot-preview" || source === "tarot-compare" || source === "tarot-art";
+  return !!source && (TAROT_SOURCES as readonly string[]).includes(source);
 }
 
 function formatBytes(bytes: number | null): string {
@@ -609,24 +611,24 @@ export default function DesignsGallery() {
 
 
 
-  /* ─── filter option lists: counts are DB totals for the current filters (facets) ─── */
+  /* ─── filter option lists: chip sets are fixed per tab; each count = what clicking it gives (facets) ─── */
   const modelOptions = useMemo(() => [
-    { key: "all", label: "全部", count: total ?? 0 },
+    { key: "all", label: "全部", count: facets?.all.model ?? total ?? 0 },
     ...Object.keys(MODEL_LABELS).map((k) => ({ key: k, label: MODEL_LABELS[k], count: facets?.model[k] ?? 0 })),
   ], [facets, total]);
 
   const productOptions = useMemo(() => [
-    { key: "all", label: "全部", count: total ?? 0 },
+    { key: "all", label: "全部", count: facets?.all.product ?? total ?? 0 },
     ...Object.entries(facets?.product ?? {}).map(([k, n]) => ({ key: k, label: PRODUCT_LABELS[k] ?? k, count: n })),
   ], [facets, total]);
 
   const themeOptions = useMemo(() => [
-    { key: "all", label: "全部", count: total ?? 0 },
+    { key: "all", label: "全部", count: facets?.all.theme ?? total ?? 0 },
     ...Object.entries(facets?.theme ?? {}).map(([k, n]) => ({ key: k, label: k, count: n })),
   ], [facets, total]);
 
   const brandOptions = useMemo(() => [
-    { key: "all", label: "全部", count: total ?? 0 },
+    { key: "all", label: "全部", count: facets?.all.brand ?? total ?? 0 },
     ...Object.entries(facets?.brand ?? {}).map(([k, n]) => ({ key: k, label: k, count: n })),
   ], [facets, total]);
 
@@ -843,9 +845,10 @@ export default function DesignsGallery() {
     );
   }
 
-  const hasProducts = productOptions.some((o) => o.key !== "all" && o.count > 0);
-  const hasThemes = themeOptions.some((o) => o.key !== "all" && o.count > 0);
-  const hasBrands = brandOptions.some((o) => o.key !== "all" && o.count > 0);
+  // A row shows when its scope has values at all (the server lists only those), never because of other filters.
+  const hasProducts = productOptions.length > 1;
+  const hasThemes = themeOptions.length > 1;
+  const hasBrands = brandOptions.length > 1;
 
   /* ─── Tab switcher (shared header) ─── */
   const TabBar = (
@@ -1138,13 +1141,13 @@ export default function DesignsGallery() {
       <div className={`designs-filter-panel${filterHidden ? " designs-filter-panel--hidden" : ""}`}>
         <Chips label="模型" options={modelOptions} value={filterModel} onChange={setFilterModel} showEmpty />
         {hasProducts && (
-          <Chips label="產品" options={productOptions} value={filterProduct} onChange={setFilterProduct} />
+          <Chips label="產品" options={productOptions} value={filterProduct} onChange={setFilterProduct} showEmpty />
         )}
         {hasThemes && (
-          <Chips label="主題" options={themeOptions} value={filterTheme} onChange={setFilterTheme} />
+          <Chips label="主題" options={themeOptions} value={filterTheme} onChange={setFilterTheme} showEmpty />
         )}
         {hasBrands && (
-          <Chips label="品牌" options={brandOptions} value={filterBrand} onChange={setFilterBrand} />
+          <Chips label="品牌" options={brandOptions} value={filterBrand} onChange={setFilterBrand} showEmpty />
         )}
 
         {/* Time + sort row */}

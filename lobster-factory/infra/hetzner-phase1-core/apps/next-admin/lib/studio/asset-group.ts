@@ -11,7 +11,7 @@
  * The raw classifier is `metadata.source`, written by /api/tools/designs on save:
  *   "mockup"                                    → product mockup 商品照
  *   "pod-studio"                                → studio design art
- *   "tarot" | "tarot-preview" | "tarot-compare" | "tarot-art" → tarot card art
+ *   TAROT_SOURCES ("tarot" | "tarot-preview" | "tarot-preview-edit" | "tarot-compare" | "tarot-art") → tarot card art
  *     ("tarot" = framed print card; "tarot-art" = frameless raw artwork)
  *   "canvas" | anything else                    → passed through verbatim
  */
@@ -26,14 +26,16 @@ export const MOCKUP_SOURCES = ["mockup", "printful-mockup"] as const;
 /** Collapse a raw `metadata.source` into a coarse tool group (tarot / studio / mockup / …). */
 export function assetToolGroup(source: string | null | undefined): string {
   if (!source) return "unknown";
-  if (source === "tarot" || source === "tarot-preview" || source === "tarot-compare" || source === "tarot-art") return "tarot";
+  if ((TAROT_SOURCES as readonly string[]).includes(source)) return "tarot";
   if (source === "pod-studio") return "studio";
   if ((MOCKUP_SOURCES as readonly string[]).includes(source)) return "mockup";
   return source;
 }
 
 /** Raw `metadata.source` values that mean tarot card art (assetToolGroup "tarot", product "tarot-card"). */
-export const TAROT_SOURCES = ["tarot", "tarot-preview", "tarot-compare", "tarot-art"] as const;
+// Every tarot save-source (TarotStudio saveToGallery / postDesign). The gallery, its counts and assetToolGroup all
+// read this list: "tarot-preview-edit" was missing from three hand-written copies, so it counted under 全部 only.
+export const TAROT_SOURCES = ["tarot", "tarot-preview", "tarot-preview-edit", "tarot-compare", "tarot-art"] as const;
 
 /** My Designs model chips. Keys = `metadata.model_name`; the /api/tools/designs counts use the same keys. */
 export const GALLERY_MODEL_LABELS: Record<string, string> = {

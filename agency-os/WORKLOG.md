@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-22（續23）My Designs 篩選「數字和項目變來變去」：選項集合固定、每列「全部」用本列總數、塔羅來源單一清單（Claude）
+
+**觸發**：操作者截圖 app.aware-wave.com/tools/designs 產品／主題列「這數字和項目變來變去」。
+
+**根因**（prod supabase-db 唯讀查詢：tarot-preview 42＋tarot 39＋tarot-compare 27＋tarot-art 2＝塔羅牌 110；pod-studio tshirt 25；計數本身正確）
+- C1 選項集合跟著其他篩選變：`lib/studio/designs-list.ts` `distinctValues` 以「其他篩選」取主題值，前端 `Chips` 隱藏 0 的選項、`hasThemes` 以 count>0 決定整列 → 點「塔羅牌」主題列整列消失、點主題產品選項消失。
+- C2 每列「全部」都顯示 `total`（套用全部篩選後的總數），點了 T-shirt 主題列「全部」也變 25。
+- M1 `tarot-preview-edit`（TarotStudio.tsx:2047 存圖來源）不在 4 份手寫塔羅來源清單內 → 只算在「全部」，不進「塔羅牌」。
+- 另：塔羅預覽／比較自動存圖 + 頁面每 5 分鐘與切回分頁時重抓 → 塔羅數字隨生圖上升，屬真實資料變化，未改。
+
+**修改**（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`）
+- `lib/studio/designs-list.ts`：`countFacets` 先以 scope（org＋tab，去掉 model/product/theme/brand/time）決定產品／主題／品牌有哪些選項，計數仍是分面（其他維度套用、本維度不套）；新 `facets.all[dim]`＝拿掉本列篩選的數量；Codex F1 → `distinctValues` 改 skip scan（每次取大於上一值的下一個值，≤51 個一列查詢），不再 `limit(2000)` 漏值。
+- `lib/studio/asset-group.ts`：`TAROT_SOURCES` 為唯一清單並加 `tarot-preview-edit`；`assetToolGroup` 改讀它。
+- `app/(shell)/tools/designs/DesignsGallery.tsx`：`assetProduct`／`isTarotSrc` 讀 `TAROT_SOURCES`；各列「全部」用 `facets.all`；產品／主題／品牌 `showEmpty`，列是否顯示看伺服器是否給了選項。
+- `app/api/tools/designs/route.test.ts`：選了塔羅後主題列與 T-shirt 選項仍在、`all.product=85`／`all.theme=82`、tarot-preview-edit 計入塔羅；2001 列 Alpha 之後的 Zulu 仍列出；假 DB 加 `gt`／`neq`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run app/api/tools/designs lib/studio`（157 pass）；`npx tsc --noEmit -p .` exit 0；突變：主題清單改回用 f（受其他篩選影響）→ 新測試紅、還原綠 | exit=0 | ms=120000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-22-partialreview-43ba9714.md`：F1 屬實（scope 主題值 limit 2000 漏值）→ skip scan＋邊界測試
+- ORACLE_WAIVED: Codex 以 -Path 只審本批 4 檔（partialreview）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`DesignFacets|facets\.(model|product|theme|brand)|"tarot-preview" \|\||source === "tarot-art"` | hits=5（皆 DesignsGallery／designs-list 本身；無其他 facets 消費者、無殘留手寫塔羅清單）
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-22（續22）塔羅續20 剩餘三項：戀人火焰樹、藍貓戀人直立已修並部署；愚人假簽名查明為 schnell 固有，換字無解（Claude）
 
 **觸發**：操作者「剛為什麼不做？…馬上做好並部署」——續20 把三項列為剩餘而未處理。

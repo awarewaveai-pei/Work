@@ -39,12 +39,16 @@ export interface DesignCursor {
   id: string;
 }
 
+/** Keys of product / theme / brand = the values that exist in the scope (org + tab) whatever else is selected
+ *  (model = every known model), so chips never appear and vanish as filters change; each count is what clicking that chip would give
+ *  (the other dimensions' filters applied, its own not). `all` = the row's 全部 chip, same rule. */
 export interface DesignFacets {
   model: Record<string, number>;
   product: Record<string, number>;
   theme: Record<string, number>;
   brand: Record<string, number>;
   time: Record<"all" | TimeRange, number>;
+  all: Record<"model" | "product" | "theme" | "brand", number>;
 }
 
 export interface DesignListResult {
@@ -168,31 +172,48 @@ async function countMap(
   return Object.fromEntries(keys.map((k, i) => [k, counts[i]]));
 }
 
-/** Distinct free-text values (theme / brand) under the other filters; counted afterwards in the DB. */
+/** Distinct free-text values (theme / brand) in `f`; counted afterwards in the DB. A skip scan — each query
+ *  fetches the next value above the last one — so a value is never missed however many rows share the earlier
+ *  ones (a single `limit(2000)` read dropped every value past row 2000, Codex 2026-10-22). Up to
+ *  MAX_FACET_VALUES + 1 one-row queries. */
 async function distinctValues(supabase: Client, f: DesignListFilters, now: Date, dim: "theme" | "brand"): Promise<string[]> {
   const path = `metadata->>${dim}`;
-  const { q, ors } = applyFilters(supabase.from("media_assets").select(`v:${path}`), f, now, dim);
-  const { data, error } = await finishOr(q.not(path, "is", null), ors).limit(2000);
-  if (error) throw new Error(`${dim} values failed: ${error.message}`);
-  const vals = new Set<string>();
-  for (const r of (data ?? []) as { v: unknown }[]) if (typeof r.v === "string" && r.v) vals.add(r.v);
-  return [...vals].slice(0, MAX_FACET_VALUES);
+  const vals: string[] = [];
+  let last: string | null = null;
+  while (vals.length < MAX_FACET_VALUES) {
+    const { q, ors } = applyFilters(supabase.from("media_assets").select(`v:${path}`), f, now, dim);
+    let next = q.not(path, "is", null).neq(path, "");
+    if (last !== null) next = next.gt(path, last);
+    const { data, error } = await finishOr(next, ors).order(path, { ascending: true }).limit(1);
+    if (error) throw new Error(`${dim} values failed: ${error.message}`);
+    const v = ((data ?? []) as { v: unknown }[])[0]?.v;
+    if (typeof v !== "string") break;
+    vals.push(v);
+    last = v;
+  }
+  return vals;
 }
 
 async function countFacets(supabase: Client, f: DesignListFilters, now: Date): Promise<{ total: number; facets: DesignFacets }> {
-  const [themes, brands] = await Promise.all([
-    distinctValues(supabase, f, now, "theme"),
-    distinctValues(supabase, f, now, "brand"),
+  // Scope = org + tab only. Which chips exist is decided here; the counts below apply the other filters.
+  const scope: DesignListFilters = { ...f, model: null, product: null, theme: null, brand: null, time: null };
+  const present = (m: Record<string, number>) => Object.keys(m).filter((k) => m[k] > 0);
+  const [scopeProducts, themes, brands] = await Promise.all([
+    countMap(supabase, scope, now, "product", Object.keys(GALLERY_PRODUCT_LABELS), applyProduct),
+    distinctValues(supabase, scope, now, "theme"),
+    distinctValues(supabase, scope, now, "brand"),
   ]);
   const ranges: TimeRange[] = ["today", "week", "month"];
-  const [total, model, product, theme, brand, timeAll, timeRanges] = await Promise.all([
+  const [total, model, product, theme, brand, timeAll, timeRanges, rowAll] = await Promise.all([
     countWhere(supabase, f, now, undefined),
+    // Model chips are all shown (showEmpty): every model key is counted.
     countMap(supabase, f, now, "model", Object.keys(GALLERY_MODEL_LABELS), (q, k) => q.eq("metadata->>model_name", k)),
-    countMap(supabase, f, now, "product", Object.keys(GALLERY_PRODUCT_LABELS), applyProduct),
+    countMap(supabase, f, now, "product", present(scopeProducts), applyProduct),
     countMap(supabase, f, now, "theme", themes, (q, k) => q.eq("metadata->>theme", k)),
     countMap(supabase, f, now, "brand", brands, (q, k) => q.eq("metadata->>brand", k)),
     countWhere(supabase, f, now, "time"),
     Promise.all(ranges.map((r) => countWhere(supabase, f, now, "time", (q) => q.gte("created_at", timeCutoff(r, f.tzOffsetMin, now))))),
+    Promise.all((["model", "product", "theme", "brand"] as const).map((d) => countWhere(supabase, f, now, d))),
   ]);
   return {
     total,
@@ -202,6 +223,7 @@ async function countFacets(supabase: Client, f: DesignListFilters, now: Date): P
       theme,
       brand,
       time: { all: timeAll, today: timeRanges[0], week: timeRanges[1], month: timeRanges[2] },
+      all: { model: rowAll[0], product: rowAll[1], theme: rowAll[2], brand: rowAll[3] },
     },
   };
 }

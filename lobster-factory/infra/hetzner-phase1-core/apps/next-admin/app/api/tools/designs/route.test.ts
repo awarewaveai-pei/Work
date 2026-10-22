@@ -72,6 +72,8 @@ function makeQuery(columns: string, opts?: { count?: string; head?: boolean }) {
     like: (c: string, v: string) => (preds.push(leaf(c, "like", v)), q),
     in: (c: string, v: string[]) => (preds.push(leaf(c, "in", v)), q),
     gte: (c: string, v: string) => (preds.push(leaf(c, "gte", v)), q),
+    gt: (c: string, v: string) => (preds.push(leaf(c, "gt", v)), q),
+    neq: (c: string, v: string) => (preds.push(leaf(c, "neq", v)), q),
     not: (c: string, op: string, v: unknown) => { const p = leaf(c, op, v); preds.push((r) => !p(r)); return q; },
     or: (expr: string) => (preds.push(parseTree(`or(${expr})`)), q),
     order: (c: string, o: { ascending: boolean }) => (orders.push({ c, asc: o.ascending }), q),
@@ -132,7 +134,12 @@ async function list(params: string) {
     assets: { id: string }[];
     nextCursor: string | null;
     total?: number;
-    facets?: { model: Record<string, number>; product: Record<string, number> };
+    facets?: {
+      model: Record<string, number>;
+      product: Record<string, number>;
+      theme: Record<string, number>;
+      all: Record<"model" | "product" | "theme" | "brand", number>;
+    };
   };
 }
 
@@ -170,5 +177,41 @@ describe("GET /api/tools/designs list", () => {
     expect(p1.total).toBe(81);
     expect(p1.facets?.model["flux-schnell"]).toBe(78);
     expect(p1.facets?.product["tarot-card"]).toBe(81);
+  });
+
+  it("keeps the chip set fixed when another filter is picked, and each 全部 is its own row's total (2026-10-22)", async () => {
+    const tee = (i: number, theme: string | null) => {
+      const r = asset(200 + i, ORG_A, "pod-studio", "flux-dev");
+      r.metadata = { ...(r.metadata as object), product_type: "tshirt", ...(theme ? { theme } : {}) };
+      return r;
+    };
+    db.rows.push(tee(0, "Art therapy"), tee(1, "Art therapy"), tee(2, null), asset(300, ORG_A, "tarot-preview-edit", null));
+
+    const all = await list("counts=1");
+    expect(all.facets?.product["tarot-card"]).toBe(82); // tarot-preview-edit is tarot art
+    expect(all.facets?.product.tshirt).toBe(3);
+    expect(all.facets?.theme["Art therapy"]).toBe(2);
+
+    // Picking 塔羅牌 must not drop the 主題 row or the T-shirt chip; their counts become what clicking gives.
+    const tarot = await list("counts=1&product=tarot-card");
+    expect(tarot.total).toBe(82);
+    expect(Object.keys(tarot.facets!.theme)).toEqual(["Art therapy"]);
+    expect(tarot.facets?.theme["Art therapy"]).toBe(0);
+    expect(tarot.facets?.product.tshirt).toBe(3);
+    // 全部 of the product row ignores the product pick; 全部 of the theme row is the tarot total.
+    expect(tarot.facets?.all.product).toBe(85);
+    expect(tarot.facets?.all.theme).toBe(82);
+  });
+
+  it("lists a theme that only appears after 2000 rows of another theme (Codex 2026-10-22)", async () => {
+    const themed = (i: number, theme: string) => {
+      const r = asset(1000 + i, ORG_A, "pod-studio", "flux-dev");
+      r.metadata = { ...(r.metadata as object), product_type: "tshirt", theme };
+      return r;
+    };
+    for (let i = 0; i < 2001; i++) db.rows.push(themed(i, "Alpha"));
+    db.rows.push(themed(2001, "Zulu"));
+    const res = await list("counts=1");
+    expect(Object.keys(res.facets!.theme)).toEqual(["Alpha", "Zulu"]);
   });
 });
