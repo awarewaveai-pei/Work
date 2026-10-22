@@ -121,6 +121,11 @@ function stateOf(repo) {
   return { dirty, blob, head };
 }
 
+// Whole-file output of scripts (no hand-written hunk to carry): never claimed, never warned about. Only paths
+// whose every writer is a script -- add a pattern after grepping its writers, not because a warning annoyed.
+const GENERATED = [/^agency-os\/reports\/status\/[^/]+-LATEST\.(json|md)$/i];
+const isGenerated = (rel) => GENERATED.some((re) => re.test(rel));
+
 const isShared = (rel, list) => list.some((s) => (process.platform === 'win32' ? s.toLowerCase() === rel.toLowerCase() : s === rel));
 
 function readClaim(absFile) {
@@ -402,7 +407,7 @@ function bashInFlight(root, sid, now) {
 
 module.exports = {
   CLAIM_TTL_MS, PENDING_MS, LOCK_STALE_MS, MAX_LISTED, claimsDir, claimPath, realAbs, normAbs, repoOf, blobOf,
-  stateOf, isShared, ageOf, readClaim, writeClaim, withLocks, breakStale, isLive, releaseClaim, listClaims,
+  stateOf, isShared, isGenerated, ageOf, readClaim, writeClaim, withLocks, breakStale, isLive, releaseClaim, listClaims,
   withWrite, writesExplain, repoAt, listedPaths, blobsOf, headBlobs, saveSnapshot, takeSnapshot, bashInFlight,
 };
 

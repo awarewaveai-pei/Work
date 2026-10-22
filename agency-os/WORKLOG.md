@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-22（續9）file-claim-guard 不再對機器產生檔發「另一個 session 在編輯」（Claude）
+
+**根因**：近 14 天 1,860 次誤報（~120 萬字元進 context）。(A) `agency-os/reports/status/*-LATEST.{json,md}` 由腳本整份重寫，某 session 跑過產生器即持有 claim，未 commit 前之後任何重寫都算到當下指令。(B) Claude app 寫進 `.claude/` 的狀態檔（`policy-limits.json*`、`remote-settings.json*`）未被 ignore，進 `listedPaths`。
+
+- 不變量：claim = session 親手寫的 hunk；單一產生器整份重寫的檔無可帶走的 hunk，不在 claim 範圍。
+- C1 `hooks/lib/file-claims.js`：`GENERATED` 單一 SSOT＋`isGenerated`（export）。
+- C2 `hooks/rules/file-claim-guard.js`：`skipped = isShared || isGenerated`，取代 `targets()`、`bashChanges()` 兩處 `isShared`。
+- C3 `.gitignore`：`.claude/policy-limits.json*`、`.claude/remote-settings.json*`。
+- C4 測試 `file-claim-guard.test.mjs` `generated:`：產生檔被 A claim 後 B 重寫 → 無 WARNING 且無 holder；同情境 a.txt 仍 exit 2。
+- 已知取捨（Codex 1m，CONFIRMED，不改）：手動 Edit 追蹤中的 `*-LATEST.*` 也不被 claim 保護；此類檔下次產生即整份覆蓋，無 hunk 可保。新增 pattern 前須 grep 確認寫入者全是腳本（註解已寫）。
+- `test-hooks.sh` 1 紅（370 tests／369 pass）：「asset tree has no unreachable MCP references」，源自未追蹤的 `.claude/skills/synced/<uuid>/`（app 同步技能引用 remote-devices／memory MCP），與本改動無關，未處理。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`node --test tests/hooks/file-claim-guard.test.mjs`（48/48 pass）＋`bash scripts/test-hooks.sh`（33/33 與 369/370，唯一紅見上）＋`git check-ignore -v` 兩檔命中 | exit=0 | ms=60000
+- 突變：`GENERATED = []` → `generated:` 紅（pass 0／fail 1）→ 還原 → 綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex oracle（agency-os/reports/oracle/2026-10-22-partialreview-f7fd9684.md）；1m 為上述取捨，接受。
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,tests,.claude | grep=isGenerated | hits=4
+- ORACLE: artifact 2026-10-22-partialreview-f7fd9684.md（當日、晚於最後改檔）
+- sync：`sync-claude-userlevel.ps1 -Mode merge` PASS，.claude/hooks 與 SSOT 相同。
+
+**rollback**：`git revert <sha>`，再跑 `sync-claude-userlevel.ps1 -Mode merge`。
 ## 2026-10-22（續8）塔羅「主角是動物」勾選框改三顆按鈕：人物／動物・擬人／動物・自然（Claude）
 
 **根因**：操作者 2026-10-22 決定動物主角要兩種畫法。f296d2a7b 只有一個勾選框＝擬人（站起來用前爪拿）；想要四腳著地的動物時沒有選項，而直接不勾又會回到「四腳貓手上什麼都沒拿」。

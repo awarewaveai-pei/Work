@@ -8,10 +8,12 @@
 // write already landed in their file: exit 2 tells this session. PostToolUseFailure: release at once.
 // Bash (sed -i, python, Set-Content): see the Bash section -- a before/after snapshot, reported after the fact.
 // WORKLOG/TASKS are skipped: every session appends to them and they already commit by hunk (private index,
-// git-shared-file-guard.js).
+// git-shared-file-guard.js). So are script-generated files (claims.GENERATED).
 const path = require('path');
 const claims = require('../lib/file-claims');
 const { SHARED } = require('./git-shared-file-guard');
+
+const skipped = (rel) => claims.isShared(rel, SHARED) || claims.isGenerated(rel);
 
 const CLI = path.join(__dirname, '..', 'lib', 'file-claims.js');
 
@@ -46,7 +48,7 @@ function targets(ctx) {
   for (const f of ctx.files) {
     const abs = claims.realAbs(f);
     const repo = claims.repoOf(abs);
-    if (repo && !claims.isShared(repo.rel, SHARED)) out.push({ abs, repo, state: claims.stateOf(repo) });
+    if (repo && !skipped(repo.rel)) out.push({ abs, repo, state: claims.stateOf(repo) });
   }
   return out;
 }
@@ -183,7 +185,7 @@ function bashChanges(snap, hookStart) {
   const listed = claims.listedPaths(snap.root);
   if (!listed) return { changed: [], big: [] };
   const listedSet = new Set(listed);
-  const rels = [...new Set([...Object.keys(snap.blobs), ...listed])].filter((r) => !claims.isShared(r, SHARED));
+  const rels = [...new Set([...Object.keys(snap.blobs), ...listed])].filter((r) => !skipped(r));
   const stats = {};
   const now = claims.blobsOf(snap.root, rels, stats);
   const before = claims.headBlobs(snap.root, snap.head, rels.filter((r) => !(r in snap.blobs) && now[r] !== null));

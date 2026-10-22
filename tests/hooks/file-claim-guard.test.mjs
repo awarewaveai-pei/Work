@@ -342,6 +342,33 @@ test('acceptance: B patches A\'s claimed dirty file via `python -c` -> exit 2 at
   assert.match(pre(s, A, ['a.txt']).stderr, /WARN: a\.txt changed outside this session/, 'the holder hears it too');
 });
 
+// Script-generated output (claims.GENERATED) has no hand-written hunk: another session's claim must not make a
+// regenerating command warn; the same situation on a normal tracked file still does.
+function seedStatus(s) {
+  const f = 'agency-os/reports/status/x-LATEST.json';
+  fs.mkdirSync(path.join(s.dir, 'agency-os', 'reports', 'status'), { recursive: true });
+  fs.writeFileSync(path.join(s.dir, f), '{}\n');
+  g(s.dir, ['add', '-A']);
+  g(s.dir, ['commit', '-q', '-m', 'seed status']);
+  return f;
+}
+
+test('generated: B regenerates reports/status/*-LATEST.json that A claimed -> no WARNING; a.txt in the same setup still warns', () => {
+  const s = setup();
+  const f = seedStatus(s);
+  const A = freshSid('A');
+  const B = freshSid('B');
+  written(s, A, f, '{"a":1}\n');
+  written(s, A, 'a.txt', 'A edit\n');
+  const gen = bashCall(s, B, () => append(s, f, 'regenerated\n'));
+  assert.equal(gen.status, 0, gen.stderr);
+  assert.doesNotMatch(gen.stderr, /another session is editing/);
+  assert.equal(holderOf(s, f), null, 'a generated file is claimed by nobody');
+  const real = bashCall(s, B, () => append(s, 'a.txt', 'B via python\n'));
+  assert.equal(real.status, 2, real.stderr);
+  assert.match(real.stderr, CHANGED_HELD);
+});
+
 test('acceptance: A\'s Edit landing during B\'s Bash call is not B\'s -- neither when A already held the file nor when A claims it then', () => {
   const s = setup();
   const A = freshSid('A');
