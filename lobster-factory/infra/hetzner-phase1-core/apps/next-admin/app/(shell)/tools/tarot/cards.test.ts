@@ -70,6 +70,9 @@ describe("THE LOVERS couple", () => {
     // "a second nude woman" reads as two women; "second" stays only for a same-kind pair.
     expect(p).not.toContain("second");
     expect(p).not.toContain("nude figure");
+    // "standing" stood a cat couple up on its hind legs; "a tree bearing twelve flames" drew flames floating in the sky.
+    expect(p).not.toContain("standing");
+    expect(p).toContain("branch tips each burn with a small candle flame");
   });
 
   it("follows the 男男 / 女女 choice, and genders a user subject", () => {

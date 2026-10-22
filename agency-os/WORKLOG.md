@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-22（續22）塔羅續20 剩餘三項：戀人火焰樹、藍貓戀人直立已修並部署；愚人假簽名查明為 schnell 固有，換字無解（Claude）
+
+**觸發**：操作者「剛為什麼不做？…馬上做好並部署」——續20 把三項列為剩餘而未處理。
+
+**根因與處置**（全部以 flux-schnell 同 seed 實生驗證，輸入與 image-gen 相同）
+- M1 戀人火焰：`a tree bearing twelve flames` → schnell 把火焰畫成漂在天空（續20 兩張皆是）。改 `a bare dark tree whose branch tips each burn with a small candle flame, twelve flames on the tree`：seed 29979/11/18911/12 四張火焰都長在樹枝上。
+- M2 藍貓戀人直立：pose 與 scene 的 `standing apart`（scene 另有 `with their feet on the grass`）把貓畫成後腳站立。改 `apart on the grass`（戀人是 airborne 卡，無著地句，"on the grass" 保留）：兩張藍貓都自然坐著；兩張男女仍站立，左男右女正確。程式產生的 prompt 與實測字串逐字相同（tsx 比對 true/true）。
+- M3 愚人右下假簽名（未修，非本次改動造成）：試 8 種寫法×固定 seed（7/3038/11/12）：四角填滿、`painted with Van Gogh's technique`、開頭不提畫家名、`Van Gogh style illustration`、指定右下角是岩石、拿掉結尾風格句、拿掉全部技法、技法放回場景後（=續20 前的排法）、加「下方兩角延續景物」→ 每組約半數仍有簽名或圖說小字。同一風格的戀人 6 張 0 簽名 → 屬 schnell 畫「直立擬人動物油畫」時的固有傾向，非畫家名位置、非續20 的技法前移。FLUX 無否定詞欄位、牌框 cover 幾乎不裁底部（`renderPrintCard.ts:61-75`，裁底會切到人物腳）→ 換字不能保證，需操作者選：生成後偵測文字自動重生，或右下角局部重繪（每張多一次呼叫的費用）。
+
+**修改**：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/tarot/cards.ts`（THE LOVERS pose／scene）；`cards.test.ts`（戀人預設 prompt 無 standing、含新火焰樹句）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run "app/(shell)/tools/tarot" lib/tarot`（20 pass）；`npx tsc --noEmit -p .` exit 0；Replicate flux-schnell 實生 22 張（戀人 4、愚人簽名診斷 18） | exit=0 | ms=600000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex `agency-os/reports/oracle/2026-10-22-partialreview-64604ea0.md`（-Path 本次 2 檔）：NO FINDINGS
+- ORACLE_WAIVED: Codex 以 -Path 只審本批 2 檔（partialreview）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`tree bearing twelve flames|standing apart` | hits=1（僅 cards.test.ts 新註解說明舊字為何改；無殘留）
 ## 2026-10-22（續21）WORKLOG 兩邊同時加 entry 不再卡住 parity：`.gitattributes` 宣告 merge=union
 
 - 缺口（自查）：兩個 session 各在 WORKLOG 頂端插一筆 → `git merge-file` 判衝突 → parity 停 → D:\Work 又落後。這是最常見的情況。
