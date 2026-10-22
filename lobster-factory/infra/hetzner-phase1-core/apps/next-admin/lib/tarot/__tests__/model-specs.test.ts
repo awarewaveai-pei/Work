@@ -3,8 +3,9 @@ import { MODEL_SPECS } from "../model-specs";
 import { TAROT_MODELS } from "../image-gen";
 import { TAROT_CARDS, buildCardPrompt } from "@/app/(shell)/tools/tarot/cards";
 
-// A long style whose detail starts at a marker, so everything before the marker is "content".
-const STYLE = "In the style of Van Gogh. STYLEDETAIL thick impasto oil, short rhythmic forceful directional brushstrokes, palette-knife buildup, tactile layered pigment, swirling skies.";
+// content-first opens with the anchor + the first technique sentence (the brief); the rest starts at the marker.
+const BRIEF = "thick impasto oil, short rhythmic forceful directional brushstrokes, palette-knife buildup";
+const STYLE = `In the style of Van Gogh. ${BRIEF}. STYLEDETAIL tactile layered pigment, swirling skies.`;
 // FLUX schnell reads 256 T5 tokens and cuts the rest silently; T5 spends at least one token per word plus
 // punctuation, so 160 words (~1.6 tokens per word) keeps the pose and scene inside what the model reads.
 const CONTENT_WORDS = 160;
@@ -20,11 +21,20 @@ describe("model specs", () => {
       for (const c of TAROT_CARDS) {
         const p = buildCardPrompt(c, { styleResolved: STYLE, subject: "blue cute cat", heroKind, order: "content-first" });
         const content = p.slice(0, p.indexOf("STYLEDETAIL"));
-        expect(content.startsWith("In the style of Van Gogh") || content.includes("in the style of Van Gogh"), c.name).toBe(true);
+        expect(content.startsWith(`In the style of Van Gogh: ${BRIEF}`) || content.includes(`in the style of Van Gogh: ${BRIEF}`), c.name).toBe(true);
+        expect(p.split(/in the style of Van Gogh/i).length - 1, c.name).toBe(1);
         const words = content.split(/\s+/).filter(Boolean).length;
         if (words > CONTENT_WORDS) over.push(`${c.name} ${heroKind ?? "person"} ${words}`);
       }
     expect(over).toEqual([]);
+  });
+
+  it("never splits a word when a long user style has no comma in its opening (Codex 2026-10-22)", () => {
+    // Character 90 falls inside "granulating", a word no card scene uses.
+    const style = "luminous translucent watercolor washes with soft blooming borders and many layered tones granulating pigment particles over damp paper surfaces";
+    const p = buildCardPrompt(TAROT_CARDS[0], { styleResolved: style, order: "content-first" });
+    // A mid-word cut leaves "acros" + "s": the whole word is then missing from the prompt.
+    for (const w of style.split(" ")) expect(p, w).toMatch(new RegExp(`\\b${w}\\b`, "i"));
   });
 
   it("puts the scene before the style detail in content-first order and after it otherwise", () => {

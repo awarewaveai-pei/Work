@@ -79,13 +79,13 @@ export type PropKind = keyof typeof PROP_PLACEMENT;
 // standing figure on the ground (THE LOVERS: the pair on the grass, the angel in the clouds).
 
 const MAJOR: TarotCard[] = [
-  { id: 0, name: "THE FOOL", roman: "0", type: "major", theme: "new beginnings, adventure, innocence", colors: ["#f0c040", "#fff8dc"], symbols: ["sun", "mountains", "flower"], hero: "carefree young traveler in bright ragged clothes", pose: "a {hero} striding across the flat cliff top toward its edge, both feet planted on the rock, body leaning slightly forward, head tilted up smiling at the sky", upright: true, natural: "with a white rose held in its mouth and a knapsack tied to a slender staff lying beside it", scene: "a {hero} at the very edge of a high flat cliff top, holding a white rose in the left hand and a knapsack tied to a slender staff over the right shoulder; exactly one small white dog running free at the {hero}'s heels; a radiant white sun in the upper right of a golden morning sky, snowy mountains in the distance" },
+  { id: 0, name: "THE FOOL", roman: "0", type: "major", theme: "new beginnings, adventure, innocence", colors: ["#f0c040", "#fff8dc"], symbols: ["sun", "mountains", "flower"], hero: "carefree young traveler in bright ragged clothes", pose: "a {hero} striding across the flat cliff top toward its edge, both feet planted on the rock, body leaning slightly forward, head tilted up smiling at the sky", upright: true, natural: "with a white rose held in its mouth and a knapsack tied to a slender staff lying beside it", scene: "a {hero} at the very edge of a high flat cliff top, holding a white rose in the left hand and a knapsack tied to a slender staff over the right shoulder; exactly one small white dog standing on the rock at the {hero}'s heels, looking up and barking; a radiant white sun in the upper right of a golden morning sky, snowy mountains in the distance" },
   { id: 1, name: "THE MAGICIAN", roman: "I", type: "major", theme: "willpower, skill, manifestation", colors: ["#c0392b", "#fff"], symbols: ["infinity", "wand", "pentagram"], hero: "robed magician", pose: "a {hero} standing tall, the right hand raising a wand high overhead and the left hand pointing one finger straight down at the ground", upright: true, holds: ["wands"], scene: "a {hero} standing behind a low altar, one arm raised holding a wand toward the sky and the other hand pointing down to the earth, a glowing infinity symbol floating above the head, a serpent belt at the waist, a cup a sword a pentacle and a wand laid on the altar, red roses and white lilies blooming around" },
   { id: 2, name: "THE HIGH PRIESTESS", roman: "II", type: "major", theme: "intuition, mystery, inner wisdom", colors: ["#1a1a6e", "#c8b8f8"], symbols: ["crescent moon", "pillars", "veil"], hero: "serene priestess", pose: "a {hero} seated perfectly still and upright between two pillars, facing straight ahead, a half-hidden scroll held in the lap", upright: true, holds: ["scroll"], scene: "a {hero} seated calmly between one black pillar and one white pillar, a horned crown bearing a full moon on the brow, a crescent moon resting at the feet, a tapestry veil patterned with pomegranates and palms behind, a partly hidden scroll in the lap" },
   { id: 3, name: "THE EMPRESS", roman: "III", type: "major", theme: "abundance, fertility, nature", colors: ["#2d6a4f", "#b7e4c7"], symbols: ["wheat", "venus", "crown"], hero: "crowned empress", pose: "a {hero} seated at ease on a cushioned throne in a wheat field, crowned with stars, the right hand raising a golden scepter topped with an orb", upright: true, holds: ["scepter"], scene: "a {hero} seated on a throne heaped with lush red cushions in a golden field of ripe wheat, wearing a flowing white gown patterned with pomegranates, a crown of twelve stars on the head, a golden scepter topped with an orb held in the right hand, a heart-shaped shield bearing the symbol of Venus resting beside, a waterfall and deep green forest behind" },
   { id: 4, name: "THE EMPEROR", roman: "IV", type: "major", theme: "authority, structure, fatherhood", colors: ["#6b2d8b", "#e8c8f8"], symbols: ["throne", "ram", "scepter"], hero: "stern bearded emperor", pose: "a {hero} seated stern and upright on a stone throne, an ankh scepter raised in one hand and a golden orb held in the other", upright: true, natural: "with an ankh scepter and a golden orb lying at its front paws", scene: "a {hero} seated upright on a massive stone throne carved with four ram heads, holding an ankh scepter in one hand and a golden orb in the other, armor showing beneath flowing red robes, jagged barren red mountains behind" },
   { id: 5, name: "THE HIEROPHANT", roman: "V", type: "major", theme: "tradition, faith, institutions", colors: ["#8b4513", "#f5deb3"], symbols: ["cross", "pillars", "keys"], hero: "high priest in sacred vestments", pose: "a {hero} seated on a throne, the right hand raised in blessing with two fingers up, the left hand holding a triple cross staff", upright: true, natural: "with a triple cross staff leaning against its side and one front paw raised in blessing", scene: "a {hero} wearing a triple-tiered crown seated between two stone pillars, the right hand raised in blessing and the left hand holding a triple cross staff, two tonsured acolytes kneeling below, a pair of crossed golden keys at the feet" },
-  { id: 6, name: "THE LOVERS", roman: "VI", type: "major", theme: "love, choice, union", colors: ["#e91e63", "#fce4ec"], symbols: ["angel", "sun", "hearts"], hero: "nude figure", airborne: true, couple: true, pose: "a {hero} and a second {hero} standing apart on the grass, the first looking toward the second, the second gazing up toward an angel above", scene: "a {hero} and a second {hero} standing apart with their feet on the grass of a green garden, a tall mountain rising in the distance between them, beneath a great winged angel in the clouds with outstretched arms haloed by a radiant sun, behind the first a tree bearing twelve flames, behind the second a fruit tree entwined with a serpent" },
+  { id: 6, name: "THE LOVERS", roman: "VI", type: "major", theme: "love, choice, union", colors: ["#e91e63", "#fce4ec"], symbols: ["angel", "sun", "hearts"], hero: "nude figure", airborne: true, couple: true, pose: "a {hero} on the left and a second {hero} on the right standing apart on the grass, the left one looking toward the right one, the right one gazing up toward an angel above", scene: "a {hero} on the left and a second {hero} on the right standing apart with their feet on the grass of a green garden, a tall mountain rising in the distance between them, beneath a great winged angel in the clouds with outstretched arms haloed by a radiant sun, behind the left figure a tree bearing twelve flames, behind the right figure a fruit tree entwined with a serpent" },
   { id: 7, name: "THE CHARIOT", roman: "VII", type: "major", theme: "victory, control, determination", colors: ["#1565c0", "#e3f2fd"], symbols: ["armor", "sphinxes", "stars"], hero: "crowned warrior in armor", pose: "a {hero} standing erect and proud inside a chariot, chest out, facing straight forward, one hand holding a short scepter", upright: true, holds: ["scepter"], scene: "a {hero} standing erect in a stone chariot beneath a starry blue canopy, the chariot drawn by one black sphinx and one white sphinx resting in front, a winged sun emblem on the chariot, a walled city behind" },
   { id: 8, name: "STRENGTH", roman: "VIII", type: "major", theme: "strength, courage, patience", colors: ["#ff8f00", "#fff8e1"], symbols: ["infinity", "lion", "flowers"], hero: "gentle woman in a white robe", pose: "a {hero} leaning calmly over a great lion, gently closing its jaws with both hands", upright: true, natural: "with one front paw resting gently on the great lion's muzzle", scene: "a {hero} wearing a garland of flowers calmly closing the jaws of a great tawny lion with both hands, a glowing infinity symbol floating above the head, a tranquil green meadow under a soft sky" },
   { id: 9, name: "THE HERMIT", roman: "IX", type: "major", theme: "solitude, introspection, guidance", colors: ["#546e7a", "#eceff1"], symbols: ["lantern", "staff", "mountain"], hero: "grey-hooded hermit", pose: "a {hero} standing with the head bowed, one hand raising a glowing lantern and the other gripping a tall staff", upright: true, holds: ["lantern", "wands"], scene: "a {hero} standing alone on a snowy mountain peak at night, raising a lantern that holds a glowing six-pointed star, leaning on a tall wooden staff, a deep blue sky behind" },
@@ -415,8 +415,13 @@ export function buildCardPrompt(card: TarotCard, input: CardPromptInput = {}): s
   const hero = subject || card.hero;
   // A `couple` card fills its first {hero} with figure A and the next with figure B (and so on, alternating).
   const pair = card.couple ? coupleHeroes(hero, !subject, input.couple) : null;
+  // "a nude man and a second nude woman" reads as two women (FLUX drew two, 2026-10-22): "second" only stays when
+  // both figures are the same kind.
   const fill = (t: string) => pair
-    ? t.split("{hero}").reduce((acc, part, i) => acc + (i === 0 ? "" : pair[(i - 1) % 2]) + part, "")
+    ? t.split("{hero}").reduce((acc, part, i) => {
+      const before = pair[0] !== pair[1] && i % 2 === 1 ? part.replace(/\bsecond $/, "") : part;
+      return acc + (i === 0 ? "" : pair[(i - 1) % 2]) + before;
+    }, "")
     : t.split("{hero}").join(hero);
   const scene = fill(card.scene);
   const group = isGroupPose(card.pose ?? "");
@@ -452,14 +457,35 @@ export function buildCardPrompt(card: TarotCard, input: CardPromptInput = {}): s
   // The pose sentence carries the style's short anchor ("in the style of Van Gogh") so moving the lead behind it
   // does not weaken the style: flux-dev drifted toward flat cartoon when the first ~45 words named no style.
   const anchor = styleRecap(lead);
-  const head = pose ? `${pose}, ${anchor.charAt(0).toLowerCase()}${anchor.slice(1)}.${animal} ` : "";
   const grounding = card.scene.includes("{hero}") && !card.airborne ? ` ${GROUNDING}` : "";
-  const tail = `${anchor}, one cohesive consistent art style across a single vertical full-bleed scene, rich symbolic detail.`;
+  const finish = "one cohesive consistent art style across a single vertical full-bleed scene, rich symbolic detail.";
   if (input.order === "content-first") {
-    // Figure-less cards have no pose sentence: the painter's name opens the prompt on its own.
-    return `${head || `${anchor}. `}${scene}.${grounding} ${lead}. ${tail}`;
+    // The anchor plus the first few technique phrases ride in the opening sentence and the rest follows the scene,
+    // each said once: repeating the painter's name three times cost tokens schnell cuts (256 T5) and the technique
+    // detail behind the scene was partly cut, so schnell drew smooth illustration under "Van Gogh" (2026-10-22).
+    const { brief, rest } = splitStyleDetail(lead, anchor);
+    const style = `${anchor}${brief ? `: ${brief}` : ""}`;
+    const open = pose ? `${pose}, ${lowerFirst(style)}.${animal} ` : `${style}. `;
+    return `${open}${scene}.${grounding} ${rest ? `${rest}, ` : ""}${finish}`;
   }
-  return `${head}${lead}. ${scene}.${grounding} ${tail}`;
+  const head = pose ? `${pose}, ${lowerFirst(anchor)}.${animal} ` : "";
+  return `${head}${lead}. ${scene}.${grounding} ${anchor}, ${finish}`;
+}
+
+function lowerFirst(s: string): string {
+  return s.charAt(0).toLowerCase() + s.slice(1);
+}
+
+// Content-first only: the lead minus its anchor, split into the first technique phrases (up to ~100 chars, cut at a
+// comma) and the remainder.
+function splitStyleDetail(lead: string, anchor: string): { brief: string; rest: string } {
+  const detail = lead.slice(anchor.length).replace(/^[.,:;\s]+/, "");
+  if (!detail) return { brief: "", rest: "" };
+  const firstSentence = detail.split(". ")[0];
+  let cut = firstSentence.length <= 100 ? firstSentence.length : firstSentence.slice(0, 100).lastIndexOf(", ");
+  if (cut < 20) cut = firstSentence.slice(0, 100).lastIndexOf(" ");
+  if (cut < 20) return { brief: "", rest: detail };
+  return { brief: lowerFirst(detail.slice(0, cut).trim()), rest: capitalize(detail.slice(cut).replace(/^[.,:;\s]+/, "").trim()) };
 }
 
 function capitalize(s: string): string {
@@ -472,6 +498,9 @@ function styleRecap(lead: string): string {
   const first = lead.split(". ")[0];
   if (first.length <= 90) return first;
   const cut = first.slice(0, 90);
+  // No comma → cut at a space: splitStyleDetail slices the lead at this length, so a mid-word cut splits a word.
   const b = cut.lastIndexOf(", ");
-  return b > 20 ? cut.slice(0, b) : cut;
+  if (b > 20) return cut.slice(0, b);
+  const s = cut.lastIndexOf(" ");
+  return s > 20 ? cut.slice(0, s) : cut;
 }

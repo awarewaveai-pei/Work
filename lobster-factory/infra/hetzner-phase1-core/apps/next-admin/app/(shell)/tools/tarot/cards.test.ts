@@ -66,7 +66,9 @@ describe("THE LOVERS couple", () => {
 
   it("draws a man and a woman by default, the woman looking up at the angel", () => {
     const p = buildCardPrompt(lovers);
-    expect(p).toContain("a nude man and a second nude woman");
+    expect(p).toContain("a nude man on the left and a nude woman on the right");
+    // "a second nude woman" reads as two women; "second" stays only for a same-kind pair.
+    expect(p).not.toContain("second");
     expect(p).not.toContain("nude figure");
   });
 
@@ -75,7 +77,8 @@ describe("THE LOVERS couple", () => {
     expect(count(mm, "nude man")).toBeGreaterThanOrEqual(2);
     expect(mm).not.toContain("woman");
     const ff = buildCardPrompt(lovers, { couple: "woman-woman", subject: "a blue cat" });
-    expect(ff).toContain("a female blue cat and a second female blue cat");
+    expect(ff).toContain("a female blue cat on the left and a second female blue cat on the right");
+    expect(buildCardPrompt(lovers, { subject: "a blue cat" })).toContain("a male blue cat on the left and a female blue cat on the right");
     expect(ff).not.toMatch(/\bmale blue cat/);
   });
 

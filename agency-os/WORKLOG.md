@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-22（續20）塔羅生圖三修：戀人一男一女被畫成兩女、愚人的狗飄空、schnell 梵谷筆觸弱（Claude）
+
+**觸發**：操作者截圖（續16 部署前本機生圖）問「問題出在哪裡」。
+
+**根因**
+- C1 戀人性別：`cards.ts` 戀人模板 `a {hero} and a second {hero}`，`coupleHeroes` 填入後成 `a nude man and a second nude woman`；「a second woman」暗示第一個也是女人 → schnell 畫兩個女人（9:18:55 圖）。藍貓版同句型，只是兩隻都是貓看不出來。
+- M1 愚人小狗：場景 `exactly one small white dog running free at the heels` 在懸崖邊 → schnell 畫成跳出懸崖飄在空中（9:22:02），或兩隻（9:22:35）；著地句在後且籠統，壓不過「running」。
+- M2 schnell 風格弱：content-first 把「In the style of Van Gogh」寫 3 次（動作句、lead 開頭、tail），技法細節全在場景後；整段 1230–1430 字元／190–236 字詞，schnell 只讀 256 T5 token。未以 tokenizer 實數（本機無 T5 tokenizer），以字數估。
+
+**修改**（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`）
+- `app/(shell)/tools/tarot/cards.ts`：戀人 pose／scene 加 on the left／on the right，樹改「behind the left/right figure」；`buildCardPrompt` couple fill 在兩人不同時刪 B 前的 `second`；愚人狗改 `standing on the rock at the {hero}'s heels, looking up and barking`；content-first 改為 `<pose>, in the style of X: <前幾個技法片語>. <scene>. <grounding> <其餘技法>, <finish>`（新 `splitStyleDetail`、`lowerFirst`），畫家名只出現一次；style-second 輸出不變。
+- `app/(shell)/tools/tarot/cards.test.ts`：戀人預設 `a nude man on the left and a nude woman on the right` 且無 second；藍貓預設男女無 second；女女保留 second。
+- `lib/tarot/__tests__/model-specs.test.ts`：STYLE 改 anchor＋BRIEF＋STYLEDETAIL；斷言開頭句含 `Van Gogh: <BRIEF>`、畫家名全文只 1 次；78 張×3 主角類型動作＋場景仍 ≤160 字詞。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run "app/(shell)/tools/tarot" lib/tarot`（20 pass）；`npx tsc --noEmit -p .` exit 0；Replicate flux-schnell 實生 6 張（輸入與 image-gen 相同：2:3、png、megapixels 1、go_fast false）：戀人一男一女＝左男右女（修前兩女）；藍貓戀人兩貓＋天使＋山＋果樹；愚人藍貓 4 張（seed 3038/7/各兩版）皆一隻狗站在岩石上 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-22-partialreview-f2f6d4bc.md`（-Path 本次 3 檔）：F1 屬實（無逗號的長自訂風格在第 90 字切斷單字，splitStyleDetail 再從斷點切 → `acros: s`）→ `styleRecap` 無逗號時退到空白；新測試「never splits a word」；突變：拔掉退空白 → 該測試紅（`granulating` 不在 prompt）、還原 → 20/20 綠
+- ORACLE_WAIVED: Codex 以 -Path 只審本批 3 檔（partialreview）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`second nude woman|running free at|behind the first a tree|splitStyleDetail` | hits=4（僅本次 cards.ts 註解＋新函式、cards.test.ts 註解；無其他舊字串殘留）
+
+**剩餘（未修）**
+- 愚人 4 張右下角都有假「Van Gogh」簽名；冒號改逗號同 seed 重生仍在 → 非冒號所致，推測畫家名在第一句使模型畫成「簽名油畫」。FLUX 不能用否定詞，需另想辦法。
+- 戀人火焰樹：兩張都把火焰畫成漂在空中，非長在樹上。
+- 藍貓戀人被「standing」畫成直立。
+- 註：本機 shared index 有舊 session 殘留的 staged 版本（`git diff` 對 index 顯示 5 檔），對 HEAD 只有本次 3 檔。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-22（續19）parity 合併補 Codex 2 項（staged 內容不得遺失）
 
 - Codex `agency-os/reports/oracle/2026-10-22-partialreview-9116c7aa.md`（審 `4d73ef128`）2 項屬實：F1 index 有與檔案不同的 staged 內容時，合併只讀檔案、`git reset` 把 staged 內容丟掉；F2 ff 失敗回滾只還原檔案、沒還原 index。
