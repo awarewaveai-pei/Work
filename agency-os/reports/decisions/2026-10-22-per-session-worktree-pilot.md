@@ -27,5 +27,6 @@ commit 要只含自己寫的，但所有 session 共用一個工作目錄與 ind
 - 未驗：寫碼卡（`node_modules` junction、`npx tsc`／vitest 在 worktree 跑、verify-gate／ORACLE 閘對 worktree 的行為）、AO-CLOSE 從 worktree 跑。第一張寫碼卡走 worktree 時補填。
 - 寫碼卡已驗（2026-10-22）：`node_modules` 以 junction 掛主目錄 → `npx tsc --noEmit` 綠、vitest social＋schedules 236 過、程式碼 commit 與 push 都不經私有 index；`worktree-reparse-guard` 在 junction 未拆時擋 remove（用它印的 `[IO.Directory]::Delete` 拆後主 `node_modules` 293 項完好）。
 - 陷阱：`git worktree remove` 報 Permission denied ＝ session 的 cwd 還在該 worktree；cwd 回主目錄後清乾淨。清殘留用 `cmd /c rmdir /s /q <明列路徑>`（`rm -rf` 被閘擋）。
-- 仍未驗：AO-CLOSE 從 worktree 跑；ORACLE／closeout 閘對 worktree 的行為（只在 AO-CLOSE 觸發）。
+- verify-gate 已驗：真 Edit 工具改 worktree 檔 → `git commit` 被擋（追蹤到 worktree 絕對路徑）→ `verify-clear.ps1` → commit 通過。發現 `verify-clear` 把 worktree 檔標成「outside-repo，not committable」（只是標籤，清除照做）→ 改為讀 `.git/worktrees/*/gitdir` 把 linked worktree 算 repo 內（測試：repo 內 2、舊版 0）。
+- AO-CLOSE 已驗（結論：只能在主目錄）：`system-health-check.ps1` 在 worktree 得 99.7%（317/318），唯一失敗＝`check-claude-sync` HARD（`.claude` junction 只存在 main，`CLAUDE.md` R1）。不放寬閘門；規則＝worktree session 以 push 收尾，AO-CLOSE 在 `D:\Work` 跑。
 - 採用：操作者 2026-10-22「直接改」→ AGENTS.md §8 Git 加一句「同時有別的 session 在寫 → 開 detached worktree」；舊閘門全留。

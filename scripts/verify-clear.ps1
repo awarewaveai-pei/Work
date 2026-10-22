@@ -10,8 +10,9 @@
   for you (verify-closeout-completeness.ps1 does, at AO-CLOSE); it prints what it is clearing so the
   transcript carries the evidence of what was released.
 
-  Paths outside the repo root (scratchpad / %TEMP% scripts the session ran and threw away) are listed
-  separately: they are not part of any commit and were never the reason the gate exists.
+  Paths outside the repo (scratchpad / %TEMP% scripts the session ran and threw away) are listed
+  separately: they are not part of any commit and were never the reason the gate exists. A linked worktree of
+  this repo (`.git/worktrees/<name>/gitdir`, read as a file) is part of the repo: its files are committable.
 
   Repo root is derived from this script's own location (scripts/ is one level below the root), so no
   native-command output is captured -- the CP950 trap class audit-cp950-traps.ps1 exists for.
@@ -37,9 +38,14 @@ try {
         exit 0
     }
     $files = @(Get-Content -LiteralPath $tf -Encoding UTF8 | ForEach-Object { $_.Trim() } | Where-Object { $_ -and $_ -notmatch '^#' }) | Sort-Object -Unique
-    $rootLower = $repoRoot.ToLowerInvariant()
-    $inRepo  = @($files | Where-Object { $_.ToLowerInvariant().StartsWith($rootLower) })
-    $outside = @($files | Where-Object { -not $_.ToLowerInvariant().StartsWith($rootLower) })
+    $roots = @($repoRoot)
+    foreach ($g in @(Get-ChildItem -LiteralPath (Join-Path $repoRoot '.git\worktrees') -Filter gitdir -Recurse -File -ErrorAction SilentlyContinue)) {
+        $roots += (Split-Path -Parent ((Get-Content -LiteralPath $g.FullName -Encoding UTF8 -TotalCount 1).Trim() -replace '/', '\'))
+    }
+    $rootsLower = @($roots | ForEach-Object { $_.ToLowerInvariant().TrimEnd('\') + '\' })
+    $isRepo  = { param($f) $l = $f.ToLowerInvariant(); @($rootsLower | Where-Object { $l.StartsWith($_) }).Count -gt 0 }
+    $inRepo  = @($files | Where-Object { & $isRepo $_ })
+    $outside = @($files | Where-Object { -not (& $isRepo $_) })
     Write-Host "verify-clear: sid=$sid"
     Write-Host ("  repo code files released ({0}):" -f $inRepo.Count)
     $inRepo | ForEach-Object { Write-Host "    - $_" }

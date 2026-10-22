@@ -1,4 +1,17 @@
 # Worklog
+## 2026-10-22（續17）worktree 流程剩餘兩項驗完：verify-gate 在 worktree 有效（修 verify-clear 標籤）；AO-CLOSE 只能在主目錄
+
+- **verify-gate**：真 Edit 改 worktree 檔 → `git commit` 被 `verify-gate-commit` 擋 → `verify-clear.ps1` → commit 通過。缺口：`scripts/verify-clear.ps1:41-42` 以 repo 根前綴分類，worktree 檔被標「outside-repo, not committable」（清除照做，只是說謊）。修：讀 `.git/worktrees/*/gitdir`（純檔案讀，不抓 native 輸出）把 linked worktree 算 repo 內。
+- **AO-CLOSE**：`system-health-check.ps1` 從 worktree 跑＝99.7%（317/318），唯一失敗 `check-claude-sync` HARD（`.claude` junction 只在 main，`CLAUDE.md` R1）。不放寬閘門；規則＝worktree session 以 push 收尾，AO-CLOSE 在 `D:\Work` 跑。`AGENTS.md` §8 Git 該句補上。
+- 決策記錄 `reports/decisions/2026-10-22-per-session-worktree-pilot.md` 同步。
+
+**[驗證結果]**：copy 成 `$TEMP/vc-test` 加假 `.git/worktrees/x/gitdir` 跑 `verify-clear.ps1 -WhatIf`：新版 repo 內 2 檔、舊版（D:\Work 版）0；`node scripts/verify-governance-pointers.mjs` PASSED。
+**[剩餘風險]**：`verify-clear` 無自動測試（腳本一向無）；若 worktree 的 `gitdir` 檔格式變，退回舊標籤行為（只是標籤）。
+**[rollback]**：`git revert` 本 commit。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -NoProfile -File $TEMP/vc-test/scripts/verify-clear.ps1 -WhatIf (fake worktree gitdir) | exit=0 | ms=2000
+- REVIEW_WAIVED: NA -- 一個 PowerShell 腳本內 5 行標籤分類加兩處文件，清除行為不變
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=outside-repo scratch|verify-clear | hits=6
 ## 2026-10-22（續16）塔羅生圖依每個模型的官方規格處理；System 新增「AI Models」頁（Claude）
 
 **觸發**：操作者截圖「非常有問題」：戀人牌（flux-dev）出現愚人的懸崖與背包客；schnell 愚人沒有小狗與道具。追問「你有去搞清楚所有模型的特性和要求嗎？」→ 查 14 個模型官方規格，並寫進 app 的 System。
