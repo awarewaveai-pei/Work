@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-23（續3）AO-CLOSE 的 gate 只檢查本 session 要 commit 的內容（續2 收尾）（Claude）
+
+**觸發**：續2 剩餘風險「sensitive path／completeness gate 仍看整個共用 index，別人的 staged 檔會讓收工被擋」。操作者：事情還沒處理好。
+
+**根因**：gate 讀共用 index（`git diff --cached`），commit 讀私有快照，兩者看的不是同一份東西。
+
+**修改**：`scripts/ao-close.ps1` 把 `Invoke-AoCloseScopedCommit` 拆成 `New-AoCloseScopedIndex`（HEAD＋本 session 快照，回傳私有 index 路徑）＋ commit。快照移到 junk guard 之後、所有 gate 之前；gate 執行期間設 `GIT_INDEX_FILE`＝私有 index（子行程 `verify-closeout-completeness.ps1` 繼承），gate 結束還原，commit 用同一個 index。gate 與 commit 現在看同一份內容；別人 staged 的檔不檢查、不 commit、不 reset。測試新增 I3「gate 只看到本 session 路徑」。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -NoProfile -ExecutionPolicy Bypass -File tests/ao-close-index-scope.test.ps1 | exit=0 | ms=1415
+- MUTATION: 拔 `New-AoCloseScopedIndex` 的 `$env:GIT_INDEX_FILE = $tmpIndex` → I3 三項紅（gate 看到 D.md／f.md），還原 11/11 綠
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 自審：與續2 已審的私有 index 機制相同，僅改變建立時機與 gate 讀取來源
+- ORACLE_WAIVED: 續2 已兩輪 Codex 審同一機制；本次只移動建立時點，未再呼叫（操作者回報額度消耗）
+- BUGHUNT_DONE: scope=agency-os,scripts,tests | grep=New-AoCloseScopedIndex|Invoke-AoCloseScopedCommit | hits=13
+
+**剩餘**：完整 ao-close 端到端要等下次真實收工。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-23（續2）AO-CLOSE 的 commit 只帶本 session 的路徑：別人預先 staged 的刪除不再混進 sync commit（Claude）
 
 **觸發**：今晨 AO-CLOSE sync commit `6c5572280` 把另一個 session 已 `git rm --cached` 的 5 份 2026-10-22 oracle 報告移出 git（檔案仍在磁碟，`87d6435e5` 已加回）。操作者：「sync commit 只能帶本次 session 的路徑，別人預先 staged 的刪除也要退回 unstaged」。

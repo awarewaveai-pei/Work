@@ -561,35 +561,52 @@ function Get-AoCloseCommitScope {
     return [pscustomobject]@{ Commit = $commit; Leaked = $leaked }
 }
 
-# Commits ONLY $Entries (Get-AoCloseCommitScope's .Commit snapshot) through a private index built
-# from HEAD. A bare `git commit` publishes the whole shared index, so anything another session
-# stages between scope check and commit (or that the scope check could not attribute) would ride
-# along. The shared index is not read again; paths left out stay staged there, untouched.
-# Returns git's exit code.
-function Invoke-AoCloseScopedCommit {
+# Builds a private index = HEAD + ONLY $Entries (Get-AoCloseCommitScope's .Commit snapshot) and
+# returns its path ($null on failure). AO-CLOSE runs its staged-content gates AND its commit with
+# GIT_INDEX_FILE pointing here, so both see exactly what gets committed: a bare `git commit` would
+# publish the whole shared index (another session's staged work included), and gates reading the
+# shared index would judge files this commit never carries. The shared index is never written.
+function New-AoCloseScopedIndex {
     param(
         [Parameter(Mandatory = $true)] [string]$RepoRoot,
-        [Parameter(Mandatory = $true)] [object[]]$Entries,
-        [string]$MessageFile = '',
-        [string]$Message = '',
-        [switch]$Quiet
+        [object[]]$Entries = @()
     )
     $tmpIndex = Join-Path $env:TEMP ("ao-close-index-" + [guid]::NewGuid().ToString('N'))
     $prevIndex = $env:GIT_INDEX_FILE
     Push-Location $RepoRoot
     try {
         $env:GIT_INDEX_FILE = $tmpIndex
-        # git output goes to the host, never the pipeline: the function's only output is the exit code.
+        # git output goes to the host, never the pipeline: the function's only output is the path.
         & git read-tree HEAD | Out-Host
-        if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
+        if ($LASTEXITCODE -ne 0) { return $null }
         foreach ($e in $Entries) {
             if ($e.Deleted) {
                 & git update-index --force-remove -- $e.Path | Out-Host
             } else {
                 & git update-index --add --cacheinfo "$($e.Mode),$($e.Sha),$($e.Path)" | Out-Host
             }
-            if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
+            if ($LASTEXITCODE -ne 0) { return $null }
         }
+        return $tmpIndex
+    } finally {
+        if ($null -eq $prevIndex) { Remove-Item Env:\GIT_INDEX_FILE -ErrorAction SilentlyContinue } else { $env:GIT_INDEX_FILE = $prevIndex }
+        Pop-Location
+    }
+}
+
+# Commits $IndexFile (from New-AoCloseScopedIndex). Returns git's exit code.
+function Invoke-AoCloseScopedCommit {
+    param(
+        [Parameter(Mandatory = $true)] [string]$RepoRoot,
+        [Parameter(Mandatory = $true)] [string]$IndexFile,
+        [string]$MessageFile = '',
+        [string]$Message = '',
+        [switch]$Quiet
+    )
+    $prevIndex = $env:GIT_INDEX_FILE
+    Push-Location $RepoRoot
+    try {
+        $env:GIT_INDEX_FILE = $IndexFile
         $commitArgs = @('commit')
         if ($Quiet) { $commitArgs += '-q' }
         if ($MessageFile) { $commitArgs += @('-F', $MessageFile) } else { $commitArgs += @('-m', $Message) }
@@ -598,7 +615,6 @@ function Invoke-AoCloseScopedCommit {
     } finally {
         if ($null -eq $prevIndex) { Remove-Item Env:\GIT_INDEX_FILE -ErrorAction SilentlyContinue } else { $env:GIT_INDEX_FILE = $prevIndex }
         Pop-Location
-        Remove-Item -LiteralPath $tmpIndex -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -1251,8 +1267,8 @@ Repair it first, then re-run:
         Write-Host "== AO-CLOSE: nothing to stage (no session edits or pipeline output this run) ==" -ForegroundColor DarkGray
     }
 
-    # The sync commit below carries only these (Invoke-AoCloseScopedCommit); anything else in the
-    # shared index stays staged for its owner.
+    # The gates and the sync commit below see only these (New-AoCloseScopedIndex); anything else
+    # in the shared index stays staged for its owner.
     $aoCloseAllowedCommitPaths = @($stagePaths + @($result.OwnGitAddPaths))
 
     # M3 fix (critic finding, 2026-09-03): print what's dirty right now but NOT
@@ -1301,8 +1317,21 @@ Repair it first, then re-run:
     #    config, so this gate's behaviour stops depending on a setting nobody owns.
     #  - it makes this query byte-identical to the sibling gate at
     #    verify-closeout-completeness.ps1:61, so the two cannot drift apart.
+    # Snapshot this session's staged entries into a private index (after the junk guard above has
+    # unstaged its finds). Every staged-content gate below -- including the child-process
+    # completeness gate, which inherits GIT_INDEX_FILE -- and the commit itself read this index.
+    $commitScope = Get-AoCloseCommitScope -RepoRoot $WorkRoot -AllowedPaths $aoCloseAllowedCommitPaths
+    if (@($commitScope.Leaked).Count -gt 0) {
+        Write-Host "== AO-CLOSE: $(@($commitScope.Leaked).Count) staged path(s) not from this session -- left staged, not checked, not committed ==" -ForegroundColor Yellow
+        foreach ($f in $commitScope.Leaked) { Write-Host "  left staged: $f" -ForegroundColor Yellow }
+    }
+    $scopedIndex = New-AoCloseScopedIndex -RepoRoot $WorkRoot -Entries @($commitScope.Commit)
+    if (-not $scopedIndex) { Write-Error "ao-close: could not build the scoped commit index"; exit 1 }
+    $prevGitIndexFile = $env:GIT_INDEX_FILE
+    $env:GIT_INDEX_FILE = $scopedIndex
+
     $staged = @(Invoke-WithUtf8Console { git -c core.quotepath=false diff --cached --name-only } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
-    $sensitive = @($staged | Where-Object { $_ -match '(?i)(^|/)\.claude/|\.credentials\.json$|(^|/)mcp-local-wrappers/node_modules/' })
+    $sensitive =@($staged | Where-Object { $_ -match '(?i)(^|/)\.claude/|\.credentials\.json$|(^|/)mcp-local-wrappers/node_modules/' })
     if ($sensitive.Count -gt 0) {
         Add-CloseoutGateResult -Gate $gate -Name "sensitive path guard" -Failed $true -Detail ("staged sensitive/ignored path(s): " + ($sensitive -join ", ")) -Fix "git reset these paths and add to .gitignore; memory/.claude must not enter git (CLAUDE.md R1)"
     }
@@ -1323,23 +1352,23 @@ Repair it first, then re-run:
         }
     }
 
+    if ($null -eq $prevGitIndexFile) { Remove-Item Env:\GIT_INDEX_FILE -ErrorAction SilentlyContinue } else { $env:GIT_INDEX_FILE = $prevGitIndexFile }
+
     # --- Phase 3 -> Phase 4 boundary: single decision point ---
     # Every quality gate above (pre-stage + post-stage) recorded into $gate instead of exiting.
     # Report ALL blockers at once and refuse to publish (commit/push/export) if any exist.
     # This is the one-pass replacement for the old scattered per-gate `exit 1` calls.
-    if (Invoke-CloseoutGateDecision -Gate $gate) { exit 1 }
+    if (Invoke-CloseoutGateDecision -Gate $gate) {
+        Remove-Item -LiteralPath $scopedIndex -Force -ErrorAction SilentlyContinue
+        exit 1
+    }
 
     # Captured ONCE so the auto commit subject and the skeleton report filename below share the exact
     # same minute (kills the timestamp-drift false-block class — critic M1, 2026-06-10). Stays $null when
     # the operator supplies -CommitMessage / -CommitMessageFile (then no deterministic name → skip skeleton).
     $autoCloseStamp = $null
-    $commitScope = Get-AoCloseCommitScope -RepoRoot $WorkRoot -AllowedPaths $aoCloseAllowedCommitPaths
-    $commitPaths = @($commitScope.Commit)
-    if (@($commitScope.Leaked).Count -gt 0) {
-        Write-Host "== AO-CLOSE: $(@($commitScope.Leaked).Count) staged path(s) not from this session -- left staged, NOT in this commit ==" -ForegroundColor Yellow
-        foreach ($f in $commitScope.Leaked) { Write-Host "  left staged: $f" -ForegroundColor Yellow }
-    }
-    $hasStaged = $commitPaths.Count -gt 0
+    $hasStaged = @($commitScope.Commit).Count -gt 0
+    if (-not $hasStaged) { Remove-Item -LiteralPath $scopedIndex -Force -ErrorAction SilentlyContinue }
     if ($hasStaged) {
         $resolvedMsgFile = $null
         if ($CommitMessageFile) {
@@ -1373,7 +1402,8 @@ Repair it first, then re-run:
             $autoCloseStamp = (Get-Date -Format "yyyy-MM-dd HHmm")
             $CommitMessage = "$autoPrefix chore: AO-CLOSE sync $autoCloseStamp"
         }
-        $commitExit = Invoke-AoCloseScopedCommit -RepoRoot $WorkRoot -Entries $commitPaths -MessageFile ([string]$resolvedMsgFile) -Message ([string]$CommitMessage)
+        $commitExit = Invoke-AoCloseScopedCommit -RepoRoot $WorkRoot -IndexFile $scopedIndex -MessageFile ([string]$resolvedMsgFile) -Message ([string]$CommitMessage)
+        Remove-Item -LiteralPath $scopedIndex -Force -ErrorAction SilentlyContinue
         if ($commitExit -ne 0) {
             Write-Error "ao-close: git commit failed"
             exit 1
@@ -1485,9 +1515,11 @@ Repair it first, then re-run:
                         # detection) instead of a hardcoded "[claude]" -- two commits from
                         # one run should not carry different prefixes.
                         $skeletonScope = Get-AoCloseCommitScope -RepoRoot $WorkRoot -AllowedPaths @($rptRelPath)
-                        $skeletonExit = if (@($skeletonScope.Commit).Count -eq 0) { 1 } else {
-                            Invoke-AoCloseScopedCommit -RepoRoot $WorkRoot -Entries @($skeletonScope.Commit) -Message "$autoPrefix chore: AO-CLOSE report skeleton $autoCloseStamp" -Quiet
+                        $skeletonIndex = if (@($skeletonScope.Commit).Count -gt 0) { New-AoCloseScopedIndex -RepoRoot $WorkRoot -Entries @($skeletonScope.Commit) } else { $null }
+                        $skeletonExit = if (-not $skeletonIndex) { 1 } else {
+                            Invoke-AoCloseScopedCommit -RepoRoot $WorkRoot -IndexFile $skeletonIndex -Message "$autoPrefix chore: AO-CLOSE report skeleton $autoCloseStamp" -Quiet
                         }
+                        if ($skeletonIndex) { Remove-Item -LiteralPath $skeletonIndex -Force -ErrorAction SilentlyContinue }
                         if ($skeletonExit -ne 0) {
                             Write-Warning "AO-CLOSE: could not commit report skeleton (non-fatal, will remain staged/uncommitted on disk): git commit exited $skeletonExit"
                         } else {

@@ -19,7 +19,7 @@ New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 # (not a scriptblock) so their $PSScriptRoot is non-empty; no verify-sid-shared.ps1 sits there,
 # so no session tracker is read.
 $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repoRoot 'scripts\ao-close.ps1'), [ref]$null, [ref]$null)
-foreach ($n in 'Get-AoCloseStagePaths', 'Get-AoCloseCommitScope', 'Invoke-AoCloseScopedCommit') {
+foreach ($n in 'Get-AoCloseStagePaths', 'Get-AoCloseCommitScope', 'New-AoCloseScopedIndex', 'Invoke-AoCloseScopedCommit') {
     $fn = $ast.Find({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $a.Name -eq $n }, $true)
     if (-not $fn) { throw "function $n not found in scripts/ao-close.ps1" }
     $f = Join-Path $tmp "$n.ps1"
@@ -62,8 +62,15 @@ try {
     $mvOnly = Get-AoCloseCommitScope -RepoRoot $repo -AllowedPaths @('C.md')
     Assert-True (-not (@($mvOnly.Leaked) -contains 'C.md')) 'I2 allowed new path never reported'
 
+    $idx = New-AoCloseScopedIndex -RepoRoot $repo -Entries @($scope.Commit)
+    Assert-True ([bool]$idx) 'I3 scoped index built'
+    # what every staged-content gate sees (they run with GIT_INDEX_FILE = the scoped index)
+    $env:GIT_INDEX_FILE = $idx
+    $gateView = @(G @('diff', '--cached', '--name-only', '--no-renames') | Where-Object { $_ }) -join ','
+    Remove-Item Env:\GIT_INDEX_FILE
+    Assert-True ($gateView -eq 'A.md,B.md,C.md') "I3 gates see only this session's paths (got '$gateView')"
     G @('reset', '-q', '--', 'A.md') | Out-Null   # another session unstages A.md after the scope snapshot
-    $exit = Invoke-AoCloseScopedCommit -RepoRoot $repo -Entries @($scope.Commit) -Message 'sync' -Quiet
+    $exit = Invoke-AoCloseScopedCommit -RepoRoot $repo -IndexFile $idx -Message 'sync' -Quiet
     Assert-True ($exit -eq 0) "I3 scoped commit exits 0 (got '$exit')"
     $files = @(G @('show', '--name-status', '--no-renames', '--format=', 'HEAD') | Where-Object { $_ })
     Assert-True (($files -join ';') -eq "M`tA.md;D`tB.md;A`tC.md") ("I3 commit = snapshot: A.md modified (not deleted by the late unstage), B.md deletion, C.md (got '" + ($files -join ';') + "')")
