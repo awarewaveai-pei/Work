@@ -22,4 +22,7 @@ commit 要只含自己寫的，但所有 session 共用一個工作目錄與 ind
 所有 session 回 `D:\Work` 共用目錄；閘門未刪，立即有效。
 
 ## 試點結果
-（待填）
+2026-10-22 doc 提交走完整一輪，用本檔自己：`git worktree add --detach D:/tmp/wt-pilot origin/main` → 改檔 → 普通 `git add`＋`git commit`（無私有 index、無 marker、閘門沒擋）→ `git fetch`＋`git rebase origin/main`（up to date）→ `git push origin HEAD:main` 成功（0e84c4273）→ `git worktree remove`（第一次 Permission denied，因 shell 還在該目錄；離開後 `--force` 乾淨移除）。
+- 已驗：settings deny 不擋 `git worktree add --detach` 與 `push HEAD:main`；detached worktree 的 index 獨立，commit 只含自己的檔。
+- 未驗：寫碼卡（`node_modules` junction、`npx tsc`／vitest 在 worktree 跑、verify-gate／ORACLE 閘對 worktree 的行為）、AO-CLOSE 從 worktree 跑。第一張寫碼卡走 worktree 時補填。
+- 採用：操作者 2026-10-22「直接改」→ AGENTS.md §8 Git 加一句「同時有別的 session 在寫 → 開 detached worktree」；舊閘門全留。
