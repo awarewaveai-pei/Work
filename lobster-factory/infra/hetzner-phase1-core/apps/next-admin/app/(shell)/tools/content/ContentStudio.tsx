@@ -556,7 +556,7 @@ export default function ContentStudio() {
   const [bvError,           setBvError]           = useState("");
   const [bvApplied,         setBvApplied]         = useState(false);
 
-  // #5 — Competitor & pain-point analysis (Claude Haiku /api/content/market-analysis)
+  // #5 — Competitor & pain-point analysis (Claude Opus 5.5 /api/content/market-analysis)
   const [showMarket,     setShowMarket]     = useState(false);
   const [marketLoading,  setMarketLoading]  = useState(false);
   const [marketAnalysis, setMarketAnalysis] = useState<MarketAnalysisResult | null>(null);

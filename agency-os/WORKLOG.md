@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-22（續12）市場分析換 Opus 5.5；SEO 修正留 Haiku 5.5（Claude）
+
+**觸發**：操作者問 Haiku 4.5→5.5 的功能思考該不該關（已由 6406dcc28／2bede23d4 全部換好、全關），再問市場分析與 SEO 修正是否用更高模型；決定「市場分析換 Opus 5.5，時間上限一起調整，SEO 修正維持 Haiku」。
+
+- C1 `app/api/content/market-analysis/route.ts`：Haiku 5.5（thinking off）→ `CLAUDE_DEFAULT_MODEL` effort low＋`claudeFallback`（`client.beta.messages`）；文字改 `claudeText`（Opus 首塊是 thinking）；`claudeIncomplete` 分截斷／拒答；新增 `logAiCall`（原本沒記帳）；`_cost` 用 `msg.model`（fallback 可能換模型）。理由：此功能不上網，模型自身知識＝產出，且結果餵進 Opus 文章生成。
+- C2 時間上限：實測 3 次 8.3／12.2／7.9 秒，`maxDuration` 維持 60（5 倍餘裕、< Cloudflare 100 秒），未調高。
+- m1 `lib/ai/cost-model.ts` TEXT_FEATURES：seo-fix／brand-voice 原寫 sonnet-4-6，route 實送 haiku-5-5 → 改正（估算原本偏高）；新增 market-analysis 列（opus-5-5，320／750 token＝實測值）。
+- SEO 修正不換：輸出約 6000 token，Opus 會逼近 Cloudflare 100 秒（`seo-fix/route.ts:83-85`）；要換須先改背景工作。
+- 旁註：未追蹤的 `lib/ai/claude-request.ts`（與 f55f13080 刪除版逐字相同、零 import）已刪。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`cat ma-time.mjs | ssh -p 58122 ubuntu@145.239.195.47 'sudo docker exec -i lobster-next-admin node --input-type=module -'`（route 同款 body：opus-5-5、max_tokens 10048、effort low、fallback beta；3 關鍵字）→ 3×200 end_turn、JSON 可解析、7888–12185 ms、每次 US$0.015–0.016；`npx tsc --noEmit` 0 errors；`npx vitest run lib/ai app/api/content` 10 files／64 passed | exit=0 | ms=12185
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex `agency-os/reports/oracle/2026-10-22-partialreview-28ed3d11.md`：NO FINDINGS
+- ORACLE_WAIVED: Codex 以 -Path 只審 route.ts＋cost-model.ts（partialreview）；ContentStudio.tsx 只改一行註解
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`content/market-analysis` | hits=11（UI 標籤 2、ContentStudio 4、route-features 1、cost-model 1、route 1、archive 2；無寫死模型名的呼叫端）
 ## 2026-10-22（續11）塔羅 78 張對照原版 RWS 審查（Codex＋SDK 雙審）→ 13 張圖像修正、56 張小牌牌意、戀人牌男女／男男／女女（Claude）
 
 **觸發**：操作者「檢查 78 張 prompt 是否符合真正塔羅牌的形象與牌意，用 Codex 和 SDK」；修正時「不用 SDK，用訂閱和 Codex」，並要求戀人可選男男、女女。

@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { textCallCostUsd } from "@/lib/ai/cost-calculator";
-import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { CLAUDE_DEFAULT_MODEL, claudeFallback, claudeIncomplete, claudeParams, claudeText, loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { logAiCall } from "@/lib/ai/log-ai-call";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Opus 5.5 at effort low answered in 8-12s (3 real calls 2026-10-22); 60s leaves 5x headroom under Cloudflare's 100s.
 export const maxDuration = 60;
 
-// #5 — Competitor & pain-point market analysis. Uses Claude Haiku (knowledge-based, not web-grounded)
+// #5 — Competitor & pain-point market analysis. Uses Claude Opus 5.5 (knowledge-based, not web-grounded:
+// the model's own knowledge of the market is the product, so the large model; operator 2026-10-22)
 // to research the topic from multiple marketing angles, then returns BOTH a structured summary (for the
 // UI) and a ready-to-inject `context` string (threaded into /api/content/generate as `marketContext`).
 // Read-only research — no writes, no persistence.
@@ -70,16 +73,21 @@ Output ONLY the JSON, no markdown fences, no explanation.`;
   try {
     const Anthropic = await loadAnthropic(grant);
     const client = new Anthropic({ apiKey });
-    const msg = await client.messages.create({
-      ...claudeParams(CLAUDE_FAST_MODEL, 2048, "medium", { thinking: "off" }),
+    const msg = await client.beta.messages.create({
+      ...claudeParams(CLAUDE_DEFAULT_MODEL, 2048, "low"),
+      ...claudeFallback(CLAUDE_DEFAULT_MODEL),
       messages: [{ role: "user", content: prompt }],
     });
-    if (msg.stop_reason === "max_tokens") {
+    void logAiCall({ route: "/api/content/market-analysis", response: msg, fallbackModel: CLAUDE_DEFAULT_MODEL, actorRole: role });
+    if (claudeIncomplete(msg) === "output_truncated") {
       return NextResponse.json({ ok: false, error: "Response truncated — retry with a simpler keyword" }, { status: 502 });
     }
-    const _cost = { usd: textCallCostUsd({ model: CLAUDE_FAST_MODEL, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens }), model: CLAUDE_FAST_MODEL, vendor: "Anthropic" };
-    const textBlock = msg.content.find(b => b.type === "text");
-    const text = textBlock?.type === "text" ? textBlock.text : "";
+    if (claudeIncomplete(msg) === "model_refused") {
+      return NextResponse.json({ ok: false, error: "模型拒絕分析這個主題，請換個關鍵字" }, { status: 502 });
+    }
+    // msg.model: a classifier fallback may have answered on another model
+    const _cost = { usd: textCallCostUsd({ model: msg.model, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens, cacheReadTokens: msg.usage.cache_read_input_tokens ?? undefined, cacheWriteTokens: msg.usage.cache_creation_input_tokens ?? undefined }), model: msg.model, vendor: "Anthropic" };
+    const text = claudeText(msg);
     if (!text) return NextResponse.json({ ok: false, error: "Empty model response" }, { status: 502 });
 
     const match = text.match(/\{[\s\S]*\}/);
