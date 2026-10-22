@@ -70,7 +70,10 @@ def main():
             for n, data in (("ours", ours), ("base", base), ("theirs", theirs)):
                 fs.append(os.path.join(d, n))
                 open(fs[-1], "wb").write(lf(data))
-            r = subprocess.run(["git", "merge-file", "-p", *fs], capture_output=True)
+            # An append-only log (.gitattributes merge=union, e.g. WORKLOG.md: every session inserts at the top)
+            # keeps both sides; every other file must merge without overlap.
+            union = git("check-attr", "merge", "--", p).stdout.decode().strip().endswith(": union")
+            r = subprocess.run(["git", "merge-file", "-p", *(["--union"] if union else []), *fs], capture_output=True)
         if r.returncode:
             return done(False, f"{p}: local edits conflict with {a.target}")
         merged = r.stdout.replace(b"\n", b"\r\n") if b"\r\n" in ours else r.stdout

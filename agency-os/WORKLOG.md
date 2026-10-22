@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-22（續21）WORKLOG 兩邊同時加 entry 不再卡住 parity：`.gitattributes` 宣告 merge=union
+
+- 缺口（自查）：兩個 session 各在 WORKLOG 頂端插一筆 → `git merge-file` 判衝突 → parity 停 → D:\Work 又落後。這是最常見的情況。
+- 修：`.gitattributes` 加 `agency-os/WORKLOG.md merge=union`（WORKLOG 依規則只增不改）；`scripts/git-parity-merge.py` 以 `git check-attr merge` 讀它，union 檔用 `--union`。git 自己的 merge／rebase 也同步受益。TASKS.md 原地改寫，維持嚴格合併（真衝突才停）。
+- 測試 P15（兩邊頂端各加一筆 → 都保留、追上）；突變：拿掉 `--union` → P15 2 項紅，還原 → 86 全綠。
+- 剩餘風險：若有人改寫 WORKLOG 既有 entry 且與 origin 重疊，union 會兩份都留（不會遺失、可能重複）。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -NoProfile -ExecutionPolicy Bypass -File tests/ao-resume-shared-worktree.test.ps1 | exit=0 | ms=95000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n（自審＋突變；同檔前一輪 Codex 已審）
+- BUGHUNT_DONE: scope=agency-os,scripts,tests | grep=merge=union|git-parity-merge | hits=5
 ## 2026-10-22（續20）塔羅生圖三修：戀人一男一女被畫成兩女、愚人的狗飄空、schnell 梵谷筆觸弱（Claude）
 
 **觸發**：操作者截圖（續16 部署前本機生圖）問「問題出在哪裡」。

@@ -5,3 +5,7 @@
 *.bat text eol=crlf
 *.cmd text eol=crlf
 *.ps1 text eol=crlf
+
+# Append-only log: every session inserts entries at the top, so two sides adding entries keep both
+# (git merges and scripts/git-parity-merge.py both read this).
+agency-os/WORKLOG.md merge=union

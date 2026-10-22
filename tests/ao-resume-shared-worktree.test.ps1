@@ -190,6 +190,16 @@ try {
     Assert-Eq (G $f.Wt @('show', ':a.txt')) 'a-staged' 'P14 staged content kept'
     Assert-Eq (Read-File (Join-Path $f.Wt 'a.txt')) "a1`n" 'P14 file untouched'
 
+    # P15 append-only log (merge=union): local entry and origin entry both at the top -> both kept
+    $f = New-Fixture 'p15'
+    Set-File (Join-Path $f.Wt '.gitattributes') "log.md merge=union`n"; Set-File (Join-Path $f.Wt 'log.md') "# Log`n## old`n"
+    G $f.Wt @('add', '-A') | Out-Null; G $f.Wt @('commit', '-q', '-m', 'log') | Out-Null; G $f.Wt @('push', '-q', 'origin', 'main') | Out-Null
+    G $f.Other @('pull', '-q') | Out-Null; Advance-Origin $f 'log.md' "# Log`n## theirs`n## old`n"
+    Set-File (Join-Path $f.Wt 'log.md') "# Log`n## mine`n## old`n"
+    $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
+    Assert-Eq $r.Action 'fast-forward' 'P15 action'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'log.md')) "# Log`n## mine`n## theirs`n## old`n" 'P15 both entries kept'
+
     # ---------------- I3: hooks act on the MAIN checkout only (2026-09-27) ----------------
     # A linked worktree (git worktree add) has `.git` as a FILE. Accepting it as the root wrote hook
     # state / reports into D:\tmp\<wt> and ensure-claude-junction replaced the worktree's tracked
