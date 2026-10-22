@@ -23,6 +23,7 @@
 - 根因：主機 `/root/lobster-phase1/logs/auto-deploy.log` 2026-10-21T19:01:11Z `npm test FAILED`，唯一紅＝`app/(shell)/tools/social/__tests__/page-rules.test.ts:30`（社群頁不得有顏色函式）；`d2534b6a2`（Codex）在 `social.css` 加了 3 個 `color-mix(`，該 commit 只跑 targeted 6 檔 vitest，沒跑到 page-rules。
 - 修法（不新增 token、不放寬規則）：遮罩改 `::before` ＋ `var(--text-primary)` ＋ `opacity .58`（`.sm-dialog` 加 `position: relative` 疊在上面）；警告底色改既有 `var(--badge-red-bg)`；危險鍵 hover 改 `filter: brightness(.88)`（原 hover 規則被 `.sm-app … button.sm-danger` 較高特異度蓋掉，本來就沒生效）。
 - 附帶發現（未修）：`lib/collect/__tests__/collect-sources-store.test.ts:171` 吃本機環境變數 `RENDERER_SH*`，筆電有設就紅、主機綠 → 測試不封閉，另開。
+- COLLECT-ENV-FIX: AO-CLOSE 前修掉上一條：該測試開頭 `vi.stubEnv` 把 `RENDERER_SHARED_SECRET`／`FIRECRAWL_API_KEY` 設空字串（`catalogue.ts:41` 以 falsy 判缺），`onTestFinished` 還原；筆電有設變數下 9 passed，`npx tsc --noEmit` 0 errors。
 
 **驗證結果**
 - REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/social"（7 檔 35 passed）；npm test 全套 1 failed＝上列 collect 環境洩漏，`env -u RENDERER_SHARED_SECRET` 重跑該檔 9 passed | exit=0 | ms=16000

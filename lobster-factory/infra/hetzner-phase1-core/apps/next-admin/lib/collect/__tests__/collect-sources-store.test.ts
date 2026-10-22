@@ -4,7 +4,7 @@
 // permission becomes a crawl seed. Everything else here is the mapping from a stored row to a seed,
 // which is where a silent mistake would mean "configured, never collected".
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { CollectionSource } from "@/lib/collect/sources-store";
 import "@/lib/collect/blocks";
 
@@ -151,6 +151,10 @@ describe("approval", () => {
   });
 
   it("lets discovery propose a source whose key has not arrived yet, but not switch it on", async () => {
+    // a developer machine may have these set; the test is about their absence
+    vi.stubEnv("RENDERER_SHARED_SECRET", "");
+    vi.stubEnv("FIRECRAWL_API_KEY", "");
+    onTestFinished(() => { vi.unstubAllEnvs(); });
     const proposed = await addSource({
       organizationId: ORG,
       blockId: "collect/extract-provider", // needs RENDERER_SHARED_SECRET or FIRECRAWL_API_KEY; neither is set here
