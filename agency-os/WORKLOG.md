@@ -8,11 +8,12 @@
 - C3 61 張 upright 牌全部印出自然句肉眼看過，沒有一張走到 fallback。
 - C4 `TarotStudio.tsx`：勾選框 → 「主角類型」三顆 `chipStyle` 按鈕（同「文字生圖／以圖生圖」），預設「人物」；說明一行附例子。previewSig 改帶 `hero=<kind>`，切換會標預覽過期。
 - C5 測試 `cards.test.ts`：魔術師三模式（擬人有前爪句、自然有擺放句且無直立句、人物兩者皆無）。
-- 未重生牌組、未跑實圖（要錢，需操作者同意）；自然模式下 pose 句仍寫 hand（如魔術師 right hand raising a wand），靠緊接的四腳句＋擺放句蓋過，未實圖驗證。
+- 未重生牌組、未跑實圖（要錢，需操作者同意）。
+- C6 Codex oracle 1m（agency-os/reports/oracle/2026-10-22-partialreview-61228c77.md，CONFIRMED）：9810ae5b8 自然模式仍保留 pose 句（魔術師 right hand raising a wand）再接四腳句，互相矛盾。修：自然模式用四腳＋擺放句**取代** pose 當開頭；scene 不動（保留 RWS 構圖，scene 裡的 hand 字樣仍在，靠開頭句權重蓋過）。測試加「自然模式開頭＝四腳句、不含 right hand raising a wand」。
 
 **驗證結果**
 - REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/tarot app`（80 files／548 pass）＋`npx tsc --noEmit` exit 0＋61 張自然句 dump | exit=0 | ms=9000
-- REVIEW_DONE: critic=Standard | verdict=pass | findings=見 commit 後 Codex oracle artifact（agency-os/reports/oracle/）
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex oracle（codex exec read-only）對 9810ae5b8：1m（C6，已修，修後 tsc 0、vitest 80 files／548 pass）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`nonHumanSubject|subjectIsAnimal` | hits=754（程式碼 0；全是舊 WORKLOG／excerpt／session 記錄）
 
 **剩餘風險**：按鈕未在瀏覽器實點（需登入）；自然模式未出實圖，FLUX 是否照擺放畫要等操作者試一張。

@@ -314,7 +314,7 @@ export const UPRIGHT_SENTENCE =
 export const UPRIGHT_SENTENCE_GROUP =
   "Every {hero} figure stands or sits upright like a person, using its front paws as hands.";
 // 「動物・自然」: the card's objects are placed, never held in hands, so the card still reads ("a cat on all fours
-// holding nothing" was the failure). Followed by naturalPlacement().
+// holding nothing" was the failure). Followed by naturalPlacement(); stands in for the pose sentence.
 export const NATURAL_SENTENCE = "The {hero} stays on all four legs in a natural animal pose, ";
 export const NATURAL_SENTENCE_GROUP = "Every {hero} figure stays on all four legs in a natural animal pose, ";
 
@@ -365,12 +365,13 @@ export function buildCardPrompt(card: TarotCard, input: CardPromptInput = {}): s
   const scene = fill(card.scene);
   const group = isGroupPose(card.pose ?? "");
   const kind = subject && card.upright ? input.heroKind : undefined;
-  const animal = kind === "animal-upright"
-    ? ` ${fill(group ? UPRIGHT_SENTENCE_GROUP : UPRIGHT_SENTENCE)}`
-    : kind === "animal-natural"
-      ? ` ${fill(group ? NATURAL_SENTENCE_GROUP : NATURAL_SENTENCE)}${naturalPlacement(card, group)}.`
-      : "";
-  const pose = card.pose ? capitalize(fill(card.pose)) : "";
+  const animal = kind === "animal-upright" ? ` ${fill(group ? UPRIGHT_SENTENCE_GROUP : UPRIGHT_SENTENCE)}` : "";
+  // 「動物・自然」 REPLACES the pose: every `upright` pose names hands ("the right hand raising a wand"), and a hand
+  // sentence right before "on all four legs" invites the upright animal this mode exists to avoid. The scene keeps
+  // the card's setting.
+  const pose = kind === "animal-natural"
+    ? `${fill(group ? NATURAL_SENTENCE_GROUP : NATURAL_SENTENCE)}${naturalPlacement(card, group)}`
+    : card.pose ? capitalize(fill(card.pose)) : "";
 
   // Style: a user-edited English override (styleResolved) wins and is used verbatim; otherwise
   // resolve the zh chip labels → their catalog English prompt (unknown free text passes through).

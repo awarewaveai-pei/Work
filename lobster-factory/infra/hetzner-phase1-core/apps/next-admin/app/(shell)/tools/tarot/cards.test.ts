@@ -41,7 +41,8 @@ describe("buildCardPrompt pose", () => {
     const p = (heroKind?: "person" | "animal-upright" | "animal-natural") =>
       buildCardPrompt(magician, { subject: "a blue cat", heroKind });
     expect(p("animal-upright")).toContain(upright);
-    expect(p("animal-natural")).toContain(`${natural}${PROP_PLACEMENT.wands}.`);
+    expect(p("animal-natural").startsWith(`${natural}${PROP_PLACEMENT.wands}, `)).toBe(true);
+    expect(p("animal-natural")).not.toContain("right hand raising a wand");
     expect(p("animal-natural")).not.toContain("upright like a person");
     expect(p("animal-natural")).not.toContain("front paws as hands");
     for (const person of [p("person"), p(undefined)]) {
