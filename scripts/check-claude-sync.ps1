@@ -298,32 +298,27 @@ foreach ($subdir in $claudeSubdirs) {
             -Detail "$($tracked.Count) tracked file(s) all present on disk"
     }
 
-    # SOFT: extras on disk (filesystem files not in git).
-    # Case-insensitive membership: git ls-files records the indexed casing, but
-    # Windows NTFS filesystem walks may emit a different case (e.g. case-only
-    # rename). Use HashSet[string] with OrdinalIgnoreCase to avoid false-positive
-    # SOFT findings on case-renamed files.
+    # SOFT: extras = untracked AND not ignored, decided by git with the repo's .gitignore only (same flags as
+    # scripts/verify-asset-mcp-refs.mjs). A filesystem walk counted gitignored app output (.claude/skills/synced/)
+    # as local work and told the operator to `git add` it.
     $repoSubdirAbs = Join-Path $MonorepoRoot ($relPath -replace '/', '\')
     if (Test-Path -LiteralPath $repoSubdirAbs) {
-        $diskFiles = @(Get-ChildItem -LiteralPath $repoSubdirAbs -Recurse -File -ErrorAction SilentlyContinue |
-            ForEach-Object {
-                $rel = $_.FullName.Substring($MonorepoRoot.Length).TrimStart('\') -replace '\\', '/'
-                $rel
-            })
-        # Filter out paths that .gitignore handles, plus Claude Code runtime junk that
-        # may live under ~/.claude/ via the junction (history snapshots, plugin caches,
-        # node_modules from skill installs). Conservative deny-list: catch known noise,
-        # let anything new surface as SOFT until we know what it is.
+        $diskFiles = @(& git -C $MonorepoRoot ls-files --others --exclude-per-directory=.gitignore -- $relPath 2>$null)
+        if ($LASTEXITCODE -ne 0) {
+            Add-Finding -Severity 'hard' -Check "S1: .claude/$subdir uncommitted extras" `
+                -Detail "git ls-files --others failed (exit $LASTEXITCODE) - extras unverified (not passing)." `
+                -Fix "git -C <root> ls-files --others --exclude-per-directory=.gitignore -- $relPath"
+            continue
+        }
+        # Claude Code runtime junk under ~/.claude/ (via the junction) that .gitignore does not cover.
+        # Conservative deny-list: anything new surfaces as SOFT until we know what it is.
         $relevant = $diskFiles | Where-Object {
             $name = Split-Path $_ -Leaf
             $isReadme = ($subdir -eq 'agents' -and ($name -eq 'README.md' -or $name -eq 'README.zh-TW.md'))
             $isRuntimeJunk = $_ -match '/(?:\.cache|\.history|\.shell-snapshots|node_modules|__pycache__|\.venv)(?:/|$)'
             -not ($isReadme -or $isRuntimeJunk)
         }
-        # Build case-insensitive set of tracked paths once per subdir
-        $trackedSet = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
-        foreach ($t in $tracked) { [void]$trackedSet.Add($t) }
-        $extras = @($relevant | Where-Object { -not $trackedSet.Contains($_) })
+        $extras = @($relevant)
         if ($extras.Count -gt 0) {
             $sample = ($extras | Select-Object -First 3) -join ', '
             $more = if ($extras.Count -gt 3) { " (+$($extras.Count - 3) more)" } else { '' }

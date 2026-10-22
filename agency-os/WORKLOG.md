@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-22（續13）check-claude-sync S1 改由 git 判定「多出的檔」
+
+- 根因：scripts/check-claude-sync.ps1 S1 走檔案系統，3c3f415ea gitignore 的 app 輸出 `.claude/skills/synced/`（510 檔）被報成本機未 commit 工作，fix 還叫人 `git add`（= 7de686789 誤 commit app 檔的源頭）。
+- 改動：S1 = `git ls-files --others --exclude-per-directory=.gitignore`（與 scripts/verify-asset-mcp-refs.mjs 同旗標；不用 --exclude-standard，避免全域 exclude 藏起 repo 工作）；git 非 0 → hard finding；刪掉已無作用的 tracked-set 比對。runtime-junk deny-list 保留（.venv/.history/.shell-snapshots 不在 .gitignore）。
+- 不變量：repo 資產檢查只看 repo 擁有、未 ignore 的檔；ignore 定義只在 .gitignore。
+- 接手：API worker（session f60c8b6e）中途停下改由訂閱 session 完成；其殘留 `.claude/skills/browser-test/zz-mut-test.md`（1 byte）已刪，claim 依 hook 指示 release。
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File scripts/check-claude-sync.ps1（clean / 加 .claude/skills/browser-test/zz-sync-probe.md / 刪除） | exit=0 | ms=60000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n
+- 審查處置：F1 git 無法啟動時 :273 先崩 = 未改的既有行，非回歸；F2 `git add -N` 檔不列 = 舊版 tracked-set 同樣排除，非回歸。皆不修（無效益）。artifact agency-os/reports/oracle/2026-10-22-partialreview-7300549e.md
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=exclude-standard|uncommitted extras | hits=10（檔；其餘 --exclude-standard 在 codex-oracle.ps1:235、write-oracle-artifact.ps1:174、verify-governance-pointers.mjs:157，屬打包/指標用途，非資產檢查，不動）
+- 驗證：clean → PASS；skill 子目錄放未追蹤檔 → SOFT S1 只列該檔；刪除 → PASS。註：`.claude/skills/` 根目錄散檔本就被 .gitignore:51 排除。
+- rollback：git revert <本 commit>。
 ## 2026-10-22（續12）市場分析換 Opus 5.5；SEO 修正留 Haiku 5.5（Claude）
 
 **觸發**：操作者問 Haiku 4.5→5.5 的功能思考該不該關（已由 6406dcc28／2bede23d4 全部換好、全關），再問市場分析與 SEO 修正是否用更高模型；決定「市場分析換 Opus 5.5，時間上限一起調整，SEO 修正維持 Haiku」。
