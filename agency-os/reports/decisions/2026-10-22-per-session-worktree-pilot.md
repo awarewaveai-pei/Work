@@ -18,6 +18,11 @@ commit 要只含自己寫的，但所有 session 共用一個工作目錄與 ind
 - 未驗證：`settings` deny 規則是否擋 `push HEAD:main`；worktree 清理不得動主 `node_modules`（WORKLOG 2026-10-21 續22 事故）。
 - 結果寫回本檔「試點結果」，再決定全面切換／加 B／維持現狀。
 
+## 撤回（2026-10-22）
+- A 已撤回：`AGENTS.md` §8 的 worktree 句刪除。
+- 原因：worktree push 讓 origin 前進、`D:\Work` 留在原地；`D:\Work` 的 ff-only 被別人未 commit 的 WORKLOG／TASKS 擋（拋棄式 repo 實測：dirty 檔內容與目標相同，`git merge --ff-only` 仍 `Aborting`）。之後在 `D:\Work` commit 的 session push 必被拒，要 cherry-pick 繞路：session `local_3c4f6ba5` 一次「COMMIT」＝22 次模型呼叫、讀約 330 萬 token（每次約 15 萬 context）。
+- 結論：根因是兩個人人都改的共用檔，不是 commit 工具；見 `TASKS.md`「共用 checkout 永遠追不上 origin」。
+
 ## Rollback
 所有 session 回 `D:\Work` 共用目錄；閘門未刪，立即有效。
 

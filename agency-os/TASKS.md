@@ -65,7 +65,7 @@
 
 ## Next — 未完成（目前正式隊列）
 
-- [ ] **舊 commit 閘門要不要刪（決策 `agency-os/reports/decisions/2026-10-22-per-session-worktree-pilot.md`）**：worktree 流程已驗可用；舊閘門（scope-guard／add-tracker／shared-file-guard／file-claim／私有 index，約 2,300 行）暫留。操作者覺得 worktree 夠順、說要刪時，才出刪除提案附 rollback；不靠計數、不自動觸發。建議模型：Opus 5.5
+- [ ] **共用 checkout 永遠追不上 origin（根因，決策 `agency-os/reports/decisions/2026-10-22-per-session-worktree-pilot.md` §撤回）**：`agency-os/WORKLOG.md`／`TASKS.md` 在 `D:\Work` 幾乎總有別人未 commit 的 hunk，而 origin 上這兩檔每個 commit 都在變；git 對 dirty 檔一律拒絕 ff（內容與目標相同也拒），所以只要有 push 不經 `D:\Work`，`D:\Work` 就落後，之後在 `D:\Work` commit 必被拒 push。治本候選＝WORKLOG／TASKS 改每筆一檔（方案 B）；開工前要操作者同意。建議模型：Opus 5.5
 > **版面規約（減少漏勾／誤判）**  
 > - **本節只保留 `- [ ]`。**已結案請移到 **`## Next — 已完成歷程（查詢用）`**，不要留在這裡。  
 > - **代理**：完成某一條 DoD 時，當日 **`WORKLOG`** 必須有 **`- AUTO_TASK_DONE: <子字串>`**（命中該條待辦）；`AO-CLOSE` 會跑 **`apply-closeout-task-checkmarks`**。  
