@@ -339,8 +339,9 @@ function Get-AoCloseStagePaths {
         $map = New-Object System.Collections.Hashtable ([StringComparer]::Ordinal)
         $renameOldPath = New-Object System.Collections.Hashtable ([StringComparer]::Ordinal)
         $unmerged = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::Ordinal)
+        $indexStaged = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::Ordinal)
         if ([string]::IsNullOrEmpty($RawZ)) {
-            return [pscustomobject]@{ Map = $map; RenameOldPath = $renameOldPath; Unmerged = $unmerged }
+            return [pscustomobject]@{ Map = $map; RenameOldPath = $renameOldPath; Unmerged = $unmerged; IndexStaged = $indexStaged }
         }
         $tokens = $RawZ -split "`0"
         $i = 0
@@ -349,7 +350,12 @@ function Get-AoCloseStagePaths {
             if ([string]::IsNullOrEmpty($entry) -or $entry.Length -lt 3) { $i++; continue }
             $xy = $entry.Substring(0, 2)
             $p  = $entry.Substring(3)
-            $map[$p] = $entry
+            # One path can appear TWICE: `git rm --cached f` with f still on disk prints
+            # `D  f` then `?? f`. Overwriting kept only `??`, so the staged deletion was
+            # never reset and got committed (6c5572280 untracked 5 oracle reports).
+            # Index state lives in $indexStaged; the map keeps both entries for diffing.
+            if ($map.ContainsKey($p)) { $map[$p] = $map[$p] + "`0" + $entry } else { $map[$p] = $entry }
+            if ($xy[0] -ne ' ' -and $xy[0] -ne '?') { [void]$indexStaged.Add($p) }
             # Merge conflict shapes (git status --porcelain table): UU, AA, DD, AU,
             # UA, DU, UD -- ANY of these has 'U' in a column, or is the literal 'AA'/
             # 'DD' pair. M-D fix: these must never be treated as "just another staged
@@ -366,7 +372,7 @@ function Get-AoCloseStagePaths {
                 $i += 1
             }
         }
-        return [pscustomobject]@{ Map = $map; RenameOldPath = $renameOldPath; Unmerged = $unmerged }
+        return [pscustomobject]@{ Map = $map; RenameOldPath = $renameOldPath; Unmerged = $unmerged; IndexStaged = $indexStaged }
     }
 
     Push-Location $RepoRoot
@@ -433,10 +439,8 @@ function Get-AoCloseStagePaths {
     # defense (aborts before ANY pipeline step runs); this exclusion is
     # defense-in-depth for the case that check somehow misses (e.g. a conflict
     # left over from something other than merge/cherry-pick/revert).
-    $foreignStagedAtBaseline = @($baselineMap.Keys | Where-Object {
-        $entry = $baselineMap[$_]
-        $entry.Length -ge 1 -and $entry[0] -ne ' ' -and $entry[0] -ne '?' -and
-            -not $ownGitAddSet.Contains($_) -and -not $baselineInfo.Unmerged.Contains($_)
+    $foreignStagedAtBaseline = @($baselineInfo.IndexStaged | Where-Object {
+        -not $ownGitAddSet.Contains($_) -and -not $baselineInfo.Unmerged.Contains($_)
     })
     # C-B fix (critic round 2): a foreign staged RENAME/COPY is keyed on the NEW
     # path only; resetting just that path leaves the OLD path staged as a bare
@@ -507,18 +511,94 @@ function Get-AoCloseStagePaths {
     foreach ($p in $stagePaths) { [void]$stageSet.Add($p) }
     $leftUnstaged = @($currentMap.Keys | Where-Object {
         if ($stageSet.Contains($_)) { return $false }
-        $entry = $currentMap[$_]
-        $alreadyLegitimatelyStaged = ($entry.Length -ge 1 -and $entry[0] -ne ' ' -and $entry[0] -ne '?' -and $ownGitAddSet.Contains($_))
+        $alreadyLegitimatelyStaged = ($currentInfo.IndexStaged.Contains($_) -and $ownGitAddSet.Contains($_))
         -not $alreadyLegitimatelyStaged
     })
 
     return [pscustomobject]@{
+        OwnGitAddPaths          = @($ownGitAddSet)
         StagePaths              = $stagePaths
         ForeignStagedAtBaseline = $foreignStagedAtBaseline   # for display: new-path names only
         ForeignStagedResetPaths = $foreignStagedResetPaths   # for `git reset --`: includes paired old paths (C-B)
         LeftUnstaged            = $leftUnstaged
         SessionTrackerMissing   = $sessionTrackerMissing
         TrackerTruncated        = $trackerTruncated
+    }
+}
+
+# Splits the staged index (vs HEAD) into what this AO-CLOSE may commit (paths this run
+# staged or this session `git add`-ed) and the rest. Independent of the status parse above,
+# so a parsing gap cannot widen the commit. --no-renames lists a rename's old path too.
+function Get-AoCloseCommitScope {
+    param(
+        [Parameter(Mandatory = $true)] [string]$RepoRoot,
+        [string[]]$AllowedPaths = @()
+    )
+    $allowed = New-Object System.Collections.Generic.HashSet[string] ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($p in $AllowedPaths) { if ($p) { [void]$allowed.Add($p) } }
+    # git-add-scope-tracker.js records only a rename's NEW path; its old side belongs to it.
+    $nameStatus = @((Invoke-WithUtf8Console { git -C $RepoRoot -c core.quotepath=false diff --cached -M --name-status -z }) -join '' -split "`0")
+    for ($i = 0; $i -lt $nameStatus.Count; $i++) {
+        if ($nameStatus[$i] -match '^[RC]\d*$' -and $i + 2 -lt $nameStatus.Count) {
+            if ($allowed.Contains($nameStatus[$i + 2])) { [void]$allowed.Add($nameStatus[$i + 1]) }
+            $i += 2
+        }
+    }
+    # Raw records are the snapshot the commit is built from (`:oldmode newmode oldsha newsha X` then
+    # the path): reading the shared index again at commit time would turn another session's
+    # unstage in between into a deletion.
+    $raw = @(((Invoke-WithUtf8Console { git -C $RepoRoot -c core.quotepath=false diff --cached --raw --no-renames --no-abbrev -z }) -join '') -split "`0")
+    $commit = @(); $leaked = @()
+    for ($i = 0; $i + 1 -lt $raw.Count; $i += 2) {
+        if ($raw[$i] -notmatch '^:\d+ (\d+) [0-9a-f]+ ([0-9a-f]+) ([A-Z])') { $i--; continue }
+        $p = $raw[$i + 1]
+        if ($allowed.Contains($p)) {
+            $commit += [pscustomobject]@{ Path = $p; Mode = $Matches[1]; Sha = $Matches[2]; Deleted = ($Matches[3] -eq 'D') }
+        } else {
+            $leaked += $p
+        }
+    }
+    return [pscustomobject]@{ Commit = $commit; Leaked = $leaked }
+}
+
+# Commits ONLY $Entries (Get-AoCloseCommitScope's .Commit snapshot) through a private index built
+# from HEAD. A bare `git commit` publishes the whole shared index, so anything another session
+# stages between scope check and commit (or that the scope check could not attribute) would ride
+# along. The shared index is not read again; paths left out stay staged there, untouched.
+# Returns git's exit code.
+function Invoke-AoCloseScopedCommit {
+    param(
+        [Parameter(Mandatory = $true)] [string]$RepoRoot,
+        [Parameter(Mandatory = $true)] [object[]]$Entries,
+        [string]$MessageFile = '',
+        [string]$Message = '',
+        [switch]$Quiet
+    )
+    $tmpIndex = Join-Path $env:TEMP ("ao-close-index-" + [guid]::NewGuid().ToString('N'))
+    $prevIndex = $env:GIT_INDEX_FILE
+    Push-Location $RepoRoot
+    try {
+        $env:GIT_INDEX_FILE = $tmpIndex
+        # git output goes to the host, never the pipeline: the function's only output is the exit code.
+        & git read-tree HEAD | Out-Host
+        if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
+        foreach ($e in $Entries) {
+            if ($e.Deleted) {
+                & git update-index --force-remove -- $e.Path | Out-Host
+            } else {
+                & git update-index --add --cacheinfo "$($e.Mode),$($e.Sha),$($e.Path)" | Out-Host
+            }
+            if ($LASTEXITCODE -ne 0) { return $LASTEXITCODE }
+        }
+        $commitArgs = @('commit')
+        if ($Quiet) { $commitArgs += '-q' }
+        if ($MessageFile) { $commitArgs += @('-F', $MessageFile) } else { $commitArgs += @('-m', $Message) }
+        & git @commitArgs | Out-Host
+        return $LASTEXITCODE
+    } finally {
+        if ($null -eq $prevIndex) { Remove-Item Env:\GIT_INDEX_FILE -ErrorAction SilentlyContinue } else { $env:GIT_INDEX_FILE = $prevIndex }
+        Pop-Location
+        Remove-Item -LiteralPath $tmpIndex -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -1171,6 +1251,10 @@ Repair it first, then re-run:
         Write-Host "== AO-CLOSE: nothing to stage (no session edits or pipeline output this run) ==" -ForegroundColor DarkGray
     }
 
+    # The sync commit below carries only these (Invoke-AoCloseScopedCommit); anything else in the
+    # shared index stays staged for its owner.
+    $aoCloseAllowedCommitPaths = @($stagePaths + @($result.OwnGitAddPaths))
+
     # M3 fix (critic finding, 2026-09-03): print what's dirty right now but NOT
     # staged -- every silent-drop scenario above (out-of-root session path, a path
     # gone stale between capture and staging, ...) becomes visible here instead of
@@ -1249,7 +1333,13 @@ Repair it first, then re-run:
     # same minute (kills the timestamp-drift false-block class — critic M1, 2026-06-10). Stays $null when
     # the operator supplies -CommitMessage / -CommitMessageFile (then no deterministic name → skip skeleton).
     $autoCloseStamp = $null
-    $hasStaged = $staged.Count -gt 0
+    $commitScope = Get-AoCloseCommitScope -RepoRoot $WorkRoot -AllowedPaths $aoCloseAllowedCommitPaths
+    $commitPaths = @($commitScope.Commit)
+    if (@($commitScope.Leaked).Count -gt 0) {
+        Write-Host "== AO-CLOSE: $(@($commitScope.Leaked).Count) staged path(s) not from this session -- left staged, NOT in this commit ==" -ForegroundColor Yellow
+        foreach ($f in $commitScope.Leaked) { Write-Host "  left staged: $f" -ForegroundColor Yellow }
+    }
+    $hasStaged = $commitPaths.Count -gt 0
     if ($hasStaged) {
         $resolvedMsgFile = $null
         if ($CommitMessageFile) {
@@ -1283,12 +1373,8 @@ Repair it first, then re-run:
             $autoCloseStamp = (Get-Date -Format "yyyy-MM-dd HHmm")
             $CommitMessage = "$autoPrefix chore: AO-CLOSE sync $autoCloseStamp"
         }
-        if ($resolvedMsgFile) {
-            git commit -F $resolvedMsgFile
-        } else {
-            git commit -m $CommitMessage
-        }
-        if ($LASTEXITCODE -ne 0) {
+        $commitExit = Invoke-AoCloseScopedCommit -RepoRoot $WorkRoot -Entries $commitPaths -MessageFile ([string]$resolvedMsgFile) -Message ([string]$CommitMessage)
+        if ($commitExit -ne 0) {
             Write-Error "ao-close: git commit failed"
             exit 1
         }
@@ -1398,9 +1484,12 @@ Repair it first, then re-run:
                         # commit ($autoPrefix, honours AO_CLOSE_COMMIT_PREFIX / Cursor
                         # detection) instead of a hardcoded "[claude]" -- two commits from
                         # one run should not carry different prefixes.
-                        git commit -q -m "$autoPrefix chore: AO-CLOSE report skeleton $autoCloseStamp"
-                        if ($LASTEXITCODE -ne 0) {
-                            Write-Warning "AO-CLOSE: could not commit report skeleton (non-fatal, will remain staged/uncommitted on disk): git commit exited $LASTEXITCODE"
+                        $skeletonScope = Get-AoCloseCommitScope -RepoRoot $WorkRoot -AllowedPaths @($rptRelPath)
+                        $skeletonExit = if (@($skeletonScope.Commit).Count -eq 0) { 1 } else {
+                            Invoke-AoCloseScopedCommit -RepoRoot $WorkRoot -Entries @($skeletonScope.Commit) -Message "$autoPrefix chore: AO-CLOSE report skeleton $autoCloseStamp" -Quiet
+                        }
+                        if ($skeletonExit -ne 0) {
+                            Write-Warning "AO-CLOSE: could not commit report skeleton (non-fatal, will remain staged/uncommitted on disk): git commit exited $skeletonExit"
                         } else {
                             # TASKS.md:655 -- same reasoning as the main sync commit above: this
                             # commit never goes through a Bash tool call either.

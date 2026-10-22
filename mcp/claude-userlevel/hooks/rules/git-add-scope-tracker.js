@@ -308,7 +308,9 @@ function handlePost(ctx, shared, addIdx, rmIdx, mvIdx) {
 
   let verified;
   try {
-    const r = spawnSync('git', ['diff', '--cached', '--name-only', '-z', '--', ...candidates], { encoding: 'utf8', timeout: 10000 });
+    // --no-renames: a `git mv` must record BOTH paths; rename detection would list only the new
+    // one, and ao-close.ps1 commits only tracked paths (the old side's deletion would be left out).
+    const r = spawnSync('git', ['diff', '--cached', '--no-renames', '--name-only', '-z', '--', ...candidates], { encoding: 'utf8', timeout: 10000 });
     if (r.error || typeof r.status !== 'number' || r.status !== 0) return null; // fail open — can't verify
     verified = String(r.stdout || '').split('\0').filter(Boolean);
   } catch (_) { return null; }

@@ -1,4 +1,30 @@
 # Worklog
+## 2026-10-23（續2）AO-CLOSE 的 commit 只帶本 session 的路徑：別人預先 staged 的刪除不再混進 sync commit（Claude）
+
+**觸發**：今晨 AO-CLOSE sync commit `6c5572280` 把另一個 session 已 `git rm --cached` 的 5 份 2026-10-22 oracle 報告移出 git（檔案仍在磁碟，`87d6435e5` 已加回）。操作者：「sync commit 只能帶本次 session 的路徑，別人預先 staged 的刪除也要退回 unstaged」。
+
+**根因**
+- C1：`git rm --cached f`（檔案仍在磁碟）時 porcelain 對同一路徑輸出兩筆 `D  f` + `?? f`；`ConvertTo-StatusPathMap` 用路徑當 key，第二筆蓋掉第一筆，index 狀態遺失 → 不被視為 foreign → 沒有 reset。
+- C2（同類、更大）：sync commit 與骨架報告 commit 都是 bare `git commit`，會帶上整個共用 index；只要解析有漏洞，或檢查完到 commit 之間別人 `git add`，就會混進來（Codex R1 F1）。
+
+**不變量**：AO-CLOSE 的 commit 內容 = 同一時刻對「本 run staged ＋ 本 session git add 過」的路徑所取的 index 快照，其他一律不碰。
+
+**修改**
+- `scripts/ao-close.ps1`：`ConvertTo-StatusPathMap` 新增 `IndexStaged`，同一路徑兩筆時保留兩筆；foreign／leftUnstaged 改看 `IndexStaged`。新函式 `Get-AoCloseCommitScope`（`diff --cached --raw --no-renames --no-abbrev` 快照：可 commit 的條目＋排除清單，允許路徑的 rename 舊路徑也允許）與 `Invoke-AoCloseScopedCommit`（從 HEAD 建私有 index，只寫入快照條目後 commit；不重讀共用 index）。sync commit 與骨架 commit 都改走這條路；被排除的路徑保持 staged，只列出、不 reset（Codex R1 F3：SID 不一致時也不會毀掉自己的 staged）。
+- `mcp/claude-userlevel/hooks/rules/git-add-scope-tracker.js`：tracker 改用 `--no-renames`，`git mv` 兩邊路徑都會記錄（Codex R1 F2：先 mv 再大改內容時，舊路徑的刪除不會被漏掉）。已 `sync-claude-userlevel.ps1 -Mode merge` 同步。
+- `tests/ao-close-index-scope.test.ps1`（新）：I1 `D`+`??` 判定為 foreign；I2 範圍拆分與自己的 rename；I3 commit 只含快照，晚到的 foreign add／unstage 都不影響。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -NoProfile -ExecutionPolicy Bypass -File tests/ao-close-index-scope.test.ps1 | exit=0 | ms=1402
+- MUTATION: 拔 `indexStaged.Add` → I1 紅；拔 `$env:GIT_INDEX_FILE = $tmpIndex`（退回共用 index commit）→ I3 紅；還原後 9/9 綠。另外實測 `git diff --cached --name-only` 對 `git mv` 只列新路徑，加 `--no-renames` 後兩邊都列。
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash scripts/test-hooks.sh | exit=0 | ms=85440
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/5m/0n -- Codex 兩輪：R1 `agency-os/reports/oracle/2026-10-23-partialreview-e6ca2383.md` 3 項（F1 競態、F2 rename、F3 SID）全修；R2 `agency-os/reports/oracle/2026-10-23-partialreview-7e3cdfab.md` F1（commit 時重讀 index 會把晚到的 unstage 變成刪除）已改為快照修掉，F2（update-index 把 glob 當 pathspec）實測 `a[b].txt`／`ab.txt` 未重現，判定誤報
+- ORACLE_WAIVED: 共用 checkout 有 80+ 個他人 dirty 檔，Codex 以 -Path 只審本批 3 檔（partialreview）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp/claude-userlevel,tests | grep=Get-AoCloseLeakedIndexPaths|Invoke-AoCloseScopedCommit|Get-AoCloseCommitScope|ConvertTo-StatusPathMap | hits=21（WORKLOG 以外；全在 ao-close.ps1／新測試／oracle artifact；舊名 Get-AoCloseLeakedIndexPaths 在 scripts/tests/mcp 0 處殘留）
+
+**剩餘**：完整 ao-close 端到端要等下次真實收工才會跑到（含 commit＋push，不在本機模擬）。gate 類檢查（sensitive path／completeness）仍看整個 index，遇到別人的 staged 檔會偏嚴，不會放錯。
+
+**rollback**：`git revert <本 commit>`，再跑 `scripts/sync-claude-userlevel.ps1 -Mode merge`。
 ## 2026-10-23（續1）塔羅「動物・自然」整類修正（62 張牌各自的四腳動作）＋ schnell 梵谷筆觸（實數 T5 token）（Claude）
 
 **觸發**：操作者截圖（11:40 動物・自然：貓直立、前爪拿玫瑰與手杖；小狗變小白貓飄在崖外）＋「flux-schnell 的筆觸也不夠梵谷風格」＋問「動物・自然把東西拿掉會不會影響牌義」。
