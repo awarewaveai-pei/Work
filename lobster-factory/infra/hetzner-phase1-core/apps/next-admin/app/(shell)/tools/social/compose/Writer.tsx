@@ -15,7 +15,7 @@ const EXTRAS: Array<{ key: Extra; label: string; icon: Parameters<typeof CIcon>[
 ];
 const EMOJI = ["🎨", "🖍️", "🌈", "💛", "✨", "🌿", "🙂", "👉"];
 // one rewrite of a post: about 1,000 tokens in and 400 out on Haiku (lib/ai/cost-model.ts rates)
-const AI_RATE = TEXT_RATES["claude-haiku-4-5"];
+const AI_RATE = TEXT_RATES["claude-haiku-5-5"];
 const AI_NTD = Math.max(1, Math.round(((1000 * AI_RATE.inputPerM + 400 * AI_RATE.outputPerM) / 1e6) * TWD_RATE * 10) / 10);
 
 export interface WriterProps {

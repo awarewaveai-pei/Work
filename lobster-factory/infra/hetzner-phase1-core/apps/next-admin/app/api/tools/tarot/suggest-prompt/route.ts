@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
@@ -57,8 +57,7 @@ async function handlePost(request: Request, grant: Grant) {
 
   try {
     const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 200,
+      ...claudeParams(CLAUDE_FAST_MODEL, 200, "medium", { thinking: "off" }),
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
     });

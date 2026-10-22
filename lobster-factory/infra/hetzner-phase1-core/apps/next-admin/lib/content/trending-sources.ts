@@ -1,4 +1,4 @@
-import { loadAnthropic } from "@/lib/ai/gateway";
+import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 /**
  * trending-sources.ts — 搜尋積木家族（kind:"search"）
@@ -33,8 +33,7 @@ export async function aiChat(prompt: string, _timeoutMs = 10000): Promise<string
     const Anthropic = await loadAnthropic(await grantFor("content.trending"));
     const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 512,
+      ...claudeParams(CLAUDE_FAST_MODEL, 512, "medium", { thinking: "off" }),
       messages: [{ role: "user", content: prompt }],
     });
     return msg.content[0]?.type === "text" ? msg.content[0].text : "";

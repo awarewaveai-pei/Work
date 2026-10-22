@@ -42,3 +42,14 @@ describe("claudeText / claudeIncomplete", () => {
     expect(claudeIncomplete({ stop_reason: "end_turn" })).toBeNull();
   });
 });
+
+describe("claudeParams on Haiku 5.5", () => {
+  it("carries no budget_tokens and no non-default sampling, and accepts thinking disabled", () => {
+    const p = claudeParams("claude-haiku-5-5", 500, "medium", { thinking: "off" });
+    expect(p).toEqual({ model: "claude-haiku-5-5", max_tokens: 500, output_config: { effort: "medium" }, thinking: { type: "disabled" } });
+    for (const k of ["temperature", "top_p", "top_k"]) expect(p).not.toHaveProperty(k);
+    expect(p.thinking).not.toHaveProperty("budget_tokens");
+    expect(claudeParams("claude-haiku-5-5", 500)).not.toHaveProperty("thinking"); // opt-in only
+    expect(claudeParams("claude-opus-5-5", 500, "medium", { thinking: "off" })).not.toHaveProperty("thinking"); // always thinks: disabled is a 400
+  });
+});

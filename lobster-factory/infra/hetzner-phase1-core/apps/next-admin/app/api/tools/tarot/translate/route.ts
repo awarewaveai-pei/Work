@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadAnthropic } from "@/lib/ai/gateway";
+import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic } from "@/lib/ai/gateway";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { needsEnglish, TRANSLATE_MAX_CHARS } from "@/lib/tarot/translate";
@@ -40,10 +40,8 @@ async function handlePost(request: Request, grant: Grant) {
   try {
     const Anthropic = await loadAnthropic(grant);
     const msg = await new Anthropic({ apiKey }).messages.create({
-      model: "claude-haiku-5-5",
-      max_tokens: 400,
-      // Haiku 5.5 thinks by default (adaptive, effort medium); a one-line translation needs none, so turn it off.
-      thinking: { type: "disabled" },
+      // Haiku 5.5 thinks by default; a one-line translation needs none, so turn it off.
+      ...claudeParams(CLAUDE_FAST_MODEL, 400, "medium", { thinking: "off" }),
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: text }],
     });

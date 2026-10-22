@@ -1,4 +1,4 @@
-import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
@@ -91,8 +91,7 @@ async function handlePost(req: Request, grant: Grant, route: string): Promise<Re
   const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 2000,
+    ...claudeParams(CLAUDE_FAST_MODEL, 2000, "medium", { thinking: "off" }),
     messages: [{
       role: "user",
       content: `Create social media posts from this article for these platforms:

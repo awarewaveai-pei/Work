@@ -1,4 +1,4 @@
-import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { grantFor } from "@/lib/entitlements/grant";
 import type { Incident } from "@/lib/ops-inbox/types";
 
@@ -31,8 +31,7 @@ export async function summarizeIncidentWithClaude(incident: Incident, evidenceTe
   try {
     const response = await client.messages.create(
       {
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: evidenceText ? 400 : 200,
+        ...claudeParams(CLAUDE_FAST_MODEL, evidenceText ? 400 : 200, "medium", { thinking: "off" }),
         system: evidenceText
           ? "You are an SRE diagnostician. Using the incident AND the collected evidence (correlated alerts, fingerprint history, recent deploys, past repairs, live host state), respond in Traditional Chinese with exactly three lines:\n根因假說: <most likely cause, cite evidence>\n立即動作: <one concrete first action>\n驗證方式: <how to confirm the fix worked>\nBe direct, no markdown."
           : "You are an SRE assistant. Summarize the incident in Traditional Chinese in 1-2 concise sentences: probable root cause + first remediation action. Be direct, no markdown.",

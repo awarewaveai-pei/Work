@@ -3,6 +3,7 @@ import { CLAUDE_DEFAULT_MODEL } from "./claude-params";
 // Ordered cheap → expensive within each group (price = lib/ai/cost-model.ts TEXT_RATES).
 // Labels carry no parenthetical descriptor — pricing is shown separately in the picker UI.
 export const AI_TEXT_MODELS = [
+  { value: "claude-haiku-5-5", label: "Claude Haiku 5.5", group: "Claude" },
   { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", group: "Claude" },
   { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", group: "Claude" },
   { value: "claude-opus-5-5", label: "Claude Opus 5.5", group: "Claude" },

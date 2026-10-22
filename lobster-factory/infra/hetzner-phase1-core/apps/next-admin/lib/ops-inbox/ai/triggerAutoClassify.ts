@@ -1,6 +1,7 @@
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { AiDiagnosis, Incident } from "@/lib/ops-inbox/types";
 import { collectEvidence, renderEvidenceText } from "@/lib/repair-center/evidence";
+import { CLAUDE_FAST_MODEL } from "@/lib/ai/gateway";
 import { summarizeIncidentWithClaude } from "./claude";
 import { summarizeIncidentWithGemini } from "./gemini";
 import { checkAndConsumeGeminiQuota } from "./quotaGuard";
@@ -17,7 +18,7 @@ async function runAiSummarize(
   if (process.env.ANTHROPIC_API_KEY) {
     try {
       const summary = await summarizeIncidentWithClaude(incident, evidenceText);
-      return { provider: "claude", model: "claude-haiku-4-5-20251001", summary };
+      return { provider: "claude", model: CLAUDE_FAST_MODEL, summary };
     } catch {
       // fall through to Gemini
     }

@@ -5,10 +5,12 @@
 // compromised DB row) must never be able to raise the ceiling on money / identity actions.
 // See agency-os/docs/Customer_service/Customer_service_automation_plan.md §3.4, §14.
 
+import { CLAUDE_FAST_MODEL } from "@/lib/ai/claude-params";
+
 export const CS_MODELS = {
   /** Cheap, fast — intent classification + supervisor grounding verdict. */
-  classify: "claude-haiku-4-5-20251001",
-  supervisor: "claude-haiku-4-5-20251001",
+  classify: CLAUDE_FAST_MODEL,
+  supervisor: CLAUDE_FAST_MODEL,
   /** Main customer-facing generation. */
   generate: "claude-opus-5-5",
   /** Cross-provider failover when Claude errors/times out. */

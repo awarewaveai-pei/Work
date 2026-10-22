@@ -1,4 +1,4 @@
-import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
@@ -61,8 +61,7 @@ async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const Anthropic = await loadAnthropic(grant);
   const client = new Anthropic({ apiKey });
   const msg = await client.messages.create({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 800,
+    ...claudeParams(CLAUDE_FAST_MODEL, 800, "medium", { thinking: "off" }),
     messages: [{
       role: "user",
       content: `Analyze this writing sample and extract the brand voice profile. Return ONLY a valid JSON object.

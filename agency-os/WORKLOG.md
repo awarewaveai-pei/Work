@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-22（續1）next-admin 全部 Haiku 4.5 呼叫改 Claude Haiku 5.5（共用參數層處理不相容參數）
+
+**觸發**：操作者「價錢如果一樣就都換」（Haiku 5.5 US$0.10/0.50，Haiku 4.5 US$1/5 每百萬 token）→「commit」。SDK（Sonnet 5.5）改了 21 檔後隨上個 session 結束被中斷，未測、未 commit；本 session 驗收後提交。
+- 共用層 `lib/ai/claude-params.ts`：`NO_EFFORT` 改 `/^claude-haiku-4/`（5.5 支援 effort）；新增 `CLAUDE_FAST_MODEL = "claude-haiku-5-5"` 與 `claudeParams(..., { thinking: "off" })`，只對 Haiku 5.x 送 `thinking: { type: "disabled" }`（always-think 模型送 disabled 會 400）；註解寫明 5.5 不收 budget_tokens／非預設 sampling／assistant prefill。
+- 呼叫點：content（brand-voice、hook-brief、keywords、market-analysis、outline、seo-fix、title、syndicate、trending-sources）、tarot（suggest-prompt、translate）、cs（config、llm）、ops-inbox（claude、triggerAutoClassify）、outreach（ai-claude）、social Writer 的費率常數；`lib/ai/cost-model.ts` 路由列改 5.5；`text-model-options.ts` 加 Haiku 5.5 選項。
+- 保留 Haiku 4.5：`cost-model.ts:42-43` 價目（舊用量紀錄要算成本）、`text-model-options.ts:7` 選單項。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=正式 next-admin 容器內直接打 `/v1/messages`，claudeParams 新產生的三種形狀（effort medium＋thinking 關／effort low＋thinking 關 JSON／effort medium 預設思考）→ 三個 status 200，thinking_tokens 0；`npx tsc --noEmit` 0 errors；`npx vitest run lib/ai lib/content lib/cs lib/ops-inbox lib/outreach app/api/content app/api/tools/tarot` 74 檔 571 passed | exit=0 | ms=300000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 claude-params diff 與 Writer.tsx（只改費率常數一行）；21 檔逐一確認 diff 只含本次換模型
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`claude-haiku-4-5` | hits=2 檔（cost-model 價目、text-model-options 選單；刻意保留）
+- ORACLE_WAIVED: 操作者要求先 commit；Codex 審查隨後跑（下一次 03:00 自動部署前），有確認問題另修
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-21（續41）塔羅翻譯改用 Claude Haiku 5.5（關閉 thinking）＋價目表補 Haiku 5.5
 
 **觸發**：操作者「那就改成Haiku 5.5」。

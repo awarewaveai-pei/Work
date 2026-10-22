@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { textCallCostUsd } from "@/lib/ai/cost-calculator";
-import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 
@@ -71,14 +71,13 @@ Output ONLY the JSON, no markdown fences, no explanation.`;
     const Anthropic = await loadAnthropic(grant);
     const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 2048,
+      ...claudeParams(CLAUDE_FAST_MODEL, 2048, "medium", { thinking: "off" }),
       messages: [{ role: "user", content: prompt }],
     });
     if (msg.stop_reason === "max_tokens") {
       return NextResponse.json({ ok: false, error: "Response truncated — retry with a simpler keyword" }, { status: 502 });
     }
-    const _cost = { usd: textCallCostUsd({ model: "claude-haiku-4-5-20251001", inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens }), model: "claude-haiku-4-5-20251001", vendor: "Anthropic" };
+    const _cost = { usd: textCallCostUsd({ model: CLAUDE_FAST_MODEL, inputTokens: msg.usage.input_tokens, outputTokens: msg.usage.output_tokens }), model: CLAUDE_FAST_MODEL, vendor: "Anthropic" };
     const textBlock = msg.content.find(b => b.type === "text");
     const text = textBlock?.type === "text" ? textBlock.text : "";
     if (!text) return NextResponse.json({ ok: false, error: "Empty model response" }, { status: 502 });

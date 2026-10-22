@@ -16,6 +16,8 @@ export interface ClaudeTurnInput {
   maxTokens: number;
   tools?: Anthropic.Tool[];
   timeoutMs?: number;
+  /** Turn thinking off on models that allow it (Haiku 5.x); ignored on always-think models. */
+  thinking?: "off";
   route: string;
   organizationId?: string | null;
   /** The caller's own feature (cs.answer, cs.intent, cs.eval, cs.translate), asked with the conversation's org. */
@@ -35,7 +37,7 @@ export async function claudeTurn(input: ClaudeTurnInput): Promise<Anthropic.Mess
     const res = await client.messages.create(
       {
         // low effort: customer-facing turns run under CS_TIMEOUTS.generateMs
-        ...claudeParams(input.model, input.maxTokens, "low"),
+        ...claudeParams(input.model, input.maxTokens, "low", { thinking: input.thinking }),
         system: input.system,
         messages: input.messages,
         ...(input.tools && input.tools.length ? { tools: input.tools } : {}),
@@ -116,6 +118,7 @@ export async function generateText(opts: GenerateTextInput): Promise<GenerateTex
       route: opts.route,
       organizationId: opts.organizationId,
       timeoutMs,
+      thinking: "off", // no-tool replies, supervisor, classification: no reasoning step wanted
       grant: opts.grant,
     });
     const text = extractText(msg);

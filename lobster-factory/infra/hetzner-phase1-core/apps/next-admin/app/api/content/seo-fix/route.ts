@@ -1,4 +1,4 @@
-import { loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
+import { CLAUDE_FAST_MODEL, claudeParams, loadAnthropic, type Anthropic } from "@/lib/ai/gateway";
 import { withFeature } from "@/lib/entitlements/grant";
 import type { Grant } from "@/lib/entitlements/can";
 import { NextResponse } from "next/server";
@@ -85,8 +85,7 @@ Please output the COMPLETE improved article. Fix ONLY the listed failed checks â
     // paragraph length, add a section) â€” not creative writing. haiku responds in ~5-10s vs sonnet's
     // ~60-90s, which matters because Cloudflare's 100s proxy timeout would 502 on large articles.
     const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 8192,
+      ...claudeParams(CLAUDE_FAST_MODEL, 8192, "medium", { thinking: "off" }),
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userPrompt }],
     });
