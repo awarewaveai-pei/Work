@@ -305,7 +305,8 @@ function Invoke-SafeGitCapture {
 # function only ever does two things: `git fetch origin` and, when HEAD is strictly
 # behind <Remote>/<Branch> while on <Branch>, `git merge --ff-only`. git itself refuses
 # the fast-forward when it would touch a locally modified tracked file (or an untracked
-# file it would create), and that refusal is REPORTED, never worked around. No stash,
+# file it would create). Since 2026-10-22 such files are carried forward by a clean 3-way
+# merge (scripts/git-parity-merge.py); a conflict is REPORTED and nothing is touched. No stash,
 # no checkout, no reset, no push. Every other state (ahead, diverged, not on the
 # branch, refused) is returned for the caller to print and for AO-CLOSE / the operator
 # to resolve. Before this, ao-resume.ps1 always ran git-align -AllowStash: 217 reflog
@@ -371,8 +372,23 @@ function Invoke-SharedWorktreeParity {
             $r.Action = 'fast-forward'; $r.Ok = $true
             $r.Message = "fast-forwarded $($r.Behind) commit(s) to $Remote/$Branch"
         } else {
-            $r.Action = 'ff-refused'
-            $r.Message = "git refused the fast-forward (a modified tracked file or untracked file would be overwritten); nothing touched. git: " + (($ff.Output | Where-Object { $_ }) -join ' | ')
+            # A local edit in a file origin also changed: carry it forward when it merges cleanly, else touch
+            # nothing (scripts/git-parity-merge.py). Without this the shared checkout never caught up.
+            $carry = $null
+            $py = Get-Command python -ErrorAction SilentlyContinue
+            $script = Join-Path $PSScriptRoot '..\git-parity-merge.py'
+            if ($py -and (Test-Path -LiteralPath $script)) {
+                $out = @(& $py.Source $script --root $WorkRoot --target "$Remote/$Branch" 2>$null)
+                try { $carry = ($out | Select-Object -Last 1) | ConvertFrom-Json } catch { $carry = $null }
+            }
+            if ($carry -and $carry.ok) {
+                $r.Action = 'fast-forward'; $r.Ok = $true
+                $r.Message = "fast-forwarded $($r.Behind) commit(s) to $Remote/$Branch; $($carry.message): $(@($carry.files) -join ', ')"
+            } else {
+                $r.Action = 'ff-refused'
+                $why = if ($carry) { $carry.message } else { 'merge helper unavailable' }
+                $r.Message = "git refused the fast-forward and the local edits cannot be carried ($why); nothing touched. git: " + (($ff.Output | Where-Object { $_ }) -join ' | ')
+            }
         }
     }
     return [pscustomobject]$r

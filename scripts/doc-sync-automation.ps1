@@ -104,7 +104,9 @@ function Upsert-RelatedBlock {
         $newContent = $content.TrimEnd("`r", "`n") + "`r`n`r`n" + $block + "`r`n"
     }
 
-    if ($newContent -ne $content) {
+    # Only the stamp would change = nothing synced: a stamp-only rewrite kept shared files dirty for no content.
+    $noStamp = { param($t) ($t -replace '(?m)^_Last synced: [^\r\n]*', '').TrimEnd("`r", "`n") }
+    if ((& $noStamp $newContent) -ne (& $noStamp $content)) {
         Write-RepoTextFile -Path $full -Content ($newContent + "`n")   # + the newline Set-Content used to add
         return $true
     }

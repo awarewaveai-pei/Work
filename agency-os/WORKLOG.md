@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-22（續18）共用 checkout 永遠追不上 origin → commit 必繞路：parity 改為乾淨 3-way 帶過 dirty 檔；doc-sync 不再只改時間戳
+
+- **症狀**：session `local_3c4f6ba5` 一次「COMMIT」＝22 次模型呼叫、讀約 330 萬 token（每次 ~15 萬 context）：push 被拒（D:\Work 落後）→ 不能 rebase（別人 dirty）→ worktree cherry-pick → 退本地重複 commit。
+- **根因**：C1 `scripts/lib/git-safe-ops.ps1` Invoke-SharedWorktreeParity 遇 origin 也改過的 dirty 檔一律 `ff-refused`（git 對內容相同的 dirty 檔也拒，拋棄式 repo 實測）；C2 `scripts/doc-sync-automation.ps1` Upsert-RelatedBlock 每次改 `_Last synced` → AGENTS.md／TASKS.md 常駐 dirty；C3 我 2026-10-22 加的「worktree push」規則讓 origin 更常前進（已撤回 `9abb5d886`）。
+- **修**：新 `scripts/git-parity-merge.py`：每個擋路檔 3-way（base=HEAD、ours=worktree、theirs=origin）；全部乾淨才做：這些路徑 index→HEAD、檔→HEAD bytes、ff-only、檔→合併結果；衝突／單邊增刪／不同的未追蹤檔 → 全不動。git-safe-ops ff-refused 分支呼叫它（無 python 或失敗 → 照舊回報）。doc-sync：只有時間戳會變就不寫。
+- **當下**：D:\Work 落後 5 → 用同一演算法（`scratchpad/catchup.py` 原型）追上，AGENTS／TASKS 別人的 3 行保留未 commit。
+
+**[驗證結果]**：`powershell -File tests/ao-resume-shared-worktree.test.ps1` 81 passed 0 failed（新 P11 內容相同 dirty、P12 不同行雙方修改都保留、P13 相同未追蹤檔；P3 衝突仍 refused 且不動）；doc-sync Upsert-RelatedBlock AST 抽出測：清單不變→不寫、清單變→寫新戳；`verify-governance-pointers` PASSED。
+**[剩餘風險]**：合併窗口內（毫秒）同檔被另一 session 寫入會被合併結果覆蓋；overlap 路徑的 staged 狀態被重設（內容保留）。
+**[rollback]**：`git revert` 本 commit。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -NoProfile -ExecutionPolicy Bypass -File tests/ao-resume-shared-worktree.test.ps1 | exit=0 | ms=90000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/0n（自審：P3 衝突不動、ff 失敗還原 ours、ASCII JSON 避 CP950）
+- ORACLE: Codex 審本 commit（`codex-oracle.ps1 -DiffRef`），結果記同條目下方
+- BUGHUNT_DONE: scope=agency-os,scripts,tests,.claude | grep=Invoke-SharedWorktreeParity|ff-refused|Last synced|dirty 檔由 git 拒絕 | hits=24
 ## 2026-10-22（續17）worktree 流程剩餘兩項驗完：verify-gate 在 worktree 有效（修 verify-clear 標籤）；AO-CLOSE 只能在主目錄
 
 - **verify-gate**：真 Edit 改 worktree 檔 → `git commit` 被 `verify-gate-commit` 擋 → `verify-clear.ps1` → commit 通過。缺口：`scripts/verify-clear.ps1:41-42` 以 repo 根前綴分類，worktree 檔被標「outside-repo, not committable」（清除照做，只是說謊）。修：讀 `.git/worktrees/*/gitdir`（純檔案讀，不抓 native 輸出）把 linked worktree 算 repo 內。

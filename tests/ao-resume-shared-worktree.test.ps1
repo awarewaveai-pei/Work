@@ -2,7 +2,7 @@
 #   I1  a session auto-triggers AO-RESUME at most once, however many sessions interleave
 #       (Test-/Add-AoResumeSessionSeen in mcp/claude-userlevel/hooks/ao-resume-on-prompt.ps1)
 #   I2  automatic mainline parity never stashes / resets / checks out / pushes: fetch + ff-only,
-#       and git's own refusal to overwrite a dirty file is reported, not worked around
+#       a dirty file origin also changed is carried forward only by a clean 3-way merge, else reported
 #       (Invoke-SharedWorktreeParity in scripts/lib/git-safe-ops.ps1)
 # Run: powershell -NoProfile -ExecutionPolicy Bypass -File tests/ao-resume-shared-worktree.test.ps1
 # All fixtures live under $env:TEMP (never inside the repo). Exit 0 = all pass.
@@ -157,6 +157,30 @@ try {
     $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
     Assert-Eq $r.Action 'ff-refused' 'P10 action'
     Assert-Eq (Read-File (Join-Path $f.Wt 'c.txt')) "c-local-untracked`n" 'P10 untracked file untouched'
+
+    # P11 dirty file byte-identical to what origin now has (a commit pushed from elsewhere) -> caught up
+    $f = New-Fixture 'p11'; Advance-Origin $f 'a.txt' "a2`n"; Set-File (Join-Path $f.Wt 'a.txt') "a2`n"
+    $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
+    Assert-Eq $r.Action 'fast-forward' 'P11 action'
+    Assert-Eq (G $f.Wt @('rev-parse', 'HEAD')) (G $f.Wt @('rev-parse', 'origin/main')) 'P11 HEAD == origin/main'
+    Assert-Eq (G $f.Wt @('status', '--porcelain', '--untracked-files=no')) '' 'P11 nothing left modified'
+
+    # P12 local hunk and origin hunk in different lines of one file -> both kept, no stash
+    $f = New-Fixture 'p12'; Set-File (Join-Path $f.Wt 'm.txt') "1`n2`n3`n4`n5`n"
+    G $f.Wt @('add', 'm.txt') | Out-Null; G $f.Wt @('commit', '-q', '-m', 'm') | Out-Null; G $f.Wt @('push', '-q', 'origin', 'main') | Out-Null
+    G $f.Other @('pull', '-q') | Out-Null; Advance-Origin $f 'm.txt' "1`n2`n3`n4`nFIVE`n"
+    Set-File (Join-Path $f.Wt 'm.txt') "ONE`n2`n3`n4`n5`n"
+    $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
+    Assert-Eq $r.Action 'fast-forward' 'P12 action'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'm.txt')) "ONE`n2`n3`n4`nFIVE`n" 'P12 local and origin edits both present'
+    Assert-Eq (G $f.Wt @('rev-parse', 'HEAD')) (G $f.Wt @('rev-parse', 'origin/main')) 'P12 HEAD == origin/main'
+    Assert-Eq (Count-Stash $f.Wt) 0 'P12 no stash'
+
+    # P13 untracked file identical to the one origin adds -> caught up, file kept
+    $f = New-Fixture 'p13'; Advance-Origin $f 'c.txt' "c-origin`n"; Set-File (Join-Path $f.Wt 'c.txt') "c-origin`n"
+    $r = Invoke-SharedWorktreeParity -WorkRoot $f.Wt
+    Assert-Eq $r.Action 'fast-forward' 'P13 action'
+    Assert-Eq (Read-File (Join-Path $f.Wt 'c.txt')) "c-origin`n" 'P13 file content kept'
 
     # ---------------- I3: hooks act on the MAIN checkout only (2026-09-27) ----------------
     # A linked worktree (git worktree add) has `.git` as a FILE. Accepting it as the root wrote hook

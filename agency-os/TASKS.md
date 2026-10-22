@@ -65,7 +65,7 @@
 
 ## Next — 未完成（目前正式隊列）
 
-- [ ] **共用 checkout 永遠追不上 origin（根因，決策 `agency-os/reports/decisions/2026-10-22-per-session-worktree-pilot.md` §撤回）**：`agency-os/WORKLOG.md`／`TASKS.md` 在 `D:\Work` 幾乎總有別人未 commit 的 hunk，而 origin 上這兩檔每個 commit 都在變；git 對 dirty 檔一律拒絕 ff（內容與目標相同也拒），所以只要有 push 不經 `D:\Work`，`D:\Work` 就落後，之後在 `D:\Work` commit 必被拒 push。治本候選＝WORKLOG／TASKS 改每筆一檔（方案 B）；開工前要操作者同意。建議模型：Opus 5.5
+- [x] **共用 checkout 永遠追不上 origin（2026-10-22 已解）**：AO-RESUME parity 遇到 origin 也改過的 dirty 檔，乾淨 3-way 合併就帶過去（`scripts/git-parity-merge.py`，`scripts/lib/git-safe-ops.ps1` ff-refused 分支），衝突才停；doc-sync 不再只改時間戳（`scripts/doc-sync-automation.ps1` Upsert-RelatedBlock）。不需拆 WORKLOG／TASKS。WORKLOG 2026-10-22 同名條目。
 > **版面規約（減少漏勾／誤判）**  
 > - **本節只保留 `- [ ]`。**已結案請移到 **`## Next — 已完成歷程（查詢用）`**，不要留在這裡。  
 > - **代理**：完成某一條 DoD 時，當日 **`WORKLOG`** 必須有 **`- AUTO_TASK_DONE: <子字串>`**（命中該條待辦）；`AO-CLOSE` 會跑 **`apply-closeout-task-checkmarks`**。  
