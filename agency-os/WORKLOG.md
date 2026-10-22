@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-22（續10）asset-mcp-refs 紅燈：app 同步的 skill 不是 repo 資產（Claude）
+
+**根因**：`scripts/verify-asset-mcp-refs.mjs` 走檔案系統掃 `.claude/skills`，連 Claude desktop app 寫入的 `.claude/skills/synced/<uuid>/`（引用 remote-devices／memory MCP，48 筆）一起掃；`7de686789` 為消 `check-claude-sync` 的 untracked 警告把 app 輸出 255 檔整包 commit。VBC：grep scripts／mcp／.claude／docs 無任何依賴者。
+- 不變量：repo 資產檢查只掃 repo 擁有的檔；範圍 SSOT = `.gitignore`。
+- C1 `.gitignore`：`.claude/skills/synced/`；`git rm -r --cached` 該目錄（磁碟檔保留，app 照寫）。
+- C2 `verify-asset-mcp-refs.mjs collectFiles()`：ROOTS 改 `git ls-files --cached --others --exclude-per-directory=.gitignore`；git 失敗／0 檔 throw（不虛綠）；EXTRA_FILES（含 gitignored 的 `.claude/SUBAGENT_CHARTER.md`）直接掃。
+- Codex 3 輪：F1 原始碼混入真 NUL（git 視為 binary）→ 已修；F2 `--exclude-standard` 吃全域 exclude → 改 per-directory；F3 EXTRA_FILES 被 git 濾掉（回歸）→ 已修；F4 64MiB maxBuffer → 超限會 throw 非靜默，~183 檔不改。
+- 止血非治本？否，治本。rollback：`git revert <sha>`。
+
+- REALTEST_EVIDENCE: tool=Bash | cmd=`bash scripts/test-hooks.sh`（370/370 pass，原 369）＋突變：diagnose/SKILL.md 加 `mcp__nopeserver__x` → asset 測試紅（SKILL.md:123）→ `git show HEAD:` 還原 → 綠 | exit=0 | ms=87000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/2m/1n
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp,tests | grep=`skills/synced` | hits=0 依賴者（僅 WORKLOG 歷史敘述）
 ## 2026-10-22（續9）file-claim-guard 不再對機器產生檔發「另一個 session 在編輯」（Claude）
 
 **根因**：近 14 天 1,860 次誤報（~120 萬字元進 context）。(A) `agency-os/reports/status/*-LATEST.{json,md}` 由腳本整份重寫，某 session 跑過產生器即持有 claim，未 commit 前之後任何重寫都算到當下指令。(B) Claude app 寫進 `.claude/` 的狀態檔（`policy-limits.json*`、`remote-settings.json*`）未被 ignore，進 `listedPaths`。

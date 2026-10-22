@@ -53,6 +53,8 @@ _paid-plugins/
 # Negate the wildcard ignore for actual skill content; runtime caches stay ignored.
 !.claude/skills/*/
 !.claude/skills/*.skill
+# Claude desktop app writes skills-plugin bundles here (uuid buckets); app-owned, not repo assets.
+.claude/skills/synced/
 .claude/skills/.cache/
 .claude/skills/*/.cache/
 

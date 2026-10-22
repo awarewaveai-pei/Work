@@ -25,7 +25,8 @@
 // Node-only on purpose: these assets are shared with Codex, whose containers ship
 // without pwsh, so a `.ps1` gate would only ever run on the Windows laptop.
 
-import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -76,26 +77,32 @@ function readRegistry() {
   return { enabled, disabled };
 }
 
-function walk(dir, out) {
-  for (const name of readdirSync(dir)) {
-    const full = join(dir, name);
-    const st = statSync(full);
-    if (st.isDirectory()) walk(full, out);
-    else if (EXTS.has(name.slice(name.lastIndexOf('.')))) out.push(full);
-  }
-  return out;
-}
-
+// File set = what git considers repo-owned under ROOTS (tracked + untracked,
+// minus .gitignore). One SSOT: app-owned output such as .claude/skills/synced/ is ignored
+// there, so it is neither committed nor scanned. A filesystem walk would disagree with it.
 function collectFiles() {
-  const files = [];
-  for (const root of ROOTS) {
-    const abs = join(REPO, root);
-    if (existsSync(abs)) walk(abs, files);
+  let out;
+  try {
+    out = execFileSync(
+      'git',
+      ['ls-files', '-z', '--cached', '--others', '--exclude-per-directory=.gitignore', '--', ...ROOTS],
+      { cwd: REPO, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+    );
+  } catch (e) {
+    // No git = no evidence; failing beats a vacuous "0 files OK".
+    throw new Error(`git ls-files failed, cannot determine repo-owned assets: ${e.message}`);
   }
+  const files = [...new Set(out.split('\x00').filter(Boolean))]
+    .filter((f) => EXTS.has(f.slice(f.lastIndexOf('.'))))
+    .map((f) => join(REPO, f))
+    .filter((abs) => existsSync(abs));
+  // EXTRA_FILES are named explicitly (some are gitignored deployed copies, e.g. the
+  // charter), so they bypass the git filter; only discovery under ROOTS is git-defined.
   for (const f of EXTRA_FILES) {
     const abs = join(REPO, f);
     if (existsSync(abs)) files.push(abs);
   }
+  if (files.length === 0) throw new Error('git ls-files returned no asset files; refusing a vacuous pass');
   return files;
 }
 
