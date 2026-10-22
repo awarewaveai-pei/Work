@@ -1,6 +1,6 @@
 # Integrated status report (assembled)
 
-- Generated: 2026-10-23 00:32:00
+- Generated: 2026-10-23 01:41:27
 - agency-os root: `D:\Work\agency-os`
 
 > Assembled from canonical sources only; edit those files to change truth. Chinese legend: `docs/overview/INTEGRATED_STATUS_REPORT.md`
@@ -388,6 +388,7 @@
 - 治理／git：worktree 試行與撤回 `0e84c4273`／`67d3b19df`／`9abb5d886`／`cb9079d51`；parity 3-way 帶過 dirty 檔 `4d73ef128`、`b623ab7fd`；WORKLOG merge=union `005386b96`；commit 帶 pathspec `c9c3a017d`；verify-clear 認 linked worktree `76390ae87`
 - hooks／檢查器誤報：file-claim-guard `a5d8202d9`、asset-mcp-refs `3c3f415ea`、sync-check S1 `3aac84cba`、session 摘要不進 git `79e6ae100`；`.mcp.json` 移除 copilot／work-global `9a3e844ae`
 - 產品：市場分析 Opus 5.5 `f37a1c782`；社群 C25 Codex 審修正 `bfa17b4a0`；C12 標完成 `89acc3fc9`；My Designs 篩選 `d26b8b281`
+- AO-CLOSE commit 範圍修正：`87d6435e5` 加回被誤移出 git 的 5 份 oracle 報告；`20f8f6c30` sync／骨架 commit 改走私有 index 快照；`6d0f3886f` gate 也只檢查本 session 要 commit 的內容（tests/ao-close-index-scope.test.ps1 11/11）
 
 ## Current state
 - 以上全在 main；今晚 03:00 自動部署 next-admin 上線

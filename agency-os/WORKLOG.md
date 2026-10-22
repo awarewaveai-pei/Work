@@ -1617,6 +1617,16 @@
 - rollback：git revert狀態commit；實作獨立revert 1ef1ee419。無prod部署。
 
 
+## 2026-10-23
+
+- AUTO_TASK_DONE_APPLIED (2026-10-22T17:38:10Z): 共用 checkout 永遠追不上 origin（2026-10-22 已解）
+- REVIEW_WAIVED: DOC_ONLY -- AO-CLOSE sync commit 只含 WORKLOG／memory／daily；程式改動的審查證據在續2、續3
+- BUGHUNT_WAIVED: DOC_ONLY -- AO-CLOSE sync commit 只含 WORKLOG／memory／daily
+- REALTEST_WAIVED: DOC_ONLY -- 同上，無程式檔
+
+### Daily
+- (TBD)
+
 ## 2026-10-22
 
 ### Daily
