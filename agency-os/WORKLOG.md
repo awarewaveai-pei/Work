@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-23（續1）塔羅「動物・自然」整類修正（62 張牌各自的四腳動作）＋ schnell 梵谷筆觸（實數 T5 token）（Claude）
+
+**觸發**：操作者截圖（11:40 動物・自然：貓直立、前爪拿玫瑰與手杖；小狗變小白貓飄在崖外）＋「flux-schnell 的筆觸也不夠梵谷風格」＋問「動物・自然把東西拿掉會不會影響牌義」。
+
+**根因**
+- C1 動物・自然自相矛盾：只把 pose 換成「stays on all four legs …」，`scene` 仍寫 `holding a white rose in the left hand …`；62 張 upright 牌有 42 張 scene 含手／拿著。
+- C2 牌義流失：舊 natural 只是 PROP_PLACEMENT 的「物件放哪」，姿勢／視線／方向全丟（魔術師指天指地、聖杯八轉身離開、權杖二三遠望、聖杯四垂眼、錢幣二拋接、騎馬／寶座／戰車），原本靠 scene 補回＝C1 的矛盾來源。
+- C3 schnell 筆觸弱：以 Google T5 v1.1 XXL `spiece.model`（FLUX 同一 tokenizer）實數，content-first prompt 306–356 token，schnell 只讀 255 → 被截的正是「swirling flame-like rhythms, skies turning to vortexes」「Deep ultramarine and burning yellow」（續20 以字數估 160 字詞，估錯）。
+- 實測另得：無手字眼時 schnell 仍把背著背包的貓畫成直立（4 張 3 張）；群體牌「two blue cat figures」被畫成貓頭人；權杖四 scene「in welcome」被畫成文字「Welcame」。
+
+**修改**（`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/`）
+- `app/(shell)/tools/tarot/cards.ts` 資料：62 張 upright 牌 → `pose`＝人物完整動作（手持物都在）；`natural`＝完整四腳動物動作，保留姿勢／視線／方向與承載牌義的動作（魔術師：前爪指天、尾巴垂地；聖杯八：背影四腳走離；寶座牌：坐在寶座上；騎馬牌：坐在馬背）；`scene`＝位置＋環境＋道具，不含手。女祭司 palms→fronded date trees（「palm」誤判）。權杖四 in welcome→in celebration、natural 改 sitting side by side on their haunches。
+- 程式：刪 `PROP_PLACEMENT`／`PropKind`／`holds`／`naturalPlacement`／`NATURAL_SENTENCE(_GROUP)`；animal-natural 直接用 `card.natural`，單一主角後插 `NATURAL_BODY`（an ordinary real four-legged animal），群體前置 `NATURAL_BODY_GROUP` 且 `{hero} figures`→`{hero} animals`（新 `heroKindFor`）。content-first：場景後的風格依目錄句型排序（技法餘句→配色→形體→構圖→情緒，`CATALOG_SENTENCE_RANK` 逐句比對，多選風格交錯排）、刪結尾通用句、`GROUNDING` 縮短（保留 kneels）。
+- 測試：`cards.test.ts` 62 張皆有 natural、scene／natural／natural prompt 無手字眼、人物 prompt 保有手持物、魔術師 natural 開頭；`lib/tarot/__tests__/model-specs.test.ts` 兩個 preset 交錯排序、場景位置改用 snowy mountains。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run "app/(shell)/tools/tarot" lib/tarot`（23 pass）；`npx tsc --noEmit -p .` exit 0；T5 實數：234 個 prompt（78 張×人物／擬人／自然，梵谷）中位 242、max 309、63 個 >255，**場景被 schnell 截斷 0 個**；flux-schnell 實生 26 張（seed 7/3038）：動物・自然 愚人 4/4 四腳或坐、魔術師 1/2 舉爪、聖杯八四腳背影離去、權杖四兩貓坐姿叼花（修前 2/2 直立跳舞）；全部有厚塗筆觸 | exit=0 | ms=900000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-2e365aed.md`：F1 屬實且嚴重（測試 regex 的 `\b` 被 Python 寫成 U+0008 退格字元，手字眼測試形同虛設）→ 以 chr 位元組修正，修後立刻抓到女祭司 palms；F2 多選風格 10 句不重排 → 逐句比對目錄排名＋測試（突變：拿掉排名→紅、還原→綠）；F3 GROUNDING 少 kneels 與星星跪姿矛盾 → 補回；F4 權杖四 sitting on all four paws → on their haunches
+- ORACLE_WAIVED: Codex 以 -Path 只審本批 3 檔（partialreview）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`PROP_PLACEMENT|naturalPlacement|NATURAL_SENTENCE|PropKind|holds:` | hits=0（刪除的匯出無其他引用；holds 命中皆為英文單字）
+
+**剩餘**：魔術師舉爪 1/2（seed 依賴）；假簽名照舊（操作者決定不處理）；schnell 63 個 prompt 仍截掉構圖／情緒句（設計上最後捨棄）。T5 數 token 工具在 scratchpad（需 spiece.model 791KB），未進 repo。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-22（續23）My Designs 篩選「數字和項目變來變去」：選項集合固定、每列「全部」用本列總數、塔羅來源單一清單（Claude）
 
 **觸發**：操作者截圖 app.aware-wave.com/tools/designs 產品／主題列「這數字和項目變來變去」。

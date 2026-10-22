@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MODEL_SPECS } from "../model-specs";
 import { TAROT_MODELS } from "../image-gen";
 import { TAROT_CARDS, buildCardPrompt } from "@/app/(shell)/tools/tarot/cards";
+import { STYLE_CATALOG } from "@/app/(shell)/tools/tarot/tarotStyles";
 
 // content-first opens with the anchor + the first technique sentence (the brief); the rest starts at the marker.
 const BRIEF = "thick impasto oil, short rhythmic forceful directional brushstrokes, palette-knife buildup";
@@ -37,12 +38,27 @@ describe("model specs", () => {
     for (const w of style.split(" ")) expect(p, w).toMatch(new RegExp(`\\b${w}\\b`, "i"));
   });
 
+  it("orders two picked presets by sentence kind, so a cut drops composition and mood first (Codex 2026-10-23)", () => {
+    const [a, b] = [STYLE_CATALOG[0], STYLE_CATALOG[1]];
+    const sa = a.prompt.replace(/[.\s]+$/, "").split(". ");
+    const sb = b.prompt.replace(/[.\s]+$/, "").split(". ");
+    const p = buildCardPrompt(TAROT_CARDS[0], { style: `${a.zh}, ${b.zh}`, order: "content-first" });
+    // The 1200-char style cap may drop the end of the second preset; compare only the sentences that made it in.
+    const present = (ts: string[]) => ts.filter((t) => p.includes(t));
+    const palettes = present([sa[3], sb[3]]);
+    const late = present([sa[1], sb[1], sa[4], sb[4]]);
+    expect(palettes.length).toBeGreaterThan(0);
+    expect(late.length).toBeGreaterThan(0);
+    // Every palette (index 3) comes before every composition (index 1) or mood (index 4).
+    for (const pal of palettes) for (const l of late) expect(p.indexOf(pal), `${pal} | ${l}`).toBeLessThan(p.indexOf(l));
+  });
+
   it("puts the scene before the style detail in content-first order and after it otherwise", () => {
     const fool = TAROT_CARDS[0];
     const first = buildCardPrompt(fool, { styleResolved: STYLE, order: "content-first" });
     const second = buildCardPrompt(fool, { styleResolved: STYLE });
-    expect(first.indexOf("white rose")).toBeLessThan(first.indexOf("STYLEDETAIL"));
-    expect(second.indexOf("white rose")).toBeGreaterThan(second.indexOf("STYLEDETAIL"));
+    expect(first.indexOf("snowy mountains")).toBeLessThan(first.indexOf("STYLEDETAIL"));
+    expect(second.indexOf("snowy mountains")).toBeGreaterThan(second.indexOf("STYLEDETAIL"));
   });
 
   it("never lets Nano Banana Pro fall back to another vendor's model", () => {

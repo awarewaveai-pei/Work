@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GROUNDING, NATURAL_SENTENCE, PROP_PLACEMENT, TAROT_CARDS, UPRIGHT_SENTENCE, UPRIGHT_SENTENCE_GROUP, buildCardPrompt } from "./cards";
+import { GROUNDING, TAROT_CARDS, UPRIGHT_SENTENCE, UPRIGHT_SENTENCE_GROUP, buildCardPrompt } from "./cards";
 
 describe("buildCardPrompt grounding", () => {
   it("adds the grounding sentence to a non-airborne card and not to an airborne one", () => {
@@ -35,13 +35,13 @@ describe("buildCardPrompt pose", () => {
       .toContain(UPRIGHT_SENTENCE_GROUP.split("{hero}").join("blue cat"));
   });
 
-  it("hero kind picks the hands-card sentence: upright paws, natural placement, or neither for a person", () => {
+  it("hero kind picks the hands-card sentence: upright paws, the card's natural action, or neither for a person", () => {
     const magician = TAROT_CARDS.find((c) => c.name === "THE MAGICIAN")!;
-    const natural = NATURAL_SENTENCE.split("{hero}").join("blue cat");
     const p = (heroKind?: "person" | "animal-upright" | "animal-natural") =>
       buildCardPrompt(magician, { subject: "a blue cat", heroKind });
     expect(p("animal-upright")).toContain(upright);
-    expect(p("animal-natural").startsWith(`${natural}${PROP_PLACEMENT.wands}, `)).toBe(true);
+    // The meaning-carrying gesture survives on four legs: a paw to the sky, the tail to the ground.
+    expect(p("animal-natural").startsWith("A blue cat, an ordinary real four-legged animal, sitting upright on its haunches behind the altar, one front paw lifted high toward the sky")).toBe(true);
     expect(p("animal-natural")).not.toContain("right hand raising a wand");
     expect(p("animal-natural")).not.toContain("upright like a person");
     expect(p("animal-natural")).not.toContain("front paws as hands");
@@ -49,6 +49,29 @@ describe("buildCardPrompt pose", () => {
       expect(person).not.toContain("upright like a person");
       expect(person).not.toContain("all four legs");
     }
+  });
+
+  // 「動物・自然」 2026-10-22: the scene said "holding a white rose in the left hand" after "on all four legs", and FLUX
+  // drew the cat standing with the rose in its paw. A held prop or hand gesture lives only in pose / natural.
+  const HANDS = /\b(hands?|holding|holds|gripping|grasping|clutching|arms?|fingers?|palms?)\b/i;
+  it("gives every upright card a four-legged natural action and keeps hands out of its scene and natural", () => {
+    const upr = TAROT_CARDS.filter((c) => c.upright);
+    expect(upr.length).toBe(62);
+    for (const c of upr) {
+      expect(c.natural, c.name).toContain("{hero}");
+      expect(c.natural, c.name).not.toMatch(HANDS);
+      expect(c.scene, c.name).not.toMatch(HANDS);
+    }
+  });
+
+  it("a natural prompt never says hand or holding anywhere, and a person prompt keeps the held props", () => {
+    for (const c of TAROT_CARDS.filter((x) => x.upright)) {
+      const natural = buildCardPrompt(c, { subject: "a blue cat", heroKind: "animal-natural" });
+      expect(natural.split(". ")[0], c.name).not.toMatch(HANDS);
+      expect(natural.slice(natural.indexOf(". ") + 2), c.name).not.toMatch(HANDS);
+    }
+    const fool = TAROT_CARDS.find((c) => c.name === "THE FOOL")!;
+    expect(buildCardPrompt(fool)).toContain("a white rose in the left hand and a knapsack tied to a slender staff");
   });
 
   it("starts with the hero + pose sentence and still carries the full style lead", () => {
