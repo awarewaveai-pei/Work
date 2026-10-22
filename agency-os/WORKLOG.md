@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-22（續5）塔羅愚人牌：狗背包袱、繩子飄在空中、出現兩隻狗 → 提示詞語序修正（Claude）
+
+**根因**：`app/(shell)/tools/tarot/cards.ts:45` 愚人 scene 把「holding a white rose… knapsack tied to a slender staff over the shoulder」寫在「a small white dog trotting at the heels」之後，模型把玫瑰／包袱／細棍歸給狗（操作者截圖：白狗背包袱拖棍，像飄浮的牽繩）；也沒寫只有一隻狗。RWS 原圖的狗本就沒有牽繩。
+
+- 改為主角道具緊接主角（the {hero} holding…，staff 在 {hero}'s own shoulder），狗放最後：exactly one、unleashed with no leash or rope、carrying nothing。{hero} 以 split/join 全部替換（cards.ts:291），多次出現無妨。
+- 掃 78 張 scene：分詞子句（holding/carrying/raising…）前一子句不是 {hero} 的只有愚人；隱士為主角連續動作，正常。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run "app/(shell)/tools/tarot" lib/tarot`（3 files／6 pass）；`npx tsc --noEmit` exit 0；Python 掃描 78 張 scene 只命中愚人 | exit=0 | ms=60000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回替換後 scene 與 buildCardPrompt 的 {hero} 全域替換
+- ORACLE_WAIVED: 單一提示詞字串修改，無程式邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`trotting at the heels|knapsack tied to a slender staff` | hits=1（cards.ts:45，本次修改）
+
+**rollback**：`git revert <本 commit>`。未部署，03:00 自動部署 main。
 ## 2026-10-22（續4）Codex hooks 自 10-21 15:18 起全部沒跑：sync-mcp-config.ps1 把 /hooks trust 當成 MCP 區塊內容一起刪掉
 
 **觸發**：AO-CLOSE parity 1/450 失敗（Codex session 10:39Z 沒有 heartbeat）；操作者「我不會 你做」。
