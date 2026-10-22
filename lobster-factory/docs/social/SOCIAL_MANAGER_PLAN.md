@@ -78,7 +78,7 @@
 - 範圍：所有狀態轉換、改時間、連接、刪除、還原寫 `social_audit_log`（C4 的 `transition` 內統一寫）；「紀錄」檢視＋「需處理」篩選。
 - 驗收：每個動作一筆紀錄的測試。
 
-### C12 上線（Opus 5.5；High-STOP）——1→6 ✅ 2026-10-15（5、6 上線：next-admin `4c4e153a7`，social.aware-wave.com 開門；ContentStudio 換連結未做）
+### C12 上線（Opus 5.5；High-STOP）——1→6 ✅ 2026-10-15（5、6 上線：next-admin `4c4e153a7`，social.aware-wave.com 開門；ContentStudio 換連結 2026-10-15 `43e4a50c2` 已做，`ContentStudio.tsx:3681-3687`）
 - 範圍：nginx vhost `social.aware-wave.com`（`safe-infra-patch.sh host-nginx`）；`middleware.ts` 以 host 選產品；`sg-deploy.sh next-admin`；`/playwright smoke`；ContentStudio 的 Postiz 面板改成「到社群發文」連結。
 - 驗收：`/check-drift` → `/verify` → deploy → smoke；runbook §9 更新；WORKLOG。
 - 對外開放前（C4 審查 2026-10-15 留下的）：API 錯誤訊息改成固定文字（現在 `lib/social/store.ts` fail()／addImage 會帶資料庫與 Postiz 的原文，只限員工時可接受）；`GET /api/social/accounts` 會寫入（配對連接），而 GET 不經過 CSRF 檢查。
@@ -88,7 +88,7 @@
   2. compose 加 `SOCIAL_DISPATCH_TOKEN`（`safe-infra-patch.sh compose`），`SOCIAL_DISPATCH_ENABLED=true`、`SOCIAL_DISPATCH_MODE=draft` → `sg-deploy.sh next-admin` → `/playwright smoke`。
   3. Trigger deploy（`trigger-deploy-agent`，`tr_pat_*`）：`social-dispatch`、`social-rotation`。
   4. C5 驗收：排一則 Bluesky 貼文 → draft 模式送出 → Postiz 出現 DRAFT 且 `postiz_post_id` 回寫 → 刪掉 → 改 `SOCIAL_DISPATCH_MODE=apply`。
-  5. ✅ 2026-10-15 上線（DNS、憑證 11 SAN、主機 nginx、lobster-nginx、sg-deploy `4c4e153a7`；證據 WORKLOG 2026-10-15 C12 ⑤⑥ 上線條目）。未做：ContentStudio 的 Postiz 面板換連結。以下為當時的步驟：子網域（規則＝ADR 018 三扇門）。程式已完成：`lib/portal/doors.ts`、middleware 把 social 網址的頁面改寫到 `/social`（`app/social/`，不套員工側欄）、其他 API 404；登入 cookie 不跨子網域，social 網址自己登入。repo 已寫好 lobster-nginx `nginx/default.conf` social 區塊（擋 matcher 跳過的路徑與編碼路徑）與主機 `sg-stack.aware-wave.com.conf` server_name。**上線待 go**：Cloudflare DNS `social`（proxied）→ 憑證加 social（`/etc/letsencrypt/live/aware-wave.com` 2026-10-15 查：SAN 10 個網址，沒有 social；用該憑證原本的簽發方式 expand）→ 主機 nginx（`safe-infra-patch.sh host-nginx`）→ lobster-nginx（`safe-infra-patch.sh nginx`）→ `sg-deploy.sh next-admin` → `/playwright smoke`＋social 網址實測（未登入轉 /login、/api/ops 404、員工登入看得到社群）；ContentStudio 的 Postiz 面板換成「到社群發文」連結。
+  5. ✅ 2026-10-15 上線（DNS、憑證 11 SAN、主機 nginx、lobster-nginx、sg-deploy `4c4e153a7`；證據 WORKLOG 2026-10-15 C12 ⑤⑥ 上線條目）。ContentStudio 的 Postiz 面板換連結也已做（`43e4a50c2`）。以下為當時的步驟：子網域（規則＝ADR 018 三扇門）。程式已完成：`lib/portal/doors.ts`、middleware 把 social 網址的頁面改寫到 `/social`（`app/social/`，不套員工側欄）、其他 API 404；登入 cookie 不跨子網域，social 網址自己登入。repo 已寫好 lobster-nginx `nginx/default.conf` social 區塊（擋 matcher 跳過的路徑與編碼路徑）與主機 `sg-stack.aware-wave.com.conf` server_name。**上線待 go**：Cloudflare DNS `social`（proxied）→ 憑證加 social（`/etc/letsencrypt/live/aware-wave.com` 2026-10-15 查：SAN 10 個網址，沒有 social；用該憑證原本的簽發方式 expand）→ 主機 nginx（`safe-infra-patch.sh host-nginx`）→ lobster-nginx（`safe-infra-patch.sh nginx`）→ `sg-deploy.sh next-admin` → `/playwright smoke`＋social 網址實測（未登入轉 /login、/api/ops 404、員工登入看得到社群）；ContentStudio 的 Postiz 面板換成「到社群發文」連結。
   6. ✅ 程式 2026-10-15：middleware 帶 `x-ops-user-id`；`authz.ts` 讀 `social_brand_members`（成員列優先，員工 owner/admin 全品牌 owner）；客戶不能開新頻道連接（時間配對只對員工安全）、看不到員工角色與 user id。2026-10-15 成員管理也完成：0103 RPC＋`/api/social/members`（只限擁有者）＋設定頁「成員」。
 
 ### C13 版面規格 ✅ 樣稿第 16 版 2026-10-17（`mockups/social-manager-mock.html`，`0755e32ab`；ADR 016 §5 操作者定案 1–6；檢查 `check-social-mocks.py`＝`[chips]`／`[card-thumb]`／`[one-screen]`／`[dead-button]` 全綠）
