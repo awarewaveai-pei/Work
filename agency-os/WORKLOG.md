@@ -23,6 +23,8 @@
 **剩餘**：魔術師舉爪 1/2（seed 依賴）；假簽名照舊（操作者決定不處理）；schnell 63 個 prompt 仍截掉構圖／情緒句（設計上最後捨棄）。T5 數 token 工具在 scratchpad（需 spiece.model 791KB），未進 repo。
 
 **rollback**：`git revert <本 commit>`。
+- AUTO_TASK_DONE: 共用 checkout 永遠追不上 origin（2026-10-22 已解）
+
 ## 2026-10-22（續23）My Designs 篩選「數字和項目變來變去」：選項集合固定、每列「全部」用本列總數、塔羅來源單一清單（Claude）
 
 **觸發**：操作者截圖 app.aware-wave.com/tools/designs 產品／主題列「這數字和項目變來變去」。
