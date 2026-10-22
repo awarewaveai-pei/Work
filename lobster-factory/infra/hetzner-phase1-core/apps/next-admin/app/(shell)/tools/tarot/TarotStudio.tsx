@@ -8,7 +8,7 @@ import GradedPreview from "@/components/tools/GradedPreview";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, buildSemanticBase } from "@/lib/studio/semantic-filename";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
-import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type TarotCard } from "./cards";
+import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type HeroKind, type TarotCard } from "./cards";
 import { needsEnglish, translateForDeck } from "@/lib/tarot/translate";
 import { tabStyle, chipStyle, ghostBtn } from "@/components/tools/panel-primitives";
 
@@ -76,6 +76,12 @@ const MODEL_OPTIONS: ModelOption[] = [
 ];
 
 const PRESET_LABELS = new Set(STYLE_PRESETS.map((p) => p.zh));
+
+const HERO_KINDS: { value: HeroKind; label: string }[] = [
+  { value: "person", label: "人物" },
+  { value: "animal-upright", label: "動物・擬人" },
+  { value: "animal-natural", label: "動物・自然" },
+];
 
 // One Haiku call per non-English field per deck (lib/tarot/translate.ts); throws with the route's error.
 async function translateText(text: string): Promise<string> {
@@ -239,8 +245,8 @@ export default function TarotStudio() {
   // English for a non-English subject + the original it was made from; editing the original invalidates it.
   const [subjectEnglish, setSubjectEnglish] = useState("");
   const [subjectEnglishSrc, setSubjectEnglishSrc] = useState("");
-  // 「主角是動物」: stands the hero up on cards whose action needs hands (cards.ts `upright`). Explicit, never guessed.
-  const [subjectIsAnimal, setSubjectIsAnimal] = useState(false);
+  // 「主角類型」: how an animal hero acts on cards whose action needs hands (cards.ts `upright`). Explicit, never guessed.
+  const [heroKind, setHeroKind] = useState<HeroKind>("person");
   const [translateBusy, setTranslateBusy] = useState(false);
   const [translateError, setTranslateError] = useState<string | null>(null);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
@@ -318,7 +324,7 @@ export default function TarotStudio() {
   const subjectNeedsEnglish = needsEnglish(subjectText);
   const subjectForPrompt = !subjectNeedsEnglish ? subjectText : subjectEnglishSrc === subjectText.trim() ? subjectEnglish : "";
   const sigOf = (model: string, style: string, subject: string) =>
-    `${model}::${style.trim()}::subj=${subjectText.trim()}=>${subject.trim()}::animal=${subjectIsAnimal}::refs=${referenceImages.length}`;
+    `${model}::${style.trim()}::subj=${subjectText.trim()}=>${subject.trim()}::hero=${heroKind}::refs=${referenceImages.length}`;
 
   // Stale when model selection, aspect ratio, style, subject, or refs changed after last generate.
   const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== sigOf(activeModel, effectiveEnglish, subjectForPrompt);
@@ -560,7 +566,7 @@ export default function TarotStudio() {
       if (!en || deckGenRef.current !== deck) return;
       const resp = await callGenerate({
         model: activeModel,
-        prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, nonHumanSubject: subjectIsAnimal }),
+        prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind }),
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
         printQuality: true,
@@ -605,7 +611,7 @@ export default function TarotStudio() {
     }
     // Capture prompt at compare time; selectCompareResult reads these for previewSig.
     compareStyleRef.current = { english: en.style, sig: (m: string) => sigOf(m, en.style, en.subject) };
-    const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, nonHumanSubject: subjectIsAnimal });
+    const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind });
     // Initialise all slots as busy so the UI shows every pending card immediately
     const slots: CompareResult[] = modelList.map((m) => ({ model: m, image: null, seed: null, busy: true }));
     setCompareResults([...slots]);
@@ -765,7 +771,7 @@ export default function TarotStudio() {
     try {
       const resp = await callGenerate({
         model: lockedModel,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, nonHumanSubject: subjectIsAnimal }),
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind }),
         referenceImages: lockedRefs,
         seed: seedOverride !== undefined ? seedOverride : previewSeed,
         printQuality: true,
@@ -805,7 +811,7 @@ export default function TarotStudio() {
         if (!live()) return;
         saveToGallery(dataUrl, "tarot", {
           cardName: card.name,
-          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, nonHumanSubject: subjectIsAnimal }),
+          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind }),
         });
       });
       // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
@@ -909,7 +915,7 @@ export default function TarotStudio() {
       const cards = TAROT_CARDS.map((card, i) => ({
         index: i,
         name: card.name,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, nonHumanSubject: subjectIsAnimal }),
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind }),
       }));
       const res = await fetch("/api/tools/tarot/batch", {
         method: "POST",
@@ -1538,21 +1544,25 @@ export default function TarotStudio() {
                 換掉每張牌的主角，整副 78 張同一角色。任何語言都可以，產生預覽時自動翻成英文一次，78 張共用。
               </div>
               {subjectText.trim() && (
-                <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 8, fontSize: 13, color: "var(--text)", cursor: locked ? "default" : "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={subjectIsAnimal}
-                    onChange={(e) => setSubjectIsAnimal(e.target.checked)}
-                    disabled={locked}
-                    style={{ marginTop: 2 }}
-                  />
-                  <span>
-                    主角是動物
-                    <span className="form-hint" style={{ display: "block", marginTop: 2 }}>
-                      勾了：要拿東西、比手勢的牌（例：魔術師舉杖、戰車），主角會像人一樣站起來，用前爪當手。
-                    </span>
-                  </span>
-                </label>
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 13, color: "var(--text)", marginBottom: 6 }}>主角類型</div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {HERO_KINDS.map((k) => (
+                      <button
+                        key={k.value}
+                        type="button"
+                        disabled={locked}
+                        onClick={() => setHeroKind(k.value)}
+                        style={{ ...chipStyle(heroKind === k.value), flex: 1, padding: "7px 0", opacity: locked ? 0.5 : 1, cursor: locked ? "default" : "pointer" }}
+                      >
+                        {k.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="form-hint" style={{ marginTop: 4 }}>
+                    要拿東西的牌（例：魔術師舉杖）：擬人＝站起來用前爪拿；自然＝四腳著地，杖靠在身邊、劍放在腳前或咬在嘴裡。
+                  </div>
+                </div>
               )}
               {subjectNeedsEnglish && (
                 <div style={{ marginTop: 10, padding: 10, borderRadius: 10, border: "1px solid var(--card-border)", background: "var(--accent-light)" }}>
@@ -1958,7 +1968,7 @@ export default function TarotStudio() {
                   </button>
                   <ImageEditPromptPanel
                     sourceImage={previewImage}
-                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt, nonHumanSubject: subjectIsAnimal })}
+                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind })}
                     imageModel={activeModel}
                     target="tarot-preview"
                     generateEndpoint="/api/tools/tarot/generate"
@@ -2064,7 +2074,7 @@ export default function TarotStudio() {
                     setSavingArt(true);
                     const ok = await postDesign(item.art, "tarot-art", {
                       cardName: item.card.name,
-                      prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, nonHumanSubject: subjectIsAnimal }),
+                      prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind }),
                     });
                     setSavingArt(false);
                     if (ok) setSavedArt((prev) => new Set(prev).add(idx));

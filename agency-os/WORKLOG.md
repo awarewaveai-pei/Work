@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-22（續8）塔羅「主角是動物」勾選框改三顆按鈕：人物／動物・擬人／動物・自然（Claude）
+
+**根因**：操作者 2026-10-22 決定動物主角要兩種畫法。f296d2a7b 只有一個勾選框＝擬人（站起來用前爪拿）；想要四腳著地的動物時沒有選項，而直接不勾又會回到「四腳貓手上什麼都沒拿」。
+
+- C1 `cards.ts`：`CardPromptInput.nonHumanSubject` 改 `heroKind: "person" | "animal-upright" | "animal-natural"`（缺省＝人物）。只在有填主角且 `upright` 牌生效（不變）。
+- C2 自然模式句 `NATURAL_SENTENCE`（群體牌 `_GROUP`）「stays on all four legs in a natural animal pose, 」＋ `naturalPlacement(card)`。擺放表 `PROP_PLACEMENT` 12 種：權杖靠在身邊、劍放前爪前、杯子立在面前、錢幣在兩前爪間、權杖／劍／杯可「咬在嘴裡」（騎馬、衝鋒、走路的牌）、權杖頭、燈籠、旗、火炬、卷軸。小牌預設用花色物件；大牌各自寫 `holds`；手勢／特殊道具的牌寫 `natural`（48 張）。全部正面描述（FLUX 會畫出否定詞提到的東西）。
+- C3 61 張 upright 牌全部印出自然句肉眼看過，沒有一張走到 fallback。
+- C4 `TarotStudio.tsx`：勾選框 → 「主角類型」三顆 `chipStyle` 按鈕（同「文字生圖／以圖生圖」），預設「人物」；說明一行附例子。previewSig 改帶 `hero=<kind>`，切換會標預覽過期。
+- C5 測試 `cards.test.ts`：魔術師三模式（擬人有前爪句、自然有擺放句且無直立句、人物兩者皆無）。
+- 未重生牌組、未跑實圖（要錢，需操作者同意）；自然模式下 pose 句仍寫 hand（如魔術師 right hand raising a wand），靠緊接的四腳句＋擺放句蓋過，未實圖驗證。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/tarot app`（80 files／548 pass）＋`npx tsc --noEmit` exit 0＋61 張自然句 dump | exit=0 | ms=9000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=見 commit 後 Codex oracle artifact（agency-os/reports/oracle/）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`nonHumanSubject|subjectIsAnimal` | hits=754（程式碼 0；全是舊 WORKLOG／excerpt／session 記錄）
+
+**剩餘風險**：按鈕未在瀏覽器實點（需登入）；自然模式未出實圖，FLUX 是否照擺放畫要等操作者試一張。
+
+**rollback**：`git revert <本 commit>`。未手動部署，03:00 自動部署 main。
 ## 2026-10-22（續7）塔羅換主角後動作不見：每張牌加 pose 放提示詞最前、動物主角可直立用前爪（Claude）
 
 **根因**：`app/(shell)/tools/tarot/cards.ts` buildCardPrompt 原順序 = 畫風（最多 1200 字）→ scene。FLUX 重視前段 token、schnell 只吃約 256 token，換成藍貓後畫風保住、動作掉了（愚人坐著、戰車不在車上）。scene 寫「one hand holding」但貓沒有手，模型畫四腳貓。
