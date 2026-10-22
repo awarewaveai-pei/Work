@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-22（續2）03:00 自動部署失敗：社群頁 social.css 用了 color-mix，主機 npm test 紅
+
+**觸發**：Telegram「後台自動部署失敗 — SG next-admin」drift=6, deployed=0aa0b1f67642, origin=9f354875eb11。
+- 根因：主機 `/root/lobster-phase1/logs/auto-deploy.log` 2026-10-21T19:01:11Z `npm test FAILED`，唯一紅＝`app/(shell)/tools/social/__tests__/page-rules.test.ts:30`（社群頁不得有顏色函式）；`d2534b6a2`（Codex）在 `social.css` 加了 3 個 `color-mix(`，該 commit 只跑 targeted 6 檔 vitest，沒跑到 page-rules。
+- 修法（不新增 token、不放寬規則）：遮罩改 `::before` ＋ `var(--text-primary)` ＋ `opacity .58`（`.sm-dialog` 加 `position: relative` 疊在上面）；警告底色改既有 `var(--badge-red-bg)`；危險鍵 hover 改 `filter: brightness(.88)`（原 hover 規則被 `.sm-app … button.sm-danger` 較高特異度蓋掉，本來就沒生效）。
+- 附帶發現（未修）：`lib/collect/__tests__/collect-sources-store.test.ts:171` 吃本機環境變數 `RENDERER_SH*`，筆電有設就紅、主機綠 → 測試不封閉，另開。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/social"（7 檔 35 passed）；npm test 全套 1 failed＝上列 collect 環境洩漏，`env -u RENDERER_SHARED_SECRET` 重跑該檔 9 passed | exit=0 | ms=16000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 social.css 230-250；遮罩層 stacking 與 hover 特異度已確認
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=color-mix | hits=1 檔（page-rules.test.ts 規則本身；social 頁已 0）
+- ORACLE_WAIVED: 純 CSS 3 行、以既有測試為判準；部署前 sg-deploy 跑全套 npm test 閘
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-22（續1）next-admin 全部 Haiku 4.5 呼叫改 Claude Haiku 5.5（共用參數層處理不相容參數）
 
 **觸發**：操作者「價錢如果一樣就都換」（Haiku 5.5 US$0.10/0.50，Haiku 4.5 US$1/5 每百萬 token）→「commit」。SDK（Sonnet 5.5）改了 21 檔後隨上個 session 結束被中斷，未測、未 commit；本 session 驗收後提交。
