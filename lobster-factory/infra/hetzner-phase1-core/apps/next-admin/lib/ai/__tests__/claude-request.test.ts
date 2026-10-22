@@ -49,7 +49,23 @@ describe("claudeParams on Haiku 5.5", () => {
     expect(p).toEqual({ model: "claude-haiku-5-5", max_tokens: 500, output_config: { effort: "medium" }, thinking: { type: "disabled" } });
     for (const k of ["temperature", "top_p", "top_k"]) expect(p).not.toHaveProperty(k);
     expect(p.thinking).not.toHaveProperty("budget_tokens");
-    expect(claudeParams("claude-haiku-5-5", 500)).not.toHaveProperty("thinking"); // opt-in only
     expect(claudeParams("claude-opus-5-5", 500, "medium", { thinking: "off" })).not.toHaveProperty("thinking"); // always thinks: disabled is a 400
+  });
+
+  it("thinking is off by default, so a user-picked Haiku 5.5 keeps its whole small budget for the answer", () => {
+    expect(claudeParams("claude-haiku-5-5", 350, "low")).toEqual({ model: "claude-haiku-5-5", max_tokens: 350, output_config: { effort: "low" }, thinking: { type: "disabled" } });
+  });
+
+  it("{ thinking: \"on\" } adds the thinking headroom and sends no disabled", () => {
+    const p = claudeParams("claude-haiku-5-5", 500, "medium", { thinking: "on" });
+    expect(p).toEqual({ model: "claude-haiku-5-5", max_tokens: 500 + THINKING_HEADROOM_TOKENS, output_config: { effort: "medium" } });
+  });
+
+  it("Opus 5.5 never gets thinking disabled, whatever is asked", () => {
+    for (const thinking of [undefined, "off", "on"] as const) {
+      const p = claudeParams("claude-opus-5-5", 500, "medium", { thinking });
+      expect(p).not.toHaveProperty("thinking");
+      expect(p.max_tokens).toBe(500 + THINKING_HEADROOM_TOKENS);
+    }
   });
 });

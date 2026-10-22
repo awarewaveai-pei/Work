@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-22（續3）Haiku 5.5 換模型的 Codex 4 項一次關閉：Haiku 5.x 由 claudeParams 預設關思考（含使用者自選模型的路徑）＋模型指南補 Haiku 5.5
+
+**觸發**：Codex 審 6406dcc28（`agency-os/reports/oracle/2026-10-22-partialreview-537f7258.md`）4 項 CONFIRMED。同一 reviewer 第 2 次點這次換模型 → 依 AGENTS.md §4 先寫不變量。
+**根因**：`claudeParams` 只在呼叫者明講 `{ thinking: "off" }` 才關 Haiku 5.x 思考；使用者自選模型的路徑（`lib/studio/image-edit-prompt.ts:113` 350 token、`lib/content/article/generate-core.ts:703`、`lib/ai/cheap-json.ts:89`）沒傳 → 選 Haiku 5.5 時思考吃掉小額度 → output_truncated／GENERATION_TRUNCATED／JSON 解析失敗。預設值放錯邊＝每個新呼叫點都要記得傳旗標。
+**不變量**：每個模型的請求規則只在 `lib/ai/claude-params.ts` `claudeParams` 一處；next-admin 每個 Anthropic messages 請求的 model／max_tokens／effort／thinking 都經它（含使用者自選模型）。Haiku 5.x 預設關思考；真要推理的呼叫者明講 `{ thinking: "on" }`，就像 always-think 模型一樣加 THINKING_HEADROOM_TOKENS。always-think 模型永不收 `thinking: disabled`。
+- C1 `lib/ai/claude-params.ts`：`opts.thinking` 型別 `"off" | "on"`；Haiku 5.x 非 "on" → `thinking: disabled`；"on" → 加 headroom、不送 disabled。既有 `{ thinking: "off" }` 呼叫點不用改（等同預設）。修好 Finding 1–3，未改任何呼叫點。
+- 請求建構點清查：`grep -rn "messages.create\|messages.stream\|beta.messages" lib app` 25 處，全部已經過 claudeParams，無需改路徑、無保留例外。
+- C2 `lib/ai/model-comparison.ts`：新增 Claude Haiku 5.5 列（US$0.10/0.50，prompt ≤100K）；Haiku 4.5 標「上一代」保留（選單 `text-model-options.ts:7` 仍有）。
+- m1 另一個 session 在共用 index 暫存了未被引用的重複檔 `lib/ai/claude-request.ts`（舊版 claudeParams，0 importer）；不是本 session 的檔，未動；該 session commit 前應刪除或改成 re-export。
+- 刻意保留思考：Opus 5.5 等 always-think 模型的所有呼叫點（command-plane、video-script、spec-generator、product-copy、humanize、script-forge 預設、visual-consistency-check）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=`cat D:/tmp/haiku55/call.js | ssh ... 'sudo docker exec -i lobster-next-admin node -'`：default_off（350, low, disabled）status=200 stop=end_turn thinking_tokens=0；thinking_on（8350, low）status=200 stop=end_turn；`npx tsc --noEmit` 0 errors；`npx vitest run lib/ai lib/content lib/studio lib/cs lib/ops-inbox lib/outreach app/api` 141 檔 1115 passed | exit=0 | ms=1139
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/1n -- 讀回 claude-params／model-comparison／test diff；n1＝重複檔 claude-request.ts（非本 session）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`claudeParams` | hits=30 檔（25 處請求全走 claudeParams；docs 只有 WORKLOG 舊條目描述 opt-in，屬歷史紀錄不回改）
+- ORACLE_WAIVED: Codex 審查依操作者指示對本 commit 本身跑（`-DiffRef <commit>`），確認的問題隨後修
+
+**rollback**：`git revert <本 commit>`（回到 opt-in 關思考；Finding 1–3 會重現）。
 ## 2026-10-22（續2）03:00 自動部署失敗：社群頁 social.css 用了 color-mix，主機 npm test 紅
 
 **觸發**：Telegram「後台自動部署失敗 — SG next-admin」drift=6, deployed=0aa0b1f67642, origin=9f354875eb11。
