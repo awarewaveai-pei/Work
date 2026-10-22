@@ -186,7 +186,7 @@ AI prompt 是獨立積木，不併進 `image/style-design-workbench`。改圖流
 | 風格 chip catalog | `STYLE_CATALOG` / `STYLE_PRESETS` | 103 個風格 chip；中文顯示、英文 prompt 進模型 |
 | 風格分類 | `tarotStyles.ts` | 西方畫家 29、亞洲畫家 26、媒材 16、風格 32 |
 | 英文 prompt 解析 | `resolveStylePrompt()` | zh label → 英文 prompt；畫家類會 lead with `In the style of <name>.` |
-| Prompt 組裝 | `buildCardPrompt()` | style + subject + RWS faithful scene；style capped at 1200 chars，避免模型吃掉牌面 scene |
+| Prompt 組裝 | `buildCardPrompt()` | 順序 hero+pose（＋動物直立句）→ style（capped 1200 chars）→ RWS faithful scene → grounding → style recap；pose 放最前，避免換主角後動作被長 style 擠掉 |
 | AI prompt 建議 | `/api/tools/tarot/suggest-prompt` | brief → 英文 art-direction prompt；使用者可手動覆寫最終英文 |
 | 多模型比較 | `generateCompare()` | 依序跑選中的模型，避免 Replicate 429；結果可點選放大 / 選定 |
 | 風格鎖定 | `lockStyle()` | 鎖定模型、prompt、seed、參考圖策略；後續生成可重用同一風格，Tarot 才套到整副牌 |

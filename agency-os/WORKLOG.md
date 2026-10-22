@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-22（續7）塔羅換主角後動作不見：每張牌加 pose 放提示詞最前、動物主角可直立用前爪（Claude）
+
+**根因**：`app/(shell)/tools/tarot/cards.ts` buildCardPrompt 原順序 = 畫風（最多 1200 字）→ scene。FLUX 重視前段 token、schnell 只吃約 256 token，換成藍貓後畫風保住、動作掉了（愚人坐著、戰車不在車上）。scene 寫「one hand holding」但貓沒有手，模型畫四腳貓。
+
+- C1 每張有 {hero} 的牌（70 張）加 `pose`：一句 RWS 核心動作。愚人：走過平坦崖頂到邊緣、雙腳在岩石上、身體前傾、仰頭笑（GROUNDING 保留）。
+- C2 `upright` 旗標（要拿東西／比手勢的牌，61 張）。勾「主角是動物」且有填主角時，加一句 `UPRIGHT_SENTENCE`（站起來、前爪當手）。預設人類主角永不加。
+- C3 「非人類」用 UI 勾選框（TarotStudio 主角替換區），不用翻譯步驟判斷：translate.ts:22 只在非拉丁文字才呼叫，「a blue cat」不會經過翻譯；用 AI 分類 teddy bear／robot 會猜錯。勾選框也進 previewSig，改了預覽會標過期。
+- C4 新順序：[pose＋畫風錨點（lead 第一句，如 in the style of Van Gogh）＋直立句] → 完整 lead（cap 不變）→ scene → grounding → 畫風收尾。去掉 lead 結尾句點，修掉原本的「..」。
+- C5 愚人 scene 去否定詞（no leash／carrying nothing → running free on its own four paws）；"stepping up to the edge" 會被 schnell 畫成爬崖，改 "walking on the flat top of a high cliff to its very edge"。
+- 實圖（藍貓＋梵谷，seed 424242，schnell／dev 各 6 張 × 改前／改後，約 US$0.5）：改後愚人站上崖頂邁步、戰車兩模型都進車；畫風 schnell 不變、dev 與改前同級（第一版沒有畫風錨點時 dev 變扁平，加錨點後恢復）。魔術師另一手指地仍畫不出來；schnell 力量多一隻貓。對照頁 https://claude.ai/artifact/SwFQYWxQCTqaQfi6R6vGub ，原圖在 $TEMP scratchpad/tarot/img。
+- C6 Codex oracle 1m（agency-os/reports/oracle/2026-10-22-partialreview-e0968f25.md）：直立句單數，多人牌（權杖四）可能只有一隻站起來。修：`isGroupPose`（pose 內 {hero} ≥2 次或 two/three/four/five {hero}）→ 用 `UPRIGHT_SENTENCE_GROUP`「Every {hero} figure…」，單人牌仍用單數（「Each」曾讓死神多出貓）；寶劍五／錢幣三／錢幣六的 pose 補上其他人物的 {hero}。11 張多人牌。實圖：權杖四 schnell/dev 兩隻都直立舉花束，死神單隻。
+- 共用 index 裡有別的 session 留下的 staged 舊 hunk（cards.ts 退回 9d29bb1d9 前、WORKLOG 刪續5）；本次走私有 index commit，提交後 scope guard 會把這兩個路徑的共用 index 對齊 HEAD。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/tarot "app/(shell)/tools/tarot"`（3 files／9 pass）＋`npx tsc --noEmit` exit 0＋Replicate flux-schnell/flux-dev 28 張實圖肉眼比對 | exit=0 | ms=420000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n -- Codex oracle 第一輪 1m（C6，已修）；修後第二輪 NO FINDINGS（agency-os/reports/oracle/2026-10-22-partialreview-37151dbc.md）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=`nonHumanSubject|UPRIGHT_SENTENCE|subjectIsAnimal` | hits=18
+- BUGHUNT_DONE: scope=lobster-factory | grep=`buildCardPrompt` | hits=26（TarotStudio 7 呼叫點全帶 nonHumanSubject；其餘為 cards.ts 定義／註解、測試、README、舊 WORKLOG／handoff）
+
+**剩餘風險**：UI 勾選框未在瀏覽器實點（需登入），靠 tsc＋程式讀回。STYLE_CAP 1200 字在 schnell 仍會截掉 scene 後段；pose 在最前所以動作保得住，但道具細節（愚人的狗）可能掉。
+
+**rollback**：`git revert <本 commit>`。未手動部署，03:00 自動部署 main。
 ## 2026-10-22（續6）Claude 每輪固定 token 精簡（研討會 Tokenomics 對照）
 
 - 根因：每輪固定載入 MEMORY.md 21.3KB（21 條只是重述 AGENTS.md 的規則）＋ Claude .mcp.json 13 個 server，其中 copilot（與 github 重複）、work-global（與內建 Read/Write/Glob 重複）在 203 個歷史 session 呼叫數 0。app 端 AI 30 天僅 US$1.48（agency-os/reports/cost/aware-wave-cost-2026-10-22.md），不是優化標的。
