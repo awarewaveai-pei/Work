@@ -5,7 +5,7 @@
 - 實況：`~/.codex/awarewave-hook-heartbeat.json` 最後 07:18:25Z；之後 10-21 07:26Z–10:39Z 共 5 個 `codex exec` session 都沒 heartbeat。`~/.codex/hooks.json` 自 09-28 未改，`runner.js` 手動以 `--host=codex` 呼叫會寫 heartbeat（測後已還原檔案）→ 是 Codex 沒呼叫 hooks。`config.toml` 內 `[hooks` 區段 0 筆（WORKLOG 2026-09 記錄 trust 時為 8 筆 `trusted_hash`）；打開 `codex` 顯示「8 hooks are new or changed」。
 - 根因：`scripts/sync-mcp-config.ps1` `Remove-ManagedBlock` 刪除兩個 managed 標記之間全部內容；managed 區塊在 config.toml 檔尾，Codex `/hooks` 把 `[hooks.state."…"] trusted_hash` 接在檔尾＝落進區塊內，下一次 MCP 同步（10-21 15:16 Meta／HCI 金鑰復原後）就一起刪掉。
 - 修法（不變量：managed 區塊只擁有 `[mcp_servers.*]`）：移除區塊時，區塊內非 `mcp_servers` 的 table 保留到區塊外。
-- 待操作者：Codex `/hooks` 重新 trust（終端機已開好，按「Trust all」）。
+- 操作者已按 Trust all：`config.toml` `trusted_hash`=8，且落在 managed 區塊內（第 115–138 行，結束標記第 140 行）＝根因實證；`codex exec` 探測後 heartbeat SessionStart／UserPromptSubmit／Stop 皆 2026-10-22T01:30Z。
 
 **驗證結果**
 - REALTEST_EVIDENCE: tool=Bash | cmd=powershell t-managed.ps1（AST 抽出 Remove-ManagedBlock 等 4 函式，餵含 hooks.state 的假 config）新版 hash_kept=True、二次執行 hash 1 份；突變＝HEAD 舊版 hash_kept=False | exit=0 | ms=3000
@@ -1227,6 +1227,16 @@
 - AUTO_TASK_DONE: ADR017 step1 done; supervisor 1/9, same private preview URL pending Claude republish.
 - rollback：git revert狀態commit；實作獨立revert 1ef1ee419。無prod部署。
 
+
+## 2026-10-22
+
+### Daily
+- AUTO_TASK_DONE: next-admin 03:00 自動部署失敗修復（social.css color-mix）＋手動 sg-deploy 7afe37e37＋collect 測試環境隔離
+- 詳見本日（續2）：根因、修法、部署證據
+- REALTEST_EVIDENCE: tool=SSH | cmd=主機 sg-deploy.sh next-admin（test gate 307 檔 2809 passed、healthy 10s、smoke 5/5 200）；本機 npx vitest run app/(shell)/tools/social 35 passed、collect-sources-store 9 passed | exit=0 | ms=120000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=color-mix | hits=1
+- ORACLE_WAIVED: CSS 3 行與測試 env stub 2 行；以既有測試為判準，部署 test gate 全綠
 
 ## 2026-10-18
 
@@ -21609,3 +21619,35 @@ WORKLOG 先前的 `REALTEST_WAIVED: Docker Desktop 未啟動` 是誠實的，但
 
 ### Machine appendix (monthly-system-review)
 - 2026-10-13 11:31:39 : gates=SKIPPED (ReportOnly) ; integrated-status: generate-integrated-status-report.ps1 OK ; supabase-memory: PASS (supabase-studio memory at 33.26% (< 85%))
+
+## 2026-10-20
+
+### Social Manager V1.5 C23/C27/C29/C30/C31 — local implementation and regression closure
+
+- AUTO_TASK_DONE: Social Manager V1.5 — completed list slot grid, auto-reply rule management/matching, read-only Inbox/Chatwoot unread counts, mobile layout, video upload/media ordering/crop, library tabs and multi-select seeding; Ads remains behind the documented Meta G3 review gate.
+- REALTEST_EVIDENCE: tool=Playwright | cmd=`PLAYWRIGHT_SOCIAL_URL=http://localhost:3902 npx playwright test e2e/social/social-manager.spec.ts --project social --workers=1` | exit=0 | ms=21000 | 8 passed
+- REVIEW_DONE: critic=SDK API earlier C23/C29 bughunt + local adversarial self-review | verdict=pass | findings=0c/0m/0n; a final broad SDK runner attempt was bounded and stopped after initialization hung, so it was not counted as a pass.
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin,tests/e2e/social | grep=`[DEBUG-]` | hits=0; found and fixed C7 weekday accessible-name regression, cross-route library seed loss, and non-base64 video data URL acceptance.
+- Verification: `npm run typecheck --if-present`; social subset 27 files / 183 passed / 3 skipped; production-change coverage passed; `git diff --check` passed.
+- Remaining external gates: live authenticated Chrome flow requires a logged-in session; Meta Ads requires approved `ads_read` permission. No production deploy or commit performed.
+
+### Social Manager C31 — saved media relation
+
+- AUTO_TASK_DONE: extended the saved-text library with ordered, brand-scoped media links via migration `0112_social_saved_text_media.sql`; existing saved text rows remain valid and the down migration removes only the new relation/functions.
+- REALTEST_EVIDENCE: tool=Playwright | cmd=`PLAYWRIGHT_SOCIAL_URL=http://localhost:3902 npx playwright test e2e/social/social-manager.spec.ts --project social --workers=1` | exit=0 | ms=21200 | 8 passed; saved text with `mediaIds` seeded its media into the composer.
+- REVIEW_DONE: critic=local adversarial self-review | verdict=pass | findings=0c/0m/0n; API rejects malformed, duplicate, and over-limit media IDs before the database relation is called.
+- Verification: `npm run typecheck`; targeted Vitest `27 passed`; `git diff --check` passed. Migration was not applied to any database.
+
+### Social Manager C31 — visual render regression closure
+
+- BUGHUNT_DONE: reproduced the render failure after opening 貼文素材庫; the old fixture response omitted `mediaIds`, causing `Library` to throw on `undefined.length` and hiding the plan tabs. Added the missing fixture field and defensive response normalization for older payloads.
+- REALTEST_EVIDENCE: visual render `render-views.mjs` completed with all 31 expected PNG/PDF outputs; full social Playwright suite remained green at 8 passed.
+- Verification: `npm run typecheck`; targeted social Vitest 25 files / 171 passed / 3 skipped; `git diff --check` passed. No production deploy or commit performed.
+
+### Social Manager C31 — final verification continuation
+
+- BUILD_GATE: repository verification reached health score 99.4% (316/318); all bootstrap, governance, manifest, secret-scan, and safety checks passed. Release gate remains blocked by pre-existing deploy drift (10 app-code commits behind origin/main) and Claude sync soft drift.
+- SYNC_CHECK: `check-claude-sync.ps1` result `WARN (soft drift -- uncommitted local work)`; H1-H4 and tracked command/agent/skill parity all passed, with 255 generated `.claude/skills/synced` files uncommitted. No unrelated commit or cleanup was performed.
+- ORACLE_ATTEMPT: standard Claude CLI review unavailable because `claude` is not on PATH; two bounded Claude SDK review attempts produced no response and were stopped. Local adversarial review plus typecheck, Vitest, Playwright, migration verification, visual render, and diff checks remain passing.
+- SYNC_REPAIR: committed the generated `.claude/skills/synced` bundle only as `7de686789` (`chore: sync generated Claude skills`); `check-claude-sync.ps1` now returns `PASS`.
+- DEPLOY_HOLD: production preflight found `infra/hetzner-phase1-core/DEPLOY_HOLD`; ADR017 step 2 prerequisites are not yet satisfied. Hold was preserved and no production deploy or override was attempted.
