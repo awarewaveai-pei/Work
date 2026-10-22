@@ -1,4 +1,19 @@
 # Worklog
+## 2026-10-22（續4）Codex hooks 自 10-21 15:18 起全部沒跑：sync-mcp-config.ps1 把 /hooks trust 當成 MCP 區塊內容一起刪掉
+
+**觸發**：AO-CLOSE parity 1/450 失敗（Codex session 10:39Z 沒有 heartbeat）；操作者「我不會 你做」。
+- 實況：`~/.codex/awarewave-hook-heartbeat.json` 最後 07:18:25Z；之後 10-21 07:26Z–10:39Z 共 5 個 `codex exec` session 都沒 heartbeat。`~/.codex/hooks.json` 自 09-28 未改，`runner.js` 手動以 `--host=codex` 呼叫會寫 heartbeat（測後已還原檔案）→ 是 Codex 沒呼叫 hooks。`config.toml` 內 `[hooks` 區段 0 筆（WORKLOG 2026-09 記錄 trust 時為 8 筆 `trusted_hash`）；打開 `codex` 顯示「8 hooks are new or changed」。
+- 根因：`scripts/sync-mcp-config.ps1` `Remove-ManagedBlock` 刪除兩個 managed 標記之間全部內容；managed 區塊在 config.toml 檔尾，Codex `/hooks` 把 `[hooks.state."…"] trusted_hash` 接在檔尾＝落進區塊內，下一次 MCP 同步（10-21 15:16 Meta／HCI 金鑰復原後）就一起刪掉。
+- 修法（不變量：managed 區塊只擁有 `[mcp_servers.*]`）：移除區塊時，區塊內非 `mcp_servers` 的 table 保留到區塊外。
+- 待操作者：Codex `/hooks` 重新 trust（終端機已開好，按「Trust all」）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell t-managed.ps1（AST 抽出 Remove-ManagedBlock 等 4 函式，餵含 hooks.state 的假 config）新版 hash_kept=True、二次執行 hash 1 份；突變＝HEAD 舊版 hash_kept=False | exit=0 | ms=3000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 Remove-ManagedBlock；`Remove-CodexMcpBlocks` 以 `^\[` 為界，`[mcp_servers.x.env]` 子表仍屬 mcp 一併移除
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp | grep=Remove-ManagedBlock | hits=2（定義＋唯一呼叫 sync-mcp-config.ps1:639）
+- ORACLE_WAIVED: 8 行 PowerShell，舊／新版對照測試即為對抗證據
+
+**rollback**：`git revert <本 commit>`（trust 會在下次 MCP 同步再度被洗掉）。
 ## 2026-10-22（續3）Haiku 5.5 換模型的 Codex 4 項一次關閉：Haiku 5.x 由 claudeParams 預設關思考（含使用者自選模型的路徑）＋模型指南補 Haiku 5.5
 
 **觸發**：Codex 審 6406dcc28（`agency-os/reports/oracle/2026-10-22-partialreview-537f7258.md`）4 項 CONFIRMED。同一 reviewer 第 2 次點這次換模型 → 依 AGENTS.md §4 先寫不變量。

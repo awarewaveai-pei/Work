@@ -491,10 +491,16 @@ function Remove-ManagedBlock {
     $begin = "# >>> managed by scripts/sync-mcp-config.ps1 >>>"
     $end = "# <<< managed by scripts/sync-mcp-config.ps1 <<<"
     if ($Content.Contains($begin) -and $Content.Contains($end)) {
+        # The block owns [mcp_servers.*] only. Codex appends tables it writes itself (the /hooks
+        # trust records, [hooks.state."..."] trusted_hash) at end of file = inside this block;
+        # dropping them silently untrusts every hook (2026-10-21: no Codex hook ran after a sync).
         return [regex]::Replace(
             $Content,
-            [regex]::Escape($begin) + '(?s).*?' + [regex]::Escape($end),
-            ""
+            [regex]::Escape($begin) + '(?s)(.*?)' + [regex]::Escape($end),
+            [System.Text.RegularExpressions.MatchEvaluator]{ param($match)
+                $foreign = Remove-CodexMcpBlocks -Content $match.Groups[1].Value
+                if ($foreign -match '(?m)^\[') { "`r`n" + $foreign + "`r`n" } else { "" }
+            }
         ).Trim()
     }
 
