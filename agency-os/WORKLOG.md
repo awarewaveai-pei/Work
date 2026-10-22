@@ -29,6 +29,7 @@
 - REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 social.css 230-250；遮罩層 stacking 與 hover 特異度已確認
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=color-mix | hits=1 檔（page-rules.test.ts 規則本身；social 頁已 0）
 - ORACLE_WAIVED: 純 CSS 3 行、以既有測試為判準；部署前 sg-deploy 跑全套 npm test 閘
+- 部署（操作者「go ahead」）：主機 `sg-deploy.sh next-admin` rc=0；test gate 307 檔 2809 passed；`.deployed-commit` 0aa0b1f → 7afe37e37；healthy 10s；smoke 5/5 200（2026-10-22T00:34:37Z）。含 `6406dcc28`（Haiku 5.5），其 Codex 審查仍未補。
 
 **rollback**：`git revert <本 commit>`。
 ## 2026-10-22（續1）next-admin 全部 Haiku 4.5 呼叫改 Claude Haiku 5.5（共用參數層處理不相容參數）
