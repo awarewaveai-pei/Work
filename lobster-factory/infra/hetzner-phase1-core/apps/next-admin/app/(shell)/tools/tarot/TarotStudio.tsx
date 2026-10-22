@@ -8,7 +8,7 @@ import GradedPreview from "@/components/tools/GradedPreview";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { buildSemanticFilename, buildSemanticBase } from "@/lib/studio/semantic-filename";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
-import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type HeroKind, type TarotCard } from "./cards";
+import { TAROT_CARDS, PREVIEW_CARD, buildCardPrompt, STYLE_PRESETS, resolveStylePrompt, type HeroKind, type Couple, type TarotCard } from "./cards";
 import { needsEnglish, translateForDeck } from "@/lib/tarot/translate";
 import { tabStyle, chipStyle, ghostBtn } from "@/components/tools/panel-primitives";
 
@@ -76,6 +76,13 @@ const MODEL_OPTIONS: ModelOption[] = [
 ];
 
 const PRESET_LABELS = new Set(STYLE_PRESETS.map((p) => p.zh));
+
+// 「戀人組合」: who the two figures on THE LOVERS are (cards.ts `couple`). RWS default = 男女.
+const COUPLES: { value: Couple; label: string }[] = [
+  { value: "man-woman", label: "男女" },
+  { value: "man-man", label: "男男" },
+  { value: "woman-woman", label: "女女" },
+];
 
 const HERO_KINDS: { value: HeroKind; label: string }[] = [
   { value: "person", label: "人物" },
@@ -247,6 +254,7 @@ export default function TarotStudio() {
   const [subjectEnglishSrc, setSubjectEnglishSrc] = useState("");
   // 「主角類型」: how an animal hero acts on cards whose action needs hands (cards.ts `upright`). Explicit, never guessed.
   const [heroKind, setHeroKind] = useState<HeroKind>("person");
+  const [couple, setCouple] = useState<Couple>("man-woman");
   const [translateBusy, setTranslateBusy] = useState(false);
   const [translateError, setTranslateError] = useState<string | null>(null);
   const [referenceImages, setReferenceImages] = useState<string[]>([]);
@@ -324,7 +332,7 @@ export default function TarotStudio() {
   const subjectNeedsEnglish = needsEnglish(subjectText);
   const subjectForPrompt = !subjectNeedsEnglish ? subjectText : subjectEnglishSrc === subjectText.trim() ? subjectEnglish : "";
   const sigOf = (model: string, style: string, subject: string) =>
-    `${model}::${style.trim()}::subj=${subjectText.trim()}=>${subject.trim()}::hero=${heroKind}::refs=${referenceImages.length}`;
+    `${model}::${style.trim()}::subj=${subjectText.trim()}=>${subject.trim()}::hero=${heroKind}::couple=${couple}::refs=${referenceImages.length}`;
 
   // Stale when model selection, aspect ratio, style, subject, or refs changed after last generate.
   const previewStale = !!previewImage && !locked && previewSig != null && previewSig !== sigOf(activeModel, effectiveEnglish, subjectForPrompt);
@@ -566,7 +574,7 @@ export default function TarotStudio() {
       if (!en || deckGenRef.current !== deck) return;
       const resp = await callGenerate({
         model: activeModel,
-        prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind }),
+        prompt: buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind, couple }),
         referenceImages: mode === "image" ? referenceImages.slice(0, maxRefs) : [],
         seed: null,
         printQuality: true,
@@ -611,7 +619,7 @@ export default function TarotStudio() {
     }
     // Capture prompt at compare time; selectCompareResult reads these for previewSig.
     compareStyleRef.current = { english: en.style, sig: (m: string) => sigOf(m, en.style, en.subject) };
-    const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind });
+    const prompt = buildCardPrompt(PREVIEW_CARD, { styleResolved: en.style, subject: en.subject, heroKind, couple });
     // Initialise all slots as busy so the UI shows every pending card immediately
     const slots: CompareResult[] = modelList.map((m) => ({ model: m, image: null, seed: null, busy: true }));
     setCompareResults([...slots]);
@@ -771,7 +779,7 @@ export default function TarotStudio() {
     try {
       const resp = await callGenerate({
         model: lockedModel,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind }),
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple }),
         referenceImages: lockedRefs,
         seed: seedOverride !== undefined ? seedOverride : previewSeed,
         printQuality: true,
@@ -811,7 +819,7 @@ export default function TarotStudio() {
         if (!live()) return;
         saveToGallery(dataUrl, "tarot", {
           cardName: card.name,
-          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind }),
+          prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple }),
         });
       });
       // Retain the gallery-sized frameless artwork so the large-view modal can save it to My Designs
@@ -915,7 +923,7 @@ export default function TarotStudio() {
       const cards = TAROT_CARDS.map((card, i) => ({
         index: i,
         name: card.name,
-        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind }),
+        prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple }),
       }));
       const res = await fetch("/api/tools/tarot/batch", {
         method: "POST",
@@ -1564,6 +1572,25 @@ export default function TarotStudio() {
                   </div>
                 </div>
               )}
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 13, color: "var(--text)", marginBottom: 6 }}>戀人牌的兩個人</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {COUPLES.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      disabled={locked}
+                      onClick={() => setCouple(c.value)}
+                      style={{ ...chipStyle(couple === c.value), flex: 1, padding: "7px 0", opacity: locked ? 0.5 : 1, cursor: locked ? "default" : "pointer" }}
+                    >
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="form-hint" style={{ marginTop: 4 }}>
+                  只影響「VI 戀人」。原版是一男一女；有填主角時會變成「公的／母的」該主角。
+                </div>
+              </div>
               {subjectNeedsEnglish && (
                 <div style={{ marginTop: 10, padding: 10, borderRadius: 10, border: "1px solid var(--card-border)", background: "var(--accent-light)" }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)" }}>英文提示詞（實際送給圖片模型）</div>
@@ -1968,7 +1995,7 @@ export default function TarotStudio() {
                   </button>
                   <ImageEditPromptPanel
                     sourceImage={previewImage}
-                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind })}
+                    currentPrompt={buildCardPrompt(PREVIEW_CARD, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple })}
                     imageModel={activeModel}
                     target="tarot-preview"
                     generateEndpoint="/api/tools/tarot/generate"
@@ -2074,7 +2101,7 @@ export default function TarotStudio() {
                     setSavingArt(true);
                     const ok = await postDesign(item.art, "tarot-art", {
                       cardName: item.card.name,
-                      prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind }),
+                      prompt: buildCardPrompt(item.card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple }),
                     });
                     setSavingArt(false);
                     if (ok) setSavedArt((prev) => new Set(prev).add(idx));

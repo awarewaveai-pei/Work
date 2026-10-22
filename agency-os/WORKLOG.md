@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-22（續11）塔羅 78 張對照原版 RWS 審查（Codex＋SDK 雙審）→ 13 張圖像修正、56 張小牌牌意、戀人牌男女／男男／女女（Claude）
+
+**觸發**：操作者「檢查 78 張 prompt 是否符合真正塔羅牌的形象與牌意，用 Codex 和 SDK」；修正時「不用 SDK，用訂閱和 Codex」，並要求戀人可選男男、女女。
+
+**審查**：78 張匯出 JSON，Codex（`agency-os/reports/oracle/2026-10-22-inspect-02091fa9.md`）與 SDK（Opus，US$0.97）各自獨立審；兩份交叉後我逐條對原版判定。採納 13 張圖像；駁回：寶劍十「應臉朝上」（RWS 臉朝下、劍在背）、寶劍侍者／塔／聖杯八月亮（原版細節不確定）、「動物自然」19 條（8c0b93995 刻意以 natural 取代 pose）。
+
+- C1 圖像（`app/(shell)/tools/tarot/cards.ts`）：愚人加太陽、玫瑰左手；皇后改坐姿＋右手寶珠權杖＋石榴紋白袍＋upright/holds scepter；教皇右手祝福、左手三重十字杖；戀人只有第二人仰望天使＋兩人間一座山；命運之輪四角有翼生物、蛇不寫顏色；死神＝倒地國王、合掌主教、轉頭少女、遞花孩子；太陽右臂張開、左手紅旗、花冠紅羽毛；權杖二右手地球儀左手杖、另一杖鐵環固定牆上；權杖四城堡；寶劍二場景寫蒙眼（hero 改 woman 避免重字）；寶劍八劍插在四周、一側開口；錢幣六只投給一個乞丐；錢幣八合計 8 枚。
+- C2 牌意：`MINOR_THEMES` 56 張小牌標準正位牌意（原為「suit theme, two energy」通用字）。theme 不進生圖 prompt，只影響存檔與顯示。
+- C3 戀人組合：`TarotCard.couple`（僅戀人）、`CardPromptInput.couple`（man-woman 預設／man-man／woman-woman）、`coupleHeroes()`；第一個 {hero}＝A、第二個＝B；預設 hero「nude figure」→ nude man／nude woman，有填主角 → male／female＋主角。TarotStudio 三顆按鈕「戀人牌的兩個人」，7 處 buildCardPrompt 全帶 couple，預覽簽章含 couple。
+- m1 新檢查抓到既有缺陷：聖杯六 `{hero} child`＋預設 hero child →「child child」，改 young {hero}。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run "app/(shell)/tools/tarot" lib/tarot`（3 files／15 pass，新增：戀人預設男女、男男／女女與主角性別、他牌不受影響、56 張牌意各異且非通用、所有預設 prompt 無連續重字）；`npx tsc --noEmit` exit 0 | exit=0 | ms=70000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-22-partialreview-78e42fe2.md`：寶劍二「blindfolded blindfolded woman」→ hero 改 woman，並加全牌「無連續重字」測試（同時抓到聖杯六）
+- ORACLE_WAIVED: Codex 以 -Path 只審 tarot 三檔（partialreview）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=`buildCardPrompt\(|energy\`|blindfolded woman` | hits=9（TarotStudio 7 呼叫全帶 couple；cards.ts 定義；通用 energy 字串已移除）
+
+**未驗證**：新按鈕未在已登入瀏覽器點過（頁面需登入）。未部署，03:00 自動部署 main。
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-22（續10）asset-mcp-refs 紅燈：app 同步的 skill 不是 repo 資產（Claude）
 
 **根因**：`scripts/verify-asset-mcp-refs.mjs` 走檔案系統掃 `.claude/skills`，連 Claude desktop app 寫入的 `.claude/skills/synced/<uuid>/`（引用 remote-devices／memory MCP，48 筆）一起掃；`7de686789` 為消 `check-claude-sync` 的 untracked 警告把 app 輸出 255 檔整包 commit。VBC：grep scripts／mcp／.claude／docs 無任何依賴者。

@@ -59,3 +59,43 @@ describe("buildCardPrompt pose", () => {
     expect(p.indexOf(style)).toBeGreaterThan(p.indexOf("striding"));
   });
 });
+
+describe("THE LOVERS couple", () => {
+  const lovers = TAROT_CARDS.find((c) => c.name === "THE LOVERS")!;
+  const count = (s: string, w: string) => s.split(w).length - 1;
+
+  it("draws a man and a woman by default, the woman looking up at the angel", () => {
+    const p = buildCardPrompt(lovers);
+    expect(p).toContain("a nude man and a second nude woman");
+    expect(p).not.toContain("nude figure");
+  });
+
+  it("follows the 男男 / 女女 choice, and genders a user subject", () => {
+    const mm = buildCardPrompt(lovers, { couple: "man-man" });
+    expect(count(mm, "nude man")).toBeGreaterThanOrEqual(2);
+    expect(mm).not.toContain("woman");
+    const ff = buildCardPrompt(lovers, { couple: "woman-woman", subject: "a blue cat" });
+    expect(ff).toContain("a female blue cat and a second female blue cat");
+    expect(ff).not.toMatch(/\bmale blue cat/);
+  });
+
+  it("leaves every other card unchanged", () => {
+    const fool = TAROT_CARDS.find((c) => c.name === "THE FOOL")!;
+    expect(buildCardPrompt(fool, { couple: "woman-woman" })).toBe(buildCardPrompt(fool));
+  });
+});
+
+describe("minor arcana meanings", () => {
+  it("gives every minor card its own standard meaning, not the generic suit text", () => {
+    const minors = TAROT_CARDS.filter((c) => c.type !== "major");
+    expect(minors).toHaveLength(56);
+    for (const c of minors) expect(c.theme, c.name).not.toMatch(/energy$/);
+    expect(new Set(minors.map((c) => c.theme)).size).toBe(56);
+  });
+});
+
+describe("hero word not doubled", () => {
+  it("never writes the same word twice in a row in any default prompt (e.g. 'blindfolded blindfolded woman')", () => {
+    for (const c of TAROT_CARDS) expect(buildCardPrompt(c), c.name).not.toMatch(/\b(\w{4,}) \1\b/i);
+  });
+});
