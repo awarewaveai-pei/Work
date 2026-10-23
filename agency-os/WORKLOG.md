@@ -139,9 +139,9 @@
 **順帶**：Foundry catalog `--check` 原本就 drift（社群 manifest／products.ts 已提交未重產）→ `node scripts/sync-foundry-catalog.mjs` 重產，check PASS。
 
 **驗證結果**
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST http://127.0.0.1:3002/api/video/reconcile (無 key) → 404；/var/log/reconcile-videos.log 10-20 06:45Z 起空回應 | exit=0 | ms=900
-- REALTEST_EVIDENCE: tool=SSH | cmd=curl -u app-pw soulfulexpression.org/wp-json/wp/v2/posts?search=感恩日記_改變人生的五分鐘習慣&status=any&context=edit → [(7393,'publish',True)]；pages 0 | exit=0 | ms=1500
-- REALTEST_EVIDENCE: tool=SSH | cmd=python3 PATCH posts/7393 content（刪 wp:video 區塊）→ 200；公開頁 grep r2.dev/video=0 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST http://127.0.0.1:3002/api/video/reconcile (無 key) → 404；/var/log/reconcile-videos.log 10-20 06:45Z 起空回應 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -u app-pw soulfulexpression.org/wp-json/wp/v2/posts?search=感恩日記_改變人生的五分鐘習慣&status=any&context=edit → [(7393,'publish',True)]；pages 0 | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=SSH | cmd=python3 PATCH posts/7393 content（刪 wp:video 區塊）→ 200；公開頁 grep r2.dev/video=0 | exit=0 | ms=0（未計時）
 - `npx tsc --noEmit` exit 0；`npx vitest run app/api/tools/designs app/api/video app/api/internal lib/content/video lib/portal lib/events lib/storage` 62 檔 274 測全過（新增 delete-guard 7、host-loopback 2、internal routes 4）。
 - 突變：腳本改回舊路徑 → host-loopback 2 測紅；delete-guard 拔「有引用就拒」→ 3 測紅；拔「掃描失敗就拒」→ 1 測紅；還原全綠。
 - REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n -- Codex `reports/oracle/2026-10-23-partialreview-fe2a7020.md`。F1（prod .env 覆寫 `NEXT_ADMIN_EVENTS_SYNC_URL` 仍指舊路徑）實查不成立：`grep -c NEXT_ADMIN_EVENTS_SYNC_URL /root/lobster-phase1/.env`=0。F2（掃描與刪除間的 TOCTOU）成立但接受：WP 是外部系統，人工貼網址無法鎖；自動嵌入只發生在剛渲染完的新片，刪除是畫廊舊片，窗口數秒 → 列剩餘風險。
