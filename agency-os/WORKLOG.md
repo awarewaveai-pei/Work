@@ -1,4 +1,26 @@
 # Worklog
+## 2026-10-24（續1）塔羅六～十：數量拆小組、構圖照 RWS 原圖；數量改善實驗結論（Claude）
+
+**觸發**：操作者回報數字牌數量常錯，要求分析可行方法並實測（用牌庫實際文字＋梵谷）。
+
+**修改**：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/tarot/cards.ts` 六～十的 `objects`（只改文字，機制同續47）：數量拆成 ≤5 的小組；位置照 `agency-os/docs/tarot_cards/Tarot card Images/` 原圖（聖盃九男人坐前方板凳、九杯一排在後方高桌；寶劍九九劍一列橫疊；錢幣八一列在直柱；錢幣十分三列浮在畫面；錢幣九左一堆 6、右 3 等）。
+
+**實驗結果（schnell，梵谷，seed 7/42；數字＝剛好正確／可數組數）**
+- A 拆小組（20 張×2）：改寫前 6/34 → 後 11/34。
+- 阿拉伯數字（nine→9）：構圖與數量無差異；T5 token 數幾乎相同（nine／9 各 1）。不採用。
+- C 程式貼物件：數量必對，但梵谷筆觸下像貼紙、桌面位置須人工指定。不採用。
+- 修圖（3 張×2，短指示）：Kontext dev 3/6（NT$1.5/張）、Kontext pro 2/6（NT$3.2）、GPT-Image-1 2/6 且改壞五芒星／人臉、gpt-image-2 4/12（寶劍九 4/4，聖盃九／錢幣十因原圖構圖錯被擋而少畫，測試無效）。長指示 Kontext dev 1/6。皆未做成功能；修圖測試前提圖構圖錯誤，須以本次正確構圖重測。
+- 測試總花費約 NT$95。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test（next-admin 全套 326 files／2945 passed／0 failed）＋ npx tsc --noEmit | exit=0 | ms=150000
+- 長度（T5 v1.1 實數，936 組）：牌面內容最長 222 token／139 字（愚者梵谷），< schnell 256、Ideogram 150；FLUX dev 最長 366 < 512。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-24-partialreview-75110dc8.md`：F1 錢幣九應為 5/4 → 放大原圖實數為左 6、右 3，Codex 數錯；但「左兩疊各三」與原圖一整堆不符，改為「左一堆 6、右 3」
+- BUGHUNT_WAIVED: NA -- 只改牌面描述字串，無符號／介面變動
+
+**剩餘**：schnell 數量命中約 1/3；寶劍十劍插地上、聖盃八疊成柱等構圖仍偶發。
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-23（續53）next-admin 部署到 main 最新 edffb48fc：payments 4a 程式上線（操作者「所有待部署的都部署，包括其他 sessions」）（Claude）
 
 **觸發**：續52 部署後，他 session 才推 `f2139d35a`（payments 4a 程式）；prod 已有 0120 migration 與 `PAYMENTS_*` env，但跑舊程式。操作者要求全部部署。
