@@ -60,7 +60,7 @@
 | `supabase` | HTTP | **已停用**（自架無 /mcp endpoint；see registry note） |
 | `supabase-awarewave-postgres` | stdio | 自架 AwareWave Supabase Postgres（需 tunnel） |
 | `awarewave-ops` | stdio | 所有自架 + 雲端 REST API 統一入口 |
-| `cloudflare` | HTTP | Cloudflare（OAuth：Claude `/mcp`、Codex `codex mcp login cloudflare`；不帶 token） |
+| `cloudflare` | HTTP | Cloudflare（Bearer `CLOUDFLARE_API_TOKEN`，與腳本／next-admin 同一把） |
 | `posthog` | HTTP | PostHog |
 | `github` | stdio | GitHub |
 | `resend` | stdio | Resend |

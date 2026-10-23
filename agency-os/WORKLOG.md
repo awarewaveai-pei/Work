@@ -1,4 +1,13 @@
 # Worklog
+## 2026-10-23（續21）Cloudflare MCP 改用唯一的 CLOUDFLARE_API_TOKEN（取代 OAuth 方案）
+
+- 變更理由：OAuth 需操作者每台／每 client 手動授權；實測現役 account token 直接可用 → 一把 token 通用腳本／next-admin／MCP，零人工步驟。
+- 改動：`mcp/registry.template.json` cloudflare 加回 header `Bearer ${env:CLOUDFLARE_API_TOKEN}`＋codex `bearer_token_env_var=CLOUDFLARE_API_TOKEN`；`sync-mcp-config.ps1` 重生 `.mcp.json`／`~/.codex/config.toml`；SERVICE_CREDENTIALS_MAP、TASKS 改述。
+- 操作者另在 Claude app 啟用了 Anthropic 目錄的 Cloudflare 外掛（同一 MCP＋14 skills）＝與專案 server 重複；agent 不得操作 Claude app 自身視窗，需操作者關開關。
+- REALTEST_EVIDENCE: tool=Bash | cmd=POST mcp.cloudflare.com/mcp initialize 200、tools/list 200（docs,search,execute,whoami）、tools/call whoami 200 回帳號 | exit=0 | ms=2500
+- REVIEW_WAIVED: NA -- 設定值改回既有 header 形式，無程式邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts,mcp,.claude | grep=`codex mcp login cloudflare|OAuth.*cloudflare` | hits=0（現行文件；WORKLOG 歷史除外）
+- 生效：新開的 session 才讀新 `.mcp.json`。
 ## 2026-10-23（續20）偵測器契約 Phase 2 完成＋MCP 偵測器改用權威來源（Claude）
 
 **觸發**：操作者「去處理好」（續9 留下的 Phase 2、MCP failed=18、MinIO）。

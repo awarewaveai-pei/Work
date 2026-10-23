@@ -272,7 +272,13 @@
                                        "enabled":  true,
                                        "transport":  "http",
                                        "url":  "https://mcp.cloudflare.com/mcp",
-                                       "note":  "OAuth, no static header (2026-10-23): a set Authorization header disables OAuth fallback, and the static token silently expired (401). Authorize once per client: Claude /mcp, Codex `codex mcp login cloudflare`. Scripts keep using CLOUDFLARE_API_TOKEN."
+                                       "headers":  {
+                                                       "Authorization":  "Bearer ${env:CLOUDFLARE_API_TOKEN}"
+                                                   },
+                                       "codex":  {
+                                                     "bearer_token_env_var":  "CLOUDFLARE_API_TOKEN"
+                                                 },
+                                       "note":  "Same single account token as scripts and next-admin (2026-10-23; the separate CLOUDFLARE_AUTH_BEARER_TOKEN expired silently and was retired). Verified: initialize + tools/call whoami = 200."
                                    },
                     "posthog":  {
                                     "enabled":  true,
