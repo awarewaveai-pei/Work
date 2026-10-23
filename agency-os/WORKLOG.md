@@ -1,4 +1,27 @@
 # Worklog
+## 2026-10-23（續37）next-admin 提前部署 d433dfe29（塔羅背景批次套框＋存設計＋PNG/WebP、牌面修正；他 session 入口／側欄）（Claude）
+
+**觸發**：操作者下令「部署」。
+
+**經過**
+- 第一次 `sg-deploy.sh next-admin`（目標 7f7f0e3b2）被 npm test 閘中止：`app/__tests__` 被產品登記測試當成頁面（見續35）。正式機未動。
+- 修 `products.test.ts` 後（d433dfe29）重跑，成功。
+
+**上線內容**（`d19ed55e4..d433dfe29`，無 migration、未動 compose）
+- `7f7f0e3b2` 塔羅（續33）；`d433dfe29` 登記測試（續35）。
+- 他 session：`818d6e781`／`d6fca2abe`／`805e6ecdc`（入口與身分：客戶走產品門、shadow 模式不再給未購付費功能）、`5df9a3d6e`／`b56f4fc86`／`bcd34597a`／`e2fdbb23d`（studio 門頁、側欄）。這些原本就會在 03:00 自動上線，DEPLOY_HOLD 無。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（npm test 閘 → build → healthy after 10s → HTTP smoke 5/5 200） | exit=0 | ms=360560
+- 容器 `lobster-next-admin Up (healthy)`，無改名；`.deployed-commit` = d433dfe292d9c6cf9a1f570fb1959af507e53f0a（前次 d19ed55e4）。
+- 新路由：容器內 `curl -H "Host: app.aware-wave.com" …/batch/c8fbba27…/image/0` → 401 `{"error":"unauthorized"}`，與同層既有 `/batch/c8fbba27…` 狀態路由相同 → 已上線且同樣受登入保護。帶登入的實圖載入未驗（不代登入）。
+- Playwright smoke：PASSED 26／Failed 0／Skipped 6（共 32），證據 `agency-os/reports/e2e/2026-10-23/smoke/`。
+- REVIEW_WAIVED: NA -- 部署動作本身無程式改動；上線程式已在續33（Codex）、續35 審查
+- BUGHUNT_WAIVED: NA -- 無程式改動
+
+**待操作者**：在 /tools/tarot 重按「載入批次結果」（job c8fbba27）→ 確認 78 張有框、出現在 /tools/designs、「下載 PNG」「下載 WebP」有檔。
+
+**rollback**：`sg-deploy.sh` 失敗會自動回退；手動回退到 d19ed55e4 見 `agency-os/docs/operations/DEPLOY_ROLLBACK_RUNBOOK.md` §2.1。
 ## 2026-10-23（續36）ADR 017 先後決策：門先、錢的內部段接著、Woo＋WP 一鍵登入等待決；商品接三軸五對象＝登記列三件事（Claude）
 
 **觸發**：操作者「各商品怎麼串接到3軸5對象；從『先做產品門還是先打通收錢與登入』判斷；排好先後寫回監工台 NEXT」。
