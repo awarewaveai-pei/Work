@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-23（續13）全產品帳戶統一由 organization_all_features 補齊：0118 取代 0117，已套 prod（Claude）
+
+**觸發**：操作者定 Soulful＝全產品合約、EdD 論文研究＝自己的研究（免費），並同意套 0118。
+
+**根因**：「全部產品」是帳戶層級承諾；逐功能手登會在新增功能時漂移（0117 只替 internal 解決）。不變量：涵蓋全部功能的帳戶＝一列資料，補齊由登記表算出。
+
+**修改**
+- `lobster-factory/packages/db/migrations/0118_entitlement_all_features.sql`：`organization_all_features`（PK org、source contract|comp、`source_ref like 'all-features:_%'`，RLS service_role only）；drop 0117 函式＋索引；新索引 `(org,product,feature,source,source_ref) where status='active' and source_ref like 'all-features:%'`；`entitlement_ensure_all_features(jsonb)`；種子 3 列（internal comp、edd-research comp、soulful-expression contract `all-features:soulful-2026-10-23`），任一缺帳戶整個 migration 失敗。down 還原 0117；down 兩份同檔。
+- `tables.ts` `registeredFeatures()`＋`ensureAllFeatures()`；expire 路由回 `all_features_added`；`expiry.test.ts` 跟著改。
+- ADR 017 §4 一行；`cards/step-3.md`、TASKS；排程 `verify-internal-comp-2026-10-24` 改查三帳戶。
+- MONGOLIA-03（等刷卡）、e2e-verify-0704、test-wp-webhook-co：刻意不給。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0118 then psql read-only（organization_all_features 3 列、新函式／索引在、0117 函式已除、帳本 1、權利 0、anon 無 execute/select） | exit=0 | ms=5000
+- `python -I packages/db/scripts/0118_entitlement_all_features-local-verify.py` PASS（缺帳戶整筆回滾、補 6→0、只限自有列、過期補回／移除涵蓋即停、service_role only、down→0117、再 up）；`vitest lib/entitlements lib/portal` 146 passed。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 自審對照 db-expert 對 0117 的 M1（索引限自有列，以 source_ref 前綴）、M2（三份 CHECK 測試沿用）、L1（header 寫明結束涵蓋步驟）
+- ORACLE_WAIVED: 0117 已經 db-expert＋Codex 審，0118 為同機制一般化；真 Postgres 驗證涵蓋所有新路徑
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=ensure_internal_comp|ensureInternalComp|internal_comp_added | hits=8 檔（0117／0118 migration 與 down、兩份 verify 腳本＝歷史或還原用；next-admin 程式 0）
+
+**rollback**：程式 `git revert <本 commit>`；`0118_entitlement_all_features.down.sql`（回 0117）；已寫權利列改 `expired`。
 ## 2026-10-23（續12）資安 ⑨ 盤點：8 條逐條實查，7 條結案、DMARC 早已勾
 
 - S1 staging WP 密碼：2 站已拆（`lobster-wordpress` 內 `/var/www/html/staging/{green-valley-farm-28ba09,ssasd-8ebcd4}` 不存在；公網 `wp-login.php` 404）。trigger-postgres `TaskRun` 9／`TaskEvent` 9 筆仍含 `Stg…!`，但對應站已不存在＝無可保護對象 → 不做 prod DB redact（零效益）。操作者 10-01 不輪換。

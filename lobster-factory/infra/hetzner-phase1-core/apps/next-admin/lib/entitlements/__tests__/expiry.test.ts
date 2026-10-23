@@ -74,7 +74,7 @@ describe("global entitlement expiry", () => {
       method: "POST", headers: { Authorization: "Bearer expiry-test-token" },
     });
     mocks.client.mockReturnValue(database({ error: null, count: 1501 }).client);
-    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501, trials_ended: 0, internal_comp_added: 0 });
+    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501, trials_ended: 0, all_features_added: 0 });
     mocks.client.mockReturnValue(database({ error: { message: "unavailable" }, count: null }).client);
     expect((await POST(request())).status).toBe(500);
     mocks.client.mockReturnValue(database({ error: null, count: null }).client);
@@ -154,16 +154,16 @@ describe("global entitlement expiry", () => {
     await expect(createEntitlementStore(client).getCreditBalance("org-1")).rejects.toThrow("invalid_credit_balance");
   });
 
-  it("tops up the internal account's comp grants from every registered feature", async () => {
+  it("tops up every all-features account from every registered feature", async () => {
     const { db, client } = database({});
     db.rpc.mockResolvedValue({ data: 3, error: null });
-    expect(await createEntitlementStore(client).ensureInternalComp()).toBe(3);
+    expect(await createEntitlementStore(client).ensureAllFeatures()).toBe(3);
     const sent = db.rpc.mock.calls[0][1].p_features as Array<{ product_key: string; feature_key: string }>;
-    expect(db.rpc.mock.calls[0][0]).toBe("entitlement_ensure_internal_comp");
+    expect(db.rpc.mock.calls[0][0]).toBe("entitlement_ensure_all_features");
     expect(sent).toEqual(PRODUCTS.flatMap((p) => p.features.map((f) => ({ product_key: p.key, feature_key: f.feature_key }))));
     expect(sent.length).toBeGreaterThan(0);
-    db.rpc.mockResolvedValue({ data: null, error: { message: "internal organization not found" } });
-    await expect(createEntitlementStore(client).ensureInternalComp()).rejects.toThrow("internal organization not found");
+    db.rpc.mockResolvedValue({ data: null, error: { message: "p_features must be an array" } });
+    await expect(createEntitlementStore(client).ensureAllFeatures()).rejects.toThrow("p_features must be an array");
   });
 
   it("every registered product is a product_key 0110 accepts, so the daily top-up cannot fail on a new product", () => {

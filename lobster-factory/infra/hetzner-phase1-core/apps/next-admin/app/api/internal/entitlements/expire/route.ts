@@ -16,8 +16,8 @@ export async function POST(request: Request): Promise<Response> {
     const now = new Date();
     const expired = await store.expireEntitlements(now);
     const trialsEnded = await store.endLapsedTrials(now);   // after grants, so grace ends both together
-    const internalComp = await store.ensureInternalComp();   // a feature added to products.ts is covered from today
-    return NextResponse.json({ ok: true, expired, trials_ended: trialsEnded, internal_comp_added: internalComp });
+    const allFeatures = await store.ensureAllFeatures();   // a feature added to products.ts is covered from today
+    return NextResponse.json({ ok: true, expired, trials_ended: trialsEnded, all_features_added: allFeatures });
   } catch (error) {
     console.error("[entitlements-expire] sweep failed", error);
     return NextResponse.json({ ok: false, error: "expiry_failed" }, { status: 500 });
