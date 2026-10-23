@@ -2025,7 +2025,7 @@
 
 ## Backlog — 未完成
 - [x] **Cloudflare MCP 連線失敗** → ✅ 2026-10-23：根因已變（`CLOUDFLARE_AUTH_BEARER_TOKEN` 失效 401，非缺 scope）；MCP 改用現役唯一的 `CLOUDFLARE_API_TOKEN`（whoami 200），不需 OAuth。WORKLOG 2026-10-23「資安 ⑨ 盤點」。原文： — 根因已診斷完成（`CLOUDFLARE_AUTH_BEARER_TOKEN` 缺 `Account Settings: Read`），修復動作屬修改外部帳號安全設定，非 Claude 可代做。步驟見 WORKLOG 2026-09-12（續13）。同條目另揭露：診斷過程誤將 6 把憑證明文印進 session transcript，建議操作者輪替。
-  - [ ] **prod Cloudflare 整合重測**（2026-10-23 已收斂成一把 `CLOUDFLARE_API_TOKEN`＋`CLOUDFLARE_ACCOUNT_ID`，DB 綁定設 pending）：新程式已部署（2026-10-23 06:27Z，`a67b0048a`）；剩操作者登入後在 `/ops` 整合頁對 cloudflare 按 validate → 預期 active（validate 需登入角色，agent 不偽造）。WORKLOG 2026-10-23「Cloudflare 憑證收斂」。建議模型：Sonnet
+  - [x] **prod Cloudflare 整合重測** → ✅ 2026-10-23 06:40Z 操作者 validate，DB `status=active`、`Provider API accepted the configured credential.`；Cloudflare 外掛已關（與專案 MCP 重複）。（2026-10-23 已收斂成一把 `CLOUDFLARE_API_TOKEN`＋`CLOUDFLARE_ACCOUNT_ID`，DB 綁定設 pending）：新程式已部署（2026-10-23 06:27Z，`a67b0048a`）；剩操作者登入後在 `/ops` 整合頁對 cloudflare 按 validate → 預期 active（validate 需登入角色，agent 不偽造）。WORKLOG 2026-10-23「Cloudflare 憑證收斂」。建議模型：Sonnet
 - [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
 
 ## Backlog — 已完成歷程
