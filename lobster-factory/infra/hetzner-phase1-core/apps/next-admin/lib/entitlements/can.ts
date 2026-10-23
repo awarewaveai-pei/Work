@@ -37,19 +37,23 @@ export async function issuePermit(request: PermitBinding, deps: CanDependencies)
   const now = deps.now?.() ?? Math.floor(Date.now() / 1000);
   let details: Pick<PermitPayload, "source" | "source_ref" | "entitlement_id" | "limits" | "max_spend">;
   let expiresAt = now + 600;
-  if (feature.billing === "credits") {
+  // Who pays is per account x feature (ADR 017 §0): an active comp/contract row wins for every feature, credits
+  // included, and never debits (report() debits only source=credits); the wallet answers only when no row does.
+  const found = await deps.store.findActiveEntitlement({ organizationId: request.tenant, productKey: request.product_key, featureKey: request.feature_key, now });
+  const row = found && found.status === "active" && found.organizationId === request.tenant && found.productKey === request.product_key && found.featureKey === request.feature_key
+    && Number.isFinite(found.startsAt) && found.startsAt <= now && (found.endsAt === null || (Number.isFinite(found.endsAt) && Math.floor(found.endsAt) > now)) ? found : null;
+  if (row) {
+    // Do not let a cached permit extend an entitlement's own deadline.
+    expiresAt = Math.min(expiresAt, row.endsAt === null ? expiresAt : Math.floor(row.endsAt));
+    details = { source: row.source, source_ref: row.sourceRef, entitlement_id: row.id, limits: row.limits, max_spend: null };
+  } else if (feature.billing === "credits") {
     const policy = await deps.creditPolicy?.(request.product_key, request.feature_key);
     if (!policy || !Number.isFinite(policy.minimumCharge) || policy.minimumCharge <= 0 || !Number.isFinite(policy.singleLimit) || policy.singleLimit < policy.minimumCharge) return deny("missing_credit_policy");
     const balance = await deps.store.getCreditBalance(request.tenant);
     if (!Number.isFinite(balance) || balance < policy.minimumCharge) return deny("insufficient_credits");
     details = { source: "credits", source_ref: null, entitlement_id: null, limits: {}, max_spend: Math.min(balance, policy.singleLimit) };
   } else {
-    const row = await deps.store.findActiveEntitlement({ organizationId: request.tenant, productKey: request.product_key, featureKey: request.feature_key, now });
-    if (!row || row.status !== "active" || row.organizationId !== request.tenant || row.productKey !== request.product_key || row.featureKey !== request.feature_key || !Number.isFinite(row.startsAt) || row.startsAt > now || (row.endsAt !== null && (!Number.isFinite(row.endsAt) || row.endsAt <= now))) return deny("no_active_entitlement");
-    // Do not let a cached permit extend an entitlement's own deadline.
-    expiresAt = Math.min(expiresAt, row.endsAt === null ? expiresAt : Math.floor(row.endsAt));
-    if (expiresAt <= now) return deny("no_active_entitlement");
-    details = { source: row.source, source_ref: row.sourceRef, entitlement_id: row.id, limits: row.limits, max_spend: null };
+    return deny("no_active_entitlement");
   }
   const payload: PermitPayload = { ...request, ...details, format_version: 1, issued_at: now, expires_at: expiresAt, kid: deps.key.kid };
   return { allowed: true, payload, permit: signPermit(payload, deps.key.privateKey) };

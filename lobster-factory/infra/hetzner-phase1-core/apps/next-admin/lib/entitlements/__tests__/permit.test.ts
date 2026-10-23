@@ -89,7 +89,7 @@ describe("can issues only registry-backed, bounded grants", () => {
     expect(verifyPermit(result.permit, publicKeys, creditBinding, valid.now)).toMatchObject({
       source: "credits", entitlement_id: null, max_spend: Math.min(balance, 8), expires_at: valid.now + 600,
     });
-    expect(deps.store.findActiveEntitlement).not.toHaveBeenCalled();
+    expect(deps.store.findActiveEntitlement).toHaveBeenCalledWith(expect.objectContaining({ featureKey: "social.rewrite" }));
   });
   it.each([1.99, 0, -1, NaN, Infinity])("rejects insufficient or invalid balance %s", async (balance) => {
     const deps = dependencies();

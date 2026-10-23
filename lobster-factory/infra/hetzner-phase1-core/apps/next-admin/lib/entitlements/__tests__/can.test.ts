@@ -22,13 +22,26 @@ describe("can() — enforce", () => {
     expect(grant.info.entitlementId).toBe("ent-1");
   });
 
-  it("a credits feature is allowed by wallet balance without an entitlement row and refused at zero balance", async () => {
+  it("a credits feature without a row still needs balance", async () => {
     const funded = gateFixture({ entitlement: null, balance: 50 });
-    expect((await can(CUSTOMER, "social.rewrite", ACTOR, funded.deps)).allowed).toBe(true);
-    expect(funded.findActiveEntitlement).not.toHaveBeenCalled();
-    const empty = gateFixture({ entitlement: null, balance: 0 });
-    const refused = await can(CUSTOMER, "social.rewrite", ACTOR, empty.deps);
+    expect(await can(CUSTOMER, "social.rewrite", ACTOR, funded.deps)).toMatchObject({ allowed: true, info: { source: "credits" } });
+    expect(funded.findActiveEntitlement).toHaveBeenCalledWith(expect.objectContaining({ featureKey: "social.rewrite" }));
+    const refused = await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ entitlement: null, balance: 0 }).deps);
     expect(refused).toMatchObject({ allowed: false, reason: "no_credits" });
+    // a row for another feature is not this feature's row: the wallet still decides
+    expect(await can(CUSTOMER, "social.rewrite", ACTOR, gateFixture({ balance: 0 }).deps)).toMatchObject({ allowed: false, reason: "no_credits" });
+  });
+
+  it("a credits feature uses an active comp or contract row before the wallet", async () => {
+    for (const source of ["comp", "contract"] as const) {
+      const { deps, debit } = gateFixture({ entitlement: { featureKey: "social.rewrite", source }, balance: 0 });
+      const grant = await can(CUSTOMER, "social.rewrite", ACTOR, deps);
+      expect(grant).toMatchObject({ allowed: true, maxSpend: null, info: { source, entitlementId: "ent-1" } });
+      await grant.report({ units: 3, idempotencyKey: "idem-key-0005" });
+      expect(debit).not.toHaveBeenCalled();
+    }
+    const lapsed = gateFixture({ entitlement: { featureKey: "social.rewrite", source: "comp", endsAt: Math.floor(Date.now() / 1000) - 1 }, balance: 0 });
+    expect(await can(CUSTOMER, "social.rewrite", ACTOR, lapsed.deps)).toMatchObject({ allowed: false, reason: "no_credits" });
   });
 
   it("a credits permit carries source=credits, no entitlement_id and max_spend = min(balance, cap)", async () => {

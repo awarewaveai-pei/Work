@@ -91,6 +91,7 @@
 - 回傳 `{allowed, limits, max_spend, report(usage)}`。
 - 主體＝計費帳戶（`on_behalf_of`），`actor`＝這次請求是誰（§0 C 軸）；`actor` 只進稽核與用量，不影響 `allowed`。
 - 線上：答案來自許可；`report()` 回報用量給控制面記帳。
+- 先看權利列、再看錢包（2026-10-23，§0 錢的軸屬帳戶×產品×功能）：該帳戶該功能有 active 的 comp／contract 列就照列放行、不扣點（`report()` 只扣 `source=credits`）；沒有列，`billing: credits` 的功能才看錢包，其餘拒絕（`can.ts` `issuePermit`）。
 - 買斷：主體＝這台安裝，答案來自授權檔；`max_spend` 空、`report()` 不做事（用客戶自己的 key）。
 - 每個收費的按鈕或 API 呼叫前問一次；產品程式不知道答案來自合約、贈送還是買斷。收費 API 路由一律用 `withFeature("<feature_key>", handler)` 包起來（順序 3）：它先問 `can()`，同時把「路由→功能」登記進一張程式內的表，順序 6 的 API key scope 檢查就查這張表，不另維護路徑清單（Codex 2026-10-18 M20）。
 

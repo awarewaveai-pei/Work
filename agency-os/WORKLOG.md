@@ -1,4 +1,33 @@
 # Worklog
+## 2026-10-23（續7）點數功能先認權利列（ADR 017 §0 錢的軸屬帳戶×功能）；自用帳戶補齊存 patch 待同意（Claude）
+
+**觸發**：監工台 NEXT ①；操作者選方案 B：段 1 推 main、段 2 寫好不推。
+
+**根因**：`lib/entitlements/can.ts` `issuePermit` 舊版 credits 功能只看錢包（舊 :40-45），comp／contract 列無效 → prod 7 天 would_deny 231（internal tarot.image 221），翻 enforce 自用即停。
+
+**段 1（本 commit，推 main）**
+- `can.ts` `issuePermit`：先驗列（狀態／帳戶／產品／功能／時間），有效列 → 用列（max_spend null；`report()` 只扣 `source=credits`）；無列：credits 看錢包，其餘 `no_active_entitlement`。permit 格式不變（`permit.ts:57-59` 本就收 comp＋entitlement_id）。
+- 測試：`can.test.ts` 新 `a credits feature uses an active comp or contract row before the wallet`、改 `a credits feature without a row still needs balance`（含錯功能的列被忽略）；`permit.test.ts`、`features.test.ts` 去掉「credits 不查列」與「查詢次數＝快取」的舊斷言。
+- 文件：ADR 017 §4 加一行；監工台第 3 項完成條件；`cards/step-3.md` 收尾段改段 1／段 2。
+- prod 影響：shadow＋0 列 → 判決不變。
+
+**段 2（存 `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-3-internal-comp.patch`，`git apply --check` 乾淨；未推）**
+- `0117_entitlement_internal_comp`：部分唯一索引 `(org,product,feature) where source='comp' and status='active' and source_ref='internal'`＋`entitlement_ensure_internal_comp(jsonb)`（STRICT internal、service_role only）；down 兩份同檔。
+- `tables.ts` `internalCompFeatures()`＋`ensureInternalComp()`；expire 路由補 `internal_comp_added`；`expiry.test.ts` 兩測（全功能送出、三份 product_key CHECK 皆涵蓋登記表）。
+- db-expert：0c/0h/2m/1l；M1 索引限 internal 列、M2 CHECK 涵蓋測試、L1 header 註明，皆已修。
+- 編號 0116 已被 social 佔，故 0117；套用時以當下空號為準。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/entitlements（段 1：108 passed；段 2 套用時：110 passed）＋ npx tsc --noEmit -p . | exit=0 | ms=3200
+- 突變：`if (row)` → `if (row && feature.billing !== "credits")` → 唯 `a credits feature uses an active comp or contract row before the wallet` 紅；還原 108 綠。
+- 段 2 真 Postgres：`python -I packages/db/scripts/0117_entitlement_internal_comp-local-verify.py` PASS（補 2→0、internal 唯一、他源 comp 不受限、過期補回、anon／authenticated 拒、STRICT 0／2 個 internal 皆錯、down/up）。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-98025e41.md`：多筆有效列取最舊（`tables.ts:31`）屬實、既有行為，寫入 `cards/step-4.md` 由寫入方保證單一有效列；另 db-expert 審段 2（見上）
+- ORACLE artifact 範圍＝段 1 四檔＋ADR（codex-oracle -Path）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory,Projects/internal/cognitive-engineering-os | grep=billing === "credits"|看餘額不看權利列|findActiveEntitlement).not.toHaveBeenCalled | hits=3（can.ts:49 本身；data.mjs 舊句已改；permit.test.ts:108 未登記功能不查列＝正確）
+
+**剩餘**：段 2 推送＝prod 寫入自用帳戶權利（High，待操作者同意）；5 家客戶列需操作者給合約；翻 enforce 前 would_deny 7 天歸零。
+
+**rollback**：`git revert <本 commit>`；段 2 未上線。
 ## 2026-10-23（續6）客戶怎麼來監工台依 prod 現況更新＋排出接下來順序（Claude）
 
 **觸發**：操作者「依現狀更新監工台，然後決定要依序做什麼」。

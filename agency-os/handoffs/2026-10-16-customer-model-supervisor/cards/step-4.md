@@ -7,6 +7,7 @@
 - **收件表** `payment_events(provider, event_id, received_at, processed_at, payload)`，`unique (provider, event_id)`；route 先 insert（衝突＝重送，直接回 `replayed`），再在同一交易處理合約、權利、帳本（Codex M8）。
 - 事件六種（Woo 原生 webhook，不經 wp-bridge）：訂單完成、訂閱續約、訂閱取消、點數包購買、**退款**、**拒付**。退款訂閱＝取消；退款點數包＝帳本 `refund` 分錄只退未用部分（0066 `entry_type` 已有 refund）；拒付＝合約權利列改 `suspended`、錢包凍結，人工複核後解（Codex M9）。目標 `app/api/webhooks/woo-billing/route.ts`（新；既有 `app/api/webhooks/woo-order/` 是 Printful 草稿出貨，不混用，Codex R2-9）。
 - 控制面處理：用 `plans.woo_product_ids` 查方案 → 0062 upsert（冪等鍵＝Woo 訂閱編號＋事件 id）→ 重算權利列，狀態機固定（ADR 017 §3，Codex R2-2）：換方案＝舊列 `ends_at = now()`、新列 active；取消＝現有列 `ends_at = current_period_end + 寬限`，不新增列；退款＝`ends_at = now()`；拒付＝`suspended`。點數包 → 帳本 `grant` 一筆（冪等鍵＝Woo 訂單編號）。
+- 同一帳戶×產品×功能同時只准一筆有效列（客戶列；internal 列由 0117 索引管）：`findActiveEntitlement` 多筆時取最舊（`tables.ts:31`），舊的寬鬆 comp 會蓋過新的 contract（Codex 2026-10-23 `partialreview-98025e41`，既有行為，段 1 後點數功能也適用）。本步寫入方在同一交易結束舊列，並加測試；贈送與合約重疊時誰優先，開工前先定。
 - 帳本泛化：`media_billing_accounts`／`media_credit_ledger` → `billing_accounts`／`credit_ledger`，加 `product_key`；migration `0105_credit_ledger_generalize.sql` 用 view 雙名過渡一版（ADR 012 §8 第 4 步「最後、expand-contract」）。
 - 試用結束：trial 到 `current_period_end` 無付款 → 權利列 `expired`；資料保留 90 天後由同一個每日 job 標記 `erasure_due`，實際刪除走既有擦除流程（不在本步）。
 - 營運看得到：`app/(shell)/ops/billing/page.tsx` 唯讀表：每個計費帳戶的合約、權利、餘額、最近 20 筆帳本；資料只經 `lib/entitlements/tables.ts`。

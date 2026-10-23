@@ -1,0 +1,296 @@
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/entitlements/expire/route.ts b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/entitlements/expire/route.ts
+index e6a6f0eb0..84cec0e8b 100644
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/entitlements/expire/route.ts
++++ b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/entitlements/expire/route.ts
+@@ -16,7 +16,8 @@ export async function POST(request: Request): Promise<Response> {
+     const now = new Date();
+     const expired = await store.expireEntitlements(now);
+     const trialsEnded = await store.endLapsedTrials(now);   // after grants, so grace ends both together
+-    return NextResponse.json({ ok: true, expired, trials_ended: trialsEnded });
++    const internalComp = await store.ensureInternalComp();   // a feature added to products.ts is covered from today
++    return NextResponse.json({ ok: true, expired, trials_ended: trialsEnded, internal_comp_added: internalComp });
+   } catch (error) {
+     console.error("[entitlements-expire] sweep failed", error);
+     return NextResponse.json({ ok: false, error: "expiry_failed" }, { status: 500 });
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/__tests__/expiry.test.ts b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/__tests__/expiry.test.ts
+index cda027a8b..5cad41cdd 100644
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/__tests__/expiry.test.ts
++++ b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/__tests__/expiry.test.ts
+@@ -1,7 +1,12 @@
++import { readFileSync } from "node:fs";
++import path from "node:path";
+ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+ import type { SupabaseClient } from "@supabase/supabase-js";
++import { PRODUCTS } from "@/lib/portal/products";
+ import { createEntitlementStore } from "../tables";
+ 
++const MIGRATIONS_DIR = path.resolve(__dirname, "../../../../../../../packages/db/migrations");
++
+ const mocks = vi.hoisted(() => ({ client: vi.fn() }));
+ vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: mocks.client }));
+ import { POST } from "@/app/api/internal/entitlements/expire/route";
+@@ -15,7 +20,7 @@ function database(result: object) {
+   const trials = { select: vi.fn(), eq: vi.fn(), lte: vi.fn(), gt: vi.fn(), order: vi.fn(), limit: vi.fn() };
+   for (const step of ["select", "eq", "lte", "gt", "order"] as const) trials[step].mockReturnValue(trials);
+   trials.limit.mockResolvedValue({ data: [], error: null });
+-  const db = { from: vi.fn((table: string) => (table === "organization_product_subscriptions" ? trials : query)), rpc: vi.fn() };
++  const db = { from: vi.fn((table: string) => (table === "organization_product_subscriptions" ? trials : query)), rpc: vi.fn().mockResolvedValue({ data: 0, error: null }) };
+   return { db, query, client: db as unknown as SupabaseClient };
+ }
+ 
+@@ -69,7 +74,7 @@ describe("global entitlement expiry", () => {
+       method: "POST", headers: { Authorization: "Bearer expiry-test-token" },
+     });
+     mocks.client.mockReturnValue(database({ error: null, count: 1501 }).client);
+-    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501, trials_ended: 0 });
++    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501, trials_ended: 0, internal_comp_added: 0 });
+     mocks.client.mockReturnValue(database({ error: { message: "unavailable" }, count: null }).client);
+     expect((await POST(request())).status).toBe(500);
+     mocks.client.mockReturnValue(database({ error: null, count: null }).client);
+@@ -148,4 +153,23 @@ describe("global entitlement expiry", () => {
+     db.rpc.mockResolvedValue({ data: "not a number", error: null });
+     await expect(createEntitlementStore(client).getCreditBalance("org-1")).rejects.toThrow("invalid_credit_balance");
+   });
++
++  it("tops up the internal account's comp grants from every registered feature", async () => {
++    const { db, client } = database({});
++    db.rpc.mockResolvedValue({ data: 3, error: null });
++    expect(await createEntitlementStore(client).ensureInternalComp()).toBe(3);
++    const sent = db.rpc.mock.calls[0][1].p_features as Array<{ product_key: string; feature_key: string }>;
++    expect(db.rpc.mock.calls[0][0]).toBe("entitlement_ensure_internal_comp");
++    expect(sent).toEqual(PRODUCTS.flatMap((p) => p.features.map((f) => ({ product_key: p.key, feature_key: f.feature_key }))));
++    expect(sent.length).toBeGreaterThan(0);
++    db.rpc.mockResolvedValue({ data: null, error: { message: "internal organization not found" } });
++    await expect(createEntitlementStore(client).ensureInternalComp()).rejects.toThrow("internal organization not found");
++  });
++
++  it("every registered product is a product_key 0110 accepts, so the daily top-up cannot fail on a new product", () => {
++    const sql = readFileSync(path.join(MIGRATIONS_DIR, "0110_plans_entitlements.sql"), "utf8");
++    const lists = [...sql.matchAll(/product_key in \(([^)]*)\)/g)].map((m) => new Set(m[1].match(/'([^']+)'/g)!.map((q) => q.slice(1, -1))));
++    expect(lists.length).toBe(3);   // plans, organization_entitlements, organization_product_subscriptions: each must accept every product
++    for (const allowed of lists) expect(PRODUCTS.map((p) => p.key).filter((k) => !allowed.has(k))).toEqual([]);
++  });
+ });
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/tables.ts b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/tables.ts
+index 584941e0b..0b13492a7 100644
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/tables.ts
++++ b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/tables.ts
+@@ -1,7 +1,12 @@
+ import type { SupabaseClient } from "@supabase/supabase-js";
+ import { getSupabaseWriteClient } from "@/lib/supabase-server";
++import { PRODUCTS } from "@/lib/portal/products";
+ import type { CanStore, EntitlementRecord } from "./can";
+ 
++/** Every registered (product, feature): the internal account's comp grants (ADR 017 §0 自用), topped up by 0117. */
++export const internalCompFeatures = (products: typeof PRODUCTS = PRODUCTS) =>
++  products.flatMap((p) => p.features.map((f) => ({ product_key: p.key, feature_key: f.feature_key })));
++
+ // A product can have more than one non-canceled plan (the migration's unique
+ // key includes plan_key). Keep the launcher state deterministic when a base
+ // plan and an add-on coexist, and prefer the state that grants access.
+@@ -17,6 +22,7 @@ const SUBSCRIPTION_STATUS_PRIORITY: Record<string, number> = {
+ export function createEntitlementStore(client: SupabaseClient | null = getSupabaseWriteClient()): CanStore & {
+   expireEntitlements(now?: Date): Promise<number>;
+   endLapsedTrials(now?: Date): Promise<number>;
++  ensureInternalComp(): Promise<number>;
+   getSubscriptionStatuses(organizationId: string): Promise<Map<string, string>>;
+ } {
+   if (!client) throw new Error("entitlements_db_unavailable");
+@@ -61,6 +67,12 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
+       }
+       return byProduct;
+     },
++    async ensureInternalComp() {
++      const { data, error } = await db.rpc("entitlement_ensure_internal_comp", { p_features: internalCompFeatures() });
++      if (error) throw new Error(error.message);
++      if (!Number.isSafeInteger(data)) throw new Error("invalid_internal_comp_count");
++      return data as number;
++    },
+     async expireEntitlements(now = new Date()) {
+       // UPDATE all matching rows; no SELECT/pagination that can skip accounts past row 1000.
+       const { error, count } = await db.from("organization_entitlements")
+diff --git a/lobster-factory/packages/db/migrations/0117_entitlement_internal_comp.down.sql b/lobster-factory/packages/db/migrations/0117_entitlement_internal_comp.down.sql
+new file mode 100644
+index 000000000..c4623f8b7
+--- /dev/null
++++ b/lobster-factory/packages/db/migrations/0117_entitlement_internal_comp.down.sql
+@@ -0,0 +1,11 @@
++begin;
++set local lock_timeout = '5s';
++do $$
++begin
++  if to_regclass('public.schema_migrations') is not null then
++    delete from public.schema_migrations where filename = '0117_entitlement_internal_comp.sql';
++  end if;
++end $$;
++drop function if exists public.entitlement_ensure_internal_comp(jsonb);
++drop index if exists public.organization_entitlements_comp_live_uniq;
++commit;
+diff --git a/lobster-factory/packages/db/migrations/0117_entitlement_internal_comp.sql b/lobster-factory/packages/db/migrations/0117_entitlement_internal_comp.sql
+new file mode 100644
+index 000000000..0a55209a1
+--- /dev/null
++++ b/lobster-factory/packages/db/migrations/0117_entitlement_internal_comp.sql
+@@ -0,0 +1,36 @@
++-- 0117: the internal account (organizations.kind = 'internal', ADR 017 §0 way 1 自用) holds one comp grant per
++-- registered feature, computed from apps/next-admin/lib/portal/products.ts and topped up by the daily
++-- /api/internal/entitlements/expire sweep, so a new feature is covered the next day without a hand-written row.
++-- Invariant: at most one live comp row per (organization, product, feature); the partial unique index makes the
++-- top-up idempotent under concurrent runs. Rows are never deleted (audit). Suspending or expiring one is undone by
++-- the next sweep: to take a feature away from internal, remove it from products.ts.
++-- The index covers only these rows (source_ref 'internal'): customer comp/contract rows keep 0110's plan-change rules.
++-- Access: service_role only, like the rest of 0110.
++begin;
++set local lock_timeout = '5s';
++
++create unique index organization_entitlements_comp_live_uniq
++  on public.organization_entitlements(organization_id, product_key, feature_key)
++  where source = 'comp' and status = 'active' and source_ref = 'internal';
++
++create function public.entitlement_ensure_internal_comp(p_features jsonb) returns integer
++language plpgsql security invoker set search_path = public, pg_temp as $$
++declare
++  v_org uuid;
++  v_added integer;
++begin
++  if jsonb_typeof(p_features) is distinct from 'array' then raise exception 'p_features must be an array'; end if;
++  -- STRICT: zero or two internal root accounts is a data error to surface, never a row to guess.
++  select id into strict v_org from public.organizations where kind = 'internal' and parent_organization_id is null;
++  insert into public.organization_entitlements (organization_id, product_key, feature_key, source, source_ref)
++  select v_org, f->>'product_key', f->>'feature_key', 'comp', 'internal'
++  from jsonb_array_elements(p_features) f
++  on conflict (organization_id, product_key, feature_key) where source = 'comp' and status = 'active' and source_ref = 'internal' do nothing;
++  get diagnostics v_added = row_count;
++  return v_added;
++end $$;
++revoke all on function public.entitlement_ensure_internal_comp(jsonb) from public, anon, authenticated;
++grant execute on function public.entitlement_ensure_internal_comp(jsonb) to service_role;
++comment on function public.entitlement_ensure_internal_comp is 'Idempotent top-up of the internal account''s comp grants from the product registry (ADR 017 §0 自用). Returns rows added. service_role only.';
++notify pgrst, 'reload schema';
++commit;
+diff --git a/lobster-factory/packages/db/scripts/0117_entitlement_internal_comp-local-verify.py b/lobster-factory/packages/db/scripts/0117_entitlement_internal_comp-local-verify.py
+new file mode 100644
+index 000000000..c43caeab7
+--- /dev/null
++++ b/lobster-factory/packages/db/scripts/0117_entitlement_internal_comp-local-verify.py
+@@ -0,0 +1,103 @@
++#!/usr/bin/env python3
++"""0117 on one disposable local Postgres (no published port): idempotent top-up, STRICT internal account,
++service_role-only execute, a second live comp row refused, down then up again. Touches no production database."""
++from pathlib import Path
++import json
++import os
++import subprocess
++import time
++import uuid
++
++DB = Path(__file__).resolve().parents[1]
++NAME = "adr017-internal-comp-verify-" + uuid.uuid4().hex[:10]
++UP = DB / "migrations/0117_entitlement_internal_comp.sql"
++DOWN = DB / "migrations/0117_entitlement_internal_comp.down.sql"
++INTERNAL = "39ad4149-5044-4077-8d9a-b6b916de0e21"
++FEATURES = json.dumps([{"product_key": "tarot", "feature_key": "tarot.image"}, {"product_key": "social", "feature_key": "social.rewrite"}])
++
++
++def command(args, sql=None, succeeds=True):
++    result = subprocess.run(args, input=sql, text=True, encoding="utf-8", capture_output=True)
++    if succeeds and result.returncode:
++        raise RuntimeError(result.stderr + result.stdout)
++    return result
++
++
++def query(sql, succeeds=True):
++    return command(["docker", "exec", "-i", NAME, "psql", "-U", "postgres", "-d", "postgres", "-X", "-v", "ON_ERROR_STOP=1", "-At"], sql, succeeds)
++
++
++def file(path):
++    return query(path.read_text(encoding="utf-8"))
++
++
++def expect_error(sql, text):
++    result = query(sql, succeeds=False)
++    assert result.returncode and text in result.stderr, result.stdout + result.stderr
++
++
++def top_up():
++    return query(f"set role service_role; select public.entitlement_ensure_internal_comp('{FEATURES}'::jsonb);").stdout.strip().splitlines()[-1]
++
++
++def main():
++    command(["docker", "run", "-d", "--name", NAME, "--label", "awarewave.test=adr017", "-e", "POSTGRES_PASSWORD=verify", os.environ.get("PG_IMAGE", "postgres:15.8-alpine")])
++    try:
++        for _ in range(60):
++            if query("select 1", succeeds=False).returncode == 0:
++                break
++            time.sleep(1)
++        else:
++            raise RuntimeError("disposable Postgres did not become ready")
++        query("""
++          create role anon; create role authenticated; create role service_role bypassrls;
++          grant usage on schema public to anon, authenticated, service_role;
++          alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
++          alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
++          create schema auth;
++          create function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;
++        """)
++        file(DB / "migrations/0001_core.sql")
++        query("""create function public.user_has_org_membership(p_org_id uuid) returns boolean
++          language sql stable security definer set search_path=public,pg_temp as $$ select false $$;""")
++        for prefix in ["0062", "0063", "0066", "0077", "0110"]:
++            matches = [p for p in (DB / "migrations").glob(prefix + "_*.sql") if not p.name.endswith(".down.sql")]
++            assert len(matches) == 1, prefix
++            file(matches[0])
++        query(f"insert into organizations(id,type,name,slug) values ('{INTERNAL}','client','AwareWave Ops','awarewave-ops');")
++        query(f"update organizations set kind='internal' where id='{INTERNAL}';")
++        file(UP)
++
++        assert top_up() == "2"
++        assert top_up() == "0", "a rerun must add nothing"
++        assert query(f"select count(*) from organization_entitlements where organization_id='{INTERNAL}' and source='comp' and status='active'").stdout.strip() == "2"
++        expect_error(f"insert into organization_entitlements(organization_id,product_key,feature_key,source,source_ref) values ('{INTERNAL}','tarot','tarot.image','comp','internal');", "organization_entitlements_comp_live_uniq")
++        # comp rows from any other source (a customer gift, a plan change in flight) are not bound by the index
++        query(f"insert into organization_entitlements(organization_id,product_key,feature_key,source,source_ref) values ('{INTERNAL}','tarot','tarot.image','comp','gift-1'),('{INTERNAL}','tarot','tarot.image','comp','gift-2');")
++        query("update organization_entitlements set status='expired' where source_ref like 'gift-%';")
++        # an expired comp row frees the slot; the next top-up restores a live one
++        query(f"update organization_entitlements set status='expired' where organization_id='{INTERNAL}' and feature_key='tarot.image';")
++        assert top_up() == "1"
++        # contract rows are not constrained by the comp index
++        query(f"insert into organization_entitlements(organization_id,product_key,feature_key,source) values ('{INTERNAL}','tarot','tarot.image','contract'),('{INTERNAL}','tarot','tarot.image','contract');")
++        for role in ["anon", "authenticated"]:
++            expect_error(f"set role {role}; select public.entitlement_ensure_internal_comp('[]'::jsonb);", "permission denied")
++        expect_error("set role service_role; select public.entitlement_ensure_internal_comp('{}'::jsonb);", "p_features must be an array")
++        query("insert into organizations(id,type,name,slug,kind) values (gen_random_uuid(),'client','Second internal','second-internal','internal');")
++        expect_error(f"set role service_role; select public.entitlement_ensure_internal_comp('{FEATURES}'::jsonb);", "more than one row")
++        query("delete from organizations where slug='second-internal'; update organizations set kind='customer' where id='" + INTERNAL + "';")
++        expect_error(f"set role service_role; select public.entitlement_ensure_internal_comp('{FEATURES}'::jsonb);", "no rows")
++        query(f"update organizations set kind='internal' where id='{INTERNAL}';")
++
++        query("update organization_entitlements set status='expired' where source='contract';")
++        file(DOWN)
++        assert query("select to_regprocedure('public.entitlement_ensure_internal_comp(jsonb)') is null and to_regclass('public.organization_entitlements_comp_live_uniq') is null").stdout.strip() == "t"
++        file(UP)
++        assert top_up() == "0"
++        print("0117 local verify: PASS (top-up 2 then 0, unique live comp, expired slot refilled, service_role only, STRICT internal, down/up)")
++    finally:
++        command(["docker", "rm", "-f", NAME], succeeds=False)
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/lobster-factory/packages/db/scripts/0117_entitlement_internal_comp_down.sql b/lobster-factory/packages/db/scripts/0117_entitlement_internal_comp_down.sql
+new file mode 100644
+index 000000000..c4623f8b7
+--- /dev/null
++++ b/lobster-factory/packages/db/scripts/0117_entitlement_internal_comp_down.sql
+@@ -0,0 +1,11 @@
++begin;
++set local lock_timeout = '5s';
++do $$
++begin
++  if to_regclass('public.schema_migrations') is not null then
++    delete from public.schema_migrations where filename = '0117_entitlement_internal_comp.sql';
++  end if;
++end $$;
++drop function if exists public.entitlement_ensure_internal_comp(jsonb);
++drop index if exists public.organization_entitlements_comp_live_uniq;
++commit;

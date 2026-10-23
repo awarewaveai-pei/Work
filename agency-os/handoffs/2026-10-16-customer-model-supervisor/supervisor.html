@@ -159,7 +159,7 @@ ul.doors li span{min-width:0}
     <div class="b">
       <p class="plain">每項收費功能執行前都先確認權限；未購買時按鈕顯示停用。</p>
       <p class="meta"><span class="pill st-done">已完成</span><span class="pill risk-med">風險 Medium</span><span class="who">負責：Opus 5.5</span></p>
-      <p class="donewhen"><b>完成條件：</b>測試：點數功能看餘額不看權利列，餘額 0 即拒；代操時從 on_behalf_of 扣點，稽核記 actor；沒有 active 權利列不簽許可；沒有登記列的產品拿不到 grant</p>
+      <p class="donewhen"><b>完成條件：</b>測試：點數功能沒有權利列時看餘額，餘額 0 即拒（有 comp／contract 列先用列，2026-10-23）；代操時從 on_behalf_of 扣點，稽核記 actor；沒有 active 權利列不簽許可；沒有登記列的產品拿不到 grant</p>
       <details><summary>工程細節：每個收費點只問 can(主體, feature_key, actor)</summary>
         <p>社群、collect、認知平台的收費按鈕與 API 呼叫前問一次；認知平台 check_entitlement 改成 can() 薄接頭（加 actor、回 grant 物件），呼叫端 main.py 9 處同 commit。</p>
         <p><b>前置：</b><a href="#s2">第 <span data-computed>2</span> 項</a></p>

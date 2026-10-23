@@ -28,8 +28,9 @@ describe("the usable-features list that greys paid buttons (ADR 017 §4)", () =>
     const first = await featureList(CUSTOMER, "a", deps, KEYS, now);
     expect(verify(null, Buffer.from(canonicalize(first.list)), deps.publicKeys().k1, Buffer.from(first.signature!, "base64url"))).toBe(true);
     expect(first.list.expires_at - first.list.issued_at).toBe(300);
+    const lookups = findActiveEntitlement.mock.calls.length;
     expect(await featureList(CUSTOMER, "a", deps, KEYS, now + 299)).toBe(first);
-    expect(findActiveEntitlement).toHaveBeenCalledTimes(1);
+    expect(findActiveEntitlement).toHaveBeenCalledTimes(lookups);   // a cached list reads nothing
     expect(await featureList(CUSTOMER, "a", deps, KEYS, now + 300)).not.toBe(first);
   });
 });
