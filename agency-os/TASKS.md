@@ -287,6 +287,7 @@
   - **證據**：WORKLOG 2026-10-15（續2、續3、續8、續32）
 - [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–7 開卡做**
   - `🟡 3／9` · `2026-10-14` · WORKLOG 續15、續17；`ADR_INDEX.md` 那列已改「已接受」（2026-10-15）
+  - **2026-10-23 先後決策**（WORKLOG 續36；監工台 NEXT 已重排）：門先（tarot→studio→video→design→content；cs／collect／outreach 最後）；錢的內部段緊接（每個付費路由接 `grant.report()` 用量回報＝全 app 現 0 呼叫點；第 4 項拆 4a 人工付款入口不等待決）；Woo 六事件＋WordPress 一鍵登入＝4b，等待決 1、3。第一個自助客戶走員工邀請＋人工合約列（Soulful 同路）。建議模型：Opus 5.5
   - **監工台 NEXT ①**（`cards/step-3.md`「收尾」段）：段 1 權利列優先已推（WORKLOG 2026-10-23 點數功能先認權利列條目）；段 2 已做（0117→0118 已套 prod：自用、EdD 免費＋Soulful 全產品合約，2026-10-23 05:53Z 已提前部署 `286e0a0ab`；三帳戶各 338 列）；[ ] 2026-10-24 10:00 排程 `verify-internal-comp-2026-10-24` 查部署後無其 would_deny；[ ] 2026-10-31 10:00 排程 `enforce-readiness-2026-10-31` 回報可否翻 enforce（只回報，翻要操作者 go）；MONGOLIA-03／兩個測試帳戶刻意不給；[ ] would_deny 7 天歸零後提翻 enforce。建議模型：Opus 5.5
   - **監工台**（plan 唯一狀態頁，操作者 2026-10-16「要有監工頁面」）：https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr（`LVBC…` 本帳號讀寫不到，2026-10-23 改回）← `agency-os/handoffs/2026-10-16-customer-model-supervisor/`（`data.mjs` 改狀態 → `node build.mjs` → `node check.mjs` → 重發同 URL）。每步 done 時改 `STEPS[n].status`＋`commit`。
   - **第 3 項 done** `e87de9225`（WORKLOG 2026-10-20 續3；監工台已重發）：can() 影子模式、認知平台取許可、灰按鈕、付費 vendor 只走三道縫。剩：[ ] 每功能每次扣幾點＝定價（操作者決定，`ledger.ts` `DEFAULT_CREDIT_POLICY` 佔位）；[ ] 翻 `ENTITLEMENT_MODE=enforce`（High，前置見 ADR 017 §4）

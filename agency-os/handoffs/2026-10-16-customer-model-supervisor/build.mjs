@@ -47,7 +47,7 @@ export function render() {
     section('now', COPY.now, yesNo(NOW, L)),
     section('ways', COPY.ways, `<div class="ways">${ways}</div>`),
     section('priority', COPY.priority, linked(PRIORITY)
-      + `\n<h3 class="sub-h">${esc(COPY.priority.next)}</h3>\n${linked(NEXT)}`
+      + `\n<h3 class="sub-h">${esc(COPY.priority.next)}</h3>\n<p class="lead">${esc(COPY.priority.nextLead)}</p>\n${linked(NEXT)}`
       + `\n<h3 class="sub-h">${esc(COPY.priority.pricing)}</h3>\n${ruleList(PRICING)}`),
     section('steps', COPY.steps, stepList(STEPS, L, (s) => META.self + s.card)),
     section('open', COPY.open, openList(OPEN, STEPS, COPY.open)),

@@ -1,4 +1,35 @@
 # Worklog
+## 2026-10-23（續36）ADR 017 先後決策：門先、錢的內部段接著、Woo＋WP 一鍵登入等待決；商品接三軸五對象＝登記列三件事（Claude）
+
+**觸發**：操作者「各商品怎麼串接到3軸5對象；從『先做產品門還是先打通收錢與登入』判斷；排好先後寫回監工台 NEXT」。
+
+**商品 × 五對象（ADR 017 §0：商品不選對象，只宣告 `features[].billing`／`door`／`standalone`＋`dependsOn`；對象＝請求與帳戶的值，`/ops/products` 顯示每產品現況，監工台不另存表）**
+- 自用：11 個全可（員工門；cognitive／hci external 自帶）。
+- 代操：判決可（0118 全產品合約列）；用量不計——`grant.report()` 只有定義（`lib/entitlements/can.ts:121`），next-admin app／lib 非測試檔 0 個呼叫點（唯一 `.report(` 是 social ReportView 的 api.report，無關）。
+- 訂閱：要 `door.enabled`＋contract 列。social 門已開；tarot／studio 門頁已建未上線（`lib/portal/products.ts:51,55` `enabled:false`）；video／design／content／cs／collect／outreach 門頁未建。合約列寫入只有 `tables.ts` `ensureAllFeatures`（全產品列），單產品列無寫入者＝人工 SQL。
+- 點數：三缺——門、錢包入帳（`ledger.ts` 只有 `debitCredits`）、`report()` 扣點。
+- 買斷：`standalone:true` 只有 cognitive／hci／social；第 5 項未開，待決 2。
+
+**判斷（三軸互不依賴）**：門＝C 軸 customer actor 的唯一前提，純內部工程、無待決；錢＝B 軸，外部段（Woo 定期扣款、點數條款）卡待決 1、3，內部段（計量、人工付款入口）不必等；登入：local 已能用（`lib/accounts/client-invite.ts` 邀請＋set-password），`awarewave-wp` 一次性碼只在付款發生在 WordPress 時有價值 → 與 Woo 同包。客戶操作者已一律 enforce（續29），翻 enforce 不擋客戶路。結論＝門先；第一個自助客戶走邀請＋人工合約列（Soulful 同路），不等 Woo。
+
+**排序（寫進 `data.mjs` NEXT）**：① 翻 enforce 等 10/31（不占工時）→ ② 每個付費路由接 `report()`（自用／合約列只記用量不扣點；單價待操作者）＋tarot 批次記操作者（migration）＋studio 後台功能門上隱藏＝門上線阻擋項，也是 PRIORITY ①「代操算得出每位客戶用了多少」的實際缺口 → ③ 門上線 tarot→studio→video→design→content；cs／collect／outreach 最後 → ④ 第 4 項分 4a（接頭＋收件表＋合約／權利＋錢包入帳＋/ops/billing，provider `local` 人工付款）／4b（Woo 六事件＋定期扣款＋點數條款＋ADR 015 順序 1）→ ⑤ 買斷 → ⑥ 等客戶。
+
+**修改**
+- `agency-os/handoffs/2026-10-16-customer-model-supervisor/data.mjs`：`COPY.priority.nextLead`（判斷一段）、NEXT 六列重寫、NOW 加「代操用量按客戶計」、META.worklog 指本條。
+- 同目錄 `build.mjs`：NEXT 子標題下渲染 `nextLead`（沿用 kit 的 `.lead`）。
+- `cards/step-4.md`：前置改「4b 另加」；Decision 首條 4a／4b。
+- `agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md` 順序 4：分兩段一句，ADR 015 順序 1 改為 4b 前置。
+- `agency-os/TASKS.md` ADR 017 條目加「2026-10-23 先後決策」一行。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs（ok: 5 ways, 9 steps, 4 open, page fresh） | exit=0 | ms=161
+- 突變：NEXT 拿掉 ④ → `node check.mjs` exit 1「第 4 項未完成卻不在 NEXT」；還原 exit 0。
+- 發布：同 URL `Htm4xqe362YM987Fo8YLCr` Version 28（1792753871-51ec），續號改正後 Version 29（1792754039-264e）；發布前 read 回 Version 27 內容＝舊 NEXT，無他人額外改動。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 data.mjs／build.mjs／step-4／ADR 017 diff 與重生頁；grep 證「0 呼叫點」「enabled:false」「debitCredits 唯一」三個事實
+- ORACLE_WAIVED: 監工台資料、卡片與 ADR 文字（無產品 source 改動）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=grant\.report\(\|nextLead | hits=47（實質：data.mjs、build.mjs、supervisor.html、ADR 017 §4、本條；其餘為 .claude 日誌與 session 紀錄）；舊 NEXT ③ 字句「付款開通的前提」只剩 .claude 紀錄，文件 0
+
+**rollback**：`git revert <本 commit>`；artifact 重發上一版 supervisor.html（Version 27）。
 ## 2026-10-23（續35）next-admin 部署被測試閘擋下：app/__tests__ 被當成頁面；登記測試跳過 `_` 私有資料夾（Claude）
 
 **觸發**：操作者下令部署 7f7f0e3b2（續33 塔羅）。`sg-deploy.sh next-admin` 在 npm test 閘中止，正式機仍為 d19ed55e4，未動。

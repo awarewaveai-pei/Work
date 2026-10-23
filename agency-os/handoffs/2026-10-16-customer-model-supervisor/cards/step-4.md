@@ -1,8 +1,9 @@
 # 第 4 項：付款 → 合約 → 權利；錢包帳本泛化；營運看得到
 
-**風險** High（金流）　**模型** Opus 5.5　**前置** 第 3 項；待決 1（定期扣款外掛）；待決 3（點數條款與預收）；ADR 015 順序 1（WordPress 一次性碼進入產品門，否則付了錢的人進不來）　**正本** ADR 017 §2、§3、順序 4；ADR 015 §3、§4
+**風險** High（金流）　**模型** Opus 5.5　**前置** 第 3 項；4b 另加：待決 1（定期扣款外掛）；待決 3（點數條款與預收）；ADR 015 順序 1（WordPress 一次性碼進入產品門，否則付了錢的人進不來）　**正本** ADR 017 §2、§3、順序 4；ADR 015 §3、§4
 
 ## Decision
+- **分兩段**（2026-10-23 先後決策，WORKLOG 續36；監工台 NEXT ④）：**4a** 接頭＋收件表＋合約／權利寫入＋錢包 `grant` 入帳＋`/ops/billing`，付款來源只有 `local`（人工：轉帳後操作者登記）＝不碰 Woo、不等待決，第一個自助客戶靠它收錢；**4b** Woo 原生 webhook 六事件、定期扣款、點數條款（待決 1、3）＋ ADR 015 順序 1 一次性碼登入，同一包做。下列設計兩段共用。
 - 付款走接頭 `lib/payments/provider.ts`：介面 `{ verify(req), parse(req) → PaymentEvent }`，實作 `woo.ts`（驗 WooCommerce 原生 webhook 簽章 `X-WC-Webhook-Signature` = base64(HMAC-SHA256(body, secret))，secret 即 Woo 後台設定的 webhook secret，存 `WOO_WEBHOOK_SECRET`；不是 Bearer＋HMAC，也不是 `video-billing/` 的 Stripe 驗法，Codex M10）與 `local.ts`（測試與離開 WordPress 用）；設定值 `PAYMENTS_PROVIDER=woo|local`。控制面只認 `PaymentEvent`，不認 Woo 欄位（ADR 017 §0b 第 5、6 條）。
 - **收件表** `payment_events(provider, event_id, received_at, processed_at, payload)`，`unique (provider, event_id)`；route 先 insert（衝突＝重送，直接回 `replayed`），再在同一交易處理合約、權利、帳本（Codex M8）。
 - 事件六種（Woo 原生 webhook，不經 wp-bridge）：訂單完成、訂閱續約、訂閱取消、點數包購買、**退款**、**拒付**。退款訂閱＝取消；退款點數包＝帳本 `refund` 分錄只退未用部分（0066 `entry_type` 已有 refund）；拒付＝合約權利列改 `suspended`、錢包凍結，人工複核後解（Codex M9）。目標 `app/api/webhooks/woo-billing/route.ts`（新；既有 `app/api/webhooks/woo-order/` 是 Printful 草稿出貨，不混用，Codex R2-9）。

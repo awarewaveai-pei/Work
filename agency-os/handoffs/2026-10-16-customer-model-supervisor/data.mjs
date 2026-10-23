@@ -9,7 +9,7 @@ export const META = {
   tasks: 'agency-os/TASKS.md「ADR 017 客戶怎麼買」',
   adr012: 'agency-os/docs/architecture/decisions/012-shared-platform-layer.md',
   adr015: 'agency-os/docs/architecture/decisions/015-awarewave-account-and-shared-wallet.md',
-  worklog: 'agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）、續15（七張卡）；2026-10-18 全鏈自審條目',
+  worklog: 'agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）、續15（七張卡）；2026-10-18 全鏈自審條目；2026-10-23 續36（先後決策）',
   self: 'agency-os/handoffs/2026-10-16-customer-model-supervisor/',
   url: 'https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr',
 };
@@ -22,7 +22,7 @@ export const COPY = {
   rules: { h: '每個系統都要過的規則', lead: '這三條寫在 ADR 017 §0b，測試會擋，不靠記憶。' },
   now: { h: '現況', lead: '客戶目前無法自行登入，也尚未收費；現在只有自用與代操。' },
   ways: { h: '五種客戶', lead: '每種客戶由三個答案決定：裝在哪、錢從哪來、誰操作。答案屬於客戶帳戶與每次請求，不屬於產品，所以每個產品五種都有、不用選。新增客戶類型只需增加一列，不必修改程式。', count: '共 {total} 種，{live} 種已運作' },
-  priority: { h: '先後與定價', lead: '依你 2026-10-17 的決定排序；賣斷的收費結構是預設值，數字可改。', next: '接下來依序做（2026-10-23 依現況排）', pricing: '賣斷怎麼收錢' },
+  priority: { h: '先後與定價', lead: '依你 2026-10-17 的決定排序；賣斷的收費結構是預設值，數字可改。', next: '接下來依序做（2026-10-23 依現況排）', nextLead: '先門、後收錢。三個答案互不等待：門是「客戶本人操作」的唯一前提，純內部工程、沒有待決；收錢的外部部分（金流商、會計師）卡兩個待決，內部部分（用量計量、人工付款入口）不等待決先做；登入目前的本機帳號已能用，WordPress 一鍵登入只在付款發生在 WordPress 時才有價值，所以跟 Woo 同一包。', pricing: '賣斷怎麼收錢' },
   steps: { h: '待建項目', lead: '項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。', count: '{done}／{total} 完成' },
   open: { h: '待你決定', lead: '以下事項待你決定；決定後才能啟動對應項目。', count: '{n} 項', before: '須於第 {n} 項前決定', src: '出處' },
   doors: { h: '入口', lead: '三個網址分開登入；網址由設定決定，不寫入程式。', login: '登入' },
@@ -46,11 +46,11 @@ export const PRIORITY = [
 ];
 // 接下來的實際順序（2026-10-23 依 prod 現況排；證據在 NOW 與各卡）。steps＝相關步驟；每個未完成步驟至少出現一次（check 擋）。
 export const NEXT = [
-  { h: '① 翻強制模式（等條件）', t: '權利已就位：點數功能先認權利列，自用、EdD、Soulful 每天自動補齊（2026-10-23 部署）。10/31 自動檢查 7 天「若強制就拒」，為零或都已解釋後，請你同意再翻（High）。', steps: [3] },
-  { h: '② 每個產品自己的門', t: '規則已定（ADR 018 §2），產品目錄已做。客戶可直接操作的工具優先：tarot、studio（門頁已做，待上線）→ video → design → content；cs（等 Chatwoot 上線）、collect、outreach（員工路由要先搬）排最後。每個門上線是 High。', steps: [8] },
-  { h: '③ WordPress 一鍵登入產品門', t: '付款開通的前提：付了錢的人要能從 aware-wave.com 進產品門（ADR 015 順序 1），所以排在門做好之後。目前未實作；動到身分驗證，屬 High。', steps: [4] },
-  { h: '④ 付款後自動開通', t: '待決 1、3 回覆後開工。兩題要問金流商與會計師，費時，建議現在就問。', steps: [4] },
-  { h: '⑤ 買斷安裝', t: '付款開通完成、待決 2 律師回覆後開工。', steps: [5] },
+  { h: '① 翻強制模式（等 10/31，不占工時）', t: '權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。', steps: [3] },
+  { h: '② 用量計量與扣點接上', t: '全 app 沒有任何用量回報呼叫（grant.report() 只有定義）＝代操算不出每位客戶用了多少，也沒有扣點。先把每個付費路由接上回報（自用與合約列只記用量不扣點；每功能單價仍由你定），同時 tarot 批次記操作者（migration）、studio 後台功能在門上隱藏。這三項是門上線的阻擋項，也是「先服務自己的客戶」還缺的最後一塊；純內部，沒有待決。', steps: [3, 8] },
+  { h: '③ 門逐個上線', t: '規則已定（ADR 018 §2）。tarot → studio（門頁已建）→ video → design → content；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
+  { h: '④ 收錢分兩段', t: '4a 內部先做：付款接頭、收件表、合約與權利寫入、錢包入帳、/ops/billing；付款來源先用「人工」（轉帳），不碰 Woo、不等待決。4b 等待決 1、3：Woo 六種事件、定期扣款、點數條款，WordPress 一鍵登入產品門（ADR 015 順序 1）同一包，不單獨先做（High，做了沒人走）。兩題現在就問金流商與會計師。', steps: [4] },
+  { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。', steps: [5] },
   { h: '⑥ 等客戶出現', t: '只串 API、代理商、白牌網址：出現第一個這類客戶才做。', steps: [6, 7, 9] },
 ];
 // ADR 017 Q9：賣斷怎麼收錢（預設值，可改）
@@ -100,6 +100,7 @@ export const WAYS = [
 export const NOW = [
   { what: '客戶可自行登入', state: 'no', ev: '員工替客戶開帳號、寄設定密碼信；prod 已設 RESEND_API_KEY，但公開註冊由程式關閉（portal/api/signup/route.ts:9、:99），要先做確認信流程' },
   { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0：plans、錢包帳本皆 0 筆，Woo 尚未販售' },
+  { what: '代操用量按客戶計', state: 'no', ev: '判決會過（0118 合約列），但用量與扣點都不記：grant.report() 只有定義（lib/entitlements/can.ts:121），全 app 0 個呼叫點；錢包也只有扣款、沒有入帳寫入（ledger.ts）' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
   { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；每功能扣幾點待你定價' },
   { what: '產品自己的門', state: 'no', ev: 'social 已上線；tarot、studio 門頁已做、尚未上線；客戶在門上取得產品使用權（resolveOpsRole，2026-10-23），tarot 批次已改向客戶組織計費；其餘 6 個未開。開門規則與三道機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon' },
