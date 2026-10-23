@@ -1,4 +1,14 @@
 # Worklog
+## 2026-10-23（續19）next-admin 部署：Cloudflare 憑證收斂上線
+
+- 前檢：無 `DEPLOY_HOLD`；`check-deploy-drift.ps1` behind=6（本次要解）；compose 只在 repo 的 `META_*` 為 `0d85eb44c` 既有落差，非本範圍。範圍 `286e0a0ab..a67b0048a` 含他 session `2e423f828`（無 migration）。
+- 我的 sg-deploy 撞到另一 session 同時部署（PID 3833388，`--skip-pull next-admin`）→ 不 `--force`，等它完成；該次已上線 `a67b0048a`（含 `b70f0905c`）。
+- 坑：等待用非 sudo `kill -0` 對 root 程序回 EPERM＝立刻判定結束；要 `sudo kill -0`。
+- 驗證 validate 管道：`middleware.ts:20` 剝除外部角色標頭、`:120` 依登入身分注入 `x-ops-claims-role` → 無偽造漏洞；因此 cloudflare 整合 validate 留給操作者登入後按（TASKS 已列）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy log：npm test 2854 passed／23 skipped，HTTP smoke 5/5 OK；`lobster-next-admin` healthy；`.deployed-commit`=a67b0048a；容器 `.next/server/app/api/ops/integrations/route.js` 含 `/accounts/…/tokens/verify`、`CLOUDFLARE_AUTH_BEARER_TOKEN` 0 處 | exit=0 | ms=330000
+- REALTEST_EVIDENCE: tool=Bash | cmd=`scripts/playwright-runner.ps1 -Mode smoke -SkipInstall` → 26 passed／0 failed／6 skipped，證據 `agency-os/reports/e2e/2026-10-23/smoke` | exit=0 | ms=34000
+- REVIEW_WAIVED: NA -- 部署既已審查的 commit（b70f0905c 審查見續16）
+- BUGHUNT_WAIVED: NA -- 無程式改動
 ## 2026-10-23（續18）部署 a67b0048a：r2-delete-guard 泛化＋staging 站 HTTPS 區塊上線（Claude）
 
 **觸發**：操作者「去處理好和部署」。`89e133f68` 已隨另一 session 早部署的 `286e0a0ab` 上線；`2e423f828` 未上線 → 本次 sg-deploy。
