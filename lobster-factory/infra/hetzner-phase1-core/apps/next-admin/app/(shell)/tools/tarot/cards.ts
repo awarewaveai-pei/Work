@@ -1,4 +1,7 @@
 // 78-card tarot dataset for the print-file generator.
+// Ground truth for every scene: agency-os/docs/tarot_cards/ (78_Tarot_Card_Visual_Descriptions_EN.md + the 78 original
+// RWS images in "Tarot card Images/"). Check a scene change against the image, not only the text: sides, worn vs
+// draped clothing and counts were wrong in text that read fine (2026-10-23).
 // Each card carries a Rider-Waite-Smith (RWS, 1909, public domain) faithful `scene` plus a
 // swappable protagonist token `{hero}`:
 //   • `scene` fixes the composition, props and symbolism (the part that must stay faithful);

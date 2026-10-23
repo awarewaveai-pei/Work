@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-23（續25）塔羅牌面依據入庫：RWS 文字描述＋78 張原圖（Claude）
+
+**觸發**：操作者決定把續24 用來核對的參考資料放進 git，`cards.ts` 開頭指向它。
+
+**修改**
+- `agency-os/docs/tarot_cards/78_Tarot_Card_Visual_Descriptions_EN.md`（26KB，操作者提供）＋`agency-os/docs/tarot_cards/Tarot card Images/`（78 張 500×863 JPG，共 16MB；repo pack 408MB，無 LFS）。
+- `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/tarot/cards.ts:2-4`：註解指向上述資料夾，並註明改牌面要對圖不只對文字（續24 有 5 處只有看圖才發現：戀人左右、袍子穿在身上、錢幣七枚數、寶劍八衣著、寶劍騎士馬色）。
+
+**驗證結果**
+- REALTEST_WAIVED: DOC_ONLY -- 只加參考檔與一段程式註解，無邏輯改動
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 cards.ts:1-5 註解；資料夾 79 檔（1 md＋78 jpg）未被 .gitignore 排除（`git check-ignore` exit=1）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=tarot_cards | hits=4（WORKLOG 3 行：續24 觸發、續25 修改與本行；cards.ts 註解 1）
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-23（續24）塔羅 78 張對照原牌圖片＋主角替換涵蓋每張有主角的牌（Claude）
 
 **觸發**：操作者給 `agency-os/docs/tarot_cards/78_Tarot_Card_Visual_Descriptions_EN.md`＋`Tarot card Images/`（78 張 RWS 原圖），要求逐張對照、注意各模型字數上限，並要求【主要替換】時卡面主角跟著換（月亮換貓仍畫狗和狼）。
