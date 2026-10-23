@@ -167,7 +167,10 @@
 | C5 | 驗收同 V8；突變：`sites/[id]` 拿掉 assert → 指名測試紅；`sources` 拿掉角色閘 → 紅 | — | L |
 | C6 | 上線（DNS／nginx）— High，要 go | `nginx/default.conf:430` | H |
 
-## 6. 要操作者／Fable 決定的點
+## 6. 決定（操作者 2026-10-23：全部採建議）
+D1 `tools/publish` 歸 studio、員工專用、不蓋門頁；D2 `content_sources` 客戶唯讀（寫入限 `canWriteTenantConfig`）；D3 客戶可核准自己組織的 release／story bible（V6 走「客戶限本組織」）；D-V 首版 nav 不放向量編輯；D-V2 橫幅門上無品牌色；D-V3 橫幅 AI 配色／文案按鈕門上隱藏。以下為原題目與選項。
+
+## 6a. 原決定點
 - **D1** `tools/publish` 歸 studio、員工專用（建議）vs 另設 content 的門頁。
 - **D2** `content_sources` 是共用資料：客戶唯讀（建議）vs 每組織一份（要 migration）。
 - **D3** 客戶能否核准自己的影片 release／story bible（目前 `canApproveMediaRelease` 擋客戶，`ops-role.ts:81`）；不決定就要在門上隱藏 Release 步驟。
