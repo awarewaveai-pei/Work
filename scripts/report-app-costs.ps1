@@ -1,15 +1,15 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-  AwareWave app AI + tool cost report. Pulls REAL usage from Supabase (ai_call_logs for exact
-  text spend, ai_image_jobs for image volume) and writes a dated markdown report.
+  AwareWave app AI + tool cost report. Pulls REAL usage from Supabase ai_call_logs (text, image
+  and video rows) and writes a dated markdown report.
 
 .DESCRIPTION
-  Text spend is authoritative: ai_call_logs.cost_usd is computed + stored at call time by
-  lib/ai/cost-calculator (so this script needs NO rate table -> zero drift from the TS SSOT).
-  Image cost is reported as volume only here (counts by model); the per-image USD breakdown lives
-  on /ops/costs (sourced from cost-model.ts IMAGE_RATES). Keeping rates out of this script is
-  deliberate -- one source of truth (R4).
+  ai_call_logs is the only cost source, same as /ops/costs (next-admin lib/ai/spend-report.ts):
+  cost_usd is computed + stored at call time, so this script needs NO rate table. ai_image_jobs is
+  NOT a cost source (never reaches status=completed; image/video spend is already in ai_call_logs).
+  Kind rule mirrors spendKind(): route video/* = video, kind image/video as stored, else text.
+  Reads are paged, so the PostgREST max-rows cap cannot silently shorten the totals.
 
   Credentials: reads $env:SUPABASE_URL + $env:SUPABASE_SERVICE_ROLE_KEY. If absent, dot-sources
   mcp/user-env.ps1 (the documented per-machine credential location) when present.
@@ -70,45 +70,40 @@ $today = (Get-Date).ToString("yyyy-MM-dd")
 
 Write-Host "[info] Pulling cost data since $sinceUtc (last $Days days)..."
 
-# --- Text spend (exact, from ai_call_logs.cost_usd) ---
-$textRows = @()
+# --- All spend rows (paged; stop only on an empty page) ---
+$rows = New-Object System.Collections.ArrayList
 $textAvailable = $true
 try {
-  $textRows = Invoke-Rest $creds "ai_call_logs?select=route,model,vendor,cost_usd,input_tokens,output_tokens&created_at=gte.$sinceUtc&limit=100000"
+  $offset = 0
+  while ($true) {
+    # PS 5.1 Invoke-RestMethod hands back a JSON array as ONE Object[]; @() alone would make it a
+    # single "row". Piping through ForEach-Object unrolls it into real rows.
+    $page = @(Invoke-Rest $creds "ai_call_logs?select=id,route,model,kind,cost_usd,input_tokens,output_tokens&created_at=gte.$sinceUtc&order=created_at.asc,id.asc&offset=$offset&limit=1000" | ForEach-Object { $_ })
+    if ($page.Count -eq 0) { break }
+    [void]$rows.AddRange($page)
+    $offset += $page.Count
+  }
 } catch {
   $textAvailable = $false
   Write-Warning "ai_call_logs query failed (migration 0043 may not be applied yet): $($_.Exception.Message)"
 }
 
-$textByRoute = @{}
-$textTotalUsd = 0.0
-$textCalls = 0
-foreach ($r in $textRows) {
+$byRoute = @{}
+$byKind = @{ text = 0.0; image = 0.0; video = 0.0 }
+$countByKind = @{ text = 0; image = 0; video = 0 }
+$totalUsd = 0.0
+foreach ($r in $rows) {
   $route = if ($r.route) { $r.route } else { "(unknown)" }
-  if (-not $textByRoute.ContainsKey($route)) { $textByRoute[$route] = @{ calls = 0; usd = 0.0; inTok = 0; outTok = 0 } }
-  $textByRoute[$route].calls += 1
-  $textByRoute[$route].usd  += [double]$r.cost_usd
-  $textByRoute[$route].inTok  += [int]$r.input_tokens
-  $textByRoute[$route].outTok += [int]$r.output_tokens
-  $textTotalUsd += [double]$r.cost_usd
-  $textCalls += 1
-}
-
-# --- Image volume (counts by model, from ai_image_jobs) ---
-$imgRows = @()
-try {
-  # Only completed jobs bill as a real image (failed/queued/cancelled produced nothing).
-  $imgRows = Invoke-Rest $creds "ai_image_jobs?select=model_name,provider&status=eq.completed&created_at=gte.$sinceUtc&limit=100000"
-} catch {
-  Write-Warning "ai_image_jobs query failed: $($_.Exception.Message)"
-}
-$imgByModel = @{}
-$imgTotal = 0
-foreach ($r in $imgRows) {
-  $m = if ($r.model_name) { $r.model_name } else { "(unknown)" }
-  if (-not $imgByModel.ContainsKey($m)) { $imgByModel[$m] = 0 }
-  $imgByModel[$m] += 1
-  $imgTotal += 1
+  $kind = if ($route -like "video/*") { "video" } elseif ($r.kind -eq "image" -or $r.kind -eq "video") { $r.kind } else { "text" }
+  $key = "$kind|$route"
+  if (-not $byRoute.ContainsKey($key)) { $byRoute[$key] = @{ route = $route; kind = $kind; calls = 0; usd = 0.0; inTok = 0; outTok = 0 } }
+  $byRoute[$key].calls += 1
+  $byRoute[$key].usd  += [double]$r.cost_usd
+  $byRoute[$key].inTok  += [int]$r.input_tokens
+  $byRoute[$key].outTok += [int]$r.output_tokens
+  $byKind[$kind] += [double]$r.cost_usd
+  $countByKind[$kind] += 1
+  $totalUsd += [double]$r.cost_usd
 }
 
 # --- Write report ---
@@ -116,50 +111,42 @@ if (-not (Test-Path $OutDir)) { New-Item -ItemType Directory -Path $OutDir -Forc
 $outFile = Join-Path $OutDir "aware-wave-cost-$today.md"
 
 $twdRate = 32
-$textTotalNtd = [math]::Round($textTotalUsd * $twdRate, 0)
+$totalNtd = [math]::Round($totalUsd * $twdRate, 0)
 
 $sb = New-Object System.Text.StringBuilder
 [void]$sb.AppendLine("# AwareWave App Cost Report -- $today")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("Window: last $Days days (since $sinceUtc UTC). USD->NT$ = $twdRate.")
-[void]$sb.AppendLine("Source: ai_call_logs (exact text spend) + ai_image_jobs (image volume). Unit rates SSOT: lib/ai/cost-model.ts.")
+[void]$sb.AppendLine("Source: ai_call_logs (all kinds; same rows as /ops/costs). Amounts = usage x list price, not vendor invoices. Unit rates SSOT: lib/ai/cost-model.ts.")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("## Summary")
 [void]$sb.AppendLine("")
 [void]$sb.AppendLine("| Metric | Value |")
 [void]$sb.AppendLine("|---|---|")
-[void]$sb.AppendLine("| Text AI spend (exact) | `$$([math]::Round($textTotalUsd,2)) USD / NT`$$textTotalNtd |")
-[void]$sb.AppendLine("| Text calls logged | $textCalls |")
-[void]$sb.AppendLine("| Images generated | $imgTotal |")
+[void]$sb.AppendLine("| Total AI spend | `$$([math]::Round($totalUsd,2)) USD / NT`$$totalNtd |")
+foreach ($k in @("text", "image", "video")) {
+  [void]$sb.AppendLine("| $k | `$$([math]::Round($byKind[$k],4)) USD ($($countByKind[$k]) rows) |")
+}
+[void]$sb.AppendLine("| Rows logged | $($rows.Count) |")
 if (-not $textAvailable) {
   [void]$sb.AppendLine("")
-  [void]$sb.AppendLine("> NOTE: ai_call_logs unavailable -- migration 0043 not applied or no text calls yet. Text spend shown as 0.")
+  [void]$sb.AppendLine("> NOTE: ai_call_logs read failed -- totals cover only the rows read before the error.")
 }
 [void]$sb.AppendLine("")
-[void]$sb.AppendLine("## Text spend by route (exact cost_usd)")
+[void]$sb.AppendLine("## Spend by route (stored cost_usd)")
 [void]$sb.AppendLine("")
-[void]$sb.AppendLine("| Route | Calls | In tok | Out tok | USD | NT`$ |")
-[void]$sb.AppendLine("|---|---:|---:|---:|---:|---:|")
-foreach ($k in ($textByRoute.Keys | Sort-Object { $textByRoute[$_].usd } -Descending)) {
-  $e = $textByRoute[$k]
+[void]$sb.AppendLine("| Route | Kind | Calls | In tok | Out tok | USD | NT`$ |")
+[void]$sb.AppendLine("|---|---|---:|---:|---:|---:|---:|")
+foreach ($k in ($byRoute.Keys | Sort-Object { $byRoute[$_].usd } -Descending)) {
+  $e = $byRoute[$k]
   $ntd = [math]::Round($e.usd * $twdRate, 0)
-  $kEsc = $k -replace '\|', '\|'   # a '|' in a route would break the markdown table
-  [void]$sb.AppendLine("| $kEsc | $($e.calls) | $($e.inTok) | $($e.outTok) | `$$([math]::Round($e.usd,4)) | NT`$$ntd |")
+  $rEsc = $e.route -replace '\|', '\|'   # a '|' in a route would break the markdown table
+  [void]$sb.AppendLine("| $rEsc | $($e.kind) | $($e.calls) | $($e.inTok) | $($e.outTok) | `$$([math]::Round($e.usd,4)) | NT`$$ntd |")
 }
-if ($textByRoute.Count -eq 0) { [void]$sb.AppendLine("| (no records) | | | | | |") }
+if ($byRoute.Count -eq 0) { [void]$sb.AppendLine("| (no records) | | | | | | |") }
 [void]$sb.AppendLine("")
-[void]$sb.AppendLine("## Image volume by model")
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("| Model | Count |")
-[void]$sb.AppendLine("|---|---:|")
-foreach ($k in ($imgByModel.Keys | Sort-Object { $imgByModel[$_] } -Descending)) {
-  $kEsc = $k -replace '\|', '\|'
-  [void]$sb.AppendLine("| $kEsc | $($imgByModel[$k]) |")
-}
-if ($imgByModel.Count -eq 0) { [void]$sb.AppendLine("| (no records) | |") }
-[void]$sb.AppendLine("")
-[void]$sb.AppendLine("Image USD breakdown + monthly estimator: /ops/costs")
+[void]$sb.AppendLine("Monthly report (per Taipei calendar month, by vendor/model/feature/client): /ops/costs tab 6")
 
 Set-Content -Path $outFile -Value $sb.ToString() -Encoding UTF8
 Write-Host "[ok] Report written: $outFile"
-Write-Host "[ok] Text spend: `$$([math]::Round($textTotalUsd,2)) USD ($textCalls calls) | Images: $imgTotal"
+Write-Host "[ok] AI spend: `$$([math]::Round($totalUsd,2)) USD ($($rows.Count) rows)"

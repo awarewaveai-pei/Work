@@ -1,4 +1,36 @@
 # Worklog
+## 2026-10-23（續41）/ops/costs：①真實花費／⑤流水帳／⑥月報同一份資料；新增月報（Claude）
+
+**觸發**：操作者：⑤ 流水帳的錢沒出現在 ① 真實花費；要有真正的月報。
+
+**根因**（prod 唯讀，`ai_call_logs` 近 30 天 495 筆 $1.9313）
+- C1 ① 的「圖片」卡讀 `ai_image_jobs` status=completed × 費率（舊 `page.tsx:30-35,48-54`）。該表全期 13 列皆 queued（2026-05），近 30 天 completed=0 → 圖片永遠 0。圖片／影片真實花費其實由 `logImageCost` 寫進 `ai_call_logs`（kind=image，`lib/ai/log-ai-call.ts`）。
+- C2 ⑤ 只讀 `job_id IS NOT NULL`（舊 `page.tsx:74`）＝目前只有 tarot 159 筆 $0.741。這些錢在 ① 被算進「文字 AI 實扣」並標成文字（舊 `page.tsx:38-43` 不分 kind），圖片卡卻是 0 → 操作者看不到。
+- M1 兩邊各自 `.limit(100000)`／`.limit(2000)` 單次查詢；PostgREST max-rows 會靜默截斷，資料變多後總額偏低且無警告。
+- M2 `scripts/report-app-costs.ps1` 同一類錯（讀 `ai_image_jobs`、單次查詢）；PS 5.1 `Invoke-RestMethod` 回整個 JSON 陣列為單一 Object[]。
+- m1 影片動態記成 kind=image（`video-pipeline.ts` → `logImageCost`）。
+
+**修改**（不變量：每一筆 `ai_call_logs` 只落在每個分項的一格、流水帳的一組、一個月份）
+- `lib/ai/spend-report.ts`（新）：純函式 `summarizeSpend`／`groupLedger`（無 job_id 的呼叫自成「單筆」組）／`monthlyReports`（台灣時間月份）／`spendKind`／`rowsSince`。
+- `lib/ai/spend-loader.ts`（新）：分頁讀到空頁為止（不信短頁＝末頁）；200k 上限時探下一列才標 truncated；`loadOrgNames`。
+- `app/(shell)/ops/costs/page.tsx`：讀一次 rows（近 12 個月 ∪ 近 30 天）→ ①⑤⑥ 全由 spend-report 算；不再讀 `ai_image_jobs`。
+- `CostsTabs.tsx`：① 文字／圖片／影片／合計＋依 route（含類型）＋依模型＋費率可疑提示；⑤ 列全部呼叫、標頭合計＝①；⑥ 月報：月份按鈕、AI 用量／固定月費（現行設定，估算另標）／依廠商・類型・功能・客戶・模型、各月比較、Download CSV；註明「用量×公開單價，非廠商帳單」。
+- `lib/ai/log-ai-call.ts`＋`video-pipeline.ts`：影片動態改記 kind=video（舊資料由 `spendKind` route `video/*` 判）。
+- `scripts/report-app-costs.ps1`：同一來源、分頁、PS 5.1 陣列展開、依 kind 分項。
+- `lib/ai/__tests__/spend-report.test.ts`（新）11 測。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin node（唯讀 PostgREST）→ 近 30 天 495 筆 $1.9313；job_id 列 159 筆 $0.741 皆在 page 查詢內；kind 分佈 text|cs 329 $1.190、image|tarot 159 $0.741、text 7；ai_image_jobs completed=0 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/ai（4 files／43 passed）＋ npx tsc --noEmit | exit=0 | ms=536
+- REALTEST_EVIDENCE: tool=Bash | cmd=preview next-admin-verify /ops/costs：① 合計 $1.93／495 筆、圖片 $0.74／159 張；⑤ 標頭「近 30 天合計 NT$62（$1.93，495 筆）」；⑥ 2026-10 AI 用量 $1.93、依廠商 Anthropic $1.19＋Replicate $0.74、依客戶 Soulful/內部/AwareWave Ops；console 無錯 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell scripts/report-app-costs.ps1 -Days 30 → [ok] AI spend: $1.93 USD (495 rows)（首跑抓到 PS 5.1 Object[] 轉型錯，已修） | exit=0 | ms=9000
+- 突變：`groupLedger` 改回只收 job_id 列 → 3 測紅（ledger 合計≠①、單筆被丟、視窗不等）；還原 11/11 綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-5a73acfe.md`：F2（剛好 200k 列誤標 truncated）已修＋測；F1（>200k 截斷）＝刻意上限、UI 會警告，現全表 819 列，不改
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=RealSpend|LedgerRow|textByRoute|imageByModel|loadRealSpend|loadLedger | hits=0（`feature-content-studio-cost-tracking.md` 無過時主張）
+
+**剩餘**：金額＝用量×公開單價，非廠商帳單；固定月費每月套現行 `INFRA_MONTHLY`。是否匯入廠商實際帳單待操作者決定。
+
+**rollback**：`git revert <本 commit>`（無 schema 變更）。
 ## 2026-10-23（續40）0119 套 prod＋tarot 批次記操作者推 main（NEXT ② 收尾）（Claude）
 
 **觸發**：操作者「Go ahead: apply migration 0119 to prod, then git apply cards/step-8-tarot-actor.patch, run the tests and push to main」。

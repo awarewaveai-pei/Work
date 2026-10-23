@@ -447,6 +447,7 @@ export async function applyVideoMotionToPrimaryFormat(
         costUsd: rate.usdPerSec * rate.defaultDurationSec,
         jobId: motionBatchJobId,
         tool: "video",
+        kind: "video",
       });
     } else {
       console.error(`[video-pipeline] scene ${scenes[i].id} motion billed but no VIDEO_MOTION_RATES entry for "${motionModel}" — cost NOT logged`);

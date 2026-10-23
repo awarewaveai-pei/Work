@@ -136,9 +136,11 @@ export interface LogImageCostArgs {
   costUsd: number;
   jobId?: string | null;
   tool?: string | null;
+  /** "video" for per-scene video motion; defaults to "image". */
+  kind?: "image" | "video";
 }
 
-/** Best-effort image cost logger — writes one row to ai_call_logs with kind="image". Never throws. */
+/** Best-effort per-call cost logger for image/video — one ai_call_logs row. Never throws. */
 export async function logImageCost(args: LogImageCostArgs): Promise<void> {
   try {
     const supabase = getSupabaseWriteClient();
@@ -156,7 +158,7 @@ export async function logImageCost(args: LogImageCostArgs): Promise<void> {
       actor_role: null,
       job_id: args.jobId ?? null,
       tool: args.tool ?? null,
-      kind: "image",
+      kind: args.kind ?? "image",
       metadata: {},
     });
   } catch { /* never break the caller */ }
