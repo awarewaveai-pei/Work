@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-23（續17）next-admin 提前部署 286e0a0ab（權利列優先＋全產品帳戶補齊上線）（Claude）
+
+**觸發**：操作者「全部去處理好 包括部署」（明確 go）。
+
+**部署**
+- 前置：main 無 DEPLOY_HOLD；`check-deploy-drift.ps1` → 落後 23 commits（預期）；compose 變數差異 `META_*` 8 個只在 repo＝social/Meta 工作線待 `safe-infra-patch.sh`，sg-deploy 不同步，今晚 03:00 自動部署同樣狀況，非本次範圍。
+- `sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin`：build OK → healthy 10s → HTTP smoke 5/5 → `.deployed-commit` e45f4417b → 286e0a0ab。容器名正常、`entitlement_ensure_all_features` 在 `/app/.next/server/chunks/482.js`。
+- Playwright smoke：第 1 次 25/1/6，失敗＝mobile `/onboard` `net::ERR_CONNECTION_RESET`（桌面版同頁過；本機當日 ssh 也遇 reset）→ 重跑 26/0/6 PASSED。
+
+**生效驗證**
+- 容器內 POST `/api/internal/entitlements/expire` → `200 {"ok":true,"expired":0,"trials_ended":0,"all_features_added":0}`（三帳戶已補齊）。
+- 7 天被拒的三組合（internal tarot.image 221、tarot.prompt 9；soulful social.dispatch 1）照 `tables.ts:25-31` 條件查 → 皆有 active 列 → 新 `issuePermit` 放行。部署後至 05:56Z 尚無付費呼叫；真流量確認由 2026-10-24 10:00 排程。
+- `/api/entitlements/features` 容器內直打 404（middleware 需員工請求），未用。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sg-deploy.sh next-admin; docker ps; POST /api/internal/entitlements/expire; playwright-runner -Mode smoke | exit=0 | ms=300000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回部署 log、容器狀態、smoke 結果、掃描回應
+- BUGHUNT_WAIVED: NA -- 部署動作，無程式或文件宣稱改動
+
+**rollback**：`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1（sg-deploy 前一版 e45f4417b）；資料面見續14。
 ## 2026-10-23（續16）Cloudflare 憑證收斂成一把＋lobster-nginx 死網段移除
 
 - 根因 C1：prod `lobster-next-admin` 的 `CLOUDFLARE_API_TOKEN`＝`CLOUDFLARE_AUTH_BEARER_TOKEN`＝同一把失效 token（`/user/tokens/verify` code 1000 Invalid API Token）。C2：`integration-health.ts` 只打 `/user/tokens/verify`，現役有效 token 是 account-owned，該端點必 401、只能 `/accounts/<id>/tokens/verify`。C3：DB `tenant_integration_bindings` cloudflare 列 `active`、`last_tested_at` 2026-05-20＝宣稱與真實不符。
