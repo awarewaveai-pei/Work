@@ -45,14 +45,28 @@ describe("buildCardPrompt pose", () => {
     }
   });
 
-  // With the count only in the scene, schnell drew 5 of the Ten of Swords' blades (2026-10-23).
-  it("states a number card's count in the first sentence, in every mode and order", () => {
+  // Every repeat of the counted object read as more of it: "juggling two golden pentacles" + "exactly two round golden
+  // coins" + "two golden pentacles linked by a ribbon" drew four coins (FLUX schnell, 2026-10-23).
+  it("names a number card's objects once, with the exact count, in the first sentence of every mode", () => {
     const pips = TAROT_CARDS.filter((c) => /^(TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN) OF /.test(c.name));
     expect(pips).toHaveLength(36);
+    const NOUN: Record<string, RegExp> = {
+      wands: /\b(wands?|staffs?|staves)\b/gi, cups: /\b(cups?|chalices?)\b/gi, swords: /\bswords?\b/gi, pentacles: /\b(pentacles?|coins?)\b/gi,
+    };
+    const HANDS = /\b(hands?|holding|holds|gripping|grasping|clutching|arms?|fingers?|palms?)\b/i;
     for (const c of pips) {
       const word = c.name.split(" ")[0].toLowerCase();
+      const noun = NOUN[c.type];
+      expect(c.objects, c.name).toMatch(new RegExp(`\\bexactly ${word}\\b`));
+      expect(c.objects!.match(noun), c.name).toHaveLength(1);
+      expect(c.scene.match(noun), `${c.name} scene`).toBeNull();
+      for (const t of [c.pose, c.natural]) if (t) expect(t.split("{objects}").length - 1, c.name).toBe(1);
+      if (c.upright) expect(c.objects, c.name).not.toMatch(HANDS);
       for (const input of [{}, { subject: "a blue cat", heroKind: "animal-natural" as const }, { order: "content-first" as const }]) {
-        expect(buildCardPrompt(c, input).split(". ")[0], c.name).toMatch(new RegExp(`exactly ${word} (wooden wands|golden cups|swords|round golden coins engraved with pentagrams)`, "i"));
+        const p = buildCardPrompt(c, input);
+        expect(p.split(". ")[0].toLowerCase(), c.name).toContain(`exactly ${word}`);
+        expect(p.match(noun), `${c.name} ${JSON.stringify(input)}`).toHaveLength(1);
+        expect(p, c.name).not.toContain("{objects}");
       }
     }
     expect(buildCardPrompt(TAROT_CARDS.find((c) => c.name === "KING OF CUPS")!)).not.toContain("exactly");

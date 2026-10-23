@@ -43,6 +43,8 @@ interface GenResponse {
   error?: string;
 }
 
+type RecentJob = { jobId: string; status: string; completedCards: number; totalCards: number; createdAt: number };
+
 interface BatchItem {
   card: TarotCard;
   status: "idle" | "pending" | "done" | "error";
@@ -328,6 +330,10 @@ export default function TarotStudio() {
   const [bgStatus, setBgStatus]     = useState<string>("idle"); // idle|pending|running|done|error
   const [bgProgress, setBgProgress] = useState({ done: 0, total: 0 });
   const [bgLoadBusy, setBgLoadBusy] = useState(false);
+  // Finished background jobs from the server: the job id lived only in page state, so a reload (needed after a deploy)
+  // left a paid batch with no way to load it (2026-10-23). Jobs restored this way have no prompt of this deck.
+  const [recentJobs, setRecentJobs] = useState<RecentJob[]>([]);
+  const restoredJobsRef = useRef<Set<string>>(new Set());
   const [viewIndex, setViewIndex] = useState<number | null>(null); // large-view modal (batch cards)
   const [savingArt, setSavingArt] = useState(false); // modal "存無框圖" in-flight
   const [savedArt, setSavedArt] = useState<Set<number>>(() => new Set()); // batch indices whose frameless art is saved
@@ -1011,6 +1017,28 @@ export default function TarotStudio() {
     }
   }
 
+  // The deck panel lists the last finished jobs with images while no job is tracked on this page.
+  useEffect(() => {
+    if (!locked || bgStatus !== "idle") return;
+    let cancelled = false;
+    fetch("/api/tools/tarot/batch", { headers: { ...roleHeader("operator") } })
+      .then((r) => r.json())
+      .then((d: { ok: boolean; jobs?: RecentJob[] }) => {
+        if (cancelled || !d.ok || !d.jobs) return;
+        setRecentJobs(d.jobs.filter((j) => (j.status === "done" || j.status === "error") && j.completedCards > 0).slice(0, 3));
+      })
+      .catch(() => { /* the list is a convenience; loading a job from this page still works */ });
+    return () => { cancelled = true; };
+  }, [locked, bgStatus]);
+
+  function restoreJob(j: RecentJob) {
+    restoredJobsRef.current.add(j.jobId);
+    setBgJob({ id: j.jobId, deck: deckGenRef.current });
+    setBgProgress({ done: j.completedCards, total: j.totalCards });
+    setBgStatus(j.status);
+    void loadBatchResults();
+  }
+
   // Load results from a completed background batch into the local batch grid.
   // Results merge only into the deck that launched the job. A job from a previous deck (style was
   // relocked while it ran) is dropped with a message instead of filling the new deck by card index.
@@ -1025,6 +1053,8 @@ export default function TarotStudio() {
       setMessage(`背景批次 ${job.id.slice(0, 8)} 是上一副牌（風格已重新鎖定）產生的，不載入到目前這副牌。`);
       return;
     }
+    // Every early exit says why: a silent return left 「載入背景批次結果中…」 on screen with nothing loaded (2026-10-23).
+    const stopped = () => setMessage(`背景批次 ${job.id.slice(0, 8)} 停止載入：這副牌已重新鎖定或換了別批，請再按一次載入。`);
     setBgLoadBusy(true);
     setMessage("載入背景批次結果中…");
     try {
@@ -1036,7 +1066,7 @@ export default function TarotStudio() {
         job?: { results: Array<{ cardIndex: number; cardName: string; url: string }> };
         error?: string;
       };
-      if (!isCurrent()) return; // deck or job changed while loading
+      if (!isCurrent()) return stopped(); // deck or job changed while loading
       if (!data.ok || !data.job) {
         setMessage(`載入失敗：${data.error ?? "unknown"}`);
         return;
@@ -1049,7 +1079,7 @@ export default function TarotStudio() {
       const saves: Promise<boolean>[] = [];
       let loaded = 0;
       for (const r of results) {
-        if (!isCurrent()) return;
+        if (!isCurrent()) return stopped();
         const card = TAROT_CARDS[r.cardIndex];
         try {
           const imgRes = await fetch(`/api/tools/tarot/batch/${job.id}/image/${r.cardIndex}`, { headers: { ...roleHeader("operator") } });
@@ -1058,7 +1088,7 @@ export default function TarotStudio() {
           const graded = !grade.neutral ? await applyGradeToDataUrl(art, grade.params).catch(() => art) : art;
           const blob = await renderPrintCard(card, graded, template);
           const galleryArt = await toGalleryArt(graded);
-          if (!isCurrent()) return;
+          if (!isCurrent()) return stopped();
           const url = URL.createObjectURL(blob);
           setBatch((prev) => prev.map((it, i) => {
             if (i !== r.cardIndex) return it;
@@ -1067,7 +1097,10 @@ export default function TarotStudio() {
           }));
           saves.push(postDesign(await blobToDataUrl(blob), "tarot", {
             cardName: card.name,
-            prompt: buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
+            // A restored job was made from another page load: this deck's prompt would mislabel it.
+            prompt: restoredJobsRef.current.has(job.id)
+              ? undefined
+              : buildCardPrompt(card, { styleResolved: effectiveEnglish, subject: subjectForPrompt, heroKind, couple, order: orderOf(lockedModel) }),
             batchJobId: job.id,
             cardIndex: r.cardIndex,
           }));
@@ -1078,7 +1111,7 @@ export default function TarotStudio() {
         }
       }
       const saved = (await Promise.all(saves)).filter(Boolean).length;
-      if (!isCurrent()) return;
+      if (!isCurrent()) return stopped();
       setMessage(
         `已載入 ${loaded} 張背景批次結果並套框；存進「我的設計」${saved} 張` +
           (saved < loaded ? `，${loaded - saved} 張沒存成功（重按「載入批次結果」會補存，已存的不會重複）` : "") + "。" +
@@ -1373,6 +1406,18 @@ export default function TarotStudio() {
                       🚀 背景生成全 78 張
                     </button>
                   )}
+                  {bgStatus === "idle" && recentJobs.map((j) => (
+                    <button
+                      key={j.jobId}
+                      className="btn-secondary"
+                      disabled={batchBusy || bgLoadBusy}
+                      onClick={() => restoreJob(j)}
+                      style={{ fontSize: 12 }}
+                      title="這批的圖會套上目前選的外框，並存進「我的設計」"
+                    >
+                      載入 {new Date(j.createdAt).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })} 那批（{j.completedCards} 張）
+                    </button>
+                  ))}
                   {(bgStatus === "pending" || bgStatus === "running") && (
                     <span style={{ fontSize: 12, color: "var(--accent)" }}>
                       進行中 {bgProgress.done}/{bgProgress.total} 張…

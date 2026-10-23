@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { LogoutButton } from "../LogoutButton";
 import { SidebarNav } from "../SidebarNav";
+import { UpdateNotice } from "../UpdateNotice";
 import { getThemeConfig } from "../../lib/theme/store";
+import { currentBuildId } from "../../lib/build-id";
 
 export default async function ShellLayout({ children }: { children: ReactNode }) {
   const { layout: navLayout } = await getThemeConfig();
@@ -26,6 +28,7 @@ export default async function ShellLayout({ children }: { children: ReactNode })
       </nav>
 
       <div className="main">
+        <UpdateNotice buildId={currentBuildId()} />
         {children}
       </div>
     </div>

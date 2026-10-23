@@ -1,4 +1,31 @@
 # Worklog
+## 2026-10-23（續47）塔羅「都沒改善」查因：舊分頁跑舊程式、重整後找不到批次、數量重複描述；修四項（Claude）
+
+**觸發**：操作者 20:07 跑背景批次 e8486f5f、20:16 載入，回報無框、沒進設計、數量仍錯。
+
+**根因（證據）**
+- C1 舊分頁跑部署前的程式：e8486f5f 的惡魔無翅膀、錢幣九頭罩在貓頭（=舊文字）；載入後 77 張無框且直接從 R2 顯示（=舊載入）；nginx 該 IP 在 12:16:48 只打 `GET /batch/e8486f5f`、無任何 `/image/`；12:20:36 整頁重整後 12:23 生成的錢幣牌 prompt 含 `exactly two round golden coins`（=新文字）。部署後開著的分頁不會換程式、也沒提示。（我先誤判「網頁沒抓圖」「瀏覽器跑新版」，nginx 看不到直連 R2 的抓圖，Cloudflare 快取的 chunk 也不進 nginx log。）
+- C2 批次只存在頁面記憶體：重整後 bgJob 消失，e8486f5f 無法再用新版載入。
+- C3 數量：錢幣二同一物件出現三次、兩種名稱（juggling two golden pentacles＋續33 加的 exactly two round golden coins＋scene two golden pentacles linked by a ribbon）→ schnell 畫 4 枚。同 prompt 4 seed 只有 1 張正確；只提一次 2/4 正確。
+- C4 卡 48 卡住：`finishCard` 一次 `fetch failed`（`[tarot-batch] card: finishCard failed batch_store_finish_failed: TypeError: fetch failed`）→ 卡片停在 generating（R2 圖其實已在 048.png）→ 整批 `run_ended_incomplete`。
+
+**修改**（next-admin）
+- `app/api/ops/build-id/route.ts`＋`lib/build-id.ts`（新）回傳 `.next/BUILD_ID`；`app/UpdateNotice.tsx`（新）掛在 `app/(shell)/layout.tsx`，每 60 秒與切回分頁時比對，不同就顯示「網站已更新…請重新整理」。
+- `TarotStudio.tsx`：牌組面板列出最近 3 個已完成批次（`GET /api/tools/tarot/batch`），按下即套框＋存設計（還原的批次不帶本頁 prompt）；`loadBatchResults` 每個提早結束都寫原因，不再無聲 return。
+- `cards.ts`：36 張數字牌新增 `objects`（含 exactly N、只出現一次，插在 pose/natural 的 `{objects}`）；scene 不再提花色物件；錢幣統一「golden coins engraved with pentagrams」；移除續33 的 `pipCount()` 數量句。
+- `lib/tarot/batch-store.ts`：`finishCard` 失敗重試 0.5s/2s/5s（同列同結果，可重複寫）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test（next-admin 全套 323 files／2930 passed／0 failed）＋ npx tsc --noEmit | exit=0 | ms=150000
+- 新測試：數字牌物件只出現一次（36 張×3 模式，花色名詞在整段 prompt 恰 1 次）、build-id 路由、finishCard 兩次失敗後成功。突變：finishCard 不重試 → 紅；還原綠。
+- 實生（操作者設定：達文西＋達利、人物、schnell、seed 7）36 張數字牌：2–5 個物件多數正確，6 個以上常錯（聖盃九約 15、寶劍九約 12、錢幣八約 12）。同文字改用 Nano Banana 2 的 6 張高數量牌：5/6 數量正確（聖盃九、聖盃十彩虹 10 杯＋兩孩、寶劍七 5+2、寶劍九、錢幣八 6+1+1），錢幣六漏飄浮 6 枚。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-85126111.md`：F1 重整後要先鎖定牌組才看到舊批次 → 屬實但為必要（套框需這副牌的外框與格子），說明告知操作者；F2 列表上限 10 可能漏掉已完成批次 → 同時最多 2 批執行（tarot MODULE_MANIFEST invariants），前 10 至少 8 筆已結束，不改；F3 兩分頁同時載入可重複存 → 同續33 已記錄的限制
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory | grep=pipCount | hits=1（只剩續33 的 oracle 報告 2026-10-23-partialreview-8795fda7.md 歷史引述；程式內 0）
+- BUGHUNT_SCOPE_NARROW: 移除的符號只在 cards.ts／cards.test.ts
+
+**剩餘**：schnell 對 6 個以上的數量仍不準（模型極限，非文字）；要整副數量對需 Nano Banana 2（約 NT$2.2／張）。e8486f5f 上線後可用「載入 … 那批」按鈕找回。
+
+**rollback**：`git revert <本 commit>`；無 migration。
 ## 2026-10-23（續46）員工路由用量歸屬：代操的付費工作記到客戶，不再記成自用／system（Claude）
 
 **觸發**：主線 session 派工（TASKS「員工路由用量歸屬」，續38「同類」，Codex `reports/oracle/2026-10-23-partialreview-17c6d5ee.md` F1）。

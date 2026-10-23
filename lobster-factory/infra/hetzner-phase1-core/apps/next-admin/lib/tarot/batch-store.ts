@@ -241,14 +241,34 @@ export async function claimCard(jobId: string, cardIndex: number, cardName: stri
 }
 
 /** Record a claimed card's outcome. A done card is never overwritten (tarot_batch_finish_card, 0115). */
-export async function finishCard(jobId: string, cardIndex: number, outcome: { url: string } | { error: string }): Promise<void> {
-  const { error } = await db().rpc("tarot_batch_finish_card", {
-    p_job_id: jobId,
-    p_card_index: cardIndex,
-    p_url: "url" in outcome ? outcome.url : null,
-    p_error: "error" in outcome ? outcome.error : null,
-  });
-  if (error) throw new BatchStoreUnavailableError(`batch_store_finish_failed: ${error.message}`);
+// One "fetch failed" on this write left card 48 of job e8486f5f "generating" with its image already in R2, and the
+// whole 78-card job ended as error (2026-10-23). The write is idempotent (same row, same outcome), so it is retried.
+const FINISH_RETRY_MS = [500, 2_000, 5_000];
+
+export async function finishCard(
+  jobId: string,
+  cardIndex: number,
+  outcome: { url: string } | { error: string },
+  opts: { retryMs?: readonly number[] } = {},
+): Promise<void> {
+  const waits = opts.retryMs ?? FINISH_RETRY_MS;
+  let last = "";
+  for (let attempt = 0; attempt <= waits.length; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, waits[attempt - 1]));
+    try {
+      const { error } = await db().rpc("tarot_batch_finish_card", {
+        p_job_id: jobId,
+        p_card_index: cardIndex,
+        p_url: "url" in outcome ? outcome.url : null,
+        p_error: "error" in outcome ? outcome.error : null,
+      });
+      if (!error) return;
+      last = error.message;
+    } catch (e) {
+      last = e instanceof Error ? e.message : String(e);
+    }
+  }
+  throw new BatchStoreUnavailableError(`batch_store_finish_failed: ${last}`);
 }
 
 async function readCards(client: SupabaseClient, jobIds: string[]): Promise<CardRow[]> {

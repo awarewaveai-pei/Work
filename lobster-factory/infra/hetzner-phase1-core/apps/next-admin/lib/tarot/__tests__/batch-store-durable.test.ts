@@ -77,6 +77,23 @@ describe("tarot batch store: rows, not memory", () => {
     expect(job.results).toHaveLength(1);
   });
 
+  it("a card's finish write survives brief network failures instead of staying 'generating' forever", async () => {
+    const { store } = await routes();
+    const jobId = randomUUID();
+    await store.createJob({ jobId, organizationId: ORG_A, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+    await store.claimCard(jobId, 0, "The Fool");
+    const client = h.client as { rpc: (fn: string, a: unknown) => Promise<unknown> };
+    const realRpc = client.rpc;
+    let calls = 0;
+    client.rpc = (fn, a) => {
+      if (fn === "tarot_batch_finish_card" && ++calls <= 2) return Promise.reject(new TypeError("fetch failed"));
+      return realRpc(fn, a);
+    };
+    await store.finishCard(jobId, 0, { url: "https://r2.test/x.png" }, { retryMs: [0, 0, 0] });
+    expect(calls).toBe(3);
+    expect((await store.getJob(jobId))!).toMatchObject({ completedCards: 1, status: "done" });
+  });
+
   it("each card is asked as the person who started the batch and billed to the job's organization, never as system", async () => {
     const { store, card, start, status } = await routes();
     const jobId = randomUUID();
