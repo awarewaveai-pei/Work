@@ -46,7 +46,7 @@ export const PRIORITY = [
 ];
 // 接下來的實際順序（2026-10-23 依 prod 現況排；證據在 NOW 與各卡）。steps＝相關步驟；每個未完成步驟至少出現一次（check 擋）。
 export const NEXT = [
-  { h: '① 自用與代操補上免費路徑', t: '收點數的功能現在只看錢包、不認免費或合約權利列（can.ts:40-45），自用帳戶 7 天有 231 筆「若強制就拒」。改成先看權利列、沒有才看錢包，再替自用與現有客戶登記權利，連續 7 天為零後才翻強制（High，要你同意）。先做，因為產品門的「已買可按、未買灰」讀同一個判斷。', steps: [3] },
+  { h: '① 翻強制模式（等條件）', t: '權利已就位：點數功能先認權利列，自用、EdD、Soulful 每天自動補齊（2026-10-23 部署）。10/31 自動檢查 7 天「若強制就拒」，為零或都已解釋後，請你同意再翻（High）。', steps: [3] },
   { h: '② 每個產品自己的門', t: '不必等任何決定。先由 Fable 5.1 定一套版面規則，再一個產品一個產品做；員工門的產品目錄一起做。每個門上線是 High。', steps: [8] },
   { h: '③ WordPress 一鍵登入產品門', t: '付款開通的前提：付了錢的人要能從 aware-wave.com 進產品門（ADR 015 順序 1），所以排在門做好之後。目前未實作；動到身分驗證，屬 High。', steps: [4] },
   { h: '④ 付款後自動開通', t: '待決 1、3 回覆後開工。兩題要問金流商與會計師，費時，建議現在就問。', steps: [4] },
@@ -99,9 +99,9 @@ export const WAYS = [
 // 現在真的在跑的（2026-10-23 查：prod docker exec printenv、psql 唯讀）
 export const NOW = [
   { what: '客戶可自行登入', state: 'no', ev: '員工替客戶開帳號、寄設定密碼信；prod 已設 RESEND_API_KEY，但公開註冊由程式關閉（portal/api/signup/route.ts:9、:99），要先做確認信流程' },
-  { what: '已有付費客戶', state: 'no', ev: 'prod：plans、organization_entitlements、錢包帳本皆 0 筆；客戶組織 5 個，Woo 尚未販售' },
+  { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0：plans、錢包帳本皆 0 筆，Woo 尚未販售' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
-  { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。7 天記到 231 筆「若強制就拒」，翻強制前要先清零；每功能扣幾點待你定價' },
+  { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；每功能扣幾點待你定價' },
   { what: '產品自己的門', state: 'no', ev: '只有 social 有門頁（app/social/）；登記表 11 個產品全是 coming_soon（products.ts）' },
 ];
 
