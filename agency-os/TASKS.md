@@ -117,7 +117,7 @@
 
 > 刷卡／登入第三方面板／瀏覽器點測／給截圖。多數每條只要幾分鐘，卻卡住下游。
 
-- [ ] **【Soulful 搬站後收尾｜無死線】網域轉 Cloudflare Registrar＋付費外掛授權盤點** — ① 網域轉 CF Registrar（網域付到 2028，無時壓；DKIM selector 是 `hostingermail1`，轉移時勿動 DNS）② ~17 個付費外掛、5–6 組授權的續約狀態盤點（清單 `tenants/company-soulful-expression/core/SITE_CODE_MANIFEST.md`）。
+- [ ] **【Soulful 搬站後收尾｜無死線】網域轉 Cloudflare Registrar** — 網域付到 2028，無時壓；DKIM selector 是 `hostingermail1`，轉移時勿動 DNS。（付費外掛授權盤點：操作者 2026-10-23 說不用做。）
   - 出自：兩條 Soulful 搬站項（操作者 2026-10-23 確認搬站完成，已歸檔）；其餘收尾（origin lockdown、Hostinger 拉取用公鑰）隨 Hostinger 11/12 到期或已由 ks-aw-01 origin guard 取代。
 - [ ] **【產品｜社群管理平台 V1】照 ADR 016 與 SOCIAL_MANAGER_PLAN.md 做：G5 升級 Postiz，C3 起逐卡**
   - `🟠 未開始` · `2026-10-14` · `G3 Meta 審核狀態（操作者）；G5 要 go-ahead`
