@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-24（續2）撤回 ef54cf21d 的牌面改寫（六～十小組＋RWS 排法）（Claude）
+
+**觸發**：操作者：「這個不要了」。
+
+**修改**：`lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/(shell)/tools/tarot/cards.ts` 還原為 `ef54cf21d^` 版本，與正式機 edffb48fc 逐位元相同（`git diff --quiet edffb48fc -- cards.ts` exit 0）。續1 的 WORKLOG 與 oracle 報告保留作實驗紀錄。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run "app/(shell)/tools/tarot/" lib/tarot（30 passed）＋ npx tsc --noEmit | exit=0 | ms=20000
+- REVIEW_WAIVED: NA -- 還原為已在正式機運行並審查過（續47）的版本
+- BUGHUNT_WAIVED: NA -- 只還原字串資料，無符號變動
+
+**rollback**：`git revert <本 commit>`（恢復 ef54cf21d 的改寫）。
 ## 2026-10-24（續1）塔羅六～十：數量拆小組、構圖照 RWS 原圖；數量改善實驗結論（Claude）
 
 **觸發**：操作者回報數字牌數量常錯，要求分析可行方法並實測（用牌庫實際文字＋梵谷）。
