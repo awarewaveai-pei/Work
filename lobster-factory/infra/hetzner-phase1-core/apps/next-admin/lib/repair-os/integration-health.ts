@@ -21,7 +21,7 @@ export interface IntegrationHealthResult {
 }
 
 const DEFAULT_ENV_BY_PROVIDER: Record<string, string[]> = {
-  cloudflare: ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_AUTH_BEARER_TOKEN"],
+  cloudflare: ["CLOUDFLARE_API_TOKEN"],
   grafana: ["GRAFANA_SERVICE_ACCOUNT_TOKEN"],
   n8n: ["N8N_API_KEY", "N8N_AUTH_BEARER_TOKEN"],
   netdata: ["NETDATA_API_TOKEN"],
@@ -44,7 +44,8 @@ export async function checkIntegrationHealth(input: IntegrationHealthInput): Pro
         checkedAt,
         provider,
         tokens: resolveTokenCandidates(input.secretRef, DEFAULT_ENV_BY_PROVIDER[provider] ?? []),
-        url: "https://api.cloudflare.com/client/v4/user/tokens/verify",
+        // Account-owned tokens (the kind we issue) 401 on /user/tokens/verify; they only verify per account.
+        url: cloudflareVerifyUrl(clean(process.env.CLOUDFLARE_ACCOUNT_ID)),
         headersForToken: bearerHeaders,
         okWhen: (status, json) => status === 200 && readBoolean(json, "success") === true,
       });
@@ -373,6 +374,11 @@ function vaultEnvName(secretRef: string | null): string | null {
   if (!value?.startsWith("vault:")) return null;
   const envName = value.slice("vault:".length).trim();
   return /^[A-Z0-9_]+$/.test(envName) ? envName : null;
+}
+
+function cloudflareVerifyUrl(accountId: string | null): string {
+  const base = "https://api.cloudflare.com/client/v4";
+  return accountId ? `${base}/accounts/${encodeURIComponent(accountId)}/tokens/verify` : `${base}/user/tokens/verify`;
 }
 
 function bearerHeaders(token: string | null): Record<string, string> {

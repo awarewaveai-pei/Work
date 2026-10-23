@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-23（續16）Cloudflare 憑證收斂成一把＋lobster-nginx 死網段移除
+
+- 根因 C1：prod `lobster-next-admin` 的 `CLOUDFLARE_API_TOKEN`＝`CLOUDFLARE_AUTH_BEARER_TOKEN`＝同一把失效 token（`/user/tokens/verify` code 1000 Invalid API Token）。C2：`integration-health.ts` 只打 `/user/tokens/verify`，現役有效 token 是 account-owned，該端點必 401、只能 `/accounts/<id>/tokens/verify`。C3：DB `tenant_integration_bindings` cloudflare 列 `active`、`last_tested_at` 2026-05-20＝宣稱與真實不符。
+- 不變量：Cloudflare 只有一個憑證名 `CLOUDFLARE_API_TOKEN`（+`CLOUDFLARE_ACCOUNT_ID`），每處驗證都用它能通過的端點。
+- 改動：`integration-health.ts` 候選只剩 `CLOUDFLARE_API_TOKEN`、有 account id 走 account 端點（`cloudflareVerifyUrl`）＋新測試 3 支；compose 舊名→`CLOUDFLARE_ACCOUNT_ID`（repo:423＋prod:391）；prod `.env` 換有效 token、加 account id、刪舊名（備份 `.env.bak-cf-20261023-053540`）；DB 列 secret_ref→`vault:CLOUDFLARE_API_TOKEN`、status→pending（待 03:00 部署後 validate）；本機 `user-env.ps1`／User env／vault 刪舊名；`check-cloudflare-security.ps1:81` 舊名 fallback 刪；template／DESKTOP_MCP_SETUP／SERVICE_CREDENTIALS_MAP／APP_AWARE_WAVE_COMPLETE_REFERENCE 改名。歷史文件 `docs/AWAREWAVE_REPAIR_OS_PRODUCT_ARCHITECTURE.md:868` 不回改。
+- lobster-nginx：容器只綁 127.0.0.1:8083、peer 永遠 host gateway → `nginx/default.conf` 的 15 條 CF `set_real_ip_from` 與 geo 白名單從不生效，刪除並改註解指向 host cf-only；信任 127.0.0.1／172.18.0.1／172.16.0.0/12 不變。`safe-infra-patch nginx` OK（backup `default.conf.bak.safe-patch-20261023-054029`）。SG 時代未部署檔 `aware-wave-security.conf`／`cloudflare-real-ip.conf` 仍含清單，未動（被他檔註解引用）。
+- REALTEST_EVIDENCE: tool=Bash | cmd=`npx vitest run lib/repair-os`（3/3）；`npx tsc --noEmit` 唯一錯誤在他 session 進行中的 `lib/content/r2-delete-guard.ts:129` | exit=0 | ms=390
+- REALTEST_EVIDENCE: tool=SSH | cmd=`docker exec lobster-next-admin printenv CLOUDFLARE_AUTH_BEARER_TOKEN`→exit 1、`printenv CLOUDFLARE_ACCOUNT_ID`→exit 0；容器內 fetch account verify→http=200 success=true status=active；safe-infra-patch compose next-admin healthy PASS | exit=0 | ms=9000
+- REALTEST_EVIDENCE: tool=curl | cmd=aware-wave.com 200、app 307、soulfulexpression.org 200；標記 UA → `/var/log/lobster-nginx` 記錄本機 IPv6（真實 IP 仍還原）；`check-cloudflare-security.ps1` 只靠 `CLOUDFLARE_API_TOKEN` → PASS | exit=0 | ms=3000
+- REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（Codex `agency-os/reports/oracle/2026-10-23-partialreview-59549efc.md`：F1 DESKTOP_MCP_SETUP 未改＝誤報，worktree:81 已是 `CLOUDFLARE_ACCOUNT_ID`；F2 fallback 測試只驗路由＝設計如此，缺 account id 時 401 會在健康檢查明確顯示 failed，不靜默）
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,mcp,docs,.claude | grep=`CLOUDFLARE_AUTH_BEARER_TOKEN` | hits=1（歷史文件，刻意保留；generated reports/handoffs/WORKLOG 排除）
+- 待辦：03:00 部署後 cloudflare 整合按 validate（TASKS 已列）。
 ## 2026-10-23（續14）全產品帳戶權利先補一次（各 338 列）；排 10/31 強制模式前提檢查（Claude）
 
 **觸發**：操作者「去處理好剩餘風險」。

@@ -31,7 +31,7 @@
 | 服務 | URL / Project | 驗證方式 | 環境變數 |
 |---|---|---|---|
 | **Soulful Expression Supabase（雲端）** | `https://mffjqjiidbeibilmxzef.supabase.co` | Service Role Key / PAT | `SUPABASE_SOULFULEXPRESSION_SERVICE_ROLE_KEY` |
-| **Cloudflare** | `api.cloudflare.com/client/v4` | API Token | `CLOUDFLARE_API_TOKEN` `CLOUDFLARE_AUTH_BEARER_TOKEN` |
+| **Cloudflare** | `api.cloudflare.com/client/v4` | API Token | `CLOUDFLARE_API_TOKEN` `CLOUDFLARE_ACCOUNT_ID` |
 | **GitHub** | `api.github.com` | PAT | `GITHUB_PERSONAL_ACCESS_TOKEN` |
 | **GitHub Copilot MCP** | `api.githubcopilot.com/mcp` | Bearer | `COPILOT_MCP_BEARER_TOKEN` |
 | **Hetzner** | `api.hetzner.cloud/v1` | API Token | `HETZNER_API_TOKEN` |

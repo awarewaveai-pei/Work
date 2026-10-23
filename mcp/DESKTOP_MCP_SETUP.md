@@ -79,7 +79,7 @@ UPTIME_KUMA_API_KEY          = "<Uptime Kuma API key（可空白）>"
 
 CLOUDFLARE_API_BASE_URL      = "https://api.cloudflare.com/client/v4"
 CLOUDFLARE_API_TOKEN         = "<Cloudflare API token>"
-CLOUDFLARE_AUTH_BEARER_TOKEN = "<Cloudflare Bearer token>"
+CLOUDFLARE_ACCOUNT_ID        = "<Cloudflare account id>"
 
 POSTHOG_API_BASE_URL         = "https://us.i.posthog.com/api"
 POSTHOG_PERSONAL_API_KEY     = "<PostHog personal API key>"

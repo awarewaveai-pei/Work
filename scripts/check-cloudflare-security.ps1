@@ -78,7 +78,6 @@ function Get-Secret {
 }
 
 $token = Get-Secret "CLOUDFLARE_API_TOKEN"
-if (-not $token) { $token = Get-Secret "CLOUDFLARE_AUTH_BEARER_TOKEN" }
 
 $overall    = "WARN"
 $botMode    = "unknown"
