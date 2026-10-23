@@ -16,9 +16,9 @@ function database(result: object) {
   query.update.mockReturnValue(query);
   query.in.mockReturnValue(query);
   query.lte.mockResolvedValue(result);
-  // endLapsedTrials' first page read: no lapsed trials.
-  const trials = { select: vi.fn(), eq: vi.fn(), lte: vi.fn(), gt: vi.fn(), order: vi.fn(), limit: vi.fn() };
-  for (const step of ["select", "eq", "lte", "gt", "order"] as const) trials[step].mockReturnValue(trials);
+  // endLapsedTrials' first page read: no lapsed contracts.
+  const trials = { select: vi.fn(), in: vi.fn(), lte: vi.fn(), gt: vi.fn(), order: vi.fn(), limit: vi.fn() };
+  for (const step of ["select", "in", "lte", "gt", "order"] as const) trials[step].mockReturnValue(trials);
   trials.limit.mockResolvedValue({ data: [], error: null });
   const db = { from: vi.fn((table: string) => (table === "organization_product_subscriptions" ? trials : query)), rpc: vi.fn().mockResolvedValue({ data: 0, error: null }) };
   return { db, query, client: db as unknown as SupabaseClient };
@@ -81,7 +81,7 @@ describe("global entitlement expiry", () => {
     expect((await POST(request())).status).toBe(500);
   });
 
-  it("ends only trials whose own contract grants are all gone, and only while still trial", async () => {
+  it("ends only trials and paid contracts past their period whose own grants are all gone (0120: a cancel waits for this)", async () => {
     const now = new Date("2026-10-21T00:00:00Z");
     const { calls, client } = trialDb({
       organization_product_subscriptions: [{ data: [{ id: "a" }, { id: "b" }], error: null }, { error: null, count: 1 }],
@@ -91,7 +91,7 @@ describe("global entitlement expiry", () => {
     const read = calls.filter((c) => c.table === "organization_product_subscriptions").slice(0, 6);
     expect(read).toEqual([
       { table: "organization_product_subscriptions", op: "select", args: ["id"] },
-      { table: "organization_product_subscriptions", op: "eq", args: ["status", "trial"] },
+      { table: "organization_product_subscriptions", op: "in", args: ["status", ["trial", "active", "past_due"]] },
       { table: "organization_product_subscriptions", op: "lte", args: ["current_period_end", now.toISOString()] },
       { table: "organization_product_subscriptions", op: "gt", args: ["id", "00000000-0000-0000-0000-000000000000"] },
       { table: "organization_product_subscriptions", op: "order", args: ["id"] },
@@ -109,7 +109,9 @@ describe("global entitlement expiry", () => {
     expect(calls.filter((c) => c.table === "organization_product_subscriptions").slice(6)).toEqual([
       { table: "organization_product_subscriptions", op: "update", args: [{ status: "canceled", updated_at: now.toISOString() }, { count: "exact" }] },
       { table: "organization_product_subscriptions", op: "in", args: ["id", ["b"]] },
-      { table: "organization_product_subscriptions", op: "eq", args: ["status", "trial"] },
+      { table: "organization_product_subscriptions", op: "in", args: ["status", ["trial", "active", "past_due"]] },
+      // a payment that renewed it after the read has a later period and is left alone
+      { table: "organization_product_subscriptions", op: "lte", args: ["current_period_end", now.toISOString()] },
     ]);
   });
 

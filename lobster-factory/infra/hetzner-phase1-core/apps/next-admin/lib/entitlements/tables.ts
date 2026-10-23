@@ -83,21 +83,22 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
       return count;
     },
     async endLapsedTrials(now = new Date()) {
-      // A trial row ends when its own contract grants are gone (portal_complete_signup writes them
-      // with source_ref = subscription id), so the 7-day grace lives only in 0110, not here too.
+      // A contract past its period ends when its own grants are gone (portal_complete_signup and 0120's payments write
+      // them with source_ref = subscription id), so the 7-day grace lives only in SQL, not here too. Trials and paid
+      // contracts alike: a canceled or unrenewed subscription stays open until then (0120), as can() does.
       // Run after expireEntitlements(). Keyset pages: no offset that skips rows as statuses change.
       let ended = 0;
       let after = "00000000-0000-0000-0000-000000000000";
       for (;;) {
         const { data: page, error } = await db.from("organization_product_subscriptions")
-          .select("id").eq("status", "trial").lte("current_period_end", now.toISOString())
+          .select("id").in("status", LAPSING).lte("current_period_end", now.toISOString())
           .gt("id", after).order("id").limit(TRIAL_PAGE);
         if (error) throw new Error(error.message);
         if (!page?.length) return ended;
         const ids = page.map((row) => row.id as string);
         after = ids[ids.length - 1];
-        // One trial has one grant per feature, so a page of trials can exceed PostgREST's row cap:
-        // read the live grants in id pages too, or a truncated answer cancels a trial still in grace.
+        // One contract has one grant per feature, so a page of contracts can exceed PostgREST's row cap:
+        // read the live grants in id pages too, or a truncated answer cancels a contract still in grace.
         const stillGranted = new Set<string>();
         let afterGrant = "00000000-0000-0000-0000-000000000000";
         for (;;) {
@@ -113,7 +114,8 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
         if (lapsed.length) {
           const { error: endError, count } = await db.from("organization_product_subscriptions")
             .update({ status: "canceled", updated_at: now.toISOString() }, { count: "exact" })
-            .in("id", lapsed).eq("status", "trial");
+            // Period re-checked: a payment that renewed the contract since the read above must not be canceled.
+            .in("id", lapsed).in("status", LAPSING).lte("current_period_end", now.toISOString());
           if (endError) throw new Error(endError.message);
           if (count === null) throw new Error("missing_trial_end_count");
           ended += count;
@@ -124,5 +126,27 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
   };
 }
 
+/** One billing account on /ops/billing (0120 billing_overview; grants grouped, so 300+ feature rows stay one line). */
+export interface BillingAccount {
+  organization_id: string; name: string; slug: string; kind: "internal" | "customer";
+  all_features: { source: string; source_ref: string; note: string | null } | null;
+  balance: number;
+  hold: { reason: string; since: string } | null;
+  contracts: Array<{ id: string; product_key: string; plan_key: string; status: string; started_at: string | null; current_period_end: string | null; source_ref: string | null }>;
+  grants: Array<{ product_key: string; source: string; source_ref: string | null; state: string; features: number; ends_at: string | null }>;
+  expired_grants: number;
+  ledger: Array<{ at: string; units: number; entry_type: string; reference_type: string | null; reference_id: string | null }>;
+  payments: Array<{ at: string; provider: string; event_id: string; kind: string; result: Record<string, unknown> | null }>;
+}
+
+export async function billingOverview(client: SupabaseClient | null = getSupabaseWriteClient()): Promise<BillingAccount[]> {
+  if (!client) throw new Error("entitlements_db_unavailable");
+  const { data, error } = await client.rpc("billing_overview", { p_ledger_rows: 20, p_event_rows: 10 });
+  if (error) throw new Error(error.message);
+  if (!Array.isArray(data)) throw new Error("invalid_billing_overview");
+  return data as BillingAccount[];
+}
+
 const TRIAL_PAGE = 200;
+const LAPSING = ["trial", "active", "past_due"];
 const GRANT_PAGE = 500;   // below PostgREST's max-rows (1000), so a full page is never a silent truncation

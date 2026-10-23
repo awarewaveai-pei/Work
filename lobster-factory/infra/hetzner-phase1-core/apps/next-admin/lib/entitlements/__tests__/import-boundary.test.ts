@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = path.resolve(__dirname, "../../..");
 const SDK = /^(?:@anthropic-ai\/sdk|openai|replicate|@fal-ai(?:\/[^/]+)?|@google\/(?:genai|generative-ai))(?:\/|$)/;
-const TABLES = new Set(["plans", "organization_entitlements", "organization_product_subscriptions", "media_credit_ledger"]);
+const TABLES = new Set(["plans", "organization_entitlements", "organization_product_subscriptions", "media_credit_ledger", "payment_events", "credit_wallet_holds"]);
 // These are separate boundaries: portal pages may read subscription state, but may not import SDKs.
 const sdkAllowed = (file: string) => file === "lib/ai/gateway.ts" || file.startsWith("lib/entitlements/");
 const tableAllowed = (file: string) => file.startsWith("lib/entitlements/") || file.startsWith("app/portal/");

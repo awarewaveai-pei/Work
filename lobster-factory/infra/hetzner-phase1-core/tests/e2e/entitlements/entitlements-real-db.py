@@ -7,6 +7,9 @@ a fresh Ed25519 key pair; then lib/entitlements/__tests__/entitlements.e2e.test.
   a wallet grant makes both usable; the cognitive permit issuer refuses without an entitlement row and issues with one.
 Last, the cognitive engine's Python check_entitlement verifies that issued permit (cross-language, enforce).
     python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py
+--suite payments (ADR 017 step 4a) adds 0092/0117/0118 (with the three accounts 0118 seeds) and 0120, then drives
+POST /api/webhooks/payments/local and /ops/billing through lib/entitlements/__tests__/payments.e2e.test.ts.
+    python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments
 """
 from __future__ import annotations
 
@@ -58,7 +61,21 @@ def migration(prefix):
     psql(found[0].read_text(encoding="utf-8"))
 
 
+# 0118 seeds all-features rows for these three accounts and refuses to apply without them.
+SEED_0118 = """insert into organizations(id, type, name, slug, kind) values
+  ('00000000-0000-4000-8000-0000000000a1', 'agency', 'AwareWave', 'e2e-internal', 'internal'),
+  ('00000000-0000-4000-8000-0000000000e1', 'client', 'EdD', 'edd-research', 'customer'),
+  ('00000000-0000-4000-8000-0000000000f1', 'client', 'Soulful', 'soulful-expression', 'customer');"""
+SUITES = {
+    "entitlements": {"migrations": ("0062", "0063", "0066", "0077", "0110"), "after": (), "test": "lib/entitlements/__tests__/entitlements.e2e.test.ts"},
+    "payments": {"migrations": ("0062", "0063", "0066", "0077", "0092", "0110", "0117"), "after": ("0118", "0120"),
+                 "test": "lib/entitlements/__tests__/payments.e2e.test.ts"},
+}
+
+
 def main() -> int:
+    suite_name = sys.argv[sys.argv.index("--suite") + 1] if "--suite" in sys.argv else "entitlements"
+    suite = SUITES[suite_name]
     run(["docker", "run", "-d", "--name", PG, "--label", "awarewave.test=entitlements-e2e", "-e", "POSTGRES_PASSWORD=verify", "postgres:15.8-alpine"])
     try:
         for _ in range(60):
@@ -66,7 +83,7 @@ def main() -> int:
                run(["docker", "exec", PG, "psql", "-U", "postgres", "-c", "select 1"], check=False).returncode == 0:
                 break
             time.sleep(1)
-        print("== schema (0001, 0062, 0063, 0066, 0077, 0110)")
+        print(f"== schema (0001, {', '.join(suite['migrations'] + suite['after'])})")
         psql("""create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
           grant usage on schema public to anon, authenticated, service_role;
           alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
@@ -78,8 +95,12 @@ def main() -> int:
         psql("""create function public.user_has_org_membership(p_org_id uuid) returns boolean language sql stable security definer
           set search_path=public,pg_temp as $$ select exists (select 1 from organization_memberships where organization_id=p_org_id
           and user_id=auth.uid() and status='active'); $$;""")
-        for prefix in ("0062", "0063", "0066", "0077", "0110"):
+        for prefix in suite["migrations"]:
             migration(prefix)
+        if suite["after"]:
+            psql(SEED_0118)
+            for prefix in suite["after"]:
+                migration(prefix)
         psql("grant service_role to postgres; grant anon to postgres; grant authenticated to postgres;")
         ip = run(["docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", PG]).stdout.strip()
         print(f"== PostgREST on 127.0.0.1:{PORT}")
@@ -96,9 +117,12 @@ def main() -> int:
             env = {**os.environ, "ENTITLEMENTS_REST": f"http://127.0.0.1:{PORT}", "ENTITLEMENTS_JWT_SECRET": SECRET, "ENTITLEMENTS_PERMIT_OUT": str(permit_file)}
             print("== next-admin routes against it (enforce)")
             npx = "npx.cmd" if os.name == "nt" else "npx"
-            vt = subprocess.run([npx, "vitest", "run", "lib/entitlements/__tests__/entitlements.e2e.test.ts"], cwd=APP, env=env)
+            vt = subprocess.run([npx, "vitest", "run", suite["test"]], cwd=APP, env=env)
             if vt.returncode:
                 return vt.returncode
+            if suite_name != "entitlements":
+                print(json.dumps({"result": "PASS", "suite": suite_name, "production_touched": False}))
+                return 0
             print("== cognitive check_entitlement verifies the issued permit (enforce)")
             out = json.loads(permit_file.read_text(encoding="utf-8"))
             py = run([sys.executable, "-c", PY_CHECK, json.dumps(out)], cwd=COS, env={**os.environ, "PYTHONPATH": str(COS)})
