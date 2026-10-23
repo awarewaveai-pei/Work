@@ -21,6 +21,7 @@ export const COPY = {
   nav: { rules: '規則', now: '現況', ways: '五種客戶', priority: '先後與定價', steps: '待建項目', open: '待你決定', doors: '入口', paths: '檔案' },
   rules: { h: '每個系統都要過的規則', lead: '這三條寫在 ADR 017 §0b，測試會擋，不靠記憶。' },
   now: { h: '現況', lead: '客戶目前無法自行登入，也尚未收費；現在只有自用與代操。' },
+  drill: { h: '實際帳戶演練（2026-10-23）', lead: '每個帳戶跑一次真正的判斷（can()、帳戶歸屬、用量記錄），資料照 prod 現況；標「加的」的帳戶 prod 沒有，是為了補齊缺的方式。來源：lib/entitlements/__tests__/customer-drill.test.ts。' },
   ways: { h: '五種客戶', lead: '每種客戶由三個答案決定：裝在哪、錢從哪來、誰操作。答案屬於客戶帳戶與每次請求，不屬於產品，所以每個產品五種都有、不用選。新增客戶類型只需增加一列，不必修改程式。', count: '共 {total} 種，{live} 種已運作' },
   priority: { h: '先後與定價', lead: '依你 2026-10-17 的決定排序；賣斷的收費結構是預設值，數字可改。', next: '接下來依序做（2026-10-23 依現況排）', nextLead: '先門、後收錢。三個答案互不等待：門是「客戶本人操作」的唯一前提，純內部工程、沒有待決；收錢的外部部分（金流商、會計師）卡兩個待決，內部部分（用量計量、人工付款入口）不等待決先做；登入目前的本機帳號已能用，WordPress 一鍵登入只在付款發生在 WordPress 時才有價值，所以跟 Woo 同一包。', pricing: '賣斷怎麼收錢' },
   steps: { h: '待建項目', lead: '項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。', count: '{done}／{total} 完成' },
@@ -53,6 +54,19 @@ export const NEXT = [
   { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。', steps: [5] },
   { h: '⑥ 等客戶出現', t: '只串 API、代理商、白牌網址：出現第一個這類客戶才做。', steps: [6, 7, 9] },
 ];
+// 實際帳戶演練：way 必須是 WAYS 的名字（check 擋）。結果＝customer-drill.test.ts 的斷言。
+export const DRILL = [
+  { way: '自用', who: 'awarewave-ops（自用帳戶）', axes: 'hosted／comp／staff', result: '全產品可用、後台 AI 可用；記用量、不扣點。' },
+  { way: '代操', who: 'soulful-expression', axes: 'hosted／contract／staff，替 Soulful', result: '用 Soulful 的合約；用量記在 Soulful、稽核寫員工本人；Soulful 底下的品牌也算 Soulful。' },
+  { way: '訂閱', who: 'soulful-expression 的客戶登入', axes: 'hosted／contract／customer', result: '一律真判決；合約內功能可用，後台 AI（文化／時事）拒絕。' },
+  { way: '自用', who: 'edd-research（你的研究，贈送）', axes: 'hosted／comp／staff 或 customer', result: '全產品免費可用。' },
+  { way: '訂閱', who: 'mongolia-03（等刷卡）', axes: 'hosted／（尚無）／customer', result: '客戶本人全部拒絕；員工替它做在影子模式放行但記「若強制就拒」，強制後拒絕。' },
+  { way: '訂閱', who: 'e2e-verify-0704、test-wp-webhook-co（測試）', axes: 'hosted／（尚無）／customer', result: '同未付款客戶，全部拒絕。' },
+  { way: '點數', who: 'drill-credits（加的，錢包 50 點）', axes: 'hosted／credits／customer', result: '點數功能用錢包放行（單次上限 50）；合約功能拒絕；目前不扣點（單價待你定）。' },
+  { way: '訂閱', who: 'drill-social-subscriber（加的，只訂社群）', axes: 'hosted／contract／customer', result: '社群可用，其他產品拒絕。' },
+  { way: '賣人＝買斷', who: '（未建）', axes: 'self_hosted／perpetual／customer', result: '授權檔與離線驗章還沒做（順序 5），演練標為待建。' },
+];
+
 // ADR 017 Q9：賣斷怎麼收錢（預設值，可改）
 export const PRICING = [
   { h: '買斷價', t: '等於 36 個月訂閱價，含 12 個月更新。' },

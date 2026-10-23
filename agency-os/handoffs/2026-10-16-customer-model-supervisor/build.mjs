@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { esc, t, page, section, yesNo, ruleList, stepList, stepLink, openList, pathRows } from '../../../scripts/supervisor-kit/build.mjs';
-import { META, COPY, RULES, PRIORITY, NEXT, PRICING, DOORS, AXES, WAYS, NOW, STEPS, OPEN, SIDE } from './data.mjs';
+import { META, COPY, RULES, PRIORITY, NEXT, PRICING, DOORS, AXES, WAYS, NOW, STEPS, OPEN, SIDE, DRILL } from './data.mjs';
 
 // 本頁專屬：五種客戶卡、入口列
 const CSS = `.ways{display:grid;gap:12px}
@@ -45,7 +45,12 @@ export function render() {
   const body = [
     section('rules', COPY.rules, ruleList(RULES)),
     section('now', COPY.now, yesNo(NOW, L)),
-    section('ways', COPY.ways, `<div class="ways">${ways}</div>`),
+    section('ways', COPY.ways, `<div class="ways">${ways}</div>`
+      + `
+<h3 class="sub-h">${esc(COPY.drill.h)}</h3>
+<p class="lead">${esc(COPY.drill.lead)}</p>
+`
+      + ruleList(DRILL.map((d) => ({ h: d.way, t: `${d.who}：${d.result}`, small: d.axes })))),
     section('priority', COPY.priority, linked(PRIORITY)
       + `\n<h3 class="sub-h">${esc(COPY.priority.next)}</h3>\n<p class="lead">${esc(COPY.priority.nextLead)}</p>\n${linked(NEXT)}`
       + `\n<h3 class="sub-h">${esc(COPY.priority.pricing)}</h3>\n${ruleList(PRICING)}`),

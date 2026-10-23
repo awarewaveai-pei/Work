@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { checkCommon, report } from '../../../scripts/supervisor-kit/check.mjs';
-import { META, AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY, RULES, PRIORITY, NEXT, PRICING } from './data.mjs';
+import { META, AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY, RULES, PRIORITY, NEXT, PRICING, DRILL } from './data.mjs';
 import { render } from './build.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -49,5 +49,7 @@ if (!/^\| 9 \|/m.test(adr) || !/^\| 10 \|/m.test(adr)) fail('ADR 017 缺 Q9／Q1
 const stepNs = new Set(STEPS.map((s) => s.n));
 for (const x of NEXT) if (!x.h || !x.t || !x.steps.length || x.steps.some((n) => !stepNs.has(n))) fail(`NEXT ${x.h}: 空欄或指向不存在的步驟`);
 for (const s of STEPS) if (s.status !== 'done' && !NEXT.some((x) => x.steps.includes(s.n))) fail(`第 ${s.n} 項未完成卻不在 NEXT`);
+for (const w of WAYS) if (!DRILL.some((d) => d.way === w.name)) fail(`演練缺「${w.name}」`);
+for (const d of DRILL) if (!WAYS.some((w) => w.name === d.way)) fail(`演練「${d.who}」的方式「${d.way}」不在五種裡`);
 
 report(errors, `ok: ${WAYS.length} ways, ${STEPS.length} steps, ${OPEN.length} open, page fresh`);

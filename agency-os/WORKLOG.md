@@ -1,4 +1,35 @@
 # Worklog
+## 2026-10-23（續42）五個客戶套三軸五對象演練：真判斷跑 prod 現況＋補三個缺的方式（Claude）
+
+**觸發**：操作者「你把目前的五個客戶名單設成三軸5對象來演練測試，如果不夠在自己增加」。
+
+**prod 唯讀現況**（`begin read only`）：根帳戶 awarewave-ops（internal，comp 全功能）、soulful-expression（contract 全功能，1 個客戶登入）、edd-research（comp 全功能）、mongolia-03、e2e-verify-0704、test-wp-webhook-co（三者無權利、無錢包）；各 338 列權利；plans 0、錢包帳本 0、合約訂閱 0、子組織 0。
+
+**方法取捨**：不在 prod 寫假權利或假帳戶——10/31 強制前提檢查把三個空帳戶當「預期拒絕」分類，mongolia-03 是真潛在客戶；改成演練測試：真 `can()`、真 `resolveSubject`、真 `recordUse`／`report()`，只有資料列在記憶體（照上列 prod 現況）。缺的方式自己加帳戶：點數（drill-credits，錢包 50）、單產品訂閱（drill-social-subscriber，只有 social 合約列）、品牌子組織（drill-soulful-brand，掛 soulful 底下）。
+
+**修改**
+- 新 `lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/__tests__/customer-drill.test.ts`：10 案＋2 待建（買斷順序 5、API key 順序 6）。
+- 監工台 `data.mjs` 新 `DRILL`（9 列：帳戶、方式、三軸、結果）＋`COPY.drill`；`build.mjs` 在「五種客戶」下渲染；`check.mjs` 新閘：五種方式每種都要有演練列、演練列的方式必須是五種之一。
+
+**演練結果**（全部符合 ADR 017 §0／§4）
+- 自用 awarewave-ops：全產品與後台 AI 可用，記用量不扣點。
+- 代操 soulful：用 Soulful 合約，用量記 Soulful、稽核寫員工；品牌子組織歸 Soulful。
+- 訂閱 soulful 客戶登入：一律真判決，合約內可用，後台 AI（`ops.cheap-json`）拒 `back_office_only`。
+- 贈送 edd-research：全產品免費。
+- 訂閱待付款 mongolia-03／兩個測試帳戶：客戶本人拒（contract 功能 `no_entitlement`、credits 功能 `no_credits`）；員工影子放行並記 would_deny，強制拒。
+- 點數 drill-credits：credits 功能錢包放行（maxSpend 50），合約功能拒，不扣點（單價待定）。
+- 單產品訂閱：social 可用，其他產品拒。
+- 買斷、API 通道：未建，演練標待建。
+- 演練未涵蓋：員工路由在 `withFeature` 範圍外時記到自用帳戶（續38「同類」，TASKS 已開）；SQL 層 `findActiveEntitlement` 用記憶體列替代（真表查詢由 10/31 排程對 prod 驗）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/entitlements/__tests__/customer-drill.test.ts（10 passed／2 todo）＋ lib/entitlements lib/portal（168 passed）＋ npx tsc --noEmit -p .（0）＋ node build.mjs && node check.mjs | exit=0 | ms=3955
+- 突變：`modeFor` 拿掉「客戶一律強制」→ 演練 5 案紅（訂閱登入、mongolia、測試帳戶、點數、單產品訂閱）；監工台拿掉點數演練列 → check `FAIL 演練缺「點數」`；皆還原綠。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回演練斷言逐條對 ADR 017 §0 五種表與 §4；資料列逐條對 prod 唯讀查詢
+- ORACLE_WAIVED: 只新增測試與監工台資料，無產品程式改動；突變證據見上
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=customer-drill | hits=3（測試檔本身、data.mjs 說明、本條）
+
+**rollback**：`git revert <本 commit>`（無資料、無 prod 改動）。
 ## 2026-10-23（續41）/ops/costs：①真實花費／⑤流水帳／⑥月報同一份資料；新增月報（Claude）
 
 **觸發**：操作者：⑤ 流水帳的錢沒出現在 ① 真實花費；要有真正的月報。
