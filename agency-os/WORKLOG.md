@@ -11,6 +11,37 @@
 - REVIEW_DONE: critic=Standard | verdict=pass | findings=0c/0m/2n（Codex `agency-os/reports/oracle/2026-10-23-partialreview-59549efc.md`：F1 DESKTOP_MCP_SETUP 未改＝誤報，worktree:81 已是 `CLOUDFLARE_ACCOUNT_ID`；F2 fallback 測試只驗路由＝設計如此，缺 account id 時 401 會在健康檢查明確顯示 failed，不靜默）
 - BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,mcp,docs,.claude | grep=`CLOUDFLARE_AUTH_BEARER_TOKEN` | hits=1（歷史文件，刻意保留；generated reports/handoffs/WORKLOG 排除）
 - 待辦：03:00 部署後 cloudflare 整合按 validate（TASKS 已列）。
+## 2026-10-23（續15）續10 收尾：R2 孤兒清完、刪除閘泛化到設計圖、staging 站 app password 從未能用（Claude）
+
+**觸發**：操作者「去處理好」續10 剩餘項（2 legacy 孤兒、設計圖同類、regenerate-image 502）。
+
+**發現**
+- C1 2 個「legacy 孤兒」實為 `video/canary_audio_caption_20260909`、`video/canary_footage_20260909`（09-09/10 footage render 開發測試，手取名無 org 前綴）；另有未入帳 `remotion/2026-09-11/04035dd9…`（remotion-502 修復測試；reconcile 只掃 `video/`）。
+- C2 續10 的刪除閘一上線就會擋下所有刪除：active `wp_sites` 含 `E2E-Verify-0704`（09-26 E2E 佈建），其 `/wp-json/` 404、憑證 401。根因兩層：① staging wp-config 沒有 main 站 docker wp-config 的 `X-Forwarded-Proto→HTTPS` 區塊 → `is_ssl()` false → WordPress 停用 application passwords（`wp_authenticate_application_password` 回 `application_passwords_disabled`）→ 佈建寫進 wp_sites 的 token 從未能用（`last_used` 空）；② 新裝站 permalinks 為 plain、`.htaccess` 只有 LiteSpeed 區塊 → `/wp-json/` 404。＝所有佈建出的 staging 站內容工具都打不進去。
+- C3 標準 REST 發文路徑（非 bridge 站，`lib/content/publish/wordpress-core.ts` `markdownToHtml`）保留 R2 圖片網址＝熱連結；設計圖 bucket 有公開 base（`lib/storage/r2.ts:14` 預設）→ 設計圖刪除同類風險。現況 3 站搜 `pub-` 0 篇。
+- C4 畫廊刪不掉 `remotion/…`、`designs/*.mp4` 的影片列（key 不符 `video/<dir>/`；續10 前即如此，r2.ts 回 `invalid_video_object_key`）。
+- m1 regenerate-image 502：host nginx 與 lobster-nginx 皆 300s、生圖硬上限 58s → 逾時排除；09-11 log 已輪替；瀏覽器未登入不可代輸密碼 → 留給操作者點一次。
+
+**做法**
+- `lib/content/video/delete-guard.ts` → `lib/content/r2-delete-guard.ts` `deleteUnreferencedAsset(objectKey)`：bucket 由 key 前綴決定（`video/<dir>/` 整夾；`remotion/` 影片桶單檔；`designs/` `captions/` `web/` 設計桶單檔；未知前綴拒刪）；needle＝資料夾或完整 key（原字＋percent-encoded）；REST 改走 `?rest_route=`。`tools/designs` 圖片與影片分支、`tools/presets`、`video/[id]`、`video/cleanup` 全走它。上傳回滾類 `deleteDesignObject` 不需（從未發布）。
+- `scripts/aw-hosting-gate.sh` `ensure_proxy_https`：prepare 三種 state 都跑，marker 冪等、與 `config_set` 同款 realpath 檢查，插在 "stop editing" 前；重跑 `staging-prepare` 即修既有站。
+- `provision-staging/route.ts` 5b：`rewrite structure '/%postname%/'` ＋ `flush_rewrite_rules(true)`（`got_rewrite` filter，wp-cli 偵測不到 mod_rewrite），失敗寫 WARN note。
+- prod：E2E staging 站套同一函式（從 gate 原文抽出）＋ permalink，wp-config 備份 `/tmp/e2e-wp-config.bak`、`.htaccess` 備份 `/tmp/e2e-htaccess.bak`（容器內）；之後 `users/me` 回 admin、`status=any` 200。
+- 3 孤兒：3 站 × posts/pages 搜尋引用 0 → R2 DELETE 200×3；現 R2 每個影片物件都有畫廊列。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=wp eval wp_authenticate_application_password(stored token) → application_passwords_disabled；修後 curl ?rest_route=/wp/v2/users/me → admin | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=MSYS_NO_PATHCONV=1 bash tests/host-scripts/hosting-gate.test.sh（拋棄式 mariadb＋wordpress:php8.2-apache） | exit=0 | ms=0（未計時） | 55 passed 0 failed（新增：block 一次且 reuse 不重複、migrated 站有 block、X-Forwarded-Proto https 時 REST index 列出 application-passwords、純 http 對照組不列）
+- REALTEST_EVIDENCE: tool=SSH | cmd=orphans.sh MODE=delete（3 站引用掃描 fail=0 hits=0 → R2 DELETE ×3 = 200）；重列 bucket 6 物件全有 media_assets 列 | exit=0 | ms=0（未計時）
+- `npx tsc --noEmit` exit 0；vitest 76 檔 404 測全過；修 Codex 後 r2-delete-guard 10/10、tsc 0。
+- 突變：拔「有引用就拒」→ 4 紅；remotion 改歸設計桶 → 1 紅；gate 拔 `ensure_proxy_https` → proxy 3 檢查紅（47/55；另 4 紅＝該輪首次 prepare 的 core download 失敗，非突變所致）；全部還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `reports/oracle/2026-10-23-partialreview-bad097ab.md`。F1（`foo.png` 誤配 `foo.png.bak`）成立→單檔 key 須後接非 key 字元（`KEY_CONTINUES`），加測試。F2（邊界測試只管 deleteVideoObjects）成立→改測「凡刪 media_assets 列的檔案必用 deleteUnreferencedAsset、不得直呼 r2 刪除」，因此抓到 `tools/presets` DELETE 也改走閘。F3（.htaccess 可能沒寫）prod 實測已寫入，但只看 exit code 屬實→同一指令加 grep `BEGIN WordPress`＋`HTTP_AUTHORIZATION`，E2E 站實跑 rc=0、`/wp-json/` 200。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=delete-guard|deleteUnreferencedVideo|video_in_use | hits=1（TASKS 結案行已改指新檔；WORKLOG 續10 為歷史不改）
+
+**剩餘風險**：其他已佈建 staging 站（目前只剩 E2E 1 個）下次 `staging-prepare` 才補 block；regenerate-image 502 待操作者一次點擊；reconcile 不掃 `remotion/`（未入帳 remotion 輸出不會被發現）。
+
+**rollback**：`git revert <本 commit>`；E2E 站 `docker exec lobster-wordpress cp /tmp/e2e-wp-config.bak <site>/wp-config.php`（.htaccess 同理）；已刪 R2 測試物件不可還原（測試產物，無引用）。
 ## 2026-10-23（續14）全產品帳戶權利先補一次（各 338 列）；排 10/31 強制模式前提檢查（Claude）
 
 **觸發**：操作者「去處理好剩餘風險」。

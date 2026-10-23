@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { deleteUnreferencedVideo } from "../../../../lib/content/video/delete-guard";
+import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
 import { videoObjectKey } from "../../../../lib/content/blocks/video-pipeline";
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -39,12 +39,12 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   if (!old || old.length === 0) return NextResponse.json({ ok: true, deleted: 0 });
 
-  // Age alone never deletes: a video still embedded in a WordPress page is kept (delete-guard.ts), and the row is
+  // Age alone never deletes: a video still embedded in a WordPress page is kept (r2-delete-guard.ts), and the row is
   // only removed after the R2 objects are gone, so a refusal or failure leaves the video in the gallery.
   let deleted = 0;
   const kept: { id: string; reason: string }[] = [];
   for (const asset of old) {
-    const r = await deleteUnreferencedVideo(videoObjectKey(asset.object_url));
+    const r = await deleteUnreferencedAsset(videoObjectKey(asset.object_url));
     if ("error" in r) { kept.push({ id: asset.id, reason: r.error }); continue; }
     const { error: delErr } = await supabase.from("media_assets").delete().eq("id", asset.id);
     if (delErr) { kept.push({ id: asset.id, reason: `db_delete_failed:${delErr.message}` }); continue; }

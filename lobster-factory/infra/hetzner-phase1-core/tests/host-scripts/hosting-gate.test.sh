@@ -80,6 +80,8 @@ check "the new DB password is not on the gate's output" not has "$out" "$(wpat $
 out="$(gate 'staging-prepare site-a wp_s_aaa111' 2>&1)"; rc=$?
 check "prepare again -> reused" has "$rc $out" "0 AW_PREPARE_OK state=reused"
 check "account still logs in after reuse" login_ok $ROOT/site-a
+proxy_blocks() { docker exec "$WP" grep -c AW_PROXY_HTTPS "$1/wp-config.php"; }
+check "wp-config gets the proxy https block once, kept once on reuse" test "$(proxy_blocks $ROOT/site-a)" = 1
 
 # --- staging-wp: the route's install shape (admin password via --prompt on stdin, never argv) ---
 script='wpcli() { php -d memory_limit=256M /usr/local/bin/wp --path='"'$ROOT/site-a/'"' "$@"; }
@@ -92,6 +94,10 @@ check "staging-wp runs the install script" has "$rc $out" "INSTALL_RC=0"
 check "admin password arrives intact via --prompt" has "$out" "PW_OK"
 check "title with \$(...) stays literal" has "$out" 'T $(touch /tmp/pwned)'
 check "no command substitution executed" not docker exec "$WP" test -e /tmp/pwned
+# Behind the https proxy WordPress must offer application passwords (the index lists them only when available).
+rest_index() { docker exec "$WP" curl -s "$@" "http://localhost/staging/site-a/?rest_route=/"; }
+check "proxied https request: application passwords available" has "$(rest_index -H 'X-Forwarded-Proto: https')" '"application-passwords"'
+check "plain http request: still not offered (control)" not has "$(rest_index)" '"application-passwords"'
 out="$(printf 'cat >/dev/null\necho AFTER_STDIN_READ\n' | gate 'staging-wp site-a' 2>&1)"
 check "a stdin-reading command cannot swallow the script" has "$out" AFTER_STDIN_READ
 out="$(head -c 1048600 /dev/zero | tr '\0' '#' | gate 'staging-wp site-a' 2>&1)"; rc=$?
@@ -110,6 +116,7 @@ check "legacy site -> migrated" has "$rc $out" "0 AW_PREPARE_OK state=migrated"
 check "migrated config uses its own account" test "$(wpat $ROOT/site-b config get DB_USER)" = wp_s_bbb222
 check "migrated site keeps its data" test "$(wpat $ROOT/site-b option get blogname)" = legacy-b
 check "migrated config holds no main password" not docker exec "$WP" grep -q mainpw-test $ROOT/site-b/wp-config.php
+check "migrated legacy site gets the proxy https block" test "$(proxy_blocks $ROOT/site-b)" = 1
 
 # --- guards ---
 out="$(gate 'staging-prepare site-c wp_s_aaa111' 2>&1)"; rc=$?

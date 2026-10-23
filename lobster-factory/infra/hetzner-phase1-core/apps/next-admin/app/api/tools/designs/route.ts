@@ -3,8 +3,8 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { buildDesignKey, deleteDesignObject, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
-import { deleteUnreferencedVideo } from "../../../../lib/content/video/delete-guard";
+import { buildDesignKey, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
+import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
 import { decodeCursor, listDesigns, type SortOrder, type TimeRange } from "../../../../lib/studio/designs-list";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 
@@ -302,25 +302,14 @@ export async function DELETE(request: Request) {
   try { assertOrgAccess(request, (asset as Record<string, unknown>).organization_id as string | null); }
   catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
 
-  // Delete from the correct R2 bucket — videos live in R2_VIDEO_BUCKET ("lobster-videos"),
-  // images in R2_DESIGNS_BUCKET ("lobster-designs"). Using deleteDesignObject for videos
-  // was a no-op (video not in designs bucket → 404 treated as success), leaving the file
-  // in the video bucket so the reconcile cron would re-insert the media_assets row.
-  // A video still embedded in a WordPress post/page is refused (delete-guard.ts); the row stays.
-  if (asset.mime_type?.startsWith("video/")) {
-    const v = await deleteUnreferencedVideo(asset.object_key);
-    if ("error" in v) {
-      console.error("[designs] video delete refused:", v.error);
-      const references = "references" in v ? v.references : undefined;
-      return NextResponse.json({ ok: false, error: v.message, code: v.error, references },
-        { status: v.error === "video_in_use" ? 409 : 502 });
-    }
-  } else {
-    const r2Result = await deleteDesignObject(asset.object_key);
-    if (!r2Result.ok) {
-      console.error("[designs] R2 delete failed:", (r2Result as { ok: false; error: string }).error);
-      return NextResponse.json({ ok: false, error: (r2Result as { ok: false; error: string }).error }, { status: 502 });
-    }
+  // A file still shown by a WordPress post/page is refused and the row stays (r2-delete-guard.ts picks the bucket
+  // from the key: video/ and remotion/ -> R2_VIDEO_BUCKET, designs/ captions/ web/ -> R2_DESIGNS_BUCKET).
+  const r2Result = await deleteUnreferencedAsset(asset.object_key);
+  if ("error" in r2Result) {
+    console.error("[designs] delete refused:", r2Result.error);
+    const references = "references" in r2Result ? r2Result.references : undefined;
+    return NextResponse.json({ ok: false, error: r2Result.message, code: r2Result.error, references },
+      { status: r2Result.error === "asset_in_use" ? 409 : 502 });
   }
 
   // Remove row from media_assets.

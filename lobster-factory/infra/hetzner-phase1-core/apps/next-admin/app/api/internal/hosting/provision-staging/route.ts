@@ -467,6 +467,16 @@ export async function POST(request: Request) {
           organizationId, siteId, slug, stagingSiteUrl, adminUser: STAGING_ADMIN_USER, password: adminPass,
         });
 
+    // 5b. Pretty permalinks + WordPress's own .htaccess block (RewriteBase /staging/<slug>/, Authorization
+    // passthrough). A fresh install has plain permalinks and writes no block, so /wp-json/ 404s and every content
+    // tool call to the site fails (2026-10-23). wp-cli cannot detect mod_rewrite, hence the got_rewrite filter.
+    const rewrite = await gateWp(conn, slug, [
+      `wpcli rewrite structure '/%postname%/' --quiet && wpcli eval 'add_filter("got_rewrite", "__return_true"); flush_rewrite_rules(true);'` +
+        // exit status alone is not proof (Codex 2026-10-23): require the written block itself
+        ` && grep -q '^# BEGIN WordPress' .htaccess && grep -q 'HTTP_AUTHORIZATION' .htaccess`,
+    ]);
+    const rewriteOk = rewrite.code === 0;
+
     // 6. Install base theme — skip for wp-tourism (apply-manifest installs TravelWP via localZip step)
     let themeOk = true;
     if (manifestSlug !== "wp-tourism") {
@@ -528,6 +538,7 @@ export async function POST(request: Request) {
       wpAdminUrl,
       wpAdminUser: STAGING_ADMIN_USER,
       provisioningNotes: [
+        ...(!rewriteOk ? ["WARN: permalinks/.htaccess not written -- /wp-json/ will 404"] : []),
         ...(!themeOk ? ["WARN: Kadence theme install had issues"] : []),
         ...(!pluginsOk ? ["WARN: some plugins may not have installed"] : [`Plugins installed: ${allPlugins.join(", ")}`]),
         wiringNote,

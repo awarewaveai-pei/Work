@@ -90,6 +90,28 @@ config_set() {
     exit((new WPConfigTransformer(\$f))->update('constant', '$1', \$v) ? 0 : 3);" >/dev/null
 }
 
+# Staging sites sit behind the https proxy like the main site, but `wp config create` does not write the
+# X-Forwarded-Proto block the main site's docker wp-config has: is_ssl() stays false and WordPress disables
+# application passwords, so the token wired into wp_sites never authenticates (2026-10-23). Idempotent (marker);
+# runs in every prepare state, so re-running staging-prepare repairs an existing site. Same path check as config_set.
+ensure_proxy_https() {
+  docker exec -i -u www-data "$WP_CT" php -- "$DIR" "$ROOT" <<'PHP' >/dev/null
+<?php
+[, $dir, $root] = $argv;
+$f = realpath("$dir/wp-config.php");
+if ($f === false || strpos($f, "$root/") !== 0 || dirname($f) !== $dir) { fwrite(STDERR, 'ensure_proxy_https: refusing path'); exit(3); }
+$c = file_get_contents($f);
+if (strpos($c, 'AW_PROXY_HTTPS') !== false) exit(0);
+$stop = "/* That's all, stop editing!";
+$p = strpos($c, $stop);
+if ($p === false) { fwrite(STDERR, 'ensure_proxy_https: no stop-editing line'); exit(3); }
+$block = "// AW_PROXY_HTTPS (aw-hosting-gate.sh): behind the https proxy\n"
+  . "if (isset(\$_SERVER['HTTP_X_FORWARDED_PROTO']) && strpos(\$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) {\n"
+  . "\t\$_SERVER['HTTPS'] = 'on';\n}\n\n";
+exit(file_put_contents($f, substr($c, 0, $p) . $block . substr($c, $p)) === false ? 3 : 0);
+PHP
+}
+
 prepare() {
   SLUG="${argv[1]}"; DB="${argv[2]}"; DIR="$ROOT/$SLUG"
   local main_db main_user state pw cfg_db cfg_user old_pw others
@@ -139,6 +161,7 @@ prepare() {
       || die 3 "wp config create failed"
     state=created
   fi
+  ensure_proxy_https || die 3 "wp-config proxy https block failed"
   echo "AW_PREPARE_OK state=$state"
   log info "prepare $SLUG $DB state=$state"
 }

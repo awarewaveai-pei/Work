@@ -273,6 +273,7 @@
   - **現在到哪**：只確認「reproducible，非本輪修的兩個 env 缺漏能解釋」，未深查。操作者明確說過重試會燒真錢，故本輪未再重現測試。
   - **下一步**：比照 remotion-render 的查法——先查 `REPLICATE_API_TOKEN`／`PEXELS_API_KEY` 是否真的接進 `docker-compose.yml`（同一批 env 區塊，見 `docker-compose.yml:381-399`），SSH 直測 Replicate API 是否用同一把 token 能通。
   - **2026-10-23**：`docker exec lobster-next-admin printenv` → `REPLICATE_API_TOKEN`／`PEXELS_API_KEY` 皆 SET；env 缺漏假說排除，剩一次付費真 UI 重現（需操作者同意花錢）。
+  - **2026-10-23 續15**：host nginx／lobster-nginx 皆 `proxy_read_timeout 300s`、生圖硬上限 58s（`lib/tarot/image-gen.ts:17`）→ 逾時假說也排除；09-11 的 log 已輪替；Claude 瀏覽器未登入、不可代輸密碼 → **需操作者登入後點一次「重新生成」**（開 devtools Network 看該請求的 status／response），才能再往下。
   - **完成定義**：草稿審核頁「重新生成」單張圖成功，真實 UI 操作驗證（非只測 API）。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-11「remotion-render 502」條目 [剩餘風險] ①。
 
@@ -664,7 +665,7 @@
   - **不變量**：「刪除一個公開資產」與「該資產被外部內容引用」必須在同一個決策裡。現在是兩個互不知情的系統。
   - **修法方向**（需設計）：① 刪除前掃已知 wp_sites 的文章內容找該 URL，有命中就擋下並列出文章 ② 或改為「先把文章裡的引用換掉／移除，再刪物件」 ③ 或根本不要寫裸 URL 進文章，改寫成指向本站的 stable redirect，讓刪除可以優雅降級。**⚠️ 別只加一句警告就當修好** —— 這是不可逆操作對外部系統的影響，要嘛擋住要嘛連帶處理。
   - **2026-10-23 VBC**：仍未修。`app/api/video/[id]/route.ts:52` 仍直接 `deleteVideoObjects`，無引用檢查；上一行說的「0065 reference ledger」從未進 main（實際 `0065_media_production_persistence.sql` 是 QA／release 四表，無 reference 表）。post 7393 仍 publish、仍嵌 404 影片（curl r2.dev → 404）。
-  - **✅ 2026-10-23 結案**：唯一刪片入口 `lib/content/video/delete-guard.ts` `deleteUnreferencedVideo()`：掃全部 active wp_sites 的 posts＋pages（`status=any`、`context=edit` raw），任何一篇含 `video/<dir>/`（原字／percent-encoded）→ 409 列出文章；掃不到（無憑證／HTTP 錯／無站）→ 拒刪。`video/[id]`、`tools/designs`（畫廊實際用的）、`video/cleanup` 三處改走它；`deleteVideoObjects` 只准 delete-guard 呼叫（`__tests__/delete-guard.test.ts` 邊界測試）。真 WP 唯讀實測該查詢命中 7393。post 7393 操作者選②：只刪 `wp:video` 區塊、文字保留（PATCH 200，公開頁 0 個 r2.dev/video）。上線＝2026-10-24 03:00 自動部署。WORKLOG 2026-10-23「影片刪除引用閘＋loopback cron」。
+  - **✅ 2026-10-23 結案**：唯一刪片入口（續15 起泛化為 `lib/content/r2-delete-guard.ts` `deleteUnreferencedAsset()`，含設計圖／remotion／captions）：掃全部 active wp_sites 的 posts＋pages（`status=any`、`context=edit` raw），任何一篇含 `video/<dir>/`（原字／percent-encoded）→ 409 列出文章；掃不到（無憑證／HTTP 錯／無站）→ 拒刪。`video/[id]`、`tools/designs`（畫廊實際用的）、`video/cleanup` 三處改走它；`deleteVideoObjects` 只准 delete-guard 呼叫（`__tests__/delete-guard.test.ts` 邊界測試）。真 WP 唯讀實測該查詢命中 7393。post 7393 操作者選②：只刪 `wp:video` 區塊、文字保留（PATCH 200，公開頁 0 個 r2.dev/video）。上線＝2026-10-24 03:00 自動部署。WORKLOG 2026-10-23「影片刪除引用閘＋loopback cron」。
   - ~~**另需操作者決定**：那篇 Soulful 文章現在就是壞的。~~（2026-10-23 已處理，見上）要 ① 重新生成同主題影片並補回 ② 直接把壞掉的影片區塊從文章移除 ③ 先不動。**這是客戶已發布的內容，我不會自行修改。**
 
 - [ ] **【2026-09-05 開出｜P0/P1｜Media Production LEGO Platform】統一影片、短劇、字幕、實拍 QA 與網站／社群交付** — 正本：[`docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md`](docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md)。
@@ -750,7 +751,7 @@
 - [x] **【✅ 2026-10-18 操作者確認已無孤兒｜2026-08-26 開出｜中】現存 10 個 staging 孤兒 / 1969.7 MB 待清理（拆除路徑已就緒，清理是決策）** — 見 `agency-os/reports/status/staging-orphans-LATEST.md`。**4 個 unregistered**（`fresh-brew-coffee-f2a3b4` 93MB、`green-valley-farm-28ba09` 217MB、`ssasd-8ebcd4` 306MB、`test-pilot` 93MB）有目錄有 DB 但從未進過 `wp_sites` —— 佈建 wiring 是 best-effort，失敗只回 WARN 不擋佈建。**3 個 complete 但已停用**（`e2e-verify-0704` 357MB、`mongolia-03` 549MB、`test-wp-webhook-co` 355MB），WP REST 實測 404。**6 個 db_only** 只剩資料庫沒有目錄，`deprovision-staging.sh` **刻意拆不動**（要求目錄存在且含 wp-config.php，否則無法證明要 DROP 哪一個），需人工確認後手動處理。SG 根磁碟 67%（48G/75G）。**注意 `test-pilot` 的 DB 叫 `wp_staging_testpilot`，命名規則與自動佈建不同，可能是更早的手工產物，不該和自動佈建的混在一起判斷。**
 - [ ] **【2026-08-26 開出｜中】手動新增的站拿不到租戶歸屬
 - [x] **【✅ 2026-08-26 結案】`/api/content/sites` 的 active 過濾收斂成 route 預設（fail-safe）** — GET 不帶參數只回 active（`route.ts:84`），唯一需要看見停用站的 `SiteManager` 以 `?includeInactive=1` 明示 opt-in，`ScriptForge` 那份重複的前端 filter 刪除。**外部覆審連抓 3 條 CONFIRMED，全是同一個實作缺陷的不同表現**：選站決策被算在 fetch callback 的單一分支裡 → ① mount-only effect 讀 URL state，掛載後 `?siteId=` 改變不重算 ② `if (sites.length)` 讓「清單被過濾成空」整個跳過決策，使用者連警告都看不到 ③ 指定的站取不到時靜默改用 `sites[0]`（＝別的客戶）。**收斂**：新增純函式 `lib/content/pick-initial-site.ts`（指定卻找不到 → 不選 + 回報），決策從載入中拆出成單一 effect，依賴是 `(paramSiteId, siteIdsKey)` 即決策的真實輸入；同檔 10 處 `?? wpSites[0]` 收斂成一個 `currentSite`（未選定即 undefined），順帶修掉 `saveAsClientDefault()` 會把表單預設寫進別的客戶那一列；`handlePublish` / `embed-to-wp` 兩個寫入點加上「未選定客戶即拒絕」（否則伺服器端的 `resolveWpSite(req, undefined)` 會挑第一個可存取的站）；`patterns` / `related-posts` 兩個讀取點同理。tsc 0；57 檔 656 測；2 組突變測試證非空跑。
-- [ ] **【2026-08-26 開出｜小｜跟著
+- [x] **【✅ 2026-10-23 結案：2 孤兒＝09-09 canary 測試渲染＋1 未入帳 remotion 測試，3 站引用 0 後已刪，R2 影片物件全有畫廊列（WORKLOG 續15）｜2026-08-26 開出｜小｜跟著
   - ②
   - ③ 一起做】R2 影片 bucket 的 2 個 legacy 目錄清理** — 2026-08-26 實測 `lobster-videos`：11 物件 / 2 目錄，皆為 2026-08-25 之前的舊格式（無 org 前綴）→ `parseOrgPrefixFromDir` 回 null → reconcile 每輪 `skippedLegacy=2` 且**永遠不會被補記**（fail-closed 是對的，但它讓計數器永遠非零）。
   - **要做的是逐一確認歸屬**（比對 `media_assets` 既有列 / 檔名 / 建立時間）→ 補 `media_assets` 列或刪除物件 → baseline 歸零 → 才有資格接告警。

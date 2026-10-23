@@ -5,11 +5,11 @@ import { withFeature } from "../../../../lib/entitlements/grant";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
 import {
   buildDesignKey,
-  deleteDesignObject,
   isR2Configured,
   parseImageDataUrl,
   putDesignObject,
 } from "../../../../lib/storage/r2";
+import { deleteUnreferencedAsset } from "../../../../lib/content/r2-delete-guard";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -257,10 +257,12 @@ async function handleDelete(request: Request): Promise<Response> {
     return NextResponse.json({ ok: false, error: "not_found" }, { status: 404 });
   }
 
-  const r2Result = await deleteDesignObject(asset.object_key);
-  if (!r2Result.ok) {
-    console.error("[presets] R2 delete failed:", (r2Result as { ok: false; error: string }).error);
-    return NextResponse.json({ ok: false, error: (r2Result as { ok: false; error: string }).error }, { status: 502 });
+  // Same rule as every saved asset: refused while a WordPress post/page still shows it (r2-delete-guard.ts).
+  const r2Result = await deleteUnreferencedAsset(asset.object_key);
+  if ("error" in r2Result) {
+    console.error("[presets] delete refused:", r2Result.error);
+    return NextResponse.json({ ok: false, error: r2Result.message, code: r2Result.error },
+      { status: r2Result.error === "asset_in_use" ? 409 : 502 });
   }
 
   const { error: deleteErr } = await supabase
