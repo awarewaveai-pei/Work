@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-23（續8）自用帳戶 comp 權利由登記表每日補齊：0117 已套 prod，程式推 main（Claude）
+
+**觸發**：操作者「同意套用第二段」（續7 的 patch）。
+
+**做法**
+- `git apply cards/step-3-internal-comp.patch`；patch 檔刪除（已進 code，留著＝第二份）。
+- 部署不套 migration：`lobster-factory/infra/hetzner-phase1-core/scripts/sg-deploy.sh:185-209` 的 migration 閘看到未套檔就拒絕整個部署 → 先套 prod、再推程式，否則今晚整個 next-admin 被擋。
+- 套用前 prod 唯讀：internal 根帳戶 1 個（`39ad4149…`）、`organization_entitlements` 0 列。
+- `node scripts/apply-db-migration.mjs 0117` → `APPLY_OK 1/1`；之後唯讀：索引存在、函式存在、帳本 1 列、表仍 0 列、anon 無 execute、service_role 有。
+- 生效時間：2026-10-24 03:00 自動部署帶上程式 → Trigger `entitlements-expire`（`0 1 * * *` UTC＝台灣 09:00）第一次補齊。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0117 then psql read-only (to_regclass/to_regprocedure/schema_migrations/has_function_privilege) | exit=0 | ms=4000
+- `npx vitest run lib/entitlements lib/portal`：146 passed；`0117_entitlement_internal_comp-local-verify.py` PASS。
+- tsc：唯一錯誤 `.next/types/validator.ts` 指向 `app/api/video/reconcile/route.js`＝另一 session（edc7ab7c）搬動中的檔，本次改動 0 錯。
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- 內容與續7 已審 patch（db-expert 段 2、Codex partialreview-98025e41 段 1）逐位元相同（`git apply` 乾淨）
+- ORACLE_WAIVED: 程式＝續7 已審 patch 原樣套用，無新邏輯
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=step-3-internal-comp.patch | hits=0（卡片與 TASKS 已改寫）
+
+**查不到**：Trigger MCP 的 token 是 `tr_prod_*`（runtime），`list_runs` 要 `tr_pat_*` → 無法用 MCP 看排程紀錄；明早改查 DB。
+
+**明早查**：`select count(*) from organization_entitlements where organization_id='39ad4149-5044-4077-8d9a-b6b916de0e21' and source='comp' and status='active'`＝登記表功能數；7 天 `would_deny` 無 internal。
+
+**rollback**：程式 `git revert <本 commit>`；0117 down（`packages/db/migrations/0117_entitlement_internal_comp.down.sql`，只刪索引與函式）；已寫的 comp 列改 `status='expired'`（不刪）。
 ## 2026-10-23（續7）點數功能先認權利列（ADR 017 §0 錢的軸屬帳戶×功能）；自用帳戶補齊存 patch 待同意（Claude）
 
 **觸發**：監工台 NEXT ①；操作者選方案 B：段 1 推 main、段 2 寫好不推。

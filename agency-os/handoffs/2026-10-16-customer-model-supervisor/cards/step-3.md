@@ -38,7 +38,7 @@ cd D:/Work/Projects/internal/cognitive-engineering-os && python scripts/affected
 - 根因：`can.ts:40-45` credits 功能只看錢包，不看權利列 → 自用（comp）與代操（contract）無法用在 credits 功能，違反 ADR 017 §0「錢的軸屬於帳戶×產品×功能」。
 - Decision：`issuePermit` credits 分支先 `findActiveEntitlement`；有 active 列 → 用列（`source` comp／contract，`max_spend` null，`report()` 因 `source≠credits` 不扣點，`can.ts:115`，用量仍記 `entitlement.usage`）；無列才看錢包。0110 `source`／`feature_key` 無 billing 限制，不改 schema。原 gate「點數功能看餘額不看權利列」改為「無權利列時看餘額」。
 - 段 1（已做，影子模式下行為不變）：上列 Decision；`can.ts` `issuePermit`、`__tests__/{can,permit,features}.test.ts`。
-- 段 2（操作者 2026-10-23 選方案 B；**寫好不推**，存 `cards/step-3-internal-comp.patch`，同意登記權利時 `git apply` 後一起推）：internal 的 comp 列不手登，由登記表算出、每日 `/api/internal/entitlements/expire` 補齊（新功能隔天自動有列，不漂移）；migration 加部分唯一索引＋`service_role` 專用函式讓補齊冪等。編號以套用當下的下一個空號為準（寫時 0117）。
+- 段 2（已做，操作者 2026-10-23 同意）：internal 的 comp 列不手登，由登記表算出、每日 `/api/internal/entitlements/expire`（Trigger `entitlements-expire`，`0 1 * * *` UTC）補齊；`0117_entitlement_internal_comp` 已套 prod（部分唯一索引限 `source_ref='internal'`＋`entitlement_ensure_internal_comp`）。部署不會套 migration（`sg-deploy.sh` 的 migration 閘只擋），所以先套 prod、再推程式。
 - 客戶 5 家的列：照實際合約，操作者提供，不從程式推。
 - Acceptance：`npx vitest run lib/entitlements` 綠，含 `a credits feature uses an active comp or contract row before the wallet` 與 `a credits feature without a row still needs balance`；突變：拿掉列優先 → 前者紅，還原綠。段 2 另跑 migration 的 local-verify（真 Postgres：重跑 0 新增、down 後可重套）。prod：段 2 上線後連續 7 天 `would_deny` = 0（或逐筆解釋）→ 才提翻 `ENTITLEMENT_MODE=enforce`（High）。
 - Rollback：段 1 `git revert`；段 2 列改 `status='expired'`（不刪，保稽核）＋ migration down。

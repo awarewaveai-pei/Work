@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PRODUCTS } from "@/lib/portal/products";
 import { createEntitlementStore } from "../tables";
+
+const MIGRATIONS_DIR = path.resolve(__dirname, "../../../../../../../packages/db/migrations");
 
 const mocks = vi.hoisted(() => ({ client: vi.fn() }));
 vi.mock("@/lib/supabase-server", () => ({ getSupabaseWriteClient: mocks.client }));
@@ -15,7 +20,7 @@ function database(result: object) {
   const trials = { select: vi.fn(), eq: vi.fn(), lte: vi.fn(), gt: vi.fn(), order: vi.fn(), limit: vi.fn() };
   for (const step of ["select", "eq", "lte", "gt", "order"] as const) trials[step].mockReturnValue(trials);
   trials.limit.mockResolvedValue({ data: [], error: null });
-  const db = { from: vi.fn((table: string) => (table === "organization_product_subscriptions" ? trials : query)), rpc: vi.fn() };
+  const db = { from: vi.fn((table: string) => (table === "organization_product_subscriptions" ? trials : query)), rpc: vi.fn().mockResolvedValue({ data: 0, error: null }) };
   return { db, query, client: db as unknown as SupabaseClient };
 }
 
@@ -69,7 +74,7 @@ describe("global entitlement expiry", () => {
       method: "POST", headers: { Authorization: "Bearer expiry-test-token" },
     });
     mocks.client.mockReturnValue(database({ error: null, count: 1501 }).client);
-    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501, trials_ended: 0 });
+    expect(await (await POST(request())).json()).toEqual({ ok: true, expired: 1501, trials_ended: 0, internal_comp_added: 0 });
     mocks.client.mockReturnValue(database({ error: { message: "unavailable" }, count: null }).client);
     expect((await POST(request())).status).toBe(500);
     mocks.client.mockReturnValue(database({ error: null, count: null }).client);
@@ -147,5 +152,24 @@ describe("global entitlement expiry", () => {
     await expect(createEntitlementStore(client).getCreditBalance("org-1")).rejects.toThrow("db error");
     db.rpc.mockResolvedValue({ data: "not a number", error: null });
     await expect(createEntitlementStore(client).getCreditBalance("org-1")).rejects.toThrow("invalid_credit_balance");
+  });
+
+  it("tops up the internal account's comp grants from every registered feature", async () => {
+    const { db, client } = database({});
+    db.rpc.mockResolvedValue({ data: 3, error: null });
+    expect(await createEntitlementStore(client).ensureInternalComp()).toBe(3);
+    const sent = db.rpc.mock.calls[0][1].p_features as Array<{ product_key: string; feature_key: string }>;
+    expect(db.rpc.mock.calls[0][0]).toBe("entitlement_ensure_internal_comp");
+    expect(sent).toEqual(PRODUCTS.flatMap((p) => p.features.map((f) => ({ product_key: p.key, feature_key: f.feature_key }))));
+    expect(sent.length).toBeGreaterThan(0);
+    db.rpc.mockResolvedValue({ data: null, error: { message: "internal organization not found" } });
+    await expect(createEntitlementStore(client).ensureInternalComp()).rejects.toThrow("internal organization not found");
+  });
+
+  it("every registered product is a product_key 0110 accepts, so the daily top-up cannot fail on a new product", () => {
+    const sql = readFileSync(path.join(MIGRATIONS_DIR, "0110_plans_entitlements.sql"), "utf8");
+    const lists = [...sql.matchAll(/product_key in \(([^)]*)\)/g)].map((m) => new Set(m[1].match(/'([^']+)'/g)!.map((q) => q.slice(1, -1))));
+    expect(lists.length).toBe(3);   // plans, organization_entitlements, organization_product_subscriptions: each must accept every product
+    for (const allowed of lists) expect(PRODUCTS.map((p) => p.key).filter((k) => !allowed.has(k))).toEqual([]);
   });
 });

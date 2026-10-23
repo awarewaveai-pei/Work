@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { PRODUCTS } from "@/lib/portal/products";
 import type { CanStore, EntitlementRecord } from "./can";
+
+/** Every registered (product, feature): the internal account's comp grants (ADR 017 §0 自用), topped up by 0117. */
+export const internalCompFeatures = (products: typeof PRODUCTS = PRODUCTS) =>
+  products.flatMap((p) => p.features.map((f) => ({ product_key: p.key, feature_key: f.feature_key })));
 
 // A product can have more than one non-canceled plan (the migration's unique
 // key includes plan_key). Keep the launcher state deterministic when a base
@@ -17,6 +22,7 @@ const SUBSCRIPTION_STATUS_PRIORITY: Record<string, number> = {
 export function createEntitlementStore(client: SupabaseClient | null = getSupabaseWriteClient()): CanStore & {
   expireEntitlements(now?: Date): Promise<number>;
   endLapsedTrials(now?: Date): Promise<number>;
+  ensureInternalComp(): Promise<number>;
   getSubscriptionStatuses(organizationId: string): Promise<Map<string, string>>;
 } {
   if (!client) throw new Error("entitlements_db_unavailable");
@@ -60,6 +66,12 @@ export function createEntitlementStore(client: SupabaseClient | null = getSupaba
         }
       }
       return byProduct;
+    },
+    async ensureInternalComp() {
+      const { data, error } = await db.rpc("entitlement_ensure_internal_comp", { p_features: internalCompFeatures() });
+      if (error) throw new Error(error.message);
+      if (!Number.isSafeInteger(data)) throw new Error("invalid_internal_comp_count");
+      return data as number;
     },
     async expireEntitlements(now = new Date()) {
       // UPDATE all matching rows; no SELECT/pagination that can skip accounts past row 1000.
