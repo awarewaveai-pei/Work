@@ -129,6 +129,7 @@
 //     broader trust via the ACK).
 const { spawnSync } = require('child_process');
 const fs = require('fs');
+const path = require('path');
 const addTracker = require('./git-add-scope-tracker');
 
 // One definition for every commit gate (lib/shared.js): env-prefixed `GIT_INDEX_FILE=<idx> git commit` included.
@@ -338,12 +339,34 @@ function gitDiffCachedNames(extraArgs, cwd, env) {
 // committed paths to HEAD (`git reset -q -- <paths>`: index only, worktree untouched -- another session's
 // whole-file add of the same shared file is replaced by HEAD, its worktree hunks stay) and removes index+marker.
 // Companion: git-shared-file-guard.js (blocks the other ways a shared file can reach a commit).
-const RE_PRIVATE_INDEX = /(?:^|[\s;&|(]|\benv\s+(?:-\S+\s+)*)GIT_INDEX_FILE=("[^"]+"|'[^']+'|\S+)/;
+// Invariant: the hook checks and later syncs exactly the index git commits. Text cannot model shell state
+// (env -i, export/unset, subshells, heredocs -- three review rounds, each a new shape), so ONE shape is
+// accepted: the commit segment STARTS with `GIT_INDEX_FILE=<existing absolute literal path> git ...` (absolute:
+// a `cd` cannot re-point it; first token: no other assignment's quoted text can pose as it). GIT_INDEX_FILE
+// anywhere else in the command is refused, as is a value with shell expansion ($ ` ~ glob), a relative path,
+// or a missing file (git would commit an empty index). Text inside the
+// commit's own message is ignored. 2026-10-23: `GIT_INDEX_FILE="$(cat f)"` read no marker, git failed open,
+// the PostToolUse sync never ran -- 57 shared-index entries left behind HEAD.
+const RE_CANONICAL_INDEX = /^GIT_INDEX_FILE=("[^"]*"|'[^']*'|[^\s"']+)\s+git\s/;
 
 function privateIndexOf(commitSegment) {
-  const m = String(commitSegment || '').match(RE_PRIVATE_INDEX);
-  if (!m) return null;
-  return m[1].replace(/^["']|["']$/g, '');
+  const m = String(commitSegment || '').trim().match(RE_CANONICAL_INDEX);
+  return m ? m[1].replace(/^["']|["']$/g, '') : null;
+}
+
+// -> null (fine) or why this command's index cannot be trusted.
+function untrustedIndex(segments, commitIndex) {
+  const commitSegment = String(segments[commitIndex] || '').trim();
+  const idx = privateIndexOf(commitSegment);
+  const head = commitSegment.slice(0, commitSegment.search(/(?:^|\s)git\s/) + 1);
+  if (segments.some((s, i) => i !== commitIndex && /GIT_INDEX_FILE/.test(s)) || (idx === null && /GIT_INDEX_FILE/.test(head))) {
+    return 'GIT_INDEX_FILE is set outside the one supported shape';
+  }
+  if (idx === null) return null;
+  if (/[$`*?[]/.test(idx) || idx.startsWith('~')) return `GIT_INDEX_FILE=${idx} is not a literal path`;
+  if (!path.isAbsolute(idx)) return `GIT_INDEX_FILE=${idx} is not an absolute path`;
+  if (!fs.existsSync(idx)) return `GIT_INDEX_FILE=${idx} does not exist (git would commit an empty index)`;
+  return null;
 }
 
 function readMarker(indexPath) {
@@ -472,10 +495,18 @@ module.exports = {
     const segments = shared.commandSegmentsBackslashJoined(ctx.commandExpanded);
     const { segment: commitSegment, index: commitIndex } = findCommitSegment(segments);
     if (!commitSegment) return null;
+    const privIdx = privateIndexOf(commitSegment);
+    const badIdx = ctx.event === 'PreToolUse' ? untrustedIndex(segments, commitIndex) : null;
+    if (badIdx) {
+      return { block: [
+        `[Hook] BLOCKED: ${badIdx}; this hook cannot check or sync what such a commit takes.`,
+        '[Hook]   Use exactly what the stage step printed, alone in the command: GIT_INDEX_FILE=<path> git commit -F <msg>',
+      ] };
+    }
     if (/--amend\b/.test(ctx.commandExpanded)) {
       // v7: a private index is never an amend (its tree was read from marker.head; the amended commit's parent
       // is not that HEAD, so neither the PreToolUse nor the PostToolUse invariant applies) -- refuse (codex r4).
-      if (ctx.event === 'PreToolUse' && privateIndexOf(commitSegment) && readMarker(privateIndexOf(commitSegment))) {
+      if (ctx.event === 'PreToolUse' && privIdx && readMarker(privIdx)) {
         return { block: ['[Hook] BLOCKED: `--amend` with a private index (GIT_INDEX_FILE) is not a supported shape; drop the index and stage again, or amend without it.'] };
       }
       return null;
@@ -499,7 +530,6 @@ module.exports = {
       // change); a full commit clears the tracker; a pathspec-scoped commit
       // shrinks it to the remainder.
       let syncWarn = [];
-      const privIdx = privateIndexOf(commitSegment);
       if (privIdx) {
         const marker = readMarker(privIdx);
         if (marker) syncWarn = syncSharedIndexAfterPrivateCommit(privIdx, marker, ctx.cwd).warn; // v7 -- see header above
@@ -534,7 +564,6 @@ module.exports = {
     }
 
     // v7: private index (GIT_INDEX_FILE=<idx> git commit ...) -- ownership proven by the helper's marker.
-    const privIdx = privateIndexOf(commitSegment);
     if (privIdx) {
       const marker = readMarker(privIdx);
       // The stale-HEAD check runs in PostToolUse, after the whole Bash call: a push in the same call would

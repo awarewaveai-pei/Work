@@ -153,7 +153,7 @@
 **剩餘風險**：掃描與刪除之間的數秒 TOCTOU（Codex F2）；設計圖（非影片）被文章嵌入同類未擋；WP 搜尋若站上關閉 REST search 會一律拒刪（fail closed，可接受）；2 legacy 孤兒仍在。
 
 **rollback**：`git revert <本 commit>`（路由與腳本同 commit；sync-host-scripts 隨部署還原）；7393 用備份 JSON 的 raw 內容 PATCH 回。
-## 2026-10-23（續9）TASKS ⑩治理與機械閘 27 條清查：24 做完／判定不做打勾，1 仍開，新增 1（Claude）
+## 2026-10-23（續9）TASKS ⑩治理與機械閘 27 條清查：26 打勾（做完或判定不做），1 仍開，新增 1（commit 844826e25 標題誤寫 24）（Claude）
 
 **觸發**：操作者貼 ⑩ 清單，「做過就打勾，沒需要就打勾，需要就去做」。
 
@@ -172,6 +172,7 @@
 - C12 autopilot registrar `$Args`→`$SchtasksArgs`；AO-CLOSE 視窗改 `ao-close-last.txt`（`.claude/commands/ao-close.md`）；`TOOL_TRIGGER_MAP.md:378` 描述。
 - C13 CP950 backlog：85 處全包 `Invoke-WithUtf8Console`，audit drift 85→0（不登記豁免）。
 - 判定不做（打勾附理由）：Codex stop gate（ORACLE gate 已取代、燒額度）、stop-review-gate-hook（第三方）、Bash wrapper（無再現）、Phase4（採③）、標籤詞彙／record-restore-drill（無效益）、動態 fetch（regex 原理限制）。已由他處完成：git add -A 閘、具名 add、git-align、injector 描述。
+- C14 L112 第二條來源（實測自本 commit）：`GIT_INDEX_FILE="$(cat f)" git commit` → hook 無法展開路徑 → 無 marker、git 讀取 fail-open、PostToolUse 不同步 → 57 筆共用 index 落後 HEAD（新偵測器當場抓到，已 reset）。不變量（同段第 3 次被報後寫）：hook 檢查並同步的必須正是 git commit 用的 index；文字模擬不了 shell 狀態（env -i／export+unset／heredoc 三輪各一新形狀）→ 只收一種形狀：commit 段**以** `GIT_INDEX_FILE=<存在的絕對字面路徑> git …` 開頭（絕對＝cd 改不了；第一個 token＝其他變數引號內文冒充不了），指令其他段／`env`／其他前綴出現 GIT_INDEX_FILE、值含 `$`／反引號／`~`／glob、相對路徑、檔不存在 → BLOCK（`git-commit-scope-guard.js` `untrustedIndex`）。既有測試「env -u 前綴應放行」改為應擋（刻意語意變更）。`shared-file-guard.test.mjs` 13/13、hooks 373/373；Codex 5c3d7da0、9dfe3e09（各 3m）、c53027f3（2m）全修；b0ec3f7b 2m 不修：訊息引號內含 `;` 被誤擋＝安全方向（用 `-F <msg>`）、`exec env … git commit` 不被認作 commit＝所有 commit 閘共用辨識器的既有限制（§4 閘擋忘記不擋刻意）。
 - 仍開：MinIO 孤兒物件（雲端 session「Fetch-runner job store TTL」處理中）。新開：detector Phase 2。
 
 **驗證結果**

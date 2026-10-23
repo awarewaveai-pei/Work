@@ -112,6 +112,34 @@ test('helper stage (worklog entry + TASKS hunk + own file) -> private-index comm
   assert.match(fs.readFileSync(path.join(dir, WORKLOG), 'utf8'), /續3）foreign/);
 });
 
+test('GIT_INDEX_FILE from a command substitution -> BLOCK (the hook cannot expand it, so it could neither check nor sync)', () => {
+  const { dir, scratch } = makeRepo();
+  dirtyBoth(dir);
+  const s1 = helper(dir, scratch, ['stage', WORKLOG, '--worklog-entry', '2', '--date', '2026-09-23', '--', 'own.txt']);
+  const idx = (s1.out.match(/^private index: (.+)$/m) || [])[1];
+  assert.ok(idx, s1.out + s1.err);
+  const v = verdict(bash('PreToolUse', 'GIT_INDEX_FILE="$(cat idx.txt)" git commit -q -m mine', dir, scratch));
+  assert.equal(v.deny, true);
+  assert.match(v.reason, /not a literal path/);
+  // same index, exported in an earlier segment of the command
+  for (const cmd of [
+    `export GIT_INDEX_FILE=${idx}; git commit -q -m mine`,
+    `export GIT_INDEX_FILE=${idx}; unset GIT_INDEX_FILE; git commit -q -m mine`,
+    `env -i GIT_INDEX_FILE=${idx} git commit -q -m mine`,
+  ]) {
+    const e = verdict(bash('PreToolUse', cmd, dir, scratch));
+    assert.equal(e.deny, true, cmd);
+    assert.match(e.reason, /outside the one supported shape/, cmd);
+  }
+  assert.match(verdict(bash('PreToolUse', 'GIT_INDEX_FILE=~/x.index git commit -q -m mine', dir, scratch)).reason, /not a literal path/);
+  assert.match(verdict(bash('PreToolUse', 'GIT_INDEX_FILE=nope.index git commit -q -m mine', dir, scratch)).reason, /not an absolute path/);
+  assert.match(verdict(bash('PreToolUse', `GIT_INDEX_FILE=${idx}.missing git commit -q -m mine`, dir, scratch)).reason, /does not exist/);
+  assert.match(verdict(bash('PreToolUse', `FOO='x GIT_INDEX_FILE=${idx}' GIT_INDEX_FILE=${idx} git commit -q -m mine`, dir, scratch)).reason, /outside the one supported shape/);
+  // the literal path the helper printed still passes; text inside the message is not an assignment
+  assert.equal(verdict(bash('PreToolUse', `GIT_INDEX_FILE=${idx} git commit -q -m mine`, dir, scratch)).deny, false);
+  assert.doesNotMatch(verdict(bash('PreToolUse', "git commit -q -m 'Document GIT_INDEX_FILE=$HOME/x.index'", dir, scratch)).reason, /literal path/);
+});
+
 test('private index tampered after stage (shared-file blob != marker) -> BLOCK; own file edited after stage -> BLOCK', () => {
   const { dir, scratch } = makeRepo();
   dirtyBoth(dir);
@@ -187,7 +215,10 @@ test('codex r2: --amend and -a are not exempt; env with a flag argument still ma
   const idx = (s1.out.match(/^private index: (.+)$/m) || [])[1];
   assert.ok(idx, s1.out + s1.err);
   const envFlag = hook('PreToolUse', { session_id: freshSid('sfg-env'), tool_name: 'Bash', tool_input: { command: `env -u FOO GIT_INDEX_FILE=${idx} git commit -m x` } }, dir, scratch);
-  assert.equal(envFlag.status, 0, envFlag.stderr); // recognised as a commit AND valid -> passes
+  // recognised as a commit, and refused: an `env` prefix is outside the one supported private-index shape
+  // (2026-10-23: `env -i GIT_INDEX_FILE=...` made the flag parser swallow the assignment and fail open)
+  assert.equal(envFlag.status, 2, envFlag.stderr);
+  assert.match(envFlag.stderr, /outside the one supported shape/);
   // another session commits meanwhile -> HEAD moves -> the private index would revert that commit
   fs.writeFileSync(path.join(dir, 'other.txt'), 'theirs\n');
   g(dir, ['add', '--', 'other.txt']);
