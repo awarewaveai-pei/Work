@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-23（續12）資安 ⑨ 盤點：8 條逐條實查，7 條結案、DMARC 早已勾
+
+- S1 staging WP 密碼：2 站已拆（`lobster-wordpress` 內 `/var/www/html/staging/{green-valley-farm-28ba09,ssasd-8ebcd4}` 不存在；公網 `wp-login.php` 404）。trigger-postgres `TaskRun` 9／`TaskEvent` 9 筆仍含 `Stg…!`，但對應站已不存在＝無可保護對象 → 不做 prod DB redact（零效益）。操作者 10-01 不輪換。
+- S2 10-16 外洩（GitHub PAT＝`COPILOT_MCP_BEARER_TOKEN` 同一把、Gemini、Google OAuth secret）：實測 PAT `api.github.com/user` 200、無到期日；Gemini 200。操作者 10-23 決定不輪換，結案。
+- S3 Defender `PowhidSubExec.B`：暫存 ps1 不在；`scripts/scheduled-task-launcher.ps1:13` 的 FromBase64 只解參數，無下載／外連；registrar `REGISTER_SYSTEM_GUARD_TASKS.ps1:47-51` 註冊 Daily 並移除 OnStartup/OnLogoff；live 僅 `AgencyOS-SystemGuard-Daily`（args 解碼＝`-WorkspaceRoot 'D:\Work\agency-os' -Mode daily -HideUi`）；`high-risk-bash-warn.js:15` 已 BLOCK 排程變更；`Get-MpThreat`=0、病毒碼 1.461.158.0。
+- S4 realip（治本）：原檔 `cloudflare-realip.conf` 隨 EU 退租已不在；ks-aw-01 同款靜態 22 條在 `/etc/nginx/conf.d/soulful-security.conf`，無任何更新者（今日比對與 CF 官方一致＝尚無損害）。不變量：主機上每份 CF 網段清單都由同一次抓取生成。改 `lobster-factory/infra/ks-aw-01/refresh-cf-edge-geo.sh` 同時生成 `cf-edge-geo.conf`（守門）＋`conf.d/cf-realip.conf`（`set_real_ip_from`，兩檔一起備份／`nginx -t` 失敗一起還原）；`real_ip_header` 留在 soulful-security.conf（政策），網段移出（資料）。不寫偵測器：同源生成後無第二份可漂移。
+  - 套用：備份 `/root/cf-realip-bak-20261023-050925/`；新腳本 sha256 `3a90fa2c…` 兩邊一致；執行 → `v4=15 v6=7`；`safe-infra-patch.sh host-nginx … soulfulexpression.org` OK（backup `…soulful-security.conf.safe-patch-20261023-050953`）；live＝repo sha `276d89dc…`。
+  - 旁註：lobster-nginx `nginx/default.conf` 的 CF 網段不生效（容器只綁 127.0.0.1:8083，peer 永遠是 host gateway 172.18.0.1）；`aware-wave-security.conf`／`cloudflare-real-ip.conf` 為 SG 時代檔、未部署於 ks-aw-01。未動。
+- S5 Cloudflare MCP：根因已變——`CLOUDFLARE_AUTH_BEARER_TOKEN` 對 `/user/tokens/verify` 與 `/accounts/<id>/tokens/verify` 皆 401（失效，非缺 scope）；`CLOUDFLARE_API_TOKEN` active（腳本用）。改 OAuth：`mcp/registry.template.json` 拿掉 header＋codex bearer，`sync-mcp-config.ps1` 重生 `.mcp.json`／`~/.codex/config.toml`（cloudflare 段只剩 url）。剩操作者 `/mcp` 授權一次；prod `lobster-next-admin` 容器也帶此變數（`integration-health.ts:24` 兩把擇一），未動。
+- S6 WPvivid refresh_token、S7 `~/.codex/config.toml` 明文：操作者既有決定不處理 → 結案。S8 DMARC 第二階段：TASKS 已勾（10-23）。
+- REALTEST_EVIDENCE: tool=SSH | cmd=`nginx -T | grep -c ^set_real_ip_from`=22、重複=0；帶標記 UA curl soulfulexpression.org 200，access log 記錄 IP＝本機公網 IPv6（非 CF 網段）| exit=0 | ms=4200
+- REALTEST_EVIDENCE: tool=SSH | cmd=trigger-postgres read-only count TaskRun/TaskEvent `Stg[a-z0-9]{16}!` → 9/9；staging 目錄檢查 gone/gone | exit=0 | ms=3100
+- REVIEW_DONE: critic=Standard | verdict=warn | findings=0c/2m/1n（Codex `agency-os/reports/oracle/2026-10-23-partialreview-bb0eb469.md`：F1 並行 run 混搭兩檔、F2 install 失敗不還原 → 已修 flock＋ERR trap 兩檔一起還原，新 sha `9ada1c98…` 已部署並重跑 v4=15 v6=7；F3 新機缺生成檔 → host-switch runbook 1f-3 加「新機跑一次確認兩檔都在」）
+- REALTEST_EVIDENCE: tool=SSH | cmd=故障路徑隔離測（/tmp 副本、假 nginx exit 1）→ rc=1、GEO=原值、REALIP 移除 | exit=0 | ms=1800
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,mcp,.claude,runbooks | grep=`cf-realip|cloudflare-realip\.conf|CLOUDFLARE_AUTH_BEARER_TOKEN.*mcp` | hits=56（全為歷史 reports/daily/WORKLOG-archive 快照與本次改動檔，無現行文件過期主張）
+- 避免再發生：CF 網段只准由 `refresh-cf-edge-geo.sh` 生成（兩檔檔頭寫明 do not hand-edit）；MCP 不再存長效 Cloudflare token。
 ## 2026-10-23（續11）Trigger MCP 改用 PAT（TRIGGER_DEPLOY_PAT）；明早自動驗證自用權利；客戶權利盤點（Claude）
 
 **觸發**：操作者「去處理好」續8 剩餘項。

@@ -236,7 +236,7 @@
   - **現在到哪**：REST key（server env）＋Unique Security ID＋child 安裝全上線（Trigger v20260921.3、next-admin 33251522a）；真 MainWP 以同一份碼註冊 staging 成功（WORKLOG 續100）。真建站 E2E run_cmuatt4cc02a021lnlhrm5drl → `provisioning_failed: Timed out while waiting for handshake`（SG_SSH_HOST=5.223.93.113）。
   - **完成定義**：真實建站後 MainWP 出現該站且 connected；run output 無 unique id／secret。
 
-- [ ] **【資安｜待操作者】staging WP admin 密碼曾明文進 Trigger.dev run output：輪換 2 站 + redact 9 run + deploy**
+- [x] **【資安】staging WP admin 密碼曾明文進 Trigger.dev run output** → ✅ 2026-10-23 結案：2 站已拆（lobster-wordpress 無目錄、公網 404）；操作者 10-01 不輪換；TaskRun/TaskEvent 各 9 筆殘留密碼已無對應站＝無可保護對象，不做 prod DB redact；源頭已改 Vault。WORKLOG 2026-10-23「資安 ⑨ 盤點」。
   - 2026-10-01 操作者：不輪換（「不用換」）。剩 redact 9 run（未在本次決定範圍）。
   - `🔴 現行` · `2026-09-21` · `卡在操作者（High：prod DB 寫入 + deploy）`
   - **一句話**：provision-staging 自 2026-06-03 把 admin 密碼放進 provisioningNotes；源頭已修（改存 Vault），但舊資料仍在 trigger-postgres `TaskRun`/`TaskEvent` 各 9 筆，其中 2 站仍在線。
@@ -278,7 +278,7 @@
 
 - [x] **【2026-09-11 開出｜DB】資料庫沒有 migration 記錄表，「哪些已套」只能靠猜** —— 0072–0075 套 prod 時，pre-flight 只能查 schema 實況反推，且一度因為查錯目錄表（`pg_constraint` 而非 `pg_indexes`）誤判唱唯一約束缺失。重套也只在該檔寫成匑等時安全。方向：`schema_migrations` 表 + `scripts/apply-db-migration.mjs` 套完寫入。見 WORKLOG 2026-09-11 第七批。 → ✅ 2026-09-26 續48：同上列（T24 ledger 上線）。
 
-- [ ] **【⚠️ 逾期 69 天｜原排 2026-06-17｜資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後**
+- [x] **【資安複盤】Defender 嚴重木馬 `Trojan:Win32/PowhidSubExec.B` 來源查清與善後** → ✅ 2026-10-23 結案：①暫存 ps1 已不在 ②launcher/registrar 無下載/外連 ③live 僅 `AgencyOS-SystemGuard-Daily`，action＝repo launcher→system-guard ④`high-risk-bash-warn.js:15` 已 BLOCK 排程任務變更 ⑤`Get-MpThreat`=0。WORKLOG 2026-10-23「資安 ⑨ 盤點」。
   - **來龍去脈**：2026-06-16 02:33:49 Windows Defender 跳出嚴重威脅，名稱 `Trojan:Win32/PowhidSubExec.B`；02:34:42 Defender 已執行「移除」，`ActionSuccess=True`，`CurrentThreatExecutionStatusID=0`。後續 Codex 已更新 Defender 病毒碼到 `1.453.108.0`，Quick Scan 於 02:59:26 開始、03:13:41 結束；`Get-MpThreat` 顯示 `Trojan:Win32/PowhidSubExec.B` 與 `Trojan:Win32/PShellDlr.HD!MTB` 皆 `IsActive=False`、`DidThreatExecute=False`，目前沒有 active threat。
   - **證據**：Defender 的 `Resources/Path` 不是下載檔或 exe，而是一條命令列：`C:\Program Files\Git\bin\bash.exe` 載入 `C:\Users\user1115\.claude\shell-snapshots\snapshot-bash-1781544836335-9sl8s6.sh`，建立 `D:\tmp\realtest-reg.ps1`，再跑 `powershell -NoProfile -ExecutionPolicy Bypass -File "D:/tmp/realtest-reg.ps1"`。`.claude\bash-commands.log` 第 9296/9299 行與 `.claude\projects\D--Work\b0dfd505-590d-4b54-9b3a-52c275a46f87.jsonl` 對上同一事件：entrypoint=`claude-desktop`，session=`b0dfd505-590d-4b54-9b3a-52c275a46f87`，tool=`Bash`，permission_mode=`bypassPermissions`，description=`Syntax-check + run new registrar + verify both tasks hidden + run Daily`。
   - **暫存腳本內容**：`D:\tmp\realtest-reg.ps1` 先 parse `D:\Work\agency-os\automation\REGISTER_SYSTEM_GUARD_TASKS.ps1`，再用 `ExecutionPolicy Bypass` 執行 registrar，查 `AgencyOS-SystemGuard-*` scheduled tasks，最後 `Start-ScheduledTask -TaskName "AgencyOS-SystemGuard-Daily"`。
@@ -529,7 +529,7 @@
   - [x] **✅ 客服設定 GET 500**（`cs-config/route.ts` 在 `const config` 宣告前使用它，有 graduation 紀錄就 ReferenceError；Codex `2026-10-16-partialreview-98a30a32` F1）：`8355f9f03` 把 `config` 移到 map 之前＋有 graduation 的 GET 測試。見 WORKLOG 2026-10-16（續22）。
   - [x] **✅ 危機訊息轉真人時回客人的話**（操作者 2026-10-16 定案）：確認句附求助專線（依客人語言寫，台灣 119／1925／1995＋澳洲 000／Lifeline 13 11 14 都列）、照樣問名字、即時 Telegram 通知操作者（不帶客人原文）。見 WORKLOG 2026-10-16（續27）。
   - [x] 婉轉說法：Soulful 加了意圖 `self_harm`（敏感、L0），分類器 10/10（6 句婉轉說法全進、4 句一般問題不進）；程式讓這個意圖跟關鍵字同樣處理（專線＋通知）。見 WORKLOG 2026-10-16（續30）。
-  - [ ] **🔴 憑證外洩到對話紀錄（2026-10-16）**：一個 session 印出 `mcp/user-env.ps1` 第 85–100 行，GitHub PAT（`GITHUB_PERSONAL_ACCESS_TOKEN`／`COPILOT_MCP_BEARER_TOKEN`）、`GEMINI_API_KEY`、`GOOGLE_OAUTH_CLIENT_SECRET` 明文進了 Claude Code 對話紀錄。待操作者決定是否輪換（High：憑證）。
+  - [x] **憑證外洩到對話紀錄（2026-10-16）** → 2026-10-23 操作者決定不輪換，結案（當日實測 PAT/Gemini 仍有效、無到期日）。原文：一個 session 印出 `mcp/user-env.ps1` 第 85–100 行，GitHub PAT（`GITHUB_PERSONAL_ACCESS_TOKEN`／`COPILOT_MCP_BEARER_TOKEN`）、`GEMINI_API_KEY`、`GOOGLE_OAUTH_CLIENT_SECRET` 明文進了 Claude Code 對話紀錄。待操作者決定是否輪換（High：憑證）。
   - [ ] **危機訊息正式環境驗收**（已部署 `940169245`，2026-10-16 12:20Z）：驗收通過 ✅ 2026-10-17 — 客人端「我想死」1.9 秒收到專線確認句；操作者端「我想死」「我不想活了」各一則 Telegram 通知，操作者確認收到。「我覺得活著很痛苦」沒通知＝沒中關鍵字＋對話已由真人接手（open＝AI 靜默，分支只做 captureName 與危機 page）。**剩一項：真人接手中的危機訊息也自動回一句、同一對話 30 分鐘內只回一次**。文案由 GPT 寫好（實話：系統收到、工作人員親自回覆、119／000、1925／1995／Lifeline；不說「我們看到了」），操作者同意文案＋方案 B；程式＋migration `0104_cs_crisis_holding_replies` 已寫好、本機驗證過（WORKLOG 2026-10-17「真人接手中的危機訊息也回一句」條）。0104 已套正式庫（2026-10-17，`--status` applied=105），程式已推、隨 03:00 自動部署上線。**剩**：部署後 John Doe 在真人接手中的對話傳「我想死」→ 預期 Telegram 一則＋客人收到三行專線句；30 分鐘內再傳 → 只有 Telegram。建議模型：Opus 5.5
   - [ ] 產品決定：知識庫內容／模型／prompt 變動要不要讓「考過」失效並自動重考（計畫 §5.2 CI 閘）。現況不失效；網站每週重爬，若失效又沒自動重考，自動回覆每週會退回草稿。見 WORKLOG 2026-10-16（續11）「沒涵蓋」。
   - [ ] Soulful 常見問答的價格／時間／地點／報名是**測試值**（WORKLOG 2026-10-16（續22））：對外宣傳前操作者給真值，在客服分頁「常見問答」改 `pricing`／`schedule`／`location`（＋ -en）四條。
@@ -648,7 +648,7 @@
   - **⏳ 步驟 C 未做**：`awmainwp` 帳號名已外洩（320 次針對性嘗試），改名或加 2FA，需操作者在後台執行。
   - **現況安全性**：攻擊仍可直連 origin，但**現在會被有效攔截** —— 直連者的 `REMOTE_ADDR` 本來就是真實 IP，經 CF 者也已還原，兩條路徑的 LLAR 封鎖與 nginx 限流都對真實 IP 生效。步驟 B 是把攻擊擋在更外層，非唯一防線。
 
-- [ ] **【2026-08-26 開出｜我自己留下的漂移風險】`cloudflare-realip.conf` 的網段清單是靜態的，無偵測器**
+- [x] **【2026-08-26 開出】`cloudflare-realip.conf` 的網段清單是靜態的，無偵測器** → ✅ 2026-10-23 治本：該檔隨 EU 退租已不在；ks-aw-01 同款靜態清單在 `soulful-security.conf`，改由 `lobster-factory/infra/ks-aw-01/refresh-cf-edge-geo.sh` 同一次抓取生成 `conf.d/cf-realip.conf`（與 origin 守門 geo map 同源＝構造上不漂移，不需偵測器）。WORKLOG 2026-10-23「資安 ⑨ 盤點」。
   - `🟡 未開始` · `2026-08-26` · `可直接做`
   - **一句話**：我今天修好了 real IP，但那份 CF 網段清單會隨 Cloudflare 增減而過期，且**目前沒有任何東西會發現**。
   - **後果（降級非中斷）**：CF 新增網段後，來自該網段的請求會退回顯示 CF IP → LLAR 與限流對那部分流量再次失效，而站台照常運作、沒有任何告警。
@@ -712,7 +712,7 @@
     - Dropbox 上多了一份 `08:01` 的備份（測試副產物），可自行刪除。
   - **下次驗證點**：`2026-08-31 00:08:15 UTC` 的排程執行。要看 `report_addon` 是否 `Succeeded`，以及往後幾週的成功率是否明顯高於先前的 50%。
 
-- [ ] **【2026-08-26 開出｜已知風險｜操作者決定不處理】WPvivid 的 Google Drive refresh_token 曾進入對話紀錄**
+- [x] **【2026-08-26 開出｜已知風險】WPvivid 的 Google Drive refresh_token 曾進入對話紀錄** → 操作者 2026-08-26 決定不重新授權，2026-10-23 結案。
   - `🧊 記錄` · `2026-08-26` · `操作者明確表示不重新授權`
   - **經過**：診斷時查該遠端設定，`token` 欄位是一個內含 `access_token` 與 `refresh_token` 的 JSON 字串，我的排除清單只擋了頂層同名鍵，未涵蓋巢狀情況，整段被印出。
   - **範圍**：scope 為 `https://www.googleapis.com/auth/drive.file`，僅涵蓋該 app 自己建立的檔案 —— 即 WPvivid 在該 Drive 上的備份，非整個雲端硬碟。
@@ -1400,7 +1400,7 @@
 
 > **這一區不是待辦。**保留是為了「日後條件變了要看得見」，不是為了有天要做掉。
 
-- [ ] **【已知風險｜操作者已決定不輪換｜2026-08-17】`~/.codex/config.toml` 明文憑證** — 該檔以明文存約 30 組正式憑證（Supabase `service_role`、Hetzner API token、Cloudflare API token、Resend、Slack、Sentry、n8n、Grafana 密碼、Trigger prod token 等）。2026-08-17 稽核 Codex 設定時另被印入 session transcript（transcript 保留期已於 `75512998` 改為 365 天）。
+- [x] **【已知風險｜2026-08-17】`~/.codex/config.toml` 明文憑證** → 操作者決定不輪換，2026-10-23 結案。 — 該檔以明文存約 30 組正式憑證（Supabase `service_role`、Hetzner API token、Cloudflare API token、Resend、Slack、Sentry、n8n、Grafana 密碼、Trigger prod token 等）。2026-08-17 稽核 Codex 設定時另被印入 session transcript（transcript 保留期已於 `75512998` 改為 365 天）。
   - **操作者 2026-08-17 明確決定不輪換**，理由：站台新、資料量少。⚠️ 該理由**不涵蓋** Hetzner（可刪伺服器）與 Cloudflare（可改 DNS 指向）
   - 這兩者風險與資料量無關。
   - **未做的補救**：
@@ -2007,7 +2007,7 @@
 - [x] `lobster-factory` A9 雲端 artifacts 治理補齊 baseline（生命周期規則/IAM/稽核自動化：policy + validator + audit report）
 
 ## Backlog — 未完成
-- [ ] **Cloudflare MCP 連線失敗（`insufficient scope: account:read`）待操作者在 Cloudflare dashboard 修 token permission** — 根因已診斷完成（`CLOUDFLARE_AUTH_BEARER_TOKEN` 缺 `Account Settings: Read`），修復動作屬修改外部帳號安全設定，非 Claude 可代做。步驟見 WORKLOG 2026-09-12（續13）。同條目另揭露：診斷過程誤將 6 把憑證明文印進 session transcript，建議操作者輪替。
+- [x] **Cloudflare MCP 連線失敗** → ✅ 2026-10-23：根因已變（`CLOUDFLARE_AUTH_BEARER_TOKEN` 失效 401，非缺 scope）；改 OAuth（`mcp/registry.template.json` 拿掉 header）。剩操作者 `/mcp` 授權一次。WORKLOG 2026-10-23「資安 ⑨ 盤點」。原文： — 根因已診斷完成（`CLOUDFLARE_AUTH_BEARER_TOKEN` 缺 `Account Settings: Read`），修復動作屬修改外部帳號安全設定，非 Claude 可代做。步驟見 WORKLOG 2026-09-12（續13）。同條目另揭露：診斷過程誤將 6 把憑證明文印進 session transcript，建議操作者輪替。
 - [ ] 建立跨國稅務與法遵顧問審核流程（法律文件外部審核）
 - [x] `lobster-factory` Enterprise 必備工具補強路線（已取消）
   - 範圍：Sentry / PostHog / Cloudflare / Secrets / Identity現況：Identity 採 JWT/OIDC（不綁特定供應商）；Secrets 暫採 env/mcp，後續升級 secrets manager

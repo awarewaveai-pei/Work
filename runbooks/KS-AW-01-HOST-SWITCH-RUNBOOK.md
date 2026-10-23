@@ -158,7 +158,7 @@ done | grep -E '^[0-9a-f]{64}'
    ovhcloud ip reverse set NEW_IP/32 NEW_IP ks-aw-01.aware-wave.com.
    ```
    帳號在**世界區** `ca.ovhcloud.com`（整併日坑：歐洲區登入頁會回「密碼錯誤」，兩套獨立帳號庫）。GAME firewall 刻意不設。
-3. `refresh-cf-edge-geo.sh` 已在 `/root/scripts/`（隨 1d 帶走），nginx geo guard 自動跟機器走。
+3. `refresh-cf-edge-geo.sh` 已在 `/root/scripts/`（隨 1d 帶走），nginx geo guard 與 `conf.d/cf-realip.conf`（同一次抓取生成）自動跟機器走；新機跑一次確認兩檔都在。
 
 ### 1g. 🔴 repo 裡寫死現役 IP 的活性工具（換機日逐一改；對「當時舊 IP」跑 `git grep -n` 重新產清單）
 

@@ -1,7 +1,7 @@
 ﻿#requires -Version 5.1
 <#
 .SYNOPSIS
-  Monthly CF IP refresh -- runs /root/scripts/refresh-cf-edge-geo.sh on ks-aw-01 (nginx cf-edge-geo map).
+  Monthly CF IP refresh -- runs /root/scripts/refresh-cf-edge-geo.sh on ks-aw-01 (nginx cf-edge-geo map + cf-realip trust list, one fetch).
   Called by ao-resume.ps1 monthly block. Warn-only, always exits 0.
   (The SG-era iptables/ipset lockdown is history; see runbooks/CLOUDFLARE-WAF-SETUP.md banner.)
 #>
