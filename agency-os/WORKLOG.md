@@ -31,6 +31,40 @@
 部署與公網煙霧測試見下一條。
 
 **rollback**：程式 `sg-deploy` 回前一版；lobster-nginx 用 `default.conf.bak.safe-patch-20261023-132557`＋`safe-infra-patch.sh nginx`；主機 nginx 用上列備份＋`safe-infra-patch.sh host-nginx`；DNS 刪 tarot record `62c2f12b…`；憑證不必回。
+## 2026-10-23（續48）ADR 017 第 4a 項：收錢的內部段（人工轉帳 → 合約、權利、錢包同一交易；/ops/billing）寫好驗過，migration 部分存 patch 待同意（Claude）
+
+**觸發**：主線 session 指派：做 ADR 017 順序 4a（卡 `cards/step-4.md` 第一條 Decision），不碰 Woo；migration 只在拋棄式 Postgres 驗，不套 prod、不推需要它的程式，存 `cards/step-4a.patch`。
+
+**設計（與卡不同處，卡已補「4a 狀態」）**
+- 狀態機整個在 Postgres 函式 `billing_apply_payment_event`（0120）：先寫收件列 `payment_events(provider, event_id)`，再寫合約、權利、帳本；同一交易，被拒＝什麼都不留（含收件列），可修正後重送。同一 id 不同內容＝拒（`event_id_reused`），不默默當重送。
+- 接頭 `lib/payments/{provider,local,index}.ts`：provider 只 `verify`（raw body 的 HMAC-SHA256，base64，同 Woo 構造）＋`parse`→`PaymentEvent`；控制面只認 `PaymentEvent`。設定 `PAYMENTS_PROVIDERS` 是清單（轉帳與 Woo 會並存），未設＝全部 404。
+- 路由 `app/api/webhooks/payments/[provider]`（4b 的 woo 同路由）；寫入只經 `lib/entitlements/contracts.ts`；`/ops/billing` 只經 `tables.ts` `billingOverview()`（0120 `billing_overview()` 回 jsonb，338 列全功能權利按來源分組，不受 PostgREST 1000 列截斷）。
+- 狀態機：付款＝同產品唯一 base 合約就地改（試用→付費同列）；換方案＝舊列現在結束、新列開始；續約延長同列，晚到的舊事件不縮短；取消＝列到期末＋7 天，合約維持 active，到期後由每日 sweep（`endLapsedTrials` 擴為 trial／active／past_due）關閉——launcher 與 `can()` 同步；訂閱退款＝合約 canceled、列現在結束；點數包＝訂單號為冪等鍵，一單只入一次；點數包退款＝先進先出（最早的先用掉），只退本包未用部分、一單一次；拒付＝合約列 suspended、合約 past_due、錢包凍結（新表 `credit_wallet_holds`；`media_credit_reserve` 與 `entitlement_credit_balance` 認凍結），只有 local 的 `chargeback_cleared`（人工複核）能解。
+- 一帳戶×產品×功能只一筆有效列：付費合約結束同功能的客戶贈送列；別的有效合約已給的功能＝拒（`feature_in_another_contract`，方案資料要修），不默默拿走。全功能帳戶（0118）不能買訂閱、能買點數。贈送 vs 合約重疊：付費優先（本次定）。
+- 帳本泛化**不在 4a**：只寫 `grant`／`refund`，現有 `media_credit_ledger` 夠用；留 4b（卡上 `0105` 編號已被 `0105_social_v16` 佔用）。
+- 操作者登記指令 `scripts/record-payment.mjs`（簽章、送出、同一筆送兩次只記一次）。
+
+**檔案**
+- 已推（不需 migration）：`lib/payments/{provider,local,index}.ts`、`lib/payments/__tests__/local.test.ts`、`scripts/record-payment.mjs`；測試共用 `lib/entitlements/__tests__/real-db.ts`（從 `entitlements.e2e.test.ts` 抽出 PostgREST proxy／service token，兩個真 DB 測試共用）。
+- patch `agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-4a.patch`：`0120_payment_events{,.down}.sql`＋`scripts/0120_payment_events_down.sql`＋`0120_payment_events-local-verify.py`；`lib/entitlements/{contracts,tables}.ts`、`__tests__/{contracts,expiry,import-boundary,payments.e2e}.test.ts`；`app/api/webhooks/payments/[provider]/{route,route.test}.ts`；`app/(shell)/ops/billing/page.tsx`；`lib/portal/products.ts`（BACK_OFFICE 加 `ops/billing`）；`app/SidebarNav.tsx`（Billing 連結）；`tests/e2e/entitlements/entitlements-real-db.py`（`--suite payments`）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/packages/db/scripts/0120_payment_events-local-verify.py（拋棄式 postgres:15.8：up→down 逐位元組還原 0066／0110 函式→up；service_role 限定、無 truncate；狀態機全程 17 項 OK；down 在有事件後拒絕）→ PASS 0120 | exit=0 | ms=60000
+- REALTEST_EVIDENCE: tool=Bash | cmd=python lobster-factory/infra/hetzner-phase1-core/tests/e2e/entitlements/entitlements-real-db.py --suite payments（真 Postgres＋PostgREST v14.6，真路由→0120→/ops/billing renderToStaticMarkup；卡上測試名：one paid event…、replaying the same event id is a no-op via the inbox、a cancel event keeps access until period end plus grace and a plan change ends the old row now、a credit pack grants once per order id、a refund of a credit pack reverses only the unused part、a chargeback suspends entitlements and freezes the wallet、an invalid X-AwareWave-Payment-Signature is refused with 401；加 sweep 關閉已取消合約）→ 9 passed，連跑兩次 | exit=0 | ms=40000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）＋ npx vitest run：patch 套用 326 files／2945 passed（另跑 patch 內 verify PASS 0120、--suite payments 9 passed）；patch 移除 324 files／2938 passed；`git apply --check` 通過，`git apply -R` 還原 | exit=0 | ms=60000
+- 突變（皆還原，sha256 比對）：拿掉收件表唯一鍵＋on conflict → 「replaying…」紅；退款改退整包 → 「refund…unused part」紅；拒付不 suspend → 「chargeback…」與 /ops/billing 紅；新列不結束舊列 → `payment_invariant` 拋出；拿掉先進先出 → verify `refund-a` 斷言紅；路由略過 verify → 401 測試紅。
+- 測試修正：e2e 第一版用主機時鐘比 DB `now()`（Docker VM 時鐘快幾 ms）→ 偶發紅；改比列本身的原到期日，`live()` 留 60 秒邊界，之後之後每次都綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex 第 1 輪 `agency-os/reports/oracle/2026-10-23-partialreview-033cc224.md`：F1 路由 tsc 失敗＝駁回（`index.ts:15` `paymentProvider(name: string)`，`tsc --noEmit -p .` exit 0 涵蓋該路由）；F2 同一訂單兩帳戶並行＝採納（insert 後再查擁有者）；F3 退款吃到別包＝採納（改先進先出）。第 2 輪（修正後）`agency-os/reports/oracle/2026-10-23-partialreview-284c2c54.md`：NO FINDINGS。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/4n -- 第二位審查 db-expert（Opus）讀 0120：M1 合約以方案找、不以供應商訂閱 id＝延到 4b（Woo 事件才有亂序與訂閱 id，卡已記）；M2 加購與基本方案共用功能會被結束＝採納（改拒絕）；M3 不變量檢查擋住拒付凍結＝採納（只在 subscription_paid／chargeback_cleared、只查碰到的功能、同 reader 的 starts_at）；M4 取消後 launcher 立刻關＝採納（合約維持 active＋sweep 關閉，拒付 past_due）；m1 同 F2；m2 查詢加 organization_id；m3 service_role 可 truncate＝採納（revoke all 後只給 select/insert/update，verify 證明 truncate 被拒）；m4 limits 非物件、period_end 無時區＝採納。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/1n -- /verify-recent critic（Opus）讀 TS 側：M `record-payment.mjs` 預設 event id `refund:social_pro` 跨期重複 → 第二次退款被當重送默默略過＝採納（`--ref` 每種都必填，id＝`<kind>:<org>:<ref>`，測試證兩期退款 id 不同）；m 路由先讀整個 body 才查 64KB（nginx 允許 50MB，未簽章可 OOM）＝採納（改用既有 `lib/ops-inbox/readRequestBody.ts` `readWebhookBody`，Content-Length 先擋，測試證 `text()` 未被呼叫）。修後 tsc 0、patch 套用 payments 9 passed、未套 324 files／2938 passed。
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=billing_apply_payment_event|PAYMENTS_PROVIDERS|record-payment\.mjs|credit_wallet_holds | hits=8（card、patch、data.mjs、supervisor.html、lib/payments 3 檔、record-payment.mjs，彼此一致）；`endLapsedTrials` 語意擴大：唯一呼叫端 expire 路由與 launcher 註解仍正確
+
+**發現（不在本次範圍，已記 TASKS）**：`tests/e2e/entitlements/entitlements-real-db.py` 預設套件在 HEAD 已紅（本次未改其行為）：harness 只套到 0110，0118 之後 expire 路由的 `ensureAllFeatures` 失敗 → 「the expiry sweep ends a trial…」`expiry_failed`；要修需讓該測試接受自用帳戶的全功能列。
+
+**待操作者（High）**：①套 0120 到 prod（`scripts/apply-db-migration.mjs`）②`git apply cards/step-4a.patch`、推 main ③容器加 `PAYMENTS_PROVIDERS=local`、`PAYMENTS_LOCAL_SECRET`（≥32 字，同值進 `mcp/user-env.ps1`；`safe-infra-patch.sh compose`）④第一個方案列（plans 0 筆；功能與上限由你定）。之後：`node lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/record-payment.mjs credit_pack --org <uuid> --units 500 --ref <轉帳編號>`。
+
+**rollback**：已推部分＝`git revert <本 commit>`（接頭無呼叫者，無行為）；patch 未套無影響；套用後＝路由回 404（移除 `PAYMENTS_PROVIDERS`），0120 down 只在第一筆付款事件前可套，之後前進修。
 ## 2026-10-23（續47）塔羅「都沒改善」查因：舊分頁跑舊程式、重整後找不到批次、數量重複描述；修四項（Claude）
 
 **觸發**：操作者 20:07 跑背景批次 e8486f5f、20:16 載入，回報無框、沒進設計、數量仍錯。
