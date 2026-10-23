@@ -173,6 +173,7 @@ export function createProviderCall(opts: ProviderCallOptions): ProviderCall {
     if (spec.allowedPaths && !spec.allowedPaths.includes(url.pathname)) {
       throw new ProviderCallError(`path_not_allowed_${providerId}`, "unconfigured");
     }
+    void opts.grant.recordUse({ provider: providerId });
 
     const auth = spec.authHeader ? spec.authHeader(key) : { authorization: `Bearer ${key}` };
     const startedAt = Date.now();

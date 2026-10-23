@@ -100,7 +100,7 @@
 - **獨立產品服務取許可（2026-10-19 實作）**：認知平台這類不在 next-admin 內的服務，請求沒帶 `X-AwareWave-Permit` 時向 `POST /api/internal/entitlements/permit/<product>` 要（Bearer＝該產品專屬 `ENTITLEMENT_ISSUER_TOKEN_<PRODUCT>`，只能簽該產品的功能、`<product>:<id>` 形式的 actor、根組織），拿到後仍在本地用公鑰驗並綁自己的（計費帳戶、功能、actor）；驗過才快取到到期前 30 秒。認知平台的 tenant→計費帳戶目前是 `ENTITLEMENT_BILLING_ACCOUNTS` 設定（`ai_lego/platform/entitlement/check.py`）。翻 enforce 的前置再加：各產品 issuer token 與公鑰已配、每個 tenant 已對應計費帳戶。
 - **灰掉沒買的按鈕**：`GET /api/entitlements/features` 回該帳戶「能用的功能」（每個收費路由功能一個判決、不寫稽核、Ed25519 簽章、快取 5 分鐘）；畫面用 `usePaidFeatures()`（`lib/entitlements/use-paid-features.ts`）灰按鈕，載入中或拿不到就不灰（API 照樣問 `can()`）。shadow 時全部可用，清單仍帶真實判決。
 - **付費 vendor 只有三道縫**：SDK 走 `lib/ai/gateway.ts` loader，直打 HTTP 走同檔 `providerUrl(grant, provider, path)`（origin 只在 `PROVIDER_ORIGINS`），collect 搜尋／抽取走 `createProviderCall({ grant })`；三道都以型別要求 grant。`import-boundary.test.ts` 擋縫外任何字串（含拼接、大小寫）出現 provider host。邊界：origin 若從環境變數或設定組成，測試看不到——新 provider 一律加進 `PROVIDER_ORIGINS` 或 collect registry，不從 env 讀 origin。
-- **扣點尚未接**：`grant.report({units, idempotencyKey})` 已備（冪等鍵必填），但沒有路由呼叫——每個功能扣幾點（`lib/entitlements/ledger.ts` `DEFAULT_CREDIT_POLICY` 是佔位值）屬定價，由操作者定；定案前 enforce 下 credits 功能只看餘額不扣點。
+- **用量已記、扣點未接**（2026-10-23）：每道付費縫（`lib/ai/gateway.ts` 三個入口、collect `createProviderCall`；video.tts 在 video-service 接單後）呼叫 `grant.recordUse()`：每個 grant 第一次碰到付費工作記一列 `entitlement.usage`（同請求的函式庫、同工作的輪詢共用 grant＝一列），units＝0、不扣點。閘 `lib/portal/__tests__/registry-code.test.ts`：每個 credits 功能的詢問處必須走到 `recordUse`。每功能扣幾點（`lib/entitlements/ledger.ts` `DEFAULT_CREDIT_POLICY` 是佔位值）屬定價，由操作者定；定案後在 `recordUse` 填 units 與冪等鍵，定案前 enforce 下 credits 功能只看餘額不扣點。
 
 ### 5. 買斷＝一鍵架站＋選購模組（LEGO）
 

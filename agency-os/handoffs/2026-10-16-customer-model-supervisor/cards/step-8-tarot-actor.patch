@@ -1,0 +1,290 @@
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/tarot/batch/[jobId]/card/route.ts b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/tarot/batch/[jobId]/card/route.ts
+index 9023446a4..88f3bd697 100644
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/tarot/batch/[jobId]/card/route.ts
++++ b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/internal/tarot/batch/[jobId]/card/route.ts
+@@ -88,7 +88,10 @@ export async function POST(
+       return NextResponse.json({ ok: false, error: "quota_exceeded", code: "quota_exceeded" }, { status: 429 });
+     }
+ 
+-    const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true }, await grantFor("tarot.image", job.organizationId ? { orgId: job.organizationId } : {}));
++    // Asked as the person who started the batch (0119), not "system": a customer's deck gets the customer's verdict
++    // and the usage row names who used it. Jobs from before 0119 have no actor and keep the old system judgment.
++    const asker = { actor: job.actor ?? "system", ...(job.organizationId ? { orgId: job.organizationId } : {}) };
++    const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true }, await grantFor("tarot.image", asker));
+     if (!result.ok) {
+       const errMsg = (result as { ok: false; error: string }).error;
+       outcome = { error: errMsg };
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/batch/route.ts b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/batch/route.ts
+index a09f37543..74d289d38 100644
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/batch/route.ts
++++ b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/api/tools/tarot/batch/route.ts
+@@ -9,6 +9,7 @@ import { isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen"
+ import { isR2Configured } from "../../../../../lib/storage/r2";
+ import { effectiveOrgId, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../../lib/tenant-guard";
+ import { withFeature } from "@/lib/entitlements/grant";
++import type { Grant } from "@/lib/entitlements/can";
+ 
+ export const runtime = "nodejs";
+ export const dynamic = "force-dynamic";
+@@ -26,7 +27,7 @@ function storeUnavailable(e: unknown): Response | null {
+ // (app/api/internal/tarot/batch/[jobId]/card/route.ts).
+ export const POST = withFeature("tarot.image", handlePost);
+ 
+-async function handlePost(req: Request): Promise<Response> {
++async function handlePost(req: Request, grant: Grant): Promise<Response> {
+   const { role } = resolveOpsRole(req);
+   if (!canCreateAiImageJob(role)) {
+     return NextResponse.json({ ok: false, error: "forbidden_role" }, { status: 403 });
+@@ -82,7 +83,7 @@ async function handlePost(req: Request): Promise<Response> {
+   // dashboard): the worker reads BATCH_INTERNAL_SECRET and AWAREWAVE_WEBHOOK_BASE_URL from its own env.
+   // The job exists before the run does: the task's first callback must find it (no create-after-trigger race).
+   try {
+-    await createJob({ jobId, organizationId, createdBy, model, aspectRatio, totalCards: cards.length });
++    await createJob({ jobId, organizationId, createdBy, actor: grant.actor, model, aspectRatio, totalCards: cards.length });
+   } catch (e) {
+     const res = storeUnavailable(e);
+     if (res) return res;
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/__tests__/trigger-callbacks-server-to-server.test.ts b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/__tests__/trigger-callbacks-server-to-server.test.ts
+index 6facba8fb..f0a8769af 100644
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/__tests__/trigger-callbacks-server-to-server.test.ts
++++ b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/__tests__/trigger-callbacks-server-to-server.test.ts
+@@ -74,7 +74,7 @@ describe("tarot batch callbacks: own token, never a role header", () => {
+     process.env.BATCH_INTERNAL_SECRET = "batch-secret-for-test";
+     fakeDb.client = createFakeBatchDb().client;
+     const jobId = "00000000-0000-4000-8000-000000000001";
+-    await createJob({ jobId, organizationId: null, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
++    await createJob({ jobId, organizationId: null, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+     expect((await call(start, jobId, { authorization: "Bearer batch-secret-for-test" })).status).toBe(200);
+     expect((await call(start, "unknown", { authorization: "Bearer batch-secret-for-test" })).status).toBe(404);
+   });
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/MODULE_MANIFEST.json b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/MODULE_MANIFEST.json
+index d8c6ab0b4..f4b84e929 100644
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/MODULE_MANIFEST.json
++++ b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/MODULE_MANIFEST.json
+@@ -10,7 +10,7 @@
+     "failure_isolation_boundary": "Generation errors return HTTP 200 with ok:false so nginx does not replace the body (tarot/generate/route.ts:113-116); a failed card is counted and the batch continues after one retry, while a 401/404 refusal from next-admin fails the run (tarot-batch-generate.ts:58-69, :74-138); an R2 failure records that card as failed (card/route.ts:105-108); missing Trigger configuration returns 503 (batch/route.ts:19-26). The task's callbacks use /api/internal/tarot/*, outside the session middleware (matcher middleware.ts:413); lib/__tests__/trigger-callbacks-server-to-server.test.ts keeps every Trigger callback there.",
+     "data_lifecycle": "Batch job rows older than 7 days are deleted on read, cards cascade (batch-store.ts:59, :184-187); the quota counter disappears on restart (quota.ts:1-5). R2 tarot-batch/ objects are not deleted by tarot code; framed copies saved to My Designs follow design's delete path.",
+     "observability_contract": "logImageCost (tool tarot) runs when the caller passes a job id (tarot/generate/route.ts:107-110); the card route logs no cost; suggest-prompt logs through logAiCall (suggest-prompt/route.ts:66); the Trigger run logs each card (tarot-batch-generate.ts:74-138). Job status is read from the 0115 rows through GET /batch and /batch/[jobId]; a framed batch card saved to My Designs writes design's ops_audit_events row.",
+-    "migration_rollback_contract": "0115_tarot_batch_jobs.sql with 0115_tarot_batch_jobs.down.sql (packages/db/migrations/); the down drops both tables and in-flight batch progress with them.",
++    "migration_rollback_contract": "0115_tarot_batch_jobs.sql with 0115_tarot_batch_jobs.down.sql (packages/db/migrations/); the down drops both tables and in-flight batch progress with them. 0119_tarot_batch_actor.sql adds tarot_batch_jobs.actor (who started the batch; the card route asks tarot.image as that actor); its down drops the column after the code is reverted.",
+     "replacement_strategy": "The model registry and transports are in lib/tarot/image-gen.ts; studio consumes it through a facade (lib/studio/image-provider.ts:1-7) and content and video import it directly, so replacing the engine affects those products too. The batch store (lib/tarot/batch-store.ts) is the only reader and writer of the 0115 tables, so another store replaces it without route changes."
+   },
+   "services": [
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/__tests__/batch-store-durable.test.ts b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/__tests__/batch-store-durable.test.ts
+index a66ee5f26..7f1f5811a 100644
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/__tests__/batch-store-durable.test.ts
++++ b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/__tests__/batch-store-durable.test.ts
+@@ -62,7 +62,7 @@ describe("tarot batch store: rows, not memory", () => {
+   it("a retried card callback neither double-counts nor regenerates", async () => {
+     const { store, card, start, status } = await routes();
+     const jobId = randomUUID();
+-    await store.createJob({ jobId, organizationId: ORG_A, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 3 });
++    await store.createJob({ jobId, organizationId: ORG_A, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 3 });
+     expect((await start(new Request("http://x", { method: "POST", headers: { authorization: `Bearer ${SECRET}` } }),
+       { params: Promise.resolve({ jobId }) })).status).toBe(200);
+ 
+@@ -77,21 +77,23 @@ describe("tarot batch store: rows, not memory", () => {
+     expect(job.results).toHaveLength(1);
+   });
+ 
+-  it("each card is billed to the organization that owns the job, not the internal account", async () => {
+-    const { store, card, start } = await routes();
++  it("each card is asked as the person who started the batch and billed to the job's organization, never as system", async () => {
++    const { store, card, start, status } = await routes();
+     const jobId = randomUUID();
+-    await store.createJob({ jobId, organizationId: ORG_B, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
++    const actor = `client:${ORG_B}:u9`;
++    await store.createJob({ jobId, organizationId: ORG_B, createdBy: null, actor, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+     await start(new Request("http://x", { method: "POST", headers: { authorization: `Bearer ${SECRET}` } }), { params: Promise.resolve({ jobId }) });
+     h.grantFor.mockClear();
+     await card(...internal(jobId, card0));
+-    expect(h.grantFor).toHaveBeenCalledWith("tarot.image", { orgId: ORG_B });
++    expect(h.grantFor).toHaveBeenCalledWith("tarot.image", { actor, orgId: ORG_B });
++    expect((await (await status(...staffGet(jobId))).json()).job).not.toHaveProperty("actor");
+   });
+ 
+   it("a job past its deadline reports timed out, not running", async () => {
+     const { store, status } = await routes();
+     const jobId = randomUUID();
+     const longAgo = Date.now() - store.RUN_BUDGET_MS - store.PENDING_BUDGET_MS - 60_000;
+-    await store.createJob({ jobId, organizationId: ORG_A, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 78, now: longAgo });
++    await store.createJob({ jobId, organizationId: ORG_A, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 78, now: longAgo });
+     await store.markRunning(jobId, longAgo);
+ 
+     const { job } = await (await status(...staffGet(jobId))).json();
+@@ -103,7 +105,7 @@ describe("tarot batch store: rows, not memory", () => {
+   it("job state survives a fresh store instance (restart)", async () => {
+     const before = await routes();
+     const jobId = randomUUID();
+-    await before.store.createJob({ jobId, organizationId: ORG_A, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 2 });
++    await before.store.createJob({ jobId, organizationId: ORG_A, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 2 });
+     await before.card(...internal(jobId, card0));
+ 
+     vi.resetModules();
+@@ -121,8 +123,8 @@ describe("tarot batch store: rows, not memory", () => {
+     const { store, list } = await routes();
+     const mine = randomUUID();
+     const theirs = randomUUID();
+-    await store.createJob({ jobId: mine, organizationId: ORG_A, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+-    await store.createJob({ jobId: theirs, organizationId: ORG_B, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
++    await store.createJob({ jobId: mine, organizationId: ORG_A, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
++    await store.createJob({ jobId: theirs, organizationId: ORG_B, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+ 
+     const res = await list(new Request("http://next-admin/api/tools/tarot/batch", {
+       headers: { "x-ops-claims-role": "operator", "x-ops-user-kind": "client", "x-ops-org-id": ORG_A },
+diff --git a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/batch-store.ts b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/batch-store.ts
+index 54a85c99f..828a6f199 100644
+--- a/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/batch-store.ts
++++ b/lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/tarot/batch-store.ts
+@@ -48,6 +48,8 @@ export interface BatchJob {
+ export interface StoredBatchJob extends BatchJob {
+   organizationId: string | null;
+   createdBy: string | null;
++  /** Who started the batch (requestActor); the card callback asks tarot.image as this actor (0119). */
++  actor: string | null;
+ }
+ 
+ // Worker budget: tarot-batch-generate.ts maxDuration (10_800 s) + 10 min. Keep the two in step.
+@@ -82,6 +84,7 @@ export interface JobRow {
+   id: string;
+   organization_id: string | null;
+   created_by: string | null;
++  actor?: string | null;
+   run_id: string | null;
+   model: string;
+   aspect_ratio: string;
+@@ -150,12 +153,13 @@ export function summarizeBatch(job: JobRow, cards: CardRow[], now: number, runSt
+     deadlineAt,
+     organizationId: job.organization_id,
+     createdBy: job.created_by,
++    actor: job.actor ?? null,
+   };
+ }
+ 
+ /** Public shape (no tenant fields). */
+ export function toPublicJob(job: StoredBatchJob): BatchJob {
+-  const { organizationId: _o, createdBy: _c, ...pub } = job;
++  const { organizationId: _o, createdBy: _c, actor: _a, ...pub } = job;
+   return pub;
+ }
+ 
+@@ -163,6 +167,7 @@ export async function createJob(input: {
+   jobId: string;
+   organizationId: string | null;
+   createdBy: string | null;
++  actor: string;
+   model: string;
+   aspectRatio: string;
+   totalCards: number;
+@@ -174,6 +179,7 @@ export async function createJob(input: {
+     id: input.jobId,
+     organization_id: input.organizationId,
+     created_by: input.createdBy && UUID_RE.test(input.createdBy) ? input.createdBy : null,
++    actor: input.actor.slice(0, 300),
+     model: input.model,
+     aspect_ratio: input.aspectRatio,
+     total_cards: input.totalCards,
+diff --git a/lobster-factory/packages/db/migrations/0119_tarot_batch_actor.sql b/lobster-factory/packages/db/migrations/0119_tarot_batch_actor.sql
+new file mode 100644
+index 000000000..30f04381e
+--- /dev/null
++++ b/lobster-factory/packages/db/migrations/0119_tarot_batch_actor.sql
+@@ -0,0 +1,9 @@
++-- 0119: tarot_batch_jobs.actor = who started the batch (requestActor: "client:<org>:<uid>" or "ops:<role>:<uid>").
++-- The card callback runs as the Trigger worker; it asks tarot.image as this actor, so a customer's deck gets the
++-- customer's verdict and every usage row names the person, not "system" (ADR 017 §4; step-8 card, door blocker 2).
++-- Nullable: jobs created before 0119 keep null and are judged as "system", as they were.
++begin;
++set local lock_timeout = '5s';
++alter table public.tarot_batch_jobs
++  add column if not exists actor text check (actor is null or length(actor) between 1 and 300);
++commit;
+diff --git a/lobster-factory/packages/db/migrations/0119_tarot_batch_actor.down.sql b/lobster-factory/packages/db/migrations/0119_tarot_batch_actor.down.sql
+new file mode 100644
+index 000000000..33b5696de
+--- /dev/null
++++ b/lobster-factory/packages/db/migrations/0119_tarot_batch_actor.down.sql
+@@ -0,0 +1,11 @@
++-- Back to 0115's job shape; the code from 0119 must be reverted first (createJob writes actor).
++begin;
++set local lock_timeout = '5s';
++do $$
++begin
++  if to_regclass('public.schema_migrations') is not null then
++    delete from public.schema_migrations where filename = '0119_tarot_batch_actor.sql';
++  end if;
++end $$;
++alter table public.tarot_batch_jobs drop column if exists actor;
++commit;
+diff --git a/lobster-factory/packages/db/scripts/0119_tarot_batch_actor-local-verify.sh b/lobster-factory/packages/db/scripts/0119_tarot_batch_actor-local-verify.sh
+new file mode 100644
+index 000000000..72ae76a54
+--- /dev/null
++++ b/lobster-factory/packages/db/scripts/0119_tarot_batch_actor-local-verify.sh
+@@ -0,0 +1,49 @@
++#!/usr/bin/env bash
++# Verify 0119 against a disposable PostgreSQL container. Touches no production database.
++# Builds on the 0115 verify (same bootstrap, leaves 0115 applied), then: up adds a nullable, length-checked actor
++# column; existing rows stay null; down drops it and its ledger row only; up twice is idempotent.
++# Usage: bash packages/db/scripts/0119_tarot_batch_actor-local-verify.sh
++set -euo pipefail
++HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
++DB_DIR="$(cd "$HERE/.." && pwd)"
++CONTAINER="tarot-0119-verify-$$"
++if command -v docker >/dev/null 2>&1 && docker version >/dev/null 2>&1; then DOCKER=docker; else DOCKER=docker.exe; fi
++cleanup() { "$DOCKER" rm -f "$CONTAINER" >/dev/null 2>&1 || true; }
++trap cleanup EXIT
++
++KEEP_CONTAINER="$CONTAINER" bash "$HERE/0115_tarot_batch_jobs-local-verify.sh"
++psql_run() { "$DOCKER" exec -i "$CONTAINER" psql -h 127.0.0.1 -v ON_ERROR_STOP=1 -U postgres -d postgres "$@"; }
++psql_file() { psql_run -f - < "$1"; }
++
++psql_run -c "INSERT INTO public.tarot_batch_jobs (id, model, aspect_ratio, total_cards, deadline_at) VALUES ('00000000-0000-4000-8000-000000000001', 'm', '2:3', 1, now() + interval '1 hour')" >/dev/null
++psql_file "$DB_DIR/migrations/0119_tarot_batch_actor.sql" >/dev/null
++psql_run -c "INSERT INTO public.schema_migrations (filename, number, sha256, applied_by) VALUES ('0119_tarot_batch_actor.sql', '0119', repeat('0', 64), 'local-verify')" >/dev/null
++psql_run <<'SQL' >/dev/null
++DO $$ BEGIN
++  ASSERT (SELECT actor IS NULL FROM public.tarot_batch_jobs WHERE id = '00000000-0000-4000-8000-000000000001'), 'existing row not null';
++  INSERT INTO public.tarot_batch_jobs (id, actor, model, aspect_ratio, total_cards, deadline_at)
++    VALUES ('00000000-0000-4000-8000-000000000002', 'client:org:u', 'm', '2:3', 1, now() + interval '1 hour');
++  BEGIN
++    INSERT INTO public.tarot_batch_jobs (id, actor, model, aspect_ratio, total_cards, deadline_at)
++      VALUES ('00000000-0000-4000-8000-000000000003', '', 'm', '2:3', 1, now() + interval '1 hour');
++    RAISE EXCEPTION 'empty actor accepted';
++  EXCEPTION WHEN check_violation THEN NULL;
++  END;
++END $$;
++SQL
++echo "OK up 0119: nullable actor, old rows null, empty actor refused"
++psql_file "$DB_DIR/migrations/0119_tarot_batch_actor.down.sql" >/dev/null
++psql_run <<'SQL' >/dev/null
++DO $$ BEGIN
++  ASSERT NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'tarot_batch_jobs' AND column_name = 'actor'), 'actor remains after down';
++  ASSERT (SELECT count(*) FROM public.tarot_batch_jobs) = 2, 'down lost job rows';
++  ASSERT NOT EXISTS (SELECT 1 FROM public.schema_migrations WHERE filename = '0119_tarot_batch_actor.sql'), 'ledger row remains';
++  ASSERT EXISTS (SELECT 1 FROM public.schema_migrations WHERE filename = '0115_tarot_batch_jobs.sql'), 'down removed 0115 ledger row';
++END $$;
++SQL
++echo "OK down 0119: column and its ledger row gone, rows and 0115 kept"
++psql_file "$DB_DIR/migrations/0119_tarot_batch_actor.sql" >/dev/null
++psql_file "$DB_DIR/migrations/0119_tarot_batch_actor.sql" >/dev/null
++echo "OK re-up + second up idempotent"
++diff -q "$DB_DIR/migrations/0119_tarot_batch_actor.down.sql" "$DB_DIR/scripts/0119_tarot_batch_actor_down.sql" >/dev/null
++echo "PASS 0119"
+diff --git a/lobster-factory/packages/db/scripts/0119_tarot_batch_actor_down.sql b/lobster-factory/packages/db/scripts/0119_tarot_batch_actor_down.sql
+new file mode 100644
+index 000000000..33b5696de
+--- /dev/null
++++ b/lobster-factory/packages/db/scripts/0119_tarot_batch_actor_down.sql
+@@ -0,0 +1,11 @@
++-- Back to 0115's job shape; the code from 0119 must be reverted first (createJob writes actor).
++begin;
++set local lock_timeout = '5s';
++do $$
++begin
++  if to_regclass('public.schema_migrations') is not null then
++    delete from public.schema_migrations where filename = '0119_tarot_batch_actor.sql';
++  end if;
++end $$;
++alter table public.tarot_batch_jobs drop column if exists actor;
++commit;

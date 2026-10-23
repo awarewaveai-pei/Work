@@ -1,4 +1,38 @@
 # Worklog
+## 2026-10-23（續38）ADR 017 NEXT ②：付費縫記用量＋閘；studio 精選免費、門上藏 AI；tarot 批次記操作者寫成 patch 待同意（Claude）
+
+**觸發**：操作者「續做 NEXT ②：每個 withFeature 付費路由接上 grant.report()（自用／合約列只記不扣）；完成＝閘、tarot 批次記操作者 migration、studio culture/trending 門上隱藏、vitest 全綠」。
+
+**設計取捨（不照字面「每條路由各呼叫一次」）**：付費呼叫有兩種形狀——27 條 `withFeature` 路由，和 35 處函式庫 `grantFor`（cs、collect、content article、video pipeline、tarot 卡片 callback…，多數不在任何路由的範圍內）。只在路由記用量會漏掉後者，而後者正是代操大宗。不變量：**每個 grant 碰到付費工作時記一次用量**。付費廠商本來就只能經三道縫且都要 grant（ADR 017 §4、import-boundary 閘），所以在縫上記＝不可能有付費呼叫不被記。
+- 「碰到付費工作」＝AwareWave 實際付廠商錢的那一刻（含失敗的生成），正是代操要歸到客戶的成本；同一 grant 多次使用（studio 函式庫沿用路由 grant、replicate 輪詢）只記一列。
+- 不經縫的付費工作只有 video.tts（video-service 在程序外叫 OpenAI）：在 video-service 接單後記。
+- 合約型非 AI 功能（social.dispatch／ads／meta、design.edit）沒有廠商成本、不按次計費，不記。
+
+**修改**（next-admin）
+- `lib/entitlements/can.ts`：`Grant.recordUse(meta)`——每個 grant 只記第一次（模組內 WeakSet），走既有 `report()`（units 0 → 只寫 `entitlement.usage` 稽核、不扣點、不拋例外）。
+- `lib/ai/gateway.ts` `loadAnthropic`／`loadGoogleGenerativeAI`／`providerUrl`、`lib/collect/net/providers.ts` `createProviderCall`：驗 grant 後 `void grant.recordUse({ provider })`。
+- `lib/content/video/render-client.ts`：video.tts grant 保留，送出給 video-service 時 recordUse（與縫同語意：碰到付費工作就記；Codex F3 後由「接單後」前移）。
+- 閘 `lib/portal/__tests__/registry-code.test.ts`：掃描器加 `meters`（`.recordUse(` 呼叫）；新測「every credits-billed feature is asked by code that reaches a usage meter」（詢問處的 import 閉包要含一個 recordUse 呼叫檔；並斷言 gateway、collect providers 在內）。與閘 ③ 同限：證引入、不證資料流。
+- `lib/ai/__tests__/gateway.test.ts` 新測：同一 grant 經四次縫只記 1 列、新 grant 再記 1 列、全程不扣點。
+- studio：`app/api/tools/studio/culture/route.ts` 精選與 curatedOnly 在付費閘之前（任何角色免費），只有 AI 後備走 `withFeature("ops.cheap-json")`；新 `route.test.ts` 3 測。`StudioWorkbench.tsx` 以 `usePaidFeatures().canUse("ops.cheap-json")` 決定是否顯示「搜尋資料 AI 模型」「時事靈感」「AI 換一批」，混搭骰在不可用時只拿精選。
+- 順帶：`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/generation/module-manifests.json` 以已提交 manifest 重產（他 session `7f7f0e3b2` 改 tarot manifest 未重產，HEAD 時 `--check` 已 drift）。
+- 文件：ADR 017 §4「用量已記、扣點未接」、`cards/step-8.md` 阻擋項狀態、監工台 NOW／NEXT ②、TASKS。
+
+**tarot 批次記操作者（寫好、未推）**：`agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-8-tarot-actor.patch`（10 檔）：`0119_tarot_batch_actor.sql`（`tarot_batch_jobs.actor text` nullable、長度 1–300）＋down 兩份＋local-verify；`batch-store.ts` 存讀 actor（公開 job 不帶）；批次 POST 存 `grant.actor`；卡片 callback 以 `{ actor: job.actor ?? "system", orgId }` 問 tarot.image（客戶的牌組得到客戶判決、用量列記本人）；tarot MODULE_MANIFEST 一句。不推的原因：`sg-deploy.sh:185-209` migration 閘看到未套 prod 的 migration 會擋下整個 03:00 部署，而套 prod 是 High。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）＋ npx vitest run（319 files／2897 passed／23 skipped，出貨狀態，Codex 修正後重跑） | exit=0 | ms=22107
+- REALTEST_EVIDENCE: tool=Bash | cmd=bash packages/db/scripts/0119_tarot_batch_actor-local-verify.sh（拋棄式 postgres:15.8：0115 全套後 up、舊列 null、空字串拒、down 只去欄與 0119 帳本列、再 up 冪等）→ PASS 0119；patch 套用狀態下 vitest 全套 2897 passed、tarot 23 passed | exit=0 | ms=11477
+- 突變：拿掉 video.tts 的 recordUse → 新閘紅並指名 `video.tts: asked in lib/content/video/render-client.ts, none reaches recordUse`；culture 精選改走付費閘 → 「a curated combo is served free…」紅；卡片 callback 去 actor → 「each card is asked as the person who started the batch…」紅；皆還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/3m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-17c6d5ee.md`。F1 video.tts 記到自用帳戶：成立（`app/api/video/render-draft/route.ts` 解出 orgId 但沒開 `withFeature` 範圍，函式庫 `grantFor` 落到 internal／system），屬一類非單點，見下「同類」；客戶繞過不可達（video 門未建，閘 ④ 建門時強制 withFeature）。F2 稽核失敗後同 grant 不再記：駁回——`safeAudit` 寫 DB 前已把完整事件 console.warn 進容器 log；改成失敗重試會讓並行共用 grant 的函式庫重複記。F3 送出成功但回應遺失則漏記：採納，計量前移到送出時。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=recordUse | hits=16（9 檔：can.ts 定義、gateway 3 縫＋註解、collect、render-client、registry-code 閘與掃描器自測、ADR 017、step-8、data.mjs、TASKS）；舊主張「沒有路由呼叫 grant.report」：ADR 017 §4、step-8、data.mjs 已改，`handoffs/2026-10-19-adr017-step3-resume.md:15` 為歷史不改
+
+**同類（Codex F1，未修，另案）**：付費工作在任何 `withFeature` 範圍外發生時，函式庫 `grantFor` 以自用帳戶／`system` 判並記用量——員工替客戶做的 content generate、video、cs 等用量會記在自用帳戶，「代操按客戶計」仍不完整。探針（閘的掃描器，未提交）：49 條 API 路由的 import 閉包碰到計量呼叫卻沒包 `withFeature`（閉包偏寬，含 webhooks 等未必真付費者）。治本＝逐條判：真付費者包 `withFeature`（客戶組織由路由解出、經 `actorFor` 授權），其餘列豁免附理由，再把閘 ④ 從「已建門的路由」擴到全部 API 路由。TASKS ADR 017 條目已記。
+
+**剩餘**：扣點單價（操作者）；tarot patch 待同意；上段同類；認知平台等外部服務的用量回報不在本次（它們走 `/api/internal/entitlements/permit`，另案）。
+
+**rollback**：`git revert <本 commit>`（無資料、無 migration）；patch 未套無影響。
 ## 2026-10-23（續37）next-admin 提前部署 d433dfe29（塔羅背景批次套框＋存設計＋PNG/WebP、牌面修正；他 session 入口／側欄）（Claude）
 
 **觸發**：操作者下令「部署」。

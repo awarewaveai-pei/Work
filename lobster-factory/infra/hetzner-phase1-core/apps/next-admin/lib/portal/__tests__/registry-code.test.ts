@@ -28,7 +28,7 @@ function sources(dir: string): string[] {
 
 // apis: every "/api/..." literal (registry tables included); calls: only those passed to a call or `new`, or set as a
 // JSX attribute -- what a page actually requests. Type-only imports are erased at build, so they are not imports.
-interface Scan { asked: string[]; apis: string[]; calls: string[]; imports: string[] }
+interface Scan { asked: string[]; apis: string[]; calls: string[]; imports: string[]; meters: boolean }
 const unwrap = (n: ts.Node | undefined): ts.Node | undefined =>
   n && (ts.isParenthesizedExpression(n) || ts.isAsExpression(n) || ts.isSatisfiesExpression(n) || ts.isNonNullExpression(n) || ts.isTypeAssertionExpression(n)) ? unwrap(n.expression) : n;
 const apiText = (node: ts.Node | undefined) => {
@@ -42,7 +42,7 @@ const typeOnly = (n: ts.ImportDeclaration | ts.ExportDeclaration) => ts.isExport
     && n.importClause.namedBindings.elements.every((e) => e.isTypeOnly)));
 function scan(file: string, text: string): Scan {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, /\.tsx$/.test(file) ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
-  const out: Scan = { asked: [], apis: [], calls: [], imports: [] };
+  const out: Scan = { asked: [], apis: [], calls: [], imports: [], meters: false };
   const spec = (s: string) => {
     const r = s.startsWith("@/") ? s.slice(2) : s.startsWith(".") ? path.posix.normalize(path.posix.join(path.posix.dirname(file), s)) : null;
     if (r) out.imports.push(r);
@@ -60,6 +60,7 @@ function scan(file: string, text: string): Scan {
         if (n.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(n.expression) && n.expression.text === "require")) spec(arg.text);
         if (ts.isIdentifier(n.expression) && ["grantFor", "withFeature"].includes(n.expression.text)) out.asked.push(arg.text);
       }
+      if (ts.isPropertyAccessExpression(n.expression) && n.expression.name.text === "recordUse") out.meters = true;
       const featureArg = n.arguments[1];
       if (ts.isIdentifier(n.expression) && n.expression.text === "can" && featureArg && ts.isStringLiteralLike(featureArg)) out.asked.push(featureArg.text);
     }
@@ -158,6 +159,21 @@ describe("registry claims match the code", () => {
     }
     for (const k of BACK_OFFICE_FEATURES) expect(asked.has(k), `${k}: back-office key nothing asks`).toBe(true);
     for (const k of asked) expect(FEATURE_OWNER.has(k) || BACK_OFFICE_FEATURES.has(k), `${k}: asked but not declared`).toBe(true);
+  });
+
+  // ADR 017 §4: usage is recorded where a grant reaches paid work (Grant.recordUse at the gateway / collect seams, or at
+  // the one call site whose paid work runs out of process). A credits feature none of whose askers reaches such a call
+  // would be used and never counted, so it could never be billed. Like gate 3, this proves the import, not the data path.
+  it("every credits-billed feature is asked by code that reaches a usage meter", () => {
+    const meters = new Set([...FILES].filter(([, s]) => s.meters).map(([f]) => f));
+    expect([...meters].sort()).toEqual(expect.arrayContaining(["lib/ai/gateway.ts", "lib/collect/net/providers.ts"]));
+    for (const p of PRODUCTS.filter((x) => x.door.app === "next-admin")) {
+      for (const f of p.features.filter((x) => x.billing === "credits")) {
+        const askers = [...FILES].filter(([, s]) => s.asked.includes(f.feature_key)).map(([file]) => file);
+        const metered = askers.some((a) => [...importClosure([a])].some((g) => meters.has(g)));
+        expect(metered, `${f.feature_key}: asked in ${askers.join(", ")}, none reaches recordUse`).toBe(true);
+      }
+    }
   });
 
   it("a product reaching another product's routes or features declares it, and declares nothing it does not reach", () => {
@@ -262,7 +278,9 @@ describe("registry claims match the code", () => {
 
   it("the scanner sees literal asks, URLs in templates, and keys in an imported file", () => {
     const s = scan("lib/x/a.ts", 'import { g } from "@/lib/tarot/b"; await grantFor("studio.image"); fetch(`/api/tools/studio/x?y=${1}`); const s = "/api/social/";');
-    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], calls: ["/api/tools/studio/x"], imports: ["lib/tarot/b"] });
+    expect(s).toEqual({ asked: ["studio.image"], apis: ["/api/tools/studio/x", "/api/social"], calls: ["/api/tools/studio/x"], imports: ["lib/tarot/b"], meters: false });
+    expect(scan("lib/x/m.ts", "void grant.recordUse({}); recordUse();").meters).toBe(true);
+    expect(scan("lib/x/m.ts", "recordUse(); // grant.recordUse()").meters).toBe(false);
     const j = scan("app/x/p.tsx", 'import type { T } from "@/lib/a"; import { type U } from "@/lib/b"; import { v, type W } from "@/lib/c"; require("@/lib/d"); const f = <form action="/api/a/b" />; new EventSource(`/api/c/${1}`); fetch(("/api/e" as const)); const tbl = ["/api/d"];');
     expect(j.imports).toEqual(["lib/c", "lib/d"]);
     expect(j.calls).toEqual(["/api/a/b", "/api/c", "/api/e"]);

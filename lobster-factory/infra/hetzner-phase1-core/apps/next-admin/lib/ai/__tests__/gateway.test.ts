@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { can, EntitlementRequired } from "@/lib/entitlements/can";
 import { CUSTOMER, INTERNAL, gateFixture } from "@/lib/entitlements/__tests__/gate-fixtures";
-import { loadAnthropic, loadGoogleGenerativeAI } from "../gateway";
+import { loadAnthropic, loadGoogleGenerativeAI, providerUrl } from "../gateway";
 
 describe("provider gateway", () => {
   it("gateway refuses a call without a grant", async () => {
@@ -16,5 +16,21 @@ describe("provider gateway", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const allowed = await can(INTERNAL, "ops.inbox-ai", "system", gateFixture().deps);
     expect(typeof (await loadAnthropic(allowed))).toBe("function");
+  });
+
+  it("a grant reaching any paid seam records one usage row however often it is used, and never debits", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { deps, audit, debit } = gateFixture({ entitlement: null, balance: 50 });
+    const usage = () => audit.mock.calls.filter(([e]) => e.event === "entitlement.usage");
+    const grant = await can(CUSTOMER, "content.title", "client:c:u", deps);
+    await loadAnthropic(grant);
+    await loadGoogleGenerativeAI(grant);
+    providerUrl(grant, "replicate", "/v1/predictions/x");
+    providerUrl(grant, "replicate", "/v1/predictions/x");
+    expect(usage()).toHaveLength(1);
+    expect(usage()[0][0]).toMatchObject({ featureKey: "content.title", subject: CUSTOMER, actor: "client:c:u", payload: { units: 0, source: "credits", provider: "anthropic" } });
+    providerUrl(await can(CUSTOMER, "content.title", "client:c:u", deps), "openai", "/v1/x");
+    expect(usage()).toHaveLength(2);
+    expect(debit).not.toHaveBeenCalled();
   });
 });

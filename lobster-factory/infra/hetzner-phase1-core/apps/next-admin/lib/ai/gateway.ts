@@ -13,13 +13,16 @@ export function assertGrant(grant: Grant): void {
   if (!grant.allowed) throw new EntitlementRequired(grant.reason ?? "denied");
 }
 
+// Every seam meters the grant it is handed (Grant.recordUse: first use per grant = one usage row, never blocks the call).
 export async function loadAnthropic(grant: Grant) {
   assertGrant(grant);
+  void grant.recordUse({ provider: "anthropic" });
   return (await import("@anthropic-ai/sdk")).default;
 }
 
 export async function loadGoogleGenerativeAI(grant: Grant) {
   assertGrant(grant);
+  void grant.recordUse({ provider: "gemini" });
   return (await import("@google/generative-ai")).GoogleGenerativeAI;
 }
 
@@ -36,5 +39,6 @@ export type Provider = keyof typeof PROVIDER_ORIGINS;
 export function providerUrl(grant: Grant, provider: Provider, path: string): string {
   assertGrant(grant);
   if (!path.startsWith("/")) throw new Error(`providerUrl: path must start with "/" (${provider})`);
+  void grant.recordUse({ provider });
   return `${PROVIDER_ORIGINS[provider]}${path}`;
 }

@@ -14,7 +14,7 @@
 - 開門規則（2026-10-23 操作者同意，正本 ADR 018 §2「開門規則」1–3）：API 範圍＝自身＋`dependsOn`＋`PLATFORM_APIS`；資料以組織為界、登入門頁不用 service role、門可呼叫的路由皆授權；多頁產品用 `door.nav`。上方 1.「抽成 `lib/<key>/ui`」改為沿用員工頁原元件（social 先例），伺服器端讀全客戶資料的頁才拆。
 - 客戶身分在 `resolveOpsRole` 固定為 operator（2026-10-23，操作者選方案 B）：開每個門前逐條核對它的路由——付費工作要向請求者的組織計費（tarot 批次曾記到 internal，已修）、客戶可寫可刪的資料限本人或本組織；outreach 的 `canManageOutreach` 本身不分租戶（`lib/ops-role.ts` Cold Outreach 段），開門前必須補組織過濾。
 - 開門順序（2026-10-23 重排，依「客戶可直接操作的現成工具」優先）：tarot、studio（已建）→ video → design → content；cs、collect、outreach 的員工頁是跨客戶營運後台，排最後。cs 暫緩到 Chatwoot 載體上線（`app/(shell)/ops/cs/page.tsx:43,63`；`cs-widget` 為 MockTransport）：客戶介面在 `ops/clients/[slug]/CustomerServiceTab.tsx`＋`CsIntentsCard.tsx`，API 在 `/api/ops/clients/[slug]/cs-*`，開門時搬到 cs 前綴並改共用元件。
-- 門上線前阻擋項（critic 2026-10-23）：① 扣點未接——全 app 無 `grant.report()` 呼叫，credits 功能只看餘額不扣（定價待操作者，ADR 017 §4）；任何門賣點數前必補，並加閘「門服務的 credits 功能走到 `report(`」。② tarot 批次每卡 `grantFor` 以 `system` 判（影子），需記批次操作者（`tarot_batch_jobs` 加欄＝migration）。③ studio 的 culture／trending 對客戶回 `back_office_only`，門上要隱藏或免費路徑先行（`culture/route.ts:57` vs `:82-88`）。
+- 門上線前阻擋項（critic 2026-10-23；狀態 WORKLOG 2026-10-23 NEXT ② 條目）：① 用量已記（付費縫 `grant.recordUse()`＋閘「每個 credits 功能走到 recordUse」）；扣點仍待定價（ADR 017 §4），任何門賣點數前必補 units。② tarot 批次記操作者：0119＋程式寫好、真 Postgres 驗過，存 `cards/step-8-tarot-actor.patch` 待操作者同意套 prod（套用順序＝先 `apply-db-migration.mjs 0119` 再 `git apply` 推 main，否則 03:00 部署被 migration 閘擋）。③ studio 已做：culture 精選免費路徑在付費閘之前，`StudioWorkbench` 在 `ops.cheap-json` 不可用時藏模型選擇、時事靈感、AI 換一批。
 - 已建的門另受閘 ④：路由的 import 走到 `lib/entitlements/grant.ts` 就必須自己宣告計費功能（否則函式庫 `grantFor` 記到 internal）。
 - 階段 0 已做 `e8f13684d`：門禁 ①（API 可達）②（不用 service role）、`ProductDoorShell`、`/ops/products`。
 - 不做：不重寫業務邏輯、不搬資料表、不改 API 前綴。

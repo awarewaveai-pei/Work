@@ -53,24 +53,25 @@ interface CultureItem {
   desc: string;
 }
 
-// Library grantFor calls inherit this request's billing account and actor (ADR 018 §2 開門規則 2).
-export const POST = withFeature("ops.cheap-json", handlePost);
+// Curated items are free for every caller; only the live LLM fallback is paid and asks ops.cheap-json (back-office:
+// a customer on the studio door gets the curated set and is refused the live call). Library grantFor calls inside
+// the live branch inherit this request's billing account and actor (ADR 018 §2 開門規則 2).
+const live = withFeature("ops.cheap-json", liveItems);
 
-async function handlePost(req: Request) {
+export async function POST(req: Request) {
   const resolved = resolveOpsRole(req);
   if (!canCreateAiImageJob(resolved.role)) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });
   }
 
-  let body: { region?: string; lens?: string; model?: string; force?: boolean; curatedOnly?: boolean };
+  let body: CultureBody;
   try {
-    body = (await req.json()) as { region?: string; lens?: string; model?: string; force?: boolean; curatedOnly?: boolean };
+    body = (await req.clone().json()) as CultureBody;
   } catch {
     return NextResponse.json({ ok: false, error: "invalid_json" }, { status: 400 });
   }
 
-  const region = (body.region ?? "").trim().slice(0, 60);
-  const lensKey = body.lens && LENS_HINTS[body.lens] ? body.lens : "";
+  const { region, lensKey } = target(body);
   if (!region || !lensKey) {
     return NextResponse.json({ ok: false, error: "missing_region_or_lens" }, { status: 400 });
   }
@@ -86,6 +87,18 @@ async function handlePost(req: Request) {
   if (body.curatedOnly) {
     return NextResponse.json({ ok: true, items: [], model: "none" });
   }
+  return live(req);
+}
+
+type CultureBody = { region?: string; lens?: string; model?: string; force?: boolean; curatedOnly?: boolean };
+const target = (body: CultureBody) => ({
+  region: (body.region ?? "").trim().slice(0, 60),
+  lensKey: body.lens && LENS_HINTS[body.lens] ? body.lens : "",
+});
+
+async function liveItems(req: Request) {
+  const body = (await req.json()) as CultureBody;
+  const { region, lensKey } = target(body);
 
   const systemPrompt = `You are a cultural design researcher helping a designer create clothing graphics inspired by world cultures.
 Given a culture and a facet, return ONLY a valid JSON array of 12 specific, authentic, visually distinctive items of that facet from that culture.

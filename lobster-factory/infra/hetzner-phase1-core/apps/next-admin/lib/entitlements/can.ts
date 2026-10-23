@@ -95,6 +95,7 @@ export class EntitlementRequired extends Error {
 }
 
 const MINT = Symbol("grant");
+const USED = new WeakSet<object>();
 /** Only `can` mints one (the symbol is not exported), so a gateway parameter of this type cannot be faked in code. */
 export class Grant {
   constructor(mint: typeof MINT, readonly info: {
@@ -115,6 +116,14 @@ export class Grant {
   get actor() { return this.info.actor; }
   get limits() { return this.info.limits; }
   get maxSpend() { return this.info.maxSpend; }
+  /** Usage metering (ADR 017 §4): every paid seam calls this when the grant reaches paid work; only the first call per
+   *  grant records (one entitlement.usage row), so a request's libraries and a job's polls sharing a grant count once.
+   *  Never debits and never rejects: units stay 0 until per-feature prices exist (operator decision). */
+  recordUse(meta: Record<string, JsonValue> = {}): Promise<void> {
+    if (USED.has(this)) return Promise.resolve();
+    USED.add(this);
+    return this.report({ meta });
+  }
   /** Credits are debited from the billing account (on_behalf_of); the audit row always names the actor. A debit needs
    *  the caller's idempotencyKey: a retry with a fresh random key would charge twice. Only the debit may throw; once it
    *  succeeded an audit failure is logged, never thrown (the caller would retry a charge that already happened). */

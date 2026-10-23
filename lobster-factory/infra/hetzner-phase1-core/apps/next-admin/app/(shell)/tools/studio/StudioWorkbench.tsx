@@ -24,6 +24,7 @@ import {
 import { tabStyle, chipStyle, actionPill, ghostBtn } from "@/components/tools/panel-primitives";
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
+import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
 import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
 import type { MockupView } from "@/lib/studio/printful-mockup";
 import {
@@ -382,6 +383,9 @@ function CategoryPicker({
 }
 
 export default function StudioWorkbench() {
+  // Culture/trending AI is back-office (ops.cheap-json): an account refused it (a customer on the studio door) keeps the
+  // free curated culture lists and never sees a button that would only answer 403.
+  const liveAi = usePaidFeatures().canUse("ops.cheap-json");
   const [selectedModels, setSelectedModels] = useState<Set<StudioModel>>(new Set<StudioModel>(["flux-schnell"]));
   const [productType, setProductType] = useState("tshirt");
   const [theme, setTheme] = useState("");
@@ -653,9 +657,10 @@ export default function StudioWorkbench() {
     setRegionTab(a.group);
     setFusionRegion(b.it);
     setTopic(t.key);
-    void fetchCulture(a.it.en, t.key);
-    void fetchCulture(b.it.en, t.key);
-  }, [fetchCulture]);
+    const opts = liveAi ? undefined : { curatedOnly: true };
+    void fetchCulture(a.it.en, t.key, opts);
+    void fetchCulture(b.it.en, t.key, opts);
+  }, [fetchCulture, liveAi]);
 
   const fetchAllTrending = useCallback(async () => {
     setTrendingFetching(true);
@@ -1029,7 +1034,7 @@ export default function StudioWorkbench() {
           </select>
         </label>
 
-        <AccordionSection
+        {liveAi && <AccordionSection
           title="🔎 搜尋資料AI模型"
           summary={selectedSearchDataModel.label}
         >
@@ -1083,9 +1088,9 @@ export default function StudioWorkbench() {
           <p style={{ fontSize: 10, opacity: 0.45, marginTop: 4, marginBottom: 0 }}>
             {textModelCostSummary(searchDataModel)}
           </p>
-        </AccordionSection>
+        </AccordionSection>}
 
-        <AccordionSection title="🔥 時事靈感">
+        {liveAi && <AccordionSection title="🔥 時事靈感">
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <p style={{ fontSize: 11, opacity: 0.55, margin: 0 }}>點擊話題填入主圖欄（再點一次取消）</p>
             <button type="button" disabled={trendingFetching} onClick={() => void fetchAllTrending()}
@@ -1118,7 +1123,7 @@ export default function StudioWorkbench() {
               });
             })()}
           </div>
-        </AccordionSection>
+        </AccordionSection>}
 
         {/* 🗓️ 活動行事曆 — upcoming events for merchandise pre-selling */}
         <AccordionSection
@@ -1336,12 +1341,12 @@ export default function StudioWorkbench() {
             return (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
-                  <button type="button" disabled={!region || fetching}
+                  {liveAi && <button type="button" disabled={!region || fetching}
                     onClick={() => { if (region) void fetchCulture(region.en, facet.key, { force: true }); }}
                     title="精選清單已自動載入（免費）。想要不一樣的，按這個用 AI 換一批（花一點點錢）"
                     style={actionPill(!region || fetching)}>
                     {fetching ? "AI 思考中…" : `🔄 AI 換一批（${region ? region.zh : "先選地域"}・${facet.zh}）`}
-                  </button>
+                  </button>}
                   {specifics.length > 0 && <span style={{ fontSize: 10, opacity: 0.45 }}>已載入 {specifics.length} 項</span>}
                 </div>
 

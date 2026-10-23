@@ -47,7 +47,7 @@ export const PRIORITY = [
 // 接下來的實際順序（2026-10-23 依 prod 現況排；證據在 NOW 與各卡）。steps＝相關步驟；每個未完成步驟至少出現一次（check 擋）。
 export const NEXT = [
   { h: '① 翻強制模式（等 10/31，不占工時）', t: '權利已就位（2026-10-23 部署）；客戶本人操作時已一律強制，翻的只影響員工。10/31 自動檢查 7 天「若強制就拒」歸零或都已解釋後，請你同意再翻（High）。', steps: [3] },
-  { h: '② 用量計量與扣點接上', t: '全 app 沒有任何用量回報呼叫（grant.report() 只有定義）＝代操算不出每位客戶用了多少，也沒有扣點。先把每個付費路由接上回報（自用與合約列只記用量不扣點；每功能單價仍由你定），同時 tarot 批次記操作者（migration）、studio 後台功能在門上隱藏。這三項是門上線的阻擋項，也是「先服務自己的客戶」還缺的最後一塊；純內部，沒有待決。', steps: [3, 8] },
+  { h: '② 用量計量與門上線阻擋項', t: '已做（2026-10-23）：每道付費縫記用量（自用與合約列只記不扣；單價待你定）、studio 精選免費路徑在付費閘前且門上藏 AI 按鈕。剩 tarot 批次記操作者：migration 0119 與程式已寫好、真 Postgres 驗過，存 patch 等你同意套 prod（High）。', steps: [3, 8] },
   { h: '③ 門逐個上線', t: '規則已定（ADR 018 §2）。tarot → studio（門頁已建）→ video → design → content；cs（等 Chatwoot）、collect、outreach（員工路由要先搬）最後。每個門上線 High。第一個自助客戶不等 Woo：員工邀請（本機帳號登入已能用）＋人工寫合約列，與 Soulful 同一條路。', steps: [8] },
   { h: '④ 收錢分兩段', t: '4a 內部先做：付款接頭、收件表、合約與權利寫入、錢包入帳、/ops/billing；付款來源先用「人工」（轉帳），不碰 Woo、不等待決。4b 等待決 1、3：Woo 六種事件、定期扣款、點數條款，WordPress 一鍵登入產品門（ADR 015 順序 1）同一包，不單獨先做（High，做了沒人走）。兩題現在就問金流商與會計師。', steps: [4] },
   { h: '⑤ 買斷安裝', t: '收錢兩段完成、待決 2 律師回覆後開工。', steps: [5] },
@@ -100,7 +100,7 @@ export const WAYS = [
 export const NOW = [
   { what: '客戶可自行登入', state: 'no', ev: '員工替客戶開帳號、寄設定密碼信；prod 已設 RESEND_API_KEY，但公開註冊由程式關閉（portal/api/signup/route.ts:9、:99），要先做確認信流程' },
   { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0：plans、錢包帳本皆 0 筆，Woo 尚未販售' },
-  { what: '代操用量按客戶計', state: 'no', ev: '判決會過（0118 合約列），但用量與扣點都不記：grant.report() 只有定義（lib/entitlements/can.ts:121），全 app 0 個呼叫點；錢包也只有扣款、沒有入帳寫入（ledger.ts）' },
+  { what: '代操用量按客戶計', state: 'no', ev: '程式已接（2026-10-23）：每道付費縫 grant.recordUse() 每個 grant 記一列 entitlement.usage（lib/ai/gateway.ts、collect、video.tts），閘擋「credits 功能走不到 recordUse」；2026-10-24 03:00 自動部署後生效。扣點仍 0（每功能單價待你定）；錢包也只有扣款、沒有入帳寫入（ledger.ts）' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
   { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；每功能扣幾點待你定價' },
   { what: '產品自己的門', state: 'no', ev: 'social 已上線；tarot、studio 門頁已做、尚未上線；客戶在門上取得產品使用權（resolveOpsRole，2026-10-23），tarot 批次已改向客戶組織計費；其餘 6 個未開。開門規則與三道機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon' },
