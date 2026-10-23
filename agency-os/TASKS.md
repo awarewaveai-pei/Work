@@ -137,12 +137,13 @@
   - `✅ 完成` · `2026-10-15` · 根因＝10/02 操作者核准抹除的專案；匯入改成重用前先向 Cognitive OS 確認（`5f38b4a06`，已部署）；19 筆依操作者決定改回「未匯入」，對帳 0 懸空（WORKLOG 2026-10-15 續11、續13）
 
 - [ ] **【產品｜ADR 017 客戶怎麼買】已接受；照 ADR「順序」1–7 開卡做**
-  - `🟠 未開始` · `2026-10-14` · WORKLOG 續15、續17；第 3 步前查定期扣款外掛；`ADR_INDEX.md` 那列已改「已接受」（2026-10-15）
-  - **監工台**（plan 唯一狀態頁，操作者 2026-10-16「要有監工頁面」）：https://claude.ai/artifact/LVBCAdvjGa9RDnFjNGfPTD ← `agency-os/handoffs/2026-10-16-customer-model-supervisor/`（`data.mjs` 改狀態 → `node build.mjs` → `node check.mjs` → 重發同 URL）。每步 done 時改 `STEPS[n].status`＋`commit`。
+  - `🟡 3／9` · `2026-10-14` · WORKLOG 續15、續17；`ADR_INDEX.md` 那列已改「已接受」（2026-10-15）
+  - **下一步＝監工台「接下來依序做」①**（`cards/step-3.md`「收尾」段；WORKLOG 2026-10-23 監工台依現況更新條目）。建議模型：Opus 5.5
+  - **監工台**（plan 唯一狀態頁，操作者 2026-10-16「要有監工頁面」）：https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr（`LVBC…` 本帳號讀寫不到，2026-10-23 改回）← `agency-os/handoffs/2026-10-16-customer-model-supervisor/`（`data.mjs` 改狀態 → `node build.mjs` → `node check.mjs` → 重發同 URL）。每步 done 時改 `STEPS[n].status`＋`commit`。
   - **第 3 項 done** `e87de9225`（WORKLOG 2026-10-20 續3；監工台已重發）：can() 影子模式、認知平台取許可、灰按鈕、付費 vendor 只走三道縫。剩：[ ] 每功能每次扣幾點＝定價（操作者決定，`ledger.ts` `DEFAULT_CREDIT_POLICY` 佔位）；[ ] 翻 `ENTITLEMENT_MODE=enforce`（High，前置見 ADR 017 §4）
   - **登記表事實 follow-up**（WORKLOG 2026-10-20「產品登記表三類事實改成可驗」）：[ ] `lib/kb/rag.ts:40` 每次 embedding 都記 cs.answer（collect kb sink、dossier、知識上傳也是）＝定價決定哪個 feature 付；[ ] cs／collect 的 `/api/ops/clients/[slug]/…` 與 optional 跨產品按鈕在產品門上 404、`/api/social/rewrite` 只認 ops 角色＝順序 8 決定；[ ] `lib/tarot/image-gen.ts` 搬到中立位置（tarot 工作停時）；[ ] 唯一已知互呼：content→video（ContentStudio 影片分頁打 `/api/video/*`）記在 content 的 `optional`，因 video.dependsOn=content（操作者選 A）；影片分頁搬回 video 頁時刪掉該 optional；[ ] video 路由未包 `withFeature`，video.image／video.motion／video.tts 的 grantFor 沒帶客戶 org，照舊記 internal 帳戶（Codex partialreview-e1a6140c F2，改前即如此）
   - 2026-10-16 §0 改三軸（部署／商業／操作），順序加 6 API 通道、7 轉售；第 1 步啟動時一併改 System Foundry：問卷只加 1 題「裝在客戶自己的主機」（self_hosted；License 只暗示不等於）；藍圖末節「交付登記」是一張推導表——五種方式＝既有答案的組合（自用＝員工使用要＋收費不要；代操＝員工要＋外部客戶不要＋收費要；訂閱＝外部客戶要＋訂閱要；點數＝外部客戶要＋預付點數要；買斷＝License 要）、三軸（誰操作＝SCOPE-001/002＋Q-CH-004；錢＝Q-COM-001/002/004/005/006/008；裝在哪＝新題）、根組織數＝Q-ORG-001/002/003/006；問卷另加一節「AwareWave 積木」（每個登記產品一題，由 `scripts/sync-foundry-catalog.mjs` 從 `products.ts` 生成，勾了就把該產品 manifest 當模組放進藍圖、依賴自動閉包；操作者 2026-10-18「可以選擇項目組裝上去」）；子網域與 WordPress 登入來源是 AwareWave 實作值，不進技術中立的問卷，由 `new-product.mjs --from-foundry <generated 目錄>` 補問（讀 `foundry-plan.json`＋「交付登記」，十項宣告填 MODULE_MANIFEST；ADR 017 §0b 第 8 條）；藍圖必寫「許可只問 `can()`」（2026-10-17 更正：昨天寫「缺代操」是錯的，代操是組合不是題），WORKLOG 2026-10-16「三條軸」條目；**v1.7 計畫**（2026-10-18 審核：選擇正確、產出不能開工、無監工台）：`agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md` 六張卡 V17-1…6
-  - **執行卡**：`agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md … step-7.md`（Decision／Files／指令→預期／突變／Rollback），下一步＝照 step-1.md 做（Opus 5.5）
+  - **執行卡**：`agency-os/handoffs/2026-10-16-customer-model-supervisor/cards/step-1.md … step-9.md`（Decision／Files／指令→預期／突變／Rollback）
   - **操作者待決（2026-10-16「目前尚未決定，之後決定」）**，各卡住一步，第 1、2、3 步（代操計費）不受影響：
     - [ ] 待決 1：訂閱每月扣款用哪個 WooCommerce 定期扣款外掛；台灣金流是否支援定期扣款（ADR 017 產品決定 Q3）→ 擋第 4 步（付款）
     - [ ] 待決 2：買斷交付前請律師確認授權——Postiz（AGPL-3.0）、MinIO（AGPLv3，Trigger 內含）、Redis（Trigger 與核心用浮動 7-alpine，7.4 起 RSALv2／SSPL）（ADR 017 §5 授權盤點）→ 擋第 5 步

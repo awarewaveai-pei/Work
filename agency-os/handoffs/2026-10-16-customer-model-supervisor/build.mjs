@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { esc, t, page, section, yesNo, ruleList, stepList, stepLink, openList, pathRows } from '../../../scripts/supervisor-kit/build.mjs';
-import { META, COPY, RULES, PRIORITY, PRICING, DOORS, AXES, WAYS, NOW, STEPS, OPEN, SIDE } from './data.mjs';
+import { META, COPY, RULES, PRIORITY, NEXT, PRICING, DOORS, AXES, WAYS, NOW, STEPS, OPEN, SIDE } from './data.mjs';
 
 // 本頁專屬：五種客戶卡、入口列
 const CSS = `.ways{display:grid;gap:12px}
@@ -39,13 +39,15 @@ export function render() {
     <dl>${AXES.map((a) => `<div><dt>${esc(a.q)}</dt><dd>${esc(val(a.key, w[a.key]).plain)}<code>${esc(w[a.key])}</code></dd></div>`).join('')}</dl>
     <p class="note">${esc(w.note)}</p></article>`).join('');
   const doors = DOORS.map((d) => `<li><b>${esc(d.name)}</b><span><code>${esc(d.host)}</code><br>${esc(d.who)}：${esc(d.does)}<small>${esc(COPY.doors.login)}：${esc(d.login)}</small></span></li>`).join('');
+  const linked = (rows) => ruleList(rows.map((p) => ({ h: p.h, t: p.t, small: p.steps.map((d) => stepLink(STEPS, L, d)).join('、') })));
   const side = SIDE.map((x) => `<li><b>${esc(L.also)}</b><span>${esc(x.what)}<small>${x.step ? stepLink(STEPS, L, x.step) : ''}${esc(x.when)}；${esc(x.src)}</small></span></li>`).join('');
 
   const body = [
     section('rules', COPY.rules, ruleList(RULES)),
     section('now', COPY.now, yesNo(NOW, L)),
     section('ways', COPY.ways, `<div class="ways">${ways}</div>`),
-    section('priority', COPY.priority, ruleList(PRIORITY.map((p) => ({ h: p.h, t: p.t, small: p.steps.map((d) => stepLink(STEPS, L, d)).join('、') })))
+    section('priority', COPY.priority, linked(PRIORITY)
+      + `\n<h3 class="sub-h">${esc(COPY.priority.next)}</h3>\n${linked(NEXT)}`
       + `\n<h3 class="sub-h">${esc(COPY.priority.pricing)}</h3>\n${ruleList(PRICING)}`),
     section('steps', COPY.steps, stepList(STEPS, L, (s) => META.self + s.card)),
     section('open', COPY.open, openList(OPEN, STEPS, COPY.open)),

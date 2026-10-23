@@ -10,6 +10,7 @@
   4. `MODULE_MANIFEST.json` 十項無 `TODO`。
   5. `status: "available"` 的條件（測試擋）：門頁存在、manifest 無 TODO、`features` 非空、`/playwright smoke` 對 `https://<subdomain>.<base>/` 綠。
 - 上線一個門＝DNS、憑證 SAN、主機 nginx、lobster-nginx 區塊（照 social 2026-10-15 的 WORKLOG 續30 做法），High，逐產品要 go。
+- 員工門產品目錄 `/ops/products`（原卡 `task_86d6f772` 併入本項，2026-10-23）：只讀 `products.ts` 列出每個產品的門、status、features；三軸與五種的正本只留 ADR 017 §0，不建 `customer-model.ts`（兩份會互相矛盾）。
 - 不做：不重寫業務邏輯、不搬資料表、不改 API 前綴。
 
 ## Files

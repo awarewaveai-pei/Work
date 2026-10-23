@@ -1,4 +1,36 @@
 # Worklog
+## 2026-10-23（續6）客戶怎麼來監工台依 prod 現況更新＋排出接下來順序（Claude）
+
+**觸發**：操作者「依現狀更新監工台，然後決定要依序做什麼」。
+
+**現況證據**（2026-10-23，prod 唯讀）
+- C1 `entitlement.would_deny` 7 天 231 筆：internal `tarot.image` 221、`tarot.prompt` 9（`no_credits`）、客戶 `social.dispatch` 1（`no_entitlement`）。根因 `lib/entitlements/can.ts:40-45` credits 功能只看錢包、不認 comp／contract 權利列 → 現在翻 enforce 自用 tarot 全停。未修，排 NEXT ①，設計寫進 `cards/step-3.md`「收尾」。
+- M1 `plans`／`organization_entitlements`／`media_credit_ledger` 0 列；`organizations.kind='customer'` 5 列。
+- M2 `RESEND_API_KEY` 已設（舊 NOW 列寫缺，過時）；註冊仍關：`app/portal/api/signup/route.ts:9` `SIGNUP_VERIFIES_EMAIL=false`、`:99`。
+- M3 產品門只有 `app/social/`；`products.ts` 11 產品全 `coming_soon`；11 份 MODULE_MANIFEST 無 TODO。
+- m1 Foundry v1.7 V17-1～8 全 done（`handoffs/2026-10-18-foundry-v17-supervisor/data.mjs`），監工台仍寫待做。
+- m2 `/ops/products`（卡 `task_86d6f772`）未建；併入第 8 項，只讀 `products.ts`，不建 `customer-model.ts`（三軸／五種正本只留 ADR 017 §0）。
+- m3 ADR 015 順序 1（WordPress 一鍵進產品門）未實作：wp-bridge 外掛與 `app/portal/api/` 無登入交接。
+- m4 artifact `LVBCAdvjGa9RDnFjNGfPTD` 本帳號讀寫皆拒；`Htm4xqe362YM987Fo8YLCr` 可寫 → 改回此 URL（version 22）。
+
+**排序（NEXT，寫在 data.mjs）**：① credits 認權利列＋seed internal／客戶＋would_deny 7 天歸零（翻 enforce 前置；產品門的已買／未買讀同一判斷）→ ② 第 8 項產品門（無待決）→ ③ ADR 015 順序 1（門做好後；身分 High）→ ④ 第 4 項（待決 1、3）→ ⑤ 第 5 項（待決 2）→ ⑥ 6／7／9 等客戶。
+
+**修改**
+- `agency-os/handoffs/2026-10-16-customer-model-supervisor/data.mjs`：META（updated、tasks 指向改條目名、url）、NOW 依證據重寫＋加「產品自己的門」、新增 `NEXT`、SIDE 兩列更新。
+- `build.mjs`：priority 段加 NEXT 子標題（與 PRIORITY 共用 `linked()`）。
+- `check.mjs`：新閘——NEXT 每列指向存在步驟、每個未完成步驟都在 NEXT。
+- `cards/step-3.md` 加「收尾」段；`cards/step-8.md` 加 `/ops/products` 一行。
+- `agency-os/TASKS.md` ADR 017 條目：狀態、下一步、URL、卡數 7→9。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=node build.mjs && node check.mjs | exit=0 | ms=400
+- 突變：NEXT 拿掉第 8 項 → `FAIL 第 8 項未完成卻不在 NEXT` exit 1；還原 exit 0。
+- 發布後 `Artifact read` 讀回 version 1792726536-5231，含「接下來依序做」與「產品自己的門」。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 data.mjs／build.mjs／check.mjs diff 與線上頁
+- ORACLE_WAIVED: 監工台資料與產生器（文件產物），無產品 source 改動
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude | grep=LVBCAdvjGa9RDnFjNGfPTD | hits=1（TASKS，已改）；另查 `TASKS.md:133` 0、`task_86d6f772`／`customer-model.ts` 只剩刻意說明（step-8.md、data.mjs）
+
+**rollback**：`git revert <本 commit>`；artifact 重發上一版 supervisor.html。
 ## 2026-10-23（續5）DMARC rua 改寄自有網域 `dmarc@aware-wave.com` → awarewaveai：報表不再卡操作者手動下載（Claude）
 
 **觸發**：續4 階段 2 逾期 8 天，根因＝rua `peijingartstudio@gmail.com` 只有操作者讀得到（Gmail 連線器登入 awarewaveai）。操作者：「你決定」。

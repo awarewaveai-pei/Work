@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { checkCommon, report } from '../../../scripts/supervisor-kit/check.mjs';
-import { META, AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY, RULES, PRIORITY, PRICING } from './data.mjs';
+import { META, AXES, WAYS, STEPS, OPEN, DOORS, NOW, COPY, RULES, PRIORITY, NEXT, PRICING } from './data.mjs';
 import { render } from './build.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -44,5 +44,10 @@ const covered = PRIORITY.flatMap((p) => p.steps).sort((a, b) => a - b);
 if (covered.join() !== STEPS.map((s) => s.n).join()) fail(`PRIORITY 沒有恰好涵蓋每一步一次：${covered.join()}`);
 if (PRICING.length < 4 || PRICING.some((p) => !p.h || !p.t)) fail('PRICING 少於 4 條或有空欄');
 if (!/^\| 9 \|/m.test(adr) || !/^\| 10 \|/m.test(adr)) fail('ADR 017 缺 Q9／Q10');
+
+// 5. 接下來的順序：每列指向存在的步驟；每個未完成步驟都排進去（漏排＝沒人做）
+const stepNs = new Set(STEPS.map((s) => s.n));
+for (const x of NEXT) if (!x.h || !x.t || !x.steps.length || x.steps.some((n) => !stepNs.has(n))) fail(`NEXT ${x.h}: 空欄或指向不存在的步驟`);
+for (const s of STEPS) if (s.status !== 'done' && !NEXT.some((x) => x.steps.includes(s.n))) fail(`第 ${s.n} 項未完成卻不在 NEXT`);
 
 report(errors, `ok: ${WAYS.length} ways, ${STEPS.length} steps, ${OPEN.length} open, page fresh`);

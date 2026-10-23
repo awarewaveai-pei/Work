@@ -32,3 +32,12 @@ cd D:/Work/Projects/internal/cognitive-engineering-os && python scripts/affected
 
 ## Rollback
 `git revert`；`can()` 預設 fail-closed，revert 後回到第 2 步狀態（入口已收斂、尚未判斷）。
+
+## 收尾：翻 enforce 前（2026-10-23 加；監工台 NEXT ①）
+- 證據：prod 7 天 `entitlement.would_deny` 231 筆＝internal `tarot.image` 221、`tarot.prompt` 9（`no_credits`）＋客戶 `social.dispatch` 1（`no_entitlement`）；`plans`／`organization_entitlements`／`media_credit_ledger` 皆 0 列（2026-10-23 psql 唯讀）。
+- 根因：`can.ts:40-45` credits 功能只看錢包，不看權利列 → 自用（comp）與代操（contract）無法用在 credits 功能，違反 ADR 017 §0「錢的軸屬於帳戶×產品×功能」。
+- Decision：`issuePermit` credits 分支先 `findActiveEntitlement`；有 active 列 → 用列（`source` comp／contract，`max_spend` null，`report()` 因 `source≠credits` 不扣點，`can.ts:115`，用量仍記 `entitlement.usage`）；無列才看錢包。0110 `source`／`feature_key` 無 billing 限制，不改 schema。原 gate「點數功能看餘額不看權利列」改為「無權利列時看餘額」。
+- Seed（prod 資料寫入＝High，要 go）：internal 帳戶各產品 comp 列；5 家 `kind=customer` 依實際合約 contract／comp。走 0110 的寫入路徑，不手打 SQL。
+- Files：`lib/entitlements/can.ts`、`lib/entitlements/__tests__/issuer.test.ts`；seed 腳本放 `lib/entitlements/` 旁的既有 seed 慣例位置（先 Glob）。
+- Acceptance：`npx vitest run lib/entitlements` 綠，含 `a credits feature uses an active comp or contract row before the wallet` 與 `a credits feature without a row still needs balance`；突變：拿掉列優先 → 前者紅，還原綠。prod：seed 後連續 7 天 `would_deny` = 0（或逐筆解釋）→ 才提翻 `ENTITLEMENT_MODE=enforce`（High）。
+- Rollback：`git revert`；seed 列 `status='expired'`（不刪，保稽核）。

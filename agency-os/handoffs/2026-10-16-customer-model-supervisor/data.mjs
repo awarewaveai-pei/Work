@@ -3,15 +3,15 @@
 
 export const META = {
   title: '客戶怎麼來 監工台',
-  updated: '2026-10-20',
+  updated: '2026-10-23',
   adr017: 'agency-os/docs/architecture/decisions/017-entitlements-and-self-hosted-modules.md',
   adr018: 'agency-os/docs/architecture/decisions/018-product-doors-and-buyout-delivery.md',
-  tasks: 'agency-os/TASKS.md:133',
+  tasks: 'agency-os/TASKS.md「ADR 017 客戶怎麼買」',
   adr012: 'agency-os/docs/architecture/decisions/012-shared-platform-layer.md',
   adr015: 'agency-os/docs/architecture/decisions/015-awarewave-account-and-shared-wallet.md',
   worklog: 'agency-os/WORKLOG.md 2026-10-16 續13（三軸）、續14（監工台）、續15（七張卡）；2026-10-18 全鏈自審條目',
   self: 'agency-os/handoffs/2026-10-16-customer-model-supervisor/',
-  url: 'https://claude.ai/artifact/LVBCAdvjGa9RDnFjNGfPTD',
+  url: 'https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr',
 };
 
 // 頁面上所有固定文字（不含資料列）。{x} 由 build.mjs 代入算出來的值。
@@ -22,7 +22,7 @@ export const COPY = {
   rules: { h: '每個系統都要過的規則', lead: '這三條寫在 ADR 017 §0b，測試會擋，不靠記憶。' },
   now: { h: '現況', lead: '客戶目前無法自行登入，也尚未收費；現在只有自用與代操。' },
   ways: { h: '五種客戶', lead: '每種客戶由三個答案決定：裝在哪、錢從哪來、誰操作。答案屬於客戶帳戶與每次請求，不屬於產品，所以每個產品五種都有、不用選。新增客戶類型只需增加一列，不必修改程式。', count: '共 {total} 種，{live} 種已運作' },
-  priority: { h: '先後與定價', lead: '依你 2026-10-17 的決定排序；賣斷的收費結構是預設值，數字可改。', pricing: '賣斷怎麼收錢' },
+  priority: { h: '先後與定價', lead: '依你 2026-10-17 的決定排序；賣斷的收費結構是預設值，數字可改。', next: '接下來依序做（2026-10-23 依現況排）', pricing: '賣斷怎麼收錢' },
   steps: { h: '待建項目', lead: '項目須依序完成，每項都有完成條件。風險 High 的項目須經你同意後才能動工。', count: '{done}／{total} 完成' },
   open: { h: '待你決定', lead: '以下事項待你決定；決定後才能啟動對應項目。', count: '{n} 項', before: '須於第 {n} 項前決定', src: '出處' },
   doors: { h: '入口', lead: '三個網址分開登入；網址由設定決定，不寫入程式。', login: '登入' },
@@ -43,6 +43,15 @@ export const PRIORITY = [
   { h: '② 訂閱與點數，產品要有樣子', t: '客戶在 aware-wave.com（WordPress）付款後自動開通；每個產品有自己的門與版面，打開就能用。', steps: [4, 8] },
   { h: '③ 賣斷給一般公司', t: '一鍵安裝到客戶主機，交接後收回存取權。', steps: [5] },
   { h: '④ 等第一個客戶出現再做', t: '只串 API 的客戶、代理商用一套服務多家客戶、客戶要用自己的網址；各自獨立，不卡前面三段。', steps: [6, 7, 9] },
+];
+// 接下來的實際順序（2026-10-23 依 prod 現況排；證據在 NOW 與各卡）。steps＝相關步驟；每個未完成步驟至少出現一次（check 擋）。
+export const NEXT = [
+  { h: '① 自用與代操補上免費路徑', t: '收點數的功能現在只看錢包、不認免費或合約權利列（can.ts:40-45），自用帳戶 7 天有 231 筆「若強制就拒」。改成先看權利列、沒有才看錢包，再替自用與現有客戶登記權利，連續 7 天為零後才翻強制（High，要你同意）。先做，因為產品門的「已買可按、未買灰」讀同一個判斷。', steps: [3] },
+  { h: '② 每個產品自己的門', t: '不必等任何決定。先由 Fable 5.1 定一套版面規則，再一個產品一個產品做；員工門的產品目錄一起做。每個門上線是 High。', steps: [8] },
+  { h: '③ WordPress 一鍵登入產品門', t: '付款開通的前提：付了錢的人要能從 aware-wave.com 進產品門（ADR 015 順序 1），所以排在門做好之後。目前未實作；動到身分驗證，屬 High。', steps: [4] },
+  { h: '④ 付款後自動開通', t: '待決 1、3 回覆後開工。兩題要問金流商與會計師，費時，建議現在就問。', steps: [4] },
+  { h: '⑤ 買斷安裝', t: '付款開通完成、待決 2 律師回覆後開工。', steps: [5] },
+  { h: '⑥ 等客戶出現', t: '只串 API、代理商、白牌網址：出現第一個這類客戶才做。', steps: [6, 7, 9] },
 ];
 // ADR 017 Q9：賣斷怎麼收錢（預設值，可改）
 export const PRICING = [
@@ -87,12 +96,13 @@ export const WAYS = [
   { name: '賣人＝買斷', zh: '安裝於客戶主機', story: '例：集團一次付清，系統安裝在集團主機，使用集團自己的 AI 金鑰；子公司與分公司共用同一套，不另收費。', deployment: 'self_hosted', money: 'perpetual', actor: 'customer', note: '＋updates_until；客戶已有網站就接入（§6）；購買維運時採 staff', live: false },
 ];
 
-// 現在真的在跑的（2026-10-16 查）
+// 現在真的在跑的（2026-10-23 查：prod docker exec printenv、psql 唯讀）
 export const NOW = [
-  { what: '客戶可自行登入', state: 'no', ev: '今天才開放：員工替客戶開立帳號，寄出設定密碼信；prod 缺少 RESEND_API_KEY，portal 的公開註冊仍關閉（WORKLOG 2026-10-16 續8、續10）' },
-  { what: '已有付費客戶', state: 'no', ev: '0062 合約 0 筆、錢包帳本 0 筆、Woo 尚未販售點數包（ADR 015:13、ADR 017 脈絡）' },
-  { what: '買斷', state: 'no', ev: '授權檔、安裝程式與模組清單均未建立（順序 5）' },
-  { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），目前影子模式：照算判決並記錄，但一律放行、不扣點；翻成強制要你同意（High），每功能扣幾點待你定價' },
+  { what: '客戶可自行登入', state: 'no', ev: '員工替客戶開帳號、寄設定密碼信；prod 已設 RESEND_API_KEY，但公開註冊由程式關閉（portal/api/signup/route.ts:9、:99），要先做確認信流程' },
+  { what: '已有付費客戶', state: 'no', ev: 'prod：plans、organization_entitlements、錢包帳本皆 0 筆；客戶組織 5 個，Woo 尚未販售' },
+  { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
+  { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。7 天記到 231 筆「若強制就拒」，翻強制前要先清零；每功能扣幾點待你定價' },
+  { what: '產品自己的門', state: 'no', ev: '只有 social 有門頁（app/social/）；登記表 11 個產品全是 coming_soon（products.ts）' },
 ];
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
@@ -123,7 +133,7 @@ export const OPEN = [
 
 // 要一起改但不是順序步驟的
 export const SIDE = [
-  { what: 'System Foundry v1.7：選擇引擎留，產出重做——刪 74 節樣板、每模組一張可執行卡、每個產生的系統自帶監工台（supervisor-kit 共用）、接軌登記表與產生器、範例自動重生、加「裝在客戶自己的主機」一題', when: '啟動時一併做', step: 1, src: 'agency-os/docs/System_Foundry_v1.6_ARTIFACT_COMPLETE/V1_7_HANDOFF_PLAN.md' },
-  { what: 'app.aware-wave.com /ops/products 頁面從 products.ts 與 customer-model.ts 渲染三扇門、三軸與五種客戶', when: '卡片 task_86d6f772', src: '本 session' },
+  { what: 'System Foundry v1.7：選擇引擎留，產出重做——刪 74 節樣板、每模組一張可執行卡、每個產生的系統自帶監工台（supervisor-kit 共用）、接軌登記表與產生器、範例自動重生、加「裝在客戶自己的主機」一題', when: '已完成（V17-1～V17-8 全部 done）', step: 1, src: 'agency-os/handoffs/2026-10-18-foundry-v17-supervisor/data.mjs' },
+  { what: '員工門產品目錄 app.aware-wave.com/ops/products：只讀 products.ts；三軸與五種的正本只留 ADR 017 §0，不另建 customer-model.ts', when: '併入', step: 8, src: 'cards/step-8.md' },
 ];
 
