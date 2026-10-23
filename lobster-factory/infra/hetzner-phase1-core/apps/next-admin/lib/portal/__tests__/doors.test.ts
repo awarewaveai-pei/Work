@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { doorForHost, portalHost, productHost, routeOnProductDoor, type NextAdminProduct } from "../doors";
+import { PLATFORM_APIS, doorApis, doorForHost, portalHost, productHost, routeOnProductDoor, type NextAdminProduct } from "../doors";
 import { PRODUCTS } from "../products";
 
 // ADR 018 §2: hosts come from config, so a buyout install on a customer's domain changes env only.
@@ -50,7 +50,20 @@ describe("routeOnProductDoor", () => {
     ["/api/ops/clients", { action: "not_found" }],
     ["/api/content/syndicate", { action: "not_found" }],
     ["/portal/api/signup", { action: "not_found" }],
+    ["/api/tools/designs", { action: "pass" }],
+    ["/api/tools/designsx", { action: "not_found" }],
   ])("%s -> %j", (path, expected) => {
     expect(routeOnProductDoor(path, p)).toEqual(expected);
+  });
+});
+
+describe("doorApis", () => {
+  const door = (key: string) => PRODUCTS.find((x) => x.key === key) as NextAdminProduct;
+  it("serves its own APIs, those of products installed with it, and the platform's -- never an optional product's", () => {
+    // design dependsOn studio; content dependsOn studio and optionally video; video dependsOn content (and so studio)
+    expect(doorApis(door("design"))).toEqual(expect.arrayContaining([...door("design").door.api, ...door("studio").door.api, ...PLATFORM_APIS]));
+    expect(doorApis(door("video"))).toEqual(expect.arrayContaining([...door("content").door.api, ...door("studio").door.api]));
+    expect(doorApis(door("content"))).not.toEqual(expect.arrayContaining([...door("video").door.api]));
+    expect(doorApis(door("social"))).toEqual([...door("social").door.api, ...PLATFORM_APIS]);
   });
 });

@@ -56,9 +56,32 @@ export function isAnonymousPath(pathname: string, product: NextAdminProduct): bo
   return (product.door.anonymous ?? []).some((a) => under(pathname, a));
 }
 
-/** The product's own page, API and no-login paths. */
+/** Shared APIs every product door serves (ADR 018 §2 開門規則 1). Each must authorize by organization
+ *  (lib/tenant-guard); lib/portal/__tests__/registry-code.test.ts enforces it. */
+// designs: the shared saved-designs library. entitlements/features: the signed list that greys unbought buttons.
+export const PLATFORM_APIS: readonly string[] = ["/api/tools/designs", "/api/entitlements/features"];
+
+/** The APIs a product door serves: its own, those of the products installed with it (dependsOn, transitively), and
+ *  the platform's. An optional product's APIs are not served: its buttons hide on the door. */
+export function doorApis(product: NextAdminProduct): string[] {
+  const seen = new Set<string>([product.key]);
+  const todo = [...product.modules.dependsOn];
+  const apis = [...product.door.api, ...PLATFORM_APIS];
+  while (todo.length) {
+    const key = todo.pop()!;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const dep = PRODUCTS.find((p) => p.key === key);
+    if (!dep) continue;
+    if (dep.door.app === "next-admin") apis.push(...dep.door.api);
+    todo.push(...dep.modules.dependsOn);
+  }
+  return apis;
+}
+
+/** The product's own page, the APIs its door serves, and its no-login paths. */
 export function isProductPath(pathname: string, product: NextAdminProduct): boolean {
-  return under(pathname, product.door.page) || product.door.api.some((a) => under(pathname, a)) || isAnonymousPath(pathname, product);
+  return under(pathname, product.door.page) || doorApis(product).some((a) => under(pathname, a)) || isAnonymousPath(pathname, product);
 }
 
 /** A page path some product serves only on its own door (e.g. /social or /smartlink on the staff host). */

@@ -36,11 +36,13 @@ const MIGRATIONS = () => migrationFiles().map((file) => ({ file, text: readFileS
 
 // Top-level route segments of the staff door (app/ and its route groups), so a product's page prefix cannot shadow one.
 const APP_DIR = path.join(__dirname, "../../../app");
+// First path segments other routes already use. A door's own top-level directory (app/<page>) is not a clash; a
+// directory inside a route group such as app/(shell)/<page> always is (both would answer /<page>).
 function staffSegments(ownPages: string[]): string[] {
   const dirs = (d: string) => readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
   const top = dirs(APP_DIR);
-  const segs = [...top.filter((n) => !n.startsWith("(")), ...top.filter((n) => n.startsWith("(")).flatMap((g) => dirs(path.join(APP_DIR, g)))];
-  return segs.filter((n) => !ownPages.includes(`/${n}`));
+  return [...top.filter((n) => !n.startsWith("(") && !ownPages.includes(`/${n}`)),
+    ...top.filter((n) => n.startsWith("(")).flatMap((g) => dirs(path.join(APP_DIR, g)))];
 }
 
 describe("product registry", () => {
@@ -71,7 +73,8 @@ describe("product registry", () => {
     const staff = staffSegments(pages);
     for (const p of doors) {
       expect(p.door.page, p.key).toMatch(/^\/[a-z][a-z0-9-]*$/);
-      expect(staff, p.key).not.toContain(p.door.page.slice(1));
+      // a reserved door may share its path with today's staff route (middleware-door.test.ts); an open one may not
+      if (p.door.enabled !== false) expect(staff, p.key).not.toContain(p.door.page.slice(1));
       if (p.status === "available") {
         expect(p.door.enabled, p.key).not.toBe(false);
         expect(existsSync(path.join(APP_DIR, p.door.page.slice(1), "page.tsx")), p.key).toBe(true);

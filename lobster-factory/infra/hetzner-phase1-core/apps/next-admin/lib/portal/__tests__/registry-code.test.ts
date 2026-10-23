@@ -10,7 +10,7 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { BACK_OFFICE_FEATURES } from "../../entitlements/can";
 import { ROUTE_FEATURES } from "../../entitlements/route-features";
-import { nextAdminProducts, servedNextAdminProducts, type NextAdminProduct } from "../doors";
+import { PLATFORM_APIS, doorApis, nextAdminProducts, servedNextAdminProducts, type NextAdminProduct } from "../doors";
 import { PRODUCTS, type PortalProduct } from "../products";
 
 const ROOT = path.join(__dirname, "../../..");
@@ -99,8 +99,12 @@ const optional = (p: PortalProduct): readonly string[] => p.modules.optional ?? 
  *  are not in it (pages fetch them; each route authorizes itself). */
 const loginPages = (p: NextAdminProduct) => [`app${p.door.page}/`];
 const allPages = (p: NextAdminProduct) => [...loginPages(p), ...(p.door.anonymous ?? []).map((a) => `app/(public)${a}/`)];
+const isRoute = (f: string) => /\/route\.[cm]?[jt]sx?$/.test(f);
 function doorFiles(roots: readonly string[]): Set<string> {
-  const todo = [...FILES.keys()].filter((f) => roots.some((r) => f.startsWith(r)) && !/\/route\.[cm]?[jt]sx?$/.test(f));
+  return importClosure([...FILES.keys()].filter((f) => roots.some((r) => f.startsWith(r)) && !isRoute(f)));
+}
+function importClosure(start: readonly string[]): Set<string> {
+  const todo = [...start];
   const seen = new Set<string>();
   while (todo.length) {
     const f = todo.pop()!;
@@ -175,11 +179,12 @@ describe("registry claims match the code", () => {
     }
   });
 
-  // A served door answers only its own API prefixes (doors.ts routeOnProductDoor); any other call 404s on the door.
+  // A served door answers only doorApis() (doors.ts routeOnProductDoor); any other call 404s on the door.
   it("a served door can reach every API its pages call", () => {
     for (const p of servedNextAdminProducts()) {
       expect(doorFiles(loginPages(p)).size, `${p.key}: no files under app${p.door.page}`).toBeGreaterThan(0);
-      const unreachable = [...doorFiles(allPages(p))].flatMap((f) => FILES.get(f)!.calls.filter((u) => !p.door.api.some((a) => under(u, a))).map((u) => `${f}: ${u}`));
+      const apis = doorApis(p);
+      const unreachable = [...doorFiles(allPages(p))].flatMap((f) => FILES.get(f)!.calls.filter((u) => !apis.some((a) => under(u, a))).map((u) => `${f}: ${u}`));
       expect(unreachable, `${p.key} door`).toEqual([]);
     }
   });
@@ -191,6 +196,27 @@ describe("registry claims match the code", () => {
     for (const p of servedNextAdminProducts()) {
       const direct = [...doorFiles(loginPages(p))].filter((f) => FILES.get(f)!.imports.some((r) => r === "lib/supabase-server"));
       expect(direct, `${p.key} door`).toEqual([]);
+    }
+  });
+
+  // ADR 018 §2 開門規則 2: every route a door serves decides who the caller may see -- by organization
+  // (lib/tenant-guard) or, for social, by brand (lib/social/authz) -- itself or through what it imports. This catches
+  // a route that forgot authorization, not one that imports it and skips it: opening a door also means reading each
+  // route's data path (WORKLOG of that door).
+  const AUTHORIZERS = ["lib/tenant-guard.ts", "lib/social/authz.ts"];
+  const routesUnder = (prefix: string) => [...FILES.keys()].filter((f) => isRoute(f) && f.startsWith(`app${prefix}/`));
+  it("every route a served door serves authorizes its caller", () => {
+    for (const p of servedNextAdminProducts()) {
+      const open = [...new Set(doorApis(p).flatMap(routesUnder))].filter((r) => !AUTHORIZERS.some((a) => importClosure([r]).has(a)));
+      expect(open, `${p.key} door`).toEqual([]);
+    }
+  });
+
+  it("a platform API authorizes by organization", () => {
+    for (const prefix of PLATFORM_APIS) {
+      const routes = routesUnder(prefix);
+      expect(routes.length, prefix).toBeGreaterThan(0);
+      for (const r of routes) expect(importClosure([r]).has("lib/tenant-guard.ts"), r).toBe(true);
     }
   });
 

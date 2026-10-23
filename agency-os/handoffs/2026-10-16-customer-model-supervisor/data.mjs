@@ -47,7 +47,7 @@ export const PRIORITY = [
 // 接下來的實際順序（2026-10-23 依 prod 現況排；證據在 NOW 與各卡）。steps＝相關步驟；每個未完成步驟至少出現一次（check 擋）。
 export const NEXT = [
   { h: '① 翻強制模式（等條件）', t: '權利已就位：點數功能先認權利列，自用、EdD、Soulful 每天自動補齊（2026-10-23 部署）。10/31 自動檢查 7 天「若強制就拒」，為零或都已解釋後，請你同意再翻（High）。', steps: [3] },
-  { h: '② 每個產品自己的門', t: '不必等任何決定。先由 Fable 5.1 定一套版面規則，再一個產品一個產品做；員工門的產品目錄一起做。每個門上線是 High。', steps: [8] },
+  { h: '② 每個產品自己的門', t: '規則已定（ADR 018 §2），產品目錄已做。依缺口由少到多：tarot（門頁已做，待解客戶角色）→ cs → collect → studio → video → design → content → outreach（員工路由要先搬到 tools/outreach）。每個門上線是 High。', steps: [8] },
   { h: '③ WordPress 一鍵登入產品門', t: '付款開通的前提：付了錢的人要能從 aware-wave.com 進產品門（ADR 015 順序 1），所以排在門做好之後。目前未實作；動到身分驗證，屬 High。', steps: [4] },
   { h: '④ 付款後自動開通', t: '待決 1、3 回覆後開工。兩題要問金流商與會計師，費時，建議現在就問。', steps: [4] },
   { h: '⑤ 買斷安裝', t: '付款開通完成、待決 2 律師回覆後開工。', steps: [5] },
@@ -102,7 +102,7 @@ export const NOW = [
   { what: '已有付費客戶', state: 'no', ev: 'Soulful 代操合約已登記（全產品，0118）；自助付費 0：plans、錢包帳本皆 0 筆，Woo 尚未販售' },
   { what: '買斷', state: 'no', ev: '授權檔與模組清單未建；provision/ 只有一鍵架站（provisionClient.ts）' },
   { what: '許可判斷', state: 'yes', ev: '每個收費點只問 can()（e87de9225），影子模式（ENTITLEMENT_MODE 未設，can.ts:63）：照算判決並記錄，一律放行、不扣點。點數功能先認權利列（b3df190e9）；自用、EdD 免費與 Soulful 全產品合約每天自動補齊（0118），已部署；翻強制待 10/31 自動檢查與你同意；每功能扣幾點待你定價' },
-  { what: '產品自己的門', state: 'no', ev: '只有 social 有門頁（app/social/）；登記表 11 個產品全是 coming_soon（products.ts）' },
+  { what: '產品自己的門', state: 'no', ev: 'social 已上線；tarot 門頁已做、尚未上線；客戶帳號沒有員工角色，tarot 路由的員工角色檢查（ops-role.ts:68）會擋客戶，待定修法；其餘 7 個未開。開門規則與三道機械閘見 ADR 018 §2；登記表 11 個產品仍是 coming_soon' },
 ];
 
 // ADR 017「順序」。status: not_started | in_progress | done；done 必填 commit。
@@ -119,7 +119,7 @@ export const STEPS = [
     files: ['lobster-factory/packages/workflows/src/provision/', 'agency-os/docs/operations/APP_AWARE_WAVE_PROVISIONING_MASTER_PLAN.md'], gate: '授權檔離線驗章；AwareWave 伺服器停止後安裝仍可用；安裝失敗只清本次 project；客戶網域由 compose、nginx、DNS 同一組值產生並 curl 200', risk: 'High（交付）', model: 'Fable 5.1 設計 → Opus 5.5 做', depends: [3, 4], status: 'not_started', before: '交付 Postiz AGPL 前請律師確認（待決 2）' },
   { n: 6, card: 'cards/step-6.md', plain: '客戶只透過程式串接、不使用畫面時，系統也能計費。', title: 'API 通道', what: '計費帳戶發 API key（scope = feature_key 子集），actor = api_key:<id>，用量走同一個 report()；登記表 accessChannels 加 api。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/'], gate: '測試：key 的 scope 外功能會被拒絕', risk: 'Medium', model: 'Opus 5.5', depends: [3], status: 'not_started', waitFor: '待第一個只串 API 的客戶出現' },
   { n: 7, card: 'cards/step-7.md', plain: '代理商用同一套系統服務多家客戶時，系統按客戶數計費。', title: '轉售（代理商版）', what: '授權檔 max_tenants > 1，安裝內「根組織」數受它限制：一家公司或一個集團（含子公司、分公司、部門）都算 1，不另收；代理商買去替多家不相干的客戶代操才是 >1，另訂價，隔離責任在客戶主機（操作者 2026-10-16 定案）。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/entitlements/（授權檔格式，順序 5 建）'], gate: '測試：建立的租戶超過 max_tenants 時會被拒絕', risk: 'Medium', model: 'Opus 5.5', depends: [5], status: 'not_started', waitFor: '待第一個轉售客戶出現' },
-  { n: 8, card: 'cards/step-8.md', plain: '每個產品都有自己的門與版面，一打開就是可用的樣子：產品名、功能清單、示範資料；不再只是後台裡的一頁。', title: '每個產品長成單一產品的樣子', what: '每個登記產品：頁面抽成共用元件、加 app/<key>/ 產品門路由（精簡版面）、開場即可用狀態、MODULE_MANIFEST 無 TODO；status: available 由測試擋；門上線（DNS、憑證、兩層 nginx）逐產品 High。不搬資料表、不改 API 前綴。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/<key>/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/<key>/ui/', 'lobster-factory/infra/hetzner-phase1-core/nginx/default.conf'], gate: '測試：available 的產品必有門頁、完整 manifest、至少一個功能；本機以 <subdomain>.localhost 開門看到產品版面；上線後 playwright smoke 綠', risk: 'Medium（每個門上線 High）', model: 'Fable 5.1 定規則 → Opus 5.5 逐產品做', depends: [1, 3], status: 'not_started' },
+  { n: 8, card: 'cards/step-8.md', plain: '每個產品都有自己的門與版面，一打開就是可用的樣子：產品名、功能清單、示範資料；不再只是後台裡的一頁。', title: '每個產品長成單一產品的樣子', what: '每個登記產品：頁面抽成共用元件、加 app/<key>/ 產品門路由（精簡版面）、開場即可用狀態、MODULE_MANIFEST 無 TODO；status: available 由測試擋；門上線（DNS、憑證、兩層 nginx）逐產品 High。不搬資料表、不改 API 前綴。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/app/<key>/', 'lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/<key>/ui/', 'lobster-factory/infra/hetzner-phase1-core/nginx/default.conf'], gate: '測試：available 的產品必有門頁、完整 manifest、至少一個功能；本機以 <subdomain>.localhost 開門看到產品版面；上線後 playwright smoke 綠', risk: 'Medium（每個門上線 High）', model: 'Fable 5.1 定規則 → Opus 5.5 逐產品做', depends: [1, 3], status: 'in_progress' },
   { n: 9, card: 'cards/step-9.md', plain: '客戶想用自己的網址（例如 social.客戶.com）開 AwareWave 主機上的產品，驗證網域後就能指過來。', title: '客戶自己的網址指到 hosted 產品門（白牌）', what: 'custom_domains 表；doorForHost 查表；DNS TXT 驗證；憑證自動（Cloudflare for SaaS 或 on-demand ACME，待決 4）。買斷安裝不用。', files: ['lobster-factory/infra/hetzner-phase1-core/apps/next-admin/lib/portal/doors.ts', 'lobster-factory/packages/db/migrations/'], gate: '測試：未驗證的網址不路由；驗證後指到正確產品門與帳戶；網址本身不給登入', risk: 'Medium', model: 'Opus 5.5', depends: [8], status: 'not_started', waitFor: '待第一個要白牌網址的客戶出現', before: '憑證方式（待決 4）' },
 ];
 

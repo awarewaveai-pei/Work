@@ -48,7 +48,7 @@ const PRODUCT_DEFINITIONS = [
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("video.script", "腳本生成"), quota("video.image", "場景圖生成"), quota("video.motion", "影片動態"), quota("video.tts", "付費旁白")],
     accessChannels: ["ui"], modules: { dependsOn: ["content"], manifest: "lib/video/MODULE_MANIFEST.json" }, staffPaths: ["tools/video"] },
-  { key: "tarot", name: "塔羅製圖", description: "生成塔羅圖片、提示詞與動態。", subdomain: "tarot", door: { app: "next-admin", page: "/tarot", enabled: false, api: ["/api/tools/tarot"] },
+  { key: "tarot", name: "塔羅製圖", description: "生成塔羅圖片、提示詞與動態。", subdomain: "tarot", door: { app: "next-admin", page: "/tarot", api: ["/api/tools/tarot"] },
     loginSources: ["local"], standalone: false, status: "coming_soon", selfSignup: false,
     features: [quota("tarot.image", "塔羅圖生成"), quota("tarot.prompt", "提示詞建議")],
     accessChannels: ["ui"], modules: { dependsOn: [], manifest: "lib/tarot/MODULE_MANIFEST.json" }, staffPaths: ["tools/tarot"] },

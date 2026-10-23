@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-23（續27）開門規則 R1/R2 機制＋tarot 門頁（ADR 018 §2）；發現客戶被員工角色擋（Claude）
+
+**觸發**：操作者同意階段 1 規則；第一個門改 tarot（閘模擬：tarot ①1/②0/③0，outreach ②2/③1＋路徑衝突＋9 頁）。
+
+**修改**
+- ADR 018 §2「開門規則」1–3；`cards/step-8.md`（規則、階段 0 已做、完成以 `door.enabled` 為準不另存清單）。
+- `lib/portal/doors.ts`：`PLATFORM_APIS`（`/api/tools/designs`、`/api/entitlements/features`）＋`doorApis()`＝自身＋`dependsOn` 閉包＋平台；`isProductPath` 改用 → `routeOnProductDoor` 與 `middleware.ts:192 isClientOutsideDoor` 一致。
+- `registry-code.test.ts`：閘 ① 用 `doorApis`；新閘 ③ 門可達路由 import 閉包含 `lib/tenant-guard` 或 `lib/social/authz`；平台路由須含 `tenant-guard`；註明閘只證引入、資料路徑逐門人核。
+- `products.test.ts` `staffSegments`：群組內同名目錄恆算衝突，僅對已開門檢查（保留門可與員工路由同名，`middleware-door.test.ts:13-16`）。
+- `doors.test.ts`：`doorApis` 與平台路徑。
+- tarot 門：`app/tarot/{layout,page}.tsx` 沿用 `TarotStudio`；登記表去 `enabled:false`。DNS／憑證／nginx 未動（上線＝High）。
+- R3 `door.nav` 延到第一個多頁門（無使用者不先做）。
+
+**tarot 路由資料路徑人核**
+- `batch` POST `effectiveOrgId`（:46）、GET 依 org 過濾（:134-137）；`batch/[jobId]` `assertOrgAccess`（:28）；`generate`／`suggest-prompt`／`translate` 不讀組織資料、`withFeature` 計費。
+- **C1 未解**：客戶帳號 `app_metadata` 無 `ops_role`（`lib/accounts/client-invite.ts:146`）→ `middleware.ts:102-108` 判 viewer → 每條 tarot 路由 `canCreateAiImageJob`（`lib/ops-role.ts:68-70`）回 403；`/api/tools/designs` POST/DELETE 同。類別：員工營運角色被當產品功能門檻。屬權限邏輯，待操作者同意修法。門未上線，無人受影響。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run lib/portal lib/entitlements（153 passed）＋ tsc（本次 0 錯）＋ 本機 next-admin-social-ui：/tarot 門框＋工作室渲染、無員工側欄；/tools/tarot 不變 | exit=0 | ms=12000
+- 突變：tarot API 下加無授權路由 → 閘 ③ 紅並指名該檔；刪除綠。閘 ① 抓到 `use-paid-features.ts` → `/api/entitlements/features` 列平台（`subject.ts` 經 `tenant-guard`）。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-773912ff.md`：閘 ③ 只證引入非資料路徑→成立，處置＝註明範圍＋逐門人核（上列）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=PRODUCTS_DONE|enabled: false, api: \["/api/tools/tarot"\]|isProductPath | hits=3（card 舊句已改、middleware.ts:192 呼叫＝本次一致化、doors.ts 定義）
+
+**rollback**：`git revert <本 commit>`（tarot 回 `enabled:false`；門未上線無外部影響）。
 ## 2026-10-23（續26）next-admin 提前部署 d19ed55e4（塔羅主角替換＋產品門階段 0）（Claude）
 
 **觸發**：操作者下令「部署」（手動提前，未等 03:00 自動部署）。

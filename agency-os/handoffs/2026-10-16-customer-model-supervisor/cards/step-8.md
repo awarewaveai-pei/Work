@@ -11,6 +11,8 @@
   5. `status: "available"` 的條件（測試擋）：門頁存在、manifest 無 TODO、`features` 非空、`/playwright smoke` 對 `https://<subdomain>.<base>/` 綠。
 - 上線一個門＝DNS、憑證 SAN、主機 nginx、lobster-nginx 區塊（照 social 2026-10-15 的 WORKLOG 續30 做法），High，逐產品要 go。
 - 員工門產品目錄 `/ops/products`（原卡 `task_86d6f772` 併入本項，2026-10-23）：只讀 `products.ts` 列出每個產品的門、status、features；三軸與五種的正本只留 ADR 017 §0，不建 `customer-model.ts`（兩份會互相矛盾）。
+- 開門規則（2026-10-23 操作者同意，正本 ADR 018 §2「開門規則」1–3）：API 範圍＝自身＋`dependsOn`＋`PLATFORM_APIS`；資料以組織為界、登入門頁不用 service role、門可呼叫的路由皆授權；多頁產品用 `door.nav`。上方 1.「抽成 `lib/<key>/ui`」改為沿用員工頁原元件（social 先例），伺服器端讀全客戶資料的頁才拆。
+- 階段 0 已做 `e8f13684d`：門禁 ①（API 可達）②（不用 service role）、`ProductDoorShell`、`/ops/products`。
 - 不做：不重寫業務邏輯、不搬資料表、不改 API 前綴。
 
 ## Files
@@ -33,7 +35,7 @@ cd D:/Work/lobster-factory/infra/hetzner-phase1-core/apps/next-admin && npx tsc 
 突變：把 `app/<key>/page.tsx` 改名 → `products.test.ts` 紅（available 條件）；還原綠。
 
 ## 完成後
-每完成一個產品，`data.mjs` 的 `PRODUCTS_DONE` 加 key；全部完成才把 `STEPS[7].status` 改 `done`。
+開了哪些門以登記表 `door.enabled` 為準（`/ops/products` 直接顯示），不在監工台另存清單；全部開完才把 `STEPS[7].status` 改 `done`。
 
 ## Rollback
 `git revert`；門未上線前無外部影響；已上線的門用 nginx 區塊移除＋DNS 刪除（各一條指令，寫在上線 WORKLOG）。
