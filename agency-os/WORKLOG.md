@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-23（續14）全產品帳戶權利先補一次（各 338 列）；排 10/31 強制模式前提檢查（Claude）
+
+**觸發**：操作者「去處理好剩餘風險」。
+
+**做法**
+- 功能清單＝`lib/entitlements/tables.ts` `registeredFeatures()` 輸出（338 個功能、10 個產品，與每日掃描同一函式）。
+- prod：`psql -U supabase_admin` → `set role service_role; select entitlement_ensure_all_features(<清單>)` → 回 1014＝338×3。與每日掃描同一 RPC、同一權限。
+- 唯讀核對：awarewave-ops／edd-research comp、soulful-expression contract 各 338 列、10 產品、ends_at 皆 null；同 (org,product,feature) 重複有效列 0。
+- 判決仍未變：prod 跑的是 `b3df190e9` 之前的程式（點數功能只看錢包），2026-10-24 03:00 部署後才生效；明早排程驗證。
+- 新排程 `enforce-readiness-2026-10-31`（10:00，一次，唯讀）：7 天 would_deny／infra_error 分「預期（mongolia-03、兩個測試帳戶）」與「需處理」，回報可否翻 enforce，不翻。存為 Bypass 模式。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql service_role entitlement_ensure_all_features(338 features) → 1014; read-only group-by slug/source_ref + duplicate check | exit=0 | ms=3000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回寫入結果：列數、來源、無重複
+- BUGHUNT_WAIVED: NA -- 無程式或文件宣稱改動（TASKS 一行狀態）
+
+**rollback**：`update organization_entitlements set status='expired' where source_ref like 'all-features:%'`，並刪 `organization_all_features` 對應列（否則隔天補回）。
 ## 2026-10-23（續13）全產品帳戶統一由 organization_all_features 補齊：0118 取代 0117，已套 prod（Claude）
 
 **觸發**：操作者定 Soulful＝全產品合約、EdD 論文研究＝自己的研究（免費），並同意套 0118。
