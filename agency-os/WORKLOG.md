@@ -13,6 +13,31 @@
 - BUGHUNT_WAIVED: NA -- 部署動作無程式改動
 
 **rollback**：主機 `sg-deploy.sh` 回退到 fb2972943（`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1）。
+## 2026-10-23（續51）ADR 017 第 4a 項上線：0120 套 prod、patch 推 main、next-admin 加付款設定（操作者 go）（Claude）
+
+**觸發**：操作者「Go: apply 0120 to prod, apply cards/step-4a.patch and push, add PAYMENTS_PROVIDERS=local and PAYMENTS_LOCAL_SECRET to the container. I'll define the first plan row separately.」設計與驗證見續48。
+
+**步驟**
+- prod 唯讀前查：`payment_events`／`credit_wallet_holds`／三個新函式名皆未被占用；`media_credit_reserve`、`entitlement_credit_balance` 的函式本體 md5（fad827ee／723cd597）與 repo 0066／0110 逐位元組相同（0120 取代它們、down 還原它們）；plans／合約／帳本皆 0 筆；帳本最後一筆 0119。
+- `node scripts/apply-db-migration.mjs 0120` → `APPLY_OK 1/1`。
+- `git apply cards/step-4a.patch`（套用前四個共用檔皆乾淨，只含本 session 的 hunk）→ tsc 0、vitest 全套 → `f2139d35a` 推 main。
+- 密鑰：本機產生 64 字元 hex，直接寫進 `mcp/user-env.ps1`（`PAYMENTS_LOCAL_SECRET`）＋經 ssh stdin 附加到主機 `/root/lobster-phase1/.env`（`PAYMENTS_PROVIDERS=local`、`PAYMENTS_LOCAL_SECRET`；備份 `.env.bak-20261023-134743-payments`），值未印出；`secrets-vault.ps1 -Action import-user-env`（82 筆）→ `get` 遮罩確認。
+- compose：主機 next-admin 第 286 行（`SCHEDULE_INGEST_TOKEN`）後加兩行映射，經 `safe-infra-patch.sh compose … next-admin`（備份 `docker-compose.yml.bak.safe-patch-20261023-134804`，healthy 9s）。repo `docker-compose.yml`、`.env.example`、`mcp/user-env.template.ps1` 同步。
+- 程式在容器裡要等 2026-10-24 03:00 自動部署（`DEPLOY_HOLD` 無；migration 閘 `--status` 全部 applied）；在那之前路由 404。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=psql 唯讀讀回：schema_migrations 有 0120、兩表三函式在、`media_credit_reserve` 含凍結檢查、service_role 只有 INSERT/SELECT/UPDATE、anon/authenticated 0、`billing_overview()`＝3 個帳戶 | exit=0 | ms=3000
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker exec lobster-next-admin printenv PAYMENTS_PROVIDERS → `local`；PAYMENTS_LOCAL_SECRET 的 sha256 前 16 碼 `2b7ff8092288c2be`、長度 64，與本機相同；容器 healthy | exit=0 | ms=2000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）＋ npx vitest run（326 files／2945 passed）＋ scripts/verify-head-typecheck.ps1（HEAD_TYPECHECK_OK f2139d35a）＋ check-deploy-drift.ps1（PAYMENTS_* 不在漂移清單） | exit=0 | ms=90000
+- REALTEST_EVIDENCE: tool=Bash | cmd=secrets-vault.ps1 -Action run -Names PAYMENTS_LOCAL_SECRET -Command "node …/record-payment.mjs credit_pack … --dry-run" → 印出簽好的請求內容（event_id `credit_pack:<org>:<ref>`），未送出 | exit=0 | ms=2000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 程式＝續48 已審 patch 原樣套用（`git apply` 無衝突、同一 16 檔）；本次新改只有 compose／.env.example／template 三處設定行，讀回比對
+- ORACLE_WAIVED: 程式＝續48 Codex 兩輪（partialreview-033cc224、-284c2c54 NO FINDINGS）已審 patch 原樣套用；本次只加設定行
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,mcp | grep=step-4a.patch|PAYMENTS_LOCAL_SECRET | hits=6（card、data.mjs、supervisor.html、TASKS 已改為「已上線」；compose、.env.example、template 已同步；WORKLOG 續48 為歷史）
+- 另見：`check-deploy-drift.ps1` 列出 repo 有、prod 沒有的 `META_*` 8 個變數——非本次、他 session 的 Meta 工作，未動。
+
+**待操作者**：①第一個方案列（plans 0 筆，訂閱付款前必須）②03:00 部署後第一筆轉帳：`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/secrets-vault.ps1 -Action run -Names @('PAYMENTS_LOCAL_SECRET') -Command 'node lobster-factory/infra/hetzner-phase1-core/apps/next-admin/scripts/record-payment.mjs credit_pack --org <計費帳戶 uuid> --units <點數> --ref <轉帳編號>'`，再看 app.aware-wave.com/ops/billing。
+
+**rollback**：關閉收款＝主機 `.env` 刪 `PAYMENTS_PROVIDERS` 行後 `safe-infra-patch.sh compose … next-admin`（路由回 404）；compose 還原 `docker-compose.yml.bak.safe-patch-20261023-134804`、`.env` 還原 `.env.bak-20261023-134743-payments`；0120 down 只在第一筆 `payment_events` 前可套，之後前進修；程式 `git revert f2139d35a`。
 ## 2026-10-23（續50）next-admin 部署 fb2972943：tarot、studio 產品門開門＋公網煙霧測試（Claude）
 
 **觸發**：續49 同一個操作者 go（「take the tarot door live … then studio, with smoke tests」）。手動提前部署（未等 03:00）；同時帶上 main 上其他 session 已推的 commit（d433dfe29..fb2972943 共 15 個，含 4fc6bacf4 用量歸屬、eb3d75787 0119、050e7fe76 用量計量），它們今晚 03:00 本來就會上線。

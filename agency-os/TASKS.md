@@ -292,7 +292,8 @@
   - **NEXT ②**（2026-10-23，WORKLOG 同日 NEXT ② 與 0119 條目）：用量計量已推（付費縫 `grant.recordUse()`＋閘）、studio 精選免費＋門上藏 AI、tarot 批次記操作者（0119 已套 prod）。剩下一行。建議模型：Opus 5.5
   - [x] **員工路由用量歸屬**（2026-10-23 done，WORKLOG 2026-10-23 續46）：`withFeature` 加 `org`（經 `actorFor`），代操記到客戶、actor＝員工；10 條付費路由包起來，rag 向量化指名 org；閘 ④ 擴到全部 API 路由（`UNSCOPED_ROUTES` 23 條附理由）。
     - [ ] 閘 ③「門路由要授權」對任何 import `grant.ts` 的路由都算已授權（`grant.ts → subject.ts → tenant-guard.ts`，`STOP_AT` 沒停在 `grant.ts`）；改前即如此，見 WORKLOG 2026-10-23 續46。建議模型：Opus 5.5
-  - [ ] **第 4a 項（收錢內部段）寫好待你同意**（2026-10-23，WORKLOG 續48）：`cards/step-4a.patch`；High 四步＝套 0120 到 prod → `git apply` 推 main → 容器加 `PAYMENTS_PROVIDERS=local`、`PAYMENTS_LOCAL_SECRET` → 定第一個方案列（plans 0 筆）。接頭與 `record-payment.mjs` 已推。建議模型：Opus 5.5
+  - [x] **第 4a 項（收錢內部段）已上線**（2026-10-23，WORKLOG 續48、續51）：0120 已套 prod、`f2139d35a`、容器有 `PAYMENTS_*`。
+    - [ ] 第一個方案列（plans 0 筆；訂閱付款前必須，功能與上限由操作者定）。建議模型：Opus 5.5
     - [ ] 真 DB e2e 預設套件在 HEAD 已紅：`tests/e2e/entitlements/entitlements-real-db.py` 只套到 0110，expire 路由的 `ensureAllFeatures`（0118）失敗 →「the expiry sweep ends a trial…」`expiry_failed`；修＝該套件套 0117/0118 並讓測試接受自用帳戶的全功能列（`--suite payments` 已示範 0118 種子）。建議模型：Opus 5.5
   - **監工台 NEXT ①**（`cards/step-3.md`「收尾」段）：段 1 權利列優先已推（WORKLOG 2026-10-23 點數功能先認權利列條目）；段 2 已做（0117→0118 已套 prod：自用、EdD 免費＋Soulful 全產品合約，2026-10-23 05:53Z 已提前部署 `286e0a0ab`；三帳戶各 338 列）；[ ] 2026-10-24 10:00 排程 `verify-internal-comp-2026-10-24` 查部署後無其 would_deny；[ ] 2026-10-31 10:00 排程 `enforce-readiness-2026-10-31` 回報可否翻 enforce（只回報，翻要操作者 go）；MONGOLIA-03／兩個測試帳戶刻意不給；[ ] would_deny 7 天歸零後提翻 enforce。建議模型：Opus 5.5
   - **監工台**（plan 唯一狀態頁，操作者 2026-10-16「要有監工頁面」）：https://claude.ai/artifact/Htm4xqe362YM987Fo8YLCr（`LVBC…` 本帳號讀寫不到，2026-10-23 改回）← `agency-os/handoffs/2026-10-16-customer-model-supervisor/`（`data.mjs` 改狀態 → `node build.mjs` → `node check.mjs` → 重發同 URL）。每步 done 時改 `STEPS[n].status`＋`commit`。
