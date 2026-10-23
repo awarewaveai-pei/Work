@@ -438,7 +438,7 @@ if ($FullMainlineParity) {
     }
 }
 
-# MCP runtime availability (Claude desktop main.log init_mcp=...). Local, sub-second; exit 1 = WARN, 2 = blind.
+# Governed MCP servers (`claude mcp list`, ~9s, 120s hard cap); exit 1 = WARN (names the server), 2 = blind.
 $mcpRuntimeScript = Join-Path $WorkRoot "scripts\check-mcp-runtime.ps1"
 if (Test-Path -LiteralPath $mcpRuntimeScript) {
     $mcpRuntimeOut = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $mcpRuntimeScript 2>&1 | Out-String).Trim()
@@ -986,9 +986,11 @@ if ($runMonthly) {
     if (Test-Path -LiteralPath $cfRefresh) {
         Write-Host "  -> refresh-cf-origin-ips..." -ForegroundColor DarkCyan
         & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $cfRefresh -WorkRoot $WorkRoot
-        $cfRefreshExit = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
-        $monthlyResults["cf_ip_refresh"] = if ($cfRefreshExit -eq 0) { "PASS" } else { "WARN" }
         $global:LASTEXITCODE = 0
+        # The script always exits 0; its verdict is the artifact (ok=PASS, error=FAIL, skip=UNKNOWN). Not measured = SKIP.
+        $cfOverall = $null
+        try { $cfOverall = [string](Get-Content -LiteralPath (Join-Path $WorkRoot "agency-os\reports\status\cf-iprefresh-LATEST.json") -Raw -Encoding UTF8 | ConvertFrom-Json).overall } catch { }
+        $monthlyResults["cf_ip_refresh"] = switch ($cfOverall) { 'PASS' { 'PASS' } 'FAIL' { 'WARN' } default { 'SKIP' } }
     } else { $monthlyResults["cf_ip_refresh"] = "SKIP" }
 
     # 5. Change Impact Matrix drift check (2026-08-24 — generalizes the same gap that let
@@ -1015,7 +1017,11 @@ if ($runMonthly) {
         cf_ip_refresh        = $monthlyResults["cf_ip_refresh"]
         impact_matrix_drift  = $monthlyResults["impact_matrix_drift"]
     }
-    $monthlyPayload | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $monthlyStatusDir "monthly-LATEST.json") -Encoding UTF8
+    # measured = monthly checks that ran (not SKIP); any FAIL > any WARN > PASS.
+    . (Join-Path $WorkRoot "scripts\lib\_detector-contract.ps1")
+    $monthlyRan = @($monthlyResults.Values | Where-Object { $_ -notlike "SKIP*" })
+    $monthlyOverall = if (@($monthlyRan | Where-Object { $_ -like "FAIL*" }).Count -gt 0) { "FAIL" } elseif (@($monthlyRan | Where-Object { $_ -like "WARN*" }).Count -gt 0) { "WARN" } else { "PASS" }
+    Write-DetectorArtifact -Path (Join-Path $monthlyStatusDir "monthly-LATEST.json") -Overall $monthlyOverall -Measured $monthlyRan.Count -Fields $monthlyPayload | Out-Null
 
     # --- Notifications: Slack + Telegram ---
     $allPass    = @($monthlyResults.Values | Where-Object { $_ -notlike "PASS*" -and $_ -notlike "SKIP*" }).Count -eq 0

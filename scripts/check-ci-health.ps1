@@ -74,6 +74,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+. (Join-Path $PSScriptRoot "lib\_detector-contract.ps1")
 
 $ICON_HEALTHY = [char]::ConvertFromUtf32(0x1F7E2)  # green circle
 $ICON_DRIFT   = [char]::ConvertFromUtf32(0x1F7E1)  # yellow circle
@@ -339,10 +340,11 @@ $payload = [ordered]@{
     verdictLabel   = $userLabel
     findings       = $reasons
 }
-[System.IO.File]::WriteAllText(
-    (Join-Path $reportDir "ci-LATEST.json"),
-    ($payload | ConvertTo-Json -Depth 6),
-    $utf8NoBom)
+# measured = workflows whose latest concluded run was actually evaluated (never-run / all-pending are not).
+$measuredWorkflows = @($workflows | Where-Object { $_.latest -notin @("none", "pending") }).Count
+$fields = @{}
+foreach ($k in $payload.Keys) { $fields[$k] = $payload[$k] }
+Write-DetectorArtifact -Path (Join-Path $reportDir "ci-LATEST.json") -Overall $userLabel -Measured $measuredWorkflows -Fields $fields | Out-Null
 
 if ($Json) {
     $payload | ConvertTo-Json -Depth 6

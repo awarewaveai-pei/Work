@@ -30,6 +30,7 @@
 #   Invoke-PostCommitDocCheck -ValidatorWorkRoot $WorkRoot -Source "commit-checkpoint.ps1"
 # CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
 . (Join-Path $PSScriptRoot '..\_console-encoding-helpers.ps1')
+. (Join-Path $PSScriptRoot '_detector-contract.ps1')
 Set-StrictMode -Version Latest
 
 function Invoke-PostCommitDocCheck {
@@ -103,11 +104,11 @@ function Invoke-PostCommitDocCheck {
         $StatusPath = Join-Path $ValidatorWorkRoot "agency-os/reports/status/doc-integrity-commits-LATEST.json"
     }
     try {
-        $statusDir = Split-Path -Parent $StatusPath
-        if ($statusDir -and -not (Test-Path -LiteralPath $statusDir)) {
-            New-Item -ItemType Directory -Force -Path $statusDir | Out-Null
-        }
-        ($result | ConvertTo-Json -Depth 10) | Set-Content -LiteralPath $StatusPath -Encoding utf8
+        # measured = commits whose links the validator judged (1 when it ran; 0 on any error -> never PASS).
+        $docOverall = if (-not $result.ok) { "UNKNOWN" } elseif ($result.brokenCount -gt 0) { "WARN" } else { "PASS" }
+        $docFields = @{}
+        foreach ($k in $result.Keys) { $docFields[$k] = $result[$k] }
+        Write-DetectorArtifact -Path $StatusPath -Overall $docOverall -Measured ([int][bool]$result.ok) -Fields $docFields | Out-Null
     } catch {
         # Status-file write failure is itself never fatal to the caller -- log to the shared
         # gate-failure log the rest of this codebase's fail-open hooks already write to, when

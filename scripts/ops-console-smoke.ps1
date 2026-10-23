@@ -20,6 +20,17 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "lib\_detector-contract.ps1")
+
+# measured = checks recorded in the report; overall mirrors $report.result (passed -> PASS, failed -> FAIL).
+function Save-Report {
+    $fields = @{}
+    foreach ($k in $report.Keys) { $fields[$k] = $report[$k] }
+    $overall = if ($report.result -eq "passed") { "PASS" } else { "FAIL" }
+    Write-DetectorArtifact -Path $ReportPath -Overall $overall -Measured @($report.checks).Count -Fields $fields | Out-Null
+    Write-Host ("report_path={0}" -f $ReportPath)
+}
+
 function Invoke-JsonRequest {
     param(
         [Parameter(Mandatory = $true)][ValidateSet("GET", "POST", "PATCH")] [string]$Method,
@@ -394,18 +405,12 @@ if ($EnableWriteChecks) {
 if ($failed.Count -gt 0) {
     $report.result = "failed"
     $report.failedChecks = @($failed)
-    if (-not [string]::IsNullOrWhiteSpace($ReportPath)) {
-        $report | ConvertTo-Json -Depth 10 | Out-File -FilePath $ReportPath -Encoding utf8
-        Write-Host ("report_path={0}" -f $ReportPath)
-    }
+    if (-not [string]::IsNullOrWhiteSpace($ReportPath)) { Save-Report }
     Write-Error ("ops-console-smoke failed: {0}" -f ($failed -join ","))
     exit 1
 }
 
 $report.result = "passed"
-if (-not [string]::IsNullOrWhiteSpace($ReportPath)) {
-    $report | ConvertTo-Json -Depth 10 | Out-File -FilePath $ReportPath -Encoding utf8
-    Write-Host ("report_path={0}" -f $ReportPath)
-}
+if (-not [string]::IsNullOrWhiteSpace($ReportPath)) { Save-Report }
 Write-Host "ops-console-smoke: ALL PASSED" -ForegroundColor Green
 exit 0

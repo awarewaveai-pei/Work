@@ -1,9 +1,15 @@
 {
-    "schemaVersion":  1,
-    "generatedAtUtc":  "2026-10-23T03:03:00.6410358Z",
+    "overall":  "PASS",
+    "measured":  12,
+    "generated_utc":  "2026-10-23T06:39:16Z",
+    "verdictLabel":  "PASS",
     "branch":  "main",
+    "verdict":  "healthy",
     "runsPerWorkflow":  20,
     "probeOk":  true,
+    "findings":  [
+
+                 ],
     "workflows":  [
                       {
                           "name":  "Auto-Repair - Claude Code",
@@ -67,7 +73,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39811858556"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39907872100"
                       },
                       {
                           "name":  "Perplexity Search-only guard",
@@ -75,7 +81,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39825021846"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39911914378"
                       },
                       {
                           "name":  "Release Gate (main)",
@@ -99,7 +105,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39825021566"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39911914395"
                       },
                       {
                           "name":  "Tenant staging SSOT",
@@ -134,9 +140,6 @@
                           "url":  ""
                       }
                   ],
-    "verdict":  "healthy",
-    "verdictLabel":  "PASS",
-    "findings":  [
-
-                 ]
+    "schemaVersion":  1,
+    "generatedAtUtc":  "2026-10-23T06:39:16.5691565Z"
 }

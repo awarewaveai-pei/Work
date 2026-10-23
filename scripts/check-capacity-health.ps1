@@ -72,6 +72,7 @@ Set-StrictMode -Version Latest
 
 # ssh with keepalive + hard total deadline; decodes stdout as UTF-8 itself (scripts/lib/ssh-deadline.ps1).
 . (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+. (Join-Path $PSScriptRoot "lib\_detector-contract.ps1")
 
 # -------------------------------------------------------------------------------------
 # Per-host policy. Calibrated 2026-08-27 from measured readings:
@@ -650,9 +651,10 @@ if ($renderError) {
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($latestPath, $md.ToString(), $utf8NoBom)
 
+# measured = hosts whose probe answered (ok); unreachable/timeout/ssh-missing = 0.
+$measured = @($results.Values | Where-Object { $_.ok }).Count
 $payload = [ordered]@{
     generatedAt = $stamp.ToUniversalTime().ToString("o")
-    overall     = $overall
     fatal       = $fatal
     fatalReason = $fatalReason
     policy      = $HOST_POLICY
@@ -665,10 +667,10 @@ $payload = [ordered]@{
     blind_spots = @($verdicts.Keys | ForEach-Object { $h = $_; $verdicts[$h].blind | Where-Object { $_ } | ForEach-Object { [ordered]@{ host = $h; reason = $_ } } })
     reportPath  = "agency-os/reports/status/capacity-LATEST.md"
 }
-[System.IO.File]::WriteAllText($jsonPath, ($payload | ConvertTo-Json -Depth 8), $utf8NoBom)
+$artifact = Write-DetectorArtifact -Path $jsonPath -Overall $overall -Measured $measured -Fields $payload
 
 if ($Json) {
-    $payload | ConvertTo-Json -Depth 8
+    $artifact | ConvertTo-Json -Depth 8
 } else {
     Write-Host "== Capacity health (AO-RESUME companion, warn-only) ==" -ForegroundColor Cyan
     Write-Host ("Overall: " + $overall)

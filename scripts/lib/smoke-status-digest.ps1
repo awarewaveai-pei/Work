@@ -90,22 +90,6 @@ function ConvertFrom-IsoUtcSafe {
     } catch { return $null }
 }
 
-# check-vps-auto-reboot-health.ps1 writes generated_utc as "yyyy-MM-dd HH:mm:ss" with NO
-# zone suffix (it is already UTC by construction -- see that script's own $genUtc). Parsing
-# it with the generic ISO parser above would apply LOCAL-zone assumptions and silently shift
-# the timestamp by the machine's UTC offset.
-function ConvertFrom-UnzonedUtcSafe {
-    param([string]$Text)
-    if (-not $Text) { return $null }
-    try {
-        # AssumeUniversal alone hands back a LOCAL-kind DateTime (converted to local time); the age
-        # maths then went negative by the machine offset and auto-reboot read BLIND on every real run
-        # (2026-09-23). AdjustToUniversal keeps the result in UTC, like the other two parsers.
-        $styles = [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
-        return [DateTime]::ParseExact([string]$Text, "yyyy-MM-dd HH:mm:ss", [System.Globalization.CultureInfo]::InvariantCulture, $styles)
-    } catch { return $null }
-}
-
 # The two MD-only reports (routine-freshness, cf-security) stamp local wall-clock time with
 # no zone info at all ("- generated: yyyy-MM-dd HH:mm (local)"). AssumeLocal + ToUniversalTime
 # converts using THIS machine's current offset, which is correct for same-machine freshness
@@ -138,8 +122,15 @@ function Test-TimestampFresh {
 function Test-ReportShape {
     param([Parameter(Mandatory = $true)]$Json, [Parameter(Mandatory = $true)][string[]]$RequiredKeys, [Parameter(Mandatory = $true)][string]$Label, [string]$FileName)
     $missing = @($RequiredKeys | Where-Object { -not $Json.PSObject.Properties[$_] })
-    if ($missing.Count -eq 0) { return $null }
-    return New-DigestEntry -Verdict "BLIND" -Label $Label -RawLines @(("{0} lacks producer key(s) {1} -- not a complete report (schema change or truncated write)" -f $FileName, ($missing -join ', ')))
+    if ($missing.Count -gt 0) {
+        return New-DigestEntry -Verdict "BLIND" -Label $Label -RawLines @(("{0} lacks producer key(s) {1} -- not a complete report (schema change or truncated write)" -f $FileName, ($missing -join ', ')))
+    }
+    # Detector contract: measured = what this run actually measured. 0 outranks any legacy verdict field
+    # (ci kept verdictLabel=PASS with every workflow pending -- read as CI PASS, 2026-10-23).
+    if ($Json.PSObject.Properties['measured'] -and [int]$Json.measured -le 0) {
+        return New-DigestEntry -Verdict "BLIND" -Label $Label -RawLines @(("{0}: measured=0 -- this run measured nothing" -f $FileName))
+    }
+    return $null
 }
 
 # Map a producer's own label to a digest verdict; anything unmapped is BLIND with a line naming the
@@ -316,7 +307,7 @@ function Get-AutoRebootEntry {
     $shape = Test-ReportShape -Json $j -RequiredKeys @('generated_utc', 'overall_user', 'ks_aw_01') -Label "Auto-reboot" -FileName "auto-reboot-LATEST.json"
     if ($shape) { return $shape }
 
-    $ts = ConvertFrom-UnzonedUtcSafe -Text ([string]$j.generated_utc)
+    $ts = ConvertFrom-IsoUtcSafe -Text ([string]$j.generated_utc)   # detector contract: ISO with Z
     if (-not (Test-TimestampFresh -UtcTimestamp $ts -MaxAgeHours $MaxAgeHours)) {
         return New-DigestEntry -Verdict "BLIND" -Label "Auto-reboot" -RawLines @(("auto-reboot-LATEST.json is stale (max {0}h)" -f $MaxAgeHours))
     }

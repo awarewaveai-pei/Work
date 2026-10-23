@@ -1,11 +1,14 @@
 ﻿{
-    "generatedAtUtc":  "2026-10-22T17:41:37Z",
-    "source":  "ao-close.ps1 (report skeleton commit)",
-    "sha":  "7fb442c39a60367b59f1a8a65bcf05e596b4f376",
-    "ok":  true,
+    "overall":  "PASS",
+    "measured":  1,
+    "generated_utc":  "2026-10-23T06:31:06Z",
+    "source":  "detector-contract-migration-check",
+    "sha":  "5f1912f3fefe4fb65d36edff031370bdad5ebdb7",
     "brokenCount":  0,
     "broken":  [
 
                ],
-    "error":  null
+    "error":  null,
+    "ok":  true,
+    "generatedAtUtc":  "2026-10-23T06:31:06Z"
 }

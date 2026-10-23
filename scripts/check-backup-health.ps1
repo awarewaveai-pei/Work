@@ -14,6 +14,7 @@ Set-StrictMode -Version Latest
 
 # ssh with keepalive + hard total deadline; decodes stdout as UTF-8 itself (scripts/lib/ssh-deadline.ps1).
 . (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+. (Join-Path $PSScriptRoot "lib\_detector-contract.ps1")
 
 function Resolve-Root {
     param([string]$InputRoot)
@@ -351,9 +352,10 @@ $jsonPath = Join-Path $statusDir "backup-health-LATEST.json"
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText($latestPath, $markdown.ToString(), $utf8NoBom)
 
+# measured = backup pipelines whose probe answered (ok) + the coverage status file when it was read and parsed.
+$measured = @(@($sg, $eu, $ks) | Where-Object { $null -ne $_ -and $_.ok }).Count + [int](($null -ne $coverage) -and $coverage.Contains("generated_at"))
 $payload = [ordered]@{
     generatedAt = $stamp.ToUniversalTime().ToString("o")
-    overall     = $overall
     fatal       = $fatal
     fatalReason = $fatalReason
     sg          = $sg
@@ -362,10 +364,10 @@ $payload = [ordered]@{
     coverage    = $coverage
     reportPath  = "agency-os/reports/status/backup-health-LATEST.md"
 }
-[System.IO.File]::WriteAllText($jsonPath, ($payload | ConvertTo-Json -Depth 6), $utf8NoBom)
+$artifact = Write-DetectorArtifact -Path $jsonPath -Overall $overall -Measured $measured -Fields $payload
 
 if ($Json) {
-    $payload | ConvertTo-Json -Depth 6
+    $artifact | ConvertTo-Json -Depth 6
 } else {
     Write-Host "== Backup health (AO-RESUME companion, warn-only) ==" -ForegroundColor Cyan
     Write-Host ("Overall: " + $overall)

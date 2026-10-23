@@ -1,0 +1,67 @@
+{
+    "overall":  "WARN",
+    "measured":  11,
+    "generated_utc":  "2026-10-23T06:53:07Z",
+    "note":  null,
+    "servers":  [
+                    {
+                        "name":  "cloudflare",
+                        "state":  "needs_auth",
+                        "status":  "! Needs authentication"
+                    },
+                    {
+                        "name":  "awarewave-ops",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "server-ssh",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "trigger",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "n8n",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "github",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "posthog",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "replicate",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "airtable",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "supabase-awarewave-postgres",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    },
+                    {
+                        "name":  "resend",
+                        "state":  "connected",
+                        "status":  "✓ Connected"
+                    }
+                ],
+    "source":  "claude mcp list",
+    "not_connected":  [
+                          "cloudflare=needs_auth"
+                      ]
+}

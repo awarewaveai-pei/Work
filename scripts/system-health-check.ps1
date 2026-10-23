@@ -979,8 +979,8 @@ if (Test-Path -LiteralPath $contractAudit) {
     Add-Check -Name $contractName -Pass $false -Detail "MISSING: scripts/audit-detector-contract.ps1"
 }
 
-# 12h) Claude desktop MCP runtime availability (init_mcp line in main.log). Reported, never blocks:
-# failed>0 or an unreadable log reads as WARN in the detail; the artifact is reports/status/mcp-runtime-LATEST.json.
+# 12h) Governed MCP servers' runtime availability (`claude mcp list`). Reported, never blocks: a server not
+# connected, or not measured, reads as WARN in the detail; the artifact is reports/status/mcp-runtime-LATEST.json.
 $mcpRuntimeScript = Join-Path $monoRoot "scripts\check-mcp-runtime.ps1"
 $mcpRuntimeName = "MCP runtime availability (check-mcp-runtime.ps1)"
 if (Test-Path -LiteralPath $mcpRuntimeScript) {

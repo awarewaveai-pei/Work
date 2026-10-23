@@ -471,7 +471,7 @@ Minor/suggestion findings also fixed in the same pass: m1 (`@()`-wrap `.Count` a
 
 - Invariant: every `reports/status/*-LATEST.json` has `overall` + `measured`; measured=0 never PASS. Writer helper `scripts/lib/_detector-contract.ps1` (`Write-DetectorArtifact`, downgrades PASS to UNKNOWN on measured=0).
 - Audit `scripts/audit-detector-contract.ps1` (health check 12g): unlisted violation or stale allowlist entry = FAIL. Legacy list `scripts/detector-contract-legacy.txt` may only shrink; new artifacts must comply.
-- First consumer `scripts/check-mcp-runtime.ps1` (health 12h): newest `init_mcp=` line of Claude `main*.log` -> `mcp-runtime-LATEST.json`; failed>0 WARN, log unreadable -> measured=0 UNKNOWN.
+- First consumer `scripts/check-mcp-runtime.ps1` (health 12h, AO-RESUME): `claude mcp list` per server -> `mcp-runtime-LATEST.json` naming each not-connected server; CLI missing/timeout/no lines -> measured=0 UNKNOWN. (Not desktop `init_mcp=` totals: they count claude.ai connectors and unauthorised plugins.)
 - Not enforced yet: "every artifact has >=1 reader".
 
 ---

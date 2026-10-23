@@ -1,4 +1,25 @@
 # Worklog
+## 2026-10-23（續20）偵測器契約 Phase 2 完成＋MCP 偵測器改用權威來源（Claude）
+
+**觸發**：操作者「去處理好」（續9 留下的 Phase 2、MCP failed=18、MinIO）。
+
+**做法**
+- MCP：續9 版讀 desktop `main.log` `init_mcp=` 總數＝量錯對象（含 claude.ai 連接器＋未授權 plugin，failed:18/needs_auth:26 恆 WARN）。改讀 `claude mcp list`（逐 server，~9s）：`scripts/check-mcp-runtime.ps1`。實測 10/11 連線，cloudflare needs_auth（操作者 `/mcp` 授權）。
+- `scripts/lib/process-deadline.ps1`：通用外部程式硬時限（taskkill /T 殺整棵樹）；`ssh-deadline.ps1` 改薄包裝（單一份時限碼）。
+- Phase 2：13 支 writer 全走 `Write-DetectorArtifact`（6 支 ssh 檢查、ci、smoke、post-commit-doc-check、ao-resume monthly、command-plane-smoke、ops-console-smoke、refresh-cf-origin-ips），舊欄位全保留。legacy 名單剩 cf-iprefresh／monthly（下次每月例行跑時重產，稽核 STALE 逼刪）。
+- 同類假綠燈 4 處：monthly `cf_ip_refresh` 改讀 artifact `overall`（腳本恆 exit 0）；digest `Test-ReportShape` measured≤0＝BLIND（ci verdictLabel=PASS 但 0 workflow 量到）；auto-reboot digest 改 ISO 解析並刪除唯一使用者已消失的 `ConvertFrom-UnzonedUtcSafe`；auto-reboot 探測失敗時 `$ks.last_reboot` StrictMode 崩潰 → 寫 not measured。
+- `refresh-cf-origin-ips.ps1` ssh 改 `Invoke-SshWithDeadline`（180s；原 `Start-Process -Wait` 無總時限，會卡死 AO-RESUME）。
+- 移除 5 月一次性快照：command-plane-smoke（git rm）、ops-console-smoke（gitignored 本機檔）——無程式讀取。
+- MinIO 孤兒：job store TTL 已合（40366864a）；GC 需改寫入順序，觸發＝fetch-runner 接真實流量前（TASKS 已寫）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=check-mcp-runtime (fixtures fail/ok/none + real) ; 6 ssh checks + ci + smoke real runs ; auto-reboot 192.0.2.1 ; cf-refresh skip path ; audit-detector-contract | exit=0 | ms=8821
+- audit：files=12 compliant=10 legacy=2 FAIL=0；digest test ALL PASS（+Case4b）；post-commit-doc-check 10/10。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- Codex cb2efdd8（2m 全修：ci 讀取端、cf ssh 時限）、669a27c4（2m 駁回：F1 `$genUtc` 只進 md、JSON 由契約寫 ISO Z（實檔 `2026-10-23T06:38:44Z`）；F2 legacy STALE＝刻意設計，訊息即修法）
+- BUGHUNT_DONE: scope=agency-os,scripts,tests | grep=ConvertFrom-UnzonedUtcSafe | hits=0
+- 未真跑：refresh-cf-origin-ips ok/error 路徑、command-plane/ops-console smoke（會改 prod／需憑證）、monthly 區塊（mock 驗）。
+
+**rollback**：`git revert <本 commit>`；`git show HEAD~1:agency-os/reports/status/command-plane-smoke-LATEST.json` 取回舊快照。
 ## 2026-10-23（續19）next-admin 部署：Cloudflare 憑證收斂上線
 
 - 前檢：無 `DEPLOY_HOLD`；`check-deploy-drift.ps1` behind=6（本次要解）；compose 只在 repo 的 `META_*` 為 `0d85eb44c` 既有落差，非本範圍。範圍 `286e0a0ab..a67b0048a` 含他 session `2e423f828`（無 migration）。

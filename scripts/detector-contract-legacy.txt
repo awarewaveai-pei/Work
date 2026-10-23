@@ -1,16 +1,6 @@
 # Phase-1 legacy: status artifacts that predate the detector contract (scripts/lib/_detector-contract.ps1).
 # One file name per line. This list may only SHRINK: migrate the writer, then delete its line.
 # audit-detector-contract.ps1 fails on a listed file that already complies (stale entry) and on any unlisted violation.
-auto-reboot-LATEST.json
-backup-health-LATEST.json
-capacity-LATEST.json
+# Writers all migrated 2026-10-23; these two regenerate on the next monthly run (ao-resume monthly block).
 cf-iprefresh-LATEST.json
-ci-LATEST.json
-clickhouse-LATEST.json
-command-plane-smoke-LATEST.json
-doc-integrity-commits-LATEST.json
 monthly-LATEST.json
-ops-console-smoke-LATEST.json
-site-watch-LATEST.json
-smoke-LATEST.json
-staging-orphans-LATEST.json

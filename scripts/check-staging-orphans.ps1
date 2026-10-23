@@ -54,6 +54,7 @@ $ErrorActionPreference = "Stop"
 # CP950 陷阱防護：EU 探測會回 wp_sites.name，真實客戶站名可能含 CJK。Invoke-SshWithDeadline 自己以 UTF-8
 # 解碼 ssh 輸出（不走主控台 ANSI 編碼），並有 keepalive + 總時限（scripts/lib/ssh-deadline.ps1）。
 . (Join-Path $PSScriptRoot 'lib\ssh-deadline.ps1')
+. (Join-Path $PSScriptRoot 'lib\_detector-contract.ps1')
 
 $reportDir = Join-Path $WorkRoot "agency-os\reports\status"
 if (-not (Test-Path -LiteralPath $reportDir)) { New-Item -ItemType Directory -Path $reportDir -Force | Out-Null }
@@ -207,16 +208,15 @@ $verdict =
     else                           { "WARN" }
 
 # ── 輸出 ───────────────────────────────────────────────────────────────────
-$json = [pscustomobject]@{
-    generated_utc   = $stamp
-    overall         = $verdict
+# measured = probes that reached their PROBE_OK completion marker (SG filesystem+MariaDB, Supabase wp_sites).
+$measured = [int]($sgRaw -match '(?m)^PROBE_OK\s*$') + [int]($euRaw -match '(?m)^PROBE_OK\s*$')
+Write-DetectorArtifact -Path (Join-Path $reportDir "staging-orphans-LATEST.json") -Overall $verdict -Measured $measured -Fields @{
     blind_spots     = @($blindSpots)
     counts          = $counts
     orphan_total    = $orphanTotal
     staging_disk_mb = $diskMb
     findings        = @($findings)
-} | ConvertTo-Json -Depth 6
-Set-Content -Path (Join-Path $reportDir "staging-orphans-LATEST.json") -Value $json -Encoding UTF8
+} | Out-Null
 
 $md = New-Object System.Collections.ArrayList
 [void]$md.Add("# staging 站三層對帳（SG 檔案 / MariaDB / Supabase wp_sites）")

@@ -54,6 +54,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'lib\_detector-contract.ps1')
+
 $script:Results = @()
 $script:RunId = [guid]::NewGuid().ToString('N').Substring(0, 8)
 $script:SmokePrefix = "smoke-$($script:RunId)"
@@ -335,7 +337,10 @@ $report = [pscustomobject]@{
 }
 
 if ($ReportPath) {
-  $report | ConvertTo-Json -Depth 6 | Set-Content -Encoding UTF8 -Path $ReportPath
+  # measured = checks that reached a verdict (a thrown probe is recorded as a failed check, so overall is FAIL, never PASS).
+  $reportFields = @{}
+  foreach ($p in $report.PSObject.Properties) { $reportFields[$p.Name] = $p.Value }
+  Write-DetectorArtifact -Path $ReportPath -Overall $(if ($report.ok) { 'PASS' } else { 'FAIL' }) -Measured @($script:Results).Count -Fields $reportFields | Out-Null
   Write-Host "Report written to $ReportPath"
 }
 

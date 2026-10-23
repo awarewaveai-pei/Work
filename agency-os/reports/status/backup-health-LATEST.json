@@ -1,8 +1,7 @@
 {
-    "generatedAt":  "2026-10-23T03:02:12.5895699Z",
     "overall":  "PASS",
-    "fatal":  false,
-    "fatalReason":  "",
+    "measured":  4,
+    "generated_utc":  "2026-10-23T06:38:38Z",
     "sg":  {
                "host":  "145.239.195.47",
                "ok":  true,
@@ -35,6 +34,7 @@
                "verify_result":  "PASSED",
                "verify_time":  "2026-10-23T03:00:37Z"
            },
+    "generatedAt":  "2026-10-23T06:38:18.9763990Z",
     "ks_aw_01":  {
                      "host":  "145.239.195.47",
                      "ok":  true,
@@ -51,14 +51,16 @@
                      "verify_result":  "PASSED",
                      "verify_time":  "2026-10-23T02:45:20Z"
                  },
+    "fatal":  false,
     "coverage":  {
                      "ok":  true,
                      "problem":  "",
-                     "generated_at":  "2026-10-22T03:30:07Z",
+                     "generated_at":  "2026-10-23T03:30:07Z",
                      "overall":  "PASS",
                      "fails":  [
 
                                ]
                  },
+    "fatalReason":  "",
     "reportPath":  "agency-os/reports/status/backup-health-LATEST.md"
 }

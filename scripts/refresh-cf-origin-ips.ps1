@@ -38,24 +38,19 @@ try {
         $status = "skip"
         $message = "SSH key not found -- skipped"
     } else {
-        $outPath = [System.IO.Path]::GetTempFileName()
-        $errPath = [System.IO.Path]::GetTempFileName()
-        try {
-            $refreshArgs = @("-i", $sshKey, "-p", "58122", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=30", "ubuntu@145.239.195.47", "sudo bash /root/scripts/refresh-cf-edge-geo.sh 2>&1")
-            $proc = Start-Process -FilePath "ssh" -ArgumentList $refreshArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $outPath -RedirectStandardError $errPath
-            $out  = (Get-Content -LiteralPath $outPath -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
-            $m = [regex]::Match([string]$out, "cf-edge-geo refreshed: v4=(\d+) v6=(\d+)")
-            if ($proc.ExitCode -eq 0 -and $m.Success) {
-                $v4Ranges = [int]$m.Groups[1].Value
-                $v6Ranges = [int]$m.Groups[2].Value
-                $status  = "ok"
-                $message = "Refresh completed: v4=$v4Ranges v6=$v6Ranges (nginx geo map on ks-aw-01)"
-            } else {
-                $status  = "error"
-                $message = "refresh exited $($proc.ExitCode): $out"
-            }
-        } finally {
-            Remove-Item -LiteralPath $outPath, $errPath -Force -ErrorAction SilentlyContinue
+        # Hard total deadline: a session that connects and then hangs must not block AO-RESUME's monthly run.
+        . (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+        $res = Invoke-SshWithDeadline -SshArgs @("-i", $sshKey, "-p", "58122", "-o", "StrictHostKeyChecking=accept-new", "ubuntu@145.239.195.47", "sudo bash /root/scripts/refresh-cf-edge-geo.sh 2>&1") -DeadlineSec 180 -ConnectTimeoutSec 30
+        $out = $res.Stdout
+        $m = [regex]::Match([string]$out, "cf-edge-geo refreshed: v4=(\d+) v6=(\d+)")
+        if ($res.ExitCode -eq 0 -and $m.Success) {
+            $v4Ranges = [int]$m.Groups[1].Value
+            $v6Ranges = [int]$m.Groups[2].Value
+            $status  = "ok"
+            $message = "Refresh completed: v4=$v4Ranges v6=$v6Ranges (nginx geo map on ks-aw-01)"
+        } else {
+            $status  = "error"
+            $message = "refresh exited $($res.ExitCode): $($res.Output)"
         }
     }
 } catch {
@@ -63,15 +58,16 @@ try {
     $message = "Exception: $($_.Exception.Message)"
 }
 
-$payload = @{
+# measured = 1 only when the on-box refresh ran and its result line parsed; skip/error measured nothing.
+. (Join-Path $PSScriptRoot "lib\_detector-contract.ps1")
+$cfOverall = switch ($status) { "ok" { "PASS" }; "error" { "FAIL" }; default { "UNKNOWN" } }
+Write-DetectorArtifact -Path (Join-Path $reportDir "cf-iprefresh-LATEST.json") -Overall $cfOverall -Measured ([int]($status -eq "ok")) -Fields @{
     generated = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
     status    = $status
     v4_ranges = $v4Ranges
     v6_ranges = $v6Ranges
     message   = $message
-} | ConvertTo-Json -Compress
-
-Set-Content -Path (Join-Path $reportDir "cf-iprefresh-LATEST.json") -Value $payload -Encoding UTF8
+} | Out-Null
 
 $colour = switch ($status) { "ok" { "Green" }; "skip" { "DarkGray" }; default { "Yellow" } }
 Write-Host "== CF origin IP refresh: $status (v4=$v4Ranges, v6=$v6Ranges) ==" -ForegroundColor $colour

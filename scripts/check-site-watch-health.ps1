@@ -55,6 +55,7 @@ Set-StrictMode -Version Latest
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
 # ssh with keepalive + hard total deadline (scripts/lib/ssh-deadline.ps1).
 . (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+. (Join-Path $PSScriptRoot "lib\_detector-contract.ps1")
 
 $HeartbeatWarnH = 2
 $HeartbeatFailH = 6
@@ -273,9 +274,10 @@ if ($blindSpots.Count -gt 0) {
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 [System.IO.File]::WriteAllText((Join-Path $statusDir "site-watch-LATEST.md"), $md.ToString(), $utf8NoBom)
+# measured = probes that produced a real verdict from data; SKIP (nothing to watch) and UNKNOWN (blind) do not count.
+$measured = @($probes.Values | Where-Object { $_.verdict -in @("PASS", "WARN", "FAIL") }).Count
 $payload = [ordered]@{
     generatedAt = $stamp.ToUniversalTime().ToString("o")
-    overall     = $overall
     blind_spots = @($blindSpots)
     source      = $source
     probes      = $probes
@@ -284,10 +286,10 @@ $payload = [ordered]@{
     thresholds  = [ordered]@{ heartbeat_warn_h = $HeartbeatWarnH; heartbeat_fail_h = $HeartbeatFailH; enabled_recent_h = $EnabledRecentH; overdue_slack_h = $OverdueSlackH; notify_stuck_h = $NotifyStuckH }
     reportPath  = "agency-os/reports/status/site-watch-LATEST.md"
 }
-[System.IO.File]::WriteAllText((Join-Path $statusDir "site-watch-LATEST.json"), ($payload | ConvertTo-Json -Depth 6), $utf8NoBom)
+$artifact = Write-DetectorArtifact -Path (Join-Path $statusDir "site-watch-LATEST.json") -Overall $overall -Measured $measured -Fields $payload
 
 if ($Json) {
-    $payload | ConvertTo-Json -Depth 6
+    $artifact | ConvertTo-Json -Depth 6
 } else {
     Write-Host "== site-watch watchdog (AO-RESUME companion, warn-only) ==" -ForegroundColor Cyan
     Write-Host ("Overall: " + $overall + "   source: " + $source)

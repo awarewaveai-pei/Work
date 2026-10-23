@@ -1,10 +1,7 @@
 {
-    "generated_utc":  "2026-10-23 03:02:32",
-    "overall_label":  "healthy",
-    "overall_user":  "PASS",
-    "ssot":  {
-                 "sha52":  "7f4e36d2b153f2450dc5bbd44c36e3c492068551af677a2d1ab795922fc682d4"
-             },
+    "overall":  "PASS",
+    "measured":  1,
+    "generated_utc":  "2026-10-23T06:38:44Z",
     "ks_aw_01":  {
                      "snapshot":  {
                                       "host":  "145.239.195.47",
@@ -32,5 +29,10 @@
                                                  ],
                                      "pending":  false
                                  }
-                 }
+                 },
+    "overall_label":  "healthy",
+    "overall_user":  "PASS",
+    "ssot":  {
+                 "sha52":  "7f4e36d2b153f2450dc5bbd44c36e3c492068551af677a2d1ab795922fc682d4"
+             }
 }

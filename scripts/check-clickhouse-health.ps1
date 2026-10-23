@@ -95,6 +95,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+. (Join-Path $PSScriptRoot "lib\_detector-contract.ps1")
 
 $ICON_HEALTHY = [char]::ConvertFromUtf32(0x1F7E2)  # green circle
 $ICON_DRIFT   = [char]::ConvertFromUtf32(0x1F7E1)  # yellow circle
@@ -279,6 +280,7 @@ $mergeFail1h = 0L; $stalledMerges = 0L; $mergeBudget = 0L
 $widestTable = ""; $widestCols = 0L
 $appMaxParts = 0L; $appMaxPartsTable = ""
 $retiredCount = 0L; $retiredNames = ""
+$measured = 0
 
 # "table:number" -> name + value. Used by widest_combo and app_max_parts_combo so the name
 # and its number arrive from one query and cannot disagree (same reasoning as no_ttl_combo).
@@ -297,6 +299,8 @@ if ($res.ExitCode -ne 0) {
     Set-Worst "broken"
     $reasons += "SSH/probe failed (exit $($res.ExitCode)): " + (($res.Output -split "`n") | Select-Object -First 1)
 } else {
+    # measured = probe queries that returned a value (q() swallows query errors into an empty value).
+    $measured = @($res.Output -split "`n" | Where-Object { $_ -match '^[a-z0-9_]+=\S' }).Count
     $systemBytes = To-Long (Parse-Kv $res.Output "system_bytes")
     $systemRows  = To-Long (Parse-Kv $res.Output "system_rows")
     $appBytes    = To-Long (Parse-Kv $res.Output "app_bytes")
@@ -562,13 +566,10 @@ $payload = [ordered]@{
     verdictLabel    = $userLabel
     findings        = $reasons
 }
-[System.IO.File]::WriteAllText(
-    (Join-Path $reportDir "clickhouse-LATEST.json"),
-    ($payload | ConvertTo-Json -Depth 6),
-    $utf8NoBom)
+$artifact = Write-DetectorArtifact -Path (Join-Path $reportDir "clickhouse-LATEST.json") -Overall $userLabel -Measured $measured -Fields $payload
 
 if ($Json) {
-    $payload | ConvertTo-Json -Depth 6
+    $artifact | ConvertTo-Json -Depth 6
 } else {
     Write-Host ("ClickHouse health: {0} {1}" -f $icon, $userLabel)
     Write-Host ("  system={0} app={1} ratio={2}x merges={3} stalled={4} mergefail1h={5} widest={6}" -f (Format-Size $systemBytes), (Format-Size $appBytes), $ratio, $merges, $stalledMerges, $mergeFail1h, $(if ($widestTable) { "${widestTable}:${widestCols}" } else { "n/a" }))

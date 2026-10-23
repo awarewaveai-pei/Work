@@ -47,6 +47,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot "lib\ssh-deadline.ps1")
+. (Join-Path $PSScriptRoot "lib\_detector-contract.ps1")
 
 # Verdict-to-emoji map (kept here so we never write emoji literals in source).
 $ICON_HEALTHY = [char]::ConvertFromUtf32(0x1F7E2)  # green circle
@@ -290,17 +291,16 @@ $genUtc = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
 $reportDir = Join-Path $rootPath "agency-os\reports\status"
 if (-not (Test-Path -LiteralPath $reportDir)) { New-Item -ItemType Directory -Force -Path $reportDir | Out-Null }
 
-# JSON output
-$jsonObj = [ordered]@{
-    generated_utc = $genUtc
+# JSON output. measured = hosts whose probe returned a snapshot (ssh failure/timeout = 0, verdict FAIL).
+$jsonFields = @{
     overall_label = $worstLabel
     overall_user  = $worstUserLabel
     ssot = [ordered]@{ sha52 = $ssotSha52 }
     ks_aw_01 = [ordered]@{ snapshot = $ks; verdict = [ordered]@{ label = $ksVerdict.label; reasons = $ksVerdict.reasons; pending = $ksVerdict.pending } }
 }
 $jsonPath = Join-Path $reportDir "auto-reboot-LATEST.json"
-$jsonText = ($jsonObj | ConvertTo-Json -Depth 8)
-[System.IO.File]::WriteAllText($jsonPath, $jsonText, [System.Text.UTF8Encoding]::new($false))
+$artifact = Write-DetectorArtifact -Path $jsonPath -Overall $worstUserLabel -Measured ([int]$ks.ok) -Fields $jsonFields
+$jsonText = ($artifact | ConvertTo-Json -Depth 8)
 
 # Markdown report
 $md = New-Object System.Text.StringBuilder
@@ -345,7 +345,7 @@ if ($ksVerdict.pending) {
 
 [void]$md.AppendLine("## Last reboot")
 [void]$md.AppendLine("")
-[void]$md.AppendLine("- ks-aw-01: $($ks.last_reboot)")
+[void]$md.AppendLine("- ks-aw-01: $(if ($ks.ok) { $ks.last_reboot } else { 'not measured (probe failed)' })")
 [void]$md.AppendLine("")
 [void]$md.AppendLine("---")
 [void]$md.AppendLine("")

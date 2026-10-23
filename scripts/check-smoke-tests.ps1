@@ -47,6 +47,7 @@ param(
 
 # CP950 protection for native stdout capture (see scripts/_console-encoding-helpers.ps1).
 . (Join-Path $PSScriptRoot "_console-encoding-helpers.ps1")
+. (Join-Path $PSScriptRoot "lib\_detector-contract.ps1")
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -647,15 +648,15 @@ $colour     = if ($overall -eq "PASS") { "Green" } elseif ($overall -eq "SKIP") 
 
 # --- Write LATEST JSON ---
 $stamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
+# measured = checks that produced real evidence: not skipped, not in $noEvidence (any check, not only critical).
+$measured = @($checks | Where-Object { $results[$_] -notlike "skip:*" -and -not $noEvidence.ContainsKey($_) }).Count
 $payload = @{
     generated   = $stamp
-    overall     = $overall
     blind_spots = @($blindSpots)   # critical detectors that produced no evidence this run
     blockers    = $blockers        # ready-to-print lines from all 10 sibling status reports
     checks      = $results
 }
-$json = $payload | ConvertTo-Json -Depth 5
-Set-Content -Path (Join-Path $reportDir "smoke-LATEST.json") -Value $json -Encoding UTF8
+Write-DetectorArtifact -Path (Join-Path $reportDir "smoke-LATEST.json") -Overall $overall -Measured $measured -Fields $payload | Out-Null
 
 # --- Summary line for console ---
 # Surface WHICH detector went blind — "WARN" with no reason sends the reader hunting.

@@ -1,19 +1,7 @@
 ﻿{
-    "generated_utc":  "2026-10-23T02:42:51Z",
     "overall":  "OK",
-    "blind_spots":  [
-
-                    ],
-    "counts":  {
-                   "unregistered":  0,
-                   "dir_only":  0,
-                   "db_only":  0,
-                   "unknown":  0,
-                   "row_only":  0,
-                   "complete":  1
-               },
-    "orphan_total":  0,
-    "staging_disk_mb":  250.4,
+    "measured":  2,
+    "generated_utc":  "2026-10-23T06:31:02Z",
     "findings":  [
                      {
                          "slug":  "e2e-verify-0704-6e2b91",
@@ -26,5 +14,18 @@
                          "active":  "t",
                          "org":  "9e6e0993-d535-438b-a252-64cecdd91cca"
                      }
-                 ]
+                 ],
+    "orphan_total":  0,
+    "staging_disk_mb":  250.4,
+    "counts":  {
+                   "unregistered":  0,
+                   "dir_only":  0,
+                   "db_only":  0,
+                   "unknown":  0,
+                   "row_only":  0,
+                   "complete":  1
+               },
+    "blind_spots":  [
+
+                    ]
 }

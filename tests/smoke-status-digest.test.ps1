@@ -37,16 +37,15 @@ try {
 
     # ---------- Case 2: all-healthy fixtures -> PASS, no blockers ----------
     # Every producer's own timestamp shape (the M1 freshness check reads these, never mtime):
-    # ISO "o" (generatedAtUtc / generatedAt), unzoned UTC (auto-reboot generated_utc), zoned ISO
-    # (staging generated_utc), local wall-clock "- generated:" / "- Generated:" lines in the two MDs.
+    # ISO "o" (generatedAtUtc / generatedAt), zoned ISO (auto-reboot / staging generated_utc,
+    # detector contract), local wall-clock "- generated:" / "- Generated:" lines in the two MDs.
     $nowIso   = (Get-Date).ToUniversalTime().ToString("o")
-    $nowUnzoned = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")
     $nowLocalMin = (Get-Date).ToString("yyyy-MM-dd HH:mm")
     $nowLocalSec = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     Write-Utf8 (Join-Path $statusDir "ci-LATEST.json") (@{ generatedAtUtc = $nowIso; verdictLabel = "PASS"; probeOk = $true; findings = @(); workflows = @() } | ConvertTo-Json)
     Write-Utf8 (Join-Path $healthDir "health-20260101-000000.json") (@{ schemaVersion = 1; generatedAtUtc = $nowIso; score = 100; critical_gate = "PASS"; critical_failures = @(); passed = 10; failed = 0; total = 10 } | ConvertTo-Json)
     Write-Utf8 (Join-Path $statusDir "backup-health-LATEST.json") (@{ generatedAt = $nowIso; overall = "PASS"; fatal = $false; fatalReason = ""; ks_aw_01 = @{ status = "ok" } } | ConvertTo-Json -Depth 5)
-    Write-Utf8 (Join-Path $statusDir "auto-reboot-LATEST.json") (@{ generated_utc = $nowUnzoned; overall_user = "PASS"; ks_aw_01 = @{ verdict = @{ reasons = @() } } } | ConvertTo-Json -Depth 5)
+    Write-Utf8 (Join-Path $statusDir "auto-reboot-LATEST.json") (@{ generated_utc = $nowIso; overall_user = "PASS"; ks_aw_01 = @{ verdict = @{ reasons = @() } } } | ConvertTo-Json -Depth 5)
     Write-Utf8 (Join-Path $statusDir "clickhouse-LATEST.json") (@{ generatedAtUtc = $nowIso; verdictLabel = "PASS"; findings = @() } | ConvertTo-Json)
     Write-Utf8 (Join-Path $statusDir "capacity-LATEST.json") (@{ generatedAt = $nowIso; overall = "PASS"; blind_spots = @(); verdicts = @{ "ks-aw-01" = @{ reasons = @(); blind = @() } } } | ConvertTo-Json -Depth 5)
     Write-Utf8 (Join-Path $statusDir "site-watch-LATEST.json") (@{ generatedAt = $nowIso; overall = "PASS"; blind_spots = @(); probes = @{ a = @{ verdict = "PASS"; detail = "ok" } } } | ConvertTo-Json -Depth 5)
@@ -73,6 +72,9 @@ try {
     Write-Utf8 (Join-Path $statusDir "ci-LATEST.json") (@{ generatedAtUtc = $nowIso; verdictLabel = "FAIL"; probeOk = $false; findings = @("BLIND SPOT: gh workflow list failed"); workflows = @() } | ConvertTo-Json)
     $d4 = Get-StatusDigest -WorkRoot $root
     Assert-Eq "BLIND" $d4.entries.ci_health.verdict "Case4: probeOk=false must be BLIND even if verdictLabel says FAIL"
+    # Case 4b: detector contract measured=0 outranks a legacy verdictLabel=PASS (every workflow pending)
+    Write-Utf8 (Join-Path $statusDir "ci-LATEST.json") (@{ generatedAtUtc = $nowIso; verdictLabel = "PASS"; probeOk = $true; findings = @(); workflows = @(); overall = "UNKNOWN"; measured = 0 } | ConvertTo-Json)
+    Assert-Eq "BLIND" (Get-StatusDigest -WorkRoot $root).entries.ci_health.verdict "Case4b: measured=0 must be BLIND even if verdictLabel says PASS"
     Write-Utf8 (Join-Path $statusDir "ci-LATEST.json") (@{ generatedAtUtc = $nowIso; verdictLabel = "PASS"; probeOk = $true; findings = @(); workflows = @() } | ConvertTo-Json)  # reset
 
     # ---------- Case 5: nightly health critical_gate FAIL ----------
