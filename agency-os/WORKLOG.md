@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-23（續34）側欄：產內容的工具收回同一個 Content Tools 區（續32 後操作者回饋）（Claude）
+
+**觸發**：操作者：Banner／Studio／Mockup／Tarot／Articles／Video 都是 content tools，不該拆到 Marketing、Design Studio、Video & Tarot 三區。
+
+**根因**：續30／續32 按「產品」切分區（products.ts 一產品一區），但操作者用側欄的心智模型是「產出內容的工具 vs 發布／排程」；按產品切把同一類工具拆散。
+
+**修改**
+- `app/SidebarNav.tsx`：新 `content-tools` 區（Clients 之後、Marketing 之前）：SEO Articles、Video Studio、Tarot Studio、POD Studio、Mockup、Banner Studio、Canvas Editor、Vector Editor、My Designs、Publish、Templates(soon)；刪 Design Studio、Video & Tarot 兩區；Marketing 只留 Content Calendar、Events Calendar、Social Posts。
+- `app/__tests__/sidebar-coverage.test.ts`：往返測試改用 `content-tools`。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/__tests__/sidebar-coverage.test.ts（6 passed）＋ npx tsc --noEmit（0） | exit=0 | ms=60000
+- 實測：本機已登入頁分區＝Overview / Build & Onboard / Clients / Content Tools / Marketing / Cold Outreach / Knowledge & Data / Customer Service / Repair & Control / AI Models & Costs / System / External，截圖已給操作者。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 diff：只搬項目與分區，無邏輯變更
+- ORACLE_WAIVED: 純資料改動（項目搬區）；applyLayout 邏輯審查見 `agency-os/reports/oracle/2026-10-23-review-143dbbef.md`
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep='design-studio'|'video-tarot' | hits=0（刪掉的 section id 已無引用）
+- BUGHUNT_SCOPE_NARROW: section id 只在 next-admin 側欄資料與其測試使用
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-23（續33）塔羅背景批次：套框＋存我的設計＋下載 PNG/WebP；牌面：數量、惡魔、正義、面向（Claude）
 
 **觸發**：操作者回報背景批次 78 張（job c8fbba27，flux-schnell，09:28 UTC）①無外框、沒進 /tools/designs ②擬人動物 3/5/6 隻腳 ③數字牌數量不對 ④沒照原圖（惡魔）⑤下載 ZIP 空資料夾 ⑥要原尺寸 PNG 或 200–300KB WebP。

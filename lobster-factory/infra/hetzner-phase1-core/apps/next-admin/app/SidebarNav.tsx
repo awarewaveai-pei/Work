@@ -16,7 +16,7 @@ export interface NavSection {
 }
 
 // Order follows the work: win and build a client → keep the client running → the services we run for
-// clients (marketing, outreach, knowledge, CS) → the creative tools → keeping the platform running.
+// clients (content tools, marketing, outreach, knowledge, CS) → keeping the platform running.
 // Labels are English only (sidebar-coverage.test.ts checks); the Chinese explanation lives in `title`.
 // Every built page under app/(shell) is linked here or listed in __tests__/sidebar-coverage.test.ts
 // with where it is reached from, so a new page fails that test until it is placed.
@@ -52,12 +52,29 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link', href: '/ops/schedules',       icon: '⏱', label: 'Schedules',       title: '所有客戶的例行工作：自動爬取、網站巡檢' },
     ],
   },
-  // ── Marketing：內容 → 排程 → 題材 → 社群；開發信是另一條獨立流程，緊接在後
+  // ── Content Tools：產出內容的工具（文章、影片、塔羅、商品圖、banner、編輯器）；Marketing 負責排程與發布
+  {
+    id: 'content-tools',
+    label: 'Content Tools',
+    items: [
+      { type: 'link',     href: '/tools/content',       icon: '✍', label: 'SEO Articles',  title: 'SEO/GEO 文章產出' },
+      { type: 'link',     href: '/tools/video',         icon: '🎬', label: 'Video Studio',  title: '影片生成工具' },
+      { type: 'link',     href: '/tools/tarot',         icon: '🔮', label: 'Tarot Studio',  title: '塔羅牌印刷檔生成工具' },
+      { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'POD Studio',    title: 'POD 設計生成器' },
+      { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',        title: 'AI 擬真商品照' },
+      { type: 'link',     href: '/tools/banner',        icon: '🖼', label: 'Banner Studio', title: 'Social media banner 生成工具' },
+      { type: 'link',     href: '/tools/canvas',        icon: '🎨', label: 'Canvas Editor', title: 'Fabric.js 快速編輯 Canvas' },
+      { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor', title: '向量設計工具（14 積木）' },
+      { type: 'link',     href: '/tools/designs',       icon: '🗂', label: 'My Designs',    title: '已儲存設計庫（R2 持久化）' },
+      { type: 'link',     href: '/tools/publish',       icon: '🛒', label: 'Publish',       title: '一鍵上架 Woo + Printful' },
+      { type: 'disabled', icon: '◧', label: 'Templates' },
+    ],
+  },
+  // ── Marketing：排程 → 找題材 → 社群發布；開發信是另一條獨立流程，緊接在後
   {
     id: 'marketing',
     label: 'Marketing',
     items: [
-      { type: 'link', href: '/tools/content',          icon: '✍', label: 'SEO Articles',     title: 'SEO/GEO 文章產出' },
       { type: 'link', href: '/tools/content/calendar', icon: '🗓', label: 'Content Calendar', title: '文章排程與發布日曆' },
       { type: 'link', href: '/tools/events',           icon: '🌍', label: 'Events Calendar',  title: '全球活動行事曆：運動賽事、國家與文化節慶，找內容題材' },
       { type: 'link', href: '/tools/social',           icon: '📣', label: 'Social Posts',     title: '多品牌社群排程（ADR 016）' },
@@ -101,29 +118,6 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link',     href: '/cs-widget', icon: '🗨', label: 'CS Widget Preview', title: '客服聊天視窗試玩（假資料，尚未接 Chatwoot）' },
       { type: 'disabled', icon: '🎚', label: 'Intents & Tiers' },
       { type: 'disabled', icon: '🧪', label: 'Eval & Simulation' },
-    ],
-  },
-  // ── 商品設計：生成 → 編輯 → 存檔 → 上架
-  {
-    id: 'design-studio',
-    label: 'Design Studio',
-    items: [
-      { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'POD Studio',    title: 'POD 設計生成器' },
-      { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',        title: 'AI 擬真商品照' },
-      { type: 'link',     href: '/tools/banner',        icon: '🖼', label: 'Banner Studio', title: 'Social media banner 生成工具' },
-      { type: 'link',     href: '/tools/canvas',        icon: '🎨', label: 'Canvas Editor', title: 'Fabric.js 快速編輯 Canvas' },
-      { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor', title: '向量設計工具（14 積木）' },
-      { type: 'link',     href: '/tools/designs',       icon: '🗂', label: 'My Designs',    title: '已儲存設計庫（R2 持久化）' },
-      { type: 'link',     href: '/tools/publish',       icon: '🛒', label: 'Publish',       title: '一鍵上架 Woo + Printful' },
-      { type: 'disabled', icon: '◧', label: 'Templates' },
-    ],
-  },
-  {
-    id: 'video-tarot',
-    label: 'Video & Tarot',
-    items: [
-      { type: 'link', href: '/tools/video', icon: '🎬', label: 'Video Studio', title: '影片生成工具' },
-      { type: 'link', href: '/tools/tarot', icon: '🔮', label: 'Tarot Studio', title: '塔羅牌印刷檔生成工具' },
     ],
   },
   // ── AI 維修主控台 + 事件 + 全域控制閘（簽核 / kill-switch）+ 健康；與首頁 dashboard 同名區一致
