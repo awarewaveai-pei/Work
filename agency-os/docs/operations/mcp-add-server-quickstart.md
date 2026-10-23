@@ -49,7 +49,7 @@
    **`.\scripts\secrets-vault.ps1 -Action sync-mcp-user-env`**
    會把 vault 中需要的 env 鍵同步到本機使用者環境；完成後完全結束並重開 Claude Code / Codex。缺哪個變數，腳本會列出；可用 **`secrets-vault.ps1 -Action set -Name … -Value …`** 補進 vault 後再跑一次 sync。
 5.2 **`SUPABASE_*`／`CLOUDFLARE_*`／`POSTHOG_*`**：若 vault 根本沒有對應鍵名，請依各服後台填入真值 **`set`** 進 vault，勿把明文留在聊天。
-6. **`trigger` 仍紅**：在 monorepo 根執行 `.\scripts\secrets-vault.ps1 -Action list`，清單裡**必須**有 **`TRIGGER_ACCESS_TOKEN`**（Trigger 後台建立的 Personal Access Token，用 `set` 寫入 vault；`import-mcp` 不會憑空生出這一筆）。自託管另需 **`trigger.env.TRIGGER_API_URL`** 與 **`start-trigger-mcp.ps1 -ProjectRef`**／**`TRIGGER_PROJECT_REF`** 正確。
+6. **`trigger` 仍紅**：在 monorepo 根執行 `.\scripts\secrets-vault.ps1 -Action list`，清單裡**必須**有 **`TRIGGER_DEPLOY_PAT`**（Trigger 後台建立的 Personal Access Token `tr_pat_*`，用 `set` 寫入 vault；`import-mcp` 不會憑空生出這一筆）。`start-trigger-mcp.ps1` 只在 MCP 子程序內把它放進 `TRIGGER_ACCESS_TOKEN`；vault 裡的 `TRIGGER_ACCESS_TOKEN` 是 `tr_prod_*` runtime token，給 MCP 會得到 `NotAccessTokenError`（2026-10-23）。自託管另需 **`trigger.env.TRIGGER_API_URL`** 與 **`start-trigger-mcp.ps1 -ProjectRef`**／**`TRIGGER_PROJECT_REF`** 正確。
 7. **`copilot` 仍紅**：先核對 URL／Bearer 權限與使用者環境變數，再執行 **`.\scripts\sync-mcp-config.ps1`**；完全結束並重開對應 client 後再測。
 
 ## 明文機密清理（舊機）

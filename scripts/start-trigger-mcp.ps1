@@ -1,6 +1,8 @@
 param(
     [string]$ProjectRef = "",
-    [string]$TokenName = "TRIGGER_ACCESS_TOKEN"
+    # The MCP (trigger.dev CLI) needs a Personal Access Token (tr_pat_*); TRIGGER_ACCESS_TOKEN in the vault is the
+    # SDK runtime token (tr_prod_*), which the CLI refuses with NotAccessTokenError (AGENTS.md §0: not interchangeable).
+    [string]$TokenName = "TRIGGER_DEPLOY_PAT"
 )
 
 Set-StrictMode -Version Latest
@@ -25,7 +27,7 @@ if (-not [string]::IsNullOrWhiteSpace($env:TRIGGER_API_URL)) {
     $u = $env:TRIGGER_API_URL.Replace("'", "''")
     $prefix = "`$env:TRIGGER_API_URL='$u'; "
 }
-$command = $prefix + "npx -y trigger.dev@latest mcp --project-ref `"$ProjectRef`""
+$command = $prefix + "`$env:TRIGGER_ACCESS_TOKEN=`$env:$TokenName; npx -y trigger.dev@latest mcp --project-ref `"$ProjectRef`""
 
 # Resolve powershell.exe by absolute path: when launched as an MCP server the child
 # process PATH may omit System32\WindowsPowerShell, so a bare `powershell` token raises

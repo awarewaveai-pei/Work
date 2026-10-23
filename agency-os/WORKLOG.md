@@ -1,4 +1,28 @@
 # Worklog
+## 2026-10-23（續11）Trigger MCP 改用 PAT（TRIGGER_DEPLOY_PAT）；明早自動驗證自用權利；客戶權利盤點（Claude）
+
+**觸發**：操作者「去處理好」續8 剩餘項。
+
+**C1 Trigger MCP 一直 NotAccessTokenError**
+- 根因：`scripts/start-trigger-mcp.ps1` 從 vault 取 `TRIGGER_ACCESS_TOKEN` 給 `trigger.dev mcp`；該值＝`tr_prod_*`（SDK runtime），CLI 只收 `tr_pat_*`（AGENTS.md §0 兩者不可互換）。
+- 修：預設 `-TokenName TRIGGER_DEPLOY_PAT`，啟動前 `$env:TRIGGER_ACCESS_TOKEN=$env:TRIGGER_DEPLOY_PAT`（只在 MCP 子程序內）；程式 runtime 的 `TRIGGER_ACCESS_TOKEN` 不動。
+- 生效：MCP 重新連線（下一個 session）。
+
+**排程**：Claude 桌面排程 `verify-internal-comp-2026-10-24`，2026-10-24 10:00（台灣）一次性唯讀驗證：自用 comp 列數＝登記表功能數、09:00 後無 internal would_deny；結果寫 WORKLOG＋TASKS 勾選。App 需開著（關著則下次開啟時跑）。
+
+**客戶盤點**（prod 唯讀，`kind='customer'` 根帳戶 5 個）
+- soulful-expression：代操付費客戶；30 天稽核只有 `social.dispatch` would_deny 1 筆。→ 待操作者定合約涵蓋產品。
+- mongolia-03：Scenery Travel Mongolia 試點，`TASKS.md:57` 等客戶刷卡 → 不給列。
+- e2e-verify-0704、test-wp-webhook-co：測試帳戶 → 不給列。
+- edd-research（EdD 論文研究）：用途不明 → 待操作者答。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=secrets-vault run 分類（DEPLOY_PAT=pat、ACCESS_TOKEN=prod）＋ 同法注入 PAT 跑 npx trigger.dev whoami --api-url <self-hosted> → 回 User ID | exit=0 | ms=40000
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 start-trigger-mcp.ps1 diff：只換 token 來源，`$TokenName` 仍可覆寫
+- ORACLE_WAIVED: 2 行設定來源修正，實測 whoami 已證
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,mcp | grep=start-trigger-mcp | hits=9（.mcp.json、registry、patch/sanitize 腳本只傳路徑或 -ProjectRef，不受影響；`mcp-add-server-quickstart.md:52` 寫 vault 需 TRIGGER_ACCESS_TOKEN，已改為 TRIGGER_DEPLOY_PAT）
+
+**rollback**：`git revert <本 commit>`；排程在 app 側欄 Scheduled 刪除。
 ## 2026-10-23（續10）⑧內容社群影片十項 VBC；影片刪除引用閘＋loopback cron 被產品門 404（Claude）
 
 **觸發**：操作者貼 TASKS ⑧ 十項「做過打勾、要做就做」；查完後選「A＋B，7393 選②」。
