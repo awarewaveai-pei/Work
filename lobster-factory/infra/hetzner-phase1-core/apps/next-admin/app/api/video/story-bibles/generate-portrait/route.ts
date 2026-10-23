@@ -16,6 +16,7 @@ import { createHash } from "node:crypto";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { thenRun, withFeature } from "@/lib/entitlements/grant";
 
 export const runtime = "nodejs";
 
@@ -30,7 +31,7 @@ interface GeneratePortraitBody {
   description?: string;
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<Response> {
   const { role: opsRole } = resolveOpsRole(req);
   if (!canCreateAiImageJob(opsRole)) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
@@ -55,39 +56,43 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const prompt = `Character reference portrait, head and shoulders studio photo, neutral background, ${name}${role ? `, ${role}` : ""}${description ? `. ${description}` : ""}, consistent identity for reuse across scenes`;
 
   const { buildSceneAsset } = await import("@/lib/content/blocks/video-pipeline");
-  const result = await buildSceneAsset(
-    { id: 0, image_prompt: prompt, broll_keyword: "", visual: "custom" },
-    // 首次定裝照沒有參考圖可帶（就是要生出這張參考圖），純文字生圖用最便宜的 flux-schnell（$0.003/張）
-    // 即可，不需要 flux-dev（$0.025/張）— 操作者要求「盡量用最便宜的模型」。
-    { imageModel: "flux-schnell", aspectRatio: "4:5", framing: "Portrait studio photography, sharp focus on face." },
-  );
-  if (!result.ok) {
-    const err = result as { ok: false; status: number; error: string };
-    return NextResponse.json({ ok: false, error: `定裝照生成失敗：${err.error}` }, { status: err.status });
-  }
-  if (!result.bytes || !result.mime) {
-    return NextResponse.json({ ok: false, error: "定裝照生成成功但缺 buffer（非預期路徑）" }, { status: 502 });
-  }
-
-  const db = getSupabaseWriteClient();
-  if (!db) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
-  const asset = await db.from("media_assets").insert({
-    organization_id: organizationId,
-    storage_backend: "r2",
-    asset_domain: "ai_generated",
-    object_key: result.r2Key ?? null,
-    object_url: result.asset,
-    mime_type: result.mime,
-    byte_size: result.bytes.byteLength,
-    checksum_sha256: createHash("sha256").update(result.bytes).digest("hex"),
-    metadata: { source: "story_bible_auto_portrait", character_name: name, character_role: role ?? "", character_description: description ?? "" },
-  }).select("id").single();
-  if (asset.error || !asset.data) {
-    if (result.r2Key) {
-      try { const { deleteDesignObject } = await import("@/lib/storage/r2"); await deleteDesignObject(result.r2Key); } catch { /* best effort cleanup */ }
+  const run = async (): Promise<Response> => {
+    const result = await buildSceneAsset(
+      { id: 0, image_prompt: prompt, broll_keyword: "", visual: "custom" },
+      // 首次定裝照沒有參考圖可帶（就是要生出這張參考圖），純文字生圖用最便宜的 flux-schnell（$0.003/張）
+      // 即可，不需要 flux-dev（$0.025/張）— 操作者要求「盡量用最便宜的模型」。
+      { imageModel: "flux-schnell", aspectRatio: "4:5", framing: "Portrait studio photography, sharp focus on face." },
+    );
+    if (!result.ok) {
+      const err = result as { ok: false; status: number; error: string };
+      return NextResponse.json({ ok: false, error: `定裝照生成失敗：${err.error}` }, { status: err.status });
     }
-    return NextResponse.json({ ok: false, error: "asset registration failed" }, { status: 502 });
-  }
+    if (!result.bytes || !result.mime) {
+      return NextResponse.json({ ok: false, error: "定裝照生成成功但缺 buffer（非預期路徑）" }, { status: 502 });
+    }
 
-  return NextResponse.json({ ok: true, assetId: asset.data.id, imageUrl: result.asset });
+    const db = getSupabaseWriteClient();
+    if (!db) return NextResponse.json({ ok: false, error: "db unavailable" }, { status: 503 });
+    const asset = await db.from("media_assets").insert({
+      organization_id: organizationId,
+      storage_backend: "r2",
+      asset_domain: "ai_generated",
+      object_key: result.r2Key ?? null,
+      object_url: result.asset,
+      mime_type: result.mime,
+      byte_size: result.bytes.byteLength,
+      checksum_sha256: createHash("sha256").update(result.bytes).digest("hex"),
+      metadata: { source: "story_bible_auto_portrait", character_name: name, character_role: role ?? "", character_description: description ?? "" },
+    }).select("id").single();
+    if (asset.error || !asset.data) {
+      if (result.r2Key) {
+        try { const { deleteDesignObject } = await import("@/lib/storage/r2"); await deleteDesignObject(result.r2Key); } catch { /* best effort cleanup */ }
+      }
+      return NextResponse.json({ ok: false, error: "asset registration failed" }, { status: 502 });
+    }
+
+    return NextResponse.json({ ok: true, assetId: asset.data.id, imageUrl: result.asset });
+  };
+  // Billed to the Story Bible's org (ADR 017 §0 代操); buildSceneAsset's image call inherits it.
+  return withFeature("video.image", thenRun, { org: () => organizationId })(req, run);
 }

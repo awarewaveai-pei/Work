@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { runTrending, aiChat, parseJsonStrings, buildDbSearchBlocks } from "@/lib/content/trending-sources";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
+import { withFeature } from "@/lib/entitlements/grant";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -117,7 +118,7 @@ export async function GET(req: Request): Promise<Response> {
   return trendingResponse(url.searchParams.get("geo") ?? "TW");
 }
 
-export async function POST(req: Request): Promise<Response> {
+async function handlePost(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) return new NextResponse("forbidden", { status: 403 });
 
@@ -144,3 +145,6 @@ export async function POST(req: Request): Promise<Response> {
 
   return NextResponse.json({ ok: false, error: "invalid type" }, { status: 400 });
 }
+
+// suggest / questions fall back to a paid aiChat call (content.trending); it inherits this grant (ADR 017 §4).
+export const POST = withFeature("content.trending", handlePost);

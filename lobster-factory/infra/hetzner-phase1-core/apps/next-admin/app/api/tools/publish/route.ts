@@ -7,6 +7,7 @@ import { toProductImage } from "../../../../lib/studio/to-product-image";
 import { normalizeManyForWp } from "../../../../lib/studio/wp-web-image";
 import { composeFlatlay, parseHexColor } from "../../../../lib/studio/flatlay";
 import { generateProductCopy } from "../../../../lib/studio/product-copy";
+import { thenRun, withFeature } from "../../../../lib/entitlements/grant";
 import { createWooProduct, isBridgeConfigured, listBridgeClients, bridgeSiteOrg, bridgeBaseUrl } from "../../../../lib/payments/woo";
 import { blockedChangeResponse } from "../../../../lib/system-modes/blocked-change";
 import { checkProductionChangeAllowed } from "../../../../lib/system-modes/production-change-gate";
@@ -39,6 +40,10 @@ export const maxDuration = 120; // upscale step can take ~1-2 min
  *   status      → has the Printful plugin synced the Woo product yet?
  *   link        → bind every synced variant to its Bella 3001 catalog variant + print file
  */
+
+// The two paid steps ask their feature (ADR 017 §4); a design has no client org yet, so a staff caller bills internal.
+const aiUpscale = withFeature("studio.upscale", thenRun);
+const productCopy = withFeature("studio.product-copy", thenRun);
 
 function gate(request: Request): NextResponse | null {
   if (process.env.POD_DESIGNS_ENABLED !== "true") {
@@ -151,20 +156,22 @@ export async function POST(request: Request) {
     const mode = body.printMode ?? "original";
     if (mode === "ai-enhance") {
       // Real-ESRGAN — sharper but synthesises detail (NOT 100% faithful). Explicit opt-in.
-      const r = await upscaleToPrintFile(body.designUrl, body.longEdgePx ?? null);
-      if (!r.ok) {
-        return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
-      }
-      return NextResponse.json({
-        ok: true,
-        printFileUrl: r.printFileUrl,
-        mode: "ai-enhance",
-        faithful: false,
-        byteSize: r.byteSize,
-        inputLongEdgePx: r.inputLongEdgePx,
-        achievedLongEdgePx: r.achievedLongEdgePx,
-        meetsTarget: r.meetsTarget,
-        passes: r.passes,
+      return aiUpscale(request, async () => {
+        const r = await upscaleToPrintFile(body.designUrl, body.longEdgePx ?? null);
+        if (!r.ok) {
+          return NextResponse.json({ ok: false, error: (r as { ok: false; error: string }).error }, { status: 502 });
+        }
+        return NextResponse.json({
+          ok: true,
+          printFileUrl: r.printFileUrl,
+          mode: "ai-enhance",
+          faithful: false,
+          byteSize: r.byteSize,
+          inputLongEdgePx: r.inputLongEdgePx,
+          achievedLongEdgePx: r.achievedLongEdgePx,
+          meetsTarget: r.meetsTarget,
+          passes: r.passes,
+        });
       });
     }
     // "original" | "resample" — faithful (no AI hallucination).
@@ -283,35 +290,37 @@ export async function POST(request: Request) {
 
   // ── Step 1c: AI product copy (SEO + GEO + AEO + RankMath) ───────────────────
   if (body.action === "copy") {
-    const r = await generateProductCopy({
-      designPrompt: body.designPrompt,
-      subject: body.subject,
-      productType: body.productType,
-      theme: body.theme,
-      brand: body.brand,
-      focusKeywordHint: body.focusKeywordHint,
-      instructions: body.instructions,
-      improveHints: Array.isArray(body.fixHints)
-        ? body.fixHints.filter((h) => typeof h === "string")
-        : undefined,
-      siteDomain: (() => {
-        try {
-          return process.env.WPBRIDGE_BASE_URL ? new URL(process.env.WPBRIDGE_BASE_URL).host : undefined;
-        } catch {
-          return undefined;
-        }
-      })(),
+    return productCopy(request, async () => {
+      const r = await generateProductCopy({
+        designPrompt: body.designPrompt,
+        subject: body.subject,
+        productType: body.productType,
+        theme: body.theme,
+        brand: body.brand,
+        focusKeywordHint: body.focusKeywordHint,
+        instructions: body.instructions,
+        improveHints: Array.isArray(body.fixHints)
+          ? body.fixHints.filter((h) => typeof h === "string")
+          : undefined,
+        siteDomain: (() => {
+          try {
+            return process.env.WPBRIDGE_BASE_URL ? new URL(process.env.WPBRIDGE_BASE_URL).host : undefined;
+          } catch {
+            return undefined;
+          }
+        })(),
+      });
+      if (!r.ok) {
+        const code = (r as { ok: false; error: string }).error;
+        let friendly = `文案生成失敗：${code}`;
+        if (code === "missing_anthropic_key") friendly = "伺服器未設定 ANTHROPIC_API_KEY。";
+        if (code === "anthropic_auth_error") friendly = "Anthropic 金鑰錯誤（401/403）。";
+        if (code === "anthropic_rate_limit") friendly = "Anthropic 流量限制，請稍後重試。";
+        if (code === "anthropic_overloaded") friendly = "Anthropic 服務忙碌，請稍後重試。";
+        return NextResponse.json({ ok: false, error: friendly, code });
+      }
+      return NextResponse.json({ ok: true, copy: r.copy, rankMath: r.rankMath });
     });
-    if (!r.ok) {
-      const code = (r as { ok: false; error: string }).error;
-      let friendly = `文案生成失敗：${code}`;
-      if (code === "missing_anthropic_key") friendly = "伺服器未設定 ANTHROPIC_API_KEY。";
-      if (code === "anthropic_auth_error") friendly = "Anthropic 金鑰錯誤（401/403）。";
-      if (code === "anthropic_rate_limit") friendly = "Anthropic 流量限制，請稍後重試。";
-      if (code === "anthropic_overloaded") friendly = "Anthropic 服務忙碌，請稍後重試。";
-      return NextResponse.json({ ok: false, error: friendly, code });
-    }
-    return NextResponse.json({ ok: true, copy: r.copy, rankMath: r.rankMath });
   }
 
   // ── Pricing helper: Printful wholesale cost per tier so the UI shows profit BEFORE publishing ──

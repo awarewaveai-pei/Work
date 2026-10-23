@@ -436,6 +436,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
           outputFormats: orderedFormats,
           videoMotionModel: isPexels ? undefined : (videoMotionModel || undefined),
           scenes: providedScenes.length > 0 ? providedScenes : undefined,
+          ...(embedded?.organizationId ? { organizationId: embedded.organizationId } : {}),
         }),
       });
       const j = (await res.json()) as {
@@ -529,6 +530,7 @@ export default function VideoStudio({ initial, remotionInitial, embedded }: { in
           visual: scene.visual,
           oldImageUrl: scene.imageUrl,
           format: activeFormat,
+          ...(embedded?.organizationId ? { organizationId: embedded.organizationId } : {}),
         }),
       });
       const j = (await res.json()) as { ok: boolean; imageUrl?: string; error?: string };
@@ -1955,6 +1957,7 @@ function RemotionStudio({ scriptPrefill, organizationId }: { scriptPrefill?: Scr
           imageModel: "flux-schnell",
           format: aspectToFormat(tmpl.aspect),
           visual: "custom",
+          ...(organizationId ? { organizationId } : {}),
         }),
       });
       const j = (await r.json()) as { ok: boolean; imageUrl?: string };

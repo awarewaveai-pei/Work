@@ -11,6 +11,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { thenRun, withFeature } from "@/lib/entitlements/grant";
 
 interface DraftBody {
   topic?: string;
@@ -33,9 +35,11 @@ interface DraftBody {
   videoMotionModel?: string;
   /** 深層接力：前製腳本場景（台詞→旁白、畫面→生圖提示）→ 跳過 Claude 重生。 */
   scenes?: { narration: string; imagePrompt: string; visual?: "custom" | "broll"; brollKeyword?: string; referenceImageUrl?: string }[];
+  /** VideoPipeline wizard 帶入的租戶（同 render-draft）；未帶 = 預設租戶。 */
+  organizationId?: string;
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return NextResponse.json({ ok: false, error: "forbidden" }, { status: 403 });
@@ -70,6 +74,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "topic 或 scenes 為必填" }, { status: 400 });
   }
 
+  // The org the video is made for, resolved as render-draft resolves it: it pays for the draft (ADR 017 §0 代操).
+  const { resolveOrgId: resolveDefaultOrgId } = await import("@/lib/content/blocks/video-pipeline");
+  let orgId: string | null;
+  try { orgId = effectiveOrgId(req, body.organizationId ?? resolveDefaultOrgId()); }
+  catch (e) { if (e instanceof OrgAccessError) return toOrgAccessResponse(e); throw e; }
+
   // 收斂到 video/prepare 積木（D 接線）：anthropicKey 缺漏 + providedScenes 邏輯由積木內處理（同 prepareScenes）。
   await import("@/lib/content/blocks/register-all");
   const { byId } = await import("@/lib/content/blocks/registry");
@@ -89,32 +99,36 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     status?: number;
     error?: string;
   }
-  const result = (await prepare.run({
-    topic,
-    articleTitle: body.articleTitle,
-    articleContent: body.articleContent,
-    language: body.language ?? "繁體中文",
-    visualStyle: body.visualStyle,
-    imageModel: body.imageModel,
-    targetMinutes: typeof body.targetMinutes === "number" ? body.targetMinutes : undefined,
-    sceneCount: typeof body.sceneCount === "number" ? body.sceneCount : undefined,
-    customScenes: typeof body.customScenes === "number" ? body.customScenes : undefined,
-    formats: Array.isArray(body.outputFormats) ? body.outputFormats : undefined,
-    videoMotionModel,
-    providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
-  })) as PrepResult;
+  const run = async (): Promise<Response> => {
+    const result = (await prepare.run({
+      topic,
+      articleTitle: body.articleTitle,
+      articleContent: body.articleContent,
+      language: body.language ?? "繁體中文",
+      visualStyle: body.visualStyle,
+      imageModel: body.imageModel,
+      targetMinutes: typeof body.targetMinutes === "number" ? body.targetMinutes : undefined,
+      sceneCount: typeof body.sceneCount === "number" ? body.sceneCount : undefined,
+      customScenes: typeof body.customScenes === "number" ? body.customScenes : undefined,
+      formats: Array.isArray(body.outputFormats) ? body.outputFormats : undefined,
+      videoMotionModel,
+      providedScenes: providedScenes.length > 0 ? providedScenes : undefined,
+    })) as PrepResult;
 
-  if (!result.ok || !result.scenes || !result.formatAssets || !result.formats) {
-    return NextResponse.json({ ok: false, error: result.error ?? "草稿生成失敗" }, { status: result.status ?? 500 });
-  }
+    if (!result.ok || !result.scenes || !result.formatAssets || !result.formats) {
+      return NextResponse.json({ ok: false, error: result.error ?? "草稿生成失敗" }, { status: result.status ?? 500 });
+    }
 
-  return NextResponse.json({
-    ok: true,
-    scenes: result.scenes.map((s) => ({ id: s.id, narration: s.narration, imagePrompt: s.image_prompt, brollKeyword: s.broll_keyword, visual: s.visual })),
-    // 每格式一組原生圖；前端以主格式（formats[0]）預覽編輯，render-draft 時送回全部格式。
-    formatImageUrls: result.formatAssets,
-    formats: result.formats,
-    r2Keys: result.r2Keys ?? [],
-    title: result.title ?? "",
-  });
+    return NextResponse.json({
+      ok: true,
+      scenes: result.scenes.map((s) => ({ id: s.id, narration: s.narration, imagePrompt: s.image_prompt, brollKeyword: s.broll_keyword, visual: s.visual })),
+      // 每格式一組原生圖；前端以主格式（formats[0]）預覽編輯，render-draft 時送回全部格式。
+      formatImageUrls: result.formatAssets,
+      formats: result.formats,
+      r2Keys: result.r2Keys ?? [],
+      title: result.title ?? "",
+    });
+  };
+  // The first paid step asks: the script, or the scene images when the script was handed in; later steps inherit it.
+  return (providedScenes.length > 0 ? withFeature("video.image", thenRun, { org: () => orgId }) : withFeature("video.script", thenRun, { org: () => orgId }))(req, run);
 }

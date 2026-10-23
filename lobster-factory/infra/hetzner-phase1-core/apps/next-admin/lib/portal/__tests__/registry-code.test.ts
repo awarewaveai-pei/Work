@@ -88,7 +88,7 @@ const OWNED = PRODUCTS.flatMap((p) => [`lib/${p.key}`, ...p.staffPaths.map((s) =
 const ownerOfFile = (rel: string) => OWNED.find((o) => rel.startsWith(`${o.dir}/`))?.key ?? null;
 const FEATURE_OWNER = new Map(PRODUCTS.flatMap((p) => p.features.map((f) => [f.feature_key, p.key] as const)));
 const ownerOfApi = (url: string) => nextAdminProducts().find((p) => p.door.api.some((a) => under(url, a)))?.key
-  ?? FEATURE_OWNER.get(ROUTE_FEATURES[url] ?? "") ?? null;
+  ?? FEATURE_OWNER.get([ROUTE_FEATURES[url] ?? ""].flat()[0]) ?? null;
 
 function closure(key: string, seen = new Set<string>()): Set<string> {
   for (const d of PRODUCTS.find((p) => p.key === key)?.modules.dependsOn ?? []) if (!seen.has(d)) { seen.add(d); closure(d, seen); }
@@ -251,21 +251,47 @@ describe("registry claims match the code", () => {
   });
 
   // A library grantFor with no request scope is judged for the internal account as `system` (lib/entitlements/grant.ts),
-  // so a route a door serves that reaches one must ask its feature itself (withFeature, or grantFor with the request).
-  // This proves the caller's feature is asked, not that it is charged: report() is not wired yet (ADR 017 §4).
-  // Routes whose imports reach grant.ts but that never run a paid call, each read for it.
-  const UNPAID_ROUTES: Readonly<Record<string, string>> = {
+  // so an API route whose imports reach a product feature's ask must ask it itself (withFeature, or grantFor with the
+  // request): the person is the actor and, through withFeature's `org`, the customer worked for is the account. Routes
+  // whose closure asks only back-office features need nothing: can() refuses those to every account but the internal one.
+  // The closure is over-broad (barrels, shared helpers), so each listed route was read for why it may run unscoped.
+  // Limit: a route that asks one feature passes, even if another paid call in it runs before or outside that scope.
+  const UNSCOPED_ROUTES: Readonly<Record<string, string>> = {
+    // no person calling; every paid ask names the org the work is for
+    "app/api/webhooks/chatwoot/route.ts": "cs asks name the conversation's org (lib/cs/generate.ts, intent.ts, orchestrator.ts); retrieval embeds for it (lib/kb/rag.ts defaultEmbedder(ctx.viewer))",
+    "app/api/webhooks/meta/route.ts": "auto-reply asks can() for the page asset's org (lib/social/meta-auto-reply.ts)",
+    "app/api/internal/social/dispatch/route.ts": "dispatch-store asks social.dispatch for each post's org (lib/social/dispatch-store.ts)",
+    "app/api/internal/schedules/run-due/route.ts": "each due job runs for its client org (lib/schedules/jobs.ts runCollection({ organizationId })); KB ingest embeds for that org",
+    "app/api/internal/collect/runs/execute/route.ts": "Cognitive OS research run for a project, no client org on the request: collect.fetch bills internal (lib/collect/run.ts runResearchCollection)",
+    // reach paid code only through an import; the handler runs no paid call
+    "app/api/content/sources/route.ts": "imports isSafePublicHttps from trending-sources; CRUD on trending source rows",
+    "app/api/internal/cognitive-os/import-project-sources/route.ts": "reads KB sources (@/lib/kb barrel) and sends them to our own Cognitive OS",
+    "app/api/ops/clients/[slug]/cognitive-os-import/route.ts": "reads KB sources (@/lib/kb barrel) and sends them to our own Cognitive OS",
+    "app/api/ops/clients/[slug]/hci-import/route.ts": "reads KB sources (@/lib/kb barrel) and sends them to our own HCI service",
+    "app/api/ops/clients/[slug]/cs-config/route.ts": "reads and writes cs thresholds and graduation rows (@/lib/cs barrel)",
+    "app/api/ops/clients/[slug]/cs-eval-cases/route.ts": "lists and replaces eval case rows (@/lib/cs barrel); running an exam is /api/ops/cs/eval",
+    "app/api/ops/clients/[slug]/cs-intents/route.ts": "CRUD on intent rows (@/lib/cs barrel)",
+    "app/api/ops/clients/[slug]/cs-knowledge-folders/route.ts": "CRUD on KB folder rows (@/lib/kb barrel)",
+    "app/api/ops/clients/[slug]/schedules/[job]/route.ts": "writes a client_schedules row; the job runs later in /api/internal/schedules/run-due",
+    "app/api/ops/schedules/route.ts": "reads the schedules view",
     "app/api/social/reports/monthly/route.ts": "toggles a client_schedules row; reads job defaults from lib/schedules/jobs.ts, never runs a job",
+    "app/api/video/[id]/route.ts": "deletes a video row and its unreferenced object (videoObjectKey only)",
+    "app/api/video/cleanup/route.ts": "deletes unreferenced R2 objects (videoObjectKey only)",
+    "app/api/video/status/route.ts": "polls our own video-service and records the finished asset; no paid step",
+    "app/api/video/remotion-render/route.ts": "submits to our own Remotion renderer (resolveOrgId only)",
+    "app/api/video/remotion-job-status/route.ts": "polls our own Remotion renderer and records the asset",
+    "app/api/video/footage/render/route.ts": "submitFootageRender sends existing footage to our own ffmpeg renderer and asks no feature (lib/content/video/render-client.ts)",
+    "app/api/internal/video/reconcile/route.ts": "records orphaned finished videos (lib/content/video/reconcile.ts); no paid step",
   };
-  it("every paid route a built door serves asks its caller's feature", () => {
-    const served = new Set<string>();
-    for (const p of builtDoors()) {
-      const routes = [...new Set(doorApis(p).flatMap(routesUnder))];
-      routes.forEach((r) => served.add(r));
-      const unbilled = routes.filter((r) => !(r in UNPAID_ROUTES) && FILES.get(r)!.asked.length === 0 && importClosure([r], STOP_AT).has("lib/entitlements/grant.ts"));
-      expect(unbilled, `${p.key} door`).toEqual([]);
+  const apiRoutes = () => [...FILES.keys()].filter((f) => isRoute(f) && f.startsWith("app/api/"));
+  const paidAsks = (r: string) => [...new Set([...importClosure([r])].flatMap((g) => FILES.get(g)!.asked).filter((k) => !BACK_OFFICE_FEATURES.has(k)))];
+  const unscoped = (r: string) => FILES.get(r)!.asked.length === 0 && paidAsks(r).length > 0;
+  it("every API route that reaches a product feature asks it for its caller, or is listed with why it need not", () => {
+    expect(apiRoutes().filter((r) => !(r in UNSCOPED_ROUTES) && unscoped(r)).map((r) => `${r} reaches ${paidAsks(r).join(", ")}`)).toEqual([]);
+    for (const [r, why] of Object.entries(UNSCOPED_ROUTES)) {
+      expect(FILES.has(r) && unscoped(r), `${r}: listed, but it is gone, asks a feature itself, or reaches none`).toBe(true);
+      expect(why.trim().length, r).toBeGreaterThan(0);
     }
-    for (const r of Object.keys(UNPAID_ROUTES)) expect(served.has(r), `${r}: listed but no built door serves it`).toBe(true);
   });
 
   it("a platform API authorizes by organization or reads no organization's data", () => {

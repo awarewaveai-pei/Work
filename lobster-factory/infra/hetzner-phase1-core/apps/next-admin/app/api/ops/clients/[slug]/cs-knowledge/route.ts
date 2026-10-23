@@ -38,6 +38,7 @@ import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import { buildFolderDossier } from "@/lib/dossier/folder";
 import { isAiTextModel } from "@/lib/ai/text-model-options";
 import { recordOpsAudit } from "@/lib/ops-audit";
+import { thenRun, withFeature } from "@/lib/entitlements/grant";
 import {
   ingestKnowledge,
   listKnowledgeSources,
@@ -215,31 +216,34 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     const orgIdForDossier = await orgIdOf(slug);
     if (!orgIdForDossier) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
-    const result = await buildFolderDossier({
-      organizationId: orgIdForDossier,
-      folderId,
-      model: isAiTextModel(body.model) ? body.model : undefined,
-      preview: body.preview === true,
-    });
-    if (!result.ok) {
-      const status = result.error === "folder_not_found" ? 404 : result.error === "no_sources" ? 400 : 502;
-      return NextResponse.json(
-        { ok: false, error: result.error, hint: DOSSIER_ERROR_HINT[result.error!] ?? null, detail: result.detail ?? null },
-        { status },
-      );
-    }
-    await recordOpsAudit(orgIdForDossier, resolved.role, resolved.source, "cs_knowledge_dossier_built", {
-      folderId,
-      sourceId: result.sourceId ?? null,
-      sourcesUsed: result.sourcesUsed,
-      preview: body.preview === true,
-    });
-    return NextResponse.json({
-      ok: true,
-      sourceId: result.sourceId ?? null,
-      sourcesUsed: result.sourcesUsed,
-      markdown: result.markdown,
-      report: result.report,
+    // The client's knowledge pays for its embeddings (ADR 017 §0 代操); the dossier's AI is staff tooling, billed internal.
+    return withFeature("cs.answer", thenRun, { org: () => orgIdForDossier })(request, async () => {
+      const result = await buildFolderDossier({
+        organizationId: orgIdForDossier,
+        folderId,
+        model: isAiTextModel(body.model) ? body.model : undefined,
+        preview: body.preview === true,
+      });
+      if (!result.ok) {
+        const status = result.error === "folder_not_found" ? 404 : result.error === "no_sources" ? 400 : 502;
+        return NextResponse.json(
+          { ok: false, error: result.error, hint: DOSSIER_ERROR_HINT[result.error!] ?? null, detail: result.detail ?? null },
+          { status },
+        );
+      }
+      await recordOpsAudit(orgIdForDossier, resolved.role, resolved.source, "cs_knowledge_dossier_built", {
+        folderId,
+        sourceId: result.sourceId ?? null,
+        sourcesUsed: result.sourcesUsed,
+        preview: body.preview === true,
+      });
+      return NextResponse.json({
+        ok: true,
+        sourceId: result.sourceId ?? null,
+        sourcesUsed: result.sourcesUsed,
+        markdown: result.markdown,
+        report: result.report,
+      });
     });
   }
 
@@ -254,26 +258,29 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
   const orgId = await orgIdOf(slug);
   if (!orgId) return NextResponse.json({ ok: false, error: "client_not_found" }, { status: 404 });
 
-  try {
-    const result = await ingestKnowledge({
-      organizationId: orgId, kind, title, body: docBody, isSensitive,
-      canonicalUrl: canonicalUrlOf(body.canonicalUrl),
-    });
-    if (!result.sourceId) return NextResponse.json({ ok: false, error: "ingest_failed" }, { status: 503 });
-    // Re-posting the same title with new text supersedes the previous version (K1); re-posting
-    // identical text is a no-op, reported as unchanged rather than as a new version.
-    await recordOpsAudit(orgId, resolved.role, resolved.source, result.unchanged ? "cs_knowledge_unchanged" : "cs_knowledge_added", {
-      title, kind, chunks: result.chunks, version: result.version, docFamilyId: result.docFamilyId,
-    });
-    return NextResponse.json({
-      ok: true, sourceId: result.sourceId, chunks: result.chunks,
-      version: result.version, unchanged: result.unchanged,
-    });
-  } catch (e) {
-    const msg = String(e);
-    const hint = msg.includes("OPENAI_API_KEY") ? "缺 OPENAI_API_KEY — embeddings 無法產生" : msg.includes("openai_embeddings") ? "OpenAI embeddings 呼叫失敗" : "ingest 失敗";
-    return NextResponse.json({ ok: false, error: hint, detail: msg.slice(0, 200) }, { status: 502 });
-  }
+  // The client's knowledge pays for its embeddings (ADR 017 §0 代操).
+  return withFeature("cs.answer", thenRun, { org: () => orgId })(request, async () => {
+    try {
+      const result = await ingestKnowledge({
+        organizationId: orgId, kind, title, body: docBody, isSensitive,
+        canonicalUrl: canonicalUrlOf(body.canonicalUrl),
+      });
+      if (!result.sourceId) return NextResponse.json({ ok: false, error: "ingest_failed" }, { status: 503 });
+      // Re-posting the same title with new text supersedes the previous version (K1); re-posting
+      // identical text is a no-op, reported as unchanged rather than as a new version.
+      await recordOpsAudit(orgId, resolved.role, resolved.source, result.unchanged ? "cs_knowledge_unchanged" : "cs_knowledge_added", {
+        title, kind, chunks: result.chunks, version: result.version, docFamilyId: result.docFamilyId,
+      });
+      return NextResponse.json({
+        ok: true, sourceId: result.sourceId, chunks: result.chunks,
+        version: result.version, unchanged: result.unchanged,
+      });
+    } catch (e) {
+      const msg = String(e);
+      const hint = msg.includes("OPENAI_API_KEY") ? "缺 OPENAI_API_KEY — embeddings 無法產生" : msg.includes("openai_embeddings") ? "OpenAI embeddings 呼叫失敗" : "ingest 失敗";
+      return NextResponse.json({ ok: false, error: hint, detail: msg.slice(0, 200) }, { status: 502 });
+    }
+  });
 }
 
 export async function DELETE(request: Request, context: { params: Promise<{ slug: string }> }) {

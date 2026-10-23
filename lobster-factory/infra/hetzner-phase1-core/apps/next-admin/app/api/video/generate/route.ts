@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { VideoServiceCapability } from "@/lib/content/video/render-client";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
 import { effectiveOrgId, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
+import { thenRun, withFeature } from "@/lib/entitlements/grant";
 
 interface GenerateBody {
   topic?: string;
@@ -32,7 +33,7 @@ interface GenerateBody {
   outputFormats?: string[];
 }
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return NextResponse.json({ ok: false, status: 403, error: "forbidden" }, { status: 403 });
@@ -116,58 +117,62 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // 讀的是這個欄位，而不是下方才寫入的 recordParams —— prepare 失敗時（:128 / :154）
   // recordParams 根本不存在，拿它當授權依據等於讓 client 永遠看不到自己失敗的原因。
   // createJob 現在會在 insert 失敗時拋出（不再靜默降級成「之後每次 /status 都 job_not_found」）。
-  let job: Awaited<ReturnType<typeof createJob>>;
-  try {
-    job = await createJob(orgId);
-  } catch (e: unknown) {
-    console.error("[video/generate] createJob failed:", e);
-    return NextResponse.json(
-      { ok: false, status: 500, error: "無法建立影片工作（job 儲存失敗）" },
-      { status: 500 },
-    );
-  }
+  const run = async (): Promise<Response> => {
+    let job: Awaited<ReturnType<typeof createJob>>;
+    try {
+      job = await createJob(orgId);
+    } catch (e: unknown) {
+      console.error("[video/generate] createJob failed:", e);
+      return NextResponse.json(
+        { ok: false, status: 500, error: "無法建立影片工作（job 儲存失敗）" },
+        { status: 500 },
+      );
+    }
 
-  // 關鍵：**同步**呼叫 prepare（Claude 腳本 + Flux 圖並行 + 提交 EU，~25s，無背景工作、不撞 CF 100s）。
-  // 渲染在 EU thread 跑（持久）；/status 輪詢 EU 收尾。無 after()/fire-and-forget → 不再撞 Next.js 背景限制。
-  const ctxWithProgress = {
-    ...ctx,
-    onProgress: (step: string) => { void updateJobStep(job.id, step); },
-  };
-  let prep: PrepareResult;
-  try {
-    prep = (await pipeline.run(ctxWithProgress)) as unknown as PrepareResult;
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error("[video/generate] prepare threw:", e);
-    await finishJob(job.id, { status: "error", error: `prepare 例外：${msg}`, statusCode: 500 });
+    // 關鍵：**同步**呼叫 prepare（Claude 腳本 + Flux 圖並行 + 提交 EU，~25s，無背景工作、不撞 CF 100s）。
+    // 渲染在 EU thread 跑（持久）；/status 輪詢 EU 收尾。無 after()/fire-and-forget → 不再撞 Next.js 背景限制。
+    const ctxWithProgress = {
+      ...ctx,
+      onProgress: (step: string) => { void updateJobStep(job.id, step); },
+    };
+    let prep: PrepareResult;
+    try {
+      prep = (await pipeline.run(ctxWithProgress)) as unknown as PrepareResult;
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("[video/generate] prepare threw:", e);
+      await finishJob(job.id, { status: "error", error: `prepare 例外：${msg}`, statusCode: 500 });
+      return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
+    }
+
+    if (prep.ok && prep.euJobId) {
+      // orgId 已在提交 EU 之前解析完成（見上方 effectiveOrgId 區塊），此處直接使用。
+      await finishJob(job.id, {
+        status: "running",
+        euJobId: prep.euJobId,
+        r2Keys: prep.r2Keys ?? [],
+        recordParams: orgId
+          ? {
+              title: prep.title ?? "",
+              sceneCount: prep.sceneCount ?? 0,
+              organizationId: orgId,
+              formats: prep.formats,
+              visualBreakdown: prep.visualBreakdown,
+              imageModel: body.imageModel,
+              source: "generate",
+              serviceCapability: prep.serviceCapability,
+            }
+          : undefined,
+      });
+    } else {
+      // prepare 失敗（腳本/生圖/提交）→ 清暫存 + 標記錯誤
+      if (prep.r2Keys?.length) await cleanupVideoInputKeys(prep.r2Keys);
+      await finishJob(job.id, { status: "error", error: prep.error ?? "prepare 失敗", statusCode: prep.status ?? 500 });
+    }
+
+    // 202 + jobId；前端輪詢 /api/video/status?jobId=（由 /status 輪詢 EU 收尾）
     return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
-  }
-
-  if (prep.ok && prep.euJobId) {
-    // orgId 已在提交 EU 之前解析完成（見上方 effectiveOrgId 區塊），此處直接使用。
-    await finishJob(job.id, {
-      status: "running",
-      euJobId: prep.euJobId,
-      r2Keys: prep.r2Keys ?? [],
-      recordParams: orgId
-        ? {
-            title: prep.title ?? "",
-            sceneCount: prep.sceneCount ?? 0,
-            organizationId: orgId,
-            formats: prep.formats,
-            visualBreakdown: prep.visualBreakdown,
-            imageModel: body.imageModel,
-            source: "generate",
-            serviceCapability: prep.serviceCapability,
-          }
-        : undefined,
-    });
-  } else {
-    // prepare 失敗（腳本/生圖/提交）→ 清暫存 + 標記錯誤
-    if (prep.r2Keys?.length) await cleanupVideoInputKeys(prep.r2Keys);
-    await finishJob(job.id, { status: "error", error: prep.error ?? "prepare 失敗", statusCode: prep.status ?? 500 });
-  }
-
-  // 202 + jobId；前端輪詢 /api/video/status?jobId=（由 /status 輪詢 EU 收尾）
-  return NextResponse.json({ ok: true, jobId: job.id }, { status: 202 });
+  };
+  // Asked before the job row exists; billed to the video's org (ADR 017 §0 代操), inherited by every pipeline step.
+  return withFeature("video.script", thenRun, { org: () => orgId })(req, run);
 }

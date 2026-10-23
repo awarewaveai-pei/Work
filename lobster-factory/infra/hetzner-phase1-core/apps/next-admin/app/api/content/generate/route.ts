@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveOpsRole, canCreateAiImageJob } from "@/lib/ops-role";
+import { withFeature } from "@/lib/entitlements/grant";
 import {
   prepareArticleGeneration,
   streamArticleGeneration,
@@ -18,7 +19,7 @@ export const maxDuration = 120;
 // check, json parse — and wraps the core async generator in a ReadableStream for
 // text/plain streaming. The streamed output (incl. GENERATION_TRUNCATED / GENERATION_ERROR
 // markers) is byte-identical to the previous inline implementation.
-export async function POST(req: Request): Promise<Response> {
+async function handlePost(req: Request): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return new NextResponse("forbidden", { status: 403 });
@@ -77,3 +78,6 @@ export async function POST(req: Request): Promise<Response> {
     },
   });
 }
+
+// Article generation asks content.article first; generate-core's own ask reuses this grant (ADR 017 §4).
+export const POST = withFeature("content.article", handlePost);

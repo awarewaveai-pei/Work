@@ -8,9 +8,12 @@ import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PRODUCTS } from "@/lib/portal/products";
 import { can, type EntitlementMode, type EntitlementRecord, type GateDependencies } from "../can";
+import { grantFor, thenRun, withFeature } from "../grant";
 import { resolveSubject, type OrgRow, type SubjectStore } from "../subject";
 
 afterEach(() => vi.restoreAllMocks());
+// actorFor reads brand member rows for a staff member below owner/admin; the drill has none.
+vi.mock("@/lib/social/store", () => ({ memberRoles: async () => new Map() }));
 
 type Account = { id: string; slug: string; kind: "internal" | "customer"; parent?: string; covers?: { source: "comp" | "contract"; products?: string[] }; wallet?: number };
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -94,6 +97,44 @@ describe("drill: our accounts on the three axes", () => {
   it("代操 for a brand under soulful bills soulful (the root of the org tree)", async () => {
     const r = await ask(ACCOUNTS.soulfulBrand, "social.dispatch", staff, "enforce");
     expect(r.grant).toMatchObject({ allowed: true, subject: { orgId: ACCOUNTS.soulful.id } });
+  });
+
+  it("代操 staff rendering a video for soulful (withFeature org): narration and scene images bill soulful under the staff member; staff tooling stays internal", async () => {
+    const { d, audit, debit } = deps("enforce");
+    const owner = new Request("http://localhost/api/video/render-draft", { method: "POST", headers: { "x-ops-user-kind": "staff", "x-ops-claims-role": "owner", "x-ops-user-id": "staff-1" } });
+    const seen: Record<string, unknown> = {};
+    const res = await withFeature("video.tts", thenRun, { org: () => ACCOUNTS.soulful.id, deps: d, subjects })(owner, async () => {
+      // what render-client.ts and buildSceneAsset do inside the route: a plain library ask, then the meter
+      const tts = await grantFor("video.tts");
+      await tts.recordUse({ provider: "openai", via: "video-service" });
+      seen.image = (await grantFor("video.image")).subject;
+      seen.tooling = (await grantFor("ops.cheap-json")).subject;
+      return new Response("ok");
+    });
+    expect(res.status).toBe(200);
+    const usage = audit.mock.calls.map(([e]) => e).filter((e) => e.event === "entitlement.usage");
+    expect(usage).toEqual([expect.objectContaining({ featureKey: "video.tts", subject: { orgId: ACCOUNTS.soulful.id, kind: "customer" }, actor: "ops:owner:staff-1" })]);
+    expect(seen).toEqual({ image: { orgId: ACCOUNTS.soulful.id, kind: "customer" }, tooling: { orgId: ACCOUNTS.internal.id, kind: "internal" } });
+    expect(debit).not.toHaveBeenCalled();
+  });
+
+  it("代操 by an operator with no role at soulful: enforce refuses not_authorized_for_org; shadow lets it run but every ask stays flagged, never billed internal", async () => {
+    const operator = () => new Request("http://localhost/api/video/regenerate-image", { method: "POST", headers: { "x-ops-user-kind": "staff", "x-ops-claims-role": "operator", "x-ops-user-id": "staff-2" } });
+    const enforce = deps("enforce");
+    const refused = await withFeature("video.image", thenRun, { org: () => ACCOUNTS.soulful.id, deps: enforce.d, subjects })(operator(), async () => new Response("ran"));
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ code: "not_authorized_for_org" });
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const shadow = deps("shadow");
+    const seen: Record<string, unknown> = {};
+    const ran = await withFeature("video.image", thenRun, { org: () => ACCOUNTS.soulful.id, deps: shadow.d, subjects })(operator(), async () => {
+      seen.script = (await grantFor("video.script")).subject.kind;
+      seen.tooling = (await grantFor("ops.cheap-json")).subject.kind;
+      return new Response("ran");
+    });
+    expect(ran.status).toBe(200);
+    expect(seen).toEqual({ script: "unresolved", tooling: "internal" });
+    expect(shadow.audit).toHaveBeenCalledWith(expect.objectContaining({ event: "entitlement.would_deny", payload: { reason: "not_authorized_for_org" } }));
   });
 
   it("訂閱 soulful's own login (hosted / contract / customer): always the real verdict; back-office AI is refused", async () => {

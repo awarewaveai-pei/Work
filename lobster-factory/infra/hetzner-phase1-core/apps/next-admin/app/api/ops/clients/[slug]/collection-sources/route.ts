@@ -23,6 +23,7 @@ import { runCollection, defaultRunKey } from "@/lib/collect/run";
 import { startRunJob, getRunJob } from "@/lib/collect/run-jobs";
 import "@/lib/collect/blocks";
 import { recordOpsAudit } from "@/lib/ops-audit";
+import { thenRun, withFeature } from "@/lib/entitlements/grant";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -97,21 +98,24 @@ export async function POST(request: Request, context: { params: Promise<{ slug: 
     // repeated `POST .../collection-sources -> 499`, i.e. the edge closing the connection out from
     // under a still-running upstream request). The browser now polls GET ?runKey= instead of
     // waiting on this response body.
-    startRunJob(
-      "collection-run",
-      `${orgId}:${runKey}`,
-      runCollection({ organizationId: orgId, sourceIds, dryRun, runKey }).then(async (result) => {
-        await recordOpsAudit(orgId, resolved.role, resolved.source, dryRun ? "collection_dry_run" : "collection_run", {
-          runKey: result.runKey,
-          sources: result.sources,
-          written: result.sink.written,
-          dirty: result.report.dirty.length,
-        });
-        return result;
-      }),
-    );
+    // The client pays for its own collection run (ADR 017 §0 代操); the background job keeps this request's scope.
+    return withFeature("collect.fetch", thenRun, { org: () => orgId })(request, async () => {
+      startRunJob(
+        "collection-run",
+        `${orgId}:${runKey}`,
+        runCollection({ organizationId: orgId, sourceIds, dryRun, runKey }).then(async (result) => {
+          await recordOpsAudit(orgId, resolved.role, resolved.source, dryRun ? "collection_dry_run" : "collection_run", {
+            runKey: result.runKey,
+            sources: result.sources,
+            written: result.sink.written,
+            dirty: result.report.dirty.length,
+          });
+          return result;
+        }),
+      );
 
-    return NextResponse.json({ ok: true, queued: true, runKey });
+      return NextResponse.json({ ok: true, queued: true, runKey });
+    });
   }
 
   const blockId = typeof body.blockId === "string" ? body.blockId : "";

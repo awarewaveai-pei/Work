@@ -36,8 +36,10 @@ import { grantFor } from "@/lib/entitlements/grant";
 class OpenAIEmbeddingProvider implements EmbeddingProvider {
   id = KB_EMBEDDING.model;
   dimensions = KB_EMBEDDING.dimensions;
+  /** The org whose knowledge this embeds: it pays (ADR 017 §0). Null = the enclosing request's account, else internal. */
+  constructor(private readonly organizationId: string | null = null) {}
   async embed(texts: string[]): Promise<number[][]> {
-  const grant = await grantFor("cs.answer");
+    const grant = await grantFor("cs.answer", this.organizationId ? { orgId: this.organizationId } : {});
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new Error("missing OPENAI_API_KEY");
     const controller = new AbortController();
@@ -70,7 +72,8 @@ let defaultProvider: EmbeddingProvider | null = null;
  * model produced `RetrievedChunk.score`, and cs thresholds that score in its knowledge-gap safety
  * gate. Callers that need a different model pass `ctx.embedder` and change nothing for anyone else.
  */
-export function defaultEmbedder(): EmbeddingProvider {
+export function defaultEmbedder(organizationId?: string | null): EmbeddingProvider {
+  if (organizationId) return new OpenAIEmbeddingProvider(organizationId);
   if (!defaultProvider) defaultProvider = new OpenAIEmbeddingProvider();
   return defaultProvider;
 }
@@ -120,7 +123,7 @@ export async function retrieve(ctx: KbContext, query: string): Promise<Retrieved
   // a network service (K4), scope and viewer arrive from the caller, and an unchecked pair is a
   // cross-tenant read dressed up as a normal query.
   if (!ctx.scope.length || !ctx.viewer || !ctx.scope.includes(ctx.viewer)) return [];
-  const embedder = ctx.embedder ?? defaultEmbedder();
+  const embedder = ctx.embedder ?? defaultEmbedder(ctx.viewer);
   const embedding = (await embedder.embed([query]))[0];
   if (!embedding) return [];
 
@@ -336,7 +339,7 @@ export async function ingestKnowledge(input: KnowledgeInput, embedder?: Embeddin
   });
   if (!sourceId) return { ...EMPTY_INGEST, docFamilyId: familyId, inheritedFolderId: live?.folderId ?? null };
 
-  const provider = embedder ?? defaultEmbedder();
+  const provider = embedder ?? defaultEmbedder(input.organizationId);
   try {
     const embeddings = await provider.embed(pieces);
     // All or nothing. Storing the subset that came back would drop paragraphs from the document

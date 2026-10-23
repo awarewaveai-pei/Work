@@ -1,7 +1,9 @@
 // Route -> feature_key, in code (ADR 017 §4). Step 6 API-key scopes read this table; withFeature refuses a feature
-// that is not listed here, so a paid route cannot be wrapped without being registered.
-export const ROUTE_FEATURES: Readonly<Record<string, string>> = {
+// that is not listed here, so a paid route cannot be wrapped without being registered. A list = the route's paid steps
+// ask different features of one product (e.g. publish's AI upscale and its product copy).
+export const ROUTE_FEATURES: Readonly<Record<string, string | readonly string[]>> = {
   "/api/content/brand-voice": "content.brand-voice",
+  "/api/content/generate": "content.article",
   "/api/content/hook-brief": "content.hook-brief",
   "/api/content/humanize": "content.humanize",
   "/api/content/image": "content.image",
@@ -11,10 +13,14 @@ export const ROUTE_FEATURES: Readonly<Record<string, string>> = {
   "/api/content/seo-fix": "content.seo-fix",
   "/api/content/syndicate": "content.syndicate",
   "/api/content/title": "content.title",
+  "/api/content/trending": "content.trending",
   "/api/social/rewrite": "social.rewrite",
   "/api/social/ads": "social.ads",
   "/api/social/meta-assets": "social.meta",
+  "/api/ops/clients/[slug]/collection-sources": "collect.fetch",
+  "/api/ops/clients/[slug]/cs-knowledge": "cs.answer",
   "/api/tools/presets": "design.edit",
+  "/api/tools/publish": ["studio.upscale", "studio.product-copy"],
   "/api/tools/script-forge": "video.script",
   "/api/tools/studio/culture": "ops.cheap-json",
   "/api/tools/studio/edit-prompt": "studio.edit-prompt",
@@ -27,6 +33,11 @@ export const ROUTE_FEATURES: Readonly<Record<string, string>> = {
   "/api/tools/tarot/generate": "tarot.image",
   "/api/tools/tarot/suggest-prompt": "tarot.prompt",
   "/api/tools/tarot/translate": "tarot.prompt",
+  "/api/video/draft": ["video.script", "video.image"],
+  "/api/video/generate": "video.script",
+  "/api/video/regenerate-image": "video.image",
+  "/api/video/render-draft": "video.tts",
+  "/api/video/story-bibles/generate-portrait": "video.image",
   "/api/video/story-bibles/visual-consistency-check": "video.image",
 };
-export const routeFeatureKeys = (): ReadonlySet<string> => new Set(Object.values(ROUTE_FEATURES));
+export const routeFeatureKeys = (): ReadonlySet<string> => new Set(Object.values(ROUTE_FEATURES).flat());

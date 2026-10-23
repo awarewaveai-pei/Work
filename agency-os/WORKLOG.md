@@ -1,4 +1,39 @@
 # Worklog
+## 2026-10-23（續46）員工路由用量歸屬：代操的付費工作記到客戶，不再記成自用／system（Claude）
+
+**觸發**：主線 session 派工（TASKS「員工路由用量歸屬」，續38「同類」，Codex `reports/oracle/2026-10-23-partialreview-17c6d5ee.md` F1）。
+
+**根因**
+- C1 library `grantFor` 只在 `withFeature` 範圍內繼承帳戶；範圍外一律 = 自用帳戶＋`system`（`lib/entitlements/grant.ts`）。`video/render-draft` 等路由自己用 `effectiveOrgId` 算出影片的 org，卻沒開範圍 → 旁白、生圖、腳本全記自用。
+- C2 `withFeature` 本身也只認 `req`：員工呼叫 → `resolveSubject({req})` = 自用帳戶。所以就算包了，代操也記不到客戶；路由沒有任何方法把「為哪個客戶做」交給範圍。
+- M1 `lib/kb/rag.ts` 向量化問 `grantFor("cs.answer")` 不帶 org → Chatwoot 客服檢索、知識庫匯入、排程蒐集的向量費全記自用（cs 其他步驟有帶 org，只有這裡沒帶）。
+- 偵測器：舊閘 ④ 只看已建門的路由，且只看「走到 grant.ts」。
+
+**修改**（next-admin）
+- `lib/entitlements/grant.ts`：`withFeature(key, handler, { org })`——路由交出自己算好的 org，經 `actorFor` 成為帳戶（沒角色 = `not_authorized_for_org`；員工對自用帳戶本身不需角色）；範圍記住授權過的 org，library 指名同一個 org 不被擋、同 feature 直接重用 grant；員工在客戶範圍內用後台工具（`BACK_OFFICE_FEATURES`）仍記自用；範圍帶 `deps`／`subjects`。新 `thenRun`：路由驗完、算完 org 後只把付費那段包進去（不重讀 body、免費分支不問）。範圍的帳戶 = grant 的 subject：shadow 下被拒（`unresolved`）時，後面 library 的 ask 也保持 `unresolved`，不默默記自用（Codex R1 F1 引出）。
+- `lib/kb/rag.ts`：embedder 指名它向量化的 org（retrieve 用 `ctx.viewer`，ingest 用 `input.organizationId`）。
+- 包起來的路由（10）：`video/{render-draft（只 OpenAI 旁白）,generate,draft,regenerate-image,story-bibles/generate-portrait}` 記影片的 org；`content/{generate,trending POST}`；`tools/publish` 的 AI 放大與商品文案兩步；`ops/clients/[slug]/cs-knowledge` POST 兩條與 `collection-sources` 的 run（記該客戶）。`video/draft`、`regenerate-image` 新收 `organizationId`（同 render-draft 的解析），`VideoStudio.tsx` 三處把 wizard 的 org 帶上。
+- `route-features.ts`：一條路由可列多個 feature（publish、draft），登記 12 條。
+- 閘：`registry-code.test.ts` 舊閘 ④（門路由）換成「所有 API 路由：import 走到產品 feature 的 ask，就要自己問，或列在 `UNSCOPED_ROUTES` 附理由」；只走到後台 feature 的路由免列（`can()` 只給自用帳戶）。清單 23 條：機器呼叫且每個 ask 都指名 org（chatwoot、meta、social dispatch、schedules run-due）、研究執行（無客戶 org，記自用）、其餘只因 barrel／共用 helper import 而被掃到、handler 不跑付費步驟。清單過期（消失、自己問了、不再走到）即紅。probe 掃出 46 條（派工寫 49，口徑不同）＝包 10＋只走到後台 feature 14（webhooks×5、onboarding×3、telegram、approvals、auto-classify、site-watch×3）＋清單 22；新閘另抓到 `webhooks/meta`（直接 `can()`，probe 沒掃）→ 清單 23。
+- `customer-drill.test.ts`：+2「員工替 soulful 渲染：旁白與場景圖記 soulful、actor = 員工；後台工具記自用」「operator 在 soulful 無角色：enforce 403 not_authorized_for_org；shadow 放行但 ask 都是 unresolved、後台工具記自用」（`@/lib/social/store` memberRoles mock 為空）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（next-admin，最終） | exit=0 | ms=4763
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（next-admin 全套，最終：326 files／2942 passed，31 skipped；含他 session 未 commit 的 lib/payments 測試） | exit=0 | ms=44452
+- REALTEST_EVIDENCE: tool=Bash | cmd=閘：放一條未包的 app/api/zz-planted-unscoped/route.ts（import generate-core）→ 紅「reaches content.article」；放過期清單項 content/generate → 紅「listed, but…」；兩者移除 → 11/11 綠 | exit=0 | ms=8000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 grant.ts `if (orgId)` → `if (false && orgId)`：drill「代操 staff rendering…」紅；還原綠 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 grant.ts 範圍 subject 在 unresolved 時改回 null：drill「operator with no role」紅；還原綠 | exit=0 | ms=4000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- Codex R1 `reports/oracle/2026-10-23-partialreview-ebc505f7.md` 4 項逐條讀碼：F1 shadow 放行無角色員工＝rollout 設計（`ENTITLEMENT_MODE` 不設），但引出真缺口（被拒後範圍帳戶為 null → library 記自用）已修；F2 後台 feature 指名客戶 org：無呼叫點（cheap-json.ts:40、ops-inbox/ai、spec-generator.ts:96、_anthropic.ts:47 全不帶 org），不採；F3 `POD_DESIGNS_DEFAULT_ORG_ID` 未設 → `noorg_` 影片不入庫＝改前即如此，歸 TASKS「影片歸屬改為持久化 mapping」；F4 閘只驗路由有沒有自問、不驗每個付費呼叫都在範圍內＝靜態掃描極限，寫進閘註解
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/0m/0n -- Codex R2（修正後差異）`reports/oracle/2026-10-23-partialreview-a5ae9d48.md` NO FINDINGS
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=UNPAID_ROUTES|ROUTE_FEATURES\[|defaultEmbedder(|every paid route a built door serves | hits=6（UNPAID_ROUTES 1 = WORKLOG 舊條目歷史不改；defaultEmbedder 5 = rag.ts 4 處＋閘理由 1，皆本次；其餘 0）
+
+**剩餘風險**
+- shadow 下員工若在客戶 org 沒角色（非 owner/admin、無 member 列），`actorFor` 拒 → 記 `would_deny`、用量記 `unresolved`；enforce 會 403。這是既有規則（outreach、cs eval 同做法），不是本次新增的例外。
+- 範圍外仍記自用的：Cognitive OS 研究執行（無客戶 org）、`tools/publish`（設計還沒有客戶 org）。
+- 既有閘洞（不在本次範圍，TASKS 一行）：閘 ③「門路由要授權」會把任何 import `grant.ts` 的路由算成已授權——`grant.ts → subject.ts → tenant-guard.ts` 早已成立，`STOP_AT` 沒停在 `grant.ts`。
+- prod 生效 = 今晚 03:00 自動部署；未在 prod 看用量列。
+
+**rollback**：`git revert <本 commit>`（無 schema／env 變更）。
 ## 2026-10-23（續45）/ops/repairs 500 ＋ Sentry 收不到頁面錯誤（Claude）
 
 **觸發**：操作者：/ops/repairs「Application error… Digest: 773356671」，問為何 Sentry／Uptime 都沒發現。
