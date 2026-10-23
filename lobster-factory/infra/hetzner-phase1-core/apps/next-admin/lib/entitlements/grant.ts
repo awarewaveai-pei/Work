@@ -3,7 +3,9 @@ import { can, EntitlementRequired, gateFailure, refuseBeforeVerdict, type GateDe
 import { routeFeatureKeys } from "./route-features";
 import { requestActor, resolveSubject, type AuthorizedOrg, type SubjectHint, type SubjectStore } from "./subject";
 
-interface Scope { subject: Subject | null; actor: string }
+// grants: what this request's withFeature already issued, so a library grantFor for the same feature reuses it instead
+// of a second verdict (a second lookup could fail into a 500, or a later report() in both places could charge twice).
+interface Scope { subject: Subject | null; actor: string; grants: ReadonlyMap<string, Grant> }
 const scope = new AsyncLocalStorage<Scope>();
 
 export interface GrantContext extends SubjectHint {
@@ -39,7 +41,11 @@ async function evaluate(featureKey: string, ctx: GrantContext, inherited: Scope 
 /** For library call sites: inherits subject and actor from the enclosing `withFeature` request, else bills the internal
  *  account as `system`. Throws EntitlementRequired when refused (enforce mode only; shadow always allows). */
 export async function grantFor(featureKey: string, ctx: GrantContext = {}): Promise<Grant> {
-  const { grant } = await evaluate(featureKey, ctx, scope.getStore());
+  const inherited = scope.getStore();
+  const plain = !ctx.req && !ctx.orgId && !ctx.slug && !ctx.brandId && !ctx.acting && !ctx.actor;
+  const issued = plain ? inherited?.grants.get(featureKey) : undefined;
+  if (issued) return issued;
+  const { grant } = await evaluate(featureKey, ctx, inherited);
   if (!grant.allowed) throw new EntitlementRequired(grant.reason ?? "denied");
   return grant;
 }
@@ -50,6 +56,6 @@ export function withFeature<R extends Request>(featureKey: string, handler: (req
   return async (req) => {
     const { grant, subject, actor } = await evaluate(featureKey, { req, ...options }, undefined);
     if (!grant.allowed) return Response.json({ ok: false, code: grant.reason }, { status: 403 });
-    return scope.run({ subject, actor }, () => handler(req, grant));
+    return scope.run({ subject, actor, grants: new Map([[featureKey, grant]]) }, () => handler(req, grant));
   };
 }

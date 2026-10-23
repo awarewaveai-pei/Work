@@ -59,7 +59,8 @@ export function isAnonymousPath(pathname: string, product: NextAdminProduct): bo
 /** Shared APIs every product door serves (ADR 018 §2 開門規則 1). Each must authorize by organization
  *  (lib/tenant-guard); lib/portal/__tests__/registry-code.test.ts enforces it. */
 // designs: the shared saved-designs library. entitlements/features: the signed list that greys unbought buttons.
-export const PLATFORM_APIS: readonly string[] = ["/api/tools/designs", "/api/entitlements/features"];
+// events/upcoming: the shared holiday calendar, read-only (events/sync, which writes it, stays staff-only).
+export const PLATFORM_APIS: readonly string[] = ["/api/tools/designs", "/api/entitlements/features", "/api/tools/events/upcoming"];
 
 /** The APIs a product door serves: its own, those of the products installed with it (dependsOn, transitively), and
  *  the platform's. An optional product's APIs are not served: its buttons hide on the door. */

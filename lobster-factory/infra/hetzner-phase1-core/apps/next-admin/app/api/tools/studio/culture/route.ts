@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractJsonArray, generateCheapJsonText } from "../../../../../lib/ai/cheap-json";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
+import { withFeature } from "@/lib/entitlements/grant";
 // Pre-baked curated items for ~all region×theme combos (generated once by
 // scripts/generate-culture-curated.mjs). Served first → free + instant, no LLM call.
 // The live LLM below is only the long-tail fallback for combos not in this file.
@@ -52,7 +53,10 @@ interface CultureItem {
   desc: string;
 }
 
-export async function POST(req: Request) {
+// Library grantFor calls inherit this request's billing account and actor (ADR 018 §2 開門規則 2).
+export const POST = withFeature("ops.cheap-json", handlePost);
+
+async function handlePost(req: Request) {
   const resolved = resolveOpsRole(req);
   if (!canCreateAiImageJob(resolved.role)) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });

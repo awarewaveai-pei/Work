@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-23（續31）studio 門頁＋閘 ③④ 收緊＋同請求沿用許可；cs 暫緩（Claude）
+
+**決策**：操作者授權自決。cs 暫緩——Chatwoot 載體未上線（`app/(shell)/ops/cs/page.tsx:43,63`），`cs-widget` 為 MockTransport；客戶介面在 `ops/clients/[slug]/CustomerServiceTab.tsx`、API 在 `/api/ops/clients/[slug]/cs-*`，現在開門＝設定一個不回話的機器人。開門順序改「客戶可直接操作的工具」優先（`cards/step-8.md`）。
+
+**修改**
+- studio 門：`app/studio/{layout,page}.tsx` 沿用 `StudioWorkbench`；`enabled:false` 保留（上線 High）。
+- studio 6 路由包 `withFeature`（culture／trending→`ops.cheap-json` 客戶得 back_office_only；edit-prompt／genfill／inpaint／remove-bg→各自 `studio.*`），`route-features.ts` 登記。根因：函式庫 `grantFor` 無請求範圍＝以 internal `system` 判（`lib/studio/generative-fill.ts:63` 等）。
+- `doors.ts` `PLATFORM_APIS` 加 `/api/tools/events/upcoming`（`events` 表無組織欄，`0053_global_events.sql:5-25`；sync 不開）。
+- `lib/entitlements/grant.ts`：Scope 帶 `grants`；同請求同功能的函式庫 `grantFor` 沿用 route 許可（免第二次判決、免 500、免日後雙扣）。
+- `registry-code.test.ts`：閘 ③ import 走到 `lib/ops-role.ts` 即停（員工角色≠組織範圍；`805e6ecdc` 後 ops-role 引 tenant-guard 使閘失效）；`grant.ts` 只對不讀 DB 的路由算授權；`ORG_FREE_ROUTES`（events/upcoming、studio/proxy-image、studio/mockup，含理由）。新閘 ④：門路由 import 走到 `grant.ts` 必須自問功能；`UNPAID_ROUTES`（social/reports/monthly）。兩清單有過期項即紅。
+
+**審查**
+- critic（Deep）：0c/1M/4m/1s。M 扣點未接（全 app 無 `report()`）→ 既有、列門上線阻擋項＋閘 ④ 改名「asks its caller's feature」不再宣稱計費。m mockup 理由不實→改寫；m 第二次判決可 500→沿用許可修；m tarot 每卡 system 影子→列阻擋項（需 migration）；m grant.ts 當授權過寬→限不讀 DB；s culture 免費路徑也被拒→列阻擋項。
+- Codex `agency-os/reports/oracle/2026-10-23-partialreview-65997827.md`：1 finding「studio enabled:false 不可達」＝刻意（已建未上線，`d6fca2abe`），非缺陷。
+- studio 路由資料路徑人核：不讀寫組織表；存檔走已強化的 designs。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run（2889 passed；1 fail＝他 session 未提交 `app/__tests__/sidebar-coverage.test.ts` 觸發 products.test 頂層目錄規則，非本次）＋ tsc（0）＋ 本機 /studio 門框＋工作台、/tools/studio 不變 | exit=0 | ms=220000
+- 突變：genfill 去 withFeature→閘 ④ 紅指名；grantFor 去沿用→can.test 紅；皆還原綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/4n -- critic M 列阻擋項＋閘改名；m 三項修、一項列阻擋；Codex 1 項為刻意設計
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=ops.cheap-json | hits=7（cheap-json.ts 2、route-features 2、culture／trending 2、BACK_OFFICE 定義 1；studio 函式庫 4 處 grantFor 現皆在 withFeature 範圍；舊測試名「bills its caller」0）
+
+**他 session 待處理**：`app/__tests__/` 為新頂層目錄，commit 後 `products.test.ts` 頂層目錄規則會紅。
+
+**rollback**：`git revert <本 commit>`；門未上線無外部影響。
 ## 2026-10-23（續30）app.aware-wave.com 側欄依產品重排＋6 個已做頁面補連結；舊存檔不再凍結排序（Claude）
 
 **觸發**：操作者「sidebar 很亂，按邏輯和產品類別重排，有些已做但沒加連結」。

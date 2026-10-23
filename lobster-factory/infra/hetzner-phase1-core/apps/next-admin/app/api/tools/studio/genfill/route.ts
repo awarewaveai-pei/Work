@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
+import { withFeature } from "@/lib/entitlements/grant";
 import { generativeFill, OUTPAINT_PRESETS, type OutpaintPreset } from "../../../../../lib/studio/generative-fill";
 import { logImageCost } from "../../../../../lib/ai/log-ai-call";
 
@@ -9,7 +10,10 @@ export const maxDuration = 60;
 const MAX_IMAGE_CHARS = 12_000_000; // ~9 MB base64, same ceiling as inpaint / remove-bg / designs save
 const DATA_URL_RE = /^data:image\/(png|jpe?g|webp);base64,/;
 
-export async function POST(request: Request) {
+// Library grantFor calls inherit this request's billing account and actor (ADR 018 §2 開門規則 2).
+export const POST = withFeature("studio.fill", handlePost);
+
+async function handlePost(request: Request) {
   if (process.env.POD_DESIGNS_ENABLED !== "true") {
     return NextResponse.json({ ok: false, error: "pod_designs_disabled" }, { status: 503 });
   }

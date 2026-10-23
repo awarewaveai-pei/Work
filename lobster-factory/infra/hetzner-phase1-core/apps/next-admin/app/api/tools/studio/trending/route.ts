@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { extractJsonArray, generateCheapJsonText } from "../../../../../lib/ai/cheap-json";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../../lib/ops-role";
+import { withFeature } from "@/lib/entitlements/grant";
 import { toTraditional } from "../../../../../lib/ai/to-traditional";
 
 export const runtime = "nodejs";
@@ -18,7 +19,10 @@ const CATEGORY_PROMPTS: Record<string, string> = {
   "artificial-intelligence": "AI models, AI companies, AI tools, and machine learning",
 };
 
-export async function POST(req: Request) {
+// Library grantFor calls inherit this request's billing account and actor (ADR 018 §2 開門規則 2).
+export const POST = withFeature("ops.cheap-json", handlePost);
+
+async function handlePost(req: Request) {
   const resolved = resolveOpsRole(req);
   if (!canCreateAiImageJob(resolved.role)) {
     return NextResponse.json({ ok: false, error: "forbidden_role", role: resolved.role }, { status: 403 });

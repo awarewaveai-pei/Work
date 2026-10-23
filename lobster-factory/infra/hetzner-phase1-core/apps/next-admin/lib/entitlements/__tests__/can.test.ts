@@ -216,6 +216,16 @@ describe("withFeature / grantFor", () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
+  it("a library grantFor inside the route reuses the route's grant for the same feature, with no second verdict", async () => {
+    const { deps, findActiveEntitlement } = gateFixture({ balance: 50 });
+    let inner: unknown;
+    const route = withFeature("content.title", async (_req, grant) => { inner = { route: grant, lib: await grantFor("content.title") }; return new Response("ok"); }, { deps, subjects: store });
+    await route(new Request("http://localhost/api/content/title", { method: "POST" }));
+    const { route: g1, lib: g2 } = inner as { route: unknown; lib: unknown };
+    expect(g2).toBe(g1);
+    expect(findActiveEntitlement).toHaveBeenCalledTimes(1);
+  });
+
   it("refuses to wrap a feature that is not registered in route-features.ts", () => {
     expect(() => withFeature("content.unlisted", async () => new Response("x"))).toThrow("not registered");
   });

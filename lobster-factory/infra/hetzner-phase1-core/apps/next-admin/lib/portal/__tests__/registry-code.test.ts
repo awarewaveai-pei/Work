@@ -106,13 +106,14 @@ const isRoute = (f: string) => /\/route\.[cm]?[jt]sx?$/.test(f);
 function doorFiles(roots: readonly string[]): Set<string> {
   return importClosure([...FILES.keys()].filter((f) => roots.some((r) => f.startsWith(r)) && !isRoute(f)));
 }
-function importClosure(start: readonly string[]): Set<string> {
+function importClosure(start: readonly string[], stopAt: ReadonlySet<string> = new Set()): Set<string> {
   const todo = [...start];
   const seen = new Set<string>();
   while (todo.length) {
     const f = todo.pop()!;
     if (seen.has(f)) continue;
     seen.add(f);
+    if (stopAt.has(f)) continue;
     for (const r of FILES.get(f)!.imports) { const g = resolve(r); if (g) todo.push(g); }
   }
   return seen;
@@ -203,23 +204,59 @@ describe("registry claims match the code", () => {
   });
 
   // ADR 018 §2 開門規則 2: every route a door serves decides who the caller may see -- by organization
-  // (lib/tenant-guard) or, for social, by brand (lib/social/authz) -- itself or through what it imports. This catches
-  // a route that forgot authorization, not one that imports it and skips it: opening a door also means reading each
-  // route's data path (WORKLOG of that door).
+  // (lib/tenant-guard) or by brand (lib/social/authz) -- itself or through what it imports. The billing subject
+  // (lib/entitlements/grant) counts only for a route that reads no database: it says who pays, not what may be read.
+  // A staff role check (lib/ops-role) is not organization scoping, so the walk stops there.
+  // This catches a route that forgot authorization, not one that imports it and skips it: opening a door also means
+  // reading each route's data path (WORKLOG of that door).
   const AUTHORIZERS = ["lib/tenant-guard.ts", "lib/social/authz.ts"];
-  const routesUnder = (prefix: string) => [...FILES.keys()].filter((f) => isRoute(f) && f.startsWith(`app${prefix}/`));
+  const STOP_AT = new Set(["lib/ops-role.ts"]);
+  const BILLING = "lib/entitlements/grant.ts";
+  // the route's own data access, not the entitlement store grant.ts reads on its behalf
+  const readsDb = (r: string) => importClosure([r], new Set([...STOP_AT, BILLING])).has("lib/supabase-server.ts");
+  // Routes a door serves that read no organization's data, each read for it; listed in place of an authorizer.
+  const ORG_FREE_ROUTES: Readonly<Record<string, string>> = {
+    "app/api/tools/events/upcoming/route.ts": "shared holiday table `events`, no organization column",
+    "app/api/tools/studio/proxy-image/route.ts": "streams only public designs-bucket objects (exact-host allowlist)",
+    "app/api/tools/studio/mockup/route.ts": "Printful mockup (free) from the request image and the public catalog; uploads that image to the shared public designs bucket and shares the Printful store quota",
+  };
+  const routesUnder = (prefix: string) => [...FILES.keys()].filter((f) => isRoute(f) && (f.startsWith(`app${prefix}/`)));
+  const authorizes = (r: string) => r in ORG_FREE_ROUTES || AUTHORIZERS.some((a) => importClosure([r], STOP_AT).has(a))
+    || (!readsDb(r) && importClosure([r], STOP_AT).has(BILLING));
   it("every route a built door serves authorizes its caller", () => {
     for (const p of builtDoors()) {
-      const open = [...new Set(doorApis(p).flatMap(routesUnder))].filter((r) => !AUTHORIZERS.some((a) => importClosure([r]).has(a)));
-      expect(open, `${p.key} door`).toEqual([]);
+      expect([...new Set(doorApis(p).flatMap(routesUnder))].filter((r) => !authorizes(r)), `${p.key} door`).toEqual([]);
+    }
+    const served = new Set(builtDoors().flatMap((p) => doorApis(p).flatMap(routesUnder)));
+    for (const [r, why] of Object.entries(ORG_FREE_ROUTES)) {
+      expect(served.has(r), `${r}: listed but no built door serves it`).toBe(true);
+      expect(why.trim().length, r).toBeGreaterThan(0);
     }
   });
 
-  it("a platform API authorizes by organization", () => {
+  // A library grantFor with no request scope is judged for the internal account as `system` (lib/entitlements/grant.ts),
+  // so a route a door serves that reaches one must ask its feature itself (withFeature, or grantFor with the request).
+  // This proves the caller's feature is asked, not that it is charged: report() is not wired yet (ADR 017 §4).
+  // Routes whose imports reach grant.ts but that never run a paid call, each read for it.
+  const UNPAID_ROUTES: Readonly<Record<string, string>> = {
+    "app/api/social/reports/monthly/route.ts": "toggles a client_schedules row; reads job defaults from lib/schedules/jobs.ts, never runs a job",
+  };
+  it("every paid route a built door serves asks its caller's feature", () => {
+    const served = new Set<string>();
+    for (const p of builtDoors()) {
+      const routes = [...new Set(doorApis(p).flatMap(routesUnder))];
+      routes.forEach((r) => served.add(r));
+      const unbilled = routes.filter((r) => !(r in UNPAID_ROUTES) && FILES.get(r)!.asked.length === 0 && importClosure([r], STOP_AT).has("lib/entitlements/grant.ts"));
+      expect(unbilled, `${p.key} door`).toEqual([]);
+    }
+    for (const r of Object.keys(UNPAID_ROUTES)) expect(served.has(r), `${r}: listed but no built door serves it`).toBe(true);
+  });
+
+  it("a platform API authorizes by organization or reads no organization's data", () => {
     for (const prefix of PLATFORM_APIS) {
       const routes = routesUnder(prefix);
       expect(routes.length, prefix).toBeGreaterThan(0);
-      for (const r of routes) expect(importClosure([r]).has("lib/tenant-guard.ts"), r).toBe(true);
+      for (const r of routes) expect(r in ORG_FREE_ROUTES || importClosure([r], STOP_AT).has("lib/tenant-guard.ts"), r).toBe(true);
     }
   });
 
