@@ -1,6 +1,6 @@
 // One place for what each image model reads and does (verified 2026-10-22 against vendor docs and the live Replicate
 // schemas). Pure data, safe on client and server: buildCardPrompt reads `promptOrder`, the tarot studio reads
-// `referenceRole`, image-gen reads `rewriteOff`, and /ops/ai-models renders the whole table. Change a model here, not
+// `referenceRole`, image-gen reads `rewriteOff`, and the image-specs tab of /tools/ai-models renders the whole table. Change a model here, not
 // in three places.
 import type { TarotModel } from "./image-gen";
 

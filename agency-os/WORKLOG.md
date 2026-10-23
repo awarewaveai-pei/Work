@@ -1,4 +1,24 @@
 # Worklog
+## 2026-10-23（續39）AI 模型兩頁併成一頁兩分頁；Chatwoot 進 Customer Service 側欄（Claude）
+
+**觸發**：操作者：(1) `/ops/ai-models` 應是 `/tools/ai-models` 的分頁；(2) chatwoot.aware-wave.com/app 為何不在 Customer Service。(3) 成本頁另開 session `costs-real-spend` 處理（Opus）。
+
+**修改**
+- `app/(shell)/tools/ai-models/ImageModelSpecs.tsx`（新）：原 `/ops/ai-models` 表格原樣搬入（仍讀 `lib/tarot/model-specs.ts`）。
+- `app/(shell)/tools/ai-models/page.tsx`：`.tab-bar` 兩分頁「模型比較／圖片模型規格」，分頁是連結（`?tab=image-specs`），每頁有自己網址。
+- `app/(shell)/ops/ai-models/page.tsx`：改 `redirect("/tools/ai-models?tab=image-specs")`，舊連結不壞。
+- `app/SidebarNav.tsx`：AI Models & Costs 只留一個 `AI Models`；Customer Service 加外部連結 `Chatwoot`（https://chatwoot.aware-wave.com/app）。
+- `lib/portal/products.ts:98`、`lib/tarot/model-specs.ts:3`：說明改指新位置。
+- `app/__tests__/sidebar-coverage.test.ts`：`/ops/ai-models` 列入 REACHED_ELSEWHERE＋斷言 redirect 目的地（Codex F1）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/__tests__/sidebar-coverage.test.ts lib/portal（51 passed，含 registry 測試）＋ sidebar-coverage 7 passed ＋ npx tsc --noEmit（0） | exit=0 | ms=90000
+- 實測：本機已登入，開 `/ops/ai-models` → 轉到 `/tools/ai-models?tab=image-specs`，分頁 active 正確、表格 16 列；點「模型比較」→ `/tools/ai-models` 正常；側欄 Customer Service 出現 Chatwoot↗。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-23-review-f6ab7c59.md` F1：allowlist 不驗 redirect 目的地 → 加斷言測試
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=ops/ai-models | hits=5（products.ts:98 已改；tools/ai-models/page.tsx:17 註解；sidebar-coverage.test.ts:9,79,80 allowlist 與 redirect 測試；皆為新位置的正確引用）
+- BUGHUNT_SCOPE_NARROW: 只搜 next-admin 程式；歷史 WORKLOG／報告中的舊網址不回改
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-23（續38）ADR 017 NEXT ②：付費縫記用量＋閘；studio 精選免費、門上藏 AI；tarot 批次記操作者寫成 patch 待同意（Claude）
 
 **觸發**：操作者「續做 NEXT ②：每個 withFeature 付費路由接上 grant.report()（自用／合約列只記不扣）；完成＝閘、tarot 批次記操作者 migration、studio culture/trending 門上隱藏、vitest 全綠」。

@@ -116,6 +116,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     items: [
       { type: 'link',     href: '/ops/cs',    icon: '💬', label: 'CS Overview',       title: 'AI 客服營運中心：意圖 / 成效 / kill-switch；知識庫在 Knowledge & Data' },
       { type: 'link',     href: '/cs-widget', icon: '🗨', label: 'CS Widget Preview', title: '客服聊天視窗試玩（假資料，尚未接 Chatwoot）' },
+      { type: 'ext',      href: 'https://chatwoot.aware-wave.com/app', icon: '💭', label: 'Chatwoot' },
       { type: 'disabled', icon: '🎚', label: 'Intents & Tiers' },
       { type: 'disabled', icon: '🧪', label: 'Eval & Simulation' },
     ],
@@ -139,8 +140,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     label: 'AI Models & Costs',
     items: [
       { type: 'link', href: '/ops/costs',       icon: '$', label: 'AI Costs',          title: 'LLM 呼叫花費帳本' },
-      { type: 'link', href: '/tools/ai-models', icon: '⚖', label: 'Model Comparison',  title: '文字／圖片／Coding 模型的價格、速度、用途' },
-      { type: 'link', href: '/ops/ai-models',   icon: '◈', label: 'Image Model Specs', title: '圖片模型規格：能讀多長、參考圖、改寫' },
+      { type: 'link', href: '/tools/ai-models', icon: '⚖', label: 'AI Models',         title: '模型比較（價格、速度、用途）＋圖片模型規格（能讀多長、參考圖、改寫）兩個分頁' },
       { type: 'link', href: '/ops/tools',       icon: '🧰', label: 'AI Tools & Alerts', title: '外部 AI 工具清單 + 事件通知管道' },
     ],
   },

@@ -6,6 +6,7 @@ import { DEFAULT_SECTIONS, applyLayout, itemKey } from "../SidebarNav";
 // A built page nobody can click to is a page nobody uses: every static page under app/(shell) is
 // linked from the sidebar, or listed here with the page that links to it.
 const REACHED_ELSEWHERE: Record<string, string> = {
+  "/ops/ai-models": "redirects to /tools/ai-models?tab=image-specs",
   "/outreach/settings/service-profiles": "tab of /outreach/settings",
   "/outreach/settings/suppression": "tab of /outreach/settings",
   "/tools/social/ads": "social app side nav (tools/social/routes.ts)",
@@ -73,6 +74,13 @@ describe("sidebar coverage", () => {
       const keys = s.items.map(itemKey);
       expect(keys.length, s.id).toBe(new Set(keys).size);
     }
+  });
+
+  it("the old /ops/ai-models URL redirects to the image-specs tab", async () => {
+    const { default: Page } = await import("../(shell)/ops/ai-models/page");
+    let digest = "";
+    try { Page(); } catch (e) { digest = String((e as { digest?: string }).digest ?? e); }
+    expect(digest).toContain("/tools/ai-models?tab=image-specs");
   });
 
   it("no page is linked twice and section ids are unique", () => {
