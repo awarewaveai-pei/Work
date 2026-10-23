@@ -1,4 +1,18 @@
 # Worklog
+## 2026-10-23（續52）next-admin 提前部署 f6d28855c（操作者「現在部署」：Chatwoot 側欄、AI Models 分頁、成本頁）（Claude）
+
+**觸發**：操作者看不到 Customer Service 的 Chatwoot（e2c6489c6 已在 main，prod 還在 d433dfe29）→「現在部署」。
+
+**內容**：`sg-deploy.sh next-admin`，previous fb2972943 → f6d28855c。同批帶上他 session 已推 main、原定 03:00 上線的 commit（門開放 tarot/studio、entitlement 計費歸屬、payments 4a 連接器（migration 半部仍 held）、成本頁 9c171b855／51fd56bc0／32afc897c）。無 DEPLOY_HOLD。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（healthy after 11s；smoke /login、/api/ops/summary、wordpress、node-api、nginx/api 皆 200） | exit=0 | ms=300000
+- 部署後：`lobster-next-admin` Up (healthy)、名稱正常；prod `SidebarNav.tsx` 含 chatwoot.aware-wave.com/app（grep 1）；`git merge-base --is-ancestor e2c6489c6 f6d28855c` 成立。
+- Playwright smoke：`scripts/playwright-runner.ps1 -Mode smoke -SkipInstall` → 26 passed／0 failed／6 skipped。
+- REVIEW_WAIVED: NA -- 部署動作本身無程式改動；各 commit 審查見各自 WORKLOG 條目
+- BUGHUNT_WAIVED: NA -- 部署動作無程式改動
+
+**rollback**：主機 `sg-deploy.sh` 回退到 fb2972943（`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1）。
 ## 2026-10-23（續50）next-admin 部署 fb2972943：tarot、studio 產品門開門＋公網煙霧測試（Claude）
 
 **觸發**：續49 同一個操作者 go（「take the tarot door live … then studio, with smoke tests」）。手動提前部署（未等 03:00）；同時帶上 main 上其他 session 已推的 commit（d433dfe29..fb2972943 共 15 個，含 4fc6bacf4 用量歸屬、eb3d75787 0119、050e7fe76 用量計量），它們今晚 03:00 本來就會上線。
