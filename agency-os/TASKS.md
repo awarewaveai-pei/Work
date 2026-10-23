@@ -220,6 +220,7 @@
 
 > 已由 critic 驗證屬實、尚未修。優先於任何功能。
 
+- [ ] **【2026-10-23 開出｜Codex 驗證】collection 事件不走 `upsertIncidentAtomic`** — `lib/collect/report-store.ts:166` 直接 `upsert`：已 resolved 的同類失敗再發生不會重開、`occurrence_count` 不增（對照 `packages/db/migrations/0035_upsert_incident_atomic.sql`）；fingerprint `collection:<org>:<shape>` 不含 environment，本機 dev 與 prod 互蓋同一列。修 = 改走 `upsertIncidentAtomic`＋fingerprint 帶 environment。見 WORKLOG 2026-10-23「/ops/repairs 500」。
 - [ ] **【2026-09-11 開出｜蒐集 C1 × KB】`provenance` 與 `author` 到 sink 就斷** — 蒐集端每份文件都蓋 `EVIDENCE`/`SOURCE_QUOTATION`（`lib/collect/provenance.ts`）並抓 byline，但 `KnowledgeInput`（`lib/kb/types.ts`）沒有這兩個欄位，`sink/kb` 只能丟掉。後果：客服 AI 從 KB 撈到爬來的廠商行銷文案時，沒有任何標記可據以包裝成 untrusted quote——正是 `DATA_COLLECTION_PLAN.md` §1.3b「傳遞」列要防的整條路徑。KB 側屬 K2e（三軸 + locked），本項在那之前不得宣稱 §1.3b 完成。
 - [ ] **【資料正確性｜共用層】生圖額度改成三軸五對象（操作者 2026-10-21 定案；「塔羅牌是一個樂高積木」＝做在共用層，不做在 tarot 裡）**：額度只由共用 `can()` 決定、花費煞車只做在共用 `lib/ai/gateway.ts`（所有付費 AI 都經過它；目前無任何花費控制），每塊積木繼承、不各自計數；tarot 只刪自己的 `quota.ts`。原狀：現在 `lib/tarot/quota.ts:15` 是全站一天 300 張（`TAROT_DAILY_LIMIT`），只存在記憶體、重啟歸零，且一天做 5 套（390 張）就被擋。改為：(1) 每張圖前由 `can(主體, feature_key, actor)` 決定扣誰的額度——自用（comp、staff）不限張數；代操扣被代操客戶；訂閱／點數扣客戶自己；買斷用客戶自己的金鑰、不限（ADR 017 §0）；(2) 全站只留**花費煞車**（以金額計、例如每小時上限、存資料庫、觸發即暫停並通知操作者），不再有全站張數上限；(3) 刪 `checkAndConsumeQuota`（呼叫點 `app/api/tools/tarot/generate/route.ts:92`、`app/api/internal/tarot/batch/[jobId]/card/route.ts:58`）。排在批次 B 方案之後（B 改同一支 card route）。
 

@@ -84,6 +84,14 @@ const REPAIR_SOURCE_POLICY_BY_SOURCE = {
     rationale: "排定的社群貼文送不出去或平台回報失敗（lib/social/dispatch.ts）；多半是頻道要重新連接或平台拒絕內容，由操作者在社群發文頁改了再排。",
     can_escalate_to_pr: false,
   },
+  collection: {
+    source: "collection",
+    label: "資料蒐集",
+    policy: "human_only",
+    family: "manual",
+    rationale: "爬取時拒收大量頁面、整輪沒存到內容，或隔離了夾帶指令的頁面（lib/collect/report-store.ts）；原因在來源網站或內容，由操作者判斷。",
+    can_escalate_to_pr: false,
+  },
   manual: {
     source: "manual",
     label: "手動",

@@ -156,7 +156,7 @@ Trigger.dev 每小時 heartbeat（`WF/src/trigger/site-watch.ts` `site-watch-hea
 - **D2（待操作者決定，2026-09-23 登記時發現）**：`MONITORING_SYSTEMS_INVENTORY.md` 定 Uptime Kuma 為「所有 HTTP 可用性檢查的唯一來源」，客戶站 `soulfulexpression.org` 已有 Kuma 監控 23–25；site-watch 的可用性檢查也涵蓋它。真故障時會收到兩則：Kuma 幾分鐘內一則、故障持續兩個 site-watch 時段後 site-watch 再一則（恢復時同理）。選項：(a) 照現況——兩個視角（Kuma 快、site-watch 看「訪客實際拿到什麼」），第二則等同「仍未恢復」；(b) 對已有 Kuma 監控的站，site-watch 只開 incident、不發可用性 Telegram——需要「哪些站有 Kuma」的資料來源（新欄位或對照表，Slice 2）；(c) 退掉 Kuma 對客戶站的監控、改 site-watch hourly（失去分鐘級）。建議 (a)：目前只影響一個站、代價是長故障多一則訊息，(b) 沒有準確的資料來源前做不對。未回覆 = (a)。
 - R1 Telegram at-least-once：最多 1 則重複（已接受）。
 - R2 lease window 下限 300s = run route `maxDuration`；route 被砍時最長延遲 = window + 1h（已接受）。
-- R3 `IncidentSource` 型別本就缺 `collection`（`NA/lib/collect/report-store.ts:169` 繞過型別）——既有漂移；補時同步 `policy.ts` catalog。
+- R3 ✅ 2026-10-23 關閉：`collection` 已進 `IncidentSource` 與 `policy.ts` catalog，寫入端 `satisfies IncidentSource`，`policy.test.ts` 改雙向相等（此漂移曾令 `/ops/repairs` 500，見 WORKLOG 2026-10-23）。
 - R4 org 轉 inactive 後其開著的 episode 收不到結束訊息（`runner.ts` monitored=false 不跑 retire）→ Slice 2 補或接受。
 - R5 R2 list `last_modified` 欄位名未對 prod 實測；缺值時 cleanup 保守不刪 → prod 首次 cleanup 後查 `deletedObjects`。
 - **R6 容量**：renderer snapshot 併發 1、每頁 ≈40s → 上限 ≈90 頁/小時。Slice 1（每客戶 1 頁、daily）遠低於此；Slice 2 hourly × 多頁必須加容量閘：`due` 對 hourly 目標的頁數總和 >60/小時 → 拒開並在卡片提示（§8）。**fan-out 必限流**（§7 步 4 `concurrencyLimit: 2`）：否則首次開啟或每日 22:00 全 target 同時到期，超過 renderer queue（`server.mjs MAX_QUEUE` 20）的 child 得 503、超過 client 150s 的先斷線——renderer 不知道客戶端走了，會把沒人等的截圖做完（`RENDERER/server.mjs` 無 `req.on('close')` 取消；P3 候選：加 abort-on-disconnect）。

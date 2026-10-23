@@ -12,6 +12,7 @@
 
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
 import type { CollectIssue, RunReport, SinkReport } from "@/lib/collect/types";
+import type { IncidentSource } from "@/lib/ops-inbox/types";
 
 export interface PersistArgs {
   organizationId: string;
@@ -166,7 +167,7 @@ async function raiseCollectionIncident(args: {
   const { error } = await sb.from("ops_incidents").upsert(
     {
       organization_id: args.organizationId,
-      source: "collection",
+      source: "collection" satisfies IncidentSource,
       external_id: fingerprint,
       fingerprint,
       signal_type: "business",

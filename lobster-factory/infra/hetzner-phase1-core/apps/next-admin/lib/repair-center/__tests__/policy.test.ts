@@ -26,11 +26,9 @@ describe("REPAIR_SOURCE_POLICIES", () => {
     expect(allowed, "no ops_incidents_source_check found in migrations").not.toBeNull();
     const sources = REPAIR_SOURCE_POLICIES.map((p) => p.source as string);
     expect(sources).toContain("site_watch");
+    // Both directions: a DB-accepted source without a policy 500s /ops/repairs (2026-10-23).
     expect(sources.filter((s) => !allowed!.includes(s))).toEqual([]);
-    // Known drift (SITE_WATCH_MASTER_PLAN §6.2 R3): lib/collect/report-store.ts writes source
-    // 'collection' around the IncidentSource type, so it has no policy yet. Fixing R3 = add it to
-    // the type and the catalog, then drop it here.
-    expect(allowed!.filter((s) => !sources.includes(s))).toEqual(["collection"]);
+    expect(allowed!.filter((s) => !sources.includes(s))).toEqual([]);
   });
 
   it("every entry has non-empty rationale", () => {

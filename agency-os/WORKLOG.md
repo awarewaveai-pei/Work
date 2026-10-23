@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-23（續45）/ops/repairs 500 ＋ Sentry 收不到頁面錯誤（Claude）
+
+**觸發**：操作者：/ops/repairs「Application error… Digest: 773356671」，問為何 Sentry／Uptime 都沒發現。
+
+**根因**
+- C1 `ops_incidents` 有 7 筆 `source=collection`（6 prod，09-12 起）；`IncidentSource` 沒有 `collection` → `policyCatalogForSource()` 回 undefined → `policy.ts:104` `.policy` TypeError（容器 log digest 773356671）。寫入端 `lib/collect/report-store.ts:168` 繞過型別；`policy.test.ts` 09-23 把它寫成「Known drift」預期值，偵測器被調成閉嘴。
+- C2 `instrumentation.ts` 未 export `onRequestError` → Next 15 server render 錯誤全不進 Sentry；`app/` 無 `global-error.tsx`。
+- m1 Kuma #7、`endpoint-alert.sh:30`、sg-deploy smoke 只打 `/api/ops/summary`、`/login`；`/ops/*` 需登入，外部探針只見 302。對這類錯誤的偵測器 = Sentry（C2）。
+
+**修改**（next-admin）
+- `lib/ops-inbox/types.ts` 加 `collection`；`lib/repair-center/policy.ts` catalog 加 `collection`（human_only）；`report-store.ts` `source: "collection" satisfies IncidentSource`；`policy.test.ts` 改雙向相等、刪豁免。
+- `instrumentation.ts` `export const onRequestError = Sentry.captureRequestError`；`app/global-error.tsx`（只 capture 無 digest 的 client 錯誤，server 錯誤已由 onRequestError 送；文案 GPT 寫 `reports/oracle/2026-10-23-inspect-b15c9e97.md`）。
+- Codex R1 抓到接上 hook 會外送 Cookie／Authorization、R2 抓到 request body（SDK 預設 `requestdata.js` DEFAULT_INCLUDE、`SentryHttpInstrumentation.js:210` body 'medium'；既有 API 錯誤事件已在外送）。連報兩次 → 不變量：只放行值不可能帶客戶端祕密的欄位。新 `lib/sentry-scrub.ts`：`event.request` 重建為白名單（url 去 query、method、5 個 header，無 referer）；span／breadcrumb `data` 刪 `url.query`／`http.query`／`http.fragment`、URL 欄去 query（R3：url.query、referer；自查：SDK http/fetch breadcrumb 寫 `http.query` `SentryHttpInstrumentation.js:337-342`）；掛 `beforeSend`／`beforeSendTransaction`／`beforeSendSpan`／`beforeBreadcrumb`，`scrubEvent` 另清 `event.breadcrumbs`；URL 一律切 `?` 與 `#`。R4：client 事件原本只去 hash、不去 query → server／edge／client 三份 config 全改 import 同一 scrubber，刪各自複本（client 的 `#token_hash` 保護併入）；`lib/__tests__/sentry-scrub.test.ts`。
+- `SITE_WATCH_MASTER_PLAN.md` R3 標關閉。範圍外（Codex R2 #2/#3）→ TASKS D：collection 事件不走 `upsertIncidentAtomic`、fingerprint 缺 environment。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=docker logs lobster-next-admin 取 digest 773356671 stack＋next-admin 容器 Supabase REST 查 ops_incidents 各 source 筆數 | exit=0 | ms=4000
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit（0）＋ npx vitest run（2926 passed／2952；1 fail = 他 session 未 commit 的 lib/portal/__tests__/registry-code.test.ts PROBE，非本改動） | exit=1 | ms=26584
+- REALTEST_EVIDENCE: tool=Bash | cmd=突變 sentry-scrub：放行全部 header／加回 referer／保留 url.query／保留 http.query／保留 hash／略過 event.breadcrumbs → sentry-scrub.test 各紅，還原綠 | exit=0 | ms=3000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/6m/1n -- Codex 5 輪 `reports/oracle/2026-10-23-review-{428652dd,13ee73b0,ae0bb681,2b12c433,3532745c}.md`；R1–R4 6 項皆讀 SDK 原始碼證實並修；R2 #2/#3（collection 事件生命週期）屬範圍外 → TASKS D；R5 #1（錯誤訊息本文含祕密）不採：那是 app 自寫文字非 SDK 附帶的請求資料，對自由文字 regex 是啟發式補丁；控制 = 不把祕密寫進錯誤訊息＋既有 TASKS「Sentry 後台 Data Scrubber」
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=scrubRequest|scrubSpanLikeData | hits=0
+- BUGHUNT_DONE: scope=agency-os,scripts,lobster-factory,.claude | grep=Known drift|around the IncidentSource | hits=1（SITE_WATCH_MASTER_PLAN.md:159，已改）
+
+**剩餘風險**：prod 生效＝今晚 03:00 自動部署；未在 prod 實看 /ops/repairs 與 Sentry 事件。`/ops/*` 仍無登入後 render 探針。
+**rollback**：`git revert <本 commit>`（無 schema／env 變更）。
 ## 2026-10-23（續44）/ops/costs：真實花費改成即時監控，和月報分工（Claude）
 
 **觸發**：操作者問「真實花費和月報應該要有差異性，你是怎麼區分的?」→ 同意「真實花費＝即時監控、月報＝月結帳，拿掉重複的表」。
