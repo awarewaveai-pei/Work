@@ -1,7 +1,7 @@
 ﻿{
     "checks":  {
                    "docker_watchdog":  "warn:shortcut_unguarded",
-                   "deploy_hold":  "warn:hold_local_only_not_on_origin_main",
+                   "deploy_hold":  "ok:none",
                    "pod_order_inbox_detail":  {
                                                   "ok":  true,
                                                   "deferred":  0,
@@ -12,13 +12,13 @@
                                                   "stuckPending":  0,
                                                   "capped":  false
                                               },
-                   "client_mail":  "ok:no_failures_7d_last_send_7d",
+                   "client_mail":  "ok:no_failures_7d_last_send_4d",
                    "nightly_health":  "ok",
                    "codex_parity":  "ok:parity",
                    "n8n_failures":  "ok:none_24h",
                    "pod_order_inbox":  "ok",
                    "repair_center":  "ok",
-                   "ci_health":  "warn:fail_[FAIL]_CI:_\u0027Cognitive_OS_full_suite\u0027_has_been_failing_for_3_consecutive_run(s)_over_6_day(s)_-_this_",
+                   "ci_health":  "ok",
                    "client_sites":  "ok:6_active",
                    "repair_detail":  {
                                          "github_app_status":  "unverified",
@@ -48,9 +48,9 @@
                },
     "overall":  "WARN",
     "blockers":  [
-                     "[FAIL] CI: \u0027Cognitive OS full suite\u0027 has been failing for 3 consecutive run(s) over 6 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/38493906498"
+
                  ],
-    "generated":  "2026-10-19 13:11:33",
+    "generated":  "2026-10-23 11:04:41",
     "blind_spots":  [
 
                     ]

@@ -1,7 +1,7 @@
 # CI health (GitHub Actions, branch main)
 
-- Generated: 2026-10-19 13:09:59
-- Overall: **🔴 FAIL**
+- Generated: 2026-10-23 11:03:00
+- Overall: **🟢 PASS**
 - Method: every workflow enumerated; last 20 run(s) of each inspected on `main`
 
 ## Workflows
@@ -12,7 +12,7 @@
 | Auto-Repair - PR Notification | none | - | - |
 | Backup scripts tests | success | - | - |
 | Cognitive OS eval harness | success | - | - |
-| Cognitive OS full suite | failure | 3 | 6d |
+| Cognitive OS full suite | success | - | - |
 | HCI-30 — Wave 1 cross-box restore drill (P0-10) | success | - | - |
 | Lobster workflows package — validate (main) | success | - | - |
 | next-admin — TypeScript typecheck | success | - | - |
@@ -27,7 +27,7 @@
 
 ## Findings
 
-- 'Cognitive OS full suite' has been failing for 3 consecutive run(s) over 6 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/38493906498
+- Every workflow's latest run on main succeeded.
 
 ## Why this check exists
 

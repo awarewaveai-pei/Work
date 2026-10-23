@@ -1,5 +1,5 @@
 {
-    "generatedAt":  "2026-10-19T05:10:34.5530181Z",
+    "generatedAt":  "2026-10-23T03:03:42.5873112Z",
     "overall":  "PASS",
     "blind_spots":  [
 
@@ -12,11 +12,11 @@
                                  },
                    "heartbeat":  {
                                      "verdict":  "PASS",
-                                     "detail":  "last heartbeat 0.1h ago"
+                                     "detail":  "last heartbeat 1.0h ago"
                                  },
                    "executor":  {
                                     "verdict":  "PASS",
-                                    "detail":  "2 monitored target(s), none overdue; newest result: 7.1h ago"
+                                    "detail":  "2 monitored target(s), none overdue; newest result: 5.0h ago"
                                 },
                    "notifications":  {
                                          "verdict":  "PASS",
@@ -24,15 +24,15 @@
                                      }
                },
     "raw":  {
-                "hb_age_s":  "335",
+                "hb_age_s":  "3522",
                 "overdue_targets":  "0",
                 "stuck_notifications":  "0",
-                "enabled_hb_age_s":  "335",
+                "enabled_hb_age_s":  "3522",
                 "overdue_slugs":  "",
                 "monitored_targets":  "2",
                 "applied":  "true",
                 "oldest_owed_s":  "none",
-                "last_result_age_s":  "25520",
+                "last_result_age_s":  "17901",
                 "owed_notifications":  "0"
             },
     "route_status":  null,

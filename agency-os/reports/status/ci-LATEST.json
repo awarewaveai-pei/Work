@@ -1,6 +1,6 @@
 {
     "schemaVersion":  1,
-    "generatedAtUtc":  "2026-10-19T05:09:59.6330784Z",
+    "generatedAtUtc":  "2026-10-23T03:03:00.6410358Z",
     "branch":  "main",
     "runsPerWorkflow":  20,
     "probeOk":  true,
@@ -35,15 +35,15 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38682512724"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39205541032"
                       },
                       {
                           "name":  "Cognitive OS full suite",
-                          "latest":  "failure",
-                          "consecutiveFailures":  3,
-                          "failingSinceUtc":  "2026-10-13T00:13:37Z",
-                          "failingDays":  6,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38493906498"
+                          "latest":  "success",
+                          "consecutiveFailures":  0,
+                          "failingSinceUtc":  "",
+                          "failingDays":  0,
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39205541020"
                       },
                       {
                           "name":  "HCI-30 — Wave 1 cross-box restore drill (P0-10)",
@@ -59,7 +59,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38677064057"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39576905996"
                       },
                       {
                           "name":  "next-admin — TypeScript typecheck",
@@ -67,7 +67,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39091839257"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39811858556"
                       },
                       {
                           "name":  "Perplexity Search-only guard",
@@ -75,7 +75,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39184609666"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39825021846"
                       },
                       {
                           "name":  "Release Gate (main)",
@@ -99,7 +99,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39184609670"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39825021566"
                       },
                       {
                           "name":  "Tenant staging SSOT",
@@ -123,7 +123,7 @@
                           "consecutiveFailures":  0,
                           "failingSinceUtc":  "",
                           "failingDays":  0,
-                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/38218906388"
+                          "url":  "https://github.com/awarewaveai-pei/Work/actions/runs/39210012062"
                       },
                       {
                           "name":  "ziwei — typecheck · test · build",
@@ -134,9 +134,9 @@
                           "url":  ""
                       }
                   ],
-    "verdict":  "broken",
-    "verdictLabel":  "FAIL",
+    "verdict":  "healthy",
+    "verdictLabel":  "PASS",
     "findings":  [
-                     "\u0027Cognitive OS full suite\u0027 has been failing for 3 consecutive run(s) over 6 day(s) - this gate has been off that whole time: https://github.com/awarewaveai-pei/Work/actions/runs/38493906498"
+
                  ]
 }
