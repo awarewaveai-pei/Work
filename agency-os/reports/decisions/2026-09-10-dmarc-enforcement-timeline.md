@@ -25,7 +25,7 @@
 
 操作者從 peijingartstudio 信箱下載 Google rua 報表到 `D:\tmp\dmarc\`（23 zip，1 個重複以 SHA256 排除）：涵蓋 09-30＋10-01～10-21 每天一份、無缺日（10-22 報表尚未發出）。34 封（pct=25 期間 33 封）DKIM 34/34 pass（`aware-wave.com`＋`amazonses.com`）、SPF 34/34 pass（`send.aware-wave.com`）、disposition 全 none；IP 全在 Amazon SES `54.240.x.x`。報表寄件方只有 google.com，期間收件人全為 Gmail 信箱（Resend 紀錄），故無其他收信方報表屬預期；Resend 10-01～10-21 寄出 33 封＝報表 33 封，無 Resend 以外的 aware-wave.com 寄件。Cloudflare API PATCH 同一 record id → `v=DMARC1; p=quarantine; pct=100; rua=mailto:peijingartstudio@gmail.com; fo=1`，CF API GET＋cloudflare-dns.com＋dns.google＋nslookup @1.1.1.1 三方覆查一致。
 
-**下一步**：≈2026-11-06 取 10-23 起的報表，同款檢查後升 `p=reject`。報表仍需操作者從 peijingartstudio 手動下載（Gmail 連線器登入的是 awarewaveai，看不到 rua 信）。
+**下一步**：≈2026-11-06 取 10-23 起的報表，同款檢查後升 `p=reject`（報表收件見下節「誰去查 rua 報表」）。
 
 **殘留（階段 1 記）**：只驗證了 Google 一家收信方；2026-10-15 複查時應同時確認是否有 Microsoft/Yahoo 等其他主要收信方的報表，不要只看 google.com 寄件者。9/28 一次性排程提醒已耗用，10/15 這一步需另開新 routine（或操作者手動記得）。
 
@@ -38,7 +38,13 @@
 
 ## 誰去查 rua 報表
 
-`rua=mailto:peijingartstudio@gmail.com`（操作者信箱）。我目前沒有任何工具能讀取這個信箱，所以 9/28 這一步需要操作者本人開信箱看聚合報表，或另外接一個 DMARC 報表解析服務（如 dmarcian／Postmark DMARC digests）——這個「怎麼看報表」本身不是本次決策範圍，先用最低成本的「操作者手動看」路徑，若嫌麻煩再評估工具。
+**2026-10-23 起**：`rua=mailto:dmarc@aware-wave.com` → Cloudflare Email Routing 規則 `44e03847ca444f9097fd9dfc72da813d` 轉寄 `awarewaveai@gmail.com`（agent 的 Gmail 連線器讀得到）。
+- 為什麼：舊 rua `peijingartstudio@gmail.com` 只有操作者能讀，每階段都卡手動下載（階段 2 因此逾期 8 天）。
+- 為什麼是自有網域：收件位址與 DNS 解耦，以後換收件人只改路由規則、不動 DMARC 紀錄；同網域 rua 也免 RFC 7489 §7.1 外部網域授權。
+- 前提：Email Routing catch-all 為停用（未符合規則的收件人在 SMTP 階段被拒），所以這條規則被刪＝報表寄不進來。改 Email Routing 規則前先看這行。
+- 舊報表（≤10-22）仍在 peijingartstudio，不搬。
+
+（舊）`rua=mailto:peijingartstudio@gmail.com`（操作者信箱），階段 1、2 由操作者手動下載報表。
 
 ## 回滾
 

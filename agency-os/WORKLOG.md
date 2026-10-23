@@ -1,4 +1,34 @@
 # Worklog
+## 2026-10-23（續5）DMARC rua 改寄自有網域 `dmarc@aware-wave.com` → awarewaveai：報表不再卡操作者手動下載（Claude）
+
+**觸發**：續4 階段 2 逾期 8 天，根因＝rua `peijingartstudio@gmail.com` 只有操作者讀得到（Gmail 連線器登入 awarewaveai）。操作者：「你決定」。
+
+**不變量**：DMARC 報表收件位址 = 自有網域、agent 可讀；換收件人只改路由，不改 DNS 紀錄。
+
+**方案比較**
+- A 每階段手動下載：現狀，已證明會逾期。
+- B peijingartstudio 設 Gmail 轉寄：設定落在操作者個人信箱，repo 看不見、agent 無法驗證。
+- C rua 加第二個 gmail 位址：兩個收件點，DNS 綁死個人信箱。
+- D（採用）rua 改 `dmarc@aware-wave.com`，Cloudflare Email Routing 轉 awarewaveai：沿用既有 Email Routing（`info@` 同模式、awarewaveai 已是 verified destination 2026-04-05），零新服務；同網域免 RFC 7489 §7.1 外部授權。
+- 不做：自建報表解析 Worker／偵測器 — 剩 1 個階段＋報表量 1–6 封/天，現階段不划算；p=reject 後若要長期監控再開卡。
+
+**修改**
+- Cloudflare Email Routing 新增規則 `44e03847ca444f9097fd9dfc72da813d`：to `dmarc@aware-wave.com` → forward `awarewaveai@gmail.com`（腳本先查同名規則，存在則不建）。
+- `_dmarc.aware-wave.com`（record `f28b0da7…`）→ `v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc@aware-wave.com; fo=1`（先比對舊值逐字相符才 PATCH；先建路由再改 rua，避免報表被拒）。
+- `agency-os/reports/decisions/2026-09-10-dmarc-enforcement-timeline.md`「誰去查 rua 報表」改寫新路徑＋前提（catch-all 停用 → 刪規則＝報表被拒）。
+- `agency-os/TASKS.md` p=reject 待辦去掉「操作者手動下載」。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=curl | cmd=Resend API POST /emails from ops@aware-wave.com to dmarc@aware-wave.com, GET 20s 後 last_event | exit=0 | ms=20000
+- Resend `01a166ce-6892-74a1-88a7-43ed123c4c81` last_event=delivered：Cloudflare MX 接受＝規則命中（catch-all 停用，未命中會在 SMTP 被拒）。Gmail 端收到未驗：本 session Gmail 連線器 invalidated。
+- DNS：CF API GET 與 dns.google 回新 rua；cloudflare-dns.com／1.1.1.1 於 TTL 300s 後覆查一致（見 commit 訊息）。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回決策紀錄與 TASKS；新舊 DNS 值逐字比對
+- ORACLE_WAIVED: 無 source 檔改動（DNS／Email Routing 設定＋文件）
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,runbooks,lobster-factory/docs | grep=rua= | hits=0（決策紀錄與 TASKS 以外無文件引用 rua 位址；歷史快照不改）
+
+**剩餘**：操作者 /mcp 重連 Gmail 後，搜 `routing test: dmarc@aware-wave.com` 確認轉寄落地；明日起應出現 `Report domain: aware-wave.com` 寄往 dmarc@ 的報表。
+
+**rollback**：PATCH 同一 record 回 `rua=mailto:peijingartstudio@gmail.com`；刪 Email Routing 規則 `44e03847…`。
 ## 2026-10-23（續4）aware-wave.com DMARC 升第二階段：pct=25 → pct=100（報表條件達成，執行）（Claude）
 
 **觸發**：AO-RESUME 期限雷達：決策正本排定 2026-10-15，已逾期 8 天。操作者：先做唯讀報表檢查 → 通過後 go ahead 改 DNS。
