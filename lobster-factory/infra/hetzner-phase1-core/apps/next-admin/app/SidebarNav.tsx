@@ -15,67 +15,67 @@ export interface NavSection {
   items: NavItem[];
 }
 
-// Grouped by product (names follow lib/portal/products.ts), then the staff-only work around them.
+// Order follows the work: win and build a client → keep the client running → the services we run for
+// clients (marketing, outreach, knowledge, CS) → the creative tools → keeping the platform running.
+// Labels are English only (sidebar-coverage.test.ts checks); the Chinese explanation lives in `title`.
 // Every built page under app/(shell) is linked here or listed in __tests__/sidebar-coverage.test.ts
 // with where it is reached from, so a new page fails that test until it is placed.
 // Section ids build-onboard / repair-control are mirrored by the dashboard (app/(shell)/page.tsx).
 export const DEFAULT_SECTIONS: NavSection[] = [
   {
     id: 'overview',
-    label: '總覽',
+    label: 'Overview',
     items: [
       { type: 'link', href: '/', icon: '◈', label: 'Dashboard' },
     ],
   },
-  // ── 產品：內容行銷 + 社群發文 ─────────────────────────────────────────────
+  // ── 建站三步序列（intake → 技術精靈 → 部署）刻意相鄰且照順序，對映 MASTER PLAN §1
+  // 資料流：submit → generate-spec → trigger-build → create-wp-site。
+  // 招新客（生新站）與下方 Clients（顧舊客）刻意分區。
   {
-    id: 'content-marketing',
-    label: '內容行銷',
+    id: 'build-onboard',
+    label: 'Build & Onboard',
     items: [
-      { type: 'link', href: '/tools/content',          icon: '✍', label: 'SEO 文章',       title: 'SEO/GEO 文章產出' },
-      { type: 'link', href: '/tools/content/calendar', icon: '🗓', label: '內容行事曆',     title: '文章排程與發布日曆' },
-      { type: 'link', href: '/tools/events',           icon: '🌍', label: '全球活動行事曆', title: '運動賽事、國家與文化節慶，找內容題材' },
-      { type: 'link', href: '/tools/social',           icon: '📣', label: '社群發文',       title: '多品牌社群排程（ADR 016）' },
+      { type: 'link', href: '/ops/onboarding', icon: '✨', label: 'Client Intake', title: '建站第 1 步：客戶探索式問卷' },
+      { type: 'link', href: '/onboard',        icon: '✦', label: 'Site Wizard',   title: '建站第 2 步：技術建站精靈' },
+      { type: 'link', href: '/build',          icon: '⚡', label: 'Build Console', title: '建站第 3 步：部署執行（plan_only 或 enqueue）' },
     ],
   },
-  // ── 產品：影片製作、塔羅製圖 ─────────────────────────────────────────────
+  // ── 既有客戶的監看 / 串接 / 例行工作（營運面，非新建站）
   {
-    id: 'media',
-    label: '影片與塔羅',
+    id: 'clients-ops',
+    label: 'Clients',
     items: [
-      { type: 'link', href: '/tools/video', icon: '🎬', label: '影片製作', title: '影片生成工具' },
-      { type: 'link', href: '/tools/tarot', icon: '🔮', label: '塔羅製圖', title: '塔羅牌印刷檔生成工具' },
+      { type: 'link', href: '/ops/clients',         icon: '👥', label: 'All Clients',     title: '全客戶健康狀態 + WP 外掛更新' },
+      { type: 'link', href: '/tools/content/sites', icon: '🌐', label: 'WordPress Sites', title: '新增、編輯、移除客戶 WP 連線' },
+      { type: 'link', href: '/ops/integrations',    icon: '⇄', label: 'Integrations',    title: '客戶工具串接狀態' },
+      { type: 'link', href: '/ops/schedules',       icon: '⏱', label: 'Schedules',       title: '所有客戶的例行工作：自動爬取、網站巡檢' },
     ],
   },
-  // ── 產品：商品設計工作室 + 設計編輯器（生成 → 編輯 → 存檔 → 上架） ────────
+  // ── Marketing：內容 → 排程 → 題材 → 社群；開發信是另一條獨立流程，緊接在後
   {
-    id: 'product-design',
-    label: '商品設計',
+    id: 'marketing',
+    label: 'Marketing',
     items: [
-      { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'Studio',        title: 'POD 設計生成器' },
-      { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',        title: 'AI 擬真商品照' },
-      { type: 'link',     href: '/tools/banner',        icon: '🖼', label: 'Banner Studio', title: 'Social media banner 生成工具' },
-      { type: 'link',     href: '/tools/canvas',        icon: '🎨', label: 'Canvas Editor', title: 'Fabric.js 快速編輯 Canvas' },
-      { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor', title: '向量設計工具（14 積木）' },
-      { type: 'link',     href: '/tools/designs',       icon: '🗂', label: 'My Designs',    title: '已儲存設計庫（R2 持久化）' },
-      { type: 'link',     href: '/tools/publish',       icon: '🛒', label: '上架',          title: '一鍵上架 Woo + Printful' },
-      { type: 'disabled', icon: '◧', label: 'Templates' },
+      { type: 'link', href: '/tools/content',          icon: '✍', label: 'SEO Articles',     title: 'SEO/GEO 文章產出' },
+      { type: 'link', href: '/tools/content/calendar', icon: '🗓', label: 'Content Calendar', title: '文章排程與發布日曆' },
+      { type: 'link', href: '/tools/events',           icon: '🌍', label: 'Events Calendar',  title: '全球活動行事曆：運動賽事、國家與文化節慶，找內容題材' },
+      { type: 'link', href: '/tools/social',           icon: '📣', label: 'Social Posts',     title: '多品牌社群排程（ADR 016）' },
     ],
   },
-  // ── 產品：行銷開發信 ─────────────────────────────────────────────────────
   {
     id: 'cold-outreach',
-    label: '行銷開發信',
+    label: 'Cold Outreach',
     items: [
-      { type: 'link', href: '/outreach',            icon: '📣', label: 'Dashboard',      title: '冷拜訪作戰中心' },
-      { type: 'link', href: '/outreach/inbox',      icon: '📥', label: 'Lead Inbox',     title: '名單收件匣（去重 + suppression）' },
-      { type: 'link', href: '/outreach/leads',      icon: '🎯', label: 'Leads',          title: '冷名單庫（三分數 + 優先級）' },
-      { type: 'link', href: '/outreach/review',     icon: '📝', label: 'Message Review', title: '文案審核中心（Cold Gate + Evidence）' },
-      { type: 'link', href: '/outreach/drafts',     icon: '🗒', label: 'Draft Queue',    title: '草稿審核佇列' },
-      { type: 'link', href: '/outreach/followups',  icon: '⏰', label: 'Follow-ups',     title: '跟進任務（不漏）' },
-      { type: 'link', href: '/outreach/replies',    icon: '💬', label: 'Replies',        title: '回覆處理（Reply Copilot）' },
-      { type: 'link', href: '/outreach/connectors', icon: '🔌', label: 'Connectors',     title: '免費工具 + 客戶 BYO-key' },
-      { type: 'link', href: '/outreach/settings',   icon: '⚙', label: 'Settings',       title: '服務檔 / 禁用詞 / Suppression / 同步規則' },
+      { type: 'link', href: '/outreach',            icon: '📣', label: 'Outreach Dashboard', title: '冷拜訪作戰中心' },
+      { type: 'link', href: '/outreach/inbox',      icon: '📥', label: 'Lead Inbox',         title: '名單收件匣（去重 + suppression）' },
+      { type: 'link', href: '/outreach/leads',      icon: '🎯', label: 'Leads',              title: '冷名單庫（三分數 + 優先級）' },
+      { type: 'link', href: '/outreach/review',     icon: '📝', label: 'Message Review',     title: '文案審核中心（Cold Gate + Evidence）' },
+      { type: 'link', href: '/outreach/drafts',     icon: '🗒', label: 'Draft Queue',        title: '草稿審核佇列' },
+      { type: 'link', href: '/outreach/followups',  icon: '⏰', label: 'Follow-ups',         title: '跟進任務（不漏）' },
+      { type: 'link', href: '/outreach/replies',    icon: '💬', label: 'Replies',            title: '回覆處理（Reply Copilot）' },
+      { type: 'link', href: '/outreach/connectors', icon: '🔌', label: 'Connectors',         title: '免費工具 + 客戶 BYO-key' },
+      { type: 'link', href: '/outreach/settings',   icon: '⚙', label: 'Outreach Settings',  title: '服務檔 / 禁用詞 / Suppression / 同步規則' },
     ],
   },
   {
@@ -87,50 +87,49 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     // to follow. K0 spent a stage pulling lib/kb out of lib/cs — filing it back under 客服 in the
     // navigation would teach every future reader the shape we just removed.
     id: 'knowledge-data',
-    label: '資料蒐集與知識庫',
+    label: 'Knowledge & Data',
     items: [
-      { type: 'link', href: '/ops/collect',   icon: '🛰', label: '資料蒐集', title: '選來源（網頁／Sitemap／RSS／學術／官方 API／影片／全網搜尋）、試跑、正式抓取' },
-      { type: 'link', href: '/ops/knowledge', icon: '📚', label: '知識庫',   title: '所有客戶的知識文件總覽（出處標籤、版本、切片數）；編輯在 客戶中心 →「客服」分頁' },
+      { type: 'link', href: '/ops/collect',   icon: '🛰', label: 'Data Collection', title: '資料蒐集：選來源（網頁／Sitemap／RSS／學術／官方 API／影片／全網搜尋）、試跑、正式抓取' },
+      { type: 'link', href: '/ops/knowledge', icon: '📚', label: 'Knowledge Base',  title: '所有客戶的知識文件總覽（出處標籤、版本、切片數）；編輯在 客戶中心 →「客服」分頁' },
     ],
   },
   {
     id: 'customer-service',
-    label: 'AI 客服',
+    label: 'Customer Service',
     items: [
-      { type: 'link',     href: '/ops/cs',    icon: '💬', label: '客服總覽',         title: 'AI 客服營運中心：意圖 / 成效 / kill-switch；知識庫在「資料蒐集與知識庫」' },
-      { type: 'link',     href: '/cs-widget', icon: '🗨', label: '客服 widget 預覽', title: '客服聊天視窗試玩（假資料，尚未接 Chatwoot）' },
-      { type: 'disabled', icon: '🎚', label: '意圖與分級（soon）' },
-      { type: 'disabled', icon: '🧪', label: 'Eval / 模擬（soon）' },
+      { type: 'link',     href: '/ops/cs',    icon: '💬', label: 'CS Overview',       title: 'AI 客服營運中心：意圖 / 成效 / kill-switch；知識庫在 Knowledge & Data' },
+      { type: 'link',     href: '/cs-widget', icon: '🗨', label: 'CS Widget Preview', title: '客服聊天視窗試玩（假資料，尚未接 Chatwoot）' },
+      { type: 'disabled', icon: '🎚', label: 'Intents & Tiers' },
+      { type: 'disabled', icon: '🧪', label: 'Eval & Simulation' },
     ],
   },
-  // ── 建站：三步序列（intake → 技術精靈 → 部署）刻意相鄰且照順序，對映 MASTER PLAN §1
-  // 資料流：submit → generate-spec → trigger-build → create-wp-site。
-  // 招新客（生新站）與下方「客戶」（顧舊客）刻意分區。
+  // ── 商品設計：生成 → 編輯 → 存檔 → 上架
   {
-    id: 'build-onboard',
-    label: '建站',
+    id: 'design-studio',
+    label: 'Design Studio',
     items: [
-      { type: 'link', href: '/ops/onboarding', icon: '✨', label: 'Onboarding（客戶 Intake）', title: '建站第 1 步：客戶探索式問卷' },
-      { type: 'link', href: '/onboard',        icon: '✦', label: '建站精靈（技術）',          title: '建站第 2 步：技術建站精靈' },
-      { type: 'link', href: '/build',          icon: '⚡', label: 'Build Console',            title: '建站第 3 步：部署執行（plan_only 或 enqueue）' },
+      { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'POD Studio',    title: 'POD 設計生成器' },
+      { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',        title: 'AI 擬真商品照' },
+      { type: 'link',     href: '/tools/banner',        icon: '🖼', label: 'Banner Studio', title: 'Social media banner 生成工具' },
+      { type: 'link',     href: '/tools/canvas',        icon: '🎨', label: 'Canvas Editor', title: 'Fabric.js 快速編輯 Canvas' },
+      { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor', title: '向量設計工具（14 積木）' },
+      { type: 'link',     href: '/tools/designs',       icon: '🗂', label: 'My Designs',    title: '已儲存設計庫（R2 持久化）' },
+      { type: 'link',     href: '/tools/publish',       icon: '🛒', label: 'Publish',       title: '一鍵上架 Woo + Printful' },
+      { type: 'disabled', icon: '◧', label: 'Templates' },
     ],
   },
-  // ── 客戶：既有客戶的監看 / 串接 / 例行工作（營運面，非新建站）
   {
-    id: 'clients-ops',
-    label: '客戶',
+    id: 'video-tarot',
+    label: 'Video & Tarot',
     items: [
-      { type: 'link', href: '/ops/clients',         icon: '👥', label: 'Clients',            title: '全客戶健康狀態 + WP 外掛更新' },
-      { type: 'link', href: '/tools/content/sites', icon: '🌐', label: 'WordPress 網站連線', title: '新增、編輯、移除客戶 WP 連線' },
-      { type: 'link', href: '/ops/integrations',    icon: '⇄', label: 'Integrations',       title: '客戶工具串接狀態' },
-      { type: 'link', href: '/ops/schedules',       icon: '⏱', label: '排程',                title: '所有客戶的例行工作：自動爬取、網站巡檢' },
+      { type: 'link', href: '/tools/video', icon: '🎬', label: 'Video Studio', title: '影片生成工具' },
+      { type: 'link', href: '/tools/tarot', icon: '🔮', label: 'Tarot Studio', title: '塔羅牌印刷檔生成工具' },
     ],
   },
-  // ── 維修與控制：AI 維修主控台 + 事件 + 全域控制閘（簽核 / kill-switch）+ 健康
-  // 與首頁 dashboard「Repair & Control」區一致
+  // ── AI 維修主控台 + 事件 + 全域控制閘（簽核 / kill-switch）+ 健康；與首頁 dashboard 同名區一致
   {
     id: 'repair-control',
-    label: '維修與控制',
+    label: 'Repair & Control',
     items: [
       { type: 'link', href: '/ops/repairs',      icon: '🛠', label: 'Repair Center', badge: 'ops-inbox', title: 'AI 維修主控台' },
       { type: 'link', href: '/ops/inbox',        icon: '◇', label: 'Ops Inbox',            title: '事件收斂中心' },
@@ -141,20 +140,19 @@ export const DEFAULT_SECTIONS: NavSection[] = [
       { type: 'link', href: '/api-check-client', icon: '⬡', label: 'API Health (browser)', title: 'Node API 健康（browser-side）' },
     ],
   },
-  // ── AI：花費、模型、外部 AI 工具與通知管道
   {
     id: 'ai',
-    label: 'AI 模型與花費',
+    label: 'AI Models & Costs',
     items: [
-      { type: 'link', href: '/ops/costs',       icon: '$', label: 'AI Costs',        title: 'LLM 呼叫花費帳本' },
-      { type: 'link', href: '/tools/ai-models', icon: '⚖', label: 'AI 模型比較',     title: '文字／圖片／Coding 模型的價格、速度、用途' },
-      { type: 'link', href: '/ops/ai-models',   icon: '◈', label: 'AI 圖片模型規格', title: '圖片模型規格：能讀多長、參考圖、改寫' },
-      { type: 'link', href: '/ops/tools',       icon: '🧰', label: 'AI 工具與通知',   title: '外部 AI 工具清單 + 事件通知管道' },
+      { type: 'link', href: '/ops/costs',       icon: '$', label: 'AI Costs',          title: 'LLM 呼叫花費帳本' },
+      { type: 'link', href: '/tools/ai-models', icon: '⚖', label: 'Model Comparison',  title: '文字／圖片／Coding 模型的價格、速度、用途' },
+      { type: 'link', href: '/ops/ai-models',   icon: '◈', label: 'Image Model Specs', title: '圖片模型規格：能讀多長、參考圖、改寫' },
+      { type: 'link', href: '/ops/tools',       icon: '🧰', label: 'AI Tools & Alerts', title: '外部 AI 工具清單 + 事件通知管道' },
     ],
   },
   {
     id: 'system',
-    label: '系統設定',
+    label: 'System',
     items: [
       { type: 'link', href: '/ops/products', icon: '▤', label: 'Products',     title: '產品登記表：門、販售狀態、收費功能' },
       { type: 'link', href: '/ops-console',  icon: '▣', label: 'Ops Console',  title: '架構邊界 · Tenant 設定 · M3 · AI Job' },
@@ -163,7 +161,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
   },
   {
     id: 'external',
-    label: '外部服務',
+    label: 'External',
     items: [
       { type: 'ext', href: 'https://n8n.aware-wave.com',     icon: '⚙', label: 'n8n' },
       { type: 'ext', href: 'https://uptime.aware-wave.com',  icon: '◉', label: 'Uptime Kuma' },

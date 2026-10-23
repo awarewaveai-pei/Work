@@ -1,4 +1,23 @@
 # Worklog
+## 2026-10-23（續32）側欄標籤全英文＋依工作流程重排（續30 後操作者回饋）（Claude）
+
+**觸發**：操作者：續30 排序沒邏輯；分區標題 9px（`app/globals.css:320`）中文小到看不清；中英混雜 → 要全英文。
+
+**根因**：續30 依 products.ts 的中文產品名排，(1) 中文在 9px 大寫標題樣式下不可讀；(2) 產品區排最前、客戶與建站排後，Marketing 與 Cold Outreach 被設計工具隔開，不符實際工作順序。
+
+**修改**
+- `app/SidebarNav.tsx`：所有分區與項目 label 改英文，中文說明只留 `title`（hover）。順序：Overview → Build & Onboard → Clients → Marketing → Cold Outreach → Knowledge & Data → Customer Service → Design Studio → Video & Tarot → Repair & Control → AI Models & Costs → System → External（接客建站 → 顧客 → 替客戶做的服務 → 創作工具 → 平台維運）。section id `product-design`→`design-studio`、`content-marketing`→`marketing`、`media`→`video-tarot`。
+- `app/__tests__/sidebar-coverage.test.ts`：新增「label 只能 ASCII」測試（操作者規則成為檢查）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/__tests__/sidebar-coverage.test.ts（6 passed）＋ npx tsc --noEmit（0） | exit=0 | ms=60000
+- 實測：本機已登入頁讀 `.sidebar-section` 文字＝上列順序與英文標籤；截圖確認標題可讀。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 讀回 diff：僅 label／順序／id 資料與一條測試；邏輯未動（applyLayout 已於續30 經 Codex 審）
+- ORACLE_WAIVED: 純資料改動（標籤、順序、section id），無邏輯變更；邏輯審查見 `agency-os/reports/oracle/2026-10-23-review-143dbbef.md`
+- BUGHUNT_DONE: scope=lobster-factory/infra/hetzner-phase1-core/apps/next-admin | grep='product-design'|'content-marketing'|id: 'media' | hits=0（舊 section id 在 app/lib/components 已無引用）
+- BUGHUNT_SCOPE_NARROW: 舊 id 只在 next-admin 側欄資料用過；全 repo 同字串命中皆為無關文件（HCI、cold email 標籤）
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-23（續31）studio 門頁＋閘 ③④ 收緊＋同請求沿用許可；cs 暫緩（Claude）
 
 **決策**：操作者授權自決。cs 暫緩——Chatwoot 載體未上線（`app/(shell)/ops/cs/page.tsx:43,63`），`cs-widget` 為 MockTransport；客戶介面在 `ops/clients/[slug]/CustomerServiceTab.tsx`、API 在 `/api/ops/clients/[slug]/cs-*`，現在開門＝設定一個不回話的機器人。開門順序改「客戶可直接操作的工具」優先（`cards/step-8.md`）。

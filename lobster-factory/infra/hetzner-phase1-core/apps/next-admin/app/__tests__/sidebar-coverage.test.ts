@@ -58,9 +58,14 @@ describe("sidebar coverage", () => {
     expect(out[0].items.map((i) => itemKey(i))).toEqual(ext);
 
     // a dragged disabled item keeps its key, so a section holding one round-trips too
-    const design = DEFAULT_SECTIONS.find((s) => s.id === "product-design")!.items.map(itemKey).reverse();
-    const out2 = applyLayout(DEFAULT_SECTIONS, { itemOrders: { "product-design": design } });
-    expect(out2.find((s) => s.id === "product-design")!.items.map(itemKey)).toEqual(design);
+    const design = DEFAULT_SECTIONS.find((s) => s.id === "design-studio")!.items.map(itemKey).reverse();
+    const out2 = applyLayout(DEFAULT_SECTIONS, { itemOrders: { "design-studio": design } });
+    expect(out2.find((s) => s.id === "design-studio")!.items.map(itemKey)).toEqual(design);
+  });
+
+  it("sidebar labels are English only (operator 2026-10-23: no mixed languages; Chinese goes in title)", () => {
+    const labels = DEFAULT_SECTIONS.flatMap((s) => [s.label, ...s.items.map((i) => i.label)]);
+    expect(labels.filter((l) => /[^\x20-\x7E]/.test(l))).toEqual([]);
   });
 
   it("item keys are unique within every section", () => {
