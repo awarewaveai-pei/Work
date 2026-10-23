@@ -1,4 +1,16 @@
 # Worklog
+## 2026-10-23（續18）部署 a67b0048a：r2-delete-guard 泛化＋staging 站 HTTPS 區塊上線（Claude）
+
+**觸發**：操作者「去處理好和部署」。`89e133f68` 已隨另一 session 早部署的 `286e0a0ab` 上線；`2e423f828` 未上線 → 本次 sg-deploy。
+**結果**：`.deployed-commit` 286e0a0ab → a67b0048a；healthy 10s；sg-deploy HTTP smoke 5/5；host `aw-hosting-gate.sh` 已含 `ensure_proxy_https`（sync-host-scripts）。
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin | exit=0 | ms=0（未計時）
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall → 26 passed／0 failed／6 skipped | exit=0 | ms=33600
+- REALTEST_EVIDENCE: tool=SSH | cmd=reconcile-videos.sh → checked=3 alreadyRecorded=3 orphanUnattributable=0；POST /api/video/reconcile=404、/api/internal/video/reconcile 無 key=401 | exit=0 | ms=0（未計時）
+- REVIEW_WAIVED: NA -- 部署既有已審 commit（續10／續15 的 Codex partialreview-fe2a7020、bad097ab）
+- BUGHUNT_WAIVED: NA -- 無程式改動
+**剩**：regenerate-image 502 仍待操作者登入點一次（TASKS 該條）。
+**rollback**：`.deployed-commit` 前值 286e0a0ab → 主機 `git checkout 286e0a0ab` 後 `sg-deploy.sh next-admin --skip-pull`（DEPLOY_ROLLBACK_RUNBOOK §2.1）。
 ## 2026-10-23（續17）next-admin 提前部署 286e0a0ab（權利列優先＋全產品帳戶補齊上線）（Claude）
 
 **觸發**：操作者「全部去處理好 包括部署」（明確 go）。
