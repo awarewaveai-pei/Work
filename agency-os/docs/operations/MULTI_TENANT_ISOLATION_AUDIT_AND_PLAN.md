@@ -76,7 +76,7 @@
 | `video/history` | GET | `:31` | `effectiveOrgId(req, null) :53` → 過濾 `:65-67` | 🟠 | staff 看**全部 org**；`tools/designs/route.ts:355` 對同一批 `media_assets` 卻強制預設 org。兩畫面集合不同（見 §2.3.2） |
 | `video/[id]` | DELETE | `:13-16` | `assertOrgAccess :42`（fetch `:32-37`、delete `:60`）| 🟢 | 刻意**不**預先用 org 過濾查詢（`:21-27` 有完整理由）；閘在 fetch 之後 |
 | `video/embed-to-wp` | POST | `:17-18` | **無** | 🔴 | `siteId` 取自 body `:23`，`getWpSites() :33` 回**全部**站含 token（`lib/content/wp-sites.ts:55-77` 零 org 過濾），缺 `siteId` fallback `sites[0]`；可 PATCH 任一客戶站的任一 postId。**根因＝`wp_sites` 無 `organization_id` 欄位**（同 §2.2 `content/sites` 🔴），必須一起修 |
-| `video/reconcile` | POST | — | `x-ops-sync-key :18-22` | 🟢 | 2026-08-25 補（原本零 auth；`middleware.ts:146` 的 `hasValidSyncKey` 是 exempt 不是 require）。租戶由 R2 key 前綴反解，解不出 fail-closed |
+| `video/reconcile`（2026-10-23 移至 `internal/video/reconcile`：loopback 非任何門，舊路徑被 middleware 404） | POST | — | `x-ops-sync-key :19-23` | 🟢 | 2026-08-25 補（原本零 auth；`middleware.ts:146` 的 `hasValidSyncKey` 是 exempt 不是 require）。租戶由 R2 key 前綴反解，解不出 fail-closed |
 | `video/cleanup` | POST | — | `x-ops-sync-key :19-23` | 🟢 | cron 專用；`:32-37` 跨全部 org 刪 30 天前影片是**設計如此**（維運清理，非租戶操作）|
 | `video/draft` | POST | `:38` | 不適用 | 🟢 | 只產草稿 scenes + 暫存圖，不寫任何 org-scoped 列 |
 | `video/regenerate-image` | POST | `:29` | 不適用 | 🟢 | 單張重生圖，回 URL，不寫 DB |

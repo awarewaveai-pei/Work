@@ -14,7 +14,7 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
-SYNC_URL="${NEXT_ADMIN_EVENTS_SYNC_URL:-http://127.0.0.1:3002/api/tools/events/sync}"
+SYNC_URL="${NEXT_ADMIN_EVENTS_SYNC_URL:-http://127.0.0.1:3002/api/internal/events/sync}"
 
 if [[ -z "${OPS_PROXY_SHARED_SECRET:-}" ]]; then
   echo "${LOG_PREFIX} missing OPS_PROXY_SHARED_SECRET" >&2

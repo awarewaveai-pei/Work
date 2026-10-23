@@ -1,4 +1,38 @@
 # Worklog
+## 2026-10-23（續10）⑧內容社群影片十項 VBC；影片刪除引用閘＋loopback cron 被產品門 404（Claude）
+
+**觸發**：操作者貼 TASKS ⑧ 十項「做過打勾、要做就做」；查完後選「A＋B，7393 選②」。
+
+**十項 VBC（2026-10-23 實查）**
+- ✅ Cold Outreach：vault 的 gemini connector key＝容器 env `GEMINI_API_KEY`，`GET .../v1beta/models` → 200（09-11 為 400）→ 打勾。
+- 🔴 `video/[id]` DELETE：仍無引用檢查（`app/api/video/[id]/route.ts:52`）；TASKS 說的「0065 reference ledger」從未進 main（實際 0065 是 QA／release 四表）；post 7393 仍嵌 404 影片 → 本次修（B）。
+- R2 legacy：`/var/log/reconcile-videos.log` 最後有效值 10-20 06:30Z `orphanUnattributable=2`；之後空回應 state=broken → 查出 A。未清，待逐一確認歸屬。
+- regenerate-image 502：`REPLICATE_API_TOKEN`／`PEXELS_API_KEY` 容器內 SET，env 假說排除；剩付費真 UI 重現（需操作者同意）。
+- 未動（多 session 專案或操作者限定）：社群 V1、Postiz OAuth 審核、內容引擎積木化、wp-bridge 販售、Media LEGO、outName mapping（要新表＝migration High）。
+
+**A 根因**：產品門（ADR 018，10-20 上線）`lib/portal/doors.ts:49` 把 127.0.0.1 判成 probe door，`middleware.ts:278-283` 只放 `GET /`、`GET /api/ops/summary`，其餘 404。主機 cron `reconcile-videos.sh` POST `/api/video/reconcile` 自 2026-10-20 06:45Z 起每 15 分空回應，孤兒告警啞 3 天；`sync-events-monthly.sh`（`/api/tools/events/sync`）同類（host 未裝該 cron）。
+**不變量**：主機 loopback 呼叫只能走 matcher 排除、自帶認證的家族（`/api/internal/*`），不加 probe 白名單（白名單＝放寬門）。
+**A 做法**：`app/api/video/reconcile` → `app/api/internal/video/reconcile`（git mv，route 自驗 key 不變）；events 拆 `lib/events/sync-response.ts`，`/api/tools/events/sync` 只留 admin、`/api/internal/events/sync` 驗 key；兩支 .sh 與 `.env.example` 改新路徑。閘：`lib/portal/__tests__/host-loopback-callers.test.ts` 掃 hetzner-phase1-core 下所有 `.sh` 的 `127.0.0.1:300x/...`，對真 middleware 跑，404 即紅（並斷言兩個已知呼叫者存在，防空掃）。
+**B 不變量**：被任何 WP 文章／頁面嵌入的影片不得離開 R2；「查不到」≠「沒人用」。
+**B 做法**：`lib/content/video/delete-guard.ts` `deleteUnreferencedVideo()`＝唯一刪片入口：全部 active wp_sites × posts/pages × `status=any&context=edit` 搜 `video/<dir>/`（原字＋percent-encoded，分頁 ≤20），raw 內容再比對；有引用 → 409 列文章；無憑證／HTTP 錯／無站／無 raw → 拒刪。`video/[id]`、`tools/designs`（畫廊實際呼叫）、`video/cleanup`（順修：R2 失敗仍刪 DB 列）改走它；邊界測試只准 delete-guard.ts 與 r2.ts 出現 `deleteVideoObjects`。
+**7393（操作者選②）**：備份 `post7393-before.json`（scratchpad）；只刪唯一 `wp:video` 區塊，文字保留；PATCH 200、status 仍 publish；公開頁 `r2.dev/video` 0 筆。
+**順帶**：Foundry catalog `--check` 原本就 drift（社群 manifest／products.ts 已提交未重產）→ `node scripts/sync-foundry-catalog.mjs` 重產，check PASS。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -X POST http://127.0.0.1:3002/api/video/reconcile (無 key) → 404；/var/log/reconcile-videos.log 10-20 06:45Z 起空回應 | exit=0 | ms=900
+- REALTEST_EVIDENCE: tool=SSH | cmd=curl -u app-pw soulfulexpression.org/wp-json/wp/v2/posts?search=感恩日記_改變人生的五分鐘習慣&status=any&context=edit → [(7393,'publish',True)]；pages 0 | exit=0 | ms=1500
+- REALTEST_EVIDENCE: tool=SSH | cmd=python3 PATCH posts/7393 content（刪 wp:video 區塊）→ 200；公開頁 grep r2.dev/video=0 | exit=0 | ms=3000
+- `npx tsc --noEmit` exit 0；`npx vitest run app/api/tools/designs app/api/video app/api/internal lib/content/video lib/portal lib/events lib/storage` 62 檔 274 測全過（新增 delete-guard 7、host-loopback 2、internal routes 4）。
+- 突變：腳本改回舊路徑 → host-loopback 2 測紅；delete-guard 拔「有引用就拒」→ 3 測紅；拔「掃描失敗就拒」→ 1 測紅；還原全綠。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/2m/0n -- Codex `reports/oracle/2026-10-23-partialreview-fe2a7020.md`。F1（prod .env 覆寫 `NEXT_ADMIN_EVENTS_SYNC_URL` 仍指舊路徑）實查不成立：`grep -c NEXT_ADMIN_EVENTS_SYNC_URL /root/lobster-phase1/.env`=0。F2（掃描與刪除間的 TOCTOU）成立但接受：WP 是外部系統，人工貼網址無法鎖；自動嵌入只發生在剛渲染完的新片，刪除是畫廊舊片，窗口數秒 → 列剩餘風險。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=api/video/reconcile|api/tools/events/sync|deleteVideoObjects | hits=6（audit doc 列、.env.example 註解、MODULE_MANIFEST、Foundry 產物已改；events page.tsx admin 呼叫保留、r2.ts 定義）
+
+**明早查（10-24 03:00 自動部署後）**：`sudo tail -2 /var/log/reconcile-videos.log` 應回 JSON（預期 `orphanUnattributable=2`）；畫廊刪一支被嵌入的影片應 409。
+
+**剩餘風險**：掃描與刪除之間的數秒 TOCTOU（Codex F2）；設計圖（非影片）被文章嵌入同類未擋；WP 搜尋若站上關閉 REST search 會一律拒刪（fail closed，可接受）；2 legacy 孤兒仍在。
+
+**rollback**：`git revert <本 commit>`（路由與腳本同 commit；sync-host-scripts 隨部署還原）；7393 用備份 JSON 的 raw 內容 PATCH 回。
 ## 2026-10-23（續8）自用帳戶 comp 權利由登記表每日補齊：0117 已套 prod，程式推 main（Claude）
 
 **觸發**：操作者「同意套用第二段」（續7 的 patch）。

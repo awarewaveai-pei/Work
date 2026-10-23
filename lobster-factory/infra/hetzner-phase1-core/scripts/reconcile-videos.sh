@@ -45,7 +45,7 @@ if [[ -z "${OPS_PROXY_SHARED_SECRET:-}" ]]; then
 fi
 
 OUT="$(curl -s -m 120 -X POST -H "x-ops-sync-key: ${OPS_PROXY_SHARED_SECRET}" \
-  http://127.0.0.1:3002/api/video/reconcile || echo '{"ok":false,"error":"curl_failed"}')"
+  http://127.0.0.1:3002/api/internal/video/reconcile || echo '{"ok":false,"error":"curl_failed"}')"
 echo "[${NOW_ISO}] ${OUT}" >> "${LOG_FILE}"
 
 # 從 JSON 取整數欄位。缺欄位一律當 -1（= 「沒量到」），**不當 0** —— 把「不知道」寫成

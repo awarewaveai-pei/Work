@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseWriteClient } from "@/lib/supabase-server";
-import { deleteVideoObjects } from "@/lib/storage/r2";
+import { deleteUnreferencedVideo } from "@/lib/content/video/delete-guard";
 import { videoObjectKey } from "@/lib/content/blocks/video-pipeline";
 import { readOpsRole } from "@/lib/ops-role";
 import { assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "@/lib/tenant-guard";
@@ -46,14 +46,14 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: "asset_has_no_url" }, { status: 422 });
   }
 
-  // Delete all format variants from the video bucket using prefix LIST (immune to format drift).
-  // Videos are in R2_VIDEO_BUCKET ("lobster-videos"), not the designs bucket.
-  // On R2 failure: abort — don't delete the DB row, let the caller retry (mirrors designs/route.ts).
-  const r2Result = await deleteVideoObjects(videoObjectKey(asset.object_url));
-  if (!r2Result.ok) {
-    const err = (r2Result as { ok: false; error: string }).error;
-    console.error("[video/id] R2 delete failed:", err);
-    return NextResponse.json({ ok: false, error: err }, { status: 502 });
+  // Refuses while any WordPress post/page still embeds the video (delete-guard.ts). On refusal or R2 failure
+  // the DB row stays, so the gallery still shows the video and the caller can retry.
+  const r2Result = await deleteUnreferencedVideo(videoObjectKey(asset.object_url));
+  if ("error" in r2Result) {
+    console.error("[video/id] video delete refused:", r2Result.error);
+    const references = "references" in r2Result ? r2Result.references : undefined;
+    return NextResponse.json({ ok: false, error: r2Result.message, code: r2Result.error, references },
+      { status: r2Result.error === "video_in_use" ? 409 : 502 });
   }
 
   // Delete DB record only after R2 succeeds (prevents orphan → reconcile re-insert loop).

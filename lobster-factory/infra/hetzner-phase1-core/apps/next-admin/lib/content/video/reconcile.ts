@@ -6,7 +6,7 @@
  * 不在畫廊）。本對帳定期掃 R2 video bucket，把缺 media_assets 的補上 → 自癒**任何**孤兒成因
  * （關頁 / 容器重啟 / 漏記）。idempotent（依 object_key 去重）；由 SG cron 每 ~15 分觸發。
  *
- * 零新攻擊面：不開新對外端點機制（/api/video/reconcile 走既有 x-ops-sync-key middleware 閘）；
+ * 零新攻擊面：不開新對外端點機制（/api/internal/video/reconcile，route 自驗 x-ops-sync-key）；
  * 不加 EU↔SG 反向耦合（不在 EU 放任何 SG 憑證）；重用 recordVideoAsset（記錄邏輯單一真相）。
  */
 import { getSupabaseWriteClient } from "../../supabase-server";

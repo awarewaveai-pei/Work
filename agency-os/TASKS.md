@@ -272,6 +272,7 @@
   - **一句話**：草稿審核「重新生成」單張圖會 502（HTML not JSON），跟同日修好的 remotion-render 502（見 WORKLOG 2026-09-11）症狀像但 code path 不同——這條走 `buildSceneAsset`→`generateTarotImage`（Flux/Replicate），非 remotion-service。
   - **現在到哪**：只確認「reproducible，非本輪修的兩個 env 缺漏能解釋」，未深查。操作者明確說過重試會燒真錢，故本輪未再重現測試。
   - **下一步**：比照 remotion-render 的查法——先查 `REPLICATE_API_TOKEN`／`PEXELS_API_KEY` 是否真的接進 `docker-compose.yml`（同一批 env 區塊，見 `docker-compose.yml:381-399`），SSH 直測 Replicate API 是否用同一把 token 能通。
+  - **2026-10-23**：`docker exec lobster-next-admin printenv` → `REPLICATE_API_TOKEN`／`PEXELS_API_KEY` 皆 SET；env 缺漏假說排除，剩一次付費真 UI 重現（需操作者同意花錢）。
   - **完成定義**：草稿審核頁「重新生成」單張圖成功，真實 UI 操作驗證（非只測 API）。
   - **證據**：`agency-os/WORKLOG.md` 2026-09-11「remotion-render 502」條目 [剩餘風險] ①。
 
@@ -656,13 +657,15 @@
   - **完成定義**：人工在 snippet 裡刪掉一段 CF 網段後跑該腳本必須 FAIL（證明不是永遠綠）；還原後回 PASS；且 AO-RESUME §1 會點名 verdict。
   - **檔案現況**：`/etc/nginx/conf.d/cloudflare-realip.conf` 檔頭已註明來源 URL、抓取時間戳與過期風險說明。
 
-- [ ] **【2026-08-26 開出｜🔴 客戶站已破圖｜刪影片會靜默弄破已發布的文章】`video/[id]` DELETE 無引用檢查** — **現行損害（實測）**：Soulful Expression 上線文章 `感恩日記：改變人生的五分鐘習慣`（post id 7393，`https://soulfulexpression.org/insights/general/...`）嵌著 `https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/感恩日記_改變人生的五分鐘習慣/16x9.mp4`，該物件 **HTTP 404**（陰性對照：仍存在的 `三個習慣_...` 回 200）。客戶頁面上是一個壞掉的影片。
+- [x] **【✅ 2026-10-23 治本｜2026-08-26 開出｜🔴 客戶站已破圖｜刪影片會靜默弄破已發布的文章】`video/[id]` DELETE 無引用檢查** — **現行損害（實測）**：Soulful Expression 上線文章 `感恩日記：改變人生的五分鐘習慣`（post id 7393，`https://soulfulexpression.org/insights/general/...`）嵌著 `https://pub-bd79a1c3b4554025bd92a6192b032427.r2.dev/video/感恩日記_改變人生的五分鐘習慣/16x9.mp4`，該物件 **HTTP 404**（陰性對照：仍存在的 `三個習慣_...` 回 200）。客戶頁面上是一個壞掉的影片。
   - **2026-09-05 本機修復已暫存、未部署**：`0065_media_production_ledger.sql` 新增 reference／coverage 台帳與 DB delete restriction；`video/[id]`、`video/cleanup` 在台帳缺失、掃描失敗或尚有 draft/active reference 時 fail closed；`video/embed-to-wp` 在改 WordPress 前先建 draft reference，成功後才啟用。尚缺隔離資料庫演練、正式套用、既有 WordPress 引用回填與壞片的個案處置，故本任務保持未完成。
   - **成因不是 `video/cleanup`**：2026-08-26 實查 SG crontab，`video/cleanup` **根本沒有 cron entry，從未執行過**（等於一段沒接線的程式碼，本身也該處理）。
   - **真正的類別**：`app/api/video/embed-to-wp/route.ts:60,65` 把**裸 R2 URL** 寫進 WP 文章內容；`app/api/video/[id]/route.ts:52` 的 `deleteVideoObjects()` 是 **LIST 整個 `video/<dir>/` 後全刪**，且**完全不檢查該影片是否正被任何已發布文章引用**。兩者之間沒有任何對帳。⇒ **從畫廊刪任何一支影片，都可能靜默弄破一個或多個客戶的線上頁面，而且不會有任何訊息。**
   - **不變量**：「刪除一個公開資產」與「該資產被外部內容引用」必須在同一個決策裡。現在是兩個互不知情的系統。
   - **修法方向**（需設計）：① 刪除前掃已知 wp_sites 的文章內容找該 URL，有命中就擋下並列出文章 ② 或改為「先把文章裡的引用換掉／移除，再刪物件」 ③ 或根本不要寫裸 URL 進文章，改寫成指向本站的 stable redirect，讓刪除可以優雅降級。**⚠️ 別只加一句警告就當修好** —— 這是不可逆操作對外部系統的影響，要嘛擋住要嘛連帶處理。
-  - **另需操作者決定**：那篇 Soulful 文章現在就是壞的。要 ① 重新生成同主題影片並補回 ② 直接把壞掉的影片區塊從文章移除 ③ 先不動。**這是客戶已發布的內容，我不會自行修改。**
+  - **2026-10-23 VBC**：仍未修。`app/api/video/[id]/route.ts:52` 仍直接 `deleteVideoObjects`，無引用檢查；上一行說的「0065 reference ledger」從未進 main（實際 `0065_media_production_persistence.sql` 是 QA／release 四表，無 reference 表）。post 7393 仍 publish、仍嵌 404 影片（curl r2.dev → 404）。
+  - **✅ 2026-10-23 結案**：唯一刪片入口 `lib/content/video/delete-guard.ts` `deleteUnreferencedVideo()`：掃全部 active wp_sites 的 posts＋pages（`status=any`、`context=edit` raw），任何一篇含 `video/<dir>/`（原字／percent-encoded）→ 409 列出文章；掃不到（無憑證／HTTP 錯／無站）→ 拒刪。`video/[id]`、`tools/designs`（畫廊實際用的）、`video/cleanup` 三處改走它；`deleteVideoObjects` 只准 delete-guard 呼叫（`__tests__/delete-guard.test.ts` 邊界測試）。真 WP 唯讀實測該查詢命中 7393。post 7393 操作者選②：只刪 `wp:video` 區塊、文字保留（PATCH 200，公開頁 0 個 r2.dev/video）。上線＝2026-10-24 03:00 自動部署。WORKLOG 2026-10-23「影片刪除引用閘＋loopback cron」。
+  - ~~**另需操作者決定**：那篇 Soulful 文章現在就是壞的。~~（2026-10-23 已處理，見上）要 ① 重新生成同主題影片並補回 ② 直接把壞掉的影片區塊從文章移除 ③ 先不動。**這是客戶已發布的內容，我不會自行修改。**
 
 - [ ] **【2026-09-05 開出｜P0/P1｜Media Production LEGO Platform】統一影片、短劇、字幕、實拍 QA 與網站／社群交付** — 正本：[`docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md`](docs/video_generator/MEDIA_PRODUCTION_LEGO_PLATFORM_PLAN.md)。
   - **✅ 文件、契約與 P0 reference/auth safety（工作區，未部署）**：Timeline v1 驗證器、fail-closed media capability catalog、0065 的 artifact/run/review/release/delivery/reference/coverage ledger，以及 video deletion/WordPress embed reference guard 均已建立。Remotion 以 `RENDER_AUTH_TOKEN` fail-closed 啟動，Next Admin 使用同一 token；Remotion 升至 4.0.520、Express 4.22.2 後 production audit 為 0 critical／0 high。focused Vitest 15/15、next-admin `tsc --noEmit` 與 Remotion build 均通過。只有 `media.timeline_validate` 為 `ACTIVE`；其他能力保持 `PROPOSED`，不得繞過註冊執行。
@@ -752,6 +755,8 @@
   - ③ 一起做】R2 影片 bucket 的 2 個 legacy 目錄清理** — 2026-08-26 實測 `lobster-videos`：11 物件 / 2 目錄，皆為 2026-08-25 之前的舊格式（無 org 前綴）→ `parseOrgPrefixFromDir` 回 null → reconcile 每輪 `skippedLegacy=2` 且**永遠不會被補記**（fail-closed 是對的，但它讓計數器永遠非零）。
   - **要做的是逐一確認歸屬**（比對 `media_assets` 既有列 / 檔名 / 建立時間）→ 補 `media_assets` 列或刪除物件 → baseline 歸零 → 才有資格接告警。
   - **注意**：另一項實測 `NEW_ORG_PREFIX=0` 代表 2026-08-25 部署 `1d15e867` 之後**prod 未曾生成過任何影片**，該批新程式碼路徑至今未被真實流量執行過。
+  - **2026-10-23 實測（未完成）**：`/var/log/reconcile-videos.log` 最後一筆有效值 2026-10-20 06:30Z＝`checked=5 alreadyRecorded=3 orphanUnattributable=2 unattributableByMissingPrefix=2`（2 legacy 仍在）。之後每輪空回應、state=broken：產品門 probe door（`lib/portal/doors.ts:49`）只放 `GET /`、`GET /api/ops/summary`（`middleware.ts:278-283`），`POST /api/video/reconcile` 被 404 → 偵測器啞了。`sync-events-monthly.sh` 同類（且 host 未裝該 cron）。
+  - **2026-10-23 loopback 已修**：兩支 cron 端點搬到 `/api/internal/video/reconcile`、`/api/internal/events/sync`（matcher 排除、route 自驗 key）；`lib/portal/__tests__/host-loopback-callers.test.ts` 掃 host `.sh` 的 127.0.0.1:3002 路徑，被真 middleware 404 即紅。2026-10-24 03:00 部署後讀 `/var/log/reconcile-videos.log` 確認回 JSON；本項（2 legacy 孤兒）仍待逐一確認歸屬。
 
 #### E. ▶️ 可直接做 — 治理與機械閘
 
@@ -1011,7 +1016,7 @@
 
 - [ ] **【未開始｜先預留】Composable AI Commerce OS** — 藍圖已吸收為參考素材（`agency-os/docs/Composable AI Commerce OS/`，含 Master Plan / Implementation Roadmap / LEGO Documentation Pack；absorbed via commit `97cdea3ed`）。操作者 2026-09-05 明示「之後要做，先預留」，**目前不動工**，勿主動排入排程；待操作者明示啟動再展開任務拆解。
 
-- [ ] **【Phase 1 全完成 2026-10-14｜剩 ops：agency GEMINI_API_KEY 換發】Cold Outreach Workbench — 冷開發完整鏈** — SSOT：[`agency-os/docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（三份草稿已整合並 superseded）；實作排程：[`COLD_OUTREACH_PHASE1_BUILD_PLAN.md`](docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md)（T1–T12 依賴排序）。
+- [x] **【✅ 2026-10-23 VBC：GEMINI key 已換發（vault=env，models API 200）｜Phase 1 全完成 2026-10-14】Cold Outreach Workbench — 冷開發完整鏈** — SSOT：[`agency-os/docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md`](docs/cold_email/COLD_OUTREACH_WORKBENCH_INTEGRATED_SPEC_v1.md)（三份草稿已整合並 superseded）；實作排程：[`COLD_OUTREACH_PHASE1_BUILD_PLAN.md`](docs/cold_email/COLD_OUTREACH_PHASE1_BUILD_PLAN.md)（T1–T12 依賴排序）。
   - **已拍板決策**：代操冷信用客戶 Gmail / 名單你幫找 / 訂閱制 / 不用 SES / schema prefix `co_`。
   - **架構對齊**：org-tenant + **service-role RLS + ops-role RBAC**（已驗證現況 §B0.1，runtime 非 Clerk；賣的 per-login 隔離留 Phase 5）；暖層走既有 wp-bridge（+小擴充 FluentCRM contact/tag endpoint，非新建 connector）；暖信走客戶 FluentSMTP 或 Brevo free；self-host Supabase/Trigger.dev/n8n = $0；**Free-Plan Router + 客戶 BYO-key 乘數**為第一級設計（PART H）。
   - **關鍵路徑**：T1 schema → T2 module 殼 → T4 Connector/Router/BYO-key → T5 Inbox → T6 AI scoring → T8 Message gen(Cold Gate) → T9 Review → T10 Gmail draft(⚠High，等 go-ahead)。

@@ -2508,6 +2508,27 @@
           "limitKind": "QUOTA",
           "buyout": true,
           "billing": "contract"
+        },
+        {
+          "feature_key": "social.auto-reply",
+          "name": "Meta 自動回覆",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "social.ads",
+          "name": "Meta 廣告管理",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
+        },
+        {
+          "feature_key": "social.meta",
+          "name": "Meta 資產設定",
+          "limitKind": "QUOTA",
+          "buyout": true,
+          "billing": "contract"
         }
       ],
       "accessChannels": [

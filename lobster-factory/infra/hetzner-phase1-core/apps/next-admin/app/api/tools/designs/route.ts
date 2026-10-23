@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import sharp from "sharp";
 import { canCreateAiImageJob, resolveOpsRole } from "../../../../lib/ops-role";
 import { getSupabaseReadClient, getSupabaseWriteClient } from "../../../../lib/supabase-server";
-import { buildDesignKey, deleteDesignObject, deleteVideoObjects, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
+import { buildDesignKey, deleteDesignObject, isR2Configured, parseImageDataUrl, putDesignObject } from "../../../../lib/storage/r2";
+import { deleteUnreferencedVideo } from "../../../../lib/content/video/delete-guard";
 import { decodeCursor, listDesigns, type SortOrder, type TimeRange } from "../../../../lib/studio/designs-list";
 import { effectiveOrgId, assertOrgAccess, OrgAccessError, toOrgAccessResponse } from "../../../../lib/tenant-guard";
 
@@ -305,12 +306,21 @@ export async function DELETE(request: Request) {
   // images in R2_DESIGNS_BUCKET ("lobster-designs"). Using deleteDesignObject for videos
   // was a no-op (video not in designs bucket → 404 treated as success), leaving the file
   // in the video bucket so the reconcile cron would re-insert the media_assets row.
-  const r2Result = asset.mime_type?.startsWith("video/")
-    ? await deleteVideoObjects(asset.object_key)
-    : await deleteDesignObject(asset.object_key);
-  if (!r2Result.ok) {
-    console.error("[designs] R2 delete failed:", (r2Result as { ok: false; error: string }).error);
-    return NextResponse.json({ ok: false, error: (r2Result as { ok: false; error: string }).error }, { status: 502 });
+  // A video still embedded in a WordPress post/page is refused (delete-guard.ts); the row stays.
+  if (asset.mime_type?.startsWith("video/")) {
+    const v = await deleteUnreferencedVideo(asset.object_key);
+    if ("error" in v) {
+      console.error("[designs] video delete refused:", v.error);
+      const references = "references" in v ? v.references : undefined;
+      return NextResponse.json({ ok: false, error: v.message, code: v.error, references },
+        { status: v.error === "video_in_use" ? 409 : 502 });
+    }
+  } else {
+    const r2Result = await deleteDesignObject(asset.object_key);
+    if (!r2Result.ok) {
+      console.error("[designs] R2 delete failed:", (r2Result as { ok: false; error: string }).error);
+      return NextResponse.json({ ok: false, error: (r2Result as { ok: false; error: string }).error }, { status: 502 });
+    }
   }
 
   // Remove row from media_assets.
