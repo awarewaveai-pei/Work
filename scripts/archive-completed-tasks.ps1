@@ -6,7 +6,10 @@
 # AO-CLOSE step: moves top-level "- [x]" blocks (the line + every deeper-indented child line) out of
 # agency-os/TASKS.md "### 未完成" into the top of "## Next — 已完成歷程（查詢用）" under
 # "### YYYY-MM-DD — AO-CLOSE 自動歸檔". Indented "  - [x]" items inside open parents are NOT moved.
-# Sub-headings (#### ...) never move. Lines are moved verbatim (line count grows by header/blank lines only).
+# A checked parent that still holds open "[ ]" children is split: each open child (with its deeper lines) is
+# promoted in place to a top-level "- [ ]" followed by "  - 出自：<parent>", and the parent with its other
+# lines is archived with a note that its open children stayed behind. No [x] parent stays in 未完成.
+# Sub-headings (#### ...) never move. Lines are moved verbatim apart from the dedent and the two added notes.
 # Also gates duplicate open tasks (only two conservative rules, fuzzy matching is deliberately absent):
 #   (1) one handoffs/<file> referenced by >=2 open "- [ ]" lines in 未完成
 #   (2) normalized-identical text on >=2 open "- [ ]" lines in 未完成
@@ -86,8 +89,13 @@ if ($dups.Count -gt 0) {
 
 # --- collect top-level [x] blocks inside 未完成
 $rxDone = New-Object System.Text.RegularExpressions.Regex('^- \[x\]\s', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-$moveIdx = [System.Collections.Generic.List[int]]::new()
+$rxOpenChild = [regex]'^(?<ind>[ \t]+)- \[ \]'
+$today = (Get-Date).ToString("yyyy-MM-dd")
+$moved = [System.Collections.Generic.List[string]]::new()
+$stayAt = @{}     # block start index -> lines left in place (promoted open children)
+$endAt = @{}      # block start index -> exclusive end index
 $blocks = 0
+$split = 0
 $i = $openStart + 1
 while ($i -lt $archIdx) {
     if (-not $rxDone.IsMatch($lines[$i])) { $i++; continue }
@@ -108,32 +116,61 @@ while ($i -lt $archIdx) {
         }
         break
     }
-    # A checked parent that still holds an open child is not done: leave it in place, say so.
-    $openChild = @($block | Where-Object { $lines[$_] -match '^[ \t]+- \[ \]' })
-    if ($openChild.Count -gt 0) {
-        Write-Host ("archive-completed-tasks: kept line {0} (checked, but open child at line {1})" -f ($block[0] + 1), ($openChild[0] + 1)) -ForegroundColor Yellow
-        continue
+    # Split off open children: each "[ ]" line plus every following line indented deeper than it.
+    $title = ([regex]::Replace($lines[$block[0]], '^- \[x\]\s+', '', 'IgnoreCase')).Replace('**', '').Trim()
+    if ($title.Length -gt 60) { $title = $title.Substring(0, 60) + '…' }
+    $stay = [System.Collections.Generic.List[string]]::new()
+    $b = 0
+    while ($b -lt $block.Count) {
+        $ln = $lines[$block[$b]]
+        $m = $rxOpenChild.Match($ln)
+        if (-not $m.Success) { $moved.Add($ln); $b++; continue }
+        $d = $m.Groups['ind'].Value.Length
+        $sub = [System.Collections.Generic.List[string]]::new()
+        $sub.Add($ln); $b++
+        while ($b -lt $block.Count) {
+            $nx = $lines[$block[$b]]
+            if ($nx.Trim().Length -gt 0 -and ($nx.Length - $nx.TrimStart(' ', "`t").Length) -le $d) { break }
+            $sub.Add($nx); $b++
+        }
+        while ($sub[$sub.Count - 1].Trim().Length -eq 0) { $sub.RemoveAt($sub.Count - 1) }
+        foreach ($s in $sub) {
+            if ($s.Trim().Length -eq 0) { $stay.Add('') }
+            elseif ($s.Substring(0, $d).Trim().Length -eq 0) { $stay.Add($s.Substring($d)) }
+            else { $stay.Add($s.TrimStart()) }
+        }
+        $stay.Add(("  - 出自：{0}（母項已完成，{1} 歸檔）" -f $title, $today))
+    }
+    if ($stay.Count -gt 0) {
+        $moved.Add(("  - 未完成子項已拆成獨立項，留在未完成區（{0}）" -f $today))
+        $split++
+        Write-Host ("archive-completed-tasks: split line {0} (checked parent archived, open children promoted in place)" -f ($block[0] + 1)) -ForegroundColor Yellow
     }
     $blocks++
-    foreach ($k in $block) { $moveIdx.Add($k) }
+    $stayAt[$block[0]] = $stay
+    $endAt[$block[0]] = $block[$block.Count - 1] + 1
 }
 
-if ($moveIdx.Count -eq 0) {
+if ($blocks -eq 0) {
     Write-Host "archive-completed-tasks: nothing to archive (0 top-level [x] blocks in 未完成)." -ForegroundColor DarkGray
     exit 0
 }
 
 if ($DryRun) {
-    Write-Host ("archive-completed-tasks: DRY RUN would move {0} blocks / {1} lines (file {2} lines)." -f $blocks, $moveIdx.Count, $lines.Count) -ForegroundColor Yellow
+    Write-Host ("archive-completed-tasks: DRY RUN would move {0} blocks / {1} lines, {2} split (file {3} lines)." -f $blocks, $moved.Count, $split, $lines.Count) -ForegroundColor Yellow
     exit 0
 }
 
-$moved = [System.Collections.Generic.List[string]]::new()
-foreach ($ix in $moveIdx) { $moved.Add($lines[$ix]) }
-for ($n = $moveIdx.Count - 1; $n -ge 0; $n--) { $lines.RemoveAt($moveIdx[$n]) }
-$archIdx -= $moveIdx.Count   # every removed line sat before the archive anchor
+$rebuilt = [System.Collections.Generic.List[string]]::new()
+$k = 0
+while ($k -lt $lines.Count) {
+    if ($stayAt.ContainsKey($k)) { $rebuilt.AddRange($stayAt[$k]); $k = $endAt[$k]; continue }
+    $rebuilt.Add($lines[$k]); $k++
+}
+$lines = $rebuilt
+$archIdx = @(for ($n = 0; $n -lt $lines.Count; $n++) { if ($lines[$n].TrimEnd() -ceq $archiveAnchor) { $n } })[0]
 
-$header = "### {0} — AO-CLOSE 自動歸檔" -f (Get-Date).ToString("yyyy-MM-dd")
+$header = "### {0} — AO-CLOSE 自動歸檔" -f $today
 $p = $archIdx + 1
 while ($p -lt $lines.Count -and $lines[$p].Trim().Length -eq 0) { $p++ }
 if ($p -lt $lines.Count -and $lines[$p].TrimEnd() -ceq $header) {
@@ -149,5 +186,5 @@ if ($p -lt $lines.Count -and $lines[$p].TrimEnd() -ceq $header) {
 }
 
 Write-RepoTextFile -Path $tasksPath -Content (($lines -join "`n") + "`n") -Atomic
-Write-Host ("archive-completed-tasks: moved {0} blocks / {1} lines to the top of the archive section." -f $blocks, $moved.Count) -ForegroundColor Green
+Write-Host ("archive-completed-tasks: moved {0} blocks / {1} lines to the top of the archive section ({2} split)." -f $blocks, $moved.Count, $split) -ForegroundColor Green
 exit 0

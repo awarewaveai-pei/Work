@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-23（續23）TASKS.md 歸檔：已完成母項不再卡在未完成區；危機訊息驗收打勾
+
+**觸發**：操作者「把 tasks.md 已打勾的刪除」→ 改口「移到已完成歷程區，保留紀錄」→「檢查還有沒有打勾沒移的，處理好」→「改 archive-completed-tasks.ps1 同樣拆法，附測試」＋「危機訊息驗收要打勾，類似的都打勾」。
+
+**根因**：`scripts/archive-completed-tasks.ps1` 對「母項 [x]、仍有 [ ] 子項」只印一行黃字就留原位 → 每次 AO-CLOSE 都留下已完成母項，未完成區永遠清不乾淨（這次手動清時發現 3 個：Messenger/Chatwoot、舊 EU origin、Cognitive OS Phase 5）。
+
+**做法**
+- C1 TASKS.md 整理（commit `edf32f8ba`、`c9e4f0b1c`）：未完成區 268 塊、Backlog 3 塊 [x] 移到兩個已完成歷程區；巢狀 [x] 加「原屬：」；混合母項拆開（母項歸檔＋註記，[ ] 子項升頂層＋「出自：」）。行多重集比對 0 行遺失。
+- C2 `archive-completed-tasks.ps1`：同樣拆法進腳本（同一不變量：未完成區不留頂層 [x]）。[ ] 子項裡的 [x] 孫項跟著子項走（沿用「open 母項內的 [x] 不搬」既有規則）。
+- C3 `tests/archive-completed-tasks.test.ps1`（新）：A1 一般搬移、A2 拆分（含孫項、出自行、位置）、A3 DryRun／無事可做不寫檔。
+- C4 「危機訊息正式環境驗收」依操作者指示打勾並歸檔；內文「剩」的那一步（真人接手中回一句 0104 上線後實測）拆成新 [ ] 項，註明出自。其餘含 ✅／完成字樣的 [ ] 逐條讀過，皆有實際「剩」的工作（例：Auto-Repair M2/M4 依 handoff 從未動工），不打勾。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=powershell -File tests/archive-completed-tasks.test.ps1 → 17 passed 0 failed；突變：換回 HEAD 版腳本 → 7 failed exit 1，還原 → 全綠；真檔 `archive-completed-tasks.ps1` 對 agency-os/TASKS.md 實跑 → moved 1 block / 2 lines（危機訊息項） | exit=0 | ms=9000
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/4m/0n -- external oracle = Codex CLI（`reports/oracle/2026-10-23-partialreview-4cb88fbf.md`、`-b3914103.md`）。R1：m1 [x] 孫項留未完成區＝符合既有巢狀規則，非 bug，測試改宣稱「無頂層 [x]」並明測孫項；m2 測試跨午夜日期競態 → 改讀腳本寫的標題日期、接受前後兩日。R2：m3 拆分會造出重複 open 項 → 駁回：重複閘 `scripts/archive-completed-tasks.ps1:55` `^\s*-\s+\[ \]` 已含縮排項，拆分前即擋；m4 測試檔未追蹤 → 本 commit 一起提交。
+- BUGHUNT_DONE: scope=agency-os,scripts,tests,.claude | grep=`archive-completed-tasks|open child|checked, but open` | hits=1（`WORKLOG.md` 續 C8 一行描述舊行為＝歷史紀錄，不改）
+
+**rollback**：`git revert <本 commit>`（腳本回到「留原位」行為；TASKS.md 內容不受影響）。
 ## 2026-10-23（續22）產品門階段 0：門禁兩測＋共用門外框＋/ops/products（ADR 017 順序 8）（Claude）
 
 **觸發**：操作者選方案 B，先做階段 0。
