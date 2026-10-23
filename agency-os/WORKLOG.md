@@ -1,4 +1,36 @@
 # Worklog
+## 2026-10-23（續49）tarot、studio 產品門上線：DNS、憑證 13 SAN、主機 nginx、lobster-nginx 共用門區塊、enabled（Claude）
+
+**觸發**：操作者「Go ahead: after the attribution session finishes, take the tarot door live (DNS, certificate, host nginx, lobster-nginx, enabled), then studio, with smoke tests」。歸屬 session 已推 `4fc6bacf4`（讀過 `grant.ts` diff：客戶組織只經 `actorFor`；Codex R2 無發現）。
+
+**門上線前查到的兩件事**
+- C1 studio 門會壞：`StudioWorkbench` 的邊緣效果預覽讀 `/edge-masks/*.png`（`lib/studio/edge-mask.ts:155`），而門的 nginx 擋掉 matcher 跳過的路徑（含 `edge-masks/`、`tarot-frames`）。不變量：門只擋「不經門判斷、且會給出非公開內容」的路徑；公開靜態圖檔（無資料、app 網域本就免登入可讀）每扇門都給。→ deny 只剩 `intake|api/auth|api/webhooks|api/internal|vector-editor.html`；守衛測試 `DOOR_NEEDS` 加兩個靜態資料夾並驗它們保留。
+- C2 studio 門上的員工頁連結：「查看 My Designs」（`/tools/designs`）與「快速編輯」（`openInCanvas` → `/tools/canvas`）是 design 產品的員工頁，門上 404。→ 新 `app/DoorContext.tsx`（`ProductDoorShell` 提供「在門上」），`StudioWorkbench` 在門上隱藏兩者。tarot 頁無員工連結、框線為程式繪製（`renderPrintCard.ts` 不讀 `/tarot-frames`）。
+
+**修改**
+- `nginx/default.conf`：social 門區塊改為所有 next-admin 門共用（`server_name social tarot studio`）；新門＝加一個主機名。守衛測試 `middleware-portal-guards.test.ts` 改為在 server_name 清單中找主機。
+- `nginx/system-sites/sg-stack.aware-wave.com.conf`：80／443 兩個 server_name 加 tarot、studio。
+- `lib/portal/products.ts`：tarot、studio 去 `enabled: false`（只提交這兩行；同檔 `ops/billing` 一行是 payments-4a session 進行中，不帶）。
+- `app/DoorContext.tsx`（新）、`app/ProductDoorShell.tsx`、`app/(shell)/tools/studio/StudioWorkbench.tsx`。
+
+**上線步驟（prod）**
+- Cloudflare：`tarot` A → 145.239.195.47 proxied（record `62c2f12bdb7d426a29f93f09da6920a6`）；`studio` 記錄原本就在（同 IP、proxied），未動。
+- 主機 nginx：上線前比對主機檔＝repo HEAD、lobster-nginx＝repo HEAD（無漂移）；`safe-infra-patch.sh host-nginx … app.aware-wave.com` OK（備份 `_etc_nginx_sites-available_sg-stack.aware-wave.com.safe-patch-20261023-132513`）。
+- 憑證：`certbot certonly --cert-name aware-wave.com --nginx --expand`（13 網域）→ SAN 含 tarot、studio，notAfter 2027-01-21；`00-default-placeholder` md5 前後相同；`nginx -t`＋reload。
+- lobster-nginx：`safe-infra-patch.sh nginx` OK（備份 `default.conf.bak.safe-patch-20261023-132557`）。
+- 部署前公網：tarot／studio 404（舊程式未開門，TLS 正常）、social `/`→307、social `/api/internal/x`→404。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）＋ npx vitest run lib/portal lib/__tests__/middleware-portal-guards.test.ts lib/__tests__/middleware-door.test.ts（77 passed；guard 測試涵蓋 social、tarot、studio 三個主機）；全套兩次各 3–4 個 5s 逾時（batch-store-durable、social routes、reconcile-classify；本機 ~210 個 node 程序），三檔單跑 40/40、無斷言失敗 | exit=0 | ms=56371
+- 突變：共用門 deny 拿掉 `api/internal` → 「social.aware-wave.com must refuse /api/internal」紅；還原綠。
+- REALTEST_EVIDENCE: tool=SSH | cmd=safe-infra-patch host-nginx OK；certbot expand → 13 SAN；safe-infra-patch nginx OK | exit=0 | ms=35000
+- REVIEW_DONE: critic=Deep | verdict=pass | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-23-partialreview-75fd6bd3.md` F1「自動部署只 rsync apps/，nginx 兩處不會跟著上」：成立但已處理——本次在部署程式前已用 `safe-infra-patch.sh` 套主機 nginx 與 lobster-nginx（上列）。
+  - external oracle = Codex CLI (codex exec -s read-only), not self-description
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=tarot-frames\|edge-masks/\|server_name social.aware-wave.com; | hits=8（edge-mask.ts／test 為素材本身、middleware matcher、守衛測試與 nginx 註解＝本次；ADR 018 §2「只留 _next、favicon、/login」已改）
+
+部署與公網煙霧測試見下一條。
+
+**rollback**：程式 `sg-deploy` 回前一版；lobster-nginx 用 `default.conf.bak.safe-patch-20261023-132557`＋`safe-infra-patch.sh nginx`；主機 nginx 用上列備份＋`safe-infra-patch.sh host-nginx`；DNS 刪 tarot record `62c2f12b…`；憑證不必回。
 ## 2026-10-23（續47）塔羅「都沒改善」查因：舊分頁跑舊程式、重整後找不到批次、數量重複描述；修四項（Claude）
 
 **觸發**：操作者 20:07 跑背景批次 e8486f5f、20:16 載入，回報無框、沒進設計、數量仍錯。

@@ -157,14 +157,16 @@ describe("product door (ADR 018): its page prefix answers only on its own host, 
 });
 
 // Paths the matcher skips never reach the door check, so each product door's nginx block must refuse them itself
-// (Codex 2026-10-15 F1). A door may keep only what every page needs: Next assets, the favicon and /login.
+// (Codex 2026-10-15 F1). A door may keep only what every page needs: Next assets, the favicon, /login and the public
+// static image folders (no data; served without login on the app host as well).
 describe("product door nginx block refuses every path the middleware matcher skips", () => {
-  const DOOR_NEEDS = new Set(["_next/static", "_next/image", "favicon.ico", "login"]);
+  const DOOR_NEEDS = new Set(["_next/static", "_next/image", "favicon.ico", "login", "tarot-frames", "edge-masks/"]);
   const skipped = /\(\?!([^)]*)\)/.exec(config.matcher[0])![1].split("|").filter((p) => !DOOR_NEEDS.has(p));
   const conf = readFileSync(path.join(__dirname, "../../../../nginx/default.conf"), "utf8");
 
   it.each(servedNextAdminProducts().map((p) => [productHost(p, {})]))("%s", (host) => {
-    const start = conf.indexOf(`server_name ${host};`);
+    // one block may serve several doors: find the server_name line that lists this host
+    const start = new RegExp(`server_name[^;\\n]*\\s${host.replace(/\./g, "\\.")}[\\s;]`).exec(conf)?.index ?? -1;
     expect(start, `no server block for ${host} in nginx/default.conf`).toBeGreaterThan(-1);
     const block = conf.slice(start, conf.indexOf(String.fromCharCode(10) + "}", start));
     // run nginx's own pattern (PCRE; this subset reads the same in JS) against real paths, not its token names
@@ -186,7 +188,8 @@ describe("product door nginx block refuses every path the middleware matcher ski
       expect(rejects(bad), `${host} must reject ${bad}`).toBe(true);
     }
     const kept = ["/", "/social", "/social/x", "/api/social/brands", "/login", "/_next/static/x.js", "/favicon.ico",
-      "/login?next=%2F", "/login?next=%2Fsocial%2Fx", "/_next/image?url=%2F_next%2Fstatic%2Fa.png&w=64", "/.well-known/x"];
+      "/login?next=%2F", "/login?next=%2Fsocial%2Fx", "/_next/image?url=%2F_next%2Fstatic%2Fa.png&w=64", "/.well-known/x",
+      "/edge-masks/torn.png", "/tarot-frames/gold.png"];
     for (const k of kept) {
       expect(refuses(k.split("?")[0]) || rejects(k), `${host} must keep ${k}`).toBe(false);
     }

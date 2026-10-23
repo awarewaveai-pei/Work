@@ -25,6 +25,7 @@ import { tabStyle, chipStyle, actionPill, ghostBtn } from "@/components/tools/pa
 import ImageEditPromptPanel from "@/components/tools/ImageEditPromptPanel";
 import { openInCanvas } from "@/components/tools/canvas-handoff";
 import { usePaidFeatures } from "@/lib/entitlements/use-paid-features";
+import { useOnDoor } from "@/app/DoorContext";
 import { buildSemanticFilename, buildSemanticBase, type SemanticFileMeta } from "@/lib/studio/semantic-filename";
 import type { MockupView } from "@/lib/studio/printful-mockup";
 import {
@@ -386,6 +387,8 @@ export default function StudioWorkbench() {
   // Culture/trending AI is back-office (ops.cheap-json): an account refused it (a customer on the studio door) keeps the
   // free curated culture lists and never sees a button that would only answer 403.
   const liveAi = usePaidFeatures().canUse("ops.cheap-json");
+  // My Designs and the canvas editor are the design product's staff pages; on the studio door they would 404.
+  const onDoor = useOnDoor();
   const [selectedModels, setSelectedModels] = useState<Set<StudioModel>>(new Set<StudioModel>(["flux-schnell"]));
   const [productType, setProductType] = useState("tshirt");
   const [theme, setTheme] = useState("");
@@ -1623,7 +1626,7 @@ export default function StudioWorkbench() {
                 <button className="btn-secondary" onClick={() => downloadImage(img, m)}>PNG下載</button>
                 <button className="btn-secondary" onClick={() => downloadImageWebP(img, m)}>WebP下載</button>
                 {activeResult.seed != null && <span style={{ fontSize: 12, opacity: 0.6 }}>seed {activeResult.seed}</span>}
-                {saveState === "saved" && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs</a>}
+                {saveState === "saved" && !onDoor && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs</a>}
                 {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>存入失敗</span>}
               </div>
 
@@ -1697,13 +1700,13 @@ export default function StudioWorkbench() {
               )}
 
               <div style={{ paddingTop: 10, borderTop: "1px solid var(--border)" }}>
-                <button
+                {!onDoor && <button
                   className="btn-secondary"
                   style={{ width: "100%", marginBottom: 6 }}
                   onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }))}
                 >
                   ✏️ 快速編輯
-                </button>
+                </button>}
                 <AccordionSection title="✏️ AI image prompt（修圖）" defaultOpen={false}>
                   <ImageEditPromptPanel
                     sourceImage={activeResult.image}
@@ -1826,7 +1829,7 @@ export default function StudioWorkbench() {
                       <button className="btn-secondary" onClick={() => downloadImage(img, m)}>PNG下載</button>
                       <button className="btn-secondary" onClick={() => downloadImageWebP(img, m)}>WebP下載</button>
                       {activeResult.seed != null && <span style={{ fontSize: 12, opacity: 0.6 }}>seed {activeResult.seed}</span>}
-                      {saveState === "saved" && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a>}
+                      {saveState === "saved" && !onDoor && <a href="/tools/designs" style={{ fontSize: 12 }}>查看 My Designs →</a>}
                       {saveState === "error" && <span style={{ color: "var(--red)", fontSize: 12 }}>儲存失敗</span>}
                     </>
                   );
@@ -1918,13 +1921,13 @@ export default function StudioWorkbench() {
 
               {/* AI edit panel + quick edit */}
               <div style={{ marginTop: 14 }}>
-                <button
+                {!onDoor && <button
                   className="btn-secondary"
                   style={{ width: "100%", marginBottom: 6 }}
                   onClick={() => openInCanvas(activeResult.image, buildSemanticBase({ ...fileMeta, track: "編輯" }))}
                 >
                   ✏️ 快速編輯
-                </button>
+                </button>}
                 <AccordionSection title="✏️ AI image prompt（修圖）" defaultOpen={false}>
                   <ImageEditPromptPanel
                     sourceImage={activeResult.image}
