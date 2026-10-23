@@ -62,7 +62,7 @@ describe("tarot batch store: rows, not memory", () => {
   it("a retried card callback neither double-counts nor regenerates", async () => {
     const { store, card, start, status } = await routes();
     const jobId = randomUUID();
-    await store.createJob({ jobId, organizationId: ORG_A, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 3 });
+    await store.createJob({ jobId, organizationId: ORG_A, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 3 });
     expect((await start(new Request("http://x", { method: "POST", headers: { authorization: `Bearer ${SECRET}` } }),
       { params: Promise.resolve({ jobId }) })).status).toBe(200);
 
@@ -77,21 +77,23 @@ describe("tarot batch store: rows, not memory", () => {
     expect(job.results).toHaveLength(1);
   });
 
-  it("each card is billed to the organization that owns the job, not the internal account", async () => {
-    const { store, card, start } = await routes();
+  it("each card is asked as the person who started the batch and billed to the job's organization, never as system", async () => {
+    const { store, card, start, status } = await routes();
     const jobId = randomUUID();
-    await store.createJob({ jobId, organizationId: ORG_B, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+    const actor = `client:${ORG_B}:u9`;
+    await store.createJob({ jobId, organizationId: ORG_B, createdBy: null, actor, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
     await start(new Request("http://x", { method: "POST", headers: { authorization: `Bearer ${SECRET}` } }), { params: Promise.resolve({ jobId }) });
     h.grantFor.mockClear();
     await card(...internal(jobId, card0));
-    expect(h.grantFor).toHaveBeenCalledWith("tarot.image", { orgId: ORG_B });
+    expect(h.grantFor).toHaveBeenCalledWith("tarot.image", { actor, orgId: ORG_B });
+    expect((await (await status(...staffGet(jobId))).json()).job).not.toHaveProperty("actor");
   });
 
   it("a job past its deadline reports timed out, not running", async () => {
     const { store, status } = await routes();
     const jobId = randomUUID();
     const longAgo = Date.now() - store.RUN_BUDGET_MS - store.PENDING_BUDGET_MS - 60_000;
-    await store.createJob({ jobId, organizationId: ORG_A, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 78, now: longAgo });
+    await store.createJob({ jobId, organizationId: ORG_A, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 78, now: longAgo });
     await store.markRunning(jobId, longAgo);
 
     const { job } = await (await status(...staffGet(jobId))).json();
@@ -103,7 +105,7 @@ describe("tarot batch store: rows, not memory", () => {
   it("job state survives a fresh store instance (restart)", async () => {
     const before = await routes();
     const jobId = randomUUID();
-    await before.store.createJob({ jobId, organizationId: ORG_A, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 2 });
+    await before.store.createJob({ jobId, organizationId: ORG_A, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 2 });
     await before.card(...internal(jobId, card0));
 
     vi.resetModules();
@@ -121,8 +123,8 @@ describe("tarot batch store: rows, not memory", () => {
     const { store, list } = await routes();
     const mine = randomUUID();
     const theirs = randomUUID();
-    await store.createJob({ jobId: mine, organizationId: ORG_A, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
-    await store.createJob({ jobId: theirs, organizationId: ORG_B, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+    await store.createJob({ jobId: mine, organizationId: ORG_A, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+    await store.createJob({ jobId: theirs, organizationId: ORG_B, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
 
     const res = await list(new Request("http://next-admin/api/tools/tarot/batch", {
       headers: { "x-ops-claims-role": "operator", "x-ops-user-kind": "client", "x-ops-org-id": ORG_A },

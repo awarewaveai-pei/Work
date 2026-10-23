@@ -9,6 +9,7 @@ import { isTarotModel, isAspectRatio } from "../../../../../lib/tarot/image-gen"
 import { isR2Configured } from "../../../../../lib/storage/r2";
 import { effectiveOrgId, OrgAccessError, resolveTenant, toOrgAccessResponse } from "../../../../../lib/tenant-guard";
 import { withFeature } from "@/lib/entitlements/grant";
+import type { Grant } from "@/lib/entitlements/can";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ function storeUnavailable(e: unknown): Response | null {
 // (app/api/internal/tarot/batch/[jobId]/card/route.ts).
 export const POST = withFeature("tarot.image", handlePost);
 
-async function handlePost(req: Request): Promise<Response> {
+async function handlePost(req: Request, grant: Grant): Promise<Response> {
   const { role } = resolveOpsRole(req);
   if (!canCreateAiImageJob(role)) {
     return NextResponse.json({ ok: false, error: "forbidden_role" }, { status: 403 });
@@ -82,7 +83,7 @@ async function handlePost(req: Request): Promise<Response> {
   // dashboard): the worker reads BATCH_INTERNAL_SECRET and AWAREWAVE_WEBHOOK_BASE_URL from its own env.
   // The job exists before the run does: the task's first callback must find it (no create-after-trigger race).
   try {
-    await createJob({ jobId, organizationId, createdBy, model, aspectRatio, totalCards: cards.length });
+    await createJob({ jobId, organizationId, createdBy, actor: grant.actor, model, aspectRatio, totalCards: cards.length });
   } catch (e) {
     const res = storeUnavailable(e);
     if (res) return res;

@@ -74,7 +74,7 @@ describe("tarot batch callbacks: own token, never a role header", () => {
     process.env.BATCH_INTERNAL_SECRET = "batch-secret-for-test";
     fakeDb.client = createFakeBatchDb().client;
     const jobId = "00000000-0000-4000-8000-000000000001";
-    await createJob({ jobId, organizationId: null, createdBy: null, model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
+    await createJob({ jobId, organizationId: null, createdBy: null, actor: "ops:operator:u1", model: "flux-schnell", aspectRatio: "2:3", totalCards: 1 });
     expect((await call(start, jobId, { authorization: "Bearer batch-secret-for-test" })).status).toBe(200);
     expect((await call(start, "unknown", { authorization: "Bearer batch-secret-for-test" })).status).toBe(404);
   });

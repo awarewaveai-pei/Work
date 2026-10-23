@@ -88,7 +88,10 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "quota_exceeded", code: "quota_exceeded" }, { status: 429 });
     }
 
-    const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true }, await grantFor("tarot.image", job.organizationId ? { orgId: job.organizationId } : {}));
+    // Asked as the person who started the batch (0119), not "system": a customer's deck gets the customer's verdict
+    // and the usage row names who used it. Jobs from before 0119 have no actor and keep the old system judgment.
+    const asker = { actor: job.actor ?? "system", ...(job.organizationId ? { orgId: job.organizationId } : {}) };
+    const result = await generateTarotImage({ model, prompt, aspectRatio, seed, printQuality: true }, await grantFor("tarot.image", asker));
     if (!result.ok) {
       const errMsg = (result as { ok: false; error: string }).error;
       outcome = { error: errMsg };

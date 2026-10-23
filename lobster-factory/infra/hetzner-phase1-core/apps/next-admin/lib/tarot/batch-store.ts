@@ -48,6 +48,8 @@ export interface BatchJob {
 export interface StoredBatchJob extends BatchJob {
   organizationId: string | null;
   createdBy: string | null;
+  /** Who started the batch (requestActor); the card callback asks tarot.image as this actor (0119). */
+  actor: string | null;
 }
 
 // Worker budget: tarot-batch-generate.ts maxDuration (10_800 s) + 10 min. Keep the two in step.
@@ -82,6 +84,7 @@ export interface JobRow {
   id: string;
   organization_id: string | null;
   created_by: string | null;
+  actor?: string | null;
   run_id: string | null;
   model: string;
   aspect_ratio: string;
@@ -150,12 +153,13 @@ export function summarizeBatch(job: JobRow, cards: CardRow[], now: number, runSt
     deadlineAt,
     organizationId: job.organization_id,
     createdBy: job.created_by,
+    actor: job.actor ?? null,
   };
 }
 
 /** Public shape (no tenant fields). */
 export function toPublicJob(job: StoredBatchJob): BatchJob {
-  const { organizationId: _o, createdBy: _c, ...pub } = job;
+  const { organizationId: _o, createdBy: _c, actor: _a, ...pub } = job;
   return pub;
 }
 
@@ -163,6 +167,7 @@ export async function createJob(input: {
   jobId: string;
   organizationId: string | null;
   createdBy: string | null;
+  actor: string;
   model: string;
   aspectRatio: string;
   totalCards: number;
@@ -174,6 +179,7 @@ export async function createJob(input: {
     id: input.jobId,
     organization_id: input.organizationId,
     created_by: input.createdBy && UUID_RE.test(input.createdBy) ? input.createdBy : null,
+    actor: input.actor.slice(0, 300),
     model: input.model,
     aspect_ratio: input.aspectRatio,
     total_cards: input.totalCards,

@@ -1,4 +1,22 @@
 # Worklog
+## 2026-10-23（續40）0119 套 prod＋tarot 批次記操作者推 main（NEXT ② 收尾）（Claude）
+
+**觸發**：操作者「Go ahead: apply migration 0119 to prod, then git apply cards/step-8-tarot-actor.patch, run the tests and push to main」。
+
+**做法**
+- `git apply` 前一條（續38）存的 patch；hook 警告另一 session（32dbd2a2）同時在改這 10 檔 → 比對工作樹 diff 與 patch 的 +/- 行：122＝122 完全相同，無他人改動混入（警告來自同時跑 Bash 的啟發式）。
+- `node scripts/apply-db-migration.mjs 0119`（`# CONFIRMED-HIGH-RISK`，操作者同意）→ `APPLY_OK 1/1`。順序先 prod 再推 main：`sg-deploy.sh` migration 閘看到未套的 migration 會擋整個 03:00 部署。
+- patch 檔刪除（已進程式，留著＝第二份）；`cards/step-8.md` 阻擋項 ②、監工台 NEXT ②、TASKS 改為已做。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=node scripts/apply-db-migration.mjs 0119 → APPLY_OK 1/1；唯讀 `begin read only`：actor text nullable、CHECK length 1–300、schema_migrations 有 0119 列、tarot_batch_jobs 2 列 actor 皆 null | exit=0 | ms=18238
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx tsc --noEmit -p .（0）＋ npx vitest run（320 files／2908 passed／23 skipped）；首跑 1 fail＝`app/api/social/__tests__/routes.test.ts` 首測 7.2s 逾 5s（多 session 同機負載），單檔 26/26、重跑全綠，非本次改動 | exit=0 | ms=32748
+- 0119 真 Postgres 驗證與三個突變見續38。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 內容＝續38 已驗 patch 原樣套用（行比對 122＝122）；prod 結果唯讀讀回
+- ORACLE_WAIVED: 程式＝續38 已審 patch 原樣套用；續38 Codex partialreview-17c6d5ee 未涵蓋 tarot 檔，以真 Postgres＋突變為證
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=step-8-tarot-actor.patch | hits=0（card、data.mjs、TASKS 已改；WORKLOG 續38 為歷史）
+
+**rollback**：程式 `git revert <本 commit>` 後套 `0119_tarot_batch_actor.down.sql`（先程式後 schema：createJob 會寫 actor）。
 ## 2026-10-23（續39）AI 模型兩頁併成一頁兩分頁；Chatwoot 進 Customer Service 側欄（Claude）
 
 **觸發**：操作者：(1) `/ops/ai-models` 應是 `/tools/ai-models` 的分頁；(2) chatwoot.aware-wave.com/app 為何不在 Customer Service。(3) 成本頁另開 session `costs-real-spend` 處理（Opus）。
