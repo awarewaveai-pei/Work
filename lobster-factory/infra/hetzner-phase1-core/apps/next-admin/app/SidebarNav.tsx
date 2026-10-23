@@ -15,72 +15,57 @@ export interface NavSection {
   items: NavItem[];
 }
 
+// Grouped by product (names follow lib/portal/products.ts), then the staff-only work around them.
+// Every built page under app/(shell) is linked here or listed in __tests__/sidebar-coverage.test.ts
+// with where it is reached from, so a new page fails that test until it is placed.
+// Section ids build-onboard / repair-control are mirrored by the dashboard (app/(shell)/page.tsx).
 export const DEFAULT_SECTIONS: NavSection[] = [
   {
     id: 'overview',
-    label: 'Overview',
+    label: '總覽',
     items: [
       { type: 'link', href: '/', icon: '◈', label: 'Dashboard' },
     ],
   },
-  // ── Build & Onboard ──────────────────────────────────────────────────────
-  // 建站三步序列（intake → 技術精靈 → 部署）刻意相鄰且照順序，對映 MASTER PLAN §1
-  // 資料流：submit → generate-spec → trigger-build → create-wp-site。
-  // 招新客（生新站）與下方營運/維修（顧舊客）刻意分區。
+  // ── 產品：內容行銷 + 社群發文 ─────────────────────────────────────────────
   {
-    id: 'build-onboard',
-    label: 'Build & Onboard',
+    id: 'content-marketing',
+    label: '內容行銷',
     items: [
-      { type: 'link', href: '/ops/onboarding', icon: '✨', label: 'Onboarding（客戶 Intake）', title: '建站第 1 步：客戶探索式問卷' },
-      { type: 'link', href: '/onboard',        icon: '✦', label: '建站精靈（技術）',          title: '建站第 2 步：技術建站精靈' },
-      { type: 'link', href: '/build',          icon: '⚡', label: 'Build Console',            title: '建站第 3 步：部署執行（plan_only 或 enqueue）' },
+      { type: 'link', href: '/tools/content',          icon: '✍', label: 'SEO 文章',       title: 'SEO/GEO 文章產出' },
+      { type: 'link', href: '/tools/content/calendar', icon: '🗓', label: '內容行事曆',     title: '文章排程與發布日曆' },
+      { type: 'link', href: '/tools/events',           icon: '🌍', label: '全球活動行事曆', title: '運動賽事、國家與文化節慶，找內容題材' },
+      { type: 'link', href: '/tools/social',           icon: '📣', label: '社群發文',       title: '多品牌社群排程（ADR 016）' },
     ],
   },
-  // ── Clients & Ops ────────────────────────────────────────────────────────
-  // 既有客戶的監看 / 串接 / 健康（營運面，非新建站）
+  // ── 產品：影片製作、塔羅製圖 ─────────────────────────────────────────────
   {
-    id: 'clients-ops',
-    label: 'Clients & Ops',
+    id: 'media',
+    label: '影片與塔羅',
     items: [
-      { type: 'link', href: '/ops/clients',      icon: '👥', label: 'Clients',      title: '全客戶健康狀態 + WP 外掛更新' },
-      { type: 'link', href: '/ops/integrations', icon: '⇄', label: 'Integrations', title: '客戶工具串接狀態' },
-      { type: 'link', href: '/ops/schedules',    icon: '⏱', label: '排程',          title: '所有客戶的例行工作：自動爬取、網站巡檢' },
-      { type: 'link', href: '/api-check',        icon: '⬡', label: 'API Health',    title: 'Node API 健康（server-side）' },
+      { type: 'link', href: '/tools/video', icon: '🎬', label: '影片製作', title: '影片生成工具' },
+      { type: 'link', href: '/tools/tarot', icon: '🔮', label: '塔羅製圖', title: '塔羅牌印刷檔生成工具' },
     ],
   },
-  // ── Repair & Control ─────────────────────────────────────────────────────
-  // AI 維修主控台 + 全域控制閘（簽核 / kill-switch）— 與首頁 dashboard「Actions」區一致
+  // ── 產品：商品設計工作室 + 設計編輯器（生成 → 編輯 → 存檔 → 上架） ────────
   {
-    id: 'repair-control',
-    label: 'Repair & Control',
+    id: 'product-design',
+    label: '商品設計',
     items: [
-      { type: 'link', href: '/ops/repairs',      icon: '🛠', label: 'Repair Center', badge: 'ops-inbox', title: 'AI 維修主控台' },
-      { type: 'link', href: '/ops/approvals',    icon: '✓', label: 'Approvals',     title: '高風險指令簽核佇列' },
-      { type: 'link', href: '/ops/system-modes', icon: '◐', label: 'System Modes',  title: '全域 Kill Switch / 維護模式' },
-      { type: 'link', href: '/ops/backup',       icon: '⛁', label: 'Backups',       title: '每個資料庫的備份與 R2 離機狀態' },
-    ],
-  },
-  {
-    id: 'content-tools',
-    label: 'Content Tools',
-    items: [
-      { type: 'link',     href: '/tools/content',      icon: '✍', label: 'SEO Content',   title: 'SEO/GEO 文章產出' },
-      { type: 'link',     href: '/tools/social',       icon: '📣', label: '社群發文',       title: '多品牌社群排程（ADR 016）' },
-      { type: 'link',     href: '/tools/video',         icon: '🎬', label: 'Video',          title: '影片生成工具' },
-      { type: 'link',     href: '/tools/tarot',         icon: '🔮', label: 'Tarot',           title: '塔羅牌印刷檔生成工具' },
-      { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'Studio',          title: 'POD 設計生成器' },
-      { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',          title: 'AI 擬真商品照' },
-      { type: 'link',     href: '/tools/banner',        icon: '🖼', label: 'Banner Studio',   title: 'Social media banner 生成工具' },
-      { type: 'link',     href: '/tools/canvas',        icon: '🎨', label: 'Canvas Editor',   title: 'Fabric.js 快速編輯 Canvas' },
-      { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor',   title: '向量設計工具（14 積木）' },
-      { type: 'link',     href: '/tools/designs',       icon: '🗂', label: 'My Designs',      title: '已儲存設計庫（R2 持久化）' },
-      { type: 'link',     href: '/tools/publish',       icon: '🛒', label: 'Publish',          title: '一鍵上架 Woo + Printful' },
+      { type: 'link',     href: '/tools/studio',        icon: '✏', label: 'Studio',        title: 'POD 設計生成器' },
+      { type: 'link',     href: '/tools/mockup',        icon: '👕', label: 'Mockup',        title: 'AI 擬真商品照' },
+      { type: 'link',     href: '/tools/banner',        icon: '🖼', label: 'Banner Studio', title: 'Social media banner 生成工具' },
+      { type: 'link',     href: '/tools/canvas',        icon: '🎨', label: 'Canvas Editor', title: 'Fabric.js 快速編輯 Canvas' },
+      { type: 'link',     href: '/tools/vector-editor', icon: '✒', label: 'Vector Editor', title: '向量設計工具（14 積木）' },
+      { type: 'link',     href: '/tools/designs',       icon: '🗂', label: 'My Designs',    title: '已儲存設計庫（R2 持久化）' },
+      { type: 'link',     href: '/tools/publish',       icon: '🛒', label: '上架',          title: '一鍵上架 Woo + Printful' },
       { type: 'disabled', icon: '◧', label: 'Templates' },
     ],
   },
+  // ── 產品：行銷開發信 ─────────────────────────────────────────────────────
   {
     id: 'cold-outreach',
-    label: 'Cold Outreach',
+    label: '行銷開發信',
     items: [
       { type: 'link', href: '/outreach',            icon: '📣', label: 'Dashboard',      title: '冷拜訪作戰中心' },
       { type: 'link', href: '/outreach/inbox',      icon: '📥', label: 'Lead Inbox',     title: '名單收件匣（去重 + suppression）' },
@@ -102,7 +87,7 @@ export const DEFAULT_SECTIONS: NavSection[] = [
     // to follow. K0 spent a stage pulling lib/kb out of lib/cs — filing it back under 客服 in the
     // navigation would teach every future reader the shape we just removed.
     id: 'knowledge-data',
-    label: 'Knowledge & Data',
+    label: '資料蒐集與知識庫',
     items: [
       { type: 'link', href: '/ops/collect',   icon: '🛰', label: '資料蒐集', title: '選來源（網頁／Sitemap／RSS／學術／官方 API／影片／全網搜尋）、試跑、正式抓取' },
       { type: 'link', href: '/ops/knowledge', icon: '📚', label: '知識庫',   title: '所有客戶的知識文件總覽（出處標籤、版本、切片數）；編輯在 客戶中心 →「客服」分頁' },
@@ -110,29 +95,75 @@ export const DEFAULT_SECTIONS: NavSection[] = [
   },
   {
     id: 'customer-service',
-    label: 'Customer Service',
+    label: 'AI 客服',
     items: [
-      { type: 'link',     href: '/ops/cs', icon: '💬', label: '客服總覽', title: 'AI 客服營運中心：意圖 / 成效 / kill-switch；知識庫在 Knowledge & Data' },
+      { type: 'link',     href: '/ops/cs',    icon: '💬', label: '客服總覽',         title: 'AI 客服營運中心：意圖 / 成效 / kill-switch；知識庫在「資料蒐集與知識庫」' },
+      { type: 'link',     href: '/cs-widget', icon: '🗨', label: '客服 widget 預覽', title: '客服聊天視窗試玩（假資料，尚未接 Chatwoot）' },
       { type: 'disabled', icon: '🎚', label: '意圖與分級（soon）' },
       { type: 'disabled', icon: '🧪', label: 'Eval / 模擬（soon）' },
     ],
   },
+  // ── 建站：三步序列（intake → 技術精靈 → 部署）刻意相鄰且照順序，對映 MASTER PLAN §1
+  // 資料流：submit → generate-spec → trigger-build → create-wp-site。
+  // 招新客（生新站）與下方「客戶」（顧舊客）刻意分區。
+  {
+    id: 'build-onboard',
+    label: '建站',
+    items: [
+      { type: 'link', href: '/ops/onboarding', icon: '✨', label: 'Onboarding（客戶 Intake）', title: '建站第 1 步：客戶探索式問卷' },
+      { type: 'link', href: '/onboard',        icon: '✦', label: '建站精靈（技術）',          title: '建站第 2 步：技術建站精靈' },
+      { type: 'link', href: '/build',          icon: '⚡', label: 'Build Console',            title: '建站第 3 步：部署執行（plan_only 或 enqueue）' },
+    ],
+  },
+  // ── 客戶：既有客戶的監看 / 串接 / 例行工作（營運面，非新建站）
+  {
+    id: 'clients-ops',
+    label: '客戶',
+    items: [
+      { type: 'link', href: '/ops/clients',         icon: '👥', label: 'Clients',            title: '全客戶健康狀態 + WP 外掛更新' },
+      { type: 'link', href: '/tools/content/sites', icon: '🌐', label: 'WordPress 網站連線', title: '新增、編輯、移除客戶 WP 連線' },
+      { type: 'link', href: '/ops/integrations',    icon: '⇄', label: 'Integrations',       title: '客戶工具串接狀態' },
+      { type: 'link', href: '/ops/schedules',       icon: '⏱', label: '排程',                title: '所有客戶的例行工作：自動爬取、網站巡檢' },
+    ],
+  },
+  // ── 維修與控制：AI 維修主控台 + 事件 + 全域控制閘（簽核 / kill-switch）+ 健康
+  // 與首頁 dashboard「Repair & Control」區一致
+  {
+    id: 'repair-control',
+    label: '維修與控制',
+    items: [
+      { type: 'link', href: '/ops/repairs',      icon: '🛠', label: 'Repair Center', badge: 'ops-inbox', title: 'AI 維修主控台' },
+      { type: 'link', href: '/ops/inbox',        icon: '◇', label: 'Ops Inbox',            title: '事件收斂中心' },
+      { type: 'link', href: '/ops/approvals',    icon: '✓', label: 'Approvals',            title: '高風險指令簽核佇列' },
+      { type: 'link', href: '/ops/system-modes', icon: '◐', label: 'System Modes',         title: '全域 Kill Switch / 維護模式' },
+      { type: 'link', href: '/ops/backup',       icon: '⛁', label: 'Backups',              title: '每個資料庫的備份與 R2 離機狀態' },
+      { type: 'link', href: '/api-check',        icon: '⬡', label: 'API Health',           title: 'Node API 健康（server-side）' },
+      { type: 'link', href: '/api-check-client', icon: '⬡', label: 'API Health (browser)', title: 'Node API 健康（browser-side）' },
+    ],
+  },
+  // ── AI：花費、模型、外部 AI 工具與通知管道
+  {
+    id: 'ai',
+    label: 'AI 模型與花費',
+    items: [
+      { type: 'link', href: '/ops/costs',       icon: '$', label: 'AI Costs',        title: 'LLM 呼叫花費帳本' },
+      { type: 'link', href: '/tools/ai-models', icon: '⚖', label: 'AI 模型比較',     title: '文字／圖片／Coding 模型的價格、速度、用途' },
+      { type: 'link', href: '/ops/ai-models',   icon: '◈', label: 'AI 圖片模型規格', title: '圖片模型規格：能讀多長、參考圖、改寫' },
+      { type: 'link', href: '/ops/tools',       icon: '🧰', label: 'AI 工具與通知',   title: '外部 AI 工具清單 + 事件通知管道' },
+    ],
+  },
   {
     id: 'system',
-    label: 'System',
+    label: '系統設定',
     items: [
-      { type: 'link', href: '/tools/theme',      icon: '🎨', label: 'Theme Editor',        title: '主題色票 + CSS token 即時編輯器' },
-      { type: 'link', href: '/ops-console',      icon: '▣',  label: 'Ops Console',          title: '架構邊界 · Tenant 設定 · M3 · AI Job' },
-      { type: 'link', href: '/ops/inbox',        icon: '◇',  label: 'Ops Inbox',            title: '事件收斂中心' },
-      { type: 'link', href: '/ops/costs',        icon: '$',  label: 'AI Costs',              title: 'LLM 呼叫花費帳本' },
-      { type: 'link', href: '/ops/ai-models',    icon: '◈',  label: 'AI Models',             title: '圖片模型規格：能讀多長、參考圖、改寫' },
-      { type: 'link', href: '/ops/products',     icon: '▤',  label: 'Products',              title: '產品登記表：門、販售狀態、收費功能' },
-      { type: 'link', href: '/api-check-client', icon: '⬡',  label: 'API Health (browser)', title: 'Node API 健康（browser-side）' },
+      { type: 'link', href: '/ops/products', icon: '▤', label: 'Products',     title: '產品登記表：門、販售狀態、收費功能' },
+      { type: 'link', href: '/ops-console',  icon: '▣', label: 'Ops Console',  title: '架構邊界 · Tenant 設定 · M3 · AI Job' },
+      { type: 'link', href: '/tools/theme',  icon: '🎨', label: 'Theme Editor', title: '主題色票 + CSS token 即時編輯器' },
     ],
   },
   {
     id: 'external',
-    label: 'External',
+    label: '外部服務',
     items: [
       { type: 'ext', href: 'https://n8n.aware-wave.com',     icon: '⚙', label: 'n8n' },
       { type: 'ext', href: 'https://uptime.aware-wave.com',  icon: '◉', label: 'Uptime Kuma' },
@@ -143,41 +174,34 @@ export const DEFAULT_SECTIONS: NavSection[] = [
 ];
 
 // Saved shape: { sectionOrder: string[], itemOrders: Record<sectionId, string[]> } — see SavedLayout in lib/theme/tokens.
-
-function applyLayout(sections: NavSection[], layout: SavedLayout): NavSection[] {
-  const map = new Map(sections.map(s => [s.id, s]));
-
-  // Apply section order
-  let ordered: NavSection[];
-  if (layout.sectionOrder) {
-    ordered = layout.sectionOrder.flatMap(id => map.has(id) ? [map.get(id)!] : []);
-    sections.forEach(s => { if (!layout.sectionOrder!.includes(s.id)) ordered.push(s); });
-  } else {
-    ordered = [...sections];
-  }
-
-  // Apply item orders per section
-  if (layout.itemOrders) {
-    return ordered.map(sec => {
-      const itemOrder = layout.itemOrders![sec.id];
-      if (!itemOrder) return sec;
-      const itemMap = new Map(sec.items.map((item, i) => [itemKey(item, i), item]));
-      const reordered = itemOrder.flatMap(k => itemMap.has(k) ? [itemMap.get(k)!] : []);
-      // Append any new items not in saved order
-      sec.items.forEach((item, i) => {
-        if (!itemOrder.includes(itemKey(item, i))) reordered.push(item);
-      });
-      return { ...sec, items: reordered };
-    });
-  }
-
-  return ordered;
+//
+// A saved order applies only to the exact set it was saved against (sections, or one section's
+// items). Once the defaults gain, lose or move an entry the saved order is stale and the default
+// wins — otherwise an old Theme Editor save freezes every later regrouping and new entries pile up
+// at the bottom.
+function sameSet(a: string[], b: string[]): boolean {
+  return a.length === b.length && new Set(a).size === a.length && a.every(x => b.includes(x));
 }
 
-// Stable key for an item (href for links, label for disabled/ext)
-export function itemKey(item: NavItem, fallbackIndex?: number): string {
+export function applyLayout(sections: NavSection[], layout: SavedLayout): NavSection[] {
+  const map = new Map(sections.map(s => [s.id, s]));
+  const ordered = layout.sectionOrder && sameSet(layout.sectionOrder, sections.map(s => s.id))
+    ? layout.sectionOrder.map(id => map.get(id)!)
+    : [...sections];
+
+  return ordered.map(sec => {
+    const itemOrder = layout.itemOrders?.[sec.id];
+    const itemMap = new Map(sec.items.map(item => [itemKey(item), item]));
+    if (!itemOrder || !sameSet(itemOrder, [...itemMap.keys()])) return sec;
+    return { ...sec, items: itemOrder.map(k => itemMap.get(k)!) };
+  });
+}
+
+// Stable key for an item: href, or label for a disabled one. Never its position — the Theme Editor
+// saves keys after a drag and they must match the default list on reload.
+export function itemKey(item: NavItem): string {
   if (item.type === 'link' || item.type === 'ext') return item.href;
-  return `disabled-${item.label}-${fallbackIndex ?? 0}`;
+  return `disabled-${item.label}`;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────

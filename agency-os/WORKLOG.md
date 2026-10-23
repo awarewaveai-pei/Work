@@ -1,4 +1,29 @@
 # Worklog
+## 2026-10-23（續30）app.aware-wave.com 側欄依產品重排＋6 個已做頁面補連結；舊存檔不再凍結排序（Claude）
+
+**觸發**：操作者「sidebar 很亂，按邏輯和產品類別重排，有些已做但沒加連結」。
+
+**根因**
+- C1 側欄分區混合產品與內部工作（Content Tools 塞 11 項、AI 頁散在 System），名稱中英混用。
+- C2 6 個已建頁面沒有側欄入口：`/tools/content/calendar`、`/tools/events`、`/tools/content/sites`、`/tools/ai-models`、`/ops/tools`、`/cs-widget`；沒有任何檢查擋「頁面做好卻沒入口」。
+- C3 prod `app_theme.layout`（Theme Editor 存檔，存色票時也會一併存當下排序）是舊結構快照；舊 `applyLayout` 先套存檔順序、新項目接到最後 → 任何重排都被凍結，新分區會排到「外部服務」之後。
+
+**修改**
+- `app/SidebarNav.tsx`：分區依 `lib/portal/products.ts` 產品名（內容行銷／影片與塔羅／商品設計／行銷開發信／資料蒐集與知識庫／AI 客服），再接內部（建站／客戶／維修與控制／AI 模型與花費／系統設定／外部服務）；補 6 連結；`build-onboard`、`repair-control` id 保留（首頁 dashboard 引用）。
+- `applyLayout` 改為 export 並加不變量：存檔順序只在「id 集合與現在預設完全相同」時套用（分區、各分區項目各自判），否則用預設。
+- `app/(shell)/tools/theme/page.tsx`：刪重複的 `applyLayoutToSections`／本地 `SavedLayout`，改用同一個 `applyLayout`。
+- `itemKey` 去掉位置參數（disabled 項改用名稱；Codex F1）。
+- 新測 `app/__tests__/sidebar-coverage.test.ts`：每個靜態 (shell) 頁必在側欄或列在 `REACHED_ELSEWHERE`（附入口）；側欄連結必存在；不重複；舊 prod 存檔形狀 → 等於預設。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npx vitest run app/__tests__/sidebar-coverage.test.ts（5 passed）＋ npx tsc --noEmit（0） | exit=0 | ms=60000
+- 實測：本機 next dev 已登入，讀 `.sidebar-section` 文字＝新順序；6 新連結 fetch 皆 200。prod `app_theme` 唯讀查詢確認舊存檔 sectionOrder 含已不存在的 `content-tools` → 新規則下回到預設。
+- REVIEW_DONE: critic=Deep | verdict=warn | findings=0c/1m/0n -- Codex `agency-os/reports/oracle/2026-10-23-review-143dbbef.md` F1：disabled 項 key 含位置編號，拖曳後存檔與重載對不上 → 新規則會丟整區排序；改 `itemKey` 只用 href／名稱，加往返測試＋同區 key 唯一測
+- BUGHUNT_DONE: scope=agency-os,scripts,.claude,lobster-factory | grep=applyLayoutToSections|content-tools|Clients & Ops|Knowledge & Data | hits=1（`agency-os/docs/operations/SCHEDULES_PAGE_PLAN.md:116` 歷史計畫表，舊檔不回改）
+
+**剩餘**：今晚 03:00 自動部署後生效；操作者之後在 Theme Editor 拖曳排序仍可存，只在下次側欄結構變動時失效回預設。
+
+**rollback**：`git revert <本 commit>`；無資料改動（prod 存檔未動）。
 ## 2026-10-23（續29）客戶在產品門上取得產品使用權（方案 B）＋兩審查 4 項修正（Claude）
 
 **觸發**：操作者選方案 B。根因：客戶帳號無 `ops_role`（`lib/accounts/client-invite.ts:146`）→ viewer（`middleware.ts:102-108`）→ `canCreateAiImageJob`（95 呼叫點）擋客戶 → 除 social 外所有門對客戶 403。

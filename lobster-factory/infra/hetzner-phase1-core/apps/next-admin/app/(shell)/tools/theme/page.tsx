@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { DEFAULT_SECTIONS, itemKey, type NavSection } from '@/app/SidebarNav';
+import { DEFAULT_SECTIONS, applyLayout, itemKey, type NavSection } from '@/app/SidebarNav';
+import type { SavedLayout } from '@/lib/theme/tokens';
 
 // ── Token definitions ───────────────────────────────────────────────────────
 type TokenDef = { name: string; default: string; type: 'color' | 'text' };
@@ -153,33 +154,6 @@ ALL_GROUPS.forEach(g => g.tokens.forEach(t => { STATIC_DEFAULTS[t.name] = t.defa
 
 type Tab = 'colors' | 'typography' | 'sidebar';
 
-interface SavedLayout {
-  sectionOrder?: string[];
-  itemOrders?: Record<string, string[]>;
-}
-
-function applyLayoutToSections(sections: NavSection[], layout: SavedLayout): NavSection[] {
-  const map = new Map(sections.map(s => [s.id, s]));
-  let ordered: NavSection[];
-  if (layout.sectionOrder) {
-    ordered = layout.sectionOrder.flatMap(id => map.has(id) ? [map.get(id)!] : []);
-    sections.forEach(s => { if (!layout.sectionOrder!.includes(s.id)) ordered.push(s); });
-  } else {
-    ordered = [...sections];
-  }
-  if (layout.itemOrders) {
-    return ordered.map(sec => {
-      const itemOrder = layout.itemOrders![sec.id];
-      if (!itemOrder) return sec;
-      const itemMap = new Map(sec.items.map((item, i) => [itemKey(item, i), item]));
-      const reordered = itemOrder.flatMap(k => itemMap.has(k) ? [itemMap.get(k)!] : []);
-      sec.items.forEach((item, i) => { if (!itemOrder.includes(itemKey(item, i))) reordered.push(item); });
-      return { ...sec, items: reordered };
-    });
-  }
-  return ordered;
-}
-
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function ThemePage() {
   const router = useRouter();
@@ -211,7 +185,7 @@ export default function ThemePage() {
             document.documentElement.style.setProperty(k, v));
         }
         if (data?.layout) {
-          setSections(applyLayoutToSections(DEFAULT_SECTIONS, data.layout));
+          setSections(applyLayout(DEFAULT_SECTIONS, data.layout));
         }
       })
       .catch(() => { /* fail-open: editor shows static defaults */ });
@@ -235,7 +209,7 @@ export default function ThemePage() {
     const layout: SavedLayout = {
       sectionOrder: sections.map(s => s.id),
       itemOrders: Object.fromEntries(
-        sections.map(sec => [sec.id, sec.items.map((item, i) => itemKey(item, i))]),
+        sections.map(sec => [sec.id, sec.items.map(itemKey)]),
       ),
     };
 
@@ -308,7 +282,7 @@ export default function ThemePage() {
   const itemOrderChanged = sections.some(sec => {
     const def = DEFAULT_SECTIONS.find(d => d.id === sec.id);
     if (!def) return false;
-    return sec.items.map((it, i) => itemKey(it, i)).join() !== def.items.map((it, i) => itemKey(it, i)).join();
+    return sec.items.map(itemKey).join() !== def.items.map(itemKey).join();
   });
   const orderChanged = sectionOrderChanged || itemOrderChanged;
 
@@ -481,7 +455,7 @@ export default function ThemePage() {
               const isExpanded = expandedSec === sec.id;
               const def = DEFAULT_SECTIONS.find(d => d.id === sec.id);
               const secItemsChanged = def
-                ? sec.items.map((it, i) => itemKey(it, i)).join() !== def.items.map((it, i) => itemKey(it, i)).join()
+                ? sec.items.map(itemKey).join() !== def.items.map(itemKey).join()
                 : false;
 
               return (
@@ -522,7 +496,7 @@ export default function ThemePage() {
                     }}>
                       {sec.items.map((item, ii) => (
                         <div
-                          key={itemKey(item, ii)}
+                          key={itemKey(item)}
                           draggable
                           onDragStart={() => setItemDragIdx(ii)}
                           onDragOver={e => { e.preventDefault(); if (itemDragIdx !== null && itemDragIdx !== ii) { moveItem(sec.id, itemDragIdx, ii); setItemDragIdx(ii); } }}
