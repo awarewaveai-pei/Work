@@ -39,7 +39,7 @@ const APP_DIR = path.join(__dirname, "../../../app");
 // First path segments other routes already use. A door's own top-level directory (app/<page>) is not a clash; a
 // directory inside a route group such as app/(shell)/<page> always is (both would answer /<page>).
 function staffSegments(ownPages: string[]): string[] {
-  const dirs = (d: string) => readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+  const dirs = (d: string) => readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith("_")).map((e) => e.name);
   const top = dirs(APP_DIR);
   return [...top.filter((n) => !n.startsWith("(") && !ownPages.includes(`/${n}`)),
     ...top.filter((n) => n.startsWith("(")).flatMap((g) => dirs(path.join(APP_DIR, g)))];
@@ -115,7 +115,9 @@ describe("product registry", () => {
   });
 
   it("every directory under app/(shell)/{tools,ops} and app/(shell)/* maps to a product or a listed back-office or staff utility", () => {
-    const dirs = (d: string) => readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+    // A `_` folder is private in the App Router (never a route): app/__tests__ failed this as a page with no product
+    // and blocked sg-deploy's test gate (2026-10-23).
+    const dirs = (d: string) => readdirSync(d, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith("_")).map((e) => e.name);
     const shell = path.join(APP_DIR, "(shell)");
     const actual = [...dirs(shell).filter((n) => !["tools", "ops"].includes(n)),
       ...["tools", "ops"].flatMap((group) => dirs(path.join(shell, group)).map((n) => `${group}/${n}`))];

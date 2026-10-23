@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-23（續35）next-admin 部署被測試閘擋下：app/__tests__ 被當成頁面；登記測試跳過 `_` 私有資料夾（Claude）
+
+**觸發**：操作者下令部署 7f7f0e3b2（續33 塔羅）。`sg-deploy.sh next-admin` 在 npm test 閘中止，正式機仍為 d19ed55e4，未動。
+
+**根因**：`e2fdbb23d`（他 session，側欄）新增 `app/__tests__/sidebar-coverage.test.ts`；`lib/portal/__tests__/products.test.ts:133` 把 `app/` 下每個非 `(` 開頭資料夾都當頁面，要求有產品登記 → `__tests__` 紅，所有 next-admin 部署（含今晚 03:00 自動部署）都會被擋。
+
+**修改**：`lib/portal/__tests__/products.test.ts` 兩個 `dirs()`（:42 staffSegments、:120 登記檢查）都跳過 `_` 開頭資料夾（Next.js App Router 的私有資料夾，永不成為路由）。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=Bash | cmd=npm test（next-admin 全套：318 files passed／2892 tests passed／0 failed） | exit=0 | ms=120000
+- 突變：建 `app/_mutant` → products.test 10/10 綠；建 `app/zzmutant`（無登記的一般資料夾）→ 1 紅，守衛仍有效；兩者皆已刪除。
+- REVIEW_DONE: critic=Quick | verdict=pass | findings=0c/0m/0n -- 單行測試篩選；讀回 products.test.ts dirs() 與三個使用處
+- BUGHUNT_DONE: scope=lobster-factory | grep=readdirSync\(.*isDirectory | hits=2（同檔 :42、:120 兩個 dirs()，皆已改；其他檔無此掃描）
+- BUGHUNT_SCOPE_NARROW: 只動一個測試檔的資料夾篩選，agency-os／scripts 無此掃描
+
+**rollback**：`git revert <本 commit>`。
 ## 2026-10-23（續34）側欄：產內容的工具收回同一個 Content Tools 區（續32 後操作者回饋）（Claude）
 
 **觸發**：操作者：Banner／Studio／Mockup／Tarot／Articles／Video 都是 content tools，不該拆到 Marketing、Design Studio、Video & Tarot 三區。
