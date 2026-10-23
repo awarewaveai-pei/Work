@@ -1,4 +1,20 @@
 # Worklog
+## 2026-10-23（續53）next-admin 部署到 main 最新 edffb48fc：payments 4a 程式上線（操作者「所有待部署的都部署，包括其他 sessions」）（Claude）
+
+**觸發**：續52 部署後，他 session 才推 `f2139d35a`（payments 4a 程式）；prod 已有 0120 migration 與 `PAYMENTS_*` env，但跑舊程式。操作者要求全部部署。
+
+**盤點**：`git diff --name-only f6d28855c origin/main` 只有 `apps/next-admin`（11 檔）＋ compose／.env.example／tests/e2e；compose 與 env 已由 `32cd7ee41` 經 safe-infra-patch 上 prod（`printenv PAYMENTS_PROVIDERS`=local、`PAYMENTS_LOCAL_SECRET` 存在）→ 只需部署 next-admin。無 DEPLOY_HOLD。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（rollback snapshot lobster-phase1-next-admin:rollback-20261023-140410；healthy after 16s；5 個 smoke 端點 200；deployed commit edffb48fc） | exit=0 | ms=330000
+- 部署後：`lobster-next-admin` Up (healthy)；build 內有 `(shell)/ops/billing` 與 `api/webhooks/payments`；容器內 fetch：`/ops/billing` 未登入 404（與 `/ops/costs` 相同的員工頁隱藏行為）、`POST /api/webhooks/payments/local` 無簽章 → 400（路由存在且拒絕）。
+- Playwright smoke：26 passed／0 failed／6 skipped。
+- REVIEW_WAIVED: NA -- 部署動作無程式改動；f2139d35a 審查見續51
+- BUGHUNT_WAIVED: NA -- 部署動作無程式改動
+
+**未部署（未 commit，無法部署）**：`app/(shell)/tools/tarot/cards.ts`（他 session c0fd663f 進行中，18+/18-）；`lib/studio/wp-bridge-client.ts`（untracked，2026-10-22 08:18 起，無主 session 認領）。
+
+**rollback**：主機 `sg-deploy.sh` 回到 f6d28855c 或用 snapshot `lobster-phase1-next-admin:rollback-20261023-140410`（`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1）；關閉收款見續51 rollback。
 ## 2026-10-23（續52）next-admin 提前部署 f6d28855c（操作者「現在部署」：Chatwoot 側欄、AI Models 分頁、成本頁）（Claude）
 
 **觸發**：操作者看不到 Customer Service 的 Chatwoot（e2c6489c6 已在 main，prod 還在 d433dfe29）→「現在部署」。
