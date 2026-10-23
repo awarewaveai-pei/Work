@@ -1,4 +1,21 @@
 # Worklog
+## 2026-10-23（續50）next-admin 部署 fb2972943：tarot、studio 產品門開門＋公網煙霧測試（Claude）
+
+**觸發**：續49 同一個操作者 go（「take the tarot door live … then studio, with smoke tests」）。手動提前部署（未等 03:00）；同時帶上 main 上其他 session 已推的 commit（d433dfe29..fb2972943 共 15 個，含 4fc6bacf4 用量歸屬、eb3d75787 0119、050e7fe76 用量計量），它們今晚 03:00 本來就會上線。
+
+**部署前**：origin/main 無 `DEPLOY_HOLD`；migration 帳本與 repo 對齊到 0119（`apply-db-migration.mjs --status` STATUS_OK）；`check-deploy-drift.ps1` 落後 15（本次解）、compose 只在 repo 的 `META_*` 8 個為既有落差、非本次範圍。
+
+**驗證結果**
+- REALTEST_EVIDENCE: tool=SSH | cmd=sudo /root/lobster-phase1/scripts/sg-deploy.sh next-admin（主機 npm test 323 files／2933 passed → build → healthy 10s → HTTP smoke 5/5；`.deployed-commit` d433dfe29 → fb2972943；rollback 快照 `lobster-phase1-next-admin:rollback-20261023-133526`） | exit=0 | ms=416772
+- REALTEST_EVIDENCE: tool=curl | cmd=公網（`--path-as-is`）tarot／studio 各：`/`→307 `/login?next=%2F`；`/<門頁>`→307 login；`/login?next=%2F`→200；`/api/ops/summary`、`/api/social/brands`、`/portal/launcher`、`/api/internal/x`、`/intake`、`/vector-editor.html`→404；`/a%2Fb`、`/x/../<門頁>`、`/x/.`→400；`/edge-masks/mask-01.png`、`/tarot-frames/classic-rw.png`→200；門的付費 API（`/api/tools/tarot/translate`、`/api/tools/studio/culture`）→401；tarot 上 `/studio`、studio 上 `/tarot`→404 | exit=0 | ms=30000
+- REALTEST_EVIDENCE: tool=curl | cmd=回歸：app `/tarot`、`/studio`→404、`/tools/tarot`、`/tools/studio`→307 login；social `/`→307、`/api/internal/x`→404；portal `/launcher`→307；aware-wave.com→200 | exit=0 | ms=10000
+- REALTEST_EVIDENCE: tool=Bash | cmd=scripts/playwright-runner.ps1 -Mode smoke -SkipInstall → 26 passed／0 failed／6 skipped，證據 `agency-os/reports/e2e/2026-10-23/smoke` | exit=0 | ms=49969
+- REVIEW_WAIVED: NA -- 部署動作；程式審查見續49（Codex partialreview-75fd6bd3）
+- BUGHUNT_WAIVED: NA -- 本條無程式改動（監工台、step-8 卡改狀態）
+
+**未驗**：登入後的門畫面（員工或客戶帳號在 tarot／studio 網址看到工作台、無側欄、studio 不顯示 My Designs 與快速編輯）需有人登入瀏覽器看；本機無帳號密碼，不代輸。
+
+**rollback**：`DEPLOY_ROLLBACK_RUNBOOK.md` §2.1（前一版 d433dfe29，或快照 `rollback-20261023-133526`）；nginx／DNS 回退見續49。
 ## 2026-10-23（續49）tarot、studio 產品門上線：DNS、憑證 13 SAN、主機 nginx、lobster-nginx 共用門區塊、enabled（Claude）
 
 **觸發**：操作者「Go ahead: after the attribution session finishes, take the tarot door live (DNS, certificate, host nginx, lobster-nginx, enabled), then studio, with smoke tests」。歸屬 session 已推 `4fc6bacf4`（讀過 `grant.ts` diff：客戶組織只經 `actorFor`；Codex R2 無發現）。
